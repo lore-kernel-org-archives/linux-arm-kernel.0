@@ -1,42 +1,94 @@
-From: jonsmirl@gmail.com (jonsmirl at gmail.com)
-Date: Mon, 18 Aug 2014 15:53:08 -0400
-Subject: [PATCH] This adds a generic PWM framework driver for the PWM
- controller
-In-Reply-To: <20140818192318.GJ15297@lukather>
-References: <20140818180316.31807.3445.stgit@studio>
- <20140818192318.GJ15297@lukather>
-Message-ID: <CAKON4OwzFDDXqCF4VNkUXXJLp3smrB6Axp_x=D47sjbpoNbe+g@mail.gmail.com>
+From: mugunthanvnm@ti.com (Mugunthan V N)
+Date: Tue, 19 Aug 2014 01:28:09 +0530
+Subject: [PATCH v3 5/7] net: cpsw: Add am33xx MACID readout
+In-Reply-To: <20140818154112.6601cbff@gandalf.local.home>
+References: <1408202315-20006-1-git-send-email-mpa@pengutronix.de>	<1408202315-20006-6-git-send-email-mpa@pengutronix.de>	<53F244DA.3070803@ti.com>
+ <20140818154112.6601cbff@gandalf.local.home>
+Message-ID: <53F25AD1.8040504@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 18, 2014 at 3:23 PM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> Hi,
+On Tuesday 19 August 2014 01:11 AM, Steven Rostedt wrote:
+> On Mon, 18 Aug 2014 23:54:26 +0530
+> Mugunthan V N <mugunthanvnm@ti.com> wrote:
 >
-> On Mon, Aug 18, 2014 at 02:03:16PM -0400, Jon Smirl wrote:
->> found on Allwinner SoCs.x
+>> On Saturday 16 August 2014 08:48 PM, Markus Pargmann wrote:
+>>> +	mac_addr[5] = (macid_lo >> 8) & 0xff;
+>>> +	mac_addr[4] = macid_lo & 0xff;
+>>> +	mac_addr[3] = (macid_hi >> 24) & 0xff;
+>>> +	mac_addr[2] = (macid_hi >> 16) & 0xff;
+>>> +	mac_addr[1] = (macid_hi >> 8) & 0xff;
+>>> +	mac_addr[0] = macid_hi & 0xff;
+>>> +
+>> This will fail incase of DRA74x and DRA72x platforms, please check for
+>> u-boot src for parsing logic as TRM is not out yet. Below is the actual
+>> code for DRA7 platforms for MAC address parsing
 >>
->> Signed-off-by: Jon Smirl <jonsmirl@gmail.com>
+>> mac_addr[0] = (mac_hi & 0xFF0000) >> 16;
+>> mac_addr[1] = (mac_hi & 0xFF00) >> 8;
+>> mac_addr[2] = mac_hi & 0xFF;
+>> mac_addr[3] = (mac_lo & 0xFF0000) >> 16;
+>> mac_addr[4] = (mac_lo & 0xFF00) >> 8;
+>> mac_addr[5] = mac_lo & 0xFF;
+>>
+> But this fails with my beaglebone white.
 >
-> Is there any notable difference with Alexandre's driver?
-> https://lkml.org/lkml/2014/5/19/568
+> I tested Markus's patches and it came up with the same ethaddr that
+> U-Boot had.
 >
-> If so, why didn't you posted incremental patches on top of his driver?
-
-Better A10 support. And I wrote this one without know about his.
-
-
+> From U-Boot:
 >
-> Thanks,
-> Maxime
+> ethaddr=d4:94:a1:8b:ec:78
 >
-> --
-> Maxime Ripard, Free Electrons
-> Embedded Linux, Kernel and Android engineering
-> http://free-electrons.com
+> With Markus's changes:
+>
+>  eth0      Link encap:Ethernet  HWaddr D4:94:A1:8B:EC:78
+>
+> But when I changed the code to match what you wrote, I got this:
+>
+>  eth0      Link encap:Ethernet  HWaddr CE:5A:8B:0E:44:45
+>
+> but it also gave me:
+>
+> cpsw 4a100000.ethernet: Random MACID = ce:5a:8b:0e:44:45
+>
+> which means it failed the valid mac test.
+>
+> Here's how I implemented your change:
+>
+> #if 1
+>         mac_addr[0] = (macid_hi & 0xFF0000) >> 16;
+>         mac_addr[1] = (macid_hi & 0xFF00) >> 8;
+>         mac_addr[2] = macid_hi & 0xFF;
+>         mac_addr[3] = (macid_lo & 0xFF0000) >> 16;
+>         mac_addr[4] = (macid_lo & 0xFF00) >> 8;
+>         mac_addr[5] = macid_lo & 0xFF;
+>
+> #else   
+>         mac_addr[5] = (macid_lo >> 8) & 0xff;
+>         mac_addr[4] = macid_lo & 0xff;
+>         mac_addr[3] = (macid_hi >> 24) & 0xff;
+>         mac_addr[2] = (macid_hi >> 16) & 0xff;
+>         mac_addr[1] = (macid_hi >> 8) & 0xff;
+>         mac_addr[0] = macid_hi & 0xff;
+> #endif  
+>
+> Just to be consistent, I updated the code as this too:
+>
+>         mac_addr[0] = (macid_hi >> 16) & 0xFF;
+>         mac_addr[1] = (macid_hi >> 8) & 0xFF;
+>         mac_addr[2] = macid_hi & 0xFF;
+>         mac_addr[3] = (macid_lo >> 16) & 0xFF;
+>         mac_addr[4] = (macid_lo >> 8) & 0xFF;
+>         mac_addr[5] = macid_lo & 0xFF;
+>
+> With the same affect.
+>
+> Thus, for this patchset, as is:
+>
+> Tested-by: Steven Rostedt <rostedt@goodmis.org>
 
+This will fail for DRA7xx not in AM33xx
 
-
--- 
-Jon Smirl
-jonsmirl at gmail.com
+Regards
+Mugunthan V N
