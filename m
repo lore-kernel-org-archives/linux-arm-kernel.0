@@ -1,55 +1,100 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Mon, 18 Aug 2014 14:06:07 +0800
-Subject: [PATCH V3 3/3] ARM: clk-imx6q: Add missing lvds and anaclk clock
- to the clock tree
-In-Reply-To: <20140811030935.GB13158@audiosh1>
-References: <cover.1407481023.git.shengjiu.wang@freescale.com>
- <9ecf6480464cffb3b4347ad3fd8ec5f07462a0fc.1407481023.git.shengjiu.wang@freescale.com>
- <20140809135841.GB8849@dragon> <20140811030935.GB13158@audiosh1>
-Message-ID: <20140818060521.GA2114@dragon>
+From: vinceh@nvidia.com (Vince Hsu)
+Date: Mon, 18 Aug 2014 14:08:08 +0800
+Subject: [PATCH v2 05/16] clk: tegra: Add closed loop support for the DFLL
+In-Reply-To: <1405957142-19416-6-git-send-email-ttynkkynen@nvidia.com>
+References: <1405957142-19416-1-git-send-email-ttynkkynen@nvidia.com>
+ <1405957142-19416-6-git-send-email-ttynkkynen@nvidia.com>
+Message-ID: <53F19848.7020303@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 11, 2014 at 11:09:36AM +0800, Shengjiu Wang wrote:
-> On Sat, Aug 09, 2014 at 09:58:42PM +0800, Shawn Guo wrote:
-> > On Fri, Aug 08, 2014 at 03:02:49PM +0800, Shengjiu Wang wrote:
-> > > @@ -176,8 +182,12 @@ static void __init imx6q_clocks_init(struct device_node *ccm_node)
-> > >  	 * the "output_enable" bit as a gate, even though it's really just
-> > >  	 * enabling clock output.
-> > >  	 */
-> > > -	clk[IMX6QDL_CLK_LVDS1_GATE] = imx_clk_gate("lvds1_gate", "lvds1_sel", base + 0x160, 10);
-> > > -	clk[IMX6QDL_CLK_LVDS2_GATE] = imx_clk_gate("lvds2_gate", "lvds2_sel", base + 0x160, 11);
-> > > +	clk[IMX6QDL_CLK_LVDS1_GATE] = imx_clk_gate2("lvds1_gate", "lvds1_sel", base + 0x160, 10);
-> > > +	clk[IMX6QDL_CLK_LVDS2_GATE] = imx_clk_gate2("lvds2_gate", "lvds2_sel", base + 0x160, 11);
-> > 
-> > I do not think you can simply change to use imx_clk_gate2() here.  It's
-> > designed for those CCGR gate clocks, each of which is controlled by two
-> > bits.
-> > 
-> > Shawn
-> >
-> As Lucas Stach's suggestion, we need to do add some method for mutually exclusive clock, 
-> lvds1_gate with lvds1_in, lvds2_gate with lvds2_in. I add imx_clk_gate2_exclusive() function in clk-gate2.c.
-> So I change imx_clk_gate() to imx_clk_gate2() here.
-> As you said, this is not good solution.
+Hi,
 
-It's not just a "not good" solution but wrong and broken one.  The net
-result of that is if you call clk_enable() on lvds1_gate, both bit 10
-and 11 will be set.
+On 07/21/2014 11:38 PM, Tuomas Tynkkynen wrote:
+> With closed loop support, the clock rate of the DFLL can be adjusted.
+>
+> The oscillator itself in the DFLL is a free-running oscillator whose
+> rate is directly determined the supply voltage. However, the DFLL
+> module contains logic to compare the DFLL output rate to a fixed
+> reference clock (51 MHz) and make a decision to either lower or raise
+> the DFLL supply voltage. The DFLL module can then autonomously change
+> the supply voltage by communicating with an off-chip PMIC via either I2C
+> or PWM signals. This driver currently supports only I2C.
+>
+> Signed-off-by: Tuomas Tynkkynen <ttynkkynen@nvidia.com>
+> ---
+> v2 changes:
+>      - query the various properties required for I2C mode from the
+>        regulator framework
+>
+>   drivers/clk/tegra/clk-dfll.c | 656 ++++++++++++++++++++++++++++++++++++++++++-
+>   1 file changed, 653 insertions(+), 3 deletions(-)
+>
+> diff --git a/drivers/clk/tegra/clk-dfll.c b/drivers/clk/tegra/clk-dfll.c
+> index d83e859..0d4b2dd 100644
+> --- a/drivers/clk/tegra/clk-dfll.c
+> +++ b/drivers/clk/tegra/clk-dfll.c
+> @@ -205,12 +205,16 @@
+...
+> +
+> +/**
+> + * dfll_calculate_rate_request - calculate DFLL parameters for a given rate
+> + * @td: DFLL instance
+> + * @req: DFLL-rate-request structure
+> + * @rate: the desired DFLL rate
+> + *
+> + * Populate the DFLL-rate-request record @req fields with the scale_bits
+> + * and mult_bits fields, based on the target input rate. Returns 0 upon
+> + * success, or -EINVAL if the requested rate in req->rate is too high
+> + * or low for the DFLL to generate.
+> + */
+> +static int dfll_calculate_rate_request(struct tegra_dfll *td,
+> +				       struct dfll_rate_req *req,
+> +				       unsigned long rate)
+> +{
+> +	u32 val;
+> +
+> +	/*
+> +	 * If requested rate is below the minimum DVCO rate, active the scaler.
+> +	 * In the future the DVCO minimum voltage should be selected based on
+> +	 * chip temperature and the actual minimum rate should be calibrated
+> +	 * at runtime.
+> +	 */
+> +	req->scale_bits = DFLL_FREQ_REQ_SCALE_MAX - 1;
+> +	if (rate < td->dvco_rate_min) {
+> +		int scale;
+> +
+> +		scale = DIV_ROUND_CLOSEST(rate / 1000 * DFLL_FREQ_REQ_SCALE_MAX,
+> +					  td->dvco_rate_min / 1000);
+> +		if (!scale) {
+> +			dev_err(td->dev, "%s: Rate %lu is too low\n",
+> +				__func__, rate);
+> +			return -EINVAL;
+> +		}
+> +		req->scale_bits = scale - 1;
+> +		rate = td->dvco_rate_min;
+> +	}
+> +
+> +	/* Convert requested rate into frequency request and scale settings */
+> +	val = DVCO_RATE_TO_MULT(rate, td->ref_rate);
+> +	if (val > FREQ_MAX) {
+> +		dev_err(td->dev, "%s: Rate %lu is above dfll range\n",
+> +			__func__, rate);
+> +		return -EINVAL;
+> +	}
+> +	req->mult_bits = val;
+> +	req->dvco_target_rate = MULT_TO_DVCO_RATE(req->mult_bits, td->ref_rate);
+> +	req->rate = dfll_scale_dvco_rate(req->dvco_target_rate,
+> +					 req->scale_bits);
+Should be dfll_scale_dvco_rate(req->scale_bits, req->dvco_target_rate);
 
-> So I need your suggestion, how can I do?
+Thanks,
+Vince
 
-I guess we will need a new clock type to handle such mutually exclusive
-clocks, rather than patching clk-gate2.
-
-> First, is it allowable that to add imx_clk_gate2_exclusive() function, is there a more better way?
-
-Again, this is completely wrong.
-
-> second, or should I change the clk-gate.c to add exclusive control?
-
-If such mutually exclusive clocks are somehow common across different
-clock controllers, we can propose to change clk-gate.c for handling
-them.  But I'm not sure this is a common case.
-
-Shawn
+> +	req->lut_index = find_lut_index_for_rate(td, req->dvco_target_rate);
+> +	if (req->lut_index < 0)
+> +		return req->lut_index;
+> +
+> +	return 0;
+> +}
+> +
