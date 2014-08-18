@@ -1,103 +1,70 @@
 From: dianders@chromium.org (Doug Anderson)
-Date: Mon, 18 Aug 2014 10:09:09 -0700
-Subject: [PATCH 4/4] ARM: dts: Enable pwm backlight on rk3288-EVB
+Date: Mon, 18 Aug 2014 10:09:06 -0700
+Subject: [PATCH 1/4] ARM: rockchip: rk3288: Switch to use the proper PWM IP
 In-Reply-To: <1408381749-14156-1-git-send-email-dianders@chromium.org>
 References: <1408381749-14156-1-git-send-email-dianders@chromium.org>
-Message-ID: <1408381749-14156-5-git-send-email-dianders@chromium.org>
+Message-ID: <1408381749-14156-2-git-send-email-dianders@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The pwm0 is the PWM associated with the LCD backlight.  Enable it.
+The rk3288 SoC has an option to switch all of the PWMs in the system
+between the old IP block and the new IP block.  The new IP block is
+working and tested and the suggested PWM to use, so setup the SoC to
+use it and then we can pretend that the other IP block doesn't exist.
+
+This code could go lots of other places, but we've put it here.  Why?
+- Pushing it to the bootloader just makes the code harder to update in
+  the field.  If we later find a bug in the new IP block and want to
+  change our mind about what to use we want it to be easy to update.
+- Putting this code in the driver for IP block is a lot of extra work,
+  device tree bindings, etc.  Now that the new IP block is validated
+  it's likely no future SoCs will need this code.  Why pollute the PWM
+  driver with this?  This is an rk3288 thing so it should be in rk3288
+  code.
+- There's a single bit that switches over PWMs, which makes it extra
+  hard to put this under the PWM device tree nodes.
 
 Signed-off-by: Doug Anderson <dianders@chromium.org>
 ---
- arch/arm/boot/dts/rk3288-evb.dtsi | 53 +++++++++++++++++++++++++++++++++++++++
- 1 file changed, 53 insertions(+)
+ arch/arm/mach-rockchip/rockchip.c | 19 +++++++++++++++++++
+ 1 file changed, 19 insertions(+)
 
-diff --git a/arch/arm/boot/dts/rk3288-evb.dtsi b/arch/arm/boot/dts/rk3288-evb.dtsi
-index 2964370..242e1a9 100644
---- a/arch/arm/boot/dts/rk3288-evb.dtsi
-+++ b/arch/arm/boot/dts/rk3288-evb.dtsi
-@@ -10,6 +10,7 @@
-  * GNU General Public License for more details.
-  */
+diff --git a/arch/arm/mach-rockchip/rockchip.c b/arch/arm/mach-rockchip/rockchip.c
+index 8ab9e0e..99133b9 100644
+--- a/arch/arm/mach-rockchip/rockchip.c
++++ b/arch/arm/mach-rockchip/rockchip.c
+@@ -24,6 +24,24 @@
+ #include <asm/hardware/cache-l2x0.h>
+ #include "core.h"
  
-+#include <dt-bindings/pwm/pwm.h>
- #include "rk3288.dtsi"
- 
- / {
-@@ -17,6 +18,48 @@
- 		reg = <0x0 0x80000000>;
- 	};
- 
-+        backlight {
-+		compatible = "pwm-backlight";
-+		brightness-levels = <
-+			  0   1   2   3   4   5   6   7
-+			  8   9  10  11  12  13  14  15
-+			 16  17  18  19  20  21  22  23
-+			 24  25  26  27  28  29  30  31
-+			 32  33  34  35  36  37  38  39
-+			 40  41  42  43  44  45  46  47
-+			 48  49  50  51  52  53  54  55
-+			 56  57  58  59  60  61  62  63
-+			 64  65  66  67  68  69  70  71
-+			 72  73  74  75  76  77  78  79
-+			 80  81  82  83  84  85  86  87
-+			 88  89  90  91  92  93  94  95
-+			 96  97  98  99 100 101 102 103
-+			104 105 106 107 108 109 110 111
-+			112 113 114 115 116 117 118 119
-+			120 121 122 123 124 125 126 127
-+			128 129 130 131 132 133 134 135
-+			136 137 138 139 140 141 142 143
-+			144 145 146 147 148 149 150 151
-+			152 153 154 155 156 157 158 159
-+			160 161 162 163 164 165 166 167
-+			168 169 170 171 172 173 174 175
-+			176 177 178 179 180 181 182 183
-+			184 185 186 187 188 189 190 191
-+			192 193 194 195 196 197 198 199
-+			200 201 202 203 204 205 206 207
-+			208 209 210 211 212 213 214 215
-+			216 217 218 219 220 221 222 223
-+			224 225 226 227 228 229 230 231
-+			232 233 234 235 236 237 238 239
-+			240 241 242 243 244 245 246 247
-+			248 249 250 251 252 253 254 255>;
-+		default-brightness-level = <128>;
-+		enable-gpios = <&gpio7 2 GPIO_ACTIVE_HIGH>;
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&bl_en>;
-+		pwms = <&pwm0 0 1000000 PWM_POLARITY_INVERTED>;
-+        };
++static void __init rk3288_init_machine(void)
++{
++	void *grf = ioremap(0xff770000, 0x10000);
 +
- 	gpio-keys {
- 		compatible = "gpio-keys";
- 		#address-cells = <1>;
-@@ -81,6 +124,10 @@
- 	status = "okay";
++	/* Set pwm_sel to RK design PWM in GRF_SOC_CON2; affects all PWMs */
++	writel(0x00010001, grf + 0x24c);
++
++	iounmap(grf);
++}
++
++static void __init rockchip_init_machine(void)
++{
++	if (of_machine_is_compatible("rockchip,rk3288"))
++		rk3288_init_machine();
++
++	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
++}
++
+ static const char * const rockchip_board_dt_compat[] = {
+ 	"rockchip,rk2928",
+ 	"rockchip,rk3066a",
+@@ -34,6 +52,7 @@ static const char * const rockchip_board_dt_compat[] = {
  };
  
-+&pwm0 {
-+	status = "okay";
-+};
-+
- &uart0 {
- 	status = "okay";
- };
-@@ -102,6 +149,12 @@
- };
- 
- &pinctrl {
-+	backlight {
-+		bl_en: bl-en {
-+			rockchip,pins = <7 2 RK_FUNC_GPIO &pcfg_pull_none>;
-+		};
-+	};
-+
- 	buttons {
- 		pwrbtn: pwrbtn {
- 			rockchip,pins = <0 5 RK_FUNC_GPIO &pcfg_pull_up>;
+ DT_MACHINE_START(ROCKCHIP_DT, "Rockchip Cortex-A9 (Device Tree)")
++	.init_machine	= rockchip_init_machine,
+ 	.l2c_aux_val	= 0,
+ 	.l2c_aux_mask	= ~0,
+ 	.dt_compat	= rockchip_board_dt_compat,
 -- 
 2.1.0.rc2.206.gedb03e5
