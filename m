@@ -1,63 +1,50 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Sun, 17 Aug 2014 21:25:12 -0400
-Subject: [PATCH v4] irqchip: gic: Allow gic_arch_extn hooks to call
- into scheduler
-In-Reply-To: <alpine.LFD.2.11.1408172000460.29347@knanqh.ubzr>
-References: <1407938238-21413-1-git-send-email-sboyd@codeaurora.org>
- <20140817173236.GG12769@titan.lakedaemon.net>
- <20140817185522.GX30401@n2100.arm.linux.org.uk>
- <20140817190434.GJ12769@titan.lakedaemon.net>
- <alpine.LFD.2.11.1408172000460.29347@knanqh.ubzr>
-Message-ID: <20140818012512.GL12769@titan.lakedaemon.net>
+From: dyoung@redhat.com (Dave Young)
+Date: Mon, 18 Aug 2014 09:30:07 +0800
+Subject: [PATCH 5/7 update] arm64/efi: do not enter virtual mode in case
+ booting with efi=noruntime or noefi
+In-Reply-To: <20140815150952.GY27466@arm.com>
+References: <1408007731-15081-1-git-send-email-dyoung@redhat.com>
+ <1408007731-15081-5-git-send-email-dyoung@redhat.com>
+ <20140815150952.GY27466@arm.com>
+Message-ID: <20140818013007.GB3379@darkstar.nay.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Aug 17, 2014 at 08:04:45PM -0400, Nicolas Pitre wrote:
-> On Sun, 17 Aug 2014, Jason Cooper wrote:
-> > On Sun, Aug 17, 2014 at 07:55:23PM +0100, Russell King - ARM Linux wrote:
-> > > On Sun, Aug 17, 2014 at 01:32:36PM -0400, Jason Cooper wrote:
-> > > > Applied to irqchip/urgent with Nico's Ack.
-> > > 
-> > > Interesting, so I'm discussing this patch, and it gets applied anyway...
-> > > yes, that's great.
-> > 
-> > Quoting Nico:
-> > 
-> > "Of course it would be good to clarify things wrt Russell's remark
-> > independently from this patch."
-> > 
-> > I took 'independently' to mean "This patch is ok, *and* we need to
-> > address Russell's concerns in a follow-up patch."
-> > 
-> > Nico's Reviewed-by with that comment was sent August 13th.  The most
-> > recent activity on this thread was also August 13th.  After four days, I
-> > reasoned there were no objections to his comment.
-> 
-> Well... I mentioned this patch is a nice cleanup independently of the 
-> reason why it was created in the first place.
 
-Ah, fair enough.
+In case efi runtime disabled via noefi kernel cmdline arm64_enter_virtual_mode
+should error out.
 
-> Maybe that shouldn't be sorted as "urgent" in that case, especially
-> when the code having problem with the current state of things is
-> living out of mainline.
+At the same time move early_memunmap(memmap.map, mapsize) to the beginning of
+the function or it will leak early mem.
 
-hmmm, yes.  I've been grappling with the semantics of '/urgent' vice
-'/fixes'.  With mvebu, /fixes is the branch for all changes needing to go
-into the current -rcX cycle.  For irqchip, Thomas suggested /urgent for
-the equivalent branch.  To me, they serve the same purpose.
-Unfortunately, I occasionally hear "Well, it's not _urgent_ ...".  I
-suppose I'll put up with it for one more cycle and then change it to
-/fixes. :)
+Signed-off-by: Dave Young <dyoung@redhat.com>
+---
+ arch/arm64/kernel/efi.c | 11 ++++++++---
+ 1 file changed, 8 insertions(+), 3 deletions(-)
 
-wrt this patch, I need to drop it anyway.  I was a bit rusty (it's been
-a few weeks) and forgot to add the Cc -stable and Fixes: tags.  I do
-agree, though, it's certainly not urgent.
-
-As Russell has raised more issues with this patch as well, I'll hold off
-on re-applying until I see a new version.  Hopefully it'll meet with
-everyones approval.
-
-thx,
-
-Jason.
+diff --git a/arch/arm64/kernel/efi.c b/arch/arm64/kernel/efi.c
+index 6ed0362..8f5db4a 100644
+--- a/arch/arm64/kernel/efi.c
++++ b/arch/arm64/kernel/efi.c
+@@ -392,11 +392,16 @@ static int __init arm64_enter_virtual_mode(void)
+ 		return -1;
+ 	}
+ 
+-	pr_info("Remapping and enabling EFI services.\n");
+-
+-	/* replace early memmap mapping with permanent mapping */
+ 	mapsize = memmap.map_end - memmap.map;
+ 	early_memunmap(memmap.map, mapsize);
++
++	if (efi_runtime_disabled()) {
++		pr_info("EFI runtime services will be disabled.\n");
++		return -1;
++	}
++
++	pr_info("Remapping and enabling EFI services.\n");
++	/* replace early memmap mapping with permanent mapping */
+ 	memmap.map = (__force void *)ioremap_cache((phys_addr_t)memmap.phys_map,
+ 						   mapsize);
+ 	memmap.map_end = memmap.map + mapsize;
+-- 
+1.8.3.1
