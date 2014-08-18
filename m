@@ -1,60 +1,60 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Mon, 18 Aug 2014 10:38:00 +0200
-Subject: [PATCH] pwm: Fix period and polarity in pwm_get() for non-perfect
- matches
-In-Reply-To: <20140818082039.GA31171@ulmo>
-References: <1407943133-18170-1-git-send-email-geert+renesas@glider.be>
- <20140818082039.GA31171@ulmo>
-Message-ID: <CAMuHMdVLA4xRGKrsyGTokZvRWkNAFyNv+_JycavfpibO8GXkkQ@mail.gmail.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Mon, 18 Aug 2014 09:39:53 +0100
+Subject: [PATCH 0/8] mtd: nand: Support for new DT NAND driver
+In-Reply-To: <20140814224013.GE18411@ld-irv-0074>
+References: <1407921127-8590-1-git-send-email-lee.jones@linaro.org>
+ <20140814224013.GE18411@ld-irv-0074>
+Message-ID: <20140818083953.GA4266@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thierry,
+On Thu, 14 Aug 2014, Brian Norris wrote:
+> On Wed, Aug 13, 2014 at 10:11:59AM +0100, Lee Jones wrote:
+> > Hi Brian, Pekon,
+> > 
+> > I believe all of your queries have either been answered or addressed
+> > and I am hoping this will be the last submission. :)
+> > 
+> > /me crosses fingers!
+> > 
+> > Kind regards,
+> > Lee
+> 
+> I didn't look through the patches yet, but my build tools tell me you
+> didn't compile-test this. Please compile, test, and resend your patches.
+> 
+> In file included from drivers/mtd/nand/stm_nand_bch.c:26:0:
+> include/linux/mtd/stm_nand_bbt.h:16:13: warning: no previous prototype for 'nandi_dump_bad_blocks' [-Wmissing-prototypes]
+> drivers/mtd/nand/stm_nand_bch.c: In function 'nandi_set_mtd_defaults':
+> drivers/mtd/nand/stm_nand_bch.c:870:19: error: 'bch_scan_bbt' undeclared (first use in this function)
+> drivers/mtd/nand/stm_nand_bch.c:870:19: note: each undeclared identifier is reported only once for each function it appears in
+> drivers/mtd/nand/stm_nand_bch.c:871:20: error: 'bch_block_isbad' undeclared (first use in this function)
+> drivers/mtd/nand/stm_nand_bch.c:872:24: error: 'bch_block_markbad'
+> undeclared (first use in this function)
 
-On Mon, Aug 18, 2014 at 10:20 AM, Thierry Reding
-<thierry.reding@gmail.com> wrote:
-> Could we achieve the same by storing a pointer to the best match and
-> then use that instead of p? Perhaps something like this:
->
->         struct pwm_lookup *entry;
->
->         ...
->
->                 if (match > best) {
->                         chip = pwmchip_find_by_name(p->provider);
->                         entry = p;
->
->                         if (match != 3)
->                                 best = match;
->                         else
->                                 break;
->                 }
->
->         ...
->
->         if (chip)
->                 pwm = pwm_request_from_chip(chip, entry->index,
->                                             con_id ?: dev_id);
->         if (IS_ERR(pwm))
->                 return pwm;
->
->         pwm_set_period(pwm, entry->period);
->         pwm_set_polarity(pwm, entry->polarity);
->
-> ?
+These are due to a CONFIG rename I did lastminute.com.  I fixed it
+~2mins after sending the set and will re-send today.
 
-That's possible. But that will add complexity, as you have to move the
-"mutex_unlock(&pwm_lookup_lock);" after the last user of "entry" again,
-and add a goto for the IS_ERR(pwm) case.
-So I'm not sure it's worth the effort.
+> Particularly, take a hard look at rewriting
+> include/linux/mtd/stm_nand_bbt.h.
 
-Gr{oetje,eeting}s,
+I don't think there is any need - although this change is required:
 
-                        Geert
+-#if defined(MTD_NAND_STM_BBT)
++#if defined(MTD_NAND_STM_BCH_BBT)
 
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+> drivers/mtd/nand/stm_nand_bch.c: In function 'bch_calc_timing_registers':
+> drivers/mtd/nand/stm_nand_bch.c:1022:6: warning: variable 'ren_half_off' set but not used [-Wunused-but-set-variable]
+> drivers/mtd/nand/stm_nand_bch.c:1021:6: warning: variable 'ren_half_on' set but not used [-Wunused-but-set-variable]
 
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+This I have never seen.  I guess -Wunused-but-set-variable is normally
+off.  This issue has been present since the beginning of this endeavour
+and exists in the original (internal) code.
+
+Will fix.
+
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
