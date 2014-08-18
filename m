@@ -1,47 +1,63 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Mon, 18 Aug 2014 15:03:49 -0500
-Subject: [PATCH v5 01/10] ARM: dts: Fix MMC pinctrl for exynos5250-snow
-In-Reply-To: <53F24A80.4000607@gmail.com>
-References: <1406868897-26874-1-git-send-email-afaerber@suse.de>	<1406868897-26874-2-git-send-email-afaerber@suse.de>
- <CAD=FV=VBa5rs_woj0mshFFbA69Nhyi3hXK_XX7-54T3vFyKYHA@mail.gmail.com>
- <53F247E2.2070007@samsung.com> <53F24A80.4000607@gmail.com>
-Message-ID: <53F25C25.4070602@samsung.com>
+From: stefan@agner.ch (Stefan Agner)
+Date: Mon, 18 Aug 2014 22:07:14 +0200
+Subject: [PATCH RESEND v2 4/7] ARM: dts: vf610: Add usbmisc for non-core
+ registers
+In-Reply-To: <cover.1408391385.git.stefan@agner.ch>
+References: <cover.1408391385.git.stefan@agner.ch>
+Message-ID: <53d894f3fcacd7eddd2ec11d9a67bb9ebafa201a.1408391385.git.stefan@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/18/14 13:48, Tomasz Figa wrote:
-> Hi Kukjin,
->
-Hi,
+Add device tree node for usbmisc which controls the non-core USB
+registers. This is required to use the property to disable the over-
+current detection.
 
-> On 18.08.2014 20:37, Kukjin Kim wrote:
->> On 08/01/14 11:26, Doug Anderson wrote:
->>> Hi,
->>>
->> Hi,
->>
->>> On Thu, Jul 31, 2014 at 9:54 PM, Andreas F?rber<afaerber@suse.de>   wrote:
->>>> The pinctrl properties should be on the device directly and not on the
->>>> slot sub-node.
->>>>
->>>> Reported-by: Doug Anderson<dianders@chromium.org>
->>>> Cc: Jaehoon Chung<jh80.chung@samsung.com>
->>>> Reviewed-by: Tomasz Figa<t.figa@samsung.com>
->>>> Signed-off-by: Andreas F?rber<afaerber@suse.de>
->>>
->>> Let's land this one before Jaehoon's, since it was a hidden
->>> functionality change in his patch.  It will be an easy conflict to
->>> resolve when his patch is applied.
->>>
->> Sounds good to me, I've applied this before Jaehoon's change.
->>
->>> Reviewed-by: Doug Anderson<dianders@chromium.org>
->
-> Version 6 of this series has been already posted. However this
-> particular patch has not changed, so it's fine.
->
-Oh, got it. Hope this and 2nd should be same with version 6 ;)
+Signed-off-by: Stefan Agner <stefan@agner.ch>
+---
+ arch/arm/boot/dts/vf610.dtsi | 16 +++++++++++++++-
+ 1 file changed, 15 insertions(+), 1 deletion(-)
 
-Thanks.
-
-- Kukjin
+diff --git a/arch/arm/boot/dts/vf610.dtsi b/arch/arm/boot/dts/vf610.dtsi
+index f36acb5..a49d739 100644
+--- a/arch/arm/boot/dts/vf610.dtsi
++++ b/arch/arm/boot/dts/vf610.dtsi
+@@ -334,11 +334,17 @@
+ 				interrupts = <0 75 IRQ_TYPE_LEVEL_HIGH>;
+ 				clocks = <&clks VF610_CLK_USBC0>;
+ 				fsl,usbphy = <&usbphy0>;
++				fsl,usbmisc = <&usbmisc0 0>;
+ 				dr_mode = "peripheral";
+ 				status = "disabled";
+ 			};
+ 
+-
++			usbmisc0: usb at 40034800 {
++				#index-cells = <1>;
++				compatible = "fsl,vf610-usbmisc";
++				reg = <0x40034800 0x200>;
++				clocks = <&clks VF610_CLK_USBC0>;
++			};
+ 		};
+ 
+ 		aips1: aips-bus at 40080000 {
+@@ -407,10 +413,18 @@
+ 				interrupts = <0 76 IRQ_TYPE_LEVEL_HIGH>;
+ 				clocks = <&clks VF610_CLK_USBC1>;
+ 				fsl,usbphy = <&usbphy1>;
++				fsl,usbmisc = <&usbmisc1 0>;
+ 				dr_mode = "host";
+ 				status = "disabled";
+ 			};
+ 
++			usbmisc1: usb at 400b4800 {
++				#index-cells = <1>;
++				compatible = "fsl,vf610-usbmisc";
++				reg = <0x400b4800 0x200>;
++				clocks = <&clks VF610_CLK_USBC1>;
++			};
++
+ 			ftm: ftm at 400b8000 {
+ 				compatible = "fsl,ftm-timer";
+ 				reg = <0x400b8000 0x1000 0x400b9000 0x1000>;
+-- 
+2.0.4
