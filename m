@@ -1,228 +1,54 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Mon, 18 Aug 2014 22:07:15 +0200
-Subject: [PATCH RESEND v2 5/7] chipidea: usbmisc_imx: Add USB support for
- VF610 SoCs
-In-Reply-To: <cover.1408391385.git.stefan@agner.ch>
-References: <cover.1408391385.git.stefan@agner.ch>
-Message-ID: <4ec2e6b9477f346cc6e10f5c5079e0f4ca276a77.1408391385.git.stefan@agner.ch>
+From: afaerber@suse.de (=?UTF-8?B?QW5kcmVhcyBGw6RyYmVy?=)
+Date: Mon, 18 Aug 2014 22:13:38 +0200
+Subject: [PATCH v5 01/10] ARM: dts: Fix MMC pinctrl for exynos5250-snow
+In-Reply-To: <53F25C25.4070602@samsung.com>
+References: <1406868897-26874-1-git-send-email-afaerber@suse.de>	<1406868897-26874-2-git-send-email-afaerber@suse.de>
+ <CAD=FV=VBa5rs_woj0mshFFbA69Nhyi3hXK_XX7-54T3vFyKYHA@mail.gmail.com>
+ <53F247E2.2070007@samsung.com> <53F24A80.4000607@gmail.com>
+ <53F25C25.4070602@samsung.com>
+Message-ID: <53F25E72.4080205@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds Vybrid VF610 SoC support. The IP is very similar to i.MX6,
-however, the non-core registers are spread in two different register
-areas. Hence we support multiple instances of the USB misc driver
-and add the driver instance to the imx_usbmisc_data structure.
+Hi,
 
-Signed-off-by: Stefan Agner <stefan@agner.ch>
----
- .../devicetree/bindings/usb/usbmisc-imx.txt        |  1 +
- drivers/usb/chipidea/ci_hdrc_imx.c                 |  8 ++++
- drivers/usb/chipidea/ci_hdrc_imx.h                 |  1 +
- drivers/usb/chipidea/usbmisc_imx.c                 | 52 +++++++++++++++++-----
- 4 files changed, 51 insertions(+), 11 deletions(-)
+Am 18.08.2014 22:03, schrieb Kukjin Kim:
+> On 08/18/14 13:48, Tomasz Figa wrote:
+>> On 18.08.2014 20:37, Kukjin Kim wrote:
+>>> On 08/01/14 11:26, Doug Anderson wrote:
+>>>> On Thu, Jul 31, 2014 at 9:54 PM, Andreas F?rber<afaerber@suse.de>  
+>>>> wrote:
+>>>>> The pinctrl properties should be on the device directly and not on the
+>>>>> slot sub-node.
+>>>>>
+>>>>> Reported-by: Doug Anderson<dianders@chromium.org>
+>>>>> Cc: Jaehoon Chung<jh80.chung@samsung.com>
+>>>>> Reviewed-by: Tomasz Figa<t.figa@samsung.com>
+>>>>> Signed-off-by: Andreas F?rber<afaerber@suse.de>
+>>>>
+>>>> Let's land this one before Jaehoon's, since it was a hidden
+>>>> functionality change in his patch.  It will be an easy conflict to
+>>>> resolve when his patch is applied.
+>>>>
+>>> Sounds good to me, I've applied this before Jaehoon's change.
+>>>
+>>>> Reviewed-by: Doug Anderson<dianders@chromium.org>
+>>
+>> Version 6 of this series has been already posted. However this
+>> particular patch has not changed, so it's fine.
+>>
+> Oh, got it. Hope this and 2nd should be same with version 6 ;)
 
-diff --git a/Documentation/devicetree/bindings/usb/usbmisc-imx.txt b/Documentation/devicetree/bindings/usb/usbmisc-imx.txt
-index 97ce94e..c101a4b 100644
---- a/Documentation/devicetree/bindings/usb/usbmisc-imx.txt
-+++ b/Documentation/devicetree/bindings/usb/usbmisc-imx.txt
-@@ -4,6 +4,7 @@ Required properties:
- - #index-cells: Cells used to descibe usb controller index. Should be <1>
- - compatible: Should be one of below:
- 	"fsl,imx6q-usbmisc" for imx6q
-+	"fsl,vf610-usbmisc" for Vybrid vf610
- - reg: Should contain registers location and length
- 
- Examples:
-diff --git a/drivers/usb/chipidea/ci_hdrc_imx.c b/drivers/usb/chipidea/ci_hdrc_imx.c
-index 2e58f8d..9af12b4 100644
---- a/drivers/usb/chipidea/ci_hdrc_imx.c
-+++ b/drivers/usb/chipidea/ci_hdrc_imx.c
-@@ -54,6 +54,7 @@ struct ci_hdrc_imx_data {
- 
- static struct imx_usbmisc_data *usbmisc_get_init_data(struct device *dev)
- {
-+	struct platform_device *misc_pdev;
- 	struct device_node *np = dev->of_node;
- 	struct of_phandle_args args;
- 	struct imx_usbmisc_data *data;
-@@ -79,8 +80,15 @@ static struct imx_usbmisc_data *usbmisc_get_init_data(struct device *dev)
- 	}
- 
- 	data->index = args.args[0];
-+
-+	misc_pdev = of_find_device_by_node(args.np);
- 	of_node_put(args.np);
- 
-+	if (!misc_pdev)
-+		return ERR_PTR(-EPROBE_DEFER);
-+
-+	data->dev = &misc_pdev->dev;
-+
- 	if (of_find_property(np, "disable-over-current", NULL))
- 		data->disable_oc = 1;
- 
-diff --git a/drivers/usb/chipidea/ci_hdrc_imx.h b/drivers/usb/chipidea/ci_hdrc_imx.h
-index 996ec93..4ed828f 100644
---- a/drivers/usb/chipidea/ci_hdrc_imx.h
-+++ b/drivers/usb/chipidea/ci_hdrc_imx.h
-@@ -13,6 +13,7 @@
- #define __DRIVER_USB_CHIPIDEA_CI_HDRC_IMX_H
- 
- struct imx_usbmisc_data {
-+	struct device *dev;
- 	int index;
- 
- 	unsigned int disable_oc:1; /* over current detect disabled */
-diff --git a/drivers/usb/chipidea/usbmisc_imx.c b/drivers/usb/chipidea/usbmisc_imx.c
-index 85293b8..926c997 100644
---- a/drivers/usb/chipidea/usbmisc_imx.c
-+++ b/drivers/usb/chipidea/usbmisc_imx.c
-@@ -57,6 +57,8 @@
- 
- #define MX6_BM_OVER_CUR_DIS		BIT(7)
- 
-+#define VF610_OVER_CUR_DIS		BIT(7)
-+
- struct usbmisc_ops {
- 	/* It's called once when probe a usb device */
- 	int (*init)(struct imx_usbmisc_data *data);
-@@ -71,10 +73,9 @@ struct imx_usbmisc {
- 	const struct usbmisc_ops *ops;
- };
- 
--static struct imx_usbmisc *usbmisc;
--
- static int usbmisc_imx25_init(struct imx_usbmisc_data *data)
- {
-+	struct imx_usbmisc *usbmisc = dev_get_drvdata(data->dev);
- 	unsigned long flags;
- 	u32 val = 0;
- 
-@@ -108,6 +109,7 @@ static int usbmisc_imx25_init(struct imx_usbmisc_data *data)
- 
- static int usbmisc_imx25_post(struct imx_usbmisc_data *data)
- {
-+	struct imx_usbmisc *usbmisc = dev_get_drvdata(data->dev);
- 	void __iomem *reg;
- 	unsigned long flags;
- 	u32 val;
-@@ -130,6 +132,7 @@ static int usbmisc_imx25_post(struct imx_usbmisc_data *data)
- 
- static int usbmisc_imx27_init(struct imx_usbmisc_data *data)
- {
-+	struct imx_usbmisc *usbmisc = dev_get_drvdata(data->dev);
- 	unsigned long flags;
- 	u32 val;
- 
-@@ -160,6 +163,7 @@ static int usbmisc_imx27_init(struct imx_usbmisc_data *data)
- 
- static int usbmisc_imx53_init(struct imx_usbmisc_data *data)
- {
-+	struct imx_usbmisc *usbmisc = dev_get_drvdata(data->dev);
- 	void __iomem *reg = NULL;
- 	unsigned long flags;
- 	u32 val = 0;
-@@ -204,6 +208,7 @@ static int usbmisc_imx53_init(struct imx_usbmisc_data *data)
- 
- static int usbmisc_imx6q_init(struct imx_usbmisc_data *data)
- {
-+	struct imx_usbmisc *usbmisc = dev_get_drvdata(data->dev);
- 	unsigned long flags;
- 	u32 reg;
- 
-@@ -221,6 +226,26 @@ static int usbmisc_imx6q_init(struct imx_usbmisc_data *data)
- 	return 0;
- }
- 
-+static int usbmisc_vf610_init(struct imx_usbmisc_data *data)
-+{
-+	struct imx_usbmisc *usbmisc = dev_get_drvdata(data->dev);
-+	u32 reg;
-+
-+	/*
-+	 * Vybrid only has one misc register set, but in two different
-+	 * areas. These is reflected in two instances of this driver.
-+	 */
-+	if (data->index >= 1)
-+		return -EINVAL;
-+
-+	if (data->disable_oc) {
-+		reg = readl(usbmisc->base);
-+		writel(reg | VF610_OVER_CUR_DIS, usbmisc->base);
-+	}
-+
-+	return 0;
-+}
-+
- static const struct usbmisc_ops imx25_usbmisc_ops = {
- 	.init = usbmisc_imx25_init,
- 	.post = usbmisc_imx25_post,
-@@ -238,10 +263,14 @@ static const struct usbmisc_ops imx6q_usbmisc_ops = {
- 	.init = usbmisc_imx6q_init,
- };
- 
-+static const struct usbmisc_ops vf610_usbmisc_ops = {
-+	.init = usbmisc_vf610_init,
-+};
-+
- int imx_usbmisc_init(struct imx_usbmisc_data *data)
- {
--	if (!usbmisc)
--		return -EPROBE_DEFER;
-+	struct imx_usbmisc *usbmisc = dev_get_drvdata(data->dev);
-+
- 	if (!usbmisc->ops->init)
- 		return 0;
- 	return usbmisc->ops->init(data);
-@@ -250,8 +279,8 @@ EXPORT_SYMBOL_GPL(imx_usbmisc_init);
- 
- int imx_usbmisc_init_post(struct imx_usbmisc_data *data)
- {
--	if (!usbmisc)
--		return -EPROBE_DEFER;
-+	struct imx_usbmisc *usbmisc = dev_get_drvdata(data->dev);
-+
- 	if (!usbmisc->ops->post)
- 		return 0;
- 	return usbmisc->ops->post(data);
-@@ -283,6 +312,10 @@ static const struct of_device_id usbmisc_imx_dt_ids[] = {
- 		.compatible = "fsl,imx6q-usbmisc",
- 		.data = &imx6q_usbmisc_ops,
- 	},
-+	{
-+		.compatible = "fsl,vf610-usbmisc",
-+		.data = &vf610_usbmisc_ops,
-+	},
- 	{ /* sentinel */ }
- };
- MODULE_DEVICE_TABLE(of, usbmisc_imx_dt_ids);
-@@ -294,9 +327,6 @@ static int usbmisc_imx_probe(struct platform_device *pdev)
- 	int ret;
- 	struct of_device_id *tmp_dev;
- 
--	if (usbmisc)
--		return -EBUSY;
--
- 	data = devm_kzalloc(&pdev->dev, sizeof(*data), GFP_KERNEL);
- 	if (!data)
- 		return -ENOMEM;
-@@ -325,15 +355,15 @@ static int usbmisc_imx_probe(struct platform_device *pdev)
- 	tmp_dev = (struct of_device_id *)
- 		of_match_device(usbmisc_imx_dt_ids, &pdev->dev);
- 	data->ops = (const struct usbmisc_ops *)tmp_dev->data;
--	usbmisc = data;
-+	platform_set_drvdata(pdev, data);
- 
- 	return 0;
- }
- 
- static int usbmisc_imx_remove(struct platform_device *pdev)
- {
-+	struct imx_usbmisc *usbmisc = dev_get_drvdata(&pdev->dev);
- 	clk_disable_unprepare(usbmisc->clk);
--	usbmisc = NULL;
- 	return 0;
- }
- 
+It is documented as such. :) Others did have changes, of course.
+
+I've started looking into rebasing myself: beware that the smdk5250
+cleanup has an additional conflict in the spi node (cs-gpios movement).
+
+http://git.kernel.org/cgit/linux/kernel/git/kgene/linux-samsung.git/commit/arch/arm/boot/dts/exynos5250-smdk5250.dts?h=v3.18-next/dt-samsung&id=e138d4333aa02a3daa12c04192bc5c842bffee74
+
+Thanks,
+Andreas
+
 -- 
-2.0.4
+SUSE LINUX Products GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
+GF: Jeff Hawn, Jennifer Guild, Felix Imend?rffer; HRB 16746 AG N?rnberg
