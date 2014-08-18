@@ -1,39 +1,37 @@
 From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
-Date: Mon, 18 Aug 2014 17:30:30 +0200
-Subject: [PATCH v7 4/8] ASoC: mxs-saif: fix mixed use of public and provider
- clk API
+Date: Mon, 18 Aug 2014 17:30:29 +0200
+Subject: [PATCH v7 3/8] cpufreq: kirkwood: Remove use of the clk provider API
 In-Reply-To: <1408375833-10703-1-git-send-email-tomeu.vizoso@collabora.com>
 References: <1408375833-10703-1-git-send-email-tomeu.vizoso@collabora.com>
-Message-ID: <1408375833-10703-5-git-send-email-tomeu.vizoso@collabora.com>
+Message-ID: <1408375833-10703-4-git-send-email-tomeu.vizoso@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In preparation to changing the clk provider API to use struct clk_core instead
-of struct clk.
-
 Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
-Acked-by: Mark Brown <broonie@linaro.org>
 ---
- sound/soc/mxs/mxs-saif.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ drivers/cpufreq/kirkwood-cpufreq.c | 3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
 
-diff --git a/sound/soc/mxs/mxs-saif.c b/sound/soc/mxs/mxs-saif.c
-index 231d7e7..a24367d 100644
---- a/sound/soc/mxs/mxs-saif.c
-+++ b/sound/soc/mxs/mxs-saif.c
-@@ -682,11 +682,11 @@ static int mxs_saif_mclk_init(struct platform_device *pdev)
- {
- 	struct mxs_saif *saif = platform_get_drvdata(pdev);
- 	struct device_node *np = pdev->dev.of_node;
--	struct clk *clk;
-+	struct clk_core *clk;
- 	int ret;
+diff --git a/drivers/cpufreq/kirkwood-cpufreq.c b/drivers/cpufreq/kirkwood-cpufreq.c
+index 37a4806..f3d087f 100644
+--- a/drivers/cpufreq/kirkwood-cpufreq.c
++++ b/drivers/cpufreq/kirkwood-cpufreq.c
+@@ -12,7 +12,6 @@
+ #include <linux/kernel.h>
+ #include <linux/module.h>
+ #include <linux/clk.h>
+-#include <linux/clk-provider.h>
+ #include <linux/cpufreq.h>
+ #include <linux/of_device.h>
+ #include <linux/platform_device.h>
+@@ -50,7 +49,7 @@ static struct cpufreq_frequency_table kirkwood_freq_table[] = {
  
- 	clk = clk_register_divider(&pdev->dev, "mxs_saif_mclk",
--				   __clk_get_name(saif->clk), 0,
-+				   clk_get_name(saif->clk), 0,
- 				   saif->base + SAIF_CTRL,
- 				   BP_SAIF_CTRL_BITCLK_MULT_RATE, 3,
- 				   0, NULL);
+ static unsigned int kirkwood_cpufreq_get_cpu_frequency(unsigned int cpu)
+ {
+-	if (__clk_is_enabled(priv.powersave_clk))
++	if (clk_is_enabled(priv.powersave_clk))
+ 		return kirkwood_freq_table[1].frequency;
+ 	return kirkwood_freq_table[0].frequency;
+ }
 -- 
 1.9.3
