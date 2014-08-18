@@ -1,21 +1,27 @@
-From: gnomes@lxorguk.ukuu.org.uk (One Thousand Gnomes)
-Date: Mon, 18 Aug 2014 11:52:49 +0100
-Subject: [PATCH 07/15] tty: serial: 8250_dma: enqueue RX dma again on
- completion.
-In-Reply-To: <1408124563-31541-8-git-send-email-bigeasy@linutronix.de>
-References: <1408124563-31541-1-git-send-email-bigeasy@linutronix.de>
- <1408124563-31541-8-git-send-email-bigeasy@linutronix.de>
-Message-ID: <20140818115249.537b3e42@alan.etchedpixels.co.uk>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Mon, 18 Aug 2014 13:26:17 +0200
+Subject: [PATCH 03/29] clk: exynos: add missing smmu_g2d clock and update
+ comments
+In-Reply-To: <1407235677-26324-4-git-send-email-m.szyprowski@samsung.com>
+References: <1407235677-26324-1-git-send-email-m.szyprowski@samsung.com>
+ <1407235677-26324-4-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <53F1E2D9.7040101@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 05.08.2014 12:47, Marek Szyprowski wrote:
+> This patch adds missing smmu_g2d clock implementation and updates
+> comment about Exynos4 clocks from 278-282 range. Those clocks are
+> available on all Exynos4 SoC series, so the misleading comment has been
+> removed.
+> 
+> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> ---
+>  drivers/clk/samsung/clk-exynos4.c   |  1 +
+>  include/dt-bindings/clock/exynos4.h | 10 +++++-----
+>  2 files changed, 6 insertions(+), 5 deletions(-)
 
->  		if (!up->dma || dma_err)
->  			status = serial8250_rx_chars(up, status);
-> +
-> +		if (dma_err && port->type == PORT_OMAP_16750)
-> +			serial8250_rx_dma(up, 0);
+Acked-by: Tomasz Figa <t.figa@samsung.com>
 
-Can we stick to a 'has dma' flag and port->rx_dma() type usages so that
-we don't have to rewrite it again to add them the next slightly odd DMA
-user we add 8)
+Best regards,
+Tomasz
