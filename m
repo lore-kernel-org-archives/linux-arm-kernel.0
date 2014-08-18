@@ -1,33 +1,155 @@
-From: ttynkkynen@nvidia.com (Tuomas Tynkkynen)
-Date: Mon, 18 Aug 2014 13:10:13 +0300
-Subject: [PATCH 1/3] of: Add of_match_machine helper
-In-Reply-To: <20140817152854.5406BC40ADD@trevor.secretlab.ca>
-References: <1407452515-2390-1-git-send-email-ttynkkynen@nvidia.com>	<1407452515-2390-2-git-send-email-ttynkkynen@nvidia.com>
- <20140817152854.5406BC40ADD@trevor.secretlab.ca>
-Message-ID: <53F1D105.1070107@nvidia.com>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Mon, 18 Aug 2014 12:31:22 +0200
+Subject: [PATCH 6/7] ARM: meson: update defconfigs
+In-Reply-To: <1408272594-10814-7-git-send-email-carlo@caione.org>
+References: <1408272594-10814-1-git-send-email-carlo@caione.org>
+ <1408272594-10814-7-git-send-email-carlo@caione.org>
+Message-ID: <53F1D5FA.1040803@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17/08/14 18:28, Grant Likely wrote:
-> On Fri, 8 Aug 2014 02:01:53 +0300, Tuomas Tynkkynen <ttynkkynen@nvidia.com> wrote:
-[...]
->> +EXPORT_SYMBOL(of_match_machine);
-> 
-> Too wordy...
-> 
-> 	return of_match_node(matches, of_allnodes);
-> 
-> :-)
-> 
-> It could be a static inline, but I don't think it's even worth having a
-> helper. The callers could just open code the above.
-> 
 
-Do you mean all the drivers should be referring to of_allnodes directly?
-I see that it's indeed exported, but to me that sounds like relying too
-much on an implementation detail. In fact, Documentation/devicetree/todo.txt
-even seems to have a TODO entry for its removal ("Remove of_allnodes list
-and iterate using list of child nodes alone").
 
--- 
-nvpublic
+On 17/08/14 12:49, Carlo Caione wrote:
+> This patch updates the multi_v7_defconfig with the CONFIG_* needed by
+> the just added Meson anch. It also adds a new defconfig specifically for
+> the Meson SoCs.
+>
+> Signed-off-by: Carlo Caione <carlo@caione.org>
+> ---
+>   arch/arm/configs/meson_defconfig    | 99 +++++++++++++++++++++++++++++++++++++
+>   arch/arm/configs/multi_v7_defconfig |  3 ++
+>   2 files changed, 102 insertions(+)
+>   create mode 100644 arch/arm/configs/meson_defconfig
+>
+> diff --git a/arch/arm/configs/meson_defconfig b/arch/arm/configs/meson_defconfig
+> new file mode 100644
+> index 0000000..3c9d976
+> --- /dev/null
+> +++ b/arch/arm/configs/meson_defconfig
+
+I doubt that we need a meson_defconfig when we can get the SoC up and 
+running using multi_v7_defconfig.
+
+> @@ -0,0 +1,99 @@
+> +CONFIG_NO_HZ=y
+> +CONFIG_HIGH_RES_TIMERS=y
+> +CONFIG_BLK_DEV_INITRD=y
+> +CONFIG_PERF_EVENTS=y
+> +CONFIG_ARCH_MESON=y
+> +CONFIG_SMP=y
+> +CONFIG_HAVE_ARM_ARCH_TIMER=y
+> +CONFIG_ARM_PSCI=y
+> +CONFIG_AEABI=y
+> +CONFIG_HIGHMEM=y
+> +CONFIG_HIGHPTE=y
+> +CONFIG_ARM_APPENDED_DTB=y
+> +CONFIG_ARM_ATAG_DTB_COMPAT=y
+> +CONFIG_VFP=y
+> +CONFIG_NEON=y
+> +CONFIG_PM_RUNTIME=y
+> +CONFIG_NET=y
+> +CONFIG_PACKET=y
+> +CONFIG_UNIX=y
+> +CONFIG_INET=y
+> +CONFIG_IP_PNP=y
+> +CONFIG_IP_PNP_DHCP=y
+> +CONFIG_IP_PNP_BOOTP=y
+> +# CONFIG_INET_XFRM_MODE_TRANSPORT is not set
+> +# CONFIG_INET_XFRM_MODE_TUNNEL is not set
+> +# CONFIG_INET_XFRM_MODE_BEET is not set
+> +# CONFIG_INET_LRO is not set
+> +# CONFIG_INET_DIAG is not set
+> +# CONFIG_IPV6 is not set
+> +# CONFIG_WIRELESS is not set
+> +CONFIG_DEVTMPFS=y
+> +CONFIG_DEVTMPFS_MOUNT=y
+> +CONFIG_BLK_DEV_SD=y
+> +CONFIG_ATA=y
+> +CONFIG_NETDEVICES=y
+> +# CONFIG_NET_VENDOR_ARC is not set
+> +# CONFIG_NET_CADENCE is not set
+> +# CONFIG_NET_VENDOR_BROADCOM is not set
+> +# CONFIG_NET_VENDOR_CIRRUS is not set
+> +# CONFIG_NET_VENDOR_FARADAY is not set
+> +# CONFIG_NET_VENDOR_INTEL is not set
+> +# CONFIG_NET_VENDOR_MARVELL is not set
+> +# CONFIG_NET_VENDOR_MICREL is not set
+> +# CONFIG_NET_VENDOR_MICROCHIP is not set
+> +# CONFIG_NET_VENDOR_NATSEMI is not set
+> +# CONFIG_NET_VENDOR_SAMSUNG is not set
+> +# CONFIG_NET_VENDOR_SEEQ is not set
+> +# CONFIG_NET_VENDOR_SMSC is not set
+> +CONFIG_STMMAC_ETH=y
+> +# CONFIG_NET_VENDOR_VIA is not set
+> +# CONFIG_NET_VENDOR_WIZNET is not set
+> +# CONFIG_WLAN is not set
+> +# CONFIG_INPUT_MOUSEDEV is not set
+> +# CONFIG_INPUT_KEYBOARD is not set
+> +# CONFIG_INPUT_MOUSE is not set
+> +CONFIG_SERIAL_MESON=y
+> +CONFIG_SERIAL_MESON_CONSOLE=y
+> +# CONFIG_HW_RANDOM is not set
+> +CONFIG_I2C=y
+> +CONFIG_I2C_CHARDEV=y
+> +CONFIG_SPI=y
+> +CONFIG_GPIOLIB=y
+> +CONFIG_GPIO_SYSFS=y
+> +CONFIG_POWER_SUPPLY=y
+> +CONFIG_POWER_RESET=y
+> +# CONFIG_HWMON is not set
+> +CONFIG_WATCHDOG=y
+> +CONFIG_WATCHDOG_CORE=y
+> +CONFIG_MFD_AXP20X=y
+> +CONFIG_REGULATOR=y
+> +CONFIG_REGULATOR_FIXED_VOLTAGE=y
+> +CONFIG_REGULATOR_VIRTUAL_CONSUMER=y
+> +CONFIG_REGULATOR_GPIO=y
+> +CONFIG_USB=y
+> +CONFIG_USB_EHCI_HCD=y
+> +CONFIG_USB_EHCI_HCD_PLATFORM=y
+> +CONFIG_USB_OHCI_HCD=y
+> +CONFIG_USB_OHCI_HCD_PLATFORM=y
+> +CONFIG_MMC=y
+> +CONFIG_NEW_LEDS=y
+> +CONFIG_LEDS_CLASS=y
+> +CONFIG_LEDS_GPIO=y
+> +CONFIG_LEDS_TRIGGERS=y
+> +CONFIG_LEDS_TRIGGER_HEARTBEAT=y
+> +CONFIG_LEDS_TRIGGER_DEFAULT_ON=y
+> +CONFIG_RTC_CLASS=y
+> +# CONFIG_RTC_INTF_SYSFS is not set
+> +# CONFIG_RTC_INTF_PROC is not set
+> +# CONFIG_IOMMU_SUPPORT is not set
+> +CONFIG_GENERIC_PHY=y
+> +CONFIG_EXT4_FS=y
+> +CONFIG_VFAT_FS=y
+> +CONFIG_TMPFS=y
+> +CONFIG_NFS_FS=y
+> +CONFIG_NFS_V3_ACL=y
+> +CONFIG_NFS_V4=y
+> +CONFIG_ROOT_NFS=y
+> +CONFIG_PRINTK_TIME=y
+> +CONFIG_DEBUG_FS=y
+> diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+> index 5fb95fb..5b44796 100644
+> --- a/arch/arm/configs/multi_v7_defconfig
+> +++ b/arch/arm/configs/multi_v7_defconfig
+> @@ -29,6 +29,7 @@ CONFIG_ARCH_HISI=y
+>   CONFIG_ARCH_HI3xxx=y
+>   CONFIG_ARCH_HIX5HD2=y
+>   CONFIG_ARCH_KEYSTONE=y
+> +CONFIG_ARCH_MESON=y
+>   CONFIG_ARCH_MXC=y
+>   CONFIG_SOC_IMX51=y
+>   CONFIG_SOC_IMX53=y
+> @@ -173,6 +174,8 @@ CONFIG_SERIAL_8250_CONSOLE=y
+>   CONFIG_SERIAL_8250_DW=y
+>   CONFIG_SERIAL_AMBA_PL011=y
+>   CONFIG_SERIAL_AMBA_PL011_CONSOLE=y
+> +CONFIG_SERIAL_MESON=y
+> +CONFIG_SERIAL_MESON_CONSOLE=y
+>   CONFIG_SERIAL_SAMSUNG=y
+>   CONFIG_SERIAL_SAMSUNG_CONSOLE=y
+>   CONFIG_SERIAL_SIRFSOC=y
+>
