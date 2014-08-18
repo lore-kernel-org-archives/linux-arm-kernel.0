@@ -1,32 +1,141 @@
-From: a.spyridakis@virtualopensystems.com (Alexander Spyridakis)
-Date: Mon, 18 Aug 2014 19:08:59 +0200
-Subject: [Linaro-acpi] [PATCH v2 00/18] Introduce ACPI for ARM64 based on
- ACPI 5.1
-In-Reply-To: <53E050B2.2080609@linaro.org>
-References: <1407166105-17675-1-git-send-email-hanjun.guo@linaro.org>
- <CAJRNFK+UfJhGR65tOecy=X+YdHQHiNPZ4p_p8LUxhRL3GW5gFw@mail.gmail.com>
- <53E050B2.2080609@linaro.org>
-Message-ID: <CAJRNFKJtbfYEkYWcyXPOfRU9D4MVhabn5X1ZumZMSQFQ=S=j5g@mail.gmail.com>
+From: dianders@chromium.org (Doug Anderson)
+Date: Mon, 18 Aug 2014 10:09:07 -0700
+Subject: [PATCH 2/4] pwm: rockchip: Allow polarity invert on rk3288
+In-Reply-To: <1408381749-14156-1-git-send-email-dianders@chromium.org>
+References: <1408381749-14156-1-git-send-email-dianders@chromium.org>
+Message-ID: <1408381749-14156-3-git-send-email-dianders@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Yes, I think so. If you meet any problem , please let us know, and we will
-> update the wiki.
->
->>
->> Should I assume that UEFI is mandatory (alternative being the aarch64
->> bootwrapper), as described in Documentation/arm64/arm-acpi.txt?
->
-> Yes, UEFI is mandatory if you want to use ACPI.
+The rk3288 has the ability to invert the polarity of the PWM.  Let's
+enable that ability.
 
-Hello Hanjun,
+To do this we increase the number of pwm_cells to 3 to allow using the
+PWM_POLARITY_INVERTED flag.  Since the PWM driver on rk3288 is very
+new, I thought this was OK.
 
-What tables do you use for the foundation model (or AEMv8)?
+Signed-off-by: Doug Anderson <dianders@chromium.org>
+---
+ .../devicetree/bindings/pwm/pwm-rockchip.txt       |  4 +--
+ drivers/pwm/pwm-rockchip.c                         | 32 ++++++++++++++++++++--
+ 2 files changed, 32 insertions(+), 4 deletions(-)
 
-The ones found in this repository:
-git://git.linaro.org/leg/acpi/acpi-asl.git are ACPIv5.0, and when the
-kernel gets pointed to them acpi is disabled because it expects an
-FADT v5.1 or later. Of course building these tables with latest ACPICA
-also fails.
-
-Regards.
+diff --git a/Documentation/devicetree/bindings/pwm/pwm-rockchip.txt b/Documentation/devicetree/bindings/pwm/pwm-rockchip.txt
+index d47d15a..b8be3d0 100644
+--- a/Documentation/devicetree/bindings/pwm/pwm-rockchip.txt
++++ b/Documentation/devicetree/bindings/pwm/pwm-rockchip.txt
+@@ -7,8 +7,8 @@ Required properties:
+    "rockchip,vop-pwm": found integrated in VOP on RK3288 SoC
+  - reg: physical base address and length of the controller's registers
+  - clocks: phandle and clock specifier of the PWM reference clock
+- - #pwm-cells: should be 2. See pwm.txt in this directory for a
+-   description of the cell format.
++ - #pwm-cells: must be 2 (rk2928) or 3 (rk3288). See pwm.txt in this directory
++   for a description of the cell format.
+ 
+ Example:
+ 
+diff --git a/drivers/pwm/pwm-rockchip.c b/drivers/pwm/pwm-rockchip.c
+index bdd8644..27f20d6 100644
+--- a/drivers/pwm/pwm-rockchip.c
++++ b/drivers/pwm/pwm-rockchip.c
+@@ -24,7 +24,9 @@
+ #define PWM_ENABLE		(1 << 0)
+ #define PWM_CONTINUOUS		(1 << 1)
+ #define PWM_DUTY_POSITIVE	(1 << 3)
++#define PWM_DUTY_NEGATIVE	(0 << 3)
+ #define PWM_INACTIVE_NEGATIVE	(0 << 4)
++#define PWM_INACTIVE_POSITIVE	(1 << 4)
+ #define PWM_OUTPUT_LEFT		(0 << 5)
+ #define PWM_LP_DISABLE		(0 << 8)
+ 
+@@ -32,6 +34,7 @@ struct rockchip_pwm_chip {
+ 	struct pwm_chip chip;
+ 	struct clk *clk;
+ 	const struct rockchip_pwm_data *data;
++	enum pwm_polarity polarity;
+ 	void __iomem *base;
+ };
+ 
+@@ -45,6 +48,7 @@ struct rockchip_pwm_regs {
+ struct rockchip_pwm_data {
+ 	struct rockchip_pwm_regs regs;
+ 	unsigned int prescaler;
++	bool has_invert;
+ 
+ 	void (*set_enable)(struct pwm_chip *chip, bool enable);
+ };
+@@ -74,10 +78,14 @@ static void rockchip_pwm_set_enable_v2(struct pwm_chip *chip, bool enable)
+ {
+ 	struct rockchip_pwm_chip *pc = to_rockchip_pwm_chip(chip);
+ 	u32 enable_conf = PWM_OUTPUT_LEFT | PWM_LP_DISABLE | PWM_ENABLE |
+-			  PWM_CONTINUOUS | PWM_DUTY_POSITIVE |
+-			  PWM_INACTIVE_NEGATIVE;
++			  PWM_CONTINUOUS;
+ 	u32 val;
+ 
++	if (pc->polarity == PWM_POLARITY_INVERSED)
++		enable_conf |= PWM_DUTY_NEGATIVE | PWM_INACTIVE_POSITIVE;
++	else
++		enable_conf |= PWM_DUTY_POSITIVE | PWM_INACTIVE_NEGATIVE;
++
+ 	val = readl_relaxed(pc->base + pc->data->regs.ctrl);
+ 
+ 	if (enable)
+@@ -124,6 +132,19 @@ static int rockchip_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm,
+ 	return 0;
+ }
+ 
++int rockchip_pwm_set_polarity(struct pwm_chip *chip, struct pwm_device *pwm,
++			      enum pwm_polarity polarity)
++{
++	struct rockchip_pwm_chip *pc = to_rockchip_pwm_chip(chip);
++
++	if (!pc->data->has_invert)
++		return -ENOSYS;
++
++	pc->polarity = polarity;
++
++	return 0;
++}
++
+ static int rockchip_pwm_enable(struct pwm_chip *chip, struct pwm_device *pwm)
+ {
+ 	struct rockchip_pwm_chip *pc = to_rockchip_pwm_chip(chip);
+@@ -149,6 +170,7 @@ static void rockchip_pwm_disable(struct pwm_chip *chip, struct pwm_device *pwm)
+ 
+ static const struct pwm_ops rockchip_pwm_ops = {
+ 	.config = rockchip_pwm_config,
++	.set_polarity = rockchip_pwm_set_polarity,
+ 	.enable = rockchip_pwm_enable,
+ 	.disable = rockchip_pwm_disable,
+ 	.owner = THIS_MODULE,
+@@ -173,6 +195,7 @@ static const struct rockchip_pwm_data pwm_data_v2 = {
+ 		.ctrl = 0x0c,
+ 	},
+ 	.prescaler = 1,
++	.has_invert = 1,
+ 	.set_enable = rockchip_pwm_set_enable_v2,
+ };
+ 
+@@ -184,6 +207,7 @@ static const struct rockchip_pwm_data pwm_data_vop = {
+ 		.ctrl = 0x00,
+ 	},
+ 	.prescaler = 1,
++	.has_invert = 1,
+ 	.set_enable = rockchip_pwm_set_enable_v2,
+ };
+ 
+@@ -228,6 +252,10 @@ static int rockchip_pwm_probe(struct platform_device *pdev)
+ 	pc->data = id->data;
+ 	pc->chip.dev = &pdev->dev;
+ 	pc->chip.ops = &rockchip_pwm_ops;
++	if (pc->data->has_invert) {
++		pc->chip.of_xlate = of_pwm_xlate_with_flags;
++		pc->chip.of_pwm_n_cells = 3;
++	}
+ 	pc->chip.base = -1;
+ 	pc->chip.npwm = 1;
+ 
+-- 
+2.1.0.rc2.206.gedb03e5
