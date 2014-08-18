@@ -1,60 +1,50 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 18 Aug 2014 09:39:53 +0100
-Subject: [PATCH 0/8] mtd: nand: Support for new DT NAND driver
-In-Reply-To: <20140814224013.GE18411@ld-irv-0074>
-References: <1407921127-8590-1-git-send-email-lee.jones@linaro.org>
- <20140814224013.GE18411@ld-irv-0074>
-Message-ID: <20140818083953.GA4266@lee--X1>
+From: Baohua.Song@csr.com (Barry Song)
+Date: Mon, 18 Aug 2014 16:49:20 +0800
+Subject: [PATCH 1/6] pinctrl: sirf: fix "quoted string split across lines"
+Message-ID: <1408351765-18253-1-git-send-email-Baohua.Song@csr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 14 Aug 2014, Brian Norris wrote:
-> On Wed, Aug 13, 2014 at 10:11:59AM +0100, Lee Jones wrote:
-> > Hi Brian, Pekon,
-> > 
-> > I believe all of your queries have either been answered or addressed
-> > and I am hoping this will be the last submission. :)
-> > 
-> > /me crosses fingers!
-> > 
-> > Kind regards,
-> > Lee
-> 
-> I didn't look through the patches yet, but my build tools tell me you
-> didn't compile-test this. Please compile, test, and resend your patches.
-> 
-> In file included from drivers/mtd/nand/stm_nand_bch.c:26:0:
-> include/linux/mtd/stm_nand_bbt.h:16:13: warning: no previous prototype for 'nandi_dump_bad_blocks' [-Wmissing-prototypes]
-> drivers/mtd/nand/stm_nand_bch.c: In function 'nandi_set_mtd_defaults':
-> drivers/mtd/nand/stm_nand_bch.c:870:19: error: 'bch_scan_bbt' undeclared (first use in this function)
-> drivers/mtd/nand/stm_nand_bch.c:870:19: note: each undeclared identifier is reported only once for each function it appears in
-> drivers/mtd/nand/stm_nand_bch.c:871:20: error: 'bch_block_isbad' undeclared (first use in this function)
-> drivers/mtd/nand/stm_nand_bch.c:872:24: error: 'bch_block_markbad'
-> undeclared (first use in this function)
+From: Bin Shi <Bin.Shi@csr.com>
 
-These are due to a CONFIG rename I did lastminute.com.  I fixed it
-~2mins after sending the set and will re-send today.
+this patch fixes:
+WARNING: quoted string split across lines
+902: FILE: drivers/pinctrl/sirf/pinctrl-sirf.c:902:
++MODULE_AUTHOR("Rongjun Ying <rongjun.ying@csr.com>, "
++	"Yuping Luo <yuping.luo@csr.com>, "
 
-> Particularly, take a hard look at rewriting
-> include/linux/mtd/stm_nand_bbt.h.
+WARNING: quoted string split across lines
+903: FILE: drivers/pinctrl/sirf/pinctrl-sirf.c:903:
++	"Yuping Luo <yuping.luo@csr.com>, "
++	"Barry Song <baohua.song@csr.com>");
 
-I don't think there is any need - although this change is required:
+Signed-off-by: Bin Shi <Bin.Shi@csr.com>
+Signed-off-by: Barry Song <Baohua.Song@csr.com>
+---
+ drivers/pinctrl/sirf/pinctrl-sirf.c | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
--#if defined(MTD_NAND_STM_BBT)
-+#if defined(MTD_NAND_STM_BCH_BBT)
-
-> drivers/mtd/nand/stm_nand_bch.c: In function 'bch_calc_timing_registers':
-> drivers/mtd/nand/stm_nand_bch.c:1022:6: warning: variable 'ren_half_off' set but not used [-Wunused-but-set-variable]
-> drivers/mtd/nand/stm_nand_bch.c:1021:6: warning: variable 'ren_half_on' set but not used [-Wunused-but-set-variable]
-
-This I have never seen.  I guess -Wunused-but-set-variable is normally
-off.  This issue has been present since the beginning of this endeavour
-and exists in the original (internal) code.
-
-Will fix.
-
+diff --git a/drivers/pinctrl/sirf/pinctrl-sirf.c b/drivers/pinctrl/sirf/pinctrl-sirf.c
+index 4c1d7c6..08d1f5a9 100644
+--- a/drivers/pinctrl/sirf/pinctrl-sirf.c
++++ b/drivers/pinctrl/sirf/pinctrl-sirf.c
+@@ -898,8 +898,8 @@ static int __init sirfsoc_gpio_init(void)
+ }
+ subsys_initcall(sirfsoc_gpio_init);
+ 
+-MODULE_AUTHOR("Rongjun Ying <rongjun.ying@csr.com>, "
+-	"Yuping Luo <yuping.luo@csr.com>, "
+-	"Barry Song <baohua.song@csr.com>");
++MODULE_AUTHOR("Rongjun Ying <rongjun.ying@csr.com>");
++MODULE_AUTHOR("Yuping Luo <yuping.luo@csr.com>");
++MODULE_AUTHOR("Barry Song <baohua.song@csr.com>");
+ MODULE_DESCRIPTION("SIRFSOC pin control driver");
+ MODULE_LICENSE("GPL");
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+2.0.4
+
+
+
+Member of the CSR plc group of companies. CSR plc registered in England and Wales, registered number 4187346, registered office Churchill House, Cambridge Business Park, Cowley Road, Cambridge, CB4 0WZ, United Kingdom
+More information can be found at www.csr.com. Keep up to date with CSR on our technical blog, www.csr.com/blog, CSR people blog, www.csr.com/people, YouTube, www.youtube.com/user/CSRplc, Facebook, www.facebook.com/pages/CSR/191038434253534, or follow us on Twitter at www.twitter.com/CSR_plc.
+New for 2014, you can now access the wide range of products powered by aptX at www.aptx.com.
