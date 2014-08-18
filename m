@@ -1,70 +1,105 @@
 From: dianders@chromium.org (Doug Anderson)
-Date: Mon, 18 Aug 2014 10:09:06 -0700
-Subject: [PATCH 1/4] ARM: rockchip: rk3288: Switch to use the proper PWM IP
+Date: Mon, 18 Aug 2014 10:09:08 -0700
+Subject: [PATCH 3/4] ARM: dts: Add main PWM info to rk3288
 In-Reply-To: <1408381749-14156-1-git-send-email-dianders@chromium.org>
 References: <1408381749-14156-1-git-send-email-dianders@chromium.org>
-Message-ID: <1408381749-14156-2-git-send-email-dianders@chromium.org>
+Message-ID: <1408381749-14156-4-git-send-email-dianders@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The rk3288 SoC has an option to switch all of the PWMs in the system
-between the old IP block and the new IP block.  The new IP block is
-working and tested and the suggested PWM to use, so setup the SoC to
-use it and then we can pretend that the other IP block doesn't exist.
+This adds the PWM info (other than the VOP PWM) to the main rk3288
+dtsi file.
 
-This code could go lots of other places, but we've put it here.  Why?
-- Pushing it to the bootloader just makes the code harder to update in
-  the field.  If we later find a bug in the new IP block and want to
-  change our mind about what to use we want it to be easy to update.
-- Putting this code in the driver for IP block is a lot of extra work,
-  device tree bindings, etc.  Now that the new IP block is validated
-  it's likely no future SoCs will need this code.  Why pollute the PWM
-  driver with this?  This is an rk3288 thing so it should be in rk3288
-  code.
-- There's a single bit that switches over PWMs, which makes it extra
-  hard to put this under the PWM device tree nodes.
-
+Signed-off-by: Caesar Wang <caesar.wang@rock-chips.com>
 Signed-off-by: Doug Anderson <dianders@chromium.org>
 ---
- arch/arm/mach-rockchip/rockchip.c | 19 +++++++++++++++++++
- 1 file changed, 19 insertions(+)
+ arch/arm/boot/dts/rk3288.dtsi | 68 +++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 68 insertions(+)
 
-diff --git a/arch/arm/mach-rockchip/rockchip.c b/arch/arm/mach-rockchip/rockchip.c
-index 8ab9e0e..99133b9 100644
---- a/arch/arm/mach-rockchip/rockchip.c
-+++ b/arch/arm/mach-rockchip/rockchip.c
-@@ -24,6 +24,24 @@
- #include <asm/hardware/cache-l2x0.h>
- #include "core.h"
+diff --git a/arch/arm/boot/dts/rk3288.dtsi b/arch/arm/boot/dts/rk3288.dtsi
+index 36be7bb..9c9d9c5 100644
+--- a/arch/arm/boot/dts/rk3288.dtsi
++++ b/arch/arm/boot/dts/rk3288.dtsi
+@@ -261,6 +261,50 @@
+ 		status = "disabled";
+ 	};
  
-+static void __init rk3288_init_machine(void)
-+{
-+	void *grf = ioremap(0xff770000, 0x10000);
++	pwm0: pwm at ff680000 {
++		compatible = "rockchip,rk3288-pwm";
++		reg = <0xff680000 0x10>;
++		#pwm-cells = <3>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&pwm0_pin>;
++		clocks = <&cru PCLK_PWM>;
++		clock-names = "pwm";
++		status = "disabled";
++	};
 +
-+	/* Set pwm_sel to RK design PWM in GRF_SOC_CON2; affects all PWMs */
-+	writel(0x00010001, grf + 0x24c);
++	pwm1: pwm at ff680010 {
++		compatible = "rockchip,rk3288-pwm";
++		reg = <0xff680010 0x10>;
++		#pwm-cells = <3>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&pwm1_pin>;
++		clocks = <&cru PCLK_PWM>;
++		clock-names = "pwm";
++		status = "disabled";
++	};
 +
-+	iounmap(grf);
-+}
++	pwm2: pwm at ff680020 {
++		compatible = "rockchip,rk3288-pwm";
++		reg = <0xff680020 0x10>;
++		#pwm-cells = <3>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&pwm2_pin>;
++		clocks = <&cru PCLK_PWM>;
++		clock-names = "pwm";
++		status = "disabled";
++	};
 +
-+static void __init rockchip_init_machine(void)
-+{
-+	if (of_machine_is_compatible("rockchip,rk3288"))
-+		rk3288_init_machine();
++	pwm3: pwm at ff680030 {
++		compatible = "rockchip,rk3288-pwm";
++		reg = <0xff680030 0x10>;
++		#pwm-cells = <2>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&pwm3_pin>;
++		clocks = <&cru PCLK_PWM>;
++		clock-names = "pwm";
++		status = "disabled";
++	};
 +
-+	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
-+}
+ 	pmu: power-management at ff730000 {
+ 		compatible = "rockchip,rk3288-pmu", "syscon";
+ 		reg = <0xff730000 0x100>;
+@@ -611,5 +655,29 @@
+ 				rockchip,pins = <5 15 3 &pcfg_pull_none>;
+ 			};
+ 		};
 +
- static const char * const rockchip_board_dt_compat[] = {
- 	"rockchip,rk2928",
- 	"rockchip,rk3066a",
-@@ -34,6 +52,7 @@ static const char * const rockchip_board_dt_compat[] = {
++		pwm0 {
++			pwm0_pin: pwm0-pin {
++				rockchip,pins = <7 0 RK_FUNC_1 &pcfg_pull_none>;
++			};
++		};
++
++		pwm1 {
++			pwm1_pin: pwm1-pin {
++				rockchip,pins = <7 1 RK_FUNC_1 &pcfg_pull_none>;
++			};
++		};
++
++		pwm2 {
++			pwm2_pin: pwm2-pin {
++				rockchip,pins = <7 22 RK_FUNC_3 &pcfg_pull_none>;
++			};
++		};
++
++		pwm3 {
++			pwm3_pin: pwm3-pin {
++				rockchip,pins = <7 23 RK_FUNC_3 &pcfg_pull_none>;
++			};
++		};
+ 	};
  };
- 
- DT_MACHINE_START(ROCKCHIP_DT, "Rockchip Cortex-A9 (Device Tree)")
-+	.init_machine	= rockchip_init_machine,
- 	.l2c_aux_val	= 0,
- 	.l2c_aux_mask	= ~0,
- 	.dt_compat	= rockchip_board_dt_compat,
 -- 
 2.1.0.rc2.206.gedb03e5
