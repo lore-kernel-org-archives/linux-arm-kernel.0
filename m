@@ -1,259 +1,43 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Mon, 18 Aug 2014 19:33:41 +0100
-Subject: [PATCH v2 06/18] ARM64 / ACPI: Parse MADT to map logical cpu
- to MPIDR and get cpu_possible/present_map
-In-Reply-To: <1407166105-17675-7-git-send-email-hanjun.guo@linaro.org>
-References: <1407166105-17675-1-git-send-email-hanjun.guo@linaro.org>
- <1407166105-17675-7-git-send-email-hanjun.guo@linaro.org>
-Message-ID: <53F24705.7080809@arm.com>
+From: robdclark@gmail.com (Rob Clark)
+Date: Mon, 18 Aug 2014 14:32:15 -0400
+Subject: [PATCH v5 1/1] iommu-api: Add map_sg/unmap_sg functions
+In-Reply-To: <20140818140730.GC9809@8bytes.org>
+References: <1407797150-515-1-git-send-email-ohaugan@codeaurora.org>
+ <1407797150-515-2-git-send-email-ohaugan@codeaurora.org>
+ <871tsm5vcn.fsf@nvidia.com>
+ <CAF6AEGvZUanVtPxAt76+AAdOaNwyMJ3cmcJ1srsEYBeG7ELkBQ@mail.gmail.com>
+ <53EA472B.3020900@codeaurora.org>
+ <20140818140730.GC9809@8bytes.org>
+Message-ID: <CAF6AEGtGmAQjMc5W5a6x5QiyUc8v0XHcsNAFe65Znc=DDKPS+w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 04/08/14 16:28, Hanjun Guo wrote:
-> MADT contains the information for MPIDR which is essential for
-> SMP initialization, parse the GIC cpu interface structures to
-> get the MPIDR value and map it to cpu_logical_map(), and add
-> enabled cpu with valid MPIDR into cpu_possible_map and
-> cpu_present_map.
+On Mon, Aug 18, 2014 at 10:07 AM, joro at 8bytes.org <joro@8bytes.org> wrote:
+> On Tue, Aug 12, 2014 at 09:56:11AM -0700, Olav Haugan wrote:
+>> On 8/12/2014 3:48 AM, Rob Clark wrote:
+>> > iirc, one plan for 'flags' was some sort of DONT_FLUSH_TLB flag for
+>> > drivers which wanted to map/unmap N buffers with a single flush at the
+>> > end.  There might have been some other usages envisioned.
+>>
+>> Yes, that was the original intent of the flags for now. I am sure we can
+>> find other uses for this in the future.
 >
-> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
-> Signed-off-by: Tomasz Nowicki <tomasz.nowicki@linaro.org>
-> ---
->   arch/arm64/include/asm/acpi.h |    2 +
->   arch/arm64/kernel/acpi.c      |  129 ++++++++++++++++++++++++++++++++++++++++-
->   arch/arm64/kernel/smp.c       |   10 +++-
->   3 files changed, 138 insertions(+), 3 deletions(-)
+> Do you have anything else in mind already besides the DONT_FLUSH_TLB
+> flag?
 >
-> diff --git a/arch/arm64/include/asm/acpi.h b/arch/arm64/include/asm/acpi.h
-> index 6e04868..e877967 100644
-> --- a/arch/arm64/include/asm/acpi.h
-> +++ b/arch/arm64/include/asm/acpi.h
-> @@ -64,6 +64,8 @@ static inline void arch_fix_phys_package_id(int num, u32 slot) { }
->   extern int (*acpi_suspend_lowlevel)(void);
->   #define acpi_wakeup_address 0
+> How is the IOTLB supposed to be flushed when this flag is used?
 >
-> +#define MAX_GIC_CPU_INTERFACE 65535
-> +
 
-Did you get this information from GIC specification ?
+well, I was thinking one of two ways:
 
-IIUC you are trying to represent max number of interrupt controller
-entries MADT can possibly have. So, I had suggested to change the name
-like MAX_MADT_INTERRUPT_CONTROLLER_ENTRIES so that it is not GIC specific.
+1) add new flush() vfunc.. this, I think, would be most convenient for
+drivers using this feature
+2) or driver simply doesn't set DONT_FLUSH_TLB flag on the last
+{map,unmap}..  that would be slightly more awkward to use, but would
+avoid adding a new vfunc
 
->   #endif /* CONFIG_ACPI */
->
->   #endif /*_ASM_ACPI_H*/
-> diff --git a/arch/arm64/kernel/acpi.c b/arch/arm64/kernel/acpi.c
-> index 69a315d..9e07d99 100644
-> --- a/arch/arm64/kernel/acpi.c
-> +++ b/arch/arm64/kernel/acpi.c
-> @@ -22,6 +22,9 @@
->   #include <linux/bootmem.h>
->   #include <linux/smp.h>
->
-> +#include <asm/smp_plat.h>
-> +#include <asm/cputype.h>
-> +
->   int acpi_noirq;			/* skip ACPI IRQ initialization */
->   int acpi_disabled;
->   EXPORT_SYMBOL(acpi_disabled);
-> @@ -29,6 +32,8 @@ EXPORT_SYMBOL(acpi_disabled);
->   int acpi_pci_disabled;		/* skip ACPI PCI scan and IRQ initialization */
->   EXPORT_SYMBOL(acpi_pci_disabled);
->
-> +static int enabled_cpus;	/* Processors (GICC) with enabled flag in MADT */
-> +
->   /*
->    * __acpi_map_table() will be called before page_init(), so early_ioremap()
->    * or early_memremap() should be called here to for ACPI table mapping.
-> @@ -49,6 +54,122 @@ void __init __acpi_unmap_table(char *map, unsigned long size)
->   	early_memunmap(map, size);
->   }
->
-> +/**
-> + * acpi_register_gic_cpu_interface - register a gic cpu interface and
-> + * generates a logical cpu number
-> + * @mpidr: CPU's hardware id to register, MPIDR represented in MADT
-> + * @enabled: this cpu is enabled or not
-> + *
-> + * Returns the logical cpu number which maps to the gic cpu interface
-> + */
-> +static int acpi_register_gic_cpu_interface(u64 mpidr, u8 enabled)
-> +{
+BR,
+-R
 
-IMO the function name gives me a wrong idea that you are registering
-something with GIC. How about acpi_map_gic_cpu_interface ?
-
-> +	int cpu;
-> +
-> +	if (mpidr == INVALID_HWID) {
-> +		pr_info("Skip invalid cpu hardware ID\n");
-> +		return -EINVAL;
-> +	}
-> +
-> +	total_cpus++;
-> +	if (!enabled)
-> +		return -EINVAL;
-> +
-> +	if (enabled_cpus >=  NR_CPUS) {
-> +		pr_warn("NR_CPUS limit of %d reached, Processor %d/0x%llx ignored.\n",
-> +			NR_CPUS, total_cpus, mpidr);
-> +		return -EINVAL;
-> +	}
-> +
-> +	/* If it is the first CPU, no need to check duplicate MPIDRs */
-> +	if (!enabled_cpus)
-> +		goto skip_mpidr_check;
-> +
-> +	/*
-> +	 * Duplicate MPIDRs are a recipe for disaster. Scan
-> +	 * all initialized entries and check for
-> +	 * duplicates. If any is found just ignore the CPU.
-> +	 */
-> +	for_each_present_cpu(cpu) {
-> +		if (cpu_logical_map(cpu) == mpidr) {
-> +			pr_err("Firmware bug, duplicate CPU MPIDR: 0x%llx in MADT\n",
-> +			       mpidr);
-> +			return -EINVAL;
-> +		}
-> +	}
-> +
-> +skip_mpidr_check:
-> +	enabled_cpus++;
-> +
-> +	/* allocate a logical cpu id for the new comer */
-> +	if (cpu_logical_map(0) == mpidr) {
-> +		/*
-> +		 * boot_cpu_init() already hold bit 0 in cpu_present_mask
-> +		 * for BSP, no need to allocate again.
-> +		 */
-> +		cpu = 0;
-> +	} else {
-> +		cpu = cpumask_next_zero(-1, cpu_present_mask);
-> +	}
-> +
-> +	/* map the logical cpu id to cpu MPIDR */
-> +	cpu_logical_map(cpu) = mpidr;
-> +
-> +	set_cpu_possible(cpu, true);
-
-IMO it better to keep all these updates to cpumasks contained in the
-smp.c as I had mentioned before. I think you can refactor smp_init_cpus
-to achieve that.
-
-> +	set_cpu_present(cpu, true);
-
-This is totally wrong ? What would you do if the cpu failed to
-initialize ? I don't see that handled.
-
-> +
-> +	return cpu;
-> +}
-> +
-> +static int __init
-> +acpi_parse_gic_cpu_interface(struct acpi_subtable_header *header,
-> +				const unsigned long end)
-> +{
-> +	struct acpi_madt_generic_interrupt *processor;
-> +
-> +	processor = (struct acpi_madt_generic_interrupt *)header;
-> +
-> +	if (BAD_MADT_ENTRY(processor, end))
-> +		return -EINVAL;
-> +
-> +	acpi_table_print_madt_entry(header);
-> +
-> +	acpi_register_gic_cpu_interface(processor->arm_mpidr,
-> +		processor->flags & ACPI_MADT_ENABLED);
-> +
-> +	return 0;
-> +}
-> +
-> +/*
-> + * Parse GIC cpu interface related entries in MADT
-> + * returns 0 on success, < 0 on error
-> + */
-> +static int __init acpi_parse_madt_gic_cpu_interface_entries(void)
-> +{
-> +	int count;
-> +
-> +	/*
-> +	 * do a partial walk of MADT to determine how many CPUs
-> +	 * we have including disabled CPUs, and get information
-> +	 * we need for SMP init
-> +	 */
-> +	count = acpi_table_parse_madt(ACPI_MADT_TYPE_GENERIC_INTERRUPT,
-> +			acpi_parse_gic_cpu_interface, MAX_GIC_CPU_INTERFACE);
-> +
-> +	if (!count) {
-> +		pr_err("No GIC CPU interface entries present\n");
-> +		return -ENODEV;
-> +	} else if (count < 0) {
-> +		pr_err("Error parsing GIC CPU interface entry\n");
-> +		return count;
-> +	}
-> +
-> +	/* Make boot-up look pretty */
-> +	pr_info("%d CPUs enabled, %d CPUs total\n", enabled_cpus, total_cpus);
-
-Ideally just setup cpu_logical_map in acpi_parse_gic_cpu_interface and
-setup cpumasks in smp_init_cpus.
-
-> +
-> +	return 0;
-> +}
-> +
->   static int __init acpi_parse_fadt(struct acpi_table_header *table)
->   {
->   	struct acpi_table_fadt *fadt = (struct acpi_table_fadt *)table;
-> @@ -99,8 +220,12 @@ int __init acpi_boot_init(void)
->   		return -ENODEV;
->
->   	err = acpi_table_parse(ACPI_SIG_FADT, acpi_parse_fadt);
-> -	if (err)
-> -		pr_err("Can't find FADT\n");
-> +	if (err) {
-> +		pr_err("Can't find FADT or error happened during parsing FADT\n");
-> +		return err;
-> +	}
-> +
-> +	err = acpi_parse_madt_gic_cpu_interface_entries();
->
->   	return err;
->   }
-> diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
-> index 40f38f4..8f1d37c 100644
-> --- a/arch/arm64/kernel/smp.c
-> +++ b/arch/arm64/kernel/smp.c
-> @@ -36,6 +36,7 @@
->   #include <linux/completion.h>
->   #include <linux/of.h>
->   #include <linux/irq_work.h>
-> +#include <linux/acpi.h>
->
->   #include <asm/atomic.h>
->   #include <asm/cacheflush.h>
-> @@ -458,7 +459,14 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
->   		if (err)
->   			continue;
->
-> -		set_cpu_present(cpu, true);
-> +		/*
-> +		 * In ACPI mode, cpu_present_map was initialised when
-> +		 * MADT table was parsed which before this function
-> +		 * is called.
-> +		 */
-> +		if (acpi_disabled)
-> +			set_cpu_present(cpu, true);
-> +
-
-This is the right place to set the cpu present based on the return value
-of cpu_prepare.
-
->   		max_cpus--;
->   	}
->   }
+>         Joerg
 >
