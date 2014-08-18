@@ -1,38 +1,63 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Mon, 18 Aug 2014 11:36:16 -0500
-Subject: [PATCH] cpuidle: big.LITTLE: add Exynos5800 compatible string
-In-Reply-To: <1407888665-24603-1-git-send-email-khilman@linaro.org>
-References: <1407888665-24603-1-git-send-email-khilman@linaro.org>
-Message-ID: <53F22B80.3050205@samsung.com>
+Date: Mon, 18 Aug 2014 11:43:07 -0500
+Subject: [PATCH 1/2] ARM: dts: Enable PMIC interrupts on ODROID
+In-Reply-To: <CAAObsKAokjDmpVy5cm_iFD52bCq+3jYeGDWzACsmh-JKktyjDw@mail.gmail.com>
+References: <1405500606-5752-1-git-send-email-drake@endlessm.com>
+ <CAAObsKAokjDmpVy5cm_iFD52bCq+3jYeGDWzACsmh-JKktyjDw@mail.gmail.com>
+Message-ID: <53F22D1B.4010900@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/12/14 19:11, Kevin Hilman wrote:
-> Exynos 5800 is big.LITTLE SoC compatible with the 5420.  Add the
-> compatible string so this driver works on the 5800.
+On 08/12/14 08:06, Tomeu Vizoso wrote:
+> Tested on an Odroid-U2:
 >
-> Tested on exynos5800-peach-pi (aka Samsung Chromebook2)
+> Tested-by: Tomeu Vizoso<tomeu@tomeuvizoso.net>
 >
-> Signed-off-by: Kevin Hilman<khilman@linaro.org>
+> Thanks,
+>
+> Tomeu
+>
+>
+> On 16 July 2014 10:50, Daniel Drake<drake@endlessm.com>  wrote:
+>> The ODROID kernel shows that the PMIC interrupt line is hooked up
+>> to pin GPX3-2.
+>>
+>> This is needed for the max77686-irq driver to create the PMIC IRQ
+>> domain, which is needed by max77686-rtc.
+>>
+>> Signed-off-by: Daniel Drake<drake@endlessm.com>
+>> ---
+>>   arch/arm/boot/dts/exynos4412-odroid-common.dtsi | 11 +++++++++++
+>>   1 file changed, 11 insertions(+)
+>>
+>> diff --git a/arch/arm/boot/dts/exynos4412-odroid-common.dtsi b/arch/arm/boot/dts/exynos4412-odroid-common.dtsi
+>> index 6d6d23c..cb6f55f 100644
+>> --- a/arch/arm/boot/dts/exynos4412-odroid-common.dtsi
+>> +++ b/arch/arm/boot/dts/exynos4412-odroid-common.dtsi
+>> @@ -148,6 +148,10 @@
+>>
+>>                  max77686: pmic at 09 {
+>>                          compatible = "maxim,max77686";
+>> +                       interrupt-parent =<&gpx3>;
+>> +                       interrupts =<2 0>;
+>> +                       pinctrl-names = "default";
+>> +                       pinctrl-0 =<&max77686_irq>;
+>>                          reg =<0x09>;
+>>                          #clock-cells =<1>;
+>>
+>> @@ -368,4 +372,11 @@
+>>                  samsung,pins = "gpx1-3";
+>>                  samsung,pin-pud =<0>;
+>>          };
+>> +
+>> +       max77686_irq: max77686-irq {
+>> +               samsung,pins = "gpx3-2";
+>> +               samsung,pin-function =<0>;
+>> +               samsung,pin-pud =<0>;
+>> +               samsung,pin-drv =<0>;
+>> +       };
+>>   };
 
-Acked-by: Kukjin Kim <kgene.kim@samsung.com>
+Thanks, applied this series.
 
-Thanks,
-Kukjin
-
-> ---
->   drivers/cpuidle/cpuidle-big_little.c | 1 +
->   1 file changed, 1 insertion(+)
->
-> diff --git a/drivers/cpuidle/cpuidle-big_little.c b/drivers/cpuidle/cpuidle-big_little.c
-> index 0a1f827308db..bf3ab66fdaaf 100644
-> --- a/drivers/cpuidle/cpuidle-big_little.c
-> +++ b/drivers/cpuidle/cpuidle-big_little.c
-> @@ -166,6 +166,7 @@ static int __init bl_idle_driver_init(struct cpuidle_driver *drv, int match_id)
->   static const struct of_device_id compatible_machine_match[] = {
->   	{ .compatible = "arm,vexpress,v2p-ca15_a7" },
->   	{ .compatible = "samsung,exynos5420" },
-> +	{ .compatible = "samsung,exynos5800" },
->   	{},
->   };
->
+- Kukjin
