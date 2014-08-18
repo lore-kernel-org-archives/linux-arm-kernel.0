@@ -1,80 +1,64 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 18 Aug 2014 16:45:48 +0100
-Subject: [PATCH v2 6/9] arm: mediatek: enable gpt6 on boot up to make
- arch timer working
-In-Reply-To: <1408373917-10002-7-git-send-email-matthias.bgg@gmail.com>
-References: <1408373917-10002-1-git-send-email-matthias.bgg@gmail.com>
- <1408373917-10002-7-git-send-email-matthias.bgg@gmail.com>
-Message-ID: <20140818154548.GA3302@leverpostej>
+From: kiran.padwal@smartplayin.com (kiran.padwal at smartplayin.com)
+Date: Mon, 18 Aug 2014 11:48:03 -0400 (EDT)
+Subject: [PATCH] ARM: apq8064: Add pinmux and i2c pinctrl nodes
+In-Reply-To: <1408129739.03949271@apps.rackspace.com>
+References: <1408129739.03949271@apps.rackspace.com>
+Message-ID: <1408376883.684512744@apps.rackspace.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Matthias,
 
-On Mon, Aug 18, 2014 at 03:58:34PM +0100, Matthias Brugger wrote:
-> We enable GTP6 which ungates the arch timer clock. Apart we write the
-> frequency with which the timer is running in the CNTFREQ register.
+On Friday, August 15, 2014 3:08pm, kiran.padwal at smartplayin.com said:
 
-We don't seem to set CNTFRQ below. Does it happen to have a consistent
-value on current versions of the bootloader?
-
-> In the future this should be done in the bootloader.
-
-Do we know how far in the future that's likely to be?
-
-What's the plan for this code when such a bootloader becomes available?
-
-Thanks,
-Mark.
-
-> Signed-off-by: Matthias Brugger <matthias.bgg@gmail.com>
-> ---
->  arch/arm/mach-mediatek/mediatek.c |   26 ++++++++++++++++++++++++++
->  1 file changed, 26 insertions(+)
 > 
-> diff --git a/arch/arm/mach-mediatek/mediatek.c b/arch/arm/mach-mediatek/mediatek.c
-> index f2acf07..2989f18 100644
-> --- a/arch/arm/mach-mediatek/mediatek.c
-> +++ b/arch/arm/mach-mediatek/mediatek.c
-> @@ -16,6 +16,31 @@
->   */
->  #include <linux/init.h>
->  #include <asm/mach/arch.h>
-> +#include <linux/of.h>
-> +#include <linux/clk-provider.h>
-> +#include <linux/clocksource.h>
-> +
-> +#define TIMER_CTRL_OP_FREERUN	0x30
-> +#define TIMER_CTRL_ENABLE	0x01
-> +
-> +#define GPT6_CON_MT65xx 0x10008060
-> +
-> +static void __init mediatek_timer_init(void)
-> +{
-> +	static void __iomem *gpt_base;
-> +
-> +	if (of_machine_is_compatible("mediatek,mt6589")) {
-> +		/* turn on GPT6 which ungates arch timer clocks */
-> +		gpt_base = ioremap(GPT6_CON_MT65xx, 0x04);
-> +	}
-> +
-> +	/* enabel clock and set to free-run */
-> +	if (gpt_base)
-> +		writel(TIMER_CTRL_OP_FREERUN | TIMER_CTRL_ENABLE, gpt_base);
-> +
-> +	of_clk_init(NULL);
-> +	clocksource_of_init();
-> +};
->  
->  static const char * const mediatek_board_dt_compat[] = {
->  	"mediatek,mt6589",
-> @@ -24,4 +49,5 @@ static const char * const mediatek_board_dt_compat[] = {
->  
->  DT_MACHINE_START(MEDIATEK_DT, "Mediatek Cortex-A7 (Device Tree)")
->  	.dt_compat	= mediatek_board_dt_compat,
-> +	.init_time	= mediatek_timer_init,
->  MACHINE_END
-> -- 
-> 1.7.9.5
+> On Thursday, August 14, 2014 6:37pm, "Bjorn Andersson" <bjorn@kryo.se> said:
+> 
+>> On Thu, Aug 14, 2014 at 12:20 AM, Kiran Padwal
+>> <kiran.padwal@smartplayin.com> wrote:
+>>> diff --git a/arch/arm/boot/dts/qcom-apq8064.dtsi
+>>> b/arch/arm/boot/dts/qcom-apq8064.dtsi
+>>> index 92bf793..fbebf5c 100644
+>>> --- a/arch/arm/boot/dts/qcom-apq8064.dtsi
+>>> +++ b/arch/arm/boot/dts/qcom-apq8064.dtsi
+>>> @@ -70,6 +70,17 @@
+>>>                 ranges;
+>>>                 compatible = "simple-bus";
+>>>
+>>> +               qcom_pinmux: pinmux at 800000 {
+>>
+>> There are (at least) three different pinmuxes in these platforms: TLMM, PMIC
+>> GPIO, PMIC MPP. Also this is the phandle that is used to reference the gpio
+>> chip throughout the board.
+>>
+>> So I would like to suggest that we name it "tlmm" or like in the downstream
+>> kernel "msmgpio".
+> 
+> ok. How about "qcomgpio" or rename it to msmgpio?
+
+Thanks for suggestion, I will rename it to "tlmm".
+
+> 
+>>
+>>> +                       compatible = "qcom,apq8064-pinctrl";
+>>> +                       reg = <0x800000 0x4000>;
+>>> +
+>>> +                       gpio-controller;
+>>> +                       #gpio-cells = <2>;
+>>> +                       interrupt-controller;
+>>> +                       #interrupt-cells = <2>;
+>>> +                       interrupts = <0 32 0x4>;
+>>
+>> I must have gotten this wrong in the dt binding example, sorry about that.
+>> interrupts should be <0 16 0x4>.
+> 
+> Thanks for information. I will update that.
+> 
+>>
+>>> +               };
+>>
+>> Regards,
+>> Bjorn
+>>
+> 
 > 
 > 
