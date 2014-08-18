@@ -1,49 +1,33 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Mon, 18 Aug 2014 14:19:07 +0800
-Subject: [GIT PULL] Allwinner DT additions for 3.17, take 2
-In-Reply-To: <20140731095158.GA14197@lukather>
-References: <20140731095158.GA14197@lukather>
-Message-ID: <CAGb2v677G33AC2C8sV2tBthVfF=WdG7673g9PggCoUuJ1xtXuw@mail.gmail.com>
+From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
+Date: Mon, 18 Aug 2014 07:23:35 +0100
+Subject: [PATCH 0/2] dmaengine: qcom_bam_dma: Add support for v1.3.0
+In-Reply-To: <1397684719-30065-1-git-send-email-agross@codeaurora.org>
+References: <1397684719-30065-1-git-send-email-agross@codeaurora.org>
+Message-ID: <53F19BE7.6070300@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Andy,
+Any plans to respin these patches with Stanimir's comments?
 
-On Thu, Jul 31, 2014 at 5:51 PM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> Hi Arnd, Kevin, Olof,
->
-> Here are a rather small (and late) pull request for the Allwinner DTs
-> that comes on top of the previous one.
->
-> It's basically just a fix, so there's no real need to merge it by
-> -rc1, it can definitely be postponed to a later 3.17-rc.
->
-> Thanks,
-> Maxime
->
-> The following changes since commit c220aec2bb793bf5a1fb451fd3e4db87654c5ba5:
->
->   ARM: dts: sun6i: Add Merrii A31 Hummingbird support (2014-07-18 22:40:37 +0200)
->
-> are available in the git repository at:
->
->   git://git.kernel.org/pub/scm/linux/kernel/git/mripard/linux.git tags/sunxi-dt-for-3.17-2
->
-> for you to fetch changes up to 495bccf3917b04c6727d720b56620e265c693ace:
->
->   ARM: dt: sun6i: Add #address-cells and #size-cells to i2c controller nodes (2014-07-28 11:34:39 +0200)
->
-> ----------------------------------------------------------------
-> Allwinner DT changes, take 2
->
-> Only a single patch in here that fixes a DTC warning.
->
-> ----------------------------------------------------------------
-> Chen-Yu Tsai (1):
->       ARM: dt: sun6i: Add #address-cells and #size-cells to i2c controller nodes
+thanks,
+srini
 
-It seems this patch didn't make it into v3.17-rc1.
 
->  arch/arm/boot/dts/sun6i-a31.dtsi | 8 ++++++++
->  1 file changed, 8 insertions(+)
+On 16/04/14 22:45, Andy Gross wrote:
+> This set of patches adds support for the v1.3.0 version of the QCOM BAM
+> dmaengine driver.  The older version of the BAM is present in the MSM8x64,
+> APQ8064, and IPQ8064 processors.
+>
+> Due to register address space changes between versions, all of the register
+> accesses have to be calculated using different offsets and multipliers that are
+> specific to that version of the IP block.
+>
+> Andy Gross (2):
+>    dmaengine: qcom_bam_dma: Add v1.3.0 driver support
+>    dmaengine: qcom_bam_dma: Add binding for v1.3.0
+>
+>   .../devicetree/bindings/dma/qcom_bam_dma.txt       |    4 +-
+>   drivers/dma/qcom_bam_dma.c                         |  177 +++++++++++++-------
+>   2 files changed, 117 insertions(+), 64 deletions(-)
+>
