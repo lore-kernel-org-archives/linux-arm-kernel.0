@@ -1,43 +1,47 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Mon, 18 Aug 2014 14:43:19 +0800
-Subject: [PATCH] ARM: dts: imx6: edmqmx6: change enet reset pin
-In-Reply-To: <76f23118ec2c07696aefd4fd88133f42837d45a5.1407765032.git.silvio.fricke@gmail.com>
-References: <cover.1407765032.git.silvio.fricke@gmail.com>
- <76f23118ec2c07696aefd4fd88133f42837d45a5.1407765032.git.silvio.fricke@gmail.com>
-Message-ID: <20140818064316.GF2114@dragon>
+From: mpa@pengutronix.de (Markus Pargmann)
+Date: Mon, 18 Aug 2014 08:58:40 +0200
+Subject: [PATCH v3 5/7] net: cpsw: Add am33xx MACID readout
+In-Reply-To: <20140816164647.GA2858@katana>
+References: <1408202315-20006-1-git-send-email-mpa@pengutronix.de>
+ <1408202315-20006-6-git-send-email-mpa@pengutronix.de>
+ <20140816164647.GA2858@katana>
+Message-ID: <20140818065840.GA12930@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 11, 2014 at 03:53:11PM +0200, Silvio Fricke wrote:
-> Signed-off-by: Silvio Fricke <silvio.fricke@gmail.com>
-> ---
->  arch/arm/boot/dts/imx6q-dmo-edmqmx6.dts | 3 ++-
->  1 file changed, 2 insertions(+), 1 deletion(-)
+Hi,
 
-Applied, thanks.
+On Sat, Aug 16, 2014 at 11:46:48AM -0500, Wolfram Sang wrote:
+> 
+> > diff --git a/drivers/net/ethernet/ti/Makefile b/drivers/net/ethernet/ti/Makefile
+> > index 9cfaab8152be..5a31c2b322ee 100644
+> > --- a/drivers/net/ethernet/ti/Makefile
+> > +++ b/drivers/net/ethernet/ti/Makefile
+> > @@ -8,5 +8,6 @@ obj-$(CONFIG_TI_DAVINCI_EMAC) += davinci_emac.o
+> >  obj-$(CONFIG_TI_DAVINCI_MDIO) += davinci_mdio.o
+> >  obj-$(CONFIG_TI_DAVINCI_CPDMA) += davinci_cpdma.o
+> >  obj-$(CONFIG_TI_CPSW_PHY_SEL) += cpsw-phy-sel.o
+> > +obj-$(CONFIG_TI_CPSW_CTRL_MACID) += cpsw-ctrl-macid.o
+> >  obj-$(CONFIG_TI_CPSW) += ti_cpsw.o
+> >  ti_cpsw-y := cpsw_ale.o cpsw.o cpts.o
+> 
+> Leftover from your last series?
 
-> 
-> diff --git a/arch/arm/boot/dts/imx6q-dmo-edmqmx6.dts b/arch/arm/boot/dts/imx6q-dmo-edmqmx6.dts
-> index 8c1cb53..4fa2543 100644
-> --- a/arch/arm/boot/dts/imx6q-dmo-edmqmx6.dts
-> +++ b/arch/arm/boot/dts/imx6q-dmo-edmqmx6.dts
-> @@ -119,7 +119,7 @@
->  	pinctrl-names = "default";
->  	pinctrl-0 = <&pinctrl_enet>;
->  	phy-mode = "rgmii";
-> -	phy-reset-gpios = <&gpio3 23 0>;
-> +	phy-reset-gpios = <&gpio1 25 0>;
->  	phy-supply = <&vgen2_1v2_eth>;
->  	status = "okay";
->  };
-> @@ -339,6 +339,7 @@
->  				MX6QDL_PAD_ENET_REF_CLK__ENET_TX_CLK	0x1b0b0
->  				MX6QDL_PAD_ENET_MDIO__ENET_MDIO		0x1b0b0
->  				MX6QDL_PAD_ENET_MDC__ENET_MDC		0x1b0b0
-> +				MX6QDL_PAD_ENET_CRS_DV__GPIO1_IO25	0x1b0b0
->  				MX6QDL_PAD_GPIO_16__ENET_REF_CLK	0x4001b0a8
->  			>;
->  		};
-> -- 
-> 2.0.3
-> 
+Yes thanks, will remove it for the next version.
+
+Best regards,
+
+Markus
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140818/0fcc2d8b/attachment.sig>
