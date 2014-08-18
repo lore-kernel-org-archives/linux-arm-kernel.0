@@ -1,94 +1,48 @@
-From: mugunthanvnm@ti.com (Mugunthan V N)
-Date: Tue, 19 Aug 2014 01:28:09 +0530
-Subject: [PATCH v3 5/7] net: cpsw: Add am33xx MACID readout
-In-Reply-To: <20140818154112.6601cbff@gandalf.local.home>
-References: <1408202315-20006-1-git-send-email-mpa@pengutronix.de>	<1408202315-20006-6-git-send-email-mpa@pengutronix.de>	<53F244DA.3070803@ti.com>
- <20140818154112.6601cbff@gandalf.local.home>
-Message-ID: <53F25AD1.8040504@ti.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Mon, 18 Aug 2014 15:03:17 -0500
+Subject: [PATCH v5 02/10] ARM: dts: Fold exynos5250-cros-common into
+ exynos5250-snow
+In-Reply-To: <CAD=FV=USKuOxiFo=VgEB6aAQ=LdLv-7+jXQNh4VCMBQwasygxg@mail.gmail.com>
+References: <1406868897-26874-1-git-send-email-afaerber@suse.de>	<1406868897-26874-3-git-send-email-afaerber@suse.de>
+ <CAD=FV=USKuOxiFo=VgEB6aAQ=LdLv-7+jXQNh4VCMBQwasygxg@mail.gmail.com>
+Message-ID: <53F25C05.5070604@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 19 August 2014 01:11 AM, Steven Rostedt wrote:
-> On Mon, 18 Aug 2014 23:54:26 +0530
-> Mugunthan V N <mugunthanvnm@ti.com> wrote:
+On 08/01/14 11:45, Doug Anderson wrote:
+> Andreas,
 >
->> On Saturday 16 August 2014 08:48 PM, Markus Pargmann wrote:
->>> +	mac_addr[5] = (macid_lo >> 8) & 0xff;
->>> +	mac_addr[4] = macid_lo & 0xff;
->>> +	mac_addr[3] = (macid_hi >> 24) & 0xff;
->>> +	mac_addr[2] = (macid_hi >> 16) & 0xff;
->>> +	mac_addr[1] = (macid_hi >> 8) & 0xff;
->>> +	mac_addr[0] = macid_hi & 0xff;
->>> +
->> This will fail incase of DRA74x and DRA72x platforms, please check for
->> u-boot src for parsing logic as TRM is not out yet. Below is the actual
->> code for DRA7 platforms for MAC address parsing
+> On Thu, Jul 31, 2014 at 9:54 PM, Andreas F?rber<afaerber@suse.de>  wrote:
+>> exynos5250-cros-common.dtsi was meant for sharing common pieces across
+>> ChromeOS devices. This turned out premature, as several devices ended up
+>> in the common file that are not common after all. Since the remaining
+>> common ChromeOS pieces are fairly minor,  exynos5250-cros-common.dtsi
+>> was requested to be merged into the Snow device tree, sharing only the
+>> keyboard controller for now. This may be re-evaluated as both mature.
 >>
->> mac_addr[0] = (mac_hi & 0xFF0000) >> 16;
->> mac_addr[1] = (mac_hi & 0xFF00) >> 8;
->> mac_addr[2] = mac_hi & 0xFF;
->> mac_addr[3] = (mac_lo & 0xFF0000) >> 16;
->> mac_addr[4] = (mac_lo & 0xFF00) >> 8;
->> mac_addr[5] = mac_lo & 0xFF;
+>> Suggested-by: Doug Anderson<dianders@chromium.org>
+>> Reviewed-by: Tomasz Figa<t.figa@samsung.com>
+>> Signed-off-by: Andreas F?rber<afaerber@suse.de>
+>> ---
+>>   v4 ->  v5:
+>>   * Extended commit message (Tomasz Figa)
 >>
-> But this fails with my beaglebone white.
+>>   v3 ->  v4: Unchanged
+>>
+>>   v2 ->  v3:
+>>   * Renamed subject to match Kukjin's style
+>>   * Rebased onto MMC pinctrl bug fix (Doug Anderson)
+>>
+>>   v2: New (Doug Anderson)
+>>
+>>   arch/arm/boot/dts/exynos5250-cros-common.dtsi | 164 --------------------------
+>>   arch/arm/boot/dts/exynos5250-snow.dts         | 164 +++++++++++++++++++++++---
+>>   2 files changed, 145 insertions(+), 183 deletions(-)
 >
-> I tested Markus's patches and it came up with the same ethaddr that
-> U-Boot had.
+> Reviewed-by: Doug Anderson<dianders@chromium.org>
 >
-> From U-Boot:
->
-> ethaddr=d4:94:a1:8b:ec:78
->
-> With Markus's changes:
->
->  eth0      Link encap:Ethernet  HWaddr D4:94:A1:8B:EC:78
->
-> But when I changed the code to match what you wrote, I got this:
->
->  eth0      Link encap:Ethernet  HWaddr CE:5A:8B:0E:44:45
->
-> but it also gave me:
->
-> cpsw 4a100000.ethernet: Random MACID = ce:5a:8b:0e:44:45
->
-> which means it failed the valid mac test.
->
-> Here's how I implemented your change:
->
-> #if 1
->         mac_addr[0] = (macid_hi & 0xFF0000) >> 16;
->         mac_addr[1] = (macid_hi & 0xFF00) >> 8;
->         mac_addr[2] = macid_hi & 0xFF;
->         mac_addr[3] = (macid_lo & 0xFF0000) >> 16;
->         mac_addr[4] = (macid_lo & 0xFF00) >> 8;
->         mac_addr[5] = macid_lo & 0xFF;
->
-> #else   
->         mac_addr[5] = (macid_lo >> 8) & 0xff;
->         mac_addr[4] = macid_lo & 0xff;
->         mac_addr[3] = (macid_hi >> 24) & 0xff;
->         mac_addr[2] = (macid_hi >> 16) & 0xff;
->         mac_addr[1] = (macid_hi >> 8) & 0xff;
->         mac_addr[0] = macid_hi & 0xff;
-> #endif  
->
-> Just to be consistent, I updated the code as this too:
->
->         mac_addr[0] = (macid_hi >> 16) & 0xFF;
->         mac_addr[1] = (macid_hi >> 8) & 0xFF;
->         mac_addr[2] = macid_hi & 0xFF;
->         mac_addr[3] = (macid_lo >> 16) & 0xFF;
->         mac_addr[4] = (macid_lo >> 8) & 0xFF;
->         mac_addr[5] = macid_lo & 0xFF;
->
-> With the same affect.
->
-> Thus, for this patchset, as is:
->
-> Tested-by: Steven Rostedt <rostedt@goodmis.org>
+> I'd suggest that this land sooner rather than later to avoid future conflicts.
 
-This will fail for DRA7xx not in AM33xx
+Applied, thanks.
 
-Regards
-Mugunthan V N
+- Kukjin
