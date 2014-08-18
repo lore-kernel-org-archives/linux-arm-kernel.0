@@ -1,96 +1,46 @@
-From: liviu@dudau.co.uk (Liviu Dudau)
-Date: Mon, 18 Aug 2014 22:30:54 +0100
-Subject: [PATCH v9 02/12] PCI: OF: Parse and map the IRQ when adding the
- PCI device.
-In-Reply-To: <20140818142550.GN20043@localhost>
-References: <1407860725-25202-1-git-send-email-Liviu.Dudau@arm.com>
- <1407860725-25202-3-git-send-email-Liviu.Dudau@arm.com>
- <20140814145804.GA5586@richard>
- <20140814154959.GG25761@e106497-lin.cambridge.arm.com>
- <20140815085632.GA4954@richard>
- <20140815103052.GD27553@e106497-lin.cambridge.arm.com>
- <20140818142550.GN20043@localhost>
-Message-ID: <20140818213054.GB13147@bart.dudau.co.uk>
+From: ohaugan@codeaurora.org (Olav Haugan)
+Date: Mon, 18 Aug 2014 14:32:36 -0700
+Subject: [PATCH v5 1/1] iommu-api: Add map_sg/unmap_sg functions
+In-Reply-To: <20140818212627.GI9809@8bytes.org>
+References: <1407797150-515-1-git-send-email-ohaugan@codeaurora.org>
+ <1407797150-515-2-git-send-email-ohaugan@codeaurora.org>
+ <871tsm5vcn.fsf@nvidia.com>
+ <CAF6AEGvZUanVtPxAt76+AAdOaNwyMJ3cmcJ1srsEYBeG7ELkBQ@mail.gmail.com>
+ <53EA472B.3020900@codeaurora.org> <20140818140730.GC9809@8bytes.org>
+ <CAF6AEGtGmAQjMc5W5a6x5QiyUc8v0XHcsNAFe65Znc=DDKPS+w@mail.gmail.com>
+ <53F266AE.40303@codeaurora.org> <20140818212627.GI9809@8bytes.org>
+Message-ID: <53F270F4.6040109@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 18, 2014 at 03:25:50PM +0100, Catalin Marinas wrote:
-> On Fri, Aug 15, 2014 at 11:30:52AM +0100, Liviu Dudau wrote:
-> > On Fri, Aug 15, 2014 at 09:56:32AM +0100, Wei Yang wrote:
-> > > On Thu, Aug 14, 2014 at 04:49:59PM +0100, Liviu Dudau wrote:
-> > > >On Thu, Aug 14, 2014 at 03:58:04PM +0100, Wei Yang wrote:
-> > > >> On Tue, Aug 12, 2014 at 05:25:15PM +0100, Liviu Dudau wrote:
-> > > >> > int __weak pcibios_add_device(struct pci_dev *dev)
-> > > >> > {
-> > > >> >+	dev->irq = of_irq_parse_and_map_pci(dev, 0, 0);
-> > > >> >+
-> > > >> > 	return 0;
-> > > >> > }
-> > > >> 
-> > > >> For this, my suggestion is to add arch dependent function to setup the irq
-> > > >> line for pci devices. I can't find an obvious reason this won't work on other
-> > > >> archs, but maybe this will hurt some of them?
-> > > >
-> > > >I'm not sure I understand your point. Architectures that support OF will obviously
-> > > >benefit from this common approach, and for the other ones the function is empty
-> > > >so it will not change existing behaviour. If you are suggesting that I should
-> > > >create a new API that each architecture could go and implement for setting up the
-> > > >IRQ line then I would agree that it would be nice to have that, but the question
-> > > >is how many architectures are outside OF that need this?
-> > > 
-> > > My suggestion is to define the pcibios_add_device() for arm arch, like the one
-> > > in arch/powerpc/kernel/pci-common.c. If my understanding is correct, this
-> > > patch set address the pci bus setup mostly on arm arch.
-> > 
-> > And also arm64 at the least.
-> ...
-> > Well, it will become necessary as old code gets dismantled and converted towards
-> > this patchset. To give you an example that I'm familiar with, for arch/arm the
-> > host bridge drivers have moved into drivers/pci/host, but they still depend/use
-> > the bios32 infrastructure that takes care of setting up the irq. When they switch
-> > to my version they would have to go and debug the "irq not being assigned" issue
-> > and it is quite likely that some of the people doing the conversion will complain
-> > about my code rather than understanding the issue. What I'm trying to do is to
-> > make switching to my patchset as painless as possible, with a cleanup to remove
-> > redundant operations coming after the switchover.
+On 8/18/2014 2:26 PM, joro at 8bytes.org wrote:
+> On Mon, Aug 18, 2014 at 01:48:46PM -0700, Olav Haugan wrote:
+>> On 8/18/2014 11:32 AM, Rob Clark wrote:
 > 
-> While the goal is fine, until we see a common pattern for what needs to
-> go into pcibios_add_device() I think we should have an arm64-specific
-> implementation (and probably an arm32 specific one as well). I can see
-> powerpc uses it for setting the DMA ops. Would we have a similar need on
-> arm64 to choose between coherent and non-coherent dma_ops?
-
-At this point I would like to hear more from people doing the conversion of
-the drivers. I cannot answer fully for all arm or arm64 drivers.
-
+>> No, I do not have other uses right now. But could imagine use cases like
+>> "force <insert minimum mapping size here> mapping" flag etc.
 > 
-> Also at some point we'll get ACPI support, so I'm not sure what we do
-> with assigning the dev->irq here but definitely of_* functions won't
-> work.
-
-Yes, maybe adding a check if the IRQ has not been assigned already?
-I have no idea what the order will be between ACPI ops and of_* ones.
-
-Best regards,
-Liviu
-
+> I think it is worth discussing to add a flush() function to the
+> IOMMU-API. I sent a patch-set myself a few years ago introducing an
+> iommu_commit() function with the same semantics, but this is
+> out-of-scope for this patch-set.
 > 
-> -- 
-> Catalin
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Also adding a flag parameter to iommu_map_sg would introduce an
+> asymentrie in the API to the iommu_map() function. So please leave it
+> out for this patch-set, when we really need a flag parameter someday we
+> can introduce it for iommu_map() and iommu_map_sg() together.
 > 
+
+Sure, I can remove it. I was trying to make iommu_map_sg/iommu_unmap_sg
+symmetric :-)
+
+Anything else before I push v6?
+
+
+Thanks,
+
+Olav
 
 -- 
--------------------
-   .oooO
-   (   )
-    \ (  Oooo.
-     \_) (   )
-          ) /
-         (_/
-
- One small step
-   for me ...
+The Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
