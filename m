@@ -1,31 +1,84 @@
-From: abrestic@chromium.org (Andrew Bresticker)
-Date: Mon, 18 Aug 2014 16:05:15 -0700
-Subject: [PATCH v2] ARM: tegra: add Acer Chromebook 13 device tree
-In-Reply-To: <1407957267-3258-1-git-send-email-dgreid@chromium.org>
-References: <1407957267-3258-1-git-send-email-dgreid@chromium.org>
-Message-ID: <CAL1qeaFS6k+ZbX=viBOvt+5Ryqk2j_TxckbH_sOxSx8CiA43qg@mail.gmail.com>
+From: ohaugan@codeaurora.org (Olav Haugan)
+Date: Mon, 18 Aug 2014 16:17:38 -0700
+Subject: [PATCH v3 1/1] iommu/arm-smmu: Do not access non-existing S2CR
+ registers
+Message-ID: <1408403858-16766-1-git-send-email-ohaugan@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> WiFi does not work yet, it needs at least some PMIC changes to enable
-> the 32k clock.
+The number of S2CR registers is not properly set when stream
+matching is not supported. Fix this and add check that we do not try to
+access outside of the number of S2CR regisrers.
 
-In addition to getting the PMIC to generate the 32k clock at 1.8V
-(instead of the 5V it's operating at now), you'll also need...
+Signed-off-by: Olav Haugan <ohaugan@codeaurora.org>
+---
+ drivers/iommu/arm-smmu.c | 24 +++++++++++++++++-------
+ 1 file changed, 17 insertions(+), 7 deletions(-)
 
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/tegra124-nyan-big.dts
-
-> +                       sdmmc1_clk_pz0 {
-> +                               nvidia,pins = "sdmmc1_clk_pz0";
-> +                               nvidia,function = "sdmmc1";
-> +                               nvidia,enable-input = <TEGRA_PIN_DISABLE>;
-
-... to turn on the input enable for the SD clock pin on the SDIO
-interface.  Unfortunately that still isn't sufficient to get WiFi
-working as SDIO commands are still timing out.  But the mwifiex card
-is at least attempting to probe now.
-
-> +                               nvidia,pull = <TEGRA_PIN_PULL_NONE>;
-> +                               nvidia,tristate = <TEGRA_PIN_DISABLE>;
-> +                       };
+diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+index 9fd8754d..a050f7a 100644
+--- a/drivers/iommu/arm-smmu.c
++++ b/drivers/iommu/arm-smmu.c
+@@ -548,9 +548,16 @@ static int register_smmu_master(struct arm_smmu_device *smmu,
+ 	master->of_node			= masterspec->np;
+ 	master->cfg.num_streamids	= masterspec->args_count;
+ 
+-	for (i = 0; i < master->cfg.num_streamids; ++i)
++	for (i = 0; i < master->cfg.num_streamids; ++i) {
++		if (!(smmu->features & ARM_SMMU_FEAT_STREAM_MATCH) &&
++		     (masterspec->args[i] >= smmu->num_mapping_groups)) {
++			dev_err(dev,
++				"stream ID for master device %s greater than maximum allowed (%d)\n",
++				masterspec->np->name, smmu->num_mapping_groups);
++			return -ENOSPC;
++		}
+ 		master->cfg.streamids[i] = masterspec->args[i];
+-
++	}
+ 	return insert_smmu_master(smmu, master);
+ }
+ 
+@@ -1734,7 +1741,7 @@ static void arm_smmu_device_reset(struct arm_smmu_device *smmu)
+ 
+ 	/* Mark all SMRn as invalid and all S2CRn as bypass */
+ 	for (i = 0; i < smmu->num_mapping_groups; ++i) {
+-		writel_relaxed(~SMR_VALID, gr0_base + ARM_SMMU_GR0_SMR(i));
++		writel_relaxed(0, gr0_base + ARM_SMMU_GR0_SMR(i));
+ 		writel_relaxed(S2CR_TYPE_BYPASS,
+ 			gr0_base + ARM_SMMU_GR0_S2CR(i));
+ 	}
+@@ -1875,6 +1882,9 @@ static int arm_smmu_device_cfg_probe(struct arm_smmu_device *smmu)
+ 		dev_notice(smmu->dev,
+ 			   "\tstream matching with %u register groups, mask 0x%x",
+ 			   smmu->num_mapping_groups, mask);
++	} else {
++		smmu->num_mapping_groups = (id >> ID0_NUMSIDB_SHIFT) &
++					   ID0_NUMSIDB_MASK;
+ 	}
+ 	smmu->idr[0] = id;
+ 
+@@ -2011,6 +2021,10 @@ static int arm_smmu_device_dt_probe(struct platform_device *pdev)
+ 		smmu->irqs[i] = irq;
+ 	}
+ 
++	err = arm_smmu_device_cfg_probe(smmu);
++	if (err)
++		return err;
++
+ 	i = 0;
+ 	smmu->masters = RB_ROOT;
+ 	while (!of_parse_phandle_with_args(dev->of_node, "mmu-masters",
+@@ -2027,10 +2041,6 @@ static int arm_smmu_device_dt_probe(struct platform_device *pdev)
+ 	}
+ 	dev_notice(dev, "registered %d master devices\n", i);
+ 
+-	err = arm_smmu_device_cfg_probe(smmu);
+-	if (err)
+-		goto out_put_masters;
+-
+ 	parse_driver_options(smmu);
+ 
+ 	if (smmu->version > 1 &&
+-- 
+The Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
