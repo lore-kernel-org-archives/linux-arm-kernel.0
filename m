@@ -1,115 +1,116 @@
-From: carlo@caione.org (Carlo Caione)
-Date: Mon, 18 Aug 2014 16:11:04 +0200
-Subject: [PATCH 3/7] ARM: meson6: clocksource: add Meson6 timer support
-In-Reply-To: <53F1EAAA.8020904@gmail.com>
-References: <1408272594-10814-1-git-send-email-carlo@caione.org>
- <1408272594-10814-4-git-send-email-carlo@caione.org>
- <53F1EAAA.8020904@gmail.com>
-Message-ID: <20140818141104.GD28819@carlo-MacBookPro>
+From: daniel.thompson@linaro.org (Daniel Thompson)
+Date: Mon, 18 Aug 2014 15:12:55 +0100
+Subject: [PATCH v9 07/16] irqchip: gic: Add support for FIQ management
+In-Reply-To: <1404979427-12943-1-git-send-email-daniel.thompson@linaro.org>
+References: <1404979427-12943-1-git-send-email-daniel.thompson@linaro.org>
+Message-ID: <1408371184-12576-8-git-send-email-daniel.thompson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 18, 2014 at 01:59:38PM +0200, Matthias Brugger wrote:
-> On 17/08/14 12:49, Carlo Caione wrote:
-> >+enum {
-> >+	A = 0,
-> >+	B,
-> >+	C,
-> >+	D,
-> >+};
-> 
-> You are just using timer A, so this enum is unnecessary. Please use
-> a define instead. Also it would be better, if the define would be
-> explenatory then just the letter 'A'.
+This patch introduces callbacks to route interrupts to or away
+from the FIQ signal and registers these callbacks with the FIQ
+infrastructure (if the device can supports it).
 
-In the meson6 SoCs there are 4 timers (TIMERA, TIMERB, TIMERC and
-TIMERD). From the source code released by Amlogic it seems that they
-have exactly the same characteristics and any of them can be used for
-the clockevents. So either I fix the usage of only the TIMERA in the
-driver or use the DTS to specify which one to use.
+Both these aspects combine and allow a driver to deploy a FIQ handler
+without any machine specific knowledge; it can be used effectively on
+multi-platform kernels.
 
-> >+
-> >+#define TIMER_ISA_MUX		0
-> >+#define TIMER_ISA_E_VAL		0x14
-> >+#define TIMER_ISA_t_VAL(t)	((t + 1) << 2)
-> >+
-> >+#define TIMER_t_INPUT_BIT(t)	(2 * t)
-> 
-> Please put braces around 't'.
+Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
+Cc: Thomas Gleixner <tglx@linutronix.de>
+Cc: Jason Cooper <jason@lakedaemon.net>
+Cc: Nicolas Pitre <nicolas.pitre@linaro.org>
+Cc: Christoffer Dall <christoffer.dall@linaro.org>
+Cc: Sricharan R <r.sricharan@ti.com>
+---
+ drivers/irqchip/irq-gic.c | 69 +++++++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 69 insertions(+)
 
-Ok
-
-> >+#define TIMER_E_INPUT_BIT	8
-> 
-> From the enum above, missing timer E would be 4 so you can use the
-> TIMER_t_INPUT_BIT(t) macro, right?
-
-Right. It was to be consistent since the mask for TIMERE is different.
-But I'll fix it.
-
-> >+#define TIMER_t_INPUT_MASK(t)	(3UL << TIMER_t_INPUT_BIT(t))
-> >+#define TIMER_E_INPUT_MASK	(7UL << TIMER_E_INPUT_BIT)
-> >+#define TIMER_t_ENABLE_BIT(t)	(16 + t)
-> >+#define TIMER_E_ENABLE_BIT	20
-> >+#define TIMER_t_PERIODIC_BIT(t)	(12 + t)
-> 
-> Please put braces around 't'.
-
-I'll do
-
-> >+
-> >+#define TIMER_UNIT_1us		0
-> >+#define TIMER_E_UNIT_1us	1
-> 
-> Please don't use lower case characters in defines.
-
-Ok
-
-<cut>
-
-> >+static void __init meson6_timer_init(struct device_node *node)
-> >+{
-> >+	u32 val;
-> >+	int ret, irq;
-> >+
-> >+	timer_base = of_iomap(node, 0);
-> 
-> Please use of_io_request_and_map instead.
-
-Agree. Fix in v2.
-
-> >+	if (!timer_base)
-> >+		panic("Can't map registers");
-> >+
-> >+	irq = irq_of_parse_and_map(node, 0);
-> >+	if (irq <= 0)
-> >+		panic("Can't parse IRQ");
-> >+
-> >+	/* Set 1us for timer E */
-> >+	val = readl(timer_base + TIMER_ISA_MUX);
-> >+	val &= ~TIMER_E_INPUT_MASK;
-> >+	val |= TIMER_E_UNIT_1us << TIMER_E_INPUT_BIT;
-> >+	writel(val, timer_base + TIMER_ISA_MUX);
-> >+
-> >+	sched_clock_register(meson6_timer_sched_read, 32, USEC_PER_SEC);
-> >+	clocksource_register_khz(&clocksource_timer_e, 1000);
-> 
-> Why don't you use clocksource_mmio_init?
-
-No real reason, I just missed that one.
-
-> >+
-> >+	/* Timer A base 1us */
-> >+	val &= ~TIMER_t_INPUT_MASK(A);
-> >+	val |= TIMER_UNIT_1us << TIMER_t_INPUT_BIT(A);
-> >+	writel(val, timer_base + TIMER_ISA_MUX);
-> 
-> Is this dependant on any clocking of the timer?
-
-No. At least this is what I can infer from the messy source code released by
-Amlogic. I wish I had any documentation for these SoCs.
-
-Thank you for your review,
+diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
+index 423707c..6fa0542 100644
+--- a/drivers/irqchip/irq-gic.c
++++ b/drivers/irqchip/irq-gic.c
+@@ -342,6 +342,69 @@ static struct irq_chip gic_chip = {
+ };
  
+ #ifdef CONFIG_FIQ
++/*
++ * Shift an interrupt between Group 0 and Group 1.
++ *
++ * In addition to changing the group we also modify the priority to
++ * match what "ARM strongly recommends" for a system where no Group 1
++ * interrupt must ever preempt a Group 0 interrupt.
++ */
++static void gic_set_group_irq(struct irq_data *d, int group)
++{
++	unsigned int grp_reg = gic_irq(d) / 32 * 4;
++	u32 grp_mask = 1 << (gic_irq(d) % 32);
++	u32 grp_val;
++
++	unsigned int pri_reg = (gic_irq(d) / 4) * 4;
++	u32 pri_mask = 1 << (7 + ((gic_irq(d) % 4) * 8));
++	u32 pri_val;
++
++	raw_spin_lock(&irq_controller_lock);
++
++	grp_val = readl_relaxed(gic_dist_base(d) + GIC_DIST_IGROUP + grp_reg);
++	pri_val = readl_relaxed(gic_dist_base(d) + GIC_DIST_PRI + pri_reg);
++
++	if (group) {
++		grp_val |= grp_mask;
++		pri_val |= pri_mask;
++	} else {
++		grp_val &= ~grp_mask;
++		pri_val &= ~pri_mask;
++	}
++
++	writel_relaxed(grp_val, gic_dist_base(d) + GIC_DIST_IGROUP + grp_reg);
++	writel_relaxed(pri_val, gic_dist_base(d) + GIC_DIST_PRI + pri_reg);
++
++	raw_spin_unlock(&irq_controller_lock);
++}
++
++static void gic_enable_fiq(struct irq_data *d)
++{
++	gic_set_group_irq(d, 0);
++}
++
++static void gic_disable_fiq(struct irq_data *d)
++{
++	gic_set_group_irq(d, 1);
++}
++
++static int gic_ack_fiq(struct irq_data *d)
++{
++	struct gic_chip_data *gic = irq_data_get_irq_chip_data(d);
++	u32 irqstat, irqnr;
++
++	irqstat = readl_relaxed(gic_data_cpu_base(gic) + GIC_CPU_INTACK);
++	irqnr = irqstat & GICC_IAR_INT_ID_MASK;
++	return irq_find_mapping(gic->domain, irqnr);
++}
++
++static struct fiq_chip gic_fiq = {
++	.fiq_enable		= gic_enable_fiq,
++	.fiq_disable            = gic_disable_fiq,
++	.fiq_ack		= gic_ack_fiq,
++	.fiq_eoi		= gic_eoi_irq,
++};
++
+ static void __init gic_init_fiq(struct gic_chip_data *gic,
+ 				irq_hw_number_t first_irq,
+ 				unsigned int num_irqs)
+@@ -370,6 +433,12 @@ static void __init gic_init_fiq(struct gic_chip_data *gic,
+ 
+ 	if (!gic->fiq_enable)
+ 		return;
++
++	/*
++	 * FIQ is supported on this device! Register our chip data.
++	 */
++	for (i = 0; i < num_irqs; i++)
++		fiq_register_mapping(first_irq + i, &gic_fiq);
+ }
+ #else /* CONFIG_FIQ */
+ static inline void gic_init_fiq(struct gic_chip_data *gic,
 -- 
-Carlo Caione
+1.9.3
