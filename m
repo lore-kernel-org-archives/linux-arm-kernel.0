@@ -1,48 +1,50 @@
 From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Mon, 18 Aug 2014 16:58:35 +0200
-Subject: [PATCH v2 7/9] arm: dts: mt6589: Add arm arch timer node
+Date: Mon, 18 Aug 2014 16:58:36 +0200
+Subject: [PATCH v2 8/9] arm: dts: mediatek: Add compatible property for
+ aquaris5
 In-Reply-To: <1408373917-10002-1-git-send-email-matthias.bgg@gmail.com>
 References: <1408373917-10002-1-git-send-email-matthias.bgg@gmail.com>
-Message-ID: <1408373917-10002-8-git-send-email-matthias.bgg@gmail.com>
+Message-ID: <1408373917-10002-9-git-send-email-matthias.bgg@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the device tree node for the arm architecture timer.
+Add the missing 'compatible' property to device tree root node of
+
+ - mt6589-aquaris5.dts
+
+and document the new values.
 
 Signed-off-by: Matthias Brugger <matthias.bgg@gmail.com>
 ---
- arch/arm/boot/dts/mt6589.dtsi |   13 +++++++++++--
- 1 file changed, 11 insertions(+), 2 deletions(-)
+ Documentation/devicetree/bindings/arm/mediatek.txt |    6 ++++++
+ arch/arm/boot/dts/mt6589-aquaris5.dts              |    1 +
+ 2 files changed, 7 insertions(+)
 
-diff --git a/arch/arm/boot/dts/mt6589.dtsi b/arch/arm/boot/dts/mt6589.dtsi
-index 742c9bd..fb922a6 100644
---- a/arch/arm/boot/dts/mt6589.dtsi
-+++ b/arch/arm/boot/dts/mt6589.dtsi
-@@ -73,14 +73,23 @@
- 		compatible = "simple-bus";
- 		ranges;
+diff --git a/Documentation/devicetree/bindings/arm/mediatek.txt b/Documentation/devicetree/bindings/arm/mediatek.txt
+index d6ac71f..fa25226 100644
+--- a/Documentation/devicetree/bindings/arm/mediatek.txt
++++ b/Documentation/devicetree/bindings/arm/mediatek.txt
+@@ -6,3 +6,9 @@ Required root node property:
  
--		timer: timer at 10008000 {
-+		timer1: timer at 10008000 {
- 			compatible = "mediatek,mt6577-timer";
--			reg = <0x10008000 0x80>;
-+			reg = <0x10008000 0x60>;
- 			interrupts = <GIC_SPI 113 IRQ_TYPE_EDGE_RISING>;
- 			clocks = <&system_clk>, <&rtc_clk>;
- 			clock-names = "system-clk", "rtc-clk";
- 		};
+ compatible: must contain "mediatek,mt6589"
  
-+		timer2: timer {
-+			compatible = "arm,armv7-timer";
-+			interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
-+				     <GIC_PPI 14 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
-+				     <GIC_PPI 11 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
-+				     <GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>;
-+			clock-frequency = <13000000>;
-+		};
 +
- 		gic: interrupt-controller at 10211000 {
- 			compatible = "arm,cortex-a15-gic";
- 			interrupt-controller;
++Supported boards:
++
++- bq Aquaris5 smart phone:
++    Required root node properties:
++      - compatible = "mundoreader,bq-aquaris5", "mediatek,mt6589";
+diff --git a/arch/arm/boot/dts/mt6589-aquaris5.dts b/arch/arm/boot/dts/mt6589-aquaris5.dts
+index 74cb1ba..0da0470 100644
+--- a/arch/arm/boot/dts/mt6589-aquaris5.dts
++++ b/arch/arm/boot/dts/mt6589-aquaris5.dts
+@@ -18,6 +18,7 @@
+ 
+ / {
+ 	model = "bq Aquaris5";
++	compatible = "mundoreader,bq-aquaris5", "mediatek,mt6589";
+ 
+ 	chosen {
+ 		bootargs = "earlyprintk";
 -- 
 1.7.9.5
