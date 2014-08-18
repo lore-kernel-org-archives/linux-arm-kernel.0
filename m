@@ -1,29 +1,54 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 18 Aug 2014 17:40:56 +0100
-Subject: [PATCH] arm64: audit: Fix build for audit changes
-In-Reply-To: <1408285597-30913-1-git-send-email-broonie@kernel.org>
-References: <1408285597-30913-1-git-send-email-broonie@kernel.org>
-Message-ID: <20140818164056.GB24600@localhost>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Tue, 19 Aug 2014 00:51:51 +0800
+Subject: [PATCH v2 2/2] ARM: dts: sun8i: Enable i2c controllers on ippo-q8h-v5
+In-Reply-To: <1408380711-26308-1-git-send-email-wens@csie.org>
+References: <1408380711-26308-1-git-send-email-wens@csie.org>
+Message-ID: <1408380711-26308-3-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Aug 17, 2014 at 03:26:37PM +0100, Mark Brown wrote:
-> From: Mark Brown <broonie@linaro.org>
-> 
-> Commit 3efe33f5d2 (audit: x86: drop arch from __audit_syscall_entry()
-> interface) removed the arch parameter from __audit_syscall_entry() and
-> updated the only current user in mainline but this breaks the ARMv8 audit
-> code that has been added in -next. Fix this by making the equivalent
-> update to ARMv8.
-> 
-> Signed-off-by: Mark Brown <broonie@linaro.org>
+i2c0 is connected to the gsl1680 capacitive touch panel controller.
+i2c1 is connected to an mma7660 3-axis accelerometer.
+i2c2 is connected to the front and back gc0309 camera sensors.
+The camera sensors require additional regulators be enabled before
+they are available.
 
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+All these peripherals are not supported by the kernel yet.
 
-BTW, we plan to revert the temporary hack to avoid this error with
-defconfig. So the above patch should go into next on top of the other
-patches from Eric changing the function prototype.
+Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+---
+ arch/arm/boot/dts/sun8i-a23-ippo-q8h-v5.dts | 19 +++++++++++++++++++
+ 1 file changed, 19 insertions(+)
 
-Thanks,
-
-Catalin
+diff --git a/arch/arm/boot/dts/sun8i-a23-ippo-q8h-v5.dts b/arch/arm/boot/dts/sun8i-a23-ippo-q8h-v5.dts
+index ef1e4f3..e9b8cca 100644
+--- a/arch/arm/boot/dts/sun8i-a23-ippo-q8h-v5.dts
++++ b/arch/arm/boot/dts/sun8i-a23-ippo-q8h-v5.dts
+@@ -43,6 +43,25 @@
+ 			};
+ 		};
+ 
++		i2c0: i2c at 01c2ac00 {
++			pinctrl-names = "default";
++			pinctrl-0 = <&i2c0_pins_a>;
++			status = "okay";
++		};
++
++		i2c1: i2c at 01c2b000 {
++			pinctrl-names = "default";
++			pinctrl-0 = <&i2c1_pins_a>;
++			status = "okay";
++		};
++
++		i2c2: i2c at 01c2b400 {
++			pinctrl-names = "default";
++			pinctrl-0 = <&i2c2_pins_a>;
++			/* pull-ups and devices require PMIC regulator */
++			status = "failed";
++		};
++
+ 		r_uart: serial at 01f02800 {
+ 			pinctrl-names = "default";
+ 			pinctrl-0 = <&r_uart_pins_a>;
+-- 
+2.1.0
