@@ -1,78 +1,77 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 18 Aug 2014 17:43:12 -0600
-Subject: [PATCH v2] ARM: tegra: add Acer Chromebook 13 device tree
-In-Reply-To: <CAL1qeaH-WfA-DLKwuXA_hBPHYuXksAibLq__zisrT9ALaRGdAw@mail.gmail.com>
-References: <1407957267-3258-1-git-send-email-dgreid@chromium.org>	<53EF76CF.9050808@suse.de>	<53F2255E.7090208@wwwdotorg.org>
- <CAL1qeaH-WfA-DLKwuXA_hBPHYuXksAibLq__zisrT9ALaRGdAw@mail.gmail.com>
-Message-ID: <53F28F90.3000004@wwwdotorg.org>
+From: horms@verge.net.au (Simon Horman)
+Date: Tue, 19 Aug 2014 08:56:34 +0900
+Subject: [PATCH repost] ARM: shmobile: sh73a0: Remove spurious 0x from
+ SCIFB clock name
+In-Reply-To: <CAMuHMdWS14CsDvk+cTYJ7JeX0_3oQdfsRC__Hofmv54uOOtG1Q@mail.gmail.com>
+References: <cover.1406766463.git.horms+renesas@verge.net.au>
+ <20140731004246.GA31860@verge.net.au>
+ <CAMuHMdWS14CsDvk+cTYJ7JeX0_3oQdfsRC__Hofmv54uOOtG1Q@mail.gmail.com>
+Message-ID: <20140818235634.GK1623@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/18/2014 05:24 PM, Andrew Bresticker wrote:
-> On Mon, Aug 18, 2014 at 9:10 AM, Stephen Warren <swarren@wwwdotorg.org> wrote:
->> On 08/16/2014 09:20 AM, Andreas F?rber wrote:
->>>
->>> Hi,
->>>
->>> Am 13.08.2014 21:14, schrieb Dylan Reid:
->>>>
->>>> The Acer Chromebook 13, codenamed Big, contains an NVIDIA tegra124
->>>> processor and is similar to the Venice2 reference platform.
->>>>
->>>> The keyboard, USB 2, audio, HDMI, sdcard, and emmc have been tested
->>>> and work on the 1266x768 models.  The HD models haven't yet been
->>>> tested.
->>>>
->>>> WiFi does not work yet, it needs at least some PMIC changes to enable
->>>> the 32k clock.
->>>>
->>>> The elan trackpad is not yet functional but hopefully will be soon as
->>>> there are patches under review.
->>>>
->>>> There is also an issue on reboot because the TPM isn't reset.  It will
->>>> cause the stock firmware to enter recovery mode.  This can be worked
->>>> around by an EC-reset, press the refresh and power keys at the same
->>>> time.
->>
->>
->>>> diff --git a/arch/arm/boot/dts/tegra124-nyan-big.dts
->>>> b/arch/arm/boot/dts/tegra124-nyan-big.dts
->>>> new file mode 100644
->>>> index 0000000..79f1852
->>>> --- /dev/null
->>>> +++ b/arch/arm/boot/dts/tegra124-nyan-big.dts
->>>> @@ -0,0 +1,1136 @@
->>>> +/dts-v1/;
->>>> +
->>>> +#include <dt-bindings/input/input.h>
->>>> +#include "tegra124.dtsi"
->>>> +
->>>> +/ {
->>>> +       model = "Acer Chromebook 13";
->>>> +       compatible = "google,nyan-big", "nvidia,tegra124";
->>>
->>>
->>> In light of v1 and the above commit message referring to this as Google
->>> Big, shouldn't this be "google,big", "nvidia,tegra124" and optionally
->>> "google,nyan" as secondary string, independent of the new file name?
->>
->>
->> Despite this board having been derived from Nyan, it isn't Nyan, so I don't
->> think Nyan should be part of any compatible value, nor a separate compatible
->> value.
->
-> "google,nyan-big" is the compatible string that the bootloader on
-> these devices looks for.  It's also the convention we are now using
-> for our ARM devices, as Olof has already mentioned.
+Hi Geert, thanks for noting that.
 
-I don't understand "that the bootloader looks for"; why is the 
-bootloader doing anything w.r.t the compatible value in the DT that's 
-passed to the kernel.
+I will add this back to the devel branch in the renesas tree.
 
-Olof also mentioned that if I had any better ideas on file naming, I 
-should point them out. As I mentioned in response, there's zero need for 
-all the files or compatible values to have "nyan" in them in order to 
-include any common .dtsi file, which was the justification for having 
-"nyan" in the filename, IIRC.
+Olof, could you pick up the patch below for v3.17-rcX?
 
-Again, this board *isn't* Nyan, so it should pretend that it is.
+On Mon, Aug 18, 2014 at 10:32:19AM +0200, Geert Uytterhoeven wrote:
+> Hi Simon, Olof,
+> 
+> On Thu, Jul 31, 2014 at 2:42 AM, Simon Horman
+> <horms+renesas@verge.net.au> wrote:
+> > A stray '0x' crept into a0f7e7496d56ac2d ("ARM: shmobile: sh73a0: add CMT1
+> > clock support for DT"). This  patch removes it.
+> >
+> > This change should not have any run-time affect at this time as
+> > the clock in question is used by a SCIF device that is not enabled by
+> > default.
+> >
+> > Reported-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+> > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> > ---
+> >  arch/arm/mach-shmobile/clock-sh73a0.c | 2 +-
+> >  1 file changed, 1 insertion(+), 1 deletion(-)
+> >
+> > Hi Olof,
+> >
+> > this is a repost of the patch you asked for so you can apply it directly
+> > rather than as pulling a pull request.
+> 
+> It seems Olof missed this one.
+> As a consequence, we now have the bad version in v3.17-rc1, and in
+> renesas-devel-20140818-v3.17-rc1.
+> 
+> > diff --git a/arch/arm/mach-shmobile/clock-sh73a0.c b/arch/arm/mach-shmobile/clock-sh73a0.c
+> > index 0d77f65..b0993a5 100644
+> > --- a/arch/arm/mach-shmobile/clock-sh73a0.c
+> > +++ b/arch/arm/mach-shmobile/clock-sh73a0.c
+> > @@ -644,7 +644,7 @@ static struct clk_lookup lookups[] = {
+> >         CLKDEV_DEV_ID("sh-sci.5", &mstp_clks[MSTP207]), /* SCIFA5 */
+> >         CLKDEV_DEV_ID("e6cb0000.serial", &mstp_clks[MSTP207]), /* SCIFA5 */
+> >         CLKDEV_DEV_ID("sh-sci.8", &mstp_clks[MSTP206]), /* SCIFB */
+> > -       CLKDEV_DEV_ID("0xe6c3000.serial", &mstp_clks[MSTP206]), /* SCIFB */
+> > +       CLKDEV_DEV_ID("e6c3000.serial", &mstp_clks[MSTP206]), /* SCIFB */
+> >         CLKDEV_DEV_ID("sh-sci.0", &mstp_clks[MSTP204]), /* SCIFA0 */
+> >         CLKDEV_DEV_ID("e6c40000.serial", &mstp_clks[MSTP204]), /* SCIFA0 */
+> >         CLKDEV_DEV_ID("sh-sci.1", &mstp_clks[MSTP203]), /* SCIFA1 */
+> > --
+> > 2.0.1
+> >
+> > --
+> > To unsubscribe from this list: send the line "unsubscribe linux-sh" in
+> > the body of a message to majordomo at vger.kernel.org
+> > More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
+> Gr{oetje,eeting}s,
+> 
+>                         Geert
+> 
+> --
+> Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+> 
+> In personal conversations with technical people, I call myself a hacker. But
+> when I'm talking to journalists I just say "programmer" or something like that.
+>                                 -- Linus Torvalds
+> 
