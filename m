@@ -1,83 +1,155 @@
-From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Mon, 18 Aug 2014 12:49:33 -0600
-Subject: [PATCH v5] pcie: Add Xilinx PCIe Host Bridge IP driver
-In-Reply-To: <CA+mB=1LX=yOqkx1xNoCBQLbYna76qAeRTqiW6SDpb1MYco7ZVQ@mail.gmail.com>
-References: <1406131381-25577-1-git-send-email-sthokal@xilinx.com>
- <CA+mB=1JhDF=BBXcyTbgVB8S7qH=Mb1JH78HLL4pA9OBH19hQvA@mail.gmail.com>
- <8258903.Rn4s07GKGV@wuerfel>
- <CA+mB=1LeZn1k2VHNby2TRBcb1xuFFTQio=C845_xe2A=ZciYqg@mail.gmail.com>
- <53E9E052.3070308@monstr.eu>
- <CA+mB=1LX=yOqkx1xNoCBQLbYna76qAeRTqiW6SDpb1MYco7ZVQ@mail.gmail.com>
-Message-ID: <20140818184933.GA2028@google.com>
+From: geoff@infradead.org (Geoff Levand)
+Date: Mon, 18 Aug 2014 11:56:52 -0700
+Subject: [PATCH v2 08/18] ARM64 / ACPI: Get the enable method for SMP
+ initialization in ACPI way
+In-Reply-To: <1407166105-17675-9-git-send-email-hanjun.guo@linaro.org>
+References: <1407166105-17675-1-git-send-email-hanjun.guo@linaro.org>
+ <1407166105-17675-9-git-send-email-hanjun.guo@linaro.org>
+Message-ID: <1408388212.22761.100.camel@smoke>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 18, 2014 at 02:47:23PM +0530, Srikanth Thokala wrote:
-> Hi Michal,
-> 
-> On Tue, Aug 12, 2014 at 3:07 PM, Michal Simek <monstr@monstr.eu> wrote:
-> > Hi Bjorn,
-> >
-> > On 07/30/2014 01:24 PM, Srikanth Thokala wrote:
-> >> Hi Arnd,
-> >>
-> >> On Mon, Jul 28, 2014 at 6:32 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> >>> On Monday 28 July 2014 18:04:34 Srikanth Thokala wrote:
-> >>>> Hi Arnd and Rob,
-> >>>>
-> >>>> I discussed with Bjorn and we believe this patch is in good shape to
-> >>>> apply.  And Bjorn requires ACKs to apply this patch.  So, could you
-> >>>> guys please review this patch and provided your ACKs to this patch.
-> >>>
-> >>> Looks great for the most part. I've looked through the whole driver
-> >>> again, and I have two small issues remaining:
-> >>>
-> >>> a) Please clarify in the changeset description why there is no support
-> >>>    for PCI I/O space.
-> >>
-> >> Sure, I will add to my changeset.
-> >>
-> >>>
-> >>> b) I think you should use the 'msi-parent' property, and the
-> >>>    of_pci_find_msi_chip_by_node() to find the msi_chip for the
-> >>>    PCI controller. This will make it possible to forward MSIs
-> >>>    to the main interrupt controller in the system, which is more
-> >>>    efficient. See the pcie-mvebu driver for an example of this.
-> >>
-> >> Ok, I need to look into this and I will plan to implement on top of this patch.
-> >>
-> >>>
-> >>> Other than these:
-> >>>
-> >>> Acked-by: Arnd Bergmann <arnd@arndb.de>
-> >>
-> >> Thanks Arnd for the Ack.
-> >
-> > What's the status on this one?
-> 
-> It looks like Bjorn is on vacation.  I have sent v6 patch by adding
-> Ack from Arnd, which
-> I feel is in good shape to be applied.
+Hi Hanjun,
 
-I actually started applying this last night (see [1]), but got some
-errors from the build-bot (attached).  I haven't looked into them,
-but my guess is that you're missing a Kconfig dependency or something
-equally minor.
+On Mon, 2014-08-04 at 23:28 +0800, Hanjun Guo wrote:
+> --- a/arch/arm64/include/asm/acpi.h
+> +++ b/arch/arm64/include/asm/acpi.h
+> @@ -14,6 +14,27 @@
+>  
+>  /* Basic configuration for ACPI */
+>  #ifdef	CONFIG_ACPI
 
-Bjorn
+By having this preprocessor conditional in the header leads
+to a proliferation of preprocessor conditionals since any
+code that includes this header will also need to have
+preprocessor conditionals.  Another down side of having
+this is that this code will not get a build test for
+builds with CONFIG_ACPI=n.
 
-[1] http://git.kernel.org/cgit/linux/kernel/git/helgaas/pci.git/commit/?h=pci/host-xilinx&id=a58f3d0c3b1c4a71a2418c3306fba86c26a49781
--------------- next part --------------
-An embedded message was scrubbed...
-From: kbuild test robot <fengguang.wu@intel.com>
-Subject: [pci:pci/host-xilinx] a58f3d0c3b1c4a71a2418c3306fba86c26a49781 BUILD DONE
-Date: Mon, 18 Aug 2014 12:40:06 +0800
-Size: 9057
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140818/4bd2db8f/attachment-0002.mht>
--------------- next part --------------
-An embedded message was scrubbed...
-From: kbuild test robot <fengguang.wu@intel.com>
-Subject: [pci:pci/host-xilinx 1/1] WARNING: drivers/built-in.o(.text+0x64acc): Section mismatch in reference from the function xilinx_pcie_probe() to the function .init.text:xilinx_pcie_scan_bus()
-Date: Mon, 18 Aug 2014 15:16:51 +0800
-Size: 2891
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140818/4bd2db8f/attachment-0003.mht>
+> +/*
+> + * ACPI 5.1 only has two explicit methods to
+> + * boot up SMP, PSCI and Parking protocol,
+> + * but the Parking protocol is only defined
+> + * for ARMv7 now, so make PSCI as the only
+> + * way for the SMP boot protocol before some
+> + * updates for the ACPI spec or the Parking
+> + * protocol spec.
+> + *
+> + * This enum is intend to make the boot method
+> + * scalable when above updates are happended,
+> + * which NOT means to support all of them.
+> + */
+> +enum acpi_smp_boot_protocol {
+> +	ACPI_SMP_BOOT_PSCI,
+> +	ACPI_SMP_BOOT_PARKING_PROTOCOL,
+> +	ACPI_SMP_BOOT_PROTOCOL_MAX
+> +};
+> +
+> +enum acpi_smp_boot_protocol smp_boot_protocol(void);
+
+The name smp_boot_protocol() seems like it would be a generic
+routine, but it is acpi specific.  Maybe:
+
+enum acpi_boot_protocol_type {...};
+
+enum acpi_boot_protocol_type acpi_boot_protocol(void);
+
+> --- a/arch/arm64/kernel/cpu_ops.c
+> +++ b/arch/arm64/kernel/cpu_ops.c
+> @@ -49,12 +51,44 @@ static const struct cpu_operations * __init cpu_get_ops(const char *name)
+>  	return NULL;
+>  }
+>  
+> +#ifdef CONFIG_ACPI
+> +/*
+> + * Get a cpu's boot method in the ACPI way.
+> + */
+> +static char * __init acpi_get_cpu_boot_method(void)
+> +{
+> +	/*
+> +	 * For ACPI 5.1, only two kind of methods are provided,
+> +	 * Parking protocol and PSCI, but Parking protocol is
+> +	 * specified for ARMv7 only, so make PSCI as the only method
+> +	 * for SMP initialization before the ACPI spec or Parking
+> +	 * protocol spec is updated.
+> +	 */
+> +	switch (smp_boot_protocol()) {
+> +	case ACPI_SMP_BOOT_PSCI:
+> +		return "psci";
+> +	case ACPI_SMP_BOOT_PARKING_PROTOCOL:
+> +	default:
+> +		return NULL;
+> +	}
+> +}
+> +#else
+> +static inline char * __init acpi_get_cpu_boot_method(void) { return NULL; }
+> +#endif
+
+Since this is inside a C source file, the inline keyword
+isn't needed since the optimizer will inline regardless.
+
+With that said, I think it would be cleaner to have this
+as:
+
+static char * __init acpi_get_cpu_boot_method(void)
+{
+#ifdef CONFIG_ACPI
+	return NULL;
+#else
+ ...
+#endif
+}
+
+Or better to make smp_boot_protocol() callable regardless
+of CONFIG_ACPI and then no preprocessor conditionals at all
+would be needed.
+
+> +
+>  /*
+> - * Read a cpu's enable method from the device tree and record it in cpu_ops.
+> + * Read a cpu's enable method and record it in cpu_ops.
+>   */
+>  int __init cpu_read_ops(struct device_node *dn, int cpu)
+>  {
+> -	const char *enable_method = of_get_property(dn, "enable-method", NULL);
+> +	const char *enable_method;
+> +
+> +	if (!acpi_disabled) {
+> +		enable_method = acpi_get_cpu_boot_method();
+> +		goto get_ops;
+> +	}
+> +
+> +	enable_method = of_get_property(dn, "enable-method", NULL);
+>  	if (!enable_method) {
+>  		/*
+>  		 * The boot CPU may not have an enable method (e.g. when
+> @@ -66,10 +100,17 @@ int __init cpu_read_ops(struct device_node *dn, int cpu)
+>  		return -ENOENT;
+>  	}
+>  
+> +get_ops:
+>  	cpu_ops[cpu] = cpu_get_ops(enable_method);
+>  	if (!cpu_ops[cpu]) {
+> -		pr_warn("%s: unsupported enable-method property: %s\n",
+> -			dn->full_name, enable_method);
+> +		if (acpi_disabled) {
+> +			pr_warn("%s: unsupported enable-method property: %s\n",
+> +				dn->full_name, enable_method);
+> +		} else {
+> +			pr_warn("CPU %d: boot protocol unsupported or unknown\n",
+> +				cpu);
+> +		}
+> +
+
+Can't we have this more integrated, maybe something like this?
+
+	enable_method = acpi_disabled ? of_get_property(dn, "enable-method", NULL)
+		: acpi_get_cpu_boot_method();
+	message = acpi_disabled ? dn->full_name : "";
+
+	...
+	
+	pr_warn("CPU %d: %s unsupported enable-method property: %s\n",
+				cpu, message, enable_method)
+
+-Geoff
