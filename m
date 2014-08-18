@@ -1,36 +1,44 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 18 Aug 2014 21:23:18 +0200
-Subject: [PATCH] This adds a generic PWM framework driver for the PWM
- controller
-In-Reply-To: <20140818180316.31807.3445.stgit@studio>
-References: <20140818180316.31807.3445.stgit@studio>
-Message-ID: <20140818192318.GJ15297@lukather>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Mon, 18 Aug 2014 12:24:54 -0700
+Subject: [PATCH v3 0/5] ARM: add Broadcom BCM63138 support
+Message-ID: <1408389899-1022-1-git-send-email-f.fainelli@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi all,
 
-On Mon, Aug 18, 2014 at 02:03:16PM -0400, Jon Smirl wrote:
-> found on Allwinner SoCs.x
-> 
-> Signed-off-by: Jon Smirl <jonsmirl@gmail.com>
+This patchset adds very minimal support for the BCM63138 SoC which is
+a xDSL SoC using a dual Cortex A9 CPU complex.
 
-Is there any notable difference with Alexandre's driver?
-https://lkml.org/lkml/2014/5/19/568
+Future work will focus on:
 
-If so, why didn't you posted incremental patches on top of his driver?
+- clock device/driver/providers
+- SMP support
+- enabling more existing bcm63xx drivers to be DT enabled
 
-Thanks,
-Maxime
+Florian Fainelli (5):
+  ARM: BCM63XX: add basic support for the Broadcom BCM63138 DSL SoC
+  ARM: BCM63XX: add low-level UART debug support
+  ARM: BCM63XX: add BCM63138 minimal Device Tree
+  ARM: BCM63XX: add BCM963138DVT Reference platform DTS
+  MAINTAINERS: add entry for the Broadcom BCM63xx ARM SoCs
+
+ .../devicetree/bindings/arm/bcm/bcm63138.txt       |   9 ++
+ MAINTAINERS                                        |   8 ++
+ arch/arm/Kconfig.debug                             |  18 ++-
+ arch/arm/boot/dts/Makefile                         |   1 +
+ arch/arm/boot/dts/bcm63138.dtsi                    | 134 +++++++++++++++++++++
+ arch/arm/boot/dts/bcm963138dvt.dts                 |  30 +++++
+ arch/arm/include/debug/bcm63xx.S                   |  33 +++++
+ arch/arm/mach-bcm/Kconfig                          |  17 +++
+ arch/arm/mach-bcm/Makefile                         |   3 +
+ arch/arm/mach-bcm/bcm63xx.c                        |  27 +++++
+ 10 files changed, 278 insertions(+), 2 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/bcm/bcm63138.txt
+ create mode 100644 arch/arm/boot/dts/bcm63138.dtsi
+ create mode 100644 arch/arm/boot/dts/bcm963138dvt.dts
+ create mode 100644 arch/arm/include/debug/bcm63xx.S
+ create mode 100644 arch/arm/mach-bcm/bcm63xx.c
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140818/2f184a5a/attachment.sig>
+1.9.1
