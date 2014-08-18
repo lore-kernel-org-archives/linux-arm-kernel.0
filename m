@@ -1,101 +1,21 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Mon, 18 Aug 2014 23:36:59 +0100
-Subject: [PATCH] arm64: topology: add MPIDR-based detection
-In-Reply-To: <CAFpQJXVmj0v=L_5NSGs1TdNuZDuKv_zxEoSVpCVSSsjSqFgiMg@mail.gmail.com>
-References: <20140603173103.GA18004@red-moon>
- <20140603210424.GJ31751@sirena.org.uk>
- <20140604093452.GA8057@e102568-lin.cambridge.arm.com>
- <20140604115751.GH2520@sirena.org.uk>
- <20140604130114.GB10775@e102568-lin.cambridge.arm.com>
- <20140604135431.GL2520@sirena.org.uk>
- <20140604155129.GD10775@e102568-lin.cambridge.arm.com>
- <20140604163400.GQ2520@sirena.org.uk>
- <20140604171030.GE10775@e102568-lin.cambridge.arm.com>
- <CAFpQJXVmj0v=L_5NSGs1TdNuZDuKv_zxEoSVpCVSSsjSqFgiMg@mail.gmail.com>
-Message-ID: <20140818223659.GC5032@e102568-lin.cambridge.arm.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Mon, 18 Aug 2014 18:46:10 -0400
+Subject: [GIT PULL] ARM: mvebu: SoC changes for v3.17 (round 2)
+In-Reply-To: <20140818205440.GB2126@drone.musicnaut.iki.fi>
+References: <20140718220516.GM24496@titan.lakedaemon.net>
+ <20140818205440.GB2126@drone.musicnaut.iki.fi>
+Message-ID: <20140818224610.GS12769@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 18, 2014 at 08:39:48AM +0100, Ganapatrao Kulkarni wrote:
-> How we map non SMT (MT bit24=0) cores of dual/multi socket system with
-> the topology which is using only aff0 and aff1?
-> can we use aff2  ( or concatenating aff2 and aff3)  to represent socket-id?
+Aaro,
 
-Can you provide us with a description of the topology and the MPIDR_EL1
-list please ?
+On Mon, Aug 18, 2014 at 11:54:40PM +0300, Aaro Koskinen wrote:
+> I tried booting kernel with appended DTB, but it just silently hangs.
+> Also tried to enable earlyprintk, but couldn't get even that working...
 
-I think that DT squashes the levels above cluster so that's how it could
-be implemented but first I would like to see what s the CPUs layout
-of the system.
+Could you post your config?
 
-Thanks,
-Lorenzo
+thx,
 
-> 
-> thanks
-> Ganapat
-> 
-> 
-> On Wed, Jun 4, 2014 at 10:40 PM, Lorenzo Pieralisi
-> <lorenzo.pieralisi@arm.com> wrote:
-> > On Wed, Jun 04, 2014 at 05:34:00PM +0100, Mark Brown wrote:
-> >> On Wed, Jun 04, 2014 at 04:51:29PM +0100, Lorenzo Pieralisi wrote:
-> >>
-> >> > My question is: is it better to pack affinity levels and "guess" what aff3
-> >> > (and aff2 on non-SMT) means or add an additional level of hierarchy in the
-> >> > arm64 topology code (eg book_id - implemented only for s390 to the best
-> >> > of my knowledge) ?
-> >>
-> >> Shoving them in there would address the issue as well, yes (though we'd
-> >> still have to combine aff2 and aff3 for the non-SMT case).  I don't know
-> >> if having books enabled has some overhead we don't want though.
-> >>
-> >> > I personally prefer the latter approach but I think it boils down to
-> >> > understanding what do we want to provide the scheduler with if we have
-> >> > a hierarchy that extends beyond "cluster" level.
-> >>
-> >> > I will be glad to help you implement it when time comes (and this will also
-> >> > fix the clusters of clusters DT issue we are facing - ie how to treat them).
-> >>
-> >> > Now, I do not think it is a major problem at the moment, merging the
-> >> > patch I sent will give us more time to discuss how to define the
-> >> > topology for clusters of clusters, because that's what we are talking
-> >> > about.
-> >>
-> >> In so far as you're saying that we don't really need to worry about
-> >> exactly how we handle multi-level clusters properly at the minute I
-> >> agree with you - until we have some idea what they physically look like
-> >> and can consider how well that maps onto the scheduler and whatnot it
-> >> doesn't really matter and we can just ignore it.  Given that I'm not
-> >> concerned about just reporting everything as flat like we do with DT at
-> >> the minute and don't see a real need to theorise about it, it'll just be
-> >> a performance problem and not a correctness problem when it is
-> >> encountered.  That feels like a better position to leave things in as it
-> >> will be less stress for whoever is bringing up such a fancy new system,
-> >> they can stand a reasonable chance of getting things at least running
-> >> with minimal effort.
-> >
-> > Ok, I think we have an agreement, let's merge the patch I sent and
-> > discuss the way forward to cater for systems with clusters of clusters
-> > when we reasonably expect them to hit production, the scheduler expected
-> > topology might well change by that time and now we are well positioned
-> > to cope with future extensions (and actually packing affinity levels
-> > might well be the final solution if the scheduler expects a "flat"
-> > topology at the higher topology level).
-> >
-> >> > Does it make sense ?
-> >>
-> >> Like I say I do think that merging your current code is better than
-> >> nothing.
-> >
-> > Great, thanks for bearing with me.
-> >
-> > Thanks !
-> > Lorenzo
-> >
-> >
-> > _______________________________________________
-> > linaro-kernel mailing list
-> > linaro-kernel at lists.linaro.org
-> > http://lists.linaro.org/mailman/listinfo/linaro-kernel
-> 
+Jason.
