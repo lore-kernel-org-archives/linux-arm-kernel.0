@@ -1,74 +1,64 @@
-From: gwen@trabucayre.com (gwenhael.goavec)
-Date: Mon, 18 Aug 2014 13:49:03 +0200
-Subject: [RFC] usb issue on imx27: 3 clocks are needed
-In-Reply-To: <782c806acb464f5781deb32e94548882@BN1PR0301MB0772.namprd03.prod.outlook.com>
-References: <53EF7AF6.2000405@gmail.com> <20140818090056.GA29393@peterchendt>
- <20140818092635.GI2114@dragon>
- <782c806acb464f5781deb32e94548882@BN1PR0301MB0772.namprd03.prod.outlook.com>
-Message-ID: <20140818134903.5b6e6c27@x230.trabucayre.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Mon, 18 Aug 2014 13:57:32 +0200
+Subject: [PATCH] mmc: core: sd: check card write-protect lock while
+ resuming
+In-Reply-To: <1408356012-18867-1-git-send-email-Barry.Song@csr.com>
+References: <1408356012-18867-1-git-send-email-Barry.Song@csr.com>
+Message-ID: <CAPDyKFpFLoREZ=rYp8bQvJ7Fczq=HyLL90jv7Hjzai9xTNBNYg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 18 Aug 2014 10:35:53 +0000
-Peter Chen <Peter.Chen@freescale.com> wrote:
+On 18 August 2014 12:00, Barry Song <Barry.Song@csr.com> wrote:
+> From: Minda Chen <Minda.Chen@csr.com>
+>
+> After suspending, unplug the sdcard, and set sd WP lock,
+> insert it again, then resume the system. resume codes do
+> not check the the sdcard write-proctect lock. now check
+> it.
+>
+> Signed-off-by: Minda Chen <Minda.Chen@csr.com>
+> Signed-off-by: Barry Song <Baohua.Song@csr.com>
+> ---
+>  drivers/mmc/core/sd.c | 7 +++++++
+>  1 file changed, 7 insertions(+)
+>
+> diff --git a/drivers/mmc/core/sd.c b/drivers/mmc/core/sd.c
+> index 0c44510..890557a 100644
+> --- a/drivers/mmc/core/sd.c
+> +++ b/drivers/mmc/core/sd.c
+> @@ -910,6 +910,7 @@ static int mmc_sd_init_card(struct mmc_host *host, u32 ocr,
+>         int err;
+>         u32 cid[4];
+>         u32 rocr = 0;
+> +       bool oldro, ro;
+>
+>         BUG_ON(!host);
+>         WARN_ON(!host->claimed);
+> @@ -922,6 +923,12 @@ static int mmc_sd_init_card(struct mmc_host *host, u32 ocr,
+>                 if (memcmp(cid, oldcard->raw_cid, sizeof(cid)) != 0)
+>                         return -ENOENT;
+>
+> +               if (host->ops->get_ro) {
+> +                       ro = host->ops->get_ro(host) ? true : false;
+> +                       oldro = mmc_card_readonly(oldcard) ? true : false;
+> +                       if (oldro ^ ro)
+> +                               return -ENOENT;
+> +               }
 
->  
-> > On Mon, Aug 18, 2014 at 05:00:59PM +0800, Peter Chen wrote:
-> > > On Sat, Aug 16, 2014 at 05:38:30PM +0200, Philippe Reynes wrote:
-> > > > Hi all,
-> > > >
-> > > > i.MX27's usb needs three clocks (usb_ipg_gate, usb_ahb_gate and
-> > > > usb_div) but the current chipidea driver implementation, and
-> > > > devicetree, provides only ipg and ahb. Consequently, if the
-> > > > bootloader don't enable the last one, the kernel will crash.
-> > > >
-> > > > Our approach/idea is to add a second, optionnal, clock in
-> > > > ci_hdrc_imx.c with 'per' name in devicetree  and to add  clock name
-> > 'main_clk' for mandatory clock.
-> > > > This approach it correct? Or an other approach seems better?
-> > > > Thank you very much for your point of view.
-> > > >
-> > >
-> > > It is ok for me to have ipg, ahb and per clocks at driver, but how can
-> > > you maintain DT consistent?
-> > 
-> > Adding new clock as optional one will just maintain the DT compatibility.
-> > 
-> 
-> How to handle node_usb_soc1's clock which is without clk name to consistent with three
-> clocks for node_usb_soc2 at driver? Except for adding some platform judge code at
-> driver, do you have other solutions?
-> 
-> node_usb_soc1: {
-> 	clocks = <&clks IMX6_CLK_USBOH3>;
-> };
-> 
-> node_usb_soc2: {
-> 	clocks = <&clks IMX27_CLK_USBIPG>, <&clks IMX27_CLK_USBOH3>, <&clks IMX27_CLK_USBPER>;
-> 	clock-names = "ipg", "ahb", "per";
-> };
-> 
-> Peter
+Seems like this code belongs better in mmc_sd_setup_card(). Could you
+try moving it there.
+
+Kind regards
+Uffe
+
+>                 card = oldcard;
+>         } else {
+>                 /*
 > --
-
-Our idea is something like this :
-node_usb_soc: {
-	clocks = <&clks IMX27_CLK_USBxxx>;
-	clock-names = "main_clk";
-};
-for all CPUs
-
-and 
-node_usb_imx27: {
-	clocks = <&clks IMX27_CLK_USB_IPG_GATE>,
-		<&clks IMX27_CLK_USB_DIV>;
-	clock-names = "main_clk", "per";
-};
-
-For imx27 and CPUs with the need of more than one clock.
-
-The last clock (ie ahb) is handled by usbmisc.c and if "per" clock is not
-present in the dtsi chipidea will not fails, just setting data->per_clk = NULL
-for prepare/unprepare.
-
-Gwenhael
+> 2.0.4
+>
+>
+>
+> Member of the CSR plc group of companies. CSR plc registered in England and Wales, registered number 4187346, registered office Churchill House, Cambridge Business Park, Cowley Road, Cambridge, CB4 0WZ, United Kingdom
+> More information can be found at www.csr.com. Keep up to date with CSR on our technical blog, www.csr.com/blog, CSR people blog, www.csr.com/people, YouTube, www.youtube.com/user/CSRplc, Facebook, www.facebook.com/pages/CSR/191038434253534, or follow us on Twitter at www.twitter.com/CSR_plc.
+> New for 2014, you can now access the wide range of products powered by aptX at www.aptx.com.
