@@ -1,38 +1,62 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 18 Aug 2014 19:33:49 +0200
-Subject: [PATCH v2 0/2] ARM: sun8i: Enable pinctrl, i2c and mmc
-In-Reply-To: <1408380711-26308-1-git-send-email-wens@csie.org>
-References: <1408380711-26308-1-git-send-email-wens@csie.org>
-Message-ID: <20140818173349.GD15297@lukather>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 18 Aug 2014 18:40:10 +0100
+Subject: [PATCH 2/2] asm-generic: add memfd_create system call to unistd.h
+In-Reply-To: <20140818171540.GE4745@redhat.com>
+References: <1407764228-7904-1-git-send-email-will.deacon@arm.com>
+ <CANq1E4Q0gDaJ5XGnkoCQsG8xLh1Q-EBErtEVPpeeZgGj+Nr8dQ@mail.gmail.com>
+ <20140811171511.GF8828@arm.com> <201408112057.01177.arnd@arndb.de>
+ <CAMuHMdWZ30ZKO2ddh8whmw5ThrKZC0wsU+rhgoc8fRZni0Zduw@mail.gmail.com>
+ <20140812102734.GG29013@arm.com> <20140812111030.GK29013@arm.com>
+ <20140812123736.GA16961@redhat.com> <20140815135520.GT27466@arm.com>
+ <20140818171540.GE4745@redhat.com>
+Message-ID: <20140818174010.GZ30401@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 19, 2014 at 12:51:49AM +0800, Chen-Yu Tsai wrote:
-> Hi Maxime,
+On Mon, Aug 18, 2014 at 01:15:40PM -0400, Vivek Goyal wrote:
+> On Fri, Aug 15, 2014 at 02:55:20PM +0100, Will Deacon wrote:
+> > What I meant was, if I wire it into asm-generic/unistd.h then it will return
+> > -ENOEXEC for architectures using that file (e.g. arm64).
+> > 
+> > Patch below, but I don't think it's very useful.
+> > 
 > 
-> This is v2 of the remaining sun8i series. I've dropped the patches you
-> merged. The remaining patches have been rebased onto sunxi-next.
+> Hi Will,
 > 
-> This series enables all the controllers on sun8i that we already have
-> drivers for, excluding SPI as the tablet I have does not use it and
-> I cannot test it. If there's a way to test it without external connections
-> or devices please let me know.
+> I have not even defined a syscall number for other arches. IIUC, this
+> patch will forcibly introduce a syscall number for the new syscall for
+> arches which use asm-generic/unistd.h.
 > 
-> The commit logs pretty much explain themselves. Note that PLL6 is not
-> implemented yet. I've some patches for the clocks that I will send later.
+> So question I have is that why should we do it now. One can do it once
+> somebody enables kexec_file_load() on arm64.
+> 
+> Right now I see that kexec_file_load() gets compiled if CONFIG_KEXEC=y. So
+> even on arm64 it must be getting compiled in. But it is not being hooked
+> up using system call table. So there should not be any way to invoke
+> syscalll definition. So my understand is that in current form, one can
+> not invoke kexec_file_load() on arm64. Is that right.
+> 
+> Now I have put one more patch to make compilation of kexec_file_load()
+> conditional on config option CONFIG_KEXEC_FILE. And this option can
+> be enabled only on x86_64. That means kexec_file_load() will not even
+> be compiled in on arm64 (once the patch gets merged). Right now patch
+> is sitting in andrew's tree.
+> 
+> http://ozlabs.org/~akpm/mmotm/broken-out/kexec-create-a-new-config-option-config_kexec_file-for-new-syscall.patch
+> 
+> Can you please help me understand that why do we need this patch if at
+> this point of time we are not even fixing a system call number for
+> kexec_file_load() for arches except x86_64.
 
-Merged, thanks!
+>From what I read, the only arch which supports this call is x86_64, and
+it requires arch code make work.  So simply wiring up the syscall is not
+enough.
 
-Maxime
+What is probably worth doing is reserving the syscall number _if_ it's
+going to be useful on architectures - by that, I mean inserting the
+syscall number with a comment in the unistd.h file, rather than
+defining a constant.
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140818/41748379/attachment.sig>
+FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
+according to speedtest.net.
