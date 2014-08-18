@@ -1,67 +1,101 @@
 From: stefan@agner.ch (Stefan Agner)
-Date: Mon, 18 Aug 2014 22:07:13 +0200
-Subject: [PATCH RESEND v2 3/7] usb: phy: mxs: Add VF610 USB PHY support
+Date: Mon, 18 Aug 2014 22:07:11 +0200
+Subject: [PATCH RESEND v2 1/7] ARM: dts: vf610: Add USB PHY and controller
 In-Reply-To: <cover.1408391385.git.stefan@agner.ch>
 References: <cover.1408391385.git.stefan@agner.ch>
-Message-ID: <acb7c055ded38c74291d0f0d8d2fdca54a8b95f8.1408391385.git.stefan@agner.ch>
+Message-ID: <240a6eadc0050de82af3e174a999f67e0ca27afa.1408391385.git.stefan@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds support for the USB PHY in Vybrid VF610. We assume that
-the disconnection without VBUS is also needed for Vybrid.
+This adds USB PHY and USB controller nodes. Vybrid SoCs have two
+independent USB cores which each supports DR (dual role). However,
+real OTG is not supported since the OTG ID pin is not available.
 
-Tests showed, without MXS_PHY_NEED_IP_FIX, enumeration of devices
-behind a USB Hub fails with errors:
+The PHYs are located within the anadig register range, hence we need
+to change the length of the anadig registers.
 
-[  215.163507] usb usb1-port1: cannot reset (err = -32)
-[  215.170498] usb usb1-port1: cannot reset (err = -32)
-[  215.185120] usb usb1-port1: cannot reset (err = -32)
-[  215.191345] usb usb1-port1: cannot reset (err = -32)
-[  215.202487] usb usb1-port1: cannot reset (err = -32)
-[  215.207718] usb usb1-port1: Cannot enable. Maybe the USB cable is bad?
-[  215.219317] usb usb1-port1: unable to enumerate USB device
-
-Hence we also enable the MXS_PHY_NEED_IP_FIX flag.
-
-Acked-by: Peter Chen <peter.chen@freescale.com>
 Signed-off-by: Stefan Agner <stefan@agner.ch>
 ---
- Documentation/devicetree/bindings/usb/mxs-phy.txt | 1 +
- drivers/usb/phy/phy-mxs-usb.c                     | 6 ++++++
- 2 files changed, 7 insertions(+)
+ arch/arm/boot/dts/vf610.dtsi | 46 +++++++++++++++++++++++++++++++++++++++++---
+ 1 file changed, 43 insertions(+), 3 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/usb/mxs-phy.txt b/Documentation/devicetree/bindings/usb/mxs-phy.txt
-index cef181a..fe3eed8 100644
---- a/Documentation/devicetree/bindings/usb/mxs-phy.txt
-+++ b/Documentation/devicetree/bindings/usb/mxs-phy.txt
-@@ -5,6 +5,7 @@ Required properties:
- 	* "fsl,imx23-usbphy" for imx23 and imx28
- 	* "fsl,imx6q-usbphy" for imx6dq and imx6dl
- 	* "fsl,imx6sl-usbphy" for imx6sl
-+	* "fsl,vf610-usbphy" for Vybrid vf610
-   "fsl,imx23-usbphy" is still a fallback for other strings
- - reg: Should contain registers location and length
- - interrupts: Should contain phy interrupt
-diff --git a/drivers/usb/phy/phy-mxs-usb.c b/drivers/usb/phy/phy-mxs-usb.c
-index c42bdf0..8c2f23b 100644
---- a/drivers/usb/phy/phy-mxs-usb.c
-+++ b/drivers/usb/phy/phy-mxs-usb.c
-@@ -125,10 +125,16 @@ static const struct mxs_phy_data imx6sl_phy_data = {
- 		MXS_PHY_NEED_IP_FIX,
- };
+diff --git a/arch/arm/boot/dts/vf610.dtsi b/arch/arm/boot/dts/vf610.dtsi
+index 6a6190c..f36acb5 100644
+--- a/arch/arm/boot/dts/vf610.dtsi
++++ b/arch/arm/boot/dts/vf610.dtsi
+@@ -25,6 +25,8 @@
+ 		gpio2 = &gpio3;
+ 		gpio3 = &gpio4;
+ 		gpio4 = &gpio5;
++		usbphy0 = &usbphy0;
++		usbphy1 = &usbphy1;
+ 	};
  
-+static const struct mxs_phy_data vf610_phy_data = {
-+	.flags = MXS_PHY_DISCONNECT_LINE_WITHOUT_VBUS |
-+		MXS_PHY_NEED_IP_FIX,
-+};
+ 	cpus {
+@@ -285,9 +287,25 @@
+ 				gpio-ranges = <&iomuxc 0 128 7>;
+ 			};
+ 
+-			anatop at 40050000 {
+-				compatible = "fsl,vf610-anatop";
+-				reg = <0x40050000 0x1000>;
++			anatop: anatop at 40050000 {
++				compatible = "fsl,vf610-anatop", "syscon";
++				reg = <0x40050000 0x400>;
++			};
 +
- static const struct of_device_id mxs_phy_dt_ids[] = {
- 	{ .compatible = "fsl,imx6sl-usbphy", .data = &imx6sl_phy_data, },
- 	{ .compatible = "fsl,imx6q-usbphy", .data = &imx6q_phy_data, },
- 	{ .compatible = "fsl,imx23-usbphy", .data = &imx23_phy_data, },
-+	{ .compatible = "fsl,vf610-usbphy", .data = &vf610_phy_data, },
- 	{ /* sentinel */ }
- };
- MODULE_DEVICE_TABLE(of, mxs_phy_dt_ids);
++			usbphy0: usbphy at 40050800 {
++				compatible = "fsl,vf610-usbphy";
++				reg = <0x40050800 0x400>;
++				interrupts = <0 50 IRQ_TYPE_LEVEL_HIGH>;
++				clocks = <&clks VF610_CLK_USBPHY0>;
++				fsl,anatop = <&anatop>;
++			};
++
++			usbphy1: usbphy at 40050c00 {
++				compatible = "fsl,vf610-usbphy";
++				reg = <0x40050c00 0x400>;
++				interrupts = <0 51 IRQ_TYPE_LEVEL_HIGH>;
++				clocks = <&clks VF610_CLK_USBPHY1>;
++				fsl,anatop = <&anatop>;
+ 			};
+ 
+ 			i2c0: i2c at 40066000 {
+@@ -309,6 +327,18 @@
+ 				reg = <0x4006b000 0x1000>;
+ 				#clock-cells = <1>;
+ 			};
++
++			usbdev0: usb at 40034000 {
++				compatible = "fsl,vf610-usb", "fsl,imx27-usb";
++				reg = <0x40034000 0x800>;
++				interrupts = <0 75 IRQ_TYPE_LEVEL_HIGH>;
++				clocks = <&clks VF610_CLK_USBC0>;
++				fsl,usbphy = <&usbphy0>;
++				dr_mode = "peripheral";
++				status = "disabled";
++			};
++
++
+ 		};
+ 
+ 		aips1: aips-bus at 40080000 {
+@@ -371,6 +401,16 @@
+ 				status = "disabled";
+ 			};
+ 
++			usbh1: usb at 400b4000 {
++				compatible = "fsl,vf610-usb", "fsl,imx27-usb";
++				reg = <0x400b4000 0x800>;
++				interrupts = <0 76 IRQ_TYPE_LEVEL_HIGH>;
++				clocks = <&clks VF610_CLK_USBC1>;
++				fsl,usbphy = <&usbphy1>;
++				dr_mode = "host";
++				status = "disabled";
++			};
++
+ 			ftm: ftm at 400b8000 {
+ 				compatible = "fsl,ftm-timer";
+ 				reg = <0x400b8000 0x1000 0x400b9000 0x1000>;
 -- 
 2.0.4
