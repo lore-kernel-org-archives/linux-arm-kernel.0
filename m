@@ -1,110 +1,53 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Mon, 18 Aug 2014 14:51:05 +0200
-Subject: [PATCH v9 4/4] arm: ARMv7 dirty page logging 2nd stage page
- fault handling support
-In-Reply-To: <53EC0ED3.8070307@samsung.com>
-References: <1406249768-25315-1-git-send-email-m.smarduch@samsung.com>
- <1406249768-25315-5-git-send-email-m.smarduch@samsung.com>
- <20140811191315.GI10550@cbox> <53E96CF1.6040806@samsung.com>
- <20140812095045.GN10550@cbox> <53EABEEF.9070907@samsung.com>
- <20140813073008.GP10550@cbox> <53EC0ED3.8070307@samsung.com>
-Message-ID: <20140818125105.GE19635@cbox>
+From: a.hajda@samsung.com (Andrzej Hajda)
+Date: Mon, 18 Aug 2014 14:58:14 +0200
+Subject: [PATCH v2] imx-drm: imx-drm-core: add suspend/resume support
+In-Reply-To: <20140818123823.GK2114@dragon>
+References: <1406269240-24622-1-git-send-email-shawn.guo@freescale.com>
+ <53F1AE97.8090807@samsung.com> <20140818123823.GK2114@dragon>
+Message-ID: <53F1F866.1@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 13, 2014 at 06:20:19PM -0700, Mario Smarduch wrote:
-> On 08/13/2014 12:30 AM, Christoffer Dall wrote:
-> > On Tue, Aug 12, 2014 at 06:27:11PM -0700, Mario Smarduch wrote:
-> >> On 08/12/2014 02:50 AM, Christoffer Dall wrote:
-> >>> On Mon, Aug 11, 2014 at 06:25:05PM -0700, Mario Smarduch wrote:
-> >>>> On 08/11/2014 12:13 PM, Christoffer Dall wrote:
-> >>>>> On Thu, Jul 24, 2014 at 05:56:08PM -0700, Mario Smarduch wrote:
-> > 
-> > [...]
-> > 
-> >>>>>> @@ -1151,7 +1170,7 @@ static void kvm_set_spte_handler(struct kvm *kvm, gpa_t gpa, void *data)
-> >>>>>>  {
-> >>>>>>  	pte_t *pte = (pte_t *)data;
-> >>>>>>  
-> >>>>>> -	stage2_set_pte(kvm, NULL, gpa, pte, false);
-> >>>>>> +	stage2_set_pte(kvm, NULL, gpa, pte, false, false);
-> >>>>>
-> >>>>> why is logging never active if we are called from MMU notifiers?
-> >>>>
-> >>>> mmu notifiers update sptes, but I don't see how these updates
-> >>>> can result in guest dirty pages. Also guest pages are marked dirty
-> >>>> from 2nd stage page fault handlers (searching through the code).
-> >>>>
-> >>> Ok, then add:
-> >>>
-> >>> /*
-> >>>  * We can always call stage2_set_pte with logging_active == false,
-> >>>  * because MMU notifiers will have unmapped a huge PMD before calling
-> >>>  * ->change_pte() (which in turn calls kvm_set_spte_hva()) and therefore
-> >>>  * stage2_set_pte() never needs to clear out a huge PMD through this
-> >>>  * calling path.
-> >>>  */
-> >>
-> >> So here on permission change to primary pte's kernel first invalidates
-> >> related s2ptes followed by ->change_pte calls to synchronize s2ptes. As
-> >> consequence of invalidation we unmap huge PMDs, if a page falls in that
-> >> range.
-> >>
-> >> Is the comment to point out use of logging flag under various scenarios?
-> > 
-> > The comment is because when you look at this function it is not obvious
-> > why we pass logging_active=false, despite logging may actually be
-> > active.  This could suggest that the parameter to stage2_set_pte()
-> > should be named differently (break_huge_pmds) or something like that,
-> > but we can also be satisfied with the comment.
-> 
-> Ok I see, I was thinking you thought it was breaking something.
-> Yeah I'll add the comment, in reality this is another use case
-> where a PMD may need to be converted to page table so it makes sense
-> to contrast use cases.
-> 
+On 08/18/2014 02:38 PM, Shawn Guo wrote:
+> Hi Andrzej,
+>
+> On Mon, Aug 18, 2014 at 09:43:19AM +0200, Andrzej Hajda wrote:
+>>> diff --git a/drivers/staging/imx-drm/imx-drm-core.c b/drivers/staging/imx-drm/imx-drm-core.c
+>>> index def8280d7ee6..ab41152089a3 100644
+>>> --- a/drivers/staging/imx-drm/imx-drm-core.c
+>>> +++ b/drivers/staging/imx-drm/imx-drm-core.c
+>>> @@ -696,6 +696,29 @@ static int imx_drm_platform_remove(struct platform_device *pdev)
+>>>  	return 0;
+>>>  }
+>>>  
+>>> +#ifdef CONFIG_PM_SLEEP
+>>> +static int imx_drm_suspend(struct device *dev)
+>>> +{
+>>> +	struct drm_device *drm_dev = dev_get_drvdata(dev);
+>>> +
+>>> +	drm_kms_helper_poll_disable(drm_dev);
+>> drm_dev can be NULL here. You should add check before.
+> The drvdata is set to drm_dev in drm_driver .load() hook.  So are you
+> saying that .suspend() hook could possibly be called before the .load()
+> hook gets called?
 
-the hidden knowledge is that MMU notifiers will ensure a huge PMD gets
-unmapped before trying to change the physical backing of the underlying
-PTEs, so it's a gigantic kernel bug if this gets called on something
-mapped with a huge PMD.
+.load hook is called after all components are attached to the master.
+So if suspend happen after probe of the master and before attaching the last
+component you will have NULL here, I guess.
 
+Regards
+Andrzej
 
-> > 
-> >>
-> >> Should I add comments on flag use in other places as well?
-> >>
-> > 
-> > It's always a judgement call.  I didn't find it necessarry to put a
-> > comment elsewhere because I think it's pretty obivous that we would
-> > never care about logging writes to device regions.
-> > 
-> > However, this made me think, are we making sure that we are not marking
-> > device mappings as read-only in the wp_range functions?  I think it's
-> 
-> KVM_SET_USER_MEMORY_REGION ioctl doesn't check type of region being
-> installed/operated on (KVM_MEM_LOG_DIRTY_PAGES), in case of QEMU
-> these regions wind up in KVMState->KVMSlot[], when
-> memory_region_add_subregion() is called KVM listener installs it.
-> For migration and dirty page logging QEMU walks the KVMSlot[] array.
-> 
-> For QEMU VFIO (PCI) mmap()ing BAR of type IORESOURCE_MEM,
-> causes the memory region to be added to KVMState->KVMSlot[].
-> In that case it's possible to walk KVMState->KVMSlot[] issue
-> the ioctl and  come across  a device mapping with normal memory and
-> WP it's s2ptes (VFIO sets unmigrateble state though).
-> 
-> But I'm not sure what's there to stop someone calling the ioctl and
-> install a region with device memory type. Most likely though if you
-> installed that kind of region migration would be disabled.
-> 
-> But just for logging use not checking memory type could be an issue.
-> 
-I forgot that the current write-protect'ing is limited to the memory
-region boundaries, so everything should be fine.
-
-If user-space write-protects device memory regions, the worst
-consequence is that it breaks the guest, but that's its own
-responsibility, so I don't think you need to change anything.
-
--Christoffer
+>
+> Shawn
+>
+>>> +
+>>> +	return 0;
+>>> +}
+>>> +
+>>> +static int imx_drm_resume(struct device *dev)
+>>> +{
+>>> +	struct drm_device *drm_dev = dev_get_drvdata(dev);
+>>> +
+>>> +	drm_helper_resume_force_mode(drm_dev);
+>> ditto
