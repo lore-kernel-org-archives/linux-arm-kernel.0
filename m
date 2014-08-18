@@ -1,15 +1,17 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Mon, 18 Aug 2014 19:48:53 +0800
+From: gwen@trabucayre.com (gwenhael.goavec)
+Date: Mon, 18 Aug 2014 13:49:03 +0200
 Subject: [RFC] usb issue on imx27: 3 clocks are needed
 In-Reply-To: <782c806acb464f5781deb32e94548882@BN1PR0301MB0772.namprd03.prod.outlook.com>
 References: <53EF7AF6.2000405@gmail.com> <20140818090056.GA29393@peterchendt>
  <20140818092635.GI2114@dragon>
  <782c806acb464f5781deb32e94548882@BN1PR0301MB0772.namprd03.prod.outlook.com>
-Message-ID: <20140818114850.GJ2114@dragon>
+Message-ID: <20140818134903.5b6e6c27@x230.trabucayre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 18, 2014 at 06:35:53PM +0800, Chen Peter-B29397 wrote:
+On Mon, 18 Aug 2014 10:35:53 +0000
+Peter Chen <Peter.Chen@freescale.com> wrote:
+
 >  
 > > On Mon, Aug 18, 2014 at 05:00:59PM +0800, Peter Chen wrote:
 > > > On Sat, Aug 16, 2014 at 05:38:30PM +0200, Philippe Reynes wrote:
@@ -45,14 +47,28 @@ On Mon, Aug 18, 2014 at 06:35:53PM +0800, Chen Peter-B29397 wrote:
 > 	clocks = <&clks IMX27_CLK_USBIPG>, <&clks IMX27_CLK_USBOH3>, <&clks IMX27_CLK_USBPER>;
 > 	clock-names = "ipg", "ahb", "per";
 > };
+> 
+> Peter
+> --
 
-Oh, what I was talking about is we need to ensure the new kernel
-(handling additional clocks) doesn't break old/existing DTB.  That's
-what we call DT compatibility.
+Our idea is something like this :
+node_usb_soc: {
+	clocks = <&clks IMX27_CLK_USBxxx>;
+	clock-names = "main_clk";
+};
+for all CPUs
 
-There is no DT consistency to maintain.  If there is only one clock for
-USB on i.MX6 while 3 clocks on i.MX27, that's something USB driver needs
-to handle, as clearly these two SoCs have different programming model on
-USB device.
+and 
+node_usb_imx27: {
+	clocks = <&clks IMX27_CLK_USB_IPG_GATE>,
+		<&clks IMX27_CLK_USB_DIV>;
+	clock-names = "main_clk", "per";
+};
 
-Shawn
+For imx27 and CPUs with the need of more than one clock.
+
+The last clock (ie ahb) is handled by usbmisc.c and if "per" clock is not
+present in the dtsi chipidea will not fails, just setting data->per_clk = NULL
+for prepare/unprepare.
+
+Gwenhael
