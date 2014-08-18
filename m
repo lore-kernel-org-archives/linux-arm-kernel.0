@@ -1,225 +1,72 @@
-From: daniel.thompson@linaro.org (Daniel Thompson)
-Date: Mon, 18 Aug 2014 15:12:54 +0100
-Subject: [PATCH v9 06/16] irqchip: gic: Provide support for interrupt grouping
-In-Reply-To: <1404979427-12943-1-git-send-email-daniel.thompson@linaro.org>
-References: <1404979427-12943-1-git-send-email-daniel.thompson@linaro.org>
-Message-ID: <1408371184-12576-7-git-send-email-daniel.thompson@linaro.org>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 18 Aug 2014 15:20:30 +0100
+Subject: [PATCH v7 1/8] arm64: kernel: refactor the CPU suspend API for
+ retention states
+In-Reply-To: <1407945127-27554-2-git-send-email-lorenzo.pieralisi@arm.com>
+References: <1407945127-27554-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <1407945127-27554-2-git-send-email-lorenzo.pieralisi@arm.com>
+Message-ID: <20140818142030.GB20043@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-All GIC hardware except GICv1-without-TrustZone support provides a means
-to group exceptions into group 0 (which can optionally be signally using
-use FIQ) and group 1. The kernel currently provides no means to exploit
-this. This patch alters the initialization of the GIC to place all
-interrupts into group 1 which is the foundational requirement to meaningfully
-use FIQ.
+On Wed, Aug 13, 2014 at 04:52:00PM +0100, Lorenzo Pieralisi wrote:
+> CPU suspend is the standard kernel interface to be used to enter
+> low-power states on ARM64 systems. Current cpu_suspend implementation
+> by default assumes that all low power states are losing the CPU context,
+> so the CPU registers must be saved and cleaned to DRAM upon state
+> entry. Furthermore, the current cpu_suspend() implementation assumes
+> that if the CPU suspend back-end method returns when called, this has
+> to be considered an error regardless of the return code (which can be
+> successful) since the CPU was not expected to return from a code path that
+> is different from cpu_resume code path - eg returning from the reset vector.
+> 
+> All in all this means that the current API does not cope well with low-power
+> states that preserve the CPU context when entered (ie retention states),
+> since first of all the context is saved for nothing on state entry for
+> those states and a successful state entry can return as a normal function
+> return, which is considered an error by the current CPU suspend
+> implementation.
+> 
+> This patch refactors the cpu_suspend() API so that it can be split in
+> two separate functionalities. The arm64 cpu_suspend API just provides
+> a wrapper around CPU suspend operation hook. A new function is
+> introduced (for architecture code use only) for states that require
+> context saving upon entry:
+> 
+> __cpu_suspend(unsigned long arg, int (*fn)(unsigned long))
+> 
+> __cpu_suspend() saves the context on function entry and calls the
+> so called suspend finisher (ie fn) to complete the suspend operation.
+> The finisher is not expected to return, unless it fails in which case
+> the error is propagated back to the __cpu_suspend caller.
+> 
+> The API refactoring results in the following pseudo code call sequence for a
+> suspending CPU, when triggered from a kernel subsystem:
+> 
+> /*
+>  * int cpu_suspend(unsigned long idx)
+>  * @idx: idle state index
+>  */
+> {
+> -> cpu_suspend(idx)
+> 	|---> CPU operations suspend hook called, if present
+> 		|--> if (retention_state)
+> 			|--> direct suspend back-end call (eg PSCI suspend)
+> 		     else
+> 			|--> __cpu_suspend(idx, &back_end_finisher);
+> }
+> 
+> By refactoring the cpu_suspend API this way, the CPU operations back-end
+> has a chance to detect whether idle states require state saving or not
+> and can call the required suspend operations accordingly either through
+> simple function call or indirectly through __cpu_suspend() which carries out
+> state saving and suspend finisher dispatching to complete idle state entry.
+> 
+> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> ---
+>  arch/arm64/include/asm/suspend.h |  1 +
+>  arch/arm64/kernel/sleep.S        | 47 +++++++++++++++++++++++++++++-----------
+>  arch/arm64/kernel/suspend.c      | 47 ++++++++++++++++++++++++----------------
+>  3 files changed, 63 insertions(+), 32 deletions(-)
 
-Note that the hardware functionality is unavailable to the kernel when a
-secure monitor is present because access to the grouping registers are
-prohibited outside "secure world" (this feature allows grouping to be
-used to allow hardware peripherals to send interrupts into the secure
-world). The GIC driver will automatically detect this and disable its
-attempts to group interrupts.
-
-On systems without TrustZone support the kernel has the power to route
-interrupt sources to FIQ, potentially allowing a driver to exploit the
-NMI-like properties of FIQ.
-
-Tested on Freescale i.MX6 (quad A9), STiH416 (dual A9) and a self-written
-qemu GICv2 model.
-
-Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
-Cc: Thomas Gleixner <tglx@linutronix.de>
-Cc: Jason Cooper <jason@lakedaemon.net>
-Cc: Nicolas Pitre <nicolas.pitre@linaro.org>
-Cc: Christoffer Dall <christoffer.dall@linaro.org>
-Cc: Sricharan R <r.sricharan@ti.com>
-Cc: Marc Zyngier <marc.zyngier@arm.com>
-Acked-by: Dirk Behme <dirk.behme@de.bosch.com>
----
- drivers/irqchip/irq-gic.c | 99 ++++++++++++++++++++++++++++++++++++++++++++---
- 1 file changed, 94 insertions(+), 5 deletions(-)
-
-diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
-index 4b959e6..423707c 100644
---- a/drivers/irqchip/irq-gic.c
-+++ b/drivers/irqchip/irq-gic.c
-@@ -41,6 +41,9 @@
- #include <linux/irqchip/arm-gic.h>
- 
- #include <asm/cputype.h>
-+#ifdef CONFIG_FIQ
-+#include <asm/fiq.h>
-+#endif
- #include <asm/irq.h>
- #include <asm/exception.h>
- #include <asm/smp_plat.h>
-@@ -68,6 +71,9 @@ struct gic_chip_data {
- #ifdef CONFIG_GIC_NON_BANKED
- 	void __iomem *(*get_base)(union gic_base *);
- #endif
-+#ifdef CONFIG_FIQ
-+	bool fiq_enable;
-+#endif
- };
- 
- static DEFINE_RAW_SPINLOCK(irq_controller_lock);
-@@ -131,6 +137,16 @@ static inline void gic_set_base_accessor(struct gic_chip_data *data,
- #define gic_set_base_accessor(d, f)
- #endif
- 
-+#ifdef CONFIG_FIQ
-+static inline bool gic_data_fiq_enable(struct gic_chip_data *data)
-+{
-+	return data->fiq_enable;
-+}
-+#else
-+static inline bool gic_data_fiq_enable(
-+		struct gic_chip_data *data) { return false; }
-+#endif
-+
- static inline void __iomem *gic_dist_base(struct irq_data *d)
- {
- 	struct gic_chip_data *gic_data = irq_data_get_irq_chip_data(d);
-@@ -325,6 +341,42 @@ static struct irq_chip gic_chip = {
- 	.irq_set_wake		= gic_set_wake,
- };
- 
-+#ifdef CONFIG_FIQ
-+static void __init gic_init_fiq(struct gic_chip_data *gic,
-+				irq_hw_number_t first_irq,
-+				unsigned int num_irqs)
-+{
-+	void __iomem *dist_base = gic_data_dist_base(gic_data);
-+	unsigned int i;
-+
-+	/*
-+	 * FIQ can only be supported on platforms without an extended irq_eoi
-+	 * method (otherwise we take a lock during eoi handling).
-+	 */
-+	if (gic_arch_extn.irq_eoi)
-+		return;
-+
-+	/*
-+	 * If grouping is not available (not implemented or prohibited by
-+	 * security mode) these registers a read-as-zero/write-ignored.
-+	 * However as a precaution we restore the reset default regardless of
-+	 * the result of the test.
-+	 */
-+	writel_relaxed(1, dist_base + GIC_DIST_IGROUP + 0);
-+	gic->fiq_enable = readl_relaxed(dist_base + GIC_DIST_IGROUP + 0);
-+	writel_relaxed(0, dist_base + GIC_DIST_IGROUP + 0);
-+	pr_debug("gic: FIQ support %s\n",
-+		 gic->fiq_enable ? "enabled" : "disabled");
-+
-+	if (!gic->fiq_enable)
-+		return;
-+}
-+#else /* CONFIG_FIQ */
-+static inline void gic_init_fiq(struct gic_chip_data *gic,
-+				irq_hw_number_t first_irq,
-+				unsigned int num_irqs) {}
-+#endif /* CONFIG_FIQ */
-+
- void __init gic_cascade_irq(unsigned int gic_nr, unsigned int irq)
- {
- 	if (gic_nr >= MAX_GIC_NR)
-@@ -373,7 +425,22 @@ static void __init gic_dist_init(struct gic_chip_data *gic)
- 
- 	gic_dist_config(base, gic_irqs, NULL);
- 
--	writel_relaxed(1, base + GIC_DIST_CTRL);
-+	/*
-+	 * Optionally set all global interrupts to be group 1.
-+	 */
-+	if (gic_data_fiq_enable(gic))
-+		for (i = 32; i < gic_irqs; i += 32)
-+			writel_relaxed(0xffffffff,
-+				       base + GIC_DIST_IGROUP + i * 4 / 32);
-+
-+	/*
-+	 * Set EnableGrp1/EnableGrp0 (bit 1 and 0) or EnableGrp (bit 0 only,
-+	 * bit 1 ignored)
-+	 */
-+	if (gic_data_fiq_enable(gic))
-+		writel_relaxed(3, base + GIC_DIST_CTRL);
-+	else
-+		writel_relaxed(1, base + GIC_DIST_CTRL);
- }
- 
- static void gic_cpu_init(struct gic_chip_data *gic)
-@@ -400,8 +467,20 @@ static void gic_cpu_init(struct gic_chip_data *gic)
- 
- 	gic_cpu_config(dist_base, NULL);
- 
-+	/*
-+	 * Set all PPI and SGI interrupts to be group 1.
-+	 *
-+	 * If grouping is not available (not implemented or prohibited by
-+	 * security mode) these registers are read-as-zero/write-ignored.
-+	 */
-+	if (gic_data_fiq_enable(gic))
-+		writel_relaxed(0xffffffff, dist_base + GIC_DIST_IGROUP + 0);
-+
- 	writel_relaxed(0xf0, base + GIC_CPU_PRIMASK);
--	writel_relaxed(1, base + GIC_CPU_CTRL);
-+	if (gic_data_fiq_enable(gic))
-+		writel_relaxed(0x1f, base + GIC_CPU_CTRL);
-+	else
-+		writel_relaxed(1, base + GIC_CPU_CTRL);
- }
- 
- void gic_cpu_if_down(void)
-@@ -485,7 +564,10 @@ static void gic_dist_restore(unsigned int gic_nr)
- 		writel_relaxed(gic_data[gic_nr].saved_spi_enable[i],
- 			dist_base + GIC_DIST_ENABLE_SET + i * 4);
- 
--	writel_relaxed(1, dist_base + GIC_DIST_CTRL);
-+	if (gic_data_fiq_enable(&gic_data[gic_nr]))
-+		writel_relaxed(3, dist_base + GIC_DIST_CTRL);
-+	else
-+		writel_relaxed(1, dist_base + GIC_DIST_CTRL);
- }
- 
- static void gic_cpu_save(unsigned int gic_nr)
-@@ -542,7 +624,7 @@ static void gic_cpu_restore(unsigned int gic_nr)
- 		writel_relaxed(0xa0a0a0a0, dist_base + GIC_DIST_PRI + i * 4);
- 
- 	writel_relaxed(0xf0, cpu_base + GIC_CPU_PRIMASK);
--	writel_relaxed(1, cpu_base + GIC_CPU_CTRL);
-+	writel_relaxed(0x1f, cpu_base + GIC_CPU_CTRL);
- }
- 
- static int gic_notifier(struct notifier_block *self, unsigned long cmd,	void *v)
-@@ -604,6 +686,7 @@ static void gic_raise_softirq(const struct cpumask *mask, unsigned int irq)
- {
- 	int cpu;
- 	unsigned long flags, map = 0;
-+	unsigned long softint;
- 
- 	raw_spin_lock_irqsave(&irq_controller_lock, flags);
- 
-@@ -618,7 +701,11 @@ static void gic_raise_softirq(const struct cpumask *mask, unsigned int irq)
- 	dmb(ishst);
- 
- 	/* this always happens on GIC0 */
--	writel_relaxed(map << 16 | irq, gic_data_dist_base(&gic_data[0]) + GIC_DIST_SOFTINT);
-+	softint = map << 16 | irq;
-+	if (gic_data_fiq_enable(&gic_data[0]))
-+		softint |= 0x8000;
-+	writel_relaxed(softint,
-+		       gic_data_dist_base(&gic_data[0]) + GIC_DIST_SOFTINT);
- 
- 	raw_spin_unlock_irqrestore(&irq_controller_lock, flags);
- }
-@@ -964,6 +1051,8 @@ void __init gic_init_bases(unsigned int gic_nr, int irq_start,
- 
- 		gic->domain = irq_domain_add_legacy(node, gic_irqs, irq_base,
- 					hwirq_base, &gic_irq_domain_ops, gic);
-+
-+		gic_init_fiq(gic, irq_base, gic_irqs);
- 	} else {
- 		gic->domain = irq_domain_add_linear(node, nr_routable_irqs,
- 						    &gic_irq_domain_ops,
--- 
-1.9.3
+Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
