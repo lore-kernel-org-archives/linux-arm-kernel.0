@@ -1,35 +1,24 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Mon, 18 Aug 2014 11:54:19 -0500
-Subject: [PATCHv10 3/5] ARM: dts: exynos: unuse the slot-node and deprecate
- the supports-highspeed for dw-mmc
-In-Reply-To: <53F20955.2050806@suse.de>
-References: <1407397082-32495-1-git-send-email-jh80.chung@samsung.com>
- <1407397082-32495-4-git-send-email-jh80.chung@samsung.com>
- <53F1F027.7060609@samsung.com> <53F20955.2050806@suse.de>
-Message-ID: <53F22FBB.4010801@samsung.com>
+From: nm@ti.com (Nishanth Menon)
+Date: Mon, 18 Aug 2014 11:56:53 -0500
+Subject: [PATCH 0/2] clk: ti: Fix up error checks in set_rate (and div 0 error)
+Message-ID: <1408381015-16042-1-git-send-email-nm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/18/14 09:10, Andreas F?rber wrote:
-> Hi Jaehoon,
->
-> Am 18.08.2014 14:23, schrieb Jaehoon Chung:
->> Socfpga and Rockchip were queued into each SoC tree.
->> I want to know whether this patch is queued or not into Samsung-Soc tree.
->> Do you have any other plan for this patch?
->
-> It isn't applied in his tree:
->
-> http://git.kernel.org/cgit/linux/kernel/git/kgene/linux-samsung.git/
->
-> In fact Kukjin has not applied any patches for 3 weeks now, which likely
-> means he's on vacation. I am hoping he will review this and the other
-> pending conflicting patches to decide on a merge order and fix any
-> trivial conflicts himself. ;)
->
-Oh, I thought it has been queued in previous merge window with my ack.
+Hi,
+The following patches are based on v3.17-rc1
+Prior to this series: http://slexy.org/view/s20QH6PW4x (notice the /0 div error spam at initial boot log)
+After this series: http://slexy.org/view/s20tPNXPf4
 
-OK, I've applied this in my tree for 3.18.
+Nishanth Menon (2):
+  clk: ti: divider: Provide error check for incoming parameters in
+    set_rate
+  clk: ti: dra7-atl: Provide error check for incoming parameters in
+    set_rate
 
-Thanks,
-Kukjin
+ drivers/clk/ti/clk-dra7-atl.c |    6 +++++-
+ drivers/clk/ti/divider.c      |    7 ++++++-
+ 2 files changed, 11 insertions(+), 2 deletions(-)
+
+-- 
+1.7.9.5
