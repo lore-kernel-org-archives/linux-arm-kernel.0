@@ -1,46 +1,77 @@
-From: ohaugan@codeaurora.org (Olav Haugan)
-Date: Mon, 18 Aug 2014 14:32:36 -0700
-Subject: [PATCH v5 1/1] iommu-api: Add map_sg/unmap_sg functions
-In-Reply-To: <20140818212627.GI9809@8bytes.org>
-References: <1407797150-515-1-git-send-email-ohaugan@codeaurora.org>
- <1407797150-515-2-git-send-email-ohaugan@codeaurora.org>
- <871tsm5vcn.fsf@nvidia.com>
- <CAF6AEGvZUanVtPxAt76+AAdOaNwyMJ3cmcJ1srsEYBeG7ELkBQ@mail.gmail.com>
- <53EA472B.3020900@codeaurora.org> <20140818140730.GC9809@8bytes.org>
- <CAF6AEGtGmAQjMc5W5a6x5QiyUc8v0XHcsNAFe65Znc=DDKPS+w@mail.gmail.com>
- <53F266AE.40303@codeaurora.org> <20140818212627.GI9809@8bytes.org>
-Message-ID: <53F270F4.6040109@codeaurora.org>
+From: liviu@dudau.co.uk (Liviu Dudau)
+Date: Mon, 18 Aug 2014 22:34:46 +0100
+Subject: [PATCH v9 03/12] PCI: Introduce helper functions to deal with
+ PCI I/O ranges.
+In-Reply-To: <20140818142604.GO20043@localhost>
+References: <1407860725-25202-1-git-send-email-Liviu.Dudau@arm.com>
+ <1407860725-25202-4-git-send-email-Liviu.Dudau@arm.com>
+ <20140818142604.GO20043@localhost>
+Message-ID: <20140818213446.GC13147@bart.dudau.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 8/18/2014 2:26 PM, joro at 8bytes.org wrote:
-> On Mon, Aug 18, 2014 at 01:48:46PM -0700, Olav Haugan wrote:
->> On 8/18/2014 11:32 AM, Rob Clark wrote:
+On Mon, Aug 18, 2014 at 03:26:04PM +0100, Catalin Marinas wrote:
+> On Tue, Aug 12, 2014 at 05:25:16PM +0100, Liviu Dudau wrote:
+> > Some architectures do not have a simple view of the PCI I/O space
+> > and instead use a range of CPU addresses that map to bus addresses.
+> > For some architectures these ranges will be expressed by OF bindings
+> > in a device tree file.
+> > 
+> > This patch introduces a pci_register_io_range() helper function with
+> > a generic implementation that can be used by such architectures to
+> > keep track of the I/O ranges described by the PCI bindings. If the
+> > PCI_IOBASE macro is not defined that signals lack of support for PCI
+> > and we return an error.
+> > 
+> > In order to retrieve the CPU address associated with an I/O port, a
+> > new helper function pci_pio_to_address() is introduced. This will
+> > search in the list of ranges registered with pci_register_io_range()
+> > and return the CPU address that corresponds to the given port.
+> > 
+> > Cc: Grant Likely <grant.likely@linaro.org>
+> > Cc: Rob Herring <robh+dt@kernel.org>
+> > Cc: Arnd Bergmann <arnd@arndb.de>
+> > Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
+> > ---
+> >  drivers/of/address.c       | 95 ++++++++++++++++++++++++++++++++++++++++++++++
+> >  include/linux/of_address.h |  2 +
+> >  2 files changed, 97 insertions(+)
 > 
->> No, I do not have other uses right now. But could imagine use cases like
->> "force <insert minimum mapping size here> mapping" flag etc.
+> Actually, I think we moved too much code into drivers/of/. Is there
+> anything OF specific about this code to live here (apart from
+> OF_BAD_ADDR)? I think driver/pci/ more appropriate?
+
+I have no strong preference for one place vs the other. While this does
+not use any OF specific code, it should be called only from OF enabled
+code. So the relationship is not one of depending on of_* but on being
+dependent on.
+
 > 
-> I think it is worth discussing to add a flush() function to the
-> IOMMU-API. I sent a patch-set myself a few years ago introducing an
-> iommu_commit() function with the same semantics, but this is
-> out-of-scope for this patch-set.
+> Otherwise it looks fine to me.
+
+Thanks! Would be nice if you can prod at the kernel summit other maintainers
+for ACKs.
+
+Best regards,
+Liviu
+
 > 
-> Also adding a flag parameter to iommu_map_sg would introduce an
-> asymentrie in the API to the iommu_map() function. So please leave it
-> out for this patch-set, when we really need a flag parameter someday we
-> can introduce it for iommu_map() and iommu_map_sg() together.
+> -- 
+> Catalin
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
 > 
-
-Sure, I can remove it. I was trying to make iommu_map_sg/iommu_unmap_sg
-symmetric :-)
-
-Anything else before I push v6?
-
-
-Thanks,
-
-Olav
 
 -- 
-The Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+-------------------
+   .oooO
+   (   )
+    \ (  Oooo.
+     \_) (   )
+          ) /
+         (_/
+
+ One small step
+   for me ...
