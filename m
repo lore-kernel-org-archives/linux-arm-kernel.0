@@ -1,63 +1,69 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Mon, 18 Aug 2014 11:43:07 -0500
-Subject: [PATCH 1/2] ARM: dts: Enable PMIC interrupts on ODROID
-In-Reply-To: <CAAObsKAokjDmpVy5cm_iFD52bCq+3jYeGDWzACsmh-JKktyjDw@mail.gmail.com>
-References: <1405500606-5752-1-git-send-email-drake@endlessm.com>
- <CAAObsKAokjDmpVy5cm_iFD52bCq+3jYeGDWzACsmh-JKktyjDw@mail.gmail.com>
-Message-ID: <53F22D1B.4010900@samsung.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 18 Aug 2014 17:47:21 +0100
+Subject: [PATCH v2 1/3] arm64: spin-table: handle unmapped
+ cpu-release-addrs
+In-Reply-To: <20140817000609.GC22224@bivouac.eciton.net>
+References: <20140813125844.GE32644@leverpostej>
+ <20140814171323.GH9039@arm.com>
+ <CAKv+Gu9ftjZby+5U5Vs0hXhyFdNLwx4MwvC-LL=y3a9eSz34iQ@mail.gmail.com>
+ <20140815115714.GP27466@arm.com>
+ <CAKv+Gu-2RyWY4V7zoOQEi3As96kmmAMae2s3YauJ4bL9-h+sdg@mail.gmail.com>
+ <20140815125324.GQ27466@arm.com>
+ <CAKv+Gu9vj=b3pOJC3-x+QdjcErHShicEw-_6UHABG_j3qkGGOw@mail.gmail.com>
+ <1408113355.599.146.camel@deneb.redhat.com>
+ <20140815143804.GW27466@arm.com>
+ <20140817000609.GC22224@bivouac.eciton.net>
+Message-ID: <20140818164721.GC24600@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/12/14 08:06, Tomeu Vizoso wrote:
-> Tested on an Odroid-U2:
->
-> Tested-by: Tomeu Vizoso<tomeu@tomeuvizoso.net>
->
-> Thanks,
->
-> Tomeu
->
->
-> On 16 July 2014 10:50, Daniel Drake<drake@endlessm.com>  wrote:
->> The ODROID kernel shows that the PMIC interrupt line is hooked up
->> to pin GPX3-2.
->>
->> This is needed for the max77686-irq driver to create the PMIC IRQ
->> domain, which is needed by max77686-rtc.
->>
->> Signed-off-by: Daniel Drake<drake@endlessm.com>
->> ---
->>   arch/arm/boot/dts/exynos4412-odroid-common.dtsi | 11 +++++++++++
->>   1 file changed, 11 insertions(+)
->>
->> diff --git a/arch/arm/boot/dts/exynos4412-odroid-common.dtsi b/arch/arm/boot/dts/exynos4412-odroid-common.dtsi
->> index 6d6d23c..cb6f55f 100644
->> --- a/arch/arm/boot/dts/exynos4412-odroid-common.dtsi
->> +++ b/arch/arm/boot/dts/exynos4412-odroid-common.dtsi
->> @@ -148,6 +148,10 @@
->>
->>                  max77686: pmic at 09 {
->>                          compatible = "maxim,max77686";
->> +                       interrupt-parent =<&gpx3>;
->> +                       interrupts =<2 0>;
->> +                       pinctrl-names = "default";
->> +                       pinctrl-0 =<&max77686_irq>;
->>                          reg =<0x09>;
->>                          #clock-cells =<1>;
->>
->> @@ -368,4 +372,11 @@
->>                  samsung,pins = "gpx1-3";
->>                  samsung,pin-pud =<0>;
->>          };
->> +
->> +       max77686_irq: max77686-irq {
->> +               samsung,pins = "gpx3-2";
->> +               samsung,pin-function =<0>;
->> +               samsung,pin-pud =<0>;
->> +               samsung,pin-drv =<0>;
->> +       };
->>   };
+On Sun, Aug 17, 2014 at 01:06:09AM +0100, Leif Lindholm wrote:
+> On Fri, Aug 15, 2014 at 03:38:04PM +0100, Will Deacon wrote:
+> > On Fri, Aug 15, 2014 at 03:35:55PM +0100, Mark Salter wrote:
+> > > On Fri, 2014-08-15 at 15:28 +0200, Ard Biesheuvel wrote:
+> > > > On 15 August 2014 14:53, Will Deacon <will.deacon@arm.com> wrote:
+> > > > > On Fri, Aug 15, 2014 at 01:07:16PM +0100, Ard Biesheuvel wrote:
+> > > > >> On 15 August 2014 13:57, Will Deacon <will.deacon@arm.com> wrote:
+> > > > >> > I was planning to take all of these for 3.18 as there's no regression here
+> > > > >> > (the fuzzing is a new debug feature and defaults to `n'). Do you think these
+> > > > >> > qualify as -rc1 material?
+> > > > >>
+> > > > >> Considering that TEXT_OFFSET fuzzing is recommended to be turned on
+> > > > >> for distro kernels, I would say this is definitely appropriate for
+> > > > >> 3.17
+> > > > >
+> > > > > Whilst I see that in the commit log, the same recommendation doesn't appear
+> > > > > in the Kconfig text and I'm not sure that it's such a wise thing to say
+> > > > > either. From a distribution's point of view, I think I'd want any kernel
+> > > > > issues to be as reproducible as possible, and fuzzing the text offset seems
+> > > > > to go against that.
+> > > > 
+> > > > OK. There is one other real world issue that 3/3 addresses, which are
+> > > > platforms that have memreserves at the base of DRAM containing bits of
+> > > > UEFI itself (this is what got this whole discussion going in the first
+> > > > place). Currently, we cannot boot via UEFI on these platforms, as the
+> > > > EFI stub will only consider base of DRAM + TEXT_OFFSET as an option,
+> > > > and fail the boot if it is not available.
+> > > > 
+> > > > If this is something that could wait until 3.18 as well (Mark S?),
+> > > > then it's fine by me.
+> > > 
+> > > I don't see a problem with waiting until 3.18.
+> > 
+> > Cheers, I've applied the series to our for-next branch and I'll push
+> > everything out at -rc1.
+> 
+> Late to the discussion since I was on an 11h flight, and still chiming
+> in since I don't think previous speakers were explicit enough about
+> the implication:
+> Bumping 3/3 to 3.18 means the upstream kernel will not boot on AMD
+> Seattle until at least December. This sounds suboptimal to me.
 
-Thanks, applied this series.
+Not unless they use PSCI. That's already working (the spin-table is
+meant for platforms where PSCI cannot be implemented).
 
-- Kukjin
+BTW, is Seattle officially supported by the mainline kernel (it was
+barely announced AFAICT)?
+
+-- 
+Catalin
