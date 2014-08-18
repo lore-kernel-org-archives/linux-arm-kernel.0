@@ -1,77 +1,79 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Mon, 18 Aug 2014 08:05:45 -0400
-Subject: [PATCH 3/6] irqchip: irq-st: Add documentation for STi based
- syscfg IRQs
-In-Reply-To: <1406642744-22589-4-git-send-email-lee.jones@linaro.org>
-References: <1406642744-22589-1-git-send-email-lee.jones@linaro.org>
- <1406642744-22589-4-git-send-email-lee.jones@linaro.org>
-Message-ID: <20140818120545.GQ12769@titan.lakedaemon.net>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Mon, 18 Aug 2014 14:12:36 +0200
+Subject: [PATCH v3 1/2] ARM: EXYNOS: Move Disabling of JPEG USE_RETENTION
+ for exynos5250 to pmu.c
+In-Reply-To: <1407412789-1919-2-git-send-email-vikas.sajjan@samsung.com>
+References: <1407412789-1919-1-git-send-email-vikas.sajjan@samsung.com>
+ <1407412789-1919-2-git-send-email-vikas.sajjan@samsung.com>
+Message-ID: <53F1EDB4.8040906@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hey Lee,
+Hi Vikas,
 
-Rob, Grant, question for you below:
-
-On Tue, Jul 29, 2014 at 03:05:41PM +0100, Lee Jones wrote:
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> ---
->  .../interrupt-controller/st,sti-irq-syscfg.txt     | 35 ++++++++++++++++++++++
->  1 file changed, 35 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/interrupt-controller/st,sti-irq-syscfg.txt
+On 07.08.2014 13:59, Vikas Sajjan wrote:
+> Move the Disabling of JPEG USE_RETENTION for exynos5250 to pmu.c to make way for
+> refactoring of pm.c and to create common functions across exynos4 and
+> exynos5250.
 > 
-> diff --git a/Documentation/devicetree/bindings/interrupt-controller/st,sti-irq-syscfg.txt b/Documentation/devicetree/bindings/interrupt-controller/st,sti-irq-syscfg.txt
-> new file mode 100644
-> index 0000000..ced6014
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/interrupt-controller/st,sti-irq-syscfg.txt
-> @@ -0,0 +1,35 @@
-> +STMicroelectronics STi System Configuration Controlled IRQs
-> +-----------------------------------------------------------
+> Signed-off-by: Vikas Sajjan <vikas.sajjan@samsung.com>
+> ---
+>  arch/arm/mach-exynos/pm.c  |    7 +------
+>  arch/arm/mach-exynos/pmu.c |    6 ++++++
+>  2 files changed, 7 insertions(+), 6 deletions(-)
+> 
+> diff --git a/arch/arm/mach-exynos/pm.c b/arch/arm/mach-exynos/pm.c
+> index c4c6d98..fdd68c2 100644
+> --- a/arch/arm/mach-exynos/pm.c
+> +++ b/arch/arm/mach-exynos/pm.c
+> @@ -265,13 +265,8 @@ static void exynos_pm_prepare(void)
+>  
+>  	s3c_pm_do_save(exynos_core_save, ARRAY_SIZE(exynos_core_save));
+>  
+> -	if (soc_is_exynos5250()) {
+> +	if (soc_is_exynos5250())
+>  		s3c_pm_do_save(exynos5_sys_save, ARRAY_SIZE(exynos5_sys_save));
+> -		/* Disable USE_RETENTION of JPEG_MEM_OPTION */
+> -		tmp = pmu_raw_readl(EXYNOS5_JPEG_MEM_OPTION);
+> -		tmp &= ~EXYNOS5_OPTION_USE_RETENTION;
+> -		pmu_raw_writel(tmp, EXYNOS5_JPEG_MEM_OPTION);
+> -	}
+>  
+>  	/* Set value of power down register for sleep mode */
+>  
+> diff --git a/arch/arm/mach-exynos/pmu.c b/arch/arm/mach-exynos/pmu.c
+> index ff9d23f..6021adb 100644
+> --- a/arch/arm/mach-exynos/pmu.c
+> +++ b/arch/arm/mach-exynos/pmu.c
+> @@ -389,6 +389,7 @@ void exynos_sys_powerdown_conf(enum sys_powerdown mode)
+>  static int __init exynos_pmu_init(void)
+>  {
+>  	unsigned int value;
+> +	unsigned int tmp;
+>  
+>  	exynos_pmu_config = exynos4210_pmu_config;
+>  
+> @@ -411,6 +412,11 @@ static int __init exynos_pmu_init(void)
+>  		value &= ~EXYNOS5_SYS_WDTRESET;
+>  		pmu_raw_writel(value, EXYNOS5_MASK_WDTRESET_REQUEST);
+>  
+> +		/* Disable USE_RETENTION of JPEG_MEM_OPTION */
+> +		tmp = pmu_raw_readl(EXYNOS5_JPEG_MEM_OPTION);
+> +		tmp &= ~EXYNOS5_OPTION_USE_RETENTION;
+> +		pmu_raw_writel(tmp, EXYNOS5_JPEG_MEM_OPTION);
 > +
-> +On STi based systems; External, CTI (Core Sight), PMU (Performance Management),
-> +and PL310 L2 Cache IRQs are controlled using System Configuration registers.
-> +This driver is used to unmask them prior to use.
 
-We don't usually refer to the driver in binding docs as they are
-supposed to be OS-agnostic.
+Note that this code is executed once at system bootup. Is this register
+preserved across a suspend/resume cycle?
 
-> +
-> +Required properties:
-> +- compatible	: Should be set to one of:
-> +			"st,stih415-irq-syscfg"
-> +			"st,stih416-irq-syscfg"
-> +			"st,stih407-irq-syscfg"
-> +			"st,stid127-irq-syscfg"
-> +- st,syscfg	: Phandle to Cortex-A9 IRQ system config registers
-> +- st,irq-device	: Array of IRQs to enable - should be 2 in length
-> +- st,fiq-device	: Array of FIQs to enable - should be 2 in length
-> +
-> +Optional properties:
-> +- st,invert-ext	: External IRQs can be inverted at will.  This property inverts
-> +		  these IRQs using bitwise logic.  A number of defines have been
-> +		  provided for convenience:
-> +			ST_IRQ_SYSCFG_EXT_1_INV
-> +			ST_IRQ_SYSCFG_EXT_2_INV
-> +			ST_IRQ_SYSCFG_EXT_3_INV
-> +Example:
+Anyway, what I suggested in my comment to previous revision of this
+series was stuffing this thing into the PMU configuration array. As you
+can see in the arrays for Exynos4 SoCs, they just hardcode the
+MEM_OPTION registers to constant values, because I believe the only
+field from those registers with non-zero value in practice is
+EXYNOS5_OPTION_USE_RETENTION (or 0x10 used directly in PMU arrays for
+Exynos4 SoCs). This would also cover my comment above, because the
+arrays are written to the PMU every time a low power state is being entered.
 
-Rob, Grant, should we be mingling implementation details (macros from
-include files) with the binding documentation?  It just _seems_ wrong
-too me.  But if we agree that the binding docs, the dts files, and their
-includes are always kept together, I also don't see the harm...
-
-> +
-> +irq-syscfg {
-> +	compatible    = "st,stih416-irq-syscfg";
-> +	st,syscfg     = <&syscfg_cpu>;
-> +	st,irq-device = <ST_IRQ_SYSCFG_PMU_0>,
-> +			<ST_IRQ_SYSCFG_PMU_1>;
-> +	st,fiq-device = <ST_IRQ_SYSCFG_DISABLED>,
-> +			<ST_IRQ_SYSCFG_DISABLED>;
-> +	st,invert-ext = <(ST_IRQ_SYSCFG_EXT_1_INV | ST_IRQ_SYSCFG_EXT_3_INV)>;
-> +};
-
-thx,
-
-Jason.
+Best regards,
+Tomasz
