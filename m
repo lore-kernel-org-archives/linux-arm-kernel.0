@@ -1,64 +1,54 @@
-From: kiran.padwal@smartplayin.com (kiran.padwal at smartplayin.com)
-Date: Mon, 18 Aug 2014 11:48:03 -0400 (EDT)
-Subject: [PATCH] ARM: apq8064: Add pinmux and i2c pinctrl nodes
-In-Reply-To: <1408129739.03949271@apps.rackspace.com>
-References: <1408129739.03949271@apps.rackspace.com>
-Message-ID: <1408376883.684512744@apps.rackspace.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Mon, 18 Aug 2014 23:57:06 +0800
+Subject: [linux-sunxi] Re: [PATCH 11/12] ARM: dts: sun8i: Add i2c
+ controller nodes
+In-Reply-To: <20140818142737.GC15297@lukather>
+References: <1408247538-16950-1-git-send-email-wens@csie.org>
+ <1408247538-16950-12-git-send-email-wens@csie.org>
+ <20140817080204.GY15297@lukather>
+ <CAGb2v67NwsJORoFrgEECDtexXGtF5qOx7NX1PVpZHkjVs-mG2A@mail.gmail.com>
+ <20140818142737.GC15297@lukather>
+Message-ID: <CAGb2v65ODS83D2LfiHs0o1D4yJ6xmOJ8vULPcfrcUu79SQvfTw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Mon, Aug 18, 2014 at 10:27 PM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> On Sun, Aug 17, 2014 at 11:20:44PM +0800, Chen-Yu Tsai wrote:
+>> Hi,
+>>
+>> On Sun, Aug 17, 2014 at 4:02 PM, Maxime Ripard
+>> <maxime.ripard@free-electrons.com> wrote:
+>> > Hi,
+>> >
+>> > On Sun, Aug 17, 2014 at 11:52:17AM +0800, Chen-Yu Tsai wrote:
+>> >> Add nodes for the 3 i2c controllers found on A23 SoCs to the sun8i DTSI.
+>> >>
+>> >> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+>> >> ---
+>> >>  arch/arm/boot/dts/sun8i-a23.dtsi | 36 ++++++++++++++++++++++++++++++++++++
+>> >>  1 file changed, 36 insertions(+)
+>> >>
+>> >> diff --git a/arch/arm/boot/dts/sun8i-a23.dtsi b/arch/arm/boot/dts/sun8i-a23.dtsi
+>> >> index 4658998..53ef350 100644
+>> >> --- a/arch/arm/boot/dts/sun8i-a23.dtsi
+>> >> +++ b/arch/arm/boot/dts/sun8i-a23.dtsi
+>> >> @@ -387,6 +387,42 @@
+>> >>                       status = "disabled";
+>> >>               };
+>> >>
+>> >> +             i2c0: i2c at 01c2ac00 {
+>> >> +                     compatible = "allwinner,sun6i-a31-i2c";
+>> >> +                     reg = <0x01c2ac00 0x400>;
+>> >> +                     interrupts = <0 6 4>;
+>> >> +                     clocks = <&apb2_gates 0>;
+>> >> +                     clock-frequency = <100000>;
+>> >
+>> > It's the default, you don't need to set it.
+>>
+>> Ah, just checked the driver, it is indeed the default.
+>> All the other sunxi dtsi have it though. Do we want to be consistent?
+>
+> Yep, it's usually a good thing :)
 
-On Friday, August 15, 2014 3:08pm, kiran.padwal at smartplayin.com said:
-
-> 
-> On Thursday, August 14, 2014 6:37pm, "Bjorn Andersson" <bjorn@kryo.se> said:
-> 
->> On Thu, Aug 14, 2014 at 12:20 AM, Kiran Padwal
->> <kiran.padwal@smartplayin.com> wrote:
->>> diff --git a/arch/arm/boot/dts/qcom-apq8064.dtsi
->>> b/arch/arm/boot/dts/qcom-apq8064.dtsi
->>> index 92bf793..fbebf5c 100644
->>> --- a/arch/arm/boot/dts/qcom-apq8064.dtsi
->>> +++ b/arch/arm/boot/dts/qcom-apq8064.dtsi
->>> @@ -70,6 +70,17 @@
->>>                 ranges;
->>>                 compatible = "simple-bus";
->>>
->>> +               qcom_pinmux: pinmux at 800000 {
->>
->> There are (at least) three different pinmuxes in these platforms: TLMM, PMIC
->> GPIO, PMIC MPP. Also this is the phandle that is used to reference the gpio
->> chip throughout the board.
->>
->> So I would like to suggest that we name it "tlmm" or like in the downstream
->> kernel "msmgpio".
-> 
-> ok. How about "qcomgpio" or rename it to msmgpio?
-
-Thanks for suggestion, I will rename it to "tlmm".
-
-> 
->>
->>> +                       compatible = "qcom,apq8064-pinctrl";
->>> +                       reg = <0x800000 0x4000>;
->>> +
->>> +                       gpio-controller;
->>> +                       #gpio-cells = <2>;
->>> +                       interrupt-controller;
->>> +                       #interrupt-cells = <2>;
->>> +                       interrupts = <0 32 0x4>;
->>
->> I must have gotten this wrong in the dt binding example, sorry about that.
->> interrupts should be <0 16 0x4>.
-> 
-> Thanks for information. I will update that.
-> 
->>
->>> +               };
->>
->> Regards,
->> Bjorn
->>
-> 
-> 
-> 
+I'll do additional patches to remove them from the other dtsi then.
