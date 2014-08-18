@@ -1,84 +1,67 @@
-From: sthokal@xilinx.com (Srikanth Thokala)
-Date: Mon, 18 Aug 2014 14:47:23 +0530
-Subject: [PATCH v5] pcie: Add Xilinx PCIe Host Bridge IP driver
-In-Reply-To: <53E9E052.3070308@monstr.eu>
-References: <1406131381-25577-1-git-send-email-sthokal@xilinx.com>
- <CA+mB=1JhDF=BBXcyTbgVB8S7qH=Mb1JH78HLL4pA9OBH19hQvA@mail.gmail.com>
- <8258903.Rn4s07GKGV@wuerfel>
- <CA+mB=1LeZn1k2VHNby2TRBcb1xuFFTQio=C845_xe2A=ZciYqg@mail.gmail.com>
- <53E9E052.3070308@monstr.eu>
-Message-ID: <CA+mB=1LX=yOqkx1xNoCBQLbYna76qAeRTqiW6SDpb1MYco7ZVQ@mail.gmail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 18 Aug 2014 10:21:56 +0100
+Subject: [RFC] arm64: Add new cpu-return-addr device tree binding
+In-Reply-To: <1408132130.22761.64.camel@smoke>
+References: <1408132130.22761.64.camel@smoke>
+Message-ID: <20140818092156.GA14559@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Michal,
+Hi Geoff,
 
-On Tue, Aug 12, 2014 at 3:07 PM, Michal Simek <monstr@monstr.eu> wrote:
-> Hi Bjorn,
->
-> On 07/30/2014 01:24 PM, Srikanth Thokala wrote:
->> Hi Arnd,
->>
->> On Mon, Jul 28, 2014 at 6:32 PM, Arnd Bergmann <arnd@arndb.de> wrote:
->>> On Monday 28 July 2014 18:04:34 Srikanth Thokala wrote:
->>>> Hi Arnd and Rob,
->>>>
->>>> I discussed with Bjorn and we believe this patch is in good shape to
->>>> apply.  And Bjorn requires ACKs to apply this patch.  So, could you
->>>> guys please review this patch and provided your ACKs to this patch.
->>>
->>> Looks great for the most part. I've looked through the whole driver
->>> again, and I have two small issues remaining:
->>>
->>> a) Please clarify in the changeset description why there is no support
->>>    for PCI I/O space.
->>
->> Sure, I will add to my changeset.
->>
->>>
->>> b) I think you should use the 'msi-parent' property, and the
->>>    of_pci_find_msi_chip_by_node() to find the msi_chip for the
->>>    PCI controller. This will make it possible to forward MSIs
->>>    to the main interrupt controller in the system, which is more
->>>    efficient. See the pcie-mvebu driver for an example of this.
->>
->> Ok, I need to look into this and I will plan to implement on top of this patch.
->>
->>>
->>> Other than these:
->>>
->>> Acked-by: Arnd Bergmann <arnd@arndb.de>
->>
->> Thanks Arnd for the Ack.
->
-> What's the status on this one?
+On Fri, Aug 15, 2014 at 08:48:50PM +0100, Geoff Levand wrote:
+> Add a new device tree binding cpu-return-addr.  This binding is required for
+> all ARM v8 CPUs that have an "enable-method" property value of "spin-table". The
+> value is a 64 bit read-only physical address that secondary CPU execution will
+> transfer to upon CPU shutdown.
 
-It looks like Bjorn is on vacation.  I have sent v6 patch by adding
-Ack from Arnd, which
-I feel is in good shape to be applied.
+As we already have implementations of spin-table which won't necessarily
+be able to implement cpu-return-addr I do not think this can be required
+for all spin-table implementations.
 
->
-> Srikanth:
-> Isn't pcie-xilinx.c better name if this is just pcie host bridge?
+Given that it's probably not worth updating the topology documentation.
 
-Yes, it looks better.  But, many other drivers which are basically
-drivers for PCIe host
-controllers has the prefix 'pci-' in the file name.  So, I feel it
-should be fine and would
-be happy to change if I have to.
+> Signed-off-by: Geoff Levand <geoff@infradead.org>
+> ---
+> Hi All,
+> 
+> We currently have no way for arm64 spin-table CPUs to re-enter the spin
+> table code, and some way to do so is needed to implement a hot-plug
+> cpu_die() for these CPUs.  
+> 
+> I just wanted to get this binding patch out for review now.  I have other
+> patches that implement the spin-table hot-plug in my kexec repo [1].
+> 
+> Please consider.
+> 
+> -Geoff
+> 
+> [1] https://git.linaro.org/people/geoff.levand/linux-kexec.git
+> 
+>  Documentation/devicetree/bindings/arm/cpus.txt     | 26 ++++++++++++++++++++++
+>  Documentation/devicetree/bindings/arm/topology.txt | 16 +++++++++++++
+>  2 files changed, 42 insertions(+)
+> 
+> diff --git a/Documentation/devicetree/bindings/arm/cpus.txt b/Documentation/devicetree/bindings/arm/cpus.txt
+> index 1fe72a0..24b98a9 100644
+> --- a/Documentation/devicetree/bindings/arm/cpus.txt
+> +++ b/Documentation/devicetree/bindings/arm/cpus.txt
+> @@ -201,6 +201,16 @@ nodes to be present and contain the properties described below.
+>  			  property identifying a 64-bit zero-initialised
+>  			  memory location.
+>  
+> +	- cpu-return-addr
+> +		Usage: required for all ARM v8 CPUs that have an "enable-method"
+> +		       property value of "spin-table".
+> +		Value type: <prop-encoded-array>
+> +		Definition:
+> +			# On ARM v8 64-bit systems must be a two cell property.
+> +			The value is a 64 bit read-only physical address that
+> +			secondary CPU execution will transfer to upon CPU
+> +			shutdown.
 
-Thanks
-Srikanth
+I'm not sure what's meant by read-only here. We're never likely to read
+anything from that physical address, just branch the CPU there.
 
->
-> Thanks,
-> Michal
->
-> --
-> Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
-> w: www.monstr.eu p: +42-0-721842854
-> Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
-> Maintainer of Linux kernel - Xilinx Zynq ARM architecture
-> Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
->
->
+Cheers,
+Mark.
