@@ -1,33 +1,92 @@
-From: abrestic@chromium.org (Andrew Bresticker)
-Date: Mon, 18 Aug 2014 12:35:42 -0700
-Subject: [PATCH v2 0/9] Tegra xHCI support
-In-Reply-To: <53F2381B.8020801@wwwdotorg.org>
-References: <1408381705-3623-1-git-send-email-abrestic@chromium.org>
- <53F2381B.8020801@wwwdotorg.org>
-Message-ID: <CAL1qeaGuMWbaZ4GQWATtrnYe-RjuTwLpFnrdhibWGNWm0iF+=g@mail.gmail.com>
+From: rostedt@goodmis.org (Steven Rostedt)
+Date: Mon, 18 Aug 2014 15:41:12 -0400
+Subject: [PATCH v3 5/7] net: cpsw: Add am33xx MACID readout
+In-Reply-To: <53F244DA.3070803@ti.com>
+References: <1408202315-20006-1-git-send-email-mpa@pengutronix.de>
+ <1408202315-20006-6-git-send-email-mpa@pengutronix.de>
+ <53F244DA.3070803@ti.com>
+Message-ID: <20140818154112.6601cbff@gandalf.local.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 18, 2014 at 10:30 AM, Stephen Warren <swarren@wwwdotorg.org> wrote:
-> On 08/18/2014 11:08 AM, Andrew Bresticker wrote:
->>
->> This series adds support for xHCI on NVIDIA Tegra SoCs.  This includes:
->>   - adding a driver for the mailbox used to communicate with the xHCI
->>     controller's firmware,
->>   - extending the XUSB pad controller driver to support the USB PHY
->>     types (UTMI, HSIC, and USB3), and
->>   - adding a xHCI host-controller driver.
->
->
-> Can you please remind us what dependencies exist between the patches? In
-> other words, is it possible to apply parts of the series to their usual
-> subsystem branches, or does the whole thing need to go into a single topic
-> branch in order to avoid compile-time problems, or run-time problems in
-> features unrelated to the new functionality? Thanks.
+On Mon, 18 Aug 2014 23:54:26 +0530
+Mugunthan V N <mugunthanvnm@ti.com> wrote:
 
-The whole thing will probably need to go into one branch.  Patch 4/9
-("pinctrl: tegra-xusb: Add USB PHY support") has compile-time
-dependencies on patch 2/9 ("mailbox: Add NVIDIA Tegra XUSB mailbox
-driver") and patch 6/9 ("usb: xhci: Add NVIDIA Tegra xHCI
-host-controller driver") has compile-time dependencies on both patches
-2/9 and 4/9.
+> On Saturday 16 August 2014 08:48 PM, Markus Pargmann wrote:
+> > +	mac_addr[5] = (macid_lo >> 8) & 0xff;
+> > +	mac_addr[4] = macid_lo & 0xff;
+> > +	mac_addr[3] = (macid_hi >> 24) & 0xff;
+> > +	mac_addr[2] = (macid_hi >> 16) & 0xff;
+> > +	mac_addr[1] = (macid_hi >> 8) & 0xff;
+> > +	mac_addr[0] = macid_hi & 0xff;
+> > +
+> This will fail incase of DRA74x and DRA72x platforms, please check for
+> u-boot src for parsing logic as TRM is not out yet. Below is the actual
+> code for DRA7 platforms for MAC address parsing
+> 
+> mac_addr[0] = (mac_hi & 0xFF0000) >> 16;
+> mac_addr[1] = (mac_hi & 0xFF00) >> 8;
+> mac_addr[2] = mac_hi & 0xFF;
+> mac_addr[3] = (mac_lo & 0xFF0000) >> 16;
+> mac_addr[4] = (mac_lo & 0xFF00) >> 8;
+> mac_addr[5] = mac_lo & 0xFF;
+> 
+
+But this fails with my beaglebone white.
+
+I tested Markus's patches and it came up with the same ethaddr that
+U-Boot had.
+
+>From U-Boot:
+
+ethaddr=d4:94:a1:8b:ec:78
+
+With Markus's changes:
+
+ eth0      Link encap:Ethernet  HWaddr D4:94:A1:8B:EC:78
+
+But when I changed the code to match what you wrote, I got this:
+
+ eth0      Link encap:Ethernet  HWaddr CE:5A:8B:0E:44:45
+
+but it also gave me:
+
+cpsw 4a100000.ethernet: Random MACID = ce:5a:8b:0e:44:45
+
+which means it failed the valid mac test.
+
+Here's how I implemented your change:
+
+#if 1
+        mac_addr[0] = (macid_hi & 0xFF0000) >> 16;
+        mac_addr[1] = (macid_hi & 0xFF00) >> 8;
+        mac_addr[2] = macid_hi & 0xFF;
+        mac_addr[3] = (macid_lo & 0xFF0000) >> 16;
+        mac_addr[4] = (macid_lo & 0xFF00) >> 8;
+        mac_addr[5] = macid_lo & 0xFF;
+
+#else   
+        mac_addr[5] = (macid_lo >> 8) & 0xff;
+        mac_addr[4] = macid_lo & 0xff;
+        mac_addr[3] = (macid_hi >> 24) & 0xff;
+        mac_addr[2] = (macid_hi >> 16) & 0xff;
+        mac_addr[1] = (macid_hi >> 8) & 0xff;
+        mac_addr[0] = macid_hi & 0xff;
+#endif  
+
+Just to be consistent, I updated the code as this too:
+
+        mac_addr[0] = (macid_hi >> 16) & 0xFF;
+        mac_addr[1] = (macid_hi >> 8) & 0xFF;
+        mac_addr[2] = macid_hi & 0xFF;
+        mac_addr[3] = (macid_lo >> 16) & 0xFF;
+        mac_addr[4] = (macid_lo >> 8) & 0xFF;
+        mac_addr[5] = macid_lo & 0xFF;
+
+With the same affect.
+
+Thus, for this patchset, as is:
+
+Tested-by: Steven Rostedt <rostedt@goodmis.org>
+
+-- Steve
