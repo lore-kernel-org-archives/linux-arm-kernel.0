@@ -1,26 +1,22 @@
-From: aaro.koskinen@iki.fi (Aaro Koskinen)
-Date: Mon, 18 Aug 2014 23:54:40 +0300
-Subject: [GIT PULL] ARM: mvebu: SoC changes for v3.17 (round 2)
-In-Reply-To: <20140718220516.GM24496@titan.lakedaemon.net>
-References: <20140718220516.GM24496@titan.lakedaemon.net>
-Message-ID: <20140818205440.GB2126@drone.musicnaut.iki.fi>
+From: rostedt@goodmis.org (Steven Rostedt)
+Date: Mon, 18 Aug 2014 16:57:11 -0400
+Subject: [PATCH v3 5/7] net: cpsw: Add am33xx MACID readout
+In-Reply-To: <53F25AD1.8040504@ti.com>
+References: <1408202315-20006-1-git-send-email-mpa@pengutronix.de>
+ <1408202315-20006-6-git-send-email-mpa@pengutronix.de>
+ <53F244DA.3070803@ti.com>
+ <20140818154112.6601cbff@gandalf.local.home>
+ <53F25AD1.8040504@ti.com>
+Message-ID: <20140818165711.7cdff1d7@gandalf.local.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 18, 2014 at 06:05:16PM -0400, Jason Cooper wrote:
-> Yeah, it's just one patch, but it's a beautiful one!  Thanks to the
-> efforts of many people over the last couple years, and in particular,
-> Andrew Lunn, Kirkwood has been completely converted to DT.
+On Tue, 19 Aug 2014 01:28:09 +0530
+Mugunthan V N <mugunthanvnm@ti.com> wrote:
 
-Is there instructions how to get OpenRD Client DT boot to work
-with 3.17-rc1? I see that legacy boot has been deleted, so there is
-no other option.
 
-I tried booting kernel with appended DTB, but it just silently hangs.
-Also tried to enable earlyprintk, but couldn't get even that working...
+> This will fail for DRA7xx not in AM33xx
 
-Can you share the configs using which OpenRD Client DT was tested?
+OK, is there a way to test the difference?
 
-Thanks,
-
-A.
+-- Steve
