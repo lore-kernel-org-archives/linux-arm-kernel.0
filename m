@@ -1,158 +1,66 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 18 Aug 2014 17:27:26 +0100
-Subject: [PATCH 3/7] ARM: meson6: clocksource: add Meson6 timer support
-In-Reply-To: <1408272594-10814-4-git-send-email-carlo@caione.org>
-References: <1408272594-10814-1-git-send-email-carlo@caione.org>
- <1408272594-10814-4-git-send-email-carlo@caione.org>
-Message-ID: <20140818162726.GE3302@leverpostej>
+From: balbi@ti.com (Felipe Balbi)
+Date: Mon, 18 Aug 2014 11:32:09 -0500
+Subject: Lock Directory failure
+Message-ID: <20140818163209.GJ9662@saruman.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Aug 17, 2014 at 11:49:50AM +0100, Carlo Caione wrote:
-> Meson6 SoCs are equipped with 5 32-bit timers, called TIMER_A, TIMER_B,
-> TIMER_C, TIMER_D and TIMER_E.
-> 
-> The driver is providing clocksource support for the 32-bit counter using
-> TIMER_E. Clockevents are also supported using TIMER_A.
-> 
-> Signed-off-by: Carlo Caione <carlo@caione.org>
-> ---
->  drivers/clocksource/Kconfig        |   3 +
->  drivers/clocksource/Makefile       |   1 +
->  drivers/clocksource/meson6_timer.c | 187 +++++++++++++++++++++++++++++++++++++
->  3 files changed, 191 insertions(+)
->  create mode 100644 drivers/clocksource/meson6_timer.c
-> 
-> diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
-> index cfd6519..38029ca 100644
-> --- a/drivers/clocksource/Kconfig
-> +++ b/drivers/clocksource/Kconfig
-> @@ -30,6 +30,9 @@ config ARMADA_370_XP_TIMER
->  	bool
->  	select CLKSRC_OF
->  
-> +config MESON6_TIMER
-> +	bool
-> +
->  config ORION_TIMER
->  	select CLKSRC_OF
->  	select CLKSRC_MMIO
-> diff --git a/drivers/clocksource/Makefile b/drivers/clocksource/Makefile
-> index 7fd9fd1..e4ae987 100644
-> --- a/drivers/clocksource/Makefile
-> +++ b/drivers/clocksource/Makefile
-> @@ -25,6 +25,7 @@ obj-$(CONFIG_ARCH_PRIMA2)	+= timer-prima2.o
->  obj-$(CONFIG_ARCH_U300)		+= timer-u300.o
->  obj-$(CONFIG_SUN4I_TIMER)	+= sun4i_timer.o
->  obj-$(CONFIG_SUN5I_HSTIMER)	+= timer-sun5i.o
-> +obj-$(CONFIG_MESON6_TIMER)	+= meson6_timer.o
->  obj-$(CONFIG_ARCH_TEGRA)	+= tegra20_timer.o
->  obj-$(CONFIG_VT8500_TIMER)	+= vt8500_timer.o
->  obj-$(CONFIG_ARCH_NSPIRE)	+= zevio-timer.o
-> diff --git a/drivers/clocksource/meson6_timer.c b/drivers/clocksource/meson6_timer.c
-> new file mode 100644
-> index 0000000..1ef1095
-> --- /dev/null
-> +++ b/drivers/clocksource/meson6_timer.c
-> @@ -0,0 +1,187 @@
-> +/*
-> + * Amlogic Meson6 SoCs timer handling.
-> + *
-> + * Copyright (C) 2014 Carlo Caione
-> + *
-> + * Carlo Caione <carlo@caione.org>
-> + *
-> + * Based on code from Amlogic, Inc
-> + *
-> + * This file is licensed under the terms of the GNU General Public
-> + * License version 2.  This program is licensed "as is" without any
-> + * warranty of any kind, whether express or implied.
-> + */
-> +
-> +#include <linux/clk.h>
-> +#include <linux/clockchips.h>
-> +#include <linux/interrupt.h>
-> +#include <linux/irq.h>
-> +#include <linux/irqreturn.h>
-> +#include <linux/sched_clock.h>
-> +#include <linux/of.h>
-> +#include <linux/of_address.h>
-> +#include <linux/of_irq.h>
-> +
-> +enum {
-> +	A = 0,
-> +	B,
-> +	C,
-> +	D,
-> +};
+Hi folks,
 
-That's a very terse set of enum names. I would recomment something a
-little longer.
+with today's Linux next I keep getting below kernel error rather
+frequently with my beagle bone black (ARM Cortex A8):
 
-Any reason for missing E?
+[    5.096203] systemd[1]: Mounting User Runtime Directory...
+         Mounting User Runtime Directory...
+[    5.135060] systemd[1]: Mounting Lock Directory...
+         Mounting Lock Directory...
+[    5.183453] systemd[1]: Started Various fixups to make systemd work better on Debian.
+[    5.248340] systemd[1]: Starting Load Random Seed...
+[    5.295601] Unable to handle kernel paging request at virtual address 6c617578
+[    5.303340] pgd = de5c0000
+[    5.306169] [6c617578] *pgd=00000000
+[    5.309969] Internal error: Oops: 805 [#1] SMP ARM
+[    5.314972] Modules linked in:
+[    5.318170] CPU: 0 PID: 1092 Comm: mount Not tainted 3.17.0-rc1-next-20140818-00002-gd236526 #636
+[    5.327433] task: de6d0dc0 ti: de350000 task.ti: de350000
+[    5.333082] PC is at mnt_set_mountpoint+0x80/0x94
+[    5.337996] LR is at _raw_spin_unlock+0x20/0x24
+[    5.342723] pc : [<c0148114>]    lr : [<c0564f84>]    psr: 20000013
+[    5.342723] sp : de351eb8  ip : 00000000  fp : 00000000
+[    5.354705] r10: de024dc0  r9 : de250740  r8 : c01487ac
+[    5.360157] r7 : de024dc0  r6 : ddd44468  r5 : de1ecc40  r4 : de250740
+[    5.366969] r3 : 6c617574  r2 : de1eccb8  r1 : de6d0dc0  r0 : ddd444c8
+[    5.373783] Flags: nzCv  IRQs on  FIQs on  Mode SVC_32  ISA ARM  Segment user
+[    5.381230] Control: 10c5387d  Table: 9e5c0019  DAC: 00000015
+[    5.387226] Process mount (pid: 1092, stack limit = 0xde350248)
+[    5.393405] Stack: (0xde351eb8 to 0xde352000)
+[    5.397952] 1ea0:                                                       de1ecc68 de1ecc40
+[    5.406490] 1ec0: de1ecc40 00000000 c0824380 c0148690 00000001 00000000 c01487ac 00000000
+[    5.415028] 1ee0: ddd44468 00000000 de022000 de1ecc40 de250740 de351f38 00000027 de6a7180
+[    5.423567] 1f00: de151740 00000000 00000000 c01487ac 00000008 00000027 c087c3c0 de1ecc50
+[    5.432105] 1f20: c0874cc0 c0149864 de6ae000 de6ae000 000250d8 c0080d4c de024dd0 ddd44468
+[    5.440644] 1f40: de6aefff 00000000 21977150 00001000 de351f8c 00000000 de1e1000 000250b8
+[    5.449182] 1f60: c0ed000e c000e604 de350000 00000000 000250d8 c014a52c de6ae000 00000006
+[    5.457720] 1f80: c000e604 de151740 de6a7180 de6ae000 c0ed000e 00025150 00023548 c0ed000e
+[    5.466259] 1fa0: 00000015 c000e440 00025150 00023548 000250b8 000250c8 000250d8 c0ed000e
+[    5.474797] 1fc0: 00025150 00023548 c0ed000e 00000015 be8deb7c 00000000 00025150 000250d8
+[    5.483335] 1fe0: b6e125f0 be8deaf8 0000c708 b6e12600 60000010 000250b8 00000000 00000000
+[    5.491887] [<c0148114>] (mnt_set_mountpoint) from [<c0148690>] (attach_recursive_mnt+0x278/0x294)
+[    5.501244] [<c0148690>] (attach_recursive_mnt) from [<c01487ac>] (do_add_mount+0x90/0xd8)
+[    5.509875] [<c01487ac>] (do_add_mount) from [<c0149864>] (do_mount+0x234/0xb78)
+[    5.517599] [<c0149864>] (do_mount) from [<c014a52c>] (SyS_mount+0x84/0xb8)
+[    5.524877] [<c014a52c>] (SyS_mount) from [<c000e440>] (ret_fast_syscall+0x0/0x48)
+[    5.532783] Code: e594300c e2852078 e3530000 e5853078 (15832004) 
+[    5.539224] ---[ end trace 29fe002647800da6 ]---
 
-> +
-> +#define TIMER_ISA_MUX		0
-> +#define TIMER_ISA_E_VAL		0x14
-> +#define TIMER_ISA_t_VAL(t)	((t + 1) << 2)
-> +
-> +#define TIMER_t_INPUT_BIT(t)	(2 * t)
-> +#define TIMER_E_INPUT_BIT	8
-> +#define TIMER_t_INPUT_MASK(t)	(3UL << TIMER_t_INPUT_BIT(t))
-> +#define TIMER_E_INPUT_MASK	(7UL << TIMER_E_INPUT_BIT)
-> +#define TIMER_t_ENABLE_BIT(t)	(16 + t)
-> +#define TIMER_E_ENABLE_BIT	20
-> +#define TIMER_t_PERIODIC_BIT(t)	(12 + t)
+since that's mounted as tmpfs, adding Hugh
 
-While I don't think it matters for any of these, it's usually good
-practice to add parentheses around arguments, e.g.
-
-#define FOO(x)		((x) * 2)
-
-So you can avoid bad expansions in cases like:
-
-FOO(reg + 4)
-
-> +
-> +#define TIMER_UNIT_1us		0
-> +#define TIMER_E_UNIT_1us	1
-> +
-> +static void __iomem *timer_base;
-> +
-> +static cycle_t cycle_read_timer_e(struct clocksource *cs)
-> +{
-> +	return (cycle_t)readl(timer_base + TIMER_ISA_E_VAL);
-> +}
-> +
-> +static struct clocksource clocksource_timer_e = {
-> +	.name	= "meson6_timerE",
-
-Do we really care which specific timer we're using within the block?
-
-Why not just "meson6_clocksource"?
-
-> +	.rating	= 300,
-> +	.read	= cycle_read_timer_e,
-> +	.mask	= CLOCKSOURCE_MASK(32),
-> +	.flags  = CLOCK_SOURCE_IS_CONTINUOUS,
-> +};
-
-[...]
-
-> +static irqreturn_t meson6_timer_interrupt(int irq, void *dev_id)
-> +{
-> +	struct clock_event_device *evt = (struct clock_event_device *)dev_id;
-> +
-> +	evt->event_handler(evt);
-> +
-> +	return IRQ_HANDLED;
-> +}
-> +
-> +static struct irqaction meson6_timer_irq = {
-> +	.name		= "meson6_timerA",
-
-Similarly to the clocksource naming, this might be better as
-"meson6_timer", without the 'A'.
-
-Thanks,
-Mark.
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140818/183bc840/attachment.sig>
