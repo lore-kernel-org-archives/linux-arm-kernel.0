@@ -1,53 +1,76 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Mon, 18 Aug 2014 10:09:05 -0700
-Subject: [PATCH 0/4] PWM changes for rk3288-evb
-Message-ID: <1408381749-14156-1-git-send-email-dianders@chromium.org>
+From: sonnyrao@chromium.org (Sonny Rao)
+Date: Mon, 18 Aug 2014 10:11:46 -0700
+Subject: [PATCH 1/4] ARM: rockchip: rk3288: Switch to use the proper PWM IP
+In-Reply-To: <1408381749-14156-2-git-send-email-dianders@chromium.org>
+References: <1408381749-14156-1-git-send-email-dianders@chromium.org>
+ <1408381749-14156-2-git-send-email-dianders@chromium.org>
+Message-ID: <CAPz6YkW5RVb=Uqgh1hVG5GEftQE9gFy-2EuOCemBVCn=95O4uQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-These patches enable the pwm backlight for the rk3288-evb board.
-There were tested by watching the backlight grow from off to max with
-the following instructions:
+On Mon, Aug 18, 2014 at 10:09 AM, Doug Anderson <dianders@chromium.org> wrote:
+> The rk3288 SoC has an option to switch all of the PWMs in the system
+> between the old IP block and the new IP block.  The new IP block is
+> working and tested and the suggested PWM to use, so setup the SoC to
+> use it and then we can pretend that the other IP block doesn't exist.
+>
+> This code could go lots of other places, but we've put it here.  Why?
+> - Pushing it to the bootloader just makes the code harder to update in
+>   the field.  If we later find a bug in the new IP block and want to
+>   change our mind about what to use we want it to be easy to update.
+> - Putting this code in the driver for IP block is a lot of extra work,
+>   device tree bindings, etc.  Now that the new IP block is validated
+>   it's likely no future SoCs will need this code.  Why pollute the PWM
+>   driver with this?  This is an rk3288 thing so it should be in rk3288
+>   code.
+> - There's a single bit that switches over PWMs, which makes it extra
+>   hard to put this under the PWM device tree nodes.
+>
+> Signed-off-by: Doug Anderson <dianders@chromium.org>
+> ---
+>  arch/arm/mach-rockchip/rockchip.c | 19 +++++++++++++++++++
+>  1 file changed, 19 insertions(+)
+>
+> diff --git a/arch/arm/mach-rockchip/rockchip.c b/arch/arm/mach-rockchip/rockchip.c
+> index 8ab9e0e..99133b9 100644
+> --- a/arch/arm/mach-rockchip/rockchip.c
+> +++ b/arch/arm/mach-rockchip/rockchip.c
+> @@ -24,6 +24,24 @@
+>  #include <asm/hardware/cache-l2x0.h>
+>  #include "core.h"
+>
+> +static void __init rk3288_init_machine(void)
+> +{
+> +       void *grf = ioremap(0xff770000, 0x10000);
 
-  cd /sys/class/backlight/backlight*/
-  for i in $(seq 255); do echo $i > brightness; sleep .01; done
+Is it worth checking for failure here?  Will the system boot without this?
 
-The first patch enables the proper IP.  I think it could land in
-Heiko's tree.
-
-The second patch switches PWM cells from 2 to 3 on rk3288.  I think it
-could land in Thierry's tree.  With the PWM subsystem as currently
-structured, I believe this will break backward compatibility.  However
-the rk3288 PWM driver was added so recently (and the rk3288 is so new)
-that this seems OK.  In the worst case if someone yells that they are
-broken, I believe we could fix this in Linux by saying that if a PWM
-driver specifies 3 cells and the DTS definition of the PWM says 2
-cells that we'll just pretend that we have no flags.
-
-The 3rd and 4th patches are DTS ones.  They could land in Heiko's tree
-after the second patch has landed.  They are based atop his current
-WIP 3.18 dts tree.  Note that instantiating the PWM backlight will
-cause the system to hang unless Heiko's (clk: rockchip: protect
-critical clocks from getting disabled)
-<patchwork.kernel.org/patch/4725391> is landed.
-
-There are no compile time or runtime dependencies between these
-patches except that patch #3 needs to come before patch #4.  ...and of
-course the PWM won't work without all 4 patches.
-
-
-Doug Anderson (4):
-  ARM: rockchip: rk3288: Switch to use the proper PWM IP
-  pwm: rockchip: Allow polarity invert on rk3288
-  ARM: dts: Add main PWM info to rk3288
-  ARM: dts: Enable pwm backlight on rk3288-EVB
-
- .../devicetree/bindings/pwm/pwm-rockchip.txt       |  4 +-
- arch/arm/boot/dts/rk3288-evb.dtsi                  | 53 +++++++++++++++++
- arch/arm/boot/dts/rk3288.dtsi                      | 68 ++++++++++++++++++++++
- arch/arm/mach-rockchip/rockchip.c                  | 19 ++++++
- drivers/pwm/pwm-rockchip.c                         | 32 +++++++++-
- 5 files changed, 172 insertions(+), 4 deletions(-)
-
--- 
-2.1.0.rc2.206.gedb03e5
+> +
+> +       /* Set pwm_sel to RK design PWM in GRF_SOC_CON2; affects all PWMs */
+> +       writel(0x00010001, grf + 0x24c);
+> +
+> +       iounmap(grf);
+> +}
+> +
+> +static void __init rockchip_init_machine(void)
+> +{
+> +       if (of_machine_is_compatible("rockchip,rk3288"))
+> +               rk3288_init_machine();
+> +
+> +       of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+> +}
+> +
+>  static const char * const rockchip_board_dt_compat[] = {
+>         "rockchip,rk2928",
+>         "rockchip,rk3066a",
+> @@ -34,6 +52,7 @@ static const char * const rockchip_board_dt_compat[] = {
+>  };
+>
+>  DT_MACHINE_START(ROCKCHIP_DT, "Rockchip Cortex-A9 (Device Tree)")
+> +       .init_machine   = rockchip_init_machine,
+>         .l2c_aux_val    = 0,
+>         .l2c_aux_mask   = ~0,
+>         .dt_compat      = rockchip_board_dt_compat,
+> --
+> 2.1.0.rc2.206.gedb03e5
+>
