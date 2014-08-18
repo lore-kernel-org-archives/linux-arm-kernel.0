@@ -1,40 +1,20 @@
-From: mpa@pengutronix.de (Markus Pargmann)
-Date: Mon, 18 Aug 2014 09:03:06 +0200
-Subject: [PATCH v3 5/7] net: cpsw: Add am33xx MACID readout
-In-Reply-To: <20140816165316.GB2858@katana>
-References: <1408202315-20006-1-git-send-email-mpa@pengutronix.de>
- <1408202315-20006-6-git-send-email-mpa@pengutronix.de>
- <20140816165316.GB2858@katana>
-Message-ID: <20140818070306.GB12930@pengutronix.de>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Mon, 18 Aug 2014 15:06:20 +0800
+Subject: [PATCH] ARM: imx: correct gpu2d_axi and gpu3d_axi clock setting
+In-Reply-To: <1407835563-28220-1-git-send-email-b20788@freescale.com>
+References: <1407835563-28220-1-git-send-email-b20788@freescale.com>
+Message-ID: <20140818070618.GG2114@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Aug 16, 2014 at 11:53:18AM -0500, Wolfram Sang wrote:
+On Tue, Aug 12, 2014 at 05:26:03PM +0800, Anson Huang wrote:
+> On i.MX6Q, gpu2d_axi and gpu3d_axi are either from AXI or
+> AHB clock, but on i.MX6DL, gpu2d_axi and gpu3d_axi are
+> from mmdc_ch0_axi_podf, and they can NOT be gated by mmdc_ch0_axi
+> 's clock gate, the mux option register field(CCM_CBCMR)
+> is marked as "Reserved" now on i.MX6DL RM, so correct these
+> two clks setting.
 > 
-> > +	mac_addr[5] = (macid_lo >> 8) & 0xff;
-> > +	mac_addr[4] = macid_lo & 0xff;
-> > +	mac_addr[3] = (macid_hi >> 24) & 0xff;
-> > +	mac_addr[2] = (macid_hi >> 16) & 0xff;
-> > +	mac_addr[1] = (macid_hi >> 8) & 0xff;
-> > +	mac_addr[0] = macid_hi & 0xff;
-> 
-> That looks twisted, but I assume that you tested it is correct.
+> Signed-off-by: Anson Huang <b20788@freescale.com>
 
-The registers are twisted that way.
-
-Best regards,
-
-Markus
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140818/8d653ce7/attachment.sig>
+Applied, thanks.
