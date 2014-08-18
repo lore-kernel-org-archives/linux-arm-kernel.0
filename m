@@ -1,66 +1,45 @@
 From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 18 Aug 2014 15:25:50 +0100
-Subject: [PATCH v9 02/12] PCI: OF: Parse and map the IRQ when adding the
- PCI device.
-In-Reply-To: <20140815103052.GD27553@e106497-lin.cambridge.arm.com>
+Date: Mon, 18 Aug 2014 15:26:04 +0100
+Subject: [PATCH v9 03/12] PCI: Introduce helper functions to deal with
+ PCI I/O ranges.
+In-Reply-To: <1407860725-25202-4-git-send-email-Liviu.Dudau@arm.com>
 References: <1407860725-25202-1-git-send-email-Liviu.Dudau@arm.com>
- <1407860725-25202-3-git-send-email-Liviu.Dudau@arm.com>
- <20140814145804.GA5586@richard>
- <20140814154959.GG25761@e106497-lin.cambridge.arm.com>
- <20140815085632.GA4954@richard>
- <20140815103052.GD27553@e106497-lin.cambridge.arm.com>
-Message-ID: <20140818142550.GN20043@localhost>
+ <1407860725-25202-4-git-send-email-Liviu.Dudau@arm.com>
+Message-ID: <20140818142604.GO20043@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 15, 2014 at 11:30:52AM +0100, Liviu Dudau wrote:
-> On Fri, Aug 15, 2014 at 09:56:32AM +0100, Wei Yang wrote:
-> > On Thu, Aug 14, 2014 at 04:49:59PM +0100, Liviu Dudau wrote:
-> > >On Thu, Aug 14, 2014 at 03:58:04PM +0100, Wei Yang wrote:
-> > >> On Tue, Aug 12, 2014 at 05:25:15PM +0100, Liviu Dudau wrote:
-> > >> > int __weak pcibios_add_device(struct pci_dev *dev)
-> > >> > {
-> > >> >+	dev->irq = of_irq_parse_and_map_pci(dev, 0, 0);
-> > >> >+
-> > >> > 	return 0;
-> > >> > }
-> > >> 
-> > >> For this, my suggestion is to add arch dependent function to setup the irq
-> > >> line for pci devices. I can't find an obvious reason this won't work on other
-> > >> archs, but maybe this will hurt some of them?
-> > >
-> > >I'm not sure I understand your point. Architectures that support OF will obviously
-> > >benefit from this common approach, and for the other ones the function is empty
-> > >so it will not change existing behaviour. If you are suggesting that I should
-> > >create a new API that each architecture could go and implement for setting up the
-> > >IRQ line then I would agree that it would be nice to have that, but the question
-> > >is how many architectures are outside OF that need this?
-> > 
-> > My suggestion is to define the pcibios_add_device() for arm arch, like the one
-> > in arch/powerpc/kernel/pci-common.c. If my understanding is correct, this
-> > patch set address the pci bus setup mostly on arm arch.
+On Tue, Aug 12, 2014 at 05:25:16PM +0100, Liviu Dudau wrote:
+> Some architectures do not have a simple view of the PCI I/O space
+> and instead use a range of CPU addresses that map to bus addresses.
+> For some architectures these ranges will be expressed by OF bindings
+> in a device tree file.
 > 
-> And also arm64 at the least.
-...
-> Well, it will become necessary as old code gets dismantled and converted towards
-> this patchset. To give you an example that I'm familiar with, for arch/arm the
-> host bridge drivers have moved into drivers/pci/host, but they still depend/use
-> the bios32 infrastructure that takes care of setting up the irq. When they switch
-> to my version they would have to go and debug the "irq not being assigned" issue
-> and it is quite likely that some of the people doing the conversion will complain
-> about my code rather than understanding the issue. What I'm trying to do is to
-> make switching to my patchset as painless as possible, with a cleanup to remove
-> redundant operations coming after the switchover.
+> This patch introduces a pci_register_io_range() helper function with
+> a generic implementation that can be used by such architectures to
+> keep track of the I/O ranges described by the PCI bindings. If the
+> PCI_IOBASE macro is not defined that signals lack of support for PCI
+> and we return an error.
+> 
+> In order to retrieve the CPU address associated with an I/O port, a
+> new helper function pci_pio_to_address() is introduced. This will
+> search in the list of ranges registered with pci_register_io_range()
+> and return the CPU address that corresponds to the given port.
+> 
+> Cc: Grant Likely <grant.likely@linaro.org>
+> Cc: Rob Herring <robh+dt@kernel.org>
+> Cc: Arnd Bergmann <arnd@arndb.de>
+> Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
+> ---
+>  drivers/of/address.c       | 95 ++++++++++++++++++++++++++++++++++++++++++++++
+>  include/linux/of_address.h |  2 +
+>  2 files changed, 97 insertions(+)
 
-While the goal is fine, until we see a common pattern for what needs to
-go into pcibios_add_device() I think we should have an arm64-specific
-implementation (and probably an arm32 specific one as well). I can see
-powerpc uses it for setting the DMA ops. Would we have a similar need on
-arm64 to choose between coherent and non-coherent dma_ops?
+Actually, I think we moved too much code into drivers/of/. Is there
+anything OF specific about this code to live here (apart from
+OF_BAD_ADDR)? I think driver/pci/ more appropriate?
 
-Also at some point we'll get ACPI support, so I'm not sure what we do
-with assigning the dev->irq here but definitely of_* functions won't
-work.
+Otherwise it looks fine to me.
 
 -- 
 Catalin
