@@ -1,21 +1,84 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Mon, 18 Aug 2014 18:46:10 -0400
-Subject: [GIT PULL] ARM: mvebu: SoC changes for v3.17 (round 2)
-In-Reply-To: <20140818205440.GB2126@drone.musicnaut.iki.fi>
-References: <20140718220516.GM24496@titan.lakedaemon.net>
- <20140818205440.GB2126@drone.musicnaut.iki.fi>
-Message-ID: <20140818224610.GS12769@titan.lakedaemon.net>
+From: ohaugan@codeaurora.org (Olav Haugan)
+Date: Mon, 18 Aug 2014 15:47:56 -0700
+Subject: [PATCH v5 1/1] iommu-api: Add map_sg/unmap_sg functions
+In-Reply-To: <20140818215553.GJ9809@8bytes.org>
+References: <1407797150-515-1-git-send-email-ohaugan@codeaurora.org>
+ <1407797150-515-2-git-send-email-ohaugan@codeaurora.org>
+ <20140818215553.GJ9809@8bytes.org>
+Message-ID: <53F2829C.2040809@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Aaro,
+On 8/18/2014 2:55 PM, Joerg Roedel wrote:
+> On Mon, Aug 11, 2014 at 03:45:50PM -0700, Olav Haugan wrote:
+>> +int default_iommu_map_sg(struct iommu_domain *domain, unsigned long iova,
+>> +			 struct scatterlist *sg, unsigned int nents,
+>> +			 int prot, unsigned long flags)
+>> +{
+>> +	int ret = 0;
+>> +	unsigned long offset = 0;
+>> +	unsigned int i;
+>> +	struct scatterlist *s;
+>> +
+>> +	for_each_sg(sg, s, nents, i) {
+>> +		phys_addr_t phys = page_to_phys(sg_page(s));
+>> +		size_t page_len = s->offset + s->length;
+>> +
+>> +		ret = iommu_map(domain, iova + offset, phys, page_len,
+>> +				prot);
+> 
+> This isn't going to work, iova + offset, phys and page_len need to be
+> aligned to the minimum page-size the given IOMMU implementation
+> supports. See the iommu_map implementation for details.
 
-On Mon, Aug 18, 2014 at 11:54:40PM +0300, Aaro Koskinen wrote:
-> I tried booting kernel with appended DTB, but it just silently hangs.
-> Also tried to enable earlyprintk, but couldn't get even that working...
+If the alignment is not correct then iommu_map() will return error. Not
+sure what other option we have here (and why make it different behavior
+than iommu_map which just return error when it is not aligned properly).
+I don't think we want to force any kind of alignment automatically. I
+would rather have the API tell me I am doing something wrong than having
+the function aligning the values and possibly undermap or overmap.
 
-Could you post your config?
+>> +int default_iommu_unmap_sg(struct iommu_domain *domain, unsigned long iova,
+>> +			       size_t size, unsigned long flags)
+> 
+> Another asymmentry here, why don't you just pass a scatterlist and nents
+> like in the map_sg function? if you implement it like this it is just a
+> duplication of iommu_unmap().
 
-thx,
+Yes, I am aware of that. However, several people prefer this than
+passing in scatterlist. It is not very convenient to pass a scatterlist
+in some use cases. Someone mentioned a use case where they would have to
+create a dummy sg list and populate it with the iova just to do an
+unmap. I believe we would have to do this also. There is no use for
+sglist when unmapping. However, would like to keep separate API from
+iommu_unmap() to keep the API function names symmetric (map_sg/unmap_sg).
 
-Jason.
+>> +static inline int iommu_map_sg(struct iommu_domain *domain, unsigned long iova,
+>> +			       struct scatterlist *sg, unsigned int nents,
+>> +			       int prot, unsigned long flags)
+>> +{
+>> +	return domain->ops->map_sg(domain, iova, sg, nents, prot, flags);
+>> +}
+>> +
+>> +static inline int iommu_unmap_sg(struct iommu_domain *domain,
+>> +				 unsigned long iova, size_t size,
+>> +				 unsigned long flags)
+>> +{
+>> +	return domain->ops->unmap_sg(domain, iova, size, flags);
+>> +}
+> 
+> These function pointers need to be checked for != NULL before calling
+> them.
+
+I thought that was why we added the default fallback and set all the
+drivers to point to these fallback functions. Several people wanted this
+so that we don't have to have NULL-check in these functions (and have
+the functions be simple inline functions).
+
+Thanks,
+
+Olav
+
+-- 
+The Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
