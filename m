@@ -1,41 +1,35 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 18 Aug 2014 10:23:58 +0100
-Subject: [RFC] arm64: Add cpu-return-addr to dts files
-In-Reply-To: <1408132229.22761.66.camel@smoke>
-References: <1408132130.22761.64.camel@smoke> <1408132229.22761.66.camel@smoke>
-Message-ID: <20140818092357.GB14559@leverpostej>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Mon, 18 Aug 2014 17:26:37 +0800
+Subject: [RFC] usb issue on imx27: 3 clocks are needed
+In-Reply-To: <20140818090056.GA29393@peterchendt>
+References: <53EF7AF6.2000405@gmail.com> <20140818090056.GA29393@peterchendt>
+Message-ID: <20140818092635.GI2114@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 15, 2014 at 08:50:29PM +0100, Geoff Levand wrote:
-> Add entries for the new device tree property cpu-return-addr to the
-> existing arm64 dts files.
+On Mon, Aug 18, 2014 at 05:00:59PM +0800, Peter Chen wrote:
+> On Sat, Aug 16, 2014 at 05:38:30PM +0200, Philippe Reynes wrote:
+> > Hi all,
+> > 
+> > i.MX27's usb needs three clocks (usb_ipg_gate, usb_ahb_gate and usb_div)
+> > but the current chipidea driver implementation, and devicetree, provides
+> > only ipg and ahb. Consequently, if the bootloader don't enable the last
+> > one, the kernel will crash.
+> > 
+> > Our approach/idea is to add a second, optionnal, clock in ci_hdrc_imx.c
+> > with 'per' name in devicetree  and to add  clock name 'main_clk' for mandatory clock.
+> > This approach it correct? Or an other approach seems better?
+> > Thank you very much for your point of view.
+> > 
 > 
-> Signed-off-by: Geoff Levand <geoff@infradead.org>
-> ---
-> 
-> Just FYI.
-> 
->  arch/arm64/boot/dts/apm-storm.dtsi     | 8 ++++++++
->  arch/arm64/boot/dts/foundation-v8.dts  | 4 ++++
->  arch/arm64/boot/dts/rtsm_ve-aemv8a.dts | 4 ++++
->  3 files changed, 16 insertions(+)
-> 
-> diff --git a/arch/arm64/boot/dts/apm-storm.dtsi b/arch/arm64/boot/dts/apm-storm.dtsi
-> index 40aa96c..c40e25f 100644
-> --- a/arch/arm64/boot/dts/apm-storm.dtsi
-> +++ b/arch/arm64/boot/dts/apm-storm.dtsi
-> @@ -25,6 +25,7 @@
->  			reg = <0x0 0x000>;
->  			enable-method = "spin-table";
->  			cpu-release-addr = <0x1 0x0000fff8>;
-> +			cpu-return-addr = <0x0 0x0>; /* Updated by bootloader */
+> It is ok for me to have ipg, ahb and per clocks at driver, but how can you maintain
+> DT consistent?
 
-Following from the way we handle PSCI in the bootwrapper, if we were to
-support these I expect we'd inject the proeprties entirely. So there's
-no need to have a property with an invalid value here -- the property
-should be valid if present (consider that zero could be a valid PA to
-jump back to).
+Adding new clock as optional one will just maintain the DT
+compatibility.
 
-Cheers,
-Mark.
+> Can you accept open ipg and per always on at clock.c?
+
+No, usb driver should manage its clocks.
+
+Shawn
