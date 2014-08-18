@@ -1,68 +1,40 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Mon, 18 Aug 2014 10:32:19 +0200
-Subject: [PATCH repost] ARM: shmobile: sh73a0: Remove spurious 0x from
- SCIFB clock name
-In-Reply-To: <20140731004246.GA31860@verge.net.au>
-References: <cover.1406766463.git.horms+renesas@verge.net.au>
- <20140731004246.GA31860@verge.net.au>
-Message-ID: <CAMuHMdWS14CsDvk+cTYJ7JeX0_3oQdfsRC__Hofmv54uOOtG1Q@mail.gmail.com>
+From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
+Date: Mon, 18 Aug 2014 10:32:40 +0200
+Subject: [PATCH v9 0/2] Add Maxim 77802 regulator support
+Message-ID: <1408350762-15520-1-git-send-email-javier.martinez@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Simon, Olof,
+Hello Mark,
 
-On Thu, Jul 31, 2014 at 2:42 AM, Simon Horman
-<horms+renesas@verge.net.au> wrote:
-> A stray '0x' crept into a0f7e7496d56ac2d ("ARM: shmobile: sh73a0: add CMT1
-> clock support for DT"). This  patch removes it.
->
-> This change should not have any run-time affect at this time as
-> the clock in question is used by a SCIF device that is not enabled by
-> default.
->
-> Reported-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-> ---
->  arch/arm/mach-shmobile/clock-sh73a0.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
->
-> Hi Olof,
->
-> this is a repost of the patch you asked for so you can apply it directly
-> rather than as pulling a pull request.
+This series add support for the regulators present in the
+Maxim 77802 Power Managment IC. Previously, the series was
+part of a bigger one [0] that aimed to add support for all
+the devices in the max77802 PMIC. But now the Maxim 77802
+PMIC dependencies were already merged for 3.17 so the series
+can be split and each driver can go through the relevant tree.
 
-It seems Olof missed this one.
-As a consequence, we now have the bad version in v3.17-rc1, and in
-renesas-devel-20140818-v3.17-rc1.
+Patch 01/02 adds the driver for the regulators in the Maxim
+77802 PMIC and patch 02/02 adds the related DT bindings doc.
 
-> diff --git a/arch/arm/mach-shmobile/clock-sh73a0.c b/arch/arm/mach-shmobile/clock-sh73a0.c
-> index 0d77f65..b0993a5 100644
-> --- a/arch/arm/mach-shmobile/clock-sh73a0.c
-> +++ b/arch/arm/mach-shmobile/clock-sh73a0.c
-> @@ -644,7 +644,7 @@ static struct clk_lookup lookups[] = {
->         CLKDEV_DEV_ID("sh-sci.5", &mstp_clks[MSTP207]), /* SCIFA5 */
->         CLKDEV_DEV_ID("e6cb0000.serial", &mstp_clks[MSTP207]), /* SCIFA5 */
->         CLKDEV_DEV_ID("sh-sci.8", &mstp_clks[MSTP206]), /* SCIFB */
-> -       CLKDEV_DEV_ID("0xe6c3000.serial", &mstp_clks[MSTP206]), /* SCIFB */
-> +       CLKDEV_DEV_ID("e6c3000.serial", &mstp_clks[MSTP206]), /* SCIFB */
->         CLKDEV_DEV_ID("sh-sci.0", &mstp_clks[MSTP204]), /* SCIFA0 */
->         CLKDEV_DEV_ID("e6c40000.serial", &mstp_clks[MSTP204]), /* SCIFA0 */
->         CLKDEV_DEV_ID("sh-sci.1", &mstp_clks[MSTP203]), /* SCIFA1 */
-> --
-> 2.0.1
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-sh" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+I kept the version numbering from the old series so this is
+version 9 although there were no changes on the max77802 driver
+since v7 of the old series.
 
-Gr{oetje,eeting}s,
+The series were tested on an Exynos5420 based Peach Pit board
+and applies cleanly to both 3.17-rc1 and today's next-20140818.
 
-                        Geert
+Javier Martinez Canillas (2):
+  regulator: Add driver for max77802 PMIC PMIC regulators
+  regulator: Add DT bindings for max77802 PMIC regulators
 
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+ .../devicetree/bindings/regulator/max77802.txt     |  53 ++
+ drivers/regulator/Kconfig                          |   9 +
+ drivers/regulator/Makefile                         |   1 +
+ drivers/regulator/max77802.c                       | 578 +++++++++++++++++++++
+ 4 files changed, 641 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/regulator/max77802.txt
+ create mode 100644 drivers/regulator/max77802.c
 
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Best regards,
+Javier
