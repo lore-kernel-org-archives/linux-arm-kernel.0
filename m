@@ -1,29 +1,33 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 18 Aug 2014 11:06:36 +0100
-Subject: [PATCH 0/8] mtd: nand: Support for new DT NAND driver
-In-Reply-To: <20140818083953.GA4266@lee--X1>
-References: <1407921127-8590-1-git-send-email-lee.jones@linaro.org>
- <20140814224013.GE18411@ld-irv-0074>
- <20140818083953.GA4266@lee--X1>
-Message-ID: <20140818100636.GB4266@lee--X1>
+From: ttynkkynen@nvidia.com (Tuomas Tynkkynen)
+Date: Mon, 18 Aug 2014 13:10:13 +0300
+Subject: [PATCH 1/3] of: Add of_match_machine helper
+In-Reply-To: <20140817152854.5406BC40ADD@trevor.secretlab.ca>
+References: <1407452515-2390-1-git-send-email-ttynkkynen@nvidia.com>	<1407452515-2390-2-git-send-email-ttynkkynen@nvidia.com>
+ <20140817152854.5406BC40ADD@trevor.secretlab.ca>
+Message-ID: <53F1D105.1070107@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > Particularly, take a hard look at rewriting
-> > include/linux/mtd/stm_nand_bbt.h.
+On 17/08/14 18:28, Grant Likely wrote:
+> On Fri, 8 Aug 2014 02:01:53 +0300, Tuomas Tynkkynen <ttynkkynen@nvidia.com> wrote:
+[...]
+>> +EXPORT_SYMBOL(of_match_machine);
 > 
-> I don't think there is any need - although this change is required:
+> Too wordy...
 > 
-> -#if defined(MTD_NAND_STM_BBT)
-> +#if defined(MTD_NAND_STM_BCH_BBT)
+> 	return of_match_node(matches, of_allnodes);
+> 
+> :-)
+> 
+> It could be a static inline, but I don't think it's even worth having a
+> helper. The callers could just open code the above.
+> 
 
-Sorry, I mean this:
-
--#if defined(MTD_NAND_STM_BBT)
-+#if defined(CONFIG_MTD_NAND_STM_BCH_BBT)
+Do you mean all the drivers should be referring to of_allnodes directly?
+I see that it's indeed exported, but to me that sounds like relying too
+much on an implementation detail. In fact, Documentation/devicetree/todo.txt
+even seems to have a TODO entry for its removal ("Remove of_allnodes list
+and iterate using list of child nodes alone").
 
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+nvpublic
