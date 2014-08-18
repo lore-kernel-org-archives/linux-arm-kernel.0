@@ -1,54 +1,62 @@
-From: afaerber@suse.de (=?UTF-8?B?QW5kcmVhcyBGw6RyYmVy?=)
-Date: Mon, 18 Aug 2014 22:13:38 +0200
-Subject: [PATCH v5 01/10] ARM: dts: Fix MMC pinctrl for exynos5250-snow
-In-Reply-To: <53F25C25.4070602@samsung.com>
-References: <1406868897-26874-1-git-send-email-afaerber@suse.de>	<1406868897-26874-2-git-send-email-afaerber@suse.de>
- <CAD=FV=VBa5rs_woj0mshFFbA69Nhyi3hXK_XX7-54T3vFyKYHA@mail.gmail.com>
- <53F247E2.2070007@samsung.com> <53F24A80.4000607@gmail.com>
- <53F25C25.4070602@samsung.com>
-Message-ID: <53F25E72.4080205@suse.de>
+From: nm@ti.com (Nishanth Menon)
+Date: Mon, 18 Aug 2014 15:13:29 -0500
+Subject: [PATCH 1/2] doc: dt/bindings: input: introduce palmas power button
+ description
+In-Reply-To: <1408392810-16011-1-git-send-email-nm@ti.com>
+References: <1408392810-16011-1-git-send-email-nm@ti.com>
+Message-ID: <1408392810-16011-2-git-send-email-nm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Many palmas family of PMICs have support for interrupt based power
+button. This allows the device to notify the processor of external
+push button events over the shared palmas interrupt.
 
-Am 18.08.2014 22:03, schrieb Kukjin Kim:
-> On 08/18/14 13:48, Tomasz Figa wrote:
->> On 18.08.2014 20:37, Kukjin Kim wrote:
->>> On 08/01/14 11:26, Doug Anderson wrote:
->>>> On Thu, Jul 31, 2014 at 9:54 PM, Andreas F?rber<afaerber@suse.de>  
->>>> wrote:
->>>>> The pinctrl properties should be on the device directly and not on the
->>>>> slot sub-node.
->>>>>
->>>>> Reported-by: Doug Anderson<dianders@chromium.org>
->>>>> Cc: Jaehoon Chung<jh80.chung@samsung.com>
->>>>> Reviewed-by: Tomasz Figa<t.figa@samsung.com>
->>>>> Signed-off-by: Andreas F?rber<afaerber@suse.de>
->>>>
->>>> Let's land this one before Jaehoon's, since it was a hidden
->>>> functionality change in his patch.  It will be an easy conflict to
->>>> resolve when his patch is applied.
->>>>
->>> Sounds good to me, I've applied this before Jaehoon's change.
->>>
->>>> Reviewed-by: Doug Anderson<dianders@chromium.org>
->>
->> Version 6 of this series has been already posted. However this
->> particular patch has not changed, so it's fine.
->>
-> Oh, got it. Hope this and 2nd should be same with version 6 ;)
+Document the hardware support for the same.
 
-It is documented as such. :) Others did have changes, of course.
+Signed-off-by: Nishanth Menon <nm@ti.com>
+---
+ .../bindings/input/ti,palmas-pwrbutton.txt         |   32 ++++++++++++++++++++
+ 1 file changed, 32 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/input/ti,palmas-pwrbutton.txt
 
-I've started looking into rebasing myself: beware that the smdk5250
-cleanup has an additional conflict in the spi node (cs-gpios movement).
-
-http://git.kernel.org/cgit/linux/kernel/git/kgene/linux-samsung.git/commit/arch/arm/boot/dts/exynos5250-smdk5250.dts?h=v3.18-next/dt-samsung&id=e138d4333aa02a3daa12c04192bc5c842bffee74
-
-Thanks,
-Andreas
-
+diff --git a/Documentation/devicetree/bindings/input/ti,palmas-pwrbutton.txt b/Documentation/devicetree/bindings/input/ti,palmas-pwrbutton.txt
+new file mode 100644
+index 0000000..6a89bcd
+--- /dev/null
++++ b/Documentation/devicetree/bindings/input/ti,palmas-pwrbutton.txt
+@@ -0,0 +1,32 @@
++Texas Instruments Palmas family power button module
++
++This module is part of the Palmas family of PMICs. For more details
++about the whole chip see:
++Documentation/devicetree/bindings/mfd/palmas.txt.
++
++This module provides a simple power button event via an Interrupt.
++
++Required properties:
++- compatible: should be one of the following
++   - "ti,palmas-pwrbutton": For Palmas compatible power on button
++- interrupt-parent: Parent interrupt device, must be handle of palmas node.
++- interrupts: Interrupt number of power button submodule on device.
++
++Optional Properties:
++
++- ti,palmas-long-press-seconds: Duration in seconds which the power
++  button should be kept pressed for Palmas to power off automatically.
++  NOTE: This depends on OTP support and POWERHOLD signal configuration
++  on platform.
++
++Example:
++
++&palmas {
++	palmas_pwr_button: pwrbutton {
++		compatible = "ti,palmas-pwrbutton";
++		interrupt-parent = <&tps659038>;
++		interrupts = <1 IRQ_TYPE_NONE>;
++		wakeup-source;
++		ti,palmas-long-press-seconds = <12>;
++	};
++};
 -- 
-SUSE LINUX Products GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
-GF: Jeff Hawn, Jennifer Guild, Felix Imend?rffer; HRB 16746 AG N?rnberg
+1.7.9.5
