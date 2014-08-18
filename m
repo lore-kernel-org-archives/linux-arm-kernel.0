@@ -1,77 +1,33 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Tue, 19 Aug 2014 08:56:34 +0900
-Subject: [PATCH repost] ARM: shmobile: sh73a0: Remove spurious 0x from
- SCIFB clock name
-In-Reply-To: <CAMuHMdWS14CsDvk+cTYJ7JeX0_3oQdfsRC__Hofmv54uOOtG1Q@mail.gmail.com>
-References: <cover.1406766463.git.horms+renesas@verge.net.au>
- <20140731004246.GA31860@verge.net.au>
- <CAMuHMdWS14CsDvk+cTYJ7JeX0_3oQdfsRC__Hofmv54uOOtG1Q@mail.gmail.com>
-Message-ID: <20140818235634.GK1623@verge.net.au>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Tue, 19 Aug 2014 01:52:38 +0200
+Subject: [GIT PULL] ARM: mvebu: SoC changes for v3.17 (round 2)
+In-Reply-To: <20140818205440.GB2126@drone.musicnaut.iki.fi>
+References: <20140718220516.GM24496@titan.lakedaemon.net>
+ <20140818205440.GB2126@drone.musicnaut.iki.fi>
+Message-ID: <20140818235238.GG9187@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Geert, thanks for noting that.
+On Mon, Aug 18, 2014 at 11:54:40PM +0300, Aaro Koskinen wrote:
+> On Fri, Jul 18, 2014 at 06:05:16PM -0400, Jason Cooper wrote:
+> > Yeah, it's just one patch, but it's a beautiful one!  Thanks to the
+> > efforts of many people over the last couple years, and in particular,
+> > Andrew Lunn, Kirkwood has been completely converted to DT.
+> 
+> Is there instructions how to get OpenRD Client DT boot to work
+> with 3.17-rc1? I see that legacy boot has been deleted, so there is
+> no other option.
+> 
+> I tried booting kernel with appended DTB, but it just silently hangs.
+> Also tried to enable earlyprintk, but couldn't get even that working...
 
-I will add this back to the devel branch in the renesas tree.
+mvebu_v5_defconfig should work. Starting from 3.17-rc1, that enabled
+appended DT by default.
 
-Olof, could you pick up the patch below for v3.17-rcX?
+CONFIG_DEBUG_LL_UART_8250=y
+CONFIG_DEBUG_UART_PHYS=0xf1012000
+CONFIG_DEBUG_UART_VIRT=0xfed12000
 
-On Mon, Aug 18, 2014 at 10:32:19AM +0200, Geert Uytterhoeven wrote:
-> Hi Simon, Olof,
-> 
-> On Thu, Jul 31, 2014 at 2:42 AM, Simon Horman
-> <horms+renesas@verge.net.au> wrote:
-> > A stray '0x' crept into a0f7e7496d56ac2d ("ARM: shmobile: sh73a0: add CMT1
-> > clock support for DT"). This  patch removes it.
-> >
-> > This change should not have any run-time affect at this time as
-> > the clock in question is used by a SCIF device that is not enabled by
-> > default.
-> >
-> > Reported-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-> > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-> > ---
-> >  arch/arm/mach-shmobile/clock-sh73a0.c | 2 +-
-> >  1 file changed, 1 insertion(+), 1 deletion(-)
-> >
-> > Hi Olof,
-> >
-> > this is a repost of the patch you asked for so you can apply it directly
-> > rather than as pulling a pull request.
-> 
-> It seems Olof missed this one.
-> As a consequence, we now have the bad version in v3.17-rc1, and in
-> renesas-devel-20140818-v3.17-rc1.
-> 
-> > diff --git a/arch/arm/mach-shmobile/clock-sh73a0.c b/arch/arm/mach-shmobile/clock-sh73a0.c
-> > index 0d77f65..b0993a5 100644
-> > --- a/arch/arm/mach-shmobile/clock-sh73a0.c
-> > +++ b/arch/arm/mach-shmobile/clock-sh73a0.c
-> > @@ -644,7 +644,7 @@ static struct clk_lookup lookups[] = {
-> >         CLKDEV_DEV_ID("sh-sci.5", &mstp_clks[MSTP207]), /* SCIFA5 */
-> >         CLKDEV_DEV_ID("e6cb0000.serial", &mstp_clks[MSTP207]), /* SCIFA5 */
-> >         CLKDEV_DEV_ID("sh-sci.8", &mstp_clks[MSTP206]), /* SCIFB */
-> > -       CLKDEV_DEV_ID("0xe6c3000.serial", &mstp_clks[MSTP206]), /* SCIFB */
-> > +       CLKDEV_DEV_ID("e6c3000.serial", &mstp_clks[MSTP206]), /* SCIFB */
-> >         CLKDEV_DEV_ID("sh-sci.0", &mstp_clks[MSTP204]), /* SCIFA0 */
-> >         CLKDEV_DEV_ID("e6c40000.serial", &mstp_clks[MSTP204]), /* SCIFA0 */
-> >         CLKDEV_DEV_ID("sh-sci.1", &mstp_clks[MSTP203]), /* SCIFA1 */
-> > --
-> > 2.0.1
-> >
-> > --
-> > To unsubscribe from this list: send the line "unsubscribe linux-sh" in
-> > the body of a message to majordomo at vger.kernel.org
-> > More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
-> Gr{oetje,eeting}s,
-> 
->                         Geert
-> 
-> --
-> Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-> 
-> In personal conversations with technical people, I call myself a hacker. But
-> when I'm talking to journalists I just say "programmer" or something like that.
->                                 -- Linus Torvalds
-> 
+Should get earlyprintk going.
+
+       Andrew
