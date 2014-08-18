@@ -1,53 +1,36 @@
 From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 18 Aug 2014 15:21:00 +0100
-Subject: [PATCH v7 3/8] drivers: cpuidle: implement DT based idle states
- infrastructure
-In-Reply-To: <20140814112911.GA5039@red-moon>
+Date: Mon, 18 Aug 2014 15:21:13 +0100
+Subject: [PATCH v7 5/8] arm64: add PSCI CPU_SUSPEND based cpu_suspend
+ support
+In-Reply-To: <1407945127-27554-6-git-send-email-lorenzo.pieralisi@arm.com>
 References: <1407945127-27554-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1407945127-27554-4-git-send-email-lorenzo.pieralisi@arm.com>
- <alpine.LFD.2.11.1408131223501.1133@knanqh.ubzr>
- <20140813170440.GA30822@e102568-lin.cambridge.arm.com>
- <alpine.LFD.2.11.1408131319210.1133@knanqh.ubzr>
- <20140814112911.GA5039@red-moon>
-Message-ID: <20140818142100.GD20043@localhost>
+ <1407945127-27554-6-git-send-email-lorenzo.pieralisi@arm.com>
+Message-ID: <20140818142113.GF20043@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 14, 2014 at 12:29:11PM +0100, Lorenzo Pieralisi wrote:
-> Here the refreshed patch is:
+On Wed, Aug 13, 2014 at 04:52:04PM +0100, Lorenzo Pieralisi wrote:
+> This patch implements the cpu_suspend cpu operations method through
+> the PSCI CPU SUSPEND API. The PSCI implementation translates the idle state
+> index passed by the cpu_suspend core call into a valid PSCI state according to
+> the PSCI states initialized at boot through the cpu_init_idle() CPU
+> operations hook.
 > 
-> -- >8 --
-> Subject: [PATCH] drivers: cpuidle: implement DT based idle states
->  infrastructure
+> The PSCI CPU suspend operation hook checks if the PSCI state is a
+> standby state. If it is, it calls the PSCI suspend implementation
+> straight away, without saving any context. If the state is a power
+> down state the kernel calls the __cpu_suspend API (that saves the CPU
+> context) and passed the PSCI suspend finisher as a parameter so that PSCI
+> can be called by the __cpu_suspend implementation after saving and flushing
+> the context as last function before power down.
 > 
-> On most common ARM systems, the low-power states a CPU can be put into are
-> not discoverable in HW and require device tree bindings to describe
-> power down suspend operations and idle states parameters.
+> For power down states, entry point is set to cpu_resume physical address,
+> that represents the default kernel execution address following a CPU reset.
 > 
-> In order to enable DT based idle states and configure idle drivers, this
-> patch implements the bulk infrastructure required to parse the device tree
-> idle states bindings and initialize the corresponding CPUidle driver states
-> data.
-> 
-> The parsing API accepts a start index that defines the first idle state
-> that should be initialized by the parsing code in order to give new and
-> legacy driver flexibility over which states should be parsed using the
-> new DT mechanism.
-> 
-> The idle states list is obtained from the first cpu in the driver
-> cpumask, which implicitly means the parsing code expects idle states
-> (and related list of phandles) to be the same for all CPUs in the
-> CPUidle driver mask. The kernel does not check this assumption, it must
-> be enforced by the bootloader to ensure correct system behaviour.
-> 
+> Reviewed-by: Ashwin Chaugule <ashwin.chaugule@linaro.org>
 > Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 > ---
->  drivers/cpuidle/Kconfig          |   3 +
->  drivers/cpuidle/Makefile         |   1 +
->  drivers/cpuidle/dt_idle_states.c | 175 +++++++++++++++++++++++++++++++++++++++
->  drivers/cpuidle/dt_idle_states.h |   5 ++
->  4 files changed, 184 insertions(+)
->  create mode 100644 drivers/cpuidle/dt_idle_states.c
->  create mode 100644 drivers/cpuidle/dt_idle_states.h
+>  arch/arm64/kernel/psci.c | 100 +++++++++++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 100 insertions(+)
 
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
