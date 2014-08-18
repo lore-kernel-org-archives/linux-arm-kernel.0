@@ -1,50 +1,32 @@
 From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Mon, 18 Aug 2014 16:58:36 +0200
-Subject: [PATCH v2 8/9] arm: dts: mediatek: Add compatible property for
- aquaris5
+Date: Mon, 18 Aug 2014 16:58:37 +0200
+Subject: [PATCH v2 9/9] arm: dts: mt6589: Change compatible string for GIC
 In-Reply-To: <1408373917-10002-1-git-send-email-matthias.bgg@gmail.com>
 References: <1408373917-10002-1-git-send-email-matthias.bgg@gmail.com>
-Message-ID: <1408373917-10002-9-git-send-email-matthias.bgg@gmail.com>
+Message-ID: <1408373917-10002-10-git-send-email-matthias.bgg@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the missing 'compatible' property to device tree root node of
-
- - mt6589-aquaris5.dts
-
-and document the new values.
+This patch changes the compatible string of the GIC to the
+new "arm,cortex-a7-gic" which does reflect the actual hardware.
 
 Signed-off-by: Matthias Brugger <matthias.bgg@gmail.com>
 ---
- Documentation/devicetree/bindings/arm/mediatek.txt |    6 ++++++
- arch/arm/boot/dts/mt6589-aquaris5.dts              |    1 +
- 2 files changed, 7 insertions(+)
+ arch/arm/boot/dts/mt6589.dtsi |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/Documentation/devicetree/bindings/arm/mediatek.txt b/Documentation/devicetree/bindings/arm/mediatek.txt
-index d6ac71f..fa25226 100644
---- a/Documentation/devicetree/bindings/arm/mediatek.txt
-+++ b/Documentation/devicetree/bindings/arm/mediatek.txt
-@@ -6,3 +6,9 @@ Required root node property:
+diff --git a/arch/arm/boot/dts/mt6589.dtsi b/arch/arm/boot/dts/mt6589.dtsi
+index fb922a6..2534ba5 100644
+--- a/arch/arm/boot/dts/mt6589.dtsi
++++ b/arch/arm/boot/dts/mt6589.dtsi
+@@ -91,7 +91,7 @@
+ 		};
  
- compatible: must contain "mediatek,mt6589"
- 
-+
-+Supported boards:
-+
-+- bq Aquaris5 smart phone:
-+    Required root node properties:
-+      - compatible = "mundoreader,bq-aquaris5", "mediatek,mt6589";
-diff --git a/arch/arm/boot/dts/mt6589-aquaris5.dts b/arch/arm/boot/dts/mt6589-aquaris5.dts
-index 74cb1ba..0da0470 100644
---- a/arch/arm/boot/dts/mt6589-aquaris5.dts
-+++ b/arch/arm/boot/dts/mt6589-aquaris5.dts
-@@ -18,6 +18,7 @@
- 
- / {
- 	model = "bq Aquaris5";
-+	compatible = "mundoreader,bq-aquaris5", "mediatek,mt6589";
- 
- 	chosen {
- 		bootargs = "earlyprintk";
+ 		gic: interrupt-controller at 10211000 {
+-			compatible = "arm,cortex-a15-gic";
++			compatible = "arm,cortex-a7-gic";
+ 			interrupt-controller;
+ 			#interrupt-cells = <3>;
+ 			reg = <0x10211000 0x1000>,
 -- 
 1.7.9.5
