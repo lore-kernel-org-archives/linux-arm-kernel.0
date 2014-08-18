@@ -1,20 +1,32 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Mon, 18 Aug 2014 13:24:17 +0800
-Subject: [PATCH V2] ARM: imx: add cpufreq support for i.mx6sx
-In-Reply-To: <20140626055431.GC7859@dragon>
-References: <1403687412-22362-1-git-send-email-b20788@freescale.com>
- <CAOMZO5BDirj-5E0ha1iDzNSC1-+Exwo1QbZiP-7viDSpBqtEtQ@mail.gmail.com>
- <20140626055431.GC7859@dragon>
-Message-ID: <20140818052415.GA31608@dragon>
+From: wills.wang.open@gmail.com (Wills Wang)
+Date: Mon, 18 Aug 2014 14:00:33 +0800
+Subject: [linux-sunxi] [PATCH v4 0/1] ARM: dts: sun7i: Add Merrii A20
+ Hummingbird support
+Message-ID: <1408341634-9952-1-git-send-email-wills.wang.open@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 26, 2014 at 01:54:32PM +0800, Shawn Guo wrote:
-> So it's because the driver change for imx6sx hasn't been in place.  I
-> just dropped the patch from my branch for now, and will revisit later
-> when driver part shows up on my branch.  (Unfortunately, that will be
-> next cycle).
+Changes since v3:
+  - adjust dtb file in alphabetic order
 
-The driver change is in v3.17-rc1, so I applies the dts patch.
+Changes since v2:
+  - fixed mistake about uart3/4/5 pinctrl config
 
-Shawn
+Changes since v1:
+  - add Signed-off-by and commit msg      
+  - add uart2/3/4/5, i2c3 and spi2
+  - remove pwm1 node
+  - use reg_vcc3v0 according to board schematic
+  - add comment for gpio pin
+  - remove unused pull-up pin setting
+
+Wills Wang (1):
+  ARM: dts: sun7i: Add Merrii A20 Hummingbird support
+
+ arch/arm/boot/dts/Makefile                  |   1 +
+ arch/arm/boot/dts/sun7i-a20-hummingbird.dts | 264 ++++++++++++++++++++++++++++
+ 2 files changed, 265 insertions(+)
+ create mode 100644 arch/arm/boot/dts/sun7i-a20-hummingbird.dts
+
+-- 
+1.8.3.2
