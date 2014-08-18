@@ -1,252 +1,68 @@
-From: daniel.thompson@linaro.org (Daniel Thompson)
-Date: Mon, 18 Aug 2014 15:12:59 +0100
-Subject: [PATCH v9 11/16] irqchip: vic: Add support for FIQ management
-In-Reply-To: <1404979427-12943-1-git-send-email-daniel.thompson@linaro.org>
-References: <1404979427-12943-1-git-send-email-daniel.thompson@linaro.org>
-Message-ID: <1408371184-12576-12-git-send-email-daniel.thompson@linaro.org>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Mon, 18 Aug 2014 16:19:56 +0200
+Subject: [PATCH 1/5] mmc: remove .owner field for drivers using
+ module_platform_driver
+In-Reply-To: <1407860069-12706-2-git-send-email-peter.griffin@linaro.org>
+References: <1407860069-12706-1-git-send-email-peter.griffin@linaro.org>
+ <1407860069-12706-2-git-send-email-peter.griffin@linaro.org>
+Message-ID: <3815db00-4b32-4484-b97e-2144dc5abb45@BY2FFO11FD040.protection.gbl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch introduces callbacks to route interrupts to or away
-from the FIQ signal. It also causes these callbacks to be registered
-with the FIQ infrastructure.
+Hi Peter,
 
-This patch enable FIQ support for mach-versatile whilst mach-ep93xx,
-mach-netx, mach-s3c64xx and plat-samsung are unmodified (and can therefore
-continue to use init_FIQ() as before).
+On 08/12/2014 06:14 PM, Peter Griffin wrote:
+> This patch removes the superflous .owner field for drivers which
+> use the module_platform_driver API, as this is overriden in
+> platform_driver_register anyway.
+> 
+> Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
+> ---
+>  drivers/mmc/host/jz4740_mmc.c      | 1 -
+>  drivers/mmc/host/moxart-mmc.c      | 1 -
+>  drivers/mmc/host/mxcmmc.c          | 1 -
+>  drivers/mmc/host/mxs-mmc.c         | 1 -
+>  drivers/mmc/host/omap.c            | 1 -
+>  drivers/mmc/host/omap_hsmmc.c      | 1 -
+>  drivers/mmc/host/pxamci.c          | 1 -
+>  drivers/mmc/host/rtsx_pci_sdmmc.c  | 1 -
+>  drivers/mmc/host/rtsx_usb_sdmmc.c  | 1 -
+>  drivers/mmc/host/s3cmci.c          | 1 -
+>  drivers/mmc/host/sdhci-bcm-kona.c  | 1 -
+>  drivers/mmc/host/sdhci-bcm2835.c   | 1 -
+>  drivers/mmc/host/sdhci-cns3xxx.c   | 1 -
+>  drivers/mmc/host/sdhci-dove.c      | 1 -
+>  drivers/mmc/host/sdhci-esdhc-imx.c | 1 -
+>  drivers/mmc/host/sdhci-msm.c       | 1 -
+>  drivers/mmc/host/sdhci-of-arasan.c | 1 -
+>  drivers/mmc/host/sdhci-of-esdhc.c  | 1 -
+>  drivers/mmc/host/sdhci-of-hlwd.c   | 1 -
+>  drivers/mmc/host/sdhci-pxav2.c     | 1 -
+>  drivers/mmc/host/sdhci-pxav3.c     | 1 -
+>  drivers/mmc/host/sdhci-s3c.c       | 1 -
+>  drivers/mmc/host/sdhci-sirf.c      | 1 -
+>  drivers/mmc/host/sdhci-spear.c     | 1 -
+>  drivers/mmc/host/sdhci-tegra.c     | 1 -
+>  drivers/mmc/host/sh_mmcif.c        | 1 -
+>  drivers/mmc/host/sh_mobile_sdhi.c  | 1 -
+>  drivers/mmc/host/sunxi-mmc.c       | 1 -
+>  28 files changed, 28 deletions(-)
 
-Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
-Cc: Hartley Sweeten <hsweeten@visionengravers.com>
-Cc: Ryan Mallon <rmallon@gmail.com>
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: Ben Dooks <ben-linux@fluff.org>
-Cc: Kukjin Kim <kgene.kim@samsung.com>
-Cc: Thomas Gleixner <tglx@linutronix.de>
-Cc: Jason Cooper <jason@lakedaemon.net>
-Cc: linux-samsung-soc at vger.kernel.org
----
- arch/arm/mach-versatile/core.c  |  2 +-
- drivers/irqchip/irq-vic.c       | 92 ++++++++++++++++++++++++++++++++---------
- include/linux/irqchip/arm-vic.h |  6 ++-
- 3 files changed, 78 insertions(+), 22 deletions(-)
+I have checked this for all xilinx drivers we have in the tree
+and I have sent similar patches.
+This problem is probably in all subsystems.
+With communication with Mark Brown. Don't you have
+cocinelle script for fixing this everywhere?
 
-diff --git a/arch/arm/mach-versatile/core.c b/arch/arm/mach-versatile/core.c
-index 08fb8c8..bad1d30 100644
---- a/arch/arm/mach-versatile/core.c
-+++ b/arch/arm/mach-versatile/core.c
-@@ -108,7 +108,7 @@ void __init versatile_init_irq(void)
- 
- 	np = of_find_matching_node_by_address(NULL, vic_of_match,
- 					      VERSATILE_VIC_BASE);
--	__vic_init(VA_VIC_BASE, 0, IRQ_VIC_START, ~0, 0, np);
-+	__vic_init(VA_VIC_BASE, 0, IRQ_VIC_START, ~0, 0, np ? false : true, np);
- 
- 	writel(~0, VA_SIC_BASE + SIC_IRQ_ENABLE_CLEAR);
- 
-diff --git a/drivers/irqchip/irq-vic.c b/drivers/irqchip/irq-vic.c
-index 7d35287..22aa126 100644
---- a/drivers/irqchip/irq-vic.c
-+++ b/drivers/irqchip/irq-vic.c
-@@ -36,6 +36,9 @@
- 
- #include <asm/exception.h>
- #include <asm/irq.h>
-+#ifdef CONFIG_FIQ
-+#include <asm/fiq.h>
-+#endif
- 
- #include "irqchip.h"
- 
-@@ -261,11 +264,53 @@ static struct irq_domain_ops vic_irqdomain_ops = {
- 	.xlate = irq_domain_xlate_onetwocell,
- };
- 
-+#ifdef CONFIG_FIQ
-+static DEFINE_RAW_SPINLOCK(irq_controller_lock);
-+
-+static void vic_set_fiq(struct irq_data *d, bool enable)
-+{
-+	void __iomem *base = irq_data_get_irq_chip_data(d);
-+	unsigned int irq = d->hwirq;
-+	u32 val;
-+
-+	raw_spin_lock(&irq_controller_lock);
-+	val = readl(base + VIC_INT_SELECT);
-+	if (enable)
-+		val |= 1 << irq;
-+	else
-+		val &= ~(1 << irq);
-+	writel(val, base + VIC_INT_SELECT);
-+	raw_spin_unlock(&irq_controller_lock);
-+}
-+
-+static void vic_enable_fiq(struct irq_data *d)
-+{
-+	vic_set_fiq(d, true);
-+}
-+
-+static void vic_disable_fiq(struct irq_data *d)
-+{
-+	vic_set_fiq(d, false);
-+}
-+
-+struct fiq_chip vic_fiq = {
-+	.fiq_enable = vic_enable_fiq,
-+	.fiq_disable = vic_disable_fiq,
-+};
-+
-+static void vic_register_fiq(int irq)
-+{
-+	fiq_register_mapping(irq, &vic_fiq);
-+}
-+#else /* CONFIG_FIQ */
-+static inline void vic_register_fiq(int irq) {}
-+#endif /* CONFIG_FIQ */
-+
- /**
-  * vic_register() - Register a VIC.
-  * @base: The base address of the VIC.
-  * @parent_irq: The parent IRQ if cascaded, else 0.
-- * @irq: The base IRQ for the VIC.
-+ * @irq_start: The base IRQ for the VIC.
-  * @valid_sources: bitmask of valid interrupts
-  * @resume_sources: bitmask of interrupts allowed for resume sources.
-  * @node: The device tree node associated with the VIC.
-@@ -277,12 +322,13 @@ static struct irq_domain_ops vic_irqdomain_ops = {
-  * This also configures the IRQ domain for the VIC.
-  */
- static void __init vic_register(void __iomem *base, unsigned int parent_irq,
--				unsigned int irq,
-+				unsigned int irq_start,
- 				u32 valid_sources, u32 resume_sources,
--				struct device_node *node)
-+				bool map_fiqs, struct device_node *node)
- {
- 	struct vic_device *v;
- 	int i;
-+	unsigned int irq;
- 
- 	if (vic_id >= ARRAY_SIZE(vic_devices)) {
- 		printk(KERN_ERR "%s: too few VICs, increase CONFIG_ARM_VIC_NR\n", __func__);
-@@ -301,15 +347,19 @@ static void __init vic_register(void __iomem *base, unsigned int parent_irq,
- 		irq_set_chained_handler(parent_irq, vic_handle_irq_cascaded);
- 	}
- 
--	v->domain = irq_domain_add_simple(node, fls(valid_sources), irq,
-+	v->domain = irq_domain_add_simple(node, fls(valid_sources), irq_start,
- 					  &vic_irqdomain_ops, v);
- 	/* create an IRQ mapping for each valid IRQ */
--	for (i = 0; i < fls(valid_sources); i++)
--		if (valid_sources & (1 << i))
--			irq_create_mapping(v->domain, i);
-+	for (i = 0; i < fls(valid_sources); i++) {
-+		if (valid_sources & (1 << i)) {
-+			irq = irq_create_mapping(v->domain, i);
-+			vic_register_fiq(irq);
-+		}
-+	}
-+
- 	/* If no base IRQ was passed, figure out our allocated base */
--	if (irq)
--		v->irq = irq;
-+	if (irq_start)
-+		v->irq = irq_start;
- 	else
- 		v->irq = irq_find_mapping(v->domain, 0);
- }
-@@ -413,7 +463,8 @@ static void __init vic_clear_interrupts(void __iomem *base)
-  *  and 020 within the page. We call this "second block".
-  */
- static void __init vic_init_st(void __iomem *base, unsigned int irq_start,
--			       u32 vic_sources, struct device_node *node)
-+			       u32 vic_sources, bool map_fiqs,
-+			       struct device_node *node)
- {
- 	unsigned int i;
- 	int vic_2nd_block = ((unsigned long)base & ~PAGE_MASK) != 0;
-@@ -439,12 +490,12 @@ static void __init vic_init_st(void __iomem *base, unsigned int irq_start,
- 		writel(32, base + VIC_PL190_DEF_VECT_ADDR);
- 	}
- 
--	vic_register(base, 0, irq_start, vic_sources, 0, node);
-+	vic_register(base, 0, irq_start, vic_sources, 0, map_fiqs, node);
- }
- 
- void __init __vic_init(void __iomem *base, int parent_irq, int irq_start,
--			      u32 vic_sources, u32 resume_sources,
--			      struct device_node *node)
-+		       u32 vic_sources, u32 resume_sources,
-+		       bool map_fiqs, struct device_node *node)
- {
- 	unsigned int i;
- 	u32 cellid = 0;
-@@ -462,7 +513,7 @@ void __init __vic_init(void __iomem *base, int parent_irq, int irq_start,
- 
- 	switch(vendor) {
- 	case AMBA_VENDOR_ST:
--		vic_init_st(base, irq_start, vic_sources, node);
-+		vic_init_st(base, irq_start, vic_sources, map_fiqs, node);
- 		return;
- 	default:
- 		printk(KERN_WARNING "VIC: unknown vendor, continuing anyways\n");
-@@ -479,7 +530,8 @@ void __init __vic_init(void __iomem *base, int parent_irq, int irq_start,
- 
- 	vic_init2(base);
- 
--	vic_register(base, parent_irq, irq_start, vic_sources, resume_sources, node);
-+	vic_register(base, parent_irq, irq_start, vic_sources, resume_sources,
-+		     map_fiqs, node);
- }
- 
- /**
-@@ -492,7 +544,8 @@ void __init __vic_init(void __iomem *base, int parent_irq, int irq_start,
- void __init vic_init(void __iomem *base, unsigned int irq_start,
- 		     u32 vic_sources, u32 resume_sources)
- {
--	__vic_init(base, 0, irq_start, vic_sources, resume_sources, NULL);
-+	__vic_init(base, 0, irq_start, vic_sources, resume_sources,
-+		   false, NULL);
- }
- 
- /**
-@@ -511,7 +564,8 @@ int __init vic_init_cascaded(void __iomem *base, unsigned int parent_irq,
- 	struct vic_device *v;
- 
- 	v = &vic_devices[vic_id];
--	__vic_init(base, parent_irq, 0, vic_sources, resume_sources, NULL);
-+	__vic_init(base, parent_irq, 0, vic_sources, resume_sources, false,
-+		   NULL);
- 	/* Return out acquired base */
- 	return v->irq;
- }
-@@ -535,9 +589,9 @@ int __init vic_of_init(struct device_node *node, struct device_node *parent)
- 	of_property_read_u32(node, "valid-wakeup-mask", &wakeup_mask);
- 
- 	/*
--	 * Passing 0 as first IRQ makes the simple domain allocate descriptors
-+	 * Passing 0 as first IRQ makes the domain allocate descriptors.
- 	 */
--	__vic_init(regs, 0, 0, interrupt_mask, wakeup_mask, node);
-+	__vic_init(regs, 0, 0, interrupt_mask, wakeup_mask, true, node);
- 
- 	return 0;
- }
-diff --git a/include/linux/irqchip/arm-vic.h b/include/linux/irqchip/arm-vic.h
-index ba46c79..30ab39f 100644
---- a/include/linux/irqchip/arm-vic.h
-+++ b/include/linux/irqchip/arm-vic.h
-@@ -30,8 +30,10 @@ struct device_node;
- struct pt_regs;
- 
- void __vic_init(void __iomem *base, int parent_irq, int irq_start,
--		u32 vic_sources, u32 resume_sources, struct device_node *node);
--void vic_init(void __iomem *base, unsigned int irq_start, u32 vic_sources, u32 resume_sources);
-+		u32 vic_sources, u32 resume_sources,
-+		bool map_fiqs, struct device_node *node);
-+void vic_init(void __iomem *base, unsigned int irq_start, u32 vic_sources,
-+	      u32 resume_sources);
- int vic_init_cascaded(void __iomem *base, unsigned int parent_irq,
- 		      u32 vic_sources, u32 resume_sources);
- 
--- 
-1.9.3
+Thanks,
+Michal
+
+
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140818/db358ef2/attachment.sig>
