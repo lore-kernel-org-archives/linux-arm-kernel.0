@@ -1,155 +1,86 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Mon, 18 Aug 2014 12:31:22 +0200
-Subject: [PATCH 6/7] ARM: meson: update defconfigs
-In-Reply-To: <1408272594-10814-7-git-send-email-carlo@caione.org>
-References: <1408272594-10814-1-git-send-email-carlo@caione.org>
- <1408272594-10814-7-git-send-email-carlo@caione.org>
-Message-ID: <53F1D5FA.1040803@gmail.com>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Mon, 18 Aug 2014 12:31:49 +0200
+Subject: [PATCH/RFC V8 1/1] clk: Support for clock parents and rates
+ assigned from device tree
+In-Reply-To: <20140813203406.GU17528@sirena.org.uk>
+References: <1403105372-30403-1-git-send-email-s.nawrocki@samsung.com>
+ <1403105372-30403-2-git-send-email-s.nawrocki@samsung.com>
+ <53B59221.5080100@samsung.com> <20140725214231.5177.86866@quantum>
+ <20140813203406.GU17528@sirena.org.uk>
+Message-ID: <53F1D615.8070707@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 13/08/14 22:34, Mark Brown wrote:
+> On Fri, Jul 25, 2014 at 02:42:31PM -0700, Mike Turquette wrote:
+>> Quoting Sylwester Nawrocki (2014-07-03 10:25:53)
+> 
+>>> I would appreciate a DT, SPI or the I2C maintainer opinions.
+> 
+>> Yes, Acks from SPI and I2C maintainers would be good. I might need to
+>> drop those parts of this patch if they don't come through :-(
+> 
+> So, I just noticed this.  The reason I didn't see this earlier is that
+> it was buried at the end of a large clock API patch rather than a split
+> out patch for the SPI subsystem so it fell towards the bottom of
+> my review queue.  There seems to be no dependency on adding the feature
+> as part of one commit so it should really have been split out.
+> 
+> Please don't assume that people are going to look in detail at patches
+> that aren't obviously for them - I know I end up ignoring a lot of what
+> I get sent since I get CCed on a lot of random things for no apparent
+> reason (or get tediously large numbers of resends of things that are
+> tangentially related), I imagine others do the same.  If you're doing
+> that please draw attention to it, splitting out per subsystem is the
+> best way of doing that.
 
+OK, will try to remember and improve things in future.
 
-On 17/08/14 12:49, Carlo Caione wrote:
-> This patch updates the multi_v7_defconfig with the CONFIG_* needed by
-> the just added Meson anch. It also adds a new defconfig specifically for
-> the Meson SoCs.
->
-> Signed-off-by: Carlo Caione <carlo@caione.org>
-> ---
->   arch/arm/configs/meson_defconfig    | 99 +++++++++++++++++++++++++++++++++++++
->   arch/arm/configs/multi_v7_defconfig |  3 ++
->   2 files changed, 102 insertions(+)
->   create mode 100644 arch/arm/configs/meson_defconfig
->
-> diff --git a/arch/arm/configs/meson_defconfig b/arch/arm/configs/meson_defconfig
-> new file mode 100644
-> index 0000000..3c9d976
-> --- /dev/null
-> +++ b/arch/arm/configs/meson_defconfig
+> This is particularly unfortunate since I am actually a bit confused as
+> to why we need to open code this for every bus rather than doing it in
+> the driver core, there doesn't seem to be anything at all bus specific
+> going on here.  Why can't we just call this from the driver core?
 
-I doubt that we need a meson_defconfig when we can get the SoC up and 
-running using multi_v7_defconfig.
+I had it done in the driver core in first versions of this patch, but
+then I learnt it is not something Greg would be fond of, so I went for
+this method. In fact, clocks configuration is not something which
+applies to each and every device, thus putting it in the bus code might
+not be that bad after all.
 
-> @@ -0,0 +1,99 @@
-> +CONFIG_NO_HZ=y
-> +CONFIG_HIGH_RES_TIMERS=y
-> +CONFIG_BLK_DEV_INITRD=y
-> +CONFIG_PERF_EVENTS=y
-> +CONFIG_ARCH_MESON=y
-> +CONFIG_SMP=y
-> +CONFIG_HAVE_ARM_ARCH_TIMER=y
-> +CONFIG_ARM_PSCI=y
-> +CONFIG_AEABI=y
-> +CONFIG_HIGHMEM=y
-> +CONFIG_HIGHPTE=y
-> +CONFIG_ARM_APPENDED_DTB=y
-> +CONFIG_ARM_ATAG_DTB_COMPAT=y
-> +CONFIG_VFP=y
-> +CONFIG_NEON=y
-> +CONFIG_PM_RUNTIME=y
-> +CONFIG_NET=y
-> +CONFIG_PACKET=y
-> +CONFIG_UNIX=y
-> +CONFIG_INET=y
-> +CONFIG_IP_PNP=y
-> +CONFIG_IP_PNP_DHCP=y
-> +CONFIG_IP_PNP_BOOTP=y
-> +# CONFIG_INET_XFRM_MODE_TRANSPORT is not set
-> +# CONFIG_INET_XFRM_MODE_TUNNEL is not set
-> +# CONFIG_INET_XFRM_MODE_BEET is not set
-> +# CONFIG_INET_LRO is not set
-> +# CONFIG_INET_DIAG is not set
-> +# CONFIG_IPV6 is not set
-> +# CONFIG_WIRELESS is not set
-> +CONFIG_DEVTMPFS=y
-> +CONFIG_DEVTMPFS_MOUNT=y
-> +CONFIG_BLK_DEV_SD=y
-> +CONFIG_ATA=y
-> +CONFIG_NETDEVICES=y
-> +# CONFIG_NET_VENDOR_ARC is not set
-> +# CONFIG_NET_CADENCE is not set
-> +# CONFIG_NET_VENDOR_BROADCOM is not set
-> +# CONFIG_NET_VENDOR_CIRRUS is not set
-> +# CONFIG_NET_VENDOR_FARADAY is not set
-> +# CONFIG_NET_VENDOR_INTEL is not set
-> +# CONFIG_NET_VENDOR_MARVELL is not set
-> +# CONFIG_NET_VENDOR_MICREL is not set
-> +# CONFIG_NET_VENDOR_MICROCHIP is not set
-> +# CONFIG_NET_VENDOR_NATSEMI is not set
-> +# CONFIG_NET_VENDOR_SAMSUNG is not set
-> +# CONFIG_NET_VENDOR_SEEQ is not set
-> +# CONFIG_NET_VENDOR_SMSC is not set
-> +CONFIG_STMMAC_ETH=y
-> +# CONFIG_NET_VENDOR_VIA is not set
-> +# CONFIG_NET_VENDOR_WIZNET is not set
-> +# CONFIG_WLAN is not set
-> +# CONFIG_INPUT_MOUSEDEV is not set
-> +# CONFIG_INPUT_KEYBOARD is not set
-> +# CONFIG_INPUT_MOUSE is not set
-> +CONFIG_SERIAL_MESON=y
-> +CONFIG_SERIAL_MESON_CONSOLE=y
-> +# CONFIG_HW_RANDOM is not set
-> +CONFIG_I2C=y
-> +CONFIG_I2C_CHARDEV=y
-> +CONFIG_SPI=y
-> +CONFIG_GPIOLIB=y
-> +CONFIG_GPIO_SYSFS=y
-> +CONFIG_POWER_SUPPLY=y
-> +CONFIG_POWER_RESET=y
-> +# CONFIG_HWMON is not set
-> +CONFIG_WATCHDOG=y
-> +CONFIG_WATCHDOG_CORE=y
-> +CONFIG_MFD_AXP20X=y
-> +CONFIG_REGULATOR=y
-> +CONFIG_REGULATOR_FIXED_VOLTAGE=y
-> +CONFIG_REGULATOR_VIRTUAL_CONSUMER=y
-> +CONFIG_REGULATOR_GPIO=y
-> +CONFIG_USB=y
-> +CONFIG_USB_EHCI_HCD=y
-> +CONFIG_USB_EHCI_HCD_PLATFORM=y
-> +CONFIG_USB_OHCI_HCD=y
-> +CONFIG_USB_OHCI_HCD_PLATFORM=y
-> +CONFIG_MMC=y
-> +CONFIG_NEW_LEDS=y
-> +CONFIG_LEDS_CLASS=y
-> +CONFIG_LEDS_GPIO=y
-> +CONFIG_LEDS_TRIGGERS=y
-> +CONFIG_LEDS_TRIGGER_HEARTBEAT=y
-> +CONFIG_LEDS_TRIGGER_DEFAULT_ON=y
-> +CONFIG_RTC_CLASS=y
-> +# CONFIG_RTC_INTF_SYSFS is not set
-> +# CONFIG_RTC_INTF_PROC is not set
-> +# CONFIG_IOMMU_SUPPORT is not set
-> +CONFIG_GENERIC_PHY=y
-> +CONFIG_EXT4_FS=y
-> +CONFIG_VFAT_FS=y
-> +CONFIG_TMPFS=y
-> +CONFIG_NFS_FS=y
-> +CONFIG_NFS_V3_ACL=y
-> +CONFIG_NFS_V4=y
-> +CONFIG_ROOT_NFS=y
-> +CONFIG_PRINTK_TIME=y
-> +CONFIG_DEBUG_FS=y
-> diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-> index 5fb95fb..5b44796 100644
-> --- a/arch/arm/configs/multi_v7_defconfig
-> +++ b/arch/arm/configs/multi_v7_defconfig
-> @@ -29,6 +29,7 @@ CONFIG_ARCH_HISI=y
->   CONFIG_ARCH_HI3xxx=y
->   CONFIG_ARCH_HIX5HD2=y
->   CONFIG_ARCH_KEYSTONE=y
-> +CONFIG_ARCH_MESON=y
->   CONFIG_ARCH_MXC=y
->   CONFIG_SOC_IMX51=y
->   CONFIG_SOC_IMX53=y
-> @@ -173,6 +174,8 @@ CONFIG_SERIAL_8250_CONSOLE=y
->   CONFIG_SERIAL_8250_DW=y
->   CONFIG_SERIAL_AMBA_PL011=y
->   CONFIG_SERIAL_AMBA_PL011_CONSOLE=y
-> +CONFIG_SERIAL_MESON=y
-> +CONFIG_SERIAL_MESON_CONSOLE=y
->   CONFIG_SERIAL_SAMSUNG=y
->   CONFIG_SERIAL_SAMSUNG_CONSOLE=y
->   CONFIG_SERIAL_SIRFSOC=y
->
+> Having the feature work for some buses and not others is going to get
+> old fast.
+> 
+> It's also not clear to me why we're passing false to of_clk_set_defaults()
+> when we do call it - it's quite common for I2C and SPI devices to be
+> clock providers and have clock trees.  As far as I can tell the
+> reasoning is that what's actually going on here is that this is actually
+> a mechanism to defer the initialisation to adding of the clock providers
+> in which case contrary to the documentation for the function it's
+> actually about device registration.  Is that right?
+
+The flag is there to tell if clocks supplied by a particular device should
+also be configured. The function is being called with the flag set right
+after a clock provider registration in the clock core, this is where the
+take care of things when an (I2C, SPI, etc.) device is a clock provider.
+Obviously attempting to configure clocks which were not yet registered
+before a device's driver probe() call would fail. The flag is there to
+defer configuration of clocks after they are actually registered with
+the clk core, not only parsable from the device tree.
+
+Documentation of the function might be indeed a bit confusing :/
+I'll consider changing the sentence:
+
+"The @clk_supplier argument
+ should be set to true if @node may be also a clock supplier of any clock
+ listed in its 'assigned-clocks' or 'assigned-clock-parents' properties."
+
+to
+
+ "The @clk_supplier argument
+  should be set to true if @node is or may be a clock supplier of any
+  clock listed in its 'assigned-clocks' or 'assigned-clock-parents'
+  properties and such clocks are also to be configured."
+
+--
+Regards,
+Sylwester
