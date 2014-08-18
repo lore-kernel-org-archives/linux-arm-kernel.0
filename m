@@ -1,49 +1,47 @@
-From: vikas.sajjan@samsung.com (Vikas Sajjan)
-Date: Mon, 18 Aug 2014 16:03:57 +0530
-Subject: [PATCH v3 0/2] Refactor the pm code to use DT based lookup
-In-Reply-To: <1407412789-1919-1-git-send-email-vikas.sajjan@samsung.com>
-References: <1407412789-1919-1-git-send-email-vikas.sajjan@samsung.com>
-Message-ID: <CAGm_ybjZBfmpv2t5kuCvd7F+vMh4mZK+1ULdXuZCRBtEjXMQuA@mail.gmail.com>
+From: Peter.Chen@freescale.com (Peter Chen)
+Date: Mon, 18 Aug 2014 10:35:53 +0000
+Subject: [RFC] usb issue on imx27: 3 clocks are needed
+In-Reply-To: <20140818092635.GI2114@dragon>
+References: <53EF7AF6.2000405@gmail.com> <20140818090056.GA29393@peterchendt>
+ <20140818092635.GI2114@dragon>
+Message-ID: <782c806acb464f5781deb32e94548882@BN1PR0301MB0772.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi All,
+ 
+> On Mon, Aug 18, 2014 at 05:00:59PM +0800, Peter Chen wrote:
+> > On Sat, Aug 16, 2014 at 05:38:30PM +0200, Philippe Reynes wrote:
+> > > Hi all,
+> > >
+> > > i.MX27's usb needs three clocks (usb_ipg_gate, usb_ahb_gate and
+> > > usb_div) but the current chipidea driver implementation, and
+> > > devicetree, provides only ipg and ahb. Consequently, if the
+> > > bootloader don't enable the last one, the kernel will crash.
+> > >
+> > > Our approach/idea is to add a second, optionnal, clock in
+> > > ci_hdrc_imx.c with 'per' name in devicetree  and to add  clock name
+> 'main_clk' for mandatory clock.
+> > > This approach it correct? Or an other approach seems better?
+> > > Thank you very much for your point of view.
+> > >
+> >
+> > It is ok for me to have ipg, ahb and per clocks at driver, but how can
+> > you maintain DT consistent?
+> 
+> Adding new clock as optional one will just maintain the DT compatibility.
+> 
 
-On Thu, Aug 7, 2014 at 5:29 PM, Vikas Sajjan <vikas.sajjan@samsung.com> wrote:
-> Refactoring the pm.c to avoid using "soc_is_exynos" checks,
-> instead use the DT based lookup.
->
-> While at it, move exynos5250 specific disabling of JPEG USE_RETENTION to pmu.c
->
-> changes since v2:
->         - Addressed Tomasz Figa's comments to unify the functions for exynos4
->         and exynos5250.
->         - Added new patch to move exynos5250 specific disabling of
->                 JPEG USE_RETENTION to pmu.c
->         - Addressed comment from Thomas Abraham.
-> changes since v1:
->         - Address Kukjin Kim comments to respin this patch separately from
->                 http://lists.infradead.org/pipermail/linux-arm-kernel/2014-July/272574.html
->         - removed panic, returned if no PMU node found and added check in exynos_wkup_irq.
->
-> Rebased on Kukjin Kim's tree, for-next branch
->         https://git.kernel.org/cgit/linux/kernel/git/kgene/linux-samsung.git/log/?h=for-next
->
-> Vikas Sajjan (2):
->   ARM: EXYNOS: Move Disabling of JPEG USE_RETENTION for exynos5250 to
->     pmu.c
->   ARM: EXYNOS: Refactor the pm code to use DT based lookup
->
->  arch/arm/mach-exynos/pm.c       |  173 ++++++++++++++++++++++++++++-----------
->  arch/arm/mach-exynos/pmu.c      |    6 ++
->  arch/arm/mach-exynos/regs-pmu.h |    1 +
->  3 files changed, 132 insertions(+), 48 deletions(-)
+How to handle node_usb_soc1's clock which is without clk name to consistent with three
+clocks for node_usb_soc2 at driver? Except for adding some platform judge code at
+driver, do you have other solutions?
 
+node_usb_soc1: {
+	clocks = <&clks IMX6_CLK_USBOH3>;
+};
 
-Anymore  comments on this series...
+node_usb_soc2: {
+	clocks = <&clks IMX27_CLK_USBIPG>, <&clks IMX27_CLK_USBOH3>, <&clks IMX27_CLK_USBPER>;
+	clock-names = "ipg", "ahb", "per";
+};
 
-
->
-> --
-> 1.7.9.5
->
+Peter
