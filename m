@@ -1,21 +1,21 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Mon, 18 Aug 2014 06:51:59 -0400
-Subject: [PATCH] irq: gic-v3: Tag all low level accessors __maybey_unused
-In-Reply-To: <20140818071104.GA2207@pengutronix.de>
-References: <1406748194-21094-1-git-send-email-broonie@kernel.org>
- <20140818071104.GA2207@pengutronix.de>
-Message-ID: <20140818105159.GP12769@titan.lakedaemon.net>
+From: gnomes@lxorguk.ukuu.org.uk (One Thousand Gnomes)
+Date: Mon, 18 Aug 2014 11:52:49 +0100
+Subject: [PATCH 07/15] tty: serial: 8250_dma: enqueue RX dma again on
+ completion.
+In-Reply-To: <1408124563-31541-8-git-send-email-bigeasy@linutronix.de>
+References: <1408124563-31541-1-git-send-email-bigeasy@linutronix.de>
+ <1408124563-31541-8-git-send-email-bigeasy@linutronix.de>
+Message-ID: <20140818115249.537b3e42@alan.etchedpixels.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Uwe,
 
-On Mon, Aug 18, 2014 at 09:11:04AM +0200, Uwe Kleine-K?nig wrote:
-> 
-> typo in the Subject line. s/maybey/maybe/
+>  		if (!up->dma || dma_err)
+>  			status = serial8250_rx_chars(up, status);
+> +
+> +		if (dma_err && port->type == PORT_OMAP_16750)
+> +			serial8250_rx_dma(up, 0);
 
-Yep, I forgot to mention I fixed that when I applied it.
-
-thx,
-
-Jason.
+Can we stick to a 'has dma' flag and port->rx_dma() type usages so that
+we don't have to rewrite it again to add them the next slightly odd DMA
+user we add 8)
