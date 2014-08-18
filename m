@@ -1,29 +1,62 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 18 Aug 2014 15:26:48 +0100
-Subject: [PATCH v9] arm64: Add architectural support for PCIe
-In-Reply-To: <1407860760-25252-2-git-send-email-Liviu.Dudau@arm.com>
-References: <1407860760-25252-1-git-send-email-Liviu.Dudau@arm.com>
- <1407860760-25252-2-git-send-email-Liviu.Dudau@arm.com>
-Message-ID: <20140818142648.GQ20043@localhost>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 18 Aug 2014 16:27:37 +0200
+Subject: [PATCH 11/12] ARM: dts: sun8i: Add i2c controller nodes
+In-Reply-To: <CAGb2v67NwsJORoFrgEECDtexXGtF5qOx7NX1PVpZHkjVs-mG2A@mail.gmail.com>
+References: <1408247538-16950-1-git-send-email-wens@csie.org>
+ <1408247538-16950-12-git-send-email-wens@csie.org>
+ <20140817080204.GY15297@lukather>
+ <CAGb2v67NwsJORoFrgEECDtexXGtF5qOx7NX1PVpZHkjVs-mG2A@mail.gmail.com>
+Message-ID: <20140818142737.GC15297@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 12, 2014 at 05:26:00PM +0100, Liviu Dudau wrote:
-> diff --git a/arch/arm64/include/asm/io.h b/arch/arm64/include/asm/io.h
-> index e0ecdcf..dc34039 100644
-> --- a/arch/arm64/include/asm/io.h
-> +++ b/arch/arm64/include/asm/io.h
-> @@ -121,7 +121,8 @@ static inline u64 __raw_readq(const volatile void __iomem *addr)
->  /*
->   *  I/O port access primitives.
->   */
-> -#define IO_SPACE_LIMIT		0xffff
-> +#define arch_has_dev_port()	(1)
-> +#define IO_SPACE_LIMIT		0x1ffffff
+On Sun, Aug 17, 2014 at 11:20:44PM +0800, Chen-Yu Tsai wrote:
+> Hi,
+> 
+> On Sun, Aug 17, 2014 at 4:02 PM, Maxime Ripard
+> <maxime.ripard@free-electrons.com> wrote:
+> > Hi,
+> >
+> > On Sun, Aug 17, 2014 at 11:52:17AM +0800, Chen-Yu Tsai wrote:
+> >> Add nodes for the 3 i2c controllers found on A23 SoCs to the sun8i DTSI.
+> >>
+> >> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+> >> ---
+> >>  arch/arm/boot/dts/sun8i-a23.dtsi | 36 ++++++++++++++++++++++++++++++++++++
+> >>  1 file changed, 36 insertions(+)
+> >>
+> >> diff --git a/arch/arm/boot/dts/sun8i-a23.dtsi b/arch/arm/boot/dts/sun8i-a23.dtsi
+> >> index 4658998..53ef350 100644
+> >> --- a/arch/arm/boot/dts/sun8i-a23.dtsi
+> >> +++ b/arch/arm/boot/dts/sun8i-a23.dtsi
+> >> @@ -387,6 +387,42 @@
+> >>                       status = "disabled";
+> >>               };
+> >>
+> >> +             i2c0: i2c at 01c2ac00 {
+> >> +                     compatible = "allwinner,sun6i-a31-i2c";
+> >> +                     reg = <0x01c2ac00 0x400>;
+> >> +                     interrupts = <0 6 4>;
+> >> +                     clocks = <&apb2_gates 0>;
+> >> +                     clock-frequency = <100000>;
+> >
+> > It's the default, you don't need to set it.
+> 
+> Ah, just checked the driver, it is indeed the default.
+> All the other sunxi dtsi have it though. Do we want to be consistent?
 
-Minor thing, (SZ_32M - 1) may be easier in case we ever change this.
+Yep, it's usually a good thing :)
 
->  #define PCI_IOBASE		((void __iomem *)(MODULES_VADDR - SZ_32M))
+Maxime
 
 -- 
-Catalin
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140818/66fc8503/attachment.sig>
