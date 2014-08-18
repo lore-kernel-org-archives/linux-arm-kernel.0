@@ -1,52 +1,78 @@
-From: joro@8bytes.org (Joerg Roedel)
-Date: Tue, 19 Aug 2014 01:32:01 +0200
-Subject: [PATCH 00/29] Exynos SYSMMU (IOMMU) integration with DT and
- DMA-mapping subsystem
-In-Reply-To: <1407235677-26324-1-git-send-email-m.szyprowski@samsung.com>
-References: <1407235677-26324-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <20140818233201.GL9809@8bytes.org>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 18 Aug 2014 17:43:12 -0600
+Subject: [PATCH v2] ARM: tegra: add Acer Chromebook 13 device tree
+In-Reply-To: <CAL1qeaH-WfA-DLKwuXA_hBPHYuXksAibLq__zisrT9ALaRGdAw@mail.gmail.com>
+References: <1407957267-3258-1-git-send-email-dgreid@chromium.org>	<53EF76CF.9050808@suse.de>	<53F2255E.7090208@wwwdotorg.org>
+ <CAL1qeaH-WfA-DLKwuXA_hBPHYuXksAibLq__zisrT9ALaRGdAw@mail.gmail.com>
+Message-ID: <53F28F90.3000004@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 05, 2014 at 12:47:28PM +0200, Marek Szyprowski wrote:
->  .../devicetree/bindings/iommu/samsung,sysmmu.txt   |  93 ++-
->  Documentation/power/notifiers.txt                  |  14 +
->  arch/arm/boot/dts/exynos4.dtsi                     | 118 ++++
->  arch/arm/boot/dts/exynos4210.dtsi                  |  23 +
->  arch/arm/boot/dts/exynos4x12.dtsi                  |  82 +++
->  arch/arm/include/asm/dma-iommu.h                   |  36 ++
->  arch/arm/mach-exynos/pm_domains.c                  |  12 +-
->  arch/arm/mach-integrator/impd1.c                   |   2 +-
->  arch/arm/mm/dma-mapping.c                          |  47 ++
->  drivers/base/bus.c                                 |   4 +-
->  drivers/base/dd.c                                  |  10 +-
->  drivers/base/platform.c                            |   2 +-
->  drivers/base/power/domain.c                        |  70 ++-
->  drivers/clk/samsung/clk-exynos4.c                  |   1 +
->  drivers/gpu/drm/exynos/exynos_drm_fimc.c           |   1 +
->  drivers/gpu/drm/exynos/exynos_drm_fimd.c           |  26 +-
->  drivers/gpu/drm/exynos/exynos_drm_g2d.c            |   1 +
->  drivers/gpu/drm/exynos/exynos_drm_gsc.c            |   1 +
->  drivers/gpu/drm/exynos/exynos_drm_rotator.c        |   1 +
->  drivers/gpu/drm/exynos/exynos_mixer.c              |   1 +
->  drivers/iommu/exynos-iommu.c                       | 663 +++++++++++++--------
->  drivers/iommu/iommu.c                              |   3 +
->  drivers/media/platform/s5p-mfc/s5p_mfc.c           | 107 ++--
->  drivers/pci/host/pci-mvebu.c                       |   2 +-
->  drivers/pci/host/pci-rcar-gen2.c                   |   2 +-
->  drivers/pci/host/pci-tegra.c                       |   2 +-
->  drivers/pci/host/pcie-rcar.c                       |   2 +-
->  drivers/soc/tegra/pmc.c                            |   2 +-
->  include/dt-bindings/clock/exynos4.h                |  10 +-
->  include/linux/device.h                             |  12 +-
->  include/linux/iommu.h                              |   1 +
->  include/linux/pm.h                                 |   2 +
->  include/linux/pm_domain.h                          |  19 +
->  33 files changed, 1016 insertions(+), 356 deletions(-)
+On 08/18/2014 05:24 PM, Andrew Bresticker wrote:
+> On Mon, Aug 18, 2014 at 9:10 AM, Stephen Warren <swarren@wwwdotorg.org> wrote:
+>> On 08/16/2014 09:20 AM, Andreas F?rber wrote:
+>>>
+>>> Hi,
+>>>
+>>> Am 13.08.2014 21:14, schrieb Dylan Reid:
+>>>>
+>>>> The Acer Chromebook 13, codenamed Big, contains an NVIDIA tegra124
+>>>> processor and is similar to the Venice2 reference platform.
+>>>>
+>>>> The keyboard, USB 2, audio, HDMI, sdcard, and emmc have been tested
+>>>> and work on the 1266x768 models.  The HD models haven't yet been
+>>>> tested.
+>>>>
+>>>> WiFi does not work yet, it needs at least some PMIC changes to enable
+>>>> the 32k clock.
+>>>>
+>>>> The elan trackpad is not yet functional but hopefully will be soon as
+>>>> there are patches under review.
+>>>>
+>>>> There is also an issue on reboot because the TPM isn't reset.  It will
+>>>> cause the stock firmware to enter recovery mode.  This can be worked
+>>>> around by an EC-reset, press the refresh and power keys at the same
+>>>> time.
+>>
+>>
+>>>> diff --git a/arch/arm/boot/dts/tegra124-nyan-big.dts
+>>>> b/arch/arm/boot/dts/tegra124-nyan-big.dts
+>>>> new file mode 100644
+>>>> index 0000000..79f1852
+>>>> --- /dev/null
+>>>> +++ b/arch/arm/boot/dts/tegra124-nyan-big.dts
+>>>> @@ -0,0 +1,1136 @@
+>>>> +/dts-v1/;
+>>>> +
+>>>> +#include <dt-bindings/input/input.h>
+>>>> +#include "tegra124.dtsi"
+>>>> +
+>>>> +/ {
+>>>> +       model = "Acer Chromebook 13";
+>>>> +       compatible = "google,nyan-big", "nvidia,tegra124";
+>>>
+>>>
+>>> In light of v1 and the above commit message referring to this as Google
+>>> Big, shouldn't this be "google,big", "nvidia,tegra124" and optionally
+>>> "google,nyan" as secondary string, independent of the new file name?
+>>
+>>
+>> Despite this board having been derived from Nyan, it isn't Nyan, so I don't
+>> think Nyan should be part of any compatible value, nor a separate compatible
+>> value.
+>
+> "google,nyan-big" is the compatible string that the bootloader on
+> these devices looks for.  It's also the convention we are now using
+> for our ARM devices, as Olof has already mentioned.
 
-This touches a lot of non-iommu stuff. What is your strategy on getting
-this in, do you plan to get the non-iommu changes merged first or do you
-want to collect the respective Acks and merge this all through one tree?
+I don't understand "that the bootloader looks for"; why is the 
+bootloader doing anything w.r.t the compatible value in the DT that's 
+passed to the kernel.
 
+Olof also mentioned that if I had any better ideas on file naming, I 
+should point them out. As I mentioned in response, there's zero need for 
+all the files or compatible values to have "nyan" in them in order to 
+include any common .dtsi file, which was the justification for having 
+"nyan" in the filename, IIRC.
 
-	Joerg
+Again, this board *isn't* Nyan, so it should pretend that it is.
