@@ -1,78 +1,34 @@
-From: vgoyal@redhat.com (Vivek Goyal)
-Date: Mon, 18 Aug 2014 17:04:23 -0400
-Subject: [PATCH 2/2] asm-generic: add memfd_create system call to unistd.h
-In-Reply-To: <20140818174010.GZ30401@n2100.arm.linux.org.uk>
-References: <CANq1E4Q0gDaJ5XGnkoCQsG8xLh1Q-EBErtEVPpeeZgGj+Nr8dQ@mail.gmail.com>
- <20140811171511.GF8828@arm.com> <201408112057.01177.arnd@arndb.de>
- <CAMuHMdWZ30ZKO2ddh8whmw5ThrKZC0wsU+rhgoc8fRZni0Zduw@mail.gmail.com>
- <20140812102734.GG29013@arm.com> <20140812111030.GK29013@arm.com>
- <20140812123736.GA16961@redhat.com>
- <20140815135520.GT27466@arm.com> <20140818171540.GE4745@redhat.com>
- <20140818174010.GZ30401@n2100.arm.linux.org.uk>
-Message-ID: <20140818210422.GH4745@redhat.com>
+From: joro@8bytes.org (joro at 8bytes.org)
+Date: Mon, 18 Aug 2014 23:26:27 +0200
+Subject: [PATCH v5 1/1] iommu-api: Add map_sg/unmap_sg functions
+In-Reply-To: <53F266AE.40303@codeaurora.org>
+References: <1407797150-515-1-git-send-email-ohaugan@codeaurora.org>
+ <1407797150-515-2-git-send-email-ohaugan@codeaurora.org>
+ <871tsm5vcn.fsf@nvidia.com>
+ <CAF6AEGvZUanVtPxAt76+AAdOaNwyMJ3cmcJ1srsEYBeG7ELkBQ@mail.gmail.com>
+ <53EA472B.3020900@codeaurora.org>
+ <20140818140730.GC9809@8bytes.org>
+ <CAF6AEGtGmAQjMc5W5a6x5QiyUc8v0XHcsNAFe65Znc=DDKPS+w@mail.gmail.com>
+ <53F266AE.40303@codeaurora.org>
+Message-ID: <20140818212627.GI9809@8bytes.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 18, 2014 at 06:40:10PM +0100, Russell King - ARM Linux wrote:
-> On Mon, Aug 18, 2014 at 01:15:40PM -0400, Vivek Goyal wrote:
-> > On Fri, Aug 15, 2014 at 02:55:20PM +0100, Will Deacon wrote:
-> > > What I meant was, if I wire it into asm-generic/unistd.h then it will return
-> > > -ENOEXEC for architectures using that file (e.g. arm64).
-> > > 
-> > > Patch below, but I don't think it's very useful.
-> > > 
-> > 
-> > Hi Will,
-> > 
-> > I have not even defined a syscall number for other arches. IIUC, this
-> > patch will forcibly introduce a syscall number for the new syscall for
-> > arches which use asm-generic/unistd.h.
-> > 
-> > So question I have is that why should we do it now. One can do it once
-> > somebody enables kexec_file_load() on arm64.
-> > 
-> > Right now I see that kexec_file_load() gets compiled if CONFIG_KEXEC=y. So
-> > even on arm64 it must be getting compiled in. But it is not being hooked
-> > up using system call table. So there should not be any way to invoke
-> > syscalll definition. So my understand is that in current form, one can
-> > not invoke kexec_file_load() on arm64. Is that right.
-> > 
-> > Now I have put one more patch to make compilation of kexec_file_load()
-> > conditional on config option CONFIG_KEXEC_FILE. And this option can
-> > be enabled only on x86_64. That means kexec_file_load() will not even
-> > be compiled in on arm64 (once the patch gets merged). Right now patch
-> > is sitting in andrew's tree.
-> > 
-> > http://ozlabs.org/~akpm/mmotm/broken-out/kexec-create-a-new-config-option-config_kexec_file-for-new-syscall.patch
-> > 
-> > Can you please help me understand that why do we need this patch if at
-> > this point of time we are not even fixing a system call number for
-> > kexec_file_load() for arches except x86_64.
-> 
-> >From what I read, the only arch which supports this call is x86_64, and
-> it requires arch code make work.  So simply wiring up the syscall is not
-> enough.
-> 
+On Mon, Aug 18, 2014 at 01:48:46PM -0700, Olav Haugan wrote:
+> On 8/18/2014 11:32 AM, Rob Clark wrote:
 
-Yes, it will require some arch work (more arch specific kernel image
-format related work) to make syscall work on other arches. Generic
-portion of the syscall should work without any significant change.
+> No, I do not have other uses right now. But could imagine use cases like
+> "force <insert minimum mapping size here> mapping" flag etc.
 
-> What is probably worth doing is reserving the syscall number _if_ it's
-> going to be useful on architectures - by that, I mean inserting the
-> syscall number with a comment in the unistd.h file, rather than
-> defining a constant.
+I think it is worth discussing to add a flush() function to the
+IOMMU-API. I sent a patch-set myself a few years ago introducing an
+iommu_commit() function with the same semantics, but this is
+out-of-scope for this patch-set.
 
-I think this syscall is going to be useful on other arches also. I
-think specially on arm64 where UEFI is there and I am hoping at
-some point of time secureboot on arm64 machines will show up (if it
-is not already there).
+Also adding a flag parameter to iommu_map_sg would introduce an
+asymentrie in the API to the iommu_map() function. So please leave it
+out for this patch-set, when we really need a flag parameter someday we
+can introduce it for iommu_map() and iommu_map_sg() together.
 
-Do we have to reserve a syscall number now. Does it break anything. Or
-it can be reserved later once somebody decides to enable this syscall
-on arm64 or any other arch which uses generic/unistd.h.
 
-Right now it sounds more like nice to have item.
-
-Thanks
-Vivek
+	Joerg
