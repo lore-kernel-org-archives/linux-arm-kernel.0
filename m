@@ -1,87 +1,128 @@
 From: abrestic@chromium.org (Andrew Bresticker)
-Date: Mon, 18 Aug 2014 10:08:23 -0700
-Subject: [PATCH v2 7/9] ARM: tegra: Add Tegra124 XUSB mailbox and xHCI
- controller
+Date: Mon, 18 Aug 2014 10:08:25 -0700
+Subject: [PATCH v2 9/9] ARM: tegra: venice2: Add xHCI support
 In-Reply-To: <1408381705-3623-1-git-send-email-abrestic@chromium.org>
 References: <1408381705-3623-1-git-send-email-abrestic@chromium.org>
-Message-ID: <1408381705-3623-8-git-send-email-abrestic@chromium.org>
+Message-ID: <1408381705-3623-10-git-send-email-abrestic@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add nodes for the Tegra XUSB mailbox and Tegra xHCI controller and
-add the PHY mailbox channel to the XUSB padctl node.
+Assign ports previously owned by the EHCI controllers to the xHCI
+controller.  There are two external USB ports (UTMI ports 0/2 and
+USB3 ports 0/1) and an internal USB port (UTMI port 1).  PCIe lanes
+0 and 1 are used by the USB3 ports.
 
 Signed-off-by: Andrew Bresticker <abrestic@chromium.org>
 ---
 Changes from v1:
- - Updated to use common mailbox bindings.
- - Added remaining clocks/resets.
+ - Updated USB power supplies.
 ---
- arch/arm/boot/dts/tegra124.dtsi | 40 ++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 40 insertions(+)
+ arch/arm/boot/dts/tegra124-venice2.dts | 79 ++++++++++++++++++++++------------
+ 1 file changed, 51 insertions(+), 28 deletions(-)
 
-diff --git a/arch/arm/boot/dts/tegra124.dtsi b/arch/arm/boot/dts/tegra124.dtsi
-index 03916ef..98b8340 100644
---- a/arch/arm/boot/dts/tegra124.dtsi
-+++ b/arch/arm/boot/dts/tegra124.dtsi
-@@ -3,6 +3,7 @@
- #include <dt-bindings/pinctrl/pinctrl-tegra.h>
- #include <dt-bindings/pinctrl/pinctrl-tegra-xusb.h>
- #include <dt-bindings/interrupt-controller/arm-gic.h>
-+#include <dt-bindings/mailbox/tegra-xusb-mailbox.h>
+diff --git a/arch/arm/boot/dts/tegra124-venice2.dts b/arch/arm/boot/dts/tegra124-venice2.dts
+index 70ad91d..3f706ff 100644
+--- a/arch/arm/boot/dts/tegra124-venice2.dts
++++ b/arch/arm/boot/dts/tegra124-venice2.dts
+@@ -736,7 +736,7 @@
+ 					regulator-always-on;
+ 				};
  
- #include "skeleton.dtsi"
- 
-@@ -495,11 +496,50 @@
- 		status = "disabled";
+-				ldo0 {
++				avdd_1v05_run: ldo0 {
+ 					regulator-name = "+1.05V_RUN_AVDD";
+ 					regulator-min-microvolt = <1050000>;
+ 					regulator-max-microvolt = <1050000>;
+@@ -878,6 +878,56 @@
+ 		status = "okay";
  	};
  
 +	usb at 0,70090000 {
-+		compatible = "nvidia,tegra124-xhci";
-+		reg = <0x0 0x70090000 0x0 0x8000>,
-+		      <0x0 0x70098000 0x0 0x1000>,
-+		      <0x0 0x70099000 0x0 0x1000>;
-+		interrupts = <GIC_SPI 39 IRQ_TYPE_LEVEL_HIGH>;
-+		clocks = <&tegra_car TEGRA124_CLK_XUSB_HOST>,
-+			 <&tegra_car TEGRA124_CLK_XUSB_HOST_SRC>,
-+			 <&tegra_car TEGRA124_CLK_XUSB_DEV>,
-+			 <&tegra_car TEGRA124_CLK_XUSB_DEV_SRC>,
-+			 <&tegra_car TEGRA124_CLK_XUSB_FALCON_SRC>,
-+			 <&tegra_car TEGRA124_CLK_XUSB_SS>,
-+			 <&tegra_car TEGRA124_CLK_XUSB_SS_DIV2>,
-+			 <&tegra_car TEGRA124_CLK_XUSB_SS_SRC>,
-+			 <&tegra_car TEGRA124_CLK_XUSB_HS_SRC>,
-+			 <&tegra_car TEGRA124_CLK_XUSB_FS_SRC>,
-+			 <&tegra_car TEGRA124_CLK_PLL_U_480M>,
-+			 <&tegra_car TEGRA124_CLK_CLK_M>,
-+			 <&tegra_car TEGRA124_CLK_PLL_E>;
-+		clock-names = "xusb_host", "xusb_host_src", "xusb_dev",
-+			      "xusb_dev_src", "xusb_falcon_src", "xusb_ss",
-+			      "xusb_ss_div2", "xusb_ss_src", "xusb_hs_src",
-+			      "xusb_fs_src", "pll_u_480m", "clk_m", "pll_e";
-+		resets = <&tegra_car 89>, <&tegra_car 95>, <&tegra_car 156>,
-+			 <&tegra_car 143>;
-+		reset-names = "xusb_host", "xusb_dev", "xusb_ss", "xusb";
-+		mboxes = <&mbox TEGRA_XUSB_MBOX_CHAN_HOST>;
-+		status = "disabled";
++		status = "okay";
++		phys = <&padctl TEGRA_XUSB_PADCTL_UTMI_P0>, /* 1st USB A */
++		       <&padctl TEGRA_XUSB_PADCTL_UTMI_P1>, /* Internal USB */
++		       <&padctl TEGRA_XUSB_PADCTL_UTMI_P2>, /* 2nd USB A */
++		       <&padctl TEGRA_XUSB_PADCTL_USB3_P0>, /* 1st USB A */
++		       <&padctl TEGRA_XUSB_PADCTL_USB3_P1>; /* 2nd USB A */
++		phy-names = "utmi-0", "utmi-1", "utmi-2", "usb3-0", "usb3-1";
++		avddio-pex-supply = <&vdd_1v05_run>;
++		dvddio-pex-supply = <&vdd_1v05_run>;
++		avdd-usb-supply = <&vdd_3v3_lp0>;
++		avdd-pll-utmip-supply = <&vddio_1v8>;
++		avdd-pll-erefe-supply = <&avdd_1v05_run>;
++		avdd-pex-pll-supply = <&vdd_1v05_run>;
++		hvdd-pex-supply = <&vdd_3v3_lp0>;
++		hvdd-pex-plle-supply = <&vdd_3v3_lp0>;
 +	};
 +
-+	mbox: mailbox at 0,70098000 {
-+		compatible = "nvidia,tegra124-xusb-mbox";
-+		reg = <0x0 0x70098000 0x0 0x1000>;
-+		interrupts = <GIC_SPI 40 IRQ_TYPE_LEVEL_HIGH>;
++	padctl at 0,7009f000 {
++		pinctrl-0 = <&padctl_default>;
++		pinctrl-names = "default";
 +
-+		#mbox-cells = <1>;
++		vbus-otg-0-supply = <&vdd_usb1_vbus>;
++		vbus-otg-1-supply = <&vdd_run_cam>;
++		vbus-otg-2-supply = <&vdd_usb3_vbus>;
++		nvidia,usb3-port-0-lane = <TEGRA_XUSB_PADCTL_PIN_PCIE_0>;
++		nvidia,usb3-port-1-lane = <TEGRA_XUSB_PADCTL_PIN_PCIE_1>;
++
++		padctl_default: pinmux {
++			otg {
++				nvidia,lanes = "otg-0", "otg-1", "otg-2";
++				nvidia,function = "xusb";
++			};
++
++			usb3p0 {
++				nvidia,lanes = "pcie-0";
++				nvidia,function = "usb3";
++				nvidia,iddq = <0>;
++				nvidia,usb2-port-num = <0>;
++			};
++
++			usb3p1 {
++				nvidia,lanes = "pcie-1";
++				nvidia,function = "usb3";
++				nvidia,iddq = <0>;
++				nvidia,usb2-port-num = <2>;
++			};
++		};
 +	};
 +
- 	padctl: padctl at 0,7009f000 {
- 		compatible = "nvidia,tegra124-xusb-padctl";
- 		reg = <0x0 0x7009f000 0x0 0x1000>;
- 		resets = <&tegra_car 142>;
- 		reset-names = "padctl";
-+		mboxes = <&mbox TEGRA_XUSB_MBOX_CHAN_PHY>;
- 
- 		#phy-cells = <1>;
+ 	sdhci at 0,700b0400 {
+ 		cd-gpios = <&gpio TEGRA_GPIO(V, 2) GPIO_ACTIVE_HIGH>;
+ 		power-gpios = <&gpio TEGRA_GPIO(R, 0) GPIO_ACTIVE_HIGH>;
+@@ -898,33 +948,6 @@
+ 		};
  	};
+ 
+-	usb at 0,7d000000 {
+-		status = "okay";
+-	};
+-
+-	usb-phy at 0,7d000000 {
+-		status = "okay";
+-		vbus-supply = <&vdd_usb1_vbus>;
+-	};
+-
+-	usb at 0,7d004000 {
+-		status = "okay";
+-	};
+-
+-	usb-phy at 0,7d004000 {
+-		status = "okay";
+-		vbus-supply = <&vdd_run_cam>;
+-	};
+-
+-	usb at 0,7d008000 {
+-		status = "okay";
+-	};
+-
+-	usb-phy at 0,7d008000 {
+-		status = "okay";
+-		vbus-supply = <&vdd_usb3_vbus>;
+-	};
+-
+ 	backlight: backlight {
+ 		compatible = "pwm-backlight";
+ 
 -- 
 2.1.0.rc2.206.gedb03e5
