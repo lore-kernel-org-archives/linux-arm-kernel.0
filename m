@@ -1,32 +1,80 @@
 From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Mon, 18 Aug 2014 16:58:37 +0200
-Subject: [PATCH v2 9/9] arm: dts: mt6589: Change compatible string for GIC
-In-Reply-To: <1408373917-10002-1-git-send-email-matthias.bgg@gmail.com>
-References: <1408373917-10002-1-git-send-email-matthias.bgg@gmail.com>
-Message-ID: <1408373917-10002-10-git-send-email-matthias.bgg@gmail.com>
+Date: Mon, 18 Aug 2014 17:10:39 +0200
+Subject: [PATCH 4/7] ARM: meson: add basic support for MesonX SoCs
+In-Reply-To: <20140818132713.GA28819@carlo-MacBookPro>
+References: <1408272594-10814-1-git-send-email-carlo@caione.org>
+ <1408272594-10814-5-git-send-email-carlo@caione.org>
+ <20140817142115.GB15297@lukather>
+ <20140818132713.GA28819@carlo-MacBookPro>
+Message-ID: <CABuKBeLSJkxPM_gyhGXN5pft0R4-+RrdiURuPwH9VxA-cSzQNQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch changes the compatible string of the GIC to the
-new "arm,cortex-a7-gic" which does reflect the actual hardware.
+2014-08-18 15:27 GMT+02:00 Carlo Caione <carlo@caione.org>:
+> On Sun, Aug 17, 2014 at 04:21:15PM +0200, Maxime Ripard wrote:
+>> Hi Carlo,
+>
+> Hi Maxime,
+> thank you for reviewing also these patches, I'll keep you in CC for the
+> next revisions if you are interested.
+>
+>> > +static __init void meson_init_machine_devicetree(void)
+>> > +{
+>> > +   of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+>> > +}
+>>
+>> This is the default, you can just remove it
+>
+> Agree
+>
+>> > +static const char * const m6_common_board_compat[] = {
+>> > +   "amlogic,8726_mx",
+>> > +   "amlogic,8726_mxs",
+>> > +   "amlogic,8726_mxl",
+>> > +   "amlogic,meson6",
+>>
+>> Why are all those compatibles needed? Usually, you add a single one
+>> per SoC (which would be the last in your case I guess.
+>
+> They are taken from the weird DTS in the original Amlogic sources but I
+> guess you are right. I am actually more inclined to just leave "8726_mx"
+> and "meson6" since online you can find equally both the versions for
+> exactly the same SoCs.
+>
+>> > +   NULL,
+>> > +};
+>> > +
+>> > +DT_MACHINE_START(AML8726_MX, "Amlogic Meson6 platform")
+>> > +   .init_machine   = meson_init_machine_devicetree,
+>>
+>> And since you don't need the init machine, you can just use the
+>> generic machine support. I'm not sure what's been decided on this,
+>> should we remove such empty machines?
+>
+> I can get rid of the .init_machine but what about the .dt_compat field?
 
-Signed-off-by: Matthias Brugger <matthias.bgg@gmail.com>
----
- arch/arm/boot/dts/mt6589.dtsi |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+AFIAK there is no consensus about that.
+For now I would leave the .dt_compat field. There are proposals which
+try to get rid of the name_str
+in the DT_MACHINE_START [0], but from what I know they are not yet merged.
 
-diff --git a/arch/arm/boot/dts/mt6589.dtsi b/arch/arm/boot/dts/mt6589.dtsi
-index fb922a6..2534ba5 100644
---- a/arch/arm/boot/dts/mt6589.dtsi
-+++ b/arch/arm/boot/dts/mt6589.dtsi
-@@ -91,7 +91,7 @@
- 		};
- 
- 		gic: interrupt-controller at 10211000 {
--			compatible = "arm,cortex-a15-gic";
-+			compatible = "arm,cortex-a7-gic";
- 			interrupt-controller;
- 			#interrupt-cells = <3>;
- 			reg = <0x10211000 0x1000>,
+Cheers,
+Matthias
+
+[0] http://lists.infradead.org/pipermail/linux-arm-kernel/2013-November/208878.html
+
+>
+> Thanks,
+>
+> --
+> Carlo Caione
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+
+
 -- 
-1.7.9.5
+motzblog.wordpress.com
