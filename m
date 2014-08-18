@@ -1,36 +1,41 @@
-From: agross@codeaurora.org (Andy Gross)
-Date: Mon, 18 Aug 2014 13:38:51 -0500
-Subject: [PATCH] MAINTAINERS: Add entry for SOC Qualcomm drivers
-Message-ID: <1408387131-32152-1-git-send-email-agross@codeaurora.org>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Mon, 18 Aug 2014 20:48:32 +0200
+Subject: [PATCH v5 01/10] ARM: dts: Fix MMC pinctrl for exynos5250-snow
+In-Reply-To: <53F247E2.2070007@samsung.com>
+References: <1406868897-26874-1-git-send-email-afaerber@suse.de>	<1406868897-26874-2-git-send-email-afaerber@suse.de>
+ <CAD=FV=VBa5rs_woj0mshFFbA69Nhyi3hXK_XX7-54T3vFyKYHA@mail.gmail.com>
+ <53F247E2.2070007@samsung.com>
+Message-ID: <53F24A80.4000607@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds a MAINTAINERS entry for the SOC Qualcomm drivers.
+Hi Kukjin,
 
-Signed-off-by: Andy Gross <agross@codeaurora.org>
----
- MAINTAINERS | 8 ++++++++
- 1 file changed, 8 insertions(+)
+On 18.08.2014 20:37, Kukjin Kim wrote:
+> On 08/01/14 11:26, Doug Anderson wrote:
+>> Hi,
+>>
+> Hi,
+> 
+>> On Thu, Jul 31, 2014 at 9:54 PM, Andreas F?rber<afaerber@suse.de>  wrote:
+>>> The pinctrl properties should be on the device directly and not on the
+>>> slot sub-node.
+>>>
+>>> Reported-by: Doug Anderson<dianders@chromium.org>
+>>> Cc: Jaehoon Chung<jh80.chung@samsung.com>
+>>> Reviewed-by: Tomasz Figa<t.figa@samsung.com>
+>>> Signed-off-by: Andreas F?rber<afaerber@suse.de>
+>>
+>> Let's land this one before Jaehoon's, since it was a hidden
+>> functionality change in his patch.  It will be an easy conflict to
+>> resolve when his patch is applied.
+>>
+> Sounds good to me, I've applied this before Jaehoon's change.
+> 
+>> Reviewed-by: Doug Anderson<dianders@chromium.org>
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index aefa948..3ad0a26 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -8426,6 +8426,14 @@ F:	include/media/soc*
- F:	drivers/media/i2c/soc_camera/
- F:	drivers/media/platform/soc_camera/
- 
-+SOC/QUALCOMM DRIVERS
-+M:	Andy Gross <agross@codeaurora.org>
-+L:	linux-arm-msm at vger.kernel.org
-+L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
-+S:	Maintained
-+F:	drivers/soc/qcom
-+T:	git git://codeaurora.org/quic/kernel/agross-msm.git
-+
- SOEKRIS NET48XX LED SUPPORT
- M:	Chris Boot <bootc@bootc.net>
- S:	Maintained
--- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by The Linux Foundation
+Version 6 of this series has been already posted. However this
+particular patch has not changed, so it's fine.
+
+Best regards,
+Tomasz
