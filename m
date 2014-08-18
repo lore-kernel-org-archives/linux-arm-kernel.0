@@ -1,64 +1,274 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Mon, 18 Aug 2014 13:57:32 +0200
-Subject: [PATCH] mmc: core: sd: check card write-protect lock while
- resuming
-In-Reply-To: <1408356012-18867-1-git-send-email-Barry.Song@csr.com>
-References: <1408356012-18867-1-git-send-email-Barry.Song@csr.com>
-Message-ID: <CAPDyKFpFLoREZ=rYp8bQvJ7Fczq=HyLL90jv7Hjzai9xTNBNYg@mail.gmail.com>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Mon, 18 Aug 2014 13:59:38 +0200
+Subject: [PATCH 3/7] ARM: meson6: clocksource: add Meson6 timer support
+In-Reply-To: <1408272594-10814-4-git-send-email-carlo@caione.org>
+References: <1408272594-10814-1-git-send-email-carlo@caione.org>
+ <1408272594-10814-4-git-send-email-carlo@caione.org>
+Message-ID: <53F1EAAA.8020904@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18 August 2014 12:00, Barry Song <Barry.Song@csr.com> wrote:
-> From: Minda Chen <Minda.Chen@csr.com>
+
+
+On 17/08/14 12:49, Carlo Caione wrote:
+> Meson6 SoCs are equipped with 5 32-bit timers, called TIMER_A, TIMER_B,
+> TIMER_C, TIMER_D and TIMER_E.
 >
-> After suspending, unplug the sdcard, and set sd WP lock,
-> insert it again, then resume the system. resume codes do
-> not check the the sdcard write-proctect lock. now check
-> it.
+> The driver is providing clocksource support for the 32-bit counter using
+> TIMER_E. Clockevents are also supported using TIMER_A.
 >
-> Signed-off-by: Minda Chen <Minda.Chen@csr.com>
-> Signed-off-by: Barry Song <Baohua.Song@csr.com>
+> Signed-off-by: Carlo Caione <carlo@caione.org>
 > ---
->  drivers/mmc/core/sd.c | 7 +++++++
->  1 file changed, 7 insertions(+)
+>   drivers/clocksource/Kconfig        |   3 +
+>   drivers/clocksource/Makefile       |   1 +
+>   drivers/clocksource/meson6_timer.c | 187 +++++++++++++++++++++++++++++++++++++
+>   3 files changed, 191 insertions(+)
+>   create mode 100644 drivers/clocksource/meson6_timer.c
 >
-> diff --git a/drivers/mmc/core/sd.c b/drivers/mmc/core/sd.c
-> index 0c44510..890557a 100644
-> --- a/drivers/mmc/core/sd.c
-> +++ b/drivers/mmc/core/sd.c
-> @@ -910,6 +910,7 @@ static int mmc_sd_init_card(struct mmc_host *host, u32 ocr,
->         int err;
->         u32 cid[4];
->         u32 rocr = 0;
-> +       bool oldro, ro;
+> diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
+> index cfd6519..38029ca 100644
+> --- a/drivers/clocksource/Kconfig
+> +++ b/drivers/clocksource/Kconfig
+> @@ -30,6 +30,9 @@ config ARMADA_370_XP_TIMER
+>   	bool
+>   	select CLKSRC_OF
 >
->         BUG_ON(!host);
->         WARN_ON(!host->claimed);
-> @@ -922,6 +923,12 @@ static int mmc_sd_init_card(struct mmc_host *host, u32 ocr,
->                 if (memcmp(cid, oldcard->raw_cid, sizeof(cid)) != 0)
->                         return -ENOENT;
->
-> +               if (host->ops->get_ro) {
-> +                       ro = host->ops->get_ro(host) ? true : false;
-> +                       oldro = mmc_card_readonly(oldcard) ? true : false;
-> +                       if (oldro ^ ro)
-> +                               return -ENOENT;
-> +               }
+> +config MESON6_TIMER
+> +	bool
+> +
+>   config ORION_TIMER
+>   	select CLKSRC_OF
+>   	select CLKSRC_MMIO
+> diff --git a/drivers/clocksource/Makefile b/drivers/clocksource/Makefile
+> index 7fd9fd1..e4ae987 100644
+> --- a/drivers/clocksource/Makefile
+> +++ b/drivers/clocksource/Makefile
+> @@ -25,6 +25,7 @@ obj-$(CONFIG_ARCH_PRIMA2)	+= timer-prima2.o
+>   obj-$(CONFIG_ARCH_U300)		+= timer-u300.o
+>   obj-$(CONFIG_SUN4I_TIMER)	+= sun4i_timer.o
+>   obj-$(CONFIG_SUN5I_HSTIMER)	+= timer-sun5i.o
+> +obj-$(CONFIG_MESON6_TIMER)	+= meson6_timer.o
+>   obj-$(CONFIG_ARCH_TEGRA)	+= tegra20_timer.o
+>   obj-$(CONFIG_VT8500_TIMER)	+= vt8500_timer.o
+>   obj-$(CONFIG_ARCH_NSPIRE)	+= zevio-timer.o
+> diff --git a/drivers/clocksource/meson6_timer.c b/drivers/clocksource/meson6_timer.c
+> new file mode 100644
+> index 0000000..1ef1095
+> --- /dev/null
+> +++ b/drivers/clocksource/meson6_timer.c
+> @@ -0,0 +1,187 @@
+> +/*
+> + * Amlogic Meson6 SoCs timer handling.
+> + *
+> + * Copyright (C) 2014 Carlo Caione
+> + *
+> + * Carlo Caione <carlo@caione.org>
+> + *
+> + * Based on code from Amlogic, Inc
+> + *
+> + * This file is licensed under the terms of the GNU General Public
+> + * License version 2.  This program is licensed "as is" without any
+> + * warranty of any kind, whether express or implied.
+> + */
+> +
+> +#include <linux/clk.h>
+> +#include <linux/clockchips.h>
+> +#include <linux/interrupt.h>
+> +#include <linux/irq.h>
+> +#include <linux/irqreturn.h>
+> +#include <linux/sched_clock.h>
+> +#include <linux/of.h>
+> +#include <linux/of_address.h>
+> +#include <linux/of_irq.h>
+> +
+> +enum {
+> +	A = 0,
+> +	B,
+> +	C,
+> +	D,
+> +};
 
-Seems like this code belongs better in mmc_sd_setup_card(). Could you
-try moving it there.
+You are just using timer A, so this enum is unnecessary. Please use a 
+define instead. Also it would be better, if the define would be 
+explenatory then just the letter 'A'.
 
-Kind regards
-Uffe
+> +
+> +#define TIMER_ISA_MUX		0
+> +#define TIMER_ISA_E_VAL		0x14
+> +#define TIMER_ISA_t_VAL(t)	((t + 1) << 2)
+> +
+> +#define TIMER_t_INPUT_BIT(t)	(2 * t)
 
->                 card = oldcard;
->         } else {
->                 /*
-> --
-> 2.0.4
+Please put braces around 't'.
+
+> +#define TIMER_E_INPUT_BIT	8
+
+ From the enum above, missing timer E would be 4 so you can use the 
+TIMER_t_INPUT_BIT(t) macro, right?
+
+> +#define TIMER_t_INPUT_MASK(t)	(3UL << TIMER_t_INPUT_BIT(t))
+> +#define TIMER_E_INPUT_MASK	(7UL << TIMER_E_INPUT_BIT)
+> +#define TIMER_t_ENABLE_BIT(t)	(16 + t)
+> +#define TIMER_E_ENABLE_BIT	20
+> +#define TIMER_t_PERIODIC_BIT(t)	(12 + t)
+
+Please put braces around 't'.
+
+> +
+> +#define TIMER_UNIT_1us		0
+> +#define TIMER_E_UNIT_1us	1
+
+Please don't use lower case characters in defines.
+
+> +
+> +static void __iomem *timer_base;
+> +
+> +static cycle_t cycle_read_timer_e(struct clocksource *cs)
+> +{
+> +	return (cycle_t)readl(timer_base + TIMER_ISA_E_VAL);
+> +}
+> +
+> +static struct clocksource clocksource_timer_e = {
+> +	.name	= "meson6_timerE",
+> +	.rating	= 300,
+> +	.read	= cycle_read_timer_e,
+> +	.mask	= CLOCKSOURCE_MASK(32),
+> +	.flags  = CLOCK_SOURCE_IS_CONTINUOUS,
+> +};
+> +
+> +static u64 notrace meson6_timer_sched_read(void)
+> +{
+> +	return (u64)readl(timer_base + TIMER_ISA_E_VAL);
+> +}
+> +
+> +static void meson6_clkevt_time_stop(unsigned char timer)
+> +{
+> +	u32 val = readl(timer_base + TIMER_ISA_MUX);
+> +
+> +	writel(val & ~TIMER_t_ENABLE_BIT(timer), timer_base + TIMER_ISA_MUX);
+> +}
+> +
+> +static void meson6_clkevt_time_setup(unsigned char timer, unsigned long delay)
+> +{
+> +	writel(delay, timer_base + TIMER_ISA_t_VAL(timer));
+> +}
+> +
+> +static void meson6_clkevt_time_start(unsigned char timer, bool periodic)
+> +{
+> +	u32 val = readl(timer_base + TIMER_ISA_MUX);
+> +
+> +	if (periodic)
+> +		val |= TIMER_t_PERIODIC_BIT(timer);
+> +	else
+> +		val &= ~TIMER_t_PERIODIC_BIT(timer);
+> +
+> +	writel(val | TIMER_t_ENABLE_BIT(timer), timer_base + TIMER_ISA_MUX);
+> +}
+> +
+> +static void meson6_clkevt_mode(enum clock_event_mode mode,
+> +			       struct clock_event_device *clk)
+> +{
+> +	switch (mode) {
+> +	case CLOCK_EVT_MODE_PERIODIC:
+> +		meson6_clkevt_time_stop(A);
+> +		meson6_clkevt_time_setup(A, USEC_PER_SEC/HZ - 1);
+> +		meson6_clkevt_time_start(A, true);
+> +		break;
+> +	case CLOCK_EVT_MODE_ONESHOT:
+> +		meson6_clkevt_time_stop(A);
+> +		meson6_clkevt_time_start(A, false);
+> +		break;
+> +	case CLOCK_EVT_MODE_UNUSED:
+> +	case CLOCK_EVT_MODE_SHUTDOWN:
+> +	default:
+> +		meson6_clkevt_time_stop(A);
+> +		break;
+> +	}
+> +}
+> +
+> +static int meson6_clkevt_next_event(unsigned long evt,
+> +				    struct clock_event_device *unused)
+> +{
+> +	meson6_clkevt_time_stop(A);
+> +	meson6_clkevt_time_setup(A, evt);
+> +	meson6_clkevt_time_start(A, false);
+> +
+> +	return 0;
+> +}
+> +
+> +static struct clock_event_device meson6_clockevent = {
+> +	.name		= "meson6_tick",
+> +	.rating		= 400,
+> +	.features	= CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT,
+> +	.set_mode	= meson6_clkevt_mode,
+> +	.set_next_event	= meson6_clkevt_next_event,
+> +};
+> +
+> +static irqreturn_t meson6_timer_interrupt(int irq, void *dev_id)
+> +{
+> +	struct clock_event_device *evt = (struct clock_event_device *)dev_id;
+> +
+> +	evt->event_handler(evt);
+> +
+> +	return IRQ_HANDLED;
+> +}
+> +
+> +static struct irqaction meson6_timer_irq = {
+> +	.name		= "meson6_timerA",
+> +	.flags		= IRQF_TIMER | IRQF_IRQPOLL,
+> +	.handler	= meson6_timer_interrupt,
+> +	.dev_id		= &meson6_clockevent,
+> +};
+> +
+> +static void __init meson6_timer_init(struct device_node *node)
+> +{
+> +	u32 val;
+> +	int ret, irq;
+> +
+> +	timer_base = of_iomap(node, 0);
+
+Please use of_io_request_and_map instead.
+
+> +	if (!timer_base)
+> +		panic("Can't map registers");
+> +
+> +	irq = irq_of_parse_and_map(node, 0);
+> +	if (irq <= 0)
+> +		panic("Can't parse IRQ");
+> +
+> +	/* Set 1us for timer E */
+> +	val = readl(timer_base + TIMER_ISA_MUX);
+> +	val &= ~TIMER_E_INPUT_MASK;
+> +	val |= TIMER_E_UNIT_1us << TIMER_E_INPUT_BIT;
+> +	writel(val, timer_base + TIMER_ISA_MUX);
+> +
+> +	sched_clock_register(meson6_timer_sched_read, 32, USEC_PER_SEC);
+> +	clocksource_register_khz(&clocksource_timer_e, 1000);
+
+Why don't you use clocksource_mmio_init?
+
+> +
+> +	/* Timer A base 1us */
+> +	val &= ~TIMER_t_INPUT_MASK(A);
+> +	val |= TIMER_UNIT_1us << TIMER_t_INPUT_BIT(A);
+> +	writel(val, timer_base + TIMER_ISA_MUX);
+
+Is this dependant on any clocking of the timer?
+
+> +
+> +	/* Stop the timer A */
+> +	meson6_clkevt_time_stop(A);
+> +
+> +	ret = setup_irq(irq, &meson6_timer_irq);
+> +	if (ret)
+> +		pr_warn("failed to setup irq %d\n", irq);
+> +
+> +	meson6_clockevent.cpumask = cpu_possible_mask;
+> +	meson6_clockevent.irq = irq;
+> +
+> +	clockevents_config_and_register(&meson6_clockevent, USEC_PER_SEC,
+> +					1, 0xfffe);
+> +}
+> +CLOCKSOURCE_OF_DECLARE(meson6, "amlogic,meson6-timer",
+> +		       meson6_timer_init);
 >
->
->
-> Member of the CSR plc group of companies. CSR plc registered in England and Wales, registered number 4187346, registered office Churchill House, Cambridge Business Park, Cowley Road, Cambridge, CB4 0WZ, United Kingdom
-> More information can be found at www.csr.com. Keep up to date with CSR on our technical blog, www.csr.com/blog, CSR people blog, www.csr.com/people, YouTube, www.youtube.com/user/CSRplc, Facebook, www.facebook.com/pages/CSR/191038434253534, or follow us on Twitter at www.twitter.com/CSR_plc.
-> New for 2014, you can now access the wide range of products powered by aptX at www.aptx.com.
