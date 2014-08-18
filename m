@@ -1,57 +1,41 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Mon, 18 Aug 2014 17:24:20 +0800
-Subject: [PATCH] clocksource: sirf: disable counter before re-setting it
-In-Reply-To: <1406124197-25083-1-git-send-email-21cnbao@gmail.com>
-References: <1406124197-25083-1-git-send-email-21cnbao@gmail.com>
-Message-ID: <CAGsJ_4wAMYwGfLCfu+RE4O=JtzBPEU8EmVMcKap4Bhu8TTYc6w@mail.gmail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 18 Aug 2014 10:23:58 +0100
+Subject: [RFC] arm64: Add cpu-return-addr to dts files
+In-Reply-To: <1408132229.22761.66.camel@smoke>
+References: <1408132130.22761.64.camel@smoke> <1408132229.22761.66.camel@smoke>
+Message-ID: <20140818092357.GB14559@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2014-07-23 22:03 GMT+08:00 Barry Song <21cnbao@gmail.com>:
-> From: Hao Liu <Hao.Liu@csr.com>
->
-> according to HW spec, we have to disable counter before setting
-> it, if we don't this, in pressure test, sometimes the timer might
-> not generate interrupt any more.
->
-> and this patch also fixes a typo for register set by changing 0x7
-> to 0x3. 0x7 is loop mode in HW, but here we are using oneshot 0x3.
->
-> Signed-off-by: Hao Liu <Hao.Liu@csr.com>
-> Signed-off-by: Barry Song <Baohua.Song@csr.com>
+On Fri, Aug 15, 2014 at 08:50:29PM +0100, Geoff Levand wrote:
+> Add entries for the new device tree property cpu-return-addr to the
+> existing arm64 dts files.
+> 
+> Signed-off-by: Geoff Levand <geoff@infradead.org>
 > ---
+> 
+> Just FYI.
+> 
+>  arch/arm64/boot/dts/apm-storm.dtsi     | 8 ++++++++
+>  arch/arm64/boot/dts/foundation-v8.dts  | 4 ++++
+>  arch/arm64/boot/dts/rtsm_ve-aemv8a.dts | 4 ++++
+>  3 files changed, 16 insertions(+)
+> 
+> diff --git a/arch/arm64/boot/dts/apm-storm.dtsi b/arch/arm64/boot/dts/apm-storm.dtsi
+> index 40aa96c..c40e25f 100644
+> --- a/arch/arm64/boot/dts/apm-storm.dtsi
+> +++ b/arch/arm64/boot/dts/apm-storm.dtsi
+> @@ -25,6 +25,7 @@
+>  			reg = <0x0 0x000>;
+>  			enable-method = "spin-table";
+>  			cpu-release-addr = <0x1 0x0000fff8>;
+> +			cpu-return-addr = <0x0 0x0>; /* Updated by bootloader */
 
-Hi Daniel,
-did you miss this one?
+Following from the way we handle PSCI in the bootwrapper, if we were to
+support these I expect we'd inject the proeprties entirely. So there's
+no need to have a property with an invalid value here -- the property
+should be valid if present (consider that zero could be a valid PA to
+jump back to).
 
->  drivers/clocksource/timer-marco.c |    5 ++++-
->  1 file changed, 4 insertions(+), 1 deletion(-)
->
-> diff --git a/drivers/clocksource/timer-marco.c b/drivers/clocksource/timer-marco.c
-> index 330e930..caf7a20 100644
-> --- a/drivers/clocksource/timer-marco.c
-> +++ b/drivers/clocksource/timer-marco.c
-> @@ -63,7 +63,7 @@ static inline void sirfsoc_timer_count_disable(int idx)
->  /* enable count and interrupt */
->  static inline void sirfsoc_timer_count_enable(int idx)
->  {
-> -       writel_relaxed(readl_relaxed(sirfsoc_timer_base + SIRFSOC_TIMER_32COUNTER_0_CTRL + 4 * idx) | 0x7,
-> +       writel_relaxed(readl_relaxed(sirfsoc_timer_base + SIRFSOC_TIMER_32COUNTER_0_CTRL + 4 * idx) | 0x3,
->                 sirfsoc_timer_base + SIRFSOC_TIMER_32COUNTER_0_CTRL + 4 * idx);
->  }
->
-> @@ -103,6 +103,9 @@ static int sirfsoc_timer_set_next_event(unsigned long delta,
->  {
->         int cpu = smp_processor_id();
->
-> +       /* disable timer first, then modify the related registers */
-> +       sirfsoc_timer_count_disable(cpu);
-> +
->         writel_relaxed(0, sirfsoc_timer_base + SIRFSOC_TIMER_COUNTER_0 +
->                 4 * cpu);
->         writel_relaxed(delta, sirfsoc_timer_base + SIRFSOC_TIMER_MATCH_0 +
-> --
-> 1.7.9.5
->
-
--barry
+Cheers,
+Mark.
