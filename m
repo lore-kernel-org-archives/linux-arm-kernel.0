@@ -1,34 +1,189 @@
-From: joro@8bytes.org (joro at 8bytes.org)
-Date: Mon, 18 Aug 2014 23:26:27 +0200
-Subject: [PATCH v5 1/1] iommu-api: Add map_sg/unmap_sg functions
-In-Reply-To: <53F266AE.40303@codeaurora.org>
-References: <1407797150-515-1-git-send-email-ohaugan@codeaurora.org>
- <1407797150-515-2-git-send-email-ohaugan@codeaurora.org>
- <871tsm5vcn.fsf@nvidia.com>
- <CAF6AEGvZUanVtPxAt76+AAdOaNwyMJ3cmcJ1srsEYBeG7ELkBQ@mail.gmail.com>
- <53EA472B.3020900@codeaurora.org>
- <20140818140730.GC9809@8bytes.org>
- <CAF6AEGtGmAQjMc5W5a6x5QiyUc8v0XHcsNAFe65Znc=DDKPS+w@mail.gmail.com>
- <53F266AE.40303@codeaurora.org>
-Message-ID: <20140818212627.GI9809@8bytes.org>
+From: liviu@dudau.co.uk (Liviu Dudau)
+Date: Mon, 18 Aug 2014 22:26:59 +0100
+Subject: [PATCH v9 02/12] PCI: OF: Parse and map the IRQ when adding the
+ PCI device.
+In-Reply-To: <20140818014404.GA11354@richard>
+References: <1407860725-25202-1-git-send-email-Liviu.Dudau@arm.com>
+ <1407860725-25202-3-git-send-email-Liviu.Dudau@arm.com>
+ <20140814145804.GA5586@richard>
+ <20140814154959.GG25761@e106497-lin.cambridge.arm.com>
+ <20140815085632.GA4954@richard>
+ <20140815103052.GD27553@e106497-lin.cambridge.arm.com>
+ <20140818014404.GA11354@richard>
+Message-ID: <20140818212659.GA13147@bart.dudau.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 18, 2014 at 01:48:46PM -0700, Olav Haugan wrote:
-> On 8/18/2014 11:32 AM, Rob Clark wrote:
+On Mon, Aug 18, 2014 at 09:44:04AM +0800, Wei Yang wrote:
+> On Fri, Aug 15, 2014 at 11:30:52AM +0100, Liviu Dudau wrote:
+> >On Fri, Aug 15, 2014 at 09:56:32AM +0100, Wei Yang wrote:
+> >> On Thu, Aug 14, 2014 at 04:49:59PM +0100, Liviu Dudau wrote:
+> >> >On Thu, Aug 14, 2014 at 03:58:04PM +0100, Wei Yang wrote:
+> >> >> On Tue, Aug 12, 2014 at 05:25:15PM +0100, Liviu Dudau wrote:
+> >> >> >Enhance the default implementation of pcibios_add_device() to
+> >> >> >parse and map the IRQ of the device if a DT binding is available.
+> >> >> >
+> >> >> >Cc: Bjorn Helgaas <bhelgaas@google.com>
+> >> >> >Cc: Grant Likely <grant.likely@linaro.org>
+> >> >> >Cc: Rob Herring <robh+dt@kernel.org>
+> >> >> >Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
+> >> >> >---
+> >> >> > drivers/pci/pci.c | 3 +++
+> >> >> > 1 file changed, 3 insertions(+)
+> >> >> >
+> >> >> >diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
+> >> >> >index 1c8592b..29d1775 100644
+> >> >> >--- a/drivers/pci/pci.c
+> >> >> >+++ b/drivers/pci/pci.c
+> >> >> >@@ -17,6 +17,7 @@
+> >> >> > #include <linux/spinlock.h>
+> >> >> > #include <linux/string.h>
+> >> >> > #include <linux/log2.h>
+> >> >> >+#include <linux/of_pci.h>
+> >> >> > #include <linux/pci-aspm.h>
+> >> >> > #include <linux/pm_wakeup.h>
+> >> >> > #include <linux/interrupt.h>
+> >> >> >@@ -1453,6 +1454,8 @@ EXPORT_SYMBOL(pcim_pin_device);
+> >> >> >  */
+> >> >> > int __weak pcibios_add_device(struct pci_dev *dev)
+> >> >> > {
+> >> >> >+	dev->irq = of_irq_parse_and_map_pci(dev, 0, 0);
+> >> >> >+
+> >> >> > 	return 0;
+> >> >> > }
+> >> >> 
+> >> >> Liviu,
+> >> >> 
+> >> >> For this, my suggestion is to add arch dependent function to setup the irq
+> >> >> line for pci devices. I can't find an obvious reason this won't work on other
+> >> >> archs, but maybe this will hurt some of them?
+> >> >
+> >> >Hi Wei,
+> >> >
+> >> >I'm not sure I understand your point. Architectures that support OF will obviously
+> >> >benefit from this common approach, and for the other ones the function is empty
+> >> >so it will not change existing behaviour. If you are suggesting that I should
+> >> >create a new API that each architecture could go and implement for setting up the
+> >> >IRQ line then I would agree that it would be nice to have that, but the question
+> >> >is how many architectures are outside OF that need this?
+> >> 
+> >> My suggestion is to define the pcibios_add_device() for arm arch, like the one
+> >> in arch/powerpc/kernel/pci-common.c. If my understanding is correct, this
+> >> patch set address the pci bus setup mostly on arm arch.
+> >
+> >And also arm64 at the least.
+> >
+> >> 
+> >> For those archs not support OF, this function is empty and has no effect. I
+> >> agree on this one.
+> >> 
+> >> For those archs rely on OF, we still have two cases:
+> >>     1. they would have implement this function like powerpc
+> >
+> >Actually, powerpc seems to be the only OF platform reimplementing this function.
+> >s390 and x86 are not OF platforms.
+> >
+> >>     2. have other way to fix it up,  otherwise how it works now?
+> >
+> >Don't forget that my patchset aims to replace existing house-made code with a more
+> >generic version. When architectures and platforms switch to my code they will have
+> >to add this back in their code if it's needed.
+> >
+> >> If my assumption is correct, this change will either have no effect, or fix up
+> >> the irq line the second time. Not harmful, but not necessary.
+> >
+> >Well, it will become necessary as old code gets dismantled and converted towards
+> >this patchset. To give you an example that I'm familiar with, for arch/arm the
+> >host bridge drivers have moved into drivers/pci/host, but they still depend/use
+> >the bios32 infrastructure that takes care of setting up the irq. When they switch
+> >to my version they would have to go and debug the "irq not being assigned" issue
+> >and it is quite likely that some of the people doing the conversion will complain
+> >about my code rather than understanding the issue. What I'm trying to do is to
+> >make switching to my patchset as painless as possible, with a cleanup to remove
+> >redundant operations coming after the switchover.
+> >
+> 
+> This means this is a temporary version for the switchover period and will be
+> reverted after switchover?
 
-> No, I do not have other uses right now. But could imagine use cases like
-> "force <insert minimum mapping size here> mapping" flag etc.
+At least one of the redundant operations will be removed. Most likely the one
+in the arch code or in the driver. Do you have any concerns with that idea?
 
-I think it is worth discussing to add a flush() function to the
-IOMMU-API. I sent a patch-set myself a few years ago introducing an
-iommu_commit() function with the same semantics, but this is
-out-of-scope for this patch-set.
+Best regards,
+Liviu
 
-Also adding a flag parameter to iommu_map_sg would introduce an
-asymentrie in the API to the iommu_map() function. So please leave it
-out for this patch-set, when we really need a flag parameter someday we
-can introduce it for iommu_map() and iommu_map_sg() together.
+> 
+> >Does that sound like a reasonable plan?
+> >
+> >Best regards,
+> >Liviu
+> >
+> >> 
+> >> I am not familiar with other arch, so the second case is my deduction. If this
+> >> is not correct, please let me know.
+> >> 
+> >> >
+> >> >If I understood you correctly, it is a nice idea but slightly outside the scope
+> >> >of my current patchset.
+> >> >
+> >> >Best regards,
+> >> >Liviu
+> >> >
+> >> >> 
+> >> >> >
+> >> >> >-- 
+> >> >> >2.0.4
+> >> >> >
+> >> >> >--
+> >> >> >To unsubscribe from this list: send the line "unsubscribe linux-pci" in
+> >> >> >the body of a message to majordomo at vger.kernel.org
+> >> >> >More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> >> >> 
+> >> >> -- 
+> >> >> Richard Yang
+> >> >> Help you, Help me
+> >> >> 
+> >> >> --
+> >> >> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
+> >> >> the body of a message to majordomo at vger.kernel.org
+> >> >> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> >> >> 
+> >> >
+> >> 
+> >> -- 
+> >> Richard Yang
+> >> Help you, Help me
+> >> 
+> >> 
+> >
+> >-- 
+> >====================
+> >| I would like to |
+> >| fix the world,  |
+> >| but they're not |
+> >| giving me the   |
+> > \ source code!  /
+> >  ---------------
+> >    ?\_(?)_/?
+> 
+> -- 
+> Richard Yang
+> Help you, Help me
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
 
+-- 
+-------------------
+   .oooO
+   (   )
+    \ (  Oooo.
+     \_) (   )
+          ) /
+         (_/
 
-	Joerg
+ One small step
+   for me ...
