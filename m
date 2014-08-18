@@ -1,75 +1,21 @@
 From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 18 Aug 2014 15:24:49 +0100
-Subject: [PATCH] arm64: ignore DT memreserve entries when booting in UEFI
- mode
-In-Reply-To: <20140813122239.GA15356@bivouac.eciton.net>
-References: <1406570583-22848-1-git-send-email-leif.lindholm@linaro.org>
- <20140728181449.GF2576@leverpostej>
- <20140813122239.GA15356@bivouac.eciton.net>
-Message-ID: <20140818142449.GM20043@localhost>
+Date: Mon, 18 Aug 2014 15:26:22 +0100
+Subject: [PATCH v9 00/12] Support for creating generic PCI host bridges
+ from DT
+In-Reply-To: <1407860725-25202-1-git-send-email-Liviu.Dudau@arm.com>
+References: <1407860725-25202-1-git-send-email-Liviu.Dudau@arm.com>
+Message-ID: <20140818142622.GP20043@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 13, 2014 at 01:22:39PM +0100, Leif Lindholm wrote:
-> On Mon, Jul 28, 2014 at 07:14:49PM +0100, Mark Rutland wrote:
-> > On Mon, Jul 28, 2014 at 07:03:03PM +0100, Leif Lindholm wrote:
-> > > UEFI provides its own method for marking regions to reserve, via the
-> > > memory map which is also used to initialise memblock. So when using the
-> > > UEFI memory map, ignore any memreserve entries present in the DT.
-> > 
-> > It's worth noting that no-one is relying on this at present, and were
-> > they it would imply that their UEFI implementation is broken (providing
-> > a dodgy memory map).
-> > 
-> > So before people start doing dodgy things, let's, close that hole. If we
-> > need a way of modifying the memory map we should come up with a more
-> > general plan.
-> 
-> Catalin - any comments?
-> As it is a bugfix, can it go into 3.17?
+On Tue, Aug 12, 2014 at 05:25:13PM +0100, Liviu Dudau wrote:
+> This is my updated attempt at adding support for generic PCI host
+> bridge controllers that make use of device tree information to
+> configure themselves. This version incorporates Catalin's proposal
+> for managing domain numbers that got Bjorn's approval. I am now requesting
+> ACKs from the relevant maintainers as I would like to get the upstream ball
+> rolling.
 
-It looks fine to me:
+As this series kept me busy on a long flight, you can add:
 
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
-
-(cc'ing Will who handles the 3.17 merging)
-
-> > > Reported-by: Mark Rutland <mark.rutland@arm.com>
-> > > Signed-off-by: Leif Lindholm <leif.lindholm@linaro.org>
-> > > ---
-> > >  arch/arm64/kernel/efi.c |    2 ++
-> > >  arch/arm64/mm/init.c    |    4 +++-
-> > >  2 files changed, 5 insertions(+), 1 deletion(-)
-> > > 
-> > > diff --git a/arch/arm64/kernel/efi.c b/arch/arm64/kernel/efi.c
-> > > index 14db1f6..7ad17b2 100644
-> > > --- a/arch/arm64/kernel/efi.c
-> > > +++ b/arch/arm64/kernel/efi.c
-> > > @@ -188,6 +188,8 @@ static __init void reserve_regions(void)
-> > >  		if (uefi_debug)
-> > >  			pr_cont("\n");
-> > >  	}
-> > > +
-> > > +	set_bit(EFI_MEMMAP, &efi.flags);
-> > >  }
-> > >  
-> > >  
-> > > diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
-> > > index e90c542..58dbf2e 100644
-> > > --- a/arch/arm64/mm/init.c
-> > > +++ b/arch/arm64/mm/init.c
-> > > @@ -32,6 +32,7 @@
-> > >  #include <linux/of_fdt.h>
-> > >  #include <linux/dma-mapping.h>
-> > >  #include <linux/dma-contiguous.h>
-> > > +#include <linux/efi.h>
-> > >  
-> > >  #include <asm/sections.h>
-> > >  #include <asm/setup.h>
-> > > @@ -151,7 +152,8 @@ void __init arm64_memblock_init(void)
-> > >  	memblock_reserve(__pa(swapper_pg_dir), SWAPPER_DIR_SIZE);
-> > >  	memblock_reserve(__pa(idmap_pg_dir), IDMAP_DIR_SIZE);
-> > >  
-> > > -	early_init_fdt_scan_reserved_mem();
-> > > +	if (!efi_enabled(EFI_MEMMAP))
-> > > +		early_init_fdt_scan_reserved_mem();
+Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
