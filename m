@@ -1,62 +1,35 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue, 19 Aug 2014 00:51:50 +0800
-Subject: [PATCH v2 1/2] ARM: dts: sun8i: Add i2c controller nodes
-In-Reply-To: <1408380711-26308-1-git-send-email-wens@csie.org>
-References: <1408380711-26308-1-git-send-email-wens@csie.org>
-Message-ID: <1408380711-26308-2-git-send-email-wens@csie.org>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Mon, 18 Aug 2014 11:54:19 -0500
+Subject: [PATCHv10 3/5] ARM: dts: exynos: unuse the slot-node and deprecate
+ the supports-highspeed for dw-mmc
+In-Reply-To: <53F20955.2050806@suse.de>
+References: <1407397082-32495-1-git-send-email-jh80.chung@samsung.com>
+ <1407397082-32495-4-git-send-email-jh80.chung@samsung.com>
+ <53F1F027.7060609@samsung.com> <53F20955.2050806@suse.de>
+Message-ID: <53F22FBB.4010801@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add nodes for the 3 i2c controllers found on A23 SoCs to the sun8i DTSI.
+On 08/18/14 09:10, Andreas F?rber wrote:
+> Hi Jaehoon,
+>
+> Am 18.08.2014 14:23, schrieb Jaehoon Chung:
+>> Socfpga and Rockchip were queued into each SoC tree.
+>> I want to know whether this patch is queued or not into Samsung-Soc tree.
+>> Do you have any other plan for this patch?
+>
+> It isn't applied in his tree:
+>
+> http://git.kernel.org/cgit/linux/kernel/git/kgene/linux-samsung.git/
+>
+> In fact Kukjin has not applied any patches for 3 weeks now, which likely
+> means he's on vacation. I am hoping he will review this and the other
+> pending conflicting patches to decide on a merge order and fix any
+> trivial conflicts himself. ;)
+>
+Oh, I thought it has been queued in previous merge window with my ack.
 
-Signed-off-by: Chen-Yu Tsai <wens@csie.org>
----
- arch/arm/boot/dts/sun8i-a23.dtsi | 33 +++++++++++++++++++++++++++++++++
- 1 file changed, 33 insertions(+)
+OK, I've applied this in my tree for 3.18.
 
-diff --git a/arch/arm/boot/dts/sun8i-a23.dtsi b/arch/arm/boot/dts/sun8i-a23.dtsi
-index 9386d1f..2ec86d36 100644
---- a/arch/arm/boot/dts/sun8i-a23.dtsi
-+++ b/arch/arm/boot/dts/sun8i-a23.dtsi
-@@ -387,6 +387,39 @@
- 			status = "disabled";
- 		};
- 
-+		i2c0: i2c at 01c2ac00 {
-+			compatible = "allwinner,sun6i-a31-i2c";
-+			reg = <0x01c2ac00 0x400>;
-+			interrupts = <0 6 4>;
-+			clocks = <&apb2_gates 0>;
-+			resets = <&apb2_rst 0>;
-+			status = "disabled";
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+		};
-+
-+		i2c1: i2c at 01c2b000 {
-+			compatible = "allwinner,sun6i-a31-i2c";
-+			reg = <0x01c2b000 0x400>;
-+			interrupts = <0 7 4>;
-+			clocks = <&apb2_gates 1>;
-+			resets = <&apb2_rst 1>;
-+			status = "disabled";
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+		};
-+
-+		i2c2: i2c at 01c2b400 {
-+			compatible = "allwinner,sun6i-a31-i2c";
-+			reg = <0x01c2b400 0x400>;
-+			interrupts = <0 8 4>;
-+			clocks = <&apb2_gates 2>;
-+			resets = <&apb2_rst 2>;
-+			status = "disabled";
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+		};
-+
- 		gic: interrupt-controller at 01c81000 {
- 			compatible = "arm,cortex-a7-gic", "arm,cortex-a15-gic";
- 			reg = <0x01c81000 0x1000>,
--- 
-2.1.0
+Thanks,
+Kukjin
