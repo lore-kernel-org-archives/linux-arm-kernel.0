@@ -1,25 +1,24 @@
-From: heikki.krogerus@linux.intel.com (Heikki Krogerus)
-Date: Mon, 18 Aug 2014 16:57:37 +0300
-Subject: [PATCH 06/15] tty: serial: 8250_dma: handle error on TX submit
-In-Reply-To: <1408124563-31541-7-git-send-email-bigeasy@linutronix.de>
-References: <1408124563-31541-1-git-send-email-bigeasy@linutronix.de>
- <1408124563-31541-7-git-send-email-bigeasy@linutronix.de>
-Message-ID: <20140818135737.GB32400@xps8300>
+From: broonie@kernel.org (Mark Brown)
+Date: Mon, 18 Aug 2014 08:57:38 -0500
+Subject: [PATCH v6 4/6] mfd: Add hi6421 PMIC core driver
+In-Reply-To: <1408367356-2628-5-git-send-email-guodong.xu@linaro.org>
+References: <1408367356-2628-1-git-send-email-guodong.xu@linaro.org>
+ <1408367356-2628-5-git-send-email-guodong.xu@linaro.org>
+Message-ID: <20140818135738.GV14537@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 15, 2014 at 07:42:34PM +0200, Sebastian Andrzej Siewior wrote:
-> diff --git a/include/linux/serial_8250.h b/include/linux/serial_8250.h
-> index b161eee..02e82dc 100644
-> --- a/include/linux/serial_8250.h
-> +++ b/include/linux/serial_8250.h
-> @@ -85,6 +85,7 @@ struct uart_8250_port {
->  	unsigned char		mcr_force;	/* mask of forced bits */
->  	unsigned char		cur_iotype;	/* Running I/O type */
->  	unsigned char		rpm_tx_active;
-> +	unsigned char		dma_tx_err;
+On Mon, Aug 18, 2014 at 09:09:14PM +0800, Guodong Xu wrote:
+> This adds driver to support HiSilicon Hi6421 PMIC. Hi6421 includes multi-
+> functions, such as regulators, codec, ADCs, Coulomb counter, etc.
+> This driver includes core APIs _only_.
 
-Why not make this member of uart_8250_dma instead?
-
--- 
-heikki
+Please don't resend already applied patches, if there are any updates
+that need applying please send incremental patches.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140818/b093e459/attachment.sig>
