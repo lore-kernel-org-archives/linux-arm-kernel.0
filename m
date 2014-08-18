@@ -1,155 +1,63 @@
-From: geoff@infradead.org (Geoff Levand)
-Date: Mon, 18 Aug 2014 11:56:52 -0700
-Subject: [PATCH v2 08/18] ARM64 / ACPI: Get the enable method for SMP
- initialization in ACPI way
-In-Reply-To: <1407166105-17675-9-git-send-email-hanjun.guo@linaro.org>
-References: <1407166105-17675-1-git-send-email-hanjun.guo@linaro.org>
- <1407166105-17675-9-git-send-email-hanjun.guo@linaro.org>
-Message-ID: <1408388212.22761.100.camel@smoke>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 18 Aug 2014 20:58:10 +0200
+Subject: [PATCH v4 2/2] mtd: nand: add sunxi NFC dt bindings doc
+In-Reply-To: <1408382788-32153-3-git-send-email-boris.brezillon@free-electrons.com>
+References: <1408382788-32153-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1408382788-32153-3-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <20140818185810.GG15297@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Hanjun,
+Hi Boris,
 
-On Mon, 2014-08-04 at 23:28 +0800, Hanjun Guo wrote:
-> --- a/arch/arm64/include/asm/acpi.h
-> +++ b/arch/arm64/include/asm/acpi.h
-> @@ -14,6 +14,27 @@
->  
->  /* Basic configuration for ACPI */
->  #ifdef	CONFIG_ACPI
-
-By having this preprocessor conditional in the header leads
-to a proliferation of preprocessor conditionals since any
-code that includes this header will also need to have
-preprocessor conditionals.  Another down side of having
-this is that this code will not get a build test for
-builds with CONFIG_ACPI=n.
-
-> +/*
-> + * ACPI 5.1 only has two explicit methods to
-> + * boot up SMP, PSCI and Parking protocol,
-> + * but the Parking protocol is only defined
-> + * for ARMv7 now, so make PSCI as the only
-> + * way for the SMP boot protocol before some
-> + * updates for the ACPI spec or the Parking
-> + * protocol spec.
-> + *
-> + * This enum is intend to make the boot method
-> + * scalable when above updates are happended,
-> + * which NOT means to support all of them.
-> + */
-> +enum acpi_smp_boot_protocol {
-> +	ACPI_SMP_BOOT_PSCI,
-> +	ACPI_SMP_BOOT_PARKING_PROTOCOL,
-> +	ACPI_SMP_BOOT_PROTOCOL_MAX
-> +};
+On Mon, Aug 18, 2014 at 07:26:28PM +0200, Boris BREZILLON wrote:
+> Add the sunxi NAND Flash Controller dt bindings documentation.
+> 
+> Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
+> ---
+>  .../devicetree/bindings/mtd/sunxi-nand.txt         | 45 ++++++++++++++++++++++
+>  1 file changed, 45 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/mtd/sunxi-nand.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/mtd/sunxi-nand.txt b/Documentation/devicetree/bindings/mtd/sunxi-nand.txt
+> new file mode 100644
+> index 0000000..798c691
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/mtd/sunxi-nand.txt
+> @@ -0,0 +1,45 @@
+> +Allwinner NAND Flash Controller (NFC)
 > +
-> +enum acpi_smp_boot_protocol smp_boot_protocol(void);
+> +Required properties:
+> +- compatible : "allwinner,sun4i-nand".
 
-The name smp_boot_protocol() seems like it would be a generic
-routine, but it is acpi specific.  Maybe:
+The pattern we usually have for the sunxi SoCs is
+allwinner,family-soc-*, which would be allwinner,sun4i-a10-nand in
+this case.
 
-enum acpi_boot_protocol_type {...};
+> +- reg : shall contain registers location and length for data and reg.
+> +- interrupts : shall define the nand controller interrupt.
+> +- #address-cells: shall be set to 1. Encode the nand CS.
+> +- #size-cells : shall be set to 0.
+> +- clocks : shall reference nand controller clocks.
+> +- clock-names : nand controller internal clock names. Shall contain :
+> +    * "ahb_clk" : AHB gating clock
+> +    * "sclk" : nand controller clock
 
-enum acpi_boot_protocol_type acpi_boot_protocol(void);
+And we're usually using "ahb" and "mod" in such a case.
 
-> --- a/arch/arm64/kernel/cpu_ops.c
-> +++ b/arch/arm64/kernel/cpu_ops.c
-> @@ -49,12 +51,44 @@ static const struct cpu_operations * __init cpu_get_ops(const char *name)
->  	return NULL;
->  }
->  
-> +#ifdef CONFIG_ACPI
-> +/*
-> + * Get a cpu's boot method in the ACPI way.
-> + */
-> +static char * __init acpi_get_cpu_boot_method(void)
-> +{
-> +	/*
-> +	 * For ACPI 5.1, only two kind of methods are provided,
-> +	 * Parking protocol and PSCI, but Parking protocol is
-> +	 * specified for ARMv7 only, so make PSCI as the only method
-> +	 * for SMP initialization before the ACPI spec or Parking
-> +	 * protocol spec is updated.
-> +	 */
-> +	switch (smp_boot_protocol()) {
-> +	case ACPI_SMP_BOOT_PSCI:
-> +		return "psci";
-> +	case ACPI_SMP_BOOT_PARKING_PROTOCOL:
-> +	default:
-> +		return NULL;
-> +	}
-> +}
-> +#else
-> +static inline char * __init acpi_get_cpu_boot_method(void) { return NULL; }
-> +#endif
+It looks fine otherwise.
 
-Since this is inside a C source file, the inline keyword
-isn't needed since the optimizer will inline regardless.
+Thanks!
+Maxime
 
-With that said, I think it would be cleaner to have this
-as:
-
-static char * __init acpi_get_cpu_boot_method(void)
-{
-#ifdef CONFIG_ACPI
-	return NULL;
-#else
- ...
-#endif
-}
-
-Or better to make smp_boot_protocol() callable regardless
-of CONFIG_ACPI and then no preprocessor conditionals at all
-would be needed.
-
-> +
->  /*
-> - * Read a cpu's enable method from the device tree and record it in cpu_ops.
-> + * Read a cpu's enable method and record it in cpu_ops.
->   */
->  int __init cpu_read_ops(struct device_node *dn, int cpu)
->  {
-> -	const char *enable_method = of_get_property(dn, "enable-method", NULL);
-> +	const char *enable_method;
-> +
-> +	if (!acpi_disabled) {
-> +		enable_method = acpi_get_cpu_boot_method();
-> +		goto get_ops;
-> +	}
-> +
-> +	enable_method = of_get_property(dn, "enable-method", NULL);
->  	if (!enable_method) {
->  		/*
->  		 * The boot CPU may not have an enable method (e.g. when
-> @@ -66,10 +100,17 @@ int __init cpu_read_ops(struct device_node *dn, int cpu)
->  		return -ENOENT;
->  	}
->  
-> +get_ops:
->  	cpu_ops[cpu] = cpu_get_ops(enable_method);
->  	if (!cpu_ops[cpu]) {
-> -		pr_warn("%s: unsupported enable-method property: %s\n",
-> -			dn->full_name, enable_method);
-> +		if (acpi_disabled) {
-> +			pr_warn("%s: unsupported enable-method property: %s\n",
-> +				dn->full_name, enable_method);
-> +		} else {
-> +			pr_warn("CPU %d: boot protocol unsupported or unknown\n",
-> +				cpu);
-> +		}
-> +
-
-Can't we have this more integrated, maybe something like this?
-
-	enable_method = acpi_disabled ? of_get_property(dn, "enable-method", NULL)
-		: acpi_get_cpu_boot_method();
-	message = acpi_disabled ? dn->full_name : "";
-
-	...
-	
-	pr_warn("CPU %d: %s unsupported enable-method property: %s\n",
-				cpu, message, enable_method)
-
--Geoff
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140818/8f7c5ae4/attachment.sig>
