@@ -1,38 +1,49 @@
-From: graeme.gregory@linaro.org (Graeme Gregory)
-Date: Mon, 18 Aug 2014 19:11:49 +0100
-Subject: [Linaro-acpi] [PATCH v2 00/18] Introduce ACPI for ARM64 based on
- ACPI 5.1
-In-Reply-To: <CAJRNFKJtbfYEkYWcyXPOfRU9D4MVhabn5X1ZumZMSQFQ=S=j5g@mail.gmail.com>
-References: <1407166105-17675-1-git-send-email-hanjun.guo@linaro.org>
- <CAJRNFK+UfJhGR65tOecy=X+YdHQHiNPZ4p_p8LUxhRL3GW5gFw@mail.gmail.com>
- <53E050B2.2080609@linaro.org>
- <CAJRNFKJtbfYEkYWcyXPOfRU9D4MVhabn5X1ZumZMSQFQ=S=j5g@mail.gmail.com>
-Message-ID: <20140818181149.GG2094@xora-yoga-deb.xora.org.uk>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Mon, 18 Aug 2014 12:40:12 -0500
+Subject: [PATCHv10 3/5] ARM: dts: exynos: unuse the slot-node and deprecate
+ the supports-highspeed for dw-mmc
+In-Reply-To: <53F23283.8040303@suse.de>
+References: <1407397082-32495-1-git-send-email-jh80.chung@samsung.com>
+ <1407397082-32495-4-git-send-email-jh80.chung@samsung.com>
+ <53F1F027.7060609@samsung.com> <53F20955.2050806@suse.de>
+ <53F22FBB.4010801@samsung.com> <53F23283.8040303@suse.de>
+Message-ID: <53F23A7C.3060404@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 18, 2014 at 07:08:59PM +0200, Alexander Spyridakis wrote:
-> > Yes, I think so. If you meet any problem , please let us know, and we will
-> > update the wiki.
-> >
-> >>
-> >> Should I assume that UEFI is mandatory (alternative being the aarch64
-> >> bootwrapper), as described in Documentation/arm64/arm-acpi.txt?
-> >
-> > Yes, UEFI is mandatory if you want to use ACPI.
-> 
-> Hello Hanjun,
-> 
-> What tables do you use for the foundation model (or AEMv8)?
-> 
-> The ones found in this repository:
-> git://git.linaro.org/leg/acpi/acpi-asl.git are ACPIv5.0, and when the
-> kernel gets pointed to them acpi is disabled because it expects an
-> FADT v5.1 or later. Of course building these tables with latest ACPICA
-> also fails.
-> 
-I updated that repository to ACPI 5.1 approximately 4 hours ago.
+On 08/18/14 12:06, Andreas F?rber wrote:
+> Am 18.08.2014 18:54, schrieb Kukjin Kim:
+>> On 08/18/14 09:10, Andreas F?rber wrote:
+>>> Hi Jaehoon,
+>>>
+>>> Am 18.08.2014 14:23, schrieb Jaehoon Chung:
+>>>> Socfpga and Rockchip were queued into each SoC tree.
+>>>> I want to know whether this patch is queued or not into Samsung-Soc
+>>>> tree.
+>>>> Do you have any other plan for this patch?
+>>>
+>>> It isn't applied in his tree:
+>>>
+>>> http://git.kernel.org/cgit/linux/kernel/git/kgene/linux-samsung.git/
+>>>
+>>> In fact Kukjin has not applied any patches for 3 weeks now, which likely
+>>> means he's on vacation. I am hoping he will review this and the other
+>>> pending conflicting patches to decide on a merge order and fix any
+>>> trivial conflicts himself. ;)
+>>>
+>> Oh, I thought it has been queued in previous merge window with my ack.
+>>
+>> OK, I've applied this in my tree for 3.18.
+>
+> So, are you dropping the snow mmc pinctrl patch Doug asked you to queue
+> before this one, and are you merging this with my exynos5250
+> cros-common/style cleanups yourself or do I need yet another respin?
+>
+Hi Andreas,
 
-If you re-fetch you should see 5.1 tables for foundation model.
+Thanks for your gentle reminder and I think I can handle it when I apply 
+it in my tree :)
 
-Graeme
+Note I will check them today and if any problems, I'll let you know.
+
+- Kukjin
