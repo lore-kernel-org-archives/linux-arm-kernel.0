@@ -1,100 +1,20 @@
-From: vinceh@nvidia.com (Vince Hsu)
-Date: Mon, 18 Aug 2014 14:08:08 +0800
-Subject: [PATCH v2 05/16] clk: tegra: Add closed loop support for the DFLL
-In-Reply-To: <1405957142-19416-6-git-send-email-ttynkkynen@nvidia.com>
-References: <1405957142-19416-1-git-send-email-ttynkkynen@nvidia.com>
- <1405957142-19416-6-git-send-email-ttynkkynen@nvidia.com>
-Message-ID: <53F19848.7020303@nvidia.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Mon, 18 Aug 2014 14:11:29 +0800
+Subject: [PATCH 1/2] ARM: dts: imx28: add pinmuxing for mmc1
+In-Reply-To: <1407489862-6358-1-git-send-email-u.kleine-koenig@pengutronix.de>
+References: <1407489862-6358-1-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <20140818061128.GB2114@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On 07/21/2014 11:38 PM, Tuomas Tynkkynen wrote:
-> With closed loop support, the clock rate of the DFLL can be adjusted.
->
-> The oscillator itself in the DFLL is a free-running oscillator whose
-> rate is directly determined the supply voltage. However, the DFLL
-> module contains logic to compare the DFLL output rate to a fixed
-> reference clock (51 MHz) and make a decision to either lower or raise
-> the DFLL supply voltage. The DFLL module can then autonomously change
-> the supply voltage by communicating with an off-chip PMIC via either I2C
-> or PWM signals. This driver currently supports only I2C.
->
-> Signed-off-by: Tuomas Tynkkynen <ttynkkynen@nvidia.com>
+On Fri, Aug 08, 2014 at 11:24:21AM +0200, Uwe Kleine-K?nig wrote:
+> From: Marc Kleine-Budde <mkl@pengutronix.de>
+> 
+> Signed-off-by: Marc Kleine-Budde <mkl@pengutronix.de>
+> [ukl: rebase from ancient kernel version]
+> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
 > ---
-> v2 changes:
->      - query the various properties required for I2C mode from the
->        regulator framework
->
->   drivers/clk/tegra/clk-dfll.c | 656 ++++++++++++++++++++++++++++++++++++++++++-
->   1 file changed, 653 insertions(+), 3 deletions(-)
->
-> diff --git a/drivers/clk/tegra/clk-dfll.c b/drivers/clk/tegra/clk-dfll.c
-> index d83e859..0d4b2dd 100644
-> --- a/drivers/clk/tegra/clk-dfll.c
-> +++ b/drivers/clk/tegra/clk-dfll.c
-> @@ -205,12 +205,16 @@
-...
-> +
-> +/**
-> + * dfll_calculate_rate_request - calculate DFLL parameters for a given rate
-> + * @td: DFLL instance
-> + * @req: DFLL-rate-request structure
-> + * @rate: the desired DFLL rate
-> + *
-> + * Populate the DFLL-rate-request record @req fields with the scale_bits
-> + * and mult_bits fields, based on the target input rate. Returns 0 upon
-> + * success, or -EINVAL if the requested rate in req->rate is too high
-> + * or low for the DFLL to generate.
-> + */
-> +static int dfll_calculate_rate_request(struct tegra_dfll *td,
-> +				       struct dfll_rate_req *req,
-> +				       unsigned long rate)
-> +{
-> +	u32 val;
-> +
-> +	/*
-> +	 * If requested rate is below the minimum DVCO rate, active the scaler.
-> +	 * In the future the DVCO minimum voltage should be selected based on
-> +	 * chip temperature and the actual minimum rate should be calibrated
-> +	 * at runtime.
-> +	 */
-> +	req->scale_bits = DFLL_FREQ_REQ_SCALE_MAX - 1;
-> +	if (rate < td->dvco_rate_min) {
-> +		int scale;
-> +
-> +		scale = DIV_ROUND_CLOSEST(rate / 1000 * DFLL_FREQ_REQ_SCALE_MAX,
-> +					  td->dvco_rate_min / 1000);
-> +		if (!scale) {
-> +			dev_err(td->dev, "%s: Rate %lu is too low\n",
-> +				__func__, rate);
-> +			return -EINVAL;
-> +		}
-> +		req->scale_bits = scale - 1;
-> +		rate = td->dvco_rate_min;
-> +	}
-> +
-> +	/* Convert requested rate into frequency request and scale settings */
-> +	val = DVCO_RATE_TO_MULT(rate, td->ref_rate);
-> +	if (val > FREQ_MAX) {
-> +		dev_err(td->dev, "%s: Rate %lu is above dfll range\n",
-> +			__func__, rate);
-> +		return -EINVAL;
-> +	}
-> +	req->mult_bits = val;
-> +	req->dvco_target_rate = MULT_TO_DVCO_RATE(req->mult_bits, td->ref_rate);
-> +	req->rate = dfll_scale_dvco_rate(req->dvco_target_rate,
-> +					 req->scale_bits);
-Should be dfll_scale_dvco_rate(req->scale_bits, req->dvco_target_rate);
+>  arch/arm/boot/dts/imx28.dtsi | 32 ++++++++++++++++++++++++++++++++
+>  1 file changed, 32 insertions(+)
 
-Thanks,
-Vince
-
-> +	req->lut_index = find_lut_index_for_rate(td, req->dvco_target_rate);
-> +	if (req->lut_index < 0)
-> +		return req->lut_index;
-> +
-> +	return 0;
-> +}
-> +
+Applied both, thanks.
