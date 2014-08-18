@@ -1,16 +1,88 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Mon, 18 Aug 2014 15:17:31 +0800
-Subject: [PATCH BUGFIX] ARM: dts: i.MX53: fix apparent bug in VPU clks
-In-Reply-To: <1407937667-26678-1-git-send-email-LW@KARO-electronics.de>
-References: <1407937667-26678-1-git-send-email-LW@KARO-electronics.de>
-Message-ID: <20140818071730.GH2114@dragon>
+From: gpkulkarni@gmail.com (Ganapatrao Kulkarni)
+Date: Mon, 18 Aug 2014 13:09:48 +0530
+Subject: [PATCH] arm64: topology: add MPIDR-based detection
+In-Reply-To: <20140604171030.GE10775@e102568-lin.cambridge.arm.com>
+References: <1401644249-23792-1-git-send-email-broonie@kernel.org>
+ <20140603173103.GA18004@red-moon>
+ <20140603210424.GJ31751@sirena.org.uk>
+ <20140604093452.GA8057@e102568-lin.cambridge.arm.com>
+ <20140604115751.GH2520@sirena.org.uk>
+ <20140604130114.GB10775@e102568-lin.cambridge.arm.com>
+ <20140604135431.GL2520@sirena.org.uk>
+ <20140604155129.GD10775@e102568-lin.cambridge.arm.com>
+ <20140604163400.GQ2520@sirena.org.uk>
+ <20140604171030.GE10775@e102568-lin.cambridge.arm.com>
+Message-ID: <CAFpQJXVmj0v=L_5NSGs1TdNuZDuKv_zxEoSVpCVSSsjSqFgiMg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 13, 2014 at 03:47:47PM +0200, Lothar Wa?mann wrote:
-> The VPU on i.MX53 has two distinct clocks for register access and
-> internal function.
-> 
-> Signed-off-by: Lothar Wa?mann <LW@KARO-electronics.de>
+How we map non SMT (MT bit24=0) cores of dual/multi socket system with
+the topology which is using only aff0 and aff1?
+can we use aff2  ( or concatenating aff2 and aff3)  to represent socket-id?
 
-Applied, thanks.
+thanks
+Ganapat
+
+
+On Wed, Jun 4, 2014 at 10:40 PM, Lorenzo Pieralisi
+<lorenzo.pieralisi@arm.com> wrote:
+> On Wed, Jun 04, 2014 at 05:34:00PM +0100, Mark Brown wrote:
+>> On Wed, Jun 04, 2014 at 04:51:29PM +0100, Lorenzo Pieralisi wrote:
+>>
+>> > My question is: is it better to pack affinity levels and "guess" what aff3
+>> > (and aff2 on non-SMT) means or add an additional level of hierarchy in the
+>> > arm64 topology code (eg book_id - implemented only for s390 to the best
+>> > of my knowledge) ?
+>>
+>> Shoving them in there would address the issue as well, yes (though we'd
+>> still have to combine aff2 and aff3 for the non-SMT case).  I don't know
+>> if having books enabled has some overhead we don't want though.
+>>
+>> > I personally prefer the latter approach but I think it boils down to
+>> > understanding what do we want to provide the scheduler with if we have
+>> > a hierarchy that extends beyond "cluster" level.
+>>
+>> > I will be glad to help you implement it when time comes (and this will also
+>> > fix the clusters of clusters DT issue we are facing - ie how to treat them).
+>>
+>> > Now, I do not think it is a major problem at the moment, merging the
+>> > patch I sent will give us more time to discuss how to define the
+>> > topology for clusters of clusters, because that's what we are talking
+>> > about.
+>>
+>> In so far as you're saying that we don't really need to worry about
+>> exactly how we handle multi-level clusters properly at the minute I
+>> agree with you - until we have some idea what they physically look like
+>> and can consider how well that maps onto the scheduler and whatnot it
+>> doesn't really matter and we can just ignore it.  Given that I'm not
+>> concerned about just reporting everything as flat like we do with DT at
+>> the minute and don't see a real need to theorise about it, it'll just be
+>> a performance problem and not a correctness problem when it is
+>> encountered.  That feels like a better position to leave things in as it
+>> will be less stress for whoever is bringing up such a fancy new system,
+>> they can stand a reasonable chance of getting things at least running
+>> with minimal effort.
+>
+> Ok, I think we have an agreement, let's merge the patch I sent and
+> discuss the way forward to cater for systems with clusters of clusters
+> when we reasonably expect them to hit production, the scheduler expected
+> topology might well change by that time and now we are well positioned
+> to cope with future extensions (and actually packing affinity levels
+> might well be the final solution if the scheduler expects a "flat"
+> topology at the higher topology level).
+>
+>> > Does it make sense ?
+>>
+>> Like I say I do think that merging your current code is better than
+>> nothing.
+>
+> Great, thanks for bearing with me.
+>
+> Thanks !
+> Lorenzo
+>
+>
+> _______________________________________________
+> linaro-kernel mailing list
+> linaro-kernel at lists.linaro.org
+> http://lists.linaro.org/mailman/listinfo/linaro-kernel
