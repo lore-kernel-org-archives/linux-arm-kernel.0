@@ -1,34 +1,57 @@
-From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
-Date: Mon, 18 Aug 2014 23:43:49 +0200
-Subject: [RESEND PATCH 1/2] ARM: dts: Improve Peach Pit and Pi power scheme
-In-Reply-To: <53F245A4.5010106@samsung.com>
-References: <1407757091-18730-1-git-send-email-javier.martinez@collabora.co.uk>
- <CAD=FV=UbckfwGucuPjEtHixVgF5K2fD5N3EPS2BH96DRDACuqw@mail.gmail.com>
- <53F245A4.5010106@samsung.com>
-Message-ID: <53F27395.5070601@collabora.co.uk>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 18 Aug 2014 22:52:25 +0100
+Subject: [PATCH v9 03/12] PCI: Introduce helper functions to deal with
+ PCI I/O ranges.
+In-Reply-To: <20140818213446.GC13147@bart.dudau.co.uk>
+References: <1407860725-25202-1-git-send-email-Liviu.Dudau@arm.com>
+ <1407860725-25202-4-git-send-email-Liviu.Dudau@arm.com>
+ <20140818142604.GO20043@localhost>
+ <20140818213446.GC13147@bart.dudau.co.uk>
+Message-ID: <20140818215225.GI24600@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Kukjin,
-
-On 08/18/2014 08:27 PM, Kukjin Kim wrote:
-> On 08/11/14 10:46, Doug Anderson wrote:
->>
-> OK, I've applied this but 2nd in this series...
->
-
-Thanks for picking this and yes PATCH 2/2 from this series was dropped.
-
->> Acked-by: Doug Anderson<dianders@chromium.org>
->>
-> Thanks,
-> Kukjin
+On Mon, Aug 18, 2014 at 10:34:46PM +0100, Liviu Dudau wrote:
+> On Mon, Aug 18, 2014 at 03:26:04PM +0100, Catalin Marinas wrote:
+> > On Tue, Aug 12, 2014 at 05:25:16PM +0100, Liviu Dudau wrote:
+> > > Some architectures do not have a simple view of the PCI I/O space
+> > > and instead use a range of CPU addresses that map to bus addresses.
+> > > For some architectures these ranges will be expressed by OF bindings
+> > > in a device tree file.
+> > > 
+> > > This patch introduces a pci_register_io_range() helper function with
+> > > a generic implementation that can be used by such architectures to
+> > > keep track of the I/O ranges described by the PCI bindings. If the
+> > > PCI_IOBASE macro is not defined that signals lack of support for PCI
+> > > and we return an error.
+> > > 
+> > > In order to retrieve the CPU address associated with an I/O port, a
+> > > new helper function pci_pio_to_address() is introduced. This will
+> > > search in the list of ranges registered with pci_register_io_range()
+> > > and return the CPU address that corresponds to the given port.
+> > > 
+> > > Cc: Grant Likely <grant.likely@linaro.org>
+> > > Cc: Rob Herring <robh+dt@kernel.org>
+> > > Cc: Arnd Bergmann <arnd@arndb.de>
+> > > Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
+> > > ---
+> > >  drivers/of/address.c       | 95 ++++++++++++++++++++++++++++++++++++++++++++++
+> > >  include/linux/of_address.h |  2 +
+> > >  2 files changed, 97 insertions(+)
+> > 
+> > Actually, I think we moved too much code into drivers/of/. Is there
+> > anything OF specific about this code to live here (apart from
+> > OF_BAD_ADDR)? I think driver/pci/ more appropriate?
 > 
+> I have no strong preference for one place vs the other. While this does
+> not use any OF specific code, it should be called only from OF enabled
+> code. So the relationship is not one of depending on of_* but on being
+> dependent on.
 
-I've posted PATCH "mmc: core: Use regulator_get_voltage() if OCR mask is
-empty." [0] instead to solve the issue that patch 2/2 tried to address.
+In this case it's probably ok to keep them here for the time being.
 
-Best regards,
-Javier
+I wonder whether it would also be useful for ACPI. But I have no idea
+how ACPI would fit with the ACPI patches.
 
-[0]: https://lkml.org/lkml/2014/8/14/200
+-- 
+Catalin
