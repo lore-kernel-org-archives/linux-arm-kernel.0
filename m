@@ -1,43 +1,22 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Mon, 18 Aug 2014 11:56:55 -0500
-Subject: [PATCH 2/2] clk: ti: dra7-atl: Provide error check for incoming
- parameters in set_rate
-In-Reply-To: <1408381015-16042-1-git-send-email-nm@ti.com>
-References: <1408381015-16042-1-git-send-email-nm@ti.com>
-Message-ID: <1408381015-16042-3-git-send-email-nm@ti.com>
+From: joro@8bytes.org (Joerg Roedel)
+Date: Mon, 18 Aug 2014 18:57:50 +0200
+Subject: [PATCH 2/2] iommu: Implement a dummy bus_set_iommu()
+In-Reply-To: <1406897113-20099-2-git-send-email-thierry.reding@gmail.com>
+References: <1406897113-20099-1-git-send-email-thierry.reding@gmail.com>
+ <1406897113-20099-2-git-send-email-thierry.reding@gmail.com>
+Message-ID: <20140818165750.GE9809@8bytes.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Check for valid parameters in check rate. Else, we end up getting
-errors.
+On Fri, Aug 01, 2014 at 02:45:13PM +0200, Thierry Reding wrote:
+> From: Thierry Reding <treding@nvidia.com>
+> 
+> This allows IOMMU drivers to compile even if IOMMU_API is not selected
+> and helps improve compile coverage.
 
-This occurs as part of the inital clock tree update of child clock
-nodes where new_rate could be 0 for non functional clocks.
+IOMMU drivers usually implement the IOMMU-API, so they have a strong
+dependency to it. Why do you want to compile-test an iommu driver
+without testing the iommu core-code as well?
 
-Fixes: 9ac33b0ce81fa48 (" CLK: TI: Driver for DRA7 ATL (Audio Tracking Logic)")
-Signed-off-by: Nishanth Menon <nm@ti.com>
----
- drivers/clk/ti/clk-dra7-atl.c |    6 +++++-
- 1 file changed, 5 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/clk/ti/clk-dra7-atl.c b/drivers/clk/ti/clk-dra7-atl.c
-index 4a65b41..af29359 100644
---- a/drivers/clk/ti/clk-dra7-atl.c
-+++ b/drivers/clk/ti/clk-dra7-atl.c
-@@ -139,9 +139,13 @@ static long atl_clk_round_rate(struct clk_hw *hw, unsigned long rate,
- static int atl_clk_set_rate(struct clk_hw *hw, unsigned long rate,
- 			    unsigned long parent_rate)
- {
--	struct dra7_atl_desc *cdesc = to_atl_desc(hw);
-+	struct dra7_atl_desc *cdesc;
- 	u32 divider;
- 
-+	if (!hw || !rate)
-+		return -EINVAL;
-+
-+	cdesc = to_atl_desc(hw);
- 	divider = ((parent_rate + rate / 2) / rate) - 1;
- 	if (divider > DRA7_ATL_DIVIDER_MASK)
- 		divider = DRA7_ATL_DIVIDER_MASK;
--- 
-1.7.9.5
+	Joerg
