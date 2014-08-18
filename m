@@ -1,534 +1,298 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Sun, 17 Aug 2014 19:41:45 -0500
-Subject: [PATCH 3/4 V3] irqchip: gic: Add supports for ARM GICv2m MSI(-X)
-In-Reply-To: <1404947104-21345-4-git-send-email-suravee.suthikulpanit@amd.com>
-References: <1404947104-21345-1-git-send-email-suravee.suthikulpanit@amd.com>
- <1404947104-21345-4-git-send-email-suravee.suthikulpanit@amd.com>
-Message-ID: <53F14BC9.8090407@gmail.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Mon, 18 Aug 2014 08:32:08 -0400
+Subject: [PATCH 2/6] irqchip: Supply new driver for STi based devices
+In-Reply-To: <1406642744-22589-3-git-send-email-lee.jones@linaro.org>
+References: <1406642744-22589-1-git-send-email-lee.jones@linaro.org>
+ <1406642744-22589-3-git-send-email-lee.jones@linaro.org>
+Message-ID: <20140818123208.GR12769@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/09/2014 06:05 PM, suravee.suthikulpanit at amd.com wrote:
-> From: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
+On Tue, Jul 29, 2014 at 03:05:40PM +0100, Lee Jones wrote:
+> This driver is used to enable System Configuration Register controlled
+> External, CTI (Core Sight), PMU (Performance Management), and PL310 L2
+> Cache IRQs prior to use.
 > 
-> ARM GICv2m specification extends GICv2 to support MSI(-X) with
-> a new set of register frames. This patch introduces support for
-> the non-secure GICv2m register frame.
-> 
-> The driver currently matchs "arm,gic-400-plus" in device tree binding,
-> which implements GICv2m.
-> 
-> The "msi-controller" keyword in ARM GIC devicetree binding is used to indentify
-> GIC driver that it should enable MSI(-X) support, The region of GICv2m MSI
-> register frame is specified using the register frame index 4 in the device tree.
-> MSI support is optional.
-> 
-> Each GIC maintains an "msi_chip" structure. To discover the msi_chip,
-> PCI host driver can do the following:
-> 
->     struct device_node *gic_node = of_irq_find_parent(pdev->dev.of_node);
->     pcie_bus->msi_chip = of_pci_find_msi_chip_by_node(gic_node);
-> 
-> Cc: Mark Rutland <Mark.Rutland@arm.com>
-> Cc: Marc Zyngier <Marc.Zyngier@arm.com>
-> Cc: Jason Cooper <jason@lakedaemon.net>
-> Cc: Catalin Marinas <Catalin.Marinas@arm.com>
-> Cc: Will Deacon <Will.Deacon@arm.com>
-> Signed-off-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
 > ---
->  Documentation/devicetree/bindings/arm/gic.txt |  20 +-
->  arch/arm64/Kconfig                            |   1 +
->  drivers/irqchip/Kconfig                       |   7 +
->  drivers/irqchip/Makefile                      |   1 +
->  drivers/irqchip/irq-gic-v2m.c                 | 251 ++++++++++++++++++++++++++
->  drivers/irqchip/irq-gic-v2m.h                 |  13 ++
->  drivers/irqchip/irq-gic.c                     |  23 ++-
->  drivers/irqchip/irq-gic.h                     |  31 +++-
->  8 files changed, 334 insertions(+), 13 deletions(-)
->  create mode 100644 drivers/irqchip/irq-gic-v2m.c
->  create mode 100644 drivers/irqchip/irq-gic-v2m.h
+>  drivers/irqchip/Kconfig  |   7 ++
+>  drivers/irqchip/Makefile |   1 +
+>  drivers/irqchip/irq-st.c | 206 +++++++++++++++++++++++++++++++++++++++++++++++
+>  3 files changed, 214 insertions(+)
+>  create mode 100644 drivers/irqchip/irq-st.c
 > 
-> diff --git a/Documentation/devicetree/bindings/arm/gic.txt b/Documentation/devicetree/bindings/arm/gic.txt
-> index 5573c08..d2eea0b 100644
-> --- a/Documentation/devicetree/bindings/arm/gic.txt
-> +++ b/Documentation/devicetree/bindings/arm/gic.txt
-> @@ -12,11 +12,14 @@ Main node required properties:
->  
->  - compatible : should be one of:
->  	"arm,gic-400"
-> +	"arm,gic-400-v2m"
-
-There is no such hardware. There is a gic-400 from ARM and then there
-are gic-400 plus extra logic from each Si vendor. So this should have a
-vendor specific compatible string in case there are quirks in your h/w.
-
->  	"arm,cortex-a15-gic"
->  	"arm,cortex-a9-gic"
->  	"arm,cortex-a7-gic"
->  	"arm,arm11mp-gic"
-> +
->  - interrupt-controller : Identifies the node as an interrupt controller
-> +
->  - #interrupt-cells : Specifies the number of cells needed to encode an
->    interrupt source.  The type shall be a <u32> and the value shall be 3.
->  
-> @@ -37,9 +40,16 @@ Main node required properties:
->  	the 8 possible cpus attached to the GIC.  A bit set to '1' indicated
->  	the interrupt is wired to that CPU.  Only valid for PPI interrupts.
->  
-> -- reg : Specifies base physical address(s) and size of the GIC registers. The
-> -  first region is the GIC distributor register base and size. The 2nd region is
-> -  the GIC cpu interface register base and size.
-> +- reg : Specifies base physical address(s) and size of the GIC register frames.
-> +
-> +  Region | Description
-> +  Index  |
-> +  -------------------------------------------------------------------
-> +     0   | GIC distributor register base and size
-> +     1   | GIC cpu interface register base and size
-> +     2   | VGIC interface control register base and size (Optional)
-> +     3   | VGIC CPU interface register base and size (Optional)
-> +     4   | GICv2m MSI interface register base and size (Optional)
->  
->  Optional
->  - interrupts	: Interrupt source of the parent interrupt controller on
-> @@ -55,6 +65,10 @@ Optional
->  		  by a crossbar/multiplexer preceding the GIC. The GIC irq
->  		  input line is assigned dynamically when the corresponding
->  		  peripheral's crossbar line is mapped.
-> +
-> +- msi-controller : Identifies the node as an MSI controller.
-> +                   (Required for GICv2m)
-> +
->  Example:
->  
->  	intc: interrupt-controller at fff11000 {
-> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-> index be52492..0f9b11d 100644
-> --- a/arch/arm64/Kconfig
-> +++ b/arch/arm64/Kconfig
-> @@ -9,6 +9,7 @@ config ARM64
->  	select ARM_AMBA
->  	select ARM_ARCH_TIMER
->  	select ARM_GIC
-> +	select ARM_GIC_V2M if (PCI && PCI_MSI)
->  	select ARM_GIC_V3
->  	select BUILDTIME_EXTABLE_SORT
->  	select CLONE_BACKWARDS
 > diff --git a/drivers/irqchip/Kconfig b/drivers/irqchip/Kconfig
-> index 7f0c2a3..274910d 100644
+> index bbb746e..7252de9 100644
 > --- a/drivers/irqchip/Kconfig
 > +++ b/drivers/irqchip/Kconfig
-> @@ -7,6 +7,13 @@ config ARM_GIC
->  	select IRQ_DOMAIN
->  	select MULTI_IRQ_HANDLER
->  
-> +config ARM_GIC_V2M
-> +	bool
-> +	select IRQ_DOMAIN
-> +	select MULTI_IRQ_HANDLER
-> +	depends on ARM_GIC
-> +	depends on PCI && PCI_MSI
+> @@ -91,3 +91,10 @@ config IRQ_CROSSBAR
+>  	  The primary irqchip invokes the crossbar's callback which inturn allocates
+>  	  a free irq and configures the IP. Thus the peripheral interrupts are
+>  	  routed to one of the free irqchip interrupt lines.
 > +
->  config GIC_NON_BANKED
->  	bool
->  
+> +config ST_IRQCHIP
+> +	bool
+> +	select REGMAP
+> +	select MFD_SYSCON
+> +	help
+> +	  Enables SysCfg Controlled IRQs on STi based platforms.
+
+Now that I have my head above water (a bit) wrt irqchip, I really don't
+like the hot mess that this file has become...
+
 > diff --git a/drivers/irqchip/Makefile b/drivers/irqchip/Makefile
-> index c57e642..09c035a 100644
+> index 62a13e5..f859c14 100644
 > --- a/drivers/irqchip/Makefile
 > +++ b/drivers/irqchip/Makefile
-> @@ -16,6 +16,7 @@ obj-$(CONFIG_ARCH_SUNXI)		+= irq-sun4i.o
->  obj-$(CONFIG_ARCH_SUNXI)		+= irq-sunxi-nmi.o
->  obj-$(CONFIG_ARCH_SPEAR3XX)		+= spear-shirq.o
->  obj-$(CONFIG_ARM_GIC)			+= irq-gic.o irq-gic-common.o
-> +obj-$(CONFIG_ARM_GIC_V2M)		+= irq-gic-v2m.o
->  obj-$(CONFIG_ARM_GIC_V3)		+= irq-gic-v3.o irq-gic-common.o
->  obj-$(CONFIG_ARM_NVIC)			+= irq-nvic.o
->  obj-$(CONFIG_ARM_VIC)			+= irq-vic.o
-> diff --git a/drivers/irqchip/irq-gic-v2m.c b/drivers/irqchip/irq-gic-v2m.c
+> @@ -30,3 +30,4 @@ obj-$(CONFIG_XTENSA)			+= irq-xtensa-pic.o
+>  obj-$(CONFIG_XTENSA_MX)			+= irq-xtensa-mx.o
+>  obj-$(CONFIG_IRQ_CROSSBAR)		+= irq-crossbar.o
+>  obj-$(CONFIG_BRCMSTB_L2_IRQ)		+= irq-brcmstb-l2.o
+> +obj-$(CONFIG_ST_IRQCHIP)		+= irq-st.o
+> diff --git a/drivers/irqchip/irq-st.c b/drivers/irqchip/irq-st.c
 > new file mode 100644
-> index 0000000..e54ca1d
+> index 0000000..f31126f
 > --- /dev/null
-> +++ b/drivers/irqchip/irq-gic-v2m.c
-> @@ -0,0 +1,251 @@
+> +++ b/drivers/irqchip/irq-st.c
+> @@ -0,0 +1,206 @@
 > +/*
-> + * ARM GIC v2m MSI(-X) support
-> + * Support for Message Signalelled Interrupts for systems that
-> + * implement ARM Generic Interrupt Controller: GICv2m.
+> + *  drivers/irqchip/irq-st.c
 > + *
-> + * Copyright (C) 2014 Advanced Micro Devices, Inc.
-> + * Authors: Suravee Suthikulpanit <suravee.suthikulpanit@amd.com>
-> + *          Harish Kasiviswanathan <harish.kasiviswanathan@amd.com>
-> + *          Brandon Anderson <brandon.anderson@amd.com>
+> + *  Copyright (C) 2014 STMicroelectronics ? All Rights Reserved
 > + *
-> + * This program is free software; you can redistribute it and/or modify it
-> + * under the terms of the GNU General Public License version 2 as published
-> + * by the Free Software Foundation.
+> + *  Author: Lee Jones <lee.jones@linaro.org>
+> + *
+> + *  This is a re-write of Christophe Kerello's PMU driver.
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
 > + */
 > +
-> +#include <linux/kernel.h>
-> +#include <linux/module.h>
+> +#include <dt-bindings/interrupt-controller/irq-st.h>
+> +#include <linux/err.h>
+> +#include <linux/mfd/syscon.h>
+> +#include <linux/of_device.h>
 > +#include <linux/platform_device.h>
-> +#include <linux/pci.h>
-> +#include <linux/irq.h>
-> +#include <linux/spinlock.h>
+> +#include <linux/regmap.h>
 > +#include <linux/slab.h>
-> +#include <linux/of_address.h>
-> +#include <linux/of_pci.h>
-> +#include <linux/bitmap.h>
 > +
-> +#include "irqchip.h"
-> +#include "irq-gic.h"
+> +#define STIH415_SYSCFG_642		0x0a8
+> +#define STIH416_SYSCFG_7543		0x87c
+> +#define STIH407_SYSCFG_5102		0x198
+> +#define STID127_SYSCFG_734		0x088
 > +
-> +/*
-> +* MSI_TYPER:
-> +*     [31:26] Reserved
-> +*     [25:16] lowest SPI assigned to MSI
-> +*     [15:10] Reserved
-> +*     [9:0]   Numer of SPIs assigned to MSI
-> +*/
-> +#define V2M_MSI_TYPER			0x008
-> +#define V2M_MSI_TYPER_BASE_SHIFT	(16)
-> +#define V2M_MSI_TYPER_BASE_MASK		(0x3FF)
-> +#define V2M_MSI_TYPER_NUM_MASK		(0x3FF)
-> +#define V2M_MSI_SETSPI_NS		0x040
-> +#define V2M_MIN_SPI			32
-> +#define V2M_MAX_SPI			1019
+> +#define ST_A9_IRQ_MASK			0x001FFFFF
+> +#define ST_A9_IRQ_MAX_CHANS		2
 > +
-> +#define GIC_OF_MSIV2M_RANGE_INDEX	4
+> +#define ST_A9_IRQ_EN_CTI_0		BIT(0)
+> +#define ST_A9_IRQ_EN_CTI_1		BIT(1)
+> +#define ST_A9_IRQ_EN_PMU_0		BIT(2)
+> +#define ST_A9_IRQ_EN_PMU_1		BIT(3)
+> +#define ST_A9_IRQ_EN_pl310_L2		BIT(4)
+
+PL310
+
+> +#define ST_A9_IRQ_EN_EXT_0		BIT(5)
+> +#define ST_A9_IRQ_EN_EXT_1		BIT(6)
+> +#define ST_A9_IRQ_EN_EXT_2		BIT(7)
 > +
-> +/*
-> + * alloc_msi_irq - Allocate MSIs from avaialbe MSI bitmap.
-> + * @data: Pointer to v2m_data
-> + * @nvec: Number of interrupts to allocate
-> + * @irq: Pointer to the allocated irq
-> + *
-> + * Allocates interrupts only if the contiguous range of MSIs
-> + * with specified nvec are available. Otherwise return the number
-> + * of available interrupts. If none are available, then returns -ENOENT.
-> + */
-> +static int alloc_msi_irq(struct v2m_data *data, int nvec, int *irq)
-> +{
-> +	int size = data->nr_spis;
-> +	int next = size, i = nvec, ret;
+> +#define ST_A9_FIQ_N_SEL(dev, chan)	(dev << (8  + (chan * 3)))
+> +#define ST_A9_IRQ_N_SEL(dev, chan)	(dev << (14 + (chan * 3)))
+> +#define ST_A9_EXTIRQ_INV_SEL(dev)	(dev << 20)
 > +
-> +	/* We should never allocate more than available nr_spis */
-> +	if (i >= size)
-> +		i = size;
-> +
-> +	spin_lock(&data->msi_cnt_lock);
-> +
-> +	for (; i > 0; i--) {
-> +		next = bitmap_find_next_zero_area(data->bm,
-> +					size, 0, i, 0);
-> +		if (next < size)
-> +			break;
-> +	}
-> +
-> +	if (i != nvec) {
-> +		ret = i ? : -ENOENT;
-> +	} else {
-> +		bitmap_set(data->bm, next, nvec);
-> +		*irq = data->spi_start + next;
-> +		ret = 0;
-> +	}
-> +
-> +	spin_unlock(&data->msi_cnt_lock);
-> +
-> +	return ret;
-> +}
-> +
-> +static struct v2m_data *to_v2m_data(struct msi_chip *chip)
-> +{
-> +	struct gic_chip_data *gic = container_of(chip, struct gic_chip_data,
-> +						 msi_chip);
-> +	return &gic->v2m_data;
-> +}
-> +
-> +static void gicv2m_teardown_msi_irq(struct msi_chip *chip, unsigned int irq)
-> +{
-> +	int pos;
-> +	struct v2m_data *data = to_v2m_data(chip);
-> +
-> +	spin_lock(&data->msi_cnt_lock);
-> +
-> +	pos = irq - data->spi_start;
-> +	if (pos >= 0 && pos < data->nr_spis)
-> +		bitmap_clear(data->bm, pos, 1);
-> +
-> +	spin_unlock(&data->msi_cnt_lock);
-> +}
-> +
-> +static int gicv2m_setup_msi_irq(struct msi_chip *chip, struct pci_dev *pdev,
-> +		      struct msi_desc *desc)
-> +{
-> +	int avail, irq = 0;
-> +	struct msi_msg msg;
-> +	phys_addr_t addr;
-> +	struct v2m_data *data = to_v2m_data(chip);
-> +
-> +	if (!desc) {
-> +		dev_err(&pdev->dev,
-> +			"GICv2m: MSI setup failed. Invalid msi descriptor\n");
-> +		return -EINVAL;
-> +	}
-> +
-> +	avail = alloc_msi_irq(data, 1, &irq);
-> +	if (avail != 0) {
-> +		dev_err(&pdev->dev,
-> +			"GICv2m: MSI setup failed. Cannnot allocate IRQ\n");
-> +		return -ENOSPC;
-> +	}
-> +
-> +	irq_set_chip_data(irq, chip);
-> +	irq_set_msi_desc(irq, desc);
-> +	irq_set_irq_type(irq, IRQ_TYPE_EDGE_RISING);
-> +
-> +	addr = data->res.start + V2M_MSI_SETSPI_NS;
-> +
-> +	msg.address_hi = (u32)(addr >> 32);
-> +	msg.address_lo = (u32)(addr);
-> +	msg.data = irq;
-> +	write_msi_msg(irq, &msg);
-> +
-> +	return 0;
-> +}
-> +
-> +static int __init
-> +gicv2m_msi_init(struct device_node *node, struct v2m_data *v2m)
-> +{
-> +	unsigned int val;
-> +
-> +	if (of_address_to_resource(node, GIC_OF_MSIV2M_RANGE_INDEX,
-> +				   &v2m->res)) {
-> +		pr_err("GICv2m: Failed locate GICv2m MSI register frame\n");
-> +		return -EINVAL;
-> +	}
-> +
-> +	v2m->base = of_iomap(node, GIC_OF_MSIV2M_RANGE_INDEX);
-> +	if (!v2m->base) {
-> +		pr_err("GICv2m: Failed to map GIC MSI registers\n");
-> +		return -EINVAL;
-> +	}
-> +
-> +	val = readl_relaxed(v2m->base + V2M_MSI_TYPER);
-> +	if (!val) {
-> +		pr_warn("GICv2m: Failed to read V2M_MSI_TYPER register\n");
-> +		return -EINVAL;
-> +	}
-> +
-> +	v2m->spi_start = (val >> V2M_MSI_TYPER_BASE_SHIFT) &
-> +				V2M_MSI_TYPER_BASE_MASK;
-> +	v2m->nr_spis = val & V2M_MSI_TYPER_NUM_MASK;
-> +	if ((v2m->spi_start < V2M_MIN_SPI) || (v2m->nr_spis >= V2M_MAX_SPI)) {
-> +			pr_err("GICv2m: Invalid MSI_TYPER (%#x)\n", val);
-> +			return -EINVAL;
-> +	}
-> +
-> +	v2m->bm = kzalloc(sizeof(long) * BITS_TO_LONGS(v2m->nr_spis),
-> +			  GFP_KERNEL);
-> +	if (!v2m->bm) {
-> +		pr_err("GICv2m: Failed to allocate MSI bitmap\n");
-> +		return -ENOMEM;
-> +	}
-> +
-> +	spin_lock_init(&v2m->msi_cnt_lock);
-> +
-> +	pr_info("GICv2m: SPI range [%d:%d]\n",
-> +		v2m->spi_start, (v2m->spi_start + v2m->nr_spis));
-> +
-> +	return 0;
-> +}
-> +
-> +static void gicv2m_mask_irq(struct irq_data *d)
-> +{
-> +	gic_mask_irq(d);
-> +	if (d->msi_desc)
-> +		mask_msi_irq(d);
-> +}
-> +
-> +static void gicv2m_unmask_irq(struct irq_data *d)
-> +{
-> +	gic_unmask_irq(d);
-> +	if (d->msi_desc)
-> +		unmask_msi_irq(d);
-> +}
-> +
-> +static struct irq_chip gicv2m_chip = {
-> +	.name			= "GICv2m",
-> +	.irq_mask		= gicv2m_mask_irq,
-> +	.irq_unmask		= gicv2m_unmask_irq,
-> +	.irq_eoi		= gic_eoi_irq,
-> +	.irq_set_type		= gic_set_type,
-> +	.irq_retrigger		= gic_retrigger,
-> +#ifdef CONFIG_SMP
-> +	.irq_set_affinity	= gic_set_affinity,
-> +#endif
-> +#ifdef CONFIG_PM
-> +	.irq_set_wake		= gic_set_wake,
-> +#endif
+> +struct st_irq_syscfg {
+> +	struct regmap *regmap;
+> +	unsigned int syscfg;
+> +	unsigned int result;
+
+result seems odd here.  It sounds like you're storing a return value,
+when in fact, it looks like you are using it to determine whether or not
+to invert...  Perhaps a different variable name here?
+
+> +	bool ext_inverted;
 > +};
 > +
-> +#ifdef CONFIG_OF
-> +static int __init
-> +gicv2m_of_init(struct device_node *node, struct device_node *parent)
+> +static const struct of_device_id st_irq_syscfg_match[] = {
+> +	{
+> +		.compatible = "st,stih415-irq-syscfg",
+> +		.data = (void *)STIH415_SYSCFG_642,
+> +	},
+> +	{
+> +		.compatible = "st,stih416-irq-syscfg",
+> +		.data = (void *)STIH416_SYSCFG_7543,
+> +	},
+> +	{
+> +		.compatible = "st,stih407-irq-syscfg",
+> +		.data = (void *)STIH407_SYSCFG_5102,
+> +	},
+> +	{
+> +		.compatible = "st,stid127-irq-syscfg",
+> +		.data = (void *)STID127_SYSCFG_734,
+> +	},
+> +	{}
+> +};
+> +
+> +static int st_irq_xlate(struct platform_device *pdev,
+> +			int device, int channel, bool irq)
 > +{
-> +	struct gic_chip_data *gic;
-> +	int ret;
+> +	struct st_irq_syscfg *ddata = dev_get_drvdata(&pdev->dev);
 > +
-> +	ret = _gic_of_init(node, parent, &gicv2m_chip, &gic);
-> +	if (ret) {
-> +		pr_err("GICv2m: Failed to initialize GIC\n");
-> +		return ret;
-> +	}
-> +
-> +	gic->msi_chip.owner = THIS_MODULE;
-> +	gic->msi_chip.of_node = node;
-> +	gic->msi_chip.setup_irq = gicv2m_setup_msi_irq;
-> +	gic->msi_chip.teardown_irq = gicv2m_teardown_msi_irq;
-> +	ret = of_pci_msi_chip_add(&gic->msi_chip);
-> +	if (ret) {
-> +		/* MSI is optional and not supported here */
-> +		pr_info("GICv2m: MSI is not supported.\n");
+> +	/* Set the device enable bit. */
+> +	switch (device) {
+> +	case ST_IRQ_SYSCFG_EXT_0 :
+> +		ddata->result |= ST_A9_IRQ_EN_EXT_0;
+> +		break;
+> +	case ST_IRQ_SYSCFG_EXT_1 :
+> +		ddata->result |= ST_A9_IRQ_EN_EXT_1;
+> +		break;
+> +	case ST_IRQ_SYSCFG_EXT_2 :
+> +		ddata->result |= ST_A9_IRQ_EN_EXT_2;
+> +		break;
+> +	case ST_IRQ_SYSCFG_CTI_0 :
+> +		ddata->result |= ST_A9_IRQ_EN_CTI_0;
+> +		break;
+> +	case ST_IRQ_SYSCFG_CTI_1 :
+> +		ddata->result |= ST_A9_IRQ_EN_CTI_1;
+> +		break;
+> +	case ST_IRQ_SYSCFG_PMU_0 :
+> +		ddata->result |= ST_A9_IRQ_EN_PMU_0;
+> +		break;
+> +	case ST_IRQ_SYSCFG_PMU_1 :
+> +		ddata->result |= ST_A9_IRQ_EN_PMU_1;
+> +		break;
+> +	case ST_IRQ_SYSCFG_pl310_L2 :
+> +		ddata->result |= ST_A9_IRQ_EN_pl310_L2;
+> +		break;
+> +	case ST_IRQ_SYSCFG_DISABLED :
 > +		return 0;
+> +	default :
+> +		dev_err(&pdev->dev, "Unrecognised device %d\n", device);
+
+dev_dbg
+
+> +		return -EINVAL;
 > +	}
 > +
-> +	ret = gicv2m_msi_init(node, &gic->v2m_data);
-> +	if (ret)
-> +		return ret;
-> +	return ret;
+> +	/* Select IRQ/FIQ channel for device. */
+> +	ddata->result |= irq ?
+> +		ST_A9_IRQ_N_SEL(device, channel) :
+> +		ST_A9_FIQ_N_SEL(device, channel);
+> +
+> +	return 0;
 > +}
 > +
-> +IRQCHIP_DECLARE(arm_gic_400_v2m, "arm,gic-400-v2m", gicv2m_of_init);
-> +
-> +#endif /* CONFIG_OF */
-> diff --git a/drivers/irqchip/irq-gic-v2m.h b/drivers/irqchip/irq-gic-v2m.h
-> new file mode 100644
-> index 0000000..2d93a87
-> --- /dev/null
-> +++ b/drivers/irqchip/irq-gic-v2m.h
-> @@ -0,0 +1,13 @@
-> +#ifndef _IRQ_GIC_V2M_H_
-> +#define _IRQ_GIC_V2M_H_
-> +
-> +struct v2m_data {
-> +	spinlock_t msi_cnt_lock;
-> +	struct resource res;      /* GICv2m resource */
-> +	void __iomem *base;       /* GICv2m virt address */
-> +	unsigned int spi_start;   /* The SPI number that MSIs start */
-> +	unsigned int nr_spis;     /* The number of SPIs for MSIs */
-> +	unsigned long *bm;        /* MSI vector bitmap */
-> +};
-> +
-> +#endif /*_IRQ_GIC_V2M_H_*/
-> diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
-> index 966e1d5..a054e0d 100644
-> --- a/drivers/irqchip/irq-gic.c
-> +++ b/drivers/irqchip/irq-gic.c
-> @@ -111,15 +111,34 @@ static inline void gic_set_base_accessor(struct gic_chip_data *data,
->  #define gic_set_base_accessor(d, f)
->  #endif
->  
-> +static inline
-> +struct gic_chip_data *irq_data_get_gic_chip_data(struct irq_data *d)
+> +static int st_irq_syscfg_enable(struct platform_device *pdev)
 > +{
-> +	struct gic_chip_data *gic_data;
-> +	struct msi_chip *mchip;
+> +	struct device_node *np = pdev->dev.of_node;
+> +	struct st_irq_syscfg *ddata = dev_get_drvdata(&pdev->dev);
+> +	int channels, ret, i;
+> +	u32 device, invert;
 > +
-> +	/*
-> +	 * For MSI, irq_data.chip_data points to struct msi_chip.
-> +	 * For non-MSI, irq_data.chip_data points to struct gic_chip_data.
-> +	 */
-> +	if (d->msi_desc) {
-> +		mchip = irq_data_get_irq_chip_data(d);
-> +		gic_data = container_of(mchip, struct gic_chip_data, msi_chip);
-> +	} else {
-> +		gic_data = irq_data_get_irq_chip_data(d);
+
+
+> +	channels = of_property_count_u32_elems(np, "st,irq-device");
+> +	if (channels != ST_A9_IRQ_MAX_CHANS) {
+> +		dev_err(&pdev->dev, "st,enable-irq-device must have 2 elems\n");
+> +		return -EINVAL;
 > +	}
-> +	return gic_data;
+> +
+> +	channels = of_property_count_u32_elems(np, "st,fiq-device");
+> +	if (channels != ST_A9_IRQ_MAX_CHANS) {
+> +		dev_err(&pdev->dev, "st,enable-fiq-device must have 2 elems\n");
+> +		return -EINVAL;
+> +	}
+
+I would drop these two blocks,
+
+> +
+> +	for (i = 0; i < channels; i++) {
+
+then use ST_A9_IRQ_MAX_CHANS here
+
+> +		of_property_read_u32_index(np,"st,irq-device", i, &device);
+
+and dev_dbg() if of_property_read_u32_index() returns an error
+
+> +
+> +		ret = st_irq_xlate(pdev, device, i, true);
+> +		if (ret)
+> +			return ret;
+> +
+> +		of_property_read_u32_index(np,"st,fiq-device", i, &device);
+
+for both of these.
+
+> +
+> +		ret = st_irq_xlate(pdev, device, i, false);
+> +		if (ret)
+> +			return ret;
+> +	}
+> +
+> +	/* External IRQs may be inverted. */
+> +	of_property_read_u32(np, "st,invert-ext", &invert);
+> +	ddata->result |= ST_A9_EXTIRQ_INV_SEL(invert);
+> +
+> +	return regmap_update_bits(ddata->regmap, ddata->syscfg,
+> +				  ST_A9_IRQ_MASK, ddata->result);
 > +}
 > +
->  static inline void __iomem *gic_dist_base(struct irq_data *d)
->  {
-> -	struct gic_chip_data *gic_data = irq_data_get_irq_chip_data(d);
-> +	struct gic_chip_data *gic_data = irq_data_get_gic_chip_data(d);
->  	return gic_data_dist_base(gic_data);
->  }
->  
->  static inline void __iomem *gic_cpu_base(struct irq_data *d)
->  {
-> -	struct gic_chip_data *gic_data = irq_data_get_irq_chip_data(d);
-> +	struct gic_chip_data *gic_data = irq_data_get_gic_chip_data(d);
->  	return gic_data_cpu_base(gic_data);
->  }
->  
-> diff --git a/drivers/irqchip/irq-gic.h b/drivers/irqchip/irq-gic.h
-> index a4beb4a..1c6547d 100644
-> --- a/drivers/irqchip/irq-gic.h
-> +++ b/drivers/irqchip/irq-gic.h
-> @@ -8,6 +8,17 @@ union gic_base {
->  	void __percpu * __iomem *percpu_base;
->  };
->  
-> +#ifdef CONFIG_ARM_GIC_V2M
-> +struct v2m_data {
-> +	spinlock_t msi_cnt_lock;
-> +	struct resource res;      /* GICv2m resource */
-> +	void __iomem *base;       /* GICv2m virt address */
-> +	unsigned int spi_start;   /* The SPI number that MSIs start */
-> +	unsigned int nr_spis;     /* The number of SPIs for MSIs */
-> +	unsigned long *bm;        /* MSI vector bitmap */
+> +int st_irq_syscfg_probe(struct platform_device *pdev)
+> +{
+> +	struct device_node *np = pdev->dev.of_node;
+> +	const struct of_device_id *match;
+> +	struct st_irq_syscfg *ddata;
+> +
+> +	match = of_match_device(st_irq_syscfg_match, &pdev->dev);
+> +	if (!np)
+
+if (!match) ?
+
+> +		return -ENODEV;
+> +
+> +	ddata = devm_kzalloc(&pdev->dev, sizeof(*ddata), GFP_KERNEL);
+> +	if (!ddata)
+> +		return -ENOMEM;
+> +
+> +	ddata->regmap = syscon_regmap_lookup_by_phandle(np, "st,syscfg");
+> +	if (IS_ERR(ddata->regmap)) {
+> +		dev_err(&pdev->dev, "syscfg phandle missing\n");
+
+dev_dbg
+
+> +		return PTR_ERR(ddata->regmap);
+> +	}
+> +
+> +	dev_set_drvdata(&pdev->dev, ddata);
+> +
+> +	return st_irq_syscfg_enable(pdev);
+> +}
+> +
+> +static int st_irq_syscfg_resume(struct device *dev)
+> +{
+> +	struct st_irq_syscfg *ddata = dev_get_drvdata(dev);
+> +
+> +	return regmap_update_bits(ddata->regmap, ddata->syscfg,
+> +				  ST_A9_IRQ_MASK, ddata->result);
+> +}
+> +
+> +static SIMPLE_DEV_PM_OPS(st_irq_syscfg_pm_ops, NULL, st_irq_syscfg_resume);
+> +
+> +static struct platform_driver st_irq_syscfg_driver = {
+> +	.driver = {
+> +		.name = "st_irq_syscfg",
+> +		.pm = &st_irq_syscfg_pm_ops,
+> +		.of_match_table = st_irq_syscfg_match,
+> +	},
+> +	.probe = st_irq_syscfg_probe,
 > +};
-> +#endif
-
-This doesn't need ifdef.
-
 > +
->  struct gic_chip_data {
->  	union gic_base dist_base;
->  	union gic_base cpu_base;
-> @@ -20,12 +31,23 @@ struct gic_chip_data {
->  #endif
->  	struct irq_domain *domain;
->  	unsigned int gic_irqs;
-> -	struct irq_chip *irq_chip;
->  #ifdef CONFIG_GIC_NON_BANKED
->  	void __iomem *(*get_base)(union gic_base *);
->  #endif
-> +	struct irq_chip *irq_chip;
-> +	struct msi_chip msi_chip;
-> +#ifdef CONFIG_ARM_GIC_V2M
-> +	struct v2m_data v2m_data;
-> +#endif
+> +static int __init st_irq_syscfg_init(void)
+> +{
+> +	return platform_driver_register(&st_irq_syscfg_driver);
+> +}
+> +core_initcall(st_irq_syscfg_init);
 
-Making this a ptr would mean you only use space when the h/w supports
-v2m. It appears that would require a pointer in msi_chip to get access
-to gic_chip_data.
+thx,
 
->  };
->  
-> +#ifdef CONFIG_OF
-> +int _gic_of_init(struct device_node *node,
-> +		 struct device_node *parent,
-> +		 struct irq_chip *chip,
-> +		 struct gic_chip_data **gic) __init;
-> +#endif
-> +
->  void gic_mask_irq(struct irq_data *d);
->  void gic_unmask_irq(struct irq_data *d);
->  void gic_eoi_irq(struct irq_data *d);
-> @@ -42,11 +64,4 @@ int gic_set_affinity(struct irq_data *d,
->  int gic_set_wake(struct irq_data *d, unsigned int on);
->  #endif
->  
-> -#ifdef CONFIG_OF
-> -int _gic_of_init(struct device_node *node,
-> -		 struct device_node *parent,
-> -		 struct irq_chip *chip,
-> -		 struct gic_chip_data **gic) __init;
-> -#endif
-> -
-
-This change looks unnecessary.
-
-Rob
+Jason.
