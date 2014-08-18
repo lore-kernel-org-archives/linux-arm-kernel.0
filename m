@@ -1,48 +1,57 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Mon, 18 Aug 2014 20:38:25 +0800
-Subject: [PATCH v2] imx-drm: imx-drm-core: add suspend/resume support
-In-Reply-To: <53F1AE97.8090807@samsung.com>
-References: <1406269240-24622-1-git-send-email-shawn.guo@freescale.com>
- <53F1AE97.8090807@samsung.com>
-Message-ID: <20140818123823.GK2114@dragon>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Mon, 18 Aug 2014 14:40:07 +0200
+Subject: [PATCH v3] mmc: sdhci-pxav3: set_uhs_signaling is initialized
+ twice differently
+In-Reply-To: <1408107735-20775-1-git-send-email-peter.griffin@linaro.org>
+References: <1408107735-20775-1-git-send-email-peter.griffin@linaro.org>
+Message-ID: <CAPDyKFrC-8UE5k3FG8SumB8yTg+G0hGY0dzEXuV0RfQKt=64qg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andrzej,
+On 15 August 2014 15:02, Peter Griffin <peter.griffin@linaro.org> wrote:
+> .set_uhs_signaling field is currently initialised twice once to the
+> arch specific callback pxav3_set_uhs_signaling, and also to the generic
+> sdhci_set_uhs_signaling callback.
+>
+> This means that uhs is currently broken for this platform currently, as pxav3
+> has some special constriants which means it can't use the generic callback.
+>
+> This happened in
+> commit 96d7b78cfc2f ("mmc: sdhci: convert sdhci_set_uhs_signaling() into a library function")
+> commit a702c8abb2a9 ("mmc: host: split up sdhci-pxa, create sdhci-pxav3.c")'
+>
+> Fix this and hopefully prevent it happening in the future by ensuring named
+> initialisers always follow the declaration order in the structure definition.
+>
+> Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
 
-On Mon, Aug 18, 2014 at 09:43:19AM +0200, Andrzej Hajda wrote:
-> > diff --git a/drivers/staging/imx-drm/imx-drm-core.c b/drivers/staging/imx-drm/imx-drm-core.c
-> > index def8280d7ee6..ab41152089a3 100644
-> > --- a/drivers/staging/imx-drm/imx-drm-core.c
-> > +++ b/drivers/staging/imx-drm/imx-drm-core.c
-> > @@ -696,6 +696,29 @@ static int imx_drm_platform_remove(struct platform_device *pdev)
-> >  	return 0;
-> >  }
-> >  
-> > +#ifdef CONFIG_PM_SLEEP
-> > +static int imx_drm_suspend(struct device *dev)
-> > +{
-> > +	struct drm_device *drm_dev = dev_get_drvdata(dev);
-> > +
-> > +	drm_kms_helper_poll_disable(drm_dev);
-> 
-> drm_dev can be NULL here. You should add check before.
+Thanks! Applied for next and added a stable tag for v3.16+
 
-The drvdata is set to drm_dev in drm_driver .load() hook.  So are you
-saying that .suspend() hook could possibly be called before the .load()
-hook gets called?
+Kind regards
+Uffe
 
-Shawn
-
-> 
-> > +
-> > +	return 0;
-> > +}
-> > +
-> > +static int imx_drm_resume(struct device *dev)
-> > +{
-> > +	struct drm_device *drm_dev = dev_get_drvdata(dev);
-> > +
-> > +	drm_helper_resume_force_mode(drm_dev);
-> 
-> ditto
+> ---
+>  drivers/mmc/host/sdhci-pxav3.c | 3 +--
+>  1 file changed, 1 insertion(+), 2 deletions(-)
+>
+> diff --git a/drivers/mmc/host/sdhci-pxav3.c b/drivers/mmc/host/sdhci-pxav3.c
+> index 6f842fb..3434c79 100644
+> --- a/drivers/mmc/host/sdhci-pxav3.c
+> +++ b/drivers/mmc/host/sdhci-pxav3.c
+> @@ -224,12 +224,11 @@ static void pxav3_set_uhs_signaling(struct sdhci_host *host, unsigned int uhs)
+>
+>  static const struct sdhci_ops pxav3_sdhci_ops = {
+>         .set_clock = sdhci_set_clock,
+> -       .set_uhs_signaling = pxav3_set_uhs_signaling,
+>         .platform_send_init_74_clocks = pxav3_gen_init_74_clocks,
+>         .get_max_clock = sdhci_pltfm_clk_get_max_clock,
+>         .set_bus_width = sdhci_set_bus_width,
+>         .reset = pxav3_reset,
+> -       .set_uhs_signaling = sdhci_set_uhs_signaling,
+> +       .set_uhs_signaling = pxav3_set_uhs_signaling,
+>  };
+>
+>  static struct sdhci_pltfm_data sdhci_pxav3_pdata = {
+> --
+> 1.9.1
+>
