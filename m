@@ -1,66 +1,171 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Mon, 18 Aug 2014 11:32:09 -0500
-Subject: Lock Directory failure
-Message-ID: <20140818163209.GJ9662@saruman.home>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 18 Aug 2014 10:34:24 -0600
+Subject: [PATCH] ARM: tegra: remove pinmux setup from Tegra124 boards
+In-Reply-To: <1407921548.5835.20.camel@weser.hi.pengutronix.de>
+References: <1403563506-6461-1-git-send-email-swarren@wwwdotorg.org>
+ <1407921548.5835.20.camel@weser.hi.pengutronix.de>
+Message-ID: <53F22B10.1010106@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi folks,
+On 08/13/2014 03:19 AM, Lucas Stach wrote:
+> Hi Stephen,
+>
+> sorry for getting on this late, I completely missed this and only now
+> stumbled upon this.
+>
+> I'm not really fond of this change. The barebox bootloader completely
+> probes itself from DT, including the pinmux. We try to stay as close as
+> possible to the upstream kernel DTs and only introduce minimal changes.
+> Removing the pinmux from the DTS will completely break barebox, as we
+> don't have any static pinmux tables there.
+>
+> In order to not break the bootloader use-case I strongly advocate to
+> keep the static pinmux in the DT. Can't we just rename the the state to
+> something like "initial", so Linux won't try to set it by default? This
+> way we could still keep the information in the DT, while being able to
+> say "if you are going to program the initial pinmux state you need to
+> follow the sequence defined by NVIDIA syseng".
+>
+> This obviously would make the naming of the state part of the binding,
+> but I think this may be acceptable.
 
-with today's Linux next I keep getting below kernel error rather
-frequently with my beagle bone black (ARM Cortex A8):
+Linus, what do you think of Lucas's proposal?
 
-[    5.096203] systemd[1]: Mounting User Runtime Directory...
-         Mounting User Runtime Directory...
-[    5.135060] systemd[1]: Mounting Lock Directory...
-         Mounting Lock Directory...
-[    5.183453] systemd[1]: Started Various fixups to make systemd work better on Debian.
-[    5.248340] systemd[1]: Starting Load Random Seed...
-[    5.295601] Unable to handle kernel paging request at virtual address 6c617578
-[    5.303340] pgd = de5c0000
-[    5.306169] [6c617578] *pgd=00000000
-[    5.309969] Internal error: Oops: 805 [#1] SMP ARM
-[    5.314972] Modules linked in:
-[    5.318170] CPU: 0 PID: 1092 Comm: mount Not tainted 3.17.0-rc1-next-20140818-00002-gd236526 #636
-[    5.327433] task: de6d0dc0 ti: de350000 task.ti: de350000
-[    5.333082] PC is at mnt_set_mountpoint+0x80/0x94
-[    5.337996] LR is at _raw_spin_unlock+0x20/0x24
-[    5.342723] pc : [<c0148114>]    lr : [<c0564f84>]    psr: 20000013
-[    5.342723] sp : de351eb8  ip : 00000000  fp : 00000000
-[    5.354705] r10: de024dc0  r9 : de250740  r8 : c01487ac
-[    5.360157] r7 : de024dc0  r6 : ddd44468  r5 : de1ecc40  r4 : de250740
-[    5.366969] r3 : 6c617574  r2 : de1eccb8  r1 : de6d0dc0  r0 : ddd444c8
-[    5.373783] Flags: nzCv  IRQs on  FIQs on  Mode SVC_32  ISA ARM  Segment user
-[    5.381230] Control: 10c5387d  Table: 9e5c0019  DAC: 00000015
-[    5.387226] Process mount (pid: 1092, stack limit = 0xde350248)
-[    5.393405] Stack: (0xde351eb8 to 0xde352000)
-[    5.397952] 1ea0:                                                       de1ecc68 de1ecc40
-[    5.406490] 1ec0: de1ecc40 00000000 c0824380 c0148690 00000001 00000000 c01487ac 00000000
-[    5.415028] 1ee0: ddd44468 00000000 de022000 de1ecc40 de250740 de351f38 00000027 de6a7180
-[    5.423567] 1f00: de151740 00000000 00000000 c01487ac 00000008 00000027 c087c3c0 de1ecc50
-[    5.432105] 1f20: c0874cc0 c0149864 de6ae000 de6ae000 000250d8 c0080d4c de024dd0 ddd44468
-[    5.440644] 1f40: de6aefff 00000000 21977150 00001000 de351f8c 00000000 de1e1000 000250b8
-[    5.449182] 1f60: c0ed000e c000e604 de350000 00000000 000250d8 c014a52c de6ae000 00000006
-[    5.457720] 1f80: c000e604 de151740 de6a7180 de6ae000 c0ed000e 00025150 00023548 c0ed000e
-[    5.466259] 1fa0: 00000015 c000e440 00025150 00023548 000250b8 000250c8 000250d8 c0ed000e
-[    5.474797] 1fc0: 00025150 00023548 c0ed000e 00000015 be8deb7c 00000000 00025150 000250d8
-[    5.483335] 1fe0: b6e125f0 be8deaf8 0000c708 b6e12600 60000010 000250b8 00000000 00000000
-[    5.491887] [<c0148114>] (mnt_set_mountpoint) from [<c0148690>] (attach_recursive_mnt+0x278/0x294)
-[    5.501244] [<c0148690>] (attach_recursive_mnt) from [<c01487ac>] (do_add_mount+0x90/0xd8)
-[    5.509875] [<c01487ac>] (do_add_mount) from [<c0149864>] (do_mount+0x234/0xb78)
-[    5.517599] [<c0149864>] (do_mount) from [<c014a52c>] (SyS_mount+0x84/0xb8)
-[    5.524877] [<c014a52c>] (SyS_mount) from [<c000e440>] (ret_fast_syscall+0x0/0x48)
-[    5.532783] Code: e594300c e2852078 e3530000 e5853078 (15832004) 
-[    5.539224] ---[ end trace 29fe002647800da6 ]---
+As background, the Tegra HW design implies that all initial pinmux setup 
+should be applied one time early during boot before peripherals are 
+used. That means it should happen early in boot code, not once an OS 
+like Linux has been loaded, since loading the OS requires use of at 
+least some peripheral(s). Hence, there's no point the kernel re-applying 
+the same configuration.
 
-since that's mounted as tmpfs, adding Hugh
+I had suggested (in this patch) removing the pinmux completely from the 
+DT, since no OS should need it. However, the Barebox bootloader is 
+configured via DT, and so wants to keep the pinmux configuration in the 
+DT, rather than embedding the pinmux tables into the bootloader's board 
+support code. Lucas has suggested simply changing the pinmux state name 
+in the DT so that the kernel won't apply the pinmux configuration yet 
+it's still there for the bootloader to use if it wants.
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140818/183bc840/attachment.sig>
+I'd suggest "boot" rather than "initial" myself for the new state name, 
+but that's just bike-shedding.
+
+> Regards,
+> Lucas
+>
+> Am Montag, den 23.06.2014, 16:45 -0600 schrieb Stephen Warren:
+>> From: Stephen Warren <swarren@nvidia.com>
+>>
+>> The defined mechanism for programming the Tegra pinmux is to perform all
+>> of the following at once:
+>>
+>> - Set the CLAMP_INPUTS_WHEN_TRISTATED PMC register bit.
+>> - Set up any GPIO pins to their "initial" state.
+>> - Program all pinmux settings in one go.
+>>
+>> Other methods such as:
+>>
+>> - Not setting CLAMP_INPUTS_WHEN_TRISTATED.
+>> - Not setting GPIOs to their "initial" state before programming the
+>>    pinmux settings of the related pin, in particular the mux function.
+>> - Not programming the entire pinmux at once, in order to avoid
+>>    possible conflicting settings.
+>>
+>> ... are not qualified or supported by NVIDIA ASIC/syseng. They could
+>> cause glitches or undesired output levels on some pins, or controller
+>> malfunction.
+>>
+>> While we've been getting away with doing something different on many
+>> Tegra boards without issue, I believe we've just been getting lucky.
+>> I'd like to switch all Tegra124 systems to the correct scheme now so
+>> they provide the right example to follow, and require that any new
+>> boards we support upstream work in the same fashion.
+>>
+>> While it would be nice to update boards containing older SoCs for
+>> consistency, I don't anticipate doing so. It's too much churn to change
+>> at this time. At least with all Tegra124 boards converted, the most
+>> recent boards provide the correct example.
+>>
+>> Since the bootloader needs to reprogram the pinmux to access certain
+>> peripherals, it must program the entire pinmux due to the supported
+>> rules above. As such, there is no need to program any part of the pinmux
+>> from the kernel, unless dynamic pinmuxing is used. Hence, this change
+>> removes all static pinmux from all Tegra124 board DTs.
+>>
+>> The following U-Boot commits fully initialize the pinmux:
+>>
+>> Jetson TK1: 4ff213b8e478 ARM: tegra: clamp inputs on Jetson TK1
+>>
+>> Venice2: 3365479ce78a ARM: tegra: Venice2 pinmux spreadsheet updates
+>>
+>> Without those commits, the only fallout I see from this change is that
+>> HDMI on Venice2 no longer works. Given the very small user-base of this
+>> platform, I feel that requiring a bootloader update is reasonable.
+>>
+>> Cc: Andrew Bresticker <abrestic@chromium.org>
+>> Cc: Doug Anderson <dianders@chromium.org>
+>> Cc: Dylan Reid <dgreid@chromium.org>
+>> Cc: Laxman Dewangan <ldewangan@nvidia.com>
+>> Cc: Thierry Reding <treding@nvidia.com>
+>> Cc: Olof Johansson <olof@lixom.net>
+>> Signed-off-by: Stephen Warren <swarren@nvidia.com>
+>> ---
+>>   arch/arm/boot/dts/tegra124-jetson-tk1.dts | 1320 -----------------------------
+>>   arch/arm/boot/dts/tegra124-venice2.dts    |  541 ------------
+>>   2 files changed, 1861 deletions(-)
+>>
+>> diff --git a/arch/arm/boot/dts/tegra124-jetson-tk1.dts b/arch/arm/boot/dts/tegra124-jetson-tk1.dts
+>> index 16082c0bdaca..4935910b16e2 100644
+>> --- a/arch/arm/boot/dts/tegra124-jetson-tk1.dts
+>> +++ b/arch/arm/boot/dts/tegra124-jetson-tk1.dts
+>> @@ -30,1326 +30,6 @@
+>>   		};
+>>   	};
+>>
+>> -	pinmux: pinmux at 0,70000868 {
+>> -		pinctrl-names = "default";
+>> -		pinctrl-0 = <&state_default>;
+>> -
+>> -		state_default: pinmux {
+>> -			clk_32k_out_pa0 {
+>> -				nvidia,pins = "clk_32k_out_pa0";
+>> -				nvidia,function = "soc";
+>> -				nvidia,pull = <TEGRA_PIN_PULL_UP>;
+>> -				nvidia,tristate = <TEGRA_PIN_DISABLE>;
+>> -				nvidia,enable-input = <TEGRA_PIN_ENABLE>;
+>> -			};
+...
+>> -			jtag_rtck {
+>> -				nvidia,pins = "jtag_rtck";
+>> -				nvidia,function = "rtck";
+>> -				nvidia,pull = <TEGRA_PIN_PULL_UP>;
+>> -				nvidia,tristate = <TEGRA_PIN_DISABLE>;
+>> -				nvidia,enable-input = <TEGRA_PIN_DISABLE>;
+>> -			};
+>> -		};
+>> -	};
+
+>> diff --git a/arch/arm/boot/dts/tegra124-venice2.dts b/arch/arm/boot/dts/tegra124-venice2.dts
+
+>> -	pinmux: pinmux at 0,70000868 {
+>> -		pinctrl-names = "default";
+>> -		pinctrl-0 = <&pinmux_default>;
+>> -
+>> -		pinmux_default: common {
+>> -			dap_mclk1_pw4 {
+>> -				nvidia,pins = "dap_mclk1_pw4";
+>> -				nvidia,function = "extperiph1";
+>> -				nvidia,enable-input = <TEGRA_PIN_DISABLE>;
+>> -				nvidia,pull = <TEGRA_PIN_PULL_NONE>;
+>> -				nvidia,tristate = <TEGRA_PIN_DISABLE>;
+>> -			};
+...
+>> -			hp_det_l {
+>> -				nvidia,pins = "ulpi_data1_po2";
+>> -				nvidia,function = "spi3";
+>> -				nvidia,pull = <TEGRA_PIN_PULL_NONE>;
+>> -				nvidia,tristate = <TEGRA_PIN_DISABLE>;
+>> -				nvidia,enable-input = <TEGRA_PIN_ENABLE>;
+>> -			};
+>> -		};
+>> -	};
