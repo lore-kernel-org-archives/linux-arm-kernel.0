@@ -1,39 +1,114 @@
-From: carlo@caione.org (Carlo Caione)
-Date: Mon, 18 Aug 2014 15:33:25 +0200
-Subject: [PATCH 7/7] ARM: meson: update documentation (uart, timer and
- vendors)
-In-Reply-To: <53F1D73F.8010204@gmail.com>
-References: <1408272594-10814-1-git-send-email-carlo@caione.org>
- <1408272594-10814-8-git-send-email-carlo@caione.org>
- <53F1D73F.8010204@gmail.com>
-Message-ID: <20140818133325.GC28819@carlo-MacBookPro>
+From: daniel.thompson@linaro.org (Daniel Thompson)
+Date: Mon, 18 Aug 2014 14:40:48 +0100
+Subject: [PATCH v9 00/16] arm: KGDB NMI/FIQ support
+In-Reply-To: <1404979427-12943-1-git-send-email-daniel.thompson@linaro.org>
+References: <1404979427-12943-1-git-send-email-daniel.thompson@linaro.org>
+Message-ID: <1408369264-14242-1-git-send-email-daniel.thompson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 18, 2014 at 12:36:47PM +0200, Matthias Brugger wrote:
-> 
-> 
-> On 17/08/14 12:49, Carlo Caione wrote:
-> >New UART and timer bindings are documented. A new vendor is added to the
-> >vendors list.
-> >
-> >Signed-off-by: Carlo Caione <carlo@caione.org>
-> >---
-> >  .../devicetree/bindings/serial/amlogic,meson-uart.txt   | 17 +++++++++++++++++
-> >  .../devicetree/bindings/timer/amlogic,meson6-timer.txt  | 16 ++++++++++++++++
-> >  Documentation/devicetree/bindings/vendor-prefixes.txt   |  1 +
-> >  3 files changed, 34 insertions(+)
-> >  create mode 100644 Documentation/devicetree/bindings/serial/amlogic,meson-uart.txt
-> >  create mode 100644 Documentation/devicetree/bindings/timer/amlogic,meson6-timer.txt
-> 
-> This should be three patches for the different files. It might
-> happen, that for example your timer driver get merged through a
-> different tree then arm-soc. For the merge, the driver and the
-> documentation should go togehter.
+This patchset makes it possible to use kgdb's NMI infrastructure on ARM
+platforms.
 
-Right. Thank you for pointing this out.
+The patches are seperated into three distinct groups:
 
-Best,
+1. arm specific changes; these provide multi-platform support for FIQ
+   (including raising an IPI using FIQ to ensure effective SMP support)
+   and extend ARM KGDB support to use the features provided.
 
--- 
-Carlo Caione
+2. irqchip changes; updates to the gic and vic drivers to provide
+   support for routing certain interrupt sources to FIQ.
+
+3. serial changes; driver support to allow the UART interrupt to be
+   routed to FIQ. The already mainlined kgdb NMI infrastructure (mostly
+   found in drivers/tty/serial/kgdb_nmi.c) will re-route the kgdb
+   console UART's interrupt signal from IRQ to FIQ. Naturally the UART
+   will no longer function normally and will instead be managed by kgdb
+   using the polled I/O functions. Any character delivered to the UART
+   causes the kgdb handler function to be called.
+
+Tested on qemu (versatile), STiH416 (B2020 board) and Freescale i.MX6
+quad (wandboard).
+
+Changes since v8:
+
+- Significant rework to separate the FIQ exception handler from kgdb.
+  This allows other features typically implemented using NMI on x86
+  to reuse the same exception handling code (Russell King)
+- Reunited arch/arm and driver code into a single patch series again.
+- Added support for raising IPIs using FIQ (makes kgdb quiesce must
+  more robust).
+- Introduced a workaround for GICv1 devices to avoid FIQs being
+  spuriously handled as IRQs.
+
+Changes since v7:
+
+- Introduced ack_fiq() to complement eoi_fiq(). Without this it is
+  not possible to meet the GIC specification (previous versions worked
+  when tested but are unpredictable according to the specification).
+  ack_fiq() also makes is possible for drivers for devices with multiple
+  interrupt lines to discover the interrupt source correctly.
+
+Changes since v6:
+
+- Corrected off-by-one comparison in has_fiq() (Nicolas Pitre)
+- Rewrote the FIQ stack initialization (Nicolas Pitre). This fixes a
+  serious data corruption bug due to bad stack mismanagement.
+- Introduced __fiq_abt to ensure lr_abt and spsr_abt are saved and
+  restored if we fast-interrupt an abort (Russell King).
+- Significantly improved the commenting of the exception handlers.
+- Added a call to trace_hardirqs_on() if we clear the I bit as we
+  exit the exception handler.
+
+Changes since v5:
+
+- Separated anything not strictly impacting arch/arm.
+- Fixed a spurious add/remove of code within the series (there was
+  broken code in intermediate patches)
+
+For previous changes see:
+http://thread.gmane.org/gmane.linux.ports.arm.kernel/333901
+
+Daniel Thompson (15):
+  arm: fiq: Add callbacks to manage FIQ routings
+  arm: fiq: Allow ACK and EOI to be passed to the intc
+  arm: fiq: Replace default FIQ handler
+  arm: smp: Introduce a special IPI signalled using FIQ
+  arm: KGDB/KDB FIQ support
+  irqchip: gic: Provide support for interrupt grouping
+  irqchip: gic: Add support for FIQ management
+  irqchip: gic: Remove spin locks from eoi_irq
+  irqchip: gic: Add support for IPI FIQ
+  irqchip: gic: Group 0 workaround.
+  irqchip: vic: Add support for FIQ management
+  serial: amba-pl011: Pass FIQ information to KGDB.
+  serial: asc: Add support for KGDB's FIQ/NMI mode
+  serial: asc: Adopt readl_/writel_relaxed()
+  serial: imx: Add support for KGDB's FIQ/NMI mode
+
+Dirk Behme (1):
+  serial: imx: clean up imx_poll_get_char()
+
+ arch/arm/Kconfig                |   2 +
+ arch/arm/Kconfig.debug          |  19 +++
+ arch/arm/include/asm/fiq.h      |  18 +++
+ arch/arm/include/asm/hardirq.h  |   2 +-
+ arch/arm/include/asm/kgdb.h     |   4 +
+ arch/arm/include/asm/smp.h      |   7 +
+ arch/arm/kernel/entry-armv.S    | 125 ++++++++++++++--
+ arch/arm/kernel/fiq.c           | 139 +++++++++++++++++-
+ arch/arm/kernel/kgdb.c          | 115 ++++++++++++++-
+ arch/arm/kernel/setup.c         |   8 +-
+ arch/arm/kernel/smp.c           |  15 ++
+ arch/arm/mach-versatile/core.c  |   2 +-
+ drivers/irqchip/irq-gic.c       | 307 +++++++++++++++++++++++++++++++++++++---
+ drivers/irqchip/irq-vic.c       |  92 +++++++++---
+ drivers/tty/serial/Kconfig      |   2 +-
+ drivers/tty/serial/amba-pl011.c |  94 +++++++-----
+ drivers/tty/serial/imx.c        |  88 +++++++-----
+ drivers/tty/serial/st-asc.c     |  27 +++-
+ include/linux/irqchip/arm-vic.h |   6 +-
+ 19 files changed, 934 insertions(+), 138 deletions(-)
+
+--
+1.9.3
