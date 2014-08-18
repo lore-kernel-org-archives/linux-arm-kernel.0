@@ -1,48 +1,67 @@
-From: Baohua.Song@csr.com (Barry Song)
-Date: Mon, 18 Aug 2014 16:49:25 +0800
-Subject: [PATCH 6/6] ARM: dts: atlas6: Add I2S external clock input pingroup
-In-Reply-To: <1408351765-18253-1-git-send-email-Baohua.Song@csr.com>
-References: <1408351765-18253-1-git-send-email-Baohua.Song@csr.com>
-Message-ID: <1408351765-18253-6-git-send-email-Baohua.Song@csr.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Mon, 18 Aug 2014 10:57:24 +0200
+Subject: [PATCH] pwm: Fix period and polarity in pwm_get() for
+ non-perfect matches
+In-Reply-To: <CAMuHMdVLA4xRGKrsyGTokZvRWkNAFyNv+_JycavfpibO8GXkkQ@mail.gmail.com>
+References: <1407943133-18170-1-git-send-email-geert+renesas@glider.be>
+ <20140818082039.GA31171@ulmo>
+ <CAMuHMdVLA4xRGKrsyGTokZvRWkNAFyNv+_JycavfpibO8GXkkQ@mail.gmail.com>
+Message-ID: <20140818085722.GE31171@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Rongjun Ying <rongjun.ying@csr.com>
+On Mon, Aug 18, 2014 at 10:38:00AM +0200, Geert Uytterhoeven wrote:
+> Hi Thierry,
+> 
+> On Mon, Aug 18, 2014 at 10:20 AM, Thierry Reding
+> <thierry.reding@gmail.com> wrote:
+> > Could we achieve the same by storing a pointer to the best match and
+> > then use that instead of p? Perhaps something like this:
+> >
+> >         struct pwm_lookup *entry;
+> >
+> >         ...
+> >
+> >                 if (match > best) {
+> >                         chip = pwmchip_find_by_name(p->provider);
+> >                         entry = p;
+> >
+> >                         if (match != 3)
+> >                                 best = match;
+> >                         else
+> >                                 break;
+> >                 }
+> >
+> >         ...
+> >
+> >         if (chip)
+> >                 pwm = pwm_request_from_chip(chip, entry->index,
+> >                                             con_id ?: dev_id);
+> >         if (IS_ERR(pwm))
+> >                 return pwm;
+> >
+> >         pwm_set_period(pwm, entry->period);
+> >         pwm_set_polarity(pwm, entry->polarity);
+> >
+> > ?
+> 
+> That's possible. But that will add complexity, as you have to move the
+> "mutex_unlock(&pwm_lookup_lock);" after the last user of "entry" again,
+> and add a goto for the IS_ERR(pwm) case.
+> So I'm not sure it's worth the effort.
 
-The I2S controller can use the external clock as reference clock with
-master mode. But based on different hardware or software design, this
-external clock might be needed or not needed.
-So the external input pin can be an independent pinctrl group, and the
-card driver can decice to get it or not.
+Oh, right. It would've been nice to avoid all the temporary variables,
+but we can always refactor if that turns out to become too messy. I'll
+apply this one for now.
 
-Signed-off-by: Rongjun Ying <rongjun.ying@csr.com>
-Signed-off-by: Barry Song <Baohua.Song@csr.com>
----
- arch/arm/boot/dts/atlas6.dtsi | 6 ++++++
- 1 file changed, 6 insertions(+)
+I'll shorten the SHA-1 in the Fixes: line to 12 characters if you don't
+mind to match the guidelines in Documentation/SubmittingPatches.
 
-diff --git a/arch/arm/boot/dts/atlas6.dtsi b/arch/arm/boot/dts/atlas6.dtsi
-index d3de7a3..1eb83c8 100644
---- a/arch/arm/boot/dts/atlas6.dtsi
-+++ b/arch/arm/boot/dts/atlas6.dtsi
-@@ -528,6 +528,12 @@
-                                                 sirf,function = "i2s_mclk";
-                                         };
-                                 };
-+				i2s_ext_clk_input_pins_a: i2s_ext_clk_input at 0 {
-+                                        i2s_ext_clk_input {
-+                                                sirf,pins = "i2s_ext_clk_inputgrp";
-+                                                sirf,function = "i2s_ext_clk_input";
-+                                        };
-+                                };
-                                 i2s_pins_a: i2s at 0 {
-                                         i2s {
-                                                 sirf,pins = "i2sgrp";
--- 
-2.0.4
-
-
-
-Member of the CSR plc group of companies. CSR plc registered in England and Wales, registered number 4187346, registered office Churchill House, Cambridge Business Park, Cowley Road, Cambridge, CB4 0WZ, United Kingdom
-More information can be found at www.csr.com. Keep up to date with CSR on our technical blog, www.csr.com/blog, CSR people blog, www.csr.com/people, YouTube, www.youtube.com/user/CSRplc, Facebook, www.facebook.com/pages/CSR/191038434253534, or follow us on Twitter at www.twitter.com/CSR_plc.
-New for 2014, you can now access the wide range of products powered by aptX at www.aptx.com.
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140818/9c917173/attachment-0001.sig>
