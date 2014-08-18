@@ -1,80 +1,69 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Sun, 17 Aug 2014 19:50:10 -0500
-Subject: [PATCHv9 3/3] arm: dts: Add Altera SDRAM controller bindings
-In-Reply-To: <1406744573-609-4-git-send-email-tthayer@opensource.altera.com>
-References: <1406744573-609-1-git-send-email-tthayer@opensource.altera.com>
- <1406744573-609-4-git-send-email-tthayer@opensource.altera.com>
-Message-ID: <53F14DC2.70000@gmail.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Mon, 18 Aug 2014 14:38:06 +0200
+Subject: [PATCH 0/5] MMC cleanup of dev_pm_ops and .owner
+In-Reply-To: <1407860069-12706-1-git-send-email-peter.griffin@linaro.org>
+References: <1407860069-12706-1-git-send-email-peter.griffin@linaro.org>
+Message-ID: <CAPDyKFr5ESzjEd3DUO7aMKN9K_Ytuw8GY-fgEyCM4sCGJAX3NQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/30/2014 01:22 PM, tthayer at opensource.altera.com wrote:
-> From: Thor Thayer <tthayer@opensource.altera.com>
-> 
-> Add the Altera SDRAM controller bindings and device tree changes to the Altera SoC project.
-> 
-> Signed-off-by: Thor Thayer <tthayer@opensource.altera.com>
-> ---
-> v2: Changes to SoC SDRAM EDAC code.
-> 
-> v3: Implement code suggestions for SDRAM EDAC code.
-> 
-> v4: Remove syscon from SDRAM controller bindings.
-> 
-> v5: No Change, bump version for consistency.
-> 
-> v6: Only map the ctrlcfg register as syscon.
-> 
-> v7: No change. Bump for consistency.
-> 
-> v8: No change. Bump for consistency.
-> 
-> v9: Changes to support a MFD SDRAM controller with nested EDAC.
-> ---
->  .../devicetree/bindings/arm/altera/socfpga-sdr.txt |   13 +++++++++++++
->  arch/arm/boot/dts/socfpga.dtsi                     |   10 ++++++++++
->  2 files changed, 23 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/arm/altera/socfpga-sdr.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/arm/altera/socfpga-sdr.txt b/Documentation/devicetree/bindings/arm/altera/socfpga-sdr.txt
-> new file mode 100644
-> index 0000000..2bb1ddf
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/arm/altera/socfpga-sdr.txt
-> @@ -0,0 +1,13 @@
-> +Altera SOCFPGA SDRAM Controller
-> +The SDRAM controller is implemented as a MFD so various drivers may
-> +nest under this main SDRAM controller binding.
-> +
-> +Required properties:
-> +- compatible : "altr,sdr";
-> +- reg : Should contain 1 register range(address and length)
-> +
-> +Example:
-> +	sdr at 0xffc25000 {
-> +		compatible = "altr,sdr";
-> +		reg = <0xffc25000 0x1000>;
-> +	};
-> diff --git a/arch/arm/boot/dts/socfpga.dtsi b/arch/arm/boot/dts/socfpga.dtsi
-> index 4676f25..ecb306d 100644
-> --- a/arch/arm/boot/dts/socfpga.dtsi
-> +++ b/arch/arm/boot/dts/socfpga.dtsi
-> @@ -603,6 +603,16 @@
->  			};
->  		};
->  
-> +		sdr at 0xffc25000 {
-> +			compatible = "altr,sdr";
-> +			reg = <0xffc25000 0x1000>;
-> +
-> +			sdramedac at 0 {
-> +				compatible = "altr,sdram-edac";
-> +				interrupts = <0 39 4>;
-> +			};
+On 12 August 2014 18:14, Peter Griffin <peter.griffin@linaro.org> wrote:
+> This series cleans up a few platform drivers in how they are declaring there
+> dev_pm_ops structs, and gets rid of a few now redundant #else conditions.
+>
+> Also it removes the .owner field of drivers which use module_platform_driver
+> api to register themselves, as this field gets overwritten.
+>
+> Peter Griffin (5):
+>   mmc: remove .owner field for drivers using module_platform_driver
+>   mmc: dw_mmc-pci: Remove superflous #else condition on CONFIG_PM_SLEEP
+>   mmc: dw_mmc-pltfm: Remove superflous #else condition on
+>     CONFIG_PM_SLEEP
+>   mmc: sdhci-pci: Use SET_RUNTIME_PM_OPS macro to set runtime pm
+>     callbacks
+>   mmc: sdhci-acpi.c: Use SET_RUNTIME_PM_OPS macro to set runtime pm
+>     callbacks
 
-This doesn't match the documentation, but I don't think this is a move
-in the right direction anyway. Because Linux has/wants an MFD driver is
-not a reason to add a sub node. It is a single h/w block and DT should
-reflect that.
+Thanks! Applied for next!
 
-Rob
+Kind regards
+Uffe
+
+>
+>  drivers/mmc/host/dw_mmc-pci.c      |  3 ---
+>  drivers/mmc/host/dw_mmc-pltfm.c    |  3 ---
+>  drivers/mmc/host/jz4740_mmc.c      |  1 -
+>  drivers/mmc/host/moxart-mmc.c      |  1 -
+>  drivers/mmc/host/mxcmmc.c          |  1 -
+>  drivers/mmc/host/mxs-mmc.c         |  1 -
+>  drivers/mmc/host/omap.c            |  1 -
+>  drivers/mmc/host/omap_hsmmc.c      |  1 -
+>  drivers/mmc/host/pxamci.c          |  1 -
+>  drivers/mmc/host/rtsx_pci_sdmmc.c  |  1 -
+>  drivers/mmc/host/rtsx_usb_sdmmc.c  |  1 -
+>  drivers/mmc/host/s3cmci.c          |  1 -
+>  drivers/mmc/host/sdhci-acpi.c      | 11 ++---------
+>  drivers/mmc/host/sdhci-bcm-kona.c  |  1 -
+>  drivers/mmc/host/sdhci-bcm2835.c   |  1 -
+>  drivers/mmc/host/sdhci-cns3xxx.c   |  1 -
+>  drivers/mmc/host/sdhci-dove.c      |  1 -
+>  drivers/mmc/host/sdhci-esdhc-imx.c |  1 -
+>  drivers/mmc/host/sdhci-msm.c       |  1 -
+>  drivers/mmc/host/sdhci-of-arasan.c |  1 -
+>  drivers/mmc/host/sdhci-of-esdhc.c  |  1 -
+>  drivers/mmc/host/sdhci-of-hlwd.c   |  1 -
+>  drivers/mmc/host/sdhci-pci.c       | 11 ++---------
+>  drivers/mmc/host/sdhci-pxav2.c     |  1 -
+>  drivers/mmc/host/sdhci-pxav3.c     |  1 -
+>  drivers/mmc/host/sdhci-s3c.c       |  1 -
+>  drivers/mmc/host/sdhci-sirf.c      |  1 -
+>  drivers/mmc/host/sdhci-spear.c     |  1 -
+>  drivers/mmc/host/sdhci-tegra.c     |  1 -
+>  drivers/mmc/host/sh_mmcif.c        |  1 -
+>  drivers/mmc/host/sh_mobile_sdhi.c  |  1 -
+>  drivers/mmc/host/sunxi-mmc.c       |  1 -
+>  32 files changed, 4 insertions(+), 52 deletions(-)
+>
+> --
+> 1.9.1
+>
