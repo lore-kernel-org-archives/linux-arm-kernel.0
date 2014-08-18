@@ -1,31 +1,82 @@
-From: pawel.moll@arm.com (Pawel Moll)
-Date: Mon, 18 Aug 2014 18:20:49 +0100
-Subject: [PATCH] bus: arm-ccn: Fix warning message
-Message-ID: <1408382449-13685-1-git-send-email-pawel.moll@arm.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Mon, 18 Aug 2014 19:22:54 +0200
+Subject: [PATCH v2 1/3] arm64: spin-table: handle unmapped
+ cpu-release-addrs
+In-Reply-To: <20140818164721.GC24600@localhost>
+References: <20140813125844.GE32644@leverpostej>
+ <20140814171323.GH9039@arm.com>
+ <CAKv+Gu9ftjZby+5U5Vs0hXhyFdNLwx4MwvC-LL=y3a9eSz34iQ@mail.gmail.com>
+ <20140815115714.GP27466@arm.com>
+ <CAKv+Gu-2RyWY4V7zoOQEi3As96kmmAMae2s3YauJ4bL9-h+sdg@mail.gmail.com>
+ <20140815125324.GQ27466@arm.com>
+ <CAKv+Gu9vj=b3pOJC3-x+QdjcErHShicEw-_6UHABG_j3qkGGOw@mail.gmail.com>
+ <1408113355.599.146.camel@deneb.redhat.com>
+ <20140815143804.GW27466@arm.com>
+ <20140817000609.GC22224@bivouac.eciton.net>
+ <20140818164721.GC24600@localhost>
+Message-ID: <CAKv+Gu9ou48Xhmkwnx8dGzds-ZP6V2pPE68Bjr2_dPFyfBzgsQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A message warning a user about wrong vc value was printing
-out port instead.
+On 18 August 2014 18:47, Catalin Marinas <catalin.marinas@arm.com> wrote:
+> On Sun, Aug 17, 2014 at 01:06:09AM +0100, Leif Lindholm wrote:
+>> On Fri, Aug 15, 2014 at 03:38:04PM +0100, Will Deacon wrote:
+>> > On Fri, Aug 15, 2014 at 03:35:55PM +0100, Mark Salter wrote:
+>> > > On Fri, 2014-08-15 at 15:28 +0200, Ard Biesheuvel wrote:
+>> > > > On 15 August 2014 14:53, Will Deacon <will.deacon@arm.com> wrote:
+>> > > > > On Fri, Aug 15, 2014 at 01:07:16PM +0100, Ard Biesheuvel wrote:
+>> > > > >> On 15 August 2014 13:57, Will Deacon <will.deacon@arm.com> wrote:
+>> > > > >> > I was planning to take all of these for 3.18 as there's no regression here
+>> > > > >> > (the fuzzing is a new debug feature and defaults to `n'). Do you think these
+>> > > > >> > qualify as -rc1 material?
+>> > > > >>
+>> > > > >> Considering that TEXT_OFFSET fuzzing is recommended to be turned on
+>> > > > >> for distro kernels, I would say this is definitely appropriate for
+>> > > > >> 3.17
+>> > > > >
+>> > > > > Whilst I see that in the commit log, the same recommendation doesn't appear
+>> > > > > in the Kconfig text and I'm not sure that it's such a wise thing to say
+>> > > > > either. From a distribution's point of view, I think I'd want any kernel
+>> > > > > issues to be as reproducible as possible, and fuzzing the text offset seems
+>> > > > > to go against that.
+>> > > >
+>> > > > OK. There is one other real world issue that 3/3 addresses, which are
+>> > > > platforms that have memreserves at the base of DRAM containing bits of
+>> > > > UEFI itself (this is what got this whole discussion going in the first
+>> > > > place). Currently, we cannot boot via UEFI on these platforms, as the
+>> > > > EFI stub will only consider base of DRAM + TEXT_OFFSET as an option,
+>> > > > and fail the boot if it is not available.
+>> > > >
+>> > > > If this is something that could wait until 3.18 as well (Mark S?),
+>> > > > then it's fine by me.
+>> > >
+>> > > I don't see a problem with waiting until 3.18.
+>> >
+>> > Cheers, I've applied the series to our for-next branch and I'll push
+>> > everything out at -rc1.
+>>
+>> Late to the discussion since I was on an 11h flight, and still chiming
+>> in since I don't think previous speakers were explicit enough about
+>> the implication:
+>> Bumping 3/3 to 3.18 means the upstream kernel will not boot on AMD
+>> Seattle until at least December. This sounds suboptimal to me.
+>
+> Not unless they use PSCI. That's already working (the spin-table is
+> meant for platforms where PSCI cannot be implemented).
+>
 
-Reported-by: Drew Richardson <drew.richardson@arm.com>
-Signed-off-by: Pawel Moll <pawel.moll@arm.com>
----
- drivers/bus/arm-ccn.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+No, that is patch #1
 
-diff --git a/drivers/bus/arm-ccn.c b/drivers/bus/arm-ccn.c
-index 3266f8f..6f550d9 100644
---- a/drivers/bus/arm-ccn.c
-+++ b/drivers/bus/arm-ccn.c
-@@ -662,7 +662,7 @@ static int arm_ccn_pmu_event_init(struct perf_event *event)
- 		}
- 		if (e->num_vcs && vc >= e->num_vcs) {
- 			dev_warn(ccn->dev, "Invalid vc %d for node/XP %d!\n",
--					port, node_xp);
-+					vc, node_xp);
- 			return -EINVAL;
- 		}
- 		valid = 1;
+#3 allows other base addresses than base of DRAM + TEXT_OFFSET when
+booting via UEFI, which is needed by AMD Seattle.
+However, #3 breaks booting the secondaries on APM Mustang, hence #1.
+
 -- 
-1.9.1
+Ard.
+
+
+> BTW, is Seattle officially supported by the mainline kernel (it was
+> barely announced AFAICT)?
+>
+> --
+> Catalin
