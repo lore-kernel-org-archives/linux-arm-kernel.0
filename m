@@ -1,31 +1,34 @@
 From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Mon, 18 Aug 2014 16:58:31 +0200
-Subject: [PATCH v2 3/9] arm: dts: mt6589: Fix typo in GIC unit address
+Date: Mon, 18 Aug 2014 16:58:33 +0200
+Subject: [PATCH v2 5/9] arm: dts: mt6589-aquaris5: Add boot argument
+ earlyprintk
 In-Reply-To: <1408373917-10002-1-git-send-email-matthias.bgg@gmail.com>
 References: <1408373917-10002-1-git-send-email-matthias.bgg@gmail.com>
-Message-ID: <1408373917-10002-4-git-send-email-matthias.bgg@gmail.com>
+Message-ID: <1408373917-10002-6-git-send-email-matthias.bgg@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This changes the unit address of the gic node to it's first register area.
+Add boot argument for earlyprintk to the aquaris5 device tree file.
 
 Signed-off-by: Matthias Brugger <matthias.bgg@gmail.com>
 ---
- arch/arm/boot/dts/mt6589.dtsi |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/boot/dts/mt6589-aquaris5.dts |    4 ++++
+ 1 file changed, 4 insertions(+)
 
-diff --git a/arch/arm/boot/dts/mt6589.dtsi b/arch/arm/boot/dts/mt6589.dtsi
-index d0297a0..742c9bd 100644
---- a/arch/arm/boot/dts/mt6589.dtsi
-+++ b/arch/arm/boot/dts/mt6589.dtsi
-@@ -81,7 +81,7 @@
- 			clock-names = "system-clk", "rtc-clk";
- 		};
+diff --git a/arch/arm/boot/dts/mt6589-aquaris5.dts b/arch/arm/boot/dts/mt6589-aquaris5.dts
+index 443b446..74cb1ba 100644
+--- a/arch/arm/boot/dts/mt6589-aquaris5.dts
++++ b/arch/arm/boot/dts/mt6589-aquaris5.dts
+@@ -19,6 +19,10 @@
+ / {
+ 	model = "bq Aquaris5";
  
--		gic: interrupt-controller at 10212000 {
-+		gic: interrupt-controller at 10211000 {
- 			compatible = "arm,cortex-a15-gic";
- 			interrupt-controller;
- 			#interrupt-cells = <3>;
++	chosen {
++		bootargs = "earlyprintk";
++	};
++
+ 	memory {
+ 		reg = <0x80000000 0x40000000>;
+ 	};
 -- 
 1.7.9.5
