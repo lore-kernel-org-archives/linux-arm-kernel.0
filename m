@@ -1,63 +1,69 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 18 Aug 2014 20:58:10 +0200
-Subject: [PATCH v4 2/2] mtd: nand: add sunxi NFC dt bindings doc
-In-Reply-To: <1408382788-32153-3-git-send-email-boris.brezillon@free-electrons.com>
-References: <1408382788-32153-1-git-send-email-boris.brezillon@free-electrons.com>
- <1408382788-32153-3-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <20140818185810.GG15297@lukather>
+From: nm@ti.com (Nishanth Menon)
+Date: Mon, 18 Aug 2014 14:07:55 -0500
+Subject: [PATCH] ARM: OMAP2+: board-generic: add support for AM57xx family
+Message-ID: <1408388875-7360-1-git-send-email-nm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Boris,
+AM57xx processor family are variants of DRA7 family of processors and
+targetted at industrial and non-automotive applications.
 
-On Mon, Aug 18, 2014 at 07:26:28PM +0200, Boris BREZILLON wrote:
-> Add the sunxi NAND Flash Controller dt bindings documentation.
-> 
-> Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
-> ---
->  .../devicetree/bindings/mtd/sunxi-nand.txt         | 45 ++++++++++++++++++++++
->  1 file changed, 45 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/mtd/sunxi-nand.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/mtd/sunxi-nand.txt b/Documentation/devicetree/bindings/mtd/sunxi-nand.txt
-> new file mode 100644
-> index 0000000..798c691
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/mtd/sunxi-nand.txt
-> @@ -0,0 +1,45 @@
-> +Allwinner NAND Flash Controller (NFC)
-> +
-> +Required properties:
-> +- compatible : "allwinner,sun4i-nand".
+Signed-off-by: Nishanth Menon <nm@ti.com>
+---
 
-The pattern we usually have for the sunxi SoCs is
-allwinner,family-soc-*, which would be allwinner,sun4i-a10-nand in
-this case.
+NOTE: there is no discrenable features yet defined in register set at
+this point in time.
 
-> +- reg : shall contain registers location and length for data and reg.
-> +- interrupts : shall define the nand controller interrupt.
-> +- #address-cells: shall be set to 1. Encode the nand CS.
-> +- #size-cells : shall be set to 0.
-> +- clocks : shall reference nand controller clocks.
-> +- clock-names : nand controller internal clock names. Shall contain :
-> +    * "ahb_clk" : AHB gating clock
-> +    * "sclk" : nand controller clock
+Tested on AM5728 compatible platform and based on v3.17-rc1
 
-And we're usually using "ahb" and "mod" in such a case.
+ .../devicetree/bindings/arm/omap/omap.txt          |   12 ++++++++++++
+ arch/arm/mach-omap2/board-generic.c                |    4 ++++
+ 2 files changed, 16 insertions(+)
 
-It looks fine otherwise.
-
-Thanks!
-Maxime
-
+diff --git a/Documentation/devicetree/bindings/arm/omap/omap.txt b/Documentation/devicetree/bindings/arm/omap/omap.txt
+index 0edc903..ddd9bcd 100644
+--- a/Documentation/devicetree/bindings/arm/omap/omap.txt
++++ b/Documentation/devicetree/bindings/arm/omap/omap.txt
+@@ -85,6 +85,18 @@ SoCs:
+ - DRA722
+   compatible = "ti,dra722", "ti,dra72", "ti,dra7"
+ 
++- AM5728
++  compatible = "ti,am5728", "ti,dra742", "ti,dra74", "ti,dra7"
++
++- AM5726
++  compatible = "ti,am5726", "ti,dra742", "ti,dra74", "ti,dra7"
++
++- AM5718
++  compatible = "ti,am5718", "ti,dra722", "ti,dra72", "ti,dra7"
++
++- AM5716
++  compatible = "ti,am5716", "ti,dra722", "ti,dra72", "ti,dra7"
++
+ - AM4372
+   compatible = "ti,am4372", "ti,am43"
+ 
+diff --git a/arch/arm/mach-omap2/board-generic.c b/arch/arm/mach-omap2/board-generic.c
+index 9480997..bdb5194 100644
+--- a/arch/arm/mach-omap2/board-generic.c
++++ b/arch/arm/mach-omap2/board-generic.c
+@@ -241,6 +241,8 @@ MACHINE_END
+ 
+ #ifdef CONFIG_SOC_DRA7XX
+ static const char *dra74x_boards_compat[] __initconst = {
++	"ti,am5728",
++	"ti,am5726",
+ 	"ti,dra742",
+ 	"ti,dra7",
+ 	NULL,
+@@ -260,6 +262,8 @@ DT_MACHINE_START(DRA74X_DT, "Generic DRA74X (Flattened Device Tree)")
+ MACHINE_END
+ 
+ static const char *dra72x_boards_compat[] __initconst = {
++	"ti,am5718",
++	"ti,am5716",
+ 	"ti,dra722",
+ 	NULL,
+ };
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140818/8f7c5ae4/attachment.sig>
+1.7.9.5
