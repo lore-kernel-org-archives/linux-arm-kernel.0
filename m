@@ -1,255 +1,87 @@
 From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
-Date: Mon, 18 Aug 2014 10:33:01 +0200
-Subject: [PATCH v9 3/6] clk: max77686: Convert to the generic max clock driver
+Date: Mon, 18 Aug 2014 10:33:04 +0200
+Subject: [PATCH v9 6/6] clk: max77802: Add DT binding documentation
 In-Reply-To: <1408350784-15577-1-git-send-email-javier.martinez@collabora.co.uk>
 References: <1408350784-15577-1-git-send-email-javier.martinez@collabora.co.uk>
-Message-ID: <1408350784-15577-4-git-send-email-javier.martinez@collabora.co.uk>
+Message-ID: <1408350784-15577-7-git-send-email-javier.martinez@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Clocks drivers for Maxim PMIC are very similar so they can
-be converted to use the generic Maxim clock driver.
-
-Also, while being there use module_platform_driver() helper
-macro to eliminate more boilerplate code.
+Add Device Tree binding documentation for the clocks
+outputs in the Maxim 77802 Power Management IC.
 
 Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
-Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 Acked-by: Mike Turquette <mturquette@linaro.org>
 ---
- drivers/clk/Kconfig        |   1 +
- drivers/clk/clk-max77686.c | 176 +++------------------------------------------
- 2 files changed, 9 insertions(+), 168 deletions(-)
 
-diff --git a/drivers/clk/Kconfig b/drivers/clk/Kconfig
-index 726d72a..d68b14b 100644
---- a/drivers/clk/Kconfig
-+++ b/drivers/clk/Kconfig
-@@ -38,6 +38,7 @@ config COMMON_CLK_MAX_GEN
- config COMMON_CLK_MAX77686
- 	tristate "Clock driver for Maxim 77686 MFD"
- 	depends on MFD_MAX77686
-+	select COMMON_CLK_MAX_GEN
- 	---help---
- 	  This driver supports Maxim 77686 crystal oscillator clock. 
- 
-diff --git a/drivers/clk/clk-max77686.c b/drivers/clk/clk-max77686.c
-index 185b611..ed0beb4 100644
---- a/drivers/clk/clk-max77686.c
-+++ b/drivers/clk/clk-max77686.c
-@@ -31,187 +31,37 @@
- #include <linux/clkdev.h>
- 
- #include <dt-bindings/clock/maxim,max77686.h>
--
--struct max77686_clk {
--	struct max77686_dev *iodev;
--	u32 mask;
--	struct clk_hw hw;
--	struct clk_lookup *lookup;
--};
--
--static struct max77686_clk *to_max77686_clk(struct clk_hw *hw)
--{
--	return container_of(hw, struct max77686_clk, hw);
--}
--
--static int max77686_clk_prepare(struct clk_hw *hw)
--{
--	struct max77686_clk *max77686 = to_max77686_clk(hw);
--
--	return regmap_update_bits(max77686->iodev->regmap,
--				  MAX77686_REG_32KHZ, max77686->mask,
--				  max77686->mask);
--}
--
--static void max77686_clk_unprepare(struct clk_hw *hw)
--{
--	struct max77686_clk *max77686 = to_max77686_clk(hw);
--
--	regmap_update_bits(max77686->iodev->regmap,
--		MAX77686_REG_32KHZ, max77686->mask, ~max77686->mask);
--}
--
--static int max77686_clk_is_prepared(struct clk_hw *hw)
--{
--	struct max77686_clk *max77686 = to_max77686_clk(hw);
--	int ret;
--	u32 val;
--
--	ret = regmap_read(max77686->iodev->regmap,
--				MAX77686_REG_32KHZ, &val);
--
--	if (ret < 0)
--		return -EINVAL;
--
--	return val & max77686->mask;
--}
--
--static unsigned long max77686_recalc_rate(struct clk_hw *hw,
--					  unsigned long parent_rate)
--{
--	return 32768;
--}
--
--static struct clk_ops max77686_clk_ops = {
--	.prepare	= max77686_clk_prepare,
--	.unprepare	= max77686_clk_unprepare,
--	.is_prepared	= max77686_clk_is_prepared,
--	.recalc_rate	= max77686_recalc_rate,
--};
-+#include "clk-max-gen.h"
- 
- static struct clk_init_data max77686_clks_init[MAX77686_CLKS_NUM] = {
- 	[MAX77686_CLK_AP] = {
- 		.name = "32khz_ap",
--		.ops = &max77686_clk_ops,
-+		.ops = &max_gen_clk_ops,
- 		.flags = CLK_IS_ROOT,
- 	},
- 	[MAX77686_CLK_CP] = {
- 		.name = "32khz_cp",
--		.ops = &max77686_clk_ops,
-+		.ops = &max_gen_clk_ops,
- 		.flags = CLK_IS_ROOT,
- 	},
- 	[MAX77686_CLK_PMIC] = {
- 		.name = "32khz_pmic",
--		.ops = &max77686_clk_ops,
-+		.ops = &max_gen_clk_ops,
- 		.flags = CLK_IS_ROOT,
- 	},
- };
- 
--static struct clk *max77686_clk_register(struct device *dev,
--				struct max77686_clk *max77686)
--{
--	struct clk *clk;
--	struct clk_hw *hw = &max77686->hw;
--
--	clk = clk_register(dev, hw);
--	if (IS_ERR(clk))
--		return clk;
--
--	max77686->lookup = kzalloc(sizeof(struct clk_lookup), GFP_KERNEL);
--	if (!max77686->lookup)
--		return ERR_PTR(-ENOMEM);
--
--	max77686->lookup->con_id = hw->init->name;
--	max77686->lookup->clk = clk;
--
--	clkdev_add(max77686->lookup);
--
--	return clk;
--}
--
- static int max77686_clk_probe(struct platform_device *pdev)
- {
- 	struct max77686_dev *iodev = dev_get_drvdata(pdev->dev.parent);
--	struct max77686_clk *max77686_clks[MAX77686_CLKS_NUM];
--	struct clk **clocks;
--	int i, ret;
--
--	clocks = devm_kzalloc(&pdev->dev, sizeof(struct clk *)
--					* MAX77686_CLKS_NUM, GFP_KERNEL);
--	if (!clocks)
--		return -ENOMEM;
--
--	for (i = 0; i < MAX77686_CLKS_NUM; i++) {
--		max77686_clks[i] = devm_kzalloc(&pdev->dev,
--					sizeof(struct max77686_clk), GFP_KERNEL);
--		if (!max77686_clks[i])
--			return -ENOMEM;
--	}
--
--	for (i = 0; i < MAX77686_CLKS_NUM; i++) {
--		max77686_clks[i]->iodev = iodev;
--		max77686_clks[i]->mask = 1 << i;
--		max77686_clks[i]->hw.init = &max77686_clks_init[i];
--
--		clocks[i] = max77686_clk_register(&pdev->dev, max77686_clks[i]);
--		if (IS_ERR(clocks[i])) {
--			ret = PTR_ERR(clocks[i]);
--			dev_err(&pdev->dev, "failed to register %s\n",
--				max77686_clks[i]->hw.init->name);
--			goto err_clocks;
--		}
--	}
--
--	platform_set_drvdata(pdev, clocks);
--
--	if (iodev->dev->of_node) {
--		struct clk_onecell_data *of_data;
--
--		of_data = devm_kzalloc(&pdev->dev,
--					sizeof(*of_data), GFP_KERNEL);
--		if (!of_data) {
--			ret = -ENOMEM;
--			goto err_clocks;
--		}
- 
--		of_data->clks = clocks;
--		of_data->clk_num = MAX77686_CLKS_NUM;
--		ret = of_clk_add_provider(iodev->dev->of_node,
--					of_clk_src_onecell_get, of_data);
--		if (ret) {
--			dev_err(&pdev->dev, "failed to register OF clock provider\n");
--			goto err_clocks;
--		}
--	}
--
--	return 0;
--
--err_clocks:
--	for (--i; i >= 0; --i) {
--		clkdev_drop(max77686_clks[i]->lookup);
--		clk_unregister(max77686_clks[i]->hw.clk);
--	}
--
--	return ret;
-+	return max_gen_clk_probe(pdev, iodev->regmap, MAX77686_REG_32KHZ,
-+				 max77686_clks_init, MAX77686_CLKS_NUM);
- }
- 
- static int max77686_clk_remove(struct platform_device *pdev)
- {
--	struct max77686_dev *iodev = dev_get_drvdata(pdev->dev.parent);
--	struct clk **clocks = platform_get_drvdata(pdev);
--	int i;
--
--	if (iodev->dev->of_node)
--		of_clk_del_provider(iodev->dev->of_node);
--
--	for (i = 0; i < MAX77686_CLKS_NUM; i++) {
--		struct clk_hw *hw = __clk_get_hw(clocks[i]);
--		struct max77686_clk *max77686 = to_max77686_clk(hw);
--
--		clkdev_drop(max77686->lookup);
--		clk_unregister(clocks[i]);
--	}
--	return 0;
-+	return max_gen_clk_remove(pdev, MAX77686_CLKS_NUM);
- }
- 
- static const struct platform_device_id max77686_clk_id[] = {
-@@ -230,17 +80,7 @@ static struct platform_driver max77686_clk_driver = {
- 	.id_table = max77686_clk_id,
- };
- 
--static int __init max77686_clk_init(void)
--{
--	return platform_driver_register(&max77686_clk_driver);
--}
--subsys_initcall(max77686_clk_init);
--
--static void __init max77686_clk_cleanup(void)
--{
--	platform_driver_unregister(&max77686_clk_driver);
--}
--module_exit(max77686_clk_cleanup);
-+module_platform_driver(max77686_clk_driver);
- 
- MODULE_DESCRIPTION("MAXIM 77686 Clock Driver");
- MODULE_AUTHOR("Jonghwa Lee <jonghwa3.lee@samsung.com>");
+Changes since v6: None
+
+Changes since v5:
+ - Fix typo error in DT binding. Suggested by Andreas Farber.
+ - Add "clock-output-names" as an optional property since now is supported.
+
+Changes since v4: None
+
+Changes since v3:
+ - Don't use the same clock driver name in clock-names since it's a consumer
+   concept and most probably will be different. Suggested by Doug Anderson.
+
+Changes since v2:
+ - Split the DT binding documentation in a separate patch.
+---
+ .../devicetree/bindings/clock/maxim,max77802.txt   | 44 ++++++++++++++++++++++
+ 1 file changed, 44 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/clock/maxim,max77802.txt
+
+diff --git a/Documentation/devicetree/bindings/clock/maxim,max77802.txt b/Documentation/devicetree/bindings/clock/maxim,max77802.txt
+new file mode 100644
+index 0000000..c6dc783
+--- /dev/null
++++ b/Documentation/devicetree/bindings/clock/maxim,max77802.txt
+@@ -0,0 +1,44 @@
++Binding for Maxim MAX77802 32k clock generator block
++
++This is a part of device tree bindings of MAX77802 multi-function device.
++More information can be found in bindings/mfd/max77802.txt file.
++
++The MAX77802 contains two 32.768khz clock outputs that can be controlled
++(gated/ungated) over I2C.
++
++Following properties should be present in main device node of the MFD chip.
++
++Required properties:
++- #clock-cells: From common clock binding; shall be set to 1.
++
++Optional properties:
++- clock-output-names: From common clock binding.
++
++Each clock is assigned an identifier and client nodes can use this identifier
++to specify the clock which they consume. Following indices are allowed:
++     - 0: 32khz_ap clock,
++     - 1: 32khz_cp clock.
++
++Clocks are defined as preprocessor macros in dt-bindings/clock/maxim,max77802.h
++header and can be used in device tree sources.
++
++Example: Node of the MFD chip
++
++	max77802: max77802 at 09 {
++		compatible = "maxim,max77802";
++		interrupt-parent = <&wakeup_eint>;
++		interrupts = <26 0>;
++		reg = <0x09>;
++		#clock-cells = <1>;
++
++		/* ... */
++	};
++
++Example: Clock consumer node
++
++	foo at 0 {
++		compatible = "bar,foo";
++		/* ... */
++		clock-names = "my-clock";
++		clocks = <&max77802 MAX77802_CLK_32K_AP>;
++	};
 -- 
 2.0.1
