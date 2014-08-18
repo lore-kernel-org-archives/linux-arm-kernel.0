@@ -1,46 +1,43 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Sun, 17 Aug 2014 18:46:42 -0300
-Subject: Oops: 17 SMP ARM (v3.16-rc2)
-In-Reply-To: <53F11FF6.8030303@gmail.com>
-References: <20140626151424.GT32514@n2100.arm.linux.org.uk>
- <20140627112151.GF32514@n2100.arm.linux.org.uk>
- <3FFB61A7A8473C49831AF20FA193534A43CADFA7@ALVA-EXMB01.alv.autoliv.int>
- <20140627163108.GP32514@n2100.arm.linux.org.uk>
- <C4A61A5CA4AD2246942F4BA6F20ACB8043575072@ALVA-EXMB04.alv.autoliv.int>
- <20140806095012.GN30282@n2100.arm.linux.org.uk>
- <C4A61A5CA4AD2246942F4BA6F20ACB8043575172@ALVA-EXMB04.alv.autoliv.int>
- <20140806125550.GO30282@n2100.arm.linux.org.uk>
- <C4A61A5CA4AD2246942F4BA6F20ACB804357526C@ALVA-EXMB04.alv.autoliv.int>
- <20140807121248.GY30282@n2100.arm.linux.org.uk>
- <20140808180900.GG30282@n2100.arm.linux.org.uk>
- <C4A61A5CA4AD2246942F4BA6F20ACB8043576356@ALVA-EXMB04.alv.autoliv.int>
- <CAOMZO5B8GR+ABBoJ=dJcFqw3Wagfaip7HM+C1FTz+aE4CmqiPw@mail.gmail.com>
- <C4A61A5CA4AD2246942F4BA6F20ACB80435776D3@ALVA-EXMB04.alv.autoliv.int>
- <CAOMZO5B7FgzB7ThVyV2Vk7wTwYgjRWjEnkkAN5uwwKMaBKq1yg@mail.gmail.com>
- <C4A61A5CA4AD2246942F4BA6F20ACB8043577770@ALVA-EXMB04.alv.autoliv.int>
- <53F11FF6.8030303@gmail.com>
-Message-ID: <CAOMZO5CDvQDD7gVLFStwv4MPrUyqZE3sEDZwb0gukkXujYG-6Q@mail.gmail.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Sun, 17 Aug 2014 20:04:45 -0400 (EDT)
+Subject: [PATCH v4] irqchip: gic: Allow gic_arch_extn hooks to call into
+ scheduler
+In-Reply-To: <20140817190434.GJ12769@titan.lakedaemon.net>
+References: <1407938238-21413-1-git-send-email-sboyd@codeaurora.org>
+ <20140817173236.GG12769@titan.lakedaemon.net>
+ <20140817185522.GX30401@n2100.arm.linux.org.uk>
+ <20140817190434.GJ12769@titan.lakedaemon.net>
+Message-ID: <alpine.LFD.2.11.1408172000460.29347@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Iain,
+On Sun, 17 Aug 2014, Jason Cooper wrote:
 
-On Sun, Aug 17, 2014 at 6:34 PM, Iain Paton <ipaton0@gmail.com> wrote:
-> On 15/08/14 06:42, Mattis Lorentzon wrote:
->
->> We mostly run SSH with benchmarks using NFS, it can probably be
->> triggered by using only SSH with the following loop:
->>
->> # while : ; do ssh arm-card date; done
->
-> Mattis,
->
-> What sort of time does it take for you to see a problem?
->
-> I've been running the above for nearly two days on 3.16.0 on a board
-> with fec interrupts routed through gpio_6 and haven't seen a hint of
-> a problem.
+> Russell,
+> 
+> On Sun, Aug 17, 2014 at 07:55:23PM +0100, Russell King - ARM Linux wrote:
+> > On Sun, Aug 17, 2014 at 01:32:36PM -0400, Jason Cooper wrote:
+> > > Applied to irqchip/urgent with Nico's Ack.
+> > 
+> > Interesting, so I'm discussing this patch, and it gets applied anyway...
+> > yes, that's great.
+> 
+> Quoting Nico:
+> 
+> "Of course it would be good to clarify things wrt Russell's remark
+> independently from this patch."
+> 
+> I took 'independently' to mean "This patch is ok, *and* we need to
+> address Russell's concerns in a follow-up patch."
+> 
+> Nico's Reviewed-by with that comment was sent August 13th.  The most
+> recent activity on this thread was also August 13th.  After four days, I
+> reasoned there were no objections to his comment.
 
-Thanks for testing.
+Well... I mentioned this patch is a nice cleanup independently of the 
+reason why it was created in the first place.  Maybe that shouldn't be 
+sorted as "urgent" in that case, especially when the code having problem 
+with the current state of things is living out of mainline.
 
-Which mx6 board have you used on this test?
+
+Nicolas
