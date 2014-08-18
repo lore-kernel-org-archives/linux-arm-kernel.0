@@ -1,45 +1,159 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 18 Aug 2014 15:26:04 +0100
-Subject: [PATCH v9 03/12] PCI: Introduce helper functions to deal with
- PCI I/O ranges.
-In-Reply-To: <1407860725-25202-4-git-send-email-Liviu.Dudau@arm.com>
-References: <1407860725-25202-1-git-send-email-Liviu.Dudau@arm.com>
- <1407860725-25202-4-git-send-email-Liviu.Dudau@arm.com>
-Message-ID: <20140818142604.GO20043@localhost>
+From: daniel.thompson@linaro.org (Daniel Thompson)
+Date: Mon, 18 Aug 2014 15:28:07 +0100
+Subject: [PATCH v9 12/16] serial: amba-pl011: Pass FIQ information to KGDB.
+In-Reply-To: <1404979427-12943-1-git-send-email-daniel.thompson@linaro.org>
+References: <1404979427-12943-1-git-send-email-daniel.thompson@linaro.org>
+Message-ID: <1408372091-12689-13-git-send-email-daniel.thompson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 12, 2014 at 05:25:16PM +0100, Liviu Dudau wrote:
-> Some architectures do not have a simple view of the PCI I/O space
-> and instead use a range of CPU addresses that map to bus addresses.
-> For some architectures these ranges will be expressed by OF bindings
-> in a device tree file.
-> 
-> This patch introduces a pci_register_io_range() helper function with
-> a generic implementation that can be used by such architectures to
-> keep track of the I/O ranges described by the PCI bindings. If the
-> PCI_IOBASE macro is not defined that signals lack of support for PCI
-> and we return an error.
-> 
-> In order to retrieve the CPU address associated with an I/O port, a
-> new helper function pci_pio_to_address() is introduced. This will
-> search in the list of ranges registered with pci_register_io_range()
-> and return the CPU address that corresponds to the given port.
-> 
-> Cc: Grant Likely <grant.likely@linaro.org>
-> Cc: Rob Herring <robh+dt@kernel.org>
-> Cc: Arnd Bergmann <arnd@arndb.de>
-> Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
-> ---
->  drivers/of/address.c       | 95 ++++++++++++++++++++++++++++++++++++++++++++++
->  include/linux/of_address.h |  2 +
->  2 files changed, 97 insertions(+)
+Speculatively register a FIQ resource with KGDB. KGDB will only
+accept it if the kgdb/fiq feature is enabled (both with compile time and
+runtime switches) and the interrupt controller supports FIQ.
 
-Actually, I think we moved too much code into drivers/of/. Is there
-anything OF specific about this code to live here (apart from
-OF_BAD_ADDR)? I think driver/pci/ more appropriate?
+By providing this information to KGDB the serial driver offers
+"permission" for KGDB to route the UART interrupt signal from the
+drivers own handler to KGDBs FIQ handler (which will eventually use the
+UART's polled I/O callbacks to interact with the user). This permission
+also implies the amba-pl011 driver has already unmasked RX interrupts
+(otherwise the FIQ handler will never trigger).
 
-Otherwise it looks fine to me.
+Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+Cc: Jiri Slaby <jslaby@suse.cz>
+Cc: linux-serial at vger.kernel.org
+---
+ drivers/tty/serial/amba-pl011.c | 94 ++++++++++++++++++++++++-----------------
+ 1 file changed, 55 insertions(+), 39 deletions(-)
 
+diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
+index 8572f2a..ec8ddc7 100644
+--- a/drivers/tty/serial/amba-pl011.c
++++ b/drivers/tty/serial/amba-pl011.c
+@@ -58,6 +58,7 @@
+ #include <linux/pinctrl/consumer.h>
+ #include <linux/sizes.h>
+ #include <linux/io.h>
++#include <linux/kgdb.h>
+ 
+ #define UART_NR			14
+ 
+@@ -1416,8 +1417,61 @@ static void pl011_break_ctl(struct uart_port *port, int break_state)
+ 	spin_unlock_irqrestore(&uap->port.lock, flags);
+ }
+ 
++static int pl011_hwinit(struct uart_port *port)
++{
++	struct uart_amba_port *uap = (struct uart_amba_port *)port;
++	int retval;
++
++	/* Optionaly enable pins to be muxed in and configured */
++	pinctrl_pm_select_default_state(port->dev);
++
++	/*
++	 * Try to enable the clock producer.
++	 */
++	retval = clk_prepare_enable(uap->clk);
++	if (retval)
++		return retval;
++
++	uap->port.uartclk = clk_get_rate(uap->clk);
++
++	/* Clear pending error and receive interrupts */
++	writew(UART011_OEIS | UART011_BEIS | UART011_PEIS | UART011_FEIS |
++	       UART011_RTIS | UART011_RXIS, uap->port.membase + UART011_ICR);
++
++	/*
++	 * Save interrupts enable mask, and enable RX interrupts in case if
++	 * the interrupt is used for NMI entry.
++	 */
++	uap->im = readw(uap->port.membase + UART011_IMSC);
++	writew(UART011_RTIM | UART011_RXIM, uap->port.membase + UART011_IMSC);
++
++	if (dev_get_platdata(uap->port.dev)) {
++		struct amba_pl011_data *plat;
++
++		plat = dev_get_platdata(uap->port.dev);
++		if (plat->init)
++			plat->init();
++	}
++	return 0;
++}
++
+ #ifdef CONFIG_CONSOLE_POLL
+ 
++static int pl011_poll_init(struct uart_port *port)
++{
++	struct uart_amba_port *uap = (struct uart_amba_port *)port;
++	int retval;
++
++	retval = pl011_hwinit(port);
++
++#ifdef CONFIG_KGDB_FIQ
++	if (retval == 0)
++		kgdb_register_fiq(uap->port.irq);
++#endif
++
++	return retval;
++}
++
+ static void pl011_quiesce_irqs(struct uart_port *port)
+ {
+ 	struct uart_amba_port *uap = (struct uart_amba_port *)port;
+@@ -1471,44 +1525,6 @@ static void pl011_put_poll_char(struct uart_port *port,
+ 
+ #endif /* CONFIG_CONSOLE_POLL */
+ 
+-static int pl011_hwinit(struct uart_port *port)
+-{
+-	struct uart_amba_port *uap = (struct uart_amba_port *)port;
+-	int retval;
+-
+-	/* Optionaly enable pins to be muxed in and configured */
+-	pinctrl_pm_select_default_state(port->dev);
+-
+-	/*
+-	 * Try to enable the clock producer.
+-	 */
+-	retval = clk_prepare_enable(uap->clk);
+-	if (retval)
+-		return retval;
+-
+-	uap->port.uartclk = clk_get_rate(uap->clk);
+-
+-	/* Clear pending error and receive interrupts */
+-	writew(UART011_OEIS | UART011_BEIS | UART011_PEIS | UART011_FEIS |
+-	       UART011_RTIS | UART011_RXIS, uap->port.membase + UART011_ICR);
+-
+-	/*
+-	 * Save interrupts enable mask, and enable RX interrupts in case if
+-	 * the interrupt is used for NMI entry.
+-	 */
+-	uap->im = readw(uap->port.membase + UART011_IMSC);
+-	writew(UART011_RTIM | UART011_RXIM, uap->port.membase + UART011_IMSC);
+-
+-	if (dev_get_platdata(uap->port.dev)) {
+-		struct amba_pl011_data *plat;
+-
+-		plat = dev_get_platdata(uap->port.dev);
+-		if (plat->init)
+-			plat->init();
+-	}
+-	return 0;
+-}
+-
+ static void pl011_write_lcr_h(struct uart_amba_port *uap, unsigned int lcr_h)
+ {
+ 	writew(lcr_h, uap->port.membase + uap->lcrh_rx);
+@@ -1888,7 +1904,7 @@ static struct uart_ops amba_pl011_pops = {
+ 	.config_port	= pl011_config_port,
+ 	.verify_port	= pl011_verify_port,
+ #ifdef CONFIG_CONSOLE_POLL
+-	.poll_init     = pl011_hwinit,
++	.poll_init     = pl011_poll_init,
+ 	.poll_get_char = pl011_get_poll_char,
+ 	.poll_put_char = pl011_put_poll_char,
+ #endif
 -- 
-Catalin
+1.9.3
