@@ -1,54 +1,91 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Mon, 18 Aug 2014 23:57:06 +0800
-Subject: [linux-sunxi] Re: [PATCH 11/12] ARM: dts: sun8i: Add i2c
- controller nodes
-In-Reply-To: <20140818142737.GC15297@lukather>
-References: <1408247538-16950-1-git-send-email-wens@csie.org>
- <1408247538-16950-12-git-send-email-wens@csie.org>
- <20140817080204.GY15297@lukather>
- <CAGb2v67NwsJORoFrgEECDtexXGtF5qOx7NX1PVpZHkjVs-mG2A@mail.gmail.com>
- <20140818142737.GC15297@lukather>
-Message-ID: <CAGb2v65ODS83D2LfiHs0o1D4yJ6xmOJ8vULPcfrcUu79SQvfTw@mail.gmail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 18 Aug 2014 17:02:53 +0100
+Subject: [PATCH] Arm64: convert soft_restart() to assembly code
+In-Reply-To: <1408128799.22761.47.camel@smoke>
+References: <1407847365-10873-1-git-send-email-achandran@mvista.com>
+ <1408123221.22761.38.camel@smoke>
+ <20140815182157.GD21908@leverpostej>
+ <1408128799.22761.47.camel@smoke>
+Message-ID: <20140818160253.GB3302@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 18, 2014 at 10:27 PM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> On Sun, Aug 17, 2014 at 11:20:44PM +0800, Chen-Yu Tsai wrote:
->> Hi,
->>
->> On Sun, Aug 17, 2014 at 4:02 PM, Maxime Ripard
->> <maxime.ripard@free-electrons.com> wrote:
->> > Hi,
->> >
->> > On Sun, Aug 17, 2014 at 11:52:17AM +0800, Chen-Yu Tsai wrote:
->> >> Add nodes for the 3 i2c controllers found on A23 SoCs to the sun8i DTSI.
->> >>
->> >> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
->> >> ---
->> >>  arch/arm/boot/dts/sun8i-a23.dtsi | 36 ++++++++++++++++++++++++++++++++++++
->> >>  1 file changed, 36 insertions(+)
->> >>
->> >> diff --git a/arch/arm/boot/dts/sun8i-a23.dtsi b/arch/arm/boot/dts/sun8i-a23.dtsi
->> >> index 4658998..53ef350 100644
->> >> --- a/arch/arm/boot/dts/sun8i-a23.dtsi
->> >> +++ b/arch/arm/boot/dts/sun8i-a23.dtsi
->> >> @@ -387,6 +387,42 @@
->> >>                       status = "disabled";
->> >>               };
->> >>
->> >> +             i2c0: i2c at 01c2ac00 {
->> >> +                     compatible = "allwinner,sun6i-a31-i2c";
->> >> +                     reg = <0x01c2ac00 0x400>;
->> >> +                     interrupts = <0 6 4>;
->> >> +                     clocks = <&apb2_gates 0>;
->> >> +                     clock-frequency = <100000>;
->> >
->> > It's the default, you don't need to set it.
->>
->> Ah, just checked the driver, it is indeed the default.
->> All the other sunxi dtsi have it though. Do we want to be consistent?
->
-> Yep, it's usually a good thing :)
+Hi Geoff,
 
-I'll do additional patches to remove them from the other dtsi then.
+On Fri, Aug 15, 2014 at 07:53:19PM +0100, Geoff Levand wrote:
+> Hi Mark,
+> 
+> On Fri, 2014-08-15 at 19:21 +0100, Mark Rutland wrote:
+> > On Fri, Aug 15, 2014 at 06:20:21PM +0100, Geoff Levand wrote:
+> > > For the cpu-ops shutdown I'm working on I need a call to move the
+> > > secondary processors to an identity mapped spin loop after the identity
+> > > map is enabled.  I want to do this in C code, so it needs to happen
+> > > after the identity map is enabled, and before the dcache is disabled.
+> > > 
+> > > I think to do this we can keep the existing soft_restart(addr) routine
+> > > with something like this:
+> > > 
+> > > void soft_restart(unsigned long addr)
+> > > {
+> > > 	setup_mm_for_reboot();
+> > > 
+> > > #if defined(CONFIG_SMP)
+> > > 	smp_secondary_shutdown();
+> > > #endif
+> > > 
+> > > 	cpu_soft_restart(addr);
+> > > 
+> > > 	/* Should never get here */
+> > > 	BUG();
+> > > }
+> > > 
+> > 
+> > I don't follow why you need a hook in the middle of soft_restart. That
+> > sounds like a layering violation to me.
+> > 
+> > I assume this is for implementing the spin-table cpu-return-addr idea?
+> 
+> Yes.
+> 
+> > If so, what's wrong with something like:
+> 
+> > void spin_table_cpu_die(unsigned int cpu)
+> > {
+> > 	unsigned long release_addr = per_cpu(return_addr, cpu);
+> > 	
+> > 	/*
+> > 	 * We should have a local_disable(DBG|ASYNC|FIQ|IRQ) function or
+> > 	 * something similar as these are all context synchronising and
+> > 	 * therefore expensive.
+> > 	 */
+> > 	local_dbg_disable();
+> > 	local_async_disable();
+> > 	local_fiq_disable();
+> > 	arch_local_irq_disable();
+> > 
+> > 	soft_restart(release_addr);
+> > }
+> 
+> OK, this is a much simpler way than what I was thinking, which
+> was to have the secondaries spin in the kernel until the main
+> cpu shutdown.  I'll switch over to this, thanks.
+
+I just realised that this is still missing the jump to EL2 that I
+mentioned a while back.
+
+I think what we need to do is:
+
+* Have KVM (if present) tears itself down prior to cpu_die, restoring
+  the __hyp_stub_vectors in VBAR_EL2 and disabling the MMU, and caches.
+  
+* Add a mechanism to __hyp_stub_vectors to allow a hypercall to
+  call a function at EL2. We should be able to replace the current
+  hyp_stub el1_sync handler with that, and rework KVM to call a function
+  at EL2 to setup VBAR_EL2 appropriately at init time.
+
+* Depending on whether EL2 is available, go via soft_restart or the
+  hypercall to cpu_soft_restart (or something very close to it).
+
+How does that sound?
+
+Mark.
