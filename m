@@ -1,80 +1,96 @@
-From: computersforpeace@gmail.com (Brian Norris)
-Date: Mon, 18 Aug 2014 17:02:34 -0700
-Subject: [PATCH v8 01/11] ARM: brcmstb: add infrastructure for ARM-based
- Broadcom STB SoCs
-In-Reply-To: <20140813234706.GC18411@ld-irv-0074>
-References: <1405976886-27807-1-git-send-email-computersforpeace@gmail.com>
- <1405976886-27807-2-git-send-email-computersforpeace@gmail.com>
- <CAL_Jsq+Nbk7m9KXhG+Chdpvurp75RrvhFR2oE_LGxV444GSe9Q@mail.gmail.com>
- <20140731022320.GM3711@ld-irv-0074>
- <20140731084315.GJ30282@n2100.arm.linux.org.uk>
- <20140731220642.GQ3711@ld-irv-0074>
- <20140802092756.GZ30282@n2100.arm.linux.org.uk>
- <20140813234706.GC18411@ld-irv-0074>
-Message-ID: <20140819000234.GM18411@ld-irv-0074>
+From: abrestic@chromium.org (Andrew Bresticker)
+Date: Mon, 18 Aug 2014 17:11:16 -0700
+Subject: [PATCH v2] ARM: tegra: add Acer Chromebook 13 device tree
+In-Reply-To: <53F28F90.3000004@wwwdotorg.org>
+References: <1407957267-3258-1-git-send-email-dgreid@chromium.org>
+ <53EF76CF.9050808@suse.de> <53F2255E.7090208@wwwdotorg.org>
+ <CAL1qeaH-WfA-DLKwuXA_hBPHYuXksAibLq__zisrT9ALaRGdAw@mail.gmail.com>
+ <53F28F90.3000004@wwwdotorg.org>
+Message-ID: <CAL1qeaFnfLDOXq07fY4xLfdRpG8FQ63ya+-0Hk+ewA1wXkLOLw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+On Mon, Aug 18, 2014 at 4:43 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
+> On 08/18/2014 05:24 PM, Andrew Bresticker wrote:
+>>
+>> On Mon, Aug 18, 2014 at 9:10 AM, Stephen Warren <swarren@wwwdotorg.org>
+>> wrote:
+>>>
+>>> On 08/16/2014 09:20 AM, Andreas F?rber wrote:
+>>>>
+>>>>
+>>>> Hi,
+>>>>
+>>>> Am 13.08.2014 21:14, schrieb Dylan Reid:
+>>>>>
+>>>>>
+>>>>> The Acer Chromebook 13, codenamed Big, contains an NVIDIA tegra124
+>>>>> processor and is similar to the Venice2 reference platform.
+>>>>>
+>>>>> The keyboard, USB 2, audio, HDMI, sdcard, and emmc have been tested
+>>>>> and work on the 1266x768 models.  The HD models haven't yet been
+>>>>> tested.
+>>>>>
+>>>>> WiFi does not work yet, it needs at least some PMIC changes to enable
+>>>>> the 32k clock.
+>>>>>
+>>>>> The elan trackpad is not yet functional but hopefully will be soon as
+>>>>> there are patches under review.
+>>>>>
+>>>>> There is also an issue on reboot because the TPM isn't reset.  It will
+>>>>> cause the stock firmware to enter recovery mode.  This can be worked
+>>>>> around by an EC-reset, press the refresh and power keys at the same
+>>>>> time.
+>>>
+>>>
+>>>
+>>>>> diff --git a/arch/arm/boot/dts/tegra124-nyan-big.dts
+>>>>> b/arch/arm/boot/dts/tegra124-nyan-big.dts
+>>>>> new file mode 100644
+>>>>> index 0000000..79f1852
+>>>>> --- /dev/null
+>>>>> +++ b/arch/arm/boot/dts/tegra124-nyan-big.dts
+>>>>> @@ -0,0 +1,1136 @@
+>>>>> +/dts-v1/;
+>>>>> +
+>>>>> +#include <dt-bindings/input/input.h>
+>>>>> +#include "tegra124.dtsi"
+>>>>> +
+>>>>> +/ {
+>>>>> +       model = "Acer Chromebook 13";
+>>>>> +       compatible = "google,nyan-big", "nvidia,tegra124";
+>>>>
+>>>>
+>>>>
+>>>> In light of v1 and the above commit message referring to this as Google
+>>>> Big, shouldn't this be "google,big", "nvidia,tegra124" and optionally
+>>>> "google,nyan" as secondary string, independent of the new file name?
+>>>
+>>>
+>>>
+>>> Despite this board having been derived from Nyan, it isn't Nyan, so I
+>>> don't
+>>> think Nyan should be part of any compatible value, nor a separate
+>>> compatible
+>>> value.
+>>
+>>
+>> "google,nyan-big" is the compatible string that the bootloader on
+>> these devices looks for.  It's also the convention we are now using
+>> for our ARM devices, as Olof has already mentioned.
+>
+>
+> I don't understand "that the bootloader looks for"; why is the bootloader
+> doing anything w.r.t the compatible value in the DT that's passed to the
+> kernel.
 
-On Wed, Aug 13, 2014 at 04:47:06PM -0700, Brian Norris wrote:
-> Picking up this thread again, as things are now set for dropping this
-> patch and resubmitting SMP support for 3.18.
-
-Any further comment on this? I'd like to submit v10 of this patch soon.
-As of now, my patch will still look essentially the same (with only
-minor changes for some of the review comments), since I'm convinced
-neither that my current per-cpu flag-based solution is unsound nor that
-a delayed work queue can solve all of the same problems.
-
-> On Sat, Aug 02, 2014 at 10:27:56AM +0100, Russell King wrote:
-> > On Thu, Jul 31, 2014 at 03:06:42PM -0700, Brian Norris wrote:
-> > > Yes, I noticed this. What I meant is that smp_ops.cpu_die() and
-> > > smp_ops.cpu_kill() are not synchronized.
-> > ...
-> > > We're not relying on the L1 cache, though. Don't sync_cache_{r,w}()
-> > > ensure all reads/writes reach at least the L2?
-> > 
-> > What exactly are you trying to achieve here?
-> 
-> Synchronization between v7_exit_coherency_flush() (on the dying CPU) and
-> yanking the power (brcmstb_cpu_kill(), on the murderous CPU). The core
-> completion-based synchronization is not sufficient, since it allows
-> brcmstb_smp_ops.smp_kill and brcmstb_smp_ops.smp_die to race.
-> 
-> Am I somehow not achieving what I intend here?
-> 
-> > > How does that ensure that the CPU is down by the time the work is
-> > > scheduled? It seems like this would just defer the work long enough that
-> > > it *most likely* has quiesced, but I don't see how this gives us a
-> > > better guarantee. Or maybe I'm missing something. (If so, please do
-> > > enlighten!)
-> > 
-> > Note that I said a delayed work queue.  The dying CPU runs a predictable
-> > sequence once cpu_die() has been entered - interrupts at the GIC have
-> > been programmed to be routed to other CPUs, interrupts at the CPU are
-> > masked, so the CPU isn't going to be doing anything else except executing
-> > that code path.  So, it's going to be a predictable number of CPU cycles.
-> > 
-> > That allows you to arrange a delayed workqueue (or a timer) to fire
-> > after a period of time that you can guarantee that the dying CPU has
-> > reached that wfi().
-> 
-> OK, that sounds workable for the active hotplug case.
-> 
-> But what about for the suspend case? CPUs are hot-unplugged during
-> disable_nonboot_cpus(), and I don't see that this would guarantee the
-> workqueue will complete before we enter suspend.
-> 
-> > Another point which raises itself in your patch is this:
-> > 
-> > +       /* Settle-time from Broadcom-internal DVT reference code */
-> > +       udelay(7);
-> > 
-[...]
-> I'm looking into this specific delay. [...]
-
-BTW, I think this delay can be dropped. It was retained from an early
-non-production release of this CPU.
-
-Brian
+The ChromeOS bootloader ("depthcharge") boots FIT images and selects
+the appropriate device-tree from the image based on the compatible
+string.  On Big boards, it looks for "google,nyan-big".  This only
+becomes an issue if there are multiple device-trees in the FIT image.
+If there's only a single configuration (or you chain-load U-Boot),
+then the bootloader will boot with that configuration.  If you build a
+kernel image in the ChromiumOS environment, however, you'll end up
+with multiple device-trees (all those built by the kernel config at
+least) in the FIT image - this is what allows us to boot the same
+binary on different boards.
