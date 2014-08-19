@@ -1,46 +1,36 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Tue, 19 Aug 2014 19:15:07 +0530
-Subject: [PATCH] Documentation: dmaengine: Add a documentation for the
- dma controller API
-In-Reply-To: <20140814085753.GS30401@n2100.arm.linux.org.uk>
-References: <1406736193-26685-1-git-send-email-maxime.ripard@free-electrons.com>
- <20140814085301.GJ2452@ldesroches-Latitude-E6320>
- <20140814085753.GS30401@n2100.arm.linux.org.uk>
-Message-ID: <20140819134507.GJ13288@intel.com>
+From: ijc@hellion.org.uk (Ian Campbell)
+Date: Tue, 19 Aug 2014 15:03:02 +0100
+Subject: [PATCH] ARM: dts: sun6i: Add #address-cells & #size-cells to i2c node
+Message-ID: <1408456982-27021-1-git-send-email-ijc@hellion.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 14, 2014 at 09:57:53AM +0100, Russell King - ARM Linux wrote:
-> On Thu, Aug 14, 2014 at 10:53:01AM +0200, Ludovic Desroches wrote:
-> > On Wed, Jul 30, 2014 at 06:03:13PM +0200, Maxime Ripard wrote:
-> > > The dmaengine is neither trivial nor properly documented at the moment, which
-> > > means a lot of trial and error development, which is not that good for such a
-> > > central piece of the system.
-> > > 
-> > > Attempt at making such a documentation.
-> > 
-> > Good idea, many questions are asked when writing a new dmaengine driver.
-> > 
-> > For instance I didn't find how to use the DMA_CTRL_ACK flags.
-> > 
-> > - How this flag has to be managed? For instance, async_tx_ack is used in
-> > dmaengine driver but also in some devices.
-> > - Is it mandatory to deal with this flag? It seems some dmaengine
-> > drivers don't care about it.
-> This is one part of the DMA engine API that even I don't understand.
-> 
-> It's got something to do with the async engine API, and seems to be
-> something to do with whether a descriptor can have other transactions
-> added to it, and whether a descriptor can be re-used (async-tx engines
-> typically allocate a fixed set of descriptors and recycle them.)
-Yes this is my understanding too. Async API IIUC can reuse descriptors and
-if engine doesnt support this is a way to tell them please do use that.
+This fixes:
+  DTC     arch/arm/boot/dts/sun6i-a31-hummingbird.dtb
+Warning (reg_format): "reg" property in /soc at 01c00000/i2c at 01c2b400/rtc at 51 has invalid length (4 bytes) (#address-cells == 2, #size-cells == 1)
+Warning (avoid_default_addr_size): Relying on default #address-cells value for /soc at 01c00000/i2c at 01c2b400/rtc at 51
+Warning (avoid_default_addr_size): Relying on default #size-cells value for /soc at 01c00000/i2c at 01c2b400/rtc at 51
 
-For slave dmanegine API we need to ignore it.
-> 
-> I was never able to get to the bottom of what that flag meant or how
-> it should be used with the DMA slave API (and I suspect everyone else
-> just gave up trying to understand it as well.)
+Signed-off-by: Ian Campbell <ijc@hellion.org.uk>
+Cc: Maxime Ripard <maxime.ripard@free-electrons.com>
+Cc: Chen-Yu Tsai <wens@csie.org>
+Cc: linux-arm-kernel at lists.infradead.org
+---
+ arch/arm/boot/dts/sun6i-a31.dtsi | 2 ++
+ 1 file changed, 2 insertions(+)
 
+diff --git a/arch/arm/boot/dts/sun6i-a31.dtsi b/arch/arm/boot/dts/sun6i-a31.dtsi
+index 44b07e5..5bc769f 100644
+--- a/arch/arm/boot/dts/sun6i-a31.dtsi
++++ b/arch/arm/boot/dts/sun6i-a31.dtsi
+@@ -680,6 +680,8 @@
+ 			clock-frequency = <100000>;
+ 			resets = <&apb2_rst 2>;
+ 			status = "disabled";
++			#address-cells = <1>;
++			#size-cells = <0>;
+ 		};
+ 
+ 		i2c3: i2c at 01c2b800 {
 -- 
-~Vinod
+2.0.1
