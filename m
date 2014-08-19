@@ -1,105 +1,54 @@
-From: gwen@trabucayre.com (gwenhael.goavec)
-Date: Tue, 19 Aug 2014 10:47:46 +0200
-Subject: [RFC] usb issue on imx27: 3 clocks are needed
-In-Reply-To: <20140819001816.GC2928@peterchendt>
-References: <53EF7AF6.2000405@gmail.com> <20140818090056.GA29393@peterchendt>
- <20140818092635.GI2114@dragon>
- <782c806acb464f5781deb32e94548882@BN1PR0301MB0772.namprd03.prod.outlook.com>
- <20140818134903.5b6e6c27@x230.trabucayre.com>
- <20140819001816.GC2928@peterchendt>
-Message-ID: <20140819104746.4a8f323c@x230>
+From: mpa@pengutronix.de (Markus Pargmann)
+Date: Tue, 19 Aug 2014 10:50:02 +0200
+Subject: [PATCH v3 5/7] net: cpsw: Add am33xx MACID readout
+In-Reply-To: <CABxcv=npv6bRq=VF8RT5trNxUzDj3bAm-PkvDEhcLVJ+uf8hCg@mail.gmail.com>
+References: <1408202315-20006-1-git-send-email-mpa@pengutronix.de>
+ <1408202315-20006-6-git-send-email-mpa@pengutronix.de>
+ <53F244DA.3070803@ti.com>
+ <20140818154112.6601cbff@gandalf.local.home>
+ <53F25AD1.8040504@ti.com>
+ <CABxcv=npv6bRq=VF8RT5trNxUzDj3bAm-PkvDEhcLVJ+uf8hCg@mail.gmail.com>
+Message-ID: <20140819085002.GE12930@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 19 Aug 2014 08:18:17 +0800
-Peter Chen <peter.chen@freescale.com> wrote:
+Hi,
 
-> On Mon, Aug 18, 2014 at 01:49:03PM +0200, gwenhael.goavec wrote:
-> > On Mon, 18 Aug 2014 10:35:53 +0000
-> > Peter Chen <Peter.Chen@freescale.com> wrote:
-> > 
-> > >  
-> > > > On Mon, Aug 18, 2014 at 05:00:59PM +0800, Peter Chen wrote:
-> > > > > On Sat, Aug 16, 2014 at 05:38:30PM +0200, Philippe Reynes wrote:
-> > > > > > Hi all,
-> > > > > >
-> > > > > > i.MX27's usb needs three clocks (usb_ipg_gate, usb_ahb_gate and
-> > > > > > usb_div) but the current chipidea driver implementation, and
-> > > > > > devicetree, provides only ipg and ahb. Consequently, if the
-> > > > > > bootloader don't enable the last one, the kernel will crash.
-> > > > > >
-> > > > > > Our approach/idea is to add a second, optionnal, clock in
-> > > > > > ci_hdrc_imx.c with 'per' name in devicetree  and to add  clock name
-> > > > 'main_clk' for mandatory clock.
-> > > > > > This approach it correct? Or an other approach seems better?
-> > > > > > Thank you very much for your point of view.
-> > > > > >
-> > > > >
-> > > > > It is ok for me to have ipg, ahb and per clocks at driver, but how can
-> > > > > you maintain DT consistent?
-> > > > 
-> > > > Adding new clock as optional one will just maintain the DT compatibility.
-> > > > 
-> > > 
-> > > How to handle node_usb_soc1's clock which is without clk name to consistent with three
-> > > clocks for node_usb_soc2 at driver? Except for adding some platform judge code at
-> > > driver, do you have other solutions?
-> > > 
-> > > node_usb_soc1: {
-> > > 	clocks = <&clks IMX6_CLK_USBOH3>;
-> > > };
-> > > 
-> > > node_usb_soc2: {
-> > > 	clocks = <&clks IMX27_CLK_USBIPG>, <&clks IMX27_CLK_USBOH3>, <&clks IMX27_CLK_USBPER>;
-> > > 	clock-names = "ipg", "ahb", "per";
-> > > };
-> > > 
-> > > Peter
-> > > --
-> > 
-> > Our idea is something like this :
-> > node_usb_soc: {
-> > 	clocks = <&clks IMX27_CLK_USBxxx>;
-> > 	clock-names = "main_clk";
-> > };
-> > for all CPUs
-> > 
-> > and 
-> > node_usb_imx27: {
-> > 	clocks = <&clks IMX27_CLK_USB_IPG_GATE>,
-> > 		<&clks IMX27_CLK_USB_DIV>;
-> > 	clock-names = "main_clk", "per";
-> > };
-> > 
-> > For imx27 and CPUs with the need of more than one clock.
-> > 
+On Tue, Aug 19, 2014 at 12:50:59AM +0200, Javier Martinez Canillas wrote:
+> Hello Mugunthan,
 > 
-> Just like Shawn said, it breaks DT compatibility, how the old dtb works
-> with newer version kernel after you change.
->
-New dtsi must be updated according to the clock name and to avoid breaking old
-dtb, i think the best way is to to do something like :
-
-data->clk = devm_clk_get(&pdev->dev, "main_clk");
-if (IS_ERR(data->clk)) {
-	/* DT compatibility */
-	data->clk = devm_clk_get(&pdev->dev, NULL);
-	if (IS_ERR(data->clk)) {
-		dev_err(&pdev->dev,
-			"Failed to get main clock, err=%ld\n",
-			PTR_ERR(data->clk));
-		return PTR_ERR(data->clk);
-	}   
-}
-Gwenhael
-
->
-> > The last clock (ie ahb) is handled by usbmisc.c and if "per" clock is not
-> > present in the dtsi chipidea will not fails, just setting data->per_clk = NULL
-> > for prepare/unprepare.
-> > 
-> > Gwenhael
+> On Mon, Aug 18, 2014 at 9:58 PM, Mugunthan V N <mugunthanvnm@ti.com> wrote:
+> >>
+> >> Thus, for this patchset, as is:
+> >>
+> >> Tested-by: Steven Rostedt <rostedt@goodmis.org>
+> >
+> > This will fail for DRA7xx not in AM33xx
+> >
 > 
-> -- 
-> Best Regards,
-> Peter Chen
+> cpsw_am33xx_cm_get_macid() checks for
+> of_machine_is_compatible("ti,am33xx") and returns 0 if the machine is
+> not an am33xx. cpsw_probe_dt() only propagates the return value if is
+> not 0 so this patch does not change the semantics for other SoCs
+> besides am33xx.
+
+Yes, this patch is only about the am33xx. I don't have the DRA7xx
+hardware so I am not able to test on that hardware. Mugunthan, perhaps
+you can supply some followup patches for DRA7xx.
+
+Best regards,
+
+Markus
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140819/ce9402ff/attachment-0001.sig>
