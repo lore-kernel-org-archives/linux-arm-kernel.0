@@ -1,29 +1,35 @@
-From: shc_work@mail.ru (=?UTF-8?B?QWxleGFuZGVyIFNoaXlhbg==?=)
-Date: Tue, 19 Aug 2014 19:22:32 +0400
-Subject: =?UTF-8?B?UmU6IFtQQVRDSCB2Ml0gQVJNOiBpLk1YOiBkdHM6IEFkZCBzdXBwb3J0IGZv?=
- =?UTF-8?B?ciB0aGUgRnJlZXNjYWxlIGkuTVgxIEFEUyBib2FyZA==?=
-In-Reply-To: <CAOMZO5B7oiy0Kuac2wMSMNBAVima+S0OR1rR-9p034S75rBzjg@mail.gmail.com>
-References: <1408430027-4326-1-git-send-email-shc_work@mail.ru>
- <CAOMZO5B7oiy0Kuac2wMSMNBAVima+S0OR1rR-9p034S75rBzjg@mail.gmail.com>
-Message-ID: <1408461752.186151416@f405.i.mail.ru>
+From: sfr@canb.auug.org.au (Stephen Rothwell)
+Date: Wed, 20 Aug 2014 01:23:45 +1000
+Subject: Lock Directory failure
+In-Reply-To: <alpine.LSU.2.11.1408181350260.1127@eggly.anvils>
+References: <20140818163209.GJ9662@saruman.home>
+ <alpine.LSU.2.11.1408181350260.1127@eggly.anvils>
+Message-ID: <20140820012345.7c358fd7@canb.auug.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tue, 19 Aug 2014 10:29:08 -0300 ?? Fabio Estevam <festevam@gmail.com>:
-> On Tue, Aug 19, 2014 at 3:33 AM, Alexander Shiyan <shc_work@mail.ru> wrote:
-> > This patch adds support for the Freescale (Motorola) i.MX1 ADS board.
-> > This change is intended to further remove non-DT support for this board.
-> >
-> > Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
-> 
-> Looks good, only one minor comment:
-> 
-> >
-> > +&iomuxc {
-> > +       imx1-motorola-ads {
-> 
-> Should be imx1-ads instead.
+Hi Hugh,
 
-Ah, yes. Shawn, can this be fixed during apply?
+On Mon, 18 Aug 2014 13:58:26 -0700 (PDT) Hugh Dickins <hughd@google.com> wrote:
+>
+> [PATCH next] vfs: initialize m_list to fix crash in mnt_set_mountpoint
+> 
+> Fix mnt_set_mountpoint() crash: new_mountpoint() must initialize m_list.
+> 
+> Reported-by: Felipe Balbi <balbi@ti.com>
+> Signed-off-by: Hugh Dickins <hughd@google.com>
 
----
+I assume that this is a fix for commit 89f7ca1af15b ("vfs: Keep a list
+of mounts on a mount point") that is currently i the vfs tree.  I will
+apply this patch as a fix up for the vfs tree in linux-next today.
+
+-- 
+Cheers,
+Stephen Rothwell
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140820/d778aa76/attachment.sig>
