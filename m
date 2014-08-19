@@ -1,27 +1,31 @@
-From: gdjakov@mm-sol.com (Georgi Djakov)
-Date: Tue, 19 Aug 2014 20:22:13 +0300
-Subject: [PATCH v1 0/3] pinctrl: qcom: Add APQ8084 pinctrl support
-Message-ID: <1408468936-12252-1-git-send-email-gdjakov@mm-sol.com>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Tue, 19 Aug 2014 22:37:27 +0530
+Subject: [PATCH] dma: xilinx: Remove .owner field for driver
+In-Reply-To: <f82330042cf6185a1f4e18232ebf6999662ae48f.1407931050.git.michal.simek@xilinx.com>
+References: <f82330042cf6185a1f4e18232ebf6999662ae48f.1407931050.git.michal.simek@xilinx.com>
+Message-ID: <20140819170727.GU13288@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This set of patches adds pinctrl support for the Qualcomm APQ8084 platform.
-The first patch adds the pin definitions. The second patch contains the
-devicetree documentation. The last patch adds the DT node.
+On Wed, Aug 13, 2014 at 01:57:42PM +0200, Michal Simek wrote:
+> There is no need to init .owner field.
+> 
+> Based on the patch from Peter Griffin <peter.griffin@linaro.org>
+> "mmc: remove .owner field for drivers using module_platform_driver"
+> 
+> This patch removes the superflous .owner field for drivers which
+> use the module_platform_driver API, as this is overriden in
+> platform_driver_register anyway."
 
-Georgi Djakov (3):
-  pinctrl: qcom: Add APQ8084 pinctrl support
-  dt: Document Qualcomm APQ8084 pinctrl binding
-  ARM: dts: Add TLMM DT node for apq8084
-
- .../bindings/pinctrl/qcom,apq8084-pinctrl.txt      |  109 ++
- arch/arm/boot/dts/qcom-apq8084.dtsi                |   10 +
- drivers/pinctrl/qcom/Kconfig                       |    8 +
- drivers/pinctrl/qcom/Makefile                      |    1 +
- drivers/pinctrl/qcom/pinctrl-apq8084.c             | 1302 ++++++++++++++++++++
- 5 files changed, 1430 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/pinctrl/qcom,apq8084-pinctrl.txt
- create mode 100644 drivers/pinctrl/qcom/pinctrl-apq8084.c
+Applied, thanks
 
 -- 
-1.7.9.5
+~Vinod
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140819/6c31ff94/attachment.sig>
