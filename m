@@ -1,148 +1,215 @@
-From: hdoyu@nvidia.com (Hiroshi Doyu)
-Date: Tue, 19 Aug 2014 18:54:52 +0300
-Subject: [PATCH 4/6] iommu/arm-smmu: implement generic DT bindings
-In-Reply-To: <20140819125449.GN23128@arm.com>
-References: <1407891099-24641-1-git-send-email-mitchelh@codeaurora.org>
- <1407891099-24641-5-git-send-email-mitchelh@codeaurora.org>
- <20140819125449.GN23128@arm.com>
-Message-ID: <87tx58h3ub.fsf@nvidia.com>
+From: shc_work@mail.ru (Alexander Shiyan)
+Date: Tue, 19 Aug 2014 20:00:09 +0400
+Subject: [PATCH] ARM: i.MX: dts: Add simple-card support
+Message-ID: <1408464009-20722-1-git-send-email-shc_work@mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+This patch adds simple-card support to the i.MX SoCs.
 
-Will Deacon <will.deacon@arm.com> writes:
+Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
+---
+ arch/arm/boot/dts/imx25.dtsi   | 2 ++
+ arch/arm/boot/dts/imx35.dtsi   | 1 +
+ arch/arm/boot/dts/imx50.dtsi   | 2 ++
+ arch/arm/boot/dts/imx51.dtsi   | 3 +++
+ arch/arm/boot/dts/imx53.dtsi   | 3 +++
+ arch/arm/boot/dts/imx6qdl.dtsi | 3 +++
+ arch/arm/boot/dts/imx6sl.dtsi  | 3 +++
+ arch/arm/boot/dts/imx6sx.dtsi  | 3 +++
+ 8 files changed, 20 insertions(+)
 
-> [adding Rob, Mark, Arnd, Thierry and Hiroshi]
->
-> On Wed, Aug 13, 2014 at 01:51:37AM +0100, Mitchel Humpherys wrote:
->> Generic IOMMU device tree bindings were recently added in
->> ["devicetree: Add generic IOMMU device tree bindings"]. Implement the
->> bindings in the ARM SMMU driver.
->> 
->> See Documentation/devicetree/bindings/iommu/iommu.txt for the bindings
->> themselves.
->
-> Could you look at moving the parsing code into a separate file please (maybe
-> under lib/ ?). That way, other IOMMUs can use the same binding without the
-> boilerplate having to be rewritten each time.
->
->> diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
->> index 63c6707fad..22e25f3172 100644
->> --- a/drivers/iommu/arm-smmu.c
->> +++ b/drivers/iommu/arm-smmu.c
->> @@ -538,25 +538,32 @@ static int insert_smmu_master(struct arm_smmu_device *smmu,
->>  	return 0;
->>  }
->>  
->> +struct iommus_entry {
->> +	struct list_head list;
->> +	struct device_node *node;
->> +	u16 streamids[MAX_MASTER_STREAMIDS];
->> +	int num_sids;
->> +};
->> +
->>  static int register_smmu_master(struct arm_smmu_device *smmu,
->> -				struct device *dev,
->> -				struct of_phandle_args *masterspec)
->> +				struct iommus_entry *entry)
->>  {
->>  	int i;
->>  	struct arm_smmu_master *master;
->> +	struct device *dev = smmu->dev;
->>  
->> -	master = find_smmu_master(smmu, masterspec->np);
->> +	master = find_smmu_master(smmu, entry->node);
->>  	if (master) {
->>  		dev_err(dev,
->>  			"rejecting multiple registrations for master device %s\n",
->> -			masterspec->np->name);
->> +			entry->node->name);
->>  		return -EBUSY;
->>  	}
->>  
->> -	if (masterspec->args_count > MAX_MASTER_STREAMIDS) {
->> +	if (entry->num_sids > MAX_MASTER_STREAMIDS) {
->>  		dev_err(dev,
->>  			"reached maximum number (%d) of stream IDs for master device %s\n",
->> -			MAX_MASTER_STREAMIDS, masterspec->np->name);
->> +			MAX_MASTER_STREAMIDS, entry->node->name);
->>  		return -ENOSPC;
->>  	}
->>  
->> @@ -564,15 +571,58 @@ static int register_smmu_master(struct arm_smmu_device *smmu,
->>  	if (!master)
->>  		return -ENOMEM;
->>  
->> -	master->of_node			= masterspec->np;
->> -	master->cfg.num_streamids	= masterspec->args_count;
->> +	master->of_node			= entry->node;
->> +	master->cfg.num_streamids	= entry->num_sids;
->>  
->>  	for (i = 0; i < master->cfg.num_streamids; ++i)
->> -		master->cfg.streamids[i] = masterspec->args[i];
->> +		master->cfg.streamids[i] = entry->streamids[i];
->>  
->>  	return insert_smmu_master(smmu, master);
->>  }
->>  
->> +static int arm_smmu_parse_iommus_properties(struct arm_smmu_device *smmu,
->> +					int *num_masters)
->> +{
->> +	struct of_phandle_args iommuspec;
->> +	struct device_node *dn;
->> +
->> +	for_each_node_with_property(dn, "iommus") {
->> +		int arg_ind = 0;
->> +		struct iommus_entry *entry, *n;
->> +		LIST_HEAD(iommus);
-
-You may want to use the macro, "of_property_for_each_phandle_with_args()"
-to parse "iommus=".
-
-  https://patchwork.ozlabs.org/patch/354073/
-
->> +
->> +		while (!of_parse_phandle_with_args(dn, "iommus", "#iommu-cells",
->> +							arg_ind, &iommuspec)) {
->
-> We need to check that the phandle does indeed point at one of our SMMUs
-> here, in case we have a system with multiple IOMMU types, all using the
-> generic binding.
->
->> +			int i;
->> +
->> +			list_for_each_entry(entry, &iommus, list)
->> +				if (entry->node == dn)
->> +					break;
->
-> Oh, yuck, this is really nasty to parse...
->
->> +			if (&entry->list == &iommus) {
->
-> Where is entry initialised the first time around?
->
->> +				entry = devm_kzalloc(smmu->dev, sizeof(*entry),
->> +						GFP_KERNEL);
->> +				if (!entry)
->> +					return -ENOMEM;
->
-> You need to of_node_put the guys you've got back from the phandle parsing
-> code.
->
->> +				entry->node = dn;
->> +				list_add(&entry->list, &iommus);
->> +			}
->> +			entry->num_sids = iommuspec.args_count;
->> +			for (i = 0; i < entry->num_sids; ++i)
->> +				entry->streamids[i] = iommuspec.args[i];
->> +			arg_ind++;
->
-> Isn't this defined by #iommu-cells?
->
->> +		}
->> +
->> +		list_for_each_entry_safe(entry, n, &iommus, list) {
->
-> Why the _safe variant? This is a local list, right?
->
-> Will
+diff --git a/arch/arm/boot/dts/imx25.dtsi b/arch/arm/boot/dts/imx25.dtsi
+index c174039..61e34f42 100644
+--- a/arch/arm/boot/dts/imx25.dtsi
++++ b/arch/arm/boot/dts/imx25.dtsi
+@@ -239,6 +239,7 @@
+ 			};
+ 
+ 			ssi2: ssi at 50014000 {
++				#sound-dai-cells = <0>;
+ 				compatible = "fsl,imx25-ssi", "fsl,imx21-ssi";
+ 				reg = <0x50014000 0x4000>;
+ 				interrupts = <11>;
+@@ -274,6 +275,7 @@
+ 			};
+ 
+ 			ssi1: ssi at 50034000 {
++				#sound-dai-cells = <0>;
+ 				compatible = "fsl,imx25-ssi", "fsl,imx21-ssi";
+ 				reg = <0x50034000 0x4000>;
+ 				interrupts = <12>;
+diff --git a/arch/arm/boot/dts/imx35.dtsi b/arch/arm/boot/dts/imx35.dtsi
+index 442e216..6932928 100644
+--- a/arch/arm/boot/dts/imx35.dtsi
++++ b/arch/arm/boot/dts/imx35.dtsi
+@@ -114,6 +114,7 @@
+ 			};
+ 
+ 			ssi1: ssi at 43fa0000 {
++				#sound-dai-cells = <0>;
+ 				compatible = "fsl,imx35-ssi", "fsl,imx21-ssi";
+ 				reg = <0x43fa0000 0x4000>;
+ 				interrupts = <11>;
+diff --git a/arch/arm/boot/dts/imx50.dtsi b/arch/arm/boot/dts/imx50.dtsi
+index c0e0f60..620b0f0 100644
+--- a/arch/arm/boot/dts/imx50.dtsi
++++ b/arch/arm/boot/dts/imx50.dtsi
+@@ -145,6 +145,7 @@
+ 				};
+ 
+ 				ssi2: ssi at 50014000 {
++					#sound-dai-cells = <0>;
+ 					compatible = "fsl,imx50-ssi",
+ 							"fsl,imx51-ssi",
+ 							"fsl,imx21-ssi";
+@@ -454,6 +455,7 @@
+ 			};
+ 
+ 			ssi1: ssi at 63fcc000 {
++				#sound-dai-cells = <0>;
+ 				compatible = "fsl,imx50-ssi", "fsl,imx51-ssi",
+ 							"fsl,imx21-ssi";
+ 				reg = <0x63fcc000 0x4000>;
+diff --git a/arch/arm/boot/dts/imx51.dtsi b/arch/arm/boot/dts/imx51.dtsi
+index 17c05a6..92660e1 100644
+--- a/arch/arm/boot/dts/imx51.dtsi
++++ b/arch/arm/boot/dts/imx51.dtsi
+@@ -210,6 +210,7 @@
+ 				};
+ 
+ 				ssi2: ssi at 70014000 {
++					#sound-dai-cells = <0>;
+ 					compatible = "fsl,imx51-ssi", "fsl,imx21-ssi";
+ 					reg = <0x70014000 0x4000>;
+ 					interrupts = <30>;
+@@ -499,6 +500,7 @@
+ 			};
+ 
+ 			ssi1: ssi at 83fcc000 {
++				#sound-dai-cells = <0>;
+ 				compatible = "fsl,imx51-ssi", "fsl,imx21-ssi";
+ 				reg = <0x83fcc000 0x4000>;
+ 				interrupts = <29>;
+@@ -554,6 +556,7 @@
+ 			};
+ 
+ 			ssi3: ssi at 83fe8000 {
++				#sound-dai-cells = <0>;
+ 				compatible = "fsl,imx51-ssi", "fsl,imx21-ssi";
+ 				reg = <0x83fe8000 0x4000>;
+ 				interrupts = <96>;
+diff --git a/arch/arm/boot/dts/imx53.dtsi b/arch/arm/boot/dts/imx53.dtsi
+index 64fa27b..f9f497e 100644
+--- a/arch/arm/boot/dts/imx53.dtsi
++++ b/arch/arm/boot/dts/imx53.dtsi
+@@ -221,6 +221,7 @@
+ 				};
+ 
+ 				ssi2: ssi at 50014000 {
++					#sound-dai-cells = <0>;
+ 					compatible = "fsl,imx53-ssi",
+ 							"fsl,imx51-ssi",
+ 							"fsl,imx21-ssi";
+@@ -661,6 +662,7 @@
+ 			};
+ 
+ 			ssi1: ssi at 63fcc000 {
++				#sound-dai-cells = <0>;
+ 				compatible = "fsl,imx53-ssi", "fsl,imx51-ssi",
+ 						"fsl,imx21-ssi";
+ 				reg = <0x63fcc000 0x4000>;
+@@ -688,6 +690,7 @@
+ 			};
+ 
+ 			ssi3: ssi at 63fe8000 {
++				#sound-dai-cells = <0>;
+ 				compatible = "fsl,imx53-ssi", "fsl,imx51-ssi",
+ 						"fsl,imx21-ssi";
+ 				reg = <0x63fe8000 0x4000>;
+diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
+index c701af9..6692115 100644
+--- a/arch/arm/boot/dts/imx6qdl.dtsi
++++ b/arch/arm/boot/dts/imx6qdl.dtsi
+@@ -273,6 +273,7 @@
+ 				};
+ 
+ 				ssi1: ssi at 02028000 {
++					#sound-dai-cells = <0>;
+ 					compatible = "fsl,imx6q-ssi",
+ 							"fsl,imx51-ssi";
+ 					reg = <0x02028000 0x4000>;
+@@ -286,6 +287,7 @@
+ 				};
+ 
+ 				ssi2: ssi at 0202c000 {
++					#sound-dai-cells = <0>;
+ 					compatible = "fsl,imx6q-ssi",
+ 							"fsl,imx51-ssi";
+ 					reg = <0x0202c000 0x4000>;
+@@ -299,6 +301,7 @@
+ 				};
+ 
+ 				ssi3: ssi at 02030000 {
++					#sound-dai-cells = <0>;
+ 					compatible = "fsl,imx6q-ssi",
+ 							"fsl,imx51-ssi";
+ 					reg = <0x02030000 0x4000>;
+diff --git a/arch/arm/boot/dts/imx6sl.dtsi b/arch/arm/boot/dts/imx6sl.dtsi
+index 505da9e..4c400fc 100644
+--- a/arch/arm/boot/dts/imx6sl.dtsi
++++ b/arch/arm/boot/dts/imx6sl.dtsi
+@@ -226,6 +226,7 @@
+ 				};
+ 
+ 				ssi1: ssi at 02028000 {
++					#sound-dai-cells = <0>;
+ 					compatible = "fsl,imx6sl-ssi",
+ 							"fsl,imx51-ssi";
+ 					reg = <0x02028000 0x4000>;
+@@ -239,6 +240,7 @@
+ 				};
+ 
+ 				ssi2: ssi at 0202c000 {
++					#sound-dai-cells = <0>;
+ 					compatible = "fsl,imx6sl-ssi",
+ 							"fsl,imx51-ssi";
+ 					reg = <0x0202c000 0x4000>;
+@@ -252,6 +254,7 @@
+ 				};
+ 
+ 				ssi3: ssi at 02030000 {
++					#sound-dai-cells = <0>;
+ 					compatible = "fsl,imx6sl-ssi",
+ 							"fsl,imx51-ssi";
+ 					reg = <0x02030000 0x4000>;
+diff --git a/arch/arm/boot/dts/imx6sx.dtsi b/arch/arm/boot/dts/imx6sx.dtsi
+index f4b9da6..63d9d82 100644
+--- a/arch/arm/boot/dts/imx6sx.dtsi
++++ b/arch/arm/boot/dts/imx6sx.dtsi
+@@ -298,6 +298,7 @@
+ 				};
+ 
+ 				ssi1: ssi at 02028000 {
++					#sound-dai-cells = <0>;
+ 					compatible = "fsl,imx6sx-ssi", "fsl,imx51-ssi";
+ 					reg = <0x02028000 0x4000>;
+ 					interrupts = <GIC_SPI 46 IRQ_TYPE_LEVEL_HIGH>;
+@@ -311,6 +312,7 @@
+ 				};
+ 
+ 				ssi2: ssi at 0202c000 {
++					#sound-dai-cells = <0>;
+ 					compatible = "fsl,imx6sx-ssi", "fsl,imx51-ssi";
+ 					reg = <0x0202c000 0x4000>;
+ 					interrupts = <GIC_SPI 47 IRQ_TYPE_LEVEL_HIGH>;
+@@ -324,6 +326,7 @@
+ 				};
+ 
+ 				ssi3: ssi at 02030000 {
++					#sound-dai-cells = <0>;
+ 					compatible = "fsl,imx6sx-ssi", "fsl,imx51-ssi";
+ 					reg = <0x02030000 0x4000>;
+ 					interrupts = <GIC_SPI 48 IRQ_TYPE_LEVEL_HIGH>;
+-- 
+1.8.5.5
