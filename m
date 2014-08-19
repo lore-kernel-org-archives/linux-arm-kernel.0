@@ -1,42 +1,25 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 19 Aug 2014 09:08:08 +0100
-Subject: [PATCH v2] imx-drm: imx-drm-core: add suspend/resume support
-In-Reply-To: <20140818062532.GC2114@dragon>
-References: <1406269240-24622-1-git-send-email-shawn.guo@freescale.com>
- <20140818062532.GC2114@dragon>
-Message-ID: <20140819080808.GB30401@n2100.arm.linux.org.uk>
+From: van.freenix@gmail.com (Peng Fan)
+Date: Tue, 19 Aug 2014 16:12:23 +0800
+Subject: [PATCH] arm: Do not overwrite __machine_arch_type
+In-Reply-To: <20140819074344.GA30401@n2100.arm.linux.org.uk>
+References: <1408418491-29330-1-git-send-email-van.freenix@gmail.com>
+ <20140819074344.GA30401@n2100.arm.linux.org.uk>
+Message-ID: <53F306E7.8020701@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 18, 2014 at 02:25:34PM +0800, Shawn Guo wrote:
-> On Fri, Jul 25, 2014 at 02:20:40PM +0800, Shawn Guo wrote:
-> > HDMI currently stops working after a system suspend/resume cycle.  The
-> > cause is that the mode setting states in hardware gets lost and isn't
-> > restored across the suspend/resume cycle.
-> > 
-> > The patch adds a very basic suspend/resume support to imx-drm driver,
-> > and calls drm_helper_resume_force_mode() in .resume hook to restore the
-> > mode setting states, so that HDMI can continue working after a system
-> > suspend/resume cycle.
-> > 
-> > Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
+
+
+On 08/19/2014 03:43 PM, Russell King - ARM Linux wrote:
+> On Tue, Aug 19, 2014 at 11:21:31AM +0800, Peng Fan wrote:
+>> If using DT_MACHINE_START when enabled CONFIG_OF, the nr of mdesc is ~0.
+>> The value of __machine_arch_type is passsed from bootloader using reigster
+>> r1, and assigned in head-common.S. Remove this line to avoid overwrite it.
 > 
-> Hi Russell,
+> No.  The idea here is that the machine_is_xxx() methods are not used when
+> using DT, so this disables them.
 > 
-> What's your take on this patch?
+Got it. Thanks.
 
-I've mostly stepped away from collecting imx-drm patches for Greg, and
-I'm probably going to be dropping those patches which I had queued up
-a while back for Greg.
-
-Greg wishes me to use signed tags for pull requests.  This is not how I
-work, and would mean having to rewrite a bunch of my scripts to cater
-for Greg's special case.  No one else requires this.
-
-I haven't had the time to start looking at what this would require
-during the last three months, so the only other solution is to step
-down from dealing with imx-drm patches.
-
--- 
-FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
-according to speedtest.net.
+Regards,
+Peng.
