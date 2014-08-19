@@ -1,34 +1,268 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 19 Aug 2014 12:33:08 +0200
-Subject: [PATH v6 2/2] ARM: dts: sun7i: Add Merrii A20 Hummingbird board
-In-Reply-To: <1408433581-14417-3-git-send-email-wills.wang.open@gmail.com>
-References: <1408433581-14417-1-git-send-email-wills.wang.open@gmail.com>
- <1408433581-14417-3-git-send-email-wills.wang.open@gmail.com>
-Message-ID: <20140819103308.GP15297@lukather>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Tue, 19 Aug 2014 18:39:54 +0800
+Subject: [PATCH v2 05/18] ARM64 / ACPI: Parse FADT table to get PSCI flags
+ for PSCI init
+In-Reply-To: <53F246D4.7040807@arm.com>
+References: <1407166105-17675-1-git-send-email-hanjun.guo@linaro.org>
+ <1407166105-17675-6-git-send-email-hanjun.guo@linaro.org>
+ <53F246D4.7040807@arm.com>
+Message-ID: <53F3297A.1040309@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 19, 2014 at 03:33:01PM +0800, Wills Wang wrote:
-> This adds support for the A20 Hummingbird:
-> http://www.merrii.com/en/pla_d.asp?id=171
+On 2014-8-19 2:32, Sudeep Holla wrote:
+> On 04/08/14 16:28, Hanjun Guo wrote:
+>> There are two flags: PSCI_COMPLIANT and PSCI_USE_HVC. When set,
+>> the former signals to the OS that the hardware is PSCI compliant.
+>> The latter selects the appropriate conduit for PSCI calls by
+>> toggling between Hypervisor Calls (HVC) and Secure Monitor Calls
+>> (SMC).
+>>
+>> FADT table contains such information, parse FADT to get the flags
+>> for PSCI init. Since ACPI 5.1 doesn't support self defined PSCI
+>> function IDs, which means that only PSCI 0.2+ is supported in ACPI.
+>>
+>> At the same time, only ACPI 5.1 or higher verison supports PSCI,
+>> and FADT Major.Minor version was introduced in ACPI 5.1, so we
+>> will check the version and only parse FADT table with version >= 5.1.
+>>
+>> If firmware provides ACPI tables with ACPI version less than 5.1,
+>> OS will be messed up with those information and have no way to
+>> bring up secondery CPUs, so disable ACPI if we get an FADT table
+>> with version less that 5.1.
+>>
+[...]
+>>
+>> +static int __init acpi_parse_fadt(struct acpi_table_header *table)
+>> +{
+>> +    struct acpi_table_fadt *fadt = (struct acpi_table_fadt *)table;
+>> +
+>> +    /*
+>> +     * Revision in table header is the FADT Major version,
+>> +     * and there is a minor version of FADT which was introduced
+>> +     * by ACPI 5.1, we only deal with ACPI 5.1 or higher version
+>> +     * to get arm boot flags, or we will disable ACPI.
+>> +     */
+>> +    if (table->revision < 5 || fadt->minor_revision < 1) {
 > 
-> This patch enable most on-board peripherals supported on current kernel,
-> such as uart, i2c, spi, pwm, ohci/ehci, gmac and mmc.
+>                 &&
+
+Catalin also pointed out this bug :), but && is not enough, for example,
+this would not trigger of revision 4.1, although 4.1 is not exist, but
+the code will still confusing people, so I updated the code as:
+
++       if (table->revision > 5 ||
++           (table->revision == 5 && fadt->minor_revision >= 1)) {
++               return 0;
++       } else {
++               pr_info("FADT revision is %d.%d, no PSCI support, should be 5.1
+or higher\n",
++                       table->revision, fadt->minor_revision);
++               disable_acpi();
++               return -EINVAL;
++       }
+
 > 
-> Reviewed-by: Chen-Yu Tsai <wens@csie.org>
-> Signed-off-by: Wills Wang <wills.wang.open@gmail.com>
+>> +        pr_info("FADT version is %d.%d, no PSCI support, should be 5.1 or
+>> higher\n",
+>> +            table->revision, fadt->minor_revision);
+>> +        disable_acpi();
+> 
+> Instead of disabling ACPI at multiple places in the boot sequence, can't
+> it be done once if acpi_boot_init failed ?
+> 
+>> +        return -EINVAL;
+>> +    }
+>> +
+>> +    return 0;
+>> +}
+>> +
+>>   /*
+>>    * acpi_boot_table_init() called from setup_arch(), always.
+>>    *    1. find RSDP and get its address, and then find XSDT
+>> @@ -68,6 +90,21 @@ void __init acpi_boot_table_init(void)
+>>       }
+>>   }
+>>
+>> +int __init acpi_boot_init(void)
+>> +{
+>> +    int err = 0;
+>> +
+>> +    /* If acpi_disabled, bail out */
+>> +    if (acpi_disabled)
+>> +        return -ENODEV;
+>> +
+>> +    err = acpi_table_parse(ACPI_SIG_FADT, acpi_parse_fadt);
+>> +    if (err)
+>> +        pr_err("Can't find FADT\n");
+>> +
+>> +    return err;
+>> +}
+>> +
+>>   /*
+>>    * acpi_suspend_lowlevel() - save kernel state and suspend.
+>>    *
+>> diff --git a/arch/arm64/kernel/psci.c b/arch/arm64/kernel/psci.c
+>> index 9e9798f..2ad2084 100644
+>> --- a/arch/arm64/kernel/psci.c
+>> +++ b/arch/arm64/kernel/psci.c
+>> @@ -15,6 +15,7 @@
+>>
+>>   #define pr_fmt(fmt) "psci: " fmt
+>>
+>> +#include <linux/acpi.h>
+>>   #include <linux/init.h>
+>>   #include <linux/of.h>
+>>   #include <linux/smp.h>
+>> @@ -231,6 +232,33 @@ static void psci_sys_poweroff(void)
+>>       invoke_psci_fn(PSCI_0_2_FN_SYSTEM_OFF, 0, 0, 0);
+>>   }
+>>
+>> +static void psci_0_2_set_functions(void)
+>> +{
+>> +    pr_info("Using standard PSCI v0.2 function IDs\n");
+>> +    psci_function_id[PSCI_FN_CPU_SUSPEND] = PSCI_0_2_FN64_CPU_SUSPEND;
+>> +    psci_ops.cpu_suspend = psci_cpu_suspend;
+>> +
+>> +    psci_function_id[PSCI_FN_CPU_OFF] = PSCI_0_2_FN_CPU_OFF;
+>> +    psci_ops.cpu_off = psci_cpu_off;
+>> +
+>> +    psci_function_id[PSCI_FN_CPU_ON] = PSCI_0_2_FN64_CPU_ON;
+>> +    psci_ops.cpu_on = psci_cpu_on;
+>> +
+>> +    psci_function_id[PSCI_FN_MIGRATE] = PSCI_0_2_FN64_MIGRATE;
+>> +    psci_ops.migrate = psci_migrate;
+>> +
+>> +    psci_function_id[PSCI_FN_AFFINITY_INFO] = PSCI_0_2_FN64_AFFINITY_INFO;
+>> +    psci_ops.affinity_info = psci_affinity_info;
+>> +
+>> +    psci_function_id[PSCI_FN_MIGRATE_INFO_TYPE] =
+>> +        PSCI_0_2_FN_MIGRATE_INFO_TYPE;
+>> +    psci_ops.migrate_info_type = psci_migrate_info_type;
+>> +
+>> +    arm_pm_restart = psci_sys_reset;
+>> +
+>> +    pm_power_off = psci_sys_poweroff;
+>> +}
+>> +
+> 
+> Nit: IMO may be you can move these refactoring as separate patch before
+> ACPI related changes ?
 
-Applied, thanks!
-Maxime
+I'm ok with it, will format another patch and place it in the
+beginning of this patch set.
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140819/4847ae34/attachment.sig>
+> 
+>>   /*
+>>    * PSCI Function IDs for v0.2+ are well defined so use
+>>    * standard values.
+>> @@ -264,29 +292,7 @@ static int psci_0_2_init(struct device_node *np)
+>>           }
+>>       }
+>>
+>> -    pr_info("Using standard PSCI v0.2 function IDs\n");
+>> -    psci_function_id[PSCI_FN_CPU_SUSPEND] = PSCI_0_2_FN64_CPU_SUSPEND;
+>> -    psci_ops.cpu_suspend = psci_cpu_suspend;
+>> -
+>> -    psci_function_id[PSCI_FN_CPU_OFF] = PSCI_0_2_FN_CPU_OFF;
+>> -    psci_ops.cpu_off = psci_cpu_off;
+>> -
+>> -    psci_function_id[PSCI_FN_CPU_ON] = PSCI_0_2_FN64_CPU_ON;
+>> -    psci_ops.cpu_on = psci_cpu_on;
+>> -
+>> -    psci_function_id[PSCI_FN_MIGRATE] = PSCI_0_2_FN64_MIGRATE;
+>> -    psci_ops.migrate = psci_migrate;
+>> -
+>> -    psci_function_id[PSCI_FN_AFFINITY_INFO] = PSCI_0_2_FN64_AFFINITY_INFO;
+>> -    psci_ops.affinity_info = psci_affinity_info;
+>> -
+>> -    psci_function_id[PSCI_FN_MIGRATE_INFO_TYPE] =
+>> -        PSCI_0_2_FN_MIGRATE_INFO_TYPE;
+>> -    psci_ops.migrate_info_type = psci_migrate_info_type;
+>> -
+>> -    arm_pm_restart = psci_sys_reset;
+>> -
+>> -    pm_power_off = psci_sys_poweroff;
+>> +    psci_0_2_set_functions();
+>>
+>>   out_put_node:
+>>       of_node_put(np);
+>> @@ -333,6 +339,40 @@ out_put_node:
+>>       return err;
+>>   }
+>>
+>> +#ifdef CONFIG_ACPI
+>> +static int get_set_conduit_method_acpi(void)
+>> +{
+>> +    pr_info("probing for conduit method from ACPI.\n");
+>> +
+>> +    if (acpi_psci_use_hvc())
+>> +        invoke_psci_fn = __invoke_psci_fn_hvc;
+>> +    else
+>> +        invoke_psci_fn = __invoke_psci_fn_smc;
+>> +
+>> +    return 0;
+>> +}
+>> +
+>> +/* We use PSCI 0.2+ when ACPI is deployed */
+>> +static int psci_0_2_init_acpi(void)
+> 
+> May be this can be renamed psci_acpi_init and called from setup directly
+> instead of calling from DT function with acpi_disabled check.
+
+Also suggested by Catalin, will do it :)
+
+> 
+>> +{
+>> +    if (!acpi_psci_present()) {
+>> +        pr_info("is not implemented in ACPI.\n");
+>> +        return -EOPNOTSUPP;
+>> +    }
+>> +
+>> +    get_set_conduit_method_acpi();
+>> +
+>> +    psci_0_2_set_functions();
+>> +
+>> +    return 0;
+>> +}
+>> +#else
+>> +static inline int psci_0_2_init_acpi(void)
+>> +{
+>> +    return -ENODEV;
+>> +}
+>> +#endif
+>> +
+>>   static const struct of_device_id psci_of_match[] __initconst = {
+>>       { .compatible = "arm,psci",    .data = psci_0_1_init},
+>>       { .compatible = "arm,psci-0.2",    .data = psci_0_2_init},
+>> @@ -345,6 +385,9 @@ int __init psci_init(void)
+>>       const struct of_device_id *matched_np;
+>>       psci_initcall_t init_fn;
+>>
+>> +    if (!acpi_disabled)
+>> +        return psci_0_2_init_acpi();
+>> +
+> 
+> As mentioned above you need not modify this.
+> 
+>>       np = of_find_matching_node_and_match(NULL, psci_of_match, &matched_np);
+>>
+>>       if (!np)
+>> diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
+>> index 85c6326..dfc4e4f3 100644
+>> --- a/arch/arm64/kernel/setup.c
+>> +++ b/arch/arm64/kernel/setup.c
+>> @@ -395,6 +395,8 @@ void __init setup_arch(char **cmdline_p)
+>>       efi_idmap_init();
+>>
+>>       cpu_logical_map(0) = read_cpuid_mpidr() & MPIDR_HWID_BITMASK;
+>> +    acpi_boot_init();
+>> +
+> 
+> Check for the return error here and disable ACPI once rather than at
+> multiple places all over.
+
+ok.
+
+Thanks
+Hanjun
