@@ -1,43 +1,124 @@
 From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Tue, 19 Aug 2014 19:29:05 +0800
-Subject: [PATCH v2 09/18] ACPI / processor: Make it possible to get CPU
- hardware ID via GICC
-In-Reply-To: <53F2472F.5060400@arm.com>
+Date: Tue, 19 Aug 2014 19:36:11 +0800
+Subject: [PATCH v2 10/18] ARM64 / ACPI: Introduce ACPI_IRQ_MODEL_GIC and
+ register device's gsi
+In-Reply-To: <53F2474F.70601@arm.com>
 References: <1407166105-17675-1-git-send-email-hanjun.guo@linaro.org>
- <1407166105-17675-10-git-send-email-hanjun.guo@linaro.org>
- <53F2472F.5060400@arm.com>
-Message-ID: <53F33501.2060009@linaro.org>
+ <1407166105-17675-11-git-send-email-hanjun.guo@linaro.org>
+ <53F2474F.70601@arm.com>
+Message-ID: <53F336AB.80401@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 2014-8-19 2:34, Sudeep Holla wrote:
-[...]
+> 
+> 
+> On 04/08/14 16:28, Hanjun Guo wrote:
+>> Introduce ACPI_IRQ_MODEL_GIC which is needed for ARM64 as GIC is
+>> used, and then register device's gsi with the core IRQ subsystem.
 >>
->> +#include <asm/smp_plat.h>
->> +
->>   /* Basic configuration for ACPI */
->>   #ifdef    CONFIG_ACPI
+>> acpi_register_gsi() is similar to DT based irq_of_parse_and_map(),
+>> since gsi is unique in the system, so use hwirq number directly
+>> for the mapping.
+>>
+>> Originally-by: Amit Daniel Kachhap <amit.daniel@samsung.com>
+>> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+>> ---
+>>   arch/arm64/kernel/acpi.c |   73 ++++++++++++++++++++++++++++++++++++++++++++++
+>>   drivers/acpi/bus.c       |    3 ++
+>>   include/linux/acpi.h     |    1 +
+>>   3 files changed, 77 insertions(+)
+>>
+>> diff --git a/arch/arm64/kernel/acpi.c b/arch/arm64/kernel/acpi.c
+>> index ac7ab34..621ced8 100644
+>> --- a/arch/arm64/kernel/acpi.c
+>> +++ b/arch/arm64/kernel/acpi.c
+>> @@ -34,6 +34,12 @@ EXPORT_SYMBOL(acpi_pci_disabled);
+>>   static int enabled_cpus;    /* Processors (GICC) with enabled flag in MADT */
+>>
 >>   /*
->> @@ -59,6 +61,18 @@ static inline void disable_acpi(void)
->>       acpi_noirq = 1;
->>   }
->>
->> +u32 pack_mpidr_into_32_bits(u64 mpidr);
+>> + * Since we're on ARM, the default interrupt routing model
+>> + * clearly has to be GIC.
+>> + */
+>> +enum acpi_irq_model_id acpi_irq_model = ACPI_IRQ_MODEL_GIC;
 >> +
 >> +/*
->> + * The ACPI processor driver for ACPI core code needs this macro
->> + * to find out this cpu was already mapped (mapping from CPU hardware
->> + * ID to CPU logical ID) or not.
->> + *
->> + * cpu_logical_map(cpu) is the mapping of MPIDR and the logical cpu,
->> + * and MPIDR is the cpu hardware ID we needed.
+>>    * __acpi_map_table() will be called before page_init(), so early_ioremap()
+>>    * or early_memremap() should be called here to for ACPI table mapping.
+>>    */
+>> @@ -169,6 +175,73 @@ static int __init
+>> acpi_parse_madt_gic_cpu_interface_entries(void)
+>>       return 0;
+>>   }
+>>
+>> +int acpi_gsi_to_irq(u32 gsi, unsigned int *irq)
+>> +{
+>> +    *irq = irq_find_mapping(NULL, gsi);
+>> +
+>> +    return 0;
+>> +}
+>> +EXPORT_SYMBOL_GPL(acpi_gsi_to_irq);
+>> +
+>> +/*
+>> + * success: return IRQ number (>0)
+>> + * failure: return =< 0
+>> + */
+>> +int acpi_register_gsi(struct device *dev, u32 gsi, int trigger, int polarity)
+>> +{
+>> +    unsigned int irq;
+>> +    unsigned int irq_type;
+>> +
+>> +    /*
+>> +     * ACPI have no bindings to indicate SPI or PPI, so we
+>> +     * use different mappings from DT in ACPI.
+>> +     *
+>> +     * For FDT
+>> +     * PPI interrupt: in the range [0, 15];
+>> +     * SPI interrupt: in the range [0, 987];
+>> +     *
+>> +     * For ACPI, GSI should be unique so using
+>> +     * the hwirq directly for the mapping:
+>> +     * PPI interrupt: in the range [16, 31];
+>> +     * SPI interrupt: in the range [32, 1019];
+>> +     */
+>> +
+>> +    if (trigger == ACPI_EDGE_SENSITIVE &&
+>> +                polarity == ACPI_ACTIVE_LOW)
+>> +        irq_type = IRQ_TYPE_EDGE_FALLING;
+>> +    else if (trigger == ACPI_EDGE_SENSITIVE &&
+>> +                polarity == ACPI_ACTIVE_HIGH)
+>> +        irq_type = IRQ_TYPE_EDGE_RISING;
+>> +    else if (trigger == ACPI_LEVEL_SENSITIVE &&
+>> +                polarity == ACPI_ACTIVE_LOW)
+>> +        irq_type = IRQ_TYPE_LEVEL_LOW;
+>> +    else if (trigger == ACPI_LEVEL_SENSITIVE &&
+>> +                polarity == ACPI_ACTIVE_HIGH)
+>> +        irq_type = IRQ_TYPE_LEVEL_HIGH;
+>> +    else
+>> +        irq_type = IRQ_TYPE_NONE;
+>> +
+>> +    /*
+>> +     * Since only one GIC is supported in ACPI 5.0, we can
+>> +     * create mapping refer to the default domain
+>> +     */
+>> +    irq = irq_create_mapping(NULL, gsi);
+>> +    if (!irq)
+>> +        return irq;
+>> +
+>> +    /* Set irq type if specified and different than the current one */
+>> +    if (irq_type != IRQ_TYPE_NONE &&
+>> +        irq_type != irq_get_trigger_type(irq))
+>> +        irq_set_irq_type(irq, irq_type);
+>> +    return irq;
+>> +}
+>> +EXPORT_SYMBOL_GPL(acpi_register_gsi);
+>> +
 > 
-> You need to specify this is packed version of cpu_logical_map or
-> better is to move pack_mpidr_into_32_bits here along with the
-> description you have so that it's easy to understand.
+> Not sure if acpi_gsi_to_irq and acpi_{,un}register_gsi belong here.
+> These are GIC specific and should belong to GIC driver IMO.
 
-Agreed, I will make pack_mpidr_into_32_bits() as inline function here and
-specify that it is the packed version we needed.
+I think we can keep them here as GSI is ACPI specific and they are
+not GIC init related.
 
 Thanks
 Hanjun
