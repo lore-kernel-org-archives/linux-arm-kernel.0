@@ -1,50 +1,45 @@
-From: daniel.thompson@linaro.org (Daniel Thompson)
-Date: Tue, 19 Aug 2014 15:48:35 +0100
-Subject: [PATCH v8 9/9] arm: Fix DEBUG_LL for multi-platform kernels (without
- PL01X)
-In-Reply-To: <1408459715-10151-1-git-send-email-daniel.thompson@linaro.org>
-References: <1404127855-30459-1-git-send-email-daniel.thompson@linaro.org>
- <1408459715-10151-1-git-send-email-daniel.thompson@linaro.org>
-Message-ID: <1408459715-10151-10-git-send-email-daniel.thompson@linaro.org>
+From: jonas.jensen@gmail.com (Jonas Jensen)
+Date: Tue, 19 Aug 2014 16:49:43 +0200
+Subject: [PATCH v4 1/2] net: moxa: clear TX descriptor length bits
+Message-ID: <1408459784-9385-1-git-send-email-jonas.jensen@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When building a multi_v7_defconfig kernel it is not possible to configure
-DEBUG_LL to use any serial device except a ARM Primecell PL01X, or more
-accurately and worse, it is possible to configure a different serial
-device but KConfig does not honour this request. In fact this also
-overrides the user selection for some of the single platform kernels, for
-example I don't think DEBUG_LL can be targetted at ICE or semihosted
-supervisor for ARCH_VERSATILE.
+TX buffer length is not cleared on ndo_start_xmit().
+Failing to do so can bug/hang the controller and
+cause TX interrupts to stop altogether.
 
-This happens because DEBUG_UART_PL01X is automatically enabled by
-some architectures and this means user decisions made regarding
-the DEBUG_LL backend will be overriden. Problem is fixed by removing the
-automatic enabling of this option.
+Add TX_DESC1_BUF_SIZE_MASK to bits that are cleared,
+before the TX buffer length is set.
 
-Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
-Acked-by: Arnd Bergmann <arnd@arndb.de>
+Addresses https://bugzilla.kernel.org/show_bug.cgi?id=69031
+
+Signed-off-by: Jonas Jensen <jonas.jensen@gmail.com>
 ---
- arch/arm/Kconfig.debug | 7 +------
- 1 file changed, 1 insertion(+), 6 deletions(-)
 
-diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
-index f92b98f..537dd04 100644
---- a/arch/arm/Kconfig.debug
-+++ b/arch/arm/Kconfig.debug
-@@ -1127,12 +1127,7 @@ config DEBUG_LL_INCLUDE
+Notes:
+    Changes since v3:
+    
+    1. commit message reworded
+    
+    Applies to next-20140818
+
+ drivers/net/ethernet/moxa/moxart_ether.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/net/ethernet/moxa/moxart_ether.c b/drivers/net/ethernet/moxa/moxart_ether.c
+index 5020fd4..aa45607 100644
+--- a/drivers/net/ethernet/moxa/moxart_ether.c
++++ b/drivers/net/ethernet/moxa/moxart_ether.c
+@@ -348,7 +348,8 @@ static int moxart_mac_start_xmit(struct sk_buff *skb, struct net_device *ndev)
  
- # Compatibility options for PL01x
- config DEBUG_UART_PL01X
--	def_bool ARCH_EP93XX || \
--		ARCH_INTEGRATOR || \
--		ARCH_SPEAR3XX || \
--		ARCH_SPEAR6XX || \
--		ARCH_SPEAR13XX || \
--		ARCH_VERSATILE
-+	bool
- 
- #Compatibility options for 8250
- config DEBUG_UART_8250
+ 	txdes1 = readl(desc + TX_REG_OFFSET_DESC1);
+ 	txdes1 |= TX_DESC1_LTS | TX_DESC1_FTS;
+-	txdes1 &= ~(TX_DESC1_FIFO_COMPLETE | TX_DESC1_INTR_COMPLETE);
++	txdes1 &= ~(TX_DESC1_FIFO_COMPLETE | TX_DESC1_INTR_COMPLETE |
++		    TX_DESC1_BUF_SIZE_MASK);
+ 	txdes1 |= (len & TX_DESC1_BUF_SIZE_MASK);
+ 	writel(txdes1, desc + TX_REG_OFFSET_DESC1);
+ 	writel(TX_DESC0_DMA_OWN, desc + TX_REG_OFFSET_DESC0);
 -- 
-1.9.3
+1.8.2.1
