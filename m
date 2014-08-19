@@ -1,48 +1,51 @@
-From: peter@hurleysoftware.com (Peter Hurley)
-Date: Tue, 19 Aug 2014 07:58:21 -0400
-Subject: [PATCH v9 12/16] serial: amba-pl011: Pass FIQ information to KGDB.
-In-Reply-To: <53F313F2.6090103@linaro.org>
-References: <1404979427-12943-1-git-send-email-daniel.thompson@linaro.org>
- <1408372091-12689-13-git-send-email-daniel.thompson@linaro.org>
- <53F24660.2030404@hurleysoftware.com> <53F313F2.6090103@linaro.org>
-Message-ID: <53F33BDD.8050705@hurleysoftware.com>
+From: joro@8bytes.org (Joerg Roedel)
+Date: Tue, 19 Aug 2014 13:59:54 +0200
+Subject: [PATCH v5 1/1] iommu-api: Add map_sg/unmap_sg functions
+In-Reply-To: <53F2829C.2040809@codeaurora.org>
+References: <1407797150-515-1-git-send-email-ohaugan@codeaurora.org>
+ <1407797150-515-2-git-send-email-ohaugan@codeaurora.org>
+ <20140818215553.GJ9809@8bytes.org>
+ <53F2829C.2040809@codeaurora.org>
+Message-ID: <20140819115954.GC16329@8bytes.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/19/2014 05:08 AM, Daniel Thompson wrote:
-> On 18/08/14 19:30, Peter Hurley wrote:
+On Mon, Aug 18, 2014 at 03:47:56PM -0700, Olav Haugan wrote:
+> If the alignment is not correct then iommu_map() will return error. Not
+> sure what other option we have here (and why make it different behavior
+> than iommu_map which just return error when it is not aligned properly).
+> I don't think we want to force any kind of alignment automatically. I
+> would rather have the API tell me I am doing something wrong than having
+> the function aligning the values and possibly undermap or overmap.
 
-[cut]
-  
->>> +static int pl011_poll_init(struct uart_port *port)
->>> +{
->>> +	struct uart_amba_port *uap = (struct uart_amba_port *)port;
->>
->> Please use container_of() in new code.
-> 
-> Ok.
-> 
-> Personally I dislike a file that mixes casts and conatiner_of but I
-> guess I can make both of us happy by switching the whole driver to
-> container_of. Separate patch again?
+But sg->offset is an offset into the page (at least it is used that way
+in the DMA-API and since you do 'page_len = s->offset + s->length' you
+use it the same way).
+So when you pass iova + offset the result will no longer be
+page-aligned. You should force sg->offset == 0 and sg->length to be
+page-aligned instead. This makes more sense because the IOMMU-API works
+on (io)-page granularity and not on arbitrary phys-addr ranges like the
+DMA-API.
 
-The change below makes the uap local unnecessary, so you can skip the
-container_of() change, if you'd prefer.
+> Yes, I am aware of that. However, several people prefer this than
+> passing in scatterlist. It is not very convenient to pass a scatterlist
+> in some use cases. Someone mentioned a use case where they would have to
+> create a dummy sg list and populate it with the iova just to do an
+> unmap. I believe we would have to do this also. There is no use for
+> sglist when unmapping. However, would like to keep separate API from
+> iommu_unmap() to keep the API function names symmetric (map_sg/unmap_sg).
 
->>> +	int retval;
->>> +
->>> +	retval = pl011_hwinit(port);
->>> +
->>> +#ifdef CONFIG_KGDB_FIQ
->>> +	if (retval == 0)
->>> +		kgdb_register_fiq(uap->port.irq);
->>
->> The uap->port dereference is unnecessary since the port parameter
->> is the same thing.
->>
->> 		kgdb_register_fiq(port->irq);
-> 
-> Ok.
+Keeping it symetric is not more complicated, the caller just needs to
+keep the sg-list used for mapping around. I prefer the unmap_sg call to
+work in sg-lists too.
 
-Thanks,
-Peter Hurley
+> I thought that was why we added the default fallback and set all the
+> drivers to point to these fallback functions. Several people wanted this
+> so that we don't have to have NULL-check in these functions (and have
+> the functions be simple inline functions).
+
+Okay, since you add these call-backs to all drivers I think I can live
+with not doing a pointer check here.
+
+
+	Joerg
