@@ -1,90 +1,32 @@
-From: jonsmirl@gmail.com (jonsmirl at gmail.com)
-Date: Tue, 19 Aug 2014 08:38:21 -0400
-Subject: [PATCH] This adds a generic PWM framework driver for the PWM
- controller
-In-Reply-To: <CAKON4OwDWqnu9Nn6rBFtUJX2f0eFVzBFhRMcvPAp=K6N1KpE0w@mail.gmail.com>
-References: <20140818180316.31807.3445.stgit@studio>
- <20140818192318.GJ15297@lukather>
- <CAKON4OwzFDDXqCF4VNkUXXJLp3smrB6Axp_x=D47sjbpoNbe+g@mail.gmail.com>
- <20140818201929.GL15297@lukather>
- <CAKON4OwDWqnu9Nn6rBFtUJX2f0eFVzBFhRMcvPAp=K6N1KpE0w@mail.gmail.com>
-Message-ID: <CAKON4OycUjDN-aPys-6hiFUHUdri12yE-=4J1LEAJVM1W3RD8A@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 19 Aug 2014 14:39:56 +0200
+Subject: [PATCH v9 02/12] PCI: OF: Parse and map the IRQ when adding the
+ PCI device.
+In-Reply-To: <20140818220906.GJ24600@localhost>
+References: <1407860725-25202-1-git-send-email-Liviu.Dudau@arm.com>
+ <20140818213054.GB13147@bart.dudau.co.uk> <20140818220906.GJ24600@localhost>
+Message-ID: <201408191439.56493.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 19, 2014 at 8:11 AM, jonsmirl at gmail.com <jonsmirl@gmail.com> wrote:
-> On Mon, Aug 18, 2014 at 4:19 PM, Maxime Ripard
-> <maxime.ripard@free-electrons.com> wrote:
->> On Mon, Aug 18, 2014 at 03:53:08PM -0400, jonsmirl at gmail.com wrote:
->>> On Mon, Aug 18, 2014 at 3:23 PM, Maxime Ripard
->>> <maxime.ripard@free-electrons.com> wrote:
->>> > Hi,
->>> >
->>> > On Mon, Aug 18, 2014 at 02:03:16PM -0400, Jon Smirl wrote:
->>> >> found on Allwinner SoCs.x
->>> >>
->>> >> Signed-off-by: Jon Smirl <jonsmirl@gmail.com>
->>> >
->>> > Is there any notable difference with Alexandre's driver?
->>> > https://lkml.org/lkml/2014/5/19/568
->>> >
->>> > If so, why didn't you posted incremental patches on top of his driver?
->>>
->>> Better A10 support.
->>
->> Better how?
->>
->>> And I wrote this one without know about his.
->>
->> So you're just require us to trash an already extensively reviewed
->> driver and start from scratch again?
->
-> Forget mine then.
->
-> Problems in the other one....
-> 1) The math is not right in either patch. Selsinork has been checking
-> mine with a scope and just found another math error in mine. The
-> internal math needs to be done in picoseconds or round off errors mess
-> up the high frequency outputs (24Mhz, 12Mhz, 8Mhz, ...).
+On Tuesday 19 August 2014, Catalin Marinas wrote:
+> On Mon, Aug 18, 2014 at 10:30:54PM +0100, Liviu Dudau wrote:
+> > At this point I would like to hear more from people doing the conversion of
+> > the drivers. I cannot answer fully for all arm or arm64 drivers.
+> 
+> As I read the description of pcibios_add_device(), it is meant as an
+> architecture hook. While it's nice to generalise this, I'm not sure we
+> we can find a common denominator. For example, we may want to call
+> set_dma_ops() as powerpc does but the ops would be arm64 specific (so
+> even the __weak implementation may not be used by any architecture).
 
-Correct output table....
-Neither driver has this right.
+Right. I'm a strong advocate of the idea of having no architecture specific
+parts in the PCI support, but I can see the set_dma_ops() call as a
+good reason to make an exception here.
 
-24Mhz  41.6ns period  1  - 62
-12Mhz  83.3ns period 63 - 104
-8Mhz  125ns  period 105 - 145
-6Mhz  167ns period 146 - 187
-4.8Mhz 208ns period 188 - 229
-4Mhz   250ns period 230 - 270
-3.4Mhz  292ns period 271 - 312
-3Mhz   333ns  period 313 - 345
+We could add another layer of indirection for the purpose of API purity
+here, to call an architecture specific DMA setup function, but it doesn't
+really add that much benefits, in particular when the DMA setup is currently
+in flux as well.
 
-
-
-
-> 3) By-pass mode on the A20 is not implemented.
-> 2) A10 is not correctly handled. Specifically the prescaler is
-> different on the A10 vs A20.
->
->
->
->
->
->
->>
->> --
->> Maxime Ripard, Free Electrons
->> Embedded Linux, Kernel and Android engineering
->> http://free-electrons.com
->
->
->
-> --
-> Jon Smirl
-> jonsmirl at gmail.com
-
-
-
--- 
-Jon Smirl
-jonsmirl at gmail.com
+	Arnd
