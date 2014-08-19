@@ -1,33 +1,97 @@
-From: computersforpeace@gmail.com (Brian Norris)
-Date: Tue, 19 Aug 2014 12:06:53 -0700
-Subject: [PATCH 0/8] mtd: nand: Support for new DT NAND driver
-In-Reply-To: <20140818083953.GA4266@lee--X1>
-References: <1407921127-8590-1-git-send-email-lee.jones@linaro.org>
- <20140814224013.GE18411@ld-irv-0074>
- <20140818083953.GA4266@lee--X1>
-Message-ID: <20140819190653.GV18411@ld-irv-0074>
+From: mitchelh@codeaurora.org (Mitchel Humpherys)
+Date: Tue, 19 Aug 2014 12:19:35 -0700
+Subject: [PATCH 6/6] iommu/arm-smmu: add .domain_{set,
+ get}_attr for coherent walk control
+In-Reply-To: <20140819124807.GM23128@arm.com> (Will Deacon's message of "Tue,
+ 19 Aug 2014 13:48:07 +0100")
+References: <1407891099-24641-1-git-send-email-mitchelh@codeaurora.org>
+ <1407891099-24641-7-git-send-email-mitchelh@codeaurora.org>
+ <20140819124807.GM23128@arm.com>
+Message-ID: <vnkw4mx8p9rs.fsf@mitchelh-linux.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 18, 2014 at 09:39:53AM +0100, Lee Jones wrote:
-> On Thu, 14 Aug 2014, Brian Norris wrote:
-> > drivers/mtd/nand/stm_nand_bch.c: In function 'bch_calc_timing_registers':
-> > drivers/mtd/nand/stm_nand_bch.c:1022:6: warning: variable 'ren_half_off' set but not used [-Wunused-but-set-variable]
-> > drivers/mtd/nand/stm_nand_bch.c:1021:6: warning: variable 'ren_half_on' set but not used [-Wunused-but-set-variable]
-> 
-> This I have never seen.  I guess -Wunused-but-set-variable is normally
-> off.  This issue has been present since the beginning of this endeavour
-> and exists in the original (internal) code.
+On Tue, Aug 19 2014 at 05:48:07 AM, Will Deacon <will.deacon@arm.com> wrote:
+> On Wed, Aug 13, 2014 at 01:51:39AM +0100, Mitchel Humpherys wrote:
+>> Under certain conditions coherent hardware translation table walks can
+>> result in degraded performance. Add a new domain attribute to
+>> disable/enable this feature in generic code along with the domain
+>> attribute setter and getter to handle it in the ARM SMMU driver.
+>
+> Again, it would be nice to have some information about these cases and the
+> performance issues that you are seeing.
 
-BTW, you can get extra warnings by building with the W=[123] option to
-the Makefile (e.g., 'make W=1').
+Basically, the data I'm basing these statements on is: that's what the
+HW folks tell me :). I believe it's specific to our hardware, not ARM
+IP. Unfortunately, I don't think I could share the specifics even if I
+had them, but I can try to press the issue if you want me to.
 
-$ make help
-[...]
-  make W=n   [targets] Enable extra gcc checks, n=1,2,3 where
-		1: warnings which may be relevant and do not occur too often
-		2: warnings which occur quite often but may still be relevant
-		3: more obscure warnings, can most likely be ignored
-		Multiple levels can be combined with W=12 or W=123
+>
+>> @@ -1908,11 +1917,15 @@ static int arm_smmu_domain_get_attr(struct iommu_domain *domain,
+>>  				    enum iommu_attr attr, void *data)
+>>  {
+>>  	struct arm_smmu_domain *smmu_domain = domain->priv;
+>> +	struct arm_smmu_cfg *cfg = &smmu_domain->cfg;
+>>  
+>>  	switch (attr) {
+>>  	case DOMAIN_ATTR_NESTING:
+>>  		*(int *)data = (smmu_domain->stage == ARM_SMMU_DOMAIN_NESTED);
+>>  		return 0;
+>> +	case DOMAIN_ATTR_COHERENT_HTW_DISABLE:
+>> +		*((bool *)data) = cfg->htw_disable;
+>> +		return 0;
+>
+> I think I'd be more comfortable using int instead of bool for this, as it
+> could well end up in the user ABI if vfio decides to make use of it. While
+> we're here, let's also add an attributes bitmap to the arm_smmu_domain
+> instead of having a bool in the arm_smmu_cfg.
 
-Brian
+Sounds good. I'll make these changes in v2.
+
+>
+>>  	default:
+>>  		return -ENODEV;
+>>  	}
+>> @@ -1922,6 +1935,7 @@ static int arm_smmu_domain_set_attr(struct iommu_domain *domain,
+>>  				    enum iommu_attr attr, void *data)
+>>  {
+>>  	struct arm_smmu_domain *smmu_domain = domain->priv;
+>> +	struct arm_smmu_cfg *cfg = &smmu_domain->cfg;
+>>  
+>>  	switch (attr) {
+>>  	case DOMAIN_ATTR_NESTING:
+>> @@ -1933,6 +1947,9 @@ static int arm_smmu_domain_set_attr(struct iommu_domain *domain,
+>>  			smmu_domain->stage = ARM_SMMU_DOMAIN_S1;
+>>  
+>>  		return 0;
+>> +	case DOMAIN_ATTR_COHERENT_HTW_DISABLE:
+>> +		cfg->htw_disable = *((bool *)data);
+>> +		return 0;
+>>  	default:
+>>  		return -ENODEV;
+>>  	}
+>> diff --git a/include/linux/iommu.h b/include/linux/iommu.h
+>> index 0550286df4..8a6449857a 100644
+>> --- a/include/linux/iommu.h
+>> +++ b/include/linux/iommu.h
+>> @@ -81,6 +81,7 @@ enum iommu_attr {
+>>  	DOMAIN_ATTR_FSL_PAMU_ENABLE,
+>>  	DOMAIN_ATTR_FSL_PAMUV1,
+>>  	DOMAIN_ATTR_NESTING,	/* two stages of translation */
+>> +	DOMAIN_ATTR_COHERENT_HTW_DISABLE,
+>
+> I wonder whether we should make this ARM-specific. Can you take a quick look
+> to see if any of the other IOMMUs can potentially benefit from this?
+
+Yeah looks like amd_iommu.c and intel-iommu.c are using
+IOMMU_CAP_CACHE_COHERENCY which seems to be the same thing (at least
+that's how we're treating it in arm-smmu.c). AMD's doesn't look
+configurable but Intel's does, so perhaps they would benefit from this.
+
+
+
+-Mitch
+
+-- 
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
