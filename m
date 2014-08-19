@@ -1,268 +1,143 @@
-From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Tue, 19 Aug 2014 18:39:54 +0800
-Subject: [PATCH v2 05/18] ARM64 / ACPI: Parse FADT table to get PSCI flags
- for PSCI init
-In-Reply-To: <53F246D4.7040807@arm.com>
-References: <1407166105-17675-1-git-send-email-hanjun.guo@linaro.org>
- <1407166105-17675-6-git-send-email-hanjun.guo@linaro.org>
- <53F246D4.7040807@arm.com>
-Message-ID: <53F3297A.1040309@linaro.org>
+From: Varun.Sethi@freescale.com (Varun Sethi)
+Date: Tue, 19 Aug 2014 10:47:25 +0000
+Subject: [PATCH v5] devicetree: Add generic IOMMU device tree bindings
+In-Reply-To: <87zjf0hk3b.fsf@nvidia.com>
+References: <1406803383-11601-1-git-send-email-thierry.reding@gmail.com>
+ <87a9774lf5.fsf@nvidia.com>
+ <cfb1d2ff66004685b7ead3f5e6321681@BL2PR03MB468.namprd03.prod.outlook.com>
+ <87y4ur2h23.fsf@nvidia.com>
+ <d9fb045d54244f26a773ba45ad3caa2d@BL2PR03MB468.namprd03.prod.outlook.com>
+ <87zjf0hk3b.fsf@nvidia.com>
+Message-ID: <a0244b6befa9407fb6c2c35cc29f92f7@BL2PR03MB468.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2014-8-19 2:32, Sudeep Holla wrote:
-> On 04/08/14 16:28, Hanjun Guo wrote:
->> There are two flags: PSCI_COMPLIANT and PSCI_USE_HVC. When set,
->> the former signals to the OS that the hardware is PSCI compliant.
->> The latter selects the appropriate conduit for PSCI calls by
->> toggling between Hypervisor Calls (HVC) and Secure Monitor Calls
->> (SMC).
->>
->> FADT table contains such information, parse FADT to get the flags
->> for PSCI init. Since ACPI 5.1 doesn't support self defined PSCI
->> function IDs, which means that only PSCI 0.2+ is supported in ACPI.
->>
->> At the same time, only ACPI 5.1 or higher verison supports PSCI,
->> and FADT Major.Minor version was introduced in ACPI 5.1, so we
->> will check the version and only parse FADT table with version >= 5.1.
->>
->> If firmware provides ACPI tables with ACPI version less than 5.1,
->> OS will be messed up with those information and have no way to
->> bring up secondery CPUs, so disable ACPI if we get an FADT table
->> with version less that 5.1.
->>
-[...]
->>
->> +static int __init acpi_parse_fadt(struct acpi_table_header *table)
->> +{
->> +    struct acpi_table_fadt *fadt = (struct acpi_table_fadt *)table;
->> +
->> +    /*
->> +     * Revision in table header is the FADT Major version,
->> +     * and there is a minor version of FADT which was introduced
->> +     * by ACPI 5.1, we only deal with ACPI 5.1 or higher version
->> +     * to get arm boot flags, or we will disable ACPI.
->> +     */
->> +    if (table->revision < 5 || fadt->minor_revision < 1) {
-> 
->                 &&
 
-Catalin also pointed out this bug :), but && is not enough, for example,
-this would not trigger of revision 4.1, although 4.1 is not exist, but
-the code will still confusing people, so I updated the code as:
 
-+       if (table->revision > 5 ||
-+           (table->revision == 5 && fadt->minor_revision >= 1)) {
-+               return 0;
-+       } else {
-+               pr_info("FADT revision is %d.%d, no PSCI support, should be 5.1
-or higher\n",
-+                       table->revision, fadt->minor_revision);
-+               disable_acpi();
-+               return -EINVAL;
-+       }
+> -----Original Message-----
+> From: Hiroshi Doyu [mailto:hdoyu at nvidia.com]
+> Sent: Tuesday, August 19, 2014 3:34 PM
+> To: Sethi Varun-B16395; Will Deacon
+> Cc: Hiroshi Doyu; Thierry Reding; Stephen Warren; Arnd Bergmann; Mark
+> Rutland; devicetree at vger.kernel.org; Olof Johansson; iommu at lists.linux-
+> foundation.org; Rob Herring; linux-tegra at vger.kernel.org; linux-arm-
+> kernel at lists.infradead.org; Yoder Stuart-B08248
+> Subject: Re: [PATCH v5] devicetree: Add generic IOMMU device tree bindings
+> 
+> 
+> Varun Sethi <Varun.Sethi@freescale.com> writes:
+> 
+> > Hi Hiroshi,
+> >
+> >> -----Original Message-----
+> >> From: Hiroshi Doyu [mailto:hdoyu at nvidia.com]
+> >> Sent: Thursday, August 14, 2014 9:35 PM
+> >> To: Sethi Varun-B16395
+> >> Cc: Hiroshi Doyu; Thierry Reding; Stephen Warren; Arnd Bergmann; Will
+> >> Deacon; Mark Rutland; devicetree at vger.kernel.org; Olof Johansson;
+> >> iommu at lists.linux-foundation.org; Rob Herring;
+> >> linux-tegra at vger.kernel.org; linux-arm-kernel at lists.infradead.org
+> >> Subject: Re: [PATCH v5] devicetree: Add generic IOMMU device tree
+> >> bindings
+> >>
+> >> Hi Varun,
+> >>
+> >> Varun Sethi <Varun.Sethi@freescale.com> writes:
+> >>
+> >> >> -----Original Message-----
+> >> >> From: iommu-bounces at lists.linux-foundation.org [mailto:iommu-
+> >> >> bounces at lists.linux-foundation.org] On Behalf Of Hiroshi Doyu
+> >> >> Sent: Thursday, August 14, 2014 12:18 PM
+> >> >> To: Thierry Reding; Stephen Warren; Arnd Bergmann; Will Deacon
+> >> >> Cc: Mark Rutland; devicetree at vger.kernel.org; Olof Johansson;
+> >> >> iommu at lists.linux-foundation.org; Rob Herring;
+> >> >> linux-tegra at vger.kernel.org; linux-arm-kernel at lists.infradead.org
+> >> >> Subject: Re: [PATCH v5] devicetree: Add generic IOMMU device tree
+> >> >> bindings
+> >> >>
+> >> >>
+> >> >> Thierry Reding <thierry.reding@gmail.com> writes:
+> >> >>
+> >> >> > +Multiple-master IOMMU:
+> >> >> > +----------------------
+> >> >> > +
+> >> >> > +       iommu {
+> >> >> > +               /* the specifier represents the ID of the master */
+> >> >> > +               #iommu-cells = <1>;
+> >> >> > +       };
+> >> >> > +
+> >> >> > +       master at 1 {
+> >> >> > +               /* device has master ID 42 in the IOMMU */
+> >> >> > +               iommus = <&{/iommu} 42>;
+> >> >> > +       };
+> >> >> > +
+> >> >> > +       master at 2 {
+> >> >> > +               /* device has master IDs 23 and 24 in the IOMMU */
+> >> >> > +               iommus = <&{/iommu} 23>, <&{/iommu} 24>;
+> >> >> > +       };
+> >> >>
+> >> >> I think that this "master ID" will be parsed in IOMMU driver. For
+> >> >> example, ARM,SMMU expects "streamID" as "master ID", right?
+> >> >>
+> >> >> If a SoC has a feature to configure to assign streamID to devices
+> >> >> at runtime, "streamID" is not equal to "master ID".
+> >> >>
+> >> >>   iommus = <&{/smmu} "soc specific master ID">;
+> >> >>
+> >> >> "soc master ID" needs to be translated into "streamID" by SoC SW.
+> >> >> It seems that ARM,SMMU kernel driver doesn't expect this kind of
+> >> >> ID translation. If ARM,SMMU kernel driver is used as is, "soc master ID"
+> >> >> would be incompatible? ARM,SMMU needs such translation before
+> >> >> parsing. Is this my understanding right?
+> >> >>
+> >> >> If so I think that this master ID configuration/translation may be
+> >> >> quite reasonable requirment for SoC using ARM,SMMU.
+> >> >>
+> >> >> Can we consider this ID translation within ARM,SMMU compatibility?
+> >> >>
+> >> >> IOW, is it possible to implement some SoC specific hook for ID
+> >> >> translation/configuration in ARM,SMMU kernel driver?
+> >> >
+> >> >
+> >> > Can the id translation be done using a SMR mask?
+> >>
+> >> No, "SoC master ID" is completely independenf of SMR.
+> >>
+> >> > Also, for dynamic stream ID allocation we would need to represent
+> >> > the specific master register (to store the stream ID) in the device tree.
+> >>
+> >> I assmue that the above means that iMX has such configuration
+> >> register to map steramID and a device dynamically.
+> >
+> > We have per master registers for setting the stream ID on the
+> > Layerscape platforms. My point was that we would need the iommu master
+> > node to include a reference to the master id register.
+> >
+> > master at 1 {
+> >                /* device has master ID 42 in the IOMMU */
+> >              iommus = <&{/iommu} 42>;
+> >              master-id-reg = <phandle offset> };
+> 
+> In the above, for "iommus=" bindings, you wouldn't need to break
+> ARM,SMMU compatibility at all if you set "streamID" exactly as below.
+> 
+>   master at 1 {
+>                  /* device has master ID 42 in the IOMMU */
+>                iommus = <&{/iommu} 'any given streamID'>;
+>                master-id-reg = <phandle offset>
+>   };
+> 
+> And your SoC needs to register bus_notifier and ADD_DEVICE should configure
+> to map 'any given streamID' to a device via the above register. This wouldn't
+> need any modification from ARM,SMMU driver and keep the iommus bindings
+> as it is.
+> 
+> IOW, SoC only needs to register ADD_DEVICE in bus_notifier to map StreamID
+> to a device. This needs to be executed earlier than IOMMU bus's ADD_DEVICE,
+> though.
+> 
+> Is my understanding right?
+I don't think that SOC specific code needs a bus notifier for setting the stream ID. It can be done as a part of SOC specific initialization. The device tree can be updated to reflect the correct stream ID (SMMU driver can get the updated stream ID from device tree). 
+I was thinking more on the lines of updating the device stream id while attaching a device to the domain.  
 
-> 
->> +        pr_info("FADT version is %d.%d, no PSCI support, should be 5.1 or
->> higher\n",
->> +            table->revision, fadt->minor_revision);
->> +        disable_acpi();
-> 
-> Instead of disabling ACPI at multiple places in the boot sequence, can't
-> it be done once if acpi_boot_init failed ?
-> 
->> +        return -EINVAL;
->> +    }
->> +
->> +    return 0;
->> +}
->> +
->>   /*
->>    * acpi_boot_table_init() called from setup_arch(), always.
->>    *    1. find RSDP and get its address, and then find XSDT
->> @@ -68,6 +90,21 @@ void __init acpi_boot_table_init(void)
->>       }
->>   }
->>
->> +int __init acpi_boot_init(void)
->> +{
->> +    int err = 0;
->> +
->> +    /* If acpi_disabled, bail out */
->> +    if (acpi_disabled)
->> +        return -ENODEV;
->> +
->> +    err = acpi_table_parse(ACPI_SIG_FADT, acpi_parse_fadt);
->> +    if (err)
->> +        pr_err("Can't find FADT\n");
->> +
->> +    return err;
->> +}
->> +
->>   /*
->>    * acpi_suspend_lowlevel() - save kernel state and suspend.
->>    *
->> diff --git a/arch/arm64/kernel/psci.c b/arch/arm64/kernel/psci.c
->> index 9e9798f..2ad2084 100644
->> --- a/arch/arm64/kernel/psci.c
->> +++ b/arch/arm64/kernel/psci.c
->> @@ -15,6 +15,7 @@
->>
->>   #define pr_fmt(fmt) "psci: " fmt
->>
->> +#include <linux/acpi.h>
->>   #include <linux/init.h>
->>   #include <linux/of.h>
->>   #include <linux/smp.h>
->> @@ -231,6 +232,33 @@ static void psci_sys_poweroff(void)
->>       invoke_psci_fn(PSCI_0_2_FN_SYSTEM_OFF, 0, 0, 0);
->>   }
->>
->> +static void psci_0_2_set_functions(void)
->> +{
->> +    pr_info("Using standard PSCI v0.2 function IDs\n");
->> +    psci_function_id[PSCI_FN_CPU_SUSPEND] = PSCI_0_2_FN64_CPU_SUSPEND;
->> +    psci_ops.cpu_suspend = psci_cpu_suspend;
->> +
->> +    psci_function_id[PSCI_FN_CPU_OFF] = PSCI_0_2_FN_CPU_OFF;
->> +    psci_ops.cpu_off = psci_cpu_off;
->> +
->> +    psci_function_id[PSCI_FN_CPU_ON] = PSCI_0_2_FN64_CPU_ON;
->> +    psci_ops.cpu_on = psci_cpu_on;
->> +
->> +    psci_function_id[PSCI_FN_MIGRATE] = PSCI_0_2_FN64_MIGRATE;
->> +    psci_ops.migrate = psci_migrate;
->> +
->> +    psci_function_id[PSCI_FN_AFFINITY_INFO] = PSCI_0_2_FN64_AFFINITY_INFO;
->> +    psci_ops.affinity_info = psci_affinity_info;
->> +
->> +    psci_function_id[PSCI_FN_MIGRATE_INFO_TYPE] =
->> +        PSCI_0_2_FN_MIGRATE_INFO_TYPE;
->> +    psci_ops.migrate_info_type = psci_migrate_info_type;
->> +
->> +    arm_pm_restart = psci_sys_reset;
->> +
->> +    pm_power_off = psci_sys_poweroff;
->> +}
->> +
-> 
-> Nit: IMO may be you can move these refactoring as separate patch before
-> ACPI related changes ?
-
-I'm ok with it, will format another patch and place it in the
-beginning of this patch set.
-
-> 
->>   /*
->>    * PSCI Function IDs for v0.2+ are well defined so use
->>    * standard values.
->> @@ -264,29 +292,7 @@ static int psci_0_2_init(struct device_node *np)
->>           }
->>       }
->>
->> -    pr_info("Using standard PSCI v0.2 function IDs\n");
->> -    psci_function_id[PSCI_FN_CPU_SUSPEND] = PSCI_0_2_FN64_CPU_SUSPEND;
->> -    psci_ops.cpu_suspend = psci_cpu_suspend;
->> -
->> -    psci_function_id[PSCI_FN_CPU_OFF] = PSCI_0_2_FN_CPU_OFF;
->> -    psci_ops.cpu_off = psci_cpu_off;
->> -
->> -    psci_function_id[PSCI_FN_CPU_ON] = PSCI_0_2_FN64_CPU_ON;
->> -    psci_ops.cpu_on = psci_cpu_on;
->> -
->> -    psci_function_id[PSCI_FN_MIGRATE] = PSCI_0_2_FN64_MIGRATE;
->> -    psci_ops.migrate = psci_migrate;
->> -
->> -    psci_function_id[PSCI_FN_AFFINITY_INFO] = PSCI_0_2_FN64_AFFINITY_INFO;
->> -    psci_ops.affinity_info = psci_affinity_info;
->> -
->> -    psci_function_id[PSCI_FN_MIGRATE_INFO_TYPE] =
->> -        PSCI_0_2_FN_MIGRATE_INFO_TYPE;
->> -    psci_ops.migrate_info_type = psci_migrate_info_type;
->> -
->> -    arm_pm_restart = psci_sys_reset;
->> -
->> -    pm_power_off = psci_sys_poweroff;
->> +    psci_0_2_set_functions();
->>
->>   out_put_node:
->>       of_node_put(np);
->> @@ -333,6 +339,40 @@ out_put_node:
->>       return err;
->>   }
->>
->> +#ifdef CONFIG_ACPI
->> +static int get_set_conduit_method_acpi(void)
->> +{
->> +    pr_info("probing for conduit method from ACPI.\n");
->> +
->> +    if (acpi_psci_use_hvc())
->> +        invoke_psci_fn = __invoke_psci_fn_hvc;
->> +    else
->> +        invoke_psci_fn = __invoke_psci_fn_smc;
->> +
->> +    return 0;
->> +}
->> +
->> +/* We use PSCI 0.2+ when ACPI is deployed */
->> +static int psci_0_2_init_acpi(void)
-> 
-> May be this can be renamed psci_acpi_init and called from setup directly
-> instead of calling from DT function with acpi_disabled check.
-
-Also suggested by Catalin, will do it :)
-
-> 
->> +{
->> +    if (!acpi_psci_present()) {
->> +        pr_info("is not implemented in ACPI.\n");
->> +        return -EOPNOTSUPP;
->> +    }
->> +
->> +    get_set_conduit_method_acpi();
->> +
->> +    psci_0_2_set_functions();
->> +
->> +    return 0;
->> +}
->> +#else
->> +static inline int psci_0_2_init_acpi(void)
->> +{
->> +    return -ENODEV;
->> +}
->> +#endif
->> +
->>   static const struct of_device_id psci_of_match[] __initconst = {
->>       { .compatible = "arm,psci",    .data = psci_0_1_init},
->>       { .compatible = "arm,psci-0.2",    .data = psci_0_2_init},
->> @@ -345,6 +385,9 @@ int __init psci_init(void)
->>       const struct of_device_id *matched_np;
->>       psci_initcall_t init_fn;
->>
->> +    if (!acpi_disabled)
->> +        return psci_0_2_init_acpi();
->> +
-> 
-> As mentioned above you need not modify this.
-> 
->>       np = of_find_matching_node_and_match(NULL, psci_of_match, &matched_np);
->>
->>       if (!np)
->> diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
->> index 85c6326..dfc4e4f3 100644
->> --- a/arch/arm64/kernel/setup.c
->> +++ b/arch/arm64/kernel/setup.c
->> @@ -395,6 +395,8 @@ void __init setup_arch(char **cmdline_p)
->>       efi_idmap_init();
->>
->>       cpu_logical_map(0) = read_cpuid_mpidr() & MPIDR_HWID_BITMASK;
->> +    acpi_boot_init();
->> +
-> 
-> Check for the return error here and disable ACPI once rather than at
-> multiple places all over.
-
-ok.
-
-Thanks
-Hanjun
+-Varun
