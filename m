@@ -1,41 +1,41 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Tue, 19 Aug 2014 09:29:01 +0200
-Subject: [PATCH v2 1/5] ARM: shmobile: r8a7740: Add CMT1 device to DT
-In-Reply-To: <CANqRtoTBJOZEFoOg+YmfyovCGDTa43Qs77OW-qd9YQLFq3tQ3A@mail.gmail.com>
-References: <1407801882-2561-1-git-send-email-horms+renesas@verge.net.au>
- <1407801882-2561-2-git-send-email-horms+renesas@verge.net.au>
- <CANqRtoTBJOZEFoOg+YmfyovCGDTa43Qs77OW-qd9YQLFq3tQ3A@mail.gmail.com>
-Message-ID: <CAMuHMdXTa8dG0L2xLNELn3R310PJc+HotHwJZsaqPzuWQRJf5A@mail.gmail.com>
+From: wills.wang.open@gmail.com (Wills Wang)
+Date: Tue, 19 Aug 2014 15:32:59 +0800
+Subject: [PATH v6 0/2] ARM: dts: sun7i: Add Merrii A20 Hummingbird support
+Message-ID: <1408433581-14417-1-git-send-email-wills.wang.open@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 19, 2014 at 8:39 AM, Magnus Damm <magnus.damm@gmail.com> wrote:
->>  arch/arm/boot/dts/r8a7740.dtsi | 12 ++++++++++++
->>  1 file changed, 12 insertions(+)
->>
->> diff --git a/arch/arm/boot/dts/r8a7740.dtsi b/arch/arm/boot/dts/r8a7740.dtsi
->> index 6cd6a46..1067a96 100644
->> --- a/arch/arm/boot/dts/r8a7740.dtsi
->> +++ b/arch/arm/boot/dts/r8a7740.dtsi
->> @@ -41,6 +41,18 @@
->>                 interrupts = <0 83 IRQ_TYPE_LEVEL_HIGH>;
->>         };
->>
->> +       cmt1: timer at e6138000 {
->> +               compatible = "renesas,cmt-48";
->
-> Do we want to have the "r8a7740" in the compatible string somewhere?
+Changes since v5:
+  - add generic pinmux spi2_pins_b
+  - remove redundant newline
 
-Documentation/devicetree/bindings/timer/renesas,cmt.txt does not
-mention compatible properties containing SoC names.
+Changes since v4:
+  - move generic pinmux into a20 dtsi
+  - add the board name as suffix
 
-Gr{oetje,eeting}s,
+Changes since v3:
+  - adjust dtb file in alphabetic order
 
-                        Geert
+Changes since v2:
+  - fixed mistake about uart3/4/5 pinctrl config
 
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+Changes since v1:
+  - add Signed-off-by and commit msg      
+  - add uart2/3/4/5, i2c3 and spi2
+  - remove pwm1 node
+  - use reg_vcc3v0 according to board schematic
+  - add comment for gpio pin
+  - remove unused pull-up pin setting
 
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Wills Wang (2):
+  ARM: dts: sun7i: Add uart3/4/5, i2c3 and spi2 pinmux
+  ARM: dts: sun7i: Add Merrii A20 Hummingbird board
+
+ arch/arm/boot/dts/Makefile                  |   1 +
+ arch/arm/boot/dts/sun7i-a20-hummingbird.dts | 236 ++++++++++++++++++++++++++++
+ arch/arm/boot/dts/sun7i-a20.dtsi            |  35 +++++
+ 3 files changed, 272 insertions(+)
+ create mode 100644 arch/arm/boot/dts/sun7i-a20-hummingbird.dts
+
+-- 
+1.8.3.2
