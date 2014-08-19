@@ -1,70 +1,73 @@
-From: hdoyu@nvidia.com (Hiroshi Doyu)
-Date: Tue, 19 Aug 2014 14:03:00 +0300
-Subject: [PATCH v5] devicetree: Add generic IOMMU device tree bindings
-In-Reply-To: <a0244b6befa9407fb6c2c35cc29f92f7@BL2PR03MB468.namprd03.prod.outlook.com>
-References: <1406803383-11601-1-git-send-email-thierry.reding@gmail.com>
- <87a9774lf5.fsf@nvidia.com>
- <cfb1d2ff66004685b7ead3f5e6321681@BL2PR03MB468.namprd03.prod.outlook.com>
- <87y4ur2h23.fsf@nvidia.com>
- <d9fb045d54244f26a773ba45ad3caa2d@BL2PR03MB468.namprd03.prod.outlook.com>
- <87zjf0hk3b.fsf@nvidia.com>
- <a0244b6befa9407fb6c2c35cc29f92f7@BL2PR03MB468.namprd03.prod.outlook.com>
-Message-ID: <87wqa4hhcr.fsf@nvidia.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Tue, 19 Aug 2014 12:07:45 +0100
+Subject: [PATCH v2 05/18] ARM64 / ACPI: Parse FADT table to get PSCI flags
+ for PSCI init
+In-Reply-To: <53F3297A.1040309@linaro.org>
+References: <1407166105-17675-1-git-send-email-hanjun.guo@linaro.org>
+ <1407166105-17675-6-git-send-email-hanjun.guo@linaro.org>
+ <53F246D4.7040807@arm.com> <53F3297A.1040309@linaro.org>
+Message-ID: <53F33001.5000207@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
-Varun Sethi <Varun.Sethi@freescale.com> writes:
 
->> >> > Also, for dynamic stream ID allocation we would need to represent
->> >> > the specific master register (to store the stream ID) in the device tree.
->> >>
->> >> I assmue that the above means that iMX has such configuration
->> >> register to map steramID and a device dynamically.
->> >
->> > We have per master registers for setting the stream ID on the
->> > Layerscape platforms. My point was that we would need the iommu master
->> > node to include a reference to the master id register.
->> >
->> > master at 1 {
->> >                /* device has master ID 42 in the IOMMU */
->> >              iommus = <&{/iommu} 42>;
->> >              master-id-reg = <phandle offset> };
->> 
->> In the above, for "iommus=" bindings, you wouldn't need to break
->> ARM,SMMU compatibility at all if you set "streamID" exactly as below.
->> 
->>   master at 1 {
->>                  /* device has master ID 42 in the IOMMU */
->>                iommus = <&{/iommu} 'any given streamID'>;
->>                master-id-reg = <phandle offset>
->>   };
->> 
->> And your SoC needs to register bus_notifier and ADD_DEVICE should configure
->> to map 'any given streamID' to a device via the above register. This wouldn't
->> need any modification from ARM,SMMU driver and keep the iommus bindings
->> as it is.
->> 
->> IOW, SoC only needs to register ADD_DEVICE in bus_notifier to map StreamID
->> to a device. This needs to be executed earlier than IOMMU bus's ADD_DEVICE,
->> though.
->> 
->> Is my understanding right?
+On 19/08/14 11:39, Hanjun Guo wrote:
+> On 2014-8-19 2:32, Sudeep Holla wrote:
+>> On 04/08/14 16:28, Hanjun Guo wrote:
+>>> There are two flags: PSCI_COMPLIANT and PSCI_USE_HVC. When set,
+>>> the former signals to the OS that the hardware is PSCI compliant.
+>>> The latter selects the appropriate conduit for PSCI calls by
+>>> toggling between Hypervisor Calls (HVC) and Secure Monitor Calls
+>>> (SMC).
+>>>
+>>> FADT table contains such information, parse FADT to get the flags
+>>> for PSCI init. Since ACPI 5.1 doesn't support self defined PSCI
+>>> function IDs, which means that only PSCI 0.2+ is supported in ACPI.
+>>>
+>>> At the same time, only ACPI 5.1 or higher verison supports PSCI,
+>>> and FADT Major.Minor version was introduced in ACPI 5.1, so we
+>>> will check the version and only parse FADT table with version >= 5.1.
+>>>
+>>> If firmware provides ACPI tables with ACPI version less than 5.1,
+>>> OS will be messed up with those information and have no way to
+>>> bring up secondery CPUs, so disable ACPI if we get an FADT table
+>>> with version less that 5.1.
+>>>
+> [...]
+>>>
+>>> +static int __init acpi_parse_fadt(struct acpi_table_header *table)
+>>> +{
+>>> +    struct acpi_table_fadt *fadt = (struct acpi_table_fadt *)table;
+>>> +
+>>> +    /*
+>>> +     * Revision in table header is the FADT Major version,
+>>> +     * and there is a minor version of FADT which was introduced
+>>> +     * by ACPI 5.1, we only deal with ACPI 5.1 or higher version
+>>> +     * to get arm boot flags, or we will disable ACPI.
+>>> +     */
+>>> +    if (table->revision < 5 || fadt->minor_revision < 1) {
+>>
+>>                  &&
 >
-> I don't think that SOC specific code needs a bus notifier for setting
-> the stream ID. It can be done as a part of SOC specific
-> initialization. The device tree can be updated to reflect the correct
-> stream ID (SMMU driver can get the updated stream ID from device
-> tree). 
+> Catalin also pointed out this bug :), but && is not enough, for example,
+> this would not trigger of revision 4.1, although 4.1 is not exist, but
+> the code will still confusing people, so I updated the code as:
+>
 
-That's possible.
+Right I missed it :), the below code looks fine.
 
-> I was thinking more on the lines of updating the device stream id
-> while attaching a device to the domain.
+> +       if (table->revision > 5 ||
+> +           (table->revision == 5 && fadt->minor_revision >= 1)) {
+> +               return 0;
+> +       } else {
+> +               pr_info("FADT revision is %d.%d, no PSCI support, should be 5.1
+> or higher\n",
+> +                       table->revision, fadt->minor_revision);
+> +               disable_acpi();
 
-I thought the same but this would break the ARM,SMMU /compatibility/
-since the 1st param of "iommus=" is always expected as "streamID".
+As suggested elsewhere try to eliminate this and have it once if
+acpi_boot_init failed for any reasons.
 
-If streamID can be assigned dynamically like PCIe, not like streamID
-statically set in DT, how should we describe this dynmaic steramID
-shifting/assignment in DT?
+Regards,
+Sudeep
