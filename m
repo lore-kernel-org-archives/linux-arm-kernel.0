@@ -1,107 +1,54 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Tue, 19 Aug 2014 11:25:47 +0530
-Subject: [PATCH v3 13/15] cpufreq: Add cpufreq driver for Tegra124
-In-Reply-To: <1408419205-10048-14-git-send-email-tuomas.tynkkynen@iki.fi>
-References: <1408419205-10048-1-git-send-email-tuomas.tynkkynen@iki.fi>
- <1408419205-10048-14-git-send-email-tuomas.tynkkynen@iki.fi>
-Message-ID: <CAKohpokQOALPH13Ykz4nTBOby8J1X6_F30LNKz=gsC4wN3=3vg@mail.gmail.com>
+From: ipaton0@gmail.com (Iain Paton)
+Date: Tue, 19 Aug 2014 07:03:07 +0100
+Subject: Oops: 17 SMP ARM (v3.16-rc2)
+In-Reply-To: <CAOMZO5CDvQDD7gVLFStwv4MPrUyqZE3sEDZwb0gukkXujYG-6Q@mail.gmail.com>
+References: <20140626151424.GT32514@n2100.arm.linux.org.uk>
+ <20140627163108.GP32514@n2100.arm.linux.org.uk>
+ <C4A61A5CA4AD2246942F4BA6F20ACB8043575072@ALVA-EXMB04.alv.autoliv.int>
+ <20140806095012.GN30282@n2100.arm.linux.org.uk>
+ <C4A61A5CA4AD2246942F4BA6F20ACB8043575172@ALVA-EXMB04.alv.autoliv.int>
+ <20140806125550.GO30282@n2100.arm.linux.org.uk>
+ <C4A61A5CA4AD2246942F4BA6F20ACB804357526C@ALVA-EXMB04.alv.autoliv.int>
+ <20140807121248.GY30282@n2100.arm.linux.org.uk>
+ <20140808180900.GG30282@n2100.arm.linux.org.uk>
+ <C4A61A5CA4AD2246942F4BA6F20ACB8043576356@ALVA-EXMB04.alv.autoliv.int>
+ <CAOMZO5B8GR+ABBoJ=dJcFqw3Wagfaip7HM+C1FTz+aE4CmqiPw@mail.gmail.com>
+ <C4A61A5CA4AD2246942F4BA6F20ACB80435776D3@ALVA-EXMB04.alv.autoliv.int>
+ <CAOMZO5B7FgzB7ThVyV2Vk7wTwYgjRWjEnkkAN5uwwKMaBKq1yg@mail.gmail.com>
+ <C4A61A5CA4AD2246942F4BA6F20ACB8043577770@ALVA-EXMB04.alv.autoliv.int>
+ <53F11FF6.8030303@gmail.com>
+ <CAOMZO5CDvQDD7gVLFStwv4MPrUyqZE3sEDZwb0gukkXujYG-6Q@mail.gmail.com>
+Message-ID: <53F2E89B.80009@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19 August 2014 09:03, Tuomas Tynkkynen <tuomas.tynkkynen@iki.fi> wrote:
-> From: Tuomas Tynkkynen <ttynkkynen@nvidia.com>
->
-> Add a new cpufreq driver for Tegra124. Instead of using the PLLX as
-> the CPU clocksource, switch immediately to the DFLL. It allows the use
-> of higher clock rates, and will automatically scale the CPU voltage as
-> well. Besides the CPU clocksource switch, we let the cpufreq-cpu0 driver
-> for all the cpufreq operations.
->
-> This driver also relies on the DFLL driver to fill the OPP table for the
-> CPU0 device, so that the cpufreq-cpu0 driver knows what frequencies to
-> use.
->
-> Signed-off-by: Tuomas Tynkkynen <ttynkkynen@nvidia.com>
-> ---
-> v3:
->  - separate Kconfig entry
+On 17/08/14 22:46, Fabio Estevam wrote:
+> Iain,
+> 
+> On Sun, Aug 17, 2014 at 6:34 PM, Iain Paton <ipaton0@gmail.com> wrote:
+>> On 15/08/14 06:42, Mattis Lorentzon wrote:
+>>
+>>> We mostly run SSH with benchmarks using NFS, it can probably be
+>>> triggered by using only SSH with the following loop:
+>>>
+>>> # while : ; do ssh arm-card date; done
+>>
+>> Mattis,
+>>
+>> What sort of time does it take for you to see a problem?
+>>
+>> I've been running the above for nearly two days on 3.16.0 on a board
+>> with fec interrupts routed through gpio_6 and haven't seen a hint of
+>> a problem.
+> 
+> Thanks for testing.
+> 
+> Which mx6 board have you used on this test?
 
-Gud..
+It's currently pointed at a RIoTboard (atheros phy) but I'm happy to 
+try it against both a Sabre-Lite and a Wandboard B1, all running the 
+same kernel binary, as well. 
 
->  - use 'select GENERIC_CPUFREQ_CPU0', not depends
-
-Bad :(
-
-It *has* to be a depends here, its not optional. That was outcome of the
-chat we had last time, if I remember it well..
-
->  - support unbinding of the platform device
->  - allocate a state structure instead of globals
->  - use of_match_machine()
->  - various style nits fixed
-> ---
-
-You don't need to add these --- here, just add a blank line and git
-will take care of things for you :)
-
->  drivers/cpufreq/Kconfig.arm        |   8 ++
->  drivers/cpufreq/Makefile           |   1 +
->  drivers/cpufreq/tegra124-cpufreq.c | 206 +++++++++++++++++++++++++++++++++++++
->  3 files changed, 215 insertions(+)
->  create mode 100644 drivers/cpufreq/tegra124-cpufreq.c
->
-> diff --git a/drivers/cpufreq/Kconfig.arm b/drivers/cpufreq/Kconfig.arm
-> index 3795a16..07bfed1 100644
-> --- a/drivers/cpufreq/Kconfig.arm
-> +++ b/drivers/cpufreq/Kconfig.arm
-> @@ -247,3 +247,11 @@ config ARM_TEGRA20_CPUFREQ
->         default y
->         help
->           This adds the CPUFreq driver support for Tegra20 SOCs.
-> +
-> +config ARM_TEGRA124_CPUFREQ
-> +       bool "Tegra124 CPUFreq support"
-> +       depends on ARCH_TEGRA
-> +       select GENERIC_CPUFREQ_CPU0
-
-So it will become: depends on ARCH_TEGRA && GENERIC_CPUFREQ_CPU0
-
-> +static int tegra124_cpufreq_probe(struct platform_device *pdev)
-> +{
-
-> +       priv->vdd_cpu_reg = regulator_get(get_cpu_device(0), "vdd-cpu");
-
-get_cpu_device() can fail as well, and so you may want to check its return
-value as well..
-
-> +static int __init tegra_cpufreq_init(void)
-> +{
-> +       int ret;
-> +       struct platform_device *pdev;
-> +
-> +       if (!of_match_machine(soc_of_matches))
-> +               return -ENODEV;
-
-You may want to add a comment here on why you chose to add another layer
-of platform device/driver.. i.e. to catch -EPROBE_DEFER from clk-APIs..
-
-> +       ret = platform_driver_register(&tegra124_cpufreq_platdrv);
-> +       if (ret)
-> +               return ret;
-> +
-> +       pdev = platform_device_register_simple("cpufreq-tegra124", -1, NULL, 0);
-> +       if (IS_ERR(pdev)) {
-> +               platform_driver_unregister(&tegra124_cpufreq_platdrv);
-> +               return PTR_ERR(pdev);
-> +       }
-> +
-> +       return 0;
-> +}
-> +module_init(tegra_cpufreq_init);
-> +
-> +MODULE_AUTHOR("Tuomas Tynkkynen <ttynkkynen@nvidia.com>");
-> +MODULE_DESCRIPTION("cpufreq driver for NVIDIA Tegra124");
-> +MODULE_LICENSE("GPL v2");
-> --
-> 1.8.1.5
->
+I'm interested enough in why different people get different results 
+with this that I'll put some time towards testing to try to help 
+narrow down the cause.
