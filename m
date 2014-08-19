@@ -1,279 +1,135 @@
-From: wills.wang.open@gmail.com (Wills Wang)
-Date: Tue, 19 Aug 2014 15:33:01 +0800
-Subject: [PATH v6 2/2] ARM: dts: sun7i: Add Merrii A20 Hummingbird board
-In-Reply-To: <1408433581-14417-1-git-send-email-wills.wang.open@gmail.com>
-References: <1408433581-14417-1-git-send-email-wills.wang.open@gmail.com>
-Message-ID: <1408433581-14417-3-git-send-email-wills.wang.open@gmail.com>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Tue, 19 Aug 2014 15:36:46 +0800
+Subject: [PATCH v2 06/18] ARM64 / ACPI: Parse MADT to map logical cpu
+ to MPIDR and get cpu_possible/present_map
+In-Reply-To: <20140818142728.GS20043@localhost>
+References: <1407166105-17675-1-git-send-email-hanjun.guo@linaro.org>
+ <1407166105-17675-7-git-send-email-hanjun.guo@linaro.org>
+ <20140818142728.GS20043@localhost>
+Message-ID: <53F2FE8E.60307@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds support for the A20 Hummingbird:
-http://www.merrii.com/en/pla_d.asp?id=171
+On 2014-8-18 22:27, Catalin Marinas wrote:
+> On Mon, Aug 04, 2014 at 04:28:13PM +0100, Hanjun Guo wrote:
+>> diff --git a/arch/arm64/include/asm/acpi.h b/arch/arm64/include/asm/acpi.h
+>> index 6e04868..e877967 100644
+>> --- a/arch/arm64/include/asm/acpi.h
+>> +++ b/arch/arm64/include/asm/acpi.h
+>> @@ -64,6 +64,8 @@ static inline void arch_fix_phys_package_id(int num, u32 slot) { }
+>>  extern int (*acpi_suspend_lowlevel)(void);
+>>  #define acpi_wakeup_address 0
+>>  
+>> +#define MAX_GIC_CPU_INTERFACE 65535
+> 
+> Does this need to be more than NR_CPUS?
 
-This patch enable most on-board peripherals supported on current kernel,
-such as uart, i2c, spi, pwm, ohci/ehci, gmac and mmc.
+Sometimes yes, CPU structure entries in MADT just like CPU nodes in
+device tree, the number of them may more than NR_CPUS.
 
-Reviewed-by: Chen-Yu Tsai <wens@csie.org>
-Signed-off-by: Wills Wang <wills.wang.open@gmail.com>
----
- arch/arm/boot/dts/Makefile                  |   1 +
- arch/arm/boot/dts/sun7i-a20-hummingbird.dts | 236 ++++++++++++++++++++++++++++
- 2 files changed, 237 insertions(+)
- create mode 100644 arch/arm/boot/dts/sun7i-a20-hummingbird.dts
+> 
+>> +/**
+>> + * acpi_register_gic_cpu_interface - register a gic cpu interface and
+>> + * generates a logical cpu number
+>> + * @mpidr: CPU's hardware id to register, MPIDR represented in MADT
+>> + * @enabled: this cpu is enabled or not
+>> + *
+>> + * Returns the logical cpu number which maps to the gic cpu interface
+>> + */
+>> +static int acpi_register_gic_cpu_interface(u64 mpidr, u8 enabled)
+>> +{
+>> +	int cpu;
+>> +
+>> +	if (mpidr == INVALID_HWID) {
+>> +		pr_info("Skip invalid cpu hardware ID\n");
+>> +		return -EINVAL;
+>> +	}
+>> +
+>> +	total_cpus++;
+>> +	if (!enabled)
+>> +		return -EINVAL;
+>> +
+>> +	if (enabled_cpus >=  NR_CPUS) {
+>> +		pr_warn("NR_CPUS limit of %d reached, Processor %d/0x%llx ignored.\n",
+>> +			NR_CPUS, total_cpus, mpidr);
+>> +		return -EINVAL;
+>> +	}
+>> +
+>> +	/* If it is the first CPU, no need to check duplicate MPIDRs */
+>> +	if (!enabled_cpus)
+>> +		goto skip_mpidr_check;
+>> +
+>> +	/*
+>> +	 * Duplicate MPIDRs are a recipe for disaster. Scan
+>> +	 * all initialized entries and check for
+>> +	 * duplicates. If any is found just ignore the CPU.
+>> +	 */
+>> +	for_each_present_cpu(cpu) {
+>> +		if (cpu_logical_map(cpu) == mpidr) {
+>> +			pr_err("Firmware bug, duplicate CPU MPIDR: 0x%llx in MADT\n",
+>> +			       mpidr);
+>> +			return -EINVAL;
+>> +		}
+>> +	}
+>> +
+>> +skip_mpidr_check:
+>> +	enabled_cpus++;
+>> +
+>> +	/* allocate a logical cpu id for the new comer */
+>> +	if (cpu_logical_map(0) == mpidr) {
+>> +		/*
+>> +		 * boot_cpu_init() already hold bit 0 in cpu_present_mask
+>> +		 * for BSP, no need to allocate again.
+>> +		 */
+>> +		cpu = 0;
+>> +	} else {
+>> +		cpu = cpumask_next_zero(-1, cpu_present_mask);
+>> +	}
+>> +
+>> +	/* map the logical cpu id to cpu MPIDR */
+>> +	cpu_logical_map(cpu) = mpidr;
+>> +
+>> +	set_cpu_possible(cpu, true);
+>> +	set_cpu_present(cpu, true);
+>> +
+>> +	return cpu;
+>> +}
+> 
+> Why not only set the cpu possible here (with the additional mpidr
+> validity checks changed to for_each_possible_cpu)...
+> 
+>> diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
+>> index 40f38f4..8f1d37c 100644
+>> --- a/arch/arm64/kernel/smp.c
+>> +++ b/arch/arm64/kernel/smp.c
+>> @@ -36,6 +36,7 @@
+>>  #include <linux/completion.h>
+>>  #include <linux/of.h>
+>>  #include <linux/irq_work.h>
+>> +#include <linux/acpi.h>
+>>  
+>>  #include <asm/atomic.h>
+>>  #include <asm/cacheflush.h>
+>> @@ -458,7 +459,14 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
+>>  		if (err)
+>>  			continue;
+>>  
+>> -		set_cpu_present(cpu, true);
+>> +		/*
+>> +		 * In ACPI mode, cpu_present_map was initialised when
+>> +		 * MADT table was parsed which before this function
+>> +		 * is called.
+>> +		 */
+>> +		if (acpi_disabled)
+>> +			set_cpu_present(cpu, true);
+>> +
+>>  		max_cpus--;
+> 
+> ... and don't touch this at all.
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index b8c5cd3..490b462 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -416,6 +416,7 @@ dtb-$(CONFIG_MACH_SUN6I) += \
- dtb-$(CONFIG_MACH_SUN7I) += \
- 	sun7i-a20-cubieboard2.dtb \
- 	sun7i-a20-cubietruck.dtb \
-+	sun6i-a20-hummingbird.dtb \
- 	sun7i-a20-i12-tvbox.dtb \
- 	sun7i-a20-olinuxino-micro.dtb \
- 	sun7i-a20-pcduino3.dtb
-diff --git a/arch/arm/boot/dts/sun7i-a20-hummingbird.dts b/arch/arm/boot/dts/sun7i-a20-hummingbird.dts
-new file mode 100644
-index 0000000..0e4bfa3
---- /dev/null
-+++ b/arch/arm/boot/dts/sun7i-a20-hummingbird.dts
-@@ -0,0 +1,236 @@
-+/*
-+ * Copyright 2013 Wills Wang
-+ *
-+ * Wills Wang <wills.wang.open@gmail.com>
-+ *
-+ * The code contained herein is licensed under the GNU General Public
-+ * License. You may obtain a copy of the GNU General Public License
-+ * Version 2 or later at the following locations:
-+ *
-+ * http://www.opensource.org/licenses/gpl-license.html
-+ * http://www.gnu.org/copyleft/gpl.html
-+ */
-+
-+/dts-v1/;
-+/include/ "sun7i-a20.dtsi"
-+/include/ "sunxi-common-regulators.dtsi"
-+
-+/ {
-+	model = "Merrii A20 Hummingbird";
-+	compatible = "merrii,a20-hummingbird", "allwinner,sun7i-a20";
-+
-+	soc at 01c00000 {
-+		mmc0: mmc at 01c0f000 {
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin_reference_design>;
-+			vmmc-supply = <&reg_vcc3v0>;
-+			bus-width = <4>;
-+			cd-gpios = <&pio 7 1 0>; /* PH1 */
-+			cd-inverted;
-+			status = "okay";
-+		};
-+
-+		mmc3: mmc at 01c12000 {
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&mmc3_pins_a>;
-+			vmmc-supply = <&reg_mmc3_vdd>;
-+			bus-width = <4>;
-+			non-removable;
-+			status = "okay";
-+		};
-+
-+		usbphy: phy at 01c13400 {
-+			usb1_vbus-supply = <&reg_usb1_vbus>;
-+			usb2_vbus-supply = <&reg_usb2_vbus>;
-+			status = "okay";
-+		};
-+
-+		ehci0: usb at 01c14000 {
-+			status = "okay";
-+		};
-+
-+		ohci0: usb at 01c14400 {
-+			status = "okay";
-+		};
-+
-+		ahci: sata at 01c18000 {
-+			target-supply = <&reg_ahci_5v>;
-+			status = "okay";
-+		};
-+
-+		ehci1: usb at 01c1c000 {
-+			status = "okay";
-+		};
-+
-+		ohci1: usb at 01c1c400 {
-+			status = "okay";
-+		};
-+
-+		pio: pinctrl at 01c20800 {
-+			ahci_pwr_pin_a20_hummingbird: ahci_pwr_pin at 0 {
-+				allwinner,pins = "PH15";
-+				allwinner,function = "gpio_out";
-+				allwinner,drive = <0>;
-+				allwinner,pull = <0>;
-+			};
-+
-+			usb1_vbus_pin_a20_hummingbird: usb1_vbus_pin at 0 {
-+				allwinner,pins = "PH2";
-+				allwinner,function = "gpio_out";
-+				allwinner,drive = <0>;
-+				allwinner,pull = <0>;
-+			};
-+
-+			mmc3_vdd_pin_a20_hummingbird: mmc3_vdd_pin at 0 {
-+				allwinner,pins = "PH9";
-+				allwinner,function = "gpio_out";
-+				allwinner,drive = <0>;
-+				allwinner,pull = <0>;
-+			};
-+
-+			gmac_vdd_pin_a20_hummingbird: gmac_vdd_pin at 0 {
-+				allwinner,pins = "PH16";
-+				allwinner,function = "gpio_out";
-+				allwinner,drive = <0>;
-+				allwinner,pull = <0>;
-+			};
-+		};
-+
-+		pwm: pwm at 01c20e00 {
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&pwm0_pins_a>;
-+			status = "okay";
-+		};
-+
-+		ir0: ir at 01c21800 {
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&ir0_pins_a>;
-+			status = "okay";
-+		};
-+
-+		uart0: serial at 01c28000 {
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&uart0_pins_a>;
-+			status = "okay";
-+		};
-+
-+		uart2: serial at 01c28800 {
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&uart2_pins_a>;
-+			status = "okay";
-+		};
-+
-+		uart3: serial at 01c28c00 {
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&uart3_pins_a>;
-+			status = "okay";
-+		};
-+
-+		uart4: serial at 01c29000 {
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&uart4_pins_a>;
-+			status = "okay";
-+		};
-+
-+		uart5: serial at 01c29400 {
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&uart5_pins_a>;
-+			status = "okay";
-+		};
-+
-+		i2c0: i2c at 01c2ac00 {
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&i2c0_pins_a>;
-+			status = "okay";
-+
-+			axp209: pmic at 34 {
-+				compatible = "x-powers,axp209";
-+				reg = <0x34>;
-+				interrupt-parent = <&nmi_intc>;
-+				interrupts = <0 8>;
-+				interrupt-controller;
-+				#interrupt-cells = <1>;
-+			};
-+		};
-+
-+		i2c1: i2c at 01c2b000 {
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&i2c1_pins_a>;
-+			status = "okay";
-+		};
-+
-+		i2c2: i2c at 01c2b400 {
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&i2c2_pins_a>;
-+			status = "okay";
-+		};
-+
-+		i2c3: i2c at 01c2b800 {
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&i2c3_pins_a>;
-+			status = "okay";
-+		};
-+
-+		spi2: spi at 01c17000 {
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&spi2_pins_b>;
-+			status = "okay";
-+		};
-+
-+		gmac: ethernet at 01c50000 {
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&gmac_pins_rgmii_a>;
-+			phy = <&phy1>;
-+			phy-mode = "rgmii";
-+			phy-supply = <&reg_gmac_vdd>;
-+			/* phy reset config */
-+			snps,reset-gpio = <&pio 0 17 0>; /* PA17 */
-+			snps,reset-active-low;
-+			/* wait 1s after reset, otherwise fail to read phy id */
-+			snps,reset-delays-us = <0 10000 1000000>;
-+			status = "okay";
-+
-+			phy1: ethernet-phy at 1 {
-+				reg = <1>;
-+			};
-+		};
-+	};
-+
-+	reg_ahci_5v: ahci-5v {
-+		pinctrl-0 = <&ahci_pwr_pin_a20_hummingbird>;
-+		gpio = <&pio 7 15 0>; /* PH15 */
-+		status = "okay";
-+	};
-+
-+	reg_usb1_vbus: usb1-vbus {
-+		pinctrl-0 = <&usb1_vbus_pin_a20_hummingbird>;
-+		gpio = <&pio 7 2 0>; /* PH2 */
-+		status = "okay";
-+	};
-+
-+	reg_usb2_vbus: usb2-vbus {
-+		status = "okay";
-+	};
-+
-+	reg_mmc3_vdd: mmc3_vdd {
-+		compatible = "regulator-fixed";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&mmc3_vdd_pin_a20_hummingbird>;
-+		regulator-name = "mmc3_vdd";
-+		regulator-min-microvolt = <3000000>;
-+		regulator-max-microvolt = <3000000>;
-+		enable-active-high;
-+		gpio = <&pio 7 9 0>; /* PH9 */
-+	};
-+
-+	reg_gmac_vdd: gmac_vdd {
-+		compatible = "regulator-fixed";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&gmac_vdd_pin_a20_hummingbird>;
-+		regulator-name = "gmac_vdd";
-+		regulator-min-microvolt = <3000000>;
-+		regulator-max-microvolt = <3000000>;
-+		enable-active-high;
-+		gpio = <&pio 7 16 0>; /* PH16 */
-+	};
-+};
--- 
-1.8.3.2
+the original intent was to support CPU hotplug, I will update the patch
+as you suggested and introduce the change when CPU hotplug patch is upstreamed,
+then it will make the patch less confusing.
+
+Thanks
+Hanjun
