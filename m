@@ -1,171 +1,137 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 19 Aug 2014 13:33:42 +0100
-Subject: [PATCH v4 7/8] ARM: mm: allow non-text sections to be
- non-executable
-In-Reply-To: <1407949593-16121-8-git-send-email-keescook@chromium.org>
+Date: Tue, 19 Aug 2014 13:36:07 +0100
+Subject: [PATCH v4 8/8] ARM: mm: allow text and rodata sections to be
+ read-only
+In-Reply-To: <1407949593-16121-9-git-send-email-keescook@chromium.org>
 References: <1407949593-16121-1-git-send-email-keescook@chromium.org>
- <1407949593-16121-8-git-send-email-keescook@chromium.org>
-Message-ID: <20140819123342.GJ23128@arm.com>
+ <1407949593-16121-9-git-send-email-keescook@chromium.org>
+Message-ID: <20140819123607.GK23128@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 13, 2014 at 06:06:32PM +0100, Kees Cook wrote:
-> Adds CONFIG_ARM_KERNMEM_PERMS to separate the kernel memory regions
-> into section-sized areas that can have different permisions. Performs
-> the NX permission changes during free_initmem, so that init memory can be
-> reclaimed.
-> 
-> This uses section size instead of PMD size to reduce memory lost to
-> padding on non-LPAE systems.
-> 
-> Based on work by Brad Spengler, Larry Bassel, and Laura Abbott.
+On Wed, Aug 13, 2014 at 06:06:33PM +0100, Kees Cook wrote:
+> This introduces CONFIG_DEBUG_RODATA, making kernel text and rodata
+> read-only. Additionally, this splits rodata from text so that rodata can
+> also be NX, which may lead to wasted memory when aligning to SECTION_SIZE.
+> The read-only areas are made writable during ftrace updates and kexec.
 
 [...]
 
-> diff --git a/arch/arm/kernel/vmlinux.lds.S b/arch/arm/kernel/vmlinux.lds.S
-> index 6f57cb94367f..a3d07ca2bbb4 100644
-> --- a/arch/arm/kernel/vmlinux.lds.S
-> +++ b/arch/arm/kernel/vmlinux.lds.S
-> @@ -8,6 +8,9 @@
->  #include <asm/thread_info.h>
->  #include <asm/memory.h>
->  #include <asm/page.h>
-> +#ifdef CONFIG_ARM_KERNMEM_PERMS
-> +#include <asm/pgtable.h>
-> +#endif
->  	
->  #define PROC_INFO							\
->  	. = ALIGN(4);							\
-> @@ -90,6 +93,11 @@ SECTIONS
->  		_text = .;
->  		HEAD_TEXT
->  	}
-> +
-> +#ifdef CONFIG_ARM_KERNMEM_PERMS
-> +	. = ALIGN(1<<SECTION_SHIFT);
-> +#endif
-> +
->  	.text : {			/* Real text segment		*/
->  		_stext = .;		/* Text and read-only data	*/
->  			__exception_text_start = .;
-> @@ -145,7 +153,11 @@ SECTIONS
->  	_etext = .;			/* End of text and rodata section */
+> diff --git a/arch/arm/kernel/ftrace.c b/arch/arm/kernel/ftrace.c
+> index af9a8a927a4e..b8c75e45a950 100644
+> --- a/arch/arm/kernel/ftrace.c
+> +++ b/arch/arm/kernel/ftrace.c
+> @@ -15,6 +15,7 @@
+>  #include <linux/ftrace.h>
+>  #include <linux/uaccess.h>
+>  #include <linux/module.h>
+> +#include <linux/stop_machine.h>
 >  
->  #ifndef CONFIG_XIP_KERNEL
-> +# ifdef CONFIG_ARM_KERNMEM_PERMS
-> +	. = ALIGN(1<<SECTION_SHIFT);
-> +# else
->  	. = ALIGN(PAGE_SIZE);
-> +# endif
+>  #include <asm/cacheflush.h>
+>  #include <asm/opcodes.h>
+> @@ -35,6 +36,22 @@
+>  
+>  #define	OLD_NOP		0xe1a00000	/* mov r0, r0 */
+>  
+> +static int __ftrace_modify_code(void *data)
+> +{
+> +	int *command = data;
+> +
+> +	set_kernel_text_rw();
+> +	ftrace_modify_all_code(*command);
+> +	set_kernel_text_ro();
+> +
+> +	return 0;
+> +}
+> +
+> +void arch_ftrace_update_code(int command)
+> +{
+> +	stop_machine(__ftrace_modify_code, &command, NULL);
+> +}
+> +
+>  static unsigned long ftrace_nop_replace(struct dyn_ftrace *rec)
+>  {
+>  	return rec->arch.old_mcount ? OLD_NOP : NOP;
+> @@ -73,6 +90,8 @@ int ftrace_arch_code_modify_prepare(void)
+>  int ftrace_arch_code_modify_post_process(void)
+>  {
+>  	set_all_modules_text_ro();
+> +	/* Make sure any TLB misses during machine stop are cleared. */
+> +	flush_tlb_all();
 
-This might be cleaner if we had a single macro (ALIGN_MIN?) that expanded to
-ALIGN(1 << SECTION_SHIFT) #ifdef  CONFIG_ARM_KERNMEM_PERMS.
+I'm afraid I don't understand what you're trying to achieve here. What do
+you mean by `clearing a TLB miss'?
+
+[...]
 
 > diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
-> index ad82c05bfc3a..ccf392ef40d4 100644
+> index ccf392ef40d4..35c838da90d5 100644
 > --- a/arch/arm/mm/init.c
 > +++ b/arch/arm/mm/init.c
-> @@ -32,6 +32,11 @@
->  #include <asm/tlb.h>
->  #include <asm/fixmap.h>
+> @@ -626,9 +626,10 @@ struct section_perm {
+>  	unsigned long end;
+>  	pmdval_t mask;
+>  	pmdval_t prot;
+> +	pmdval_t clear;
+>  };
 >  
-> +#ifdef CONFIG_ARM_KERNMEM_PERMS
-> +#include <asm/system_info.h>
-> +#include <asm/cp15.h>
+> -struct section_perm nx_perms[] = {
+> +static struct section_perm nx_perms[] = {
+>  	/* Make pages tables, etc before _stext RW (set NX). */
+>  	{
+>  		.start	= PAGE_OFFSET,
+> @@ -643,8 +644,35 @@ struct section_perm nx_perms[] = {
+>  		.mask	= ~PMD_SECT_XN,
+>  		.prot	= PMD_SECT_XN,
+>  	},
+> +#ifdef CONFIG_DEBUG_RODATA
+> +	/* Make rodata NX (set RO in ro_perms below). */
+> +	{
+> +		.start  = (unsigned long)__start_rodata,
+> +		.end    = (unsigned long)__init_begin,
+> +		.mask   = ~PMD_SECT_XN,
+> +		.prot   = PMD_SECT_XN,
+> +	},
 > +#endif
-
-We already #include cp15.h in this file. If you need system_info.h, I don't
-think you should bother making the include conditional.
-
-> +/*
-> + * Updates section permissions only for the current mm (sections are
-> + * copied into each mm). During startup, this is the init_mm.
-> + */
-> +static inline void section_update(unsigned long addr, pmdval_t mask,
-> +				  pmdval_t prot)
-> +{
-> +	struct mm_struct *mm;
-> +	pmd_t *pmd;
-> +
-> +	mm = current->active_mm;
-> +	pmd = pmd_offset(pud_offset(pgd_offset(mm, addr), addr), addr);
-> +
+>  };
+>  
+> +#ifdef CONFIG_DEBUG_RODATA
+> +static struct section_perm ro_perms[] = {
+> +	/* Make kernel code and rodata RX (set RO). */
+> +	{
+> +		.start  = (unsigned long)_stext,
+> +		.end    = (unsigned long)__init_begin,
 > +#ifdef CONFIG_ARM_LPAE
-> +	pmd[0] = __pmd((pmd_val(pmd[0]) & mask) | prot);
+> +		.mask   = ~PMD_SECT_RDONLY,
+> +		.prot   = PMD_SECT_RDONLY,
 > +#else
-> +	if (addr & SECTION_SIZE)
-> +		pmd[1] = __pmd((pmd_val(pmd[1]) & mask) | prot);
-> +	else
-> +		pmd[0] = __pmd((pmd_val(pmd[0]) & mask) | prot);
+> +		.mask   = ~(PMD_SECT_APX | PMD_SECT_AP_WRITE),
+> +		.prot   = PMD_SECT_APX | PMD_SECT_AP_WRITE,
+> +		.clear  = PMD_SECT_AP_WRITE,
 > +#endif
-> +	flush_pmd_entry(pmd);
-> +	local_flush_tlb_kernel_range(addr, addr + SECTION_SIZE);
-
-Why only a local flush? You're changing global mappings here, right?
-
-> +}
+> +	},
+> +};
+> +#endif
 > +
-> +/* Make sure extended page tables are in use. */
-> +static inline bool arch_has_strict_perms(void)
-> +{
-> +	unsigned int cr;
-> +
-> +	if (cpu_architecture() < CPU_ARCH_ARMv6)
-> +		return false;
-> +
-> +	cr = get_cr();
-> +	if (!(cr & CR_XP))
-> +		return false;
-> +
-> +	return true;
-
-return !!(get_cr() & CR_XP)?
-
-> +}
-> +
-> +#define set_section_perms(perms, field)	{				\
-> +	size_t i;							\
-> +	unsigned long addr;						\
-> +									\
-> +	if (!arch_has_strict_perms())					\
-> +		return;							\
-> +									\
-> +	for (i = 0; i < ARRAY_SIZE(perms); i++) {			\
-> +		if (!IS_ALIGNED(perms[i].start, SECTION_SIZE) ||	\
-> +		    !IS_ALIGNED(perms[i].end, SECTION_SIZE)) {		\
-> +			pr_err("BUG: section %lx-%lx not aligned to %lx\n", \
-> +				perms[i].start, perms[i].end,		\
-> +				SECTION_SIZE);				\
-> +			continue;					\
-> +		}							\
-> +									\
-> +		for (addr = perms[i].start;				\
-> +		     addr < perms[i].end;				\
-> +		     addr += SECTION_SIZE)				\
-> +			section_update(addr, perms[i].mask,		\
-> +				       perms[i].field);			\
-> +	}								\
-> +}
-> +
-> +static inline void fix_kernmem_perms(void)
-> +{
-> +	set_section_perms(nx_perms, prot);
-> +}
-> +#else
-> +static inline void fix_kernmem_perms(void) { }
-> +#endif /* CONFIG_ARM_KERNMEM_PERMS */
-> +
->  void free_initmem(void)
+>  /*
+>   * Updates section permissions only for the current mm (sections are
+>   * copied into each mm). During startup, this is the init_mm.
+> @@ -713,6 +741,24 @@ static inline void fix_kernmem_perms(void)
 >  {
->  #ifdef CONFIG_HAVE_TCM
->  	extern char __tcm_start, __tcm_end;
-> +#endif
+>  	set_section_perms(nx_perms, prot);
+>  }
 > +
-> +	fix_kernmem_perms();
->  
-> +#ifdef CONFIG_HAVE_TCM
+> +#ifdef CONFIG_DEBUG_RODATA
+> +void mark_rodata_ro(void)
+> +{
+> +	set_section_perms(ro_perms, prot);
+> +}
+> +
+> +void set_kernel_text_rw(void)
+> +{
+> +	set_section_perms(ro_perms, clear);
+> +}
 
-You could avoid the double #ifdef by moving the tcm stuff into another
-function (free_tcmmem?)
+How does this work with LPAE? I don't see a populated clear field there.
 
 Will
