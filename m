@@ -1,137 +1,90 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 19 Aug 2014 13:36:07 +0100
-Subject: [PATCH v4 8/8] ARM: mm: allow text and rodata sections to be
- read-only
-In-Reply-To: <1407949593-16121-9-git-send-email-keescook@chromium.org>
-References: <1407949593-16121-1-git-send-email-keescook@chromium.org>
- <1407949593-16121-9-git-send-email-keescook@chromium.org>
-Message-ID: <20140819123607.GK23128@arm.com>
+From: jonsmirl@gmail.com (jonsmirl at gmail.com)
+Date: Tue, 19 Aug 2014 08:38:21 -0400
+Subject: [PATCH] This adds a generic PWM framework driver for the PWM
+ controller
+In-Reply-To: <CAKON4OwDWqnu9Nn6rBFtUJX2f0eFVzBFhRMcvPAp=K6N1KpE0w@mail.gmail.com>
+References: <20140818180316.31807.3445.stgit@studio>
+ <20140818192318.GJ15297@lukather>
+ <CAKON4OwzFDDXqCF4VNkUXXJLp3smrB6Axp_x=D47sjbpoNbe+g@mail.gmail.com>
+ <20140818201929.GL15297@lukather>
+ <CAKON4OwDWqnu9Nn6rBFtUJX2f0eFVzBFhRMcvPAp=K6N1KpE0w@mail.gmail.com>
+Message-ID: <CAKON4OycUjDN-aPys-6hiFUHUdri12yE-=4J1LEAJVM1W3RD8A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 13, 2014 at 06:06:33PM +0100, Kees Cook wrote:
-> This introduces CONFIG_DEBUG_RODATA, making kernel text and rodata
-> read-only. Additionally, this splits rodata from text so that rodata can
-> also be NX, which may lead to wasted memory when aligning to SECTION_SIZE.
-> The read-only areas are made writable during ftrace updates and kexec.
+On Tue, Aug 19, 2014 at 8:11 AM, jonsmirl at gmail.com <jonsmirl@gmail.com> wrote:
+> On Mon, Aug 18, 2014 at 4:19 PM, Maxime Ripard
+> <maxime.ripard@free-electrons.com> wrote:
+>> On Mon, Aug 18, 2014 at 03:53:08PM -0400, jonsmirl at gmail.com wrote:
+>>> On Mon, Aug 18, 2014 at 3:23 PM, Maxime Ripard
+>>> <maxime.ripard@free-electrons.com> wrote:
+>>> > Hi,
+>>> >
+>>> > On Mon, Aug 18, 2014 at 02:03:16PM -0400, Jon Smirl wrote:
+>>> >> found on Allwinner SoCs.x
+>>> >>
+>>> >> Signed-off-by: Jon Smirl <jonsmirl@gmail.com>
+>>> >
+>>> > Is there any notable difference with Alexandre's driver?
+>>> > https://lkml.org/lkml/2014/5/19/568
+>>> >
+>>> > If so, why didn't you posted incremental patches on top of his driver?
+>>>
+>>> Better A10 support.
+>>
+>> Better how?
+>>
+>>> And I wrote this one without know about his.
+>>
+>> So you're just require us to trash an already extensively reviewed
+>> driver and start from scratch again?
+>
+> Forget mine then.
+>
+> Problems in the other one....
+> 1) The math is not right in either patch. Selsinork has been checking
+> mine with a scope and just found another math error in mine. The
+> internal math needs to be done in picoseconds or round off errors mess
+> up the high frequency outputs (24Mhz, 12Mhz, 8Mhz, ...).
 
-[...]
+Correct output table....
+Neither driver has this right.
 
-> diff --git a/arch/arm/kernel/ftrace.c b/arch/arm/kernel/ftrace.c
-> index af9a8a927a4e..b8c75e45a950 100644
-> --- a/arch/arm/kernel/ftrace.c
-> +++ b/arch/arm/kernel/ftrace.c
-> @@ -15,6 +15,7 @@
->  #include <linux/ftrace.h>
->  #include <linux/uaccess.h>
->  #include <linux/module.h>
-> +#include <linux/stop_machine.h>
->  
->  #include <asm/cacheflush.h>
->  #include <asm/opcodes.h>
-> @@ -35,6 +36,22 @@
->  
->  #define	OLD_NOP		0xe1a00000	/* mov r0, r0 */
->  
-> +static int __ftrace_modify_code(void *data)
-> +{
-> +	int *command = data;
-> +
-> +	set_kernel_text_rw();
-> +	ftrace_modify_all_code(*command);
-> +	set_kernel_text_ro();
-> +
-> +	return 0;
-> +}
-> +
-> +void arch_ftrace_update_code(int command)
-> +{
-> +	stop_machine(__ftrace_modify_code, &command, NULL);
-> +}
-> +
->  static unsigned long ftrace_nop_replace(struct dyn_ftrace *rec)
->  {
->  	return rec->arch.old_mcount ? OLD_NOP : NOP;
-> @@ -73,6 +90,8 @@ int ftrace_arch_code_modify_prepare(void)
->  int ftrace_arch_code_modify_post_process(void)
->  {
->  	set_all_modules_text_ro();
-> +	/* Make sure any TLB misses during machine stop are cleared. */
-> +	flush_tlb_all();
+24Mhz  41.6ns period  1  - 62
+12Mhz  83.3ns period 63 - 104
+8Mhz  125ns  period 105 - 145
+6Mhz  167ns period 146 - 187
+4.8Mhz 208ns period 188 - 229
+4Mhz   250ns period 230 - 270
+3.4Mhz  292ns period 271 - 312
+3Mhz   333ns  period 313 - 345
 
-I'm afraid I don't understand what you're trying to achieve here. What do
-you mean by `clearing a TLB miss'?
 
-[...]
 
-> diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
-> index ccf392ef40d4..35c838da90d5 100644
-> --- a/arch/arm/mm/init.c
-> +++ b/arch/arm/mm/init.c
-> @@ -626,9 +626,10 @@ struct section_perm {
->  	unsigned long end;
->  	pmdval_t mask;
->  	pmdval_t prot;
-> +	pmdval_t clear;
->  };
->  
-> -struct section_perm nx_perms[] = {
-> +static struct section_perm nx_perms[] = {
->  	/* Make pages tables, etc before _stext RW (set NX). */
->  	{
->  		.start	= PAGE_OFFSET,
-> @@ -643,8 +644,35 @@ struct section_perm nx_perms[] = {
->  		.mask	= ~PMD_SECT_XN,
->  		.prot	= PMD_SECT_XN,
->  	},
-> +#ifdef CONFIG_DEBUG_RODATA
-> +	/* Make rodata NX (set RO in ro_perms below). */
-> +	{
-> +		.start  = (unsigned long)__start_rodata,
-> +		.end    = (unsigned long)__init_begin,
-> +		.mask   = ~PMD_SECT_XN,
-> +		.prot   = PMD_SECT_XN,
-> +	},
-> +#endif
->  };
->  
-> +#ifdef CONFIG_DEBUG_RODATA
-> +static struct section_perm ro_perms[] = {
-> +	/* Make kernel code and rodata RX (set RO). */
-> +	{
-> +		.start  = (unsigned long)_stext,
-> +		.end    = (unsigned long)__init_begin,
-> +#ifdef CONFIG_ARM_LPAE
-> +		.mask   = ~PMD_SECT_RDONLY,
-> +		.prot   = PMD_SECT_RDONLY,
-> +#else
-> +		.mask   = ~(PMD_SECT_APX | PMD_SECT_AP_WRITE),
-> +		.prot   = PMD_SECT_APX | PMD_SECT_AP_WRITE,
-> +		.clear  = PMD_SECT_AP_WRITE,
-> +#endif
-> +	},
-> +};
-> +#endif
-> +
->  /*
->   * Updates section permissions only for the current mm (sections are
->   * copied into each mm). During startup, this is the init_mm.
-> @@ -713,6 +741,24 @@ static inline void fix_kernmem_perms(void)
->  {
->  	set_section_perms(nx_perms, prot);
->  }
-> +
-> +#ifdef CONFIG_DEBUG_RODATA
-> +void mark_rodata_ro(void)
-> +{
-> +	set_section_perms(ro_perms, prot);
-> +}
-> +
-> +void set_kernel_text_rw(void)
-> +{
-> +	set_section_perms(ro_perms, clear);
-> +}
 
-How does this work with LPAE? I don't see a populated clear field there.
+> 3) By-pass mode on the A20 is not implemented.
+> 2) A10 is not correctly handled. Specifically the prescaler is
+> different on the A10 vs A20.
+>
+>
+>
+>
+>
+>
+>>
+>> --
+>> Maxime Ripard, Free Electrons
+>> Embedded Linux, Kernel and Android engineering
+>> http://free-electrons.com
+>
+>
+>
+> --
+> Jon Smirl
+> jonsmirl at gmail.com
 
-Will
+
+
+-- 
+Jon Smirl
+jonsmirl at gmail.com
