@@ -1,97 +1,45 @@
-From: mitchelh@codeaurora.org (Mitchel Humpherys)
-Date: Tue, 19 Aug 2014 12:19:35 -0700
-Subject: [PATCH 6/6] iommu/arm-smmu: add .domain_{set,
- get}_attr for coherent walk control
-In-Reply-To: <20140819124807.GM23128@arm.com> (Will Deacon's message of "Tue,
- 19 Aug 2014 13:48:07 +0100")
-References: <1407891099-24641-1-git-send-email-mitchelh@codeaurora.org>
- <1407891099-24641-7-git-send-email-mitchelh@codeaurora.org>
- <20140819124807.GM23128@arm.com>
-Message-ID: <vnkw4mx8p9rs.fsf@mitchelh-linux.qualcomm.com>
+From: jic23@kernel.org (Jonathan Cameron)
+Date: Tue, 19 Aug 2014 20:23:45 +0100
+Subject: [PATCH] iio: adc: xilinx: Remove .owner field for driver
+In-Reply-To: <32522124850adfda5c6cb8a7759d0e3a63893c1e.1407931250.git.michal.simek@xilinx.com>
+References: <32522124850adfda5c6cb8a7759d0e3a63893c1e.1407931250.git.michal.simek@xilinx.com>
+Message-ID: <53F3A441.1040103@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 19 2014 at 05:48:07 AM, Will Deacon <will.deacon@arm.com> wrote:
-> On Wed, Aug 13, 2014 at 01:51:39AM +0100, Mitchel Humpherys wrote:
->> Under certain conditions coherent hardware translation table walks can
->> result in degraded performance. Add a new domain attribute to
->> disable/enable this feature in generic code along with the domain
->> attribute setter and getter to handle it in the ARM SMMU driver.
->
-> Again, it would be nice to have some information about these cases and the
-> performance issues that you are seeing.
+On 13/08/14 13:00, Michal Simek wrote:
+> There is no need to init .owner field.
+> 
+> Based on the patch from Peter Griffin <peter.griffin@linaro.org>
+> "mmc: remove .owner field for drivers using module_platform_driver"
+> 
+> This patch removes the superflous .owner field for drivers which
+> use the module_platform_driver API, as this is overriden in
+> platform_driver_register anyway."
+> 
+> Signed-off-by: Michal Simek <michal.simek@xilinx.com>
+Applied to the togreg branch of iio.git
 
-Basically, the data I'm basing these statements on is: that's what the
-HW folks tell me :). I believe it's specific to our hardware, not ARM
-IP. Unfortunately, I don't think I could share the specifics even if I
-had them, but I can try to press the issue if you want me to.
+Thanks,
 
->
->> @@ -1908,11 +1917,15 @@ static int arm_smmu_domain_get_attr(struct iommu_domain *domain,
->>  				    enum iommu_attr attr, void *data)
->>  {
->>  	struct arm_smmu_domain *smmu_domain = domain->priv;
->> +	struct arm_smmu_cfg *cfg = &smmu_domain->cfg;
->>  
->>  	switch (attr) {
->>  	case DOMAIN_ATTR_NESTING:
->>  		*(int *)data = (smmu_domain->stage == ARM_SMMU_DOMAIN_NESTED);
->>  		return 0;
->> +	case DOMAIN_ATTR_COHERENT_HTW_DISABLE:
->> +		*((bool *)data) = cfg->htw_disable;
->> +		return 0;
->
-> I think I'd be more comfortable using int instead of bool for this, as it
-> could well end up in the user ABI if vfio decides to make use of it. While
-> we're here, let's also add an attributes bitmap to the arm_smmu_domain
-> instead of having a bool in the arm_smmu_cfg.
-
-Sounds good. I'll make these changes in v2.
-
->
->>  	default:
->>  		return -ENODEV;
->>  	}
->> @@ -1922,6 +1935,7 @@ static int arm_smmu_domain_set_attr(struct iommu_domain *domain,
->>  				    enum iommu_attr attr, void *data)
->>  {
->>  	struct arm_smmu_domain *smmu_domain = domain->priv;
->> +	struct arm_smmu_cfg *cfg = &smmu_domain->cfg;
->>  
->>  	switch (attr) {
->>  	case DOMAIN_ATTR_NESTING:
->> @@ -1933,6 +1947,9 @@ static int arm_smmu_domain_set_attr(struct iommu_domain *domain,
->>  			smmu_domain->stage = ARM_SMMU_DOMAIN_S1;
->>  
->>  		return 0;
->> +	case DOMAIN_ATTR_COHERENT_HTW_DISABLE:
->> +		cfg->htw_disable = *((bool *)data);
->> +		return 0;
->>  	default:
->>  		return -ENODEV;
->>  	}
->> diff --git a/include/linux/iommu.h b/include/linux/iommu.h
->> index 0550286df4..8a6449857a 100644
->> --- a/include/linux/iommu.h
->> +++ b/include/linux/iommu.h
->> @@ -81,6 +81,7 @@ enum iommu_attr {
->>  	DOMAIN_ATTR_FSL_PAMU_ENABLE,
->>  	DOMAIN_ATTR_FSL_PAMUV1,
->>  	DOMAIN_ATTR_NESTING,	/* two stages of translation */
->> +	DOMAIN_ATTR_COHERENT_HTW_DISABLE,
->
-> I wonder whether we should make this ARM-specific. Can you take a quick look
-> to see if any of the other IOMMUs can potentially benefit from this?
-
-Yeah looks like amd_iommu.c and intel-iommu.c are using
-IOMMU_CAP_CACHE_COHERENCY which seems to be the same thing (at least
-that's how we're treating it in arm-smmu.c). AMD's doesn't look
-configurable but Intel's does, so perhaps they would benefit from this.
-
-
-
--Mitch
-
--- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by The Linux Foundation
+Jonathan
+> ---
+> 
+>  drivers/iio/adc/xilinx-xadc-core.c | 1 -
+>  1 file changed, 1 deletion(-)
+> 
+> diff --git a/drivers/iio/adc/xilinx-xadc-core.c b/drivers/iio/adc/xilinx-xadc-core.c
+> index fd2745c62943..92541a80b041 100644
+> --- a/drivers/iio/adc/xilinx-xadc-core.c
+> +++ b/drivers/iio/adc/xilinx-xadc-core.c
+> @@ -1322,7 +1322,6 @@ static struct platform_driver xadc_driver = {
+>  	.remove = xadc_remove,
+>  	.driver = {
+>  		.name = "xadc",
+> -		.owner = THIS_MODULE,
+>  		.of_match_table = xadc_of_match_table,
+>  	},
+>  };
+> --
+> 1.8.2.3
+> 
