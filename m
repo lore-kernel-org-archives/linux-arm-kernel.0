@@ -1,48 +1,35 @@
-From: fabio.estevam@freescale.com (Fabio Estevam)
-Date: Tue, 19 Aug 2014 15:21:13 -0300
-Subject: [PATCH 3/4] ARM: dts: imx6sl-evk.dts: Keep pinctrl nodes sorted
-In-Reply-To: <1408472474-4914-1-git-send-email-fabio.estevam@freescale.com>
-References: <1408472474-4914-1-git-send-email-fabio.estevam@freescale.com>
-Message-ID: <1408472474-4914-3-git-send-email-fabio.estevam@freescale.com>
+From: aaro.koskinen@iki.fi (Aaro Koskinen)
+Date: Tue, 19 Aug 2014 21:21:40 +0300
+Subject: [GIT PULL] ARM: mvebu: SoC changes for v3.17 (round 2)
+In-Reply-To: <20140818235238.GG9187@lunn.ch>
+References: <20140718220516.GM24496@titan.lakedaemon.net>
+ <20140818205440.GB2126@drone.musicnaut.iki.fi>
+ <20140818235238.GG9187@lunn.ch>
+Message-ID: <20140819182139.GB4885@drone.musicnaut.iki.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Let's keep pinctrl nodes sorted.
+Hi,
 
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
- arch/arm/boot/dts/imx6sl-evk.dts | 12 ++++++------
- 1 file changed, 6 insertions(+), 6 deletions(-)
+On Tue, Aug 19, 2014 at 01:52:38AM +0200, Andrew Lunn wrote:
+> On Mon, Aug 18, 2014 at 11:54:40PM +0300, Aaro Koskinen wrote:
+> > Is there instructions how to get OpenRD Client DT boot to work
+> > with 3.17-rc1? I see that legacy boot has been deleted, so there is
+> > no other option.
+> 
+> mvebu_v5_defconfig should work. Starting from 3.17-rc1, that enabled
+> appended DT by default.
+> 
+> CONFIG_DEBUG_LL_UART_8250=y
+> CONFIG_DEBUG_UART_PHYS=0xf1012000
+> CONFIG_DEBUG_UART_VIRT=0xfed12000
+> 
+> Should get earlyprintk going.
 
-diff --git a/arch/arm/boot/dts/imx6sl-evk.dts b/arch/arm/boot/dts/imx6sl-evk.dts
-index 3f9e041..366eb02 100644
---- a/arch/arm/boot/dts/imx6sl-evk.dts
-+++ b/arch/arm/boot/dts/imx6sl-evk.dts
-@@ -329,12 +329,6 @@
- 			>;
- 		};
- 
--		pinctrl_led: ledgrp {
--			fsl,pins = <
--				MX6SL_PAD_HSIC_STROBE__GPIO3_IO20 0x17059
--			>;
--		};
--
- 		pinctrl_kpp: kppgrp {
- 			fsl,pins = <
- 				MX6SL_PAD_KEY_ROW0__KEY_ROW0    0x1b010
-@@ -346,6 +340,12 @@
- 			>;
- 		};
- 
-+		pinctrl_led: ledgrp {
-+			fsl,pins = <
-+				MX6SL_PAD_HSIC_STROBE__GPIO3_IO20 0x17059
-+			>;
-+		};
-+
- 		pinctrl_uart1: uart1grp {
- 			fsl,pins = <
- 				MX6SL_PAD_UART1_RXD__UART1_RX_DATA	0x1b0b1
--- 
-1.9.1
+In the end the issue was just a screwed up command line (console and
+root missing). It seems that CONFIG_CMDLINE_EXTEND is doing nothing
+when booting with DT. :-/
+
+Thanks,
+
+A.
