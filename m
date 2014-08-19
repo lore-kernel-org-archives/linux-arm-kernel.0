@@ -1,90 +1,41 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Tue, 19 Aug 2014 15:26:25 +0800
-Subject: [PATCH v3] imx-drm: imx-drm-core: add suspend/resume support
-Message-ID: <1408433185-14702-1-git-send-email-shawn.guo@freescale.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Tue, 19 Aug 2014 09:29:01 +0200
+Subject: [PATCH v2 1/5] ARM: shmobile: r8a7740: Add CMT1 device to DT
+In-Reply-To: <CANqRtoTBJOZEFoOg+YmfyovCGDTa43Qs77OW-qd9YQLFq3tQ3A@mail.gmail.com>
+References: <1407801882-2561-1-git-send-email-horms+renesas@verge.net.au>
+ <1407801882-2561-2-git-send-email-horms+renesas@verge.net.au>
+ <CANqRtoTBJOZEFoOg+YmfyovCGDTa43Qs77OW-qd9YQLFq3tQ3A@mail.gmail.com>
+Message-ID: <CAMuHMdXTa8dG0L2xLNELn3R310PJc+HotHwJZsaqPzuWQRJf5A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-HDMI currently stops working after a system suspend/resume cycle.  The
-cause is that the mode setting states in hardware gets lost and isn't
-restored across the suspend/resume cycle.
+On Tue, Aug 19, 2014 at 8:39 AM, Magnus Damm <magnus.damm@gmail.com> wrote:
+>>  arch/arm/boot/dts/r8a7740.dtsi | 12 ++++++++++++
+>>  1 file changed, 12 insertions(+)
+>>
+>> diff --git a/arch/arm/boot/dts/r8a7740.dtsi b/arch/arm/boot/dts/r8a7740.dtsi
+>> index 6cd6a46..1067a96 100644
+>> --- a/arch/arm/boot/dts/r8a7740.dtsi
+>> +++ b/arch/arm/boot/dts/r8a7740.dtsi
+>> @@ -41,6 +41,18 @@
+>>                 interrupts = <0 83 IRQ_TYPE_LEVEL_HIGH>;
+>>         };
+>>
+>> +       cmt1: timer at e6138000 {
+>> +               compatible = "renesas,cmt-48";
+>
+> Do we want to have the "r8a7740" in the compatible string somewhere?
 
-The patch adds a very basic suspend/resume support to imx-drm driver,
-and calls drm_helper_resume_force_mode() in .resume hook to restore the
-mode setting states, so that HDMI can continue working after a system
-suspend/resume cycle.
+Documentation/devicetree/bindings/timer/renesas,cmt.txt does not
+mention compatible properties containing SoC names.
 
-Since the suspend/resume hook can be called with drm_device pointer
-being NULL from driver data, we need a check on the pointer in the
-hooks.  And to avoid using a stale pointer from driver data, it also
-clears driver data in .unload hook.
+Gr{oetje,eeting}s,
 
-Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
----
-Changes since v2:
- - Check NULL pointer of drm_dev in suspend/resume hook
- - Clear driver data in .unload hook
+                        Geert
 
- drivers/staging/imx-drm/imx-drm-core.c | 33 +++++++++++++++++++++++++++++++++
- 1 file changed, 33 insertions(+)
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
 
-diff --git a/drivers/staging/imx-drm/imx-drm-core.c b/drivers/staging/imx-drm/imx-drm-core.c
-index 6b22106534d8..41ff896d2ca9 100644
---- a/drivers/staging/imx-drm/imx-drm-core.c
-+++ b/drivers/staging/imx-drm/imx-drm-core.c
-@@ -87,6 +87,8 @@ static int imx_drm_driver_unload(struct drm_device *drm)
- 	drm_vblank_cleanup(drm);
- 	drm_mode_config_cleanup(drm);
- 
-+	platform_set_drvdata(drm->platformdev, NULL);
-+
- 	return 0;
- }
- 
-@@ -647,6 +649,36 @@ static int imx_drm_platform_remove(struct platform_device *pdev)
- 	return 0;
- }
- 
-+#ifdef CONFIG_PM_SLEEP
-+static int imx_drm_suspend(struct device *dev)
-+{
-+	struct drm_device *drm_dev = dev_get_drvdata(dev);
-+
-+	/* The drm_dev is NULL before .load hook is called */
-+	if (drm_dev == NULL)
-+		return 0;
-+
-+	drm_kms_helper_poll_disable(drm_dev);
-+
-+	return 0;
-+}
-+
-+static int imx_drm_resume(struct device *dev)
-+{
-+	struct drm_device *drm_dev = dev_get_drvdata(dev);
-+
-+	if (drm_dev == NULL)
-+		return 0;
-+
-+	drm_helper_resume_force_mode(drm_dev);
-+	drm_kms_helper_poll_enable(drm_dev);
-+
-+	return 0;
-+}
-+#endif
-+
-+static SIMPLE_DEV_PM_OPS(imx_drm_pm_ops, imx_drm_suspend, imx_drm_resume);
-+
- static const struct of_device_id imx_drm_dt_ids[] = {
- 	{ .compatible = "fsl,imx-display-subsystem", },
- 	{ /* sentinel */ },
-@@ -659,6 +691,7 @@ static struct platform_driver imx_drm_pdrv = {
- 	.driver		= {
- 		.owner	= THIS_MODULE,
- 		.name	= "imx-drm",
-+		.pm	= &imx_drm_pm_ops,
- 		.of_match_table = imx_drm_dt_ids,
- 	},
- };
--- 
-1.9.1
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
