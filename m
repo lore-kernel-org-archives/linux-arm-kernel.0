@@ -1,46 +1,35 @@
 From: tuomas.tynkkynen@iki.fi (Tuomas Tynkkynen)
-Date: Tue, 19 Aug 2014 06:33:24 +0300
-Subject: [PATCH v3 14/15] ARM: tegra: Add entries for cpufreq on Tegra124
+Date: Tue, 19 Aug 2014 06:33:25 +0300
+Subject: [PATCH v3 15/15] ARM: tegra: Add CPU regulator to the Jetson TK1
+ device tree
 In-Reply-To: <1408419205-10048-1-git-send-email-tuomas.tynkkynen@iki.fi>
 References: <1408419205-10048-1-git-send-email-tuomas.tynkkynen@iki.fi>
-Message-ID: <1408419205-10048-15-git-send-email-tuomas.tynkkynen@iki.fi>
+Message-ID: <1408419205-10048-16-git-send-email-tuomas.tynkkynen@iki.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Tuomas Tynkkynen <ttynkkynen@nvidia.com>
 
-The Tegra124 cpufreq driver relies on certain clocks being present
-in the /cpus/cpu at 0 node.
+Add the CPU voltage regulator for the cpufreq driver.
 
 Signed-off-by: Tuomas Tynkkynen <ttynkkynen@nvidia.com>
 ---
- arch/arm/boot/dts/tegra124.dtsi | 11 ++++++++++-
- 1 file changed, 10 insertions(+), 1 deletion(-)
+v3: New patch
+---
+ arch/arm/boot/dts/tegra124-jetson-tk1.dts | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-diff --git a/arch/arm/boot/dts/tegra124.dtsi b/arch/arm/boot/dts/tegra124.dtsi
-index 8ff4332..17f2382 100644
---- a/arch/arm/boot/dts/tegra124.dtsi
-+++ b/arch/arm/boot/dts/tegra124.dtsi
-@@ -782,10 +782,19 @@
- 		#address-cells = <1>;
- 		#size-cells = <0>;
- 
--		cpu at 0 {
-+		cpu0: cpu at 0 {
- 			device_type = "cpu";
- 			compatible = "arm,cortex-a15";
- 			reg = <0>;
+diff --git a/arch/arm/boot/dts/tegra124-jetson-tk1.dts b/arch/arm/boot/dts/tegra124-jetson-tk1.dts
+index 0c30450..4be7c82 100644
+--- a/arch/arm/boot/dts/tegra124-jetson-tk1.dts
++++ b/arch/arm/boot/dts/tegra124-jetson-tk1.dts
+@@ -1858,3 +1858,7 @@
+ 		clock-names = "pll_a", "pll_a_out0", "mclk";
+ 	};
+ };
 +
-+			clocks = <&tegra_car TEGRA124_CLK_CCLK_G>,
-+				 <&tegra_car TEGRA124_CLK_CCLK_LP>,
-+				 <&tegra_car TEGRA124_CLK_PLL_X>,
-+				 <&tegra_car TEGRA124_CLK_PLL_P>,
-+				 <&dfll>;
-+			clock-names = "cpu_g", "cpu_lp", "pll_x", "pll_p", "dfll";
-+			/* FIXME: what's the actual transition time? */
-+			clock-latency = <300000>;
- 		};
- 
- 		cpu at 1 {
++&cpu0 {
++	vdd-cpu-supply = <&vdd_cpu>;
++};
 -- 
 1.8.1.5
