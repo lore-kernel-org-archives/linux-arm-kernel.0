@@ -1,54 +1,42 @@
-From: magnus.damm@gmail.com (Magnus Damm)
-Date: Tue, 19 Aug 2014 15:39:29 +0900
-Subject: [PATCH v2 1/5] ARM: shmobile: r8a7740: Add CMT1 device to DT
-In-Reply-To: <1407801882-2561-2-git-send-email-horms+renesas@verge.net.au>
-References: <1407801882-2561-1-git-send-email-horms+renesas@verge.net.au>
- <1407801882-2561-2-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <CANqRtoTBJOZEFoOg+YmfyovCGDTa43Qs77OW-qd9YQLFq3tQ3A@mail.gmail.com>
+From: vikas.sajjan@samsung.com (Vikas Sajjan)
+Date: Tue, 19 Aug 2014 12:37:45 +0545
+Subject: [RESEND PATCH v4 0/2] Refactor the pm code to use DT based lookup
+Message-ID: <1408431167-14134-1-git-send-email-vikas.sajjan@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Simon, Laurent,
+Refactoring the pm.c to avoid using "soc_is_exynos" checks,
+instead use the DT based lookup.
 
-On Tue, Aug 12, 2014 at 9:04 AM, Simon Horman
-<horms+renesas@verge.net.au> wrote:
-> Add the CMT1 counters to the r8a7740 device tree and make it
-> disabled by default.
->
-> Based on work by Magnus Damm.
->
-> Cc: Magnus Damm <magnus.damm@gmail.com>
-> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
->
-> ---
-> v2
-> * Corrected copy-paste-error: CMT0 -> CMT1
+While at it, move exynos5250 specific disabling of JPEG USE_RETENTION to pmu.c
 
-Thanks for breaking out, brushing up and submitting code based on my
-earlier hack!
+changes since v3:
+	- Addressed comments from Tomasz Figa.
+changes since v2:
+	- Addressed Tomasz Figa's comments to unify the functions for exynos4
+	and exynos5250.
+	- Added new patch to move exynos5250 specific disabling of 
+		JPEG USE_RETENTION to pmu.c 
+	- Addressed comment from Thomas Abraham.
+changes since v1:
+	- Address Kukjin Kim comments to respin this patch separately from
+		http://lists.infradead.org/pipermail/linux-arm-kernel/2014-July/272574.html
+	- removed panic, returned if no PMU node found and added check in exynos_wkup_irq.
 
-I've got one minor comment (see below ) and I also made sure to CC
-Laurent that wrote the DT bindings.
+Rebased on Kukjin Kim's tree, for-next branch 
+	https://git.kernel.org/cgit/linux/kernel/git/kgene/linux-samsung.git/log/?h=for-next
 
-Laurent, can you please check if this is the way you want us to use
-the CMT bindings?
+Tested on 5250 based Chromebook.
 
->  arch/arm/boot/dts/r8a7740.dtsi | 12 ++++++++++++
->  1 file changed, 12 insertions(+)
->
-> diff --git a/arch/arm/boot/dts/r8a7740.dtsi b/arch/arm/boot/dts/r8a7740.dtsi
-> index 6cd6a46..1067a96 100644
-> --- a/arch/arm/boot/dts/r8a7740.dtsi
-> +++ b/arch/arm/boot/dts/r8a7740.dtsi
-> @@ -41,6 +41,18 @@
->                 interrupts = <0 83 IRQ_TYPE_LEVEL_HIGH>;
->         };
->
-> +       cmt1: timer at e6138000 {
-> +               compatible = "renesas,cmt-48";
+Vikas Sajjan (2):
+  ARM: EXYNOS: Move Disabling of JPEG USE_RETENTION for exynos5250 to
+    pmu.c
+  ARM: EXYNOS: Refactor the pm code to use DT based lookup
 
-Do we want to have the "r8a7740" in the compatible string somewhere?
+ arch/arm/mach-exynos/pm.c       |  172 ++++++++++++++++++++++++++++-----------
+ arch/arm/mach-exynos/pmu.c      |    1 +
+ arch/arm/mach-exynos/regs-pmu.h |    1 +
+ 3 files changed, 127 insertions(+), 47 deletions(-)
 
-Cheers,
-
-/ magnus
+-- 
+1.7.9.5
