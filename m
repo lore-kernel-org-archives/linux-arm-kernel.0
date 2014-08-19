@@ -1,35 +1,25 @@
-From: geoff@infradead.org (Geoff Levand)
-Date: Tue, 19 Aug 2014 12:25:26 -0700
-Subject: [PATCH v2 08/18] ARM64 / ACPI: Get the enable method for SMP
- initialization in ACPI way
-In-Reply-To: <53F33EDC.3090203@linaro.org>
-References: <1407166105-17675-1-git-send-email-hanjun.guo@linaro.org>
- <1407166105-17675-9-git-send-email-hanjun.guo@linaro.org>
- <1408388212.22761.100.camel@smoke> <53F33EDC.3090203@linaro.org>
-Message-ID: <1408476326.22761.134.camel@smoke>
+From: mitchelh@codeaurora.org (Mitchel Humpherys)
+Date: Tue, 19 Aug 2014 12:28:44 -0700
+Subject: [PATCH 1/6] iommu/arm-smmu: add support for specifying clocks
+In-Reply-To: <20140819125833.GO23128@arm.com> (Will Deacon's message of "Tue,
+ 19 Aug 2014 13:58:34 +0100")
+References: <1407891099-24641-1-git-send-email-mitchelh@codeaurora.org>
+ <1407891099-24641-2-git-send-email-mitchelh@codeaurora.org>
+ <20140819125833.GO23128@arm.com>
+Message-ID: <vnkwha18nus3.fsf@mitchelh-linux.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Hanjun,
+On Tue, Aug 19 2014 at 05:58:34 AM, Will Deacon <will.deacon@arm.com> wrote:
+> I also assume that the clk API ignores calls to clk_enable_prepare
+> for a clk that's already enabled? I couldn't find that code...
 
-On Tue, 2014-08-19 at 20:11 +0800, Hanjun Guo wrote:
-> On 2014-8-19 2:56, Geoff Levand wrote:
+That's clk_prepare_enable, not clk_enable_prepare. It's in
+<linux/clk.h>.
 
-> > 	message = acpi_disabled ? dn->full_name : "";
-> > 
-> > 	...
-> > 	
-> > 	pr_warn("CPU %d: %s unsupported enable-method property: %s\n",
-> > 				cpu, message, enable_method)
-> 
-> In ACPI, there is no enable-method property, it is a term from, so I think the
-> message printed can be separated.
 
-I think it better to have a single message that can cover all
-than to have separate messages.  Wouldn't the enable method be
-"acpi-parking" or "acpi-psci"?  Then something like this would
-work:
+-Mitch
 
-	pr_warn("CPU %d: %s Unsupported enable method: %s\n", cpu, message, enable_method);
-
--Geoff
+-- 
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
