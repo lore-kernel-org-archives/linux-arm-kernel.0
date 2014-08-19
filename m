@@ -1,32 +1,83 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 19 Aug 2014 14:39:56 +0200
-Subject: [PATCH v9 02/12] PCI: OF: Parse and map the IRQ when adding the
- PCI device.
-In-Reply-To: <20140818220906.GJ24600@localhost>
-References: <1407860725-25202-1-git-send-email-Liviu.Dudau@arm.com>
- <20140818213054.GB13147@bart.dudau.co.uk> <20140818220906.GJ24600@localhost>
-Message-ID: <201408191439.56493.arnd@arndb.de>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 19 Aug 2014 13:44:32 +0100
+Subject: [PATCH 3/6] iommu/arm-smmu: add support for iova_to_phys through
+ ATS1PR
+In-Reply-To: <1407891099-24641-4-git-send-email-mitchelh@codeaurora.org>
+References: <1407891099-24641-1-git-send-email-mitchelh@codeaurora.org>
+ <1407891099-24641-4-git-send-email-mitchelh@codeaurora.org>
+Message-ID: <20140819124431.GL23128@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 19 August 2014, Catalin Marinas wrote:
-> On Mon, Aug 18, 2014 at 10:30:54PM +0100, Liviu Dudau wrote:
-> > At this point I would like to hear more from people doing the conversion of
-> > the drivers. I cannot answer fully for all arm or arm64 drivers.
-> 
-> As I read the description of pcibios_add_device(), it is meant as an
-> architecture hook. While it's nice to generalise this, I'm not sure we
-> we can find a common denominator. For example, we may want to call
-> set_dma_ops() as powerpc does but the ops would be arm64 specific (so
-> even the __weak implementation may not be used by any architecture).
+On Wed, Aug 13, 2014 at 01:51:36AM +0100, Mitchel Humpherys wrote:
+> Currently, we provide the iommu_ops.iova_to_phys service by doing a
+> table walk in software to translate IO virtual addresses to physical
+> addresses. On SMMUs that support it, it can be useful to ask the SMMU
+> itself to do the translation. This can be used to warm the TLBs for an
+> SMMU. It can also be useful for testing and hardware validation.
 
-Right. I'm a strong advocate of the idea of having no architecture specific
-parts in the PCI support, but I can see the set_dma_ops() call as a
-good reason to make an exception here.
+I'm not really sold on the usefulness of this feature. If you want hardware
+validation features, I'd rather do something through debugfs, but your
+use-case for warming the TLBs is intriguing. Do you have an example use-case
+with performance figures?
 
-We could add another layer of indirection for the purpose of API purity
-here, to call an architecture specific DMA setup function, but it doesn't
-really add that much benefits, in particular when the DMA setup is currently
-in flux as well.
+> Since the address translation registers are optional on SMMUv2, only
+> enable hardware translations when using SMMUv1 or when SMMU_IDR0.S1TS=1
+> and SMMU_IDR0.ATOSNS=0, as described in the ARM SMMU v1-v2 spec.
 
-	Arnd
+[...]
+
+> +static phys_addr_t arm_smmu_iova_to_phys_hard(struct iommu_domain *domain,
+> +					dma_addr_t iova)
+> +{
+> +	struct arm_smmu_domain *smmu_domain = domain->priv;
+> +	struct arm_smmu_device *smmu = smmu_domain->smmu;
+> +	struct arm_smmu_cfg *cfg = &smmu_domain->cfg;
+> +	struct device *dev = smmu->dev;
+> +	void __iomem *cb_base;
+> +	int count = 0;
+> +	u64 phys;
+> +
+> +	arm_smmu_enable_clocks(smmu);
+> +
+> +	cb_base = ARM_SMMU_CB_BASE(smmu) + ARM_SMMU_CB(smmu, cfg->cbndx);
+> +
+> +	if (smmu->version == 1) {
+> +		u32 reg = iova & 0xFFFFF000;
+> +		writel_relaxed(reg, cb_base + ARM_SMMU_CB_ATS1PR_LO);
+> +	} else {
+> +		u64 reg = iova & 0xfffffffffffff000;
+> +		writeq_relaxed(reg, cb_base + ARM_SMMU_CB_ATS1PR_LO);
+
+We don't have writeq for arch/arm/.
+
+> +	}
+> +
+> +	mb();
+
+Why?
+
+> +	while (readl_relaxed(cb_base + ARM_SMMU_CB_ATSR) & ATSR_ACTIVE) {
+> +		if (++count == ATSR_LOOP_TIMEOUT) {
+> +			dev_err(dev,
+> +				"iova to phys timed out on 0x%pa for %s. Falling back to software table walk.\n",
+> +				&iova, dev_name(dev));
+> +			arm_smmu_disable_clocks(smmu);
+> +			return arm_smmu_iova_to_phys_soft(domain, iova);
+> +		}
+> +		cpu_relax();
+> +	}
+
+Do you know what happened to Olav's patches to make this sort of code
+generic?
+
+> @@ -2005,6 +2073,11 @@ int arm_smmu_device_cfg_probe(struct arm_smmu_device *smmu)
+>  		return -ENODEV;
+>  	}
+>  
+> +	if (smmu->version == 1 || (!(id & ID0_ATOSNS) && (id & ID0_S1TS))) {
+
+Are you sure about this? The v2 spec says that is ATOSNS is clear then S1TS
+is also clear.
+
+Will
