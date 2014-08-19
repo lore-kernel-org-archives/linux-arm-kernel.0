@@ -1,54 +1,65 @@
-From: ipaton0@gmail.com (Iain Paton)
-Date: Tue, 19 Aug 2014 07:03:07 +0100
-Subject: Oops: 17 SMP ARM (v3.16-rc2)
-In-Reply-To: <CAOMZO5CDvQDD7gVLFStwv4MPrUyqZE3sEDZwb0gukkXujYG-6Q@mail.gmail.com>
-References: <20140626151424.GT32514@n2100.arm.linux.org.uk>
- <20140627163108.GP32514@n2100.arm.linux.org.uk>
- <C4A61A5CA4AD2246942F4BA6F20ACB8043575072@ALVA-EXMB04.alv.autoliv.int>
- <20140806095012.GN30282@n2100.arm.linux.org.uk>
- <C4A61A5CA4AD2246942F4BA6F20ACB8043575172@ALVA-EXMB04.alv.autoliv.int>
- <20140806125550.GO30282@n2100.arm.linux.org.uk>
- <C4A61A5CA4AD2246942F4BA6F20ACB804357526C@ALVA-EXMB04.alv.autoliv.int>
- <20140807121248.GY30282@n2100.arm.linux.org.uk>
- <20140808180900.GG30282@n2100.arm.linux.org.uk>
- <C4A61A5CA4AD2246942F4BA6F20ACB8043576356@ALVA-EXMB04.alv.autoliv.int>
- <CAOMZO5B8GR+ABBoJ=dJcFqw3Wagfaip7HM+C1FTz+aE4CmqiPw@mail.gmail.com>
- <C4A61A5CA4AD2246942F4BA6F20ACB80435776D3@ALVA-EXMB04.alv.autoliv.int>
- <CAOMZO5B7FgzB7ThVyV2Vk7wTwYgjRWjEnkkAN5uwwKMaBKq1yg@mail.gmail.com>
- <C4A61A5CA4AD2246942F4BA6F20ACB8043577770@ALVA-EXMB04.alv.autoliv.int>
- <53F11FF6.8030303@gmail.com>
- <CAOMZO5CDvQDD7gVLFStwv4MPrUyqZE3sEDZwb0gukkXujYG-6Q@mail.gmail.com>
-Message-ID: <53F2E89B.80009@gmail.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Tue, 19 Aug 2014 08:07:41 +0200
+Subject: [PATCH 00/29] Exynos SYSMMU (IOMMU) integration with DT and
+ DMA-mapping subsystem
+In-Reply-To: <20140818233201.GL9809@8bytes.org>
+References: <1407235677-26324-1-git-send-email-m.szyprowski@samsung.com>
+ <20140818233201.GL9809@8bytes.org>
+Message-ID: <53F2E9AD.9030308@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17/08/14 22:46, Fabio Estevam wrote:
-> Iain,
-> 
-> On Sun, Aug 17, 2014 at 6:34 PM, Iain Paton <ipaton0@gmail.com> wrote:
->> On 15/08/14 06:42, Mattis Lorentzon wrote:
->>
->>> We mostly run SSH with benchmarks using NFS, it can probably be
->>> triggered by using only SSH with the following loop:
->>>
->>> # while : ; do ssh arm-card date; done
->>
->> Mattis,
->>
->> What sort of time does it take for you to see a problem?
->>
->> I've been running the above for nearly two days on 3.16.0 on a board
->> with fec interrupts routed through gpio_6 and haven't seen a hint of
->> a problem.
-> 
-> Thanks for testing.
-> 
-> Which mx6 board have you used on this test?
+Hello,
 
-It's currently pointed at a RIoTboard (atheros phy) but I'm happy to 
-try it against both a Sabre-Lite and a Wandboard B1, all running the 
-same kernel binary, as well. 
+On 2014-08-19 01:32, Joerg Roedel wrote:
+> On Tue, Aug 05, 2014 at 12:47:28PM +0200, Marek Szyprowski wrote:
+>>   .../devicetree/bindings/iommu/samsung,sysmmu.txt   |  93 ++-
+>>   Documentation/power/notifiers.txt                  |  14 +
+>>   arch/arm/boot/dts/exynos4.dtsi                     | 118 ++++
+>>   arch/arm/boot/dts/exynos4210.dtsi                  |  23 +
+>>   arch/arm/boot/dts/exynos4x12.dtsi                  |  82 +++
+>>   arch/arm/include/asm/dma-iommu.h                   |  36 ++
+>>   arch/arm/mach-exynos/pm_domains.c                  |  12 +-
+>>   arch/arm/mach-integrator/impd1.c                   |   2 +-
+>>   arch/arm/mm/dma-mapping.c                          |  47 ++
+>>   drivers/base/bus.c                                 |   4 +-
+>>   drivers/base/dd.c                                  |  10 +-
+>>   drivers/base/platform.c                            |   2 +-
+>>   drivers/base/power/domain.c                        |  70 ++-
+>>   drivers/clk/samsung/clk-exynos4.c                  |   1 +
+>>   drivers/gpu/drm/exynos/exynos_drm_fimc.c           |   1 +
+>>   drivers/gpu/drm/exynos/exynos_drm_fimd.c           |  26 +-
+>>   drivers/gpu/drm/exynos/exynos_drm_g2d.c            |   1 +
+>>   drivers/gpu/drm/exynos/exynos_drm_gsc.c            |   1 +
+>>   drivers/gpu/drm/exynos/exynos_drm_rotator.c        |   1 +
+>>   drivers/gpu/drm/exynos/exynos_mixer.c              |   1 +
+>>   drivers/iommu/exynos-iommu.c                       | 663 +++++++++++++--------
+>>   drivers/iommu/iommu.c                              |   3 +
+>>   drivers/media/platform/s5p-mfc/s5p_mfc.c           | 107 ++--
+>>   drivers/pci/host/pci-mvebu.c                       |   2 +-
+>>   drivers/pci/host/pci-rcar-gen2.c                   |   2 +-
+>>   drivers/pci/host/pci-tegra.c                       |   2 +-
+>>   drivers/pci/host/pcie-rcar.c                       |   2 +-
+>>   drivers/soc/tegra/pmc.c                            |   2 +-
+>>   include/dt-bindings/clock/exynos4.h                |  10 +-
+>>   include/linux/device.h                             |  12 +-
+>>   include/linux/iommu.h                              |   1 +
+>>   include/linux/pm.h                                 |   2 +
+>>   include/linux/pm_domain.h                          |  19 +
+>>   33 files changed, 1016 insertions(+), 356 deletions(-)
+> This touches a lot of non-iommu stuff. What is your strategy on getting
+> this in, do you plan to get the non-iommu changes merged first or do you
+> want to collect the respective Acks and merge this all through one tree?
 
-I'm interested enough in why different people get different results 
-with this that I'll put some time towards testing to try to help 
-narrow down the cause.
+Those patches are posted as one patchset mainly to demonstrate how to get
+everything to work together. I also posted this as a single patch series
+to get some feedback from other iommu developers, especially all those
+involved in the generic iommu dt bindings.
+
+For merging, I will split them into smaller series and try to get
+respective acks.
+
+Best regards
+-- 
+Marek Szyprowski, PhD
+Samsung R&D Institute Poland
