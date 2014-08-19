@@ -1,29 +1,40 @@
 From: frans.klaver@xsens.com (Frans Klaver)
-Date: Tue, 19 Aug 2014 14:14:44 +0200
-Subject: [RFC PATCHv2 0/4] omap-serial high-speed fixes/improvements
-In-Reply-To: <1406645577-18620-1-git-send-email-frans.klaver@xsens.com>
+Date: Tue, 19 Aug 2014 14:14:46 +0200
+Subject: [PATCH 2/4] tty: omap-serial: prevent division by zero
+In-Reply-To: <1408450488-4083-1-git-send-email-frans.klaver@xsens.com>
 References: <1406645577-18620-1-git-send-email-frans.klaver@xsens.com>
-Message-ID: <1408450488-4083-1-git-send-email-frans.klaver@xsens.com>
+ <1408450488-4083-1-git-send-email-frans.klaver@xsens.com>
+Message-ID: <1408450488-4083-3-git-send-email-frans.klaver@xsens.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Here's version 2 of the patches that should improve the behavior of the omap
-serial port at high baud and data rates.
+If the chosen baud rate is large enough (e.g. 3.5 megabaud), the
+calculated n values in calculate_baud_abs_diff may become 0. This causes
+a division by zero when calculating the difference between calculated
+and desired baud rates. To prevent this, cap n on 1.
 
-Differences with regard to v1 are:
-  - centralize baud_is_mode16's calculation
-  - fix/unbreak an uninitialized variable in "use threaded interrupt handler"
-  - read has-hw-flow-control property in of_get_uart_port_info
+Signed-off-by: Frans Klaver <frans.klaver@xsens.com>
+---
+ drivers/tty/serial/omap-serial.c | 6 +++++-
+ 1 file changed, 5 insertions(+), 1 deletion(-)
 
-Frans Klaver (4):
-  tty: omap-serial: pull out calculation from baud_is_mode16
-  tty: omap-serial: prevent division by zero
-  tty: omap-serial: use threaded interrupt handler
-  tty: omap-serial: support setting of hardware flow control in dts
-
- .../devicetree/bindings/serial/omap_serial.txt     |  1 +
- drivers/tty/serial/omap-serial.c                   | 65 +++++++++++++++++-----
- 2 files changed, 51 insertions(+), 15 deletions(-)
-
+diff --git a/drivers/tty/serial/omap-serial.c b/drivers/tty/serial/omap-serial.c
+index ae935ce..14a0167 100644
+--- a/drivers/tty/serial/omap-serial.c
++++ b/drivers/tty/serial/omap-serial.c
+@@ -246,8 +246,12 @@ static inline int calculate_baud_abs_diff(struct uart_port *port,
+ 				unsigned int baud, unsigned int mode)
+ {
+ 	unsigned int n = port->uartclk / (mode * baud);
+-	int abs_diff = baud - (port->uartclk / (mode * n));
++	int abs_diff;
+ 
++	if (n == 0)
++		n = 1;
++
++	abs_diff = baud - (uartclk / (mode * n));
+ 	if (abs_diff < 0)
+ 		abs_diff = -abs_diff;
+ 
 -- 
 1.9.3
