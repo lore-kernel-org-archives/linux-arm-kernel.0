@@ -1,66 +1,83 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Tue, 19 Aug 2014 18:11:44 +0200
-Subject: [PATCH v5 1/1] iommu-api: Add map_sg/unmap_sg functions
-In-Reply-To: <20140819115954.GC16329@8bytes.org>
-References: <1407797150-515-1-git-send-email-ohaugan@codeaurora.org>
- <53F2829C.2040809@codeaurora.org> <20140819115954.GC16329@8bytes.org>
-Message-ID: <2348740.xICP2AxYHy@avalon>
+From: carlo@caione.org (Carlo Caione)
+Date: Tue, 19 Aug 2014 18:16:52 +0200
+Subject: [PATCH 5/7] ARM: meson: dts: add basic
+ Meson/Meson6/Meson6-atv1200 DTSI/DTS
+In-Reply-To: <20140818161744.GD3302@leverpostej>
+References: <1408272594-10814-1-git-send-email-carlo@caione.org>
+ <1408272594-10814-6-git-send-email-carlo@caione.org>
+ <20140818161744.GD3302@leverpostej>
+Message-ID: <20140819161652.GB869@carlo-MacBookPro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 19 August 2014 13:59:54 Joerg Roedel wrote:
-> On Mon, Aug 18, 2014 at 03:47:56PM -0700, Olav Haugan wrote:
-> > If the alignment is not correct then iommu_map() will return error. Not
-> > sure what other option we have here (and why make it different behavior
-> > than iommu_map which just return error when it is not aligned properly).
-> > I don't think we want to force any kind of alignment automatically. I
-> > would rather have the API tell me I am doing something wrong than having
-> > the function aligning the values and possibly undermap or overmap.
+On Mon, Aug 18, 2014 at 05:17:44PM +0100, Mark Rutland wrote:
+> On Sun, Aug 17, 2014 at 11:49:52AM +0100, Carlo Caione wrote:
+
+<cut>
+
+> > +	soc at c8100000 {
 > 
-> But sg->offset is an offset into the page (at least it is used that way
-> in the DMA-API and since you do 'page_len = s->offset + s->length' you
-> use it the same way).
-> So when you pass iova + offset the result will no longer be
-> page-aligned. You should force sg->offset == 0 and sg->length to be
-> page-aligned instead. This makes more sense because the IOMMU-API works
-> on (io)-page granularity and not on arbitrary phys-addr ranges like the
-> DMA-API.
+> What's the unit-address for? This node doesn't have a reg or compatible.
+
+I used it to indicate the starting address of the memory mapped region.
+
+> > +		compatible = "simple-bus";
+> > +		#address-cells = <1>;
+> > +		#size-cells = <1>;
+> > +		ranges;
+> > +
+> > +		uart_AO: serial at c81004c0 {
+> > +			compatible = "amlogic,meson-uart";
+> > +			reg = <0xc81004c0 0x14>;
+> > +			interrupts = <0 90 1>;
+> > +			clocks = <&clk81>;
+> > +			status = "disabled";
+> > +		};
+> > +
+> > +		uart_A: serial at c81084c0 {
+> > +			compatible = "amlogic,meson-uart";
+> > +			reg = <0xc81084c0 0x14>;
+> > +			interrupts = <0 90 1>;
+> > +			clocks = <&clk81>;
+> > +			status = "disabled";
+> > +		};
+> > +
+> > +		uart_B: serial at c81084dc {
+> > +			compatible = "amlogic,meson-uart";
+> > +			reg = <0xc81084dc 0x14>;
+> > +			interrupts = <0 90 1>;
+> > +			clocks = <&clk81>;
+> > +			status = "disabled";
+> > +		};
+> > +
+> > +		uart_C: serial at c8108700 {
+> > +			compatible = "amlogic,meson-uart";
+> > +			reg = <0xc8108700 0x14>;
+> > +			interrupts = <0 90 1>;
+> > +			clocks = <&clk81>;
+> > +			status = "disabled";
 > 
-> > Yes, I am aware of that. However, several people prefer this than
-> > passing in scatterlist. It is not very convenient to pass a scatterlist
-> > in some use cases. Someone mentioned a use case where they would have to
-> > create a dummy sg list and populate it with the iova just to do an
-> > unmap. I believe we would have to do this also. There is no use for
-> > sglist when unmapping. However, would like to keep separate API from
-> > iommu_unmap() to keep the API function names symmetric (map_sg/unmap_sg).
+> I guess these are disabled because they aren't always wired up?
+
+Yes
+
+<cut>
+
+> > +	clocks {
+> > +		#address-cells = <1>;
+> > +
+> > +		clk81: clk at 0 {
+> > +			#clock-cells = <0>;
+> > +			compatible = "fixed-clock";
+> > +			clock-frequency = <200000000>;
+> > +		};
+> > +	};
 > 
-> Keeping it symetric is not more complicated, the caller just needs to
-> keep the sg-list used for mapping around. I prefer the unmap_sg call to
-> work in sg-lists too.
-
-Do we have a use case where the unmap_sg() implementation would be different 
-than a plain iommu_unmap() call ? If not I'd rather remove unmap_sg() 
-completely.
-
-> > I thought that was why we added the default fallback and set all the
-> > drivers to point to these fallback functions. Several people wanted this
-> > so that we don't have to have NULL-check in these functions (and have
-> > the functions be simple inline functions).
+> There is really no need to put clocks in a container.
 > 
-> Okay, since you add these call-backs to all drivers I think I can live
-> with not doing a pointer check here.
+> Just put them under the root, and drop the unit-address.
 
-I suggested doing a
-
-if (ops is not NULL)
-	return ops();
-else
-	return default_ops();
-
-to avoid modifying all drivers. I'm not sure why that wasn't received with 
-much enthusiasm.
+I'll do, thanks.
 
 -- 
-Regards,
-
-Laurent Pinchart
+Carlo Caione
