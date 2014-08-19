@@ -1,27 +1,90 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Tue, 19 Aug 2014 16:29:24 +0200
-Subject: [PATCH 1/2] imx-drm: imx-ldb: fix kernel Oops in imx_ldb_unbind()
-In-Reply-To: <1408441795-24719-2-git-send-email-shawn.guo@freescale.com>
-References: <1408441795-24719-1-git-send-email-shawn.guo@freescale.com>
- <1408441795-24719-2-git-send-email-shawn.guo@freescale.com>
-Message-ID: <1408458564.2899.17.camel@paszta.hi.pengutronix.de>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Tue, 19 Aug 2014 16:30:44 +0200
+Subject: [PATCH v7 3/4] ARM: EXYNOS: Add platform driver support for Exynos
+ PMU
+In-Reply-To: <2491338.uD82s4TcKJ@amdc1032>
+References: <1404878455-31518-1-git-send-email-pankaj.dubey@samsung.com>
+ <53D238E1.3030901@gmail.com> <002601cfaa11$93de5060$bb9af120$@samsung.com>
+ <2491338.uD82s4TcKJ@amdc1032>
+Message-ID: <53F35F94.1010101@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Dienstag, den 19.08.2014, 17:49 +0800 schrieb Shawn Guo:
-> Unbinding imx-ldb driver on imx6q-sabresd board triggers a kernel Oops
-> as below.
+Hi Bart,
+
+On 18.08.2014 19:42, Bartlomiej Zolnierkiewicz wrote:
 > 
-> $ echo 2000000.aips-bus\:ldb\@020e0008 > unbind
-[...]
-> Fix the issue by checking if the LDB channel is actually created/valid
-> before calling into its connector/encoder's destroy() function.
+> Hi,
 > 
-> Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
+> On Monday, July 28, 2014 08:40:52 AM Pankaj Dubey wrote:
+>> Hi Tomasz,
+>>
+>> On Friday, July 25, 2014 Tomasz Figa wrote:
+>>
+>>> To: Pankaj Dubey; 'Kukjin Kim'; linux-arm-kernel at lists.infradead.org;
+>> linux-
+>>> samsung-soc at vger.kernel.org; linux-kernel at vger.kernel.org
+>>> Cc: linux at arm.linux.org.uk; t.figa at samsung.com; vikas.sajjan at samsung.com;
+>>> joshi at samsung.com; naushad at samsung.com; thomas.ab at samsung.com;
+>>> chow.kim at samsung.com
+>>> Subject: Re: [PATCH v7 3/4] ARM: EXYNOS: Add platform driver support for
+>>> Exynos PMU
+>>>
+>>> Hi Pankaj, Kukjin,
+>>>
+>>> On 25.07.2014 07:32, Pankaj Dubey wrote:
+>>>> Hi Kukjin,
+>>>>
+>>>> On Friday, July 25, 2014 Kukjin Kim wrote:
+>>>
+>>> [snip]
+>>>
+>>>>>>
+>>>>> Looks good to me, will apply this and 4/4.
+>>>>>
+>>>>
+>>>> We need to hold these two patches until dependent patch [1] from
+>>>> Tomasz Figa gets merged.
+>>>>
+>>>> [1]: mfd: syscon: Decouple syscon interface from syscon devices
+>>>>       https://lkml.org/lkml/2014/6/24/188
+>>>
+>>> That RFC patch had few comments from Arnd needed to be addressed, so it
+>> needs a
+>>> new revision.
+>>>
+>>> Pankaj, If I remember correctly, we had talked about this and the
+>> conclusion was that
+>>> you would take care of addressing the comments and sending new version of
+>> the
+>>> patch. Any update on this or have I missed something?
+>>>
+>>
+>> Well, I don't think we concluded as such anything.
+>> Since this patch needs to get in so that Exynos PMU and PM related changes
+>> can go in,
+>> I discussed with you saying that I am not able to understand about Arnd's
+>> comments and
+>> if possible and time permits I will look into it. Meanwhile I got busy with
+>> some other
+>> official work, so could not get time to look into it.
+> 
+> Tomasz/Pankaj, could we please get some agreement on what needs to be
+> done and who should do the pending work?
+> 
+> syscon patch is blocking PMU cleanup patches which in turn are blocking
+> PMU support additions for new SoCs (Exynos5420/5800 and Exynos3250 PMU
+> patches).
 
-Acked-by: Philipp Zabel <p.zabel@pengutronix.de>
+Leaving alone the matter who is going to take care of it for now, the
+remaining work to do is to further decouple syscon from struct device,
+which means providing of_ API to register a syscon provider on a device
+tree node even before driver model is available yet.
 
-Tested on Nitrogen6X with LVDS panel.
+I believe it should be quite straightforward on top of my RFC and should
+require only saving syscon's of_node directly in syscon struct, adding
+appropriate API and extending the look-up loops to handle cases when
+syscon's dev is NULL.
 
-regards
-Philipp
+Best regards,
+Tomasz
