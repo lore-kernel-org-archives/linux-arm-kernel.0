@@ -1,189 +1,75 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Tue, 19 Aug 2014 09:06:37 -0500
-Subject: [PATCH] mfd: palmas: Add support for optional wakeup
-Message-ID: <1408457197-30487-1-git-send-email-nm@ti.com>
+From: joel.schopp@amd.com (Joel Schopp)
+Date: Tue, 19 Aug 2014 09:05:09 -0500
+Subject: [PATCH v4] arm64: fix VTTBR_BADDR_MASK
+In-Reply-To: <20140819122236.GB31086@cbox>
+References: <20140811203823.2828.36074.stgit@joelaarch64.amd.com>
+ <20140812160521.GO10550@cbox> <53F26282.5010103@amd.com>
+ <20140819122236.GB31086@cbox>
+Message-ID: <53F35995.8010008@amd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With the recent pinctrl-single changes, omaps can treat wake-up events
-from deeper idle states as interrupts.
 
-Let's add support for the optional second interrupt for wake-up
-events. And then SoC can wakeup and handle the event using it's
-regular handler.
+On 08/19/2014 07:22 AM, Christoffer Dall wrote:
+> On Mon, Aug 18, 2014 at 03:30:58PM -0500, Joel Schopp wrote:
+>>  #endif /* __ARM_KVM_MMU_H__ */
+>> diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
+>> index 16e7994..70f0f02 100644
+>> --- a/arch/arm/kvm/mmu.c
+>> +++ b/arch/arm/kvm/mmu.c
+>> @@ -521,6 +521,7 @@ int create_hyp_io_mappings(void *from, void *to, phys_addr_t phys_addr)
+>>   */
+>>  int kvm_alloc_stage2_pgd(struct kvm *kvm)
+>>  {
+>> +	unsigned int s2_pgds, s2_pgd_order;
+>>  	pgd_t *pgd;
+>>  
+>>  	if (kvm->arch.pgd != NULL) {
+>> @@ -528,10 +529,18 @@ int kvm_alloc_stage2_pgd(struct kvm *kvm)
+>>  		return -EINVAL;
+>>  	}
+>>  
+>> -	pgd = (pgd_t *)__get_free_pages(GFP_KERNEL, S2_PGD_ORDER);
+>> +	s2_pgds = (1 << (kvm_get_phys_addr_shift() - PGDIR_SHIFT));
+>> +	s2_pgd_order = get_order(s2_pgds * sizeof(pgd_t));
+>> +
+>> +	pgd = (pgd_t *)__get_free_pages(GFP_KERNEL, s2_pgd_order);
+>>  	if (!pgd)
+>>  		return -ENOMEM;
+>>  
+>> +	if ((unsigned long)pgd & ~vttbr_baddr_mask) {
+>> +		kvm_err("Stage-2 pgd not correctly aligned: %p\n", pgd);
+>> +		return -EFAULT;
+>> +	}
+>>
+>>
+>> There are two problems that I've found here.  The first problem is that
+>> vttbr_baddr_mask isn't allocated yet at this point in the code.
+> allocated? you mean assigned?
+> aren't you setting vttbr_baddr_mask in kvm_arch_init()?  that's
+> certainly called before kvm_arch_init_vm().
+Yes, I mean assigned, at least I got the first letter correct :)  All I
+know is that vttbr_baddr_mask was still zero and checking for zero and
+calling the set function gave it a value.
+>
+>
+>> The
+>> second problem is that pgd is a virtual address, ie pgd ==
+>> 0xfffffe03bbb40000 while the vttbr masks off the high bits for a
+>> physical address, ie vttbr_baddr_mask=0x00007ffffffe0000 .  Even
+>> correcting for those issues I haven't been able to make this check work
+>> properly.  I'll resend v5 the patch with all the other suggested changes.
+>>
+> What are the issues that you face?  Iow. what is the alignment of the
+> returned physical address?
+>
+> (You should be able to just to virt_to_phys(pgd) and use that to test
+> for the vttbr_baddr_mask).
+The addresses above are actually from my system, 64K page aligned on a
+64K page kernel.  I did use virt_to_phys() and the kernel got a null
+dereference and paniced, I didn't trace down where the panic was occuring.
 
-Finally, to pass the wake-up interrupt in the dts file,
-interrupts-extended property needs to be passed.
-
-This is similar in approach to commit 2a0b965cfb6e ("serial: omap: Add
-support for optional wake-up")
-
-Signed-off-by: Nishanth Menon <nm@ti.com>
----
- Documentation/devicetree/bindings/mfd/palmas.txt |   20 ++++++++
- drivers/mfd/palmas.c                             |   59 ++++++++++++++++++++++
- include/linux/mfd/palmas.h                       |    2 +
- 3 files changed, 81 insertions(+)
-
-diff --git a/Documentation/devicetree/bindings/mfd/palmas.txt b/Documentation/devicetree/bindings/mfd/palmas.txt
-index eda8989..2627842 100644
---- a/Documentation/devicetree/bindings/mfd/palmas.txt
-+++ b/Documentation/devicetree/bindings/mfd/palmas.txt
-@@ -51,3 +51,23 @@ palmas {
- 		....
- 	};
- }
-+
-+Example: with interrupts extended
-+ See Documentation/devicetree/bindings/interrupt-controller/interrupts.txt
-+ Use pinmux 0x418 as wakeup interrupt and gpio1_0 as interrupt source
-+
-+palmas {
-+	compatible = "ti,twl6035", "ti,palmas";
-+	reg = <0x48>
-+	interrupt-parent = <&intc>;
-+	interrupt-controller;
-+	#interrupt-cells = <2>;
-+	#address-cells = <1>;
-+	#size-cells = <0>;
-+	interrupts-extended = <&gpio1 0 IRQ_TYPE_LEVEL_HIGH
-+			       &pinmux 0x418>;
-+	pmic {
-+		compatible = "ti,twl6035-pmic", "ti,palmas-pmic";
-+		....
-+	};
-+}
-diff --git a/drivers/mfd/palmas.c b/drivers/mfd/palmas.c
-index 28cb048..11186ab 100644
---- a/drivers/mfd/palmas.c
-+++ b/drivers/mfd/palmas.c
-@@ -24,6 +24,7 @@
- #include <linux/mfd/core.h>
- #include <linux/mfd/palmas.h>
- #include <linux/of_device.h>
-+#include <linux/of_irq.h>
- 
- static const struct regmap_config palmas_regmap_config[PALMAS_NUM_CLIENTS] = {
- 	{
-@@ -326,6 +327,16 @@ static struct regmap_irq_chip tps65917_irq_chip = {
- 			PALMAS_INT1_MASK),
- };
- 
-+static irqreturn_t palmas_wake_irq(int irq, void *_palmas)
-+{
-+	/*
-+	 * Return Not handled so that interrupt is disabled.
-+	 * Level event ensures that the event is eventually handled
-+	 * by the appropriate chip handler already registered
-+	 */
-+	return IRQ_NONE;
-+}
-+
- int palmas_ext_control_req_config(struct palmas *palmas,
- 	enum palmas_external_requestor_id id,  int ext_ctrl, bool enable)
- {
-@@ -409,6 +420,7 @@ static void palmas_dt_to_pdata(struct i2c_client *i2c,
- 		pdata->mux_from_pdata = 1;
- 		pdata->pad2 = prop;
- 	}
-+	pdata->wakeirq = irq_of_parse_and_map(node, 1);
- 
- 	/* The default for this register is all masked */
- 	ret = of_property_read_u32(node, "ti,power-ctrl", &prop);
-@@ -521,6 +533,7 @@ static int palmas_i2c_probe(struct i2c_client *i2c,
- 	i2c_set_clientdata(i2c, palmas);
- 	palmas->dev = &i2c->dev;
- 	palmas->irq = i2c->irq;
-+	palmas->wakeirq = pdata->wakeirq;
- 
- 	match = of_match_device(of_palmas_match_tbl, &i2c->dev);
- 
-@@ -587,6 +600,22 @@ static int palmas_i2c_probe(struct i2c_client *i2c,
- 	if (ret < 0)
- 		goto err_i2c;
- 
-+	if (!palmas->wakeirq)
-+		goto no_wake_irq;
-+
-+	ret = devm_request_irq(palmas->dev, palmas->wakeirq,
-+			       palmas_wake_irq,
-+			       IRQF_ONESHOT | pdata->irq_flags,
-+			       dev_name(palmas->dev),
-+			       &palmas);
-+	if (ret < 0)
-+		goto err_i2c;
-+
-+	/* We use wakeirq only during suspend-resume path */
-+	device_set_wakeup_capable(palmas->dev, true);
-+	disable_irq_nosync(palmas->wakeirq);
-+
-+no_wake_irq:
- no_irq:
- 	slave = PALMAS_BASE_TO_SLAVE(PALMAS_PU_PD_OD_BASE);
- 	addr = PALMAS_BASE_TO_REG(PALMAS_PU_PD_OD_BASE,
-@@ -706,6 +735,34 @@ static int palmas_i2c_remove(struct i2c_client *i2c)
- 	return 0;
- }
- 
-+static int palmas_i2c_suspend(struct i2c_client *i2c,  pm_message_t mesg)
-+{
-+	struct palmas *palmas = i2c_get_clientdata(i2c);
-+	struct device *dev = &i2c->dev;
-+
-+	if (!palmas->wakeirq)
-+		return 0;
-+
-+	if (device_may_wakeup(dev))
-+		enable_irq(palmas->wakeirq);
-+
-+	return 0;
-+}
-+
-+static int palmas_i2c_resume(struct i2c_client *i2c)
-+{
-+	struct palmas *palmas = i2c_get_clientdata(i2c);
-+	struct device *dev = &i2c->dev;
-+
-+	if (!palmas->wakeirq)
-+		return 0;
-+
-+	if (device_may_wakeup(dev))
-+		disable_irq_nosync(palmas->wakeirq);
-+
-+	return 0;
-+}
-+
- static const struct i2c_device_id palmas_i2c_id[] = {
- 	{ "palmas", },
- 	{ "twl6035", },
-@@ -721,6 +778,8 @@ static struct i2c_driver palmas_i2c_driver = {
- 		   .of_match_table = of_palmas_match_tbl,
- 		   .owner = THIS_MODULE,
- 	},
-+	.suspend = palmas_i2c_suspend,
-+	.resume = palmas_i2c_resume,
- 	.probe = palmas_i2c_probe,
- 	.remove = palmas_i2c_remove,
- 	.id_table = palmas_i2c_id,
-diff --git a/include/linux/mfd/palmas.h b/include/linux/mfd/palmas.h
-index fb0390a..e8cf4c2 100644
---- a/include/linux/mfd/palmas.h
-+++ b/include/linux/mfd/palmas.h
-@@ -75,6 +75,7 @@ struct palmas {
- 	/* IRQ Data */
- 	int irq;
- 	u32 irq_mask;
-+	int wakeirq;
- 	struct mutex irq_lock;
- 	struct regmap_irq_chip_data *irq_data;
- 
-@@ -377,6 +378,7 @@ struct palmas_clk_platform_data {
- 
- struct palmas_platform_data {
- 	int irq_flags;
-+	int wakeirq;
- 	int gpio_base;
- 
- 	/* bit value to be loaded to the POWER_CTRL register */
--- 
-1.7.9.5
+>
+>
+> Thanks,
+> -Christoffer
