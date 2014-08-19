@@ -1,154 +1,100 @@
-From: daniel.thompson@linaro.org (Daniel Thompson)
-Date: Tue, 19 Aug 2014 17:46:09 +0100
-Subject: [PATCH v10 19/19] serial: imx: Add support for KGDB's FIQ/NMI mode
-In-Reply-To: <1408466769-20004-1-git-send-email-daniel.thompson@linaro.org>
-References: <1408369264-14242-1-git-send-email-daniel.thompson@linaro.org>
- <1408466769-20004-1-git-send-email-daniel.thompson@linaro.org>
-Message-ID: <1408466769-20004-20-git-send-email-daniel.thompson@linaro.org>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Tue, 19 Aug 2014 22:33:46 +0530
+Subject: [PATCH v3 2/2] dma: Add Xilinx AXI Direct Memory Access Engine
+ driver support
+In-Reply-To: <1406549869-24422-2-git-send-email-sthokal@xilinx.com>
+References: <1406549869-24422-1-git-send-email-sthokal@xilinx.com>
+ <1406549869-24422-2-git-send-email-sthokal@xilinx.com>
+Message-ID: <20140819170346.GS13288@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch makes it possible to use the imx uart with KGDB's FIQ/NMI
-mode.
+On Mon, Jul 28, 2014 at 05:47:49PM +0530, Srikanth Thokala wrote:
+> +struct xilinx_dma_chan {
+> +	struct xilinx_dma_device *xdev;
+> +	u32 ctrl_offset;
+> +	spinlock_t lock;
+> +	struct list_head pending_list;
+> +	struct xilinx_dma_tx_descriptor *active_desc;
+> +	struct xilinx_dma_tx_descriptor *allocated_desc;
+> +	struct list_head done_list;
+> +	struct list_head free_seg_list;
+> +	struct dma_chan common;
+> +	struct xilinx_dma_tx_segment *seg_v;
+> +	dma_addr_t seg_p;
+> +	struct device *dev;
+> +	int irq;
+> +	int id;
+> +	enum dma_transfer_direction direction;
+This looks suspect. Why should channel have direction, for a descriptor it
+makes sense though.
 
-Main changes are:
+> +static enum dma_status xilinx_dma_tx_status(struct dma_chan *dchan,
+> +					    dma_cookie_t cookie,
+> +					    struct dma_tx_state *txstate)
+> +{
+> +	struct xilinx_dma_chan *chan = to_xilinx_chan(dchan);
+> +	enum dma_status ret;
+> +	unsigned long flags;
+> +
+> +	ret = dma_cookie_status(dchan, cookie, txstate);
+> +	if (ret != DMA_COMPLETE) {
+> +		spin_lock_irqsave(&chan->lock, flags);
+> +		dma_set_residue(txstate, chan->residue);
+> +		spin_unlock_irqrestore(&chan->lock, flags);
+> +	}
+No residue reporting?
 
-.poll_init() will, if KGDB+FIQ are enabled, perform deeper hardware
-initialization to ensure the serial port is always active (required
-otherwise FIQ is not triggered by UART activity). This has an impact on
-power usage so it is conservatively enabled.
+> +static int xilinx_dma_device_control(struct dma_chan *dchan,
+> +				     enum dma_ctrl_cmd cmd, unsigned long arg)
+> +{
+> +	struct xilinx_dma_chan *chan = to_xilinx_chan(dchan);
+> +	unsigned long flags;
+> +
+> +	if (cmd != DMA_TERMINATE_ALL)
+> +		return -ENXIO;
+> +
+> +	/* Halt the DMA engine */
+> +	xilinx_dma_halt(chan);
+> +
+> +	spin_lock_irqsave(&chan->lock, flags);
+> +
+> +	/* Remove and free all of the descriptors in the lists */
+> +	xilinx_dma_free_desc_list(chan, &chan->pending_list);
+> +	xilinx_dma_free_desc_list(chan, &chan->done_list);
 
-imx_put_poll_char() has been simplified to remove the code to disable
-interrupts. The present code can corrupt register state when re-entered
-from FIQ handler.
+> +
+> +	spin_unlock_irqrestore(&chan->lock, flags);
+> +
+> +	return 0;
+> +}
+> +
+> +/**
+> + * xilinx_dma_channel_set_config - Configure DMA channel
+> + * @dchan: DMA channel
+> + * @cfg: DMA device configuration pointer
+> + *
+> + * Return: '0' on success and failure value on error
+> + */
+> +int xilinx_dma_channel_set_config(struct dma_chan *dchan,
+> +				  struct xilinx_dma_config *cfg)
+> +{
+> +	struct xilinx_dma_chan *chan = to_xilinx_chan(dchan);
+> +	u32 reg = dma_ctrl_read(chan, XILINX_DMA_REG_CONTROL);
+> +
+> +	if (cfg->reset)
+> +		return xilinx_dma_reset(chan);
+> +
+> +	if (cfg->coalesc <= XILINX_DMA_CR_COALESCE_MAX)
+> +		reg |= cfg->coalesc << XILINX_DMA_CR_COALESCE_SHIFT;
+> +
+> +	if (cfg->delay <= XILINX_DMA_CR_DELAY_MAX)
+> +		reg |= cfg->delay << XILINX_DMA_CR_DELAY_SHIFT;
+> +
+> +	dma_ctrl_write(chan, XILINX_DMA_REG_CONTROL, reg);
+You aren't checking if a transaction is already running on this channel.
+Also don't you need other slave parameters, I see you have removed the
+dma_slave_config entirely
 
-Both imx_put_poll_char() and imx_get_poll_char() adopt _relaxed()
-MMIO functions (which are safe for polled I/O and needed to avoid taking
-spin locks).
-
-Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
-Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-Cc: Jiri Slaby <jslaby@suse.cz>
-Cc: linux-serial at vger.kernel.org
-Acked-by: Dirk Behme <dirk.behme@de.bosch.com>
----
- drivers/tty/serial/imx.c | 71 +++++++++++++++++++++++++++++++++++-------------
- 1 file changed, 52 insertions(+), 19 deletions(-)
-
-diff --git a/drivers/tty/serial/imx.c b/drivers/tty/serial/imx.c
-index 983668a..a201c61 100644
---- a/drivers/tty/serial/imx.c
-+++ b/drivers/tty/serial/imx.c
-@@ -49,6 +49,7 @@
- #include <linux/of_device.h>
- #include <linux/io.h>
- #include <linux/dma-mapping.h>
-+#include <linux/kgdb.h>
- 
- #include <asm/irq.h>
- #include <linux/platform_data/serial-imx.h>
-@@ -1505,44 +1506,73 @@ imx_verify_port(struct uart_port *port, struct serial_struct *ser)
- }
- 
- #if defined(CONFIG_CONSOLE_POLL)
-+
-+#if defined(CONFIG_KGDB_FIQ)
-+/*
-+ * Prepare the UART to be used from kgdb's NMI support.
-+ */
-+static int imx_poll_init(struct uart_port *port)
-+{
-+	struct imx_port *sport = (struct imx_port *)port;
-+	unsigned long flags;
-+	unsigned long temp;
-+	int retval;
-+
-+	retval = clk_prepare_enable(sport->clk_ipg);
-+	if (retval)
-+		return retval;
-+	retval = clk_prepare_enable(sport->clk_per);
-+	if (retval)
-+		clk_disable_unprepare(sport->clk_ipg);
-+
-+	imx_setup_ufcr(sport, 0);
-+
-+	spin_lock_irqsave(&sport->port.lock, flags);
-+
-+	temp = readl(sport->port.membase + UCR1);
-+	if (is_imx1_uart(sport))
-+		temp |= IMX1_UCR1_UARTCLKEN;
-+	temp |= UCR1_UARTEN | UCR1_RRDYEN;
-+	temp &= ~(UCR1_TXMPTYEN | UCR1_RTSDEN);
-+	writel(temp, sport->port.membase + UCR1);
-+
-+	temp = readl(sport->port.membase + UCR2);
-+	temp |= UCR2_RXEN;
-+	writel(temp, sport->port.membase + UCR2);
-+
-+	spin_unlock_irqrestore(&sport->port.lock, flags);
-+
-+	/* register the FIQ with kgdb */
-+	kgdb_register_fiq(sport->port.irq);
-+
-+	return 0;
-+}
-+#endif /* CONFIG_KGDB_FIQ */
-+
- static int imx_poll_get_char(struct uart_port *port)
- {
--	if (!(readl(port->membase + USR2) & USR2_RDR))
-+	if (!(readl_relaxed(port->membase + USR2) & USR2_RDR))
- 		return NO_POLL_CHAR;
- 
--	return readl(port->membase + URXD0) & URXD_RX_DATA;
-+	return readl_relaxed(port->membase + URXD0) & URXD_RX_DATA;
- }
- 
- static void imx_poll_put_char(struct uart_port *port, unsigned char c)
- {
--	struct imx_port_ucrs old_ucr;
- 	unsigned int status;
- 
--	/* save control registers */
--	imx_port_ucrs_save(port, &old_ucr);
--
--	/* disable interrupts */
--	writel(UCR1_UARTEN, port->membase + UCR1);
--	writel(old_ucr.ucr2 & ~(UCR2_ATEN | UCR2_RTSEN | UCR2_ESCI),
--	       port->membase + UCR2);
--	writel(old_ucr.ucr3 & ~(UCR3_DCD | UCR3_RI | UCR3_DTREN),
--	       port->membase + UCR3);
--
- 	/* drain */
- 	do {
--		status = readl(port->membase + USR1);
-+		status = readl_relaxed(port->membase + USR1);
- 	} while (~status & USR1_TRDY);
- 
- 	/* write */
--	writel(c, port->membase + URTX0);
-+	writel_relaxed(c, port->membase + URTX0);
- 
- 	/* flush */
- 	do {
--		status = readl(port->membase + USR2);
-+		status = readl_relaxed(port->membase + USR2);
- 	} while (~status & USR2_TXDC);
--
--	/* restore control registers */
--	imx_port_ucrs_restore(port, &old_ucr);
- }
- #endif
- 
-@@ -1563,6 +1593,9 @@ static struct uart_ops imx_pops = {
- 	.config_port	= imx_config_port,
- 	.verify_port	= imx_verify_port,
- #if defined(CONFIG_CONSOLE_POLL)
-+#if defined(CONFIG_KGDB_FIQ)
-+	.poll_init      = imx_poll_init,
-+#endif
- 	.poll_get_char  = imx_poll_get_char,
- 	.poll_put_char  = imx_poll_put_char,
- #endif
 -- 
-1.9.3
+~Vinod
