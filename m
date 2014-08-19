@@ -1,209 +1,233 @@
-From: juha-matti.tilli@iki.fi (Juha-Matti Tilli)
-Date: Tue, 19 Aug 2014 17:09:55 +0300
-Subject: [PATCH v4 4/4] thermal: Add Tegra SOCTHERM thermal management
- driver
-In-Reply-To: <1408100430-29461-1-git-send-email-mperttunen@nvidia.com>
-Message-ID: <20140819140955.GA50475@sandfort.unics.fi>
+From: joel.schopp@amd.com (Joel Schopp)
+Date: Tue, 19 Aug 2014 09:23:57 -0500
+Subject: [PATCH v5] arm64: fix VTTBR_BADDR_MASK
+In-Reply-To: <20140819122420.GC31086@cbox>
+References: <20140818203604.4654.99905.stgit@joelaarch64.amd.com>
+ <20140819122420.GC31086@cbox>
+Message-ID: <53F35DFD.9070804@amd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> This adds support for the Tegra SOCTHERM thermal sensing and management
-> system found in the Tegra124 system-on-chip. This initial driver supports
-> temperature polling for four thermal zones.
 
-I have several comments about this patch. Overall, the code looks clean,
-way cleaner than NVIDIA's internal soc_therm driver. I adopted your code
-to run on the internal firmware of a Tegra124 SoC. Additionally, I
-tested the code as-is on a Jetson TK1.
-
-My test shows that the temperature readings look sane and do vary with
-load, so the code seems to work. However, I have some concerns about the
-calibration values calculated by this code and the error handling of the
-code.
-
-Originally, I thought the fuse offsets were incorrect but as it turns
-out, the official Linux kernel starts counting the fuses at a different
-location than NVIDIA's internal kernel.
-
-[snip]
-> +static int calculate_shared_calibration(struct tsensor_shared_calibration *r)
-> +{
-> +	u32 val;
-> +	u32 shifted_cp, shifted_ft;
-> +	int err;
-> +
-> +	err = tegra_fuse_readl(FUSE_TSENSOR8_CALIB, &val);
-> +	if (err)
-> +		return err;
-> +	r->base_cp = val & FUSE_TSENSOR8_CALIB_CP_TS_BASE_MASK;
-> +	r->base_ft = (val & FUSE_TSENSOR8_CALIB_FT_TS_BASE_MASK)
-> +		>> FUSE_TSENSOR8_CALIB_FT_TS_BASE_SHIFT;
-> +
-> +	err = tegra_fuse_readl(FUSE_SPARE_REALIGNMENT_REG_0, &val);
-> +	if (err)
-> +		return err;
-> +	shifted_cp = sign_extend32(val, 5);
-> +	val = ((val & FUSE_SPARE_REALIGNMENT_REG_SHIFT_FT_MASK)
-> +		>> FUSE_SPARE_REALIGNMENT_REG_SHIFT_FT_SHIFT);
-> +	shifted_ft = sign_extend32(val, 4);
-> +
-> +	r->actual_temp_cp = 2 * NOMINAL_CALIB_CP_T124 + shifted_cp;
-> +	r->actual_temp_ft = 2 * NOMINAL_CALIB_FT_T124 + shifted_ft;
-> +
-> +	return 0;
-> +}
-> +
-> +static int calculate_tsensor_calibration(
-> +	struct tegra_tsensor *sensor,
-> +	struct tsensor_shared_calibration shared,
-> +	u32 *calib
-> +)
-> +{
-> +	u32 val;
-> +	s32 actual_tsensor_ft, actual_tsensor_cp;
-> +	s32 delta_sens, delta_temp;
-> +	s32 mult, div;
-> +	s16 therma, thermb;
-> +	int err;
-> +
-> +	err = tegra_fuse_readl(sensor->calib_fuse_offset, &val);
-> +	if (err)
-> +		return err;
-> +
-> +	actual_tsensor_cp = (shared.base_cp * 64) + sign_extend32(val, 12);
-> +	val = (val & FUSE_TSENSOR_CALIB_FT_TS_BASE_MASK)
-> +		>> FUSE_TSENSOR_CALIB_FT_TS_BASE_SHIFT;
-> +	actual_tsensor_ft = (shared.base_ft * 32) + sign_extend32(val, 12);
-> +
-> +	delta_sens = actual_tsensor_ft - actual_tsensor_cp;
-> +	delta_temp = shared.actual_temp_ft - shared.actual_temp_cp;
-> +
-> +	mult = t124_tsensor_config.pdiv * t124_tsensor_config.tsample_ate;
-> +	div = t124_tsensor_config.tsample * t124_tsensor_config.pdiv_ate;
-> +
-> +	therma = div_s64((s64) delta_temp * (1LL << 13) * mult,
-> +		(s64) delta_sens * div);
-> +	thermb = div_s64(((s64) actual_tsensor_ft * shared.actual_temp_cp) -
-> +		((s64) actual_tsensor_cp * shared.actual_temp_ft),
-> +		(s64) delta_sens);
-> +
-> +	therma = div_s64((s64) therma * sensor->fuse_corr_alpha,
-> +		(s64) 1000000LL);
-> +	thermb = div_s64((s64) thermb * sensor->fuse_corr_alpha +
-> +		sensor->fuse_corr_beta,
-> +		(s64) 1000000LL);
-> +
-> +	*calib = ((u16)(therma) << SENSOR_CONFIG2_THERMA_SHIFT) |
-> +		((u16)thermb << SENSOR_CONFIG2_THERMB_SHIFT);
-> +
-> +	return 0;
-> +}
-> +
-> +static int enable_tsensor(struct tegra_soctherm *tegra,
-> +			  struct tegra_tsensor *sensor,
-> +			  struct tsensor_shared_calibration shared)
-> +{
-> +	void * __iomem base = tegra->regs + sensor->base;
-> +	unsigned int val;
-> +	u32 calib;
-> +	int err;
-> +
-> +	err = calculate_tsensor_calibration(sensor, shared, &calib);
-> +	if (err)
-> +		return err;
-> +
-> +	val = 0;
-> +	val |= t124_tsensor_config.tall << SENSOR_CONFIG0_TALL_SHIFT;
-> +	writel(val, base + SENSOR_CONFIG0);
-> +
-> +	val = 0;
-> +	val |= (t124_tsensor_config.tsample - 1) <<
-> +		SENSOR_CONFIG1_TSAMPLE_SHIFT;
-> +	val |= t124_tsensor_config.tiddq_en << SENSOR_CONFIG1_TIDDQ_EN_SHIFT;
-> +	val |= t124_tsensor_config.ten_count << SENSOR_CONFIG1_TEN_COUNT_SHIFT;
-> +	val |= SENSOR_CONFIG1_TEMP_ENABLE;
-> +	writel(val, base + SENSOR_CONFIG1);
-> +
-> +	writel(calib, base + SENSOR_CONFIG2);
-> +
-> +	return 0;
-> +}
-
-This code writes different values to SENSOR_CONFIG2 registers than what
-the NVIDIA's internal soc_therm driver does. Because the calibration
-value calculation should be based on the same fuses that NVIDIA's
-internal driver reads, I believe the value calculated and eventually
-written to SENSOR_CONFIG2 should be identical with NVIDIA's internal
-driver. That is not the case now.
-
-I first loaded the NVIDIA's internal soc_therm driver and then loaded
-code adopted from your driver running on Tegra's firmware. Here's a log
-of how the CONFIG2 values are changed by this code to different values
-than NVIDIA's internal soc_therm driver originally sets them to:
-
-CONFIG2: 5b0f813 -> 5c6f7fb
-CONFIG2: 5e8f7cd -> 5fff7b4
-CONFIG2: 5bdf7ce -> 5d3f7b5
-CONFIG2: 596f831 -> 5aaf81a
-CONFIG2: 675f6b5 -> 68cf698
-CONFIG2: 6d6f641 -> 6eff623
-CONFIG2: 641f72b -> 659f710
-CONFIG2: 590f861 -> 5a5f84a
-
-On the left, there's the value set by NVIDIA's internal soc_therm driver
-and on the right, there's the value set by code adopted from your
-driver. My modifications to the code are minor, and I don't think they
-could explain why the CONFIG2 values set are different.
-
-If you want them, I can supply you the values of the fuses on my
-development board.
-
-The temperature readings look sane and do vary with load, but I think
-they're a bit different than what NVIDIA's internal soc_therm driver
-gives. I'm not entirely sure if the calibration values set by your
-driver or the calibration values set by NVIDIA's internal soc_therm
-driver are correct, but it seems to me that only one of these drivers
-can be correct.
-
-The values written to CONFIG1 and CONFIG0 do seem sane.
-
-Since there are divisions being done, some sort of explicit protection
-from divisions by zero should perhaps be considered, although this can
-happen only if the fuses for some reason read all zeroes. I'm not sure
-if that's possible with real hardware.
-
-Where does this code come from? It does not definitely come from
-NVIDIA's internal soc_therm driver, as it looks entirely different. And
-it calculates different calibration values. If you wrote the code, you
-should consider commenting it since there are a lot of complex
-calculations going on that are not obvious to the reader. For example,
-what do "cp" and "ft" mean? Are they acronyms? If so, they should be
-explained.
-
-[snip]
-> +	for (i = 0; i < ARRAY_SIZE(tegra->thermctl_tzs); ++i) {
-> +		struct tegra_thermctl_zone *zone =
-> +			devm_kzalloc(&pdev->dev, sizeof(*zone), GFP_KERNEL);
-> +		if (!zone) {
-> +			err = -ENOMEM;
-
-Shouldn't this one have a --i line like the next IS_ERR block?
-
-> +			goto unregister_tzs;
-> +		}
-> +
-> +		zone->temp_reg = tegra->regs + thermctl_temp_offsets[i];
-> +		zone->temp_shift = thermctl_temp_shifts[i];
-> +
-> +		tz = thermal_zone_of_sensor_register(
-> +			&pdev->dev, i, zone, tegra_thermctl_get_temp, NULL);
-> +		if (IS_ERR(tz)) {
-> +			err = PTR_ERR(tz);
-> +			dev_err(&pdev->dev, "failed to register sensor: %d\n",
-> +				err);
-> +			--i;
-> +			goto unregister_tzs;
-> +		}
-> +
-> +		tegra->thermctl_tzs[i] = tz;
-> +	}
+On 08/19/2014 07:24 AM, Christoffer Dall wrote:
+> On Mon, Aug 18, 2014 at 03:36:04PM -0500, Joel Schopp wrote:
+>> The current VTTBR_BADDR_MASK only masks 39 bits, which is broken on current
+>> systems.  Rather than just add a bit it seems like a good time to also set
+>> things at run-time instead of compile time to accomodate more hardware.
+>>
+>> This patch sets TCR_EL2.PS, VTCR_EL2.T0SZ and vttbr_baddr_mask in runtime,
+>> not compile time.
+>>
+>> In ARMv8, EL2 physical address size (TCR_EL2.PS) and stage2 input address
+>> size (VTCR_EL2.T0SZE) cannot be determined in compile time since they
+>> depend on hardware capability.
+>>
+>> According to Table D4-23 and Table D4-25 in ARM DDI 0487A.b document,
+>> vttbr_x is calculated using different fixed values with consideration
+>> of T0SZ, granule size and the level of translation tables. Therefore,
+>> vttbr_baddr_mask should be determined dynamically.
+>>
+>> Changes since v4:
+>> More minor cleanups from review
+>> Moved some functions into headers
+>>
+>> Changes since v3:
+>> Another rebase
+>> Addressed minor comments from v2
+>>
+>> Changes since v2:
+>> Rebased on https://git.kernel.org/pub/scm/linux/kernel/git/kvmarm/kvmarm.git next branch
+>>
+>> Changes since v1:
+>> Rebased fix on Jungseok Lee's patch https://lkml.org/lkml/2014/5/12/189 to
+>> provide better long term fix.  Updated that patch to log error instead of
+>> silently fail on unaligned vttbr.
+>>
+>> Cc: Christoffer Dall <christoffer.dall@linaro.org>
+>> Cc: Sungjinn Chung <sungjinn.chung@samsung.com>
+>> Signed-off-by: Jungseok Lee <jays.lee@samsung.com>
+>> Signed-off-by: Joel Schopp <joel.schopp@amd.com>
+>> ---
+>>  arch/arm/include/asm/kvm_mmu.h   |   12 ++++++
+>>  arch/arm/kvm/arm.c               |   17 +++++++-
+>>  arch/arm64/include/asm/kvm_arm.h |   17 +-------
+>>  arch/arm64/include/asm/kvm_mmu.h |   78 ++++++++++++++++++++++++++++++++++++++
+>>  arch/arm64/kvm/hyp-init.S        |   20 +++++++---
+>>  5 files changed, 122 insertions(+), 22 deletions(-)
+>>
+>> diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
+>> index 5c7aa3c..73f6ff6 100644
+>> --- a/arch/arm/include/asm/kvm_mmu.h
+>> +++ b/arch/arm/include/asm/kvm_mmu.h
+>> @@ -166,6 +166,18 @@ static inline void coherent_cache_guest_page(struct kvm_vcpu *vcpu, hva_t hva,
+>>  
+>>  void stage2_flush_vm(struct kvm *kvm);
+>>  
+>> +static inline int kvm_get_phys_addr_shift(void)
+>> +{
+>> +	return KVM_PHYS_SHIFT;
+>> +}
+>> +
+>> +static inline int set_vttbr_baddr_mask(void)
+>> +{
+>> +	vttbr_baddr_mask = VTTBR_BADDR_MASK;
+>> +	return 0;
+>> +}
+>> +
+>> +
+>>  #endif	/* !__ASSEMBLY__ */
+>>  
+>>  #endif /* __ARM_KVM_MMU_H__ */
+>> diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
+>> index 3c82b37..f396eb7 100644
+>> --- a/arch/arm/kvm/arm.c
+>> +++ b/arch/arm/kvm/arm.c
+>> @@ -37,6 +37,7 @@
+>>  #include <asm/mman.h>
+>>  #include <asm/tlbflush.h>
+>>  #include <asm/cacheflush.h>
+>> +#include <asm/cputype.h>
+>>  #include <asm/virt.h>
+>>  #include <asm/kvm_arm.h>
+>>  #include <asm/kvm_asm.h>
+>> @@ -466,8 +467,14 @@ static void update_vttbr(struct kvm *kvm)
+>>  	/* update vttbr to be used with the new vmid */
+>>  	pgd_phys = virt_to_phys(kvm->arch.pgd);
+>>  	vmid = ((u64)(kvm->arch.vmid) << VTTBR_VMID_SHIFT) & VTTBR_VMID_MASK;
+>> -	kvm->arch.vttbr = pgd_phys & VTTBR_BADDR_MASK;
+>> -	kvm->arch.vttbr |= vmid;
+>> +
+>> +	/*
+>> +	 * If the VTTBR isn't aligned there is something wrong with the system
+>> +	 * or kernel.
+>> +	 */
+>> +	BUG_ON(pgd_phys & ~vttbr_baddr_mask);
+>> +
+>> +	kvm->arch.vttbr = pgd_phys | vmid;
+>>  
+>>  	spin_unlock(&kvm_vmid_lock);
+>>  }
+>> @@ -1052,6 +1059,12 @@ int kvm_arch_init(void *opaque)
+>>  		}
+>>  	}
+>>  
+>> +	err = set_vttbr_baddr_mask();
+>> +	if (err) {
+>> +		kvm_err("Cannot set vttbr_baddr_mask\n");
+>> +		return -EINVAL;
+>> +	}
+>> +
+>>  	cpu_notifier_register_begin();
+>>  
+>>  	err = init_hyp_mode();
+>> diff --git a/arch/arm64/include/asm/kvm_arm.h b/arch/arm64/include/asm/kvm_arm.h
+>> index 3d69030..8dbef70 100644
+>> --- a/arch/arm64/include/asm/kvm_arm.h
+>> +++ b/arch/arm64/include/asm/kvm_arm.h
+>> @@ -94,7 +94,6 @@
+>>  /* TCR_EL2 Registers bits */
+>>  #define TCR_EL2_TBI	(1 << 20)
+>>  #define TCR_EL2_PS	(7 << 16)
+>> -#define TCR_EL2_PS_40B	(2 << 16)
+>>  #define TCR_EL2_TG0	(1 << 14)
+>>  #define TCR_EL2_SH0	(3 << 12)
+>>  #define TCR_EL2_ORGN0	(3 << 10)
+>> @@ -103,8 +102,6 @@
+>>  #define TCR_EL2_MASK	(TCR_EL2_TG0 | TCR_EL2_SH0 | \
+>>  			 TCR_EL2_ORGN0 | TCR_EL2_IRGN0 | TCR_EL2_T0SZ)
+>>  
+>> -#define TCR_EL2_FLAGS	(TCR_EL2_PS_40B)
+>> -
+>>  /* VTCR_EL2 Registers bits */
+>>  #define VTCR_EL2_PS_MASK	(7 << 16)
+>>  #define VTCR_EL2_TG0_MASK	(1 << 14)
+>> @@ -119,36 +116,28 @@
+>>  #define VTCR_EL2_SL0_MASK	(3 << 6)
+>>  #define VTCR_EL2_SL0_LVL1	(1 << 6)
+>>  #define VTCR_EL2_T0SZ_MASK	0x3f
+>> -#define VTCR_EL2_T0SZ_40B	24
+>> +#define VTCR_EL2_T0SZ(bits)	(64 - (bits))
+>>  
+>>  #ifdef CONFIG_ARM64_64K_PAGES
+>>  /*
+>>   * Stage2 translation configuration:
+>> - * 40bits output (PS = 2)
+>> - * 40bits input  (T0SZ = 24)
+>>   * 64kB pages (TG0 = 1)
+>>   * 2 level page tables (SL = 1)
+>>   */
+>>  #define VTCR_EL2_FLAGS		(VTCR_EL2_TG0_64K | VTCR_EL2_SH0_INNER | \
+>>  				 VTCR_EL2_ORGN0_WBWA | VTCR_EL2_IRGN0_WBWA | \
+>> -				 VTCR_EL2_SL0_LVL1 | VTCR_EL2_T0SZ_40B)
+>> -#define VTTBR_X		(38 - VTCR_EL2_T0SZ_40B)
+>> +				 VTCR_EL2_SL0_LVL1)
+>>  #else
+>>  /*
+>>   * Stage2 translation configuration:
+>> - * 40bits output (PS = 2)
+>> - * 40bits input  (T0SZ = 24)
+>>   * 4kB pages (TG0 = 0)
+>>   * 3 level page tables (SL = 1)
+>>   */
+>>  #define VTCR_EL2_FLAGS		(VTCR_EL2_TG0_4K | VTCR_EL2_SH0_INNER | \
+>>  				 VTCR_EL2_ORGN0_WBWA | VTCR_EL2_IRGN0_WBWA | \
+>> -				 VTCR_EL2_SL0_LVL1 | VTCR_EL2_T0SZ_40B)
+>> -#define VTTBR_X		(37 - VTCR_EL2_T0SZ_40B)
+>> +				 VTCR_EL2_SL0_LVL1)
+>>  #endif
+>>  
+>> -#define VTTBR_BADDR_SHIFT (VTTBR_X - 1)
+>> -#define VTTBR_BADDR_MASK  (((1LLU << (40 - VTTBR_X)) - 1) << VTTBR_BADDR_SHIFT)
+>>  #define VTTBR_VMID_SHIFT  (48LLU)
+>>  #define VTTBR_VMID_MASK	  (0xffLLU << VTTBR_VMID_SHIFT)
+>>  
+>> diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
+>> index 7d29847..b6ae83b 100644
+>> --- a/arch/arm64/include/asm/kvm_mmu.h
+>> +++ b/arch/arm64/include/asm/kvm_mmu.h
+>> @@ -152,5 +152,83 @@ static inline void coherent_cache_guest_page(struct kvm_vcpu *vcpu, hva_t hva,
+>>  
+>>  void stage2_flush_vm(struct kvm *kvm);
+>>  
+>> +/*
+>> + * ARMv8 64K architecture limitations:
+>> + * 16 <= T0SZ <= 21 is valid under 3 level of translation tables
+>> + * 18 <= T0SZ <= 34 is valid under 2 level of translation tables
+>> + * 31 <= T0SZ <= 39 is valid under 1 level of transltaion tables
+>> + *
+>> + * ARMv8 4K architecture limitations:
+>> + * 16 <= T0SZ <= 24 is valid under 4 level of translation tables
+>> + * 21 <= T0SZ <= 33 is valid under 3 level of translation tables
+>> + * 30 <= T0SZ <= 39 is valid under 2 level of translation tables
+>> + *
+>> + * For 4K pages we only support 3 or 4 level, giving T0SZ a range of 16 to 33.
+>> + * For 64K pages we only support 2 or 3 level, giving T0SZ a range of 16 to 34.
+>> + *
+>> + * See Table D4-23 and Table D4-25 in ARM DDI 0487A.b to figure out
+>> + * the origin of the hardcoded values, 38 and 37.
+>> + */
+>> +
+>> +#ifdef CONFIG_ARM64_64K_PAGES
+>> +static inline int t0sz_to_vttbr_x(int t0sz)
+>> +{
+>> +	if (t0sz < 16 || t0sz > 34) {
+>> +		kvm_err("Cannot support %d-bit address space\n", 64 - t0sz);
+>> +		return 0;
+>> +	}
+>> +
+>> +	return 38 - t0sz;
+>> +}
+>> +#else /* 4K pages */
+>> +static inline int t0sz_to_vttbr_x(int t0sz)
+>> +{
+>> +	if (t0sz < 16 || t0sz > 33) {
+>> +		kvm_err("Cannot support %d-bit address space\n", 64 - t0sz);
+>> +		return 0;
+> why not just return an error code directly here?  These are now
+> returning 0 on error which usually means everything was ok...
+The return is a value,not just an error code. Because of this returning
+an error overloads that value.  0 just seemed like a convenient invalid
+value to check since a vttbr_x of 0 is invalid, but returning a negative
+error code would be as equally invalid.  If this is the only issue it
+doesn't seem worth respinning the patch for, but I'll change it to
+-EINVAL if for some reason a v6 is needed.
