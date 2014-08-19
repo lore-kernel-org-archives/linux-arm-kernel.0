@@ -1,23 +1,55 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Tue, 19 Aug 2014 10:29:08 -0300
-Subject: [PATCH v2] ARM: i.MX: dts: Add support for the Freescale i.MX1
- ADS board
-In-Reply-To: <1408430027-4326-1-git-send-email-shc_work@mail.ru>
-References: <1408430027-4326-1-git-send-email-shc_work@mail.ru>
-Message-ID: <CAOMZO5B7oiy0Kuac2wMSMNBAVima+S0OR1rR-9p034S75rBzjg@mail.gmail.com>
+From: nm@ti.com (Nishanth Menon)
+Date: Tue, 19 Aug 2014 08:54:00 -0500
+Subject: [PATCH] ARM: dts: DRA7: Add PMU nodes
+Message-ID: <1408456440-30171-1-git-send-email-nm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 19, 2014 at 3:33 AM, Alexander Shiyan <shc_work@mail.ru> wrote:
-> This patch adds support for the Freescale (Motorola) i.MX1 ADS board.
-> This change is intended to further remove non-DT support for this board.
->
-> Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
+From: Lucas Weaver <l-weaver@ti.com>
 
-Looks good, only one minor comment:
+DRA74x and DRA72x family of processors vary slightly in the number
+of CPUs. So, add different instances of PMU for each of these processor
+groups. Further, since the interrupts bypass crossbar and are directly
+connected to GIC, mark the dts nodes with relevant information.
 
->
-> +&iomuxc {
-> +       imx1-motorola-ads {
+Tested with perf utility.
 
-Should be imx1-ads instead.
+Reviewed-by: Felipe Balbi <balbi@ti.com>
+Signed-off-by: Lucas Weaver <l-weaver@ti.com>
+Signed-off-by: Nishanth Menon <nm@ti.com>
+---
+ arch/arm/boot/dts/dra72x.dtsi |    5 +++++
+ arch/arm/boot/dts/dra74x.dtsi |    6 ++++++
+ 2 files changed, 11 insertions(+)
+
+diff --git a/arch/arm/boot/dts/dra72x.dtsi b/arch/arm/boot/dts/dra72x.dtsi
+index f1ec22f..e5a3d23 100644
+--- a/arch/arm/boot/dts/dra72x.dtsi
++++ b/arch/arm/boot/dts/dra72x.dtsi
+@@ -22,4 +22,9 @@
+ 			reg = <0>;
+ 		};
+ 	};
++
++	pmu {
++		compatible = "arm,cortex-a15-pmu";
++		interrupts = <GIC_SPI DIRECT_IRQ(131) IRQ_TYPE_LEVEL_HIGH>;
++	};
+ };
+diff --git a/arch/arm/boot/dts/dra74x.dtsi b/arch/arm/boot/dts/dra74x.dtsi
+index a4e8bb9..3be544c 100644
+--- a/arch/arm/boot/dts/dra74x.dtsi
++++ b/arch/arm/boot/dts/dra74x.dtsi
+@@ -38,4 +38,10 @@
+ 			reg = <1>;
+ 		};
+ 	};
++
++	pmu {
++		compatible = "arm,cortex-a15-pmu";
++		interrupts = <GIC_SPI DIRECT_IRQ(131) IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI DIRECT_IRQ(132) IRQ_TYPE_LEVEL_HIGH>;
++	};
+ };
+-- 
+1.7.9.5
