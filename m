@@ -1,53 +1,74 @@
-From: afaerber@suse.de (=?ISO-8859-15?Q?Andreas_F=E4rber?=)
-Date: Tue, 19 Aug 2014 20:37:44 +0200
-Subject: [PATCH 5/6] ARM: dts: Add vmmc and vqmmc supplies for Peach Pit
- and Pi boards
-In-Reply-To: <1408460913-13863-6-git-send-email-javier.martinez@collabora.co.uk>
-References: <1408460913-13863-1-git-send-email-javier.martinez@collabora.co.uk>
- <1408460913-13863-6-git-send-email-javier.martinez@collabora.co.uk>
-Message-ID: <53F39978.3080901@suse.de>
+From: ohaugan@codeaurora.org (Olav Haugan)
+Date: Tue, 19 Aug 2014 11:40:24 -0700
+Subject: [PATCH v5 1/1] iommu-api: Add map_sg/unmap_sg functions
+In-Reply-To: <2348740.xICP2AxYHy@avalon>
+References: <1407797150-515-1-git-send-email-ohaugan@codeaurora.org>
+ <53F2829C.2040809@codeaurora.org> <20140819115954.GC16329@8bytes.org>
+ <2348740.xICP2AxYHy@avalon>
+Message-ID: <53F39A18.70409@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Javier,
+On 8/19/2014 9:11 AM, Laurent Pinchart wrote:
+> On Tuesday 19 August 2014 13:59:54 Joerg Roedel wrote:
+>> On Mon, Aug 18, 2014 at 03:47:56PM -0700, Olav Haugan wrote:
+>>> If the alignment is not correct then iommu_map() will return error. Not
+>>> sure what other option we have here (and why make it different behavior
+>>> than iommu_map which just return error when it is not aligned properly).
+>>> I don't think we want to force any kind of alignment automatically. I
+>>> would rather have the API tell me I am doing something wrong than having
+>>> the function aligning the values and possibly undermap or overmap.
+>>
+>> But sg->offset is an offset into the page (at least it is used that way
+>> in the DMA-API and since you do 'page_len = s->offset + s->length' you
+>> use it the same way).
+>> So when you pass iova + offset the result will no longer be
+>> page-aligned. You should force sg->offset == 0 and sg->length to be
+>> page-aligned instead. This makes more sense because the IOMMU-API works
+>> on (io)-page granularity and not on arbitrary phys-addr ranges like the
+>> DMA-API.
+>>
+>>> Yes, I am aware of that. However, several people prefer this than
+>>> passing in scatterlist. It is not very convenient to pass a scatterlist
+>>> in some use cases. Someone mentioned a use case where they would have to
+>>> create a dummy sg list and populate it with the iova just to do an
+>>> unmap. I believe we would have to do this also. There is no use for
+>>> sglist when unmapping. However, would like to keep separate API from
+>>> iommu_unmap() to keep the API function names symmetric (map_sg/unmap_sg).
+>>
+>> Keeping it symetric is not more complicated, the caller just needs to
+>> keep the sg-list used for mapping around. I prefer the unmap_sg call to
+>> work in sg-lists too.
+> 
+> Do we have a use case where the unmap_sg() implementation would be different 
+> than a plain iommu_unmap() call ? If not I'd rather remove unmap_sg() 
+> completely.
+> 
+>>> I thought that was why we added the default fallback and set all the
+>>> drivers to point to these fallback functions. Several people wanted this
+>>> so that we don't have to have NULL-check in these functions (and have
+>>> the functions be simple inline functions).
+>>
+>> Okay, since you add these call-backs to all drivers I think I can live
+>> with not doing a pointer check here.
+> 
+> I suggested doing a
+> 
+> if (ops is not NULL)
+> 	return ops();
+> else
+> 	return default_ops();
+> 
+> to avoid modifying all drivers. I'm not sure why that wasn't received with 
+> much enthusiasm.
+> 
 
-Am 19.08.2014 17:08, schrieb Javier Martinez Canillas:
-> diff --git a/arch/arm/boot/dts/exynos5420-peach-pit.dts b/arch/arm/boot/dts/exynos5420-peach-pit.dts
-> index 8e50042..5b9dbb9 100644
-> --- a/arch/arm/boot/dts/exynos5420-peach-pit.dts
-> +++ b/arch/arm/boot/dts/exynos5420-peach-pit.dts
-> @@ -547,6 +547,8 @@
->  };
->  
->  &mmc_2 {
-> +	vmmc-supply = <&tps65090_fet4>;
-> +	vqmmc-supply = <&vqmmc_sdcard>;
->  	status = "okay";
->  	num-slots = <1>;
->  	supports-highspeed;
-> diff --git a/arch/arm/boot/dts/exynos5800-peach-pi.dts b/arch/arm/boot/dts/exynos5800-peach-pi.dts
-> index 939f91c..dcac443 100644
-> --- a/arch/arm/boot/dts/exynos5800-peach-pi.dts
-> +++ b/arch/arm/boot/dts/exynos5800-peach-pi.dts
-> @@ -545,6 +545,8 @@
->  };
->  
->  &mmc_2 {
-> +	vmmc-supply = <&tps65090_fet4>;
-> +	vqmmc-supply = <&vqmmc_sdcard>;
->  	status = "okay";
->  	num-slots = <1>;
->  	supports-highspeed;
+Both Thierry R. and Konrad W. argued for modifying the drivers instead
+so I implemented what the majority wanted. :-)
 
-A convention that I picked up was to place overridden status property
-first. Do your new properties really need to go before that?
 
-Also, if you look at today's for-next, then supports-highspeed should be
-cap-{sd,mmc}-highspeed, so it may be worth to rebase.
-
-Regards,
-Andreas
+Olav
 
 -- 
-SUSE LINUX Products GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
-GF: Jeff Hawn, Jennifer Guild, Felix Imend?rffer; HRB 16746 AG N?rnberg
+The Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
