@@ -1,46 +1,136 @@
 From: daniel.thompson@linaro.org (Daniel Thompson)
-Date: Tue, 19 Aug 2014 16:16:41 +0100
-Subject: [PATCH v9 3/9] arm: Remove DEBUG_LL_UART_NONE
+Date: Tue, 19 Aug 2014 16:16:44 +0100
+Subject: [PATCH v9 6/9] arm: netx: Migrate DEBUG_LL macros to shared directory
 In-Reply-To: <1408461407-10429-1-git-send-email-daniel.thompson@linaro.org>
 References: <1408459715-10151-1-git-send-email-daniel.thompson@linaro.org>
  <1408461407-10429-1-git-send-email-daniel.thompson@linaro.org>
-Message-ID: <1408461407-10429-4-git-send-email-daniel.thompson@linaro.org>
+Message-ID: <1408461407-10429-7-git-send-email-daniel.thompson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Only a very small handful of platforms support DEBUG_LL_UART_NONE but it
-lurks in the menus of every single platform config ready to break the
-build. This is an especial problem for defconfig/oldconfig since it is
-often selected by default.
-
-This patch solves the problem by removing this option. Any platforms
-still depending upon this option must be migrated.
+As part of the migration we introduce DEBUG_UART_PHYS/DEBUG_UART_VIRT
+which default to UART1 but allow a user to configure UART2 or UART3.
+We also introduce symbolic names for the registers and flags.
 
 Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
 Cc: Russell King <linux@arm.linux.org.uk>
+Acked-by: Arnd Bergmann <arnd.bergmann@linaro.org>
+Cc: linux-arm-kernel at lists.infradead.org
 ---
- arch/arm/Kconfig.debug | 9 ---------
- 1 file changed, 9 deletions(-)
+ arch/arm/Kconfig.debug                             | 17 +++++++++++++++--
+ .../mach/debug-macro.S => include/debug/netx.S}    | 22 +++++++++++-----------
+ 2 files changed, 26 insertions(+), 13 deletions(-)
+ rename arch/arm/{mach-netx/include/mach/debug-macro.S => include/debug/netx.S} (62%)
 
 diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
-index b11ad54..9c46729 100644
+index 01f4ee2..d71427e 100644
 --- a/arch/arm/Kconfig.debug
 +++ b/arch/arm/Kconfig.debug
-@@ -877,15 +877,6 @@ choice
- 		  This option selects UART0 on VIA/Wondermedia System-on-a-chip
- 		  devices, including VT8500, WM8505, WM8650 and WM8850.
+@@ -447,6 +447,14 @@ choice
+ 		  Say Y here if you want kernel low-level debugging support
+ 		  on Vybrid based platforms.
  
--	config DEBUG_LL_UART_NONE
--		bool "No low-level debugging UART"
--		depends on !ARCH_MULTIPLATFORM
--		help
--		  Say Y here if your platform doesn't provide a UART option
--		  above. This relies on your platform choosing the right UART
--		  definition internally in order for low-level debugging to
--		  work.
--
- 	config DEBUG_ICEDCC
- 		bool "Kernel low-level debugging via EmbeddedICE DCC channel"
- 		help
++	config DEBUG_NETX_UART
++		bool "Kernel low-level debugging messages via NetX UART"
++		depends on ARCH_NETX
++		select DEBUG_UART_NETX
++		help
++		  Say Y here if you want kernel low-level debugging support
++		  on Hilscher NetX based platforms.
++
+ 	config DEBUG_NOMADIK_UART
+ 		bool "Kernel low-level debugging messages via NOMADIK UART"
+ 		depends on ARCH_NOMADIK
+@@ -1074,6 +1082,7 @@ config DEBUG_LL_INCLUDE
+ 				 DEBUG_IMX6SX_UART
+ 	default "debug/ks8695.S" if DEBUG_KS8695_UART
+ 	default "debug/msm.S" if DEBUG_MSM_UART || DEBUG_QCOM_UARTDM
++	default "debug/netx.S" if DEBUG_NETX_UART
+ 	default "debug/omap2plus.S" if DEBUG_OMAP2PLUS_UART
+ 	default "debug/s3c24xx.S" if DEBUG_S3C24XX_UART
+ 	default "debug/s5pv210.S" if DEBUG_S5PV210_UART
+@@ -1106,6 +1115,7 @@ config DEBUG_UART_8250
+ 
+ config DEBUG_UART_PHYS
+ 	hex "Physical base address of debug UART"
++	default 0x00100a00 if DEBUG_NETX_UART
+ 	default 0x01c20000 if DEBUG_DAVINCI_DMx_UART0
+ 	default 0x01c28000 if DEBUG_SUNXI_UART0
+ 	default 0x01c28400 if DEBUG_SUNXI_UART1
+@@ -1176,10 +1186,12 @@ config DEBUG_UART_PHYS
+ 	depends on DEBUG_LL_UART_8250 || DEBUG_LL_UART_PL01X || \
+ 		DEBUG_LL_UART_EFM32 || \
+ 		DEBUG_UART_8250 || DEBUG_UART_PL01X || \
+-		DEBUG_MSM_UART || DEBUG_QCOM_UARTDM || DEBUG_S3C24XX_UART
++		DEBUG_MSM_UART || DEBUG_NETX_UART || DEBUG_QCOM_UARTDM || \
++		DEBUG_S3C24XX_UART
+ 
+ config DEBUG_UART_VIRT
+ 	hex "Virtual base address of debug UART"
++	default 0xe0000a00 if DEBUG_NETX_UART
+ 	default 0xe0010fe0 if ARCH_RPC
+ 	default 0xe1000000 if DEBUG_MSM_UART
+ 	default 0xf0000be0 if ARCH_EBSA110
+@@ -1247,7 +1259,8 @@ config DEBUG_UART_VIRT
+ 	default DEBUG_UART_PHYS if !MMU
+ 	depends on DEBUG_LL_UART_8250 || DEBUG_LL_UART_PL01X || \
+ 		DEBUG_UART_8250 || DEBUG_UART_PL01X || \
+-		DEBUG_MSM_UART || DEBUG_QCOM_UARTDM || DEBUG_S3C24XX_UART
++		DEBUG_MSM_UART || DEBUG_NETX_UART || DEBUG_QCOM_UARTDM || \
++		DEBUG_S3C24XX_UART
+ 
+ config DEBUG_UART_8250_SHIFT
+ 	int "Register offset shift for the 8250 debug UART"
+diff --git a/arch/arm/mach-netx/include/mach/debug-macro.S b/arch/arm/include/debug/netx.S
+similarity index 62%
+rename from arch/arm/mach-netx/include/mach/debug-macro.S
+rename to arch/arm/include/debug/netx.S
+index 247781e..cf7522a 100644
+--- a/arch/arm/mach-netx/include/mach/debug-macro.S
++++ b/arch/arm/include/debug/netx.S
+@@ -1,5 +1,4 @@
+-/* arch/arm/mach-netx/include/mach/debug-macro.S
+- *
++/*
+  * Debugging macro include header
+  *
+  *  Copyright (C) 1994-1999 Russell King
+@@ -11,26 +10,27 @@
+  *
+ */
+ 
+-#include "hardware.h"
++#define UART_DATA 0
++#define UART_FLAG 0x18
++#define UART_FLAG_BUSY (1 << 3)
+ 
+ 		.macro	addruart, rp, rv, tmp
+-		mov	\rp, #0x00000a00
+-		orr	\rv, \rp, #io_p2v(0x00100000)	@ virtual
+-		orr	\rp, \rp, #0x00100000		@ physical
++		ldr	\rp, =CONFIG_DEBUG_UART_PHYS
++		ldr	\rp, =CONFIG_DEBUG_UART_VIRT
+ 		.endm
+ 
+ 		.macro	senduart,rd,rx
+-		str	\rd, [\rx, #0]
++		str	\rd, [\rx, #UART_DATA]
+ 		.endm
+ 
+ 		.macro	busyuart,rd,rx
+-1002:		ldr	\rd, [\rx, #0x18]
+-		tst	\rd, #(1 << 3)
++1002:		ldr	\rd, [\rx, #UART_FLAG]
++		tst	\rd, #UART_FLAG_BUSY
+ 		bne	1002b
+ 		.endm
+ 
+ 		.macro	waituart,rd,rx
+-1001:		ldr	\rd, [\rx, #0x18]
+-		tst	\rd, #(1 << 3)
++1001:		ldr	\rd, [\rx, #UART_FLAG]
++		tst	\rd, #UART_FLAG_BUSY
+ 		bne	1001b
+ 		.endm
 -- 
 1.9.3
