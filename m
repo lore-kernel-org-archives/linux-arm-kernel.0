@@ -1,10 +1,10 @@
 From: eric.auger@linaro.org (Eric Auger)
-Date: Tue, 19 Aug 2014 10:53:02 +0200
+Date: Tue, 19 Aug 2014 10:53:16 +0200
 Subject: [RFC PATCH] ARM: KVM: add irqfd support
 In-Reply-To: <20140813145523.GR10550@cbox>
 References: <1407154102-26459-1-git-send-email-eric.auger@linaro.org>
  <20140813145523.GR10550@cbox>
-Message-ID: <53F3106E.1050304@linaro.org>
+Message-ID: <53F3107C.6060404@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -304,6 +304,12 @@ Waiting for Marc's feedback.
 Well some MSI support comes with GICv2m and GICv3. My current
 understanding is it makes sense to inject an MSI from an irqfd trigger.
 Don't you share this understanding?
+
+Thanks
+
+Best Regards
+
+Eric
 > 
 >> +int kvm_set_msi(struct kvm_kernel_irq_routing_entry *e,
 >> +		struct kvm *kvm, int irq_source_id, int level, bool line_status)
