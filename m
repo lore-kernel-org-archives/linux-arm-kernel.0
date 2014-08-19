@@ -1,101 +1,34 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Tue, 19 Aug 2014 22:41:54 +0800
-Subject: [PATCH 2/2] imx-drm: ipuv3-plane: fix kernel Oops in ipu_dp_put()
-In-Reply-To: <1408456778.2899.6.camel@paszta.hi.pengutronix.de>
-References: <1408441795-24719-1-git-send-email-shawn.guo@freescale.com>
- <1408441795-24719-3-git-send-email-shawn.guo@freescale.com>
- <1408456778.2899.6.camel@paszta.hi.pengutronix.de>
-Message-ID: <20140819144152.GB26734@dragon>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 19 Aug 2014 15:44:23 +0100
+Subject: [PATCH] Documentation: dmaengine: Add a documentation for the
+ dma controller API
+In-Reply-To: <20140819134507.GJ13288@intel.com>
+References: <1406736193-26685-1-git-send-email-maxime.ripard@free-electrons.com>
+ <20140814085301.GJ2452@ldesroches-Latitude-E6320>
+ <20140814085753.GS30401@n2100.arm.linux.org.uk>
+ <20140819134507.GJ13288@intel.com>
+Message-ID: <20140819144423.GE30401@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 19, 2014 at 03:59:38PM +0200, Philipp Zabel wrote:
-> > diff --git a/drivers/staging/imx-drm/ipuv3-plane.c b/drivers/staging/imx-drm/ipuv3-plane.c
-> > index 6f393a11f44d..a79ae7731a03 100644
-> > --- a/drivers/staging/imx-drm/ipuv3-plane.c
-> > +++ b/drivers/staging/imx-drm/ipuv3-plane.c
-> > @@ -274,15 +274,10 @@ static void ipu_plane_dpms(struct ipu_plane *ipu_plane, int mode)
-> >  	if (enable == ipu_plane->enabled)
-> >  		return;
-> >  
-> > -	if (enable) {
-> > +	if (enable)
-> >  		ipu_plane_enable(ipu_plane);
-> > -	} else {
-> > +	else
-> >  		ipu_plane_disable(ipu_plane);
-> > -
-> > -		ipu_idmac_put(ipu_plane->ipu_ch);
-> > -		ipu_dmfc_put(ipu_plane->dmfc);
-> > -		ipu_dp_put(ipu_plane->dp);
-> > -	}
-> >  }
-> >  
-> >  /*
+On Tue, Aug 19, 2014 at 07:15:07PM +0530, Vinod Koul wrote:
+> On Thu, Aug 14, 2014 at 09:57:53AM +0100, Russell King - ARM Linux wrote:
+> > It's got something to do with the async engine API, and seems to be
+> > something to do with whether a descriptor can have other transactions
+> > added to it, and whether a descriptor can be re-used (async-tx engines
+> > typically allocate a fixed set of descriptors and recycle them.)
+> Yes this is my understanding too. Async API IIUC can reuse descriptors and
+> if engine doesnt support this is a way to tell them please do use that.
 > 
-> we could then remove ipu_plane_dpms completely:
+> For slave dmanegine API we need to ignore it.
 
-Yeah, you're right, Philipp.  I will fold your code change below into my
-v2 of the patch.  Thanks.
+We shouldn't ignore it - ignoring it makes it harder to implement a DMA
+engine driver which supports both the slave and async APIs, because
+we then need to know the reason for the channel being requested.
 
-Shawn
+Ignoring it until it can be understood and documented is an approach I
+would agree with though.
 
-> 
-> ---
->  drivers/staging/imx-drm/ipuv3-plane.c | 23 ++++-------------------
->  1 file changed, 4 insertions(+), 19 deletions(-)
-> 
-> diff --git a/drivers/staging/imx-drm/ipuv3-plane.c b/drivers/staging/imx-drm/ipuv3-plane.c
-> index b2d1bb2..6987e16 100644
-> --- a/drivers/staging/imx-drm/ipuv3-plane.c
-> +++ b/drivers/staging/imx-drm/ipuv3-plane.c
-> @@ -290,23 +290,6 @@ void ipu_plane_disable(struct ipu_plane *ipu_plane)
->  		ipu_dp_disable(ipu_plane->ipu);
->  }
->  
-> -static void ipu_plane_dpms(struct ipu_plane *ipu_plane, int mode)
-> -{
-> -	bool enable;
-> -
-> -	DRM_DEBUG_KMS("mode = %d", mode);
-> -
-> -	enable = (mode == DRM_MODE_DPMS_ON);
-> -
-> -	if (enable == ipu_plane->enabled)
-> -		return;
-> -
-> -	if (enable)
-> -		ipu_plane_enable(ipu_plane);
-> -	else
-> -		ipu_plane_disable(ipu_plane);
-> -}
-> -
->  /*
->   * drm_plane API
->   */
-> @@ -340,7 +323,8 @@ static int ipu_update_plane(struct drm_plane *plane, struct drm_crtc *crtc,
->  				plane->crtc, crtc);
->  	plane->crtc = crtc;
->  
-> -	ipu_plane_dpms(ipu_plane, DRM_MODE_DPMS_ON);
-> +	if (!ipu_plane->enabled)
-> +		ipu_plane_enable(ipu_plane);
->  
->  	return 0;
->  }
-> @@ -351,7 +335,8 @@ static int ipu_disable_plane(struct drm_plane *plane)
->  
->  	DRM_DEBUG_KMS("[%d] %s\n", __LINE__, __func__);
->  
-> -	ipu_plane_dpms(ipu_plane, DRM_MODE_DPMS_OFF);
-> +	if (ipu_plane->enabled)
-> +		ipu_plane_disable(ipu_plane);
->  
->  	ipu_plane_put_resources(ipu_plane);
->  
-> -- 
-> 2.1.0.rc1
-> 
-> regards
-> Philipp
-> 
+-- 
+FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
+according to speedtest.net.
