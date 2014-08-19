@@ -1,128 +1,37 @@
-From: daniel.thompson@linaro.org (Daniel Thompson)
-Date: Tue, 19 Aug 2014 10:08:02 +0100
-Subject: [PATCH v9 12/16] serial: amba-pl011: Pass FIQ information to KGDB.
-In-Reply-To: <53F24660.2030404@hurleysoftware.com>
-References: <1404979427-12943-1-git-send-email-daniel.thompson@linaro.org>
- <1408372091-12689-13-git-send-email-daniel.thompson@linaro.org>
- <53F24660.2030404@hurleysoftware.com>
-Message-ID: <53F313F2.6090103@linaro.org>
+From: ohad@wizery.com (Ohad Ben-Cohen)
+Date: Tue, 19 Aug 2014 12:10:32 +0300
+Subject: [PATCH 2/2] remoteproc: add support to handle internal memories
+In-Reply-To: <53D7F6F3.9020804@ti.com>
+References: <1404836521-59637-1-git-send-email-s-anna@ti.com>
+ <1404836521-59637-3-git-send-email-s-anna@ti.com>
+ <CAK=WgbY-WmcJdnLHDf1CSkJqNBUeUMPTLcEZyLGKnECbxH1OAQ@mail.gmail.com>
+ <53D7F6F3.9020804@ti.com>
+Message-ID: <CAK=WgbZ+NhA5AAhURUOojwnCbi2wYkJ11i-C5e7-kpZL5vD_3g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18/08/14 19:30, Peter Hurley wrote:
-> Hi Daniel,
-> 
-> On 08/18/2014 10:28 AM, Daniel Thompson wrote:
->> Speculatively register a FIQ resource with KGDB. KGDB will only
->> accept it if the kgdb/fiq feature is enabled (both with compile time and
->> runtime switches) and the interrupt controller supports FIQ.
->>
->> By providing this information to KGDB the serial driver offers
->> "permission" for KGDB to route the UART interrupt signal from the
->> drivers own handler to KGDBs FIQ handler (which will eventually use the
->> UART's polled I/O callbacks to interact with the user). This permission
->> also implies the amba-pl011 driver has already unmasked RX interrupts
->> (otherwise the FIQ handler will never trigger).
->>
->> Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
->> Cc: Russell King <linux@arm.linux.org.uk>
->> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
->> Cc: Jiri Slaby <jslaby@suse.cz>
->> Cc: linux-serial at vger.kernel.org
->> ---
->>  drivers/tty/serial/amba-pl011.c | 94 ++++++++++++++++++++++++-----------------
->>  1 file changed, 55 insertions(+), 39 deletions(-)#
+Hi Suman,
 
-Thanks for the review.
+On Tue, Jul 29, 2014 at 10:33 PM, Suman Anna <s-anna@ti.com> wrote:
+> We currently have two usecases. The primary usecase is the WkupM3
+> processor on TI Sitara AM335x/AM437x SoCs used for suspend/resume
+> management. This series is a dependency for the WkupM3 remoteproc driver
+> that Dave posted [1]. More details are in section 8.1.4.6 of the AM335x
+> TRM [2]. The program/data sections for this processor all _needs_ to be
+> in the two internal memory RAMS (16K Unified RAM and 8K Data RAM), and
+> there is no MMU for this processor. The current RSC_CARVEOUT and
+> RSC_DEVMEM do not fit to describe this type of memory (we neither
+> allocate memory through dma api nor do we need to map these into an MMU).
 
+Thanks for the details.
 
->> diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
->> index 8572f2a..ec8ddc7 100644
->> --- a/drivers/tty/serial/amba-pl011.c
->> +++ b/drivers/tty/serial/amba-pl011.c
->> @@ -58,6 +58,7 @@
->>  #include <linux/pinctrl/consumer.h>
->>  #include <linux/sizes.h>
->>  #include <linux/io.h>
->> +#include <linux/kgdb.h>
->>  
->>  #define UART_NR			14
->>  
->> @@ -1416,8 +1417,61 @@ static void pl011_break_ctl(struct uart_port *port, int break_state)
->>  	spin_unlock_irqrestore(&uap->port.lock, flags);
->>  }
->>  
-> 
-> Is pl011_hwinit() just being relocated in source to avoid the forward
-> declaration? If so, this is usually split into its own commit.
+Can we define a CMA block for these regions, and then just use
+carveout resource entries instead of the ioremap approach?
 
-Ok. I'll do this.
+This may require some changes in remoteproc which we'll need to think
+about, but it sounds like it may fit the problem better instead of
+forcing ioremap to provide a regular pointer (we're supposed to use
+ioremaped memory only with memory primitives such as readl/writel/..).
 
-
->> +static int pl011_hwinit(struct uart_port *port)
->> +{
->> +	struct uart_amba_port *uap = (struct uart_amba_port *)port;
->> +	int retval;
->> +
->> +	/* Optionaly enable pins to be muxed in and configured */
->> +	pinctrl_pm_select_default_state(port->dev);
->> +
->> +	/*
->> +	 * Try to enable the clock producer.
->> +	 */
->> +	retval = clk_prepare_enable(uap->clk);
->> +	if (retval)
->> +		return retval;
->> +
->> +	uap->port.uartclk = clk_get_rate(uap->clk);
->> +
->> +	/* Clear pending error and receive interrupts */
->> +	writew(UART011_OEIS | UART011_BEIS | UART011_PEIS | UART011_FEIS |
->> +	       UART011_RTIS | UART011_RXIS, uap->port.membase + UART011_ICR);
->> +
->> +	/*
->> +	 * Save interrupts enable mask, and enable RX interrupts in case if
->> +	 * the interrupt is used for NMI entry.
->> +	 */
->> +	uap->im = readw(uap->port.membase + UART011_IMSC);
->> +	writew(UART011_RTIM | UART011_RXIM, uap->port.membase + UART011_IMSC);
->> +
->> +	if (dev_get_platdata(uap->port.dev)) {
->> +		struct amba_pl011_data *plat;
->> +
->> +		plat = dev_get_platdata(uap->port.dev);
->> +		if (plat->init)
->> +			plat->init();
->> +	}
->> +	return 0;
->> +}
->> +
->>  #ifdef CONFIG_CONSOLE_POLL
->>  
->> +static int pl011_poll_init(struct uart_port *port)
->> +{
->> +	struct uart_amba_port *uap = (struct uart_amba_port *)port;
-> 
-> Please use container_of() in new code.
-
-Ok.
-
-Personally I dislike a file that mixes casts and conatiner_of but I
-guess I can make both of us happy by switching the whole driver to
-container_of. Separate patch again?
-
-
->> +	int retval;
->> +
->> +	retval = pl011_hwinit(port);
->> +
->> +#ifdef CONFIG_KGDB_FIQ
->> +	if (retval == 0)
->> +		kgdb_register_fiq(uap->port.irq);
-> 
-> The uap->port dereference is unnecessary since the port parameter
-> is the same thing.
-> 
-> 		kgdb_register_fiq(port->irq);
-
-Ok.
+Thanks,
+Ohad.
