@@ -1,78 +1,30 @@
-From: jonas.jensen@gmail.com (Jonas Jensen)
-Date: Tue, 19 Aug 2014 16:49:44 +0200
-Subject: [PATCH v4 2/2] net: moxa: replace build_skb() with
- netdev_alloc_skb_ip_align() / memcpy()
-In-Reply-To: <1408459784-9385-1-git-send-email-jonas.jensen@gmail.com>
-References: <1408459784-9385-1-git-send-email-jonas.jensen@gmail.com>
-Message-ID: <1408459784-9385-2-git-send-email-jonas.jensen@gmail.com>
+From: joel.schopp@amd.com (Joel Schopp)
+Date: Tue, 19 Aug 2014 09:49:07 -0500
+Subject: [PATCH v5] arm64: fix VTTBR_BADDR_MASK
+In-Reply-To: <20140819143834.GE31086@cbox>
+References: <20140818203604.4654.99905.stgit@joelaarch64.amd.com>
+ <20140819122420.GC31086@cbox> <53F35DFD.9070804@amd.com>
+ <20140819143834.GE31086@cbox>
+Message-ID: <53F363E3.8060108@amd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-build_skb() is used to make skbs out of existing RX ring memory
-which is bad because the RX ring is allocated only once, on probe.
-Memory corruption occur because said memory is reclaimed, i.e.
-__kfree_skb() (and eventually put_page()).
 
-Replace build_skb() with netdev_alloc_skb_ip_align() and use memcpy().
-Also, synchronize DMA memory before passing skb to napi_gro_receive().
+>> The return is a value,not just an error code. Because of this returning
+>> an error overloads that value.  0 just seemed like a convenient invalid
+>> value to check since a vttbr_x of 0 is invalid, but returning a negative
+>> error code would be as equally invalid.  If this is the only issue it
+>> doesn't seem worth respinning the patch for, but I'll change it to
+>> -EINVAL if for some reason a v6 is needed.
+> Have you given up on doing the alignment check with the proper size on
+> the pgd allocation for this patch?
+Yes, I'd rather leave the extra check out of this patch.  If I were
+changing the pgd allocation code I would make sure to add a check, or if
+there were a static check there now I would update it for the dynamic
+value from the hardware, but it seems unrelated to add several checks to
+other parts of the code beyond those already in the patch.  I did leave
+the functions in the headers such that checks like this could be added
+when someone is updating the code for other reasons, say 4 level page
+tables.
 
-Addresses https://bugzilla.kernel.org/show_bug.cgi?id=69041
-
-Signed-off-by: Jonas Jensen <jonas.jensen@gmail.com>
----
-
-Notes:
-    The original motivation was to avoid memcpy(), since the memory is
-    already allocated, why make a copy.
-    
-    Maybe the copy can be avoided updating RX ring descriptor addresses;
-    new memory must be allocated just the same, the only difference that
-    the controller could write directly to it.
-    
-    This fixes errors due to memory corruption, such as the following,
-    seen on wget download (or ncftp):
-    
-    "read error: Bad address"
-    
-    On receiving error, wget exits without resuming (busybox default).
-    
-    Changes since v3:
-    
-    1. commit message reworded
-    
-    Applies to next-20140818
-
- drivers/net/ethernet/moxa/moxart_ether.c | 13 ++++++++++---
- 1 file changed, 10 insertions(+), 3 deletions(-)
-
-diff --git a/drivers/net/ethernet/moxa/moxart_ether.c b/drivers/net/ethernet/moxa/moxart_ether.c
-index aa45607..17c9f0e 100644
---- a/drivers/net/ethernet/moxa/moxart_ether.c
-+++ b/drivers/net/ethernet/moxa/moxart_ether.c
-@@ -226,14 +226,21 @@ static int moxart_rx_poll(struct napi_struct *napi, int budget)
- 		if (len > RX_BUF_SIZE)
- 			len = RX_BUF_SIZE;
- 
--		skb = build_skb(priv->rx_buf[rx_head], priv->rx_buf_size);
-+		dma_sync_single_for_cpu(&ndev->dev,
-+					priv->rx_mapping[rx_head],
-+					priv->rx_buf_size, DMA_FROM_DEVICE);
-+		skb = netdev_alloc_skb_ip_align(ndev, len);
- 		if (unlikely(!skb)) {
--			net_dbg_ratelimited("build_skb failed\n");
-+			net_dbg_ratelimited("netdev_alloc_skb_ip_align failed\n");
- 			priv->stats.rx_dropped++;
- 			priv->stats.rx_errors++;
- 		}
--
-+		memcpy(skb->data, priv->rx_buf[rx_head], len);
- 		skb_put(skb, len);
-+		dma_sync_single_for_device(&ndev->dev,
-+					   priv->rx_mapping[rx_head],
-+					   priv->rx_buf_size, DMA_FROM_DEVICE);
-+
- 		skb->protocol = eth_type_trans(skb, ndev);
- 		napi_gro_receive(&priv->napi, skb);
- 		rx++;
--- 
-1.8.2.1
+-Joel
