@@ -1,66 +1,72 @@
-From: jonsmirl@gmail.com (jonsmirl at gmail.com)
-Date: Tue, 19 Aug 2014 08:11:40 -0400
-Subject: [PATCH] This adds a generic PWM framework driver for the PWM
- controller
-In-Reply-To: <20140818201929.GL15297@lukather>
-References: <20140818180316.31807.3445.stgit@studio>
- <20140818192318.GJ15297@lukather>
- <CAKON4OwzFDDXqCF4VNkUXXJLp3smrB6Axp_x=D47sjbpoNbe+g@mail.gmail.com>
- <20140818201929.GL15297@lukather>
-Message-ID: <CAKON4OwDWqnu9Nn6rBFtUJX2f0eFVzBFhRMcvPAp=K6N1KpE0w@mail.gmail.com>
+From: Varun.Sethi@freescale.com (Varun Sethi)
+Date: Tue, 19 Aug 2014 12:11:43 +0000
+Subject: [PATCH v5] devicetree: Add generic IOMMU device tree bindings
+In-Reply-To: <20140815115110.GO27466@arm.com>
+References: <1406803383-11601-1-git-send-email-thierry.reding@gmail.com>
+ <87a9774lf5.fsf@nvidia.com> <20140815115110.GO27466@arm.com>
+Message-ID: <6a3d4048ddb84bd19c847adf7f02fc52@BL2PR03MB468.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 18, 2014 at 4:19 PM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> On Mon, Aug 18, 2014 at 03:53:08PM -0400, jonsmirl at gmail.com wrote:
->> On Mon, Aug 18, 2014 at 3:23 PM, Maxime Ripard
->> <maxime.ripard@free-electrons.com> wrote:
->> > Hi,
->> >
->> > On Mon, Aug 18, 2014 at 02:03:16PM -0400, Jon Smirl wrote:
->> >> found on Allwinner SoCs.x
->> >>
->> >> Signed-off-by: Jon Smirl <jonsmirl@gmail.com>
->> >
->> > Is there any notable difference with Alexandre's driver?
->> > https://lkml.org/lkml/2014/5/19/568
->> >
->> > If so, why didn't you posted incremental patches on top of his driver?
->>
->> Better A10 support.
->
-> Better how?
->
->> And I wrote this one without know about his.
->
-> So you're just require us to trash an already extensively reviewed
-> driver and start from scratch again?
+Hi Will,
 
-Forget mine then.
+> -----Original Message-----
+> From: iommu-bounces at lists.linux-foundation.org [mailto:iommu-
+> bounces at lists.linux-foundation.org] On Behalf Of Will Deacon
+> Sent: Friday, August 15, 2014 5:21 PM
+> To: Hiroshi Doyu
+> Cc: Mark Rutland; devicetree at vger.kernel.org; Stephen Warren; Arnd
+> Bergmann; Rob Herring; iommu at lists.linux-foundation.org; Thierry Reding;
+> linux-tegra at vger.kernel.org; linux-arm-kernel at lists.infradead.org
+> Subject: Re: [PATCH v5] devicetree: Add generic IOMMU device tree bindings
+> 
+> On Thu, Aug 14, 2014 at 07:47:42AM +0100, Hiroshi Doyu wrote:
+> > Thierry Reding <thierry.reding@gmail.com> writes:
+> >
+> > > +Multiple-master IOMMU:
+> > > +----------------------
+> > > +
+> > > +       iommu {
+> > > +               /* the specifier represents the ID of the master */
+> > > +               #iommu-cells = <1>;
+> > > +       };
+> > > +
+> > > +       master at 1 {
+> > > +               /* device has master ID 42 in the IOMMU */
+> > > +               iommus = <&{/iommu} 42>;
+> > > +       };
+> > > +
+> > > +       master at 2 {
+> > > +               /* device has master IDs 23 and 24 in the IOMMU */
+> > > +               iommus = <&{/iommu} 23>, <&{/iommu} 24>;
+> > > +       };
+> >
+> > I think that this "master ID" will be parsed in IOMMU driver. For
+> > example, ARM,SMMU expects "streamID" as "master ID", right?
+> >
+> > If a SoC has a feature to configure to assign streamID to devices at
+> > runtime, "streamID" is not equal to "master ID".
+> >
+> >   iommus = <&{/smmu} "soc specific master ID">;
+> >
+> > "soc master ID" needs to be translated into "streamID" by SoC SW. It
+> > seems that ARM,SMMU kernel driver doesn't expect this kind of ID
+> > translation. If ARM,SMMU kernel driver is used as is, "soc master ID"
+> > would be incompatible? ARM,SMMU needs such translation before parsing.
+> > Is this my understanding right?
+> >
+> > If so I think that this master ID configuration/translation may be
+> > quite reasonable requirment for SoC using ARM,SMMU.
+> >
+> > Can we consider this ID translation within ARM,SMMU compatibility?
+> >
+> > IOW, is it possible to implement some SoC specific hook for ID
+> > translation/configuration in ARM,SMMU kernel driver?
+> 
+> I think there's some confusion here. The ARM architected SMMU does not
+> perform any StreamID translation -- it sees an incoming ID and uses that to
+> lookup a set of translation tables. 
 
-Problems in the other one....
-1) The math is not right in either patch. Selsinork has been checking
-mine with a scope and just found another math error in mine. The
-internal math needs to be done in picoseconds or round off errors mess
-up the high frequency outputs (24Mhz, 12Mhz, 8Mhz, ...).
-3) By-pass mode on the A20 is not implemented.
-2) A10 is not correctly handled. Specifically the prescaler is
-different on the A10 vs A20.
+I don't completely agree with this. In case of MMU-500  don't we have the "TBUID + device assigned stream ID" representing the stream ID for matching at the TCU? In case of our platform, we have hot pluggable device objects comprising of devices connected to different TBUs. We have a requirement to use a single stream ID for all the distributed objects. We will have to use the stream ID masking capability to mask out the TBU ID.
 
-
-
-
-
-
->
-> --
-> Maxime Ripard, Free Electrons
-> Embedded Linux, Kernel and Android engineering
-> http://free-electrons.com
-
-
-
--- 
-Jon Smirl
-jonsmirl at gmail.com
+-Varun
