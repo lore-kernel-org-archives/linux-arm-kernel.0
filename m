@@ -1,57 +1,52 @@
-From: computersforpeace@gmail.com (Brian Norris)
-Date: Mon, 18 Aug 2014 18:37:29 -0700
-Subject: [PATCH v2 0/8] mtd: nand: Support for new DT NAND driver
-In-Reply-To: <1408357919-19793-1-git-send-email-lee.jones@linaro.org>
-References: <1408357919-19793-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <20140819013729.GP18411@ld-irv-0074>
+From: weiyang@linux.vnet.ibm.com (Wei Yang)
+Date: Tue, 19 Aug 2014 09:44:01 +0800
+Subject: [PATCH v9 02/12] PCI: OF: Parse and map the IRQ when adding the
+ PCI device.
+In-Reply-To: <20140818142550.GN20043@localhost>
+References: <1407860725-25202-1-git-send-email-Liviu.Dudau@arm.com>
+ <1407860725-25202-3-git-send-email-Liviu.Dudau@arm.com>
+ <20140814145804.GA5586@richard>
+ <20140814154959.GG25761@e106497-lin.cambridge.arm.com>
+ <20140815085632.GA4954@richard>
+ <20140815103052.GD27553@e106497-lin.cambridge.arm.com>
+ <20140818142550.GN20043@localhost>
+Message-ID: <20140819014401.GB9558@richard>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 18, 2014 at 11:31:51AM +0100, Lee Jones wrote:
-> I believe all of your queries have either been answered or addressed
-> and I am hoping this will be the last submission. :)
+On Mon, Aug 18, 2014 at 03:25:50PM +0100, Catalin Marinas wrote:
+>...
+>> Well, it will become necessary as old code gets dismantled and converted towards
+>> this patchset. To give you an example that I'm familiar with, for arch/arm the
+>> host bridge drivers have moved into drivers/pci/host, but they still depend/use
+>> the bios32 infrastructure that takes care of setting up the irq. When they switch
+>> to my version they would have to go and debug the "irq not being assigned" issue
+>> and it is quite likely that some of the people doing the conversion will complain
+>> about my code rather than understanding the issue. What I'm trying to do is to
+>> make switching to my patchset as painless as possible, with a cleanup to remove
+>> redundant operations coming after the switchover.
+>
+>While the goal is fine, until we see a common pattern for what needs to
+>go into pcibios_add_device() I think we should have an arm64-specific
+>implementation (and probably an arm32 specific one as well). I can see
+>powerpc uses it for setting the DMA ops. Would we have a similar need on
+>arm64 to choose between coherent and non-coherent dma_ops?
 
-Sorry, no. I can't review code that doesn't compile, so I'm only now
-getting to some of the review.
+Liviu,
 
-> This is v2 of the squashed submission.  v1 had a small typo which
-> prevented the BBT code from being truly configurable.  This has now
-> been rectified and build tested with and without MTD_NAND_STM_BCH_BBT
-> support.
+I have the same feeling with Catalin. An arm64-specific implementation of
+pcibios_add_device() would be better.
 
->From smatch:
+No more other concerns from my side.
 
-  drivers/mtd/nand/stm_nand_bch.c:1556 stm_nand_bch_probe() error: we previously assumed 'bank' could be null (see line 1482) [smatch]
+>
+>Also at some point we'll get ACPI support, so I'm not sure what we do
+>with assigning the dev->irq here but definitely of_* functions won't
+>work.
+>
+>-- 
+>Catalin
 
->From GCC (extra warnings):
-
-  drivers/mtd/nand/stm_nand_dt.c:39:21: warning: no previous prototype for 'stm_of_get_partitions_node' [-Wmissing-prototypes]
-  drivers/mtd/nand/stm_nand_dt.c:68:5: warning: no previous prototype for 'stm_of_get_nand_banks' [-Wmissing-prototypes]
-
-Looks like you forgot to include <linux/mtd/stm_nand_bbt.h>.
-
-And your code is not bisectable. I think patch 7 and 8 should be
-reordered (with some tweaks, perhaps):
-
-Bisectability test results for configuration "arm-multi_v7_defconfig,arm,arm-unknown-linux-gnueabi-"
-
-Failed to build patch #7: 5936df30f5e1 mtd: nand: stm_nand_bch: add support for ST's BCH NAND controller
-Configuration: "arm-multi_v7_defconfig, architecture arm".
-
-
-In file included from include/linux/ftrace.h:20:0,
-                 from include/linux/perf_event.h:47,
-                 from kernel/sys.c:16:
-arch/arm/include/asm/ftrace.h:48:21: warning: no previous prototype for 'return_address' [-Wmissing-prototypes]
-In file included from include/linux/ftrace.h:20:0,
-                 from include/linux/perf_event.h:47,
-                 from include/linux/ftrace_event.h:9,
-                 from kernel/module.c:21:
-arch/arm/include/asm/ftrace.h:48:21: warning: no previous prototype for 'return_address' [-Wmissing-prototypes]
-kernel/module.c: In function 'add_usage_links':
-kernel/module.c:1512:6: warning: variable 'nowarn' set but not used [-Wunused-but-set-variable]
-drivers/mtd/nand/stm_nand_bch.c:26:36: fatal error: linux/mtd/stm_nand_bbt.h: No such file or directory
-compilation terminated.
-make[4]: *** [drivers/mtd/nand/stm_nand_bch.o] Error 1
-
-Brian
+-- 
+Richard Yang
+Help you, Help me
