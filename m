@@ -1,46 +1,40 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Tue, 19 Aug 2014 16:59:33 +0200
-Subject: [PATCH v5] arm64: fix VTTBR_BADDR_MASK
-In-Reply-To: <53F363E3.8060108@amd.com>
-References: <20140818203604.4654.99905.stgit@joelaarch64.amd.com>
- <20140819122420.GC31086@cbox> <53F35DFD.9070804@amd.com>
- <20140819143834.GE31086@cbox> <53F363E3.8060108@amd.com>
-Message-ID: <20140819145933.GF31086@cbox>
+From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
+Date: Tue, 19 Aug 2014 17:08:27 +0200
+Subject: [PATCH 0/6] Add max77802 support for Peach boards
+Message-ID: <1408460913-13863-1-git-send-email-javier.martinez@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 19, 2014 at 09:49:07AM -0500, Joel Schopp wrote:
-> 
-> >> The return is a value,not just an error code. Because of this returning
-> >> an error overloads that value.  0 just seemed like a convenient invalid
-> >> value to check since a vttbr_x of 0 is invalid, but returning a negative
-> >> error code would be as equally invalid.  If this is the only issue it
-> >> doesn't seem worth respinning the patch for, but I'll change it to
-> >> -EINVAL if for some reason a v6 is needed.
-> > Have you given up on doing the alignment check with the proper size on
-> > the pgd allocation for this patch?
-> Yes, I'd rather leave the extra check out of this patch.  If I were
-> changing the pgd allocation code I would make sure to add a check, or if
-> there were a static check there now I would update it for the dynamic
-> value from the hardware, but it seems unrelated to add several checks to
-> other parts of the code beyond those already in the patch.  I did leave
-> the functions in the headers such that checks like this could be added
-> when someone is updating the code for other reasons, say 4 level page
-> tables.
-> 
+Hello Kukjin,
 
-hmmm, the point is that we need to ensure that we have a properly
-aligned allocated PGD, that's what this patch currently addresses, and as
-you pointed out, the BUG_ON() just before trying to run a VM is not the
-nicest solution - we should really be dealing with this properly at
-allocation time.
+Mark Brown has already queued for 3.18 the max77802 PMIC regulators
+driver so now we can add support for these in the Peach Pit and Pi
+DTS and also merge all the posted patches that depend on this. I've
+picked all the patches I found and rebased them to be sure that they
+apply cleanly on top of linux-next. Also I've taken some DT snippets
+from the downstream Chrome OS 3.8 kernel DTS for devices that use
+one of the regulators of these regulators has their input supply.
 
-But, if you don't have time to look at that, then ok, I'll have to pick
-it up myself.
+The series is composed of the following patches:
 
-However, you are hinting that we do not support 4 levels of page tables,
-yet you do allow the t0sz_to_vttbr_x funciton to pass even when using
-t0sz values only supported under 4 levels of page tables....  What is
-the rationale for that?
+Javier Martinez Canillas (3):
+  ARM: dts: Add Peach Pit and Pi dts entry for max77802 PMIC
+  ARM: dts: Add vmmc and vqmmc supplies for Peach Pit and Pi boards
+  ARM: dts: Add Peach Pit and Pi dts entry for ISL29018 sensor
 
--Christoffer
+Naveen Krishna Chatradhi (1):
+  ARM: dts: Add thermistor dts fragment used by exynos based Peach
+    boards
+
+Rahul Sharma (2):
+  ARM: dts: add hdmi regulators for exynos5800 based peach-pi board
+  ARM: dts: add hdmi regulators for exynos5420 based peach-pit board
+
+ arch/arm/boot/dts/cros-adc-thermistors.dtsi |  44 ++++
+ arch/arm/boot/dts/exynos5420-peach-pit.dts  | 390 ++++++++++++++++++++++++++++
+ arch/arm/boot/dts/exynos5800-peach-pi.dts   | 390 ++++++++++++++++++++++++++++
+ 3 files changed, 824 insertions(+)
+ create mode 100644 arch/arm/boot/dts/cros-adc-thermistors.dtsi
+
+Best regards,
+Javier
