@@ -1,46 +1,146 @@
 From: daniel.thompson@linaro.org (Daniel Thompson)
-Date: Tue, 19 Aug 2014 15:48:29 +0100
-Subject: [PATCH v8 3/9] arm: Remove DEBUG_LL_UART_NONE
+Date: Tue, 19 Aug 2014 15:48:30 +0100
+Subject: [PATCH v8 4/9] arm: ks8695: Migrate debug_ll macros to shared
+ directory
 In-Reply-To: <1408459715-10151-1-git-send-email-daniel.thompson@linaro.org>
 References: <1404127855-30459-1-git-send-email-daniel.thompson@linaro.org>
  <1408459715-10151-1-git-send-email-daniel.thompson@linaro.org>
-Message-ID: <1408459715-10151-4-git-send-email-daniel.thompson@linaro.org>
+Message-ID: <1408459715-10151-5-git-send-email-daniel.thompson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Only a very small handful of platforms support DEBUG_LL_UART_NONE but it
-lurks in the menus of every single platform config ready to break the
-build. This is an especial problem for defconfig/oldconfig since it is
-often selected by default.
+As part of the migration a couple of uart definitions have been copied
+from of the platform specific header files.
 
-This patch solves the problem by removing this option. Any platforms
-still depending upon this option must be migrated.
+Note that, in order to keep oldconfig working nicely we must defer the
+removal of arch/arm/mach-ks8695/include/mach/debug-macro.S until
+DEBUG_LL_UART_NONE has been removed.
 
 Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
 Cc: Russell King <linux@arm.linux.org.uk>
+Cc: Greg Ungerer <gerg@uclinux.org>
+Cc: Arnd Bergmann <arnd.bergmann@linaro.org>
 ---
- arch/arm/Kconfig.debug | 9 ---------
- 1 file changed, 9 deletions(-)
+ arch/arm/Kconfig.debug                          |  8 +++++
+ arch/arm/include/debug/ks8695.S                 | 40 +++++++++++++++++++++++++
+ arch/arm/mach-ks8695/include/mach/debug-macro.S | 36 ----------------------
+ 3 files changed, 48 insertions(+), 36 deletions(-)
+ create mode 100644 arch/arm/include/debug/ks8695.S
+ delete mode 100644 arch/arm/mach-ks8695/include/mach/debug-macro.S
 
 diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
-index b11ad54..9c46729 100644
+index 9c46729..97c3058 100644
 --- a/arch/arm/Kconfig.debug
 +++ b/arch/arm/Kconfig.debug
-@@ -877,15 +877,6 @@ choice
- 		  This option selects UART0 on VIA/Wondermedia System-on-a-chip
- 		  devices, including VT8500, WM8505, WM8650 and WM8850.
+@@ -348,6 +348,13 @@ choice
+ 		  Say Y here if you want the debug print routines to direct
+ 		  their output to UART1 serial port on KEYSTONE2 devices.
  
--	config DEBUG_LL_UART_NONE
--		bool "No low-level debugging UART"
--		depends on !ARCH_MULTIPLATFORM
--		help
--		  Say Y here if your platform doesn't provide a UART option
--		  above. This relies on your platform choosing the right UART
--		  definition internally in order for low-level debugging to
--		  work.
++	config DEBUG_KS8695_UART
++		bool "KS8695 Debug UART"
++		depends on ARCH_KS8695
++		help
++		  Say Y here if you want kernel low-level debugging support
++		  on KS8695.
++
+ 	config DEBUG_MMP_UART2
+ 		bool "Kernel low-level debugging message via MMP UART2"
+ 		depends on ARCH_MMP
+@@ -1017,6 +1024,7 @@ config DEBUG_LL_INCLUDE
+ 				 DEBUG_IMX6Q_UART || \
+ 				 DEBUG_IMX6SL_UART || \
+ 				 DEBUG_IMX6SX_UART
++	default "debug/ks8695.S" if DEBUG_KS8695_UART
+ 	default "debug/msm.S" if DEBUG_MSM_UART || DEBUG_QCOM_UARTDM
+ 	default "debug/omap2plus.S" if DEBUG_OMAP2PLUS_UART
+ 	default "debug/s3c24xx.S" if DEBUG_S3C24XX_UART
+diff --git a/arch/arm/include/debug/ks8695.S b/arch/arm/include/debug/ks8695.S
+new file mode 100644
+index 0000000..961da1f
+--- /dev/null
++++ b/arch/arm/include/debug/ks8695.S
+@@ -0,0 +1,40 @@
++/*
++ * arch/arm/include/debug/ks8695.S
++ *
++ * Copyright (C) 2006 Ben Dooks <ben@simtec.co.uk>
++ * Copyright (C) 2006 Simtec Electronics
++ *
++ * KS8695 - Debug macros
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++
++#define KS8695_UART_PA	0x03ffe000
++#define KS8695_UART_VA	0xf00fe000
++#define KS8695_URTH	(0x04)
++#define KS8695_URLS	(0x14)
++#define URLS_URTE	(1 << 6)
++#define URLS_URTHRE	(1 << 5)
++
++	.macro	addruart, rp, rv, tmp
++		ldr	\rp, =KS8695_UART_PA		@ physical base address
++		ldr	\rv, =KS8695_UART_VA		@ virtual base address
++	.endm
++
++	.macro	senduart, rd, rx
++		str	\rd, [\rx, #KS8695_URTH]	@ Write to Transmit Holding Register
++	.endm
++
++	.macro	busyuart, rd, rx
++1001:		ldr	\rd, [\rx, #KS8695_URLS]	@ Read Line Status Register
++		tst	\rd, #URLS_URTE			@ Holding & Shift registers empty?
++		beq	1001b
++	.endm
++
++	.macro	waituart, rd, rx
++1001:		ldr	\rd, [\rx, #KS8695_URLS]	@ Read Line Status Register
++		tst	\rd, #URLS_URTHRE		@ Holding Register empty?
++		beq	1001b
++	.endm
+diff --git a/arch/arm/mach-ks8695/include/mach/debug-macro.S b/arch/arm/mach-ks8695/include/mach/debug-macro.S
+deleted file mode 100644
+index a79e489..0000000
+--- a/arch/arm/mach-ks8695/include/mach/debug-macro.S
++++ /dev/null
+@@ -1,36 +0,0 @@
+-/*
+- * arch/arm/mach-ks8695/include/mach/debug-macro.S
+- *
+- * Copyright (C) 2006 Ben Dooks <ben@simtec.co.uk>
+- * Copyright (C) 2006 Simtec Electronics
+- *
+- * KS8695 - Debug macros
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+- */
 -
- 	config DEBUG_ICEDCC
- 		bool "Kernel low-level debugging via EmbeddedICE DCC channel"
- 		help
+-#include <mach/hardware.h>
+-#include <mach/regs-uart.h>
+-
+-	.macro	addruart, rp, rv, tmp
+-		ldr	\rp, =KS8695_UART_PA		@ physical base address
+-		ldr	\rv, =KS8695_UART_VA		@ virtual base address
+-	.endm
+-
+-	.macro	senduart, rd, rx
+-		str	\rd, [\rx, #KS8695_URTH]	@ Write to Transmit Holding Register
+-	.endm
+-
+-	.macro	busyuart, rd, rx
+-1001:		ldr	\rd, [\rx, #KS8695_URLS]	@ Read Line Status Register
+-		tst	\rd, #URLS_URTE			@ Holding & Shift registers empty?
+-		beq	1001b
+-	.endm
+-
+-	.macro	waituart, rd, rx
+-1001:		ldr	\rd, [\rx, #KS8695_URLS]	@ Read Line Status Register
+-		tst	\rd, #URLS_URTHRE		@ Holding Register empty?
+-		beq	1001b
+-	.endm
 -- 
 1.9.3
