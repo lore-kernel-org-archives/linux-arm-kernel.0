@@ -1,66 +1,138 @@
-From: daniel.thompson@linaro.org (Daniel Thompson)
-Date: Tue, 19 Aug 2014 13:51:53 +0100
-Subject: [PATCH v9 12/16] serial: amba-pl011: Pass FIQ information to KGDB.
-In-Reply-To: <53F33BDD.8050705@hurleysoftware.com>
-References: <1404979427-12943-1-git-send-email-daniel.thompson@linaro.org>
- <1408372091-12689-13-git-send-email-daniel.thompson@linaro.org>
- <53F24660.2030404@hurleysoftware.com> <53F313F2.6090103@linaro.org>
- <53F33BDD.8050705@hurleysoftware.com>
-Message-ID: <53F34869.7050901@linaro.org>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 19 Aug 2014 13:54:49 +0100
+Subject: [PATCH 4/6] iommu/arm-smmu: implement generic DT bindings
+In-Reply-To: <1407891099-24641-5-git-send-email-mitchelh@codeaurora.org>
+References: <1407891099-24641-1-git-send-email-mitchelh@codeaurora.org>
+ <1407891099-24641-5-git-send-email-mitchelh@codeaurora.org>
+Message-ID: <20140819125449.GN23128@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19/08/14 12:58, Peter Hurley wrote:
-> On 08/19/2014 05:08 AM, Daniel Thompson wrote:
->> On 18/08/14 19:30, Peter Hurley wrote:
+[adding Rob, Mark, Arnd, Thierry and Hiroshi]
+
+On Wed, Aug 13, 2014 at 01:51:37AM +0100, Mitchel Humpherys wrote:
+> Generic IOMMU device tree bindings were recently added in
+> ["devicetree: Add generic IOMMU device tree bindings"]. Implement the
+> bindings in the ARM SMMU driver.
 > 
-> [cut]
->   
->>>> +static int pl011_poll_init(struct uart_port *port)
->>>> +{
->>>> +	struct uart_amba_port *uap = (struct uart_amba_port *)port;
->>>
->>> Please use container_of() in new code.
->>
->> Ok.
->>
->> Personally I dislike a file that mixes casts and conatiner_of but I
->> guess I can make both of us happy by switching the whole driver to
->> container_of. Separate patch again?
-> 
-> The change below makes the uap local unnecessary, so you can skip the
-> container_of() change, if you'd prefer.
+> See Documentation/devicetree/bindings/iommu/iommu.txt for the bindings
+> themselves.
 
-I realized that myself although not until after I'd replaced all the
-casts with container_of()...
+Could you look at moving the parsing code into a separate file please (maybe
+under lib/ ?). That way, other IOMMUs can use the same binding without the
+boilerplate having to be rewritten each time.
 
-So I'll keep the patch for now but can drop it if anyone takes against it.
+> diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+> index 63c6707fad..22e25f3172 100644
+> --- a/drivers/iommu/arm-smmu.c
+> +++ b/drivers/iommu/arm-smmu.c
+> @@ -538,25 +538,32 @@ static int insert_smmu_master(struct arm_smmu_device *smmu,
+>  	return 0;
+>  }
+>  
+> +struct iommus_entry {
+> +	struct list_head list;
+> +	struct device_node *node;
+> +	u16 streamids[MAX_MASTER_STREAMIDS];
+> +	int num_sids;
+> +};
+> +
+>  static int register_smmu_master(struct arm_smmu_device *smmu,
+> -				struct device *dev,
+> -				struct of_phandle_args *masterspec)
+> +				struct iommus_entry *entry)
+>  {
+>  	int i;
+>  	struct arm_smmu_master *master;
+> +	struct device *dev = smmu->dev;
+>  
+> -	master = find_smmu_master(smmu, masterspec->np);
+> +	master = find_smmu_master(smmu, entry->node);
+>  	if (master) {
+>  		dev_err(dev,
+>  			"rejecting multiple registrations for master device %s\n",
+> -			masterspec->np->name);
+> +			entry->node->name);
+>  		return -EBUSY;
+>  	}
+>  
+> -	if (masterspec->args_count > MAX_MASTER_STREAMIDS) {
+> +	if (entry->num_sids > MAX_MASTER_STREAMIDS) {
+>  		dev_err(dev,
+>  			"reached maximum number (%d) of stream IDs for master device %s\n",
+> -			MAX_MASTER_STREAMIDS, masterspec->np->name);
+> +			MAX_MASTER_STREAMIDS, entry->node->name);
+>  		return -ENOSPC;
+>  	}
+>  
+> @@ -564,15 +571,58 @@ static int register_smmu_master(struct arm_smmu_device *smmu,
+>  	if (!master)
+>  		return -ENOMEM;
+>  
+> -	master->of_node			= masterspec->np;
+> -	master->cfg.num_streamids	= masterspec->args_count;
+> +	master->of_node			= entry->node;
+> +	master->cfg.num_streamids	= entry->num_sids;
+>  
+>  	for (i = 0; i < master->cfg.num_streamids; ++i)
+> -		master->cfg.streamids[i] = masterspec->args[i];
+> +		master->cfg.streamids[i] = entry->streamids[i];
+>  
+>  	return insert_smmu_master(smmu, master);
+>  }
+>  
+> +static int arm_smmu_parse_iommus_properties(struct arm_smmu_device *smmu,
+> +					int *num_masters)
+> +{
+> +	struct of_phandle_args iommuspec;
+> +	struct device_node *dn;
+> +
+> +	for_each_node_with_property(dn, "iommus") {
+> +		int arg_ind = 0;
+> +		struct iommus_entry *entry, *n;
+> +		LIST_HEAD(iommus);
+> +
+> +		while (!of_parse_phandle_with_args(dn, "iommus", "#iommu-cells",
+> +							arg_ind, &iommuspec)) {
 
+We need to check that the phandle does indeed point at one of our SMMUs
+here, in case we have a system with multiple IOMMU types, all using the
+generic binding.
 
+> +			int i;
+> +
+> +			list_for_each_entry(entry, &iommus, list)
+> +				if (entry->node == dn)
+> +					break;
 
-Thanks
+Oh, yuck, this is really nasty to parse...
 
-Daniel.
+> +			if (&entry->list == &iommus) {
 
+Where is entry initialised the first time around?
 
+> +				entry = devm_kzalloc(smmu->dev, sizeof(*entry),
+> +						GFP_KERNEL);
+> +				if (!entry)
+> +					return -ENOMEM;
 
+You need to of_node_put the guys you've got back from the phandle parsing
+code.
 
-> 
->>>> +	int retval;
->>>> +
->>>> +	retval = pl011_hwinit(port);
->>>> +
->>>> +#ifdef CONFIG_KGDB_FIQ
->>>> +	if (retval == 0)
->>>> +		kgdb_register_fiq(uap->port.irq);
->>>
->>> The uap->port dereference is unnecessary since the port parameter
->>> is the same thing.
->>>
->>> 		kgdb_register_fiq(port->irq);
->>
->> Ok.
-> 
-> Thanks,
-> Peter Hurley
-> 
+> +				entry->node = dn;
+> +				list_add(&entry->list, &iommus);
+> +			}
+> +			entry->num_sids = iommuspec.args_count;
+> +			for (i = 0; i < entry->num_sids; ++i)
+> +				entry->streamids[i] = iommuspec.args[i];
+> +			arg_ind++;
+
+Isn't this defined by #iommu-cells?
+
+> +		}
+> +
+> +		list_for_each_entry_safe(entry, n, &iommus, list) {
+
+Why the _safe variant? This is a local list, right?
+
+Will
