@@ -1,83 +1,88 @@
-From: carlo@caione.org (Carlo Caione)
-Date: Tue, 19 Aug 2014 18:16:52 +0200
-Subject: [PATCH 5/7] ARM: meson: dts: add basic
- Meson/Meson6/Meson6-atv1200 DTSI/DTS
-In-Reply-To: <20140818161744.GD3302@leverpostej>
-References: <1408272594-10814-1-git-send-email-carlo@caione.org>
- <1408272594-10814-6-git-send-email-carlo@caione.org>
- <20140818161744.GD3302@leverpostej>
-Message-ID: <20140819161652.GB869@carlo-MacBookPro>
+From: dianders@chromium.org (Doug Anderson)
+Date: Tue, 19 Aug 2014 09:26:26 -0700
+Subject: [PATCH 5/6] ARM: dts: Add vmmc and vqmmc supplies for Peach Pit
+ and Pi boards
+In-Reply-To: <1408460913-13863-6-git-send-email-javier.martinez@collabora.co.uk>
+References: <1408460913-13863-1-git-send-email-javier.martinez@collabora.co.uk>
+ <1408460913-13863-6-git-send-email-javier.martinez@collabora.co.uk>
+Message-ID: <CAD=FV=V9oct-iJ==1SLdxusq68AY3utMQF+MbX0Uf+2dC0mwww@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 18, 2014 at 05:17:44PM +0100, Mark Rutland wrote:
-> On Sun, Aug 17, 2014 at 11:49:52AM +0100, Carlo Caione wrote:
+Javier,
 
-<cut>
+On Tue, Aug 19, 2014 at 8:08 AM, Javier Martinez Canillas
+<javier.martinez@collabora.co.uk> wrote:
+> The VCC/VDD and VCCQ/VDD_IO power supplies for the MMC are
+> provided by the tps65090 fet4 and max77802 ldo4 regulators
+> respectively. Add the phandle to the regulators tree nodes
+> for the the dw_mmc device device.
+>
+> These DTS snippets were taken from the downstream ChromeOS
+> 3.8 kernel Device Tree for Peach Pit and Pi boards.
+>
+> Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+> ---
+>  arch/arm/boot/dts/exynos5420-peach-pit.dts | 2 ++
+>  arch/arm/boot/dts/exynos5800-peach-pi.dts  | 2 ++
+>  2 files changed, 4 insertions(+)
+>
+> diff --git a/arch/arm/boot/dts/exynos5420-peach-pit.dts b/arch/arm/boot/dts/exynos5420-peach-pit.dts
+> index 8e50042..5b9dbb9 100644
+> --- a/arch/arm/boot/dts/exynos5420-peach-pit.dts
+> +++ b/arch/arm/boot/dts/exynos5420-peach-pit.dts
+> @@ -547,6 +547,8 @@
+>  };
+>
+>  &mmc_2 {
+> +       vmmc-supply = <&tps65090_fet4>;
+> +       vqmmc-supply = <&vqmmc_sdcard>;
+>         status = "okay";
+>         num-slots = <1>;
+>         supports-highspeed;
+> diff --git a/arch/arm/boot/dts/exynos5800-peach-pi.dts b/arch/arm/boot/dts/exynos5800-peach-pi.dts
+> index 939f91c..dcac443 100644
+> --- a/arch/arm/boot/dts/exynos5800-peach-pi.dts
+> +++ b/arch/arm/boot/dts/exynos5800-peach-pi.dts
+> @@ -545,6 +545,8 @@
+>  };
+>
+>  &mmc_2 {
+> +       vmmc-supply = <&tps65090_fet4>;
+> +       vqmmc-supply = <&vqmmc_sdcard>;
+>         status = "okay";
+>         num-slots = <1>;
+>         supports-highspeed;
 
-> > +	soc at c8100000 {
-> 
-> What's the unit-address for? This node doesn't have a reg or compatible.
+While your change is correct, I have a worry that it will break things
+if it's merged before some patches that Yuvaraj is working on.
 
-I used it to indicate the starting address of the memory mapped region.
+Specifically the problem on pit and pi (and any exynos5250 / 5420 /
+5800 / ... boards using the built-in "card detect") is that the card
+detect line is on the same power rail as "vqmmc".  That means you
+can't turn off vqmmc if you still need to be able to detect card
+insertions.
 
-> > +		compatible = "simple-bus";
-> > +		#address-cells = <1>;
-> > +		#size-cells = <1>;
-> > +		ranges;
-> > +
-> > +		uart_AO: serial at c81004c0 {
-> > +			compatible = "amlogic,meson-uart";
-> > +			reg = <0xc81004c0 0x14>;
-> > +			interrupts = <0 90 1>;
-> > +			clocks = <&clk81>;
-> > +			status = "disabled";
-> > +		};
-> > +
-> > +		uart_A: serial at c81084c0 {
-> > +			compatible = "amlogic,meson-uart";
-> > +			reg = <0xc81084c0 0x14>;
-> > +			interrupts = <0 90 1>;
-> > +			clocks = <&clk81>;
-> > +			status = "disabled";
-> > +		};
-> > +
-> > +		uart_B: serial at c81084dc {
-> > +			compatible = "amlogic,meson-uart";
-> > +			reg = <0xc81084dc 0x14>;
-> > +			interrupts = <0 90 1>;
-> > +			clocks = <&clk81>;
-> > +			status = "disabled";
-> > +		};
-> > +
-> > +		uart_C: serial at c8108700 {
-> > +			compatible = "amlogic,meson-uart";
-> > +			reg = <0xc8108700 0x14>;
-> > +			interrupts = <0 90 1>;
-> > +			clocks = <&clk81>;
-> > +			status = "disabled";
-> 
-> I guess these are disabled because they aren't always wired up?
+...but you can't turn off vmmc without turning off vqmmc, otherwise
+current will leak through the IO lines into the card, which is bad.
 
-Yes
 
-<cut>
+Right now the SDMMC core will try to turn off power to the card at two times:
+1. when the card is ejected
+2. when it's trying to reset the card
 
-> > +	clocks {
-> > +		#address-cells = <1>;
-> > +
-> > +		clk81: clk at 0 {
-> > +			#clock-cells = <0>;
-> > +			compatible = "fixed-clock";
-> > +			clock-frequency = <200000000>;
-> > +		};
-> > +	};
-> 
-> There is really no need to put clocks in a container.
-> 
-> Just put them under the root, and drop the unit-address.
 
-I'll do, thanks.
+Obviously the first problem is a huge problem on exynos because it
+means that we won't be able to detect card insertions.  ...but we
+still want to turn the power off from #2.  To really fix the problem I
+think the core needs to be extended to treat the above as two separate
+cases.
 
--- 
-Carlo Caione
+
+Your patch might work at the moment because I think dw_mmc doesn't
+actually try to turn off these rails with the main SDMMC core asks it
+to.  ...but I still worry about merging them before Yuvaraj's changes
+are ready.
+
+
+-Doug
