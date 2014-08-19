@@ -1,84 +1,43 @@
-From: peter.chen@freescale.com (Peter Chen)
-Date: Tue, 19 Aug 2014 08:18:17 +0800
-Subject: [RFC] usb issue on imx27: 3 clocks are needed
-In-Reply-To: <20140818134903.5b6e6c27@x230.trabucayre.com>
-References: <53EF7AF6.2000405@gmail.com> <20140818090056.GA29393@peterchendt>
- <20140818092635.GI2114@dragon>
- <782c806acb464f5781deb32e94548882@BN1PR0301MB0772.namprd03.prod.outlook.com>
- <20140818134903.5b6e6c27@x230.trabucayre.com>
-Message-ID: <20140819001816.GC2928@peterchendt>
+From: geoff@infradead.org (Geoff Levand)
+Date: Mon, 18 Aug 2014 18:10:32 -0700
+Subject: [PATCH] Arm64: convert soft_restart() to assembly code
+In-Reply-To: <CAMJs5B9iCKBsSSbXvX6Y+QpOcUgEVtjBcWkcLonu3761_BkPsg@mail.gmail.com>
+References: <1407847365-10873-1-git-send-email-achandran@mvista.com>
+ <1408123221.22761.38.camel@smoke> <20140815182157.GD21908@leverpostej>
+ <1408128799.22761.47.camel@smoke> <20140818160253.GB3302@leverpostej>
+ <CAMJs5B9iCKBsSSbXvX6Y+QpOcUgEVtjBcWkcLonu3761_BkPsg@mail.gmail.com>
+Message-ID: <1408410632.22761.122.camel@smoke>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 18, 2014 at 01:49:03PM +0200, gwenhael.goavec wrote:
-> On Mon, 18 Aug 2014 10:35:53 +0000
-> Peter Chen <Peter.Chen@freescale.com> wrote:
-> 
-> >  
-> > > On Mon, Aug 18, 2014 at 05:00:59PM +0800, Peter Chen wrote:
-> > > > On Sat, Aug 16, 2014 at 05:38:30PM +0200, Philippe Reynes wrote:
-> > > > > Hi all,
-> > > > >
-> > > > > i.MX27's usb needs three clocks (usb_ipg_gate, usb_ahb_gate and
-> > > > > usb_div) but the current chipidea driver implementation, and
-> > > > > devicetree, provides only ipg and ahb. Consequently, if the
-> > > > > bootloader don't enable the last one, the kernel will crash.
-> > > > >
-> > > > > Our approach/idea is to add a second, optionnal, clock in
-> > > > > ci_hdrc_imx.c with 'per' name in devicetree  and to add  clock name
-> > > 'main_clk' for mandatory clock.
-> > > > > This approach it correct? Or an other approach seems better?
-> > > > > Thank you very much for your point of view.
-> > > > >
-> > > >
-> > > > It is ok for me to have ipg, ahb and per clocks at driver, but how can
-> > > > you maintain DT consistent?
-> > > 
-> > > Adding new clock as optional one will just maintain the DT compatibility.
-> > > 
-> > 
-> > How to handle node_usb_soc1's clock which is without clk name to consistent with three
-> > clocks for node_usb_soc2 at driver? Except for adding some platform judge code at
-> > driver, do you have other solutions?
-> > 
-> > node_usb_soc1: {
-> > 	clocks = <&clks IMX6_CLK_USBOH3>;
-> > };
-> > 
-> > node_usb_soc2: {
-> > 	clocks = <&clks IMX27_CLK_USBIPG>, <&clks IMX27_CLK_USBOH3>, <&clks IMX27_CLK_USBPER>;
-> > 	clock-names = "ipg", "ahb", "per";
-> > };
-> > 
-> > Peter
-> > --
-> 
-> Our idea is something like this :
-> node_usb_soc: {
-> 	clocks = <&clks IMX27_CLK_USBxxx>;
-> 	clock-names = "main_clk";
-> };
-> for all CPUs
-> 
-> and 
-> node_usb_imx27: {
-> 	clocks = <&clks IMX27_CLK_USB_IPG_GATE>,
-> 		<&clks IMX27_CLK_USB_DIV>;
-> 	clock-names = "main_clk", "per";
-> };
-> 
-> For imx27 and CPUs with the need of more than one clock.
-> 
+Hi Christoffer,
 
-Just like Shawn said, it breaks DT compatibility, how the old dtb works
-with newer version kernel after you change.
+On Mon, 2014-08-18 at 19:33 +0200, Christoffer Dall wrote:
+> On Mon, Aug 18, 2014 at 6:02 PM, Mark Rutland <mark.rutland@arm.com> wrote:
+> > I just realised that this is still missing the jump to EL2 that I
+> > mentioned a while back.
+> >
+> > I think what we need to do is:
+> >
+> > * Have KVM (if present) tears itself down prior to cpu_die, restoring
+> >   the __hyp_stub_vectors in VBAR_EL2 and disabling the MMU, and caches.
+> >
+> > * Add a mechanism to __hyp_stub_vectors to allow a hypercall to
+> >   call a function at EL2. We should be able to replace the current
+> >   hyp_stub el1_sync handler with that, and rework KVM to call a function
+> >   at EL2 to setup VBAR_EL2 appropriately at init time.
+> >
+> Why do you need to change the current mechanism?  Is this due to the
+> CPU being in a different state when restarted with the MMU enabled in
+> EL2 or something like that?
 
-> The last clock (ie ahb) is handled by usbmisc.c and if "per" clock is not
-> present in the dtsi chipidea will not fails, just setting data->per_clk = NULL
-> for prepare/unprepare.
-> 
-> Gwenhael
+I haven't looked into the details of how to do it too closely yet,
+but we need to handle the case where a 1st stage kernel that is not
+configured with visualization support, needs to kexec re-boot to a
+2nd stage kernel that will support visualization.
 
--- 
-Best Regards,
-Peter Chen
+Also, the current arm64 bootwrapper program expects to be entered in
+EL2 or higher, so a CPU running at EL1 needs to get back to EL2
+before re-entering the bootwrapper program on a CPU hot-unplug.
+
+-Geoff
