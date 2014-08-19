@@ -1,66 +1,68 @@
-From: frans.klaver@xsens.com (Frans Klaver)
-Date: Tue, 19 Aug 2014 14:14:45 +0200
-Subject: [PATCH 1/4] tty: omap-serial: pull out calculation from baud_is_mode16
-In-Reply-To: <1408450488-4083-1-git-send-email-frans.klaver@xsens.com>
-References: <1406645577-18620-1-git-send-email-frans.klaver@xsens.com>
- <1408450488-4083-1-git-send-email-frans.klaver@xsens.com>
-Message-ID: <1408450488-4083-2-git-send-email-frans.klaver@xsens.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Tue, 19 Aug 2014 14:22:36 +0200
+Subject: [PATCH v4] arm64: fix VTTBR_BADDR_MASK
+In-Reply-To: <53F26282.5010103@amd.com>
+References: <20140811203823.2828.36074.stgit@joelaarch64.amd.com>
+ <20140812160521.GO10550@cbox> <53F26282.5010103@amd.com>
+Message-ID: <20140819122236.GB31086@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To determine the correct divisor, we need to know the difference between
-the desired baud rate and the actual baud rate. The calculation for this
-difference is implemented twice within omap_serial_baud_is_mode16().
-Pull out the calculation for easier maintenance.
+On Mon, Aug 18, 2014 at 03:30:58PM -0500, Joel Schopp wrote:
+> 
+>  #endif /* __ARM_KVM_MMU_H__ */
+> diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
+> index 16e7994..70f0f02 100644
+> --- a/arch/arm/kvm/mmu.c
+> +++ b/arch/arm/kvm/mmu.c
+> @@ -521,6 +521,7 @@ int create_hyp_io_mappings(void *from, void *to, phys_addr_t phys_addr)
+>   */
+>  int kvm_alloc_stage2_pgd(struct kvm *kvm)
+>  {
+> +	unsigned int s2_pgds, s2_pgd_order;
+>  	pgd_t *pgd;
+>  
+>  	if (kvm->arch.pgd != NULL) {
+> @@ -528,10 +529,18 @@ int kvm_alloc_stage2_pgd(struct kvm *kvm)
+>  		return -EINVAL;
+>  	}
+>  
+> -	pgd = (pgd_t *)__get_free_pages(GFP_KERNEL, S2_PGD_ORDER);
+> +	s2_pgds = (1 << (kvm_get_phys_addr_shift() - PGDIR_SHIFT));
+> +	s2_pgd_order = get_order(s2_pgds * sizeof(pgd_t));
+> +
+> +	pgd = (pgd_t *)__get_free_pages(GFP_KERNEL, s2_pgd_order);
+>  	if (!pgd)
+>  		return -ENOMEM;
+>  
+> +	if ((unsigned long)pgd & ~vttbr_baddr_mask) {
+> +		kvm_err("Stage-2 pgd not correctly aligned: %p\n", pgd);
+> +		return -EFAULT;
+> +	}
+> 
+> 
+> There are two problems that I've found here.  The first problem is that
+> vttbr_baddr_mask isn't allocated yet at this point in the code.
 
-Signed-off-by: Frans Klaver <frans.klaver@xsens.com>
----
- drivers/tty/serial/omap-serial.c | 26 ++++++++++++++++++--------
- 1 file changed, 18 insertions(+), 8 deletions(-)
+allocated? you mean assigned?
+aren't you setting vttbr_baddr_mask in kvm_arch_init()?  that's
+certainly called before kvm_arch_init_vm().
 
-diff --git a/drivers/tty/serial/omap-serial.c b/drivers/tty/serial/omap-serial.c
-index d017cec..ae935ce 100644
---- a/drivers/tty/serial/omap-serial.c
-+++ b/drivers/tty/serial/omap-serial.c
-@@ -239,6 +239,22 @@ static void serial_omap_enable_wakeup(struct uart_omap_port *up, bool enable)
- }
- 
- /*
-+ * Calculate the absolute difference between the desired and actual baud
-+ * rate for the given mode.
-+ */
-+static inline int calculate_baud_abs_diff(struct uart_port *port,
-+				unsigned int baud, unsigned int mode)
-+{
-+	unsigned int n = port->uartclk / (mode * baud);
-+	int abs_diff = baud - (port->uartclk / (mode * n));
-+
-+	if (abs_diff < 0)
-+		abs_diff = -abs_diff;
-+
-+	return abs_diff;
-+}
-+
-+/*
-  * serial_omap_baud_is_mode16 - check if baud rate is MODE16X
-  * @port: uart port info
-  * @baud: baudrate for which mode needs to be determined
-@@ -252,14 +268,8 @@ static void serial_omap_enable_wakeup(struct uart_omap_port *up, bool enable)
- static bool
- serial_omap_baud_is_mode16(struct uart_port *port, unsigned int baud)
- {
--	unsigned int n13 = port->uartclk / (13 * baud);
--	unsigned int n16 = port->uartclk / (16 * baud);
--	int baudAbsDiff13 = baud - (port->uartclk / (13 * n13));
--	int baudAbsDiff16 = baud - (port->uartclk / (16 * n16));
--	if (baudAbsDiff13 < 0)
--		baudAbsDiff13 = -baudAbsDiff13;
--	if (baudAbsDiff16 < 0)
--		baudAbsDiff16 = -baudAbsDiff16;
-+	int baudAbsDiff13 = calculate_baud_abs_diff(port, baud, 13);
-+	int baudAbsDiff16 = calculate_baud_abs_diff(port, baud, 16);
- 
- 	return (baudAbsDiff13 >= baudAbsDiff16);
- }
--- 
-1.9.3
+
+> The
+> second problem is that pgd is a virtual address, ie pgd ==
+> 0xfffffe03bbb40000 while the vttbr masks off the high bits for a
+> physical address, ie vttbr_baddr_mask=0x00007ffffffe0000 .  Even
+> correcting for those issues I haven't been able to make this check work
+> properly.  I'll resend v5 the patch with all the other suggested changes.
+> 
+
+What are the issues that you face?  Iow. what is the alignment of the
+returned physical address?
+
+(You should be able to just to virt_to_phys(pgd) and use that to test
+for the vttbr_baddr_mask).
+
+
+Thanks,
+-Christoffer
