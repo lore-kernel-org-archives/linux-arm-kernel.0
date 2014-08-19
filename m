@@ -1,41 +1,25 @@
-From: mugunthanvnm@ti.com (Mugunthan V N)
-Date: Tue, 19 Aug 2014 22:07:06 +0530
-Subject: [PATCH v3 5/7] net: cpsw: Add am33xx MACID readout
-In-Reply-To: <20140819085002.GE12930@pengutronix.de>
-References: <1408202315-20006-1-git-send-email-mpa@pengutronix.de>
- <1408202315-20006-6-git-send-email-mpa@pengutronix.de>
- <53F244DA.3070803@ti.com> <20140818154112.6601cbff@gandalf.local.home>
- <53F25AD1.8040504@ti.com>
- <CABxcv=npv6bRq=VF8RT5trNxUzDj3bAm-PkvDEhcLVJ+uf8hCg@mail.gmail.com>
- <20140819085002.GE12930@pengutronix.de>
-Message-ID: <53F37D32.3080301@ti.com>
+From: zlim.lnx@gmail.com (Zi Shen Lim)
+Date: Tue, 19 Aug 2014 11:46:21 -0500
+Subject: [Linaro-acpi] [PATCH v2 06/18] ARM64 / ACPI: Parse MADT to map
+ logical cpu to MPIDR and get cpu_possible/present_map
+In-Reply-To: <53F32E3C.1070102@linaro.org>
+References: <1407166105-17675-1-git-send-email-hanjun.guo@linaro.org>
+ <1407166105-17675-7-git-send-email-hanjun.guo@linaro.org>
+ <53F24705.7080809@arm.com> <53F32E3C.1070102@linaro.org>
+Message-ID: <CAMDttNf5d6XZ66mbiZivLmZQvcFv1mN1KKkN6TUQe_Z5VCu-1g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 19 August 2014 02:20 PM, Markus Pargmann wrote:
-> Hi,
->
-> On Tue, Aug 19, 2014 at 12:50:59AM +0200, Javier Martinez Canillas wrote:
->> Hello Mugunthan,
->>
->> On Mon, Aug 18, 2014 at 9:58 PM, Mugunthan V N <mugunthanvnm@ti.com> wrote:
->>>> Thus, for this patchset, as is:
->>>>
->>>> Tested-by: Steven Rostedt <rostedt@goodmis.org>
->>> This will fail for DRA7xx not in AM33xx
->>>
->> cpsw_am33xx_cm_get_macid() checks for
->> of_machine_is_compatible("ti,am33xx") and returns 0 if the machine is
->> not an am33xx. cpsw_probe_dt() only propagates the return value if is
->> not 0 so this patch does not change the semantics for other SoCs
->> besides am33xx.
-> Yes, this patch is only about the am33xx. I don't have the DRA7xx
-> hardware so I am not able to test on that hardware. Mugunthan, perhaps
-> you can supply some followup patches for DRA7xx.
->
->
+Hanjun,
 
-I will check on this thursday and update.
+On Tue, Aug 19, 2014 at 6:00 AM, Hanjun Guo <hanjun.guo@linaro.org> wrote:
+> Will INTERRUPT_CONTROLLER confuse people? There is only one GIC redistributor
+> (some people regard it as interrupt controller) in ARM system, if we use
+> INTERRUPT_CONTROLLER people will regard it as multi-redistributors in the
+> system, I think GIC_CPU_INTERFACE would be better, what do you think?
 
-Regards
-Mugunthan V N
+I think you meant to say "one GIC _distributor_" (GICD) instead of
+redistributor (GICR).
+ACPI5.1 only describes one GICD per system, but we can most certainly
+describe multiple GICRs.
+For multi-cpu systems, you'll definitely see multiple GIC redistributors.
