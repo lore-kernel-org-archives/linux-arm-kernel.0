@@ -1,52 +1,324 @@
-From: weiyang@linux.vnet.ibm.com (Wei Yang)
-Date: Tue, 19 Aug 2014 09:44:01 +0800
-Subject: [PATCH v9 02/12] PCI: OF: Parse and map the IRQ when adding the
- PCI device.
-In-Reply-To: <20140818142550.GN20043@localhost>
-References: <1407860725-25202-1-git-send-email-Liviu.Dudau@arm.com>
- <1407860725-25202-3-git-send-email-Liviu.Dudau@arm.com>
- <20140814145804.GA5586@richard>
- <20140814154959.GG25761@e106497-lin.cambridge.arm.com>
- <20140815085632.GA4954@richard>
- <20140815103052.GD27553@e106497-lin.cambridge.arm.com>
- <20140818142550.GN20043@localhost>
-Message-ID: <20140819014401.GB9558@richard>
+From: fugang.duan@freescale.com (fugang.duan at freescale.com)
+Date: Tue, 19 Aug 2014 01:46:31 +0000
+Subject: [PATCH] ARM: dts: imx6sx: fix the pad setting for uart CTS_B
+In-Reply-To: <20140818133122.GA27577@orthanc.am.freescale.net>
+References: <1408349484-840-1-git-send-email-b38611@freescale.com>
+ <20140818122953.GB2404@dragon>
+ <20140818133122.GA27577@orthanc.am.freescale.net>
+Message-ID: <13228d45ca9d4885a2189c74719cce2b@BLUPR03MB373.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 18, 2014 at 03:25:50PM +0100, Catalin Marinas wrote:
->...
->> Well, it will become necessary as old code gets dismantled and converted towards
->> this patchset. To give you an example that I'm familiar with, for arch/arm the
->> host bridge drivers have moved into drivers/pci/host, but they still depend/use
->> the bios32 infrastructure that takes care of setting up the irq. When they switch
->> to my version they would have to go and debug the "irq not being assigned" issue
->> and it is quite likely that some of the people doing the conversion will complain
->> about my code rather than understanding the issue. What I'm trying to do is to
->> make switching to my patchset as painless as possible, with a cleanup to remove
->> redundant operations coming after the switchover.
+From: David Wolfe <david.wolfe@freescale.com> Sent: Monday, August 18, 2014 9:31 PM
+>To: Shawn Guo
+>Cc: Duan Fugang-B38611; linux-arm-kernel at lists.infradead.org;
+>kernel at pengutronix.de
+>Subject: Re: [PATCH] ARM: dts: imx6sx: fix the pad setting for uart CTS_B
 >
->While the goal is fine, until we see a common pattern for what needs to
->go into pcibios_add_device() I think we should have an arm64-specific
->implementation (and probably an arm32 specific one as well). I can see
->powerpc uses it for setting the DMA ops. Would we have a similar need on
->arm64 to choose between coherent and non-coherent dma_ops?
-
-Liviu,
-
-I have the same feeling with Catalin. An arm64-specific implementation of
-pcibios_add_device() would be better.
-
-No more other concerns from my side.
-
+>[ Shawn Guo writes: ]
+>> On Mon, Aug 18, 2014 at 04:11:24PM +0800, Fugang Duan wrote:
+>>> The current pinfunc define all uart CTS_B IO port for DCE uart 'CTS_B'
+>>> IP port. Since uart IP port 'CTS_B' is output, and it don't need to
+>>> set 'SELECT_INPUT' bit.
+>>>
+>>> Signed-off-by: Fugang Duan <B38611@freescale.com>
+>>
+>> How did you find this error?  Something is not working without this
+>> fix?
 >
->Also at some point we'll get ACPI support, so I'm not sure what we do
->with assigning the dev->irq here but definitely of_* functions won't
->work.
+>A customer is attempting to change a UART from DCE to DTE mode using
+>pinmux in the device tree. This works for 3-wire serial as in other
+>i.MX6 parts. However, two problems prevent pinmux with hardware flow
+>control on the i.MX6SX. E.g.
 >
->-- 
->Catalin
+>	fsl,pins = <
+>		MX6SX_PAD_SD4_DATA4__UART5_RX    0x1b0b1
+>		MX6SX_PAD_SD4_DATA5__UART5_TX    0x1b0b1
+>		MX6SX_PAD_SD4_DATA6__UART5_RTS_B 0x1b0b1
+>		MX6SX_PAD_SD4_DATA7__UART5_CTS_B 0x1b0b1
+>	>;
+>
+>Using the above pinmux for DCE, the CTS_B definition overwrites the RTS_B
+>DAISY register. If you swap the order of DATA6 and DATA7 above, the RTS_B
+>DAISY setting overwrites the CTS_B DAISY register setting and hardware
+>flow control happens to work. But since CTS_B is an output, setting DAISY
+>at all is incorrect. This patch from Fugang Duan corrects this problem.
+>
+>However, there is a second problem when trying to use pinmux to configure
+>for DTE mode.
+>
+>	fsl,pins = <
+>		MX6SX_PAD_SD4_DATA4__UART5_TX    0x1b0b1
+>		MX6SX_PAD_SD4_DATA5__UART5_RX    0x1b0b1
+>		MX6SX_PAD_SD4_DATA6__UART5_CTS_B 0x1b0b1
+>		MX6SX_PAD_SD4_DATA7__UART5_RTS_B 0x1b0b1
+>	>;
+>
+>The definitions for MX6SX_PAD_SD4_DATA6__UART5_CTS_B and
+>MX6SX_PAD_SD4_DATA7__UART5_RTS_B above are missing. They are missing for
+>all UARTs, not just UART5. This patch does not address the missing RTS_B
+>and CTS_B definitions; I assume a second patch is forthcoming. Using
+>UART5 data pads as in the following example, one expects the following
+>RTS/CTS definitions for all UARTs in order to satisfy the DTE pinmux
+>example above.
+>
+Yes, the pinfunc file don't define DTE pad setting, so there will have the second patch 
+For the DTE setting.
 
--- 
-Richard Yang
-Help you, Help me
+Thanks for your detail explanation.
+
+>	#define MX6SX_PAD_SD4_DATA6__UART5_RTS_B 0x0298 0x05E0 0x084C 0x2
+>0x0
+>	#define MX6SX_PAD_SD4_DATA6__UART5_CTS_B 0x0298 0x05E0 0x0000 0x2
+>0x0
+>	#define MX6SX_PAD_SD4_DATA7__UART5_RTS_B 0x029C 0x05E4 0x084C 0x2
+>0x1
+>	#define MX6SX_PAD_SD4_DATA7__UART5_CTS_B 0x029C 0x05E4 0x0000 0x2
+>0x0
+>
+>> Since this file is generated by tool, we may need to feed it back to
+>> the tool owner.  Oh, FSL kernel also needs this fix, right?
+>
+>Yes, the FSL kernel also needs this fix.
+>
+>Thank you.
+>
+>>> ---
+>>>  arch/arm/boot/dts/imx6sx-pinfunc.h |   26 +++++++++++++-------------
+>>>  1 files changed, 13 insertions(+), 13 deletions(-)
+>>>
+>>> diff --git a/arch/arm/boot/dts/imx6sx-pinfunc.h
+>>> b/arch/arm/boot/dts/imx6sx-pinfunc.h
+>>> index 3e0b816..bb9c6b7 100644
+>>> --- a/arch/arm/boot/dts/imx6sx-pinfunc.h
+>>> +++ b/arch/arm/boot/dts/imx6sx-pinfunc.h
+>>> @@ -78,7 +78,7 @@
+>>>  #define MX6SX_PAD_GPIO1_IO07__USDHC2_WP
+>0x0030 0x0378 0x0870 0x1 0x1
+>>>  #define MX6SX_PAD_GPIO1_IO07__ENET2_MDIO
+>0x0030 0x0378 0x0770 0x2 0x0
+>>>  #define MX6SX_PAD_GPIO1_IO07__AUDMUX_MCLK
+>0x0030 0x0378 0x0000 0x3 0x0
+>>> -#define MX6SX_PAD_GPIO1_IO07__UART1_CTS_B
+>0x0030 0x0378 0x082C 0x4 0x1
+>>> +#define MX6SX_PAD_GPIO1_IO07__UART1_CTS_B
+>0x0030 0x0378 0x0000 0x4 0x0
+>>>  #define MX6SX_PAD_GPIO1_IO07__GPIO1_IO_7
+>0x0030 0x0378 0x0000 0x5 0x0
+>>>  #define MX6SX_PAD_GPIO1_IO07__SRC_EARLY_RESET
+>0x0030 0x0378 0x0000 0x6 0x0
+>>>  #define MX6SX_PAD_GPIO1_IO07__DCIC2_OUT
+>0x0030 0x0378 0x0000 0x7 0x0
+>>> @@ -96,7 +96,7 @@
+>>>  #define MX6SX_PAD_GPIO1_IO09__WDOG2_WDOG_B
+>0x0038 0x0380 0x0000 0x1 0x0
+>>>  #define MX6SX_PAD_GPIO1_IO09__SDMA_EXT_EVENT_1
+>0x0038 0x0380 0x0820 0x2 0x0
+>>>  #define MX6SX_PAD_GPIO1_IO09__CCM_OUT0
+>0x0038 0x0380 0x0000 0x3 0x0
+>>> -#define MX6SX_PAD_GPIO1_IO09__UART2_CTS_B
+>0x0038 0x0380 0x0834 0x4 0x1
+>>> +#define MX6SX_PAD_GPIO1_IO09__UART2_CTS_B
+>0x0038 0x0380 0x0000 0x4 0x0
+>>>  #define MX6SX_PAD_GPIO1_IO09__GPIO1_IO_9
+>0x0038 0x0380 0x0000 0x5 0x0
+>>>  #define MX6SX_PAD_GPIO1_IO09__SRC_INT_BOOT
+>0x0038 0x0380 0x0000 0x6 0x0
+>>>  #define MX6SX_PAD_GPIO1_IO09__OBSERVE_MUX_OUT_4
+>0x0038 0x0380 0x0000 0x7 0x0
+>>> @@ -213,7 +213,7 @@
+>>>  #define MX6SX_PAD_CSI_DATA07__ESAI_TX3_RX2
+>0x0068 0x03B0 0x079C 0x1 0x1
+>>>  #define MX6SX_PAD_CSI_DATA07__I2C4_SDA
+>0x0068 0x03B0 0x07C4 0x2 0x2
+>>>  #define MX6SX_PAD_CSI_DATA07__KPP_ROW_7
+>0x0068 0x03B0 0x07DC 0x3 0x0
+>>> -#define MX6SX_PAD_CSI_DATA07__UART6_CTS_B
+>0x0068 0x03B0 0x0854 0x4 0x1
+>>> +#define MX6SX_PAD_CSI_DATA07__UART6_CTS_B
+>0x0068 0x03B0 0x0000 0x4 0x0
+>>>  #define MX6SX_PAD_CSI_DATA07__GPIO1_IO_21
+>0x0068 0x03B0 0x0000 0x5 0x0
+>>>  #define MX6SX_PAD_CSI_DATA07__WEIM_DATA_16
+>0x0068 0x03B0 0x0000 0x6 0x0
+>>>  #define MX6SX_PAD_CSI_DATA07__DCIC1_OUT
+>0x0068 0x03B0 0x0000 0x7 0x0
+>>> @@ -254,7 +254,7 @@
+>>>  #define MX6SX_PAD_CSI_VSYNC__CSI1_VSYNC
+>0x0078 0x03C0 0x0708 0x0 0x0
+>>>  #define MX6SX_PAD_CSI_VSYNC__ESAI_TX5_RX0
+>0x0078 0x03C0 0x07A4 0x1 0x1
+>>>  #define MX6SX_PAD_CSI_VSYNC__AUDMUX_AUD6_RXD
+>0x0078 0x03C0 0x0674 0x2 0x1
+>>> -#define MX6SX_PAD_CSI_VSYNC__UART4_CTS_B
+>0x0078 0x03C0 0x0844 0x3 0x3
+>>> +#define MX6SX_PAD_CSI_VSYNC__UART4_CTS_B
+>0x0078 0x03C0 0x0000 0x3 0x0
+>>>  #define MX6SX_PAD_CSI_VSYNC__MQS_RIGHT
+>0x0078 0x03C0 0x0000 0x4 0x0
+>>>  #define MX6SX_PAD_CSI_VSYNC__GPIO1_IO_25
+>0x0078 0x03C0 0x0000 0x5 0x0
+>>>  #define MX6SX_PAD_CSI_VSYNC__WEIM_DATA_24
+>0x0078 0x03C0 0x0000 0x6 0x0
+>>> @@ -352,7 +352,7 @@
+>>>  #define MX6SX_PAD_ENET2_TX_CLK__ENET2_TX_CLK
+>0x00A0 0x03E8 0x0000 0x0 0x0
+>>>  #define MX6SX_PAD_ENET2_TX_CLK__ENET2_REF_CLK2
+>0x00A0 0x03E8 0x076C 0x1 0x1
+>>>  #define MX6SX_PAD_ENET2_TX_CLK__I2C3_SDA
+>0x00A0 0x03E8 0x07BC 0x2 0x1
+>>> -#define MX6SX_PAD_ENET2_TX_CLK__UART1_CTS_B
+>0x00A0 0x03E8 0x082C 0x3 0x3
+>>> +#define MX6SX_PAD_ENET2_TX_CLK__UART1_CTS_B
+>0x00A0 0x03E8 0x0000 0x3 0x0
+>>>  #define MX6SX_PAD_ENET2_TX_CLK__MLB_CLK
+>0x00A0 0x03E8 0x07E8 0x4 0x1
+>>>  #define MX6SX_PAD_ENET2_TX_CLK__GPIO2_IO_9
+>0x00A0 0x03E8 0x0000 0x5 0x0
+>>>  #define MX6SX_PAD_ENET2_TX_CLK__USB_OTG2_PWR
+>0x00A0 0x03E8 0x0000 0x6 0x0
+>>> @@ -404,7 +404,7 @@
+>>>  #define MX6SX_PAD_KEY_COL4__SAI2_RX_BCLK
+>0x00B4 0x03FC 0x0808 0x7 0x0
+>>>  #define MX6SX_PAD_KEY_ROW0__KPP_ROW_0
+>0x00B8 0x0400 0x0000 0x0 0x0
+>>>  #define MX6SX_PAD_KEY_ROW0__USDHC3_WP
+>0x00B8 0x0400 0x0000 0x1 0x0
+>>> -#define MX6SX_PAD_KEY_ROW0__UART6_CTS_B
+>0x00B8 0x0400 0x0854 0x2 0x3
+>>> +#define MX6SX_PAD_KEY_ROW0__UART6_CTS_B
+>0x00B8 0x0400 0x0000 0x2 0x0
+>>>  #define MX6SX_PAD_KEY_ROW0__ECSPI1_MOSI
+>0x00B8 0x0400 0x0718 0x3 0x0
+>>>  #define MX6SX_PAD_KEY_ROW0__AUDMUX_AUD5_TXD
+>0x00B8 0x0400 0x0660 0x4 0x0
+>>>  #define MX6SX_PAD_KEY_ROW0__GPIO2_IO_15
+>0x00B8 0x0400 0x0000 0x5 0x0
+>>> @@ -423,7 +423,7 @@
+>>>  #define MX6SX_PAD_KEY_ROW1__M4_NMI
+>0x00BC 0x0404 0x0000 0x8 0x0
+>>>  #define MX6SX_PAD_KEY_ROW2__KPP_ROW_2
+>0x00C0 0x0408 0x0000 0x0 0x0
+>>>  #define MX6SX_PAD_KEY_ROW2__USDHC4_WP
+>0x00C0 0x0408 0x0878 0x1 0x1
+>>> -#define MX6SX_PAD_KEY_ROW2__UART5_CTS_B
+>0x00C0 0x0408 0x084C 0x2 0x3
+>>> +#define MX6SX_PAD_KEY_ROW2__UART5_CTS_B
+>0x00C0 0x0408 0x0000 0x2 0x0
+>>>  #define MX6SX_PAD_KEY_ROW2__CAN1_RX
+>0x00C0 0x0408 0x068C 0x3 0x1
+>>>  #define MX6SX_PAD_KEY_ROW2__CANFD_RX1
+>0x00C0 0x0408 0x0694 0x4 0x1
+>>>  #define MX6SX_PAD_KEY_ROW2__GPIO2_IO_17
+>0x00C0 0x0408 0x0000 0x5 0x0
+>>> @@ -815,7 +815,7 @@
+>>>  #define MX6SX_PAD_NAND_DATA05__RAWNAND_DATA05
+>0x0164 0x04AC 0x0000 0x0 0x0
+>>>  #define MX6SX_PAD_NAND_DATA05__USDHC2_DATA5
+>0x0164 0x04AC 0x0000 0x1 0x0
+>>>  #define MX6SX_PAD_NAND_DATA05__QSPI2_B_DQS
+>0x0164 0x04AC 0x0000 0x2 0x0
+>>> -#define MX6SX_PAD_NAND_DATA05__UART3_CTS_B
+>0x0164 0x04AC 0x083C 0x3 0x1
+>>> +#define MX6SX_PAD_NAND_DATA05__UART3_CTS_B
+>0x0164 0x04AC 0x0000 0x3 0x0
+>>>  #define MX6SX_PAD_NAND_DATA05__AUDMUX_AUD4_RXC
+>0x0164 0x04AC 0x064C 0x4 0x0
+>>>  #define MX6SX_PAD_NAND_DATA05__GPIO4_IO_9
+>0x0164 0x04AC 0x0000 0x5 0x0
+>>>  #define MX6SX_PAD_NAND_DATA05__WEIM_AD_5
+>0x0164 0x04AC 0x0000 0x6 0x0
+>>> @@ -957,7 +957,7 @@
+>>>  #define MX6SX_PAD_QSPI1A_SS1_B__SIM_M_HADDR_12
+>0x019C 0x04E4 0x0000 0x7 0x0
+>>>  #define MX6SX_PAD_QSPI1A_SS1_B__SDMA_DEBUG_PC_3
+>0x019C 0x04E4 0x0000 0x9 0x0
+>>>  #define MX6SX_PAD_QSPI1B_DATA0__QSPI1_B_DATA_0
+>0x01A0 0x04E8 0x0000 0x0 0x0
+>>> -#define MX6SX_PAD_QSPI1B_DATA0__UART3_CTS_B
+>0x01A0 0x04E8 0x083C 0x1 0x4
+>>> +#define MX6SX_PAD_QSPI1B_DATA0__UART3_CTS_B
+>0x01A0 0x04E8 0x0000 0x1 0x0
+>>>  #define MX6SX_PAD_QSPI1B_DATA0__ECSPI3_MOSI
+>0x01A0 0x04E8 0x0738 0x2 0x1
+>>>  #define MX6SX_PAD_QSPI1B_DATA0__ESAI_RX_FS
+>0x01A0 0x04E8 0x0778 0x3 0x2
+>>>  #define MX6SX_PAD_QSPI1B_DATA0__CSI1_DATA_22
+>0x01A0 0x04E8 0x06F4 0x4 0x1
+>>> @@ -1236,7 +1236,7 @@
+>>>  #define MX6SX_PAD_SD1_DATA2__AUDMUX_AUD5_TXFS
+>0x0230 0x0578 0x0670 0x1 0x1
+>>>  #define MX6SX_PAD_SD1_DATA2__PWM3_OUT
+>0x0230 0x0578 0x0000 0x2 0x0
+>>>  #define MX6SX_PAD_SD1_DATA2__GPT_COMPARE2
+>0x0230 0x0578 0x0000 0x3 0x0
+>>> -#define MX6SX_PAD_SD1_DATA2__UART2_CTS_B
+>0x0230 0x0578 0x0834 0x4 0x2
+>>> +#define MX6SX_PAD_SD1_DATA2__UART2_CTS_B
+>0x0230 0x0578 0x0000 0x4 0x0
+>>>  #define MX6SX_PAD_SD1_DATA2__GPIO6_IO_4
+>0x0230 0x0578 0x0000 0x5 0x0
+>>>  #define MX6SX_PAD_SD1_DATA2__ECSPI4_RDY
+>0x0230 0x0578 0x0000 0x6 0x0
+>>>  #define MX6SX_PAD_SD1_DATA2__CCM_OUT0
+>0x0230 0x0578 0x0000 0x7 0x0
+>>> @@ -1315,7 +1315,7 @@
+>>>  #define MX6SX_PAD_SD2_DATA3__VADC_CLAMP_CURRENT_3
+>0x024C 0x0594 0x0000 0x8 0x0
+>>>  #define MX6SX_PAD_SD2_DATA3__MMDC_DEBUG_31
+>0x024C 0x0594 0x0000 0x9 0x0
+>>>  #define MX6SX_PAD_SD3_CLK__USDHC3_CLK
+>0x0250 0x0598 0x0000 0x0 0x0
+>>> -#define MX6SX_PAD_SD3_CLK__UART4_CTS_B
+>0x0250 0x0598 0x0844 0x1 0x0
+>>> +#define MX6SX_PAD_SD3_CLK__UART4_CTS_B
+>0x0250 0x0598 0x0000 0x1 0x0
+>>>  #define MX6SX_PAD_SD3_CLK__ECSPI4_SCLK
+>0x0250 0x0598 0x0740 0x2 0x0
+>>>  #define MX6SX_PAD_SD3_CLK__AUDMUX_AUD6_RXFS
+>0x0250 0x0598 0x0680 0x3 0x0
+>>>  #define MX6SX_PAD_SD3_CLK__LCDIF2_VSYNC
+>0x0250 0x0598 0x0000 0x4 0x0
+>>> @@ -1409,7 +1409,7 @@
+>>>  #define MX6SX_PAD_SD3_DATA7__USDHC3_DATA7
+>0x0274 0x05BC 0x0000 0x0 0x0
+>>>  #define MX6SX_PAD_SD3_DATA7__CAN1_RX
+>0x0274 0x05BC 0x068C 0x1 0x0
+>>>  #define MX6SX_PAD_SD3_DATA7__CANFD_RX1
+>0x0274 0x05BC 0x0694 0x2 0x0
+>>> -#define MX6SX_PAD_SD3_DATA7__UART3_CTS_B
+>0x0274 0x05BC 0x083C 0x3 0x3
+>>> +#define MX6SX_PAD_SD3_DATA7__UART3_CTS_B
+>0x0274 0x05BC 0x0000 0x3 0x0
+>>>  #define MX6SX_PAD_SD3_DATA7__LCDIF2_DATA_5
+>0x0274 0x05BC 0x0000 0x4 0x0
+>>>  #define MX6SX_PAD_SD3_DATA7__GPIO7_IO_9
+>0x0274 0x05BC 0x0000 0x5 0x0
+>>>  #define MX6SX_PAD_SD3_DATA7__ENET1_1588_EVENT0_IN
+>0x0274 0x05BC 0x0000 0x6 0x0
+>>> @@ -1510,7 +1510,7 @@
+>>>  #define MX6SX_PAD_SD4_DATA6__SDMA_DEBUG_EVENT_CHANNEL_1
+>0x0298 0x05E0 0x0000 0x9 0x0
+>>>  #define MX6SX_PAD_SD4_DATA7__USDHC4_DATA7
+>0x029C 0x05E4 0x0000 0x0 0x0
+>>>  #define MX6SX_PAD_SD4_DATA7__RAWNAND_DATA08
+>0x029C 0x05E4 0x0000 0x1 0x0
+>>> -#define MX6SX_PAD_SD4_DATA7__UART5_CTS_B
+>0x029C 0x05E4 0x084C 0x2 0x1
+>>> +#define MX6SX_PAD_SD4_DATA7__UART5_CTS_B
+>0x029C 0x05E4 0x0000 0x2 0x0
+>>>  #define MX6SX_PAD_SD4_DATA7__ECSPI3_SS0
+>0x029C 0x05E4 0x073C 0x3 0x0
+>>>  #define MX6SX_PAD_SD4_DATA7__LCDIF2_DATA_15
+>0x029C 0x05E4 0x0000 0x4 0x0
+>>>  #define MX6SX_PAD_SD4_DATA7__GPIO6_IO_21
+>0x029C 0x05E4 0x0000 0x5 0x0
+>>> --
+>>> 1.7.8
+>>>
+>
+>--
+>David Wolfe
+>MPU Software Apps
+>Freescale Semiconductor, Inc.
+>david.wolfe at freescale.com
