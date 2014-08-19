@@ -1,72 +1,158 @@
-From: Varun.Sethi@freescale.com (Varun Sethi)
-Date: Tue, 19 Aug 2014 12:11:43 +0000
-Subject: [PATCH v5] devicetree: Add generic IOMMU device tree bindings
-In-Reply-To: <20140815115110.GO27466@arm.com>
-References: <1406803383-11601-1-git-send-email-thierry.reding@gmail.com>
- <87a9774lf5.fsf@nvidia.com> <20140815115110.GO27466@arm.com>
-Message-ID: <6a3d4048ddb84bd19c847adf7f02fc52@BL2PR03MB468.namprd03.prod.outlook.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 19 Aug 2014 13:11:42 +0100
+Subject: [PATCHv3 2/2] arm64: Add CONFIG_DEBUG_SET_MODULE_RONX support
+In-Reply-To: <1407886667-16919-3-git-send-email-lauraa@codeaurora.org>
+References: <1407886667-16919-1-git-send-email-lauraa@codeaurora.org>
+ <1407886667-16919-3-git-send-email-lauraa@codeaurora.org>
+Message-ID: <20140819121142.GC23128@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will,
+Hi Laura,
 
-> -----Original Message-----
-> From: iommu-bounces at lists.linux-foundation.org [mailto:iommu-
-> bounces at lists.linux-foundation.org] On Behalf Of Will Deacon
-> Sent: Friday, August 15, 2014 5:21 PM
-> To: Hiroshi Doyu
-> Cc: Mark Rutland; devicetree at vger.kernel.org; Stephen Warren; Arnd
-> Bergmann; Rob Herring; iommu at lists.linux-foundation.org; Thierry Reding;
-> linux-tegra at vger.kernel.org; linux-arm-kernel at lists.infradead.org
-> Subject: Re: [PATCH v5] devicetree: Add generic IOMMU device tree bindings
-> 
-> On Thu, Aug 14, 2014 at 07:47:42AM +0100, Hiroshi Doyu wrote:
-> > Thierry Reding <thierry.reding@gmail.com> writes:
-> >
-> > > +Multiple-master IOMMU:
-> > > +----------------------
-> > > +
-> > > +       iommu {
-> > > +               /* the specifier represents the ID of the master */
-> > > +               #iommu-cells = <1>;
-> > > +       };
-> > > +
-> > > +       master at 1 {
-> > > +               /* device has master ID 42 in the IOMMU */
-> > > +               iommus = <&{/iommu} 42>;
-> > > +       };
-> > > +
-> > > +       master at 2 {
-> > > +               /* device has master IDs 23 and 24 in the IOMMU */
-> > > +               iommus = <&{/iommu} 23>, <&{/iommu} 24>;
-> > > +       };
-> >
-> > I think that this "master ID" will be parsed in IOMMU driver. For
-> > example, ARM,SMMU expects "streamID" as "master ID", right?
-> >
-> > If a SoC has a feature to configure to assign streamID to devices at
-> > runtime, "streamID" is not equal to "master ID".
-> >
-> >   iommus = <&{/smmu} "soc specific master ID">;
-> >
-> > "soc master ID" needs to be translated into "streamID" by SoC SW. It
-> > seems that ARM,SMMU kernel driver doesn't expect this kind of ID
-> > translation. If ARM,SMMU kernel driver is used as is, "soc master ID"
-> > would be incompatible? ARM,SMMU needs such translation before parsing.
-> > Is this my understanding right?
-> >
-> > If so I think that this master ID configuration/translation may be
-> > quite reasonable requirment for SoC using ARM,SMMU.
-> >
-> > Can we consider this ID translation within ARM,SMMU compatibility?
-> >
-> > IOW, is it possible to implement some SoC specific hook for ID
-> > translation/configuration in ARM,SMMU kernel driver?
-> 
-> I think there's some confusion here. The ARM architected SMMU does not
-> perform any StreamID translation -- it sees an incoming ID and uses that to
-> lookup a set of translation tables. 
+On Wed, Aug 13, 2014 at 12:37:47AM +0100, Laura Abbott wrote:
+> In a similar fashion to other architecture, add the infrastructure
+> and Kconfig to enable DEBUG_SET_MODULE_RONX support. When
+> enabled, module ranges will be marked read-only/no-execute as
+> appropriate.
 
-I don't completely agree with this. In case of MMU-500  don't we have the "TBUID + device assigned stream ID" representing the stream ID for matching at the TCU? In case of our platform, we have hot pluggable device objects comprising of devices connected to different TBUs. We have a requirement to use a single stream ID for all the distributed objects. We will have to use the stream ID masking capability to mask out the TBU ID.
+[...]
 
--Varun
+> diff --git a/arch/arm64/mm/pageattr.c b/arch/arm64/mm/pageattr.c
+> new file mode 100644
+> index 0000000..13573da
+> --- /dev/null
+> +++ b/arch/arm64/mm/pageattr.c
+> @@ -0,0 +1,118 @@
+> +/*
+> + * Copyright (c) 2014, The Linux Foundation. All rights reserved.
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 and
+> + * only version 2 as published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + */
+> +#include <linux/kernel.h>
+> +#include <linux/mm.h>
+> +#include <linux/module.h>
+> +#include <linux/sched.h>
+> +
+> +#include <asm/pgtable.h>
+> +#include <asm/tlbflush.h>
+> +
+> +static int __change_memory(pte_t *ptep, pgtable_t token, unsigned long addr,
+> +			pgprot_t prot, bool set)
+> +{
+> +	pte_t pte;
+> +
+> +	if (set)
+> +		pte = set_pte_bit(*ptep, prot);
+> +	else
+> +		pte = clear_pte_bit(*ptep, prot);
+> +	set_pte(ptep, pte);
+> +	return 0;
+> +}
+
+Why do we need to propagate the token this far?
+
+> +static int set_page_range(pte_t *ptep, pgtable_t token, unsigned long addr,
+> +			void *data)
+> +{
+> +	pgprot_t prot = (pgprot_t)data;
+> +
+> +	return __change_memory(ptep, token, addr, prot, true);
+> +}
+> +
+> +static int clear_page_range(pte_t *ptep, pgtable_t token, unsigned long addr,
+> +			void *data)
+> +{
+> +	pgprot_t prot = (pgprot_t)data;
+> +
+> +	return __change_memory(ptep, token, addr, prot, false);
+> +}
+> +
+> +static int change_memory_common(unsigned long addr, int numpages,
+> +				pgprot_t prot, bool set)
+> +{
+> +	unsigned long start = addr;
+> +	unsigned long size = PAGE_SIZE*numpages;
+> +	unsigned long end = start + size;
+> +	int ret;
+> +
+> +	if (!is_module_address(start) || !is_module_address(end))
+> +		return -EINVAL;
+> +
+> +	if (set)
+> +		ret = apply_to_page_range(&init_mm, start, size,
+> +					set_page_range, (void *)prot);
+> +	else
+> +		ret = apply_to_page_range(&init_mm, start, size,
+> +					clear_page_range, (void *)prot);
+
+What if addr isn't page-aligned?
+
+> +	flush_tlb_kernel_range(start, end);
+> +	return ret;
+> +}
+> +
+> +static int change_memory_set_bit(unsigned long addr, int numpages,
+> +					pgprot_t prot)
+> +{
+> +	return change_memory_common(addr, numpages, prot, true);
+> +}
+> +
+> +static int change_memory_clear_bit(unsigned long addr, int numpages,
+> +					pgprot_t prot)
+> +{
+> +	return change_memory_common(addr, numpages, prot, false);
+> +}
+> +
+> +int set_memory_ro(unsigned long addr, int numpages)
+> +{
+> +	int ret;
+> +
+> +	ret = change_memory_clear_bit(addr, numpages, __pgprot(PTE_WRITE));
+> +	if (ret)
+> +		return ret;
+
+I'm slightly uncomfortable with this. Can other cores make the pages
+writable again here before we've set R/O? I think this would be neater if,
+instead of explicit set/clear operations, we had a single function that
+takes a set mask and a clear mask and writes the page table once (we also
+avoid the extra TLBI that way)
+
+> +	return change_memory_set_bit(addr, numpages, __pgprot(PTE_RDONLY));
+> +}
+> +EXPORT_SYMBOL_GPL(set_memory_ro);
+> +
+> +int set_memory_rw(unsigned long addr, int numpages)
+> +{
+> +	int ret;
+> +
+> +	ret = change_memory_set_bit(addr, numpages, __pgprot(PTE_WRITE));
+> +	if (ret)
+> +		return ret;
+> +
+> +	return change_memory_clear_bit(addr, numpages, __pgprot(PTE_RDONLY));
+> +}
+> +EXPORT_SYMBOL_GPL(set_memory_rw);
+> +
+> +int set_memory_nx(unsigned long addr, int numpages)
+> +{
+> +	return change_memory_set_bit(addr, numpages, __pgprot(PTE_PXN));
+> +}
+> +EXPORT_SYMBOL_GPL(set_memory_nx);
+> +
+> +int set_memory_x(unsigned long addr, int numpages)
+> +{
+> +	return change_memory_clear_bit(addr, numpages, __pgprot(PTE_PXN));
+> +}
+
+What about UXN? (I don't have the ARM ARM to hand, but we may want to set
+both)
+
+Will
