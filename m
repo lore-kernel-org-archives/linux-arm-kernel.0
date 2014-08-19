@@ -1,95 +1,62 @@
 From: dianders@chromium.org (Doug Anderson)
-Date: Tue, 19 Aug 2014 09:05:31 -0700
-Subject: [PATCH 4/4] ARM: dts: Enable pwm backlight on rk3288-EVB
-In-Reply-To: <20140819072220.GE12859@ulmo>
-References: <1408381749-14156-1-git-send-email-dianders@chromium.org>
- <1408381749-14156-5-git-send-email-dianders@chromium.org>
- <20140819072220.GE12859@ulmo>
-Message-ID: <CAD=FV=Vis=0bOMTMxSp4Vqv13dpdB-akiumNoOuiR9ZxtOemow@mail.gmail.com>
+Date: Tue, 19 Aug 2014 09:07:52 -0700
+Subject: [PATCH v3 0/4] PWM changes for rk3288-evb
+Message-ID: <1408464476-28316-1-git-send-email-dianders@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thierry,
+These patches enable the PWM backlight for the rk3288-evb board.
+There were tested by watching the backlight grow from off to max with
+the following instructions:
 
-On Tue, Aug 19, 2014 at 12:22 AM, Thierry Reding
-<thierry.reding@gmail.com> wrote:
-> On Mon, Aug 18, 2014 at 10:09:09AM -0700, Doug Anderson wrote:
->> The pwm0 is the PWM associated with the LCD backlight.  Enable it.
->
-> In the subject, s/pwm/PWM/.
+  cd /sys/class/backlight/backlight*/
+  for i in $(seq 255); do echo $i > brightness; sleep .01; done
 
-Done.
+The first patch enables the proper IP.  I think it could land in
+Heiko's tree.
 
+The second patch switches PWM cells from 2 to 3 on rk3288.  I think it
+could land in Thierry's tree.  With the PWM subsystem as currently
+structured, I believe this will break backward compatibility.  However
+the rk3288 PWM driver was added so recently (and the rk3288 is so new)
+that this seems OK.  In the worst case if someone yells that they are
+broken, I believe we could fix this in Linux by saying that if a PWM
+driver specifies 3 cells and the DTS definition of the PWM says 2
+cells that we'll just pretend that we have no flags.
 
->> Signed-off-by: Doug Anderson <dianders@chromium.org>
->> ---
->>  arch/arm/boot/dts/rk3288-evb.dtsi | 53 +++++++++++++++++++++++++++++++++++++++
->>  1 file changed, 53 insertions(+)
->>
->> diff --git a/arch/arm/boot/dts/rk3288-evb.dtsi b/arch/arm/boot/dts/rk3288-evb.dtsi
->> index 2964370..242e1a9 100644
->> --- a/arch/arm/boot/dts/rk3288-evb.dtsi
->> +++ b/arch/arm/boot/dts/rk3288-evb.dtsi
->> @@ -10,6 +10,7 @@
->>   * GNU General Public License for more details.
->>   */
->>
->> +#include <dt-bindings/pwm/pwm.h>
->>  #include "rk3288.dtsi"
->>
->>  / {
->> @@ -17,6 +18,48 @@
->>               reg = <0x0 0x80000000>;
->>       };
->>
->> +        backlight {
->
-> Indentation seems to be off here.
+The 3rd and 4th patches are DTS ones.  They could land in Heiko's tree
+after the second patch has landed.  They are based atop his current
+WIP 3.18 dts tree.  Note that instantiating the PWM backlight will
+cause the system to hang unless Heiko's (clk: rockchip: protect
+critical clocks from getting disabled)
+<patchwork.kernel.org/patch/4725391> is landed.
 
-Good catch.  Done.
+There are no compile time or runtime dependencies between these
+patches except that patch #3 needs to come before patch #4.  ...and of
+course the PWM won't work without all 4 patches.
 
+Changes in v3:
+- Don't store a private copy of polarity.
+- Use true instead of 1.
+- Cleanup init order with "has_invert".
+- Fix space to tab in 2 places in DTS.
+- Make sure PWM is upper case in prose.
 
->> +             compatible = "pwm-backlight";
->> +             brightness-levels = <
->> +                       0   1   2   3   4   5   6   7
->> +                       8   9  10  11  12  13  14  15
->> +                      16  17  18  19  20  21  22  23
->> +                      24  25  26  27  28  29  30  31
->> +                      32  33  34  35  36  37  38  39
->> +                      40  41  42  43  44  45  46  47
->> +                      48  49  50  51  52  53  54  55
->> +                      56  57  58  59  60  61  62  63
->> +                      64  65  66  67  68  69  70  71
->> +                      72  73  74  75  76  77  78  79
->> +                      80  81  82  83  84  85  86  87
->> +                      88  89  90  91  92  93  94  95
->> +                      96  97  98  99 100 101 102 103
->> +                     104 105 106 107 108 109 110 111
->> +                     112 113 114 115 116 117 118 119
->> +                     120 121 122 123 124 125 126 127
->> +                     128 129 130 131 132 133 134 135
->> +                     136 137 138 139 140 141 142 143
->> +                     144 145 146 147 148 149 150 151
->> +                     152 153 154 155 156 157 158 159
->> +                     160 161 162 163 164 165 166 167
->> +                     168 169 170 171 172 173 174 175
->> +                     176 177 178 179 180 181 182 183
->> +                     184 185 186 187 188 189 190 191
->> +                     192 193 194 195 196 197 198 199
->> +                     200 201 202 203 204 205 206 207
->> +                     208 209 210 211 212 213 214 215
->> +                     216 217 218 219 220 221 222 223
->> +                     224 225 226 227 228 229 230 231
->> +                     232 233 234 235 236 237 238 239
->> +                     240 241 242 243 244 245 246 247
->> +                     248 249 250 251 252 253 254 255>;
->> +             default-brightness-level = <128>;
->> +             enable-gpios = <&gpio7 2 GPIO_ACTIVE_HIGH>;
->> +             pinctrl-names = "default";
->> +             pinctrl-0 = <&bl_en>;
->> +             pwms = <&pwm0 0 1000000 PWM_POLARITY_INVERTED>;
->> +        };
->
-> And here.
+Changes in v2:
+- Check for failed ioremap()
 
-Done.
+Doug Anderson (4):
+  ARM: rockchip: rk3288: Switch to use the proper PWM IP
+  pwm: rockchip: Allow polarity invert on rk3288
+  ARM: dts: Add main PWM info to rk3288
+  ARM: dts: Enable PWM backlight on rk3288-EVB
+
+ .../devicetree/bindings/pwm/pwm-rockchip.txt       |  4 +-
+ arch/arm/boot/dts/rk3288-evb.dtsi                  | 53 +++++++++++++++++
+ arch/arm/boot/dts/rk3288.dtsi                      | 68 ++++++++++++++++++++++
+ arch/arm/mach-rockchip/rockchip.c                  | 24 ++++++++
+ drivers/pwm/pwm-rockchip.c                         | 48 ++++++++++++---
+ 5 files changed, 188 insertions(+), 9 deletions(-)
+
+-- 
+2.1.0.rc2.206.gedb03e5
