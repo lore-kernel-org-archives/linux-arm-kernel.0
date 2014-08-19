@@ -1,158 +1,175 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 19 Aug 2014 13:11:42 +0100
-Subject: [PATCHv3 2/2] arm64: Add CONFIG_DEBUG_SET_MODULE_RONX support
-In-Reply-To: <1407886667-16919-3-git-send-email-lauraa@codeaurora.org>
-References: <1407886667-16919-1-git-send-email-lauraa@codeaurora.org>
- <1407886667-16919-3-git-send-email-lauraa@codeaurora.org>
-Message-ID: <20140819121142.GC23128@arm.com>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Tue, 19 Aug 2014 20:11:08 +0800
+Subject: [PATCH v2 08/18] ARM64 / ACPI: Get the enable method for SMP
+ initialization in ACPI way
+In-Reply-To: <1408388212.22761.100.camel@smoke>
+References: <1407166105-17675-1-git-send-email-hanjun.guo@linaro.org>	
+ <1407166105-17675-9-git-send-email-hanjun.guo@linaro.org>
+ <1408388212.22761.100.camel@smoke>
+Message-ID: <53F33EDC.3090203@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Laura,
+On 2014-8-19 2:56, Geoff Levand wrote:
+> Hi Hanjun,
 
-On Wed, Aug 13, 2014 at 12:37:47AM +0100, Laura Abbott wrote:
-> In a similar fashion to other architecture, add the infrastructure
-> and Kconfig to enable DEBUG_SET_MODULE_RONX support. When
-> enabled, module ranges will be marked read-only/no-execute as
-> appropriate.
+Hi Geoff,
 
-[...]
+> 
+> On Mon, 2014-08-04 at 23:28 +0800, Hanjun Guo wrote:
+>> --- a/arch/arm64/include/asm/acpi.h
+>> +++ b/arch/arm64/include/asm/acpi.h
+>> @@ -14,6 +14,27 @@
+>>  
+>>  /* Basic configuration for ACPI */
+>>  #ifdef	CONFIG_ACPI
+> 
+> By having this preprocessor conditional in the header leads
+> to a proliferation of preprocessor conditionals since any
+> code that includes this header will also need to have
+> preprocessor conditionals.  Another down side of having
+> this is that this code will not get a build test for
+> builds with CONFIG_ACPI=n.
 
-> diff --git a/arch/arm64/mm/pageattr.c b/arch/arm64/mm/pageattr.c
-> new file mode 100644
-> index 0000000..13573da
-> --- /dev/null
-> +++ b/arch/arm64/mm/pageattr.c
-> @@ -0,0 +1,118 @@
-> +/*
-> + * Copyright (c) 2014, The Linux Foundation. All rights reserved.
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 and
-> + * only version 2 as published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + */
-> +#include <linux/kernel.h>
-> +#include <linux/mm.h>
-> +#include <linux/module.h>
-> +#include <linux/sched.h>
-> +
-> +#include <asm/pgtable.h>
-> +#include <asm/tlbflush.h>
-> +
-> +static int __change_memory(pte_t *ptep, pgtable_t token, unsigned long addr,
-> +			pgprot_t prot, bool set)
-> +{
-> +	pte_t pte;
-> +
-> +	if (set)
-> +		pte = set_pte_bit(*ptep, prot);
-> +	else
-> +		pte = clear_pte_bit(*ptep, prot);
-> +	set_pte(ptep, pte);
-> +	return 0;
-> +}
+I will move some definitions out of preprocessor conditional and
+introduce some stub function when CONFIG_ACPI is disabled, then
+I think I can remove all the preprocessor conditionals in .c file.
 
-Why do we need to propagate the token this far?
+> 
+>> +/*
+>> + * ACPI 5.1 only has two explicit methods to
+>> + * boot up SMP, PSCI and Parking protocol,
+>> + * but the Parking protocol is only defined
+>> + * for ARMv7 now, so make PSCI as the only
+>> + * way for the SMP boot protocol before some
+>> + * updates for the ACPI spec or the Parking
+>> + * protocol spec.
+>> + *
+>> + * This enum is intend to make the boot method
+>> + * scalable when above updates are happended,
+>> + * which NOT means to support all of them.
+>> + */
+>> +enum acpi_smp_boot_protocol {
+>> +	ACPI_SMP_BOOT_PSCI,
+>> +	ACPI_SMP_BOOT_PARKING_PROTOCOL,
+>> +	ACPI_SMP_BOOT_PROTOCOL_MAX
+>> +};
+>> +
+>> +enum acpi_smp_boot_protocol smp_boot_protocol(void);
+> 
+> The name smp_boot_protocol() seems like it would be a generic
+> routine, but it is acpi specific.  Maybe:
+> 
+> enum acpi_boot_protocol_type {...};
+> 
+> enum acpi_boot_protocol_type acpi_boot_protocol(void);
 
-> +static int set_page_range(pte_t *ptep, pgtable_t token, unsigned long addr,
-> +			void *data)
-> +{
-> +	pgprot_t prot = (pgprot_t)data;
-> +
-> +	return __change_memory(ptep, token, addr, prot, true);
-> +}
-> +
-> +static int clear_page_range(pte_t *ptep, pgtable_t token, unsigned long addr,
-> +			void *data)
-> +{
-> +	pgprot_t prot = (pgprot_t)data;
-> +
-> +	return __change_memory(ptep, token, addr, prot, false);
-> +}
-> +
-> +static int change_memory_common(unsigned long addr, int numpages,
-> +				pgprot_t prot, bool set)
-> +{
-> +	unsigned long start = addr;
-> +	unsigned long size = PAGE_SIZE*numpages;
-> +	unsigned long end = start + size;
-> +	int ret;
-> +
-> +	if (!is_module_address(start) || !is_module_address(end))
-> +		return -EINVAL;
-> +
-> +	if (set)
-> +		ret = apply_to_page_range(&init_mm, start, size,
-> +					set_page_range, (void *)prot);
-> +	else
-> +		ret = apply_to_page_range(&init_mm, start, size,
-> +					clear_page_range, (void *)prot);
+Agreed.
 
-What if addr isn't page-aligned?
+> 
+>> --- a/arch/arm64/kernel/cpu_ops.c
+>> +++ b/arch/arm64/kernel/cpu_ops.c
+>> @@ -49,12 +51,44 @@ static const struct cpu_operations * __init cpu_get_ops(const char *name)
+>>  	return NULL;
+>>  }
+>>  
+>> +#ifdef CONFIG_ACPI
+>> +/*
+>> + * Get a cpu's boot method in the ACPI way.
+>> + */
+>> +static char * __init acpi_get_cpu_boot_method(void)
+>> +{
+>> +	/*
+>> +	 * For ACPI 5.1, only two kind of methods are provided,
+>> +	 * Parking protocol and PSCI, but Parking protocol is
+>> +	 * specified for ARMv7 only, so make PSCI as the only method
+>> +	 * for SMP initialization before the ACPI spec or Parking
+>> +	 * protocol spec is updated.
+>> +	 */
+>> +	switch (smp_boot_protocol()) {
+>> +	case ACPI_SMP_BOOT_PSCI:
+>> +		return "psci";
+>> +	case ACPI_SMP_BOOT_PARKING_PROTOCOL:
+>> +	default:
+>> +		return NULL;
+>> +	}
+>> +}
+>> +#else
+>> +static inline char * __init acpi_get_cpu_boot_method(void) { return NULL; }
+>> +#endif
+> 
+> Since this is inside a C source file, the inline keyword
+> isn't needed since the optimizer will inline regardless.
+> 
+> With that said, I think it would be cleaner to have this
+> as:
+> 
+> static char * __init acpi_get_cpu_boot_method(void)
+> {
+> #ifdef CONFIG_ACPI
+> 	return NULL;
+> #else
+>  ...
+> #endif
+> }
+> 
+> Or better to make smp_boot_protocol() callable regardless
+> of CONFIG_ACPI and then no preprocessor conditionals at all
+> would be needed.
+> 
+>> +
+>>  /*
+>> - * Read a cpu's enable method from the device tree and record it in cpu_ops.
+>> + * Read a cpu's enable method and record it in cpu_ops.
+>>   */
+>>  int __init cpu_read_ops(struct device_node *dn, int cpu)
+>>  {
+>> -	const char *enable_method = of_get_property(dn, "enable-method", NULL);
+>> +	const char *enable_method;
+>> +
+>> +	if (!acpi_disabled) {
+>> +		enable_method = acpi_get_cpu_boot_method();
+>> +		goto get_ops;
+>> +	}
+>> +
+>> +	enable_method = of_get_property(dn, "enable-method", NULL);
+>>  	if (!enable_method) {
+>>  		/*
+>>  		 * The boot CPU may not have an enable method (e.g. when
+>> @@ -66,10 +100,17 @@ int __init cpu_read_ops(struct device_node *dn, int cpu)
+>>  		return -ENOENT;
+>>  	}
+>>  
+>> +get_ops:
+>>  	cpu_ops[cpu] = cpu_get_ops(enable_method);
+>>  	if (!cpu_ops[cpu]) {
+>> -		pr_warn("%s: unsupported enable-method property: %s\n",
+>> -			dn->full_name, enable_method);
+>> +		if (acpi_disabled) {
+>> +			pr_warn("%s: unsupported enable-method property: %s\n",
+>> +				dn->full_name, enable_method);
+>> +		} else {
+>> +			pr_warn("CPU %d: boot protocol unsupported or unknown\n",
+>> +				cpu);
+>> +		}
+>> +
+> 
+> Can't we have this more integrated, maybe something like this?
+> 
+> 	enable_method = acpi_disabled ? of_get_property(dn, "enable-method", NULL)
+> 		: acpi_get_cpu_boot_method();
 
-> +	flush_tlb_kernel_range(start, end);
-> +	return ret;
-> +}
-> +
-> +static int change_memory_set_bit(unsigned long addr, int numpages,
-> +					pgprot_t prot)
-> +{
-> +	return change_memory_common(addr, numpages, prot, true);
-> +}
-> +
-> +static int change_memory_clear_bit(unsigned long addr, int numpages,
-> +					pgprot_t prot)
-> +{
-> +	return change_memory_common(addr, numpages, prot, false);
-> +}
-> +
-> +int set_memory_ro(unsigned long addr, int numpages)
-> +{
-> +	int ret;
-> +
-> +	ret = change_memory_clear_bit(addr, numpages, __pgprot(PTE_WRITE));
-> +	if (ret)
-> +		return ret;
+I like this :)
 
-I'm slightly uncomfortable with this. Can other cores make the pages
-writable again here before we've set R/O? I think this would be neater if,
-instead of explicit set/clear operations, we had a single function that
-takes a set mask and a clear mask and writes the page table once (we also
-avoid the extra TLBI that way)
+> 	message = acpi_disabled ? dn->full_name : "";
+> 
+> 	...
+> 	
+> 	pr_warn("CPU %d: %s unsupported enable-method property: %s\n",
+> 				cpu, message, enable_method)
 
-> +	return change_memory_set_bit(addr, numpages, __pgprot(PTE_RDONLY));
-> +}
-> +EXPORT_SYMBOL_GPL(set_memory_ro);
-> +
-> +int set_memory_rw(unsigned long addr, int numpages)
-> +{
-> +	int ret;
-> +
-> +	ret = change_memory_set_bit(addr, numpages, __pgprot(PTE_WRITE));
-> +	if (ret)
-> +		return ret;
-> +
-> +	return change_memory_clear_bit(addr, numpages, __pgprot(PTE_RDONLY));
-> +}
-> +EXPORT_SYMBOL_GPL(set_memory_rw);
-> +
-> +int set_memory_nx(unsigned long addr, int numpages)
-> +{
-> +	return change_memory_set_bit(addr, numpages, __pgprot(PTE_PXN));
-> +}
-> +EXPORT_SYMBOL_GPL(set_memory_nx);
-> +
-> +int set_memory_x(unsigned long addr, int numpages)
-> +{
-> +	return change_memory_clear_bit(addr, numpages, __pgprot(PTE_PXN));
-> +}
+In ACPI, there is no enable-method property, it is a term from, so I think the
+message printed can be separated.
 
-What about UXN? (I don't have the ARM ARM to hand, but we may want to set
-both)
-
-Will
+Thanks
+Hanjun
