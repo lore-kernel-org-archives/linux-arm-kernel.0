@@ -1,221 +1,69 @@
-From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Tue, 19 Aug 2014 17:35:41 +0800
-Subject: [PATCH v2 02/18] ARM64 / ACPI: Get RSDP and ACPI boot-time tables
-In-Reply-To: <53F24632.7030903@arm.com>
-References: <1407166105-17675-1-git-send-email-hanjun.guo@linaro.org>
- <1407166105-17675-3-git-send-email-hanjun.guo@linaro.org>
- <53F24632.7030903@arm.com>
-Message-ID: <53F31A6D.5090104@linaro.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 19 Aug 2014 10:42:47 +0100
+Subject: [PATCH v2] imx-drm: imx-drm-core: add suspend/resume support
+In-Reply-To: <20140819091641.GA1349@kroah.com>
+References: <1406269240-24622-1-git-send-email-shawn.guo@freescale.com>
+ <20140818062532.GC2114@dragon>
+ <20140819080808.GB30401@n2100.arm.linux.org.uk>
+ <20140819091641.GA1349@kroah.com>
+Message-ID: <20140819094247.GC30401@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2014-8-19 2:30, Sudeep Holla wrote:
-> On 04/08/14 16:28, Hanjun Guo wrote:
->> From: Al Stone <al.stone@linaro.org>
->>
->> As we want to get ACPI tables to parse and then use the information
->> for system initialization, we should get the RSDP (Root System
->> Description Pointer) first, it then locates Extended Root Description
->> Table (XSDT) which contains all the 64-bit physical address that
->> pointer to other boot-time tables.
->>
->> Introduce acpi.c and its related head file in this patch to provide
->> fundamental needs of extern variables and functions for ACPI core,
->> and then get boot-time tables as needed.
->>    - asm/cpu.h need for ACPI core and will be updated in the future to
->>      add definitions for arch_(un)register_cpu which are required for
->>      ACPI based physical CPU hotplug;
+On Tue, Aug 19, 2014 at 04:16:41AM -0500, Greg KH wrote:
+> On Tue, Aug 19, 2014 at 09:08:08AM +0100, Russell King - ARM Linux wrote:
+> > On Mon, Aug 18, 2014 at 02:25:34PM +0800, Shawn Guo wrote:
+> > > On Fri, Jul 25, 2014 at 02:20:40PM +0800, Shawn Guo wrote:
+> > > > HDMI currently stops working after a system suspend/resume cycle.  The
+> > > > cause is that the mode setting states in hardware gets lost and isn't
+> > > > restored across the suspend/resume cycle.
+> > > > 
+> > > > The patch adds a very basic suspend/resume support to imx-drm driver,
+> > > > and calls drm_helper_resume_force_mode() in .resume hook to restore the
+> > > > mode setting states, so that HDMI can continue working after a system
+> > > > suspend/resume cycle.
+> > > > 
+> > > > Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
+> > > 
+> > > Hi Russell,
+> > > 
+> > > What's your take on this patch?
+> > 
+> > I've mostly stepped away from collecting imx-drm patches for Greg, and
+> > I'm probably going to be dropping those patches which I had queued up
+> > a while back for Greg.
+> > 
+> > Greg wishes me to use signed tags for pull requests.  This is not how I
+> > work, and would mean having to rewrite a bunch of my scripts to cater
+> > for Greg's special case.  No one else requires this.
 > 
-> This can go away now, as it's already present in v3.17-rc1
+> "special case"?  That's what Linus wants from everyone as well, how hard
+> is it to add a simple line to your scripts that does:
+> 	git tag -u ${KEY} -s ${TREE} ${BRANCH}
 
-Thanks for the reminding, I will rebase this patch set on top of
-3.17-rc1 and remove the outdated description.
+Linus is perfectly happy with my pull requests as is.  That's because he
+knows their format (which pre-dates git) and it includes protection
+against modification of the requested git tree by including the SHA
+hash of the top most commit, which was agreed at the time of the
+kernel.org break-in as an acceptable alternative approach to signed
+tags.
 
+> before doing:
+> 	git request-pull .... ${TREE}
 > 
->>    - asm/acenv.h for arch specific ACPICA environments and
->>      implementation;
->>    - asm/acpi.h for arch specific variables and functions needed by
->>      ACPI driver core;
->>    - acpi.c for ARM64 related ACPI implementation for ACPI driver
->>      core;
->>
->> acpi_boot_table_init() is introduced to get RSDP and boot-time tables,
->> it will be called in setup_arch() before paging_init(), so we should
->> use eary_memremap() mechanism here to get the RSDP and all the table
->> pointers.
-[...]
->> +
->> +/*
->> + * Checking for the posibility that the CPU can be initialized from the MADT.
->> + * It's used from ACPI core in crash kernel case where boot CPU is not
->> + * necessarily CPU0 like spec demands. Since MADT must provide at least one
-> 
-> Do you mean ACPI spec demands CPU0 to be boot cpu ?
+> It's just a simple one line addition, right?  What am I missing here?
 
-ACPI spec demands CPU0 (BSP) should be the first entry in MADT.
+I don't use git request-pull.  I have my own suite of scripts which
+generate a set of formatted patches in mbox format, combined patches,
+and the pull request email template, and uploading the appropriate
+branches and patches to the server.  They're also more than 10 years
+old, which shows how long Linus has been happy with my process.
 
-> 
-> IIUC it's basically to handle UP system with SMP kernel. IWO if all the
-> ACPI resources are reused from SMP system to boot UP system with SMP
-> kernel, with this check the ACPI core won't override the CPU index
-> obtained from GIC/APIC mapping to zero.
+> You should be using signed tags for your other trees as well, it's not
+> just me who should be asking you for this...
 
-Yes, you are right, I will update the comments.
+You are the only one who has been asking me for it.
 
-> 
->> + * GICC structure for GIC initialization, CPU will be always available in
->> + * MADT on ARM64.
->> + */
->> +static inline bool acpi_has_cpu_in_madt(void)
->> +{
->> +    return 1;
-> 
-> probably true instead of 1
-
-ok.
-
-> 
->> +}
->> +
->> +static inline void arch_fix_phys_package_id(int num, u32 slot) { }
->> +
->> +#endif /* CONFIG_ACPI */
->> +
->> +#endif /*_ASM_ACPI_H*/
->> diff --git a/arch/arm64/include/asm/cpu.h b/arch/arm64/include/asm/cpu.h
->> new file mode 100644
->> index 0000000..cee7d3f
->> --- /dev/null
->> +++ b/arch/arm64/include/asm/cpu.h
->> @@ -0,0 +1,11 @@
->> +/*
->> + *  Copyright (C) 2013-2014 ARM Ltd.
->> + *
->> + * This program is free software; you can redistribute it and/or modify
->> + * it under the terms of the GNU General Public License version 2 as
->> + * published by the Free Software Foundation.
->> + */
->> +#ifndef __ASM_CPU_H
->> +#define __ASM_CPU_H
->> +
->> +#endif
->> diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
->> index cdaedad..b568c26 100644
->> --- a/arch/arm64/kernel/Makefile
->> +++ b/arch/arm64/kernel/Makefile
->> @@ -29,6 +29,7 @@ arm64-obj-$(CONFIG_ARM64_CPU_SUSPEND)    += sleep.o suspend.o
->>   arm64-obj-$(CONFIG_JUMP_LABEL)        += jump_label.o
->>   arm64-obj-$(CONFIG_KGDB)        += kgdb.o
->>   arm64-obj-$(CONFIG_EFI)            += efi.o efi-stub.o efi-entry.o
->> +arm64-obj-$(CONFIG_ACPI)        += acpi.o
->>
->>   obj-y                    += $(arm64-obj-y) vdso/
->>   obj-m                    += $(arm64-obj-m)
->> diff --git a/arch/arm64/kernel/acpi.c b/arch/arm64/kernel/acpi.c
->> new file mode 100644
->> index 0000000..395778c
->> --- /dev/null
->> +++ b/arch/arm64/kernel/acpi.c
->> @@ -0,0 +1,69 @@
->> +/*
->> + *  ARM64 Specific Low-Level ACPI Boot Support
->> + *
->> + *  Copyright (C) 2013-2014, Linaro Ltd.
->> + *    Author: Al Stone <al.stone@linaro.org>
->> + *    Author: Graeme Gregory <graeme.gregory@linaro.org>
->> + *    Author: Hanjun Guo <hanjun.guo@linaro.org>
->> + *
->> + *  This program is free software; you can redistribute it and/or modify
->> + *  it under the terms of the GNU General Public License version 2 as
->> + *  published by the Free Software Foundation.
->> + */
->> +
->> +#include <linux/init.h>
->> +#include <linux/acpi.h>
->> +#include <linux/cpumask.h>
->> +#include <linux/memblock.h>
->> +#include <linux/irq.h>
->> +#include <linux/irqdomain.h>
->> +#include <linux/bootmem.h>
->> +#include <linux/smp.h>
->> +
->> +int acpi_noirq;            /* skip ACPI IRQ initialization */
->> +int acpi_disabled;
->> +EXPORT_SYMBOL(acpi_disabled);
->> +
->> +int acpi_pci_disabled;        /* skip ACPI PCI scan and IRQ initialization */
->> +EXPORT_SYMBOL(acpi_pci_disabled);
->> +
->> +/*
->> + * __acpi_map_table() will be called before page_init(), so early_ioremap()
->> + * or early_memremap() should be called here to for ACPI table mapping.
->> + */
->> +char *__init __acpi_map_table(unsigned long phys, unsigned long size)
->> +{
->> +    if (!phys || !size)
->> +        return NULL;
->> +
->> +    return early_memremap(phys, size);
->> +}
->> +
->> +void __init __acpi_unmap_table(char *map, unsigned long size)
->> +{
->> +    if (!map || !size)
->> +        return;
->> +
->> +    early_memunmap(map, size);
->> +}
->> +
->> +/*
->> + * acpi_boot_table_init() called from setup_arch(), always.
->> + *    1. find RSDP and get its address, and then find XSDT
->> + *    2. extract all tables and checksums them all
->> + *
->> + * We can parse ACPI boot-time tables such as FADT, MADT after
->> + * this function is called.
->> + */
->> +void __init acpi_boot_table_init(void)
->> +{
->> +    /* If acpi_disabled, bail out */
->> +    if (acpi_disabled)
->> +        return;
->> +
->> +    /* Initialize the ACPI boot-time table parser. */
->> +    if (acpi_table_init()) {
-> 
-> Can't we call acpi_table_init directly in setup ?
-> IIUC x86 has acpi_boot_table_init as it parses Boot Flags
-> table(ACPI_SIG_BOOT)
-
-Yes, we can. But I think it not a big deal to dot that, if that
-makes the code more readable, I will update it.
-
-> 
->> +        disable_acpi();
->> +        return;
->> +    }
->> +}
->> diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
->> index fc50461..85c6326 100644
->> --- a/arch/arm64/kernel/setup.c
->> +++ b/arch/arm64/kernel/setup.c
->> @@ -43,6 +43,7 @@
->>   #include <linux/of_fdt.h>
->>   #include <linux/of_platform.h>
->>   #include <linux/efi.h>
->> +#include <linux/acpi.h>
->>
->>   #include <asm/fixmap.h>
->>   #include <asm/cputype.h>
->> @@ -385,6 +386,9 @@ void __init setup_arch(char **cmdline_p)
->>       efi_init();
->>       arm64_memblock_init();
->>
->> +    /* Parse the ACPI tables for possible boot-time configuration */
->> +    acpi_boot_table_init();
->> +
->>       paging_init();
->>       request_standard_resources();
-
-Thanks
-Hanjun
+-- 
+FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
+according to speedtest.net.
