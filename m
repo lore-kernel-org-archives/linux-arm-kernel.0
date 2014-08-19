@@ -1,216 +1,282 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Tue, 19 Aug 2014 13:00:51 +0200
-Subject: [PATCH v5] mmc: implement Driver Stage Register handling
-In-Reply-To: <1408437951-31477-1-git-send-email-u.kleine-koenig@pengutronix.de>
-References: <1408437951-31477-1-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <CAPDyKFqf0Ci1C+1_qCpAMEtpH4dmVoxBZv=GHW-CFMpMEt=vog@mail.gmail.com>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Tue, 19 Aug 2014 19:00:12 +0800
+Subject: [PATCH v2 06/18] ARM64 / ACPI: Parse MADT to map logical cpu
+ to MPIDR and get cpu_possible/present_map
+In-Reply-To: <53F24705.7080809@arm.com>
+References: <1407166105-17675-1-git-send-email-hanjun.guo@linaro.org>
+ <1407166105-17675-7-git-send-email-hanjun.guo@linaro.org>
+ <53F24705.7080809@arm.com>
+Message-ID: <53F32E3C.1070102@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19 August 2014 10:45, Uwe Kleine-K?nig
-<u.kleine-koenig@pengutronix.de> wrote:
-> From: Sascha Hauer <s.hauer@pengutronix.de>
->
-> Some eMMC and SD cards implement a DSR register that allows to tune
-> raise/fall times and drive strength of the CMD and DATA outputs.
-> The values to use depend on the card in use and the host.
-> It might be needed to reduce the drive strength to prevent voltage peaks
-> above the host's specification.
->
-> Implement a 'dsr' devicetree property that allows to specify the value
-> to set the DSR to. For non-dt setups the new members of mmc_host can be
-> set by board code.
->
-> This patch was initially authored by Sascha Hauer. It contains
-> improvements authored by Markus Niebel and Uwe Kleine-K?nig.
->
-> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
-> Signed-off-by: Markus Niebel <Markus.Niebel@tq-group.com>
-> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+Hi Sudeep,
 
-Thanks! Applied for next.
+On 2014-8-19 2:33, Sudeep Holla wrote:
+> On 04/08/14 16:28, Hanjun Guo wrote:
+>> MADT contains the information for MPIDR which is essential for
+>> SMP initialization, parse the GIC cpu interface structures to
+>> get the MPIDR value and map it to cpu_logical_map(), and add
+>> enabled cpu with valid MPIDR into cpu_possible_map and
+>> cpu_present_map.
+>>
+>> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+>> Signed-off-by: Tomasz Nowicki <tomasz.nowicki@linaro.org>
+>> ---
+>>   arch/arm64/include/asm/acpi.h |    2 +
+>>   arch/arm64/kernel/acpi.c      |  129 ++++++++++++++++++++++++++++++++++++++++-
+>>   arch/arm64/kernel/smp.c       |   10 +++-
+>>   3 files changed, 138 insertions(+), 3 deletions(-)
+>>
+>> diff --git a/arch/arm64/include/asm/acpi.h b/arch/arm64/include/asm/acpi.h
+>> index 6e04868..e877967 100644
+>> --- a/arch/arm64/include/asm/acpi.h
+>> +++ b/arch/arm64/include/asm/acpi.h
+>> @@ -64,6 +64,8 @@ static inline void arch_fix_phys_package_id(int num, u32
+>> slot) { }
+>>   extern int (*acpi_suspend_lowlevel)(void);
+>>   #define acpi_wakeup_address 0
+>>
+>> +#define MAX_GIC_CPU_INTERFACE 65535
+>> +
+> 
+> Did you get this information from GIC specification ?
 
-> ---
->
-> Notes:
->     Changes since v4, Message-Id: 1408091882-32123-1-git-send-email-u.kleine-koenig at pengutronix.de:
->
->      - fix logic to set dsr_req
->      - make dsr_req an int as requested by Ulf Hansson and put it near dsr in the
->        struct
->
->  Documentation/devicetree/bindings/mmc/mmc.txt |  2 ++
->  drivers/mmc/core/host.c                       |  8 ++++++++
->  drivers/mmc/core/mmc.c                        |  8 ++++++++
->  drivers/mmc/core/mmc_ops.c                    | 20 ++++++++++++++++++++
->  drivers/mmc/core/mmc_ops.h                    |  1 +
->  drivers/mmc/core/sd.c                         |  8 ++++++++
->  include/linux/mmc/card.h                      |  3 ++-
->  include/linux/mmc/host.h                      |  4 ++++
->  8 files changed, 53 insertions(+), 1 deletion(-)
->
-> diff --git a/Documentation/devicetree/bindings/mmc/mmc.txt b/Documentation/devicetree/bindings/mmc/mmc.txt
-> index 3c18001dfd5d..a3fe21f2b709 100644
-> --- a/Documentation/devicetree/bindings/mmc/mmc.txt
-> +++ b/Documentation/devicetree/bindings/mmc/mmc.txt
-> @@ -40,6 +40,8 @@ Optional properties:
->  - mmc-hs200-1_2v: eMMC HS200 mode(1.2V I/O) is supported
->  - mmc-hs400-1_8v: eMMC HS400 mode(1.8V I/O) is supported
->  - mmc-hs400-1_2v: eMMC HS400 mode(1.2V I/O) is supported
-> +- dsr: Value the card's (optional) Driver Stage Register (DSR) should be
-> +  programmed with. Valid range: [0 .. 0xffff].
->
->  *NOTE* on CD and WP polarity. To use common for all SD/MMC host controllers line
->  polarity properties, we have to fix the meaning of the "normal" and "inverted"
-> diff --git a/drivers/mmc/core/host.c b/drivers/mmc/core/host.c
-> index 95cceae96944..d572b2beb65a 100644
-> --- a/drivers/mmc/core/host.c
-> +++ b/drivers/mmc/core/host.c
-> @@ -452,6 +452,14 @@ int mmc_of_parse(struct mmc_host *host)
->         if (of_find_property(np, "mmc-hs400-1_2v", &len))
->                 host->caps2 |= MMC_CAP2_HS400_1_2V | MMC_CAP2_HS200_1_2V_SDR;
->
-> +       host->dsr_req = !of_property_read_u32(np, "dsr", &host->dsr);
-> +       if (host->dsr_req && (host->dsr & ~0xffff)) {
-> +               dev_err(host->parent,
-> +                       "device tree specified broken value for DSR: 0x%x, ignoring\n",
-> +                       host->dsr);
-> +               host->dsr_req = 0;
-> +       }
-> +
->         return 0;
->
->  out:
-> diff --git a/drivers/mmc/core/mmc.c b/drivers/mmc/core/mmc.c
-> index 793c6f7ddb04..fdc1ac1360c4 100644
-> --- a/drivers/mmc/core/mmc.c
-> +++ b/drivers/mmc/core/mmc.c
-> @@ -162,6 +162,7 @@ static int mmc_decode_csd(struct mmc_card *card)
->         csd->read_partial = UNSTUFF_BITS(resp, 79, 1);
->         csd->write_misalign = UNSTUFF_BITS(resp, 78, 1);
->         csd->read_misalign = UNSTUFF_BITS(resp, 77, 1);
-> +       csd->dsr_imp = UNSTUFF_BITS(resp, 76, 1);
->         csd->r2w_factor = UNSTUFF_BITS(resp, 26, 3);
->         csd->write_blkbits = UNSTUFF_BITS(resp, 22, 4);
->         csd->write_partial = UNSTUFF_BITS(resp, 21, 1);
-> @@ -1273,6 +1274,13 @@ static int mmc_init_card(struct mmc_host *host, u32 ocr,
->         }
->
->         /*
-> +        * handling only for cards supporting DSR and hosts requesting
-> +        * DSR configuration
-> +        */
-> +       if (card->csd.dsr_imp && host->dsr_req)
-> +               mmc_set_dsr(host);
-> +
-> +       /*
->          * Select card, as all following commands rely on that.
->          */
->         if (!mmc_host_is_spi(host)) {
-> diff --git a/drivers/mmc/core/mmc_ops.c b/drivers/mmc/core/mmc_ops.c
-> index f51b5ba3bbea..ba0275e90617 100644
-> --- a/drivers/mmc/core/mmc_ops.c
-> +++ b/drivers/mmc/core/mmc_ops.c
-> @@ -93,6 +93,26 @@ int mmc_deselect_cards(struct mmc_host *host)
->         return _mmc_select_card(host, NULL);
->  }
->
-> +/*
-> + * Write the value specified in the device tree or board code into the optional
-> + * 16 bit Driver Stage Register. This can be used to tune raise/fall times and
-> + * drive strength of the DAT and CMD outputs. The actual meaning of a given
-> + * value is hardware dependant.
-> + * The presence of the DSR register can be determined from the CSD register,
-> + * bit 76.
-> + */
-> +int mmc_set_dsr(struct mmc_host *host)
-> +{
-> +       struct mmc_command cmd = {0};
-> +
-> +       cmd.opcode = MMC_SET_DSR;
-> +
-> +       cmd.arg = (host->dsr << 16) | 0xffff;
-> +       cmd.flags = MMC_RSP_NONE | MMC_CMD_AC;
-> +
-> +       return mmc_wait_for_cmd(host, &cmd, MMC_CMD_RETRIES);
-> +}
-> +
->  int mmc_go_idle(struct mmc_host *host)
->  {
->         int err;
-> diff --git a/drivers/mmc/core/mmc_ops.h b/drivers/mmc/core/mmc_ops.h
-> index 80ae9f4e0293..390dac665b2a 100644
-> --- a/drivers/mmc/core/mmc_ops.h
-> +++ b/drivers/mmc/core/mmc_ops.h
-> @@ -14,6 +14,7 @@
->
->  int mmc_select_card(struct mmc_card *card);
->  int mmc_deselect_cards(struct mmc_host *host);
-> +int mmc_set_dsr(struct mmc_host *host);
->  int mmc_go_idle(struct mmc_host *host);
->  int mmc_send_op_cond(struct mmc_host *host, u32 ocr, u32 *rocr);
->  int mmc_all_send_cid(struct mmc_host *host, u32 *cid);
-> diff --git a/drivers/mmc/core/sd.c b/drivers/mmc/core/sd.c
-> index 0c44510bf717..25913889cbaa 100644
-> --- a/drivers/mmc/core/sd.c
-> +++ b/drivers/mmc/core/sd.c
-> @@ -127,6 +127,7 @@ static int mmc_decode_csd(struct mmc_card *card)
->                 csd->read_partial = UNSTUFF_BITS(resp, 79, 1);
->                 csd->write_misalign = UNSTUFF_BITS(resp, 78, 1);
->                 csd->read_misalign = UNSTUFF_BITS(resp, 77, 1);
-> +               csd->dsr_imp = UNSTUFF_BITS(resp, 76, 1);
->                 csd->r2w_factor = UNSTUFF_BITS(resp, 26, 3);
->                 csd->write_blkbits = UNSTUFF_BITS(resp, 22, 4);
->                 csd->write_partial = UNSTUFF_BITS(resp, 21, 1);
-> @@ -954,6 +955,13 @@ static int mmc_sd_init_card(struct mmc_host *host, u32 ocr,
->         }
->
->         /*
-> +        * handling only for cards supporting DSR and hosts requesting
-> +        * DSR configuration
-> +        */
-> +       if (card->csd.dsr_imp && host->dsr_req)
-> +               mmc_set_dsr(host);
-> +
-> +       /*
->          * Select card, as all following commands rely on that.
->          */
->         if (!mmc_host_is_spi(host)) {
-> diff --git a/include/linux/mmc/card.h b/include/linux/mmc/card.h
-> index d424b9de3aff..680a7f0188bb 100644
-> --- a/include/linux/mmc/card.h
-> +++ b/include/linux/mmc/card.h
-> @@ -42,7 +42,8 @@ struct mmc_csd {
->         unsigned int            read_partial:1,
->                                 read_misalign:1,
->                                 write_partial:1,
-> -                               write_misalign:1;
-> +                               write_misalign:1,
-> +                               dsr_imp:1;
->  };
->
->  struct mmc_ext_csd {
-> diff --git a/include/linux/mmc/host.h b/include/linux/mmc/host.h
-> index 7960424d0bc0..fd3d81e3fd8e 100644
-> --- a/include/linux/mmc/host.h
-> +++ b/include/linux/mmc/host.h
-> @@ -365,6 +365,10 @@ struct mmc_host {
->
->         unsigned int            slotno; /* used for sdio acpi binding */
->
-> +       int                     dsr_req;        /* DSR value is valid */
-> +
+Actually not. since MAX_GIC_CPU_INTERFACE represents the maximum GIC CPU
+interfaces (CPUs) entries in MADT, so I use a number big enough to represent max
+CPUs in the system.
 
-I took the liberty to remove this empty line.
+> 
+> IIUC you are trying to represent max number of interrupt controller
+> entries MADT can possibly have. So, I had suggested to change the name
+> like MAX_MADT_INTERRUPT_CONTROLLER_ENTRIES so that it is not GIC specific.
 
-> +       u32                     dsr;    /* optional driver stage (DSR) value */
-> +
->         unsigned long           private[0] ____cacheline_aligned;
->  };
->
-> --
-> 2.1.0.rc1
->
+Will INTERRUPT_CONTROLLER confuse people? There is only one GIC redistributor
+(some people regard it as interrupt controller) in ARM system, if we use
+INTERRUPT_CONTROLLER people will regard it as multi-redistributors in the
+system, I think GIC_CPU_INTERFACE would be better, what do you think?
 
-Kind regards
-Uffe
+> 
+>>   #endif /* CONFIG_ACPI */
+>>
+>>   #endif /*_ASM_ACPI_H*/
+>> diff --git a/arch/arm64/kernel/acpi.c b/arch/arm64/kernel/acpi.c
+>> index 69a315d..9e07d99 100644
+>> --- a/arch/arm64/kernel/acpi.c
+>> +++ b/arch/arm64/kernel/acpi.c
+>> @@ -22,6 +22,9 @@
+>>   #include <linux/bootmem.h>
+>>   #include <linux/smp.h>
+>>
+>> +#include <asm/smp_plat.h>
+>> +#include <asm/cputype.h>
+>> +
+>>   int acpi_noirq;            /* skip ACPI IRQ initialization */
+>>   int acpi_disabled;
+>>   EXPORT_SYMBOL(acpi_disabled);
+>> @@ -29,6 +32,8 @@ EXPORT_SYMBOL(acpi_disabled);
+>>   int acpi_pci_disabled;        /* skip ACPI PCI scan and IRQ initialization */
+>>   EXPORT_SYMBOL(acpi_pci_disabled);
+>>
+>> +static int enabled_cpus;    /* Processors (GICC) with enabled flag in MADT */
+>> +
+>>   /*
+>>    * __acpi_map_table() will be called before page_init(), so early_ioremap()
+>>    * or early_memremap() should be called here to for ACPI table mapping.
+>> @@ -49,6 +54,122 @@ void __init __acpi_unmap_table(char *map, unsigned long size)
+>>       early_memunmap(map, size);
+>>   }
+>>
+>> +/**
+>> + * acpi_register_gic_cpu_interface - register a gic cpu interface and
+>> + * generates a logical cpu number
+>> + * @mpidr: CPU's hardware id to register, MPIDR represented in MADT
+>> + * @enabled: this cpu is enabled or not
+>> + *
+>> + * Returns the logical cpu number which maps to the gic cpu interface
+>> + */
+>> +static int acpi_register_gic_cpu_interface(u64 mpidr, u8 enabled)
+>> +{
+> 
+> IMO the function name gives me a wrong idea that you are registering
+> something with GIC. How about acpi_map_gic_cpu_interface ?
+
+Great, acpi_map_gic_cpu_interface is better.
+
+> 
+>> +    int cpu;
+>> +
+>> +    if (mpidr == INVALID_HWID) {
+>> +        pr_info("Skip invalid cpu hardware ID\n");
+>> +        return -EINVAL;
+>> +    }
+>> +
+>> +    total_cpus++;
+>> +    if (!enabled)
+>> +        return -EINVAL;
+>> +
+>> +    if (enabled_cpus >=  NR_CPUS) {
+>> +        pr_warn("NR_CPUS limit of %d reached, Processor %d/0x%llx ignored.\n",
+>> +            NR_CPUS, total_cpus, mpidr);
+>> +        return -EINVAL;
+>> +    }
+>> +
+>> +    /* If it is the first CPU, no need to check duplicate MPIDRs */
+>> +    if (!enabled_cpus)
+>> +        goto skip_mpidr_check;
+>> +
+>> +    /*
+>> +     * Duplicate MPIDRs are a recipe for disaster. Scan
+>> +     * all initialized entries and check for
+>> +     * duplicates. If any is found just ignore the CPU.
+>> +     */
+>> +    for_each_present_cpu(cpu) {
+>> +        if (cpu_logical_map(cpu) == mpidr) {
+>> +            pr_err("Firmware bug, duplicate CPU MPIDR: 0x%llx in MADT\n",
+>> +                   mpidr);
+>> +            return -EINVAL;
+>> +        }
+>> +    }
+>> +
+>> +skip_mpidr_check:
+>> +    enabled_cpus++;
+>> +
+>> +    /* allocate a logical cpu id for the new comer */
+>> +    if (cpu_logical_map(0) == mpidr) {
+>> +        /*
+>> +         * boot_cpu_init() already hold bit 0 in cpu_present_mask
+>> +         * for BSP, no need to allocate again.
+>> +         */
+>> +        cpu = 0;
+>> +    } else {
+>> +        cpu = cpumask_next_zero(-1, cpu_present_mask);
+>> +    }
+>> +
+>> +    /* map the logical cpu id to cpu MPIDR */
+>> +    cpu_logical_map(cpu) = mpidr;
+>> +
+>> +    set_cpu_possible(cpu, true);
+> 
+> IMO it better to keep all these updates to cpumasks contained in the
+> smp.c as I had mentioned before. I think you can refactor smp_init_cpus
+> to achieve that.
+
+Could you give me more hints? smp_init_cpus() use the CPU node in device
+tree to map cpu, but in ACPI, they are table entries, if you can give me
+more hints about how to refactor it, I will appreciate a lot.
+
+> 
+>> +    set_cpu_present(cpu, true);
+> 
+> This is totally wrong ? What would you do if the cpu failed to
+> initialize ? I don't see that handled.
+> 
+>> +
+>> +    return cpu;
+>> +}
+>> +
+>> +static int __init
+>> +acpi_parse_gic_cpu_interface(struct acpi_subtable_header *header,
+>> +                const unsigned long end)
+>> +{
+>> +    struct acpi_madt_generic_interrupt *processor;
+>> +
+>> +    processor = (struct acpi_madt_generic_interrupt *)header;
+>> +
+>> +    if (BAD_MADT_ENTRY(processor, end))
+>> +        return -EINVAL;
+>> +
+>> +    acpi_table_print_madt_entry(header);
+>> +
+>> +    acpi_register_gic_cpu_interface(processor->arm_mpidr,
+>> +        processor->flags & ACPI_MADT_ENABLED);
+>> +
+>> +    return 0;
+>> +}
+>> +
+>> +/*
+>> + * Parse GIC cpu interface related entries in MADT
+>> + * returns 0 on success, < 0 on error
+>> + */
+>> +static int __init acpi_parse_madt_gic_cpu_interface_entries(void)
+>> +{
+>> +    int count;
+>> +
+>> +    /*
+>> +     * do a partial walk of MADT to determine how many CPUs
+>> +     * we have including disabled CPUs, and get information
+>> +     * we need for SMP init
+>> +     */
+>> +    count = acpi_table_parse_madt(ACPI_MADT_TYPE_GENERIC_INTERRUPT,
+>> +            acpi_parse_gic_cpu_interface, MAX_GIC_CPU_INTERFACE);
+>> +
+>> +    if (!count) {
+>> +        pr_err("No GIC CPU interface entries present\n");
+>> +        return -ENODEV;
+>> +    } else if (count < 0) {
+>> +        pr_err("Error parsing GIC CPU interface entry\n");
+>> +        return count;
+>> +    }
+>> +
+>> +    /* Make boot-up look pretty */
+>> +    pr_info("%d CPUs enabled, %d CPUs total\n", enabled_cpus, total_cpus);
+> 
+> Ideally just setup cpu_logical_map in acpi_parse_gic_cpu_interface and
+> setup cpumasks in smp_init_cpus.
+> 
+>> +
+>> +    return 0;
+>> +}
+>> +
+>>   static int __init acpi_parse_fadt(struct acpi_table_header *table)
+>>   {
+>>       struct acpi_table_fadt *fadt = (struct acpi_table_fadt *)table;
+>> @@ -99,8 +220,12 @@ int __init acpi_boot_init(void)
+>>           return -ENODEV;
+>>
+>>       err = acpi_table_parse(ACPI_SIG_FADT, acpi_parse_fadt);
+>> -    if (err)
+>> -        pr_err("Can't find FADT\n");
+>> +    if (err) {
+>> +        pr_err("Can't find FADT or error happened during parsing FADT\n");
+>> +        return err;
+>> +    }
+>> +
+>> +    err = acpi_parse_madt_gic_cpu_interface_entries();
+>>
+>>       return err;
+>>   }
+>> diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
+>> index 40f38f4..8f1d37c 100644
+>> --- a/arch/arm64/kernel/smp.c
+>> +++ b/arch/arm64/kernel/smp.c
+>> @@ -36,6 +36,7 @@
+>>   #include <linux/completion.h>
+>>   #include <linux/of.h>
+>>   #include <linux/irq_work.h>
+>> +#include <linux/acpi.h>
+>>
+>>   #include <asm/atomic.h>
+>>   #include <asm/cacheflush.h>
+>> @@ -458,7 +459,14 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
+>>           if (err)
+>>               continue;
+>>
+>> -        set_cpu_present(cpu, true);
+>> +        /*
+>> +         * In ACPI mode, cpu_present_map was initialised when
+>> +         * MADT table was parsed which before this function
+>> +         * is called.
+>> +         */
+>> +        if (acpi_disabled)
+>> +            set_cpu_present(cpu, true);
+>> +
+> 
+> This is the right place to set the cpu present based on the return value
+> of cpu_prepare.
+
+Yes, as I replied in previous email, I will update the patch and consider
+CPU hotplug in the future.
+
+Thanks
+Hanjun
