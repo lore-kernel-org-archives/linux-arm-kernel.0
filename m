@@ -1,84 +1,83 @@
 From: peter.chen@freescale.com (Peter Chen)
-Date: Tue, 19 Aug 2014 08:14:23 +0800
-Subject: [PATCH RESEND v2 0/7] vf610: Add USB support
-In-Reply-To: <cover.1408391385.git.stefan@agner.ch>
-References: <cover.1408391385.git.stefan@agner.ch>
-Message-ID: <20140819001422.GB2928@peterchendt>
+Date: Tue, 19 Aug 2014 08:18:17 +0800
+Subject: [RFC] usb issue on imx27: 3 clocks are needed
+In-Reply-To: <20140818134903.5b6e6c27@x230.trabucayre.com>
+References: <53EF7AF6.2000405@gmail.com> <20140818090056.GA29393@peterchendt>
+ <20140818092635.GI2114@dragon>
+ <782c806acb464f5781deb32e94548882@BN1PR0301MB0772.namprd03.prod.outlook.com>
+ <20140818134903.5b6e6c27@x230.trabucayre.com>
+Message-ID: <20140819001816.GC2928@peterchendt>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 18, 2014 at 10:07:10PM +0200, Stefan Agner wrote:
-> This patchset adds USB support for Vybrid VF610 SoC. It extends the
-> clock framework to support the USB PHY cocks, extends the device
-> tree files and adds support for the non-core registers in the
-> usbmisc_imx driver.
+On Mon, Aug 18, 2014 at 01:49:03PM +0200, gwenhael.goavec wrote:
+> On Mon, 18 Aug 2014 10:35:53 +0000
+> Peter Chen <Peter.Chen@freescale.com> wrote:
 > 
-> This patchset needs the eSDHC registers length fix available in
-> Shawn's for-next branch, since that overlapped by chance the USB
-> areas.
+> >  
+> > > On Mon, Aug 18, 2014 at 05:00:59PM +0800, Peter Chen wrote:
+> > > > On Sat, Aug 16, 2014 at 05:38:30PM +0200, Philippe Reynes wrote:
+> > > > > Hi all,
+> > > > >
+> > > > > i.MX27's usb needs three clocks (usb_ipg_gate, usb_ahb_gate and
+> > > > > usb_div) but the current chipidea driver implementation, and
+> > > > > devicetree, provides only ipg and ahb. Consequently, if the
+> > > > > bootloader don't enable the last one, the kernel will crash.
+> > > > >
+> > > > > Our approach/idea is to add a second, optionnal, clock in
+> > > > > ci_hdrc_imx.c with 'per' name in devicetree  and to add  clock name
+> > > 'main_clk' for mandatory clock.
+> > > > > This approach it correct? Or an other approach seems better?
+> > > > > Thank you very much for your point of view.
+> > > > >
+> > > >
+> > > > It is ok for me to have ipg, ahb and per clocks at driver, but how can
+> > > > you maintain DT consistent?
+> > > 
+> > > Adding new clock as optional one will just maintain the DT compatibility.
+> > > 
+> > 
+> > How to handle node_usb_soc1's clock which is without clk name to consistent with three
+> > clocks for node_usb_soc2 at driver? Except for adding some platform judge code at
+> > driver, do you have other solutions?
+> > 
+> > node_usb_soc1: {
+> > 	clocks = <&clks IMX6_CLK_USBOH3>;
+> > };
+> > 
+> > node_usb_soc2: {
+> > 	clocks = <&clks IMX27_CLK_USBIPG>, <&clks IMX27_CLK_USBOH3>, <&clks IMX27_CLK_USBPER>;
+> > 	clock-names = "ipg", "ahb", "per";
+> > };
+> > 
+> > Peter
+> > --
 > 
-> The whole patchset proved to be working on a Colibri VF61 and
-> Freescale Tower VF65GS10. The first USB controller runs in
-> peripheral mode. I could successfully use RNDIS, however with some
-> stability issues: Suddenly the other side was not reachable anymore
-> and the interface needed to brought down and back up again. I'm
-> still investigating this.
+> Our idea is something like this :
+> node_usb_soc: {
+> 	clocks = <&clks IMX27_CLK_USBxxx>;
+> 	clock-names = "main_clk";
+> };
+> for all CPUs
 > 
-> The second USB controller, running in USB host mode, showed errors
-> when connecting devices behind a USB hub:
+> and 
+> node_usb_imx27: {
+> 	clocks = <&clks IMX27_CLK_USB_IPG_GATE>,
+> 		<&clks IMX27_CLK_USB_DIV>;
+> 	clock-names = "main_clk", "per";
+> };
 > 
-> [  215.163507] usb usb1-port1: cannot reset (err = -32)
-> [  215.170498] usb usb1-port1: cannot reset (err = -32)
-> [  215.185120] usb usb1-port1: cannot reset (err = -32)
-> [  215.191345] usb usb1-port1: cannot reset (err = -32)
-> [  215.202487] usb usb1-port1: cannot reset (err = -32)
-> [  215.207718] usb usb1-port1: Cannot enable. Maybe the USB cable is bad?
-> [  215.219317] usb usb1-port1: unable to enumerate USB device
+> For imx27 and CPUs with the need of more than one clock.
 > 
-> By extending the PHY driver with the MXS_PHY_NEED_IP_FIX flag, this
-> issue is resolved.
-> 
-> Resend, also added Felipe Balbi this time, sorry about that. I think
-> I only miss the Ack/Review from you here and then things should be
-> fine.
-> 
-> Changes in v2:
-> - Extended usbmisc_imx to support multiple instances
-> - Update DT documentation and compatible strings where necessary
-> - Add USB PHY flag MXS_PHY_NEED_IP_FIX
-> - Added patches to enable USB on Tower
-> 
-> Stefan Agner (7):
->   ARM: dts: vf610: Add USB PHY and controller
->   ARM: imx: clk-vf610: Add USBPHY clocks
->   usb: phy: mxs: Add VF610 USB PHY support
->   ARM: dts: vf610: Add usbmisc for non-core registers
->   chipidea: usbmisc_imx: Add USB support for VF610 SoCs
 
-This driver change is already at my tree, but it is too late
-for 3.17-rc1 when you sent, so I sent it to greg for v3.18.
+Just like Shawn said, it breaks DT compatibility, how the old dtb works
+with newer version kernel after you change.
 
-Peter
-
->   ARM: dts: vf610-colibri: Add USB support
->   ARM: dts: vf610-twr: Add USB support
+> The last clock (ie ahb) is handled by usbmisc.c and if "per" clock is not
+> present in the dtsi chipidea will not fails, just setting data->per_clk = NULL
+> for prepare/unprepare.
 > 
->  Documentation/devicetree/bindings/usb/mxs-phy.txt  |  1 +
->  .../devicetree/bindings/usb/usbmisc-imx.txt        |  1 +
->  arch/arm/boot/dts/vf610-colibri.dts                | 10 ++++
->  arch/arm/boot/dts/vf610-twr.dts                    | 10 ++++
->  arch/arm/boot/dts/vf610.dtsi                       | 60 ++++++++++++++++++++--
->  arch/arm/mach-imx/clk-vf610.c                      | 12 ++++-
->  drivers/usb/chipidea/ci_hdrc_imx.c                 |  8 +++
->  drivers/usb/chipidea/ci_hdrc_imx.h                 |  1 +
->  drivers/usb/chipidea/usbmisc_imx.c                 | 52 +++++++++++++++----
->  drivers/usb/phy/phy-mxs-usb.c                      |  6 +++
->  include/dt-bindings/clock/vf610-clock.h            |  5 +-
->  11 files changed, 149 insertions(+), 17 deletions(-)
-> 
-> -- 
-> 2.0.4
-> 
+> Gwenhael
 
 -- 
 Best Regards,
