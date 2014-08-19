@@ -1,101 +1,136 @@
-From: Varun.Sethi@freescale.com (Varun Sethi)
-Date: Tue, 19 Aug 2014 09:52:30 +0000
-Subject: [PATCH v5] devicetree: Add generic IOMMU device tree bindings
-In-Reply-To: <87y4ur2h23.fsf@nvidia.com>
-References: <1406803383-11601-1-git-send-email-thierry.reding@gmail.com>
- <87a9774lf5.fsf@nvidia.com>
- <cfb1d2ff66004685b7ead3f5e6321681@BL2PR03MB468.namprd03.prod.outlook.com>
- <87y4ur2h23.fsf@nvidia.com>
-Message-ID: <d9fb045d54244f26a773ba45ad3caa2d@BL2PR03MB468.namprd03.prod.outlook.com>
+From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
+Date: Tue, 19 Aug 2014 11:52:22 +0200
+Subject: [PATCH] ARM: Exynos: remove arm diagnostic and power register
+ save/restore code
+In-Reply-To: <CADWw7OiqK+4_uXtPnkS4zL2nBMw08en9venrupFMfqrsWevVJw@mail.gmail.com>
+References: <1407738165-10139-1-git-send-email-k.chander@samsung.com>
+ <CADWw7OiqK+4_uXtPnkS4zL2nBMw08en9venrupFMfqrsWevVJw@mail.gmail.com>
+Message-ID: <2193450.Ihy0kb3U7o@amdc1032>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Hiroshi,
 
-> -----Original Message-----
-> From: Hiroshi Doyu [mailto:hdoyu at nvidia.com]
-> Sent: Thursday, August 14, 2014 9:35 PM
-> To: Sethi Varun-B16395
-> Cc: Hiroshi Doyu; Thierry Reding; Stephen Warren; Arnd Bergmann; Will
-> Deacon; Mark Rutland; devicetree at vger.kernel.org; Olof Johansson;
-> iommu at lists.linux-foundation.org; Rob Herring; linux-tegra at vger.kernel.org;
-> linux-arm-kernel at lists.infradead.org
-> Subject: Re: [PATCH v5] devicetree: Add generic IOMMU device tree bindings
-> 
-> Hi Varun,
-> 
-> Varun Sethi <Varun.Sethi@freescale.com> writes:
-> 
-> >> -----Original Message-----
-> >> From: iommu-bounces at lists.linux-foundation.org [mailto:iommu-
-> >> bounces at lists.linux-foundation.org] On Behalf Of Hiroshi Doyu
-> >> Sent: Thursday, August 14, 2014 12:18 PM
-> >> To: Thierry Reding; Stephen Warren; Arnd Bergmann; Will Deacon
-> >> Cc: Mark Rutland; devicetree at vger.kernel.org; Olof Johansson;
-> >> iommu at lists.linux-foundation.org; Rob Herring;
-> >> linux-tegra at vger.kernel.org; linux-arm-kernel at lists.infradead.org
-> >> Subject: Re: [PATCH v5] devicetree: Add generic IOMMU device tree
-> >> bindings
-> >>
-> >>
-> >> Thierry Reding <thierry.reding@gmail.com> writes:
-> >>
-> >> > +Multiple-master IOMMU:
-> >> > +----------------------
-> >> > +
-> >> > +       iommu {
-> >> > +               /* the specifier represents the ID of the master */
-> >> > +               #iommu-cells = <1>;
-> >> > +       };
-> >> > +
-> >> > +       master at 1 {
-> >> > +               /* device has master ID 42 in the IOMMU */
-> >> > +               iommus = <&{/iommu} 42>;
-> >> > +       };
-> >> > +
-> >> > +       master at 2 {
-> >> > +               /* device has master IDs 23 and 24 in the IOMMU */
-> >> > +               iommus = <&{/iommu} 23>, <&{/iommu} 24>;
-> >> > +       };
-> >>
-> >> I think that this "master ID" will be parsed in IOMMU driver. For
-> >> example, ARM,SMMU expects "streamID" as "master ID", right?
-> >>
-> >> If a SoC has a feature to configure to assign streamID to devices at
-> >> runtime, "streamID" is not equal to "master ID".
-> >>
-> >>   iommus = <&{/smmu} "soc specific master ID">;
-> >>
-> >> "soc master ID" needs to be translated into "streamID" by SoC SW. It
-> >> seems that ARM,SMMU kernel driver doesn't expect this kind of ID
-> >> translation. If ARM,SMMU kernel driver is used as is, "soc master ID"
-> >> would be incompatible? ARM,SMMU needs such translation before
-> >> parsing. Is this my understanding right?
-> >>
-> >> If so I think that this master ID configuration/translation may be
-> >> quite reasonable requirment for SoC using ARM,SMMU.
-> >>
-> >> Can we consider this ID translation within ARM,SMMU compatibility?
-> >>
-> >> IOW, is it possible to implement some SoC specific hook for ID
-> >> translation/configuration in ARM,SMMU kernel driver?
-> >
-> >
-> > Can the id translation be done using a SMR mask?
-> 
-> No, "SoC master ID" is completely independenf of SMR.
-> 
-> > Also, for dynamic stream ID allocation we would need to represent the
-> > specific master register (to store the stream ID) in the device tree.
-> 
-> I assmue that the above means that iMX has such configuration register to map
-> steramID and a device dynamically.
-We have per master registers for setting the stream ID on the Layerscape platforms. My point was that we would need the iommu master node
-to include a reference to the master id register.
-master at 1 {
-               /* device has master ID 42 in the IOMMU */
-             iommus = <&{/iommu} 42>;
-             master-id-reg = <phandle offset>
-};
+Hi,
 
--Varun
+On Tuesday, August 19, 2014 02:58:31 PM Chander Kashyap wrote:
+> On Mon, Aug 11, 2014 at 11:52 AM, Chander Kashyap <k.chander@samsung.com> wrote:
+> > As save/restore of arm "diagnostic" and "power" registers is handled by
+> > generic code, so remove the same.
+> >
+> > Signed-off-by: Chander Kashyap <k.chander@samsung.com>
+> > ---
+> >  arch/arm/mach-exynos/pm.c |   54 ++-------------------------------------------
+> >  1 file changed, 2 insertions(+), 52 deletions(-)
+> >
+> > diff --git a/arch/arm/mach-exynos/pm.c b/arch/arm/mach-exynos/pm.c
+> > index 18646b7..af99c55 100644
+> > --- a/arch/arm/mach-exynos/pm.c
+> > +++ b/arch/arm/mach-exynos/pm.c
+> > @@ -134,45 +134,6 @@ void exynos_enter_aftr(void)
+> >         exynos_sys_powerdown_conf(SYS_AFTR);
+> >  }
+> >
+> > -/* For Cortex-A9 Diagnostic and Power control register */
+> > -static unsigned int save_arm_register[2];
+> > -
+> > -static void exynos_cpu_save_register(void)
+> > -{
+> > -       unsigned long tmp;
+> > -
+> > -       /* Save Power control register */
+> > -       asm ("mrc p15, 0, %0, c15, c0, 0"
+> > -            : "=r" (tmp) : : "cc");
+> > -
+> > -       save_arm_register[0] = tmp;
+> > -
+> > -       /* Save Diagnostic register */
+> > -       asm ("mrc p15, 0, %0, c15, c0, 1"
+> > -            : "=r" (tmp) : : "cc");
+> > -
+> > -       save_arm_register[1] = tmp;
+> > -}
+> > -
+> > -static void exynos_cpu_restore_register(void)
+> > -{
+> > -       unsigned long tmp;
+> > -
+> > -       /* Restore Power control register */
+> > -       tmp = save_arm_register[0];
+> > -
+> > -       asm volatile ("mcr p15, 0, %0, c15, c0, 0"
+> > -                     : : "r" (tmp)
+> > -                     : "cc");
+> > -
+> > -       /* Restore Diagnostic register */
+> > -       tmp = save_arm_register[1];
+> > -
+> > -       asm volatile ("mcr p15, 0, %0, c15, c0, 1"
+> > -                     : : "r" (tmp)
+> > -                     : "cc");
+> > -}
+> > -
+> >  static int exynos_cpu_suspend(unsigned long arg)
+> >  {
+> >  #ifdef CONFIG_CACHE_L2X0
+> > @@ -238,9 +199,6 @@ static int exynos_pm_suspend(void)
+> >         tmp = (S5P_USE_STANDBY_WFI0 | S5P_USE_STANDBY_WFE0);
+> >         pmu_raw_writel(tmp, S5P_CENTRAL_SEQ_OPTION);
+> >
+> > -       if (read_cpuid_part() == ARM_CPU_PART_CORTEX_A9)
+> > -               exynos_cpu_save_register();
+> > -
+> >         return 0;
+> >  }
+> >
+> > @@ -272,9 +230,6 @@ static void exynos_pm_resume(void)
+> >         if (exynos_pm_central_resume())
+> >                 goto early_wakeup;
+> >
+> > -       if (read_cpuid_part() == ARM_CPU_PART_CORTEX_A9)
+> > -               exynos_cpu_restore_register();
+> > -
+> >         /* For release retention */
+> >
+> >         pmu_raw_writel((1 << 28), S5P_PAD_RET_MAUDIO_OPTION);
+> > @@ -376,19 +331,14 @@ static int exynos_cpu_pm_notifier(struct notifier_block *self,
+> >
+> >         switch (cmd) {
+> >         case CPU_PM_ENTER:
+> > -               if (cpu == 0) {
+> > +               if (cpu == 0)
+> >                         exynos_pm_central_suspend();
+> > -                       if (read_cpuid_part() == ARM_CPU_PART_CORTEX_A9)
+> > -                               exynos_cpu_save_register();
+> > -               }
+> >                 break;
+> >
+> >         case CPU_PM_EXIT:
+> >                 if (cpu == 0) {
+> > -                       if (read_cpuid_part() == ARM_CPU_PART_CORTEX_A9) {
+> > +                       if (read_cpuid_part() == ARM_CPU_PART_CORTEX_A9)
+> >                                 scu_enable(S5P_VA_SCU);
+> > -                               exynos_cpu_restore_register();
+> > -                       }
+> >                         exynos_pm_central_resume();
+> >                 }
+> >                 break;
+> 
+> Hi Kukjin,
+> Can you take this patch?
+
+Your cleanup patch won't apply to the current kernels becaouse
+exynos_cpu_pm_notifier() has been removed.  Please resfresh it.
+
+While refreshing it please rebase it on top of my PM_SLEEP=n build
+fixes:
+
+  http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg35430.html
+
+Please also update patch description to point to the generic code
+that does arm diagnostic and power register save/restore code.
+
+Best regards,
+--
+Bartlomiej Zolnierkiewicz
+Samsung R&D Institute Poland
+Samsung Electronics
