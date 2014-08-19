@@ -1,74 +1,66 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 19 Aug 2014 13:48:07 +0100
-Subject: [PATCH 6/6] iommu/arm-smmu: add .domain_{set,get}_attr for
- coherent walk control
-In-Reply-To: <1407891099-24641-7-git-send-email-mitchelh@codeaurora.org>
-References: <1407891099-24641-1-git-send-email-mitchelh@codeaurora.org>
- <1407891099-24641-7-git-send-email-mitchelh@codeaurora.org>
-Message-ID: <20140819124807.GM23128@arm.com>
+From: daniel.thompson@linaro.org (Daniel Thompson)
+Date: Tue, 19 Aug 2014 13:51:53 +0100
+Subject: [PATCH v9 12/16] serial: amba-pl011: Pass FIQ information to KGDB.
+In-Reply-To: <53F33BDD.8050705@hurleysoftware.com>
+References: <1404979427-12943-1-git-send-email-daniel.thompson@linaro.org>
+ <1408372091-12689-13-git-send-email-daniel.thompson@linaro.org>
+ <53F24660.2030404@hurleysoftware.com> <53F313F2.6090103@linaro.org>
+ <53F33BDD.8050705@hurleysoftware.com>
+Message-ID: <53F34869.7050901@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 13, 2014 at 01:51:39AM +0100, Mitchel Humpherys wrote:
-> Under certain conditions coherent hardware translation table walks can
-> result in degraded performance. Add a new domain attribute to
-> disable/enable this feature in generic code along with the domain
-> attribute setter and getter to handle it in the ARM SMMU driver.
+On 19/08/14 12:58, Peter Hurley wrote:
+> On 08/19/2014 05:08 AM, Daniel Thompson wrote:
+>> On 18/08/14 19:30, Peter Hurley wrote:
+> 
+> [cut]
+>   
+>>>> +static int pl011_poll_init(struct uart_port *port)
+>>>> +{
+>>>> +	struct uart_amba_port *uap = (struct uart_amba_port *)port;
+>>>
+>>> Please use container_of() in new code.
+>>
+>> Ok.
+>>
+>> Personally I dislike a file that mixes casts and conatiner_of but I
+>> guess I can make both of us happy by switching the whole driver to
+>> container_of. Separate patch again?
+> 
+> The change below makes the uap local unnecessary, so you can skip the
+> container_of() change, if you'd prefer.
 
-Again, it would be nice to have some information about these cases and the
-performance issues that you are seeing.
+I realized that myself although not until after I'd replaced all the
+casts with container_of()...
 
-> @@ -1908,11 +1917,15 @@ static int arm_smmu_domain_get_attr(struct iommu_domain *domain,
->  				    enum iommu_attr attr, void *data)
->  {
->  	struct arm_smmu_domain *smmu_domain = domain->priv;
-> +	struct arm_smmu_cfg *cfg = &smmu_domain->cfg;
->  
->  	switch (attr) {
->  	case DOMAIN_ATTR_NESTING:
->  		*(int *)data = (smmu_domain->stage == ARM_SMMU_DOMAIN_NESTED);
->  		return 0;
-> +	case DOMAIN_ATTR_COHERENT_HTW_DISABLE:
-> +		*((bool *)data) = cfg->htw_disable;
-> +		return 0;
+So I'll keep the patch for now but can drop it if anyone takes against it.
 
-I think I'd be more comfortable using int instead of bool for this, as it
-could well end up in the user ABI if vfio decides to make use of it. While
-we're here, let's also add an attributes bitmap to the arm_smmu_domain
-instead of having a bool in the arm_smmu_cfg.
 
->  	default:
->  		return -ENODEV;
->  	}
-> @@ -1922,6 +1935,7 @@ static int arm_smmu_domain_set_attr(struct iommu_domain *domain,
->  				    enum iommu_attr attr, void *data)
->  {
->  	struct arm_smmu_domain *smmu_domain = domain->priv;
-> +	struct arm_smmu_cfg *cfg = &smmu_domain->cfg;
->  
->  	switch (attr) {
->  	case DOMAIN_ATTR_NESTING:
-> @@ -1933,6 +1947,9 @@ static int arm_smmu_domain_set_attr(struct iommu_domain *domain,
->  			smmu_domain->stage = ARM_SMMU_DOMAIN_S1;
->  
->  		return 0;
-> +	case DOMAIN_ATTR_COHERENT_HTW_DISABLE:
-> +		cfg->htw_disable = *((bool *)data);
-> +		return 0;
->  	default:
->  		return -ENODEV;
->  	}
-> diff --git a/include/linux/iommu.h b/include/linux/iommu.h
-> index 0550286df4..8a6449857a 100644
-> --- a/include/linux/iommu.h
-> +++ b/include/linux/iommu.h
-> @@ -81,6 +81,7 @@ enum iommu_attr {
->  	DOMAIN_ATTR_FSL_PAMU_ENABLE,
->  	DOMAIN_ATTR_FSL_PAMUV1,
->  	DOMAIN_ATTR_NESTING,	/* two stages of translation */
-> +	DOMAIN_ATTR_COHERENT_HTW_DISABLE,
 
-I wonder whether we should make this ARM-specific. Can you take a quick look
-to see if any of the other IOMMUs can potentially benefit from this?
+Thanks
 
-Will
+Daniel.
+
+
+
+
+> 
+>>>> +	int retval;
+>>>> +
+>>>> +	retval = pl011_hwinit(port);
+>>>> +
+>>>> +#ifdef CONFIG_KGDB_FIQ
+>>>> +	if (retval == 0)
+>>>> +		kgdb_register_fiq(uap->port.irq);
+>>>
+>>> The uap->port dereference is unnecessary since the port parameter
+>>> is the same thing.
+>>>
+>>> 		kgdb_register_fiq(port->irq);
+>>
+>> Ok.
+> 
+> Thanks,
+> Peter Hurley
+> 
