@@ -1,140 +1,47 @@
-From: mitchelh@codeaurora.org (Mitchel Humpherys)
-Date: Tue, 19 Aug 2014 11:12:41 -0700
-Subject: [PATCH 3/6] iommu/arm-smmu: add support for iova_to_phys through
- ATS1PR
-In-Reply-To: <20140819124431.GL23128@arm.com> (Will Deacon's message of "Tue,
- 19 Aug 2014 13:44:32 +0100")
-References: <1407891099-24641-1-git-send-email-mitchelh@codeaurora.org>
- <1407891099-24641-4-git-send-email-mitchelh@codeaurora.org>
- <20140819124431.GL23128@arm.com>
-Message-ID: <vnkwa970qrfq.fsf@mitchelh-linux.qualcomm.com>
+From: fabio.estevam@freescale.com (Fabio Estevam)
+Date: Tue, 19 Aug 2014 15:21:11 -0300
+Subject: [PATCH 1/4] ARM: clk-imx6sl: Remove csi_lcdif_sels[]
+Message-ID: <1408472474-4914-1-git-send-email-fabio.estevam@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 19 2014 at 05:44:32 AM, Will Deacon <will.deacon@arm.com> wrote:
-> On Wed, Aug 13, 2014 at 01:51:36AM +0100, Mitchel Humpherys wrote:
->> Currently, we provide the iommu_ops.iova_to_phys service by doing a
->> table walk in software to translate IO virtual addresses to physical
->> addresses. On SMMUs that support it, it can be useful to ask the SMMU
->> itself to do the translation. This can be used to warm the TLBs for an
->> SMMU. It can also be useful for testing and hardware validation.
->
-> I'm not really sold on the usefulness of this feature. If you want hardware
-> validation features, I'd rather do something through debugfs, but your
-> use-case for warming the TLBs is intriguing. Do you have an example use-case
-> with performance figures?
+Currently csi_lcdif_sels[] is a shared array for the providing the possible 
+clock parents for csi and lcdif blocks.
 
-I'm afraid I don't have an example use case or performance numbers at
-the moment...
+This is not correct, as csi and lcdif do not share the same clock parents.
 
->> Since the address translation registers are optional on SMMUv2, only
->> enable hardware translations when using SMMUv1 or when SMMU_IDR0.S1TS=1
->> and SMMU_IDR0.ATOSNS=0, as described in the ARM SMMU v1-v2 spec.
->
-> [...]
->
->> +static phys_addr_t arm_smmu_iova_to_phys_hard(struct iommu_domain *domain,
->> +					dma_addr_t iova)
->> +{
->> +	struct arm_smmu_domain *smmu_domain = domain->priv;
->> +	struct arm_smmu_device *smmu = smmu_domain->smmu;
->> +	struct arm_smmu_cfg *cfg = &smmu_domain->cfg;
->> +	struct device *dev = smmu->dev;
->> +	void __iomem *cb_base;
->> +	int count = 0;
->> +	u64 phys;
->> +
->> +	arm_smmu_enable_clocks(smmu);
->> +
->> +	cb_base = ARM_SMMU_CB_BASE(smmu) + ARM_SMMU_CB(smmu, cfg->cbndx);
->> +
->> +	if (smmu->version == 1) {
->> +		u32 reg = iova & 0xFFFFF000;
->> +		writel_relaxed(reg, cb_base + ARM_SMMU_CB_ATS1PR_LO);
->> +	} else {
->> +		u64 reg = iova & 0xfffffffffffff000;
->> +		writeq_relaxed(reg, cb_base + ARM_SMMU_CB_ATS1PR_LO);
->
-> We don't have writeq for arch/arm/.
+Introduce csi_sels[] for the csi and lcdif_axi_sels[] for the lcdif clocks in
+order to describe the parents correctly.
 
-Ah yes looks like this is an MSM-ism that never made it upstream since
-it wouldn't be guaranteed to be atomic. I'll make sure to do arm32
-compiles on upstream kernels for future patches, sorry!
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+---
+ arch/arm/mach-imx/clk-imx6sl.c | 7 ++++---
+ 1 file changed, 4 insertions(+), 3 deletions(-)
 
-I guess we could use <asm-generic/io-64-nonatomic-lo-hi.h> but I can
-also re-work this to be two separate writel's.
-
->> +	}
->> +
->> +	mb();
->
-> Why?
-
-My thought was that if we start polling ATSR_ACTIVE prematurely (before
-the write to ATS1PR actually finishes) all heck could break loose? Not
-sure if that's a bogus assumption due to device memory being strongly
-ordered?
-
->> +	while (readl_relaxed(cb_base + ARM_SMMU_CB_ATSR) & ATSR_ACTIVE) {
->> +		if (++count == ATSR_LOOP_TIMEOUT) {
->> +			dev_err(dev,
->> +				"iova to phys timed out on 0x%pa for %s. Falling back to software table walk.\n",
->> +				&iova, dev_name(dev));
->> +			arm_smmu_disable_clocks(smmu);
->> +			return arm_smmu_iova_to_phys_soft(domain, iova);
->> +		}
->> +		cpu_relax();
->> +	}
->
-> Do you know what happened to Olav's patches to make this sort of code
-> generic?
-
-I assume you're talking about this, right?
-
-    http://lists.infradead.org/pipermail/linux-arm-kernel/2014-June/267943.html
-
-Yeah looks like he never sent an update since it was part of a series
-that wasn't going to make it in (the qsmmu driver). I can always bring
-that patch (actually Matt Wagantall's patch) in here and rework this to
-use that.
-
->
->> @@ -2005,6 +2073,11 @@ int arm_smmu_device_cfg_probe(struct arm_smmu_device *smmu)
->>  		return -ENODEV;
->>  	}
->>  
->> +	if (smmu->version == 1 || (!(id & ID0_ATOSNS) && (id & ID0_S1TS))) {
->
-> Are you sure about this? The v2 spec says that is ATOSNS is clear then S1TS
-> is also clear.
-
-I was looking at Section 4.1.1 of ARM IHI 0062C ID091613 which states:
-
-    In SMMUv2, the address translation registers are OPTIONAL. The
-    address translation registers are implemented only when both:
-
-        o The SMMU_IDR0.S1TS bit is set to 1.
-        o The SMMU_IDR0.ATOSNS bit is set to 0.
-
-I assume you're referring to section 9.6.1 of the same document:
-
-    ATOSNS, bit[26]
-    Address Translation Operations Not Supported. The possible values of
-    this bit are:
-
-        0 Address translation operations are supported. Stage 1
-          translation is not supported, that is, the S1TS bit is set to 0.
-
-        1 Address translation operations are not supported. Stage 1
-          translation is supported, that is, the S1TS bit is set to 1.
-
-If that really means that S1TS and ATOSNS always have the same value
-then Section 4.1.1 doesn't make any sense. Or am I missing something?
-
-
-
--Mitch
-
+diff --git a/arch/arm/mach-imx/clk-imx6sl.c b/arch/arm/mach-imx/clk-imx6sl.c
+index fef46fa..ba3af22 100644
+--- a/arch/arm/mach-imx/clk-imx6sl.c
++++ b/arch/arm/mach-imx/clk-imx6sl.c
+@@ -43,7 +43,8 @@ static const char *periph_clk2_sels[]	= { "pll3_usb_otg", "osc", "osc", "dummy",
+ static const char *periph2_clk2_sels[]	= { "pll3_usb_otg", "pll2_bus", };
+ static const char *periph_sels[]	= { "pre_periph_sel", "periph_clk2_podf", };
+ static const char *periph2_sels[]	= { "pre_periph2_sel", "periph2_clk2_podf", };
+-static const char *csi_lcdif_sels[]	= { "mmdc", "pll2_pfd2", "pll3_120m", "pll3_pfd1", };
++static const char *csi_sels[]		= { "osc", "pll2_pfd2", "pll3_120m", "pll3_pfd1", };
++static const char *lcdif_axi_sels[]	= { "pll2_bus", "pll2_pfd2", "pll3_usb_otg", "pll3_pfd1", };
+ static const char *usdhc_sels[]		= { "pll2_pfd2", "pll2_pfd0", };
+ static const char *ssi_sels[]		= { "pll3_pfd2", "pll3_pfd3", "pll4_audio_div", "dummy", };
+ static const char *perclk_sels[]	= { "ipg", "osc", };
+@@ -241,8 +242,8 @@ static void __init imx6sl_clocks_init(struct device_node *ccm_node)
+ 	clks[IMX6SL_CLK_PRE_PERIPH_SEL]   = imx_clk_mux("pre_periph_sel",   base + 0x18, 18, 2, pre_periph_sels,   ARRAY_SIZE(pre_periph_sels));
+ 	clks[IMX6SL_CLK_PERIPH2_CLK2_SEL] = imx_clk_mux("periph2_clk2_sel", base + 0x18, 20, 1, periph2_clk2_sels, ARRAY_SIZE(periph2_clk2_sels));
+ 	clks[IMX6SL_CLK_PERIPH_CLK2_SEL]  = imx_clk_mux("periph_clk2_sel",  base + 0x18, 12, 2, periph_clk2_sels,  ARRAY_SIZE(periph_clk2_sels));
+-	clks[IMX6SL_CLK_CSI_SEL]          = imx_clk_mux("csi_sel",          base + 0x3c, 9,  2, csi_lcdif_sels,    ARRAY_SIZE(csi_lcdif_sels));
+-	clks[IMX6SL_CLK_LCDIF_AXI_SEL]    = imx_clk_mux("lcdif_axi_sel",    base + 0x3c, 14, 2, csi_lcdif_sels,    ARRAY_SIZE(csi_lcdif_sels));
++	clks[IMX6SL_CLK_CSI_SEL]          = imx_clk_mux("csi_sel",          base + 0x3c, 9,  2, csi_sels,          ARRAY_SIZE(csi_sels));
++	clks[IMX6SL_CLK_LCDIF_AXI_SEL]    = imx_clk_mux("lcdif_axi_sel",    base + 0x3c, 14, 2, lcdif_axi_sels,    ARRAY_SIZE(lcdif_axi_sels));
+ 	clks[IMX6SL_CLK_USDHC1_SEL]       = imx_clk_fixup_mux("usdhc1_sel", base + 0x1c, 16, 1, usdhc_sels,        ARRAY_SIZE(usdhc_sels),  imx_cscmr1_fixup);
+ 	clks[IMX6SL_CLK_USDHC2_SEL]       = imx_clk_fixup_mux("usdhc2_sel", base + 0x1c, 17, 1, usdhc_sels,        ARRAY_SIZE(usdhc_sels),  imx_cscmr1_fixup);
+ 	clks[IMX6SL_CLK_USDHC3_SEL]       = imx_clk_fixup_mux("usdhc3_sel", base + 0x1c, 18, 1, usdhc_sels,        ARRAY_SIZE(usdhc_sels),  imx_cscmr1_fixup);
 -- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by The Linux Foundation
+1.9.1
