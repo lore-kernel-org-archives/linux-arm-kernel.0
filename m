@@ -1,153 +1,77 @@
-From: addy.ke@rock-chips.com (Addy Ke)
-Date: Tue, 19 Aug 2014 18:21:08 +0800
-Subject: [PATCH v4] ARM: dts: Add sdio0 and sdio1 to the rk3288
-In-Reply-To: <1408436126-23390-1-git-send-email-addy.ke@rock-chips.com>
-References: <1408436126-23390-1-git-send-email-addy.ke@rock-chips.com>
-Message-ID: <1408443668-23933-1-git-send-email-addy.ke@rock-chips.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Tue, 19 Aug 2014 22:52:46 +0200
+Subject: [PATCH v5 1/1] iommu-api: Add map_sg/unmap_sg functions
+In-Reply-To: <53F39A18.70409@codeaurora.org>
+References: <1407797150-515-1-git-send-email-ohaugan@codeaurora.org>
+ <2348740.xICP2AxYHy@avalon> <53F39A18.70409@codeaurora.org>
+Message-ID: <2767102.8U6hAaZh2n@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch requires that <https://patchwork.kernel.org/patch/4701721/>
-land in order to compile.
+On Tuesday 19 August 2014 11:40:24 Olav Haugan wrote:
+> On 8/19/2014 9:11 AM, Laurent Pinchart wrote:
+> > On Tuesday 19 August 2014 13:59:54 Joerg Roedel wrote:
+> >> On Mon, Aug 18, 2014 at 03:47:56PM -0700, Olav Haugan wrote:
+> >>> If the alignment is not correct then iommu_map() will return error. Not
+> >>> sure what other option we have here (and why make it different behavior
+> >>> than iommu_map which just return error when it is not aligned properly).
+> >>> I don't think we want to force any kind of alignment automatically. I
+> >>> would rather have the API tell me I am doing something wrong than having
+> >>> the function aligning the values and possibly undermap or overmap.
+> >> 
+> >> But sg->offset is an offset into the page (at least it is used that way
+> >> in the DMA-API and since you do 'page_len = s->offset + s->length' you
+> >> use it the same way).
+> >> So when you pass iova + offset the result will no longer be
+> >> page-aligned. You should force sg->offset == 0 and sg->length to be
+> >> page-aligned instead. This makes more sense because the IOMMU-API works
+> >> on (io)-page granularity and not on arbitrary phys-addr ranges like the
+> >> DMA-API.
+> >> 
+> >>> Yes, I am aware of that. However, several people prefer this than
+> >>> passing in scatterlist. It is not very convenient to pass a scatterlist
+> >>> in some use cases. Someone mentioned a use case where they would have to
+> >>> create a dummy sg list and populate it with the iova just to do an
+> >>> unmap. I believe we would have to do this also. There is no use for
+> >>> sglist when unmapping. However, would like to keep separate API from
+> >>> iommu_unmap() to keep the API function names symmetric
+> >>> (map_sg/unmap_sg).
+> >> 
+> >> Keeping it symetric is not more complicated, the caller just needs to
+> >> keep the sg-list used for mapping around. I prefer the unmap_sg call to
+> >> work in sg-lists too.
+> > 
+> > Do we have a use case where the unmap_sg() implementation would be
+> > different than a plain iommu_unmap() call ? If not I'd rather remove
+> > unmap_sg() completely.
+> > 
+> >>> I thought that was why we added the default fallback and set all the
+> >>> drivers to point to these fallback functions. Several people wanted this
+> >>> so that we don't have to have NULL-check in these functions (and have
+> >>> the functions be simple inline functions).
+> >> 
+> >> Okay, since you add these call-backs to all drivers I think I can live
+> >> with not doing a pointer check here.
+> > 
+> > I suggested doing a
+> > 
+> > if (ops is not NULL)
+> > 
+> > 	return ops();
+> > 
+> > else
+> > 
+> > 	return default_ops();
+> > 
+> > to avoid modifying all drivers. I'm not sure why that wasn't received with
+> > much enthusiasm.
+> 
+> Both Thierry R. and Konrad W. argued for modifying the drivers instead
+> so I implemented what the majority wanted. :-)
 
-Reviewed-by: Doug Anderson <dianders@chromium.org>
-Signed-off-by: Addy Ke <addy.ke@rock-chips.com>
----
-Changes in v2:
-- repost patch to match what's in Heiko's "wip/v3.18-next/dts" tree
-  for the other dwmmc controllers
-- add "cd" and "int" line, suggested by Doug Anderson
-- fix up sdio1 configuration error
+I'm not blaming you :-) I was just wondering what their rationale was.
 
-Changes in v3:
-- sort sdio0 and sdio1 by pin number, suggested by Doug Anderson
-- add "ro" and "bkpwr" line, suggested by Doug Anderson
-
-Changes in v4:
-- change "sdiox_ro" to "sdiox_wp", suggested by Doug Anderson
-
- arch/arm/boot/dts/rk3288.dtsi | 102 ++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 102 insertions(+)
-
-diff --git a/arch/arm/boot/dts/rk3288.dtsi b/arch/arm/boot/dts/rk3288.dtsi
-index 36be7bb..1fcc20e 100644
---- a/arch/arm/boot/dts/rk3288.dtsi
-+++ b/arch/arm/boot/dts/rk3288.dtsi
-@@ -88,6 +88,26 @@
- 		status = "disabled";
- 	};
- 
-+	sdio0: dwmmc at ff0d0000 {
-+		compatible = "rockchip,rk3288-dw-mshc";
-+		clocks = <&cru HCLK_SDIO0>, <&cru SCLK_SDIO0>;
-+		clock-names = "biu", "ciu";
-+		fifo-depth = <0x100>;
-+		interrupts = <GIC_SPI 33 IRQ_TYPE_LEVEL_HIGH>;
-+		reg = <0xff0d0000 0x4000>;
-+		status = "disabled";
-+	};
-+
-+	sdio1: dwmmc at ff0e0000 {
-+		compatible = "rockchip,rk3288-dw-mshc";
-+		clocks = <&cru HCLK_SDIO1>, <&cru SCLK_SDIO1>;
-+		clock-names = "biu", "ciu";
-+		fifo-depth = <0x100>;
-+		interrupts = <GIC_SPI 34 IRQ_TYPE_LEVEL_HIGH>;
-+		reg = <0xff0e0000 0x4000>;
-+		status = "disabled";
-+	};
-+
- 	emmc: dwmmc at ff0f0000 {
- 		compatible = "rockchip,rk3288-dw-mshc";
- 		clocks = <&cru HCLK_EMMC>, <&cru SCLK_EMMC>;
-@@ -508,6 +528,88 @@
- 			};
- 		};
- 
-+		sdio0 {
-+			sdio0_bus1: sdio0-bus1 {
-+				rockchip,pins = <4 20 RK_FUNC_1 &pcfg_pull_up>;
-+			};
-+
-+			sdio0_bus4: sdio0-bus4 {
-+				rockchip,pins = <4 20 RK_FUNC_1 &pcfg_pull_up>,
-+						<4 21 RK_FUNC_1 &pcfg_pull_up>,
-+						<4 22 RK_FUNC_1 &pcfg_pull_up>,
-+						<4 23 RK_FUNC_1 &pcfg_pull_up>;
-+			};
-+
-+			sdio0_cmd: sdio0-cmd {
-+				rockchip,pins = <4 24 RK_FUNC_1 &pcfg_pull_up>;
-+			};
-+
-+			sdio0_clk: sdio0-clk {
-+				rockchip,pins = <4 25 RK_FUNC_1 &pcfg_pull_none>;
-+			};
-+
-+			sdio0_cd: sdio0-cd {
-+				rockchip,pins = <4 26 RK_FUNC_1 &pcfg_pull_up>;
-+			};
-+
-+			sdio0_wp: sdio0-wp {
-+				rockchip,pins = <4 27 RK_FUNC_1 &pcfg_pull_up>;
-+			};
-+
-+			sdio0_pwr: sdio0-pwr {
-+				rockchip,pins = <4 28 RK_FUNC_1 &pcfg_pull_up>;
-+			};
-+
-+			sdio0_bkpwr: sdio0-bkpwr {
-+				rockchip,pins = <4 29 RK_FUNC_1 &pcfg_pull_up>;
-+			};
-+
-+			sdio0_int: sdio0-int {
-+				rockchip,pins = <4 30 RK_FUNC_1 &pcfg_pull_up>;
-+			};
-+		};
-+
-+		sdio1 {
-+			sdio1_bus1: sdio1-bus1 {
-+				rockchip,pins = <3 24 RK_FUNC_4 &pcfg_pull_up>;
-+			};
-+
-+			sdio1_bus4: sdio1-bus4 {
-+				rockchip,pins = <3 24 RK_FUNC_4 &pcfg_pull_up>,
-+						<3 25 RK_FUNC_4 &pcfg_pull_up>,
-+						<3 26 RK_FUNC_4 &pcfg_pull_up>,
-+						<3 27 RK_FUNC_4 &pcfg_pull_up>;
-+			};
-+
-+			sdio1_cd: sdio1-cd {
-+				rockchip,pins = <3 28 RK_FUNC_4 &pcfg_pull_up>;
-+			};
-+
-+			sdio1_wp: sdio1-wp {
-+				rockchip,pins = <3 29 RK_FUNC_4 &pcfg_pull_up>;
-+			};
-+
-+			sdio1_bkpwr: sdio1-bkpwr {
-+				rockchip,pins = <3 30 RK_FUNC_4 &pcfg_pull_up>;
-+			};
-+
-+			sdio1_int: sdio1-int {
-+				rockchip,pins = <3 31 RK_FUNC_4 &pcfg_pull_up>;
-+			};
-+
-+			sdio1_cmd: sdio1-cmd {
-+				rockchip,pins = <4 6 RK_FUNC_4 &pcfg_pull_up>;
-+			};
-+
-+			sdio1_clk: sdio1-clk {
-+				rockchip,pins = <4 7 RK_FUNC_4 &pcfg_pull_none>;
-+			};
-+
-+			sdio1_pwr: sdio1-pwr {
-+				rockchip,pins = <4 9 RK_FUNC_4 &pcfg_pull_up>;
-+			};
-+		};
-+
- 		emmc {
- 			emmc_clk: emmc-clk {
- 				rockchip,pins = <3 18 RK_FUNC_2 &pcfg_pull_none>;
 -- 
-1.8.3.2
+Regards,
+
+Laurent Pinchart
