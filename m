@@ -1,126 +1,45 @@
-From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Tue, 19 Aug 2014 11:50:27 +0800
-Subject: [PATCH v2 05/18] ARM64 / ACPI: Parse FADT table to get PSCI flags
- for PSCI init
-In-Reply-To: <20140818142721.GR20043@localhost>
-References: <1407166105-17675-1-git-send-email-hanjun.guo@linaro.org>
- <1407166105-17675-6-git-send-email-hanjun.guo@linaro.org>
- <20140818142721.GR20043@localhost>
-Message-ID: <53F2C983.8000800@linaro.org>
+From: jh80.chung@samsung.com (Jaehoon Chung)
+Date: Tue, 19 Aug 2014 12:52:47 +0900
+Subject: [PATCHv10 3/5] ARM: dts: exynos: unuse the slot-node and deprecate
+ the supports-highspeed for dw-mmc
+In-Reply-To: <53F22FBB.4010801@samsung.com>
+References: <1407397082-32495-1-git-send-email-jh80.chung@samsung.com>
+ <1407397082-32495-4-git-send-email-jh80.chung@samsung.com>
+ <53F1F027.7060609@samsung.com> <53F20955.2050806@suse.de>
+ <53F22FBB.4010801@samsung.com>
+Message-ID: <53F2CA0F.1070800@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2014-8-18 22:27, Catalin Marinas wrote:
-> On Mon, Aug 04, 2014 at 04:28:12PM +0100, Hanjun Guo wrote:
->> There are two flags: PSCI_COMPLIANT and PSCI_USE_HVC. When set,
->> the former signals to the OS that the hardware is PSCI compliant.
+Hi, Kukjin
+
+On 08/19/2014 01:54 AM, Kukjin Kim wrote:
+> On 08/18/14 09:10, Andreas F?rber wrote:
+>> Hi Jaehoon,
+>>
+>> Am 18.08.2014 14:23, schrieb Jaehoon Chung:
+>>> Socfpga and Rockchip were queued into each SoC tree.
+>>> I want to know whether this patch is queued or not into Samsung-Soc tree.
+>>> Do you have any other plan for this patch?
+>>
+>> It isn't applied in his tree:
+>>
+>> http://git.kernel.org/cgit/linux/kernel/git/kgene/linux-samsung.git/
+>>
+>> In fact Kukjin has not applied any patches for 3 weeks now, which likely
+>> means he's on vacation. I am hoping he will review this and the other
+>> pending conflicting patches to decide on a merge order and fix any
+>> trivial conflicts himself. ;)
+>>
+> Oh, I thought it has been queued in previous merge window with my ack.
 > 
-> Actually it signals that the firmware is PSCI compliant. The hardware
-> doesn't care much.
+> OK, I've applied this in my tree for 3.18.
 
-Right, I will update it.
+Thanks!
 
+Best Regards,
+Jaehoon Chung
 > 
->> diff --git a/arch/arm64/include/asm/acpi.h b/arch/arm64/include/asm/acpi.h
->> index 6400312..6e04868 100644
->> --- a/arch/arm64/include/asm/acpi.h
->> +++ b/arch/arm64/include/asm/acpi.h
->> @@ -19,6 +19,18 @@ extern int acpi_disabled;
->>  extern int acpi_noirq;
->>  extern int acpi_pci_disabled;
->>  
->> +/* 1 to indicate PSCI 0.2+ is implemented */
->> +static inline bool acpi_psci_present(void)
->> +{
->> +	return !!(acpi_gbl_FADT.arm_boot_flags & ACPI_FADT_PSCI_COMPLIANT);
->> +}
->> +
->> +/* 1 to indicate HVC must be used instead of SMC as the PSCI conduit */
->> +static inline bool acpi_psci_use_hvc(void)
->> +{
->> +	return !!(acpi_gbl_FADT.arm_boot_flags & ACPI_FADT_PSCI_USE_HVC);
->> +}
+> Thanks,
+> Kukjin
 > 
-> Do we actually need !! here? Shouldn't the compiler figure out
-> conversion to bool automatically?
-
-I thought !! will explicitly show that it's a bool value and
-improve the readability of the code, but I'm ok to remove !!
-here.
-
-> 
->> diff --git a/arch/arm64/kernel/acpi.c b/arch/arm64/kernel/acpi.c
->> index 9cf9127..69a315d 100644
->> --- a/arch/arm64/kernel/acpi.c
->> +++ b/arch/arm64/kernel/acpi.c
->> @@ -11,6 +11,8 @@
->>   *  published by the Free Software Foundation.
->>   */
->>  
->> +#define pr_fmt(fmt) "ACPI: " fmt
->> +
->>  #include <linux/init.h>
->>  #include <linux/acpi.h>
->>  #include <linux/cpumask.h>
->> @@ -47,6 +49,26 @@ void __init __acpi_unmap_table(char *map, unsigned long size)
->>  	early_memunmap(map, size);
->>  }
->>  
->> +static int __init acpi_parse_fadt(struct acpi_table_header *table)
->> +{
->> +	struct acpi_table_fadt *fadt = (struct acpi_table_fadt *)table;
->> +
->> +	/*
->> +	 * Revision in table header is the FADT Major version,
->> +	 * and there is a minor version of FADT which was introduced
->> +	 * by ACPI 5.1, we only deal with ACPI 5.1 or higher version
->> +	 * to get arm boot flags, or we will disable ACPI.
->> +	 */
->> +	if (table->revision < 5 || fadt->minor_revision < 1) {
-> 
-> If we ever get revision 6.0, this would trigger.
-
-Yes, good catch, actually I already fixed that in my local git repo,
-
-+       if (table->revision > 5 ||
-+           (table->revision == 5 && fadt->minor_revision >= 1)) {
-+               return 0;
-+       } else {
-+               pr_info("FADT revision is %d.%d, no PSCI support, should be 5.1
-or higher\n",
-+                       table->revision, fadt->minor_revision);
-+               disable_acpi();
-+               return -EINVAL;
-+       }
-
-> 
->> diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
->> index 85c6326..dfc4e4f3 100644
->> --- a/arch/arm64/kernel/setup.c
->> +++ b/arch/arm64/kernel/setup.c
->> @@ -395,6 +395,8 @@ void __init setup_arch(char **cmdline_p)
->>  	efi_idmap_init();
->>  
->>  	cpu_logical_map(0) = read_cpuid_mpidr() & MPIDR_HWID_BITMASK;
->> +	acpi_boot_init();
->> +
->>  	unflatten_device_tree();
-> 
-> Unless that's changed in a subsequent patch, do we still need to call
-> unflatten_device_tree() if ACPI was successful?
-
-No, we don't. in [PATCH v2 16/18], we will not call unflatten_device_tree()
-if ACPI is successful. Since the CONFIG_ACPI is not enabled for ARM64 (will
-enable it in the last patch), so acpi_boot_init() is a stub empty function
-here.
-
-> 
->>  	psci_init();
-> 
-> I would also rename this to something like psci_dt_init() and move the
-> acpi_disabled check here rather than in the callee.
-
-thanks for the suggestion, I will update my patch :)
-
-Thanks
-Hanjun
