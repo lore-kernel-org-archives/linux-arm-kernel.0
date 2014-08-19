@@ -1,64 +1,145 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Tue, 19 Aug 2014 20:27:38 +0800
-Subject: [GIT PULL] ARM: imx: fixes for 3.17
-Message-ID: <20140819122736.GM2114@dragon>
+From: edubezval@gmail.com (edubezval at gmail.com)
+Date: Tue, 19 Aug 2014 08:28:40 -0400
+Subject: [PATCHv2] thermal: exynos: Add support for TRIM_RELOAD feature at
+ Exynos3250
+In-Reply-To: <1408450078-6296-1-git-send-email-cw00.choi@samsung.com>
+References: <1408449463-3987-1-git-send-email-cw00.choi@samsung.com>
+ <1408450078-6296-1-git-send-email-cw00.choi@samsung.com>
+Message-ID: <CAC-25o9ExZVTczq3ttkc5XX9ozXUCby2m7hAkUe=LAQakjzVWA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 7d1311b93e58ed55f3a31cc8f94c4b8fe988a2b9:
+Amit,
 
-  Linux 3.17-rc1 (2014-08-16 10:40:26 -0600)
+On Tue, Aug 19, 2014 at 8:07 AM, Chanwoo Choi <cw00.choi@samsung.com> wrote:
+> This patch add support for TRIM_RELOAD feature at Exynos3250. The TMU of
+> Exynos3250 has two TRIMINFO_CON register.
+>
+> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
+> Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
+> Cc: Zhang Rui <rui.zhang@intel.com>
+> Cc: Eduardo Valentin <edubezval@gmail.com>
 
-are available in the git repository at:
+What do you think about this patch?
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git tags/imx-fixes-3.17
+> ---
+> Changes from v1:
+> - Add missing 'TMU_SUPPORT_TRIM_RELOAD' features
+>
+>  drivers/thermal/samsung/exynos_tmu.c      |  7 +++++--
+>  drivers/thermal/samsung/exynos_tmu.h      |  5 +++--
+>  drivers/thermal/samsung/exynos_tmu_data.c | 11 +++++++++--
+>  drivers/thermal/samsung/exynos_tmu_data.h |  7 +++++--
+>  4 files changed, 22 insertions(+), 8 deletions(-)
+>
+> diff --git a/drivers/thermal/samsung/exynos_tmu.c b/drivers/thermal/samsung/exynos_tmu.c
+> index acbff14..ed01606 100644
+> --- a/drivers/thermal/samsung/exynos_tmu.c
+> +++ b/drivers/thermal/samsung/exynos_tmu.c
+> @@ -164,8 +164,11 @@ static int exynos_tmu_initialize(struct platform_device *pdev)
+>                 }
+>         }
+>
+> -       if (TMU_SUPPORTS(pdata, TRIM_RELOAD))
+> -               __raw_writel(1, data->base + reg->triminfo_ctrl);
+> +       if (TMU_SUPPORTS(pdata, TRIM_RELOAD)) {
+> +               for (i = 0; i < pdata->triminfo_reload_count; i++)
+> +                       __raw_writel(pdata->triminfo_reload[i],
+> +                                       data->base + reg->triminfo_ctrl[i]);
+> +       }
+>
+>         if (pdata->cal_mode == HW_MODE)
+>                 goto skip_calib_data;
+> diff --git a/drivers/thermal/samsung/exynos_tmu.h b/drivers/thermal/samsung/exynos_tmu.h
+> index 1b4a644..72cb54e 100644
+> --- a/drivers/thermal/samsung/exynos_tmu.h
+> +++ b/drivers/thermal/samsung/exynos_tmu.h
+> @@ -151,8 +151,7 @@ struct exynos_tmu_registers {
+>         u32     triminfo_25_shift;
+>         u32     triminfo_85_shift;
+>
+> -       u32     triminfo_ctrl;
+> -       u32     triminfo_ctrl1;
+> +       u32     triminfo_ctrl[2];
+>         u32     triminfo_reload_shift;
+>
+>         u32     tmu_ctrl;
+> @@ -295,6 +294,8 @@ struct exynos_tmu_platform_data {
+>         u8 second_point_trim;
+>         u8 default_temp_offset;
+>         u8 test_mux;
+> +       u8 triminfo_reload[2];
+> +       u8 triminfo_reload_count;
+>
+>         enum calibration_type cal_type;
+>         enum calibration_mode cal_mode;
+> diff --git a/drivers/thermal/samsung/exynos_tmu_data.c b/drivers/thermal/samsung/exynos_tmu_data.c
+> index aa8e0de..b45aa90 100644
+> --- a/drivers/thermal/samsung/exynos_tmu_data.c
+> +++ b/drivers/thermal/samsung/exynos_tmu_data.c
+> @@ -95,6 +95,8 @@ static const struct exynos_tmu_registers exynos3250_tmu_registers = {
+>         .triminfo_data = EXYNOS_TMU_REG_TRIMINFO,
+>         .triminfo_25_shift = EXYNOS_TRIMINFO_25_SHIFT,
+>         .triminfo_85_shift = EXYNOS_TRIMINFO_85_SHIFT,
+> +       .triminfo_ctrl[0] = EXYNOS_TMU_TRIMINFO_CON1,
+> +       .triminfo_ctrl[1] = EXYNOS_TMU_TRIMINFO_CON2,
+>         .tmu_ctrl = EXYNOS_TMU_REG_CONTROL,
+>         .test_mux_addr_shift = EXYNOS4412_MUX_ADDR_SHIFT,
+>         .buf_vref_sel_shift = EXYNOS_TMU_REF_VOLTAGE_SHIFT,
+> @@ -160,8 +162,11 @@ static const struct exynos_tmu_registers exynos3250_tmu_registers = {
+>                 .temp_level = 95, \
+>         }, \
+>         .freq_tab_count = 2, \
+> +       .triminfo_reload[0] = 0x1, \
+> +       .triminfo_reload[1] = 0x11, \
+> +       .triminfo_reload_count = 2, \
+>         .registers = &exynos3250_tmu_registers, \
+> -       .features = (TMU_SUPPORT_EMULATION | \
+> +       .features = (TMU_SUPPORT_EMULATION | TMU_SUPPORT_TRIM_RELOAD\
+>                         TMU_SUPPORT_FALLING_TRIP | TMU_SUPPORT_READY_STATUS | \
+>                         TMU_SUPPORT_EMUL_TIME)
+>  #endif
+> @@ -184,7 +189,7 @@ static const struct exynos_tmu_registers exynos4412_tmu_registers = {
+>         .triminfo_data = EXYNOS_TMU_REG_TRIMINFO,
+>         .triminfo_25_shift = EXYNOS_TRIMINFO_25_SHIFT,
+>         .triminfo_85_shift = EXYNOS_TRIMINFO_85_SHIFT,
+> -       .triminfo_ctrl = EXYNOS_TMU_TRIMINFO_CON,
+> +       .triminfo_ctrl[0] = EXYNOS_TMU_TRIMINFO_CON2,
+>         .triminfo_reload_shift = EXYNOS_TRIMINFO_RELOAD_SHIFT,
+>         .tmu_ctrl = EXYNOS_TMU_REG_CONTROL,
+>         .test_mux_addr_shift = EXYNOS4412_MUX_ADDR_SHIFT,
+> @@ -252,6 +257,8 @@ static const struct exynos_tmu_registers exynos4412_tmu_registers = {
+>                 .temp_level = 95, \
+>         }, \
+>         .freq_tab_count = 2, \
+> +       .triminfo_reload[0] = 0x1, \
+> +       .triminfo_reload_count = 1, \
+>         .registers = &exynos4412_tmu_registers, \
+>         .features = (TMU_SUPPORT_EMULATION | TMU_SUPPORT_TRIM_RELOAD | \
+>                         TMU_SUPPORT_FALLING_TRIP | TMU_SUPPORT_READY_STATUS | \
+> diff --git a/drivers/thermal/samsung/exynos_tmu_data.h b/drivers/thermal/samsung/exynos_tmu_data.h
+> index f0979e5..e0536c3 100644
+> --- a/drivers/thermal/samsung/exynos_tmu_data.h
+> +++ b/drivers/thermal/samsung/exynos_tmu_data.h
+> @@ -57,8 +57,11 @@
+>  #define EXYNOS4210_TMU_TRIG_LEVEL_MASK 0x1111
+>  #define EXYNOS4210_TMU_INTCLEAR_VAL    0x1111
+>
+> -/* Exynos5250 and Exynos4412 specific registers */
+> -#define EXYNOS_TMU_TRIMINFO_CON        0x14
+> +/* Exynos3250 specific registers */
+> +#define EXYNOS_TMU_TRIMINFO_CON1       0x10
+> +
+> +/* Exynos5250, Exynos4412 and Exynos3250 specific registers */
+> +#define EXYNOS_TMU_TRIMINFO_CON2       0x14
+>  #define EXYNOS_THD_TEMP_RISE           0x50
+>  #define EXYNOS_THD_TEMP_FALL           0x54
+>  #define EXYNOS_EMUL_CON                0x80
+> --
+> 1.8.0
+>
 
-for you to fetch changes up to 3bc4d037c6791c5089a04845995410aac4fdb514:
 
-  ARM: dts: imx6sx: fix the pad setting for uart CTS_B (2014-08-19 20:06:59 +0800)
 
-----------------------------------------------------------------
-The i.MX fixes for 3.17:
- - A correction on imx6dl gpu axi clock setting
- - Fix a compilation error which comes after ARMv6K SMP build is allowed
- - Fix a typo with pinctrl_esdhc1 in vf610-twr dts
- - Correct i.MX6SX pad setting for UART in dts
- - Fix i.MX53 VPU clock settings in dts
- - Fix a suspend/resume failure seen on Cubox-i board, which is caused
-   by TLB missing of IOMUXC base address during suspend
- - ARCH_HAS_OPP has been removed by commit 78c5e0bb145d (PM / OPP:
-   Remove ARCH_HAS_OPP), so we need to kill it for IMX
- - A small fix on enet reset pin of edmqmx6 board
-
-----------------------------------------------------------------
-Anson Huang (1):
-      ARM: imx: correct gpu2d_axi and gpu3d_axi clock setting
-
-Arnd Bergmann (1):
-      ARM: imx6: fix SMP compilation again
-
-Bill Pringlemeir (1):
-      ARM: dts: vf610-twr: Fix pinctrl_esdhc1 pin definitions.
-
-Fugang Duan (1):
-      ARM: dts: imx6sx: fix the pad setting for uart CTS_B
-
-Lothar Wa?mann (1):
-      ARM: dts: i.MX53: fix apparent bug in VPU clks
-
-Shawn Guo (2):
-      ARM: imx: fix TLB missing of IOMUXC base address during suspend
-      ARM: imx: remove unnecessary ARCH_HAS_OPP select
-
-Silvio Fricke (1):
-      ARM: dts: imx6: edmqmx6: change enet reset pin
-
- arch/arm/boot/dts/imx53.dtsi            |  2 +-
- arch/arm/boot/dts/imx6q-dmo-edmqmx6.dts |  3 ++-
- arch/arm/boot/dts/imx6sx-pinfunc.h      | 26 +++++++++++++-------------
- arch/arm/boot/dts/vf610-twr.dts         |  2 +-
- arch/arm/mach-imx/Kconfig               |  2 --
- arch/arm/mach-imx/Makefile              |  2 ++
- arch/arm/mach-imx/clk-imx6q.c           | 10 ++++++++--
- arch/arm/mach-imx/suspend-imx6.S        |  2 ++
- 8 files changed, 29 insertions(+), 20 deletions(-)
+-- 
+Eduardo Bezerra Valentin
