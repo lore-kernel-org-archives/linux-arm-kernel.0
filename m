@@ -1,126 +1,51 @@
-From: hdoyu@nvidia.com (Hiroshi Doyu)
-Date: Tue, 19 Aug 2014 13:03:52 +0300
-Subject: [PATCH v5] devicetree: Add generic IOMMU device tree bindings
-In-Reply-To: <d9fb045d54244f26a773ba45ad3caa2d@BL2PR03MB468.namprd03.prod.outlook.com>
-References: <1406803383-11601-1-git-send-email-thierry.reding@gmail.com>
- <87a9774lf5.fsf@nvidia.com>
- <cfb1d2ff66004685b7ead3f5e6321681@BL2PR03MB468.namprd03.prod.outlook.com>
- <87y4ur2h23.fsf@nvidia.com>
- <d9fb045d54244f26a773ba45ad3caa2d@BL2PR03MB468.namprd03.prod.outlook.com>
-Message-ID: <87zjf0hk3b.fsf@nvidia.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Tue, 19 Aug 2014 12:04:58 +0200
+Subject: [RFC PATCH] ARM: KVM: add irqfd support
+In-Reply-To: <53F3107C.6060404@linaro.org>
+References: <1407154102-26459-1-git-send-email-eric.auger@linaro.org>
+ <20140813145523.GR10550@cbox> <53F3107C.6060404@linaro.org>
+Message-ID: <20140819100458.GA31086@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tue, Aug 19, 2014 at 10:53:16AM +0200, Eric Auger wrote:
+> On 08/13/2014 04:55 PM, Christoffer Dall wrote:
+> > On Mon, Aug 04, 2014 at 02:08:22PM +0200, Eric Auger wrote:
+> >> This patch enables irqfd on ARM.
+> >>
+> >> irqfd framework enables to inject a virtual IRQ into a guest upon an
+> >> eventfd trigger. User-side uses KVM_IRQFD VM ioctl to provide KVM with
+> >> a kvm_irqfd struct that associates a VM, an eventfd, an IRQ number
+> >> (aka. the gsi). When an actor signals the eventfd (typically a VFIO
+> >> platform driver), the kvm irqfd subsystem injects the provided virtual
+> >> IRQ into the guest.
+> >>
+> >> The gsi must correspond to a shared peripheral interrupt (SPI), ie the
+> >> GIC interrupt ID is gsi+32.
+> > 
+> > Why can't we support PPIs?
+> Hi Christoffer,
+> 
+> Well, in case we want to support PPI at irqfd level, we would need to
+> change the semantic of the GSI value and use the same as KVM_IRQ_LINE,
+> to specify the target vcpu. This is obviously feasible but this also
+> induces changes in currently generic user parts, vfio, vhost. is PPI
+> injection though irqfd a valid use case?
 
-Varun Sethi <Varun.Sethi@freescale.com> writes:
+I don't see why you wouldn't want to be able to support PPIs as
+passthrough interrupts to a guest?
 
-> Hi Hiroshi,
->
->> -----Original Message-----
->> From: Hiroshi Doyu [mailto:hdoyu at nvidia.com]
->> Sent: Thursday, August 14, 2014 9:35 PM
->> To: Sethi Varun-B16395
->> Cc: Hiroshi Doyu; Thierry Reding; Stephen Warren; Arnd Bergmann; Will
->> Deacon; Mark Rutland; devicetree at vger.kernel.org; Olof Johansson;
->> iommu at lists.linux-foundation.org; Rob Herring; linux-tegra at vger.kernel.org;
->> linux-arm-kernel at lists.infradead.org
->> Subject: Re: [PATCH v5] devicetree: Add generic IOMMU device tree bindings
->> 
->> Hi Varun,
->> 
->> Varun Sethi <Varun.Sethi@freescale.com> writes:
->> 
->> >> -----Original Message-----
->> >> From: iommu-bounces at lists.linux-foundation.org [mailto:iommu-
->> >> bounces at lists.linux-foundation.org] On Behalf Of Hiroshi Doyu
->> >> Sent: Thursday, August 14, 2014 12:18 PM
->> >> To: Thierry Reding; Stephen Warren; Arnd Bergmann; Will Deacon
->> >> Cc: Mark Rutland; devicetree at vger.kernel.org; Olof Johansson;
->> >> iommu at lists.linux-foundation.org; Rob Herring;
->> >> linux-tegra at vger.kernel.org; linux-arm-kernel at lists.infradead.org
->> >> Subject: Re: [PATCH v5] devicetree: Add generic IOMMU device tree
->> >> bindings
->> >>
->> >>
->> >> Thierry Reding <thierry.reding@gmail.com> writes:
->> >>
->> >> > +Multiple-master IOMMU:
->> >> > +----------------------
->> >> > +
->> >> > +       iommu {
->> >> > +               /* the specifier represents the ID of the master */
->> >> > +               #iommu-cells = <1>;
->> >> > +       };
->> >> > +
->> >> > +       master at 1 {
->> >> > +               /* device has master ID 42 in the IOMMU */
->> >> > +               iommus = <&{/iommu} 42>;
->> >> > +       };
->> >> > +
->> >> > +       master at 2 {
->> >> > +               /* device has master IDs 23 and 24 in the IOMMU */
->> >> > +               iommus = <&{/iommu} 23>, <&{/iommu} 24>;
->> >> > +       };
->> >>
->> >> I think that this "master ID" will be parsed in IOMMU driver. For
->> >> example, ARM,SMMU expects "streamID" as "master ID", right?
->> >>
->> >> If a SoC has a feature to configure to assign streamID to devices at
->> >> runtime, "streamID" is not equal to "master ID".
->> >>
->> >>   iommus = <&{/smmu} "soc specific master ID">;
->> >>
->> >> "soc master ID" needs to be translated into "streamID" by SoC SW. It
->> >> seems that ARM,SMMU kernel driver doesn't expect this kind of ID
->> >> translation. If ARM,SMMU kernel driver is used as is, "soc master ID"
->> >> would be incompatible? ARM,SMMU needs such translation before
->> >> parsing. Is this my understanding right?
->> >>
->> >> If so I think that this master ID configuration/translation may be
->> >> quite reasonable requirment for SoC using ARM,SMMU.
->> >>
->> >> Can we consider this ID translation within ARM,SMMU compatibility?
->> >>
->> >> IOW, is it possible to implement some SoC specific hook for ID
->> >> translation/configuration in ARM,SMMU kernel driver?
->> >
->> >
->> > Can the id translation be done using a SMR mask?
->> 
->> No, "SoC master ID" is completely independenf of SMR.
->> 
->> > Also, for dynamic stream ID allocation we would need to represent the
->> > specific master register (to store the stream ID) in the device tree.
->> 
->> I assmue that the above means that iMX has such configuration register to map
->> steramID and a device dynamically.
->
-> We have per master registers for setting the stream ID on the
-> Layerscape platforms. My point was that we would need the iommu master
-> node to include a reference to the master id register.
->
-> master at 1 {
->                /* device has master ID 42 in the IOMMU */
->              iommus = <&{/iommu} 42>;
->              master-id-reg = <phandle offset>
-> };
+[...]
 
-In the above, for "iommus=" bindings, you wouldn't need to break
-ARM,SMMU compatibility at all if you set "streamID" exactly as below.
+> >> +
+> >> +/* MSI not implemented yet */
+> > 
+> > yet?  What is an MSI on ARM?
+> Well some MSI support comes with GICv2m and GICv3. My current
+> understanding is it makes sense to inject an MSI from an irqfd trigger.
+> Don't you share this understanding?
+> 
+Doh, I read GSI and wrote MSI, of course, complete brain meltdown on my
+side.
 
-  master at 1 {
-                 /* device has master ID 42 in the IOMMU */
-               iommus = <&{/iommu} 'any given streamID'>;
-               master-id-reg = <phandle offset>
-  };
-
-And your SoC needs to register bus_notifier and ADD_DEVICE should
-configure to map 'any given streamID' to a device via the above
-register. This wouldn't need any modification from ARM,SMMU driver and
-keep the iommus bindings as it is.
-
-IOW, SoC only needs to register ADD_DEVICE in bus_notifier to map
-StreamID to a device. This needs to be executed earlier than IOMMU bus's
-ADD_DEVICE, though.
-
-Is my understanding right?
+-Christoffer
