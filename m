@@ -1,64 +1,87 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Tue, 19 Aug 2014 14:01:32 +0200
-Subject: [PATCH 00/29] Exynos SYSMMU (IOMMU) integration with DT and
- DMA-mapping subsystem
-In-Reply-To: <53F3375E.6030402@suse.de>
-References: <1407235677-26324-1-git-send-email-m.szyprowski@samsung.com>
- <20140818233201.GL9809@8bytes.org> <53F2E9AD.9030308@samsung.com>
- <53F3375E.6030402@suse.de>
-Message-ID: <53F33C9C.1080601@samsung.com>
+From: Varun.Sethi@freescale.com (Varun Sethi)
+Date: Tue, 19 Aug 2014 12:01:34 +0000
+Subject: [PATCH v5] devicetree: Add generic IOMMU device tree bindings
+In-Reply-To: <87wqa4hhcr.fsf@nvidia.com>
+References: <1406803383-11601-1-git-send-email-thierry.reding@gmail.com>
+ <87a9774lf5.fsf@nvidia.com>
+ <cfb1d2ff66004685b7ead3f5e6321681@BL2PR03MB468.namprd03.prod.outlook.com>
+ <87y4ur2h23.fsf@nvidia.com>
+ <d9fb045d54244f26a773ba45ad3caa2d@BL2PR03MB468.namprd03.prod.outlook.com>
+ <87zjf0hk3b.fsf@nvidia.com>
+ <a0244b6befa9407fb6c2c35cc29f92f7@BL2PR03MB468.namprd03.prod.outlook.com>
+ <87wqa4hhcr.fsf@nvidia.com>
+Message-ID: <1d843c14ed0d49cc916abcfa2d3e0553@BL2PR03MB468.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
 
-On 2014-08-19 13:39, Andreas F?rber wrote:
-> Hi Marek and Inki,
->
-> Am 19.08.2014 08:07, schrieb Marek Szyprowski:
->> On 2014-08-19 01:32, Joerg Roedel wrote:
->>> On Tue, Aug 05, 2014 at 12:47:28PM +0200, Marek Szyprowski wrote:
-> [...]
->>>>    33 files changed, 1016 insertions(+), 356 deletions(-)
->>> This touches a lot of non-iommu stuff. What is your strategy on getting
->>> this in, do you plan to get the non-iommu changes merged first or do you
->>> want to collect the respective Acks and merge this all through one tree?
->> Those patches are posted as one patchset mainly to demonstrate how to get
->> everything to work together. I also posted this as a single patch series
->> to get some feedback from other iommu developers, especially all those
->> involved in the generic iommu dt bindings.
->>
->> For merging, I will split them into smaller series and try to get
->> respective acks.
-> I'm working on 5250 based Spring Chromebook and noticed that v3.17-rc1
-> got some more iommu support. With the new CONFIG_DRM_EXYNOS_IOMMU=y my
-> machine stops booting. So I'm wondering, is any of this a fix for 3.17,
-> or is all of this "unrelated" -next material?
 
-This is probably a side effect of patch 
-3170447c1f264d51b8d1f3898bf2588588a64fdc
-("iommu/exynos: Select ARM_DMA_USE_IOMMU"). It added selection of 
-ARM_DMA_USE_IOMMU
-symbol, on which IOMMU support in Exynos DRM subsystem depends. However 
-selecting
-this symbol is all that this patch does, without providing any code code 
-which
-implements real support for ARM DMA IOMMU integration, which is needed 
-by Exynos
-DRM driver. Please disable CONFIG_DRM_EXYNOS_IOMMU in kernel .config and 
-your
-system should be bootable again.
+> -----Original Message-----
+> From: Hiroshi Doyu [mailto:hdoyu at nvidia.com]
+> Sent: Tuesday, August 19, 2014 4:33 PM
+> To: Sethi Varun-B16395; Will Deacon
+> Cc: Hiroshi Doyu; Thierry Reding; Stephen Warren; Arnd Bergmann; Mark
+> Rutland; devicetree at vger.kernel.org; Olof Johansson; iommu at lists.linux-
+> foundation.org; Rob Herring; linux-tegra at vger.kernel.org; linux-arm-
+> kernel at lists.infradead.org; Yoder Stuart-B08248
+> Subject: Re: [PATCH v5] devicetree: Add generic IOMMU device tree bindings
+> 
+> 
+> Varun Sethi <Varun.Sethi@freescale.com> writes:
+> 
+> >> >> > Also, for dynamic stream ID allocation we would need to
+> >> >> > represent the specific master register (to store the stream ID) in the
+> device tree.
+> >> >>
+> >> >> I assmue that the above means that iMX has such configuration
+> >> >> register to map steramID and a device dynamically.
+> >> >
+> >> > We have per master registers for setting the stream ID on the
+> >> > Layerscape platforms. My point was that we would need the iommu
+> >> > master node to include a reference to the master id register.
+> >> >
+> >> > master at 1 {
+> >> >                /* device has master ID 42 in the IOMMU */
+> >> >              iommus = <&{/iommu} 42>;
+> >> >              master-id-reg = <phandle offset> };
+> >>
+> >> In the above, for "iommus=" bindings, you wouldn't need to break
+> >> ARM,SMMU compatibility at all if you set "streamID" exactly as below.
+> >>
+> >>   master at 1 {
+> >>                  /* device has master ID 42 in the IOMMU */
+> >>                iommus = <&{/iommu} 'any given streamID'>;
+> >>                master-id-reg = <phandle offset>
+> >>   };
+> >>
+> >> And your SoC needs to register bus_notifier and ADD_DEVICE should
+> >> configure to map 'any given streamID' to a device via the above
+> >> register. This wouldn't need any modification from ARM,SMMU driver
+> >> and keep the iommus bindings as it is.
+> >>
+> >> IOW, SoC only needs to register ADD_DEVICE in bus_notifier to map
+> >> StreamID to a device. This needs to be executed earlier than IOMMU
+> >> bus's ADD_DEVICE, though.
+> >>
+> >> Is my understanding right?
+> >
+> > I don't think that SOC specific code needs a bus notifier for setting
+> > the stream ID. It can be done as a part of SOC specific
+> > initialization. The device tree can be updated to reflect the correct
+> > stream ID (SMMU driver can get the updated stream ID from device
+> > tree).
+> 
+> That's possible.
+> 
+> > I was thinking more on the lines of updating the device stream id
+> > while attaching a device to the domain.
+> 
+> I thought the same but this would break the ARM,SMMU /compatibility/ since
+> the 1st param of "iommus=" is always expected as "streamID".
+> 
+> If streamID can be assigned dynamically like PCIe, not like streamID statically
+> set in DT, how should we describe this dynmaic steramID shifting/assignment in
+> DT?
+ Can you dynamically program the stream ID for the device? If yes, then you require a unique numberspace for allocating a streamID. I am not clear on the stream ID translation requirement.
 
-> Also, are you or someone
-> working on the respective DT changes for Exynos5?
-
-I can prepare DT changes for Exynos5 as well, but first I wanted to 
-clarify if
-everyone involved in generic IOMMU bindings and Exynos IOMMU driver 
-agrees on my
-proposal.
-
-Best regards
--- 
-Marek Szyprowski, PhD
-Samsung R&D Institute Poland
+-Varun
