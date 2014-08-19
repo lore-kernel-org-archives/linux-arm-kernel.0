@@ -1,113 +1,129 @@
-From: computersforpeace@gmail.com (Brian Norris)
-Date: Mon, 18 Aug 2014 19:12:48 -0700
-Subject: [PATCH] mtd: nand: stm_nand_bch: add new driver
-In-Reply-To: <d4ba973a22bd71eaff94be1f479c5334@pek-sem.com>
-References: <1401268805-26043-1-git-send-email-lee.jones@linaro.org>
- <20140703002237.GM3599@ld-irv-0074>
- <20980858CB6D3A4BAE95CA194937D5E73EAFAFF1@DBDE04.ent.ti.com>
- <20140805142324.GA10136@lee--X1>
- <d4ba973a22bd71eaff94be1f479c5334@pek-sem.com>
-Message-ID: <20140819021248.GR18411@ld-irv-0074>
+From: addy.ke@rock-chips.com (Addy Ke)
+Date: Tue, 19 Aug 2014 10:31:52 +0800
+Subject: [PATCH v2] ARM: dts: Add sdio0 and sdio1 to the rk3288
+In-Reply-To: <1407995360-26009-1-git-send-email-addy.ke@rock-chips.com>
+References: <1407995360-26009-1-git-send-email-addy.ke@rock-chips.com>
+Message-ID: <1408415512-17275-1-git-send-email-addy.ke@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 06, 2014 at 02:32:18AM +0530, pekon at pek-sem.com wrote:
-> On Tuesday 05 August 2014 07:53 PM, Lee Jones wrote:
-> >On Thu, 03 Jul 2014, Gupta, Pekon wrote:
-> >>>>+	/* Load last page of block */
-> >>>>+	offs = (loff_t)block << chip->phys_erase_shift;
-> >>>>+	offs += mtd->erasesize - mtd->writesize;
-> >>>>+	if (bch_read_page(nandi, offs, buf) < 0) {
-> >>
-> >>*Important*: You shouldn't call internal functions directly here..
-> >>Instead use chip->_read() OR mtd-read() that will:
+This patch requires that <https://patchwork.kernel.org/patch/4701721/>
+land in order to compile.
 
-I'm not sure exactly what you're saying in the above line (chip->_read()
-is not a function, and and mtd-read() is syntactically incorrect),
-but...
+Signed-off-by: Addy Ke <addy.ke@rock-chips.com>
+---
+Changes in v2:
+- repost patch to match what's in Heiko's "wip/v3.18-next/dts" tree
+  for the other dwmmc controllers
+- add "cd" and "int" line, suggested by Doug Anderson
+- fix up sdio1 configuration error 
 
-You most certainly do *not* want to call mtd->_read() directly (or any
-of the callbacks prefixed with underscores). That is one of the main
-purposes of:
+ arch/arm/boot/dts/rk3288.dtsi | 86 +++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 86 insertions(+)
 
-    commit 3c3c10bba1e4ccb75b41442e45c1a072f6cded19
-    Author: Artem Bityutskiy <artem.bityutskiy@linux.intel.com>
-    Date:   Mon Jan 30 14:58:32 2012 +0200
-
-        mtd: add leading underscore to all mtd functions
-
-> >>- keep this code independent of ECC modes added in your driver
-> >>in future.
-> >>- implicitly handle updating mtd->ecc_stat (like ecc_failed,
-> >>bits_corrected).
-> >>- implicitly take care of address alignments checks and offset
-> >>calculations.
-> >>
-> >><Same applies to other places where you have directly used
-> >>bch_read_page())
-> >
-> >Yourself and Brian seem to disagree on this point.  Which is correct?
-
-I think you've worked out a decent solution in your latest series, but
-a few of the guiding principles:
-
- * BBT code can rely on generic NAND implementation details (e.g.,
-   chip->options), but it can also act as an MTD user (i.e., use the
-   mtd_*() APIs)
-
- * It should not rely on details of the particular NAND driver (e.g.,
-   calling your ST bch_read_page())
-
- * Look at similar code and try to follow its pattern where it makes
-   sense. So while nand_bbt.c is not a shining example in all regards, I
-   think it does OK in terms of some of the key points of layering.
-
-> >>>>+	/* Is block already considered bad? (will also catch
-> >>>>invalid offsets) */
-> >>>>+	ret = mtd_block_isbad(mtd, offs);
-> >>>
-> >>>You're violating some of the layering here; the low-level driver
-> >>>probably shouldn't be calling the high-level mtd_*() APIs. On
-> >>>a similar
-> >>>note, I'm not 100% confident that the nand_base/nand_bbt
-> >>>separation is
-> >>>written cleanly enough for easy maintenance of your nand_base
-> >>>+ ST BBT
-> >>>code in parallel. I might need a second look at that, and I think
-> >>>modularizing your BBT code to a separate file could help ease
-> >>>this a
-> >>>little.
-> >
-> >... here is the converse argument.
-
-I think I clarified this one; I misspoke about the mtd_*() APIs.
-
-> I think somewhere in earlier comments, Brian also supported
-> to use high-level function like mtd_read(). Also, nand_bbt.c
-> itself uses 'mtd_read(), mtd_read_oob() and mtd_write_oob()
-> at many places. So I'll let Brain decide here.
-> But having low-level function will add redundant code for
-> re-checking and aligning the addresses boundaries to block
-> and page/sector sizes.
-
-Not all checks are redundant. It's redundant to have the direct
-descendant doing the same checks that the parent does, like:
-
-  mtd_read() (checks boundaries)
-  |_ mtd->_read() (e.g., nand_read())
-
-So nand_read() and nand_do_read_ops() don't need the checking.
-
-But for a BBT implementation, it can help to make sure that its
-page/block/etc. arithmetic fits the right bounds when it ends up
-deciding to scan a block.
-
-Now, it still may be easy to prove that the checks are
-redundant/unnecessary for correctly-written code, but if the layering
-makes sense, then it still may be a better choice to simply use the
-high-level, self-checking API than to try to dig deeper. For instance,
-I'm pretty sure UBI does some checks to make sure it's not reading off
-the end of an MTD, but it still calls mtd_read() because it's The Right
-Thing (TM).
-
-Brian
+diff --git a/arch/arm/boot/dts/rk3288.dtsi b/arch/arm/boot/dts/rk3288.dtsi
+index 36be7bb..91576ae 100644
+--- a/arch/arm/boot/dts/rk3288.dtsi
++++ b/arch/arm/boot/dts/rk3288.dtsi
+@@ -88,6 +88,26 @@
+ 		status = "disabled";
+ 	};
+ 
++	sdio0: dwmmc at ff0d0000 {
++		compatible = "rockchip,rk3288-dw-mshc";
++		clocks = <&cru HCLK_SDIO0>, <&cru SCLK_SDIO0>;
++		clock-names = "biu", "ciu";
++		fifo-depth = <0x100>;
++		interrupts = <GIC_SPI 33 IRQ_TYPE_LEVEL_HIGH>;
++		reg = <0xff0d0000 0x4000>;
++		status = "disabled";
++	};
++
++	sdio1: dwmmc at ff0e0000 {
++		compatible = "rockchip,rk3288-dw-mshc";
++		clocks = <&cru HCLK_SDIO1>, <&cru SCLK_SDIO1>;
++		clock-names = "biu", "ciu";
++		fifo-depth = <0x100>;
++		interrupts = <GIC_SPI 34 IRQ_TYPE_LEVEL_HIGH>;
++		reg = <0xff0e0000 0x4000>;
++		status = "disabled";
++	};
++
+ 	emmc: dwmmc at ff0f0000 {
+ 		compatible = "rockchip,rk3288-dw-mshc";
+ 		clocks = <&cru HCLK_EMMC>, <&cru SCLK_EMMC>;
+@@ -508,6 +528,72 @@
+ 			};
+ 		};
+ 
++		sdio0 {
++			sdio0_clk: sdio0-clk {
++				rockchip,pins = <4 25 RK_FUNC_1 &pcfg_pull_none>;
++			};
++
++			sdio0_cmd: sdio0-cmd {
++				rockchip,pins = <4 24 RK_FUNC_1 &pcfg_pull_up>;
++			};
++
++			sdio0_cd: sdio0-cd {
++				rockchip,pins = <4 26 RK_FUNC_1 &pcfg_pull_up>;
++			};
++
++			sdio0_pwr: sdio0-pwr {
++				rockchip,pins = <4 28 RK_FUNC_1 &pcfg_pull_up>;
++			};
++
++			sdio0_int: sdio0-int {
++				rockchip,pins = <4 30 RK_FUNC_1 &pcfg_pull_up>;
++			};
++
++			sdio0_bus1: sdio0-bus1 {
++				rockchip,pins = <4 20 RK_FUNC_1 &pcfg_pull_up>;
++			};
++
++			sdio0_bus4: sdio0-bus4 {
++				rockchip,pins = <4 20 RK_FUNC_1 &pcfg_pull_up>,
++						<4 21 RK_FUNC_1 &pcfg_pull_up>,
++						<4 22 RK_FUNC_1 &pcfg_pull_up>,
++						<4 23 RK_FUNC_1 &pcfg_pull_up>;
++			};
++		};
++
++		sdio1 {
++			sdio1_clk: sdio1-clk {
++				rockchip,pins = <4 7 RK_FUNC_4 &pcfg_pull_none>;
++			};
++
++			sdio1_cmd: sdio1-cmd {
++				rockchip,pins = <4 6 RK_FUNC_4 &pcfg_pull_up>;
++			};
++
++			sdio1_cd: sdio1-cd {
++				rockchip,pins = <3 28 RK_FUNC_4 &pcfg_pull_up>;
++			};
++
++			sdio1_pwr: sdio1-pwr {
++				rockchip,pins = <4 9 RK_FUNC_4 &pcfg_pull_up>;
++			};
++
++			sdio1_int: sdio1-int {
++				rockchip,pins = <3 31 RK_FUNC_4 &pcfg_pull_up>;
++			};
++
++			sdio1_bus1: sdio1-bus1 {
++				rockchip,pins = <3 24 RK_FUNC_4 &pcfg_pull_up>;
++			};
++
++			sdio1_bus4: sdio1-bus4 {
++				rockchip,pins = <3 24 RK_FUNC_4 &pcfg_pull_up>,
++						<3 25 RK_FUNC_4 &pcfg_pull_up>,
++						<3 26 RK_FUNC_4 &pcfg_pull_up>,
++						<3 27 RK_FUNC_4 &pcfg_pull_up>;
++			};
++		};
++
+ 		emmc {
+ 			emmc_clk: emmc-clk {
+ 				rockchip,pins = <3 18 RK_FUNC_2 &pcfg_pull_none>;
+-- 
+1.8.3.2
