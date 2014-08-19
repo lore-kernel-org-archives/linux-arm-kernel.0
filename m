@@ -1,25 +1,44 @@
-From: javier@dowhile0.org (Javier Martinez Canillas)
-Date: Tue, 19 Aug 2014 12:15:41 +0200
-Subject: [PATCH 1/2] ARM: dts: Enable PMIC interrupts on ODROID
-In-Reply-To: <3413299.OcpyWkc82q@amdc1032>
-References: <1405500606-5752-1-git-send-email-drake@endlessm.com>
- <CAAObsKAokjDmpVy5cm_iFD52bCq+3jYeGDWzACsmh-JKktyjDw@mail.gmail.com>
- <53F22D1B.4010900@samsung.com> <3413299.OcpyWkc82q@amdc1032>
-Message-ID: <CABxcv=mkqmg_b+vwbVPAW7AaB86Fxx+LTuMSyC7L_mUy6u2+TQ@mail.gmail.com>
+From: magnus.damm@gmail.com (Magnus Damm)
+Date: Tue, 19 Aug 2014 19:17:33 +0900
+Subject: [PATCH v2 1/5] ARM: shmobile: r8a7740: Add CMT1 device to DT
+In-Reply-To: <CAMuHMdXTa8dG0L2xLNELn3R310PJc+HotHwJZsaqPzuWQRJf5A@mail.gmail.com>
+References: <1407801882-2561-1-git-send-email-horms+renesas@verge.net.au>
+ <1407801882-2561-2-git-send-email-horms+renesas@verge.net.au>
+ <CANqRtoTBJOZEFoOg+YmfyovCGDTa43Qs77OW-qd9YQLFq3tQ3A@mail.gmail.com>
+ <CAMuHMdXTa8dG0L2xLNELn3R310PJc+HotHwJZsaqPzuWQRJf5A@mail.gmail.com>
+Message-ID: <CANqRtoQ-g906KNRGjx_6nuX_E8COSunXMDZQUZkPUFzBUTZFgA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
-
-On Tue, Aug 19, 2014 at 11:57 AM, Bartlomiej Zolnierkiewicz
-<b.zolnierkie@samsung.com> wrote:
+On Tue, Aug 19, 2014 at 4:29 PM, Geert Uytterhoeven
+<geert@linux-m68k.org> wrote:
+> On Tue, Aug 19, 2014 at 8:39 AM, Magnus Damm <magnus.damm@gmail.com> wrote:
+>>>  arch/arm/boot/dts/r8a7740.dtsi | 12 ++++++++++++
+>>>  1 file changed, 12 insertions(+)
+>>>
+>>> diff --git a/arch/arm/boot/dts/r8a7740.dtsi b/arch/arm/boot/dts/r8a7740.dtsi
+>>> index 6cd6a46..1067a96 100644
+>>> --- a/arch/arm/boot/dts/r8a7740.dtsi
+>>> +++ b/arch/arm/boot/dts/r8a7740.dtsi
+>>> @@ -41,6 +41,18 @@
+>>>                 interrupts = <0 83 IRQ_TYPE_LEVEL_HIGH>;
+>>>         };
+>>>
+>>> +       cmt1: timer at e6138000 {
+>>> +               compatible = "renesas,cmt-48";
+>>
+>> Do we want to have the "r8a7740" in the compatible string somewhere?
 >
-> IMHO they should go to upstream ASAP as they fix the boot for
-> ODROID boards and they cannot break anything as they are limited
-> to ODROID dts files.
->
+> Documentation/devicetree/bindings/timer/renesas,cmt.txt does not
+> mention compatible properties containing SoC names.
 
-Agreed, this is definitely -rc material IMHO.
+Right, that seems to be missing from the timers. Is there any reason
+why we need to treat those in a special way?
 
-Best regards,
-Javier
+In my mind this timer case is similar to various SCIF variants
+documented in Documentation/devicetree/bindings/serial/renesas,sci-serial.txt
+- in the case of SCIF we have SoC name in the binding documentation.
+
+Cheers,
+
+/ magnus
