@@ -1,80 +1,32 @@
-From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
-Date: Mon, 18 Aug 2014 22:28:42 -0700
-Subject: [PATCH 1/2] doc: dt/bindings: input: introduce palmas power
- button description
-In-Reply-To: <1408392810-16011-2-git-send-email-nm@ti.com>
-References: <1408392810-16011-1-git-send-email-nm@ti.com>
- <1408392810-16011-2-git-send-email-nm@ti.com>
-Message-ID: <20140819052842.GB21199@core.coreip.homeip.net>
+From: leoy@marvell.com (Leo Yan)
+Date: Tue, 19 Aug 2014 13:31:30 +0800
+Subject: [Question]: redundant interrupts for broadcast timer
+Message-ID: <53F2E132.10701@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 18, 2014 at 03:13:29PM -0500, Nishanth Menon wrote:
-> Many palmas family of PMICs have support for interrupt based power
-> button. This allows the device to notify the processor of external
-> push button events over the shared palmas interrupt.
-> 
-> Document the hardware support for the same.
-> 
-> Signed-off-by: Nishanth Menon <nm@ti.com>
-> ---
->  .../bindings/input/ti,palmas-pwrbutton.txt         |   32 ++++++++++++++++++++
->  1 file changed, 32 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/input/ti,palmas-pwrbutton.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/input/ti,palmas-pwrbutton.txt b/Documentation/devicetree/bindings/input/ti,palmas-pwrbutton.txt
-> new file mode 100644
-> index 0000000..6a89bcd
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/input/ti,palmas-pwrbutton.txt
-> @@ -0,0 +1,32 @@
-> +Texas Instruments Palmas family power button module
-> +
-> +This module is part of the Palmas family of PMICs. For more details
-> +about the whole chip see:
-> +Documentation/devicetree/bindings/mfd/palmas.txt.
-> +
-> +This module provides a simple power button event via an Interrupt.
-> +
-> +Required properties:
-> +- compatible: should be one of the following
-> +   - "ti,palmas-pwrbutton": For Palmas compatible power on button
-> +- interrupt-parent: Parent interrupt device, must be handle of palmas node.
-> +- interrupts: Interrupt number of power button submodule on device.
-> +
-> +Optional Properties:
-> +
-> +- ti,palmas-long-press-seconds: Duration in seconds which the power
-> +  button should be kept pressed for Palmas to power off automatically.
-> +  NOTE: This depends on OTP support and POWERHOLD signal configuration
-> +  on platform.
+hi,
 
-Only a few values are valid for this property, I think you should mention that.
+We observed the redundant interrupts for broadcast timer, so want to 
+confirm here firstly; pls see below flow:
 
-> +
-> +Example:
-> +
-> +&palmas {
-> +	palmas_pwr_button: pwrbutton {
-> +		compatible = "ti,palmas-pwrbutton";
-> +		interrupt-parent = <&tps659038>;
-> +		interrupts = <1 IRQ_TYPE_NONE>;
+1. Thread_A starts a hrtimer with 100ms timeout, and then thread_A will 
+remove from the runqueue to sleep;
+2. The CPU which thread_A runs on will enter idle and call notify 
+CLOCK_EVT_NOTIFY_BROADCAST_ENTER, so the CPU will shutdown its local 
+timer and set broadcast timer's next event with delta for 100ms;
+3. After 70ms later, the CPU is waken up by other peripheral's interrupt 
+and thread_A will be waken up as well; thread_A will cancel the hrtimer 
+at this point, kernel will remove the timer event from the event queue 
+but it will not disable broadcast timer;
+4. So after 30ms later, the broadcast timer interrupt will be triggered 
+even though the timer has been cancelled by s/w in step 3.
 
-Why none? Can we specify appropriate trigger here instead of hard-coding in the
-driver?
+With current timer framework, is upper behaviour expected? Or maybe we 
+miss something so that introduce such kind issue?
 
-> +		wakeup-source;
+And i'm interesting now if have some idea to optimize such issue, very 
+appreciate for suggestion and comment.
 
-What handles this attribute? I do not see it handled in the driver.
-
-> +		ti,palmas-long-press-seconds = <12>;
-> +	};
-> +};
-> -- 
-> 1.7.9.5
-> 
-
-Thanks.
-
--- 
-Dmitry
+Thanks,
+Leo Yan
