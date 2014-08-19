@@ -1,262 +1,148 @@
-From: daniel.thompson@linaro.org (Daniel Thompson)
-Date: Tue, 19 Aug 2014 17:45:55 +0100
-Subject: [PATCH v10 05/19] arm: KGDB/KDB FIQ support
-In-Reply-To: <1408466769-20004-1-git-send-email-daniel.thompson@linaro.org>
-References: <1408369264-14242-1-git-send-email-daniel.thompson@linaro.org>
- <1408466769-20004-1-git-send-email-daniel.thompson@linaro.org>
-Message-ID: <1408466769-20004-6-git-send-email-daniel.thompson@linaro.org>
+From: dianders@chromium.org (Doug Anderson)
+Date: Tue, 19 Aug 2014 09:47:35 -0700
+Subject: [PATCH v2] ARM: dts: Add sdio0 and sdio1 to the rk3288
+In-Reply-To: <1408415512-17275-1-git-send-email-addy.ke@rock-chips.com>
+References: <1407995360-26009-1-git-send-email-addy.ke@rock-chips.com>
+ <1408415512-17275-1-git-send-email-addy.ke@rock-chips.com>
+Message-ID: <CAD=FV=V_LMm_xKhanwqQLK5nV3WvyvpdOdBN-z5b9jGd2=TgGw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The FIQ debugger may be used to debug situations when the kernel stuck
-in uninterruptable sections, e.g. the kernel infinitely loops or
-deadlocked in an interrupt or with interrupts disabled.
+Addy,
 
-Credit:
+On Mon, Aug 18, 2014 at 7:31 PM, Addy Ke <addy.ke@rock-chips.com> wrote:
+> This patch requires that <https://patchwork.kernel.org/patch/4701721/>
+> land in order to compile.
+>
+> Signed-off-by: Addy Ke <addy.ke@rock-chips.com>
+> ---
+> Changes in v2:
+> - repost patch to match what's in Heiko's "wip/v3.18-next/dts" tree
+>   for the other dwmmc controllers
+> - add "cd" and "int" line, suggested by Doug Anderson
+> - fix up sdio1 configuration error
+>
+>  arch/arm/boot/dts/rk3288.dtsi | 86 +++++++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 86 insertions(+)
+>
+> diff --git a/arch/arm/boot/dts/rk3288.dtsi b/arch/arm/boot/dts/rk3288.dtsi
+> index 36be7bb..91576ae 100644
+> --- a/arch/arm/boot/dts/rk3288.dtsi
+> +++ b/arch/arm/boot/dts/rk3288.dtsi
+> @@ -88,6 +88,26 @@
+>                 status = "disabled";
+>         };
+>
+> +       sdio0: dwmmc at ff0d0000 {
+> +               compatible = "rockchip,rk3288-dw-mshc";
+> +               clocks = <&cru HCLK_SDIO0>, <&cru SCLK_SDIO0>;
+> +               clock-names = "biu", "ciu";
+> +               fifo-depth = <0x100>;
+> +               interrupts = <GIC_SPI 33 IRQ_TYPE_LEVEL_HIGH>;
+> +               reg = <0xff0d0000 0x4000>;
+> +               status = "disabled";
+> +       };
+> +
+> +       sdio1: dwmmc at ff0e0000 {
+> +               compatible = "rockchip,rk3288-dw-mshc";
+> +               clocks = <&cru HCLK_SDIO1>, <&cru SCLK_SDIO1>;
+> +               clock-names = "biu", "ciu";
+> +               fifo-depth = <0x100>;
+> +               interrupts = <GIC_SPI 34 IRQ_TYPE_LEVEL_HIGH>;
+> +               reg = <0xff0e0000 0x4000>;
+> +               status = "disabled";
+> +       };
+> +
+>         emmc: dwmmc at ff0f0000 {
+>                 compatible = "rockchip,rk3288-dw-mshc";
+>                 clocks = <&cru HCLK_EMMC>, <&cru SCLK_EMMC>;
+> @@ -508,6 +528,72 @@
+>                         };
+>                 };
+>
+> +               sdio0 {
+> +                       sdio0_clk: sdio0-clk {
+> +                               rockchip,pins = <4 25 RK_FUNC_1 &pcfg_pull_none>;
+> +                       };
+> +
+> +                       sdio0_cmd: sdio0-cmd {
+> +                               rockchip,pins = <4 24 RK_FUNC_1 &pcfg_pull_up>;
+> +                       };
+> +
+> +                       sdio0_cd: sdio0-cd {
+> +                               rockchip,pins = <4 26 RK_FUNC_1 &pcfg_pull_up>;
+> +                       };
+> +
+> +                       sdio0_pwr: sdio0-pwr {
+> +                               rockchip,pins = <4 28 RK_FUNC_1 &pcfg_pull_up>;
+> +                       };
+> +
+> +                       sdio0_int: sdio0-int {
+> +                               rockchip,pins = <4 30 RK_FUNC_1 &pcfg_pull_up>;
+> +                       };
+> +
+> +                       sdio0_bus1: sdio0-bus1 {
+> +                               rockchip,pins = <4 20 RK_FUNC_1 &pcfg_pull_up>;
+> +                       };
+> +
+> +                       sdio0_bus4: sdio0-bus4 {
+> +                               rockchip,pins = <4 20 RK_FUNC_1 &pcfg_pull_up>,
+> +                                               <4 21 RK_FUNC_1 &pcfg_pull_up>,
+> +                                               <4 22 RK_FUNC_1 &pcfg_pull_up>,
+> +                                               <4 23 RK_FUNC_1 &pcfg_pull_up>;
+> +                       };
 
-    This patch is a near complete re-write of a patch originally
-    provided by Anton Vorontsov. Today only a couple of comments and
-    other small fragments still survive, however without Anton's work
-    to build from this patch would not exist.
+Can you make sure to include all of the sdio0 pins?  I think you're
+still missing gpio4d3 (write protect).  You're also missing gpio4d5
+(bkpwr), not that I know what that actually is.
 
-Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: Ben Dooks <ben.dooks@codethink.co.uk>
-Cc: Omar Sandoval <osandov@osandov.com>
----
- arch/arm/Kconfig            |   2 +
- arch/arm/Kconfig.debug      |  19 +++++++
- arch/arm/include/asm/kgdb.h |   4 ++
- arch/arm/kernel/kgdb.c      | 117 +++++++++++++++++++++++++++++++++++++++++---
- 4 files changed, 136 insertions(+), 6 deletions(-)
+Also: I know that sdmmc isn't sorted properly (should probably fix
+that), but can you sort sdio0 and sdio1 by pin number?  So list data
+lines first, then cmd, then clock, then detect, then write protect,
+...
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index c49a775..e6380b3 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -305,6 +305,7 @@ choice
- config ARCH_MULTIPLATFORM
- 	bool "Allow multiple platforms to be selected"
- 	depends on MMU
-+	select ARCH_MIGHT_HAVE_KGDB_FIQ
- 	select ARCH_WANT_OPTIONAL_GPIOLIB
- 	select ARM_HAS_SG_CHAIN
- 	select ARM_PATCH_PHYS_VIRT
-@@ -352,6 +353,7 @@ config ARCH_REALVIEW
- 
- config ARCH_VERSATILE
- 	bool "ARM Ltd. Versatile family"
-+	select ARCH_MIGHT_HAVE_KGDB_FIQ
- 	select ARCH_WANT_OPTIONAL_GPIOLIB
- 	select ARM_AMBA
- 	select ARM_TIMER_SP804
-diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
-index b11ad54..df3f0bf 100644
---- a/arch/arm/Kconfig.debug
-+++ b/arch/arm/Kconfig.debug
-@@ -2,6 +2,25 @@ menu "Kernel hacking"
- 
- source "lib/Kconfig.debug"
- 
-+config ARCH_MIGHT_HAVE_KGDB_FIQ
-+	bool
-+
-+config KGDB_FIQ
-+	bool "KGDB FIQ support"
-+	depends on KGDB_KDB && ARCH_MIGHT_HAVE_KGDB_FIQ && !THUMB2_KERNEL
-+	select FIQ
-+	help
-+	  The FIQ debugger may be used to debug situations when the
-+	  kernel stuck in uninterruptable sections, e.g. the kernel
-+	  infinitely loops or deadlocked in an interrupt or with
-+	  interrupts disabled.
-+
-+	  By default KGDB FIQ is disabled at runtime, but can be enabled
-+	  by setting the console to ttyNMI0 (and choosing the underlying
-+	  serial port using kgdboc)
-+
-+	  If unsure, say N.
-+
- config ARM_PTDUMP
- 	bool "Export kernel pagetable layout to userspace via debugfs"
- 	depends on DEBUG_KERNEL
-diff --git a/arch/arm/include/asm/kgdb.h b/arch/arm/include/asm/kgdb.h
-index 0a9d5dd..6563da0 100644
---- a/arch/arm/include/asm/kgdb.h
-+++ b/arch/arm/include/asm/kgdb.h
-@@ -11,7 +11,9 @@
- #define __ARM_KGDB_H__
- 
- #include <linux/ptrace.h>
-+#include <linux/linkage.h>
- #include <asm/opcodes.h>
-+#include <asm/exception.h>
- 
- /*
-  * GDB assumes that we're a user process being debugged, so
-@@ -48,6 +50,8 @@ static inline void arch_kgdb_breakpoint(void)
- extern void kgdb_handle_bus_error(void);
- extern int kgdb_fault_expected;
- 
-+extern int kgdb_register_fiq(unsigned int fiq);
-+
- #endif /* !__ASSEMBLY__ */
- 
- /*
-diff --git a/arch/arm/kernel/kgdb.c b/arch/arm/kernel/kgdb.c
-index a74b53c..b77b885 100644
---- a/arch/arm/kernel/kgdb.c
-+++ b/arch/arm/kernel/kgdb.c
-@@ -12,8 +12,11 @@
- #include <linux/irq.h>
- #include <linux/kdebug.h>
- #include <linux/kgdb.h>
-+#include <asm/fiq.h>
- #include <asm/traps.h>
- 
-+static unsigned int kgdb_fiq;
-+
- struct dbg_reg_def_t dbg_reg_def[DBG_MAX_REG_NUM] =
- {
- 	{ "r0", 4, offsetof(struct pt_regs, ARM_r0)},
-@@ -175,14 +178,26 @@ static struct undef_hook kgdb_compiled_brkpt_hook = {
- 
- static void kgdb_call_nmi_hook(void *ignored)
- {
--       kgdb_nmicallback(raw_smp_processor_id(), get_irq_regs());
-+	kgdb_nmicallback(raw_smp_processor_id(), get_irq_regs());
- }
- 
- void kgdb_roundup_cpus(unsigned long flags)
- {
--       local_irq_enable();
--       smp_call_function(kgdb_call_nmi_hook, NULL, 0);
--       local_irq_disable();
-+#if defined CONFIG_KGDB_FIQ && defined CONFIG_SMP
-+	struct cpumask mask;
-+
-+	if (in_nmi()) {
-+		cpumask_copy(&mask, cpu_online_mask);
-+		cpumask_clear_cpu(raw_smp_processor_id(), &mask);
-+		if (!cpumask_empty(&mask))
-+			send_fiq_ipi_mask(&mask);
-+		return;
-+	}
-+#endif
-+
-+	local_irq_enable();
-+	smp_call_function(kgdb_call_nmi_hook, NULL, 0);
-+	local_irq_disable();
- }
- 
- static int __kgdb_notify(struct die_args *args, unsigned long cmd)
-@@ -244,6 +259,43 @@ void kgdb_arch_exit(void)
- 	unregister_die_notifier(&kgdb_notifier);
- }
- 
-+/**
-+ * kgdb_fiq_enable_nmi - Manage NMI-triggered entry to KGDB
-+ * @on: Flag to either enable or disable an NMI
-+ *
-+ * The call counts disable requests, and thus allows to nest disables. But
-+ * trying to enable already enabled NMI is an error.
-+ */
-+static void kgdb_fiq_enable_nmi(bool on)
-+{
-+	if (!kgdb_fiq)
-+		return;
-+
-+#ifdef CONFIG_KGDB_FIQ
-+	static atomic_t cnt;
-+	int ret;
-+
-+	if (on) {
-+		ret = atomic_add_return(1, &cnt);
-+		if (ret == 1)
-+			enable_fiq(kgdb_fiq);
-+
-+		/*
-+		 * There should be only one instance that calls this function
-+		 * in "enable, disable" order. All other users must call
-+		 * disable first, then enable. If not, something is wrong.
-+		 */
-+		if (WARN_ON(ret > 1))
-+			return;
-+	} else {
-+		ret = atomic_add_return(-1, &cnt);
-+		if (ret == 0)
-+			disable_fiq(kgdb_fiq);
-+	}
-+#endif
-+}
-+
-+
- /*
-  * Register our undef instruction hooks with ARM undef core.
-  * We regsiter a hook specifically looking for the KGB break inst
-@@ -252,8 +304,61 @@ void kgdb_arch_exit(void)
-  */
- struct kgdb_arch arch_kgdb_ops = {
- #ifndef __ARMEB__
--	.gdb_bpt_instr		= {0xfe, 0xde, 0xff, 0xe7}
-+	.gdb_bpt_instr		= {0xfe, 0xde, 0xff, 0xe7},
- #else /* ! __ARMEB__ */
--	.gdb_bpt_instr		= {0xe7, 0xff, 0xde, 0xfe}
-+	.gdb_bpt_instr		= {0xe7, 0xff, 0xde, 0xfe},
- #endif
-+	.enable_nmi		= kgdb_fiq_enable_nmi
- };
-+
-+#ifdef CONFIG_KGDB_FIQ
-+static int kgdb_handle_fiq(struct notifier_block *nb, unsigned long arg,
-+			   void *data)
-+{
-+	struct pt_regs *regs = (void *) arg;
-+	int actual;
-+
-+	if (!kgdb_nmicallback(raw_smp_processor_id(), regs))
-+		return NOTIFY_OK;
-+
-+	actual = ack_fiq(kgdb_fiq);
-+	WARN_ON(actual != kgdb_fiq);
-+
-+	/* there's no harm in doing this regardless of the above WARN_ON() */
-+	if (kgdb_nmi_poll_knock())
-+		kgdb_handle_exception(1, 0, 0, regs);
-+
-+	eoi_fiq(actual);
-+
-+	return NOTIFY_OK;
-+}
-+
-+static struct notifier_block kgdb_fiq_notifier = {
-+	.notifier_call = kgdb_handle_fiq,
-+	.priority = 100,
-+};
-+
-+int kgdb_register_fiq(unsigned int fiq)
-+{
-+	static struct fiq_handler kgdb_fiq_desc = { .name = "kgdb", };
-+	int err;
-+
-+	if (!has_fiq(fiq)) {
-+		pr_warn(
-+		    "%s: Cannot register %u (no FIQ with this number)\n",
-+		    __func__, fiq);
-+		return -ENODEV;
-+	}
-+
-+	err = claim_fiq(&kgdb_fiq_desc);
-+	if (err) {
-+		pr_warn("%s: unable to claim fiq", __func__);
-+		return err;
-+	}
-+
-+	kgdb_fiq = fiq;
-+	register_fiq_nmi_notifier(&kgdb_fiq_notifier);
-+
-+	return 0;
-+}
-+#endif
--- 
-1.9.3
+
+Same comments apply to sdio1.
+
+> +               };
+> +
+> +               sdio1 {
+> +                       sdio1_clk: sdio1-clk {
+> +                               rockchip,pins = <4 7 RK_FUNC_4 &pcfg_pull_none>;
+> +                       };
+> +
+> +                       sdio1_cmd: sdio1-cmd {
+> +                               rockchip,pins = <4 6 RK_FUNC_4 &pcfg_pull_up>;
+> +                       };
+> +
+> +                       sdio1_cd: sdio1-cd {
+> +                               rockchip,pins = <3 28 RK_FUNC_4 &pcfg_pull_up>;
+> +                       };
+> +
+> +                       sdio1_pwr: sdio1-pwr {
+> +                               rockchip,pins = <4 9 RK_FUNC_4 &pcfg_pull_up>;
+> +                       };
+> +
+> +                       sdio1_int: sdio1-int {
+> +                               rockchip,pins = <3 31 RK_FUNC_4 &pcfg_pull_up>;
+> +                       };
+> +
+> +                       sdio1_bus1: sdio1-bus1 {
+> +                               rockchip,pins = <3 24 RK_FUNC_4 &pcfg_pull_up>;
+> +                       };
+> +
+> +                       sdio1_bus4: sdio1-bus4 {
+> +                               rockchip,pins = <3 24 RK_FUNC_4 &pcfg_pull_up>,
+> +                                               <3 25 RK_FUNC_4 &pcfg_pull_up>,
+> +                                               <3 26 RK_FUNC_4 &pcfg_pull_up>,
+> +                                               <3 27 RK_FUNC_4 &pcfg_pull_up>;
+> +                       };
+> +               };
+> +
+>                 emmc {
+>                         emmc_clk: emmc-clk {
+>                                 rockchip,pins = <3 18 RK_FUNC_2 &pcfg_pull_none>;
+> --
+> 1.8.3.2
+>
+>
