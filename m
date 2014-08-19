@@ -1,57 +1,135 @@
-From: ttynkkynen@nvidia.com (Tuomas Tynkkynen)
-Date: Tue, 19 Aug 2014 22:52:59 +0300
-Subject: [PATCH v3 03/15] clk: tegra: Add closed loop support for the DFLL
-In-Reply-To: <53F2D454.2020000@nvidia.com>
-References: <1408419205-10048-1-git-send-email-tuomas.tynkkynen@iki.fi>
- <1408419205-10048-4-git-send-email-tuomas.tynkkynen@iki.fi>
- <53F2D454.2020000@nvidia.com>
-Message-ID: <53F3AB1B.70703@nvidia.com>
+From: dianders@chromium.org (Doug Anderson)
+Date: Tue, 19 Aug 2014 13:14:09 -0700
+Subject: [PATCH v3] ARM: dts: Add sdio0 and sdio1 to the rk3288
+In-Reply-To: <1408436126-23390-1-git-send-email-addy.ke@rock-chips.com>
+References: <1408415512-17275-1-git-send-email-addy.ke@rock-chips.com>
+ <1408436126-23390-1-git-send-email-addy.ke@rock-chips.com>
+Message-ID: <CAD=FV=XMfjSjvjZuFox1hLcN66PchkDzAmoV8EQ11ztshG=xoA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19/08/14 07:36, Vince Hsu wrote:
-> Hi,
-> 
-> On 08/19/2014 11:33 AM, Tuomas Tynkkynen wrote:
-[...]
->> +    dfll_writel(td, val, DFLL_OUTPUT_CFG);
->> +    dfll_wmb(td);
-> Sorry that I forgot to mention this in v2's comment. Could you squash the change below in this patch? And actually it's pretty easy to misuse the dfll read/write/wmb functions. We might want to have some generic functions for these, and let the generic functions handle the offset to different register blocks.
-> 
+Addy,
 
-Indeed, having single readl/writel and handling the different register areas there
-sounds much better, I'll implement that.
+On Tue, Aug 19, 2014 at 1:15 AM, Addy Ke <addy.ke@rock-chips.com> wrote:
+> This patch requires that <https://patchwork.kernel.org/patch/4701721/>
+> land in order to compile.
+>
+> Signed-off-by: Addy Ke <addy.ke@rock-chips.com>
+> ---
+> Changes in v2:
+> - repost patch to match what's in Heiko's "wip/v3.18-next/dts" tree
+>   for the other dwmmc controllers
+> - add "cd" and "int" line, suggested by Doug Anderson
+> - fix up sdio1 configuration error
+>
+> Changes in v3:
+> - sort sdio0 and sdio1 by pin number, suggested by Doug Anderson
+> - add "ro" and "bkpwr" line, suggested by Doug Anderson
+>
+>  arch/arm/boot/dts/rk3288.dtsi | 102 ++++++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 102 insertions(+)
+>
+> diff --git a/arch/arm/boot/dts/rk3288.dtsi b/arch/arm/boot/dts/rk3288.dtsi
+> index 36be7bb..12c0297 100644
+> --- a/arch/arm/boot/dts/rk3288.dtsi
+> +++ b/arch/arm/boot/dts/rk3288.dtsi
+> @@ -88,6 +88,26 @@
+>                 status = "disabled";
+>         };
+>
+> +       sdio0: dwmmc at ff0d0000 {
+> +               compatible = "rockchip,rk3288-dw-mshc";
+> +               clocks = <&cru HCLK_SDIO0>, <&cru SCLK_SDIO0>;
+> +               clock-names = "biu", "ciu";
+> +               fifo-depth = <0x100>;
+> +               interrupts = <GIC_SPI 33 IRQ_TYPE_LEVEL_HIGH>;
+> +               reg = <0xff0d0000 0x4000>;
+> +               status = "disabled";
+> +       };
+> +
+> +       sdio1: dwmmc at ff0e0000 {
+> +               compatible = "rockchip,rk3288-dw-mshc";
+> +               clocks = <&cru HCLK_SDIO1>, <&cru SCLK_SDIO1>;
+> +               clock-names = "biu", "ciu";
+> +               fifo-depth = <0x100>;
+> +               interrupts = <GIC_SPI 34 IRQ_TYPE_LEVEL_HIGH>;
+> +               reg = <0xff0e0000 0x4000>;
+> +               status = "disabled";
+> +       };
+> +
+>         emmc: dwmmc at ff0f0000 {
+>                 compatible = "rockchip,rk3288-dw-mshc";
+>                 clocks = <&cru HCLK_EMMC>, <&cru SCLK_EMMC>;
+> @@ -508,6 +528,88 @@
+>                         };
+>                 };
+>
+> +               sdio0 {
+> +                       sdio0_bus1: sdio0-bus1 {
+> +                               rockchip,pins = <4 20 RK_FUNC_1 &pcfg_pull_up>;
+> +                       };
+> +
+> +                       sdio0_bus4: sdio0-bus4 {
+> +                               rockchip,pins = <4 20 RK_FUNC_1 &pcfg_pull_up>,
+> +                                               <4 21 RK_FUNC_1 &pcfg_pull_up>,
+> +                                               <4 22 RK_FUNC_1 &pcfg_pull_up>,
+> +                                               <4 23 RK_FUNC_1 &pcfg_pull_up>;
+> +                       };
+> +
+> +                       sdio0_cmd: sdio0-cmd {
+> +                               rockchip,pins = <4 24 RK_FUNC_1 &pcfg_pull_up>;
+> +                       };
+> +
+> +                       sdio0_clk: sdio0-clk {
+> +                               rockchip,pins = <4 25 RK_FUNC_1 &pcfg_pull_none>;
+> +                       };
+> +
+> +                       sdio0_cd: sdio0-cd {
+> +                               rockchip,pins = <4 26 RK_FUNC_1 &pcfg_pull_up>;
+> +                       };
+> +
+> +                       sdio0_ro: sdio0-ro {
 
-[...]
-> diff --git a/drivers/clk/tegra/clk-dfll.c b/drivers/clk/tegra/clk-dfll.c
-> index 9b3eded6b880..71e4b256ea0d 100644
-> --- a/drivers/clk/tegra/clk-dfll.c
-> +++ b/drivers/clk/tegra/clk-dfll.c
-> @@ -645,7 +645,7 @@ static void dfll_init_out_if(struct tegra_dfll *td)
->         val = (td->lut_safe << DFLL_OUTPUT_CFG_SAFE_SHIFT) |
->                 (td->lut_max << DFLL_OUTPUT_CFG_MAX_SHIFT) |
->                 (td->lut_min << DFLL_OUTPUT_CFG_MIN_SHIFT);
-> -       dfll_writel(td, val, DFLL_OUTPUT_CFG);
-> +       dfll_i2c_writel(td, val, DFLL_OUTPUT_CFG);
-> -        dfll_wmb(td);
-> +        dfll_i2c_wmb(td);
-> 
->         dfll_writel(td, 0, DFLL_OUTPUT_FORCE);
-> @@ -1146,7 +1146,8 @@ static int attr_registers_show(struct seq_file *s, void *data)
->         seq_puts(s, "CONTROL REGISTERS:\n");
->         for (offs = 0; offs <= DFLL_MONITOR_DATA; offs += 4)
->                 seq_printf(s, "[0x%02x] = 0x%08x\n", offs,
-> -                          dfll_readl(td, offs));
-> +                               offs == DFLL_OUTPUT_CFG ? dfll_i2c_readl(td, offs) :
-> +                                       dfll_readl(td, offs));
-> 
->         seq_puts(s, "\nI2C and INTR REGISTERS:\n");
->         for (offs = DFLL_I2C_CFG; offs <= DFLL_I2C_STS; offs += 4)
-> 
-> 
-> 
-> Thanks,
-> Vince
+I probably would have called it "sdio0-wp", not "sdio-ro".  That
+matches the syntax used elsewhere ("wp-gpios", "disable-wp", etc).
+Can you do one more spin?
 
--- 
-nvpublic
+With that change, you can add my Reviewed-by tag.
+
+
+
+> +                               rockchip,pins = <4 27 RK_FUNC_1 &pcfg_pull_up>;
+> +                       };
+> +
+> +                       sdio0_pwr: sdio0-pwr {
+> +                               rockchip,pins = <4 28 RK_FUNC_1 &pcfg_pull_up>;
+> +                       };
+> +
+> +                       sdio0_bkpwr: sdio0-bkpwr {
+> +                               rockchip,pins = <4 29 RK_FUNC_1 &pcfg_pull_up>;
+> +                       };
+> +
+> +                       sdio0_int: sdio0-int {
+> +                               rockchip,pins = <4 30 RK_FUNC_1 &pcfg_pull_up>;
+> +                       };
+> +               };
+> +
+> +               sdio1 {
+> +                       sdio1_bus1: sdio1-bus1 {
+> +                               rockchip,pins = <3 24 RK_FUNC_4 &pcfg_pull_up>;
+> +                       };
+> +
+> +                       sdio1_bus4: sdio1-bus4 {
+> +                               rockchip,pins = <3 24 RK_FUNC_4 &pcfg_pull_up>,
+> +                                               <3 25 RK_FUNC_4 &pcfg_pull_up>,
+> +                                               <3 26 RK_FUNC_4 &pcfg_pull_up>,
+> +                                               <3 27 RK_FUNC_4 &pcfg_pull_up>;
+> +                       };
+> +
+> +                       sdio1_cd: sdio1-cd {
+> +                               rockchip,pins = <3 28 RK_FUNC_4 &pcfg_pull_up>;
+> +                       };
+> +
+> +                       sdio1_ro: sdio1-ro {
+
+Here, too.
