@@ -1,33 +1,80 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Tue, 19 Aug 2014 01:52:38 +0200
-Subject: [GIT PULL] ARM: mvebu: SoC changes for v3.17 (round 2)
-In-Reply-To: <20140818205440.GB2126@drone.musicnaut.iki.fi>
-References: <20140718220516.GM24496@titan.lakedaemon.net>
- <20140818205440.GB2126@drone.musicnaut.iki.fi>
-Message-ID: <20140818235238.GG9187@lunn.ch>
+From: computersforpeace@gmail.com (Brian Norris)
+Date: Mon, 18 Aug 2014 17:02:34 -0700
+Subject: [PATCH v8 01/11] ARM: brcmstb: add infrastructure for ARM-based
+ Broadcom STB SoCs
+In-Reply-To: <20140813234706.GC18411@ld-irv-0074>
+References: <1405976886-27807-1-git-send-email-computersforpeace@gmail.com>
+ <1405976886-27807-2-git-send-email-computersforpeace@gmail.com>
+ <CAL_Jsq+Nbk7m9KXhG+Chdpvurp75RrvhFR2oE_LGxV444GSe9Q@mail.gmail.com>
+ <20140731022320.GM3711@ld-irv-0074>
+ <20140731084315.GJ30282@n2100.arm.linux.org.uk>
+ <20140731220642.GQ3711@ld-irv-0074>
+ <20140802092756.GZ30282@n2100.arm.linux.org.uk>
+ <20140813234706.GC18411@ld-irv-0074>
+Message-ID: <20140819000234.GM18411@ld-irv-0074>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 18, 2014 at 11:54:40PM +0300, Aaro Koskinen wrote:
-> On Fri, Jul 18, 2014 at 06:05:16PM -0400, Jason Cooper wrote:
-> > Yeah, it's just one patch, but it's a beautiful one!  Thanks to the
-> > efforts of many people over the last couple years, and in particular,
-> > Andrew Lunn, Kirkwood has been completely converted to DT.
+Hi Russell,
+
+On Wed, Aug 13, 2014 at 04:47:06PM -0700, Brian Norris wrote:
+> Picking up this thread again, as things are now set for dropping this
+> patch and resubmitting SMP support for 3.18.
+
+Any further comment on this? I'd like to submit v10 of this patch soon.
+As of now, my patch will still look essentially the same (with only
+minor changes for some of the review comments), since I'm convinced
+neither that my current per-cpu flag-based solution is unsound nor that
+a delayed work queue can solve all of the same problems.
+
+> On Sat, Aug 02, 2014 at 10:27:56AM +0100, Russell King wrote:
+> > On Thu, Jul 31, 2014 at 03:06:42PM -0700, Brian Norris wrote:
+> > > Yes, I noticed this. What I meant is that smp_ops.cpu_die() and
+> > > smp_ops.cpu_kill() are not synchronized.
+> > ...
+> > > We're not relying on the L1 cache, though. Don't sync_cache_{r,w}()
+> > > ensure all reads/writes reach at least the L2?
+> > 
+> > What exactly are you trying to achieve here?
 > 
-> Is there instructions how to get OpenRD Client DT boot to work
-> with 3.17-rc1? I see that legacy boot has been deleted, so there is
-> no other option.
+> Synchronization between v7_exit_coherency_flush() (on the dying CPU) and
+> yanking the power (brcmstb_cpu_kill(), on the murderous CPU). The core
+> completion-based synchronization is not sufficient, since it allows
+> brcmstb_smp_ops.smp_kill and brcmstb_smp_ops.smp_die to race.
 > 
-> I tried booting kernel with appended DTB, but it just silently hangs.
-> Also tried to enable earlyprintk, but couldn't get even that working...
+> Am I somehow not achieving what I intend here?
+> 
+> > > How does that ensure that the CPU is down by the time the work is
+> > > scheduled? It seems like this would just defer the work long enough that
+> > > it *most likely* has quiesced, but I don't see how this gives us a
+> > > better guarantee. Or maybe I'm missing something. (If so, please do
+> > > enlighten!)
+> > 
+> > Note that I said a delayed work queue.  The dying CPU runs a predictable
+> > sequence once cpu_die() has been entered - interrupts at the GIC have
+> > been programmed to be routed to other CPUs, interrupts at the CPU are
+> > masked, so the CPU isn't going to be doing anything else except executing
+> > that code path.  So, it's going to be a predictable number of CPU cycles.
+> > 
+> > That allows you to arrange a delayed workqueue (or a timer) to fire
+> > after a period of time that you can guarantee that the dying CPU has
+> > reached that wfi().
+> 
+> OK, that sounds workable for the active hotplug case.
+> 
+> But what about for the suspend case? CPUs are hot-unplugged during
+> disable_nonboot_cpus(), and I don't see that this would guarantee the
+> workqueue will complete before we enter suspend.
+> 
+> > Another point which raises itself in your patch is this:
+> > 
+> > +       /* Settle-time from Broadcom-internal DVT reference code */
+> > +       udelay(7);
+> > 
+[...]
+> I'm looking into this specific delay. [...]
 
-mvebu_v5_defconfig should work. Starting from 3.17-rc1, that enabled
-appended DT by default.
+BTW, I think this delay can be dropped. It was retained from an early
+non-production release of this CPU.
 
-CONFIG_DEBUG_LL_UART_8250=y
-CONFIG_DEBUG_UART_PHYS=0xf1012000
-CONFIG_DEBUG_UART_VIRT=0xfed12000
-
-Should get earlyprintk going.
-
-       Andrew
+Brian
