@@ -1,135 +1,112 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Tue, 19 Aug 2014 13:14:09 -0700
-Subject: [PATCH v3] ARM: dts: Add sdio0 and sdio1 to the rk3288
-In-Reply-To: <1408436126-23390-1-git-send-email-addy.ke@rock-chips.com>
-References: <1408415512-17275-1-git-send-email-addy.ke@rock-chips.com>
- <1408436126-23390-1-git-send-email-addy.ke@rock-chips.com>
-Message-ID: <CAD=FV=XMfjSjvjZuFox1hLcN66PchkDzAmoV8EQ11ztshG=xoA@mail.gmail.com>
+From: bjorn.andersson@sonymobile.com (Bjorn Andersson)
+Date: Tue, 19 Aug 2014 13:23:31 -0700
+Subject: [PATCH] genirq: Introduce irq_read_line()
+Message-ID: <1408479811-26088-1-git-send-email-bjorn.andersson@sonymobile.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Addy,
+Introduce the irq_read_line() function to allow device drivers to read
+the current logical state of an input when the hardware only exposes
+this through status bits in the interrupt controller.
 
-On Tue, Aug 19, 2014 at 1:15 AM, Addy Ke <addy.ke@rock-chips.com> wrote:
-> This patch requires that <https://patchwork.kernel.org/patch/4701721/>
-> land in order to compile.
->
-> Signed-off-by: Addy Ke <addy.ke@rock-chips.com>
-> ---
-> Changes in v2:
-> - repost patch to match what's in Heiko's "wip/v3.18-next/dts" tree
->   for the other dwmmc controllers
-> - add "cd" and "int" line, suggested by Doug Anderson
-> - fix up sdio1 configuration error
->
-> Changes in v3:
-> - sort sdio0 and sdio1 by pin number, suggested by Doug Anderson
-> - add "ro" and "bkpwr" line, suggested by Doug Anderson
->
->  arch/arm/boot/dts/rk3288.dtsi | 102 ++++++++++++++++++++++++++++++++++++++++++
->  1 file changed, 102 insertions(+)
->
-> diff --git a/arch/arm/boot/dts/rk3288.dtsi b/arch/arm/boot/dts/rk3288.dtsi
-> index 36be7bb..12c0297 100644
-> --- a/arch/arm/boot/dts/rk3288.dtsi
-> +++ b/arch/arm/boot/dts/rk3288.dtsi
-> @@ -88,6 +88,26 @@
->                 status = "disabled";
->         };
->
-> +       sdio0: dwmmc at ff0d0000 {
-> +               compatible = "rockchip,rk3288-dw-mshc";
-> +               clocks = <&cru HCLK_SDIO0>, <&cru SCLK_SDIO0>;
-> +               clock-names = "biu", "ciu";
-> +               fifo-depth = <0x100>;
-> +               interrupts = <GIC_SPI 33 IRQ_TYPE_LEVEL_HIGH>;
-> +               reg = <0xff0d0000 0x4000>;
-> +               status = "disabled";
-> +       };
-> +
-> +       sdio1: dwmmc at ff0e0000 {
-> +               compatible = "rockchip,rk3288-dw-mshc";
-> +               clocks = <&cru HCLK_SDIO1>, <&cru SCLK_SDIO1>;
-> +               clock-names = "biu", "ciu";
-> +               fifo-depth = <0x100>;
-> +               interrupts = <GIC_SPI 34 IRQ_TYPE_LEVEL_HIGH>;
-> +               reg = <0xff0e0000 0x4000>;
-> +               status = "disabled";
-> +       };
-> +
->         emmc: dwmmc at ff0f0000 {
->                 compatible = "rockchip,rk3288-dw-mshc";
->                 clocks = <&cru HCLK_EMMC>, <&cru SCLK_EMMC>;
-> @@ -508,6 +528,88 @@
->                         };
->                 };
->
-> +               sdio0 {
-> +                       sdio0_bus1: sdio0-bus1 {
-> +                               rockchip,pins = <4 20 RK_FUNC_1 &pcfg_pull_up>;
-> +                       };
-> +
-> +                       sdio0_bus4: sdio0-bus4 {
-> +                               rockchip,pins = <4 20 RK_FUNC_1 &pcfg_pull_up>,
-> +                                               <4 21 RK_FUNC_1 &pcfg_pull_up>,
-> +                                               <4 22 RK_FUNC_1 &pcfg_pull_up>,
-> +                                               <4 23 RK_FUNC_1 &pcfg_pull_up>;
-> +                       };
-> +
-> +                       sdio0_cmd: sdio0-cmd {
-> +                               rockchip,pins = <4 24 RK_FUNC_1 &pcfg_pull_up>;
-> +                       };
-> +
-> +                       sdio0_clk: sdio0-clk {
-> +                               rockchip,pins = <4 25 RK_FUNC_1 &pcfg_pull_none>;
-> +                       };
-> +
-> +                       sdio0_cd: sdio0-cd {
-> +                               rockchip,pins = <4 26 RK_FUNC_1 &pcfg_pull_up>;
-> +                       };
-> +
-> +                       sdio0_ro: sdio0-ro {
+The new function is backed by a new callback function in the irq_chip -
+irq_read_line() - that can be implemented by irq_chips that owns such
+status bits.
 
-I probably would have called it "sdio0-wp", not "sdio-ro".  That
-matches the syntax used elsewhere ("wp-gpios", "disable-wp", etc).
-Can you do one more spin?
+Based on rfc patch from April 2011 by Abhijeet.
 
-With that change, you can add my Reviewed-by tag.
+Cc: Abhijeet Dharmapurikar <adharmap@codeaurora.org>
+Signed-off-by: Bjorn Andersson <bjorn.andersson@sonymobile.com>
+---
+
+Due to address size limitations in the SSBI protocol used to communicate with
+various Qualcomm PMICs most accesses are banked. Furthermore the input/status
+bits for the adc, battery monitor, charger, gpio, mpp and usb blocks are all
+banked as interrupt status bits.
+
+Therefor to be able to implement any of those drivers we need to make a call
+into the pm8xxx irq_chip code to acquire the state of those bits - as my first
+hack [1] did.
 
 
+The patch is based on Abhijeet's RFC found here [2], but my reasons for having
+this accessor function is different.
 
-> +                               rockchip,pins = <4 27 RK_FUNC_1 &pcfg_pull_up>;
-> +                       };
-> +
-> +                       sdio0_pwr: sdio0-pwr {
-> +                               rockchip,pins = <4 28 RK_FUNC_1 &pcfg_pull_up>;
-> +                       };
-> +
-> +                       sdio0_bkpwr: sdio0-bkpwr {
-> +                               rockchip,pins = <4 29 RK_FUNC_1 &pcfg_pull_up>;
-> +                       };
-> +
-> +                       sdio0_int: sdio0-int {
-> +                               rockchip,pins = <4 30 RK_FUNC_1 &pcfg_pull_up>;
-> +                       };
-> +               };
-> +
-> +               sdio1 {
-> +                       sdio1_bus1: sdio1-bus1 {
-> +                               rockchip,pins = <3 24 RK_FUNC_4 &pcfg_pull_up>;
-> +                       };
-> +
-> +                       sdio1_bus4: sdio1-bus4 {
-> +                               rockchip,pins = <3 24 RK_FUNC_4 &pcfg_pull_up>,
-> +                                               <3 25 RK_FUNC_4 &pcfg_pull_up>,
-> +                                               <3 26 RK_FUNC_4 &pcfg_pull_up>,
-> +                                               <3 27 RK_FUNC_4 &pcfg_pull_up>;
-> +                       };
-> +
-> +                       sdio1_cd: sdio1-cd {
-> +                               rockchip,pins = <3 28 RK_FUNC_4 &pcfg_pull_up>;
-> +                       };
-> +
-> +                       sdio1_ro: sdio1-ro {
+[1] https://lkml.org/lkml/2014/7/7/892
+[2] http://lists.infradead.org/pipermail/linux-arm-kernel/2011-April/048277.html
 
-Here, too.
+ include/linux/interrupt.h |    1 +
+ include/linux/irq.h       |    2 ++
+ kernel/irq/manage.c       |   25 +++++++++++++++++++++++++
+ 3 files changed, 28 insertions(+)
+
+diff --git a/include/linux/interrupt.h b/include/linux/interrupt.h
+index 698ad05..8f3af5d 100644
+--- a/include/linux/interrupt.h
++++ b/include/linux/interrupt.h
+@@ -361,6 +361,7 @@ static inline int disable_irq_wake(unsigned int irq)
+ 	return irq_set_irq_wake(irq, 0);
+ }
+ 
++extern int irq_read_line(unsigned int irq);
+ 
+ #ifdef CONFIG_IRQ_FORCED_THREADING
+ extern bool force_irqthreads;
+diff --git a/include/linux/irq.h b/include/linux/irq.h
+index 0d998d8..f656590 100644
+--- a/include/linux/irq.h
++++ b/include/linux/irq.h
+@@ -294,6 +294,7 @@ static inline irq_hw_number_t irqd_to_hwirq(struct irq_data *d)
+  * @irq_retrigger:	resend an IRQ to the CPU
+  * @irq_set_type:	set the flow type (IRQ_TYPE_LEVEL/etc.) of an IRQ
+  * @irq_set_wake:	enable/disable power-management wake-on of an IRQ
++ * @irq_read_line:	read the logical state of an irq line
+  * @irq_bus_lock:	function to lock access to slow bus (i2c) chips
+  * @irq_bus_sync_unlock:function to sync and unlock slow bus (i2c) chips
+  * @irq_cpu_online:	configure an interrupt source for a secondary CPU
+@@ -326,6 +327,7 @@ struct irq_chip {
+ 	int		(*irq_retrigger)(struct irq_data *data);
+ 	int		(*irq_set_type)(struct irq_data *data, unsigned int flow_type);
+ 	int		(*irq_set_wake)(struct irq_data *data, unsigned int on);
++	int		(*irq_read_line)(struct irq_data *data);
+ 
+ 	void		(*irq_bus_lock)(struct irq_data *data);
+ 	void		(*irq_bus_sync_unlock)(struct irq_data *data);
+diff --git a/kernel/irq/manage.c b/kernel/irq/manage.c
+index 3dc6a61..33bf9c7 100644
+--- a/kernel/irq/manage.c
++++ b/kernel/irq/manage.c
+@@ -565,6 +565,31 @@ int irq_set_irq_wake(unsigned int irq, unsigned int on)
+ }
+ EXPORT_SYMBOL(irq_set_irq_wake);
+ 
++/**
++ *	irq_read_line - read the logical state of an irq line
++ *	@irq:	interrupt to read
++ *
++ *	This function may be called from IRQ context only when
++ *	desc->chip->bus_lock and desc->chip->bus_sync_unlock are NULL !
++ */
++int irq_read_line(unsigned int irq)
++{
++	struct irq_desc *desc;
++	unsigned long flags;
++	int ret = -ENOSYS;
++
++	desc = irq_get_desc_buslock(irq, &flags, IRQ_GET_DESC_CHECK_GLOBAL);
++	if (!desc)
++		return -EINVAL;
++
++	if (desc->irq_data.chip->irq_read_line)
++		ret = desc->irq_data.chip->irq_read_line(&desc->irq_data);
++
++	irq_put_desc_busunlock(desc, flags);
++	return ret;
++}
++EXPORT_SYMBOL_GPL(irq_read_line);
++
+ /*
+  * Internal function that tells the architecture code whether a
+  * particular irq has been exclusively allocated or is available
+-- 
+1.7.9.5
