@@ -1,132 +1,66 @@
-From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Tue, 19 Aug 2014 21:07:58 +0900
-Subject: [PATCHv2] thermal: exynos: Add support for TRIM_RELOAD feature at
- Exynos3250
-In-Reply-To: <1408449463-3987-1-git-send-email-cw00.choi@samsung.com>
-References: <1408449463-3987-1-git-send-email-cw00.choi@samsung.com>
-Message-ID: <1408450078-6296-1-git-send-email-cw00.choi@samsung.com>
+From: jonsmirl@gmail.com (jonsmirl at gmail.com)
+Date: Tue, 19 Aug 2014 08:11:40 -0400
+Subject: [PATCH] This adds a generic PWM framework driver for the PWM
+ controller
+In-Reply-To: <20140818201929.GL15297@lukather>
+References: <20140818180316.31807.3445.stgit@studio>
+ <20140818192318.GJ15297@lukather>
+ <CAKON4OwzFDDXqCF4VNkUXXJLp3smrB6Axp_x=D47sjbpoNbe+g@mail.gmail.com>
+ <20140818201929.GL15297@lukather>
+Message-ID: <CAKON4OwDWqnu9Nn6rBFtUJX2f0eFVzBFhRMcvPAp=K6N1KpE0w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch add support for TRIM_RELOAD feature at Exynos3250. The TMU of
-Exynos3250 has two TRIMINFO_CON register.
+On Mon, Aug 18, 2014 at 4:19 PM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> On Mon, Aug 18, 2014 at 03:53:08PM -0400, jonsmirl at gmail.com wrote:
+>> On Mon, Aug 18, 2014 at 3:23 PM, Maxime Ripard
+>> <maxime.ripard@free-electrons.com> wrote:
+>> > Hi,
+>> >
+>> > On Mon, Aug 18, 2014 at 02:03:16PM -0400, Jon Smirl wrote:
+>> >> found on Allwinner SoCs.x
+>> >>
+>> >> Signed-off-by: Jon Smirl <jonsmirl@gmail.com>
+>> >
+>> > Is there any notable difference with Alexandre's driver?
+>> > https://lkml.org/lkml/2014/5/19/568
+>> >
+>> > If so, why didn't you posted incremental patches on top of his driver?
+>>
+>> Better A10 support.
+>
+> Better how?
+>
+>> And I wrote this one without know about his.
+>
+> So you're just require us to trash an already extensively reviewed
+> driver and start from scratch again?
 
-Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
-Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
-Cc: Zhang Rui <rui.zhang@intel.com>
-Cc: Eduardo Valentin <edubezval@gmail.com>
----
-Changes from v1:
-- Add missing 'TMU_SUPPORT_TRIM_RELOAD' features
+Forget mine then.
 
- drivers/thermal/samsung/exynos_tmu.c      |  7 +++++--
- drivers/thermal/samsung/exynos_tmu.h      |  5 +++--
- drivers/thermal/samsung/exynos_tmu_data.c | 11 +++++++++--
- drivers/thermal/samsung/exynos_tmu_data.h |  7 +++++--
- 4 files changed, 22 insertions(+), 8 deletions(-)
+Problems in the other one....
+1) The math is not right in either patch. Selsinork has been checking
+mine with a scope and just found another math error in mine. The
+internal math needs to be done in picoseconds or round off errors mess
+up the high frequency outputs (24Mhz, 12Mhz, 8Mhz, ...).
+3) By-pass mode on the A20 is not implemented.
+2) A10 is not correctly handled. Specifically the prescaler is
+different on the A10 vs A20.
 
-diff --git a/drivers/thermal/samsung/exynos_tmu.c b/drivers/thermal/samsung/exynos_tmu.c
-index acbff14..ed01606 100644
---- a/drivers/thermal/samsung/exynos_tmu.c
-+++ b/drivers/thermal/samsung/exynos_tmu.c
-@@ -164,8 +164,11 @@ static int exynos_tmu_initialize(struct platform_device *pdev)
- 		}
- 	}
- 
--	if (TMU_SUPPORTS(pdata, TRIM_RELOAD))
--		__raw_writel(1, data->base + reg->triminfo_ctrl);
-+	if (TMU_SUPPORTS(pdata, TRIM_RELOAD)) {
-+		for (i = 0; i < pdata->triminfo_reload_count; i++)
-+			__raw_writel(pdata->triminfo_reload[i],
-+					data->base + reg->triminfo_ctrl[i]);
-+	}
- 
- 	if (pdata->cal_mode == HW_MODE)
- 		goto skip_calib_data;
-diff --git a/drivers/thermal/samsung/exynos_tmu.h b/drivers/thermal/samsung/exynos_tmu.h
-index 1b4a644..72cb54e 100644
---- a/drivers/thermal/samsung/exynos_tmu.h
-+++ b/drivers/thermal/samsung/exynos_tmu.h
-@@ -151,8 +151,7 @@ struct exynos_tmu_registers {
- 	u32	triminfo_25_shift;
- 	u32	triminfo_85_shift;
- 
--	u32	triminfo_ctrl;
--	u32	triminfo_ctrl1;
-+	u32	triminfo_ctrl[2];
- 	u32	triminfo_reload_shift;
- 
- 	u32	tmu_ctrl;
-@@ -295,6 +294,8 @@ struct exynos_tmu_platform_data {
- 	u8 second_point_trim;
- 	u8 default_temp_offset;
- 	u8 test_mux;
-+	u8 triminfo_reload[2];
-+	u8 triminfo_reload_count;
- 
- 	enum calibration_type cal_type;
- 	enum calibration_mode cal_mode;
-diff --git a/drivers/thermal/samsung/exynos_tmu_data.c b/drivers/thermal/samsung/exynos_tmu_data.c
-index aa8e0de..b45aa90 100644
---- a/drivers/thermal/samsung/exynos_tmu_data.c
-+++ b/drivers/thermal/samsung/exynos_tmu_data.c
-@@ -95,6 +95,8 @@ static const struct exynos_tmu_registers exynos3250_tmu_registers = {
- 	.triminfo_data = EXYNOS_TMU_REG_TRIMINFO,
- 	.triminfo_25_shift = EXYNOS_TRIMINFO_25_SHIFT,
- 	.triminfo_85_shift = EXYNOS_TRIMINFO_85_SHIFT,
-+	.triminfo_ctrl[0] = EXYNOS_TMU_TRIMINFO_CON1,
-+	.triminfo_ctrl[1] = EXYNOS_TMU_TRIMINFO_CON2,
- 	.tmu_ctrl = EXYNOS_TMU_REG_CONTROL,
- 	.test_mux_addr_shift = EXYNOS4412_MUX_ADDR_SHIFT,
- 	.buf_vref_sel_shift = EXYNOS_TMU_REF_VOLTAGE_SHIFT,
-@@ -160,8 +162,11 @@ static const struct exynos_tmu_registers exynos3250_tmu_registers = {
- 		.temp_level = 95, \
- 	}, \
- 	.freq_tab_count = 2, \
-+	.triminfo_reload[0] = 0x1, \
-+	.triminfo_reload[1] = 0x11, \
-+	.triminfo_reload_count = 2, \
- 	.registers = &exynos3250_tmu_registers, \
--	.features = (TMU_SUPPORT_EMULATION | \
-+	.features = (TMU_SUPPORT_EMULATION | TMU_SUPPORT_TRIM_RELOAD\
- 			TMU_SUPPORT_FALLING_TRIP | TMU_SUPPORT_READY_STATUS | \
- 			TMU_SUPPORT_EMUL_TIME)
- #endif
-@@ -184,7 +189,7 @@ static const struct exynos_tmu_registers exynos4412_tmu_registers = {
- 	.triminfo_data = EXYNOS_TMU_REG_TRIMINFO,
- 	.triminfo_25_shift = EXYNOS_TRIMINFO_25_SHIFT,
- 	.triminfo_85_shift = EXYNOS_TRIMINFO_85_SHIFT,
--	.triminfo_ctrl = EXYNOS_TMU_TRIMINFO_CON,
-+	.triminfo_ctrl[0] = EXYNOS_TMU_TRIMINFO_CON2,
- 	.triminfo_reload_shift = EXYNOS_TRIMINFO_RELOAD_SHIFT,
- 	.tmu_ctrl = EXYNOS_TMU_REG_CONTROL,
- 	.test_mux_addr_shift = EXYNOS4412_MUX_ADDR_SHIFT,
-@@ -252,6 +257,8 @@ static const struct exynos_tmu_registers exynos4412_tmu_registers = {
- 		.temp_level = 95, \
- 	}, \
- 	.freq_tab_count = 2, \
-+	.triminfo_reload[0] = 0x1, \
-+	.triminfo_reload_count = 1, \
- 	.registers = &exynos4412_tmu_registers, \
- 	.features = (TMU_SUPPORT_EMULATION | TMU_SUPPORT_TRIM_RELOAD | \
- 			TMU_SUPPORT_FALLING_TRIP | TMU_SUPPORT_READY_STATUS | \
-diff --git a/drivers/thermal/samsung/exynos_tmu_data.h b/drivers/thermal/samsung/exynos_tmu_data.h
-index f0979e5..e0536c3 100644
---- a/drivers/thermal/samsung/exynos_tmu_data.h
-+++ b/drivers/thermal/samsung/exynos_tmu_data.h
-@@ -57,8 +57,11 @@
- #define EXYNOS4210_TMU_TRIG_LEVEL_MASK	0x1111
- #define EXYNOS4210_TMU_INTCLEAR_VAL	0x1111
- 
--/* Exynos5250 and Exynos4412 specific registers */
--#define EXYNOS_TMU_TRIMINFO_CON	0x14
-+/* Exynos3250 specific registers */
-+#define EXYNOS_TMU_TRIMINFO_CON1	0x10
-+
-+/* Exynos5250, Exynos4412 and Exynos3250 specific registers */
-+#define EXYNOS_TMU_TRIMINFO_CON2	0x14
- #define EXYNOS_THD_TEMP_RISE		0x50
- #define EXYNOS_THD_TEMP_FALL		0x54
- #define EXYNOS_EMUL_CON		0x80
+
+
+
+
+
+>
+> --
+> Maxime Ripard, Free Electrons
+> Embedded Linux, Kernel and Android engineering
+> http://free-electrons.com
+
+
+
 -- 
-1.8.0
+Jon Smirl
+jonsmirl at gmail.com
