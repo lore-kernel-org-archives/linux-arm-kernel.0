@@ -1,334 +1,221 @@
-From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
-Date: Tue, 19 Aug 2014 11:35:40 +0200
-Subject: [RESEND PATCH v4 2/2] ARM: EXYNOS: Refactor the pm code to use DT
- based lookup
-In-Reply-To: <CAGm_ybjx4t7kGg0mJHjrox39jP-DNgc-0rkLNn2rcOLS6JjAHQ@mail.gmail.com>
-References: <1408431167-14134-1-git-send-email-vikas.sajjan@samsung.com>
- <1408431167-14134-3-git-send-email-vikas.sajjan@samsung.com>
- <CAGm_ybjx4t7kGg0mJHjrox39jP-DNgc-0rkLNn2rcOLS6JjAHQ@mail.gmail.com>
-Message-ID: <2186657.jhIisq7Fok@amdc1032>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Tue, 19 Aug 2014 17:35:41 +0800
+Subject: [PATCH v2 02/18] ARM64 / ACPI: Get RSDP and ACPI boot-time tables
+In-Reply-To: <53F24632.7030903@arm.com>
+References: <1407166105-17675-1-git-send-email-hanjun.guo@linaro.org>
+ <1407166105-17675-3-git-send-email-hanjun.guo@linaro.org>
+ <53F24632.7030903@arm.com>
+Message-ID: <53F31A6D.5090104@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-Hi,
-
-On Tuesday, August 19, 2014 01:26:49 PM Vikas Sajjan wrote:
-> Hi Kukjin,
+On 2014-8-19 2:30, Sudeep Holla wrote:
+> On 04/08/14 16:28, Hanjun Guo wrote:
+>> From: Al Stone <al.stone@linaro.org>
+>>
+>> As we want to get ACPI tables to parse and then use the information
+>> for system initialization, we should get the RSDP (Root System
+>> Description Pointer) first, it then locates Extended Root Description
+>> Table (XSDT) which contains all the 64-bit physical address that
+>> pointer to other boot-time tables.
+>>
+>> Introduce acpi.c and its related head file in this patch to provide
+>> fundamental needs of extern variables and functions for ACPI core,
+>> and then get boot-time tables as needed.
+>>    - asm/cpu.h need for ACPI core and will be updated in the future to
+>>      add definitions for arch_(un)register_cpu which are required for
+>>      ACPI based physical CPU hotplug;
 > 
-> On Tue, Aug 19, 2014 at 12:22 PM, Vikas Sajjan <vikas.sajjan@samsung.com> wrote:
-> > Refactoring the pm.c to avoid using "soc_is_exynos" checks,
-> > instead use the DT based lookup.
-> >
-> > While at it, consolidate the common code across SoCs
-> > and create static helper functions.
-> >
-> > Signed-off-by: Vikas Sajjan <vikas.sajjan@samsung.com>
-> > Reviewed-by: Tomasz Figa <t.figa@samsung.com>
+> This can go away now, as it's already present in v3.17-rc1
+
+Thanks for the reminding, I will rebase this patch set on top of
+3.17-rc1 and remove the outdated description.
+
 > 
-> Can you pick this series...
+>>    - asm/acenv.h for arch specific ACPICA environments and
+>>      implementation;
+>>    - asm/acpi.h for arch specific variables and functions needed by
+>>      ACPI driver core;
+>>    - acpi.c for ARM64 related ACPI implementation for ACPI driver
+>>      core;
+>>
+>> acpi_boot_table_init() is introduced to get RSDP and boot-time tables,
+>> it will be called in setup_arch() before paging_init(), so we should
+>> use eary_memremap() mechanism here to get the RSDP and all the table
+>> pointers.
+[...]
+>> +
+>> +/*
+>> + * Checking for the posibility that the CPU can be initialized from the MADT.
+>> + * It's used from ACPI core in crash kernel case where boot CPU is not
+>> + * necessarily CPU0 like spec demands. Since MADT must provide at least one
+> 
+> Do you mean ACPI spec demands CPU0 to be boot cpu ?
 
-I think that my PM_SLEEP=n build fixes should go in before this cleanup
-series:
+ACPI spec demands CPU0 (BSP) should be the first entry in MADT.
 
-  http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg35430.html
+> 
+> IIUC it's basically to handle UP system with SMP kernel. IWO if all the
+> ACPI resources are reused from SMP system to boot UP system with SMP
+> kernel, with this check the ACPI core won't override the CPU index
+> obtained from GIC/APIC mapping to zero.
 
-Best regards,
---
-Bartlomiej Zolnierkiewicz
-Samsung R&D Institute Poland
-Samsung Electronics
+Yes, you are right, I will update the comments.
 
-> > ---
-> >  arch/arm/mach-exynos/pm.c       |  167 +++++++++++++++++++++++++++++----------
-> >  arch/arm/mach-exynos/regs-pmu.h |    1 +
-> >  2 files changed, 126 insertions(+), 42 deletions(-)
-> >
-> > diff --git a/arch/arm/mach-exynos/pm.c b/arch/arm/mach-exynos/pm.c
-> > index 31e209b..16b23d1 100644
-> > --- a/arch/arm/mach-exynos/pm.c
-> > +++ b/arch/arm/mach-exynos/pm.c
-> > @@ -36,6 +36,8 @@
-> >  #include "regs-pmu.h"
-> >  #include "regs-sys.h"
-> >
-> > +#define REG_TABLE_END (-1U)
-> > +
-> >  /**
-> >   * struct exynos_wkup_irq - Exynos GIC to PMU IRQ mapping
-> >   * @hwirq: Hardware IRQ signal of the GIC
-> > @@ -59,6 +61,21 @@ static struct sleep_save exynos_core_save[] = {
-> >         SAVE_ITEM(S5P_SROM_BC3),
-> >  };
-> >
-> > +struct exynos_pm_data {
-> > +       const struct exynos_wkup_irq *wkup_irq;
-> > +       struct sleep_save *extra_save;
-> > +       int num_extra_save;
-> > +       unsigned int wake_disable_mask;
-> > +       unsigned int *release_ret_regs;
-> > +
-> > +       void (*pm_prepare)(void);
-> > +       void (*pm_resume)(void);
-> > +       int (*pm_suspend)(void);
-> > +       int (*cpu_suspend)(unsigned long);
-> > +};
-> > +
-> > +struct exynos_pm_data *pm_data;
-> > +
-> >  /*
-> >   * GIC wake-up support
-> >   */
-> > @@ -77,14 +94,24 @@ static const struct exynos_wkup_irq exynos5250_wkup_irq[] = {
-> >         { /* sentinel */ },
-> >  };
-> >
-> > +unsigned int exynos_release_ret_regs[] = {
-> > +       S5P_PAD_RET_MAUDIO_OPTION,
-> > +       S5P_PAD_RET_GPIO_OPTION,
-> > +       S5P_PAD_RET_UART_OPTION,
-> > +       S5P_PAD_RET_MMCA_OPTION,
-> > +       S5P_PAD_RET_MMCB_OPTION,
-> > +       S5P_PAD_RET_EBIA_OPTION,
-> > +       S5P_PAD_RET_EBIB_OPTION,
-> > +       REG_TABLE_END,
-> > +};
-> > +
-> >  static int exynos_irq_set_wake(struct irq_data *data, unsigned int state)
-> >  {
-> >         const struct exynos_wkup_irq *wkup_irq;
-> >
-> > -       if (soc_is_exynos5250())
-> > -               wkup_irq = exynos5250_wkup_irq;
-> > -       else
-> > -               wkup_irq = exynos4_wkup_irq;
-> > +       if (!pm_data->wkup_irq)
-> > +               return -ENOENT;
-> > +       wkup_irq = pm_data->wkup_irq;
-> >
-> >         while (wkup_irq->mask) {
-> >                 if (wkup_irq->hwirq == data->hwirq) {
-> > @@ -229,15 +256,8 @@ void exynos_enter_aftr(void)
-> >         cpu_pm_exit();
-> >  }
-> >
-> > -static int exynos_cpu_suspend(unsigned long arg)
-> > +static int exynos_cpu_do_idle(void)
-> >  {
-> > -#ifdef CONFIG_CACHE_L2X0
-> > -       outer_flush_all();
-> > -#endif
-> > -
-> > -       if (soc_is_exynos5250())
-> > -               flush_cache_all();
-> > -
-> >         /* issue the standby signal into the pm unit. */
-> >         cpu_do_idle();
-> >
-> > @@ -245,29 +265,44 @@ static int exynos_cpu_suspend(unsigned long arg)
-> >         return 1; /* Aborting suspend */
-> >  }
-> >
-> > -static void exynos_pm_prepare(void)
-> > +static int exynos_cpu_suspend(unsigned long arg)
-> >  {
-> > -       unsigned int tmp;
-> > +       flush_cache_all();
-> > +       outer_flush_all();
-> > +       return exynos_cpu_do_idle();
-> > +}
-> >
-> > +static void exynos_pm_set_wakeup_mask(void)
-> > +{
-> >         /* Set wake-up mask registers */
-> >         pmu_raw_writel(exynos_get_eint_wake_mask(), S5P_EINT_WAKEUP_MASK);
-> >         pmu_raw_writel(exynos_irqwake_intmask & ~(1 << 31), S5P_WAKEUP_MASK);
-> > +}
-> >
-> > -       s3c_pm_do_save(exynos_core_save, ARRAY_SIZE(exynos_core_save));
-> > -
-> > -       if (soc_is_exynos5250())
-> > -               s3c_pm_do_save(exynos5_sys_save, ARRAY_SIZE(exynos5_sys_save));
-> > -
-> > +static void exynos_pm_enter_sleep_mode(void)
-> > +{
-> >         /* Set value of power down register for sleep mode */
-> > -
-> >         exynos_sys_powerdown_conf(SYS_SLEEP);
-> >         pmu_raw_writel(S5P_CHECK_SLEEP, S5P_INFORM1);
-> >
-> >         /* ensure at least INFORM0 has the resume address */
-> > -
-> >         pmu_raw_writel(virt_to_phys(exynos_cpu_resume), S5P_INFORM0);
-> >  }
-> >
-> > +static void exynos_pm_prepare(void)
-> > +{
-> > +       /* Set wake-up mask registers */
-> > +       exynos_pm_set_wakeup_mask();
-> > +
-> > +       s3c_pm_do_save(exynos_core_save, ARRAY_SIZE(exynos_core_save));
-> > +
-> > +        if (pm_data->extra_save)
-> > +               s3c_pm_do_save(pm_data->extra_save,
-> > +                               pm_data->num_extra_save);
-> > +
-> > +       exynos_pm_enter_sleep_mode();
-> > +}
-> > +
-> >  static int exynos_pm_suspend(void)
-> >  {
-> >         unsigned long tmp;
-> > @@ -285,6 +320,15 @@ static int exynos_pm_suspend(void)
-> >         return 0;
-> >  }
-> >
-> > +static void exynos_pm_release_retention(void)
-> > +{
-> > +       unsigned int i;
-> > +
-> > +       for (i = 0; (pm_data->release_ret_regs[i] != REG_TABLE_END); i++)
-> > +               pmu_raw_writel(EXYNOS_WAKEUP_FROM_LOWPWR,
-> > +                               pm_data->release_ret_regs[i]);
-> > +}
-> > +
-> >  static void exynos_pm_resume(void)
-> >  {
-> >         if (exynos_pm_central_resume())
-> > @@ -294,18 +338,11 @@ static void exynos_pm_resume(void)
-> >                 exynos_cpu_restore_register();
-> >
-> >         /* For release retention */
-> > +       exynos_pm_release_retention();
-> >
-> > -       pmu_raw_writel((1 << 28), S5P_PAD_RET_MAUDIO_OPTION);
-> > -       pmu_raw_writel((1 << 28), S5P_PAD_RET_GPIO_OPTION);
-> > -       pmu_raw_writel((1 << 28), S5P_PAD_RET_UART_OPTION);
-> > -       pmu_raw_writel((1 << 28), S5P_PAD_RET_MMCA_OPTION);
-> > -       pmu_raw_writel((1 << 28), S5P_PAD_RET_MMCB_OPTION);
-> > -       pmu_raw_writel((1 << 28), S5P_PAD_RET_EBIA_OPTION);
-> > -       pmu_raw_writel((1 << 28), S5P_PAD_RET_EBIB_OPTION);
-> > -
-> > -       if (soc_is_exynos5250())
-> > -               s3c_pm_do_restore(exynos5_sys_save,
-> > -                       ARRAY_SIZE(exynos5_sys_save));
-> > +       if (pm_data->extra_save)
-> > +               s3c_pm_do_restore_core(pm_data->extra_save,
-> > +                                       pm_data->num_extra_save);
-> >
-> >         s3c_pm_do_restore_core(exynos_core_save, ARRAY_SIZE(exynos_core_save));
-> >
-> > @@ -316,15 +353,8 @@ early_wakeup:
-> >
-> >         /* Clear SLEEP mode set in INFORM1 */
-> >         pmu_raw_writel(0x0, S5P_INFORM1);
-> > -
-> > -       return;
-> >  }
-> >
-> > -static struct syscore_ops exynos_pm_syscore_ops = {
-> > -       .suspend        = exynos_pm_suspend,
-> > -       .resume         = exynos_pm_resume,
-> > -};
-> > -
-> >  /*
-> >   * Suspend Ops
-> >   */
-> > @@ -348,11 +378,12 @@ static int exynos_suspend_enter(suspend_state_t state)
-> >         }
-> >
-> >         s3c_pm_save_uarts();
-> > -       exynos_pm_prepare();
-> > +       if (pm_data->pm_prepare)
-> > +               pm_data->pm_prepare();
-> >         flush_cache_all();
-> >         s3c_pm_check_store();
-> >
-> > -       ret = cpu_suspend(0, exynos_cpu_suspend);
-> > +       ret = cpu_suspend(0, pm_data->cpu_suspend);
-> >         if (ret)
-> >                 return ret;
-> >
-> > @@ -387,18 +418,70 @@ static const struct platform_suspend_ops exynos_suspend_ops = {
-> >         .valid          = suspend_valid_only_mem,
-> >  };
-> >
-> > +static const struct exynos_pm_data exynos4_pm_data = {
-> > +       .wkup_irq       = exynos4_wkup_irq,
-> > +       .wake_disable_mask = ((0xFF << 8) | (0x1F << 1)),
-> > +       .release_ret_regs = exynos_release_ret_regs,
-> > +       .pm_suspend     = exynos_pm_suspend,
-> > +       .pm_resume      = exynos_pm_resume,
-> > +       .pm_prepare     = exynos_pm_prepare,
-> > +       .cpu_suspend    = exynos_cpu_suspend,
-> > +};
-> > +
-> > +static const struct exynos_pm_data exynos5250_pm_data = {
-> > +       .wkup_irq       = exynos5250_wkup_irq,
-> > +       .wake_disable_mask = ((0xFF << 8) | (0x1F << 1)),
-> > +       .release_ret_regs = exynos_release_ret_regs,
-> > +       .extra_save     = exynos5_sys_save,
-> > +       .num_extra_save = ARRAY_SIZE(exynos5_sys_save),
-> > +       .pm_suspend     = exynos_pm_suspend,
-> > +       .pm_resume      = exynos_pm_resume,
-> > +       .pm_prepare     = exynos_pm_prepare,
-> > +       .cpu_suspend    = exynos_cpu_suspend,
-> > +};
-> > +
-> > +static struct of_device_id exynos_pmu_of_device_ids[] = {
-> > +       {
-> > +               .compatible = "samsung,exynos4210-pmu",
-> > +               .data = &exynos4_pm_data,
-> > +       }, {
-> > +               .compatible = "samsung,exynos4212-pmu",
-> > +               .data = &exynos4_pm_data,
-> > +       }, {
-> > +               .compatible = "samsung,exynos4412-pmu",
-> > +               .data = &exynos4_pm_data,
-> > +       }, {
-> > +               .compatible = "samsung,exynos5250-pmu",
-> > +               .data = &exynos5250_pm_data,
-> > +       },
-> > +       { /*sentinel*/ },
-> > +};
-> > +
-> > +static struct syscore_ops exynos_pm_syscore_ops;
-> > +
-> >  void __init exynos_pm_init(void)
-> >  {
-> > +       const struct of_device_id *match;
-> >         u32 tmp;
-> >
-> > +       of_find_matching_node_and_match(NULL, exynos_pmu_of_device_ids, &match);
-> > +       if (!match) {
-> > +               pr_err("Failed to find PMU node\n");
-> > +               return;
-> > +       }
-> > +       pm_data = (struct exynos_pm_data *) match->data;
-> > +
-> >         /* Platform-specific GIC callback */
-> >         gic_arch_extn.irq_set_wake = exynos_irq_set_wake;
-> >
-> >         /* All wakeup disable */
-> >         tmp = pmu_raw_readl(S5P_WAKEUP_MASK);
-> > -       tmp |= ((0xFF << 8) | (0x1F << 1));
-> > +       tmp |= pm_data->wake_disable_mask;
-> >         pmu_raw_writel(tmp, S5P_WAKEUP_MASK);
-> >
-> > +       exynos_pm_syscore_ops.suspend   = pm_data->pm_suspend;
-> > +       exynos_pm_syscore_ops.resume    = pm_data->pm_resume;
-> > +
-> >         register_syscore_ops(&exynos_pm_syscore_ops);
-> >         suspend_set_ops(&exynos_suspend_ops);
-> >  }
-> > diff --git a/arch/arm/mach-exynos/regs-pmu.h b/arch/arm/mach-exynos/regs-pmu.h
-> > index 96a1569..30c0301 100644
-> > --- a/arch/arm/mach-exynos/regs-pmu.h
-> > +++ b/arch/arm/mach-exynos/regs-pmu.h
-> > @@ -21,6 +21,7 @@
-> >  #define S5P_USE_STANDBY_WFI0                   (1 << 16)
-> >  #define S5P_USE_STANDBY_WFE0                   (1 << 24)
-> >
-> > +#define EXYNOS_WAKEUP_FROM_LOWPWR              (1 << 28)
-> >  #define EXYNOS_SWRESET                         0x0400
-> >  #define EXYNOS5440_SWRESET                     0x00C4
+> 
+>> + * GICC structure for GIC initialization, CPU will be always available in
+>> + * MADT on ARM64.
+>> + */
+>> +static inline bool acpi_has_cpu_in_madt(void)
+>> +{
+>> +    return 1;
+> 
+> probably true instead of 1
+
+ok.
+
+> 
+>> +}
+>> +
+>> +static inline void arch_fix_phys_package_id(int num, u32 slot) { }
+>> +
+>> +#endif /* CONFIG_ACPI */
+>> +
+>> +#endif /*_ASM_ACPI_H*/
+>> diff --git a/arch/arm64/include/asm/cpu.h b/arch/arm64/include/asm/cpu.h
+>> new file mode 100644
+>> index 0000000..cee7d3f
+>> --- /dev/null
+>> +++ b/arch/arm64/include/asm/cpu.h
+>> @@ -0,0 +1,11 @@
+>> +/*
+>> + *  Copyright (C) 2013-2014 ARM Ltd.
+>> + *
+>> + * This program is free software; you can redistribute it and/or modify
+>> + * it under the terms of the GNU General Public License version 2 as
+>> + * published by the Free Software Foundation.
+>> + */
+>> +#ifndef __ASM_CPU_H
+>> +#define __ASM_CPU_H
+>> +
+>> +#endif
+>> diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
+>> index cdaedad..b568c26 100644
+>> --- a/arch/arm64/kernel/Makefile
+>> +++ b/arch/arm64/kernel/Makefile
+>> @@ -29,6 +29,7 @@ arm64-obj-$(CONFIG_ARM64_CPU_SUSPEND)    += sleep.o suspend.o
+>>   arm64-obj-$(CONFIG_JUMP_LABEL)        += jump_label.o
+>>   arm64-obj-$(CONFIG_KGDB)        += kgdb.o
+>>   arm64-obj-$(CONFIG_EFI)            += efi.o efi-stub.o efi-entry.o
+>> +arm64-obj-$(CONFIG_ACPI)        += acpi.o
+>>
+>>   obj-y                    += $(arm64-obj-y) vdso/
+>>   obj-m                    += $(arm64-obj-m)
+>> diff --git a/arch/arm64/kernel/acpi.c b/arch/arm64/kernel/acpi.c
+>> new file mode 100644
+>> index 0000000..395778c
+>> --- /dev/null
+>> +++ b/arch/arm64/kernel/acpi.c
+>> @@ -0,0 +1,69 @@
+>> +/*
+>> + *  ARM64 Specific Low-Level ACPI Boot Support
+>> + *
+>> + *  Copyright (C) 2013-2014, Linaro Ltd.
+>> + *    Author: Al Stone <al.stone@linaro.org>
+>> + *    Author: Graeme Gregory <graeme.gregory@linaro.org>
+>> + *    Author: Hanjun Guo <hanjun.guo@linaro.org>
+>> + *
+>> + *  This program is free software; you can redistribute it and/or modify
+>> + *  it under the terms of the GNU General Public License version 2 as
+>> + *  published by the Free Software Foundation.
+>> + */
+>> +
+>> +#include <linux/init.h>
+>> +#include <linux/acpi.h>
+>> +#include <linux/cpumask.h>
+>> +#include <linux/memblock.h>
+>> +#include <linux/irq.h>
+>> +#include <linux/irqdomain.h>
+>> +#include <linux/bootmem.h>
+>> +#include <linux/smp.h>
+>> +
+>> +int acpi_noirq;            /* skip ACPI IRQ initialization */
+>> +int acpi_disabled;
+>> +EXPORT_SYMBOL(acpi_disabled);
+>> +
+>> +int acpi_pci_disabled;        /* skip ACPI PCI scan and IRQ initialization */
+>> +EXPORT_SYMBOL(acpi_pci_disabled);
+>> +
+>> +/*
+>> + * __acpi_map_table() will be called before page_init(), so early_ioremap()
+>> + * or early_memremap() should be called here to for ACPI table mapping.
+>> + */
+>> +char *__init __acpi_map_table(unsigned long phys, unsigned long size)
+>> +{
+>> +    if (!phys || !size)
+>> +        return NULL;
+>> +
+>> +    return early_memremap(phys, size);
+>> +}
+>> +
+>> +void __init __acpi_unmap_table(char *map, unsigned long size)
+>> +{
+>> +    if (!map || !size)
+>> +        return;
+>> +
+>> +    early_memunmap(map, size);
+>> +}
+>> +
+>> +/*
+>> + * acpi_boot_table_init() called from setup_arch(), always.
+>> + *    1. find RSDP and get its address, and then find XSDT
+>> + *    2. extract all tables and checksums them all
+>> + *
+>> + * We can parse ACPI boot-time tables such as FADT, MADT after
+>> + * this function is called.
+>> + */
+>> +void __init acpi_boot_table_init(void)
+>> +{
+>> +    /* If acpi_disabled, bail out */
+>> +    if (acpi_disabled)
+>> +        return;
+>> +
+>> +    /* Initialize the ACPI boot-time table parser. */
+>> +    if (acpi_table_init()) {
+> 
+> Can't we call acpi_table_init directly in setup ?
+> IIUC x86 has acpi_boot_table_init as it parses Boot Flags
+> table(ACPI_SIG_BOOT)
+
+Yes, we can. But I think it not a big deal to dot that, if that
+makes the code more readable, I will update it.
+
+> 
+>> +        disable_acpi();
+>> +        return;
+>> +    }
+>> +}
+>> diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
+>> index fc50461..85c6326 100644
+>> --- a/arch/arm64/kernel/setup.c
+>> +++ b/arch/arm64/kernel/setup.c
+>> @@ -43,6 +43,7 @@
+>>   #include <linux/of_fdt.h>
+>>   #include <linux/of_platform.h>
+>>   #include <linux/efi.h>
+>> +#include <linux/acpi.h>
+>>
+>>   #include <asm/fixmap.h>
+>>   #include <asm/cputype.h>
+>> @@ -385,6 +386,9 @@ void __init setup_arch(char **cmdline_p)
+>>       efi_init();
+>>       arm64_memblock_init();
+>>
+>> +    /* Parse the ACPI tables for possible boot-time configuration */
+>> +    acpi_boot_table_init();
+>> +
+>>       paging_init();
+>>       request_standard_resources();
+
+Thanks
+Hanjun
