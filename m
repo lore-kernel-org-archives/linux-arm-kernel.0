@@ -1,51 +1,25 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Tue, 19 Aug 2014 12:04:58 +0200
-Subject: [RFC PATCH] ARM: KVM: add irqfd support
-In-Reply-To: <53F3107C.6060404@linaro.org>
-References: <1407154102-26459-1-git-send-email-eric.auger@linaro.org>
- <20140813145523.GR10550@cbox> <53F3107C.6060404@linaro.org>
-Message-ID: <20140819100458.GA31086@cbox>
+From: javier@dowhile0.org (Javier Martinez Canillas)
+Date: Tue, 19 Aug 2014 12:15:41 +0200
+Subject: [PATCH 1/2] ARM: dts: Enable PMIC interrupts on ODROID
+In-Reply-To: <3413299.OcpyWkc82q@amdc1032>
+References: <1405500606-5752-1-git-send-email-drake@endlessm.com>
+ <CAAObsKAokjDmpVy5cm_iFD52bCq+3jYeGDWzACsmh-JKktyjDw@mail.gmail.com>
+ <53F22D1B.4010900@samsung.com> <3413299.OcpyWkc82q@amdc1032>
+Message-ID: <CABxcv=mkqmg_b+vwbVPAW7AaB86Fxx+LTuMSyC7L_mUy6u2+TQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 19, 2014 at 10:53:16AM +0200, Eric Auger wrote:
-> On 08/13/2014 04:55 PM, Christoffer Dall wrote:
-> > On Mon, Aug 04, 2014 at 02:08:22PM +0200, Eric Auger wrote:
-> >> This patch enables irqfd on ARM.
-> >>
-> >> irqfd framework enables to inject a virtual IRQ into a guest upon an
-> >> eventfd trigger. User-side uses KVM_IRQFD VM ioctl to provide KVM with
-> >> a kvm_irqfd struct that associates a VM, an eventfd, an IRQ number
-> >> (aka. the gsi). When an actor signals the eventfd (typically a VFIO
-> >> platform driver), the kvm irqfd subsystem injects the provided virtual
-> >> IRQ into the guest.
-> >>
-> >> The gsi must correspond to a shared peripheral interrupt (SPI), ie the
-> >> GIC interrupt ID is gsi+32.
-> > 
-> > Why can't we support PPIs?
-> Hi Christoffer,
-> 
-> Well, in case we want to support PPI at irqfd level, we would need to
-> change the semantic of the GSI value and use the same as KVM_IRQ_LINE,
-> to specify the target vcpu. This is obviously feasible but this also
-> induces changes in currently generic user parts, vfio, vhost. is PPI
-> injection though irqfd a valid use case?
+Hello,
 
-I don't see why you wouldn't want to be able to support PPIs as
-passthrough interrupts to a guest?
+On Tue, Aug 19, 2014 at 11:57 AM, Bartlomiej Zolnierkiewicz
+<b.zolnierkie@samsung.com> wrote:
+>
+> IMHO they should go to upstream ASAP as they fix the boot for
+> ODROID boards and they cannot break anything as they are limited
+> to ODROID dts files.
+>
 
-[...]
+Agreed, this is definitely -rc material IMHO.
 
-> >> +
-> >> +/* MSI not implemented yet */
-> > 
-> > yet?  What is an MSI on ARM?
-> Well some MSI support comes with GICv2m and GICv3. My current
-> understanding is it makes sense to inject an MSI from an irqfd trigger.
-> Don't you share this understanding?
-> 
-Doh, I read GSI and wrote MSI, of course, complete brain meltdown on my
-side.
-
--Christoffer
+Best regards,
+Javier
