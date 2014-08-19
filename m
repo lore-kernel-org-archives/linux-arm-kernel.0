@@ -1,111 +1,73 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 19 Aug 2014 13:58:34 +0100
-Subject: [PATCH 1/6] iommu/arm-smmu: add support for specifying clocks
-In-Reply-To: <1407891099-24641-2-git-send-email-mitchelh@codeaurora.org>
-References: <1407891099-24641-1-git-send-email-mitchelh@codeaurora.org>
- <1407891099-24641-2-git-send-email-mitchelh@codeaurora.org>
-Message-ID: <20140819125833.GO23128@arm.com>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Tue, 19 Aug 2014 20:59:13 +0800
+Subject: [PATCH v2] mmc: sdhci-sirf: fix 8bit width enable by overwriting
+ set_bus_width
+Message-ID: <1408453153-8125-1-git-send-email-21cnbao@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 13, 2014 at 01:51:34AM +0100, Mitchel Humpherys wrote:
-> On some platforms with tight power constraints it is polite to only
-> leave your clocks on for as long as you absolutely need them. Currently
-> we assume that all clocks necessary for SMMU register access are always
-> on.
-> 
-> Add some optional device tree properties to specify any clocks that are
-> necessary for SMMU register access and turn them on and off as needed.
-> 
-> If no clocks are specified in the device tree things continue to work
-> the way they always have: we assume all necessary clocks are always
-> turned on.
+From: Minda Chen <Minda.Chen@csr.com>
 
-How does this interact with an SMMU in bypass mode?
+8bit-width enable bit of CSR MMC hosts is 3, while stardard hosts use
+bit 5. this patch fixes the functionality of 8bit transfer in CSR mmc
+controllers and improve performance for mmc0 a lot.
 
-[...]
+Signed-off-by: Minda Chen <Minda.Chen@csr.com>
+Signed-off-by: Barry Song <Baohua.Song@csr.com>
+---
+ -v2: check for host->version >= SDHCI_SPEC_300
 
-> +static int arm_smmu_enable_clocks(struct arm_smmu_device *smmu)
-> +{
-> +	int i, ret = 0;
-> +
-> +	for (i = 0; i < smmu->num_clocks; ++i) {
-> +		ret = clk_prepare_enable(smmu->clocks[i]);
-> +		if (ret) {
-> +			dev_err(smmu->dev, "Couldn't enable clock #%d\n", i);
-> +			while (i--)
-> +				clk_disable_unprepare(smmu->clocks[i]);
-> +			break;
-> +		}
-> +	}
-> +
-> +	return ret;
-> +}
-> +
-> +static void arm_smmu_disable_clocks(struct arm_smmu_device *smmu)
-> +{
-> +	int i;
-> +
-> +	for (i = 0; i < smmu->num_clocks; ++i)
-> +		clk_disable_unprepare(smmu->clocks[i]);
-> +}
+ drivers/mmc/host/sdhci-sirf.c | 28 +++++++++++++++++++++++++++-
+ 1 file changed, 27 insertions(+), 1 deletion(-)
 
-What stops theses from racing with each other when there are multiple
-clocks? I also assume that the clk API ignores calls to clk_enable_prepare
-for a clk that's already enabled? I couldn't find that code...
-
->  /* Wait for any pending TLB invalidations to complete */
->  static void arm_smmu_tlb_sync(struct arm_smmu_device *smmu)
->  {
-> @@ -644,11 +672,15 @@ static irqreturn_t arm_smmu_context_fault(int irq, void *dev)
->  	struct arm_smmu_device *smmu = smmu_domain->smmu;
->  	void __iomem *cb_base;
->  
-> +	arm_smmu_enable_clocks(smmu);
-
-How can I get a context interrupt from an SMMU without its clocks enabled?
-
-[...]
-
-> +int arm_smmu_device_cfg_probe(struct arm_smmu_device *smmu)
->  {
->  	unsigned long size;
->  	void __iomem *gr0_base = ARM_SMMU_GR0(smmu);
-> @@ -2027,10 +2124,16 @@ static int arm_smmu_device_dt_probe(struct platform_device *pdev)
->  	}
->  	dev_notice(dev, "registered %d master devices\n", i);
->  
-> -	err = arm_smmu_device_cfg_probe(smmu);
-> +	err = arm_smmu_init_clocks(smmu);
->  	if (err)
->  		goto out_put_masters;
->  
-> +	arm_smmu_enable_clocks(smmu);
-> +
-> +	err = arm_smmu_device_cfg_probe(smmu);
-> +	if (err)
-> +		goto out_disable_clocks;
-> +
->  	parse_driver_options(smmu);
->  
->  	if (smmu->version > 1 &&
-> @@ -2039,7 +2142,7 @@ static int arm_smmu_device_dt_probe(struct platform_device *pdev)
->  			"found only %d context interrupt(s) but %d required\n",
->  			smmu->num_context_irqs, smmu->num_context_banks);
->  		err = -ENODEV;
-> -		goto out_put_masters;
-> +		goto out_disable_clocks;
->  	}
->  
->  	for (i = 0; i < smmu->num_global_irqs; ++i) {
-> @@ -2061,12 +2164,16 @@ static int arm_smmu_device_dt_probe(struct platform_device *pdev)
->  	spin_unlock(&arm_smmu_devices_lock);
->  
->  	arm_smmu_device_reset(smmu);
-> +	arm_smmu_disable_clocks(smmu);
-
-I wonder if this is really the right thing to do. Rather than the
-fine-grained clock enable/disable you have, why don't we just enable in
-domain_init and disable in domain_destroy, with refcounting for the clocks?
-
-Will
+diff --git a/drivers/mmc/host/sdhci-sirf.c b/drivers/mmc/host/sdhci-sirf.c
+index 1700453..a7224e5 100644
+--- a/drivers/mmc/host/sdhci-sirf.c
++++ b/drivers/mmc/host/sdhci-sirf.c
+@@ -15,6 +15,8 @@
+ #include <linux/mmc/slot-gpio.h>
+ #include "sdhci-pltfm.h"
+ 
++#define SDHCI_SIRF_8BITBUS BIT(3)
++
+ struct sdhci_sirf_priv {
+ 	struct clk *clk;
+ 	int gpio_cd;
+@@ -27,10 +29,34 @@ static unsigned int sdhci_sirf_get_max_clk(struct sdhci_host *host)
+ 	return clk_get_rate(priv->clk);
+ }
+ 
++static void sdhci_sirf_set_bus_width(struct sdhci_host *host, int width)
++{
++	u8 ctrl;
++
++	ctrl = sdhci_readb(host, SDHCI_HOST_CONTROL);
++	if (width == MMC_BUS_WIDTH_8) {
++		ctrl &= ~SDHCI_CTRL_4BITBUS;
++		/*
++		 * 8bit-width enable bit of CSR MMC hosts is 3,
++		 * while stardard hosts use bit 5
++		 */
++		if (host->version >= SDHCI_SPEC_300)
++			ctrl |= SDHCI_SIRF_8BITBUS;
++	} else {
++		if (host->version >= SDHCI_SPEC_300)
++			ctrl &= ~SDHCI_SIRF_8BITBUS;
++		if (width == MMC_BUS_WIDTH_4)
++			ctrl |= SDHCI_CTRL_4BITBUS;
++		else
++			ctrl &= ~SDHCI_CTRL_4BITBUS;
++	}
++	sdhci_writeb(host, ctrl, SDHCI_HOST_CONTROL);
++}
++
+ static struct sdhci_ops sdhci_sirf_ops = {
+ 	.set_clock = sdhci_set_clock,
+ 	.get_max_clock	= sdhci_sirf_get_max_clk,
+-	.set_bus_width = sdhci_set_bus_width,
++	.set_bus_width = sdhci_sirf_set_bus_width,
+ 	.reset = sdhci_reset,
+ 	.set_uhs_signaling = sdhci_set_uhs_signaling,
+ };
+-- 
+2.0.4
