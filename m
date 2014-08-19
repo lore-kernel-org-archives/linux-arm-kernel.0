@@ -1,87 +1,65 @@
-From: Varun.Sethi@freescale.com (Varun Sethi)
-Date: Tue, 19 Aug 2014 12:01:34 +0000
-Subject: [PATCH v5] devicetree: Add generic IOMMU device tree bindings
-In-Reply-To: <87wqa4hhcr.fsf@nvidia.com>
-References: <1406803383-11601-1-git-send-email-thierry.reding@gmail.com>
- <87a9774lf5.fsf@nvidia.com>
- <cfb1d2ff66004685b7ead3f5e6321681@BL2PR03MB468.namprd03.prod.outlook.com>
- <87y4ur2h23.fsf@nvidia.com>
- <d9fb045d54244f26a773ba45ad3caa2d@BL2PR03MB468.namprd03.prod.outlook.com>
- <87zjf0hk3b.fsf@nvidia.com>
- <a0244b6befa9407fb6c2c35cc29f92f7@BL2PR03MB468.namprd03.prod.outlook.com>
- <87wqa4hhcr.fsf@nvidia.com>
-Message-ID: <1d843c14ed0d49cc916abcfa2d3e0553@BL2PR03MB468.namprd03.prod.outlook.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Tue, 19 Aug 2014 14:01:51 +0200
+Subject: [PATCH 1/2] KVM: Introduce gfn_to_hva_memslow_prot
+Message-ID: <1408449712-14903-1-git-send-email-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+To support read-only memory regions on arm and arm64, we have a need to
+resolve a gfn to an hva given a pointer to a memslot to avoid looping
+through the memslots twice and to reuse the hva error checking of
+gfn_to_hva_prot(), add a new gfn_to_hva_memslot_prot() function and
+refactor gfn_to_hva_prot() to use this function.
 
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+---
+ include/linux/kvm_host.h |  2 ++
+ virt/kvm/kvm_main.c      | 11 +++++++++--
+ 2 files changed, 11 insertions(+), 2 deletions(-)
 
-> -----Original Message-----
-> From: Hiroshi Doyu [mailto:hdoyu at nvidia.com]
-> Sent: Tuesday, August 19, 2014 4:33 PM
-> To: Sethi Varun-B16395; Will Deacon
-> Cc: Hiroshi Doyu; Thierry Reding; Stephen Warren; Arnd Bergmann; Mark
-> Rutland; devicetree at vger.kernel.org; Olof Johansson; iommu at lists.linux-
-> foundation.org; Rob Herring; linux-tegra at vger.kernel.org; linux-arm-
-> kernel at lists.infradead.org; Yoder Stuart-B08248
-> Subject: Re: [PATCH v5] devicetree: Add generic IOMMU device tree bindings
-> 
-> 
-> Varun Sethi <Varun.Sethi@freescale.com> writes:
-> 
-> >> >> > Also, for dynamic stream ID allocation we would need to
-> >> >> > represent the specific master register (to store the stream ID) in the
-> device tree.
-> >> >>
-> >> >> I assmue that the above means that iMX has such configuration
-> >> >> register to map steramID and a device dynamically.
-> >> >
-> >> > We have per master registers for setting the stream ID on the
-> >> > Layerscape platforms. My point was that we would need the iommu
-> >> > master node to include a reference to the master id register.
-> >> >
-> >> > master at 1 {
-> >> >                /* device has master ID 42 in the IOMMU */
-> >> >              iommus = <&{/iommu} 42>;
-> >> >              master-id-reg = <phandle offset> };
-> >>
-> >> In the above, for "iommus=" bindings, you wouldn't need to break
-> >> ARM,SMMU compatibility at all if you set "streamID" exactly as below.
-> >>
-> >>   master at 1 {
-> >>                  /* device has master ID 42 in the IOMMU */
-> >>                iommus = <&{/iommu} 'any given streamID'>;
-> >>                master-id-reg = <phandle offset>
-> >>   };
-> >>
-> >> And your SoC needs to register bus_notifier and ADD_DEVICE should
-> >> configure to map 'any given streamID' to a device via the above
-> >> register. This wouldn't need any modification from ARM,SMMU driver
-> >> and keep the iommus bindings as it is.
-> >>
-> >> IOW, SoC only needs to register ADD_DEVICE in bus_notifier to map
-> >> StreamID to a device. This needs to be executed earlier than IOMMU
-> >> bus's ADD_DEVICE, though.
-> >>
-> >> Is my understanding right?
-> >
-> > I don't think that SOC specific code needs a bus notifier for setting
-> > the stream ID. It can be done as a part of SOC specific
-> > initialization. The device tree can be updated to reflect the correct
-> > stream ID (SMMU driver can get the updated stream ID from device
-> > tree).
-> 
-> That's possible.
-> 
-> > I was thinking more on the lines of updating the device stream id
-> > while attaching a device to the domain.
-> 
-> I thought the same but this would break the ARM,SMMU /compatibility/ since
-> the 1st param of "iommus=" is always expected as "streamID".
-> 
-> If streamID can be assigned dynamically like PCIe, not like streamID statically
-> set in DT, how should we describe this dynmaic steramID shifting/assignment in
-> DT?
- Can you dynamically program the stream ID for the device? If yes, then you require a unique numberspace for allocating a streamID. I am not clear on the stream ID translation requirement.
-
--Varun
+diff --git a/include/linux/kvm_host.h b/include/linux/kvm_host.h
+index a4c33b3..85875e0 100644
+--- a/include/linux/kvm_host.h
++++ b/include/linux/kvm_host.h
+@@ -528,6 +528,8 @@ struct page *gfn_to_page(struct kvm *kvm, gfn_t gfn);
+ unsigned long gfn_to_hva(struct kvm *kvm, gfn_t gfn);
+ unsigned long gfn_to_hva_prot(struct kvm *kvm, gfn_t gfn, bool *writable);
+ unsigned long gfn_to_hva_memslot(struct kvm_memory_slot *slot, gfn_t gfn);
++unsigned long gfn_to_hva_memslot_prot(struct kvm_memory_slot *slot, gfn_t gfn,
++				      bool *writable);
+ void kvm_release_page_clean(struct page *page);
+ void kvm_release_page_dirty(struct page *page);
+ void kvm_set_page_accessed(struct page *page);
+diff --git a/virt/kvm/kvm_main.c b/virt/kvm/kvm_main.c
+index 33712fb..36b887d 100644
+--- a/virt/kvm/kvm_main.c
++++ b/virt/kvm/kvm_main.c
+@@ -1075,9 +1075,9 @@ EXPORT_SYMBOL_GPL(gfn_to_hva);
+  * If writable is set to false, the hva returned by this function is only
+  * allowed to be read.
+  */
+-unsigned long gfn_to_hva_prot(struct kvm *kvm, gfn_t gfn, bool *writable)
++unsigned long gfn_to_hva_memslot_prot(struct kvm_memory_slot *slot,
++				      gfn_t gfn, bool *writable)
+ {
+-	struct kvm_memory_slot *slot = gfn_to_memslot(kvm, gfn);
+ 	unsigned long hva = __gfn_to_hva_many(slot, gfn, NULL, false);
+ 
+ 	if (!kvm_is_error_hva(hva) && writable)
+@@ -1086,6 +1086,13 @@ unsigned long gfn_to_hva_prot(struct kvm *kvm, gfn_t gfn, bool *writable)
+ 	return hva;
+ }
+ 
++unsigned long gfn_to_hva_prot(struct kvm *kvm, gfn_t gfn, bool *writable)
++{
++	struct kvm_memory_slot *slot = gfn_to_memslot(kvm, gfn);
++
++	return gfn_to_hva_memslot_prot(slot, gfn, writable);
++}
++
+ static int kvm_read_hva(void *data, void __user *hva, int len)
+ {
+ 	return __copy_from_user(data, hva, len);
+-- 
+2.0.0
