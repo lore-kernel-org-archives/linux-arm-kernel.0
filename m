@@ -1,24 +1,33 @@
-From: mitchelh@codeaurora.org (Mitchel Humpherys)
-Date: Tue, 19 Aug 2014 12:28:44 -0700
-Subject: [PATCH 1/6] iommu/arm-smmu: add support for specifying clocks
-In-Reply-To: <20140819125833.GO23128@arm.com> (Will Deacon's message of "Tue,
- 19 Aug 2014 13:58:34 +0100")
-References: <1407891099-24641-1-git-send-email-mitchelh@codeaurora.org>
- <1407891099-24641-2-git-send-email-mitchelh@codeaurora.org>
- <20140819125833.GO23128@arm.com>
-Message-ID: <vnkwha18nus3.fsf@mitchelh-linux.qualcomm.com>
+From: lauraa@codeaurora.org (Laura Abbott)
+Date: Tue, 19 Aug 2014 12:41:41 -0700
+Subject: [PATCHv4 0/2] arm64 CONFIG_DEBUG_SET_MODULE_RONX support
+Message-ID: <1408477303-2640-1-git-send-email-lauraa@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 19 2014 at 05:58:34 AM, Will Deacon <will.deacon@arm.com> wrote:
-> I also assume that the clk API ignores calls to clk_enable_prepare
-> for a clk that's already enabled? I couldn't find that code...
+Hi,
 
-That's clk_prepare_enable, not clk_enable_prepare. It's in
-<linux/clk.h>.
+This is another version of DEBUG_SET_MODULE_RONX support for arm64.
+
+Thanks,
+Laura
+
+v4: Switch to one function to do set/clear per suggestion of Will
+
+v3: Addressed comments by Will/Steve
 
 
--Mitch
+Laura Abbott (2):
+  arm64: Introduce {set,clear}_pte_bit
+  arm64: Add CONFIG_DEBUG_SET_MODULE_RONX support
+
+ arch/arm64/Kconfig.debug            | 11 +++++
+ arch/arm64/include/asm/cacheflush.h |  4 ++
+ arch/arm64/include/asm/pgtable.h    | 33 +++++++------
+ arch/arm64/mm/Makefile              |  2 +-
+ arch/arm64/mm/pageattr.c            | 96 +++++++++++++++++++++++++++++++++++++
+ 5 files changed, 131 insertions(+), 15 deletions(-)
+ create mode 100644 arch/arm64/mm/pageattr.c
 
 -- 
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
