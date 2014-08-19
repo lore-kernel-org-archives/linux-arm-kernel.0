@@ -1,114 +1,171 @@
-From: shc_work@mail.ru (Alexander Shiyan)
-Date: Tue, 19 Aug 2014 16:31:14 +0400
-Subject: [PATCH 2/3] ARM: clps711x: edb7211: Use new PWM driver for backlight
-In-Reply-To: <1408451475-1140-1-git-send-email-shc_work@mail.ru>
-References: <1408451475-1140-1-git-send-email-shc_work@mail.ru>
-Message-ID: <1408451475-1140-2-git-send-email-shc_work@mail.ru>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 19 Aug 2014 13:33:42 +0100
+Subject: [PATCH v4 7/8] ARM: mm: allow non-text sections to be
+ non-executable
+In-Reply-To: <1407949593-16121-8-git-send-email-keescook@chromium.org>
+References: <1407949593-16121-1-git-send-email-keescook@chromium.org>
+ <1407949593-16121-8-git-send-email-keescook@chromium.org>
+Message-ID: <20140819123342.GJ23128@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Remove existing tricks for handling PWM and use CLPS711X PWM driver.
+On Wed, Aug 13, 2014 at 06:06:32PM +0100, Kees Cook wrote:
+> Adds CONFIG_ARM_KERNMEM_PERMS to separate the kernel memory regions
+> into section-sized areas that can have different permisions. Performs
+> the NX permission changes during free_initmem, so that init memory can be
+> reclaimed.
+> 
+> This uses section size instead of PMD size to reduce memory lost to
+> padding on non-LPAE systems.
+> 
+> Based on work by Brad Spengler, Larry Bassel, and Laura Abbott.
 
-Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
----
- arch/arm/configs/clps711x_defconfig    |  4 +++-
- arch/arm/mach-clps711x/board-edb7211.c | 37 ++++++++++++++++++++--------------
- 2 files changed, 25 insertions(+), 16 deletions(-)
+[...]
 
-diff --git a/arch/arm/configs/clps711x_defconfig b/arch/arm/configs/clps711x_defconfig
-index 0facf9d..fc105c9 100644
---- a/arch/arm/configs/clps711x_defconfig
-+++ b/arch/arm/configs/clps711x_defconfig
-@@ -68,8 +68,8 @@ CONFIG_GPIO_GENERIC_PLATFORM=y
- # CONFIG_HWMON is not set
- CONFIG_FB=y
- CONFIG_FB_CLPS711X=y
--CONFIG_BACKLIGHT_LCD_SUPPORT=y
- CONFIG_LCD_PLATFORM=y
-+CONFIG_BACKLIGHT_PWM=y
- # CONFIG_USB_SUPPORT is not set
- CONFIG_NEW_LEDS=y
- CONFIG_LEDS_CLASS=y
-@@ -77,6 +77,8 @@ CONFIG_LEDS_GPIO=y
- CONFIG_LEDS_TRIGGERS=y
- CONFIG_LEDS_TRIGGER_HEARTBEAT=y
- # CONFIG_IOMMU_SUPPORT is not set
-+CONFIG_PWM=y
-+CONFIG_PWM_CLPS711X=y
- CONFIG_EXT2_FS=y
- CONFIG_CRAMFS=y
- CONFIG_MINIX_FS=y
-diff --git a/arch/arm/mach-clps711x/board-edb7211.c b/arch/arm/mach-clps711x/board-edb7211.c
-index fdf54d4..f339797 100644
---- a/arch/arm/mach-clps711x/board-edb7211.c
-+++ b/arch/arm/mach-clps711x/board-edb7211.c
-@@ -14,8 +14,9 @@
- #include <linux/types.h>
- #include <linux/i2c-gpio.h>
- #include <linux/interrupt.h>
--#include <linux/backlight.h>
- #include <linux/platform_device.h>
-+#include <linux/pwm.h>
-+#include <linux/pwm_backlight.h>
- #include <linux/memblock.h>
- 
- #include <linux/mtd/physmap.h>
-@@ -108,23 +109,23 @@ static struct plat_lcd_data edb7211_lcd_power_pdata = {
- 	.set_power	= edb7211_lcd_power_set,
- };
- 
--static void edb7211_lcd_backlight_set_intensity(int intensity)
--{
--	gpio_set_value(EDB7211_LCDBL, !!intensity);
--	clps_writel((clps_readl(PMPCON) & 0xf0ff) | (intensity << 8), PMPCON);
--}
-+static struct pwm_lookup edb7211_pwm_lookup[] = {
-+	PWM_LOOKUP("clps711x-pwm", 0, "pwm-backlight.0", NULL,
-+		   0, PWM_POLARITY_NORMAL),
-+};
- 
--static struct generic_bl_info edb7211_lcd_backlight_pdata = {
--	.name			= "lcd-backlight.0",
--	.default_intensity	= 0x01,
--	.max_intensity		= 0x0f,
--	.set_bl_intensity	= edb7211_lcd_backlight_set_intensity,
-+static struct platform_pwm_backlight_data pwm_bl_pdata = {
-+	.dft_brightness	= 0x01,
-+	.max_brightness	= 0x0f,
-+	.enable_gpio	= EDB7211_LCDBL,
- };
- 
-+static struct resource clps711x_pwm_res =
-+	DEFINE_RES_MEM(CLPS711X_PHYS_BASE + PMPCON, SZ_4);
-+
- static struct gpio edb7211_gpios[] __initconst = {
- 	{ EDB7211_LCD_DC_DC_EN,	GPIOF_OUT_INIT_LOW,	"LCD DC-DC" },
- 	{ EDB7211_LCDEN,	GPIOF_OUT_INIT_LOW,	"LCD POWER" },
--	{ EDB7211_LCDBL,	GPIOF_OUT_INIT_LOW,	"LCD BACKLIGHT" },
- };
- 
- /* Reserve screen memory region@the start of main system memory. */
-@@ -153,12 +154,18 @@ static void __init edb7211_init_late(void)
- 	gpio_request_array(edb7211_gpios, ARRAY_SIZE(edb7211_gpios));
- 
- 	platform_device_register(&edb7211_flash_pdev);
-+
- 	platform_device_register_data(NULL, "platform-lcd", 0,
- 				      &edb7211_lcd_power_pdata,
- 				      sizeof(edb7211_lcd_power_pdata));
--	platform_device_register_data(NULL, "generic-bl", 0,
--				      &edb7211_lcd_backlight_pdata,
--				      sizeof(edb7211_lcd_backlight_pdata));
-+
-+	platform_device_register_simple("clps711x-pwm", PLATFORM_DEVID_NONE,
-+					&clps711x_pwm_res, 1);
-+	pwm_add_table(edb7211_pwm_lookup, ARRAY_SIZE(edb7211_pwm_lookup));
-+
-+	platform_device_register_data(&platform_bus, "pwm-backlight", 0,
-+				      &pwm_bl_pdata, sizeof(pwm_bl_pdata));
-+
- 	platform_device_register_simple("video-clps711x", 0, NULL, 0);
- 	platform_device_register_simple("cs89x0", 0, edb7211_cs8900_resource,
- 					ARRAY_SIZE(edb7211_cs8900_resource));
--- 
-1.8.5.5
+> diff --git a/arch/arm/kernel/vmlinux.lds.S b/arch/arm/kernel/vmlinux.lds.S
+> index 6f57cb94367f..a3d07ca2bbb4 100644
+> --- a/arch/arm/kernel/vmlinux.lds.S
+> +++ b/arch/arm/kernel/vmlinux.lds.S
+> @@ -8,6 +8,9 @@
+>  #include <asm/thread_info.h>
+>  #include <asm/memory.h>
+>  #include <asm/page.h>
+> +#ifdef CONFIG_ARM_KERNMEM_PERMS
+> +#include <asm/pgtable.h>
+> +#endif
+>  	
+>  #define PROC_INFO							\
+>  	. = ALIGN(4);							\
+> @@ -90,6 +93,11 @@ SECTIONS
+>  		_text = .;
+>  		HEAD_TEXT
+>  	}
+> +
+> +#ifdef CONFIG_ARM_KERNMEM_PERMS
+> +	. = ALIGN(1<<SECTION_SHIFT);
+> +#endif
+> +
+>  	.text : {			/* Real text segment		*/
+>  		_stext = .;		/* Text and read-only data	*/
+>  			__exception_text_start = .;
+> @@ -145,7 +153,11 @@ SECTIONS
+>  	_etext = .;			/* End of text and rodata section */
+>  
+>  #ifndef CONFIG_XIP_KERNEL
+> +# ifdef CONFIG_ARM_KERNMEM_PERMS
+> +	. = ALIGN(1<<SECTION_SHIFT);
+> +# else
+>  	. = ALIGN(PAGE_SIZE);
+> +# endif
+
+This might be cleaner if we had a single macro (ALIGN_MIN?) that expanded to
+ALIGN(1 << SECTION_SHIFT) #ifdef  CONFIG_ARM_KERNMEM_PERMS.
+
+> diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
+> index ad82c05bfc3a..ccf392ef40d4 100644
+> --- a/arch/arm/mm/init.c
+> +++ b/arch/arm/mm/init.c
+> @@ -32,6 +32,11 @@
+>  #include <asm/tlb.h>
+>  #include <asm/fixmap.h>
+>  
+> +#ifdef CONFIG_ARM_KERNMEM_PERMS
+> +#include <asm/system_info.h>
+> +#include <asm/cp15.h>
+> +#endif
+
+We already #include cp15.h in this file. If you need system_info.h, I don't
+think you should bother making the include conditional.
+
+> +/*
+> + * Updates section permissions only for the current mm (sections are
+> + * copied into each mm). During startup, this is the init_mm.
+> + */
+> +static inline void section_update(unsigned long addr, pmdval_t mask,
+> +				  pmdval_t prot)
+> +{
+> +	struct mm_struct *mm;
+> +	pmd_t *pmd;
+> +
+> +	mm = current->active_mm;
+> +	pmd = pmd_offset(pud_offset(pgd_offset(mm, addr), addr), addr);
+> +
+> +#ifdef CONFIG_ARM_LPAE
+> +	pmd[0] = __pmd((pmd_val(pmd[0]) & mask) | prot);
+> +#else
+> +	if (addr & SECTION_SIZE)
+> +		pmd[1] = __pmd((pmd_val(pmd[1]) & mask) | prot);
+> +	else
+> +		pmd[0] = __pmd((pmd_val(pmd[0]) & mask) | prot);
+> +#endif
+> +	flush_pmd_entry(pmd);
+> +	local_flush_tlb_kernel_range(addr, addr + SECTION_SIZE);
+
+Why only a local flush? You're changing global mappings here, right?
+
+> +}
+> +
+> +/* Make sure extended page tables are in use. */
+> +static inline bool arch_has_strict_perms(void)
+> +{
+> +	unsigned int cr;
+> +
+> +	if (cpu_architecture() < CPU_ARCH_ARMv6)
+> +		return false;
+> +
+> +	cr = get_cr();
+> +	if (!(cr & CR_XP))
+> +		return false;
+> +
+> +	return true;
+
+return !!(get_cr() & CR_XP)?
+
+> +}
+> +
+> +#define set_section_perms(perms, field)	{				\
+> +	size_t i;							\
+> +	unsigned long addr;						\
+> +									\
+> +	if (!arch_has_strict_perms())					\
+> +		return;							\
+> +									\
+> +	for (i = 0; i < ARRAY_SIZE(perms); i++) {			\
+> +		if (!IS_ALIGNED(perms[i].start, SECTION_SIZE) ||	\
+> +		    !IS_ALIGNED(perms[i].end, SECTION_SIZE)) {		\
+> +			pr_err("BUG: section %lx-%lx not aligned to %lx\n", \
+> +				perms[i].start, perms[i].end,		\
+> +				SECTION_SIZE);				\
+> +			continue;					\
+> +		}							\
+> +									\
+> +		for (addr = perms[i].start;				\
+> +		     addr < perms[i].end;				\
+> +		     addr += SECTION_SIZE)				\
+> +			section_update(addr, perms[i].mask,		\
+> +				       perms[i].field);			\
+> +	}								\
+> +}
+> +
+> +static inline void fix_kernmem_perms(void)
+> +{
+> +	set_section_perms(nx_perms, prot);
+> +}
+> +#else
+> +static inline void fix_kernmem_perms(void) { }
+> +#endif /* CONFIG_ARM_KERNMEM_PERMS */
+> +
+>  void free_initmem(void)
+>  {
+>  #ifdef CONFIG_HAVE_TCM
+>  	extern char __tcm_start, __tcm_end;
+> +#endif
+> +
+> +	fix_kernmem_perms();
+>  
+> +#ifdef CONFIG_HAVE_TCM
+
+You could avoid the double #ifdef by moving the tcm stuff into another
+function (free_tcmmem?)
+
+Will
