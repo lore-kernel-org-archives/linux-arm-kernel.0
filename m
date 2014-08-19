@@ -1,146 +1,242 @@
 From: daniel.thompson@linaro.org (Daniel Thompson)
-Date: Tue, 19 Aug 2014 15:48:30 +0100
-Subject: [PATCH v8 4/9] arm: ks8695: Migrate debug_ll macros to shared
- directory
+Date: Tue, 19 Aug 2014 15:48:31 +0100
+Subject: [PATCH v8 5/9] arm: omap1: Migrate debug_ll macros to use 8250.S
 In-Reply-To: <1408459715-10151-1-git-send-email-daniel.thompson@linaro.org>
 References: <1404127855-30459-1-git-send-email-daniel.thompson@linaro.org>
  <1408459715-10151-1-git-send-email-daniel.thompson@linaro.org>
-Message-ID: <1408459715-10151-5-git-send-email-daniel.thompson@linaro.org>
+Message-ID: <1408459715-10151-6-git-send-email-daniel.thompson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As part of the migration a couple of uart definitions have been copied
-from of the platform specific header files.
+The omap1's debug-macro.S is similar to the generic 8250 code. Compared to
+the 8520 code the omap1 macro automatically determines what UART to use
+based on breadcrumbs left by the bootloader and automatically copes with
+the eccentric register layout on OMAP7XX.
 
-Note that, in order to keep oldconfig working nicely we must defer the
-removal of arch/arm/mach-ks8695/include/mach/debug-macro.S until
-DEBUG_LL_UART_NONE has been removed.
+This patch drops both these features and relies instead on the generic
+8250 macros:
+
+1. Dropping support for the bootloader breadcrumbs is identical to the
+   way the migration was handled for OMAP2 (see 808b7e07464d...).
+
+2. Support for OMAP7XX still exists but it must be configured by hand
+   (DEBUG_OMAP7XXUART1/2/3) rather than handled at runtime.
 
 Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
 Cc: Russell King <linux@arm.linux.org.uk>
-Cc: Greg Ungerer <gerg@uclinux.org>
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: Tony Lindgren <tony@atomide.com>
 Cc: Arnd Bergmann <arnd.bergmann@linaro.org>
+Cc: linux-omap at vger.kernel.org
+Tested-by: Aaro Koskinen <aaro.koskinen@iki.fi>
 ---
- arch/arm/Kconfig.debug                          |  8 +++++
- arch/arm/include/debug/ks8695.S                 | 40 +++++++++++++++++++++++++
- arch/arm/mach-ks8695/include/mach/debug-macro.S | 36 ----------------------
- 3 files changed, 48 insertions(+), 36 deletions(-)
- create mode 100644 arch/arm/include/debug/ks8695.S
- delete mode 100644 arch/arm/mach-ks8695/include/mach/debug-macro.S
+ arch/arm/Kconfig.debug                         |  57 +++++++++++++-
+ arch/arm/mach-omap1/include/mach/debug-macro.S | 101 -------------------------
+ 2 files changed, 56 insertions(+), 102 deletions(-)
+ delete mode 100644 arch/arm/mach-omap1/include/mach/debug-macro.S
 
 diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
-index 9c46729..97c3058 100644
+index 97c3058..01f4ee2 100644
 --- a/arch/arm/Kconfig.debug
 +++ b/arch/arm/Kconfig.debug
-@@ -348,6 +348,13 @@ choice
- 		  Say Y here if you want the debug print routines to direct
- 		  their output to UART1 serial port on KEYSTONE2 devices.
+@@ -471,6 +471,30 @@ choice
+ 		  Say Y here if you want kernel low-level debugging support
+ 		  on TI-NSPIRE CX models.
  
-+	config DEBUG_KS8695_UART
-+		bool "KS8695 Debug UART"
-+		depends on ARCH_KS8695
++	config DEBUG_OMAP1UART1
++		bool "Kernel low-level debugging via OMAP1 UART1"
++		depends on ARCH_OMAP1
++		select DEBUG_UART_8250
 +		help
 +		  Say Y here if you want kernel low-level debugging support
-+		  on KS8695.
++		  on OMAP1 based platforms (expect OMAP730) on the UART1.
 +
- 	config DEBUG_MMP_UART2
- 		bool "Kernel low-level debugging message via MMP UART2"
- 		depends on ARCH_MMP
-@@ -1017,6 +1024,7 @@ config DEBUG_LL_INCLUDE
- 				 DEBUG_IMX6Q_UART || \
- 				 DEBUG_IMX6SL_UART || \
- 				 DEBUG_IMX6SX_UART
-+	default "debug/ks8695.S" if DEBUG_KS8695_UART
- 	default "debug/msm.S" if DEBUG_MSM_UART || DEBUG_QCOM_UARTDM
- 	default "debug/omap2plus.S" if DEBUG_OMAP2PLUS_UART
- 	default "debug/s3c24xx.S" if DEBUG_S3C24XX_UART
-diff --git a/arch/arm/include/debug/ks8695.S b/arch/arm/include/debug/ks8695.S
-new file mode 100644
-index 0000000..961da1f
---- /dev/null
-+++ b/arch/arm/include/debug/ks8695.S
-@@ -0,0 +1,40 @@
-+/*
-+ * arch/arm/include/debug/ks8695.S
-+ *
-+ * Copyright (C) 2006 Ben Dooks <ben@simtec.co.uk>
-+ * Copyright (C) 2006 Simtec Electronics
-+ *
-+ * KS8695 - Debug macros
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
++	config DEBUG_OMAP1UART2
++		bool "Kernel low-level debugging via OMAP1 UART2"
++		depends on ARCH_OMAP1
++		select DEBUG_UART_8250
++		help
++		  Say Y here if you want kernel low-level debugging support
++		  on OMAP1 based platforms (expect OMAP730) on the UART2.
 +
-+#define KS8695_UART_PA	0x03ffe000
-+#define KS8695_UART_VA	0xf00fe000
-+#define KS8695_URTH	(0x04)
-+#define KS8695_URLS	(0x14)
-+#define URLS_URTE	(1 << 6)
-+#define URLS_URTHRE	(1 << 5)
++	config DEBUG_OMAP1UART3
++		bool "Kernel low-level debugging via OMAP1 UART3"
++		depends on ARCH_OMAP1
++		select DEBUG_UART_8250
++		help
++		  Say Y here if you want kernel low-level debugging support
++		  on OMAP1 based platforms (expect OMAP730) on the UART3.
 +
-+	.macro	addruart, rp, rv, tmp
-+		ldr	\rp, =KS8695_UART_PA		@ physical base address
-+		ldr	\rv, =KS8695_UART_VA		@ virtual base address
-+	.endm
+ 	config DEBUG_OMAP2UART1
+ 		bool "OMAP2/3/4 UART1 (omap2/3 sdp boards and some omap3 boards)"
+ 		depends on ARCH_OMAP2PLUS
+@@ -513,6 +537,30 @@ choice
+ 		depends on ARCH_OMAP2PLUS
+ 		select DEBUG_OMAP2PLUS_UART
+ 
++	config DEBUG_OMAP7XXUART1
++		bool "Kernel low-level debugging via OMAP730 UART1"
++		depends on ARCH_OMAP730
++		select DEBUG_UART_8250
++		help
++		  Say Y here if you want kernel low-level debugging support
++		  on OMAP730 based platforms on the UART1.
 +
-+	.macro	senduart, rd, rx
-+		str	\rd, [\rx, #KS8695_URTH]	@ Write to Transmit Holding Register
-+	.endm
++	config DEBUG_OMAP7XXUART2
++		bool "Kernel low-level debugging via OMAP730 UART2"
++		depends on ARCH_OMAP730
++		select DEBUG_UART_8250
++		help
++		  Say Y here if you want kernel low-level debugging support
++		  on OMAP730 based platforms on the UART2.
 +
-+	.macro	busyuart, rd, rx
-+1001:		ldr	\rd, [\rx, #KS8695_URLS]	@ Read Line Status Register
-+		tst	\rd, #URLS_URTE			@ Holding & Shift registers empty?
-+		beq	1001b
-+	.endm
++	config DEBUG_OMAP7XXUART3
++		bool "Kernel low-level debugging via OMAP730 UART3"
++		depends on ARCH_OMAP730
++		select DEBUG_UART_8250
++		help
++		  Say Y here if you want kernel low-level debugging support
++		  on OMAP730 based platforms on the UART3.
 +
-+	.macro	waituart, rd, rx
-+1001:		ldr	\rd, [\rx, #KS8695_URLS]	@ Read Line Status Register
-+		tst	\rd, #URLS_URTHRE		@ Holding Register empty?
-+		beq	1001b
-+	.endm
-diff --git a/arch/arm/mach-ks8695/include/mach/debug-macro.S b/arch/arm/mach-ks8695/include/mach/debug-macro.S
+ 	config DEBUG_TI81XXUART1
+ 		bool "Kernel low-level debugging messages via TI81XX UART1 (ti8148evm)"
+ 		depends on ARCH_OMAP2PLUS
+@@ -1120,6 +1168,9 @@ config DEBUG_UART_PHYS
+ 	default 0xff690000 if DEBUG_RK32_UART2
+ 	default 0xffc02000 if DEBUG_SOCFPGA_UART
+ 	default 0xffd82340 if ARCH_IOP13XX
++	default 0xfffb0000 if DEBUG_OMAP1UART1 || DEBUG_OMAP7XXUART1
++	default 0xfffb0800 if DEBUG_OMAP1UART2 || DEBUG_OMAP7XXUART2
++	default 0xfffb9800 if DEBUG_OMAP1UART3 || DEBUG_OMAP7XXUART3
+ 	default 0xfff36000 if DEBUG_HIGHBANK_UART
+ 	default 0xfffff700 if ARCH_IOP33X
+ 	depends on DEBUG_LL_UART_8250 || DEBUG_LL_UART_PL01X || \
+@@ -1188,6 +1239,9 @@ config DEBUG_UART_VIRT
+ 	default 0xfef00000 if ARCH_IXP4XX && !CPU_BIG_ENDIAN
+ 	default 0xfef00003 if ARCH_IXP4XX && CPU_BIG_ENDIAN
+ 	default 0xfef36000 if DEBUG_HIGHBANK_UART
++	default 0xfefb0000 if DEBUG_OMAP1UART1 || DEBUG_OMAP7XXUART1
++	default 0xfefb0800 if DEBUG_OMAP1UART2 || DEBUG_OMAP7XXUART2
++	default 0xfefb9800 if DEBUG_OMAP1UART3 || DEBUG_OMAP7XXUART3
+ 	default 0xfefff700 if ARCH_IOP33X
+ 	default 0xff003000 if DEBUG_U300_UART
+ 	default DEBUG_UART_PHYS if !MMU
+@@ -1198,7 +1252,8 @@ config DEBUG_UART_VIRT
+ config DEBUG_UART_8250_SHIFT
+ 	int "Register offset shift for the 8250 debug UART"
+ 	depends on DEBUG_LL_UART_8250 || DEBUG_UART_8250
+-	default 0 if FOOTBRIDGE || ARCH_IOP32X
++	default 0 if FOOTBRIDGE || ARCH_IOP32X || \
++		DEBUG_OMAP7XXUART1 || DEBUG_OMAP7XXUART2 || DEBUG_OMAP7XXUART3
+ 	default 2
+ 
+ config DEBUG_UART_8250_WORD
+diff --git a/arch/arm/mach-omap1/include/mach/debug-macro.S b/arch/arm/mach-omap1/include/mach/debug-macro.S
 deleted file mode 100644
-index a79e489..0000000
---- a/arch/arm/mach-ks8695/include/mach/debug-macro.S
+index 5c1a26c..0000000
+--- a/arch/arm/mach-omap1/include/mach/debug-macro.S
 +++ /dev/null
-@@ -1,36 +0,0 @@
--/*
-- * arch/arm/mach-ks8695/include/mach/debug-macro.S
+@@ -1,101 +0,0 @@
+-/* arch/arm/mach-omap1/include/mach/debug-macro.S
 - *
-- * Copyright (C) 2006 Ben Dooks <ben@simtec.co.uk>
-- * Copyright (C) 2006 Simtec Electronics
+- * Debugging macro include header
 - *
-- * KS8695 - Debug macros
+- *  Copyright (C) 1994-1999 Russell King
+- *  Moved from linux/arch/arm/kernel/debug.S by Ben Dooks
 - *
 - * This program is free software; you can redistribute it and/or modify
 - * it under the terms of the GNU General Public License version 2 as
 - * published by the Free Software Foundation.
-- */
+- *
+-*/
 -
--#include <mach/hardware.h>
--#include <mach/regs-uart.h>
+-#include <linux/serial_reg.h>
 -
--	.macro	addruart, rp, rv, tmp
--		ldr	\rp, =KS8695_UART_PA		@ physical base address
--		ldr	\rv, =KS8695_UART_VA		@ virtual base address
--	.endm
+-#include "serial.h"
 -
--	.macro	senduart, rd, rx
--		str	\rd, [\rx, #KS8695_URTH]	@ Write to Transmit Holding Register
--	.endm
+-		.pushsection .data
+-omap_uart_phys:	.word	0x0
+-omap_uart_virt:	.word	0x0
+-		.popsection
 -
--	.macro	busyuart, rd, rx
--1001:		ldr	\rd, [\rx, #KS8695_URLS]	@ Read Line Status Register
--		tst	\rd, #URLS_URTE			@ Holding & Shift registers empty?
--		beq	1001b
--	.endm
+-		/*
+-		 * Note that this code won't work if the bootloader passes
+-		 * a wrong machine ID number in r1. To debug, just hardcode
+-		 * the desired UART phys and virt addresses temporarily into
+-		 * the omap_uart_phys and omap_uart_virt above.
+-		 */
+-		.macro	addruart, rp, rv, tmp
 -
--	.macro	waituart, rd, rx
--1001:		ldr	\rd, [\rx, #KS8695_URLS]	@ Read Line Status Register
--		tst	\rd, #URLS_URTHRE		@ Holding Register empty?
--		beq	1001b
--	.endm
+-		/* Use omap_uart_phys/virt if already configured */
+-9:		adr	\rp, 99f		@ get effective addr of 99f
+-		ldr	\rv, [\rp]		@ get absolute addr of 99f
+-		sub	\rv, \rv, \rp		@ offset between the two
+-		ldr	\rp, [\rp, #4]		@ abs addr of omap_uart_phys
+-		sub	\tmp, \rp, \rv		@ make it effective
+-		ldr	\rp, [\tmp, #0]		@ omap_uart_phys
+-		ldr	\rv, [\tmp, #4]		@ omap_uart_virt
+-		cmp	\rp, #0			@ is port configured?
+-		cmpne	\rv, #0
+-		bne	100f			@ already configured
+-
+-		/* Check the debug UART configuration set in uncompress.h */
+-		and	\rp, pc, #0xff000000
+-		ldr	\rv, =OMAP_UART_INFO_OFS
+-		ldr	\rp, [\rp, \rv]
+-
+-		/* Select the UART to use based on the UART1 scratchpad value */
+-10:		cmp	\rp, #0			@ no port configured?
+-		beq	11f			@ if none, try to use UART1
+-		cmp	\rp, #OMAP1UART1
+-		beq	11f			@ configure OMAP1UART1
+-		cmp	\rp, #OMAP1UART2
+-		beq	12f			@ configure OMAP1UART2
+-		cmp	\rp, #OMAP1UART3
+-		beq	13f			@ configure OMAP2UART3
+-
+-		/* Configure the UART offset from the phys/virt base */
+-11:		mov	\rp, #0x00fb0000	@ OMAP1UART1
+-		b	98f
+-12:		mov	\rp, #0x00fb0000	@ OMAP1UART1
+-		orr	\rp, \rp, #0x00000800	@ OMAP1UART2
+-		b	98f
+-13:		mov	\rp, #0x00fb0000	@ OMAP1UART1
+-		orr	\rp, \rp, #0x00000800	@ OMAP1UART2
+-		orr	\rp, \rp, #0x00009000	@ OMAP1UART3
+-
+-		/* Store both phys and virt address for the uart */
+-98:		add	\rp, \rp, #0xff000000	@ phys base
+-		str	\rp, [\tmp, #0]		@ omap_uart_phys
+-		sub	\rp, \rp, #0xff000000	@ phys base
+-		add	\rp, \rp, #0xfe000000	@ virt base
+-		str	\rp, [\tmp, #4]		@ omap_uart_virt
+-		b	9b
+-
+-		.align
+-99:		.word	.
+-		.word	omap_uart_phys
+-		.ltorg
+-
+-100:
+-		.endm
+-
+-		.macro	senduart,rd,rx
+-		strb	\rd, [\rx]
+-		.endm
+-
+-		.macro	busyuart,rd,rx
+-1001:		ldrb	\rd, [\rx, #(UART_LSR << OMAP_PORT_SHIFT)]
+-		and	\rd, \rd, #(UART_LSR_TEMT | UART_LSR_THRE)
+-		teq	\rd, #(UART_LSR_TEMT | UART_LSR_THRE)
+-		beq	1002f
+-		ldrb	\rd, [\rx, #(UART_LSR << OMAP7XX_PORT_SHIFT)]
+-		and	\rd, \rd, #(UART_LSR_TEMT | UART_LSR_THRE)
+-		teq	\rd, #(UART_LSR_TEMT | UART_LSR_THRE)
+-		bne	1001b
+-1002:
+-		.endm
+-
+-		.macro	waituart,rd,rx
+-		.endm
 -- 
 1.9.3
