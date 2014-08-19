@@ -1,96 +1,53 @@
-From: ohaugan@codeaurora.org (Olav Haugan)
-Date: Tue, 19 Aug 2014 11:37:02 -0700
-Subject: [PATCH v5 1/1] iommu-api: Add map_sg/unmap_sg functions
-In-Reply-To: <20140819115954.GC16329@8bytes.org>
-References: <1407797150-515-1-git-send-email-ohaugan@codeaurora.org>
- <1407797150-515-2-git-send-email-ohaugan@codeaurora.org>
- <20140818215553.GJ9809@8bytes.org> <53F2829C.2040809@codeaurora.org>
- <20140819115954.GC16329@8bytes.org>
-Message-ID: <53F3994E.7080104@codeaurora.org>
+From: afaerber@suse.de (=?ISO-8859-15?Q?Andreas_F=E4rber?=)
+Date: Tue, 19 Aug 2014 20:37:44 +0200
+Subject: [PATCH 5/6] ARM: dts: Add vmmc and vqmmc supplies for Peach Pit
+ and Pi boards
+In-Reply-To: <1408460913-13863-6-git-send-email-javier.martinez@collabora.co.uk>
+References: <1408460913-13863-1-git-send-email-javier.martinez@collabora.co.uk>
+ <1408460913-13863-6-git-send-email-javier.martinez@collabora.co.uk>
+Message-ID: <53F39978.3080901@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 8/19/2014 4:59 AM, Joerg Roedel wrote:
-> On Mon, Aug 18, 2014 at 03:47:56PM -0700, Olav Haugan wrote:
->> If the alignment is not correct then iommu_map() will return error. Not
->> sure what other option we have here (and why make it different behavior
->> than iommu_map which just return error when it is not aligned properly).
->> I don't think we want to force any kind of alignment automatically. I
->> would rather have the API tell me I am doing something wrong than having
->> the function aligning the values and possibly undermap or overmap.
-> 
-> But sg->offset is an offset into the page (at least it is used that way
-> in the DMA-API and since you do 'page_len = s->offset + s->length' you
-> use it the same way).
-> So when you pass iova + offset the result will no longer be
-> page-aligned. You should force sg->offset == 0 and sg->length to be
-> page-aligned instead. This makes more sense because the IOMMU-API works
-> on (io)-page granularity and not on arbitrary phys-addr ranges like the
-> DMA-API.
+Hi Javier,
 
-Ok, but I don't think we want to force a specific alignment here (as I
-discussed earlier with Will D.). So I would just do something like
-	
-	iommu_map(domain, iova + offset, phys, s->length, prot);
-	offset += s->length;
+Am 19.08.2014 17:08, schrieb Javier Martinez Canillas:
+> diff --git a/arch/arm/boot/dts/exynos5420-peach-pit.dts b/arch/arm/boot/dts/exynos5420-peach-pit.dts
+> index 8e50042..5b9dbb9 100644
+> --- a/arch/arm/boot/dts/exynos5420-peach-pit.dts
+> +++ b/arch/arm/boot/dts/exynos5420-peach-pit.dts
+> @@ -547,6 +547,8 @@
+>  };
+>  
+>  &mmc_2 {
+> +	vmmc-supply = <&tps65090_fet4>;
+> +	vqmmc-supply = <&vqmmc_sdcard>;
+>  	status = "okay";
+>  	num-slots = <1>;
+>  	supports-highspeed;
+> diff --git a/arch/arm/boot/dts/exynos5800-peach-pi.dts b/arch/arm/boot/dts/exynos5800-peach-pi.dts
+> index 939f91c..dcac443 100644
+> --- a/arch/arm/boot/dts/exynos5800-peach-pi.dts
+> +++ b/arch/arm/boot/dts/exynos5800-peach-pi.dts
+> @@ -545,6 +545,8 @@
+>  };
+>  
+>  &mmc_2 {
+> +	vmmc-supply = <&tps65090_fet4>;
+> +	vqmmc-supply = <&vqmmc_sdcard>;
+>  	status = "okay";
+>  	num-slots = <1>;
+>  	supports-highspeed;
 
->> Yes, I am aware of that. However, several people prefer this than
->> passing in scatterlist. It is not very convenient to pass a scatterlist
->> in some use cases. Someone mentioned a use case where they would have to
->> create a dummy sg list and populate it with the iova just to do an
->> unmap. I believe we would have to do this also. There is no use for
->> sglist when unmapping. However, would like to keep separate API from
->> iommu_unmap() to keep the API function names symmetric (map_sg/unmap_sg).
-> 
-> Keeping it symetric is not more complicated, the caller just needs to
-> keep the sg-list used for mapping around. I prefer the unmap_sg call to
-> work in sg-lists too.
+A convention that I picked up was to place overridden status property
+first. Do your new properties really need to go before that?
 
-So are you looking for something like this then:
+Also, if you look at today's for-next, then supports-highspeed should be
+cap-{sd,mmc}-highspeed, so it may be worth to rebase.
 
-int iommu_map_sg(struct iommu_domain *domain, unsigned long iova,
-			 struct scatterlist *sg, unsigned int nents,
-			 int prot, unsigned long flags)
-
-int iommu_unmap_sg(struct iommu_domain *domain, unsigned long iova,
-			 struct scatterlist *sg, unsigned int nents,
-			 unsigned long flags)
-
-This makes unmapping code more complicated (and slow) though. For
-example the way I would implement the fallback would be to iterate
-through the sglist first to calculate the total length to unmap and then
-call iommu_unmap().
-
-I know we talked about removing the flag argument in the map call.
-However, the TLB_NO_INV usage is actually needed for both map and unmap.
-We have HW that requires TLB invalidate on MAP and TLB inv. is also
-required if you implement your mapping function to support replacing an
-existing mapping...
-
-Rob, did you have an issue with this API before or was it just an issue
-with not having the iova in the unmap call?
-
->> I thought that was why we added the default fallback and set all the
->> drivers to point to these fallback functions. Several people wanted this
->> so that we don't have to have NULL-check in these functions (and have
->> the functions be simple inline functions).
-> 
-> Okay, since you add these call-backs to all drivers I think I can live
-> with not doing a pointer check here.
-> 
-> 
-> 	Joerg
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
-
-
-Olav
+Regards,
+Andreas
 
 -- 
-The Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+SUSE LINUX Products GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
+GF: Jeff Hawn, Jennifer Guild, Felix Imend?rffer; HRB 16746 AG N?rnberg
