@@ -1,117 +1,78 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Tue, 19 Aug 2014 14:01:52 +0200
-Subject: [PATCH 2/2] arm/arm64: KVM: Support KVM_CAP_READONLY_MEM
-In-Reply-To: <1408449712-14903-1-git-send-email-christoffer.dall@linaro.org>
-References: <1408449712-14903-1-git-send-email-christoffer.dall@linaro.org>
-Message-ID: <1408449712-14903-2-git-send-email-christoffer.dall@linaro.org>
+From: liviu@dudau.co.uk (Liviu Dudau)
+Date: Tue, 19 Aug 2014 13:05:30 +0100
+Subject: [PATCH v9 02/12] PCI: OF: Parse and map the IRQ when adding the
+ PCI device.
+In-Reply-To: <20140819014401.GB9558@richard>
+References: <1407860725-25202-1-git-send-email-Liviu.Dudau@arm.com>
+ <1407860725-25202-3-git-send-email-Liviu.Dudau@arm.com>
+ <20140814145804.GA5586@richard>
+ <20140814154959.GG25761@e106497-lin.cambridge.arm.com>
+ <20140815085632.GA4954@richard>
+ <20140815103052.GD27553@e106497-lin.cambridge.arm.com>
+ <20140818142550.GN20043@localhost> <20140819014401.GB9558@richard>
+Message-ID: <20140819120530.GF13147@bart.dudau.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When userspace loads code and data in a read-only memory regions, KVM
-needs to be able to handle this on arm and arm64.  Specifically this is
-used when running code directly from a read-only flash device; the
-common scenario is a UEFI blob loaded with the -bios option in QEMU.
+On Tue, Aug 19, 2014 at 09:44:01AM +0800, Wei Yang wrote:
+> On Mon, Aug 18, 2014 at 03:25:50PM +0100, Catalin Marinas wrote:
+> >...
+> >> Well, it will become necessary as old code gets dismantled and converted towards
+> >> this patchset. To give you an example that I'm familiar with, for arch/arm the
+> >> host bridge drivers have moved into drivers/pci/host, but they still depend/use
+> >> the bios32 infrastructure that takes care of setting up the irq. When they switch
+> >> to my version they would have to go and debug the "irq not being assigned" issue
+> >> and it is quite likely that some of the people doing the conversion will complain
+> >> about my code rather than understanding the issue. What I'm trying to do is to
+> >> make switching to my patchset as painless as possible, with a cleanup to remove
+> >> redundant operations coming after the switchover.
+> >
+> >While the goal is fine, until we see a common pattern for what needs to
+> >go into pcibios_add_device() I think we should have an arm64-specific
+> >implementation (and probably an arm32 specific one as well). I can see
+> >powerpc uses it for setting the DMA ops. Would we have a similar need on
+> >arm64 to choose between coherent and non-coherent dma_ops?
+> 
+> Liviu,
+> 
+> I have the same feeling with Catalin. An arm64-specific implementation of
+> pcibios_add_device() would be better.
+> 
+> No more other concerns from my side.
 
-Note that the MMIO exit on writes to a read-only memory is ABI and can
-be used to emulate block-erase style flash devices.
+OK, I will make the change when returning from my holiday at the beginning of September,
+when I plan to send v10.
 
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
-Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
----
- arch/arm/include/uapi/asm/kvm.h   |  1 +
- arch/arm/kvm/arm.c                |  1 +
- arch/arm/kvm/mmu.c                | 15 ++++++++-------
- arch/arm64/include/uapi/asm/kvm.h |  1 +
- 4 files changed, 11 insertions(+), 7 deletions(-)
+Best regards,
+Liviu
 
-diff --git a/arch/arm/include/uapi/asm/kvm.h b/arch/arm/include/uapi/asm/kvm.h
-index e6ebdd3..51257fd 100644
---- a/arch/arm/include/uapi/asm/kvm.h
-+++ b/arch/arm/include/uapi/asm/kvm.h
-@@ -25,6 +25,7 @@
- 
- #define __KVM_HAVE_GUEST_DEBUG
- #define __KVM_HAVE_IRQ_LINE
-+#define __KVM_HAVE_READONLY_MEM
- 
- #define KVM_REG_SIZE(id)						\
- 	(1U << (((id) & KVM_REG_SIZE_MASK) >> KVM_REG_SIZE_SHIFT))
-diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
-index a99e0cd..3ab3e60 100644
---- a/arch/arm/kvm/arm.c
-+++ b/arch/arm/kvm/arm.c
-@@ -188,6 +188,7 @@ int kvm_vm_ioctl_check_extension(struct kvm *kvm, long ext)
- 	case KVM_CAP_ONE_REG:
- 	case KVM_CAP_ARM_PSCI:
- 	case KVM_CAP_ARM_PSCI_0_2:
-+	case KVM_CAP_READONLY_MEM:
- 		r = 1;
- 		break;
- 	case KVM_CAP_COALESCED_MMIO:
-diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
-index 16e7994..dcbe01e 100644
---- a/arch/arm/kvm/mmu.c
-+++ b/arch/arm/kvm/mmu.c
-@@ -747,14 +747,13 @@ static bool transparent_hugepage_adjust(pfn_t *pfnp, phys_addr_t *ipap)
- }
- 
- static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
--			  struct kvm_memory_slot *memslot,
-+			  struct kvm_memory_slot *memslot, unsigned long hva,
- 			  unsigned long fault_status)
- {
- 	int ret;
- 	bool write_fault, writable, hugetlb = false, force_pte = false;
- 	unsigned long mmu_seq;
- 	gfn_t gfn = fault_ipa >> PAGE_SHIFT;
--	unsigned long hva = gfn_to_hva(vcpu->kvm, gfn);
- 	struct kvm *kvm = vcpu->kvm;
- 	struct kvm_mmu_memory_cache *memcache = &vcpu->arch.mmu_page_cache;
- 	struct vm_area_struct *vma;
-@@ -863,7 +862,8 @@ int kvm_handle_guest_abort(struct kvm_vcpu *vcpu, struct kvm_run *run)
- 	unsigned long fault_status;
- 	phys_addr_t fault_ipa;
- 	struct kvm_memory_slot *memslot;
--	bool is_iabt;
-+	unsigned long hva;
-+	bool is_iabt, write_fault, writable;
- 	gfn_t gfn;
- 	int ret, idx;
- 
-@@ -884,7 +884,10 @@ int kvm_handle_guest_abort(struct kvm_vcpu *vcpu, struct kvm_run *run)
- 	idx = srcu_read_lock(&vcpu->kvm->srcu);
- 
- 	gfn = fault_ipa >> PAGE_SHIFT;
--	if (!kvm_is_visible_gfn(vcpu->kvm, gfn)) {
-+	memslot = gfn_to_memslot(vcpu->kvm, gfn);
-+	hva = gfn_to_hva_memslot_prot(memslot, gfn, &writable);
-+	write_fault = kvm_is_write_fault(kvm_vcpu_get_hsr(vcpu));
-+	if (kvm_is_error_hva(hva) || (write_fault && !writable)) {
- 		if (is_iabt) {
- 			/* Prefetch Abort on I/O address */
- 			kvm_inject_pabt(vcpu, kvm_vcpu_get_hfar(vcpu));
-@@ -910,9 +913,7 @@ int kvm_handle_guest_abort(struct kvm_vcpu *vcpu, struct kvm_run *run)
- 		goto out_unlock;
- 	}
- 
--	memslot = gfn_to_memslot(vcpu->kvm, gfn);
--
--	ret = user_mem_abort(vcpu, fault_ipa, memslot, fault_status);
-+	ret = user_mem_abort(vcpu, fault_ipa, memslot, hva, fault_status);
- 	if (ret == 0)
- 		ret = 1;
- out_unlock:
-diff --git a/arch/arm64/include/uapi/asm/kvm.h b/arch/arm64/include/uapi/asm/kvm.h
-index e633ff8..f4ec5a6 100644
---- a/arch/arm64/include/uapi/asm/kvm.h
-+++ b/arch/arm64/include/uapi/asm/kvm.h
-@@ -37,6 +37,7 @@
- 
- #define __KVM_HAVE_GUEST_DEBUG
- #define __KVM_HAVE_IRQ_LINE
-+#define __KVM_HAVE_READONLY_MEM
- 
- #define KVM_REG_SIZE(id)						\
- 	(1U << (((id) & KVM_REG_SIZE_MASK) >> KVM_REG_SIZE_SHIFT))
+> 
+> >
+> >Also at some point we'll get ACPI support, so I'm not sure what we do
+> >with assigning the dev->irq here but definitely of_* functions won't
+> >work.
+> >
+> >-- 
+> >Catalin
+> 
+> -- 
+> Richard Yang
+> Help you, Help me
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
+
 -- 
-2.0.0
+-------------------
+   .oooO
+   (   )
+    \ (  Oooo.
+     \_) (   )
+          ) /
+         (_/
+
+ One small step
+   for me ...
