@@ -1,50 +1,28 @@
-From: daniel.thompson@linaro.org (Daniel Thompson)
-Date: Tue, 19 Aug 2014 16:16:47 +0100
-Subject: [PATCH v9 9/9] arm: Fix DEBUG_LL for multi-platform kernels (without
- PL01X)
-In-Reply-To: <1408461407-10429-1-git-send-email-daniel.thompson@linaro.org>
-References: <1408459715-10151-1-git-send-email-daniel.thompson@linaro.org>
- <1408461407-10429-1-git-send-email-daniel.thompson@linaro.org>
-Message-ID: <1408461407-10429-10-git-send-email-daniel.thompson@linaro.org>
+From: joel.schopp@amd.com (Joel Schopp)
+Date: Tue, 19 Aug 2014 10:16:12 -0500
+Subject: [PATCH v5] arm64: fix VTTBR_BADDR_MASK
+In-Reply-To: <20140819145933.GF31086@cbox>
+References: <20140818203604.4654.99905.stgit@joelaarch64.amd.com>
+ <20140819122420.GC31086@cbox> <53F35DFD.9070804@amd.com>
+ <20140819143834.GE31086@cbox> <53F363E3.8060108@amd.com>
+ <20140819145933.GF31086@cbox>
+Message-ID: <53F36A3C.4060104@amd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When building a multi_v7_defconfig kernel it is not possible to configure
-DEBUG_LL to use any serial device except a ARM Primecell PL01X, or more
-accurately and worse, it is possible to configure a different serial
-device but KConfig does not honour this request. In fact this also
-overrides the user selection for some of the single platform kernels, for
-example I don't think DEBUG_LL can be targetted at ICE or semihosted
-supervisor for ARCH_VERSATILE.
 
-This happens because DEBUG_UART_PL01X is automatically enabled by
-some architectures and this means user decisions made regarding
-the DEBUG_LL backend will be overriden. Problem is fixed by removing the
-automatic enabling of this option.
-
-Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
-Acked-by: Arnd Bergmann <arnd@arndb.de>
----
- arch/arm/Kconfig.debug | 7 +------
- 1 file changed, 1 insertion(+), 6 deletions(-)
-
-diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
-index f92b98f..537dd04 100644
---- a/arch/arm/Kconfig.debug
-+++ b/arch/arm/Kconfig.debug
-@@ -1127,12 +1127,7 @@ config DEBUG_LL_INCLUDE
- 
- # Compatibility options for PL01x
- config DEBUG_UART_PL01X
--	def_bool ARCH_EP93XX || \
--		ARCH_INTEGRATOR || \
--		ARCH_SPEAR3XX || \
--		ARCH_SPEAR6XX || \
--		ARCH_SPEAR13XX || \
--		ARCH_VERSATILE
-+	bool
- 
- #Compatibility options for 8250
- config DEBUG_UART_8250
--- 
-1.9.3
+> hmmm, the point is that we need to ensure that we have a properly
+> aligned allocated PGD, that's what this patch currently addresses, and as
+> you pointed out, the BUG_ON() just before trying to run a VM is not the
+> nicest solution - we should really be dealing with this properly at
+> allocation time.
+>
+> But, if you don't have time to look at that, then ok, I'll have to pick
+> it up myself.
+>
+> However, you are hinting that we do not support 4 levels of page tables,
+> yet you do allow the t0sz_to_vttbr_x funciton to pass even when using
+> t0sz values only supported under 4 levels of page tables....  What is
+> the rationale for that?
+Minimizing merge conflicts. I figure both are going in within the next
+month or two.
