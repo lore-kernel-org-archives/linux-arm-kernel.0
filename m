@@ -1,200 +1,114 @@
 From: shc_work@mail.ru (Alexander Shiyan)
-Date: Tue, 19 Aug 2014 16:31:13 +0400
-Subject: [PATCH 1/3] ARM: clps711x: Switch CLPS711X subarch to use clk and
- clocksource driver
-Message-ID: <1408451475-1140-1-git-send-email-shc_work@mail.ru>
+Date: Tue, 19 Aug 2014 16:31:14 +0400
+Subject: [PATCH 2/3] ARM: clps711x: edb7211: Use new PWM driver for backlight
+In-Reply-To: <1408451475-1140-1-git-send-email-shc_work@mail.ru>
+References: <1408451475-1140-1-git-send-email-shc_work@mail.ru>
+Message-ID: <1408451475-1140-2-git-send-email-shc_work@mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch removes old support for clk and clocksource support and
-switches platform to use new drivers.
+Remove existing tricks for handling PWM and use CLPS711X PWM driver.
 
 Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
 ---
- arch/arm/mach-clps711x/common.c | 138 ++--------------------------------------
- arch/arm/mach-clps711x/common.h |   5 ++
- 2 files changed, 9 insertions(+), 134 deletions(-)
+ arch/arm/configs/clps711x_defconfig    |  4 +++-
+ arch/arm/mach-clps711x/board-edb7211.c | 37 ++++++++++++++++++++--------------
+ 2 files changed, 25 insertions(+), 16 deletions(-)
 
-diff --git a/arch/arm/mach-clps711x/common.c b/arch/arm/mach-clps711x/common.c
-index 2a6323b..671acc5a 100644
---- a/arch/arm/mach-clps711x/common.c
-+++ b/arch/arm/mach-clps711x/common.c
-@@ -19,29 +19,17 @@
-  * along with this program; if not, write to the Free Software
-  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
-  */
--#include <linux/io.h>
+diff --git a/arch/arm/configs/clps711x_defconfig b/arch/arm/configs/clps711x_defconfig
+index 0facf9d..fc105c9 100644
+--- a/arch/arm/configs/clps711x_defconfig
++++ b/arch/arm/configs/clps711x_defconfig
+@@ -68,8 +68,8 @@ CONFIG_GPIO_GENERIC_PLATFORM=y
+ # CONFIG_HWMON is not set
+ CONFIG_FB=y
+ CONFIG_FB_CLPS711X=y
+-CONFIG_BACKLIGHT_LCD_SUPPORT=y
+ CONFIG_LCD_PLATFORM=y
++CONFIG_BACKLIGHT_PWM=y
+ # CONFIG_USB_SUPPORT is not set
+ CONFIG_NEW_LEDS=y
+ CONFIG_LEDS_CLASS=y
+@@ -77,6 +77,8 @@ CONFIG_LEDS_GPIO=y
+ CONFIG_LEDS_TRIGGERS=y
+ CONFIG_LEDS_TRIGGER_HEARTBEAT=y
+ # CONFIG_IOMMU_SUPPORT is not set
++CONFIG_PWM=y
++CONFIG_PWM_CLPS711X=y
+ CONFIG_EXT2_FS=y
+ CONFIG_CRAMFS=y
+ CONFIG_MINIX_FS=y
+diff --git a/arch/arm/mach-clps711x/board-edb7211.c b/arch/arm/mach-clps711x/board-edb7211.c
+index fdf54d4..f339797 100644
+--- a/arch/arm/mach-clps711x/board-edb7211.c
++++ b/arch/arm/mach-clps711x/board-edb7211.c
+@@ -14,8 +14,9 @@
+ #include <linux/types.h>
+ #include <linux/i2c-gpio.h>
+ #include <linux/interrupt.h>
+-#include <linux/backlight.h>
+ #include <linux/platform_device.h>
++#include <linux/pwm.h>
++#include <linux/pwm_backlight.h>
+ #include <linux/memblock.h>
+ 
+ #include <linux/mtd/physmap.h>
+@@ -108,23 +109,23 @@ static struct plat_lcd_data edb7211_lcd_power_pdata = {
+ 	.set_power	= edb7211_lcd_power_set,
+ };
+ 
+-static void edb7211_lcd_backlight_set_intensity(int intensity)
+-{
+-	gpio_set_value(EDB7211_LCDBL, !!intensity);
+-	clps_writel((clps_readl(PMPCON) & 0xf0ff) | (intensity << 8), PMPCON);
+-}
++static struct pwm_lookup edb7211_pwm_lookup[] = {
++	PWM_LOOKUP("clps711x-pwm", 0, "pwm-backlight.0", NULL,
++		   0, PWM_POLARITY_NORMAL),
++};
+ 
+-static struct generic_bl_info edb7211_lcd_backlight_pdata = {
+-	.name			= "lcd-backlight.0",
+-	.default_intensity	= 0x01,
+-	.max_intensity		= 0x0f,
+-	.set_bl_intensity	= edb7211_lcd_backlight_set_intensity,
++static struct platform_pwm_backlight_data pwm_bl_pdata = {
++	.dft_brightness	= 0x01,
++	.max_brightness	= 0x0f,
++	.enable_gpio	= EDB7211_LCDBL,
+ };
+ 
++static struct resource clps711x_pwm_res =
++	DEFINE_RES_MEM(CLPS711X_PHYS_BASE + PMPCON, SZ_4);
 +
- #include <linux/init.h>
- #include <linux/sizes.h>
--#include <linux/interrupt.h>
--#include <linux/irq.h>
--#include <linux/clk.h>
--#include <linux/clkdev.h>
--#include <linux/clockchips.h>
--#include <linux/clocksource.h>
--#include <linux/clk-provider.h>
--#include <linux/sched_clock.h>
+ static struct gpio edb7211_gpios[] __initconst = {
+ 	{ EDB7211_LCD_DC_DC_EN,	GPIOF_OUT_INIT_LOW,	"LCD DC-DC" },
+ 	{ EDB7211_LCDEN,	GPIOF_OUT_INIT_LOW,	"LCD POWER" },
+-	{ EDB7211_LCDBL,	GPIOF_OUT_INIT_LOW,	"LCD BACKLIGHT" },
+ };
  
- #include <asm/mach/map.h>
--#include <asm/mach/time.h>
- #include <asm/system_misc.h>
+ /* Reserve screen memory region@the start of main system memory. */
+@@ -153,12 +154,18 @@ static void __init edb7211_init_late(void)
+ 	gpio_request_array(edb7211_gpios, ARRAY_SIZE(edb7211_gpios));
  
- #include <mach/hardware.h>
- 
- #include "common.h"
- 
--static struct clk *clk_pll, *clk_bus, *clk_uart, *clk_timerl, *clk_timerh,
--		  *clk_tint, *clk_spi;
--
- /*
-  * This maps the generic CLPS711x registers
-  */
-@@ -64,129 +52,11 @@ void __init clps711x_init_irq(void)
- 	clps711x_intc_init(CLPS711X_PHYS_BASE, SZ_16K);
- }
- 
--static u64 notrace clps711x_sched_clock_read(void)
--{
--	return ~readw_relaxed(CLPS711X_VIRT_BASE + TC1D);
--}
--
--static void clps711x_clockevent_set_mode(enum clock_event_mode mode,
--					 struct clock_event_device *evt)
--{
--	disable_irq(IRQ_TC2OI);
--
--	switch (mode) {
--	case CLOCK_EVT_MODE_PERIODIC:
--		enable_irq(IRQ_TC2OI);
--		break;
--	case CLOCK_EVT_MODE_ONESHOT:
--		/* Not supported */
--	case CLOCK_EVT_MODE_SHUTDOWN:
--	case CLOCK_EVT_MODE_UNUSED:
--	case CLOCK_EVT_MODE_RESUME:
--		/* Left event sources disabled, no more interrupts appear */
--		break;
--	}
--}
--
--static struct clock_event_device clockevent_clps711x = {
--	.name		= "clps711x-clockevent",
--	.rating		= 300,
--	.features	= CLOCK_EVT_FEAT_PERIODIC,
--	.set_mode	= clps711x_clockevent_set_mode,
--};
--
--static irqreturn_t clps711x_timer_interrupt(int irq, void *dev_id)
--{
--	clockevent_clps711x.event_handler(&clockevent_clps711x);
--
--	return IRQ_HANDLED;
--}
--
--static struct irqaction clps711x_timer_irq = {
--	.name		= "clps711x-timer",
--	.flags		= IRQF_TIMER | IRQF_IRQPOLL,
--	.handler	= clps711x_timer_interrupt,
--};
--
--static void add_fixed_clk(struct clk *clk, const char *name, int rate)
--{
--	clk = clk_register_fixed_rate(NULL, name, NULL, CLK_IS_ROOT, rate);
--	clk_register_clkdev(clk, name, NULL);
--}
--
- void __init clps711x_timer_init(void)
- {
--	int osc, ext, pll, cpu, bus, timl, timh, uart, spi;
--	u32 tmp;
--
--	osc = 3686400;
--	ext = 13000000;
--
--	tmp = clps_readl(PLLR) >> 24;
--	if (tmp)
--		pll = (osc * tmp) / 2;
--	else
--		pll = 73728000; /* Default value */
--
--	tmp = clps_readl(SYSFLG2);
--	if (tmp & SYSFLG2_CKMODE) {
--		cpu = ext;
--		bus = cpu;
--		spi = 135400;
--		pll = 0;
--	} else {
--		cpu = pll;
--		if (cpu >= 36864000)
--			bus = cpu / 2;
--		else
--			bus = 36864000 / 2;
--		spi = cpu / 576;
--	}
--
--	uart = bus / 10;
--
--	if (tmp & SYSFLG2_CKMODE) {
--		tmp = clps_readl(SYSCON2);
--		if (tmp & SYSCON2_OSTB)
--			timh = ext / 26;
--		else
--			timh = 541440;
--	} else
--		timh = DIV_ROUND_CLOSEST(cpu, 144);
--
--	timl = DIV_ROUND_CLOSEST(timh, 256);
--
--	/* All clocks are fixed */
--	add_fixed_clk(clk_pll, "pll", pll);
--	add_fixed_clk(clk_bus, "bus", bus);
--	add_fixed_clk(clk_uart, "uart", uart);
--	add_fixed_clk(clk_timerl, "timer_lf", timl);
--	add_fixed_clk(clk_timerh, "timer_hf", timh);
--	add_fixed_clk(clk_tint, "tint", 64);
--	add_fixed_clk(clk_spi, "spi", spi);
--
--	pr_info("CPU frequency set at %i Hz.\n", cpu);
--
--	/* Start Timer1 in free running mode (Low frequency) */
--	tmp = clps_readl(SYSCON1) & ~(SYSCON1_TC1S | SYSCON1_TC1M);
--	clps_writel(tmp, SYSCON1);
--
--	sched_clock_register(clps711x_sched_clock_read, 16, timl);
--
--	clocksource_mmio_init(CLPS711X_VIRT_BASE + TC1D,
--			      "clps711x_clocksource", timl, 300, 16,
--			      clocksource_mmio_readw_down);
--
--	/* Set Timer2 prescaler */
--	clps_writew(DIV_ROUND_CLOSEST(timh, HZ), TC2D);
--
--	/* Start Timer2 in prescale mode (High frequency)*/
--	tmp = clps_readl(SYSCON1) | SYSCON1_TC2M | SYSCON1_TC2S;
--	clps_writel(tmp, SYSCON1);
--
--	clockevents_config_and_register(&clockevent_clps711x, timh, 0, 0);
--
--	setup_irq(IRQ_TC2OI, &clps711x_timer_irq);
-+	clps711x_clk_init(CLPS711X_VIRT_BASE);
-+	clps711x_clksrc_init(CLPS711X_VIRT_BASE + TC1D,
-+			     CLPS711X_VIRT_BASE + TC2D, IRQ_TC2OI);
- }
- 
- void clps711x_restart(enum reboot_mode mode, const char *cmd)
-diff --git a/arch/arm/mach-clps711x/common.h b/arch/arm/mach-clps711x/common.h
-index f881899..370200b 100644
---- a/arch/arm/mach-clps711x/common.h
-+++ b/arch/arm/mach-clps711x/common.h
-@@ -16,3 +16,8 @@ extern void clps711x_restart(enum reboot_mode mode, const char *cmd);
- 
- /* drivers/irqchip/irq-clps711x.c */
- void clps711x_intc_init(phys_addr_t, resource_size_t);
-+/* drivers/clk/clk-clps711x.c */
-+void clps711x_clk_init(void __iomem *base);
-+/* drivers/clocksource/clps711x-timer.c */
-+void clps711x_clksrc_init(void __iomem *tc1_base, void __iomem *tc2_base,
-+			  unsigned int irq);
+ 	platform_device_register(&edb7211_flash_pdev);
++
+ 	platform_device_register_data(NULL, "platform-lcd", 0,
+ 				      &edb7211_lcd_power_pdata,
+ 				      sizeof(edb7211_lcd_power_pdata));
+-	platform_device_register_data(NULL, "generic-bl", 0,
+-				      &edb7211_lcd_backlight_pdata,
+-				      sizeof(edb7211_lcd_backlight_pdata));
++
++	platform_device_register_simple("clps711x-pwm", PLATFORM_DEVID_NONE,
++					&clps711x_pwm_res, 1);
++	pwm_add_table(edb7211_pwm_lookup, ARRAY_SIZE(edb7211_pwm_lookup));
++
++	platform_device_register_data(&platform_bus, "pwm-backlight", 0,
++				      &pwm_bl_pdata, sizeof(pwm_bl_pdata));
++
+ 	platform_device_register_simple("video-clps711x", 0, NULL, 0);
+ 	platform_device_register_simple("cs89x0", 0, edb7211_cs8900_resource,
+ 					ARRAY_SIZE(edb7211_cs8900_resource));
 -- 
 1.8.5.5
