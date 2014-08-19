@@ -1,27 +1,92 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Tue, 19 Aug 2014 15:21:24 +0800
-Subject: [PATCH v2] imx-drm: imx-drm-core: add suspend/resume support
-In-Reply-To: <53F1FB9A.4070305@samsung.com>
-References: <1406269240-24622-1-git-send-email-shawn.guo@freescale.com>
- <53F1AE97.8090807@samsung.com> <20140818123823.GK2114@dragon>
- <53F1F866.1@samsung.com> <53F1FB9A.4070305@samsung.com>
-Message-ID: <20140819072122.GL2114@dragon>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Tue, 19 Aug 2014 09:22:21 +0200
+Subject: [PATCH 4/4] ARM: dts: Enable pwm backlight on rk3288-EVB
+In-Reply-To: <1408381749-14156-5-git-send-email-dianders@chromium.org>
+References: <1408381749-14156-1-git-send-email-dianders@chromium.org>
+ <1408381749-14156-5-git-send-email-dianders@chromium.org>
+Message-ID: <20140819072220.GE12859@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 18, 2014 at 03:11:54PM +0200, Andrzej Hajda wrote:
-> On 08/18/2014 02:58 PM, Andrzej Hajda wrote:
-> > .load hook is called after all components are attached to the master.
-> > So if suspend happen after probe of the master and before attaching the last
-> > component you will have NULL here, I guess.
-> 
-> Probably you can test it by disabling driver for one of drm components
-> and putting board in sleep mode.
-> 
-> Moreover I guess drvdata should be cleaned in .unload callback,
-> otherwise if for some reason one of components will be detached and suspend
-> happens drvdata will contain invalid pointer.
+On Mon, Aug 18, 2014 at 10:09:09AM -0700, Doug Anderson wrote:
+> The pwm0 is the PWM associated with the LCD backlight.  Enable it.
 
-You're right, Andrzej.  I will fix it in v3.  Thanks for the comment.
+In the subject, s/pwm/PWM/.
 
-Shawn
+> 
+> Signed-off-by: Doug Anderson <dianders@chromium.org>
+> ---
+>  arch/arm/boot/dts/rk3288-evb.dtsi | 53 +++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 53 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/rk3288-evb.dtsi b/arch/arm/boot/dts/rk3288-evb.dtsi
+> index 2964370..242e1a9 100644
+> --- a/arch/arm/boot/dts/rk3288-evb.dtsi
+> +++ b/arch/arm/boot/dts/rk3288-evb.dtsi
+> @@ -10,6 +10,7 @@
+>   * GNU General Public License for more details.
+>   */
+>  
+> +#include <dt-bindings/pwm/pwm.h>
+>  #include "rk3288.dtsi"
+>  
+>  / {
+> @@ -17,6 +18,48 @@
+>  		reg = <0x0 0x80000000>;
+>  	};
+>  
+> +        backlight {
+
+Indentation seems to be off here.
+
+> +		compatible = "pwm-backlight";
+> +		brightness-levels = <
+> +			  0   1   2   3   4   5   6   7
+> +			  8   9  10  11  12  13  14  15
+> +			 16  17  18  19  20  21  22  23
+> +			 24  25  26  27  28  29  30  31
+> +			 32  33  34  35  36  37  38  39
+> +			 40  41  42  43  44  45  46  47
+> +			 48  49  50  51  52  53  54  55
+> +			 56  57  58  59  60  61  62  63
+> +			 64  65  66  67  68  69  70  71
+> +			 72  73  74  75  76  77  78  79
+> +			 80  81  82  83  84  85  86  87
+> +			 88  89  90  91  92  93  94  95
+> +			 96  97  98  99 100 101 102 103
+> +			104 105 106 107 108 109 110 111
+> +			112 113 114 115 116 117 118 119
+> +			120 121 122 123 124 125 126 127
+> +			128 129 130 131 132 133 134 135
+> +			136 137 138 139 140 141 142 143
+> +			144 145 146 147 148 149 150 151
+> +			152 153 154 155 156 157 158 159
+> +			160 161 162 163 164 165 166 167
+> +			168 169 170 171 172 173 174 175
+> +			176 177 178 179 180 181 182 183
+> +			184 185 186 187 188 189 190 191
+> +			192 193 194 195 196 197 198 199
+> +			200 201 202 203 204 205 206 207
+> +			208 209 210 211 212 213 214 215
+> +			216 217 218 219 220 221 222 223
+> +			224 225 226 227 228 229 230 231
+> +			232 233 234 235 236 237 238 239
+> +			240 241 242 243 244 245 246 247
+> +			248 249 250 251 252 253 254 255>;
+> +		default-brightness-level = <128>;
+> +		enable-gpios = <&gpio7 2 GPIO_ACTIVE_HIGH>;
+> +		pinctrl-names = "default";
+> +		pinctrl-0 = <&bl_en>;
+> +		pwms = <&pwm0 0 1000000 PWM_POLARITY_INVERTED>;
+> +        };
+
+And here.
+
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140819/d4d4db57/attachment.sig>
