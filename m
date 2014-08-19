@@ -1,52 +1,59 @@
 From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
-Date: Tue, 19 Aug 2014 17:08:32 +0200
-Subject: [PATCH 5/6] ARM: dts: Add vmmc and vqmmc supplies for Peach Pit and
- Pi boards
+Date: Tue, 19 Aug 2014 17:08:33 +0200
+Subject: [PATCH 6/6] ARM: dts: Add Peach Pit and Pi dts entry for ISL29018
+ sensor
 In-Reply-To: <1408460913-13863-1-git-send-email-javier.martinez@collabora.co.uk>
 References: <1408460913-13863-1-git-send-email-javier.martinez@collabora.co.uk>
-Message-ID: <1408460913-13863-6-git-send-email-javier.martinez@collabora.co.uk>
+Message-ID: <1408460913-13863-7-git-send-email-javier.martinez@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The VCC/VDD and VCCQ/VDD_IO power supplies for the MMC are
-provided by the tps65090 fet4 and max77802 ldo4 regulators
-respectively. Add the phandle to the regulators tree nodes
-for the the dw_mmc device device.
+The Exynos5420 based Peach Pit and the Exynos5800 based Peach Pi
+machines have an i2c ISL29018 light sensor. This patch adds the
+device nodes needed to support this device.
 
-These DTS snippets were taken from the downstream ChromeOS
-3.8 kernel Device Tree for Peach Pit and Pi boards.
+These DTS snippets were taken from the downstream Chrome OS 3.8
+kernel Device Tree for Peach Pit and Pi boards.
 
 Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
 ---
- arch/arm/boot/dts/exynos5420-peach-pit.dts | 2 ++
- arch/arm/boot/dts/exynos5800-peach-pi.dts  | 2 ++
- 2 files changed, 4 insertions(+)
+ arch/arm/boot/dts/exynos5420-peach-pit.dts | 6 ++++++
+ arch/arm/boot/dts/exynos5800-peach-pi.dts  | 6 ++++++
+ 2 files changed, 12 insertions(+)
 
 diff --git a/arch/arm/boot/dts/exynos5420-peach-pit.dts b/arch/arm/boot/dts/exynos5420-peach-pit.dts
-index 8e50042..5b9dbb9 100644
+index 5b9dbb9..b835953 100644
 --- a/arch/arm/boot/dts/exynos5420-peach-pit.dts
 +++ b/arch/arm/boot/dts/exynos5420-peach-pit.dts
-@@ -547,6 +547,8 @@
+@@ -498,6 +498,12 @@
+ 		pinctrl-names = "default";
+ 		pinctrl-0 = <&max98090_irq>;
+ 	};
++
++	light-sensor at 44 {
++		compatible = "isil,isl29018";
++		reg = <0x44>;
++		vcc-supply = <&tps65090_fet5>;
++	};
  };
  
- &mmc_2 {
-+	vmmc-supply = <&tps65090_fet4>;
-+	vqmmc-supply = <&vqmmc_sdcard>;
- 	status = "okay";
- 	num-slots = <1>;
- 	supports-highspeed;
+ &hsi2c_9 {
 diff --git a/arch/arm/boot/dts/exynos5800-peach-pi.dts b/arch/arm/boot/dts/exynos5800-peach-pi.dts
-index 939f91c..dcac443 100644
+index dcac443..c3c51c0 100644
 --- a/arch/arm/boot/dts/exynos5800-peach-pi.dts
 +++ b/arch/arm/boot/dts/exynos5800-peach-pi.dts
-@@ -545,6 +545,8 @@
+@@ -496,6 +496,12 @@
+ 		pinctrl-names = "default";
+ 		pinctrl-0 = <&max98091_irq>;
+ 	};
++
++	light-sensor at 44 {
++		compatible = "isil,isl29018";
++		reg = <0x44>;
++		vcc-supply = <&tps65090_fet5>;
++	};
  };
  
- &mmc_2 {
-+	vmmc-supply = <&tps65090_fet4>;
-+	vqmmc-supply = <&vqmmc_sdcard>;
- 	status = "okay";
- 	num-slots = <1>;
- 	supports-highspeed;
+ &hsi2c_9 {
 -- 
 2.0.1
