@@ -1,124 +1,42 @@
-From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Tue, 19 Aug 2014 19:36:11 +0800
-Subject: [PATCH v2 10/18] ARM64 / ACPI: Introduce ACPI_IRQ_MODEL_GIC and
- register device's gsi
-In-Reply-To: <53F2474F.70601@arm.com>
-References: <1407166105-17675-1-git-send-email-hanjun.guo@linaro.org>
- <1407166105-17675-11-git-send-email-hanjun.guo@linaro.org>
- <53F2474F.70601@arm.com>
-Message-ID: <53F336AB.80401@linaro.org>
+From: afaerber@suse.de (=?UTF-8?B?QW5kcmVhcyBGw6RyYmVy?=)
+Date: Tue, 19 Aug 2014 13:39:10 +0200
+Subject: [PATCH 00/29] Exynos SYSMMU (IOMMU) integration with DT and
+ DMA-mapping subsystem
+In-Reply-To: <53F2E9AD.9030308@samsung.com>
+References: <1407235677-26324-1-git-send-email-m.szyprowski@samsung.com>
+ <20140818233201.GL9809@8bytes.org> <53F2E9AD.9030308@samsung.com>
+Message-ID: <53F3375E.6030402@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2014-8-19 2:34, Sudeep Holla wrote:
-> 
-> 
-> On 04/08/14 16:28, Hanjun Guo wrote:
->> Introduce ACPI_IRQ_MODEL_GIC which is needed for ARM64 as GIC is
->> used, and then register device's gsi with the core IRQ subsystem.
->>
->> acpi_register_gsi() is similar to DT based irq_of_parse_and_map(),
->> since gsi is unique in the system, so use hwirq number directly
->> for the mapping.
->>
->> Originally-by: Amit Daniel Kachhap <amit.daniel@samsung.com>
->> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
->> ---
->>   arch/arm64/kernel/acpi.c |   73 ++++++++++++++++++++++++++++++++++++++++++++++
->>   drivers/acpi/bus.c       |    3 ++
->>   include/linux/acpi.h     |    1 +
->>   3 files changed, 77 insertions(+)
->>
->> diff --git a/arch/arm64/kernel/acpi.c b/arch/arm64/kernel/acpi.c
->> index ac7ab34..621ced8 100644
->> --- a/arch/arm64/kernel/acpi.c
->> +++ b/arch/arm64/kernel/acpi.c
->> @@ -34,6 +34,12 @@ EXPORT_SYMBOL(acpi_pci_disabled);
->>   static int enabled_cpus;    /* Processors (GICC) with enabled flag in MADT */
->>
->>   /*
->> + * Since we're on ARM, the default interrupt routing model
->> + * clearly has to be GIC.
->> + */
->> +enum acpi_irq_model_id acpi_irq_model = ACPI_IRQ_MODEL_GIC;
->> +
->> +/*
->>    * __acpi_map_table() will be called before page_init(), so early_ioremap()
->>    * or early_memremap() should be called here to for ACPI table mapping.
->>    */
->> @@ -169,6 +175,73 @@ static int __init
->> acpi_parse_madt_gic_cpu_interface_entries(void)
->>       return 0;
->>   }
->>
->> +int acpi_gsi_to_irq(u32 gsi, unsigned int *irq)
->> +{
->> +    *irq = irq_find_mapping(NULL, gsi);
->> +
->> +    return 0;
->> +}
->> +EXPORT_SYMBOL_GPL(acpi_gsi_to_irq);
->> +
->> +/*
->> + * success: return IRQ number (>0)
->> + * failure: return =< 0
->> + */
->> +int acpi_register_gsi(struct device *dev, u32 gsi, int trigger, int polarity)
->> +{
->> +    unsigned int irq;
->> +    unsigned int irq_type;
->> +
->> +    /*
->> +     * ACPI have no bindings to indicate SPI or PPI, so we
->> +     * use different mappings from DT in ACPI.
->> +     *
->> +     * For FDT
->> +     * PPI interrupt: in the range [0, 15];
->> +     * SPI interrupt: in the range [0, 987];
->> +     *
->> +     * For ACPI, GSI should be unique so using
->> +     * the hwirq directly for the mapping:
->> +     * PPI interrupt: in the range [16, 31];
->> +     * SPI interrupt: in the range [32, 1019];
->> +     */
->> +
->> +    if (trigger == ACPI_EDGE_SENSITIVE &&
->> +                polarity == ACPI_ACTIVE_LOW)
->> +        irq_type = IRQ_TYPE_EDGE_FALLING;
->> +    else if (trigger == ACPI_EDGE_SENSITIVE &&
->> +                polarity == ACPI_ACTIVE_HIGH)
->> +        irq_type = IRQ_TYPE_EDGE_RISING;
->> +    else if (trigger == ACPI_LEVEL_SENSITIVE &&
->> +                polarity == ACPI_ACTIVE_LOW)
->> +        irq_type = IRQ_TYPE_LEVEL_LOW;
->> +    else if (trigger == ACPI_LEVEL_SENSITIVE &&
->> +                polarity == ACPI_ACTIVE_HIGH)
->> +        irq_type = IRQ_TYPE_LEVEL_HIGH;
->> +    else
->> +        irq_type = IRQ_TYPE_NONE;
->> +
->> +    /*
->> +     * Since only one GIC is supported in ACPI 5.0, we can
->> +     * create mapping refer to the default domain
->> +     */
->> +    irq = irq_create_mapping(NULL, gsi);
->> +    if (!irq)
->> +        return irq;
->> +
->> +    /* Set irq type if specified and different than the current one */
->> +    if (irq_type != IRQ_TYPE_NONE &&
->> +        irq_type != irq_get_trigger_type(irq))
->> +        irq_set_irq_type(irq, irq_type);
->> +    return irq;
->> +}
->> +EXPORT_SYMBOL_GPL(acpi_register_gsi);
->> +
-> 
-> Not sure if acpi_gsi_to_irq and acpi_{,un}register_gsi belong here.
-> These are GIC specific and should belong to GIC driver IMO.
+Hi Marek and Inki,
 
-I think we can keep them here as GSI is ACPI specific and they are
-not GIC init related.
+Am 19.08.2014 08:07, schrieb Marek Szyprowski:
+> On 2014-08-19 01:32, Joerg Roedel wrote:
+>> On Tue, Aug 05, 2014 at 12:47:28PM +0200, Marek Szyprowski wrote:
+[...]
+>>>   33 files changed, 1016 insertions(+), 356 deletions(-)
+>> This touches a lot of non-iommu stuff. What is your strategy on getting
+>> this in, do you plan to get the non-iommu changes merged first or do you
+>> want to collect the respective Acks and merge this all through one tree?
+> 
+> Those patches are posted as one patchset mainly to demonstrate how to get
+> everything to work together. I also posted this as a single patch series
+> to get some feedback from other iommu developers, especially all those
+> involved in the generic iommu dt bindings.
+> 
+> For merging, I will split them into smaller series and try to get
+> respective acks.
 
-Thanks
-Hanjun
+I'm working on 5250 based Spring Chromebook and noticed that v3.17-rc1
+got some more iommu support. With the new CONFIG_DRM_EXYNOS_IOMMU=y my
+machine stops booting. So I'm wondering, is any of this a fix for 3.17,
+or is all of this "unrelated" -next material? Also, are you or someone
+working on the respective DT changes for Exynos5?
+
+Regards,
+Andreas
+
+-- 
+SUSE LINUX Products GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
+GF: Jeff Hawn, Jennifer Guild, Felix Imend?rffer; HRB 16746 AG N?rnberg
