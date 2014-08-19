@@ -1,133 +1,76 @@
 From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
-Date: Tue, 19 Aug 2014 11:52:22 +0200
-Subject: [PATCH] ARM: Exynos: remove arm diagnostic and power register
- save/restore code
-In-Reply-To: <CADWw7OiqK+4_uXtPnkS4zL2nBMw08en9venrupFMfqrsWevVJw@mail.gmail.com>
-References: <1407738165-10139-1-git-send-email-k.chander@samsung.com>
- <CADWw7OiqK+4_uXtPnkS4zL2nBMw08en9venrupFMfqrsWevVJw@mail.gmail.com>
-Message-ID: <2193450.Ihy0kb3U7o@amdc1032>
+Date: Tue, 19 Aug 2014 11:57:22 +0200
+Subject: [PATCH 1/2] ARM: dts: Enable PMIC interrupts on ODROID
+In-Reply-To: <53F22D1B.4010900@samsung.com>
+References: <1405500606-5752-1-git-send-email-drake@endlessm.com>
+ <CAAObsKAokjDmpVy5cm_iFD52bCq+3jYeGDWzACsmh-JKktyjDw@mail.gmail.com>
+ <53F22D1B.4010900@samsung.com>
+Message-ID: <3413299.OcpyWkc82q@amdc1032>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 Hi,
 
-On Tuesday, August 19, 2014 02:58:31 PM Chander Kashyap wrote:
-> On Mon, Aug 11, 2014 at 11:52 AM, Chander Kashyap <k.chander@samsung.com> wrote:
-> > As save/restore of arm "diagnostic" and "power" registers is handled by
-> > generic code, so remove the same.
+On Monday, August 18, 2014 11:43:07 AM Kukjin Kim wrote:
+> On 08/12/14 08:06, Tomeu Vizoso wrote:
+> > Tested on an Odroid-U2:
 > >
-> > Signed-off-by: Chander Kashyap <k.chander@samsung.com>
-> > ---
-> >  arch/arm/mach-exynos/pm.c |   54 ++-------------------------------------------
-> >  1 file changed, 2 insertions(+), 52 deletions(-)
+> > Tested-by: Tomeu Vizoso<tomeu@tomeuvizoso.net>
 > >
-> > diff --git a/arch/arm/mach-exynos/pm.c b/arch/arm/mach-exynos/pm.c
-> > index 18646b7..af99c55 100644
-> > --- a/arch/arm/mach-exynos/pm.c
-> > +++ b/arch/arm/mach-exynos/pm.c
-> > @@ -134,45 +134,6 @@ void exynos_enter_aftr(void)
-> >         exynos_sys_powerdown_conf(SYS_AFTR);
-> >  }
+> > Thanks,
 > >
-> > -/* For Cortex-A9 Diagnostic and Power control register */
-> > -static unsigned int save_arm_register[2];
-> > -
-> > -static void exynos_cpu_save_register(void)
-> > -{
-> > -       unsigned long tmp;
-> > -
-> > -       /* Save Power control register */
-> > -       asm ("mrc p15, 0, %0, c15, c0, 0"
-> > -            : "=r" (tmp) : : "cc");
-> > -
-> > -       save_arm_register[0] = tmp;
-> > -
-> > -       /* Save Diagnostic register */
-> > -       asm ("mrc p15, 0, %0, c15, c0, 1"
-> > -            : "=r" (tmp) : : "cc");
-> > -
-> > -       save_arm_register[1] = tmp;
-> > -}
-> > -
-> > -static void exynos_cpu_restore_register(void)
-> > -{
-> > -       unsigned long tmp;
-> > -
-> > -       /* Restore Power control register */
-> > -       tmp = save_arm_register[0];
-> > -
-> > -       asm volatile ("mcr p15, 0, %0, c15, c0, 0"
-> > -                     : : "r" (tmp)
-> > -                     : "cc");
-> > -
-> > -       /* Restore Diagnostic register */
-> > -       tmp = save_arm_register[1];
-> > -
-> > -       asm volatile ("mcr p15, 0, %0, c15, c0, 1"
-> > -                     : : "r" (tmp)
-> > -                     : "cc");
-> > -}
-> > -
-> >  static int exynos_cpu_suspend(unsigned long arg)
-> >  {
-> >  #ifdef CONFIG_CACHE_L2X0
-> > @@ -238,9 +199,6 @@ static int exynos_pm_suspend(void)
-> >         tmp = (S5P_USE_STANDBY_WFI0 | S5P_USE_STANDBY_WFE0);
-> >         pmu_raw_writel(tmp, S5P_CENTRAL_SEQ_OPTION);
+> > Tomeu
 > >
-> > -       if (read_cpuid_part() == ARM_CPU_PART_CORTEX_A9)
-> > -               exynos_cpu_save_register();
-> > -
-> >         return 0;
-> >  }
 > >
-> > @@ -272,9 +230,6 @@ static void exynos_pm_resume(void)
-> >         if (exynos_pm_central_resume())
-> >                 goto early_wakeup;
-> >
-> > -       if (read_cpuid_part() == ARM_CPU_PART_CORTEX_A9)
-> > -               exynos_cpu_restore_register();
-> > -
-> >         /* For release retention */
-> >
-> >         pmu_raw_writel((1 << 28), S5P_PAD_RET_MAUDIO_OPTION);
-> > @@ -376,19 +331,14 @@ static int exynos_cpu_pm_notifier(struct notifier_block *self,
-> >
-> >         switch (cmd) {
-> >         case CPU_PM_ENTER:
-> > -               if (cpu == 0) {
-> > +               if (cpu == 0)
-> >                         exynos_pm_central_suspend();
-> > -                       if (read_cpuid_part() == ARM_CPU_PART_CORTEX_A9)
-> > -                               exynos_cpu_save_register();
-> > -               }
-> >                 break;
-> >
-> >         case CPU_PM_EXIT:
-> >                 if (cpu == 0) {
-> > -                       if (read_cpuid_part() == ARM_CPU_PART_CORTEX_A9) {
-> > +                       if (read_cpuid_part() == ARM_CPU_PART_CORTEX_A9)
-> >                                 scu_enable(S5P_VA_SCU);
-> > -                               exynos_cpu_restore_register();
-> > -                       }
-> >                         exynos_pm_central_resume();
-> >                 }
-> >                 break;
+> > On 16 July 2014 10:50, Daniel Drake<drake@endlessm.com>  wrote:
+> >> The ODROID kernel shows that the PMIC interrupt line is hooked up
+> >> to pin GPX3-2.
+> >>
+> >> This is needed for the max77686-irq driver to create the PMIC IRQ
+> >> domain, which is needed by max77686-rtc.
+> >>
+> >> Signed-off-by: Daniel Drake<drake@endlessm.com>
+> >> ---
+> >>   arch/arm/boot/dts/exynos4412-odroid-common.dtsi | 11 +++++++++++
+> >>   1 file changed, 11 insertions(+)
+> >>
+> >> diff --git a/arch/arm/boot/dts/exynos4412-odroid-common.dtsi b/arch/arm/boot/dts/exynos4412-odroid-common.dtsi
+> >> index 6d6d23c..cb6f55f 100644
+> >> --- a/arch/arm/boot/dts/exynos4412-odroid-common.dtsi
+> >> +++ b/arch/arm/boot/dts/exynos4412-odroid-common.dtsi
+> >> @@ -148,6 +148,10 @@
+> >>
+> >>                  max77686: pmic at 09 {
+> >>                          compatible = "maxim,max77686";
+> >> +                       interrupt-parent =<&gpx3>;
+> >> +                       interrupts =<2 0>;
+> >> +                       pinctrl-names = "default";
+> >> +                       pinctrl-0 =<&max77686_irq>;
+> >>                          reg =<0x09>;
+> >>                          #clock-cells =<1>;
+> >>
+> >> @@ -368,4 +372,11 @@
+> >>                  samsung,pins = "gpx1-3";
+> >>                  samsung,pin-pud =<0>;
+> >>          };
+> >> +
+> >> +       max77686_irq: max77686-irq {
+> >> +               samsung,pins = "gpx3-2";
+> >> +               samsung,pin-function =<0>;
+> >> +               samsung,pin-pud =<0>;
+> >> +               samsung,pin-drv =<0>;
+> >> +       };
+> >>   };
 > 
-> Hi Kukjin,
-> Can you take this patch?
+> Thanks, applied this series.
 
-Your cleanup patch won't apply to the current kernels becaouse
-exynos_cpu_pm_notifier() has been removed.  Please resfresh it.
+Unfortunately these patches were applied to v3.18-next/dt-samsung
+branch and not v3.17-samsung-fixes-1 one.
 
-While refreshing it please rebase it on top of my PM_SLEEP=n build
-fixes:
-
-  http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg35430.html
-
-Please also update patch description to point to the generic code
-that does arm diagnostic and power register save/restore code.
+IMHO they should go to upstream ASAP as they fix the boot for
+ODROID boards and they cannot break anything as they are limited
+to ODROID dts files.
 
 Best regards,
 --
