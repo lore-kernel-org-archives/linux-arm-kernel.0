@@ -1,34 +1,46 @@
 From: daniel.thompson@linaro.org (Daniel Thompson)
-Date: Tue, 19 Aug 2014 16:16:40 +0100
-Subject: [PATCH v9 2/9] arm: ep93xx: Enable DEBUG_LL_UART_PL01X
+Date: Tue, 19 Aug 2014 16:16:41 +0100
+Subject: [PATCH v9 3/9] arm: Remove DEBUG_LL_UART_NONE
 In-Reply-To: <1408461407-10429-1-git-send-email-daniel.thompson@linaro.org>
 References: <1408459715-10151-1-git-send-email-daniel.thompson@linaro.org>
  <1408461407-10429-1-git-send-email-daniel.thompson@linaro.org>
-Message-ID: <1408461407-10429-3-git-send-email-daniel.thompson@linaro.org>
+Message-ID: <1408461407-10429-4-git-send-email-daniel.thompson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This defconfig already enables DEBUG_LL and by default DEBUG_LL_UART_NONE
-will be selected (but due to some back compability magic I'd like to
-remove is not actually honoured). DEBUG_LL_UART_PL01X is a much saner
-default.
+Only a very small handful of platforms support DEBUG_LL_UART_NONE but it
+lurks in the menus of every single platform config ready to break the
+build. This is an especial problem for defconfig/oldconfig since it is
+often selected by default.
+
+This patch solves the problem by removing this option. Any platforms
+still depending upon this option must be migrated.
 
 Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
-Acked-by: Arnd Bergmann <arnd@arndb.de>
+Cc: Russell King <linux@arm.linux.org.uk>
 ---
- arch/arm/configs/ep93xx_defconfig | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm/Kconfig.debug | 9 ---------
+ 1 file changed, 9 deletions(-)
 
-diff --git a/arch/arm/configs/ep93xx_defconfig b/arch/arm/configs/ep93xx_defconfig
-index 1b650c8..72233b9 100644
---- a/arch/arm/configs/ep93xx_defconfig
-+++ b/arch/arm/configs/ep93xx_defconfig
-@@ -107,5 +107,6 @@ CONFIG_DEBUG_SPINLOCK=y
- CONFIG_DEBUG_MUTEXES=y
- CONFIG_DEBUG_USER=y
- CONFIG_DEBUG_LL=y
-+CONFIG_DEBUG_LL_UART_PL01X=y
- # CONFIG_CRYPTO_ANSI_CPRNG is not set
- CONFIG_LIBCRC32C=y
+diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+index b11ad54..9c46729 100644
+--- a/arch/arm/Kconfig.debug
++++ b/arch/arm/Kconfig.debug
+@@ -877,15 +877,6 @@ choice
+ 		  This option selects UART0 on VIA/Wondermedia System-on-a-chip
+ 		  devices, including VT8500, WM8505, WM8650 and WM8850.
+ 
+-	config DEBUG_LL_UART_NONE
+-		bool "No low-level debugging UART"
+-		depends on !ARCH_MULTIPLATFORM
+-		help
+-		  Say Y here if your platform doesn't provide a UART option
+-		  above. This relies on your platform choosing the right UART
+-		  definition internally in order for low-level debugging to
+-		  work.
+-
+ 	config DEBUG_ICEDCC
+ 		bool "Kernel low-level debugging via EmbeddedICE DCC channel"
+ 		help
 -- 
 1.9.3
