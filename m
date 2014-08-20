@@ -1,76 +1,29 @@
-From: jonas.jensen@gmail.com (Jonas Jensen)
-Date: Wed, 20 Aug 2014 16:19:02 +0200
-Subject: [PATCH v5 2/2] net: moxa: replace build_skb() with
- netdev_alloc_skb_ip_align() / memcpy()
-In-Reply-To: <1408459784-9385-2-git-send-email-jonas.jensen@gmail.com>
-References: <1408459784-9385-2-git-send-email-jonas.jensen@gmail.com>
-Message-ID: <1408544342-32058-1-git-send-email-jonas.jensen@gmail.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Wed, 20 Aug 2014 16:20:22 +0200
+Subject: [PATCH] mmc: sunxi: Declare ERASE capability
+In-Reply-To: <3728016.4j3Ljjy6eM@dizzy-6.o2s.ch>
+References: <1408541960-14788-1-git-send-email-wens@csie.org>
+ <3728016.4j3Ljjy6eM@dizzy-6.o2s.ch>
+Message-ID: <CAPDyKFq1yzdu19ReECRZzVynHZByN4803WdZ=vjgCnC9F0+MiA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-build_skb() is used to make skbs out of existing RX ring memory
-which is bad because the RX ring is allocated only once, on probe.
-Memory corruption occur because said memory is reclaimed, i.e.
-__kfree_skb() (and eventually put_page()).
+On 20 August 2014 16:10, David Lanzend?rfer <david.lanzendoerfer@o2s.ch> wrote:
+> Hi
+>> Declare ERASE capability so we can use filesystems with the discard
+>> option and the fstrim tool.
+> I totally agree with you that information about such capabilities should be
+> exposed but maybe it would be wiser to use DT instead of hardcoding it?
 
-Replace build_skb() with netdev_alloc_skb_ip_align(), use memcpy(),
-and synchronize DMA memory before passing skb to napi_gro_receive().
+Nope, this is pure software support. No HW config.
 
-Remove SKB_DATA_ALIGN() from RX buffer size while we're at it.
+What we should do future wise, is to remove the MMC_CAP_ERASE
+entirely. Due to current existing bugs, mainly in mmc core layer
+regarding erase, we can't do it yet.
 
-Addresses https://bugzilla.kernel.org/show_bug.cgi?id=69041
+> I mean a WiFi device won't support erase functionality...
 
-Signed-off-by: Jonas Jensen <jonas.jensen@gmail.com>
----
+That's already covered by the mmc core layer. No worries.
 
-Notes:
-    Changes since v4:
-    
-    1. remove SKB_DATA_ALIGN() from RX buffer size
-    
-    Applies to next-20140820
-
- drivers/net/ethernet/moxa/moxart_ether.c | 16 +++++++++++-----
- 1 file changed, 11 insertions(+), 5 deletions(-)
-
-diff --git a/drivers/net/ethernet/moxa/moxart_ether.c b/drivers/net/ethernet/moxa/moxart_ether.c
-index aa45607..06a6fce 100644
---- a/drivers/net/ethernet/moxa/moxart_ether.c
-+++ b/drivers/net/ethernet/moxa/moxart_ether.c
-@@ -226,14 +226,21 @@ static int moxart_rx_poll(struct napi_struct *napi, int budget)
- 		if (len > RX_BUF_SIZE)
- 			len = RX_BUF_SIZE;
- 
--		skb = build_skb(priv->rx_buf[rx_head], priv->rx_buf_size);
-+		dma_sync_single_for_cpu(&ndev->dev,
-+					priv->rx_mapping[rx_head],
-+					priv->rx_buf_size, DMA_FROM_DEVICE);
-+		skb = netdev_alloc_skb_ip_align(ndev, len);
- 		if (unlikely(!skb)) {
--			net_dbg_ratelimited("build_skb failed\n");
-+			net_dbg_ratelimited("netdev_alloc_skb_ip_align failed\n");
- 			priv->stats.rx_dropped++;
- 			priv->stats.rx_errors++;
- 		}
--
-+		memcpy(skb->data, priv->rx_buf[rx_head], len);
- 		skb_put(skb, len);
-+		dma_sync_single_for_device(&ndev->dev,
-+					   priv->rx_mapping[rx_head],
-+					   priv->rx_buf_size, DMA_FROM_DEVICE);
-+
- 		skb->protocol = eth_type_trans(skb, ndev);
- 		napi_gro_receive(&priv->napi, skb);
- 		rx++;
-@@ -466,8 +473,7 @@ static int moxart_mac_probe(struct platform_device *pdev)
- 	spin_lock_init(&priv->txlock);
- 
- 	priv->tx_buf_size = TX_BUF_SIZE;
--	priv->rx_buf_size = RX_BUF_SIZE +
--			    SKB_DATA_ALIGN(sizeof(struct skb_shared_info));
-+	priv->rx_buf_size = RX_BUF_SIZE;
- 
- 	priv->tx_desc_base = dma_alloc_coherent(NULL, TX_REG_DESC_SIZE *
- 						TX_DESC_NUM, &priv->tx_base,
--- 
-1.8.2.1
+Kind regards
+Uffe
