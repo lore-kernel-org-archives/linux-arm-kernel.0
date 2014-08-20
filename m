@@ -1,103 +1,83 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 20 Aug 2014 12:31:39 +0100
-Subject: [PATCH 1/6] Documentation: DT: Add bindings for FSL NS16550A The
- UART
-In-Reply-To: <a446f06690fd4dcfb3a3f978c52b0d6c@BN1PR03MB220.namprd03.prod.outlook.com>
-References: <1408096156-29772-1-git-send-email-bhupesh.sharma@freescale.com>
- <1408096156-29772-2-git-send-email-bhupesh.sharma@freescale.com>
- <20140815104606.GB15621@leverpostej>
- <e0350675b3a6462d87cb06a33a1b6dc9@BN1PR03MB220.namprd03.prod.outlook.com>
- <20140815150344.GA21908@leverpostej>
- <a446f06690fd4dcfb3a3f978c52b0d6c@BN1PR03MB220.namprd03.prod.outlook.com>
-Message-ID: <20140820113139.GB21734@leverpostej>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 20 Aug 2014 12:59:01 +0100
+Subject: [PATCH] mfd: max77686: make interrupts support optional
+In-Reply-To: <53F45C73.1030304@collabora.co.uk>
+References: <1408516009-22106-1-git-send-email-m.szyprowski@samsung.com>
+ <20140820081909.GH4266@lee--X1> <53F45C73.1030304@collabora.co.uk>
+Message-ID: <20140820115901.GJ4266@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Bhupesh,
+On Wed, 20 Aug 2014, Javier Martinez Canillas wrote:
 
-[...]
-
-> > > > -----Original Message-----
-> > > > From: Mark Rutland [mailto:mark.rutland at arm.com]
-> > > > Sent: Friday, August 15, 2014 4:16 PM
-> > > > To: Sharma Bhupesh-B45370
-> > > > Cc: devicetree-discuss at lists.ozlabs.org; Catalin Marinas;
-> > > > arnd at arndb.de; Will Deacon; Yoder Stuart-B08248;
-> > > > grant.likely at secretlab.ca; Basu Arnab- B45036;
-> > > > linux-arm-kernel at lists.infradead.org
-> > > > Subject: Re: [PATCH 1/6] Documentation: DT: Add bindings for FSL
-> > > > NS16550A UART
-> > > >
-> > > > On Fri, Aug 15, 2014 at 10:49:10AM +0100, Bhupesh Sharma wrote:
-> > > > > This patch addss the device-tree documentation for Freescale's
-> > > > > NS16550 UART (also called DUART).
-> > > > >
-> > > > > There is a specific errata fix required in FSL NS16550 UART which
-> > > > > ensures that an random interrupt storm is not observed when a
-> > > > > break is provided as an input to the UART.
-> > > >
-> > > > Should this not go in
-> > > > Documentation/devicetree/bindings/serial/of-serial.txt as with other
-> > > > NS16550A variations?
-> > > >
-> > > > The only code for handling this string seems to live in
-> > > > arch/powerpc/kernel/legacy_serial.c. Is there a patch factoring that
-> > > > out into common code? Or is the erratum not applicable to the
-> > > > revision used in your ARMv8 SoC?
-> > > >
-> > >
-> > > The FSL specific 8250 (or NS16550A0 driver) at path
-> > > drivers/tty/serial/8250/8250_fsl.c
-> > > uses this string and provides the code to handle the erratum (see [1])
-> > 
-> > While the workaround itself is in that file, as far as I can see the
-> > detection and setup is not. Even in next-20140815 it seems that only
-> > happens in arch/powerpc/kernel/legacy_serial.c (see [2]):
-> > 
-> > [mark at leverpostej:~/src/linux]% git grep fsl8250_handle_irq next-20140815
-> > next-20140815:arch/powerpc/kernel/legacy_serial.c:              port-
-> > >handle_irq = fsl8250_handle_irq;
-> > next-20140815:drivers/tty/serial/8250/8250_fsl.c:int
-> > fsl8250_handle_irq(struct uart_port *port) next-
-> > 20140815:include/linux/serial_8250.h:extern int fsl8250_handle_irq(struct
-> > uart_port *port);
-> > 
-> > I cannot see any use of the string outside of arch/powerpc:
-> > 
-> > [mark at leverpostej:~/src/linux]% git grep fsl,ns16550 next-20140815 | wc -l
-> > 102
-> > [mark at leverpostej:~/src/linux]% git grep fsl,ns16550 next-20140815 --
-> > arch/powerpc | wc -l
-> > 102
-> > 
-> > Am I missing something? Perhaps some macro is getting in the way of a
-> > simple grep.
-> > 
-> > > The NS16550 UART present on our SoC and the corresponding simulator
-> > > model has this erratum and hence the specific way in which IRQ are
-> > > handled (fsl8250_handle_irq) by the driver (in [1]) is applicable here
-> > as well.
-> > 
-> > Assuming I've not missed something, do you need to factor out the
-> > detection and setup? Do things just happen to work on the simulator
-> > without the workaround?
+> Hello Lee, Marek,
 > 
-> You are right. The simulator platform doesn't take into account the
-> erratum, however we need to take is into account for the emulator and
-> silicon platforms.
+> On 08/20/2014 10:19 AM, Lee Jones wrote:
+> > On Wed, 20 Aug 2014, Marek Szyprowski wrote:
+> > 
+> >> Commit 6f1c1e71d93 ("mfd: max77686: Convert to use regmap_irq") broke
+> >> support for boards, which provide no irq for MAX 77686 PMIC. In such
+> >> case, not all functions of PMIC are available, but the driver still
+> >> should at least handle voltage regulators instead of failing to init.
+> >> This patch restores previous behavior.
+> >> 
+> >> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> >> ---
+> >> Hello,
+> >> 
+> >> This patch fixes booting issues with recently merged support for
+> >> Exynos4412 based Odroid X2/U3 boards. See
+> >> http://www.spinics.net/lists/linux-samsung-soc/msg35773.html
+> >> thread for more details.
+> >> 
+> >> Best regards
+> >> Marek Szyprowski
+> >> Samsung R&D Institute Poland
 > 
-> I am currently working to fork this out into a common code base so
-> that both PPC and ARM platforms can use the same and a patch for the
-> same is in my to-do list.
->
-> So, I sent out the DT documentation patch early (as it is equally
-> applicable to  both PPC and ARM platforms) and the patch that makes
-> this code leg usable for both ARM and PPC platform will follow soon.
+> I already gave my opinion about this patch on thread:
+> 
+> "[PATCH v2 0/4] Add Exynos4412 based Odroid X2 and U2/U3/U3+ support"
+> 
+> where the issue was reported by Olof but I'll add it here as well for
+> completeness since I don't know if the same people are cc'ed on both threads.
+> 
+> Bartlomiej Zolnierkiewicz posted a similar patch [0] before but as I said
+> on that thread, I'm not sure if is correct to make that DT property
+> optional. Or rather, if we need to make it optional then we should also
+> change the Documentation/devicetree/bindings/mfd/max77686.txt that list
+> "interrupts" DT property as required.
+> 
+> It's true that before converting the max77686 to use the regmap irq API,
+> the driver was loose on that regard but max77686_irq_init() in
+> max77686-irq.c was returning -ENODEV when the IRQ was not provided and
+> that error code was not checked in max77686_i2c_probe() (which was a bug
+> IMHO).
+> 
+> More importantly I wonder if a design where a IRQ line is not connected to
+> the max77686 PMIC makes even sense. If such a design is possible then the
+> "interrupt" property should be made optional but if not then I think that
+> the driver should fail to probe in that case. Yes, it is a regression but
+> the Odroid DTS was not following the DT binding and was just lucky that
+> the driver was not checking the required DT properties.
+> 
+> Daniel Drake posted the correct fix for the Odroid DTS [1]. So I tend to
+> say that Daniel's fix should be added as a -rc fix and we should keep both
+> the max77686 driver and its DT binding as it is now but as I said, if from
+> a hardware point of view makes sense to leave that line unconnected then I
+> don't oppose to this change.
 
-Ok.
+I wasn't aware that this had already been discussed.
 
-My only issue with the DT binding is the placement; I think that should
-live with the other NS16550A variations.
+FWIW, I agree with everything you just said, so unless someone insists
+that the device can be functional without an IRQ line, I'm going to
+shelve (not accept) this patch.
 
-Cheers,
-Mark.
+> [0]: https://lkml.org/lkml/2014/8/7/374
+> [1]:
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2014-July/272869.html
+
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
