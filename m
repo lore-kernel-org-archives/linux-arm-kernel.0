@@ -1,76 +1,77 @@
-From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
-Date: Wed, 20 Aug 2014 11:49:24 +0200
-Subject: [PATCH 5/6] ARM: dts: Add vmmc and vqmmc supplies for Peach Pit
- and Pi boards
-In-Reply-To: <CAD=FV=V9oct-iJ==1SLdxusq68AY3utMQF+MbX0Uf+2dC0mwww@mail.gmail.com>
-References: <1408460913-13863-1-git-send-email-javier.martinez@collabora.co.uk>	<1408460913-13863-6-git-send-email-javier.martinez@collabora.co.uk>
- <CAD=FV=V9oct-iJ==1SLdxusq68AY3utMQF+MbX0Uf+2dC0mwww@mail.gmail.com>
-Message-ID: <53F46F24.9020800@collabora.co.uk>
+From: long.wanglong@huawei.com (Wang Long)
+Date: Wed, 20 Aug 2014 17:50:02 +0800
+Subject: [PATCH] ARM: avoid corrupts register in mcaro kputc kphex etc.
+Message-ID: <1408528202-152139-1-git-send-email-long.wanglong@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Doug,
+when use macro 'kputc' kphex' to print the content of
+register r0-r3, they will corrupts these registers.
 
-On 08/19/2014 06:26 PM, Doug Anderson wrote:
-> 
-> While your change is correct, I have a worry that it will break things
-> if it's merged before some patches that Yuvaraj is working on.
-> 
-> Specifically the problem on pit and pi (and any exynos5250 / 5420 /
-> 5800 / ... boards using the built-in "card detect") is that the card
-> detect line is on the same power rail as "vqmmc".  That means you
-> can't turn off vqmmc if you still need to be able to detect card
-> insertions.
-> 
-> ...but you can't turn off vmmc without turning off vqmmc, otherwise
-> current will leak through the IO lines into the card, which is bad.
-> 
-> 
-> Right now the SDMMC core will try to turn off power to the card at two times:
-> 1. when the card is ejected
-> 2. when it's trying to reset the card
-> 
-> 
-> Obviously the first problem is a huge problem on exynos because it
-> means that we won't be able to detect card insertions.  ...but we
-> still want to turn the power off from #2.  To really fix the problem I
-> think the core needs to be extended to treat the above as two separate
-> cases.
->
+the same as the macro 'debug_reloc_start' and 'debug_reloc_end'.
 
-Thanks a lot for the explanation, now I remember reading about this on
-thread "[PATCH 2/3] mmc: dw_mmc: Dont cut off vqmmc and vmmc" [0] but
-didn't think in the side effect when adding this patch...
+so using 'push' when enter the macro and 'pop' when leave
+the macro to fix it.
 
-> 
-> Your patch might work at the moment because I think dw_mmc doesn't
-> actually try to turn off these rails with the main SDMMC core asks it
-> to.  ...but I still worry about merging them before Yuvaraj's changes
-> are ready.
-> 
+Signed-off-by: Wang Long <long.wanglong@huawei.com>
+---
+ arch/arm/boot/compressed/head.S | 9 +++++++++
+ 1 file changed, 9 insertions(+)
 
-Agreed, I'll drop this patch and wait for Yuvaraj's series to land first.
-
-Yuvaraj's "UHS support for dw_mmc driver" series that should contain the
-change you are referring had the issue that when the tps65090 fet4 was
-used as vmmc-supply, mmc_regulator_get_supply() was failing.
-
-I posted a bunch of patches to fix that issue and there were already
-merged on the relevant trees and shows on linux-next:
-
-e1da8cd mmc: core: Use regulator_get_voltage() if OCR mask is empty.
-a130548 ARM: dts: Improve Peach Pit and Pi power scheme
-4f2352c regulator: tps65090: Set voltage for fixed regulators
-26988ef regulator: core: Allow to get voltage count and list from parent
-e303996 regulator: core: Get voltage from parent if not available
-
-So hopefully his series have no blockers anymore.
-
-> 
-> -Doug
-> 
-
-Best regards,
-Javier
-
-[0]: https://www.mail-archive.com/linux-mmc at vger.kernel.org/msg27152.html
+diff --git a/arch/arm/boot/compressed/head.S b/arch/arm/boot/compressed/head.S
+index 413fd94..aa57a09 100644
+--- a/arch/arm/boot/compressed/head.S
++++ b/arch/arm/boot/compressed/head.S
+@@ -19,6 +19,7 @@
+  * 100% relocatable.  Any attempt to do so will result in a crash.
+  * Please select one of the following when turning on debugging.
+  */
++#define DEBUG
+ #ifdef DEBUG
+ 
+ #if defined(CONFIG_DEBUG_ICEDCC)
+@@ -69,18 +70,23 @@
+ #endif
+ 
+ 		.macro	kputc,val
++		push	{r0-r3}
+ 		mov	r0, \val
+ 		bl	putc
++		pop	{r0-r3}
+ 		.endm
+ 
+ 		.macro	kphex,val,len
++		push	{r0-r3}
+ 		mov	r0, \val
+ 		mov	r1, #\len
+ 		bl	phex
++		pop	{r0-r3}
+ 		.endm
+ 
+ 		.macro	debug_reloc_start
+ #ifdef DEBUG
++		push	{r0-r3}
+ 		kputc	#'\n'
+ 		kphex	r6, 8		/* processor id */
+ 		kputc	#':'
+@@ -97,15 +103,18 @@
+ 		kputc	#'>'
+ 		kphex	r4, 8		/* kernel execution address */
+ 		kputc	#'\n'
++		pop	{r0-r3}
+ #endif
+ 		.endm
+ 
+ 		.macro	debug_reloc_end
+ #ifdef DEBUG
++		push    {r0-r3,r10-r12}
+ 		kphex	r5, 8		/* end of kernel */
+ 		kputc	#'\n'
+ 		mov	r0, r4
+ 		bl	memdump		/* dump 256 bytes at start of kernel */
++		pop	{r0-r3,r10-r12}
+ #endif
+ 		.endm
+ 
+-- 
+1.8.3.4
