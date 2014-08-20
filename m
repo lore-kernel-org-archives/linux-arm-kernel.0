@@ -1,57 +1,104 @@
-From: magnus.damm@gmail.com (Magnus Damm)
-Date: Wed, 20 Aug 2014 17:45:04 +0900
-Subject: [PATCH v2 1/5] ARM: shmobile: r8a7740: Add CMT1 device to DT
-In-Reply-To: <20140819231144.GA27115@verge.net.au>
-References: <1407801882-2561-1-git-send-email-horms+renesas@verge.net.au>
- <1407801882-2561-2-git-send-email-horms+renesas@verge.net.au>
- <CANqRtoTBJOZEFoOg+YmfyovCGDTa43Qs77OW-qd9YQLFq3tQ3A@mail.gmail.com>
- <CAMuHMdXTa8dG0L2xLNELn3R310PJc+HotHwJZsaqPzuWQRJf5A@mail.gmail.com>
- <CANqRtoQ-g906KNRGjx_6nuX_E8COSunXMDZQUZkPUFzBUTZFgA@mail.gmail.com>
- <20140819231144.GA27115@verge.net.au>
-Message-ID: <CANqRtoR1xemQbs4t0HmFfLAvO+1mdRAf_etwp8R5dQ0Y9SjZaw@mail.gmail.com>
+From: boris.brezillon@free-electrons.com (Boris BREZILLON)
+Date: Wed, 20 Aug 2014 11:06:25 +0200
+Subject: [PATCH 3/3] ARM: at91/tclib: mask interruptions at shutdown and
+ probe
+In-Reply-To: <20140820082818.GB15414@ulmo>
+References: <1408486072-19268-1-git-send-email-gael.portay@gmail.com>
+ <1408486072-19268-4-git-send-email-gael.portay@gmail.com>
+ <776D4128-09AC-418C-A710-28A2522D1D63@jcrosoft.com>
+ <20140820010130.10974326@bbrezillon> <20140820073111.GH13793@ulmo>
+ <20140820101422.3e8da816@bbrezillon> <20140820082818.GB15414@ulmo>
+Message-ID: <20140820110625.17f77c9f@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Simon,
+On Wed, 20 Aug 2014 10:28:20 +0200
+Thierry Reding <thierry.reding@gmail.com> wrote:
 
-On Wed, Aug 20, 2014 at 8:11 AM, Simon Horman <horms@verge.net.au> wrote:
-> On Tue, Aug 19, 2014 at 07:17:33PM +0900, Magnus Damm wrote:
->> On Tue, Aug 19, 2014 at 4:29 PM, Geert Uytterhoeven
->> <geert@linux-m68k.org> wrote:
->> > On Tue, Aug 19, 2014 at 8:39 AM, Magnus Damm <magnus.damm@gmail.com> wrote:
->> >>>  arch/arm/boot/dts/r8a7740.dtsi | 12 ++++++++++++
->> >>>  1 file changed, 12 insertions(+)
->> >>>
->> >>> diff --git a/arch/arm/boot/dts/r8a7740.dtsi b/arch/arm/boot/dts/r8a7740.dtsi
->> >>> index 6cd6a46..1067a96 100644
->> >>> --- a/arch/arm/boot/dts/r8a7740.dtsi
->> >>> +++ b/arch/arm/boot/dts/r8a7740.dtsi
->> >>> @@ -41,6 +41,18 @@
->> >>>                 interrupts = <0 83 IRQ_TYPE_LEVEL_HIGH>;
->> >>>         };
->> >>>
->> >>> +       cmt1: timer at e6138000 {
->> >>> +               compatible = "renesas,cmt-48";
->> >>
->> >> Do we want to have the "r8a7740" in the compatible string somewhere?
->> >
->> > Documentation/devicetree/bindings/timer/renesas,cmt.txt does not
->> > mention compatible properties containing SoC names.
->>
->> Right, that seems to be missing from the timers. Is there any reason
->> why we need to treat those in a special way?
->>
->> In my mind this timer case is similar to various SCIF variants
->> documented in Documentation/devicetree/bindings/serial/renesas,sci-serial.txt
->> - in the case of SCIF we have SoC name in the binding documentation.
->
-> FWIW, now you mention it I agree with your point.
-> But I am interested to hear if Laurent had a specific reason for this.
->
-> If it is an oversight then I recommend correcting it as a series
-> of add-on patches, even for the r8a7740. That will avoid adding
-> more dependencies to this series.
+> On Wed, Aug 20, 2014 at 10:14:22AM +0200, Boris BREZILLON wrote:
+> > Hi Thierry,
+> > 
+> > On Wed, 20 Aug 2014 09:31:13 +0200
+> > Thierry Reding <thierry.reding@gmail.com> wrote:
+> > 
+> > > On Wed, Aug 20, 2014 at 01:01:30AM +0200, Boris BREZILLON wrote:
+> > > > Hi Jean-Christophe,
+> > > > 
+> > > > On Wed, 20 Aug 2014 06:11:17 +0800
+> > > > Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com> wrote:
+> > > > 
+> > > > > Hi,
+> > > > > 
+> > > > > 	This is a bit weird as the clock of the TC should be off and the irq free
+> > > > > 
+> > > > > 	so this should never happened we need to investigate more why this append
+> > > > 
+> > > > I may have found the source of this bug.
+> > > > 
+> > > > As Gael stated, when you're kexec-ing a new kernel your previous kernel
+> > > > could be using the tbc_clksrc driver (and especially the clkevent
+> > > > device). Thus the kernel might have planned a timer event and then been
+> > > > asked to shutdown the machine (requested by the kexec code).
+> > > > In this case the AIC interrupt connected to the TC Block is disabled
+> > > > but not the interrupts within the TCB IP (IDR registers), possibly
+> > > > leaving a pending interrupt before booting the new kernel.
+> > > > 
+> > > > When the tcb_clksrc driver is loaded by the new kernel it enables the
+> > > > interrupt line by calling setup_irq [1] while the clockevent device is
+> > > > not registered yet [2]. Thus the event_handler is still NULL when the
+> > > > AIC line connected to the TCB is unmasked. Remember that an interrupt
+> > > > is still pending on this HW block, which will lead to an immediate call
+> > > > to the ch2_irq handler, which tries to call the event_handler, which in
+> > > > turns is NULL because clkevent device registration has not taken place
+> > > > at this moment => Kernel panic.
+> > > > ITOH, we can't register the clkevent device before the irq handler is
+> > > > set up, because we should be ready to handle clkevent request at the
+> > > > time clockevents_config_and_register is called.
+> > > > 
+> > > > This leaves two solution:
+> > > >  1) disable the TCB irqs (using TCB IDR registers) before calling
+> > > >  setup_irq in the tcb_clksrc driver
+> > > >  2) disable the TCB irqs at the tclib level (as proposed by Gael)
+> > > > 
+> > > > I prefer solution #2 because it fixes the bug for all TCB users (not
+> > > > just the tcb_clksrc driver).
+> > > 
+> > > Wouldn't a more proper fix be to only enable the IRQ (setup_irq()) once
+> > > everything has properly been set up? That's certainly how all other
+> > > drivers are doing this. Generally I think it's best to assume that an
+> > > interrupt can fire at any point after it's been enabled, so everything
+> > > should be set up prior to enabling it.
+> > 
+> > Sure. And, AFAIK, another common practice is to disable all interrupts
+> > and acknowledge all pending interrupts before registering a new irq
+> > handler to avoid inheriting peripheral dirty state from previous usage
+> > (either the bootloader, or the previous kernel when using kexec).
+> 
+> Discarding all pending interrupts may not always be what we want. And
+> masking interrupts prior to registering the handler isn't always going
+> to work either (shared interrupts), so device drivers should always set
+> things up in the correct order.
+> 
 
-Sure, sounds good. Thanks!
+I meant disabling/acknowledging interrupts within the HW block not
+the interrupt line connected to the interrupt controller (which indeed
+can be shared among several peripherals).
+The TCB IP provides SR (Status Register) to acknowledge interrupts at
+the TCB level and IER/IDR/ISR (Interrupt Enable/Disable/Status
+Register) to manipulate TCB interrupts.
 
-/ magnus
+> > This being said, I really think we should leave the HW in a clean state
+> > when shutdown is called. And disabling interrupts at the tclib level
+> > (in a shutdown callback) ensure that.
+> 
+> Yes, cleaning up the hardware and disabling interrupts upon shutdown
+> seems like a good idea to me in addition to the above.
+> 
+> Thierry
+
+
+
+-- 
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
