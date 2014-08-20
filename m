@@ -1,56 +1,72 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Wed, 20 Aug 2014 09:29:35 +0200
-Subject: [PATCH] mmc: atmel-mci: add 0x600 IP version
-In-Reply-To: <53F39F3A.1090704@atmel.com>
-References: <1402559265-18340-1-git-send-email-ludovic.desroches@atmel.com>
- <53F39F3A.1090704@atmel.com>
-Message-ID: <CAPDyKFopHQzYuCjC09i0QYJ92FhXskN7TtQOkYEd5_o4JMJKSw@mail.gmail.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Wed, 20 Aug 2014 09:31:13 +0200
+Subject: [PATCH 3/3] ARM: at91/tclib: mask interruptions at shutdown and
+ probe
+In-Reply-To: <20140820010130.10974326@bbrezillon>
+References: <1408486072-19268-1-git-send-email-gael.portay@gmail.com>
+ <1408486072-19268-4-git-send-email-gael.portay@gmail.com>
+ <776D4128-09AC-418C-A710-28A2522D1D63@jcrosoft.com>
+ <20140820010130.10974326@bbrezillon>
+Message-ID: <20140820073111.GH13793@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19 August 2014 21:02, Nicolas Ferre <nicolas.ferre@atmel.com> wrote:
-> On 12/06/2014 02:47, Ludovic Desroches :
->> From: Nicolas Ferre <nicolas.ferre@atmel.com>
->>
->> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
->> Acked-by: Ludovic Desroches <ludovic.desroches@atmel.com>
->
-> Chris, Ufl,
->
-> It seems that this tiny patch got forgotten: Should we re-send it?
->
-> Thanks, bye,
+On Wed, Aug 20, 2014 at 01:01:30AM +0200, Boris BREZILLON wrote:
+> Hi Jean-Christophe,
+> 
+> On Wed, 20 Aug 2014 06:11:17 +0800
+> Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com> wrote:
+> 
+> > Hi,
+> > 
+> > 	This is a bit weird as the clock of the TC should be off and the irq free
+> > 
+> > 	so this should never happened we need to investigate more why this append
+> 
+> I may have found the source of this bug.
+> 
+> As Gael stated, when you're kexec-ing a new kernel your previous kernel
+> could be using the tbc_clksrc driver (and especially the clkevent
+> device). Thus the kernel might have planned a timer event and then been
+> asked to shutdown the machine (requested by the kexec code).
+> In this case the AIC interrupt connected to the TC Block is disabled
+> but not the interrupts within the TCB IP (IDR registers), possibly
+> leaving a pending interrupt before booting the new kernel.
+> 
+> When the tcb_clksrc driver is loaded by the new kernel it enables the
+> interrupt line by calling setup_irq [1] while the clockevent device is
+> not registered yet [2]. Thus the event_handler is still NULL when the
+> AIC line connected to the TCB is unmasked. Remember that an interrupt
+> is still pending on this HW block, which will lead to an immediate call
+> to the ch2_irq handler, which tries to call the event_handler, which in
+> turns is NULL because clkevent device registration has not taken place
+> at this moment => Kernel panic.
+> ITOH, we can't register the clkevent device before the irq handler is
+> set up, because we should be ready to handle clkevent request at the
+> time clockevents_config_and_register is called.
+> 
+> This leaves two solution:
+>  1) disable the TCB irqs (using TCB IDR registers) before calling
+>  setup_irq in the tcb_clksrc driver
+>  2) disable the TCB irqs at the tclib level (as proposed by Gael)
+> 
+> I prefer solution #2 because it fixes the bug for all TCB users (not
+> just the tcb_clksrc driver).
 
-Sorry for delay.
+Wouldn't a more proper fix be to only enable the IRQ (setup_irq()) once
+everything has properly been set up? That's certainly how all other
+drivers are doing this. Generally I think it's best to assume that an
+interrupt can fire at any point after it's been enabled, so everything
+should be set up prior to enabling it.
 
-I have applied it for next now. Thanks!
+Also, does anyone know why this driver uses setup_irq() rather than the
+more idiomatic request_irq()?
 
-Kind regards
-Uffe
-
->
->> ---
->>  drivers/mmc/host/atmel-mci.c |    1 +
->>  1 file changed, 1 insertion(+)
->>
->> diff --git a/drivers/mmc/host/atmel-mci.c b/drivers/mmc/host/atmel-mci.c
->> index 1b4b064..9c4c191 100644
->> --- a/drivers/mmc/host/atmel-mci.c
->> +++ b/drivers/mmc/host/atmel-mci.c
->> @@ -2306,6 +2306,7 @@ static void __init atmci_get_cap(struct atmel_mci *host)
->>
->>       /* keep only major version number */
->>       switch (version & 0xf00) {
->> +     case 0x600:
->>       case 0x500:
->>               host->caps.has_odd_clk_div = 1;
->>       case 0x400:
->>
->
->
-> --
-> Nicolas Ferre
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-mmc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140820/67449f7a/attachment.sig>
