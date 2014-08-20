@@ -1,105 +1,115 @@
 From: dianders@chromium.org (Doug Anderson)
-Date: Wed, 20 Aug 2014 11:54:00 -0700
-Subject: [PATCH v4 2/4] ARM: rockchip: rk3288: Switch to use the proper PWM IP
+Date: Wed, 20 Aug 2014 11:54:01 -0700
+Subject: [PATCH v4 3/4] ARM: dts: Add main PWM info to rk3288
 In-Reply-To: <1408560842-3746-1-git-send-email-dianders@chromium.org>
 References: <1408560842-3746-1-git-send-email-dianders@chromium.org>
-Message-ID: <1408560842-3746-3-git-send-email-dianders@chromium.org>
+Message-ID: <1408560842-3746-4-git-send-email-dianders@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The rk3288 SoC has an option to switch all of the PWMs in the system
-between the old IP block and the new IP block.  The rk3288 PWM driver
-is written for the new block, so make sure that we enable the new
-block in the GRF (general register file) when the PWM driver probes.
+This adds the PWM info (other than the VOP PWM) to the main rk3288
+dtsi file.
 
-We emulate the solution to this problem used in i2c-rk3x.c.  One
-difference for the PWM is that there's a single "enable new IP" that's
-used for all 4 PWMs.  That means we set this bit 4 times if we've got
-all 4 PWMs enabled.  That shouldn't hurt.
-
+Signed-off-by: Caesar Wang <caesar.wang@rock-chips.com>
 Signed-off-by: Doug Anderson <dianders@chromium.org>
 ---
 Changes in v4:
-- Totally rewrote to go in the PWM driver.
-- Reordered IP switch to be atop invert patch.
+- Add rockchip,grf to pwm nodes.
 
 Changes in v3: None
-Changes in v2:
-- Check for failed ioremap()
+Changes in v2: None
 
- .../devicetree/bindings/pwm/pwm-rockchip.txt       |  4 +++
- drivers/pwm/pwm-rockchip.c                         | 29 ++++++++++++++++++++++
- 2 files changed, 33 insertions(+)
+ arch/arm/boot/dts/rk3288.dtsi | 72 +++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 72 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/pwm/pwm-rockchip.txt b/Documentation/devicetree/bindings/pwm/pwm-rockchip.txt
-index b8be3d0..39190ec 100644
---- a/Documentation/devicetree/bindings/pwm/pwm-rockchip.txt
-+++ b/Documentation/devicetree/bindings/pwm/pwm-rockchip.txt
-@@ -10,6 +10,10 @@ Required properties:
-  - #pwm-cells: must be 2 (rk2928) or 3 (rk3288). See pwm.txt in this directory
-    for a description of the cell format.
+diff --git a/arch/arm/boot/dts/rk3288.dtsi b/arch/arm/boot/dts/rk3288.dtsi
+index 36be7bb..9074205 100644
+--- a/arch/arm/boot/dts/rk3288.dtsi
++++ b/arch/arm/boot/dts/rk3288.dtsi
+@@ -261,6 +261,54 @@
+ 		status = "disabled";
+ 	};
  
-+Required for "rockchip,rk3288-pwm":
-+ - rockchip,grf : the phandle of the syscon node for the general register
-+		  file (GRF)
++	pwm0: pwm at ff680000 {
++		compatible = "rockchip,rk3288-pwm";
++		reg = <0xff680000 0x10>;
++		#pwm-cells = <3>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&pwm0_pin>;
++		clocks = <&cru PCLK_PWM>;
++		clock-names = "pwm";
++		rockchip,grf = <&grf>;
++		status = "disabled";
++	};
 +
- Example:
- 
- 	pwm0: pwm at 20030000 {
-diff --git a/drivers/pwm/pwm-rockchip.c b/drivers/pwm/pwm-rockchip.c
-index 9442df2..08cbde6 100644
---- a/drivers/pwm/pwm-rockchip.c
-+++ b/drivers/pwm/pwm-rockchip.c
-@@ -16,7 +16,12 @@
- #include <linux/of_device.h>
- #include <linux/platform_device.h>
- #include <linux/pwm.h>
-+#include <linux/regmap.h>
- #include <linux/time.h>
-+#include <linux/mfd/syscon.h>
++	pwm1: pwm at ff680010 {
++		compatible = "rockchip,rk3288-pwm";
++		reg = <0xff680010 0x10>;
++		#pwm-cells = <3>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&pwm1_pin>;
++		clocks = <&cru PCLK_PWM>;
++		clock-names = "pwm";
++		rockchip,grf = <&grf>;
++		status = "disabled";
++	};
 +
-+#define RK3288_GRF_PWM_ENABLE_OFFSET	0x024c
-+#define RK3288_GRF_PWM_ENABLE_BIT	0
- 
- #define PWM_CTRL_TIMER_EN	(1 << 0)
- #define PWM_CTRL_OUTPUT_EN	(1 << 3)
-@@ -231,6 +236,7 @@ MODULE_DEVICE_TABLE(of, rockchip_pwm_dt_ids);
- 
- static int rockchip_pwm_probe(struct platform_device *pdev)
- {
-+	struct device_node *np = pdev->dev.of_node;
- 	const struct of_device_id *id;
- 	struct rockchip_pwm_chip *pc;
- 	struct resource *r;
-@@ -240,6 +246,29 @@ static int rockchip_pwm_probe(struct platform_device *pdev)
- 	if (!id)
- 		return -EINVAL;
- 
-+	/*
-+	 * Switch to new interface on rk3288.
-+	 * The control bit is located in the GRF register space.
-+	 */
-+	if (of_device_is_compatible(np, "rockchip,rk3288-pwm")) {
-+		struct regmap *grf;
++	pwm2: pwm at ff680020 {
++		compatible = "rockchip,rk3288-pwm";
++		reg = <0xff680020 0x10>;
++		#pwm-cells = <3>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&pwm2_pin>;
++		clocks = <&cru PCLK_PWM>;
++		clock-names = "pwm";
++		rockchip,grf = <&grf>;
++		status = "disabled";
++	};
 +
-+		grf = syscon_regmap_lookup_by_phandle(np, "rockchip,grf");
-+		if (IS_ERR(grf)) {
-+			dev_err(&pdev->dev, "Missing rockchip,grf property\n");
-+			return PTR_ERR(grf);
-+		}
++	pwm3: pwm at ff680030 {
++		compatible = "rockchip,rk3288-pwm";
++		reg = <0xff680030 0x10>;
++		#pwm-cells = <2>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&pwm3_pin>;
++		clocks = <&cru PCLK_PWM>;
++		clock-names = "pwm";
++		rockchip,grf = <&grf>;
++		status = "disabled";
++	};
 +
-+		/* Set bit 16 for write mask, 0 for switch to new IP */
-+		ret = regmap_write(grf, RK3288_GRF_PWM_ENABLE_OFFSET,
-+				   BIT(RK3288_GRF_PWM_ENABLE_BIT + 16) |
-+				   BIT(RK3288_GRF_PWM_ENABLE_BIT));
-+		if (ret != 0) {
-+			dev_err(&pdev->dev, "Could not access GRF: %d\n", ret);
-+			return ret;
-+		}
-+	}
+ 	pmu: power-management at ff730000 {
+ 		compatible = "rockchip,rk3288-pmu", "syscon";
+ 		reg = <0xff730000 0x100>;
+@@ -611,5 +659,29 @@
+ 				rockchip,pins = <5 15 3 &pcfg_pull_none>;
+ 			};
+ 		};
 +
- 	pc = devm_kzalloc(&pdev->dev, sizeof(*pc), GFP_KERNEL);
- 	if (!pc)
- 		return -ENOMEM;
++		pwm0 {
++			pwm0_pin: pwm0-pin {
++				rockchip,pins = <7 0 RK_FUNC_1 &pcfg_pull_none>;
++			};
++		};
++
++		pwm1 {
++			pwm1_pin: pwm1-pin {
++				rockchip,pins = <7 1 RK_FUNC_1 &pcfg_pull_none>;
++			};
++		};
++
++		pwm2 {
++			pwm2_pin: pwm2-pin {
++				rockchip,pins = <7 22 RK_FUNC_3 &pcfg_pull_none>;
++			};
++		};
++
++		pwm3 {
++			pwm3_pin: pwm3-pin {
++				rockchip,pins = <7 23 RK_FUNC_3 &pcfg_pull_none>;
++			};
++		};
+ 	};
+ };
 -- 
 2.1.0.rc2.206.gedb03e5
