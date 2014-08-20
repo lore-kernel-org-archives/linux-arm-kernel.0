@@ -1,93 +1,72 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Wed, 20 Aug 2014 10:28:20 +0200
-Subject: [PATCH 3/3] ARM: at91/tclib: mask interruptions at shutdown and
- probe
-In-Reply-To: <20140820101422.3e8da816@bbrezillon>
-References: <1408486072-19268-1-git-send-email-gael.portay@gmail.com>
- <1408486072-19268-4-git-send-email-gael.portay@gmail.com>
- <776D4128-09AC-418C-A710-28A2522D1D63@jcrosoft.com>
- <20140820010130.10974326@bbrezillon> <20140820073111.GH13793@ulmo>
- <20140820101422.3e8da816@bbrezillon>
-Message-ID: <20140820082818.GB15414@ulmo>
+From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
+Date: Wed, 20 Aug 2014 10:29:39 +0200
+Subject: [PATCH] mfd: max77686: make interrupts support optional
+In-Reply-To: <20140820081909.GH4266@lee--X1>
+References: <1408516009-22106-1-git-send-email-m.szyprowski@samsung.com>
+ <20140820081909.GH4266@lee--X1>
+Message-ID: <53F45C73.1030304@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 20, 2014 at 10:14:22AM +0200, Boris BREZILLON wrote:
-> Hi Thierry,
+Hello Lee, Marek,
+
+On 08/20/2014 10:19 AM, Lee Jones wrote:
+> On Wed, 20 Aug 2014, Marek Szyprowski wrote:
 > 
-> On Wed, 20 Aug 2014 09:31:13 +0200
-> Thierry Reding <thierry.reding@gmail.com> wrote:
-> 
-> > On Wed, Aug 20, 2014 at 01:01:30AM +0200, Boris BREZILLON wrote:
-> > > Hi Jean-Christophe,
-> > > 
-> > > On Wed, 20 Aug 2014 06:11:17 +0800
-> > > Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com> wrote:
-> > > 
-> > > > Hi,
-> > > > 
-> > > > 	This is a bit weird as the clock of the TC should be off and the irq free
-> > > > 
-> > > > 	so this should never happened we need to investigate more why this append
-> > > 
-> > > I may have found the source of this bug.
-> > > 
-> > > As Gael stated, when you're kexec-ing a new kernel your previous kernel
-> > > could be using the tbc_clksrc driver (and especially the clkevent
-> > > device). Thus the kernel might have planned a timer event and then been
-> > > asked to shutdown the machine (requested by the kexec code).
-> > > In this case the AIC interrupt connected to the TC Block is disabled
-> > > but not the interrupts within the TCB IP (IDR registers), possibly
-> > > leaving a pending interrupt before booting the new kernel.
-> > > 
-> > > When the tcb_clksrc driver is loaded by the new kernel it enables the
-> > > interrupt line by calling setup_irq [1] while the clockevent device is
-> > > not registered yet [2]. Thus the event_handler is still NULL when the
-> > > AIC line connected to the TCB is unmasked. Remember that an interrupt
-> > > is still pending on this HW block, which will lead to an immediate call
-> > > to the ch2_irq handler, which tries to call the event_handler, which in
-> > > turns is NULL because clkevent device registration has not taken place
-> > > at this moment => Kernel panic.
-> > > ITOH, we can't register the clkevent device before the irq handler is
-> > > set up, because we should be ready to handle clkevent request at the
-> > > time clockevents_config_and_register is called.
-> > > 
-> > > This leaves two solution:
-> > >  1) disable the TCB irqs (using TCB IDR registers) before calling
-> > >  setup_irq in the tcb_clksrc driver
-> > >  2) disable the TCB irqs at the tclib level (as proposed by Gael)
-> > > 
-> > > I prefer solution #2 because it fixes the bug for all TCB users (not
-> > > just the tcb_clksrc driver).
-> > 
-> > Wouldn't a more proper fix be to only enable the IRQ (setup_irq()) once
-> > everything has properly been set up? That's certainly how all other
-> > drivers are doing this. Generally I think it's best to assume that an
-> > interrupt can fire at any point after it's been enabled, so everything
-> > should be set up prior to enabling it.
-> 
-> Sure. And, AFAIK, another common practice is to disable all interrupts
-> and acknowledge all pending interrupts before registering a new irq
-> handler to avoid inheriting peripheral dirty state from previous usage
-> (either the bootloader, or the previous kernel when using kexec).
+>> Commit 6f1c1e71d93 ("mfd: max77686: Convert to use regmap_irq") broke
+>> support for boards, which provide no irq for MAX 77686 PMIC. In such
+>> case, not all functions of PMIC are available, but the driver still
+>> should at least handle voltage regulators instead of failing to init.
+>> This patch restores previous behavior.
+>> 
+>> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+>> ---
+>> Hello,
+>> 
+>> This patch fixes booting issues with recently merged support for
+>> Exynos4412 based Odroid X2/U3 boards. See
+>> http://www.spinics.net/lists/linux-samsung-soc/msg35773.html
+>> thread for more details.
+>> 
+>> Best regards
+>> Marek Szyprowski
+>> Samsung R&D Institute Poland
 
-Discarding all pending interrupts may not always be what we want. And
-masking interrupts prior to registering the handler isn't always going
-to work either (shared interrupts), so device drivers should always set
-things up in the correct order.
+I already gave my opinion about this patch on thread:
 
-> This being said, I really think we should leave the HW in a clean state
-> when shutdown is called. And disabling interrupts at the tclib level
-> (in a shutdown callback) ensure that.
+"[PATCH v2 0/4] Add Exynos4412 based Odroid X2 and U2/U3/U3+ support"
 
-Yes, cleaning up the hardware and disabling interrupts upon shutdown
-seems like a good idea to me in addition to the above.
+where the issue was reported by Olof but I'll add it here as well for
+completeness since I don't know if the same people are cc'ed on both threads.
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140820/d2002450/attachment-0001.sig>
+Bartlomiej Zolnierkiewicz posted a similar patch [0] before but as I said
+on that thread, I'm not sure if is correct to make that DT property
+optional. Or rather, if we need to make it optional then we should also
+change the Documentation/devicetree/bindings/mfd/max77686.txt that list
+"interrupts" DT property as required.
+
+It's true that before converting the max77686 to use the regmap irq API,
+the driver was loose on that regard but max77686_irq_init() in
+max77686-irq.c was returning -ENODEV when the IRQ was not provided and
+that error code was not checked in max77686_i2c_probe() (which was a bug
+IMHO).
+
+More importantly I wonder if a design where a IRQ line is not connected to
+the max77686 PMIC makes even sense. If such a design is possible then the
+"interrupt" property should be made optional but if not then I think that
+the driver should fail to probe in that case. Yes, it is a regression but
+the Odroid DTS was not following the DT binding and was just lucky that
+the driver was not checking the required DT properties.
+
+Daniel Drake posted the correct fix for the Odroid DTS [1]. So I tend to
+say that Daniel's fix should be added as a -rc fix and we should keep both
+the max77686 driver and its DT binding as it is now but as I said, if from
+a hardware point of view makes sense to leave that line unconnected then I
+don't oppose to this change.
+
+Best regards,
+Javier
+
+[0]: https://lkml.org/lkml/2014/8/7/374
+[1]:
+http://lists.infradead.org/pipermail/linux-arm-kernel/2014-July/272869.html
