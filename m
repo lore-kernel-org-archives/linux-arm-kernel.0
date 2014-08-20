@@ -1,30 +1,81 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Wed, 20 Aug 2014 16:40:01 +0400
-Subject: [RFC PATCH 6/6] rtc: rtc-isl12057: Change vendor prefix for
- Intersil Corporation to isil
-In-Reply-To: <1408524184-31928-7-git-send-email-p.zabel@pengutronix.de>
-References: <1408524184-31928-1-git-send-email-p.zabel@pengutronix.de>
- <1408524184-31928-7-git-send-email-p.zabel@pengutronix.de>
-Message-ID: <53F49721.1000407@cogentembedded.com>
+From: tixy@linaro.org (Jon Medhurst (Tixy))
+Date: Wed, 20 Aug 2014 13:41:04 +0100
+Subject: [PATCH v2] video: ARM CLCD: Fix calculation of bits-per-pixel
+Message-ID: <1408538464.3858.43.camel@linaro1.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+If the device-tree specifies a max-memory-bandwidth property then the
+CLCD driver uses that to calculate the bits-per-pixel supported,
+however, this calculation is faulty for two reasons.
 
-On 8/20/2014 12:43 PM, Philipp Zabel wrote:
+1. It doesn't ensure that the result is a sane value, i.e. a power of 2
+   and <= 32 as the rest of the code assumes.
 
-> Currently there is a wild mixture of isl, isil, and intersil
-> compatibles in the kernel. At this point, changing the vendor
-> symbol to the most often used variant, which is equal to the
-> NASDAQ symbol, isil, should not hurt, since the isl1208 driver
-> doesn't care either way.
-> Patch 70e123373c05 added this driver with device tree support
+2. It uses the displayed resolution and calculates the average bandwidth
+   across the whole frame. It should instead calculate the peak
+   bandwidth based on the pixel clock.
 
-    Please also specify that commit's summary line in parens.
+This patch fixes both the above.
 
-> using the then documented isl vendor prefix, so we keep that
-> around for backwards compatibility.
+Signed-off-by: Jon Medhurst <tixy@linaro.org>
+---
 
-> Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
+Changes since v1:
+- Changed formula for calculating bits per pixel
+- Changed commit message and subject, was:
+  "video: ARM CLCD: Ensure bits-per-pixel is a power of 2 and <= 32"
 
-WBR, Sergei
+ drivers/video/fbdev/amba-clcd.c | 23 ++++++++++++++++++-----
+ 1 file changed, 18 insertions(+), 5 deletions(-)
+
+diff --git a/drivers/video/fbdev/amba-clcd.c b/drivers/video/fbdev/amba-clcd.c
+index beadd3e..a7b6217 100644
+--- a/drivers/video/fbdev/amba-clcd.c
++++ b/drivers/video/fbdev/amba-clcd.c
+@@ -24,6 +24,7 @@
+ #include <linux/list.h>
+ #include <linux/amba/bus.h>
+ #include <linux/amba/clcd.h>
++#include <linux/bitops.h>
+ #include <linux/clk.h>
+ #include <linux/hardirq.h>
+ #include <linux/dma-mapping.h>
+@@ -650,6 +651,7 @@ static int clcdfb_of_init_display(struct clcd_fb *fb)
+ {
+ 	struct device_node *endpoint;
+ 	int err;
++	unsigned int bpp;
+ 	u32 max_bandwidth;
+ 	u32 tft_r0b0g0[3];
+ 
+@@ -667,11 +669,22 @@ static int clcdfb_of_init_display(struct clcd_fb *fb)
+ 
+ 	err = of_property_read_u32(fb->dev->dev.of_node, "max-memory-bandwidth",
+ 			&max_bandwidth);
+-	if (!err)
+-		fb->panel->bpp = 8 * max_bandwidth / (fb->panel->mode.xres *
+-				fb->panel->mode.yres * fb->panel->mode.refresh);
+-	else
+-		fb->panel->bpp = 32;
++	if (!err) {
++		/*
++		 * max_bandwidth is in bytes per second and pixclock in
++		 * pico-seconds, so the maximum allowed bits per pixel is
++		 *   8 * max_bandwidth / (PICOS2KHZ(pixclock) * 1000)
++		 * Rearrange this calculation to avoid overflow and then ensure
++		 * result is a valid format.
++		 */
++		bpp = max_bandwidth / (1000 / 8)
++			/ PICOS2KHZ(fb->panel->mode.pixclock);
++		bpp = rounddown_pow_of_two(bpp);
++		if (bpp > 32)
++			bpp = 32;
++	} else
++		bpp = 32;
++	fb->panel->bpp = bpp;
+ 
+ #ifdef CONFIG_CPU_BIG_ENDIAN
+ 	fb->panel->cntl |= CNTL_BEBO;
+-- 
+2.1.0.rc1
