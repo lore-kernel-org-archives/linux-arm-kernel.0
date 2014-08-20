@@ -1,255 +1,163 @@
-From: sthokal@xilinx.com (Srikanth Thokala)
-Date: Wed, 20 Aug 2014 17:43:39 +0530
-Subject: [PATCH v5] pcie: Add Xilinx PCIe Host Bridge IP driver
-In-Reply-To: <20140818184933.GA2028@google.com>
-References: <1406131381-25577-1-git-send-email-sthokal@xilinx.com>
- <CA+mB=1JhDF=BBXcyTbgVB8S7qH=Mb1JH78HLL4pA9OBH19hQvA@mail.gmail.com>
- <8258903.Rn4s07GKGV@wuerfel>
- <CA+mB=1LeZn1k2VHNby2TRBcb1xuFFTQio=C845_xe2A=ZciYqg@mail.gmail.com>
- <53E9E052.3070308@monstr.eu>
- <CA+mB=1LX=yOqkx1xNoCBQLbYna76qAeRTqiW6SDpb1MYco7ZVQ@mail.gmail.com>
- <20140818184933.GA2028@google.com>
-Message-ID: <CA+mB=1+vy-9bM6gOBekU4V4id187gjstXq5frOQFjRqnAig4JQ@mail.gmail.com>
+From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
+Date: Wed, 20 Aug 2014 14:14:52 +0200
+Subject: [PATCHv3] thermal: exynos: Add support for TRIM_RELOAD feature at
+ Exynos3250
+In-Reply-To: <1408492364-8012-1-git-send-email-cw00.choi@samsung.com>
+References: <1408450078-6296-1-git-send-email-cw00.choi@samsung.com>
+ <1408492364-8012-1-git-send-email-cw00.choi@samsung.com>
+Message-ID: <1706216.YJ4TzvQvn4@amdc1032>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Bjorn,
 
-On Tue, Aug 19, 2014 at 12:19 AM, Bjorn Helgaas <bhelgaas@google.com> wrote:
-> On Mon, Aug 18, 2014 at 02:47:23PM +0530, Srikanth Thokala wrote:
->> Hi Michal,
->>
->> On Tue, Aug 12, 2014 at 3:07 PM, Michal Simek <monstr@monstr.eu> wrote:
->> > Hi Bjorn,
->> >
->> > On 07/30/2014 01:24 PM, Srikanth Thokala wrote:
->> >> Hi Arnd,
->> >>
->> >> On Mon, Jul 28, 2014 at 6:32 PM, Arnd Bergmann <arnd@arndb.de> wrote:
->> >>> On Monday 28 July 2014 18:04:34 Srikanth Thokala wrote:
->> >>>> Hi Arnd and Rob,
->> >>>>
->> >>>> I discussed with Bjorn and we believe this patch is in good shape to
->> >>>> apply.  And Bjorn requires ACKs to apply this patch.  So, could you
->> >>>> guys please review this patch and provided your ACKs to this patch.
->> >>>
->> >>> Looks great for the most part. I've looked through the whole driver
->> >>> again, and I have two small issues remaining:
->> >>>
->> >>> a) Please clarify in the changeset description why there is no support
->> >>>    for PCI I/O space.
->> >>
->> >> Sure, I will add to my changeset.
->> >>
->> >>>
->> >>> b) I think you should use the 'msi-parent' property, and the
->> >>>    of_pci_find_msi_chip_by_node() to find the msi_chip for the
->> >>>    PCI controller. This will make it possible to forward MSIs
->> >>>    to the main interrupt controller in the system, which is more
->> >>>    efficient. See the pcie-mvebu driver for an example of this.
->> >>
->> >> Ok, I need to look into this and I will plan to implement on top of this patch.
->> >>
->> >>>
->> >>> Other than these:
->> >>>
->> >>> Acked-by: Arnd Bergmann <arnd@arndb.de>
->> >>
->> >> Thanks Arnd for the Ack.
->> >
->> > What's the status on this one?
->>
->> It looks like Bjorn is on vacation.  I have sent v6 patch by adding
->> Ack from Arnd, which
->> I feel is in good shape to be applied.
->
-> I actually started applying this last night (see [1]), but got some
-> errors from the build-bot (attached).  I haven't looked into them,
-> but my guess is that you're missing a Kconfig dependency or something
-> equally minor.
+Hi,
 
-These are due to the same config flag name (CONFIG_PCI_XILINX) being used
-for Microblaze and Zynq platforms.  I will fix it and send you next
-version of patch.
+On Wednesday, August 20, 2014 08:52:44 AM Chanwoo Choi wrote:
+> This patch add support for TRIM_RELOAD feature at Exynos3250. The TMU of
+> Exynos3250 has two TRIMINFO_CON register.
 
-Thanks,
-Srikanth
+This patch also silently fixes wrong behavior of the Exynos thermal
+driver and TRIM_RELOAD feature for Exynos5260 and Exynos5420.  Currently
+these SoCs claim TRIM_RELOAD support but don't have triminfo_ctrl
+register address defined in their struct exynos_tmu_registers entries.
+This causes write of value "1" to data->base + 0x00 address (which
+happens to be TRIMINFO register).  Your patch doesn't define
+triminfo_reload_count on all SoCs that use TRIM_RELOAD flag so wrong
+write to TRIMINFO register no longer happens but I think that it would
+be the best to fix it explicitly by removing TRIM_RELOAD flag for
+Exynos5260 and Exynos5420 in a pre-patch to your patch, please see:
 
->
-> Bjorn
->
-> [1] http://git.kernel.org/cgit/linux/kernel/git/helgaas/pci.git/commit/?h=pci/host-xilinx&id=a58f3d0c3b1c4a71a2418c3306fba86c26a49781
->
->
-> ---------- Forwarded message ----------
-> From: kbuild test robot <fengguang.wu@intel.com>
-> To: Bjorn Helgaas <bhelgaas@google.com>
-> Cc:
-> Date: Mon, 18 Aug 2014 12:40:06 +0800
-> Subject: [pci:pci/host-xilinx] a58f3d0c3b1c4a71a2418c3306fba86c26a49781 BUILD DONE
-> git://git.kernel.org/pub/scm/linux/kernel/git/helgaas/pci.git  pci/host-xilinx
-> a58f3d0c3b1c4a71a2418c3306fba86c26a49781  PCI: xilinx: Add Xilinx PCIe Host Bridge IP driver
->
-> drivers/pci/host/pci-xilinx.c:470:21: error: 'IRQF_VALID' undeclared (first use in this function)
-> drivers/pci/host/pci-xilinx.c:742:14: error: dereferencing pointer to incomplete type
-> drivers/pci/host/pci-xilinx.c:939:2: error: implicit declaration of function 'pci_common_init_dev' [-Werror=implicit-function-declaration]
-> drivers/pci/host/pci-xilinx.c:417:2: error: implicit declaration of function 'set_irq_flags' [-Werror=implicit-function-declaration]
-> drivers/pci/host/pci-xilinx.c:938:2: error: invalid use of undefined type 'struct hw_pci'
-> drivers/pci/host/pci-xilinx.c:888:16: error: storage size of 'hw' isn't known
-> drivers/pci/host/pci-xilinx.c:935:3: error: unknown field 'add_bus' specified in initializer
-> drivers/pci/host/pci-xilinx.c:934:3: error: unknown field 'map_irq' specified in initializer
-> drivers/pci/host/pci-xilinx.c:931:3: error: unknown field 'nr_controllers' specified in initializer
-> drivers/pci/host/pci-xilinx.c:937:3: error: unknown field 'ops' specified in initializer
-> drivers/pci/host/pci-xilinx.c:932:3: error: unknown field 'private_data' specified in initializer
-> drivers/pci/host/pci-xilinx.c:936:3: error: unknown field 'scan' specified in initializer
-> drivers/pci/host/pci-xilinx.c:933:3: error: unknown field 'setup' specified in initializer
-> drivers/pci/host/pci-xilinx.c:937:3: warning: (near initialization for '(anonymous)')
-> drivers/pci/host/pci-xilinx.c:937:3: warning: excess elements in struct initializer
-> drivers/pci/host/pci-xilinx.c:124:59: warning: its scope is only this definition or declaration, which is probably not what you want
-> drivers/pci/host/pci-xilinx.c:737:34: warning: passing argument 1 of 'sys_to_pcie' from incompatible pointer type
-> drivers/pci/host/pci-xilinx.c:735:17: warning: 'struct pci_sys_data' declared inside parameter list
->
-> elapsed time: 25m
->
-> configs tested: 112
->
-> parisc                        c3000_defconfig
-> parisc                         b180_defconfig
-> parisc                              defconfig
-> alpha                               defconfig
-> parisc                            allnoconfig
-> i386                              allnoconfig
-> i386                                defconfig
-> i386                             allmodconfig
-> i386                             alldefconfig
-> sh                            titan_defconfig
-> sh                          rsk7269_defconfig
-> sh                  sh7785lcr_32bit_defconfig
-> sh                                allnoconfig
-> x86_64                     randconfig-c3-0818
-> x86_64                     randconfig-c1-0818
-> x86_64                     randconfig-c0-0818
-> x86_64                     randconfig-c2-0818
-> ia64                             allmodconfig
-> ia64                              allnoconfig
-> ia64                                defconfig
-> ia64                             alldefconfig
-> x86_64                                    lkp
-> x86_64                                   rhel
-> powerpc                      chroma_defconfig
-> powerpc                 linkstation_defconfig
-> powerpc                               powerpc
-> powerpc                         wii_defconfig
-> powerpc                    gamecube_defconfig
-> powerpc               corenet64_smp_defconfig
-> powerpc                               mpc512x
-> powerpc                                ppc44x
-> x86_64                     randconfig-j0-0818
-> x86_64                     randconfig-j1-0818
-> i386                      randconfig-ha2-0818
-> i386                      randconfig-ha5-0818
-> i386                      randconfig-ha4-0818
-> i386                      randconfig-ha3-0818
-> i386                      randconfig-ha0-0818
-> i386                      randconfig-ha1-0818
-> sparc                               defconfig
-> sparc64                           allnoconfig
-> sparc64                             defconfig
-> x86_64                           allmodconfig
-> xtensa                       common_defconfig
-> m32r                       m32104ut_defconfig
-> xtensa                          iss_defconfig
-> m32r                         opsput_defconfig
-> m32r                           usrv_defconfig
-> m32r                     mappi3.smp_defconfig
-> i386                          randconfig-i002
-> i386                          randconfig-i003
-> i386                          randconfig-i000
-> i386                          randconfig-i001
-> i386                          randconfig-i006
-> i386                          randconfig-i007
-> i386                          randconfig-i004
-> i386                          randconfig-i005
-> i386                          randconfig-i008
-> i386                          randconfig-i009
-> x86_64                        randconfig-i009
-> x86_64                        randconfig-i008
-> x86_64                        randconfig-i003
-> x86_64                        randconfig-i002
-> x86_64                        randconfig-i001
-> x86_64                        randconfig-i000
-> x86_64                        randconfig-i007
-> x86_64                        randconfig-i006
-> x86_64                        randconfig-i005
-> x86_64                        randconfig-i004
-> microblaze                      mmu_defconfig
-> microblaze                    nommu_defconfig
-> i386                             allyesconfig
-> cris                 etrax-100lx_v2_defconfig
-> blackfin                  TCM-BF537_defconfig
-> blackfin            BF561-EZKIT-SMP_defconfig
-> blackfin                BF533-EZKIT_defconfig
-> blackfin                BF526-EZBRD_defconfig
-> i386                       randconfig-r2-0818
-> i386                       randconfig-r1-0818
-> i386                       randconfig-r0-0818
-> i386                       randconfig-r3-0818
-> mn10300                     asb2364_defconfig
-> openrisc                    or1ksim_defconfig
-> um                           x86_64_defconfig
-> um                             i386_defconfig
-> avr32                      atngw100_defconfig
-> frv                                 defconfig
-> avr32                     atstk1006_defconfig
-> tile                         tilegx_defconfig
-> x86_64                   randconfig-x004-0817
-> i386                     randconfig-x000-0817
-> x86_64                   randconfig-x007-0817
-> i386                     randconfig-x001-0817
-> i386                     randconfig-x002-0817
-> i386                     randconfig-x005-0817
-> i386                     randconfig-x007-0817
-> x86_64                   randconfig-x003-0817
-> i386                     randconfig-x003-0817
-> x86_64                   randconfig-x008-0817
-> i386                     randconfig-x006-0817
-> x86_64                   randconfig-x000-0817
-> i386                     randconfig-x004-0817
-> x86_64                   randconfig-x002-0817
-> i386                     randconfig-x008-0817
-> i386                     randconfig-x009-0817
-> x86_64                   randconfig-x006-0817
-> x86_64                   randconfig-x009-0817
-> x86_64                   randconfig-x005-0817
-> x86_64                   randconfig-x001-0817
-> x86_64                             acpi-redef
-> x86_64                           allyesdebian
-> x86_64                                nfsroot
->
-> Thanks,
-> Fengguang
->
->
-> ---------- Forwarded message ----------
-> From: kbuild test robot <fengguang.wu@intel.com>
-> To: Srikanth Thokala <sthokal@xilinx.com>
-> Cc: Bjorn Helgaas <bhelgaas@google.com>, kbuild-all at 01.org
-> Date: Mon, 18 Aug 2014 15:16:51 +0800
-> Subject: [pci:pci/host-xilinx 1/1] WARNING: drivers/built-in.o(.text+0x64acc): Section mismatch in reference from the function xilinx_pcie_probe() to the function .init.text:xilinx_pcie_scan_bus()
-> tree:   git://git.kernel.org/pub/scm/linux/kernel/git/helgaas/pci.git pci/host-xilinx
-> head:   a58f3d0c3b1c4a71a2418c3306fba86c26a49781
-> commit: a58f3d0c3b1c4a71a2418c3306fba86c26a49781 [1/1] PCI: xilinx: Add Xilinx PCIe Host Bridge IP driver
-> config: make ARCH=arm allmodconfig
->
-> All warnings:
->
->>> WARNING: drivers/built-in.o(.text+0x64acc): Section mismatch in reference from the function xilinx_pcie_probe() to the function .init.text:xilinx_pcie_scan_bus()
->    The function xilinx_pcie_probe() references
->    the function __init xilinx_pcie_scan_bus().
->    This is often because xilinx_pcie_probe lacks a __init
->    annotation or the annotation of xilinx_pcie_scan_bus is wrong.
->
+	https://lkml.org/lkml/2014/8/20/334
+
+One other issue with your patch is that it modifies struct
+exynos_tmu_registers and struct exynos_tmu_platform_data without
+updating corresponding documentation.  Please fix it.
+
+Otherwise it looks fine to me.
+
+Best regards,
+--
+Bartlomiej Zolnierkiewicz
+Samsung R&D Institute Poland
+Samsung Electronics
+ 
+> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
+> Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
+> Cc: Zhang Rui <rui.zhang@intel.com>
+> Cc: Eduardo Valentin <edubezval@gmail.com>
+> Cc: Amit Daniel Kachhap <amit.daniel@samsung.com>
 > ---
-> 0-DAY kernel build testing backend              Open Source Technology Center
-> http://lists.01.org/mailman/listinfo/kbuild                 Intel Corporation
->
+> Changes from v2:
+> - Fix build break because of missing 'or' operation.
+> Changes from v1:
+> - Add missing 'TMU_SUPPORT_TRIM_RELOAD' feature
+> 
+>  drivers/thermal/samsung/exynos_tmu.c      |  7 +++++--
+>  drivers/thermal/samsung/exynos_tmu.h      |  5 +++--
+>  drivers/thermal/samsung/exynos_tmu_data.c | 11 +++++++++--
+>  drivers/thermal/samsung/exynos_tmu_data.h |  7 +++++--
+>  4 files changed, 22 insertions(+), 8 deletions(-)
+> 
+> diff --git a/drivers/thermal/samsung/exynos_tmu.c b/drivers/thermal/samsung/exynos_tmu.c
+> index acbff14..ed01606 100644
+> --- a/drivers/thermal/samsung/exynos_tmu.c
+> +++ b/drivers/thermal/samsung/exynos_tmu.c
+> @@ -164,8 +164,11 @@ static int exynos_tmu_initialize(struct platform_device *pdev)
+>  		}
+>  	}
+>  
+> -	if (TMU_SUPPORTS(pdata, TRIM_RELOAD))
+> -		__raw_writel(1, data->base + reg->triminfo_ctrl);
+> +	if (TMU_SUPPORTS(pdata, TRIM_RELOAD)) {
+> +		for (i = 0; i < pdata->triminfo_reload_count; i++)
+> +			__raw_writel(pdata->triminfo_reload[i],
+> +					data->base + reg->triminfo_ctrl[i]);
+> +	}
+>  
+>  	if (pdata->cal_mode == HW_MODE)
+>  		goto skip_calib_data;
+> diff --git a/drivers/thermal/samsung/exynos_tmu.h b/drivers/thermal/samsung/exynos_tmu.h
+> index 1b4a644..72cb54e 100644
+> --- a/drivers/thermal/samsung/exynos_tmu.h
+> +++ b/drivers/thermal/samsung/exynos_tmu.h
+> @@ -151,8 +151,7 @@ struct exynos_tmu_registers {
+>  	u32	triminfo_25_shift;
+>  	u32	triminfo_85_shift;
+>  
+> -	u32	triminfo_ctrl;
+> -	u32	triminfo_ctrl1;
+> +	u32	triminfo_ctrl[2];
+>  	u32	triminfo_reload_shift;
+>  
+>  	u32	tmu_ctrl;
+> @@ -295,6 +294,8 @@ struct exynos_tmu_platform_data {
+>  	u8 second_point_trim;
+>  	u8 default_temp_offset;
+>  	u8 test_mux;
+> +	u8 triminfo_reload[2];
+> +	u8 triminfo_reload_count;
+>  
+>  	enum calibration_type cal_type;
+>  	enum calibration_mode cal_mode;
+> diff --git a/drivers/thermal/samsung/exynos_tmu_data.c b/drivers/thermal/samsung/exynos_tmu_data.c
+> index aa8e0de..8cd609c 100644
+> --- a/drivers/thermal/samsung/exynos_tmu_data.c
+> +++ b/drivers/thermal/samsung/exynos_tmu_data.c
+> @@ -95,6 +95,8 @@ static const struct exynos_tmu_registers exynos3250_tmu_registers = {
+>  	.triminfo_data = EXYNOS_TMU_REG_TRIMINFO,
+>  	.triminfo_25_shift = EXYNOS_TRIMINFO_25_SHIFT,
+>  	.triminfo_85_shift = EXYNOS_TRIMINFO_85_SHIFT,
+> +	.triminfo_ctrl[0] = EXYNOS_TMU_TRIMINFO_CON1,
+> +	.triminfo_ctrl[1] = EXYNOS_TMU_TRIMINFO_CON2,
+>  	.tmu_ctrl = EXYNOS_TMU_REG_CONTROL,
+>  	.test_mux_addr_shift = EXYNOS4412_MUX_ADDR_SHIFT,
+>  	.buf_vref_sel_shift = EXYNOS_TMU_REF_VOLTAGE_SHIFT,
+> @@ -160,8 +162,11 @@ static const struct exynos_tmu_registers exynos3250_tmu_registers = {
+>  		.temp_level = 95, \
+>  	}, \
+>  	.freq_tab_count = 2, \
+> +	.triminfo_reload[0] = 0x1, \
+> +	.triminfo_reload[1] = 0x11, \
+> +	.triminfo_reload_count = 2, \
+>  	.registers = &exynos3250_tmu_registers, \
+> -	.features = (TMU_SUPPORT_EMULATION | \
+> +	.features = (TMU_SUPPORT_EMULATION | TMU_SUPPORT_TRIM_RELOAD | \
+>  			TMU_SUPPORT_FALLING_TRIP | TMU_SUPPORT_READY_STATUS | \
+>  			TMU_SUPPORT_EMUL_TIME)
+>  #endif
+> @@ -184,7 +189,7 @@ static const struct exynos_tmu_registers exynos4412_tmu_registers = {
+>  	.triminfo_data = EXYNOS_TMU_REG_TRIMINFO,
+>  	.triminfo_25_shift = EXYNOS_TRIMINFO_25_SHIFT,
+>  	.triminfo_85_shift = EXYNOS_TRIMINFO_85_SHIFT,
+> -	.triminfo_ctrl = EXYNOS_TMU_TRIMINFO_CON,
+> +	.triminfo_ctrl[0] = EXYNOS_TMU_TRIMINFO_CON2,
+>  	.triminfo_reload_shift = EXYNOS_TRIMINFO_RELOAD_SHIFT,
+>  	.tmu_ctrl = EXYNOS_TMU_REG_CONTROL,
+>  	.test_mux_addr_shift = EXYNOS4412_MUX_ADDR_SHIFT,
+> @@ -252,6 +257,8 @@ static const struct exynos_tmu_registers exynos4412_tmu_registers = {
+>  		.temp_level = 95, \
+>  	}, \
+>  	.freq_tab_count = 2, \
+> +	.triminfo_reload[0] = 0x1, \
+> +	.triminfo_reload_count = 1, \
+>  	.registers = &exynos4412_tmu_registers, \
+>  	.features = (TMU_SUPPORT_EMULATION | TMU_SUPPORT_TRIM_RELOAD | \
+>  			TMU_SUPPORT_FALLING_TRIP | TMU_SUPPORT_READY_STATUS | \
+> diff --git a/drivers/thermal/samsung/exynos_tmu_data.h b/drivers/thermal/samsung/exynos_tmu_data.h
+> index f0979e5..e0536c3 100644
+> --- a/drivers/thermal/samsung/exynos_tmu_data.h
+> +++ b/drivers/thermal/samsung/exynos_tmu_data.h
+> @@ -57,8 +57,11 @@
+>  #define EXYNOS4210_TMU_TRIG_LEVEL_MASK	0x1111
+>  #define EXYNOS4210_TMU_INTCLEAR_VAL	0x1111
+>  
+> -/* Exynos5250 and Exynos4412 specific registers */
+> -#define EXYNOS_TMU_TRIMINFO_CON	0x14
+> +/* Exynos3250 specific registers */
+> +#define EXYNOS_TMU_TRIMINFO_CON1	0x10
+> +
+> +/* Exynos5250, Exynos4412 and Exynos3250 specific registers */
+> +#define EXYNOS_TMU_TRIMINFO_CON2	0x14
+>  #define EXYNOS_THD_TEMP_RISE		0x50
+>  #define EXYNOS_THD_TEMP_FALL		0x54
+>  #define EXYNOS_EMUL_CON		0x80
