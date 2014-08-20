@@ -1,148 +1,67 @@
-From: kiran.padwal@smartplayin.com (Kiran Padwal)
-Date: Wed, 20 Aug 2014 17:32:13 +0530
-Subject: [PATCH v2] ARM: apq8064: Add pinmux and i2c pinctrl nodes
-Message-ID: <1408536133-13824-1-git-send-email-kiran.padwal@smartplayin.com>
+From: juha-matti.tilli@iki.fi (Juha-Matti Tilli)
+Date: Wed, 20 Aug 2014 15:05:13 +0300
+Subject: [PATCH v4 4/4] thermal: Add Tegra SOCTHERM thermal management
+ driver
+In-Reply-To: <CAC-25o-bLeDYpTgPy5UOvBGJ7k7HJkBM3YcCRPSZHBkyxugULA@mail.gmail.com>
+References: <1408100430-29461-1-git-send-email-mperttunen@nvidia.com>
+ <20140819140955.GA50475@sandfort.unics.fi>
+ <CAC-25o-bLeDYpTgPy5UOvBGJ7k7HJkBM3YcCRPSZHBkyxugULA@mail.gmail.com>
+Message-ID: <20140820120513.GA76825@sandfort.unics.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds pinmux and i2c pinctrl DT node for IFC6410 board.
-It also adds necessary DT support for i2c eeprom which is present on
-IFC6410.
+On Tue, Aug 19, 2014 at 10:33:13AM -0400, edubezval at gmail.com wrote:
+> > The temperature readings look sane and do vary with load, but I think
+> > they're a bit different than what NVIDIA's internal soc_therm driver
+> 
+> hmm..  Based on a single sample?
 
-Tested on IFC6410 board.
+Now I have more than one sample. I wrote a test program to load the
+CONFIG2 registers with the values NVIDIA's internal driver sets and also
+with the values the patch sets. The difference on my development board
+is between 3 and 4 degrees C, with the patch giving hotter readings than
+the downstream driver. This is repeatable; I have made about ten test
+runs and every time I can observe the difference.
 
-Signed-off-by: Kiran Padwal <kiran.padwal@smartplayin.com>
----
-Chages since v1:
-	- Renamed pinmux phandle "qcom_pinmux" to "tlmm_pinmux".
-	- Updated pinmux interrupt.
+As a matter of fact, I believe there are two other bugs in the patch in
+addition to the --i error handling bug.
 
- arch/arm/boot/dts/qcom-apq8064-ifc6410.dts |   29 ++++++++++++++
- arch/arm/boot/dts/qcom-apq8064.dtsi        |   59 ++++++++++++++++++++++++++++
- 2 files changed, 88 insertions(+)
+Firstly, shifted_ft seems to be read from the wrong register. It should
+be read from FUSE_TSENSOR8_CALIB (and it's read from there in the
+downstream driver), but Mikko's code erroneously reads it from
+FUSE_SPARE_REALIGNMENT_REG_0. So, the downstream code has fields like
+this:
+FUSE_TSENSOR8_CALIB = zero-padding | shifted_ft | base_ft | base_cp
+FUSE_SPARE_REALIGNMENT_REG_0 = zero-padding | shifted_cp
 
-diff --git a/arch/arm/boot/dts/qcom-apq8064-ifc6410.dts b/arch/arm/boot/dts/qcom-apq8064-ifc6410.dts
-index 7c2441d..d52ac3c 100644
---- a/arch/arm/boot/dts/qcom-apq8064-ifc6410.dts
-+++ b/arch/arm/boot/dts/qcom-apq8064-ifc6410.dts
-@@ -5,6 +5,15 @@
- 	compatible = "qcom,apq8064-ifc6410", "qcom,apq8064";
- 
- 	soc {
-+		pinmux at 800000 {
-+			i2c1_pins: i2c1_pinmux {
-+				mux {
-+					pins = "gpio20", "gpio21";
-+					function = "gsbi1";
-+				};
-+			};
-+		};
-+
- 		gsbi at 16600000 {
- 			status = "ok";
- 			qcom,mode = <GSBI_PROT_I2C_UART>;
-@@ -12,5 +21,25 @@
- 				status = "ok";
- 			};
- 		};
-+
-+		gsbi1: gsbi at 12440000 {
-+			qcom,mode = <GSBI_PROT_I2C>;
-+			status = "ok";
-+
-+			i2c1: i2c at 12460000 {
-+				status = "ok";
-+
-+				clock-frequency = <200000>;
-+
-+				pinctrl-0 = <&i2c1_pins>;
-+				pinctrl-names = "default";
-+
-+				eeprom: eeprom at 52 {
-+					compatible = "atmel,24c128";
-+					reg = <0x52>;
-+					pagesize = <32>;
-+				};
-+			};
-+		};
- 	};
- };
-diff --git a/arch/arm/boot/dts/qcom-apq8064.dtsi b/arch/arm/boot/dts/qcom-apq8064.dtsi
-index 92bf793..bb2ccde 100644
---- a/arch/arm/boot/dts/qcom-apq8064.dtsi
-+++ b/arch/arm/boot/dts/qcom-apq8064.dtsi
-@@ -70,6 +70,17 @@
- 		ranges;
- 		compatible = "simple-bus";
- 
-+		tlmm_pinmux: pinmux at 800000 {
-+			compatible = "qcom,apq8064-pinctrl";
-+			reg = <0x800000 0x4000>;
-+
-+			gpio-controller;
-+			#gpio-cells = <2>;
-+			interrupt-controller;
-+			#interrupt-cells = <2>;
-+			interrupts = <0 16 0x4>;
-+		};
-+
- 		intc: interrupt-controller at 2000000 {
- 			compatible = "qcom,msm-qgic2";
- 			interrupt-controller;
-@@ -133,6 +144,54 @@
- 			regulator;
- 		};
- 
-+		gsbi1: gsbi at 12440000 {
-+			compatible = "qcom,gsbi-v1.0.0";
-+			reg = <0x12440000 0x100>;
-+			clocks = <&gcc GSBI1_H_CLK>;
-+			clock-names = "iface";
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+			ranges;
-+			status = "disabled";
-+
-+			i2c at 12460000 {
-+				compatible = "qcom,i2c-qup-v1.1.1";
-+				reg = <0x12460000 0x1000>;
-+				interrupts = <0 194 0>;
-+
-+				clocks = <&gcc GSBI1_QUP_CLK>, <&gcc GSBI1_H_CLK>;
-+				clock-names = "core", "iface";
-+				status = "disabled";
-+
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+			};
-+		};
-+
-+		gsbi2: gsbi at 12480000 {
-+			compatible = "qcom,gsbi-v1.0.0";
-+			reg = <0x12480000 0x100>;
-+			clocks = <&gcc GSBI2_H_CLK>;
-+			clock-names = "iface";
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+			ranges;
-+			status = "disabled";
-+
-+			i2c at 124a0000 {
-+				compatible = "qcom,i2c-qup-v1.1.1";
-+				reg = <0x124a0000 0x1000>;
-+				interrupts = <0 196 0>;
-+
-+				clocks = <&gcc GSBI2_QUP_CLK>, <&gcc GSBI2_H_CLK>;
-+				clock-names = "core", "iface";
-+				status = "disabled";
-+
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+			};
-+		};
-+
- 		gsbi7: gsbi at 16600000 {
- 			status = "disabled";
- 			compatible = "qcom,gsbi-v1.0.0";
--- 
-1.7.9.5
+While the patch has the fields like that:
+FUSE_TSENSOR8_CALIB = zero-padding | base_ft | base_cp
+FUSE_SPARE_REALIGNMENT_REG_0 = zero-padding | shifted_ft | zero-padding ?shifted_cp
+
+Note the illogical zero-padding in the middle of
+FUSE_SPARE_REALIGNMENT_REG_0 according to the patch.
+
+As a result of that, the patch reads shifted_ft as 0 on my system even
+though it should read -2, which is the value the downstream driver
+reads. This also suggests that the patch is reading the incorrect
+location as it gets all zeroes. This is the major reason for the
+differing temperature readings between the downstream code and this
+driver.
+
+Secondly, .tsample_ate should be 480, not 481.
+
+I communicated a patch to fix these issues to Mikko; he'll surely send a
+version 5 of the patch with these issues fixed back to these mailing
+lists.
+
+As Mikko already noticed, yet another difference is that
+div64_s64_precise is used in the downstream code instead of div_s64. I'm
+not sure if that should be included in the code: it would mean higher
+precision, but it would make the code more complicated. The difference
+between div64_s64_precise and div_s64 is anyway small so either way is
+fine with me.
+
+Other than these issues, the code has been both tested by me and
+reviewed by me and in my opinion it seems to have good code clarity and
+be a good addition to the kernel, once the --i bug, the .tsample_ate bug
+and the shifted_ft bug are fixed.
