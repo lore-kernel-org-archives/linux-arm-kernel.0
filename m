@@ -1,112 +1,55 @@
 From: linux@roeck-us.net (Guenter Roeck)
-Date: Tue, 19 Aug 2014 17:45:34 -0700
-Subject: [PATCH v7 07/11] watchdog: sunxi: Register restart handler with
- kernel restart handler
+Date: Tue, 19 Aug 2014 17:45:35 -0700
+Subject: [PATCH v7 08/11] arm/arm64: Unexport restart handlers
 In-Reply-To: <1408495538-27480-1-git-send-email-linux@roeck-us.net>
 References: <1408495538-27480-1-git-send-email-linux@roeck-us.net>
-Message-ID: <1408495538-27480-8-git-send-email-linux@roeck-us.net>
+Message-ID: <1408495538-27480-9-git-send-email-linux@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The kernel core now provides an API to trigger a system restart.
-Register with it instead of setting arm_pm_restart.
+Implementing a restart handler in a module don't make sense
+as there would be no guarantee that the module is loaded when
+a restart is needed. Unexport arm_pm_restart to ensure that
+no one gets the idea to do it anyway.
 
 Signed-off-by: Guenter Roeck <linux@roeck-us.net>
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
 Acked-by: Heiko Stuebner <heiko@sntech.de>
 ---
-v7: Added patch to series. Necessary since the restart handler in the driver
-    is now available upstream.
+v7: No change
+v6: No change
+v5: No change
+v4: No change
+v3: No change
+v2: No change
 
- drivers/watchdog/sunxi_wdt.c | 31 ++++++++++++++++++++-----------
- 1 file changed, 20 insertions(+), 11 deletions(-)
+ arch/arm/kernel/process.c   | 1 -
+ arch/arm64/kernel/process.c | 1 -
+ 2 files changed, 2 deletions(-)
 
-diff --git a/drivers/watchdog/sunxi_wdt.c b/drivers/watchdog/sunxi_wdt.c
-index 60deb9d..480bb55 100644
---- a/drivers/watchdog/sunxi_wdt.c
-+++ b/drivers/watchdog/sunxi_wdt.c
-@@ -21,14 +21,13 @@
- #include <linux/kernel.h>
- #include <linux/module.h>
- #include <linux/moduleparam.h>
-+#include <linux/notifier.h>
- #include <linux/of.h>
- #include <linux/platform_device.h>
- #include <linux/reboot.h>
- #include <linux/types.h>
- #include <linux/watchdog.h>
+diff --git a/arch/arm/kernel/process.c b/arch/arm/kernel/process.c
+index ea279f7..250b6f6 100644
+--- a/arch/arm/kernel/process.c
++++ b/arch/arm/kernel/process.c
+@@ -121,7 +121,6 @@ void (*pm_power_off)(void);
+ EXPORT_SYMBOL(pm_power_off);
  
--#include <asm/system_misc.h>
--
- #define WDT_MAX_TIMEOUT         16
- #define WDT_MIN_TIMEOUT         1
- #define WDT_MODE_TIMEOUT(n)     ((n) << 3)
-@@ -50,6 +49,7 @@ static unsigned int timeout = WDT_MAX_TIMEOUT;
- struct sunxi_wdt_dev {
- 	struct watchdog_device wdt_dev;
- 	void __iomem *wdt_base;
-+	struct notifier_block restart_handler;
- };
+ void (*arm_pm_restart)(enum reboot_mode reboot_mode, const char *cmd);
+-EXPORT_SYMBOL_GPL(arm_pm_restart);
  
  /*
-@@ -74,24 +74,29 @@ static const int wdt_timeout_map[] = {
- 	[16] = 0xB, /* 16s */
- };
+  * This is our default idle handler.
+diff --git a/arch/arm64/kernel/process.c b/arch/arm64/kernel/process.c
+index 0d3fb9f..398ab05 100644
+--- a/arch/arm64/kernel/process.c
++++ b/arch/arm64/kernel/process.c
+@@ -98,7 +98,6 @@ void (*pm_power_off)(void);
+ EXPORT_SYMBOL_GPL(pm_power_off);
  
--static void __iomem *reboot_wdt_base;
+ void (*arm_pm_restart)(enum reboot_mode reboot_mode, const char *cmd);
+-EXPORT_SYMBOL_GPL(arm_pm_restart);
  
--static void sun4i_wdt_restart(enum reboot_mode mode, const char *cmd)
-+static int sunxi_restart_handle(struct notifier_block *this, unsigned long mode,
-+				void *cmd)
- {
-+	struct sunxi_wdt_dev *sunxi_wdt = container_of(this,
-+						       struct sunxi_wdt_dev,
-+						       restart_handler);
-+	void __iomem *wdt_base = sunxi_wdt->wdt_base;
-+
- 	/* Enable timer and set reset bit in the watchdog */
--	writel(WDT_MODE_EN | WDT_MODE_RST_EN, reboot_wdt_base + WDT_MODE);
-+	writel(WDT_MODE_EN | WDT_MODE_RST_EN, wdt_base + WDT_MODE);
- 
- 	/*
- 	 * Restart the watchdog. The default (and lowest) interval
- 	 * value for the watchdog is 0.5s.
- 	 */
--	writel(WDT_CTRL_RELOAD, reboot_wdt_base + WDT_CTRL);
-+	writel(WDT_CTRL_RELOAD, wdt_base + WDT_CTRL);
- 
- 	while (1) {
- 		mdelay(5);
--		writel(WDT_MODE_EN | WDT_MODE_RST_EN,
--		       reboot_wdt_base + WDT_MODE);
-+		writel(WDT_MODE_EN | WDT_MODE_RST_EN, wdt_base + WDT_MODE);
- 	}
-+	return NOTIFY_DONE;
- }
- 
- static int sunxi_wdt_ping(struct watchdog_device *wdt_dev)
-@@ -205,8 +210,12 @@ static int sunxi_wdt_probe(struct platform_device *pdev)
- 	if (unlikely(err))
- 		return err;
- 
--	reboot_wdt_base = sunxi_wdt->wdt_base;
--	arm_pm_restart = sun4i_wdt_restart;
-+	sunxi_wdt->restart_handler.notifier_call = sunxi_restart_handle;
-+	sunxi_wdt->restart_handler.priority = 128;
-+	err = register_restart_handler(&sunxi_wdt->restart_handler);
-+	if (err)
-+		dev_err(&pdev->dev,
-+			"cannot register restart handler (err=%d)\n", err);
- 
- 	dev_info(&pdev->dev, "Watchdog enabled (timeout=%d sec, nowayout=%d)",
- 			sunxi_wdt->wdt_dev.timeout, nowayout);
-@@ -218,7 +227,7 @@ static int sunxi_wdt_remove(struct platform_device *pdev)
- {
- 	struct sunxi_wdt_dev *sunxi_wdt = platform_get_drvdata(pdev);
- 
--	arm_pm_restart = NULL;
-+	unregister_restart_handler(&sunxi_wdt->restart_handler);
- 
- 	watchdog_unregister_device(&sunxi_wdt->wdt_dev);
- 	watchdog_set_drvdata(&sunxi_wdt->wdt_dev, NULL);
+ /*
+  * This is our default idle handler.
 -- 
 1.9.1
