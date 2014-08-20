@@ -1,147 +1,155 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Wed, 20 Aug 2014 16:43:13 -0400 (EDT)
-Subject: [PATCH v5] irqchip: gic: Allow gic_arch_extn hooks to call into
- scheduler
-In-Reply-To: <1408562561-10424-1-git-send-email-sboyd@codeaurora.org>
-References: <1408562561-10424-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <alpine.LFD.2.11.1408201641080.29347@knanqh.ubzr>
+From: dianders@chromium.org (Doug Anderson)
+Date: Wed, 20 Aug 2014 13:49:20 -0700
+Subject: [PATCH 1/4] ARM: rockchip: rk3288: Switch to use the proper PWM IP
+In-Reply-To: <9118476.CpedIJMoMR@phil>
+References: <1408381749-14156-1-git-send-email-dianders@chromium.org>
+ <2927513.T62GI7nq9T@phil>
+ <CAD=FV=U_TEi7zh=LcnfTz07yFCrOXo1SsGJ0h6-VFCVdy1GDEA@mail.gmail.com>
+ <9118476.CpedIJMoMR@phil>
+Message-ID: <CAD=FV=WcZKyMa3Megire6Zmd7ipFVTEH3iFinGZURHXwBH0ghg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 20 Aug 2014, Stephen Boyd wrote:
+Heiko,
 
-> Commit 1a6b69b6548c (ARM: gic: add CPU migration support,
-> 2012-04-12) introduced an acquisition of the irq_controller_lock
-> in gic_raise_softirq() which can lead to a spinlock recursion if
-> the gic_arch_extn hooks call into the scheduler (via complete()
-> or wake_up(), etc.). This happens because gic_arch_extn hooks are
-> normally called with the irq_controller_lock held and calling
-> into the scheduler may cause us to call smp_send_reschedule()
-> which will grab the irq_controller_lock again. Here's an example
-> from a vendor kernel (note that the gic_arch_extn hook code here
-> isn't actually in mainline):
-> 
-> BUG: spinlock recursion on CPU#0, swapper/0/1
+On Wed, Aug 20, 2014 at 11:03 AM, Heiko St?bner <heiko@sntech.de> wrote:
+> Am Mittwoch, 20. August 2014, 09:27:02 schrieb Doug Anderson:
+>> Heiko,
+>>
+>> On Wed, Aug 20, 2014 at 9:20 AM, Heiko St?bner <heiko@sntech.de> wrote:
+>> > Am Mittwoch, 20. August 2014, 08:55:09 schrieb Doug Anderson:
+>> >> Thierry,
+>> >>
+>> >> On Wed, Aug 20, 2014 at 8:38 AM, Thierry Reding
+>> >>
+>> >> <thierry.reding@gmail.com> wrote:
+>> >> > On Wed, Aug 20, 2014 at 08:20:53AM -0700, Doug Anderson wrote:
+>> >> >> Thierry,
+>> >> >>
+>> >> >> On Tue, Aug 19, 2014 at 11:08 PM, Thierry Reding
+>> >> >>
+>> >> >> <thierry.reding@gmail.com> wrote:
+>> >> >> > On Tue, Aug 19, 2014 at 08:18:54AM -0700, Doug Anderson wrote:
+>> >> >> >> Thierry,
+>> >> >> >>
+>> >> >> >> On Tue, Aug 19, 2014 at 12:10 AM, Thierry Reding
+>> >> >> >>
+>> >> >> >> <thierry.reding@gmail.com> wrote:
+>> >> >> >> > On Mon, Aug 18, 2014 at 10:09:06AM -0700, Doug Anderson wrote:
+>> >> >> >> >> The rk3288 SoC has an option to switch all of the PWMs in the
+>> >> >> >> >> system
+>> >> >> >> >> between the old IP block and the new IP block.  The new IP block
+>> >> >> >> >> is
+>> >> >> >> >> working and tested and the suggested PWM to use, so setup the
+>> >> >> >> >> SoC
+>> >> >> >> >> to
+>> >> >> >> >> use it and then we can pretend that the other IP block doesn't
+>> >> >> >> >> exist.
+>> >> >> >
+>> >> >> > A few more questions as to how this actually works. Does it mean
+>> >> >> > there
+>> >> >> > are two physically separate blocks (with different physical
+>> >> >> > addresses)
+>> >> >> > to control the same PWM? And this register simply causes some of the
+>> >> >> > pins to be routed to one or another? As far as I recall there are a
+>> >> >> > number of instances of the PWM block, so the above would need to
+>> >> >> > count
+>> >> >> > for all of them. Or are there separate bits for each of them?
+>> >> >>
+>> >> >> All I have is the TRM (technical reference manual) which doesn't give
+>> >> >> me much more info than I've provided you.  But I can answer some of
+>> >> >> your questoins:
+>> >> >>
+>> >> >> 1. If there are two physically separate blocks then the "old" block is
+>> >> >> not documented in my TRM.
+>> >> >>
+>> >> >> 1a) It's entirely possible it's located at some memory address that is
+>> >> >> marked "Reserved" in the TRM, but I have no idea.
+>> >> >>
+>> >> >> 1b) It's entirely possible that the old IP block and the new IP block
+>> >> >> are supposed to be "compatible" but that the old block is broken and
+>> >> >> thus isn't behaving properly.
+>> >> >>
+>> >> >> 1c) It's entirely possible that the old IP block and the new IP block
+>> >> >> are located at the same physical addresses but somehow work
+>> >> >> differently.  If so, the old IP block isn't documented.
+>> >> >>
+>> >> >>
+>> >> >> 2. As per the patch description, there is a single bit that controls
+>> >> >> all of the PWMs.  My guess is that there's actually a single IP block
+>> >> >> that implements all 4 PWMs.
+>> >> >
+>> >> > Looking at the register offsets in the device tree that seems likely.
+>> >> > At
+>> >> > least PWMs 0 and 1 as well as 2 and 3 seem like they could be in the
+>> >> >
+>> >> > same IP block. Their placement in the register map is somewhat strange:
+>> >> >         pwm0: pwm at 20030000 {
+>> >> >
+>> >> >                 ...
+>> >> >                 reg = <0x20030000 0x10>;
+>> >> >                 ...
+>> >> >                 clocks = <&cru PCLK_PWM01>;
+>> >> >                 ...
+>> >> >
+>> >> >         };
+>> >> >
+>> >> >         pwm1: pwm at 20030010 {
+>> >> >
+>> >> >                 ...
+>> >> >                 reg = <0x20030010 0x10>;
+>> >> >                 ...
+>> >> >                 clocks = <&cru PCLK_PWM01>;
+>> >> >                 ...
+>> >> >
+>> >> >         };
+>> >> >
+>> >> >         ...
+>> >> >
+>> >> >         pwm2: pwm at 20050020 {
+>> >> >
+>> >> >                 ...
+>> >> >                 reg = <0x20050020 0x10>;
+>> >> >                 ...
+>> >> >                 clocks = <&cru PCLK_PWM23>;
+>> >> >                 ...
+>> >> >
+>> >> >         };
+>> >> >
+>> >> >         pwm3: pwm at 20050030 {
+>> >> >
+>> >> >                 ...
+>> >> >                 reg = <0x20050030 0x10>;
+>> >> >                 ...
+>> >> >                 clocks = <&cru PCLK_PWM23>;
+>> >> >                 ...
+>> >> >
+>> >> >         };
+>> >>
+>> >> Ah, you're looking at "rk3xxx.dtsi".  That doesn't apply to rk3288
+>> >> (the downsides of trying to guess ahead of time what SoC vendors will
+>> >> name new models).
+>> >
+>> > It did sound like a nice idea at the time to hold the common stuff of
+>> > rk3066/rk3188 and all their derivatives and I assumed a SoC that changed
+>> > dramatically (including the core) would be called 4xxx or so :-) .
+>>
+>> Yes, I've fallen into the same trap.  Now I jump on the bandwagon and
+>> name things arbitrarily by the first machine that had them.  It's
+>> confusing, but sorta less confusing too.
+>
+> the problem was in this case, that there also is rk3066-specific material which
+> made it all the more difficult.
+>
+> I guess rk3066-common would have been a possibility but still sounds somewhat
+> strange, or something else entirely.
+>
+> I'm not sure but don't think dtsi file-naming counts as API, so we can rename
+> the rk3xxx.dtsi file if this gets to confusing in the future.
 
-Given the actual source of the bug is contested, you probably should 
-only talk about the locking optimization which is the only undisputed 
-reason for this patch.
+Yup.  Sorry, didn't mean to bring it up.  It's not a huge deal IMHO,
+but if you want to submit a patch to rename I'm happy to support it.
+Since the dts issues are all around people shipping device tree files
+in firmware, I don't think a rename will affect anything...
 
-
-
-
-
->  lock: irq_controller_lock+0x0/0x18, .magic: dead4ead, .owner: sw
-> er_cpu: 0
-> CPU: 0 PID: 1 Comm: swapper/0 Not tainted 3.14.10-00430-g3d433c4e
-> 
-> Call trace:
-> [<ffffffc000087e1c>] dump_backtrace+0x0/0x140
-> [<ffffffc000087f6c>] show_stack+0x10/0x1c
-> [<ffffffc00064732c>] dump_stack+0x74/0xc4
-> [<ffffffc0006446c0>] spin_dump+0x78/0x88
-> [<ffffffc0006446f4>] spin_bug+0x24/0x34
-> [<ffffffc0000d47d0>] do_raw_spin_lock+0x58/0x148
-> [<ffffffc00064d398>] _raw_spin_lock_irqsave+0x24/0x38
-> [<ffffffc0002c9d7c>] gic_raise_softirq+0x2c/0xbc
-> [<ffffffc00008daa4>] smp_send_reschedule+0x34/0x40
-> [<ffffffc0000c1e94>] try_to_wake_up+0x224/0x288
-> [<ffffffc0000c1f4c>] default_wake_function+0xc/0x18
-> [<ffffffc0000ceef0>] __wake_up_common+0x50/0x8c
-> [<ffffffc0000cef3c>] __wake_up_locked+0x10/0x1c
-> [<ffffffc0000cf734>] complete+0x3c/0x5c
-> [<ffffffc0002f0e78>] msm_mpm_enable_irq_exclusive+0x1b8/0x1c8
-> [<ffffffc0002f0f58>] __msm_mpm_enable_irq+0x4c/0x7c
-> [<ffffffc0002f0f94>] msm_mpm_enable_irq+0xc/0x18
-> [<ffffffc0002c9bb0>] gic_unmask_irq+0x40/0x7c
-> [<ffffffc0000de5f4>] irq_enable+0x2c/0x48
-> [<ffffffc0000de65c>] irq_startup+0x4c/0x74
-> [<ffffffc0000dd2fc>] __setup_irq+0x264/0x3f0
-> [<ffffffc0000dd5e0>] request_threaded_irq+0xcc/0x11c
-> [<ffffffc0000df254>] devm_request_threaded_irq+0x68/0xb4
-> [<ffffffc000471520>] msm_iommu_ctx_probe+0x124/0x2d4
-> [<ffffffc000337374>] platform_drv_probe+0x20/0x54
-> [<ffffffc00033598c>] driver_probe_device+0x158/0x340
-> [<ffffffc000335c20>] __driver_attach+0x60/0x90
-> [<ffffffc000333c9c>] bus_for_each_dev+0x6c/0x8c
-> [<ffffffc000335304>] driver_attach+0x1c/0x28
-> [<ffffffc000334f14>] bus_add_driver+0x120/0x204
-> [<ffffffc0003362e4>] driver_register+0xbc/0x10c
-> [<ffffffc000337348>] __platform_driver_register+0x5c/0x68
-> [<ffffffc00094c478>] msm_iommu_driver_init+0x54/0x7c
-> [<ffffffc0000813ec>] do_one_initcall+0xa4/0x130
-> [<ffffffc00091d928>] kernel_init_freeable+0x138/0x1dc
-> [<ffffffc000642578>] kernel_init+0xc/0xd4
-> 
-> We really just want to synchronize the sending of an SGI with the
-> update of the gic_cpu_map[], so introduce a new SGI lock that we
-> can use to synchronize the two code paths. To further optimize
-> we don't take any locks at all if the BL switcher code isn't used.
-> 
-> Cc: Nicolas Pitre <nico@linaro.org>
-> Cc: Russell King - ARM Linux <linux@arm.linux.org.uk>
-> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
-> ---
->  drivers/irqchip/irq-gic.c | 16 ++++++++++++++--
->  1 file changed, 14 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
-> index 4b959e606fe8..052762638b1c 100644
-> --- a/drivers/irqchip/irq-gic.c
-> +++ b/drivers/irqchip/irq-gic.c
-> @@ -80,6 +80,16 @@ static DEFINE_RAW_SPINLOCK(irq_controller_lock);
->  #define NR_GIC_CPU_IF 8
->  static u8 gic_cpu_map[NR_GIC_CPU_IF] __read_mostly;
->  
-> +#ifdef CONFIG_BL_SWITCHER
-> +/* Synchronize switching CPU interface and sending SGIs */
-> +static DEFINE_RAW_SPINLOCK(gic_sgi_lock);
-> +#define sgi_map_lock(flags) raw_spin_lock_irqsave(&gic_sgi_lock, flags)
-> +#define sgi_map_unlock(flags) raw_spin_unlock_irqrestore(&gic_sgi_lock, flags)
-> +#else
-> +#define sgi_map_lock(flags) (void)(flags)
-> +#define sgi_map_unlock(flags) (void)(flags)
-> +#endif
-> +
->  /*
->   * Supported arch specific GIC irq extension.
->   * Default make them NULL.
-> @@ -605,7 +615,7 @@ static void gic_raise_softirq(const struct cpumask *mask, unsigned int irq)
->  	int cpu;
->  	unsigned long flags, map = 0;
->  
-> -	raw_spin_lock_irqsave(&irq_controller_lock, flags);
-> +	sgi_map_lock(flags);
->  
->  	/* Convert our logical CPU mask into a physical one. */
->  	for_each_cpu(cpu, mask)
-> @@ -620,7 +630,7 @@ static void gic_raise_softirq(const struct cpumask *mask, unsigned int irq)
->  	/* this always happens on GIC0 */
->  	writel_relaxed(map << 16 | irq, gic_data_dist_base(&gic_data[0]) + GIC_DIST_SOFTINT);
->  
-> -	raw_spin_unlock_irqrestore(&irq_controller_lock, flags);
-> +	sgi_map_unlock(flags);
->  }
->  #endif
->  
-> @@ -690,6 +700,7 @@ void gic_migrate_target(unsigned int new_cpu_id)
->  	ror_val = (cur_cpu_id - new_cpu_id) & 31;
->  
->  	raw_spin_lock(&irq_controller_lock);
-> +	raw_spin_lock(&gic_sgi_lock);
->  
->  	/* Update the target interface for this logical CPU */
->  	gic_cpu_map[cpu] = 1 << new_cpu_id;
-> @@ -709,6 +720,7 @@ void gic_migrate_target(unsigned int new_cpu_id)
->  		}
->  	}
->  
-> +	raw_spin_unlock(&gic_sgi_lock);
->  	raw_spin_unlock(&irq_controller_lock);
->  
->  	/*
-> -- 
-> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-> hosted by The Linux Foundation
-> 
-> 
+-Doug
