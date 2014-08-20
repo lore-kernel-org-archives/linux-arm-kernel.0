@@ -1,77 +1,124 @@
-From: steve.capper@linaro.org (Steve Capper)
-Date: Wed, 20 Aug 2014 16:11:43 +0100
-Subject: [PATCH 0/6] RCU get_user_pages_fast and __get_user_pages_fast
-In-Reply-To: <CALdTtns6+MRb=Z7i0ncq_c2u7QZWo1mUxD824bvNF==q-_+BiQ@mail.gmail.com>
-References: <1403710824-24340-1-git-send-email-steve.capper@linaro.org>
- <CALdTtns6+MRb=Z7i0ncq_c2u7QZWo1mUxD824bvNF==q-_+BiQ@mail.gmail.com>
-Message-ID: <20140820151142.GA26217@linaro.org>
+From: grant.likely@linaro.org (Grant Likely)
+Date: Wed, 20 Aug 2014 10:02:54 -0500
+Subject: [PATCH 06/19] ARM64 / ACPI: Parse FADT table to get PSCI flags
+ for PSCI init
+In-Reply-To: <53DA1916.1030907@linaro.org>
+References: <1406206825-15590-1-git-send-email-hanjun.guo@linaro.org>
+ <1406206825-15590-7-git-send-email-hanjun.guo@linaro.org>
+ <CAOesGMjzFyd_=+ToFmjyn958F86KsDJDht+9ZmniAERz16K_VQ@mail.gmail.com>
+ <53DA1916.1030907@linaro.org>
+Message-ID: <20140820150254.E115EC41205@trevor.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 20, 2014 at 08:56:09AM -0600, Dann Frazier wrote:
-> On Wed, Jun 25, 2014 at 9:40 AM, Steve Capper <steve.capper@linaro.org> wrote:
-> > Hello,
-> > This series implements general forms of get_user_pages_fast and
-> > __get_user_pages_fast and activates them for arm and arm64.
-> >
-> > These are required for Transparent HugePages to function correctly, as
-> > a futex on a THP tail will otherwise result in an infinite loop (due to
-> > the core implementation of __get_user_pages_fast always returning 0).
-> >
-> > This series may also be beneficial for direct-IO heavy workloads and
-> > certain KVM workloads.
-> >
-> > The main changes since RFC V5 are:
-> >  * Rebased against 3.16-rc1.
-> >  * pmd_present no longer tested for by gup_huge_pmd and gup_huge_pud,
-> >    because the entry must be present for these leaf functions to be
-> >    called.
-> >  * Rather than assume puds can be re-cast as pmds, a separate
-> >    function pud_write is instead used by the core gup.
-> >  * ARM activation logic changed, now it will only activate
-> >    RCU_TABLE_FREE and RCU_GUP when running with LPAE.
-> >
-> > The main changes since RFC V4 are:
-> >  * corrected the arm64 logic so it now correctly rcu-frees page
-> >    table backing pages.
-> >  * rcu free logic relaxed for pre-ARMv7 ARM as we need an IPI to
-> >    invalidate TLBs anyway.
-> >  * rebased to 3.15-rc3 (some minor changes were needed to allow it to merge).
-> >  * dropped Catalin's mmu_gather patch as that's been merged already.
-> >
-> > This series has been tested with LTP and some custom futex tests that
-> > exacerbate the futex on THP tail case. Also debug counters were
-> > temporarily employed to ensure that the RCU_TABLE_FREE logic was
-> > behaving as expected.
-> >
-> > I would really appreciate any testers or comments (especially on the
-> > validity or otherwise of the core fast_gup implementation).
+On Thu, 31 Jul 2014 18:23:18 +0800, Hanjun Guo <hanjun.guo@linaro.org> wrote:
+> On 2014-7-31 12:22, Olof Johansson wrote:
+> > Hi,
 > 
-> I have a test case that can reliably hit the THP issue on arm64, which
-> hits it on both 3.16 and 3.17-rc1. I do a "juju bootstrap local" w/
-> THP disabled at boot. Then I reboot with THP enabled. At this point
-> you'll see jujud spin at 200% CPU. gccgo binaries seem to have a nack
-> for hitting it.
+> Hi Olof,
 > 
-> I validated that your patches resolve this issue on 3.16, so:
+> > 
+> > On Thu, Jul 24, 2014 at 6:00 AM, Hanjun Guo <hanjun.guo@linaro.org> wrote:
+> >> There are two flags: PSCI_COMPLIANT and PSCI_USE_HVC. When set,
+> >> the former signals to the OS that the hardware is PSCI compliant.
+> >> The latter selects the appropriate conduit for PSCI calls by
+> >> toggling between Hypervisor Calls (HVC) and Secure Monitor Calls
+> >> (SMC).
+> >>
+> >> FADT table contains such information, parse FADT to get the flags
+> >> for PSCI init. Since ACPI 5.1 doesn't support self defined PSCI
+> >> function IDs, which means that only PSCI 0.2+ is supported in ACPI.
+> >>
+> >> At the same time, only ACPI 5.1 or higher verison supports PSCI,
+> >> and FADT Major.Minor version was introduced in ACPI 5.1, so we
+> >> will check the version and only parse FADT table with version >= 5.1.
+> >>
+> >> If firmware provides ACPI tables with ACPI version less than 5.1,
+> >> OS will be messed up with those information and have no way to
+> >> bring up secondery CPUs, so disable ACPI if we get an FADT table
+> >> with version less that 5.1.
+> >>
+> >> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+> >> Signed-off-by: Graeme Gregory <graeme.gregory@linaro.org>
+> >> ---
+> >>  arch/arm64/include/asm/acpi.h |    2 +
+> >>  arch/arm64/kernel/acpi.c      |   50 ++++++++++++++++++++++
+> >>  arch/arm64/kernel/psci.c      |   95 +++++++++++++++++++++++++++++------------
+> >>  arch/arm64/kernel/setup.c     |    2 +
+> >>  4 files changed, 121 insertions(+), 28 deletions(-)
+> >>
+> >> diff --git a/arch/arm64/include/asm/acpi.h b/arch/arm64/include/asm/acpi.h
+> >> index 44b617f..67dac90 100644
+> >> --- a/arch/arm64/include/asm/acpi.h
+> >> +++ b/arch/arm64/include/asm/acpi.h
+> >> @@ -18,6 +18,8 @@ extern int acpi_disabled;
+> >>  extern int acpi_noirq;
+> >>  extern int acpi_pci_disabled;
+> >>  extern int acpi_strict;
+> >> +extern int acpi_psci_present;
+> >> +extern int acpi_psci_use_hvc;
+> >>
+> >>  static inline void disable_acpi(void)
+> >>  {
+> >> diff --git a/arch/arm64/kernel/acpi.c b/arch/arm64/kernel/acpi.c
+> >> index f5a10b5..374926f 100644
+> >> --- a/arch/arm64/kernel/acpi.c
+> >> +++ b/arch/arm64/kernel/acpi.c
+> >> @@ -11,6 +11,8 @@
+> >>   *  published by the Free Software Foundation.
+> >>   */
+> >>
+> >> +#define pr_fmt(fmt) "ACPI: " fmt
+> >> +
+> >>  #include <linux/init.h>
+> >>  #include <linux/acpi.h>
+> >>  #include <linux/cpumask.h>
+> >> @@ -34,6 +36,12 @@ EXPORT_SYMBOL(acpi_disabled);
+> >>  int acpi_pci_disabled;         /* skip ACPI PCI scan and IRQ initialization */
+> >>  EXPORT_SYMBOL(acpi_pci_disabled);
+> >>
+> >> +/* 1 to indicate PSCI is implemented */
+> >> +int acpi_psci_present;
+> >> +
+> >> +/* 1 to indicate HVC must be used instead of SMC as the PSCI conduit */
+> >> +int acpi_psci_use_hvc;
+> > 
+> > Here's a prime example of where it would just make more sense to
+> > populate DT based on what's in the ACPI info.
+> > 
+> > Have a acpi_parse_fadt() that, if needed, creates a /psci node in the
+> > system-wide DT and populates it with the few properties needed.
+> > 
+> > That way, the rest of the code path in the kernel setup is identical,
+> > instead of dealing with separate functions for setup, two exported
+> > variables just to communicate the state, and so on. It's just extra
+> > complexity for no good reason. The ACPi side code isn't even adding
+> > significant complexity compared to this. We'll need to add an
+> > of_add_node() property though.
 > 
-> Tested-by: dann frazier <dann.frazier@canonical.com>
+> Yes, this will make the code path in the kernel setup is identical, but
+> I think mixture of ACPI and DT (converting ACPI into DT at run-time) is
+> not a good solution, and this had been discussed last year:
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2013-November/211662.html
 
-Thanks Dann!
+Agreed. I don't want to get into populating DT structures with ACPI
+data. I think doing so ends up increasing the conceptual complexity.
 
+> >> -       np = of_find_matching_node_and_match(NULL, psci_of_match, &matched_np);
+> >> +       if (acpi_disabled) {
+> >> +               np = of_find_matching_node_and_match(NULL,
+> >> +                               psci_of_match, &matched_np);
+> > 
+> > Ideally this code should go away by changing the rest of it, but for
+> > future cases: It'd be a lot cleaner to do this as:
+> > 
+> >         if (!acpi_disabled)
+> >                 return psci_0_2_init_acpi();
+> > 
+> > ... then fall through to the current implementation instead.
 > 
-> I haven't done the same for 3.17-rc1 because they no longer apply
-> cleanly, but I'm happy to test future submissions w/ hopefully a
-> shorter feedback loop (please add me to the CC). btw, should we
-> consider something like this until your patches go in?
+> I prefer this one :)
 
-I am about to post the following series, I will CC you:
-git://git.linaro.org/people/steve.capper/linux.git fast_gup/3.17-rc1
-(I've just been giving it a workout on 3.17-rc1).
+Good! :-)
 
-I would much prefer for the RCU fast_gup to go into 3.18 rather than
-BROKEN for THP. I am not sure what to do about earlier versions.
-
-Cheers,
--- 
-Steve
+g.
