@@ -1,20 +1,196 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 20 Aug 2014 10:31:32 -0500
-Subject: [PATCH] spi/rockchip: fixup incorrect dma direction setting
-In-Reply-To: <1408506462-3686-1-git-send-email-addy.ke@rock-chips.com>
-References: <1408506462-3686-1-git-send-email-addy.ke@rock-chips.com>
-Message-ID: <20140820153132.GY24407@sirena.org.uk>
+From: afaerber@suse.de (=?ISO-8859-15?Q?Andreas_F=E4rber?=)
+Date: Wed, 20 Aug 2014 17:36:37 +0200
+Subject: [PATCH v2] ARM: apq8064: Add pinmux and i2c pinctrl nodes
+In-Reply-To: <1408536133-13824-1-git-send-email-kiran.padwal@smartplayin.com>
+References: <1408536133-13824-1-git-send-email-kiran.padwal@smartplayin.com>
+Message-ID: <53F4C085.5060101@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 20, 2014 at 11:47:42AM +0800, Addy Ke wrote:
-> Signed-off-by: Addy Ke <addy.ke@rock-chips.com>
+Hi,
 
-Applied, thanks.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140820/90d480f7/attachment.sig>
+Am 20.08.2014 14:02, schrieb Kiran Padwal:
+> This patch adds pinmux and i2c pinctrl DT node for IFC6410 board.
+> It also adds necessary DT support for i2c eeprom which is present on
+> IFC6410.
+> 
+> Tested on IFC6410 board.
+> 
+> Signed-off-by: Kiran Padwal <kiran.padwal@smartplayin.com>
+> ---
+> Chages since v1:
+> 	- Renamed pinmux phandle "qcom_pinmux" to "tlmm_pinmux".
+> 	- Updated pinmux interrupt.
+> 
+>  arch/arm/boot/dts/qcom-apq8064-ifc6410.dts |   29 ++++++++++++++
+>  arch/arm/boot/dts/qcom-apq8064.dtsi        |   59 ++++++++++++++++++++++++++++
+>  2 files changed, 88 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/qcom-apq8064-ifc6410.dts b/arch/arm/boot/dts/qcom-apq8064-ifc6410.dts
+> index 7c2441d..d52ac3c 100644
+> --- a/arch/arm/boot/dts/qcom-apq8064-ifc6410.dts
+> +++ b/arch/arm/boot/dts/qcom-apq8064-ifc6410.dts
+> @@ -5,6 +5,15 @@
+>  	compatible = "qcom,apq8064-ifc6410", "qcom,apq8064";
+>  
+>  	soc {
+> +		pinmux at 800000 {
+> +			i2c1_pins: i2c1_pinmux {
+
+Is there a requirement to have "_pinmux" in the subnode of the "pinmux"
+node? Otherwise use just "i2c1"? I notice because the general convention
+seems to be dashes rather than underscores for node names.
+
+> +				mux {
+> +					pins = "gpio20", "gpio21";
+> +					function = "gsbi1";
+> +				};
+> +			};
+> +		};
+> +
+>  		gsbi at 16600000 {
+>  			status = "ok";
+>  			qcom,mode = <GSBI_PROT_I2C_UART>;
+> @@ -12,5 +21,25 @@
+>  				status = "ok";
+>  			};
+>  		};
+> +
+> +		gsbi1: gsbi at 12440000 {
+> +			qcom,mode = <GSBI_PROT_I2C>;
+> +			status = "ok";
+
+Usually the overridden status property goes first, as seen on the
+previous gsbi node.
+
+Further, its canonical value is "okay" (although in practice anything
+other than "disabled" should work), so suggest you adopt it for your new
+nodes.
+
+Also, you already provide a label "gsbi1" to this node in the .dtsi
+below, so you don't need to do it here again.
+Some architectures prefer in such a case that in the .dts the node is
+referenced as &gsbi1 {...}; below the root node in alphabetical order
+rather than duplicating the full /soc/foo at bar hierarchy.
+
+> +
+> +			i2c1: i2c at 12460000 {
+
+Suggest to move the i2c1 label to the .dtsi. Then optionally same could
+be done here as outlined for gsbi1.
+
+> +				status = "ok";
+
+"okay".
+
+> +
+> +				clock-frequency = <200000>;
+> +
+> +				pinctrl-0 = <&i2c1_pins>;
+> +				pinctrl-names = "default";
+> +
+> +				eeprom: eeprom at 52 {
+> +					compatible = "atmel,24c128";
+> +					reg = <0x52>;
+> +					pagesize = <32>;
+> +				};
+> +			};
+> +		};
+>  	};
+>  };
+> diff --git a/arch/arm/boot/dts/qcom-apq8064.dtsi b/arch/arm/boot/dts/qcom-apq8064.dtsi
+> index 92bf793..bb2ccde 100644
+> --- a/arch/arm/boot/dts/qcom-apq8064.dtsi
+> +++ b/arch/arm/boot/dts/qcom-apq8064.dtsi
+> @@ -70,6 +70,17 @@
+>  		ranges;
+>  		compatible = "simple-bus";
+>  
+> +		tlmm_pinmux: pinmux at 800000 {
+> +			compatible = "qcom,apq8064-pinctrl";
+> +			reg = <0x800000 0x4000>;
+> +
+> +			gpio-controller;
+> +			#gpio-cells = <2>;
+> +			interrupt-controller;
+> +			#interrupt-cells = <2>;
+> +			interrupts = <0 16 0x4>;
+
+s/0x4/IRQ_TYPE_LEVEL_HIGH/?
+
+> +		};
+> +
+>  		intc: interrupt-controller at 2000000 {
+>  			compatible = "qcom,msm-qgic2";
+>  			interrupt-controller;
+> @@ -133,6 +144,54 @@
+>  			regulator;
+>  		};
+>  
+> +		gsbi1: gsbi at 12440000 {
+> +			compatible = "qcom,gsbi-v1.0.0";
+> +			reg = <0x12440000 0x100>;
+> +			clocks = <&gcc GSBI1_H_CLK>;
+> +			clock-names = "iface";
+> +			#address-cells = <1>;
+> +			#size-cells = <1>;
+> +			ranges;
+> +			status = "disabled";
+> +
+> +			i2c at 12460000 {
+> +				compatible = "qcom,i2c-qup-v1.1.1";
+> +				reg = <0x12460000 0x1000>;
+> +				interrupts = <0 194 0>;
+
+The trailing 0 might be IRQ_TYPE_NONE?
+
+> +
+> +				clocks = <&gcc GSBI1_QUP_CLK>, <&gcc GSBI1_H_CLK>;
+> +				clock-names = "core", "iface";
+> +				status = "disabled";
+
+I'd guess this is redundant since the parent is already disabled?
+
+> +
+> +				#address-cells = <1>;
+> +				#size-cells = <0>;
+> +			};
+> +		};
+> +
+> +		gsbi2: gsbi at 12480000 {
+> +			compatible = "qcom,gsbi-v1.0.0";
+> +			reg = <0x12480000 0x100>;
+> +			clocks = <&gcc GSBI2_H_CLK>;
+> +			clock-names = "iface";
+> +			#address-cells = <1>;
+> +			#size-cells = <1>;
+> +			ranges;
+> +			status = "disabled";
+> +
+> +			i2c at 124a0000 {
+> +				compatible = "qcom,i2c-qup-v1.1.1";
+> +				reg = <0x124a0000 0x1000>;
+> +				interrupts = <0 196 0>;
+
+Again, IRQ_TYPE_NONE possibly?
+
+Cheers,
+Andreas
+
+> +
+> +				clocks = <&gcc GSBI2_QUP_CLK>, <&gcc GSBI2_H_CLK>;
+> +				clock-names = "core", "iface";
+> +				status = "disabled";
+> +
+> +				#address-cells = <1>;
+> +				#size-cells = <0>;
+> +			};
+> +		};
+> +
+>  		gsbi7: gsbi at 16600000 {
+>  			status = "disabled";
+>  			compatible = "qcom,gsbi-v1.0.0";
+
+-- 
+SUSE LINUX Products GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
+GF: Jeff Hawn, Jennifer Guild, Felix Imend?rffer; HRB 16746 AG N?rnberg
