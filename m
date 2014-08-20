@@ -1,39 +1,121 @@
 From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
-Date: Wed, 20 Aug 2014 13:19:51 +0200
-Subject: [PATCH v2 3/5] ARM: dts: add hdmi regulators for exynos5420 based
- peach-pit board
+Date: Wed, 20 Aug 2014 13:19:52 +0200
+Subject: [PATCH v2 4/5] ARM: dts: Add thermistor dts fragment used by exynos
+ based Peach boards
 In-Reply-To: <1408533593-32346-1-git-send-email-javier.martinez@collabora.co.uk>
 References: <1408533593-32346-1-git-send-email-javier.martinez@collabora.co.uk>
-Message-ID: <1408533593-32346-4-git-send-email-javier.martinez@collabora.co.uk>
+Message-ID: <1408533593-32346-5-git-send-email-javier.martinez@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Rahul Sharma <rahul.sharma@samsung.com>
+From: Naveen Krishna Chatradhi <ch.naveen@samsung.com>
 
-Adding regulators for hdmi for peach-pit board.
+This patch creates a thermistor fragment carrying the NTC Thermistor
+nodes as children of the IIO based ADC.
 
-Signed-off-by: Rahul Sharma <rahul.sharma@samsung.com>
-Reviewed-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+This fragment is included in exynos5420-peach-pit.dts and
+exynos5800-peach-pi.dts.
+
+Signed-off-by: Naveen Krishna Chatradhi <ch.naveen@samsung.com>
 Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
 ---
- arch/arm/boot/dts/exynos5420-peach-pit.dts | 5 +++++
- 1 file changed, 5 insertions(+)
+ arch/arm/boot/dts/cros-adc-thermistors.dtsi | 44 +++++++++++++++++++++++++++++
+ arch/arm/boot/dts/exynos5420-peach-pit.dts  |  6 ++++
+ arch/arm/boot/dts/exynos5800-peach-pi.dts   |  6 ++++
+ 3 files changed, 56 insertions(+)
+ create mode 100644 arch/arm/boot/dts/cros-adc-thermistors.dtsi
 
+diff --git a/arch/arm/boot/dts/cros-adc-thermistors.dtsi b/arch/arm/boot/dts/cros-adc-thermistors.dtsi
+new file mode 100644
+index 0000000..acd4fe1
+--- /dev/null
++++ b/arch/arm/boot/dts/cros-adc-thermistors.dtsi
+@@ -0,0 +1,44 @@
++/*
++ * Thermistor dts fragment for devices that use Thermistors as
++ * children of the IIO based ADC.
++ *
++ * Currently, used by Exynos5420 based Peach PIT and
++ * Exynos5800 based Peach PI.
++ *
++ * Copyright (c) 2014 Samsung Electronics Co., Ltd.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++*/
++
++&adc {
++	ncp15wb473 at 3 {
++		compatible = "murata,ncp15wb473";
++		pullup-uv = <1800000>;
++		pullup-ohm = <47000>;
++		pulldown-ohm = <0>;
++		io-channels = <&adc 3>;
++	};
++	ncp15wb473 at 4 {
++		compatible = "murata,ncp15wb473";
++		pullup-uv = <1800000>;
++		pullup-ohm = <47000>;
++		pulldown-ohm = <0>;
++		io-channels = <&adc 4>;
++	};
++	ncp15wb473 at 5 {
++		compatible = "murata,ncp15wb473";
++		pullup-uv = <1800000>;
++		pullup-ohm = <47000>;
++		pulldown-ohm = <0>;
++		io-channels = <&adc 5>;
++	};
++	ncp15wb473 at 6 {
++		compatible = "murata,ncp15wb473";
++		pullup-uv = <1800000>;
++		pullup-ohm = <47000>;
++		pulldown-ohm = <0>;
++		io-channels = <&adc 6>;
++	};
++};
 diff --git a/arch/arm/boot/dts/exynos5420-peach-pit.dts b/arch/arm/boot/dts/exynos5420-peach-pit.dts
-index 78cea4c..7c5957b 100644
+index 7c5957b..94225e6 100644
 --- a/arch/arm/boot/dts/exynos5420-peach-pit.dts
 +++ b/arch/arm/boot/dts/exynos5420-peach-pit.dts
-@@ -143,6 +143,11 @@
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&hdmi_hpd_irq>;
- 	ddc = <&i2c_2>;
-+
-+	hdmi-en-supply = <&tps65090_fet7>;
-+	vdd-supply = <&ldo8_reg>;
-+	vdd_osc-supply = <&ldo10_reg>;
-+	vdd_pll-supply = <&ldo8_reg>;
+@@ -103,6 +103,11 @@
+ 	};
  };
  
- &hsi2c_4 {
++&adc {
++	status = "okay";
++	vdd-supply = <&ldo9_reg>;
++};
++
+ &dp {
+ 	status = "okay";
+ 	pinctrl-names = "default";
+@@ -814,3 +819,4 @@
+ };
+ 
+ #include "cros-ec-keyboard.dtsi"
++#include "cros-adc-thermistors.dtsi"
+diff --git a/arch/arm/boot/dts/exynos5800-peach-pi.dts b/arch/arm/boot/dts/exynos5800-peach-pi.dts
+index ec4e5c7..8f9d66e 100644
+--- a/arch/arm/boot/dts/exynos5800-peach-pi.dts
++++ b/arch/arm/boot/dts/exynos5800-peach-pi.dts
+@@ -101,6 +101,11 @@
+ 	};
+ };
+ 
++&adc {
++	status = "okay";
++	vdd-supply = <&ldo9_reg>;
++};
++
+ &dp {
+ 	status = "okay";
+ 	pinctrl-names = "default";
+@@ -812,3 +817,4 @@
+ };
+ 
+ #include "cros-ec-keyboard.dtsi"
++#include "cros-adc-thermistors.dtsi"
 -- 
 2.0.1
