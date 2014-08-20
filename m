@@ -1,117 +1,89 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Wed, 20 Aug 2014 11:13:36 +0200
-Subject: [PATCH v2 2/2] arm/arm64: KVM: Support KVM_CAP_READONLY_MEM
-In-Reply-To: <1408526016-4696-1-git-send-email-christoffer.dall@linaro.org>
-References: <1408526016-4696-1-git-send-email-christoffer.dall@linaro.org>
-Message-ID: <1408526016-4696-2-git-send-email-christoffer.dall@linaro.org>
+From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
+Date: Wed, 20 Aug 2014 11:17:24 +0200
+Subject: [PATCH] mfd: max77686: make interrupts support optional
+In-Reply-To: <53F45C73.1030304@collabora.co.uk>
+References: <1408516009-22106-1-git-send-email-m.szyprowski@samsung.com>
+ <20140820081909.GH4266@lee--X1> <53F45C73.1030304@collabora.co.uk>
+Message-ID: <3154093.ltyAb6brb9@amdc1032>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When userspace loads code and data in a read-only memory regions, KVM
-needs to be able to handle this on arm and arm64.  Specifically this is
-used when running code directly from a read-only flash device; the
-common scenario is a UEFI blob loaded with the -bios option in QEMU.
 
-Note that the MMIO exit on writes to a read-only memory is ABI and can
-be used to emulate block-erase style flash devices.
+Hi,
 
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
-Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
----
- arch/arm/include/uapi/asm/kvm.h   |  1 +
- arch/arm/kvm/arm.c                |  1 +
- arch/arm/kvm/mmu.c                | 15 ++++++++-------
- arch/arm64/include/uapi/asm/kvm.h |  1 +
- 4 files changed, 11 insertions(+), 7 deletions(-)
+On Wednesday, August 20, 2014 10:29:39 AM Javier Martinez Canillas wrote:
+> Hello Lee, Marek,
+> 
+> On 08/20/2014 10:19 AM, Lee Jones wrote:
+> > On Wed, 20 Aug 2014, Marek Szyprowski wrote:
+> > 
+> >> Commit 6f1c1e71d93 ("mfd: max77686: Convert to use regmap_irq") broke
+> >> support for boards, which provide no irq for MAX 77686 PMIC. In such
+> >> case, not all functions of PMIC are available, but the driver still
+> >> should at least handle voltage regulators instead of failing to init.
+> >> This patch restores previous behavior.
+> >> 
+> >> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> >> ---
+> >> Hello,
+> >> 
+> >> This patch fixes booting issues with recently merged support for
+> >> Exynos4412 based Odroid X2/U3 boards. See
+> >> http://www.spinics.net/lists/linux-samsung-soc/msg35773.html
+> >> thread for more details.
+> >> 
+> >> Best regards
+> >> Marek Szyprowski
+> >> Samsung R&D Institute Poland
+> 
+> I already gave my opinion about this patch on thread:
+> 
+> "[PATCH v2 0/4] Add Exynos4412 based Odroid X2 and U2/U3/U3+ support"
+> 
+> where the issue was reported by Olof but I'll add it here as well for
+> completeness since I don't know if the same people are cc'ed on both threads.
+> 
+> Bartlomiej Zolnierkiewicz posted a similar patch [0] before but as I said
 
-diff --git a/arch/arm/include/uapi/asm/kvm.h b/arch/arm/include/uapi/asm/kvm.h
-index e6ebdd3..51257fd 100644
---- a/arch/arm/include/uapi/asm/kvm.h
-+++ b/arch/arm/include/uapi/asm/kvm.h
-@@ -25,6 +25,7 @@
- 
- #define __KVM_HAVE_GUEST_DEBUG
- #define __KVM_HAVE_IRQ_LINE
-+#define __KVM_HAVE_READONLY_MEM
- 
- #define KVM_REG_SIZE(id)						\
- 	(1U << (((id) & KVM_REG_SIZE_MASK) >> KVM_REG_SIZE_SHIFT))
-diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
-index a99e0cd..3ab3e60 100644
---- a/arch/arm/kvm/arm.c
-+++ b/arch/arm/kvm/arm.c
-@@ -188,6 +188,7 @@ int kvm_vm_ioctl_check_extension(struct kvm *kvm, long ext)
- 	case KVM_CAP_ONE_REG:
- 	case KVM_CAP_ARM_PSCI:
- 	case KVM_CAP_ARM_PSCI_0_2:
-+	case KVM_CAP_READONLY_MEM:
- 		r = 1;
- 		break;
- 	case KVM_CAP_COALESCED_MMIO:
-diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
-index 16e7994..dcbe01e 100644
---- a/arch/arm/kvm/mmu.c
-+++ b/arch/arm/kvm/mmu.c
-@@ -747,14 +747,13 @@ static bool transparent_hugepage_adjust(pfn_t *pfnp, phys_addr_t *ipap)
- }
- 
- static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
--			  struct kvm_memory_slot *memslot,
-+			  struct kvm_memory_slot *memslot, unsigned long hva,
- 			  unsigned long fault_status)
- {
- 	int ret;
- 	bool write_fault, writable, hugetlb = false, force_pte = false;
- 	unsigned long mmu_seq;
- 	gfn_t gfn = fault_ipa >> PAGE_SHIFT;
--	unsigned long hva = gfn_to_hva(vcpu->kvm, gfn);
- 	struct kvm *kvm = vcpu->kvm;
- 	struct kvm_mmu_memory_cache *memcache = &vcpu->arch.mmu_page_cache;
- 	struct vm_area_struct *vma;
-@@ -863,7 +862,8 @@ int kvm_handle_guest_abort(struct kvm_vcpu *vcpu, struct kvm_run *run)
- 	unsigned long fault_status;
- 	phys_addr_t fault_ipa;
- 	struct kvm_memory_slot *memslot;
--	bool is_iabt;
-+	unsigned long hva;
-+	bool is_iabt, write_fault, writable;
- 	gfn_t gfn;
- 	int ret, idx;
- 
-@@ -884,7 +884,10 @@ int kvm_handle_guest_abort(struct kvm_vcpu *vcpu, struct kvm_run *run)
- 	idx = srcu_read_lock(&vcpu->kvm->srcu);
- 
- 	gfn = fault_ipa >> PAGE_SHIFT;
--	if (!kvm_is_visible_gfn(vcpu->kvm, gfn)) {
-+	memslot = gfn_to_memslot(vcpu->kvm, gfn);
-+	hva = gfn_to_hva_memslot_prot(memslot, gfn, &writable);
-+	write_fault = kvm_is_write_fault(kvm_vcpu_get_hsr(vcpu));
-+	if (kvm_is_error_hva(hva) || (write_fault && !writable)) {
- 		if (is_iabt) {
- 			/* Prefetch Abort on I/O address */
- 			kvm_inject_pabt(vcpu, kvm_vcpu_get_hfar(vcpu));
-@@ -910,9 +913,7 @@ int kvm_handle_guest_abort(struct kvm_vcpu *vcpu, struct kvm_run *run)
- 		goto out_unlock;
- 	}
- 
--	memslot = gfn_to_memslot(vcpu->kvm, gfn);
--
--	ret = user_mem_abort(vcpu, fault_ipa, memslot, fault_status);
-+	ret = user_mem_abort(vcpu, fault_ipa, memslot, hva, fault_status);
- 	if (ret == 0)
- 		ret = 1;
- out_unlock:
-diff --git a/arch/arm64/include/uapi/asm/kvm.h b/arch/arm64/include/uapi/asm/kvm.h
-index e633ff8..f4ec5a6 100644
---- a/arch/arm64/include/uapi/asm/kvm.h
-+++ b/arch/arm64/include/uapi/asm/kvm.h
-@@ -37,6 +37,7 @@
- 
- #define __KVM_HAVE_GUEST_DEBUG
- #define __KVM_HAVE_IRQ_LINE
-+#define __KVM_HAVE_READONLY_MEM
- 
- #define KVM_REG_SIZE(id)						\
- 	(1U << (((id) & KVM_REG_SIZE_MASK) >> KVM_REG_SIZE_SHIFT))
--- 
-2.0.0
+BTW my patch a bit simpler than this one.
+
+regmap_del_irq_chip() checks for second argument being NULL so it is not
+needed to explicitly check for max77686->irq not being zero on probe
+failures before calling regmap_del_irq_chip().
+
+> on that thread, I'm not sure if is correct to make that DT property
+> optional. Or rather, if we need to make it optional then we should also
+> change the Documentation/devicetree/bindings/mfd/max77686.txt that list
+> "interrupts" DT property as required.
+> 
+> It's true that before converting the max77686 to use the regmap irq API,
+> the driver was loose on that regard but max77686_irq_init() in
+> max77686-irq.c was returning -ENODEV when the IRQ was not provided and
+> that error code was not checked in max77686_i2c_probe() (which was a bug
+> IMHO).
+> 
+> More importantly I wonder if a design where a IRQ line is not connected to
+> the max77686 PMIC makes even sense. If such a design is possible then the
+> "interrupt" property should be made optional but if not then I think that
+> the driver should fail to probe in that case. Yes, it is a regression but
+> the Odroid DTS was not following the DT binding and was just lucky that
+> the driver was not checking the required DT properties.
+> 
+> Daniel Drake posted the correct fix for the Odroid DTS [1]. So I tend to
+> say that Daniel's fix should be added as a -rc fix and we should keep both
+> the max77686 driver and its DT binding as it is now but as I said, if from
+> a hardware point of view makes sense to leave that line unconnected then I
+> don't oppose to this change.
+> 
+> Best regards,
+> Javier
+> 
+> [0]: https://lkml.org/lkml/2014/8/7/374
+> [1]:
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2014-July/272869.html
+
+Best regards,
+--
+Bartlomiej Zolnierkiewicz
+Samsung R&D Institute Poland
+Samsung Electronics
