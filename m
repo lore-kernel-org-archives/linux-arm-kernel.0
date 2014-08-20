@@ -1,56 +1,46 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 20 Aug 2014 15:52:19 +0100
-Subject: [PATCH v2 08/18] ARM64 / ACPI: Get the enable method for SMP
- initialization in ACPI way
-In-Reply-To: <53F30B99.4000704@linaro.org>
-References: <1407166105-17675-1-git-send-email-hanjun.guo@linaro.org>
- <1407166105-17675-9-git-send-email-hanjun.guo@linaro.org>
- <20140818142733.GT20043@localhost> <53F30B99.4000704@linaro.org>
-Message-ID: <20140820145219.GO24600@localhost>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Wed, 20 Aug 2014 20:23:23 +0530
+Subject: [PATCH 2/5] phy: miphy28lp: Add MiPHY28lp header file for DT
+ x Driver defines
+In-Reply-To: <1407944075-8093-3-git-send-email-gabriel.fernandez@linaro.org>
+References: <1407944075-8093-1-git-send-email-gabriel.fernandez@linaro.org>
+ <1407944075-8093-3-git-send-email-gabriel.fernandez@linaro.org>
+Message-ID: <53F4B663.90400@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 19, 2014 at 09:32:25AM +0100, Hanjun Guo wrote:
-> On 2014-8-18 22:27, Catalin Marinas wrote:
-> > On Mon, Aug 04, 2014 at 04:28:15PM +0100, Hanjun Guo wrote:
-> >> +#ifdef CONFIG_ACPI
-> >> +/*
-> >> + * Get a cpu's boot method in the ACPI way.
-> >> + */
-> >> +static char * __init acpi_get_cpu_boot_method(void)
-> >> +{
-> >> +	/*
-> >> +	 * For ACPI 5.1, only two kind of methods are provided,
-> >> +	 * Parking protocol and PSCI, but Parking protocol is
-> >> +	 * specified for ARMv7 only, so make PSCI as the only method
-> >> +	 * for SMP initialization before the ACPI spec or Parking
-> >> +	 * protocol spec is updated.
-> >> +	 */
-> >> +	switch (smp_boot_protocol()) {
-> >> +	case ACPI_SMP_BOOT_PSCI:
-> >> +		return "psci";
-> >> +	case ACPI_SMP_BOOT_PARKING_PROTOCOL:
-> >> +	default:
-> >> +		return NULL;
-> >> +	}
-> >> +}
-> > 
-> > Actually, do we even need to define smp_boot_protocol()? Is it used
-> > anywhere else apart from this patch (I still haven't gone through all
-> > patches)?
+Hi,
+
+On Wednesday 13 August 2014 09:04 PM, Gabriel FERNANDEZ wrote:
+> This provides the shared header file which will be reference from both
+> the MiPHY28lp driver and its associated Device Tree node(s).
 > 
-> It is just used in this patch. I think we can make the ACPI boot protocol
-> scalable in this way, if we support another boot protocol in ACPI in the
-> future, we can easily update the function to support it, does it make sense?
+> Signed-off-by: alexandre torgue <alexandre.torgue@st.com>
+> Signed-off-by: Gabriel Fernandez <gabriel.fernandez@linaro.org>
+> ---
+>  include/dt-bindings/phy/phy-miphy28lp.h | 12 ++++++++++++
+>  1 file changed, 12 insertions(+)
+>  create mode 100644 include/dt-bindings/phy/phy-miphy28lp.h
+> 
+> diff --git a/include/dt-bindings/phy/phy-miphy28lp.h b/include/dt-bindings/phy/phy-miphy28lp.h
+> new file mode 100644
+> index 0000000..7cf9bce
+> --- /dev/null
+> +++ b/include/dt-bindings/phy/phy-miphy28lp.h
+> @@ -0,0 +1,12 @@
+> +/*
+> + * This header provides constants for the phy framework
+> + * based on the STMicroelectronics miph28lp.
+> + */
+> +#ifndef _DT_BINDINGS_PHY_MIPHY28LP
+> +#define _DT_BINDINGS_PHY_MIPHY28LP
+> +
+> +#define MIPHY_TYPE_SATA		1
+> +#define MIPHY_TYPE_PCIE		2
+> +#define MIPHY_TYPE_USB		3
 
-Not really. You just add additional code, enums, functions when all you
-do is check for acpi_psci_present() (or whatever new protocol you would
-get). If the enum is never going to be used outside this file, don't
-bother with additional functions.
+I think we should create a common file for phy so that all user's need not
+create a separate copy of the same thing.
 
-BTW, it would be nicer if the acpi related functions are contained in as
-fewer files as possible. So here you could keep
-acpi_get_cpu_boot_method() in the acpi.c file. It only returns a string.
-
--- 
-Catalin
+Thanks
+Kishon
