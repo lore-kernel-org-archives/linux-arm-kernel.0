@@ -1,89 +1,47 @@
-From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
-Date: Wed, 20 Aug 2014 11:17:24 +0200
-Subject: [PATCH] mfd: max77686: make interrupts support optional
-In-Reply-To: <53F45C73.1030304@collabora.co.uk>
-References: <1408516009-22106-1-git-send-email-m.szyprowski@samsung.com>
- <20140820081909.GH4266@lee--X1> <53F45C73.1030304@collabora.co.uk>
-Message-ID: <3154093.ltyAb6brb9@amdc1032>
+From: frans.klaver@xsens.com (Frans Klaver)
+Date: Wed, 20 Aug 2014 11:23:21 +0200
+Subject: [PATCH 03/15] tty: serial: 8250_core: add run time pm
+In-Reply-To: <1408124563-31541-4-git-send-email-bigeasy@linutronix.de>
+References: <1408124563-31541-1-git-send-email-bigeasy@linutronix.de>
+ <1408124563-31541-4-git-send-email-bigeasy@linutronix.de>
+Message-ID: <20140820092319.GA20775@ci00147.xsens-tech.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
 Hi,
 
-On Wednesday, August 20, 2014 10:29:39 AM Javier Martinez Canillas wrote:
-> Hello Lee, Marek,
-> 
-> On 08/20/2014 10:19 AM, Lee Jones wrote:
-> > On Wed, 20 Aug 2014, Marek Szyprowski wrote:
-> > 
-> >> Commit 6f1c1e71d93 ("mfd: max77686: Convert to use regmap_irq") broke
-> >> support for boards, which provide no irq for MAX 77686 PMIC. In such
-> >> case, not all functions of PMIC are available, but the driver still
-> >> should at least handle voltage regulators instead of failing to init.
-> >> This patch restores previous behavior.
-> >> 
-> >> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-> >> ---
-> >> Hello,
-> >> 
-> >> This patch fixes booting issues with recently merged support for
-> >> Exynos4412 based Odroid X2/U3 boards. See
-> >> http://www.spinics.net/lists/linux-samsung-soc/msg35773.html
-> >> thread for more details.
-> >> 
-> >> Best regards
-> >> Marek Szyprowski
-> >> Samsung R&D Institute Poland
-> 
-> I already gave my opinion about this patch on thread:
-> 
-> "[PATCH v2 0/4] Add Exynos4412 based Odroid X2 and U2/U3/U3+ support"
-> 
-> where the issue was reported by Olof but I'll add it here as well for
-> completeness since I don't know if the same people are cc'ed on both threads.
-> 
-> Bartlomiej Zolnierkiewicz posted a similar patch [0] before but as I said
+On Fri, Aug 15, 2014 at 07:42:31PM +0200, Sebastian Andrzej Siewior wrote:
+> --- a/drivers/tty/serial/8250/8250_core.c
+> +++ b/drivers/tty/serial/8250/8250_core.c
+> @@ -1899,12 +1984,22 @@ static void wait_for_xmitr(struct uart_8250_port *up, int bits)
+>  
+>  static int serial8250_get_poll_char(struct uart_port *port)
+>  {
+> -	unsigned char lsr = serial_port_in(port, UART_LSR);
+> +	unsigned char lsr;
+> +	int status;
+> +
+> +	serial8250_rpm_get(up);
 
-BTW my patch a bit simpler than this one.
+or up won't be defined below. You probably need 
++	struct uart_8250_port *up = up_to_u8250p(port);
+somewhere in there.
 
-regmap_del_irq_chip() checks for second argument being NULL so it is not
-needed to explicitly check for max77686->irq not being zero on probe
-failures before calling regmap_del_irq_chip().
+> -	if (!(lsr & UART_LSR_DR))
+> -		return NO_POLL_CHAR;
+> +	lsr = serial_port_in(port, UART_LSR);
+>  
+> -	return serial_port_in(port, UART_RX);
+> +	if (!(lsr & UART_LSR_DR)) {
+> +		status = NO_POLL_CHAR;
+> +		goto out;
+> +	}
+> +
+> +	status = serial_port_in(port, UART_RX);
+> +out:
+> +	serial8250_rpm_put(up);
+> +	return status;
+>  }
 
-> on that thread, I'm not sure if is correct to make that DT property
-> optional. Or rather, if we need to make it optional then we should also
-> change the Documentation/devicetree/bindings/mfd/max77686.txt that list
-> "interrupts" DT property as required.
-> 
-> It's true that before converting the max77686 to use the regmap irq API,
-> the driver was loose on that regard but max77686_irq_init() in
-> max77686-irq.c was returning -ENODEV when the IRQ was not provided and
-> that error code was not checked in max77686_i2c_probe() (which was a bug
-> IMHO).
-> 
-> More importantly I wonder if a design where a IRQ line is not connected to
-> the max77686 PMIC makes even sense. If such a design is possible then the
-> "interrupt" property should be made optional but if not then I think that
-> the driver should fail to probe in that case. Yes, it is a regression but
-> the Odroid DTS was not following the DT binding and was just lucky that
-> the driver was not checking the required DT properties.
-> 
-> Daniel Drake posted the correct fix for the Odroid DTS [1]. So I tend to
-> say that Daniel's fix should be added as a -rc fix and we should keep both
-> the max77686 driver and its DT binding as it is now but as I said, if from
-> a hardware point of view makes sense to leave that line unconnected then I
-> don't oppose to this change.
-> 
-> Best regards,
-> Javier
-> 
-> [0]: https://lkml.org/lkml/2014/8/7/374
-> [1]:
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2014-July/272869.html
-
-Best regards,
---
-Bartlomiej Zolnierkiewicz
-Samsung R&D Institute Poland
-Samsung Electronics
+Cheers,
+Frans
