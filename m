@@ -1,37 +1,85 @@
-From: jonas.jensen@gmail.com (Jonas Jensen)
-Date: Wed, 20 Aug 2014 16:24:04 +0200
-Subject: [PATCH v4 2/2] net: moxa: replace build_skb() with
- netdev_alloc_skb_ip_align() / memcpy()
-In-Reply-To: <1408473119.5604.4.camel@edumazet-glaptop2.roam.corp.google.com>
-References: <1408459784-9385-1-git-send-email-jonas.jensen@gmail.com>
- <1408459784-9385-2-git-send-email-jonas.jensen@gmail.com>
- <1408473119.5604.4.camel@edumazet-glaptop2.roam.corp.google.com>
-Message-ID: <CACmBeS0MB+K_30vLACZJ8LqzmXejGQ=PP_t+gFpmke1e5yub9A@mail.gmail.com>
+From: kiran.padwal@smartplayin.com (Kiran Padwal)
+Date: Wed, 20 Aug 2014 19:56:40 +0530
+Subject: [PATCH] pinctrl: spear: Make of_device_id array const
+Message-ID: <1408544800-24628-1-git-send-email-kiran.padwal@smartplayin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19 August 2014 20:31, Eric Dumazet <eric.dumazet@gmail.com> wrote:
-> Instead of :
->
-> priv->rx_buf_size = RX_BUF_SIZE +
->                 SKB_DATA_ALIGN(sizeof(struct skb_shared_info));
->
-> I think rx_buf_size can now be RX_BUF_SIZE
+Make of_device_id array const, because all OF functions handle it as const.
 
-You're right, that's now a remnant, see update in v5.
+Signed-off-by: Kiran Padwal <kiran.padwal@smartplayin.com>
+---
+ drivers/pinctrl/spear/pinctrl-spear1310.c |    2 +-
+ drivers/pinctrl/spear/pinctrl-spear1340.c |    2 +-
+ drivers/pinctrl/spear/pinctrl-spear300.c  |    2 +-
+ drivers/pinctrl/spear/pinctrl-spear310.c  |    2 +-
+ drivers/pinctrl/spear/pinctrl-spear320.c  |    2 +-
+ 5 files changed, 5 insertions(+), 5 deletions(-)
 
-
-> Another point is that priv->stats seems not needed, as ndev->stats could
-> be used instead (and remove moxart_mac_get_stats())
-
-I will fix that. I can add it to patches adding support for ethtool /
-stats and PHY.
-
-I think I'm supposed to post those closer to the merge window, which
-would keep this set about bug fixes only.
-
-
-Regards,
-
-
-   Jonas
+diff --git a/drivers/pinctrl/spear/pinctrl-spear1310.c b/drivers/pinctrl/spear/pinctrl-spear1310.c
+index 1a8bbfe..6d57d43 100644
+--- a/drivers/pinctrl/spear/pinctrl-spear1310.c
++++ b/drivers/pinctrl/spear/pinctrl-spear1310.c
+@@ -2692,7 +2692,7 @@ static struct spear_pinctrl_machdata spear1310_machdata = {
+ 	.modes_supported = false,
+ };
+ 
+-static struct of_device_id spear1310_pinctrl_of_match[] = {
++static const struct of_device_id spear1310_pinctrl_of_match[] = {
+ 	{
+ 		.compatible = "st,spear1310-pinmux",
+ 	},
+diff --git a/drivers/pinctrl/spear/pinctrl-spear1340.c b/drivers/pinctrl/spear/pinctrl-spear1340.c
+index 873966e..d243e43 100644
+--- a/drivers/pinctrl/spear/pinctrl-spear1340.c
++++ b/drivers/pinctrl/spear/pinctrl-spear1340.c
+@@ -2008,7 +2008,7 @@ static struct spear_pinctrl_machdata spear1340_machdata = {
+ 	.modes_supported = false,
+ };
+ 
+-static struct of_device_id spear1340_pinctrl_of_match[] = {
++static const struct of_device_id spear1340_pinctrl_of_match[] = {
+ 	{
+ 		.compatible = "st,spear1340-pinmux",
+ 	},
+diff --git a/drivers/pinctrl/spear/pinctrl-spear300.c b/drivers/pinctrl/spear/pinctrl-spear300.c
+index 4777c0d..9db83e9 100644
+--- a/drivers/pinctrl/spear/pinctrl-spear300.c
++++ b/drivers/pinctrl/spear/pinctrl-spear300.c
+@@ -646,7 +646,7 @@ static struct spear_function *spear300_functions[] = {
+ 	&gpio1_function,
+ };
+ 
+-static struct of_device_id spear300_pinctrl_of_match[] = {
++static const struct of_device_id spear300_pinctrl_of_match[] = {
+ 	{
+ 		.compatible = "st,spear300-pinmux",
+ 	},
+diff --git a/drivers/pinctrl/spear/pinctrl-spear310.c b/drivers/pinctrl/spear/pinctrl-spear310.c
+index ed1d360..db775a4 100644
+--- a/drivers/pinctrl/spear/pinctrl-spear310.c
++++ b/drivers/pinctrl/spear/pinctrl-spear310.c
+@@ -371,7 +371,7 @@ static struct spear_function *spear310_functions[] = {
+ 	&tdm_function,
+ };
+ 
+-static struct of_device_id spear310_pinctrl_of_match[] = {
++static const struct of_device_id spear310_pinctrl_of_match[] = {
+ 	{
+ 		.compatible = "st,spear310-pinmux",
+ 	},
+diff --git a/drivers/pinctrl/spear/pinctrl-spear320.c b/drivers/pinctrl/spear/pinctrl-spear320.c
+index b8e290a..80fbd68 100644
+--- a/drivers/pinctrl/spear/pinctrl-spear320.c
++++ b/drivers/pinctrl/spear/pinctrl-spear320.c
+@@ -3410,7 +3410,7 @@ static struct spear_function *spear320_functions[] = {
+ 	&i2c2_function,
+ };
+ 
+-static struct of_device_id spear320_pinctrl_of_match[] = {
++static const struct of_device_id spear320_pinctrl_of_match[] = {
+ 	{
+ 		.compatible = "st,spear320-pinmux",
+ 	},
+-- 
+1.7.9.5
