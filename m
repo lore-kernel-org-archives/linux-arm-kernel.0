@@ -1,29 +1,27 @@
-From: afaerber@suse.de (=?UTF-8?B?QW5kcmVhcyBGw6RyYmVy?=)
-Date: Wed, 20 Aug 2014 18:00:21 +0200
-Subject: [PATCH 2/3] ARM: zynq: DT: Move size/address properties to dtsi
-In-Reply-To: <1408550219-19825-2-git-send-email-soren.brinkmann@xilinx.com>
-References: <1408550219-19825-1-git-send-email-soren.brinkmann@xilinx.com>
- <1408550219-19825-2-git-send-email-soren.brinkmann@xilinx.com>
-Message-ID: <53F4C615.9060908@suse.de>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 20 Aug 2014 17:01:57 +0100
+Subject: [PATCH v3 0/7] i2c: Relax mandatory I2C ID table passing
+In-Reply-To: <20140717130306.GG2740@katana>
+References: <1403265753-25851-1-git-send-email-lee.jones@linaro.org>
+ <20140717102342.GD30888@lee--X1> <20140717130306.GG2740@katana>
+Message-ID: <20140820160157.GO4266@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 20.08.2014 17:56, schrieb Soren Brinkmann:
-> Move the GEM's size and address cells properties to the common
-> dtsi file.
+On Thu, 17 Jul 2014, Wolfram Sang wrote:
+
+> On Thu, Jul 17, 2014 at 11:23:42AM +0100, Lee Jones wrote:
+> > Hi Wolfram,
+> > 
+> > Are you going to take a look at this set?
 > 
-> Cc: Andreas F?rber <afaerber@suse.de>
-> Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
-> ---
->  arch/arm/boot/dts/zynq-7000.dtsi      | 4 ++++
->  arch/arm/boot/dts/zynq-parallella.dts | 2 --
->  2 files changed, 4 insertions(+), 2 deletions(-)
+> Sure thing, yet I won't make it for 3.17, sadly :( It has high priority
+> for 3.18, though.
 
-Reviewed-by: Andreas F?rber <afaerber@suse.de>
-
-Regards,
-Andreas
+Do you want me to re-send now the -rc1 had been released?
 
 -- 
-SUSE LINUX Products GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
-GF: Jeff Hawn, Jennifer Guild, Felix Imend?rffer; HRB 16746 AG N?rnberg
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
