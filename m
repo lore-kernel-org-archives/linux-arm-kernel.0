@@ -1,44 +1,31 @@
 From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
-Date: Wed, 20 Aug 2014 12:21:58 +0200
-Subject: [PATCH 5/6] ARM: dts: Add vmmc and vqmmc supplies for Peach Pit
- and Pi boards
-In-Reply-To: <53F39978.3080901@suse.de>
+Date: Wed, 20 Aug 2014 12:27:53 +0200
+Subject: [PATCH 1/6] ARM: dts: Add Peach Pit and Pi dts entry for max77802
+ PMIC
+In-Reply-To: <53F39CE3.8040303@suse.de>
 References: <1408460913-13863-1-git-send-email-javier.martinez@collabora.co.uk>
- <1408460913-13863-6-git-send-email-javier.martinez@collabora.co.uk>
- <53F39978.3080901@suse.de>
-Message-ID: <53F476C6.9030809@collabora.co.uk>
+ <1408460913-13863-2-git-send-email-javier.martinez@collabora.co.uk>
+ <53F39CE3.8040303@suse.de>
+Message-ID: <53F47829.5040708@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hello Andreas,
 
-Thanks a lot for your feedback.
-
-On 08/19/2014 08:37 PM, Andreas F?rber wrote:
->>  &mmc_2 {
->> +	vmmc-supply = <&tps65090_fet4>;
->> +	vqmmc-supply = <&vqmmc_sdcard>;
->>  	status = "okay";
->>  	num-slots = <1>;
->>  	supports-highspeed;
+On 08/19/2014 08:52 PM, Andreas F?rber wrote:
+>> +
+>> +	max77802-pmic at 9 {
+>> +		compatible = "maxim,max77802";
+>> +		interrupt-parent = <&gpx3>;
+>> +		interrupts = <1 0>;
 > 
-> A convention that I picked up was to place overridden status property
-> first. Do your new properties really need to go before that?
->
-
-OF doesn't care about the order of the child nodes but I do agree that
-consistency is a good thing so I'll change that on v2.
-
-> Also, if you look at today's for-next, then supports-highspeed should be
-> cap-{sd,mmc}-highspeed, so it may be worth to rebase.
+> <1 IRQ_TYPE_NONE>?
 > 
 
-You are right, this patch used to be part of an older series so I didn't
-realize that "[PATCHv10 3/5] ARM: dts: exynos: unuse the slot-node and
-deprecate the supports-highspeed for dw-mmc" was already merged. Thanks
-for the reminder!
+Indeed, I'll change both on v2. Thanks a lot.
 
-> Regards,
+> 
+> Cheers,
 > Andreas
 > 
 
