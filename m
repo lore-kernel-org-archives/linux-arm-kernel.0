@@ -1,111 +1,43 @@
-From: dann.frazier@canonical.com (Dann Frazier)
-Date: Wed, 20 Aug 2014 08:56:09 -0600
-Subject: [PATCH 0/6] RCU get_user_pages_fast and __get_user_pages_fast
-In-Reply-To: <1403710824-24340-1-git-send-email-steve.capper@linaro.org>
-References: <1403710824-24340-1-git-send-email-steve.capper@linaro.org>
-Message-ID: <CALdTtns6+MRb=Z7i0ncq_c2u7QZWo1mUxD824bvNF==q-_+BiQ@mail.gmail.com>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Wed, 20 Aug 2014 20:26:00 +0530
+Subject: [PATCH 1/5] phy: miphy28lp: Add Device Tree bindings for the
+ MiPHY28lp
+In-Reply-To: <1407944075-8093-2-git-send-email-gabriel.fernandez@linaro.org>
+References: <1407944075-8093-1-git-send-email-gabriel.fernandez@linaro.org>
+ <1407944075-8093-2-git-send-email-gabriel.fernandez@linaro.org>
+Message-ID: <53F4B700.1010302@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 25, 2014 at 9:40 AM, Steve Capper <steve.capper@linaro.org> wrote:
-> Hello,
-> This series implements general forms of get_user_pages_fast and
-> __get_user_pages_fast and activates them for arm and arm64.
->
-> These are required for Transparent HugePages to function correctly, as
-> a futex on a THP tail will otherwise result in an infinite loop (due to
-> the core implementation of __get_user_pages_fast always returning 0).
->
-> This series may also be beneficial for direct-IO heavy workloads and
-> certain KVM workloads.
->
-> The main changes since RFC V5 are:
->  * Rebased against 3.16-rc1.
->  * pmd_present no longer tested for by gup_huge_pmd and gup_huge_pud,
->    because the entry must be present for these leaf functions to be
->    called.
->  * Rather than assume puds can be re-cast as pmds, a separate
->    function pud_write is instead used by the core gup.
->  * ARM activation logic changed, now it will only activate
->    RCU_TABLE_FREE and RCU_GUP when running with LPAE.
->
-> The main changes since RFC V4 are:
->  * corrected the arm64 logic so it now correctly rcu-frees page
->    table backing pages.
->  * rcu free logic relaxed for pre-ARMv7 ARM as we need an IPI to
->    invalidate TLBs anyway.
->  * rebased to 3.15-rc3 (some minor changes were needed to allow it to merge).
->  * dropped Catalin's mmu_gather patch as that's been merged already.
->
-> This series has been tested with LTP and some custom futex tests that
-> exacerbate the futex on THP tail case. Also debug counters were
-> temporarily employed to ensure that the RCU_TABLE_FREE logic was
-> behaving as expected.
->
-> I would really appreciate any testers or comments (especially on the
-> validity or otherwise of the core fast_gup implementation).
 
-I have a test case that can reliably hit the THP issue on arm64, which
-hits it on both 3.16 and 3.17-rc1. I do a "juju bootstrap local" w/
-THP disabled at boot. Then I reboot with THP enabled. At this point
-you'll see jujud spin at 200% CPU. gccgo binaries seem to have a nack
-for hitting it.
 
-I validated that your patches resolve this issue on 3.16, so:
+On Wednesday 13 August 2014 09:04 PM, Gabriel FERNANDEZ wrote:
+> The MiPHY28lp is a Generic PHY which can serve various SATA or PCIe
+> or USB3 devices.
+> 
+> Signed-off-by: alexandre torgue <alexandre.torgue@st.com>
+> Signed-off-by: Giuseppe Cavallaro <peppe.cavallaro@st.com>
+> Signed-off-by: Gabriel Fernandez <gabriel.fernandez@linaro.org>
+> ---
+>  .../devicetree/bindings/phy/phy-miphy28lp.txt      | 126 +++++++++++++++++++++
+>  1 file changed, 126 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/phy/phy-miphy28lp.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/phy/phy-miphy28lp.txt b/Documentation/devicetree/bindings/phy/phy-miphy28lp.txt
+> new file mode 100644
+> index 0000000..6e57bd5
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/phy/phy-miphy28lp.txt
+> @@ -0,0 +1,126 @@
+> +STMicroelectronics STi MIPHY28LP PHY binding
+> +============================================
+> +
+> +This binding describes a miphy device that is used to control PHY hardware
+> +for SATA, PCIe or USB3.
+> +
+> +Required properties (controller (parent) node):
+> +- compatible	: Should be "st,miphy28lp-phy"
+> +- st,syscfg     : Should be a phandle of the system configuration register group
 
-Tested-by: dann frazier <dann.frazier@canonical.com>
-
-I haven't done the same for 3.17-rc1 because they no longer apply
-cleanly, but I'm happy to test future submissions w/ hopefully a
-shorter feedback loop (please add me to the CC). btw, should we
-consider something like this until your patches go in?
-
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index fd4e81a..820e3d9 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -306,6 +306,7 @@ config ARCH_WANT_HUGE_PMD_SHARE
-
- config HAVE_ARCH_TRANSPARENT_HUGEPAGE
-        def_bool y
-+       depends on BROKEN
-
- config ARCH_HAS_CACHE_LINE_SIZE
-        def_bool y
-
-  -dann
-
-> Cheers,
-> --
-> Steve
->
-> Steve Capper (6):
->   mm: Introduce a general RCU get_user_pages_fast.
->   arm: mm: Introduce special ptes for LPAE
->   arm: mm: Enable HAVE_RCU_TABLE_FREE logic
->   arm: mm: Enable RCU fast_gup
->   arm64: mm: Enable HAVE_RCU_TABLE_FREE logic
->   arm64: mm: Enable RCU fast_gup
->
->  arch/arm/Kconfig                      |   5 +
->  arch/arm/include/asm/pgtable-2level.h |   2 +
->  arch/arm/include/asm/pgtable-3level.h |  16 ++
->  arch/arm/include/asm/pgtable.h        |   6 +-
->  arch/arm/include/asm/tlb.h            |  38 ++++-
->  arch/arm/mm/flush.c                   |  19 +++
->  arch/arm64/Kconfig                    |   4 +
->  arch/arm64/include/asm/pgtable.h      |  11 +-
->  arch/arm64/include/asm/tlb.h          |  18 ++-
->  arch/arm64/mm/flush.c                 |  19 +++
->  mm/Kconfig                            |   3 +
->  mm/gup.c                              | 278 ++++++++++++++++++++++++++++++++++
->  12 files changed, 410 insertions(+), 9 deletions(-)
->
-> --
-> 1.9.3
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+		^^^
+I think here you used space and in the rest of places used tabs.
