@@ -1,61 +1,90 @@
-From: grant.likely@linaro.org (Grant Likely)
-Date: Wed, 20 Aug 2014 11:42:27 -0500
-Subject: [PATCH 19/19] Documentation: ACPI for ARM64
-In-Reply-To: <1406206825-15590-20-git-send-email-hanjun.guo@linaro.org>
-References: <1406206825-15590-1-git-send-email-hanjun.guo@linaro.org>
- <1406206825-15590-20-git-send-email-hanjun.guo@linaro.org>
-Message-ID: <20140820164227.E0F4BC41204@trevor.secretlab.ca>
+From: mathieu.poirier@linaro.org (mathieu.poirier at linaro.org)
+Date: Wed, 20 Aug 2014 11:03:40 -0600
+Subject: [PATCH 00/11 v4] Coresight framework and drivers
+Message-ID: <1408554231-24321-1-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 24 Jul 2014 21:00:25 +0800, Hanjun Guo <hanjun.guo@linaro.org> wrote:
-> +Clocks
-> +------
-> +
-> +Like clocks that are part of the power resources there is no standard way
-> +to represent a clock tree in ACPI 5.1 in a similar manner to how it is
-> +described in DT.
-> +
-> +Devices affected by this include things like UARTs, SoC driven LCD displays,
-> +etc.
-> +
-> +The firmware for example UEFI should initialise these clocks to fixed working
-> +values before the kernel is executed. If a driver requires to know rates of
-> +clocks set by firmware then they can be passed to kernel using _DSD.
-> +
-> +example :-
-> +
-> +Device (CLK0) {
-> +	...
-> +
-> +	Name (_DSD, Package() {
-> +		ToUUID("XXXXX"),
-> +		Package() {
-> +			Package(2) {"#clock-cells", 0},
-> +			Package(2) {"clock-frequency", "10000"}
-> +		}
-> +	})
-> +
-> +	...
-> +}
-> +
-> +Device (USR1) {
-> +	...
-> +
-> +	Name (_DSD, Package() {
-> +		ToUUID("XXXXX"),
-> +		Package() {
-> +			Package(2) {"clocks", Package() {1, ^CLK0}}},
-> +		}
-> +	})
-> +
-> +	...
-> +}
+From: Mathieu Poirier <mathieu.poirier@linaro.org>
 
-Really? This looks wrong. The above example goes right back to
-conceptually putting the clock tree into ACPI. I would expect the ACPI
-way to expose current clock rate to an individual device driver is to
-expose a clock rate method that internally knows how to return the
-currently set rate.
+This patchset concentrates on enabling HW assisted tracing on ARM
+SoCs.  This first wave centers on the basic tracing functionnality,
+enabling components such ETM/PTM, funnel, replicator, TMC, TPIU and
+ETB.  Subsequent submissions will enable more intricate IP blocks such
+as STM and CTI.
 
-g.
+Generated traces are encoded in a PFTv1.1 format and can be interpreted
+using the procedure detailed here [1] or ptm2human [2]. STM abides to the
+widely available STPv2.
+
+Bindings for the driver have been sent separately to the devicetree list.
+
+[1].https://wiki.linaro.org/WorklingGroups/Kernel/Coresight/traceDecodingWithDS5
+[2].https://github.com/hwangcc23/ptm2human
+
+Mathieu Poirier (4):
+  coresight: adding documentation for coresight
+  coresight: adding support for beagle and beagleXM
+  coresight: adding basic support for Vexpress TC2
+  ARM: removing support for etb/etm in "arch/arm/kernel/"
+
+Pratik Patel (7):
+  coresight: add CoreSight core layer framework
+  coresight-tmc: add CoreSight TMC driver
+  coresight-tpiu: add CoreSight TPIU driver
+  coresight-etb: add CoreSight ETB driver
+  coresight-funnel: add CoreSight Funnel driver
+  coresight-replicator: add CoreSight Replicator driver
+  coresight-etm: add CoreSight ETM/PTM driver
+
+ Documentation/trace/coresight.txt          |  235 ++++
+ arch/arm/Kconfig.debug                     |   36 +-
+ arch/arm/boot/dts/omap3-beagle-xm.dts      |   28 +
+ arch/arm/boot/dts/omap3-beagle.dts         |   28 +
+ arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts |  199 ++++
+ arch/arm/include/asm/hardware/coresight.h  |  157 ---
+ arch/arm/include/asm/hardware/cp14.h       |  540 +++++++++
+ arch/arm/kernel/Makefile                   |    1 -
+ arch/arm/kernel/etm.c                      |  654 -----------
+ arch/arm/kernel/hw_breakpoint.c            |    4 +-
+ arch/arm/mach-omap2/Kconfig                |    8 -
+ arch/arm/mach-omap2/Makefile               |    1 -
+ arch/arm/mach-omap2/emu.c                  |   50 -
+ drivers/Makefile                           |    1 +
+ drivers/amba/bus.c                         |    2 +-
+ drivers/coresight/Makefile                 |    9 +
+ drivers/coresight/coresight-etb10.c        |  529 +++++++++
+ drivers/coresight/coresight-etm-cp14.c     |  506 +++++++++
+ drivers/coresight/coresight-etm.h          |  200 ++++
+ drivers/coresight/coresight-etm3x.c        | 1702 ++++++++++++++++++++++++++++
+ drivers/coresight/coresight-funnel.c       |  251 ++++
+ drivers/coresight/coresight-priv.h         |   63 +
+ drivers/coresight/coresight-replicator.c   |  153 +++
+ drivers/coresight/coresight-tmc.c          |  740 ++++++++++++
+ drivers/coresight/coresight-tpiu.c         |  212 ++++
+ drivers/coresight/coresight.c              |  669 +++++++++++
+ drivers/coresight/of_coresight.c           |  202 ++++
+ include/linux/amba/bus.h                   |    1 +
+ include/linux/coresight.h                  |  206 ++++
+ 29 files changed, 6505 insertions(+), 882 deletions(-)
+ create mode 100644 Documentation/trace/coresight.txt
+ delete mode 100644 arch/arm/include/asm/hardware/coresight.h
+ create mode 100644 arch/arm/include/asm/hardware/cp14.h
+ delete mode 100644 arch/arm/kernel/etm.c
+ delete mode 100644 arch/arm/mach-omap2/emu.c
+ create mode 100644 drivers/coresight/Makefile
+ create mode 100644 drivers/coresight/coresight-etb10.c
+ create mode 100644 drivers/coresight/coresight-etm-cp14.c
+ create mode 100644 drivers/coresight/coresight-etm.h
+ create mode 100644 drivers/coresight/coresight-etm3x.c
+ create mode 100644 drivers/coresight/coresight-funnel.c
+ create mode 100644 drivers/coresight/coresight-priv.h
+ create mode 100644 drivers/coresight/coresight-replicator.c
+ create mode 100644 drivers/coresight/coresight-tmc.c
+ create mode 100644 drivers/coresight/coresight-tpiu.c
+ create mode 100644 drivers/coresight/coresight.c
+ create mode 100644 drivers/coresight/of_coresight.c
+ create mode 100644 include/linux/coresight.h
+
+-- 
+1.9.1
