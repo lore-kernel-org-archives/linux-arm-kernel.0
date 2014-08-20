@@ -1,45 +1,45 @@
 From: mathieu.poirier@linaro.org (mathieu.poirier at linaro.org)
-Date: Wed, 20 Aug 2014 11:03:45 -0600
-Subject: [PATCH 05/11 v4] coresight-funnel: add CoreSight Funnel driver
+Date: Wed, 20 Aug 2014 11:03:44 -0600
+Subject: [PATCH 04/11 v4] coresight-etb: add CoreSight ETB driver
 In-Reply-To: <1408554231-24321-1-git-send-email-mathieu.poirier@linaro.org>
 References: <1408554231-24321-1-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <1408554231-24321-6-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <1408554231-24321-5-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Pratik Patel <pratikp@codeaurora.org>
 
-This driver manages CoreSight Funnel which acts as a link.
-Funnels have multiple input ports (typically 8) each of which
-represents an input trace data stream. These multiple input trace
-data streams are interleaved into a single output stream coming
-out of the Funnel.
+This driver manages CoreSight ETB (Embedded Trace Buffer) which
+acts as a circular buffer sink collecting generated trace data.
 
 Signed-off-by: Pratik Patel <pratikp@codeaurora.org>
 Signed-off-by: Panchaxari Prasannamurthy <panchaxari.prasannamurthy@linaro.org>
 Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
 ---
- drivers/coresight/Makefile           |   2 +-
- drivers/coresight/coresight-funnel.c | 251 +++++++++++++++++++++++++++++++++++
- 2 files changed, 252 insertions(+), 1 deletion(-)
- create mode 100644 drivers/coresight/coresight-funnel.c
+ drivers/coresight/Makefile          |   3 +-
+ drivers/coresight/coresight-etb10.c | 529 ++++++++++++++++++++++++++++++++++++
+ drivers/coresight/coresight.c       |   2 +-
+ include/linux/coresight.h           |   2 +-
+ 4 files changed, 533 insertions(+), 3 deletions(-)
+ create mode 100644 drivers/coresight/coresight-etb10.c
 
 diff --git a/drivers/coresight/Makefile b/drivers/coresight/Makefile
-index 5dd3d98..26a07e1 100644
+index 540df99..5dd3d98 100644
 --- a/drivers/coresight/Makefile
 +++ b/drivers/coresight/Makefile
-@@ -4,4 +4,4 @@
+@@ -3,4 +3,5 @@
+ #
  obj-$(CONFIG_CORESIGHT) += coresight.o
  obj-$(CONFIG_OF) += of_coresight.o
- obj-$(CONFIG_CORESIGHT_LINKS_AND_SINKS) += coresight-tmc.o coresight-tpiu.o \
--					   coresight-etb10.o
-+					   coresight-etb10.o coresight-funnel.o
-diff --git a/drivers/coresight/coresight-funnel.c b/drivers/coresight/coresight-funnel.c
+-obj-$(CONFIG_CORESIGHT_LINKS_AND_SINKS) += coresight-tmc.o coresight-tpiu.o
++obj-$(CONFIG_CORESIGHT_LINKS_AND_SINKS) += coresight-tmc.o coresight-tpiu.o \
++					   coresight-etb10.o
+diff --git a/drivers/coresight/coresight-etb10.c b/drivers/coresight/coresight-etb10.c
 new file mode 100644
-index 0000000..1792f4e
+index 0000000..0249dfc
 --- /dev/null
-+++ b/drivers/coresight/coresight-funnel.c
-@@ -0,0 +1,251 @@
++++ b/drivers/coresight/coresight-etb10.c
+@@ -0,0 +1,529 @@
 +/* Copyright (c) 2011-2012, The Linux Foundation. All rights reserved.
 + *
 + * This program is free software; you can redistribute it and/or modify
@@ -57,154 +57,404 @@ index 0000000..1792f4e
 +#include <linux/init.h>
 +#include <linux/types.h>
 +#include <linux/device.h>
++#include <linux/io.h>
 +#include <linux/err.h>
 +#include <linux/fs.h>
++#include <linux/miscdevice.h>
++#include <linux/uaccess.h>
 +#include <linux/slab.h>
++#include <linux/spinlock.h>
 +#include <linux/clk.h>
++#include <linux/seq_file.h>
 +#include <linux/coresight.h>
 +#include <linux/amba/bus.h>
 +
 +#include "coresight-priv.h"
 +
-+#define FUNNEL_FUNCTL		0x000
-+#define FUNNEL_PRICTL		0x004
++#define ETB_RAM_DEPTH_REG	0x004
++#define ETB_STATUS_REG		0x00c
++#define ETB_RAM_READ_DATA_REG	0x010
++#define ETB_RAM_READ_POINTER	0x014
++#define ETB_RAM_WRITE_POINTER	0x018
++#define ETB_TRG			0x01c
++#define ETB_CTL_REG		0x020
++#define ETB_RWD_REG		0x024
++#define ETB_FFSR		0x300
++#define ETB_FFCR		0x304
++#define ETB_ITMISCOP0		0xee0
++#define ETB_ITTRFLINACK		0xee4
++#define ETB_ITTRFLIN		0xee8
++#define ETB_ITATBDATA0		0xeeC
++#define ETB_ITATBCTR2		0xef0
++#define ETB_ITATBCTR1		0xef4
++#define ETB_ITATBCTR0		0xef8
 +
-+#define FUNNEL_HOLDTIME_MASK	0xf00
-+#define FUNNEL_HOLDTIME_SHFT	0x8
-+#define FUNNEL_HOLDTIME		(0x7 << FUNNEL_HOLDTIME_SHFT)
++/** register description **/
++/* STS - 0x00C */
++#define ETB_STATUS_RAM_FULL	BIT(0)
++/* CTL - 0x020 */
++#define ETB_CTL_CAPT_EN		BIT(0)
++/* FFCR - 0x304 */
++#define ETB_FFCR_EN_FTC		BIT(0)
++#define ETB_FFCR_FON_MAN	BIT(6)
++#define ETB_FFCR_STOP_FI	BIT(12)
++#define ETB_FFCR_STOP_TRIGGER	BIT(13)
 +
-+struct funnel_drvdata {
++#define ETB_FFCR_BIT		6
++#define ETB_FFSR_BIT		1
++#define ETB_FRAME_SIZE_WORDS	4
++
++struct etb_drvdata {
 +	void __iomem		*base;
 +	struct device		*dev;
 +	struct coresight_device	*csdev;
++	struct miscdevice	miscdev;
 +	struct clk		*clk;
-+	u32			priority;
++	spinlock_t		spinlock;
++	bool			reading;
++	atomic_t		in_use;
++	u8			*buf;
++	u32			buffer_depth;
++	bool			enable;
++	u32			trigger_cntr;
 +};
 +
-+static void funnel_enable_hw(struct funnel_drvdata *drvdata, int port)
++static unsigned int etb_get_buffer_depth(struct etb_drvdata *drvdata)
 +{
-+	u32 functl;
-+
-+	CS_UNLOCK(drvdata->base);
-+
-+	functl = readl_relaxed(drvdata->base + FUNNEL_FUNCTL);
-+	functl &= ~FUNNEL_HOLDTIME_MASK;
-+	functl |= FUNNEL_HOLDTIME;
-+	functl |= (1 << port);
-+	writel_relaxed(functl, drvdata->base + FUNNEL_FUNCTL);
-+	writel_relaxed(drvdata->priority, drvdata->base + FUNNEL_PRICTL);
-+
-+	CS_LOCK(drvdata->base);
-+}
-+
-+static int funnel_enable(struct coresight_device *csdev, int inport,
-+			 int outport)
-+{
-+	struct funnel_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
 +	int ret;
++	u32 depth = 0;
 +
 +	ret = clk_prepare_enable(drvdata->clk);
 +	if (ret)
 +		return ret;
 +
-+	funnel_enable_hw(drvdata, inport);
++	/* RO registers don't need locking */
++	depth = readl_relaxed(drvdata->base + ETB_RAM_DEPTH_REG);
 +
-+	dev_info(drvdata->dev, "FUNNEL inport %d enabled\n", inport);
-+	return 0;
++	clk_disable_unprepare(drvdata->clk);
++	return depth;
 +}
 +
-+static void funnel_disable_hw(struct funnel_drvdata *drvdata, int inport)
++static void etb_enable_hw(struct etb_drvdata *drvdata)
 +{
-+	u32 functl;
++	int i;
++	u32 depth;
 +
 +	CS_UNLOCK(drvdata->base);
 +
-+	functl = readl_relaxed(drvdata->base + FUNNEL_FUNCTL);
-+	functl &= ~(1 << inport);
-+	writel_relaxed(functl, drvdata->base + FUNNEL_FUNCTL);
++	depth = drvdata->buffer_depth;
++	/* reset write RAM pointer address */
++	writel_relaxed(0x0, drvdata->base + ETB_RAM_WRITE_POINTER);
++	/* clear entire RAM buffer */
++	for (i = 0; i < depth; i++)
++		writel_relaxed(0x0, drvdata->base + ETB_RWD_REG);
++
++	/* reset write RAM pointer address */
++	writel_relaxed(0x0, drvdata->base + ETB_RAM_WRITE_POINTER);
++	/* reset read RAM pointer address */
++	writel_relaxed(0x0, drvdata->base + ETB_RAM_READ_POINTER);
++
++	writel_relaxed(drvdata->trigger_cntr, drvdata->base + ETB_TRG);
++	writel_relaxed(ETB_FFCR_EN_FTC | ETB_FFCR_STOP_TRIGGER,
++		       drvdata->base + ETB_FFCR);
++	/* ETB trace capture enable */
++	writel_relaxed(ETB_CTL_CAPT_EN, drvdata->base + ETB_CTL_REG);
 +
 +	CS_LOCK(drvdata->base);
 +}
 +
-+static void funnel_disable(struct coresight_device *csdev, int inport,
-+			   int outport)
++static int etb_enable(struct coresight_device *csdev)
 +{
-+	struct funnel_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
++	struct etb_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
++	int ret;
++	unsigned long flags;
 +
-+	funnel_disable_hw(drvdata, inport);
++	ret = clk_prepare_enable(drvdata->clk);
++	if (ret)
++		return ret;
++
++	spin_lock_irqsave(&drvdata->spinlock, flags);
++	etb_enable_hw(drvdata);
++	drvdata->enable = true;
++	spin_unlock_irqrestore(&drvdata->spinlock, flags);
++
++	dev_info(drvdata->dev, "ETB enabled\n");
++	return 0;
++}
++
++static void etb_disable_hw(struct etb_drvdata *drvdata)
++{
++	u32 ffcr;
++
++	CS_UNLOCK(drvdata->base);
++
++	ffcr = readl_relaxed(drvdata->base + ETB_FFCR);
++	/* stop formatter when a stop has completed */
++	ffcr |= ETB_FFCR_STOP_FI;
++	writel_relaxed(ffcr, drvdata->base + ETB_FFCR);
++	/* manually generate a flush of the system */
++	ffcr |= ETB_FFCR_FON_MAN;
++	writel_relaxed(ffcr, drvdata->base + ETB_FFCR);
++
++	coresight_timeout(drvdata->base, ETB_FFCR, ETB_FFCR_BIT, 0);
++
++	/* disable trace capture */
++	writel_relaxed(0x0, drvdata->base + ETB_CTL_REG);
++
++	coresight_timeout(drvdata->base, ETB_FFSR, ETB_FFSR_BIT, 1);
++	CS_LOCK(drvdata->base);
++}
++
++static void etb_dump_hw(struct etb_drvdata *drvdata)
++{
++	int i;
++	u8 *buf_ptr;
++	u32 read_data, depth;
++	u32 read_ptr, write_ptr;
++	u32 frame_off, frame_endoff;
++
++	CS_UNLOCK(drvdata->base);
++
++	read_ptr = readl_relaxed(drvdata->base + ETB_RAM_READ_POINTER);
++	write_ptr = readl_relaxed(drvdata->base + ETB_RAM_WRITE_POINTER);
++
++	frame_off = write_ptr % ETB_FRAME_SIZE_WORDS;
++	frame_endoff = ETB_FRAME_SIZE_WORDS - frame_off;
++	if (frame_off) {
++		dev_err(drvdata->dev,
++			"write_ptr: %lu not aligned to formatter frame size\n",
++			(unsigned long)write_ptr);
++		dev_err(drvdata->dev, "frameoff: %lu, frame_endoff: %lu\n",
++			(unsigned long)frame_off, (unsigned long)frame_endoff);
++		write_ptr += frame_endoff;
++	}
++
++	if ((readl_relaxed(drvdata->base + ETB_STATUS_REG)
++		      & ETB_STATUS_RAM_FULL) == 0)
++		writel_relaxed(0x0, drvdata->base + ETB_RAM_READ_POINTER);
++	else
++		writel_relaxed(write_ptr, drvdata->base + ETB_RAM_READ_POINTER);
++
++	depth = drvdata->buffer_depth;
++	buf_ptr = drvdata->buf;
++	for (i = 0; i < depth; i++) {
++		read_data = readl_relaxed(drvdata->base +
++					  ETB_RAM_READ_DATA_REG);
++		*buf_ptr++ = read_data >> 0;
++		*buf_ptr++ = read_data >> 8;
++		*buf_ptr++ = read_data >> 16;
++		*buf_ptr++ = read_data >> 24;
++	}
++
++	if (frame_off) {
++		buf_ptr -= (frame_endoff * 4);
++		for (i = 0; i < frame_endoff; i++) {
++			*buf_ptr++ = 0x0;
++			*buf_ptr++ = 0x0;
++			*buf_ptr++ = 0x0;
++			*buf_ptr++ = 0x0;
++		}
++	}
++
++	writel_relaxed(read_ptr, drvdata->base + ETB_RAM_READ_POINTER);
++
++	CS_LOCK(drvdata->base);
++}
++
++static void etb_disable(struct coresight_device *csdev)
++{
++	struct etb_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
++	unsigned long flags;
++
++	spin_lock_irqsave(&drvdata->spinlock, flags);
++	etb_disable_hw(drvdata);
++	etb_dump_hw(drvdata);
++	drvdata->enable = false;
++	spin_unlock_irqrestore(&drvdata->spinlock, flags);
 +
 +	clk_disable_unprepare(drvdata->clk);
 +
-+	dev_info(drvdata->dev, "FUNNEL inport %d disabled\n", inport);
++	dev_info(drvdata->dev, "ETB disabled\n");
 +}
 +
-+static const struct coresight_ops_link funnel_link_ops = {
-+	.enable		= funnel_enable,
-+	.disable	= funnel_disable,
++static const struct coresight_ops_sink etb_sink_ops = {
++	.enable		= etb_enable,
++	.disable	= etb_disable,
 +};
 +
-+static const struct coresight_ops funnel_cs_ops = {
-+	.link_ops	= &funnel_link_ops,
++static const struct coresight_ops etb_cs_ops = {
++	.sink_ops	= &etb_sink_ops,
 +};
 +
-+static ssize_t debugfs_funnel_priority_get(void *data, u64 *val)
++static void etb_dump(struct etb_drvdata *drvdata)
 +{
-+	struct funnel_drvdata *drvdata = data;
++	unsigned long flags;
 +
-+	*val = drvdata->priority;
++	spin_lock_irqsave(&drvdata->spinlock, flags);
++	if (drvdata->enable) {
++		etb_disable_hw(drvdata);
++		etb_dump_hw(drvdata);
++		etb_enable_hw(drvdata);
++	}
++	spin_unlock_irqrestore(&drvdata->spinlock, flags);
++
++	dev_info(drvdata->dev, "ETB dumped\n");
++}
++
++static int etb_open(struct inode *inode, struct file *file)
++{
++	struct etb_drvdata *drvdata = container_of(file->private_data,
++						   struct etb_drvdata, miscdev);
++
++	if (atomic_cmpxchg(&drvdata->in_use, 0, 1))
++		return -EBUSY;
++
++	dev_dbg(drvdata->dev, "%s: successfully opened\n", __func__);
 +	return 0;
 +}
 +
-+static ssize_t debugfs_funnel_priority_set(void *data, u64 val)
++static ssize_t etb_read(struct file *file, char __user *data,
++				size_t len, loff_t *ppos)
 +{
-+	struct funnel_drvdata *drvdata = data;
++	u32 depth;
++	struct etb_drvdata *drvdata = container_of(file->private_data,
++						   struct etb_drvdata, miscdev);
 +
-+	drvdata->priority = val;
++	if (drvdata->reading == false) {
++		etb_dump(drvdata);
++		drvdata->reading = true;
++	}
++
++	depth = drvdata->buffer_depth;
++	if (*ppos + len > depth * 4)
++		len = depth * 4 - *ppos;
++
++	if (copy_to_user(data, drvdata->buf + *ppos, len)) {
++		dev_dbg(drvdata->dev, "%s: copy_to_user failed\n", __func__);
++		return -EFAULT;
++	}
++
++	*ppos += len;
++
++	dev_dbg(drvdata->dev, "%s: %d bytes copied, %d bytes left\n",
++		__func__, len, (int) (depth * 4 - *ppos));
++	return len;
++}
++
++static int etb_release(struct inode *inode, struct file *file)
++{
++	struct etb_drvdata *drvdata = container_of(file->private_data,
++						   struct etb_drvdata, miscdev);
++
++	drvdata->reading = false;
++	atomic_set(&drvdata->in_use, 0);
++
++	dev_dbg(drvdata->dev, "%s: released\n", __func__);
 +	return 0;
 +}
-+CORESIGHT_DEBUGFS_ENTRY(debugfs_funnel_priority, "priority",
-+			S_IRUGO | S_IWUSR, debugfs_funnel_priority_get,
-+			debugfs_funnel_priority_set, "%llx\n");
 +
-+static u32 get_funnel_ctrl_hw(struct funnel_drvdata *drvdata)
++static const struct file_operations etb_fops = {
++	.owner		= THIS_MODULE,
++	.open		= etb_open,
++	.read		= etb_read,
++	.release	= etb_release,
++	.llseek		= no_llseek,
++};
++
++static ssize_t debugfs_status_show(struct seq_file *f, void *ptr)
 +{
-+	u32 functl;
++	int ret;
++	unsigned long flags;
++	u32 etb_rdr, etb_sr, etb_rrp, etb_rwp;
++	u32 etb_trg, etb_cr, etb_ffsr, etb_ffcr;
++	struct etb_drvdata *drvdata = f->private;
 +
-+	CS_UNLOCK(drvdata->base);
-+	functl = readl_relaxed(drvdata->base + FUNNEL_FUNCTL);
-+	CS_LOCK(drvdata->base);
-+
-+	return functl;
-+}
-+
-+static ssize_t debugfs_funnel_ctrl_get(void *data, u64 *val)
-+{
-+	struct funnel_drvdata *drvdata = data;
-+
-+	if (clk_prepare_enable(drvdata->clk))
++	ret = clk_prepare_enable(drvdata->clk);
++	if (ret)
 +		goto out;
 +
-+	*val = get_funnel_ctrl_hw(drvdata);
++	spin_lock_irqsave(&drvdata->spinlock, flags);
++	CS_UNLOCK(drvdata->base);
++
++	etb_rdr = readl_relaxed(drvdata->base + ETB_RAM_DEPTH_REG);
++	etb_sr = readl_relaxed(drvdata->base + ETB_STATUS_REG);
++	etb_rrp = readl_relaxed(drvdata->base + ETB_RAM_READ_POINTER);
++	etb_rwp = readl_relaxed(drvdata->base + ETB_RAM_WRITE_POINTER);
++	etb_trg = readl_relaxed(drvdata->base + ETB_TRG);
++	etb_cr = readl_relaxed(drvdata->base + ETB_CTL_REG);
++	etb_ffsr = readl_relaxed(drvdata->base + ETB_FFSR);
++	etb_ffcr = readl_relaxed(drvdata->base + ETB_FFCR);
++
++	CS_LOCK(drvdata->base);
++	spin_unlock_irqrestore(&drvdata->spinlock, flags);
++
 +	clk_disable_unprepare(drvdata->clk);
++
++	seq_printf(f,
++		   "Depth:\t\t0x%x\n"
++		   "Status:\t\t0x%x\n"
++		   "RAM read ptr:\t0x%x\n"
++		   "RAM wrt ptr:\t0x%x\n"
++		   "Trigger cnt:\t0x%x\n"
++		   "Control:\t0x%x\n"
++		   "Flush status:\t0x%x\n"
++		   "Flush ctrl:\t0x%x\n",
++		   etb_rdr, etb_sr, etb_rrp, etb_rwp,
++		   etb_trg, etb_cr, etb_ffsr, etb_ffcr);
 +out:
 +	return 0;
 +}
-+CORESIGHT_DEBUGFS_ENTRY(debugfs_funnel_ctrl, "funnel_ctrl",
-+			S_IRUGO, debugfs_funnel_ctrl_get,
-+			NULL, "%llx\n");
 +
-+static const struct coresight_ops_entry *funnel_attr_grps[] = {
-+	&debugfs_funnel_priority_entry,
-+	&debugfs_funnel_ctrl_entry,
++static int debugfs_status_show_open(struct inode *inode, struct file *file)
++{
++	return single_open(file, debugfs_status_show, inode->i_private);
++}
++
++static const struct file_operations debugfs_status_ops = {
++	.open = debugfs_status_show_open,
++	.read = seq_read,
++	.llseek = seq_lseek,
++	.release = single_release,
++};
++
++static const struct coresight_ops_entry debugfs_status_entry = {
++	.name = "status",
++	.mode = S_IRUGO,
++	.ops = &debugfs_status_ops,
++};
++
++static ssize_t debugfs_trigger_cntr_get(void *data, u64 *val)
++{
++	struct etb_drvdata *drvdata = data;
++
++	*val = drvdata->trigger_cntr;
++	return 0;
++}
++
++static ssize_t debugfs_trigger_cntr_set(void *data, u64 val)
++{
++	struct etb_drvdata *drvdata = data;
++
++	drvdata->trigger_cntr = val;
++	return 0;
++}
++CORESIGHT_DEBUGFS_ENTRY(debugfs_trigger_cntr, "trigger_cntr",
++			S_IRUGO | S_IWUSR, debugfs_trigger_cntr_get,
++			debugfs_trigger_cntr_set, "%llx\n");
++
++static const struct coresight_ops_entry *etb_attr_grps[] = {
++	&debugfs_trigger_cntr_entry,
++	&debugfs_status_entry,
 +	NULL,
 +};
 +
-+static int funnel_probe(struct amba_device *adev, const struct amba_id *id)
++static int etb_probe(struct amba_device *adev, const struct amba_id *id)
 +{
++	int ret;
 +	void __iomem *base;
 +	struct device *dev = &adev->dev;
 +	struct coresight_platform_data *pdata = NULL;
-+	struct funnel_drvdata *drvdata;
++	struct etb_drvdata *drvdata;
 +	struct resource *res = &adev->res;
 +	struct coresight_desc *desc;
 +	struct device_node *np = adev->dev.of_node;
@@ -230,66 +480,120 @@ index 0000000..1792f4e
 +
 +	drvdata->base = base;
 +
++	spin_lock_init(&drvdata->spinlock);
++
 +	drvdata->clk = adev->pclk;
++	ret = clk_prepare_enable(drvdata->clk);
++	if (ret)
++		return ret;
++
++	drvdata->buffer_depth =  etb_get_buffer_depth(drvdata);
++	clk_disable_unprepare(drvdata->clk);
++
++	if (drvdata->buffer_depth < 0)
++		return -EINVAL;
++
++	drvdata->buf = devm_kzalloc(dev,
++				    drvdata->buffer_depth * 4, GFP_KERNEL);
++	if (!drvdata->buf)
++		return -ENOMEM;
 +
 +	desc = devm_kzalloc(dev, sizeof(*desc), GFP_KERNEL);
 +	if (!desc)
 +		return -ENOMEM;
 +
-+	desc->type = CORESIGHT_DEV_TYPE_LINK;
-+	desc->subtype.link_subtype = CORESIGHT_DEV_SUBTYPE_LINK_MERG;
-+	desc->ops = &funnel_cs_ops;
++	desc->type = CORESIGHT_DEV_TYPE_SINK;
++	desc->subtype.sink_subtype = CORESIGHT_DEV_SUBTYPE_SINK_BUFFER;
++	desc->ops = &etb_cs_ops;
 +	desc->pdata = pdata;
 +	desc->dev = dev;
-+	desc->debugfs_ops = funnel_attr_grps;
++	desc->debugfs_ops = etb_attr_grps;
 +	desc->owner = THIS_MODULE;
 +	drvdata->csdev = coresight_register(desc);
 +	if (IS_ERR(drvdata->csdev))
 +		return PTR_ERR(drvdata->csdev);
 +
-+	dev_info(dev, "FUNNEL initialized\n");
++	drvdata->miscdev.name = pdata->name;
++	drvdata->miscdev.minor = MISC_DYNAMIC_MINOR;
++	drvdata->miscdev.fops = &etb_fops;
++	ret = misc_register(&drvdata->miscdev);
++	if (ret)
++		goto err_misc_register;
++
++	dev_info(dev, "ETB initialized\n");
 +	return 0;
++
++err_misc_register:
++	coresight_unregister(drvdata->csdev);
++	return ret;
 +}
 +
-+static int funnel_remove(struct amba_device *adev)
++static int etb_remove(struct amba_device *adev)
 +{
-+	struct funnel_drvdata *drvdata = amba_get_drvdata(adev);
++	struct etb_drvdata *drvdata = amba_get_drvdata(adev);
 +
++	misc_deregister(&drvdata->miscdev);
 +	coresight_unregister(drvdata->csdev);
 +	return 0;
 +}
 +
-+static struct amba_id funnel_ids[] = {
++static struct amba_id etb_ids[] = {
 +	{
-+		.id     = 0x0003b908,
-+		.mask   = 0x0003ffff,
++		.id	= 0x0003b907,
++		.mask	= 0x0003ffff,
 +	},
 +	{ 0, 0},
 +};
 +
-+static struct amba_driver funnel_driver = {
++static struct amba_driver etb_driver = {
 +	.drv = {
-+		.name	= "coresight-funnel",
++		.name	= "coresight-etb10",
 +		.owner	= THIS_MODULE,
 +	},
-+	.probe		= funnel_probe,
-+	.remove		= funnel_remove,
-+	.id_table	= funnel_ids,
++	.probe		= etb_probe,
++	.remove		= etb_remove,
++	.id_table	= etb_ids,
 +};
 +
-+static int __init funnel_init(void)
++static int __init etb_init(void)
 +{
-+	return amba_driver_register(&funnel_driver);
++	return amba_driver_register(&etb_driver);
 +}
-+module_init(funnel_init);
++module_init(etb_init);
 +
-+static void __exit funnel_exit(void)
++static void __exit etb_exit(void)
 +{
-+	amba_driver_unregister(&funnel_driver);
++	amba_driver_unregister(&etb_driver);
 +}
-+module_exit(funnel_exit);
++module_exit(etb_exit);
 +
 +MODULE_LICENSE("GPL v2");
-+MODULE_DESCRIPTION("CoreSight Funnel driver");
++MODULE_DESCRIPTION("CoreSight Embedded Trace Buffer driver");
+diff --git a/drivers/coresight/coresight.c b/drivers/coresight/coresight.c
+index fb5e61e..f2d5520 100644
+--- a/drivers/coresight/coresight.c
++++ b/drivers/coresight/coresight.c
+@@ -375,7 +375,7 @@ static ssize_t debugfs_active_set(void *data, u64 val)
+ 	val ? (csdev->activated = 1) : (csdev->activated = 0);
+ 	return 0;
+ }
+-CORESIGHT_DEBUGFS_ENTRY(debugfs_active, "active",
++CORESIGHT_DEBUGFS_ENTRY(debugfs_active, "enable",
+ 			S_IRUGO | S_IWUSR, debugfs_active_get,
+ 			debugfs_active_set, "%llx\n");
+ 
+diff --git a/include/linux/coresight.h b/include/linux/coresight.h
+index b0f9ee8..c54ef0b 100644
+--- a/include/linux/coresight.h
++++ b/include/linux/coresight.h
+@@ -133,7 +133,7 @@ struct coresight_device {
+ 	struct list_head path_link;
+ 	struct module *owner;
+ 	bool enable;	/* true only if configured as part of a path */
+-	bool activated;	/* only valid for sinks */
++	bool activated;	/* true only if a sink is part of a path */
+ };
+ 
+ #define to_coresight_device(d) container_of(d, struct coresight_device, dev)
 -- 
 1.9.1
