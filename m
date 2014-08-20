@@ -1,174 +1,127 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Wed, 20 Aug 2014 10:39:14 +0300
-Subject: [PATCH 1/1] clk: ti: add support for external clock provider
-In-Reply-To: <20140819132232.GM3302@leverpostej>
-References: <1406898948-26113-1-git-send-email-t-kristo@ti.com>
- <1406898948-26113-2-git-send-email-t-kristo@ti.com>
- <20140819132232.GM3302@leverpostej>
-Message-ID: <53F450A2.2030609@ti.com>
+From: Bharat.Bhushan@freescale.com (Bharat.Bhushan at freescale.com)
+Date: Wed, 20 Aug 2014 07:41:55 +0000
+Subject: [RFC PATCH 00/11] Refactor MSI to support Non-PCI device
+In-Reply-To: <53F44022.6030706@huawei.com>
+References: <1406344128-27055-1-git-send-email-wangyijing@huawei.com>
+ <c6d34fe1bbe9457ea8cff7dcd97902b8@DM2PR03MB317.namprd03.prod.outlook.com>
+ <53DEF80C.1010608@huawei.com>
+ <8a2b4e237f2d4c7e95ef72867658b53a@BLUPR03MB566.namprd03.prod.outlook.com>
+ <53F44022.6030706@huawei.com>
+Message-ID: <c3b2bd89ef3d462cb302f6ede56a0d44@BLUPR03MB566.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/19/2014 04:22 PM, Mark Rutland wrote:
-> Hi Tero,
->
-> On Fri, Aug 01, 2014 at 02:15:48PM +0100, Tero Kristo wrote:
->> External clock provider can now be used to register external clocks under
->> it. This is needed as the TI clock driver only registers clocks
->> hierarchically under clock providers, and external clocks do not belong
->> under any of the current ones.
->
-> I must admit that I don't understand the justification for this binding.
->
-> Why can't these clocks be descrbied elsewhere and wired up as usual? Why
-> must they be under the TI clock provide node?
->
->  From the limited description above it sounds like the only reason this
-> exists is to work around a deficiency in the TI clock driver. That does
-> not sound like a very good reason for having this.
 
-I wouldn't call it a deficiency, but its by design due to need for 
-registering clocks and clock providers hierarchically.
 
-I guess it might be possible to re-work the TI clock init to check for 
-the parent node, and if it is a clock provider, see if it has been 
-initialized or not. The clock provider maps the IO range so it must be 
-initialized before any clocks under it are initialized. I'll experiment 
-with this a bit and see how it works out.
+> -----Original Message-----
+> From: linux-pci-owner at vger.kernel.org [mailto:linux-pci-owner at vger.kernel.org]
+> On Behalf Of Yijing Wang
+> Sent: Wednesday, August 20, 2014 11:59 AM
+> To: Bhushan Bharat-R65777; Basu Arnab-B45036
+> Cc: Xinwei Hu; Wuyun; Bjorn Helgaas; linux-pci at vger.kernel.org;
+> Paul.Mundt at huawei.com; James E.J. Bottomley; Marc Zyngier; linux-arm-
+> kernel at lists.infradead.org; Russell King; linux-arch at vger.kernel.org;
+> virtualization at lists.linux-foundation.org; Hanjun Guo; linux-
+> kernel at vger.kernel.org
+> Subject: Re: [RFC PATCH 00/11] Refactor MSI to support Non-PCI device
+> 
+> >> The key difference between PCI device and Non-PCI MSI is the
+> >> interfaces to access hardware MSI registers.
+> >> for instance, currently, msi_chip->setup_irq() to setup MSI irq and
+> >> configure the MSI address/data registers, so we need to provide
+> >> device specific
+> >> write_msi_msg() interface, then when we call msi_chip->setup_irq(),
+> >> the device MSI registers can be configured appropriately.
+> >
+> > What if we can register/override the setup_irq() from bus-driver (not sure,
+> but may be device-driver itself). Example PCI bus-driver will provide
+> setup_irq() (or the part of setup_irq which set address and data in h/w) by PCI
+> bus, which configure address/data in h/w as per PCI standard.
+> >
+> > We in Freescale will be using MSI for the devices behind a new-bus (which is
+> not PCI based), We have a separate bus driver for same. And this new bus driver
+> register/provide its own address/data write function which is based on that
+> specific bus protocol.
+> 
+> Hi Bharat, I'm glad to know your MSI device working mode.
+> Provide the private MSI setup functions in bus-driver layer can't apply to all
+> Non-PCI MSI devices, because we can not guarantee Non-PCI MSI devices are always
+> on a bus. The existing HPET, DMAR device both have no bus bind.
 
--Tero
+Yes, that's why I was not sure of bus-driver or device-driver model.
 
->
-> Thanks,
-> Mark.
->
->>
->> Signed-off-by: Tero Kristo <t-kristo@ti.com>
->> ---
->>   .../devicetree/bindings/arm/omap/ext-clocks.txt    |   32 ++++++++++++++++++++
->>   arch/arm/mach-omap2/io.c                           |   12 ++++++--
->>   drivers/clk/ti/clk.c                               |   23 ++++++++++++++
->>   include/linux/clk/ti.h                             |    2 ++
->>   4 files changed, 67 insertions(+), 2 deletions(-)
->>   create mode 100644 Documentation/devicetree/bindings/arm/omap/ext-clocks.txt
->>
->> diff --git a/Documentation/devicetree/bindings/arm/omap/ext-clocks.txt b/Documentation/devicetree/bindings/arm/omap/ext-clocks.txt
->> new file mode 100644
->> index 0000000..8e784bb
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/arm/omap/ext-clocks.txt
->> @@ -0,0 +1,32 @@
->> +TI external clock provider properties
->> +
->> +External clock provider is used to group SoC external board specific
->> +clock nodes. A separate provider node is required as the TI clock
->> +driver registers clocks hierarchically.
->> +
->> +Required properties:
->> +- compatible:		Shall be: "ti,external-clocks"
->> +- clocks:		Contains the external clocks for the board
->> +- clockdomains:		Contains the external clockdomains for the board
->> +
->> +Example:
->> +
->> +ext_clocks {
->> +	compatible = "ti,external-clocks";
->> +
->> +	ext_clocks: clocks {
->> +	};
->> +
->> +	ext_clockdomains: clockdomains {
->> +	};
->> +};
->> +
->> +...
->> +
->> +&ext_clocks {
->> +	gpio_test_clock {
->> +		compatible = "gpio-clock";
->> +		#clock-cells = <0>;
->> +		enable-gpios = <&gpio5 25 GPIO_ACTIVE_HIGH>;
->> +	};
->> +};
->> diff --git a/arch/arm/mach-omap2/io.c b/arch/arm/mach-omap2/io.c
->> index 8f55945..77be18b 100644
->> --- a/arch/arm/mach-omap2/io.c
->> +++ b/arch/arm/mach-omap2/io.c
->> @@ -21,6 +21,8 @@
->>   #include <linux/init.h>
->>   #include <linux/io.h>
->>   #include <linux/clk.h>
->> +#include <linux/clk-provider.h>
->> +#include <linux/clk/ti.h>
->>
->>   #include <asm/tlb.h>
->>   #include <asm/mach/map.h>
->> @@ -729,8 +731,14 @@ int __init omap_clk_init(void)
->>   		return 0;
->>
->>   	ret = of_prcm_init();
->> -	if (!ret)
->> -		ret = omap_clk_soc_init();
->> +	if (ret)
->> +		return ret;
->> +
->> +	ret = ti_dt_clk_ext_init();
->> +	if (ret)
->> +		return ret;
->> +
->> +	ret = omap_clk_soc_init();
->>
->>   	return ret;
->>   }
->> diff --git a/drivers/clk/ti/clk.c b/drivers/clk/ti/clk.c
->> index b1a6f71..c84ce4d 100644
->> --- a/drivers/clk/ti/clk.c
->> +++ b/drivers/clk/ti/clk.c
->> @@ -165,3 +165,26 @@ void ti_dt_clk_init_provider(struct device_node *parent, int index)
->>   		kfree(retry);
->>   	}
->>   }
->> +
->> +static struct of_device_id ti_ext_clk_match_table[] = {
->> +	{ .compatible = "ti,external-clocks" },
->> +	{ }
->> +};
->> +
->> +/**
->> + * ti_dt_clk_ext_init - initialize external clocks from DT
->> + *
->> + * Some clocks are provided from external chips outside the main SoC.
->> + * The details for these are given under a special DT node, which will
->> + * be parsed by this function.
->> + */
->> +int ti_dt_clk_ext_init(void)
->> +{
->> +	struct device_node *np;
->> +
->> +	for_each_matching_node(np, ti_ext_clk_match_table) {
->> +		ti_dt_clk_init_provider(np, -1);
->> +	}
->> +
->> +	return 0;
->> +}
->> diff --git a/include/linux/clk/ti.h b/include/linux/clk/ti.h
->> index e8d8a35..188270c 100644
->> --- a/include/linux/clk/ti.h
->> +++ b/include/linux/clk/ti.h
->> @@ -310,6 +310,8 @@ int am43xx_dt_clk_init(void);
->>   int omap2420_dt_clk_init(void);
->>   int omap2430_dt_clk_init(void);
->>
->> +int ti_dt_clk_ext_init(void);
->> +
->>   #ifdef CONFIG_OF
->>   void of_ti_clk_allow_autoidle_all(void);
->>   void of_ti_clk_deny_autoidle_all(void);
->> --
->> 1.7.9.5
->>
->> --
->> To unsubscribe from this list: send the line "unsubscribe devicetree" in
->> the body of a message to majordomo at vger.kernel.org
->> More majordomo info at  http://vger.kernel.org/majordomo-info.html
->>
+> I'm working on a
+> new MSI setup framework, as you mentioned before, in device-driver model.
+> 
+> I abstracted a new virtual device (called struct msi_dev), this msi_dev will
+> manage all MSI info,
+
+Will this "struct msi_dev" will be part of "struct device"?
+
+> and a new bus named msi_bus, also introduced a new driver
+> msi_driver, msi_bus is responsible for binding msi_dev and msi_driver.
+> All MSI devices will be classified into different MSI device types, like
+> MSI_TYPE_PCI, MSI_TYPE_HPET, MSI_TYPE_DMAR, etc..
+> 
+> Each MSI type device should provide a private struct msi_driver. msi_driver
+> should contain the type specific MSI ops functions to help setup and enable MSI
+> device, request MSI irq.
+> 
+> I almost finish the first draft, and will post out next week in plan :)
+
+Will be looking forward to next version.
+
+Thanks
+-Bharat
+
+> 
+> 
+> Thanks!
+> Yijing.
+> 
+> >
+> > Thanks
+> > -Bharat
+> >
+> >>
+> >> My patchset is just a RFC draft, I will update it later, all we want
+> >> to do is make kernel support Non-PCI MSI devices.
+> >>
+> >> Thanks!
+> >> Yijing.
+> >>
+> >>
+> >>>
+> >>> Thanks
+> >>> Arnab
+> >>> --
+> >>> To unsubscribe from this list: send the line "unsubscribe
+> >>> linux-kernel" in the body of a message to majordomo at vger.kernel.org
+> >>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> >>> Please read the FAQ at  http://www.tux.org/lkml/
+> >>>
+> >>> .
+> >>>
+> >>
+> >>
+> >> --
+> >> Thanks!
+> >> Yijing
+> >>
+> >> --
+> >> To unsubscribe from this list: send the line "unsubscribe linux-pci"
+> >> in the body of a message to majordomo at vger.kernel.org More majordomo
+> >> info at http://vger.kernel.org/majordomo-info.html
+> >
+> > .
+> >
+> 
+> 
+> --
+> Thanks!
+> Yijing
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-pci" in the body
+> of a message to majordomo at vger.kernel.org More majordomo info at
+> http://vger.kernel.org/majordomo-info.html
