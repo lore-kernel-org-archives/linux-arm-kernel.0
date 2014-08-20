@@ -1,44 +1,41 @@
-From: achandran@mvista.com (Arun Chandran)
-Date: Wed, 20 Aug 2014 12:17:48 +0530
-Subject: [PATCH v2] Arm64: Remove unnecessary keyword 'extern' from proc-fns.h
-Message-ID: <1408517268-14566-1-git-send-email-achandran@mvista.com>
+From: LW@KARO-electronics.de (=?UTF-8?q?Lothar=20Wa=C3=9Fmann?=)
+Date: Wed, 20 Aug 2014 08:55:53 +0200
+Subject: [PATCHv4 1/4] pwm: print error messages with pr_err() instead of
+ pr_debug()
+In-Reply-To: <1408517756-9412-1-git-send-email-LW@KARO-electronics.de>
+References: <1408517756-9412-1-git-send-email-LW@KARO-electronics.de>
+Message-ID: <1408517756-9412-2-git-send-email-LW@KARO-electronics.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since function prototypes are not definitions,
-extern doesn't have any effect on them; removing it.
+Make the messages that are printed in case of fatal errors actually
+visible to the user without having to recompile the driver with
+debugging enabled.
 
-Reported-by: Geoff Levand <geoff@infradead.org>
-Signed-off-by: Arun Chandran <achandran@mvista.com>
+Signed-off-by: Lothar Wa?mann <LW@KARO-electronics.de>
 ---
-v2
-* cleaned the patch description according to comment from Geoff Levand <geoff@infradead.org>
----
- arch/arm64/include/asm/proc-fns.h |   12 ++++++------
- 1 file changed, 6 insertions(+), 6 deletions(-)
+ drivers/pwm/core.c |    4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm64/include/asm/proc-fns.h b/arch/arm64/include/asm/proc-fns.h
-index 0c657bb..919ac3a 100644
---- a/arch/arm64/include/asm/proc-fns.h
-+++ b/arch/arm64/include/asm/proc-fns.h
-@@ -28,12 +28,12 @@
- struct mm_struct;
- struct cpu_suspend_ctx;
+diff --git a/drivers/pwm/core.c b/drivers/pwm/core.c
+index 4b66bf0..7af0043 100644
+--- a/drivers/pwm/core.c
++++ b/drivers/pwm/core.c
+@@ -525,13 +525,13 @@ struct pwm_device *of_pwm_get(struct device_node *np, const char *con_id)
+ 	err = of_parse_phandle_with_args(np, "pwms", "#pwm-cells", index,
+ 					 &args);
+ 	if (err) {
+-		pr_debug("%s(): can't parse \"pwms\" property\n", __func__);
++		pr_err("%s(): can't parse \"pwms\" property\n", __func__);
+ 		return ERR_PTR(err);
+ 	}
  
--extern void cpu_cache_off(void);
--extern void cpu_do_idle(void);
--extern void cpu_do_switch_mm(unsigned long pgd_phys, struct mm_struct *mm);
--extern void cpu_reset(unsigned long addr) __attribute__((noreturn));
--extern void cpu_do_suspend(struct cpu_suspend_ctx *ptr);
--extern u64 cpu_do_resume(phys_addr_t ptr, u64 idmap_ttbr);
-+void cpu_cache_off(void);
-+void cpu_do_idle(void);
-+void cpu_do_switch_mm(unsigned long pgd_phys, struct mm_struct *mm);
-+void cpu_reset(unsigned long addr) __attribute__((noreturn));
-+void cpu_do_suspend(struct cpu_suspend_ctx *ptr);
-+u64 cpu_do_resume(phys_addr_t ptr, u64 idmap_ttbr);
- 
- #include <asm/memory.h>
- 
+ 	pc = of_node_to_pwmchip(args.np);
+ 	if (IS_ERR(pc)) {
+-		pr_debug("%s(): PWM chip not found\n", __func__);
++		pr_err("%s(): PWM chip not found\n", __func__);
+ 		pwm = ERR_CAST(pc);
+ 		goto put;
+ 	}
 -- 
-1.7.9.5
+1.7.10.4
