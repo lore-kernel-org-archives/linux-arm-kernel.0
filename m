@@ -1,63 +1,61 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Wed, 20 Aug 2014 07:16:34 -0500
-Subject: [PATCH v4 2/8] ARM: expand fixmap region to 3MB
-In-Reply-To: <20140819122653.GH23128@arm.com>
-References: <1407949593-16121-1-git-send-email-keescook@chromium.org>
- <1407949593-16121-3-git-send-email-keescook@chromium.org>
- <20140819122653.GH23128@arm.com>
-Message-ID: <CAGXu5jJRx8e2_9jpMYApH8maJog_z2YAs2ihoD4SFNfvPqn2Aw@mail.gmail.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Wed, 20 Aug 2014 08:16:43 -0400
+Subject: [RFC PATCH 0/6] Change vendor prefix for Intersil Corporation
+In-Reply-To: <1408524184-31928-1-git-send-email-p.zabel@pengutronix.de>
+References: <1408524184-31928-1-git-send-email-p.zabel@pengutronix.de>
+Message-ID: <20140820121643.GU12769@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 19, 2014 at 7:26 AM, Will Deacon <will.deacon@arm.com> wrote:
-> Hi Kees, Rob,
->
-> On Wed, Aug 13, 2014 at 06:06:27PM +0100, Kees Cook wrote:
->> From: Rob Herring <robh@kernel.org>
->>
->> With commit a05e54c103b0 ("ARM: 8031/2: change fixmap mapping region to
->> support 32 CPUs"), the fixmap region was expanded to 2MB, but it
->> precluded any other uses of the fixmap region. In order to support other
->> uses the fixmap region needs to be expanded beyond 2MB. Fortunately, the
->> adjacent 1MB range 0xffe00000-0xfff00000 is availabe.
->>
->> Remove fixmap_page_table ptr and lookup the page table via the virtual
->> address so that the fixmap region can span more that one pmd. The 2nd
->> pmd is already created since it is shared with the vector page.
->
-> [...]
->
->> diff --git a/arch/arm/mm/highmem.c b/arch/arm/mm/highmem.c
->> index 45aeaaca9052..81061987ac45 100644
->> --- a/arch/arm/mm/highmem.c
->> +++ b/arch/arm/mm/highmem.c
->> @@ -18,19 +18,20 @@
->>  #include <asm/tlbflush.h>
->>  #include "mm.h"
->>
->> -pte_t *fixmap_page_table;
->> -
->>  static inline void set_fixmap_pte(int idx, pte_t pte)
->>  {
->>       unsigned long vaddr = __fix_to_virt(idx);
->> -     set_pte_ext(fixmap_page_table + idx, pte, 0);
->> +     pte_t *ptep = pte_offset_kernel(pmd_off_k(vaddr), vaddr);
->> +
->> +     set_pte_ext(ptep, pte, 0);
->>       local_flush_tlb_kernel_page(vaddr);
->>  }
->
-> Minor comment, but we can drop the ifx parameter here now, right? It looks a
-> bit weird having a setter/getter pair of functions where the type signatures
-> aren't the inverse.
+Philipp,
 
-idx is used to get the vaddr here. I suppose the various users of
-these functions in highmem could be reworked, but that doesn't look
-sensible either. Maybe it's just the names of the functions that are
-confusing?
+On Wed, Aug 20, 2014 at 10:42:58AM +0200, Philipp Zabel wrote:
+> Hi,
+> 
+> currently there is a wild mixture of isl, isil, and intersil
+> compatibles in the kernel. I figure at this point it is still
+> possible to change this to use "isil" everywhere without too
+> much pain, but it might be preferred to keep the already
+> documented "isl" prefix, even though it doesn't follow the
+> convention to use the NASDAQ symbol where available.
+> 
+> The current users of the "isil" prefix are the following drivers
+> and device trees, so we could just as well change those instead:
+> 	arch/arm/boot/dts/tegra20-seaboard.dts
+> 	arch/arm/boot/dts/tegra20-ventana.dts
+> 	arch/arm/boot/dts/tegra30-cardhu.dtsi
+> 	arch/powerpc/boot/dts/p1022rdk.dts
+> 	drivers/staging/iio/light/isl29018.c
+> 	drivers/staging/iio/light/isl29028.c
+> 
+> regards
+> Philipp
+> 
+> Philipp Zabel (6):
+>   of: Change vendor prefix for Intersil Corporation to isil
+>   Documentation: Add isl1208 and isl12022 to trivial-devices list
+>   ARM: mvebu: Change vendor prefix for Intersil Corporation to isil
+>   powerpc/85xx: Change vendor prefix for Intersil Corporation to isil
+>   rtc: rtc-isl12022: Change vendor prefix for Intersil Corporation to
+>     isil
+>   rtc: rtc-isl12057: Change vendor prefix for Intersil Corporation to
+>     isil
+> 
+>  Documentation/devicetree/bindings/i2c/trivial-devices.txt | 4 +++-
+>  Documentation/devicetree/bindings/vendor-prefixes.txt     | 2 +-
+>  arch/arm/boot/dts/armada-370-netgear-rn102.dts            | 2 +-
+>  arch/arm/boot/dts/armada-370-netgear-rn104.dts            | 2 +-
+>  arch/arm/boot/dts/armada-xp-netgear-rn2120.dts            | 2 +-
+>  arch/powerpc/boot/dts/ppa8548.dts                         | 2 +-
+>  drivers/rtc/rtc-isl12022.c                                | 3 ++-
+>  drivers/rtc/rtc-isl12057.c                                | 3 ++-
+>  8 files changed, 12 insertions(+), 8 deletions(-)
 
--Kees
+This looks good overall.  My only nit is that I'd like to see the legacy
+name(s) captured in the binding docs.
 
--- 
-Kees Cook
-Chrome OS Security
+I'll take the Armada dts changes through mvebu/arm-soc after a few days.
+
+thx,
+
+Jason.
