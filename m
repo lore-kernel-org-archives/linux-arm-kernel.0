@@ -1,39 +1,54 @@
-From: agross@codeaurora.org (Andy Gross)
-Date: Wed, 20 Aug 2014 10:42:00 -0500
-Subject: [PATCH v1 1/3] pinctrl: qcom: Add APQ8084 pinctrl support
-In-Reply-To: <20140820043929.GH7070@sonymobile.com>
-References: <1408468936-12252-1-git-send-email-gdjakov@mm-sol.com>
- <1408468936-12252-2-git-send-email-gdjakov@mm-sol.com>
- <20140820043929.GH7070@sonymobile.com>
-Message-ID: <20140820154200.GA14731@qualcomm.com>
+From: graeme.gregory@linaro.org (graeme.gregory at linaro.org)
+Date: Wed, 20 Aug 2014 16:43:58 +0100
+Subject: [PATCH 06/19] ARM64 / ACPI: Parse FADT table to get PSCI flags
+ for PSCI init
+In-Reply-To: <20140820152944.GR24600@localhost>
+References: <1406206825-15590-1-git-send-email-hanjun.guo@linaro.org>
+ <1406206825-15590-7-git-send-email-hanjun.guo@linaro.org>
+ <20140820150029.0BB3FC41205@trevor.secretlab.ca>
+ <20140820152944.GR24600@localhost>
+Message-ID: <20140820154358.GA27927@xora-yoga-deb.xora.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 19, 2014 at 09:39:30PM -0700, Bjorn Andersson wrote:
-> On Tue 19 Aug 10:22 PDT 2014, Georgi Djakov wrote:
-> 
-> > This patch adds support for the TLMM (Top-Level Mode Mux) block found
-> > in the APQ8084 platform.
+On Wed, Aug 20, 2014 at 04:29:44PM +0100, Catalin Marinas wrote:
+> On Wed, Aug 20, 2014 at 04:00:28PM +0100, Grant Likely wrote:
+> > On Thu, 24 Jul 2014 21:00:12 +0800, Hanjun Guo <hanjun.guo@linaro.org> wrote:
+> > > @@ -345,13 +378,19 @@ int __init psci_init(void)
+> > >  	const struct of_device_id *matched_np;
+> > >  	psci_initcall_t init_fn;
+> > >  
+> > > -	np = of_find_matching_node_and_match(NULL, psci_of_match, &matched_np);
+> > > +	if (acpi_disabled) {
+> > > +		np = of_find_matching_node_and_match(NULL,
+> > > +				psci_of_match, &matched_np);
+> > >  
+> > > -	if (!np)
+> > > -		return -ENODEV;
+> > > +		if (!np)
+> > > +			return -ENODEV;
+> > > +
+> > > +		init_fn = (psci_initcall_t)matched_np->data;
+> > > +
+> > > +		return init_fn(np);
+> > > +	}
+> > >  
+> > > -	init_fn = (psci_initcall_t)matched_np->data;
+> > > -	return init_fn(np);
+> > > +	return psci_0_2_init_acpi();
+> > >  }
 > > 
-> [...]
-> > +
-> > +#define NUM_GPIO_PINGROUPS 143
-> > +
+> > So, while the functionality is sound, this is kind of a stinky diff. The
+> > ACPI path should not push the OF code into a sub branch. Make it look
+> > like this instead (with the advantage that the diff will be simpler):
+> > 
+> > +	if (IS_ENABLED(CONFIG_ACPI) && !acpi_disabled)
+> > +		return psci_0_2_init_acpi();
 > 
-> I think this looks good overall, but in my APQ8084 documentation
-> (80-NG550-2X Rev. B) there are 147 (0..146) gpio pins in the TLMM block.
+> Minor point: we should define acpi_disabled to 1 when !CONFIG_ACPI and
+> avoid additional IS_ENABLED(CONFIG_ACPI) checks (unless already don this
+> way).
 > 
-> Any suggestion to why there's a discrepancy?
-> 
+This is the default behaviour already.
 
-We have some discrepancies internally on the documentation.  However, in this
-case I'd expect the OEM documentation to be correct.  So this needs to change to
-bjorn's version, as it appears to be the correct version.
-
-I have no idea why some pins are missing.
-
-
--- 
-sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by The Linux Foundation
+Graeme
