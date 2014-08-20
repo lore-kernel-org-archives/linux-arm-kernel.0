@@ -1,104 +1,86 @@
 From: linux@roeck-us.net (Guenter Roeck)
-Date: Tue, 19 Aug 2014 17:45:38 -0700
-Subject: [PATCH v7 11/11] clk: rockchip: add restart handler
-In-Reply-To: <1408495538-27480-1-git-send-email-linux@roeck-us.net>
-References: <1408495538-27480-1-git-send-email-linux@roeck-us.net>
-Message-ID: <1408495538-27480-12-git-send-email-linux@roeck-us.net>
+Date: Tue, 19 Aug 2014 17:45:27 -0700
+Subject: [PATCH v7 00/11] kernel: Add support for restart handler call chain
+Message-ID: <1408495538-27480-1-git-send-email-linux@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Heiko St?bner <heiko@sntech.de>
+Various drivers implement architecture and/or device specific means
+to restart (reset) the system. Various mechanisms have been implemented
+to support those schemes. The best known mechanism is arm_pm_restart,
+which is a function pointer to be set either from platform specific code
+or from drivers. Another mechanism is to use hardware watchdogs to issue
+a reset; this mechanism is used if there is no other method available
+to reset a board or system. Two examples are alim7101_wdt, which currently
+uses the reboot notifier to trigger a reset, and moxart_wdt, which registers
+the arm_pm_restart function. Several other restart drivers for arm, all
+directly calling arm_pm_restart, are in the process of being integrated
+into the kernel. All those drivers would benefit from the new API.
 
-Add infrastructure to write the correct value to the restart register and
-register the restart notifier for both rk3188 (including rk3066) and rk3288.
+The existing mechanisms have a number of drawbacks. Typically only one scheme
+to restart the system is supported (at least if arm_pm_restart is used).
+At least in theory there can be multiple means to restart the system, some of
+which may be less desirable (for example one mechanism may only reset the CPU,
+while another may reset the entire system). Using arm_pm_restart can also be
+racy if the function pointer is set from a driver, as the driver may be in
+the process of being unloaded when arm_pm_restart is called.
+Using the reboot notifier is always racy, as it is unknown if and when
+other functions using the reboot notifier have completed execution
+by the time the watchdog fires.
 
-Signed-off-by: Heiko Stuebner <heiko@sntech.de>
-Signed-off-by: Guenter Roeck <linux@roeck-us.net>
+Introduce a system restart handler call chain to solve the described problems.
+This call chain is expected to be executed from the architecture specific
+machine_restart() function. Drivers providing system restart functionality
+(such as the watchdog drivers mentioned above) are expected to register
+with this call chain. By using the priority field in the notifier block,
+callers can control restart handler execution sequence and thus ensure that
+the restart handler with the optimal restart capabilities for a given system
+is called first.
+
+Since the first revision of this patchset, a number of separate patch
+submissions have been made which either depend on it or could make use of it.
+
+http://www.spinics.net/linux/lists/arm-kernel/msg344796.html
+	registers three notifiers.
+https://lkml.org/lkml/2014/7/8/962
+	would benefit from it.
+
+Patch 1 of this series implements the restart handler function. Patches 2 and 3
+implement calling the restart handler chain from arm and arm64 restart code.
+
+Patch 4 modifies the restart-poweroff driver to no longer call arm_pm_restart
+directly but machine_restart. This is done to avoid calling arm_pm_restart
+from more than one place. The change makes the driver architecture independent,
+so it would be possible to drop the arm dependency from its Kconfig entry.
+
+Patch 5 and 6 convert existing restart handlers in the watchdog subsystem
+to use the restart handler. Patch 7 unexports arm_pm_restart to ensure
+that no one gets the idea to implement a restart handler as module.
+
+The entire patch series, including additional patches depending on it,
+is available from
+https://git.kernel.org/cgit/linux/kernel/git/groeck/linux-staging.git/
+in branch 'restart-staging'.
+
 ---
-v7: Added patch to series.
-
- drivers/clk/rockchip/clk-rk3188.c |  2 ++
- drivers/clk/rockchip/clk-rk3288.c |  2 ++
- drivers/clk/rockchip/clk.c        | 25 +++++++++++++++++++++++++
- drivers/clk/rockchip/clk.h        |  1 +
- 4 files changed, 30 insertions(+)
-
-diff --git a/drivers/clk/rockchip/clk-rk3188.c b/drivers/clk/rockchip/clk-rk3188.c
-index a83a6d8..71b661a 100644
---- a/drivers/clk/rockchip/clk-rk3188.c
-+++ b/drivers/clk/rockchip/clk-rk3188.c
-@@ -631,6 +631,8 @@ static void __init rk3188_common_clk_init(struct device_node *np)
- 
- 	rockchip_register_softrst(np, 9, reg_base + RK2928_SOFTRST_CON(0),
- 				  ROCKCHIP_SOFTRST_HIWORD_MASK);
-+
-+	rockchip_register_restart_notifier(RK2928_GLB_SRST_FST);
- }
- 
- static void __init rk3066a_clk_init(struct device_node *np)
-diff --git a/drivers/clk/rockchip/clk-rk3288.c b/drivers/clk/rockchip/clk-rk3288.c
-index 0d8c6c5..b604217 100644
---- a/drivers/clk/rockchip/clk-rk3288.c
-+++ b/drivers/clk/rockchip/clk-rk3288.c
-@@ -713,5 +713,7 @@ static void __init rk3288_clk_init(struct device_node *np)
- 
- 	rockchip_register_softrst(np, 9, reg_base + RK3288_SOFTRST_CON(0),
- 				  ROCKCHIP_SOFTRST_HIWORD_MASK);
-+
-+	rockchip_register_restart_notifier(RK3288_GLB_SRST_FST);
- }
- CLK_OF_DECLARE(rk3288_cru, "rockchip,rk3288-cru", rk3288_clk_init);
-diff --git a/drivers/clk/rockchip/clk.c b/drivers/clk/rockchip/clk.c
-index 278cf9d..aa41433 100644
---- a/drivers/clk/rockchip/clk.c
-+++ b/drivers/clk/rockchip/clk.c
-@@ -25,6 +25,7 @@
- #include <linux/clk-provider.h>
- #include <linux/mfd/syscon.h>
- #include <linux/regmap.h>
-+#include <linux/reboot.h>
- #include "clk.h"
- 
- /**
-@@ -242,3 +243,27 @@ void __init rockchip_clk_register_branches(
- 		rockchip_clk_add_lookup(clk, list->id);
- 	}
- }
-+
-+static unsigned int reg_restart;
-+static int rockchip_restart_notify(struct notifier_block *this,
-+				   unsigned long mode, void *cmd)
-+{
-+	writel(0xfdb9, reg_base + reg_restart);
-+	return NOTIFY_DONE;
-+}
-+
-+static struct notifier_block rockchip_restart_handler = {
-+	.notifier_call = rockchip_restart_notify,
-+	.priority = 128,
-+};
-+
-+void __init rockchip_register_restart_notifier(unsigned int reg)
-+{
-+	int ret;
-+
-+	reg_restart = reg;
-+	ret = register_restart_handler(&rockchip_restart_handler);
-+	if (ret)
-+		pr_err("%s: cannot register restart handler, %d\n",
-+		       __func__, ret);
-+}
-diff --git a/drivers/clk/rockchip/clk.h b/drivers/clk/rockchip/clk.h
-index 887cbde..0b5eab5 100644
---- a/drivers/clk/rockchip/clk.h
-+++ b/drivers/clk/rockchip/clk.h
-@@ -329,6 +329,7 @@ void rockchip_clk_register_branches(struct rockchip_clk_branch *clk_list,
- 				    unsigned int nr_clk);
- void rockchip_clk_register_plls(struct rockchip_pll_clock *pll_list,
- 				unsigned int nr_pll, int grf_lock_offset);
-+void rockchip_register_restart_notifier(unsigned int reg);
- 
- #define ROCKCHIP_SOFTRST_HIWORD_MASK	BIT(0)
- 
--- 
-1.9.1
+v7: Rebased to v3.17-rc1
+    Dropped null_restart from arm code to make arm_pm_restart truly optional
+    Reordered series. power/restart must be patched to not use arm_pm_restart
+    prior to making arm_pm_restart optional.
+    Added all pending patches to series
+v6: Use atomic notifier call chain 
+    Rebased series to v3.16
+v5: Rebased series to v3.16-rc5
+    Function renames:
+    register_restart_notifier -> register_restart_handler
+    unregister_restart_notifier -> unregister_restart_handler
+    kernel_restart_notify -> do_kernel_restart
+v4: Document restart notifier priorities
+    Select 128 as default priority for newly introduced notifiers
+    Fix checkpatch warning (line too long) in moxart patch
+v3: Drop RFC.
+    Add kernel_restart_notify wrapper function to execute notifier
+    Improve documentation.
+    Move restart_notifier_list into kernel/reboot.c and make it static.
+v2: Add patch 4.
+    Only call blocking notifier call chain if arm_pm_restart was not set.
