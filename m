@@ -1,85 +1,93 @@
-From: tixy@linaro.org (Jon Medhurst (Tixy))
-Date: Wed, 20 Aug 2014 09:27:11 +0100
-Subject: [PATCH] video: ARM CLCD: Ensure bits-per-pixel is a power of 2
- and <= 32
-In-Reply-To: <20140819144032.GD30401@n2100.arm.linux.org.uk>
-References: <1408453651.3746.41.camel@linaro1.home>
- <20140819144032.GD30401@n2100.arm.linux.org.uk>
-Message-ID: <1408523231.3858.5.camel@linaro1.home>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Wed, 20 Aug 2014 10:28:20 +0200
+Subject: [PATCH 3/3] ARM: at91/tclib: mask interruptions at shutdown and
+ probe
+In-Reply-To: <20140820101422.3e8da816@bbrezillon>
+References: <1408486072-19268-1-git-send-email-gael.portay@gmail.com>
+ <1408486072-19268-4-git-send-email-gael.portay@gmail.com>
+ <776D4128-09AC-418C-A710-28A2522D1D63@jcrosoft.com>
+ <20140820010130.10974326@bbrezillon> <20140820073111.GH13793@ulmo>
+ <20140820101422.3e8da816@bbrezillon>
+Message-ID: <20140820082818.GB15414@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2014-08-19 at 15:40 +0100, Russell King - ARM Linux wrote:
-> On Tue, Aug 19, 2014 at 02:07:31PM +0100, Jon Medhurst (Tixy) wrote:
-> > If the device-tree specifies a max-memory-bandwidth property then
-> > the CLCD driver uses that to calculate the bits-per-pixel supported,
-> > however, it doesn't ensure that the result is a sane value, i.e. a
-> > power of 2 and <= 32 as the rest of the code assumes.
+On Wed, Aug 20, 2014 at 10:14:22AM +0200, Boris BREZILLON wrote:
+> Hi Thierry,
+> 
+> On Wed, 20 Aug 2014 09:31:13 +0200
+> Thierry Reding <thierry.reding@gmail.com> wrote:
+> 
+> > On Wed, Aug 20, 2014 at 01:01:30AM +0200, Boris BREZILLON wrote:
+> > > Hi Jean-Christophe,
+> > > 
+> > > On Wed, 20 Aug 2014 06:11:17 +0800
+> > > Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com> wrote:
+> > > 
+> > > > Hi,
+> > > > 
+> > > > 	This is a bit weird as the clock of the TC should be off and the irq free
+> > > > 
+> > > > 	so this should never happened we need to investigate more why this append
+> > > 
+> > > I may have found the source of this bug.
+> > > 
+> > > As Gael stated, when you're kexec-ing a new kernel your previous kernel
+> > > could be using the tbc_clksrc driver (and especially the clkevent
+> > > device). Thus the kernel might have planned a timer event and then been
+> > > asked to shutdown the machine (requested by the kexec code).
+> > > In this case the AIC interrupt connected to the TC Block is disabled
+> > > but not the interrupts within the TCB IP (IDR registers), possibly
+> > > leaving a pending interrupt before booting the new kernel.
+> > > 
+> > > When the tcb_clksrc driver is loaded by the new kernel it enables the
+> > > interrupt line by calling setup_irq [1] while the clockevent device is
+> > > not registered yet [2]. Thus the event_handler is still NULL when the
+> > > AIC line connected to the TCB is unmasked. Remember that an interrupt
+> > > is still pending on this HW block, which will lead to an immediate call
+> > > to the ch2_irq handler, which tries to call the event_handler, which in
+> > > turns is NULL because clkevent device registration has not taken place
+> > > at this moment => Kernel panic.
+> > > ITOH, we can't register the clkevent device before the irq handler is
+> > > set up, because we should be ready to handle clkevent request at the
+> > > time clockevents_config_and_register is called.
+> > > 
+> > > This leaves two solution:
+> > >  1) disable the TCB irqs (using TCB IDR registers) before calling
+> > >  setup_irq in the tcb_clksrc driver
+> > >  2) disable the TCB irqs at the tclib level (as proposed by Gael)
+> > > 
+> > > I prefer solution #2 because it fixes the bug for all TCB users (not
+> > > just the tcb_clksrc driver).
 > > 
-> > Acked-by: Pawel Moll <pawel.moll@arm.com>
-> > Signed-off-by: Jon Medhurst <tixy@linaro.org>
-> > ---
-> > 
-> > This fixes code which is new in 3.17 (commit d10715be03) and so I assume
-> > is a candidate for adding to a coming -rc ? Without the fix, people can
-> > be left (as I was) with a blank non-functioning screen even if they
-> > create a valid device-tree for the new driver functionality.
-> > 
-> >  drivers/video/fbdev/amba-clcd.c | 14 ++++++++++----
-> >  1 file changed, 10 insertions(+), 4 deletions(-)
-> > 
-> > diff --git a/drivers/video/fbdev/amba-clcd.c b/drivers/video/fbdev/amba-clcd.c
-> > index beadd3e..98b66b7 100644
-> > --- a/drivers/video/fbdev/amba-clcd.c
-> > +++ b/drivers/video/fbdev/amba-clcd.c
-> > @@ -24,6 +24,7 @@
-> >  #include <linux/list.h>
-> >  #include <linux/amba/bus.h>
-> >  #include <linux/amba/clcd.h>
-> > +#include <linux/bitops.h>
-> >  #include <linux/clk.h>
-> >  #include <linux/hardirq.h>
-> >  #include <linux/dma-mapping.h>
-> > @@ -650,6 +651,7 @@ static int clcdfb_of_init_display(struct clcd_fb *fb)
-> >  {
-> >  	struct device_node *endpoint;
-> >  	int err;
-> > +	int bpp;
-> >  	u32 max_bandwidth;
-> >  	u32 tft_r0b0g0[3];
-> >  
-> > @@ -667,11 +669,15 @@ static int clcdfb_of_init_display(struct clcd_fb *fb)
-> >  
-> >  	err = of_property_read_u32(fb->dev->dev.of_node, "max-memory-bandwidth",
-> >  			&max_bandwidth);
-> > -	if (!err)
-> > -		fb->panel->bpp = 8 * max_bandwidth / (fb->panel->mode.xres *
-> > +	if (!err) {
-> > +		bpp = 8 * max_bandwidth / (fb->panel->mode.xres *
-> >  				fb->panel->mode.yres * fb->panel->mode.refresh);
+> > Wouldn't a more proper fix be to only enable the IRQ (setup_irq()) once
+> > everything has properly been set up? That's certainly how all other
+> > drivers are doing this. Generally I think it's best to assume that an
+> > interrupt can fire at any point after it's been enabled, so everything
+> > should be set up prior to enabling it.
 > 
-> This calculation is wrong in any case - this is the na?eve calculation
-> which assumes that the bandwidth is:
-> 
-> 	x * y * (bpp / 8) * refresh
-> 
-> That isn't the maximum bandwidth, it's the average bandwidth across a
-> full frame.
-> 
-> If we're interested in limiting the maximum bandwidth, because the
-> hardware can't cope with fetching the data above a certain rate, then
-> we need a different method.
-> 
-> We know the pixel rate.  We know how many memory bits are fetched for
-> each pixel.  So:
-> 
-> 	peak_bandwidth = pixel_clock * bpp / 8
+> Sure. And, AFAIK, another common practice is to disable all interrupts
+> and acknowledge all pending interrupts before registering a new irq
+> handler to avoid inheriting peripheral dirty state from previous usage
+> (either the bootloader, or the previous kernel when using kexec).
 
-That all sounds logical and reasonable to me, especially as the binding
-doc describes the property as "maximum bandwidth in bytes per second
-that the cell's memory interface can handle".
+Discarding all pending interrupts may not always be what we want. And
+masking interrupts prior to registering the handler isn't always going
+to work either (shared interrupts), so device drivers should always set
+things up in the correct order.
 
-I'll update the patch to also correct the calculation as you suggest.
+> This being said, I really think we should leave the HW in a clean state
+> when shutdown is called. And disabling interrupts at the tclib level
+> (in a shutdown callback) ensure that.
 
--- 
-Tixy
+Yes, cleaning up the hardware and disabling interrupts upon shutdown
+seems like a good idea to me in addition to the above.
+
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140820/d2002450/attachment-0001.sig>
