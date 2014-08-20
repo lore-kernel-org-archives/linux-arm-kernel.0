@@ -1,71 +1,84 @@
-From: liviu@dudau.co.uk (Liviu Dudau)
-Date: Wed, 20 Aug 2014 13:31:12 +0100
-Subject: [PATCH] drivers: pci: convert generic host controller to DT host
- bridge creation API
-In-Reply-To: <201408201327.57376.arnd@arndb.de>
-References: <1407861695-25549-1-git-send-email-Liviu.Dudau@arm.com>
- <201408201327.57376.arnd@arndb.de>
-Message-ID: <20140820123112.GG13147@bart.dudau.co.uk>
+From: diana.craciun@freescale.com (Diana Craciun)
+Date: Wed, 20 Aug 2014 15:34:57 +0300
+Subject: [PATCHv2 4/6] dt-bindings: arm: add Freescale LS1021A SoC device
+ tree binding
+In-Reply-To: <1407145148-29217-5-git-send-email-jingchang.lu@freescale.com>
+References: <1407145148-29217-1-git-send-email-jingchang.lu@freescale.com>
+ <1407145148-29217-5-git-send-email-jingchang.lu@freescale.com>
+Message-ID: <53F495F1.60800@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 20, 2014 at 01:27:57PM +0200, Arnd Bergmann wrote:
-> On Tuesday 12 August 2014, Liviu Dudau wrote:
-> > +       return of_create_pci_host_bridge(dev, 0, 0xff, &gen_pci_ops,
-> > +                                       gen_pci_setup, pci);
-> 
-> I had not noticed it earlier, but the setup callback is actually a feature
-> of the arm32 PCI code that I had hoped to avoid when moving to the
-> generic API. Can we do this as a more regular sequence of
-> 
-> 
-> 	ret = of_create_pci_host_bridge(dev, 0, 0xff, &gen_pci_ops, pci);
-> 	if (ret)
-> 		return ret;
-> 
-> 	ret = gen_pci_setup(pci);
-> 	if (ret)
-> 		pci_destroy_host_bridge(dev, pci);
-> 	return ret;
-> 
-> ?
-> 
-> 	Arnd
+On 08/04/2014 12:39 PM, Jingchang Lu wrote:
+> Signed-off-by: Jingchang Lu <jingchang.lu@freescale.com>
+> ---
+>   Documentation/devicetree/bindings/arm/fsl.txt | 37 +++++++++++++++++++++++++++
+>   1 file changed, 37 insertions(+)
+>
+> diff --git a/Documentation/devicetree/bindings/arm/fsl.txt b/Documentation/devicetree/bindings/arm/fsl.txt
+> index e935d7d..c962124 100644
+> --- a/Documentation/devicetree/bindings/arm/fsl.txt
+> +++ b/Documentation/devicetree/bindings/arm/fsl.txt
+> @@ -74,3 +74,40 @@ Required root node properties:
+>   i.MX6q generic board
+>   Required root node properties:
+>       - compatible = "fsl,imx6q";
+> +
+> +
+> +Freescale LS1021A Platform Device Tree Bindings
+> +------------------------------------------------
+> +
+> +Required root node compatible properties:
+> +  - compatible = "fsl,ls1021a";
+> +
+> +SoC-specific device tree bindings for system configuration
+> +-------------------------------------------
+> +
+> +Required device node compatible properties:
+> +
+> +  - compatible = "fsl,ls1021a-scfg":
+> +	scfg is the supplemental configuration unit, provides SoC specific
+> +	configuration and status registers for the chip. There is no dedicate
+> +	driver for it, but for device whose configuration and status register
+> +	locates in this space should operate on it. Such as getting PEX port
+> +	status.
+> +
+> +  - compatible = "fsl,ls1021a-dcfg":
+> +	dcfg is the device configuration unit that provides general purpose
+> +	configuration and status for the device, there is no dedicate driver
+> +	for it, but for device whose configuration and status register locates
+> +	in this space should operate on it. Such as setting the secondary core
+> +	start address and release the secondary core from holdoff and startup.
 
-Hi Arnd,
+Is it that important to be mentioned in the binding that there is no 
+driver for it? It seems to be just an implementation detail, the device 
+tree describes the hardware not any particular implementation.
 
-That has been the general approach of my patchset up to v9. But, as Bjorn has
-mentioned in his v8 review and I have put in my cover letter, the regular
-aproach means that architectures that use pci_scan_root_bus() will have to
-drop their one liner and replace it with the more verbose of_create_pci_host_bridge()
-followed by pci_scan_child_bus() and pci_bus_add_devices() (basically, the content
-of pci_scan_root_bus()). For those architectures it will lead to a net increase of
-lines of code.
+> +
+> +Example:
+> +	scfg: scfg at 1570000 {
+> +		compatible = "fsl,ls1021a-scfg";
+> +		reg = <0x0 0x1570000 0x0 0x10000>;
 
-The patch for pci-host-generic.c is the first to use the callback setup function, but
-not the only one. My PCI host bridge driver for Juno has the same need, and I'm betting
-all other host bridge controllers will use it as it will be the only opportunity to
-finish the controller setup before we start scanning the child busses. I'm trying to
-balance ease of read vs ease of use here and it is the best version I've come up with
-so far.
+The reg is not part of the description above. I think that each of these 
+nodes should be described separate, maybe something like this:
 
-Best regards,
-Liviu
+Freescale SCFG
 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+scfg is the supplemental configuration unit, provides SoC specific 
+configuration and status registers for the chip. There is no dedicate 
+driver for it, but for device whose configuration and status register 
+locates in this space should operate on it. Such as getting PEX port status.
 
--- 
--------------------
-   .oooO
-   (   )
-    \ (  Oooo.
-     \_) (   )
-          ) /
-         (_/
+Required properties:
+- compatible: Should be "fsl,ls1021a-scfg"
+- reg: should contain.....
 
- One small step
-   for me ...
+> +	};
+> +
+> +	dcfg: dcfg at 1ee0000 {
+> +		compatible = "fsl,ls1021a-dcfg";
+> +		reg = <0x0 0x1ee0000 0x0 0x10000>;
+> +	};
+
+Diana
