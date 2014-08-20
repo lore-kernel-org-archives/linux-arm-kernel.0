@@ -1,81 +1,68 @@
-From: tixy@linaro.org (Jon Medhurst (Tixy))
-Date: Wed, 20 Aug 2014 13:41:04 +0100
-Subject: [PATCH v2] video: ARM CLCD: Fix calculation of bits-per-pixel
-Message-ID: <1408538464.3858.43.camel@linaro1.home>
+From: afaerber@suse.de (=?UTF-8?B?QW5kcmVhcyBGw6RyYmVy?=)
+Date: Wed, 20 Aug 2014 14:50:30 +0200
+Subject: [PATCH v6 10/10] ARM: dts: Add exynos5250-spring device tree
+In-Reply-To: <CAD=FV=WFP53bZAks7t9xybUxpna89Nz=KG+PQwAcxFEH0D+3mw@mail.gmail.com>
+References: <1406940750-15880-1-git-send-email-afaerber@suse.de>	<1406940750-15880-11-git-send-email-afaerber@suse.de>
+ <CAD=FV=WFP53bZAks7t9xybUxpna89Nz=KG+PQwAcxFEH0D+3mw@mail.gmail.com>
+Message-ID: <53F49996.30007@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If the device-tree specifies a max-memory-bandwidth property then the
-CLCD driver uses that to calculate the bits-per-pixel supported,
-however, this calculation is faulty for two reasons.
+Kukjin,
 
-1. It doesn't ensure that the result is a sane value, i.e. a power of 2
-   and <= 32 as the rest of the code assumes.
+Am 04.08.2014 17:22, schrieb Doug Anderson:
+> On Fri, Aug 1, 2014 at 5:52 PM, Andreas F?rber <afaerber@suse.de> wrote:
+>> diff --git a/arch/arm/boot/dts/exynos5250-spring.dts b/arch/arm/boot/dts/exynos5250-spring.dts
+>> new file mode 100644
+>> index 000000000000..f5566f84d885
+>> --- /dev/null
+>> +++ b/arch/arm/boot/dts/exynos5250-spring.dts
+[...]
+>> +       usb-hub {
+>> +               compatible = "smsc,usb3503a";
+>> +               reset-gpios = <&gpe1 0 GPIO_ACTIVE_LOW>;
+>> +       };
+> 
+> Last I remember hearing about this, Julius said that the generic
+> usb-hub driver didn't work right for asserting the reset line.
+> Something about needing the reset at a very specific time in the USB
+> enumeration, I think.  Maybe it's somehow been fixed since then and
+> that's why it's working?
+> 
+> Also: you technically should have a pinctrl-0 and pinctrl-names
+> referencing "hsic_reset" below to make sure the pin gets initted
+> properly.
+[...]
+> Technically the missing pinctrl for hsic-reset is something that out
+> to be fixed and we should figure out whether the reset line is
+> actually working properly anyway.  ...but I think this has been
+> through enough spins and any additional fixup can happen later, so you
+> can add my:
+> 
+> Reviewed-by: Doug Anderson <dianders@chromium.org>
 
-2. It uses the displayed resolution and calculates the average bandwidth
-   across the whole frame. It should instead calculate the peak
-   bandwidth based on the pixel clock.
+I wonder how to proceed now... Are you planning to continue inserting my
+remaining snow/smdk/arndale refactoring patches [1,2,3,4] before the mmc
+slot node refactoring on v3.18-next/dt-samsung branch?
+I.e., should I send out a v7 rebasing either the remainder or just
+Spring on top of your for-next, or should I just post new follow-up
+patches to this series and wait?
 
-This patch fixes both the above.
+I've prepared and successfully tested a patch adding the pinctrl Doug
+requested above. Additionally, I have another follow-up ready, adding a
+gmt,g781 temperature sensor (with v3.17-rc1 that actually works).
 
-Signed-off-by: Jon Medhurst <tixy@linaro.org>
----
+Also I understood that Javier is waiting for my remaining Snow bits to
+be applied before sending out further Snow DT cleanups/fixes of his.
 
-Changes since v1:
-- Changed formula for calculating bits per pixel
-- Changed commit message and subject, was:
-  "video: ARM CLCD: Ensure bits-per-pixel is a power of 2 and <= 32"
+Thanks,
+Andreas
 
- drivers/video/fbdev/amba-clcd.c | 23 ++++++++++++++++++-----
- 1 file changed, 18 insertions(+), 5 deletions(-)
+[1] https://patchwork.kernel.org/patch/4664881/
+[2] https://patchwork.kernel.org/patch/4664801/
+[3] https://patchwork.kernel.org/patch/4664731/
+[4] https://patchwork.kernel.org/patch/4664751/
 
-diff --git a/drivers/video/fbdev/amba-clcd.c b/drivers/video/fbdev/amba-clcd.c
-index beadd3e..a7b6217 100644
---- a/drivers/video/fbdev/amba-clcd.c
-+++ b/drivers/video/fbdev/amba-clcd.c
-@@ -24,6 +24,7 @@
- #include <linux/list.h>
- #include <linux/amba/bus.h>
- #include <linux/amba/clcd.h>
-+#include <linux/bitops.h>
- #include <linux/clk.h>
- #include <linux/hardirq.h>
- #include <linux/dma-mapping.h>
-@@ -650,6 +651,7 @@ static int clcdfb_of_init_display(struct clcd_fb *fb)
- {
- 	struct device_node *endpoint;
- 	int err;
-+	unsigned int bpp;
- 	u32 max_bandwidth;
- 	u32 tft_r0b0g0[3];
- 
-@@ -667,11 +669,22 @@ static int clcdfb_of_init_display(struct clcd_fb *fb)
- 
- 	err = of_property_read_u32(fb->dev->dev.of_node, "max-memory-bandwidth",
- 			&max_bandwidth);
--	if (!err)
--		fb->panel->bpp = 8 * max_bandwidth / (fb->panel->mode.xres *
--				fb->panel->mode.yres * fb->panel->mode.refresh);
--	else
--		fb->panel->bpp = 32;
-+	if (!err) {
-+		/*
-+		 * max_bandwidth is in bytes per second and pixclock in
-+		 * pico-seconds, so the maximum allowed bits per pixel is
-+		 *   8 * max_bandwidth / (PICOS2KHZ(pixclock) * 1000)
-+		 * Rearrange this calculation to avoid overflow and then ensure
-+		 * result is a valid format.
-+		 */
-+		bpp = max_bandwidth / (1000 / 8)
-+			/ PICOS2KHZ(fb->panel->mode.pixclock);
-+		bpp = rounddown_pow_of_two(bpp);
-+		if (bpp > 32)
-+			bpp = 32;
-+	} else
-+		bpp = 32;
-+	fb->panel->bpp = bpp;
- 
- #ifdef CONFIG_CPU_BIG_ENDIAN
- 	fb->panel->cntl |= CNTL_BEBO;
 -- 
-2.1.0.rc1
+SUSE LINUX Products GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
+GF: Jeff Hawn, Jennifer Guild, Felix Imend?rffer; HRB 16746 AG N?rnberg
