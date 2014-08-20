@@ -1,30 +1,27 @@
-From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
-Date: Wed, 20 Aug 2014 14:29:17 -0500
-Subject: [PATCH v3 2/4] pwm: rockchip: Allow polarity invert on rk3288
-In-Reply-To: <CAD=FV=U9gOiY=4s7WmAQcm0n9s67nWdqQ3A0L2B7Dg83dNotjQ@mail.gmail.com>
-References: <1408464476-28316-1-git-send-email-dianders@chromium.org>
- <1408464476-28316-3-git-send-email-dianders@chromium.org>
- <20140820100447.GG15414@ulmo>
- <CAD=FV=U9gOiY=4s7WmAQcm0n9s67nWdqQ3A0L2B7Dg83dNotjQ@mail.gmail.com>
-Message-ID: <387c82a0-efeb-431d-b8a5-200f24bc47ff@email.android.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 20 Aug 2014 21:30:28 +0200
+Subject: [PATCH v3] arm/smp: Absorb boot_secondary()
+In-Reply-To: <CAMuHMdXp0ruZjjJLXmWyCdfAXs9_9xFHDcmJ08M9_SbZqqq04g@mail.gmail.com>
+References: <1404918119-3676-1-git-send-email-geert+renesas@glider.be>
+ <CAMuHMdXp0ruZjjJLXmWyCdfAXs9_9xFHDcmJ08M9_SbZqqq04g@mail.gmail.com>
+Message-ID: <201408202130.28389.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On August 20, 2014 1:54:11 PM CDT, Doug Anderson <dianders@chromium.org> wrote:
->On Wed, Aug 20, 2014 at 3:04 AM, Thierry Reding
-><thierry.reding@gmail.com> wrote:
->> On Tue, Aug 19, 2014 at 09:07:54AM -0700, Doug Anderson wrote:
->>> The rk3288 has the ability to invert 
->>> +     struct rockchip_pwm_chip *pc = to_rockchip_pwm_chip(chip);
->>> +
->>> +     if (!pc->data->has_invert)
->>> +             return -ENOSYS;
->>> +
+On Wednesday 20 August 2014, Geert Uytterhoeven wrote:
+> 
+> Ping?
+> 
+> On Wed, Jul 9, 2014 at 5:01 PM, Geert Uytterhoeven
+> <geert+renesas@glider.be> wrote:
+> > After becoming a mandatory function, boot_secondary() is no longer used
+> > outside arch/arm/kernel/smp.c. Hence remove its public prototype, and,
+> > as suggested by Arnd, let it be absorbed by its single caller.
+> >
+> > Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> > Acked-by: Arnd Bergmann <arnd@arndb.de>
 
-At the kernel summit hpa also mentioned that ENOSYS should only be used for missing syscalls. Not sure what error code would suit better here though...
+I think you should add the patch to Russell's patch tracking system
+at http://www.arm.linux.org.uk/developer/patches to get it applied.
 
-
-Thanks.
-
--- 
-Dmitry
+	Arnd
