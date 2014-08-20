@@ -1,33 +1,91 @@
-From: ttynkkynen@nvidia.com (Tuomas Tynkkynen)
-Date: Thu, 21 Aug 2014 00:04:44 +0300
-Subject: [PATCH v4 16/16] ARM: tegra: enable Tegra124 cpufreq driver by default
-In-Reply-To: <1408568684-11016-1-git-send-email-ttynkkynen@nvidia.com>
-References: <1408568684-11016-1-git-send-email-ttynkkynen@nvidia.com>
-Message-ID: <1408568684-11016-17-git-send-email-ttynkkynen@nvidia.com>
+From: bhelgaas@google.com (Bjorn Helgaas)
+Date: Wed, 20 Aug 2014 17:35:59 -0500
+Subject: [PATCH] drivers: pci: convert generic host controller to DT host
+ bridge creation API
+In-Reply-To: <20140820123112.GG13147@bart.dudau.co.uk>
+References: <1407861695-25549-1-git-send-email-Liviu.Dudau@arm.com>
+ <201408201327.57376.arnd@arndb.de> <20140820123112.GG13147@bart.dudau.co.uk>
+Message-ID: <CAErSpo6Z4b3w7j=X9C1YGOV59JHZwZUt7pnVp+Z0erY2RLCNAQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Tegra124 cpufreq driver depends on CONFIG_GENERIC_CPUFREQ_CPU0, so
-enable it to get the Tegra driver to build by default.
+On Wed, Aug 20, 2014 at 7:31 AM, Liviu Dudau <liviu@dudau.co.uk> wrote:
+> On Wed, Aug 20, 2014 at 01:27:57PM +0200, Arnd Bergmann wrote:
+>> On Tuesday 12 August 2014, Liviu Dudau wrote:
+>> > +       return of_create_pci_host_bridge(dev, 0, 0xff, &gen_pci_ops,
+>> > +                                       gen_pci_setup, pci);
+>>
+>> I had not noticed it earlier, but the setup callback is actually a feature
+>> of the arm32 PCI code that I had hoped to avoid when moving to the
+>> generic API. Can we do this as a more regular sequence of
+>>
+>>
+>>       ret = of_create_pci_host_bridge(dev, 0, 0xff, &gen_pci_ops, pci);
+>>       if (ret)
+>>               return ret;
+>>
+>>       ret = gen_pci_setup(pci);
+>>       if (ret)
+>>               pci_destroy_host_bridge(dev, pci);
+>>       return ret;
+>>
+>> ?
+>>
+>>       Arnd
+>
+> Hi Arnd,
+>
+> That has been the general approach of my patchset up to v9. But, as Bjorn has
+> mentioned in his v8 review and I have put in my cover letter, the regular
+> aproach means that architectures that use pci_scan_root_bus() will have to
+> drop their one liner and replace it with the more verbose of_create_pci_host_bridge()
+> followed by pci_scan_child_bus() and pci_bus_add_devices() (basically, the content
+> of pci_scan_root_bus()). For those architectures it will lead to a net increase of
+> lines of code.
+>
+> The patch for pci-host-generic.c is the first to use the callback setup function, but
+> not the only one. My PCI host bridge driver for Juno has the same need, and I'm betting
+> all other host bridge controllers will use it as it will be the only opportunity to
+> finish the controller setup before we start scanning the child busses. I'm trying to
+> balance ease of read vs ease of use here and it is the best version I've come up with
+> so far.
 
-Signed-off-by: Tuomas Tynkkynen <ttynkkynen@nvidia.com>
----
-v4: New patch
----
- arch/arm/configs/tegra_defconfig | 1 +
- 1 file changed, 1 insertion(+)
+My guess is that you're referring to
+http://lkml.kernel.org/r/20140708011136.GE22939 at google.com
 
-diff --git a/arch/arm/configs/tegra_defconfig b/arch/arm/configs/tegra_defconfig
-index 285c433..afaa97c 100644
---- a/arch/arm/configs/tegra_defconfig
-+++ b/arch/arm/configs/tegra_defconfig
-@@ -43,6 +43,7 @@ CONFIG_KEXEC=y
- CONFIG_CPU_FREQ=y
- CONFIG_CPU_FREQ_STAT_DETAILS=y
- CONFIG_CPU_FREQ_DEFAULT_GOV_ONDEMAND=y
-+CONFIG_GENERIC_CPUFREQ_CPU0=y
- CONFIG_CPU_IDLE=y
- CONFIG_VFP=y
- CONFIG_NEON=y
--- 
-1.8.1.5
+I'm trying to get to the point where arch code can discover the host
+bridge, configure it, learn its properties (apertures, etc.), then
+pass it off completely to the PCI core for PCI device enumeration.
+pci_scan_root_bus() is the closest thing we have to that right now, so
+that's why I point to that.  Here's the current pci_scan_root_bus():
+
+  pci_scan_root_bus()
+  {
+    pci_create_root_bus();
+    /* 1 */
+    pci_scan_child_bus()
+    /* 2 */
+    pci_bus_add_devices()
+  }
+
+This is obviously incomplete as it is -- for example, it does nothing
+about assigning resources to PCI devices, so it only works if we rely
+completely on the firmware to do that.  Some arches (x86, ia64, etc.)
+don't want to rely on firmware, so they basically open-code
+pci_scan_root_bus() and insert resource assignment at (2) above.  That
+resource assignment really *should* be done in pci_scan_root_bus()
+itself, but it's quite a bit of work to make that happen.
+
+In your case, of_create_pci_host_bridge() open-codes
+pci_scan_root_bus() and calls the "setup" callback at (1) in the
+outline above.  I don't have any problem with that, and I don't care
+whether you do it by passing in a callback function pointer or via
+some other means.
+
+However, I would ask whether this is really a requirement.  Most
+(maybe all) other arches require nothing special at (1), i.e., between
+pci_create_root_bus() and pci_scan_child_bus().  If you can do it
+*before* pci_create_root_bus(), I think that would be nicer, but maybe
+you can't.
+
+Bjorn
