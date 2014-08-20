@@ -1,173 +1,45 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed, 20 Aug 2014 09:24:17 +0900
-Subject: [PATCH 8/8] ARM: shmobile: genmai-reference: Enable MTU2 in device
- tree
+Date: Wed, 20 Aug 2014 09:24:16 +0900
+Subject: [PATCH 7/8] ARM: shmobile: r7s72100: Add MTU2 device to DT
 In-Reply-To: <cover.1408492048.git.horms+renesas@verge.net.au>
 References: <cover.1408492048.git.horms+renesas@verge.net.au>
-Message-ID: <9dddfcfacaadb5491b62233b893b510fa00da4e0.1408492048.git.horms+renesas@verge.net.au>
+Message-ID: <9162d39ccb9400bfaed85630cf517c85861faa6f.1408492048.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 
-No more device needs to be added from platform code when booting the
-reference platform, move MTU2 registration from setup-r7s72100.c to
-board-genmai.c and remove the now empty r7s72100_add_dt_devices()
-function.
-
-As the genmai_add_standard_devices() function is now identical to the
-default init_machine implementation, remove it as well.
+Add the MTU2 counter to the r7s72100 device tree and make it disabled by
+default.
 
 Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 Acked-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
+[horms+renesas at verge.net.au correct irq number]
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r7s72100-genmai.dts           |  4 ++++
- arch/arm/mach-shmobile/board-genmai-reference.c | 20 --------------------
- arch/arm/mach-shmobile/board-genmai.c           | 14 +++++++++++++-
- arch/arm/mach-shmobile/r7s72100.h               |  1 -
- arch/arm/mach-shmobile/setup-r7s72100.c         | 21 ---------------------
- 5 files changed, 17 insertions(+), 43 deletions(-)
+ arch/arm/boot/dts/r7s72100.dtsi | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
-diff --git a/arch/arm/boot/dts/r7s72100-genmai.dts b/arch/arm/boot/dts/r7s72100-genmai.dts
-index 2070546..a3ed23c 100644
---- a/arch/arm/boot/dts/r7s72100-genmai.dts
-+++ b/arch/arm/boot/dts/r7s72100-genmai.dts
-@@ -43,6 +43,10 @@
- 	clock-frequency = <48000000>;
- };
+diff --git a/arch/arm/boot/dts/r7s72100.dtsi b/arch/arm/boot/dts/r7s72100.dtsi
+index bdee225..1d28d01 100644
+--- a/arch/arm/boot/dts/r7s72100.dtsi
++++ b/arch/arm/boot/dts/r7s72100.dtsi
+@@ -229,6 +229,16 @@
+ 		status = "disabled";
+ 	};
  
-+&mtu2 {
-+	status = "ok";
-+};
++	mtu2: timer at fcff0000 {
++		compatible = "renesas,mtu2";
++		reg = <0xfcff0000 0x400>;
++		interrupts = <0 107 IRQ_TYPE_LEVEL_HIGH>;
++		interrupt-names = "tgi0a";
++		clocks = <&mstp3_clks R7S72100_CLK_MTU2>;
++		clock-names = "fck";
++		status = "disabled";
++	};
 +
- &i2c2 {
- 	status = "okay";
- 	clock-frequency = <400000>;
-diff --git a/arch/arm/mach-shmobile/board-genmai-reference.c b/arch/arm/mach-shmobile/board-genmai-reference.c
-index e5448f7..bc52677 100644
---- a/arch/arm/mach-shmobile/board-genmai-reference.c
-+++ b/arch/arm/mach-shmobile/board-genmai-reference.c
-@@ -19,29 +19,10 @@
-  */
- 
- #include <linux/kernel.h>
--#include <linux/of_platform.h>
- 
--#include <asm/mach-types.h>
- #include <asm/mach/arch.h>
- 
--#include "clock.h"
- #include "common.h"
--#include "r7s72100.h"
--
--/*
-- * This is a really crude hack to provide clkdev support to platform
-- * devices until they get moved to DT.
-- */
--static const struct clk_name clk_names[] = {
--	{ "mtu2", "fck", "sh-mtu2" },
--};
--
--static void __init genmai_add_standard_devices(void)
--{
--	shmobile_clk_workaround(clk_names, ARRAY_SIZE(clk_names), true);
--	r7s72100_add_dt_devices();
--	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
--}
- 
- static const char * const genmai_boards_compat_dt[] __initconst = {
- 	"renesas,genmai",
-@@ -50,6 +31,5 @@ static const char * const genmai_boards_compat_dt[] __initconst = {
- 
- DT_MACHINE_START(GENMAI_DT, "genmai")
- 	.init_early	= shmobile_init_delay,
--	.init_machine	= genmai_add_standard_devices,
- 	.dt_compat	= genmai_boards_compat_dt,
- MACHINE_END
-diff --git a/arch/arm/mach-shmobile/board-genmai.c b/arch/arm/mach-shmobile/board-genmai.c
-index 7bf2d80..ba545fc 100644
---- a/arch/arm/mach-shmobile/board-genmai.c
-+++ b/arch/arm/mach-shmobile/board-genmai.c
-@@ -23,6 +23,7 @@
- #include <linux/platform_device.h>
- #include <linux/serial_sci.h>
- #include <linux/sh_eth.h>
-+#include <linux/sh_timer.h>
- #include <linux/spi/rspi.h>
- #include <linux/spi/spi.h>
- 
-@@ -125,10 +126,21 @@ R7S72100_SCIF(7, 0xe800a800, gic_iid(249));
- 					  &scif##index##_platform_data,	       \
- 					  sizeof(scif##index##_platform_data))
- 
-+static struct resource mtu2_resources[] __initdata = {
-+	DEFINE_RES_MEM(0xfcff0000, 0x400),
-+	DEFINE_RES_IRQ_NAMED(gic_iid(139), "tgi0a"),
-+};
-+
-+#define r7s72100_register_mtu2()					\
-+	platform_device_register_resndata(&platform_bus, "sh-mtu2",	\
-+					  -1, mtu2_resources,		\
-+					  ARRAY_SIZE(mtu2_resources),	\
-+					  NULL, 0)
-+
- static void __init genmai_add_standard_devices(void)
- {
- 	r7s72100_clock_init();
--	r7s72100_add_dt_devices();
-+	r7s72100_register_mtu2();
- 
- 	platform_device_register_full(&ether_info);
- 
-diff --git a/arch/arm/mach-shmobile/r7s72100.h b/arch/arm/mach-shmobile/r7s72100.h
-index efb723c..321ae4e 100644
---- a/arch/arm/mach-shmobile/r7s72100.h
-+++ b/arch/arm/mach-shmobile/r7s72100.h
-@@ -1,7 +1,6 @@
- #ifndef __ASM_R7S72100_H__
- #define __ASM_R7S72100_H__
- 
--void r7s72100_add_dt_devices(void);
- void r7s72100_clock_init(void);
- 
- #endif /* __ASM_R7S72100_H__ */
-diff --git a/arch/arm/mach-shmobile/setup-r7s72100.c b/arch/arm/mach-shmobile/setup-r7s72100.c
-index f3b3b14..d898cef 100644
---- a/arch/arm/mach-shmobile/setup-r7s72100.c
-+++ b/arch/arm/mach-shmobile/setup-r7s72100.c
-@@ -18,32 +18,11 @@
-  * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
-  */
- 
--#include <linux/irq.h>
- #include <linux/kernel.h>
--#include <linux/of_platform.h>
--#include <linux/sh_timer.h>
- 
- #include <asm/mach/arch.h>
- 
- #include "common.h"
--#include "irqs.h"
--#include "r7s72100.h"
--
--static struct resource mtu2_resources[] __initdata = {
--	DEFINE_RES_MEM(0xfcff0000, 0x400),
--	DEFINE_RES_IRQ_NAMED(gic_iid(139), "tgi0a"),
--};
--
--#define r7s72100_register_mtu2()					\
--	platform_device_register_resndata(NULL, "sh-mtu2",		\
--					  -1, mtu2_resources,		\
--					  ARRAY_SIZE(mtu2_resources),	\
--					  NULL, 0)
--
--void __init r7s72100_add_dt_devices(void)
--{
--	r7s72100_register_mtu2();
--}
- 
- #ifdef CONFIG_USE_OF
- static const char *r7s72100_boards_compat_dt[] __initdata = {
+ 	scif0: serial at e8007000 {
+ 		compatible = "renesas,scif-r7s72100", "renesas,scif";
+ 		reg = <0xe8007000 64>;
 -- 
 2.0.1
