@@ -1,50 +1,89 @@
 From: soren.brinkmann@xilinx.com (Soren Brinkmann)
-Date: Wed, 20 Aug 2014 13:41:46 -0700
-Subject: [PATCH 0/9] Zynq PM updates
-Message-ID: <1408567315-28479-1-git-send-email-soren.brinkmann@xilinx.com>
+Date: Wed, 20 Aug 2014 13:41:47 -0700
+Subject: [PATCH 1/9] ARM: zynq: PM: Enable A9 internal clock gating feature
+In-Reply-To: <1408567315-28479-1-git-send-email-soren.brinkmann@xilinx.com>
+References: <1408567315-28479-1-git-send-email-soren.brinkmann@xilinx.com>
+Message-ID: <1408567315-28479-2-git-send-email-soren.brinkmann@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
+---
+ arch/arm/mach-zynq/common.c  |  6 ++++++
+ arch/arm/mach-zynq/common.h  | 11 +++++++++++
+ arch/arm/mach-zynq/platsmp.c |  9 +++++++++
+ 3 files changed, 26 insertions(+)
 
-I'm working on some PM-related updates and suspend for Zynq (for the
-interested, a branch with all patches is found here:
-https://github.com/sorenb-xlnx/linux-xlnx/commits/suspend).
-
-This series consists of the rather unproblematic parts that affect Zynq
-only and have no further dependencies. It's a little bit of clean up
-(thanks to Daniel too) and enabling a couple of the HW's power saving
-features.
-
-	Thanks,
-	S?ren
-
-Daniel Lezcano (2):
-  ARM: zynq: Remove invalidate cache for cpu die
-  ARM: zynq: cpuidle: Remove pointless code
-
-Soren Brinkmann (7):
-  ARM: zynq: PM: Enable A9 internal clock gating feature
-  Documentation: devicetree: Add binding for Synopsys DDR controller
-  ARM: zynq: DT: Add DDRC node
-  ARM: zynq: PM: Enable DDR self-refresh and clock stop
-  ARM: zynq: Synchronise zynq_cpu_die/kill
-  ARM: zynq: Remove hotplug.c
-  ARM: zynq: Rename 'zynq_platform_cpu_die'
-
- .../bindings/memory-controllers/synopsys.txt       | 11 +++
- arch/arm/boot/dts/zynq-7000.dtsi                   |  5 ++
- arch/arm/mach-zynq/Makefile                        |  3 +-
- arch/arm/mach-zynq/common.c                        |  7 ++
- arch/arm/mach-zynq/common.h                        | 18 ++++-
- arch/arm/mach-zynq/hotplug.c                       | 47 +-----------
- arch/arm/mach-zynq/platsmp.c                       | 35 ++++++++-
- arch/arm/mach-zynq/pm.c                            | 84 ++++++++++++++++++++++
- arch/arm/mach-zynq/slcr.c                          | 43 ++++++++++-
- drivers/cpuidle/cpuidle-zynq.c                     | 10 +--
- 10 files changed, 202 insertions(+), 61 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/memory-controllers/synopsys.txt
- create mode 100644 arch/arm/mach-zynq/pm.c
-
+diff --git a/arch/arm/mach-zynq/common.c b/arch/arm/mach-zynq/common.c
+index 31a6fa40ba37..3cb7c198615a 100644
+--- a/arch/arm/mach-zynq/common.c
++++ b/arch/arm/mach-zynq/common.c
+@@ -98,6 +98,11 @@ static int __init zynq_get_revision(void)
+ 	return revision;
+ }
+ 
++static void __init zynq_init_late(void)
++{
++	zynq_core_pm_init();
++}
++
+ /**
+  * zynq_init_machine - System specific initialization, intended to be
+  *		       called from board specific initialization.
+@@ -204,6 +209,7 @@ DT_MACHINE_START(XILINX_EP107, "Xilinx Zynq Platform")
+ 	.map_io		= zynq_map_io,
+ 	.init_irq	= zynq_irq_init,
+ 	.init_machine	= zynq_init_machine,
++	.init_late	= zynq_init_late,
+ 	.init_time	= zynq_timer_init,
+ 	.dt_compat	= zynq_dt_match,
+ 	.reserve	= zynq_memory_init,
+diff --git a/arch/arm/mach-zynq/common.h b/arch/arm/mach-zynq/common.h
+index f652f0a884a6..596ef0b5067c 100644
+--- a/arch/arm/mach-zynq/common.h
++++ b/arch/arm/mach-zynq/common.h
+@@ -40,4 +40,15 @@ extern void __iomem *zynq_scu_base;
+ /* Hotplug */
+ extern void zynq_platform_cpu_die(unsigned int cpu);
+ 
++static inline void zynq_core_pm_init(void)
++{
++	/* A9 clock gating */
++	asm volatile ("mrc  p15, 0, r12, c15, c0, 0\n"
++		      "orr  r12, r12, #1\n"
++		      "mcr  p15, 0, r12, c15, c0, 0\n"
++		      : /* no outputs */
++		      : /* no inputs */
++		      : "r12");
++}
++
+ #endif
+diff --git a/arch/arm/mach-zynq/platsmp.c b/arch/arm/mach-zynq/platsmp.c
+index abc82ef085c1..616b99e07c60 100644
+--- a/arch/arm/mach-zynq/platsmp.c
++++ b/arch/arm/mach-zynq/platsmp.c
+@@ -112,6 +112,14 @@ static void __init zynq_smp_prepare_cpus(unsigned int max_cpus)
+ 	scu_enable(zynq_scu_base);
+ }
+ 
++/*
++ * This function is in the hotplug path. Don't move it into the init section!!
++ */
++static void zynq_secondary_init(unsigned int cpu)
++{
++	zynq_core_pm_init();
++}
++
+ #ifdef CONFIG_HOTPLUG_CPU
+ static int zynq_cpu_kill(unsigned cpu)
+ {
+@@ -124,6 +132,7 @@ struct smp_operations zynq_smp_ops __initdata = {
+ 	.smp_init_cpus		= zynq_smp_init_cpus,
+ 	.smp_prepare_cpus	= zynq_smp_prepare_cpus,
+ 	.smp_boot_secondary	= zynq_boot_secondary,
++	.smp_secondary_init	= zynq_secondary_init,
+ #ifdef CONFIG_HOTPLUG_CPU
+ 	.cpu_die		= zynq_platform_cpu_die,
+ 	.cpu_kill		= zynq_cpu_kill,
 -- 
 2.0.1.1.gfbfc394
