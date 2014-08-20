@@ -1,43 +1,59 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Wed, 20 Aug 2014 20:26:00 +0530
-Subject: [PATCH 1/5] phy: miphy28lp: Add Device Tree bindings for the
- MiPHY28lp
-In-Reply-To: <1407944075-8093-2-git-send-email-gabriel.fernandez@linaro.org>
-References: <1407944075-8093-1-git-send-email-gabriel.fernandez@linaro.org>
- <1407944075-8093-2-git-send-email-gabriel.fernandez@linaro.org>
-Message-ID: <53F4B700.1010302@ti.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 20 Aug 2014 15:56:54 +0100
+Subject: [PATCH v2 09/18] ACPI / processor: Make it possible to get CPU
+ hardware ID via GICC
+In-Reply-To: <53F30CCE.9040705@linaro.org>
+References: <1407166105-17675-1-git-send-email-hanjun.guo@linaro.org>
+ <1407166105-17675-10-git-send-email-hanjun.guo@linaro.org>
+ <20140818142740.GU20043@localhost> <53F30CCE.9040705@linaro.org>
+Message-ID: <20140820145654.GP24600@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On Wednesday 13 August 2014 09:04 PM, Gabriel FERNANDEZ wrote:
-> The MiPHY28lp is a Generic PHY which can serve various SATA or PCIe
-> or USB3 devices.
+On Tue, Aug 19, 2014 at 09:37:34AM +0100, Hanjun Guo wrote:
+> On 2014-8-18 22:27, Catalin Marinas wrote:
+> > On Mon, Aug 04, 2014 at 04:28:16PM +0100, Hanjun Guo wrote:
+> >> diff --git a/drivers/acpi/processor_core.c b/drivers/acpi/processor_core.c
+> >> index e32321c..4007313 100644
+> >> --- a/drivers/acpi/processor_core.c
+> >> +++ b/drivers/acpi/processor_core.c
+> >> @@ -64,6 +64,38 @@ static int map_lsapic_id(struct acpi_subtable_header *entry,
+> >>  	return 0;
+> >>  }
+> >>  
+> >> +/*
+> >> + * On ARM platform, MPIDR value is the hardware ID as apic ID
+> >> + * on Intel platforms
+> >> + */
+> >> +static int map_gicc_mpidr(struct acpi_subtable_header *entry,
+> >> +		int device_declaration, u32 acpi_id, int *mpidr)
+> >> +{
+> >> +	struct acpi_madt_generic_interrupt *gicc =
+> >> +	    container_of(entry, struct acpi_madt_generic_interrupt, header);
+> >> +
+> >> +	if (!(gicc->flags & ACPI_MADT_ENABLED))
+> >> +		return -ENODEV;
+> >> +
+> >> +	/* In the GIC interrupt model, logical processors are
+> >> +	 * required to have a Processor Device object in the DSDT,
+> >> +	 * so we should check device_declaration here
+> >> +	 */
+> >> +	if (device_declaration && (gicc->uid == acpi_id)) {
+> >> +		/*
+> >> +		 * Only bits [0:7] Aff0, bits [8:15] Aff1, bits [16:23] Aff2
+> >> +		 * and bits [32:39] Aff3 are meaningful, so pack the Affx
+> >> +		 * fields into a single 32 bit identifier to accommodate the
+> >> +		 * acpi processor drivers.
+> >> +		 */
+> >> +		*mpidr = ((gicc->arm_mpidr & 0xff00000000) >> 8)
+> >> +			 | gicc->arm_mpidr;
+> > 
+> > You can use pack_mpidr_into_32_bits().
 > 
-> Signed-off-by: alexandre torgue <alexandre.torgue@st.com>
-> Signed-off-by: Giuseppe Cavallaro <peppe.cavallaro@st.com>
-> Signed-off-by: Gabriel Fernandez <gabriel.fernandez@linaro.org>
-> ---
->  .../devicetree/bindings/phy/phy-miphy28lp.txt      | 126 +++++++++++++++++++++
->  1 file changed, 126 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/phy/phy-miphy28lp.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/phy/phy-miphy28lp.txt b/Documentation/devicetree/bindings/phy/phy-miphy28lp.txt
-> new file mode 100644
-> index 0000000..6e57bd5
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/phy/phy-miphy28lp.txt
-> @@ -0,0 +1,126 @@
-> +STMicroelectronics STi MIPHY28LP PHY binding
-> +============================================
-> +
-> +This binding describes a miphy device that is used to control PHY hardware
-> +for SATA, PCIe or USB3.
-> +
-> +Required properties (controller (parent) node):
-> +- compatible	: Should be "st,miphy28lp-phy"
-> +- st,syscfg     : Should be a phandle of the system configuration register group
+> processor_core.c will be used by x86 and ia64 too, it will cause
+> compile error on !ARM64 platforms.
 
-		^^^
-I think here you used space and in the rest of places used tabs.
+Oh. So we do we have an ARM-specific function in core ACPI code?
+
+-- 
+Catalin
