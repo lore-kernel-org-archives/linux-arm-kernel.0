@@ -1,52 +1,46 @@
 From: ttynkkynen@nvidia.com (Tuomas Tynkkynen)
-Date: Thu, 21 Aug 2014 00:04:37 +0300
-Subject: [PATCH v4 09/16] ARM: tegra: Add the DFLL to Tegra124 device tree
+Date: Thu, 21 Aug 2014 00:04:38 +0300
+Subject: [PATCH v4 10/16] ARM: tegra: Enable the DFLL on the Jetson TK1
 In-Reply-To: <1408568684-11016-1-git-send-email-ttynkkynen@nvidia.com>
 References: <1408568684-11016-1-git-send-email-ttynkkynen@nvidia.com>
-Message-ID: <1408568684-11016-10-git-send-email-ttynkkynen@nvidia.com>
+Message-ID: <1408568684-11016-11-git-send-email-ttynkkynen@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The DFLL clocksource is a separate IP block from the usual
-clock-and-reset controller, so it gets its own device tree node.
+Add the board-specific properties of the DFLL for the Jetson TK1 board.
+On this board, the DFLL will take control of the sd0 regulator on the
+on-board AS3722 PMIC.
 
 Signed-off-by: Tuomas Tynkkynen <ttynkkynen@nvidia.com>
 ---
- arch/arm/boot/dts/tegra124.dtsi | 22 ++++++++++++++++++++++
- 1 file changed, 22 insertions(+)
+ arch/arm/boot/dts/tegra124-jetson-tk1.dts | 8 +++++++-
+ 1 file changed, 7 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/tegra124.dtsi b/arch/arm/boot/dts/tegra124.dtsi
-index a579fab..608fa29 100644
---- a/arch/arm/boot/dts/tegra124.dtsi
-+++ b/arch/arm/boot/dts/tegra124.dtsi
-@@ -545,6 +545,28 @@
- 		status = "disabled";
+diff --git a/arch/arm/boot/dts/tegra124-jetson-tk1.dts b/arch/arm/boot/dts/tegra124-jetson-tk1.dts
+index 1b7c342..04134da 100644
+--- a/arch/arm/boot/dts/tegra124-jetson-tk1.dts
++++ b/arch/arm/boot/dts/tegra124-jetson-tk1.dts
+@@ -1453,7 +1453,7 @@
+ 				vin-ldo9-10-supply = <&vdd_5v0_sys>;
+ 				vin-ldo11-supply = <&vdd_3v3_run>;
+ 
+-				sd0 {
++				vdd_cpu: sd0 {
+ 					regulator-name = "+VDD_CPU_AP";
+ 					regulator-min-microvolt = <700000>;
+ 					regulator-max-microvolt = <1400000>;
+@@ -1662,6 +1662,12 @@
+ 		non-removable;
  	};
  
-+	dfll: dfll at 0,70110000 {
-+		compatible = "nvidia,tegra124-dfll";
-+		reg = <0 0x70110000 0 0x100>, /* DFLL control */
-+		      <0 0x70110000 0 0x100>, /* I2C output control */
-+		      <0 0x70110100 0 0x100>, /* Integrated I2C controller */
-+		      <0 0x70110200 0 0x100>; /* Look-up table RAM */
-+		interrupts = <GIC_SPI 62 IRQ_TYPE_LEVEL_HIGH>;
-+		clocks = <&tegra_car TEGRA124_CLK_DFLL_SOC>,
-+			 <&tegra_car TEGRA124_CLK_DFLL_REF>,
-+			 <&tegra_car TEGRA124_CLK_I2C5>;
-+		clock-names = "soc", "ref", "i2c";
-+		#clock-cells = <0>;
-+		clock-output-names = "dfllCPU_out";
-+		nvidia,sample-rate = <12500>;
-+		nvidia,droop-ctrl = <0x00000f00>;
-+		nvidia,force-mode = <1>;
-+		nvidia,cf = <10>;
-+		nvidia,ci = <0>;
-+		nvidia,cg = <2>;
-+		status = "disabled";
++	dfll at 0,70110000 {
++		status = "okay";
++		vdd-cpu-supply = <&vdd_cpu>;
++		nvidia,i2c-fs-rate = <400000>;
 +	};
 +
  	ahub at 0,70300000 {
- 		compatible = "nvidia,tegra124-ahub";
- 		reg = <0x0 0x70300000 0x0 0x200>,
+ 		i2s at 0,70301100 {
+ 			status = "okay";
 -- 
 1.8.1.5
