@@ -1,80 +1,77 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Wed, 20 Aug 2014 17:08:25 +0200
-Subject: [PATCH] ARM: mm: fix size rounding-down of arm_add_memory()
-In-Reply-To: <20140801213719.D537.AA925319@jp.panasonic.com>
-References: <1402025567-18021-1-git-send-email-yamada.m@jp.panasonic.com>
- <20140801213719.D537.AA925319@jp.panasonic.com>
-Message-ID: <CAMuHMdXjX5AJT9fVja+GCTV4Zxp==xTe8ZFT8_uf=aFDYZ9+Jw@mail.gmail.com>
+From: steve.capper@linaro.org (Steve Capper)
+Date: Wed, 20 Aug 2014 16:11:43 +0100
+Subject: [PATCH 0/6] RCU get_user_pages_fast and __get_user_pages_fast
+In-Reply-To: <CALdTtns6+MRb=Z7i0ncq_c2u7QZWo1mUxD824bvNF==q-_+BiQ@mail.gmail.com>
+References: <1403710824-24340-1-git-send-email-steve.capper@linaro.org>
+ <CALdTtns6+MRb=Z7i0ncq_c2u7QZWo1mUxD824bvNF==q-_+BiQ@mail.gmail.com>
+Message-ID: <20140820151142.GA26217@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Yamada-san,
+On Wed, Aug 20, 2014 at 08:56:09AM -0600, Dann Frazier wrote:
+> On Wed, Jun 25, 2014 at 9:40 AM, Steve Capper <steve.capper@linaro.org> wrote:
+> > Hello,
+> > This series implements general forms of get_user_pages_fast and
+> > __get_user_pages_fast and activates them for arm and arm64.
+> >
+> > These are required for Transparent HugePages to function correctly, as
+> > a futex on a THP tail will otherwise result in an infinite loop (due to
+> > the core implementation of __get_user_pages_fast always returning 0).
+> >
+> > This series may also be beneficial for direct-IO heavy workloads and
+> > certain KVM workloads.
+> >
+> > The main changes since RFC V5 are:
+> >  * Rebased against 3.16-rc1.
+> >  * pmd_present no longer tested for by gup_huge_pmd and gup_huge_pud,
+> >    because the entry must be present for these leaf functions to be
+> >    called.
+> >  * Rather than assume puds can be re-cast as pmds, a separate
+> >    function pud_write is instead used by the core gup.
+> >  * ARM activation logic changed, now it will only activate
+> >    RCU_TABLE_FREE and RCU_GUP when running with LPAE.
+> >
+> > The main changes since RFC V4 are:
+> >  * corrected the arm64 logic so it now correctly rcu-frees page
+> >    table backing pages.
+> >  * rcu free logic relaxed for pre-ARMv7 ARM as we need an IPI to
+> >    invalidate TLBs anyway.
+> >  * rebased to 3.15-rc3 (some minor changes were needed to allow it to merge).
+> >  * dropped Catalin's mmu_gather patch as that's been merged already.
+> >
+> > This series has been tested with LTP and some custom futex tests that
+> > exacerbate the futex on THP tail case. Also debug counters were
+> > temporarily employed to ensure that the RCU_TABLE_FREE logic was
+> > behaving as expected.
+> >
+> > I would really appreciate any testers or comments (especially on the
+> > validity or otherwise of the core fast_gup implementation).
+> 
+> I have a test case that can reliably hit the THP issue on arm64, which
+> hits it on both 3.16 and 3.17-rc1. I do a "juju bootstrap local" w/
+> THP disabled at boot. Then I reboot with THP enabled. At this point
+> you'll see jujud spin at 200% CPU. gccgo binaries seem to have a nack
+> for hitting it.
+> 
+> I validated that your patches resolve this issue on 3.16, so:
+> 
+> Tested-by: dann frazier <dann.frazier@canonical.com>
 
-On Fri, Aug 1, 2014 at 2:37 PM, Masahiro Yamada
-<yamada.m@jp.panasonic.com> wrote:
-> Any comments for this patch?
+Thanks Dann!
 
-Thanks for your patch!
+> 
+> I haven't done the same for 3.17-rc1 because they no longer apply
+> cleanly, but I'm happy to test future submissions w/ hopefully a
+> shorter feedback loop (please add me to the CC). btw, should we
+> consider something like this until your patches go in?
 
-I had a slightly different fix for the same issue, but apparently it got stuck
-on the freshly installed machine that didn't have email set up yet ;-(
+I am about to post the following series, I will CC you:
+git://git.linaro.org/people/steve.capper/linux.git fast_gup/3.17-rc1
+(I've just been giving it a workout on 3.17-rc1).
 
-Acked-by: Geert Uytterhoeven <geert@linux-m68k.org>
+I would much prefer for the RCU fast_gup to go into 3.18 rather than
+BROKEN for THP. I am not sure what to do about earlier versions.
 
-early_init_dt_add_memory_arch() has the same bug, I'll resend my (also stuck)
-fix for that.
-
-> Thanks
->
-> Best Regards
-> Masahiro Yamada
->
->
->
-> On Fri,  6 Jun 2014 12:32:47 +0900
-> Masahiro Yamada <yamada.m@jp.panasonic.com> wrote:
->
->> The current rounding of "size" is wrong.
->>
->>     size -= start & ~PAGE_MASK;
->>
->> should be
->>
->>     size -= PAGE_SIZE - (start & ~PAGE_MASK);
->>
->> Or more simply
->>
->>     size -= aligned_start - start;
->>
->> Signed-off-by: Masahiro Yamada <yamada.m@jp.panasonic.com>
->> ---
->>  arch/arm/kernel/setup.c | 2 +-
->>  1 file changed, 1 insertion(+), 1 deletion(-)
->>
->> diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
->> index 50e198c..84508c0 100644
->> --- a/arch/arm/kernel/setup.c
->> +++ b/arch/arm/kernel/setup.c
->> @@ -641,8 +641,8 @@ int __init arm_add_memory(u64 start, u64 size)
->>        * Ensure that start/size are aligned to a page boundary.
->>        * Size is appropriately rounded down, start is rounded up.
->>        */
->> -     size -= start & ~PAGE_MASK;
->>       aligned_start = PAGE_ALIGN(start);
->> +     size -= aligned_start - start;
->>
->>  #ifndef CONFIG_ARCH_PHYS_ADDR_T_64BIT
->>       if (aligned_start > ULONG_MAX) {
->> --
->> 1.9.1
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Cheers,
+-- 
+Steve
