@@ -1,73 +1,80 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Wed, 20 Aug 2014 20:33:42 +0530
-Subject: [PATCH 0/9] phy: various misc cleanups to phy drivers
-In-Reply-To: <1408106416-19044-1-git-send-email-peter.griffin@linaro.org>
-References: <1408106416-19044-1-git-send-email-peter.griffin@linaro.org>
-Message-ID: <53F4B8CE.50300@ti.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Wed, 20 Aug 2014 17:08:25 +0200
+Subject: [PATCH] ARM: mm: fix size rounding-down of arm_add_memory()
+In-Reply-To: <20140801213719.D537.AA925319@jp.panasonic.com>
+References: <1402025567-18021-1-git-send-email-yamada.m@jp.panasonic.com>
+ <20140801213719.D537.AA925319@jp.panasonic.com>
+Message-ID: <CAMuHMdXjX5AJT9fVja+GCTV4Zxp==xTe8ZFT8_uf=aFDYZ9+Jw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Yamada-san,
 
-On Friday 15 August 2014 06:10 PM, Peter Griffin wrote:
-> Hi,
-> 
-> This series some a few misc cleanups to the PHY drivers: -
-> 
-> 1) Use module_platform_driver to register spear PHY drivers. This gets rid
-> of a lof of boiler plate code.
-> 
-> 2) Remove .owner field from drivers using module_platform_driver, as this gets
-> overridden anyway in __platform_driver_register.
-> 
-> 3) Remove OOM site specific failure messages. These are unecessary and make
-> the kernel bigger.
-> 
-> 4) Add missing kzalloc error check, which could avoid NULL ptr dereference.
+On Fri, Aug 1, 2014 at 2:37 PM, Masahiro Yamada
+<yamada.m@jp.panasonic.com> wrote:
+> Any comments for this patch?
 
-Thanks for doing this clean-up.
-But I can queue this only for 3.18 (since these are cleanups) after -rc4 is tagged.
+Thanks for your patch!
 
-Thanks
-Kishon
+I had a slightly different fix for the same issue, but apparently it got stuck
+on the freshly installed machine that didn't have email set up yet ;-(
 
-> 
-> regards,
-> 
-> Peter.
-> 
-> Peter Griffin (9):
->   phy: phy-omap-control: Remove unncessary site specific OOM messages
->   phy: phy-mvebu-sata: Add missing error check for devm_kzalloc
->   phy: phy-omap-usb2: Remove unncessary site specific OOM messages
->   phy: phy-ti-pipe3: Remove unncessary site specific OOM messages
->   phy: phy-spear1310-miphy: Remove unncessary site specific OOM messages
->   phy: phy-spear1340-miphy: Remove unncessary site specific OOM messages
->   phy: remove .owner field for drivers using module_platform_driver
->   phy: phy-spear1310-miphy: Use module_platform_driver to register
->     driver.
->   phy: phy-spear1340-miphy: Use module_platform_driver to register
->     driver.
-> 
->  drivers/phy/phy-bcm-kona-usb2.c     |  1 -
->  drivers/phy/phy-berlin-sata.c       |  1 -
->  drivers/phy/phy-exynos-dp-video.c   |  1 -
->  drivers/phy/phy-exynos-mipi-video.c |  1 -
->  drivers/phy/phy-exynos5-usbdrd.c    |  1 -
->  drivers/phy/phy-exynos5250-sata.c   |  1 -
->  drivers/phy/phy-hix5hd2-sata.c      |  1 -
->  drivers/phy/phy-miphy365x.c         |  1 -
->  drivers/phy/phy-mvebu-sata.c        |  3 ++-
->  drivers/phy/phy-omap-control.c      |  5 +----
->  drivers/phy/phy-omap-usb2.c         |  9 ++-------
->  drivers/phy/phy-qcom-apq8064-sata.c |  1 -
->  drivers/phy/phy-qcom-ipq806x-sata.c |  1 -
->  drivers/phy/phy-samsung-usb2.c      |  1 -
->  drivers/phy/phy-spear1310-miphy.c   | 17 ++---------------
->  drivers/phy/phy-spear1340-miphy.c   | 17 ++---------------
->  drivers/phy/phy-sun4i-usb.c         |  1 -
->  drivers/phy/phy-ti-pipe3.c          |  6 ++----
->  drivers/phy/phy-twl4030-usb.c       |  1 -
->  drivers/phy/phy-xgene.c             |  1 -
->  20 files changed, 11 insertions(+), 60 deletions(-)
-> 
+Acked-by: Geert Uytterhoeven <geert@linux-m68k.org>
+
+early_init_dt_add_memory_arch() has the same bug, I'll resend my (also stuck)
+fix for that.
+
+> Thanks
+>
+> Best Regards
+> Masahiro Yamada
+>
+>
+>
+> On Fri,  6 Jun 2014 12:32:47 +0900
+> Masahiro Yamada <yamada.m@jp.panasonic.com> wrote:
+>
+>> The current rounding of "size" is wrong.
+>>
+>>     size -= start & ~PAGE_MASK;
+>>
+>> should be
+>>
+>>     size -= PAGE_SIZE - (start & ~PAGE_MASK);
+>>
+>> Or more simply
+>>
+>>     size -= aligned_start - start;
+>>
+>> Signed-off-by: Masahiro Yamada <yamada.m@jp.panasonic.com>
+>> ---
+>>  arch/arm/kernel/setup.c | 2 +-
+>>  1 file changed, 1 insertion(+), 1 deletion(-)
+>>
+>> diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+>> index 50e198c..84508c0 100644
+>> --- a/arch/arm/kernel/setup.c
+>> +++ b/arch/arm/kernel/setup.c
+>> @@ -641,8 +641,8 @@ int __init arm_add_memory(u64 start, u64 size)
+>>        * Ensure that start/size are aligned to a page boundary.
+>>        * Size is appropriately rounded down, start is rounded up.
+>>        */
+>> -     size -= start & ~PAGE_MASK;
+>>       aligned_start = PAGE_ALIGN(start);
+>> +     size -= aligned_start - start;
+>>
+>>  #ifndef CONFIG_ARCH_PHYS_ADDR_T_64BIT
+>>       if (aligned_start > ULONG_MAX) {
+>> --
+>> 1.9.1
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
