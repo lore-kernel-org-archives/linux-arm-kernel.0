@@ -1,98 +1,44 @@
-From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Wed, 20 Aug 2014 12:12:36 +0800
-Subject: [PATCH v2 05/18] ARM64 / ACPI: Parse FADT table to get PSCI flags
- for PSCI init
-In-Reply-To: <94F2FBAB4432B54E8AACC7DFDE6C92E37D1E7D1B@ORSMSX112.amr.corp.intel.com>
-References: <1407166105-17675-1-git-send-email-hanjun.guo@linaro.org>
- <1407166105-17675-6-git-send-email-hanjun.guo@linaro.org>
- <20140818142721.GR20043@localhost> <53F2C983.8000800@linaro.org>
- <20140819111000.GG3302@leverpostej> <53F33F7A.7030307@linaro.org>
- <94F2FBAB4432B54E8AACC7DFDE6C92E37D1E7D1B@ORSMSX112.amr.corp.intel.com>
-Message-ID: <53F42034.1080308@linaro.org>
+From: cw00.choi@samsung.com (Chanwoo Choi)
+Date: Wed, 20 Aug 2014 13:24:33 +0900
+Subject: [PATCH] thermal: exynos: Remove duplicate code when reading triminfo
+ register of Exynos5440
+In-Reply-To: <1408450078-6296-1-git-send-email-cw00.choi@samsung.com>
+References: <1408450078-6296-1-git-send-email-cw00.choi@samsung.com>
+Message-ID: <1408508673-3173-1-git-send-email-cw00.choi@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Bob,
+This patch remove simply duplicate code when reading triminfo register of Exynos5440.
 
-On 2014-8-20 6:55, Moore, Robert wrote:
-> I should warn you that FADT version numbers are notoriously unreliable;
-> In fact, in ACPICA we were eventually forced to abandon them entirely. 
-> We use the actual size of the FADT instead.
+Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
+Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
+Cc: Zhang Rui <rui.zhang@intel.com>
+Cc: Eduardo Valentin <edubezval@gmail.com>
+Cc: Amit Daniel Kachhap <amit.daniel@samsung.com>
+---
+ drivers/thermal/samsung/exynos_tmu.c | 4 +---
+ 1 file changed, 1 insertion(+), 3 deletions(-)
 
-Yes, I heard that story, thanks for the reminding. But I also see that the
-revision number is used on x86 and ia64 now in parsing FADT, it is a firmware
-bug not to comply with the spec, and on ARM, only ACPI 5.1 or higher can be
-used in Linux, Major.Minor revision was introduced in ACPI 5.1 and it was a
-major change for it, so I think firmware should comply with that, if firmware
-just copy some code from somewhere else and leave the revision number
-unchanged, we will not boot (disable ACPI).
-
-The size of FADT for 5.0 and 5.1 is no difference, it is pretty hard to use
-that to identify the version of FADT, did I  miss something?
-
-Thanks
-Hanjun
-
-> 
-> Bob
-> 
-> 
-> 
->> -----Original Message-----
->> From: Hanjun Guo [mailto:hanjun.guo at linaro.org]
->> Sent: Tuesday, August 19, 2014 5:14 AM
->> To: Mark Rutland
->> Cc: Catalin Marinas; Rafael J. Wysocki; graeme.gregory at linaro.org; Arnd
->> Bergmann; Olof Johansson; grant.likely at linaro.org; Sudeep Holla; Will
->> Deacon; Jason Cooper; Marc Zyngier; Bjorn Helgaas; Daniel Lezcano; Mark
->> Brown; Rob Herring; Robert Richter; Zheng, Lv; Moore, Robert; Lorenzo
->> Pieralisi; Liviu Dudau; Randy Dunlap; Charles Garcia-Tobin; linux-
->> acpi at vger.kernel.org; linux-arm-kernel at lists.infradead.org; linux-
->> kernel at vger.kernel.org; linaro-acpi at lists.linaro.org
->> Subject: Re: [PATCH v2 05/18] ARM64 / ACPI: Parse FADT table to get PSCI
->> flags for PSCI init
->>
->> On 2014-8-19 19:10, Mark Rutland wrote:
->>>>>> @@ -47,6 +49,26 @@ void __init __acpi_unmap_table(char *map, unsigned
->> long size)
->>>>>>  	early_memunmap(map, size);
->>>>>>  }
->>>>>>
->>>>>> +static int __init acpi_parse_fadt(struct acpi_table_header *table)
->>>>>> +{
->>>>>> +	struct acpi_table_fadt *fadt = (struct acpi_table_fadt
->> *)table;
->>>>>> +
->>>>>> +	/*
->>>>>> +	 * Revision in table header is the FADT Major version,
->>>>>> +	 * and there is a minor version of FADT which was introduced
->>>>>> +	 * by ACPI 5.1, we only deal with ACPI 5.1 or higher version
->>>>>> +	 * to get arm boot flags, or we will disable ACPI.
->>>>>> +	 */
->>>>>> +	if (table->revision < 5 || fadt->minor_revision < 1) {
->>>>>
->>>>> If we ever get revision 6.0, this would trigger.
->>>>
->>>> Yes, good catch, actually I already fixed that in my local git repo,
->>>>
->>>> +       if (table->revision > 5 ||
->>>> +           (table->revision == 5 && fadt->minor_revision >= 1)) {
->>>> +               return 0;
->>>> +       } else {
->>>> +               pr_info("FADT revision is %d.%d, no PSCI support,
->>>> + should be 5.1
->>>> or higher\n",
->>>> +                       table->revision, fadt->minor_revision);
->>>> +               disable_acpi();
->>>> +               return -EINVAL;
->>>> +       }
->>>
->>> Given you return in the first path, you don't need the remaining code
->>> to live in an else block.
->>
->> Agreed, I will update it, and move disable_acpi() outside this function
->> and keep it in one place as Sudeep suggested.
->>
->> Thanks
->> Hanjun
-> 
+diff --git a/drivers/thermal/samsung/exynos_tmu.c b/drivers/thermal/samsung/exynos_tmu.c
+index ed01606..13c2e01 100644
+--- a/drivers/thermal/samsung/exynos_tmu.c
++++ b/drivers/thermal/samsung/exynos_tmu.c
+@@ -181,15 +181,13 @@ static int exynos_tmu_initialize(struct platform_device *pdev)
+ 		 */
+ 		switch (data->id) {
+ 		case 0:
++		case 2:
+ 			trim_info = readl(data->base +
+ 			EXYNOS5440_EFUSE_SWAP_OFFSET + reg->triminfo_data);
+ 			break;
+ 		case 1:
+ 			trim_info = readl(data->base + reg->triminfo_data);
+ 			break;
+-		case 2:
+-			trim_info = readl(data->base -
+-			EXYNOS5440_EFUSE_SWAP_OFFSET + reg->triminfo_data);
+ 		}
+ 	} else {
+ 		/* On exynos5420 the triminfo register is in the shared space */
+-- 
+1.8.0
