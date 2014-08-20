@@ -1,83 +1,68 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed, 20 Aug 2014 09:24:03 +0900
-Subject: [PATCH 12/12] ARM: shmobile: lager: add VIN1/ADV7180 device nodes
-In-Reply-To: <cover.1408492753.git.horms+renesas@verge.net.au>
-References: <cover.1408492753.git.horms+renesas@verge.net.au>
-Message-ID: <d594c9775409a4276133db5e34dbd791329c5eae.1408492753.git.horms+renesas@verge.net.au>
+Date: Wed, 20 Aug 2014 09:24:13 +0900
+Subject: [GIT PULL] Renesas ARM Based SoC DT Timers Updates for v3.18
+Message-ID: <cover.1408492048.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ben Dooks <ben.dooks@codethink.co.uk>
+Hi Olof, Hi Kevin, Hi Arnd,
 
-Add the Lager board specific device node part for VIN1 (composite video in);
-add the device node for Analog Devices ADV7180 video decoder to IIC2 bus.
-Add the necessary subnodes to interconnect VIN1 and ADV7180 devices.
+Please consider these Renesas ARM based SoC DT Timers updates for v3.18.
 
-Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
-[Sergei: rebased, edited changelog and summary]
-Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/boot/dts/r8a7790-lager.dts | 36 ++++++++++++++++++++++++++++++++++++
- 1 file changed, 36 insertions(+)
+The patches in this pull request were originally posted as
+"Renesas ARM Based SoC DT Timers Updates for v3.17" and tagged as
+renesas-dt-timers-for-v3.17.  For various reasons it did not get
+pulled for v3.17 so I have rebased it on v3.17-rc1 and am submitting
+it for v3.18.
 
-diff --git a/arch/arm/boot/dts/r8a7790-lager.dts b/arch/arm/boot/dts/r8a7790-lager.dts
-index 856b423..b5f56bc 100644
---- a/arch/arm/boot/dts/r8a7790-lager.dts
-+++ b/arch/arm/boot/dts/r8a7790-lager.dts
-@@ -234,6 +234,11 @@
- 		renesas,groups = "usb2";
- 		renesas,function = "usb2";
- 	};
-+
-+	vin1_pins: vin {
-+		renesas,groups = "vin1_data8", "vin1_clk";
-+		renesas,function = "vin1";
-+	};
- };
- 
- &ether {
-@@ -366,6 +371,19 @@
- 	status = "ok";
- 	pinctrl-0 = <&iic2_pins>;
- 	pinctrl-names = "default";
-+
-+	composite-in at 20 {
-+		compatible = "adi,adv7180";
-+		reg = <0x20>;
-+		remote = <&vin1>;
-+
-+		port {
-+			adv7180: endpoint {
-+				bus-width = <8>;
-+				remote-endpoint = <&vin1ep0>;
-+			};
-+		};
-+	};
- };
- 
- &iic3 {
-@@ -401,3 +419,21 @@
- 	pinctrl-0 = <&usb2_pins>;
- 	pinctrl-names = "default";
- };
-+
-+/* composite video input */
-+&vin1 {
-+	pinctrl-0 = <&vin1_pins>;
-+	pinctrl-names = "default";
-+
-+	status = "ok";
-+
-+	port {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		vin1ep0: endpoint {
-+			remote-endpoint = <&adv7180>;
-+			bus-width = <8>;
-+		};
-+	};
-+};
--- 
-2.0.1
+
+The following changes since commit 7d1311b93e58ed55f3a31cc8f94c4b8fe988a2b9:
+
+  Linux 3.17-rc1 (2014-08-16 10:40:26 -0600)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-dt-timers-for-v3.18
+
+for you to fetch changes up to 9dddfcfacaadb5491b62233b893b510fa00da4e0:
+
+  ARM: shmobile: genmai-reference: Enable MTU2 in device tree (2014-08-17 09:02:54 +0900)
+
+----------------------------------------------------------------
+Renesas ARM Based SoC DT Timers Updates for v3.18
+
+* Enable timers using DT when booting boards without Legacy-C code
+
+----------------------------------------------------------------
+Laurent Pinchart (8):
+      ARM: shmobile: r8a7790: Add CMT devices to DT
+      ARM: shmobile: r8a7791: Add CMT devices to DT
+      ARM: shmobile: r8a7779: Add TMU devices to DT
+      ARM: shmobile: lager-reference: Enable CMT0 in device tree
+      ARM: shmobile: koelsch-reference: Enable CMT0 in device tree
+      ARM: shmobile: marzen-reference: Enable TMU0 in device tree
+      ARM: shmobile: r7s72100: Add MTU2 device to DT
+      ARM: shmobile: genmai-reference: Enable MTU2 in device tree
+
+ arch/arm/boot/dts/r7s72100-genmai.dts            |  4 +++
+ arch/arm/boot/dts/r7s72100.dtsi                  | 10 ++++++
+ arch/arm/boot/dts/r8a7779-marzen.dts             |  4 +++
+ arch/arm/boot/dts/r8a7779.dtsi                   | 42 ++++++++++++++++++++++++
+ arch/arm/boot/dts/r8a7790-lager.dts              |  4 +++
+ arch/arm/boot/dts/r8a7790.dtsi                   | 32 ++++++++++++++++++
+ arch/arm/boot/dts/r8a7791-koelsch.dts            |  4 +++
+ arch/arm/boot/dts/r8a7791.dtsi                   | 32 ++++++++++++++++++
+ arch/arm/mach-shmobile/board-genmai-reference.c  | 20 -----------
+ arch/arm/mach-shmobile/board-genmai.c            | 14 +++++++-
+ arch/arm/mach-shmobile/board-koelsch-reference.c |  2 --
+ arch/arm/mach-shmobile/board-lager-reference.c   |  2 --
+ arch/arm/mach-shmobile/board-marzen-reference.c  | 10 ------
+ arch/arm/mach-shmobile/r7s72100.h                |  1 -
+ arch/arm/mach-shmobile/r8a7779.h                 |  1 -
+ arch/arm/mach-shmobile/r8a7790.h                 |  1 -
+ arch/arm/mach-shmobile/r8a7791.h                 |  1 -
+ arch/arm/mach-shmobile/setup-r7s72100.c          | 21 ------------
+ arch/arm/mach-shmobile/setup-r8a7779.c           | 17 +++-------
+ arch/arm/mach-shmobile/setup-r8a7790.c           |  7 +---
+ arch/arm/mach-shmobile/setup-r8a7791.c           |  7 +---
+ 21 files changed, 152 insertions(+), 84 deletions(-)
