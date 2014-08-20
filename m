@@ -1,286 +1,73 @@
-From: grant.likely@linaro.org (Grant Likely)
-Date: Wed, 20 Aug 2014 10:00:28 -0500
-Subject: [PATCH 06/19] ARM64 / ACPI: Parse FADT table to get PSCI flags
- for PSCI init
-In-Reply-To: <1406206825-15590-7-git-send-email-hanjun.guo@linaro.org>
-References: <1406206825-15590-1-git-send-email-hanjun.guo@linaro.org>
- <1406206825-15590-7-git-send-email-hanjun.guo@linaro.org>
-Message-ID: <20140820150029.0BB3FC41205@trevor.secretlab.ca>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Wed, 20 Aug 2014 20:33:42 +0530
+Subject: [PATCH 0/9] phy: various misc cleanups to phy drivers
+In-Reply-To: <1408106416-19044-1-git-send-email-peter.griffin@linaro.org>
+References: <1408106416-19044-1-git-send-email-peter.griffin@linaro.org>
+Message-ID: <53F4B8CE.50300@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 24 Jul 2014 21:00:12 +0800, Hanjun Guo <hanjun.guo@linaro.org> wrote:
-> There are two flags: PSCI_COMPLIANT and PSCI_USE_HVC. When set,
-> the former signals to the OS that the hardware is PSCI compliant.
-> The latter selects the appropriate conduit for PSCI calls by
-> toggling between Hypervisor Calls (HVC) and Secure Monitor Calls
-> (SMC).
-> 
-> FADT table contains such information, parse FADT to get the flags
-> for PSCI init. Since ACPI 5.1 doesn't support self defined PSCI
-> function IDs, which means that only PSCI 0.2+ is supported in ACPI.
-> 
-> At the same time, only ACPI 5.1 or higher verison supports PSCI,
-> and FADT Major.Minor version was introduced in ACPI 5.1, so we
-> will check the version and only parse FADT table with version >= 5.1.
-> 
-> If firmware provides ACPI tables with ACPI version less than 5.1,
-> OS will be messed up with those information and have no way to
-> bring up secondery CPUs, so disable ACPI if we get an FADT table
-> with version less that 5.1.
-> 
-> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
-> Signed-off-by: Graeme Gregory <graeme.gregory@linaro.org>
-> ---
->  arch/arm64/include/asm/acpi.h |    2 +
->  arch/arm64/kernel/acpi.c      |   50 ++++++++++++++++++++++
->  arch/arm64/kernel/psci.c      |   95 +++++++++++++++++++++++++++++------------
->  arch/arm64/kernel/setup.c     |    2 +
->  4 files changed, 121 insertions(+), 28 deletions(-)
-> 
-> diff --git a/arch/arm64/include/asm/acpi.h b/arch/arm64/include/asm/acpi.h
-> index 44b617f..67dac90 100644
-> --- a/arch/arm64/include/asm/acpi.h
-> +++ b/arch/arm64/include/asm/acpi.h
-> @@ -18,6 +18,8 @@ extern int acpi_disabled;
->  extern int acpi_noirq;
->  extern int acpi_pci_disabled;
->  extern int acpi_strict;
-> +extern int acpi_psci_present;
-> +extern int acpi_psci_use_hvc;
->  
->  static inline void disable_acpi(void)
->  {
-> diff --git a/arch/arm64/kernel/acpi.c b/arch/arm64/kernel/acpi.c
-> index f5a10b5..374926f 100644
-> --- a/arch/arm64/kernel/acpi.c
-> +++ b/arch/arm64/kernel/acpi.c
-> @@ -11,6 +11,8 @@
->   *  published by the Free Software Foundation.
->   */
->  
-> +#define pr_fmt(fmt) "ACPI: " fmt
-> +
->  #include <linux/init.h>
->  #include <linux/acpi.h>
->  #include <linux/cpumask.h>
-> @@ -34,6 +36,12 @@ EXPORT_SYMBOL(acpi_disabled);
->  int acpi_pci_disabled;		/* skip ACPI PCI scan and IRQ initialization */
->  EXPORT_SYMBOL(acpi_pci_disabled);
->  
-> +/* 1 to indicate PSCI is implemented */
-> +int acpi_psci_present;
-> +
-> +/* 1 to indicate HVC must be used instead of SMC as the PSCI conduit */
-> +int acpi_psci_use_hvc;
-> +
->  /*
->   * __acpi_map_table() will be called before page_init(), so early_ioremap()
->   * or early_memremap() should be called here to for ACPI table mapping.
-> @@ -54,6 +62,33 @@ void __init __acpi_unmap_table(char *map, unsigned long size)
->  	early_iounmap(map, size);
->  }
->  
-> +static int __init acpi_parse_fadt(struct acpi_table_header *table)
-> +{
-> +	struct acpi_table_fadt *fadt = (struct acpi_table_fadt *)table;
-> +
-> +	/*
-> +	 * Revision in table header is the FADT Major version,
-> +	 * and there is a minor version of FADT which was introduced
-> +	 * by ACPI 5.1, we only deal with ACPI 5.1 or higher version
-> +	 * to get arm boot flags, or we will disable ACPI.
-> +	 */
-> +	if (table->revision < 5 || fadt->minor_version < 1) {
-> +		pr_info("FADT version is %d.%d, no PSCI support, should be 5.1 or higher\n",
-> +			table->revision, fadt->minor_version);
-> +		acpi_psci_present = 0;
-> +		disable_acpi();
-> +		return -EINVAL;
-> +	}
-> +
-> +	if (acpi_gbl_FADT.arm_boot_flags & ACPI_FADT_PSCI_COMPLIANT)
-> +		acpi_psci_present = 1;
-> +
-> +	if (acpi_gbl_FADT.arm_boot_flags & ACPI_FADT_PSCI_USE_HVC)
-> +		acpi_psci_use_hvc = 1;
-> +
-> +	return 0;
-> +}
-> +
->  /*
->   * acpi_boot_table_init() called from setup_arch(), always.
->   *	1. find RSDP and get its address, and then find XSDT
-> @@ -75,6 +110,21 @@ void __init acpi_boot_table_init(void)
->  	}
->  }
->  
-> +int __init acpi_boot_init(void)
-> +{
-> +	int err = 0;
-> +
-> +	/* If acpi_disabled, bail out */
-> +	if (acpi_disabled)
-> +		return -ENODEV;
-> +
-> +	err = acpi_table_parse(ACPI_SIG_FADT, acpi_parse_fadt);
-> +	if (err)
-> +		pr_err("Can't find FADT\n");
-> +
-> +	return err;
-> +}
-> +
->  static int __init parse_acpi(char *arg)
->  {
->  	if (!arg)
-> diff --git a/arch/arm64/kernel/psci.c b/arch/arm64/kernel/psci.c
-> index 9e9798f..adb25f3 100644
-> --- a/arch/arm64/kernel/psci.c
-> +++ b/arch/arm64/kernel/psci.c
-> @@ -15,6 +15,7 @@
->  
->  #define pr_fmt(fmt) "psci: " fmt
->  
-> +#include <linux/acpi.h>
->  #include <linux/init.h>
->  #include <linux/of.h>
->  #include <linux/smp.h>
-> @@ -231,6 +232,33 @@ static void psci_sys_poweroff(void)
->  	invoke_psci_fn(PSCI_0_2_FN_SYSTEM_OFF, 0, 0, 0);
->  }
->  
-> +static void psci_0_2_set_functions(void)
-> +{
-> +	pr_info("Using standard PSCI v0.2 function IDs\n");
-> +	psci_function_id[PSCI_FN_CPU_SUSPEND] = PSCI_0_2_FN64_CPU_SUSPEND;
-> +	psci_ops.cpu_suspend = psci_cpu_suspend;
-> +
-> +	psci_function_id[PSCI_FN_CPU_OFF] = PSCI_0_2_FN_CPU_OFF;
-> +	psci_ops.cpu_off = psci_cpu_off;
-> +
-> +	psci_function_id[PSCI_FN_CPU_ON] = PSCI_0_2_FN64_CPU_ON;
-> +	psci_ops.cpu_on = psci_cpu_on;
-> +
-> +	psci_function_id[PSCI_FN_MIGRATE] = PSCI_0_2_FN64_MIGRATE;
-> +	psci_ops.migrate = psci_migrate;
-> +
-> +	psci_function_id[PSCI_FN_AFFINITY_INFO] = PSCI_0_2_FN64_AFFINITY_INFO;
-> +	psci_ops.affinity_info = psci_affinity_info;
-> +
-> +	psci_function_id[PSCI_FN_MIGRATE_INFO_TYPE] =
-> +		PSCI_0_2_FN_MIGRATE_INFO_TYPE;
-> +	psci_ops.migrate_info_type = psci_migrate_info_type;
-> +
-> +	arm_pm_restart = psci_sys_reset;
-> +
-> +	pm_power_off = psci_sys_poweroff;
-> +}
-> +
->  /*
->   * PSCI Function IDs for v0.2+ are well defined so use
->   * standard values.
-> @@ -264,29 +292,7 @@ static int psci_0_2_init(struct device_node *np)
->  		}
->  	}
->  
-> -	pr_info("Using standard PSCI v0.2 function IDs\n");
-> -	psci_function_id[PSCI_FN_CPU_SUSPEND] = PSCI_0_2_FN64_CPU_SUSPEND;
-> -	psci_ops.cpu_suspend = psci_cpu_suspend;
-> -
-> -	psci_function_id[PSCI_FN_CPU_OFF] = PSCI_0_2_FN_CPU_OFF;
-> -	psci_ops.cpu_off = psci_cpu_off;
-> -
-> -	psci_function_id[PSCI_FN_CPU_ON] = PSCI_0_2_FN64_CPU_ON;
-> -	psci_ops.cpu_on = psci_cpu_on;
-> -
-> -	psci_function_id[PSCI_FN_MIGRATE] = PSCI_0_2_FN64_MIGRATE;
-> -	psci_ops.migrate = psci_migrate;
-> -
-> -	psci_function_id[PSCI_FN_AFFINITY_INFO] = PSCI_0_2_FN64_AFFINITY_INFO;
-> -	psci_ops.affinity_info = psci_affinity_info;
-> -
-> -	psci_function_id[PSCI_FN_MIGRATE_INFO_TYPE] =
-> -		PSCI_0_2_FN_MIGRATE_INFO_TYPE;
-> -	psci_ops.migrate_info_type = psci_migrate_info_type;
-> -
-> -	arm_pm_restart = psci_sys_reset;
-> -
-> -	pm_power_off = psci_sys_poweroff;
-> +	psci_0_2_set_functions();
->  
->  out_put_node:
->  	of_node_put(np);
-> @@ -333,6 +339,33 @@ out_put_node:
->  	return err;
->  }
->  
-> +#ifdef CONFIG_ACPI
-> +static int get_set_conduit_method_acpi(void)
-> +{
-> +	if (acpi_psci_use_hvc)
-> +		invoke_psci_fn = __invoke_psci_fn_hvc;
-> +	else
-> +		invoke_psci_fn = __invoke_psci_fn_smc;
-> +
-> +	return 0;
-> +}
-> +
-> +/* We use PSCI 0.2+ when ACPI is deployed */
-> +static int psci_0_2_init_acpi(void)
-> +{
-> +	get_set_conduit_method_acpi();
-> +
-> +	psci_0_2_set_functions();
-> +
-> +	return 0;
-> +}
-> +#else
-> +static inline int psci_0_2_init_acpi(void)
-> +{
-> +	return -ENODEV;
-> +}
-> +#endif
-> +
->  static const struct of_device_id psci_of_match[] __initconst = {
->  	{ .compatible = "arm,psci",	.data = psci_0_1_init},
->  	{ .compatible = "arm,psci-0.2",	.data = psci_0_2_init},
-> @@ -345,13 +378,19 @@ int __init psci_init(void)
->  	const struct of_device_id *matched_np;
->  	psci_initcall_t init_fn;
->  
-> -	np = of_find_matching_node_and_match(NULL, psci_of_match, &matched_np);
-> +	if (acpi_disabled) {
-> +		np = of_find_matching_node_and_match(NULL,
-> +				psci_of_match, &matched_np);
->  
-> -	if (!np)
-> -		return -ENODEV;
-> +		if (!np)
-> +			return -ENODEV;
-> +
-> +		init_fn = (psci_initcall_t)matched_np->data;
-> +
-> +		return init_fn(np);
-> +	}
->  
-> -	init_fn = (psci_initcall_t)matched_np->data;
-> -	return init_fn(np);
-> +	return psci_0_2_init_acpi();
->  }
+Hi,
 
-So, while the functionality is sound, this is kind of a stinky diff. The
-ACPI path should not push the OF code into a sub branch. Make it look
-like this instead (with the advantage that the diff will be simpler):
+On Friday 15 August 2014 06:10 PM, Peter Griffin wrote:
+> Hi,
+> 
+> This series some a few misc cleanups to the PHY drivers: -
+> 
+> 1) Use module_platform_driver to register spear PHY drivers. This gets rid
+> of a lof of boiler plate code.
+> 
+> 2) Remove .owner field from drivers using module_platform_driver, as this gets
+> overridden anyway in __platform_driver_register.
+> 
+> 3) Remove OOM site specific failure messages. These are unecessary and make
+> the kernel bigger.
+> 
+> 4) Add missing kzalloc error check, which could avoid NULL ptr dereference.
 
-+	if (IS_ENABLED(CONFIG_ACPI) && !acpi_disabled)
-+		return psci_0_2_init_acpi();
+Thanks for doing this clean-up.
+But I can queue this only for 3.18 (since these are cleanups) after -rc4 is tagged.
 
- 	np = of_find_matching_node_and_match(NULL, psci_of_match, &matched_np);
- 
- 	if (!np)
- 		return -ENODEV;
- 
- 	init_fn = (psci_initcall_t)matched_np->data;
- 	return init_fn(np);
+Thanks
+Kishon
 
-g.
+> 
+> regards,
+> 
+> Peter.
+> 
+> Peter Griffin (9):
+>   phy: phy-omap-control: Remove unncessary site specific OOM messages
+>   phy: phy-mvebu-sata: Add missing error check for devm_kzalloc
+>   phy: phy-omap-usb2: Remove unncessary site specific OOM messages
+>   phy: phy-ti-pipe3: Remove unncessary site specific OOM messages
+>   phy: phy-spear1310-miphy: Remove unncessary site specific OOM messages
+>   phy: phy-spear1340-miphy: Remove unncessary site specific OOM messages
+>   phy: remove .owner field for drivers using module_platform_driver
+>   phy: phy-spear1310-miphy: Use module_platform_driver to register
+>     driver.
+>   phy: phy-spear1340-miphy: Use module_platform_driver to register
+>     driver.
+> 
+>  drivers/phy/phy-bcm-kona-usb2.c     |  1 -
+>  drivers/phy/phy-berlin-sata.c       |  1 -
+>  drivers/phy/phy-exynos-dp-video.c   |  1 -
+>  drivers/phy/phy-exynos-mipi-video.c |  1 -
+>  drivers/phy/phy-exynos5-usbdrd.c    |  1 -
+>  drivers/phy/phy-exynos5250-sata.c   |  1 -
+>  drivers/phy/phy-hix5hd2-sata.c      |  1 -
+>  drivers/phy/phy-miphy365x.c         |  1 -
+>  drivers/phy/phy-mvebu-sata.c        |  3 ++-
+>  drivers/phy/phy-omap-control.c      |  5 +----
+>  drivers/phy/phy-omap-usb2.c         |  9 ++-------
+>  drivers/phy/phy-qcom-apq8064-sata.c |  1 -
+>  drivers/phy/phy-qcom-ipq806x-sata.c |  1 -
+>  drivers/phy/phy-samsung-usb2.c      |  1 -
+>  drivers/phy/phy-spear1310-miphy.c   | 17 ++---------------
+>  drivers/phy/phy-spear1340-miphy.c   | 17 ++---------------
+>  drivers/phy/phy-sun4i-usb.c         |  1 -
+>  drivers/phy/phy-ti-pipe3.c          |  6 ++----
+>  drivers/phy/phy-twl4030-usb.c       |  1 -
+>  drivers/phy/phy-xgene.c             |  1 -
+>  20 files changed, 11 insertions(+), 60 deletions(-)
+> 
