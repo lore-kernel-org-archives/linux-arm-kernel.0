@@ -1,36 +1,91 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Wed, 20 Aug 2014 10:09:56 +0200
-Subject: [PATCH] spi/rockchip: fixup incorrect dma direction setting
-In-Reply-To: <1408506462-3686-1-git-send-email-addy.ke@rock-chips.com>
-References: <1408506462-3686-1-git-send-email-addy.ke@rock-chips.com>
-Message-ID: <3440626.YssIeyfVzZ@phil>
+From: boris.brezillon@free-electrons.com (Boris BREZILLON)
+Date: Wed, 20 Aug 2014 10:14:22 +0200
+Subject: [PATCH 3/3] ARM: at91/tclib: mask interruptions at shutdown and
+ probe
+In-Reply-To: <20140820073111.GH13793@ulmo>
+References: <1408486072-19268-1-git-send-email-gael.portay@gmail.com>
+ <1408486072-19268-4-git-send-email-gael.portay@gmail.com>
+ <776D4128-09AC-418C-A710-28A2522D1D63@jcrosoft.com>
+ <20140820010130.10974326@bbrezillon> <20140820073111.GH13793@ulmo>
+Message-ID: <20140820101422.3e8da816@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Addy,
+Hi Thierry,
 
-please always remember to add a real commit message, something similar to:
+On Wed, 20 Aug 2014 09:31:13 +0200
+Thierry Reding <thierry.reding@gmail.com> wrote:
 
-"Fix typo that caused the tx direction to be set twice and left out the rx 
-direction."
-
-for example.
-
-> Signed-off-by: Addy Ke <addy.ke@rock-chips.com>
-> ---
->  drivers/spi/spi-rockchip.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+> On Wed, Aug 20, 2014 at 01:01:30AM +0200, Boris BREZILLON wrote:
+> > Hi Jean-Christophe,
+> > 
+> > On Wed, 20 Aug 2014 06:11:17 +0800
+> > Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com> wrote:
+> > 
+> > > Hi,
+> > > 
+> > > 	This is a bit weird as the clock of the TC should be off and the irq free
+> > > 
+> > > 	so this should never happened we need to investigate more why this append
+> > 
+> > I may have found the source of this bug.
+> > 
+> > As Gael stated, when you're kexec-ing a new kernel your previous kernel
+> > could be using the tbc_clksrc driver (and especially the clkevent
+> > device). Thus the kernel might have planned a timer event and then been
+> > asked to shutdown the machine (requested by the kexec code).
+> > In this case the AIC interrupt connected to the TC Block is disabled
+> > but not the interrupts within the TCB IP (IDR registers), possibly
+> > leaving a pending interrupt before booting the new kernel.
+> > 
+> > When the tcb_clksrc driver is loaded by the new kernel it enables the
+> > interrupt line by calling setup_irq [1] while the clockevent device is
+> > not registered yet [2]. Thus the event_handler is still NULL when the
+> > AIC line connected to the TCB is unmasked. Remember that an interrupt
+> > is still pending on this HW block, which will lead to an immediate call
+> > to the ch2_irq handler, which tries to call the event_handler, which in
+> > turns is NULL because clkevent device registration has not taken place
+> > at this moment => Kernel panic.
+> > ITOH, we can't register the clkevent device before the irq handler is
+> > set up, because we should be ready to handle clkevent request at the
+> > time clockevents_config_and_register is called.
+> > 
+> > This leaves two solution:
+> >  1) disable the TCB irqs (using TCB IDR registers) before calling
+> >  setup_irq in the tcb_clksrc driver
+> >  2) disable the TCB irqs at the tclib level (as proposed by Gael)
+> > 
+> > I prefer solution #2 because it fixes the bug for all TCB users (not
+> > just the tcb_clksrc driver).
 > 
-> diff --git a/drivers/spi/spi-rockchip.c b/drivers/spi/spi-rockchip.c
-> index cb8fd6f..4ef3fd3 100644
-> --- a/drivers/spi/spi-rockchip.c
-> +++ b/drivers/spi/spi-rockchip.c
-> @@ -679,7 +679,7 @@ static int rockchip_spi_probe(struct platform_device
-> *pdev) rs->dma_tx.addr = (dma_addr_t)(mem->start + ROCKCHIP_SPI_TXDR);
-> rs->dma_rx.addr = (dma_addr_t)(mem->start + ROCKCHIP_SPI_RXDR);
-> rs->dma_tx.direction = DMA_MEM_TO_DEV;
-> -		rs->dma_tx.direction = DMA_DEV_TO_MEM;
-> +		rs->dma_rx.direction = DMA_DEV_TO_MEM;
+> Wouldn't a more proper fix be to only enable the IRQ (setup_irq()) once
+> everything has properly been set up? That's certainly how all other
+> drivers are doing this. Generally I think it's best to assume that an
+> interrupt can fire at any point after it's been enabled, so everything
+> should be set up prior to enabling it.
+
+Sure. And, AFAIK, another common practice is to disable all interrupts
+and acknowledge all pending interrupts before registering a new irq
+handler to avoid inheriting peripheral dirty state from previous usage
+(either the bootloader, or the previous kernel when using kexec).
+
+This being said, I really think we should leave the HW in a clean state
+when shutdown is called. And disabling interrupts at the tclib level
+(in a shutdown callback) ensure that.
+
 > 
->  		master->can_dma = rockchip_spi_can_dma;
->  		master->dma_tx = rs->dma_tx.ch;
+> Also, does anyone know why this driver uses setup_irq() rather than the
+> more idiomatic request_irq()?
+
+Because nobody has sanitized this driver yet ;-).
+
+Best Regards,
+
+Boris
+
+
+
+-- 
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
