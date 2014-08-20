@@ -1,121 +1,47 @@
 From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
-Date: Wed, 20 Aug 2014 13:19:52 +0200
-Subject: [PATCH v2 4/5] ARM: dts: Add thermistor dts fragment used by exynos
- based Peach boards
-In-Reply-To: <1408533593-32346-1-git-send-email-javier.martinez@collabora.co.uk>
-References: <1408533593-32346-1-git-send-email-javier.martinez@collabora.co.uk>
-Message-ID: <1408533593-32346-5-git-send-email-javier.martinez@collabora.co.uk>
+Date: Wed, 20 Aug 2014 13:19:48 +0200
+Subject: [PATCH v2 0/5] Add max77802 support for Peach boards
+Message-ID: <1408533593-32346-1-git-send-email-javier.martinez@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Naveen Krishna Chatradhi <ch.naveen@samsung.com>
+Hello Kukjin,
 
-This patch creates a thermistor fragment carrying the NTC Thermistor
-nodes as children of the IIO based ADC.
+This is a second version of th series that adds max77802 support for
+the Peach Pit and Pi boards. The series also have all the pending
+patches that were posted but depended on this support. I've picked
+all the patches I found and rebased them to be sure that they apply
+cleanly on top of linux-next. Also I've taken some DT snippets from
+the downstream Chrome OS 3.8 kernel DTS for devices that use one of
+these regulators as their input supply.
 
-This fragment is included in exynos5420-peach-pit.dts and
-exynos5800-peach-pi.dts.
+Changes sinve v1 [0]:
+ - Dropped patch that added vmmc and vqmmc supplies as suggested
+   by Doug Anderson.
+ - Use IRQ flags define instead of a magic number as suggested by
+   Andreas F?rber.
 
-Signed-off-by: Naveen Krishna Chatradhi <ch.naveen@samsung.com>
-Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
----
- arch/arm/boot/dts/cros-adc-thermistors.dtsi | 44 +++++++++++++++++++++++++++++
- arch/arm/boot/dts/exynos5420-peach-pit.dts  |  6 ++++
- arch/arm/boot/dts/exynos5800-peach-pi.dts   |  6 ++++
- 3 files changed, 56 insertions(+)
+The series is composed of the following patches:
+
+Javier Martinez Canillas (2):
+  ARM: dts: Add Peach Pit and Pi dts entry for max77802 PMIC
+  ARM: dts: Add Peach Pit and Pi dts entry for ISL29018 sensor
+
+Naveen Krishna Chatradhi (1):
+  ARM: dts: Add thermistor dts fragment used by exynos based Peach
+    boards
+
+Rahul Sharma (2):
+  ARM: dts: add hdmi regulators for exynos5800 based peach-pi board
+  ARM: dts: add hdmi regulators for exynos5420 based peach-pit board
+
+ arch/arm/boot/dts/cros-adc-thermistors.dtsi |  44 ++++
+ arch/arm/boot/dts/exynos5420-peach-pit.dts  | 389 ++++++++++++++++++++++++++++
+ arch/arm/boot/dts/exynos5800-peach-pi.dts   | 389 ++++++++++++++++++++++++++++
+ 3 files changed, 822 insertions(+)
  create mode 100644 arch/arm/boot/dts/cros-adc-thermistors.dtsi
 
-diff --git a/arch/arm/boot/dts/cros-adc-thermistors.dtsi b/arch/arm/boot/dts/cros-adc-thermistors.dtsi
-new file mode 100644
-index 0000000..acd4fe1
---- /dev/null
-+++ b/arch/arm/boot/dts/cros-adc-thermistors.dtsi
-@@ -0,0 +1,44 @@
-+/*
-+ * Thermistor dts fragment for devices that use Thermistors as
-+ * children of the IIO based ADC.
-+ *
-+ * Currently, used by Exynos5420 based Peach PIT and
-+ * Exynos5800 based Peach PI.
-+ *
-+ * Copyright (c) 2014 Samsung Electronics Co., Ltd.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+*/
-+
-+&adc {
-+	ncp15wb473 at 3 {
-+		compatible = "murata,ncp15wb473";
-+		pullup-uv = <1800000>;
-+		pullup-ohm = <47000>;
-+		pulldown-ohm = <0>;
-+		io-channels = <&adc 3>;
-+	};
-+	ncp15wb473 at 4 {
-+		compatible = "murata,ncp15wb473";
-+		pullup-uv = <1800000>;
-+		pullup-ohm = <47000>;
-+		pulldown-ohm = <0>;
-+		io-channels = <&adc 4>;
-+	};
-+	ncp15wb473 at 5 {
-+		compatible = "murata,ncp15wb473";
-+		pullup-uv = <1800000>;
-+		pullup-ohm = <47000>;
-+		pulldown-ohm = <0>;
-+		io-channels = <&adc 5>;
-+	};
-+	ncp15wb473 at 6 {
-+		compatible = "murata,ncp15wb473";
-+		pullup-uv = <1800000>;
-+		pullup-ohm = <47000>;
-+		pulldown-ohm = <0>;
-+		io-channels = <&adc 6>;
-+	};
-+};
-diff --git a/arch/arm/boot/dts/exynos5420-peach-pit.dts b/arch/arm/boot/dts/exynos5420-peach-pit.dts
-index 7c5957b..94225e6 100644
---- a/arch/arm/boot/dts/exynos5420-peach-pit.dts
-+++ b/arch/arm/boot/dts/exynos5420-peach-pit.dts
-@@ -103,6 +103,11 @@
- 	};
- };
- 
-+&adc {
-+	status = "okay";
-+	vdd-supply = <&ldo9_reg>;
-+};
-+
- &dp {
- 	status = "okay";
- 	pinctrl-names = "default";
-@@ -814,3 +819,4 @@
- };
- 
- #include "cros-ec-keyboard.dtsi"
-+#include "cros-adc-thermistors.dtsi"
-diff --git a/arch/arm/boot/dts/exynos5800-peach-pi.dts b/arch/arm/boot/dts/exynos5800-peach-pi.dts
-index ec4e5c7..8f9d66e 100644
---- a/arch/arm/boot/dts/exynos5800-peach-pi.dts
-+++ b/arch/arm/boot/dts/exynos5800-peach-pi.dts
-@@ -101,6 +101,11 @@
- 	};
- };
- 
-+&adc {
-+	status = "okay";
-+	vdd-supply = <&ldo9_reg>;
-+};
-+
- &dp {
- 	status = "okay";
- 	pinctrl-names = "default";
-@@ -812,3 +817,4 @@
- };
- 
- #include "cros-ec-keyboard.dtsi"
-+#include "cros-adc-thermistors.dtsi"
--- 
-2.0.1
+Best regards,
+Javier
+
+[0]: https://lkml.org/lkml/2014/8/19/372
