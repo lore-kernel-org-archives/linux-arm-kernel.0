@@ -1,147 +1,387 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Wed, 20 Aug 2014 20:03:28 +0200
-Subject: [PATCH 1/4] ARM: rockchip: rk3288: Switch to use the proper PWM IP
-In-Reply-To: <CAD=FV=U_TEi7zh=LcnfTz07yFCrOXo1SsGJ0h6-VFCVdy1GDEA@mail.gmail.com>
-References: <1408381749-14156-1-git-send-email-dianders@chromium.org>
- <2927513.T62GI7nq9T@phil>
- <CAD=FV=U_TEi7zh=LcnfTz07yFCrOXo1SsGJ0h6-VFCVdy1GDEA@mail.gmail.com>
-Message-ID: <9118476.CpedIJMoMR@phil>
+From: balbi@ti.com (Felipe Balbi)
+Date: Wed, 20 Aug 2014 13:08:50 -0500
+Subject: [PATCH v4 1/3] usb: dwc3: add ST dwc3 glue layer to manage dwc3 HC
+In-Reply-To: <1406734091-16202-2-git-send-email-peter.griffin@linaro.org>
+References: <1406734091-16202-1-git-send-email-peter.griffin@linaro.org>
+ <1406734091-16202-2-git-send-email-peter.griffin@linaro.org>
+Message-ID: <20140820180850.GV24500@saruman.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Mittwoch, 20. August 2014, 09:27:02 schrieb Doug Anderson:
-> Heiko,
+Hi,
+
+On Wed, Jul 30, 2014 at 04:28:09PM +0100, Peter Griffin wrote:
+> This patch adds the ST glue logic to manage the DWC3 HC
+> on STiH407 SoC family. It manages the powerdown signal,
+> and configures the internal glue logic and syscfg registers.
 > 
-> On Wed, Aug 20, 2014 at 9:20 AM, Heiko St?bner <heiko@sntech.de> wrote:
-> > Am Mittwoch, 20. August 2014, 08:55:09 schrieb Doug Anderson:
-> >> Thierry,
-> >> 
-> >> On Wed, Aug 20, 2014 at 8:38 AM, Thierry Reding
-> >> 
-> >> <thierry.reding@gmail.com> wrote:
-> >> > On Wed, Aug 20, 2014 at 08:20:53AM -0700, Doug Anderson wrote:
-> >> >> Thierry,
-> >> >> 
-> >> >> On Tue, Aug 19, 2014 at 11:08 PM, Thierry Reding
-> >> >> 
-> >> >> <thierry.reding@gmail.com> wrote:
-> >> >> > On Tue, Aug 19, 2014 at 08:18:54AM -0700, Doug Anderson wrote:
-> >> >> >> Thierry,
-> >> >> >> 
-> >> >> >> On Tue, Aug 19, 2014 at 12:10 AM, Thierry Reding
-> >> >> >> 
-> >> >> >> <thierry.reding@gmail.com> wrote:
-> >> >> >> > On Mon, Aug 18, 2014 at 10:09:06AM -0700, Doug Anderson wrote:
-> >> >> >> >> The rk3288 SoC has an option to switch all of the PWMs in the
-> >> >> >> >> system
-> >> >> >> >> between the old IP block and the new IP block.  The new IP block
-> >> >> >> >> is
-> >> >> >> >> working and tested and the suggested PWM to use, so setup the
-> >> >> >> >> SoC
-> >> >> >> >> to
-> >> >> >> >> use it and then we can pretend that the other IP block doesn't
-> >> >> >> >> exist.
-> >> >> > 
-> >> >> > A few more questions as to how this actually works. Does it mean
-> >> >> > there
-> >> >> > are two physically separate blocks (with different physical
-> >> >> > addresses)
-> >> >> > to control the same PWM? And this register simply causes some of the
-> >> >> > pins to be routed to one or another? As far as I recall there are a
-> >> >> > number of instances of the PWM block, so the above would need to
-> >> >> > count
-> >> >> > for all of them. Or are there separate bits for each of them?
-> >> >> 
-> >> >> All I have is the TRM (technical reference manual) which doesn't give
-> >> >> me much more info than I've provided you.  But I can answer some of
-> >> >> your questoins:
-> >> >> 
-> >> >> 1. If there are two physically separate blocks then the "old" block is
-> >> >> not documented in my TRM.
-> >> >> 
-> >> >> 1a) It's entirely possible it's located at some memory address that is
-> >> >> marked "Reserved" in the TRM, but I have no idea.
-> >> >> 
-> >> >> 1b) It's entirely possible that the old IP block and the new IP block
-> >> >> are supposed to be "compatible" but that the old block is broken and
-> >> >> thus isn't behaving properly.
-> >> >> 
-> >> >> 1c) It's entirely possible that the old IP block and the new IP block
-> >> >> are located at the same physical addresses but somehow work
-> >> >> differently.  If so, the old IP block isn't documented.
-> >> >> 
-> >> >> 
-> >> >> 2. As per the patch description, there is a single bit that controls
-> >> >> all of the PWMs.  My guess is that there's actually a single IP block
-> >> >> that implements all 4 PWMs.
-> >> > 
-> >> > Looking at the register offsets in the device tree that seems likely.
-> >> > At
-> >> > least PWMs 0 and 1 as well as 2 and 3 seem like they could be in the
-> >> > 
-> >> > same IP block. Their placement in the register map is somewhat strange:
-> >> >         pwm0: pwm at 20030000 {
-> >> >         
-> >> >                 ...
-> >> >                 reg = <0x20030000 0x10>;
-> >> >                 ...
-> >> >                 clocks = <&cru PCLK_PWM01>;
-> >> >                 ...
-> >> >         
-> >> >         };
-> >> >         
-> >> >         pwm1: pwm at 20030010 {
-> >> >         
-> >> >                 ...
-> >> >                 reg = <0x20030010 0x10>;
-> >> >                 ...
-> >> >                 clocks = <&cru PCLK_PWM01>;
-> >> >                 ...
-> >> >         
-> >> >         };
-> >> >         
-> >> >         ...
-> >> >         
-> >> >         pwm2: pwm at 20050020 {
-> >> >         
-> >> >                 ...
-> >> >                 reg = <0x20050020 0x10>;
-> >> >                 ...
-> >> >                 clocks = <&cru PCLK_PWM23>;
-> >> >                 ...
-> >> >         
-> >> >         };
-> >> >         
-> >> >         pwm3: pwm at 20050030 {
-> >> >         
-> >> >                 ...
-> >> >                 reg = <0x20050030 0x10>;
-> >> >                 ...
-> >> >                 clocks = <&cru PCLK_PWM23>;
-> >> >                 ...
-> >> >         
-> >> >         };
-> >> 
-> >> Ah, you're looking at "rk3xxx.dtsi".  That doesn't apply to rk3288
-> >> (the downsides of trying to guess ahead of time what SoC vendors will
-> >> name new models).
-> > 
-> > It did sound like a nice idea at the time to hold the common stuff of
-> > rk3066/rk3188 and all their derivatives and I assumed a SoC that changed
-> > dramatically (including the core) would be called 4xxx or so :-) .
+> Signed-off-by: Giuseppe Cavallaro <peppe.cavallaro@st.com>
+> Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
+> Acked-by: Lee Jones <lee.jones@linaro.org>
+> ---
+>  drivers/usb/dwc3/Kconfig   |   9 ++
+>  drivers/usb/dwc3/Makefile  |   1 +
+>  drivers/usb/dwc3/dwc3-st.c | 336 +++++++++++++++++++++++++++++++++++++++++++++
+>  3 files changed, 346 insertions(+)
+>  create mode 100644 drivers/usb/dwc3/dwc3-st.c
 > 
-> Yes, I've fallen into the same trap.  Now I jump on the bandwagon and
-> name things arbitrarily by the first machine that had them.  It's
-> confusing, but sorta less confusing too.
+> diff --git a/drivers/usb/dwc3/Kconfig b/drivers/usb/dwc3/Kconfig
+> index 8eb996e..6c85c43 100644
+> --- a/drivers/usb/dwc3/Kconfig
+> +++ b/drivers/usb/dwc3/Kconfig
+> @@ -79,6 +79,15 @@ config USB_DWC3_KEYSTONE
+>  	  Support of USB2/3 functionality in TI Keystone2 platforms.
+>  	  Say 'Y' or 'M' here if you have one such device
+>  
+> +config USB_DWC3_ST
+> +	tristate "STMicroelectronics Platforms"
+> +	depends on ARCH_STI && OF
+> +	default USB_DWC3_HOST
 
-the problem was in this case, that there also is rk3066-specific material which 
-made it all the more difficult.
+this seems wrong as USB_DWC3_{HOST,GADGET,DUAL_ROLE} are booleans and
+USB_DWC3_ST is a tristate. Better to stick with defaulting to USB_DWC3
+instead like all the others.
 
-I guess rk3066-common would have been a possibility but still sounds somewhat 
-strange, or something else entirely.
+> +	help
+> +	  STMicroelectronics SoCs with one DesignWare Core USB3 IP
+> +	  inside (i.e. STiH407).
+> +	  Say 'Y' or 'M' if you have one such device.
+> +
+>  comment "Debugging features"
+>  
+>  config USB_DWC3_DEBUG
+> diff --git a/drivers/usb/dwc3/Makefile b/drivers/usb/dwc3/Makefile
+> index 10ac3e7..11c9f54 100644
+> --- a/drivers/usb/dwc3/Makefile
+> +++ b/drivers/usb/dwc3/Makefile
+> @@ -33,3 +33,4 @@ obj-$(CONFIG_USB_DWC3_OMAP)		+= dwc3-omap.o
+>  obj-$(CONFIG_USB_DWC3_EXYNOS)		+= dwc3-exynos.o
+>  obj-$(CONFIG_USB_DWC3_PCI)		+= dwc3-pci.o
+>  obj-$(CONFIG_USB_DWC3_KEYSTONE)		+= dwc3-keystone.o
+> +obj-$(CONFIG_USB_DWC3_ST)		+= dwc3-st.o
+> diff --git a/drivers/usb/dwc3/dwc3-st.c b/drivers/usb/dwc3/dwc3-st.c
+> new file mode 100644
+> index 0000000..227698f
+> --- /dev/null
+> +++ b/drivers/usb/dwc3/dwc3-st.c
+> @@ -0,0 +1,336 @@
+> +/**
+> + * dwc3-st.c Support for dwc3 platform devices on ST Microelectronics platforms
+> + *
+> + * This is a small driver for the dwc3 to provide the glue logic
+> + * to configure the controller. Tested on STi platforms.
+> + *
+> + * Copyright (C) 2014 Stmicroelectronics
+> + *
+> + * Author: Giuseppe Cavallaro <peppe.cavallaro@st.com>
+> + * Contributors: Aymen Bouattay <aymen.bouattay@st.com>
+> + *               Peter Griffin <peter.griffin@linaro.org>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License as published by
+> + * the Free Software Foundation; either version 2 of the License, or
+> + * (at your option) any later version.
+> + *
+> + * Inspired by dwc3-omap.c and dwc3-exynos.c.
+> + */
+> +
+> +#include <linux/delay.h>
+> +#include <linux/interrupt.h>
+> +#include <linux/io.h>
+> +#include <linux/ioport.h>
+> +#include <linux/kernel.h>
+> +#include <linux/mfd/syscon.h>
+> +#include <linux/module.h>
+> +#include <linux/of.h>
+> +#include <linux/of_platform.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/slab.h>
+> +#include <linux/regmap.h>
+> +#include <linux/reset.h>
+> +#include <linux/usb/of.h>
+> +
+> +#include "core.h"
+> +#include "io.h"
+> +
+> +/* glue registers */
+> +#define CLKRST_CTRL		0x00
+> +#define AUX_CLK_EN		BIT(0)
+> +#define SW_PIPEW_RESET_N	BIT(4)
+> +#define EXT_CFG_RESET_N		BIT(8)
+> +/*
+> + * 1'b0 : The host controller complies with the xHCI revision 0.96
+> + * 1'b1 : The host controller complies with the xHCI revision 1.0
+> + */
+> +#define XHCI_REVISION		BIT(12)
+> +
+> +#define USB2_VBUS_MNGMNT_SEL1	0x2C
+> +/*
+> + * For all fields in USB2_VBUS_MNGMNT_SEL1
+> + * 2?b00 : Override value from Reg 0x30 is selected
+> + * 2?b01 : utmiotg_<signal_name> from usb3_top is selected
+> + * 2?b10 : pipew_<signal_name> from PIPEW instance is selected
+> + * 2?b11 : value is 1'b0
+> + */
+> +#define USB2_VBUS_REG30		0x0
+> +#define USB2_VBUS_UTMIOTG	0x1
+> +#define USB2_VBUS_PIPEW		0x2
+> +#define USB2_VBUS_ZERO		0x3
+> +
+> +#define SEL_OVERRIDE_VBUSVALID(n)	(n << 0)
+> +#define SEL_OVERRIDE_POWERPRESENT(n)	(n << 4)
+> +#define SEL_OVERRIDE_BVALID(n)		(n << 8)
+> +
+> +/* Static DRD configuration */
+> +#define USB_HOST_DEFAULT_MASK	0xffe
+> +#define USB_SET_PORT_DEVICE	0x1
+> +
+> +/**
+> + * struct st_dwc3 - dwc3-st driver private structure
+> + * @dev:		device pointer
+> + * @glue_base:		ioaddr for the glue registers
+> + * @regmap:		regmap pointer for getting syscfg
+> + * @syscfg_reg_off:	usb syscfg control offset
+> + * @dr_mode:		drd static host/device config
+> + * @rstc_pwrdn:		rest controller for powerdown signal
+> + * @rstc_rst:		reset controller for softreset signal
+> + */
+> +
+> +struct st_dwc3 {
+> +	struct device *dev;
+> +	void __iomem *glue_base;
+> +	struct regmap *regmap;
+> +	int syscfg_reg_off;
+> +	enum usb_dr_mode dr_mode;
+> +	struct reset_control *rstc_pwrdn;
+> +	struct reset_control *rstc_rst;
+> +};
+> +
+> +static inline u32 st_dwc3_readl(void __iomem *base, u32 offset)
+> +{
+> +	return readl_relaxed(base + offset);
+> +}
+> +
+> +static inline void st_dwc3_writel(void __iomem *base, u32 offset, u32 value)
+> +{
+> +	writel_relaxed(value, base + offset);
 
-I'm not sure but don't think dtsi file-naming counts as API, so we can rename 
-the rk3xxx.dtsi file if this gets to confusing in the future.
+why relaxed ?
 
+> +}
+> +
+> +/**
+> + * st_dwc3_drd_init: program the port
+> + * @dwc3_data: driver private structure
+> + * Description: this function is to program the port as either host or device
+> + * according to the static configuration passed from devicetree.
+> + * OTG and dual role are not yet supported!
+> + */
+> +static int st_dwc3_drd_init(struct st_dwc3 *dwc3_data)
+> +{
+> +	u32 val;
+> +	int err;
+> +
+> +	err = regmap_read(dwc3_data->regmap, dwc3_data->syscfg_reg_off, &val);
+> +	if (err)
+> +		return err;
+> +
+> +	switch (dwc3_data->dr_mode) {
+> +	case USB_DR_MODE_PERIPHERAL:
+> +		val |= USB_SET_PORT_DEVICE;
+> +		dev_dbg(dwc3_data->dev, "Configuring as Device\n");
+> +		break;
+> +
+> +	case USB_DR_MODE_HOST:
+> +		val &= USB_HOST_DEFAULT_MASK;
 
-Heiko
+are you missing a ~ here ? Also, shouldn't you mask off the bits before
+this switch ?
+
+> +		dev_dbg(dwc3_data->dev, "Configuring as Host\n");
+> +		break;
+> +
+> +	default:
+> +		dev_err(dwc3_data->dev, "Unsupported mode of operation %d\n",
+> +			dwc3_data->dr_mode);
+> +		return -EINVAL;
+> +	}
+> +
+> +	return regmap_write(dwc3_data->regmap, dwc3_data->syscfg_reg_off, val);
+> +}
+> +
+> +/**
+> + * st_dwc3_init: init the controller via glue logic
+> + * @dwc3_data: driver private structure
+> + */
+> +static void st_dwc3_init(struct st_dwc3 *dwc3_data)
+> +{
+> +
+
+this blank line isn't necessary.
+
+> +	u32 reg = st_dwc3_readl(dwc3_data->glue_base, CLKRST_CTRL);
+> +
+> +	reg |= AUX_CLK_EN | EXT_CFG_RESET_N | XHCI_REVISION;
+> +	reg &= ~SW_PIPEW_RESET_N;
+> +	st_dwc3_writel(dwc3_data->glue_base, CLKRST_CTRL, reg);
+> +
+> +	/* configure mux for vbus, powerpresent and bvalid signals */
+> +	reg = st_dwc3_readl(dwc3_data->glue_base, USB2_VBUS_MNGMNT_SEL1);
+> +
+> +	reg |= SEL_OVERRIDE_VBUSVALID(USB2_VBUS_UTMIOTG) |
+> +		SEL_OVERRIDE_POWERPRESENT(USB2_VBUS_UTMIOTG) |
+> +		SEL_OVERRIDE_BVALID(USB2_VBUS_UTMIOTG);
+> +
+> +	st_dwc3_writel(dwc3_data->glue_base, USB2_VBUS_MNGMNT_SEL1, reg);
+> +
+> +	reg = st_dwc3_readl(dwc3_data->glue_base, CLKRST_CTRL);
+> +	reg |= SW_PIPEW_RESET_N;
+> +	st_dwc3_writel(dwc3_data->glue_base, CLKRST_CTRL, reg);
+> +}
+> +
+> +static int st_dwc3_probe(struct platform_device *pdev)
+> +{
+> +	struct st_dwc3 *dwc3_data;
+> +	struct resource *res;
+> +	struct device *dev = &pdev->dev;
+> +	struct device_node *node = dev->of_node, *child;
+> +	struct regmap *regmap;
+> +	int ret;
+> +
+> +	dwc3_data = devm_kzalloc(dev, sizeof(*dwc3_data), GFP_KERNEL);
+> +	if (!dwc3_data)
+> +		return -ENOMEM;
+> +
+> +	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "reg-glue");
+> +	dwc3_data->glue_base = devm_ioremap_resource(dev, res);
+> +	if (IS_ERR(dwc3_data->glue_base))
+> +		return PTR_ERR(dwc3_data->glue_base);
+> +
+> +	regmap = syscon_regmap_lookup_by_phandle(node, "st,syscfg");
+> +	if (IS_ERR(regmap))
+> +		return PTR_ERR(regmap);
+> +
+> +	dma_set_coherent_mask(dev, dev->coherent_dma_mask);
+> +	dwc3_data->dev = dev;
+> +	dwc3_data->regmap = regmap;
+> +
+> +	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "syscfg-reg");
+> +	if (!res) {
+> +		ret = -ENXIO;
+> +		goto undo_platform_dev_alloc;
+> +	}
+> +
+> +	dwc3_data->syscfg_reg_off = res->start;
+> +
+> +	dev_dbg(&pdev->dev, "glue-logic addr 0x%p, syscfg-reg offset 0x%x\n",
+> +		dwc3_data->glue_base, dwc3_data->syscfg_reg_off);
+
+looks like this message would be more of a dev_vdbg().
+
+> +	dwc3_data->rstc_pwrdn = devm_reset_control_get(dev, "powerdown");
+> +	if (IS_ERR(dwc3_data->rstc_pwrdn)) {
+> +		dev_err(&pdev->dev, "could not get power controller\n");
+> +		ret = PTR_ERR(dwc3_data->rstc_pwrdn);
+> +		goto undo_platform_dev_alloc;
+> +	}
+> +
+> +	/* Manage PowerDown */
+> +	reset_control_deassert(dwc3_data->rstc_pwrdn);
+> +
+> +	dwc3_data->rstc_rst = devm_reset_control_get(dev, "softreset");
+> +	if (IS_ERR(dwc3_data->rstc_rst)) {
+> +		dev_err(&pdev->dev, "could not get reset controller\n");
+> +		ret = PTR_ERR(dwc3_data->rstc_pwrdn);
+> +		goto undo_powerdown;
+> +	}
+> +
+> +	/* Manage SoftReset */
+> +	reset_control_deassert(dwc3_data->rstc_rst);
+> +
+> +	child = of_get_child_by_name(node, "dwc3");
+> +	if (!child) {
+> +		dev_err(&pdev->dev, "failed to find dwc3 core node\n");
+> +		ret = -ENODEV;
+> +		goto undo_softreset;
+> +	}
+> +
+> +	dwc3_data->dr_mode = of_usb_get_dr_mode(child);
+> +
+> +	/* Allocate and initialize the core */
+> +	ret = of_platform_populate(node, NULL, NULL, dev);
+> +	if (ret) {
+> +		dev_err(dev, "failed to add dwc3 core\n");
+> +		goto undo_softreset;
+> +	}
+> +
+> +	/*
+> +	 * Configure the USB port as device or host according to the static
+> +	 * configuration passed from DT.
+> +	 * DRD is the only mode currently supported so this will be enhanced
+> +	 * as soon as OTG is available.
+> +	 */
+> +	ret = st_dwc3_drd_init(dwc3_data);
+> +	if (ret) {
+> +		dev_err(dev, "drd initialisation failed\n");
+> +		goto undo_softreset;
+> +	}
+> +
+> +	/* ST glue logic init */
+> +	st_dwc3_init(dwc3_data);
+> +
+> +	platform_set_drvdata(pdev, dwc3_data);
+> +	return 0;
+> +
+> +undo_softreset:
+> +	reset_control_assert(dwc3_data->rstc_rst);
+> +undo_powerdown:
+> +	reset_control_assert(dwc3_data->rstc_pwrdn);
+> +undo_platform_dev_alloc:
+> +	platform_device_put(pdev);
+> +	return ret;
+> +}
+> +
+> +
+> +static int st_dwc3_remove_child(struct device *dev, void *c)
+> +{
+> +	struct platform_device *pdev = to_platform_device(dev);
+> +
+> +	of_device_unregister(pdev);
+> +
+> +	return 0;
+> +}
+> +
+> +static int st_dwc3_remove(struct platform_device *pdev)
+> +{
+> +	struct st_dwc3 *dwc3_data = platform_get_drvdata(pdev);
+> +
+> +	device_for_each_child(&pdev->dev, NULL, st_dwc3_remove_child);
+> +
+> +	reset_control_assert(dwc3_data->rstc_pwrdn);
+> +	reset_control_assert(dwc3_data->rstc_rst);
+> +
+> +	return 0;
+> +}
+> +
+> +#ifdef CONFIG_PM_SLEEP
+> +static int st_dwc3_suspend(struct device *dev)
+> +{
+> +	struct st_dwc3 *dwc3_data = dev_get_drvdata(dev);
+> +
+> +	reset_control_assert(dwc3_data->rstc_pwrdn);
+> +	reset_control_assert(dwc3_data->rstc_rst);
+
+Two questions:
+
+1) how would you handle the case when this device is a wakeup source ?
+2) when resuming, wouldn't you have to reinitialize the entire core ?
+
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140820/d2dfdd1e/attachment-0001.sig>
