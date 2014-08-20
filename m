@@ -1,62 +1,39 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Wed, 20 Aug 2014 08:40:33 -0700
-Subject: [PATCH v2] ARM: tegra: add Acer Chromebook 13 device tree
-In-Reply-To: <20140820143201.GA3368@ulmo>
-References: <1407957267-3258-1-git-send-email-dgreid@chromium.org>
- <53EF76CF.9050808@suse.de> <53F2255E.7090208@wwwdotorg.org>
- <CAL1qeaH-WfA-DLKwuXA_hBPHYuXksAibLq__zisrT9ALaRGdAw@mail.gmail.com>
- <53F28F90.3000004@wwwdotorg.org>
- <CAOesGMhBdQh_ddycZ-Y5dupR9hW74bogHtG3yyPUJ2tAgWi19A@mail.gmail.com>
- <20140820143201.GA3368@ulmo>
-Message-ID: <CAOesGMjFGabNOk0ODjbDN5aaro5309t02+B+UZoM_+q5VE9Ltw@mail.gmail.com>
+From: agross@codeaurora.org (Andy Gross)
+Date: Wed, 20 Aug 2014 10:42:00 -0500
+Subject: [PATCH v1 1/3] pinctrl: qcom: Add APQ8084 pinctrl support
+In-Reply-To: <20140820043929.GH7070@sonymobile.com>
+References: <1408468936-12252-1-git-send-email-gdjakov@mm-sol.com>
+ <1408468936-12252-2-git-send-email-gdjakov@mm-sol.com>
+ <20140820043929.GH7070@sonymobile.com>
+Message-ID: <20140820154200.GA14731@qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 20, 2014 at 7:32 AM, Thierry Reding
-<thierry.reding@gmail.com> wrote:
-> On Wed, Aug 20, 2014 at 06:29:14AM -0700, Olof Johansson wrote:
->> On Mon, Aug 18, 2014 at 4:43 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
+On Tue, Aug 19, 2014 at 09:39:30PM -0700, Bjorn Andersson wrote:
+> On Tue 19 Aug 10:22 PDT 2014, Georgi Djakov wrote:
+> 
+> > This patch adds support for the TLMM (Top-Level Mode Mux) block found
+> > in the APQ8084 platform.
+> > 
 > [...]
->> > Again, this board *isn't* Nyan, so it should pretend that it is.
->>
->> It is a derivative design of the nyan reference platform, and it is
->> compatible with it. It is perfectly fine to claim to be compatible
->> with it. I'm sorry, but you're just wrong here.
->
-> I guess that depends a little on how you define compatibility. I had
-> always assumed that the top-level compatible string would be a sort of
-> "checksum" over the rest of the content. Which, admittedly, makes it
-> kind of redundant. Compatibility could mean a lot of things. Does it
-> mean any kernel/DTB compatible with one device could run on any device
-> derived from it? Does compatibility mean it needs to provide full
-> functionality or is it still compatible if it runs at a reduced feature
-> set but doesn't "break" otherwise?
+> > +
+> > +#define NUM_GPIO_PINGROUPS 143
+> > +
+> 
+> I think this looks good overall, but in my APQ8084 documentation
+> (80-NG550-2X Rev. B) there are 147 (0..146) gpio pins in the TLMM block.
+> 
+> Any suggestion to why there's a discrepancy?
+> 
 
-Consider:
-        compatible = "foo,x", "foo,y";
+We have some discrepancies internally on the documentation.  However, in this
+case I'd expect the OEM documentation to be correct.  So this needs to change to
+bjorn's version, as it appears to be the correct version.
 
-My interpretation is:  foo,x is compatible with foo,y if and only if:
-
-foo,x can be driven by the same code as foo,y -- i.e. the driver
-doesn't need changes for basic things to work (and nothing should be
-broken).
-
-foo,x _can_ be a superset though. It could have features that foo,y
-doesn't have, that needs driver changes to take advantage of. But
-using the foo,y driver with a foo,x device should give you the foo,y
-functionality.
-
-The simple case is where foo,x is more or less identical to foo,y, but
-there might be some implementation-specific bugs that makes it useful
-to be able to, at some point in the future, tell if you're running on
-a foo,x or foo,y device even if the code is identical today.
+I have no idea why some pins are missing.
 
 
-In this particular case, google,nyan and google,nyan-big are very
-similar. There are some differences in panels, etc, but it's described
-in the individual device trees already, but things will come up and be
-functional even if you boot with the wrong device tree (as far as I
-know). Andrew has done that in the past, as far as I know.
-
-
--Olof
+-- 
+sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
