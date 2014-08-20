@@ -1,155 +1,112 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Wed, 20 Aug 2014 13:49:20 -0700
-Subject: [PATCH 1/4] ARM: rockchip: rk3288: Switch to use the proper PWM IP
-In-Reply-To: <9118476.CpedIJMoMR@phil>
-References: <1408381749-14156-1-git-send-email-dianders@chromium.org>
- <2927513.T62GI7nq9T@phil>
- <CAD=FV=U_TEi7zh=LcnfTz07yFCrOXo1SsGJ0h6-VFCVdy1GDEA@mail.gmail.com>
- <9118476.CpedIJMoMR@phil>
-Message-ID: <CAD=FV=WcZKyMa3Megire6Zmd7ipFVTEH3iFinGZURHXwBH0ghg@mail.gmail.com>
+From: ttynkkynen@nvidia.com (Tuomas Tynkkynen)
+Date: Thu, 21 Aug 2014 00:04:28 +0300
+Subject: [PATCH v4 00/16] Tegra124 CL-DVFS / DFLL clocksource, plus cpufreq
+Message-ID: <1408568684-11016-1-git-send-email-ttynkkynen@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Heiko,
+v4 changes:
+DFLL:
+    - fix wrong register accessors used for the DFLL_OUTPUT_CFG register
+        - I decided to leave the dfll_i2c_{readl,writel} separate since the
+          correct barrier function still needs to be called
+    - fix PMIC I2C voltage register address being uninitialized
+cpufreq:
+    - back to 'depends on GENERIC_CPUFREQ_CPU0' from 'select GENERIC_CPUFREQ_CPU0'
+        - leads to new patch to update the defconfigs
+    - check for get_cpu_device() return value
+    - add comment why an extra platform driver+device is required
 
-On Wed, Aug 20, 2014 at 11:03 AM, Heiko St?bner <heiko@sntech.de> wrote:
-> Am Mittwoch, 20. August 2014, 09:27:02 schrieb Doug Anderson:
->> Heiko,
->>
->> On Wed, Aug 20, 2014 at 9:20 AM, Heiko St?bner <heiko@sntech.de> wrote:
->> > Am Mittwoch, 20. August 2014, 08:55:09 schrieb Doug Anderson:
->> >> Thierry,
->> >>
->> >> On Wed, Aug 20, 2014 at 8:38 AM, Thierry Reding
->> >>
->> >> <thierry.reding@gmail.com> wrote:
->> >> > On Wed, Aug 20, 2014 at 08:20:53AM -0700, Doug Anderson wrote:
->> >> >> Thierry,
->> >> >>
->> >> >> On Tue, Aug 19, 2014 at 11:08 PM, Thierry Reding
->> >> >>
->> >> >> <thierry.reding@gmail.com> wrote:
->> >> >> > On Tue, Aug 19, 2014 at 08:18:54AM -0700, Doug Anderson wrote:
->> >> >> >> Thierry,
->> >> >> >>
->> >> >> >> On Tue, Aug 19, 2014 at 12:10 AM, Thierry Reding
->> >> >> >>
->> >> >> >> <thierry.reding@gmail.com> wrote:
->> >> >> >> > On Mon, Aug 18, 2014 at 10:09:06AM -0700, Doug Anderson wrote:
->> >> >> >> >> The rk3288 SoC has an option to switch all of the PWMs in the
->> >> >> >> >> system
->> >> >> >> >> between the old IP block and the new IP block.  The new IP block
->> >> >> >> >> is
->> >> >> >> >> working and tested and the suggested PWM to use, so setup the
->> >> >> >> >> SoC
->> >> >> >> >> to
->> >> >> >> >> use it and then we can pretend that the other IP block doesn't
->> >> >> >> >> exist.
->> >> >> >
->> >> >> > A few more questions as to how this actually works. Does it mean
->> >> >> > there
->> >> >> > are two physically separate blocks (with different physical
->> >> >> > addresses)
->> >> >> > to control the same PWM? And this register simply causes some of the
->> >> >> > pins to be routed to one or another? As far as I recall there are a
->> >> >> > number of instances of the PWM block, so the above would need to
->> >> >> > count
->> >> >> > for all of them. Or are there separate bits for each of them?
->> >> >>
->> >> >> All I have is the TRM (technical reference manual) which doesn't give
->> >> >> me much more info than I've provided you.  But I can answer some of
->> >> >> your questoins:
->> >> >>
->> >> >> 1. If there are two physically separate blocks then the "old" block is
->> >> >> not documented in my TRM.
->> >> >>
->> >> >> 1a) It's entirely possible it's located at some memory address that is
->> >> >> marked "Reserved" in the TRM, but I have no idea.
->> >> >>
->> >> >> 1b) It's entirely possible that the old IP block and the new IP block
->> >> >> are supposed to be "compatible" but that the old block is broken and
->> >> >> thus isn't behaving properly.
->> >> >>
->> >> >> 1c) It's entirely possible that the old IP block and the new IP block
->> >> >> are located at the same physical addresses but somehow work
->> >> >> differently.  If so, the old IP block isn't documented.
->> >> >>
->> >> >>
->> >> >> 2. As per the patch description, there is a single bit that controls
->> >> >> all of the PWMs.  My guess is that there's actually a single IP block
->> >> >> that implements all 4 PWMs.
->> >> >
->> >> > Looking at the register offsets in the device tree that seems likely.
->> >> > At
->> >> > least PWMs 0 and 1 as well as 2 and 3 seem like they could be in the
->> >> >
->> >> > same IP block. Their placement in the register map is somewhat strange:
->> >> >         pwm0: pwm at 20030000 {
->> >> >
->> >> >                 ...
->> >> >                 reg = <0x20030000 0x10>;
->> >> >                 ...
->> >> >                 clocks = <&cru PCLK_PWM01>;
->> >> >                 ...
->> >> >
->> >> >         };
->> >> >
->> >> >         pwm1: pwm at 20030010 {
->> >> >
->> >> >                 ...
->> >> >                 reg = <0x20030010 0x10>;
->> >> >                 ...
->> >> >                 clocks = <&cru PCLK_PWM01>;
->> >> >                 ...
->> >> >
->> >> >         };
->> >> >
->> >> >         ...
->> >> >
->> >> >         pwm2: pwm at 20050020 {
->> >> >
->> >> >                 ...
->> >> >                 reg = <0x20050020 0x10>;
->> >> >                 ...
->> >> >                 clocks = <&cru PCLK_PWM23>;
->> >> >                 ...
->> >> >
->> >> >         };
->> >> >
->> >> >         pwm3: pwm at 20050030 {
->> >> >
->> >> >                 ...
->> >> >                 reg = <0x20050030 0x10>;
->> >> >                 ...
->> >> >                 clocks = <&cru PCLK_PWM23>;
->> >> >                 ...
->> >> >
->> >> >         };
->> >>
->> >> Ah, you're looking at "rk3xxx.dtsi".  That doesn't apply to rk3288
->> >> (the downsides of trying to guess ahead of time what SoC vendors will
->> >> name new models).
->> >
->> > It did sound like a nice idea at the time to hold the common stuff of
->> > rk3066/rk3188 and all their derivatives and I assumed a SoC that changed
->> > dramatically (including the core) would be called 4xxx or so :-) .
->>
->> Yes, I've fallen into the same trap.  Now I jump on the bandwagon and
->> name things arbitrarily by the first machine that had them.  It's
->> confusing, but sorta less confusing too.
->
-> the problem was in this case, that there also is rk3066-specific material which
-> made it all the more difficult.
->
-> I guess rk3066-common would have been a possibility but still sounds somewhat
-> strange, or something else entirely.
->
-> I'm not sure but don't think dtsi file-naming counts as API, so we can rename
-> the rk3xxx.dtsi file if this gets to confusing in the future.
+v3 changes:
+- Fix incorrect order of arguments to dfll_scale_dvco_rate
+- Fix accidental commas at end-of-statement to semicolons
+- Some cpufreq changes:
+    - rename cpufreq-tegra to cpufreq-tegra20
+    - have separate Kconfig entries for Tegra20/Tegra124 support
+    - use 'select GENERIC_CPUFREQ_CPU0', not depends
+    - support unbinding of the platform device
+        - requires adding the vdd_cpu regulator to the DT so
+          the old voltage can be restored when switching to PLLX
+    - allocate a state structure instead of globals
+    - use of_match_machine()
+    - various style nits fixed
 
-Yup.  Sorry, didn't mean to bring it up.  It's not a huge deal IMHO,
-but if you want to submit a patch to rename I'm happy to support it.
-Since the dts issues are all around people shipping device tree files
-in firmware, I don't think a rename will affect anything...
+The cpufreq part is dependant on the of_match_machine() series.
 
--Doug
+Original cover letter:
+
+This series implements the DFLL/CL-DVFS clock source for the fast CPU
+cluster on Tegra124, and a cpufreq driver that uses the DFLL for
+clocking the CPU. Most of this is based on Paul Walmsley's public patch
+set from December 2013, which is available at
+http://comments.gmane.org/gmane.linux.ports.tegra/15273
+
+The DFLL clock hardware is a voltage-controlled oscillator plus
+control logic that compares the generated output clock with a
+51 MHz reference clock, and can make decisions to either lower
+or raise the DFLL voltage to keep the output rate close to the
+software-requested rate. The voltage changes are done by
+communicating with an off-chip PMIC via either I2C or PWM.
+As the DFLL oscillator is powered via the CPU rail, using
+the DFLL as the CPU clocksource also gives us dynamic CPU
+voltage scaling.
+
+This series has been tested on the Jetson TK1 (Rev C). Porting this to
+the Venice2 should be simple, though do note that it does not have
+active cooling.
+
+Thanks,
+Tuomas
+
+Paul Walmsley (1):
+  clk: tegra: Add DFLL DVCO reset control for Tegra124
+
+Tuomas Tynkkynen (15):
+  clk: tegra: Add binding for the Tegra124 DFLL clocksource
+  clk: tegra: Add library for the DFLL clock source (open-loop mode)
+  clk: tegra: Add closed loop support for the DFLL
+  clk: tegra: Add functions for parsing CVB tables
+  clk: tegra: Add Tegra124 DFLL clocksource platform driver
+  clk: tegra: Save/restore CCLKG_BURST_POLICY on suspend
+  clk: tegra: Add the DFLL as a possible parent of the cclk_g clock
+  ARM: tegra: Add the DFLL to Tegra124 device tree
+  ARM: tegra: Enable the DFLL on the Jetson TK1
+  cpufreq: tegra124: Add device tree bindings
+  cpufreq: tegra: Rename tegra-cpufreq to tegra20-cpufreq
+  cpufreq: Add cpufreq driver for Tegra124
+  ARM: tegra: Add entries for cpufreq on Tegra124
+  ARM: tegra: Add CPU regulator to the Jetson TK1 device tree
+  ARM: tegra: enable Tegra124 cpufreq driver by default
+
+ .../bindings/clock/nvidia,tegra124-dfll.txt        |   69 +
+ .../bindings/cpufreq/tegra124-cpufreq.txt          |   44 +
+ arch/arm/boot/dts/tegra124-jetson-tk1.dts          |   12 +-
+ arch/arm/boot/dts/tegra124.dtsi                    |   33 +-
+ arch/arm/configs/tegra_defconfig                   |    1 +
+ arch/arm/mach-tegra/Kconfig                        |    1 +
+ drivers/clk/tegra/Makefile                         |    3 +
+ drivers/clk/tegra/clk-dfll.c                       | 1741 ++++++++++++++++++++
+ drivers/clk/tegra/clk-dfll.h                       |   55 +
+ drivers/clk/tegra/clk-tegra-super-gen4.c           |    4 +-
+ drivers/clk/tegra/clk-tegra124-dfll-fcpu.c         |  165 ++
+ drivers/clk/tegra/clk-tegra124.c                   |   61 +
+ drivers/clk/tegra/clk.h                            |    3 +
+ drivers/clk/tegra/cvb.c                            |  133 ++
+ drivers/clk/tegra/cvb.h                            |   67 +
+ drivers/cpufreq/Kconfig.arm                        |   13 +-
+ drivers/cpufreq/Makefile                           |    3 +-
+ drivers/cpufreq/tegra124-cpufreq.c                 |  215 +++
+ .../cpufreq/{tegra-cpufreq.c => tegra20-cpufreq.c} |    0
+ 19 files changed, 2616 insertions(+), 7 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/clock/nvidia,tegra124-dfll.txt
+ create mode 100644 Documentation/devicetree/bindings/cpufreq/tegra124-cpufreq.txt
+ create mode 100644 drivers/clk/tegra/clk-dfll.c
+ create mode 100644 drivers/clk/tegra/clk-dfll.h
+ create mode 100644 drivers/clk/tegra/clk-tegra124-dfll-fcpu.c
+ create mode 100644 drivers/clk/tegra/cvb.c
+ create mode 100644 drivers/clk/tegra/cvb.h
+ create mode 100644 drivers/cpufreq/tegra124-cpufreq.c
+ rename drivers/cpufreq/{tegra-cpufreq.c => tegra20-cpufreq.c} (100%)
+
+-- 
+1.8.1.5
