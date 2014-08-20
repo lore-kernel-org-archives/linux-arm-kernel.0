@@ -1,126 +1,111 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Wed, 20 Aug 2014 07:36:16 +0200
-Subject: [PATCH v2] ARM: tegra: add Acer Chromebook 13 device tree
-In-Reply-To: <53F3C5FD.4050808@wwwdotorg.org>
-References: <1407957267-3258-1-git-send-email-dgreid@chromium.org>
- <53EF76CF.9050808@suse.de> <53F2255E.7090208@wwwdotorg.org>
- <CAL1qeaH-WfA-DLKwuXA_hBPHYuXksAibLq__zisrT9ALaRGdAw@mail.gmail.com>
- <53F28F90.3000004@wwwdotorg.org>
- <CAL1qeaFnfLDOXq07fY4xLfdRpG8FQ63ya+-0Hk+ewA1wXkLOLw@mail.gmail.com>
- <53F3C5FD.4050808@wwwdotorg.org>
-Message-ID: <20140820053614.GB13793@ulmo>
+From: Bharat.Bhushan@freescale.com (Bharat.Bhushan at freescale.com)
+Date: Wed, 20 Aug 2014 05:44:17 +0000
+Subject: [RFC PATCH 00/11] Refactor MSI to support Non-PCI device
+In-Reply-To: <53DEF80C.1010608@huawei.com>
+References: <1406344128-27055-1-git-send-email-wangyijing@huawei.com>
+ <c6d34fe1bbe9457ea8cff7dcd97902b8@DM2PR03MB317.namprd03.prod.outlook.com>
+ <53DEF80C.1010608@huawei.com>
+Message-ID: <8a2b4e237f2d4c7e95ef72867658b53a@BLUPR03MB566.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 19, 2014 at 03:47:41PM -0600, Stephen Warren wrote:
-> On 08/18/2014 06:11 PM, Andrew Bresticker wrote:
-> >On Mon, Aug 18, 2014 at 4:43 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
-> >>On 08/18/2014 05:24 PM, Andrew Bresticker wrote:
-> >>>
-> >>>On Mon, Aug 18, 2014 at 9:10 AM, Stephen Warren <swarren@wwwdotorg.org>
-> >>>wrote:
-> >>>>
-> >>>>On 08/16/2014 09:20 AM, Andreas F?rber wrote:
-> >>>>>
-> >>>>>
-> >>>>>Hi,
-> >>>>>
-> >>>>>Am 13.08.2014 21:14, schrieb Dylan Reid:
-> >>>>>>
-> >>>>>>
-> >>>>>>The Acer Chromebook 13, codenamed Big, contains an NVIDIA tegra124
-> >>>>>>processor and is similar to the Venice2 reference platform.
-> >>>>>>
-> >>>>>>The keyboard, USB 2, audio, HDMI, sdcard, and emmc have been tested
-> >>>>>>and work on the 1266x768 models.  The HD models haven't yet been
-> >>>>>>tested.
-> >>>>>>
-> >>>>>>WiFi does not work yet, it needs at least some PMIC changes to enable
-> >>>>>>the 32k clock.
-> >>>>>>
-> >>>>>>The elan trackpad is not yet functional but hopefully will be soon as
-> >>>>>>there are patches under review.
-> >>>>>>
-> >>>>>>There is also an issue on reboot because the TPM isn't reset.  It will
-> >>>>>>cause the stock firmware to enter recovery mode.  This can be worked
-> >>>>>>around by an EC-reset, press the refresh and power keys at the same
-> >>>>>>time.
-> >>>>
-> >>>>
-> >>>>
-> >>>>>>diff --git a/arch/arm/boot/dts/tegra124-nyan-big.dts
-> >>>>>>b/arch/arm/boot/dts/tegra124-nyan-big.dts
-> >>>>>>new file mode 100644
-> >>>>>>index 0000000..79f1852
-> >>>>>>--- /dev/null
-> >>>>>>+++ b/arch/arm/boot/dts/tegra124-nyan-big.dts
-> >>>>>>@@ -0,0 +1,1136 @@
-> >>>>>>+/dts-v1/;
-> >>>>>>+
-> >>>>>>+#include <dt-bindings/input/input.h>
-> >>>>>>+#include "tegra124.dtsi"
-> >>>>>>+
-> >>>>>>+/ {
-> >>>>>>+       model = "Acer Chromebook 13";
-> >>>>>>+       compatible = "google,nyan-big", "nvidia,tegra124";
-> >>>>>
-> >>>>>
-> >>>>>
-> >>>>>In light of v1 and the above commit message referring to this as Google
-> >>>>>Big, shouldn't this be "google,big", "nvidia,tegra124" and optionally
-> >>>>>"google,nyan" as secondary string, independent of the new file name?
-> >>>>
-> >>>>
-> >>>>
-> >>>>Despite this board having been derived from Nyan, it isn't Nyan, so I
-> >>>>don't
-> >>>>think Nyan should be part of any compatible value, nor a separate
-> >>>>compatible
-> >>>>value.
-> >>>
-> >>>
-> >>>"google,nyan-big" is the compatible string that the bootloader on
-> >>>these devices looks for.  It's also the convention we are now using
-> >>>for our ARM devices, as Olof has already mentioned.
-> >>
-> >>I don't understand "that the bootloader looks for"; why is the bootloader
-> >>doing anything w.r.t the compatible value in the DT that's passed to the
-> >>kernel.
+Hi Yijing
+
+> -----Original Message-----
+> From: linux-pci-owner at vger.kernel.org [mailto:linux-pci-owner at vger.kernel.org]
+> On Behalf Of Yijing Wang
+> Sent: Monday, August 04, 2014 8:34 AM
+> To: Basu Arnab-B45036
+> Cc: Xinwei Hu; Wuyun; Bjorn Helgaas; linux-pci at vger.kernel.org;
+> Paul.Mundt at huawei.com; James E.J. Bottomley; Marc Zyngier; linux-arm-
+> kernel at lists.infradead.org; Russell King; linux-arch at vger.kernel.org;
+> virtualization at lists.linux-foundation.org; Hanjun Guo; linux-
+> kernel at vger.kernel.org
+> Subject: Re: [RFC PATCH 00/11] Refactor MSI to support Non-PCI device
+> 
+> >> MSI was introduced in PCI Spec 2.2. Currently, kernel MSI driver
+> >> codes are bonding with PCI device. Because MSI has a lot advantages in
+> design.
+> >> More and more non-PCI devices want to use MSI as their default interrupt.
+> >> The existing MSI device include HPET. HPET driver provide its own MSI
+> >> code to initialize and process MSI interrupts. In the latest GIC v3
+> >> spec, legacy device can deliver MSI by the help of a relay device
+> >> named consolidator.
+> >> Consolidator can translate the legacy interrupts connected to it to
+> >> MSI/MSI-X. And new non-PCI device will be designed to support MSI in
+> >> future. So make the MSI driver code be generic will help the non-PCI
+> >> device use MSI more simply.
 > >
-> >The ChromeOS bootloader ("depthcharge") boots FIT images and selects
-> >the appropriate device-tree from the image based on the compatible
-> >string.  On Big boards, it looks for "google,nyan-big".  This only
-> >becomes an issue if there are multiple device-trees in the FIT image.
-> >If there's only a single configuration (or you chain-load U-Boot),
-> >then the bootloader will boot with that configuration.  If you build a
-> >kernel image in the ChromiumOS environment, however, you'll end up
-> >with multiple device-trees (all those built by the kernel config at
-> >least) in the FIT image - this is what allows us to boot the same
-> >binary on different boards.
+> > As per my understanding the GICv3 provides a service that will convert writes
+> to a specified address to IRQs delivered to the core and as you mention above
+> MSIs are part of the PCI spec. So I can see a strong case for non-PCI devices to
+> want MSI like functionality without being fully compliant with the requirements
+> of the MSI spec.
 > 
-> This just makes me dislike FIT (and DT ABIs) even more, although I suppose
-> the same issue would arise if the DTBs were stored in separate files and
-> looked up by filename.
+> In GICv3, MBI is named for the service, but there is no more detailed
+> information about it, only we can know is MBI is analogous to MSI, MBI devices
+> must have address/data registers, but other registers like enable/mask/ctrl are
+> not mandatory requirement.
+> I don't know whether the MBI spec will be release, but anyway I think MSI
+> refactoring is make sense, there are some existing Non-PCI MSI device like hpet,
+> dmar.
+> For simplicity, let name MSI and MBI to MSI temporarily.
+> >
+> > My question is do we necessarily want to rework so much of the PCI-MSI layer
+> to support non PCI devices? Or will it be sufficient to create a framework to
+> allow non PCI devices to hook up with a device that can convert their writes to
+> an IRQ to the core.
+> >
+> > As I understand it, the msi_chip is (almost) such a framework. The only
+> problem being that it makes some PCI specific assumptions (such as PCI specific
+> writes from within msi_chip functions). Won't it be sufficient to make the
+> msi_chip framework generic enough to be used by non-PCI devices and let each
+> bus/device manage any additional requirements (such as configuration flow, bit
+> definitions etc) that it places on message based interrupts?
 > 
-> I have to say this sucks, because it means that a downstream bootloader is
-> imposing an ABI on the mainline kernel without a chance to fix things during
-> upstreaming. For all other boards, we've concentrated on mainline U-Boot as
-> the bootloader precisely so that strange behaviour of our downstream product
-> kernels don't force the hand of the mainline kernel design.
+> msi_chip framework is important to support that, but I think maybe it's not
+> enough, msi_chip is only responsible for IRQ allocation, teardown, etc..
 > 
-> Still, I suppose I have no choice but to drop my objection here.
+> The key difference between PCI device and Non-PCI MSI is the interfaces to
+> access hardware MSI registers.
+> for instance, currently, msi_chip->setup_irq() to setup MSI irq and configure
+> the MSI address/data registers, so we need to provide device specific
+> write_msi_msg() interface, then when we call msi_chip->setup_irq(), the device
+> MSI registers can be configured appropriately.
 
-Do you? We reject things all the time if they're considered not good
-enough during upstreaming. The whole DT ABI debate in fact explicitly
-resulted in the decision not to take any of the downstream components
-into consideration when upstreaming. ABI stability only counts for
-things that we've supported in one of the final releases.
+What if we can register/override the setup_irq() from bus-driver (not sure, but may be device-driver itself). Example PCI bus-driver will provide setup_irq() (or the part of setup_irq which set address and data in h/w) by PCI bus, which configure address/data in h/w as per PCI standard. 
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140820/c073fc53/attachment-0001.sig>
+We in Freescale will be using MSI for the devices behind a new-bus (which is not PCI based), We have a separate bus driver for same. And this new bus driver register/provide its own address/data write function which is based on that specific bus protocol.
+
+Thanks
+-Bharat
+
+> 
+> My patchset is just a RFC draft, I will update it later, all we want to do is
+> make kernel support Non-PCI MSI devices.
+> 
+> Thanks!
+> Yijing.
+> 
+> 
+> >
+> > Thanks
+> > Arnab
+> > --
+> > To unsubscribe from this list: send the line "unsubscribe
+> > linux-kernel" in the body of a message to majordomo at vger.kernel.org
+> > More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> > Please read the FAQ at  http://www.tux.org/lkml/
+> >
+> > .
+> >
+> 
+> 
+> --
+> Thanks!
+> Yijing
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-pci" in the body
+> of a message to majordomo at vger.kernel.org More majordomo info at
+> http://vger.kernel.org/majordomo-info.html
