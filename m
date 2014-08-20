@@ -1,115 +1,207 @@
 From: dianders@chromium.org (Doug Anderson)
-Date: Wed, 20 Aug 2014 11:54:01 -0700
-Subject: [PATCH v4 3/4] ARM: dts: Add main PWM info to rk3288
+Date: Wed, 20 Aug 2014 11:53:59 -0700
+Subject: [PATCH v4 1/4] pwm: rockchip: Allow polarity invert on rk3288
 In-Reply-To: <1408560842-3746-1-git-send-email-dianders@chromium.org>
 References: <1408560842-3746-1-git-send-email-dianders@chromium.org>
-Message-ID: <1408560842-3746-4-git-send-email-dianders@chromium.org>
+Message-ID: <1408560842-3746-2-git-send-email-dianders@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds the PWM info (other than the VOP PWM) to the main rk3288
-dtsi file.
+The rk3288 has the ability to invert the polarity of the PWM.  Let's
+enable that ability.  Note that this increases pwm_cells to 3 for
+rk3288.
 
-Signed-off-by: Caesar Wang <caesar.wang@rock-chips.com>
 Signed-off-by: Doug Anderson <dianders@chromium.org>
 ---
 Changes in v4:
-- Add rockchip,grf to pwm nodes.
+- Updated comment not to add caveats about pwm_cells 3.
+- rockchip_pwm_set_polarity() is now static.
+- Separate pwm_ops for v1 and v2; no set_polarity() in v1.
+- Added a blank line.
 
-Changes in v3: None
+Changes in v3:
+- Don't store a private copy of polarity.
+- Use true instead of 1.
+- Cleanup init order with "has_invert".
+
 Changes in v2: None
 
- arch/arm/boot/dts/rk3288.dtsi | 72 +++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 72 insertions(+)
+ .../devicetree/bindings/pwm/pwm-rockchip.txt       |  4 +-
+ drivers/pwm/pwm-rockchip.c                         | 57 ++++++++++++++++++----
+ 2 files changed, 50 insertions(+), 11 deletions(-)
 
-diff --git a/arch/arm/boot/dts/rk3288.dtsi b/arch/arm/boot/dts/rk3288.dtsi
-index 36be7bb..9074205 100644
---- a/arch/arm/boot/dts/rk3288.dtsi
-+++ b/arch/arm/boot/dts/rk3288.dtsi
-@@ -261,6 +261,54 @@
- 		status = "disabled";
- 	};
+diff --git a/Documentation/devicetree/bindings/pwm/pwm-rockchip.txt b/Documentation/devicetree/bindings/pwm/pwm-rockchip.txt
+index d47d15a..b8be3d0 100644
+--- a/Documentation/devicetree/bindings/pwm/pwm-rockchip.txt
++++ b/Documentation/devicetree/bindings/pwm/pwm-rockchip.txt
+@@ -7,8 +7,8 @@ Required properties:
+    "rockchip,vop-pwm": found integrated in VOP on RK3288 SoC
+  - reg: physical base address and length of the controller's registers
+  - clocks: phandle and clock specifier of the PWM reference clock
+- - #pwm-cells: should be 2. See pwm.txt in this directory for a
+-   description of the cell format.
++ - #pwm-cells: must be 2 (rk2928) or 3 (rk3288). See pwm.txt in this directory
++   for a description of the cell format.
  
-+	pwm0: pwm at ff680000 {
-+		compatible = "rockchip,rk3288-pwm";
-+		reg = <0xff680000 0x10>;
-+		#pwm-cells = <3>;
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pwm0_pin>;
-+		clocks = <&cru PCLK_PWM>;
-+		clock-names = "pwm";
-+		rockchip,grf = <&grf>;
-+		status = "disabled";
-+	};
-+
-+	pwm1: pwm at ff680010 {
-+		compatible = "rockchip,rk3288-pwm";
-+		reg = <0xff680010 0x10>;
-+		#pwm-cells = <3>;
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pwm1_pin>;
-+		clocks = <&cru PCLK_PWM>;
-+		clock-names = "pwm";
-+		rockchip,grf = <&grf>;
-+		status = "disabled";
-+	};
-+
-+	pwm2: pwm at ff680020 {
-+		compatible = "rockchip,rk3288-pwm";
-+		reg = <0xff680020 0x10>;
-+		#pwm-cells = <3>;
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pwm2_pin>;
-+		clocks = <&cru PCLK_PWM>;
-+		clock-names = "pwm";
-+		rockchip,grf = <&grf>;
-+		status = "disabled";
-+	};
-+
-+	pwm3: pwm at ff680030 {
-+		compatible = "rockchip,rk3288-pwm";
-+		reg = <0xff680030 0x10>;
-+		#pwm-cells = <2>;
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pwm3_pin>;
-+		clocks = <&cru PCLK_PWM>;
-+		clock-names = "pwm";
-+		rockchip,grf = <&grf>;
-+		status = "disabled";
-+	};
-+
- 	pmu: power-management at ff730000 {
- 		compatible = "rockchip,rk3288-pmu", "syscon";
- 		reg = <0xff730000 0x100>;
-@@ -611,5 +659,29 @@
- 				rockchip,pins = <5 15 3 &pcfg_pull_none>;
- 			};
- 		};
-+
-+		pwm0 {
-+			pwm0_pin: pwm0-pin {
-+				rockchip,pins = <7 0 RK_FUNC_1 &pcfg_pull_none>;
-+			};
-+		};
-+
-+		pwm1 {
-+			pwm1_pin: pwm1-pin {
-+				rockchip,pins = <7 1 RK_FUNC_1 &pcfg_pull_none>;
-+			};
-+		};
-+
-+		pwm2 {
-+			pwm2_pin: pwm2-pin {
-+				rockchip,pins = <7 22 RK_FUNC_3 &pcfg_pull_none>;
-+			};
-+		};
-+
-+		pwm3 {
-+			pwm3_pin: pwm3-pin {
-+				rockchip,pins = <7 23 RK_FUNC_3 &pcfg_pull_none>;
-+			};
-+		};
- 	};
+ Example:
+ 
+diff --git a/drivers/pwm/pwm-rockchip.c b/drivers/pwm/pwm-rockchip.c
+index bdd8644..9442df2 100644
+--- a/drivers/pwm/pwm-rockchip.c
++++ b/drivers/pwm/pwm-rockchip.c
+@@ -24,7 +24,9 @@
+ #define PWM_ENABLE		(1 << 0)
+ #define PWM_CONTINUOUS		(1 << 1)
+ #define PWM_DUTY_POSITIVE	(1 << 3)
++#define PWM_DUTY_NEGATIVE	(0 << 3)
+ #define PWM_INACTIVE_NEGATIVE	(0 << 4)
++#define PWM_INACTIVE_POSITIVE	(1 << 4)
+ #define PWM_OUTPUT_LEFT		(0 << 5)
+ #define PWM_LP_DISABLE		(0 << 8)
+ 
+@@ -45,8 +47,10 @@ struct rockchip_pwm_regs {
+ struct rockchip_pwm_data {
+ 	struct rockchip_pwm_regs regs;
+ 	unsigned int prescaler;
++	const struct pwm_ops *ops;
+ 
+-	void (*set_enable)(struct pwm_chip *chip, bool enable);
++	void (*set_enable)(struct pwm_chip *chip,
++			   struct pwm_device *pwm, bool enable);
  };
+ 
+ static inline struct rockchip_pwm_chip *to_rockchip_pwm_chip(struct pwm_chip *c)
+@@ -54,7 +58,8 @@ static inline struct rockchip_pwm_chip *to_rockchip_pwm_chip(struct pwm_chip *c)
+ 	return container_of(c, struct rockchip_pwm_chip, chip);
+ }
+ 
+-static void rockchip_pwm_set_enable_v1(struct pwm_chip *chip, bool enable)
++static void rockchip_pwm_set_enable_v1(struct pwm_chip *chip,
++				       struct pwm_device *pwm, bool enable)
+ {
+ 	struct rockchip_pwm_chip *pc = to_rockchip_pwm_chip(chip);
+ 	u32 enable_conf = PWM_CTRL_OUTPUT_EN | PWM_CTRL_TIMER_EN;
+@@ -70,14 +75,19 @@ static void rockchip_pwm_set_enable_v1(struct pwm_chip *chip, bool enable)
+ 	writel_relaxed(val, pc->base + pc->data->regs.ctrl);
+ }
+ 
+-static void rockchip_pwm_set_enable_v2(struct pwm_chip *chip, bool enable)
++static void rockchip_pwm_set_enable_v2(struct pwm_chip *chip,
++				       struct pwm_device *pwm, bool enable)
+ {
+ 	struct rockchip_pwm_chip *pc = to_rockchip_pwm_chip(chip);
+ 	u32 enable_conf = PWM_OUTPUT_LEFT | PWM_LP_DISABLE | PWM_ENABLE |
+-			  PWM_CONTINUOUS | PWM_DUTY_POSITIVE |
+-			  PWM_INACTIVE_NEGATIVE;
++			  PWM_CONTINUOUS;
+ 	u32 val;
+ 
++	if (pwm->polarity == PWM_POLARITY_INVERSED)
++		enable_conf |= PWM_DUTY_NEGATIVE | PWM_INACTIVE_POSITIVE;
++	else
++		enable_conf |= PWM_DUTY_POSITIVE | PWM_INACTIVE_NEGATIVE;
++
+ 	val = readl_relaxed(pc->base + pc->data->regs.ctrl);
+ 
+ 	if (enable)
+@@ -124,6 +134,19 @@ static int rockchip_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm,
+ 	return 0;
+ }
+ 
++static int rockchip_pwm_set_polarity(struct pwm_chip *chip,
++				     struct pwm_device *pwm,
++				     enum pwm_polarity polarity)
++{
++	/*
++	 * No action needed here because pwm->polarity will be set by the core
++	 * and the core will only change polarity when the PWM is not enabled.
++	 * We'll handle things in set_enable().
++	 */
++
++	return 0;
++}
++
+ static int rockchip_pwm_enable(struct pwm_chip *chip, struct pwm_device *pwm)
+ {
+ 	struct rockchip_pwm_chip *pc = to_rockchip_pwm_chip(chip);
+@@ -133,7 +156,7 @@ static int rockchip_pwm_enable(struct pwm_chip *chip, struct pwm_device *pwm)
+ 	if (ret)
+ 		return ret;
+ 
+-	pc->data->set_enable(chip, true);
++	pc->data->set_enable(chip, pwm, true);
+ 
+ 	return 0;
+ }
+@@ -142,18 +165,26 @@ static void rockchip_pwm_disable(struct pwm_chip *chip, struct pwm_device *pwm)
+ {
+ 	struct rockchip_pwm_chip *pc = to_rockchip_pwm_chip(chip);
+ 
+-	pc->data->set_enable(chip, false);
++	pc->data->set_enable(chip, pwm, false);
+ 
+ 	clk_disable(pc->clk);
+ }
+ 
+-static const struct pwm_ops rockchip_pwm_ops = {
++static const struct pwm_ops rockchip_pwm_ops_v1 = {
+ 	.config = rockchip_pwm_config,
+ 	.enable = rockchip_pwm_enable,
+ 	.disable = rockchip_pwm_disable,
+ 	.owner = THIS_MODULE,
+ };
+ 
++static const struct pwm_ops rockchip_pwm_ops_v2 = {
++	.config = rockchip_pwm_config,
++	.set_polarity = rockchip_pwm_set_polarity,
++	.enable = rockchip_pwm_enable,
++	.disable = rockchip_pwm_disable,
++	.owner = THIS_MODULE,
++};
++
+ static const struct rockchip_pwm_data pwm_data_v1 = {
+ 	.regs = {
+ 		.duty = 0x04,
+@@ -162,6 +193,7 @@ static const struct rockchip_pwm_data pwm_data_v1 = {
+ 		.ctrl = 0x0c,
+ 	},
+ 	.prescaler = 2,
++	.ops = &rockchip_pwm_ops_v1,
+ 	.set_enable = rockchip_pwm_set_enable_v1,
+ };
+ 
+@@ -173,6 +205,7 @@ static const struct rockchip_pwm_data pwm_data_v2 = {
+ 		.ctrl = 0x0c,
+ 	},
+ 	.prescaler = 1,
++	.ops = &rockchip_pwm_ops_v2,
+ 	.set_enable = rockchip_pwm_set_enable_v2,
+ };
+ 
+@@ -184,6 +217,7 @@ static const struct rockchip_pwm_data pwm_data_vop = {
+ 		.ctrl = 0x00,
+ 	},
+ 	.prescaler = 1,
++	.ops = &rockchip_pwm_ops_v2,
+ 	.set_enable = rockchip_pwm_set_enable_v2,
+ };
+ 
+@@ -227,10 +261,15 @@ static int rockchip_pwm_probe(struct platform_device *pdev)
+ 
+ 	pc->data = id->data;
+ 	pc->chip.dev = &pdev->dev;
+-	pc->chip.ops = &rockchip_pwm_ops;
++	pc->chip.ops = pc->data->ops;
+ 	pc->chip.base = -1;
+ 	pc->chip.npwm = 1;
+ 
++	if (pc->data->ops->set_polarity) {
++		pc->chip.of_xlate = of_pwm_xlate_with_flags;
++		pc->chip.of_pwm_n_cells = 3;
++	}
++
+ 	ret = pwmchip_add(&pc->chip);
+ 	if (ret < 0) {
+ 		clk_unprepare(pc->clk);
 -- 
 2.1.0.rc2.206.gedb03e5
