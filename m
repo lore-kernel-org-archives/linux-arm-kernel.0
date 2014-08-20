@@ -1,39 +1,38 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Wed, 20 Aug 2014 16:32:02 +0200
-Subject: [PATCH v2] ARM: tegra: add Acer Chromebook 13 device tree
-In-Reply-To: <CAOesGMhBdQh_ddycZ-Y5dupR9hW74bogHtG3yyPUJ2tAgWi19A@mail.gmail.com>
-References: <1407957267-3258-1-git-send-email-dgreid@chromium.org>
- <53EF76CF.9050808@suse.de> <53F2255E.7090208@wwwdotorg.org>
- <CAL1qeaH-WfA-DLKwuXA_hBPHYuXksAibLq__zisrT9ALaRGdAw@mail.gmail.com>
- <53F28F90.3000004@wwwdotorg.org>
- <CAOesGMhBdQh_ddycZ-Y5dupR9hW74bogHtG3yyPUJ2tAgWi19A@mail.gmail.com>
-Message-ID: <20140820143201.GA3368@ulmo>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 20 Aug 2014 15:38:17 +0100
+Subject: [PATCH v2 06/18] ARM64 / ACPI: Parse MADT to map logical cpu to
+ MPIDR and get cpu_possible/present_map
+In-Reply-To: <53F2FE8E.60307@linaro.org>
+References: <1407166105-17675-1-git-send-email-hanjun.guo@linaro.org>
+ <1407166105-17675-7-git-send-email-hanjun.guo@linaro.org>
+ <20140818142728.GS20043@localhost> <53F2FE8E.60307@linaro.org>
+Message-ID: <20140820143817.GN24600@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 20, 2014 at 06:29:14AM -0700, Olof Johansson wrote:
-> On Mon, Aug 18, 2014 at 4:43 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
-[...]
-> > Again, this board *isn't* Nyan, so it should pretend that it is.
+On Tue, Aug 19, 2014 at 08:36:46AM +0100, Hanjun Guo wrote:
+> On 2014-8-18 22:27, Catalin Marinas wrote:
+> > On Mon, Aug 04, 2014 at 04:28:13PM +0100, Hanjun Guo wrote:
+> >> diff --git a/arch/arm64/include/asm/acpi.h b/arch/arm64/include/asm/acpi.h
+> >> index 6e04868..e877967 100644
+> >> --- a/arch/arm64/include/asm/acpi.h
+> >> +++ b/arch/arm64/include/asm/acpi.h
+> >> @@ -64,6 +64,8 @@ static inline void arch_fix_phys_package_id(int num, u32 slot) { }
+> >>  extern int (*acpi_suspend_lowlevel)(void);
+> >>  #define acpi_wakeup_address 0
+> >>  
+> >> +#define MAX_GIC_CPU_INTERFACE 65535
+> > 
+> > Does this need to be more than NR_CPUS?
 > 
-> It is a derivative design of the nyan reference platform, and it is
-> compatible with it. It is perfectly fine to claim to be compatible
-> with it. I'm sorry, but you're just wrong here.
+> Sometimes yes, CPU structure entries in MADT just like CPU nodes in
+> device tree, the number of them may more than NR_CPUS.
 
-I guess that depends a little on how you define compatibility. I had
-always assumed that the top-level compatible string would be a sort of
-"checksum" over the rest of the content. Which, admittedly, makes it
-kind of redundant. Compatibility could mean a lot of things. Does it
-mean any kernel/DTB compatible with one device could run on any device
-derived from it? Does compatibility mean it needs to provide full
-functionality or is it still compatible if it runs at a reduced feature
-set but doesn't "break" otherwise?
+I have a more general question here. In ACPI, is MADT the only way to
+build a CPU topology? It looks weird that we use GIC properties to
+create the cpu_logical_map(). A side-effect is that the GIC-related
+functions are now scattered all over the kernel rather than being
+contained in the GIC driver itself.
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140820/882f6571/attachment.sig>
+-- 
+Catalin
