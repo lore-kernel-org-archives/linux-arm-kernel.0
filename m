@@ -1,46 +1,71 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 20 Aug 2014 13:30:30 +0100
-Subject: [PATCH] mfd: twl4030-power: Fix PM idle pin configuration to not
- conflict with regulators
-In-Reply-To: <20140819152405.GA12002@atomide.com>
-References: <20140819152405.GA12002@atomide.com>
-Message-ID: <20140820123030.GL4266@lee--X1>
+From: liviu@dudau.co.uk (Liviu Dudau)
+Date: Wed, 20 Aug 2014 13:31:12 +0100
+Subject: [PATCH] drivers: pci: convert generic host controller to DT host
+ bridge creation API
+In-Reply-To: <201408201327.57376.arnd@arndb.de>
+References: <1407861695-25549-1-git-send-email-Liviu.Dudau@arm.com>
+ <201408201327.57376.arnd@arndb.de>
+Message-ID: <20140820123112.GG13147@bart.dudau.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 19 Aug 2014, Tony Lindgren wrote:
+On Wed, Aug 20, 2014 at 01:27:57PM +0200, Arnd Bergmann wrote:
+> On Tuesday 12 August 2014, Liviu Dudau wrote:
+> > +       return of_create_pci_host_bridge(dev, 0, 0xff, &gen_pci_ops,
+> > +                                       gen_pci_setup, pci);
+> 
+> I had not noticed it earlier, but the setup callback is actually a feature
+> of the arm32 PCI code that I had hoped to avoid when moving to the
+> generic API. Can we do this as a more regular sequence of
+> 
+> 
+> 	ret = of_create_pci_host_bridge(dev, 0, 0xff, &gen_pci_ops, pci);
+> 	if (ret)
+> 		return ret;
+> 
+> 	ret = gen_pci_setup(pci);
+> 	if (ret)
+> 		pci_destroy_host_bridge(dev, pci);
+> 	return ret;
+> 
+> ?
+> 
+> 	Arnd
 
-> Commit 43fef47f94a1 (mfd: twl4030-power: Add a configuration to turn
-> off oscillator during off-idle) added support for configuring the PMIC
-> to cut off resources during deeper idle states to save power.
-> 
-> This however caused regression for n900 display power that needed the
-> PMIC configuration to be disabled with commit d937678ab625 (ARM: dts:
-> Revert enabling of twl configuration for n900).
-> 
-> Turns out the root cause of the problem is that we must use
-> TWL4030_RESCONFIG_UNDEF instead of DEV_GRP_NULL to avoid disabling
-> regulators that may have been enabled before the init function
-> for twl4030-power.c runs. With TWL4030_RESCONFIG_UNDEF we let the
-> regulator framework control the regulators like it should. Here we
-> need to only configure the sys_clken and sys_off_mode triggers for
-> the regulators that cannot be done by the regulator framework as
-> it's not running at that point.
-> 
-> This allows us to enable the PMIC configuration for n900.
-> 
-> Fixes: 43fef47f94a1 (mfd: twl4030-power: Add a configuration to turn off oscillator during off-idle)
-> Cc: stable at vger.kernel.org # v3.16
-> Signed-off-by: Tony Lindgren <tony@atomide.com>
-> 
-> ---
-> 
-> Lee, can you please pick this one for the v3.17-rc series?
+Hi Arnd,
 
-Applied with Aaro's Tested-by.
+That has been the general approach of my patchset up to v9. But, as Bjorn has
+mentioned in his v8 review and I have put in my cover letter, the regular
+aproach means that architectures that use pci_scan_root_bus() will have to
+drop their one liner and replace it with the more verbose of_create_pci_host_bridge()
+followed by pci_scan_child_bus() and pci_bus_add_devices() (basically, the content
+of pci_scan_root_bus()). For those architectures it will lead to a net increase of
+lines of code.
+
+The patch for pci-host-generic.c is the first to use the callback setup function, but
+not the only one. My PCI host bridge driver for Juno has the same need, and I'm betting
+all other host bridge controllers will use it as it will be the only opportunity to
+finish the controller setup before we start scanning the child busses. I'm trying to
+balance ease of read vs ease of use here and it is the best version I've come up with
+so far.
+
+Best regards,
+Liviu
+
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
 
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+-------------------
+   .oooO
+   (   )
+    \ (  Oooo.
+     \_) (   )
+          ) /
+         (_/
+
+ One small step
+   for me ...
