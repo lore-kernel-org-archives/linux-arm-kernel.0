@@ -1,234 +1,62 @@
-From: mathieu.poirier@linaro.org (mathieu.poirier at linaro.org)
-Date: Wed, 20 Aug 2014 11:11:38 -0600
-Subject: [PATCH v4] coresight: bindings for coresight drivers
-Message-ID: <1408554698-24459-1-git-send-email-mathieu.poirier@linaro.org>
+From: abrestic@chromium.org (Andrew Bresticker)
+Date: Wed, 20 Aug 2014 10:25:34 -0700
+Subject: [PATCH v2] ARM: tegra: add Acer Chromebook 13 device tree
+In-Reply-To: <20140820152507.GA3427@ulmo>
+References: <1407957267-3258-1-git-send-email-dgreid@chromium.org>
+ <53EF76CF.9050808@suse.de> <53F2255E.7090208@wwwdotorg.org>
+ <CAL1qeaH-WfA-DLKwuXA_hBPHYuXksAibLq__zisrT9ALaRGdAw@mail.gmail.com>
+ <53F28F90.3000004@wwwdotorg.org>
+ <CAL1qeaFnfLDOXq07fY4xLfdRpG8FQ63ya+-0Hk+ewA1wXkLOLw@mail.gmail.com>
+ <53F3C5FD.4050808@wwwdotorg.org>
+ <CAOesGMhDe0zFYkUWqBOTunK76wccdKOQ8b+EFAzeTr+oOUQyWA@mail.gmail.com>
+ <20140820152507.GA3427@ulmo>
+Message-ID: <CAL1qeaFvpnu=4ShKp1i1pm6XGjjnquE3jheXZBqdS7OSXFEBNQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Pratik Patel <pratikp@codeaurora.org>
+> It's been a long time since I've used FIT, but I seem to remember that
+> it was simply a device tree-based description of a file format. As such
+> couldn't you add an additional property to the configuration entry that
+> the bootloader could match on? That would avoid the need to parse an
+> embedded device tree and it might be useful to keep variants for the
+> same board in the same FIT image.
 
-Coresight IP blocks allow for the support of HW assisted tracing
-on ARM SoCs.  Bindings for the currently available blocks are
-presented herein.
+Yes, I suppose something like that would be possible, however it's not
+just depthcharge that matches to configurations based on the
+compatible string within the configuration's FDT blob, this is the
+convention U-Boot uses as well when booting FIT images.
 
-Signed-off-by: Pratik Patel <pratikp@codeaurora.org>
-Signed-off-by: Panchaxari Prasannamurthy <panchaxari.prasannamurthy@linaro.org>
-Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
----
- .../devicetree/bindings/arm/coresight.txt          | 205 +++++++++++++++++++++
- 1 file changed, 205 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/arm/coresight.txt
+> Perhaps you can explain a little more what the use-cases are. For
+> example how are people suppose to run an upstream kernel on one of these
+> Chromebooks?
 
-diff --git a/Documentation/devicetree/bindings/arm/coresight.txt b/Documentation/devicetree/bindings/arm/coresight.txt
-new file mode 100644
-index 0000000..2ee594d
---- /dev/null
-+++ b/Documentation/devicetree/bindings/arm/coresight.txt
-@@ -0,0 +1,205 @@
-+* CoreSight Components
-+
-+CoreSight components are compliant with the ARM CoreSight architecture
-+specification and can be connected in various topologies to suit a particular
-+SoCs tracing needs. These trace components can generally be classified as sinks,
-+links and sources. Trace data produced by one or more sources flows through the
-+intermediate links connecting the source to the currently selected sink. Each
-+CoreSight component device should use these properties to describe its hardware
-+characteristcs.
-+
-+Required properties for all components *except* non-configurable replicators:
-+
-+- compatible : name of the component used for driver matching.  Possible values
-+include: "arm,coresight-etb10", "arm,coresight-tpiu", "arm,coresight-tmc",
-+"arm,coresight-funnel", and "arm,coresight-etm3x".  All of these have to
-+be supplemented with "arm,primecell" as drivers are using the AMBA bus
-+interface.  Since non-configurable replicators don't show up on the AMBA
-+bus they don't need to be post-fixed with "arm,primecell".
-+
-+- reg : physical base address and length of the register set(s) of the component.
-+
-+- clocks : the clock associated to this component.
-+
-+- clock-names: the name of the clock as referenced by the code.  Since we are
-+using the AMBA framework, the name should be "apb_pclk".
-+
-+- ports or port: The representation of the component's port layout using the
-+generic DT graph presentation found in "bindings/graph.txt".
-+
-+Non-configurable replicators:
-+
-+- compatible: currently supported value is "arm-replicator".  Since non-configurable
-+replicators don't show up on the AMBA hey don't need to be post-fixed with
-+"arm,primecell".
-+
-+- id: a unique number that will identify this replicator.
-+
-+- ports or port: same as above.
-+
-+Optional properties for Sinks:
-+
-+- coresight-default-sink: must be specified for one of the sink devices that is
-+intended to be made the default sink. Other sink devices must not have this
-+specified. Not specifying this property on any of the sinks is invalid.
-+
-+Optional properties for ETM/PTMs:
-+
-+- arm,cp14: must be present if the system accesses ETM/PTM management registers
-+via co-processor 14.
-+
-+- arm,cp14: access to ETM/PTM management registers is made via cp14.
-+
-+- cpu: the cpu phandle this ETM/PTM is affined to. When omitted the source is
-+considered to belong to CPU0.
-+
-+Optional property for TMC:
-+
-+- arm,buffer-size: size of contiguous buffer space for TMC ETR (embedded trace router)
-+
-+
-+Example:
-+
-+1. Sinks
-+	etb: etb at 20010000 {
-+		compatible = "arm,coresight-etb10", "arm,primecell";
-+		reg = <0 0x20010000 0 0x1000>;
-+
-+		coresight-default-sink;
-+		clocks = <&oscclk6a>;
-+		clock-names = "apb_pclk";
-+		port {
-+			etb_in_port: endpoint at 0 {
-+				slave-mode;
-+				remote-endpoint = <&replicator_out_port0>;
-+			};
-+		};
-+	};
-+
-+	tpiu: tpiu at 20030000 {
-+		compatible = "arm,coresight-tpiu", "arm,primecell";
-+		reg = <0 0x20030000 0 0x1000>;
-+
-+		clocks = <&oscclk6a>;
-+		clock-names = "apb_pclk";
-+		port {
-+			tpiu_in_port: endpoint at 0 {
-+				slave-mode;
-+				remote-endpoint = <&replicator_out_port1>;
-+			};
-+		};
-+	};
-+
-+2. Links
-+	replicator {
-+		/* non-configurable replicators don't show up on the
-+		 * AMBA bus.  As such no need to add "arm,primecell".
-+		 */
-+		compatible = "arm,coresight-replicator";
-+		/* this will show up in debugfs as "0.replicator" */
-+		id = <0>;
-+
-+		ports {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+
-+			/* replicator output ports */
-+			port at 0 {
-+				reg = <0>;
-+				replicator_out_port0: endpoint {
-+					remote-endpoint = <&etb_in_port>;
-+				};
-+			};
-+
-+			port at 1 {
-+				reg = <1>;
-+				replicator_out_port1: endpoint {
-+					remote-endpoint = <&tpiu_in_port>;
-+				};
-+			};
-+
-+			/* replicator input port */
-+			port at 2 {
-+				reg = <0>;
-+				replicator_in_port0: endpoint {
-+					slave-mode;
-+					remote-endpoint = <&funnel_out_port0>;
-+				};
-+			};
-+		};
-+	};
-+
-+	funnel at 20040000 {
-+		compatible = "arm,coresight-funnel", "arm,primecell";
-+		reg = <0 0x20040000 0 0x1000>;
-+
-+		clocks = <&oscclk6a>;
-+		clock-names = "apb_pclk";
-+		ports {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+
-+			/* funnel output port */
-+			port at 0 {
-+				reg = <0>;
-+				funnel_out_port0: endpoint {
-+					remote-endpoint = <&replicator_in_port0>;
-+				};
-+			};
-+
-+			/* funnel input ports */
-+			port at 1 {
-+				reg = <0>;
-+				funnel_in_port0: endpoint {
-+					slave-mode;
-+					remote-endpoint = <&ptm0_out_port>;
-+				};
-+			};
-+
-+			port at 2 {
-+				reg = <1>;
-+				funnel_in_port1: endpoint {
-+					slave-mode;
-+					remote-endpoint = <&ptm1_out_port>;
-+				};
-+			};
-+
-+			port at 3 {
-+				reg = <2>;
-+				funnel_in_port2: endpoint {
-+					slave-mode;
-+					remote-endpoint = <&etm0_out_port>;
-+				};
-+			};
-+
-+		};
-+	};
-+
-+3. Sources
-+	ptm0: ptm at 2201c000 {
-+		compatible = "arm,coresight-etm3x", "arm,primecell";
-+		reg = <0 0x2201c000 0 0x1000>;
-+
-+		cpu = <&cpu0>;
-+		clocks = <&oscclk6a>;
-+		clock-names = "apb_pclk";
-+		port {
-+			ptm0_out_port: endpoint {
-+				remote-endpoint = <&funnel_in_port0>;
-+			};
-+		};
-+	};
-+
-+	ptm1: ptm at 2201d000 {
-+		compatible = "arm,coresight-etm3x", "arm,primecell";
-+		reg = <0 0x2201d000 0 0x1000>;
-+
-+		cpu = <&cpu1>;
-+		clocks = <&oscclk6a>;
-+		clock-names = "apb_pclk";
-+		port {
-+			ptm1_out_port: endpoint {
-+				remote-endpoint = <&funnel_in_port1>;
-+			};
-+		};
-+	};
--- 
-1.9.1
+There are a few ways you could run an upstream kernel:
+
+1) Building your own verified-boot-wrapped FIT image and replacing the
+existing one using tools found in the ChromiumOS tree [0].  This is
+the workflow must of our developers use when working on product
+kernels, but could just as easily be done with an upstream kernel.
+
+2) Using U-Boot, either through the built-in legacy mode payload
+(Ctrl-L at the developer screen) or by replacing the vboot-wrapped FIT
+image with one that has U-Boot as a payload rather than a kernel [1].
+
+3) If you're willing to flash your own firmware to the device, you can
+build netboot-enabled firmware form the ChromiumOS tree that will load
+a FIT image over the network.  This is the most flexible, as it
+doesn't require the root device to be partitioned in any particular
+way and allows you to boot non-ChromeOS distributions (e.g. Ubuntu).
+This is what Dylan and I usually do when working on upstream kernels.
+
+> How does dual-booting work?
+
+You could dual-boot with the legacy-mode U-Boot, described above.
+
+> Does the user get a menu to choose a configuration they want to boot if
+> multiple entries are compatible with the detected board?
+
+IIRC depthcharge will just pick the first one if there are multiple
+exact matches.
+
+[0] http://www.chromium.org/chromium-os/how-tos-and-troubleshooting/kernel-faq#TOC-How-to-quickly-test-kernel-modifications-the-fast-way-
+[1] http://www.chromium.org/chromium-os/u-boot-porting-guide/using-nv-u-boot-on-the-samsung-arm-chromebook#TOC-Installing-nv-U-Boot-chained-U-Boot-method-
