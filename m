@@ -1,104 +1,82 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Wed, 20 Aug 2014 08:26:49 +0200
-Subject: [PATCH] mfd: max77686: make interrupts support optional
-Message-ID: <1408516009-22106-1-git-send-email-m.szyprowski@samsung.com>
+From: wangyijing@huawei.com (Yijing Wang)
+Date: Wed, 20 Aug 2014 14:28:50 +0800
+Subject: [RFC PATCH 00/11] Refactor MSI to support Non-PCI device
+In-Reply-To: <8a2b4e237f2d4c7e95ef72867658b53a@BLUPR03MB566.namprd03.prod.outlook.com>
+References: <1406344128-27055-1-git-send-email-wangyijing@huawei.com>
+ <c6d34fe1bbe9457ea8cff7dcd97902b8@DM2PR03MB317.namprd03.prod.outlook.com>
+ <53DEF80C.1010608@huawei.com>
+ <8a2b4e237f2d4c7e95ef72867658b53a@BLUPR03MB566.namprd03.prod.outlook.com>
+Message-ID: <53F44022.6030706@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 6f1c1e71d93 ("mfd: max77686: Convert to use regmap_irq") broke
-support for boards, which provide no irq for MAX 77686 PMIC. In such
-case, not all functions of PMIC are available, but the driver still
-should at least handle voltage regulators instead of failing to init.
-This patch restores previous behavior.
+>> The key difference between PCI device and Non-PCI MSI is the interfaces to
+>> access hardware MSI registers.
+>> for instance, currently, msi_chip->setup_irq() to setup MSI irq and configure
+>> the MSI address/data registers, so we need to provide device specific
+>> write_msi_msg() interface, then when we call msi_chip->setup_irq(), the device
+>> MSI registers can be configured appropriately.
+> 
+> What if we can register/override the setup_irq() from bus-driver (not sure, but may be device-driver itself). Example PCI bus-driver will provide setup_irq() (or the part of setup_irq which set address and data in h/w) by PCI bus, which configure address/data in h/w as per PCI standard. 
+> 
+> We in Freescale will be using MSI for the devices behind a new-bus (which is not PCI based), We have a separate bus driver for same. And this new bus driver register/provide its own address/data write function which is based on that specific bus protocol.
 
-Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
----
-Hello,
+Hi Bharat, I'm glad to know your MSI device working mode.
+Provide the private MSI setup functions in bus-driver layer can't apply to all Non-PCI MSI devices,
+because we can not guarantee Non-PCI MSI devices are always on a bus. The existing HPET, DMAR device both
+have no bus bind. I'm working on a new MSI setup framework, as you mentioned before, in device-driver model.
 
-This patch fixes booting issues with recently merged support for
-Exynos4412 based Odroid X2/U3 boards. See
-http://www.spinics.net/lists/linux-samsung-soc/msg35773.html
-thread for more details.
+I abstracted a new virtual device (called struct msi_dev), this msi_dev will manage all MSI info, and a new bus
+named msi_bus, also introduced a new driver msi_driver, msi_bus is responsible for binding msi_dev and msi_driver.
+All MSI devices will be classified into different MSI device types, like MSI_TYPE_PCI, MSI_TYPE_HPET, MSI_TYPE_DMAR, etc..
 
-Best regards
-Marek Szyprowski
-Samsung R&D Institute Poland
----
- drivers/mfd/max77686.c | 46 +++++++++++++++++++++++++++-------------------
- 1 file changed, 27 insertions(+), 19 deletions(-)
+Each MSI type device should provide a private struct msi_driver. msi_driver should contain the type specific
+MSI ops functions to help setup and enable MSI device, request MSI irq.
 
-diff --git a/drivers/mfd/max77686.c b/drivers/mfd/max77686.c
-index 86e552348db4..525718c448c8 100644
---- a/drivers/mfd/max77686.c
-+++ b/drivers/mfd/max77686.c
-@@ -314,22 +314,26 @@ static int max77686_i2c_probe(struct i2c_client *i2c,
- 		}
- 	}
- 
--	ret = regmap_add_irq_chip(max77686->regmap, max77686->irq,
--				  IRQF_TRIGGER_FALLING | IRQF_ONESHOT |
--				  IRQF_SHARED, 0, irq_chip,
--				  &max77686->irq_data);
--	if (ret) {
--		dev_err(&i2c->dev, "failed to add PMIC irq chip: %d\n", ret);
--		goto err_unregister_i2c;
--	}
-+	if (max77686->irq) {
-+		ret = regmap_add_irq_chip(max77686->regmap, max77686->irq,
-+					  IRQF_TRIGGER_FALLING | IRQF_ONESHOT |
-+					  IRQF_SHARED, 0, irq_chip,
-+					  &max77686->irq_data);
-+		if (ret) {
-+			dev_err(&i2c->dev, "failed to add PMIC irq chip: %d\n",
-+				 ret);
-+			goto err_unregister_i2c;
-+		}
- 
--	ret = regmap_add_irq_chip(*rtc_regmap, max77686->irq,
--				  IRQF_TRIGGER_FALLING | IRQF_ONESHOT |
--				  IRQF_SHARED, 0, rtc_irq_chip,
--				  &max77686->rtc_irq_data);
--	if (ret) {
--		dev_err(&i2c->dev, "failed to add RTC irq chip: %d\n", ret);
--		goto err_del_irqc;
-+		ret = regmap_add_irq_chip(*rtc_regmap, max77686->irq,
-+					  IRQF_TRIGGER_FALLING | IRQF_ONESHOT |
-+					  IRQF_SHARED, 0, rtc_irq_chip,
-+					  &max77686->rtc_irq_data);
-+		if (ret) {
-+			dev_err(&i2c->dev, "failed to add RTC irq chip: %d\n",
-+				ret);
-+			goto err_del_irqc;
-+		}
- 	}
- 
- 	ret = mfd_add_devices(max77686->dev, -1, cells, n_devs, NULL, 0, NULL);
-@@ -341,9 +345,11 @@ static int max77686_i2c_probe(struct i2c_client *i2c,
- 	return 0;
- 
- err_del_rtc_irqc:
--	regmap_del_irq_chip(max77686->irq, max77686->rtc_irq_data);
-+	if (max77686->irq)
-+		regmap_del_irq_chip(max77686->irq, max77686->rtc_irq_data);
- err_del_irqc:
--	regmap_del_irq_chip(max77686->irq, max77686->irq_data);
-+	if (max77686->irq)
-+		regmap_del_irq_chip(max77686->irq, max77686->irq_data);
- err_unregister_i2c:
- 	if (max77686->type == TYPE_MAX77686)
- 		i2c_unregister_device(max77686->rtc);
-@@ -357,8 +363,10 @@ static int max77686_i2c_remove(struct i2c_client *i2c)
- 
- 	mfd_remove_devices(max77686->dev);
- 
--	regmap_del_irq_chip(max77686->irq, max77686->rtc_irq_data);
--	regmap_del_irq_chip(max77686->irq, max77686->irq_data);
-+	if (max77686->irq)
-+		regmap_del_irq_chip(max77686->irq, max77686->rtc_irq_data);
-+	if (max77686->irq)
-+		regmap_del_irq_chip(max77686->irq, max77686->irq_data);
- 
- 	if (max77686->type == TYPE_MAX77686)
- 		i2c_unregister_device(max77686->rtc);
+I almost finish the first draft, and will post out next week in plan :)
+
+
+Thanks!
+Yijing.
+
+> 
+> Thanks
+> -Bharat
+> 
+>>
+>> My patchset is just a RFC draft, I will update it later, all we want to do is
+>> make kernel support Non-PCI MSI devices.
+>>
+>> Thanks!
+>> Yijing.
+>>
+>>
+>>>
+>>> Thanks
+>>> Arnab
+>>> --
+>>> To unsubscribe from this list: send the line "unsubscribe
+>>> linux-kernel" in the body of a message to majordomo at vger.kernel.org
+>>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>>> Please read the FAQ at  http://www.tux.org/lkml/
+>>>
+>>> .
+>>>
+>>
+>>
+>> --
+>> Thanks!
+>> Yijing
+>>
+>> --
+>> To unsubscribe from this list: send the line "unsubscribe linux-pci" in the body
+>> of a message to majordomo at vger.kernel.org More majordomo info at
+>> http://vger.kernel.org/majordomo-info.html
+> 
+> .
+> 
+
+
 -- 
-1.9.2
+Thanks!
+Yijing
