@@ -1,87 +1,236 @@
 From: boris.brezillon@free-electrons.com (Boris BREZILLON)
-Date: Wed, 20 Aug 2014 10:14:22 +0200
-Subject: [PATCH 3/3] ARM: at91/tclib: mask interruptions at shutdown and
+Date: Wed, 20 Aug 2014 10:16:35 +0200
+Subject: [PATCH 2/3] ARM: at91/tclib: move initialization from alloc to
  probe
-In-Reply-To: <20140820073111.GH13793@ulmo>
+In-Reply-To: <1408486072-19268-3-git-send-email-gael.portay@gmail.com>
 References: <1408486072-19268-1-git-send-email-gael.portay@gmail.com>
- <1408486072-19268-4-git-send-email-gael.portay@gmail.com>
- <776D4128-09AC-418C-A710-28A2522D1D63@jcrosoft.com>
- <20140820010130.10974326@bbrezillon> <20140820073111.GH13793@ulmo>
-Message-ID: <20140820101422.3e8da816@bbrezillon>
+ <1408486072-19268-3-git-send-email-gael.portay@gmail.com>
+Message-ID: <20140820101635.3a61d090@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thierry,
+Hi Gael,
 
-On Wed, 20 Aug 2014 09:31:13 +0200
-Thierry Reding <thierry.reding@gmail.com> wrote:
+On Wed, 20 Aug 2014 00:07:51 +0200
+Ga?l PORTAY <gael.portay@gmail.com> wrote:
 
-> On Wed, Aug 20, 2014 at 01:01:30AM +0200, Boris BREZILLON wrote:
-> > Hi Jean-Christophe,
-> > 
-> > On Wed, 20 Aug 2014 06:11:17 +0800
-> > Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com> wrote:
-> > 
-> > > Hi,
-> > > 
-> > > 	This is a bit weird as the clock of the TC should be off and the irq free
-> > > 
-> > > 	so this should never happened we need to investigate more why this append
-> > 
-> > I may have found the source of this bug.
-> > 
-> > As Gael stated, when you're kexec-ing a new kernel your previous kernel
-> > could be using the tbc_clksrc driver (and especially the clkevent
-> > device). Thus the kernel might have planned a timer event and then been
-> > asked to shutdown the machine (requested by the kexec code).
-> > In this case the AIC interrupt connected to the TC Block is disabled
-> > but not the interrupts within the TCB IP (IDR registers), possibly
-> > leaving a pending interrupt before booting the new kernel.
-> > 
-> > When the tcb_clksrc driver is loaded by the new kernel it enables the
-> > interrupt line by calling setup_irq [1] while the clockevent device is
-> > not registered yet [2]. Thus the event_handler is still NULL when the
-> > AIC line connected to the TCB is unmasked. Remember that an interrupt
-> > is still pending on this HW block, which will lead to an immediate call
-> > to the ch2_irq handler, which tries to call the event_handler, which in
-> > turns is NULL because clkevent device registration has not taken place
-> > at this moment => Kernel panic.
-> > ITOH, we can't register the clkevent device before the irq handler is
-> > set up, because we should be ready to handle clkevent request at the
-> > time clockevents_config_and_register is called.
-> > 
-> > This leaves two solution:
-> >  1) disable the TCB irqs (using TCB IDR registers) before calling
-> >  setup_irq in the tcb_clksrc driver
-> >  2) disable the TCB irqs at the tclib level (as proposed by Gael)
-> > 
-> > I prefer solution #2 because it fixes the bug for all TCB users (not
-> > just the tcb_clksrc driver).
+> Move resource retrieval from atmel_tc_alloc to tc_probe to avoid lately
+> reporting resource related issues when a TC block user request a TC block.
 > 
-> Wouldn't a more proper fix be to only enable the IRQ (setup_irq()) once
-> everything has properly been set up? That's certainly how all other
-> drivers are doing this. Generally I think it's best to assume that an
-> interrupt can fire at any point after it's been enabled, so everything
-> should be set up prior to enabling it.
-
-Sure. And, AFAIK, another common practice is to disable all interrupts
-and acknowledge all pending interrupts before registering a new irq
-handler to avoid inheriting peripheral dirty state from previous usage
-(either the bootloader, or the previous kernel when using kexec).
-
-This being said, I really think we should leave the HW in a clean state
-when shutdown is called. And disabling interrupts at the tclib level
-(in a shutdown callback) ensure that.
-
+> Moreover, resources retrieval are usually done in the probe function,
+> thus moving them add some consistency with other drivers.
 > 
-> Also, does anyone know why this driver uses setup_irq() rather than the
-> more idiomatic request_irq()?
+> Initialization is done once, ie not every time a tc block is requested.
+> If it fails, the device is not appended to the list of tc blocks.
+> 
+> Furhermore, the device id is retrieved at probe as well, avoiding parsing
+> DT every time the user requests of tc block.
+> 
+> Signed-off-by: Ga?l PORTAY <gael.portay@gmail.com>
 
-Because nobody has sanitized this driver yet ;-).
+Acked-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 
-Best Regards,
-
-Boris
+> ---
+>  drivers/clocksource/tcb_clksrc.c |  2 +-
+>  drivers/misc/atmel_tclib.c       | 71 +++++++++++++---------------------------
+>  drivers/pwm/pwm-atmel-tcb.c      |  2 +-
+>  include/linux/atmel_tc.h         |  8 +++--
+>  4 files changed, 29 insertions(+), 54 deletions(-)
+> 
+> diff --git a/drivers/clocksource/tcb_clksrc.c b/drivers/clocksource/tcb_clksrc.c
+> index a8d7ea1..f922e81 100644
+> --- a/drivers/clocksource/tcb_clksrc.c
+> +++ b/drivers/clocksource/tcb_clksrc.c
+> @@ -279,7 +279,7 @@ static int __init tcb_clksrc_init(void)
+>  	int i;
+>  	int ret;
+>  
+> -	tc = atmel_tc_alloc(CONFIG_ATMEL_TCB_CLKSRC_BLOCK, clksrc.name);
+> +	tc = atmel_tc_alloc(CONFIG_ATMEL_TCB_CLKSRC_BLOCK);
+>  	if (!tc) {
+>  		pr_debug("can't alloc TC for clocksource\n");
+>  		return -ENODEV;
+> diff --git a/drivers/misc/atmel_tclib.c b/drivers/misc/atmel_tclib.c
+> index b514a2d..d505d1e 100644
+> --- a/drivers/misc/atmel_tclib.c
+> +++ b/drivers/misc/atmel_tclib.c
+> @@ -35,60 +35,31 @@ static LIST_HEAD(tc_list);
+>  /**
+>   * atmel_tc_alloc - allocate a specified TC block
+>   * @block: which block to allocate
+> - * @name: name to be associated with the iomem resource
+>   *
+>   * Caller allocates a block.  If it is available, a pointer to a
+>   * pre-initialized struct atmel_tc is returned. The caller can access
+>   * the registers directly through the "regs" field.
+>   */
+> -struct atmel_tc *atmel_tc_alloc(unsigned block, const char *name)
+> +struct atmel_tc *atmel_tc_alloc(unsigned block)
+>  {
+>  	struct atmel_tc		*tc;
+>  	struct platform_device	*pdev = NULL;
+> -	struct resource		*r;
+> -	size_t			size;
+>  
+>  	spin_lock(&tc_list_lock);
+>  	list_for_each_entry(tc, &tc_list, node) {
+> -		if (tc->pdev->dev.of_node) {
+> -			if (of_alias_get_id(tc->pdev->dev.of_node, "tcb")
+> -					== block) {
+> -				pdev = tc->pdev;
+> -				break;
+> -			}
+> -		} else if (tc->pdev->id == block) {
+> +		if (tc->allocated)
+> +			continue;
+> +
+> +		if ((tc->pdev->dev.of_node && tc->id == block) ||
+> +		    (tc->pdev->id == block)) {
+>  			pdev = tc->pdev;
+> +			tc->allocated = true;
+>  			break;
+>  		}
+>  	}
+> -
+> -	if (!pdev || tc->iomem)
+> -		goto fail;
+> -
+> -	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> -	if (!r)
+> -		goto fail;
+> -
+> -	size = resource_size(r);
+> -	r = request_mem_region(r->start, size, name);
+> -	if (!r)
+> -		goto fail;
+> -
+> -	tc->regs = ioremap(r->start, size);
+> -	if (!tc->regs)
+> -		goto fail_ioremap;
+> -
+> -	tc->iomem = r;
+> -
+> -out:
+>  	spin_unlock(&tc_list_lock);
+> -	return tc;
+>  
+> -fail_ioremap:
+> -	release_mem_region(r->start, size);
+> -fail:
+> -	tc = NULL;
+> -	goto out;
+> +	return pdev ? tc : NULL;
+>  }
+>  EXPORT_SYMBOL_GPL(atmel_tc_alloc);
+>  
+> @@ -96,19 +67,14 @@ EXPORT_SYMBOL_GPL(atmel_tc_alloc);
+>   * atmel_tc_free - release a specified TC block
+>   * @tc: Timer/counter block that was returned by atmel_tc_alloc()
+>   *
+> - * This reverses the effect of atmel_tc_alloc(), unmapping the I/O
+> - * registers, invalidating the resource returned by that routine and
+> - * making the TC available to other drivers.
+> + * This reverses the effect of atmel_tc_alloc(), invalidating the resource
+> + * returned by that routine and making the TC available to other drivers.
+>   */
+>  void atmel_tc_free(struct atmel_tc *tc)
+>  {
+>  	spin_lock(&tc_list_lock);
+> -	if (tc->regs) {
+> -		iounmap(tc->regs);
+> -		release_mem_region(tc->iomem->start, resource_size(tc->iomem));
+> -		tc->regs = NULL;
+> -		tc->iomem = NULL;
+> -	}
+> +	if (tc->allocated)
+> +		tc->allocated = false;
+>  	spin_unlock(&tc_list_lock);
+>  }
+>  EXPORT_SYMBOL_GPL(atmel_tc_free);
+> @@ -142,9 +108,7 @@ static int __init tc_probe(struct platform_device *pdev)
+>  	struct atmel_tc *tc;
+>  	struct clk	*clk;
+>  	int		irq;
+> -
+> -	if (!platform_get_resource(pdev, IORESOURCE_MEM, 0))
+> -		return -EINVAL;
+> +	struct resource	*r;
+>  
+>  	irq = platform_get_irq(pdev, 0);
+>  	if (irq < 0)
+> @@ -160,12 +124,21 @@ static int __init tc_probe(struct platform_device *pdev)
+>  	if (IS_ERR(clk))
+>  		return PTR_ERR(clk);
+>  
+> +	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> +	tc->regs = devm_ioremap_resource(&pdev->dev, r);
+> +	if (IS_ERR(tc->regs))
+> +		return PTR_ERR(tc->regs);
+> +
+>  	/* Now take SoC information if available */
+>  	if (pdev->dev.of_node) {
+>  		const struct of_device_id *match;
+>  		match = of_match_node(atmel_tcb_dt_ids, pdev->dev.of_node);
+>  		if (match)
+>  			tc->tcb_config = match->data;
+> +
+> +		tc->id = of_alias_get_id(tc->pdev->dev.of_node, "tcb");
+> +	} else {
+> +		tc->id = pdev->id;
+>  	}
+>  
+>  	tc->clk[0] = clk;
+> diff --git a/drivers/pwm/pwm-atmel-tcb.c b/drivers/pwm/pwm-atmel-tcb.c
+> index f3dcd02..d56e5b7 100644
+> --- a/drivers/pwm/pwm-atmel-tcb.c
+> +++ b/drivers/pwm/pwm-atmel-tcb.c
+> @@ -379,7 +379,7 @@ static int atmel_tcb_pwm_probe(struct platform_device *pdev)
+>  		return err;
+>  	}
+>  
+> -	tc = atmel_tc_alloc(tcblock, "tcb-pwm");
+> +	tc = atmel_tc_alloc(tcblock);
+>  	if (tc == NULL) {
+>  		dev_err(&pdev->dev, "failed to allocate Timer Counter Block\n");
+>  		return -ENOMEM;
+> diff --git a/include/linux/atmel_tc.h b/include/linux/atmel_tc.h
+> index 89a931b..d8aa884 100644
+> --- a/include/linux/atmel_tc.h
+> +++ b/include/linux/atmel_tc.h
+> @@ -44,12 +44,13 @@ struct atmel_tcb_config {
+>  /**
+>   * struct atmel_tc - information about a Timer/Counter Block
+>   * @pdev: physical device
+> - * @iomem: resource associated with the I/O register
+>   * @regs: mapping through which the I/O registers can be accessed
+> + * @id: block id
+>   * @tcb_config: configuration data from SoC
+>   * @irq: irq for each of the three channels
+>   * @clk: internal clock source for each of the three channels
+>   * @node: list node, for tclib internal use
+> + * @allocated: if already used, for tclib internal use
+>   *
+>   * On some platforms, each TC channel has its own clocks and IRQs,
+>   * while on others, all TC channels share the same clock and IRQ.
+> @@ -61,15 +62,16 @@ struct atmel_tcb_config {
+>   */
+>  struct atmel_tc {
+>  	struct platform_device	*pdev;
+> -	struct resource		*iomem;
+>  	void __iomem		*regs;
+> +	int                     id;
+>  	const struct atmel_tcb_config *tcb_config;
+>  	int			irq[3];
+>  	struct clk		*clk[3];
+>  	struct list_head	node;
+> +	bool			allocated;
+>  };
+>  
+> -extern struct atmel_tc *atmel_tc_alloc(unsigned block, const char *name);
+> +extern struct atmel_tc *atmel_tc_alloc(unsigned block);
+>  extern void atmel_tc_free(struct atmel_tc *tc);
+>  
+>  /* platform-specific ATMEL_TC_TIMER_CLOCKx divisors (0 means 32KiHz) */
 
 
 
