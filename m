@@ -1,85 +1,39 @@
-From: kiran.padwal@smartplayin.com (Kiran Padwal)
-Date: Wed, 20 Aug 2014 19:56:40 +0530
-Subject: [PATCH] pinctrl: spear: Make of_device_id array const
-Message-ID: <1408544800-24628-1-git-send-email-kiran.padwal@smartplayin.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Wed, 20 Aug 2014 16:32:02 +0200
+Subject: [PATCH v2] ARM: tegra: add Acer Chromebook 13 device tree
+In-Reply-To: <CAOesGMhBdQh_ddycZ-Y5dupR9hW74bogHtG3yyPUJ2tAgWi19A@mail.gmail.com>
+References: <1407957267-3258-1-git-send-email-dgreid@chromium.org>
+ <53EF76CF.9050808@suse.de> <53F2255E.7090208@wwwdotorg.org>
+ <CAL1qeaH-WfA-DLKwuXA_hBPHYuXksAibLq__zisrT9ALaRGdAw@mail.gmail.com>
+ <53F28F90.3000004@wwwdotorg.org>
+ <CAOesGMhBdQh_ddycZ-Y5dupR9hW74bogHtG3yyPUJ2tAgWi19A@mail.gmail.com>
+Message-ID: <20140820143201.GA3368@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Make of_device_id array const, because all OF functions handle it as const.
+On Wed, Aug 20, 2014 at 06:29:14AM -0700, Olof Johansson wrote:
+> On Mon, Aug 18, 2014 at 4:43 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
+[...]
+> > Again, this board *isn't* Nyan, so it should pretend that it is.
+> 
+> It is a derivative design of the nyan reference platform, and it is
+> compatible with it. It is perfectly fine to claim to be compatible
+> with it. I'm sorry, but you're just wrong here.
 
-Signed-off-by: Kiran Padwal <kiran.padwal@smartplayin.com>
----
- drivers/pinctrl/spear/pinctrl-spear1310.c |    2 +-
- drivers/pinctrl/spear/pinctrl-spear1340.c |    2 +-
- drivers/pinctrl/spear/pinctrl-spear300.c  |    2 +-
- drivers/pinctrl/spear/pinctrl-spear310.c  |    2 +-
- drivers/pinctrl/spear/pinctrl-spear320.c  |    2 +-
- 5 files changed, 5 insertions(+), 5 deletions(-)
+I guess that depends a little on how you define compatibility. I had
+always assumed that the top-level compatible string would be a sort of
+"checksum" over the rest of the content. Which, admittedly, makes it
+kind of redundant. Compatibility could mean a lot of things. Does it
+mean any kernel/DTB compatible with one device could run on any device
+derived from it? Does compatibility mean it needs to provide full
+functionality or is it still compatible if it runs at a reduced feature
+set but doesn't "break" otherwise?
 
-diff --git a/drivers/pinctrl/spear/pinctrl-spear1310.c b/drivers/pinctrl/spear/pinctrl-spear1310.c
-index 1a8bbfe..6d57d43 100644
---- a/drivers/pinctrl/spear/pinctrl-spear1310.c
-+++ b/drivers/pinctrl/spear/pinctrl-spear1310.c
-@@ -2692,7 +2692,7 @@ static struct spear_pinctrl_machdata spear1310_machdata = {
- 	.modes_supported = false,
- };
- 
--static struct of_device_id spear1310_pinctrl_of_match[] = {
-+static const struct of_device_id spear1310_pinctrl_of_match[] = {
- 	{
- 		.compatible = "st,spear1310-pinmux",
- 	},
-diff --git a/drivers/pinctrl/spear/pinctrl-spear1340.c b/drivers/pinctrl/spear/pinctrl-spear1340.c
-index 873966e..d243e43 100644
---- a/drivers/pinctrl/spear/pinctrl-spear1340.c
-+++ b/drivers/pinctrl/spear/pinctrl-spear1340.c
-@@ -2008,7 +2008,7 @@ static struct spear_pinctrl_machdata spear1340_machdata = {
- 	.modes_supported = false,
- };
- 
--static struct of_device_id spear1340_pinctrl_of_match[] = {
-+static const struct of_device_id spear1340_pinctrl_of_match[] = {
- 	{
- 		.compatible = "st,spear1340-pinmux",
- 	},
-diff --git a/drivers/pinctrl/spear/pinctrl-spear300.c b/drivers/pinctrl/spear/pinctrl-spear300.c
-index 4777c0d..9db83e9 100644
---- a/drivers/pinctrl/spear/pinctrl-spear300.c
-+++ b/drivers/pinctrl/spear/pinctrl-spear300.c
-@@ -646,7 +646,7 @@ static struct spear_function *spear300_functions[] = {
- 	&gpio1_function,
- };
- 
--static struct of_device_id spear300_pinctrl_of_match[] = {
-+static const struct of_device_id spear300_pinctrl_of_match[] = {
- 	{
- 		.compatible = "st,spear300-pinmux",
- 	},
-diff --git a/drivers/pinctrl/spear/pinctrl-spear310.c b/drivers/pinctrl/spear/pinctrl-spear310.c
-index ed1d360..db775a4 100644
---- a/drivers/pinctrl/spear/pinctrl-spear310.c
-+++ b/drivers/pinctrl/spear/pinctrl-spear310.c
-@@ -371,7 +371,7 @@ static struct spear_function *spear310_functions[] = {
- 	&tdm_function,
- };
- 
--static struct of_device_id spear310_pinctrl_of_match[] = {
-+static const struct of_device_id spear310_pinctrl_of_match[] = {
- 	{
- 		.compatible = "st,spear310-pinmux",
- 	},
-diff --git a/drivers/pinctrl/spear/pinctrl-spear320.c b/drivers/pinctrl/spear/pinctrl-spear320.c
-index b8e290a..80fbd68 100644
---- a/drivers/pinctrl/spear/pinctrl-spear320.c
-+++ b/drivers/pinctrl/spear/pinctrl-spear320.c
-@@ -3410,7 +3410,7 @@ static struct spear_function *spear320_functions[] = {
- 	&i2c2_function,
- };
- 
--static struct of_device_id spear320_pinctrl_of_match[] = {
-+static const struct of_device_id spear320_pinctrl_of_match[] = {
- 	{
- 		.compatible = "st,spear320-pinmux",
- 	},
--- 
-1.7.9.5
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140820/882f6571/attachment.sig>
