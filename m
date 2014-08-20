@@ -1,82 +1,147 @@
-From: pekon@pek-sem.com (pekon)
-Date: Wed, 20 Aug 2014 23:32:37 +0530
-Subject: [PATCH] mtd: nand: stm_nand_bch: add new driver
-In-Reply-To: <20140819021248.GR18411@ld-irv-0074>
-References: <1401268805-26043-1-git-send-email-lee.jones@linaro.org>
- <20140703002237.GM3599@ld-irv-0074>
- <20980858CB6D3A4BAE95CA194937D5E73EAFAFF1@DBDE04.ent.ti.com>
- <20140805142324.GA10136@lee--X1>
- <d4ba973a22bd71eaff94be1f479c5334@pek-sem.com>
- <20140819021248.GR18411@ld-irv-0074>
-Message-ID: <53F4E2BD.5080205@pek-sem.com>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Wed, 20 Aug 2014 20:03:28 +0200
+Subject: [PATCH 1/4] ARM: rockchip: rk3288: Switch to use the proper PWM IP
+In-Reply-To: <CAD=FV=U_TEi7zh=LcnfTz07yFCrOXo1SsGJ0h6-VFCVdy1GDEA@mail.gmail.com>
+References: <1408381749-14156-1-git-send-email-dianders@chromium.org>
+ <2927513.T62GI7nq9T@phil>
+ <CAD=FV=U_TEi7zh=LcnfTz07yFCrOXo1SsGJ0h6-VFCVdy1GDEA@mail.gmail.com>
+Message-ID: <9118476.CpedIJMoMR@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 19 August 2014 07:42 AM, Brian Norris wrote:
-> On Wed, Aug 06, 2014 at 02:32:18AM +0530, pekon at pek-sem.com wrote:
->> On Tuesday 05 August 2014 07:53 PM, Lee Jones wrote:
->>> On Thu, 03 Jul 2014, Gupta, Pekon wrote:
->>>>>> +	/* Load last page of block */
->>>>>> +	offs = (loff_t)block << chip->phys_erase_shift;
->>>>>> +	offs += mtd->erasesize - mtd->writesize;
->>>>>> +	if (bch_read_page(nandi, offs, buf) < 0) {
->>>>
->>>> *Important*: You shouldn't call internal functions directly here..
->>>> Instead use chip->_read() OR mtd-read() that will:
->
-> I'm not sure exactly what you're saying in the above line (chip->_read()
-> is not a function, and and mtd-read() is syntactically incorrect),
-> but...
->
-> You most certainly do *not* want to call mtd->_read() directly (or any
-> of the callbacks prefixed with underscores). That is one of the main
-> purposes of:
->
->      commit 3c3c10bba1e4ccb75b41442e45c1a072f6cded19
->      Author: Artem Bityutskiy <artem.bityutskiy@linux.intel.com>
->      Date:   Mon Jan 30 14:58:32 2012 +0200
->
->          mtd: add leading underscore to all mtd functions
->
-Makes sense. Thanks for pointing this.
+Am Mittwoch, 20. August 2014, 09:27:02 schrieb Doug Anderson:
+> Heiko,
+> 
+> On Wed, Aug 20, 2014 at 9:20 AM, Heiko St?bner <heiko@sntech.de> wrote:
+> > Am Mittwoch, 20. August 2014, 08:55:09 schrieb Doug Anderson:
+> >> Thierry,
+> >> 
+> >> On Wed, Aug 20, 2014 at 8:38 AM, Thierry Reding
+> >> 
+> >> <thierry.reding@gmail.com> wrote:
+> >> > On Wed, Aug 20, 2014 at 08:20:53AM -0700, Doug Anderson wrote:
+> >> >> Thierry,
+> >> >> 
+> >> >> On Tue, Aug 19, 2014 at 11:08 PM, Thierry Reding
+> >> >> 
+> >> >> <thierry.reding@gmail.com> wrote:
+> >> >> > On Tue, Aug 19, 2014 at 08:18:54AM -0700, Doug Anderson wrote:
+> >> >> >> Thierry,
+> >> >> >> 
+> >> >> >> On Tue, Aug 19, 2014 at 12:10 AM, Thierry Reding
+> >> >> >> 
+> >> >> >> <thierry.reding@gmail.com> wrote:
+> >> >> >> > On Mon, Aug 18, 2014 at 10:09:06AM -0700, Doug Anderson wrote:
+> >> >> >> >> The rk3288 SoC has an option to switch all of the PWMs in the
+> >> >> >> >> system
+> >> >> >> >> between the old IP block and the new IP block.  The new IP block
+> >> >> >> >> is
+> >> >> >> >> working and tested and the suggested PWM to use, so setup the
+> >> >> >> >> SoC
+> >> >> >> >> to
+> >> >> >> >> use it and then we can pretend that the other IP block doesn't
+> >> >> >> >> exist.
+> >> >> > 
+> >> >> > A few more questions as to how this actually works. Does it mean
+> >> >> > there
+> >> >> > are two physically separate blocks (with different physical
+> >> >> > addresses)
+> >> >> > to control the same PWM? And this register simply causes some of the
+> >> >> > pins to be routed to one or another? As far as I recall there are a
+> >> >> > number of instances of the PWM block, so the above would need to
+> >> >> > count
+> >> >> > for all of them. Or are there separate bits for each of them?
+> >> >> 
+> >> >> All I have is the TRM (technical reference manual) which doesn't give
+> >> >> me much more info than I've provided you.  But I can answer some of
+> >> >> your questoins:
+> >> >> 
+> >> >> 1. If there are two physically separate blocks then the "old" block is
+> >> >> not documented in my TRM.
+> >> >> 
+> >> >> 1a) It's entirely possible it's located at some memory address that is
+> >> >> marked "Reserved" in the TRM, but I have no idea.
+> >> >> 
+> >> >> 1b) It's entirely possible that the old IP block and the new IP block
+> >> >> are supposed to be "compatible" but that the old block is broken and
+> >> >> thus isn't behaving properly.
+> >> >> 
+> >> >> 1c) It's entirely possible that the old IP block and the new IP block
+> >> >> are located at the same physical addresses but somehow work
+> >> >> differently.  If so, the old IP block isn't documented.
+> >> >> 
+> >> >> 
+> >> >> 2. As per the patch description, there is a single bit that controls
+> >> >> all of the PWMs.  My guess is that there's actually a single IP block
+> >> >> that implements all 4 PWMs.
+> >> > 
+> >> > Looking at the register offsets in the device tree that seems likely.
+> >> > At
+> >> > least PWMs 0 and 1 as well as 2 and 3 seem like they could be in the
+> >> > 
+> >> > same IP block. Their placement in the register map is somewhat strange:
+> >> >         pwm0: pwm at 20030000 {
+> >> >         
+> >> >                 ...
+> >> >                 reg = <0x20030000 0x10>;
+> >> >                 ...
+> >> >                 clocks = <&cru PCLK_PWM01>;
+> >> >                 ...
+> >> >         
+> >> >         };
+> >> >         
+> >> >         pwm1: pwm at 20030010 {
+> >> >         
+> >> >                 ...
+> >> >                 reg = <0x20030010 0x10>;
+> >> >                 ...
+> >> >                 clocks = <&cru PCLK_PWM01>;
+> >> >                 ...
+> >> >         
+> >> >         };
+> >> >         
+> >> >         ...
+> >> >         
+> >> >         pwm2: pwm at 20050020 {
+> >> >         
+> >> >                 ...
+> >> >                 reg = <0x20050020 0x10>;
+> >> >                 ...
+> >> >                 clocks = <&cru PCLK_PWM23>;
+> >> >                 ...
+> >> >         
+> >> >         };
+> >> >         
+> >> >         pwm3: pwm at 20050030 {
+> >> >         
+> >> >                 ...
+> >> >                 reg = <0x20050030 0x10>;
+> >> >                 ...
+> >> >                 clocks = <&cru PCLK_PWM23>;
+> >> >                 ...
+> >> >         
+> >> >         };
+> >> 
+> >> Ah, you're looking at "rk3xxx.dtsi".  That doesn't apply to rk3288
+> >> (the downsides of trying to guess ahead of time what SoC vendors will
+> >> name new models).
+> > 
+> > It did sound like a nice idea at the time to hold the common stuff of
+> > rk3066/rk3188 and all their derivatives and I assumed a SoC that changed
+> > dramatically (including the core) would be called 4xxx or so :-) .
+> 
+> Yes, I've fallen into the same trap.  Now I jump on the bandwagon and
+> name things arbitrarily by the first machine that had them.  It's
+> confusing, but sorta less confusing too.
 
-[...]
+the problem was in this case, that there also is rk3066-specific material which 
+made it all the more difficult.
 
->
->> I think somewhere in earlier comments, Brian also supported
->> to use high-level function like mtd_read(). Also, nand_bbt.c
->> itself uses 'mtd_read(), mtd_read_oob() and mtd_write_oob()
->> at many places. So I'll let Brain decide here.
->> But having low-level function will add redundant code for
->> re-checking and aligning the addresses boundaries to block
->> and page/sector sizes.
->
-> Not all checks are redundant. It's redundant to have the direct
-> descendant doing the same checks that the parent does, like:
->
->    mtd_read() (checks boundaries)
->    |_ mtd->_read() (e.g., nand_read())
->
-> So nand_read() and nand_do_read_ops() don't need the checking.
->
-> But for a BBT implementation, it can help to make sure that its
-> page/block/etc. arithmetic fits the right bounds when it ends up
-> deciding to scan a block.
->
-> Now, it still may be easy to prove that the checks are
-> redundant/unnecessary for correctly-written code, but if the layering
-> makes sense, then it still may be a better choice to simply use the
-> high-level, self-checking API than to try to dig deeper. For instance,
-> I'm pretty sure UBI does some checks to make sure it's not reading off
-> the end of an MTD, but it still calls mtd_read() because it's The Right
-> Thing (TM).
->
-> Brian
->
-Agree.. re-using mtd_*() API for non-critical paths is justified.
+I guess rk3066-common would have been a possibility but still sounds somewhat 
+strange, or something else entirely.
+
+I'm not sure but don't think dtsi file-naming counts as API, so we can rename 
+the rk3xxx.dtsi file if this gets to confusing in the future.
 
 
-with regards, pekon
-
-------------------------
-Powered by BigRock.com
+Heiko
