@@ -1,115 +1,112 @@
 From: linux@roeck-us.net (Guenter Roeck)
-Date: Tue, 19 Aug 2014 17:45:33 -0700
-Subject: [PATCH v7 06/11] watchdog: alim7101: Register restart handler with
+Date: Tue, 19 Aug 2014 17:45:34 -0700
+Subject: [PATCH v7 07/11] watchdog: sunxi: Register restart handler with
  kernel restart handler
 In-Reply-To: <1408495538-27480-1-git-send-email-linux@roeck-us.net>
 References: <1408495538-27480-1-git-send-email-linux@roeck-us.net>
-Message-ID: <1408495538-27480-7-git-send-email-linux@roeck-us.net>
+Message-ID: <1408495538-27480-8-git-send-email-linux@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 The kernel core now provides an API to trigger a system restart.
-Register with it to restart the system instead of misusing the
-reboot notifier.
+Register with it instead of setting arm_pm_restart.
 
 Signed-off-by: Guenter Roeck <linux@roeck-us.net>
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
 Acked-by: Heiko Stuebner <heiko@sntech.de>
 ---
-v7: No change.
-v6: No change.
-v5: Function and variable renames: *notifier -> *handler.
-v4: Set restart notifier priority to 128.
-v3: No change.
-v2: No change.
+v7: Added patch to series. Necessary since the restart handler in the driver
+    is now available upstream.
 
- drivers/watchdog/alim7101_wdt.c | 42 +++++++++++++++++++++++++++++++----------
- 1 file changed, 32 insertions(+), 10 deletions(-)
+ drivers/watchdog/sunxi_wdt.c | 31 ++++++++++++++++++++-----------
+ 1 file changed, 20 insertions(+), 11 deletions(-)
 
-diff --git a/drivers/watchdog/alim7101_wdt.c b/drivers/watchdog/alim7101_wdt.c
-index 996b2f7..665e0e7 100644
---- a/drivers/watchdog/alim7101_wdt.c
-+++ b/drivers/watchdog/alim7101_wdt.c
-@@ -301,6 +301,28 @@ static struct miscdevice wdt_miscdev = {
- 	.fops	=	&wdt_fops,
+diff --git a/drivers/watchdog/sunxi_wdt.c b/drivers/watchdog/sunxi_wdt.c
+index 60deb9d..480bb55 100644
+--- a/drivers/watchdog/sunxi_wdt.c
++++ b/drivers/watchdog/sunxi_wdt.c
+@@ -21,14 +21,13 @@
+ #include <linux/kernel.h>
+ #include <linux/module.h>
+ #include <linux/moduleparam.h>
++#include <linux/notifier.h>
+ #include <linux/of.h>
+ #include <linux/platform_device.h>
+ #include <linux/reboot.h>
+ #include <linux/types.h>
+ #include <linux/watchdog.h>
+ 
+-#include <asm/system_misc.h>
+-
+ #define WDT_MAX_TIMEOUT         16
+ #define WDT_MIN_TIMEOUT         1
+ #define WDT_MODE_TIMEOUT(n)     ((n) << 3)
+@@ -50,6 +49,7 @@ static unsigned int timeout = WDT_MAX_TIMEOUT;
+ struct sunxi_wdt_dev {
+ 	struct watchdog_device wdt_dev;
+ 	void __iomem *wdt_base;
++	struct notifier_block restart_handler;
  };
  
-+static int wdt_restart_handle(struct notifier_block *this, unsigned long mode,
-+			      void *cmd)
-+{
-+	/*
-+	 * Cobalt devices have no way of rebooting themselves other
-+	 * than getting the watchdog to pull reset, so we restart the
-+	 * watchdog on reboot with no heartbeat.
-+	 */
-+	wdt_change(WDT_ENABLE);
-+
-+	/* loop until the watchdog fires */
-+	while (true)
-+		;
-+
-+	return NOTIFY_DONE;
-+}
-+
-+static struct notifier_block wdt_restart_handler = {
-+	.notifier_call = wdt_restart_handle,
-+	.priority = 128,
-+};
-+
  /*
-  *	Notifier for system down
-  */
-@@ -311,15 +333,6 @@ static int wdt_notify_sys(struct notifier_block *this,
- 	if (code == SYS_DOWN || code == SYS_HALT)
- 		wdt_turnoff();
+@@ -74,24 +74,29 @@ static const int wdt_timeout_map[] = {
+ 	[16] = 0xB, /* 16s */
+ };
  
--	if (code == SYS_RESTART) {
--		/*
--		 * Cobalt devices have no way of rebooting themselves other
--		 * than getting the watchdog to pull reset, so we restart the
--		 * watchdog on reboot with no heartbeat
--		 */
--		wdt_change(WDT_ENABLE);
--		pr_info("Watchdog timer is now enabled with no heartbeat - should reboot in ~1 second\n");
--	}
- 	return NOTIFY_DONE;
- }
+-static void __iomem *reboot_wdt_base;
  
-@@ -338,6 +351,7 @@ static void __exit alim7101_wdt_unload(void)
- 	/* Deregister */
- 	misc_deregister(&wdt_miscdev);
- 	unregister_reboot_notifier(&wdt_notifier);
-+	unregister_restart_handler(&wdt_restart_handler);
- 	pci_dev_put(alim7101_pmu);
- }
- 
-@@ -390,11 +404,17 @@ static int __init alim7101_wdt_init(void)
- 		goto err_out;
- 	}
- 
-+	rc = register_restart_handler(&wdt_restart_handler);
-+	if (rc) {
-+		pr_err("cannot register restart handler (err=%d)\n", rc);
-+		goto err_out_reboot;
-+	}
+-static void sun4i_wdt_restart(enum reboot_mode mode, const char *cmd)
++static int sunxi_restart_handle(struct notifier_block *this, unsigned long mode,
++				void *cmd)
+ {
++	struct sunxi_wdt_dev *sunxi_wdt = container_of(this,
++						       struct sunxi_wdt_dev,
++						       restart_handler);
++	void __iomem *wdt_base = sunxi_wdt->wdt_base;
 +
- 	rc = misc_register(&wdt_miscdev);
- 	if (rc) {
- 		pr_err("cannot register miscdev on minor=%d (err=%d)\n",
- 		       wdt_miscdev.minor, rc);
--		goto err_out_reboot;
-+		goto err_out_restart;
+ 	/* Enable timer and set reset bit in the watchdog */
+-	writel(WDT_MODE_EN | WDT_MODE_RST_EN, reboot_wdt_base + WDT_MODE);
++	writel(WDT_MODE_EN | WDT_MODE_RST_EN, wdt_base + WDT_MODE);
+ 
+ 	/*
+ 	 * Restart the watchdog. The default (and lowest) interval
+ 	 * value for the watchdog is 0.5s.
+ 	 */
+-	writel(WDT_CTRL_RELOAD, reboot_wdt_base + WDT_CTRL);
++	writel(WDT_CTRL_RELOAD, wdt_base + WDT_CTRL);
+ 
+ 	while (1) {
+ 		mdelay(5);
+-		writel(WDT_MODE_EN | WDT_MODE_RST_EN,
+-		       reboot_wdt_base + WDT_MODE);
++		writel(WDT_MODE_EN | WDT_MODE_RST_EN, wdt_base + WDT_MODE);
  	}
++	return NOTIFY_DONE;
+ }
  
- 	if (nowayout)
-@@ -404,6 +424,8 @@ static int __init alim7101_wdt_init(void)
- 		timeout, nowayout);
- 	return 0;
+ static int sunxi_wdt_ping(struct watchdog_device *wdt_dev)
+@@ -205,8 +210,12 @@ static int sunxi_wdt_probe(struct platform_device *pdev)
+ 	if (unlikely(err))
+ 		return err;
  
-+err_out_restart:
-+	unregister_restart_handler(&wdt_restart_handler);
- err_out_reboot:
- 	unregister_reboot_notifier(&wdt_notifier);
- err_out:
+-	reboot_wdt_base = sunxi_wdt->wdt_base;
+-	arm_pm_restart = sun4i_wdt_restart;
++	sunxi_wdt->restart_handler.notifier_call = sunxi_restart_handle;
++	sunxi_wdt->restart_handler.priority = 128;
++	err = register_restart_handler(&sunxi_wdt->restart_handler);
++	if (err)
++		dev_err(&pdev->dev,
++			"cannot register restart handler (err=%d)\n", err);
+ 
+ 	dev_info(&pdev->dev, "Watchdog enabled (timeout=%d sec, nowayout=%d)",
+ 			sunxi_wdt->wdt_dev.timeout, nowayout);
+@@ -218,7 +227,7 @@ static int sunxi_wdt_remove(struct platform_device *pdev)
+ {
+ 	struct sunxi_wdt_dev *sunxi_wdt = platform_get_drvdata(pdev);
+ 
+-	arm_pm_restart = NULL;
++	unregister_restart_handler(&sunxi_wdt->restart_handler);
+ 
+ 	watchdog_unregister_device(&sunxi_wdt->wdt_dev);
+ 	watchdog_set_drvdata(&sunxi_wdt->wdt_dev, NULL);
 -- 
 1.9.1
