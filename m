@@ -1,79 +1,83 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed, 20 Aug 2014 09:24:01 +0900
-Subject: [PATCH 10/12] ARM: shmobile: r8a7790 dtsi: Enable DMA for MSIOF
+Date: Wed, 20 Aug 2014 09:24:03 +0900
+Subject: [PATCH 12/12] ARM: shmobile: lager: add VIN1/ADV7180 device nodes
 In-Reply-To: <cover.1408492753.git.horms+renesas@verge.net.au>
 References: <cover.1408492753.git.horms+renesas@verge.net.au>
-Message-ID: <fbff66886b9c5f657b6649a264551ac572fae0b7.1408492753.git.horms+renesas@verge.net.au>
+Message-ID: <d594c9775409a4276133db5e34dbd791329c5eae.1408492753.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Geert Uytterhoeven <geert+renesas@glider.be>
+From: Ben Dooks <ben.dooks@codethink.co.uk>
 
-Add register sets used for access by the DMA engine, and DMA properties to
-the MSIOF nodes.
+Add the Lager board specific device node part for VIN1 (composite video in);
+add the device node for Analog Devices ADV7180 video decoder to IIC2 bus.
+Add the necessary subnodes to interconnect VIN1 and ADV7180 devices.
 
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
+[Sergei: rebased, edited changelog and summary]
+Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7790.dtsi | 16 ++++++++++++----
- 1 file changed, 12 insertions(+), 4 deletions(-)
+ arch/arm/boot/dts/r8a7790-lager.dts | 36 ++++++++++++++++++++++++++++++++++++
+ 1 file changed, 36 insertions(+)
 
-diff --git a/arch/arm/boot/dts/r8a7790.dtsi b/arch/arm/boot/dts/r8a7790.dtsi
-index 6dc328d..60f8551 100644
---- a/arch/arm/boot/dts/r8a7790.dtsi
-+++ b/arch/arm/boot/dts/r8a7790.dtsi
-@@ -956,9 +956,11 @@
+diff --git a/arch/arm/boot/dts/r8a7790-lager.dts b/arch/arm/boot/dts/r8a7790-lager.dts
+index 856b423..b5f56bc 100644
+--- a/arch/arm/boot/dts/r8a7790-lager.dts
++++ b/arch/arm/boot/dts/r8a7790-lager.dts
+@@ -234,6 +234,11 @@
+ 		renesas,groups = "usb2";
+ 		renesas,function = "usb2";
+ 	};
++
++	vin1_pins: vin {
++		renesas,groups = "vin1_data8", "vin1_clk";
++		renesas,function = "vin1";
++	};
+ };
  
- 	msiof0: spi at e6e20000 {
- 		compatible = "renesas,msiof-r8a7790";
--		reg = <0 0xe6e20000 0 0x0064>;
-+		reg = <0 0xe6e20000 0 0x0064>, <0 0xe7e20000 0 0x0064>;
- 		interrupts = <0 156 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp0_clks R8A7790_CLK_MSIOF0>;
-+		dmas = <&dmac0 0x51>, <&dmac0 0x52>;
-+		dma-names = "tx", "rx";
- 		#address-cells = <1>;
- 		#size-cells = <0>;
- 		status = "disabled";
-@@ -966,9 +968,11 @@
+ &ether {
+@@ -366,6 +371,19 @@
+ 	status = "ok";
+ 	pinctrl-0 = <&iic2_pins>;
+ 	pinctrl-names = "default";
++
++	composite-in at 20 {
++		compatible = "adi,adv7180";
++		reg = <0x20>;
++		remote = <&vin1>;
++
++		port {
++			adv7180: endpoint {
++				bus-width = <8>;
++				remote-endpoint = <&vin1ep0>;
++			};
++		};
++	};
+ };
  
- 	msiof1: spi at e6e10000 {
- 		compatible = "renesas,msiof-r8a7790";
--		reg = <0 0xe6e10000 0 0x0064>;
-+		reg = <0 0xe6e10000 0 0x0064>, <0 0xe7e10000 0 0x0064>;
- 		interrupts = <0 157 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp2_clks R8A7790_CLK_MSIOF1>;
-+		dmas = <&dmac0 0x55>, <&dmac0 0x56>;
-+		dma-names = "tx", "rx";
- 		#address-cells = <1>;
- 		#size-cells = <0>;
- 		status = "disabled";
-@@ -976,9 +980,11 @@
- 
- 	msiof2: spi at e6e00000 {
- 		compatible = "renesas,msiof-r8a7790";
--		reg = <0 0xe6e00000 0 0x0064>;
-+		reg = <0 0xe6e00000 0 0x0064>, <0 0xe7e00000 0 0x0064>;
- 		interrupts = <0 158 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp2_clks R8A7790_CLK_MSIOF2>;
-+		dmas = <&dmac0 0x41>, <&dmac0 0x42>;
-+		dma-names = "tx", "rx";
- 		#address-cells = <1>;
- 		#size-cells = <0>;
- 		status = "disabled";
-@@ -986,9 +992,11 @@
- 
- 	msiof3: spi at e6c90000 {
- 		compatible = "renesas,msiof-r8a7790";
--		reg = <0 0xe6c90000 0 0x0064>;
-+		reg = <0 0xe6c90000 0 0x0064>, <0 0xe7c90000 0 0x0064>;
- 		interrupts = <0 159 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp2_clks R8A7790_CLK_MSIOF3>;
-+		dmas = <&dmac0 0x45>, <&dmac0 0x46>;
-+		dma-names = "tx", "rx";
- 		#address-cells = <1>;
- 		#size-cells = <0>;
- 		status = "disabled";
+ &iic3 {
+@@ -401,3 +419,21 @@
+ 	pinctrl-0 = <&usb2_pins>;
+ 	pinctrl-names = "default";
+ };
++
++/* composite video input */
++&vin1 {
++	pinctrl-0 = <&vin1_pins>;
++	pinctrl-names = "default";
++
++	status = "ok";
++
++	port {
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		vin1ep0: endpoint {
++			remote-endpoint = <&adv7180>;
++			bus-width = <8>;
++		};
++	};
++};
 -- 
 2.0.1
