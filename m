@@ -1,141 +1,171 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Wed, 20 Aug 2014 06:37:48 -0700
-Subject: [PATCH v2] ARM: tegra: add Acer Chromebook 13 device tree
-In-Reply-To: <53F3C5FD.4050808@wwwdotorg.org>
-References: <1407957267-3258-1-git-send-email-dgreid@chromium.org>
- <53EF76CF.9050808@suse.de> <53F2255E.7090208@wwwdotorg.org>
- <CAL1qeaH-WfA-DLKwuXA_hBPHYuXksAibLq__zisrT9ALaRGdAw@mail.gmail.com>
- <53F28F90.3000004@wwwdotorg.org>
- <CAL1qeaFnfLDOXq07fY4xLfdRpG8FQ63ya+-0Hk+ewA1wXkLOLw@mail.gmail.com>
- <53F3C5FD.4050808@wwwdotorg.org>
-Message-ID: <CAOesGMhDe0zFYkUWqBOTunK76wccdKOQ8b+EFAzeTr+oOUQyWA@mail.gmail.com>
+From: edubezval@gmail.com (edubezval at gmail.com)
+Date: Wed, 20 Aug 2014 09:38:05 -0400
+Subject: [PATCHv3] thermal: exynos: Add support for TRIM_RELOAD feature at
+ Exynos3250
+In-Reply-To: <1408492364-8012-1-git-send-email-cw00.choi@samsung.com>
+References: <1408450078-6296-1-git-send-email-cw00.choi@samsung.com>
+ <1408492364-8012-1-git-send-email-cw00.choi@samsung.com>
+Message-ID: <CAC-25o9LjKwjBwwxcOvV75bXEHGdUh2vU=ae1STsXxD6q4YsiA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 19, 2014 at 2:47 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
-> On 08/18/2014 06:11 PM, Andrew Bresticker wrote:
->>
->> On Mon, Aug 18, 2014 at 4:43 PM, Stephen Warren <swarren@wwwdotorg.org>
->> wrote:
->>>
->>> On 08/18/2014 05:24 PM, Andrew Bresticker wrote:
->>>>
->>>>
->>>> On Mon, Aug 18, 2014 at 9:10 AM, Stephen Warren <swarren@wwwdotorg.org>
->>>> wrote:
->>>>>
->>>>>
->>>>> On 08/16/2014 09:20 AM, Andreas F?rber wrote:
->>>>>>
->>>>>>
->>>>>>
->>>>>> Hi,
->>>>>>
->>>>>> Am 13.08.2014 21:14, schrieb Dylan Reid:
->>>>>>>
->>>>>>>
->>>>>>>
->>>>>>> The Acer Chromebook 13, codenamed Big, contains an NVIDIA tegra124
->>>>>>> processor and is similar to the Venice2 reference platform.
->>>>>>>
->>>>>>> The keyboard, USB 2, audio, HDMI, sdcard, and emmc have been tested
->>>>>>> and work on the 1266x768 models.  The HD models haven't yet been
->>>>>>> tested.
->>>>>>>
->>>>>>> WiFi does not work yet, it needs at least some PMIC changes to enable
->>>>>>> the 32k clock.
->>>>>>>
->>>>>>> The elan trackpad is not yet functional but hopefully will be soon as
->>>>>>> there are patches under review.
->>>>>>>
->>>>>>> There is also an issue on reboot because the TPM isn't reset.  It
->>>>>>> will
->>>>>>> cause the stock firmware to enter recovery mode.  This can be worked
->>>>>>> around by an EC-reset, press the refresh and power keys at the same
->>>>>>> time.
->>>>>
->>>>>
->>>>>
->>>>>
->>>>>>> diff --git a/arch/arm/boot/dts/tegra124-nyan-big.dts
->>>>>>> b/arch/arm/boot/dts/tegra124-nyan-big.dts
->>>>>>> new file mode 100644
->>>>>>> index 0000000..79f1852
->>>>>>> --- /dev/null
->>>>>>> +++ b/arch/arm/boot/dts/tegra124-nyan-big.dts
->>>>>>> @@ -0,0 +1,1136 @@
->>>>>>> +/dts-v1/;
->>>>>>> +
->>>>>>> +#include <dt-bindings/input/input.h>
->>>>>>> +#include "tegra124.dtsi"
->>>>>>> +
->>>>>>> +/ {
->>>>>>> +       model = "Acer Chromebook 13";
->>>>>>> +       compatible = "google,nyan-big", "nvidia,tegra124";
->>>>>>
->>>>>>
->>>>>>
->>>>>>
->>>>>> In light of v1 and the above commit message referring to this as
->>>>>> Google
->>>>>> Big, shouldn't this be "google,big", "nvidia,tegra124" and optionally
->>>>>> "google,nyan" as secondary string, independent of the new file name?
->>>>>
->>>>>
->>>>>
->>>>>
->>>>> Despite this board having been derived from Nyan, it isn't Nyan, so I
->>>>> don't
->>>>> think Nyan should be part of any compatible value, nor a separate
->>>>> compatible
->>>>> value.
->>>>
->>>>
->>>>
->>>> "google,nyan-big" is the compatible string that the bootloader on
->>>> these devices looks for.  It's also the convention we are now using
->>>> for our ARM devices, as Olof has already mentioned.
->>>
->>>
->>> I don't understand "that the bootloader looks for"; why is the bootloader
->>> doing anything w.r.t the compatible value in the DT that's passed to the
->>> kernel.
->>
->>
->> The ChromeOS bootloader ("depthcharge") boots FIT images and selects
->> the appropriate device-tree from the image based on the compatible
->> string.  On Big boards, it looks for "google,nyan-big".  This only
->> becomes an issue if there are multiple device-trees in the FIT image.
->> If there's only a single configuration (or you chain-load U-Boot),
->> then the bootloader will boot with that configuration.  If you build a
->> kernel image in the ChromiumOS environment, however, you'll end up
->> with multiple device-trees (all those built by the kernel config at
->> least) in the FIT image - this is what allows us to boot the same
->> binary on different boards.
+Hello Chanwoo,
+
+On Tue, Aug 19, 2014 at 7:52 PM, Chanwoo Choi <cw00.choi@samsung.com> wrote:
+> This patch add support for TRIM_RELOAD feature at Exynos3250. The TMU of
+> Exynos3250 has two TRIMINFO_CON register.
+
+Can you please split the two changes above into two patches? Meaning,
+one that adds TRIMINFO_CON2 and another that adds TRIM_RELOAD?
+
 >
+> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
+> Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
+> Cc: Zhang Rui <rui.zhang@intel.com>
+> Cc: Eduardo Valentin <edubezval@gmail.com>
+> Cc: Amit Daniel Kachhap <amit.daniel@samsung.com>
+> ---
+> Changes from v2:
+> - Fix build break because of missing 'or' operation.
+> Changes from v1:
+> - Add missing 'TMU_SUPPORT_TRIM_RELOAD' feature
 >
-> This just makes me dislike FIT (and DT ABIs) even more, although I suppose
-> the same issue would arise if the DTBs were stored in separate files and
-> looked up by filename.
-
-Yes, or stored in separate files and looked up by compatible field.
-
-Do you have a suggestion on a better way to solve it, btw? Definitely
-not one of those things we can fix retroactively, but if it works
-poorly for you upstream we'll consider improvements if we can for
-future products.
-
-I'm not a huge fan of fitImage myself, but it gets the work done.
-
-> I have to say this sucks, because it means that a downstream bootloader is
-> imposing an ABI on the mainline kernel without a chance to fix things during
-> upstreaming. For all other boards, we've concentrated on mainline U-Boot as
-> the bootloader precisely so that strange behaviour of our downstream product
-> kernels don't force the hand of the mainline kernel design.
+>  drivers/thermal/samsung/exynos_tmu.c      |  7 +++++--
+>  drivers/thermal/samsung/exynos_tmu.h      |  5 +++--
+>  drivers/thermal/samsung/exynos_tmu_data.c | 11 +++++++++--
+>  drivers/thermal/samsung/exynos_tmu_data.h |  7 +++++--
+>  4 files changed, 22 insertions(+), 8 deletions(-)
 >
-> Still, I suppose I have no choice but to drop my objection here.
+> diff --git a/drivers/thermal/samsung/exynos_tmu.c b/drivers/thermal/samsung/exynos_tmu.c
+> index acbff14..ed01606 100644
+> --- a/drivers/thermal/samsung/exynos_tmu.c
+> +++ b/drivers/thermal/samsung/exynos_tmu.c
+> @@ -164,8 +164,11 @@ static int exynos_tmu_initialize(struct platform_device *pdev)
+>                 }
+>         }
+>
+> -       if (TMU_SUPPORTS(pdata, TRIM_RELOAD))
+> -               __raw_writel(1, data->base + reg->triminfo_ctrl);
+> +       if (TMU_SUPPORTS(pdata, TRIM_RELOAD)) {
+> +               for (i = 0; i < pdata->triminfo_reload_count; i++)
+> +                       __raw_writel(pdata->triminfo_reload[i],
+> +                                       data->base + reg->triminfo_ctrl[i]);
+> +       }
 
-Thanks for being pragmatic on this one, Stephen!
+What is the logic behind the trim reload feature? Which SoCs support it?
+
+>
+>         if (pdata->cal_mode == HW_MODE)
+>                 goto skip_calib_data;
+> diff --git a/drivers/thermal/samsung/exynos_tmu.h b/drivers/thermal/samsung/exynos_tmu.h
+> index 1b4a644..72cb54e 100644
+> --- a/drivers/thermal/samsung/exynos_tmu.h
+> +++ b/drivers/thermal/samsung/exynos_tmu.h
+> @@ -151,8 +151,7 @@ struct exynos_tmu_registers {
+>         u32     triminfo_25_shift;
+>         u32     triminfo_85_shift;
+>
+> -       u32     triminfo_ctrl;
+> -       u32     triminfo_ctrl1;
+> +       u32     triminfo_ctrl[2];
 
 
--Olof
+The above change needs to be documented.
+
+>         u32     triminfo_reload_shift;
+>
+>         u32     tmu_ctrl;
+> @@ -295,6 +294,8 @@ struct exynos_tmu_platform_data {
+>         u8 second_point_trim;
+>         u8 default_temp_offset;
+>         u8 test_mux;
+> +       u8 triminfo_reload[2];
+> +       u8 triminfo_reload_count;
+>
+
+The above addition needs to be documented too.
+
+>         enum calibration_type cal_type;
+>         enum calibration_mode cal_mode;
+> diff --git a/drivers/thermal/samsung/exynos_tmu_data.c b/drivers/thermal/samsung/exynos_tmu_data.c
+> index aa8e0de..8cd609c 100644
+> --- a/drivers/thermal/samsung/exynos_tmu_data.c
+> +++ b/drivers/thermal/samsung/exynos_tmu_data.c
+> @@ -95,6 +95,8 @@ static const struct exynos_tmu_registers exynos3250_tmu_registers = {
+>         .triminfo_data = EXYNOS_TMU_REG_TRIMINFO,
+>         .triminfo_25_shift = EXYNOS_TRIMINFO_25_SHIFT,
+>         .triminfo_85_shift = EXYNOS_TRIMINFO_85_SHIFT,
+> +       .triminfo_ctrl[0] = EXYNOS_TMU_TRIMINFO_CON1,
+> +       .triminfo_ctrl[1] = EXYNOS_TMU_TRIMINFO_CON2,
+>         .tmu_ctrl = EXYNOS_TMU_REG_CONTROL,
+>         .test_mux_addr_shift = EXYNOS4412_MUX_ADDR_SHIFT,
+>         .buf_vref_sel_shift = EXYNOS_TMU_REF_VOLTAGE_SHIFT,
+> @@ -160,8 +162,11 @@ static const struct exynos_tmu_registers exynos3250_tmu_registers = {
+>                 .temp_level = 95, \
+>         }, \
+>         .freq_tab_count = 2, \
+> +       .triminfo_reload[0] = 0x1, \
+> +       .triminfo_reload[1] = 0x11, \
+
+What does 0x1 mean? How about 0x11?
+
+> +       .triminfo_reload_count = 2, \
+
+What is count?
+
+>         .registers = &exynos3250_tmu_registers, \
+> -       .features = (TMU_SUPPORT_EMULATION | \
+> +       .features = (TMU_SUPPORT_EMULATION | TMU_SUPPORT_TRIM_RELOAD | \
+>                         TMU_SUPPORT_FALLING_TRIP | TMU_SUPPORT_READY_STATUS | \
+>                         TMU_SUPPORT_EMUL_TIME)
+>  #endif
+> @@ -184,7 +189,7 @@ static const struct exynos_tmu_registers exynos4412_tmu_registers = {
+>         .triminfo_data = EXYNOS_TMU_REG_TRIMINFO,
+>         .triminfo_25_shift = EXYNOS_TRIMINFO_25_SHIFT,
+>         .triminfo_85_shift = EXYNOS_TRIMINFO_85_SHIFT,
+> -       .triminfo_ctrl = EXYNOS_TMU_TRIMINFO_CON,
+> +       .triminfo_ctrl[0] = EXYNOS_TMU_TRIMINFO_CON2,
+>         .triminfo_reload_shift = EXYNOS_TRIMINFO_RELOAD_SHIFT,
+>         .tmu_ctrl = EXYNOS_TMU_REG_CONTROL,
+>         .test_mux_addr_shift = EXYNOS4412_MUX_ADDR_SHIFT,
+> @@ -252,6 +257,8 @@ static const struct exynos_tmu_registers exynos4412_tmu_registers = {
+>                 .temp_level = 95, \
+>         }, \
+>         .freq_tab_count = 2, \
+> +       .triminfo_reload[0] = 0x1, \
+> +       .triminfo_reload_count = 1, \
+
+
+Your patch description says nothing about TRIM_RELOAD on 4412, does it?
+
+What about the other SoCs?
+
+>         .registers = &exynos4412_tmu_registers, \
+>         .features = (TMU_SUPPORT_EMULATION | TMU_SUPPORT_TRIM_RELOAD | \
+>                         TMU_SUPPORT_FALLING_TRIP | TMU_SUPPORT_READY_STATUS | \
+> diff --git a/drivers/thermal/samsung/exynos_tmu_data.h b/drivers/thermal/samsung/exynos_tmu_data.h
+> index f0979e5..e0536c3 100644
+> --- a/drivers/thermal/samsung/exynos_tmu_data.h
+> +++ b/drivers/thermal/samsung/exynos_tmu_data.h
+> @@ -57,8 +57,11 @@
+>  #define EXYNOS4210_TMU_TRIG_LEVEL_MASK 0x1111
+>  #define EXYNOS4210_TMU_INTCLEAR_VAL    0x1111
+>
+> -/* Exynos5250 and Exynos4412 specific registers */
+> -#define EXYNOS_TMU_TRIMINFO_CON        0x14
+> +/* Exynos3250 specific registers */
+> +#define EXYNOS_TMU_TRIMINFO_CON1       0x10
+> +
+> +/* Exynos5250, Exynos4412 and Exynos3250 specific registers */
+> +#define EXYNOS_TMU_TRIMINFO_CON2       0x14
+>  #define EXYNOS_THD_TEMP_RISE           0x50
+>  #define EXYNOS_THD_TEMP_FALL           0x54
+>  #define EXYNOS_EMUL_CON                0x80
+> --
+> 1.8.0
+>
+
+
+
+-- 
+Eduardo Bezerra Valentin
