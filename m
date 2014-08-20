@@ -1,59 +1,67 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed, 20 Aug 2014 09:23:58 +0900
-Subject: [GIT PULL] Renesas ARM Based SoC DT Updates for v3.18
-Message-ID: <cover.1408492753.git.horms+renesas@verge.net.au>
+Date: Wed, 20 Aug 2014 09:23:52 +0900
+Subject: [PATCH 01/12] ARM: shmobile: r8a7791: add VIN DT support
+In-Reply-To: <cover.1408492753.git.horms+renesas@verge.net.au>
+References: <cover.1408492753.git.horms+renesas@verge.net.au>
+Message-ID: <0b8d1d579b4130f33a8776691453238839cb1973.1408492753.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof, Hi Kevin, Hi Arnd,
+From: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
-Please consider these Renesas ARM based SoC DT updates for v3.18.
+Define the generic R8A7791 parts of the VIN[0-2] device nodes. Add aliases for
+the VIN[0-2] device nodes.
 
+Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ arch/arm/boot/dts/r8a7791.dtsi | 27 +++++++++++++++++++++++++++
+ 1 file changed, 27 insertions(+)
 
-The following changes since commit 7d1311b93e58ed55f3a31cc8f94c4b8fe988a2b9:
-
-  Linux 3.17-rc1 (2014-08-16 10:40:26 -0600)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-dt-for-v3.18
-
-for you to fetch changes up to d594c9775409a4276133db5e34dbd791329c5eae:
-
-  ARM: shmobile: lager: add VIN1/ADV7180 device nodes (2014-08-17 09:44:07 +0900)
-
-----------------------------------------------------------------
-Renesas ARM Based SoC DT Updates for v3.18
-
-* Add VIN support to lager/r8a7790, koelsch/r8a7791 and henninger/r8a7791
-* Enable DMA for MSIOF and QSPI on r8a7790 and r8a7791
-
-----------------------------------------------------------------
-Ben Dooks (2):
-      ARM: shmobile: r8a7790: add VIN device nodes
-      ARM: shmobile: lager: add VIN1/ADV7180 device nodes
-
-Geert Uytterhoeven (4):
-      ARM: shmobile: r8a7791 dtsi: Enable DMA for QSPI
-      ARM: shmobile: r8a7791 dtsi: Enable DMA for MSIOF
-      ARM: shmobile: r8a7790 dtsi: Enable DMA for QSPI
-      ARM: shmobile: r8a7790 dtsi: Enable DMA for MSIOF
-
-Laurent Pinchart (3):
-      ARM: shmobile: r8a7790: Add DMAC clocks to DT
-      ARM: shmobile: r8a7790: Add DMAC devices to DT
-      ARM: shmobile: r8a7791: Add DMAC devices to DT
-
-Sergei Shtylyov (2):
-      ARM: shmobile: r8a7791: add VIN DT support
-      ARM: shmobile: henninger: add VIN0/ADV7180 DT support
-
-sergei.shtylyov at cogentembedded.com (1):
-      ARM: shmobile: koelsch: add VIN1/ADV7180 DT support
-
- arch/arm/boot/dts/r8a7790-lager.dts     |  36 ++++++++++
- arch/arm/boot/dts/r8a7790.dtsi          | 120 ++++++++++++++++++++++++++++++--
- arch/arm/boot/dts/r8a7791-henninger.dts |  35 ++++++++++
- arch/arm/boot/dts/r8a7791-koelsch.dts   |  35 ++++++++++
- arch/arm/boot/dts/r8a7791.dtsi          | 101 ++++++++++++++++++++++++++-
- 5 files changed, 318 insertions(+), 9 deletions(-)
+diff --git a/arch/arm/boot/dts/r8a7791.dtsi b/arch/arm/boot/dts/r8a7791.dtsi
+index 0d82a4b..0f28921 100644
+--- a/arch/arm/boot/dts/r8a7791.dtsi
++++ b/arch/arm/boot/dts/r8a7791.dtsi
+@@ -34,6 +34,9 @@
+ 		spi1 = &msiof0;
+ 		spi2 = &msiof1;
+ 		spi3 = &msiof2;
++		vin0 = &vin0;
++		vin1 = &vin1;
++		vin2 = &vin2;
+ 	};
+ 
+ 	cpus {
+@@ -518,6 +521,30 @@
+ 		status = "disabled";
+ 	};
+ 
++	vin0: video at e6ef0000 {
++		compatible = "renesas,vin-r8a7791";
++		clocks = <&mstp8_clks R8A7791_CLK_VIN0>;
++		reg = <0 0xe6ef0000 0 0x1000>;
++		interrupts = <0 188 IRQ_TYPE_LEVEL_HIGH>;
++		status = "disabled";
++	};
++
++	vin1: video at e6ef1000 {
++		compatible = "renesas,vin-r8a7791";
++		clocks = <&mstp8_clks R8A7791_CLK_VIN1>;
++		reg = <0 0xe6ef1000 0 0x1000>;
++		interrupts = <0 189 IRQ_TYPE_LEVEL_HIGH>;
++		status = "disabled";
++	};
++
++	vin2: video at e6ef2000 {
++		compatible = "renesas,vin-r8a7791";
++		clocks = <&mstp8_clks R8A7791_CLK_VIN2>;
++		reg = <0 0xe6ef2000 0 0x1000>;
++		interrupts = <0 190 IRQ_TYPE_LEVEL_HIGH>;
++		status = "disabled";
++	};
++
+ 	clocks {
+ 		#address-cells = <2>;
+ 		#size-cells = <2>;
+-- 
+2.0.1
