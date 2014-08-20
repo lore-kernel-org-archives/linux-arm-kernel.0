@@ -1,54 +1,98 @@
-From: graeme.gregory@linaro.org (graeme.gregory at linaro.org)
-Date: Wed, 20 Aug 2014 16:43:58 +0100
-Subject: [PATCH 06/19] ARM64 / ACPI: Parse FADT table to get PSCI flags
- for PSCI init
-In-Reply-To: <20140820152944.GR24600@localhost>
-References: <1406206825-15590-1-git-send-email-hanjun.guo@linaro.org>
- <1406206825-15590-7-git-send-email-hanjun.guo@linaro.org>
- <20140820150029.0BB3FC41205@trevor.secretlab.ca>
- <20140820152944.GR24600@localhost>
-Message-ID: <20140820154358.GA27927@xora-yoga-deb.xora.org.uk>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Wed, 20 Aug 2014 17:51:08 +0200
+Subject: [PATCH v3] arm/smp: Absorb boot_secondary()
+In-Reply-To: <1404918119-3676-1-git-send-email-geert+renesas@glider.be>
+References: <1404918119-3676-1-git-send-email-geert+renesas@glider.be>
+Message-ID: <CAMuHMdXp0ruZjjJLXmWyCdfAXs9_9xFHDcmJ08M9_SbZqqq04g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 20, 2014 at 04:29:44PM +0100, Catalin Marinas wrote:
-> On Wed, Aug 20, 2014 at 04:00:28PM +0100, Grant Likely wrote:
-> > On Thu, 24 Jul 2014 21:00:12 +0800, Hanjun Guo <hanjun.guo@linaro.org> wrote:
-> > > @@ -345,13 +378,19 @@ int __init psci_init(void)
-> > >  	const struct of_device_id *matched_np;
-> > >  	psci_initcall_t init_fn;
-> > >  
-> > > -	np = of_find_matching_node_and_match(NULL, psci_of_match, &matched_np);
-> > > +	if (acpi_disabled) {
-> > > +		np = of_find_matching_node_and_match(NULL,
-> > > +				psci_of_match, &matched_np);
-> > >  
-> > > -	if (!np)
-> > > -		return -ENODEV;
-> > > +		if (!np)
-> > > +			return -ENODEV;
-> > > +
-> > > +		init_fn = (psci_initcall_t)matched_np->data;
-> > > +
-> > > +		return init_fn(np);
-> > > +	}
-> > >  
-> > > -	init_fn = (psci_initcall_t)matched_np->data;
-> > > -	return init_fn(np);
-> > > +	return psci_0_2_init_acpi();
-> > >  }
-> > 
-> > So, while the functionality is sound, this is kind of a stinky diff. The
-> > ACPI path should not push the OF code into a sub branch. Make it look
-> > like this instead (with the advantage that the diff will be simpler):
-> > 
-> > +	if (IS_ENABLED(CONFIG_ACPI) && !acpi_disabled)
-> > +		return psci_0_2_init_acpi();
-> 
-> Minor point: we should define acpi_disabled to 1 when !CONFIG_ACPI and
-> avoid additional IS_ENABLED(CONFIG_ACPI) checks (unless already don this
-> way).
-> 
-This is the default behaviour already.
+Ping?
 
-Graeme
+On Wed, Jul 9, 2014 at 5:01 PM, Geert Uytterhoeven
+<geert+renesas@glider.be> wrote:
+> After becoming a mandatory function, boot_secondary() is no longer used
+> outside arch/arm/kernel/smp.c. Hence remove its public prototype, and,
+> as suggested by Arnd, let it be absorbed by its single caller.
+>
+> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> Acked-by: Arnd Bergmann <arnd@arndb.de>
+> ---
+> v3:
+>   - Add Acked-by
+>
+> v2:
+>   - This is v2 of "arm/smp: Make boot_secondary() static"
+>   - Absorb boot_secondary() instead of making it static.
+> ---
+>  arch/arm/include/asm/smp.h |  6 ------
+>  arch/arm/kernel/smp.c      | 12 ++++--------
+>  2 files changed, 4 insertions(+), 14 deletions(-)
+>
+> diff --git a/arch/arm/include/asm/smp.h b/arch/arm/include/asm/smp.h
+> index 2ec765c39ab4..18f5a554134f 100644
+> --- a/arch/arm/include/asm/smp.h
+> +++ b/arch/arm/include/asm/smp.h
+> @@ -49,12 +49,6 @@ extern void smp_init_cpus(void);
+>  extern void set_smp_cross_call(void (*)(const struct cpumask *, unsigned int));
+>
+>  /*
+> - * Boot a secondary CPU, and assign it the specified idle task.
+> - * This also gives us the initial stack to use for this CPU.
+> - */
+> -extern int boot_secondary(unsigned int cpu, struct task_struct *);
+> -
+> -/*
+>   * Called from platform specific assembly code, this is the
+>   * secondary CPU entry point.
+>   */
+> diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
+> index 7c4fada440f0..2cf681bccd6f 100644
+> --- a/arch/arm/kernel/smp.c
+> +++ b/arch/arm/kernel/smp.c
+> @@ -92,6 +92,9 @@ int __cpu_up(unsigned int cpu, struct task_struct *idle)
+>  {
+>         int ret;
+>
+> +       if (!smp_ops.smp_boot_secondary)
+> +               return -ENOSYS;
+> +
+>         /*
+>          * We need to tell the secondary core where to find
+>          * its stack and the page tables.
+> @@ -110,7 +113,7 @@ int __cpu_up(unsigned int cpu, struct task_struct *idle)
+>         /*
+>          * Now bring the CPU into our world.
+>          */
+> -       ret = boot_secondary(cpu, idle);
+> +       ret = smp_ops.smp_boot_secondary(cpu, idle);
+>         if (ret == 0) {
+>                 /*
+>                  * CPU was successfully started, wait for it
+> @@ -139,13 +142,6 @@ void __init smp_init_cpus(void)
+>                 smp_ops.smp_init_cpus();
+>  }
+>
+> -int boot_secondary(unsigned int cpu, struct task_struct *idle)
+> -{
+> -       if (smp_ops.smp_boot_secondary)
+> -               return smp_ops.smp_boot_secondary(cpu, idle);
+> -       return -ENOSYS;
+> -}
+> -
+>  int platform_can_cpu_hotplug(void)
+>  {
+>  #ifdef CONFIG_HOTPLUG_CPU
+> --
+> 1.9.1
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
