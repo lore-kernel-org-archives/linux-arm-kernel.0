@@ -1,46 +1,111 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Wed, 20 Aug 2014 20:23:23 +0530
-Subject: [PATCH 2/5] phy: miphy28lp: Add MiPHY28lp header file for DT
- x Driver defines
-In-Reply-To: <1407944075-8093-3-git-send-email-gabriel.fernandez@linaro.org>
-References: <1407944075-8093-1-git-send-email-gabriel.fernandez@linaro.org>
- <1407944075-8093-3-git-send-email-gabriel.fernandez@linaro.org>
-Message-ID: <53F4B663.90400@ti.com>
+From: dann.frazier@canonical.com (Dann Frazier)
+Date: Wed, 20 Aug 2014 08:56:09 -0600
+Subject: [PATCH 0/6] RCU get_user_pages_fast and __get_user_pages_fast
+In-Reply-To: <1403710824-24340-1-git-send-email-steve.capper@linaro.org>
+References: <1403710824-24340-1-git-send-email-steve.capper@linaro.org>
+Message-ID: <CALdTtns6+MRb=Z7i0ncq_c2u7QZWo1mUxD824bvNF==q-_+BiQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Wed, Jun 25, 2014 at 9:40 AM, Steve Capper <steve.capper@linaro.org> wrote:
+> Hello,
+> This series implements general forms of get_user_pages_fast and
+> __get_user_pages_fast and activates them for arm and arm64.
+>
+> These are required for Transparent HugePages to function correctly, as
+> a futex on a THP tail will otherwise result in an infinite loop (due to
+> the core implementation of __get_user_pages_fast always returning 0).
+>
+> This series may also be beneficial for direct-IO heavy workloads and
+> certain KVM workloads.
+>
+> The main changes since RFC V5 are:
+>  * Rebased against 3.16-rc1.
+>  * pmd_present no longer tested for by gup_huge_pmd and gup_huge_pud,
+>    because the entry must be present for these leaf functions to be
+>    called.
+>  * Rather than assume puds can be re-cast as pmds, a separate
+>    function pud_write is instead used by the core gup.
+>  * ARM activation logic changed, now it will only activate
+>    RCU_TABLE_FREE and RCU_GUP when running with LPAE.
+>
+> The main changes since RFC V4 are:
+>  * corrected the arm64 logic so it now correctly rcu-frees page
+>    table backing pages.
+>  * rcu free logic relaxed for pre-ARMv7 ARM as we need an IPI to
+>    invalidate TLBs anyway.
+>  * rebased to 3.15-rc3 (some minor changes were needed to allow it to merge).
+>  * dropped Catalin's mmu_gather patch as that's been merged already.
+>
+> This series has been tested with LTP and some custom futex tests that
+> exacerbate the futex on THP tail case. Also debug counters were
+> temporarily employed to ensure that the RCU_TABLE_FREE logic was
+> behaving as expected.
+>
+> I would really appreciate any testers or comments (especially on the
+> validity or otherwise of the core fast_gup implementation).
 
-On Wednesday 13 August 2014 09:04 PM, Gabriel FERNANDEZ wrote:
-> This provides the shared header file which will be reference from both
-> the MiPHY28lp driver and its associated Device Tree node(s).
-> 
-> Signed-off-by: alexandre torgue <alexandre.torgue@st.com>
-> Signed-off-by: Gabriel Fernandez <gabriel.fernandez@linaro.org>
-> ---
->  include/dt-bindings/phy/phy-miphy28lp.h | 12 ++++++++++++
->  1 file changed, 12 insertions(+)
->  create mode 100644 include/dt-bindings/phy/phy-miphy28lp.h
-> 
-> diff --git a/include/dt-bindings/phy/phy-miphy28lp.h b/include/dt-bindings/phy/phy-miphy28lp.h
-> new file mode 100644
-> index 0000000..7cf9bce
-> --- /dev/null
-> +++ b/include/dt-bindings/phy/phy-miphy28lp.h
-> @@ -0,0 +1,12 @@
-> +/*
-> + * This header provides constants for the phy framework
-> + * based on the STMicroelectronics miph28lp.
-> + */
-> +#ifndef _DT_BINDINGS_PHY_MIPHY28LP
-> +#define _DT_BINDINGS_PHY_MIPHY28LP
-> +
-> +#define MIPHY_TYPE_SATA		1
-> +#define MIPHY_TYPE_PCIE		2
-> +#define MIPHY_TYPE_USB		3
+I have a test case that can reliably hit the THP issue on arm64, which
+hits it on both 3.16 and 3.17-rc1. I do a "juju bootstrap local" w/
+THP disabled at boot. Then I reboot with THP enabled. At this point
+you'll see jujud spin at 200% CPU. gccgo binaries seem to have a nack
+for hitting it.
 
-I think we should create a common file for phy so that all user's need not
-create a separate copy of the same thing.
+I validated that your patches resolve this issue on 3.16, so:
 
-Thanks
-Kishon
+Tested-by: dann frazier <dann.frazier@canonical.com>
+
+I haven't done the same for 3.17-rc1 because they no longer apply
+cleanly, but I'm happy to test future submissions w/ hopefully a
+shorter feedback loop (please add me to the CC). btw, should we
+consider something like this until your patches go in?
+
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index fd4e81a..820e3d9 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -306,6 +306,7 @@ config ARCH_WANT_HUGE_PMD_SHARE
+
+ config HAVE_ARCH_TRANSPARENT_HUGEPAGE
+        def_bool y
++       depends on BROKEN
+
+ config ARCH_HAS_CACHE_LINE_SIZE
+        def_bool y
+
+  -dann
+
+> Cheers,
+> --
+> Steve
+>
+> Steve Capper (6):
+>   mm: Introduce a general RCU get_user_pages_fast.
+>   arm: mm: Introduce special ptes for LPAE
+>   arm: mm: Enable HAVE_RCU_TABLE_FREE logic
+>   arm: mm: Enable RCU fast_gup
+>   arm64: mm: Enable HAVE_RCU_TABLE_FREE logic
+>   arm64: mm: Enable RCU fast_gup
+>
+>  arch/arm/Kconfig                      |   5 +
+>  arch/arm/include/asm/pgtable-2level.h |   2 +
+>  arch/arm/include/asm/pgtable-3level.h |  16 ++
+>  arch/arm/include/asm/pgtable.h        |   6 +-
+>  arch/arm/include/asm/tlb.h            |  38 ++++-
+>  arch/arm/mm/flush.c                   |  19 +++
+>  arch/arm64/Kconfig                    |   4 +
+>  arch/arm64/include/asm/pgtable.h      |  11 +-
+>  arch/arm64/include/asm/tlb.h          |  18 ++-
+>  arch/arm64/mm/flush.c                 |  19 +++
+>  mm/Kconfig                            |   3 +
+>  mm/gup.c                              | 278 ++++++++++++++++++++++++++++++++++
+>  12 files changed, 410 insertions(+), 9 deletions(-)
+>
+> --
+> 1.9.3
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
