@@ -1,99 +1,46 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Wed, 20 Aug 2014 07:28:11 -0500
-Subject: [PATCH v4 4/8] arm: use fixmap for text patching when text is RO
-In-Reply-To: <20140819122933.GI23128@arm.com>
-References: <1407949593-16121-1-git-send-email-keescook@chromium.org>
- <1407949593-16121-5-git-send-email-keescook@chromium.org>
- <20140819122933.GI23128@arm.com>
-Message-ID: <CAGXu5jLxqyfJtg8rR9nzOrSBSsRC6y34rG6mZ8bb=AoxbSHkWQ@mail.gmail.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 20 Aug 2014 13:30:30 +0100
+Subject: [PATCH] mfd: twl4030-power: Fix PM idle pin configuration to not
+ conflict with regulators
+In-Reply-To: <20140819152405.GA12002@atomide.com>
+References: <20140819152405.GA12002@atomide.com>
+Message-ID: <20140820123030.GL4266@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 19, 2014 at 7:29 AM, Will Deacon <will.deacon@arm.com> wrote:
-> Hello,
->
-> On Wed, Aug 13, 2014 at 06:06:29PM +0100, Kees Cook wrote:
->> From: Rabin Vincent <rabin@rab.in>
->>
->> Use fixmaps for text patching when the kernel text is read-only,
->> inspired by x86.  This makes jump labels and kprobes work with the
->> currently available CONFIG_DEBUG_SET_MODULE_RONX and the upcoming
->> CONFIG_DEBUG_RODATA options.
->>
->> Signed-off-by: Rabin Vincent <rabin@rab.in>
->> [kees: fixed up for merge with "arm: use generic fixmap.h"]
->> [kees: added parse acquire/release annotations to pass C=1 builds]
->> Signed-off-by: Kees Cook <keescook@chromium.org>
->
-> [...]
->
->> diff --git a/arch/arm/kernel/patch.c b/arch/arm/kernel/patch.c
->> index 07314af47733..a1dce690446a 100644
->> --- a/arch/arm/kernel/patch.c
->> +++ b/arch/arm/kernel/patch.c
->> @@ -1,8 +1,11 @@
->>  #include <linux/kernel.h>
->> +#include <linux/spinlock.h>
->>  #include <linux/kprobes.h>
->> +#include <linux/mm.h>
->>  #include <linux/stop_machine.h>
->>
->>  #include <asm/cacheflush.h>
->> +#include <asm/fixmap.h>
->>  #include <asm/smp_plat.h>
->>  #include <asm/opcodes.h>
->>
->> @@ -13,21 +16,77 @@ struct patch {
->>       unsigned int insn;
->>  };
->>
->> -void __kprobes __patch_text(void *addr, unsigned int insn)
->> +static DEFINE_SPINLOCK(patch_lock);
->> +
->> +static void __kprobes *patch_map(void *addr, int fixmap, unsigned long *flags)
->> +     __acquires(&patch_lock)
->> +{
->> +     unsigned int uintaddr = (uintptr_t) addr;
->> +     bool module = !core_kernel_text(uintaddr);
->> +     struct page *page;
->> +
->> +     if (module && IS_ENABLED(CONFIG_DEBUG_SET_MODULE_RONX))
->> +             page = vmalloc_to_page(addr);
->> +     else if (!module && IS_ENABLED(CONFIG_DEBUG_RODATA))
->> +             page = virt_to_page(addr);
->> +     else
->> +             return addr;
->> +
->> +     if (flags)
->> +             spin_lock_irqsave(&patch_lock, *flags);
->> +     else
->> +             __acquire(&patch_lock);
->
-> I don't understand the locking here. Why is it conditional, why do we need
-> to disable interrupts, and are you just racing against yourself?
+On Tue, 19 Aug 2014, Tony Lindgren wrote:
 
-AIUI, the locking is here to avoid multiple users of the text poking
-fixmaps. It's conditional because there are two fixmaps
-(FIX_TEXT_POKE0 and FIX_TEXT_POKE1). Locking happens around 0 so
-locking around 1 is not needed since it is only ever used when 0 is in
-use. (__patch_text_real locks patch_lock before setting 0 when it uses
-remapping, and if it also needs 1, it doesn't have to lock since the
-lock is already held.)
+> Commit 43fef47f94a1 (mfd: twl4030-power: Add a configuration to turn
+> off oscillator during off-idle) added support for configuring the PMIC
+> to cut off resources during deeper idle states to save power.
+> 
+> This however caused regression for n900 display power that needed the
+> PMIC configuration to be disabled with commit d937678ab625 (ARM: dts:
+> Revert enabling of twl configuration for n900).
+> 
+> Turns out the root cause of the problem is that we must use
+> TWL4030_RESCONFIG_UNDEF instead of DEV_GRP_NULL to avoid disabling
+> regulators that may have been enabled before the init function
+> for twl4030-power.c runs. With TWL4030_RESCONFIG_UNDEF we let the
+> regulator framework control the regulators like it should. Here we
+> need to only configure the sys_clken and sys_off_mode triggers for
+> the regulators that cannot be done by the regulator framework as
+> it's not running at that point.
+> 
+> This allows us to enable the PMIC configuration for n900.
+> 
+> Fixes: 43fef47f94a1 (mfd: twl4030-power: Add a configuration to turn off oscillator during off-idle)
+> Cc: stable at vger.kernel.org # v3.16
+> Signed-off-by: Tony Lindgren <tony@atomide.com>
+> 
+> ---
+> 
+> Lee, can you please pick this one for the v3.17-rc series?
 
->> +     set_fixmap(fixmap, page_to_phys(page));
->
-> set_fixmap does TLB invalidation, right? I think that means it can block on
-> 11MPCore and A15 w/ the TLBI erratum, so it's not safe to call this with
-> interrupts disabled anyway.
-
-Oh right. Hrm.
-
-In an earlier version of this series set_fixmap did not perform TLB
-invalidation. I wonder if this is not needed at all? (Wouldn't that be
-nice...)
-
--Kees
+Applied with Aaro's Tested-by.
 
 -- 
-Kees Cook
-Chrome OS Security
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
