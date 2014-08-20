@@ -1,72 +1,74 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Wed, 20 Aug 2014 16:15:15 +0200
-Subject: [PATCH v5 1/1] iommu-api: Add map_sg/unmap_sg functions
-In-Reply-To: <20140820130250.GA3120@laptop.dumpdata.com>
-References: <1407797150-515-1-git-send-email-ohaugan@codeaurora.org>
- <2767102.8U6hAaZh2n@avalon> <20140820130250.GA3120@laptop.dumpdata.com>
-Message-ID: <1689625.AvEiiWCphE@avalon>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 20 Aug 2014 15:16:23 +0100
+Subject: [PATCH] Arm64: convert soft_restart() to assembly code
+In-Reply-To: <CAFdej00s9ZYXnE4AfU0vUqTb4dmUg4U=fOhc3KS1_JK+0=+mdw@mail.gmail.com>
+References: <1407847365-10873-1-git-send-email-achandran@mvista.com>
+ <1408123221.22761.38.camel@smoke>
+ <20140815182157.GD21908@leverpostej>
+ <CAFdej01kDMSTpzdGiRmX8g=E4mZU2_5oiiKzyQ_z7z1jxeCF-A@mail.gmail.com>
+ <20140820105408.GG21174@leverpostej>
+ <CAFdej00s9ZYXnE4AfU0vUqTb4dmUg4U=fOhc3KS1_JK+0=+mdw@mail.gmail.com>
+Message-ID: <20140820141623.GF21734@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Konrad,
+[...]
 
-On Wednesday 20 August 2014 09:02:50 Konrad Rzeszutek Wilk wrote:
-> On Tue, Aug 19, 2014 at 10:52:46PM +0200, Laurent Pinchart wrote:
-> > On Tuesday 19 August 2014 11:40:24 Olav Haugan wrote:
-> > > On 8/19/2014 9:11 AM, Laurent Pinchart wrote:
-> > > > On Tuesday 19 August 2014 13:59:54 Joerg Roedel wrote:
-
-[snip]
-
-> > > >> Okay, since you add these call-backs to all drivers I think I can
-> > > >> live with not doing a pointer check here.
-> > > > 
-> > > > I suggested doing a
-> > > > 
-> > > > if (ops is not NULL)
-> > > > 	return ops();
-> > > > else
-> > > > 	return default_ops();
-> > > > 
-> > > > to avoid modifying all drivers. I'm not sure why that wasn't received
-> > > > with much enthusiasm.
-> > > 
-> > > Both Thierry R. and Konrad W. argued for modifying the drivers instead
-> > > so I implemented what the majority wanted. :-)
-> > 
-> > I'm not blaming you :-) I was just wondering what their rationale was.
+> I am trying to kexec a UP-LE kernel from and SMP-LE kernel.
 > 
-> a). To be inline with the usage of this API.
+> > As I mentioned we do need to ensure that the CPUs are in the mode they
+> > started in, though I'm not sure I follow what you mean by "not waiting".
+> > This could be an orthogonal issue.
 > 
->     For this particular case the other functions (but maybe I missed some)
->     follow the idea that they implement the ops->func for every operation
->     and they don't have an fallback.
-
-That's because the other functions are mandatory, while this particular one is 
-just an optimization and can be implemented generically.
-
-> b)  Follow what x86 maintainers prefer (based on other API calls,
->     such as x86_init or any other platform overrides).
+> If I verify the secondary CPUs from u-boot I can see that
+> they are all looping at
 > 
-> c). When there are new IOMMUs it has to take in-to account all of the
->     function ops. If they fail to implement all of them the kernel
->     crashes instead of working (but maybe working incorrectly).
-
-I don't think that applies in this case, the generic implementation should 
-work in all cases.
-
-> d). Lastly, we also want the bloat of kernel. If the compiler decides
->     to roll in the fallback implementation for 'iommu_map_sg' in - it will
->     needlessly expand the kernel wherever we use 'iommu_map_sg' call with
->     a fallback implementation (which might not be called 99% of time).
+>     Core number       : 1
+>     Core state        : debug (AArch64 EL2)
+>     Debug entry cause : External Debug Request
+>     Current PC        : 0x0000000000000238
+>     Current CPSR      : 0x200003c9 (EL2h)
 > 
->     Having the little inline static just do 'func_ops->func' will
->     stop the compiler from optimizing too much and convert this just
->     to a simple function.
+> But after the kexec calls soft_restar(0) for all secondary CPUs
+> they are looping at
+> 
+>     Core number       : 1
+>     Core state        : debug (AArch64 EL1)
+>     Debug entry cause : External Debug Request
+>     Current PC        : 0xffffffc000083200
+>     Current CPSR      : 0x600003c5 (EL1h)
+> 
+> This is what I mean by they are not waiting for
+> the secondary start-up address to jump.
 
-That's an argument I can buy.
+Ok.
 
--- 
-Regards,
+> >
+> > What exactly do you see, do the CPUs leave the spin-table, are they
+> > taking exceptions, are they getting stuck in the spin-table, etc?
+> >
+> They all are clearly resetting to address "0"(Put a breakpoint and
+> verified) but somehow they end up @0xffffffc000083200.
+> I still don't know why.
+> 
+> ########
+> ffffffc00008319c:       d503201f        nop
+>         ...
+> ffffffc000083200:       14000260        b       ffffffc000083b80 <el1_sync>
+> ffffffc000083204:       d503201f        nop
+> ffffffc000083208:       d503201f        nop
+> ########
 
-Laurent Pinchart
+That's the EL1 exception vector table.
+
+What looks to be happening is that something causes the CPUs to take an
+exception (at EL1). Because translation isn't enabled and the vector
+address doesn't map to anything, they'll take some sort of exception.
+Because the vectors aren't mapped that will go recursive.
+
+Your spin-table implementation might be poking something that's not
+accessible at EL1, in which case you require the jump to EL2 for
+correctness. I can't say for certain either way.
+
+Thanks,
+Mark.
