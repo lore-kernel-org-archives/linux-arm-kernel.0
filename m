@@ -1,163 +1,63 @@
-From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
-Date: Wed, 20 Aug 2014 14:14:52 +0200
-Subject: [PATCHv3] thermal: exynos: Add support for TRIM_RELOAD feature at
- Exynos3250
-In-Reply-To: <1408492364-8012-1-git-send-email-cw00.choi@samsung.com>
-References: <1408450078-6296-1-git-send-email-cw00.choi@samsung.com>
- <1408492364-8012-1-git-send-email-cw00.choi@samsung.com>
-Message-ID: <1706216.YJ4TzvQvn4@amdc1032>
+From: keescook@chromium.org (Kees Cook)
+Date: Wed, 20 Aug 2014 07:16:34 -0500
+Subject: [PATCH v4 2/8] ARM: expand fixmap region to 3MB
+In-Reply-To: <20140819122653.GH23128@arm.com>
+References: <1407949593-16121-1-git-send-email-keescook@chromium.org>
+ <1407949593-16121-3-git-send-email-keescook@chromium.org>
+ <20140819122653.GH23128@arm.com>
+Message-ID: <CAGXu5jJRx8e2_9jpMYApH8maJog_z2YAs2ihoD4SFNfvPqn2Aw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tue, Aug 19, 2014 at 7:26 AM, Will Deacon <will.deacon@arm.com> wrote:
+> Hi Kees, Rob,
+>
+> On Wed, Aug 13, 2014 at 06:06:27PM +0100, Kees Cook wrote:
+>> From: Rob Herring <robh@kernel.org>
+>>
+>> With commit a05e54c103b0 ("ARM: 8031/2: change fixmap mapping region to
+>> support 32 CPUs"), the fixmap region was expanded to 2MB, but it
+>> precluded any other uses of the fixmap region. In order to support other
+>> uses the fixmap region needs to be expanded beyond 2MB. Fortunately, the
+>> adjacent 1MB range 0xffe00000-0xfff00000 is availabe.
+>>
+>> Remove fixmap_page_table ptr and lookup the page table via the virtual
+>> address so that the fixmap region can span more that one pmd. The 2nd
+>> pmd is already created since it is shared with the vector page.
+>
+> [...]
+>
+>> diff --git a/arch/arm/mm/highmem.c b/arch/arm/mm/highmem.c
+>> index 45aeaaca9052..81061987ac45 100644
+>> --- a/arch/arm/mm/highmem.c
+>> +++ b/arch/arm/mm/highmem.c
+>> @@ -18,19 +18,20 @@
+>>  #include <asm/tlbflush.h>
+>>  #include "mm.h"
+>>
+>> -pte_t *fixmap_page_table;
+>> -
+>>  static inline void set_fixmap_pte(int idx, pte_t pte)
+>>  {
+>>       unsigned long vaddr = __fix_to_virt(idx);
+>> -     set_pte_ext(fixmap_page_table + idx, pte, 0);
+>> +     pte_t *ptep = pte_offset_kernel(pmd_off_k(vaddr), vaddr);
+>> +
+>> +     set_pte_ext(ptep, pte, 0);
+>>       local_flush_tlb_kernel_page(vaddr);
+>>  }
+>
+> Minor comment, but we can drop the ifx parameter here now, right? It looks a
+> bit weird having a setter/getter pair of functions where the type signatures
+> aren't the inverse.
 
-Hi,
+idx is used to get the vaddr here. I suppose the various users of
+these functions in highmem could be reworked, but that doesn't look
+sensible either. Maybe it's just the names of the functions that are
+confusing?
 
-On Wednesday, August 20, 2014 08:52:44 AM Chanwoo Choi wrote:
-> This patch add support for TRIM_RELOAD feature at Exynos3250. The TMU of
-> Exynos3250 has two TRIMINFO_CON register.
+-Kees
 
-This patch also silently fixes wrong behavior of the Exynos thermal
-driver and TRIM_RELOAD feature for Exynos5260 and Exynos5420.  Currently
-these SoCs claim TRIM_RELOAD support but don't have triminfo_ctrl
-register address defined in their struct exynos_tmu_registers entries.
-This causes write of value "1" to data->base + 0x00 address (which
-happens to be TRIMINFO register).  Your patch doesn't define
-triminfo_reload_count on all SoCs that use TRIM_RELOAD flag so wrong
-write to TRIMINFO register no longer happens but I think that it would
-be the best to fix it explicitly by removing TRIM_RELOAD flag for
-Exynos5260 and Exynos5420 in a pre-patch to your patch, please see:
-
-	https://lkml.org/lkml/2014/8/20/334
-
-One other issue with your patch is that it modifies struct
-exynos_tmu_registers and struct exynos_tmu_platform_data without
-updating corresponding documentation.  Please fix it.
-
-Otherwise it looks fine to me.
-
-Best regards,
---
-Bartlomiej Zolnierkiewicz
-Samsung R&D Institute Poland
-Samsung Electronics
- 
-> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
-> Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
-> Cc: Zhang Rui <rui.zhang@intel.com>
-> Cc: Eduardo Valentin <edubezval@gmail.com>
-> Cc: Amit Daniel Kachhap <amit.daniel@samsung.com>
-> ---
-> Changes from v2:
-> - Fix build break because of missing 'or' operation.
-> Changes from v1:
-> - Add missing 'TMU_SUPPORT_TRIM_RELOAD' feature
-> 
->  drivers/thermal/samsung/exynos_tmu.c      |  7 +++++--
->  drivers/thermal/samsung/exynos_tmu.h      |  5 +++--
->  drivers/thermal/samsung/exynos_tmu_data.c | 11 +++++++++--
->  drivers/thermal/samsung/exynos_tmu_data.h |  7 +++++--
->  4 files changed, 22 insertions(+), 8 deletions(-)
-> 
-> diff --git a/drivers/thermal/samsung/exynos_tmu.c b/drivers/thermal/samsung/exynos_tmu.c
-> index acbff14..ed01606 100644
-> --- a/drivers/thermal/samsung/exynos_tmu.c
-> +++ b/drivers/thermal/samsung/exynos_tmu.c
-> @@ -164,8 +164,11 @@ static int exynos_tmu_initialize(struct platform_device *pdev)
->  		}
->  	}
->  
-> -	if (TMU_SUPPORTS(pdata, TRIM_RELOAD))
-> -		__raw_writel(1, data->base + reg->triminfo_ctrl);
-> +	if (TMU_SUPPORTS(pdata, TRIM_RELOAD)) {
-> +		for (i = 0; i < pdata->triminfo_reload_count; i++)
-> +			__raw_writel(pdata->triminfo_reload[i],
-> +					data->base + reg->triminfo_ctrl[i]);
-> +	}
->  
->  	if (pdata->cal_mode == HW_MODE)
->  		goto skip_calib_data;
-> diff --git a/drivers/thermal/samsung/exynos_tmu.h b/drivers/thermal/samsung/exynos_tmu.h
-> index 1b4a644..72cb54e 100644
-> --- a/drivers/thermal/samsung/exynos_tmu.h
-> +++ b/drivers/thermal/samsung/exynos_tmu.h
-> @@ -151,8 +151,7 @@ struct exynos_tmu_registers {
->  	u32	triminfo_25_shift;
->  	u32	triminfo_85_shift;
->  
-> -	u32	triminfo_ctrl;
-> -	u32	triminfo_ctrl1;
-> +	u32	triminfo_ctrl[2];
->  	u32	triminfo_reload_shift;
->  
->  	u32	tmu_ctrl;
-> @@ -295,6 +294,8 @@ struct exynos_tmu_platform_data {
->  	u8 second_point_trim;
->  	u8 default_temp_offset;
->  	u8 test_mux;
-> +	u8 triminfo_reload[2];
-> +	u8 triminfo_reload_count;
->  
->  	enum calibration_type cal_type;
->  	enum calibration_mode cal_mode;
-> diff --git a/drivers/thermal/samsung/exynos_tmu_data.c b/drivers/thermal/samsung/exynos_tmu_data.c
-> index aa8e0de..8cd609c 100644
-> --- a/drivers/thermal/samsung/exynos_tmu_data.c
-> +++ b/drivers/thermal/samsung/exynos_tmu_data.c
-> @@ -95,6 +95,8 @@ static const struct exynos_tmu_registers exynos3250_tmu_registers = {
->  	.triminfo_data = EXYNOS_TMU_REG_TRIMINFO,
->  	.triminfo_25_shift = EXYNOS_TRIMINFO_25_SHIFT,
->  	.triminfo_85_shift = EXYNOS_TRIMINFO_85_SHIFT,
-> +	.triminfo_ctrl[0] = EXYNOS_TMU_TRIMINFO_CON1,
-> +	.triminfo_ctrl[1] = EXYNOS_TMU_TRIMINFO_CON2,
->  	.tmu_ctrl = EXYNOS_TMU_REG_CONTROL,
->  	.test_mux_addr_shift = EXYNOS4412_MUX_ADDR_SHIFT,
->  	.buf_vref_sel_shift = EXYNOS_TMU_REF_VOLTAGE_SHIFT,
-> @@ -160,8 +162,11 @@ static const struct exynos_tmu_registers exynos3250_tmu_registers = {
->  		.temp_level = 95, \
->  	}, \
->  	.freq_tab_count = 2, \
-> +	.triminfo_reload[0] = 0x1, \
-> +	.triminfo_reload[1] = 0x11, \
-> +	.triminfo_reload_count = 2, \
->  	.registers = &exynos3250_tmu_registers, \
-> -	.features = (TMU_SUPPORT_EMULATION | \
-> +	.features = (TMU_SUPPORT_EMULATION | TMU_SUPPORT_TRIM_RELOAD | \
->  			TMU_SUPPORT_FALLING_TRIP | TMU_SUPPORT_READY_STATUS | \
->  			TMU_SUPPORT_EMUL_TIME)
->  #endif
-> @@ -184,7 +189,7 @@ static const struct exynos_tmu_registers exynos4412_tmu_registers = {
->  	.triminfo_data = EXYNOS_TMU_REG_TRIMINFO,
->  	.triminfo_25_shift = EXYNOS_TRIMINFO_25_SHIFT,
->  	.triminfo_85_shift = EXYNOS_TRIMINFO_85_SHIFT,
-> -	.triminfo_ctrl = EXYNOS_TMU_TRIMINFO_CON,
-> +	.triminfo_ctrl[0] = EXYNOS_TMU_TRIMINFO_CON2,
->  	.triminfo_reload_shift = EXYNOS_TRIMINFO_RELOAD_SHIFT,
->  	.tmu_ctrl = EXYNOS_TMU_REG_CONTROL,
->  	.test_mux_addr_shift = EXYNOS4412_MUX_ADDR_SHIFT,
-> @@ -252,6 +257,8 @@ static const struct exynos_tmu_registers exynos4412_tmu_registers = {
->  		.temp_level = 95, \
->  	}, \
->  	.freq_tab_count = 2, \
-> +	.triminfo_reload[0] = 0x1, \
-> +	.triminfo_reload_count = 1, \
->  	.registers = &exynos4412_tmu_registers, \
->  	.features = (TMU_SUPPORT_EMULATION | TMU_SUPPORT_TRIM_RELOAD | \
->  			TMU_SUPPORT_FALLING_TRIP | TMU_SUPPORT_READY_STATUS | \
-> diff --git a/drivers/thermal/samsung/exynos_tmu_data.h b/drivers/thermal/samsung/exynos_tmu_data.h
-> index f0979e5..e0536c3 100644
-> --- a/drivers/thermal/samsung/exynos_tmu_data.h
-> +++ b/drivers/thermal/samsung/exynos_tmu_data.h
-> @@ -57,8 +57,11 @@
->  #define EXYNOS4210_TMU_TRIG_LEVEL_MASK	0x1111
->  #define EXYNOS4210_TMU_INTCLEAR_VAL	0x1111
->  
-> -/* Exynos5250 and Exynos4412 specific registers */
-> -#define EXYNOS_TMU_TRIMINFO_CON	0x14
-> +/* Exynos3250 specific registers */
-> +#define EXYNOS_TMU_TRIMINFO_CON1	0x10
-> +
-> +/* Exynos5250, Exynos4412 and Exynos3250 specific registers */
-> +#define EXYNOS_TMU_TRIMINFO_CON2	0x14
->  #define EXYNOS_THD_TEMP_RISE		0x50
->  #define EXYNOS_THD_TEMP_FALL		0x54
->  #define EXYNOS_EMUL_CON		0x80
+-- 
+Kees Cook
+Chrome OS Security
