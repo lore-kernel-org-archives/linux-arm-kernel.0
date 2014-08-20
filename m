@@ -1,91 +1,66 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed, 20 Aug 2014 09:23:56 +0900
-Subject: [PATCH 05/12] ARM: shmobile: r8a7790: Add DMAC devices to DT
+Date: Wed, 20 Aug 2014 09:23:59 +0900
+Subject: [PATCH 08/12] ARM: shmobile: r8a7791 dtsi: Enable DMA for MSIOF
 In-Reply-To: <cover.1408492753.git.horms+renesas@verge.net.au>
 References: <cover.1408492753.git.horms+renesas@verge.net.au>
-Message-ID: <b9fea49c79f23212ff21ef2f305ea4ae865db860.1408492753.git.horms+renesas@verge.net.au>
+Message-ID: <a5ce27f5f3285520496af0fe5282395ac07c4138.1408492753.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+From: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Instantiate the two system DMA controllers in the r8a7790 device tree.
+Add register sets used for access by the DMA engine, and DMA properties to
+the MSIOF nodes.
 
-Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7790.dtsi | 59 ++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 59 insertions(+)
+ arch/arm/boot/dts/r8a7791.dtsi | 12 +++++++++---
+ 1 file changed, 9 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/boot/dts/r8a7790.dtsi b/arch/arm/boot/dts/r8a7790.dtsi
-index 220662f..3707f0e 100644
---- a/arch/arm/boot/dts/r8a7790.dtsi
-+++ b/arch/arm/boot/dts/r8a7790.dtsi
-@@ -217,6 +217,65 @@
- 			     <0 3 IRQ_TYPE_LEVEL_HIGH>;
- 	};
+diff --git a/arch/arm/boot/dts/r8a7791.dtsi b/arch/arm/boot/dts/r8a7791.dtsi
+index ab55efd..f26226e 100644
+--- a/arch/arm/boot/dts/r8a7791.dtsi
++++ b/arch/arm/boot/dts/r8a7791.dtsi
+@@ -1022,9 +1022,11 @@
  
-+	dmac0: dma-controller at e6700000 {
-+		compatible = "renesas,rcar-dmac";
-+		reg = <0 0xe6700000 0 0x20000>;
-+		interrupts = <0 197 IRQ_TYPE_LEVEL_HIGH
-+			      0 200 IRQ_TYPE_LEVEL_HIGH
-+			      0 201 IRQ_TYPE_LEVEL_HIGH
-+			      0 202 IRQ_TYPE_LEVEL_HIGH
-+			      0 203 IRQ_TYPE_LEVEL_HIGH
-+			      0 204 IRQ_TYPE_LEVEL_HIGH
-+			      0 205 IRQ_TYPE_LEVEL_HIGH
-+			      0 206 IRQ_TYPE_LEVEL_HIGH
-+			      0 207 IRQ_TYPE_LEVEL_HIGH
-+			      0 208 IRQ_TYPE_LEVEL_HIGH
-+			      0 209 IRQ_TYPE_LEVEL_HIGH
-+			      0 210 IRQ_TYPE_LEVEL_HIGH
-+			      0 211 IRQ_TYPE_LEVEL_HIGH
-+			      0 212 IRQ_TYPE_LEVEL_HIGH
-+			      0 213 IRQ_TYPE_LEVEL_HIGH
-+			      0 214 IRQ_TYPE_LEVEL_HIGH>;
-+		interrupt-names = "error",
-+				"ch0", "ch1", "ch2", "ch3",
-+				"ch4", "ch5", "ch6", "ch7",
-+				"ch8", "ch9", "ch10", "ch11",
-+				"ch12", "ch13", "ch14";
-+		clocks = <&mstp2_clks R8A7790_CLK_SYS_DMAC0>;
-+		clock-names = "fck";
-+		#dma-cells = <1>;
-+		dma-channels = <15>;
-+	};
-+
-+	dmac1: dma-controller at e6720000 {
-+		compatible = "renesas,rcar-dmac";
-+		reg = <0 0xe6720000 0 0x20000>;
-+		interrupts = <0 220 IRQ_TYPE_LEVEL_HIGH
-+			      0 216 IRQ_TYPE_LEVEL_HIGH
-+			      0 217 IRQ_TYPE_LEVEL_HIGH
-+			      0 218 IRQ_TYPE_LEVEL_HIGH
-+			      0 219 IRQ_TYPE_LEVEL_HIGH
-+			      0 308 IRQ_TYPE_LEVEL_HIGH
-+			      0 309 IRQ_TYPE_LEVEL_HIGH
-+			      0 310 IRQ_TYPE_LEVEL_HIGH
-+			      0 311 IRQ_TYPE_LEVEL_HIGH
-+			      0 312 IRQ_TYPE_LEVEL_HIGH
-+			      0 313 IRQ_TYPE_LEVEL_HIGH
-+			      0 314 IRQ_TYPE_LEVEL_HIGH
-+			      0 315 IRQ_TYPE_LEVEL_HIGH
-+			      0 316 IRQ_TYPE_LEVEL_HIGH
-+			      0 317 IRQ_TYPE_LEVEL_HIGH
-+			      0 318 IRQ_TYPE_LEVEL_HIGH>;
-+		interrupt-names = "error",
-+				"ch0", "ch1", "ch2", "ch3",
-+				"ch4", "ch5", "ch6", "ch7",
-+				"ch8", "ch9", "ch10", "ch11",
-+				"ch12", "ch13", "ch14";
-+		clocks = <&mstp2_clks R8A7790_CLK_SYS_DMAC1>;
-+		clock-names = "fck";
-+		#dma-cells = <1>;
-+		dma-channels = <15>;
-+	};
- 	i2c0: i2c at e6508000 {
+ 	msiof0: spi at e6e20000 {
+ 		compatible = "renesas,msiof-r8a7791";
+-		reg = <0 0xe6e20000 0 0x0064>;
++		reg = <0 0xe6e20000 0 0x0064>, <0 0xe7e20000 0 0x0064>;
+ 		interrupts = <0 156 IRQ_TYPE_LEVEL_HIGH>;
+ 		clocks = <&mstp0_clks R8A7791_CLK_MSIOF0>;
++		dmas = <&dmac0 0x51>, <&dmac0 0x52>;
++		dma-names = "tx", "rx";
  		#address-cells = <1>;
  		#size-cells = <0>;
+ 		status = "disabled";
+@@ -1032,9 +1034,11 @@
+ 
+ 	msiof1: spi at e6e10000 {
+ 		compatible = "renesas,msiof-r8a7791";
+-		reg = <0 0xe6e10000 0 0x0064>;
++		reg = <0 0xe6e10000 0 0x0064>, <0 0xe7e10000 0 0x0064>;
+ 		interrupts = <0 157 IRQ_TYPE_LEVEL_HIGH>;
+ 		clocks = <&mstp2_clks R8A7791_CLK_MSIOF1>;
++		dmas = <&dmac0 0x55>, <&dmac0 0x56>;
++		dma-names = "tx", "rx";
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
+ 		status = "disabled";
+@@ -1042,9 +1046,11 @@
+ 
+ 	msiof2: spi at e6e00000 {
+ 		compatible = "renesas,msiof-r8a7791";
+-		reg = <0 0xe6e00000 0 0x0064>;
++		reg = <0 0xe6e00000 0 0x0064>, <0 0xe7e00000 0 0x0064>;
+ 		interrupts = <0 158 IRQ_TYPE_LEVEL_HIGH>;
+ 		clocks = <&mstp2_clks R8A7791_CLK_MSIOF2>;
++		dmas = <&dmac0 0x41>, <&dmac0 0x42>;
++		dma-names = "tx", "rx";
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
+ 		status = "disabled";
 -- 
 2.0.1
