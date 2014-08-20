@@ -1,84 +1,199 @@
-From: diana.craciun@freescale.com (Diana Craciun)
-Date: Wed, 20 Aug 2014 15:34:57 +0300
-Subject: [PATCHv2 4/6] dt-bindings: arm: add Freescale LS1021A SoC device
- tree binding
-In-Reply-To: <1407145148-29217-5-git-send-email-jingchang.lu@freescale.com>
-References: <1407145148-29217-1-git-send-email-jingchang.lu@freescale.com>
- <1407145148-29217-5-git-send-email-jingchang.lu@freescale.com>
-Message-ID: <53F495F1.60800@freescale.com>
+From: keescook@chromium.org (Kees Cook)
+Date: Wed, 20 Aug 2014 07:37:14 -0500
+Subject: [PATCH v4 7/8] ARM: mm: allow non-text sections to be
+ non-executable
+In-Reply-To: <20140819123342.GJ23128@arm.com>
+References: <1407949593-16121-1-git-send-email-keescook@chromium.org>
+ <1407949593-16121-8-git-send-email-keescook@chromium.org>
+ <20140819123342.GJ23128@arm.com>
+Message-ID: <CAGXu5jLnXeavr4E4YF9jtB03iA-y4vLZjf83a8ABzUC-hdkz9w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/04/2014 12:39 PM, Jingchang Lu wrote:
-> Signed-off-by: Jingchang Lu <jingchang.lu@freescale.com>
-> ---
->   Documentation/devicetree/bindings/arm/fsl.txt | 37 +++++++++++++++++++++++++++
->   1 file changed, 37 insertions(+)
+On Tue, Aug 19, 2014 at 7:33 AM, Will Deacon <will.deacon@arm.com> wrote:
+> On Wed, Aug 13, 2014 at 06:06:32PM +0100, Kees Cook wrote:
+>> Adds CONFIG_ARM_KERNMEM_PERMS to separate the kernel memory regions
+>> into section-sized areas that can have different permisions. Performs
+>> the NX permission changes during free_initmem, so that init memory can be
+>> reclaimed.
+>>
+>> This uses section size instead of PMD size to reduce memory lost to
+>> padding on non-LPAE systems.
+>>
+>> Based on work by Brad Spengler, Larry Bassel, and Laura Abbott.
 >
-> diff --git a/Documentation/devicetree/bindings/arm/fsl.txt b/Documentation/devicetree/bindings/arm/fsl.txt
-> index e935d7d..c962124 100644
-> --- a/Documentation/devicetree/bindings/arm/fsl.txt
-> +++ b/Documentation/devicetree/bindings/arm/fsl.txt
-> @@ -74,3 +74,40 @@ Required root node properties:
->   i.MX6q generic board
->   Required root node properties:
->       - compatible = "fsl,imx6q";
-> +
-> +
-> +Freescale LS1021A Platform Device Tree Bindings
-> +------------------------------------------------
-> +
-> +Required root node compatible properties:
-> +  - compatible = "fsl,ls1021a";
-> +
-> +SoC-specific device tree bindings for system configuration
-> +-------------------------------------------
-> +
-> +Required device node compatible properties:
-> +
-> +  - compatible = "fsl,ls1021a-scfg":
-> +	scfg is the supplemental configuration unit, provides SoC specific
-> +	configuration and status registers for the chip. There is no dedicate
-> +	driver for it, but for device whose configuration and status register
-> +	locates in this space should operate on it. Such as getting PEX port
-> +	status.
-> +
-> +  - compatible = "fsl,ls1021a-dcfg":
-> +	dcfg is the device configuration unit that provides general purpose
-> +	configuration and status for the device, there is no dedicate driver
-> +	for it, but for device whose configuration and status register locates
-> +	in this space should operate on it. Such as setting the secondary core
-> +	start address and release the secondary core from holdoff and startup.
+> [...]
+>
+>> diff --git a/arch/arm/kernel/vmlinux.lds.S b/arch/arm/kernel/vmlinux.lds.S
+>> index 6f57cb94367f..a3d07ca2bbb4 100644
+>> --- a/arch/arm/kernel/vmlinux.lds.S
+>> +++ b/arch/arm/kernel/vmlinux.lds.S
+>> @@ -8,6 +8,9 @@
+>>  #include <asm/thread_info.h>
+>>  #include <asm/memory.h>
+>>  #include <asm/page.h>
+>> +#ifdef CONFIG_ARM_KERNMEM_PERMS
+>> +#include <asm/pgtable.h>
+>> +#endif
+>>
+>>  #define PROC_INFO                                                    \
+>>       . = ALIGN(4);                                                   \
+>> @@ -90,6 +93,11 @@ SECTIONS
+>>               _text = .;
+>>               HEAD_TEXT
+>>       }
+>> +
+>> +#ifdef CONFIG_ARM_KERNMEM_PERMS
+>> +     . = ALIGN(1<<SECTION_SHIFT);
+>> +#endif
+>> +
+>>       .text : {                       /* Real text segment            */
+>>               _stext = .;             /* Text and read-only data      */
+>>                       __exception_text_start = .;
+>> @@ -145,7 +153,11 @@ SECTIONS
+>>       _etext = .;                     /* End of text and rodata section */
+>>
+>>  #ifndef CONFIG_XIP_KERNEL
+>> +# ifdef CONFIG_ARM_KERNMEM_PERMS
+>> +     . = ALIGN(1<<SECTION_SHIFT);
+>> +# else
+>>       . = ALIGN(PAGE_SIZE);
+>> +# endif
+>
+> This might be cleaner if we had a single macro (ALIGN_MIN?) that expanded to
+> ALIGN(1 << SECTION_SHIFT) #ifdef  CONFIG_ARM_KERNMEM_PERMS.
 
-Is it that important to be mentioned in the binding that there is no 
-driver for it? It seems to be just an implementation detail, the device 
-tree describes the hardware not any particular implementation.
+I didn't see a cleaner way to do this, since some times it's optional
+(no alignment instead of different alignment), and sometimes it's not
+controlled by _KERNMEM_PERMS (i.e. sometimes it's _DEBUG_RODATA).
 
-> +
-> +Example:
-> +	scfg: scfg at 1570000 {
-> +		compatible = "fsl,ls1021a-scfg";
-> +		reg = <0x0 0x1570000 0x0 0x10000>;
+>
+>> diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
+>> index ad82c05bfc3a..ccf392ef40d4 100644
+>> --- a/arch/arm/mm/init.c
+>> +++ b/arch/arm/mm/init.c
+>> @@ -32,6 +32,11 @@
+>>  #include <asm/tlb.h>
+>>  #include <asm/fixmap.h>
+>>
+>> +#ifdef CONFIG_ARM_KERNMEM_PERMS
+>> +#include <asm/system_info.h>
+>> +#include <asm/cp15.h>
+>> +#endif
+>
+> We already #include cp15.h in this file. If you need system_info.h, I don't
+> think you should bother making the include conditional.
 
-The reg is not part of the description above. I think that each of these 
-nodes should be described separate, maybe something like this:
+Ah, yes. I will fix this.
 
-Freescale SCFG
+>
+>> +/*
+>> + * Updates section permissions only for the current mm (sections are
+>> + * copied into each mm). During startup, this is the init_mm.
+>> + */
+>> +static inline void section_update(unsigned long addr, pmdval_t mask,
+>> +                               pmdval_t prot)
+>> +{
+>> +     struct mm_struct *mm;
+>> +     pmd_t *pmd;
+>> +
+>> +     mm = current->active_mm;
+>> +     pmd = pmd_offset(pud_offset(pgd_offset(mm, addr), addr), addr);
+>> +
+>> +#ifdef CONFIG_ARM_LPAE
+>> +     pmd[0] = __pmd((pmd_val(pmd[0]) & mask) | prot);
+>> +#else
+>> +     if (addr & SECTION_SIZE)
+>> +             pmd[1] = __pmd((pmd_val(pmd[1]) & mask) | prot);
+>> +     else
+>> +             pmd[0] = __pmd((pmd_val(pmd[0]) & mask) | prot);
+>> +#endif
+>> +     flush_pmd_entry(pmd);
+>> +     local_flush_tlb_kernel_range(addr, addr + SECTION_SIZE);
+>
+> Why only a local flush? You're changing global mappings here, right?
 
-scfg is the supplemental configuration unit, provides SoC specific 
-configuration and status registers for the chip. There is no dedicate 
-driver for it, but for device whose configuration and status register 
-locates in this space should operate on it. Such as getting PEX port status.
+Yes, but with the a15 errata, it cannot use a global flush. As a
+result, section_update can only be used by a single CPU which is how
+the usage is managed. Perhaps I should add some comments to that
+effect? (There was a thread a few months ago on this problem and this
+shook out as a solution.)
 
-Required properties:
-- compatible: Should be "fsl,ls1021a-scfg"
-- reg: should contain.....
+>
+>> +}
+>> +
+>> +/* Make sure extended page tables are in use. */
+>> +static inline bool arch_has_strict_perms(void)
+>> +{
+>> +     unsigned int cr;
+>> +
+>> +     if (cpu_architecture() < CPU_ARCH_ARMv6)
+>> +             return false;
+>> +
+>> +     cr = get_cr();
+>> +     if (!(cr & CR_XP))
+>> +             return false;
+>> +
+>> +     return true;
+>
+> return !!(get_cr() & CR_XP)?
 
-> +	};
-> +
-> +	dcfg: dcfg at 1ee0000 {
-> +		compatible = "fsl,ls1021a-dcfg";
-> +		reg = <0x0 0x1ee0000 0x0 0x10000>;
-> +	};
+Sure, I can reduce this.
 
-Diana
+>
+>> +}
+>> +
+>> +#define set_section_perms(perms, field)      {                               \
+>> +     size_t i;                                                       \
+>> +     unsigned long addr;                                             \
+>> +                                                                     \
+>> +     if (!arch_has_strict_perms())                                   \
+>> +             return;                                                 \
+>> +                                                                     \
+>> +     for (i = 0; i < ARRAY_SIZE(perms); i++) {                       \
+>> +             if (!IS_ALIGNED(perms[i].start, SECTION_SIZE) ||        \
+>> +                 !IS_ALIGNED(perms[i].end, SECTION_SIZE)) {          \
+>> +                     pr_err("BUG: section %lx-%lx not aligned to %lx\n", \
+>> +                             perms[i].start, perms[i].end,           \
+>> +                             SECTION_SIZE);                          \
+>> +                     continue;                                       \
+>> +             }                                                       \
+>> +                                                                     \
+>> +             for (addr = perms[i].start;                             \
+>> +                  addr < perms[i].end;                               \
+>> +                  addr += SECTION_SIZE)                              \
+>> +                     section_update(addr, perms[i].mask,             \
+>> +                                    perms[i].field);                 \
+>> +     }                                                               \
+>> +}
+>> +
+>> +static inline void fix_kernmem_perms(void)
+>> +{
+>> +     set_section_perms(nx_perms, prot);
+>> +}
+>> +#else
+>> +static inline void fix_kernmem_perms(void) { }
+>> +#endif /* CONFIG_ARM_KERNMEM_PERMS */
+>> +
+>>  void free_initmem(void)
+>>  {
+>>  #ifdef CONFIG_HAVE_TCM
+>>       extern char __tcm_start, __tcm_end;
+>> +#endif
+>> +
+>> +     fix_kernmem_perms();
+>>
+>> +#ifdef CONFIG_HAVE_TCM
+>
+> You could avoid the double #ifdef by moving the tcm stuff into another
+> function (free_tcmmem?)
+
+Sure, I can do that.
+
+Thanks!
+
+-Kees
+
+-- 
+Kees Cook
+Chrome OS Security
