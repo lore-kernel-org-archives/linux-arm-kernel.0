@@ -1,56 +1,71 @@
 From: soren.brinkmann@xilinx.com (Soren Brinkmann)
-Date: Wed, 20 Aug 2014 08:56:58 -0700
-Subject: [PATCH 2/3] ARM: zynq: DT: Move size/address properties to dtsi
+Date: Wed, 20 Aug 2014 08:56:59 -0700
+Subject: [PATCH 3/3] ARM: zynq: DT: Add Ethernet phys
 In-Reply-To: <1408550219-19825-1-git-send-email-soren.brinkmann@xilinx.com>
 References: <1408550219-19825-1-git-send-email-soren.brinkmann@xilinx.com>
-Message-ID: <1408550219-19825-2-git-send-email-soren.brinkmann@xilinx.com>
+Message-ID: <1408550219-19825-3-git-send-email-soren.brinkmann@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Move the GEM's size and address cells properties to the common
-dtsi file.
+Add missing Ethernet phys to Zynq DTs.
 
-Cc: Andreas F?rber <afaerber@suse.de>
 Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
 ---
- arch/arm/boot/dts/zynq-7000.dtsi      | 4 ++++
- arch/arm/boot/dts/zynq-parallella.dts | 2 --
- 2 files changed, 4 insertions(+), 2 deletions(-)
+ arch/arm/boot/dts/zynq-zc702.dts | 6 ++++++
+ arch/arm/boot/dts/zynq-zc706.dts | 6 ++++++
+ arch/arm/boot/dts/zynq-zed.dts   | 6 ++++++
+ 3 files changed, 18 insertions(+)
 
-diff --git a/arch/arm/boot/dts/zynq-7000.dtsi b/arch/arm/boot/dts/zynq-7000.dtsi
-index 6cc83d4c6c76..4e6e96ef7bd0 100644
---- a/arch/arm/boot/dts/zynq-7000.dtsi
-+++ b/arch/arm/boot/dts/zynq-7000.dtsi
-@@ -195,6 +195,8 @@
- 			interrupts = <0 22 4>;
- 			clocks = <&clkc 30>, <&clkc 30>, <&clkc 13>;
- 			clock-names = "pclk", "hclk", "tx_clk";
-+			#address-cells = <1>;
-+			#size-cells = <0>;
- 		};
- 
- 		gem1: ethernet at e000c000 {
-@@ -204,6 +206,8 @@
- 			interrupts = <0 45 4>;
- 			clocks = <&clkc 31>, <&clkc 31>, <&clkc 14>;
- 			clock-names = "pclk", "hclk", "tx_clk";
-+			#address-cells = <1>;
-+			#size-cells = <0>;
- 		};
- 
- 		sdhci0: sdhci at e0100000 {
-diff --git a/arch/arm/boot/dts/zynq-parallella.dts b/arch/arm/boot/dts/zynq-parallella.dts
-index 41afd9da6876..690e6206beac 100644
---- a/arch/arm/boot/dts/zynq-parallella.dts
-+++ b/arch/arm/boot/dts/zynq-parallella.dts
-@@ -38,8 +38,6 @@
+diff --git a/arch/arm/boot/dts/zynq-zc702.dts b/arch/arm/boot/dts/zynq-zc702.dts
+index 30bcfe20f0bc..fa810505ab8f 100644
+--- a/arch/arm/boot/dts/zynq-zc702.dts
++++ b/arch/arm/boot/dts/zynq-zc702.dts
+@@ -36,6 +36,12 @@
+ &gem0 {
  	status = "okay";
  	phy-mode = "rgmii-id";
- 	phy-handle = <&ethernet_phy>;
--	#address-cells = <1>;
--	#size-cells = <0>;
++	phy-handle = <&ethernet_phy>;
++
++	ethernet_phy: ethernet-phy at 7 {
++		compatible = "marvell,88e1116r", "ethernet-phy-ieee802.3-c22";
++		reg = <7>;
++	};
+ };
  
- 	ethernet_phy: ethernet-phy at 0 {
- 		/* Marvell 88E1318 */
+ &i2c0 {
+diff --git a/arch/arm/boot/dts/zynq-zc706.dts b/arch/arm/boot/dts/zynq-zc706.dts
+index 3d9cb023e158..d446b44d45a2 100644
+--- a/arch/arm/boot/dts/zynq-zc706.dts
++++ b/arch/arm/boot/dts/zynq-zc706.dts
+@@ -33,6 +33,12 @@
+ &gem0 {
+ 	status = "okay";
+ 	phy-mode = "rgmii-id";
++	phy-handle = <&ethernet_phy>;
++
++	ethernet_phy: ethernet-phy at 7 {
++		compatible = "marvell,88e1116r", "ethernet-phy-ieee802.3-c22";
++		reg = <7>;
++	};
+ };
+ 
+ &i2c0 {
+diff --git a/arch/arm/boot/dts/zynq-zed.dts b/arch/arm/boot/dts/zynq-zed.dts
+index 42deb1b7dbc8..92662eb078ce 100644
+--- a/arch/arm/boot/dts/zynq-zed.dts
++++ b/arch/arm/boot/dts/zynq-zed.dts
+@@ -33,6 +33,12 @@
+ &gem0 {
+ 	status = "okay";
+ 	phy-mode = "rgmii-id";
++	phy-handle = <&ethernet_phy>;
++
++	ethernet_phy: ethernet-phy at 0 {
++		compatible = "marvell,88e1518", "ethernet-phy-ieee802.3-c22";
++		reg = <0>;
++	};
+ };
+ 
+ &sdhci0 {
 -- 
 2.0.1.1.gfbfc394
