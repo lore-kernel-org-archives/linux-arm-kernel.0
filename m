@@ -1,61 +1,126 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Wed, 20 Aug 2014 08:16:43 -0400
-Subject: [RFC PATCH 0/6] Change vendor prefix for Intersil Corporation
-In-Reply-To: <1408524184-31928-1-git-send-email-p.zabel@pengutronix.de>
-References: <1408524184-31928-1-git-send-email-p.zabel@pengutronix.de>
-Message-ID: <20140820121643.GU12769@titan.lakedaemon.net>
+From: bhupesh.sharma@freescale.com (bhupesh.sharma at freescale.com)
+Date: Wed, 20 Aug 2014 12:20:02 +0000
+Subject: [PATCH 1/6] Documentation: DT: Add bindings for FSL NS16550A The
+ UART
+In-Reply-To: <20140820113139.GB21734@leverpostej>
+References: <1408096156-29772-1-git-send-email-bhupesh.sharma@freescale.com>
+ <1408096156-29772-2-git-send-email-bhupesh.sharma@freescale.com>
+ <20140815104606.GB15621@leverpostej>
+ <e0350675b3a6462d87cb06a33a1b6dc9@BN1PR03MB220.namprd03.prod.outlook.com>
+ <20140815150344.GA21908@leverpostej>
+ <a446f06690fd4dcfb3a3f978c52b0d6c@BN1PR03MB220.namprd03.prod.outlook.com>
+ <20140820113139.GB21734@leverpostej>
+Message-ID: <bb328dba287f4f5fb1829671b8637866@BN1PR03MB220.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Philipp,
+Hi Mark,
 
-On Wed, Aug 20, 2014 at 10:42:58AM +0200, Philipp Zabel wrote:
-> Hi,
+> -----Original Message-----
+> From: Mark Rutland [mailto:mark.rutland at arm.com]
+> Sent: Wednesday, August 20, 2014 5:02 PM
+> To: Sharma Bhupesh-B45370
+> Cc: devicetree-discuss at lists.ozlabs.org; Catalin Marinas; arnd at arndb.de;
+> Will Deacon; Yoder Stuart-B08248; grant.likely at secretlab.ca; Basu Arnab-
+> B45036; linux-arm-kernel at lists.infradead.org
+> Subject: Re: [PATCH 1/6] Documentation: DT: Add bindings for FSL NS16550A
+> The UART
 > 
-> currently there is a wild mixture of isl, isil, and intersil
-> compatibles in the kernel. I figure at this point it is still
-> possible to change this to use "isil" everywhere without too
-> much pain, but it might be preferred to keep the already
-> documented "isl" prefix, even though it doesn't follow the
-> convention to use the NASDAQ symbol where available.
+> Hi Bhupesh,
 > 
-> The current users of the "isil" prefix are the following drivers
-> and device trees, so we could just as well change those instead:
-> 	arch/arm/boot/dts/tegra20-seaboard.dts
-> 	arch/arm/boot/dts/tegra20-ventana.dts
-> 	arch/arm/boot/dts/tegra30-cardhu.dtsi
-> 	arch/powerpc/boot/dts/p1022rdk.dts
-> 	drivers/staging/iio/light/isl29018.c
-> 	drivers/staging/iio/light/isl29028.c
+> [...]
 > 
-> regards
-> Philipp
+> > > > > -----Original Message-----
+> > > > > From: Mark Rutland [mailto:mark.rutland at arm.com]
+> > > > > Sent: Friday, August 15, 2014 4:16 PM
+> > > > > To: Sharma Bhupesh-B45370
+> > > > > Cc: devicetree-discuss at lists.ozlabs.org; Catalin Marinas;
+> > > > > arnd at arndb.de; Will Deacon; Yoder Stuart-B08248;
+> > > > > grant.likely at secretlab.ca; Basu Arnab- B45036;
+> > > > > linux-arm-kernel at lists.infradead.org
+> > > > > Subject: Re: [PATCH 1/6] Documentation: DT: Add bindings for FSL
+> > > > > NS16550A UART
+> > > > >
+> > > > > On Fri, Aug 15, 2014 at 10:49:10AM +0100, Bhupesh Sharma wrote:
+> > > > > > This patch addss the device-tree documentation for Freescale's
+> > > > > > NS16550 UART (also called DUART).
+> > > > > >
+> > > > > > There is a specific errata fix required in FSL NS16550 UART
+> > > > > > which ensures that an random interrupt storm is not observed
+> > > > > > when a break is provided as an input to the UART.
+> > > > >
+> > > > > Should this not go in
+> > > > > Documentation/devicetree/bindings/serial/of-serial.txt as with
+> > > > > other NS16550A variations?
+> > > > >
+> > > > > The only code for handling this string seems to live in
+> > > > > arch/powerpc/kernel/legacy_serial.c. Is there a patch factoring
+> > > > > that out into common code? Or is the erratum not applicable to
+> > > > > the revision used in your ARMv8 SoC?
+> > > > >
+> > > >
+> > > > The FSL specific 8250 (or NS16550A0 driver) at path
+> > > > drivers/tty/serial/8250/8250_fsl.c
+> > > > uses this string and provides the code to handle the erratum (see
+> > > > [1])
+> > >
+> > > While the workaround itself is in that file, as far as I can see the
+> > > detection and setup is not. Even in next-20140815 it seems that only
+> > > happens in arch/powerpc/kernel/legacy_serial.c (see [2]):
+> > >
+> > > [mark at leverpostej:~/src/linux]% git grep fsl8250_handle_irq next-
+> 20140815
+> > > next-20140815:arch/powerpc/kernel/legacy_serial.c:              port-
+> > > >handle_irq = fsl8250_handle_irq;
+> > > next-20140815:drivers/tty/serial/8250/8250_fsl.c:int
+> > > fsl8250_handle_irq(struct uart_port *port) next-
+> > > 20140815:include/linux/serial_8250.h:extern int
+> > > fsl8250_handle_irq(struct uart_port *port);
+> > >
+> > > I cannot see any use of the string outside of arch/powerpc:
+> > >
+> > > [mark at leverpostej:~/src/linux]% git grep fsl,ns16550 next-20140815 |
+> > > wc -l
+> > > 102
+> > > [mark at leverpostej:~/src/linux]% git grep fsl,ns16550 next-20140815
+> > > -- arch/powerpc | wc -l
+> > > 102
+> > >
+> > > Am I missing something? Perhaps some macro is getting in the way of
+> > > a simple grep.
+> > >
+> > > > The NS16550 UART present on our SoC and the corresponding
+> > > > simulator model has this erratum and hence the specific way in
+> > > > which IRQ are handled (fsl8250_handle_irq) by the driver (in [1])
+> > > > is applicable here
+> > > as well.
+> > >
+> > > Assuming I've not missed something, do you need to factor out the
+> > > detection and setup? Do things just happen to work on the simulator
+> > > without the workaround?
+> >
+> > You are right. The simulator platform doesn't take into account the
+> > erratum, however we need to take is into account for the emulator and
+> > silicon platforms.
+> >
+> > I am currently working to fork this out into a common code base so
+> > that both PPC and ARM platforms can use the same and a patch for the
+> > same is in my to-do list.
+> >
+> > So, I sent out the DT documentation patch early (as it is equally
+> > applicable to  both PPC and ARM platforms) and the patch that makes
+> > this code leg usable for both ARM and PPC platform will follow soon.
 > 
-> Philipp Zabel (6):
->   of: Change vendor prefix for Intersil Corporation to isil
->   Documentation: Add isl1208 and isl12022 to trivial-devices list
->   ARM: mvebu: Change vendor prefix for Intersil Corporation to isil
->   powerpc/85xx: Change vendor prefix for Intersil Corporation to isil
->   rtc: rtc-isl12022: Change vendor prefix for Intersil Corporation to
->     isil
->   rtc: rtc-isl12057: Change vendor prefix for Intersil Corporation to
->     isil
+> Ok.
 > 
->  Documentation/devicetree/bindings/i2c/trivial-devices.txt | 4 +++-
->  Documentation/devicetree/bindings/vendor-prefixes.txt     | 2 +-
->  arch/arm/boot/dts/armada-370-netgear-rn102.dts            | 2 +-
->  arch/arm/boot/dts/armada-370-netgear-rn104.dts            | 2 +-
->  arch/arm/boot/dts/armada-xp-netgear-rn2120.dts            | 2 +-
->  arch/powerpc/boot/dts/ppa8548.dts                         | 2 +-
->  drivers/rtc/rtc-isl12022.c                                | 3 ++-
->  drivers/rtc/rtc-isl12057.c                                | 3 ++-
->  8 files changed, 12 insertions(+), 8 deletions(-)
+> My only issue with the DT binding is the placement; I think that should
+> live with the other NS16550A variations.
 
-This looks good overall.  My only nit is that I'd like to see the legacy
-name(s) captured in the binding docs.
+Sure. I will look at how I can change the DT binding placement and then
+address it in my v2.
 
-I'll take the Armada dts changes through mvebu/arm-soc after a few days.
+Regards,
+Bhupesh
 
-thx,
-
-Jason.
+> Cheers,
+> Mark.
