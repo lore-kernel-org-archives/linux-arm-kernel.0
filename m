@@ -1,206 +1,87 @@
-From: LW@KARO-electronics.de (=?UTF-8?q?Lothar=20Wa=C3=9Fmann?=)
-Date: Wed, 20 Aug 2014 08:55:54 +0200
-Subject: [PATCHv4 2/4] pwm: make the PWM_POLARITY flag in DTB optional
-In-Reply-To: <1408517756-9412-2-git-send-email-LW@KARO-electronics.de>
-References: <1408517756-9412-1-git-send-email-LW@KARO-electronics.de>
- <1408517756-9412-2-git-send-email-LW@KARO-electronics.de>
-Message-ID: <1408517756-9412-3-git-send-email-LW@KARO-electronics.de>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 20 Aug 2014 07:57:44 +0100
+Subject: [PATCH v2 0/8] mtd: nand: Support for new DT NAND driver
+In-Reply-To: <20140819013729.GP18411@ld-irv-0074>
+References: <1408357919-19793-1-git-send-email-lee.jones@linaro.org>
+ <20140819013729.GP18411@ld-irv-0074>
+Message-ID: <20140820065744.GE4266@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Change the pwm chip driver registration, so that a chip driver that
-supports polarity inversion can still be used with DTBs that don't
-provide the 'PWM_POLARITY' flag.
+On Mon, 18 Aug 2014, Brian Norris wrote:
+> On Mon, Aug 18, 2014 at 11:31:51AM +0100, Lee Jones wrote:
+> > I believe all of your queries have either been answered or addressed
+> > and I am hoping this will be the last submission. :)
+> 
+> Sorry, no. I can't review code that doesn't compile, so I'm only now
+> getting to some of the review.
+> 
+> > This is v2 of the squashed submission.  v1 had a small typo which
+> > prevented the BBT code from being truly configurable.  This has now
+> > been rectified and build tested with and without MTD_NAND_STM_BCH_BBT
+> > support.
+> 
+> From smatch:
+> 
+>   drivers/mtd/nand/stm_nand_bch.c:1556 stm_nand_bch_probe() error:
+>   we previously assumed 'bank' could be null (see line 1482)
+>   [smatch] 
 
-This is done to provide polarity inversion support for the pwm-imx
-driver without having to modify all existing DTS files.
+I have now built and installed smatch - it is now part of my built
+scripts.
 
-Signed-off-by: Lothar Wa?mann <LW@KARO-electronics.de>
----
- drivers/pwm/core.c            |   18 ++++++------------
- drivers/pwm/pwm-atmel-tcb.c   |    1 -
- drivers/pwm/pwm-atmel.c       |    4 +---
- drivers/pwm/pwm-pxa.c         |    5 ++---
- drivers/pwm/pwm-renesas-tpu.c |    1 -
- drivers/pwm/pwm-samsung.c     |    1 -
- drivers/pwm/pwm-tiecap.c      |    1 -
- drivers/pwm/pwm-tiehrpwm.c    |    1 -
- drivers/pwm/pwm-vt8500.c      |    1 -
- include/linux/pwm.h           |    1 -
- 10 files changed, 9 insertions(+), 25 deletions(-)
+> From GCC (extra warnings):
+> 
+>   drivers/mtd/nand/stm_nand_dt.c:39:21: warning: no previous
+>   prototype for 'stm_of_get_partitions_node' [-Wmissing-prototypes] 
+>   drivers/mtd/nand/stm_nand_dt.c:68:5: warning: no previous
+>   prototype for 'stm_of_get_nand_banks' [-Wmissing-prototypes] 
 
-diff --git a/drivers/pwm/core.c b/drivers/pwm/core.c
-index 7af0043..ab0fc5a 100644
---- a/drivers/pwm/core.c
-+++ b/drivers/pwm/core.c
-@@ -136,7 +136,7 @@ of_pwm_xlate_with_flags(struct pwm_chip *pc, const struct of_phandle_args *args)
- {
- 	struct pwm_device *pwm;
- 
--	if (pc->of_pwm_n_cells < 3)
-+	if (args->args_count != 3)
- 		return ERR_PTR(-EINVAL);
- 
- 	if (args->args[0] >= pc->npwm)
-@@ -162,12 +162,15 @@ of_pwm_simple_xlate(struct pwm_chip *pc, const struct of_phandle_args *args)
- {
- 	struct pwm_device *pwm;
- 
--	if (pc->of_pwm_n_cells < 2)
-+	if (args->args_count < 2)
- 		return ERR_PTR(-EINVAL);
- 
- 	if (args->args[0] >= pc->npwm)
- 		return ERR_PTR(-EINVAL);
- 
-+	if (args->args_count > 2)
-+		return of_pwm_xlate_with_flags(pc, args);
-+
- 	pwm = pwm_request_from_chip(pc, args->args[0], NULL);
- 	if (IS_ERR(pwm))
- 		return pwm;
-@@ -182,10 +185,8 @@ static void of_pwmchip_add(struct pwm_chip *chip)
- 	if (!chip->dev || !chip->dev->of_node)
- 		return;
- 
--	if (!chip->of_xlate) {
-+	if (!chip->of_xlate)
- 		chip->of_xlate = of_pwm_simple_xlate;
--		chip->of_pwm_n_cells = 2;
--	}
- 
- 	of_node_get(chip->dev->of_node);
- }
-@@ -536,13 +537,6 @@ struct pwm_device *of_pwm_get(struct device_node *np, const char *con_id)
- 		goto put;
- 	}
- 
--	if (args.args_count != pc->of_pwm_n_cells) {
--		pr_debug("%s: wrong #pwm-cells for %s\n", np->full_name,
--			 args.np->full_name);
--		pwm = ERR_PTR(-EINVAL);
--		goto put;
--	}
--
- 	pwm = pc->of_xlate(pc, &args);
- 	if (IS_ERR(pwm))
- 		goto put;
-diff --git a/drivers/pwm/pwm-atmel-tcb.c b/drivers/pwm/pwm-atmel-tcb.c
-index f3dcd02..55fabf8 100644
---- a/drivers/pwm/pwm-atmel-tcb.c
-+++ b/drivers/pwm/pwm-atmel-tcb.c
-@@ -395,7 +395,6 @@ static int atmel_tcb_pwm_probe(struct platform_device *pdev)
- 	tcbpwm->chip.dev = &pdev->dev;
- 	tcbpwm->chip.ops = &atmel_tcb_pwm_ops;
- 	tcbpwm->chip.of_xlate = of_pwm_xlate_with_flags;
--	tcbpwm->chip.of_pwm_n_cells = 3;
- 	tcbpwm->chip.base = -1;
- 	tcbpwm->chip.npwm = NPWM;
- 	tcbpwm->tc = tc;
-diff --git a/drivers/pwm/pwm-atmel.c b/drivers/pwm/pwm-atmel.c
-index 6e700a5..ae7c946 100644
---- a/drivers/pwm/pwm-atmel.c
-+++ b/drivers/pwm/pwm-atmel.c
-@@ -350,10 +350,8 @@ static int atmel_pwm_probe(struct platform_device *pdev)
- 	atmel_pwm->chip.dev = &pdev->dev;
- 	atmel_pwm->chip.ops = &atmel_pwm_ops;
- 
--	if (pdev->dev.of_node) {
-+	if (pdev->dev.of_node)
- 		atmel_pwm->chip.of_xlate = of_pwm_xlate_with_flags;
--		atmel_pwm->chip.of_pwm_n_cells = 3;
--	}
- 
- 	atmel_pwm->chip.base = -1;
- 	atmel_pwm->chip.npwm = 4;
-diff --git a/drivers/pwm/pwm-pxa.c b/drivers/pwm/pwm-pxa.c
-index 0b312ec..5656052 100644
---- a/drivers/pwm/pwm-pxa.c
-+++ b/drivers/pwm/pwm-pxa.c
-@@ -191,10 +191,9 @@ static int pwm_probe(struct platform_device *pdev)
- 	pwm->chip.base = -1;
- 	pwm->chip.npwm = (id->driver_data & HAS_SECONDARY_PWM) ? 2 : 1;
- 
--	if (IS_ENABLED(CONFIG_OF)) {
-+	if (IS_ENABLED(CONFIG_OF))
- 		pwm->chip.of_xlate = pxa_pwm_of_xlate;
--		pwm->chip.of_pwm_n_cells = 1;
--	}
-+
- 
- 	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
- 	pwm->mmio_base = devm_ioremap_resource(&pdev->dev, r);
-diff --git a/drivers/pwm/pwm-renesas-tpu.c b/drivers/pwm/pwm-renesas-tpu.c
-index 3b71b42..5271da3 100644
---- a/drivers/pwm/pwm-renesas-tpu.c
-+++ b/drivers/pwm/pwm-renesas-tpu.c
-@@ -419,7 +419,6 @@ static int tpu_probe(struct platform_device *pdev)
- 	tpu->chip.dev = &pdev->dev;
- 	tpu->chip.ops = &tpu_pwm_ops;
- 	tpu->chip.of_xlate = of_pwm_xlate_with_flags;
--	tpu->chip.of_pwm_n_cells = 3;
- 	tpu->chip.base = -1;
- 	tpu->chip.npwm = TPU_CHANNEL_MAX;
- 
-diff --git a/drivers/pwm/pwm-samsung.c b/drivers/pwm/pwm-samsung.c
-index ba6b650..317d7d1 100644
---- a/drivers/pwm/pwm-samsung.c
-+++ b/drivers/pwm/pwm-samsung.c
-@@ -484,7 +484,6 @@ static int pwm_samsung_probe(struct platform_device *pdev)
- 			return ret;
- 
- 		chip->chip.of_xlate = of_pwm_xlate_with_flags;
--		chip->chip.of_pwm_n_cells = 3;
- 	} else {
- 		if (!pdev->dev.platform_data) {
- 			dev_err(&pdev->dev, "no platform data specified\n");
-diff --git a/drivers/pwm/pwm-tiecap.c b/drivers/pwm/pwm-tiecap.c
-index 74efbe7..a8e8282 100644
---- a/drivers/pwm/pwm-tiecap.c
-+++ b/drivers/pwm/pwm-tiecap.c
-@@ -227,7 +227,6 @@ static int ecap_pwm_probe(struct platform_device *pdev)
- 	pc->chip.dev = &pdev->dev;
- 	pc->chip.ops = &ecap_pwm_ops;
- 	pc->chip.of_xlate = of_pwm_xlate_with_flags;
--	pc->chip.of_pwm_n_cells = 3;
- 	pc->chip.base = -1;
- 	pc->chip.npwm = 1;
- 
-diff --git a/drivers/pwm/pwm-tiehrpwm.c b/drivers/pwm/pwm-tiehrpwm.c
-index cb75133..12a8ae4 100644
---- a/drivers/pwm/pwm-tiehrpwm.c
-+++ b/drivers/pwm/pwm-tiehrpwm.c
-@@ -458,7 +458,6 @@ static int ehrpwm_pwm_probe(struct platform_device *pdev)
- 	pc->chip.dev = &pdev->dev;
- 	pc->chip.ops = &ehrpwm_pwm_ops;
- 	pc->chip.of_xlate = of_pwm_xlate_with_flags;
--	pc->chip.of_pwm_n_cells = 3;
- 	pc->chip.base = -1;
- 	pc->chip.npwm = NUM_PWM_CHANNEL;
- 
-diff --git a/drivers/pwm/pwm-vt8500.c b/drivers/pwm/pwm-vt8500.c
-index 652e6b5..e04a3c0 100644
---- a/drivers/pwm/pwm-vt8500.c
-+++ b/drivers/pwm/pwm-vt8500.c
-@@ -217,7 +217,6 @@ static int vt8500_pwm_probe(struct platform_device *pdev)
- 	chip->chip.dev = &pdev->dev;
- 	chip->chip.ops = &vt8500_pwm_ops;
- 	chip->chip.of_xlate = of_pwm_xlate_with_flags;
--	chip->chip.of_pwm_n_cells = 3;
- 	chip->chip.base = -1;
- 	chip->chip.npwm = VT8500_NR_PWMS;
- 
-diff --git a/include/linux/pwm.h b/include/linux/pwm.h
-index e90628c..4cf1569 100644
---- a/include/linux/pwm.h
-+++ b/include/linux/pwm.h
-@@ -174,7 +174,6 @@ struct pwm_chip {
- 
- 	struct pwm_device *	(*of_xlate)(struct pwm_chip *pc,
- 					    const struct of_phandle_args *args);
--	unsigned int		of_pwm_n_cells;
- 	bool			can_sleep;
- };
- 
+My build scripts now support extended warnings to level 1.  This was a
+pain to get working, as my scripts also build DTBS, which has a side
+effect of re-compiling everything, every time.  This was fixed by also
+issuing W=1 on the `make $(make_options) $(extra_build_options) dtbs`
+line.
+
+> Looks like you forgot to include <linux/mtd/stm_nand_bbt.h>.
+
+This had me confused for a little while.  I think you mean:
+
+  #include "stm_nand_dt.h".
+
+Basically, the DT code wasn't including its own header file.
+
+Caught and fixed.
+
+> And your code is not bisectable. I think patch 7 and 8 should be
+> reordered (with some tweaks, perhaps):
+
+Now fixed.
+
+I have split out the BBT header file and applied it first.
+
+> Bisectability test results for configuration
+> "arm-multi_v7_defconfig,arm,arm-unknown-linux-gnueabi-" 
+> 
+> Failed to build patch #7: 5936df30f5e1 mtd: nand: stm_nand_bch: add
+> support for ST's BCH NAND controller 
+> Configuration: "arm-multi_v7_defconfig, architecture arm".
+
+How do _you_ test for bisectability?  Do you have a script?
+
+What outputs "Failed to build patch #7: ..."?
+
+[...]
+
+> drivers/mtd/nand/stm_nand_bch.c:26:36: fatal error:
+> linux/mtd/stm_nand_bbt.h: No such file or directory 
+> compilation terminated.
+> make[4]: *** [drivers/mtd/nand/stm_nand_bch.o] Error 1
+
+Fixed.
+
 -- 
-1.7.10.4
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
