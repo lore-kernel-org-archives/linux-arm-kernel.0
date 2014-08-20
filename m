@@ -1,68 +1,52 @@
-From: afaerber@suse.de (=?UTF-8?B?QW5kcmVhcyBGw6RyYmVy?=)
-Date: Wed, 20 Aug 2014 15:06:36 +0200
-Subject: [PATCH v6 03/10] ARM: dts: Prepare node labels for exynos5250
-In-Reply-To: <53DCE0F4.4060101@suse.de>
-References: <1406940750-15880-1-git-send-email-afaerber@suse.de>
- <1406940750-15880-4-git-send-email-afaerber@suse.de>
- <53DCD74B.8090400@gmail.com> <53DCE0F4.4060101@suse.de>
-Message-ID: <53F49D5C.4050007@suse.de>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Wed, 20 Aug 2014 09:22:23 -0400
+Subject: [PATCH v17 8/9] irq: enable hip04 irq chip
+In-Reply-To: <1407408695-19626-9-git-send-email-haojian.zhuang@linaro.org>
+References: <1407408695-19626-1-git-send-email-haojian.zhuang@linaro.org>
+ <1407408695-19626-9-git-send-email-haojian.zhuang@linaro.org>
+Message-ID: <20140820132223.GV12769@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 02.08.2014 15:00, schrieb Andreas F?rber:
-> Am 02.08.2014 14:19, schrieb Tomasz Figa:
->> Andreas,
->>
->> Ehh, one more thing. It looks like my memory is playing tricks on me.
->> Please see inline.
->>
->> On 02.08.2014 02:52, Andreas F?rber wrote:
->>> Allows them to be extended by reference.
->>>
->>> Signed-off-by: Andreas F?rber <afaerber@suse.de>
->>> ---
->>>  v6: Split off from Snow/SMDK cleanups (Doug Anderson)
->>
->> [snip]
->>
->>> -	serial at 12C00000 {
->>> +	uart0: serial at 12C00000 {
->>>  		clocks = <&clock CLK_UART0>, <&clock CLK_SCLK_UART0>;
->>>  		clock-names = "uart", "clk_uart_baud0";
->>>  	};
->>>  
->>> -	serial at 12C10000 {
->>> +	uart1: serial at 12C10000 {
->>>  		clocks = <&clock CLK_UART1>, <&clock CLK_SCLK_UART1>;
->>>  		clock-names = "uart", "clk_uart_baud0";
->>>  	};
->>>  
->>> -	serial at 12C20000 {
->>> +	uart2: serial at 12C20000 {
->>>  		clocks = <&clock CLK_UART2>, <&clock CLK_SCLK_UART2>;
->>>  		clock-names = "uart", "clk_uart_baud0";
->>>  	};
->>>  
->>> -	serial at 12C30000 {
->>> +	uart3: serial at 12C30000 {
->>>  		clocks = <&clock CLK_UART3>, <&clock CLK_SCLK_UART3>;
->>>  		clock-names = "uart", "clk_uart_baud0";
->>>  	};
->>
->> I forgot about a series [1] that went through tty tree, which is going
->> to conflict with this patch. It already adds labels to uart nodes in
->> serial_X format. I don't really remember why I went with this format for
->> Exynos SoCs and with uartX for older ones...
->>
->> [1]
->> https://git.kernel.org/cgit/linux/kernel/git/next/linux-next.git/commit/arch/arm/boot/dts?id=1e64f48ea7c59fb94acd7551dd9fa68b8a752efc
+Haojian,
+
+On Thu, Aug 07, 2014 at 06:51:34PM +0800, Haojian Zhuang wrote:
+> HiP04 GIC is the variate of ARM GICv2.
 > 
-> I doubt that I'll manage to resend another time today, [...]
+> ARM GICv2 supports 8 cores. HiP04 GIC extends to support 16 cores. It
+> results that bit fields in GIC_DIST_TARGET & GIC_DIST_SOFTINT are
+> different from ARM GICv2. And the maximium IRQ is downgrade from 1020 to 510.
+> 
+> Since different register offset & bitfields definitation breaks
+> compartible with ARM GICv2, create a new hip04 irq driver.
+> 
+> And this driver is derived from irq-gic.c to support the Hisilicon HiP04
+> interrupt controller, which is similar to the GIC, but deviates at some
+> points. Support for power management, non-banked registers, cascaded
+> GICs (and multiple controllers in general) and bigLittle support has
+> been removed from the GIC driver.
+> 
+> Affinity related functions have been adjusted to match the Hisilicon
+> hardware implementation.
+> 
+> Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
+> ---
+>  drivers/irqchip/Makefile    |   1 +
+>  drivers/irqchip/irq-hip04.c | 424 ++++++++++++++++++++++++++++++++++++++++++++
+>  2 files changed, 425 insertions(+)
+>  create mode 100644 drivers/irqchip/irq-hip04.c
 
-Sorry, forgot about this. Done now. v7 as individual reply.
+Ok, I've tentatively applied this irqchip/hip04.  Once I merge that
+branch into irqchip/core, you can consider it a stable base to merge in
+with the rest of your series.  With everyone at KS this week, I'm going
+to let things cook in -next a little longer than usual.  So, it'll
+probably be early next week when I merge this in to irqchip/core.
 
-Andreas
+fwiw, there are still a few things I'd like to comment on in this
+driver.  However, we've beat it up enough.  As long as it isn't
+adversely affecting irq-gic for everyone else, let's merge it and get
+the ball moving.  My comments can easily be follow-on patches.
 
--- 
-SUSE LINUX Products GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
-GF: Jeff Hawn, Jennifer Guild, Felix Imend?rffer; HRB 16746 AG N?rnberg
+thx,
+
+Jason.
