@@ -1,33 +1,40 @@
 From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Wed, 20 Aug 2014 11:24:40 +0800
-Subject: [Linaro-acpi] [PATCH v2 06/18] ARM64 / ACPI: Parse MADT to map
- logical cpu to MPIDR and get cpu_possible/present_map
-In-Reply-To: <CAMDttNf5d6XZ66mbiZivLmZQvcFv1mN1KKkN6TUQe_Z5VCu-1g@mail.gmail.com>
-References: <1407166105-17675-1-git-send-email-hanjun.guo@linaro.org>	<1407166105-17675-7-git-send-email-hanjun.guo@linaro.org>	<53F24705.7080809@arm.com>	<53F32E3C.1070102@linaro.org>
- <CAMDttNf5d6XZ66mbiZivLmZQvcFv1mN1KKkN6TUQe_Z5VCu-1g@mail.gmail.com>
-Message-ID: <53F414F8.2030405@linaro.org>
+Date: Wed, 20 Aug 2014 11:25:55 +0800
+Subject: [PATCH v2 08/18] ARM64 / ACPI: Get the enable method for SMP
+ initialization in ACPI way
+In-Reply-To: <1408476326.22761.134.camel@smoke>
+References: <1407166105-17675-1-git-send-email-hanjun.guo@linaro.org>		
+ <1407166105-17675-9-git-send-email-hanjun.guo@linaro.org>	
+ <1408388212.22761.100.camel@smoke> <53F33EDC.3090203@linaro.org>
+ <1408476326.22761.134.camel@smoke>
+Message-ID: <53F41543.4090602@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2014-8-20 0:46, Zi Shen Lim wrote:
-> Hanjun,
-
-Hi Lim,
-
+On 2014-8-20 3:25, Geoff Levand wrote:
+> Hi Hanjun,
 > 
-> On Tue, Aug 19, 2014 at 6:00 AM, Hanjun Guo <hanjun.guo@linaro.org> wrote:
->> Will INTERRUPT_CONTROLLER confuse people? There is only one GIC redistributor
->> (some people regard it as interrupt controller) in ARM system, if we use
->> INTERRUPT_CONTROLLER people will regard it as multi-redistributors in the
->> system, I think GIC_CPU_INTERFACE would be better, what do you think?
+> On Tue, 2014-08-19 at 20:11 +0800, Hanjun Guo wrote:
+>> On 2014-8-19 2:56, Geoff Levand wrote:
 > 
-> I think you meant to say "one GIC _distributor_" (GICD) instead of
-> redistributor (GICR).
-> ACPI5.1 only describes one GICD per system, but we can most certainly
-> describe multiple GICRs.
-> For multi-cpu systems, you'll definitely see multiple GIC redistributors.
+>>> 	message = acpi_disabled ? dn->full_name : "";
+>>>
+>>> 	...
+>>> 	
+>>> 	pr_warn("CPU %d: %s unsupported enable-method property: %s\n",
+>>> 				cpu, message, enable_method)
+>>
+>> In ACPI, there is no enable-method property, it is a term from, so I think the
+>> message printed can be separated.
+> 
+> I think it better to have a single message that can cover all
+> than to have separate messages.  Wouldn't the enable method be
+> "acpi-parking" or "acpi-psci"?  Then something like this would
+> work:
+> 
+> 	pr_warn("CPU %d: %s Unsupported enable method: %s\n", cpu, message, enable_method);
 
-Yes, you are right, thanks for pointing it out, I think I need more coffee :)
+Thanks for the suggestion, I will update it in next version.
 
 Thanks
 Hanjun
