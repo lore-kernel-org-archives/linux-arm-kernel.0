@@ -1,29 +1,37 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Wed, 20 Aug 2014 16:20:22 +0200
-Subject: [PATCH] mmc: sunxi: Declare ERASE capability
-In-Reply-To: <3728016.4j3Ljjy6eM@dizzy-6.o2s.ch>
-References: <1408541960-14788-1-git-send-email-wens@csie.org>
- <3728016.4j3Ljjy6eM@dizzy-6.o2s.ch>
-Message-ID: <CAPDyKFq1yzdu19ReECRZzVynHZByN4803WdZ=vjgCnC9F0+MiA@mail.gmail.com>
+From: jonas.jensen@gmail.com (Jonas Jensen)
+Date: Wed, 20 Aug 2014 16:24:04 +0200
+Subject: [PATCH v4 2/2] net: moxa: replace build_skb() with
+ netdev_alloc_skb_ip_align() / memcpy()
+In-Reply-To: <1408473119.5604.4.camel@edumazet-glaptop2.roam.corp.google.com>
+References: <1408459784-9385-1-git-send-email-jonas.jensen@gmail.com>
+ <1408459784-9385-2-git-send-email-jonas.jensen@gmail.com>
+ <1408473119.5604.4.camel@edumazet-glaptop2.roam.corp.google.com>
+Message-ID: <CACmBeS0MB+K_30vLACZJ8LqzmXejGQ=PP_t+gFpmke1e5yub9A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20 August 2014 16:10, David Lanzend?rfer <david.lanzendoerfer@o2s.ch> wrote:
-> Hi
->> Declare ERASE capability so we can use filesystems with the discard
->> option and the fstrim tool.
-> I totally agree with you that information about such capabilities should be
-> exposed but maybe it would be wiser to use DT instead of hardcoding it?
+On 19 August 2014 20:31, Eric Dumazet <eric.dumazet@gmail.com> wrote:
+> Instead of :
+>
+> priv->rx_buf_size = RX_BUF_SIZE +
+>                 SKB_DATA_ALIGN(sizeof(struct skb_shared_info));
+>
+> I think rx_buf_size can now be RX_BUF_SIZE
 
-Nope, this is pure software support. No HW config.
+You're right, that's now a remnant, see update in v5.
 
-What we should do future wise, is to remove the MMC_CAP_ERASE
-entirely. Due to current existing bugs, mainly in mmc core layer
-regarding erase, we can't do it yet.
 
-> I mean a WiFi device won't support erase functionality...
+> Another point is that priv->stats seems not needed, as ndev->stats could
+> be used instead (and remove moxart_mac_get_stats())
 
-That's already covered by the mmc core layer. No worries.
+I will fix that. I can add it to patches adding support for ethtool /
+stats and PHY.
 
-Kind regards
-Uffe
+I think I'm supposed to post those closer to the merge window, which
+would keep this set about bug fixes only.
+
+
+Regards,
+
+
+   Jonas
