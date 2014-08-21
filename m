@@ -1,109 +1,42 @@
-From: dan.j.williams@intel.com (Dan Williams)
-Date: Thu, 21 Aug 2014 12:22:06 -0700
-Subject: [PATCH] dmaengine maintainer update
-Message-ID: <20140821192035.27601.50486.stgit@viggo.jf.intel.com>
+From: dianders@chromium.org (Doug Anderson)
+Date: Thu, 21 Aug 2014 12:30:44 -0700
+Subject: [PATCH v7 02/11] power/restart: Call machine_restart instead of
+ arm_pm_restart
+In-Reply-To: <20140821044230.GA14609@roeck-us.net>
+References: <1408495538-27480-1-git-send-email-linux@roeck-us.net>
+ <1408495538-27480-3-git-send-email-linux@roeck-us.net>
+ <CAD=FV=Va8UrpDCLjFQJ6j-K0C3v7NPfifaJGtReCkUEu3x0mLg@mail.gmail.com>
+ <20140821044230.GA14609@roeck-us.net>
+Message-ID: <CAD=FV=XMBegDcPWM+sG4S64ZC6KEzKA-ykpEJrcGo2db+P0VLg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I am stepping down as dmaengine maintainer as the bulk of the activity
-in the subsystem is primarily targeted at the slave-dma case handled by
-Vinod, and I have recently been unable to give the few patches I do
-receive timely review.  There is still an item in my backlog to
-eliminate the async_tx api and the constraints it poses on dmaengine
-drivers, but I need not hold on to the maintainer role in the meantime.
-I will still be subscribed to dmaengine at vger.kernel.org to answer
-questions, but all patches should be routed through Vinod unless/until a
-maintainer for the non-slave-dma use case arrives.  It is non-entirely
-clear at this point that there is enough work going forward for a
-separate maintainer of the pure-offload case.
+Guenter,
 
-Ongoing development of the ioatdma driver is handled by Dave.  I'm still
-interested in reviewing ioatdma patches, but he is the primary
-maintainer/developer going forward.
+On Wed, Aug 20, 2014 at 9:42 PM, Guenter Roeck <linux@roeck-us.net> wrote:
+> On Wed, Aug 20, 2014 at 09:10:31PM -0700, Doug Anderson wrote:
+>> Guenter,
+>>
+>> On Tue, Aug 19, 2014 at 5:45 PM, Guenter Roeck <linux@roeck-us.net> wrote:
+>> > machine_restart is supported on non-ARM platforms, and and ultimately calls
+>> > arm_pm_restart, so dont call arm_pm_restart directly but use the more
+>> > generic function.
+>> >
+>> > Cc: Russell King <linux@arm.linux.org.uk>
+>>
+>> Do you need to submit this to his patch tracker to get him to pick it
+>> up?  How are you envisioning that this series land?  It crosses a lot
+>> of boundaries so I guess will need a reasonable amount of coordination
+>> between maintainers...
+>>
+>>
+> If I get an Acked-by: from all maintainers, I could send a pull request
+> to Linus directly. How do I send a patch to Russell's patch tracker ?
+> I thought I copied all mailing lists suggested by get_maintainer.pl,
+> but maybe I missed one.
 
-IOP platforms are not generating any traffic in my inbox, but if a patch
-did arrive I've long since lost access to hardware.
-
-Cc: Andrew Morton <akpm@linux-foundation.org>
-Cc: Vinod Koul <vinod.koul@intel.com>
-Cc: Dave Jiang <dave.jiang@intel.com>
-Signed-off-by: Dan Williams <dan.j.williams@intel.com>
----
-I'll add this to final pull request for the contents of dmaengine.git
-and priority fixes from patchwork that have been stalled.
- 
- MAINTAINERS |   15 ++++-----------
- 1 files changed, 4 insertions(+), 11 deletions(-)
-
-diff --git a/MAINTAINERS b/MAINTAINERS
-index b3fdb0f004ba..848ff1281b67 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -970,24 +970,20 @@ F:	arch/arm/mach-pxa/colibri-pxa270-income.c
- 
- ARM/INTEL IOP32X ARM ARCHITECTURE
- M:	Lennert Buytenhek <kernel@wantstofly.org>
--M:	Dan Williams <dan.j.williams@intel.com>
- L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
- S:	Maintained
- 
- ARM/INTEL IOP33X ARM ARCHITECTURE
--M:	Dan Williams <dan.j.williams@intel.com>
- L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
--S:	Maintained
-+S:	Orphan
- 
- ARM/INTEL IOP13XX ARM ARCHITECTURE
- M:	Lennert Buytenhek <kernel@wantstofly.org>
--M:	Dan Williams <dan.j.williams@intel.com>
- L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
- S:	Maintained
- 
- ARM/INTEL IQ81342EX MACHINE SUPPORT
- M:	Lennert Buytenhek <kernel@wantstofly.org>
--M:	Dan Williams <dan.j.williams@intel.com>
- L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
- S:	Maintained
- 
-@@ -1012,7 +1008,6 @@ F:	drivers/pcmcia/pxa2xx_stargate2.c
- 
- ARM/INTEL XSC3 (MANZANO) ARM CORE
- M:	Lennert Buytenhek <kernel@wantstofly.org>
--M:	Dan Williams <dan.j.williams@intel.com>
- L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
- S:	Maintained
- 
-@@ -1446,7 +1441,7 @@ F:	drivers/platform/x86/eeepc*.c
- ASYNCHRONOUS TRANSFERS/TRANSFORMS (IOAT) API
- M:	Dan Williams <dan.j.williams@intel.com>
- W:	http://sourceforge.net/projects/xscaleiop
--S:	Maintained
-+S:	Odd fixes
- F:	Documentation/crypto/async-tx-api.txt
- F:	crypto/async_tx/
- F:	drivers/dma/
-@@ -2778,13 +2773,11 @@ T:	git git://git.linaro.org/people/sumitsemwal/linux-dma-buf.git
- 
- DMA GENERIC OFFLOAD ENGINE SUBSYSTEM
- M:	Vinod Koul <vinod.koul@intel.com>
--M:	Dan Williams <dan.j.williams@intel.com>
- L:	dmaengine at vger.kernel.org
- Q:	https://patchwork.kernel.org/project/linux-dmaengine/list/
--S:	Supported
-+S:	Maintained
- F:	drivers/dma/
- F:	include/linux/dma*
--T:	git git://git.kernel.org/pub/scm/linux/kernel/git/djbw/async_tx.git
- T:	git git://git.infradead.org/users/vkoul/slave-dma.git (slave-dma)
- 
- DME1737 HARDWARE MONITOR DRIVER
-@@ -4500,8 +4493,8 @@ F:	arch/x86/kernel/microcode_core.c
- F:	arch/x86/kernel/microcode_intel.c
- 
- INTEL I/OAT DMA DRIVER
--M:	Dan Williams <dan.j.williams@intel.com>
- M:	Dave Jiang <dave.jiang@intel.com>
-+M:	Dan Williams <dan.j.williams@intel.com>
- L:	dmaengine at vger.kernel.org
- Q:	https://patchwork.kernel.org/project/linux-dmaengine/list/
- S:	Supported
+Ah, OK.  Perhaps it's best to ignore me, then.  ;)  FYI: Russell's
+Patch System is at <http://www.arm.linux.org.uk/developer/patches/>
+and is used for getting individual patches into branches maintained by
+Russel.  If you're just going to send a pull request for the series
+then I don't think you need it.
