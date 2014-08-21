@@ -1,47 +1,62 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 21 Aug 2014 09:27:41 +0100
-Subject: [RFC PATCH] arm: fix get_user BE behavior for target variable
- with size of 8 bytes
-In-Reply-To: <1408598949-23050-1-git-send-email-victor.kamensky@linaro.org>
-References: <1408598949-23050-1-git-send-email-victor.kamensky@linaro.org>
-Message-ID: <20140821082740.GI30401@n2100.arm.linux.org.uk>
+From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
+Date: Thu, 21 Aug 2014 10:34:21 +0200
+Subject: [PATCH 15/15] tty: serial: 8250: omap: add dma support
+In-Reply-To: <20140815210211.GD9239@atomide.com>
+References: <1408124563-31541-1-git-send-email-bigeasy@linutronix.de>
+ <1408124563-31541-16-git-send-email-bigeasy@linutronix.de>
+ <20140815210211.GD9239@atomide.com>
+Message-ID: <53F5AF0D.5060409@linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 20, 2014 at 10:29:09PM -0700, Victor Kamensky wrote:
-> e38361d 'ARM: 8091/2: add get_user() support for 8 byte types' commit
-> broke V7 BE get_user call when target var size is 64 bit, but '*ptr' size
-> is 32 bit or smaller. e38361d changed type of __r2 from 'register
-> unsigned long' to 'register typeof(x) __r2 asm("r2")' i.e before the change
-> even when target variable size was 64 bit, __r2 was still 32 bit.
-> But after e38361d commit, for target var of 64 bit size, __r2 became 64
-> bit and now it should occupy 2 registers r2, and r3. The issue in BE case
-> that r3 register is least significant word of __r2 and r2 register is most
-> significant word of __r2. But __get_user_4 still copies result into r2 (most
-> significant word of __r2). Subsequent code copies from __r2 into x, but
-> for situation described it will pick up only garbage from r3 register.
+On 08/15/2014 11:02 PM, Tony Lindgren wrote:
+> * Sebastian Andrzej Siewior <bigeasy@linutronix.de> [140815 11:13]:
+>> +#ifdef CONFIG_SERIAL_8250_DMA
+>> +	if (pdev->dev.of_node) {
+>> +		/*
+>> +		 * Oh DMA support. If there are no DMA properties in the DT then
+>> +		 * we will fall back to a generic DMA channel which does not
+>> +		 * really work here. To ensure that we do not get a generic DMA
+>> +		 * channel assigned, we have the the_no_dma_filter_fn() here.
+>> +		 * To avoid "failed to request DMA" messages we check for DMA
+>> +		 * properties in DT.
+>> +		 */
+>> +		ret = of_property_count_strings(pdev->dev.of_node, "dma-names");
+>> +		if (ret == 2) {
+>> +			up.dma = &priv->omap8250_dma;
+>> +			priv->omap8250_dma.fn = the_no_dma_filter_fn;
+>> +			priv->omap8250_dma.rx_size = RX_TRIGGER;
+>> +			priv->omap8250_dma.rxconf.src_maxburst = RX_TRIGGER;
+>> +			priv->omap8250_dma.txconf.dst_maxburst = TX_TRIGGER;
+>> +
+>> +			if (of_machine_is_compatible("ti,am33xx"))
+>> +				up.bugs |= UART_BUG_DMATX;
+>> +		}
+>> +	}
+>> +#endif
 > 
-> It was discovered during 3.17-rc1 V7 BE KVM testing. Simple test case below.
-> Note it works in LE case because r2 in LE case is still least significant
-> word.
+> Hmm I wonder if there's a more generic solution to this?
+
+To what exactly? The trigger level, the TX-bug or using DMA in the
+first place?
+
+> It would be also nice to be able to specify the use of DMA from
+> the board specific .dts file.
+
+Really? I don't see this requirement for MMC for instance. However you
+still could provide an empty "dma-names" property in your board .dts
+file if you do not want use DMA. Would this work?
+
+> Also, with DMA enabled, looks like omap deeper idle states are
+> blocked as the DMA stays reserved. After I commented out the
+> DMA info for my console UART, PM started working.
+
+Hmm. This would explain something. This would mean that I should cancel
+the RX DMA transfer in the PM-suspend routine. Let me see how that
+works.
+
+> Regards,
 > 
-> Proposed fix uninspiringly restores previous code but now in individual
-> branches of switch statement for '*(__p)' byte sizes 1, 2, 4 and have
-> newer code only for sizeof(*(__p)) == 8. Looking for may be better ideas
-> how to fix the issue.
+> Tony
 
-The only down side of this is that it quadruples the number of warnings
-when get_user() is used incorrectly:
-
-t-getuser.c: In function ?test_wrong?:
-t-getuser.c:346:388: warning: assignment discards ?const? qualifier from pointer target type [enabled by default]
-t-getuser.c:346:581: warning: assignment discards ?const? qualifier from pointer target type [enabled by default]
-t-getuser.c:346:774: warning: assignment discards ?const? qualifier from pointer target type [enabled by default]
-t-getuser.c:346:1100: warning: assignment discards ?const? qualifier from pointer target type [enabled by default]
-
-as we now have four assignments instead of one.  It would be nice to have
-proper behaviour here, with just one warning.
-
--- 
-FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
-according to speedtest.net.
+Sebastian
