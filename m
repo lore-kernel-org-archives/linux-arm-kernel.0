@@ -1,114 +1,122 @@
-From: boris.brezillon@free-electrons.com (Boris BREZILLON)
-Date: Thu, 21 Aug 2014 15:06:00 +0200
-Subject: [PATCH v4 00/11] drm: add support for Atmel HLCDC Display
- Controller
-In-Reply-To: <20140821095202.GA21848@ulmo>
-References: <1406034695-15534-1-git-send-email-boris.brezillon@free-electrons.com>
- <20140821081619.GZ2452@ldesroches-Latitude-E6320>
- <20140821103706.2349915d@bbrezillon> <20140821090406.GA13733@ulmo>
- <20140821114159.319e741b@bbrezillon> <20140821095202.GA21848@ulmo>
-Message-ID: <20140821150600.37788d82@bbrezillon>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Thu, 21 Aug 2014 14:06:47 +0100
+Subject: [PATCH v2 06/15] arm/arm64: KVM: make the maximum number of vCPUs a
+ per-VM value
+In-Reply-To: <1408626416-11326-1-git-send-email-andre.przywara@arm.com>
+References: <1408626416-11326-1-git-send-email-andre.przywara@arm.com>
+Message-ID: <1408626416-11326-7-git-send-email-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 21 Aug 2014 11:52:03 +0200
-Thierry Reding <thierry.reding@gmail.com> wrote:
+Currently the maximum number of vCPUs supported is a global value
+limited by the used GIC model. GICv3 will lift this limit, but we
+still need to observe it for guests using GICv2.
+So the maximum number of vCPUs is per-VM value, depending on the
+GIC model the guest uses.
+Store and check the value in struct kvm_arch, but keep it down to
+8 for now.
 
-> On Thu, Aug 21, 2014 at 11:41:59AM +0200, Boris BREZILLON wrote:
-> > On Thu, 21 Aug 2014 11:04:07 +0200
-> > Thierry Reding <thierry.reding@gmail.com> wrote:
-> > 
-> > > On Thu, Aug 21, 2014 at 10:37:06AM +0200, Boris BREZILLON wrote:
-> > > > Hi Ludovic,
-> > > > 
-> > > > On Thu, 21 Aug 2014 10:16:19 +0200
-> > > > Ludovic Desroches <ludovic.desroches@atmel.com> wrote:
-> > > > 
-> > > > > Hi Boris,
-> > > > > 
-> > > > > You can add
-> > > > > 
-> > > > > Tested-by: Ludovic Desroches <ludovic.desroches@atmel.com>
-> > > > 
-> > > > Thanks for testing this driver.
-> > > > 
-> > > > > 
-> > > > > Only one issue but not related to your patches, you can't display
-> > > > > quickly the bootup logo since the panel detection takes too much
-> > > > > time.
-> > > > 
-> > > > Yes, actually this is related to the device probe order: the
-> > > > hlcdc-display-controller device is probed before the simple-panel, thus
-> > > > nothing is detected on the RGB connector (I use of_drm_find_panel to
-> > > > check for panel availability) when the display controller is
-> > > > instantiated. I rely on the default polling infrastructure provided by
-> > > > the DRM/KMS framework which polls for a new connector every 10s, and
-> > > > this is far more than you kernel boot time.
-> > > > 
-> > > > Do anyone see a solution to reduce this delay (without changing the
-> > > > polling interval). I thought we could add a notifier infrastructure to
-> > > > the DRM panel framework, but I'm not sure this is how you want things
-> > > > done...
-> > > 
-> > > Other drivers return -EPROBE_DEFER when a panel hasn't been registered
-> > > yet. This will automatically take care of ordering things in a way that
-> > > DRM/KMS will only be initialized after the panel has been probed.
-> > 
-> > Actually I'd like to avoid doing this with a deferred probe, because,
-> > AFAIU, the remote endpoint is not tightly linked with the display
-> > controller driver (I mean the display controller can still be
-> > initialized without having a display connected on it).
-> > Moreover the atmel dev kit I'm using has an HDMI bridge connected on
-> > the same RGB connector and I'd like to use it in a near future.
-> > Returning -EPROBE_DEFER in case of several devices connected on the
-> > same connector implies that I'll have to wait for all the remote
-> > end-points to be available before my display controller could be
-> > instantiated.
-> > 
-> > While this could be acceptable when all drivers are statically linked
-> > in the kernel, it might be problematic when you're using modules,
-> > meaning that you won't be able to display anything on your LCD panel
-> > until your HDMI bridge module has been loaded.
-> 
-> No. HDMI should be using proper hotplugging anyway, hence it should be
-> always be loaded anyway. You're in for a world of pain if you think you
-> can run DRM with a driver that's composed of separate kernel modules.
+Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+---
+ arch/arm/include/asm/kvm_host.h   |    1 +
+ arch/arm/kvm/arm.c                |    6 ++++++
+ arch/arm64/include/asm/kvm_host.h |    3 +++
+ virt/kvm/arm/vgic-v2.c            |    5 +++++
+ virt/kvm/arm/vgic-v3.c            |    6 ++++++
+ 5 files changed, 21 insertions(+)
 
-I was talking about the external RGB to HDMI encoder, should the driver
-for this encoder (which is not on On Chip block) be compiled
-statically too ?
-
-> 
-> Also if you don't want to use deferred probe, then you're in for the
-> full hotplugging panel dance and that implies that you need to fix a
-> bunch of things in DRM (one being the framebuffer console instantiation
-> that I referred to in the other thread).
-
-For now, I wait until there is a device connected on the RGB connector
-(connector status set to connector_status_connected) before creating an
-fbdev. It might not be the cleanest way to solve this issue, but it
-works :-).
-
-> You also can't be using the
-> current device tree bindings because they all assume a dependency from
-> the display controller/output to the panel. For hotplugging you'd need
-> the dependency the other way around (the panel needs to refer to the
-> output by phandle).
-
-Here [1] is a proposal for notification support in the drm_panel
-infrastructure (which is not that complicated), and here [2] is how
-I use it in my atmel-hlcdc driver to generate hotplug events.
-
-Let me know if you want me to submit a proper patch series...
-
-Best Regards,
-
-Boris
-
-[1]http://code.bulix.org/scq4g3-86804
-[2]http://code.bulix.org/7dg501-86805
-
+diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
+index cf99ad0..0638419 100644
+--- a/arch/arm/include/asm/kvm_host.h
++++ b/arch/arm/include/asm/kvm_host.h
+@@ -67,6 +67,7 @@ struct kvm_arch {
+ 
+ 	/* Interrupt controller */
+ 	struct vgic_dist	vgic;
++	int max_vcpus;
+ };
+ 
+ #define KVM_NR_MEM_OBJS     40
+diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
+index 157e1b6..190f05f 100644
+--- a/arch/arm/kvm/arm.c
++++ b/arch/arm/kvm/arm.c
+@@ -142,6 +142,7 @@ int kvm_arch_init_vm(struct kvm *kvm, unsigned long type)
+ 
+ 	/* Mark the initial VMID generation invalid */
+ 	kvm->arch.vmid_gen = 0;
++	kvm->arch.max_vcpus = CONFIG_KVM_ARM_MAX_VCPUS;
+ 
+ 	return ret;
+ out_free_stage2_pgd:
+@@ -223,6 +224,11 @@ struct kvm_vcpu *kvm_arch_vcpu_create(struct kvm *kvm, unsigned int id)
+ 	int err;
+ 	struct kvm_vcpu *vcpu;
+ 
++	if (id >= kvm->arch.max_vcpus) {
++		err = -EINVAL;
++		goto out;
++	}
++
+ 	vcpu = kmem_cache_zalloc(kvm_vcpu_cache, GFP_KERNEL);
+ 	if (!vcpu) {
+ 		err = -ENOMEM;
+diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+index 017fbae..a325161 100644
+--- a/arch/arm64/include/asm/kvm_host.h
++++ b/arch/arm64/include/asm/kvm_host.h
+@@ -58,6 +58,9 @@ struct kvm_arch {
+ 	/* VTTBR value associated with above pgd and vmid */
+ 	u64    vttbr;
+ 
++	/* The maximum number of vCPUs depends on the used GIC model */
++	int max_vcpus;
++
+ 	/* Interrupt controller */
+ 	struct vgic_dist	vgic;
+ 
+diff --git a/virt/kvm/arm/vgic-v2.c b/virt/kvm/arm/vgic-v2.c
+index 90947c6..c7362ff 100644
+--- a/virt/kvm/arm/vgic-v2.c
++++ b/virt/kvm/arm/vgic-v2.c
+@@ -177,11 +177,16 @@ static struct vgic_params vgic_v2_params;
+ static bool vgic_v2_init_emul(struct kvm *kvm, int type)
+ {
+ 	struct vgic_vm_ops *vm_ops = &kvm->arch.vgic.vm_ops;
++	int nr_vcpus;
+ 
+ 	switch (type) {
+ 	case KVM_DEV_TYPE_ARM_VGIC_V2:
++		nr_vcpus = atomic_read(&kvm->online_vcpus);
++		if (nr_vcpus > 8)
++			return false;
+ 		vm_ops->get_lr = vgic_v2_get_lr;
+ 		vm_ops->set_lr = vgic_v2_set_lr;
++		kvm->arch.max_vcpus = 8;
+ 		return true;
+ 	}
+ 
+diff --git a/virt/kvm/arm/vgic-v3.c b/virt/kvm/arm/vgic-v3.c
+index a38339e..86e8b99 100644
+--- a/virt/kvm/arm/vgic-v3.c
++++ b/virt/kvm/arm/vgic-v3.c
+@@ -171,11 +171,17 @@ static const struct vgic_ops vgic_v3_ops = {
+ static bool vgic_v3_init_emul_compat(struct kvm *kvm, int type)
+ {
+ 	struct vgic_vm_ops *vm_ops = &kvm->arch.vgic.vm_ops;
++	int nr_vcpus;
+ 
+ 	switch (type) {
+ 	case KVM_DEV_TYPE_ARM_VGIC_V2:
++		nr_vcpus = atomic_read(&kvm->online_vcpus);
++		if (nr_vcpus > 8)
++			return false;
++
+ 		vm_ops->get_lr = vgic_v3_get_lr;
+ 		vm_ops->set_lr = vgic_v3_set_lr;
++		kvm->arch.max_vcpus = 8;
+ 		return true;
+ 	}
+ 	return false;
 -- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+1.7.9.5
