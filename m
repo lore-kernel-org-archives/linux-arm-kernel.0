@@ -1,155 +1,60 @@
-From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Thu, 21 Aug 2014 17:56:45 +0900
-Subject: [PATCH v6 6/6] arm64: add seccomp support
-In-Reply-To: <1408611405-8943-1-git-send-email-takahiro.akashi@linaro.org>
-References: <1408611405-8943-1-git-send-email-takahiro.akashi@linaro.org>
-Message-ID: <1408611405-8943-7-git-send-email-takahiro.akashi@linaro.org>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Thu, 21 Aug 2014 11:04:07 +0200
+Subject: [PATCH v4 00/11] drm: add support for Atmel HLCDC Display
+ Controller
+In-Reply-To: <20140821103706.2349915d@bbrezillon>
+References: <1406034695-15534-1-git-send-email-boris.brezillon@free-electrons.com>
+ <20140821081619.GZ2452@ldesroches-Latitude-E6320>
+ <20140821103706.2349915d@bbrezillon>
+Message-ID: <20140821090406.GA13733@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-secure_computing() is called first in syscall_trace_enter() so that a system
-call will be aborted quickly without doing succeeding syscall tracing,
-contrary to other cases, if seccomp rules deny that system call.
+On Thu, Aug 21, 2014 at 10:37:06AM +0200, Boris BREZILLON wrote:
+> Hi Ludovic,
+> 
+> On Thu, 21 Aug 2014 10:16:19 +0200
+> Ludovic Desroches <ludovic.desroches@atmel.com> wrote:
+> 
+> > Hi Boris,
+> > 
+> > You can add
+> > 
+> > Tested-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+> 
+> Thanks for testing this driver.
+> 
+> > 
+> > Only one issue but not related to your patches, you can't display
+> > quickly the bootup logo since the panel detection takes too much
+> > time.
+> 
+> Yes, actually this is related to the device probe order: the
+> hlcdc-display-controller device is probed before the simple-panel, thus
+> nothing is detected on the RGB connector (I use of_drm_find_panel to
+> check for panel availability) when the display controller is
+> instantiated. I rely on the default polling infrastructure provided by
+> the DRM/KMS framework which polls for a new connector every 10s, and
+> this is far more than you kernel boot time.
+> 
+> Do anyone see a solution to reduce this delay (without changing the
+> polling interval). I thought we could add a notifier infrastructure to
+> the DRM panel framework, but I'm not sure this is how you want things
+> done...
 
-On compat task, syscall numbers for system calls allowed in seccomp mode 1
-are different from those on normal tasks, and so _NR_seccomp_xxx_32's need
-to be redefined.
+Other drivers return -EPROBE_DEFER when a panel hasn't been registered
+yet. This will automatically take care of ordering things in a way that
+DRM/KMS will only be initialized after the panel has been probed. That
+will still cause some delay before everything gets set up, but hopefully
+less than what you're seeing now. There's also another thread where this
+is being discussed because deferred probing is causing "unacceptable"
+delays as well.
 
-Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
----
- arch/arm64/Kconfig               |   14 ++++++++++++++
- arch/arm64/include/asm/ptrace.h  |    1 +
- arch/arm64/include/asm/seccomp.h |   25 +++++++++++++++++++++++++
- arch/arm64/include/asm/unistd.h  |    3 +++
- arch/arm64/kernel/entry.S        |    2 ++
- arch/arm64/kernel/ptrace.c       |    5 +++++
- 6 files changed, 50 insertions(+)
- create mode 100644 arch/arm64/include/asm/seccomp.h
-
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index fd4e81a..d6dc436 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -34,6 +34,7 @@ config ARM64
- 	select HAVE_ARCH_AUDITSYSCALL
- 	select HAVE_ARCH_JUMP_LABEL
- 	select HAVE_ARCH_KGDB
-+	select HAVE_ARCH_SECCOMP_FILTER
- 	select HAVE_ARCH_TRACEHOOK
- 	select HAVE_C_RECORDMCOUNT
- 	select HAVE_CC_STACKPROTECTOR
-@@ -312,6 +313,19 @@ config ARCH_HAS_CACHE_LINE_SIZE
- 
- source "mm/Kconfig"
- 
-+config SECCOMP
-+	bool "Enable seccomp to safely compute untrusted bytecode"
-+	---help---
-+	  This kernel feature is useful for number crunching applications
-+	  that may need to compute untrusted bytecode during their
-+	  execution. By using pipes or other transports made available to
-+	  the process as file descriptors supporting the read/write
-+	  syscalls, it's possible to isolate those applications in
-+	  their own address space using seccomp. Once seccomp is
-+	  enabled via prctl(PR_SET_SECCOMP), it cannot be disabled
-+	  and the task is only allowed to execute a few safe syscalls
-+	  defined by each seccomp mode.
-+
- config XEN_DOM0
- 	def_bool y
- 	depends on XEN
-diff --git a/arch/arm64/include/asm/ptrace.h b/arch/arm64/include/asm/ptrace.h
-index a58cf62..a844d06 100644
---- a/arch/arm64/include/asm/ptrace.h
-+++ b/arch/arm64/include/asm/ptrace.h
-@@ -71,6 +71,7 @@
-  * with ptrace(PTRACE_SET_SYSCALL)
-  */
- #define RET_SKIP_SYSCALL	-1
-+#define RET_SKIP_SYSCALL_TRACE	-2
- #define IS_SKIP_SYSCALL(no)	((int)(no & 0xffffffff) == -1)
- 
- #ifndef __ASSEMBLY__
-diff --git a/arch/arm64/include/asm/seccomp.h b/arch/arm64/include/asm/seccomp.h
-new file mode 100644
-index 0000000..c76fac9
---- /dev/null
-+++ b/arch/arm64/include/asm/seccomp.h
-@@ -0,0 +1,25 @@
-+/*
-+ * arch/arm64/include/asm/seccomp.h
-+ *
-+ * Copyright (C) 2014 Linaro Limited
-+ * Author: AKASHI Takahiro <takahiro.akashi@linaro.org>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+#ifndef _ASM_SECCOMP_H
-+#define _ASM_SECCOMP_H
-+
-+#include <asm/unistd.h>
-+
-+#ifdef CONFIG_COMPAT
-+#define __NR_seccomp_read_32		__NR_compat_read
-+#define __NR_seccomp_write_32		__NR_compat_write
-+#define __NR_seccomp_exit_32		__NR_compat_exit
-+#define __NR_seccomp_sigreturn_32	__NR_compat_rt_sigreturn
-+#endif /* CONFIG_COMPAT */
-+
-+#include <asm-generic/seccomp.h>
-+
-+#endif /* _ASM_SECCOMP_H */
-diff --git a/arch/arm64/include/asm/unistd.h b/arch/arm64/include/asm/unistd.h
-index cf6ee31..7c73059 100644
---- a/arch/arm64/include/asm/unistd.h
-+++ b/arch/arm64/include/asm/unistd.h
-@@ -31,6 +31,9 @@
-  * Compat syscall numbers used by the AArch64 kernel.
-  */
- #define __NR_compat_restart_syscall	0
-+#define __NR_compat_exit		1
-+#define __NR_compat_read		3
-+#define __NR_compat_write		4
- #define __NR_compat_sigreturn		119
- #define __NR_compat_rt_sigreturn	173
- 
-diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
-index fdd6eae..d5eb447 100644
---- a/arch/arm64/kernel/entry.S
-+++ b/arch/arm64/kernel/entry.S
-@@ -672,6 +672,8 @@ ENDPROC(el0_svc)
- __sys_trace:
- 	mov	x0, sp
- 	bl	syscall_trace_enter
-+	cmp	w0, #RET_SKIP_SYSCALL_TRACE	// skip syscall and tracing?
-+	b.eq	ret_to_user
- 	cmp	w0, #RET_SKIP_SYSCALL		// skip syscall?
- 	b.eq	__sys_trace_return_skipped
- 	adr	lr, __sys_trace_return		// return address
-diff --git a/arch/arm64/kernel/ptrace.c b/arch/arm64/kernel/ptrace.c
-index c54dbcc..4287d68 100644
---- a/arch/arm64/kernel/ptrace.c
-+++ b/arch/arm64/kernel/ptrace.c
-@@ -27,6 +27,7 @@
- #include <linux/smp.h>
- #include <linux/ptrace.h>
- #include <linux/user.h>
-+#include <linux/seccomp.h>
- #include <linux/security.h>
- #include <linux/init.h>
- #include <linux/signal.h>
-@@ -1123,6 +1124,10 @@ asmlinkage int syscall_trace_enter(struct pt_regs *regs)
- {
- 	unsigned int saved_syscallno = regs->syscallno;
- 
-+	/* Do the secure computing check first; failures should be fast. */
-+	if (secure_computing(regs->syscallno) == -1)
-+		return RET_SKIP_SYSCALL_TRACE;
-+
- 	if (test_thread_flag(TIF_SYSCALL_TRACE))
- 		tracehook_report_syscall(regs, PTRACE_SYSCALL_ENTER);
- 
--- 
-1.7.9.5
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140821/5a32aeba/attachment.sig>
