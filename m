@@ -1,103 +1,35 @@
-From: dmurphy@ti.com (Murphy, Dan)
-Date: Thu, 21 Aug 2014 17:46:05 +0000
-Subject: [PATCH V2 2/2] Input: misc: introduce palmas-pwrbutton
-References: <1408392810-16011-1-git-send-email-nm@ti.com>
- <1408636935-29515-1-git-send-email-nm@ti.com>
- <1408636935-29515-3-git-send-email-nm@ti.com>
- <00FC9A978A94B7418C33AFAE8A35ED49DF0662@DFLE09.ent.ti.com>
- <53F62A2B.6010208@ti.com>
- <00FC9A978A94B7418C33AFAE8A35ED49DF07A2@DFLE09.ent.ti.com>
- <20140821173715.GA23419@kahuna>
-Message-ID: <00FC9A978A94B7418C33AFAE8A35ED49DF07F9@DFLE09.ent.ti.com>
+From: addy.ke@rock-chips.com (Addy Ke)
+Date: Fri, 22 Aug 2014 01:50:57 +0800
+Subject: [PATCH] i2c: rk3x: fix bug that cause transfer fails in master
+ receive mode
+Message-ID: <1408643457-7126-1-git-send-email-addy.ke@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/21/2014 12:37 PM, Menon, Nishanth wrote:
-> On 12:32-20140821, Murphy, Dan wrote:
->> On 08/21/2014 12:19 PM, Menon, Nishanth wrote:
->>> On 08/21/2014 11:59 AM, Murphy, Dan wrote:
->>> [...]
->>> Ooops.. missed answering one addition statement:
->>>
->>>>> +	of_property_read_u32(np, "ti,palmas-long-press-seconds", &val);
->>>>
->>>> Probably should check the return to make sure the value exists and that is is
->>>> within an expected range.
->>> It is an optional parameter and may not exist in dt. when it does
->>> exist, the logic tries to do a best match (this is the for loop in the
->>> logic just below).
->>>
->>
->> The issue is val might be returned as a negative which will then proceed to
->> set the config->long_press_time_val to the lowest time value which then overrides
->> your initial setting of config->long_press_time_val = ARRAY_SIZE(lpk_times) - 1;
->>
-> 
-> Does the following as a replacement look OK? if yes, I can incorporate
-> as part of v3 of this series.
-> /**
->  * palmas_pwron_params_ofinit() - device tree parameter parser
->  * @dev:	palmas button device
->  * @config:	configuration params that this fills up
->  */
-> static void palmas_pwron_params_ofinit(struct device *dev,
-> 				       struct palmas_pwron_config *config)
-> {
-> 	struct device_node *np;
-> 	u32 val;
-> 	int i, ret;
-> 	u8 lpk_times[] = { 6, 8, 10, 12 };
-> 	int pwr_on_deb_ms[] = { 15, 100, 500, 1000 };
-> 
-> 	/* Handle cases where device node based configuration is not present */
-> 	if (!of_have_populated_dt())
-> 		return;
-> 	np = of_node_get(dev->of_node);
-> 	if (!np)
-> 		return;
-> 
-> 	/* Default config parameters - least debounce, max long key press */
-> 	config->pwron_debounce_val = 0;
+In rk3x SOC, the I2C controller can receive/transmit up to 32 bytes data
+in one transaction, so the size of data to be write/read to/from
+TXDATAx/RXDATAx must be less than or equal 32 bytes at a time.
 
-And you can drop this as this value is set to zero in the probe when initialized.
+Test on pinky board, elan receive 158 bytes data.
 
-> 	config->long_press_time_val = ARRAY_SIZE(lpk_times) - 1;
+Signed-off-by: Addy Ke <addy.ke@rock-chips.com>
+---
+ drivers/i2c/busses/i2c-rk3x.c | 3 +++
+ 1 file changed, 3 insertions(+)
 
-I would move this up to just before checking the dt.  Then they are defaulted
-properly or move these to the probe.  Otherwise defaults are not set.
-
-> 
-> 	ret = of_property_read_u32(np, "ti,palmas-long-press-seconds", &val);
-> 	if (ret)
-> 		goto skip_lpk;
-> 	for (i = 0; i < ARRAY_SIZE(lpk_times); i++) {
-> 		if (val <= lpk_times[i]) {
-> 			config->long_press_time_val = i;
-> 			break;
-> 		}
-> 	}
-> 
-> skip_lpk:
-> 	ret = of_property_read_u32(np, "ti,palmas-pwron-debounce-milli-seconds",
-> 				   &val);
-> 	if (ret)
-> 		goto skip_debounce;
-> 	for (i = 0; i < ARRAY_SIZE(pwr_on_deb_ms); i++) {
-> 		if (val <= pwr_on_deb_ms[i]) {
-> 			config->pwron_debounce_val = i;
-> 			break;
-> 		}
-> 	}
-> 
-> skip_debounce:
-> 	dev_info(dev, "h/w controlled shutdown duration=%d seconds\n",
-> 		 lpk_times[config->long_press_time_val]);
-> 
-> 	of_node_put(np);
-> }
-> 
-
-
+diff --git a/drivers/i2c/busses/i2c-rk3x.c b/drivers/i2c/busses/i2c-rk3x.c
+index 69e1185..dc0aa64 100644
+--- a/drivers/i2c/busses/i2c-rk3x.c
++++ b/drivers/i2c/busses/i2c-rk3x.c
+@@ -323,6 +323,9 @@ static void rk3x_i2c_handle_read(struct rk3x_i2c *i2c, unsigned int ipd)
+ 	/* ack interrupt */
+ 	i2c_writel(i2c, REG_INT_MBRF, REG_IPD);
+ 
++	/* Can only handle a maximum of 32 bytes at a time */
++	len = (len > 32) ? 32 : len;
++
+ 	/* read the data from receive buffer */
+ 	for (i = 0; i < len; ++i) {
+ 		if (i % 4 == 0)
 -- 
-------------------
-Dan Murphy
+1.8.3.2
