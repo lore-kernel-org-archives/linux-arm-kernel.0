@@ -1,117 +1,147 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Thu, 21 Aug 2014 19:08:53 +0200
-Subject: [PATCH v4 00/11] drm: add support for Atmel HLCDC Display
- Controller
-In-Reply-To: <20140821150600.37788d82@bbrezillon>
-References: <1406034695-15534-1-git-send-email-boris.brezillon@free-electrons.com>
- <20140821095202.GA21848@ulmo> <20140821150600.37788d82@bbrezillon>
-Message-ID: <2138720.5GSxsvjVxS@avalon>
+From: keescook@chromium.org (Kees Cook)
+Date: Thu, 21 Aug 2014 12:08:47 -0500
+Subject: [PATCH v6 2/6] arm64: ptrace: allow tracer to skip a system call
+In-Reply-To: <1408611405-8943-3-git-send-email-takahiro.akashi@linaro.org>
+References: <1408611405-8943-1-git-send-email-takahiro.akashi@linaro.org>
+ <1408611405-8943-3-git-send-email-takahiro.akashi@linaro.org>
+Message-ID: <CAGXu5jJCyqpXkdvNDCu+eMr0qnqwbqUUo4u+2p_7DvFMzfKoEw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Boris,
+On Thu, Aug 21, 2014 at 3:56 AM, AKASHI Takahiro
+<takahiro.akashi@linaro.org> wrote:
+> If tracer specifies -1 as a syscall number, this traced system call should
+> be skipped with a value in x0 used as a return value.
+> This patch enables this semantics, but there is a restriction here:
+>
+>    when syscall(-1) is issued by user, tracer cannot skip this system call
+>    and modify a return value at syscall entry.
+>
+> In order to ease this flavor, we need to treat whatever value in x0 as
+> a return value, but this might result in a bogus value being returned,
+> especially when tracer doesn't do anything at this syscall.
+> So we always return ENOSYS instead, while we have another chance to change
+> a return value at syscall exit.
+>
+> Please also note:
+> * syscall entry tracing and syscall exit tracing (ftrace tracepoint and
+>   audit) are always executed, if enabled, even when skipping a system call
+>   (that is, -1).
+>   In this way, we can avoid a potential bug where audit_syscall_entry()
+>   might be called without audit_syscall_exit() at the previous system call
+>   being called, that would cause OOPs in audit_syscall_entry().
+>
+> * syscallno may also be set to -1 if a fatal signal (SIGKILL) is detected
+>   in tracehook_report_syscall_entry(), but since a value set to x0 (ENOSYS)
+>   is not used in this case, we may neglect the case.
+>
+> Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
+> ---
+>  arch/arm64/include/asm/ptrace.h |    8 ++++++++
+>  arch/arm64/kernel/entry.S       |    4 ++++
+>  arch/arm64/kernel/ptrace.c      |   20 ++++++++++++++++++++
+>  3 files changed, 32 insertions(+)
+>
+> diff --git a/arch/arm64/include/asm/ptrace.h b/arch/arm64/include/asm/ptrace.h
+> index 501000f..a58cf62 100644
+> --- a/arch/arm64/include/asm/ptrace.h
+> +++ b/arch/arm64/include/asm/ptrace.h
+> @@ -65,6 +65,14 @@
+>  #define COMPAT_PT_TEXT_ADDR            0x10000
+>  #define COMPAT_PT_DATA_ADDR            0x10004
+>  #define COMPAT_PT_TEXT_END_ADDR                0x10008
+> +
+> +/*
+> + * used to skip a system call when tracer changes its number to -1
+> + * with ptrace(PTRACE_SET_SYSCALL)
+> + */
+> +#define RET_SKIP_SYSCALL       -1
+> +#define IS_SKIP_SYSCALL(no)    ((int)(no & 0xffffffff) == -1)
+> +
+>  #ifndef __ASSEMBLY__
+>
+>  /* sizeof(struct user) for AArch32 */
+> diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
+> index f0b5e51..fdd6eae 100644
+> --- a/arch/arm64/kernel/entry.S
+> +++ b/arch/arm64/kernel/entry.S
+> @@ -25,6 +25,7 @@
+>  #include <asm/asm-offsets.h>
+>  #include <asm/errno.h>
+>  #include <asm/esr.h>
+> +#include <asm/ptrace.h>
+>  #include <asm/thread_info.h>
+>  #include <asm/unistd.h>
+>
+> @@ -671,6 +672,8 @@ ENDPROC(el0_svc)
+>  __sys_trace:
+>         mov     x0, sp
+>         bl      syscall_trace_enter
+> +       cmp     w0, #RET_SKIP_SYSCALL           // skip syscall?
+> +       b.eq    __sys_trace_return_skipped
+>         adr     lr, __sys_trace_return          // return address
+>         uxtw    scno, w0                        // syscall number (possibly new)
+>         mov     x1, sp                          // pointer to regs
+> @@ -685,6 +688,7 @@ __sys_trace:
+>
+>  __sys_trace_return:
+>         str     x0, [sp]                        // save returned x0
+> +__sys_trace_return_skipped:                    // x0 already in regs[0]
+>         mov     x0, sp
+>         bl      syscall_trace_exit
+>         b       ret_to_user
+> diff --git a/arch/arm64/kernel/ptrace.c b/arch/arm64/kernel/ptrace.c
+> index 8876049..c54dbcc 100644
+> --- a/arch/arm64/kernel/ptrace.c
+> +++ b/arch/arm64/kernel/ptrace.c
+> @@ -1121,9 +1121,29 @@ static void tracehook_report_syscall(struct pt_regs *regs,
+>
+>  asmlinkage int syscall_trace_enter(struct pt_regs *regs)
+>  {
+> +       unsigned int saved_syscallno = regs->syscallno;
+> +
+>         if (test_thread_flag(TIF_SYSCALL_TRACE))
+>                 tracehook_report_syscall(regs, PTRACE_SYSCALL_ENTER);
+>
+> +       if (IS_SKIP_SYSCALL(regs->syscallno)) {
+> +               /*
+> +                * RESTRICTION: we can't modify a return value of user
+> +                * issued syscall(-1) here. In order to ease this flavor,
+> +                * we need to treat whatever value in x0 as a return value,
+> +                * but this might result in a bogus value being returned.
+> +                */
+> +               /*
+> +                * NOTE: syscallno may also be set to -1 if fatal signal is
+> +                * detected in tracehook_report_syscall_entry(), but since
+> +                * a value set to x0 here is not used in this case, we may
+> +                * neglect the case.
+> +                */
+> +               if (!test_thread_flag(TIF_SYSCALL_TRACE) ||
+> +                               (IS_SKIP_SYSCALL(saved_syscallno)))
+> +                       regs->regs[0] = -ENOSYS;
+> +       }
+> +
 
-On Thursday 21 August 2014 15:06:00 Boris BREZILLON wrote:
-> On Thu, 21 Aug 2014 11:52:03 +0200 Thierry Reding wrote:
-> > On Thu, Aug 21, 2014 at 11:41:59AM +0200, Boris BREZILLON wrote:
-> >> On Thu, 21 Aug 2014 11:04:07 +0200 Thierry Reding wrote:
-> >>> On Thu, Aug 21, 2014 at 10:37:06AM +0200, Boris BREZILLON wrote:
-> >>>> On Thu, 21 Aug 2014 10:16:19 +0200 Ludovic Desroches wrote:
-> >>>>> Hi Boris,
-> >>>>> 
-> >>>>> You can add
-> >>>>> 
-> >>>>> Tested-by: Ludovic Desroches <ludovic.desroches@atmel.com>
-> >>>> 
-> >>>> Thanks for testing this driver.
-> >>>> 
-> >>>>> Only one issue but not related to your patches, you can't display
-> >>>>> quickly the bootup logo since the panel detection takes too much
-> >>>>> time.
-> >>>> 
-> >>>> Yes, actually this is related to the device probe order: the
-> >>>> hlcdc-display-controller device is probed before the simple-panel,
-> >>>> thus nothing is detected on the RGB connector (I use
-> >>>> of_drm_find_panel to check for panel availability) when the display
-> >>>> controller is instantiated. I rely on the default polling
-> >>>> infrastructure provided by the DRM/KMS framework which polls for a
-> >>>> new connector every 10s, and this is far more than you kernel boot
-> >>>> time.
-> >>>> 
-> >>>> Do anyone see a solution to reduce this delay (without changing the
-> >>>> polling interval). I thought we could add a notifier infrastructure
-> >>>> to the DRM panel framework, but I'm not sure this is how you want
-> >>>> things done...
-> >>> 
-> >>> Other drivers return -EPROBE_DEFER when a panel hasn't been registered
-> >>> yet. This will automatically take care of ordering things in a way
-> >>> that DRM/KMS will only be initialized after the panel has been probed.
-> >> 
-> >> Actually I'd like to avoid doing this with a deferred probe, because,
-> >> AFAIU, the remote endpoint is not tightly linked with the display
-> >> controller driver (I mean the display controller can still be
-> >> initialized without having a display connected on it).
-> >> Moreover the atmel dev kit I'm using has an HDMI bridge connected on
-> >> the same RGB connector and I'd like to use it in a near future.
-> >> Returning -EPROBE_DEFER in case of several devices connected on the
-> >> same connector implies that I'll have to wait for all the remote
-> >> end-points to be available before my display controller could be
-> >> instantiated.
-> >> 
-> >> While this could be acceptable when all drivers are statically linked
-> >> in the kernel, it might be problematic when you're using modules,
-> >> meaning that you won't be able to display anything on your LCD panel
-> >> until your HDMI bridge module has been loaded.
-> > 
-> > No. HDMI should be using proper hotplugging anyway, hence it should be
-> > always be loaded anyway. You're in for a world of pain if you think you
-> > can run DRM with a driver that's composed of separate kernel modules.
-> 
-> I was talking about the external RGB to HDMI encoder, should the driver
-> for this encoder (which is not on On Chip block) be compiled
-> statically too ?
+I don't have a runtime environment yet for arm64, so I can't test this
+directly myself, so I'm just trying to eyeball this. :)
 
-Given the move to multiplatform kernels we need to aim for as few modules 
-compiled in as possible. I'd say this includes HDMI encoders, panels and 
-display controllers.
+Once the seccomp logic is added here, I don't think using -2 as a
+special value will work. Doesn't this mean the Oops is possible by the
+user issuing a "-2" syscall? As in, if TIF_SYSCALL_WORK is set, and
+the user passed -2 as the syscall, audit will be called only on entry,
+and then skipped on exit?
 
-> > Also if you don't want to use deferred probe, then you're in for the
-> > full hotplugging panel dance and that implies that you need to fix a
-> > bunch of things in DRM (one being the framebuffer console instantiation
-> > that I referred to in the other thread).
-> 
-> For now, I wait until there is a device connected on the RGB connector
-> (connector status set to connector_status_connected) before creating an
-> fbdev. It might not be the cleanest way to solve this issue, but it
-> works :-).
+-Kees
 
-Do you create a new drm_encoder at runtime for the HDMI encoder when it 
-appears ? I thought the DRM core and API were not able to correctly cope with 
-that.
+>         if (test_thread_flag(TIF_SYSCALL_TRACEPOINT))
+>                 trace_sys_enter(regs, regs->syscallno);
+>
+> --
+> 1.7.9.5
+>
 
-> > You also can't be using the current device tree bindings because they all
-> > assume a dependency from the display controller/output to the panel. For
-> > hotplugging you'd need the dependency the other way around (the panel
-> > needs to refer to the output by phandle).
-> 
-> Here [1] is a proposal for notification support in the drm_panel
-> infrastructure (which is not that complicated), and here [2] is how
-> I use it in my atmel-hlcdc driver to generate hotplug events.
 
-Is there a way we could use the component framework for that ? I know that 
-partial notification isn't supported at the moment, but Russell agreed it was 
-a real use case that should be implemented at some point.
-
-> Let me know if you want me to submit a proper patch series...
-> 
-> Best Regards,
-> 
-> Boris
-> 
-> [1]http://code.bulix.org/scq4g3-86804
-> [2]http://code.bulix.org/7dg501-86805
 
 -- 
-Regards,
-
-Laurent Pinchart
+Kees Cook
+Chrome OS Security
