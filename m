@@ -1,144 +1,57 @@
-From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
-Date: Thu, 21 Aug 2014 09:53:43 +0200
-Subject: [PATCH v7 3/8] cpufreq: kirkwood: Remove use of the clk provider
- API
-In-Reply-To: <20140820225513.5251.284@quantum>
-References: <1408375833-10703-1-git-send-email-tomeu.vizoso@collabora.com>
- <1408375833-10703-4-git-send-email-tomeu.vizoso@collabora.com>
- <20140820225513.5251.284@quantum>
-Message-ID: <53F5A587.9030200@collabora.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Thu, 21 Aug 2014 10:00:40 +0200
+Subject: [PATCH v2 3/3] arm64/efi: efistub: don't abort if base of DRAM is
+ occupied
+In-Reply-To: <20140820173528.GH21734@leverpostej>
+References: <1406717944-24725-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1406717944-24725-4-git-send-email-ard.biesheuvel@linaro.org>
+ <20140814113204.GE24018@leverpostej>
+ <20140820171057.GG29733@console-pimps.org>
+ <20140820173528.GH21734@leverpostej>
+Message-ID: <CAKv+Gu-3wWQJf6DTSbx68cg4BV9FX4-5t=GQ+06ikvC4M5jSkw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/21/2014 12:55 AM, Mike Turquette wrote:
-> Quoting Tomeu Vizoso (2014-08-18 08:30:29)
->> Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
->> ---
->>   drivers/cpufreq/kirkwood-cpufreq.c | 3 +--
->>   1 file changed, 1 insertion(+), 2 deletions(-)
+On 20 August 2014 19:35, Mark Rutland <mark.rutland@arm.com> wrote:
+> On Wed, Aug 20, 2014 at 06:10:57PM +0100, Matt Fleming wrote:
+>> On Thu, 14 Aug, at 12:32:05PM, Mark Rutland wrote:
+>> > On Wed, Jul 30, 2014 at 11:59:04AM +0100, Ard Biesheuvel wrote:
+>> > > If we cannot relocate the kernel Image to its preferred offset of base of DRAM
+>> > > plus TEXT_OFFSET, instead relocate it to the lowest available 2 MB boundary plus
+>> > > TEXT_OFFSET. We may lose a bit of memory at the low end, but we can still
+>> > > proceed normally otherwise.
+>> > >
+>> > > Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+>> > > Acked-by: Mark Salter <msalter@redhat.com>
+>> >
+>> > Acked-by: Mark Rutland <mark.rutland@arm.com>
 >>
->> diff --git a/drivers/cpufreq/kirkwood-cpufreq.c b/drivers/cpufreq/kirkwood-cpufreq.c
->> index 37a4806..f3d087f 100644
->> --- a/drivers/cpufreq/kirkwood-cpufreq.c
->> +++ b/drivers/cpufreq/kirkwood-cpufreq.c
->> @@ -12,7 +12,6 @@
->>   #include <linux/kernel.h>
->>   #include <linux/module.h>
->>   #include <linux/clk.h>
->> -#include <linux/clk-provider.h>
->>   #include <linux/cpufreq.h>
->>   #include <linux/of_device.h>
->>   #include <linux/platform_device.h>
->> @@ -50,7 +49,7 @@ static struct cpufreq_frequency_table kirkwood_freq_table[] = {
->>
->>   static unsigned int kirkwood_cpufreq_get_cpu_frequency(unsigned int cpu)
->>   {
->> -       if (__clk_is_enabled(priv.powersave_clk))
->> +       if (clk_is_enabled(priv.powersave_clk))
->>                  return kirkwood_freq_table[1].frequency;
->>          return kirkwood_freq_table[0].frequency;
->>   }
->> --
->> 1.9.3
->>
+>> Ard, who's picking this up?
 >
-> Tomeu,
->
-> After taking a second look at clk_is_enabled and the Kirkwood driver, I
-> would prefer to not implement clk_is_enabled. The main reason is that it
-> is racey, since the clock's status could of course change as soon as as
-> that call completes. Furthermore I am worried that drivers might do
-> something like:
->
-> if (!clk_is_enabled(clk))
-> 	clk_enable(clk);
->
-> Which is crap and the driver should just call clk_enable any time it
-> needs the clock. To that end I propose to drop "clk: provide public
-> clk_is_enabled function" and replace your update to kirkwood-cpufreq.c
-> with the following patch. Let me know what you think.
 
-Yep, this looks much better to me. I will replace 2/8 and 3/8 with this 
-one for v8.
+Hey Matt,
 
-Reviewed-By: Tomeu Vizoso <tomeu.vizoso@collabora.com>
+These patches mostly touch non-EFI specific files under arch/arm64, so
+to prevent conflicts, it makes sense for the arm64 tree to take them.
 
-Thanks!
+ arch/arm64/kernel/efi-stub.c       | 18 ++++++------------
+ arch/arm64/kernel/head.S           |  6 +++---
+ arch/arm64/kernel/smp_spin_table.c | 21 ++++++++++++++++-----
+ 3 files changed, 25 insertions(+), 20 deletions(-)
 
-Tomeu
+-- 
+Ard.
 
-> Regards,
-> Mike
+
+> Will's already taken this into arm64/devel [1,2] with the intention of
+> waiting for v3.18 [3]. Per Leif's comment [4] that might have to be
+> bumped.
 >
+> Will?
 >
+> Mark.
 >
->  From 713b46fd66abd26a4e4d584a0b8a2a28c0459a60 Mon Sep 17 00:00:00 2001
-> From: Mike Turquette <mturquette@linaro.org>
-> Date: Mon, 18 Aug 2014 17:30:29 +0200
-> Subject: [PATCH] cpufreq: kirkwood: Remove use of the clk provider API
->
-> Instead of checking the clock framework to see if the clock is enabled,
-> track the cpu frequency within the driver as the powersave_clk is
-> enabled and disabled.
->
-> Cc: Tomeu Vizoso <tomeu.vizoso@collabora.com>
-> Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
-> Cc: Viresh Kumar <viresh.kumar@linaro.org>
-> Signed-off-by: Mike Turquette <mturquette@linaro.org>
-> ---
->   drivers/cpufreq/kirkwood-cpufreq.c | 10 ++++++----
->   1 file changed, 6 insertions(+), 4 deletions(-)
->
-> diff --git a/drivers/cpufreq/kirkwood-cpufreq.c b/drivers/cpufreq/kirkwood-cpufreq.c
-> index 37a4806..88f4641 100644
-> --- a/drivers/cpufreq/kirkwood-cpufreq.c
-> +++ b/drivers/cpufreq/kirkwood-cpufreq.c
-> @@ -12,7 +12,6 @@
->   #include <linux/kernel.h>
->   #include <linux/module.h>
->   #include <linux/clk.h>
-> -#include <linux/clk-provider.h>
->   #include <linux/cpufreq.h>
->   #include <linux/of_device.h>
->   #include <linux/platform_device.h>
-> @@ -33,6 +32,8 @@ static struct priv
->   #define STATE_CPU_FREQ 0x01
->   #define STATE_DDR_FREQ 0x02
->
-> +static unsigned long cpu_frequency = 0;
-> +
->   /*
->    * Kirkwood can swap the clock to the CPU between two clocks:
->    *
-> @@ -50,9 +51,7 @@ static struct cpufreq_frequency_table kirkwood_freq_table[] = {
->
->   static unsigned int kirkwood_cpufreq_get_cpu_frequency(unsigned int cpu)
->   {
-> -	if (__clk_is_enabled(priv.powersave_clk))
-> -		return kirkwood_freq_table[1].frequency;
-> -	return kirkwood_freq_table[0].frequency;
-> +	return cpu_frequency;
->   }
->
->   static int kirkwood_cpufreq_target(struct cpufreq_policy *policy,
-> @@ -71,9 +70,11 @@ static int kirkwood_cpufreq_target(struct cpufreq_policy *policy,
->   	switch (state) {
->   	case STATE_CPU_FREQ:
->   		clk_disable(priv.powersave_clk);
-> +		cpu_frequency = kirkwood_freq_table[0].frequency;
->   		break;
->   	case STATE_DDR_FREQ:
->   		clk_enable(priv.powersave_clk);
-> +		cpu_frequency = kirkwood_freq_table[1].frequency;
->   		break;
->   	}
->
-> @@ -133,6 +134,7 @@ static int kirkwood_cpufreq_probe(struct platform_device *pdev)
->
->   	clk_prepare_enable(priv.cpu_clk);
->   	kirkwood_freq_table[0].frequency = clk_get_rate(priv.cpu_clk) / 1000;
-> +	cpu_frequency = kirkwood_freq_table[0].frequency;
->
->   	priv.ddr_clk = of_clk_get_by_name(np, "ddrclk");
->   	if (IS_ERR(priv.ddr_clk)) {
->
+> [1] https://git.kernel.org/cgit/linux/kernel/git/arm64/linux.git/commit/?h=devel
+> [2] https://git.kernel.org/cgit/linux/kernel/git/arm64/linux.git/commit/?h=devel&id=12f002aa8d96b90e6e37cc2b0d9a6a3cacdf8ef5
+> [3] http://lists.infradead.org/pipermail/linux-arm-kernel/2014-August/279655.html
+> [4] http://lists.infradead.org/pipermail/linux-arm-kernel/2014-August/279771.html
