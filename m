@@ -1,40 +1,72 @@
 From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Thu, 21 Aug 2014 03:49:22 +0200
-Subject: [PATCH] cpuidle: big.LITTLE: add Exynos5800 compatible string
-In-Reply-To: <1407888665-24603-1-git-send-email-khilman@linaro.org>
-References: <1407888665-24603-1-git-send-email-khilman@linaro.org>
-Message-ID: <53F55022.8020505@linaro.org>
+Date: Thu, 21 Aug 2014 03:50:57 +0200
+Subject: [PATCH] clocksource: sirf: disable counter before re-setting
+ it
+In-Reply-To: <CAGsJ_4wAMYwGfLCfu+RE4O=JtzBPEU8EmVMcKap4Bhu8TTYc6w@mail.gmail.com>
+References: <1406124197-25083-1-git-send-email-21cnbao@gmail.com>
+ <CAGsJ_4wAMYwGfLCfu+RE4O=JtzBPEU8EmVMcKap4Bhu8TTYc6w@mail.gmail.com>
+Message-ID: <53F55081.3020802@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/13/2014 02:11 AM, Kevin Hilman wrote:
-> Exynos 5800 is big.LITTLE SoC compatible with the 5420.  Add the
-> compatible string so this driver works on the 5800.
+On 08/18/2014 11:24 AM, Barry Song wrote:
+> 2014-07-23 22:03 GMT+08:00 Barry Song <21cnbao@gmail.com>:
+>> From: Hao Liu <Hao.Liu@csr.com>
+>>
+>> according to HW spec, we have to disable counter before setting
+>> it, if we don't this, in pressure test, sometimes the timer might
+>> not generate interrupt any more.
+>>
+>> and this patch also fixes a typo for register set by changing 0x7
+>> to 0x3. 0x7 is loop mode in HW, but here we are using oneshot 0x3.
+>>
+>> Signed-off-by: Hao Liu <Hao.Liu@csr.com>
+>> Signed-off-by: Barry Song <Baohua.Song@csr.com>
+>> ---
 >
-> Tested on exynos5800-peach-pi (aka Samsung Chromebook2)
->
-> Signed-off-by: Kevin Hilman <khilman@linaro.org>
-> ---
+> Hi Daniel,
+> did you miss this one?
 
-Thanks.
+Nope, I have it locally. Let me review it in details next week when I 
+return from the kernel summit.
 
-I will apply it to my tree.
+Thanks
 
->   drivers/cpuidle/cpuidle-big_little.c | 1 +
->   1 file changed, 1 insertion(+)
+   -- Daniel
+
+
 >
-> diff --git a/drivers/cpuidle/cpuidle-big_little.c b/drivers/cpuidle/cpuidle-big_little.c
-> index 0a1f827308db..bf3ab66fdaaf 100644
-> --- a/drivers/cpuidle/cpuidle-big_little.c
-> +++ b/drivers/cpuidle/cpuidle-big_little.c
-> @@ -166,6 +166,7 @@ static int __init bl_idle_driver_init(struct cpuidle_driver *drv, int match_id)
->   static const struct of_device_id compatible_machine_match[] = {
->   	{ .compatible = "arm,vexpress,v2p-ca15_a7" },
->   	{ .compatible = "samsung,exynos5420" },
-> +	{ .compatible = "samsung,exynos5800" },
->   	{},
->   };
+>>   drivers/clocksource/timer-marco.c |    5 ++++-
+>>   1 file changed, 4 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/drivers/clocksource/timer-marco.c b/drivers/clocksource/timer-marco.c
+>> index 330e930..caf7a20 100644
+>> --- a/drivers/clocksource/timer-marco.c
+>> +++ b/drivers/clocksource/timer-marco.c
+>> @@ -63,7 +63,7 @@ static inline void sirfsoc_timer_count_disable(int idx)
+>>   /* enable count and interrupt */
+>>   static inline void sirfsoc_timer_count_enable(int idx)
+>>   {
+>> -       writel_relaxed(readl_relaxed(sirfsoc_timer_base + SIRFSOC_TIMER_32COUNTER_0_CTRL + 4 * idx) | 0x7,
+>> +       writel_relaxed(readl_relaxed(sirfsoc_timer_base + SIRFSOC_TIMER_32COUNTER_0_CTRL + 4 * idx) | 0x3,
+>>                  sirfsoc_timer_base + SIRFSOC_TIMER_32COUNTER_0_CTRL + 4 * idx);
+>>   }
+>>
+>> @@ -103,6 +103,9 @@ static int sirfsoc_timer_set_next_event(unsigned long delta,
+>>   {
+>>          int cpu = smp_processor_id();
+>>
+>> +       /* disable timer first, then modify the related registers */
+>> +       sirfsoc_timer_count_disable(cpu);
+>> +
+>>          writel_relaxed(0, sirfsoc_timer_base + SIRFSOC_TIMER_COUNTER_0 +
+>>                  4 * cpu);
+>>          writel_relaxed(delta, sirfsoc_timer_base + SIRFSOC_TIMER_MATCH_0 +
+>> --
+>> 1.7.9.5
+>>
 >
+> -barry
 >
 
 
