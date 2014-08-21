@@ -1,273 +1,199 @@
 From: lauraa@codeaurora.org (Laura Abbott)
-Date: Wed, 20 Aug 2014 18:20:37 -0700
-Subject: [PATCHv3 5/7] arm64: Factor out fixmap initialiation from ioremap
+Date: Wed, 20 Aug 2014 18:20:38 -0700
+Subject: [PATCHv3 6/7] arm64: use fixmap for text patching when text is RO
 In-Reply-To: <1408584039-12735-1-git-send-email-lauraa@codeaurora.org>
 References: <1408584039-12735-1-git-send-email-lauraa@codeaurora.org>
-Message-ID: <1408584039-12735-6-git-send-email-lauraa@codeaurora.org>
+Message-ID: <1408584039-12735-7-git-send-email-lauraa@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The fixmap API was originally added for arm64 for
-early_ioremap purposes. It can be used for other purposes too
-so move the initialization from ioremap to somewhere more
-generic. This makes it obvious where the fixmap is being set
-up and allows for a cleaner implementation of __set_fixmap.
+When kernel text is marked as read only, it cannot be modified directly.
+Use a fixmap to modify the text instead in a similar manner to
+x86 and arm.
 
 Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
 ---
- arch/arm64/include/asm/fixmap.h |  7 +--
- arch/arm64/kernel/setup.c       |  3 +-
- arch/arm64/mm/ioremap.c         | 93 ++--------------------------------------
- arch/arm64/mm/mmu.c             | 94 +++++++++++++++++++++++++++++++++++++++++
- 4 files changed, 103 insertions(+), 94 deletions(-)
+I think there were some questions on spinlocks for the arm version, not
+sure if similar concerns apply here.
+---
+ arch/arm64/include/asm/fixmap.h |  1 +
+ arch/arm64/include/asm/insn.h   |  2 ++
+ arch/arm64/kernel/insn.c        | 74 +++++++++++++++++++++++++++++++++++++++--
+ arch/arm64/kernel/jump_label.c  |  2 +-
+ 4 files changed, 75 insertions(+), 4 deletions(-)
 
 diff --git a/arch/arm64/include/asm/fixmap.h b/arch/arm64/include/asm/fixmap.h
-index 5f7bfe6..db26a2f2 100644
+index db26a2f2..2cd4b0d 100644
 --- a/arch/arm64/include/asm/fixmap.h
 +++ b/arch/arm64/include/asm/fixmap.h
-@@ -56,10 +56,11 @@ enum fixed_addresses {
+@@ -48,6 +48,7 @@ enum fixed_addresses {
  
- #define FIXMAP_PAGE_IO     __pgprot(PROT_DEVICE_nGnRE)
+ 	FIX_BTMAP_END = __end_of_permanent_fixed_addresses,
+ 	FIX_BTMAP_BEGIN = FIX_BTMAP_END + TOTAL_FIX_BTMAPS - 1,
++	FIX_TEXT_POKE0,
+ 	__end_of_fixed_addresses
+ };
  
--extern void __early_set_fixmap(enum fixed_addresses idx,
--			       phys_addr_t phys, pgprot_t flags);
-+void __init early_fixmap_init(void);
+diff --git a/arch/arm64/include/asm/insn.h b/arch/arm64/include/asm/insn.h
+index dc1f73b..07ac29b 100644
+--- a/arch/arm64/include/asm/insn.h
++++ b/arch/arm64/include/asm/insn.h
+@@ -92,6 +92,7 @@ bool aarch64_insn_is_nop(u32 insn);
  
--#define __set_fixmap __early_set_fixmap
-+#define __early_set_fixmap __set_fixmap
-+
-+extern void __set_fixmap(enum fixed_addresses idx, phys_addr_t phys, pgprot_t prot);
+ int aarch64_insn_read(void *addr, u32 *insnp);
+ int aarch64_insn_write(void *addr, u32 insn);
++int aarch64_insn_write_early(void *addr, u32 insn);
+ enum aarch64_insn_encoding_class aarch64_get_insn_class(u32 insn);
+ u32 aarch64_insn_encode_immediate(enum aarch64_insn_imm_type type,
+ 				  u32 insn, u64 imm);
+@@ -103,6 +104,7 @@ u32 aarch64_insn_gen_nop(void);
+ bool aarch64_insn_hotpatch_safe(u32 old_insn, u32 new_insn);
  
- #include <asm-generic/fixmap.h>
- 
-diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
-index f6f0ccf..9244e20 100644
---- a/arch/arm64/kernel/setup.c
-+++ b/arch/arm64/kernel/setup.c
-@@ -378,7 +378,8 @@ void __init setup_arch(char **cmdline_p)
- 
- 	*cmdline_p = boot_command_line;
- 
--	early_ioremap_init();
-+	early_fixmap_init();
-+	early_ioremap_setup();
- 
- 	parse_early_param();
- 
-diff --git a/arch/arm64/mm/ioremap.c b/arch/arm64/mm/ioremap.c
-index fa324bd..cbb99c8 100644
---- a/arch/arm64/mm/ioremap.c
-+++ b/arch/arm64/mm/ioremap.c
-@@ -103,97 +103,10 @@ void __iomem *ioremap_cache(phys_addr_t phys_addr, size_t size)
- }
- EXPORT_SYMBOL(ioremap_cache);
- 
--static pte_t bm_pte[PTRS_PER_PTE] __page_aligned_bss;
--#if CONFIG_ARM64_PGTABLE_LEVELS > 2
--static pte_t bm_pmd[PTRS_PER_PMD] __page_aligned_bss;
--#endif
--#if CONFIG_ARM64_PGTABLE_LEVELS > 3
--static pte_t bm_pud[PTRS_PER_PUD] __page_aligned_bss;
--#endif
--
--static inline pud_t * __init early_ioremap_pud(unsigned long addr)
--{
--	pgd_t *pgd;
--
--	pgd = pgd_offset_k(addr);
--	BUG_ON(pgd_none(*pgd) || pgd_bad(*pgd));
--
--	return pud_offset(pgd, addr);
--}
--
--static inline pmd_t * __init early_ioremap_pmd(unsigned long addr)
--{
--	pud_t *pud = early_ioremap_pud(addr);
--
--	BUG_ON(pud_none(*pud) || pud_bad(*pud));
--
--	return pmd_offset(pud, addr);
--}
--
--static inline pte_t * __init early_ioremap_pte(unsigned long addr)
--{
--	pmd_t *pmd = early_ioremap_pmd(addr);
--
--	BUG_ON(pmd_none(*pmd) || pmd_bad(*pmd));
--
--	return pte_offset_kernel(pmd, addr);
--}
--
-+/*
-+ * Must be called after early_fixmap_init
-+ */
- void __init early_ioremap_init(void)
- {
--	pgd_t *pgd;
--	pud_t *pud;
--	pmd_t *pmd;
--	unsigned long addr = fix_to_virt(FIX_BTMAP_BEGIN);
--
--	pgd = pgd_offset_k(addr);
--	pgd_populate(&init_mm, pgd, bm_pud);
--	pud = pud_offset(pgd, addr);
--	pud_populate(&init_mm, pud, bm_pmd);
--	pmd = pmd_offset(pud, addr);
--	pmd_populate_kernel(&init_mm, pmd, bm_pte);
--
--	/*
--	 * The boot-ioremap range spans multiple pmds, for which
--	 * we are not prepared:
--	 */
--	BUILD_BUG_ON((__fix_to_virt(FIX_BTMAP_BEGIN) >> PMD_SHIFT)
--		     != (__fix_to_virt(FIX_BTMAP_END) >> PMD_SHIFT));
--
--	if (pmd != early_ioremap_pmd(fix_to_virt(FIX_BTMAP_END))) {
--		WARN_ON(1);
--		pr_warn("pmd %p != %p\n",
--			pmd, early_ioremap_pmd(fix_to_virt(FIX_BTMAP_END)));
--		pr_warn("fix_to_virt(FIX_BTMAP_BEGIN): %08lx\n",
--			fix_to_virt(FIX_BTMAP_BEGIN));
--		pr_warn("fix_to_virt(FIX_BTMAP_END):   %08lx\n",
--			fix_to_virt(FIX_BTMAP_END));
--
--		pr_warn("FIX_BTMAP_END:       %d\n", FIX_BTMAP_END);
--		pr_warn("FIX_BTMAP_BEGIN:     %d\n",
--			FIX_BTMAP_BEGIN);
--	}
--
- 	early_ioremap_setup();
- }
--
--void __init __early_set_fixmap(enum fixed_addresses idx,
--			       phys_addr_t phys, pgprot_t flags)
--{
--	unsigned long addr = __fix_to_virt(idx);
--	pte_t *pte;
--
--	if (idx >= __end_of_fixed_addresses) {
--		BUG();
--		return;
--	}
--
--	pte = early_ioremap_pte(addr);
--
--	if (pgprot_val(flags))
--		set_pte(pte, pfn_pte(phys >> PAGE_SHIFT, flags));
--	else {
--		pte_clear(&init_mm, addr, pte);
--		flush_tlb_kernel_range(addr, addr+PAGE_SIZE);
--	}
--}
-diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
-index c555672..bd549a3 100644
---- a/arch/arm64/mm/mmu.c
-+++ b/arch/arm64/mm/mmu.c
-@@ -28,6 +28,7 @@
- #include <linux/io.h>
- 
- #include <asm/cputype.h>
+ int aarch64_insn_patch_text_nosync(void *addr, u32 insn);
++int __aarch64_insn_patch_text_nosync(void *addr, u32 insn, bool early);
+ int aarch64_insn_patch_text_sync(void *addrs[], u32 insns[], int cnt);
+ int aarch64_insn_patch_text(void *addrs[], u32 insns[], int cnt);
+ #endif /* __ASSEMBLY__ */
+diff --git a/arch/arm64/kernel/insn.c b/arch/arm64/kernel/insn.c
+index 92f3683..b25f8db 100644
+--- a/arch/arm64/kernel/insn.c
++++ b/arch/arm64/kernel/insn.c
+@@ -17,10 +17,13 @@
+ #include <linux/bitops.h>
+ #include <linux/compiler.h>
+ #include <linux/kernel.h>
++#include <linux/mm.h>
+ #include <linux/smp.h>
++#include <linux/spinlock.h>
+ #include <linux/stop_machine.h>
+ #include <linux/uaccess.h>
+ #include <asm/cacheflush.h>
 +#include <asm/fixmap.h>
- #include <asm/sections.h>
- #include <asm/setup.h>
- #include <asm/sizes.h>
-@@ -459,3 +460,96 @@ void vmemmap_free(unsigned long start, unsigned long end)
- {
+ #include <asm/insn.h>
+ 
+ static int aarch64_insn_encoding_class[] = {
+@@ -65,6 +68,36 @@ bool __kprobes aarch64_insn_is_nop(u32 insn)
+ 	}
  }
- #endif	/* CONFIG_SPARSEMEM_VMEMMAP */
+ 
++static DEFINE_SPINLOCK(patch_lock);
 +
-+static pte_t bm_pte[PTRS_PER_PTE] __page_aligned_bss;
-+#if CONFIG_ARM64_PGTABLE_LEVELS > 2
-+static pte_t bm_pmd[PTRS_PER_PMD] __page_aligned_bss;
-+#endif
-+#if CONFIG_ARM64_PGTABLE_LEVELS > 3
-+static pte_t bm_pud[PTRS_PER_PUD] __page_aligned_bss;
-+#endif
-+
-+static inline pud_t * fixmap_pud(unsigned long addr)
++static void __kprobes *patch_map(void *addr, int fixmap, unsigned long *flags)
 +{
-+	pgd_t *pgd = pgd_offset_k(addr);
++	unsigned long uintaddr = (uintptr_t) addr;
++	bool module = !core_kernel_text(uintaddr);
++	struct page *page;
 +
-+	BUG_ON(pgd_none(*pgd) || pgd_bad(*pgd));
++	if (module && IS_ENABLED(CONFIG_DEBUG_SET_MODULE_RONX))
++		page = vmalloc_to_page(addr);
++	else if (!module && IS_ENABLED(CONFIG_DEBUG_RODATA))
++		page = virt_to_page(addr);
++	else
++		return addr;
 +
-+	return pud_offset(pgd, addr);
++	if (flags)
++		spin_lock_irqsave(&patch_lock, *flags);
++
++	set_fixmap(fixmap, page_to_phys(page));
++
++	return (void *) (__fix_to_virt(fixmap) + (uintaddr & ~PAGE_MASK));
 +}
 +
-+static inline pmd_t * fixmap_pmd(unsigned long addr)
++static void __kprobes patch_unmap(int fixmap, unsigned long *flags)
 +{
-+	pud_t *pud = fixmap_pud(addr);
++	clear_fixmap(fixmap);
 +
-+	BUG_ON(pud_none(*pud) || pud_bad(*pud));
-+
-+	return pmd_offset(pud, addr);
++	if (flags)
++		spin_unlock_irqrestore(&patch_lock, *flags);
 +}
-+
-+static inline pte_t * fixmap_pte(unsigned long addr)
+ /*
+  * In ARMv8-A, A64 instructions have a fixed length of 32 bits and are always
+  * little-endian.
+@@ -81,10 +114,36 @@ int __kprobes aarch64_insn_read(void *addr, u32 *insnp)
+ 	return ret;
+ }
+ 
++static int __kprobes __aarch64_insn_write(void *addr, u32 insn, bool patch)
 +{
-+	pmd_t *pmd = fixmap_pmd(addr);
++	void *waddr = addr;
++	unsigned long flags;
++	int ret;
 +
-+	BUG_ON(pmd_none(*pmd) || pmd_bad(*pmd));
++	if (patch)
++		waddr = patch_map(addr, FIX_TEXT_POKE0, &flags);
 +
-+	return pte_offset_kernel(pmd, addr);
-+}
++	ret = probe_kernel_write(waddr, &insn, AARCH64_INSN_SIZE);
 +
-+void __init early_fixmap_init(void)
-+{
-+	pgd_t *pgd;
-+	pud_t *pud;
-+	pmd_t *pmd;
-+	unsigned long addr = FIXADDR_START;
-+
-+	pgd = pgd_offset_k(addr);
-+	pgd_populate(&init_mm, pgd, bm_pud);
-+	pud = pud_offset(pgd, addr);
-+	pud_populate(&init_mm, pud, bm_pmd);
-+	pmd = pmd_offset(pud, addr);
-+	pmd_populate_kernel(&init_mm, pmd, bm_pte);
-+
-+	/*
-+	 * The boot-ioremap range spans multiple pmds, for which
-+	 * we are not preparted:
-+	 */
-+	BUILD_BUG_ON((__fix_to_virt(FIX_BTMAP_BEGIN) >> PMD_SHIFT)
-+		     != (__fix_to_virt(FIX_BTMAP_END) >> PMD_SHIFT));
-+
-+	if ((pmd != fixmap_pmd(fix_to_virt(FIX_BTMAP_BEGIN)))
-+	     || pmd != fixmap_pmd(fix_to_virt(FIX_BTMAP_END))) {
-+		WARN_ON(1);
-+		pr_warn("pmd %p != %p, %p\n",
-+			pmd, fixmap_pmd(fix_to_virt(FIX_BTMAP_BEGIN)),
-+			fixmap_pmd(fix_to_virt(FIX_BTMAP_END)));
-+		pr_warn("fix_to_virt(FIX_BTMAP_BEGIN): %08lx\n",
-+			fix_to_virt(FIX_BTMAP_BEGIN));
-+		pr_warn("fix_to_virt(FIX_BTMAP_END):   %08lx\n",
-+			fix_to_virt(FIX_BTMAP_END));
-+
-+		pr_warn("FIX_BTMAP_END:       %d\n", FIX_BTMAP_END);
-+		pr_warn("FIX_BTMAP_BEGIN:     %d\n", FIX_BTMAP_BEGIN);
-+	}
-+}
-+
-+void __set_fixmap(enum fixed_addresses idx,
-+			       phys_addr_t phys, pgprot_t flags)
-+{
-+	unsigned long addr = __fix_to_virt(idx);
-+	pte_t *pte;
-+
-+	if (idx >= __end_of_fixed_addresses) {
-+		BUG();
-+		return;
++	if (waddr != addr) {
++		__flush_dcache_area(waddr, AARCH64_INSN_SIZE);
++		patch_unmap(FIX_TEXT_POKE0, &flags);
 +	}
 +
-+	pte = fixmap_pte(addr);
-+
-+	if (pgprot_val(flags)) {
-+		set_pte(pte, pfn_pte(phys >> PAGE_SHIFT, flags));
-+	} else {
-+		pte_clear(&init_mm, addr, pte);
-+		flush_tlb_kernel_range(addr, addr+PAGE_SIZE);
-+	}
++	return ret;
 +}
++
+ int __kprobes aarch64_insn_write(void *addr, u32 insn)
+ {
+ 	insn = cpu_to_le32(insn);
+-	return probe_kernel_write(addr, &insn, AARCH64_INSN_SIZE);
++	return __aarch64_insn_write(addr, insn, true);
++}
++
++int __kprobes aarch64_insn_write_early(void *addr, u32 insn)
++{
++	insn = cpu_to_le32(insn);
++	return __aarch64_insn_write(addr, insn, false);
++
+ }
+ 
+ static bool __kprobes __aarch64_insn_hotpatch_safe(u32 insn)
+@@ -117,7 +176,7 @@ bool __kprobes aarch64_insn_hotpatch_safe(u32 old_insn, u32 new_insn)
+ 	       __aarch64_insn_hotpatch_safe(new_insn);
+ }
+ 
+-int __kprobes aarch64_insn_patch_text_nosync(void *addr, u32 insn)
++int __kprobes __aarch64_insn_patch_text_nosync(void *addr, u32 insn, bool early)
+ {
+ 	u32 *tp = addr;
+ 	int ret;
+@@ -126,7 +185,11 @@ int __kprobes aarch64_insn_patch_text_nosync(void *addr, u32 insn)
+ 	if ((uintptr_t)tp & 0x3)
+ 		return -EINVAL;
+ 
+-	ret = aarch64_insn_write(tp, insn);
++	if (early)
++		ret = aarch64_insn_write_early(tp, insn);
++	else
++		ret = aarch64_insn_write(tp, insn);
++
+ 	if (ret == 0)
+ 		flush_icache_range((uintptr_t)tp,
+ 				   (uintptr_t)tp + AARCH64_INSN_SIZE);
+@@ -134,6 +197,11 @@ int __kprobes aarch64_insn_patch_text_nosync(void *addr, u32 insn)
+ 	return ret;
+ }
+ 
++int __kprobes aarch64_insn_patch_text_nosync(void *addr, u32 insn)
++{
++	return __aarch64_insn_patch_text_nosync(addr, insn, false);
++}
++
+ struct aarch64_insn_patch {
+ 	void		**text_addrs;
+ 	u32		*new_insns;
+diff --git a/arch/arm64/kernel/jump_label.c b/arch/arm64/kernel/jump_label.c
+index 263a166..9ac30bb 100644
+--- a/arch/arm64/kernel/jump_label.c
++++ b/arch/arm64/kernel/jump_label.c
+@@ -38,7 +38,7 @@ static void __arch_jump_label_transform(struct jump_entry *entry,
+ 	}
+ 
+ 	if (is_static)
+-		aarch64_insn_patch_text_nosync(addr, insn);
++		__aarch64_insn_patch_text_nosync(addr, insn, true);
+ 	else
+ 		aarch64_insn_patch_text(&addr, &insn, 1);
+ }
 -- 
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
 hosted by The Linux Foundation
