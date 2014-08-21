@@ -1,89 +1,35 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Thu, 21 Aug 2014 09:59:47 +0530
-Subject: [PATCH] pinctrl: spear: Make of_device_id array const
-In-Reply-To: <1408544800-24628-1-git-send-email-kiran.padwal@smartplayin.com>
-References: <1408544800-24628-1-git-send-email-kiran.padwal@smartplayin.com>
-Message-ID: <CAOh2x=nf+s3WKrWatmmvp4Nn+=gZgSsAFscXSmwchT7c63YKHQ@mail.gmail.com>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Wed, 20 Aug 2014 21:42:30 -0700
+Subject: [PATCH v7 02/11] power/restart: Call machine_restart instead of
+ arm_pm_restart
+In-Reply-To: <CAD=FV=Va8UrpDCLjFQJ6j-K0C3v7NPfifaJGtReCkUEu3x0mLg@mail.gmail.com>
+References: <1408495538-27480-1-git-send-email-linux@roeck-us.net>
+ <1408495538-27480-3-git-send-email-linux@roeck-us.net>
+ <CAD=FV=Va8UrpDCLjFQJ6j-K0C3v7NPfifaJGtReCkUEu3x0mLg@mail.gmail.com>
+Message-ID: <20140821044230.GA14609@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 20, 2014 at 7:56 PM, Kiran Padwal
-<kiran.padwal@smartplayin.com> wrote:
-> Make of_device_id array const, because all OF functions handle it as const.
->
-> Signed-off-by: Kiran Padwal <kiran.padwal@smartplayin.com>
-> ---
->  drivers/pinctrl/spear/pinctrl-spear1310.c |    2 +-
->  drivers/pinctrl/spear/pinctrl-spear1340.c |    2 +-
->  drivers/pinctrl/spear/pinctrl-spear300.c  |    2 +-
->  drivers/pinctrl/spear/pinctrl-spear310.c  |    2 +-
->  drivers/pinctrl/spear/pinctrl-spear320.c  |    2 +-
->  5 files changed, 5 insertions(+), 5 deletions(-)
->
-> diff --git a/drivers/pinctrl/spear/pinctrl-spear1310.c b/drivers/pinctrl/spear/pinctrl-spear1310.c
-> index 1a8bbfe..6d57d43 100644
-> --- a/drivers/pinctrl/spear/pinctrl-spear1310.c
-> +++ b/drivers/pinctrl/spear/pinctrl-spear1310.c
-> @@ -2692,7 +2692,7 @@ static struct spear_pinctrl_machdata spear1310_machdata = {
->         .modes_supported = false,
->  };
->
-> -static struct of_device_id spear1310_pinctrl_of_match[] = {
-> +static const struct of_device_id spear1310_pinctrl_of_match[] = {
->         {
->                 .compatible = "st,spear1310-pinmux",
->         },
-> diff --git a/drivers/pinctrl/spear/pinctrl-spear1340.c b/drivers/pinctrl/spear/pinctrl-spear1340.c
-> index 873966e..d243e43 100644
-> --- a/drivers/pinctrl/spear/pinctrl-spear1340.c
-> +++ b/drivers/pinctrl/spear/pinctrl-spear1340.c
-> @@ -2008,7 +2008,7 @@ static struct spear_pinctrl_machdata spear1340_machdata = {
->         .modes_supported = false,
->  };
->
-> -static struct of_device_id spear1340_pinctrl_of_match[] = {
-> +static const struct of_device_id spear1340_pinctrl_of_match[] = {
->         {
->                 .compatible = "st,spear1340-pinmux",
->         },
-> diff --git a/drivers/pinctrl/spear/pinctrl-spear300.c b/drivers/pinctrl/spear/pinctrl-spear300.c
-> index 4777c0d..9db83e9 100644
-> --- a/drivers/pinctrl/spear/pinctrl-spear300.c
-> +++ b/drivers/pinctrl/spear/pinctrl-spear300.c
-> @@ -646,7 +646,7 @@ static struct spear_function *spear300_functions[] = {
->         &gpio1_function,
->  };
->
-> -static struct of_device_id spear300_pinctrl_of_match[] = {
-> +static const struct of_device_id spear300_pinctrl_of_match[] = {
->         {
->                 .compatible = "st,spear300-pinmux",
->         },
-> diff --git a/drivers/pinctrl/spear/pinctrl-spear310.c b/drivers/pinctrl/spear/pinctrl-spear310.c
-> index ed1d360..db775a4 100644
-> --- a/drivers/pinctrl/spear/pinctrl-spear310.c
-> +++ b/drivers/pinctrl/spear/pinctrl-spear310.c
-> @@ -371,7 +371,7 @@ static struct spear_function *spear310_functions[] = {
->         &tdm_function,
->  };
->
-> -static struct of_device_id spear310_pinctrl_of_match[] = {
-> +static const struct of_device_id spear310_pinctrl_of_match[] = {
->         {
->                 .compatible = "st,spear310-pinmux",
->         },
-> diff --git a/drivers/pinctrl/spear/pinctrl-spear320.c b/drivers/pinctrl/spear/pinctrl-spear320.c
-> index b8e290a..80fbd68 100644
-> --- a/drivers/pinctrl/spear/pinctrl-spear320.c
-> +++ b/drivers/pinctrl/spear/pinctrl-spear320.c
-> @@ -3410,7 +3410,7 @@ static struct spear_function *spear320_functions[] = {
->         &i2c2_function,
->  };
->
-> -static struct of_device_id spear320_pinctrl_of_match[] = {
-> +static const struct of_device_id spear320_pinctrl_of_match[] = {
->         {
->                 .compatible = "st,spear320-pinmux",
->         },
+On Wed, Aug 20, 2014 at 09:10:31PM -0700, Doug Anderson wrote:
+> Guenter,
+> 
+> On Tue, Aug 19, 2014 at 5:45 PM, Guenter Roeck <linux@roeck-us.net> wrote:
+> > machine_restart is supported on non-ARM platforms, and and ultimately calls
+> > arm_pm_restart, so dont call arm_pm_restart directly but use the more
+> > generic function.
+> >
+> > Cc: Russell King <linux@arm.linux.org.uk>
+> 
+> Do you need to submit this to his patch tracker to get him to pick it
+> up?  How are you envisioning that this series land?  It crosses a lot
+> of boundaries so I guess will need a reasonable amount of coordination
+> between maintainers...
+> 
+> 
+If I get an Acked-by: from all maintainers, I could send a pull request
+to Linus directly. How do I send a patch to Russell's patch tracker ?
+I thought I copied all mailing lists suggested by get_maintainer.pl,
+but maybe I missed one.
 
-Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
+Thanks,
+Guenter
