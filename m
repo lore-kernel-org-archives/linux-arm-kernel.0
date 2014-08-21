@@ -1,64 +1,196 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 21 Aug 2014 11:56:08 +0100
-Subject: [PATCH v2 6/9] arm: mediatek: enable gpt6 on boot up to make
- arch timer working
-In-Reply-To: <CABuKBe+oVzQ9_Q__sULLQt8OvJ1Za_uA5x2aXSSQ6r8myvFqnA@mail.gmail.com>
-References: <1408373917-10002-1-git-send-email-matthias.bgg@gmail.com>
- <1408373917-10002-7-git-send-email-matthias.bgg@gmail.com>
- <20140818154548.GA3302@leverpostej>
- <CABuKBe+oVzQ9_Q__sULLQt8OvJ1Za_uA5x2aXSSQ6r8myvFqnA@mail.gmail.com>
-Message-ID: <20140821105608.GK21734@leverpostej>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Thu, 21 Aug 2014 11:59:52 +0100
+Subject: [PATCH v3 09/11] ARM64: kernel: add support for cpu cache information
+In-Reply-To: <1408618794-28497-1-git-send-email-sudeep.holla@arm.com>
+References: <1406306692-7135-1-git-send-email-sudeep.holla@arm.com>
+ <1408618794-28497-1-git-send-email-sudeep.holla@arm.com>
+Message-ID: <1408618794-28497-10-git-send-email-sudeep.holla@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 21, 2014 at 11:38:20AM +0100, Matthias Brugger wrote:
-> 2014-08-18 17:45 GMT+02:00 Mark Rutland <mark.rutland@arm.com>:
-> > Hi Matthias,
-> >
-> > On Mon, Aug 18, 2014 at 03:58:34PM +0100, Matthias Brugger wrote:
-> >> We enable GTP6 which ungates the arch timer clock. Apart we write the
-> >> frequency with which the timer is running in the CNTFREQ register.
-> >
-> > We don't seem to set CNTFRQ below. Does it happen to have a consistent
-> > value on current versions of the bootloader?
-> 
-> Oh sorry, my fault. In v2 I moved the frequency to the dts, as this
-> will make the driver write CNTFRQ.
-> I forgot to update the commit message.
+From: Sudeep Holla <sudeep.holla@arm.com>
 
-The arch timer driver does not write CNTFRQ as this can only be done
-from the secure side. It simply uses the value provided internally. This
-isn't sufficient for virtualization guests (which need to have CNTFRQ
-programmed correctly).
+This patch adds support for cacheinfo on ARM64.
 
-For the moment as we're not booting at Hyp that's not necessarily a big
-problem, but it is a shame.
+On ARMv8, the cache hierarchy can be identified through Cache Level ID
+(CLIDR) register while the cache geometry is provided by Cache Size ID
+(CCSIDR) register.
 
-> >> In the future this should be done in the bootloader.
-> >
-> > Do we know how far in the future that's likely to be?
-> 
-> AFAIK no one right now is working on an open source bootloader for the
-> mediatek devices.
-> So I think we won't see an open source bootloader in a reasonable time.
+Since the architecture doesn't provide any way of detecting the cpus
+sharing particular cache, device tree is used for the same purpose.
+
+Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+Cc: linux-arm-kernel at lists.infradead.org
+---
+ arch/arm64/kernel/Makefile    |   2 +-
+ arch/arm64/kernel/cacheinfo.c | 142 ++++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 143 insertions(+), 1 deletion(-)
+ create mode 100644 arch/arm64/kernel/cacheinfo.c
+
+diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
+index df7ef8768fc2..285cd88c1e37 100644
+--- a/arch/arm64/kernel/Makefile
++++ b/arch/arm64/kernel/Makefile
+@@ -15,7 +15,7 @@ arm64-obj-y		:= cputable.o debug-monitors.o entry.o irq.o fpsimd.o	\
+ 			   entry-fpsimd.o process.o ptrace.o setup.o signal.o	\
+ 			   sys.o stacktrace.o time.o traps.o io.o vdso.o	\
+ 			   hyp-stub.o psci.o cpu_ops.o insn.o return_address.o	\
+-			   cpuinfo.o
++			   cpuinfo.o cacheinfo.o
  
-Ok. :(
-
-> > What's the plan for this code when such a bootloader becomes available?
-> 
-> I think when a bootloader becomes available, this code should be
-> removed. I know that this will lead to a not working ARM arch timer in
-> devices which don't migrate to the new bootloader, but I think it's
-> not too critical. Apart from the ARM arch timer, the devices have the
-> mediatek global porpose timer (drivers/clocksource/mtk_timer.c), which
-> implement a clock source and a clock event timer. So the system won't
-> hang.
-
-I fear that's never going to happen, either because such a bootloader
-never becomes available or because there will be hold-outs sticking to
-the old loader.
-
-If that's not critical, why not for the moment use the global timer?
-
-Thanks,
-Mark.
+ arm64-obj-$(CONFIG_COMPAT)		+= sys32.o kuser32.o signal32.o 	\
+ 					   sys_compat.o
+diff --git a/arch/arm64/kernel/cacheinfo.c b/arch/arm64/kernel/cacheinfo.c
+new file mode 100644
+index 000000000000..a9cbf3b40a1f
+--- /dev/null
++++ b/arch/arm64/kernel/cacheinfo.c
+@@ -0,0 +1,142 @@
++/*
++ *  ARM64 cacheinfo support
++ *
++ *  Copyright (C) 2014 ARM Ltd.
++ *  All Rights Reserved
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed "as is" WITHOUT ANY WARRANTY of any
++ * kind, whether express or implied; without even the implied warranty
++ * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
++ */
++
++#include <linux/bitops.h>
++#include <linux/cacheinfo.h>
++#include <linux/cpu.h>
++#include <linux/compiler.h>
++#include <linux/of.h>
++
++#include <asm/processor.h>
++
++#define MAX_CACHE_LEVEL			7	/* Max 7 level supported */
++/* Ctypen, bits[3(n - 1) + 2 : 3(n - 1)], for n = 1 to 7 */
++#define CLIDR_CTYPE_SHIFT(level)	(3 * (level - 1))
++#define CLIDR_CTYPE_MASK(level)		(7 << CLIDR_CTYPE_SHIFT(level))
++#define CLIDR_CTYPE(clidr, level)	\
++	(((clidr) & CLIDR_CTYPE_MASK(level)) >> CLIDR_CTYPE_SHIFT(level))
++
++static inline enum cache_type get_cache_type(int level)
++{
++	u64 clidr;
++
++	if (level > MAX_CACHE_LEVEL)
++		return CACHE_TYPE_NOCACHE;
++	asm volatile ("mrs     %x0, clidr_el1" : "=r" (clidr));
++	return CLIDR_CTYPE(clidr, level);
++}
++
++/*
++ * NumSets, bits[27:13] - (Number of sets in cache) - 1
++ * Associativity, bits[12:3] - (Associativity of cache) - 1
++ * LineSize, bits[2:0] - (Log2(Number of words in cache line)) - 2
++ */
++#define CCSIDR_WRITE_THROUGH		BIT(31)
++#define CCSIDR_WRITE_BACK		BIT(30)
++#define CCSIDR_READ_ALLOCATE		BIT(29)
++#define CCSIDR_WRITE_ALLOCATE		BIT(28)
++#define CCSIDR_LINESIZE_MASK		0x7
++#define CCSIDR_ASSOCIATIVITY_SHIFT	3
++#define CCSIDR_ASSOCIATIVITY_MASK	0x3FF
++#define CCSIDR_NUMSETS_SHIFT		13
++#define CCSIDR_NUMSETS_MASK		0x7FF
++
++/*
++ * Which cache CCSIDR represents depends on CSSELR value
++ * Make sure no one else changes CSSELR during this
++ * smp_call_function_single prevents preemption for us
++ */
++static inline u32 get_ccsidr(u64 csselr)
++{
++	u64 ccsidr;
++
++	/* Put value into CSSELR */
++	asm volatile("msr csselr_el1, %x0" : : "r" (csselr));
++	isb();
++	/* Read result out of CCSIDR */
++	asm volatile("mrs %x0, ccsidr_el1" : "=r" (ccsidr));
++
++	return (u32)ccsidr;
++}
++
++static void ci_leaf_init(struct cacheinfo *this_leaf,
++			 enum cache_type type, unsigned int level)
++{
++	bool is_instr_cache = type & CACHE_TYPE_INST;
++	u32 tmp = get_ccsidr((level - 1) << 1 | is_instr_cache);
++
++	this_leaf->level = level;
++	this_leaf->type = type;
++	this_leaf->coherency_line_size =
++	    (1 << ((tmp & CCSIDR_LINESIZE_MASK) + 2)) * 4;
++	this_leaf->number_of_sets =
++	    ((tmp >> CCSIDR_NUMSETS_SHIFT) & CCSIDR_NUMSETS_MASK) + 1;
++	this_leaf->ways_of_associativity = ((tmp >> CCSIDR_ASSOCIATIVITY_SHIFT)
++					    & CCSIDR_ASSOCIATIVITY_MASK) + 1;
++	this_leaf->size = this_leaf->number_of_sets *
++	    this_leaf->coherency_line_size * this_leaf->ways_of_associativity;
++	this_leaf->attributes =
++		((tmp & CCSIDR_WRITE_THROUGH) ? CACHE_WRITE_THROUGH : 0) |
++		((tmp & CCSIDR_WRITE_BACK) ? CACHE_WRITE_BACK : 0) |
++		((tmp & CCSIDR_READ_ALLOCATE) ? CACHE_READ_ALLOCATE : 0) |
++		((tmp & CCSIDR_WRITE_ALLOCATE) ? CACHE_WRITE_ALLOCATE : 0);
++}
++
++static int __init_cache_level(unsigned int cpu)
++{
++	unsigned int ctype, level, leaves;
++	struct cpu_cacheinfo *this_cpu_ci = get_cpu_cacheinfo(cpu);
++
++	for (level = 1, leaves = 0; level <= MAX_CACHE_LEVEL; level++) {
++		ctype = get_cache_type(level);
++		if (ctype == CACHE_TYPE_NOCACHE) {
++			level--;
++			break;
++		}
++		/* Separate instruction and data caches */
++		leaves += (ctype == CACHE_TYPE_SEPARATE) ? 2 : 1;
++	}
++
++	this_cpu_ci->num_levels = level;
++	this_cpu_ci->num_leaves = leaves;
++	return 0;
++}
++
++static int __populate_cache_leaves(unsigned int cpu)
++{
++	unsigned int level, idx;
++	enum cache_type type;
++	struct cpu_cacheinfo *this_cpu_ci = get_cpu_cacheinfo(cpu);
++	struct cacheinfo *this_leaf = this_cpu_ci->info_list;
++
++	for (idx = 0, level = 1; level <= this_cpu_ci->num_levels &&
++	     idx < this_cpu_ci->num_leaves; idx++, level++) {
++		type = get_cache_type(level);
++		if (type == CACHE_TYPE_SEPARATE) {
++			ci_leaf_init(this_leaf++, CACHE_TYPE_DATA, level);
++			ci_leaf_init(this_leaf++, CACHE_TYPE_INST, level);
++		} else {
++			ci_leaf_init(this_leaf++, type, level);
++		}
++	}
++	return 0;
++}
++
++DEFINE_SMP_CALL_CACHE_FUNCTION(init_cache_level)
++DEFINE_SMP_CALL_CACHE_FUNCTION(populate_cache_leaves)
+-- 
+1.8.3.2
