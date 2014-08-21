@@ -1,93 +1,102 @@
-From: vikas.sajjan@samsung.com (Vikas Sajjan)
-Date: Thu, 21 Aug 2014 18:52:37 +0545
-Subject: [PATCH v2 3/3] ARM: exynos: Add PMU and S2R support for exynos5800 SoC
-In-Reply-To: <1408626457-3422-1-git-send-email-vikas.sajjan@samsung.com>
-References: <1408626457-3422-1-git-send-email-vikas.sajjan@samsung.com>
-Message-ID: <1408626457-3422-4-git-send-email-vikas.sajjan@samsung.com>
+From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
+Date: Thu, 21 Aug 2014 15:09:12 +0200
+Subject: [PATCH 1/7] dmaengine: edma: fix two faults which happen with
+ the 8250_dma user
+In-Reply-To: <20140819151216.GO13288@intel.com>
+References: <1406660344-25307-1-git-send-email-bigeasy@linutronix.de>
+ <1406660344-25307-2-git-send-email-bigeasy@linutronix.de>
+ <20140731121702.GU8181@intel.com> <20140808162950.GA12080@linutronix.de>
+ <20140819151216.GO13288@intel.com>
+Message-ID: <53F5EF78.2050800@linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adds PMU and S2R support for exynos5800 SoC.
+On 08/19/2014 05:12 PM, Vinod Koul wrote:
+>>
+>>     desc = dmaengine_prep_slave_single(rxchan, ?);
+>>     rx_cookie = dmaengine_submit(desc);
+>>     dma_async_issue_pending(rxchan);
+>>
+>>     ssleep(2);
+>>     /* Now assume that the transfer did not start */
+>>     st = dmaengine_tx_status(rxchan, rx_cookie, NULL);
+>>     /* st is now DMA_IN_PROGRESS as expected */
+>>
+>>     dmaengine_terminate_all(rxchan);
+>>     st = dmaengine_tx_status(rxchan, rx_cookie, NULL);
+> and here is the culprit. You have terminated the channel. This means that
+> dmaengine driver is free to clean up all the allocated descriptors on the
+> channels and do whatever it decides to do with them.
 
-Signed-off-by: Vikas Sajjan <vikas.sajjan@samsung.com>
----
- arch/arm/mach-exynos/pm.c       |    3 +++
- arch/arm/mach-exynos/pmu.c      |   22 ++++++++++++++++++++++
- arch/arm/mach-exynos/regs-pmu.h |    3 ++-
- 3 files changed, 27 insertions(+), 1 deletion(-)
+descriptors, yes.
 
-diff --git a/arch/arm/mach-exynos/pm.c b/arch/arm/mach-exynos/pm.c
-index acdcf0b..41fc1c3 100644
---- a/arch/arm/mach-exynos/pm.c
-+++ b/arch/arm/mach-exynos/pm.c
-@@ -646,6 +646,9 @@ static struct of_device_id exynos_pmu_of_device_ids[] = {
- 	}, {
- 		.compatible = "samsung,exynos5420-pmu",
- 		.data = &exynos5420_pm_data,
-+	}, {
-+		.compatible = "samsung,exynos5800-pmu",
-+		.data = &exynos5420_pm_data,
- 	},
- 	{ /*sentinel*/ },
- };
-diff --git a/arch/arm/mach-exynos/pmu.c b/arch/arm/mach-exynos/pmu.c
-index f8ced42..c1cd31c 100644
---- a/arch/arm/mach-exynos/pmu.c
-+++ b/arch/arm/mach-exynos/pmu.c
-@@ -719,6 +719,19 @@ static void exynos5420_pmu_init(void)
- 	pr_info("EXYNOS5420 PMU initialized\n");
- }
- 
-+static void exynos5800_pmu_init(void)
-+{
-+	unsigned int value;
-+
-+	exynos5420_pmu_init();
-+
-+	value = pmu_raw_readl(EXYNOS5420_LPI_MASK);
-+	value |= EXYNOS5800_POWER_GATE_CTRL;
-+	pmu_raw_writel(value, EXYNOS5420_LPI_MASK);
-+
-+	pr_info("EXYNOS5800 PMU initialized\n");
-+}
-+
- 
- static const struct exynos_pmu_data exynos4210_pmu_data = {
- 	.pmu_config	= exynos4210_pmu_config,
-@@ -745,6 +758,12 @@ static struct exynos_pmu_data exynos5420_pmu_data = {
- 	.powerdown_conf	= exynos5420_powerdown_conf,
- };
- 
-+static struct exynos_pmu_data exynos5800_pmu_data = {
-+	.pmu_config	= exynos5420_pmu_config,
-+	.pmu_init	= exynos5800_pmu_init,
-+	.powerdown_conf	= exynos5420_powerdown_conf,
-+};
-+
- static const struct regmap_config pmu_regmap_config = {
- 	.reg_bits = 32,
- 	.val_bits = 32,
-@@ -770,6 +789,9 @@ static const struct of_device_id exynos_pmu_of_device_ids[] = {
- 	}, {
- 		.compatible = "samsung,exynos5420-pmu",
- 		.data = &exynos5420_pmu_data,
-+	}, {
-+		.compatible = "samsung,exynos5800-pmu",
-+		.data = &exynos5800_pmu_data,
- 	},
- 	{ /*sentinel*/ },
- };
-diff --git a/arch/arm/mach-exynos/regs-pmu.h b/arch/arm/mach-exynos/regs-pmu.h
-index 3a6a559..3a0140c 100644
---- a/arch/arm/mach-exynos/regs-pmu.h
-+++ b/arch/arm/mach-exynos/regs-pmu.h
-@@ -555,5 +555,6 @@ static inline unsigned int exynos_pmu_cpunr(unsigned int mpidr)
- 					 | EXYNOS5420_KFC_USE_STANDBY_WFI1  \
- 					 | EXYNOS5420_KFC_USE_STANDBY_WFI2  \
- 					 | EXYNOS5420_KFC_USE_STANDBY_WFI3)
--
-+/* for exynos5800 only */
-+#define EXYNOS5800_POWER_GATE_CTRL                              (1 << 15)
- #endif /* __ASM_ARCH_REGS_PMU_H */
--- 
-1.7.9.5
+> You have already terminated the channel so what is the point in querying the
+> status of the cookie, which you shouldn't use anyway after invoking
+> terminate_all() as its result is not correct.
+
+The point is to check (later, after terminate_all()) if there is an
+outstanding DMA transfer or not _and_ how much data was really
+transfered. Looking at edma it does not really support the latter if
+the transfer is already completed. On the plus side the HW does not
+support partly transfers :)
+
+But where is it written that the life time of the cookie is limited?
+Looking at the "cooking check" code there is no such thing. It is
+simply compare of completed vs passed number but okay, this is an
+implementation detail.
+>From [0] it says under "4. Submit the transaction":
+
+| This returns a cookie can be used to check the progress of DMA engine
+| activity via other DMA engine calls not covered in this document.
+
+no life time limit mentioned here. Which brings to the question: Why is
+it okay to use the cookie after the transaction "terminated" normally
+but not if it has been canceled?
+
+And from [0] the API explanation  "4. ? dma_async_is_tx_complete()":
+
+|Note:
+|    Not all DMA engine drivers can return reliable information for
+|    a running DMA channel.  It is recommended that DMA engine users
+|    pause or stop (via dmaengine_terminate_all) the channel before
+|    using this API.
+
+So the documentation says to use the cookie with
+dma_async_is_tx_complete() and before doing so it is recommended that
+the transfer should be paused or stopped. _Exactly_ what is done here.
+
+>>     /* st is still DMA_IN_PROGRESS but _I_ expect DMA_COMPLETE because
+>>      * it has been terminated / canceled
+>>      */
+>>
+>> Both dma driver clean up all / terminate all descriptors as required but
+>> _none_ of them completes the cookie. As a result dma_cookie_status()
+>> still thinks that the transfer is in progress.
+> 
+> Btw how does it matter in the driver here if the transaction completed or
+> not after terminate_all() was invoked. What is the purpose of querying
+> status.
+
+In the RX interrupt (of the 8250 unit), the code checks if the transfer
+has been already started or not via querying the status. So if it
+returns DMA_COMPLETE then a new transfer will be started. If it returns
+DMA_IN_PROGRESS then the code returns doing nothing because the DMA
+engine should start moving data anytime now so the RX interrupt goes
+away.
+
+That means: If the transfer is canceled then it won't be started again.
+
+Btw: the current (probably only) dma driver that is used by 8250-dma is
+dw/core.c. That one does cookie complete on terminate:
+ dwc_control(DMA_TERMINATE_ALL) -> dwc_descriptor_complete() ->
+ dma_cookie_complete().
+
+That is why it works for them?
+
+[0] Documentation/dmaengine.txt
+
+> 
+> Thanks
+> 
+
+Sebastian
