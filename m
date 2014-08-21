@@ -1,44 +1,43 @@
 From: vikas.sajjan@samsung.com (Vikas Sajjan)
-Date: Thu, 21 Aug 2014 18:52:34 +0545
-Subject: [PATCH v2 0/3] Adds PMU and S2R support for exynos5800
-Message-ID: <1408626457-3422-1-git-send-email-vikas.sajjan@samsung.com>
+Date: Thu, 21 Aug 2014 18:52:35 +0545
+Subject: [PATCH v2 1/3] ARM: dts: Add pmu node for exynos5800 SoC
+In-Reply-To: <1408626457-3422-1-git-send-email-vikas.sajjan@samsung.com>
+References: <1408626457-3422-1-git-send-email-vikas.sajjan@samsung.com>
+Message-ID: <1408626457-3422-2-git-send-email-vikas.sajjan@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Rebased on
-1] Kukjin Kim's tree, master branch
-http://git.kernel.org/cgit/linux/kernel/git/kgene/linux-samsung.git/log/
-2] My 5420 PMU Series :
-http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg35699.html
+Adds pmu node for exynos5800 SoC.
 
-Tested on Exynos5800 based chromebook (peach-pi board) with help of
-http://www.spinics.net/lists/linux-samsung-soc/msg33750.html (modified to support 5800)
-
-Below procedures were followed to test S2R:
-Procedure A:
-	1. make multi_v7_defconfig 
-	2  enable MCPM for 5420
-	3. enable S3C RTC
-	4. pass "no_console_suspend" in bootargs
-	5. echo +20 > /sys/class/rtc/rtc0/wakealarm && echo mem > /sys/power/state
-Procedure B:
-	1. make exynos_defconfig 
-	2  disable BL_SWITCHER
-	3. pass "no_console_suspend" in bootargs
-	4. echo +20 > /sys/class/rtc/rtc0/wakealarm && echo mem > /sys/power/state
-
-Vikas Sajjan (3):
-  ARM: dts: Add pmu node for exynos5800 SoC
-  ARM: exynos: Add exynos5800-pmu compatible entry
-  ARM: exynos: Add PMU and S2R support for exynos5800 SoC
-
+Signed-off-by: Vikas Sajjan <vikas.sajjan@samsung.com>
+---
  .../devicetree/bindings/arm/samsung/pmu.txt        |    1 +
  arch/arm/boot/dts/exynos5800.dtsi                  |    4 ++++
- arch/arm/mach-exynos/exynos.c                      |    1 +
- arch/arm/mach-exynos/pm.c                          |    3 +++
- arch/arm/mach-exynos/pmu.c                         |   22 ++++++++++++++++++++
- arch/arm/mach-exynos/regs-pmu.h                    |    3 ++-
- 6 files changed, 33 insertions(+), 1 deletion(-)
+ 2 files changed, 5 insertions(+)
 
+diff --git a/Documentation/devicetree/bindings/arm/samsung/pmu.txt b/Documentation/devicetree/bindings/arm/samsung/pmu.txt
+index 1e1979b..9647317 100644
+--- a/Documentation/devicetree/bindings/arm/samsung/pmu.txt
++++ b/Documentation/devicetree/bindings/arm/samsung/pmu.txt
+@@ -10,6 +10,7 @@ Properties:
+ 		   - "samsung,exynos5260-pmu" - for Exynos5260 SoC.
+ 		   - "samsung,exynos5410-pmu" - for Exynos5410 SoC,
+ 		   - "samsung,exynos5420-pmu" - for Exynos5420 SoC.
++		   - "samsung,exynos5800-pmu" - for Exynos5800 SoC.
+ 		second value must be always "syscon".
+ 
+  - reg : offset and length of the register set.
+diff --git a/arch/arm/boot/dts/exynos5800.dtsi b/arch/arm/boot/dts/exynos5800.dtsi
+index c0bb356..2009b9c 100644
+--- a/arch/arm/boot/dts/exynos5800.dtsi
++++ b/arch/arm/boot/dts/exynos5800.dtsi
+@@ -26,3 +26,7 @@
+ &mfc {
+ 	compatible = "samsung,mfc-v8";
+ };
++
++&pmu_system_controller {
++	compatible = "samsung,exynos5800-pmu", "syscon";
++};
 -- 
 1.7.9.5
