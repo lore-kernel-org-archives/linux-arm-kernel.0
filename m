@@ -1,122 +1,282 @@
 From: andre.przywara@arm.com (Andre Przywara)
-Date: Thu, 21 Aug 2014 14:06:47 +0100
-Subject: [PATCH v2 06/15] arm/arm64: KVM: make the maximum number of vCPUs a
- per-VM value
+Date: Thu, 21 Aug 2014 14:06:55 +0100
+Subject: [PATCH v2 14/15] arm/arm64: KVM: enable kernel side of GICv3 emulation
 In-Reply-To: <1408626416-11326-1-git-send-email-andre.przywara@arm.com>
 References: <1408626416-11326-1-git-send-email-andre.przywara@arm.com>
-Message-ID: <1408626416-11326-7-git-send-email-andre.przywara@arm.com>
+Message-ID: <1408626416-11326-15-git-send-email-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently the maximum number of vCPUs supported is a global value
-limited by the used GIC model. GICv3 will lift this limit, but we
-still need to observe it for guests using GICv2.
-So the maximum number of vCPUs is per-VM value, depending on the
-GIC model the guest uses.
-Store and check the value in struct kvm_arch, but keep it down to
-8 for now.
+With all the necessary GICv3 emulation code in place, we can now
+connect the code to the GICv3 backend in the kernel.
+The LR register handling is different depending on the emulated GIC
+model, so provide different implementations for each.
+Also allow non-v2-compatible GICv3 implementations (which don't
+provide MMIO regions for the virtual CPU interface in the DT), but
+restrict those hosts to use GICv3 guests only.
 
 Signed-off-by: Andre Przywara <andre.przywara@arm.com>
 ---
- arch/arm/include/asm/kvm_host.h   |    1 +
- arch/arm/kvm/arm.c                |    6 ++++++
- arch/arm64/include/asm/kvm_host.h |    3 +++
- virt/kvm/arm/vgic-v2.c            |    5 +++++
- virt/kvm/arm/vgic-v3.c            |    6 ++++++
- 5 files changed, 21 insertions(+)
+ virt/kvm/arm/vgic-v3.c |  168 +++++++++++++++++++++++++++++++++++-------------
+ virt/kvm/arm/vgic.c    |    2 +
+ 2 files changed, 127 insertions(+), 43 deletions(-)
 
-diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
-index cf99ad0..0638419 100644
---- a/arch/arm/include/asm/kvm_host.h
-+++ b/arch/arm/include/asm/kvm_host.h
-@@ -67,6 +67,7 @@ struct kvm_arch {
- 
- 	/* Interrupt controller */
- 	struct vgic_dist	vgic;
-+	int max_vcpus;
- };
- 
- #define KVM_NR_MEM_OBJS     40
-diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
-index 157e1b6..190f05f 100644
---- a/arch/arm/kvm/arm.c
-+++ b/arch/arm/kvm/arm.c
-@@ -142,6 +142,7 @@ int kvm_arch_init_vm(struct kvm *kvm, unsigned long type)
- 
- 	/* Mark the initial VMID generation invalid */
- 	kvm->arch.vmid_gen = 0;
-+	kvm->arch.max_vcpus = CONFIG_KVM_ARM_MAX_VCPUS;
- 
- 	return ret;
- out_free_stage2_pgd:
-@@ -223,6 +224,11 @@ struct kvm_vcpu *kvm_arch_vcpu_create(struct kvm *kvm, unsigned int id)
- 	int err;
- 	struct kvm_vcpu *vcpu;
- 
-+	if (id >= kvm->arch.max_vcpus) {
-+		err = -EINVAL;
-+		goto out;
-+	}
-+
- 	vcpu = kmem_cache_zalloc(kvm_vcpu_cache, GFP_KERNEL);
- 	if (!vcpu) {
- 		err = -ENOMEM;
-diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
-index 017fbae..a325161 100644
---- a/arch/arm64/include/asm/kvm_host.h
-+++ b/arch/arm64/include/asm/kvm_host.h
-@@ -58,6 +58,9 @@ struct kvm_arch {
- 	/* VTTBR value associated with above pgd and vmid */
- 	u64    vttbr;
- 
-+	/* The maximum number of vCPUs depends on the used GIC model */
-+	int max_vcpus;
-+
- 	/* Interrupt controller */
- 	struct vgic_dist	vgic;
- 
-diff --git a/virt/kvm/arm/vgic-v2.c b/virt/kvm/arm/vgic-v2.c
-index 90947c6..c7362ff 100644
---- a/virt/kvm/arm/vgic-v2.c
-+++ b/virt/kvm/arm/vgic-v2.c
-@@ -177,11 +177,16 @@ static struct vgic_params vgic_v2_params;
- static bool vgic_v2_init_emul(struct kvm *kvm, int type)
- {
- 	struct vgic_vm_ops *vm_ops = &kvm->arch.vgic.vm_ops;
-+	int nr_vcpus;
- 
- 	switch (type) {
- 	case KVM_DEV_TYPE_ARM_VGIC_V2:
-+		nr_vcpus = atomic_read(&kvm->online_vcpus);
-+		if (nr_vcpus > 8)
-+			return false;
- 		vm_ops->get_lr = vgic_v2_get_lr;
- 		vm_ops->set_lr = vgic_v2_set_lr;
-+		kvm->arch.max_vcpus = 8;
- 		return true;
- 	}
- 
 diff --git a/virt/kvm/arm/vgic-v3.c b/virt/kvm/arm/vgic-v3.c
-index a38339e..86e8b99 100644
+index 8af8037..c4e2f13 100644
 --- a/virt/kvm/arm/vgic-v3.c
 +++ b/virt/kvm/arm/vgic-v3.c
-@@ -171,11 +171,17 @@ static const struct vgic_ops vgic_v3_ops = {
+@@ -34,6 +34,7 @@
+ #define GICH_LR_VIRTUALID		(0x3ffUL << 0)
+ #define GICH_LR_PHYSID_CPUID_SHIFT	(10)
+ #define GICH_LR_PHYSID_CPUID		(7UL << GICH_LR_PHYSID_CPUID_SHIFT)
++#define ICH_LR_VIRTUALID_MASK		(BIT_ULL(32) - 1)
+ 
+ /*
+  * LRs are stored in reverse order in memory. make sure we index them
+@@ -43,7 +44,35 @@
+ 
+ static u32 ich_vtr_el2;
+ 
+-static struct vgic_lr vgic_v3_get_lr(const struct kvm_vcpu *vcpu, int lr)
++static u64 sync_lr_val(u8 state)
++{
++	u64 lr_val = 0;
++
++	if (state & LR_STATE_PENDING)
++		lr_val |= ICH_LR_PENDING_BIT;
++	if (state & LR_STATE_ACTIVE)
++		lr_val |= ICH_LR_ACTIVE_BIT;
++	if (state & LR_EOI_INT)
++		lr_val |= ICH_LR_EOI;
++
++	return lr_val;
++}
++
++static u8 sync_lr_state(u64 lr_val)
++{
++	u8 state = 0;
++
++	if (lr_val & ICH_LR_PENDING_BIT)
++		state |= LR_STATE_PENDING;
++	if (lr_val & ICH_LR_ACTIVE_BIT)
++		state |= LR_STATE_ACTIVE;
++	if (lr_val & ICH_LR_EOI)
++		state |= LR_EOI_INT;
++
++	return state;
++}
++
++static struct vgic_lr vgic_v2_on_v3_get_lr(const struct kvm_vcpu *vcpu, int lr)
+ {
+ 	struct vgic_lr lr_desc;
+ 	u64 val = vcpu->arch.vgic_cpu.vgic_v3.vgic_lr[LR_INDEX(lr)];
+@@ -53,30 +82,53 @@ static struct vgic_lr vgic_v3_get_lr(const struct kvm_vcpu *vcpu, int lr)
+ 		lr_desc.source	= (val >> GICH_LR_PHYSID_CPUID_SHIFT) & 0x7;
+ 	else
+ 		lr_desc.source = 0;
+-	lr_desc.state	= 0;
++	lr_desc.state	= sync_lr_state(val);
+ 
+-	if (val & ICH_LR_PENDING_BIT)
+-		lr_desc.state |= LR_STATE_PENDING;
+-	if (val & ICH_LR_ACTIVE_BIT)
+-		lr_desc.state |= LR_STATE_ACTIVE;
+-	if (val & ICH_LR_EOI)
+-		lr_desc.state |= LR_EOI_INT;
++	return lr_desc;
++}
++
++static struct vgic_lr vgic_v3_on_v3_get_lr(const struct kvm_vcpu *vcpu, int lr)
++{
++	struct vgic_lr lr_desc;
++	u64 val = vcpu->arch.vgic_cpu.vgic_v3.vgic_lr[LR_INDEX(lr)];
++
++	lr_desc.irq	= val & ICH_LR_VIRTUALID_MASK;
++	lr_desc.source	= 0;
++	lr_desc.state	= sync_lr_state(val);
+ 
+ 	return lr_desc;
+ }
+ 
+-static void vgic_v3_set_lr(struct kvm_vcpu *vcpu, int lr,
+-			   struct vgic_lr lr_desc)
++static void vgic_v3_on_v3_set_lr(struct kvm_vcpu *vcpu, int lr,
++				 struct vgic_lr lr_desc)
+ {
+-	u64 lr_val = (((u32)lr_desc.source << GICH_LR_PHYSID_CPUID_SHIFT) |
+-		      lr_desc.irq);
++	u64 lr_val;
+ 
+-	if (lr_desc.state & LR_STATE_PENDING)
+-		lr_val |= ICH_LR_PENDING_BIT;
+-	if (lr_desc.state & LR_STATE_ACTIVE)
+-		lr_val |= ICH_LR_ACTIVE_BIT;
+-	if (lr_desc.state & LR_EOI_INT)
+-		lr_val |= ICH_LR_EOI;
++	lr_val = lr_desc.irq;
++
++	/*
++	 * currently all guest IRQs are Group1, as Group0 would result
++	 * in a FIQ in the guest, which it wouldn't expect.
++	 * Eventually we want to make this configurable, so we may revisit
++	 * this in the future.
++	 */
++	lr_val |= ICH_LR_GROUP;
++
++	lr_val |= sync_lr_val(lr_desc.state);
++
++	vcpu->arch.vgic_cpu.vgic_v3.vgic_lr[LR_INDEX(lr)] = lr_val;
++}
++
++static void vgic_v2_on_v3_set_lr(struct kvm_vcpu *vcpu, int lr,
++				 struct vgic_lr lr_desc)
++{
++	u64 lr_val;
++
++	lr_val = lr_desc.irq;
++
++	lr_val |= (u32)lr_desc.source << GICH_LR_PHYSID_CPUID_SHIFT;
++
++	lr_val |= sync_lr_val(lr_desc.state);
+ 
+ 	vcpu->arch.vgic_cpu.vgic_v3.vgic_lr[LR_INDEX(lr)] = lr_val;
+ }
+@@ -145,9 +197,8 @@ static void vgic_v3_set_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcrp)
+ 
+ static void vgic_v3_enable(struct kvm_vcpu *vcpu)
+ {
+-	struct vgic_v3_cpu_if *vgic_v3;
++	struct vgic_v3_cpu_if *vgic_v3 = &vcpu->arch.vgic_cpu.vgic_v3;
+ 
+-	vgic_v3 = &vcpu->arch.vgic_cpu.vgic_v3;
+ 	/*
+ 	 * By forcing VMCR to zero, the GIC will restore the binary
+ 	 * points to their reset values. Anything else resets to zero
+@@ -155,7 +206,14 @@ static void vgic_v3_enable(struct kvm_vcpu *vcpu)
+ 	 */
+ 	vgic_v3->vgic_vmcr = 0;
+ 
+-	vgic_v3->vgic_sre	= 0;
++	/*
++	 * Set the SRE_EL1 value depending on the configured
++	 * emulated vGIC model.
++	 */
++	if (vcpu->kvm->arch.vgic.vgic_model == KVM_DEV_TYPE_ARM_VGIC_V3)
++		vgic_v3->vgic_sre	= ICC_SRE_EL1_SRE;
++	else
++		vgic_v3->vgic_sre	= 0;
+ 
+ 	/* Get the show on the road... */
+ 	vgic_v3->vgic_hcr = ICH_HCR_EN;
+@@ -173,6 +231,15 @@ static const struct vgic_ops vgic_v3_ops = {
+ 	.enable			= vgic_v3_enable,
+ };
+ 
++static void init_vgic_v3_emul(struct kvm *kvm)
++{
++	struct vgic_vm_ops *vm_ops = &kvm->arch.vgic.vm_ops;
++
++	vm_ops->get_lr = vgic_v3_on_v3_get_lr;
++	vm_ops->set_lr = vgic_v3_on_v3_set_lr;
++	kvm->arch.max_vcpus = KVM_MAX_VCPUS;
++}
++
  static bool vgic_v3_init_emul_compat(struct kvm *kvm, int type)
  {
  	struct vgic_vm_ops *vm_ops = &kvm->arch.vgic.vm_ops;
-+	int nr_vcpus;
+@@ -184,14 +251,28 @@ static bool vgic_v3_init_emul_compat(struct kvm *kvm, int type)
+ 		if (nr_vcpus > 8)
+ 			return false;
  
- 	switch (type) {
- 	case KVM_DEV_TYPE_ARM_VGIC_V2:
-+		nr_vcpus = atomic_read(&kvm->online_vcpus);
-+		if (nr_vcpus > 8)
-+			return false;
-+
- 		vm_ops->get_lr = vgic_v3_get_lr;
- 		vm_ops->set_lr = vgic_v3_set_lr;
-+		kvm->arch.max_vcpus = 8;
+-		vm_ops->get_lr = vgic_v3_get_lr;
+-		vm_ops->set_lr = vgic_v3_set_lr;
++		vm_ops->get_lr = vgic_v2_on_v3_get_lr;
++		vm_ops->set_lr = vgic_v2_on_v3_set_lr;
+ 		kvm->arch.max_vcpus = 8;
  		return true;
++	case KVM_DEV_TYPE_ARM_VGIC_V3:
++		init_vgic_v3_emul(kvm);
++		return true;
  	}
  	return false;
+ }
+ 
++static bool vgic_v3_init_emul(struct kvm *kvm, int type)
++{
++	switch (type) {
++	case KVM_DEV_TYPE_ARM_VGIC_V3:
++		init_vgic_v3_emul(kvm);
++		return true;
++	}
++
++	return false;
++}
++
+ static struct vgic_params vgic_v3_params;
+ 
+ /**
+@@ -233,28 +314,29 @@ int vgic_v3_probe(struct device_node *vgic_node,
+ 
+ 	gicv_idx += 3; /* Also skip GICD, GICC, GICH */
+ 	if (of_address_to_resource(vgic_node, gicv_idx, &vcpu_res)) {
+-		kvm_err("Cannot obtain GICV region\n");
+-		ret = -ENXIO;
+-		goto out;
+-	}
+-
+-	if (!PAGE_ALIGNED(vcpu_res.start)) {
+-		kvm_err("GICV physical address 0x%llx not page aligned\n",
+-			(unsigned long long)vcpu_res.start);
+-		ret = -ENXIO;
+-		goto out;
+-	}
+-
+-	if (!PAGE_ALIGNED(resource_size(&vcpu_res))) {
+-		kvm_err("GICV size 0x%llx not a multiple of page size 0x%lx\n",
+-			(unsigned long long)resource_size(&vcpu_res),
+-			PAGE_SIZE);
+-		ret = -ENXIO;
+-		goto out;
++		kvm_info("GICv3: GICv2 emulation not available\n");
++		vgic->vcpu_base = 0;
++		vgic->init_emul = vgic_v3_init_emul;
++	} else {
++		if (!PAGE_ALIGNED(vcpu_res.start)) {
++			kvm_err("GICV physical address 0x%llx not page aligned\n",
++				(unsigned long long)vcpu_res.start);
++			ret = -ENXIO;
++			goto out;
++		}
++
++		if (!PAGE_ALIGNED(resource_size(&vcpu_res))) {
++			kvm_err("GICV size 0x%llx not a multiple of page size 0x%lx\n",
++				(unsigned long long)resource_size(&vcpu_res),
++				PAGE_SIZE);
++			ret = -ENXIO;
++			goto out;
++		}
++
++		vgic->vcpu_base = vcpu_res.start;
++		vgic->init_emul = vgic_v3_init_emul_compat;
+ 	}
+ 
+-	vgic->init_emul = vgic_v3_init_emul_compat;
+-	vgic->vcpu_base = vcpu_res.start;
+ 	vgic->vctrl_base = NULL;
+ 	vgic->type = VGIC_V3;
+ 
+diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
+index d50afe8..b1bcb6d 100644
+--- a/virt/kvm/arm/vgic.c
++++ b/virt/kvm/arm/vgic.c
+@@ -1464,6 +1464,8 @@ static bool init_emulation_ops(struct kvm *kvm, int type)
+ 	switch (type) {
+ 	case KVM_DEV_TYPE_ARM_VGIC_V2:
+ 		return vgic_v2_init_emulation_ops(kvm, type);
++	case KVM_DEV_TYPE_ARM_VGIC_V3:
++		return vgic_v3_init_emulation_ops(kvm, type);
+ 	}
+ 	return false;
+ }
 -- 
 1.7.9.5
