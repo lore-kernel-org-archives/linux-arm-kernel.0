@@ -1,56 +1,44 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Thu, 21 Aug 2014 09:05:12 +0200
-Subject: [PATCH v2 2/5] of: Add nvidia,controller-id property to Tegra
- I2C bindings
-In-Reply-To: <53F502D7.9030403@wwwdotorg.org>
-References: <1407933685-12404-1-git-send-email-mperttunen@nvidia.com>
- <1407933685-12404-3-git-send-email-mperttunen@nvidia.com>
- <53F502D7.9030403@wwwdotorg.org>
-Message-ID: <20140821070511.GF4486@ulmo>
+From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
+Date: Thu, 21 Aug 2014 09:10:08 +0200
+Subject: [PATCH v7 0/8] Per-user clock constraints
+In-Reply-To: <20140821021200.GB11103@lunn.ch>
+References: <1408375833-10703-1-git-send-email-tomeu.vizoso@collabora.com>
+ <20140821021200.GB11103@lunn.ch>
+Message-ID: <CAAObsKBUiNu-be2AvjedqoPrFNSTdcSA7nGg4PWisJR1Ry_gwA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 20, 2014 at 02:19:35PM -0600, Stephen Warren wrote:
-> On 08/13/2014 06:41 AM, Mikko Perttunen wrote:
-> >Sometimes, hardware blocks want to issue requests to devices
-> >connected to I2C buses by itself. In such case, the bus the
-> >target device resides on must be configured into a register.
-> >For this purpose, each I2C controller has a defined ID known
-> >by the hardware. Add a property for these IDs to the device tree
-> >bindings, so that drivers can know what ID to write to a hardware
-> >register when configuring a block that sends I2C messages autonomously.
-> 
-> >diff --git a/Documentation/devicetree/bindings/i2c/nvidia,tegra20-i2c.txt b/Documentation/devicetree/bindings/i2c/nvidia,tegra20-i2c.txt
-> 
-> >+Optional properties:
-> >+- nvidia,controller-id: ID of controller when referred to in
-> >+                        hardware registers.
-> 
-> I'd prefer to put this information into the thermal trip node, since this
-> represents what ID the PMC uses to communicate with the I2C controller, and
-> there's no absolute guarantee that multiple clients that communicate
-> directly with an I2C controller would use the same numbering scheme.
-> 
-> If that doesn't work, can be at least name this nvidia,pmc-controller-id or
-> nvidia,id-in-pmc so that if there are different numbering schemes, there's a
-> clear path to represent this in different properties without conflicting
-> names?
+On 21 August 2014 04:12, Andrew Lunn <andrew@lunn.ch> wrote:
+> On Mon, Aug 18, 2014 at 05:30:26PM +0200, Tomeu Vizoso wrote:
+>> Hi,
+>>
+>> in this v7 of the patchset I have only rebased on top of 3.17rc1, with no other
+>> changes. I have had to do a fair amount of fixing due to the rebase, more
+>> details below. Follows the original cover letter blurb:
+>
+> Hi Tomeu
+>
+> I would like to test this patchset, but patch 5 never made it to the
+> list. Do you have a git tree i can clone?
 
-This is the ID of the controller used internally by the documentation.
-And as far as I can tell every aspect of the documentation refers to the
-controllers by the same ID (clocks, interrupts, ...). The PMC uses this
-same numbering scheme. That makes the ID about as canonical as it gets,
-so the extra prefix isn't warranted in my opinion.
+Sure:
 
-I'd argue that if ever there was a case where something was referring to
-the controller using a different ID then that should be considered the
-oddball and get special treatment.
+http://cgit.collabora.com/git/user/tomeu/linux.git/log/?h=clk-refactoring-7
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140821/71c5f115/attachment.sig>
+Though it seems to have made into at least one mailing list (the
+others seem to have rejected it because of either its size, or the
+number of recipients):
+
+http://article.gmane.org/gmane.linux.ports.ppc64.devel/104392
+
+Thanks for the interest!
+
+Tomeu
+
+> Thanks
+>         Andrew
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
