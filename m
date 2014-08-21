@@ -1,110 +1,140 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Thu, 21 Aug 2014 17:53:43 +0200
-Subject: [PATCH 1/4] ARM: rockchip: rk3288: Switch to use the proper PWM IP
-In-Reply-To: <20140821062420.GA4486@ulmo>
-References: <1408381749-14156-1-git-send-email-dianders@chromium.org>
- <CAD=FV=Xf4Hm5tCaaW3QG-ZSQGovh6RKH=1Og1K-yxj+jKyGsmA@mail.gmail.com>
- <20140821062420.GA4486@ulmo>
-Message-ID: <3306005.N0EURaUzl3@phil>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Thu, 21 Aug 2014 17:59:16 +0200
+Subject: [PATCH v7 3/4] ARM: EXYNOS: Add platform driver support for Exynos
+ PMU
+In-Reply-To: <001601cfbd49$72359450$56a0bcf0$@samsung.com>
+References: <1404878455-31518-1-git-send-email-pankaj.dubey@samsung.com>
+ <53D238E1.3030901@gmail.com> <002601cfaa11$93de5060$bb9af120$@samsung.com>
+ <2491338.uD82s4TcKJ@amdc1032> <53F35F94.1010101@gmail.com>
+ <001601cfbd49$72359450$56a0bcf0$@samsung.com>
+Message-ID: <53F61754.6010206@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Donnerstag, 21. August 2014, 08:24:22 schrieb Thierry Reding:
-> On Wed, Aug 20, 2014 at 08:55:09AM -0700, Doug Anderson wrote:
-> > On Wed, Aug 20, 2014 at 8:38 AM, Thierry Reding <thierry.reding@gmail.com> 
-wrote:
-> [...]
+On 21.08.2014 16:07, Pankaj Dubey wrote:
+> +Arnd, Lee Jones
 > 
-> > > Looking at the register offsets in the device tree that seems likely. At
-> > > least PWMs 0 and 1 as well as 2 and 3 seem like they could be in the
-> > > 
-> > > same IP block. Their placement in the register map is somewhat strange:
-> > >         pwm0: pwm at 20030000 {
-> > >         
-> > >                 ...
-> > >                 reg = <0x20030000 0x10>;
-> > >                 ...
-> > >                 clocks = <&cru PCLK_PWM01>;
-> > >                 ...
-> > >         
-> > >         };
-> > >         
-> > >         pwm1: pwm at 20030010 {
-> > >         
-> > >                 ...
-> > >                 reg = <0x20030010 0x10>;
-> > >                 ...
-> > >                 clocks = <&cru PCLK_PWM01>;
-> > >                 ...
-> > >         
-> > >         };
-> > >         
-> > >         ...
-> > >         
-> > >         pwm2: pwm at 20050020 {
-> > >         
-> > >                 ...
-> > >                 reg = <0x20050020 0x10>;
-> > >                 ...
-> > >                 clocks = <&cru PCLK_PWM23>;
-> > >                 ...
-> > >         
-> > >         };
-> > >         
-> > >         pwm3: pwm at 20050030 {
-> > >         
-> > >                 ...
-> > >                 reg = <0x20050030 0x10>;
-> > >                 ...
-> > >                 clocks = <&cru PCLK_PWM23>;
-> > >                 ...
-> > >         
-> > >         };
-> > 
-> > Ah, you're looking at "rk3xxx.dtsi".  That doesn't apply to rk3288
-> > (the downsides of trying to guess ahead of time what SoC vendors will
-> > name new models).
-> > 
-> > In rk3288 they have the same clocks.  See patch #3 in this series.
-> > 
-> > > The clocks would also indicate that there are actually two blocks. I
-> > > seem to remember a discussion about whether to handle them as a single
-> > > block or two/four, but I can't seem to find a reference to it. Maybe I'm
-> > > confusing it with another driver.
-> > 
-> > At this point it seems like the choice has already been made to handle
-> > them as separate PWMs.  I can change this choice if you want...
+> Hi Tomasz,
 > 
-> Well, looking at patch 3/4 this really does seem to be one single block
-> providing four PWM channels, so the right thing to do would be to
-> represent it in one device tree node. But I'll leave it up to Heiko to
-> decide how he wants to handle this.
+> On Tuesday, August 19, 2014 Tomasz Figa wrote:
 > 
-> One downside of describing it as one device is that it would make the
-> pinmux handling slightly more difficult, since presumably you'd only
-> want to apply the pinmux settings when a channel is actually being used.
-> Currently the pinmux doesn't apply as long as the device remains
-> disabled in device tree (though enabling it doesn't necessarily mean
-> that it's being used).
+>>
+>> Hi Bart,
+>>
+>> On 18.08.2014 19:42, Bartlomiej Zolnierkiewicz wrote:
+>>>
+>>> Hi,
+>>>
+>>> On Monday, July 28, 2014 08:40:52 AM Pankaj Dubey wrote:
+>>>> Hi Tomasz,
+>>>>
+>>>> On Friday, July 25, 2014 Tomasz Figa wrote:
+>>>>
+>>>>> To: Pankaj Dubey; 'Kukjin Kim';
+>>>>> linux-arm-kernel at lists.infradead.org;
+>>>> linux-
+>>>>> samsung-soc at vger.kernel.org; linux-kernel at vger.kernel.org
+>>>>> Cc: linux at arm.linux.org.uk; t.figa at samsung.com;
+>>>>> vikas.sajjan at samsung.com; joshi at samsung.com; naushad at samsung.com;
+>>>>> thomas.ab at samsung.com; chow.kim at samsung.com
+>>>>> Subject: Re: [PATCH v7 3/4] ARM: EXYNOS: Add platform driver support
+>>>>> for Exynos PMU
+>>>>>
+>>>>> Hi Pankaj, Kukjin,
+>>>>>
+>>>>> On 25.07.2014 07:32, Pankaj Dubey wrote:
+>>>>>> Hi Kukjin,
+>>>>>>
+>>>>>> On Friday, July 25, 2014 Kukjin Kim wrote:
+>>>>>
+>>>>> [snip]
+>>>>>
+>>>>>>>>
+>>>>>>> Looks good to me, will apply this and 4/4.
+>>>>>>>
+>>>>>>
+>>>>>> We need to hold these two patches until dependent patch [1] from
+>>>>>> Tomasz Figa gets merged.
+>>>>>>
+>>>>>> [1]: mfd: syscon: Decouple syscon interface from syscon devices
+>>>>>>       https://lkml.org/lkml/2014/6/24/188
+>>>>>
+>>>>> That RFC patch had few comments from Arnd needed to be addressed, so
+>>>>> it
+>>>> needs a
+>>>>> new revision.
+>>>>>
+>>>>> Pankaj, If I remember correctly, we had talked about this and the
+>>>> conclusion was that
+>>>>> you would take care of addressing the comments and sending new
+>>>>> version of
+>>>> the
+>>>>> patch. Any update on this or have I missed something?
+>>>>>
+>>>>
+>>>> Well, I don't think we concluded as such anything.
+>>>> Since this patch needs to get in so that Exynos PMU and PM related
+>>>> changes can go in, I discussed with you saying that I am not able to
+>>>> understand about Arnd's comments and if possible and time permits I
+>>>> will look into it. Meanwhile I got busy with some other official
+>>>> work, so could not get time to look into it.
+>>>
+>>> Tomasz/Pankaj, could we please get some agreement on what needs to be
+>>> done and who should do the pending work?
+>>>
+>>> syscon patch is blocking PMU cleanup patches which in turn are
+>>> blocking PMU support additions for new SoCs (Exynos5420/5800 and
+>>> Exynos3250 PMU patches).
+>>
+>> Leaving alone the matter who is going to take care of it for now, the
+> remaining work
+>> to do is to further decouple syscon from struct device, which means
+> providing of_
+>> API to register a syscon provider on a device tree node even before driver
+> model is
+>> available yet.
+>>
+> 
+> As per Arnd's comment on your RFC patch he mentioned -
+> "I believe the part you are missing is that with the approach I suggested,
+> there would be no registration function at all."
+> 
+> I think he is not in favor of adding such registration function at all. So
+> do you think
+> adding such function will really solve the problem?
+> 
+> Further even Lee Jones agreed to Arnd's point of making syscon independent
+> of device,
+> but he also mentioned that it can be done in subsequent patch.
 
-yeah, the pinctrl settings would need to move to the board files, to only set 
-the pins necessary on the relevant board. But I don't see that as a problem.
+Let's look again at the original thread then...
 
+I believe Lee agreed with my proposed solution or at least he quoted my
+e-mail and pointed that further work addressing Arnd's comments could be
+done in follow up patches. I also think that we should rather make one
+step as a time, especially this patch is required for further clean-up
+of Exynos.
 
-> Like I said, it's up to Heiko to decide whether it's worth making this
-> change (and it'd make sense to apply it to existing DTS files
-> retroactively) or better to keep what we have.
+However there was also a reply from Michal Simek, which pointed out that
+even with my patch the syscon is still bound to driver model and for his
+use case he would need a purely OF-based version of the API. That's why
+I think my patch should be re-spun with changes I mentioned in my
+previous message in this thread.
 
-hmm, I guess I don't really have a hard opinion on this. Generally I like the 
-"right thing" approach, but the current option also looks ok to me.
-So I guess I'm not much help in deciding this :-)
+>   
+> So in IMHO, your RFC patch can be taken as is, and any further improvement
+> suggested
+> by Arnd can be done in subsequent patches,  because as I can see in 3.17-rc1
+> still
+> has user of syscon_regmap_lookup_by_pdevname (clps711x.c) so we can't
+> completely
+> make it independent of platform_device as of now and also the changes
+> required
+> as per Arnd's suggestions requires considerable effort and time.
 
+Agreed. However we can still provide OF-only syscon registration
+function and modify look-up functions to allow syscons without struct
+device pointer, just with OF node.
 
-Heiko
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 490 bytes
-Desc: This is a digitally signed message part.
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140821/23ad51c0/attachment.sig>
+Best regards,
+Tomasz
