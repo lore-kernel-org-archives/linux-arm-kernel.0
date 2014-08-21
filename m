@@ -1,64 +1,48 @@
-From: liviu@dudau.co.uk (Liviu Dudau)
-Date: Fri, 22 Aug 2014 00:07:40 +0100
-Subject: [PATCH] drivers: pci: convert generic host controller to DT host
- bridge creation API
-In-Reply-To: <201408202139.27678.arnd@arndb.de>
-References: <1407861695-25549-1-git-send-email-Liviu.Dudau@arm.com>
- <201408201327.57376.arnd@arndb.de>
- <20140820123112.GG13147@bart.dudau.co.uk>
- <201408202139.27678.arnd@arndb.de>
-Message-ID: <20140821230740.GJ13147@bart.dudau.co.uk>
+From: vincent.stehle@laposte.net (=?UTF-8?q?Vincent=20Stehl=C3=A9?=)
+Date: Fri, 22 Aug 2014 01:31:20 +0200
+Subject: [PATCH linux-next] irq: export handle_fasteoi_irq
+Message-ID: <1408663880-29179-1-git-send-email-vincent.stehle@laposte.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 20, 2014 at 09:39:27PM +0200, Arnd Bergmann wrote:
-> On Wednesday 20 August 2014, Liviu Dudau wrote:
-> > That has been the general approach of my patchset up to v9. But, as Bjorn has
-> > mentioned in his v8 review and I have put in my cover letter, the regular
-> > aproach means that architectures that use pci_scan_root_bus() will have to
-> > drop their one liner and replace it with the more verbose of_create_pci_host_bridge()
-> > followed by pci_scan_child_bus() and pci_bus_add_devices() (basically, the content
-> > of pci_scan_root_bus()). For those architectures it will lead to a net increase of
-> > lines of code.
-> 
-> I'll try to get hold of Bjorn here and discuss it with him in person. I'd
-> rather see a few extra lines in each driver than the complexity of callback
-> funtions.
-> 
-> > The patch for pci-host-generic.c is the first to use the callback setup function, but
-> > not the only one. My PCI host bridge driver for Juno has the same need, and I'm betting
-> > all other host bridge controllers will use it as it will be the only opportunity to
-> > finish the controller setup before we start scanning the child busses. I'm trying to
-> > balance ease of read vs ease of use here and it is the best version I've come up with
-> > so far.
-> 
-> My main objection to the new approach is that it's different from most other
-> subsystems doing the same thing. For a person reading the pci host driver
-> implementation, when they are familiar with other device drivers, I think it's
-> much clearer what is going on when smaller functions are called in sequence
-> than to see one function passed into some other interface that you now have
-> to read as well in order to understand when it gets called.
+Export handle_fasteoi_irq to be able to use it in e.g. the Zynq gpio driver
+since commit 6dd859508336 ("gpio: zynq: Fix IRQ handlers").
 
-Would it be more clear if (when) the currently opaque sysdata becomes a structure
-to be filled by the host bridge driver with a .setup member pointing to the
-callback? That would be my preferred way of expressing the API, tbh, but it means
-duplicating the existing pci_{create,scan}_root_bus() functions.
+This fixes the following link issue:
+
+  ERROR: "handle_fasteoi_irq" [drivers/gpio/gpio-zynq.ko] undefined!
+
+Signed-off-by: Vincent Stehl? <vincent.stehle@laposte.net>
+Cc: Thomas Gleixner <tglx@linutronix.de>
+Cc: Lars-Peter Clausen <lars@metafoo.de>
+Cc: Linus Walleij <linus.walleij@linaro.org>
+---
+
+Hi,
+
+This can be seen in Linux next-20140822 with e.g. arm allmodconfig.
+
+Zync gpio seems to be the first code to use handle_fasteoi_irq, which can be
+compiled as a module.
 
 Best regards,
-Liviu
 
-> 
-> 	Arnd
-> 
+V.
 
+ kernel/irq/chip.c | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/kernel/irq/chip.c b/kernel/irq/chip.c
+index a2b28a2..6223fab 100644
+--- a/kernel/irq/chip.c
++++ b/kernel/irq/chip.c
+@@ -517,6 +517,7 @@ out:
+ 		chip->irq_eoi(&desc->irq_data);
+ 	raw_spin_unlock(&desc->lock);
+ }
++EXPORT_SYMBOL_GPL(handle_fasteoi_irq);
+ 
+ /**
+  *	handle_edge_irq - edge type IRQ handler
 -- 
--------------------
-   .oooO
-   (   )
-    \ (  Oooo.
-     \_) (   )
-          ) /
-         (_/
-
- One small step
-   for me ...
+2.1.0.rc1
