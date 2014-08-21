@@ -1,90 +1,87 @@
-From: gerg@uclinux.org (Greg Ungerer)
-Date: Thu, 21 Aug 2014 21:46:05 +1000
-Subject: [PATCH v9 4/9] arm: ks8695: Migrate debug_ll macros to shared
- directory
-In-Reply-To: <1408461407-10429-5-git-send-email-daniel.thompson@linaro.org>
-References: <1408459715-10151-1-git-send-email-daniel.thompson@linaro.org>
- <1408461407-10429-1-git-send-email-daniel.thompson@linaro.org>
- <1408461407-10429-5-git-send-email-daniel.thompson@linaro.org>
-Message-ID: <53F5DBFD.2020502@uclinux.org>
+From: mchehab@osg.samsung.com (Mauro Carvalho Chehab)
+Date: Thu, 21 Aug 2014 06:50:06 -0500
+Subject: [PATCH v2 3/3] [media] rc: remove change_protocol in rc-ir-raw.c
+In-Reply-To: <1408613086-12538-4-git-send-email-zhangfei.gao@linaro.org>
+References: <1408613086-12538-1-git-send-email-zhangfei.gao@linaro.org>
+ <1408613086-12538-4-git-send-email-zhangfei.gao@linaro.org>
+Message-ID: <20140821065006.6d831ec4@concha.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Daniel,
+Em Thu, 21 Aug 2014 17:24:45 +0800
+Zhangfei Gao <zhangfei.gao@linaro.org> escreveu:
 
-On 20/08/14 01:16, Daniel Thompson wrote:
-> As part of the migration a couple of uart definitions have been copied
-> from of the platform specific header files.
->
-> Note that, in order to keep oldconfig working nicely we must defer the
-> removal of arch/arm/mach-ks8695/include/mach/debug-macro.S until
-> DEBUG_LL_UART_NONE has been removed.
->
-> Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Cc: Greg Ungerer <gerg@uclinux.org>
-> Cc: Arnd Bergmann <arnd.bergmann@linaro.org>
+> With commit 4924a311a62f ("[media] rc-core: rename ir-raw.c"),
+> empty change_protocol was introduced.
+
+No. This was introduced on this changeset:
+
+commit da6e162d6a4607362f8478c715c797d84d449f8b
+Author: David H?rdeman <david@hardeman.nu>
+Date:   Thu Apr 3 20:32:16 2014 -0300
+
+    [media] rc-core: simplify sysfs code
+
+> As a result, rc_register_device will set dev->enabled_protocols
+> addording to rc_map->rc_type, which prevent using all protocols.
+
+I strongly suspect that this patch will break some things, as
+the new code seems to expect that this is always be set. 
+
+See the code at store_protocols(): if this callback is not set,
+then it won't allow to disable a protocol.
+
+Also, this doesn't prevent using all protocols. You can still use
+"ir-keytable -p all" to enable all protocols (the "all" protocol
+type were introduced recently at the userspace tool).
+
+>From the way I see, setting the protocol when a table is loaded
+is not a bad thing, as:
+- if RC tables are loaded, the needed protocol to decode it is
+  already known;
+- by running just one IR decoder, the IR handling routine will
+  be faster and will consume less power;
+- on a real case scenario, it is a way more likely that just one
+  decoder will ever be needed by the end user.
+
+So, I think that this is just annoying for developers when are checking
+if all decoders are working, by sending keycodes from different IR types
+at the same time.
+
+> 
+> Signed-off-by: Zhangfei Gao <zhangfei.gao@linaro.org>
 > ---
->   arch/arm/Kconfig.debug                                         |  8 ++++++++
->   .../include/mach/debug-macro.S => include/debug/ks8695.S}      | 10 +++++++---
->   2 files changed, 15 insertions(+), 3 deletions(-)
->   rename arch/arm/{mach-ks8695/include/mach/debug-macro.S => include/debug/ks8695.S} (80%)
->
-> diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
-> index 9c46729..97c3058 100644
-> --- a/arch/arm/Kconfig.debug
-> +++ b/arch/arm/Kconfig.debug
-> @@ -348,6 +348,13 @@ choice
->   		  Say Y here if you want the debug print routines to direct
->   		  their output to UART1 serial port on KEYSTONE2 devices.
->   
-> +	config DEBUG_KS8695_UART
-> +		bool "KS8695 Debug UART"
-> +		depends on ARCH_KS8695
-> +		help
-> +		  Say Y here if you want kernel low-level debugging support
-> +		  on KS8695.
-> +
->   	config DEBUG_MMP_UART2
->   		bool "Kernel low-level debugging message via MMP UART2"
->   		depends on ARCH_MMP
-> @@ -1017,6 +1024,7 @@ config DEBUG_LL_INCLUDE
->   				 DEBUG_IMX6Q_UART || \
->   				 DEBUG_IMX6SL_UART || \
->   				 DEBUG_IMX6SX_UART
-> +	default "debug/ks8695.S" if DEBUG_KS8695_UART
->   	default "debug/msm.S" if DEBUG_MSM_UART || DEBUG_QCOM_UARTDM
->   	default "debug/omap2plus.S" if DEBUG_OMAP2PLUS_UART
->   	default "debug/s3c24xx.S" if DEBUG_S3C24XX_UART
-> diff --git a/arch/arm/mach-ks8695/include/mach/debug-macro.S b/arch/arm/include/debug/ks8695.S
-> similarity index 80%
-> rename from arch/arm/mach-ks8695/include/mach/debug-macro.S
-> rename to arch/arm/include/debug/ks8695.S
-> index a79e489..961da1f 100644
-> --- a/arch/arm/mach-ks8695/include/mach/debug-macro.S
-> +++ b/arch/arm/include/debug/ks8695.S
-> @@ -1,5 +1,5 @@
->   /*
-> - * arch/arm/mach-ks8695/include/mach/debug-macro.S
-> + * arch/arm/include/debug/ks8695.S
->    *
->    * Copyright (C) 2006 Ben Dooks <ben@simtec.co.uk>
->    * Copyright (C) 2006 Simtec Electronics
-> @@ -11,8 +11,12 @@
->    * published by the Free Software Foundation.
->    */
->   
-> -#include <mach/hardware.h>
-> -#include <mach/regs-uart.h>
-> +#define KS8695_UART_PA	0x03ffe000
-> +#define KS8695_UART_VA	0xf00fe000
-> +#define KS8695_URTH	(0x04)
-> +#define KS8695_URLS	(0x14)
-> +#define URLS_URTE	(1 << 6)
-> +#define URLS_URTHRE	(1 << 5)
+>  drivers/media/rc/rc-ir-raw.c |    7 -------
+>  1 file changed, 7 deletions(-)
+> 
+> diff --git a/drivers/media/rc/rc-ir-raw.c b/drivers/media/rc/rc-ir-raw.c
+> index e8fff2a..a118539 100644
+> --- a/drivers/media/rc/rc-ir-raw.c
+> +++ b/drivers/media/rc/rc-ir-raw.c
+> @@ -240,12 +240,6 @@ ir_raw_get_allowed_protocols(void)
+>  	return protocols;
+>  }
+>  
+> -static int change_protocol(struct rc_dev *dev, u64 *rc_type)
+> -{
+> -	/* the caller will update dev->enabled_protocols */
+> -	return 0;
+> -}
+> -
+>  /*
+>   * Used to (un)register raw event clients
+>   */
+> @@ -263,7 +257,6 @@ int ir_raw_event_register(struct rc_dev *dev)
+>  
+>  	dev->raw->dev = dev;
+>  	dev->enabled_protocols = ~0;
+> -	dev->change_protocol = change_protocol;
+>  	rc = kfifo_alloc(&dev->raw->kfifo,
+>  			 sizeof(struct ir_raw_event) * MAX_IR_EVENT_SIZE,
+>  			 GFP_KERNEL);
 
-Whats the thinking behind moving these definitions here?
-Is there a plan to move/change regs-uart.h?
 
-Regards
-Greg
+-- 
+
+Cheers,
+Mauro
