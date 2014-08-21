@@ -1,47 +1,117 @@
-From: davem@davemloft.net (David Miller)
-Date: Thu, 21 Aug 2014 16:36:12 -0700 (PDT)
-Subject: [PATCH v2 0/3] net: Add Keystone NetCP ethernet driver support
-In-Reply-To: <1408115562-22487-1-git-send-email-santosh.shilimkar@ti.com>
-References: <1408115562-22487-1-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <20140821.163612.282672926741753926.davem@davemloft.net>
+From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
+Date: Thu, 21 Aug 2014 16:38:26 -0700
+Subject: [PATCH 8/9] ARM: zynq: Remove hotplug.c
+In-Reply-To: <53F54C26.5010000@linaro.org>
+References: <1408567315-28479-1-git-send-email-soren.brinkmann@xilinx.com>
+ <1408567315-28479-9-git-send-email-soren.brinkmann@xilinx.com>
+ <53F54C26.5010000@linaro.org>
+Message-ID: <347fcf72-b3a5-4212-87b9-0cc92d1a962c@BN1AFFO11FD035.protection.gbl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Santosh Shilimkar <santosh.shilimkar@ti.com>
-Date: Fri, 15 Aug 2014 11:12:39 -0400
-
-> Update version after incorporating David Miller's comment from earlier
-> posting [1]. I would like to get these merged for upcoming 3.18 merge
-> window if there are no concerns on this version.
+On Thu, 2014-08-21 at 03:32AM +0200, Daniel Lezcano wrote:
+> On 08/20/2014 10:41 PM, Soren Brinkmann wrote:
+> >The hotplug code contains only a single function, which is an SMP
+> >function. Move that to platsmp.c where all other SMP runctions reside.
+> >That allows removing hotplug.c and declaring the cpu_die function
+> >static.
+> >
+> >Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
+> >---
+> >  arch/arm/mach-zynq/Makefile  |  1 -
+> >  arch/arm/mach-zynq/common.h  |  3 +--
+> >  arch/arm/mach-zynq/hotplug.c | 17 -----------------
+> >  arch/arm/mach-zynq/platsmp.c | 18 ++++++++++++++++++
+> >  4 files changed, 19 insertions(+), 20 deletions(-)
+> >
+> >diff --git a/arch/arm/mach-zynq/Makefile b/arch/arm/mach-zynq/Makefile
+> >index 820dff6e1eba..c85fb3f7d5cd 100644
+> >--- a/arch/arm/mach-zynq/Makefile
+> >+++ b/arch/arm/mach-zynq/Makefile
+> >@@ -6,5 +6,4 @@
+> >  obj-y				:= common.o slcr.o pm.o
+> >  CFLAGS_REMOVE_hotplug.o		=-march=armv6k
+> >  CFLAGS_hotplug.o 		=-Wa,-march=armv7-a -mcpu=cortex-a9
+> >-obj-$(CONFIG_HOTPLUG_CPU)	+= hotplug.o
+> >  obj-$(CONFIG_SMP)		+= headsmp.o platsmp.o
+> >diff --git a/arch/arm/mach-zynq/common.h b/arch/arm/mach-zynq/common.h
+> >index c0773e87e83c..e6bb12c50a23 100644
+> >--- a/arch/arm/mach-zynq/common.h
+> >+++ b/arch/arm/mach-zynq/common.h
+> >@@ -39,8 +39,7 @@ extern struct smp_operations zynq_smp_ops __initdata;
+> >
+> >  extern void __iomem *zynq_scu_base;
+> >
+> >-/* Hotplug */
+> >-extern void zynq_platform_cpu_die(unsigned int cpu);
+> >+int zynq_pm_late_init(void);
+> >
+> >  int zynq_pm_late_init(void);
+> >
+> >diff --git a/arch/arm/mach-zynq/hotplug.c b/arch/arm/mach-zynq/hotplug.c
+> >index fe44a05677e2..b685c89f11e4 100644
+> >--- a/arch/arm/mach-zynq/hotplug.c
+> >+++ b/arch/arm/mach-zynq/hotplug.c
+> >@@ -12,20 +12,3 @@
+> >   */
+> >  #include <asm/proc-fns.h>
+> >
+> >-/*
+> >- * platform-specific code to shutdown a CPU
+> >- *
+> >- * Called with IRQs disabled
+> >- */
+> >-void zynq_platform_cpu_die(unsigned int cpu)
+> >-{
+> >-	zynq_slcr_cpu_state_write(cpu, true);
+> >-
+> >-	/*
+> >-	 * there is no power-control hardware on this platform, so all
+> >-	 * we can do is put the core into WFI; this is safe as the calling
+> >-	 * code will have already disabled interrupts
+> >-	 */
+> >-	for (;;)
+> >-		cpu_do_idle();
+> >-}
+> >diff --git a/arch/arm/mach-zynq/platsmp.c b/arch/arm/mach-zynq/platsmp.c
+> >index f77f7ca4c45b..04e578718aa2 100644
+> >--- a/arch/arm/mach-zynq/platsmp.c
+> >+++ b/arch/arm/mach-zynq/platsmp.c
+> >@@ -132,6 +132,24 @@ static int zynq_cpu_kill(unsigned cpu)
+> >  	zynq_slcr_cpu_stop(cpu);
+> >  	return 1;
+> >  }
+> >+
+> >+/*
+> >+ * platform-specific code to shutdown a CPU
+> >+ *
+> >+ * Called with IRQs disabled
+> >+ */
+> >+static void zynq_platform_cpu_die(unsigned int cpu)
+> >+{
+> >+	zynq_slcr_cpu_state_write(cpu, true);
+> >+
+> >+	/*
+> >+	 * there is no power-control hardware on this platform, so all
+> >+	 * we can do is put the core into WFI; this is safe as the calling
+> >+	 * code will have already disabled interrupts
+> >+	 */
+> >+	for (;;)
+> >+		cpu_do_idle();
 > 
-> The network coprocessor (NetCP) is a hardware accelerator that processes
-> Ethernet packets. NetCP has a gigabit Ethernet (GbE) subsystem with a ethernet
-> switch sub-module to send and receive packets. NetCP also includes a packet
-> accelerator (PA) module to perform packet classification operations such as
-> header matching, and packet modification operations such as checksum
-> generation. NetCP can also optionally include a Security Accelerator(SA)
-> capable of performing IPSec operations on ingress/egress packets.
->     
-> Keystone SoC's also have a 10 Gigabit Ethernet Subsystem (XGbE) which
-> includes a 3-port Ethernet switch sub-module capable of 10Gb/s and
-> 1Gb/s rates per Ethernet port.
->     
-> NetCP driver has a plug-in module architecture where each of the NetCP
-> sub-modules exist as a loadable kernel module which plug in to the netcp
-> core. These sub-modules are represented as "netcp-devices" in the dts
-> bindings. It is mandatory to have the ethernet switch sub-module for
-> the ethernet interface to be operational. Any other sub-module like the
-> PA is optional.
-> 
-> Both GBE and XGBE network processors supported using common driver. It
-> is also designed to handle future variants of NetCP.
+> IIUC, the cpu_do_idle() will flush the L1 cache and then call the
+> WFI. It makes sense if we are about to power down the core. So I am
+> wondering if we can just call wfi() instead.
 
-I don't want to see an offload driver that doesn't plug into the existing
-generic frameworks for configuration et al.
+I'm not sure - it's not that trivial to trace that through the sources.
+But I think cpu_do_idle ends up in cpu_v7_do_idle which is just:
+	ENTRY(cpu_v7_do_idle)                                                            
+	        dsb                                     @ WFI may enter a low-power mode 
+	        wfi                                                                      
+	        ret     lr                                                               
+	ENDPROC(cpu_v7_do_idle)
 
-If no existing facility exists to support what you need, you must work
-with the upstream maintainers to design and create one.
+I think that is what we want here.
 
-It is absolutely no reasonable for every "switch on a chip" driver to
-export it's own configuration knob, we need a standard interface all
-such drivers will plug into and provide.
+	Thanks,
+	S?ren
