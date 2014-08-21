@@ -1,28 +1,51 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Thu, 21 Aug 2014 14:01:43 -0500
-Subject: [PATCH V2 2/2] Input: misc: introduce palmas-pwrbutton
-In-Reply-To: <20140821180300.GA5854@core.coreip.homeip.net>
-References: <1408392810-16011-1-git-send-email-nm@ti.com>
- <1408636935-29515-1-git-send-email-nm@ti.com>
- <1408636935-29515-3-git-send-email-nm@ti.com>
- <00FC9A978A94B7418C33AFAE8A35ED49DF0662@DFLE09.ent.ti.com>
- <53F62A2B.6010208@ti.com>
- <00FC9A978A94B7418C33AFAE8A35ED49DF07A2@DFLE09.ent.ti.com>
- <20140821173715.GA23419@kahuna>
- <20140821180300.GA5854@core.coreip.homeip.net>
-Message-ID: <53F64217.5020303@ti.com>
+From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
+Date: Thu, 21 Aug 2014 12:02:35 -0700
+Subject: [PATCH 9/9] ARM: zynq: Rename 'zynq_platform_cpu_die'
+In-Reply-To: <4ac42f4d-72bf-4a8d-a997-094f129d7c74@BN1AFFO11FD020.protection.gbl>
+References: <1408567315-28479-1-git-send-email-soren.brinkmann@xilinx.com>
+ <1408567315-28479-10-git-send-email-soren.brinkmann@xilinx.com>
+ <4ac42f4d-72bf-4a8d-a997-094f129d7c74@BN1AFFO11FD020.protection.gbl>
+Message-ID: <9c7c26e1-4098-4252-a719-fb7b7205be61@BN1AFFO11FD006.protection.gbl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/21/2014 01:03 PM, Dmitry Torokhov wrote:
+On Thu, 2014-08-21 at 02:28PM +0200, Michal Simek wrote:
+> On 08/20/2014 10:41 PM, Soren Brinkmann wrote:
+> > Match the naming pattern of all other SMP ops and rename
+> > zynq_platform_cpu_die --> zynq_cpu_die.
+> > 
+> > Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
+> > ---
+> >  arch/arm/mach-zynq/platsmp.c | 4 ++--
+> >  1 file changed, 2 insertions(+), 2 deletions(-)
+> > 
+> > diff --git a/arch/arm/mach-zynq/platsmp.c b/arch/arm/mach-zynq/platsmp.c
+> > index 04e578718aa2..95933c5e70e1 100644
+> > --- a/arch/arm/mach-zynq/platsmp.c
+> > +++ b/arch/arm/mach-zynq/platsmp.c
+> > @@ -138,7 +138,7 @@ static int zynq_cpu_kill(unsigned cpu)
+> >   *
+> >   * Called with IRQs disabled
+> >   */
+> > -static void zynq_platform_cpu_die(unsigned int cpu)
+> > +static void zynq_cpu_die(unsigned int cpu)
+> >  {
+> >  	zynq_slcr_cpu_state_write(cpu, true);
+> >  
+> > @@ -158,7 +158,7 @@ struct smp_operations zynq_smp_ops __initdata = {
+> >  	.smp_boot_secondary	= zynq_boot_secondary,
+> >  	.smp_secondary_init	= zynq_secondary_init,
+> >  #ifdef CONFIG_HOTPLUG_CPU
+> > -	.cpu_die		= zynq_platform_cpu_die,
+> > +	.cpu_die		= zynq_cpu_die,
+> >  	.cpu_kill		= zynq_cpu_kill,
+> >  #endif
+> >  };
+> 
+> Will be good if you can move fix that kernel-doc format for this function
+> too. It is just nice to have thing.
 
-I believe I have taken care of other concerns on v2, but..Arrgh.. I
-did not reply to this comment..
-> BTW, I do not think you need to use of_node_get/put here, it's not going anywhere.
-It has been mentioned as a good practice to ensure we use get_put in
-to ensure reference count is appropriately maintained. So, I have'nt
-changed that in v3.
+All these SMP-ops should be documented in the header defining that
+struct, shouldn't they?
 
--- 
-Regards,
-Nishanth Menon
+	S?ren
