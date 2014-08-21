@@ -1,85 +1,118 @@
-From: zlim.lnx@gmail.com (Zi Shen Lim)
-Date: Thu, 21 Aug 2014 00:15:40 -0500
-Subject: [PATCH] arm64: topology: add MPIDR-based detection
-In-Reply-To: <CAFpQJXW7MGGYTa6ChboGCCFUVnkUjjnGMMVc9MKfYNnchsOwAw@mail.gmail.com>
-References: <20140603173103.GA18004@red-moon>
- <20140603210424.GJ31751@sirena.org.uk>
- <20140604093452.GA8057@e102568-lin.cambridge.arm.com>
- <20140604115751.GH2520@sirena.org.uk>
- <20140604130114.GB10775@e102568-lin.cambridge.arm.com>
- <20140604135431.GL2520@sirena.org.uk>
- <20140604155129.GD10775@e102568-lin.cambridge.arm.com>
- <20140604163400.GQ2520@sirena.org.uk>
- <20140604171030.GE10775@e102568-lin.cambridge.arm.com>
- <CAFpQJXVmj0v=L_5NSGs1TdNuZDuKv_zxEoSVpCVSSsjSqFgiMg@mail.gmail.com>
- <20140818223659.GC5032@e102568-lin.cambridge.arm.com>
- <CAFpQJXW7MGGYTa6ChboGCCFUVnkUjjnGMMVc9MKfYNnchsOwAw@mail.gmail.com>
-Message-ID: <CAMDttNenA5UPJMPVScsP6BcVZS3D5brX5V7sYzPV_M+WAQpbHQ@mail.gmail.com>
+From: victor.kamensky@linaro.org (Victor Kamensky)
+Date: Wed, 20 Aug 2014 22:29:09 -0700
+Subject: [RFC PATCH] arm: fix get_user BE behavior for target variable with
+ size of 8 bytes
+Message-ID: <1408598949-23050-1-git-send-email-victor.kamensky@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ganapatrao,
+e38361d 'ARM: 8091/2: add get_user() support for 8 byte types' commit
+broke V7 BE get_user call when target var size is 64 bit, but '*ptr' size
+is 32 bit or smaller. e38361d changed type of __r2 from 'register
+unsigned long' to 'register typeof(x) __r2 asm("r2")' i.e before the change
+even when target variable size was 64 bit, __r2 was still 32 bit.
+But after e38361d commit, for target var of 64 bit size, __r2 became 64
+bit and now it should occupy 2 registers r2, and r3. The issue in BE case
+that r3 register is least significant word of __r2 and r2 register is most
+significant word of __r2. But __get_user_4 still copies result into r2 (most
+significant word of __r2). Subsequent code copies from __r2 into x, but
+for situation described it will pick up only garbage from r3 register.
 
-On Tue, Aug 19, 2014 at 11:08 PM, Ganapatrao Kulkarni
-<gpkulkarni@gmail.com> wrote:
-> Hi Lorenzo,
->
-> On Tue, Aug 19, 2014 at 4:06 AM, Lorenzo Pieralisi
-> <lorenzo.pieralisi@arm.com> wrote:
->> On Mon, Aug 18, 2014 at 08:39:48AM +0100, Ganapatrao Kulkarni wrote:
->>> How we map non SMT (MT bit24=0) cores of dual/multi socket system with
->>> the topology which is using only aff0 and aff1?
->>> can we use aff2  ( or concatenating aff2 and aff3)  to represent socket-id?
->>
->> Can you provide us with a description of the topology and the MPIDR_EL1
->> list please ?
->>
->> I think that DT squashes the levels above cluster so that's how it could
->> be implemented but first I would like to see what s the CPUs layout
->> of the system.
->
-> Our Soc has 48 core(Cavium's  thunderX) design. 48 cores are
-> sub-grouped in to 3 clusters.
-> In turn each cluster is having 16 cores.
-> We do have support for connecting 2 SoCs and making single system of 96 cores.
->
-> the MPIDR mapping for this topology is,
->
-> Aff0 is mapped to 16 cores within a cluster. Valid range is 0 to 0xf
-> Aff1 is mapped to cluster number, valid values are 0,1 and 2.
-> Aff2 is mapped to Socket-id or SoC number. Valid values are 0 and 1.
+It was discovered during 3.17-rc1 V7 BE KVM testing. Simple test case below.
+Note it works in LE case because r2 in LE case is still least significant
+word.
 
-So, we went back and forth a few times and finally settled on what's
-merged into 3.17, due to lack of visibility into hardware that'll be
-shipped.
+Proposed fix uninspiringly restores previous code but now in individual
+branches of switch statement for '*(__p)' byte sizes 1, 2, 4 and have
+newer code only for sizeof(*(__p)) == 8. Looking for may be better ideas
+how to fix the issue.
 
-At one point, we had something approximating behavior of DT-based
-topology, along the lines of:
+Small test case C code
 
-        if (mpidr & MPIDR_MT_BITMASK) {
-                /* Multiprocessor system : Multi-threads per core */
-                cpuid_topo->thread_id  = MPIDR_AFFINITY_LEVEL(mpidr, 0);
-                cpuid_topo->core_id    = MPIDR_AFFINITY_LEVEL(mpidr, 1);
-                cpuid_topo->cluster_id = MPIDR_AFFINITY_LEVEL(mpidr, 2) |
-                                         MPIDR_AFFINITY_LEVEL(mpidr, 3) << 8;
-        } else {
-                /* Multiprocessor system : Single-thread per core */
-                cpuid_topo->thread_id  = -1;
-                cpuid_topo->core_id    = MPIDR_AFFINITY_LEVEL(mpidr, 0);
-                cpuid_topo->cluster_id = MPIDR_AFFINITY_LEVEL(mpidr, 1) |
-                                         MPIDR_AFFINITY_LEVEL(mpidr, 2) << 8 |
-                                         MPIDR_AFFINITY_LEVEL(mpidr, 3) << 16;
-        }
+char gut_lower_v64_p32 (int *ptr) {
+       long long value = 0;
+       get_user(value, ptr);
+       return 0xff & value;
+}
 
-BTW, Mark Brown just posted "[PATCH] arm64: topology: Fix handling of
-multi-level cluster MPIDR-based detection" which reintroduces the
-above, albeit only for MT case.
+the following code in BE V7 image will be generated. Note uxtb access to
+r3 register, but __get_user_4 retrieves data into r2.
 
-I suspect you're looking for something above for the non-MT case?
-As a workaround, have you considered defining your topology in DT?
+(gdb) disassemble gut_lower_v64_p32
+Dump of assembler code for function gut_lower_v64_p32:
+   0xc0022ec8 <+0>:	push	{lr}		; (str lr, [sp, #-4]!)
+   0xc0022ecc <+4>:	mov	r2, sp
+   0xc0022ed0 <+8>:	bic	r3, r2, #8128	; 0x1fc0
+   0xc0022ed4 <+12>:	bic	r3, r3, #63	; 0x3f
+   0xc0022ed8 <+16>:	ldr	r1, [r3, #8]
+   0xc0022edc <+20>:	sub	r1, r1, #1
+   0xc0022ee0 <+24>:	bl	0xc03792ac <__get_user_4>
+   0xc0022ee4 <+28>:	uxtb	r0, r3
+   0xc0022ee8 <+32>:	pop	{pc}		; (ldr pc, [sp], #4)
+End of assembler dump.
+(gdb) disassemble __get_user_4
+Dump of assembler code for function __get_user_4:
+   0xc03792ac <+0>:	adds	r2, r0, #3
+   0xc03792b0 <+4>:	sbcscc	r2, r2, r1
+   0xc03792b4 <+8>:	bcs	0xc03792fc <__get_user_bad>
+   0xc03792b8 <+12>:	ldr	r2, [r0]
+   0xc03792bc <+16>:	mov	r0, #0
+   0xc03792c0 <+20>:	bx	lr
+End of assembler dump.
 
-Lorenzo,
+Signed-off-by: Victor Kamensky <victor.kamensky@linaro.org>
+---
+ arch/arm/include/asm/uaccess.h | 18 ++++++++++++++++--
+ 1 file changed, 16 insertions(+), 2 deletions(-)
 
-Are you open to the above "workaround" given that Thunder is facing
-the current deficiency for non-MT case?
-Or is it time to introduce socket_id or something equivalent?
+diff --git a/arch/arm/include/asm/uaccess.h b/arch/arm/include/asm/uaccess.h
+index a4cd7af..69b9292 100644
+--- a/arch/arm/include/asm/uaccess.h
++++ b/arch/arm/include/asm/uaccess.h
+@@ -141,28 +141,42 @@ extern int __get_user_8(void *);
+ 	({								\
+ 		unsigned long __limit = current_thread_info()->addr_limit - 1; \
+ 		register const typeof(*(p)) __user *__p asm("r0") = (p);\
+-		register typeof(x) __r2 asm("r2");			\
+ 		register unsigned long __l asm("r1") = __limit;		\
+ 		register int __e asm("r0");				\
+ 		switch (sizeof(*(__p))) {				\
+ 		case 1:							\
++		{							\
++			register unsigned long __r2 asm("r2");		\
+ 			__get_user_x(__r2, __p, __e, __l, 1);		\
++			x = (typeof(*(p))) __r2;			\
+ 			break;						\
++		}							\
+ 		case 2:							\
++		{							\
++			register unsigned long __r2 asm("r2");		\
+ 			__get_user_x(__r2, __p, __e, __l, 2);		\
++			x = (typeof(*(p))) __r2;			\
+ 			break;						\
++		}							\
+ 		case 4:							\
++		{							\
++			register unsigned long __r2 asm("r2");		\
+ 			__get_user_x(__r2, __p, __e, __l, 4);		\
++			x = (typeof(*(p))) __r2;			\
+ 			break;						\
++		}							\
+ 		case 8:							\
++		{							\
++			register typeof(x) __r2 asm("r2");		\
+ 			if (sizeof((x)) < 8)				\
+ 				__get_user_xb(__r2, __p, __e, __l, 4);	\
+ 			else						\
+ 				__get_user_x(__r2, __p, __e, __l, 8);	\
++			x = (typeof(*(p))) __r2;			\
+ 			break;						\
++		}							\
+ 		default: __e = __get_user_bad(); break;			\
+ 		}							\
+-		x = (typeof(*(p))) __r2;				\
+ 		__e;							\
+ 	})
+ 
+-- 
+1.8.1.4
