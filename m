@@ -1,131 +1,125 @@
 From: andre.przywara@arm.com (Andre Przywara)
-Date: Thu, 21 Aug 2014 14:06:41 +0100
-Subject: [PATCH v2 00/15] KVM GICv3 emulation
-Message-ID: <1408626416-11326-1-git-send-email-andre.przywara@arm.com>
+Date: Thu, 21 Aug 2014 14:06:54 +0100
+Subject: [PATCH v2 13/15] arm/arm64: KVM: add SGI system register trapping
+In-Reply-To: <1408626416-11326-1-git-send-email-andre.przywara@arm.com>
+References: <1408626416-11326-1-git-send-email-andre.przywara@arm.com>
+Message-ID: <1408626416-11326-14-git-send-email-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is an updated version of the GICv3 guest emulation series.
-Compared to v1[1] it has been rebased on v3.17-rc1 (with quite some
-conflict resolutions done by MarcZ) and contains minor fixes
-(partially triggered by comments on the list, partially due to code
-review caused by the rebase). Also there is a new patch (09/15) with
-some refactoring to make the big split patch (10/15) smaller.
-This big patch contains now an elaborate commit message to detail
-the code move, as the diff isn't always obvious here. This part
-should be considered for removal from the patch on committing it.
+While the injection of a (virtual) inter-processor interrupt (SGI)
+on a GICv2 works by writing to a MMIO register, GICv3 uses system
+registers to trigger them.
+Trap the appropriate registers both on ARM and ARM64 machines and
+call the SGI handler function in the vGICv3 emulation code.
 
-A git repo hosting all these patches lives in the kvm-gicv3/v2 branch
-of: http://www.linux-arm.org/git?p=linux-ap.git
------
+Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+---
+ arch/arm/kvm/coproc.c       |   19 +++++++++++++++++++
+ arch/arm64/kvm/sys_regs.c   |   26 ++++++++++++++++++++++++++
+ virt/kvm/arm/vgic-v3-emul.c |    2 +-
+ 3 files changed, 46 insertions(+), 1 deletion(-)
 
-GICv3 is the ARM generic interrupt controller designed to overcome
-some limits of the prevalent GICv2. Most notably it lifts the 8-CPU
-limit. Though with recent patches from Marc there is support for
-hosts to use a GICv3, the CPU limitation still applies to KVM guests,
-since the current code emulates a GICv2 only.
-Also, GICv2 backward compatibility being optional in GICv3, a number
-of systems won't be able to run GICv2 guests.
-
-This patch series provides code to emulate a GICv3 distributor and
-redistributor for any KVM guest. It requires a GICv3 in the host to
-work. With those patches one can run guests efficiently on any GICv3
-host. It has the following features:
-- Affinity routing (support for up to 255 VCPUs, more possible)
-- System registers (as opposed to MMIO access)
-- No ITS
-- No priority support (as the GICv2 emulation)
-- No save / restore support so far (will be added soon)
-
-The first 11 patches actually refactor the current VGIC code to make
-room for a different VGIC model to be dropped in with Patch 12/15.
-The remaining patches connect the new model to the kernel backend and
-the userland facing code.
-
-The series goes on top of v3.17-rc1 and Marc's vgic-dyn series[2].
-The necessary patches for kvmtool to enable the guest's GICv3 have
-been posted here before [3], an updated version will follow as soon
-as the kvmtools tree has been updated.
-
-There was some testing on the fast model with some I/O and interrupt
-affinity shuffling in a Linux guest with a varying number of VCPUs as
-well as some testing on a Juno board (GICv2 only, to spot
-regressions).
-
-Please review and test.
-I would be grateful for people to test for GICv2 regressions also
-(so on a GICv2 host with current kvmtool/qemu), as there is quite
-some refactoring on that front.
-
-Much of the code was inspired by MarcZ, also kudos to him for doing
-the rather painful rebase on top of v3.17-rc1.
-
-Cheers,
-Andre.
-
-[1] https://lists.cs.columbia.edu/pipermail/kvmarm/2014-June/010060.html
-[2] https://git.kernel.org/cgit/linux/kernel/git/maz/arm-platforms.git/log/?h=kvm-arm64/vgic-dyn
-[3] https://lists.cs.columbia.edu/pipermail/kvmarm/2014-June/010086.html
-
-Changes v1 ... v2:
-* rebase to v3.17-rc1, caused quite some changes to the init code
-* new 9/15 patch to make 10/15 smaller
-* fix wrongly ordered cp15 register trap entry (MarcZ)
-* fix SGI broadcast (thanks to wanghaibin for spotting)
-* fix broken bailout path in kvm_vgic_create (wanghaibin)
-* check return value of init_emulation_ops() (wanghaibin)
-* fix return value check in vgic_[sg]et_attr()
-* add header inclusion guards
-* remove double definition of VCPU_NOT_ALLOCATED
-* some code move-around
-* whitespace fixes
-
-
-Andre Przywara (15):
-  arm/arm64: KVM: rework MPIDR assignment and add accessors
-  arm/arm64: KVM: pass down user space provided GIC type into vGIC code
-  arm/arm64: KVM: refactor vgic_handle_mmio() function
-  arm/arm64: KVM: wrap 64 bit MMIO accesses with two 32 bit ones
-  arm/arm64: KVM: introduce per-VM ops
-  arm/arm64: KVM: make the maximum number of vCPUs a per-VM value
-  arm/arm64: KVM: make the value of ICC_SRE_EL1 a per-VM variable
-  arm/arm64: KVM: refactor MMIO accessors
-  arm/arm64: KVM: refactor/wrap vgic_set/get_attr()
-  arm/arm64: KVM: split GICv2 specific emulation code from vgic.c
-  arm/arm64: KVM: add opaque private pointer to MMIO accessors
-  arm/arm64: KVM: add virtual GICv3 distributor emulation
-  arm/arm64: KVM: add SGI system register trapping
-  arm/arm64: KVM: enable kernel side of GICv3 emulation
-  arm/arm64: KVM: allow userland to request a virtual GICv3
-
- arch/arm/include/asm/kvm_emulate.h   |    2 +-
- arch/arm/include/asm/kvm_host.h      |    3 +
- arch/arm/kvm/Makefile                |    1 +
- arch/arm/kvm/arm.c                   |   23 +-
- arch/arm/kvm/coproc.c                |   19 +
- arch/arm/kvm/psci.c                  |   15 +-
- arch/arm64/include/asm/kvm_emulate.h |    3 +-
- arch/arm64/include/asm/kvm_host.h    |    5 +
- arch/arm64/include/uapi/asm/kvm.h    |    7 +
- arch/arm64/kernel/asm-offsets.c      |    1 +
- arch/arm64/kvm/Makefile              |    2 +
- arch/arm64/kvm/sys_regs.c            |   37 +-
- arch/arm64/kvm/vgic-v3-switch.S      |   14 +-
- include/kvm/arm_vgic.h               |   38 +-
- include/linux/irqchip/arm-gic-v3.h   |   26 +
- include/linux/kvm_host.h             |    1 +
- include/uapi/linux/kvm.h             |    1 +
- virt/kvm/arm/vgic-v2-emul.c          |  803 +++++++++++++++++++++++++++
- virt/kvm/arm/vgic-v2.c               |   22 +-
- virt/kvm/arm/vgic-v3-emul.c          |  899 ++++++++++++++++++++++++++++++
- virt/kvm/arm/vgic-v3.c               |  187 +++++--
- virt/kvm/arm/vgic.c                  |  992 +++++++---------------------------
- virt/kvm/arm/vgic.h                  |  126 +++++
- virt/kvm/kvm_main.c                  |    3 +
- 24 files changed, 2361 insertions(+), 869 deletions(-)
- create mode 100644 virt/kvm/arm/vgic-v2-emul.c
- create mode 100644 virt/kvm/arm/vgic-v3-emul.c
- create mode 100644 virt/kvm/arm/vgic.h
-
+diff --git a/arch/arm/kvm/coproc.c b/arch/arm/kvm/coproc.c
+index 37a0fe1..1cd049f 100644
+--- a/arch/arm/kvm/coproc.c
++++ b/arch/arm/kvm/coproc.c
+@@ -230,6 +230,22 @@ done:
+ 	return true;
+ }
+ 
++static bool access_gic_sgi(struct kvm_vcpu *vcpu,
++			   const struct coproc_params *p,
++			   const struct coproc_reg *r)
++{
++	u64 val;
++
++	if (!p->is_write)
++		return read_from_write_only(vcpu, p);
++
++	val = *vcpu_reg(vcpu, p->Rt1);
++	val |= (u64)*vcpu_reg(vcpu, p->Rt2) << 32;
++	vgic_v3_dispatch_sgi(vcpu, val);
++
++	return true;
++}
++
+ /*
+  * Generic accessor for VM registers. Only called as long as HCR_TVM
+  * is set.
+@@ -401,6 +417,9 @@ static const struct coproc_reg cp15_regs[] = {
+ 	{ CRn(10), CRm( 3), Op1( 0), Op2( 1), is32,
+ 			access_vm_reg, reset_unknown, c10_AMAIR1},
+ 
++	/* ICC_SGI1R */
++	{ CRm64(12), Op1( 0), is64, access_gic_sgi},
++
+ 	/* VBAR: swapped by interrupt.S. */
+ 	{ CRn(12), CRm( 0), Op1( 0), Op2( 0), is32,
+ 			NULL, reset_val, c12_VBAR, 0x00000000 },
+diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
+index a79538a..befbcfd 100644
+--- a/arch/arm64/kvm/sys_regs.c
++++ b/arch/arm64/kvm/sys_regs.c
+@@ -165,6 +165,27 @@ static bool access_sctlr(struct kvm_vcpu *vcpu,
+ 	return true;
+ }
+ 
++/*
++ * Trapping on the GICv3 SGI system register.
++ * Forward the request to the VGIC emulation.
++ * The cp15_64 code makes sure this automatically works
++ * for both AArch64 and AArch32 accesses.
++ */
++static bool access_gic_sgi(struct kvm_vcpu *vcpu,
++			   const struct sys_reg_params *p,
++			   const struct sys_reg_desc *r)
++{
++	u64 val;
++
++	if (!p->is_write)
++		return read_from_write_only(vcpu, p);
++
++	val = *vcpu_reg(vcpu, p->Rt);
++	vgic_v3_dispatch_sgi(vcpu, val);
++
++	return true;
++}
++
+ static bool trap_raz_wi(struct kvm_vcpu *vcpu,
+ 			const struct sys_reg_params *p,
+ 			const struct sys_reg_desc *r)
+@@ -431,6 +452,9 @@ static const struct sys_reg_desc sys_reg_descs[] = {
+ 	/* VBAR_EL1 */
+ 	{ Op0(0b11), Op1(0b000), CRn(0b1100), CRm(0b0000), Op2(0b000),
+ 	  NULL, reset_val, VBAR_EL1, 0 },
++	/* ICC_SGI1R_EL1 */
++	{ Op0(0b11), Op1(0b000), CRn(0b1100), CRm(0b1011), Op2(0b101),
++	  access_gic_sgi },
+ 	/* CONTEXTIDR_EL1 */
+ 	{ Op0(0b11), Op1(0b000), CRn(0b1101), CRm(0b0000), Op2(0b001),
+ 	  access_vm_reg, reset_val, CONTEXTIDR_EL1, 0 },
+@@ -659,6 +683,8 @@ static const struct sys_reg_desc cp14_64_regs[] = {
+  * register).
+  */
+ static const struct sys_reg_desc cp15_regs[] = {
++	{ Op1( 0), CRn( 0), CRm(12), Op2( 0), access_gic_sgi },
++
+ 	{ Op1( 0), CRn( 1), CRm( 0), Op2( 0), access_sctlr, NULL, c1_SCTLR },
+ 	{ Op1( 0), CRn( 2), CRm( 0), Op2( 0), access_vm_reg, NULL, c2_TTBR0 },
+ 	{ Op1( 0), CRn( 2), CRm( 0), Op2( 1), access_vm_reg, NULL, c2_TTBR1 },
+diff --git a/virt/kvm/arm/vgic-v3-emul.c b/virt/kvm/arm/vgic-v3-emul.c
+index 82ca1b5..ac5c5ee 100644
+--- a/virt/kvm/arm/vgic-v3-emul.c
++++ b/virt/kvm/arm/vgic-v3-emul.c
+@@ -802,7 +802,7 @@ void vgic_v3_dispatch_sgi(struct kvm_vcpu *vcpu, u64 reg)
+ 	 */
+ 	spin_lock(&dist->lock);
+ 	kvm_for_each_vcpu(c, c_vcpu, kvm) {
+-		if (target_cpus == 0)
++		if (!mode && target_cpus == 0)
+ 			break;
+ 		if (mode && c == vcpu_id)       /* not to myself */
+ 			continue;
 -- 
 1.7.9.5
