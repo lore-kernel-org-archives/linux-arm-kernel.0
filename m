@@ -1,63 +1,117 @@
-From: mperttunen@nvidia.com (Mikko Perttunen)
-Date: Thu, 21 Aug 2014 10:39:53 +0300
-Subject: [PATCH v3 4/4] thermal: Add Tegra SOCTHERM thermal management
- driver
-In-Reply-To: <53F4FC18.90804@wwwdotorg.org>
-References: <1407320706-17440-1-git-send-email-mperttunen@nvidia.com>
- <1407320706-17440-5-git-send-email-mperttunen@nvidia.com>
- <53F4FC18.90804@wwwdotorg.org>
-Message-ID: <53F5A249.7030008@nvidia.com>
+From: leoy@marvell.com (Leo Yan)
+Date: Thu, 21 Aug 2014 15:46:51 +0800
+Subject: [RFC PATCH] clockevents: re-calculate event when cpu enter idle
+Message-ID: <1408607211-13027-1-git-send-email-leoy@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+We observed the redundant interrupts for broadcast timer, pls see
+below flow:
 
+1. Process A starts a hrtimer with 100ms timeout, then Process A will
+   wait on the waitqueue to sleep;
+2. The CPU which Process A runs on will enter idle and call notify
+   CLOCK_EVT_NOTIFY_BROADCAST_ENTER, so the CPU will shutdown its local
+   and set broadcast timer's next event with delta for 100ms timeout;
+3. After 70ms later, the CPU is waken up by other peripheral's interrupt
+   and Process A will be waken up as well; Process A will cancel the hrtimer
+   at this point, kernel will remove the timer event from the event queue
+   but it will not really disable broadcast timer;
+4. So after 30ms later, the broadcast timer interrupt will be triggered
+   even though the timer has been cancelled by s/w in step 3.
 
-On 20/08/14 22:50, Stephen Warren wrote:
-> On 08/06/2014 04:25 AM, Mikko Perttunen wrote:
->> This adds support for the Tegra SOCTHERM thermal sensing and management
->> system found in the Tegra124 system-on-chip. This initial driver supports
->> temperature polling for four thermal zones.
->
-> Since both the Tegra DT patches and this driver all rely on a new header
-> added by patch 1/4, I guess this whole series needs to be applied in one
-> branch. I think it makes sense to apply it to the Tegra since it's
-> likely to have more conflicts there and fewer in the thermal
-> maintainer's tree. It can be applied in a topic branch that can be
-> merged into the thermal maintainer's tree if required to resolve
-> conflicts there.
->
-> Rui, Eduardo, do you agree?
->
->> diff --git a/drivers/thermal/tegra_soctherm.c
->> b/drivers/thermal/tegra_soctherm.c
->
->> +static struct of_device_id tegra_soctherm_of_match[] = {
->> +    { .compatible = "nvidia,tegra124-soctherm" },
->> +    { },
->> +};
->> +MODULE_DEVICE_TABLE(of, tegra_soctherm_of_match);
->> +
->> +static int thermctl_temp_offsets[] = {
->> +    SENSOR_TEMP1, SENSOR_TEMP2, SENSOR_TEMP1, SENSOR_TEMP2
->> +};
->> +
->> +static int thermctl_temp_shifts[] = {
->> +    16, 16, 0, 0
->> +};
->
-> Can any/all of those be const?
+To fix this issue, this patch will check the situation when the cpu
+enter and exit idle. So every time iterate the related cpus to calculate
+the correct broadcast event value.
 
-Yes!
+Signed-off-by: Leo Yan <leoy@marvell.com>
+---
+ kernel/time/tick-broadcast.c | 56 +++++++++++++++++++++++++++++++++++++-------
+ 1 file changed, 48 insertions(+), 8 deletions(-)
 
->
-> I don't pretend to know anything about the soctherm HW, but I see no
-> gross issues in the code structure, so,
-> Acked-by: Stephen Warren <swarren@nvidia.com>
-
-Thanks; I'll need to do a v5 anyway, so I'll fix the things you 
-mentioned while doing it.
-
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-tegra" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+diff --git a/kernel/time/tick-broadcast.c b/kernel/time/tick-broadcast.c
+index 64c5990..1dfe08e 100644
+--- a/kernel/time/tick-broadcast.c
++++ b/kernel/time/tick-broadcast.c
+@@ -679,6 +679,30 @@ static void broadcast_move_bc(int deadcpu)
+ 	clockevents_program_event(bc, bc->next_event, 1);
+ }
+ 
++static void tick_broadcast_oneshot_get_earlier_event(void)
++{
++	struct clock_event_device *bc;
++	struct tick_device *td;
++	ktime_t now, next_event;
++	int cpu, next_cpu = 0;
++
++	next_event.tv64 = KTIME_MAX;
++
++	/* iterate all expired events */
++	for_each_cpu(cpu, tick_broadcast_oneshot_mask) {
++
++		td = &per_cpu(tick_cpu_device, cpu);
++		if (td->evtdev->next_event.tv64 < next_event.tv64) {
++			next_event.tv64 = td->evtdev->next_event.tv64;
++			next_cpu = cpu;
++		}
++	}
++
++	bc = tick_broadcast_device.evtdev;
++	if (next_event.tv64 != KTIME_MAX)
++		tick_broadcast_set_event(bc, next_cpu, next_event, 0);
++}
++
+ /*
+  * Powerstate information: The system enters/leaves a state, where
+  * affected devices might stop
+@@ -717,17 +741,32 @@ int tick_broadcast_oneshot_control(unsigned long reason)
+ 		if (!cpumask_test_and_set_cpu(cpu, tick_broadcast_oneshot_mask)) {
+ 			WARN_ON_ONCE(cpumask_test_cpu(cpu, tick_broadcast_pending_mask));
+ 			broadcast_shutdown_local(bc, dev);
++
++			/*
++			 * We only reprogram the broadcast timer if we did not
++			 * mark ourself in the force mask; If the current CPU
++			 * is in the force mask, then we are going to be woken
++			 * by the IPI right away.
++			 */
++			if (cpumask_test_cpu(cpu, tick_broadcast_force_mask))
++				goto out;
++
+ 			/*
+-			 * We only reprogram the broadcast timer if we
+-			 * did not mark ourself in the force mask and
+-			 * if the cpu local event is earlier than the
+-			 * broadcast event. If the current CPU is in
+-			 * the force mask, then we are going to be
+-			 * woken by the IPI right away.
++			 * Reprogram the broadcast timer if the cpu local event
++			 * is earlier than the broadcast event;
+ 			 */
+-			if (!cpumask_test_cpu(cpu, tick_broadcast_force_mask) &&
+-			    dev->next_event.tv64 < bc->next_event.tv64)
++			if (dev->next_event.tv64 < bc->next_event.tv64) {
+ 				tick_broadcast_set_event(bc, cpu, dev->next_event, 1);
++				goto out;
++			}
++
++			/*
++			 * It's possible the cpu has cancelled the timer which
++			 * has set the broadcast event at last time, so
++			 * re-calculate the broadcast timer according to all
++			 * related cpus' expire events.
++			 */
++			tick_broadcast_oneshot_get_earlier_event();
+ 		}
+ 		/*
+ 		 * If the current CPU owns the hrtimer broadcast
+@@ -802,6 +841,7 @@ int tick_broadcast_oneshot_control(unsigned long reason)
+ 			 * the cpu local timer device.
+ 			 */
+ 			tick_program_event(dev->next_event, 1);
++			tick_broadcast_oneshot_get_earlier_event();
+ 		}
+ 	}
+ out:
+-- 
+1.9.1
