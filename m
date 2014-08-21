@@ -1,44 +1,56 @@
-From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
-Date: Thu, 21 Aug 2014 09:10:08 +0200
-Subject: [PATCH v7 0/8] Per-user clock constraints
-In-Reply-To: <20140821021200.GB11103@lunn.ch>
-References: <1408375833-10703-1-git-send-email-tomeu.vizoso@collabora.com>
- <20140821021200.GB11103@lunn.ch>
-Message-ID: <CAAObsKBUiNu-be2AvjedqoPrFNSTdcSA7nGg4PWisJR1Ry_gwA@mail.gmail.com>
+From: gabriel.fernandez@linaro.org (Gabriel Fernandez)
+Date: Thu, 21 Aug 2014 09:12:06 +0200
+Subject: [PATCH 2/5] phy: miphy28lp: Add MiPHY28lp header file for DT x
+ Driver defines
+In-Reply-To: <53F4B663.90400@ti.com>
+References: <1407944075-8093-1-git-send-email-gabriel.fernandez@linaro.org>
+ <1407944075-8093-3-git-send-email-gabriel.fernandez@linaro.org>
+ <53F4B663.90400@ti.com>
+Message-ID: <CAG374jC5qYWZgsaUZjgp_YU8uYqwxg8SSfzEr8OTVWNvEZXUQQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21 August 2014 04:12, Andrew Lunn <andrew@lunn.ch> wrote:
-> On Mon, Aug 18, 2014 at 05:30:26PM +0200, Tomeu Vizoso wrote:
->> Hi,
+Hi Kishon,
+
+Okay, good.
+
+
+BR
+Gabriel
+
+On 20 August 2014 16:53, Kishon Vijay Abraham I <kishon@ti.com> wrote:
+> Hi,
+>
+> On Wednesday 13 August 2014 09:04 PM, Gabriel FERNANDEZ wrote:
+>> This provides the shared header file which will be reference from both
+>> the MiPHY28lp driver and its associated Device Tree node(s).
 >>
->> in this v7 of the patchset I have only rebased on top of 3.17rc1, with no other
->> changes. I have had to do a fair amount of fixing due to the rebase, more
->> details below. Follows the original cover letter blurb:
+>> Signed-off-by: alexandre torgue <alexandre.torgue@st.com>
+>> Signed-off-by: Gabriel Fernandez <gabriel.fernandez@linaro.org>
+>> ---
+>>  include/dt-bindings/phy/phy-miphy28lp.h | 12 ++++++++++++
+>>  1 file changed, 12 insertions(+)
+>>  create mode 100644 include/dt-bindings/phy/phy-miphy28lp.h
+>>
+>> diff --git a/include/dt-bindings/phy/phy-miphy28lp.h b/include/dt-bindings/phy/phy-miphy28lp.h
+>> new file mode 100644
+>> index 0000000..7cf9bce
+>> --- /dev/null
+>> +++ b/include/dt-bindings/phy/phy-miphy28lp.h
+>> @@ -0,0 +1,12 @@
+>> +/*
+>> + * This header provides constants for the phy framework
+>> + * based on the STMicroelectronics miph28lp.
+>> + */
+>> +#ifndef _DT_BINDINGS_PHY_MIPHY28LP
+>> +#define _DT_BINDINGS_PHY_MIPHY28LP
+>> +
+>> +#define MIPHY_TYPE_SATA              1
+>> +#define MIPHY_TYPE_PCIE              2
+>> +#define MIPHY_TYPE_USB               3
 >
-> Hi Tomeu
+> I think we should create a common file for phy so that all user's need not
+> create a separate copy of the same thing.
 >
-> I would like to test this patchset, but patch 5 never made it to the
-> list. Do you have a git tree i can clone?
-
-Sure:
-
-http://cgit.collabora.com/git/user/tomeu/linux.git/log/?h=clk-refactoring-7
-
-Though it seems to have made into at least one mailing list (the
-others seem to have rejected it because of either its size, or the
-number of recipients):
-
-http://article.gmane.org/gmane.linux.ports.ppc64.devel/104392
-
-Thanks for the interest!
-
-Tomeu
-
 > Thanks
->         Andrew
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
+> Kishon
