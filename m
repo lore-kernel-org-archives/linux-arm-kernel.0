@@ -1,42 +1,54 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Thu, 21 Aug 2014 12:30:44 -0700
-Subject: [PATCH v7 02/11] power/restart: Call machine_restart instead of
- arm_pm_restart
-In-Reply-To: <20140821044230.GA14609@roeck-us.net>
-References: <1408495538-27480-1-git-send-email-linux@roeck-us.net>
- <1408495538-27480-3-git-send-email-linux@roeck-us.net>
- <CAD=FV=Va8UrpDCLjFQJ6j-K0C3v7NPfifaJGtReCkUEu3x0mLg@mail.gmail.com>
- <20140821044230.GA14609@roeck-us.net>
-Message-ID: <CAD=FV=XMBegDcPWM+sG4S64ZC6KEzKA-ykpEJrcGo2db+P0VLg@mail.gmail.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Thu, 21 Aug 2014 23:32:47 +0400
+Subject: [PATCH 1/2] doc: dt/bindings: input: introduce TI DRV2667 haptic
+ driver description
+In-Reply-To: <00FC9A978A94B7418C33AFAE8A35ED49DF0ABE@DFLE09.ent.ti.com>
+References: <1408645143-25690-1-git-send-email-dmurphy@ti.com>
+ <1408645143-25690-2-git-send-email-dmurphy@ti.com>
+ <53F642AF.3070200@cogentembedded.com>
+ <00FC9A978A94B7418C33AFAE8A35ED49DF0ABE@DFLE09.ent.ti.com>
+Message-ID: <53F6495F.9050204@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Guenter,
+On 08/21/2014 11:14 PM, Murphy, Dan wrote:
 
-On Wed, Aug 20, 2014 at 9:42 PM, Guenter Roeck <linux@roeck-us.net> wrote:
-> On Wed, Aug 20, 2014 at 09:10:31PM -0700, Doug Anderson wrote:
->> Guenter,
->>
->> On Tue, Aug 19, 2014 at 5:45 PM, Guenter Roeck <linux@roeck-us.net> wrote:
->> > machine_restart is supported on non-ARM platforms, and and ultimately calls
->> > arm_pm_restart, so dont call arm_pm_restart directly but use the more
->> > generic function.
->> >
->> > Cc: Russell King <linux@arm.linux.org.uk>
->>
->> Do you need to submit this to his patch tracker to get him to pick it
->> up?  How are you envisioning that this series land?  It crosses a lot
->> of boundaries so I guess will need a reasonable amount of coordination
->> between maintainers...
->>
->>
-> If I get an Acked-by: from all maintainers, I could send a pull request
-> to Linus directly. How do I send a patch to Russell's patch tracker ?
-> I thought I copied all mailing lists suggested by get_maintainer.pl,
-> but maybe I missed one.
+[...]
 
-Ah, OK.  Perhaps it's best to ignore me, then.  ;)  FYI: Russell's
-Patch System is at <http://www.arm.linux.org.uk/developer/patches/>
-and is used for getting individual patches into branches maintained by
-Russel.  If you're just going to send a pull request for the series
-then I don't think you need it.
+>>> DRV2667 is a haptic/vibrator driver for Linear Resonant Actuators.
+>>> Adding dt binding for this part
+
+>>> Signed-off-by: Dan Murphy <dmurphy@ti.com>
+>>> ---
+>>>    .../devicetree/bindings/input/ti,drv2667.txt       |   18 ++++++++++++++++++
+>>>    1 file changed, 18 insertions(+)
+>>>    create mode 100644 Documentation/devicetree/bindings/input/ti,drv2667.txt
+
+>>> diff --git a/Documentation/devicetree/bindings/input/ti,drv2667.txt b/Documentation/devicetree/bindings/input/ti,drv2667.txt
+>>> new file mode 100644
+>>> index 0000000..525216d
+>>> --- /dev/null
+>>> +++ b/Documentation/devicetree/bindings/input/ti,drv2667.txt
+>>> @@ -0,0 +1,18 @@
+>>> +Texas Instruments - drv2667 Haptics driver
+>>> +
+>>> +The drv2667 uses serial control bus communicates through I2C protocols
+>>> +
+>>> +Required properties:
+>>> +	- compatible - "ti,drv2667" - DRV2667
+>>> +	- reg -  I2C slave address
+>>> +	- vbat-supply - Required supply regulator
+>>> +
+>>> +Example:
+>>> +
+>>> +drv2667: drv2667 at 59 {
+
+>>      The ePAPR standard [1] has something to say on this matter:
+
+> What is this reference?  Did not know this existed so wanted to read up on it.
+
+    Sorry, forgot to paste the link. :-<
+
+[1] http://www.power.org/resources/downloads/Power_ePAPR_APPROVED_v1.0.pdf
+
+WBR, Sergei
