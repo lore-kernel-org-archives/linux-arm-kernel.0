@@ -1,88 +1,35 @@
-From: boris.brezillon@free-electrons.com (Boris BREZILLON)
-Date: Thu, 21 Aug 2014 19:26:33 +0200
-Subject: [PATCH v4 00/11] drm: add support for Atmel HLCDC Display
- Controller
-In-Reply-To: <2138720.5GSxsvjVxS@avalon>
-References: <1406034695-15534-1-git-send-email-boris.brezillon@free-electrons.com>
- <20140821095202.GA21848@ulmo> <20140821150600.37788d82@bbrezillon>
- <2138720.5GSxsvjVxS@avalon>
-Message-ID: <20140821192633.69f6b21b@bbrezillon>
+From: dmurphy@ti.com (Murphy, Dan)
+Date: Thu, 21 Aug 2014 17:32:00 +0000
+Subject: [PATCH V2 2/2] Input: misc: introduce palmas-pwrbutton
+References: <1408392810-16011-1-git-send-email-nm@ti.com>
+ <1408636935-29515-1-git-send-email-nm@ti.com>
+ <1408636935-29515-3-git-send-email-nm@ti.com>
+ <00FC9A978A94B7418C33AFAE8A35ED49DF0662@DFLE09.ent.ti.com>
+ <53F62A2B.6010208@ti.com>
+Message-ID: <00FC9A978A94B7418C33AFAE8A35ED49DF07A2@DFLE09.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Laurent,
-
-On Thu, 21 Aug 2014 19:08:53 +0200
-Laurent Pinchart <laurent.pinchart@ideasonboard.com> wrote:
-
-[...]
-
-> > >> 
-> > >> While this could be acceptable when all drivers are statically linked
-> > >> in the kernel, it might be problematic when you're using modules,
-> > >> meaning that you won't be able to display anything on your LCD panel
-> > >> until your HDMI bridge module has been loaded.
-> > > 
-> > > No. HDMI should be using proper hotplugging anyway, hence it should be
-> > > always be loaded anyway. You're in for a world of pain if you think you
-> > > can run DRM with a driver that's composed of separate kernel modules.
-> > 
-> > I was talking about the external RGB to HDMI encoder, should the driver
-> > for this encoder (which is not on On Chip block) be compiled
-> > statically too ?
+On 08/21/2014 12:19 PM, Menon, Nishanth wrote:
+> On 08/21/2014 11:59 AM, Murphy, Dan wrote:
+> [...]
+> Ooops.. missed answering one addition statement:
 > 
-> Given the move to multiplatform kernels we need to aim for as few modules 
-> compiled in as possible. I'd say this includes HDMI encoders, panels and 
-> display controllers.
+>>> +	of_property_read_u32(np, "ti,palmas-long-press-seconds", &val);
+>>
+>> Probably should check the return to make sure the value exists and that is is
+>> within an expected range.
+> It is an optional parameter and may not exist in dt. when it does
+> exist, the logic tries to do a best match (this is the for loop in the
+> logic just below).
 > 
-> > > Also if you don't want to use deferred probe, then you're in for the
-> > > full hotplugging panel dance and that implies that you need to fix a
-> > > bunch of things in DRM (one being the framebuffer console instantiation
-> > > that I referred to in the other thread).
-> > 
-> > For now, I wait until there is a device connected on the RGB connector
-> > (connector status set to connector_status_connected) before creating an
-> > fbdev. It might not be the cleanest way to solve this issue, but it
-> > works :-).
-> 
-> Do you create a new drm_encoder at runtime for the HDMI encoder when it 
-> appears ? I thought the DRM core and API were not able to correctly cope with 
-> that.
 
-I haven't started to work on the HDMI encoder yet, and ATM I only have
-a single connector (which is true from an HW POV), which is then bound
-to an LCD panel (the only type of remote endpoint I currently support).
+The issue is val might be returned as a negative which will then proceed to
+set the config->long_press_time_val to the lowest time value which then overrides
+your initial setting of config->long_press_time_val = ARRAY_SIZE(lpk_times) - 1;
 
-BTW, I wonder how my use case should be represented in the DRM
-subsystem. As I said, from an HW POV I only have one RGB (or whatever
-name you choose for it) connector. But on such kind of connectors you
-can connect several output devices (panels, encoders, ...).
-And in my case I have 2 devices on the same RGB connector: a panel and
-an RGB to HDMI converter.
-
-> 
-> > > You also can't be using the current device tree bindings because they all
-> > > assume a dependency from the display controller/output to the panel. For
-> > > hotplugging you'd need the dependency the other way around (the panel
-> > > needs to refer to the output by phandle).
-> > 
-> > Here [1] is a proposal for notification support in the drm_panel
-> > infrastructure (which is not that complicated), and here [2] is how
-> > I use it in my atmel-hlcdc driver to generate hotplug events.
-> 
-> Is there a way we could use the component framework for that ? I know that 
-> partial notification isn't supported at the moment, but Russell agreed it was 
-> a real use case that should be implemented at some point.
-
-I'll give it a try.
-
-Best Regards,
-
-Boris
-
-
+Dan
 
 -- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+------------------
+Dan Murphy
