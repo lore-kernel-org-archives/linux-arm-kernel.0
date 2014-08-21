@@ -1,53 +1,68 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 21 Aug 2014 10:32:55 +0100
-Subject: CMA region and highmem
-In-Reply-To: <CAD8Lp47W9UcA7CHSK9xia_b9opLv-5wi_9Omj2DThRo4wYkcNw@mail.gmail.com>
-References: <20140813191811.GP30401@n2100.arm.linux.org.uk>
- <53F44858.2070906@samsung.com>
- <CAD8Lp47W9UcA7CHSK9xia_b9opLv-5wi_9Omj2DThRo4wYkcNw@mail.gmail.com>
-Message-ID: <20140821093255.GJ30401@n2100.arm.linux.org.uk>
+From: ipaton0@gmail.com (Iain Paton)
+Date: Thu, 21 Aug 2014 10:39:09 +0100
+Subject: Oops: 17 SMP ARM (v3.16-rc2)
+In-Reply-To: <53F2E89B.80009@gmail.com>
+References: <20140626151424.GT32514@n2100.arm.linux.org.uk>
+ <20140627163108.GP32514@n2100.arm.linux.org.uk>
+ <C4A61A5CA4AD2246942F4BA6F20ACB8043575072@ALVA-EXMB04.alv.autoliv.int>
+ <20140806095012.GN30282@n2100.arm.linux.org.uk>
+ <C4A61A5CA4AD2246942F4BA6F20ACB8043575172@ALVA-EXMB04.alv.autoliv.int>
+ <20140806125550.GO30282@n2100.arm.linux.org.uk>
+ <C4A61A5CA4AD2246942F4BA6F20ACB804357526C@ALVA-EXMB04.alv.autoliv.int>
+ <20140807121248.GY30282@n2100.arm.linux.org.uk>
+ <20140808180900.GG30282@n2100.arm.linux.org.uk>
+ <C4A61A5CA4AD2246942F4BA6F20ACB8043576356@ALVA-EXMB04.alv.autoliv.int>
+ <CAOMZO5B8GR+ABBoJ=dJcFqw3Wagfaip7HM+C1FTz+aE4CmqiPw@mail.gmail.com>
+ <C4A61A5CA4AD2246942F4BA6F20ACB80435776D3@ALVA-EXMB04.alv.autoliv.int>
+ <CAOMZO5B7FgzB7ThVyV2Vk7wTwYgjRWjEnkkAN5uwwKMaBKq1yg@mail.gmail.com>
+ <C4A61A5CA4AD2246942F4BA6F20ACB8043577770@ALVA-EXMB04.alv.autoliv.int>
+ <53F11FF6.8030303@gmail.com>
+ <CAOMZO5CDvQDD7gVLFStwv4MPrUyqZE3sEDZwb0gukkXujYG-6Q@mail.gmail.com>
+ <53F2E89B.80009@gmail.com>
+Message-ID: <53F5BE3D.5070209@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 21, 2014 at 10:22:35AM +0100, Daniel Drake wrote:
-> On Wed, Aug 20, 2014 at 8:03 AM, Marek Szyprowski
-> <m.szyprowski@samsung.com> wrote:
-> > There is no direct dependecy on low-mem. It was rather a heritage of initial
-> > CMA implementation, which by design worked only with lowmem (there was no
-> > code to allocate kernel virtual mappings from vmalloc range). The only
-> > requirement about CMA regions is to put them entirely either in lowmem or
-> > in highmem. I will prepare a patch swtiching default CMA region to highmem
-> > if such is available and defined region fits into it.
+On 19/08/14 07:03, Iain Paton wrote:
+> On 17/08/14 22:46, Fabio Estevam wrote:
+>> Iain,
+>>
+>> On Sun, Aug 17, 2014 at 6:34 PM, Iain Paton <ipaton0@gmail.com> wrote:
+>>> On 15/08/14 06:42, Mattis Lorentzon wrote:
+>>>
+>>>> We mostly run SSH with benchmarks using NFS, it can probably be
+>>>> triggered by using only SSH with the following loop:
+>>>>
+>>>> # while : ; do ssh arm-card date; done
+>>>
+>>> Mattis,
+>>>
+>>> What sort of time does it take for you to see a problem?
+>>>
+>>> I've been running the above for nearly two days on 3.16.0 on a board
+>>> with fec interrupts routed through gpio_6 and haven't seen a hint of
+>>> a problem.
+>>
+>> Thanks for testing.
+>>
+>> Which mx6 board have you used on this test?
 > 
-> Just curious, to complete my understanding here...
+> It's currently pointed at a RIoTboard (atheros phy) but I'm happy to 
+> try it against both a Sabre-Lite and a Wandboard B1, all running the 
+> same kernel binary, as well. 
 > 
-> If the CMA region is now moved into highmem, when memory is allocated
-> with the DMA API, such memory will now use up vmalloc space. Is that
-> right?
+> I'm interested enough in why different people get different results 
+> with this that I'll put some time towards testing to try to help 
+> narrow down the cause.
 > 
-> In the default 3G/1G split configuration, of the 1G, 240mb is vmalloc
-> space by default (and 760mb is lowmem).
-> 
-> So, lets say your patch moves CMA into highmem, and I build a kernel
-> with a 512mb CMA allocation.
-> 
-> Now whenever anyone uses the DMA API to allocate from CMA, it will
-> only be able to allocate a maximum of 240mb, later allocations will
-> then fail due to lack of vmalloc space. Right?
-> 
-> Of course, vmalloc space can be increased, but only at the expenses of
-> reducing lowmem.
 
-Correct.  So, if you need more space than is available, the options are:
+two and a half days of running this against both a sabre-lite and a 
+wandboard quad B1 and I still have no reason to think there's any 
+sort of a problem.
 
-- use an API which does not map into virtual space when it is not required.
-  (Unfortunately, the DMA API assumes that if you want DMA memory, you
-  also want it mapped as well.)  This avoids unnecessary wastage of kernel
-  memory space.
+Up to now, my testing has been done with my own config, I'll now
+repeat the whole thing using the config Mattis posted to see if 
+I can reproduce it that way.
 
-- reduce PAGE_OFFSET to give yourself more kernel memory space at the
-  expense of reduced userspace.
-
--- 
-FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
-according to speedtest.net.
+Suggestions on a better / easier / quicker way to reproduce it are 
+welcome.
