@@ -1,5 +1,5 @@
-From: boris.brezillon@free-electrons.com (Boris BREZILLON)
-Date: Thu, 21 Aug 2014 11:49:21 +0200
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Thu, 21 Aug 2014 11:52:03 +0200
 Subject: [PATCH v4 00/11] drm: add support for Atmel HLCDC Display
  Controller
 In-Reply-To: <20140821114159.319e741b@bbrezillon>
@@ -7,13 +7,11 @@ References: <1406034695-15534-1-git-send-email-boris.brezillon@free-electrons.co
  <20140821081619.GZ2452@ldesroches-Latitude-E6320>
  <20140821103706.2349915d@bbrezillon> <20140821090406.GA13733@ulmo>
  <20140821114159.319e741b@bbrezillon>
-Message-ID: <20140821114921.3a91eb1b@bbrezillon>
+Message-ID: <20140821095202.GA21848@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 21 Aug 2014 11:41:59 +0200
-Boris BREZILLON <boris.brezillon@free-electrons.com> wrote:
-
+On Thu, Aug 21, 2014 at 11:41:59AM +0200, Boris BREZILLON wrote:
 > On Thu, 21 Aug 2014 11:04:07 +0200
 > Thierry Reding <thierry.reding@gmail.com> wrote:
 > 
@@ -68,7 +66,20 @@ Boris BREZILLON <boris.brezillon@free-electrons.com> wrote:
 > in the kernel, it might be problematic when you're using modules,
 > meaning that you won't be able to display anything on your LCD panel
 > until your HDMI bridge module has been loaded.
-> 
+
+No. HDMI should be using proper hotplugging anyway, hence it should be
+always be loaded anyway. You're in for a world of pain if you think you
+can run DRM with a driver that's composed of separate kernel modules.
+
+Also if you don't want to use deferred probe, then you're in for the
+full hotplugging panel dance and that implies that you need to fix a
+bunch of things in DRM (one being the framebuffer console instantiation
+that I referred to in the other thread). You also can't be using the
+current device tree bindings because they all assume a dependency from
+the display controller/output to the panel. For hotplugging you'd need
+the dependency the other way around (the panel needs to refer to the
+output by phandle).
+
 > > That
 > > will still cause some delay before everything gets set up, but hopefully
 > > less than what you're seeing now. There's also another thread where this
@@ -77,17 +88,13 @@ Boris BREZILLON <boris.brezillon@free-electrons.com> wrote:
 > 
 > Could you point this thread out to me please ?
 
-Sorry, I didn't check my emails before asking this :-).
+I Cc'ed you on it.
 
-> 
-> Best Regards,
-> 
-> Boris
-> 
-
-
-
--- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140821/b2a2b1e8/attachment.sig>
