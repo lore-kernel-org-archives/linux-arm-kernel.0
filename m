@@ -1,28 +1,33 @@
-From: edubezval@gmail.com (Eduardo Valentin)
-Date: Thu, 21 Aug 2014 12:01:29 -0400
-Subject: [PATCH v5 0/4] Tegra124 soctherm driver
-In-Reply-To: <20140821122011.GA99564@sandfort.unics.fi>
-References: <1408616242-21009-1-git-send-email-mperttunen@nvidia.com>
- <20140821122011.GA99564@sandfort.unics.fi>
-Message-ID: <20140821160127.GA17621@developer>
+From: nm@ti.com (Nishanth Menon)
+Date: Thu, 21 Aug 2014 11:02:13 -0500
+Subject: [PATCH V2 0/2] Input: palmas: add support for palmas power button
+In-Reply-To: <1408392810-16011-1-git-send-email-nm@ti.com>
+References: <1408392810-16011-1-git-send-email-nm@ti.com>
+Message-ID: <1408636935-29515-1-git-send-email-nm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Juha-Matti,
+Many Palmas PMIC variants have support for power button feature. This
+feature depends on certain One Time Program (OTP) and board pull
+configurations (POWERHOLD signal). However, on many platforms such
+as DRA72-evm, OMAP5-uevm, this may be used to generate input events
+similar to twl4030-pwrbutton.c
 
-On Thu, Aug 21, 2014 at 03:20:11PM +0300, Juha-Matti Tilli wrote:
-> On Thu, Aug 21, 2014 at 01:17:18PM +0300, Mikko Perttunen wrote:
-> > this series adds support for the thermal monitoring features of the
-> > soctherm unit on the Tegra124 SoC. 
-> 
-> For all patches in this series:
-> 
-> Reviewed-by: Juha-Matti Tilli <jtilli@nvidia.com>
-> Tested-by: Juha-Matti Tilli <jtilli@nvidia.com>
+Series is based on v3.17-rc1
 
-I suppose the 4 C to 5 C difference is not seen anymore in this version,
-right?
+V2 of the series incorporating comments from http://marc.info/?l=linux-input&m=140839287431882&w=2
 
-Cheers,
+Nishanth Menon (2):
+  doc: dt/bindings: input: introduce palmas power button description
+  Input: misc: introduce palmas-pwrbutton
 
-Eduardo
+ .../bindings/input/ti,palmas-pwrbutton.txt         |   36 ++
+ drivers/input/misc/Kconfig                         |   10 +
+ drivers/input/misc/Makefile                        |    1 +
+ drivers/input/misc/palmas-pwrbutton.c              |  356 ++++++++++++++++++++
+ 4 files changed, 403 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/input/ti,palmas-pwrbutton.txt
+ create mode 100644 drivers/input/misc/palmas-pwrbutton.c
+
+-- 
+1.7.9.5
