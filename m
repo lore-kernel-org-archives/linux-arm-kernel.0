@@ -1,54 +1,60 @@
 From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Thu, 21 Aug 2014 10:51:36 +0800
-Subject: [PATCH v2 06/18] ARM64 / ACPI: Parse MADT to map logical cpu
- to MPIDR and get cpu_possible/present_map
-In-Reply-To: <20140820143817.GN24600@localhost>
+Date: Thu, 21 Aug 2014 11:06:54 +0800
+Subject: [PATCH v2 08/18] ARM64 / ACPI: Get the enable method for SMP
+ initialization in ACPI way
+In-Reply-To: <20140820145219.GO24600@localhost>
 References: <1407166105-17675-1-git-send-email-hanjun.guo@linaro.org>
- <1407166105-17675-7-git-send-email-hanjun.guo@linaro.org>
- <20140818142728.GS20043@localhost> <53F2FE8E.60307@linaro.org>
- <20140820143817.GN24600@localhost>
-Message-ID: <53F55EB8.3010101@linaro.org>
+ <1407166105-17675-9-git-send-email-hanjun.guo@linaro.org>
+ <20140818142733.GT20043@localhost> <53F30B99.4000704@linaro.org>
+ <20140820145219.GO24600@localhost>
+Message-ID: <53F5624E.3010102@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2014-8-20 22:38, Catalin Marinas wrote:
-> On Tue, Aug 19, 2014 at 08:36:46AM +0100, Hanjun Guo wrote:
+On 2014-8-20 22:52, Catalin Marinas wrote:
+> On Tue, Aug 19, 2014 at 09:32:25AM +0100, Hanjun Guo wrote:
 >> On 2014-8-18 22:27, Catalin Marinas wrote:
->>> On Mon, Aug 04, 2014 at 04:28:13PM +0100, Hanjun Guo wrote:
->>>> diff --git a/arch/arm64/include/asm/acpi.h b/arch/arm64/include/asm/acpi.h
->>>> index 6e04868..e877967 100644
->>>> --- a/arch/arm64/include/asm/acpi.h
->>>> +++ b/arch/arm64/include/asm/acpi.h
->>>> @@ -64,6 +64,8 @@ static inline void arch_fix_phys_package_id(int num, u32 slot) { }
->>>>  extern int (*acpi_suspend_lowlevel)(void);
->>>>  #define acpi_wakeup_address 0
->>>>  
->>>> +#define MAX_GIC_CPU_INTERFACE 65535
+>>> On Mon, Aug 04, 2014 at 04:28:15PM +0100, Hanjun Guo wrote:
+>>>> +#ifdef CONFIG_ACPI
+>>>> +/*
+>>>> + * Get a cpu's boot method in the ACPI way.
+>>>> + */
+>>>> +static char * __init acpi_get_cpu_boot_method(void)
+>>>> +{
+>>>> +	/*
+>>>> +	 * For ACPI 5.1, only two kind of methods are provided,
+>>>> +	 * Parking protocol and PSCI, but Parking protocol is
+>>>> +	 * specified for ARMv7 only, so make PSCI as the only method
+>>>> +	 * for SMP initialization before the ACPI spec or Parking
+>>>> +	 * protocol spec is updated.
+>>>> +	 */
+>>>> +	switch (smp_boot_protocol()) {
+>>>> +	case ACPI_SMP_BOOT_PSCI:
+>>>> +		return "psci";
+>>>> +	case ACPI_SMP_BOOT_PARKING_PROTOCOL:
+>>>> +	default:
+>>>> +		return NULL;
+>>>> +	}
+>>>> +}
 >>>
->>> Does this need to be more than NR_CPUS?
+>>> Actually, do we even need to define smp_boot_protocol()? Is it used
+>>> anywhere else apart from this patch (I still haven't gone through all
+>>> patches)?
 >>
->> Sometimes yes, CPU structure entries in MADT just like CPU nodes in
->> device tree, the number of them may more than NR_CPUS.
+>> It is just used in this patch. I think we can make the ACPI boot protocol
+>> scalable in this way, if we support another boot protocol in ACPI in the
+>> future, we can easily update the function to support it, does it make sense?
 > 
-> I have a more general question here. In ACPI, is MADT the only way to
-> build a CPU topology? 
+> Not really. You just add additional code, enums, functions when all you
+> do is check for acpi_psci_present() (or whatever new protocol you would
+> get). If the enum is never going to be used outside this file, don't
+> bother with additional functions.
+> 
+> BTW, it would be nicer if the acpi related functions are contained in as
+> fewer files as possible. So here you could keep
+> acpi_get_cpu_boot_method() in the acpi.c file. It only returns a string.
 
-Unfortunately yes as far as I can tell.
-
-> It looks weird that we use GIC properties to
-> create the cpu_logical_map(). 
-
-Actually information in GICC structures in MADT will both used
-for GIC init and SMP init, GICC structures represents CPUs in the
-system.
-
-> A side-effect is that the GIC-related
-> functions are now scattered all over the kernel rather than being
-> contained in the GIC driver itself.
-
-As patch 12/18 shows, all the GIC related code all contained in the
-GIC driver, GICC structure is more than GIC-related but also CPUs in the
-system (I have to admit that the name of GICC in ACPI is confusing).
+ok, I will update them.
 
 Thanks
 Hanjun
