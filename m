@@ -1,48 +1,51 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu, 21 Aug 2014 13:20:35 -0500
-Subject: [PATCH 2/2] spi: davinci: support adding delay between
- transmission
-In-Reply-To: <1408634706-5762-3-git-send-email-grygorii.strashko@ti.com>
-References: <1408634706-5762-1-git-send-email-grygorii.strashko@ti.com>
- <1408634706-5762-3-git-send-email-grygorii.strashko@ti.com>
-Message-ID: <20140821182035.GM24407@sirena.org.uk>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Thu, 21 Aug 2014 22:28:56 +0400
+Subject: [PATCH 1/2] doc: dt/bindings: input: introduce TI DRV2667 haptic
+ driver description
+In-Reply-To: <1408645143-25690-2-git-send-email-dmurphy@ti.com>
+References: <1408645143-25690-1-git-send-email-dmurphy@ti.com>
+ <1408645143-25690-2-git-send-email-dmurphy@ti.com>
+Message-ID: <53F63A68.1080002@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 21, 2014 at 06:25:06PM +0300, Grygorii Strashko wrote:
+Hello.
 
-> +- ti,davinci-spi-wdelay : delay between transmissions.
+On 08/21/2014 10:19 PM, Dan Murphy wrote:
 
-I don't understand why this is here - there is already standard support
-in the SPI core for client drivers specifying inter-transfer delays.  If
-there is a need to provide platform configuration for this in addition
-to that then it should also be a standard property, there is nothing
-device specific about these.
+> DRV2667 is a haptic/vibrator driver for Linear Resonant Actuators.
+> Adding dt binding for this part
 
-> +- ti,davinci-spi-odd-parity : odd partity enabled
-> +   OR
-> +  ti,davinci-spi-even-parity : even parity enabled
+> Signed-off-by: Dan Murphy <dmurphy@ti.com>
+> ---
+>   .../devicetree/bindings/input/ti,drv2667.txt       |   18 ++++++++++++++++++
+>   1 file changed, 18 insertions(+)
+>   create mode 100644 Documentation/devicetree/bindings/input/ti,drv2667.txt
 
-What do these mean?
+> diff --git a/Documentation/devicetree/bindings/input/ti,drv2667.txt b/Documentation/devicetree/bindings/input/ti,drv2667.txt
+> new file mode 100644
+> index 0000000..525216d
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/input/ti,drv2667.txt
+> @@ -0,0 +1,18 @@
+> +Texas Instruments - drv2667 Haptics driver
+> +
+> +The drv2667 uses serial control bus communicates through I2C protocols
 
-> +- ti,davinci-spi-io-type: io type (check platform_data/spi-davinci.h)
+    I can't parse that.
 
-The bindings should be independent of the kernel, the values need to be
-included here (and the defines moved to include/dt-bindings so they can
-be used when writing DTs).
+> +
+> +Required properties:
+> +	- compatible - "ti,drv2667" - DRV2667
+> +	- reg -  I2C slave address
+> +	- vbat-supply - Required supply regulator
+> +
+> +Example:
+> +
+> +drv2667: drv2667 at 59 {
+> +		compatible = "ti,drv2667";
+> +		reg = <0x59>;
 
-> +- ti,davinci-spi-disable-timer: disable CS timer (SPIFMTn)
-> +- ti,davinci-spi-c2t-delay: c2t delay
-> +- ti,davinci-spi-t2c-delay: t2c delay
-> +- ti,davinci-spi-t2e-delay: t2e delay
-> +- ti,davinci-spi-c2e-delay: c2e delay
+    You say "vbat-supply" is mandatory, yet you don't have it in your example?
 
-What are all these timers/delays - at least some reference to the
-datasheet please?
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140821/09a45eb3/attachment.sig>
+WBR, Sergei
