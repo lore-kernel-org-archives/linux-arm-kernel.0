@@ -1,41 +1,19 @@
-From: mperttunen@nvidia.com (Mikko Perttunen)
-Date: Thu, 21 Aug 2014 16:11:53 +0300
-Subject: [PATCH v2 5/5] ARM: tegra: Add thermal reset (thermtrip) support
- to PMC
-In-Reply-To: <53F5042A.7020603@wwwdotorg.org>
-References: <1407933685-12404-1-git-send-email-mperttunen@nvidia.com>
- <1407933685-12404-6-git-send-email-mperttunen@nvidia.com>
- <53F5042A.7020603@wwwdotorg.org>
-Message-ID: <53F5F019.10308@nvidia.com>
+From: peter.griffin@linaro.org (Peter Griffin)
+Date: Thu, 21 Aug 2014 14:15:30 +0100
+Subject: [PATCH v4 3/3] MAINTAINERS: Add dwc3-st.c file to ARCH/STI
+ architecture
+In-Reply-To: <20140820175824.GT24500@saruman.home>
+References: <1406734091-16202-1-git-send-email-peter.griffin@linaro.org>
+ <1406734091-16202-4-git-send-email-peter.griffin@linaro.org>
+ <20140820175824.GT24500@saruman.home>
+Message-ID: <20140821131530.GB17487@griffinp-ThinkPad-X1-Carbon-2nd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20/08/14 23:25, Stephen Warren wrote:
-> On 08/13/2014 06:41 AM, Mikko Perttunen wrote:
->> This adds a device tree controlled option to enable PMC-based
->> thermal reset in overheating situations. Thermtrip is supported on
->> Tegra30, Tegra114 and Tegra124. The thermal reset only works when
->> the thermal sensors are calibrated, so a soctherm driver is also
->> required.
->
-> If calibration is required, presumably the soctherm must initialize
-> before this thermtrip code can initialize, or this thermtrip logic might
-> be triggered by uncalibrated sensors?
+Hi Felipe,
 
-SOCTHERM requires that each sensor be explicitly enabled before it gives 
-readings. If a sensor is not enabled, the temperature given by the 
-register (and used to trigger thermtrip) will be zero. So in order for a 
-thermtrip shutdown to be caused before soctherm is initialized, the 
-thermtrip temperature would have to be programmed to below zero (the 
-default value is 105C), in which case an immediate shutdown would 
-probably be in order anyway (unless the user uses LN2 or something to 
-cool the soc below zero).
+Will fix the commit log and rebase onto 3.17-rc1 for the next iteration.
 
->
-> If so, then there needs to be some explicit mechanism to force the two
-> drivers into probing in the right order.
+regards,
 
-Because of the above, I think it isn't necessary to probe these in order.
-
-Cheers,
-Mikko
+Peter.
