@@ -1,147 +1,58 @@
-From: liviu@dudau.co.uk (Liviu Dudau)
-Date: Thu, 21 Aug 2014 23:13:23 +0100
-Subject: [PATCH] drivers: pci: convert generic host controller to DT host
- bridge creation API
-In-Reply-To: <20140821180216.GA15311@google.com>
-References: <1407861695-25549-1-git-send-email-Liviu.Dudau@arm.com>
- <201408201327.57376.arnd@arndb.de>
- <20140820123112.GG13147@bart.dudau.co.uk>
- <CAErSpo6Z4b3w7j=X9C1YGOV59JHZwZUt7pnVp+Z0erY2RLCNAQ@mail.gmail.com>
- <20140821180216.GA15311@google.com>
-Message-ID: <20140821221322.GH13147@bart.dudau.co.uk>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 21 Aug 2014 23:33:24 +0100
+Subject: Build failure with v3.17-rc1
+In-Reply-To: <20140821211100.GS11146@saruman.home>
+References: <20140821211100.GS11146@saruman.home>
+Message-ID: <20140821223324.GM30401@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 21, 2014 at 12:02:16PM -0600, Bjorn Helgaas wrote:
-> [+cc Lorenzo]
+On Thu, Aug 21, 2014 at 04:11:00PM -0500, Felipe Balbi wrote:
+> Hi Russell,
 > 
-> On Wed, Aug 20, 2014 at 05:35:59PM -0500, Bjorn Helgaas wrote:
-> > On Wed, Aug 20, 2014 at 7:31 AM, Liviu Dudau <liviu@dudau.co.uk> wrote:
-> > > On Wed, Aug 20, 2014 at 01:27:57PM +0200, Arnd Bergmann wrote:
-> > >> On Tuesday 12 August 2014, Liviu Dudau wrote:
-> > >> > +       return of_create_pci_host_bridge(dev, 0, 0xff, &gen_pci_ops,
-> > >> > +                                       gen_pci_setup, pci);
-> > >>
-> > >> I had not noticed it earlier, but the setup callback is actually a feature
-> > >> of the arm32 PCI code that I had hoped to avoid when moving to the
-> > >> generic API. Can we do this as a more regular sequence of
-> > >>
-> > >>
-> > >>       ret = of_create_pci_host_bridge(dev, 0, 0xff, &gen_pci_ops, pci);
-> > >>       if (ret)
-> > >>               return ret;
-> > >>
-> > >>       ret = gen_pci_setup(pci);
-> > >>       if (ret)
-> > >>               pci_destroy_host_bridge(dev, pci);
-> > >>       return ret;
-> > >>
-> > >> ?
-> > >>
-> > >>       Arnd
-> > >
-> > > Hi Arnd,
-> > >
-> > > That has been the general approach of my patchset up to v9. But, as Bjorn has
-> > > mentioned in his v8 review and I have put in my cover letter, the regular
-> > > aproach means that architectures that use pci_scan_root_bus() will have to
-> > > drop their one liner and replace it with the more verbose of_create_pci_host_bridge()
-> > > followed by pci_scan_child_bus() and pci_bus_add_devices() (basically, the content
-> > > of pci_scan_root_bus()). For those architectures it will lead to a net increase of
-> > > lines of code.
-> > >
-> > > The patch for pci-host-generic.c is the first to use the callback setup function, but
-> > > not the only one. My PCI host bridge driver for Juno has the same need, and I'm betting
-> > > all other host bridge controllers will use it as it will be the only opportunity to
-> > > finish the controller setup before we start scanning the child busses. I'm trying to
-> > > balance ease of read vs ease of use here and it is the best version I've come up with
-> > > so far.
-> > 
-> > My guess is that you're referring to
-> > http://lkml.kernel.org/r/20140708011136.GE22939 at google.com
-> > 
-> > I'm trying to get to the point where arch code can discover the host
-> > bridge, configure it, learn its properties (apertures, etc.), then
-> > pass it off completely to the PCI core for PCI device enumeration.
-> > pci_scan_root_bus() is the closest thing we have to that right now, so
-> > that's why I point to that.  Here's the current pci_scan_root_bus():
-> > 
-> >   pci_scan_root_bus()
-> >   {
-> >     pci_create_root_bus();
-> >     /* 1 */
-> >     pci_scan_child_bus()
-> >     /* 2 */
-> >     pci_bus_add_devices()
-> >   }
-> > 
-> > This is obviously incomplete as it is -- for example, it does nothing
-> > about assigning resources to PCI devices, so it only works if we rely
-> > completely on the firmware to do that.  Some arches (x86, ia64, etc.)
-> > don't want to rely on firmware, so they basically open-code
-> > pci_scan_root_bus() and insert resource assignment at (2) above.  That
-> > resource assignment really *should* be done in pci_scan_root_bus()
-> > itself, but it's quite a bit of work to make that happen.
-> > 
-> > In your case, of_create_pci_host_bridge() open-codes
-> > pci_scan_root_bus() and calls the "setup" callback at (1) in the
-> > outline above.  I don't have any problem with that, and I don't care
-> > whether you do it by passing in a callback function pointer or via
-> > some other means.
-> > 
-> > However, I would ask whether this is really a requirement.  Most
-> > (maybe all) other arches require nothing special at (1), i.e., between
-> > pci_create_root_bus() and pci_scan_child_bus().  If you can do it
-> > *before* pci_create_root_bus(), I think that would be nicer, but maybe
-> > you can't.
+> When running my randconfig build tests, I noticed that I had a build
+> failure at arch/arm/kernel/patch.c
 > 
-> I talked to Lorenzo here at LinuxCon and he explained this so it makes a
-> lot more sense to me now.  Would something like the following work?
+> KCONFIG_SEED=0x26B77624
+> arch/arm/kernel/patch.c: In function ?__patch_text?:
+> arch/arm/kernel/patch.c:35:4: error: implicit declaration of function ?__opcode_to_mem_thumb32? [-Werror=implicit-function-declaration]
+>     insn = __opcode_to_mem_thumb32(insn);
+>     ^
+> cc1: some warnings being treated as errors
+> make[1]: *** [arch/arm/kernel/patch.o] Error 1
+> make[1]: *** Waiting for unfinished jobs....
+> make: *** [arch/arm/kernel] Error 2
+> make: *** Waiting for unfinished jobs....
 > 
->   gen_pci_probe()
->   {
->     LIST_HEAD(res);
->     resource_size_t io_base = 0;
+> Looking at the definition of __opcode_to_mem_thumb32 it's easy to see
+> that it's not defined when ! CONFIG_CPU_ENDIAN_BE8 and that's exactly
+> what I have in my generated defconfig (attached).
 > 
->     of_parse_pci_host_bridge_resources(dev, &res, 0, 0xff, &io_base);
->     gen_pci_setup(&res, io_base);
-> 
->     pci_create_root_bus(..., &res);
->     pci_scan_child_bus();
->     ... pci_assign_unassigned_bus_resources
->     pci_bus_add_resources();
->   }
-> 
-> Then we at least have all the PCI-related code consolidated, without
-> the arch-specific stuff mixed in.  We could almost use pci_scan_root_bus(),
-> but not quite, because of the pci_assign_unassigned_bus_resources() call
-> that pci_scan_root_bus() doesn't do.
+> Would below patch be the correct fix for this ?
 
-Yes, that makes sense and should address both yours and Arnd's concerns (I hope).
-I'm about to head for the second leg of my holiday where I'm going to loose my
-internet connection (funny enough, going east to west in Europe can result in
-worse coverage and higher fees), but when I'm going to get back on the 4th of
-September I will send v10 with this suggestion included.
+I think you should read a bit more of the file first.  In the ifdef which
+starts in the context of your patch:
 
-If it is not too much to ask, I would really appreciate if you and Arnd find the
-time to review the patchset and ACK the non controversial parts as I would like
-to ask for inclusion in -next as soon as I can.
+#ifndef CONFIG_CPU_ENDIAN_BE32
+/*
+ * On BE32 systems, using 32-bit accesses to store Thumb instructions will not
+ * work in all cases, due to alignment constraints.  For now, a correct
+ * version is not provided for BE32.
+ */
+#define __opcode_to_mem_thumb32(x) ___opcode_swahw32(x)
+#define ___asm_opcode_to_mem_thumb32(x) ___asm_opcode_swahw32(x)
+#endif
 
-Best regards,
-Liviu
+The contents of the ifdef cover the !BE32 case.  It doesn't cover the BE32
+case, and the BE32 case is what is being referred to in the comment.
 
-> 
-> Bjorn
-> 
+It seems that it is intentionally not provided because it's currently
+broken, and has been broken for about the last two years.
+
+Further information can be found by looking in the git history, which
+brings up commit ID 57b9da32addd.  This commit text implies the need
+for __opcode_to_mem_thumb32() is an error.
 
 -- 
--------------------
-   .oooO
-   (   )
-    \ (  Oooo.
-     \_) (   )
-          ) /
-         (_/
-
- One small step
-   for me ...
+FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
+according to speedtest.net.
