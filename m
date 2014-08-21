@@ -1,97 +1,29 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Thu, 21 Aug 2014 21:46:30 +0200
-Subject: [PATCH 04/29] drivers: base: add notifier for failed driver bind
-In-Reply-To: <1407235677-26324-5-git-send-email-m.szyprowski@samsung.com>
-References: <1407235677-26324-1-git-send-email-m.szyprowski@samsung.com>
- <1407235677-26324-5-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <5058601.WyRAooKDLt@avalon>
+From: lauraa@codeaurora.org (Laura Abbott)
+Date: Thu, 21 Aug 2014 13:05:19 -0700
+Subject: set_memory_ro/set_memory_rw for ARM
+In-Reply-To: <CAMxMOAs=4qgOgHygg5kygyyVcggQithycm_XM0SkxHTH62cnRw@mail.gmail.com>
+References: <CAMxMOAs=4qgOgHygg5kygyyVcggQithycm_XM0SkxHTH62cnRw@mail.gmail.com>
+Message-ID: <53F650FF.4030301@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marek,
+On 8/21/2014 12:18 PM, Christian S. Perone wrote:
+> Does anyone knows if there is any set_memory_ro()/set_memory_rw()
+> (from x86) equivalent for ARM ? I just want to set pages to be
+> read-only (even when in supervisor mode).
+> 
+> Thanks !
+> 
 
-Thank you for the patch.
+Yes, set_memory_ro/set_memory_rw were implemented for ARM
+(75374ad47 ARM: mm: Define set_memory_* functions for ARM) and should
+be in v3.14. Note that these are restricted to module addresses only
+since changing individual pages of generic memory is not possible
+due to the section mappings used in lowmem.
 
-On Tuesday 05 August 2014 12:47:32 Marek Szyprowski wrote:
-> This patch adds support for getting a notify for failed device driver
-> bind, so all the items done in BUS_NOTIFY_BIND_DRIVER event can be
-> cleaned if the driver fails to bind.
-> 
-> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-> ---
->  drivers/base/dd.c      | 10 +++++++---
->  include/linux/device.h |  4 +++-
->  2 files changed, 10 insertions(+), 4 deletions(-)
-> 
-> diff --git a/drivers/base/dd.c b/drivers/base/dd.c
-> index e4ffbcf..541a41f 100644
-> --- a/drivers/base/dd.c
-> +++ b/drivers/base/dd.c
-> @@ -237,10 +237,14 @@ static int driver_sysfs_add(struct device *dev)
->  	return ret;
->  }
-> 
-> -static void driver_sysfs_remove(struct device *dev)
-> +static void driver_sysfs_remove(struct device *dev, int failed)
->  {
->  	struct device_driver *drv = dev->driver;
-> 
-> +	if (failed && dev->bus)
-> +		blocking_notifier_call_chain(&dev->bus->p->bus_notifier,
-> +					     BUS_NOTIFY_DRVBIND_FAILED, dev);
-
-This might be a stupid question, but as you only call driver_sysfs_remove with 
-failed set to true in a single location (in the failure path of really_probe), 
-how about moving the blocking_notifier_call_chain to that location ? The code 
-seems to be a bit out of place here.
-
-> +
->  	if (drv) {
->  		sysfs_remove_link(&drv->p->kobj, kobject_name(&dev->kobj));
->  		sysfs_remove_link(&dev->kobj, "driver");
-> @@ -316,7 +320,7 @@ static int really_probe(struct device *dev, struct
-> device_driver *drv)
-> 
->  probe_failed:
->  	devres_release_all(dev);
-> -	driver_sysfs_remove(dev);
-> +	driver_sysfs_remove(dev, true);
->  	dev->driver = NULL;
->  	dev_set_drvdata(dev, NULL);
-> 
-> @@ -509,7 +513,7 @@ static void __device_release_driver(struct device *dev)
->  	if (drv) {
->  		pm_runtime_get_sync(dev);
-> 
-> -		driver_sysfs_remove(dev);
-> +		driver_sysfs_remove(dev, false);
-> 
->  		if (dev->bus)
->  			blocking_notifier_call_chain(&dev->bus->p->bus_notifier,
-> diff --git a/include/linux/device.h b/include/linux/device.h
-> index b387710..92daded 100644
-> --- a/include/linux/device.h
-> +++ b/include/linux/device.h
-> @@ -176,7 +176,7 @@ extern int bus_register_notifier(struct bus_type *bus,
->  extern int bus_unregister_notifier(struct bus_type *bus,
->  				   struct notifier_block *nb);
-> 
-> -/* All 4 notifers below get called with the target struct device *
-> +/* All 7 notifers below get called with the target struct device *
->   * as an argument. Note that those functions are likely to be called
->   * with the device lock held in the core, so be careful.
->   */
-> @@ -189,6 +189,8 @@ extern int bus_unregister_notifier(struct bus_type *bus,
-> unbound */
->  #define BUS_NOTIFY_UNBOUND_DRIVER	0x00000006 /* driver is unbound
->  						      from the device */
-> +#define BUS_NOTIFY_DRVBIND_FAILED	0x00000007 /* driver failed to bind
-> +						      to device */
-> 
->  extern struct kset *bus_get_kset(struct bus_type *bus);
->  extern struct klist *bus_get_device_klist(struct bus_type *bus);
+Thanks,
+Laura
 
 -- 
-Regards,
-
-Laurent Pinchart
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
