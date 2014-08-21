@@ -1,90 +1,82 @@
-From: shc_work@mail.ru (=?UTF-8?B?QWxleGFuZGVyIFNoaXlhbg==?=)
-Date: Thu, 21 Aug 2014 20:51:14 +0400
-Subject: =?UTF-8?B?UmU6IFtQQVRDSCB2MiAwLzNdIGdwaW86IHN5c2NvbjogcmV1c2UgZm9yIGtl?=
- =?UTF-8?B?eXN0b25lIDIgc29jcw==?=
-In-Reply-To: <1408638203-8246-1-git-send-email-grygorii.strashko@ti.com>
-References: <53ECE9B1.4060303@ti.com>
- <1408638203-8246-1-git-send-email-grygorii.strashko@ti.com>
-Message-ID: <1408639874.873856101@f420.i.mail.ru>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Thu, 21 Aug 2014 18:53:58 +0200
+Subject: [PATCH v2 1/5] of: Add descriptions of thermtrip properties to
+ Tegra PMC bindings
+In-Reply-To: <53F61275.9020508@wwwdotorg.org>
+References: <1407933685-12404-1-git-send-email-mperttunen@nvidia.com>
+ <1407933685-12404-2-git-send-email-mperttunen@nvidia.com>
+ <53F50231.5010605@wwwdotorg.org> <20140821065853.GE4486@ulmo>
+ <53F61275.9020508@wwwdotorg.org>
+Message-ID: <20140821165357.GC1172@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thu, 21 Aug 2014 19:23:20 +0300 ?? Grygorii Strashko <grygorii.strashko@ti.com>:
-> Hi All,
+On Thu, Aug 21, 2014 at 09:38:29AM -0600, Stephen Warren wrote:
+> On 08/21/2014 12:58 AM, Thierry Reding wrote:
+> >On Wed, Aug 20, 2014 at 02:16:49PM -0600, Stephen Warren wrote:
+> >>On 08/13/2014 06:41 AM, Mikko Perttunen wrote:
+> >>>Hardware-triggered thermal reset requires configuring the I2C
+> >>>reset procedure. This configuration is read from the device tree,
+> >>>so document the relevant properties in the binding documentation.
+> >>
+> >>>diff --git a/Documentation/devicetree/bindings/arm/tegra/nvidia,tegra20-pmc.txt b/Documentation/devicetree/bindings/arm/tegra/nvidia,tegra20-pmc.txt
+> >>
+> >>>+Hardware-triggered thermal reset:
+> >>>+On Tegra30, Tegra114 and Tegra124, if the 'i2c-thermtrip' subnode exists,
+> >>>+hardware-triggered thermal reset will be enabled.
+> >>
+> >>"will be enabled" sounds like SW behaviour, whereas DT is suppose to
+> >>describe HW, and leave SW to define its own behaviour. I would suggest:
+> >>
+> >>Optional sub-nodes:
+> >>i2c-thermtrip: Describes how to power off the system in the event of a
+> >>   thermal emergency.
+> >>
+> >>>+Required properties for hardware-triggered thermal reset (inside 'i2c-thermtrip'):
+> >>
+> >>Simpler might be:
+> >>
+> >>Required properties for i2c-thermtrip node:
+> >>
+> >>>+- nvidia,pmu : Phandle to power management unit / PMIC handling poweroff
+> >>>+- nvidia,reg-addr : I2C register address to write poweroff command to
+> >>>+- nvidia,reg-data : Poweroff command to write to PMU
+> >>
+> >>Why are both the PMU/PMIC phandle and the register address/data required? I
+> >>thought the purpose of having the phandle was to allow the register address
+> >>and data to be queried from the PMU/PMIC driver.
+> >>
+> >>To me, it seems much simpler to get rid of the phandle and just hard-code
+> >>the I2C bus number, address, and data into this node, rather than having to
+> >>go query it from the PMU/PMIC driver, then find the I2C controller, then
+> >>query it for its ID (and hope that all HW modules that talk to I2C
+> >>controllers directly use the same numbering scheme...)
+> >
+> >I originally requested this to be changed. It seems wrong to duplicate
+> >information about the PMIC in both the PMIC device tree node and the
+> >i2c-thermtrip node if we can get the same information from the driver
+> >directly (via the phandle). It certainly requires a little more code,
+> >but at the advantage of not having to figure out the I2C controller
+> >hardware number and I2C slave addresses when writing the i2c-thermtrip
+> >node.
 > 
-> Alexander,
-> 
-> I've updated gpio-syscon as requested in [3].
-> I still don't like it, but any way I did it :(
-> 
-> Linus,
-> 
-> I'd very appreciated if you can comment on these series.
-> Personally, I like v1 [3], because this v2 is not elegant and will
-> require constant code patching in case of adding new SoCs or new SoC's versions.
-> 
-> This series intended to integrate Keystone 2 DSP GPIO controller functionality
-> into gpio-syscon driver (drivers/gpio/gpio-syscon.c) as requested
-> by Linus Walleij in [1].
-> 
-> On Keystone SOCs, ARM host can send interrupts to DSP cores using the
-> DSP GPIO controller IP. Each DSP GPIO controller provides 28 IRQ signals for
-> each DSP core. This is one of the component used by the IPC mechanism used
-> on Keystone SOCs.
-> 
-> Keystone 2 DSP GPIO controller has specific features:
-> - each GPIO can be configured only as output pin;
-> - setting GPIO value to 1 causes IRQ generation on target DSP core;
-> - reading pin value returns 0 - if IRQ was handled or 1 - IRQ is still
->   pending.
-> 
-> The gpio-syscon driver was need to be updated to satisfy Keystone 2 SoC
-> requirements:
-> - special sequence of operations need to be used to assign output GPIO value.
->    As result, first patch introduces SoC specific callback .set() to configure
->    output GPIO value.
-> 
-> Also, patch 3 was added to illustrate DSP GPIO configuration in DT used by Keystone 2.
-> 
-> Related sicussions:
->  [1] https://lkml.org/lkml/2014/7/16/170
->  [2] https://lkml.org/lkml/2014/7/23/352
->  [3] https://www.mail-archive.com/devicetree at vger.kernel.org/msg37863.html
-> 
-> Grygorii Strashko (3):
->   gpio: syscon: add soc specific callback to assign output value
->   gpio: syscon: reuse for keystone 2 socs
->   ARM: dts: keystone-k2hk: add dsp gpio controllers nodes
-> 
->  .../bindings/gpio/gpio-mctrl-keystone.txt          |   42 ++++++
->  arch/arm/boot/dts/k2hk.dtsi                        |   48 +++++++
->  drivers/gpio/gpio-syscon.c                         |  140 ++++++++++++++++++++
->  3 files changed, 230 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/gpio/gpio-mctrl-keystone.txt
+> I cant see that argument, but surely the PMIC driver can also supply the
+> "reg-addr" and "reg-data" values too, if it's already being queried for the
+> I2C device address and bus number? The binding above appears to duplicate
+> part of the information, while requiring querying of the other part.
 
-1. mctrl -> dsp in filenames
-2. mctrl -> dsp in documentation.
-3. Here is a more elegant solution for first part.
+I suppose that could be done. It would take a new function to do that,
+though, since I'm not aware of a generic mechanism to query this kind of
+information from a PMIC (there's no generic PMIC API, either, so perhaps
+it would be a good time to create one?). The I2C controller and I2C
+slave are generic I2C properties, whereas the register and data to power
+off the device are very device specific.
 
---- gpio-syscon.c.old	2014-08-19 09:46:09.000000000 +0400
-+++ gpio-syscon.c	2014-08-21 20:45:49.357529323 +0400
-@@ -111,7 +111,7 @@
- 				   BIT(offs % SYSCON_REG_BITS));
- 	}
- 
--	syscon_gpio_set(chip, offset, val);
-+	priv->data->set(chip, offset, val);
- 
- 	return 0;
- }
-@@ -159,7 +159,7 @@
- 	if (priv->data->flags & GPIO_SYSCON_FEAT_IN)
- 		priv->chip.direction_input = syscon_gpio_dir_in;
- 	if (priv->data->flags & GPIO_SYSCON_FEAT_OUT) {
--		priv->chip.set = syscon_gpio_set;
-+		priv->chip.set = priv->data->set ? : syscon_gpio_set;
- 		priv->chip.direction_output = syscon_gpio_dir_out;
- 	}
- 
-
----
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140821/d90b31f9/attachment.sig>
