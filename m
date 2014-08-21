@@ -1,62 +1,50 @@
-From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
-Date: Thu, 21 Aug 2014 10:34:21 +0200
-Subject: [PATCH 15/15] tty: serial: 8250: omap: add dma support
-In-Reply-To: <20140815210211.GD9239@atomide.com>
-References: <1408124563-31541-1-git-send-email-bigeasy@linutronix.de>
- <1408124563-31541-16-git-send-email-bigeasy@linutronix.de>
- <20140815210211.GD9239@atomide.com>
-Message-ID: <53F5AF0D.5060409@linutronix.de>
+From: boris.brezillon@free-electrons.com (Boris BREZILLON)
+Date: Thu, 21 Aug 2014 10:37:06 +0200
+Subject: [PATCH v4 00/11] drm: add support for Atmel HLCDC Display
+ Controller
+In-Reply-To: <20140821081619.GZ2452@ldesroches-Latitude-E6320>
+References: <1406034695-15534-1-git-send-email-boris.brezillon@free-electrons.com>
+ <20140821081619.GZ2452@ldesroches-Latitude-E6320>
+Message-ID: <20140821103706.2349915d@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/15/2014 11:02 PM, Tony Lindgren wrote:
-> * Sebastian Andrzej Siewior <bigeasy@linutronix.de> [140815 11:13]:
->> +#ifdef CONFIG_SERIAL_8250_DMA
->> +	if (pdev->dev.of_node) {
->> +		/*
->> +		 * Oh DMA support. If there are no DMA properties in the DT then
->> +		 * we will fall back to a generic DMA channel which does not
->> +		 * really work here. To ensure that we do not get a generic DMA
->> +		 * channel assigned, we have the the_no_dma_filter_fn() here.
->> +		 * To avoid "failed to request DMA" messages we check for DMA
->> +		 * properties in DT.
->> +		 */
->> +		ret = of_property_count_strings(pdev->dev.of_node, "dma-names");
->> +		if (ret == 2) {
->> +			up.dma = &priv->omap8250_dma;
->> +			priv->omap8250_dma.fn = the_no_dma_filter_fn;
->> +			priv->omap8250_dma.rx_size = RX_TRIGGER;
->> +			priv->omap8250_dma.rxconf.src_maxburst = RX_TRIGGER;
->> +			priv->omap8250_dma.txconf.dst_maxburst = TX_TRIGGER;
->> +
->> +			if (of_machine_is_compatible("ti,am33xx"))
->> +				up.bugs |= UART_BUG_DMATX;
->> +		}
->> +	}
->> +#endif
+Hi Ludovic,
+
+On Thu, 21 Aug 2014 10:16:19 +0200
+Ludovic Desroches <ludovic.desroches@atmel.com> wrote:
+
+> Hi Boris,
 > 
-> Hmm I wonder if there's a more generic solution to this?
-
-To what exactly? The trigger level, the TX-bug or using DMA in the
-first place?
-
-> It would be also nice to be able to specify the use of DMA from
-> the board specific .dts file.
-
-Really? I don't see this requirement for MMC for instance. However you
-still could provide an empty "dma-names" property in your board .dts
-file if you do not want use DMA. Would this work?
-
-> Also, with DMA enabled, looks like omap deeper idle states are
-> blocked as the DMA stays reserved. After I commented out the
-> DMA info for my console UART, PM started working.
-
-Hmm. This would explain something. This would mean that I should cancel
-the RX DMA transfer in the PM-suspend routine. Let me see how that
-works.
-
-> Regards,
+> You can add
 > 
-> Tony
+> Tested-by: Ludovic Desroches <ludovic.desroches@atmel.com>
 
-Sebastian
+Thanks for testing this driver.
+
+> 
+> Only one issue but not related to your patches, you can't display
+> quickly the bootup logo since the panel detection takes too much
+> time.
+
+Yes, actually this is related to the device probe order: the
+hlcdc-display-controller device is probed before the simple-panel, thus
+nothing is detected on the RGB connector (I use of_drm_find_panel to
+check for panel availability) when the display controller is
+instantiated. I rely on the default polling infrastructure provided by
+the DRM/KMS framework which polls for a new connector every 10s, and
+this is far more than you kernel boot time.
+
+Do anyone see a solution to reduce this delay (without changing the
+polling interval). I thought we could add a notifier infrastructure to
+the DRM panel framework, but I'm not sure this is how you want things
+done...
+
+Best Regards,
+
+Boris
+
+-- 
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
