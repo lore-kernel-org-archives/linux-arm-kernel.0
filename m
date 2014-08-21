@@ -1,166 +1,48 @@
-From: ludovic.desroches@atmel.com (Ludovic Desroches)
-Date: Thu, 21 Aug 2014 10:16:19 +0200
-Subject: [PATCH v4 00/11] drm: add support for Atmel HLCDC Display
- Controller
-In-Reply-To: <1406034695-15534-1-git-send-email-boris.brezillon@free-electrons.com>
-References: <1406034695-15534-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <20140821081619.GZ2452@ldesroches-Latitude-E6320>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Thu, 21 Aug 2014 10:18:08 +0200
+Subject: [PATCH v7 11/11] clk: rockchip: add restart handler
+In-Reply-To: <CAD=FV=U+WbodSLyQVQieiKkWNTBROCktJLgR9B8eOWZhGWYxgg@mail.gmail.com>
+References: <1408495538-27480-1-git-send-email-linux@roeck-us.net>
+ <1408495538-27480-12-git-send-email-linux@roeck-us.net>
+ <CAD=FV=U+WbodSLyQVQieiKkWNTBROCktJLgR9B8eOWZhGWYxgg@mail.gmail.com>
+Message-ID: <18796253.Gqruund2RM@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Boris,
+Am Mittwoch, 20. August 2014, 21:15:10 schrieb Doug Anderson:
+> Guenter / Heiko,
+> 
+> On Tue, Aug 19, 2014 at 5:45 PM, Guenter Roeck <linux@roeck-us.net> wrote:
+> > From: Heiko St?bner <heiko@sntech.de>
+> > 
+> > Add infrastructure to write the correct value to the restart register and
+> > register the restart notifier for both rk3188 (including rk3066) and
+> > rk3288.
+> > 
+> > Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+> > Signed-off-by: Guenter Roeck <linux@roeck-us.net>
+> > ---
+> > v7: Added patch to series.
+> > 
+> >  drivers/clk/rockchip/clk-rk3188.c |  2 ++
+> >  drivers/clk/rockchip/clk-rk3288.c |  2 ++
+> >  drivers/clk/rockchip/clk.c        | 25 +++++++++++++++++++++++++
+> >  drivers/clk/rockchip/clk.h        |  1 +
+> >  4 files changed, 30 insertions(+)
+> 
+> This patch doesn't apply cleanly with the in-flight (clk: rockchip:
+> protect critical clocks from getting disabled) patch from Heiko.  It's
+> trivial to resolve and unclear which will land first, so I think it's
+> fine...
 
-You can add
+This should be expected :-) .
 
-Tested-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+The patch about critical clocks will (hopefully soon) go through Mike's tree, 
+while this series will most likely go through somewhere else (Linus' tree 
+directly or something), so I guess the merge conflic will be resolved by Linus 
+when both trees meet each other during the merge window.
+So both this patch as well as the other one should stay independent of each 
+other.
 
-Only one issue but not related to your patches, you can't display
-quickly the bootup logo since the panel detection takes too much
-time.
 
-Regards
-
-Ludovic
-
-On Tue, Jul 22, 2014 at 03:11:24PM +0200, Boris BREZILLON wrote:
-> Hello,
-> 
-> This patch series adds support for Atmel HLCDC (HLCD Controller) available
-> on some Atmel SoCs (i.e. the sama5d3 family).
-> 
-> The HLCDC actually provides a Display Controller and a PWM device, hence I
-> decided to declare an MFD device exposing 2 subdevices: a display
-> controller and a PWM chip.
-> This also solves a circular dependency issue preventing HLCDC driver from
-> unloading.
-> The HLCDC request a drm_panel device, which request a backlight device
-> (a PWM backlight), which depends on a PWM which is provided by the HLCDC
-> driver (hlcdc -> panel -> backlight -> hlcdc (pwm part)).
-> 
-> The current implementation only supports sama5d3 SoCs but other SoCs should
-> be easily ported by defining new compatible strings and adding HLCDC
-> description structures for these SoCs.
-> 
-> The drivers supports basic CRTC functionalities, several overlays and an
-> hardware cursor.
-> 
-> At the moment, it only supports connection to LCD panels through an RGB
-> connector (defined as an LVDS connector in my implementation), though
-> connection to other kind of devices (like DRM bridges) could be added later.
-> 
-> It also supports several RGB formats on all planes and some YUV formats on
-> the HEO overlay plane.
-> 
-> This series depends on 2 other series currently under review: [1] and [2].
-> 
-> Best Regards,
-> 
-> Boris
-> 
-> [1]http://lkml.iu.edu/hypermail/linux/kernel/1407.1/04171.html
-> [2]http://www.spinics.net/lists/kernel/msg1791681.html
-> 
-> Changes since v3:
-> - rework the layer code to simplify several parts (locking and layer
->   disabling)
-> - make use of the drm_flip_work infrastructure
-> - rely on default HW cursor implementation using on the cursor plane
-> - rework the display controller DT bindings (based on OF graph
->   representation)
-> - add rotation support
-> - retrive RGB bus format from drm_display_info
-> - drop the dynamic pinctrl state selection
-> - rework HLCDC output handling (previously specialized to interface
->   with LCD panels)
-> - drop ".module = THIS_MODULE" lines
-> - change display controller compatible string
-> 
-> Changes since v2:
-> - fix coding style issues (macro indentation)
-> - make use of GENMASK in several places
-> - declare regmap config as a static structure
-> - rework hlcdc plane update API
-> - rework cursor handling to make use of the new plane update API
-> - fix backporch config
-> - do not use devm_regmap_init_mmio_clk to avoid extra clk_enable
->   clk disable calls when accessing registers
-> - explicitely include regmap and clk headers instead of relying on
->   atmel-hlcdc.h inclusions
-> - make the atmel-hlcdc driver depends on CONFIG_OF
-> - separate DT bindings documentation from driver implementation
-> - support several pin muxing for HLCDC pins on sama5d3 SoCs
-> 
-> Changes since v1:
-> - replace the backlight driver by a PWM driver
-> - make use of drm_panel infrastructure
-> - split driver code in several subsystem: MFD, PWM and DRM
-> - add support for overlays
-> - add support for hardware cursor
-> 
-> 
-> Boris BREZILLON (11):
->   mfd: add atmel-hlcdc driver
->   mfd: add documentation for atmel-hlcdc DT bindings
->   pwm: add support for atmel-hlcdc-pwm device
->   pwm: add DT bindings documentation for atmel-hlcdc-pwm driver
->   drm: add Atmel HLCDC Display Controller support
->   drm: add DT bindings documentation for atmel-hlcdc-dc driver
->   ARM: AT91/dt: split sama5d3 lcd pin definitions to match RGB mode
->     configs
->   ARM: AT91/dt: add alternative pin muxing for sama5d3 lcd pins
->   ARM: at91/dt: define the HLCDC node available on sama5d3 SoCs
->   ARM: at91/dt: add LCD panel description to sama5d3xdm.dtsi
->   ARM: at91/dt: enable the LCD panel on sama5d3xek boards
-> 
->  .../devicetree/bindings/drm/atmel-hlcdc-dc.txt     |  54 ++
->  .../devicetree/bindings/mfd/atmel-hlcdc.txt        |  50 ++
->  .../devicetree/bindings/pwm/atmel-hlcdc-pwm.txt    |  55 ++
->  arch/arm/boot/dts/sama5d31ek.dts                   |  20 +
->  arch/arm/boot/dts/sama5d33ek.dts                   |  20 +
->  arch/arm/boot/dts/sama5d34ek.dts                   |  20 +
->  arch/arm/boot/dts/sama5d36ek.dts                   |  20 +
->  arch/arm/boot/dts/sama5d3_lcd.dtsi                 | 205 +++++-
->  arch/arm/boot/dts/sama5d3xdm.dtsi                  |  58 ++
->  drivers/gpu/drm/Kconfig                            |   2 +
->  drivers/gpu/drm/Makefile                           |   1 +
->  drivers/gpu/drm/atmel-hlcdc/Kconfig                |  11 +
->  drivers/gpu/drm/atmel-hlcdc/Makefile               |   7 +
->  drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_crtc.c     | 286 ++++++++
->  drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.c       | 488 +++++++++++++
->  drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.h       | 224 ++++++
->  drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_layer.c    | 635 ++++++++++++++++
->  drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_layer.h    | 396 ++++++++++
->  drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_output.c   | 478 ++++++++++++
->  drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_plane.c    | 804 +++++++++++++++++++++
->  drivers/mfd/Kconfig                                |  12 +
->  drivers/mfd/Makefile                               |   1 +
->  drivers/mfd/atmel-hlcdc.c                          | 118 +++
->  drivers/pwm/Kconfig                                |   9 +
->  drivers/pwm/Makefile                               |   1 +
->  drivers/pwm/pwm-atmel-hlcdc.c                      | 229 ++++++
->  include/linux/mfd/atmel-hlcdc.h                    |  78 ++
->  27 files changed, 4251 insertions(+), 31 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/drm/atmel-hlcdc-dc.txt
->  create mode 100644 Documentation/devicetree/bindings/mfd/atmel-hlcdc.txt
->  create mode 100644 Documentation/devicetree/bindings/pwm/atmel-hlcdc-pwm.txt
->  create mode 100644 drivers/gpu/drm/atmel-hlcdc/Kconfig
->  create mode 100644 drivers/gpu/drm/atmel-hlcdc/Makefile
->  create mode 100644 drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_crtc.c
->  create mode 100644 drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.c
->  create mode 100644 drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.h
->  create mode 100644 drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_layer.c
->  create mode 100644 drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_layer.h
->  create mode 100644 drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_output.c
->  create mode 100644 drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_plane.c
->  create mode 100644 drivers/mfd/atmel-hlcdc.c
->  create mode 100644 drivers/pwm/pwm-atmel-hlcdc.c
->  create mode 100644 include/linux/mfd/atmel-hlcdc.h
-> 
-> -- 
-> 1.8.3.2
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Heiko
