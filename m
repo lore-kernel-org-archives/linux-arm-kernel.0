@@ -1,34 +1,82 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Thu, 21 Aug 2014 10:45:14 +0200
-Subject: [PATCH 2/2] ARM: mm: don't limit default CMA region only to low memory
-In-Reply-To: <1408610714-16204-1-git-send-email-m.szyprowski@samsung.com>
-References: <1408610714-16204-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <1408610714-16204-3-git-send-email-m.szyprowski@samsung.com>
+From: takahiro.akashi@linaro.org (AKASHI Takahiro)
+Date: Thu, 21 Aug 2014 17:56:39 +0900
+Subject: [PATCH v6 0/6] arm64: add seccomp support
+Message-ID: <1408611405-8943-1-git-send-email-takahiro.akashi@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-DMA-mapping supports CMA regions places either in low or high memory, so
-there is no longer needed to limit default CMA regions only to low memory.
-The real limit is still defined by architecture specific DMA limit.
+This patch series enable secure computing (system call filtering) on arm64,
+and contain related enhancements and bug fixes.
 
-Reported-by: Russell King - ARM Linux <linux@arm.linux.org.uk>
-Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
----
- arch/arm/mm/init.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+This code was tested on ARMv8 fast model with 64-bit/32-bit userspace
+using
+ * libseccomp v2.1.1 with modifications for arm64, especially its "live"
+   tests: No.20, 21 and 24.
+ * modified version of Kees' seccomp test for 'changing/skipping a syscall'
+   and seccomp() system call
+ * in-house tests for 'changing/skipping a system call' in tracing with
+   ptrace(PTRACE_SYSCALL) (that is, without seccomp)'
+with and without audit tracing.
 
-diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
-index 659c75d808dc..c1b513555786 100644
---- a/arch/arm/mm/init.c
-+++ b/arch/arm/mm/init.c
-@@ -322,7 +322,7 @@ void __init arm_memblock_init(const struct machine_desc *mdesc)
- 	 * reserve memory for DMA contigouos allocations,
- 	 * must come from DMA area inside low memory
- 	 */
--	dma_contiguous_reserve(min(arm_dma_limit, arm_lowmem_limit));
-+	dma_contiguous_reserve(arm_dma_limit);
- 
- 	arm_memblock_steal_permitted = false;
- 	memblock_dump_all();
+Changes v5 -> v6:
+* rebased to v3.17-rc
+* changed the interface of changing/skipping a system call from re-writing
+  x8 register [v5 1/3] to using dedicated PTRACE_SET_SYSCALL command
+  [1/6, 2/6]
+  Patch [1/6] contains a checkpatch error around a switch statement, but it
+  won't be fixed as in compat_arch_ptrace().
+* added a new system call, seccomp(), for compat task [4/6]
+* added SIGSYS siginfo for compat task [5/6]
+* changed to always execute audit exit tracing to avoid OOPs [2/6, 6/6]
+
+Changes v4 -> v5:
+* rebased to v3.16-rc
+* add patch [1/3] to allow ptrace to change a system call
+  (please note that this patch should be applied even without seccomp.)
+
+Changes v3 -> v4:
+* removed the following patch and moved it to "arm64: prerequisites for
+  audit and ftrace" patchset since it is required for audit and ftrace in
+  case of !COMPAT, too.
+  "arm64: is_compat_task is defined both in asm/compat.h and linux/compat.h"
+
+Changes v2 -> v3:
+* removed unnecessary 'type cast' operations [2/3]
+* check for a return value (-1) of secure_computing() explicitly [2/3]
+* aligned with the patch, "arm64: split syscall_trace() into separate
+  functions for enter/exit" [2/3]
+* changed default of CONFIG_SECCOMP to n [2/3]
+
+Changes v1 -> v2:
+* added generic seccomp.h for arm64 to utilize it [1,2/3] 
+* changed syscall_trace() to return more meaningful value (-EPERM)
+  on seccomp failure case [2/3]
+* aligned with the change in "arm64: make a single hook to syscall_trace()
+  for all syscall features" v2 [2/3]
+* removed is_compat_task() definition from compat.h [3/3]
+
+AKASHI Takahiro (6):
+  arm64: ptrace: add PTRACE_SET_SYSCALL
+  arm64: ptrace: allow tracer to skip a system call
+  asm-generic: add generic seccomp.h for secure computing mode 1
+  arm64: add seccomp syscall for compat task
+  arm64: add SIGSYS siginfo for compat task
+  arm64: add seccomp support
+
+ arch/arm64/Kconfig                   |   14 ++++++++++++
+ arch/arm64/include/asm/compat.h      |    7 ++++++
+ arch/arm64/include/asm/ptrace.h      |    9 ++++++++
+ arch/arm64/include/asm/seccomp.h     |   25 ++++++++++++++++++++++
+ arch/arm64/include/asm/unistd.h      |    5 ++++-
+ arch/arm64/include/asm/unistd32.h    |    3 +++
+ arch/arm64/include/uapi/asm/ptrace.h |    1 +
+ arch/arm64/kernel/entry.S            |    6 ++++++
+ arch/arm64/kernel/ptrace.c           |   39 +++++++++++++++++++++++++++++++++-
+ arch/arm64/kernel/signal32.c         |    8 +++++++
+ include/asm-generic/seccomp.h        |   28 ++++++++++++++++++++++++
+ 11 files changed, 143 insertions(+), 2 deletions(-)
+ create mode 100644 arch/arm64/include/asm/seccomp.h
+ create mode 100644 include/asm-generic/seccomp.h
+
 -- 
-1.9.2
+1.7.9.5
