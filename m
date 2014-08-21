@@ -1,240 +1,114 @@
-From: vikas.sajjan@samsung.com (Vikas Sajjan)
-Date: Thu, 21 Aug 2014 18:44:42 +0545
-Subject: [PATCH v7 2/2] ARM: exynos5: Add Suspend-to-RAM support for 5420
-In-Reply-To: <1408625982-3267-1-git-send-email-vikas.sajjan@samsung.com>
-References: <1408625982-3267-1-git-send-email-vikas.sajjan@samsung.com>
-Message-ID: <1408625982-3267-3-git-send-email-vikas.sajjan@samsung.com>
+From: boris.brezillon@free-electrons.com (Boris BREZILLON)
+Date: Thu, 21 Aug 2014 15:06:00 +0200
+Subject: [PATCH v4 00/11] drm: add support for Atmel HLCDC Display
+ Controller
+In-Reply-To: <20140821095202.GA21848@ulmo>
+References: <1406034695-15534-1-git-send-email-boris.brezillon@free-electrons.com>
+ <20140821081619.GZ2452@ldesroches-Latitude-E6320>
+ <20140821103706.2349915d@bbrezillon> <20140821090406.GA13733@ulmo>
+ <20140821114159.319e741b@bbrezillon> <20140821095202.GA21848@ulmo>
+Message-ID: <20140821150600.37788d82@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Abhilash Kesavan <a.kesavan@samsung.com>
+On Thu, 21 Aug 2014 11:52:03 +0200
+Thierry Reding <thierry.reding@gmail.com> wrote:
 
-Adds Suspend-to-RAM support for EXYNOS5420
+> On Thu, Aug 21, 2014 at 11:41:59AM +0200, Boris BREZILLON wrote:
+> > On Thu, 21 Aug 2014 11:04:07 +0200
+> > Thierry Reding <thierry.reding@gmail.com> wrote:
+> > 
+> > > On Thu, Aug 21, 2014 at 10:37:06AM +0200, Boris BREZILLON wrote:
+> > > > Hi Ludovic,
+> > > > 
+> > > > On Thu, 21 Aug 2014 10:16:19 +0200
+> > > > Ludovic Desroches <ludovic.desroches@atmel.com> wrote:
+> > > > 
+> > > > > Hi Boris,
+> > > > > 
+> > > > > You can add
+> > > > > 
+> > > > > Tested-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+> > > > 
+> > > > Thanks for testing this driver.
+> > > > 
+> > > > > 
+> > > > > Only one issue but not related to your patches, you can't display
+> > > > > quickly the bootup logo since the panel detection takes too much
+> > > > > time.
+> > > > 
+> > > > Yes, actually this is related to the device probe order: the
+> > > > hlcdc-display-controller device is probed before the simple-panel, thus
+> > > > nothing is detected on the RGB connector (I use of_drm_find_panel to
+> > > > check for panel availability) when the display controller is
+> > > > instantiated. I rely on the default polling infrastructure provided by
+> > > > the DRM/KMS framework which polls for a new connector every 10s, and
+> > > > this is far more than you kernel boot time.
+> > > > 
+> > > > Do anyone see a solution to reduce this delay (without changing the
+> > > > polling interval). I thought we could add a notifier infrastructure to
+> > > > the DRM panel framework, but I'm not sure this is how you want things
+> > > > done...
+> > > 
+> > > Other drivers return -EPROBE_DEFER when a panel hasn't been registered
+> > > yet. This will automatically take care of ordering things in a way that
+> > > DRM/KMS will only be initialized after the panel has been probed.
+> > 
+> > Actually I'd like to avoid doing this with a deferred probe, because,
+> > AFAIU, the remote endpoint is not tightly linked with the display
+> > controller driver (I mean the display controller can still be
+> > initialized without having a display connected on it).
+> > Moreover the atmel dev kit I'm using has an HDMI bridge connected on
+> > the same RGB connector and I'd like to use it in a near future.
+> > Returning -EPROBE_DEFER in case of several devices connected on the
+> > same connector implies that I'll have to wait for all the remote
+> > end-points to be available before my display controller could be
+> > instantiated.
+> > 
+> > While this could be acceptable when all drivers are statically linked
+> > in the kernel, it might be problematic when you're using modules,
+> > meaning that you won't be able to display anything on your LCD panel
+> > until your HDMI bridge module has been loaded.
+> 
+> No. HDMI should be using proper hotplugging anyway, hence it should be
+> always be loaded anyway. You're in for a world of pain if you think you
+> can run DRM with a driver that's composed of separate kernel modules.
 
-Signed-off-by: Vikas Sajjan <vikas.sajjan@samsung.com>
-Signed-off-by: Abhilash Kesavan <a.kesavan@samsung.com>
----
- arch/arm/mach-exynos/pm.c |  149 ++++++++++++++++++++++++++++++++++++++++++++-
- 1 file changed, 148 insertions(+), 1 deletion(-)
+I was talking about the external RGB to HDMI encoder, should the driver
+for this encoder (which is not on On Chip block) be compiled
+statically too ?
 
-diff --git a/arch/arm/mach-exynos/pm.c b/arch/arm/mach-exynos/pm.c
-index 4153b5d..b6a957d 100644
---- a/arch/arm/mach-exynos/pm.c
-+++ b/arch/arm/mach-exynos/pm.c
-@@ -39,6 +39,8 @@
- 
- #define REG_TABLE_END (-1U)
- 
-+#define EXYNOS5420_CPU_STATE	0x28
-+
- /**
-  * struct exynos_wkup_irq - Exynos GIC to PMU IRQ mapping
-  * @hwirq: Hardware IRQ signal of the GIC
-@@ -77,6 +79,9 @@ struct exynos_pm_data {
- 
- struct exynos_pm_data *pm_data;
- 
-+static int exynos5420_cpu_state;
-+static unsigned int exynos_pmu_spare3;
-+
- /*
-  * GIC wake-up support
-  */
-@@ -106,6 +111,23 @@ unsigned int exynos_release_ret_regs[] = {
- 	REG_TABLE_END,
- };
- 
-+unsigned int exynos5420_release_ret_regs[] = {
-+	EXYNOS_PAD_RET_DRAM_OPTION,
-+	EXYNOS_PAD_RET_MAUDIO_OPTION,
-+	EXYNOS_PAD_RET_JTAG_OPTION,
-+	EXYNOS5420_PAD_RET_GPIO_OPTION,
-+	EXYNOS5420_PAD_RET_UART_OPTION,
-+	EXYNOS5420_PAD_RET_MMCA_OPTION,
-+	EXYNOS5420_PAD_RET_MMCB_OPTION,
-+	EXYNOS5420_PAD_RET_MMCC_OPTION,
-+	EXYNOS5420_PAD_RET_HSI_OPTION,
-+	EXYNOS_PAD_RET_EBIA_OPTION,
-+	EXYNOS_PAD_RET_EBIB_OPTION,
-+	EXYNOS5420_PAD_RET_SPI_OPTION,
-+	EXYNOS5420_PAD_RET_DRAM_COREBLK_OPTION,
-+	REG_TABLE_END,
-+};
-+
- static int exynos_irq_set_wake(struct irq_data *data, unsigned int state)
- {
- 	const struct exynos_wkup_irq *wkup_irq;
-@@ -266,10 +288,22 @@ static int exynos_cpu_do_idle(void)
- 	return 1; /* Aborting suspend */
- }
- 
--static int exynos_cpu_suspend(unsigned long arg)
-+static void exynos_flush_cache_all(void)
- {
- 	flush_cache_all();
- 	outer_flush_all();
-+}
-+
-+static int exynos_cpu_suspend(unsigned long arg)
-+{
-+	exynos_flush_cache_all();
-+	return exynos_cpu_do_idle();
-+}
-+
-+static int exynos5420_cpu_suspend(unsigned long arg)
-+{
-+	exynos_flush_cache_all();
-+	__raw_writel(0x0, sysram_base_addr + EXYNOS5420_CPU_STATE);
- 	return exynos_cpu_do_idle();
- }
- 
-@@ -304,6 +338,49 @@ static void exynos_pm_prepare(void)
- 	exynos_pm_enter_sleep_mode();
- }
- 
-+static void exynos5420_pm_prepare(void)
-+{
-+	unsigned int tmp;
-+
-+	/* Set wake-up mask registers */
-+	exynos_pm_set_wakeup_mask();
-+
-+	s3c_pm_do_save(exynos_core_save, ARRAY_SIZE(exynos_core_save));
-+
-+	exynos_pmu_spare3 = pmu_raw_readl(S5P_PMU_SPARE3);
-+	/*
-+	 * The cpu state needs to be saved and restored so that the
-+	 * secondary CPUs will enter low power start. Though the U-Boot
-+	 * is setting the cpu state with low power flag, the kernel
-+	 * needs to restore it back in case, the primary cpu fails to
-+	 * suspend for any reason.
-+	 */
-+	exynos5420_cpu_state = __raw_readl(sysram_base_addr +
-+						EXYNOS5420_CPU_STATE);
-+
-+	exynos_pm_enter_sleep_mode();
-+
-+	tmp = pmu_raw_readl(EXYNOS5_ARM_L2_OPTION);
-+	tmp &= ~EXYNOS5_USE_RETENTION;
-+	pmu_raw_writel(tmp, EXYNOS5_ARM_L2_OPTION);
-+
-+	tmp = pmu_raw_readl(EXYNOS5420_SFR_AXI_CGDIS1);
-+	tmp |= EXYNOS5420_UFS;
-+	pmu_raw_writel(tmp, EXYNOS5420_SFR_AXI_CGDIS1);
-+
-+	tmp = pmu_raw_readl(EXYNOS5420_ARM_COMMON_OPTION);
-+	tmp &= ~EXYNOS5420_L2RSTDISABLE_VALUE;
-+	pmu_raw_writel(tmp, EXYNOS5420_ARM_COMMON_OPTION);
-+
-+	tmp = pmu_raw_readl(EXYNOS5420_FSYS2_OPTION);
-+	tmp |= EXYNOS5420_EMULATION;
-+	pmu_raw_writel(tmp, EXYNOS5420_FSYS2_OPTION);
-+
-+	tmp = pmu_raw_readl(EXYNOS5420_PSGEN_OPTION);
-+	tmp |= EXYNOS5420_EMULATION;
-+	pmu_raw_writel(tmp, EXYNOS5420_PSGEN_OPTION);
-+}
-+
- static int exynos_pm_suspend(void)
- {
- 	unsigned long tmp;
-@@ -321,6 +398,24 @@ static int exynos_pm_suspend(void)
- 	return 0;
- }
- 
-+static int exynos5420_pm_suspend(void)
-+{
-+	u32 this_cluster;
-+
-+	exynos_pm_central_suspend();
-+
-+	/* Setting SEQ_OPTION register */
-+
-+	this_cluster = MPIDR_AFFINITY_LEVEL(read_cpuid_mpidr(), 1);
-+	if (!this_cluster)
-+		pmu_raw_writel(EXYNOS5420_ARM_USE_STANDBY_WFI0,
-+				S5P_CENTRAL_SEQ_OPTION);
-+	else
-+		pmu_raw_writel(EXYNOS5420_KFC_USE_STANDBY_WFI0,
-+				S5P_CENTRAL_SEQ_OPTION);
-+	return 0;
-+}
-+
- static void exynos_pm_release_retention(void)
- {
- 	unsigned int i;
-@@ -356,6 +451,45 @@ early_wakeup:
- 	pmu_raw_writel(0x0, S5P_INFORM1);
- }
- 
-+static void exynos5420_pm_resume(void)
-+{
-+	unsigned long tmp;
-+
-+	/* Restore the sysram cpu state register */
-+	__raw_writel(exynos5420_cpu_state,
-+		sysram_base_addr + EXYNOS5420_CPU_STATE);
-+
-+	pmu_raw_writel(EXYNOS5420_USE_STANDBY_WFI_ALL,
-+			S5P_CENTRAL_SEQ_OPTION);
-+
-+	if (exynos_pm_central_resume())
-+		goto early_wakeup;
-+
-+	/* For release retention */
-+	exynos_pm_release_retention();
-+
-+	pmu_raw_writel(exynos_pmu_spare3, S5P_PMU_SPARE3);
-+
-+	s3c_pm_do_restore_core(exynos_core_save, ARRAY_SIZE(exynos_core_save));
-+
-+early_wakeup:
-+
-+	tmp = pmu_raw_readl(EXYNOS5420_SFR_AXI_CGDIS1);
-+	tmp &= ~EXYNOS5420_UFS;
-+	pmu_raw_writel(tmp, EXYNOS5420_SFR_AXI_CGDIS1);
-+
-+	tmp = pmu_raw_readl(EXYNOS5420_FSYS2_OPTION);
-+	tmp &= ~EXYNOS5420_EMULATION;
-+	pmu_raw_writel(tmp, EXYNOS5420_FSYS2_OPTION);
-+
-+	tmp = pmu_raw_readl(EXYNOS5420_PSGEN_OPTION);
-+	tmp &= ~EXYNOS5420_EMULATION;
-+	pmu_raw_writel(tmp, EXYNOS5420_PSGEN_OPTION);
-+
-+	/* Clear SLEEP mode set in INFORM1 */
-+	pmu_raw_writel(0x0, S5P_INFORM1);
-+}
-+
- /*
-  * Suspend Ops
-  */
-@@ -441,6 +575,16 @@ static const struct exynos_pm_data exynos5250_pm_data = {
- 	.cpu_suspend	= exynos_cpu_suspend,
- };
- 
-+static struct exynos_pm_data exynos5420_pm_data = {
-+	.wkup_irq	= exynos5250_wkup_irq,
-+	.wake_disable_mask = (0x7F << 7) | (0x1F << 1),
-+	.release_ret_regs = exynos5420_release_ret_regs,
-+	.pm_resume	= exynos5420_pm_resume,
-+	.pm_suspend	= exynos5420_pm_suspend,
-+	.pm_prepare	= exynos5420_pm_prepare,
-+	.cpu_suspend	= exynos5420_cpu_suspend,
-+};
-+
- static struct of_device_id exynos_pmu_of_device_ids[] = {
- 	{
- 		.compatible = "samsung,exynos4210-pmu",
-@@ -454,6 +598,9 @@ static struct of_device_id exynos_pmu_of_device_ids[] = {
- 	}, {
- 		.compatible = "samsung,exynos5250-pmu",
- 		.data = &exynos5250_pm_data,
-+	}, {
-+		.compatible = "samsung,exynos5420-pmu",
-+		.data = &exynos5420_pm_data,
- 	},
- 	{ /*sentinel*/ },
- };
+> 
+> Also if you don't want to use deferred probe, then you're in for the
+> full hotplugging panel dance and that implies that you need to fix a
+> bunch of things in DRM (one being the framebuffer console instantiation
+> that I referred to in the other thread).
+
+For now, I wait until there is a device connected on the RGB connector
+(connector status set to connector_status_connected) before creating an
+fbdev. It might not be the cleanest way to solve this issue, but it
+works :-).
+
+> You also can't be using the
+> current device tree bindings because they all assume a dependency from
+> the display controller/output to the panel. For hotplugging you'd need
+> the dependency the other way around (the panel needs to refer to the
+> output by phandle).
+
+Here [1] is a proposal for notification support in the drm_panel
+infrastructure (which is not that complicated), and here [2] is how
+I use it in my atmel-hlcdc driver to generate hotplug events.
+
+Let me know if you want me to submit a proper patch series...
+
+Best Regards,
+
+Boris
+
+[1]http://code.bulix.org/scq4g3-86804
+[2]http://code.bulix.org/7dg501-86805
+
 -- 
-1.7.9.5
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
