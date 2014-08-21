@@ -1,566 +1,210 @@
-From: b38343@freescale.com (Robin Gong)
-Date: Thu, 21 Aug 2014 11:53:10 +0800
-Subject: [PATCH v3] spi: spi-imx: add DMA support
-Message-ID: <1408593190-1031-1-git-send-email-b38343@freescale.com>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Thu, 21 Aug 2014 12:00:40 +0800
+Subject: [PATCH 19/19] Documentation: ACPI for ARM64
+In-Reply-To: <20140820221702.GA26287@localhost>
+References: <1406206825-15590-1-git-send-email-hanjun.guo@linaro.org>
+ <CAOesGMjs1dM37ZoFA-xs7tYYaXP-XC3NjJsj291bCNoDwAXwiw@mail.gmail.com>
+ <20140812182347.GA4100@arm.com> <2152407.NpXOMHAEH6@vostro.rjw.lan>
+ <53EC2B35.5010302@linaro.org> <20140814102723.GB9039@arm.com>
+ <53EDCE56.6020702@linaro.org> <20140815100113.GA18863@arm.com>
+ <53F1C776.4080501@linaro.org> <20140820221702.GA26287@localhost>
+Message-ID: <53F56EE8.9050009@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-After enable DMA
+On 2014-8-21 6:17, Olof Johansson wrote:
+> On Mon, Aug 18, 2014 at 05:29:26PM +0800, Hanjun Guo wrote:
+>> On 2014-8-15 18:01, Catalin Marinas wrote:
+>>> Hanjun,
+>>
+>> Hi Catalin,
+>>
+>>>
+>>> On Fri, Aug 15, 2014 at 10:09:42AM +0100, Hanjun Guo wrote:
+>>>> On 2014-8-14 18:27, Catalin Marinas wrote:
+>>>>> On Thu, Aug 14, 2014 at 04:21:25AM +0100, Hanjun Guo wrote:
+>>>>>> On 2014-8-14 7:41, Rafael J. Wysocki wrote:
+>>>>>>> On Tuesday, August 12, 2014 07:23:47 PM Catalin Marinas wrote:
+>>>>>>>> If we consider ACPI unusable on ARM but we still want to start merging
+>>>>>>>> patches, we should rather make the config option depend on BROKEN
+>>>>>>>> (though if it is that unusable that no real platform can use it, I would
+>>>>>>>> rather not merge it at all at this stage).
+>>>>>>>
+>>>>>>> I agree here.
+>>>>>>>
+>>>>>>> I would recommend creating a separate branch for that living outside of the
+>>>>>>> mainline kernel and merging it when there are real users.
+>>>>>>
+>>>>>> Real users will coming soon, we already tested this patch set on real hardware
+>>>>>> (ARM64 Juno platform),
+>>>>>
+>>>>> I don't consider Juno a server platform ;) (but it's good enough for
+>>>>> development).
+>>>>>
+>>>>>> and I think ARM64 server chips and platforms will show up before 3.18
+>>>>>> is released.
+>>>>>
+>>>>> That's what I've heard/seen. The questions I have are (a) whether
+>>>>> current ACPI patchset is enough to successfully run Linux on such
+>>>>> _hardware_ platform (maybe not fully optimised, for example just WFI
+>>>>> cpuidle) and (b) whether we still want to mandate a DT in the kernel for
+>>>>> such platforms.
+>>>>
+>>>> For (a), this patch set is only for ARM64 core, not including platform
+>>>> specific device drivers, it will be covered by the binding of _DSD or
+>>>> explicit definition of PNP ID/ACPI ID(s).
+>>>
+>>> So we go back to the discussions we had few months ago in Macau. I'm not
+>>> concerned about the core ARM and architected peripherals covered by ACPI
+>>> 5.1 (as long as the current patches get positive technical review). But
+>>> I'm concerned about the additional bits needed for a real SoC like _DSD
+>>> definitions, how they get reviewed/accepted (or is it just the vendor's
+>>> problem?).
+>>
+>> As the _DSD patch set sent out by Intel folks, _DSD definitions are just
+>> DT definitions. To use _DSD or not, I think it depends on OEM use cases,
+>> we can bring up Juno without _DSD (Graeme is working on that, still need
+>> some time to clean up the code).
+>>
+>>>
+>>> I think SBSA is too vague to guarantee a kernel image running on a
+>>> compliant platform without additional (vendor-specific) tweaks. So what
+>>> I asked for is (1) a document (guide) to define the strict set of ACPI
+>>> features and bindings needed for a real SoC and (2) proof that the
+>>> guidelines are enough for real hardware. I think we have (1) under
+>>> review with some good feedback so far. As for (2), we can probably only
+>>> discuss Juno openly. I think you could share the additional Juno patches
+>>> on this list so that reviewers can assess the suitability. If we deem
+>>> ACPI not (yet) suitable for Juno, is there other platform we could see
+>>> patches for?
+>>
+>> Ok, we will send out all the patches for Juno in next version for review,
+>> as mentioned above, we still need more time to clean up the code.
+>>
+>>>
+>>>>> Given the answer to (a) and what other features are needed, we may or
+>>>>> may not mandate (b). We were pretty clear few months ago that (b) is
+>>>>> still required but at the time we were only openly talking about ACPI
+>>>>> 5.0 which was lacking many features. I think we need to revisit that
+>>>>> position based on how usable ACPI 5.1 for ARM (and current kernel
+>>>>> implementation) is. Would you mind elaborating what an ACPI-only
+>>>>> platform miss?
+>>>>
+>>>> Do you mean something still missing? We still miss some features for
+>>>> ARM in ACPI, but I think they are not critical, here is the list I can
+>>>> remember:
+>>>> - ITS for GICv3/4;
+>>>> - SMMU support;
+>>>> - CPU idle control.
+>>>
+>>> I agree, these are not critical at this stage. But they only refer to
+>>> architected peripherals. Is there anything else missing for an SoC? Do
+>>> we need to define clocks?
+>>
+>> No, I prefer not. As we discussed in this thread before, we don't need
+>> clock definition if we use SBSA compatible UART on Juno.
+>>
+>>>
+>>>> For ACPI 5.1, it fixes many problems for ARM:
+>>>> - weak definition for GIC, so we introduce visualization, v2m and
+>>>>   part of GICv3/4 (redistributors) support.
+>>>> - No support for PSCI. Fix it to support PSCI 0.2+;
+>>>> - Not support for Always-on timer and SBSA-L1 watchdog.
+>>>
+>>> These are all good, that's why we shouldn't even talk about ACPI 5.0 in
+>>> the ARM context.
+>>>
+>>>> - How to describe device properties, so _DSD is introduced for
+>>>>   device probe.
+>>>
+>>> For the last bullet, is there any review process (at least like what we
+>>> have for DT bindings)? On top of such process, do we have guidelines and
+>>> example code on how the Linux support should be implemented. As Olof
+>>> mentioned, should we see how the DT and ACPI probing paths work
+>>> together? I really think we should be very clear here and not let
+>>> vendors invent their own independent methods.
+>>
+>> As said above, Intel folks provided some good examples for that, and
+>> clarified a lot of things:
+>>
+>> https://lkml.org/lkml/2014/8/17/10
+>>
+>>>
+>>>>> I would expect a new server platform designed with ACPI in mind to
+>>>>> require minimal SoC specific code, so we may only see a few patches
+>>>>> under drivers/ for such platforms adding ACPI-specific probing (possibly
+>>>>> new drivers as well if it's a new component).
+>>>>>
+>>>>>> For this patch set, DT is the first class citizen at now:
+>>>>>>
+>>>>>> a) We can always set CONFIG_ACPI as off in Kconfig, and use DT only;
+>>>>>
+>>>>> Not just off but, based on maturity, depend on EXPERT.
+>>>>
+>>>> Ok. And don't set ACPI default off (pass acpi=on to enable it)?
+>>>
+>>> That's my view, just make it clear ACPI is experimental at the Kconfig
+>>> level because longer term we won't mandate SoCs to provide both DT and
+>>> ACPI tables.
+>>
+>> I agree with you that if we set ACPI default off, firmware will always
+>> pass acpi=on if they want to use ACPI, so I think it would be better
+>> to depend on EXPERT instead.
+>>
+>> Olof, is it ok to you too?
+> 
+> Given that we're going through all these complex schemes to merge code
+> that isn't ready and keeping it off by default, the answer is really
+> to continue holding off merging it.
+> 
+> We already had agreement from earlier this year that we needed to see
+> several systems in the _market_ that uses ACPI before we have an idea of
+> how messy they will be in reality. Not eval boards, development systems
+> or reference designs. None of the current discussion has changed that.
 
-spi-nor read speed is
-dd if=/dev/mtd0 of=/dev/null bs=1M count=1
-1+0 records in
-1+0 records out
-1048576 bytes (1.0 MB) copied, 0.720402 s, 1.5 MB/s
+I think some SBSA compatible ARM64 server boards would work, such as Seattle
+board, right?
 
-spi-nor write speed is
-dd if=/dev/zero of=/dev/mtd0 bs=1M count=1
-1+0 records in
-1+0 records out
-1048576 bytes (1.0 MB) copied, 3.56044 s, 295 kB/s
+> 
+> There's also the concern that there are still significant portions missing
+> from 5.1 that won't be there until 5.2 or later. Having experimental
+> 5.1 support for a few systems (out of tree) is likely going to result in
+> finding out things that don't work well and should be revised -- if we
+> don't merge this now then we can avoid having to keep the 5.1 backwards
+> compatibility forever. Compare this to how we've been regretting some
+> of the early-defined bindings on DT and wish we didn't have to keep
+> them around. Please learn from our mistakes. :-)
 
-Before enable DMA
+Yes, there are some features missing in ACPI 5.1, and I list them out
+in previous email replying Catalin, as I said, they are not critical
+for ARM64 for now.
 
-spi-nor read speed is
-dd if=/dev/mtd0 of=/dev/null bs=1M count=1
-1+0 records in
-1+0 records out
-1048576 bytes (1.0 MB) copied, 2.37717 s, 441 kB/s
+> 
+> On the patches themselves:
+> 
+> It's great to see the patch sets posted, and they're looking pretty good
+> -- things are very much heading in the right direction. My main remaining
+> objection is around how it is integrated with the arch code. I don't
+> like seeing all the dual code paths that ACPI introduces. It's obvious
+> that two completely different entities have written the ACPI and the DT
+> portions of the kernel, and we can't really have that situation for a
+> brand new architecture like this.
+> 
+> So, I'd like to see closer integration between the two before code
+> goes in. More shared code path and driving the differences through data
+> (or possibly function pointers in places, etc), and fewer completely
+> separate implementations.
 
-spi-nor write speed is
+I'm working on it, I hope I can achieve that, you know, it needs
+more efforts to do it :)
 
-dd if=/dev/zero of=/dev/mtd0 bs=1M count=1
-1+0 records in
-1+0 records out
-1048576 bytes (1.0 MB) copied, 4.83181 s, 217 kB/s
+> 
+> Until then, please keep posting patches for review -- it's useful
+> to see where it's going. I think it's also useful to get the generic
+> ACPI integration merged as it has been already (with pieces going in
+> over time).
 
-Signed-off-by: Frank Li <Frank.Li@freescale.com>
-Signed-off-by: Robin Gong <b38343@freescale.com>
+Sure I will :)
 
----
-Change from v2:
-http://thread.gmane.org/gmane.linux.ports.arm.kernel/291722/focus=294363
-1. dma setup only for imx51-ecspi
-2. use one small dummy buffer(1 bd size) to templiy store data
-   for meanless rx/tx, instead of malloc the actual transfer size.
-3. split spi_mx_sdma_transfer to smaller and easily to read.
-4. fix some code indent.
----
- drivers/spi/spi-imx.c |  398 ++++++++++++++++++++++++++++++++++++++++++++++++-
- 1 file changed, 392 insertions(+), 6 deletions(-)
-
-diff --git a/drivers/spi/spi-imx.c b/drivers/spi/spi-imx.c
-index a5474ef..0c81a66 100644
---- a/drivers/spi/spi-imx.c
-+++ b/drivers/spi/spi-imx.c
-@@ -39,6 +39,9 @@
- #include <linux/of_gpio.h>
- 
- #include <linux/platform_data/spi-imx.h>
-+#include <linux/dma-mapping.h>
-+#include <linux/platform_data/dma-imx.h>
-+#include <linux/dmaengine.h>
- 
- #define DRIVER_NAME "spi_imx"
- 
-@@ -52,6 +55,10 @@
- #define MXC_INT_RR	(1 << 0) /* Receive data ready interrupt */
- #define MXC_INT_TE	(1 << 1) /* Transmit FIFO empty interrupt */
- 
-+/* The maximum  bytes that a sdma BD can transfer.*/
-+#define MAX_SDMA_BD_BYTES  (1 << 15)
-+#define IMX_DMA_TIMEOUT (msecs_to_jiffies(3000))
-+
- struct spi_imx_config {
- 	unsigned int speed_hz;
- 	unsigned int bpw;
-@@ -84,6 +91,7 @@ struct spi_imx_data {
- 
- 	struct completion xfer_done;
- 	void __iomem *base;
-+	phys_addr_t pbase;
- 	int irq;
- 	struct clk *clk_per;
- 	struct clk *clk_ipg;
-@@ -92,6 +100,27 @@ struct spi_imx_data {
- 	unsigned int count;
- 	void (*tx)(struct spi_imx_data *);
- 	void (*rx)(struct spi_imx_data *);
-+	int (*txrx_bufs)(struct spi_device *spi, struct spi_transfer *t);
-+	struct dma_chan *dma_chan_rx;
-+	struct dma_chan *dma_chan_tx;
-+	unsigned int dma_is_inited;
-+	struct device *dev;
-+
-+	struct completion dma_rx_completion;
-+	struct completion dma_tx_completion;
-+
-+	void *dummy_buf;
-+	dma_addr_t dummy_dma;
-+	dma_addr_t dma_rx_phy_addr;
-+	dma_addr_t dma_tx_phy_addr;
-+
-+	unsigned int usedma;
-+	unsigned int dma_finished;
-+	/* SDMA wartermark */
-+	u32 rx_wml;
-+	u32 tx_wml;
-+	u32 rxt_wml;
-+
- 	void *rx_buf;
- 	const void *tx_buf;
- 	unsigned int txfifo; /* number of words pushed in tx FIFO */
-@@ -185,6 +214,7 @@ static unsigned int spi_imx_clkdiv_2(unsigned int fin,
- #define MX51_ECSPI_CTRL		0x08
- #define MX51_ECSPI_CTRL_ENABLE		(1 <<  0)
- #define MX51_ECSPI_CTRL_XCH		(1 <<  2)
-+#define MX51_ECSPI_CTRL_SMC		(1 << 3)
- #define MX51_ECSPI_CTRL_MODE_MASK	(0xf << 4)
- #define MX51_ECSPI_CTRL_POSTDIV_OFFSET	8
- #define MX51_ECSPI_CTRL_PREDIV_OFFSET	12
-@@ -202,6 +232,18 @@ static unsigned int spi_imx_clkdiv_2(unsigned int fin,
- #define MX51_ECSPI_INT_TEEN		(1 <<  0)
- #define MX51_ECSPI_INT_RREN		(1 <<  3)
- 
-+#define MX51_ECSPI_DMA      0x14
-+#define MX51_ECSPI_DMA_TX_WML_OFFSET	0
-+#define MX51_ECSPI_DMA_TX_WML_MASK	0x3F
-+#define MX51_ECSPI_DMA_RX_WML_OFFSET	16
-+#define MX51_ECSPI_DMA_RX_WML_MASK	(0x3F << 16)
-+#define MX51_ECSPI_DMA_RXT_WML_OFFSET	24
-+#define MX51_ECSPI_DMA_RXT_WML_MASK	(0x3F << 24)
-+
-+#define MX51_ECSPI_DMA_TEDEN_OFFSET	7
-+#define MX51_ECSPI_DMA_RXDEN_OFFSET	23
-+#define MX51_ECSPI_DMA_RXTDEN_OFFSET	31
-+
- #define MX51_ECSPI_STAT		0x18
- #define MX51_ECSPI_STAT_RR		(1 <<  3)
- 
-@@ -258,17 +300,22 @@ static void __maybe_unused mx51_ecspi_intctrl(struct spi_imx_data *spi_imx, int
- 
- static void __maybe_unused mx51_ecspi_trigger(struct spi_imx_data *spi_imx)
- {
--	u32 reg;
--
--	reg = readl(spi_imx->base + MX51_ECSPI_CTRL);
--	reg |= MX51_ECSPI_CTRL_XCH;
-+	u32 reg = readl(spi_imx->base + MX51_ECSPI_CTRL);
-+
-+	if (!spi_imx->usedma)
-+		reg |= MX51_ECSPI_CTRL_XCH;
-+	else if (!spi_imx->dma_finished)
-+		reg |= MX51_ECSPI_CTRL_SMC;
-+	else
-+		reg &= ~MX51_ECSPI_CTRL_SMC;
- 	writel(reg, spi_imx->base + MX51_ECSPI_CTRL);
- }
- 
- static int __maybe_unused mx51_ecspi_config(struct spi_imx_data *spi_imx,
- 		struct spi_imx_config *config)
- {
--	u32 ctrl = MX51_ECSPI_CTRL_ENABLE, cfg = 0;
-+	u32 ctrl = MX51_ECSPI_CTRL_ENABLE, cfg = 0, dma = 0;
-+	u32 tx_wml_cfg, rx_wml_cfg, rxt_wml_cfg;
- 	u32 clk = config->speed_hz, delay;
- 
- 	/*
-@@ -320,6 +367,30 @@ static int __maybe_unused mx51_ecspi_config(struct spi_imx_data *spi_imx,
- 	else			/* SCLK is _very_ slow */
- 		usleep_range(delay, delay + 10);
- 
-+	/*
-+	 * Configure the DMA register: setup the watermark
-+	 * and enable DMA request.
-+	 */
-+	if (spi_imx->dma_is_inited) {
-+		dma = readl(spi_imx->base + MX51_ECSPI_DMA);
-+
-+		spi_imx->tx_wml = spi_imx_get_fifosize(spi_imx) / 2;
-+		spi_imx->rx_wml = spi_imx_get_fifosize(spi_imx) / 2;
-+		spi_imx->rxt_wml = spi_imx_get_fifosize(spi_imx) / 2;
-+		rx_wml_cfg = spi_imx->rx_wml << MX51_ECSPI_DMA_RX_WML_OFFSET;
-+		tx_wml_cfg = spi_imx->tx_wml << MX51_ECSPI_DMA_TX_WML_OFFSET;
-+		rxt_wml_cfg = spi_imx->rxt_wml << MX51_ECSPI_DMA_RXT_WML_OFFSET;
-+		dma = (dma & ~MX51_ECSPI_DMA_TX_WML_MASK
-+				   & ~MX51_ECSPI_DMA_RX_WML_MASK
-+				   & ~MX51_ECSPI_DMA_RXT_WML_MASK)
-+				   | rx_wml_cfg | tx_wml_cfg | rxt_wml_cfg
-+				   |(1 << MX51_ECSPI_DMA_TEDEN_OFFSET)
-+				   |(1 << MX51_ECSPI_DMA_RXDEN_OFFSET)
-+				   |(1 << MX51_ECSPI_DMA_RXTDEN_OFFSET);
-+
-+		writel(dma, spi_imx->base + MX51_ECSPI_DMA);
-+	}
-+
- 	return 0;
- }
- 
-@@ -731,7 +802,225 @@ static int spi_imx_setupxfer(struct spi_device *spi,
- 	return 0;
- }
- 
--static int spi_imx_transfer(struct spi_device *spi,
-+static void spi_imx_sdma_exit(struct spi_imx_data *spi_imx)
-+{
-+	if (spi_imx->dma_chan_rx) {
-+		dma_release_channel(spi_imx->dma_chan_rx);
-+		spi_imx->dma_chan_rx = NULL;
-+	}
-+
-+	if (spi_imx->dma_chan_tx) {
-+		dma_release_channel(spi_imx->dma_chan_tx);
-+		spi_imx->dma_chan_tx = NULL;
-+	}
-+
-+	spi_imx->dma_is_inited = 0;
-+}
-+
-+static void spi_imx_dma_rx_callback(void *cookie)
-+{
-+	struct spi_imx_data *spi_imx = (struct spi_imx_data *)cookie;
-+
-+	complete(&spi_imx->dma_rx_completion);
-+
-+}
-+
-+static void spi_imx_dma_tx_callback(void *cookie)
-+{
-+	struct spi_imx_data *spi_imx = (struct spi_imx_data *)cookie;
-+
-+	complete(&spi_imx->dma_tx_completion);
-+}
-+
-+static struct scatterlist *spi_imx_sdma_submit(struct spi_imx_data *spi_imx,
-+					  struct spi_transfer *transfer,
-+					  bool is_tx, bool is_tx_dummy,
-+					  bool is_rx_dummy)
-+{
-+	int sg_num;
-+	int loop;
-+	struct scatterlist *sg_rxtx;
-+	unsigned len = transfer->len;
-+	const void *rxtxbuf;
-+	dma_addr_t rxtx_dma = (is_tx ? transfer->tx_dma : transfer->rx_dma);
-+	struct dma_async_tx_descriptor *rxtxdesc;
-+	enum dma_data_direction direction = is_tx ? DMA_TO_DEVICE :
-+					    DMA_FROM_DEVICE;
-+	bool dummy = false;
-+	struct dma_chan *dma_chan = (is_tx ? spi_imx->dma_chan_tx :
-+				     spi_imx->dma_chan_rx);
-+
-+	if ((is_tx && is_tx_dummy) || (!is_tx && is_rx_dummy)) {
-+		rxtxbuf = spi_imx->dummy_buf;
-+		rxtx_dma = spi_imx->dummy_dma;
-+		len = MAX_SDMA_BD_BYTES;
-+		dummy = true;
-+	} else if (is_tx) {
-+		rxtxbuf = transfer->tx_buf;
-+	} else {
-+		rxtxbuf = transfer->rx_buf;
-+	}
-+
-+	if (!dummy) {
-+		rxtx_dma = dma_map_single(spi_imx->dev,
-+					(void *)rxtxbuf, len,
-+					direction);
-+		if (dma_mapping_error(spi_imx->dev, rxtx_dma)) {
-+			dev_err(spi_imx->dev,
-+			"Memory dma map fail, line = %d\n", __LINE__);
-+			goto err_rxtx;
-+		}
-+		if (is_tx)
-+			transfer->tx_dma = rxtx_dma;
-+		else
-+			transfer->rx_dma = rxtx_dma;
-+	}
-+	/* Prepare sg for txrx sdma. */
-+	sg_num = ((transfer->len - 1) / MAX_SDMA_BD_BYTES) + 1;
-+	sg_rxtx = kzalloc(sg_num * sizeof(struct scatterlist), GFP_KERNEL);
-+	if (NULL == sg_rxtx) {
-+		dev_err(spi_imx->dev,
-+			"Memory allocate fail, line = %d\n",
-+			__LINE__);
-+		goto err_rxtx_sg;
-+	}
-+	sg_init_table(sg_rxtx, sg_num);
-+	for (loop = 0; loop < (sg_num - 1); loop++) {
-+		if (dummy)
-+			sg_dma_address(&sg_rxtx[loop]) = rxtx_dma;
-+		else
-+			sg_dma_address(&sg_rxtx[loop]) =
-+				rxtx_dma + loop * MAX_SDMA_BD_BYTES;
-+		sg_dma_len(&sg_rxtx[loop]) = MAX_SDMA_BD_BYTES;
-+	}
-+
-+	if (dummy)
-+		sg_dma_address(&sg_rxtx[loop]) = rxtx_dma;
-+	else
-+		sg_dma_address(&sg_rxtx[loop]) =
-+			rxtx_dma + loop * MAX_SDMA_BD_BYTES;
-+	sg_dma_len(&sg_rxtx[loop]) = transfer->len - loop * MAX_SDMA_BD_BYTES;
-+
-+	rxtxdesc = dmaengine_prep_slave_sg(dma_chan,
-+			sg_rxtx, sg_num , direction, DMA_PREP_INTERRUPT);
-+	if (!rxtxdesc)
-+		goto err_desc;
-+
-+	rxtxdesc->callback = (is_tx ? spi_imx_dma_tx_callback :
-+			   spi_imx_dma_rx_callback);
-+	rxtxdesc->callback_param = (void *)spi_imx;
-+
-+	dmaengine_submit(rxtxdesc);
-+
-+	return sg_rxtx;
-+err_desc:
-+	kfree(sg_rxtx);
-+err_rxtx_sg:
-+	if (!dummy) {
-+		dma_unmap_single(spi_imx->dev, rxtx_dma,
-+			len, direction);
-+		if (is_tx)
-+			transfer->tx_dma = NULL;
-+		else
-+			transfer->rx_dma = NULL;
-+
-+	}
-+err_rxtx:
-+	return NULL;
-+}
-+
-+static int spi_imx_sdma_transfer(struct spi_device *spi,
-+				struct spi_transfer *transfer)
-+{
-+	struct spi_imx_data *spi_imx = spi_master_get_devdata(spi->master);
-+	int ret = 0;
-+	int left;
-+	u32 dma;
-+	bool is_tx_dummy = false;
-+	bool is_rx_dummy = false;
-+
-+	struct scatterlist *sg_rx, *sg_tx;
-+
-+	if (transfer->tx_buf && transfer->rx_buf) {
-+		dev_warn(spi_imx->dev, "null data need transfer\n");
-+		return 0;
-+	} else if (!transfer->tx_buf) {
-+		is_tx_dummy = true;
-+	} else if (!transfer->rx_buf) {
-+		is_rx_dummy = true;
-+	}
-+
-+	reinit_completion(&spi_imx->dma_rx_completion);
-+	reinit_completion(&spi_imx->dma_tx_completion);
-+
-+	sg_tx = spi_imx_sdma_submit(spi_imx, transfer, true, is_tx_dummy,
-+				    is_rx_dummy);
-+	if (!sg_tx)
-+		goto err_tx;
-+
-+	sg_rx = spi_imx_sdma_submit(spi_imx, transfer, false, is_tx_dummy,
-+				    is_rx_dummy);
-+	if (!sg_rx)
-+		goto err_rx;
-+	/* Trigger the cspi module. */
-+	spi_imx->dma_finished = 0;
-+
-+	spi_imx->devtype_data->trigger(spi_imx);
-+
-+	dma_async_issue_pending(spi_imx->dma_chan_tx);
-+	dma_async_issue_pending(spi_imx->dma_chan_rx);
-+	/* Wait SDMA to finish the data transfer.*/
-+	ret = wait_for_completion_timeout(&spi_imx->dma_tx_completion,
-+						IMX_DMA_TIMEOUT);
-+	if (!ret) {
-+		dev_err(spi_imx->dev,
-+			"I/O Error in DMA TX, line = %d ####\n", __LINE__);
-+		dmaengine_terminate_all(spi_imx->dma_chan_tx);
-+		goto err_desc;
-+	} else {
-+		dma = readl(spi_imx->base + MX51_ECSPI_DMA);
-+		dma = dma & (~MX51_ECSPI_DMA_RXT_WML_MASK);
-+		/* Change RX_DMA_LENGTH trigger dma fetch tail data */
-+		left = transfer->len & (~spi_imx->rxt_wml);
-+		if (left)
-+			writel(dma | (left << MX51_ECSPI_DMA_RXT_WML_OFFSET),
-+					spi_imx->base + MX51_ECSPI_DMA);
-+
-+		ret = wait_for_completion_timeout(&spi_imx->dma_rx_completion,
-+				IMX_DMA_TIMEOUT);
-+		writel(dma |
-+		       spi_imx->rxt_wml << MX51_ECSPI_DMA_RXT_WML_OFFSET,
-+		       spi_imx->base + MX51_ECSPI_DMA);
-+		if (!ret) {
-+			dev_err(spi_imx->dev,
-+				"I/O Error in DMA RX. len %d, line = %d\n",
-+					transfer->len,
-+					__LINE__);
-+			spi_imx->devtype_data->reset(spi_imx);
-+			dmaengine_terminate_all(spi_imx->dma_chan_rx);
-+		}
-+	}
-+
-+err_desc:
-+	kfree(sg_rx);
-+	if (!is_rx_dummy && transfer->rx_dma)
-+		dma_unmap_single(spi_imx->dev, transfer->rx_dma,
-+			transfer->len, DMA_TO_DEVICE);
-+err_rx:
-+	kfree(sg_tx);
-+	if (!is_tx_dummy && transfer->tx_dma)
-+		dma_unmap_single(spi_imx->dev, transfer->tx_dma,
-+			transfer->len, DMA_FROM_DEVICE);
-+err_tx:
-+	spi_imx->dma_finished = 1;
-+	spi_imx->devtype_data->trigger(spi_imx);
-+	if (!ret)
-+		return -EIO;
-+	else
-+		return transfer->len;
-+}
-+
-+static int spi_imx_pio_transfer(struct spi_device *spi,
- 				struct spi_transfer *transfer)
- {
- 	struct spi_imx_data *spi_imx = spi_master_get_devdata(spi->master);
-@@ -752,6 +1041,25 @@ static int spi_imx_transfer(struct spi_device *spi,
- 	return transfer->len;
- }
- 
-+static int spi_imx_transfer(struct spi_device *spi,
-+				struct spi_transfer *transfer)
-+{
-+	struct spi_imx_data *spi_imx = spi_master_get_devdata(spi->master);
-+
-+	/*
-+	 * Don't use sdma when the size of data to be transfered is
-+	 * lower then SDMA wartermark.
-+	 */
-+	if (spi_imx->dma_is_inited && (transfer->len > spi_imx->rx_wml)
-+	    && (transfer->len > spi_imx->tx_wml)) {
-+		spi_imx->usedma = 1;
-+		return spi_imx_sdma_transfer(spi, transfer);
-+	} else {
-+		spi_imx->usedma = 0;
-+		return spi_imx_pio_transfer(spi, transfer);
-+	}
-+}
-+
- static int spi_imx_setup(struct spi_device *spi)
- {
- 	struct spi_imx_data *spi_imx = spi_master_get_devdata(spi->master);
-@@ -801,6 +1109,66 @@ spi_imx_unprepare_message(struct spi_master *master, struct spi_message *msg)
- 	return 0;
- }
- 
-+static int spi_imx_sdma_init(struct spi_imx_data *spi_imx)
-+{
-+	struct dma_slave_config slave_config = {};
-+	struct device *dev = spi_imx->dev;
-+	int ret;
-+
-+	/* Prepare for TX DMA: */
-+	spi_imx->dma_chan_tx = dma_request_slave_channel(dev, "tx");
-+	if (!spi_imx->dma_chan_tx) {
-+		dev_err(dev, "cannot get the TX DMA channel!\n");
-+		ret = -EINVAL;
-+		goto err;
-+	}
-+
-+	slave_config.direction = DMA_MEM_TO_DEV;
-+	slave_config.dst_addr = spi_imx->pbase + MXC_CSPITXDATA;
-+	slave_config.dst_addr_width = DMA_SLAVE_BUSWIDTH_1_BYTE;
-+	slave_config.dst_maxburst = spi_imx_get_fifosize(spi_imx) / 2;
-+	ret = dmaengine_slave_config(spi_imx->dma_chan_tx, &slave_config);
-+	if (ret) {
-+		dev_err(dev, "error in TX dma configuration.");
-+		goto err;
-+	}
-+
-+	/* Prepare for RX : */
-+	spi_imx->dma_chan_rx = dma_request_slave_channel(dev, "rx");
-+	if (!spi_imx->dma_chan_rx) {
-+		dev_dbg(dev, "cannot get the DMA channel.\n");
-+		ret = -EINVAL;
-+		goto err;
-+	}
-+
-+	slave_config.direction = DMA_DEV_TO_MEM;
-+	slave_config.src_addr = spi_imx->pbase + MXC_CSPIRXDATA;
-+	slave_config.src_addr_width = DMA_SLAVE_BUSWIDTH_1_BYTE;
-+	slave_config.src_maxburst = spi_imx_get_fifosize(spi_imx) / 2;
-+	ret = dmaengine_slave_config(spi_imx->dma_chan_rx, &slave_config);
-+	if (ret) {
-+		dev_err(dev, "error in RX dma configuration.\n");
-+		goto err;
-+	}
-+
-+	spi_imx->dummy_buf = dma_alloc_coherent(dev, MAX_SDMA_BD_BYTES,
-+						&spi_imx->dummy_dma,
-+						GFP_KERNEL);
-+	if (!spi_imx->dummy_buf) {
-+		dev_err(dev, "error in dummy buf alloc.\n");
-+		goto err;
-+	}
-+
-+	init_completion(&spi_imx->dma_rx_completion);
-+	init_completion(&spi_imx->dma_tx_completion);
-+	spi_imx->dma_is_inited = 1;
-+
-+	return 0;
-+err:
-+	spi_imx_sdma_exit(spi_imx);
-+	return ret;
-+}
-+
- static int spi_imx_probe(struct platform_device *pdev)
- {
- 	struct device_node *np = pdev->dev.of_node;
-@@ -872,6 +1240,8 @@ static int spi_imx_probe(struct platform_device *pdev)
- 		(struct spi_imx_devtype_data *) pdev->id_entry->driver_data;
- 
- 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	if (res)
-+		spi_imx->pbase = res->start;
- 	spi_imx->base = devm_ioremap_resource(&pdev->dev, res);
- 	if (IS_ERR(spi_imx->base)) {
- 		ret = PTR_ERR(spi_imx->base);
-@@ -913,6 +1283,15 @@ static int spi_imx_probe(struct platform_device *pdev)
- 
- 	spi_imx->spi_clk = clk_get_rate(spi_imx->clk_per);
- 
-+	spi_imx->dev = &pdev->dev;
-+	/*
-+	 * Only validated on i.mx6 now, can remove the constrain if validated on
-+	 * other chips.
-+	 */
-+	if (spi_imx->devtype_data == &imx51_ecspi_devtype_data
-+	    && spi_imx_sdma_init(spi_imx))
-+		dev_err(&pdev->dev, "dma setup error,use pio instead\n");
-+
- 	spi_imx->devtype_data->reset(spi_imx);
- 
- 	spi_imx->devtype_data->intctrl(spi_imx, 0);
-@@ -931,6 +1310,9 @@ static int spi_imx_probe(struct platform_device *pdev)
- 	return ret;
- 
- out_clk_put:
-+	if (spi_imx->dma_is_inited)
-+		dma_free_coherent(&pdev->dev, MAX_SDMA_BD_BYTES,
-+				  spi_imx->dummy_buf, spi_imx->dummy_dma);
- 	clk_disable_unprepare(spi_imx->clk_ipg);
- out_put_per:
- 	clk_disable_unprepare(spi_imx->clk_per);
-@@ -947,6 +1329,10 @@ static int spi_imx_remove(struct platform_device *pdev)
- 
- 	spi_bitbang_stop(&spi_imx->bitbang);
- 
-+	if (spi_imx->dma_is_inited)
-+		dma_free_coherent(&pdev->dev, MAX_SDMA_BD_BYTES,
-+				  spi_imx->dummy_buf, spi_imx->dummy_dma);
-+
- 	writel(0, spi_imx->base + MXC_CSPICTRL);
- 	clk_disable_unprepare(spi_imx->clk_ipg);
- 	clk_disable_unprepare(spi_imx->clk_per);
--- 
-1.7.9.5
+Thanks
+Hanjun
