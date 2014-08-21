@@ -1,46 +1,31 @@
-From: zhangfei.gao@linaro.org (Zhangfei Gao)
-Date: Thu, 21 Aug 2014 17:24:45 +0800
-Subject: [PATCH v2 3/3] [media] rc: remove change_protocol in rc-ir-raw.c
-In-Reply-To: <1408613086-12538-1-git-send-email-zhangfei.gao@linaro.org>
-References: <1408613086-12538-1-git-send-email-zhangfei.gao@linaro.org>
-Message-ID: <1408613086-12538-4-git-send-email-zhangfei.gao@linaro.org>
+From: drake@endlessm.com (Daniel Drake)
+Date: Thu, 21 Aug 2014 10:26:30 +0100
+Subject: [PATCH 2/2] ARM: mm: don't limit default CMA region only to low
+ memory
+In-Reply-To: <1408610714-16204-3-git-send-email-m.szyprowski@samsung.com>
+References: <1408610714-16204-1-git-send-email-m.szyprowski@samsung.com>
+ <1408610714-16204-3-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <CAD8Lp44MHLv_C0SscRAxq_09Ux+Uz=9B3KvDKvUkamBenoSm=Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With commit 4924a311a62f ("[media] rc-core: rename ir-raw.c"),
-empty change_protocol was introduced.
-As a result, rc_register_device will set dev->enabled_protocols
-addording to rc_map->rc_type, which prevent using all protocols.
+Hi Marek,
 
-Signed-off-by: Zhangfei Gao <zhangfei.gao@linaro.org>
----
- drivers/media/rc/rc-ir-raw.c |    7 -------
- 1 file changed, 7 deletions(-)
+On Thu, Aug 21, 2014 at 9:45 AM, Marek Szyprowski
+<m.szyprowski@samsung.com> wrote:
+> DMA-mapping supports CMA regions places either in low or high memory, so
+> there is no longer needed to limit default CMA regions only to low memory.
+> The real limit is still defined by architecture specific DMA limit.
 
-diff --git a/drivers/media/rc/rc-ir-raw.c b/drivers/media/rc/rc-ir-raw.c
-index e8fff2a..a118539 100644
---- a/drivers/media/rc/rc-ir-raw.c
-+++ b/drivers/media/rc/rc-ir-raw.c
-@@ -240,12 +240,6 @@ ir_raw_get_allowed_protocols(void)
- 	return protocols;
- }
- 
--static int change_protocol(struct rc_dev *dev, u64 *rc_type)
--{
--	/* the caller will update dev->enabled_protocols */
--	return 0;
--}
--
- /*
-  * Used to (un)register raw event clients
-  */
-@@ -263,7 +257,6 @@ int ir_raw_event_register(struct rc_dev *dev)
- 
- 	dev->raw->dev = dev;
- 	dev->enabled_protocols = ~0;
--	dev->change_protocol = change_protocol;
- 	rc = kfifo_alloc(&dev->raw->kfifo,
- 			 sizeof(struct ir_raw_event) * MAX_IR_EVENT_SIZE,
- 			 GFP_KERNEL);
--- 
-1.7.9.5
+Thanks for working on this!
+
+I think you need to update the comment here though, which still says:
+    /*
+     * reserve memory for DMA contigouos allocations,
+     * must come from DMA area inside low memory
+     */
+
+If you're making a second version, as a minor nitpick you could also
+s/places/placed in the commit message.
+
+Daniel
