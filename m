@@ -1,36 +1,276 @@
-From: hs@denx.de (Heiko Schocher)
-Date: Thu, 21 Aug 2014 08:13:17 +0200
-Subject: Handling commit change logs
-In-Reply-To: <CAOh2x=mO1r76fkvruvBLaL144G8fHgDPMwhKVCxv4HW8FRUE_Q@mail.gmail.com>
-References: <1408419205-10048-1-git-send-email-tuomas.tynkkynen@iki.fi>
- <1408419205-10048-14-git-send-email-tuomas.tynkkynen@iki.fi>
- <CAKohpokQOALPH13Ykz4nTBOby8J1X6_F30LNKz=gsC4wN3=3vg@mail.gmail.com>
- <53F3A900.8010805@nvidia.com>
- <CAKohponcZv9-MFNUQFxC_49-+P6QOhdjxsnYAyL3i4sXdCBYrw@mail.gmail.com>
- <CABxcv=ncm3Y7Ecfymro6TOuP=d10OV5--8n=dYmHyj6zi8hwEw@mail.gmail.com>
- <53F4FED4.7060408@suse.de> <53F50554.3050505@wwwdotorg.org>
- <CAOh2x=mO1r76fkvruvBLaL144G8fHgDPMwhKVCxv4HW8FRUE_Q@mail.gmail.com>
-Message-ID: <53F58DFD.900@denx.de>
+From: mpa@pengutronix.de (Markus Pargmann)
+Date: Thu, 21 Aug 2014 08:15:25 +0200
+Subject: [v4] watchdog: Add DA906x PMIC watchdog driver.
+In-Reply-To: <20140820144322.GA7609@roeck-us.net>
+References: <1408192545-23987-1-git-send-email-mpa@pengutronix.de>
+ <20140820144322.GA7609@roeck-us.net>
+Message-ID: <20140821061525.GA23823@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Viresh,
+Hi,
 
-Am 21.08.2014 06:26, schrieb Viresh Kumar:
-> On Thu, Aug 21, 2014 at 2:00 AM, Stephen Warren<swarren@wwwdotorg.org>  wrote:
->> On 08/20/2014 02:02 PM, Andreas F?rber wrote:
->>> Am 20.08.2014 17:39, schrieb Javier Martinez Canillas:
->>>> If this not the correct workflow and you have a better way to manage
->>>> this, I would love to know about it.
->
-> Oh yes, this was certainly useful. I was missing this (mis)feature :)
+On Wed, Aug 20, 2014 at 07:43:22AM -0700, Guenter Roeck wrote:
+> On Sat, Aug 16, 2014 at 02:35:45PM +0200, Markus Pargmann wrote:
+> > From: Krystian Garbaciak <krystian.garbaciak@diasemi.com>
+> > 
+> > This driver supports the watchdog device inside the DA906x PMIC.
+> > 
+> > Signed-off-by: Krystian Garbaciak <krystian.garbaciak@diasemi.com>
+> > Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
+> > Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
+> > 
+> > ---
+> > Notes:
+> >     Changes in v4:
+> >      - Fixed indentation
+> >      - Fixed lock without unlock
+> >      - Check for parent device and device driver data in probe(). If not present,
+> >        this is an invalid prober initialization, return -EINVAL.
+> >     
+> >     Changes in v3:
+> >      - Cleanup error handling for timeout selection and setting
+> >      - Fix race condition due to late wdt drvdata setup
+> >      - Remove static struct watchdog_device. It is not initialized in the probe
+> >        function
+> >      - Use WATCHDOG_NOWAYOUT_INIT_STATUS for the status
+> >      - Remove 0 shift using DA9063_TWDSCALE_SHIFT
+> > 
+> >  drivers/watchdog/Kconfig      |   7 ++
+> >  drivers/watchdog/Makefile     |   1 +
+> >  drivers/watchdog/da9063_wdt.c | 231 ++++++++++++++++++++++++++++++++++++++++++
+> >  3 files changed, 239 insertions(+)
+> >  create mode 100644 drivers/watchdog/da9063_wdt.c
+> > 
+> > diff --git a/drivers/watchdog/Kconfig b/drivers/watchdog/Kconfig
+> > index c845527b503a..8d5c9b33552a 100644
+> > --- a/drivers/watchdog/Kconfig
+> > +++ b/drivers/watchdog/Kconfig
+> > @@ -87,6 +87,13 @@ config DA9055_WATCHDOG
+> >  	  This driver can also be built as a module.  If so, the module
+> >  	  will be called da9055_wdt.
+> >  
+> > +config DA9063_WATCHDOG
+> > +	tristate "Dialog DA9063 Watchdog"
+> > +	depends on MFD_DA9063
+> > +	select WATCHDOG_CORE
+> > +	help
+> > +	  Support for the watchdog in the DA9063 PMIC.
+> > +
+> Please add a note such as above, listing the module name.
 
-maybe patman from u-boot is also interesting for you, see:
+Added such a note.
 
-http://git.denx.de/?p=u-boot.git;a=blob;f=tools/patman/README;h=5fb508b80df10d3b11d95eea95a141ce3d0ef578;hb=67ee22b0681305ba1099c508eecade996abc1c65
+> 
+> >  config GPIO_WATCHDOG
+> >  	tristate "Watchdog device controlled through GPIO-line"
+> >  	depends on OF_GPIO
+> > diff --git a/drivers/watchdog/Makefile b/drivers/watchdog/Makefile
+> > index 7b8a91ed20e7..ce4a7632d863 100644
+> > --- a/drivers/watchdog/Makefile
+> > +++ b/drivers/watchdog/Makefile
+> > @@ -172,6 +172,7 @@ obj-$(CONFIG_XEN_WDT) += xen_wdt.o
+> >  # Architecture Independent
+> >  obj-$(CONFIG_DA9052_WATCHDOG) += da9052_wdt.o
+> >  obj-$(CONFIG_DA9055_WATCHDOG) += da9055_wdt.o
+> > +obj-$(CONFIG_DA9063_WATCHDOG) += da9063_wdt.o
+> >  obj-$(CONFIG_GPIO_WATCHDOG)	+= gpio_wdt.o
+> >  obj-$(CONFIG_WM831X_WATCHDOG) += wm831x_wdt.o
+> >  obj-$(CONFIG_WM8350_WATCHDOG) += wm8350_wdt.o
+> > diff --git a/drivers/watchdog/da9063_wdt.c b/drivers/watchdog/da9063_wdt.c
+> > new file mode 100644
+> > index 000000000000..a2d46bc55805
+> > --- /dev/null
+> > +++ b/drivers/watchdog/da9063_wdt.c
+> > @@ -0,0 +1,231 @@
+> > +/*
+> > + * Watchdog driver for DA9063 PMICs.
+> > + *
+> > + * Copyright(c) 2012 Dialog Semiconductor Ltd.
+> > + *
+> > + * Author: Mariusz Wojtasik <mariusz.wojtasik@diasemi.com>
+> > + *
+> > + * This program is free software; you can redistribute  it and/or modify it
+> > + * under  the terms of  the GNU General  Public License as published by the
+> > + * Free Software Foundation;  either version 2 of the  License, or (at your
+> > + * option) any later version.
+> > + */
+> > +
+> > +#include <linux/kernel.h>
+> > +#include <linux/module.h>
+> > +#include <linux/watchdog.h>
+> > +#include <linux/platform_device.h>
+> > +#include <linux/uaccess.h>
+> > +#include <linux/slab.h>
+> > +#include <linux/delay.h>
+> > +#include <linux/mfd/da9063/registers.h>
+> > +#include <linux/mfd/da9063/core.h>
+> > +#include <linux/regmap.h>
+> > +
+> > +/*
+> > + * Watchdog selector to timeout in seconds.
+> > + *   0: WDT disabled;
+> > + *   others: timeout = 2048 ms * 2^(TWDSCALE-1).
+> > + */
+> > +static const int wdt_timeout[] = { 0, 2, 4, 8, 16, 32, 65, 131 };
+> > +#define DA9063_TWDSCALE_DISABLE		0
+> > +#define DA9063_TWDSCALE_MIN		1
+> > +#define DA9063_TWDSCALE_MAX		(ARRAY_SIZE(wdt_timeout) - 1)
+> > +#define DA9063_WDT_MIN_TIMEOUT		wdt_timeout[DA9063_TWDSCALE_MIN]
+> > +#define DA9063_WDT_MAX_TIMEOUT		wdt_timeout[DA9063_TWDSCALE_MAX]
+> > +#define DA9063_WDG_TIMEOUT		wdt_timeout[3]
+> > +
+> > +struct da9063_watchdog {
+> > +	struct da9063 *da9063;
+> > +	struct watchdog_device wdtdev;
+> > +	struct mutex lock;
+> > +};
+> > +
+> > +static int da9063_wdt_timeout_to_sel(int secs)
+> > +{
+> > +	int i;
+> > +
+> > +	for (i = DA9063_TWDSCALE_MIN; i <= DA9063_TWDSCALE_MAX; i++) {
+> 
+> When building with W=1, gcc complains about this line. Would be great if you can
+> have a look and fix it.
 
-bye,
-Heiko
+I just compiled with W=1, it doesn't complain here about this line.
+Could you give me the warning?
+
+> 
+> > +		if (wdt_timeout[i] >= secs)
+> > +			return i;
+> > +	}
+> > +
+> > +	return -EINVAL;
+> > +}
+> > +
+> > +static int da9063_wdt_disable(struct da9063 *da9063)
+> > +{
+> > +	return regmap_update_bits(da9063->regmap, DA9063_REG_CONTROL_D,
+> > +			DA9063_TWDSCALE_MASK,
+> > +			DA9063_TWDSCALE_DISABLE);
+> > +}
+> > +
+> > +static int _da9063_wdt_set_timeout(struct da9063 *da9063, unsigned int regval)
+> > +{
+> > +	return regmap_update_bits(da9063->regmap, DA9063_REG_CONTROL_D,
+> > +			DA9063_TWDSCALE_MASK, regval);
+> > +}
+> > +
+> > +static int _da9063_wdt_kick(struct da9063 *da9063)
+> > +{
+> > +	return regmap_write(da9063->regmap, DA9063_REG_CONTROL_F,
+> > +			DA9063_WATCHDOG);
+> > +}
+> > +
+> > +static int da9063_wdt_start(struct watchdog_device *wdd)
+> > +{
+> > +	struct da9063_watchdog *wdt = watchdog_get_drvdata(wdd);
+> > +	unsigned int selector;
+> > +	int ret;
+> > +
+> > +	selector = da9063_wdt_timeout_to_sel(wdt->wdtdev.timeout);
+> > +	if (selector < 0) {
+> 
+> selector has to be an int for this to work. Building the driver with W=1 reports
+> it, btw.
+
+Yes, thanks, I changed both selector variables to int.
+
+> 
+> > +		dev_err(wdt->da9063->dev, "Timeout out of range (timeout=%d)\n",
+> > +				wdt->wdtdev.timeout);
+> > +		return selector;
+> > +	}
+> > +
+> > +	mutex_lock(&wdt->lock);
+> > +	ret = _da9063_wdt_set_timeout(wdt->da9063, selector);
+> > +	if (ret) {
+> > +		dev_err(wdt->da9063->dev, "Watchdog failed to start (err = %d)\n",
+> > +				ret);
+> > +	}
+> > +	mutex_unlock(&wdt->lock);
+> > +
+> > +	return ret;
+> > +}
+> > +
+> > +static int da9063_wdt_stop(struct watchdog_device *wdd)
+> > +{
+> > +	struct da9063_watchdog *wdt = watchdog_get_drvdata(wdd);
+> > +	int ret;
+> > +
+> > +	mutex_lock(&wdt->lock);
+> > +	ret = da9063_wdt_disable(wdt->da9063);
+> > +	if (ret)
+> > +		dev_alert(wdt->da9063->dev, "Watchdog failed to stop (err = %d)\n",
+> > +				ret);
+> 
+> You have a number of places where the continuation line _on purpose_
+> does not align to te opening '('. I would understand it if your indentation
+> rules were in any way consistent, but I don't see that either.
+> Ok, I can see that you dislike the rule that continuation lines should be
+> aligned to '(', but to misalign even when the '(' matches a tab position doesn't
+> really make any sense.
+
+My indentation rules are consistent, otherwise I made a mistake. I
+always indent two tabs after an opening bracket when breaking long
+lines. Also I can't find any specific rules about how to break long
+lines in the coding style document.
+
+> 
+> > +	mutex_unlock(&wdt->lock);
+> > +
+> > +	return ret;
+> > +}
+> > +
+> > +static int da9063_wdt_ping(struct watchdog_device *wdd)
+> > +{
+> > +	struct da9063_watchdog *wdt = watchdog_get_drvdata(wdd);
+> > +	int ret;
+> > +
+> > +	mutex_lock(&wdt->lock);
+> > +	ret = _da9063_wdt_kick(wdt->da9063);
+> > +	if (ret)
+> > +		dev_alert(wdt->da9063->dev, "Failed to ping the watchdog (err = %d)\n",
+> > +				ret);
+> > +	mutex_unlock(&wdt->lock);
+> > +
+> > +	return ret;
+> > +}
+> > +
+> > +static int da9063_wdt_set_timeout(struct watchdog_device *wdd,
+> > +		unsigned int timeout)
+> > +{
+> > +	struct da9063_watchdog *wdt = watchdog_get_drvdata(wdd);
+> > +	unsigned int selector;
+> > +	int ret;
+> > +
+> > +	selector = da9063_wdt_timeout_to_sel(timeout);
+> > +	if (selector < 0) {
+> 
+> selector must be an int for this to work.
+> 
+> > +		dev_err(wdt->da9063->dev, "Unsupported watchdog timeout, should be between 2 and 131\n");
+> 
+> Please use a continuation line here.
+
+Ok.
+
+Thank you,
+
+Markus
+
 -- 
-DENX Software Engineering GmbH,     MD: Wolfgang Denk & Detlev Zundel
-HRB 165235 Munich, Office: Kirchenstr.5, D-82194 Groebenzell, Germany
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140821/3bda1b04/attachment.sig>
