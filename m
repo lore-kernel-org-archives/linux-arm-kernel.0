@@ -1,215 +1,87 @@
-From: gabriel.fernandez@linaro.org (Gabriel Fernandez)
-Date: Thu, 21 Aug 2014 09:12:22 +0200
-Subject: [PATCH 3/5] phy: miphy28lp: Provide support for the MiPHY28lp
- Generic PHY
-In-Reply-To: <53F4B7AB.1020009@ti.com>
-References: <1407944075-8093-1-git-send-email-gabriel.fernandez@linaro.org>
- <1407944075-8093-4-git-send-email-gabriel.fernandez@linaro.org>
- <53F4B7AB.1020009@ti.com>
-Message-ID: <CAG374jB617upnE0F+ZXkkAR6U6eoGKOPMMWfDFWm0N8WJ+eoVA@mail.gmail.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Thu, 21 Aug 2014 09:19:35 +0200
+Subject: [PATCH v2] ARM: tegra: add Acer Chromebook 13 device tree
+In-Reply-To: <CAOesGMjFGabNOk0ODjbDN5aaro5309t02+B+UZoM_+q5VE9Ltw@mail.gmail.com>
+References: <1407957267-3258-1-git-send-email-dgreid@chromium.org>
+ <53EF76CF.9050808@suse.de> <53F2255E.7090208@wwwdotorg.org>
+ <CAL1qeaH-WfA-DLKwuXA_hBPHYuXksAibLq__zisrT9ALaRGdAw@mail.gmail.com>
+ <53F28F90.3000004@wwwdotorg.org>
+ <CAOesGMhBdQh_ddycZ-Y5dupR9hW74bogHtG3yyPUJ2tAgWi19A@mail.gmail.com>
+ <20140820143201.GA3368@ulmo>
+ <CAOesGMjFGabNOk0ODjbDN5aaro5309t02+B+UZoM_+q5VE9Ltw@mail.gmail.com>
+Message-ID: <20140821071933.GG4486@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kishon,
+On Wed, Aug 20, 2014 at 08:40:33AM -0700, Olof Johansson wrote:
+> On Wed, Aug 20, 2014 at 7:32 AM, Thierry Reding
+> <thierry.reding@gmail.com> wrote:
+> > On Wed, Aug 20, 2014 at 06:29:14AM -0700, Olof Johansson wrote:
+> >> On Mon, Aug 18, 2014 at 4:43 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
+> > [...]
+> >> > Again, this board *isn't* Nyan, so it should pretend that it is.
+> >>
+> >> It is a derivative design of the nyan reference platform, and it is
+> >> compatible with it. It is perfectly fine to claim to be compatible
+> >> with it. I'm sorry, but you're just wrong here.
+> >
+> > I guess that depends a little on how you define compatibility. I had
+> > always assumed that the top-level compatible string would be a sort of
+> > "checksum" over the rest of the content. Which, admittedly, makes it
+> > kind of redundant. Compatibility could mean a lot of things. Does it
+> > mean any kernel/DTB compatible with one device could run on any device
+> > derived from it? Does compatibility mean it needs to provide full
+> > functionality or is it still compatible if it runs at a reduced feature
+> > set but doesn't "break" otherwise?
+> 
+> Consider:
+>         compatible = "foo,x", "foo,y";
+> 
+> My interpretation is:  foo,x is compatible with foo,y if and only if:
+> 
+> foo,x can be driven by the same code as foo,y -- i.e. the driver
+> doesn't need changes for basic things to work (and nothing should be
+> broken).
+> 
+> foo,x _can_ be a superset though. It could have features that foo,y
+> doesn't have, that needs driver changes to take advantage of. But
+> using the foo,y driver with a foo,x device should give you the foo,y
+> functionality.
+> 
+> The simple case is where foo,x is more or less identical to foo,y, but
+> there might be some implementation-specific bugs that makes it useful
+> to be able to, at some point in the future, tell if you're running on
+> a foo,x or foo,y device even if the code is identical today.
+> 
+> 
+> In this particular case, google,nyan and google,nyan-big are very
+> similar. There are some differences in panels, etc, but it's described
+> in the individual device trees already, but things will come up and be
+> functional even if you boot with the wrong device tree (as far as I
+> know). Andrew has done that in the past, as far as I know.
 
-ok i'll split into specific procedures.
+The problem with the above that it makes a bunch of assumptions about
+drivers. It's perfectly possible for one OS to be implemented in a way
+that matches your expectations above, while another OS would not work
+the same way.
 
-BR
+In particular since you point out panels being different: you typically
+can't rely on a driver for one panel to support another panel as well.
+While it's true that many panels provide an EDID for the display timings
+it's equally well possible that some panels don't, therefore a driver
+for one panel can't drive another (because the timings are wrong). There
+are other things that can be incompatible between panels such as power
+up/down sequences and power supplies. All those together mean that the
+panels aren't compatible and I'd argue that the panel is one of the key
+features of a Chromebook. Booting a "google,nyan" DTB on a
+"google,nyan-big" device may (depending on OS) in fact break
+functionality and hence be incompatible.
 
-Gabriel.
-
-On 20 August 2014 16:58, Kishon Vijay Abraham I <kishon@ti.com> wrote:
-> Hi,
->
-> On Wednesday 13 August 2014 09:04 PM, Gabriel FERNANDEZ wrote:
->> The MiPHY28lp is a Generic PHY which can serve various SATA or PCIe
->> or USB3 devices.
->>
->> Signed-off-by: alexandre torgue <alexandre.torgue@st.com>
->> Signed-off-by: Giuseppe Cavallaro <peppe.cavallaro@st.com>
->> Signed-off-by: Gabriel Fernandez <gabriel.fernandez@linaro.org>
->> ---
->>  drivers/phy/Kconfig         |   8 +
->>  drivers/phy/Makefile        |   1 +
->>  drivers/phy/phy-miphy28lp.c | 736 ++++++++++++++++++++++++++++++++++++++++++++
->>  3 files changed, 745 insertions(+)
->>  create mode 100644 drivers/phy/phy-miphy28lp.c
->>
->> diff --git a/drivers/phy/Kconfig b/drivers/phy/Kconfig
->> index 0dd7427..2053f72 100644
->> --- a/drivers/phy/Kconfig
->> +++ b/drivers/phy/Kconfig
->> @@ -230,4 +230,12 @@ config PHY_XGENE
->>       help
->>         This option enables support for APM X-Gene SoC multi-purpose PHY.
->>
->> +config PHY_MIPHY28LP
->> +     tristate "STMicroelectronics MIPHY28LP PHY driver for STiH407"
->> +     depends on ARCH_STI
->> +     depends on GENERIC_PHY
->> +     help
->> +       Enable this to support the miphy transceiver (for SATA/PCIE/USB3)
->> +       that is part of STMicroelectronics STiH407 SoC.
->> +
->>  endmenu
->> diff --git a/drivers/phy/Makefile b/drivers/phy/Makefile
->> index 95c69ed..f7e7c59 100644
->> --- a/drivers/phy/Makefile
->> +++ b/drivers/phy/Makefile
->> @@ -8,6 +8,7 @@ obj-$(CONFIG_BCM_KONA_USB2_PHY)               += phy-bcm-kona-usb2.o
->>  obj-$(CONFIG_PHY_EXYNOS_DP_VIDEO)    += phy-exynos-dp-video.o
->>  obj-$(CONFIG_PHY_EXYNOS_MIPI_VIDEO)  += phy-exynos-mipi-video.o
->>  obj-$(CONFIG_PHY_MVEBU_SATA)         += phy-mvebu-sata.o
->> +obj-$(CONFIG_PHY_MIPHY28LP)          += phy-miphy28lp.o
->>  obj-$(CONFIG_PHY_MIPHY365X)          += phy-miphy365x.o
->>  obj-$(CONFIG_OMAP_CONTROL_PHY)               += phy-omap-control.o
->>  obj-$(CONFIG_OMAP_USB2)                      += phy-omap-usb2.o
->> diff --git a/drivers/phy/phy-miphy28lp.c b/drivers/phy/phy-miphy28lp.c
->> new file mode 100644
->> index 0000000..767614c
->> --- /dev/null
->> +++ b/drivers/phy/phy-miphy28lp.c
->> @@ -0,0 +1,736 @@
->> +/*
->> + * Copyright (C) 2014 STMicroelectronics
->> + *
->> + * STMicroelectronics PHY driver MiPHY28lp (for SoC STiH407).
->> + *
->> + * Author: Alexandre Torgue <alexandre.torgue@st.com>
->> + *
->> + * This program is free software; you can redistribute it and/or modify
->> + * it under the terms of the GNU General Public License version 2, as
->> + * published by the Free Software Foundation.
->> + *
->> + */
->> +
->> +#include <linux/platform_device.h>
->> +#include <linux/io.h>
->> +#include <linux/kernel.h>
->> +#include <linux/module.h>
->> +#include <linux/of.h>
->> +#include <linux/of_platform.h>
->> +#include <linux/of_address.h>
->> +#include <linux/clk.h>
->> +#include <linux/phy/phy.h>
->> +#include <linux/delay.h>
->> +#include <linux/mfd/syscon.h>
->> +#include <linux/regmap.h>
->> +#include <linux/reset.h>
->> +
->> +#include <dt-bindings/phy/phy-miphy28lp.h>
->> +
->> +/* MiPHY registers */
->> +#define MIPHY_STATUS_1               0x02
->> +#define MIPHY_PHY_RDY                0x01
->> +#define MIPHY_PLL_HFC_RDY    0x06
->> +#define MIPHY_COMP_FSM_6     0x3f
->> +#define MIPHY_COMP_DONE              0x80
->> +
->> +#define MIPHY_CTRL_REG               0x04
->> +#define MIPHY_PX_RX_POL              BIT(5)
->> +
->> +/*
->> + * On STiH407 the glue logic can be different among MiPHY devices; for example:
->> + * MiPHY0: OSC_FORCE_EXT means:
->> + *  0: 30MHz crystal clk - 1: 100MHz ext clk routed through MiPHY1
->> + * MiPHY1: OSC_FORCE_EXT means:
->> + *  1: 30MHz crystal clk - 0: 100MHz ext clk routed through MiPHY1
->> + * Some devices have not the possibility to check if the osc is ready.
->> + */
->> +#define MIPHY_OSC_FORCE_EXT  BIT(3)
->> +#define MIPHY_OSC_RDY                BIT(5)
->> +
->> +#define MIPHY_CTRL_MASK              0xf
->> +#define MIPHY_CTRL_DEFAULT   0
->> +#define MIPHY_CTRL_SYNC_D_EN BIT(2)
->> +
->> +/* SATA / PCIe defines */
->> +#define SATA_CTRL_MASK               0x7
->> +#define PCIE_CTRL_MASK               0xff
->> +#define SATA_CTRL_SELECT_SATA        1
->> +#define SATA_CTRL_SELECT_PCIE        0
->> +#define SYSCFG_PCIE_PCIE_VAL 0x80
->> +#define SATA_SPDMODE         1
->> +
->> +struct miphy28lp_phy {
->> +     struct phy *phy;
->> +     struct miphy28lp_dev *phydev;
->> +     void __iomem *base;
->> +     void __iomem *pipebase;
->> +
->> +     bool osc_force_ext;
->> +     bool osc_rdy;
->> +     bool px_rx_pol_inv;
->> +
->> +     struct reset_control *miphy_rst;
->> +
->> +     u32 sata_gen;
->> +
->> +     /* Sysconfig registers offsets needed to configure the device */
->> +     u32 syscfg_miphy_ctrl;
->> +     u32 syscfg_miphy_status;
->> +     u32 syscfg_pci;
->> +     u32 syscfg_sata;
->> +     u8 type;
->> +};
->> +
->> +struct miphy28lp_dev {
->> +     struct device *dev;
->> +     struct regmap *regmap;
->> +     struct mutex miphy_mutex;
->> +     struct miphy28lp_phy **phys;
->> +};
->> +
->> +struct miphy_initval {
->> +     u16 reg;
->> +     u16 val;
->> +};
->> +
->> +enum miphy_sata_gen { SATA_GEN1, SATA_GEN2, SATA_GEN3 };
->> +
->> +static char *miphy_type_name[] = { "sata-up", "pcie-up", "usb3-up" };
->> +
->> +static const struct miphy_initval miphylp28_initvals_sata[] = {
->> +     /* Putting Macro in reset */
->> +     {0x00, 0x01}, {0x00, 0x03},
->> +     /* Wait for a while */
->> +     {0x00, 0x01}, {0x04, 0x1c},
->> +     /* PLL calibration */
->> +     {0xeb, 0x1d}, {0x0d, 0x1e}, {0x0f, 0x00},
->> +     /* Writing The PLL Ratio */
->> +     {0xd4, 0xc8}, {0xd5, 0x00}, {0xd6, 0x00}, {0xd7, 0x00},
->> +     {0xd3, 0x00}, {0x0f, 0x02}, {0x0e, 0x0a}, {0x0f, 0x01},
->> +     {0x0e, 0x0a}, {0x0f, 0x00}, {0x0e, 0x0a}, {0x4e, 0xd1},
->> +     {0x4e, 0xd1},
->> +     /* Rx Calibration */
->> +     {0x99, 0x1f}, {0x0a, 0x41}, {0x7a, 0x0d}, {0x7f, 0x7d},
->> +     {0x80, 0x56}, {0x81, 0x00}, {0x7b, 0x00}, {0xc1, 0x01},
->> +     {0xc2, 0x01}, {0x97, 0xf3}, {0xc9, 0x02}, {0xca, 0x02},
->> +     {0xcb, 0x02}, {0xcc, 0x0a}, {0x9d, 0xe5}, {0x0f, 0x00},
->> +     {0x0e, 0x02}, {0x0e, 0x00}, {0x63, 0x00}, {0x64, 0xaf},
->> +     {0x0f, 0x00}, {0x49, 0x07}, {0x0f, 0x01}, {0x49, 0x07},
->> +     {0x0f, 0x02}, {0x49, 0x07}, {0x0f, 0x03}, {0x49, 0x07},
->> +     {0x0f, 0x00}, {0x4a, 0x50}, {0x4a, 0x53}, {0x4b, 0x00},
->> +     {0x4b, 0x00}, {0x0f, 0x01}, {0x0e, 0x04}, {0x0e, 0x05},
->> +     {0x63, 0x00}, {0x64, 0xae}, {0x0f, 0x00}, {0x49, 0x07},
->> +     {0x0f, 0x01}, {0x49, 0x07}, {0x0f, 0x02}, {0x49, 0x07},
->> +     {0x0f, 0x03}, {0x49, 0x07}, {0x0f, 0x01}, {0x4a, 0x73},
->> +     {0x4a, 0x72}, {0x4b, 0x20}, {0x4b, 0x20}, {0x0f, 0x02},
->> +     {0x0e, 0x09}, {0x0e, 0x0a}, {0x63, 0x00}, {0x64, 0xae},
->> +     {0x0f, 0x00}, {0x49, 0x07}, {0x0f, 0x01}, {0x49, 0x07},
->> +     {0x0f, 0x02}, {0x49, 0x07}, {0x0f, 0x03}, {0x49, 0x07},
->> +     {0x0f, 0x02}, {0x4a, 0xc2}, {0x4a, 0xc0}, {0x4b, 0x20},
->> +     {0x4b, 0x20}, {0xcd, 0x21}, {0xcd, 0x21}, {0x00, 0x00},
->> +     {0x00, 0x01}, {0x00, 0x00}, {0x01, 0x04}, {0x01, 0x05},
->> +     {0xe9, 0x00}, {0x0d, 0x1e}, {0x3a, 0x40}, {0x01, 0x01},
->> +     {0x01, 0x00}, {0xe9, 0x40}, {0x0a, 0x41}, {0x0f, 0X00},
->> +     {0x0b, 0x00}, {0x0b, 0x00}, {0x62, 0x00}, {0x0f, 0x00},
->> +     {0xe3, 0x02}, {0xe3, 0x02}, {0x26, 0x27}, {0x26, 0x00},
->> +     {0x26, 0x62}, {0x26, 0x00}, {0x0f, 0x00}, {0x0f, 0x01},
->> +     {0x0f, 0x02}, {0x0f, 0x00},
->
-> I'm not in for doing this sort of initialization. Sorry.
->
-> Thanks
-> Kishon
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140821/59e857eb/attachment.sig>
