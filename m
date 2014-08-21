@@ -1,214 +1,131 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 21 Aug 2014 15:31:55 +0100
-Subject: [PATCH] Arm64: convert soft_restart() to assembly code
-In-Reply-To: <CAFdej023ABj=xstTS_vddr2PMoqE4Fe1qBN9Gr0P69hW+u=YBA@mail.gmail.com>
-References: <1407847365-10873-1-git-send-email-achandran@mvista.com>
- <1408123221.22761.38.camel@smoke>
- <20140815182157.GD21908@leverpostej>
- <CAFdej01kDMSTpzdGiRmX8g=E4mZU2_5oiiKzyQ_z7z1jxeCF-A@mail.gmail.com>
- <20140820105408.GG21174@leverpostej>
- <CAFdej00s9ZYXnE4AfU0vUqTb4dmUg4U=fOhc3KS1_JK+0=+mdw@mail.gmail.com>
- <20140820141623.GF21734@leverpostej>
- <CAFdej023ABj=xstTS_vddr2PMoqE4Fe1qBN9Gr0P69hW+u=YBA@mail.gmail.com>
-Message-ID: <20140821143155.GN21734@leverpostej>
+From: boris.brezillon@free-electrons.com (Boris BREZILLON)
+Date: Thu, 21 Aug 2014 16:32:32 +0200
+Subject: [PATCH v4 00/11] drm: add support for Atmel HLCDC Display
+ Controller
+In-Reply-To: <20140821131552.GA19293@ulmo.nvidia.com>
+References: <1406034695-15534-1-git-send-email-boris.brezillon@free-electrons.com>
+ <20140821081619.GZ2452@ldesroches-Latitude-E6320>
+ <20140821103706.2349915d@bbrezillon> <20140821090406.GA13733@ulmo>
+ <20140821114159.319e741b@bbrezillon> <20140821095202.GA21848@ulmo>
+ <20140821150600.37788d82@bbrezillon>
+ <20140821131552.GA19293@ulmo.nvidia.com>
+Message-ID: <20140821163232.475c0ed8@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 21, 2014 at 02:34:46PM +0100, Arun Chandran wrote:
-> Hi Mark,
-> 
-> On Wed, Aug 20, 2014 at 7:46 PM, Mark Rutland <mark.rutland@arm.com> wrote:
-> > [...]
-> >
-> >> I am trying to kexec a UP-LE kernel from and SMP-LE kernel.
-> >>
-> >> > As I mentioned we do need to ensure that the CPUs are in the mode they
-> >> > started in, though I'm not sure I follow what you mean by "not waiting".
-> >> > This could be an orthogonal issue.
-> >>
-> >> If I verify the secondary CPUs from u-boot I can see that
-> >> they are all looping at
-> >>
-> >>     Core number       : 1
-> >>     Core state        : debug (AArch64 EL2)
-> >>     Debug entry cause : External Debug Request
-> >>     Current PC        : 0x0000000000000238
-> >>     Current CPSR      : 0x200003c9 (EL2h)
-> >>
-> >> But after the kexec calls soft_restar(0) for all secondary CPUs
-> >> they are looping at
-> >>
-> >>     Core number       : 1
-> >>     Core state        : debug (AArch64 EL1)
-> >>     Debug entry cause : External Debug Request
-> >>     Current PC        : 0xffffffc000083200
-> >>     Current CPSR      : 0x600003c5 (EL1h)
-> >>
-> >> This is what I mean by they are not waiting for
-> >> the secondary start-up address to jump.
-> >
-> > Ok.
-> >
-> >> >
-> >> > What exactly do you see, do the CPUs leave the spin-table, are they
-> >> > taking exceptions, are they getting stuck in the spin-table, etc?
-> >> >
-> >> They all are clearly resetting to address "0"(Put a breakpoint and
-> >> verified) but somehow they end up @0xffffffc000083200.
-> >> I still don't know why.
-> >>
-> >> ########
-> >> ffffffc00008319c:       d503201f        nop
-> >>         ...
-> >> ffffffc000083200:       14000260        b       ffffffc000083b80 <el1_sync>
-> >> ffffffc000083204:       d503201f        nop
-> >> ffffffc000083208:       d503201f        nop
-> >> ########
-> >
-> > That's the EL1 exception vector table.
-> >
-> > What looks to be happening is that something causes the CPUs to take an
-> > exception (at EL1). Because translation isn't enabled and the vector
-> > address doesn't map to anything, they'll take some sort of exception.
-> > Because the vectors aren't mapped that will go recursive.
-> >
-> > Your spin-table implementation might be poking something that's not
-> > accessible at EL1, in which case you require the jump to EL2 for
-> > correctness. I can't say for certain either way.
-> >
-> 
-> Yes you are right I needed a jump to EL2 for putting the
-> secondary CPUs at correct spinning loop.
+On Thu, 21 Aug 2014 15:16:08 +0200
+Thierry Reding <thierry.reding@gmail.com> wrote:
 
-Ok. So we need to do what I have suggested elsewhere w.r.t. jumping back
-up to EL2. As you point out below we need to synchronise with the CPUs
-on their way out too we can add a spin-table cpu_kill with a slightly
-dodgy delay to ensure that, given we have no other mechanism for
-synchronising.
+> On Thu, Aug 21, 2014 at 03:06:00PM +0200, Boris BREZILLON wrote:
+> > On Thu, 21 Aug 2014 11:52:03 +0200
+> > Thierry Reding <thierry.reding@gmail.com> wrote:
+> > 
+> > > On Thu, Aug 21, 2014 at 11:41:59AM +0200, Boris BREZILLON wrote:
+> > > > On Thu, 21 Aug 2014 11:04:07 +0200
+> > > > Thierry Reding <thierry.reding@gmail.com> wrote:
+> > > > 
+> > > > > On Thu, Aug 21, 2014 at 10:37:06AM +0200, Boris BREZILLON wrote:
+> > > > > > Hi Ludovic,
+> > > > > > 
+> > > > > > On Thu, 21 Aug 2014 10:16:19 +0200
+> > > > > > Ludovic Desroches <ludovic.desroches@atmel.com> wrote:
+> > > > > > 
+> > > > > > > Hi Boris,
+> > > > > > > 
+> > > > > > > You can add
+> > > > > > > 
+> > > > > > > Tested-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+> > > > > > 
+> > > > > > Thanks for testing this driver.
+> > > > > > 
+> > > > > > > 
+> > > > > > > Only one issue but not related to your patches, you can't display
+> > > > > > > quickly the bootup logo since the panel detection takes too much
+> > > > > > > time.
+> > > > > > 
+> > > > > > Yes, actually this is related to the device probe order: the
+> > > > > > hlcdc-display-controller device is probed before the simple-panel, thus
+> > > > > > nothing is detected on the RGB connector (I use of_drm_find_panel to
+> > > > > > check for panel availability) when the display controller is
+> > > > > > instantiated. I rely on the default polling infrastructure provided by
+> > > > > > the DRM/KMS framework which polls for a new connector every 10s, and
+> > > > > > this is far more than you kernel boot time.
+> > > > > > 
+> > > > > > Do anyone see a solution to reduce this delay (without changing the
+> > > > > > polling interval). I thought we could add a notifier infrastructure to
+> > > > > > the DRM panel framework, but I'm not sure this is how you want things
+> > > > > > done...
+> > > > > 
+> > > > > Other drivers return -EPROBE_DEFER when a panel hasn't been registered
+> > > > > yet. This will automatically take care of ordering things in a way that
+> > > > > DRM/KMS will only be initialized after the panel has been probed.
+> > > > 
+> > > > Actually I'd like to avoid doing this with a deferred probe, because,
+> > > > AFAIU, the remote endpoint is not tightly linked with the display
+> > > > controller driver (I mean the display controller can still be
+> > > > initialized without having a display connected on it).
+> > > > Moreover the atmel dev kit I'm using has an HDMI bridge connected on
+> > > > the same RGB connector and I'd like to use it in a near future.
+> > > > Returning -EPROBE_DEFER in case of several devices connected on the
+> > > > same connector implies that I'll have to wait for all the remote
+> > > > end-points to be available before my display controller could be
+> > > > instantiated.
+> > > > 
+> > > > While this could be acceptable when all drivers are statically linked
+> > > > in the kernel, it might be problematic when you're using modules,
+> > > > meaning that you won't be able to display anything on your LCD panel
+> > > > until your HDMI bridge module has been loaded.
+> > > 
+> > > No. HDMI should be using proper hotplugging anyway, hence it should be
+> > > always be loaded anyway. You're in for a world of pain if you think you
+> > > can run DRM with a driver that's composed of separate kernel modules.
+> > 
+> > I was talking about the external RGB to HDMI encoder, should the driver
+> > for this encoder (which is not on On Chip block) be compiled
+> > statically too ?
+> > 
+> > > 
+> > > Also if you don't want to use deferred probe, then you're in for the
+> > > full hotplugging panel dance and that implies that you need to fix a
+> > > bunch of things in DRM (one being the framebuffer console instantiation
+> > > that I referred to in the other thread).
+> > 
+> > For now, I wait until there is a device connected on the RGB connector
+> > (connector status set to connector_status_connected) before creating an
+> > fbdev. It might not be the cleanest way to solve this issue, but it
+> > works :-).
+> 
+> Yeah, I guess that's one way to do it. But it's tricky to get right when
+> you have several outputs. Which one should be considered the primary and
+> trigger fbdev creation?
+> 
+> > > You also can't be using the
+> > > current device tree bindings because they all assume a dependency from
+> > > the display controller/output to the panel. For hotplugging you'd need
+> > > the dependency the other way around (the panel needs to refer to the
+> > > output by phandle).
+> > 
+> > Here [1] is a proposal for notification support in the drm_panel
+> > infrastructure (which is not that complicated), and here [2] is how
+> > I use it in my atmel-hlcdc driver to generate hotplug events.
+> > 
+> > Let me know if you want me to submit a proper patch series...
+> > 
+> > Best Regards,
+> > 
+> > Boris
+> > 
+> > [1]http://code.bulix.org/scq4g3-86804
+> > [2]http://code.bulix.org/7dg501-86805
+> 
+> Those look interesting. Any chance you could look into how to do the
+> same without resorting to notifiers?
 
-> I made some progress with the below changes.
-> 
-> ###########
-> diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
-> index 607d4bb..8969922 100644
-> --- a/arch/arm64/kernel/head.S
-> +++ b/arch/arm64/kernel/head.S
-> @@ -343,6 +343,11 @@ CPU_LE(    movk    x0, #0x30d0, lsl #16    )
->  // Clear EE and E0E on LE systems
->                       PSR_MODE_EL1h)
->         msr     spsr_el2, x0
->         msr     elr_el2, lr
-> +       mov     x0, #0x33ff
-> +       movk    x0, #0x801f, lsl #16
-> +       msr     cptr_el2, x0                    // Enable traps to el2
-> when CPACR or CPACR_EL1 is accessed
-> +       mov     x0, #3 << 20
-> +       msr     cpacr_el1, x0                   // Enable FP/ASIMD
->         mov     w20, #BOOT_CPU_MODE_EL2         // This CPU booted in EL2
->         eret
->  ENDPROC(el2_setup)
-> diff --git a/arch/arm64/kernel/hyp-stub.S b/arch/arm64/kernel/hyp-stub.S
-> index a272f33..d8e806c 100644
-> --- a/arch/arm64/kernel/hyp-stub.S
-> +++ b/arch/arm64/kernel/hyp-stub.S
-> @@ -66,6 +66,14 @@ ENDPROC(el1_sync)
-> 
->  .macro invalid_vector  label
->  \label:
-> +       mov     x1, #0x33ff
-> +       msr     cptr_el2, x1                    // Disable copro. traps to EL2
-> +
-> +       ic      ialluis
-> +       isb
-> +       dsb     sy
+A new version without notifiers usage:
+http://code.bulix.org/7urh8v-86806
 
-As far as I am aware an "isb; dsb" sequence never makes sense. It should
-be "dsb; isb". You want the I-side maintenance to complete (for which
-you have the DSB) _then_ you want to synchronise the execution context
-with the newly-visible instructions (for which you have the ISB).
 
-> +
-> +       br  x0
->         b \label
->  ENDPROC(\label)
->  .endm
-> diff --git a/arch/arm64/kernel/process.c b/arch/arm64/kernel/process.c
-> index 64733d4..8ca929c 100644
-> --- a/arch/arm64/kernel/process.c
-> +++ b/arch/arm64/kernel/process.c
-> @@ -65,6 +65,12 @@ void soft_restart(unsigned long addr)
->  //     smp_secondary_shutdown();
->  #endif
-> 
-> +       /* Delay primary cpu; allow enough time for
-> +        * secondaries to enter spin loop
-> +        */
-> +       if (smp_processor_id() == 0)
-> +               mdelay(1000);
-> +
->         cpu_soft_restart(virt_to_phys(cpu_reset), addr);
-> 
->         /* Should never get here */
-> diff --git a/arch/arm64/mm/proc.S b/arch/arm64/mm/proc.S
-> index 3cb6dec..f6ab468 100644
-> --- a/arch/arm64/mm/proc.S
-> +++ b/arch/arm64/mm/proc.S
-> @@ -76,6 +76,10 @@ ENTRY(cpu_reset)
->  #if defined(CONFIG_SMP)
->  /*     bl      secondary_shutdown */
->  #endif
-> +
-> +       /* Trap to EL2 */
-> +       mov     x1, #3 << 20
-> +       msr     cpacr_el1, x1                   // Enable FP/ASIMD
->         ret     x0
->  ENDPROC(cpu_reset)
-> 
-> @@ -200,8 +204,6 @@ ENTRY(__cpu_setup)
->         tlbi    vmalle1is                       // invalidate I + D TLBs
->         dsb     ish
-> 
-> -       mov     x0, #3 << 20
-> -       msr     cpacr_el1, x0                   // Enable FP/ASIMD
->         msr     mdscr_el1, xzr                  // Reset mdscr_el1
->         /*
->          * Memory region attributes for LPAE:
-> #########
-> 
-> With the above code I was able to manually kexec
-> an SMP kernel (With the help of debugger).
-> 
-> Basically the branch instruction (br x0) is not working
-> in the el2 vector.
-> ------------------
-> CPU#0>h
->     Core number       : 0
->     Core state        : debug (AArch64 EL2)
->     Debug entry cause : External Debug Request
->     Current PC        : 0x0000004000089800
-
-Does this address look similar to the VBAR_EL2, perhaps?
-
->     Current CPSR      : 0x600003c9 (EL2h)
-> CPU#0>rd
-> GPR00: 00000043eb891000 0000000000000018 0000000000000006 0000000000000004
-> GPR04: 000000000000001f 000000000000001b 0000000000000000 ffffffffffffffff
-> GPR08: ffffffc3ffe80614 ffffffffffffffff 0000000000000000 0000000000000002
-> GPR12: ffffffc0000968f0 00000040008c0000 00000043eb949002 ffffffffffffffff
-> GPR16: ffffffc0000c1244 0000000000435260 0000007ff9c5d490 00000040000968c0
-> GPR20: 00000043eb891000 ffffffc3eb891000 ffffffc3eb973c00 0000000000000110
-> GPR24: ffffffc000094000 ffffffc000094cd8 000000000000008e ffffffc00082f000
-> GPR28: ffffffc3e9888000 ffffffc3e988bd00 ffffffc000095d88 00000043efb24430
-> CPU#0>go 0x00000043eb891000
-> --------------------
-> 
-> I had to use the debugger  to make cpu0 jump to kexec-boot code.
-> Similarly I had to manually put other CPUs to spinning code
-> using debugger. Could you please throw some light here?
-
-I really can't say. I know nothing of your platform or spin-table
-implementation, and this is nothing like what I'd expect the jump to EL2
-code to look like.
-
-Thanks,
-Mark.
+-- 
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
