@@ -1,85 +1,76 @@
-From: lauraa@codeaurora.org (Laura Abbott)
-Date: Thu, 21 Aug 2014 14:42:13 -0700
-Subject: [PATCHv3 4/7] arm64: Move some head.text functions to executable
- section
-In-Reply-To: <20140821103455.GJ21734@leverpostej>
-References: <1408584039-12735-1-git-send-email-lauraa@codeaurora.org>
- <1408584039-12735-5-git-send-email-lauraa@codeaurora.org>
- <20140821103455.GJ21734@leverpostej>
-Message-ID: <53F667B5.6010609@codeaurora.org>
+From: frans.klaver@xsens.com (Frans Klaver)
+Date: Thu, 21 Aug 2014 23:41:17 +0200
+Subject: [RFC PATCH 3/4] tty: omap-serial: use threaded interrupt handler
+In-Reply-To: <20140820160604.GH24500@saruman.home>
+References: <1406645577-18620-1-git-send-email-frans.klaver@xsens.com>
+ <1408450488-4083-1-git-send-email-frans.klaver@xsens.com>
+ <1408450488-4083-4-git-send-email-frans.klaver@xsens.com>
+ <20140819185701.GC22003@saruman.home>
+ <20140820064028.GC9319@ci00147.xsens-tech.local>
+ <20140820160604.GH24500@saruman.home>
+Message-ID: <20140821214117.GA7076@ci00147.xsens-tech.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 8/21/2014 3:34 AM, Mark Rutland wrote:
-> Hi Laura,
-> 
-> On Thu, Aug 21, 2014 at 02:20:36AM +0100, Laura Abbott wrote:
->> The code in the head.text section of the kernel exists in the
->> same section as the swapper_pg_dir which means it needs the
->> same page table permissions. The swapper_pg_dir needs to be
->> writeable but shouldn't be executable.
-> 
-> I think we can drop the above. As far as I can tell as of commit
-> bd00cd5f8c8c (arm64: place initial page tables above the kernel) it's no
-> longer relevant.
->
+On Wed, Aug 20, 2014 at 11:06:05AM -0500, Felipe Balbi wrote:
+> On Wed, Aug 20, 2014 at 08:40:28AM +0200, Frans Klaver wrote:
+> > On Tue, Aug 19, 2014 at 01:57:02PM -0500, Felipe Balbi wrote:
+> > > On Tue, Aug 19, 2014 at 02:14:47PM +0200, Frans Klaver wrote:
+> > > > At 3.6Mbaud, with slightly over 2Mbit/s data coming in, we see 1600 uart
+> > > > rx buffer overflows within 30 seconds. Threading the interrupt handling reduces
+> > > > this to about 170 overflows in 10 minutes.
+> > > 
+> > > Can you try Sebastian Siewior's patches for 8250_omap and 8250 dma
+> > > support ? That should help you a lot.
+> > 
+> > I'll have a look at that series. Thanks for pointing it out.
 
-Yes, this should be changed. Instead of citing swapper_pg_dir, I need
-to cite the fact that there may still be memory outside of stext which
-will get freed to the buddy allocator and therefore should be RW/NX.
- 
->> The head.text section
->> is intended to be run at early bootup before any of the regular
->> kernel mappings have been setup so there is no issue at bootup.
->> The suspend/resume/hotplug code path requires some of these
->> head.S functions to run however which means they need to be
->> executable. We can't easily move all of the head.text to
->> an executable section, so split it into two parts: that which
->> is used only at early head.S bootup and that which is used
->> after bootup. There is a small bit of code duplication because
->> of some relocation issues related to accessing code more than
->> 1MB away.
-> 
-> From a cursory glance it looks like the only things we need write access
-> to in .head.text are __cpu_boot_mode and __switch_data. Can't we instead
-> place those in .data and make .head.text executable?
-> 
-> We currently find them with adr, which should be easy to replace with
-> adrp + add to get around relocation issues.
-> 
+I have had a look at Sebastian's series, but I'm not convinced
+yet that we should use it. So far the serial console seems to be
+missing data every now and then. I haven't gotten around to testing our
+high traffic application yet.
 
-__boot_cpu_mode should be placed in data with a push section and
-__switch_data is only modified before the permissions are set up.
-I took a closer look at the code and the only thing that actually
-needs to be executable from head.S is __secondary_switched so
-the following patch should be sufficient to cover it:
 
-diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
-index caa9557..5c17599 100644
---- a/arch/arm64/kernel/head.S
-+++ b/arch/arm64/kernel/head.S
-@@ -414,12 +414,14 @@ ENTRY(secondary_startup)
-        b       __enable_mmu
- ENDPROC(secondary_startup)
- 
-+       .pushsection    .text, "ax"
- ENTRY(__secondary_switched)
-        ldr     x0, [x21]                       // get secondary_data.stack
-        mov     sp, x0
-        mov     x29, #0
-        b       secondary_start_kernel
- ENDPROC(__secondary_switched)
-+       .popsection
- #endif /* CONFIG_SMP */
- 
- /*
+> > > >  drivers/tty/serial/omap-serial.c | 31 ++++++++++++++++++++++++-------
+> > > >  1 file changed, 24 insertions(+), 7 deletions(-)
+> > > > 
+> > > > diff --git a/drivers/tty/serial/omap-serial.c b/drivers/tty/serial/omap-serial.c
+> > > > index 14a0167..57664b9 100644
+> > > > --- a/drivers/tty/serial/omap-serial.c
+> > > > +++ b/drivers/tty/serial/omap-serial.c
+> > > > @@ -575,6 +575,21 @@ static void serial_omap_rdi(struct uart_omap_port *up, unsigned int lsr)
+> > > >  }
+> > > >  
+> > > >  /**
+> > > > + * serial_omap_fast_irq() - schedule interrupt handling
+> > > > + */
+> > > > +static irqreturn_t serial_omap_fast_irq(int irq, void *dev_id)
+> > > > +{
+> > > > +	struct uart_omap_port *up = dev_id;
+> > > > +	unsigned int iir = serial_in(up, UART_IIR);
+> > > > +
+> > > > +	if (iir & UART_IIR_NO_INT)
+> > > > +		return IRQ_NONE;
+> > > > +
+> > > > +	disable_irq_nosync(up->port.irq);
+> > > 
+> > > NAK. Either use IRQF_ONESHOT or actually mask the IRQs at the device's
+> > > registers (basically clearing IER).
+> > 
+> > Given the work that's been done on the 8250 based driver, what are the
+> > short-term chances omap-serial will be dropped? I'd be happy to improve
+> > here if it makes sense to do so. If the 8250 based driver is going to
+> > replace omap-serial anyway on the short term, I don't see the point of
+> > further developing this patch. The others would still make sense in my
+> > opinion.
+> 
+> if we find a way to maintain the same ttyO* naming scheme and make it
+> coexist with ttyS* naming, then we could drop as soon as 8250_omap is
+> ready for prime time.
 
-I think I was a bit over zealous in determining that everything needed
-to be placed in .text vs. not.
+With that in mind, for now I'll be betting on two horses.
+
+I'll cook up a new version using oneshot.
 
 Thanks,
-Laura
-
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+Frans
