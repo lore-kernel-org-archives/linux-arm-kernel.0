@@ -1,127 +1,58 @@
-From: afaerber@suse.de (=?ISO-8859-1?Q?Andreas_F=E4rber?=)
-Date: Thu, 21 Aug 2014 13:15:05 +0200
-Subject: [PATCH v4] coresight: bindings for coresight drivers
-In-Reply-To: <1408554698-24459-1-git-send-email-mathieu.poirier@linaro.org>
-References: <1408554698-24459-1-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <53F5D4B9.5060305@suse.de>
+From: diana.craciun@freescale.com (Diana Craciun)
+Date: Thu, 21 Aug 2014 14:28:29 +0300
+Subject: [PATCH] clk: ppc-corenet: Add Freescale ARM-based platforms
+ CLK_OF_DECLARE support
+In-Reply-To: <1407145537-15027-1-git-send-email-jingchang.lu@freescale.com>
+References: <1407145537-15027-1-git-send-email-jingchang.lu@freescale.com>
+Message-ID: <53F5D7DD.4070805@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+I think you should cc also linuxppc-dev as it touches common code.
 
-Am 20.08.2014 19:11, schrieb mathieu.poirier at linaro.org:
-> From: Pratik Patel <pratikp@codeaurora.org>
-> 
-> Coresight IP blocks allow for the support of HW assisted tracing
-> on ARM SoCs.  Bindings for the currently available blocks are
-> presented herein.
-> 
-> Signed-off-by: Pratik Patel <pratikp@codeaurora.org>
-> Signed-off-by: Panchaxari Prasannamurthy <panchaxari.prasannamurthy@linaro.org>
-> Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+On 08/04/2014 12:45 PM, Jingchang Lu wrote:
+> Signed-off-by: Jingchang Lu <jingchang.lu@freescale.com>
 > ---
->  .../devicetree/bindings/arm/coresight.txt          | 205 +++++++++++++++++++++
->  1 file changed, 205 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/arm/coresight.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/arm/coresight.txt b/Documentation/devicetree/bindings/arm/coresight.txt
-> new file mode 100644
-> index 0000000..2ee594d
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/arm/coresight.txt
-> @@ -0,0 +1,205 @@
-> +* CoreSight Components
-> +
-> +CoreSight components are compliant with the ARM CoreSight architecture
-> +specification and can be connected in various topologies to suit a particular
-> +SoCs tracing needs. These trace components can generally be classified as sinks,
-> +links and sources. Trace data produced by one or more sources flows through the
-> +intermediate links connecting the source to the currently selected sink. Each
-> +CoreSight component device should use these properties to describe its hardware
-> +characteristcs.
-> +
-> +Required properties for all components *except* non-configurable replicators:
-> +
-> +- compatible : name of the component used for driver matching.  Possible values
-> +include: "arm,coresight-etb10", "arm,coresight-tpiu", "arm,coresight-tmc",
-> +"arm,coresight-funnel", and "arm,coresight-etm3x".  All of these have to
-> +be supplemented with "arm,primecell" as drivers are using the AMBA bus
-> +interface.  Since non-configurable replicators don't show up on the AMBA
-> +bus they don't need to be post-fixed with "arm,primecell".
+>   drivers/clk/Kconfig           | 7 ++++---
+>   drivers/clk/clk-ppc-corenet.c | 5 +++++
+>   2 files changed, 9 insertions(+), 3 deletions(-)
+>
+> diff --git a/drivers/clk/Kconfig b/drivers/clk/Kconfig
+> index cfd3af7..8784704 100644
+> --- a/drivers/clk/Kconfig
+> +++ b/drivers/clk/Kconfig
+> @@ -82,11 +82,12 @@ config COMMON_CLK_AXI_CLKGEN
+>   	  FPGAs. It is commonly used in Analog Devices' reference designs.
+>   
+>   config CLK_PPC_CORENET
+> -	bool "Clock driver for PowerPC corenet platforms"
+> -	depends on PPC_E500MC && OF
+> +	bool "Clock driver for PowerPC corenet and compatible ARM-based platforms"
+> +	depends on (PPC_E500MC || ARM) && OF
+>   	---help---
+>   	  This adds the clock driver support for Freescale PowerPC corenet
+> -	  platforms using common clock framework.
+> +	  platforms and compatible Freescale ARM based platforms using common
+> +	  clock framework.
+>   
+>   config COMMON_CLK_XGENE
+>   	bool "Clock driver for APM XGene SoC"
+> diff --git a/drivers/clk/clk-ppc-corenet.c b/drivers/clk/clk-ppc-corenet.c
 
-I think this document would be much easier to read if you indented these
-paragraphs below "name" here. That way the actual property names would
-stand out more when looking up a particular property.
+Can't this file be renamed in order to reflect that is common between 
+PPC and ARM? It is strange to be named ppc_xxx and to be used by ARM kernel.
 
+> index 8e58edf..7692cac 100644
+> --- a/drivers/clk/clk-ppc-corenet.c
+> +++ b/drivers/clk/clk-ppc-corenet.c
+> @@ -305,3 +305,8 @@ static int __init ppc_corenet_clk_init(void)
+>   	return platform_driver_register(&ppc_corenet_clk_driver);
+>   }
+>   subsys_initcall(ppc_corenet_clk_init);
 > +
-> +- reg : physical base address and length of the register set(s) of the component.
-> +
-> +- clocks : the clock associated to this component.
-> +
-> +- clock-names: the name of the clock as referenced by the code.  Since we are
-> +using the AMBA framework, the name should be "apb_pclk".
-> +
-> +- ports or port: The representation of the component's port layout using the
-> +generic DT graph presentation found in "bindings/graph.txt".
-> +
-> +Non-configurable replicators:
-> +
-> +- compatible: currently supported value is "arm-replicator".  Since non-configurable
-> +replicators don't show up on the AMBA hey don't need to be post-fixed with
-> +"arm,primecell".
-> +
-> +- id: a unique number that will identify this replicator.
-> +
-> +- ports or port: same as above.
-> +
-> +Optional properties for Sinks:
-> +
-> +- coresight-default-sink: must be specified for one of the sink devices that is
-> +intended to be made the default sink. Other sink devices must not have this
-> +specified. Not specifying this property on any of the sinks is invalid.
-> +
-> +Optional properties for ETM/PTMs:
-> +
-> +- arm,cp14: must be present if the system accesses ETM/PTM management registers
-> +via co-processor 14.
-> +
-> +- arm,cp14: access to ETM/PTM management registers is made via cp14.
-> +
-> +- cpu: the cpu phandle this ETM/PTM is affined to. When omitted the source is
-> +considered to belong to CPU0.
-> +
-> +Optional property for TMC:
-> +
-> +- arm,buffer-size: size of contiguous buffer space for TMC ETR (embedded trace router)
-> +
-> +
-> +Example:
-> +
-> +1. Sinks
-> +	etb: etb at 20010000 {
-> +		compatible = "arm,coresight-etb10", "arm,primecell";
-> +		reg = <0 0x20010000 0 0x1000>;
+> +CLK_OF_DECLARE(ppc_core_pll_v1, "fsl,qoriq-core-pll-1.0", core_pll_init);
+> +CLK_OF_DECLARE(ppc_core_pll_v2, "fsl,qoriq-core-pll-2.0", core_pll_init);
+> +CLK_OF_DECLARE(ppc_core_mux_v1, "fsl,qoriq-core-mux-1.0", core_mux_init);
+> +CLK_OF_DECLARE(ppc_core_mux_v2, "fsl,qoriq-core-mux-2.0", core_mux_init);
 
-You seem to be using two address cells (and two size cells). In that
-case, I believe I read it were convention to use etb at 0,20010000?
-
-Regards,
-Andreas
-
-> +
-> +		coresight-default-sink;
-> +		clocks = <&oscclk6a>;
-> +		clock-names = "apb_pclk";
-> +		port {
-> +			etb_in_port: endpoint at 0 {
-> +				slave-mode;
-> +				remote-endpoint = <&replicator_out_port0>;
-> +			};
-> +		};
-> +	};
-[snip]
-
-
--- 
-SUSE LINUX Products GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
-GF: Jeff Hawn, Jennifer Guild, Felix Imend?rffer; HRB 16746 AG N?rnberg
+Diana
