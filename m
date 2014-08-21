@@ -1,65 +1,67 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Thu, 21 Aug 2014 08:56:21 -0500
-Subject: [PATCH v4 2/3] usb: dwc3: dwc3-st: Add st-dwc3 devicetree
- bindings documentation
-In-Reply-To: <20140821133340.GC17487@griffinp-ThinkPad-X1-Carbon-2nd>
-References: <1406734091-16202-1-git-send-email-peter.griffin@linaro.org>
- <1406734091-16202-3-git-send-email-peter.griffin@linaro.org>
- <20140820180005.GU24500@saruman.home>
- <20140821133340.GC17487@griffinp-ThinkPad-X1-Carbon-2nd>
-Message-ID: <20140821135620.GD9608@saruman.home>
+From: nm@ti.com (Nishanth Menon)
+Date: Thu, 21 Aug 2014 08:59:16 -0500
+Subject: [PATCH] clk: prevent erronous parsing of children during rate
+ change
+In-Reply-To: <1408628866-32351-1-git-send-email-t-kristo@ti.com>
+References: <1408628866-32351-1-git-send-email-t-kristo@ti.com>
+Message-ID: <20140821135916.GA29906@kahuna>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 21, 2014 at 02:33:40PM +0100, Peter Griffin wrote:
-> Hi Felipe,
+On 16:47-20140821, Tero Kristo wrote:
+> In some cases, clocks can switch their parent with clk_set_rate, for
+> example clk_mux can do this in some cases. Current implementation of
+> clk_change_rate uses un-safe list iteration on the clock children, which
+> will cause wrong clocks to be parsed in case any of the clock children
+> change their parents during the change rate operation. Fixed by using
+> the safe list iterator instead.
 > 
-> Thanks for reviewing, see my comments below: -
-> 
-> On Wed, 20 Aug 2014, Felipe Balbi wrote:
-> 
-> > > +	dwc3: dwc3 at 9900000 {
-> > > +		compatible	= "snps,dwc3";
-> > > +		reg		= <0x09900000 0x100000>;
-> > > +		interrupts	= <GIC_SPI 155 IRQ_TYPE_NONE>;
-> > > +		dr_mode		= "host"
-> > > +		usb-phy		= <&usb3_phy>;
-> > > +		phy-names	= "usb2-phy";
-> > > +		phys		= <&usb2_picophy2>;
-> > 
-> > why are you using different binding for usb2 and usb3 phys ? Why can't
-> > you just:
-> > 
-> > 	phys-names	= "usb2-phy", "usb3-phy";
-> > 	phys		= <&usb2_picophy2>, <&usb3_phy>;
-> > 
-> > ??
-> 
-> Currently (in the vendor tree) one of the phys lives in
-> drivers/usb/phy and the other in drivers/phy.
-> I believe that is because one is only a usb phy and the other is a
-> multi function phy which can drive PCI-E or USB3.
+> The problem was detected due to some divide by zero errors generated
+> by clock init on dra7-evm board, see discussion under
+> http://article.gmane.org/gmane.linux.ports.arm.kernel/349180 for details.
+>
 
-right, but for mainline, we can have both PHYs in drivers/phy only.
+Fixes: 71472c0c06cf ("clk: add support for clock reparent on set_rate")
+?
 
-> So to make that work, when dwc3/core.c gets the PHYS in
-> dwc3_core_get_phy() we need to use the different bindings.
+> Signed-off-by: Tero Kristo <t-kristo@ti.com>
+> To: Mike Turquette <mturquette@linaro.org>
+> Reported-by: Nishanth Menon <nm@ti.com>
+
+Tested-by: Nishanth Menon <nm@ti.com>
+> ---
+>  drivers/clk/clk.c |    7 ++++++-
+>  1 file changed, 6 insertions(+), 1 deletion(-)
 > 
-> I think we are the only platform using "one of each", but luckily
-> dwc3_core_get_phy() has been written generically enough that it "just
-> works" :-).
-
-true, but I want to drop support for the legacy drivers/usb/phy layer
-from dwc3. I'll try to move all PHYs to drivers/phy for v3.18.
-
-cheers
+> diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+> index b76fa69..bacc06f 100644
+> --- a/drivers/clk/clk.c
+> +++ b/drivers/clk/clk.c
+> @@ -1467,6 +1467,7 @@ static struct clk *clk_propagate_rate_change(struct clk *clk, unsigned long even
+>  static void clk_change_rate(struct clk *clk)
+>  {
+>  	struct clk *child;
+> +	struct hlist_node *tmp;
+>  	unsigned long old_rate;
+>  	unsigned long best_parent_rate = 0;
+>  	bool skip_set_rate = false;
+> @@ -1502,7 +1503,11 @@ static void clk_change_rate(struct clk *clk)
+>  	if (clk->notifier_count && old_rate != clk->rate)
+>  		__clk_notify(clk, POST_RATE_CHANGE, old_rate, clk->rate);
+>  
+> -	hlist_for_each_entry(child, &clk->children, child_node) {
+> +	/*
+> +	 * Use safe iteration, as change_rate can actually swap parents
+> +	 * for certain clock types.
+> +	 */
+> +	hlist_for_each_entry_safe(child, tmp, &clk->children, child_node) {
+>  		/* Skip children who will be reparented to another clock */
+>  		if (child->new_parent && child->new_parent != clk)
+>  			continue;
+> -- 
+> 1.7.9.5
+> 
 
 -- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140821/300d80b2/attachment.sig>
+Regards,
+Nishanth Menon
