@@ -1,136 +1,65 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Thu, 21 Aug 2014 16:49:19 +0300
-Subject: [PATCH] clk: ti: change clock init to use generic of_clk_init
-Message-ID: <1408628959-32442-1-git-send-email-t-kristo@ti.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Thu, 21 Aug 2014 08:56:21 -0500
+Subject: [PATCH v4 2/3] usb: dwc3: dwc3-st: Add st-dwc3 devicetree
+ bindings documentation
+In-Reply-To: <20140821133340.GC17487@griffinp-ThinkPad-X1-Carbon-2nd>
+References: <1406734091-16202-1-git-send-email-peter.griffin@linaro.org>
+ <1406734091-16202-3-git-send-email-peter.griffin@linaro.org>
+ <20140820180005.GU24500@saruman.home>
+ <20140821133340.GC17487@griffinp-ThinkPad-X1-Carbon-2nd>
+Message-ID: <20140821135620.GD9608@saruman.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Previously, the TI clock driver initialized all the clocks hierarchically
-under each separate clock provider node. Now, each clock that requires
-IO access will instead check their parent node to find out which IO range
-to use.
+On Thu, Aug 21, 2014 at 02:33:40PM +0100, Peter Griffin wrote:
+> Hi Felipe,
+> 
+> Thanks for reviewing, see my comments below: -
+> 
+> On Wed, 20 Aug 2014, Felipe Balbi wrote:
+> 
+> > > +	dwc3: dwc3 at 9900000 {
+> > > +		compatible	= "snps,dwc3";
+> > > +		reg		= <0x09900000 0x100000>;
+> > > +		interrupts	= <GIC_SPI 155 IRQ_TYPE_NONE>;
+> > > +		dr_mode		= "host"
+> > > +		usb-phy		= <&usb3_phy>;
+> > > +		phy-names	= "usb2-phy";
+> > > +		phys		= <&usb2_picophy2>;
+> > 
+> > why are you using different binding for usb2 and usb3 phys ? Why can't
+> > you just:
+> > 
+> > 	phys-names	= "usb2-phy", "usb3-phy";
+> > 	phys		= <&usb2_picophy2>, <&usb3_phy>;
+> > 
+> > ??
+> 
+> Currently (in the vendor tree) one of the phys lives in
+> drivers/usb/phy and the other in drivers/phy.
+> I believe that is because one is only a usb phy and the other is a
+> multi function phy which can drive PCI-E or USB3.
 
-This patch allows the TI clock driver to use a few new features provided
-by the generic of_clk_init, and also allows registration of clock nodes
-outside the clock hierarchy (for example, any external clocks.)
+right, but for mainline, we can have both PHYs in drivers/phy only.
 
-Signed-off-by: Tero Kristo <t-kristo@ti.com>
-Cc: Mike Turquette <mturquette@linaro.org>
-Cc: Paul Walmsley <paul@pwsan.com>
-Cc: Tony Lindgren <tony@atomide.com>
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: Peter Ujfalusi <peter.ujfalusi@ti.com>
-Cc: Jyri Sarha <jsarha@ti.com>
-Cc: Stefan Assmann <sassmann@kpanic.de>
----
- arch/arm/mach-omap2/io.c         |   10 ++++++++--
- arch/arm/mach-omap2/prm_common.c |    2 --
- drivers/clk/ti/clk.c             |   31 ++++++++++++++++---------------
- 3 files changed, 24 insertions(+), 19 deletions(-)
+> So to make that work, when dwc3/core.c gets the PHYS in
+> dwc3_core_get_phy() we need to use the different bindings.
+> 
+> I think we are the only platform using "one of each", but luckily
+> dwc3_core_get_phy() has been written generically enough that it "just
+> works" :-).
 
-diff --git a/arch/arm/mach-omap2/io.c b/arch/arm/mach-omap2/io.c
-index 5d0667c..3325df6 100644
---- a/arch/arm/mach-omap2/io.c
-+++ b/arch/arm/mach-omap2/io.c
-@@ -734,8 +734,14 @@ int __init omap_clk_init(void)
- 	ti_clk_init_features();
- 
- 	ret = of_prcm_init();
--	if (!ret)
--		ret = omap_clk_soc_init();
-+	if (ret)
-+		return ret;
-+
-+	of_clk_init(NULL);
-+
-+	ti_dt_clockdomains_setup();
-+
-+	ret = omap_clk_soc_init();
- 
- 	return ret;
- }
-diff --git a/arch/arm/mach-omap2/prm_common.c b/arch/arm/mach-omap2/prm_common.c
-index 76ca320..3b89080 100644
---- a/arch/arm/mach-omap2/prm_common.c
-+++ b/arch/arm/mach-omap2/prm_common.c
-@@ -525,8 +525,6 @@ int __init of_prcm_init(void)
- 		memmap_index++;
- 	}
- 
--	ti_dt_clockdomains_setup();
--
- 	return 0;
- }
- 
-diff --git a/drivers/clk/ti/clk.c b/drivers/clk/ti/clk.c
-index b1a6f71..f7201d0 100644
---- a/drivers/clk/ti/clk.c
-+++ b/drivers/clk/ti/clk.c
-@@ -25,8 +25,8 @@
- #undef pr_fmt
- #define pr_fmt(fmt) "%s: " fmt, __func__
- 
--static int ti_dt_clk_memmap_index;
- struct ti_clk_ll_ops *ti_clk_ll_ops;
-+static struct device_node *clocks_node_ptr[CLK_MAX_MEMMAPS];
- 
- /**
-  * ti_dt_clocks_register - register DT alias clocks during boot
-@@ -108,9 +108,21 @@ void __iomem *ti_clk_get_reg_addr(struct device_node *node, int index)
- 	struct clk_omap_reg *reg;
- 	u32 val;
- 	u32 tmp;
-+	int i;
- 
- 	reg = (struct clk_omap_reg *)&tmp;
--	reg->index = ti_dt_clk_memmap_index;
-+
-+	for (i = 0; i < CLK_MAX_MEMMAPS; i++) {
-+		if (clocks_node_ptr[i] == node->parent)
-+			break;
-+	}
-+
-+	if (i == CLK_MAX_MEMMAPS) {
-+		pr_err("clk-provider not found for %s!\n", node->name);
-+		return NULL;
-+	}
-+
-+	reg->index = i;
- 
- 	if (of_property_read_u32_index(node, "reg", index, &val)) {
- 		pr_err("%s must have reg[%d]!\n", node->name, index);
-@@ -133,15 +145,10 @@ void __iomem *ti_clk_get_reg_addr(struct device_node *node, int index)
-  */
- void ti_dt_clk_init_provider(struct device_node *parent, int index)
- {
--	const struct of_device_id *match;
--	struct device_node *np;
- 	struct device_node *clocks;
--	of_clk_init_cb_t clk_init_cb;
- 	struct clk_init_item *retry;
- 	struct clk_init_item *tmp;
- 
--	ti_dt_clk_memmap_index = index;
--
- 	/* get clocks for this parent */
- 	clocks = of_get_child_by_name(parent, "clocks");
- 	if (!clocks) {
-@@ -149,14 +156,8 @@ void ti_dt_clk_init_provider(struct device_node *parent, int index)
- 		return;
- 	}
- 
--	for_each_child_of_node(clocks, np) {
--		match = of_match_node(&__clk_of_table, np);
--		if (!match)
--			continue;
--		clk_init_cb = (of_clk_init_cb_t)match->data;
--		pr_debug("%s: initializing: %s\n", __func__, np->name);
--		clk_init_cb(np);
--	}
-+	/* add clocks node info */
-+	clocks_node_ptr[index] = clocks;
- 
- 	list_for_each_entry_safe(retry, tmp, &retry_list, link) {
- 		pr_debug("retry-init: %s\n", retry->node->name);
+true, but I want to drop support for the legacy drivers/usb/phy layer
+from dwc3. I'll try to move all PHYs to drivers/phy for v3.18.
+
+cheers
+
 -- 
-1.7.9.5
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140821/300d80b2/attachment.sig>
