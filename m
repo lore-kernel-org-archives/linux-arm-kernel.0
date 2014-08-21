@@ -1,97 +1,38 @@
-From: a.hajda@samsung.com (Andrzej Hajda)
-Date: Thu, 21 Aug 2014 12:16:02 +0200
-Subject: [PATCH v4 00/11] drm: add support for Atmel HLCDC Display
- Controller
-In-Reply-To: <20140821114159.319e741b@bbrezillon>
-References: <1406034695-15534-1-git-send-email-boris.brezillon@free-electrons.com>
- <20140821081619.GZ2452@ldesroches-Latitude-E6320>
- <20140821103706.2349915d@bbrezillon> <20140821090406.GA13733@ulmo>
- <20140821114159.319e741b@bbrezillon>
-Message-ID: <53F5C6E2.7070604@samsung.com>
+From: mperttunen@nvidia.com (Mikko Perttunen)
+Date: Thu, 21 Aug 2014 13:17:18 +0300
+Subject: [PATCH v5 0/4] Tegra124 soctherm driver
+Message-ID: <1408616242-21009-1-git-send-email-mperttunen@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/21/2014 11:41 AM, Boris BREZILLON wrote:
-> On Thu, 21 Aug 2014 11:04:07 +0200
-> Thierry Reding <thierry.reding@gmail.com> wrote:
-> 
->> On Thu, Aug 21, 2014 at 10:37:06AM +0200, Boris BREZILLON wrote:
->>> Hi Ludovic,
->>>
->>> On Thu, 21 Aug 2014 10:16:19 +0200
->>> Ludovic Desroches <ludovic.desroches@atmel.com> wrote:
->>>
->>>> Hi Boris,
->>>>
->>>> You can add
->>>>
->>>> Tested-by: Ludovic Desroches <ludovic.desroches@atmel.com>
->>>
->>> Thanks for testing this driver.
->>>
->>>>
->>>> Only one issue but not related to your patches, you can't display
->>>> quickly the bootup logo since the panel detection takes too much
->>>> time.
->>>
->>> Yes, actually this is related to the device probe order: the
->>> hlcdc-display-controller device is probed before the simple-panel, thus
->>> nothing is detected on the RGB connector (I use of_drm_find_panel to
->>> check for panel availability) when the display controller is
->>> instantiated. I rely on the default polling infrastructure provided by
->>> the DRM/KMS framework which polls for a new connector every 10s, and
->>> this is far more than you kernel boot time.
->>>
->>> Do anyone see a solution to reduce this delay (without changing the
->>> polling interval). I thought we could add a notifier infrastructure to
->>> the DRM panel framework, but I'm not sure this is how you want things
->>> done...
->>
->> Other drivers return -EPROBE_DEFER when a panel hasn't been registered
->> yet. This will automatically take care of ordering things in a way that
->> DRM/KMS will only be initialized after the panel has been probed.
-> 
-> Actually I'd like to avoid doing this with a deferred probe, because,
-> AFAIU, the remote endpoint is not tightly linked with the display
-> controller driver (I mean the display controller can still be
-> initialized without having a display connected on it).
-> Moreover the atmel dev kit I'm using has an HDMI bridge connected on
-> the same RGB connector and I'd like to use it in a near future.
-> Returning -EPROBE_DEFER in case of several devices connected on the
-> same connector implies that I'll have to wait for all the remote
-> end-points to be available before my display controller could be
-> instantiated.
-> 
-> While this could be acceptable when all drivers are statically linked
-> in the kernel, it might be problematic when you're using modules,
-> meaning that you won't be able to display anything on your LCD panel
-> until your HDMI bridge module has been loaded.
+Hi,
 
-I agree that deferring whole drm initialization due to panel not being
-ready is not an optimal solution. Nice solution of this problem is with
-DSI panels, DSI bus infrastructure provides callbacks for DRM encoder
-which are called when DSI panel is ready. Simple panels are platform
-devices so they do not have such callbacks. To solve this in a generic
-way I have proposed framework for tracking interfaces[1], the series
-contains also solution for the same problem with exynos display
-controller[2].
+this series adds support for the thermal monitoring features of the
+soctherm unit on the Tegra124 SoC. 
 
-Regards
-Andrzej
+The branch is also available in my github repo,
+  git://github.com/cyndis/linux.git soctherm-v5
 
-[1]: https://lkml.org/lkml/2014/4/30/345
-[2]: https://lkml.org/lkml/2014/4/30/653
+Thanks,
+Mikko
 
-> 
->> That
->> will still cause some delay before everything gets set up, but hopefully
->> less than what you're seeing now. There's also another thread where this
->> is being discussed because deferred probing is causing "unacceptable"
->> delays as well.
-> 
-> Could you point this thread out to me please ?
-> 
-> Best Regards,
-> 
-> Boris
-> 
+Mikko Perttunen (4):
+  of: Add bindings for nvidia,tegra124-soctherm
+  ARM: tegra: Add soctherm and thermal zones to Tegra124 device tree
+  ARM: tegra: Add thermal trip points for Jetson TK1
+  thermal: Add Tegra SOCTHERM thermal management driver
+
+ .../devicetree/bindings/thermal/tegra-soctherm.txt |  53 +++
+ arch/arm/boot/dts/tegra124-jetson-tk1.dts          |  41 ++
+ arch/arm/boot/dts/tegra124.dtsi                    |  47 ++
+ drivers/thermal/Kconfig                            |  10 +
+ drivers/thermal/Makefile                           |   1 +
+ drivers/thermal/tegra_soctherm.c                   | 471 +++++++++++++++++++++
+ include/dt-bindings/thermal/tegra124-soctherm.h    |  13 +
+ 7 files changed, 636 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/thermal/tegra-soctherm.txt
+ create mode 100644 drivers/thermal/tegra_soctherm.c
+ create mode 100644 include/dt-bindings/thermal/tegra124-soctherm.h
+
+-- 
+1.8.1.5
