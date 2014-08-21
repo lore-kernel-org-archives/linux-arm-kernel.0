@@ -1,59 +1,80 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu, 21 Aug 2014 09:41:57 -0600
-Subject: [PATCH v2 2/5] of: Add nvidia,controller-id property to Tegra
- I2C bindings
-In-Reply-To: <20140821070511.GF4486@ulmo>
-References: <1407933685-12404-1-git-send-email-mperttunen@nvidia.com>
- <1407933685-12404-3-git-send-email-mperttunen@nvidia.com>
- <53F502D7.9030403@wwwdotorg.org> <20140821070511.GF4486@ulmo>
-Message-ID: <53F61345.2080803@wwwdotorg.org>
+From: steve.capper@linaro.org (Steve Capper)
+Date: Thu, 21 Aug 2014 16:43:26 +0100
+Subject: [PATH V2 0/6] RCU get_user_pages_fast and __get_user_pages_fast
+Message-ID: <1408635812-31584-1-git-send-email-steve.capper@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/21/2014 01:05 AM, Thierry Reding wrote:
-> On Wed, Aug 20, 2014 at 02:19:35PM -0600, Stephen Warren wrote:
->> On 08/13/2014 06:41 AM, Mikko Perttunen wrote:
->>> Sometimes, hardware blocks want to issue requests to devices
->>> connected to I2C buses by itself. In such case, the bus the
->>> target device resides on must be configured into a register.
->>> For this purpose, each I2C controller has a defined ID known
->>> by the hardware. Add a property for these IDs to the device tree
->>> bindings, so that drivers can know what ID to write to a hardware
->>> register when configuring a block that sends I2C messages autonomously.
->>
->>> diff --git a/Documentation/devicetree/bindings/i2c/nvidia,tegra20-i2c.txt b/Documentation/devicetree/bindings/i2c/nvidia,tegra20-i2c.txt
->>
->>> +Optional properties:
->>> +- nvidia,controller-id: ID of controller when referred to in
->>> +                        hardware registers.
->>
->> I'd prefer to put this information into the thermal trip node, since this
->> represents what ID the PMC uses to communicate with the I2C controller, and
->> there's no absolute guarantee that multiple clients that communicate
->> directly with an I2C controller would use the same numbering scheme.
->>
->> If that doesn't work, can be at least name this nvidia,pmc-controller-id or
->> nvidia,id-in-pmc so that if there are different numbering schemes, there's a
->> clear path to represent this in different properties without conflicting
->> names?
->
-> This is the ID of the controller used internally by the documentation.
-> And as far as I can tell every aspect of the documentation refers to the
-> controllers by the same ID (clocks, interrupts, ...). The PMC uses this
-> same numbering scheme. That makes the ID about as canonical as it gets,
-> so the extra prefix isn't warranted in my opinion.
->
-> I'd argue that if ever there was a case where something was referring to
-> the controller using a different ID then that should be considered the
-> oddball and get special treatment.
+Hello,
+This series implements general forms of get_user_pages_fast and
+__get_user_pages_fast and activates them for arm and arm64.
 
-This is certainly true in practice in current SoCs, but in general, 
-there's no reason why every HW module that talks to I2C HW modules needs 
-to be hooked up to all of them in the same order, especially if SoCs 
-start getting put together by mixing/matching components from all kinds 
-of vendors etc.
+These are required for Transparent HugePages to function correctly, as
+a futex on a THP tail will otherwise result in an infinite loop (due to
+the core implementation of __get_user_pages_fast always returning 0).
 
-Still, since they are today, I suppose that binding is fine; we can 
-always modify the binding for any new SoC (and associated compatible 
-value) in the future if the current rule ever gets broken. The code will 
-be a little annoying though.
+Unfortunately, a futex on THP tail can be quite common for certain
+workloads; thus THP is unreliable without a __get_user_pages_fast
+implementation.
+
+This series may also be beneficial for direct-IO heavy workloads and
+certain KVM workloads.
+
+Changes since PATCH V1 are:
+ * Rebase to 3.17-rc1
+ * Switched to kick_all_cpus_sync as suggested by Mark Rutland.
+
+The main changes since RFC V5 are:
+ * Rebased against 3.16-rc1.
+ * pmd_present no longer tested for by gup_huge_pmd and gup_huge_pud,
+   because the entry must be present for these leaf functions to be
+   called. 
+ * Rather than assume puds can be re-cast as pmds, a separate
+   function pud_write is instead used by the core gup.
+ * ARM activation logic changed, now it will only activate
+   RCU_TABLE_FREE and RCU_GUP when running with LPAE.
+
+The main changes since RFC V4 are:
+ * corrected the arm64 logic so it now correctly rcu-frees page
+   table backing pages.
+ * rcu free logic relaxed for pre-ARMv7 ARM as we need an IPI to
+   invalidate TLBs anyway.
+ * rebased to 3.15-rc3 (some minor changes were needed to allow it to merge).
+ * dropped Catalin's mmu_gather patch as that's been merged already.
+
+This series has been tested with LTP mm tests and some custom futex tests
+that exacerbate the futex on THP tail case; on both an Arndale board and
+a Juno board. Also debug counters were temporarily employed to ensure that
+the RCU_TABLE_FREE logic was behaving as expected.
+
+I would really appreciate any comments (especially on the validity or
+otherwise of the core fast_gup implementation) and testers.
+
+Cheers,
+--
+Steve
+
+Steve Capper (6):
+  mm: Introduce a general RCU get_user_pages_fast.
+  arm: mm: Introduce special ptes for LPAE
+  arm: mm: Enable HAVE_RCU_TABLE_FREE logic
+  arm: mm: Enable RCU fast_gup
+  arm64: mm: Enable HAVE_RCU_TABLE_FREE logic
+  arm64: mm: Enable RCU fast_gup
+
+ arch/arm/Kconfig                      |   5 +
+ arch/arm/include/asm/pgtable-2level.h |   2 +
+ arch/arm/include/asm/pgtable-3level.h |  15 ++
+ arch/arm/include/asm/pgtable.h        |   6 +-
+ arch/arm/include/asm/tlb.h            |  38 ++++-
+ arch/arm/mm/flush.c                   |  15 ++
+ arch/arm64/Kconfig                    |   4 +
+ arch/arm64/include/asm/pgtable.h      |  11 +-
+ arch/arm64/include/asm/tlb.h          |  20 ++-
+ arch/arm64/mm/flush.c                 |  15 ++
+ mm/Kconfig                            |   3 +
+ mm/gup.c                              | 278 ++++++++++++++++++++++++++++++++++
+ 12 files changed, 402 insertions(+), 10 deletions(-)
+
+-- 
+1.9.3
