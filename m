@@ -1,48 +1,47 @@
-From: vincent.stehle@laposte.net (=?UTF-8?q?Vincent=20Stehl=C3=A9?=)
-Date: Fri, 22 Aug 2014 01:31:20 +0200
-Subject: [PATCH linux-next] irq: export handle_fasteoi_irq
-Message-ID: <1408663880-29179-1-git-send-email-vincent.stehle@laposte.net>
+From: davem@davemloft.net (David Miller)
+Date: Thu, 21 Aug 2014 16:36:12 -0700 (PDT)
+Subject: [PATCH v2 0/3] net: Add Keystone NetCP ethernet driver support
+In-Reply-To: <1408115562-22487-1-git-send-email-santosh.shilimkar@ti.com>
+References: <1408115562-22487-1-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <20140821.163612.282672926741753926.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Export handle_fasteoi_irq to be able to use it in e.g. the Zynq gpio driver
-since commit 6dd859508336 ("gpio: zynq: Fix IRQ handlers").
+From: Santosh Shilimkar <santosh.shilimkar@ti.com>
+Date: Fri, 15 Aug 2014 11:12:39 -0400
 
-This fixes the following link issue:
+> Update version after incorporating David Miller's comment from earlier
+> posting [1]. I would like to get these merged for upcoming 3.18 merge
+> window if there are no concerns on this version.
+> 
+> The network coprocessor (NetCP) is a hardware accelerator that processes
+> Ethernet packets. NetCP has a gigabit Ethernet (GbE) subsystem with a ethernet
+> switch sub-module to send and receive packets. NetCP also includes a packet
+> accelerator (PA) module to perform packet classification operations such as
+> header matching, and packet modification operations such as checksum
+> generation. NetCP can also optionally include a Security Accelerator(SA)
+> capable of performing IPSec operations on ingress/egress packets.
+>     
+> Keystone SoC's also have a 10 Gigabit Ethernet Subsystem (XGbE) which
+> includes a 3-port Ethernet switch sub-module capable of 10Gb/s and
+> 1Gb/s rates per Ethernet port.
+>     
+> NetCP driver has a plug-in module architecture where each of the NetCP
+> sub-modules exist as a loadable kernel module which plug in to the netcp
+> core. These sub-modules are represented as "netcp-devices" in the dts
+> bindings. It is mandatory to have the ethernet switch sub-module for
+> the ethernet interface to be operational. Any other sub-module like the
+> PA is optional.
+> 
+> Both GBE and XGBE network processors supported using common driver. It
+> is also designed to handle future variants of NetCP.
 
-  ERROR: "handle_fasteoi_irq" [drivers/gpio/gpio-zynq.ko] undefined!
+I don't want to see an offload driver that doesn't plug into the existing
+generic frameworks for configuration et al.
 
-Signed-off-by: Vincent Stehl? <vincent.stehle@laposte.net>
-Cc: Thomas Gleixner <tglx@linutronix.de>
-Cc: Lars-Peter Clausen <lars@metafoo.de>
-Cc: Linus Walleij <linus.walleij@linaro.org>
----
+If no existing facility exists to support what you need, you must work
+with the upstream maintainers to design and create one.
 
-Hi,
-
-This can be seen in Linux next-20140822 with e.g. arm allmodconfig.
-
-Zync gpio seems to be the first code to use handle_fasteoi_irq, which can be
-compiled as a module.
-
-Best regards,
-
-V.
-
- kernel/irq/chip.c | 1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/kernel/irq/chip.c b/kernel/irq/chip.c
-index a2b28a2..6223fab 100644
---- a/kernel/irq/chip.c
-+++ b/kernel/irq/chip.c
-@@ -517,6 +517,7 @@ out:
- 		chip->irq_eoi(&desc->irq_data);
- 	raw_spin_unlock(&desc->lock);
- }
-+EXPORT_SYMBOL_GPL(handle_fasteoi_irq);
- 
- /**
-  *	handle_edge_irq - edge type IRQ handler
--- 
-2.1.0.rc1
+It is absolutely no reasonable for every "switch on a chip" driver to
+export it's own configuration knob, we need a standard interface all
+such drivers will plug into and provide.
