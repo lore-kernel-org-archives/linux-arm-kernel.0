@@ -1,54 +1,51 @@
-From: mirqus@gmail.com (=?ISO-8859-2?Q?Micha=B3_Miros=B3aw?=)
-Date: Thu, 21 Aug 2014 23:43:38 +0200
-Subject: [PATCH v4 2/2] net: moxa: replace build_skb() with
- netdev_alloc_skb_ip_align() / memcpy()
-In-Reply-To: <1408459784-9385-2-git-send-email-jonas.jensen@gmail.com>
-References: <1408459784-9385-1-git-send-email-jonas.jensen@gmail.com>
- <1408459784-9385-2-git-send-email-jonas.jensen@gmail.com>
-Message-ID: <CAHXqBFJ3bWW8NVYcjxLnkk=6qxcRv75iCuBLrHuF91wxcL=61g@mail.gmail.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Thu, 21 Aug 2014 16:48:40 -0500
+Subject: [RFC PATCH 3/4] tty: omap-serial: use threaded interrupt handler
+In-Reply-To: <20140821214117.GA7076@ci00147.xsens-tech.local>
+References: <1406645577-18620-1-git-send-email-frans.klaver@xsens.com>
+ <1408450488-4083-1-git-send-email-frans.klaver@xsens.com>
+ <1408450488-4083-4-git-send-email-frans.klaver@xsens.com>
+ <20140819185701.GC22003@saruman.home>
+ <20140820064028.GC9319@ci00147.xsens-tech.local>
+ <20140820160604.GH24500@saruman.home>
+ <20140821214117.GA7076@ci00147.xsens-tech.local>
+Message-ID: <20140821214840.GU11146@saruman.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2014-08-19 16:49 GMT+02:00 Jonas Jensen <jonas.jensen@gmail.com>:
-[...]
-> diff --git a/drivers/net/ethernet/moxa/moxart_ether.c b/drivers/net/ethernet/moxa/moxart_ether.c
-> index aa45607..17c9f0e 100644
-> --- a/drivers/net/ethernet/moxa/moxart_ether.c
-> +++ b/drivers/net/ethernet/moxa/moxart_ether.c
-> @@ -226,14 +226,21 @@ static int moxart_rx_poll(struct napi_struct *napi, int budget)
->                 if (len > RX_BUF_SIZE)
->                         len = RX_BUF_SIZE;
->
-> -               skb = build_skb(priv->rx_buf[rx_head], priv->rx_buf_size);
-> +               dma_sync_single_for_cpu(&ndev->dev,
-> +                                       priv->rx_mapping[rx_head],
-> +                                       priv->rx_buf_size, DMA_FROM_DEVICE);
-> +               skb = netdev_alloc_skb_ip_align(ndev, len);
->                 if (unlikely(!skb)) {
-> -                       net_dbg_ratelimited("build_skb failed\n");
-> +                       net_dbg_ratelimited("netdev_alloc_skb_ip_align failed\n");
->                         priv->stats.rx_dropped++;
->                         priv->stats.rx_errors++;
->                 }
-> -
-> +               memcpy(skb->data, priv->rx_buf[rx_head], len);
+Hi,
 
-This has implicit: if (!skb) BUG(); There should probably be a return
-or continue inside the if (!skb).
+On Thu, Aug 21, 2014 at 11:41:17PM +0200, Frans Klaver wrote:
+> On Wed, Aug 20, 2014 at 11:06:05AM -0500, Felipe Balbi wrote:
+> > On Wed, Aug 20, 2014 at 08:40:28AM +0200, Frans Klaver wrote:
+> > > On Tue, Aug 19, 2014 at 01:57:02PM -0500, Felipe Balbi wrote:
+> > > > On Tue, Aug 19, 2014 at 02:14:47PM +0200, Frans Klaver wrote:
+> > > > > At 3.6Mbaud, with slightly over 2Mbit/s data coming in, we see 1600 uart
+> > > > > rx buffer overflows within 30 seconds. Threading the interrupt handling reduces
+> > > > > this to about 170 overflows in 10 minutes.
+> > > > 
+> > > > Can you try Sebastian Siewior's patches for 8250_omap and 8250 dma
+> > > > support ? That should help you a lot.
+> > > 
+> > > I'll have a look at that series. Thanks for pointing it out.
+> 
+> I have had a look at Sebastian's series, but I'm not convinced
+> yet that we should use it. So far the serial console seems to be
+> missing data every now and then. I haven't gotten around to testing our
+> high traffic application yet.
 
->                 skb_put(skb, len);
-> +               dma_sync_single_for_device(&ndev->dev,
-> +                                          priv->rx_mapping[rx_head],
-> +                                          priv->rx_buf_size, DMA_FROM_DEVICE);
-> +
+as any new driver, there are bugs to be fixed. How about reporting the
+ones you found together with a way of reproducing them so they can be
+fixed ?
 
-dma_sync_single_for_device() is not needed here as CPU does not and
-should not write to the DMA_FROM_DEVICE mapping.
+cheers
 
-
->                 skb->protocol = eth_type_trans(skb, ndev);
->                 napi_gro_receive(&priv->napi, skb);
->                 rx++;
-
-Best Regards,
-Micha? Miros?aw
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140821/636428fd/attachment.sig>
