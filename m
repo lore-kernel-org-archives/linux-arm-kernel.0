@@ -1,97 +1,59 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Thu, 21 Aug 2014 08:39:43 -0700
-Subject: [PATCH 1/4] ARM: rockchip: rk3288: Switch to use the proper PWM IP
-In-Reply-To: <20140821062420.GA4486@ulmo>
-References: <1408381749-14156-1-git-send-email-dianders@chromium.org>
- <1408381749-14156-2-git-send-email-dianders@chromium.org>
- <20140819071011.GC12859@ulmo>
- <CAD=FV=Xr4ywGT_pPK=r6f6tfVpwbduUY7D5LK61HVtc8=JmkaA@mail.gmail.com>
- <20140820060759.GD13793@ulmo>
- <CAD=FV=Uqm43x0N=eOCQkY_MXviiD2WMw55pOZmC=WVRbD2+veg@mail.gmail.com>
- <20140820153801.GB3427@ulmo>
- <CAD=FV=Xf4Hm5tCaaW3QG-ZSQGovh6RKH=1Og1K-yxj+jKyGsmA@mail.gmail.com>
- <20140821062420.GA4486@ulmo>
-Message-ID: <CAD=FV=WdJhGD=oSKGgAmHNgPmEfmp4rXtCxsjEdaijVK=dW=sA@mail.gmail.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Thu, 21 Aug 2014 09:41:57 -0600
+Subject: [PATCH v2 2/5] of: Add nvidia,controller-id property to Tegra
+ I2C bindings
+In-Reply-To: <20140821070511.GF4486@ulmo>
+References: <1407933685-12404-1-git-send-email-mperttunen@nvidia.com>
+ <1407933685-12404-3-git-send-email-mperttunen@nvidia.com>
+ <53F502D7.9030403@wwwdotorg.org> <20140821070511.GF4486@ulmo>
+Message-ID: <53F61345.2080803@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thierry and Heiko
-
-On Wed, Aug 20, 2014 at 11:24 PM, Thierry Reding
-<thierry.reding@gmail.com> wrote:
-> On Wed, Aug 20, 2014 at 08:55:09AM -0700, Doug Anderson wrote:
->> On Wed, Aug 20, 2014 at 8:38 AM, Thierry Reding <thierry.reding@gmail.com> wrote:
-> [...]
->> > Looking at the register offsets in the device tree that seems likely. At
->> > least PWMs 0 and 1 as well as 2 and 3 seem like they could be in the
->> > same IP block. Their placement in the register map is somewhat strange:
->> >
->> >         pwm0: pwm at 20030000 {
->> >                 ...
->> >                 reg = <0x20030000 0x10>;
->> >                 ...
->> >                 clocks = <&cru PCLK_PWM01>;
->> >                 ...
->> >         };
->> >
->> >         pwm1: pwm at 20030010 {
->> >                 ...
->> >                 reg = <0x20030010 0x10>;
->> >                 ...
->> >                 clocks = <&cru PCLK_PWM01>;
->> >                 ...
->> >         };
->> >
->> >         ...
->> >
->> >         pwm2: pwm at 20050020 {
->> >                 ...
->> >                 reg = <0x20050020 0x10>;
->> >                 ...
->> >                 clocks = <&cru PCLK_PWM23>;
->> >                 ...
->> >         };
->> >
->> >         pwm3: pwm at 20050030 {
->> >                 ...
->> >                 reg = <0x20050030 0x10>;
->> >                 ...
->> >                 clocks = <&cru PCLK_PWM23>;
->> >                 ...
->> >         };
+On 08/21/2014 01:05 AM, Thierry Reding wrote:
+> On Wed, Aug 20, 2014 at 02:19:35PM -0600, Stephen Warren wrote:
+>> On 08/13/2014 06:41 AM, Mikko Perttunen wrote:
+>>> Sometimes, hardware blocks want to issue requests to devices
+>>> connected to I2C buses by itself. In such case, the bus the
+>>> target device resides on must be configured into a register.
+>>> For this purpose, each I2C controller has a defined ID known
+>>> by the hardware. Add a property for these IDs to the device tree
+>>> bindings, so that drivers can know what ID to write to a hardware
+>>> register when configuring a block that sends I2C messages autonomously.
 >>
->> Ah, you're looking at "rk3xxx.dtsi".  That doesn't apply to rk3288
->> (the downsides of trying to guess ahead of time what SoC vendors will
->> name new models).
+>>> diff --git a/Documentation/devicetree/bindings/i2c/nvidia,tegra20-i2c.txt b/Documentation/devicetree/bindings/i2c/nvidia,tegra20-i2c.txt
 >>
->> In rk3288 they have the same clocks.  See patch #3 in this series.
+>>> +Optional properties:
+>>> +- nvidia,controller-id: ID of controller when referred to in
+>>> +                        hardware registers.
 >>
+>> I'd prefer to put this information into the thermal trip node, since this
+>> represents what ID the PMC uses to communicate with the I2C controller, and
+>> there's no absolute guarantee that multiple clients that communicate
+>> directly with an I2C controller would use the same numbering scheme.
 >>
->> > The clocks would also indicate that there are actually two blocks. I
->> > seem to remember a discussion about whether to handle them as a single
->> > block or two/four, but I can't seem to find a reference to it. Maybe I'm
->> > confusing it with another driver.
->>
->> At this point it seems like the choice has already been made to handle
->> them as separate PWMs.  I can change this choice if you want...
+>> If that doesn't work, can be at least name this nvidia,pmc-controller-id or
+>> nvidia,id-in-pmc so that if there are different numbering schemes, there's a
+>> clear path to represent this in different properties without conflicting
+>> names?
 >
-> Well, looking at patch 3/4 this really does seem to be one single block
-> providing four PWM channels, so the right thing to do would be to
-> represent it in one device tree node. But I'll leave it up to Heiko to
-> decide how he wants to handle this.
+> This is the ID of the controller used internally by the documentation.
+> And as far as I can tell every aspect of the documentation refers to the
+> controllers by the same ID (clocks, interrupts, ...). The PMC uses this
+> same numbering scheme. That makes the ID about as canonical as it gets,
+> so the extra prefix isn't warranted in my opinion.
 >
-> One downside of describing it as one device is that it would make the
-> pinmux handling slightly more difficult, since presumably you'd only
-> want to apply the pinmux settings when a channel is actually being used.
-> Currently the pinmux doesn't apply as long as the device remains
-> disabled in device tree (though enabling it doesn't necessarily mean
-> that it's being used).
->
-> Like I said, it's up to Heiko to decide whether it's worth making this
-> change (and it'd make sense to apply it to existing DTS files
-> retroactively) or better to keep what we have.
+> I'd argue that if ever there was a case where something was referring to
+> the controller using a different ID then that should be considered the
+> oddball and get special treatment.
 
-Please let me know if you'd like me to spin.  Otherwise I'll assume
-this is OK as is.
+This is certainly true in practice in current SoCs, but in general, 
+there's no reason why every HW module that talks to I2C HW modules needs 
+to be hooked up to all of them in the same order, especially if SoCs 
+start getting put together by mixing/matching components from all kinds 
+of vendors etc.
 
--Doug
+Still, since they are today, I suppose that binding is fine; we can 
+always modify the binding for any new SoC (and associated compatible 
+value) in the future if the current rule ever gets broken. The code will 
+be a little annoying though.
