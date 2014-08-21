@@ -1,35 +1,87 @@
-From: addy.ke@rock-chips.com (Addy Ke)
-Date: Fri, 22 Aug 2014 01:50:57 +0800
-Subject: [PATCH] i2c: rk3x: fix bug that cause transfer fails in master
- receive mode
-Message-ID: <1408643457-7126-1-git-send-email-addy.ke@rock-chips.com>
+From: keescook@chromium.org (Kees Cook)
+Date: Thu, 21 Aug 2014 12:51:51 -0500
+Subject: [PATCH v6 3/6] asm-generic: add generic seccomp.h for secure
+ computing mode 1
+In-Reply-To: <1408611405-8943-4-git-send-email-takahiro.akashi@linaro.org>
+References: <1408611405-8943-1-git-send-email-takahiro.akashi@linaro.org>
+ <1408611405-8943-4-git-send-email-takahiro.akashi@linaro.org>
+Message-ID: <CAGXu5j+6kyiZqXF0pScqsCzqDonCthKSvYDVT5+vEd3+iY72vg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In rk3x SOC, the I2C controller can receive/transmit up to 32 bytes data
-in one transaction, so the size of data to be write/read to/from
-TXDATAx/RXDATAx must be less than or equal 32 bytes at a time.
+On Thu, Aug 21, 2014 at 3:56 AM, AKASHI Takahiro
+<takahiro.akashi@linaro.org> wrote:
+> Those values (__NR_seccomp_*) are used solely in secure_computing()
+> to identify mode 1 system calls. If compat system calls have different
+> syscall numbers, asm/seccomp.h may override them.
+>
+> Acked-by: Arnd Bergmann <arnd@arndb.de>
+> Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
 
-Test on pinky board, elan receive 158 bytes data.
+Reviewed-by: Kees Cook <keescook@chromium.org>
 
-Signed-off-by: Addy Ke <addy.ke@rock-chips.com>
----
- drivers/i2c/busses/i2c-rk3x.c | 3 +++
- 1 file changed, 3 insertions(+)
+> ---
+>  include/asm-generic/seccomp.h |   28 ++++++++++++++++++++++++++++
+>  1 file changed, 28 insertions(+)
+>  create mode 100644 include/asm-generic/seccomp.h
+>
+> diff --git a/include/asm-generic/seccomp.h b/include/asm-generic/seccomp.h
+> new file mode 100644
+> index 0000000..5e97022
+> --- /dev/null
+> +++ b/include/asm-generic/seccomp.h
+> @@ -0,0 +1,28 @@
+> +/*
+> + * include/asm-generic/seccomp.h
+> + *
+> + * Copyright (C) 2014 Linaro Limited
+> + * Author: AKASHI Takahiro <takahiro.akashi@linaro.org>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + */
+> +#ifndef _ASM_GENERIC_SECCOMP_H
+> +#define _ASM_GENERIC_SECCOMP_H
+> +
+> +#include <asm-generic/unistd.h>
 
-diff --git a/drivers/i2c/busses/i2c-rk3x.c b/drivers/i2c/busses/i2c-rk3x.c
-index 69e1185..dc0aa64 100644
---- a/drivers/i2c/busses/i2c-rk3x.c
-+++ b/drivers/i2c/busses/i2c-rk3x.c
-@@ -323,6 +323,9 @@ static void rk3x_i2c_handle_read(struct rk3x_i2c *i2c, unsigned int ipd)
- 	/* ack interrupt */
- 	i2c_writel(i2c, REG_INT_MBRF, REG_IPD);
- 
-+	/* Can only handle a maximum of 32 bytes at a time */
-+	len = (len > 32) ? 32 : len;
-+
- 	/* read the data from receive buffer */
- 	for (i = 0; i < len; ++i) {
- 		if (i % 4 == 0)
+While this isn't a problem for ARM, this should be linux/unistd.h for
+other architectures to get the right stuff.
+
+> +
+> +#if defined(CONFIG_COMPAT) && !defined(__NR_seccomp_read_32)
+> +#define __NR_seccomp_read_32           __NR_read
+> +#define __NR_seccomp_write_32          __NR_write
+> +#define __NR_seccomp_exit_32           __NR_exit
+> +#define __NR_seccomp_sigreturn_32      __NR_rt_sigreturn
+> +#endif /* CONFIG_COMPAT && ! already defined */
+> +
+> +#define __NR_seccomp_read              __NR_read
+> +#define __NR_seccomp_write             __NR_write
+> +#define __NR_seccomp_exit              __NR_exit
+> +#define __NR_seccomp_sigreturn         __NR_rt_sigreturn
+
+Some architectures use __NR_sigreturn, so this will need to be
+adjusted in the future into:
+
+#ifdef __NR_seccomp_sigreturn
+#define __NR_seccomp_sigreturn         __NR_rt_sigreturn
+#endif
+
+After these changes, I was able to port x86 to using this
+asm-generic/seccomp.h too.
+
+-Kees
+
+> +
+> +#endif /* _ASM_GENERIC_SECCOMP_H */
+> --
+> 1.7.9.5
+>
+
+
+
 -- 
-1.8.3.2
+Kees Cook
+Chrome OS Security
