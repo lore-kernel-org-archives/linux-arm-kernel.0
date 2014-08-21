@@ -1,147 +1,24 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Thu, 21 Aug 2014 12:08:47 -0500
-Subject: [PATCH v6 2/6] arm64: ptrace: allow tracer to skip a system call
-In-Reply-To: <1408611405-8943-3-git-send-email-takahiro.akashi@linaro.org>
-References: <1408611405-8943-1-git-send-email-takahiro.akashi@linaro.org>
- <1408611405-8943-3-git-send-email-takahiro.akashi@linaro.org>
-Message-ID: <CAGXu5jJCyqpXkdvNDCu+eMr0qnqwbqUUo4u+2p_7DvFMzfKoEw@mail.gmail.com>
+From: nm@ti.com (Nishanth Menon)
+Date: Thu, 21 Aug 2014 12:09:38 -0500
+Subject: [PATCH V2 2/2] Input: misc: introduce palmas-pwrbutton
+In-Reply-To: <20140821170512.GA3796@core.coreip.homeip.net>
+References: <1408392810-16011-1-git-send-email-nm@ti.com>
+ <1408636935-29515-1-git-send-email-nm@ti.com>
+ <1408636935-29515-3-git-send-email-nm@ti.com>
+ <20140821170512.GA3796@core.coreip.homeip.net>
+Message-ID: <CAGo_u6rTnNxRhgOVkUHscB79qWZz3gVWRrM50Cu9ozO8RDsvZg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 21, 2014 at 3:56 AM, AKASHI Takahiro
-<takahiro.akashi@linaro.org> wrote:
-> If tracer specifies -1 as a syscall number, this traced system call should
-> be skipped with a value in x0 used as a return value.
-> This patch enables this semantics, but there is a restriction here:
+On Thu, Aug 21, 2014 at 12:05 PM, Dmitry Torokhov
+<dmitry.torokhov@gmail.com> wrote:
 >
->    when syscall(-1) is issued by user, tracer cannot skip this system call
->    and modify a return value at syscall entry.
 >
-> In order to ease this flavor, we need to treat whatever value in x0 as
-> a return value, but this might result in a bogus value being returned,
-> especially when tracer doesn't do anything at this syscall.
-> So we always return ENOSYS instead, while we have another chance to change
-> a return value at syscall exit.
->
-> Please also note:
-> * syscall entry tracing and syscall exit tracing (ftrace tracepoint and
->   audit) are always executed, if enabled, even when skipping a system call
->   (that is, -1).
->   In this way, we can avoid a potential bug where audit_syscall_entry()
->   might be called without audit_syscall_exit() at the previous system call
->   being called, that would cause OOPs in audit_syscall_entry().
->
-> * syscallno may also be set to -1 if a fatal signal (SIGKILL) is detected
->   in tracehook_report_syscall_entry(), but since a value set to x0 (ENOSYS)
->   is not used in this case, we may neglect the case.
->
-> Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
-> ---
->  arch/arm64/include/asm/ptrace.h |    8 ++++++++
->  arch/arm64/kernel/entry.S       |    4 ++++
->  arch/arm64/kernel/ptrace.c      |   20 ++++++++++++++++++++
->  3 files changed, 32 insertions(+)
->
-> diff --git a/arch/arm64/include/asm/ptrace.h b/arch/arm64/include/asm/ptrace.h
-> index 501000f..a58cf62 100644
-> --- a/arch/arm64/include/asm/ptrace.h
-> +++ b/arch/arm64/include/asm/ptrace.h
-> @@ -65,6 +65,14 @@
->  #define COMPAT_PT_TEXT_ADDR            0x10000
->  #define COMPAT_PT_DATA_ADDR            0x10004
->  #define COMPAT_PT_TEXT_END_ADDR                0x10008
-> +
-> +/*
-> + * used to skip a system call when tracer changes its number to -1
-> + * with ptrace(PTRACE_SET_SYSCALL)
-> + */
-> +#define RET_SKIP_SYSCALL       -1
-> +#define IS_SKIP_SYSCALL(no)    ((int)(no & 0xffffffff) == -1)
-> +
->  #ifndef __ASSEMBLY__
->
->  /* sizeof(struct user) for AArch32 */
-> diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
-> index f0b5e51..fdd6eae 100644
-> --- a/arch/arm64/kernel/entry.S
-> +++ b/arch/arm64/kernel/entry.S
-> @@ -25,6 +25,7 @@
->  #include <asm/asm-offsets.h>
->  #include <asm/errno.h>
->  #include <asm/esr.h>
-> +#include <asm/ptrace.h>
->  #include <asm/thread_info.h>
->  #include <asm/unistd.h>
->
-> @@ -671,6 +672,8 @@ ENDPROC(el0_svc)
->  __sys_trace:
->         mov     x0, sp
->         bl      syscall_trace_enter
-> +       cmp     w0, #RET_SKIP_SYSCALL           // skip syscall?
-> +       b.eq    __sys_trace_return_skipped
->         adr     lr, __sys_trace_return          // return address
->         uxtw    scno, w0                        // syscall number (possibly new)
->         mov     x1, sp                          // pointer to regs
-> @@ -685,6 +688,7 @@ __sys_trace:
->
->  __sys_trace_return:
->         str     x0, [sp]                        // save returned x0
-> +__sys_trace_return_skipped:                    // x0 already in regs[0]
->         mov     x0, sp
->         bl      syscall_trace_exit
->         b       ret_to_user
-> diff --git a/arch/arm64/kernel/ptrace.c b/arch/arm64/kernel/ptrace.c
-> index 8876049..c54dbcc 100644
-> --- a/arch/arm64/kernel/ptrace.c
-> +++ b/arch/arm64/kernel/ptrace.c
-> @@ -1121,9 +1121,29 @@ static void tracehook_report_syscall(struct pt_regs *regs,
->
->  asmlinkage int syscall_trace_enter(struct pt_regs *regs)
->  {
-> +       unsigned int saved_syscallno = regs->syscallno;
-> +
->         if (test_thread_flag(TIF_SYSCALL_TRACE))
->                 tracehook_report_syscall(regs, PTRACE_SYSCALL_ENTER);
->
-> +       if (IS_SKIP_SYSCALL(regs->syscallno)) {
-> +               /*
-> +                * RESTRICTION: we can't modify a return value of user
-> +                * issued syscall(-1) here. In order to ease this flavor,
-> +                * we need to treat whatever value in x0 as a return value,
-> +                * but this might result in a bogus value being returned.
-> +                */
-> +               /*
-> +                * NOTE: syscallno may also be set to -1 if fatal signal is
-> +                * detected in tracehook_report_syscall_entry(), but since
-> +                * a value set to x0 here is not used in this case, we may
-> +                * neglect the case.
-> +                */
-> +               if (!test_thread_flag(TIF_SYSCALL_TRACE) ||
-> +                               (IS_SKIP_SYSCALL(saved_syscallno)))
-> +                       regs->regs[0] = -ENOSYS;
-> +       }
-> +
+> You can not use free_irq with devm-managed resources. As I mentioned, since you
+> need manual unwinding, I'd rather you not use managed resources in the driver
+> at all.
+ok. will drop all devm_  ops in the next version.
 
-I don't have a runtime environment yet for arm64, so I can't test this
-directly myself, so I'm just trying to eyeball this. :)
-
-Once the seccomp logic is added here, I don't think using -2 as a
-special value will work. Doesn't this mean the Oops is possible by the
-user issuing a "-2" syscall? As in, if TIF_SYSCALL_WORK is set, and
-the user passed -2 as the syscall, audit will be called only on entry,
-and then skipped on exit?
-
--Kees
-
->         if (test_thread_flag(TIF_SYSCALL_TRACEPOINT))
->                 trace_sys_enter(regs, regs->syscallno);
->
-> --
-> 1.7.9.5
->
-
-
-
--- 
-Kees Cook
-Chrome OS Security
+---
+Regards,
+Nishanth Menon
