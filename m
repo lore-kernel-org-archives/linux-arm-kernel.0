@@ -1,32 +1,32 @@
 From: mpa@pengutronix.de (Markus Pargmann)
-Date: Thu, 21 Aug 2014 07:51:51 +0200
-Subject: [PATCH v4 4/7] net: cpsw: Replace pr_err by dev_err
+Date: Thu, 21 Aug 2014 07:51:54 +0200
+Subject: [PATCH v4 7/7] arm: dts: am33xx, Add syscon phandle to cpsw node
 In-Reply-To: <1408600314-19824-1-git-send-email-mpa@pengutronix.de>
 References: <1408600314-19824-1-git-send-email-mpa@pengutronix.de>
-Message-ID: <1408600314-19824-5-git-send-email-mpa@pengutronix.de>
+Message-ID: <1408600314-19824-8-git-send-email-mpa@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use dev_err instead of pr_err.
+There are 2 MACIDs stored in the control module of the am33xx. These are
+read by the cpsw driver if no valid MACID was found in the devicetree.
 
 Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
 Reviewed-by: Wolfram Sang <wsa@the-dreams.de>
 ---
- drivers/net/ethernet/ti/cpsw.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/boot/dts/am33xx.dtsi | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/drivers/net/ethernet/ti/cpsw.c b/drivers/net/ethernet/ti/cpsw.c
-index f09b4639ad31..0bc2c2a2c236 100644
---- a/drivers/net/ethernet/ti/cpsw.c
-+++ b/drivers/net/ethernet/ti/cpsw.c
-@@ -1921,7 +1921,7 @@ static int cpsw_probe_dt(struct cpsw_platform_data *data,
- 		mdio = of_find_device_by_node(mdio_node);
- 		of_node_put(mdio_node);
- 		if (!mdio) {
--			pr_err("Missing mdio platform device\n");
-+			dev_err(&pdev->dev, "Missing mdio platform device\n");
- 			return -EINVAL;
- 		}
- 		snprintf(slave_data->phy_id, sizeof(slave_data->phy_id),
+diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
+index 25e38b6ac376..13e44b0f5adc 100644
+--- a/arch/arm/boot/dts/am33xx.dtsi
++++ b/arch/arm/boot/dts/am33xx.dtsi
+@@ -701,6 +701,7 @@
+ 			 */
+ 			interrupts = <40 41 42 43>;
+ 			ranges;
++			syscon = <&cm>;
+ 			status = "disabled";
+ 
+ 			davinci_mdio: mdio at 4a101000 {
 -- 
 2.1.0.rc1
