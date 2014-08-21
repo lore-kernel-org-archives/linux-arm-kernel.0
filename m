@@ -1,51 +1,60 @@
-From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
-Date: Thu, 21 Aug 2014 12:02:35 -0700
-Subject: [PATCH 9/9] ARM: zynq: Rename 'zynq_platform_cpu_die'
-In-Reply-To: <4ac42f4d-72bf-4a8d-a997-094f129d7c74@BN1AFFO11FD020.protection.gbl>
-References: <1408567315-28479-1-git-send-email-soren.brinkmann@xilinx.com>
- <1408567315-28479-10-git-send-email-soren.brinkmann@xilinx.com>
- <4ac42f4d-72bf-4a8d-a997-094f129d7c74@BN1AFFO11FD020.protection.gbl>
-Message-ID: <9c7c26e1-4098-4252-a719-fb7b7205be61@BN1AFFO11FD006.protection.gbl>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Thu, 21 Aug 2014 23:04:15 +0400
+Subject: [PATCH 1/2] doc: dt/bindings: input: introduce TI DRV2667 haptic
+ driver description
+In-Reply-To: <1408645143-25690-2-git-send-email-dmurphy@ti.com>
+References: <1408645143-25690-1-git-send-email-dmurphy@ti.com>
+ <1408645143-25690-2-git-send-email-dmurphy@ti.com>
+Message-ID: <53F642AF.3070200@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2014-08-21 at 02:28PM +0200, Michal Simek wrote:
-> On 08/20/2014 10:41 PM, Soren Brinkmann wrote:
-> > Match the naming pattern of all other SMP ops and rename
-> > zynq_platform_cpu_die --> zynq_cpu_die.
-> > 
-> > Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
-> > ---
-> >  arch/arm/mach-zynq/platsmp.c | 4 ++--
-> >  1 file changed, 2 insertions(+), 2 deletions(-)
-> > 
-> > diff --git a/arch/arm/mach-zynq/platsmp.c b/arch/arm/mach-zynq/platsmp.c
-> > index 04e578718aa2..95933c5e70e1 100644
-> > --- a/arch/arm/mach-zynq/platsmp.c
-> > +++ b/arch/arm/mach-zynq/platsmp.c
-> > @@ -138,7 +138,7 @@ static int zynq_cpu_kill(unsigned cpu)
-> >   *
-> >   * Called with IRQs disabled
-> >   */
-> > -static void zynq_platform_cpu_die(unsigned int cpu)
-> > +static void zynq_cpu_die(unsigned int cpu)
-> >  {
-> >  	zynq_slcr_cpu_state_write(cpu, true);
-> >  
-> > @@ -158,7 +158,7 @@ struct smp_operations zynq_smp_ops __initdata = {
-> >  	.smp_boot_secondary	= zynq_boot_secondary,
-> >  	.smp_secondary_init	= zynq_secondary_init,
-> >  #ifdef CONFIG_HOTPLUG_CPU
-> > -	.cpu_die		= zynq_platform_cpu_die,
-> > +	.cpu_die		= zynq_cpu_die,
-> >  	.cpu_kill		= zynq_cpu_kill,
-> >  #endif
-> >  };
-> 
-> Will be good if you can move fix that kernel-doc format for this function
-> too. It is just nice to have thing.
+Hello.
 
-All these SMP-ops should be documented in the header defining that
-struct, shouldn't they?
+On 08/21/2014 10:19 PM, Dan Murphy wrote:
 
-	S?ren
+> DRV2667 is a haptic/vibrator driver for Linear Resonant Actuators.
+> Adding dt binding for this part
+
+> Signed-off-by: Dan Murphy <dmurphy@ti.com>
+> ---
+>   .../devicetree/bindings/input/ti,drv2667.txt       |   18 ++++++++++++++++++
+>   1 file changed, 18 insertions(+)
+>   create mode 100644 Documentation/devicetree/bindings/input/ti,drv2667.txt
+
+> diff --git a/Documentation/devicetree/bindings/input/ti,drv2667.txt b/Documentation/devicetree/bindings/input/ti,drv2667.txt
+> new file mode 100644
+> index 0000000..525216d
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/input/ti,drv2667.txt
+> @@ -0,0 +1,18 @@
+> +Texas Instruments - drv2667 Haptics driver
+> +
+> +The drv2667 uses serial control bus communicates through I2C protocols
+> +
+> +Required properties:
+> +	- compatible - "ti,drv2667" - DRV2667
+> +	- reg -  I2C slave address
+> +	- vbat-supply - Required supply regulator
+> +
+> +Example:
+> +
+> +drv2667: drv2667 at 59 {
+
+    The ePAPR standard [1] has something to say on this matter:
+
+"The name of a node should be somewhat generic, reflecting the function of the 
+device and not its precise programming model."
+
+> +		compatible = "ti,drv2667";
+
+    Indented too much to the right.
+
+> +		reg = <0x59>;
+
+    Still no "vbat-supply"... :-/
+
+> +};
+[...]
+
+WBR, Sergei
