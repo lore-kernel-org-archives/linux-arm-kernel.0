@@ -1,39 +1,63 @@
 From: mperttunen@nvidia.com (Mikko Perttunen)
-Date: Thu, 21 Aug 2014 10:37:46 +0300
-Subject: [PATCH v3 3/4] ARM: tegra: Add thermal trip points for Jetson TK1
-In-Reply-To: <53F4FA80.9050103@wwwdotorg.org>
+Date: Thu, 21 Aug 2014 10:39:53 +0300
+Subject: [PATCH v3 4/4] thermal: Add Tegra SOCTHERM thermal management
+ driver
+In-Reply-To: <53F4FC18.90804@wwwdotorg.org>
 References: <1407320706-17440-1-git-send-email-mperttunen@nvidia.com>
- <1407320706-17440-4-git-send-email-mperttunen@nvidia.com>
- <53F4FA80.9050103@wwwdotorg.org>
-Message-ID: <53F5A1CA.1010601@nvidia.com>
+ <1407320706-17440-5-git-send-email-mperttunen@nvidia.com>
+ <53F4FC18.90804@wwwdotorg.org>
+Message-ID: <53F5A249.7030008@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20/08/14 22:44, Stephen Warren wrote:
+
+
+On 20/08/14 22:50, Stephen Warren wrote:
 > On 08/06/2014 04:25 AM, Mikko Perttunen wrote:
->> This adds critical trip points to the Jetson TK1 device tree.
->> The device will do a controlled shutdown when either the CPU, GPU
->> or MEM thermal zone reaches 101 degrees Celsius.
+>> This adds support for the Tegra SOCTHERM thermal sensing and management
+>> system found in the Tegra124 system-on-chip. This initial driver supports
+>> temperature polling for four thermal zones.
 >
->> diff --git a/arch/arm/boot/dts/tegra124-jetson-tk1.dts
->> b/arch/arm/boot/dts/tegra124-jetson-tk1.dts
+> Since both the Tegra DT patches and this driver all rely on a new header
+> added by patch 1/4, I guess this whole series needs to be applied in one
+> branch. I think it makes sense to apply it to the Tegra since it's
+> likely to have more conflicts there and fewer in the thermal
+> maintainer's tree. It can be applied in a topic branch that can be
+> merged into the thermal maintainer's tree if required to resolve
+> conflicts there.
 >
->> +    thermal-zones {
->> +        cpu {
->> +            trips {
-> ...
->> +            };
->> +        };
+> Rui, Eduardo, do you agree?
 >
-> thermal.txt states that a cooling-maps sub-node is mandatory. However,
-> it seems to be missing here. Is the DT binding documentation overly
-> strict, or do we need to add such a node here?
+>> diff --git a/drivers/thermal/tegra_soctherm.c
+>> b/drivers/thermal/tegra_soctherm.c
+>
+>> +static struct of_device_id tegra_soctherm_of_match[] = {
+>> +    { .compatible = "nvidia,tegra124-soctherm" },
+>> +    { },
+>> +};
+>> +MODULE_DEVICE_TABLE(of, tegra_soctherm_of_match);
+>> +
+>> +static int thermctl_temp_offsets[] = {
+>> +    SENSOR_TEMP1, SENSOR_TEMP2, SENSOR_TEMP1, SENSOR_TEMP2
+>> +};
+>> +
+>> +static int thermctl_temp_shifts[] = {
+>> +    16, 16, 0, 0
+>> +};
+>
+> Can any/all of those be const?
 
-Debatable. I can add an empty one, that's probably the easiest solution.
+Yes!
 
-Mikko
+>
+> I don't pretend to know anything about the soctherm HW, but I see no
+> gross issues in the code structure, so,
+> Acked-by: Stephen Warren <swarren@nvidia.com>
+
+Thanks; I'll need to do a v5 anyway, so I'll fix the things you 
+mentioned while doing it.
 
 > --
-> To unsubscribe from this list: send the line "unsubscribe linux-pm" in
+> To unsubscribe from this list: send the line "unsubscribe linux-tegra" in
 > the body of a message to majordomo at vger.kernel.org
 > More majordomo info at  http://vger.kernel.org/majordomo-info.html
