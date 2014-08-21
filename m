@@ -1,90 +1,46 @@
-From: mark.roszko@gmail.com (Marek Roszko)
-Date: Wed, 20 Aug 2014 21:39:41 -0400
-Subject: [PATCH v2] i2c:at91: add bound checking on SMBus block length bytes
-Message-ID: <1408585181-10131-1-git-send-email-mark.roszko@gmail.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Thu, 21 Aug 2014 03:49:22 +0200
+Subject: [PATCH] cpuidle: big.LITTLE: add Exynos5800 compatible string
+In-Reply-To: <1407888665-24603-1-git-send-email-khilman@linaro.org>
+References: <1407888665-24603-1-git-send-email-khilman@linaro.org>
+Message-ID: <53F55022.8020505@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The driver was not bound checking the received length byte to ensure it was within the
-the buffer size that is allocated for SMBus blocks. This resulted in buffer overflows
-whenever an invalid length byte was received.
-It also failed to ensure the length byte was not zero. If it received zero, it would end up
-in an infinite loop as the at91_twi_read_next_byte function returned immediately without
-allowing RHR to be read to clear the RXRDY interrupt.
+On 08/13/2014 02:11 AM, Kevin Hilman wrote:
+> Exynos 5800 is big.LITTLE SoC compatible with the 5420.  Add the
+> compatible string so this driver works on the 5800.
+>
+> Tested on exynos5800-peach-pi (aka Samsung Chromebook2)
+>
+> Signed-off-by: Kevin Hilman <khilman@linaro.org>
+> ---
 
-Tested agaisnt a SMBus compliant battery.
+Thanks.
 
-Signed-off-by: Marek Roszko <mark.roszko@gmail.com>
-Acked-by: Ludovic Desroches <ludovic.desroches@atmel.com>
----
-Change from v1:
-fixed typo in commit message
-reworded message slightly to be specifically say length byte
+I will apply it to my tree.
 
- drivers/i2c/busses/i2c-at91.c |   28 ++++++++++++++++++++++++----
- 1 file changed, 24 insertions(+), 4 deletions(-)
+>   drivers/cpuidle/cpuidle-big_little.c | 1 +
+>   1 file changed, 1 insertion(+)
+>
+> diff --git a/drivers/cpuidle/cpuidle-big_little.c b/drivers/cpuidle/cpuidle-big_little.c
+> index 0a1f827308db..bf3ab66fdaaf 100644
+> --- a/drivers/cpuidle/cpuidle-big_little.c
+> +++ b/drivers/cpuidle/cpuidle-big_little.c
+> @@ -166,6 +166,7 @@ static int __init bl_idle_driver_init(struct cpuidle_driver *drv, int match_id)
+>   static const struct of_device_id compatible_machine_match[] = {
+>   	{ .compatible = "arm,vexpress,v2p-ca15_a7" },
+>   	{ .compatible = "samsung,exynos5420" },
+> +	{ .compatible = "samsung,exynos5800" },
+>   	{},
+>   };
+>
+>
 
-diff --git a/drivers/i2c/busses/i2c-at91.c b/drivers/i2c/busses/i2c-at91.c
-index e95f9ba..ec4ff33 100644
---- a/drivers/i2c/busses/i2c-at91.c
-+++ b/drivers/i2c/busses/i2c-at91.c
-@@ -101,6 +101,7 @@ struct at91_twi_dev {
- 	unsigned twi_cwgr_reg;
- 	struct at91_twi_pdata *pdata;
- 	bool use_dma;
-+	bool recv_len_abort;
- 	struct at91_twi_dma dma;
- };
- 
-@@ -267,12 +268,24 @@ static void at91_twi_read_next_byte(struct at91_twi_dev *dev)
- 	*dev->buf = at91_twi_read(dev, AT91_TWI_RHR) & 0xff;
- 	--dev->buf_len;
- 
-+	/* return if aborting, we only needed to read RHR to clear RXRDY*/
-+	if (dev->recv_len_abort)
-+		return;
-+
- 	/* handle I2C_SMBUS_BLOCK_DATA */
- 	if (unlikely(dev->msg->flags & I2C_M_RECV_LEN)) {
--		dev->msg->flags &= ~I2C_M_RECV_LEN;
--		dev->buf_len += *dev->buf;
--		dev->msg->len = dev->buf_len + 1;
--		dev_dbg(dev->dev, "received block length %d\n", dev->buf_len);
-+		/* ensure length byte is a valid value */
-+		if (*dev->buf <= I2C_SMBUS_BLOCK_MAX && *dev->buf > 0) {
-+			dev->msg->flags &= ~I2C_M_RECV_LEN;
-+			dev->buf_len += *dev->buf;
-+			dev->msg->len = dev->buf_len + 1;
-+			dev_dbg(dev->dev, "received block length %d\n",
-+					 dev->buf_len);
-+		} else {
-+			/* abort and send the stop by reading one more byte */
-+			dev->recv_len_abort = true;
-+			dev->buf_len = 1;
-+		}
- 	}
- 
- 	/* send stop if second but last byte has been read */
-@@ -444,6 +457,12 @@ static int at91_do_twi_transfer(struct at91_twi_dev *dev)
- 		ret = -EIO;
- 		goto error;
- 	}
-+	if (dev->recv_len_abort) {
-+		dev_err(dev->dev, "invalid smbus block length recvd\n");
-+		ret = -EPROTO;
-+		goto error;
-+	}
-+
- 	dev_dbg(dev->dev, "transfer complete\n");
- 
- 	return 0;
-@@ -500,6 +519,7 @@ static int at91_twi_xfer(struct i2c_adapter *adap, struct i2c_msg *msg, int num)
- 	dev->buf_len = m_start->len;
- 	dev->buf = m_start->buf;
- 	dev->msg = m_start;
-+	dev->recv_len_abort = false;
- 
- 	ret = at91_do_twi_transfer(dev);
- 
+
 -- 
-1.7.10.4
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
