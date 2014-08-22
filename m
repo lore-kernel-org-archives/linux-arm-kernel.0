@@ -1,80 +1,57 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 22 Aug 2014 15:17:12 +0100
-Subject: [GIT PULL] arm64: post merge-window fixes for 3.17
-Message-ID: <20140822141712.GA12681@arm.com>
+From: dmurphy@ti.com (Murphy, Dan)
+Date: Fri, 22 Aug 2014 14:25:13 +0000
+Subject: [PATCH] doc: dt/bindings: input: Fix drv260x binding document
+References: <1408716741-1163-1-git-send-email-dmurphy@ti.com>
+ <20140822141532.GC22707@saruman.home>
+Message-ID: <00FC9A978A94B7418C33AFAE8A35ED49DF1F66@DFLE09.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+Felipe
 
-Please can you pull the following small set of arm64 fixes to address some
-issues introduced during the merge window? There's one change outside of
-arch/arm64, which wires up memfd_create for asm-generic unistd.h. Arnd
-suggested that we take that via the arm64 tree [1].
+On 08/22/2014 09:15 AM, Balbi, Felipe wrote:
+> On Fri, Aug 22, 2014 at 09:12:21AM -0500, Dan Murphy wrote:
+>> Update the drv260x dt binding document:
+>> - Change the node name to the devices function not the
+>> device name.
+>> - Add vbat-supply to the example.
+>> - Fix indentation of the example.
+>>
+>> Signed-off-by: Dan Murphy <dmurphy@ti.com>
+>> ---
+>>  .../devicetree/bindings/input/ti,drv260x.txt       |   19 ++++++++++---------
+>>  1 file changed, 10 insertions(+), 9 deletions(-)
+>>
+>> diff --git a/Documentation/devicetree/bindings/input/ti,drv260x.txt b/Documentation/devicetree/bindings/input/ti,drv260x.txt
+>> index a9c8519..214e25d 100644
+>> --- a/Documentation/devicetree/bindings/input/ti,drv260x.txt
+>> +++ b/Documentation/devicetree/bindings/input/ti,drv260x.txt
+>> @@ -37,15 +37,16 @@ Optional properties:
+>>  			  3.2 v.
+>>  Example:
+>>  
+>> -drv2605l: drv2605l at 5a {
+>> -		compatible = "ti,drv2605l";
+>> -		reg = <0x5a>;
+>> -		enable-gpio = <&gpio1 28 GPIO_ACTIVE_HIGH>;
+>> -		mode = <DRV260X_LRA_MODE>;
+>> -		library-sel = <DRV260X_LIB_LRA>;
+>> -		vib-rated-mv = <3200>;
+>> -		vib-overdriver-mv = <3200>;
+>> -};
+>> +haptics:@5a {
+> 
+> haptics: haptics at 5a ??
+> 
 
-Thanks,
+I found both types of entries in the bindings docs.
 
-Will
+There is no consistency within the input bindings documentation.
 
-[1] https://lkml.org/lkml/2014/8/11/473
+I have no issue doing it either way.
 
---->8
+Dan
 
-The following changes since commit 7d1311b93e58ed55f3a31cc8f94c4b8fe988a2b9:
-
-  Linux 3.17-rc1 (2014-08-16 10:40:26 -0600)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux.git tags/arm64-fixes
-
-for you to fetch changes up to 44b375070fa3defa6bf1010bd0e4e64f7986bfc4:
-
-  Revert "arm64: Do not invoke audit_syscall_* functions if !CONFIG_AUDIT_SYSCALL" (2014-08-19 22:05:45 +0100)
-
-----------------------------------------------------------------
-arm64 fixes for merge window fallout
-
-This small set of fixes addresses a few issues introduced during the
-merge window, including:
-
-  - Fix typo in I-cache detection that was causing us to treat all
-    I-caches as aliasing
-  - Hook up memfd_create and getrandom syscalls for native and compat
-  - Revert a temporary hack for defconfig builds in -next (the audit
-    tree changes didn't make it in this merge window)
-  - A couple of UEFI fixes for TEXT_OFFSET fuzzing and /memreserve/
-  - A simple sparsemem fix for 48-bit physical addressing
-  - Small defconfig updates to get autotesters working with X-gene
-
-----------------------------------------------------------------
-Ard Biesheuvel (2):
-      arm64: fix typo in I-cache policy detection
-      arm64: align randomized TEXT_OFFSET on 4 kB boundary
-
-Ganapatrao Kulkarni (1):
-      arm64: mm: update max pa bits to 48
-
-Leif Lindholm (1):
-      arm64: ignore DT memreserve entries when booting in UEFI mode
-
-Mark Brown (1):
-      arm64: configs: Enable X-Gene SATA and ethernet in defconfig
-
-Will Deacon (3):
-      arm64: compat: wire up memfd_create and getrandom syscalls for aarch32
-      asm-generic: add memfd_create system call to unistd.h
-      Revert "arm64: Do not invoke audit_syscall_* functions if !CONFIG_AUDIT_SYSCALL"
-
- arch/arm64/Makefile                | 2 +-
- arch/arm64/configs/defconfig       | 3 +++
- arch/arm64/include/asm/sparsemem.h | 2 +-
- arch/arm64/include/asm/unistd.h    | 2 +-
- arch/arm64/include/asm/unistd32.h  | 5 +++++
- arch/arm64/kernel/cpuinfo.c        | 2 +-
- arch/arm64/kernel/efi.c            | 2 ++
- arch/arm64/kernel/head.S           | 8 ++++----
- arch/arm64/kernel/ptrace.c         | 4 ----
- arch/arm64/mm/init.c               | 4 +++-
- include/uapi/asm-generic/unistd.h  | 4 +++-
- 11 files changed, 24 insertions(+), 14 deletions(-)
+-- 
+------------------
+Dan Murphy
