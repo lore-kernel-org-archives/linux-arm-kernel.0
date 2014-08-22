@@ -1,40 +1,43 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Fri, 22 Aug 2014 10:40:27 +0900
-Subject: [PATCH] ARM: shmobile: bockw: Do not disable SUSPEND in defconfig
-In-Reply-To: <1408052188-8551-1-git-send-email-horms+renesas@verge.net.au>
-References: <1408052188-8551-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <20140822014027.GA9099@verge.net.au>
+Date: Fri, 22 Aug 2014 10:46:06 +0900
+Subject: [PATCH v2 3/5] ARM: shmobile: armadillo800eva-reference: Sort
+ includes
+In-Reply-To: <1407801882-2561-4-git-send-email-horms+renesas@verge.net.au>
+References: <1407801882-2561-1-git-send-email-horms+renesas@verge.net.au>
+ <1407801882-2561-4-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <20140822014606.GB9099@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 15, 2014 at 06:36:28AM +0900, Simon Horman wrote:
-> As of "ARM: shmobile: r8a7778: Add missing call to shmobile_init_late()"
-> suspend-to-ram is now supported on the r8a7778 SoC and thus the bockw
-> board.
+On Tue, Aug 12, 2014 at 09:04:40AM +0900, Simon Horman wrote:
+> Sorted includes seems to be the done thing these days.
 > 
-> Cc: Geert Uytterhoeven <geert+renesas@glider.be>
 > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 
-I have queued this up.
+I have queued up this patch but I am leaving the rest of the series for
+now.
 
 > ---
->  arch/arm/configs/bockw_defconfig | 1 -
->  1 file changed, 1 deletion(-)
+>  arch/arm/mach-shmobile/board-armadillo800eva-reference.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 > 
-> diff --git a/arch/arm/configs/bockw_defconfig b/arch/arm/configs/bockw_defconfig
-> index 70b3f45..1dde5da 100644
-> --- a/arch/arm/configs/bockw_defconfig
-> +++ b/arch/arm/configs/bockw_defconfig
-> @@ -29,7 +29,6 @@ CONFIG_ZBOOT_ROM_BSS=0x0
->  CONFIG_ARM_APPENDED_DTB=y
->  CONFIG_VFP=y
->  # CONFIG_CORE_DUMP_DEFAULT_ELF_HEADERS is not set
-> -# CONFIG_SUSPEND is not set
->  CONFIG_PM_RUNTIME=y
->  CONFIG_NET=y
->  CONFIG_PACKET=y
+> diff --git a/arch/arm/mach-shmobile/board-armadillo800eva-reference.c b/arch/arm/mach-shmobile/board-armadillo800eva-reference.c
+> index 84bc6cb..c392632 100644
+> --- a/arch/arm/mach-shmobile/board-armadillo800eva-reference.c
+> +++ b/arch/arm/mach-shmobile/board-armadillo800eva-reference.c
+> @@ -21,9 +21,9 @@
+>  
+>  #include <linux/clk.h>
+>  #include <linux/err.h>
+> -#include <linux/kernel.h>
+>  #include <linux/gpio.h>
+>  #include <linux/io.h>
+> +#include <linux/kernel.h>
+>  
+>  #include <asm/mach/arch.h>
+>  #include <asm/hardware/cache-l2x0.h>
 > -- 
-> 2.0.1
+> 2.0.0.rc2
 > 
 > 
 > _______________________________________________
