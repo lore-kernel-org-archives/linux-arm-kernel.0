@@ -1,64 +1,128 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Fri, 22 Aug 2014 22:27:18 +0200
-Subject: [PATCH v7 3/8] cpufreq: kirkwood: Remove use of the clk provider
- API
-In-Reply-To: <20140822201112.GH17277@lunn.ch>
-References: <1408375833-10703-1-git-send-email-tomeu.vizoso@collabora.com>
- <1408375833-10703-4-git-send-email-tomeu.vizoso@collabora.com>
- <20140820225513.5251.284@quantum> <53F5A587.9030200@collabora.com>
- <20140821133825.GH8608@lunn.ch> <20140822192933.5251.53733@quantum>
- <20140822201112.GH17277@lunn.ch>
-Message-ID: <20140822202718.GI17277@lunn.ch>
+From: dianders@google.com (Doug Anderson)
+Date: Fri, 22 Aug 2014 13:38:52 -0700
+Subject: [PATCH V2 2/3] mmc: dw_mmc: Support voltage changes
+In-Reply-To: <CAPDyKFrATFrvVNmrt8bxrKZ_4Wea00R7VUKvyJQp-FQUTJghsA@mail.gmail.com>
+References: <1408715272-13833-1-git-send-email-yuvaraj.cd@samsung.com>
+ <1408715272-13833-3-git-send-email-yuvaraj.cd@samsung.com>
+ <CAPDyKFrATFrvVNmrt8bxrKZ_4Wea00R7VUKvyJQp-FQUTJghsA@mail.gmail.com>
+Message-ID: <CAD=FV=WAKXV4MuqybN4ypA+2tr1m6CP6=9_O+sYYe_-GYiy7SA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> It was clearer in earlier versions of the driver, but code has been
-> refactored into the cpufreq core. The core should call
-> kirkwood_cpufreq_get_cpu_frequency() in order to get the current
-> frequency, and only perform a change if the requested frequency is
-> different. In the current code, kirkwood_cpufreq_get_cpu_frequency()
-> reads from the hardware what the current frequency is. So we are
-> guaranteed to only call kirkwood_cpufreq_target() when there is a real
-> change.
+Ulf,
 
-Hi Mike
+On Fri, Aug 22, 2014 at 8:35 AM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
+> On 22 August 2014 15:47, Yuvaraj Kumar C D <yuvaraj.cd@gmail.com> wrote:
+>> From: Doug Anderson <dianders@chromium.org>
+>>
+>> For UHS cards we need the ability to switch voltages from 3.3V to
+>> 1.8V.  Add support to the dw_mmc driver to handle this.  Note that
+>> dw_mmc needs a little bit of extra code since the interface needs a
+>> special bit programmed to the CMD register while CMD11 is progressing.
+>> This means adding a few extra states to the state machine to track.
+>>
+>> Signed-off-by: Doug Anderson <dianders@chromium.org>
+>> Signed-off-by: Yuvaraj Kumar C D <yuvaraj.cd@samsung.com>
+>> ---
+>> changes since v1:
+>>         1. Added error message and return error in case of regulator_set_voltage() fail.
+>>         2. changed  dw_mci_cmd_interrupt(host,pending | SDMMC_INT_CMD_DONE)
+>>            to dw_mci_cmd_interrupt(host,pending).
+>>         3. Removed unnecessary comments.
+>>
+>>  drivers/mmc/host/dw_mmc.c  |  134 +++++++++++++++++++++++++++++++++++++++++---
+>>  drivers/mmc/host/dw_mmc.h  |    5 +-
+>>  include/linux/mmc/dw_mmc.h |    2 +
+>>  3 files changed, 131 insertions(+), 10 deletions(-)
+>>
+>> diff --git a/drivers/mmc/host/dw_mmc.c b/drivers/mmc/host/dw_mmc.c
+>> index aadb0d6..f20b4b8 100644
+>> --- a/drivers/mmc/host/dw_mmc.c
+>> +++ b/drivers/mmc/host/dw_mmc.c
+>> @@ -29,6 +29,7 @@
+>>  #include <linux/irq.h>
+>>  #include <linux/mmc/host.h>
+>>  #include <linux/mmc/mmc.h>
+>> +#include <linux/mmc/sd.h>
+>>  #include <linux/mmc/sdio.h>
+>>  #include <linux/mmc/dw_mmc.h>
+>>  #include <linux/bitops.h>
+>> @@ -234,10 +235,13 @@ err:
+>>  }
+>>  #endif /* defined(CONFIG_DEBUG_FS) */
+>>
+>> +static void mci_send_cmd(struct dw_mci_slot *slot, u32 cmd, u32 arg);
+>> +
+>>  static u32 dw_mci_prepare_command(struct mmc_host *mmc, struct mmc_command *cmd)
+>>  {
+>>         struct mmc_data *data;
+>>         struct dw_mci_slot *slot = mmc_priv(mmc);
+>> +       struct dw_mci *host = slot->host;
+>>         const struct dw_mci_drv_data *drv_data = slot->host->drv_data;
+>>         u32 cmdr;
+>>         cmd->error = -EINPROGRESS;
+>> @@ -253,6 +257,31 @@ static u32 dw_mci_prepare_command(struct mmc_host *mmc, struct mmc_command *cmd)
+>>         else if (cmd->opcode != MMC_SEND_STATUS && cmd->data)
+>>                 cmdr |= SDMMC_CMD_PRV_DAT_WAIT;
+>>
+>> +       if (cmd->opcode == SD_SWITCH_VOLTAGE) {
+>> +               u32 clk_en_a;
+>> +
+>> +               /* Special bit makes CMD11 not die */
+>> +               cmdr |= SDMMC_CMD_VOLT_SWITCH;
+>> +
+>> +               /* Change state to continue to handle CMD11 weirdness */
+>> +               WARN_ON(slot->host->state != STATE_SENDING_CMD);
+>> +               slot->host->state = STATE_SENDING_CMD11;
+>> +
+>> +               /*
+>> +                * We need to disable clock stop while doing voltage switch
+>> +                * according to Voltage Switch Normal Scenario.
+>> +                * It's assumed that by the next time the CLKENA is updated
+>> +                * (when we set the clock next) that the voltage change will
+>> +                * be over, so we don't bother setting any bits to synchronize
+>> +                * with dw_mci_setup_bus().
+>> +                */
+>
+> I don't know the details about the dw_mmc controller, but normally a
+> host driver is expected to gate the clock from it's ->set_ios
+> callback, when the clk frequency are set to 0.
+>
+> Could you elaborate on why dw_mmc can't do that, but need to handle
+> this from here?
 
-I went looking at the core.
+Let's see, it's been a while since I wrote this...
 
-drivers/cpufreq/cpufreq.c:__cpufreq_add_dev() contains:
 
-        if (cpufreq_driver->get && !cpufreq_driver->setpolicy) {
-                policy->cur = cpufreq_driver->get(policy->cpu);
-                if (!policy->cur) {
-                        pr_err("%s: ->get() failed\n", __func__);
-                        goto err_get_freq;
-                }
-        }
+So dw_mmc has a special feature where the controller itself will
+automatically stop the MMC Card clock when nothing is going on.  This
+is called "low power" mode.  I'm not super familiar with other MMC
+drivers, I get the impression that this is a special dw_mmc feature
+and not common to other controllers.  I think other drivers have
+aggressive runtime PM to get similar power savings.
 
-So this gets the current frequency from the driver, when the driver is
-added. So for the current code, this gets the real state of the
-hardware.
+The dw_mmc auto clock gating can wreck total havoc on the voltage
+change procedure, since part of the way that the host and card
+communicate is that the host is supposed to stop its clock when it
+gets to a certain phase of the voltage switch sequence.  If the
+controller is stopping the clock for us then it can confuse the card.
 
-and
+The dw_mmc manual says that before starting a voltage change you must
+turn off low power mode.  That's what we're doing here.
 
-drivers/cpufreq/cpufreq.c:__cpufreq_driver_target() contains:
 
-        /*
-         * This might look like a redundant call as we are checking it again
-         * after finding index. But it is left intentionally for cases where
-         * exactly same freq is called again and so we can save on few function
-         * calls.
-         */
-        if (target_freq == policy->cur)
-                return 0;
+The comment above refers to the fact dw_mci_setup_bus() will
+unconditionally turn low power mode back on for us when called with a
+non-zero clock.  If dw_mci_setup_bus() might be called with a non-zero
+clock during the voltage change then this would be disaster (low power
+mode would be back on!).  ...but the clock will always be zero during
+the voltage change and when it's finally non-zero then it's the last
+stage of the voltage change and we can go back to low power mode.
 
-        /* Save last value to restore later on errors */
-        policy->restore_freq = policy->cur;
 
-        if (cpufreq_driver->target)
-                retval = cpufreq_driver->target(policy, target_freq, relation);
+Possibly the above was not super clear from the comment (even for
+those familiar with the oddities of dw_mmc).  If you want me to try to
+rewrite the comment, let me know.
 
-and here it will only call the function to change the frequency, if it
-is different from the current frequency.
 
-   Andrew
+-Doug
