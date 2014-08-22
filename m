@@ -1,188 +1,97 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Fri, 22 Aug 2014 09:02:32 -0500
-Subject: [PATCH 08/10] ARM: OMAP5/DRA7: PM: cpuidle MPU CSWR support
-In-Reply-To: <1408716154-26101-1-git-send-email-nm@ti.com>
-References: <1408716154-26101-1-git-send-email-nm@ti.com>
-Message-ID: <1408716154-26101-9-git-send-email-nm@ti.com>
+From: frans.klaver@xsens.com (Frans Klaver)
+Date: Fri, 22 Aug 2014 16:02:50 +0200
+Subject: [RFC PATCH 3/4] tty: omap-serial: use threaded interrupt handler
+In-Reply-To: <20140819185701.GC22003@saruman.home>
+References: <20140819185701.GC22003@saruman.home>
+Message-ID: <1408716170-543-1-git-send-email-frans.klaver@xsens.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Santosh Shilimkar <santosh.shilimkar@ti.com>
+At 3.6Mbaud, with slightly over 2Mbit/s data coming in, we see 1600 uart
+rx buffer overflows within 30 seconds. Threading the interrupt handling reduces
+this to about 170 overflows in 10 minutes.
 
-Add OMAP5/DRA74/72 CPUIDLE support.
+In practice this therefore reduces the need for hardware flow control,
+meaning the sending side doesn't have to buffer as much either.
 
-This patch adds MPUSS low power states in cpuidle.
-
-        C1 - CPU0 WFI + CPU1 WFI + MPU ON
-        C2 - CPU0 RET + CPU1 RET + MPU CSWR
-
-Tested on DRA74/72-EVM for C1 and C2 states.
-
-NOTE: DRA7 does not do voltage scaling as part of retention transition
-and has Mercury which speeds up transition paths - Latency numbers are
-based on measurements done by toggling GPIOs.
-
-Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-[ j-keerthy at ti.com rework on 3.14]
-Signed-off-by: Keerthy <j-keerthy@ti.com>
-[nm at ti.com: updates based on profiling, OMAP5 squashed]
-Signed-off-by: Nishanth Menon <nm@ti.com>
+Signed-off-by: Frans Klaver <frans.klaver@xsens.com>
 ---
- arch/arm/mach-omap2/cpuidle44xx.c |   82 ++++++++++++++++++++++++++++++++++++-
- arch/arm/mach-omap2/pm44xx.c      |    2 +-
- 2 files changed, 82 insertions(+), 2 deletions(-)
+ drivers/tty/serial/omap-serial.c | 30 +++++++++++++++++++++++-------
+ 1 file changed, 23 insertions(+), 7 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/cpuidle44xx.c b/arch/arm/mach-omap2/cpuidle44xx.c
-index 2498ab0..8ad4f44 100644
---- a/arch/arm/mach-omap2/cpuidle44xx.c
-+++ b/arch/arm/mach-omap2/cpuidle44xx.c
-@@ -22,6 +22,7 @@
- #include "common.h"
- #include "pm.h"
- #include "prm.h"
-+#include "soc.h"
- #include "clockdomain.h"
- 
- #define MAX_CPUS	2
-@@ -31,6 +32,7 @@ struct idle_statedata {
- 	u32 cpu_state;
- 	u32 mpu_logic_state;
- 	u32 mpu_state;
-+	u32 mpu_state_vote;
- };
- 
- static struct idle_statedata omap4_idle_data[] = {
-@@ -51,12 +53,26 @@ static struct idle_statedata omap4_idle_data[] = {
- 	},
- };
- 
-+static struct idle_statedata dra7_idle_data[] = {
-+	{
-+		.cpu_state = PWRDM_POWER_ON,
-+		.mpu_state = PWRDM_POWER_ON,
-+		.mpu_logic_state = PWRDM_POWER_ON,
-+	},
-+	{
-+		.cpu_state = PWRDM_POWER_RET,
-+		.mpu_state = PWRDM_POWER_RET,
-+		.mpu_logic_state = PWRDM_POWER_RET,
-+	},
-+};
-+
- static struct powerdomain *mpu_pd, *cpu_pd[MAX_CPUS];
- static struct clockdomain *cpu_clkdm[MAX_CPUS];
- 
- static atomic_t abort_barrier;
- static bool cpu_done[MAX_CPUS];
- static struct idle_statedata *state_ptr = &omap4_idle_data[0];
-+static DEFINE_RAW_SPINLOCK(mpu_lock);
- 
- /* Private functions */
- 
-@@ -78,6 +94,32 @@ static int omap_enter_idle_simple(struct cpuidle_device *dev,
- 	return index;
+diff --git a/drivers/tty/serial/omap-serial.c b/drivers/tty/serial/omap-serial.c
+index 14a0167..1671443a 100644
+--- a/drivers/tty/serial/omap-serial.c
++++ b/drivers/tty/serial/omap-serial.c
+@@ -575,6 +575,20 @@ static void serial_omap_rdi(struct uart_omap_port *up, unsigned int lsr)
  }
- 
-+static int omap_enter_idle_smp(struct cpuidle_device *dev,
-+			       struct cpuidle_driver *drv,
-+			       int index)
-+{
-+	struct idle_statedata *cx = state_ptr + index;
-+	unsigned long flag;
-+
-+	raw_spin_lock_irqsave(&mpu_lock, flag);
-+	cx->mpu_state_vote++;
-+	if (cx->mpu_state_vote == num_online_cpus()) {
-+		pwrdm_set_logic_retst(mpu_pd, cx->mpu_logic_state);
-+		omap_set_pwrdm_state(mpu_pd, cx->mpu_state);
-+	}
-+	raw_spin_unlock_irqrestore(&mpu_lock, flag);
-+
-+	omap4_enter_lowpower(dev->cpu, cx->cpu_state);
-+
-+	raw_spin_lock_irqsave(&mpu_lock, flag);
-+	if (cx->mpu_state_vote == num_online_cpus())
-+		omap_set_pwrdm_state(mpu_pd, PWRDM_POWER_ON);
-+	cx->mpu_state_vote--;
-+	raw_spin_unlock_irqrestore(&mpu_lock, flag);
-+
-+	return index;
-+}
-+
- static int omap_enter_idle_coupled(struct cpuidle_device *dev,
- 			struct cpuidle_driver *drv,
- 			int index)
-@@ -224,6 +266,34 @@ static struct cpuidle_driver omap4_idle_driver = {
- 	.safe_state_index = 0,
- };
- 
-+static struct cpuidle_driver dra7_idle_driver = {
-+	.name				= "dra7_idle",
-+	.owner				= THIS_MODULE,
-+	.states = {
-+		{
-+			/* C1 - CPU0 ON + CPU1 ON + MPU ON */
-+			.exit_latency = 2 + 2,
-+			.target_residency = 5,
-+			.flags = CPUIDLE_FLAG_TIME_VALID,
-+			.enter = omap_enter_idle_simple,
-+			.name = "C1",
-+			.desc = "CPUx WFI, MPUSS ON"
-+		},
-+		{
-+			/* C2 - CPU0 RET + CPU1 RET + MPU CSWR */
-+			.exit_latency = 48 + 60,
-+			.target_residency = 100,
-+			.flags = CPUIDLE_FLAG_TIME_VALID
-+					| CPUIDLE_FLAG_TIMER_STOP,
-+			.enter = omap_enter_idle_smp,
-+			.name = "C2",
-+			.desc = "CPUx CSWR, MPUSS CSWR",
-+		},
-+	},
-+	.state_count = ARRAY_SIZE(dra7_idle_data),
-+	.safe_state_index = 0,
-+};
-+
- /* Public functions */
  
  /**
-@@ -234,6 +304,16 @@ static struct cpuidle_driver omap4_idle_driver = {
-  */
- int __init omap4_idle_init(void)
- {
-+	struct cpuidle_driver *idle_driver;
++ * serial_omap_fast_irq() - schedule interrupt handling
++ */
++static irqreturn_t serial_omap_fast_irq(int irq, void *dev_id)
++{
++	struct uart_omap_port *up = dev_id;
++	unsigned int iir = serial_in(up, UART_IIR);
 +
-+	if (soc_is_dra7xx() || soc_is_omap54xx()) {
-+		state_ptr = &dra7_idle_data[0];
-+		idle_driver = &dra7_idle_driver;
-+	} else {
-+		state_ptr = &omap4_idle_data[0];
-+		idle_driver = &omap4_idle_driver;
-+	}
++	if (iir & UART_IIR_NO_INT)
++		return IRQ_NONE;
 +
- 	mpu_pd = pwrdm_lookup("mpu_pwrdm");
- 	cpu_pd[0] = pwrdm_lookup("cpu0_pwrdm");
- 	cpu_pd[1] = pwrdm_lookup("cpu1_pwrdm");
-@@ -248,5 +328,5 @@ int __init omap4_idle_init(void)
- 	/* Configure the broadcast timer on each cpu */
- 	on_each_cpu(omap_setup_broadcast_timer, NULL, 1);
++	return IRQ_WAKE_THREAD;
++}
++
++/**
+  * serial_omap_irq() - This handles the interrupt from one port
+  * @irq: uart port irq number
+  * @dev_id: uart port info
+@@ -584,7 +598,6 @@ static irqreturn_t serial_omap_irq(int irq, void *dev_id)
+ 	struct uart_omap_port *up = dev_id;
+ 	unsigned int iir, lsr;
+ 	unsigned int type;
+-	irqreturn_t ret = IRQ_NONE;
+ 	int max_count = 256;
  
--	return cpuidle_register(&omap4_idle_driver, cpu_online_mask);
-+	return cpuidle_register(idle_driver, cpu_online_mask);
+ 	spin_lock(&up->port.lock);
+@@ -595,7 +608,6 @@ static irqreturn_t serial_omap_irq(int irq, void *dev_id)
+ 		if (iir & UART_IIR_NO_INT)
+ 			break;
+ 
+-		ret = IRQ_HANDLED;
+ 		lsr = serial_in(up, UART_LSR);
+ 
+ 		/* extract IRQ type from IIR register */
+@@ -634,7 +646,7 @@ static irqreturn_t serial_omap_irq(int irq, void *dev_id)
+ 	pm_runtime_put_autosuspend(up->dev);
+ 	up->port_activity = jiffies;
+ 
+-	return ret;
++	return IRQ_HANDLED;
  }
-diff --git a/arch/arm/mach-omap2/pm44xx.c b/arch/arm/mach-omap2/pm44xx.c
-index c063833..1d22162 100644
---- a/arch/arm/mach-omap2/pm44xx.c
-+++ b/arch/arm/mach-omap2/pm44xx.c
-@@ -293,7 +293,7 @@ int __init omap4_pm_init(void)
- 	/* Overwrite the default cpu_do_idle() */
- 	arm_pm_idle = omap_default_idle;
  
--	if (cpu_is_omap44xx())
-+	if (cpu_is_omap44xx() || soc_is_dra7xx() || soc_is_omap54xx())
- 		omap4_idle_init();
+ static unsigned int serial_omap_tx_empty(struct uart_port *port)
+@@ -731,15 +743,19 @@ static int serial_omap_startup(struct uart_port *port)
+ 	/*
+ 	 * Allocate the IRQ
+ 	 */
+-	retval = request_irq(up->port.irq, serial_omap_irq, up->port.irqflags,
+-				up->name, up);
++	retval = request_threaded_irq(up->port.irq, serial_omap_fast_irq,
++						serial_omap_irq,
++						IRQF_ONESHOT | up->port.irqflags,
++						up->name, up);
+ 	if (retval)
+ 		return retval;
  
- err2:
+ 	/* Optional wake-up IRQ */
+ 	if (up->wakeirq) {
+-		retval = request_irq(up->wakeirq, serial_omap_irq,
+-				     up->port.irqflags, up->name, up);
++		retval = request_threaded_irq(up->wakeirq, serial_omap_fast_irq,
++						serial_omap_irq,
++						IRQF_ONESHOT | up->port.irqflags,
++						up->name, up);
+ 		if (retval) {
+ 			free_irq(up->port.irq, up);
+ 			return retval;
 -- 
-1.7.9.5
+1.9.3
