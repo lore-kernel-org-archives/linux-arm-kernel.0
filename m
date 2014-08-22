@@ -1,76 +1,104 @@
 From: nm@ti.com (Nishanth Menon)
-Date: Fri, 22 Aug 2014 09:02:25 -0500
-Subject: [PATCH 01/10] ARM: OMAP5 / DRA7: PM: Update CPU context register
- offset
+Date: Fri, 22 Aug 2014 09:02:30 -0500
+Subject: [PATCH 06/10] ARM: OMAP5 / DRA7: PM: Provide a dummy startup function
+ for CPU hotplug
 In-Reply-To: <1408716154-26101-1-git-send-email-nm@ti.com>
 References: <1408716154-26101-1-git-send-email-nm@ti.com>
-Message-ID: <1408716154-26101-2-git-send-email-nm@ti.com>
+Message-ID: <1408716154-26101-7-git-send-email-nm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Santosh Shilimkar <santosh.shilimkar@ti.com>
 
-On OMAP5, RM_CPUi_CPUi_CONTEXT offset has changed. Update the code
-so that same code works for OMAP4+ devices. DRA7 and OMAP5 have the same
-context offset as well.
+Dont assume that all OMAP4+ code will be able to use OMAP4 hotplug
+logic. On OMAP5, DRA7, we do not need this in place yet, also,
+currently the CPU startup pointer is located in omap4_cpu_pm_info
+instead of cpu_pm_ops.
+
+So, isolate the function to hotplug_restart pointer in cpu_pm_ops
+where it should have belonged, initalize them as per valid startup
+pointers for OMAP4430/60 as in current logic, however provide
+dummy_cpu_resume to be the startup location as well.
 
 Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-[rnayak at ti.com: for DRA7]
-Signed-off-by: Rajendra Nayak <rnayak@ti.com>
-[nm at ti.com: rebase, split/merge etc..]
+[nm at ti.com: split this out of original code and isolate it]
 Signed-off-by: Nishanth Menon <nm@ti.com>
 ---
- arch/arm/mach-omap2/omap-mpuss-lowpower.c |   13 +++++++++----
- 1 file changed, 9 insertions(+), 4 deletions(-)
+ arch/arm/mach-omap2/omap-mpuss-lowpower.c |   14 ++++++++------
+ 1 file changed, 8 insertions(+), 6 deletions(-)
 
 diff --git a/arch/arm/mach-omap2/omap-mpuss-lowpower.c b/arch/arm/mach-omap2/omap-mpuss-lowpower.c
-index 4001325..63a1dd7 100644
+index 53d8de5..207fce2 100644
 --- a/arch/arm/mach-omap2/omap-mpuss-lowpower.c
 +++ b/arch/arm/mach-omap2/omap-mpuss-lowpower.c
-@@ -56,6 +56,7 @@
- #include "omap4-sar-layout.h"
- #include "pm.h"
- #include "prcm_mpu44xx.h"
-+#include "prcm_mpu54xx.h"
- #include "prminst44xx.h"
- #include "prcm44xx.h"
- #include "prm44xx.h"
-@@ -89,6 +90,7 @@ struct cpu_pm_ops {
+@@ -69,7 +69,6 @@ struct omap4_cpu_pm_info {
+ 	void __iomem *scu_sar_addr;
+ 	void __iomem *wkup_sar_addr;
+ 	void __iomem *l2x0_sar_addr;
+-	void (*secondary_startup)(void);
+ };
+ 
+ /**
+@@ -77,6 +76,7 @@ struct omap4_cpu_pm_info {
+  * @finish_suspend:	CPU suspend finisher function pointer
+  * @resume:		CPU resume function pointer
+  * @scu_prepare:	CPU Snoop Control program function pointer
++ * @hotplug_restart:	CPU restart function pointer
+  *
+  * Structure holds functions pointer for CPU low power operations like
+  * suspend, resume and scu programming.
+@@ -85,6 +85,7 @@ struct cpu_pm_ops {
+ 	int (*finish_suspend)(unsigned long cpu_state);
+ 	void (*resume)(void);
+ 	void (*scu_prepare)(unsigned int cpu_id, unsigned int cpu_state);
++	void (*hotplug_restart)(void);
+ };
+ 
  static DEFINE_PER_CPU(struct omap4_cpu_pm_info, omap4_pm_info);
- static struct powerdomain *mpuss_pd;
- static void __iomem *sar_base;
-+static u32 cpu_context_offset;
+@@ -108,6 +109,7 @@ struct cpu_pm_ops omap_pm_ops = {
+ 	.finish_suspend		= default_finish_suspend,
+ 	.resume			= dummy_cpu_resume,
+ 	.scu_prepare		= dummy_scu_prepare,
++	.hotplug_restart	= dummy_cpu_resume,
+ };
  
- static int default_finish_suspend(unsigned long cpu_state)
- {
-@@ -161,14 +163,14 @@ static inline void cpu_clear_prev_logic_pwrst(unsigned int cpu_id)
+ /*
+@@ -312,7 +314,7 @@ int omap4_hotplug_cpu(unsigned int cpu, unsigned int power_state)
  
- 	if (cpu_id) {
- 		reg = omap4_prcm_mpu_read_inst_reg(OMAP4430_PRCM_MPU_CPU1_INST,
--					OMAP4_RM_CPU1_CPU1_CONTEXT_OFFSET);
-+					cpu_context_offset);
- 		omap4_prcm_mpu_write_inst_reg(reg, OMAP4430_PRCM_MPU_CPU1_INST,
--					OMAP4_RM_CPU1_CPU1_CONTEXT_OFFSET);
-+					cpu_context_offset);
- 	} else {
- 		reg = omap4_prcm_mpu_read_inst_reg(OMAP4430_PRCM_MPU_CPU0_INST,
--					OMAP4_RM_CPU0_CPU0_CONTEXT_OFFSET);
-+					cpu_context_offset);
- 		omap4_prcm_mpu_write_inst_reg(reg, OMAP4430_PRCM_MPU_CPU0_INST,
--					OMAP4_RM_CPU0_CPU0_CONTEXT_OFFSET);
-+					cpu_context_offset);
+ 	pwrdm_clear_all_prev_pwrst(pm_info->pwrdm);
+ 	pwrdm_set_next_pwrst(pm_info->pwrdm, power_state);
+-	set_cpu_wakeup_addr(cpu, virt_to_phys(pm_info->secondary_startup));
++	set_cpu_wakeup_addr(cpu, virt_to_phys(omap_pm_ops.hotplug_restart));
+ 	omap_pm_ops.scu_prepare(cpu, power_state);
+ 
+ 	/*
+@@ -385,10 +387,6 @@ int __init omap4_mpuss_init(void)
+ 					CPU1_WAKEUP_NS_PA_ADDR_OFFSET;
+ 		pm_info->l2x0_sar_addr = sar_base + L2X0_SAVE_OFFSET1;
  	}
- }
+-	if (cpu_is_omap446x())
+-		pm_info->secondary_startup = omap4460_secondary_startup;
+-	else
+-		pm_info->secondary_startup = omap4_secondary_startup;
  
-@@ -392,6 +394,9 @@ int __init omap4_mpuss_init(void)
+ 	pm_info->pwrdm = pwrdm_lookup("cpu1_pwrdm");
+ 	if (!pm_info->pwrdm) {
+@@ -422,12 +420,16 @@ int __init omap4_mpuss_init(void)
  		omap_pm_ops.finish_suspend = omap4_finish_suspend;
  		omap_pm_ops.resume = omap4_cpu_resume;
  		omap_pm_ops.scu_prepare = scu_pwrst_prepare;
-+		cpu_context_offset = OMAP4_RM_CPU0_CPU0_CONTEXT_OFFSET;
-+	} else if (soc_is_omap54xx() || soc_is_dra7xx()) {
-+		cpu_context_offset = OMAP54XX_RM_CPU0_CPU0_CONTEXT_OFFSET;
++		omap_pm_ops.hotplug_restart = omap4_secondary_startup;
+ 		cpu_context_offset = OMAP4_RM_CPU0_CPU0_CONTEXT_OFFSET;
+ 	} else if (soc_is_omap54xx() || soc_is_dra7xx()) {
+ 		cpu_context_offset = OMAP54XX_RM_CPU0_CPU0_CONTEXT_OFFSET;
+ 		enable_mercury_retention_mode();
  	}
  
++	if (cpu_is_omap446x())
++		omap_pm_ops.hotplug_restart = omap4460_secondary_startup;
++
  	return 0;
+ }
+ 
 -- 
 1.7.9.5
