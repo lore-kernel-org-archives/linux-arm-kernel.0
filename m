@@ -1,92 +1,67 @@
 From: nm@ti.com (Nishanth Menon)
-Date: Fri, 22 Aug 2014 09:02:27 -0500
-Subject: [PATCH 03/10] ARM: OMAP5 / DRA7: PM / wakeupgen: Enables ES2 PM mode
- by default
+Date: Fri, 22 Aug 2014 09:02:28 -0500
+Subject: [PATCH 04/10] ARM: OMAP5 / DRA7: PM: Enable Mercury retention mode on
+ CPUx powerdomains
 In-Reply-To: <1408716154-26101-1-git-send-email-nm@ti.com>
 References: <1408716154-26101-1-git-send-email-nm@ti.com>
-Message-ID: <1408716154-26101-4-git-send-email-nm@ti.com>
+Message-ID: <1408716154-26101-5-git-send-email-nm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Santosh Shilimkar <santosh.shilimkar@ti.com>
 
-Enables MPUSS ES2 power management mode using ES2_PM_MODE in
-AMBA_IF_MODE register.
+In addition to the standard power-management technique, the OMAP5 / DRA7
+MPU subsystem also employs an SR3-APG (mercury) power management
+technology to reduce leakage.
 
-0x0: OMAP5 ES1 behavior, CPU cores would enter and exit OFF mode together.
-     Broken! Fortunately, we do not support this anymore.
-0x1: OMAP5 ES2, DRA7 behavior, CPU cores are allowed to enter/exit OFF mode
-     independently.
-
-This is one time settings thanks to always ON domain.
+It allows for full logic and memories retention on MPU_C0 and MPU_C1 and
+is controlled by the PRCM_MPU. Only "Fast-mode" is supported on the
+OMAP5 and DRA7 family of processors.
 
 Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-[nm at ti.com: minor conflict resolutions, consolidation for DRA7]
+[nm at ti.com: minor consolidation]
 Signed-off-by: Nishanth Menon <nm@ti.com>
 ---
- arch/arm/mach-omap2/omap-secure.h    |    1 +
- arch/arm/mach-omap2/omap-wakeupgen.c |   17 +++++++++++++++++
- arch/arm/mach-omap2/omap-wakeupgen.h |    1 +
- 3 files changed, 19 insertions(+)
 
-diff --git a/arch/arm/mach-omap2/omap-secure.h b/arch/arm/mach-omap2/omap-secure.h
-index 3e97c6c..dec2b05 100644
---- a/arch/arm/mach-omap2/omap-secure.h
-+++ b/arch/arm/mach-omap2/omap-secure.h
-@@ -45,6 +45,7 @@
- #define OMAP4_MON_L2X0_PREFETCH_INDEX	0x113
+This has a minor checkpatch warning for aligning with '(', but that
+when fixed results in over 80 char warning. So choose '(' check instead :D.
+
+ arch/arm/mach-omap2/omap-mpuss-lowpower.c |   16 ++++++++++++++++
+ 1 file changed, 16 insertions(+)
+
+diff --git a/arch/arm/mach-omap2/omap-mpuss-lowpower.c b/arch/arm/mach-omap2/omap-mpuss-lowpower.c
+index 63a1dd7..fad6e8c 100644
+--- a/arch/arm/mach-omap2/omap-mpuss-lowpower.c
++++ b/arch/arm/mach-omap2/omap-mpuss-lowpower.c
+@@ -321,6 +321,21 @@ int omap4_hotplug_cpu(unsigned int cpu, unsigned int power_state)
  
- #define OMAP5_DRA7_MON_SET_CNTFRQ_INDEX	0x109
-+#define OMAP5_MON_AMBA_IF_INDEX		0x108
  
- /* Secure PPA(Primary Protected Application) APIs */
- #define OMAP4_PPA_L2_POR_INDEX		0x23
-diff --git a/arch/arm/mach-omap2/omap-wakeupgen.c b/arch/arm/mach-omap2/omap-wakeupgen.c
-index 37843a7..e844e16 100644
---- a/arch/arm/mach-omap2/omap-wakeupgen.c
-+++ b/arch/arm/mach-omap2/omap-wakeupgen.c
-@@ -406,6 +406,7 @@ int __init omap_wakeupgen_init(void)
- {
- 	int i;
- 	unsigned int boot_cpu = smp_processor_id();
-+	u32 val;
- 
- 	/* Not supported on OMAP4 ES1.0 silicon */
- 	if (omap_rev() == OMAP4430_REV_ES1_0) {
-@@ -451,6 +452,22 @@ int __init omap_wakeupgen_init(void)
- 	for (i = 0; i < max_irqs; i++)
- 		irq_target_cpu[i] = boot_cpu;
- 
-+	/*
-+	 * Enables OMAP5 ES2 PM Mode using ES2_PM_MODE in AMBA_IF_MODE
-+	 * 0x0:	ES1 behavior, CPU cores would enter and exit OFF mode together.
-+	 * 0x1:	ES2 behavior, CPU cores are allowed to enter/exit OFF mode
-+	 * independently.
-+	 * This needs to be set one time thanks to always ON domain.
-+	 *
-+	 * We do not support ES1 behavior anymore. OMAP5 is assumed to be
-+	 * ES2.0, and the same is applicable for DRA7.
-+	 */
-+	if (soc_is_omap54xx() || soc_is_dra7xx()) {
-+		val = __raw_readl(wakeupgen_base + OMAP_AMBA_IF_MODE);
-+		val |= BIT(5);
-+		omap_smc1(OMAP5_MON_AMBA_IF_INDEX, val);
-+	}
+ /*
++ * Enable Mercury Fast HG retention mode by default.
++ */
++static void enable_mercury_retention_mode(void)
++{
++	u32 reg;
 +
- 	irq_hotplug_init();
- 	irq_pm_init();
++	reg = omap4_prcm_mpu_read_inst_reg(OMAP54XX_PRCM_MPU_DEVICE_INST,
++				  OMAP54XX_PRCM_MPU_PRM_PSCON_COUNT_OFFSET);
++	/* Enable HG_EN, HG_RAMPUP = fast mode */
++	reg |= BIT(24) | BIT(25);
++	omap4_prcm_mpu_write_inst_reg(reg, OMAP54XX_PRCM_MPU_DEVICE_INST,
++				      OMAP54XX_PRCM_MPU_PRM_PSCON_COUNT_OFFSET);
++}
++
++/*
+  * Initialise OMAP4 MPUSS
+  */
+ int __init omap4_mpuss_init(void)
+@@ -397,6 +412,7 @@ int __init omap4_mpuss_init(void)
+ 		cpu_context_offset = OMAP4_RM_CPU0_CPU0_CONTEXT_OFFSET;
+ 	} else if (soc_is_omap54xx() || soc_is_dra7xx()) {
+ 		cpu_context_offset = OMAP54XX_RM_CPU0_CPU0_CONTEXT_OFFSET;
++		enable_mercury_retention_mode();
+ 	}
  
-diff --git a/arch/arm/mach-omap2/omap-wakeupgen.h b/arch/arm/mach-omap2/omap-wakeupgen.h
-index b0fd16f..b3c8ecc 100644
---- a/arch/arm/mach-omap2/omap-wakeupgen.h
-+++ b/arch/arm/mach-omap2/omap-wakeupgen.h
-@@ -27,6 +27,7 @@
- #define OMAP_WKG_ENB_E_1			0x420
- #define OMAP_AUX_CORE_BOOT_0			0x800
- #define OMAP_AUX_CORE_BOOT_1			0x804
-+#define OMAP_AMBA_IF_MODE			0x80c
- #define OMAP_PTMSYNCREQ_MASK			0xc00
- #define OMAP_PTMSYNCREQ_EN			0xc04
- #define OMAP_TIMESTAMPCYCLELO			0xc08
+ 	return 0;
 -- 
 1.7.9.5
