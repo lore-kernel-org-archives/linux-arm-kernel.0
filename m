@@ -1,296 +1,388 @@
-From: nathan_lynch@mentor.com (Nathan Lynch)
-Date: Fri, 22 Aug 2014 16:52:30 -0500
-Subject: [PATCH v9 5/6] ARM: vdso initialization, mapping, and synchronization
-In-Reply-To: <1408744351-7814-1-git-send-email-nathan_lynch@mentor.com>
-References: <1408744351-7814-1-git-send-email-nathan_lynch@mentor.com>
-Message-ID: <1408744351-7814-6-git-send-email-nathan_lynch@mentor.com>
+From: tharvey@gateworks.com (Tim Harvey)
+Date: Fri, 22 Aug 2014 14:52:54 -0700
+Subject: [PATCH v3] ARM: dts: Gateworks GW5520 support (i.MX6)
+In-Reply-To: <1407572602-14017-1-git-send-email-tharvey@gateworks.com>
+References: <1407572602-14017-1-git-send-email-tharvey@gateworks.com>
+Message-ID: <1408744374-30800-1-git-send-email-tharvey@gateworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Initialize the vdso page list at boot, install the vdso mapping at
-exec time, and update the data page during timer ticks.  This code is
-not built if CONFIG_VDSO is not enabled.
+Add support for the Gateworks GW5520 board.
 
-Account for the vdso length when randomizing the offset from the
-stack.  The vdso is placed immediately following the sigpage with a
-separate install_special_mapping call in arm_install_vdso.
-
-Signed-off-by: Nathan Lynch <nathan_lynch@mentor.com>
+Signed-off-by: Tim Harvey <tharvey@gateworks.com>
 ---
- arch/arm/kernel/process.c |  17 +++-
- arch/arm/kernel/vdso.c    | 207 ++++++++++++++++++++++++++++++++++++++++++++++
- 2 files changed, 221 insertions(+), 3 deletions(-)
- create mode 100644 arch/arm/kernel/vdso.c
+Changes in v3:
+ - remove gpiogrp and hog
+ - fix state on pcie reset
+ - remove unused input bindings include
 
-diff --git a/arch/arm/kernel/process.c b/arch/arm/kernel/process.c
-index 9e0d931dd475..7aa1025aff1f 100644
---- a/arch/arm/kernel/process.c
-+++ b/arch/arm/kernel/process.c
-@@ -41,6 +41,7 @@
- #include <asm/system_misc.h>
- #include <asm/mach/time.h>
- #include <asm/tls.h>
-+#include <asm/vdso.h>
- 
- #ifdef CONFIG_CC_STACKPROTECTOR
- #include <linux/stackprotector.h>
-@@ -476,7 +477,7 @@ const char *arch_vma_name(struct vm_area_struct *vma)
- }
- 
- /* If possible, provide a placement hint at a random offset from the
-- * stack for the signal page.
-+ * stack for the sigpage and vdso pages.
-  */
- static unsigned long sigpage_addr(const struct mm_struct *mm, unsigned int npages)
- {
-@@ -519,6 +520,7 @@ int arch_setup_additional_pages(struct linux_binprm *bprm, int uses_interp)
- {
- 	struct mm_struct *mm = current->mm;
- 	struct vm_area_struct *vma;
-+	unsigned long npages;
- 	unsigned long addr;
- 	unsigned long hint;
- 	int ret = 0;
-@@ -528,9 +530,12 @@ int arch_setup_additional_pages(struct linux_binprm *bprm, int uses_interp)
- 	if (!signal_page)
- 		return -ENOMEM;
- 
-+	npages = 1; /* for sigpage */
-+	npages += vdso_total_pages;
-+
- 	down_write(&mm->mmap_sem);
--	hint = sigpage_addr(mm, 1);
--	addr = get_unmapped_area(NULL, hint, PAGE_SIZE, 0, 0);
-+	hint = sigpage_addr(mm, npages);
-+	addr = get_unmapped_area(NULL, hint, npages << PAGE_SHIFT, 0, 0);
- 	if (IS_ERR_VALUE(addr)) {
- 		ret = addr;
- 		goto up_fail;
-@@ -547,6 +552,12 @@ int arch_setup_additional_pages(struct linux_binprm *bprm, int uses_interp)
- 
- 	mm->context.sigpage = addr;
- 
-+	/* Unlike the sigpage, failure to install the vdso is unlikely
-+	 * to be fatal to the process, so no error check needed
-+	 * here.
-+	 */
-+	arm_install_vdso(mm, addr + PAGE_SIZE);
-+
-  up_fail:
- 	up_write(&mm->mmap_sem);
- 	return ret;
-diff --git a/arch/arm/kernel/vdso.c b/arch/arm/kernel/vdso.c
+Changes in v2:
+ - use GPIO constants
+ - move gpio pins from hoggrp to gpiogrp
+ - use proper pad conf instead of 0x80000000
+ - moved iomuxc to bottom for readability
+ - pulled gpioledsgrp into iomuxc
+ - fix whitespace errors
+
+Signed-off-by: Tim Harvey <tharvey@gateworks.com>
+---
+ arch/arm/boot/dts/Makefile            |   2 +
+ arch/arm/boot/dts/imx6dl-gw552x.dts   |  20 +++
+ arch/arm/boot/dts/imx6q-gw552x.dts    |  24 +++
+ arch/arm/boot/dts/imx6qdl-gw552x.dtsi | 267 ++++++++++++++++++++++++++++++++++
+ 4 files changed, 313 insertions(+)
+ create mode 100644 arch/arm/boot/dts/imx6dl-gw552x.dts
+ create mode 100644 arch/arm/boot/dts/imx6q-gw552x.dts
+ create mode 100644 arch/arm/boot/dts/imx6qdl-gw552x.dtsi
+
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index adb5ed9..99697b4 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -188,6 +188,7 @@ dtb-$(CONFIG_ARCH_MXC) += \
+ 	imx6dl-gw52xx.dtb \
+ 	imx6dl-gw53xx.dtb \
+ 	imx6dl-gw54xx.dtb \
++	imx6dl-gw552x.dtb \
+ 	imx6dl-hummingboard.dtb \
+ 	imx6dl-nitrogen6x.dtb \
+ 	imx6dl-phytec-pbab01.dtb \
+@@ -207,6 +208,7 @@ dtb-$(CONFIG_ARCH_MXC) += \
+ 	imx6q-gw53xx.dtb \
+ 	imx6q-gw5400-a.dtb \
+ 	imx6q-gw54xx.dtb \
++	imx6q-gw552x.dtb \
+ 	imx6q-nitrogen6x.dtb \
+ 	imx6q-phytec-pbab01.dtb \
+ 	imx6q-sabreauto.dtb \
+diff --git a/arch/arm/boot/dts/imx6dl-gw552x.dts b/arch/arm/boot/dts/imx6dl-gw552x.dts
 new file mode 100644
-index 000000000000..7bd393f588ea
+index 0000000..a4b700c
 --- /dev/null
-+++ b/arch/arm/kernel/vdso.c
-@@ -0,0 +1,207 @@
++++ b/arch/arm/boot/dts/imx6dl-gw552x.dts
+@@ -0,0 +1,20 @@
 +/*
-+ * Adapted from arm64 version.
++ * Copyright 2014 Gateworks Corporation
 + *
-+ * Copyright (C) 2012 ARM Limited
++ * The code contained herein is licensed under the GNU General Public
++ * License. You may obtain a copy of the GNU General Public License
++ * Version 2 or later at the following locations:
 + *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
++ * http://www.opensource.org/licenses/gpl-license.html
++ * http://www.gnu.org/copyleft/gpl.html
 + */
 +
-+#include <linux/err.h>
-+#include <linux/kernel.h>
-+#include <linux/mm.h>
-+#include <linux/slab.h>
-+#include <linux/timekeeper_internal.h>
-+#include <linux/vmalloc.h>
++/dts-v1/;
 +
-+#include <asm/barrier.h>
-+#include <asm/cacheflush.h>
-+#include <asm/page.h>
-+#include <asm/vdso.h>
-+#include <asm/vdso_datapage.h>
++#include "imx6dl.dtsi"
++#include "imx6qdl-gw552x.dtsi"
 +
-+#include <asm/arch_timer.h>
-+
-+static struct page **vdso_text_pagelist;
-+
-+/* Total number of pages needed for the data and text portions of the VDSO. */
-+unsigned int vdso_total_pages __read_mostly;
-+
++/ {
++	model = "Gateworks Ventana i.MX6 DualLite/Solo GW552X";
++	compatible = "gw,imx6dl-gw552x", "gw,ventana", "fsl,imx6dl";
++};
+diff --git a/arch/arm/boot/dts/imx6q-gw552x.dts b/arch/arm/boot/dts/imx6q-gw552x.dts
+new file mode 100644
+index 0000000..f87a8fa
+--- /dev/null
++++ b/arch/arm/boot/dts/imx6q-gw552x.dts
+@@ -0,0 +1,24 @@
 +/*
-+ * The vDSO data page.
++ * Copyright 2014 Gateworks Corporation
++ *
++ * The code contained herein is licensed under the GNU General Public
++ * License. You may obtain a copy of the GNU General Public License
++ * Version 2 or later at the following locations:
++ *
++ * http://www.opensource.org/licenses/gpl-license.html
++ * http://www.gnu.org/copyleft/gpl.html
 + */
-+static union vdso_data_store vdso_data_store __page_aligned_data;
-+static struct vdso_data *vdso_data = &vdso_data_store.data;
 +
-+static struct page *vdso_data_page;
-+static struct vm_special_mapping vdso_data_mapping = {
-+	.name = "[vvar]",
-+	.pages = &vdso_data_page,
++/dts-v1/;
++
++#include "imx6q.dtsi"
++#include "imx6qdl-gw552x.dtsi"
++
++/ {
++	model = "Gateworks Ventana i.MX6 Dual/Quad GW552X";
++	compatible = "gw,imx6q-gw552x", "gw,ventana", "fsl,imx6q";
 +};
 +
-+static struct vm_special_mapping vdso_text_mapping = {
-+	.name = "[vdso]",
++&sata {
++	status = "okay";
++};
+diff --git a/arch/arm/boot/dts/imx6qdl-gw552x.dtsi b/arch/arm/boot/dts/imx6qdl-gw552x.dtsi
+new file mode 100644
+index 0000000..5c6587f
+--- /dev/null
++++ b/arch/arm/boot/dts/imx6qdl-gw552x.dtsi
+@@ -0,0 +1,267 @@
++/*
++ * Copyright 2014 Gateworks Corporation
++ *
++ * The code contained herein is licensed under the GNU General Public
++ * License. You may obtain a copy of the GNU General Public License
++ * Version 2 or later at the following locations:
++ *
++ * http://www.opensource.org/licenses/gpl-license.html
++ * http://www.gnu.org/copyleft/gpl.html
++ */
++
++#include <dt-bindings/gpio/gpio.h>
++
++/ {
++	/* these are used by bootloader for disabling nodes */
++	aliases {
++		led0 = &led0;
++		led1 = &led1;
++		led2 = &led2;
++		nand = &gpmi;
++		usb0 = &usbh1;
++		usb1 = &usbotg;
++	};
++
++	chosen {
++		bootargs = "console=ttymxc1,115200";
++	};
++
++	leds {
++		compatible = "gpio-leds";
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_gpio_leds>;
++
++		led0: user1 {
++			label = "user1";
++			gpios = <&gpio4 6 GPIO_ACTIVE_HIGH>; /* MX6_PANLEDG */
++			default-state = "on";
++			linux,default-trigger = "heartbeat";
++		};
++
++		led1: user2 {
++			label = "user2";
++			gpios = <&gpio4 7 GPIO_ACTIVE_HIGH>; /* MX6_PANLEDR */
++			default-state = "off";
++		};
++
++		led2: user3 {
++			label = "user3";
++			gpios = <&gpio4 15 GPIO_ACTIVE_LOW>; /* MX6_LOCLED# */
++			default-state = "off";
++		};
++	};
++
++	memory {
++		reg = <0x10000000 0x20000000>;
++	};
++
++	regulators {
++		compatible = "simple-bus";
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		reg_1p0v: regulator at 0 {
++			compatible = "regulator-fixed";
++			reg = <0>;
++			regulator-name = "1P0V";
++			regulator-min-microvolt = <1000000>;
++			regulator-max-microvolt = <1000000>;
++			regulator-always-on;
++		};
++
++		reg_3p3v: regulator at 2 {
++			compatible = "regulator-fixed";
++			reg = <2>;
++			regulator-name = "3P3V";
++			regulator-min-microvolt = <3300000>;
++			regulator-max-microvolt = <3300000>;
++			regulator-always-on;
++		};
++
++		reg_5p0v: regulator at 3 {
++			compatible = "regulator-fixed";
++			reg = <3>;
++			regulator-name = "5P0V";
++			regulator-min-microvolt = <5000000>;
++			regulator-max-microvolt = <5000000>;
++			regulator-always-on;
++		};
++	};
 +};
 +
-+static int __init vdso_init(void)
-+{
-+	unsigned int text_pages;
-+	int i;
++&gpmi {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_gpmi_nand>;
++	status = "okay";
++};
 +
-+	if (memcmp(&vdso_start, "\177ELF", 4)) {
-+		pr_err("vDSO is not a valid ELF object!\n");
-+		return -ENOEXEC;
-+	}
++&hdmi {
++	ddc-i2c-bus = <&i2c3>;
++	status = "okay";
++};
 +
-+	text_pages = (&vdso_end - &vdso_start) >> PAGE_SHIFT;
-+	pr_debug("vdso: %i text pages at base %p\n", text_pages, &vdso_start);
++&i2c1 {
++	clock-frequency = <100000>;
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_i2c1>;
++	status = "okay";
 +
-+	/* Allocate the vDSO text pagelist */
-+	vdso_text_pagelist = kcalloc(text_pages, sizeof(struct page *),
-+				     GFP_KERNEL);
-+	if (vdso_text_pagelist == NULL)
-+		return -ENOMEM;
++	eeprom1: eeprom at 50 {
++		compatible = "atmel,24c02";
++		reg = <0x50>;
++		pagesize = <16>;
++	};
 +
-+	/* Grab the vDSO data page. */
-+	vdso_data_page = virt_to_page(vdso_data);
++	eeprom2: eeprom at 51 {
++		compatible = "atmel,24c02";
++		reg = <0x51>;
++		pagesize = <16>;
++	};
 +
-+	/* Grab the vDSO text pages. */
-+	for (i = 0; i < text_pages; i++)
-+		vdso_text_pagelist[i] = virt_to_page(&vdso_start + i * PAGE_SIZE);
++	eeprom3: eeprom at 52 {
++		compatible = "atmel,24c02";
++		reg = <0x52>;
++		pagesize = <16>;
++	};
 +
-+	vdso_text_mapping.pages = vdso_text_pagelist;
++	eeprom4: eeprom at 53 {
++		compatible = "atmel,24c02";
++		reg = <0x53>;
++		pagesize = <16>;
++	};
 +
-+	vdso_total_pages = 1; /* for the data/vvar page */
-+	vdso_total_pages += text_pages;
++	gpio: pca9555 at 23 {
++		compatible = "nxp,pca9555";
++		reg = <0x23>;
++		gpio-controller;
++		#gpio-cells = <2>;
++	};
 +
-+	return 0;
-+}
-+arch_initcall(vdso_init);
++	rtc: ds1672 at 68 {
++		compatible = "dallas,ds1672";
++		reg = <0x68>;
++	};
++};
 +
-+static int install_vvar(struct mm_struct *mm, unsigned long addr)
-+{
-+	struct vm_area_struct *vma;
++&i2c2 {
++	clock-frequency = <100000>;
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_i2c2>;
++	status = "okay";
++};
 +
-+	vma = _install_special_mapping(mm, addr, PAGE_SIZE,
-+				       VM_READ | VM_MAYREAD,
-+				       &vdso_data_mapping);
++&i2c3 {
++	clock-frequency = <100000>;
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_i2c3>;
++	status = "okay";
++};
 +
-+	return IS_ERR(vma) ? PTR_ERR(vma) : 0;
-+}
++&pcie {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_pcie>;
++	reset-gpio = <&gpio1 29 GPIO_ACTIVE_LOW>;
++	status = "okay";
++};
 +
-+/* assumes mmap_sem is write-locked */
-+void arm_install_vdso(struct mm_struct *mm, unsigned long addr)
-+{
-+	struct vm_area_struct *vma;
-+	unsigned long len;
++&uart2 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_uart2>;
++	status = "okay";
++};
 +
-+	mm->context.vdso = 0;
++&uart3 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_uart3>;
++	status = "okay";
++};
 +
-+	if (vdso_text_pagelist == NULL)
-+		return;
++&uart5 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_uart5>;
++	status = "okay"; };
 +
-+	if (install_vvar(mm, addr))
-+		return;
++&usbh1 {
++	status = "okay";
++};
 +
-+	/* Account for vvar page. */
-+	addr += PAGE_SIZE;
-+	len = (vdso_total_pages - 1) << PAGE_SHIFT;
++&iomuxc {
++	imx6qdl-gw552x {
++		pinctrl_gpio_leds: gpioledsgrp {
++			fsl,pins = <
++				MX6QDL_PAD_KEY_COL0__GPIO4_IO06		0x1b0b0
++				MX6QDL_PAD_KEY_ROW0__GPIO4_IO07		0x1b0b0
++				MX6QDL_PAD_KEY_ROW4__GPIO4_IO15		0x1b0b0
++			>;
++		};
 +
-+	vma = _install_special_mapping(mm, addr, len,
-+		VM_READ | VM_EXEC | VM_MAYREAD | VM_MAYWRITE | VM_MAYEXEC,
-+		&vdso_text_mapping);
++		pinctrl_gpmi_nand: gpminandgrp {
++			fsl,pins = <
++				MX6QDL_PAD_NANDF_CLE__NAND_CLE		0xb0b1
++				MX6QDL_PAD_NANDF_ALE__NAND_ALE		0xb0b1
++				MX6QDL_PAD_NANDF_WP_B__NAND_WP_B	0xb0b1
++				MX6QDL_PAD_NANDF_RB0__NAND_READY_B	0xb000
++				MX6QDL_PAD_NANDF_CS0__NAND_CE0_B	0xb0b1
++				MX6QDL_PAD_NANDF_CS1__NAND_CE1_B	0xb0b1
++				MX6QDL_PAD_SD4_CMD__NAND_RE_B		0xb0b1
++				MX6QDL_PAD_SD4_CLK__NAND_WE_B		0xb0b1
++				MX6QDL_PAD_NANDF_D0__NAND_DATA00	0xb0b1
++				MX6QDL_PAD_NANDF_D1__NAND_DATA01	0xb0b1
++				MX6QDL_PAD_NANDF_D2__NAND_DATA02	0xb0b1
++				MX6QDL_PAD_NANDF_D3__NAND_DATA03	0xb0b1
++				MX6QDL_PAD_NANDF_D4__NAND_DATA04	0xb0b1
++				MX6QDL_PAD_NANDF_D5__NAND_DATA05	0xb0b1
++				MX6QDL_PAD_NANDF_D6__NAND_DATA06	0xb0b1
++				MX6QDL_PAD_NANDF_D7__NAND_DATA07	0xb0b1
++			>;
++		};
 +
-+	if (!IS_ERR(vma))
-+		mm->context.vdso = addr;
-+}
++		pinctrl_i2c1: i2c1grp {
++			fsl,pins = <
++				MX6QDL_PAD_EIM_D21__I2C1_SCL		0x4001b8b1
++				MX6QDL_PAD_EIM_D28__I2C1_SDA		0x4001b8b1
++			>;
++		};
 +
-+static void vdso_write_begin(struct vdso_data *vdata)
-+{
-+	++vdso_data->seq_count;
-+	smp_wmb();
-+}
++		pinctrl_i2c2: i2c2grp {
++			fsl,pins = <
++				MX6QDL_PAD_KEY_COL3__I2C2_SCL		0x4001b8b1
++				MX6QDL_PAD_KEY_ROW3__I2C2_SDA		0x4001b8b1
++			>;
++		};
 +
-+static void vdso_write_end(struct vdso_data *vdata)
-+{
-+	smp_wmb();
-+	++vdso_data->seq_count;
-+}
++		pinctrl_i2c3: i2c3grp {
++			fsl,pins = <
++				MX6QDL_PAD_GPIO_3__I2C3_SCL		0x4001b8b1
++				MX6QDL_PAD_GPIO_6__I2C3_SDA		0x4001b8b1
++			>;
++		};
 +
-+static bool vdso_can_use_arch_timer(const struct timekeeper *tk)
-+{
-+#ifdef CONFIG_ARM_ARCH_TIMER
-+	u32 cntkctl;
++		pinctrl_pcie: pciegrp {
++			fsl,pins = <
++				MX6QDL_PAD_ENET_TXD1__GPIO1_IO29	0x1b0b0
++			>;
++		};
 +
-+	if (strcmp(tk->tkr.clock->name, "arch_sys_counter") != 0)
-+		return false;
++		pinctrl_uart2: uart2grp {
++			fsl,pins = <
++				MX6QDL_PAD_SD4_DAT7__UART2_TX_DATA	0x1b0b1
++				MX6QDL_PAD_SD4_DAT4__UART2_RX_DATA	0x1b0b1
++			>;
++		};
 +
-+	cntkctl = arch_timer_get_cntkctl();
++		pinctrl_uart3: uart3grp {
++			fsl,pins = <
++				MX6QDL_PAD_EIM_D24__UART3_TX_DATA	0x1b0b1
++				MX6QDL_PAD_EIM_D25__UART3_RX_DATA	0x1b0b1
++			>;
++		};
 +
-+	return cntkctl & ARCH_TIMER_USR_VCT_ACCESS_EN;
-+#else
-+	return false;
-+#endif
-+}
-+
-+/**
-+ * update_vsyscall - update the vdso data page
-+ *
-+ * Increment the sequence counter, making it odd, indicating to
-+ * userspace that an update is in progress.  Update the fields used
-+ * for coarse clocks and, if the architected system timer is in use,
-+ * the fields used for high precision clocks.  Increment the sequence
-+ * counter again, making it even, indicating to userspace that the
-+ * update is finished.
-+ *
-+ * Userspace is expected to sample seq_count before reading any other
-+ * fields from the data page.  If seq_count is odd, userspace is
-+ * expected to wait until it becomes even.  After copying data from
-+ * the page, userspace must sample seq_count again; if it has changed
-+ * from its previous value, userspace must retry the whole sequence.
-+ *
-+ * Calls to update_vsyscall are serialized by the timekeeping core.
-+ */
-+void update_vsyscall(struct timekeeper *tk)
-+{
-+	struct timespec xtime_coarse;
-+	struct timespec64 *wtm = &tk->wall_to_monotonic;
-+	bool use_syscall = !vdso_can_use_arch_timer(tk);
-+
-+	vdso_write_begin(vdso_data);
-+
-+	xtime_coarse = __current_kernel_time();
-+	vdso_data->use_syscall			= use_syscall;
-+	vdso_data->xtime_coarse_sec		= xtime_coarse.tv_sec;
-+	vdso_data->xtime_coarse_nsec		= xtime_coarse.tv_nsec;
-+	vdso_data->wtm_clock_sec		= wtm->tv_sec;
-+	vdso_data->wtm_clock_nsec		= wtm->tv_nsec;
-+
-+	if (!use_syscall) {
-+		vdso_data->cs_cycle_last	= tk->tkr.cycle_last;
-+		vdso_data->xtime_clock_sec	= tk->xtime_sec;
-+		vdso_data->xtime_clock_snsec	= tk->tkr.xtime_nsec;
-+		vdso_data->cs_mult		= tk->tkr.mult;
-+		vdso_data->cs_shift		= tk->tkr.shift;
-+		vdso_data->cs_mask		= tk->tkr.mask;
-+	}
-+
-+	vdso_write_end(vdso_data);
-+
-+	flush_dcache_page(virt_to_page(vdso_data));
-+}
-+
-+void update_vsyscall_tz(void)
-+{
-+	vdso_data->tz_minuteswest	= sys_tz.tz_minuteswest;
-+	vdso_data->tz_dsttime		= sys_tz.tz_dsttime;
-+	flush_dcache_page(virt_to_page(vdso_data));
-+}
++		pinctrl_uart5: uart5grp {
++			fsl,pins = <
++				MX6QDL_PAD_KEY_COL1__UART5_TX_DATA	0x1b0b1
++				MX6QDL_PAD_KEY_ROW1__UART5_RX_DATA	0x1b0b1
++			>;
++                };
++	};
++};
 -- 
-1.9.3
+1.8.3.2
