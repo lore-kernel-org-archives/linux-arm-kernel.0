@@ -1,39 +1,37 @@
 From: geoff@infradead.org (Geoff Levand)
 Date: Fri, 22 Aug 2014 19:49:16 +0000
-Subject: [PATCH 5/9] arm64: Fix include header order in vmlinux.lds.S
+Subject: [PATCH 4/9] arm64: Remove unused variable in head.S
 In-Reply-To: <cover.1408736066.git.geoff@infradead.org>
 References: <cover.1408736066.git.geoff@infradead.org>
-Message-ID: <314ef77423f90ed407b54b4658ea41a96b6f6170.1408736066.git.geoff@infradead.org>
+Message-ID: <6930ff21b3945aa6a2575f5a8b9bb712fcac688f.1408736066.git.geoff@infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-asm-generic/vmlinux.lds.h should be included after the arch
-specific headers so that the arch headers can override the
-generic macro defs in asm-generic/vmlinux.lds.h.
+Remove an unused local variable from head.S.  It seems this was never
+used even from the initial commit
+9703d9d7f77ce129621f7d80a844822e2daa7008 (arm64: Kernel booting and
+initialisation), and is a left over from a previous implementation
+of __calc_phys_offset.
 
-Fixes preprosessor redefined warnings when adding arch specific
-macros.
-
-Signed-off-by: Geoff Levand <geoff@infradead.org> for Huawei, Linaro
+Signed-off-by: Geoff Levand <geoff@infradead.org>
 ---
- arch/arm64/kernel/vmlinux.lds.S | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm64/kernel/head.S | 4 ----
+ 1 file changed, 4 deletions(-)
 
-diff --git a/arch/arm64/kernel/vmlinux.lds.S b/arch/arm64/kernel/vmlinux.lds.S
-index fbb1af7..8dc1d46 100644
---- a/arch/arm64/kernel/vmlinux.lds.S
-+++ b/arch/arm64/kernel/vmlinux.lds.S
-@@ -4,10 +4,10 @@
-  * Written by Martin Mares <mj@atrey.karlin.mff.cuni.cz>
-  */
+diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
+index 4019b85..607d4bb 100644
+--- a/arch/arm64/kernel/head.S
++++ b/arch/arm64/kernel/head.S
+@@ -377,10 +377,6 @@ ENTRY(__boot_cpu_mode)
+ 	.long	0
+ 	.popsection
  
--#include <asm-generic/vmlinux.lds.h>
- #include <asm/thread_info.h>
- #include <asm/memory.h>
- #include <asm/page.h>
-+#include <asm-generic/vmlinux.lds.h>
- 
- #include "image.h"
- 
+-	.align	3
+-2:	.quad	.
+-	.quad	PAGE_OFFSET
+-
+ #ifdef CONFIG_SMP
+ 	.align	3
+ 1:	.quad	.
 -- 
 1.9.1
