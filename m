@@ -1,37 +1,30 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu, 21 Aug 2014 19:50:30 -0500
-Subject: [PATCH v3] spi: spi-imx: add DMA support
-In-Reply-To: <1408593190-1031-1-git-send-email-b38343@freescale.com>
-References: <1408593190-1031-1-git-send-email-b38343@freescale.com>
-Message-ID: <20140822005030.GR24407@sirena.org.uk>
+From: dianders@chromium.org (Doug Anderson)
+Date: Thu, 21 Aug 2014 17:54:55 -0700
+Subject: [PATCH] regulator: RK808: Fix uninitialized value
+Message-ID: <1408668895-1108-1-git-send-email-dianders@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 21, 2014 at 11:53:10AM +0800, Robin Gong wrote:
+The RK808 regulator driver was putting its config on the stack but not
+initting it.  That means that you got a semi-random config.  Fix this.
 
-> Change from v2:
-> http://thread.gmane.org/gmane.linux.ports.arm.kernel/291722/focus=294363
-> 1. dma setup only for imx51-ecspi
-> 2. use one small dummy buffer(1 bd size) to templiy store data
->    for meanless rx/tx, instead of malloc the actual transfer size.
+Signed-off-by: Doug Anderson <dianders@chromium.org>
+---
+ drivers/regulator/rk808-regulator.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-You can use the must_tx and must_rx flags to use the core implementation
-of this functionality.  This will mean you get any performance or other
-improvements we implement there.
-
-> +	int (*txrx_bufs)(struct spi_device *spi, struct spi_transfer *t);
-> +	struct dma_chan *dma_chan_rx;
-> +	struct dma_chan *dma_chan_tx;
-
-The SPI controller has variables for this already - you should use them
-(and the core support).  In general my main comment on this patch is
-that you should be using the core DMA support, it fixes some problems
-(like not having mapping for vmalloc() buffers) and factors out some
-code.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140821/087c20a9/attachment.sig>
+diff --git a/drivers/regulator/rk808-regulator.c b/drivers/regulator/rk808-regulator.c
+index 94753fd..4d5041c 100644
+--- a/drivers/regulator/rk808-regulator.c
++++ b/drivers/regulator/rk808-regulator.c
+@@ -334,7 +334,7 @@ static int rk808_regulator_probe(struct platform_device *pdev)
+ {
+ 	struct rk808 *rk808 = dev_get_drvdata(pdev->dev.parent);
+ 	struct rk808_board *pdata;
+-	struct regulator_config config;
++	struct regulator_config config = {};
+ 	struct regulator_dev *rk808_rdev;
+ 	struct regulator_init_data *reg_data;
+ 	int i = 0;
+-- 
+2.1.0.rc2.206.gedb03e5
