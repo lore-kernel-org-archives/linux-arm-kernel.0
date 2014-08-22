@@ -1,162 +1,181 @@
-From: d-gerlach@ti.com (Dave Gerlach)
-Date: Fri, 22 Aug 2014 02:46:02 -0500
-Subject: [PATCH v7 RESEND] ARM: omap: edma: add suspend suspend/resume hooks
-Message-ID: <1408693562-18068-1-git-send-email-d-gerlach@ti.com>
+From: jaswinder.singh@linaro.org (Jassi Brar)
+Date: Fri, 22 Aug 2014 13:16:33 +0530
+Subject: [PATCH 5/8] pinctrl: add driver for MB86S7x
+In-Reply-To: <CACRpkdb_NC7j=XkbMPv8YYLSeEd1AOpFqmD8x+ohC7ds3cPCfg@mail.gmail.com>
+References: <1405233067-4725-1-git-send-email-mollie.wu@linaro.org>
+ <CACRpkdb_NC7j=XkbMPv8YYLSeEd1AOpFqmD8x+ohC7ds3cPCfg@mail.gmail.com>
+Message-ID: <CAJe_Zhe2VuzHtkojm9nxvDTjT4AL7Znvma+5T7JTadvFJ1vAJQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Daniel Mack <zonque@gmail.com>
+On 22 July 2014 21:41, Linus Walleij <linus.walleij@linaro.org> wrote:
+> On Sun, Jul 13, 2014 at 8:31 AM, Mollie Wu <mollie.wu@linaro.org> wrote:
 
-This patch makes the edma driver resume correctly after suspend. Tested
-on an AM33xx platform with cyclic audio streams and omap_hsmmc.
+>
+>> +static int
+>> +mb86s70_pmx_enable(struct pinctrl_dev *pctl,
+>> +                  unsigned func_selector, unsigned group_selector)
+>> +{
+>> +       struct mb86s70_pmux_chip *pchip = pinctrl_dev_get_drvdata(pctl);
+>> +       unsigned long flags;
+>> +       const unsigned *pins;
+>> +       int i, j;
+>> +
+>> +       if (group_selector >= grp_count) {
+>> +               pr_err("%s:%d\n", __func__, __LINE__);
+>> +               return -EINVAL;
+>> +       }
+>> +
+>> +       j = mb86s7x_pgrps[group_selector].num_pins;
+>> +       pins = mb86s7x_pgrps[group_selector].pins;
+>> +
+>> +       spin_lock_irqsave(&pchip->lock, flags);
+>> +
+>> +       /* Busy if any pin in the same 'bunch' is taken */
+>> +       for (i = 0; i < j; i++) {
+>> +               u32 val;
+>> +               int p = pins[i] / 4 * 4;
+>> +
+>> +               if (pins[i] >= PINS_VIRT) /* Not for virtual pins */
+>> +                       continue;
+>> +
+>> +               val = readl(pchip->base + p);
+>> +               /* skip if no change needed */
+>> +               if (val == mb86s7x_pmx_funcs[func_selector].prog_val)
+>> +                       continue;
+>> +
+>> +               if (pchip->pin_busy[p]) {
+>> +                       pr_err("%s:%d:%d %d busy\n",
+>> +                              __func__, __LINE__, pins[i], p);
+>> +                       goto busy_exit;
+>> +               }
+>> +
+>> +               if (pchip->pin_busy[p + 1]) {
+>> +                       pr_err("%s:%d:%d %d busy\n",
+>> +                              __func__, __LINE__, pins[i], p+1);
+>> +                       goto busy_exit;
+>> +               }
+>
+> I don't see why you are doing this and keeping track of
+> pins as "busy" or not. One thing the pin control core does
+> is to make sure pins do not collide in different use cases,
+> it seems like you're re-implementing this check again.
+>
+>> +               if (p == 64)
+>> +                       continue;
+>
+> This if-clause seems dubious. At least add a comment as
+> to what is happening here and why.
+>
+>> +               if (pchip->pin_busy[p + 2]) {
+>> +                       pr_err("%s:%d:%d %d busy\n",
+>> +                              __func__, __LINE__, pins[i], p+2);
+>> +                       goto busy_exit;
+>> +               }
+>> +
+>> +               if (pchip->pin_busy[p + 3]) {
+>> +                       pr_err("%s:%d:%d %d busy\n",
+>> +                              __func__, __LINE__, pins[i], p+3);
+>> +                       goto busy_exit;
+>> +               }
+>
+> I don't understand this either.
+>
+> Why all this fuzz around the four pins from p ... p+3?
+>
+>> +               continue;
+>> +busy_exit:
+>> +               spin_unlock_irqrestore(&pchip->lock, flags);
+>> +               pr_err("%s:%d Take a look!\n", __func__, __LINE__);
+>> +               return -EBUSY;
+>> +       }
+>
+> You don't have to have the busy_exit: inside the for-loop right?
+>
+> Just push it below the return 0; in the end of this function
+> so you can get rid of the dangling continue;
+>
+>> +       pr_debug("Going to enable %s on pins -",
+>> +                mb86s7x_pmx_funcs[func_selector].name);
+>> +       for (i = 0; i < j; i++) {
+>> +               int p = pins[i];
+>> +
+>> +               pr_debug(" %d", p);
+>> +               pchip->pin_busy[p] = true;
+>
+> So I'm questioning this....
+>
+>> +               if (p < PINS_VIRT) /* Not for virtual pins */
+>
+> We need an explanation somewhere about what "virtual pins"
+> means in this driver, I have never seen that before.
+>
+>> +                       writel(mb86s7x_pmx_funcs[func_selector].prog_val,
+>> +                              pchip->base + p / 4 * 4);
+>
+> This may need some static inline like described above to simplify
+> the code and make it more readable, but I see what is going on.
+>
+>> +       }
+>> +
+>> +       spin_unlock_irqrestore(&pchip->lock, flags);
+>> +       pr_debug("\n");
+>> +
+>> +       return 0;
+>> +}
+>> +
+>> +static void
+>> +mb86s70_pmx_disable(struct pinctrl_dev *pctl,
+>> +                   unsigned func_selector, unsigned group_selector)
+>> +{
+>> +       struct mb86s70_pmux_chip *pchip = pinctrl_dev_get_drvdata(pctl);
+>> +       unsigned long flags;
+>> +       const unsigned *pins;
+>> +       int i, j;
+>> +
+>> +       if (group_selector >= grp_count) {
+>> +               pr_err("%s:%d\n", __func__, __LINE__);
+>> +               return;
+>> +       }
+>> +
+>> +       j = mb86s7x_pgrps[group_selector].num_pins;
+>> +       pins = mb86s7x_pgrps[group_selector].pins;
+>> +
+>> +       pr_debug("Going to disable %s on pins -",
+>> +                mb86s7x_pmx_funcs[func_selector].name);
+>> +       spin_lock_irqsave(&pchip->lock, flags);
+>> +       for (i = 0; i < j; i++) {
+>> +               pr_debug(" %d", pins[i]);
+>> +               pchip->pin_busy[pins[i]] = false;
+>> +       }
+>> +       spin_unlock_irqrestore(&pchip->lock, flags);
+>> +       pr_debug("\n");
+>> +}
+>
+> Remove this function. The .disable member is gone from
+> struct pinmux_ops, as it was ambiguous, see commit
+> 2243a87d90b42eb38bc281957df3e57c712b5e56
+> "pinctrl: avoid duplicated calling enable_pinmux_setting for a pin"
+>
+Hmm... I just got bitten by this while updating the patchset. Sorry I
+missed the patch review.
 
-All information can be reconstructed by already known runtime
-information.
+The reasons given in changelog are
+  (1) 'Fix' desc->mux_usecount
+  (2) The .disable callback is not useful for any of the existing platforms.
 
-As we now use some functions that were previously only used from __init
-context, annotations had to be dropped.
+Well, for (2) I think it is only reasonable for the provider to need
+to know when some resource is released by a user just as when it was
+requested.
+   Even if the core ensures only one user is provided access to a pin,
+the controller driver may still need to know when a pin is no more in
+use. For ex, within consecutive 4 pins my controller can not enable a
+pin for some function if any in the bunch is already
+enabled/configured. So I need to know if the pin has been
+disabled/released, so I can go ahead enabling the 'neighbor' pin for
+some other role.
 
-[nm at ti.com: added error handling for runtime + suspend_late/early_resume]
-Signed-off-by: Nishanth Menon <nm@ti.com>
-Signed-off-by: Daniel Mack <zonque@gmail.com>
-Tested-by: Joel Fernandes <joelf@ti.com>
-Acked-by: Joel Fernandes <joelf@ti.com>
-[d-gerlach at ti.com: updated to remove queue_tc_mapping use]
-Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
----
+For reason (1), there should be some way to fix within the core?
 
-Needed for am335x suspend, but never got picked up. Previously
-sent here: http://marc.info/?l=linux-arm-kernel&m=138556067416051&w=2
-
- arch/arm/common/edma.c | 86 ++++++++++++++++++++++++++++++++++++++++++++++++--
- 1 file changed, 84 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm/common/edma.c b/arch/arm/common/edma.c
-index 8809917..ece1e3d 100644
---- a/arch/arm/common/edma.c
-+++ b/arch/arm/common/edma.c
-@@ -244,6 +244,8 @@ struct edma {
- 	/* list of channels with no even trigger; terminated by "-1" */
- 	const s8	*noevent;
- 
-+	struct edma_soc_info *info;
-+
- 	/* The edma_inuse bit for each PaRAM slot is clear unless the
- 	 * channel is in use ... by ARM or DSP, for QDMA, or whatever.
- 	 */
-@@ -295,7 +297,7 @@ static void map_dmach_queue(unsigned ctlr, unsigned ch_no,
- 			~(0x7 << bit), queue_no << bit);
- }
- 
--static void __init assign_priority_to_queue(unsigned ctlr, int queue_no,
-+static void assign_priority_to_queue(unsigned ctlr, int queue_no,
- 		int priority)
- {
- 	int bit = queue_no * 4;
-@@ -314,7 +316,7 @@ static void __init assign_priority_to_queue(unsigned ctlr, int queue_no,
-  * included in that particular EDMA variant (Eg : dm646x)
-  *
-  */
--static void __init map_dmach_param(unsigned ctlr)
-+static void map_dmach_param(unsigned ctlr)
- {
- 	int i;
- 	for (i = 0; i < EDMA_MAX_DMACH; i++)
-@@ -1791,15 +1793,95 @@ static int edma_probe(struct platform_device *pdev)
- 			edma_write_array2(j, EDMA_DRAE, i, 1, 0x0);
- 			edma_write_array(j, EDMA_QRAE, i, 0x0);
- 		}
-+		edma_cc[j]->info = info[j];
- 		arch_num_cc++;
- 	}
- 
- 	return 0;
- }
- 
-+static int edma_pm_suspend(struct device *dev)
-+{
-+	int j, r;
-+
-+	r = pm_runtime_get_sync(dev);
-+	if (r < 0) {
-+		dev_err(dev, "%s: get_sync returned %d\n", __func__, r);
-+		return r;
-+	}
-+
-+	for (j = 0; j < arch_num_cc; j++) {
-+		struct edma *ecc = edma_cc[j];
-+
-+		disable_irq(ecc->irq_res_start);
-+		disable_irq(ecc->irq_res_end);
-+	}
-+
-+	pm_runtime_put_sync(dev);
-+
-+	return 0;
-+}
-+
-+static int edma_pm_resume(struct device *dev)
-+{
-+	int i, j, r;
-+
-+	r = pm_runtime_get_sync(dev);
-+	if (r < 0) {
-+		dev_err(dev, "%s: get_sync returned %d\n", __func__, r);
-+		return r;
-+	}
-+
-+	for (j = 0; j < arch_num_cc; j++) {
-+		struct edma *cc = edma_cc[j];
-+
-+		s8 (*queue_priority_mapping)[2];
-+
-+		queue_priority_mapping = cc->info->queue_priority_mapping;
-+
-+		/* Event queue priority mapping */
-+		for (i = 0; queue_priority_mapping[i][0] != -1; i++)
-+			assign_priority_to_queue(j,
-+						 queue_priority_mapping[i][0],
-+						 queue_priority_mapping[i][1]);
-+
-+		/*
-+		 * Map the channel to param entry if channel mapping logic
-+		 * exist
-+		 */
-+		if (edma_read(j, EDMA_CCCFG) & CHMAP_EXIST)
-+			map_dmach_param(j);
-+
-+		for (i = 0; i < cc->num_channels; i++) {
-+			if (test_bit(i, cc->edma_inuse)) {
-+				/* ensure access through shadow region 0 */
-+				edma_or_array2(j, EDMA_DRAE, 0, i >> 5,
-+					       BIT(i & 0x1f));
-+
-+				setup_dma_interrupt(i,
-+						    cc->intr_data[i].callback,
-+						    cc->intr_data[i].data);
-+			}
-+		}
-+
-+		enable_irq(cc->irq_res_start);
-+		enable_irq(cc->irq_res_end);
-+	}
-+
-+	pm_runtime_put_sync(dev);
-+
-+	return 0;
-+}
-+
-+static const struct dev_pm_ops edma_pm_ops = {
-+	.suspend_late	= edma_pm_suspend,
-+	.resume_early	= edma_pm_resume,
-+};
-+
- static struct platform_driver edma_driver = {
- 	.driver = {
- 		.name	= "edma",
-+		.pm	= &edma_pm_ops,
- 		.of_match_table = edma_of_ids,
- 	},
- 	.probe = edma_probe,
--- 
-1.9.0
+Regards,
+Jassi
