@@ -1,24 +1,74 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Fri, 22 Aug 2014 15:47:12 +0800
-Subject: [PATCH RESEND v2 7/7] ARM: dts: vf610-twr: Add USB support
-In-Reply-To: <53F26105.9000907@cogentembedded.com>
-References: <cover.1408391385.git.stefan@agner.ch>
- <07491836b9c23a82b7a33972a5c71f2676ceaf71.1408391385.git.stefan@agner.ch>
- <53F26105.9000907@cogentembedded.com>
-Message-ID: <20140822074711.GC2540@dragon>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Fri, 22 Aug 2014 08:50:41 +0100
+Subject: [PATCH v5 2/3] mfd: qcom-rpm: Driver for the Qualcomm RPM
+In-Reply-To: <20140822012748.GB12494@sonymobile.com>
+References: <1407796988-25872-1-git-send-email-bjorn.andersson@sonymobile.com>
+ <1407796988-25872-3-git-send-email-bjorn.andersson@sonymobile.com>
+ <20140821132204.GH4266@lee--X1>
+ <20140822012748.GB12494@sonymobile.com>
+Message-ID: <20140822075041.GT4266@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 19, 2014 at 12:24:37AM +0400, Sergei Shtylyov wrote:
-> Hello.
+On Thu, 21 Aug 2014, Bjorn Andersson wrote:
+> On Thu 21 Aug 06:22 PDT 2014, Lee Jones wrote:
+> > > +struct qcom_rpm *dev_get_qcom_rpm(struct device *dev)
+> > > +{
+> > > +	return dev_get_drvdata(dev);
+> > > +}
+> > > +EXPORT_SYMBOL(dev_get_qcom_rpm);
+> > 
+> > No need for this at all.  Use dev_get_drvdata() direct instead.
+> > 
 > 
-> On 08/19/2014 12:07 AM, Stefan Agner wrote:
+> I see that others have put this as static inline in the header file, so I will
+> follow that. I don't want to expose this directly in the implementation of the
+> clients.
 > 
-> >Add USB support for Freescale Vybrid tower. The USB hosts over-current
-> >protection signal is not connected is not connected to the PHY's over-
-> 
->    Yes, we all understood that it's not connected, no need to repeat. ;-)
+> Let me know if you object.
 
-I will fix it up when applying.
+I do (unless you convince me otherwise).  Why is this a good idea and
+why 'exposing' this directly is a bad one?  At the moment this looks
+to me like abstraction for the sake of abstraction.
 
-Shawn
+> > > +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> > > +	rpm->status_regs = devm_ioremap_resource(&pdev->dev, res);
+> > > +	rpm->ctrl_regs = rpm->status_regs + 0x400;
+> > > +	rpm->req_regs = rpm->status_regs + 0x600;
+> > > +	if (IS_ERR(rpm->status_regs))
+> > > +		return PTR_ERR(rpm->status_regs);
+> > 
+> > You should probably do this _before_ using it above.
+> 
+> There's no difference in behaviour, but it just feels cleaner than:
+> 
+> res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> rpm->status_regs = devm_ioremap_resource(&pdev->dev, res);
+> if (IS_ERR(rpm->status_regs))
+> 	return PTR_ERR(rpm->status_regs);
+> rpm->ctrl_regs = rpm->status_regs + 0x400;
+> rpm->req_regs = rpm->status_regs + 0x600;
+> 
+> If you don't like it, I'll change it.
+
+There is a difference.  In the current implementation you're doing math
+with a possible error code and assigning rubbish to rpm->ctrl_regs and
+rpm->req_regs.
+
+[...]
+
+> > > +MODULE_DESCRIPTION("Qualcomm Resource Power Manager driver");
+> > > +MODULE_LICENSE("GPL v2");
+> > 
+> > No one authored this driver?
+> > 
+> 
+> Thought that was optional, will update.
+
+It's also helpful.  Can you place an Author: line in the header(s) too.
+
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
