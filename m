@@ -1,222 +1,112 @@
 From: liviu@dudau.co.uk (Liviu Dudau)
-Date: Fri, 22 Aug 2014 13:32:53 +0100
-Subject: [PATCH] drivers: pci: convert generic host controller to DT host
- bridge creation API
-In-Reply-To: <CAErSpo7-NhCr=DLTua53yZH3EsKk_YjDOFsVLChnndJmxhiB2w@mail.gmail.com>
-References: <1407861695-25549-1-git-send-email-Liviu.Dudau@arm.com>
- <201408201327.57376.arnd@arndb.de>
- <20140820123112.GG13147@bart.dudau.co.uk>
- <CAErSpo6Z4b3w7j=X9C1YGOV59JHZwZUt7pnVp+Z0erY2RLCNAQ@mail.gmail.com>
- <20140821180216.GA15311@google.com>
- <20140821230133.GI13147@bart.dudau.co.uk>
- <CAErSpo7-NhCr=DLTua53yZH3EsKk_YjDOFsVLChnndJmxhiB2w@mail.gmail.com>
-Message-ID: <20140822123252.GK13147@bart.dudau.co.uk>
+Date: Fri, 22 Aug 2014 13:43:26 +0100
+Subject: [PATCH v9 12/12] PCI: Introduce pci_remap_iospace() for
+ remapping PCI I/O bus resources into CPU space
+In-Reply-To: <CAL_JsqK6XiuS7OJ_2F16ySA8oj9AHqP0fAft21AOtJxXP2SqnQ@mail.gmail.com>
+References: <1407860725-25202-1-git-send-email-Liviu.Dudau@arm.com>
+ <1407860725-25202-13-git-send-email-Liviu.Dudau@arm.com>
+ <CAL_JsqK6XiuS7OJ_2F16ySA8oj9AHqP0fAft21AOtJxXP2SqnQ@mail.gmail.com>
+Message-ID: <20140822124326.GL13147@bart.dudau.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 22, 2014 at 12:13:33AM -0500, Bjorn Helgaas wrote:
-> On Thu, Aug 21, 2014 at 6:01 PM, Liviu Dudau <liviu@dudau.co.uk> wrote:
-> > On Thu, Aug 21, 2014 at 12:02:16PM -0600, Bjorn Helgaas wrote:
-> >> [+cc Lorenzo]
-> >>
-> >> On Wed, Aug 20, 2014 at 05:35:59PM -0500, Bjorn Helgaas wrote:
-> >> > On Wed, Aug 20, 2014 at 7:31 AM, Liviu Dudau <liviu@dudau.co.uk> wrote:
-> >> > > On Wed, Aug 20, 2014 at 01:27:57PM +0200, Arnd Bergmann wrote:
-> >> > >> On Tuesday 12 August 2014, Liviu Dudau wrote:
-> >> > >> > +       return of_create_pci_host_bridge(dev, 0, 0xff, &gen_pci_ops,
-> >> > >> > +                                       gen_pci_setup, pci);
-> >> > >>
-> >> > >> I had not noticed it earlier, but the setup callback is actually a feature
-> >> > >> of the arm32 PCI code that I had hoped to avoid when moving to the
-> >> > >> generic API. Can we do this as a more regular sequence of
-> >> > >>
-> >> > >>
-> >> > >>       ret = of_create_pci_host_bridge(dev, 0, 0xff, &gen_pci_ops, pci);
-> >> > >>       if (ret)
-> >> > >>               return ret;
-> >> > >>
-> >> > >>       ret = gen_pci_setup(pci);
-> >> > >>       if (ret)
-> >> > >>               pci_destroy_host_bridge(dev, pci);
-> >> > >>       return ret;
-> >> > >>
-> >> > >> ?
-> >> > >>
-> >> > >>       Arnd
-> >> > >
-> >> > > Hi Arnd,
-> >> > >
-> >> > > That has been the general approach of my patchset up to v9. But, as Bjorn has
-> >> > > mentioned in his v8 review and I have put in my cover letter, the regular
-> >> > > aproach means that architectures that use pci_scan_root_bus() will have to
-> >> > > drop their one liner and replace it with the more verbose of_create_pci_host_bridge()
-> >> > > followed by pci_scan_child_bus() and pci_bus_add_devices() (basically, the content
-> >> > > of pci_scan_root_bus()). For those architectures it will lead to a net increase of
-> >> > > lines of code.
-> >> > >
-> >> > > The patch for pci-host-generic.c is the first to use the callback setup function, but
-> >> > > not the only one. My PCI host bridge driver for Juno has the same need, and I'm betting
-> >> > > all other host bridge controllers will use it as it will be the only opportunity to
-> >> > > finish the controller setup before we start scanning the child busses. I'm trying to
-> >> > > balance ease of read vs ease of use here and it is the best version I've come up with
-> >> > > so far.
-> >> >
-> >> > My guess is that you're referring to
-> >> > http://lkml.kernel.org/r/20140708011136.GE22939 at google.com
-> >> >
-> >> > I'm trying to get to the point where arch code can discover the host
-> >> > bridge, configure it, learn its properties (apertures, etc.), then
-> >> > pass it off completely to the PCI core for PCI device enumeration.
-> >> > pci_scan_root_bus() is the closest thing we have to that right now, so
-> >> > that's why I point to that.  Here's the current pci_scan_root_bus():
-> >> >
-> >> >   pci_scan_root_bus()
-> >> >   {
-> >> >     pci_create_root_bus();
-> >> >     /* 1 */
-> >> >     pci_scan_child_bus()
-> >> >     /* 2 */
-> >> >     pci_bus_add_devices()
-> >> >   }
-> >> >
-> >> > This is obviously incomplete as it is -- for example, it does nothing
-> >> > about assigning resources to PCI devices, so it only works if we rely
-> >> > completely on the firmware to do that.  Some arches (x86, ia64, etc.)
-> >> > don't want to rely on firmware, so they basically open-code
-> >> > pci_scan_root_bus() and insert resource assignment at (2) above.  That
-> >> > resource assignment really *should* be done in pci_scan_root_bus()
-> >> > itself, but it's quite a bit of work to make that happen.
-> >> >
-> >> > In your case, of_create_pci_host_bridge() open-codes
-> >> > pci_scan_root_bus() and calls the "setup" callback at (1) in the
-> >> > outline above.  I don't have any problem with that, and I don't care
-> >> > whether you do it by passing in a callback function pointer or via
-> >> > some other means.
-> >> >
-> >> > However, I would ask whether this is really a requirement.  Most
-> >> > (maybe all) other arches require nothing special at (1), i.e., between
-> >> > pci_create_root_bus() and pci_scan_child_bus().  If you can do it
-> >> > *before* pci_create_root_bus(), I think that would be nicer, but maybe
-> >> > you can't.
-> >>
-> >> I talked to Lorenzo here at LinuxCon and he explained this so it makes a
-> >> lot more sense to me now.  Would something like the following work?
-> >>
-> >>   gen_pci_probe()
-> >>   {
-> >>     LIST_HEAD(res);
-> >>     resource_size_t io_base = 0;
-> >>
-> >>     of_parse_pci_host_bridge_resources(dev, &res, 0, 0xff, &io_base);
-> >>     gen_pci_setup(&res, io_base);
-> >>
-> >>     pci_create_root_bus(..., &res);
-> >>     pci_scan_child_bus();
-> >>     ... pci_assign_unassigned_bus_resources
-> >>     pci_bus_add_resources();
-> >>   }
-> >>
-> >> Then we at least have all the PCI-related code consolidated, without
-> >> the arch-specific stuff mixed in.  We could almost use pci_scan_root_bus(),
-> >> but not quite, because of the pci_assign_unassigned_bus_resources() call
-> >> that pci_scan_root_bus() doesn't do.
+On Thu, Aug 21, 2014 at 11:16:16PM -0500, Rob Herring wrote:
+> On Tue, Aug 12, 2014 at 11:25 AM, Liviu Dudau <Liviu.Dudau@arm.com> wrote:
+> > Introduce a default implementation for remapping PCI bus I/O resources
+> > onto the CPU address space. Architectures with special needs may
+> > provide their own version, but most should be able to use this one.
 > >
-> > Hmm, after having a little bit more time to get my brain back into the problem
-> > I'm now not sure this will be good enough.
-> >
-> > Let me explain what I was trying to solve with the callback that Arnd doesn't
-> > like and maybe you (both) can validate if my concerns are real or not:
-> >
-> > I was trying to come up with a function that can easily replace pci_scan_child_bus().
-> > The problem I'm facing is that the ranges that we parse from the device tree
-> > need to be converted to resources and passed on to the pci_host_bridge structure
-> > to be stored as windows. In order for the host bridge driver to be initialised, it
-> > also needs to parse the device tree information *and* use the information calculated
-> > for the io_base in order to program the address translation correctly. The only way
-> > I found to avoid duplicating the parsing step and sequence the initialisation correctly
-> > was to introduce the callback.
+> > Cc: Bjorn Helgaas <bhelgaas@google.com>
+> > Cc: Arnd Bergmann <arnd@arndb.de>
+> > Cc: Rob Herring <robh+dt@kernel.org>
+> > Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
 > 
-> The current v9 patch has this:
-> 
->   int of_create_pci_host_bridge(...)
->   {
->     of_pci_parse_bus_range();
->     pci_host_bridge_of_get_ranges();
->     pci_create_root_bus();
->     setup();
->     pci_scan_child_bus();
->     pci_assign_unassigned_bus_resources();
->     pci_bus_add_devices();
->   }
-> 
-> I don't think there's anything that requires setup() to be done after
-> pci_create_root_bus().  You do pass the "struct pci_host_bridge *" to
-> setup(), but I think that's only a convenient way to pass in the
-> resource information that's also passed to pci_create_root_bus().
-> setup() doesn't actually require the pci_bus or pci_host_bridge
-> structures themselves.  So I think setup() *could* be done before
-> pci_create_root_bus().  I think that would be better because then all
-> the PCI core stuff is together and can be more easily factored out.
-> 
+> Reviewed-by: Rob Herring <robh@kernel.org>
 
-OK. In my mind the setup part was not worth doing if we failed to create the root
-bus, hence the order I've put them in. Also, up to v8 and in line with the
-side discussions we had over the last year, the domain information and future
-data was/could be stored in the pci_host_bridge structure, which again introduces
-order. But I agree that in the current shape the setup can be done before
-pci_create_root_bus().
+Thanks, Rob, much appreciated!
 
-> If setup() is before pci_create_root_bus(), my objective is met, and I
-> don't care how you structure the rest.  Arnd prefers to avoid the
-> callback, and I do agree that we should avoid callbacks when possible.
 > 
+> However, I would like to see ARM pci_ioremap_io converted over to this function.
 
-I am slightly cagey that I have started with a grand plan of trying to create
-a generic framework that can be future proof and now I'm trying to make the code
-fit the existing API without too much insight on how it can be used in the future.
-If you think this will be alright in your future plans of making pci_host_bridge
-structure more central to the PCI framework, then I'm happy with it.
+Do you care if this is done as a separate patch?
 
 Best regards,
 Liviu
 
-> > If I follow your suggestion with gen_pci_probe() the question I have is about
-> > gen_pci_setup(). Is that something that is implemented at architectural level?
-> > If so, then we are droping into the arm implementation where each host bridge
-> > driver has to register another hook to be called from arch code. If not, then
-> > we risk having a platform with two host bridges, each implementing
-> > gen_pci_setup().
 > 
-> The gen_pci_setup() in Lorenzo's patch [1] is already in
-> pci-host-generic.c and doesn't look arch-specific to me.
+> Rob
 > 
-> [1] http://lkml.kernel.org/r/1407861695-25549-1-git-send-email-Liviu.Dudau at arm.com
-> 
-> > Arnd, one thing I'm trying to figure out is if you are not actually seeing the
-> > callback I've introduced as a repeat of the arm implementation. That is not
-> > my intent and it is designed to be used only by the host bridge drivers in order
-> > to finish their initialisation once all the generic and architectural code has
-> > run, but before any actual scanning of the root bus happens.
+> > ---
+> >  drivers/pci/pci.c   | 33 +++++++++++++++++++++++++++++++++
+> >  include/linux/pci.h |  3 +++
+> >  2 files changed, 36 insertions(+)
 > >
-> > Best regards,
-> > Liviu
+> > diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
+> > index 29d1775..76d21b6 100644
+> > --- a/drivers/pci/pci.c
+> > +++ b/drivers/pci/pci.c
+> > @@ -2707,6 +2707,39 @@ int pci_request_regions_exclusive(struct pci_dev *pdev, const char *res_name)
+> >  }
+> >  EXPORT_SYMBOL(pci_request_regions_exclusive);
 > >
-> >>
-> >> Bjorn
-> >>
+> > +/**
+> > + *     pci_remap_iospace - Remap the memory mapped I/O space
+> > + *     @res: Resource describing the I/O space
+> > + *     @phys_addr: physical address where the range will be mapped.
+> > + *
+> > + *     Remap the memory mapped I/O space described by the @res
+> > + *     into the CPU physical address space. Only architectures
+> > + *     that have memory mapped IO defined (and hence PCI_IOBASE)
+> > + *     should call this function.
+> > + */
+> > +int __weak pci_remap_iospace(const struct resource *res, phys_addr_t phys_addr)
+> > +{
+> > +       int err = -ENODEV;
+> > +
+> > +#ifdef PCI_IOBASE
+> > +       if (!(res->flags & IORESOURCE_IO))
+> > +               return -EINVAL;
+> > +
+> > +       if (res->end > IO_SPACE_LIMIT)
+> > +               return -EINVAL;
+> > +
+> > +       err = ioremap_page_range(res->start + (unsigned long)PCI_IOBASE,
+> > +                               res->end + 1 + (unsigned long)PCI_IOBASE,
+> > +                               phys_addr, pgprot_device(PAGE_KERNEL));
+> > +#else
+> > +       /* this architecture does not have memory mapped I/O space,
+> > +          so this function should never be called */
+> > +       WARN_ON(1);
+> > +#endif
+> > +
+> > +       return err;
+> > +}
+> > +
+> >  static void __pci_set_master(struct pci_dev *dev, bool enable)
+> >  {
+> >         u16 old_cmd, cmd;
+> > diff --git a/include/linux/pci.h b/include/linux/pci.h
+> > index e1e0d80..988c2f5 100644
+> > --- a/include/linux/pci.h
+> > +++ b/include/linux/pci.h
+> > @@ -1098,6 +1098,9 @@ int __must_check pci_bus_alloc_resource(struct pci_bus *bus,
+> >                                                   resource_size_t),
+> >                         void *alignf_data);
 > >
+> > +
+> > +int pci_remap_iospace(const struct resource *res, phys_addr_t phys_addr);
+> > +
+> >  static inline dma_addr_t pci_bus_address(struct pci_dev *pdev, int bar)
+> >  {
+> >         struct pci_bus_region region;
 > > --
-> > -------------------
-> >    .oooO
-> >    (   )
-> >     \ (  Oooo.
-> >      \_) (   )
-> >           ) /
-> >          (_/
+> > 2.0.4
 > >
-> >  One small step
-> >    for me ...
 > >
+> > _______________________________________________
+> > linux-arm-kernel mailing list
+> > linux-arm-kernel at lists.infradead.org
+> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 > --
 > To unsubscribe from this list: send the line "unsubscribe linux-pci" in
 > the body of a message to majordomo at vger.kernel.org
