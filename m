@@ -1,47 +1,82 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Fri, 22 Aug 2014 13:04:48 -0700
-Subject: [PATCH v4] i2c: rk3x: fix bug that cause transfer fails in master
- receive mode
-In-Reply-To: <53F79046.5020803@rock-chips.com>
-References: <1408669991-9703-1-git-send-email-addy.ke@rock-chips.com>
- <1408730452-3552-1-git-send-email-addy.ke@rock-chips.com>
- <CAD=FV=Vof8mOmCHkRyrhjGBewJqJaCu==1RfUZ+8C9Jm+UH50w@mail.gmail.com>
- <53F79046.5020803@rock-chips.com>
-Message-ID: <CAD=FV=U9Rsjfnn-2ZxraDEJpOTcXVzJUN7e-67qiaFZFCmG-Sw@mail.gmail.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Fri, 22 Aug 2014 22:11:12 +0200
+Subject: [PATCH v7 3/8] cpufreq: kirkwood: Remove use of the clk provider
+ API
+In-Reply-To: <20140822192933.5251.53733@quantum>
+References: <1408375833-10703-1-git-send-email-tomeu.vizoso@collabora.com>
+ <1408375833-10703-4-git-send-email-tomeu.vizoso@collabora.com>
+ <20140820225513.5251.284@quantum> <53F5A587.9030200@collabora.com>
+ <20140821133825.GH8608@lunn.ch> <20140822192933.5251.53733@quantum>
+Message-ID: <20140822201112.GH17277@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Addy,
+> Thanks for reviewing. I think my patch is equivalent to the old way of
+> doing things, with one exception that I will address later below.
+> 
+> struct cpufreq_frequency_table kirkwood_freq_table has clock rates
+> initialized to zero, so there is no regression compared to my unsigned
+> long cpu_frequency variable used for tracking the clock rate. Both
+> implementations start with unknown rates in hardware and initialize a
+> variable to zero until that rate can be discovered later on in
+> kirkwood_cpufreq_probe().
+> 
+> kirkwood_cpufreq_get_cpu_frequency() returns the frequency based on the
+> state of the clock. As best I can tell, this clock is only touched by
+> this cpufreq driver and nowhere else
 
-On Fri, Aug 22, 2014 at 11:47 AM, addy ke <addy.ke@rock-chips.com> wrote:
->> Addy,
->>
->> On Fri, Aug 22, 2014 at 11:00 AM, Addy Ke <addy.ke@rock-chips.com> wrote:
->>> In rk3x SOC, the I2C controller can receive/transmit up to 32 bytes data
->>> in one chunk, so the size of data to be write/read to/from TXDATAx/RXDATAx
->>> must be less than or equal 32 bytes at a time.
->>>
->>> Tested on rk3288-pinky board, elan receive 158 bytes data.
->>>
->>> Suggested-by: Dmitry Torokhov <dmitry.torokhov@gmail.com>
->>
->> You only need a "Suggested-by" if the entire patch was suggested by
->> someone.  If someone provides you review feedback you don't need it.
->>
->> Said another way: in this case Dmitry didn't suggest that you need to
->> fix the i2c controller to transmit 32 byte chunks (he only provided
->> review feedback), so you shouldn't say this was Suggested-by him.
->>
->> You also had my reviewed-by on a previous version so you could keep it.
->>
->> Reviewed-by: Doug Anderson <dianders@chromium.org>
->
-> so, Do I need repost this patch or post a new one as patch v5?
+Not quite true. u-boot might of touch the clock. Weird things happen
+with some kirkwood boards. Some don't have the ability to control
+there power supplies. So some boards implement "power off" by
+rebooting, and letting u-boot spin until a button is pressed. I hope
+such a u-boot powers off as much as possible, and e.g. drops the CPU
+clock to the lower frequency. One would also hope it puts it back to
+high speed before calling the kernel.
 
-Tags are typically something that the maintainer (Wolfram) can adjust
-when he adds his own.  I think it's OK and he can remove the
-"Suggested-by".  However, if Wolfram responds and asks you to respin
-then you should follow his advice.
+There is also the somewhat unlikely case that somebody uses kexec to
+go from one kernel to another. You have no idea what state the
+previous kernel left the clock in.
 
+> , so the driver knows the state of
+> the clock implicitly and doesn't need to read any hardware registers to
+> see if it is enabled or not. Every time we enable or disable the clock
+> we can know the cpu frequency.
+> 
+> > 
+> > However, if you don't cause an actual state change, the WFI never
+> > returns. If this assumption is wrong, your box is dead the first time
+> > it tries to change cpu frequency.
+> 
+> So if a state change in hardware never occurs, the cpu will not wake up?
 
--Doug
+Correct. I had that situation a few times while developing this
+driver. And it is not obvious what has happened, since it does not
+happen immediately, but when the governor decides the CPU load passes
+a threshold and the frequency can be changed. I had it stop dead while
+i assume it executed some sleep in an /etc/init.d script.
+
+> That sounds like a bad situation but I do not understand how it relates
+> to the changes I made in the driver. Could you explain how tracking
+> cpu_frequency in the driver would result in the cpu not waking up from
+> wfi?
+
+It was clearer in earlier versions of the driver, but code has been
+refactored into the cpufreq core. The core should call
+kirkwood_cpufreq_get_cpu_frequency() in order to get the current
+frequency, and only perform a change if the requested frequency is
+different. In the current code, kirkwood_cpufreq_get_cpu_frequency()
+reads from the hardware what the current frequency is. So we are
+guaranteed to only call kirkwood_cpufreq_target() when there is a real
+change.
+
+[snip]
+
+> Can the driver's
+> view of the clock status be out of sync with the actual hardware?
+
+Yes, at startup, as explained above, we have no idea what the current
+state of the hardware is. Once we do know the real state, we can track
+it within the driver, but we need to get that initial state correct,
+or we WFI forever on the first frequency change.
+
+   Andrew
