@@ -1,34 +1,43 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Fri, 22 Aug 2014 19:39:52 +0900
-Subject: [PATCH 1/2] ARM: dts: Enable PMIC interrupts on ODROID
-In-Reply-To: <20140819201859.GA7929@localhost>
-References: <1405500606-5752-1-git-send-email-drake@endlessm.com>
- <CAAObsKAokjDmpVy5cm_iFD52bCq+3jYeGDWzACsmh-JKktyjDw@mail.gmail.com>
- <53F22D1B.4010900@samsung.com> <3413299.OcpyWkc82q@amdc1032>
- <CABxcv=mkqmg_b+vwbVPAW7AaB86Fxx+LTuMSyC7L_mUy6u2+TQ@mail.gmail.com>
- <20140819201859.GA7929@localhost>
-Message-ID: <07e201cfbdf5$69d92770$3d8b7650$@samsung.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 22 Aug 2014 11:41:41 +0100
+Subject: [PATCH V2] ARM/ARM64: KVM: Nuke Hyp-mode tlbs before enabling MMU
+In-Reply-To: <20140822102315.GQ21734@leverpostej>
+References: <1406789604-10533-1-git-send-email-pranavkumar@linaro.org>
+ <20140822102315.GQ21734@leverpostej>
+Message-ID: <53F71E65.6020400@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Olof Johansson wrote:
+On 22/08/14 11:23, Mark Rutland wrote:
+> Hi Pranav,
 > 
-> On Tue, Aug 19, 2014 at 12:15:41PM +0200, Javier Martinez Canillas wrote:
-> > Hello,
-> >
-> > On Tue, Aug 19, 2014 at 11:57 AM, Bartlomiej Zolnierkiewicz
-> > <b.zolnierkie@samsung.com> wrote:
-> > >
-> > > IMHO they should go to upstream ASAP as they fix the boot for
-> > > ODROID boards and they cannot break anything as they are limited
-> > > to ODROID dts files.
-> > >
-> >
-> > Agreed, this is definitely -rc material IMHO.
+> On Thu, Jul 31, 2014 at 07:53:23AM +0100, Pranavkumar Sawargaonkar wrote:
+>> X-Gene u-boot runs in EL2 mode with MMU enabled hence we might
+>> have stale EL2 tlb enteris when we enable EL2 MMU on each host CPU.
 > 
-> Yes. Definitely.
+> Nit: entries
 > 
-OK, agreed. Will apply into fixes.
+>> This can happen on any ARM/ARM64 board running bootloader in
+>> Hyp-mode (or EL2-mode) with MMU enabled.
+>>
+>> This patch ensures that we flush all Hyp-mode (or EL2-mode) TLBs
+>> on each host CPU before enabling Hyp-mode (or EL2-mode) MMU.
+> 
+> I hit a similar issue intermittently on a Juno board when I boot Linux
+> as an EFI application, where CPU0 would get stuck in a recursive
+> exception at EL2 while initialising hyp. We don't nuke the TLBs in
+> efi_stub_entry nor do we do so in el2_setup, so there's the possibility
+> of stale EL2 TLB entries lying around from UEFI.
+> 
+> With this patch applied I'm unable to reproduce the issue (with ~30
+> boots so far). So:
+> 
+> Tested-by: Mark Rutland <mark.rutland@arm.com>
+> 
+> It would be nice to see this hit mainline soon.
 
-Thanks,
-Kukjin
+Thanks for testing. I guess this is a candidate for stable as well.
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
