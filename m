@@ -1,18 +1,17 @@
 From: dianders@chromium.org (Doug Anderson)
-Date: Thu, 21 Aug 2014 18:14:29 -0700
-Subject: [PATCH v2] i2c: rk3x: fix bug that cause transfer fails in maste
+Date: Thu, 21 Aug 2014 18:15:13 -0700
+Subject: [PATCH v3] i2c: rk3x: fix bug that cause transfer fails in master
  receive mode
-In-Reply-To: <1408657107-8715-1-git-send-email-addy.ke@rock-chips.com>
+In-Reply-To: <1408669991-9703-1-git-send-email-addy.ke@rock-chips.com>
 References: <1408657107-8715-1-git-send-email-addy.ke@rock-chips.com>
-Message-ID: <CAD=FV=V9uKSSbKFSeiVXAxgaTTc5JMLyr7qPkisRQi9AN6t2-A@mail.gmail.com>
+ <1408669991-9703-1-git-send-email-addy.ke@rock-chips.com>
+Message-ID: <CAD=FV=XY73RU1B4i1NEBffiRTbwMO_0Z9+Lh96-sckQmkH8Ogg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Addy,
 
-Title should probably have "master", not "maste"
-
-On Thu, Aug 21, 2014 at 2:38 PM, Addy Ke <addy.ke@rock-chips.com> wrote:
+On Thu, Aug 21, 2014 at 6:13 PM, Addy Ke <addy.ke@rock-chips.com> wrote:
 > In rk3x SOC, the I2C controller can receive/transmit up to 32 bytes data
 > in one chunk, so the size of data to be write/read to/from TXDATAx/RXDATAx
 > must be less than or equal 32 bytes at a time.
@@ -26,21 +25,12 @@ On Thu, Aug 21, 2014 at 2:38 PM, Addy Ke <addy.ke@rock-chips.com> wrote:
 > - Use cleaner syntax as suggested by Sergei.
 > - Update commit message as suggested by Wolfram.
 >
+> Changes in v3:
+> - fix typo: maste --> master and double spaces after 'len'
+>
 >  drivers/i2c/busses/i2c-rk3x.c | 4 ++++
 >  1 file changed, 4 insertions(+)
->
-> diff --git a/drivers/i2c/busses/i2c-rk3x.c b/drivers/i2c/busses/i2c-rk3x.c
-> index 69e1185..806724a 100644
-> --- a/drivers/i2c/busses/i2c-rk3x.c
-> +++ b/drivers/i2c/busses/i2c-rk3x.c
-> @@ -323,6 +323,10 @@ static void rk3x_i2c_handle_read(struct rk3x_i2c *i2c, unsigned int ipd)
->         /* ack interrupt */
->         i2c_writel(i2c, REG_INT_MBRF, REG_IPD);
->
-> +       /* Can only handle a maximum of 32 bytes at a time */
-> +       if (unlikely(len > 32))
-> +               len  = 32;
 
-nit: one space before "=", not two.
+Oops, we collided in the ether.  This looks good to me.
 
 Tested-by: Doug Anderson <dianders@chromium.org>
