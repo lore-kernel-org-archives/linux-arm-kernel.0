@@ -1,38 +1,35 @@
 From: nm@ti.com (Nishanth Menon)
-Date: Fri, 22 Aug 2014 09:00:59 -0500
-Subject: [PATCH 0/3] pinctrl: Add DRA7/AM437x pinctrl compatibility
-Message-ID: <1408716062-26055-1-git-send-email-nm@ti.com>
+Date: Fri, 22 Aug 2014 09:01:00 -0500
+Subject: [PATCH 1/3] pinctrl: bindings: Add OMAP pinctrl binding
+In-Reply-To: <1408716062-26055-1-git-send-email-nm@ti.com>
+References: <1408716062-26055-1-git-send-email-nm@ti.com>
+Message-ID: <1408716062-26055-2-git-send-email-nm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following series are various fixes and improvements for pinctrl
-for AM437x and DRA7. It also tries to add documentation for existing
-pinctrl bindings for Texas Instruments' OMAP SoCs.
+Add basic skeleton of OMAP pinctrl bindings. This is compatible with
+pinctrl,single bindings and is meant purely as a reference point.
 
-Functionality depends on the dts update (in series 6), PRM fixes and
-the pdata quirk changes
-
-This is part 4/6 series which eventually enables framework for
-suspend-to-ram and cpuidle for OMAP5 and DRA7
-
-Each of series is based on v3.17-rc1 and this specific series is available:
-weblink: https://github.com/nmenon/linux-2.6-playground/commits/push/v3.17/pinctrl-compat
-
-git repo: https://github.com/nmenon/linux-2.6-playground.git push/v3.17/pinctrl-compat
-
-An complete integrated branch is available here: https://github.com/nmenon/linux-2.6-playground/commits/testing/v3.17/cpu-idle-suspend-dra7-omap5-framework
-
-Keerthy (1):
-  pinctrl: single: AM437x: Add pinctrl compatibility
-
-Nishanth Menon (2):
-  pinctrl: bindings: Add OMAP pinctrl binding
-  pinctrl: single: Add DRA7 pinctrl compatibility
-
- .../bindings/pinctrl/ti,omap-pinctrl.txt           |   11 +++++++++++
- drivers/pinctrl/pinctrl-single.c                   |   14 ++++++++++++++
- 2 files changed, 25 insertions(+)
+Signed-off-by: Nishanth Menon <nm@ti.com>
+---
+ .../bindings/pinctrl/ti,omap-pinctrl.txt           |    9 +++++++++
+ 1 file changed, 9 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/pinctrl/ti,omap-pinctrl.txt
 
+diff --git a/Documentation/devicetree/bindings/pinctrl/ti,omap-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/ti,omap-pinctrl.txt
+new file mode 100644
+index 0000000..156d964
+--- /dev/null
++++ b/Documentation/devicetree/bindings/pinctrl/ti,omap-pinctrl.txt
+@@ -0,0 +1,9 @@
++OMAP Pinctrl definitions
++
++Required properties:
++- compatible : Should be one of:
++  "ti,omap3-padconf" - OMAP3 compatible pinctrl
++  "ti,omap4-padconf" - OMAP4 compatible pinctrl
++  "ti,omap5-padconf" - OMAP5 compatible pinctrl
++
++See Documentation/devicetree/bindings/pinctrl/pinctrl-single.txt for further details.
 -- 
 1.7.9.5
