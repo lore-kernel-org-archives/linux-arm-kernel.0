@@ -1,21 +1,22 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu, 21 Aug 2014 21:19:38 -0500
-Subject: [PATCH] regulator: RK808: Fix uninitialized value
-In-Reply-To: <1408668895-1108-1-git-send-email-dianders@chromium.org>
-References: <1408668895-1108-1-git-send-email-dianders@chromium.org>
-Message-ID: <20140822021938.GT24407@sirena.org.uk>
+From: stephen@networkplumber.org (Stephen Hemminger)
+Date: Thu, 21 Aug 2014 19:48:38 -0700
+Subject: [PATCH v2 2/3] net: Add Keystone NetCP ethernet driver
+In-Reply-To: <1408115562-22487-3-git-send-email-santosh.shilimkar@ti.com>
+References: <1408115562-22487-1-git-send-email-santosh.shilimkar@ti.com>
+ <1408115562-22487-3-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <20140821194838.32f2c3f1@uryu.home.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 21, 2014 at 05:54:55PM -0700, Doug Anderson wrote:
-> The RK808 regulator driver was putting its config on the stack but not
-> initting it.  That means that you got a semi-random config.  Fix this.
+On Fri, 15 Aug 2014 11:12:41 -0400
+Santosh Shilimkar <santosh.shilimkar@ti.com> wrote:
 
-Applied, thanks.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140821/777cb340/attachment-0001.sig>
+> NetCP driver has a plug-in module architecture where each of the NetCP
+> sub-modules exist as a loadable kernel module which plug in to the netcp
+> core. These sub-modules are represented as "netcp-devices" in the dts
+> bindings. It is mandatory to have the ethernet switch sub-module for
+> the ethernet interface to be operational. Any other sub-module like the
+> PA is optional.
+
+What are you doing to prevent/discourage proprietary binary only
+sub-modules?
