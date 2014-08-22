@@ -1,35 +1,114 @@
 From: shawn.guo@freescale.com (Shawn Guo)
-Date: Fri, 22 Aug 2014 15:43:45 +0800
-Subject: [PATCH] ARM: dts: Gateworks GW5520 support (i.MX6)
-In-Reply-To: <CAJ+vNU0qJrNtZMcPGWkGOPuHmyiV+3d-OM71PGDNRmnJZCS8SQ@mail.gmail.com>
+Date: Fri, 22 Aug 2014 15:46:05 +0800
+Subject: [PATCH v2] ARM: dts: Gateworks GW5520 support (i.MX6)
+In-Reply-To: <1408679706-18200-1-git-send-email-tharvey@gateworks.com>
 References: <1407572602-14017-1-git-send-email-tharvey@gateworks.com>
- <20140818063510.GD2114@dragon>
- <CAJ+vNU0qJrNtZMcPGWkGOPuHmyiV+3d-OM71PGDNRmnJZCS8SQ@mail.gmail.com>
-Message-ID: <20140822074341.GA2540@dragon>
+ <1408679706-18200-1-git-send-email-tharvey@gateworks.com>
+Message-ID: <20140822074604.GB2540@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 19, 2014 at 08:17:03AM -0700, Tim Harvey wrote:
-> Do you know of any appropriate bindings for a USB hub reset signal?
-> This does get configured and used properly in the bootloader but I
-> thought the common belief was that GPIO's should get configured in the
-> kernel as well (and of course I will use a value other than 0x8000000
-> so that its pinmuxed and padconf'd).
-> 
-> The PCISKT_WDIS# is a gpio that routes to the miniPCIe socket(s) WDIS#
-> signal. While no kernel driver uses it I think its valuable to
-> document to users such that they can export it and use it for rfkill
-> of wireless devices that may be placed in those sockets. I'm not aware
-> of a proper binding for an rfkill pin either.
-> 
-> If no bindings exist, are you saying these should be dropped and thus
-> functionality hidden from a user possibly trying to use them from
-> userspace through gpio-sysfs or are you saying they should be moved
-> into pinctrl groups for logical grouping?
+On Thu, Aug 21, 2014 at 08:55:06PM -0700, Tim Harvey wrote:
+> +&iomuxc {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_hog>;
 
-Oh, I was wondering if these GPIOs can be put into USB and PCIe
-pingroup.  But if you think it doesn't make sense to do so, I'm fine
-with them being in hoggrp, after all it seems we do not have a proper
-binding existing for them.
+  DTC     arch/arm/boot/dts/imx6dl-gw552x.dtb
+ERROR (phandle_references): Reference to non-existent node or label "pinctrl_hog"
+
+> +
+> +	imx6qdl-gw552x {
+> +		pinctrl_gpio: gpiogrp {
+> +			fsl,pins = <
+> +				MX6QDL_PAD_GPIO_9__GPIO1_IO09	0x4001b0b0 /* USBHUB_RST# */
+> +				MX6QDL_PAD_GPIO_17__GPIO7_IO12	0x4001b0b0 /* PCIESKT_WDIS# */
+> +			>;
+> +		};
+
+pinctrl_gpio is not referenced by any client device, so kernel will not
+set up these two pins.
 
 Shawn
+
+> +
+> +		pinctrl_gpio_leds: gpioledsgrp {
+> +			fsl,pins = <
+> +				MX6QDL_PAD_KEY_COL0__GPIO4_IO06		0x1b0b0
+> +				MX6QDL_PAD_KEY_ROW0__GPIO4_IO07		0x1b0b0
+> +				MX6QDL_PAD_KEY_ROW4__GPIO4_IO15		0x1b0b0
+> +			>;
+> +		};
+> +
+> +		pinctrl_gpmi_nand: gpminandgrp {
+> +			fsl,pins = <
+> +				MX6QDL_PAD_NANDF_CLE__NAND_CLE		0xb0b1
+> +				MX6QDL_PAD_NANDF_ALE__NAND_ALE		0xb0b1
+> +				MX6QDL_PAD_NANDF_WP_B__NAND_WP_B	0xb0b1
+> +				MX6QDL_PAD_NANDF_RB0__NAND_READY_B	0xb000
+> +				MX6QDL_PAD_NANDF_CS0__NAND_CE0_B	0xb0b1
+> +				MX6QDL_PAD_NANDF_CS1__NAND_CE1_B	0xb0b1
+> +				MX6QDL_PAD_SD4_CMD__NAND_RE_B		0xb0b1
+> +				MX6QDL_PAD_SD4_CLK__NAND_WE_B		0xb0b1
+> +				MX6QDL_PAD_NANDF_D0__NAND_DATA00	0xb0b1
+> +				MX6QDL_PAD_NANDF_D1__NAND_DATA01	0xb0b1
+> +				MX6QDL_PAD_NANDF_D2__NAND_DATA02	0xb0b1
+> +				MX6QDL_PAD_NANDF_D3__NAND_DATA03	0xb0b1
+> +				MX6QDL_PAD_NANDF_D4__NAND_DATA04	0xb0b1
+> +				MX6QDL_PAD_NANDF_D5__NAND_DATA05	0xb0b1
+> +				MX6QDL_PAD_NANDF_D6__NAND_DATA06	0xb0b1
+> +				MX6QDL_PAD_NANDF_D7__NAND_DATA07	0xb0b1
+> +			>;
+> +		};
+> +
+> +		pinctrl_i2c1: i2c1grp {
+> +			fsl,pins = <
+> +				MX6QDL_PAD_EIM_D21__I2C1_SCL		0x4001b8b1
+> +				MX6QDL_PAD_EIM_D28__I2C1_SDA		0x4001b8b1
+> +			>;
+> +		};
+> +
+> +		pinctrl_i2c2: i2c2grp {
+> +			fsl,pins = <
+> +				MX6QDL_PAD_KEY_COL3__I2C2_SCL		0x4001b8b1
+> +				MX6QDL_PAD_KEY_ROW3__I2C2_SDA		0x4001b8b1
+> +			>;
+> +		};
+> +
+> +		pinctrl_i2c3: i2c3grp {
+> +			fsl,pins = <
+> +				MX6QDL_PAD_GPIO_3__I2C3_SCL		0x4001b8b1
+> +				MX6QDL_PAD_GPIO_6__I2C3_SDA		0x4001b8b1
+> +			>;
+> +		};
+> +
+> +		pinctrl_pcie: pciegrp {
+> +			fsl,pins = <
+> +				MX6QDL_PAD_ENET_TXD1__GPIO1_IO29	0x1b0b0
+> +			>;
+> +		};
+> +
+> +		pinctrl_uart2: uart2grp {
+> +			fsl,pins = <
+> +				MX6QDL_PAD_SD4_DAT7__UART2_TX_DATA	0x1b0b1
+> +				MX6QDL_PAD_SD4_DAT4__UART2_RX_DATA	0x1b0b1
+> +			>;
+> +		};
+> +
+> +		pinctrl_uart3: uart3grp {
+> +			fsl,pins = <
+> +				MX6QDL_PAD_EIM_D24__UART3_TX_DATA	0x1b0b1
+> +				MX6QDL_PAD_EIM_D25__UART3_RX_DATA	0x1b0b1
+> +			>;
+> +		};
+> +
+> +		pinctrl_uart5: uart5grp {
+> +			fsl,pins = <
+> +				MX6QDL_PAD_KEY_COL1__UART5_TX_DATA	0x1b0b1
+> +				MX6QDL_PAD_KEY_ROW1__UART5_RX_DATA	0x1b0b1
+> +			>;
+> +                };
+> +	};
+> +};
+> -- 
+> 1.8.3.2
+> 
