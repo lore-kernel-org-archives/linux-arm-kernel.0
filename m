@@ -1,35 +1,50 @@
 From: nm@ti.com (Nishanth Menon)
-Date: Fri, 22 Aug 2014 08:49:33 -0500
-Subject: [PATCH 7/7] ARM: OMAP4+: PM: Use only valid low power state for CPU
- hotplug
+Date: Fri, 22 Aug 2014 08:49:31 -0500
+Subject: [PATCH 5/7] ARM: OMAP4+: PM: Make logic state programmable
 In-Reply-To: <1408715373-25791-1-git-send-email-nm@ti.com>
 References: <1408715373-25791-1-git-send-email-nm@ti.com>
-Message-ID: <1408715373-25791-8-git-send-email-nm@ti.com>
+Message-ID: <1408715373-25791-6-git-send-email-nm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Not all SoCs support OFF mode - for example DRA74/72. So, use valid
-power state during CPU hotplug.
+Move the logic state as different for each power domain. This allows us
+to customize the deepest power state we should target over all for each
+powerdomain in the follow on patches.
 
 Signed-off-by: Nishanth Menon <nm@ti.com>
 ---
- arch/arm/mach-omap2/omap-mpuss-lowpower.c |    4 ++++
- 1 file changed, 4 insertions(+)
+ arch/arm/mach-omap2/pm44xx.c |    5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-omap2/omap-mpuss-lowpower.c b/arch/arm/mach-omap2/omap-mpuss-lowpower.c
-index 4001325..e9cdacf 100644
---- a/arch/arm/mach-omap2/omap-mpuss-lowpower.c
-+++ b/arch/arm/mach-omap2/omap-mpuss-lowpower.c
-@@ -298,6 +298,10 @@ int omap4_hotplug_cpu(unsigned int cpu, unsigned int power_state)
- 	if (omap_rev() == OMAP4430_REV_ES1_0)
- 		return -ENXIO;
+diff --git a/arch/arm/mach-omap2/pm44xx.c b/arch/arm/mach-omap2/pm44xx.c
+index 0dda6cf..b377b03 100644
+--- a/arch/arm/mach-omap2/pm44xx.c
++++ b/arch/arm/mach-omap2/pm44xx.c
+@@ -29,6 +29,7 @@ u16 pm44xx_errata;
+ struct power_state {
+ 	struct powerdomain *pwrdm;
+ 	u32 next_state;
++	u32 next_logic_state;
+ #ifdef CONFIG_SUSPEND
+ 	u32 saved_state;
+ 	u32 saved_logic_state;
+@@ -54,7 +55,7 @@ static int omap4_pm_suspend(void)
+ 	/* Set targeted power domain states by suspend */
+ 	list_for_each_entry(pwrst, &pwrst_list, node) {
+ 		omap_set_pwrdm_state(pwrst->pwrdm, pwrst->next_state);
+-		pwrdm_set_logic_retst(pwrst->pwrdm, PWRDM_POWER_OFF);
++		pwrdm_set_logic_retst(pwrst->pwrdm, pwrst->next_logic_state);
+ 	}
  
-+	/* Use the achievable power state for the domain */
-+	power_state = pwrdm_get_valid_lp_state(pm_info->pwrdm,
-+					       false, power_state);
+ 	/*
+@@ -121,6 +122,8 @@ static int __init pwrdms_setup(struct powerdomain *pwrdm, void *unused)
+ 
+ 	pwrst->pwrdm = pwrdm;
+ 	pwrst->next_state = PWRDM_POWER_RET;
++	pwrst->next_logic_state = PWRDM_POWER_OFF;
 +
- 	if (power_state == PWRDM_POWER_OFF)
- 		cpu_state = 1;
+ 	list_add(&pwrst->node, &pwrst_list);
  
+ 	return omap_set_pwrdm_state(pwrst->pwrdm, pwrst->next_state);
 -- 
 1.7.9.5
