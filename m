@@ -1,30 +1,46 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Thu, 21 Aug 2014 17:54:55 -0700
-Subject: [PATCH] regulator: RK808: Fix uninitialized value
-Message-ID: <1408668895-1108-1-git-send-email-dianders@chromium.org>
+From: addy.ke@rock-chips.com (Addy Ke)
+Date: Fri, 22 Aug 2014 09:13:11 +0800
+Subject: [PATCH v3] i2c: rk3x: fix bug that cause transfer fails in master
+ receive mode
+In-Reply-To: <1408657107-8715-1-git-send-email-addy.ke@rock-chips.com>
+References: <1408657107-8715-1-git-send-email-addy.ke@rock-chips.com>
+Message-ID: <1408669991-9703-1-git-send-email-addy.ke@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The RK808 regulator driver was putting its config on the stack but not
-initting it.  That means that you got a semi-random config.  Fix this.
+In rk3x SOC, the I2C controller can receive/transmit up to 32 bytes data
+in one chunk, so the size of data to be write/read to/from TXDATAx/RXDATAx
+must be less than or equal 32 bytes at a time.
 
-Signed-off-by: Doug Anderson <dianders@chromium.org>
+Tested on rk3288-pinky board, elan receive 158 bytes data.
+
+Acked-by: Max Schwarz <max.schwarz@online.de>
+Signed-off-by: Addy Ke <addy.ke@rock-chips.com>
 ---
- drivers/regulator/rk808-regulator.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Changes in v2:
+- Use cleaner syntax as suggested by Sergei.
+- Update commit message as suggested by Wolfram.
 
-diff --git a/drivers/regulator/rk808-regulator.c b/drivers/regulator/rk808-regulator.c
-index 94753fd..4d5041c 100644
---- a/drivers/regulator/rk808-regulator.c
-+++ b/drivers/regulator/rk808-regulator.c
-@@ -334,7 +334,7 @@ static int rk808_regulator_probe(struct platform_device *pdev)
- {
- 	struct rk808 *rk808 = dev_get_drvdata(pdev->dev.parent);
- 	struct rk808_board *pdata;
--	struct regulator_config config;
-+	struct regulator_config config = {};
- 	struct regulator_dev *rk808_rdev;
- 	struct regulator_init_data *reg_data;
- 	int i = 0;
+Changes in v3:
+- fix typo: maste --> master and double spaces after 'len'
+
+ drivers/i2c/busses/i2c-rk3x.c | 4 ++++
+ 1 file changed, 4 insertions(+)
+
+diff --git a/drivers/i2c/busses/i2c-rk3x.c b/drivers/i2c/busses/i2c-rk3x.c
+index 69e1185..806724a 100644
+--- a/drivers/i2c/busses/i2c-rk3x.c
++++ b/drivers/i2c/busses/i2c-rk3x.c
+@@ -323,6 +323,10 @@ static void rk3x_i2c_handle_read(struct rk3x_i2c *i2c, unsigned int ipd)
+ 	/* ack interrupt */
+ 	i2c_writel(i2c, REG_INT_MBRF, REG_IPD);
+ 
++	/* Can only handle a maximum of 32 bytes at a time */
++	if (unlikely(len > 32))
++		len = 32;
++
+ 	/* read the data from receive buffer */
+ 	for (i = 0; i < len; ++i) {
+ 		if (i % 4 == 0)
 -- 
-2.1.0.rc2.206.gedb03e5
+1.8.3.2
