@@ -1,55 +1,39 @@
-From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
-Date: Fri, 22 Aug 2014 09:16:41 -0700
-Subject: [PATCH v3] i2c: rk3x: fix bug that cause transfer fails in
- master receive mode
-In-Reply-To: <1408669991-9703-1-git-send-email-addy.ke@rock-chips.com>
-References: <1408657107-8715-1-git-send-email-addy.ke@rock-chips.com>
- <1408669991-9703-1-git-send-email-addy.ke@rock-chips.com>
-Message-ID: <20140822161641.GA12900@core.coreip.homeip.net>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Fri, 22 Aug 2014 10:20:48 -0600
+Subject: [PATCH 3/3] ARM: zynq: DT: Add Ethernet phys
+In-Reply-To: <f166a186-301c-4288-97cf-71f8173c07e7@BN1AFFO11FD010.protection.gbl>
+References: <1408550219-19825-1-git-send-email-soren.brinkmann@xilinx.com>
+ <1408550219-19825-3-git-send-email-soren.brinkmann@xilinx.com>
+ <5a7b6f57-b6c0-4fb3-af0d-d403277c0207@BN1AFFO11FD045.protection.gbl>
+ <53F5D8D9.7040604@suse.de>
+ <f166a186-301c-4288-97cf-71f8173c07e7@BN1AFFO11FD010.protection.gbl>
+Message-ID: <20140822162048.GB8477@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Addy,
+On Thu, Aug 21, 2014 at 08:49:19AM -0700, S?ren Brinkmann wrote:
 
-On Fri, Aug 22, 2014 at 09:13:11AM +0800, Addy Ke wrote:
-> In rk3x SOC, the I2C controller can receive/transmit up to 32 bytes data
-> in one chunk, so the size of data to be write/read to/from TXDATAx/RXDATAx
-> must be less than or equal 32 bytes at a time.
-> 
-> Tested on rk3288-pinky board, elan receive 158 bytes data.
-> 
-> Acked-by: Max Schwarz <max.schwarz@online.de>
-> Signed-off-by: Addy Ke <addy.ke@rock-chips.com>
-> ---
-> Changes in v2:
-> - Use cleaner syntax as suggested by Sergei.
-> - Update commit message as suggested by Wolfram.
-> 
-> Changes in v3:
-> - fix typo: maste --> master and double spaces after 'len'
-> 
->  drivers/i2c/busses/i2c-rk3x.c | 4 ++++
->  1 file changed, 4 insertions(+)
-> 
-> diff --git a/drivers/i2c/busses/i2c-rk3x.c b/drivers/i2c/busses/i2c-rk3x.c
-> index 69e1185..806724a 100644
-> --- a/drivers/i2c/busses/i2c-rk3x.c
-> +++ b/drivers/i2c/busses/i2c-rk3x.c
-> @@ -323,6 +323,10 @@ static void rk3x_i2c_handle_read(struct rk3x_i2c *i2c, unsigned int ipd)
->  	/* ack interrupt */
->  	i2c_writel(i2c, REG_INT_MBRF, REG_IPD);
->  
-> +	/* Can only handle a maximum of 32 bytes at a time */
-> +	if (unlikely(len > 32))
-> +		len = 32;
+> So my thinkings:
+>  - the compatible string with the -c22 is used and documented in the phy
+>    bindings, it should be there.
 
-I do not think we should be using unlikely here (and in another spot in the
-driver): unlikely should be used only if the condition happens extremely
-infrequently in all of the systems. Here, if a box happens to have a device
-that uses transfers larger than 32 bytes we'd be hitting unlikely branch pretty
-often.
+Yes
 
-Thanks.
+>  - the ID based strings seem to be not needed since, IIUC, the core
+>    reads the ID from the PHY and uses it, so I just left it out not
+>    trying to figure out how to obtain the correct ID
 
--- 
-Dmitry
+It is certainly optional, I added the property to solve some obscure
+problems with probing, but I've noticed people using it more broadly.
+I suspect it also speeds up booting a tiny bit.
+
+>  - the marvell compatible strings are used in our vendor tree. They
+>    aren't used anywhere but in our vendor tree. I though keeping them is
+>    nice since it identifies the PHY fully. And in case that level of
+>    detail is needed at some point it is already there.
+
+DT is complex enough already, don't include useless compatible strings
+in mainline - people will see and tend to blindly copy. Ideally your
+vendor tree would use the standard property :|
+
+Jason
