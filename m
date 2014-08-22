@@ -1,51 +1,168 @@
-From: mperttunen@nvidia.com (Mikko Perttunen)
-Date: Fri, 22 Aug 2014 15:55:56 +0300
-Subject: [PATCH v2 5/5] ARM: tegra: Add thermal reset (thermtrip) support
- to PMC
-In-Reply-To: <53F612D2.8020803@wwwdotorg.org>
-References: <1407933685-12404-1-git-send-email-mperttunen@nvidia.com>
- <1407933685-12404-6-git-send-email-mperttunen@nvidia.com>
- <53F5042A.7020603@wwwdotorg.org> <53F5F019.10308@nvidia.com>
- <53F612D2.8020803@wwwdotorg.org>
-Message-ID: <53F73DDC.2000303@nvidia.com>
+From: liviu@dudau.co.uk (Liviu Dudau)
+Date: Fri, 22 Aug 2014 14:06:40 +0100
+Subject: [PATCH v9 04/12] PCI: OF: Fix the conversion of IO ranges into
+ IO resources.
+In-Reply-To: <CAL_JsqJm6qWNdrJ2F8xddFUj46y42n6hQVu1nkTaA-5Tbg--XQ@mail.gmail.com>
+References: <1407860725-25202-1-git-send-email-Liviu.Dudau@arm.com>
+ <1407860725-25202-5-git-send-email-Liviu.Dudau@arm.com>
+ <CAL_JsqJm6qWNdrJ2F8xddFUj46y42n6hQVu1nkTaA-5Tbg--XQ@mail.gmail.com>
+Message-ID: <20140822130640.GM13147@bart.dudau.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Thu, Aug 21, 2014 at 11:08:48PM -0500, Rob Herring wrote:
+> On Tue, Aug 12, 2014 at 11:25 AM, Liviu Dudau <Liviu.Dudau@arm.com> wrote:
+> > The ranges property for a host bridge controller in DT describes
+> > the mapping between the PCI bus address and the CPU physical address.
+> > The resources framework however expects that the IO resources start
+> > at a pseudo "port" address 0 (zero) and have a maximum size of IO_SPACE_LIMIT.
+> > The conversion from pci ranges to resources failed to take that into account.
+> >
+> > In the process move the function into drivers/of/address.c as it now
+> > depends on pci_address_to_pio() code and make it return an error code.
+> >
+> > Cc: Grant Likely <grant.likely@linaro.org>
+> > Cc: Rob Herring <robh+dt@kernel.org>
+> 
+> Humm, this says I'm cc'ed, but I'm not which defeats the point of
+> recording the Cc's in the commit.
 
+Appologies, I've screwed up my git send-email arguments.
 
-On 21/08/14 18:40, Stephen Warren wrote:
-> On 08/21/2014 07:11 AM, Mikko Perttunen wrote:
->> On 20/08/14 23:25, Stephen Warren wrote:
->>> On 08/13/2014 06:41 AM, Mikko Perttunen wrote:
->>>> This adds a device tree controlled option to enable PMC-based
->>>> thermal reset in overheating situations. Thermtrip is supported on
->>>> Tegra30, Tegra114 and Tegra124. The thermal reset only works when
->>>> the thermal sensors are calibrated, so a soctherm driver is also
->>>> required.
->>>
->>> If calibration is required, presumably the soctherm must initialize
->>> before this thermtrip code can initialize, or this thermtrip logic might
->>> be triggered by uncalibrated sensors?
->>
->> SOCTHERM requires that each sensor be explicitly enabled before it gives
->> readings. If a sensor is not enabled, the temperature given by the
->> register (and used to trigger thermtrip) will be zero. So in order for a
->> thermtrip shutdown to be caused before soctherm is initialized, the
->> thermtrip temperature would have to be programmed to below zero (the
->> default value is 105C), in which case an immediate shutdown would
->> probably be in order anyway (unless the user uses LN2 or something to
->> cool the soc below zero).
->>
->>>
->>> If so, then there needs to be some explicit mechanism to force the two
->>> drivers into probing in the right order.
->>
->> Because of the above, I think it isn't necessary to probe these in order.
->
-> OK, that makes sense. Briefly mentioning this in the commit description
-> could be useful.
->
+> 
+> I still have the same concerns that this will break existing users.
+> Are you sure integrator is the only platform affected?
 
-Sure, I'll add a mention to the next version.
+microblaze and powerpc have their similar handcoded routine for parsing ranges
+where they pre-compute the io_base and adjust the values again when registering
+resources. I'm not absolutely sure they are not broken as I lack the appropriate
+platforms to test (I've been asking for an FPGA engineer to build me a microblaze
+image with all the bits included but haven't received anything yet and it is
+possible Xilinx has now shifted their interests towards ARM + PCI as the ML605
+board that I have seems to have been discontinued).
 
-Mikko
+mips is doing the same thing and I believe is not affected, pci-host-generic.c
+was adjusting the returned values afterwards so that will not be needed and Lorenzo
+has a patch for the driver to adapt it to this series anyway.
+
+pcie-designware.c also recalculates the io.start and io.end values, so that's fine
+for now. The only ones that I believe are still affected are pci-tegra.c and
+pcie-rcar.c for which I will need to provide a patch similar to integrator unless
+the code gets converted to the new range parsing.
+
+Best regards,
+Liviu
+
+> 
+> Rob
+> 
+> > Cc: Arnd Bergmann <arnd@arndb.de>
+> > Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
+> > ---
+> >  drivers/of/address.c       | 46 ++++++++++++++++++++++++++++++++++++++++++++++
+> >  include/linux/of_address.h | 13 ++-----------
+> >  2 files changed, 48 insertions(+), 11 deletions(-)
+> >
+> > diff --git a/drivers/of/address.c b/drivers/of/address.c
+> > index 4dab700..3735ac7 100644
+> > --- a/drivers/of/address.c
+> > +++ b/drivers/of/address.c
+> > @@ -906,3 +906,49 @@ bool of_dma_is_coherent(struct device_node *np)
+> >         return false;
+> >  }
+> >  EXPORT_SYMBOL_GPL(of_dma_is_coherent);
+> > +
+> > +/*
+> > + * of_pci_range_to_resource - Create a resource from an of_pci_range
+> > + * @range:     the PCI range that describes the resource
+> > + * @np:                device node where the range belongs to
+> > + * @res:       pointer to a valid resource that will be updated to
+> > + *              reflect the values contained in the range.
+> > + *
+> > + * Returns EINVAL if the range cannot be converted to resource.
+> > + *
+> > + * Note that if the range is an IO range, the resource will be converted
+> > + * using pci_address_to_pio() which can fail if it is called too early or
+> > + * if the range cannot be matched to any host bridge IO space (our case here).
+> > + * To guard against that we try to register the IO range first.
+> > + * If that fails we know that pci_address_to_pio() will do too.
+> > + */
+> > +int of_pci_range_to_resource(struct of_pci_range *range,
+> > +       struct device_node *np, struct resource *res)
+> > +{
+> > +       int err;
+> > +       res->flags = range->flags;
+> > +       res->parent = res->child = res->sibling = NULL;
+> > +       res->name = np->full_name;
+> > +
+> > +       if (res->flags & IORESOURCE_IO) {
+> > +               unsigned long port = -1;
+> > +               err = pci_register_io_range(range->cpu_addr, range->size);
+> > +               if (err)
+> > +                       goto invalid_range;
+> > +               port = pci_address_to_pio(range->cpu_addr);
+> > +               if (port == (unsigned long)-1) {
+> > +                       err = -EINVAL;
+> > +                       goto invalid_range;
+> > +               }
+> > +               res->start = port;
+> > +       } else {
+> > +               res->start = range->cpu_addr;
+> > +       }
+> > +       res->end = res->start + range->size - 1;
+> > +       return 0;
+> > +
+> > +invalid_range:
+> > +       res->start = (resource_size_t)OF_BAD_ADDR;
+> > +       res->end = (resource_size_t)OF_BAD_ADDR;
+> > +       return err;
+> > +}
+> > diff --git a/include/linux/of_address.h b/include/linux/of_address.h
+> > index 28e6836..6015f21 100644
+> > --- a/include/linux/of_address.h
+> > +++ b/include/linux/of_address.h
+> > @@ -23,17 +23,8 @@ struct of_pci_range {
+> >  #define for_each_of_pci_range(parser, range) \
+> >         for (; of_pci_range_parser_one(parser, range);)
+> >
+> > -static inline void of_pci_range_to_resource(struct of_pci_range *range,
+> > -                                           struct device_node *np,
+> > -                                           struct resource *res)
+> > -{
+> > -       res->flags = range->flags;
+> > -       res->start = range->cpu_addr;
+> > -       res->end = range->cpu_addr + range->size - 1;
+> > -       res->parent = res->child = res->sibling = NULL;
+> > -       res->name = np->full_name;
+> > -}
+> > -
+> > +extern int of_pci_range_to_resource(struct of_pci_range *range,
+> > +               struct device_node *np, struct resource *res);
+> >  /* Translate a DMA address from device space to CPU space */
+> >  extern u64 of_translate_dma_address(struct device_node *dev,
+> >                                     const __be32 *in_addr);
+> > --
+> > 2.0.4
+> >
+> >
+> > _______________________________________________
+> > linux-arm-kernel mailing list
+> > linux-arm-kernel at lists.infradead.org
+> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
+
+-- 
+-------------------
+   .oooO
+   (   )
+    \ (  Oooo.
+     \_) (   )
+          ) /
+         (_/
+
+ One small step
+   for me ...
