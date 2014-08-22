@@ -1,135 +1,87 @@
 From: nm@ti.com (Nishanth Menon)
-Date: Fri, 22 Aug 2014 09:02:29 -0500
-Subject: [PATCH 05/10] ARM: OMAP5 / DRA7: PM: Avoid all SAR saves
+Date: Fri, 22 Aug 2014 09:02:26 -0500
+Subject: [PATCH 02/10] ARM: OMAP5 / DRA7: PM: Set MPUSS-EMIF clock-domain
+ static dependency
 In-Reply-To: <1408716154-26101-1-git-send-email-nm@ti.com>
 References: <1408716154-26101-1-git-send-email-nm@ti.com>
-Message-ID: <1408716154-26101-6-git-send-email-nm@ti.com>
+Message-ID: <1408716154-26101-3-git-send-email-nm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Rajendra Nayak <rnayak@ti.com>
+From: Santosh Shilimkar <santosh.shilimkar@ti.com>
 
-Get rid of all assumptions about always having a sar base on *all*
-OMAP4+ platforms. We dont need one on DRA7 and it is not necessary at
-this point for OMAP5 either.
+With EMIF clock-domain put under hardware supervised control, memory
+corruption and untraceable crashes are observed on OMAP5. Further
+investigation revealed that there is a weakness in the PRCM on this
+specific dynamic depedency.
 
+The recommendation is to set MPUSS static dependency towards EMIF
+clock-domain to avoid issues. This recommendation holds good for DRA7
+family of devices as well.
+
+Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+[rnayak at ti.com: DRA7]
 Signed-off-by: Rajendra Nayak <rnayak@ti.com>
-[nm at ti.com: Split and optimize]
+[nm at ti.com: conflict resolution, dra7]
 Signed-off-by: Nishanth Menon <nm@ti.com>
 ---
- arch/arm/mach-omap2/omap-mpuss-lowpower.c |   55 ++++++++++++++++++-----------
- 1 file changed, 34 insertions(+), 21 deletions(-)
+ arch/arm/mach-omap2/pm44xx.c |   36 +++++++++++++++++++++++++++++++++---
+ 1 file changed, 33 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/omap-mpuss-lowpower.c b/arch/arm/mach-omap2/omap-mpuss-lowpower.c
-index fad6e8c..53d8de5 100644
---- a/arch/arm/mach-omap2/omap-mpuss-lowpower.c
-+++ b/arch/arm/mach-omap2/omap-mpuss-lowpower.c
-@@ -118,7 +118,8 @@ static inline void set_cpu_wakeup_addr(unsigned int cpu_id, u32 addr)
- {
- 	struct omap4_cpu_pm_info *pm_info = &per_cpu(omap4_pm_info, cpu_id);
- 
--	writel_relaxed(addr, pm_info->wkup_sar_addr);
-+	if (pm_info->wkup_sar_addr)
-+		writel_relaxed(addr, pm_info->wkup_sar_addr);
+diff --git a/arch/arm/mach-omap2/pm44xx.c b/arch/arm/mach-omap2/pm44xx.c
+index 0dda6cf..b6f243d 100644
+--- a/arch/arm/mach-omap2/pm44xx.c
++++ b/arch/arm/mach-omap2/pm44xx.c
+@@ -203,6 +203,32 @@ static inline int omap4_init_static_deps(void)
  }
  
- /*
-@@ -143,7 +144,8 @@ static void scu_pwrst_prepare(unsigned int cpu_id, unsigned int cpu_state)
- 		break;
- 	}
- 
--	writel_relaxed(scu_pwr_st, pm_info->scu_sar_addr);
-+	if (pm_info->scu_sar_addr)
-+		writel_relaxed(scu_pwr_st, pm_info->scu_sar_addr);
- }
- 
- /* Helper functions for MPUSS OSWR */
-@@ -181,7 +183,8 @@ static void l2x0_pwrst_prepare(unsigned int cpu_id, unsigned int save_state)
- {
- 	struct omap4_cpu_pm_info *pm_info = &per_cpu(omap4_pm_info, cpu_id);
- 
--	writel_relaxed(save_state, pm_info->l2x0_sar_addr);
-+	if (pm_info->l2x0_sar_addr)
-+		writel_relaxed(save_state, pm_info->l2x0_sar_addr);
- }
- 
- /*
-@@ -191,10 +194,14 @@ static void l2x0_pwrst_prepare(unsigned int cpu_id, unsigned int save_state)
- #ifdef CONFIG_CACHE_L2X0
- static void __init save_l2x0_context(void)
- {
--	writel_relaxed(l2x0_saved_regs.aux_ctrl,
--		     sar_base + L2X0_AUXCTRL_OFFSET);
--	writel_relaxed(l2x0_saved_regs.prefetch_ctrl,
--		     sar_base + L2X0_PREFETCH_CTRL_OFFSET);
-+	void __iomem *l2x0_base = omap4_get_l2cache_base();
+ /**
++ * omap5_dra7_init_static_deps - Init static clkdm dependencies on OMAP5 and
++ *				 DRA7
++ *
++ * The dynamic dependency between MPUSS -> EMIF is broken and has
++ * not worked as expected. The hardware recommendation is to
++ * enable static dependencies for these to avoid system
++ * lock ups or random crashes.
++ */
++static inline int omap5_dra7_init_static_deps(void)
++{
++	struct clockdomain *mpuss_clkdm, *emif_clkdm;
++	int ret;
 +
-+	if (l2x0_base && sar_base) {
-+		writel_relaxed(l2x0_saved_regs.aux_ctrl,
-+			       sar_base + L2X0_AUXCTRL_OFFSET);
-+		writel_relaxed(l2x0_saved_regs.prefetch_ctrl,
-+			       sar_base + L2X0_PREFETCH_CTRL_OFFSET);
-+	}
- }
- #else
- static void __init save_l2x0_context(void)
-@@ -347,13 +354,17 @@ int __init omap4_mpuss_init(void)
- 		return -ENODEV;
++	mpuss_clkdm = clkdm_lookup("mpu_clkdm");
++	emif_clkdm = clkdm_lookup("emif_clkdm");
++	if (!mpuss_clkdm || !emif_clkdm)
++		return -EINVAL;
++
++	ret = clkdm_add_wkdep(mpuss_clkdm, emif_clkdm);
++	if (ret)
++		pr_err("Failed to add MPUSS -> EMIF wakeup dependency\n");
++
++	return ret;
++}
++
++/**
+  * omap4_pm_init_early - Does early initialization necessary for OMAP4+ devices
+  *
+  * Initializes basic stuff for power management functionality.
+@@ -239,10 +265,14 @@ int __init omap4_pm_init(void)
+ 		goto err2;
  	}
  
--	sar_base = omap4_get_sar_ram_base();
+-	if (cpu_is_omap44xx()) {
 +	if (cpu_is_omap44xx())
-+		sar_base = omap4_get_sar_ram_base();
+ 		ret = omap4_init_static_deps();
+-		if (ret)
+-			goto err2;
++	else if (soc_is_omap54xx() || soc_is_dra7xx())
++		ret = omap5_dra7_init_static_deps();
++
++	if (ret) {
++		pr_err("Failed to initialise static dependencies.\n");
++		goto err2;
+ 	}
  
- 	/* Initilaise per CPU PM information */
- 	pm_info = &per_cpu(omap4_pm_info, 0x0);
--	pm_info->scu_sar_addr = sar_base + SCU_OFFSET0;
--	pm_info->wkup_sar_addr = sar_base + CPU0_WAKEUP_NS_PA_ADDR_OFFSET;
--	pm_info->l2x0_sar_addr = sar_base + L2X0_SAVE_OFFSET0;
-+	if (sar_base) {
-+		pm_info->scu_sar_addr = sar_base + SCU_OFFSET0;
-+		pm_info->wkup_sar_addr = sar_base +
-+					CPU0_WAKEUP_NS_PA_ADDR_OFFSET;
-+		pm_info->l2x0_sar_addr = sar_base + L2X0_SAVE_OFFSET0;
-+	}
- 	pm_info->pwrdm = pwrdm_lookup("cpu0_pwrdm");
- 	if (!pm_info->pwrdm) {
- 		pr_err("Lookup failed for CPU0 pwrdm\n");
-@@ -368,9 +379,12 @@ int __init omap4_mpuss_init(void)
- 	pwrdm_set_next_pwrst(pm_info->pwrdm, PWRDM_POWER_ON);
- 
- 	pm_info = &per_cpu(omap4_pm_info, 0x1);
--	pm_info->scu_sar_addr = sar_base + SCU_OFFSET1;
--	pm_info->wkup_sar_addr = sar_base + CPU1_WAKEUP_NS_PA_ADDR_OFFSET;
--	pm_info->l2x0_sar_addr = sar_base + L2X0_SAVE_OFFSET1;
-+	if (sar_base) {
-+		pm_info->scu_sar_addr = sar_base + SCU_OFFSET1;
-+		pm_info->wkup_sar_addr = sar_base +
-+					CPU1_WAKEUP_NS_PA_ADDR_OFFSET;
-+		pm_info->l2x0_sar_addr = sar_base + L2X0_SAVE_OFFSET1;
-+	}
- 	if (cpu_is_omap446x())
- 		pm_info->secondary_startup = omap4460_secondary_startup;
- 	else
-@@ -397,13 +411,12 @@ int __init omap4_mpuss_init(void)
- 	pwrdm_clear_all_prev_pwrst(mpuss_pd);
- 	mpuss_clear_prev_logic_pwrst();
- 
--	/* Save device type on scratchpad for low level code to use */
--	if (omap_type() != OMAP2_DEVICE_TYPE_GP)
--		writel_relaxed(1, sar_base + OMAP_TYPE_OFFSET);
--	else
--		writel_relaxed(0, sar_base + OMAP_TYPE_OFFSET);
--
--	save_l2x0_context();
-+	if (sar_base) {
-+		/* Save device type on scratchpad for low level code to use */
-+		writel_relaxed((omap_type() != OMAP2_DEVICE_TYPE_GP) ? 1 : 0,
-+			       sar_base + OMAP_TYPE_OFFSET);
-+		save_l2x0_context();
-+	}
- 
- 	if (cpu_is_omap44xx()) {
- 		omap_pm_ops.finish_suspend = omap4_finish_suspend;
+ 	ret = omap4_mpuss_init();
 -- 
 1.7.9.5
