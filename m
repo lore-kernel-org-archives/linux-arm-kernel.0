@@ -1,45 +1,43 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Fri, 22 Aug 2014 10:57:09 +0200
-Subject: [RFC PATCH 5/6] rtc: rtc-isl12022: Change vendor prefix for
- Intersil Corporation to isil
-In-Reply-To: <1408524184-31928-6-git-send-email-p.zabel@pengutronix.de>
-References: <1408524184-31928-1-git-send-email-p.zabel@pengutronix.de>
- <1408524184-31928-6-git-send-email-p.zabel@pengutronix.de>
-Message-ID: <1408697829.3118.28.camel@paszta.hi.pengutronix.de>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 22 Aug 2014 10:03:43 +0100
+Subject: [PATCH V2] ARM/ARM64: KVM: Nuke Hyp-mode tlbs before enabling MMU
+In-Reply-To: <20140804120648.GB524@cbox>
+References: <1406789604-10533-1-git-send-email-pranavkumar@linaro.org>
+ <20140804120648.GB524@cbox>
+Message-ID: <53F7076F.1010502@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Mittwoch, den 20.08.2014, 10:43 +0200 schrieb Philipp Zabel:
-> Currently there is a wild mixture of isl, isil, and intersil
-> compatibles in the kernel. At this point, changing the vendor
-> symbol to the most often used variant, which is equal to the
-> NASDAQ symbol, isil, should not hurt, since the isl1208 driver
-> doesn't care either way.
-> Patch db04d6284e2a added device tree support using the then
-> documented isl vendor prefix, so we keep that around for
-> backwards compatibility.
+On 04/08/14 13:06, Christoffer Dall wrote:
+> On Thu, Jul 31, 2014 at 12:23:23PM +0530, Pranavkumar Sawargaonkar wrote:
+>> X-Gene u-boot runs in EL2 mode with MMU enabled hence we might
+>> have stale EL2 tlb enteris when we enable EL2 MMU on each host CPU.
+>>
+>> This can happen on any ARM/ARM64 board running bootloader in
+>> Hyp-mode (or EL2-mode) with MMU enabled.
+>>
+>> This patch ensures that we flush all Hyp-mode (or EL2-mode) TLBs
+>> on each host CPU before enabling Hyp-mode (or EL2-mode) MMU.
+>>
+>> Changelog:
+>>
+>> V2:
+>>  - Flush Hyp-mode TLBs for both KVM ARM32 and KVM ARM64 at boot time
+>>
+>> V1:
+>>  - Initial patch with only arm64 change
+>>
+>> Signed-off-by: Pranavkumar Sawargaonkar <pranavkumar@linaro.org>
+>> Signed-off-by: Anup Patel <anup.patel@linaro.org>
 > 
-> Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
-> ---
->  drivers/rtc/rtc-isl12022.c | 3 ++-
->  1 file changed, 2 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/rtc/rtc-isl12022.c b/drivers/rtc/rtc-isl12022.c
-> index aa55f08..df20f18 100644
-> --- a/drivers/rtc/rtc-isl12022.c
-> +++ b/drivers/rtc/rtc-isl12022.c
-> @@ -275,7 +275,8 @@ static int isl12022_probe(struct i2c_client *client,
->  
->  #ifdef CONFIG_OF
->  static struct of_device_id isl12022_dt_match[] = {
-> -	{ .compatible = "isl,isl12022" },
-> +	{ .compatible = "isil,isl12022" },
-> +	{ .compatible = "isl,isl12022" }, /* for backwards compatibility */
+> Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
 
-Actually, is it even necessary to keep this around in here?
-If of_driver_match_device fails, i2c_device_match will continue to try
-i2c_match_id if driver->id_table is set, which matches against the
-result of of_modalias_node (dropping the vendor prefix altogether).
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
 
-regards
-Philipp
+This should probably go in quickly as a fix.
+
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
