@@ -1,87 +1,55 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Fri, 22 Aug 2014 09:14:56 -0700
-Subject: [PATCH v7] ARM: dts: Prepare node labels for exynos5250
-In-Reply-To: <080101cfbdf6$c8fd1f30$5af75d90$@samsung.com>
-References: <53DCD74B.8090400@gmail.com>
- <1408539764-5835-1-git-send-email-afaerber@suse.de>
- <080101cfbdf6$c8fd1f30$5af75d90$@samsung.com>
-Message-ID: <CAD=FV=VS8e4Fs-j4CFvGYtvj58QwOk52gWh7AfnZcpswVRnDKA@mail.gmail.com>
+From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
+Date: Fri, 22 Aug 2014 09:16:41 -0700
+Subject: [PATCH v3] i2c: rk3x: fix bug that cause transfer fails in
+ master receive mode
+In-Reply-To: <1408669991-9703-1-git-send-email-addy.ke@rock-chips.com>
+References: <1408657107-8715-1-git-send-email-addy.ke@rock-chips.com>
+ <1408669991-9703-1-git-send-email-addy.ke@rock-chips.com>
+Message-ID: <20140822161641.GA12900@core.coreip.homeip.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Kukjin,
+Hi Addy,
 
-On Fri, Aug 22, 2014 at 3:49 AM, Kukjin Kim <kgene.kim@samsung.com> wrote:
-> Andreas F?rber wrote:
->>
->> Allows them to be extended by reference.
->>
->> Reviewed-by: Doug Anderson <dianders@chromium.org>
->> Signed-off-by: Andreas F?rber <afaerber@suse.de>
->> ---
->>  v6 -> v7:
->>  * Dropped uart* labels (Tomasz Figa)
->>
->>  v6: Split off from Snow/SMDK cleanups (Doug Anderson)
->>
->>  arch/arm/boot/dts/exynos5250.dtsi | 16 ++++++++--------
->>  1 file changed, 8 insertions(+), 8 deletions(-)
->>
->> diff --git a/arch/arm/boot/dts/exynos5250.dtsi b/arch/arm/boot/dts/exynos5250.dtsi
->> index 492e1eff37bd..42eafd19cfb2 100644
->> --- a/arch/arm/boot/dts/exynos5250.dtsi
->> +++ b/arch/arm/boot/dts/exynos5250.dtsi
->> @@ -218,7 +218,7 @@
->>               clock-names = "fimg2d";
->>       };
->>
->> -     codec at 11000000 {
->> +     mfc: codec at 11000000 {
->>               compatible = "samsung,mfc-v6";
->>               reg = <0x11000000 0x10000>;
->>               interrupts = <0 96 0>;
->> @@ -227,7 +227,7 @@
->>               clock-names = "mfc";
->>       };
->>
->> -     rtc at 101E0000 {
->> +     rtc: rtc at 101E0000 {
->>               clocks = <&clock CLK_RTC>;
->>               clock-names = "rtc";
->>               status = "disabled";
->> @@ -261,7 +261,7 @@
->>               clock-names = "uart", "clk_uart_baud0";
->>       };
->>
->> -     sata at 122F0000 {
->> +     sata: sata at 122F0000 {
->>               compatible = "snps,dwc-ahci";
->>               samsung,sata-freq = <66>;
->>               reg = <0x122F0000 0x1ff>;
->> @@ -573,7 +573,7 @@
->>               #phy-cells = <1>;
->>       };
->>
->> -     usb at 12110000 {
->> +     ehci: usb at 12110000 {
->
-> I'm not sure which one is recommended between above and "ehci: ehci at 12110000 {"
+On Fri, Aug 22, 2014 at 09:13:11AM +0800, Addy Ke wrote:
+> In rk3x SOC, the I2C controller can receive/transmit up to 32 bytes data
+> in one chunk, so the size of data to be write/read to/from TXDATAx/RXDATAx
+> must be less than or equal 32 bytes at a time.
+> 
+> Tested on rk3288-pinky board, elan receive 158 bytes data.
+> 
+> Acked-by: Max Schwarz <max.schwarz@online.de>
+> Signed-off-by: Addy Ke <addy.ke@rock-chips.com>
+> ---
+> Changes in v2:
+> - Use cleaner syntax as suggested by Sergei.
+> - Update commit message as suggested by Wolfram.
+> 
+> Changes in v3:
+> - fix typo: maste --> master and double spaces after 'len'
+> 
+>  drivers/i2c/busses/i2c-rk3x.c | 4 ++++
+>  1 file changed, 4 insertions(+)
+> 
+> diff --git a/drivers/i2c/busses/i2c-rk3x.c b/drivers/i2c/busses/i2c-rk3x.c
+> index 69e1185..806724a 100644
+> --- a/drivers/i2c/busses/i2c-rk3x.c
+> +++ b/drivers/i2c/busses/i2c-rk3x.c
+> @@ -323,6 +323,10 @@ static void rk3x_i2c_handle_read(struct rk3x_i2c *i2c, unsigned int ipd)
+>  	/* ack interrupt */
+>  	i2c_writel(i2c, REG_INT_MBRF, REG_IPD);
+>  
+> +	/* Can only handle a maximum of 32 bytes at a time */
+> +	if (unlikely(len > 32))
+> +		len = 32;
 
-My understanding is that more generic names should be used for node
-names.  AKA: "usb" and not "ehci".  "mmc" and not "dwmmc".
+I do not think we should be using unlikely here (and in another spot in the
+driver): unlikely should be used only if the condition happens extremely
+infrequently in all of the systems. Here, if a box happens to have a device
+that uses transfers larger than 32 bytes we'd be hitting unlikely branch pretty
+often.
 
-In another thread I was pointed at ePAPR
-<http://www.power.org/resources/downloads/Power_ePAPR_APPROVED_v1.0.pdf>:
+Thanks.
 
-The name of a node should be somewhat generic, reflecting the function
-of the device and not its precise programming model.
-
-
->> -     hdmi {
->> +     hdmi: hdmi {
->
-> Should be
->
-> +       hdmi: hdmi at 14530000 { ?
-
-Seems like that should be a followon patch.
+-- 
+Dmitry
