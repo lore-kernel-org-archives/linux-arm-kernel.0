@@ -1,82 +1,37 @@
-From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Fri, 22 Aug 2014 09:44:22 +0900
-Subject: [PATCH v6 5/6] arm64: add SIGSYS siginfo for compat task
-In-Reply-To: <CAGXu5jLFZEWKgSVKrz=6cOfEV_2M-MwE4m+n_oOpHFZqmjRkVA@mail.gmail.com>
-References: <1408611405-8943-1-git-send-email-takahiro.akashi@linaro.org>	<1408611405-8943-6-git-send-email-takahiro.akashi@linaro.org>
- <CAGXu5jLFZEWKgSVKrz=6cOfEV_2M-MwE4m+n_oOpHFZqmjRkVA@mail.gmail.com>
-Message-ID: <53F69266.4070806@linaro.org>
+From: broonie@kernel.org (Mark Brown)
+Date: Thu, 21 Aug 2014 19:50:30 -0500
+Subject: [PATCH v3] spi: spi-imx: add DMA support
+In-Reply-To: <1408593190-1031-1-git-send-email-b38343@freescale.com>
+References: <1408593190-1031-1-git-send-email-b38343@freescale.com>
+Message-ID: <20140822005030.GR24407@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/22/2014 02:54 AM, Kees Cook wrote:
-> On Thu, Aug 21, 2014 at 3:56 AM, AKASHI Takahiro
-> <takahiro.akashi@linaro.org> wrote:
->> SIGSYS is primarily used in secure computing to notify tracer.
->> This patch allows signal handler on compat task to get correct information
->> with SA_SYSINFO specified when this signal is delivered.
+On Thu, Aug 21, 2014 at 11:53:10AM +0800, Robin Gong wrote:
 
-typo: SA_SIGINFO
+> Change from v2:
+> http://thread.gmane.org/gmane.linux.ports.arm.kernel/291722/focus=294363
+> 1. dma setup only for imx51-ecspi
+> 2. use one small dummy buffer(1 bd size) to templiy store data
+>    for meanless rx/tx, instead of malloc the actual transfer size.
 
->> Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
->
-> I'm unable to test this myself, but if you've got the test suite
-> passing in compat mode, then this patch must be correct. :)
+You can use the must_tx and must_rx flags to use the core implementation
+of this functionality.  This will mean you get any performance or other
+improvements we implement there.
 
-Thanks.
-Actually I found this bug when I ran your test programs, TRAP.handler, on 32bit userland.
+> +	int (*txrx_bufs)(struct spi_device *spi, struct spi_transfer *t);
+> +	struct dma_chan *dma_chan_rx;
+> +	struct dma_chan *dma_chan_tx;
 
--Takahiro AKASHI
-
-
-> Reviewed-by: Kees Cook <keescook@chromium.org>
->
-> -Kees
->
->> ---
->>   arch/arm64/include/asm/compat.h |    7 +++++++
->>   arch/arm64/kernel/signal32.c    |    8 ++++++++
->>   2 files changed, 15 insertions(+)
->>
->> diff --git a/arch/arm64/include/asm/compat.h b/arch/arm64/include/asm/compat.h
->> index 253e33b..c877915 100644
->> --- a/arch/arm64/include/asm/compat.h
->> +++ b/arch/arm64/include/asm/compat.h
->> @@ -205,6 +205,13 @@ typedef struct compat_siginfo {
->>                          compat_long_t _band;    /* POLL_IN, POLL_OUT, POLL_MSG */
->>                          int _fd;
->>                  } _sigpoll;
->> +
->> +               /* SIGSYS */
->> +               struct {
->> +                       compat_uptr_t _call_addr; /* calling user insn */
->> +                       int _syscall;   /* triggering system call number */
->> +                       unsigned int _arch;     /* AUDIT_ARCH_* of syscall */
->> +               } _sigsys;
->>          } _sifields;
->>   } compat_siginfo_t;
->>
->> diff --git a/arch/arm64/kernel/signal32.c b/arch/arm64/kernel/signal32.c
->> index 1b9ad02..aa550d6 100644
->> --- a/arch/arm64/kernel/signal32.c
->> +++ b/arch/arm64/kernel/signal32.c
->> @@ -186,6 +186,14 @@ int copy_siginfo_to_user32(compat_siginfo_t __user *to, const siginfo_t *from)
->>                  err |= __put_user(from->si_uid, &to->si_uid);
->>                  err |= __put_user((compat_uptr_t)(unsigned long)from->si_ptr, &to->si_ptr);
->>                  break;
->> +#ifdef __ARCH_SIGSYS
->> +       case __SI_SYS:
->> +               err |= __put_user((compat_uptr_t)(unsigned long)
->> +                               from->si_call_addr, &to->si_call_addr);
->> +               err |= __put_user(from->si_syscall, &to->si_syscall);
->> +               err |= __put_user(from->si_arch, &to->si_arch);
->> +               break;
->> +#endif
->>          default: /* this is just in case for now ... */
->>                  err |= __put_user(from->si_pid, &to->si_pid);
->>                  err |= __put_user(from->si_uid, &to->si_uid);
->> --
->> 1.7.9.5
->>
->
->
->
+The SPI controller has variables for this already - you should use them
+(and the core support).  In general my main comment on this patch is
+that you should be using the core DMA support, it fixes some problems
+(like not having mapping for vmalloc() buffers) and factors out some
+code.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140821/087c20a9/attachment.sig>
