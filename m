@@ -1,142 +1,51 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Fri, 22 Aug 2014 12:00:01 +0200
-Subject: [PATCH] mmc: core: sd: check card write-protect lock while
- resuming
-In-Reply-To: <5EB3BFCD089AD643B9BB63439F5FD5E9012C98252C@SHAASIEXM01.ASIA.ROOT.PRI>
-References: <1408356012-18867-1-git-send-email-Barry.Song@csr.com>
- <CAPDyKFpFLoREZ=rYp8bQvJ7Fczq=HyLL90jv7Hjzai9xTNBNYg@mail.gmail.com>
- <5EB3BFCD089AD643B9BB63439F5FD5E9012C98252C@SHAASIEXM01.ASIA.ROOT.PRI>
-Message-ID: <CAPDyKFp4vV_n5KEGSkdjfDMtbvhFzrdU0oB6N6WpmS9Ant8EOw@mail.gmail.com>
+From: ipaton0@gmail.com (Iain Paton)
+Date: Fri, 22 Aug 2014 11:36:11 +0100
+Subject: Oops: 17 SMP ARM (v3.16-rc2)
+In-Reply-To: <CAOMZO5A3CgaVCKxNDG-zEdwprYdRDXD_XZ2ikW+mns-iieYHsg@mail.gmail.com>
+References: <20140626151424.GT32514@n2100.arm.linux.org.uk>
+ <20140806095012.GN30282@n2100.arm.linux.org.uk>
+ <C4A61A5CA4AD2246942F4BA6F20ACB8043575172@ALVA-EXMB04.alv.autoliv.int>
+ <20140806125550.GO30282@n2100.arm.linux.org.uk>
+ <C4A61A5CA4AD2246942F4BA6F20ACB804357526C@ALVA-EXMB04.alv.autoliv.int>
+ <20140807121248.GY30282@n2100.arm.linux.org.uk>
+ <20140808180900.GG30282@n2100.arm.linux.org.uk>
+ <C4A61A5CA4AD2246942F4BA6F20ACB8043576356@ALVA-EXMB04.alv.autoliv.int>
+ <CAOMZO5B8GR+ABBoJ=dJcFqw3Wagfaip7HM+C1FTz+aE4CmqiPw@mail.gmail.com>
+ <C4A61A5CA4AD2246942F4BA6F20ACB80435776D3@ALVA-EXMB04.alv.autoliv.int>
+ <CAOMZO5B7FgzB7ThVyV2Vk7wTwYgjRWjEnkkAN5uwwKMaBKq1yg@mail.gmail.com>
+ <C4A61A5CA4AD2246942F4BA6F20ACB8043577770@ALVA-EXMB04.alv.autoliv.int>
+ <53F11FF6.8030303@gmail.com>
+ <CAOMZO5CDvQDD7gVLFStwv4MPrUyqZE3sEDZwb0gukkXujYG-6Q@mail.gmail.com>
+ <53F2E89B.80009@gmail.com> <53F5BE3D.5070209@gmail.com>
+ <CAOMZO5A3CgaVCKxNDG-zEdwprYdRDXD_XZ2ikW+mns-iieYHsg@mail.gmail.com>
+Message-ID: <53F71D1B.8090004@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22 August 2014 08:55, Barry Song <Barry.Song@csr.com> wrote:
->> -----Original Message-----
->> From: Ulf Hansson [mailto:ulf.hansson at linaro.org]
->> Sent: Monday, August 18, 2014 7:58 PM
->> To: Barry Song
->> Cc: Chris Ball; linux-mmc; linux-arm-kernel at lists.infradead.org; DL-SHA-
->> WorkGroupLinux; Minda Chen; Barry Song
->> Subject: Re: [PATCH] mmc: core: sd: check card write-protect lock while
->> resuming
+On 22/08/14 01:01, Fabio Estevam wrote:
+> On Thu, Aug 21, 2014 at 6:39 AM, Iain Paton <ipaton0@gmail.com> wrote:
+> 
+>> two and a half days of running this against both a sabre-lite and a
+>> wandboard quad B1 and I still have no reason to think there's any
+>> sort of a problem.
 >>
->> On 18 August 2014 12:00, Barry Song <Barry.Song@csr.com> wrote:
->> > From: Minda Chen <Minda.Chen@csr.com>
->> >
->> > After suspending, unplug the sdcard, and set sd WP lock, insert it
->> > again, then resume the system. resume codes do not check the the
->> > sdcard write-proctect lock. now check it.
->> >
->> > Signed-off-by: Minda Chen <Minda.Chen@csr.com>
->> > Signed-off-by: Barry Song <Baohua.Song@csr.com>
->> > ---
->> >  drivers/mmc/core/sd.c | 7 +++++++
->> >  1 file changed, 7 insertions(+)
->> >
->> > diff --git a/drivers/mmc/core/sd.c b/drivers/mmc/core/sd.c index
->> > 0c44510..890557a 100644
->> > --- a/drivers/mmc/core/sd.c
->> > +++ b/drivers/mmc/core/sd.c
->> > @@ -910,6 +910,7 @@ static int mmc_sd_init_card(struct mmc_host
->> *host, u32 ocr,
->> >         int err;
->> >         u32 cid[4];
->> >         u32 rocr = 0;
->> > +       bool oldro, ro;
->> >
->> >         BUG_ON(!host);
->> >         WARN_ON(!host->claimed);
->> > @@ -922,6 +923,12 @@ static int mmc_sd_init_card(struct mmc_host
->> *host, u32 ocr,
->> >                 if (memcmp(cid, oldcard->raw_cid, sizeof(cid)) != 0)
->> >                         return -ENOENT;
->> >
->> > +               if (host->ops->get_ro) {
->> > +                       ro = host->ops->get_ro(host) ? true : false;
->> > +                       oldro = mmc_card_readonly(oldcard) ? true : false;
->> > +                       if (oldro ^ ro)
->> > +                               return -ENOENT;
->> > +               }
+>> Up to now, my testing has been done with my own config, I'll now
+>> repeat the whole thing using the config Mattis posted to see if
+>> I can reproduce it that way.
 >>
->> Seems like this code belongs better in mmc_sd_setup_card(). Could you try
->> moving it there.
-> [Barry Song]
-> Well. How about:
->
-> diff --git a/drivers/mmc/core/sd.c b/drivers/mmc/core/sd.c
-> index 0c44510..643bc82d8 100644
-> --- a/drivers/mmc/core/sd.c
-> +++ b/drivers/mmc/core/sd.c
-> @@ -815,6 +815,7 @@ int mmc_sd_setup_card(struct mmc_host *host, struct mmc_card *card,
->         bool reinit)
->  {
->         int err;
-> +       int oldro, ro = -1;
->
->         if (!reinit) {
->                 /*
-> @@ -861,23 +862,28 @@ int mmc_sd_setup_card(struct mmc_host *host, struct mmc_card *card,
->         /*
->          * Check if read-only switch is active.
->          */
-> -       if (!reinit) {
-> -               int ro = -1;
->
-> -               if (host->ops->get_ro) {
-> -                       mmc_host_clk_hold(card->host);
-> -                       ro = host->ops->get_ro(host);
-> -                       mmc_host_clk_release(card->host);
-> -               }
-> +       if (host->ops->get_ro) {
-> +               mmc_host_clk_hold(card->host);
-> +               ro = host->ops->get_ro(host);
-> +               mmc_host_clk_release(card->host);
-> +       }
->
-> -               if (ro < 0) {
-> -                       pr_warning("%s: host does not "
-> -                               "support reading read-only "
-> -                               "switch. assuming write-enable.\n",
-> -                               mmc_hostname(host));
-> -               } else if (ro > 0) {
-> -                       mmc_card_set_readonly(card);
-> -               }
-> +       if (ro < 0)
-> +               pr_warning("%s: host does not "
-> +                       "support reading read-only "
-> +                       "switch. assuming write-enable.\n",
-> +                       mmc_hostname(host));
+>> Suggestions on a better / easier / quicker way to reproduce it are
+>> welcome.
+> 
+> Thanks, Iain.
+> 
+> Mattis,
+> 
+> What is the silicon version of the mx6 in your sabrelite? What GCC
+> version do you use?
+> 
 
-I don't wont this pr_warning to spam the log each resume.
-I suppose we could print it only for !reinit, right?
+For reference, both my SL and WBQUAD report silicon rev 1.2
+The RIoTboard uses a Solo and reports silicon rev 1.1
 
-> +
-> +       if (!reinit && (ro > 0))
-> +               mmc_card_set_readonly(card);
-> +       else if (reinit && (ro >= 0)) {
-> +               /* check if the write-protection lock is changed */
-> +               oldro = mmc_card_readonly(card) ? 1 : 0;
-> +               ro = (ro > 0) ? 1 : 0;
-> +
-> +               if (oldro ^ ro)
-> +                       return -ENOENT;
-
-This will have the effect of quickly returning an error to the mmc
-bus' ->suspend callback. That path are not able remove the card
-device, which I guess is what you would like to happen, right?
-
-I am not completely sure, but I believe the card will still be
-operational after resuming. Moreover it will be using the
-initialization frequency and 1-bit bus width and thus performing
-poorly. This is definitely not what we want.
-
-How did you test this patch? Can you confirm my theory above?
-
-The card may only be removed from the mmc_rescan work, scheduled at
-PM_POST_SUSPEND phase. What I think you should do here, is to also set
-the card state into MMC_CARD_REMOVED, by invoking
-mmc_card_set_removed(). Thus the SD's bus_ops->detect callback will
-remove the card during this phase.
-
-Kind regards
-Uffe
+I'm using vanilla gcc 4.9.1 and compiling the kernel natively on a 
+sabre-lite.
