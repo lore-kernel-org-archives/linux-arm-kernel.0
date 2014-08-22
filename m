@@ -1,89 +1,60 @@
 From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Fri, 22 Aug 2014 09:38:12 +0900
-Subject: [PATCH v6 3/6] asm-generic: add generic seccomp.h for secure
- computing mode 1
-In-Reply-To: <CAGXu5j+6kyiZqXF0pScqsCzqDonCthKSvYDVT5+vEd3+iY72vg@mail.gmail.com>
-References: <1408611405-8943-1-git-send-email-takahiro.akashi@linaro.org>	<1408611405-8943-4-git-send-email-takahiro.akashi@linaro.org>
- <CAGXu5j+6kyiZqXF0pScqsCzqDonCthKSvYDVT5+vEd3+iY72vg@mail.gmail.com>
-Message-ID: <53F690F4.8060007@linaro.org>
+Date: Fri, 22 Aug 2014 09:39:35 +0900
+Subject: [PATCH v6 4/6] arm64: add seccomp syscall for compat task
+In-Reply-To: <CAGXu5jK9yThj5Ma1ajmQkNOfL1gggDebmFPdh-KV3R3BkveO_w@mail.gmail.com>
+References: <1408611405-8943-1-git-send-email-takahiro.akashi@linaro.org>	<1408611405-8943-5-git-send-email-takahiro.akashi@linaro.org>
+ <CAGXu5jK9yThj5Ma1ajmQkNOfL1gggDebmFPdh-KV3R3BkveO_w@mail.gmail.com>
+Message-ID: <53F69147.4040204@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/22/2014 02:51 AM, Kees Cook wrote:
+On 08/22/2014 02:52 AM, Kees Cook wrote:
 > On Thu, Aug 21, 2014 at 3:56 AM, AKASHI Takahiro
 > <takahiro.akashi@linaro.org> wrote:
->> Those values (__NR_seccomp_*) are used solely in secure_computing()
->> to identify mode 1 system calls. If compat system calls have different
->> syscall numbers, asm/seccomp.h may override them.
+>> This patch allows compat task to issue seccomp() system call.
 >>
->> Acked-by: Arnd Bergmann <arnd@arndb.de>
 >> Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
->
-> Reviewed-by: Kees Cook <keescook@chromium.org>
->
 >> ---
->>   include/asm-generic/seccomp.h |   28 ++++++++++++++++++++++++++++
->>   1 file changed, 28 insertions(+)
->>   create mode 100644 include/asm-generic/seccomp.h
+>>   arch/arm64/include/asm/unistd.h   |    2 +-
+>>   arch/arm64/include/asm/unistd32.h |    3 +++
+>>   2 files changed, 4 insertions(+), 1 deletion(-)
 >>
->> diff --git a/include/asm-generic/seccomp.h b/include/asm-generic/seccomp.h
->> new file mode 100644
->> index 0000000..5e97022
->> --- /dev/null
->> +++ b/include/asm-generic/seccomp.h
->> @@ -0,0 +1,28 @@
->> +/*
->> + * include/asm-generic/seccomp.h
->> + *
->> + * Copyright (C) 2014 Linaro Limited
->> + * Author: AKASHI Takahiro <takahiro.akashi@linaro.org>
->> + *
->> + * This program is free software; you can redistribute it and/or modify
->> + * it under the terms of the GNU General Public License version 2 as
->> + * published by the Free Software Foundation.
->> + */
->> +#ifndef _ASM_GENERIC_SECCOMP_H
->> +#define _ASM_GENERIC_SECCOMP_H
+>> diff --git a/arch/arm64/include/asm/unistd.h b/arch/arm64/include/asm/unistd.h
+>> index 4bc95d2..cf6ee31 100644
+>> --- a/arch/arm64/include/asm/unistd.h
+>> +++ b/arch/arm64/include/asm/unistd.h
+>> @@ -41,7 +41,7 @@
+>>   #define __ARM_NR_compat_cacheflush     (__ARM_NR_COMPAT_BASE+2)
+>>   #define __ARM_NR_compat_set_tls                (__ARM_NR_COMPAT_BASE+5)
+>>
+>> -#define __NR_compat_syscalls           383
+>> +#define __NR_compat_syscalls           384
+>>   #endif
+>>
+>>   #define __ARCH_WANT_SYS_CLONE
+>> diff --git a/arch/arm64/include/asm/unistd32.h b/arch/arm64/include/asm/unistd32.h
+>> index e242600..2922c40 100644
+>> --- a/arch/arm64/include/asm/unistd32.h
+>> +++ b/arch/arm64/include/asm/unistd32.h
+>> @@ -787,3 +787,6 @@ __SYSCALL(__NR_sched_setattr, sys_sched_setattr)
+>>   __SYSCALL(__NR_sched_getattr, sys_sched_getattr)
+>>   #define __NR_renameat2 382
+>>   __SYSCALL(__NR_renameat2, sys_renameat2)
+>> +#define __NR_seccomp 383
+>> +__SYSCALL(__NR_seccomp, sys_seccomp)
 >> +
->> +#include <asm-generic/unistd.h>
 >
-> While this isn't a problem for ARM, this should be linux/unistd.h for
-> other architectures to get the right stuff.
+> Nit: this adds a trailing blank line. Other than that:
 
 I will fix it.
-
->> +
->> +#if defined(CONFIG_COMPAT) && !defined(__NR_seccomp_read_32)
->> +#define __NR_seccomp_read_32           __NR_read
->> +#define __NR_seccomp_write_32          __NR_write
->> +#define __NR_seccomp_exit_32           __NR_exit
->> +#define __NR_seccomp_sigreturn_32      __NR_rt_sigreturn
->> +#endif /* CONFIG_COMPAT && ! already defined */
->> +
->> +#define __NR_seccomp_read              __NR_read
->> +#define __NR_seccomp_write             __NR_write
->> +#define __NR_seccomp_exit              __NR_exit
->> +#define __NR_seccomp_sigreturn         __NR_rt_sigreturn
->
-> Some architectures use __NR_sigreturn, so this will need to be
-> adjusted in the future into:
->
-> #ifdef __NR_seccomp_sigreturn
-> #define __NR_seccomp_sigreturn         __NR_rt_sigreturn
-> #endif
-
-I will fix it.
-
-> After these changes, I was able to port x86 to using this
-> asm-generic/seccomp.h too.
-
 Thanks,
+
 -Takahiro AKASHI
 
+> Reviewed-by: Kees Cook <keescook@chromium.org>
+>
 > -Kees
 >
->> +
->> +#endif /* _ASM_GENERIC_SECCOMP_H */
 >> --
 >> 1.7.9.5
 >>
