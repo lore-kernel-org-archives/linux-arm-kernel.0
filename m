@@ -1,31 +1,51 @@
 From: nathan_lynch@mentor.com (Nathan Lynch)
-Date: Fri, 22 Aug 2014 16:43:13 -0500
-Subject: [PATCH 0/4] arm_arch_timer: VDSO preparation, code consolidation
-Message-ID: <1408743797-7648-1-git-send-email-nathan_lynch@mentor.com>
+Date: Fri, 22 Aug 2014 16:43:14 -0500
+Subject: [PATCH 1/4] clocksource: arm_arch_timer: change clocksource name if
+ CP15 unavailable
+In-Reply-To: <1408743797-7648-1-git-send-email-nathan_lynch@mentor.com>
+References: <1408743797-7648-1-git-send-email-nathan_lynch@mentor.com>
+Message-ID: <1408743797-7648-2-git-send-email-nathan_lynch@mentor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series contains the necessary changes to allow architected timer
-access from user-space on 32-bit ARM.  This allows the VDSO to support
-high resolution timestamps for clock_gettime and gettimeofday.  This
-also merges substantially similar code from arm and arm64 into the
-core arm_arch_timer driver.
+The arm and arm64 VDSOs need CP15 access to the architected counter.
+If this is unavailable (which is allowed by ARM v7), indicate this by
+changing the clocksource name to "arch_mem_counter" before registering
+the clocksource.
 
-These patches have been carried as part of the ARM VDSO patch set over
-the last several months, but I am splitting them out here as I assume
-they should go through the clocksource maintainer.
+Suggested by Stephen Boyd.
 
-Nathan Lynch (4):
-  clocksource: arm_arch_timer: change clocksource name if CP15
-    unavailable
-  clocksource: arm_arch_timer: enable counter access for 32-bit ARM
-  ARM: arch_timer: remove unused functions
-  arm64: arch_timer: remove unused functions
+Signed-off-by: Nathan Lynch <nathan_lynch@mentor.com>
+Reviewed-by: Stephen Boyd <sboyd@codeaurora.org>
+---
+ drivers/clocksource/arm_arch_timer.c | 12 ++++++++++--
+ 1 file changed, 10 insertions(+), 2 deletions(-)
 
- arch/arm/include/asm/arch_timer.h    | 25 -------------------
- arch/arm64/include/asm/arch_timer.h  | 31 -----------------------
- drivers/clocksource/arm_arch_timer.c | 48 +++++++++++++++++++++++++++++++++---
- 3 files changed, 44 insertions(+), 60 deletions(-)
-
+diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
+index 5163ec13429d..c99afdf12e98 100644
+--- a/drivers/clocksource/arm_arch_timer.c
++++ b/drivers/clocksource/arm_arch_timer.c
+@@ -429,11 +429,19 @@ static void __init arch_counter_register(unsigned type)
+ 	u64 start_count;
+ 
+ 	/* Register the CP15 based counter if we have one */
+-	if (type & ARCH_CP15_TIMER)
++	if (type & ARCH_CP15_TIMER) {
+ 		arch_timer_read_counter = arch_counter_get_cntvct;
+-	else
++	} else {
+ 		arch_timer_read_counter = arch_counter_get_cntvct_mem;
+ 
++		/* If the clocksource name is "arch_sys_counter" the
++		 * VDSO will attempt to read the CP15-based counter.
++		 * Ensure this does not happen when CP15-based
++		 * counter is not available.
++		 */
++		clocksource_counter.name = "arch_mem_counter";
++	}
++
+ 	start_count = arch_timer_read_counter();
+ 	clocksource_register_hz(&clocksource_counter, arch_timer_rate);
+ 	cyclecounter.mult = clocksource_counter.mult;
 -- 
 1.9.3
