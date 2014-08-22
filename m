@@ -1,37 +1,39 @@
 From: geoff@infradead.org (Geoff Levand)
 Date: Fri, 22 Aug 2014 19:49:16 +0000
-Subject: [PATCH 4/9] arm64: Remove unused variable in head.S
+Subject: [PATCH 2/9] arm64: Fix INVALID_HWID definition
 In-Reply-To: <cover.1408736066.git.geoff@infradead.org>
 References: <cover.1408736066.git.geoff@infradead.org>
-Message-ID: <6930ff21b3945aa6a2575f5a8b9bb712fcac688f.1408736066.git.geoff@infradead.org>
+Message-ID: <6f84108ac880ef48548208738cbb169fba2fa51a.1408736066.git.geoff@infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Remove an unused local variable from head.S.  It seems this was never
-used even from the initial commit
-9703d9d7f77ce129621f7d80a844822e2daa7008 (arm64: Kernel booting and
-initialisation), and is a left over from a previous implementation
-of __calc_phys_offset.
+Change the preprocessor macro INVALID_HWID definition from ULONG_MAX to (~0)
+to allow INVALID_HWID to be used within assembly source files.
+
+Commit 3e98fdacc59bbbdbb659be1a144ccc48ed4860fa (arm64: kernel: make the pen of
+the secondary a 64-bit unsigned value) added the preprocessor macro INVALID_HWID
+to asm/cputype.h with it defined to be ULONG_MAX.  Use of INVALID_HWID in an
+assembly source file that includes cputype.h will generate an assembler
+undefined symbol ULONG_MAX build error.  The kernel does define a ULONG_MAX in
+kernel.h, but that file not setup to be included in assembly files.
 
 Signed-off-by: Geoff Levand <geoff@infradead.org>
 ---
- arch/arm64/kernel/head.S | 4 ----
- 1 file changed, 4 deletions(-)
+ arch/arm64/include/asm/cputype.h | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
-index 4019b85..607d4bb 100644
---- a/arch/arm64/kernel/head.S
-+++ b/arch/arm64/kernel/head.S
-@@ -377,10 +377,6 @@ ENTRY(__boot_cpu_mode)
- 	.long	0
- 	.popsection
+diff --git a/arch/arm64/include/asm/cputype.h b/arch/arm64/include/asm/cputype.h
+index 379d0b8..6b68380 100644
+--- a/arch/arm64/include/asm/cputype.h
++++ b/arch/arm64/include/asm/cputype.h
+@@ -16,7 +16,7 @@
+ #ifndef __ASM_CPUTYPE_H
+ #define __ASM_CPUTYPE_H
  
--	.align	3
--2:	.quad	.
--	.quad	PAGE_OFFSET
--
- #ifdef CONFIG_SMP
- 	.align	3
- 1:	.quad	.
+-#define INVALID_HWID		ULONG_MAX
++#define INVALID_HWID		UL(~0)
+ 
+ #define MPIDR_UP_BITMASK	(0x1 << 30)
+ #define MPIDR_MT_BITMASK	(0x1 << 24)
 -- 
 1.9.1
