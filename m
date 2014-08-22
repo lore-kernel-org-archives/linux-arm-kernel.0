@@ -1,173 +1,45 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Fri, 22 Aug 2014 10:40:02 -0700
-Subject: [PATCH] ARM: mvebu: update v7 defconfig with useful options
-Message-ID: <1408729202-11064-1-git-send-email-olof@lixom.net>
+From: dianders@chromium.org (Doug Anderson)
+Date: Fri, 22 Aug 2014 10:43:44 -0700
+Subject: [PATCH] i2c: rk3x: Remove unlikely() annotations
+Message-ID: <1408729424-11433-1-git-send-email-dianders@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Turn on a bunch of options to make my cubox bootable/usable:
+Having a transfer more than 32 bits is not all that unlikely.  Remove
+the annotation.
 
-PRINTK_TIME
-EXT4 (and turn off 2/3 since 4 can mount all filesystems)
-MV643XX_ETH for Dove
-SDHCI for Dove
-DEVTMPFS
-PACKET and UNIX protocol support
+The unlikely in the IRQ handler can't gain us much.  It's not in a
+loop, so at most it would save 1 instruction per IRQ, which isn't
+much.  In fact on the compiler I tested it produced the exact same
+code.  Remove it too.
 
-Much of the other churn is just due to reorderings in the defconfig
-
-Signed-off-by: Olof Johansson <olof@lixom.net>
+Suggested-by: Dmitry Torokhov <dmitry.torokhov@gmail.com>
+Signed-off-by: Doug Anderson <dianders@chromium.org>
 ---
- arch/arm/configs/mvebu_v7_defconfig |   67 ++++++++++++++++-------------------
- 1 file changed, 31 insertions(+), 36 deletions(-)
+ drivers/i2c/busses/i2c-rk3x.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/configs/mvebu_v7_defconfig b/arch/arm/configs/mvebu_v7_defconfig
-index fdfda1f..0acbe11 100644
---- a/arch/arm/configs/mvebu_v7_defconfig
-+++ b/arch/arm/configs/mvebu_v7_defconfig
-@@ -1,4 +1,3 @@
--CONFIG_EXPERIMENTAL=y
- CONFIG_SYSVIPC=y
- CONFIG_FHANDLE=y
- CONFIG_IRQ_DOMAIN_DEBUG=y
-@@ -15,9 +14,6 @@ CONFIG_MACH_ARMADA_375=y
- CONFIG_MACH_ARMADA_38X=y
- CONFIG_MACH_ARMADA_XP=y
- CONFIG_MACH_DOVE=y
--CONFIG_NEON=y
--# CONFIG_CACHE_L2X0 is not set
--# CONFIG_SWP_EMULATE is not set
- CONFIG_PCI=y
- CONFIG_PCI_MSI=y
- CONFIG_PCI_MVEBU=y
-@@ -29,12 +25,14 @@ CONFIG_ZBOOT_ROM_TEXT=0x0
- CONFIG_ZBOOT_ROM_BSS=0x0
- CONFIG_ARM_APPENDED_DTB=y
- CONFIG_ARM_ATAG_DTB_COMPAT=y
-+CONFIG_CPU_FREQ=y
- CONFIG_CPU_IDLE=y
- CONFIG_ARM_MVEBU_V7_CPUIDLE=y
--CONFIG_CPU_FREQ=y
--CONFIG_CPUFREQ_GENERIC=y
- CONFIG_VFP=y
-+CONFIG_NEON=y
- CONFIG_NET=y
-+CONFIG_PACKET=y
-+CONFIG_UNIX=y
- CONFIG_INET=y
- CONFIG_IP_PNP=y
- CONFIG_IP_PNP_DHCP=y
-@@ -44,11 +42,24 @@ CONFIG_BT_MRVL=y
- CONFIG_BT_MRVL_SDIO=y
- CONFIG_CFG80211=y
- CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
-+CONFIG_DEVTMPFS=y
-+CONFIG_DEVTMPFS_MOUNT=y
-+CONFIG_MTD=y
-+CONFIG_MTD_CFI=y
-+CONFIG_MTD_CFI_INTELEXT=y
-+CONFIG_MTD_CFI_AMDSTD=y
-+CONFIG_MTD_CFI_STAA=y
-+CONFIG_MTD_PHYSMAP_OF=y
-+CONFIG_MTD_M25P80=y
-+CONFIG_MTD_NAND=y
-+CONFIG_MTD_NAND_PXA3xx=y
-+CONFIG_MTD_SPI_NOR=y
- CONFIG_BLK_DEV_SD=y
- CONFIG_ATA=y
- CONFIG_AHCI_MVEBU=y
- CONFIG_SATA_MV=y
- CONFIG_NETDEVICES=y
-+CONFIG_MV643XX_ETH=y
- CONFIG_MVNETA=y
- CONFIG_MVPP2=y
- CONFIG_MARVELL_PHY=y
-@@ -58,48 +69,34 @@ CONFIG_INPUT_EVDEV=y
- CONFIG_KEYBOARD_GPIO=y
- CONFIG_SERIAL_8250=y
- CONFIG_SERIAL_8250_CONSOLE=y
-+CONFIG_SERIAL_8250_DW=y
- CONFIG_SERIAL_OF_PLATFORM=y
- CONFIG_I2C=y
-+CONFIG_I2C_MV64XXX=y
- CONFIG_SPI=y
- CONFIG_SPI_ORION=y
--CONFIG_I2C_MV64XXX=y
--CONFIG_MTD=y
--CONFIG_MTD_CHAR=y
--CONFIG_MTD_M25P80=y
--CONFIG_MTD_SPI_NOR=y
--CONFIG_MTD_CFI=y
--CONFIG_MTD_CFI_INTELEXT=y
--CONFIG_MTD_CFI_AMDSTD=y
--CONFIG_MTD_CFI_STAA=y
--CONFIG_MTD_PHYSMAP_OF=y
--CONFIG_MTD_NAND=y
--CONFIG_MTD_NAND_PXA3xx=y
--CONFIG_SERIAL_8250_DW=y
--CONFIG_GPIOLIB=y
- CONFIG_GPIO_SYSFS=y
- CONFIG_THERMAL=y
- CONFIG_ARMADA_THERMAL=y
-+CONFIG_WATCHDOG=y
-+CONFIG_ORION_WATCHDOG=y
- CONFIG_SOUND=y
- CONFIG_SND=y
- CONFIG_SND_SOC=y
- CONFIG_SND_KIRKWOOD_SOC=y
- CONFIG_SND_KIRKWOOD_SOC_ARMADA370_DB=y
--CONFIG_WATCHDOG=y
--CONFIG_ORION_WATCHDOG=y
--CONFIG_USB_SUPPORT=y
- CONFIG_USB=y
-+CONFIG_USB_XHCI_HCD=y
-+CONFIG_USB_XHCI_MVEBU=y
- CONFIG_USB_EHCI_HCD=y
- CONFIG_USB_EHCI_ROOT_HUB_TT=y
- CONFIG_USB_STORAGE=y
--CONFIG_USB_XHCI_HCD=y
--CONFIG_USB_XHCI_MVEBU=y
- CONFIG_MMC=y
--CONFIG_MMC_SDHCI_PXAV3=y
-+CONFIG_MMC_SDHCI=y
-+CONFIG_MMC_SDHCI_PLTFM=y
-+CONFIG_MMC_SDHCI_DOVE=y
- CONFIG_MMC_MVSDIO=y
--CONFIG_NEW_LEDS=y
- CONFIG_LEDS_GPIO=y
--CONFIG_LEDS_CLASS=m
--CONFIG_LEDS_TRIGGERS=y
- CONFIG_LEDS_TRIGGER_TIMER=y
- CONFIG_LEDS_TRIGGER_HEARTBEAT=y
- CONFIG_RTC_CLASS=y
-@@ -107,12 +104,9 @@ CONFIG_RTC_DRV_S35390A=y
- CONFIG_RTC_DRV_MV=y
- CONFIG_DMADEVICES=y
- CONFIG_MV_XOR=y
--CONFIG_MEMORY=y
--CONFIG_MVEBU_DEVBUS=y
- # CONFIG_IOMMU_SUPPORT is not set
--CONFIG_EXT2_FS=y
--CONFIG_EXT3_FS=y
--# CONFIG_EXT3_FS_XATTR is not set
-+CONFIG_MEMORY=y
-+CONFIG_EXT4_FS=y
- CONFIG_ISO9660_FS=y
- CONFIG_JOLIET=y
- CONFIG_UDF_FS=m
-@@ -126,10 +120,11 @@ CONFIG_NLS_CODEPAGE_850=y
- CONFIG_NLS_ISO8859_1=y
- CONFIG_NLS_ISO8859_2=y
- CONFIG_NLS_UTF8=y
--CONFIG_MAGIC_SYSRQ=y
-+CONFIG_PRINTK_TIME=y
-+CONFIG_DEBUG_INFO=y
- CONFIG_DEBUG_FS=y
-+CONFIG_MAGIC_SYSRQ=y
- # CONFIG_SCHED_DEBUG is not set
- CONFIG_TIMER_STATS=y
- # CONFIG_DEBUG_BUGVERBOSE is not set
--CONFIG_DEBUG_INFO=y
- CONFIG_DEBUG_USER=y
+diff --git a/drivers/i2c/busses/i2c-rk3x.c b/drivers/i2c/busses/i2c-rk3x.c
+index 69e1185..b8b2b89 100644
+--- a/drivers/i2c/busses/i2c-rk3x.c
++++ b/drivers/i2c/busses/i2c-rk3x.c
+@@ -208,7 +208,7 @@ static void rk3x_i2c_prepare_read(struct rk3x_i2c *i2c)
+ 	 * The hw can read up to 32 bytes at a time. If we need more than one
+ 	 * chunk, send an ACK after the last byte of the current chunk.
+ 	 */
+-	if (unlikely(len > 32)) {
++	if (len > 32) {
+ 		len = 32;
+ 		con &= ~REG_CON_LASTACK;
+ 	} else {
+@@ -399,7 +399,7 @@ static irqreturn_t rk3x_i2c_irq(int irqno, void *dev_id)
+ 	}
+ 
+ 	/* is there anything left to handle? */
+-	if (unlikely((ipd & REG_INT_ALL) == 0))
++	if ((ipd & REG_INT_ALL) == 0)
+ 		goto out;
+ 
+ 	switch (i2c->state) {
 -- 
-1.7.10.4
+2.1.0.rc2.206.gedb03e5
