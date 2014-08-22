@@ -1,197 +1,76 @@
-From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Fri, 22 Aug 2014 00:13:33 -0500
-Subject: [PATCH] drivers: pci: convert generic host controller to DT host
- bridge creation API
-In-Reply-To: <20140821230133.GI13147@bart.dudau.co.uk>
-References: <1407861695-25549-1-git-send-email-Liviu.Dudau@arm.com>
- <201408201327.57376.arnd@arndb.de> <20140820123112.GG13147@bart.dudau.co.uk>
- <CAErSpo6Z4b3w7j=X9C1YGOV59JHZwZUt7pnVp+Z0erY2RLCNAQ@mail.gmail.com>
- <20140821180216.GA15311@google.com> <20140821230133.GI13147@bart.dudau.co.uk>
-Message-ID: <CAErSpo7-NhCr=DLTua53yZH3EsKk_YjDOFsVLChnndJmxhiB2w@mail.gmail.com>
+From: monstr@monstr.eu (Michal Simek)
+Date: Fri, 22 Aug 2014 07:52:49 +0200
+Subject: [PATCH 9/9] ARM: zynq: Rename 'zynq_platform_cpu_die'
+In-Reply-To: <9c7c26e1-4098-4252-a719-fb7b7205be61@BN1AFFO11FD006.protection.gbl>
+References: <1408567315-28479-1-git-send-email-soren.brinkmann@xilinx.com>
+ <1408567315-28479-10-git-send-email-soren.brinkmann@xilinx.com>
+ <4ac42f4d-72bf-4a8d-a997-094f129d7c74@BN1AFFO11FD020.protection.gbl>
+ <9c7c26e1-4098-4252-a719-fb7b7205be61@BN1AFFO11FD006.protection.gbl>
+Message-ID: <53F6DAB1.9020001@monstr.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 21, 2014 at 6:01 PM, Liviu Dudau <liviu@dudau.co.uk> wrote:
-> On Thu, Aug 21, 2014 at 12:02:16PM -0600, Bjorn Helgaas wrote:
->> [+cc Lorenzo]
->>
->> On Wed, Aug 20, 2014 at 05:35:59PM -0500, Bjorn Helgaas wrote:
->> > On Wed, Aug 20, 2014 at 7:31 AM, Liviu Dudau <liviu@dudau.co.uk> wrote:
->> > > On Wed, Aug 20, 2014 at 01:27:57PM +0200, Arnd Bergmann wrote:
->> > >> On Tuesday 12 August 2014, Liviu Dudau wrote:
->> > >> > +       return of_create_pci_host_bridge(dev, 0, 0xff, &gen_pci_ops,
->> > >> > +                                       gen_pci_setup, pci);
->> > >>
->> > >> I had not noticed it earlier, but the setup callback is actually a feature
->> > >> of the arm32 PCI code that I had hoped to avoid when moving to the
->> > >> generic API. Can we do this as a more regular sequence of
->> > >>
->> > >>
->> > >>       ret = of_create_pci_host_bridge(dev, 0, 0xff, &gen_pci_ops, pci);
->> > >>       if (ret)
->> > >>               return ret;
->> > >>
->> > >>       ret = gen_pci_setup(pci);
->> > >>       if (ret)
->> > >>               pci_destroy_host_bridge(dev, pci);
->> > >>       return ret;
->> > >>
->> > >> ?
->> > >>
->> > >>       Arnd
->> > >
->> > > Hi Arnd,
->> > >
->> > > That has been the general approach of my patchset up to v9. But, as Bjorn has
->> > > mentioned in his v8 review and I have put in my cover letter, the regular
->> > > aproach means that architectures that use pci_scan_root_bus() will have to
->> > > drop their one liner and replace it with the more verbose of_create_pci_host_bridge()
->> > > followed by pci_scan_child_bus() and pci_bus_add_devices() (basically, the content
->> > > of pci_scan_root_bus()). For those architectures it will lead to a net increase of
->> > > lines of code.
->> > >
->> > > The patch for pci-host-generic.c is the first to use the callback setup function, but
->> > > not the only one. My PCI host bridge driver for Juno has the same need, and I'm betting
->> > > all other host bridge controllers will use it as it will be the only opportunity to
->> > > finish the controller setup before we start scanning the child busses. I'm trying to
->> > > balance ease of read vs ease of use here and it is the best version I've come up with
->> > > so far.
->> >
->> > My guess is that you're referring to
->> > http://lkml.kernel.org/r/20140708011136.GE22939 at google.com
->> >
->> > I'm trying to get to the point where arch code can discover the host
->> > bridge, configure it, learn its properties (apertures, etc.), then
->> > pass it off completely to the PCI core for PCI device enumeration.
->> > pci_scan_root_bus() is the closest thing we have to that right now, so
->> > that's why I point to that.  Here's the current pci_scan_root_bus():
->> >
->> >   pci_scan_root_bus()
->> >   {
->> >     pci_create_root_bus();
->> >     /* 1 */
->> >     pci_scan_child_bus()
->> >     /* 2 */
->> >     pci_bus_add_devices()
->> >   }
->> >
->> > This is obviously incomplete as it is -- for example, it does nothing
->> > about assigning resources to PCI devices, so it only works if we rely
->> > completely on the firmware to do that.  Some arches (x86, ia64, etc.)
->> > don't want to rely on firmware, so they basically open-code
->> > pci_scan_root_bus() and insert resource assignment at (2) above.  That
->> > resource assignment really *should* be done in pci_scan_root_bus()
->> > itself, but it's quite a bit of work to make that happen.
->> >
->> > In your case, of_create_pci_host_bridge() open-codes
->> > pci_scan_root_bus() and calls the "setup" callback at (1) in the
->> > outline above.  I don't have any problem with that, and I don't care
->> > whether you do it by passing in a callback function pointer or via
->> > some other means.
->> >
->> > However, I would ask whether this is really a requirement.  Most
->> > (maybe all) other arches require nothing special at (1), i.e., between
->> > pci_create_root_bus() and pci_scan_child_bus().  If you can do it
->> > *before* pci_create_root_bus(), I think that would be nicer, but maybe
->> > you can't.
->>
->> I talked to Lorenzo here at LinuxCon and he explained this so it makes a
->> lot more sense to me now.  Would something like the following work?
->>
->>   gen_pci_probe()
->>   {
->>     LIST_HEAD(res);
->>     resource_size_t io_base = 0;
->>
->>     of_parse_pci_host_bridge_resources(dev, &res, 0, 0xff, &io_base);
->>     gen_pci_setup(&res, io_base);
->>
->>     pci_create_root_bus(..., &res);
->>     pci_scan_child_bus();
->>     ... pci_assign_unassigned_bus_resources
->>     pci_bus_add_resources();
->>   }
->>
->> Then we at least have all the PCI-related code consolidated, without
->> the arch-specific stuff mixed in.  We could almost use pci_scan_root_bus(),
->> but not quite, because of the pci_assign_unassigned_bus_resources() call
->> that pci_scan_root_bus() doesn't do.
->
-> Hmm, after having a little bit more time to get my brain back into the problem
-> I'm now not sure this will be good enough.
->
-> Let me explain what I was trying to solve with the callback that Arnd doesn't
-> like and maybe you (both) can validate if my concerns are real or not:
->
-> I was trying to come up with a function that can easily replace pci_scan_child_bus().
-> The problem I'm facing is that the ranges that we parse from the device tree
-> need to be converted to resources and passed on to the pci_host_bridge structure
-> to be stored as windows. In order for the host bridge driver to be initialised, it
-> also needs to parse the device tree information *and* use the information calculated
-> for the io_base in order to program the address translation correctly. The only way
-> I found to avoid duplicating the parsing step and sequence the initialisation correctly
-> was to introduce the callback.
+On 08/21/2014 09:02 PM, S?ren Brinkmann wrote:
+> On Thu, 2014-08-21 at 02:28PM +0200, Michal Simek wrote:
+>> On 08/20/2014 10:41 PM, Soren Brinkmann wrote:
+>>> Match the naming pattern of all other SMP ops and rename
+>>> zynq_platform_cpu_die --> zynq_cpu_die.
+>>>
+>>> Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
+>>> ---
+>>>  arch/arm/mach-zynq/platsmp.c | 4 ++--
+>>>  1 file changed, 2 insertions(+), 2 deletions(-)
+>>>
+>>> diff --git a/arch/arm/mach-zynq/platsmp.c b/arch/arm/mach-zynq/platsmp.c
+>>> index 04e578718aa2..95933c5e70e1 100644
+>>> --- a/arch/arm/mach-zynq/platsmp.c
+>>> +++ b/arch/arm/mach-zynq/platsmp.c
+>>> @@ -138,7 +138,7 @@ static int zynq_cpu_kill(unsigned cpu)
+>>>   *
+>>>   * Called with IRQs disabled
+>>>   */
+>>> -static void zynq_platform_cpu_die(unsigned int cpu)
+>>> +static void zynq_cpu_die(unsigned int cpu)
+>>>  {
 
-The current v9 patch has this:
+Sorry for incorrect place - I mean to use kernel-doc here not below. :-)
 
-  int of_create_pci_host_bridge(...)
-  {
-    of_pci_parse_bus_range();
-    pci_host_bridge_of_get_ranges();
-    pci_create_root_bus();
-    setup();
-    pci_scan_child_bus();
-    pci_assign_unassigned_bus_resources();
-    pci_bus_add_devices();
-  }
 
-I don't think there's anything that requires setup() to be done after
-pci_create_root_bus().  You do pass the "struct pci_host_bridge *" to
-setup(), but I think that's only a convenient way to pass in the
-resource information that's also passed to pci_create_root_bus().
-setup() doesn't actually require the pci_bus or pci_host_bridge
-structures themselves.  So I think setup() *could* be done before
-pci_create_root_bus().  I think that would be better because then all
-the PCI core stuff is together and can be more easily factored out.
-
-If setup() is before pci_create_root_bus(), my objective is met, and I
-don't care how you structure the rest.  Arnd prefers to avoid the
-callback, and I do agree that we should avoid callbacks when possible.
-
-> If I follow your suggestion with gen_pci_probe() the question I have is about
-> gen_pci_setup(). Is that something that is implemented at architectural level?
-> If so, then we are droping into the arm implementation where each host bridge
-> driver has to register another hook to be called from arch code. If not, then
-> we risk having a platform with two host bridges, each implementing
-> gen_pci_setup().
-
-The gen_pci_setup() in Lorenzo's patch [1] is already in
-pci-host-generic.c and doesn't look arch-specific to me.
-
-[1] http://lkml.kernel.org/r/1407861695-25549-1-git-send-email-Liviu.Dudau at arm.com
-
-> Arnd, one thing I'm trying to figure out is if you are not actually seeing the
-> callback I've introduced as a repeat of the arm implementation. That is not
-> my intent and it is designed to be used only by the host bridge drivers in order
-> to finish their initialisation once all the generic and architectural code has
-> run, but before any actual scanning of the root bus happens.
->
-> Best regards,
-> Liviu
->
+>>>  	zynq_slcr_cpu_state_write(cpu, true);
+>>>  
+>>> @@ -158,7 +158,7 @@ struct smp_operations zynq_smp_ops __initdata = {
+>>>  	.smp_boot_secondary	= zynq_boot_secondary,
+>>>  	.smp_secondary_init	= zynq_secondary_init,
+>>>  #ifdef CONFIG_HOTPLUG_CPU
+>>> -	.cpu_die		= zynq_platform_cpu_die,
+>>> +	.cpu_die		= zynq_cpu_die,
+>>>  	.cpu_kill		= zynq_cpu_kill,
+>>>  #endif
+>>>  };
 >>
->> Bjorn
->>
->
-> --
-> -------------------
->    .oooO
->    (   )
->     \ (  Oooo.
->      \_) (   )
->           ) /
->          (_/
->
->  One small step
->    for me ...
->
+>> Will be good if you can move fix that kernel-doc format for this function
+>> too. It is just nice to have thing.
+> 
+> All these SMP-ops should be documented in the header defining that
+> struct, shouldn't they?
+
+This struct is not necessary. I have added comment to wrong place.
+
+Thanks,
+Michal
+
+-- 
+Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
+w: www.monstr.eu p: +42-0-721842854
+Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
+Maintainer of Linux kernel - Xilinx Zynq ARM architecture
+Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
+
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140822/70a267ca/attachment.sig>
