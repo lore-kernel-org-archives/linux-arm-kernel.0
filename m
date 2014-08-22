@@ -1,182 +1,65 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Thu, 21 Aug 2014 23:59:41 -0500
-Subject: [PATCH v9 03/12] PCI: Introduce helper functions to deal with PCI
- I/O ranges.
-In-Reply-To: <1407860725-25202-4-git-send-email-Liviu.Dudau@arm.com>
-References: <1407860725-25202-1-git-send-email-Liviu.Dudau@arm.com>
- <1407860725-25202-4-git-send-email-Liviu.Dudau@arm.com>
-Message-ID: <CAL_JsqKgW=HN35YnYBtAVDPxMYQfR35Bw3ekonXPmNhjrsVDUg@mail.gmail.com>
+From: computersforpeace@gmail.com (Brian Norris)
+Date: Thu, 21 Aug 2014 22:09:07 -0700
+Subject: [PATCH] ARM: bcm: Don't build brcmstb SMP code when building for
+ V6
+In-Reply-To: <1408673194-16228-1-git-send-email-broonie@kernel.org>
+References: <1408673194-16228-1-git-send-email-broonie@kernel.org>
+Message-ID: <20140822050907.GC3246@norris-Latitude-E6410>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 12, 2014 at 11:25 AM, Liviu Dudau <Liviu.Dudau@arm.com> wrote:
-> Some architectures do not have a simple view of the PCI I/O space
-> and instead use a range of CPU addresses that map to bus addresses.
-> For some architectures these ranges will be expressed by OF bindings
-> in a device tree file.
->
-> This patch introduces a pci_register_io_range() helper function with
-> a generic implementation that can be used by such architectures to
-> keep track of the I/O ranges described by the PCI bindings. If the
-> PCI_IOBASE macro is not defined that signals lack of support for PCI
-> and we return an error.
->
-> In order to retrieve the CPU address associated with an I/O port, a
-> new helper function pci_pio_to_address() is introduced. This will
-> search in the list of ranges registered with pci_register_io_range()
-> and return the CPU address that corresponds to the given port.
->
-> Cc: Grant Likely <grant.likely@linaro.org>
-> Cc: Rob Herring <robh+dt@kernel.org>
-> Cc: Arnd Bergmann <arnd@arndb.de>
-> Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
++ Russell
 
-Acked-by: Rob Herring <robh@kernel.org>
+On Thu, Aug 21, 2014 at 09:06:34PM -0500, Mark Brown wrote:
+> From: Mark Brown <broonie@linaro.org>
+> 
+> The brcmstb SMP code contains isb() and dsb() which are not supported when
 
+The problem is not with isb() and dsb() (which have different
+definitions when v6 is enabled), but with v7_exit_coherency_flush().
 
+> building for -march=armv6 as happens when building allmodconfig. Since I
+> have not been able to identify a way to override the compiler architecture
+> selection per file add a Kconfig dependency to ensure this code is not
+> built if V6 support is enabled.
+
+I already proposed this solution to override the compiler architecture,
+in the same pattern as other similar code in the same directory.
+
+  http://article.gmane.org/gmane.linux.drivers.devicetree/84517
+
+My using 'CFLAGS_<obj> += <flags>', you can compile in v7.
+
+> There is doubtless a better solution.
+
+I think mine is better? Not sure. Comments are welcome.
+
+But anyway, this file *should* be dropped for 3.17 (resolving the
+current problem at hand), if somebody will eventually pick up this
+patch:
+
+  http://article.gmane.org/gmane.linux.kernel/1767679
+
+Hello, anybody? Should Matt be picking this up, or for post-rc1, do
+Arnd/Olof take these patches directly?
+
+> Signed-off-by: Mark Brown <broonie@linaro.org>
 > ---
->  drivers/of/address.c       | 95 ++++++++++++++++++++++++++++++++++++++++++++++
->  include/linux/of_address.h |  2 +
->  2 files changed, 97 insertions(+)
->
-> diff --git a/drivers/of/address.c b/drivers/of/address.c
-> index 5edfcb0..4dab700 100644
-> --- a/drivers/of/address.c
-> +++ b/drivers/of/address.c
-> @@ -5,6 +5,7 @@
->  #include <linux/module.h>
->  #include <linux/of_address.h>
->  #include <linux/pci_regs.h>
-> +#include <linux/slab.h>
->  #include <linux/string.h>
->
->  /* Max address size we deal with */
-> @@ -601,12 +602,106 @@ const __be32 *of_get_address(struct device_node *dev, int index, u64 *size,
->  }
->  EXPORT_SYMBOL(of_get_address);
->
-> +#ifdef PCI_IOBASE
-> +struct io_range {
-> +       struct list_head list;
-> +       phys_addr_t start;
-> +       resource_size_t size;
-> +};
-> +
-> +static LIST_HEAD(io_range_list);
-> +static DEFINE_SPINLOCK(io_range_lock);
-> +#endif
-> +
-> +/*
-> + * Record the PCI IO range (expressed as CPU physical address + size).
-> + * Return a negative value if an error has occured, zero otherwise
-> + */
-> +int __weak pci_register_io_range(phys_addr_t addr, resource_size_t size)
-> +{
-> +#ifdef PCI_IOBASE
-> +       struct io_range *range;
-> +       resource_size_t allocated_size = 0;
-> +
-> +       /* check if the range hasn't been previously recorded */
-> +       spin_lock(&io_range_lock);
-> +       list_for_each_entry(range, &io_range_list, list) {
-> +               if (addr >= range->start && addr + size <= range->start + size)
-> +                       return 0;
-> +               allocated_size += range->size;
-> +       }
-> +       spin_unlock(&io_range_lock);
-> +
-> +       /* range not registed yet, check for available space */
-> +       if (allocated_size + size - 1 > IO_SPACE_LIMIT) {
-> +               /* if it's too big check if 64K space can be reserved */
-> +               if (allocated_size + SZ_64K - 1 > IO_SPACE_LIMIT)
-> +                       return -E2BIG;
-> +
-> +               size = SZ_64K;
-> +               pr_warn("Requested IO range too big, new size set to 64K\n");
-> +       }
-> +
-> +       /* add the range to the list */
-> +       range = kzalloc(sizeof(*range), GFP_KERNEL);
-> +       if (!range)
-> +               return -ENOMEM;
-> +
-> +       range->start = addr;
-> +       range->size = size;
-> +
-> +       list_add_tail(&range->list, &io_range_list);
-> +#endif
-> +
-> +       return 0;
-> +}
-> +
-> +phys_addr_t pci_pio_to_address(unsigned long pio)
-> +{
-> +       phys_addr_t address = (phys_addr_t)OF_BAD_ADDR;
-> +
-> +#ifdef PCI_IOBASE
-> +       struct io_range *range;
-> +       resource_size_t allocated_size = 0;
-> +
-> +       if (pio > IO_SPACE_LIMIT)
-> +               return address;
-> +
-> +       spin_lock(&io_range_lock);
-> +       list_for_each_entry(range, &io_range_list, list) {
-> +               if (pio >= allocated_size && pio < allocated_size + range->size) {
-> +                       address = range->start + pio - allocated_size;
-> +                       break;
-> +               }
-> +               allocated_size += range->size;
-> +       }
-> +       spin_unlock(&io_range_lock);
-> +#endif
-> +
-> +       return address;
-> +}
-> +
->  unsigned long __weak pci_address_to_pio(phys_addr_t address)
->  {
-> +#ifdef PCI_IOBASE
-> +       struct io_range *res;
-> +       resource_size_t offset = 0;
-> +
-> +       list_for_each_entry(res, &io_range_list, list) {
-> +               if (address >= res->start &&
-> +                       address < res->start + res->size) {
-> +                       return res->start - address + offset;
-> +               }
-> +               offset += res->size;
-> +       }
-> +
-> +       return (unsigned long)-1;
-> +#else
->         if (address > IO_SPACE_LIMIT)
->                 return (unsigned long)-1;
->
->         return (unsigned long) address;
-> +#endif
->  }
->
->  static int __of_address_to_resource(struct device_node *dev,
-> diff --git a/include/linux/of_address.h b/include/linux/of_address.h
-> index c13b878..28e6836 100644
-> --- a/include/linux/of_address.h
-> +++ b/include/linux/of_address.h
-> @@ -55,7 +55,9 @@ extern void __iomem *of_iomap(struct device_node *device, int index);
->  extern const __be32 *of_get_address(struct device_node *dev, int index,
->                            u64 *size, unsigned int *flags);
->
-> +extern int pci_register_io_range(phys_addr_t addr, resource_size_t size);
->  extern unsigned long pci_address_to_pio(phys_addr_t addr);
-> +extern phys_addr_t pci_pio_to_address(unsigned long pio);
->
->  extern int of_pci_range_parser_init(struct of_pci_range_parser *parser,
->                         struct device_node *node);
-> --
-> 2.0.4
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>  arch/arm/mach-bcm/Kconfig | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/arch/arm/mach-bcm/Kconfig b/arch/arm/mach-bcm/Kconfig
+> index fc93800..372132d 100644
+> --- a/arch/arm/mach-bcm/Kconfig
+> +++ b/arch/arm/mach-bcm/Kconfig
+> @@ -102,6 +102,7 @@ config ARCH_BCM_5301X
+>  config ARCH_BRCMSTB
+>  	bool "Broadcom BCM7XXX based boards" if ARCH_MULTI_V7
+>  	depends on MMU
+> +	depends on !CPU_V6
+>  	select ARM_GIC
+>  	select MIGHT_HAVE_PCI
+>  	select HAVE_SMP
+
+Regards,
+Brian
