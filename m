@@ -1,88 +1,28 @@
-From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
-Date: Sat, 23 Aug 2014 01:13:05 +0200
-Subject: [PATCH 1/1] ARM: exynos_defconfig: Enable options for display panel
- support
-Message-ID: <1408749185-14133-1-git-send-email-javier.martinez@collabora.co.uk>
+From: javier@dowhile0.org (Javier Martinez Canillas)
+Date: Sat, 23 Aug 2014 01:31:07 +0200
+Subject: [PATCH 2/3] ARM: dts: Add DT changes for display on peach_pit
+In-Reply-To: <1406317464-7525-3-git-send-email-ajaykumar.rs@samsung.com>
+References: <1406317464-7525-1-git-send-email-ajaykumar.rs@samsung.com>
+ <1406317464-7525-3-git-send-email-ajaykumar.rs@samsung.com>
+Message-ID: <CABxcv==PJGDQ85r13OOoWdDONTHu8NYBciNeLLUHQjanoMJYyA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Many Exynos devices have a display panel, most of them just have
-a simple panel while others have more complex configurations that
-requires an embedded DisplayPort (eDP) to LVDS display bridge.
+Hello Ajay,
 
-This patch enables the following features to support both setups:
+On Fri, Jul 25, 2014 at 9:44 PM, Ajay Kumar <ajaykumar.rs@samsung.com> wrote:
+> Add DT nodes for ps8622 bridge chip and panel-simple panel.
+> Add backlight power supply for pwm-backlight.
+> Also add bridge phandle needed by dp to enable display on peach_pit.
+>
+> Note that, peach_pit doesn't support "chunghwa,claa101wb01" panel,
+> but still we choose to reuse the binding since "chunghwa,claa101wb01"
+> has similar LCD timings.
+>
+> Signed-off-by: Ajay Kumar <ajaykumar.rs@samsung.com>
+> ---
 
-- Direct Rendering Manager (DRM)
-- DRM bridge registration and lookup framework
-- Parade ps8622/ps8625 eDP/LVDS bridge
-- NXP ptn3460 eDP/LVDS bridge
-- Exynos Fully Interactive Mobile Display controller (FIMD)
-- Panel registration and lookup framework
-- Simple panels
-- Backlight and LCD device support
-
-Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
----
-
-Some of the options enabled here (e.g: the eDP/LVDS bridges)
-are still not merged in mainline so this patch depends on
-the following posted patches that were still not merged:
-
-"drm/bridge: Modify drm_bridge core to support driver model" [0]
-"drm/bridge: Add i2c based driver for ptn3460 bridge" [1]
-"drm/bridge: Add i2c based driver for ps8622/ps8625 bridge" [2]
-
-But I wanted to post anyways to make easier for others to
-figure out what are the needed options to have the display
-working on their Exynos machines.
-
-In order to test the display panel on the Peach machines,
-the following patches are also needed:
-
-"ARM: dts: Add DT changes for display on peach_pit" [3]
-"ARM: dts: Add DT changes for display on peach_pi" [4]
+Tested-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
 
 Best regards,
 Javier
-
-[0]: http://patchwork.ozlabs.org/patch/373792/
-[1]: http://patchwork.ozlabs.org/patch/373793/
-[2]: http://patchwork.ozlabs.org/patch/373794/
-[3]: http://www.spinics.net/lists/arm-kernel/msg350568.html
-[4]: http://www.spinics.net/lists/arm-kernel/msg350569.html 
-
- arch/arm/configs/exynos_defconfig | 14 ++++++++++++++
- 1 file changed, 14 insertions(+)
-
-diff --git a/arch/arm/configs/exynos_defconfig b/arch/arm/configs/exynos_defconfig
-index 676c744..f69d57e 100644
---- a/arch/arm/configs/exynos_defconfig
-+++ b/arch/arm/configs/exynos_defconfig
-@@ -101,11 +101,25 @@ CONFIG_REGULATOR_S2MPA01=y
- CONFIG_REGULATOR_S2MPS11=y
- CONFIG_REGULATOR_S5M8767=y
- CONFIG_REGULATOR_TPS65090=y
-+CONFIG_DRM=y
-+CONFIG_DRM_BRIDGE=y
-+CONFIG_DRM_PS8622=y
-+CONFIG_DRM_EXYNOS=y
-+CONFIG_DRM_EXYNOS_FIMD=y
-+CONFIG_DRM_EXYNOS_DP=y
-+CONFIG_DRM_PANEL=y
-+CONFIG_DRM_PANEL_SIMPLE=y
- CONFIG_FB=y
- CONFIG_FB_MODE_HELPERS=y
- CONFIG_FB_SIMPLE=y
- CONFIG_EXYNOS_VIDEO=y
- CONFIG_EXYNOS_MIPI_DSI=y
-+CONFIG_BACKLIGHT_LCD_SUPPORT=y
-+CONFIG_LCD_CLASS_DEVICE=y
-+CONFIG_LCD_PLATFORM=y
-+CONFIG_BACKLIGHT_CLASS_DEVICE=y
-+CONFIG_BACKLIGHT_GENERIC=y
-+CONFIG_BACKLIGHT_PWM=y
- CONFIG_FRAMEBUFFER_CONSOLE=y
- CONFIG_FONTS=y
- CONFIG_FONT_7x14=y
--- 
-2.0.1
