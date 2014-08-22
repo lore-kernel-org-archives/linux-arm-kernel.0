@@ -1,143 +1,77 @@
-From: bjorn.andersson@sonymobile.com (Bjorn Andersson)
-Date: Thu, 21 Aug 2014 18:27:49 -0700
-Subject: [PATCH v5 2/3] mfd: qcom-rpm: Driver for the Qualcomm RPM
-In-Reply-To: <20140821132204.GH4266@lee--X1>
-References: <1407796988-25872-1-git-send-email-bjorn.andersson@sonymobile.com>
- <1407796988-25872-3-git-send-email-bjorn.andersson@sonymobile.com>
- <20140821132204.GH4266@lee--X1>
-Message-ID: <20140822012748.GB12494@sonymobile.com>
+From: afaerber@suse.de (=?ISO-8859-15?Q?Andreas_F=E4rber?=)
+Date: Fri, 22 Aug 2014 03:32:42 +0200
+Subject: [PATCH v7 04/11] arm: Support restart through restart handler
+ call chain
+In-Reply-To: <1408495538-27480-5-git-send-email-linux@roeck-us.net>
+References: <1408495538-27480-1-git-send-email-linux@roeck-us.net>
+ <1408495538-27480-5-git-send-email-linux@roeck-us.net>
+Message-ID: <53F69DBA.4070806@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu 21 Aug 06:22 PDT 2014, Lee Jones wrote:
-> > diff --git a/drivers/mfd/qcom_rpm.c b/drivers/mfd/qcom_rpm.c
-> > +static const struct qcom_rpm_data msm8660_template = {
-> > +	.version = -1,
-> 
-> -1?
-> 
+Hi,
 
-2 would be a better number...
-
-> > +	.resource_table = msm8660_rpm_resource_table,
-> > +	.n_resources = ARRAY_SIZE(msm8660_rpm_resource_table),
-> > +};
+Am 20.08.2014 02:45, schrieb Guenter Roeck:
+> The kernel core now supports a restart handler call chain for system
+> restart functions.
 > 
-> [...]
-> 
-> > +struct qcom_rpm *dev_get_qcom_rpm(struct device *dev)
-> > +{
-> > +	return dev_get_drvdata(dev);
-> > +}
-> > +EXPORT_SYMBOL(dev_get_qcom_rpm);
-> 
-> No need for this at all.  Use dev_get_drvdata() direct instead.
-> 
-
-I see that others have put this as static inline in the header file, so I will
-follow that. I don't want to expose this directly in the implementation of the
-clients.
-
-Let me know if you object.
-
-> [...]
-> 
-> > +static int qcom_rpm_probe(struct platform_device *pdev)
-> > +{
+> With this change, the arm_pm_restart callback is now optional, so
+> drop its initialization and check if it is set before calling it.
+> Only call the kernel restart handler if arm_pm_restart is not set.
 [...]
-> > +
-> > +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> > +	rpm->status_regs = devm_ioremap_resource(&pdev->dev, res);
-> > +	rpm->ctrl_regs = rpm->status_regs + 0x400;
-> > +	rpm->req_regs = rpm->status_regs + 0x600;
-> > +	if (IS_ERR(rpm->status_regs))
-> > +		return PTR_ERR(rpm->status_regs);
-> 
-> You should probably do this _before_ using it above.
-> 
+> diff --git a/arch/arm/kernel/process.c b/arch/arm/kernel/process.c
+> index 81ef686..ea279f7 100644
+> --- a/arch/arm/kernel/process.c
+> +++ b/arch/arm/kernel/process.c
+> @@ -114,17 +114,13 @@ void soft_restart(unsigned long addr)
+>  	BUG();
+>  }
+>  
+> -static void null_restart(enum reboot_mode reboot_mode, const char *cmd)
+> -{
+> -}
+> -
+>  /*
+>   * Function pointers to optional machine specific functions
+>   */
+>  void (*pm_power_off)(void);
+>  EXPORT_SYMBOL(pm_power_off);
+>  
+> -void (*arm_pm_restart)(enum reboot_mode reboot_mode, const char *cmd) = null_restart;
+> +void (*arm_pm_restart)(enum reboot_mode reboot_mode, const char *cmd);
 
-There's no difference in behaviour, but it just feels cleaner than:
+Stupid newbie question maybe, but isn't this variable uninitialized now,
+like any non-static variable in C99? Or does the kernel assure that all
+such "fields" are zero-initialized?
 
-res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-rpm->status_regs = devm_ioremap_resource(&pdev->dev, res);
-if (IS_ERR(rpm->status_regs))
-	return PTR_ERR(rpm->status_regs);
-rpm->ctrl_regs = rpm->status_regs + 0x400;
-rpm->req_regs = rpm->status_regs + 0x600;
+>  EXPORT_SYMBOL_GPL(arm_pm_restart);
 
-If you don't like it, I'll change it.
+(This doesn't seem to be affecting the value of arm_pm_restart, just
+redeclaring it extern and adding further derived symbols.)
 
-[...]
-> > +
-> > +	writel(fw_version[0], RPM_CTRL_REG(rpm, 0));
-> > +	writel(fw_version[1], RPM_CTRL_REG(rpm, 1));
-> > +	writel(fw_version[2], RPM_CTRL_REG(rpm, 2));
-> 
-> A comment documenting what this is doing would be helpful here.
-> 
+>  
+>  /*
+> @@ -230,7 +226,10 @@ void machine_restart(char *cmd)
+>  	local_irq_disable();
+>  	smp_send_stop();
+>  
+> -	arm_pm_restart(reboot_mode, cmd);
+> +	if (arm_pm_restart)
 
-Sounds reasonable, this seems to be incorrect now that I had to investigate
-what's really happening. So I'll update it.
+Here we seem to be relying on arm_pm_restart to be NULL when not
+callable. I.e., wondering whether it's ruled out that the following line
+is triggered due to non-zero garbage in arm_pm_restart?
 
-[...]
-> > +}
-> > +
-> > +static int qcom_rpm_remove_child(struct device *dev, void *unused)
-> > +{
-> > +	platform_device_unregister(to_platform_device(dev));
-> > +	return 0;
-> > +}
-> > +
-> > +static int qcom_rpm_remove(struct platform_device *pdev)
-> > +{
-> > +	device_for_each_child(&pdev->dev, NULL, qcom_rpm_remove_child);
-> 
-> of_platform_depopulate()?
-> 
+Thanks,
+Andreas
 
-Forgot that we had that now, will update.
+> +		arm_pm_restart(reboot_mode, cmd);
+> +	else
+> +		do_kernel_restart(cmd);
+>  
+>  	/* Give a grace period for failure to restart of 1s */
+>  	mdelay(1000);
 
-> > +	return 0;
-> > +}
-> > +
-> > +static struct platform_driver qcom_rpm_driver = {
-> > +	.probe = qcom_rpm_probe,
-> > +	.remove = qcom_rpm_remove,
-> > +	.driver  = {
-> > +		.name  = "qcom_rpm",
-> > +		.owner = THIS_MODULE,
-> 
-> Remove this line, it's taken care of for you.
-> 
-
-OK
-
-> > +		.of_match_table = qcom_rpm_of_match,
-> > +	},
-> > +};
-> > +
-> > +static int __init qcom_rpm_init(void)
-> > +{
-> > +	return platform_driver_register(&qcom_rpm_driver);
-> > +}
-> > +arch_initcall(qcom_rpm_init);
-> > +
-> > +static void __exit qcom_rpm_exit(void)
-> > +{
-> > +	platform_driver_unregister(&qcom_rpm_driver);
-> > +}
-> > +module_exit(qcom_rpm_exit)
-> > +
-> > +MODULE_DESCRIPTION("Qualcomm Resource Power Manager driver");
-> > +MODULE_LICENSE("GPL v2");
-> 
-> No one authored this driver?
-> 
-
-Thought that was optional, will update.
-
-
-Thanks for the review!
-
-Regards,
-Bjorn
+-- 
+SUSE LINUX Products GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
+GF: Jeff Hawn, Jennifer Guild, Felix Imend?rffer; HRB 16746 AG N?rnberg
