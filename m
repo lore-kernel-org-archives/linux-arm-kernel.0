@@ -1,71 +1,33 @@
 From: nm@ti.com (Nishanth Menon)
-Date: Fri, 22 Aug 2014 09:03:50 -0500
-Subject: [PATCH 1/6] ARM: dts: OMAP3+: Add PRM interrupt
+Date: Fri, 22 Aug 2014 09:03:55 -0500
+Subject: [PATCH 6/6] ARM: dts: dra7-evm: Mark uart1 rxd as wakeup capable
 In-Reply-To: <1408716235-26164-1-git-send-email-nm@ti.com>
 References: <1408716235-26164-1-git-send-email-nm@ti.com>
-Message-ID: <1408716235-26164-2-git-send-email-nm@ti.com>
+Message-ID: <1408716235-26164-7-git-send-email-nm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Provide OMAP3, 4 and OMAP5 with interrupt number for PRM
-
-And for DRA7, provide crossbar number for prm interrupt.
+Mark rxd as wakeupcapable for 115200n8 no hardware-flow control
+configuration. If h/w flow control is being used, then rts/cts
+appropriately should be used.
 
 Signed-off-by: Nishanth Menon <nm@ti.com>
 ---
- arch/arm/boot/dts/dra7.dtsi  |    1 +
- arch/arm/boot/dts/omap3.dtsi |    1 +
- arch/arm/boot/dts/omap4.dtsi |    1 +
- arch/arm/boot/dts/omap5.dtsi |    1 +
- 4 files changed, 4 insertions(+)
+ arch/arm/boot/dts/dra7-evm.dts |    2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
-index 97f603c..7a3e011 100644
---- a/arch/arm/boot/dts/dra7.dtsi
-+++ b/arch/arm/boot/dts/dra7.dtsi
-@@ -89,6 +89,7 @@
- 		prm: prm at 4ae06000 {
- 			compatible = "ti,dra7-prm";
- 			reg = <0x4ae06000 0x3000>;
-+			interrupts = <GIC_SPI 6 IRQ_TYPE_LEVEL_HIGH>;
+diff --git a/arch/arm/boot/dts/dra7-evm.dts b/arch/arm/boot/dts/dra7-evm.dts
+index 50f8022..a329177 100644
+--- a/arch/arm/boot/dts/dra7-evm.dts
++++ b/arch/arm/boot/dts/dra7-evm.dts
+@@ -303,6 +303,8 @@
+ 	status = "okay";
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&uart1_pins>;
++	interrupts-extended = <&gic GIC_SPI 67 IRQ_TYPE_LEVEL_HIGH
++			       &dra7_pmx_core 0x3e0>;
+ };
  
- 			prm_clocks: clocks {
- 				#address-cells = <1>;
-diff --git a/arch/arm/boot/dts/omap3.dtsi b/arch/arm/boot/dts/omap3.dtsi
-index 575a49b..3136ed1 100644
---- a/arch/arm/boot/dts/omap3.dtsi
-+++ b/arch/arm/boot/dts/omap3.dtsi
-@@ -97,6 +97,7 @@
- 		prm: prm at 48306000 {
- 			compatible = "ti,omap3-prm";
- 			reg = <0x48306000 0x4000>;
-+			interrupts = <11>;
- 
- 			prm_clocks: clocks {
- 				#address-cells = <1>;
-diff --git a/arch/arm/boot/dts/omap4.dtsi b/arch/arm/boot/dts/omap4.dtsi
-index 69408b5..7375d44 100644
---- a/arch/arm/boot/dts/omap4.dtsi
-+++ b/arch/arm/boot/dts/omap4.dtsi
-@@ -129,6 +129,7 @@
- 		prm: prm at 4a306000 {
- 			compatible = "ti,omap4-prm";
- 			reg = <0x4a306000 0x3000>;
-+			interrupts = <GIC_SPI 11 IRQ_TYPE_LEVEL_HIGH>;
- 
- 			prm_clocks: clocks {
- 				#address-cells = <1>;
-diff --git a/arch/arm/boot/dts/omap5.dtsi b/arch/arm/boot/dts/omap5.dtsi
-index fc8df17..df0a09b 100644
---- a/arch/arm/boot/dts/omap5.dtsi
-+++ b/arch/arm/boot/dts/omap5.dtsi
-@@ -131,6 +131,7 @@
- 		prm: prm at 4ae06000 {
- 			compatible = "ti,omap5-prm";
- 			reg = <0x4ae06000 0x3000>;
-+			interrupts = <GIC_SPI 11 IRQ_TYPE_LEVEL_HIGH>;
- 
- 			prm_clocks: clocks {
- 				#address-cells = <1>;
+ &uart2 {
 -- 
 1.7.9.5
