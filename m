@@ -1,43 +1,33 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 22 Aug 2014 10:03:43 +0100
-Subject: [PATCH V2] ARM/ARM64: KVM: Nuke Hyp-mode tlbs before enabling MMU
-In-Reply-To: <20140804120648.GB524@cbox>
-References: <1406789604-10533-1-git-send-email-pranavkumar@linaro.org>
- <20140804120648.GB524@cbox>
-Message-ID: <53F7076F.1010502@arm.com>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Fri, 22 Aug 2014 11:13:02 +0200
+Subject: [PATCH] ARM: dts: nitrogen6x: Add Intersil ISL1208 RTC
+Message-ID: <1408698782-2327-1-git-send-email-p.zabel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/08/14 13:06, Christoffer Dall wrote:
-> On Thu, Jul 31, 2014 at 12:23:23PM +0530, Pranavkumar Sawargaonkar wrote:
->> X-Gene u-boot runs in EL2 mode with MMU enabled hence we might
->> have stale EL2 tlb enteris when we enable EL2 MMU on each host CPU.
->>
->> This can happen on any ARM/ARM64 board running bootloader in
->> Hyp-mode (or EL2-mode) with MMU enabled.
->>
->> This patch ensures that we flush all Hyp-mode (or EL2-mode) TLBs
->> on each host CPU before enabling Hyp-mode (or EL2-mode) MMU.
->>
->> Changelog:
->>
->> V2:
->>  - Flush Hyp-mode TLBs for both KVM ARM32 and KVM ARM64 at boot time
->>
->> V1:
->>  - Initial patch with only arm64 change
->>
->> Signed-off-by: Pranavkumar Sawargaonkar <pranavkumar@linaro.org>
->> Signed-off-by: Anup Patel <anup.patel@linaro.org>
-> 
-> Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
+This patch adds the battery backed real time clock connected to I2C1
+to the device tree.
 
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
+---
+ arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-This should probably go in quickly as a fix.
-
-Thanks,
-
-	M.
+diff --git a/arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi b/arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi
+index 2c67048..0821812 100644
+--- a/arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi
+@@ -192,6 +192,11 @@
+ 		VDDA-supply = <&reg_2p5v>;
+ 		VDDIO-supply = <&reg_3p3v>;
+ 	};
++
++	rtc: rtc at 6f {
++		compatible = "isil,isl1208";
++		reg = <0x6f>;
++	};
+ };
+ 
+ &i2c2 {
 -- 
-Jazz is not dead. It just smells funny...
+2.1.0.rc1
