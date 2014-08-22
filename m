@@ -1,114 +1,162 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Fri, 22 Aug 2014 15:46:05 +0800
-Subject: [PATCH v2] ARM: dts: Gateworks GW5520 support (i.MX6)
-In-Reply-To: <1408679706-18200-1-git-send-email-tharvey@gateworks.com>
-References: <1407572602-14017-1-git-send-email-tharvey@gateworks.com>
- <1408679706-18200-1-git-send-email-tharvey@gateworks.com>
-Message-ID: <20140822074604.GB2540@dragon>
+From: d-gerlach@ti.com (Dave Gerlach)
+Date: Fri, 22 Aug 2014 02:46:02 -0500
+Subject: [PATCH v7 RESEND] ARM: omap: edma: add suspend suspend/resume hooks
+Message-ID: <1408693562-18068-1-git-send-email-d-gerlach@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 21, 2014 at 08:55:06PM -0700, Tim Harvey wrote:
-> +&iomuxc {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_hog>;
+From: Daniel Mack <zonque@gmail.com>
 
-  DTC     arch/arm/boot/dts/imx6dl-gw552x.dtb
-ERROR (phandle_references): Reference to non-existent node or label "pinctrl_hog"
+This patch makes the edma driver resume correctly after suspend. Tested
+on an AM33xx platform with cyclic audio streams and omap_hsmmc.
 
-> +
-> +	imx6qdl-gw552x {
-> +		pinctrl_gpio: gpiogrp {
-> +			fsl,pins = <
-> +				MX6QDL_PAD_GPIO_9__GPIO1_IO09	0x4001b0b0 /* USBHUB_RST# */
-> +				MX6QDL_PAD_GPIO_17__GPIO7_IO12	0x4001b0b0 /* PCIESKT_WDIS# */
-> +			>;
-> +		};
+All information can be reconstructed by already known runtime
+information.
 
-pinctrl_gpio is not referenced by any client device, so kernel will not
-set up these two pins.
+As we now use some functions that were previously only used from __init
+context, annotations had to be dropped.
 
-Shawn
+[nm at ti.com: added error handling for runtime + suspend_late/early_resume]
+Signed-off-by: Nishanth Menon <nm@ti.com>
+Signed-off-by: Daniel Mack <zonque@gmail.com>
+Tested-by: Joel Fernandes <joelf@ti.com>
+Acked-by: Joel Fernandes <joelf@ti.com>
+[d-gerlach at ti.com: updated to remove queue_tc_mapping use]
+Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
+---
 
-> +
-> +		pinctrl_gpio_leds: gpioledsgrp {
-> +			fsl,pins = <
-> +				MX6QDL_PAD_KEY_COL0__GPIO4_IO06		0x1b0b0
-> +				MX6QDL_PAD_KEY_ROW0__GPIO4_IO07		0x1b0b0
-> +				MX6QDL_PAD_KEY_ROW4__GPIO4_IO15		0x1b0b0
-> +			>;
-> +		};
-> +
-> +		pinctrl_gpmi_nand: gpminandgrp {
-> +			fsl,pins = <
-> +				MX6QDL_PAD_NANDF_CLE__NAND_CLE		0xb0b1
-> +				MX6QDL_PAD_NANDF_ALE__NAND_ALE		0xb0b1
-> +				MX6QDL_PAD_NANDF_WP_B__NAND_WP_B	0xb0b1
-> +				MX6QDL_PAD_NANDF_RB0__NAND_READY_B	0xb000
-> +				MX6QDL_PAD_NANDF_CS0__NAND_CE0_B	0xb0b1
-> +				MX6QDL_PAD_NANDF_CS1__NAND_CE1_B	0xb0b1
-> +				MX6QDL_PAD_SD4_CMD__NAND_RE_B		0xb0b1
-> +				MX6QDL_PAD_SD4_CLK__NAND_WE_B		0xb0b1
-> +				MX6QDL_PAD_NANDF_D0__NAND_DATA00	0xb0b1
-> +				MX6QDL_PAD_NANDF_D1__NAND_DATA01	0xb0b1
-> +				MX6QDL_PAD_NANDF_D2__NAND_DATA02	0xb0b1
-> +				MX6QDL_PAD_NANDF_D3__NAND_DATA03	0xb0b1
-> +				MX6QDL_PAD_NANDF_D4__NAND_DATA04	0xb0b1
-> +				MX6QDL_PAD_NANDF_D5__NAND_DATA05	0xb0b1
-> +				MX6QDL_PAD_NANDF_D6__NAND_DATA06	0xb0b1
-> +				MX6QDL_PAD_NANDF_D7__NAND_DATA07	0xb0b1
-> +			>;
-> +		};
-> +
-> +		pinctrl_i2c1: i2c1grp {
-> +			fsl,pins = <
-> +				MX6QDL_PAD_EIM_D21__I2C1_SCL		0x4001b8b1
-> +				MX6QDL_PAD_EIM_D28__I2C1_SDA		0x4001b8b1
-> +			>;
-> +		};
-> +
-> +		pinctrl_i2c2: i2c2grp {
-> +			fsl,pins = <
-> +				MX6QDL_PAD_KEY_COL3__I2C2_SCL		0x4001b8b1
-> +				MX6QDL_PAD_KEY_ROW3__I2C2_SDA		0x4001b8b1
-> +			>;
-> +		};
-> +
-> +		pinctrl_i2c3: i2c3grp {
-> +			fsl,pins = <
-> +				MX6QDL_PAD_GPIO_3__I2C3_SCL		0x4001b8b1
-> +				MX6QDL_PAD_GPIO_6__I2C3_SDA		0x4001b8b1
-> +			>;
-> +		};
-> +
-> +		pinctrl_pcie: pciegrp {
-> +			fsl,pins = <
-> +				MX6QDL_PAD_ENET_TXD1__GPIO1_IO29	0x1b0b0
-> +			>;
-> +		};
-> +
-> +		pinctrl_uart2: uart2grp {
-> +			fsl,pins = <
-> +				MX6QDL_PAD_SD4_DAT7__UART2_TX_DATA	0x1b0b1
-> +				MX6QDL_PAD_SD4_DAT4__UART2_RX_DATA	0x1b0b1
-> +			>;
-> +		};
-> +
-> +		pinctrl_uart3: uart3grp {
-> +			fsl,pins = <
-> +				MX6QDL_PAD_EIM_D24__UART3_TX_DATA	0x1b0b1
-> +				MX6QDL_PAD_EIM_D25__UART3_RX_DATA	0x1b0b1
-> +			>;
-> +		};
-> +
-> +		pinctrl_uart5: uart5grp {
-> +			fsl,pins = <
-> +				MX6QDL_PAD_KEY_COL1__UART5_TX_DATA	0x1b0b1
-> +				MX6QDL_PAD_KEY_ROW1__UART5_RX_DATA	0x1b0b1
-> +			>;
-> +                };
-> +	};
-> +};
-> -- 
-> 1.8.3.2
-> 
+Needed for am335x suspend, but never got picked up. Previously
+sent here: http://marc.info/?l=linux-arm-kernel&m=138556067416051&w=2
+
+ arch/arm/common/edma.c | 86 ++++++++++++++++++++++++++++++++++++++++++++++++--
+ 1 file changed, 84 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/common/edma.c b/arch/arm/common/edma.c
+index 8809917..ece1e3d 100644
+--- a/arch/arm/common/edma.c
++++ b/arch/arm/common/edma.c
+@@ -244,6 +244,8 @@ struct edma {
+ 	/* list of channels with no even trigger; terminated by "-1" */
+ 	const s8	*noevent;
+ 
++	struct edma_soc_info *info;
++
+ 	/* The edma_inuse bit for each PaRAM slot is clear unless the
+ 	 * channel is in use ... by ARM or DSP, for QDMA, or whatever.
+ 	 */
+@@ -295,7 +297,7 @@ static void map_dmach_queue(unsigned ctlr, unsigned ch_no,
+ 			~(0x7 << bit), queue_no << bit);
+ }
+ 
+-static void __init assign_priority_to_queue(unsigned ctlr, int queue_no,
++static void assign_priority_to_queue(unsigned ctlr, int queue_no,
+ 		int priority)
+ {
+ 	int bit = queue_no * 4;
+@@ -314,7 +316,7 @@ static void __init assign_priority_to_queue(unsigned ctlr, int queue_no,
+  * included in that particular EDMA variant (Eg : dm646x)
+  *
+  */
+-static void __init map_dmach_param(unsigned ctlr)
++static void map_dmach_param(unsigned ctlr)
+ {
+ 	int i;
+ 	for (i = 0; i < EDMA_MAX_DMACH; i++)
+@@ -1791,15 +1793,95 @@ static int edma_probe(struct platform_device *pdev)
+ 			edma_write_array2(j, EDMA_DRAE, i, 1, 0x0);
+ 			edma_write_array(j, EDMA_QRAE, i, 0x0);
+ 		}
++		edma_cc[j]->info = info[j];
+ 		arch_num_cc++;
+ 	}
+ 
+ 	return 0;
+ }
+ 
++static int edma_pm_suspend(struct device *dev)
++{
++	int j, r;
++
++	r = pm_runtime_get_sync(dev);
++	if (r < 0) {
++		dev_err(dev, "%s: get_sync returned %d\n", __func__, r);
++		return r;
++	}
++
++	for (j = 0; j < arch_num_cc; j++) {
++		struct edma *ecc = edma_cc[j];
++
++		disable_irq(ecc->irq_res_start);
++		disable_irq(ecc->irq_res_end);
++	}
++
++	pm_runtime_put_sync(dev);
++
++	return 0;
++}
++
++static int edma_pm_resume(struct device *dev)
++{
++	int i, j, r;
++
++	r = pm_runtime_get_sync(dev);
++	if (r < 0) {
++		dev_err(dev, "%s: get_sync returned %d\n", __func__, r);
++		return r;
++	}
++
++	for (j = 0; j < arch_num_cc; j++) {
++		struct edma *cc = edma_cc[j];
++
++		s8 (*queue_priority_mapping)[2];
++
++		queue_priority_mapping = cc->info->queue_priority_mapping;
++
++		/* Event queue priority mapping */
++		for (i = 0; queue_priority_mapping[i][0] != -1; i++)
++			assign_priority_to_queue(j,
++						 queue_priority_mapping[i][0],
++						 queue_priority_mapping[i][1]);
++
++		/*
++		 * Map the channel to param entry if channel mapping logic
++		 * exist
++		 */
++		if (edma_read(j, EDMA_CCCFG) & CHMAP_EXIST)
++			map_dmach_param(j);
++
++		for (i = 0; i < cc->num_channels; i++) {
++			if (test_bit(i, cc->edma_inuse)) {
++				/* ensure access through shadow region 0 */
++				edma_or_array2(j, EDMA_DRAE, 0, i >> 5,
++					       BIT(i & 0x1f));
++
++				setup_dma_interrupt(i,
++						    cc->intr_data[i].callback,
++						    cc->intr_data[i].data);
++			}
++		}
++
++		enable_irq(cc->irq_res_start);
++		enable_irq(cc->irq_res_end);
++	}
++
++	pm_runtime_put_sync(dev);
++
++	return 0;
++}
++
++static const struct dev_pm_ops edma_pm_ops = {
++	.suspend_late	= edma_pm_suspend,
++	.resume_early	= edma_pm_resume,
++};
++
+ static struct platform_driver edma_driver = {
+ 	.driver = {
+ 		.name	= "edma",
++		.pm	= &edma_pm_ops,
+ 		.of_match_table = edma_of_ids,
+ 	},
+ 	.probe = edma_probe,
+-- 
+1.9.0
