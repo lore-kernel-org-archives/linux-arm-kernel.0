@@ -1,79 +1,43 @@
 From: nm@ti.com (Nishanth Menon)
-Date: Fri, 22 Aug 2014 08:49:27 -0500
-Subject: [PATCH 1/7] ARM: OMAP: DRA7: powerdomain data: fix powerdomain
- powerstate
-In-Reply-To: <1408715373-25791-1-git-send-email-nm@ti.com>
-References: <1408715373-25791-1-git-send-email-nm@ti.com>
-Message-ID: <1408715373-25791-2-git-send-email-nm@ti.com>
+Date: Fri, 22 Aug 2014 08:49:26 -0500
+Subject: [PATCH 0/7] ARM: OMAP4+: powerdomain fixes
+Message-ID: <1408715373-25791-1-git-send-email-nm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-DRA7 supports only CSWR for CPU, MPU power domains. Core power domain
-supports upto INA.
+Hi,
 
-Signed-off-by: Nishanth Menon <nm@ti.com>
----
- arch/arm/mach-omap2/powerdomain.h          |    1 +
- arch/arm/mach-omap2/powerdomains7xx_data.c |   14 +++++++-------
- 2 files changed, 8 insertions(+), 7 deletions(-)
+The following series are various fixes and improvements for
+powerdomain support in OMAP4+.
 
-diff --git a/arch/arm/mach-omap2/powerdomain.h b/arch/arm/mach-omap2/powerdomain.h
-index f472711..a754c82 100644
---- a/arch/arm/mach-omap2/powerdomain.h
-+++ b/arch/arm/mach-omap2/powerdomain.h
-@@ -39,6 +39,7 @@
- #define PWRSTS_OFF_RET		(PWRSTS_OFF | PWRSTS_RET)
- #define PWRSTS_RET_ON		(PWRSTS_RET | PWRSTS_ON)
- #define PWRSTS_OFF_RET_ON	(PWRSTS_OFF_RET | PWRSTS_ON)
-+#define PWRSTS_INA_ON		(PWRSTS_INACTIVE | PWRSTS_ON)
- 
- 
- /*
-diff --git a/arch/arm/mach-omap2/powerdomains7xx_data.c b/arch/arm/mach-omap2/powerdomains7xx_data.c
-index 48151d1..287a203 100644
---- a/arch/arm/mach-omap2/powerdomains7xx_data.c
-+++ b/arch/arm/mach-omap2/powerdomains7xx_data.c
-@@ -160,8 +160,8 @@ static struct powerdomain core_7xx_pwrdm = {
- 	.name		  = "core_pwrdm",
- 	.prcm_offs	  = DRA7XX_PRM_CORE_INST,
- 	.prcm_partition	  = DRA7XX_PRM_PARTITION,
--	.pwrsts		  = PWRSTS_RET_ON,
--	.pwrsts_logic_ret = PWRSTS_OFF_RET,
-+	.pwrsts		  = PWRSTS_INA_ON,
-+	.pwrsts_logic_ret = PWRSTS_RET,
- 	.banks		  = 5,
- 	.pwrsts_mem_ret	= {
- 		[0] = PWRSTS_OFF_RET,	/* core_nret_bank */
-@@ -193,8 +193,8 @@ static struct powerdomain cpu0_7xx_pwrdm = {
- 	.name		  = "cpu0_pwrdm",
- 	.prcm_offs	  = DRA7XX_MPU_PRCM_PRM_C0_INST,
- 	.prcm_partition	  = DRA7XX_MPU_PRCM_PARTITION,
--	.pwrsts		  = PWRSTS_OFF_RET_ON,
--	.pwrsts_logic_ret = PWRSTS_OFF_RET,
-+	.pwrsts		  = PWRSTS_RET_ON,
-+	.pwrsts_logic_ret = PWRSTS_RET,
- 	.banks		  = 1,
- 	.pwrsts_mem_ret	= {
- 		[0] = PWRSTS_OFF_RET,	/* cpu0_l1 */
-@@ -209,8 +209,8 @@ static struct powerdomain cpu1_7xx_pwrdm = {
- 	.name		  = "cpu1_pwrdm",
- 	.prcm_offs	  = DRA7XX_MPU_PRCM_PRM_C1_INST,
- 	.prcm_partition	  = DRA7XX_MPU_PRCM_PARTITION,
--	.pwrsts		  = PWRSTS_OFF_RET_ON,
--	.pwrsts_logic_ret = PWRSTS_OFF_RET,
-+	.pwrsts		  = PWRSTS_RET_ON,
-+	.pwrsts_logic_ret = PWRSTS_RET,
- 	.banks		  = 1,
- 	.pwrsts_mem_ret	= {
- 		[0] = PWRSTS_OFF_RET,	/* cpu1_l1 */
-@@ -243,7 +243,7 @@ static struct powerdomain mpu_7xx_pwrdm = {
- 	.prcm_offs	  = DRA7XX_PRM_MPU_INST,
- 	.prcm_partition	  = DRA7XX_PRM_PARTITION,
- 	.pwrsts		  = PWRSTS_RET_ON,
--	.pwrsts_logic_ret = PWRSTS_OFF_RET,
-+	.pwrsts_logic_ret = PWRSTS_RET,
- 	.banks		  = 2,
- 	.pwrsts_mem_ret	= {
- 		[0] = PWRSTS_OFF_RET,	/* mpu_l2 */
+This is part 1/6 series which eventually enables framework for
+suspend-to-ram and cpuidle for OMAP5 and DRA7
+
+Each of series is based on v3.17-rc1 and this specific series is available:
+weblink: https://github.com/nmenon/linux-2.6-playground/commits/push/v3.17/powerdomain-fixes
+
+git repo: https://github.com/nmenon/linux-2.6-playground.git push/v3.17/powerdomain-fixes
+
+An complete integrated branch is available here: https://github.com/nmenon/linux-2.6-playground/commits/testing/v3.17/cpu-idle-suspend-dra7-omap5-framework
+
+Nishanth Menon (7):
+  ARM: OMAP: DRA7: powerdomain data: fix powerdomain powerstate
+  ARM: OMAP5: powerdomain data: fix powerdomain powerstate
+  ARM: OMAP2+: powerdomain: pwrdm_for_each_clkdm iterate only valid
+    clkdms
+  ARM: OMAP2+: powerdomain: introduce logic for finding valid power
+    domain
+  ARM: OMAP4+: PM: Make logic state programmable
+  ARM: OMAP4+: PM: use only valid low power state for suspend
+  ARM: OMAP4+: PM: Use only valid low power state for CPU hotplug
+
+ arch/arm/mach-omap2/omap-mpuss-lowpower.c   |    4 ++
+ arch/arm/mach-omap2/pm44xx.c                |    9 +++-
+ arch/arm/mach-omap2/powerdomain.c           |   76 ++++++++++++++++++++++++++-
+ arch/arm/mach-omap2/powerdomain.h           |    4 ++
+ arch/arm/mach-omap2/powerdomains54xx_data.c |   12 ++---
+ arch/arm/mach-omap2/powerdomains7xx_data.c  |   14 ++---
+ 6 files changed, 103 insertions(+), 16 deletions(-)
+
 -- 
 1.7.9.5
