@@ -1,87 +1,61 @@
 From: nm@ti.com (Nishanth Menon)
-Date: Fri, 22 Aug 2014 09:02:26 -0500
-Subject: [PATCH 02/10] ARM: OMAP5 / DRA7: PM: Set MPUSS-EMIF clock-domain
- static dependency
+Date: Fri, 22 Aug 2014 09:02:34 -0500
+Subject: [PATCH 10/10] ARM: DRA7: Add hook in SoC initcalls to enable pm
+ initialization
 In-Reply-To: <1408716154-26101-1-git-send-email-nm@ti.com>
 References: <1408716154-26101-1-git-send-email-nm@ti.com>
-Message-ID: <1408716154-26101-3-git-send-email-nm@ti.com>
+Message-ID: <1408716154-26101-11-git-send-email-nm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Santosh Shilimkar <santosh.shilimkar@ti.com>
+From: Rajendra Nayak <rnayak@ti.com>
 
-With EMIF clock-domain put under hardware supervised control, memory
-corruption and untraceable crashes are observed on OMAP5. Further
-investigation revealed that there is a weakness in the PRCM on this
-specific dynamic depedency.
+With consolidated code, now we can add the required hooks for
+DRA7 to enable power management.
 
-The recommendation is to set MPUSS static dependency towards EMIF
-clock-domain to avoid issues. This recommendation holds good for DRA7
-family of devices as well.
-
-Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-[rnayak at ti.com: DRA7]
 Signed-off-by: Rajendra Nayak <rnayak@ti.com>
-[nm at ti.com: conflict resolution, dra7]
+[nm at ti.com: minor modifications]
 Signed-off-by: Nishanth Menon <nm@ti.com>
 ---
- arch/arm/mach-omap2/pm44xx.c |   36 +++++++++++++++++++++++++++++++++---
- 1 file changed, 33 insertions(+), 3 deletions(-)
+Note: Minor checkpatch warning exists for 80 char limit that was ignored.
 
-diff --git a/arch/arm/mach-omap2/pm44xx.c b/arch/arm/mach-omap2/pm44xx.c
-index 0dda6cf..b6f243d 100644
---- a/arch/arm/mach-omap2/pm44xx.c
-+++ b/arch/arm/mach-omap2/pm44xx.c
-@@ -203,6 +203,32 @@ static inline int omap4_init_static_deps(void)
+ arch/arm/mach-omap2/common.h |    2 +-
+ arch/arm/mach-omap2/io.c     |    3 +++
+ 2 files changed, 4 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm/mach-omap2/common.h b/arch/arm/mach-omap2/common.h
+index 5bb1592..b6d2989 100644
+--- a/arch/arm/mach-omap2/common.h
++++ b/arch/arm/mach-omap2/common.h
+@@ -60,7 +60,7 @@ static inline int omap3_pm_init(void)
  }
+ #endif
  
- /**
-+ * omap5_dra7_init_static_deps - Init static clkdm dependencies on OMAP5 and
-+ *				 DRA7
-+ *
-+ * The dynamic dependency between MPUSS -> EMIF is broken and has
-+ * not worked as expected. The hardware recommendation is to
-+ * enable static dependencies for these to avoid system
-+ * lock ups or random crashes.
-+ */
-+static inline int omap5_dra7_init_static_deps(void)
-+{
-+	struct clockdomain *mpuss_clkdm, *emif_clkdm;
-+	int ret;
-+
-+	mpuss_clkdm = clkdm_lookup("mpu_clkdm");
-+	emif_clkdm = clkdm_lookup("emif_clkdm");
-+	if (!mpuss_clkdm || !emif_clkdm)
-+		return -EINVAL;
-+
-+	ret = clkdm_add_wkdep(mpuss_clkdm, emif_clkdm);
-+	if (ret)
-+		pr_err("Failed to add MPUSS -> EMIF wakeup dependency\n");
-+
-+	return ret;
-+}
-+
-+/**
-  * omap4_pm_init_early - Does early initialization necessary for OMAP4+ devices
-  *
-  * Initializes basic stuff for power management functionality.
-@@ -239,10 +265,14 @@ int __init omap4_pm_init(void)
- 		goto err2;
- 	}
+-#if defined(CONFIG_PM) && (defined(CONFIG_ARCH_OMAP4) || defined(CONFIG_SOC_OMAP5))
++#if defined(CONFIG_PM) && (defined(CONFIG_ARCH_OMAP4) || defined(CONFIG_SOC_OMAP5) || defined(CONFIG_SOC_DRA7XX))
+ int omap4_pm_init(void);
+ int omap4_pm_init_early(void);
+ #else
+diff --git a/arch/arm/mach-omap2/io.c b/arch/arm/mach-omap2/io.c
+index 2890c2d..831805e 100644
+--- a/arch/arm/mach-omap2/io.c
++++ b/arch/arm/mach-omap2/io.c
+@@ -698,6 +698,7 @@ void __init dra7xx_init_early(void)
+ 	omap2_set_globals_cm(OMAP2_L4_IO_ADDRESS(DRA7XX_CM_CORE_AON_BASE),
+ 			     OMAP2_L4_IO_ADDRESS(OMAP54XX_CM_CORE_BASE));
+ 	omap2_set_globals_prcm_mpu(OMAP2_L4_IO_ADDRESS(OMAP54XX_PRCM_MPU_BASE));
++	omap4_pm_init_early();
+ 	omap_prm_base_init();
+ 	omap_cm_base_init();
+ 	omap44xx_prm_init();
+@@ -712,6 +713,8 @@ void __init dra7xx_init_early(void)
+ void __init dra7xx_init_late(void)
+ {
+ 	omap_common_late_init();
++	omap4_pm_init();
++	omap2_clk_enable_autoidle_all();
+ }
+ #endif
  
--	if (cpu_is_omap44xx()) {
-+	if (cpu_is_omap44xx())
- 		ret = omap4_init_static_deps();
--		if (ret)
--			goto err2;
-+	else if (soc_is_omap54xx() || soc_is_dra7xx())
-+		ret = omap5_dra7_init_static_deps();
-+
-+	if (ret) {
-+		pr_err("Failed to initialise static dependencies.\n");
-+		goto err2;
- 	}
- 
- 	ret = omap4_mpuss_init();
 -- 
 1.7.9.5
