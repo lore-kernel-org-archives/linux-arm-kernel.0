@@ -1,65 +1,97 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Fri, 22 Aug 2014 14:15:30 +0200
-Subject: [PATCH 00/24] PM / Domains: Generic OF-based support and cleanups
-In-Reply-To: <1402397497-26737-1-git-send-email-ulf.hansson@linaro.org>
-References: <1402397497-26737-1-git-send-email-ulf.hansson@linaro.org>
-Message-ID: <CAMuHMdWLLcWvgvY_nC4doEGnHxNJEQfx5RYbJqZfjm0UT=J47Q@mail.gmail.com>
+From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
+Date: Fri, 22 Aug 2014 14:15:46 +0200
+Subject: [PATCH v9 1/2] regulator: Add driver for max77802 PMIC PMIC
+ regulators
+In-Reply-To: <CA+NduCDL65=Y=PyU3FfXsTz0FfbmYzicGrY4U7ji3_V+nXhtCQ@mail.gmail.com>
+References: <1408350762-15520-1-git-send-email-javier.martinez@collabora.co.uk>	<1408350762-15520-2-git-send-email-javier.martinez@collabora.co.uk>
+ <CA+NduCDL65=Y=PyU3FfXsTz0FfbmYzicGrY4U7ji3_V+nXhtCQ@mail.gmail.com>
+Message-ID: <53F73472.8010609@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ulf, Tomasz,
+Hello Yuvaraj,
 
-On Tue, Jun 10, 2014 at 12:51 PM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
-> Parts of this patchset has been posted earlier. To be able to smoothly continue
-> my work in re-factoring genpd I have collected patches into this patchset.
+On 08/22/2014 08:01 AM, Yuvaraj Cd wrote:
+>> +
+>> +static int max77802_pmic_probe(struct platform_device *pdev)
+>> +{
+>> +       struct max77686_dev *iodev = dev_get_drvdata(pdev->dev.parent);
+>> +       struct max77686_platform_data *pdata = dev_get_platdata(iodev->dev);
+>> +       struct max77802_regulator_prv *max77802;
+>> +       int i, ret = 0, val;
+>> +       struct regulator_config config = { };
+>> +
+>> +       /* This is allocated by the MFD driver */
+>> +       if (!pdata) {
+>> +               dev_err(&pdev->dev, "no platform data found for regulator\n");
+>> +               return -ENODEV;
+>> +       }
+>> +
+>> +       max77802 = devm_kzalloc(&pdev->dev,
+>> +                               sizeof(struct max77802_regulator_prv),
+>> +                               GFP_KERNEL);
+>> +       if (!max77802)
+>> +               return -ENOMEM;
+>> +
+>> +       if (iodev->dev->of_node) {
+>> +               ret = max77802_pmic_dt_parse_pdata(pdev, pdata);
+>> +               if (ret)
+>> +                       return ret;
+>> +       }
+>> +
+>> +       config.dev = iodev->dev;
+>> +       config.regmap = iodev->regmap;
+>> +       config.driver_data = max77802;
+>> +       platform_set_drvdata(pdev, max77802);
+>> +
+>> +       for (i = 0; i < MAX77802_REG_MAX; i++) {
+>> +               struct regulator_dev *rdev;
+>> +               int id = pdata->regulators[i].id;
+>> +               int shift = max77802_get_opmode_shift(id);
+>> +
+>> +               config.init_data = pdata->regulators[i].initdata;
+>> +               config.of_node = pdata->regulators[i].of_node;
+>> +
+>> +               ret = regmap_read(iodev->regmap, regulators[i].enable_reg, &val);
+>> +               max77802->opmode[id] = val >> shift & MAX77802_OPMODE_MASK;
+> 
+> I have been using this patch series for adding UHS support for dw_mmc
+> driver. During reboot testing I came across an issue where card
+> detection fails due to vqmmc regulator not getting enabled. On
+> debugging further, I found that PMIC driver is reading the operating
+> mode during probe and reusing it in the enable function. With the UHS
+> patches vqmmc regulator gets disabled during POWER_OFF and if we do
+> warm reboot, an incorrect operating mode(OFF) is read. This leads to
+> the vqmmc regulator staying disabled. I have referred to 77686 driver
+> and observed that they are handling this a little differently. With
+> the following change in the driver above issue is resolved:
+> 
+> -               ret = regmap_read(iodev->regmap,
+> regulators[i].enable_reg, &val);
+> -               max77802->opmode[id] = val >> shift & MAX77802_OPMODE_MASK;
+> +               max77802->opmode[i] = regulators[i].enable_mask >> shift;
+> 
+
+I don't think this change is correct it its current form since
+.enable_mask is initialized to MAX77802_OPMODE_MASK << shift so this is
+actually setting the opmode to MAX77802_OPMODE_MASK.
+
+Now, MAX77802_OPMODE_MASK has the same value than MAX77802_OPMODE_NORMAL
+so what you are really doing here is initializing the opmode to
+MAX77802_OPMODE_NORMAL.
+
+> Please have a look and let me know, if there is any better way of handling this.
 >
-> The complete patchset is available at the linux-pm_linux-next_genpd branch at:
-> git.linaro.org/people/ulf.hansson/linux-2.6.git
-> This branch is based upon Rafael's linux-pm tree's linux-next branch.
->
-> And important note. There are dependencies througout this patchset, which means
-> the all need to go together. I suggest we use Rafael's tree, thus I seek for
-> acks from the affected ARM SoC maintainers.
->
-> Tomasz Figa (3):
->   base: power: Add generic OF-based power domain look-up
->   drivercore: Bind/unbind power domain on probe/remove
->   ARM: exynos: Move to generic power domain bindings
->
-> Ulf Hansson (21):
->   PM / Domains: Ignore callbacks for subsys generic_pm_domain_data
->   PM / Domains: Remove the pm_genpd_add|remove_callbacks APIs
->   PM / Domains: Remove system PM callbacks from gpd_dev_ops
->   ARM: shmobile: Drop dev_irq_safe from r8a7779 genpd config
->   ARM: shmobile: Drop dev_irq_safe from R-mobile genpd config
->   PM / Domains: Remove dev_irq_safe from genpd config
->   PM / Domains: Remove redundant check for CONFIG_PM
->   PM / Domains: Remove legacy API for adding devices through DT
->   PM / Domains: Remove pm_genpd_syscore_switch() API
->   PM / Domains: Remove genpd_queue_power_off_work() API
->   PM / Domains: Add late_initcall to disable unused domains
->   ARM: exynos: Leave disabling of unused pm domains to genpd
->   ARM: s3c64xx: Leave disabling of unused pm domains to genpd
->   drivers: sh: Leave disabling of unused pm domains to genpd
->   PM / Domains: Remove default_stop_ok() API
->   dt: bindings: ux500: Add documentation for power domains
->   dt: bindings: ux500: Add header for power domains specifiers
->   ARM: ux500: Initial support for power domains
->   ARM: ux500: Enable Kconfig for the generic power domain
->   ARM: ux500: Add DT node for ux500 power domains
->   ARM: ux500: Add sdi[n] devices to VAPE power domain
 
-What are your plans with this patch series?
+The first versions of this driver did in fact set the opmode to
+MAX77802_OPMODE_NORMAL on probe but Mark asked me to read it from the
+hardware instead [0]. I was indeed worried at the time that something like
+this could happen on a warm reset [1].
 
-Thanks!
+Mark, any opinions on how this should be solved will be highly appreciated.
 
-Gr{oetje,eeting}s,
+Best regards,
+Javier
 
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+[0]: https://lkml.org/lkml/2014/6/16/576
+[1]: https://lkml.org/lkml/2014/6/17/174
