@@ -1,46 +1,32 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Fri, 22 Aug 2014 13:30:54 -0500
-Subject: [PATCH v9 1/2] regulator: Add driver for max77802 PMIC PMIC
- regulators
-In-Reply-To: <53F7838F.8060906@collabora.co.uk>
-References: <1408350762-15520-1-git-send-email-javier.martinez@collabora.co.uk>
- <1408350762-15520-2-git-send-email-javier.martinez@collabora.co.uk>
- <CA+NduCDL65=Y=PyU3FfXsTz0FfbmYzicGrY4U7ji3_V+nXhtCQ@mail.gmail.com>
- <53F73472.8010609@collabora.co.uk>
- <20140822144531.GV24407@sirena.org.uk>
- <53F7838F.8060906@collabora.co.uk>
-Message-ID: <20140822183054.GY24407@sirena.org.uk>
+From: dianders@chromium.org (Doug Anderson)
+Date: Fri, 22 Aug 2014 11:33:02 -0700
+Subject: [PATCH v4] i2c: rk3x: fix bug that cause transfer fails in master
+ receive mode
+In-Reply-To: <1408730452-3552-1-git-send-email-addy.ke@rock-chips.com>
+References: <1408669991-9703-1-git-send-email-addy.ke@rock-chips.com>
+ <1408730452-3552-1-git-send-email-addy.ke@rock-chips.com>
+Message-ID: <CAD=FV=Vof8mOmCHkRyrhjGBewJqJaCu==1RfUZ+8C9Jm+UH50w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 22, 2014 at 07:53:19PM +0200, Javier Martinez Canillas wrote:
-> On 08/22/2014 04:45 PM, Mark Brown wrote:
-> > On Fri, Aug 22, 2014 at 02:15:46PM +0200, Javier Martinez Canillas wrote:
+Addy,
 
-> >> Mark, any opinions on how this should be solved will be highly appreciated.
+On Fri, Aug 22, 2014 at 11:00 AM, Addy Ke <addy.ke@rock-chips.com> wrote:
+> In rk3x SOC, the I2C controller can receive/transmit up to 32 bytes data
+> in one chunk, so the size of data to be write/read to/from TXDATAx/RXDATAx
+> must be less than or equal 32 bytes at a time.
+>
+> Tested on rk3288-pinky board, elan receive 158 bytes data.
+>
+> Suggested-by: Dmitry Torokhov <dmitry.torokhov@gmail.com>
 
-> > If someone could tell me what "this" is that'd help...
+You only need a "Suggested-by" if the entire patch was suggested by
+someone.  If someone provides you review feedback you don't need it.
 
-> Sorry for not being clear on that regard. By "this" I meant the problem
-> reported by Yuvaraj.
+Said another way: in this case Dmitry didn't suggest that you need to
+fix the i2c controller to transmit 32 byte chunks (he only provided
+review feedback), so you shouldn't say this was Suggested-by him.
 
-That mail was rather lengthy and seemed to be discussing several issues.
+You also had my reviewed-by on a previous version so you could keep it.
 
-> The problem is that one of these regulators is used as the vqmmc-supply
-> (VCCQ/VDD_IO) so the mmc host controller driver disables it on
-> MMC_POWER_OFF. Now AFAIK (Yuvaraj can correct me what I got wrong) this
-> shouldn't be an issue since on card detection, the vqmmc supply should be
-> enabled again but on Exynos the built-in card detect line is on the same
-> power rail as vqmmc. That means that disabling the regulator prevents card
-> insertions to be detected.
-
-If the MMC host controller needs a supply enabling in order to do card
-detection and it's supposed to be doing card detection I'd expect it to
-be enabling that supply.  Why is it not doing that?
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140822/c1622e3c/attachment-0001.sig>
+Reviewed-by: Doug Anderson <dianders@chromium.org>
