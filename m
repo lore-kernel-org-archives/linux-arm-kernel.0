@@ -1,109 +1,33 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Fri, 22 Aug 2014 13:47:09 -0700
-Subject: [PATCH 3/3] ARM: zynq: DT: Add Ethernet phys
-In-Reply-To: <f166a186-301c-4288-97cf-71f8173c07e7@BN1AFFO11FD010.protection.gbl>
-References: <1408550219-19825-1-git-send-email-soren.brinkmann@xilinx.com>
- <1408550219-19825-3-git-send-email-soren.brinkmann@xilinx.com>
- <5a7b6f57-b6c0-4fb3-af0d-d403277c0207@BN1AFFO11FD045.protection.gbl>
- <53F5D8D9.7040604@suse.de>
- <f166a186-301c-4288-97cf-71f8173c07e7@BN1AFFO11FD010.protection.gbl>
-Message-ID: <CAGVrzcYWN83tznwvw1M9V_mwWgobs2kwtRvEj4stqE=XGC10fg@mail.gmail.com>
+From: sjoerd.simons@collabora.co.uk (Sjoerd Simons)
+Date: Fri, 22 Aug 2014 22:56:59 +0200
+Subject: [PATCH 0/2] Fix Exynos peach USB on kernels with USB Gadget support
+Message-ID: <1408741021-17759-1-git-send-email-sjoerd.simons@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2014-08-21 8:49 GMT-07:00 S?ren Brinkmann <soren.brinkmann@xilinx.com>:
-> On Thu, 2014-08-21 at 01:32PM +0200, Andreas F?rber wrote:
->> Am 21.08.2014 10:41, schrieb Michal Simek:
->> > On 08/20/2014 05:56 PM, Soren Brinkmann wrote:
->> >> Add missing Ethernet phys to Zynq DTs.
->> >>
->> >> Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
->> >> ---
->> >>  arch/arm/boot/dts/zynq-zc702.dts | 6 ++++++
->> >>  arch/arm/boot/dts/zynq-zc706.dts | 6 ++++++
->> >>  arch/arm/boot/dts/zynq-zed.dts   | 6 ++++++
->> >>  3 files changed, 18 insertions(+)
->> >>
->> >> diff --git a/arch/arm/boot/dts/zynq-zc702.dts b/arch/arm/boot/dts/zynq-zc702.dts
->> >> index 30bcfe20f0bc..fa810505ab8f 100644
->> >> --- a/arch/arm/boot/dts/zynq-zc702.dts
->> >> +++ b/arch/arm/boot/dts/zynq-zc702.dts
->> >> @@ -36,6 +36,12 @@
->> >>  &gem0 {
->> >>    status = "okay";
->> >>    phy-mode = "rgmii-id";
->> >> +  phy-handle = <&ethernet_phy>;
->> >> +
->> >> +  ethernet_phy: ethernet-phy at 7 {
->> >> +          compatible = "marvell,88e1116r", "ethernet-phy-ieee802.3-c22";
->> >
->> > c22 is completely unused by the kernel and also c22 is default option anyway.
->> > Any advantage to have c22 specified here?
->>
->> http://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/tree/Documentation/devicetree/bindings/net/phy.txt
->>
->> S?ren's marvell,* entries do not seem documented, therefore I used the
->> documented "ethernet-phy-idAAAA.BBBB" based syntax. The documented
->> example specifically uses -c22, too.
->>
->> Either it's okay to prepend unrecognized model strings, then you should
->> update zynq-parallella.dts as well (I put the model in a comment there)
->> or use the official strings like I used and keep the readable models as
->> comments. Documenting all those "marvell,88e1116r", "marvell,88e1518",
->> "marvell,88e1318" PHY bindings and possibly prepending them to the ID
->> based strings would be another option, of course.
->
-> These phy-bindings are everything than obvious to me. It seems the docs
-> are spread across a couple of different files and not fully up to date
-> either. I basically tried to get something working out of the docs, the
-> parallela and our vendor DT files.
+When building a kernel with support for both USB host and USB Gadget support on
+the dwc3 controller on the Exynos5 soc will go into USB OTG mode unless
+otherwise specified in the dtb, which is unhelpful for boards hooked up to run
+as USB host.
 
-There is one file that describes everything that is needed in
-Documentation/devicetree/bindings/net/phy.txt, if it is not clear,
-patches are welcome.
+First patch in this set explicitely set the dual-role mode for the dwc3
+controller on Peach pi and Peach pit boards to host mode. Second patch enables
+gadget mode in the default exynos config to more easily catch/trigger issues
+like these.
 
->
-> So my thinkings:
->  - the compatible string with the -c22 is used and documented in the phy
->    bindings, it should be there.
+I suspect other boards base using exynos5420/5800 might need the similar fixes
+(Arndale Octa and Samsung SMDK5420) to their dts files, so would be great if
+folks with those board could verify this.
 
-The clause 22 compatible string is not used, but we do need it to know
-it is not a clause 45 PHY, which implicitly makes the clause 22
-compatible string used.
+Sjoerd Simons (2):
+  ARM: dts: exynos: Explicitly set dr_mode on peach-pit and peach-pi
+  ARM: exynos_defconfig: enable USB gadget support
 
->  - the ID based strings seem to be not needed since, IIUC, the core
->    reads the ID from the PHY and uses it, so I just left it out not
->    trying to figure out how to obtain the correct ID
-
-It is not needed, but it is one way to specify a PHY device if you do
-not know what compatible string to use instead.
-
->  - the marvell compatible strings are used in our vendor tree. They
->    aren't used anywhere but in our vendor tree. I though keeping them is
->    nice since it identifies the PHY fully. And in case that level of
->    detail is needed at some point it is already there.
-
-And this is the recommended way to do it in case we ever need to key a
-software decision based on the hardware.
-
->
-> Assuming that we wanna keep things this way, I'm happy to re-spin this
-> patch and also add a similar compatible string to the parallela DT.
-
-Your initial patchset is correct with repesct to how the Device Tree
-binding for Ethernet PHY nodes is defined.
-
->
->         Thanks,
->         S?ren
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-
-
+ arch/arm/boot/dts/exynos5420-peach-pit.dts | 8 ++++++++
+ arch/arm/boot/dts/exynos5420.dtsi          | 4 ++--
+ arch/arm/boot/dts/exynos5800-peach-pi.dts  | 8 ++++++++
+ arch/arm/configs/exynos_defconfig          | 1 +
+ 4 files changed, 19 insertions(+), 2 deletions(-)
 
 -- 
-Florian
+2.1.0
