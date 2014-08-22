@@ -1,49 +1,142 @@
-From: jingchang.lu@freescale.com (Jingchang Lu)
-Date: Fri, 22 Aug 2014 17:34:56 +0800
-Subject: [RESEND] clk: ppc-corenet: Add Freescale ARM-based platforms
- CLK_OF_DECLARE support
-Message-ID: <1408700096-25415-1-git-send-email-jingchang.lu@freescale.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Fri, 22 Aug 2014 12:00:01 +0200
+Subject: [PATCH] mmc: core: sd: check card write-protect lock while
+ resuming
+In-Reply-To: <5EB3BFCD089AD643B9BB63439F5FD5E9012C98252C@SHAASIEXM01.ASIA.ROOT.PRI>
+References: <1408356012-18867-1-git-send-email-Barry.Song@csr.com>
+ <CAPDyKFpFLoREZ=rYp8bQvJ7Fczq=HyLL90jv7Hjzai9xTNBNYg@mail.gmail.com>
+ <5EB3BFCD089AD643B9BB63439F5FD5E9012C98252C@SHAASIEXM01.ASIA.ROOT.PRI>
+Message-ID: <CAPDyKFp4vV_n5KEGSkdjfDMtbvhFzrdU0oB6N6WpmS9Ant8EOw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Jingchang Lu <jingchang.lu@freescale.com>
----
- drivers/clk/Kconfig           | 7 ++++---
- drivers/clk/clk-ppc-corenet.c | 5 +++++
- 2 files changed, 9 insertions(+), 3 deletions(-)
+On 22 August 2014 08:55, Barry Song <Barry.Song@csr.com> wrote:
+>> -----Original Message-----
+>> From: Ulf Hansson [mailto:ulf.hansson at linaro.org]
+>> Sent: Monday, August 18, 2014 7:58 PM
+>> To: Barry Song
+>> Cc: Chris Ball; linux-mmc; linux-arm-kernel at lists.infradead.org; DL-SHA-
+>> WorkGroupLinux; Minda Chen; Barry Song
+>> Subject: Re: [PATCH] mmc: core: sd: check card write-protect lock while
+>> resuming
+>>
+>> On 18 August 2014 12:00, Barry Song <Barry.Song@csr.com> wrote:
+>> > From: Minda Chen <Minda.Chen@csr.com>
+>> >
+>> > After suspending, unplug the sdcard, and set sd WP lock, insert it
+>> > again, then resume the system. resume codes do not check the the
+>> > sdcard write-proctect lock. now check it.
+>> >
+>> > Signed-off-by: Minda Chen <Minda.Chen@csr.com>
+>> > Signed-off-by: Barry Song <Baohua.Song@csr.com>
+>> > ---
+>> >  drivers/mmc/core/sd.c | 7 +++++++
+>> >  1 file changed, 7 insertions(+)
+>> >
+>> > diff --git a/drivers/mmc/core/sd.c b/drivers/mmc/core/sd.c index
+>> > 0c44510..890557a 100644
+>> > --- a/drivers/mmc/core/sd.c
+>> > +++ b/drivers/mmc/core/sd.c
+>> > @@ -910,6 +910,7 @@ static int mmc_sd_init_card(struct mmc_host
+>> *host, u32 ocr,
+>> >         int err;
+>> >         u32 cid[4];
+>> >         u32 rocr = 0;
+>> > +       bool oldro, ro;
+>> >
+>> >         BUG_ON(!host);
+>> >         WARN_ON(!host->claimed);
+>> > @@ -922,6 +923,12 @@ static int mmc_sd_init_card(struct mmc_host
+>> *host, u32 ocr,
+>> >                 if (memcmp(cid, oldcard->raw_cid, sizeof(cid)) != 0)
+>> >                         return -ENOENT;
+>> >
+>> > +               if (host->ops->get_ro) {
+>> > +                       ro = host->ops->get_ro(host) ? true : false;
+>> > +                       oldro = mmc_card_readonly(oldcard) ? true : false;
+>> > +                       if (oldro ^ ro)
+>> > +                               return -ENOENT;
+>> > +               }
+>>
+>> Seems like this code belongs better in mmc_sd_setup_card(). Could you try
+>> moving it there.
+> [Barry Song]
+> Well. How about:
+>
+> diff --git a/drivers/mmc/core/sd.c b/drivers/mmc/core/sd.c
+> index 0c44510..643bc82d8 100644
+> --- a/drivers/mmc/core/sd.c
+> +++ b/drivers/mmc/core/sd.c
+> @@ -815,6 +815,7 @@ int mmc_sd_setup_card(struct mmc_host *host, struct mmc_card *card,
+>         bool reinit)
+>  {
+>         int err;
+> +       int oldro, ro = -1;
+>
+>         if (!reinit) {
+>                 /*
+> @@ -861,23 +862,28 @@ int mmc_sd_setup_card(struct mmc_host *host, struct mmc_card *card,
+>         /*
+>          * Check if read-only switch is active.
+>          */
+> -       if (!reinit) {
+> -               int ro = -1;
+>
+> -               if (host->ops->get_ro) {
+> -                       mmc_host_clk_hold(card->host);
+> -                       ro = host->ops->get_ro(host);
+> -                       mmc_host_clk_release(card->host);
+> -               }
+> +       if (host->ops->get_ro) {
+> +               mmc_host_clk_hold(card->host);
+> +               ro = host->ops->get_ro(host);
+> +               mmc_host_clk_release(card->host);
+> +       }
+>
+> -               if (ro < 0) {
+> -                       pr_warning("%s: host does not "
+> -                               "support reading read-only "
+> -                               "switch. assuming write-enable.\n",
+> -                               mmc_hostname(host));
+> -               } else if (ro > 0) {
+> -                       mmc_card_set_readonly(card);
+> -               }
+> +       if (ro < 0)
+> +               pr_warning("%s: host does not "
+> +                       "support reading read-only "
+> +                       "switch. assuming write-enable.\n",
+> +                       mmc_hostname(host));
 
-diff --git a/drivers/clk/Kconfig b/drivers/clk/Kconfig
-index cfd3af7..8784704 100644
---- a/drivers/clk/Kconfig
-+++ b/drivers/clk/Kconfig
-@@ -82,11 +82,12 @@ config COMMON_CLK_AXI_CLKGEN
- 	  FPGAs. It is commonly used in Analog Devices' reference designs.
- 
- config CLK_PPC_CORENET
--	bool "Clock driver for PowerPC corenet platforms"
--	depends on PPC_E500MC && OF
-+	bool "Clock driver for PowerPC corenet and compatible ARM-based platforms"
-+	depends on (PPC_E500MC || ARM) && OF
- 	---help---
- 	  This adds the clock driver support for Freescale PowerPC corenet
--	  platforms using common clock framework.
-+	  platforms and compatible Freescale ARM based platforms using common
-+	  clock framework.
- 
- config COMMON_CLK_XGENE
- 	bool "Clock driver for APM XGene SoC"
-diff --git a/drivers/clk/clk-ppc-corenet.c b/drivers/clk/clk-ppc-corenet.c
-index 8e58edf..7692cac 100644
---- a/drivers/clk/clk-ppc-corenet.c
-+++ b/drivers/clk/clk-ppc-corenet.c
-@@ -305,3 +305,8 @@ static int __init ppc_corenet_clk_init(void)
- 	return platform_driver_register(&ppc_corenet_clk_driver);
- }
- subsys_initcall(ppc_corenet_clk_init);
-+
-+CLK_OF_DECLARE(ppc_core_pll_v1, "fsl,qoriq-core-pll-1.0", core_pll_init);
-+CLK_OF_DECLARE(ppc_core_pll_v2, "fsl,qoriq-core-pll-2.0", core_pll_init);
-+CLK_OF_DECLARE(ppc_core_mux_v1, "fsl,qoriq-core-mux-1.0", core_mux_init);
-+CLK_OF_DECLARE(ppc_core_mux_v2, "fsl,qoriq-core-mux-2.0", core_mux_init);
--- 
-1.8.0
+I don't wont this pr_warning to spam the log each resume.
+I suppose we could print it only for !reinit, right?
+
+> +
+> +       if (!reinit && (ro > 0))
+> +               mmc_card_set_readonly(card);
+> +       else if (reinit && (ro >= 0)) {
+> +               /* check if the write-protection lock is changed */
+> +               oldro = mmc_card_readonly(card) ? 1 : 0;
+> +               ro = (ro > 0) ? 1 : 0;
+> +
+> +               if (oldro ^ ro)
+> +                       return -ENOENT;
+
+This will have the effect of quickly returning an error to the mmc
+bus' ->suspend callback. That path are not able remove the card
+device, which I guess is what you would like to happen, right?
+
+I am not completely sure, but I believe the card will still be
+operational after resuming. Moreover it will be using the
+initialization frequency and 1-bit bus width and thus performing
+poorly. This is definitely not what we want.
+
+How did you test this patch? Can you confirm my theory above?
+
+The card may only be removed from the mmc_rescan work, scheduled at
+PM_POST_SUSPEND phase. What I think you should do here, is to also set
+the card state into MMC_CARD_REMOVED, by invoking
+mmc_card_set_removed(). Thus the SD's bus_ops->detect callback will
+remove the card during this phase.
+
+Kind regards
+Uffe
