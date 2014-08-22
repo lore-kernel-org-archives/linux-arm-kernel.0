@@ -1,48 +1,36 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Fri, 22 Aug 2014 17:00:56 -0500
-Subject: [PATCH v7][ 3/5] video: mx3fb: Introduce regulator support.
-In-Reply-To: <5397083D.4090400@eukrea.com>
-References: <1394788369-5096-1-git-send-email-denis@eukrea.com>
- <1394788369-5096-3-git-send-email-denis@eukrea.com>
- <20140317062026.GZ17250@pengutronix.de>
- <5397083D.4090400@eukrea.com>
-Message-ID: <20140822220056.GE24407@sirena.org.uk>
+From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
+Date: Sat, 23 Aug 2014 00:02:00 +0200
+Subject: [PATCH v9 1/2] regulator: Add driver for max77802 PMIC PMIC
+ regulators
+In-Reply-To: <20140822183054.GY24407@sirena.org.uk>
+References: <1408350762-15520-1-git-send-email-javier.martinez@collabora.co.uk>
+ <1408350762-15520-2-git-send-email-javier.martinez@collabora.co.uk>
+ <CA+NduCDL65=Y=PyU3FfXsTz0FfbmYzicGrY4U7ji3_V+nXhtCQ@mail.gmail.com>
+ <53F73472.8010609@collabora.co.uk> <20140822144531.GV24407@sirena.org.uk>
+ <53F7838F.8060906@collabora.co.uk> <20140822183054.GY24407@sirena.org.uk>
+Message-ID: <53F7BDD8.7060500@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 10, 2014 at 03:29:33PM +0200, Denis Carikli wrote:
-> On 03/17/2014 07:20 AM, Sascha Hauer wrote:
+Hello Mark,
 
-> >This patch adds regulator support for the display of a i.MX3 IPU. The
-> >problem Denis has to solve here is that he needs to get the regulator,
-> >but the display devicenode doesn't have a struct device associated with
-> >it, so he cannot provide one to regulator_get(). One way out here could
-> >be a of_regulator_get(struct device_node *). Mark, would this be ok with
-> >you?
+On 08/22/2014 08:30 PM, Mark Brown wrote:
+> 
+>> The problem is that one of these regulators is used as the vqmmc-supply
+>> (VCCQ/VDD_IO) so the mmc host controller driver disables it on
+>> MMC_POWER_OFF. Now AFAIK (Yuvaraj can correct me what I got wrong) this
+>> shouldn't be an issue since on card detection, the vqmmc supply should be
+>> enabled again but on Exynos the built-in card detect line is on the same
+>> power rail as vqmmc. That means that disabling the regulator prevents card
+>> insertions to be detected.
+> 
+> If the MMC host controller needs a supply enabling in order to do card
+> detection and it's supposed to be doing card detection I'd expect it to
+> be enabling that supply.  Why is it not doing that?
+> 
 
-> Here, the display devicenode has no struct device associated with it like
-> mentioned above.
-> Because of that, retriving the regulator from the devicetree, for instance
-> like regulator_dev_lookup() does, would require a different approach.
+Good question. I'm not that familiar with the dw_mmc host controller nor
+its driver implementation so I'll let Yuvaraj or Doug to answer that.
 
-> As I understand it, what happen in regulator_dev_lookup when
-> regulator_get(NULL, regulator_name) is used is the following:
-
-> Since the struct device is NULL, it skips the struct device based lookup,
-> but also the devicetree lookup (it uses dev->of_node for that)
-> At the end it falls back on a match on the regulator name to find it.
-
-> would keeping regulator_get(NULL, regulator_name); in the driver instead be
-> better for now?
-
-It would be much better to have an actual device to get things for,
-using a hard coded regulator name is very much deprecated.  Using a hard
-coded name is fragile and we don't have support for mapping this
-properly in the device tree.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140822/16a51093/attachment.sig>
+Best regards,
+Javier
