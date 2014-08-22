@@ -1,36 +1,143 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Thu, 21 Aug 2014 18:15:13 -0700
-Subject: [PATCH v3] i2c: rk3x: fix bug that cause transfer fails in master
- receive mode
-In-Reply-To: <1408669991-9703-1-git-send-email-addy.ke@rock-chips.com>
-References: <1408657107-8715-1-git-send-email-addy.ke@rock-chips.com>
- <1408669991-9703-1-git-send-email-addy.ke@rock-chips.com>
-Message-ID: <CAD=FV=XY73RU1B4i1NEBffiRTbwMO_0Z9+Lh96-sckQmkH8Ogg@mail.gmail.com>
+From: bjorn.andersson@sonymobile.com (Bjorn Andersson)
+Date: Thu, 21 Aug 2014 18:27:49 -0700
+Subject: [PATCH v5 2/3] mfd: qcom-rpm: Driver for the Qualcomm RPM
+In-Reply-To: <20140821132204.GH4266@lee--X1>
+References: <1407796988-25872-1-git-send-email-bjorn.andersson@sonymobile.com>
+ <1407796988-25872-3-git-send-email-bjorn.andersson@sonymobile.com>
+ <20140821132204.GH4266@lee--X1>
+Message-ID: <20140822012748.GB12494@sonymobile.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Addy,
+On Thu 21 Aug 06:22 PDT 2014, Lee Jones wrote:
+> > diff --git a/drivers/mfd/qcom_rpm.c b/drivers/mfd/qcom_rpm.c
+> > +static const struct qcom_rpm_data msm8660_template = {
+> > +	.version = -1,
+> 
+> -1?
+> 
 
-On Thu, Aug 21, 2014 at 6:13 PM, Addy Ke <addy.ke@rock-chips.com> wrote:
-> In rk3x SOC, the I2C controller can receive/transmit up to 32 bytes data
-> in one chunk, so the size of data to be write/read to/from TXDATAx/RXDATAx
-> must be less than or equal 32 bytes at a time.
->
-> Tested on rk3288-pinky board, elan receive 158 bytes data.
->
-> Acked-by: Max Schwarz <max.schwarz@online.de>
-> Signed-off-by: Addy Ke <addy.ke@rock-chips.com>
-> ---
-> Changes in v2:
-> - Use cleaner syntax as suggested by Sergei.
-> - Update commit message as suggested by Wolfram.
->
-> Changes in v3:
-> - fix typo: maste --> master and double spaces after 'len'
->
->  drivers/i2c/busses/i2c-rk3x.c | 4 ++++
->  1 file changed, 4 insertions(+)
+2 would be a better number...
 
-Oops, we collided in the ether.  This looks good to me.
+> > +	.resource_table = msm8660_rpm_resource_table,
+> > +	.n_resources = ARRAY_SIZE(msm8660_rpm_resource_table),
+> > +};
+> 
+> [...]
+> 
+> > +struct qcom_rpm *dev_get_qcom_rpm(struct device *dev)
+> > +{
+> > +	return dev_get_drvdata(dev);
+> > +}
+> > +EXPORT_SYMBOL(dev_get_qcom_rpm);
+> 
+> No need for this at all.  Use dev_get_drvdata() direct instead.
+> 
 
-Tested-by: Doug Anderson <dianders@chromium.org>
+I see that others have put this as static inline in the header file, so I will
+follow that. I don't want to expose this directly in the implementation of the
+clients.
+
+Let me know if you object.
+
+> [...]
+> 
+> > +static int qcom_rpm_probe(struct platform_device *pdev)
+> > +{
+[...]
+> > +
+> > +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> > +	rpm->status_regs = devm_ioremap_resource(&pdev->dev, res);
+> > +	rpm->ctrl_regs = rpm->status_regs + 0x400;
+> > +	rpm->req_regs = rpm->status_regs + 0x600;
+> > +	if (IS_ERR(rpm->status_regs))
+> > +		return PTR_ERR(rpm->status_regs);
+> 
+> You should probably do this _before_ using it above.
+> 
+
+There's no difference in behaviour, but it just feels cleaner than:
+
+res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+rpm->status_regs = devm_ioremap_resource(&pdev->dev, res);
+if (IS_ERR(rpm->status_regs))
+	return PTR_ERR(rpm->status_regs);
+rpm->ctrl_regs = rpm->status_regs + 0x400;
+rpm->req_regs = rpm->status_regs + 0x600;
+
+If you don't like it, I'll change it.
+
+[...]
+> > +
+> > +	writel(fw_version[0], RPM_CTRL_REG(rpm, 0));
+> > +	writel(fw_version[1], RPM_CTRL_REG(rpm, 1));
+> > +	writel(fw_version[2], RPM_CTRL_REG(rpm, 2));
+> 
+> A comment documenting what this is doing would be helpful here.
+> 
+
+Sounds reasonable, this seems to be incorrect now that I had to investigate
+what's really happening. So I'll update it.
+
+[...]
+> > +}
+> > +
+> > +static int qcom_rpm_remove_child(struct device *dev, void *unused)
+> > +{
+> > +	platform_device_unregister(to_platform_device(dev));
+> > +	return 0;
+> > +}
+> > +
+> > +static int qcom_rpm_remove(struct platform_device *pdev)
+> > +{
+> > +	device_for_each_child(&pdev->dev, NULL, qcom_rpm_remove_child);
+> 
+> of_platform_depopulate()?
+> 
+
+Forgot that we had that now, will update.
+
+> > +	return 0;
+> > +}
+> > +
+> > +static struct platform_driver qcom_rpm_driver = {
+> > +	.probe = qcom_rpm_probe,
+> > +	.remove = qcom_rpm_remove,
+> > +	.driver  = {
+> > +		.name  = "qcom_rpm",
+> > +		.owner = THIS_MODULE,
+> 
+> Remove this line, it's taken care of for you.
+> 
+
+OK
+
+> > +		.of_match_table = qcom_rpm_of_match,
+> > +	},
+> > +};
+> > +
+> > +static int __init qcom_rpm_init(void)
+> > +{
+> > +	return platform_driver_register(&qcom_rpm_driver);
+> > +}
+> > +arch_initcall(qcom_rpm_init);
+> > +
+> > +static void __exit qcom_rpm_exit(void)
+> > +{
+> > +	platform_driver_unregister(&qcom_rpm_driver);
+> > +}
+> > +module_exit(qcom_rpm_exit)
+> > +
+> > +MODULE_DESCRIPTION("Qualcomm Resource Power Manager driver");
+> > +MODULE_LICENSE("GPL v2");
+> 
+> No one authored this driver?
+> 
+
+Thought that was optional, will update.
+
+
+Thanks for the review!
+
+Regards,
+Bjorn
