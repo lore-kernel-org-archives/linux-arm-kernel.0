@@ -1,57 +1,71 @@
-From: dmurphy@ti.com (Murphy, Dan)
-Date: Fri, 22 Aug 2014 14:25:13 +0000
-Subject: [PATCH] doc: dt/bindings: input: Fix drv260x binding document
-References: <1408716741-1163-1-git-send-email-dmurphy@ti.com>
- <20140822141532.GC22707@saruman.home>
-Message-ID: <00FC9A978A94B7418C33AFAE8A35ED49DF1F66@DFLE09.ent.ti.com>
+From: nm@ti.com (Nishanth Menon)
+Date: Fri, 22 Aug 2014 09:03:50 -0500
+Subject: [PATCH 1/6] ARM: dts: OMAP3+: Add PRM interrupt
+In-Reply-To: <1408716235-26164-1-git-send-email-nm@ti.com>
+References: <1408716235-26164-1-git-send-email-nm@ti.com>
+Message-ID: <1408716235-26164-2-git-send-email-nm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Felipe
+Provide OMAP3, 4 and OMAP5 with interrupt number for PRM
 
-On 08/22/2014 09:15 AM, Balbi, Felipe wrote:
-> On Fri, Aug 22, 2014 at 09:12:21AM -0500, Dan Murphy wrote:
->> Update the drv260x dt binding document:
->> - Change the node name to the devices function not the
->> device name.
->> - Add vbat-supply to the example.
->> - Fix indentation of the example.
->>
->> Signed-off-by: Dan Murphy <dmurphy@ti.com>
->> ---
->>  .../devicetree/bindings/input/ti,drv260x.txt       |   19 ++++++++++---------
->>  1 file changed, 10 insertions(+), 9 deletions(-)
->>
->> diff --git a/Documentation/devicetree/bindings/input/ti,drv260x.txt b/Documentation/devicetree/bindings/input/ti,drv260x.txt
->> index a9c8519..214e25d 100644
->> --- a/Documentation/devicetree/bindings/input/ti,drv260x.txt
->> +++ b/Documentation/devicetree/bindings/input/ti,drv260x.txt
->> @@ -37,15 +37,16 @@ Optional properties:
->>  			  3.2 v.
->>  Example:
->>  
->> -drv2605l: drv2605l at 5a {
->> -		compatible = "ti,drv2605l";
->> -		reg = <0x5a>;
->> -		enable-gpio = <&gpio1 28 GPIO_ACTIVE_HIGH>;
->> -		mode = <DRV260X_LRA_MODE>;
->> -		library-sel = <DRV260X_LIB_LRA>;
->> -		vib-rated-mv = <3200>;
->> -		vib-overdriver-mv = <3200>;
->> -};
->> +haptics:@5a {
-> 
-> haptics: haptics at 5a ??
-> 
+And for DRA7, provide crossbar number for prm interrupt.
 
-I found both types of entries in the bindings docs.
+Signed-off-by: Nishanth Menon <nm@ti.com>
+---
+ arch/arm/boot/dts/dra7.dtsi  |    1 +
+ arch/arm/boot/dts/omap3.dtsi |    1 +
+ arch/arm/boot/dts/omap4.dtsi |    1 +
+ arch/arm/boot/dts/omap5.dtsi |    1 +
+ 4 files changed, 4 insertions(+)
 
-There is no consistency within the input bindings documentation.
-
-I have no issue doing it either way.
-
-Dan
-
+diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
+index 97f603c..7a3e011 100644
+--- a/arch/arm/boot/dts/dra7.dtsi
++++ b/arch/arm/boot/dts/dra7.dtsi
+@@ -89,6 +89,7 @@
+ 		prm: prm at 4ae06000 {
+ 			compatible = "ti,dra7-prm";
+ 			reg = <0x4ae06000 0x3000>;
++			interrupts = <GIC_SPI 6 IRQ_TYPE_LEVEL_HIGH>;
+ 
+ 			prm_clocks: clocks {
+ 				#address-cells = <1>;
+diff --git a/arch/arm/boot/dts/omap3.dtsi b/arch/arm/boot/dts/omap3.dtsi
+index 575a49b..3136ed1 100644
+--- a/arch/arm/boot/dts/omap3.dtsi
++++ b/arch/arm/boot/dts/omap3.dtsi
+@@ -97,6 +97,7 @@
+ 		prm: prm at 48306000 {
+ 			compatible = "ti,omap3-prm";
+ 			reg = <0x48306000 0x4000>;
++			interrupts = <11>;
+ 
+ 			prm_clocks: clocks {
+ 				#address-cells = <1>;
+diff --git a/arch/arm/boot/dts/omap4.dtsi b/arch/arm/boot/dts/omap4.dtsi
+index 69408b5..7375d44 100644
+--- a/arch/arm/boot/dts/omap4.dtsi
++++ b/arch/arm/boot/dts/omap4.dtsi
+@@ -129,6 +129,7 @@
+ 		prm: prm at 4a306000 {
+ 			compatible = "ti,omap4-prm";
+ 			reg = <0x4a306000 0x3000>;
++			interrupts = <GIC_SPI 11 IRQ_TYPE_LEVEL_HIGH>;
+ 
+ 			prm_clocks: clocks {
+ 				#address-cells = <1>;
+diff --git a/arch/arm/boot/dts/omap5.dtsi b/arch/arm/boot/dts/omap5.dtsi
+index fc8df17..df0a09b 100644
+--- a/arch/arm/boot/dts/omap5.dtsi
++++ b/arch/arm/boot/dts/omap5.dtsi
+@@ -131,6 +131,7 @@
+ 		prm: prm at 4ae06000 {
+ 			compatible = "ti,omap5-prm";
+ 			reg = <0x4ae06000 0x3000>;
++			interrupts = <GIC_SPI 11 IRQ_TYPE_LEVEL_HIGH>;
+ 
+ 			prm_clocks: clocks {
+ 				#address-cells = <1>;
 -- 
-------------------
-Dan Murphy
+1.7.9.5
