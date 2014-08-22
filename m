@@ -1,182 +1,39 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Fri, 22 Aug 2014 09:03:54 -0500
-Subject: [PATCH 5/6] ARM: dts: OMAP5/DRA7: switch over to interrupts-extended
- property for UART
-In-Reply-To: <1408716235-26164-1-git-send-email-nm@ti.com>
-References: <1408716235-26164-1-git-send-email-nm@ti.com>
-Message-ID: <1408716235-26164-6-git-send-email-nm@ti.com>
+From: dmurphy@ti.com (Dan Murphy)
+Date: Fri, 22 Aug 2014 09:11:15 -0500
+Subject: [PATCH] input: misc: drv260x remove defines not used
+Message-ID: <1408716675-1093-1-git-send-email-dmurphy@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We've had deeper idle states working on omaps for few years now,
-but only in the legacy mode. When booted with device tree, the
-wake-up events did not have a chance to work until commit
-3e6cee1786a1 ("pinctrl: single: Add support for wake-up interrupts")
-that recently got merged. In addition to that we also needed
-commit 79d9701559a9 ("of/irq: create interrupts-extended property")
-that's now also merged.
+Removing some #defines that are not and should
+never be used pertaining to I2C.
 
-Note that there's no longer need to specify the wake-up bit in
-the pinctrl settings, the request_irq on the wake-up pin takes
-care of that.
+Removing:
+define DRV260X_ALLOWED_R_BYTES	25
+define DRV260X_ALLOWED_W_BYTES	2
+define DRV260X_MAX_RW_RETRIES	5
+define DRV260X_I2C_RETRY_DELAY 10
 
-Signed-off-by: Nishanth Menon <nm@ti.com>
+Signed-off-by: Dan Murphy <dmurphy@ti.com>
 ---
- arch/arm/boot/dts/dra7.dtsi  |   20 ++++++++++----------
- arch/arm/boot/dts/omap5.dtsi |   12 ++++++------
- 2 files changed, 16 insertions(+), 16 deletions(-)
+ drivers/input/misc/drv260x.c |    5 -----
+ 1 file changed, 5 deletions(-)
 
-diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
-index 4e4ce96..45cb91f 100644
---- a/arch/arm/boot/dts/dra7.dtsi
-+++ b/arch/arm/boot/dts/dra7.dtsi
-@@ -331,7 +331,7 @@
- 		uart1: serial at 4806a000 {
- 			compatible = "ti,omap4-uart";
- 			reg = <0x4806a000 0x100>;
--			interrupts = <GIC_SPI 67 IRQ_TYPE_LEVEL_HIGH>;
-+			interrupts-extended = <&gic GIC_SPI 67 IRQ_TYPE_LEVEL_HIGH>;
- 			ti,hwmods = "uart1";
- 			clock-frequency = <48000000>;
- 			status = "disabled";
-@@ -340,7 +340,7 @@
- 		uart2: serial at 4806c000 {
- 			compatible = "ti,omap4-uart";
- 			reg = <0x4806c000 0x100>;
--			interrupts = <GIC_SPI 68 IRQ_TYPE_LEVEL_HIGH>;
-+			interrupts-extended = <&gic GIC_SPI 68 IRQ_TYPE_LEVEL_HIGH>;
- 			ti,hwmods = "uart2";
- 			clock-frequency = <48000000>;
- 			status = "disabled";
-@@ -349,7 +349,7 @@
- 		uart3: serial at 48020000 {
- 			compatible = "ti,omap4-uart";
- 			reg = <0x48020000 0x100>;
--			interrupts = <GIC_SPI 69 IRQ_TYPE_LEVEL_HIGH>;
-+			interrupts-extended = <&gic GIC_SPI 69 IRQ_TYPE_LEVEL_HIGH>;
- 			ti,hwmods = "uart3";
- 			clock-frequency = <48000000>;
- 			status = "disabled";
-@@ -358,7 +358,7 @@
- 		uart4: serial at 4806e000 {
- 			compatible = "ti,omap4-uart";
- 			reg = <0x4806e000 0x100>;
--			interrupts = <GIC_SPI 65 IRQ_TYPE_LEVEL_HIGH>;
-+			interrupts-extended = <&gic GIC_SPI 65 IRQ_TYPE_LEVEL_HIGH>;
- 			ti,hwmods = "uart4";
- 			clock-frequency = <48000000>;
-                         status = "disabled";
-@@ -367,7 +367,7 @@
- 		uart5: serial at 48066000 {
- 			compatible = "ti,omap4-uart";
- 			reg = <0x48066000 0x100>;
--			interrupts = <GIC_SPI 100 IRQ_TYPE_LEVEL_HIGH>;
-+			interrupts-extended = <&gic GIC_SPI 100 IRQ_TYPE_LEVEL_HIGH>;
- 			ti,hwmods = "uart5";
- 			clock-frequency = <48000000>;
- 			status = "disabled";
-@@ -376,7 +376,7 @@
- 		uart6: serial at 48068000 {
- 			compatible = "ti,omap4-uart";
- 			reg = <0x48068000 0x100>;
--			interrupts = <GIC_SPI 101 IRQ_TYPE_LEVEL_HIGH>;
-+			interrupts-extended = <&gic GIC_SPI 101 IRQ_TYPE_LEVEL_HIGH>;
- 			ti,hwmods = "uart6";
- 			clock-frequency = <48000000>;
- 			status = "disabled";
-@@ -385,7 +385,7 @@
- 		uart7: serial at 48420000 {
- 			compatible = "ti,omap4-uart";
- 			reg = <0x48420000 0x100>;
--			interrupts = <GIC_SPI 218 IRQ_TYPE_LEVEL_HIGH>;
-+			interrupts-extended = <&gic GIC_SPI 218 IRQ_TYPE_LEVEL_HIGH>;
- 			ti,hwmods = "uart7";
- 			clock-frequency = <48000000>;
- 			status = "disabled";
-@@ -394,7 +394,7 @@
- 		uart8: serial at 48422000 {
- 			compatible = "ti,omap4-uart";
- 			reg = <0x48422000 0x100>;
--			interrupts = <GIC_SPI 219 IRQ_TYPE_LEVEL_HIGH>;
-+			interrupts-extended = <&gic GIC_SPI 219 IRQ_TYPE_LEVEL_HIGH>;
- 			ti,hwmods = "uart8";
- 			clock-frequency = <48000000>;
- 			status = "disabled";
-@@ -403,7 +403,7 @@
- 		uart9: serial at 48424000 {
- 			compatible = "ti,omap4-uart";
- 			reg = <0x48424000 0x100>;
--			interrupts = <GIC_SPI 220 IRQ_TYPE_LEVEL_HIGH>;
-+			interrupts-extended = <&gic GIC_SPI 220 IRQ_TYPE_LEVEL_HIGH>;
- 			ti,hwmods = "uart9";
- 			clock-frequency = <48000000>;
- 			status = "disabled";
-@@ -412,7 +412,7 @@
- 		uart10: serial at 4ae2b000 {
- 			compatible = "ti,omap4-uart";
- 			reg = <0x4ae2b000 0x100>;
--			interrupts = <GIC_SPI 221 IRQ_TYPE_LEVEL_HIGH>;
-+			interrupts-extended = <&gic GIC_SPI 221 IRQ_TYPE_LEVEL_HIGH>;
- 			ti,hwmods = "uart10";
- 			clock-frequency = <48000000>;
- 			status = "disabled";
-diff --git a/arch/arm/boot/dts/omap5.dtsi b/arch/arm/boot/dts/omap5.dtsi
-index 04acda6..fe2effd 100644
---- a/arch/arm/boot/dts/omap5.dtsi
-+++ b/arch/arm/boot/dts/omap5.dtsi
-@@ -452,7 +452,7 @@
- 		uart1: serial at 4806a000 {
- 			compatible = "ti,omap4-uart";
- 			reg = <0x4806a000 0x100>;
--			interrupts = <GIC_SPI 72 IRQ_TYPE_LEVEL_HIGH>;
-+			interrupts-extended = <&gic GIC_SPI 72 IRQ_TYPE_LEVEL_HIGH>;
- 			ti,hwmods = "uart1";
- 			clock-frequency = <48000000>;
- 		};
-@@ -460,7 +460,7 @@
- 		uart2: serial at 4806c000 {
- 			compatible = "ti,omap4-uart";
- 			reg = <0x4806c000 0x100>;
--			interrupts = <GIC_SPI 73 IRQ_TYPE_LEVEL_HIGH>;
-+			interrupts-extended = <&gic GIC_SPI 73 IRQ_TYPE_LEVEL_HIGH>;
- 			ti,hwmods = "uart2";
- 			clock-frequency = <48000000>;
- 		};
-@@ -468,7 +468,7 @@
- 		uart3: serial at 48020000 {
- 			compatible = "ti,omap4-uart";
- 			reg = <0x48020000 0x100>;
--			interrupts = <GIC_SPI 74 IRQ_TYPE_LEVEL_HIGH>;
-+			interrupts-extended = <&gic GIC_SPI 74 IRQ_TYPE_LEVEL_HIGH>;
- 			ti,hwmods = "uart3";
- 			clock-frequency = <48000000>;
- 		};
-@@ -476,7 +476,7 @@
- 		uart4: serial at 4806e000 {
- 			compatible = "ti,omap4-uart";
- 			reg = <0x4806e000 0x100>;
--			interrupts = <GIC_SPI 70 IRQ_TYPE_LEVEL_HIGH>;
-+			interrupts-extended = <&gic GIC_SPI 70 IRQ_TYPE_LEVEL_HIGH>;
- 			ti,hwmods = "uart4";
- 			clock-frequency = <48000000>;
- 		};
-@@ -484,7 +484,7 @@
- 		uart5: serial at 48066000 {
- 			compatible = "ti,omap4-uart";
- 			reg = <0x48066000 0x100>;
--			interrupts = <GIC_SPI 105 IRQ_TYPE_LEVEL_HIGH>;
-+			interrupts-extended = <&gic GIC_SPI 105 IRQ_TYPE_LEVEL_HIGH>;
- 			ti,hwmods = "uart5";
- 			clock-frequency = <48000000>;
- 		};
-@@ -492,7 +492,7 @@
- 		uart6: serial at 48068000 {
- 			compatible = "ti,omap4-uart";
- 			reg = <0x48068000 0x100>;
--			interrupts = <GIC_SPI 106 IRQ_TYPE_LEVEL_HIGH>;
-+			interrupts-extended = <&gic GIC_SPI 106 IRQ_TYPE_LEVEL_HIGH>;
- 			ti,hwmods = "uart6";
- 			clock-frequency = <48000000>;
- 		};
+diff --git a/drivers/input/misc/drv260x.c b/drivers/input/misc/drv260x.c
+index e90e3b8..a7a19e6 100644
+--- a/drivers/input/misc/drv260x.c
++++ b/drivers/input/misc/drv260x.c
+@@ -66,11 +66,6 @@
+ #define DRV260X_LRA_RES_PERIOD	0x22
+ #define DRV260X_MAX_REG			0x23
+ 
+-#define DRV260X_ALLOWED_R_BYTES	25
+-#define DRV260X_ALLOWED_W_BYTES	2
+-#define DRV260X_MAX_RW_RETRIES	5
+-#define DRV260X_I2C_RETRY_DELAY 10
+-
+ #define DRV260X_GO_BIT				0x01
+ 
+ /* Library Selection */
 -- 
 1.7.9.5
