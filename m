@@ -1,45 +1,46 @@
-From: yamada.m@jp.panasonic.com (Masahiro Yamada)
-Date: Fri, 22 Aug 2014 19:52:17 +0900
-Subject: [PATCH] kbuild: arm: Do not define "comma" twice
-Message-ID: <1408704737-16973-1-git-send-email-yamada.m@jp.panasonic.com>
+From: mmarek@suse.cz (Michal Marek)
+Date: Fri, 22 Aug 2014 13:09:17 +0200
+Subject: [PATCH v2] arch: Kconfig: Let all little endian architectures
+ define CPU_LITTLE_ENDIAN explicitly
+In-Reply-To: <CAMuHMdV_2b-A+eE--cXEFA68=72HK6mqx8+TCXRMVkyhESLYxQ@mail.gmail.com>
+References: <53EA99C3.90203@gmail.com>
+ <CAMuHMdV_2b-A+eE--cXEFA68=72HK6mqx8+TCXRMVkyhESLYxQ@mail.gmail.com>
+Message-ID: <53F724DD.1080605@suse.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The definition of "comma" exists in scripts/Kbuild.include.
-We should not double it.
+Dne 13.8.2014 10:03, Geert Uytterhoeven napsal(a):
+> CC kbuild
+> 
+> On Wed, Aug 13, 2014 at 12:48 AM, Chen Gang <gang.chen.5i5j@gmail.com> wrote:
+>> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+>> index c49a775..0510a5d 100644
+>> --- a/arch/arm/Kconfig
+>> +++ b/arch/arm/Kconfig
+>> @@ -199,6 +199,11 @@ config NEED_DMA_MAP_STATE
+>>  config ARCH_SUPPORTS_UPROBES
+>>         def_bool y
+>>
+>> +config CPU_LITTLE_ENDIAN
+>> +       depends on !CPU_BIG_ENDIAN
+>> +       def_bool y
+>> +
+>> +
+>>  config ARCH_HAS_DMA_SET_COHERENT_MASK
+>>         bool
+> 
+> As this is a common symbol, and replicated for all affected architectures,
+> I'm wondering if we should have the "config CPU_LITTLE_ENDIAN" in
+> common Kconfig code instead, and make the individual architectures do a
+> "select CPU_LITTLE_ENDIAN"?
 
-Signed-off-by: Masahiro Yamada <yamada.m@jp.panasonic.com>
-Cc: linux-arm-kernel at lists.infradead.org
----
- arch/arm/Makefile   | 2 --
- arch/arm64/Makefile | 2 --
- 2 files changed, 4 deletions(-)
+Yes!
 
-diff --git a/arch/arm/Makefile b/arch/arm/Makefile
-index 0ce9d0f..8568b6fb 100644
---- a/arch/arm/Makefile
-+++ b/arch/arm/Makefile
-@@ -50,8 +50,6 @@ AS		+= -EL
- LD		+= -EL
- endif
- 
--comma = ,
--
- # This selects which instruction set is used.
- # Note that GCC does not numerically define an architecture version
- # macro, but instead defines a whole series of macros which makes
-diff --git a/arch/arm64/Makefile b/arch/arm64/Makefile
-index 5783354..ebd0659 100644
---- a/arch/arm64/Makefile
-+++ b/arch/arm64/Makefile
-@@ -30,8 +30,6 @@ AS		+= -EL
- LD		+= -EL
- endif
- 
--comma = ,
--
- CHECKFLAGS	+= -D__aarch64__
- 
- # Default value
--- 
-1.9.1
+
+> Also we could have "config CPU_BIG_ENDIAN", too, and error out
+> if none or both are selected (can Kconfig error out?).
+
+We can error out in the Makefile, if there is consensus that we should
+be doing so.
+
+Michal
