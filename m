@@ -1,46 +1,48 @@
-From: sjoerd.simons@collabora.co.uk (Sjoerd Simons)
-Date: Sat, 23 Aug 2014 01:03:01 +0200
-Subject: [PATCH 1/2] i2c: cros-ec-tunnel: Add of match table
-In-Reply-To: <1408748582-29029-1-git-send-email-sjoerd.simons@collabora.co.uk>
-References: <1408748582-29029-1-git-send-email-sjoerd.simons@collabora.co.uk>
-Message-ID: <1408748582-29029-2-git-send-email-sjoerd.simons@collabora.co.uk>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 22 Aug 2014 16:07:00 -0700
+Subject: [PATCH] ARM: OMAP2+: omap_device: remove warning that clk alias
+ already exists
+In-Reply-To: <1407156844-21548-1-git-send-email-mpa@pengutronix.de>
+References: <1407156844-21548-1-git-send-email-mpa@pengutronix.de>
+Message-ID: <20140822230700.GA17254@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To enable the cros-ec-tunnel driver to be auto-loaded when build as a
-module add an of match table (and export it) to match the modalias
-information passed on to userspace as the Cros EC MFD driver registers
-the MFD subdevices with an of_compatibility string.
+* Markus Pargmann <mpa@pengutronix.de> [140804 05:56]:
+> When an alias for a clock already exists the warning is printed. For
+> every module with a main_clk defined, a clk alias for fck is added.
+> There are some components that have the same main_clk defined, so this
+> is a really normal situation.
+> 
+> For example the am33xx edma device has 4 components using the same main
+> clock. So there are three warnings in the boot log for this already
+> existing clock alias:
+> 	platform 49000000.edma: alias fck already exists
+> 	platform 49000000.edma: alias fck already exists
+> 	platform 49000000.edma: alias fck already exists
+> 
+> As this is only interesting for developers, this patch changes the
+> message to a debug message.
+> 
+> Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
+> ---
+>  arch/arm/mach-omap2/omap_device.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/mach-omap2/omap_device.c b/arch/arm/mach-omap2/omap_device.c
+> index 01ef59def44b..d22c30d3ccfa 100644
+> --- a/arch/arm/mach-omap2/omap_device.c
+> +++ b/arch/arm/mach-omap2/omap_device.c
+> @@ -56,7 +56,7 @@ static void _add_clkdev(struct omap_device *od, const char *clk_alias,
+>  
+>  	r = clk_get_sys(dev_name(&od->pdev->dev), clk_alias);
+>  	if (!IS_ERR(r)) {
+> -		dev_warn(&od->pdev->dev,
+> +		dev_dbg(&od->pdev->dev,
+>  			 "alias %s already exists\n", clk_alias);
+>  		clk_put(r);
+>  		return;
 
-Signed-off-by: Sjoerd Simons <sjoerd.simons@collabora.co.uk>
----
- drivers/i2c/busses/i2c-cros-ec-tunnel.c | 9 +++++++++
- 1 file changed, 9 insertions(+)
+Thanks applying into omap-for-v3.17/fixes.
 
-diff --git a/drivers/i2c/busses/i2c-cros-ec-tunnel.c b/drivers/i2c/busses/i2c-cros-ec-tunnel.c
-index 05e033c..3c15dcc 100644
---- a/drivers/i2c/busses/i2c-cros-ec-tunnel.c
-+++ b/drivers/i2c/busses/i2c-cros-ec-tunnel.c
-@@ -310,11 +310,20 @@ static int ec_i2c_remove(struct platform_device *dev)
- 	return 0;
- }
- 
-+#ifdef CONFIG_OF
-+static const struct of_device_id cros_ec_i2c_of_match[] = {
-+	{ .compatible = "google,cros-ec-i2c-tunnel" },
-+	{},
-+};
-+MODULE_DEVICE_TABLE(of, cros_ec_i2c_of_match);
-+#endif
-+
- static struct platform_driver ec_i2c_tunnel_driver = {
- 	.probe = ec_i2c_probe,
- 	.remove = ec_i2c_remove,
- 	.driver = {
- 		.name = "cros-ec-i2c-tunnel",
-+		.of_match_table = of_match_ptr (cros_ec_i2c_of_match),
- 	},
- };
- 
--- 
-2.1.0
+Tony
