@@ -1,67 +1,45 @@
-From: srv_yingjoe.chen@mediatek.com (Joe.C)
-Date: Fri, 22 Aug 2014 16:39:11 +0800
-Subject: [RESEND PATCH v2 4/4] dt-bindings: add bindings for mediatek
- intpol
-In-Reply-To: <CABuKBeJ0OsaBex_5D9tazTVZX1T8pnUjG7v0nVay-jzqL2nuqQ@mail.gmail.com>
-References: <1407895884-18131-1-git-send-email-srv_yingjoe.chen@mediatek.com>
- <1407895884-18131-5-git-send-email-srv_yingjoe.chen@mediatek.com>
- <CABuKBeJ0OsaBex_5D9tazTVZX1T8pnUjG7v0nVay-jzqL2nuqQ@mail.gmail.com>
-Message-ID: <1408696751.27728.61.camel@mtksdaap41>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Fri, 22 Aug 2014 10:57:09 +0200
+Subject: [RFC PATCH 5/6] rtc: rtc-isl12022: Change vendor prefix for
+ Intersil Corporation to isil
+In-Reply-To: <1408524184-31928-6-git-send-email-p.zabel@pengutronix.de>
+References: <1408524184-31928-1-git-send-email-p.zabel@pengutronix.de>
+ <1408524184-31928-6-git-send-email-p.zabel@pengutronix.de>
+Message-ID: <1408697829.3118.28.camel@paszta.hi.pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Am Mittwoch, den 20.08.2014, 10:43 +0200 schrieb Philipp Zabel:
+> Currently there is a wild mixture of isl, isil, and intersil
+> compatibles in the kernel. At this point, changing the vendor
+> symbol to the most often used variant, which is equal to the
+> NASDAQ symbol, isil, should not hurt, since the isl1208 driver
+> doesn't care either way.
+> Patch db04d6284e2a added device tree support using the then
+> documented isl vendor prefix, so we keep that around for
+> backwards compatibility.
+> 
+> Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
+> ---
+>  drivers/rtc/rtc-isl12022.c | 3 ++-
+>  1 file changed, 2 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/rtc/rtc-isl12022.c b/drivers/rtc/rtc-isl12022.c
+> index aa55f08..df20f18 100644
+> --- a/drivers/rtc/rtc-isl12022.c
+> +++ b/drivers/rtc/rtc-isl12022.c
+> @@ -275,7 +275,8 @@ static int isl12022_probe(struct i2c_client *client,
+>  
+>  #ifdef CONFIG_OF
+>  static struct of_device_id isl12022_dt_match[] = {
+> -	{ .compatible = "isl,isl12022" },
+> +	{ .compatible = "isil,isl12022" },
+> +	{ .compatible = "isl,isl12022" }, /* for backwards compatibility */
 
-Hi, Rob,
+Actually, is it even necessary to keep this around in here?
+If of_driver_match_device fails, i2c_device_match will continue to try
+i2c_match_id if driver->id_table is set, which matches against the
+result of of_modalias_node (dropping the vendor prefix altogether).
 
-Would you help to review this DT bindings and give us some
-suggestions? Matthias suggests moving this to
-Documentation/devicetree/bindings/arm/mediatek/mediatek,intpol.txt
-I think that's a better place for this. What do you think?
-
-Joe.C
-
-On Thu, 2014-08-21 at 17:02 +0200, Matthias Brugger wrote:
-> 2014-08-13 4:11 GMT+02:00 Joe.C <srv_yingjoe.chen@mediatek.com>:
-> > From: "Joe.C" <yingjoe.chen@mediatek.com>
-> >
-> > Add binding documentation for Mediatek SoC GIC interrupt polarity extension.
-> >
-> > Signed-off-by: Joe.C <yingjoe.chen@mediatek.com>
-> > ---
-> >  .../bindings/interrupt-controller/mediatek,intpol.txt    | 16 ++++++++++++++++
-> >  1 file changed, 16 insertions(+)
-> >  create mode 100644 Documentation/devicetree/bindings/interrupt-controller/mediatek,intpol.txt
-> 
-> I think the place for the file should be in
-> Documentation/devicetree/bindings/arm/mediatek/mediatek,intpol.txt as
-> it is a interrupt-controller extension of the mediatek architecture.
-> 
-> >
-> > diff --git a/Documentation/devicetree/bindings/interrupt-controller/mediatek,intpol.txt b/Documentation/devicetree/bindings/interrupt-controller/mediatek,intpol.txt
-> > new file mode 100644
-> > index 0000000..16ea372
-> > --- /dev/null
-> > +++ b/Documentation/devicetree/bindings/interrupt-controller/mediatek,intpol.txt
-> > @@ -0,0 +1,16 @@
-> > +Mediatek 65xx/81xx GIC interrupt polarity extension
-> > +
-> > +Mediatek SOCs contain controllable inverter for each GIC SPI interrupt,
-> > +these can be used as GIC interrupt polarity extension.
-> > +
-> > +Required properties:
-> > +- compatible: Compatible property value should be "mediatek,mt6577-intpol"
-> > +
-> > +- reg: Physical base address of the int pol registers and length of memory
-> > +  mapped region.
-> > +
-> > +Example:
-> > +       intpol: intpol at 10200100 {
-> > +               compatible = "mediatek,mt6577-intpol";
-> > +               reg = <0x10200100 0x1c>;
-> > +       };
-> > --
-> > 1.8.1.1.dirty
-> >
-> 
-> 
-> 
+regards
+Philipp
