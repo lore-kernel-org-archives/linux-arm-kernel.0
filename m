@@ -1,37 +1,34 @@
 From: nm@ti.com (Nishanth Menon)
-Date: Fri, 22 Aug 2014 08:51:51 -0500
-Subject: [PATCH 4/6] ARM: OMAP4+: PRM: remove "wkup" event
-In-Reply-To: <1408715513-25851-1-git-send-email-nm@ti.com>
-References: <1408715513-25851-1-git-send-email-nm@ti.com>
-Message-ID: <1408715513-25851-5-git-send-email-nm@ti.com>
+Date: Fri, 22 Aug 2014 08:55:25 -0500
+Subject: [PATCH 3/3] ARM: AM437x: use pdata quirks for pinctrl information
+In-Reply-To: <1408715725-25919-1-git-send-email-nm@ti.com>
+References: <1408715725-25919-1-git-send-email-nm@ti.com>
+Message-ID: <1408715725-25919-4-git-send-email-nm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-"wkup" event at bit offset 0 exists only on OMAP3.
-OMAP4430/60 PRM_IRQSTATUS_A9, OMAP5/DRA7 PRM_IRQSTATUS_MPU
+From: Keerthy <j-keerthy@ti.com>
 
-register bit 0 is DPLL_CORE_RECAL_ST not wakeup event like OMAP3.
+Provide pdata-quirks for Am437x processor family.
 
-The same applies to AM437x as well.
-
-Remove the wrong definition.
-
-Signed-off-by: Nishanth Menon <nm@ti.com>
+Signed-off-by: Keerthy <j-keerthy@ti.com>
 ---
- arch/arm/mach-omap2/prm44xx.c |    1 -
- 1 file changed, 1 deletion(-)
+ arch/arm/mach-omap2/pdata-quirks.c |    3 +++
+ 1 file changed, 3 insertions(+)
 
-diff --git a/arch/arm/mach-omap2/prm44xx.c b/arch/arm/mach-omap2/prm44xx.c
-index 5a70c91..b6bfa6f 100644
---- a/arch/arm/mach-omap2/prm44xx.c
-+++ b/arch/arm/mach-omap2/prm44xx.c
-@@ -33,7 +33,6 @@
- /* Static data */
- 
- static const struct omap_prcm_irq omap4_prcm_irqs[] = {
--	OMAP_PRCM_IRQ("wkup",   0,      0),
- 	OMAP_PRCM_IRQ("io",     9,      1),
- };
- 
+diff --git a/arch/arm/mach-omap2/pdata-quirks.c b/arch/arm/mach-omap2/pdata-quirks.c
+index 827e106..5fea34e 100644
+--- a/arch/arm/mach-omap2/pdata-quirks.c
++++ b/arch/arm/mach-omap2/pdata-quirks.c
+@@ -359,6 +359,9 @@ struct of_dev_auxdata omap_auxdata_lookup[] __initdata = {
+ #ifdef CONFIG_SOC_DRA7XX
+ 	OF_DEV_AUXDATA("ti,dra7-padconf", 0x4a003400, "4a003400.pinmux", &pcs_pdata),
+ #endif
++#ifdef CONFIG_SOC_AM43XX
++	OF_DEV_AUXDATA("ti,am437-padconf", 0x44e10800, "44e10800.pinmux", &pcs_pdata),
++#endif
+ #if defined(CONFIG_ARCH_OMAP4) || defined(CONFIG_SOC_OMAP5)
+ 	OF_DEV_AUXDATA("ti,omap4-iommu", 0x4a066000, "4a066000.mmu",
+ 		       &omap4_iommu_pdata),
 -- 
 1.7.9.5
