@@ -1,36 +1,52 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu, 21 Aug 2014 21:06:34 -0500
-Subject: [PATCH] ARM: bcm: Don't build brcmstb SMP code when building for V6
-Message-ID: <1408673194-16228-1-git-send-email-broonie@kernel.org>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Thu, 21 Aug 2014 19:19:47 -0700
+Subject: [PATCH v7 04/11] arm: Support restart through restart handler
+ call chain
+In-Reply-To: <53F69DBA.4070806@suse.de>
+References: <1408495538-27480-1-git-send-email-linux@roeck-us.net>
+ <1408495538-27480-5-git-send-email-linux@roeck-us.net>
+ <53F69DBA.4070806@suse.de>
+Message-ID: <20140822021947.GA17788@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Mark Brown <broonie@linaro.org>
+On Fri, Aug 22, 2014 at 03:32:42AM +0200, Andreas F?rber wrote:
+> Hi,
+> 
+> Am 20.08.2014 02:45, schrieb Guenter Roeck:
+> > The kernel core now supports a restart handler call chain for system
+> > restart functions.
+> > 
+> > With this change, the arm_pm_restart callback is now optional, so
+> > drop its initialization and check if it is set before calling it.
+> > Only call the kernel restart handler if arm_pm_restart is not set.
+> [...]
+> > diff --git a/arch/arm/kernel/process.c b/arch/arm/kernel/process.c
+> > index 81ef686..ea279f7 100644
+> > --- a/arch/arm/kernel/process.c
+> > +++ b/arch/arm/kernel/process.c
+> > @@ -114,17 +114,13 @@ void soft_restart(unsigned long addr)
+> >  	BUG();
+> >  }
+> >  
+> > -static void null_restart(enum reboot_mode reboot_mode, const char *cmd)
+> > -{
+> > -}
+> > -
+> >  /*
+> >   * Function pointers to optional machine specific functions
+> >   */
+> >  void (*pm_power_off)(void);
+> >  EXPORT_SYMBOL(pm_power_off);
+> >  
+> > -void (*arm_pm_restart)(enum reboot_mode reboot_mode, const char *cmd) = null_restart;
+> > +void (*arm_pm_restart)(enum reboot_mode reboot_mode, const char *cmd);
+> 
+> Stupid newbie question maybe, but isn't this variable uninitialized now,
+> like any non-static variable in C99? Or does the kernel assure that all
+> such "fields" are zero-initialized?
+> 
+It is initialized with NULL, like all other global and static variables in the
+kernel (and like pm_power_off a few lines above).
 
-The brcmstb SMP code contains isb() and dsb() which are not supported when
-building for -march=armv6 as happens when building allmodconfig. Since I
-have not been able to identify a way to override the compiler architecture
-selection per file add a Kconfig dependency to ensure this code is not
-built if V6 support is enabled.
-
-There is doubtless a better solution.
-
-Signed-off-by: Mark Brown <broonie@linaro.org>
----
- arch/arm/mach-bcm/Kconfig | 1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/arch/arm/mach-bcm/Kconfig b/arch/arm/mach-bcm/Kconfig
-index fc93800..372132d 100644
---- a/arch/arm/mach-bcm/Kconfig
-+++ b/arch/arm/mach-bcm/Kconfig
-@@ -102,6 +102,7 @@ config ARCH_BCM_5301X
- config ARCH_BRCMSTB
- 	bool "Broadcom BCM7XXX based boards" if ARCH_MULTI_V7
- 	depends on MMU
-+	depends on !CPU_V6
- 	select ARM_GIC
- 	select MIGHT_HAVE_PCI
- 	select HAVE_SMP
--- 
-2.1.0.rc1
+Guenter
