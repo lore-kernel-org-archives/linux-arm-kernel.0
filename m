@@ -1,52 +1,21 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Thu, 21 Aug 2014 19:19:47 -0700
-Subject: [PATCH v7 04/11] arm: Support restart through restart handler
- call chain
-In-Reply-To: <53F69DBA.4070806@suse.de>
-References: <1408495538-27480-1-git-send-email-linux@roeck-us.net>
- <1408495538-27480-5-git-send-email-linux@roeck-us.net>
- <53F69DBA.4070806@suse.de>
-Message-ID: <20140822021947.GA17788@roeck-us.net>
+From: broonie@kernel.org (Mark Brown)
+Date: Thu, 21 Aug 2014 21:19:38 -0500
+Subject: [PATCH] regulator: RK808: Fix uninitialized value
+In-Reply-To: <1408668895-1108-1-git-send-email-dianders@chromium.org>
+References: <1408668895-1108-1-git-send-email-dianders@chromium.org>
+Message-ID: <20140822021938.GT24407@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 22, 2014 at 03:32:42AM +0200, Andreas F?rber wrote:
-> Hi,
-> 
-> Am 20.08.2014 02:45, schrieb Guenter Roeck:
-> > The kernel core now supports a restart handler call chain for system
-> > restart functions.
-> > 
-> > With this change, the arm_pm_restart callback is now optional, so
-> > drop its initialization and check if it is set before calling it.
-> > Only call the kernel restart handler if arm_pm_restart is not set.
-> [...]
-> > diff --git a/arch/arm/kernel/process.c b/arch/arm/kernel/process.c
-> > index 81ef686..ea279f7 100644
-> > --- a/arch/arm/kernel/process.c
-> > +++ b/arch/arm/kernel/process.c
-> > @@ -114,17 +114,13 @@ void soft_restart(unsigned long addr)
-> >  	BUG();
-> >  }
-> >  
-> > -static void null_restart(enum reboot_mode reboot_mode, const char *cmd)
-> > -{
-> > -}
-> > -
-> >  /*
-> >   * Function pointers to optional machine specific functions
-> >   */
-> >  void (*pm_power_off)(void);
-> >  EXPORT_SYMBOL(pm_power_off);
-> >  
-> > -void (*arm_pm_restart)(enum reboot_mode reboot_mode, const char *cmd) = null_restart;
-> > +void (*arm_pm_restart)(enum reboot_mode reboot_mode, const char *cmd);
-> 
-> Stupid newbie question maybe, but isn't this variable uninitialized now,
-> like any non-static variable in C99? Or does the kernel assure that all
-> such "fields" are zero-initialized?
-> 
-It is initialized with NULL, like all other global and static variables in the
-kernel (and like pm_power_off a few lines above).
+On Thu, Aug 21, 2014 at 05:54:55PM -0700, Doug Anderson wrote:
+> The RK808 regulator driver was putting its config on the stack but not
+> initting it.  That means that you got a semi-random config.  Fix this.
 
-Guenter
+Applied, thanks.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140821/777cb340/attachment-0001.sig>
