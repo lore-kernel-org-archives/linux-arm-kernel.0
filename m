@@ -1,133 +1,35 @@
-From: Barry.Song@csr.com (Barry Song)
-Date: Fri, 22 Aug 2014 06:55:36 +0000
-Subject: [PATCH] mmc: core: sd: check card write-protect lock while
- resuming
-In-Reply-To: <CAPDyKFpFLoREZ=rYp8bQvJ7Fczq=HyLL90jv7Hjzai9xTNBNYg@mail.gmail.com>
-References: <1408356012-18867-1-git-send-email-Barry.Song@csr.com>
- <CAPDyKFpFLoREZ=rYp8bQvJ7Fczq=HyLL90jv7Hjzai9xTNBNYg@mail.gmail.com>
-Message-ID: <5EB3BFCD089AD643B9BB63439F5FD5E9012C98252C@SHAASIEXM01.ASIA.ROOT.PRI>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Fri, 22 Aug 2014 15:43:45 +0800
+Subject: [PATCH] ARM: dts: Gateworks GW5520 support (i.MX6)
+In-Reply-To: <CAJ+vNU0qJrNtZMcPGWkGOPuHmyiV+3d-OM71PGDNRmnJZCS8SQ@mail.gmail.com>
+References: <1407572602-14017-1-git-send-email-tharvey@gateworks.com>
+ <20140818063510.GD2114@dragon>
+ <CAJ+vNU0qJrNtZMcPGWkGOPuHmyiV+3d-OM71PGDNRmnJZCS8SQ@mail.gmail.com>
+Message-ID: <20140822074341.GA2540@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Ulf Hansson [mailto:ulf.hansson at linaro.org]
-> Sent: Monday, August 18, 2014 7:58 PM
-> To: Barry Song
-> Cc: Chris Ball; linux-mmc; linux-arm-kernel at lists.infradead.org; DL-SHA-
-> WorkGroupLinux; Minda Chen; Barry Song
-> Subject: Re: [PATCH] mmc: core: sd: check card write-protect lock while
-> resuming
+On Tue, Aug 19, 2014 at 08:17:03AM -0700, Tim Harvey wrote:
+> Do you know of any appropriate bindings for a USB hub reset signal?
+> This does get configured and used properly in the bootloader but I
+> thought the common belief was that GPIO's should get configured in the
+> kernel as well (and of course I will use a value other than 0x8000000
+> so that its pinmuxed and padconf'd).
 > 
-> On 18 August 2014 12:00, Barry Song <Barry.Song@csr.com> wrote:
-> > From: Minda Chen <Minda.Chen@csr.com>
-> >
-> > After suspending, unplug the sdcard, and set sd WP lock, insert it
-> > again, then resume the system. resume codes do not check the the
-> > sdcard write-proctect lock. now check it.
-> >
-> > Signed-off-by: Minda Chen <Minda.Chen@csr.com>
-> > Signed-off-by: Barry Song <Baohua.Song@csr.com>
-> > ---
-> >  drivers/mmc/core/sd.c | 7 +++++++
-> >  1 file changed, 7 insertions(+)
-> >
-> > diff --git a/drivers/mmc/core/sd.c b/drivers/mmc/core/sd.c index
-> > 0c44510..890557a 100644
-> > --- a/drivers/mmc/core/sd.c
-> > +++ b/drivers/mmc/core/sd.c
-> > @@ -910,6 +910,7 @@ static int mmc_sd_init_card(struct mmc_host
-> *host, u32 ocr,
-> >         int err;
-> >         u32 cid[4];
-> >         u32 rocr = 0;
-> > +       bool oldro, ro;
-> >
-> >         BUG_ON(!host);
-> >         WARN_ON(!host->claimed);
-> > @@ -922,6 +923,12 @@ static int mmc_sd_init_card(struct mmc_host
-> *host, u32 ocr,
-> >                 if (memcmp(cid, oldcard->raw_cid, sizeof(cid)) != 0)
-> >                         return -ENOENT;
-> >
-> > +               if (host->ops->get_ro) {
-> > +                       ro = host->ops->get_ro(host) ? true : false;
-> > +                       oldro = mmc_card_readonly(oldcard) ? true : false;
-> > +                       if (oldro ^ ro)
-> > +                               return -ENOENT;
-> > +               }
+> The PCISKT_WDIS# is a gpio that routes to the miniPCIe socket(s) WDIS#
+> signal. While no kernel driver uses it I think its valuable to
+> document to users such that they can export it and use it for rfkill
+> of wireless devices that may be placed in those sockets. I'm not aware
+> of a proper binding for an rfkill pin either.
 > 
-> Seems like this code belongs better in mmc_sd_setup_card(). Could you try
-> moving it there.
-[Barry Song] 
-Well. How about:
+> If no bindings exist, are you saying these should be dropped and thus
+> functionality hidden from a user possibly trying to use them from
+> userspace through gpio-sysfs or are you saying they should be moved
+> into pinctrl groups for logical grouping?
 
-diff --git a/drivers/mmc/core/sd.c b/drivers/mmc/core/sd.c
-index 0c44510..643bc82d8 100644
---- a/drivers/mmc/core/sd.c
-+++ b/drivers/mmc/core/sd.c
-@@ -815,6 +815,7 @@ int mmc_sd_setup_card(struct mmc_host *host, struct mmc_card *card,
- 	bool reinit)
- {
- 	int err;
-+	int oldro, ro = -1;
- 
- 	if (!reinit) {
- 		/*
-@@ -861,23 +862,28 @@ int mmc_sd_setup_card(struct mmc_host *host, struct mmc_card *card,
- 	/*
- 	 * Check if read-only switch is active.
- 	 */
--	if (!reinit) {
--		int ro = -1;
- 
--		if (host->ops->get_ro) {
--			mmc_host_clk_hold(card->host);
--			ro = host->ops->get_ro(host);
--			mmc_host_clk_release(card->host);
--		}
-+	if (host->ops->get_ro) {
-+		mmc_host_clk_hold(card->host);
-+		ro = host->ops->get_ro(host);
-+		mmc_host_clk_release(card->host);
-+	}
- 
--		if (ro < 0) {
--			pr_warning("%s: host does not "
--				"support reading read-only "
--				"switch. assuming write-enable.\n",
--				mmc_hostname(host));
--		} else if (ro > 0) {
--			mmc_card_set_readonly(card);
--		}
-+	if (ro < 0)
-+		pr_warning("%s: host does not "
-+			"support reading read-only "
-+			"switch. assuming write-enable.\n",
-+			mmc_hostname(host));
-+
-+	if (!reinit && (ro > 0))
-+		mmc_card_set_readonly(card);
-+	else if (reinit && (ro >= 0)) {
-+		/* check if the write-protection lock is changed */
-+		oldro = mmc_card_readonly(card) ? 1 : 0;
-+		ro = (ro > 0) ? 1 : 0;
-+
-+		if (oldro ^ ro)
-+			return -ENOENT;
- 	}
- 
- 	return 0;
-> 
-> Kind regards
-> Uffe
-> 
-> >                 card = oldcard;
-> >         } else {
-> >                 /*
--barry
+Oh, I was wondering if these GPIOs can be put into USB and PCIe
+pingroup.  But if you think it doesn't make sense to do so, I'm fine
+with them being in hoggrp, after all it seems we do not have a proper
+binding existing for them.
 
-
-
-Member of the CSR plc group of companies. CSR plc registered in England and Wales, registered number 4187346, registered office Churchill House, Cambridge Business Park, Cowley Road, Cambridge, CB4 0WZ, United Kingdom
-More information can be found at www.csr.com. Keep up to date with CSR on our technical blog, www.csr.com/blog, CSR people blog, www.csr.com/people, YouTube, www.youtube.com/user/CSRplc, Facebook, www.facebook.com/pages/CSR/191038434253534, or follow us on Twitter at www.twitter.com/CSR_plc.
-New for 2014, you can now access the wide range of products powered by aptX at www.aptx.com.
+Shawn
