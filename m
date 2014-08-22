@@ -1,62 +1,135 @@
 From: nm@ti.com (Nishanth Menon)
-Date: Fri, 22 Aug 2014 09:01:02 -0500
-Subject: [PATCH 3/3] pinctrl: single: AM437x: Add pinctrl compatibility
-In-Reply-To: <1408716062-26055-1-git-send-email-nm@ti.com>
-References: <1408716062-26055-1-git-send-email-nm@ti.com>
-Message-ID: <1408716062-26055-4-git-send-email-nm@ti.com>
+Date: Fri, 22 Aug 2014 09:02:29 -0500
+Subject: [PATCH 05/10] ARM: OMAP5 / DRA7: PM: Avoid all SAR saves
+In-Reply-To: <1408716154-26101-1-git-send-email-nm@ti.com>
+References: <1408716154-26101-1-git-send-email-nm@ti.com>
+Message-ID: <1408716154-26101-6-git-send-email-nm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Keerthy <j-keerthy@ti.com>
+From: Rajendra Nayak <rnayak@ti.com>
 
-AM437x pinctrl definitions now differ from traditional 16 bit OMAP pin
-ctrl definitions, in that all 32 bits are used to describe a single pin
+Get rid of all assumptions about always having a sar base on *all*
+OMAP4+ platforms. We dont need one on DRA7 and it is not necessary at
+this point for OMAP5 either.
 
-Also the location of wakeupenable and event bits have changed.
-
-Signed-off-by: Keerthy <j-keerthy@ti.com>
-[nm at ti.com: minor updates]
+Signed-off-by: Rajendra Nayak <rnayak@ti.com>
+[nm at ti.com: Split and optimize]
 Signed-off-by: Nishanth Menon <nm@ti.com>
 ---
- .../bindings/pinctrl/ti,omap-pinctrl.txt           |    1 +
- drivers/pinctrl/pinctrl-single.c                   |    7 +++++++
- 2 files changed, 8 insertions(+)
+ arch/arm/mach-omap2/omap-mpuss-lowpower.c |   55 ++++++++++++++++++-----------
+ 1 file changed, 34 insertions(+), 21 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/pinctrl/ti,omap-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/ti,omap-pinctrl.txt
-index d45386d..af225fe 100644
---- a/Documentation/devicetree/bindings/pinctrl/ti,omap-pinctrl.txt
-+++ b/Documentation/devicetree/bindings/pinctrl/ti,omap-pinctrl.txt
-@@ -6,5 +6,6 @@ Required properties:
-   "ti,omap4-padconf" - OMAP4 compatible pinctrl
-   "ti,omap5-padconf" - OMAP5 compatible pinctrl
-   "ti,dra7-padconf" - DRA7 compatible pinctrl
-+  "ti,am437-padconf" - AM437x compatible pinctrl
+diff --git a/arch/arm/mach-omap2/omap-mpuss-lowpower.c b/arch/arm/mach-omap2/omap-mpuss-lowpower.c
+index fad6e8c..53d8de5 100644
+--- a/arch/arm/mach-omap2/omap-mpuss-lowpower.c
++++ b/arch/arm/mach-omap2/omap-mpuss-lowpower.c
+@@ -118,7 +118,8 @@ static inline void set_cpu_wakeup_addr(unsigned int cpu_id, u32 addr)
+ {
+ 	struct omap4_cpu_pm_info *pm_info = &per_cpu(omap4_pm_info, cpu_id);
  
- See Documentation/devicetree/bindings/pinctrl/pinctrl-single.txt for further details.
-diff --git a/drivers/pinctrl/pinctrl-single.c b/drivers/pinctrl/pinctrl-single.c
-index 598d600..784de13 100644
---- a/drivers/pinctrl/pinctrl-single.c
-+++ b/drivers/pinctrl/pinctrl-single.c
-@@ -1987,6 +1987,12 @@ static const struct pcs_soc_data pinctrl_single_dra7 = {
- 	.irq_status_mask = (1 << 25),	/* WAKEUPEVENT */
- };
+-	writel_relaxed(addr, pm_info->wkup_sar_addr);
++	if (pm_info->wkup_sar_addr)
++		writel_relaxed(addr, pm_info->wkup_sar_addr);
+ }
  
-+static const struct pcs_soc_data pinctrl_single_am437x = {
-+	.flags = PCS_QUIRK_SHARED_IRQ,
-+	.irq_enable_mask = (1 << 29),   /* OMAP_WAKEUP_EN */
-+	.irq_status_mask = (1 << 30),   /* OMAP_WAKEUP_EVENT */
-+};
+ /*
+@@ -143,7 +144,8 @@ static void scu_pwrst_prepare(unsigned int cpu_id, unsigned int cpu_state)
+ 		break;
+ 	}
+ 
+-	writel_relaxed(scu_pwr_st, pm_info->scu_sar_addr);
++	if (pm_info->scu_sar_addr)
++		writel_relaxed(scu_pwr_st, pm_info->scu_sar_addr);
+ }
+ 
+ /* Helper functions for MPUSS OSWR */
+@@ -181,7 +183,8 @@ static void l2x0_pwrst_prepare(unsigned int cpu_id, unsigned int save_state)
+ {
+ 	struct omap4_cpu_pm_info *pm_info = &per_cpu(omap4_pm_info, cpu_id);
+ 
+-	writel_relaxed(save_state, pm_info->l2x0_sar_addr);
++	if (pm_info->l2x0_sar_addr)
++		writel_relaxed(save_state, pm_info->l2x0_sar_addr);
+ }
+ 
+ /*
+@@ -191,10 +194,14 @@ static void l2x0_pwrst_prepare(unsigned int cpu_id, unsigned int save_state)
+ #ifdef CONFIG_CACHE_L2X0
+ static void __init save_l2x0_context(void)
+ {
+-	writel_relaxed(l2x0_saved_regs.aux_ctrl,
+-		     sar_base + L2X0_AUXCTRL_OFFSET);
+-	writel_relaxed(l2x0_saved_regs.prefetch_ctrl,
+-		     sar_base + L2X0_PREFETCH_CTRL_OFFSET);
++	void __iomem *l2x0_base = omap4_get_l2cache_base();
 +
- static const struct pcs_soc_data pinctrl_single = {
- };
++	if (l2x0_base && sar_base) {
++		writel_relaxed(l2x0_saved_regs.aux_ctrl,
++			       sar_base + L2X0_AUXCTRL_OFFSET);
++		writel_relaxed(l2x0_saved_regs.prefetch_ctrl,
++			       sar_base + L2X0_PREFETCH_CTRL_OFFSET);
++	}
+ }
+ #else
+ static void __init save_l2x0_context(void)
+@@ -347,13 +354,17 @@ int __init omap4_mpuss_init(void)
+ 		return -ENODEV;
+ 	}
  
-@@ -1999,6 +2005,7 @@ static struct of_device_id pcs_of_match[] = {
- 	{ .compatible = "ti,omap4-padconf", .data = &pinctrl_single_omap_wkup },
- 	{ .compatible = "ti,omap5-padconf", .data = &pinctrl_single_omap_wkup },
- 	{ .compatible = "ti,dra7-padconf", .data = &pinctrl_single_dra7 },
-+	{ .compatible = "ti,am437-padconf", .data = &pinctrl_single_am437x },
- 	{ .compatible = "pinctrl-single", .data = &pinctrl_single },
- 	{ .compatible = "pinconf-single", .data = &pinconf_single },
- 	{ },
+-	sar_base = omap4_get_sar_ram_base();
++	if (cpu_is_omap44xx())
++		sar_base = omap4_get_sar_ram_base();
+ 
+ 	/* Initilaise per CPU PM information */
+ 	pm_info = &per_cpu(omap4_pm_info, 0x0);
+-	pm_info->scu_sar_addr = sar_base + SCU_OFFSET0;
+-	pm_info->wkup_sar_addr = sar_base + CPU0_WAKEUP_NS_PA_ADDR_OFFSET;
+-	pm_info->l2x0_sar_addr = sar_base + L2X0_SAVE_OFFSET0;
++	if (sar_base) {
++		pm_info->scu_sar_addr = sar_base + SCU_OFFSET0;
++		pm_info->wkup_sar_addr = sar_base +
++					CPU0_WAKEUP_NS_PA_ADDR_OFFSET;
++		pm_info->l2x0_sar_addr = sar_base + L2X0_SAVE_OFFSET0;
++	}
+ 	pm_info->pwrdm = pwrdm_lookup("cpu0_pwrdm");
+ 	if (!pm_info->pwrdm) {
+ 		pr_err("Lookup failed for CPU0 pwrdm\n");
+@@ -368,9 +379,12 @@ int __init omap4_mpuss_init(void)
+ 	pwrdm_set_next_pwrst(pm_info->pwrdm, PWRDM_POWER_ON);
+ 
+ 	pm_info = &per_cpu(omap4_pm_info, 0x1);
+-	pm_info->scu_sar_addr = sar_base + SCU_OFFSET1;
+-	pm_info->wkup_sar_addr = sar_base + CPU1_WAKEUP_NS_PA_ADDR_OFFSET;
+-	pm_info->l2x0_sar_addr = sar_base + L2X0_SAVE_OFFSET1;
++	if (sar_base) {
++		pm_info->scu_sar_addr = sar_base + SCU_OFFSET1;
++		pm_info->wkup_sar_addr = sar_base +
++					CPU1_WAKEUP_NS_PA_ADDR_OFFSET;
++		pm_info->l2x0_sar_addr = sar_base + L2X0_SAVE_OFFSET1;
++	}
+ 	if (cpu_is_omap446x())
+ 		pm_info->secondary_startup = omap4460_secondary_startup;
+ 	else
+@@ -397,13 +411,12 @@ int __init omap4_mpuss_init(void)
+ 	pwrdm_clear_all_prev_pwrst(mpuss_pd);
+ 	mpuss_clear_prev_logic_pwrst();
+ 
+-	/* Save device type on scratchpad for low level code to use */
+-	if (omap_type() != OMAP2_DEVICE_TYPE_GP)
+-		writel_relaxed(1, sar_base + OMAP_TYPE_OFFSET);
+-	else
+-		writel_relaxed(0, sar_base + OMAP_TYPE_OFFSET);
+-
+-	save_l2x0_context();
++	if (sar_base) {
++		/* Save device type on scratchpad for low level code to use */
++		writel_relaxed((omap_type() != OMAP2_DEVICE_TYPE_GP) ? 1 : 0,
++			       sar_base + OMAP_TYPE_OFFSET);
++		save_l2x0_context();
++	}
+ 
+ 	if (cpu_is_omap44xx()) {
+ 		omap_pm_ops.finish_suspend = omap4_finish_suspend;
 -- 
 1.7.9.5
