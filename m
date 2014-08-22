@@ -1,50 +1,136 @@
 From: nm@ti.com (Nishanth Menon)
-Date: Fri, 22 Aug 2014 08:49:31 -0500
-Subject: [PATCH 5/7] ARM: OMAP4+: PM: Make logic state programmable
+Date: Fri, 22 Aug 2014 08:49:30 -0500
+Subject: [PATCH 4/7] ARM: OMAP2+: powerdomain: introduce logic for finding
+ valid power domain
 In-Reply-To: <1408715373-25791-1-git-send-email-nm@ti.com>
 References: <1408715373-25791-1-git-send-email-nm@ti.com>
-Message-ID: <1408715373-25791-6-git-send-email-nm@ti.com>
+Message-ID: <1408715373-25791-5-git-send-email-nm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Move the logic state as different for each power domain. This allows us
-to customize the deepest power state we should target over all for each
-powerdomain in the follow on patches.
+powerdomain configuration in OMAP is done using PWRSTCTRL register for
+each power domain. However, PRCM lets us write any value we'd like to
+the logic and power domain target states, however the SoC integration
+tends to actually function only at a few discrete states. These valid
+states are already in our powerdomains_xxx_data.c file.
+
+So, provide a function to easily query valid low power state that the
+power domain is allowed to go to.
+
+Based on work originally done by Jean Pihet <j-pihet@ti.com>
+https://patchwork.kernel.org/patch/1325091/ . There is no attempt to
+create a new powerdomain solution here, except fixing issues seen
+attempting invalid programming attempts. Future consolidation to the
+generic powerdomain framework should consider this requirement as
+well.
+
+Similar solutions have been done in product kernels in the past such
+as:
+https://android.googlesource.com/kernel/omap.git/+blame/android-omap-panda-3.0/arch/arm/mach-omap2/pm44xx.c
 
 Signed-off-by: Nishanth Menon <nm@ti.com>
 ---
- arch/arm/mach-omap2/pm44xx.c |    5 ++++-
- 1 file changed, 4 insertions(+), 1 deletion(-)
+ arch/arm/mach-omap2/powerdomain.c |   73 +++++++++++++++++++++++++++++++++++++
+ arch/arm/mach-omap2/powerdomain.h |    3 ++
+ 2 files changed, 76 insertions(+)
 
-diff --git a/arch/arm/mach-omap2/pm44xx.c b/arch/arm/mach-omap2/pm44xx.c
-index 0dda6cf..b377b03 100644
---- a/arch/arm/mach-omap2/pm44xx.c
-+++ b/arch/arm/mach-omap2/pm44xx.c
-@@ -29,6 +29,7 @@ u16 pm44xx_errata;
- struct power_state {
- 	struct powerdomain *pwrdm;
- 	u32 next_state;
-+	u32 next_logic_state;
- #ifdef CONFIG_SUSPEND
- 	u32 saved_state;
- 	u32 saved_logic_state;
-@@ -54,7 +55,7 @@ static int omap4_pm_suspend(void)
- 	/* Set targeted power domain states by suspend */
- 	list_for_each_entry(pwrst, &pwrst_list, node) {
- 		omap_set_pwrdm_state(pwrst->pwrdm, pwrst->next_state);
--		pwrdm_set_logic_retst(pwrst->pwrdm, PWRDM_POWER_OFF);
-+		pwrdm_set_logic_retst(pwrst->pwrdm, pwrst->next_logic_state);
- 	}
+diff --git a/arch/arm/mach-omap2/powerdomain.c b/arch/arm/mach-omap2/powerdomain.c
+index f391948..831a2bc 100644
+--- a/arch/arm/mach-omap2/powerdomain.c
++++ b/arch/arm/mach-omap2/powerdomain.c
+@@ -1081,6 +1081,79 @@ int pwrdm_post_transition(struct powerdomain *pwrdm)
+ }
  
- 	/*
-@@ -121,6 +122,8 @@ static int __init pwrdms_setup(struct powerdomain *pwrdm, void *unused)
- 
- 	pwrst->pwrdm = pwrdm;
- 	pwrst->next_state = PWRDM_POWER_RET;
-+	pwrst->next_logic_state = PWRDM_POWER_OFF;
+ /**
++ * pwrdm_get_valid_lp_state() - Find best match deep power state
++ * @pwrdm:	power domain for which we want to find best match
++ * @is_logic_state: Are we looking for logic state match here? Should
++ *		    be one of PWRDM_xxx macro values
++ * @req_state:	requested power state
++ *
++ * Returns: closest match for requested power state. default fallback
++ * is RET for logic state and ON for power state.
++ *
++ * This does a search from the power domain data looking for the
++ * closest valid power domain state that the hardware can achieve.
++ * PRCM definitions for PWRSTCTRL allows us to program whatever
++ * configuration we'd like, and PRCM will actually attempt such
++ * a transition, however if the powerdomain does not actually support it,
++ * we endup with a hung system. The valid power domain states are already
++ * available in our powerdomain data files. So this function tries to do
++ * the following:
++ * a) find if we have an exact match to the request - no issues.
++ * b) else find if a deeper power state is possible.
++ * c) failing which, it tries to find closest higher power state for the
++ * request.
++ */
++u8 pwrdm_get_valid_lp_state(struct powerdomain *pwrdm,
++			    bool is_logic_state, u8 req_state)
++{
++	u8 pwrdm_states = is_logic_state ? pwrdm->pwrsts_logic_ret :
++			pwrdm->pwrsts;
++	/* For logic, ret is highest and others, ON is highest */
++	u8 default_pwrst = is_logic_state ? PWRDM_POWER_RET : PWRDM_POWER_ON;
++	u8 new_pwrst;
++	bool found;
 +
- 	list_add(&pwrst->node, &pwrst_list);
++	/* If it is already supported, nothing to search */
++	if (pwrdm_states & BIT(req_state))
++		return req_state;
++
++	if (!req_state)
++		goto up_search;
++
++	/*
++	 * So, we dont have a exact match
++	 * Can we get a deeper power state match?
++	 */
++	new_pwrst = req_state - 1;
++	found = true;
++	while (!(pwrdm_states & BIT(new_pwrst))) {
++		/* No match even at OFF? Not available */
++		if (new_pwrst == PWRDM_POWER_OFF) {
++			found = false;
++			break;
++		}
++		new_pwrst--;
++	}
++
++	if (found)
++		goto done;
++
++up_search:
++	/* OK, no deeper ones, can we get a higher match? */
++	new_pwrst = req_state + 1;
++	while (!(pwrdm_states & BIT(new_pwrst))) {
++		/* BUG if we have messed up database */
++		BUG_ON(new_pwrst > PWRDM_POWER_ON);
++
++		if (new_pwrst == default_pwrst)
++			break;
++		new_pwrst++;
++	}
++done:
++	return new_pwrst;
++}
++
++/**
+  * omap_set_pwrdm_state - change a powerdomain's current power state
+  * @pwrdm: struct powerdomain * to change the power state of
+  * @pwrst: power state to change to
+diff --git a/arch/arm/mach-omap2/powerdomain.h b/arch/arm/mach-omap2/powerdomain.h
+index a754c82..11bd4dd 100644
+--- a/arch/arm/mach-omap2/powerdomain.h
++++ b/arch/arm/mach-omap2/powerdomain.h
+@@ -220,6 +220,9 @@ struct voltagedomain *pwrdm_get_voltdm(struct powerdomain *pwrdm);
  
- 	return omap_set_pwrdm_state(pwrst->pwrdm, pwrst->next_state);
+ int pwrdm_get_mem_bank_count(struct powerdomain *pwrdm);
+ 
++u8 pwrdm_get_valid_lp_state(struct powerdomain *pwrdm,
++			    bool is_logic_state, u8 req_state);
++
+ int pwrdm_set_next_pwrst(struct powerdomain *pwrdm, u8 pwrst);
+ int pwrdm_read_next_pwrst(struct powerdomain *pwrdm);
+ int pwrdm_read_pwrst(struct powerdomain *pwrdm);
 -- 
 1.7.9.5
