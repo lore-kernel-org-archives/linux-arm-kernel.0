@@ -1,40 +1,42 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 22 Aug 2014 14:33:16 +0100
-Subject: [PATCH v3] arm/smp: Absorb boot_secondary()
-In-Reply-To: <CAMuHMdVp3xeJ2nDYJ00tLc7HuZ5v+jC-T8omWV5+G_3C8XoyoA@mail.gmail.com>
-References: <1404918119-3676-1-git-send-email-geert+renesas@glider.be>
- <CAMuHMdXp0ruZjjJLXmWyCdfAXs9_9xFHDcmJ08M9_SbZqqq04g@mail.gmail.com>
- <201408202130.28389.arnd@arndb.de>
- <CAMuHMdVp3xeJ2nDYJ00tLc7HuZ5v+jC-T8omWV5+G_3C8XoyoA@mail.gmail.com>
-Message-ID: <20140822133315.GC20583@arm.com>
+From: yuvaraj.cd@gmail.com (Yuvaraj Kumar C D)
+Date: Fri, 22 Aug 2014 19:17:49 +0530
+Subject: [PATCH V2 0/3] Adding UHS support for dw_mmc driver 
+Message-ID: <1408715272-13833-1-git-send-email-yuvaraj.cd@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 20, 2014 at 08:55:33PM +0100, Geert Uytterhoeven wrote:
-> Has anyone already written a "git-send-email"-compatible script to
-> submit patches there?
+This series adds UHS support for dw_mmc driver.
+Patch[1] reworks the handling of vmmc and vqmmc regulators by mmc core 
+regulator API's.
 
-You can send patches as usual to patches at arm.linux.org.uk, just add
-KernelVersion: v3.?? after the --- line in your patch (maybe this could
-be automate as well but I didn't bother).
+Patch[2] was taken from chrome tree originally developed by Doug Anderson.
+Comments recieved for this patch to remove extra state machine for CMD11
+handling is dropped since it's very much required to set the 
+SDMMC_CMD_VOLT_SWITCH bit(28) for the proper working of clock update after 
+the first VOLT_SWITCH interrupt occurs during the voltage switch scenario.
+Though its not mentioned in Synopsys data book, its essential to complete
+the voltage switchingi sequence.  
 
-For series, because the arrival order is not guaranteed, I use the git
-alias below to trick it into sleeping 60s between patches:
+Patch[3] handles the case where in some boards uses built-in CD line for
+card detection and connected to a same voltage domain as of the IO rails.
+This version adds the changes for the concerned expressed by Doug Anderson
+in prevoius version.
 
-ksend-rmk-patch = !git send-email --annotate --no-thread --suppress-cc=all --to-cmd='sleep 60 && echo patches at arm.linux.org.uk "#"'
+Doug Anderson (1):
+ [2].mmc: dw_mmc: Support voltage changes
 
-For stgit, I have a dedicated template:
+Yuvaraj Kumar C D (2):
+ [1]. mmc: dw_mmc: use mmc_regulator_get_supply to handle regulators
+ [3]. mmc: dw_mmc: Dont cut off vqmmc and vmmc
 
-From: %(sender)s
-To: patches at arm.linux.org.uk
-Subject: %(prefix)s%(shortdescr)s
-
-%(longdescr)s
-PATCH FOLLOWS
-KernelVersion:%(version)s
-%(diff)s
-
-And there is always git pull request that Russell is happy with.
+ drivers/mmc/core/core.c          |   16 ++-
+ drivers/mmc/core/debugfs.c       |    3 +
+ drivers/mmc/host/dw_mmc-exynos.c |   12 ++
+ drivers/mmc/host/dw_mmc.c        |  231 ++++++++++++++++++++++++++++++--------
+ drivers/mmc/host/dw_mmc.h        |    7 +-
+ include/linux/mmc/dw_mmc.h       |    4 +-
+ include/linux/mmc/host.h         |    2 +
+ 7 files changed, 225 insertions(+), 50 deletions(-)
 
 -- 
-Catalin
+1.7.10.4
