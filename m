@@ -1,97 +1,34 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Fri, 22 Aug 2014 10:47:04 +0900
-Subject: [PATCH] ARM: shmobile: armadillo800eva: Sort includes
-In-Reply-To: <1407724739-14100-1-git-send-email-horms+renesas@verge.net.au>
-References: <1407724739-14100-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <20140822014704.GC9099@verge.net.au>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Thu, 21 Aug 2014 22:59:32 -0300
+Subject: [PATCH] ARM: dts: imx28-evk: Fix display duplicate name warning
+Message-ID: <1408672772-6365-1-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 11, 2014 at 11:38:59AM +0900, Simon Horman wrote:
-> Sorted includes seems to be the done thing these days.
-> 
-> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+From: Fabio Estevam <fabio.estevam@freescale.com>
 
-I have queued up this patch.
+Provide the display unit address in order to fix the following warning:
 
-> ---
->  arch/arm/mach-shmobile/board-armadillo800eva.c | 40 +++++++++++++-------------
->  1 file changed, 20 insertions(+), 20 deletions(-)
-> 
-> diff --git a/arch/arm/mach-shmobile/board-armadillo800eva.c b/arch/arm/mach-shmobile/board-armadillo800eva.c
-> index fc73246..ad27665 100644
-> --- a/arch/arm/mach-shmobile/board-armadillo800eva.c
-> +++ b/arch/arm/mach-shmobile/board-armadillo800eva.c
-> @@ -22,43 +22,43 @@
->  #include <linux/clk.h>
->  #include <linux/delay.h>
->  #include <linux/err.h>
-> -#include <linux/kernel.h>
-> -#include <linux/input.h>
-> -#include <linux/platform_data/st1232_pdata.h>
-> -#include <linux/irq.h>
-> -#include <linux/platform_device.h>
->  #include <linux/gpio.h>
->  #include <linux/gpio_keys.h>
-> -#include <linux/regulator/driver.h>
-> +#include <linux/i2c-gpio.h>
-> +#include <linux/input.h>
-> +#include <linux/irq.h>
-> +#include <linux/kernel.h>
-> +#include <linux/mfd/tmio.h>
-> +#include <linux/mmc/host.h>
-> +#include <linux/mmc/sh_mmcif.h>
-> +#include <linux/mmc/sh_mobile_sdhi.h>
->  #include <linux/pinctrl/machine.h>
-> +#include <linux/platform_data/st1232_pdata.h>
-> +#include <linux/platform_device.h>
->  #include <linux/pwm.h>
->  #include <linux/pwm_backlight.h>
-> +#include <linux/reboot.h>
-> +#include <linux/regulator/driver.h>
->  #include <linux/regulator/fixed.h>
->  #include <linux/regulator/gpio-regulator.h>
->  #include <linux/regulator/machine.h>
->  #include <linux/sh_eth.h>
-> -#include <linux/videodev2.h>
->  #include <linux/usb/renesas_usbhs.h>
-> -#include <linux/mfd/tmio.h>
-> -#include <linux/mmc/host.h>
-> -#include <linux/mmc/sh_mmcif.h>
-> -#include <linux/mmc/sh_mobile_sdhi.h>
-> -#include <linux/i2c-gpio.h>
-> -#include <linux/reboot.h>
-> +#include <linux/videodev2.h>
->  
-> -#include <media/mt9t112.h>
-> -#include <media/sh_mobile_ceu.h>
-> -#include <media/soc_camera.h>
-> -#include <asm/page.h>
-> +#include <asm/hardware/cache-l2x0.h>
->  #include <asm/mach-types.h>
->  #include <asm/mach/arch.h>
->  #include <asm/mach/map.h>
->  #include <asm/mach/time.h>
-> -#include <asm/hardware/cache-l2x0.h>
-> -#include <video/sh_mobile_lcdc.h>
-> -#include <video/sh_mobile_hdmi.h>
-> +#include <asm/page.h>
-> +#include <media/mt9t112.h>
-> +#include <media/sh_mobile_ceu.h>
-> +#include <media/soc_camera.h>
->  #include <sound/sh_fsi.h>
->  #include <sound/simple_card.h>
-> +#include <video/sh_mobile_hdmi.h>
-> +#include <video/sh_mobile_lcdc.h>
->  
->  #include "common.h"
->  #include "irqs.h"
-> -- 
-> 2.0.1
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+[    0.114765] regulator-dummy: no parameters
+[    0.152091] device-tree: Duplicate name in lcdif at 80030000, renamed to "display#1"
+
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+---
+ arch/arm/boot/dts/imx28-evk.dts | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm/boot/dts/imx28-evk.dts b/arch/arm/boot/dts/imx28-evk.dts
+index e4cc44c..c258b2c 100644
+--- a/arch/arm/boot/dts/imx28-evk.dts
++++ b/arch/arm/boot/dts/imx28-evk.dts
+@@ -127,7 +127,7 @@
+ 				display = <&display>;
+ 				status = "okay";
+ 
+-				display: display {
++				display: display at 0 {
+ 					bits-per-pixel = <32>;
+ 					bus-width = <24>;
+ 
+-- 
+1.9.1
