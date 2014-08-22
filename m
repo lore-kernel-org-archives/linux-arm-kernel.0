@@ -1,168 +1,226 @@
-From: liviu@dudau.co.uk (Liviu Dudau)
-Date: Fri, 22 Aug 2014 14:06:40 +0100
-Subject: [PATCH v9 04/12] PCI: OF: Fix the conversion of IO ranges into
- IO resources.
-In-Reply-To: <CAL_JsqJm6qWNdrJ2F8xddFUj46y42n6hQVu1nkTaA-5Tbg--XQ@mail.gmail.com>
-References: <1407860725-25202-1-git-send-email-Liviu.Dudau@arm.com>
- <1407860725-25202-5-git-send-email-Liviu.Dudau@arm.com>
- <CAL_JsqJm6qWNdrJ2F8xddFUj46y42n6hQVu1nkTaA-5Tbg--XQ@mail.gmail.com>
-Message-ID: <20140822130640.GM13147@bart.dudau.co.uk>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 22 Aug 2014 14:15:18 +0100
+Subject: [PATCH] Arm64: convert soft_restart() to assembly code
+In-Reply-To: <CAFdej00oR5r2=-r1dv3qG59SXT6+WbZeu+zOeS19nV5nRhw20w@mail.gmail.com>
+References: <1407847365-10873-1-git-send-email-achandran@mvista.com>
+ <1408123221.22761.38.camel@smoke>
+ <20140815182157.GD21908@leverpostej>
+ <CAFdej01kDMSTpzdGiRmX8g=E4mZU2_5oiiKzyQ_z7z1jxeCF-A@mail.gmail.com>
+ <20140820105408.GG21174@leverpostej>
+ <CAFdej00s9ZYXnE4AfU0vUqTb4dmUg4U=fOhc3KS1_JK+0=+mdw@mail.gmail.com>
+ <20140820141623.GF21734@leverpostej>
+ <CAFdej023ABj=xstTS_vddr2PMoqE4Fe1qBN9Gr0P69hW+u=YBA@mail.gmail.com>
+ <20140821143155.GN21734@leverpostej>
+ <CAFdej00oR5r2=-r1dv3qG59SXT6+WbZeu+zOeS19nV5nRhw20w@mail.gmail.com>
+Message-ID: <20140822131518.GW21734@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 21, 2014 at 11:08:48PM -0500, Rob Herring wrote:
-> On Tue, Aug 12, 2014 at 11:25 AM, Liviu Dudau <Liviu.Dudau@arm.com> wrote:
-> > The ranges property for a host bridge controller in DT describes
-> > the mapping between the PCI bus address and the CPU physical address.
-> > The resources framework however expects that the IO resources start
-> > at a pseudo "port" address 0 (zero) and have a maximum size of IO_SPACE_LIMIT.
-> > The conversion from pci ranges to resources failed to take that into account.
+[...]
+
+> >> > Your spin-table implementation might be poking something that's not
+> >> > accessible at EL1, in which case you require the jump to EL2 for
+> >> > correctness. I can't say for certain either way.
+> >> >
+> >>
+> >> Yes you are right I needed a jump to EL2 for putting the
+> >> secondary CPUs at correct spinning loop.
 > >
-> > In the process move the function into drivers/of/address.c as it now
-> > depends on pci_address_to_pio() code and make it return an error code.
+> > Ok. So we need to do what I have suggested elsewhere w.r.t. jumping back
+> > up to EL2. As you point out below we need to synchronise with the CPUs
+> > on their way out too we can add a spin-table cpu_kill with a slightly
+> > dodgy delay to ensure that, given we have no other mechanism for
+> > synchronising.
 > >
-> > Cc: Grant Likely <grant.likely@linaro.org>
-> > Cc: Rob Herring <robh+dt@kernel.org>
+> Ok
 > 
-> Humm, this says I'm cc'ed, but I'm not which defeats the point of
-> recording the Cc's in the commit.
-
-Appologies, I've screwed up my git send-email arguments.
-
-> 
-> I still have the same concerns that this will break existing users.
-> Are you sure integrator is the only platform affected?
-
-microblaze and powerpc have their similar handcoded routine for parsing ranges
-where they pre-compute the io_base and adjust the values again when registering
-resources. I'm not absolutely sure they are not broken as I lack the appropriate
-platforms to test (I've been asking for an FPGA engineer to build me a microblaze
-image with all the bits included but haven't received anything yet and it is
-possible Xilinx has now shifted their interests towards ARM + PCI as the ML605
-board that I have seems to have been discontinued).
-
-mips is doing the same thing and I believe is not affected, pci-host-generic.c
-was adjusting the returned values afterwards so that will not be needed and Lorenzo
-has a patch for the driver to adapt it to this series anyway.
-
-pcie-designware.c also recalculates the io.start and io.end values, so that's fine
-for now. The only ones that I believe are still affected are pci-tegra.c and
-pcie-rcar.c for which I will need to provide a patch similar to integrator unless
-the code gets converted to the new range parsing.
-
-Best regards,
-Liviu
-
-> 
-> Rob
-> 
-> > Cc: Arnd Bergmann <arnd@arndb.de>
-> > Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
-> > ---
-> >  drivers/of/address.c       | 46 ++++++++++++++++++++++++++++++++++++++++++++++
-> >  include/linux/of_address.h | 13 ++-----------
-> >  2 files changed, 48 insertions(+), 11 deletions(-)
 > >
-> > diff --git a/drivers/of/address.c b/drivers/of/address.c
-> > index 4dab700..3735ac7 100644
-> > --- a/drivers/of/address.c
-> > +++ b/drivers/of/address.c
-> > @@ -906,3 +906,49 @@ bool of_dma_is_coherent(struct device_node *np)
-> >         return false;
-> >  }
-> >  EXPORT_SYMBOL_GPL(of_dma_is_coherent);
-> > +
-> > +/*
-> > + * of_pci_range_to_resource - Create a resource from an of_pci_range
-> > + * @range:     the PCI range that describes the resource
-> > + * @np:                device node where the range belongs to
-> > + * @res:       pointer to a valid resource that will be updated to
-> > + *              reflect the values contained in the range.
-> > + *
-> > + * Returns EINVAL if the range cannot be converted to resource.
-> > + *
-> > + * Note that if the range is an IO range, the resource will be converted
-> > + * using pci_address_to_pio() which can fail if it is called too early or
-> > + * if the range cannot be matched to any host bridge IO space (our case here).
-> > + * To guard against that we try to register the IO range first.
-> > + * If that fails we know that pci_address_to_pio() will do too.
-> > + */
-> > +int of_pci_range_to_resource(struct of_pci_range *range,
-> > +       struct device_node *np, struct resource *res)
-> > +{
-> > +       int err;
-> > +       res->flags = range->flags;
-> > +       res->parent = res->child = res->sibling = NULL;
-> > +       res->name = np->full_name;
-> > +
-> > +       if (res->flags & IORESOURCE_IO) {
-> > +               unsigned long port = -1;
-> > +               err = pci_register_io_range(range->cpu_addr, range->size);
-> > +               if (err)
-> > +                       goto invalid_range;
-> > +               port = pci_address_to_pio(range->cpu_addr);
-> > +               if (port == (unsigned long)-1) {
-> > +                       err = -EINVAL;
-> > +                       goto invalid_range;
-> > +               }
-> > +               res->start = port;
-> > +       } else {
-> > +               res->start = range->cpu_addr;
-> > +       }
-> > +       res->end = res->start + range->size - 1;
-> > +       return 0;
-> > +
-> > +invalid_range:
-> > +       res->start = (resource_size_t)OF_BAD_ADDR;
-> > +       res->end = (resource_size_t)OF_BAD_ADDR;
-> > +       return err;
-> > +}
-> > diff --git a/include/linux/of_address.h b/include/linux/of_address.h
-> > index 28e6836..6015f21 100644
-> > --- a/include/linux/of_address.h
-> > +++ b/include/linux/of_address.h
-> > @@ -23,17 +23,8 @@ struct of_pci_range {
-> >  #define for_each_of_pci_range(parser, range) \
-> >         for (; of_pci_range_parser_one(parser, range);)
+> > As far as I am aware an "isb; dsb" sequence never makes sense. It should
+> > be "dsb; isb". You want the I-side maintenance to complete (for which
+> > you have the DSB) _then_ you want to synchronise the execution context
+> > with the newly-visible instructions (for which you have the ISB).
 > >
-> > -static inline void of_pci_range_to_resource(struct of_pci_range *range,
-> > -                                           struct device_node *np,
-> > -                                           struct resource *res)
-> > -{
-> > -       res->flags = range->flags;
-> > -       res->start = range->cpu_addr;
-> > -       res->end = range->cpu_addr + range->size - 1;
-> > -       res->parent = res->child = res->sibling = NULL;
-> > -       res->name = np->full_name;
-> > -}
-> > -
-> > +extern int of_pci_range_to_resource(struct of_pci_range *range,
-> > +               struct device_node *np, struct resource *res);
-> >  /* Translate a DMA address from device space to CPU space */
-> >  extern u64 of_translate_dma_address(struct device_node *dev,
-> >                                     const __be32 *in_addr);
-> > --
-> > 2.0.4
-> >
-> >
-> > _______________________________________________
-> > linux-arm-kernel mailing list
-> > linux-arm-kernel at lists.infradead.org
-> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Thanks for the nice explanation.
 > 
+> Now I am able to kexec an SMP kernel with the below change.
+> 
+> ##########
+> diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
+> index 607d4bb..8969922 100644
+> --- a/arch/arm64/kernel/head.S
+> +++ b/arch/arm64/kernel/head.S
+> @@ -343,6 +343,11 @@ CPU_LE(    movk    x0, #0x30d0, lsl #16    )
+>  // Clear EE and E0E on LE systems
+>                       PSR_MODE_EL1h)
+>         msr     spsr_el2, x0
+>         msr     elr_el2, lr
+> +       mov     x0, #0x33ff
+> +       movk    x0, #0x801f, lsl #16
+> +       msr     cptr_el2, x0                    // Enable traps to el2
+> when CPACR or CPACR_EL1 is accessed
+> +       mov     x0, #3 << 20
+> +       msr     cpacr_el1, x0                   // Enable FP/ASIMD
+>         mov     w20, #BOOT_CPU_MODE_EL2         // This CPU booted in EL2
+>         eret
+>  ENDPROC(el2_setup)
+> diff --git a/arch/arm64/kernel/hyp-stub.S b/arch/arm64/kernel/hyp-stub.S
+> index a272f33..1fb4c38 100644
+> --- a/arch/arm64/kernel/hyp-stub.S
+> +++ b/arch/arm64/kernel/hyp-stub.S
+> @@ -56,12 +56,25 @@ el1_sync:
+>         mrs     x1, esr_el2
+>         lsr     x1, x1, #26
+>         cmp     x1, #0x16
+> -       b.ne    2f                              // Not an HVC trap
+> +       b.ne    3f                              // Not an HVC trap
+>         cbz     x0, 1f
+>         msr     vbar_el2, x0                    // Set vbar_el2
+>         b       2f
+>  1:     mrs     x0, vbar_el2                    // Return vbar_el2
+>  2:     eret
+> +3:     cmp     x1, #0x18       // Traps to EL2 for CPACR access have this code
+> +       b.ne    2b
+> +
+> +       mov     x1, #0x33ff
+> +       msr     cptr_el2, x1                    // Disable copro. traps to EL2
+> +
+> +       msr     cntp_ctl_el0, xzr
+> +       msr     cntfrq_el0, xzr
+> +       ic      ialluis
+> +       dsb     sy
+> +       isb
+> +
+> +       br  x0
+>  ENDPROC(el1_sync)
+> 
+>  .macro invalid_vector  label
+> diff --git a/arch/arm64/kernel/process.c b/arch/arm64/kernel/process.c
+> index 64733d4..77298c2 100644
+> --- a/arch/arm64/kernel/process.c
+> +++ b/arch/arm64/kernel/process.c
+> @@ -65,6 +65,14 @@ void soft_restart(unsigned long addr)
+>  //     smp_secondary_shutdown();
+>  #endif
+> 
+> +       /* Delay primary cpu; allow enough time for
+> +        * secondaries to enter spin loop
+> +        */
+> +#if defined(CONFIG_SMP)
+> +       if (smp_processor_id() == 0)
+> +               mdelay(1000);
+> +#endif
+> +
+>         cpu_soft_restart(virt_to_phys(cpu_reset), addr);
+> 
+>         /* Should never get here */
+> diff --git a/arch/arm64/mm/proc.S b/arch/arm64/mm/proc.S
+> index 3cb6dec..f6ab468 100644
+> --- a/arch/arm64/mm/proc.S
+> +++ b/arch/arm64/mm/proc.S
+> @@ -76,6 +76,10 @@ ENTRY(cpu_reset)
+>  #if defined(CONFIG_SMP)
+>  /*     bl      secondary_shutdown */
+>  #endif
+> +
+> +       /* Trap to EL2 */
+> +       mov     x1, #3 << 20
+> +       msr     cpacr_el1, x1                   // Enable FP/ASIMD
+>         ret     x0
+>  ENDPROC(cpu_reset)
+> 
+> @@ -200,8 +204,6 @@ ENTRY(__cpu_setup)
+>         tlbi    vmalle1is                       // invalidate I + D TLBs
+>         dsb     ish
+> 
+> -       mov     x0, #3 << 20
+> -       msr     cpacr_el1, x0                   // Enable FP/ASIMD
+>         msr     mdscr_el1, xzr                  // Reset mdscr_el1
+>         /*
+>          * Memory region attributes for LPAE:
+> ##########
+> 
+> The two lines
+> +       msr     cntp_ctl_el0, xzr
+> +       msr     cntfrq_el0, xzr
 
--- 
--------------------
-   .oooO
-   (   )
-    \ (  Oooo.
-     \_) (   )
-          ) /
-         (_/
+The kernel should _NEVER_ write to CNTFRQ. It is not guaranteed to be
+accessible from the non-secure side. The firmware should have configured
+this appropriately.
 
- One small step
-   for me ...
+If the firmware does not configure CNTFRQ correctly then it is buggy and
+must be fixed.
+
+Overriding the CNTFRQ to zero is completely broken.
+
+> were added for
+> ##########
+> SANITY CHECK: Unexpected variation in cntfrq. Boot CPU:
+> 0x00000002faf080, CPU1: 0x00000000000000
+> ------------[ cut here ]------------
+> WARNING: CPU: 1 PID: 0 at arch/arm64/kernel/cpuinfo.c:146
+> cpuinfo_store_cpu+0x2e8/0x14f4()
+> Unsupported CPU feature variation.
+> Modules linked in:
+> CPU: 1 PID: 0 Comm: swapper/1 Not tainted 3.16.0-rc4+ #196
+> Call trace:
+> [<ffffffc000087fd0>] dump_backtrace+0x0/0x130
+> [<ffffffc000088110>] show_stack+0x10/0x1c
+> [<ffffffc0004c03e0>] dump_stack+0x74/0xb8
+> [<ffffffc00009dfac>] warn_slowpath_common+0x8c/0xb4
+> [<ffffffc00009e078>] warn_slowpath_fmt_taint+0x4c/0x58
+> [<ffffffc00008adf0>] cpuinfo_store_cpu+0x2e4/0x14f4
+> [<ffffffc00008f7e0>] secondary_start_kernel+0xd4/0x120
+> ---[ end trace 62c0cf48de286b1c ]---
+> CPU2: Booted secondary processor
+> Detected PIPT I-cache on CPU2
+> SANITY CHECK: Unexpected variation in cntfrq. Boot CPU:
+> 0x00000002faf080, CPU2: 0x00000000000000
+> CPU3: Booted secondary processor
+> ##########
+> 
+> does this mean we also need to stop/handle timers before
+> jumping to new kernel??
+
+The value of CNTFRQ has nothing to do with whether the timers are
+enabled. If we don't already disabling the timers I guess we could as a
+courtesy to the next kernel, but interrupts should be masked and the
+next kernel should be able to handle it anyway. That would all live in
+the timer driver anyhow.
+
+Do you see the sanity check failure on a cold boot (with the same
+kernel)?
+
+ - If so, your firmware is not configuring CNTFRQ appropriately as it
+   MUST do. Virtualization IS broken on your system. This is a bug in
+   the firmware.
+
+ - If not, then something in the spin-table's cpu return path is
+   resulting in CPUs being reconfigured, or reset and not configured as
+   with cold boot. This is a bug in the firmware.
+
+The firmware MUST configure CNTFRQ. It must do so regardless of
+cold/warm boot. A clock-frequency property in the DT is insufficient;
+it's a half-baked workaround that's especially problematic if you boot
+at EL2.
+
+> > I really can't say. I know nothing of your platform or spin-table
+> > implementation, and this is nothing like what I'd expect the jump to EL2
+> > code to look like.
+> 
+> Yes It was just for trying things out. Traping to EL2 and then jumping
+> to the kexec/SMP-spin code is not sane. And by the way
+> I did not find anyway to do mode change to el2 from el1 other than
+> trapping.
+> 
+> Could you please elaborate more about the way you expect
+> it to be working/implemented??.
+
+Elsewhere in this thread I gave an outline of how I would expect this to
+be implemented with modifications to KVM and the hyp stub.
+
+Obviously some trap will be taken to EL2, but that should be as a result
+of an explicit HVC rather than an access to the CPACR, and it should
+only occur when the kernel was booted at EL2.
+
+Thanks,
+Mark.
