@@ -1,98 +1,30 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Thu, 21 Aug 2014 23:16:16 -0500
-Subject: [PATCH v9 12/12] PCI: Introduce pci_remap_iospace() for remapping
- PCI I/O bus resources into CPU space
-In-Reply-To: <1407860725-25202-13-git-send-email-Liviu.Dudau@arm.com>
-References: <1407860725-25202-1-git-send-email-Liviu.Dudau@arm.com>
- <1407860725-25202-13-git-send-email-Liviu.Dudau@arm.com>
-Message-ID: <CAL_JsqK6XiuS7OJ_2F16ySA8oj9AHqP0fAft21AOtJxXP2SqnQ@mail.gmail.com>
+From: davem@davemloft.net (David Miller)
+Date: Thu, 21 Aug 2014 21:39:29 -0700 (PDT)
+Subject: [PATCH v5 1/2] net: moxa: clear TX descriptor length bits
+In-Reply-To: <1408544322-32023-1-git-send-email-jonas.jensen@gmail.com>
+References: <1408459784-9385-1-git-send-email-jonas.jensen@gmail.com>
+ <1408544322-32023-1-git-send-email-jonas.jensen@gmail.com>
+Message-ID: <20140821.213929.2048600939729474726.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 12, 2014 at 11:25 AM, Liviu Dudau <Liviu.Dudau@arm.com> wrote:
-> Introduce a default implementation for remapping PCI bus I/O resources
-> onto the CPU address space. Architectures with special needs may
-> provide their own version, but most should be able to use this one.
->
-> Cc: Bjorn Helgaas <bhelgaas@google.com>
-> Cc: Arnd Bergmann <arnd@arndb.de>
-> Cc: Rob Herring <robh+dt@kernel.org>
-> Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
+From: Jonas Jensen <jonas.jensen@gmail.com>
+Date: Wed, 20 Aug 2014 16:18:42 +0200
 
-Reviewed-by: Rob Herring <robh@kernel.org>
+> @@ -348,7 +348,8 @@ static int moxart_mac_start_xmit(struct sk_buff *skb, struct net_device *ndev)
+>  
+>  	txdes1 = readl(desc + TX_REG_OFFSET_DESC1);
+>  	txdes1 |= TX_DESC1_LTS | TX_DESC1_FTS;
+> -	txdes1 &= ~(TX_DESC1_FIFO_COMPLETE | TX_DESC1_INTR_COMPLETE);
+> +	txdes1 &= ~(TX_DESC1_FIFO_COMPLETE | TX_DESC1_INTR_COMPLETE |
+> +		    TX_DESC1_BUF_SIZE_MASK);
+>  	txdes1 |= (len & TX_DESC1_BUF_SIZE_MASK);
+>  	writel(txdes1, desc + TX_REG_OFFSET_DESC1);
+>  	writel(TX_DESC0_DMA_OWN, desc + TX_REG_OFFSET_DESC0);
 
-However, I would like to see ARM pci_ioremap_io converted over to this function.
+Like others I wonder why the existing descriptor value is being read
+at all.
 
-Rob
-
-> ---
->  drivers/pci/pci.c   | 33 +++++++++++++++++++++++++++++++++
->  include/linux/pci.h |  3 +++
->  2 files changed, 36 insertions(+)
->
-> diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
-> index 29d1775..76d21b6 100644
-> --- a/drivers/pci/pci.c
-> +++ b/drivers/pci/pci.c
-> @@ -2707,6 +2707,39 @@ int pci_request_regions_exclusive(struct pci_dev *pdev, const char *res_name)
->  }
->  EXPORT_SYMBOL(pci_request_regions_exclusive);
->
-> +/**
-> + *     pci_remap_iospace - Remap the memory mapped I/O space
-> + *     @res: Resource describing the I/O space
-> + *     @phys_addr: physical address where the range will be mapped.
-> + *
-> + *     Remap the memory mapped I/O space described by the @res
-> + *     into the CPU physical address space. Only architectures
-> + *     that have memory mapped IO defined (and hence PCI_IOBASE)
-> + *     should call this function.
-> + */
-> +int __weak pci_remap_iospace(const struct resource *res, phys_addr_t phys_addr)
-> +{
-> +       int err = -ENODEV;
-> +
-> +#ifdef PCI_IOBASE
-> +       if (!(res->flags & IORESOURCE_IO))
-> +               return -EINVAL;
-> +
-> +       if (res->end > IO_SPACE_LIMIT)
-> +               return -EINVAL;
-> +
-> +       err = ioremap_page_range(res->start + (unsigned long)PCI_IOBASE,
-> +                               res->end + 1 + (unsigned long)PCI_IOBASE,
-> +                               phys_addr, pgprot_device(PAGE_KERNEL));
-> +#else
-> +       /* this architecture does not have memory mapped I/O space,
-> +          so this function should never be called */
-> +       WARN_ON(1);
-> +#endif
-> +
-> +       return err;
-> +}
-> +
->  static void __pci_set_master(struct pci_dev *dev, bool enable)
->  {
->         u16 old_cmd, cmd;
-> diff --git a/include/linux/pci.h b/include/linux/pci.h
-> index e1e0d80..988c2f5 100644
-> --- a/include/linux/pci.h
-> +++ b/include/linux/pci.h
-> @@ -1098,6 +1098,9 @@ int __must_check pci_bus_alloc_resource(struct pci_bus *bus,
->                                                   resource_size_t),
->                         void *alignf_data);
->
-> +
-> +int pci_remap_iospace(const struct resource *res, phys_addr_t phys_addr);
-> +
->  static inline dma_addr_t pci_bus_address(struct pci_dev *pdev, int bar)
->  {
->         struct pci_bus_region region;
-> --
-> 2.0.4
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+It's inefficient and completely unnecessary, you can just compute a new
+value from scratch, and that way all of these "uncleared field" issues
+just automatically disappear.
