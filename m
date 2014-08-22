@@ -1,51 +1,34 @@
-From: ipaton0@gmail.com (Iain Paton)
-Date: Fri, 22 Aug 2014 11:36:11 +0100
-Subject: Oops: 17 SMP ARM (v3.16-rc2)
-In-Reply-To: <CAOMZO5A3CgaVCKxNDG-zEdwprYdRDXD_XZ2ikW+mns-iieYHsg@mail.gmail.com>
-References: <20140626151424.GT32514@n2100.arm.linux.org.uk>
- <20140806095012.GN30282@n2100.arm.linux.org.uk>
- <C4A61A5CA4AD2246942F4BA6F20ACB8043575172@ALVA-EXMB04.alv.autoliv.int>
- <20140806125550.GO30282@n2100.arm.linux.org.uk>
- <C4A61A5CA4AD2246942F4BA6F20ACB804357526C@ALVA-EXMB04.alv.autoliv.int>
- <20140807121248.GY30282@n2100.arm.linux.org.uk>
- <20140808180900.GG30282@n2100.arm.linux.org.uk>
- <C4A61A5CA4AD2246942F4BA6F20ACB8043576356@ALVA-EXMB04.alv.autoliv.int>
- <CAOMZO5B8GR+ABBoJ=dJcFqw3Wagfaip7HM+C1FTz+aE4CmqiPw@mail.gmail.com>
- <C4A61A5CA4AD2246942F4BA6F20ACB80435776D3@ALVA-EXMB04.alv.autoliv.int>
- <CAOMZO5B7FgzB7ThVyV2Vk7wTwYgjRWjEnkkAN5uwwKMaBKq1yg@mail.gmail.com>
- <C4A61A5CA4AD2246942F4BA6F20ACB8043577770@ALVA-EXMB04.alv.autoliv.int>
- <53F11FF6.8030303@gmail.com>
- <CAOMZO5CDvQDD7gVLFStwv4MPrUyqZE3sEDZwb0gukkXujYG-6Q@mail.gmail.com>
- <53F2E89B.80009@gmail.com> <53F5BE3D.5070209@gmail.com>
- <CAOMZO5A3CgaVCKxNDG-zEdwprYdRDXD_XZ2ikW+mns-iieYHsg@mail.gmail.com>
-Message-ID: <53F71D1B.8090004@gmail.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Fri, 22 Aug 2014 19:39:52 +0900
+Subject: [PATCH 1/2] ARM: dts: Enable PMIC interrupts on ODROID
+In-Reply-To: <20140819201859.GA7929@localhost>
+References: <1405500606-5752-1-git-send-email-drake@endlessm.com>
+ <CAAObsKAokjDmpVy5cm_iFD52bCq+3jYeGDWzACsmh-JKktyjDw@mail.gmail.com>
+ <53F22D1B.4010900@samsung.com> <3413299.OcpyWkc82q@amdc1032>
+ <CABxcv=mkqmg_b+vwbVPAW7AaB86Fxx+LTuMSyC7L_mUy6u2+TQ@mail.gmail.com>
+ <20140819201859.GA7929@localhost>
+Message-ID: <07e201cfbdf5$69d92770$3d8b7650$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22/08/14 01:01, Fabio Estevam wrote:
-> On Thu, Aug 21, 2014 at 6:39 AM, Iain Paton <ipaton0@gmail.com> wrote:
+Olof Johansson wrote:
 > 
->> two and a half days of running this against both a sabre-lite and a
->> wandboard quad B1 and I still have no reason to think there's any
->> sort of a problem.
->>
->> Up to now, my testing has been done with my own config, I'll now
->> repeat the whole thing using the config Mattis posted to see if
->> I can reproduce it that way.
->>
->> Suggestions on a better / easier / quicker way to reproduce it are
->> welcome.
+> On Tue, Aug 19, 2014 at 12:15:41PM +0200, Javier Martinez Canillas wrote:
+> > Hello,
+> >
+> > On Tue, Aug 19, 2014 at 11:57 AM, Bartlomiej Zolnierkiewicz
+> > <b.zolnierkie@samsung.com> wrote:
+> > >
+> > > IMHO they should go to upstream ASAP as they fix the boot for
+> > > ODROID boards and they cannot break anything as they are limited
+> > > to ODROID dts files.
+> > >
+> >
+> > Agreed, this is definitely -rc material IMHO.
 > 
-> Thanks, Iain.
+> Yes. Definitely.
 > 
-> Mattis,
-> 
-> What is the silicon version of the mx6 in your sabrelite? What GCC
-> version do you use?
-> 
+OK, agreed. Will apply into fixes.
 
-For reference, both my SL and WBQUAD report silicon rev 1.2
-The RIoTboard uses a Solo and reports silicon rev 1.1
-
-I'm using vanilla gcc 4.9.1 and compiling the kernel natively on a 
-sabre-lite.
+Thanks,
+Kukjin
