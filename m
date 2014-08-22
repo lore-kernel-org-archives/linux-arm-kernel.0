@@ -1,44 +1,91 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Thu, 21 Aug 2014 21:01:09 -0300
-Subject: Oops: 17 SMP ARM (v3.16-rc2)
-In-Reply-To: <53F5BE3D.5070209@gmail.com>
-References: <20140626151424.GT32514@n2100.arm.linux.org.uk>
- <20140627163108.GP32514@n2100.arm.linux.org.uk>
- <C4A61A5CA4AD2246942F4BA6F20ACB8043575072@ALVA-EXMB04.alv.autoliv.int>
- <20140806095012.GN30282@n2100.arm.linux.org.uk>
- <C4A61A5CA4AD2246942F4BA6F20ACB8043575172@ALVA-EXMB04.alv.autoliv.int>
- <20140806125550.GO30282@n2100.arm.linux.org.uk>
- <C4A61A5CA4AD2246942F4BA6F20ACB804357526C@ALVA-EXMB04.alv.autoliv.int>
- <20140807121248.GY30282@n2100.arm.linux.org.uk>
- <20140808180900.GG30282@n2100.arm.linux.org.uk>
- <C4A61A5CA4AD2246942F4BA6F20ACB8043576356@ALVA-EXMB04.alv.autoliv.int>
- <CAOMZO5B8GR+ABBoJ=dJcFqw3Wagfaip7HM+C1FTz+aE4CmqiPw@mail.gmail.com>
- <C4A61A5CA4AD2246942F4BA6F20ACB80435776D3@ALVA-EXMB04.alv.autoliv.int>
- <CAOMZO5B7FgzB7ThVyV2Vk7wTwYgjRWjEnkkAN5uwwKMaBKq1yg@mail.gmail.com>
- <C4A61A5CA4AD2246942F4BA6F20ACB8043577770@ALVA-EXMB04.alv.autoliv.int>
- <53F11FF6.8030303@gmail.com>
- <CAOMZO5CDvQDD7gVLFStwv4MPrUyqZE3sEDZwb0gukkXujYG-6Q@mail.gmail.com>
- <53F2E89B.80009@gmail.com> <53F5BE3D.5070209@gmail.com>
-Message-ID: <CAOMZO5A3CgaVCKxNDG-zEdwprYdRDXD_XZ2ikW+mns-iieYHsg@mail.gmail.com>
+From: takahiro.akashi@linaro.org (AKASHI Takahiro)
+Date: Fri, 22 Aug 2014 09:19:13 +0900
+Subject: [PATCH v6 1/6] arm64: ptrace: add PTRACE_SET_SYSCALL
+In-Reply-To: <CAGXu5jJrTEhdDZ8fipNeaVm1_wto7u2f=uq_KzyMcVHJMT57vw@mail.gmail.com>
+References: <1408611405-8943-1-git-send-email-takahiro.akashi@linaro.org>	<1408611405-8943-2-git-send-email-takahiro.akashi@linaro.org>
+ <CAGXu5jJrTEhdDZ8fipNeaVm1_wto7u2f=uq_KzyMcVHJMT57vw@mail.gmail.com>
+Message-ID: <53F68C81.6020807@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 21, 2014 at 6:39 AM, Iain Paton <ipaton0@gmail.com> wrote:
-
-> two and a half days of running this against both a sabre-lite and a
-> wandboard quad B1 and I still have no reason to think there's any
-> sort of a problem.
+On 08/22/2014 01:47 AM, Kees Cook wrote:
+> On Thu, Aug 21, 2014 at 3:56 AM, AKASHI Takahiro
+> <takahiro.akashi@linaro.org> wrote:
+>> To allow tracer to be able to change/skip a system call by re-writing
+>> a syscall number, there are several approaches:
+>>
+>> (1) modify x8 register with ptrace(PTRACE_SETREGSET), and handle this case
+>>      later on in syscall_trace_enter(), or
+>> (2) support ptrace(PTRACE_SET_SYSCALL) as on arm
+>>
+>> Thinking of the fact that user_pt_regs doesn't expose 'syscallno' to
+>> tracer as well as that secure_computing() expects a changed syscall number
+>> to be visible, especially case of -1, before this function returns in
+>> syscall_trace_enter(), we'd better take (2).
+>>
+>> Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
 >
-> Up to now, my testing has been done with my own config, I'll now
-> repeat the whole thing using the config Mattis posted to see if
-> I can reproduce it that way.
+> Thanks, I like having this on both arm and arm64.
+
+Yeah, having this simplified the code of syscall_trace_enter() a bit, but
+also imposes some restriction on arm64, too.
+
+ > I wonder if other archs should add this option too.
+
+Do you think so? I assumed that SET_SYSCALL is to be avoided if possible.
+
+I also think that SET_SYSCALL should take an extra argument for a return value
+just in case of -1 (or we have SKIP_SYSCALL?).
+
+-Takahiro AKASHI
+
+> Reviewed-by: Kees Cook <keescook@chromium.org>
 >
-> Suggestions on a better / easier / quicker way to reproduce it are
-> welcome.
-
-Thanks, Iain.
-
-Mattis,
-
-What is the silicon version of the mx6 in your sabrelite? What GCC
-version do you use?
+>> ---
+>>   arch/arm64/include/uapi/asm/ptrace.h |    1 +
+>>   arch/arm64/kernel/ptrace.c           |   14 +++++++++++++-
+>>   2 files changed, 14 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/arch/arm64/include/uapi/asm/ptrace.h b/arch/arm64/include/uapi/asm/ptrace.h
+>> index 6913643..49c6174 100644
+>> --- a/arch/arm64/include/uapi/asm/ptrace.h
+>> +++ b/arch/arm64/include/uapi/asm/ptrace.h
+>> @@ -23,6 +23,7 @@
+>>
+>>   #include <asm/hwcap.h>
+>>
+>> +#define PTRACE_SET_SYSCALL     23
+>>
+>>   /*
+>>    * PSR bits
+>> diff --git a/arch/arm64/kernel/ptrace.c b/arch/arm64/kernel/ptrace.c
+>> index 0310811..8876049 100644
+>> --- a/arch/arm64/kernel/ptrace.c
+>> +++ b/arch/arm64/kernel/ptrace.c
+>> @@ -1077,7 +1077,19 @@ const struct user_regset_view *task_user_regset_view(struct task_struct *task)
+>>   long arch_ptrace(struct task_struct *child, long request,
+>>                   unsigned long addr, unsigned long data)
+>>   {
+>> -       return ptrace_request(child, request, addr, data);
+>> +       int ret;
+>> +
+>> +       switch (request) {
+>> +               case PTRACE_SET_SYSCALL:
+>> +                       task_pt_regs(child)->syscallno = data;
+>> +                       ret = 0;
+>> +                       break;
+>> +               default:
+>> +                       ret = ptrace_request(child, request, addr, data);
+>> +                       break;
+>> +       }
+>> +
+>> +       return ret;
+>>   }
+>>
+>>   enum ptrace_syscall_dir {
+>> --
+>> 1.7.9.5
+>>
+>
+>
+>
