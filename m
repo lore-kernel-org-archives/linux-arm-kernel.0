@@ -1,81 +1,87 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Fri, 22 Aug 2014 17:56:25 +0200
-Subject: [PATCH 00/24] PM / Domains: Generic OF-based support and cleanups
-In-Reply-To: <CAMuHMdWLLcWvgvY_nC4doEGnHxNJEQfx5RYbJqZfjm0UT=J47Q@mail.gmail.com>
-References: <1402397497-26737-1-git-send-email-ulf.hansson@linaro.org>
- <CAMuHMdWLLcWvgvY_nC4doEGnHxNJEQfx5RYbJqZfjm0UT=J47Q@mail.gmail.com>
-Message-ID: <CAPDyKFpXPO+BZu4g0uDwmS7h+QjpiXYVpSz2Yt1F4Ro6UBTJTg@mail.gmail.com>
+From: dianders@chromium.org (Doug Anderson)
+Date: Fri, 22 Aug 2014 09:14:56 -0700
+Subject: [PATCH v7] ARM: dts: Prepare node labels for exynos5250
+In-Reply-To: <080101cfbdf6$c8fd1f30$5af75d90$@samsung.com>
+References: <53DCD74B.8090400@gmail.com>
+ <1408539764-5835-1-git-send-email-afaerber@suse.de>
+ <080101cfbdf6$c8fd1f30$5af75d90$@samsung.com>
+Message-ID: <CAD=FV=VS8e4Fs-j4CFvGYtvj58QwOk52gWh7AfnZcpswVRnDKA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22 August 2014 14:15, Geert Uytterhoeven <geert@linux-m68k.org> wrote:
-> Hi Ulf, Tomasz,
->
-> On Tue, Jun 10, 2014 at 12:51 PM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
->> Parts of this patchset has been posted earlier. To be able to smoothly continue
->> my work in re-factoring genpd I have collected patches into this patchset.
->>
->> The complete patchset is available at the linux-pm_linux-next_genpd branch at:
->> git.linaro.org/people/ulf.hansson/linux-2.6.git
->> This branch is based upon Rafael's linux-pm tree's linux-next branch.
->>
->> And important note. There are dependencies througout this patchset, which means
->> the all need to go together. I suggest we use Rafael's tree, thus I seek for
->> acks from the affected ARM SoC maintainers.
->>
->> Tomasz Figa (3):
->>   base: power: Add generic OF-based power domain look-up
->>   drivercore: Bind/unbind power domain on probe/remove
->>   ARM: exynos: Move to generic power domain bindings
->>
->> Ulf Hansson (21):
->>   PM / Domains: Ignore callbacks for subsys generic_pm_domain_data
->>   PM / Domains: Remove the pm_genpd_add|remove_callbacks APIs
->>   PM / Domains: Remove system PM callbacks from gpd_dev_ops
->>   ARM: shmobile: Drop dev_irq_safe from r8a7779 genpd config
->>   ARM: shmobile: Drop dev_irq_safe from R-mobile genpd config
->>   PM / Domains: Remove dev_irq_safe from genpd config
->>   PM / Domains: Remove redundant check for CONFIG_PM
->>   PM / Domains: Remove legacy API for adding devices through DT
->>   PM / Domains: Remove pm_genpd_syscore_switch() API
->>   PM / Domains: Remove genpd_queue_power_off_work() API
->>   PM / Domains: Add late_initcall to disable unused domains
->>   ARM: exynos: Leave disabling of unused pm domains to genpd
->>   ARM: s3c64xx: Leave disabling of unused pm domains to genpd
->>   drivers: sh: Leave disabling of unused pm domains to genpd
->>   PM / Domains: Remove default_stop_ok() API
->>   dt: bindings: ux500: Add documentation for power domains
->>   dt: bindings: ux500: Add header for power domains specifiers
->>   ARM: ux500: Initial support for power domains
->>   ARM: ux500: Enable Kconfig for the generic power domain
->>   ARM: ux500: Add DT node for ux500 power domains
->>   ARM: ux500: Add sdi[n] devices to VAPE power domain
->
-> What are your plans with this patch series?
->
-> Thanks!
+Kukjin,
 
-I have been working on the generic power domain DT parts. It needs
-some more tests, but will for sure post and new patchset early next
-week.
+On Fri, Aug 22, 2014 at 3:49 AM, Kukjin Kim <kgene.kim@samsung.com> wrote:
+> Andreas F?rber wrote:
+>>
+>> Allows them to be extended by reference.
+>>
+>> Reviewed-by: Doug Anderson <dianders@chromium.org>
+>> Signed-off-by: Andreas F?rber <afaerber@suse.de>
+>> ---
+>>  v6 -> v7:
+>>  * Dropped uart* labels (Tomasz Figa)
+>>
+>>  v6: Split off from Snow/SMDK cleanups (Doug Anderson)
+>>
+>>  arch/arm/boot/dts/exynos5250.dtsi | 16 ++++++++--------
+>>  1 file changed, 8 insertions(+), 8 deletions(-)
+>>
+>> diff --git a/arch/arm/boot/dts/exynos5250.dtsi b/arch/arm/boot/dts/exynos5250.dtsi
+>> index 492e1eff37bd..42eafd19cfb2 100644
+>> --- a/arch/arm/boot/dts/exynos5250.dtsi
+>> +++ b/arch/arm/boot/dts/exynos5250.dtsi
+>> @@ -218,7 +218,7 @@
+>>               clock-names = "fimg2d";
+>>       };
+>>
+>> -     codec at 11000000 {
+>> +     mfc: codec at 11000000 {
+>>               compatible = "samsung,mfc-v6";
+>>               reg = <0x11000000 0x10000>;
+>>               interrupts = <0 96 0>;
+>> @@ -227,7 +227,7 @@
+>>               clock-names = "mfc";
+>>       };
+>>
+>> -     rtc at 101E0000 {
+>> +     rtc: rtc at 101E0000 {
+>>               clocks = <&clock CLK_RTC>;
+>>               clock-names = "rtc";
+>>               status = "disabled";
+>> @@ -261,7 +261,7 @@
+>>               clock-names = "uart", "clk_uart_baud0";
+>>       };
+>>
+>> -     sata at 122F0000 {
+>> +     sata: sata at 122F0000 {
+>>               compatible = "snps,dwc-ahci";
+>>               samsung,sata-freq = <66>;
+>>               reg = <0x122F0000 0x1ff>;
+>> @@ -573,7 +573,7 @@
+>>               #phy-cells = <1>;
+>>       };
+>>
+>> -     usb at 12110000 {
+>> +     ehci: usb at 12110000 {
+>
+> I'm not sure which one is recommended between above and "ehci: ehci at 12110000 {"
 
-Then there are two more separate series:
-1.. "The genpd cleanup/small-fixes" - I will also post this soon,
-re-based and separate from the other series.
-2. "Genpd support for ux500" - I will keep this one on hold, until the
-generic power domain DT patchset has been accepted.
+My understanding is that more generic names should be used for node
+names.  AKA: "usb" and not "ehci".  "mmc" and not "dwmmc".
 
-Kind regards
-Uffe
+In another thread I was pointed at ePAPR
+<http://www.power.org/resources/downloads/Power_ePAPR_APPROVED_v1.0.pdf>:
 
+The name of a node should be somewhat generic, reflecting the function
+of the device and not its precise programming model.
+
+
+>> -     hdmi {
+>> +     hdmi: hdmi {
 >
-> Gr{oetje,eeting}s,
+> Should be
 >
->                         Geert
->
-> --
-> Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
->
-> In personal conversations with technical people, I call myself a hacker. But
-> when I'm talking to journalists I just say "programmer" or something like that.
->                                 -- Linus Torvalds
+> +       hdmi: hdmi at 14530000 { ?
+
+Seems like that should be a followon patch.
