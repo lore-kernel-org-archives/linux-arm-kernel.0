@@ -1,36 +1,33 @@
 From: nm@ti.com (Nishanth Menon)
-Date: Fri, 22 Aug 2014 08:55:22 -0500
-Subject: [PATCH 0/3] ARM: OMAP5+: pdata quirks for pinctrl
-Message-ID: <1408715725-25919-1-git-send-email-nm@ti.com>
+Date: Fri, 22 Aug 2014 08:55:23 -0500
+Subject: [PATCH 1/3] ARM: OMAP5: use pdata quirks for pinctrl information
+In-Reply-To: <1408715725-25919-1-git-send-email-nm@ti.com>
+References: <1408715725-25919-1-git-send-email-nm@ti.com>
+Message-ID: <1408715725-25919-2-git-send-email-nm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following series are various fixes and improvements for daisychain
-support in OMAP5+ using pinctrl framework similar to that done for
-OMAP3+
+Provide pdata-quirks for OMAP5 processor family.
 
-This is part 3/6 series which eventually enables framework for
-suspend-to-ram and cpuidle for OMAP5 and DRA7
+Signed-off-by: Nishanth Menon <nm@ti.com>
+---
+ arch/arm/mach-omap2/pdata-quirks.c |    4 ++++
+ 1 file changed, 4 insertions(+)
 
-Each of series is based on v3.17-rc1 and this specific series is available:
-weblink: https://github.com/nmenon/linux-2.6-playground/commits/push/v3.17/prm-pdata-quirks
-
-git repo: https://github.com/nmenon/linux-2.6-playground.git push/v3.17/prm-pdata-quirks
-
-An complete integrated branch is available here: https://github.com/nmenon/linux-2.6-playground/commits/testing/v3.17/cpu-idle-suspend-dra7-omap5-framework
-
-Minor note: thanks to existing style in pdata-quirks, new entries
-continue to possess 'over 80 character' checkpatch warnings
-
-Keerthy (1):
-  ARM: AM437x: use pdata quirks for pinctrl information
-
-Nishanth Menon (2):
-  ARM: OMAP5: use pdata quirks for pinctrl information
-  ARM: DRA7: use pdata quirks for pinctrl information
-
- arch/arm/mach-omap2/pdata-quirks.c |   10 ++++++++++
- 1 file changed, 10 insertions(+)
-
+diff --git a/arch/arm/mach-omap2/pdata-quirks.c b/arch/arm/mach-omap2/pdata-quirks.c
+index 90c88d4..edacfed 100644
+--- a/arch/arm/mach-omap2/pdata-quirks.c
++++ b/arch/arm/mach-omap2/pdata-quirks.c
+@@ -352,6 +352,10 @@ struct of_dev_auxdata omap_auxdata_lookup[] __initdata = {
+ 	OF_DEV_AUXDATA("ti,omap4-padconf", 0x4a100040, "4a100040.pinmux", &pcs_pdata),
+ 	OF_DEV_AUXDATA("ti,omap4-padconf", 0x4a31e040, "4a31e040.pinmux", &pcs_pdata),
+ #endif
++#ifdef CONFIG_SOC_OMAP5
++	OF_DEV_AUXDATA("ti,omap5-padconf", 0x4a002840, "4a002840.pinmux", &pcs_pdata),
++	OF_DEV_AUXDATA("ti,omap5-padconf", 0x4ae0c840, "4ae0c840.pinmux", &pcs_pdata),
++#endif
+ #if defined(CONFIG_ARCH_OMAP4) || defined(CONFIG_SOC_OMAP5)
+ 	OF_DEV_AUXDATA("ti,omap4-iommu", 0x4a066000, "4a066000.mmu",
+ 		       &omap4_iommu_pdata),
 -- 
 1.7.9.5
