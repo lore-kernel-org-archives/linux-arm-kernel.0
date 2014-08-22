@@ -1,58 +1,48 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 22 Aug 2014 16:10:07 +0100
-Subject: [PATCH 5/7 update] arm64/efi: do not enter virtual mode in case
- booting with efi=noruntime or noefi
-In-Reply-To: <20140818013007.GB3379@darkstar.nay.redhat.com>
-References: <1408007731-15081-1-git-send-email-dyoung@redhat.com>
- <1408007731-15081-5-git-send-email-dyoung@redhat.com>
- <20140815150952.GY27466@arm.com>
- <20140818013007.GB3379@darkstar.nay.redhat.com>
-Message-ID: <20140822151007.GA17255@arm.com>
+Date: Fri, 22 Aug 2014 16:22:15 +0100
+Subject: [PATCH v3 1/1] iommu/arm-smmu: Do not access non-existing S2CR
+ registers
+In-Reply-To: <1408403858-16766-1-git-send-email-ohaugan@codeaurora.org>
+References: <1408403858-16766-1-git-send-email-ohaugan@codeaurora.org>
+Message-ID: <20140822152215.GC17255@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 18, 2014 at 02:30:07AM +0100, Dave Young wrote:
-> In case efi runtime disabled via noefi kernel cmdline arm64_enter_virtual_mode
-> should error out.
+Hi Olav,
+
+Some really minor comments, but this looks good.
+
+On Tue, Aug 19, 2014 at 12:17:38AM +0100, Olav Haugan wrote:
+> The number of S2CR registers is not properly set when stream
+> matching is not supported. Fix this and add check that we do not try to
+> access outside of the number of S2CR regisrers.
 > 
-> At the same time move early_memunmap(memmap.map, mapsize) to the beginning of
-> the function or it will leak early mem.
-> 
-> Signed-off-by: Dave Young <dyoung@redhat.com>
+> Signed-off-by: Olav Haugan <ohaugan@codeaurora.org>
 > ---
->  arch/arm64/kernel/efi.c | 11 ++++++++---
->  1 file changed, 8 insertions(+), 3 deletions(-)
+>  drivers/iommu/arm-smmu.c | 24 +++++++++++++++++-------
+>  1 file changed, 17 insertions(+), 7 deletions(-)
 > 
-> diff --git a/arch/arm64/kernel/efi.c b/arch/arm64/kernel/efi.c
-> index 6ed0362..8f5db4a 100644
-> --- a/arch/arm64/kernel/efi.c
-> +++ b/arch/arm64/kernel/efi.c
-> @@ -392,11 +392,16 @@ static int __init arm64_enter_virtual_mode(void)
->  		return -1;
->  	}
+> diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+> index 9fd8754d..a050f7a 100644
+> --- a/drivers/iommu/arm-smmu.c
+> +++ b/drivers/iommu/arm-smmu.c
+> @@ -548,9 +548,16 @@ static int register_smmu_master(struct arm_smmu_device *smmu,
+>  	master->of_node			= masterspec->np;
+>  	master->cfg.num_streamids	= masterspec->args_count;
 >  
-> -	pr_info("Remapping and enabling EFI services.\n");
-> -
-> -	/* replace early memmap mapping with permanent mapping */
->  	mapsize = memmap.map_end - memmap.map;
->  	early_memunmap(memmap.map, mapsize);
-> +
-> +	if (efi_runtime_disabled()) {
-> +		pr_info("EFI runtime services will be disabled.\n");
-> +		return -1;
-> +	}
-> +
-> +	pr_info("Remapping and enabling EFI services.\n");
-> +	/* replace early memmap mapping with permanent mapping */
->  	memmap.map = (__force void *)ioremap_cache((phys_addr_t)memmap.phys_map,
->  						   mapsize);
->  	memmap.map_end = memmap.map + mapsize;
+> -	for (i = 0; i < master->cfg.num_streamids; ++i)
+> +	for (i = 0; i < master->cfg.num_streamids; ++i) {
+> +		if (!(smmu->features & ARM_SMMU_FEAT_STREAM_MATCH) &&
+> +		     (masterspec->args[i] >= smmu->num_mapping_groups)) {
 
-This looks better, thanks:
+Can we stick masterspec->args[i] into a loop-local streamid variable,
+please?
 
-  Reviewed-by: Will Deacon <will.deacon@arm.com>
+> +			dev_err(dev,
+> +				"stream ID for master device %s greater than maximum allowed (%d)\n",
+> +				masterspec->np->name, smmu->num_mapping_groups);
+> +			return -ENOSPC;
 
-Are you sending these via the efi tree as part of this series, or do you
-need me to pick anything up into the arm64 tree?
+-ERANGE might be better.
 
 Will
