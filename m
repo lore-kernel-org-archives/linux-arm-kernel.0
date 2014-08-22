@@ -1,52 +1,48 @@
-From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
-Date: Fri, 22 Aug 2014 19:53:19 +0200
-Subject: [PATCH v9 1/2] regulator: Add driver for max77802 PMIC PMIC
- regulators
-In-Reply-To: <20140822144531.GV24407@sirena.org.uk>
-References: <1408350762-15520-1-git-send-email-javier.martinez@collabora.co.uk>
- <1408350762-15520-2-git-send-email-javier.martinez@collabora.co.uk>
- <CA+NduCDL65=Y=PyU3FfXsTz0FfbmYzicGrY4U7ji3_V+nXhtCQ@mail.gmail.com>
- <53F73472.8010609@collabora.co.uk> <20140822144531.GV24407@sirena.org.uk>
-Message-ID: <53F7838F.8060906@collabora.co.uk>
+From: addy.ke@rock-chips.com (Addy Ke)
+Date: Sat, 23 Aug 2014 02:00:52 +0800
+Subject: [PATCH v4] i2c: rk3x: fix bug that cause transfer fails in master
+ receive mode
+In-Reply-To: <1408669991-9703-1-git-send-email-addy.ke@rock-chips.com>
+References: <1408669991-9703-1-git-send-email-addy.ke@rock-chips.com>
+Message-ID: <1408730452-3552-1-git-send-email-addy.ke@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Mark,
+In rk3x SOC, the I2C controller can receive/transmit up to 32 bytes data
+in one chunk, so the size of data to be write/read to/from TXDATAx/RXDATAx
+must be less than or equal 32 bytes at a time.
 
-On 08/22/2014 04:45 PM, Mark Brown wrote:
-> On Fri, Aug 22, 2014 at 02:15:46PM +0200, Javier Martinez Canillas wrote:
-> 
->> Mark, any opinions on how this should be solved will be highly appreciated.
-> 
-> If someone could tell me what "this" is that'd help...
-> 
+Tested on rk3288-pinky board, elan receive 158 bytes data.
 
-Sorry for not being clear on that regard. By "this" I meant the problem
-reported by Yuvaraj.
+Suggested-by: Dmitry Torokhov <dmitry.torokhov@gmail.com>
+Signed-off-by: Addy Ke <addy.ke@rock-chips.com>
+Acked-by: Max Schwarz <max.schwarz@online.de>
+---
+Changes in v2:
+- Use cleaner syntax as suggested by Sergei.
+- Update commit message as suggested by Wolfram.
 
-The regulators operating mode is read from the hardware registers on probe
-as you suggested but that means that if the regulator is disabled and the
-machine rebooted (warm reset) the opmode reported by the hardware is
-MAX77802_OPMODE_OFF.
+Changes in v3:
+- fix typo: maste --> master and double spaces after 'len'
+ drivers/i2c/busses/i2c-rk3x.c | 4 ++++
 
-The problem is that one of these regulators is used as the vqmmc-supply
-(VCCQ/VDD_IO) so the mmc host controller driver disables it on
-MMC_POWER_OFF. Now AFAIK (Yuvaraj can correct me what I got wrong) this
-shouldn't be an issue since on card detection, the vqmmc supply should be
-enabled again but on Exynos the built-in card detect line is on the same
-power rail as vqmmc. That means that disabling the regulator prevents card
-insertions to be detected.
+Changes in v4:
+- remove unlikely() annotations, suggested by Dmitry Torokhov
 
-This does not happen on the downstream Chrome OS kernel because the
-max77802 regulator driver has some ad-hoc DT bindings were you can define
-the operating mode to be set on probe. For this particular regulator is
-MAX77802_OPMODE_STANDBY.
-
-Yuvaraj solution was to set the operating mode to MAX77802_OPMODE_NORMAL
-on probe() which was what I did on a previous version of the driver but
-you explained to me that it was not safe to do that.
-
-That's why I'm asking for suggestions.
-
-Thanks a lot and best regards,
-Javier
+diff --git a/drivers/i2c/busses/i2c-rk3x.c b/drivers/i2c/busses/i2c-rk3x.c
+index b8b2b89..31de730 100644
+--- a/drivers/i2c/busses/i2c-rk3x.c
++++ b/drivers/i2c/busses/i2c-rk3x.c
+@@ -323,6 +323,10 @@ static void rk3x_i2c_handle_read(struct rk3x_i2c *i2c, unsigned int ipd)
+ 	/* ack interrupt */
+ 	i2c_writel(i2c, REG_INT_MBRF, REG_IPD);
+ 
++	/* Can only handle a maximum of 32 bytes at a time */
++	if (len > 32)
++		len = 32;
++
+ 	/* read the data from receive buffer */
+ 	for (i = 0; i < len; ++i) {
+ 		if (i % 4 == 0)
+-- 
+1.8.3.2
