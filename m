@@ -1,45 +1,43 @@
-From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
-Date: Fri, 22 Aug 2014 09:31:20 -0700
-Subject: [PATCH 3/3] ARM: zynq: DT: Add Ethernet phys
-In-Reply-To: <20140822162048.GB8477@obsidianresearch.com>
-References: <1408550219-19825-1-git-send-email-soren.brinkmann@xilinx.com>
- <1408550219-19825-3-git-send-email-soren.brinkmann@xilinx.com>
- <5a7b6f57-b6c0-4fb3-af0d-d403277c0207@BN1AFFO11FD045.protection.gbl>
- <53F5D8D9.7040604@suse.de>
- <f166a186-301c-4288-97cf-71f8173c07e7@BN1AFFO11FD010.protection.gbl>
- <20140822162048.GB8477@obsidianresearch.com>
-Message-ID: <d31d72f2-acac-4aa3-b992-fc244ac6db4e@BY2FFO11FD005.protection.gbl>
+From: dianders@chromium.org (Doug Anderson)
+Date: Fri, 22 Aug 2014 09:38:28 -0700
+Subject: [PATCH] clk: rockchip: Fix the clocks for i2c1 and i2c2
+Message-ID: <1408725508-24066-1-git-send-email-dianders@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2014-08-22 at 10:20AM -0600, Jason Gunthorpe wrote:
-> On Thu, Aug 21, 2014 at 08:49:19AM -0700, S?ren Brinkmann wrote:
-> 
-> > So my thinkings:
-> >  - the compatible string with the -c22 is used and documented in the phy
-> >    bindings, it should be there.
-> 
-> Yes
-> 
-> >  - the ID based strings seem to be not needed since, IIUC, the core
-> >    reads the ID from the PHY and uses it, so I just left it out not
-> >    trying to figure out how to obtain the correct ID
-> 
-> It is certainly optional, I added the property to solve some obscure
-> problems with probing, but I've noticed people using it more broadly.
-> I suspect it also speeds up booting a tiny bit.
-> 
-> >  - the marvell compatible strings are used in our vendor tree. They
-> >    aren't used anywhere but in our vendor tree. I though keeping them is
-> >    nice since it identifies the PHY fully. And in case that level of
-> >    detail is needed at some point it is already there.
-> 
-> DT is complex enough already, don't include useless compatible strings
-> in mainline - people will see and tend to blindly copy. Ideally your
-> vendor tree would use the standard property :|
+The clocks for i2c1 and i2c2 are flipped.  The clock tree matched the
+Technical Reference Manual (TRM) but the TRM was wrong.  Swap them in
+the clock tree.  This was determined experimentally (by Addy) and
+confirmed by the Rockchip IC team.
 
-There are different opinions on this. I also heard to just add such
-strings, so in case this level of differentiation becomes necessary at
-some later point, it is already existing.
+Seires-cc: Eddie Cai <eddie.cai@rock-chips.com>
+Signed-off-by: Doug Anderson <dianders@chromium.org>
+Reported-by: Addy Ke <addy.ke@rock-chips.com>
+---
+ drivers/clk/rockchip/clk-rk3288.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-	S?ren
+diff --git a/drivers/clk/rockchip/clk-rk3288.c b/drivers/clk/rockchip/clk-rk3288.c
+index 0d8c6c5..b22a2d2 100644
+--- a/drivers/clk/rockchip/clk-rk3288.c
++++ b/drivers/clk/rockchip/clk-rk3288.c
+@@ -545,7 +545,7 @@ static struct rockchip_clk_branch rk3288_clk_branches[] __initdata = {
+ 	GATE(PCLK_PWM, "pclk_pwm", "pclk_cpu", 0, RK3288_CLKGATE_CON(10), 0, GFLAGS),
+ 	GATE(PCLK_TIMER, "pclk_timer", "pclk_cpu", 0, RK3288_CLKGATE_CON(10), 1, GFLAGS),
+ 	GATE(PCLK_I2C0, "pclk_i2c0", "pclk_cpu", 0, RK3288_CLKGATE_CON(10), 2, GFLAGS),
+-	GATE(PCLK_I2C1, "pclk_i2c1", "pclk_cpu", 0, RK3288_CLKGATE_CON(10), 3, GFLAGS),
++	GATE(PCLK_I2C2, "pclk_i2c2", "pclk_cpu", 0, RK3288_CLKGATE_CON(10), 3, GFLAGS),
+ 	GATE(0, "pclk_ddrupctl0", "pclk_cpu", 0, RK3288_CLKGATE_CON(10), 14, GFLAGS),
+ 	GATE(0, "pclk_publ0", "pclk_cpu", 0, RK3288_CLKGATE_CON(10), 15, GFLAGS),
+ 	GATE(0, "pclk_ddrupctl1", "pclk_cpu", 0, RK3288_CLKGATE_CON(11), 0, GFLAGS),
+@@ -603,7 +603,7 @@ static struct rockchip_clk_branch rk3288_clk_branches[] __initdata = {
+ 	GATE(PCLK_I2C4, "pclk_i2c4", "pclk_peri", 0, RK3288_CLKGATE_CON(6), 15, GFLAGS),
+ 	GATE(PCLK_UART3, "pclk_uart3", "pclk_peri", 0, RK3288_CLKGATE_CON(6), 11, GFLAGS),
+ 	GATE(PCLK_UART4, "pclk_uart4", "pclk_peri", 0, RK3288_CLKGATE_CON(6), 12, GFLAGS),
+-	GATE(PCLK_I2C2, "pclk_i2c2", "pclk_peri", 0, RK3288_CLKGATE_CON(6), 13, GFLAGS),
++	GATE(PCLK_I2C1, "pclk_i2c1", "pclk_peri", 0, RK3288_CLKGATE_CON(6), 13, GFLAGS),
+ 	GATE(PCLK_I2C3, "pclk_i2c3", "pclk_peri", 0, RK3288_CLKGATE_CON(6), 14, GFLAGS),
+ 	GATE(PCLK_SARADC, "pclk_saradc", "pclk_peri", 0, RK3288_CLKGATE_CON(7), 1, GFLAGS),
+ 	GATE(PCLK_TSADC, "pclk_tsadc", "pclk_peri", 0, RK3288_CLKGATE_CON(7), 2, GFLAGS),
+-- 
+2.1.0.rc2.206.gedb03e5
