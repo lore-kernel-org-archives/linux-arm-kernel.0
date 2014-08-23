@@ -1,133 +1,735 @@
-From: afaerber@suse.de (=?ISO-8859-15?Q?Andreas_F=E4rber?=)
-Date: Sat, 23 Aug 2014 12:47:26 +0200
-Subject: [PATCH 1/3] ARM: dts: Add DT changes for display on snow
-In-Reply-To: <1406317464-7525-2-git-send-email-ajaykumar.rs@samsung.com>
-References: <1406317464-7525-1-git-send-email-ajaykumar.rs@samsung.com>
- <1406317464-7525-2-git-send-email-ajaykumar.rs@samsung.com>
-Message-ID: <53F8713E.5040408@suse.de>
+From: shc_work@mail.ru (Alexander Shiyan)
+Date: Sat, 23 Aug 2014 15:12:09 +0400
+Subject: [PATCH] ARM: i.MX: Remove Phytec i.MX27 PCM038/PCM970 board files
+Message-ID: <1408792329-32248-1-git-send-email-shc_work@mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 25.07.2014 21:44, schrieb Ajay Kumar:
-> Add DT nodes for ptn3460 bridge chip and panel-simple panel.
+pcm970-baseboard.c and mach-pcm038.c can be replaced with their
+devicetree equivalents: imx27-phytec-phycore-rdk.dts and
+imx27-phytec-phycore-som.dtsi respectively, so remove the board files.
 
-"simple-panel"
+Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
+---
+ arch/arm/configs/imx_v4_v5_defconfig |   1 -
+ arch/arm/mach-imx/Kconfig            |  30 ---
+ arch/arm/mach-imx/Makefile           |   2 -
+ arch/arm/mach-imx/board-pcm038.h     |  36 ----
+ arch/arm/mach-imx/mach-pcm038.c      | 358 -----------------------------------
+ arch/arm/mach-imx/pcm970-baseboard.c | 231 ----------------------
+ 6 files changed, 658 deletions(-)
+ delete mode 100644 arch/arm/mach-imx/board-pcm038.h
+ delete mode 100644 arch/arm/mach-imx/mach-pcm038.c
+ delete mode 100644 arch/arm/mach-imx/pcm970-baseboard.c
 
-> Add backlight enable pin and backlight power supply for pwm-backlight.
-> Also add bridge phandle needed by dp to enable display on snow.
-> 
-> Signed-off-by: Ajay Kumar <ajaykumar.rs@samsung.com>
-> ---
->  arch/arm/boot/dts/exynos5250-snow.dts |   40 +++++++++++++++++----------------
->  1 file changed, 21 insertions(+), 19 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/exynos5250-snow.dts b/arch/arm/boot/dts/exynos5250-snow.dts
-> index 6c36d41..f57f993 100644
-> --- a/arch/arm/boot/dts/exynos5250-snow.dts
-> +++ b/arch/arm/boot/dts/exynos5250-snow.dts
-> @@ -270,7 +270,7 @@
->  					dcdc3 {
->  						ti,enable-ext-control;
->  					};
-> -					fet1 {
-> +					fet1: fet1 {
->  						regulator-name = "vcd_led";
->  						ti,overcurrent-wait = <3>;
->  					};
-> @@ -293,7 +293,7 @@
->  						regulator-always-on;
->  						ti,overcurrent-wait = <3>;
->  					};
-> -					fet6 {
-> +					fet6: fet6 {
->  						regulator-name = "lcd_vdd";
->  						ti,overcurrent-wait = <3>;
->  					};
-> @@ -342,6 +342,15 @@
->  			pinctrl-0 = <&max98095_en>;
->  			pinctrl-names = "default";
->  		};
-> +
-> +		ptn3460: ptn3460-bridge at 20 {
-
-"lvds-bridge"? (AF)
-
-> +			compatible = "nxp,ptn3460";
-> +			reg = <0x20>;
-> +			powerdown-gpios = <&gpy2 5 0>;
-> +			reset-gpios = <&gpx1 5 0>;
-> +			edid-emulation = <5>;
-> +			panel = <&panel>;
-> +		};
->  	};
->  
->  	i2s0: i2s at 03830000 {
-> @@ -389,11 +398,13 @@
->  		vdd_pll-supply = <&ldo8_reg>;
->  	};
->  
-> -	backlight {
-> +	backlight: backlight {
->  		compatible = "pwm-backlight";
->  		pwms = <&pwm 0 1000000 0>;
->  		brightness-levels = <0 100 500 1000 1500 2000 2500 2800>;
->  		default-brightness-level = <7>;
-> +		enable-gpios = <&gpx3 0 0>;
-> +		power-supply = <&fet1>;
->  		pinctrl-0 = <&pwm0_out>;
->  		pinctrl-names = "default";
->  	};
-> @@ -403,6 +414,12 @@
->  		samsung,invert-vclk;
->  	};
->  
-> +	panel: panel-simple {
-
-Just "panel"? (AF)
-
-> +		compatible = "simple-panel";
-
-Use something more concrete than "simple-panel"? (Thierry)
-
-> +		power-supply = <&fet6>;
-> +		backlight = <&backlight>;
-> +	};
-> +
->  	dp-controller at 145B0000 {
->  		status = "okay";
->  		pinctrl-names = "default";
-> @@ -414,21 +431,6 @@
->  		samsung,link-rate = <0x0a>;
->  		samsung,lane-count = <2>;
->  		samsung,hpd-gpio = <&gpx0 7 0>;
-> -
-> -		display-timings {
-> -			native-mode = <&timing1>;
-> -
-> -			timing1: timing at 1 {
-> -				clock-frequency = <70589280>;
-> -				hactive = <1366>;
-> -				vactive = <768>;
-> -				hfront-porch = <40>;
-> -				hback-porch = <40>;
-> -				hsync-len = <32>;
-> -				vback-porch = <10>;
-> -				vfront-porch = <12>;
-> -				vsync-len = <6>;
-> -			};
-> -		};
-> +		bridge = <&ptn3460>;
->  	};
->  };
-
-This patch will trivially conflict with my Snow cleanup [1]; ptn3460
-would go into the appropriate &i2c_* and this hunk into &dp then.
-
-Regards,
-Andreas
-
-[1] https://patchwork.kernel.org/patch/4664801/
-
+diff --git a/arch/arm/configs/imx_v4_v5_defconfig b/arch/arm/configs/imx_v4_v5_defconfig
+index f53074c..9d73e69 100644
+--- a/arch/arm/configs/imx_v4_v5_defconfig
++++ b/arch/arm/configs/imx_v4_v5_defconfig
+@@ -30,7 +30,6 @@ CONFIG_MACH_MX25_3DS=y
+ CONFIG_MACH_EUKREA_CPUIMX25SD=y
+ CONFIG_MACH_IMX25_DT=y
+ CONFIG_MACH_MX27ADS=y
+-CONFIG_MACH_PCM038=y
+ CONFIG_MACH_MX27_3DS=y
+ CONFIG_MACH_IMX27_VISSTRIM_M10=y
+ CONFIG_MACH_PCA100=y
+diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
+index d48901a..64161aa 100644
+--- a/arch/arm/mach-imx/Kconfig
++++ b/arch/arm/mach-imx/Kconfig
+@@ -231,36 +231,6 @@ config MACH_MX27ADS
+ 	  Include support for MX27ADS platform. This includes specific
+ 	  configurations for the board and its peripherals.
+ 
+-config MACH_PCM038
+-	bool "Phytec phyCORE-i.MX27 CPU module (pcm038)"
+-	select IMX_HAVE_PLATFORM_IMX2_WDT
+-	select IMX_HAVE_PLATFORM_IMX_I2C
+-	select IMX_HAVE_PLATFORM_IMX_UART
+-	select IMX_HAVE_PLATFORM_MXC_EHCI
+-	select IMX_HAVE_PLATFORM_MXC_NAND
+-	select IMX_HAVE_PLATFORM_MXC_W1
+-	select IMX_HAVE_PLATFORM_SPI_IMX
+-	select USB_ULPI_VIEWPORT if USB_ULPI
+-	select SOC_IMX27
+-	help
+-	  Include support for phyCORE-i.MX27 (aka pcm038) platform. This
+-	  includes specific configurations for the module and its peripherals.
+-
+-choice
+-	prompt "Baseboard"
+-	depends on MACH_PCM038
+-	default MACH_PCM970_BASEBOARD
+-
+-config MACH_PCM970_BASEBOARD
+-	bool "PHYTEC PCM970 development board"
+-	select IMX_HAVE_PLATFORM_IMX_FB
+-	select IMX_HAVE_PLATFORM_MXC_MMC
+-	help
+-	  This adds board specific devices that can be found on Phytec's
+-	  PCM970 evaluation board.
+-
+-endchoice
+-
+ config MACH_MX27_3DS
+ 	bool "MX27PDK platform"
+ 	select IMX_HAVE_PLATFORM_FSL_USB2_UDC
+diff --git a/arch/arm/mach-imx/Makefile b/arch/arm/mach-imx/Makefile
+index 614df32..9f1c359 100644
+--- a/arch/arm/mach-imx/Makefile
++++ b/arch/arm/mach-imx/Makefile
+@@ -57,8 +57,6 @@ obj-$(CONFIG_MACH_IMX25_DT) += imx25-dt.o
+ 
+ # i.MX27 based machines
+ obj-$(CONFIG_MACH_MX27ADS) += mach-mx27ads.o
+-obj-$(CONFIG_MACH_PCM038) += mach-pcm038.o
+-obj-$(CONFIG_MACH_PCM970_BASEBOARD) += pcm970-baseboard.o
+ obj-$(CONFIG_MACH_MX27_3DS) += mach-mx27_3ds.o
+ obj-$(CONFIG_MACH_IMX27_VISSTRIM_M10) += mach-imx27_visstrim_m10.o
+ obj-$(CONFIG_MACH_PCA100) += mach-pca100.o
+diff --git a/arch/arm/mach-imx/board-pcm038.h b/arch/arm/mach-imx/board-pcm038.h
+deleted file mode 100644
+index 6f371e3..0000000
+--- a/arch/arm/mach-imx/board-pcm038.h
++++ /dev/null
+@@ -1,36 +0,0 @@
+-/*
+- * Copyright (C) 2008 Juergen Beisert (kernel at pengutronix.de)
+- *
+- * This program is free software; you can redistribute it and/or
+- * modify it under the terms of the GNU General Public License
+- * as published by the Free Software Foundation; either version 2
+- * of the License, or (at your option) any later version.
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+- *
+- * You should have received a copy of the GNU General Public License
+- * along with this program; if not, write to the Free Software
+- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
+- * MA 02110-1301, USA.
+- */
+-
+-#ifndef __ASM_ARCH_MXC_BOARD_PCM038_H__
+-#define __ASM_ARCH_MXC_BOARD_PCM038_H__
+-
+-#ifndef __ASSEMBLY__
+-/*
+- * This CPU module needs a baseboard to work. After basic initializing
+- * its own devices, it calls the baseboard's init function.
+- * TODO: Add your own baseboard init function and call it from
+- * inside pcm038_init().
+- *
+- * This example here is for the development board. Refer pcm970-baseboard.c
+- */
+-
+-extern void pcm970_baseboard_init(void);
+-
+-#endif
+-
+-#endif /* __ASM_ARCH_MXC_BOARD_PCM038_H__ */
+diff --git a/arch/arm/mach-imx/mach-pcm038.c b/arch/arm/mach-imx/mach-pcm038.c
+deleted file mode 100644
+index ee862ad..0000000
+--- a/arch/arm/mach-imx/mach-pcm038.c
++++ /dev/null
+@@ -1,358 +0,0 @@
+-/*
+- * Copyright 2007 Robert Schwebel <r.schwebel@pengutronix.de>, Pengutronix
+- * Copyright (C) 2008 Juergen Beisert (kernel at pengutronix.de)
+- *
+- * This program is free software; you can redistribute it and/or
+- * modify it under the terms of the GNU General Public License
+- * as published by the Free Software Foundation; either version 2
+- * of the License, or (at your option) any later version.
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+- *
+- * You should have received a copy of the GNU General Public License
+- * along with this program; if not, write to the Free Software
+- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
+- * MA 02110-1301, USA.
+- */
+-
+-#include <linux/i2c.h>
+-#include <linux/platform_data/at24.h>
+-#include <linux/io.h>
+-#include <linux/mtd/plat-ram.h>
+-#include <linux/mtd/physmap.h>
+-#include <linux/platform_device.h>
+-#include <linux/regulator/machine.h>
+-#include <linux/mfd/mc13783.h>
+-#include <linux/spi/spi.h>
+-#include <linux/irq.h>
+-#include <linux/gpio.h>
+-
+-#include <asm/mach-types.h>
+-#include <asm/mach/arch.h>
+-#include <asm/mach/time.h>
+-
+-#include "board-pcm038.h"
+-#include "common.h"
+-#include "devices-imx27.h"
+-#include "ehci.h"
+-#include "hardware.h"
+-#include "iomux-mx27.h"
+-#include "ulpi.h"
+-
+-static const int pcm038_pins[] __initconst = {
+-	/* UART1 */
+-	PE12_PF_UART1_TXD,
+-	PE13_PF_UART1_RXD,
+-	PE14_PF_UART1_CTS,
+-	PE15_PF_UART1_RTS,
+-	/* UART2 */
+-	PE3_PF_UART2_CTS,
+-	PE4_PF_UART2_RTS,
+-	PE6_PF_UART2_TXD,
+-	PE7_PF_UART2_RXD,
+-	/* UART3 */
+-	PE8_PF_UART3_TXD,
+-	PE9_PF_UART3_RXD,
+-	PE10_PF_UART3_CTS,
+-	PE11_PF_UART3_RTS,
+-	/* FEC */
+-	PD0_AIN_FEC_TXD0,
+-	PD1_AIN_FEC_TXD1,
+-	PD2_AIN_FEC_TXD2,
+-	PD3_AIN_FEC_TXD3,
+-	PD4_AOUT_FEC_RX_ER,
+-	PD5_AOUT_FEC_RXD1,
+-	PD6_AOUT_FEC_RXD2,
+-	PD7_AOUT_FEC_RXD3,
+-	PD8_AF_FEC_MDIO,
+-	PD9_AIN_FEC_MDC,
+-	PD10_AOUT_FEC_CRS,
+-	PD11_AOUT_FEC_TX_CLK,
+-	PD12_AOUT_FEC_RXD0,
+-	PD13_AOUT_FEC_RX_DV,
+-	PD14_AOUT_FEC_RX_CLK,
+-	PD15_AOUT_FEC_COL,
+-	PD16_AIN_FEC_TX_ER,
+-	PF23_AIN_FEC_TX_EN,
+-	/* I2C2 */
+-	PC5_PF_I2C2_SDA,
+-	PC6_PF_I2C2_SCL,
+-	/* SPI1 */
+-	PD25_PF_CSPI1_RDY,
+-	PD29_PF_CSPI1_SCLK,
+-	PD30_PF_CSPI1_MISO,
+-	PD31_PF_CSPI1_MOSI,
+-	/* SSI1 */
+-	PC20_PF_SSI1_FS,
+-	PC21_PF_SSI1_RXD,
+-	PC22_PF_SSI1_TXD,
+-	PC23_PF_SSI1_CLK,
+-	/* SSI4 */
+-	PC16_PF_SSI4_FS,
+-	PC17_PF_SSI4_RXD,
+-	PC18_PF_SSI4_TXD,
+-	PC19_PF_SSI4_CLK,
+-	/* USB host */
+-	PA0_PF_USBH2_CLK,
+-	PA1_PF_USBH2_DIR,
+-	PA2_PF_USBH2_DATA7,
+-	PA3_PF_USBH2_NXT,
+-	PA4_PF_USBH2_STP,
+-	PD19_AF_USBH2_DATA4,
+-	PD20_AF_USBH2_DATA3,
+-	PD21_AF_USBH2_DATA6,
+-	PD22_AF_USBH2_DATA0,
+-	PD23_AF_USBH2_DATA2,
+-	PD24_AF_USBH2_DATA1,
+-	PD26_AF_USBH2_DATA5,
+-};
+-
+-/*
+- * Phytec's PCM038 comes with 2MiB battery buffered SRAM,
+- * 16 bit width
+- */
+-
+-static struct platdata_mtd_ram pcm038_sram_data = {
+-	.bankwidth = 2,
+-};
+-
+-static struct resource pcm038_sram_resource = {
+-	.start = MX27_CS1_BASE_ADDR,
+-	.end   = MX27_CS1_BASE_ADDR + 512 * 1024 - 1,
+-	.flags = IORESOURCE_MEM,
+-};
+-
+-static struct platform_device pcm038_sram_mtd_device = {
+-	.name = "mtd-ram",
+-	.id = 0,
+-	.dev = {
+-		.platform_data = &pcm038_sram_data,
+-	},
+-	.num_resources = 1,
+-	.resource = &pcm038_sram_resource,
+-};
+-
+-/*
+- * Phytec's phyCORE-i.MX27 comes with 32MiB flash,
+- * 16 bit width
+- */
+-static struct physmap_flash_data pcm038_flash_data = {
+-	.width = 2,
+-};
+-
+-static struct resource pcm038_flash_resource = {
+-	.start = 0xc0000000,
+-	.end   = 0xc1ffffff,
+-	.flags = IORESOURCE_MEM,
+-};
+-
+-static struct platform_device pcm038_nor_mtd_device = {
+-	.name = "physmap-flash",
+-	.id = 0,
+-	.dev = {
+-		.platform_data = &pcm038_flash_data,
+-	},
+-	.num_resources = 1,
+-	.resource = &pcm038_flash_resource,
+-};
+-
+-static const struct imxuart_platform_data uart_pdata __initconst = {
+-	.flags = IMXUART_HAVE_RTSCTS,
+-};
+-
+-static const struct mxc_nand_platform_data
+-pcm038_nand_board_info __initconst = {
+-	.width = 1,
+-	.hw_ecc = 1,
+-};
+-
+-static struct platform_device *platform_devices[] __initdata = {
+-	&pcm038_nor_mtd_device,
+-	&pcm038_sram_mtd_device,
+-};
+-
+-/* On pcm038 there's a sram attached to CS1, we enable the chipselect here and
+- * setup other stuffs to access the sram. */
+-static void __init pcm038_init_sram(void)
+-{
+-	__raw_writel(0x0000d843, MX27_IO_ADDRESS(MX27_WEIM_CSCRxU(1)));
+-	__raw_writel(0x22252521, MX27_IO_ADDRESS(MX27_WEIM_CSCRxL(1)));
+-	__raw_writel(0x22220a00, MX27_IO_ADDRESS(MX27_WEIM_CSCRxA(1)));
+-}
+-
+-static const struct imxi2c_platform_data pcm038_i2c1_data __initconst = {
+-	.bitrate = 100000,
+-};
+-
+-static struct at24_platform_data board_eeprom = {
+-	.byte_len = 4096,
+-	.page_size = 32,
+-	.flags = AT24_FLAG_ADDR16,
+-};
+-
+-static struct i2c_board_info pcm038_i2c_devices[] = {
+-	{
+-		I2C_BOARD_INFO("at24", 0x52), /* E0=0, E1=1, E2=0 */
+-		.platform_data = &board_eeprom,
+-	}, {
+-		I2C_BOARD_INFO("pcf8563", 0x51),
+-	}, {
+-		I2C_BOARD_INFO("lm75", 0x4a),
+-	}
+-};
+-
+-static int pcm038_spi_cs[] = {GPIO_PORTD + 28};
+-
+-static const struct spi_imx_master pcm038_spi0_data __initconst = {
+-	.chipselect = pcm038_spi_cs,
+-	.num_chipselect = ARRAY_SIZE(pcm038_spi_cs),
+-};
+-
+-static struct regulator_consumer_supply sdhc1_consumers[] = {
+-	{
+-		.dev_name = "imx21-mmc.1",
+-		.supply	= "sdhc_vcc",
+-	},
+-};
+-
+-static struct regulator_init_data sdhc1_data = {
+-	.constraints = {
+-		.min_uV = 3000000,
+-		.max_uV = 3400000,
+-		.valid_ops_mask = REGULATOR_CHANGE_VOLTAGE |
+-			REGULATOR_CHANGE_MODE | REGULATOR_CHANGE_STATUS,
+-		.valid_modes_mask = REGULATOR_MODE_NORMAL |
+-			REGULATOR_MODE_FAST,
+-		.always_on = 0,
+-		.boot_on = 0,
+-	},
+-	.num_consumer_supplies = ARRAY_SIZE(sdhc1_consumers),
+-	.consumer_supplies = sdhc1_consumers,
+-};
+-
+-static struct regulator_consumer_supply cam_consumers[] = {
+-	{
+-		.dev_name = NULL,
+-		.supply	= "imx_cam_vcc",
+-	},
+-};
+-
+-static struct regulator_init_data cam_data = {
+-	.constraints = {
+-		.min_uV = 3000000,
+-		.max_uV = 3400000,
+-		.valid_ops_mask = REGULATOR_CHANGE_VOLTAGE |
+-			REGULATOR_CHANGE_MODE | REGULATOR_CHANGE_STATUS,
+-		.valid_modes_mask = REGULATOR_MODE_NORMAL |
+-			REGULATOR_MODE_FAST,
+-		.always_on = 0,
+-		.boot_on = 0,
+-	},
+-	.num_consumer_supplies = ARRAY_SIZE(cam_consumers),
+-	.consumer_supplies = cam_consumers,
+-};
+-
+-static struct mc13xxx_regulator_init_data pcm038_regulators[] = {
+-	{
+-		.id = MC13783_REG_VCAM,
+-		.init_data = &cam_data,
+-	}, {
+-		.id = MC13783_REG_VMMC1,
+-		.init_data = &sdhc1_data,
+-	},
+-};
+-
+-static struct mc13xxx_platform_data pcm038_pmic = {
+-	.regulators = {
+-		.regulators = pcm038_regulators,
+-		.num_regulators = ARRAY_SIZE(pcm038_regulators),
+-	},
+-	.flags = MC13XXX_USE_ADC | MC13XXX_USE_TOUCHSCREEN,
+-};
+-
+-static struct spi_board_info pcm038_spi_board_info[] __initdata = {
+-	{
+-		.modalias = "mc13783",
+-		/* irq number is run-time assigned */
+-		.max_speed_hz = 300000,
+-		.bus_num = 0,
+-		.chip_select = 0,
+-		.platform_data = &pcm038_pmic,
+-		.mode = SPI_CS_HIGH,
+-	}
+-};
+-
+-static int pcm038_usbh2_init(struct platform_device *pdev)
+-{
+-	return mx27_initialize_usb_hw(pdev->id, MXC_EHCI_POWER_PINS_ENABLED |
+-			MXC_EHCI_INTERFACE_DIFF_UNI);
+-}
+-
+-static const struct mxc_usbh_platform_data usbh2_pdata __initconst = {
+-	.init	= pcm038_usbh2_init,
+-	.portsc	= MXC_EHCI_MODE_ULPI,
+-};
+-
+-static void __init pcm038_init(void)
+-{
+-	imx27_soc_init();
+-
+-	mxc_gpio_setup_multiple_pins(pcm038_pins, ARRAY_SIZE(pcm038_pins),
+-			"PCM038");
+-
+-	pcm038_init_sram();
+-
+-	imx27_add_imx_uart0(&uart_pdata);
+-	imx27_add_imx_uart1(&uart_pdata);
+-	imx27_add_imx_uart2(&uart_pdata);
+-
+-	mxc_gpio_mode(PE16_AF_OWIRE);
+-	imx27_add_mxc_nand(&pcm038_nand_board_info);
+-
+-	/* only the i2c master 1 is used on this CPU card */
+-	i2c_register_board_info(1, pcm038_i2c_devices,
+-				ARRAY_SIZE(pcm038_i2c_devices));
+-
+-	imx27_add_imx_i2c(1, &pcm038_i2c1_data);
+-
+-	/* PE18 for user-LED D40 */
+-	mxc_gpio_mode(GPIO_PORTE | 18 | GPIO_GPIO | GPIO_OUT);
+-
+-	mxc_gpio_mode(GPIO_PORTD | 28 | GPIO_GPIO | GPIO_OUT);
+-
+-	/* MC13783 IRQ */
+-	mxc_gpio_mode(GPIO_PORTB | 23 | GPIO_GPIO | GPIO_IN);
+-
+-	imx27_add_spi_imx0(&pcm038_spi0_data);
+-	pcm038_spi_board_info[0].irq = gpio_to_irq(IMX_GPIO_NR(2, 23));
+-	spi_register_board_info(pcm038_spi_board_info,
+-				ARRAY_SIZE(pcm038_spi_board_info));
+-
+-	imx27_add_mxc_ehci_hs(2, &usbh2_pdata);
+-
+-	imx27_add_fec(NULL);
+-	platform_add_devices(platform_devices, ARRAY_SIZE(platform_devices));
+-	imx27_add_imx2_wdt();
+-	imx27_add_mxc_w1();
+-
+-#ifdef CONFIG_MACH_PCM970_BASEBOARD
+-	pcm970_baseboard_init();
+-#endif
+-}
+-
+-static void __init pcm038_timer_init(void)
+-{
+-	mx27_clocks_init(26000000);
+-}
+-
+-MACHINE_START(PCM038, "phyCORE-i.MX27")
+-	.atag_offset = 0x100,
+-	.map_io = mx27_map_io,
+-	.init_early = imx27_init_early,
+-	.init_irq = mx27_init_irq,
+-	.init_time	= pcm038_timer_init,
+-	.init_machine = pcm038_init,
+-	.restart	= mxc_restart,
+-MACHINE_END
+diff --git a/arch/arm/mach-imx/pcm970-baseboard.c b/arch/arm/mach-imx/pcm970-baseboard.c
+deleted file mode 100644
+index 51c6082..0000000
+--- a/arch/arm/mach-imx/pcm970-baseboard.c
++++ /dev/null
+@@ -1,231 +0,0 @@
+-/*
+- * Copyright (C) 2008 Juergen Beisert (kernel at pengutronix.de)
+- *
+- * This program is free software; you can redistribute it and/or
+- * modify it under the terms of the GNU General Public License
+- * as published by the Free Software Foundation; either version 2
+- * of the License, or (at your option) any later version.
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+- *
+- * You should have received a copy of the GNU General Public License
+- * along with this program; if not, write to the Free Software
+- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
+- * MA 02110-1301, USA.
+- */
+-
+-#include <linux/gpio.h>
+-#include <linux/irq.h>
+-#include <linux/platform_device.h>
+-#include <linux/can/platform/sja1000.h>
+-
+-#include <asm/mach/arch.h>
+-
+-#include "common.h"
+-#include "devices-imx27.h"
+-#include "hardware.h"
+-#include "iomux-mx27.h"
+-
+-static const int pcm970_pins[] __initconst = {
+-	/* SDHC */
+-	PB4_PF_SD2_D0,
+-	PB5_PF_SD2_D1,
+-	PB6_PF_SD2_D2,
+-	PB7_PF_SD2_D3,
+-	PB8_PF_SD2_CMD,
+-	PB9_PF_SD2_CLK,
+-	/* display */
+-	PA5_PF_LSCLK,
+-	PA6_PF_LD0,
+-	PA7_PF_LD1,
+-	PA8_PF_LD2,
+-	PA9_PF_LD3,
+-	PA10_PF_LD4,
+-	PA11_PF_LD5,
+-	PA12_PF_LD6,
+-	PA13_PF_LD7,
+-	PA14_PF_LD8,
+-	PA15_PF_LD9,
+-	PA16_PF_LD10,
+-	PA17_PF_LD11,
+-	PA18_PF_LD12,
+-	PA19_PF_LD13,
+-	PA20_PF_LD14,
+-	PA21_PF_LD15,
+-	PA22_PF_LD16,
+-	PA23_PF_LD17,
+-	PA24_PF_REV,
+-	PA25_PF_CLS,
+-	PA26_PF_PS,
+-	PA27_PF_SPL_SPR,
+-	PA28_PF_HSYNC,
+-	PA29_PF_VSYNC,
+-	PA30_PF_CONTRAST,
+-	PA31_PF_OE_ACD,
+-	/*
+-	 * it seems the data line misses a pullup, so we must enable
+-	 * the internal pullup as a local workaround
+-	 */
+-	PD17_PF_I2C_DATA | GPIO_PUEN,
+-	PD18_PF_I2C_CLK,
+-	/* Camera */
+-	PB10_PF_CSI_D0,
+-	PB11_PF_CSI_D1,
+-	PB12_PF_CSI_D2,
+-	PB13_PF_CSI_D3,
+-	PB14_PF_CSI_D4,
+-	PB15_PF_CSI_MCLK,
+-	PB16_PF_CSI_PIXCLK,
+-	PB17_PF_CSI_D5,
+-	PB18_PF_CSI_D6,
+-	PB19_PF_CSI_D7,
+-	PB20_PF_CSI_VSYNC,
+-	PB21_PF_CSI_HSYNC,
+-};
+-
+-static int pcm970_sdhc2_get_ro(struct device *dev)
+-{
+-	return gpio_get_value(GPIO_PORTC + 28);
+-}
+-
+-static int pcm970_sdhc2_init(struct device *dev, irq_handler_t detect_irq, void *data)
+-{
+-	int ret;
+-
+-	ret = request_irq(gpio_to_irq(IMX_GPIO_NR(3, 29)), detect_irq,
+-			  IRQF_TRIGGER_FALLING, "imx-mmc-detect", data);
+-	if (ret)
+-		return ret;
+-
+-	ret = gpio_request(GPIO_PORTC + 28, "imx-mmc-ro");
+-	if (ret) {
+-		free_irq(gpio_to_irq(IMX_GPIO_NR(3, 29)), data);
+-		return ret;
+-	}
+-
+-	gpio_direction_input(GPIO_PORTC + 28);
+-
+-	return 0;
+-}
+-
+-static void pcm970_sdhc2_exit(struct device *dev, void *data)
+-{
+-	free_irq(gpio_to_irq(IMX_GPIO_NR(3, 29)), data);
+-	gpio_free(GPIO_PORTC + 28);
+-}
+-
+-static const struct imxmmc_platform_data sdhc_pdata __initconst = {
+-	.get_ro = pcm970_sdhc2_get_ro,
+-	.init = pcm970_sdhc2_init,
+-	.exit = pcm970_sdhc2_exit,
+-};
+-
+-static struct imx_fb_videomode pcm970_modes[] = {
+-	{
+-		.mode = {
+-			.name		= "Sharp-LQ035Q7",
+-			.refresh	= 60,
+-			.xres		= 240,
+-			.yres		= 320,
+-			.pixclock	= 188679, /* in ps (5.3MHz) */
+-			.hsync_len	= 7,
+-			.left_margin	= 5,
+-			.right_margin	= 16,
+-			.vsync_len	= 1,
+-			.upper_margin	= 7,
+-			.lower_margin	= 9,
+-		},
+-		/*
+-		 * - HSYNC active high
+-		 * - VSYNC active high
+-		 * - clk notenabled while idle
+-		 * - clock not inverted
+-		 * - data not inverted
+-		 * - data enable low active
+-		 * - enable sharp mode
+-		 */
+-		.pcr		= 0xF00080C0,
+-		.bpp		= 16,
+-	}, {
+-		.mode = {
+-			.name		= "TX090",
+-			.refresh	= 60,
+-			.xres		= 240,
+-			.yres		= 320,
+-			.pixclock	= 38255,
+-			.left_margin	= 144,
+-			.right_margin	= 0,
+-			.upper_margin	= 7,
+-			.lower_margin	= 40,
+-			.hsync_len	= 96,
+-			.vsync_len	= 1,
+-		},
+-		/*
+-		 * - HSYNC active low (1 << 22)
+-		 * - VSYNC active low (1 << 23)
+-		 * - clk notenabled while idle
+-		 * - clock not inverted
+-		 * - data not inverted
+-		 * - data enable low active
+-		 * - enable sharp mode
+-		 */
+-		.pcr = 0xF0008080 | (1<<22) | (1<<23) | (1<<19),
+-		.bpp = 32,
+-	},
+-};
+-
+-static const struct imx_fb_platform_data pcm038_fb_data __initconst = {
+-	.mode = pcm970_modes,
+-	.num_modes = ARRAY_SIZE(pcm970_modes),
+-
+-	.pwmr		= 0x00A903FF,
+-	.lscr1		= 0x00120300,
+-	.dmacr		= 0x00020010,
+-};
+-
+-static struct resource pcm970_sja1000_resources[] = {
+-	{
+-		.start   = MX27_CS4_BASE_ADDR,
+-		.end     = MX27_CS4_BASE_ADDR + 0x100 - 1,
+-		.flags   = IORESOURCE_MEM,
+-	}, {
+-		/* irq number is run-time assigned */
+-		.flags   = IORESOURCE_IRQ | IORESOURCE_IRQ_LOWEDGE,
+-	},
+-};
+-
+-static struct sja1000_platform_data pcm970_sja1000_platform_data = {
+-	.osc_freq	= 16000000,
+-	.ocr		= OCR_TX1_PULLDOWN | OCR_TX0_PUSHPULL,
+-	.cdr		= CDR_CBP,
+-};
+-
+-static struct platform_device pcm970_sja1000 = {
+-	.name = "sja1000_platform",
+-	.dev = {
+-		.platform_data = &pcm970_sja1000_platform_data,
+-	},
+-	.resource = pcm970_sja1000_resources,
+-	.num_resources = ARRAY_SIZE(pcm970_sja1000_resources),
+-};
+-
+-/*
+- * system init for baseboard usage. Will be called by pcm038 init.
+- *
+- * Add platform devices present on this baseboard and init
+- * them from CPU side as far as required to use them later on
+- */
+-void __init pcm970_baseboard_init(void)
+-{
+-	mxc_gpio_setup_multiple_pins(pcm970_pins, ARRAY_SIZE(pcm970_pins),
+-			"PCM970");
+-
+-	imx27_add_imx_fb(&pcm038_fb_data);
+-	mxc_gpio_mode(GPIO_PORTC | 28 | GPIO_GPIO | GPIO_IN);
+-	imx27_add_mxc_mmc(1, &sdhc_pdata);
+-	pcm970_sja1000_resources[1].start = gpio_to_irq(IMX_GPIO_NR(5, 19));
+-	pcm970_sja1000_resources[1].end = gpio_to_irq(IMX_GPIO_NR(5, 19));
+-	platform_device_register(&pcm970_sja1000);
+-}
 -- 
-SUSE LINUX Products GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
-GF: Jeff Hawn, Jennifer Guild, Felix Imend?rffer; HRB 16746 AG N?rnberg
+1.8.5.5
