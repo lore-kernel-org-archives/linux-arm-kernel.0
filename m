@@ -1,36 +1,34 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Sat, 23 Aug 2014 10:44:11 +0900
-Subject: [PATCH 01/11] ARM: shmobile: r8a7778: Add missing call to
- shmobile_init_late()
+Date: Sat, 23 Aug 2014 10:44:12 +0900
+Subject: [PATCH 02/11] ARM: shmobile: sh73a0: Add shmobile_init_late()
 In-Reply-To: <cover.1408671240.git.horms+renesas@verge.net.au>
 References: <cover.1408671240.git.horms+renesas@verge.net.au>
-Message-ID: <54a06dde40f6a01e323d49390d78b8c9f1dfacc0.1408671240.git.horms+renesas@verge.net.au>
+Message-ID: <e604d80971e65c7ae895a4b38caed3838cf07554.1408671240.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Geert Uytterhoeven <geert+renesas@glider.be>
+From: Magnus Damm <damm+renesas@opensource.se>
 
-Add the missing call to shmobile_init_late() to r8a7778_init_late().
-This should make sure Suspend-to-RAM and CPUIdle are setup as expected
-on bockw.
+Extend sh73a0 SoC machine vector to include shmobile_init_late()
+so Suspend-to-RAM and CPUIdle are setup as expected.
 
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Signed-off-by: Magnus Damm <damm+renesas@opensource.se>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/setup-r8a7778.c | 1 +
+ arch/arm/mach-shmobile/setup-sh73a0.c | 1 +
  1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/mach-shmobile/setup-r8a7778.c b/arch/arm/mach-shmobile/setup-r8a7778.c
-index f00a488..383e43b 100644
---- a/arch/arm/mach-shmobile/setup-r8a7778.c
-+++ b/arch/arm/mach-shmobile/setup-r8a7778.c
-@@ -520,6 +520,7 @@ void __init r8a7778_add_standard_devices(void)
- 
- void __init r8a7778_init_late(void)
- {
-+	shmobile_init_late();
- 	platform_device_register_full(&ehci_info);
- 	platform_device_register_full(&ohci_info);
- }
+diff --git a/arch/arm/mach-shmobile/setup-sh73a0.c b/arch/arm/mach-shmobile/setup-sh73a0.c
+index 2c802ae..0022918 100644
+--- a/arch/arm/mach-shmobile/setup-sh73a0.c
++++ b/arch/arm/mach-shmobile/setup-sh73a0.c
+@@ -799,6 +799,7 @@ DT_MACHINE_START(SH73A0_DT, "Generic SH73A0 (Flattened Device Tree)")
+ 	.init_early	= sh73a0_init_delay,
+ 	.nr_irqs	= NR_IRQS_LEGACY,
+ 	.init_machine	= sh73a0_add_standard_devices_dt,
++	.init_late	= shmobile_init_late,
+ 	.dt_compat	= sh73a0_boards_compat_dt,
+ MACHINE_END
+ #endif /* CONFIG_USE_OF */
 -- 
 2.0.1
