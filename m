@@ -1,59 +1,77 @@
-From: ohaugan@codeaurora.org (Olav Haugan)
-Date: Fri, 22 Aug 2014 16:56:23 -0700
-Subject: [PATCH v3 1/1] iommu/arm-smmu: Do not access non-existing S2CR
- registers
-In-Reply-To: <20140822152215.GC17255@arm.com>
-References: <1408403858-16766-1-git-send-email-ohaugan@codeaurora.org>
- <20140822152215.GC17255@arm.com>
-Message-ID: <53F7D8A7.4010508@codeaurora.org>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Sat, 23 Aug 2014 02:02:27 +0200
+Subject: [PATCH v9 4/6] ARM: Exynos: switch to using generic cpufreq driver
+ for Exynos4210/5250/5420
+In-Reply-To: <7hbnrc6px3.fsf@paris.lan>
+References: <1406707663-16656-1-git-send-email-thomas.ab@samsung.com>	<1406707663-16656-5-git-send-email-thomas.ab@samsung.com>	<53DA8BB9.6020702@samsung.com>
+ <53DA8D85.3050106@gmail.com> <7hbnrc6px3.fsf@paris.lan>
+Message-ID: <53F7DA13.6090305@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 8/22/2014 8:22 AM, Will Deacon wrote:
-> Hi Olav,
+Hi Kevin,
+
+Thanks for taking a look at this.
+
+On 23.08.2014 01:54, Kevin Hilman wrote:
+> Tomasz Figa <tomasz.figa@gmail.com> writes:
 > 
-> Some really minor comments, but this looks good.
-> 
-> On Tue, Aug 19, 2014 at 12:17:38AM +0100, Olav Haugan wrote:
->> The number of S2CR registers is not properly set when stream
->> matching is not supported. Fix this and add check that we do not try to
->> access outside of the number of S2CR regisrers.
+>> Kukjin,
 >>
->> Signed-off-by: Olav Haugan <ohaugan@codeaurora.org>
->> ---
->>  drivers/iommu/arm-smmu.c | 24 +++++++++++++++++-------
->>  1 file changed, 17 insertions(+), 7 deletions(-)
+>> On 31.07.2014 20:32, Kukjin Kim wrote:
+>>> On 07/30/14 17:07, Thomas Abraham wrote:
+>>>> The new CPU clock type allows the use of generic CPUfreq drivers. So for
+>>>> Exynos4210/5250, switch to using generic cpufreq driver. For Exynos5420,
+>>>> which did not have CPUfreq driver support, enable the use of generic
+>>>> CPUfreq driver.
+>>>>
+>>>> Suggested-by: Tomasz Figa<t.figa@samsung.com>
+>>>> Cc: Kukjin Kim<kgene.kim@samsung.com>
+>>>
+>>> Looks good to me,
+>>>
+>>> Acked-by: Kukjin Kim <kgene.kim@samsung.com>
+>>>
+>>> BTW, who will handle this series? I hope see this series in 3.17.
 >>
->> diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
->> index 9fd8754d..a050f7a 100644
->> --- a/drivers/iommu/arm-smmu.c
->> +++ b/drivers/iommu/arm-smmu.c
->> @@ -548,9 +548,16 @@ static int register_smmu_master(struct arm_smmu_device *smmu,
->>  	master->of_node			= masterspec->np;
->>  	master->cfg.num_streamids	= masterspec->args_count;
->>  
->> -	for (i = 0; i < master->cfg.num_streamids; ++i)
->> +	for (i = 0; i < master->cfg.num_streamids; ++i) {
->> +		if (!(smmu->features & ARM_SMMU_FEAT_STREAM_MATCH) &&
->> +		     (masterspec->args[i] >= smmu->num_mapping_groups)) {
+>> This series consists mostly of clock changes and it likely depends on
+>> patches already in my for-next, so I would be inclined toward taking it
+>> through samsung-clk tree. 
 > 
-> Can we stick masterspec->args[i] into a loop-local streamid variable,
-> please?
+> So has this series been picked up anywhere?  I don't see it in your
+> samsung-clk tree, nor in Kukjin's for-next.
+
+No, it has not. In general it was already too late in the release cycle
+when the last version was posted.
+
+I had a plan to take it through clock tree with Kukjin's and Viresh's
+cooperation, but now as you say it...
+
 > 
->> +			dev_err(dev,
->> +				"stream ID for master device %s greater than maximum allowed (%d)\n",
->> +				masterspec->np->name, smmu->num_mapping_groups);
->> +			return -ENOSPC;
+> Also, I'm curious whether or how this is has been tested on big.LITTLE
+> SoCs.  
 > 
-> -ERANGE might be better.
+> I'm trying it on the 5800/Chromebook2 and it's not terribly stable.  I'm
+> testing along with CPUidle, so there may be some untested interactions
+> there as it seems a bit more stable without CPUidle enabled.
 > 
+> I'd love to hear from anyone else that's testing CPUidle and CPUfreq
+> together big.LITTLE 5420/5800, with or without the switcher.
 
-Sure, will post v4 with these changes.
+I'd definitely like to see a clarification on this issues, before this
+series hits mainline or at least its parts related to affected SoCs.
+Also I'd like to hear some confirmation from Samsung Poland R&D Center
+guys (on CC), whether this code works stable on their target boards
+(Universal C210, Trats, Trats2).
 
-Thanks,
+> 
+> Also, the patch below[2] is needed for 5800.
+> 
+> FWIW, I have a temporary branch[1] based on the v3.17-rc branch of the
+> exynos-reference tree where I've added the DT patch needed for CPUidle,
+> this series (and it's dependencies) which is what I'm using for testing.
 
-Olav
+The patch looks fine to me (well, it's trivial :)), thanks.
 
--- 
-The Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+Best regards,
+Tomasz
