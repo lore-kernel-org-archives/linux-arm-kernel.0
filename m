@@ -1,57 +1,79 @@
 From: horms+renesas@verge.net.au (Simon Horman)
 Date: Sat, 23 Aug 2014 10:44:01 +0900
-Subject: [GIT PULL] Renesas ARM Based SoC Cleanup Updates for v3.18
-Message-ID: <cover.1408670789.git.horms+renesas@verge.net.au>
+Subject: [PATCH 1/3] ARM: shmobile: r7s72100: genmai: Remove reference board
+ file
+In-Reply-To: <cover.1408670789.git.horms+renesas@verge.net.au>
+References: <cover.1408670789.git.horms+renesas@verge.net.au>
+Message-ID: <71d03dabd6d3141872e23effd00345afe2ea2dab.1408670789.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof, Hi Kevin, Hi Arnd,
+From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 
-Please consider these Renesas ARM based SoC cleanup updates for v3.18.
+The genmai board now boots using the generic R7S72100 DT machine with
+the same feature set as the board file. Remove the board file.
 
-This pull request is based on
-"Renesas ARM Based SoC DT Timers Updates for v3.18",
-tagged as dt-timers-for-v3.18,
-which I have already sent a pull-request for.
-
-This is a rebase of changes that didn't quite make it into v3.17.
-These cleanups depend on changes in dt-timers-for-v3.18 and rebasing
-to remove that dependency is not entirely trivial.
-
-
-The following changes since commit 9dddfcfacaadb5491b62233b893b510fa00da4e0:
-
-  ARM: shmobile: genmai-reference: Enable MTU2 in device tree (2014-08-17 09:02:54 +0900)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-cleanup-for-v3.18
-
-for you to fetch changes up to ad8c3af8b75ff26c5c887f2101da653bdcd53a38:
-
-  ARM: shmobile: r7s72100: Remove legacy board support (2014-08-17 09:57:08 +0900)
-
-----------------------------------------------------------------
-Renesas ARM Based SoC Cleanup Updates for v3.18
-
-* Remove Genmai board code
-
-----------------------------------------------------------------
-Laurent Pinchart (3):
-      ARM: shmobile: r7s72100: genmai: Remove reference board file
-      ARM: shmobile: r7s72100: genmai: Remove legacy board file
-      ARM: shmobile: r7s72100: Remove legacy board support
-
- arch/arm/mach-shmobile/Kconfig                  |  17 --
- arch/arm/mach-shmobile/Makefile                 |   3 -
- arch/arm/mach-shmobile/Makefile.boot            |   1 -
- arch/arm/mach-shmobile/board-genmai-reference.c |  35 ----
- arch/arm/mach-shmobile/board-genmai.c           | 173 ------------------
- arch/arm/mach-shmobile/clock-r7s72100.c         | 231 ------------------------
- arch/arm/mach-shmobile/r7s72100.h               |   6 -
- arch/arm/mach-shmobile/setup-r7s72100.c         |   2 -
- 8 files changed, 468 deletions(-)
+Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+Acked-by: Wolfram Sang <wsa@sang-engineering.com>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ arch/arm/mach-shmobile/Makefile                 |  1 -
+ arch/arm/mach-shmobile/board-genmai-reference.c | 35 -------------------------
+ 2 files changed, 36 deletions(-)
  delete mode 100644 arch/arm/mach-shmobile/board-genmai-reference.c
- delete mode 100644 arch/arm/mach-shmobile/board-genmai.c
- delete mode 100644 arch/arm/mach-shmobile/clock-r7s72100.c
- delete mode 100644 arch/arm/mach-shmobile/r7s72100.h
+
+diff --git a/arch/arm/mach-shmobile/Makefile b/arch/arm/mach-shmobile/Makefile
+index fe3878a..a058ec3 100644
+--- a/arch/arm/mach-shmobile/Makefile
++++ b/arch/arm/mach-shmobile/Makefile
+@@ -63,7 +63,6 @@ obj-$(CONFIG_ARCH_SH7372)	+= entry-intc.o
+ 
+ # Board objects
+ ifdef CONFIG_ARCH_SHMOBILE_MULTI
+-obj-$(CONFIG_MACH_GENMAI)	+= board-genmai-reference.o
+ obj-$(CONFIG_MACH_KOELSCH)	+= board-koelsch-reference.o
+ obj-$(CONFIG_MACH_LAGER)	+= board-lager-reference.o
+ obj-$(CONFIG_MACH_MARZEN)	+= board-marzen-reference.o
+diff --git a/arch/arm/mach-shmobile/board-genmai-reference.c b/arch/arm/mach-shmobile/board-genmai-reference.c
+deleted file mode 100644
+index bc52677..0000000
+--- a/arch/arm/mach-shmobile/board-genmai-reference.c
++++ /dev/null
+@@ -1,35 +0,0 @@
+-/*
+- * Genmai board support
+- *
+- * Copyright (C) 2013  Renesas Solutions Corp.
+- * Copyright (C) 2013  Magnus Damm
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License as published by
+- * the Free Software Foundation; version 2 of the License.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+- *
+- * You should have received a copy of the GNU General Public License
+- * along with this program; if not, write to the Free Software
+- * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
+- */
+-
+-#include <linux/kernel.h>
+-
+-#include <asm/mach/arch.h>
+-
+-#include "common.h"
+-
+-static const char * const genmai_boards_compat_dt[] __initconst = {
+-	"renesas,genmai",
+-	NULL,
+-};
+-
+-DT_MACHINE_START(GENMAI_DT, "genmai")
+-	.init_early	= shmobile_init_delay,
+-	.dt_compat	= genmai_boards_compat_dt,
+-MACHINE_END
+-- 
+2.0.1
