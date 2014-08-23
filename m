@@ -1,33 +1,57 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Fri, 22 Aug 2014 21:17:34 -0700
-Subject: [PATCH 00/11] ARM: multi_v7_defconfig: Enable Zynq/Xilinx drivers
-In-Reply-To: <1408722876-7791-1-git-send-email-soren.brinkmann@xilinx.com>
-References: <1408722876-7791-1-git-send-email-soren.brinkmann@xilinx.com>
-Message-ID: <20140823041734.GA11268@localhost>
+Date: Fri, 22 Aug 2014 21:20:22 -0700
+Subject: [GIT PULL] Allwinner DT additions for 3.17, take 2
+In-Reply-To: <20140821211500.GU15297@lukather>
+References: <20140731095158.GA14197@lukather>
+ <CAGb2v677G33AC2C8sV2tBthVfF=WdG7673g9PggCoUuJ1xtXuw@mail.gmail.com>
+ <20140821211500.GU15297@lukather>
+Message-ID: <20140823042022.GB11268@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 22, 2014 at 08:54:25AM -0700, Soren Brinkmann wrote:
-> Hi,
+On Thu, Aug 21, 2014 at 11:15:00PM +0200, Maxime Ripard wrote:
+> On Mon, Aug 18, 2014 at 02:19:07PM +0800, Chen-Yu Tsai wrote:
+> > Hi,
+> > 
+> > On Thu, Jul 31, 2014 at 5:51 PM, Maxime Ripard
+> > <maxime.ripard@free-electrons.com> wrote:
+> > > Hi Arnd, Kevin, Olof,
+> > >
+> > > Here are a rather small (and late) pull request for the Allwinner DTs
+> > > that comes on top of the previous one.
+> > >
+> > > It's basically just a fix, so there's no real need to merge it by
+> > > -rc1, it can definitely be postponed to a later 3.17-rc.
+> > >
+> > > Thanks,
+> > > Maxime
+> > >
+> > > The following changes since commit c220aec2bb793bf5a1fb451fd3e4db87654c5ba5:
+> > >
+> > >   ARM: dts: sun6i: Add Merrii A31 Hummingbird support (2014-07-18 22:40:37 +0200)
+> > >
+> > > are available in the git repository at:
+> > >
+> > >   git://git.kernel.org/pub/scm/linux/kernel/git/mripard/linux.git tags/sunxi-dt-for-3.17-2
+> > >
+> > > for you to fetch changes up to 495bccf3917b04c6727d720b56620e265c693ace:
+> > >
+> > >   ARM: dt: sun6i: Add #address-cells and #size-cells to i2c controller nodes (2014-07-28 11:34:39 +0200)
+> > >
+> > > ----------------------------------------------------------------
+> > > Allwinner DT changes, take 2
+> > >
+> > > Only a single patch in here that fixes a DTC warning.
+> > >
+> > > ----------------------------------------------------------------
+> > > Chen-Yu Tsai (1):
+> > >       ARM: dt: sun6i: Add #address-cells and #size-cells to i2c controller nodes
+> > 
+> > It seems this patch didn't make it into v3.17-rc1.
 > 
-> I went through the defconfig and searched for Zynq drivers. The result is
-> this series of patches. The first few are all for Zynq and pretty much
-> straight forward. The second half is mostly soft-IP, I think. That
-> soft-IP works with Zynq devices, but I'm not sure whether those should
-> go into the multi_v7 defconfig.
+> Indeed. Arnd, Olof, Kevin, any news on this pull request?
 
-Thanks, S?ren! 
-
-There's no need to split up into individual patches like this, but it was
-convenient in case I wanted to only apply a few of them. I took them all
-as one patch, and used your series description as commit message since
-none of the individual patches had any. :)
-
-As far as "unusual" drivers in the multiconfig; yeah, we need to deal
-with that at some point due to kernel size. We're likely to switch ti
-using modules first, but it'll make things slightly more complicated
-since people will need to start dealing with initrds and at least I
-don't have a good setup for that in my test farm yet. :-)
+Missed it. Will pull it for fixes.
 
 
 -Olof
