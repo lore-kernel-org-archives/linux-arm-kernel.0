@@ -1,91 +1,133 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Sat, 23 Aug 2014 11:43:42 +0100
-Subject: [PATCH] arm64: topology: add MPIDR-based detection
-In-Reply-To: <CAMDttNenA5UPJMPVScsP6BcVZS3D5brX5V7sYzPV_M+WAQpbHQ@mail.gmail.com>
-References: <20140604115751.GH2520@sirena.org.uk>
- <20140604130114.GB10775@e102568-lin.cambridge.arm.com>
- <20140604135431.GL2520@sirena.org.uk>
- <20140604155129.GD10775@e102568-lin.cambridge.arm.com>
- <20140604163400.GQ2520@sirena.org.uk>
- <20140604171030.GE10775@e102568-lin.cambridge.arm.com>
- <CAFpQJXVmj0v=L_5NSGs1TdNuZDuKv_zxEoSVpCVSSsjSqFgiMg@mail.gmail.com>
- <20140818223659.GC5032@e102568-lin.cambridge.arm.com>
- <CAFpQJXW7MGGYTa6ChboGCCFUVnkUjjnGMMVc9MKfYNnchsOwAw@mail.gmail.com>
- <CAMDttNenA5UPJMPVScsP6BcVZS3D5brX5V7sYzPV_M+WAQpbHQ@mail.gmail.com>
-Message-ID: <20140823104342.GD15601@e102568-lin.cambridge.arm.com>
+From: afaerber@suse.de (=?ISO-8859-15?Q?Andreas_F=E4rber?=)
+Date: Sat, 23 Aug 2014 12:47:26 +0200
+Subject: [PATCH 1/3] ARM: dts: Add DT changes for display on snow
+In-Reply-To: <1406317464-7525-2-git-send-email-ajaykumar.rs@samsung.com>
+References: <1406317464-7525-1-git-send-email-ajaykumar.rs@samsung.com>
+ <1406317464-7525-2-git-send-email-ajaykumar.rs@samsung.com>
+Message-ID: <53F8713E.5040408@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 21, 2014 at 06:15:40AM +0100, Zi Shen Lim wrote:
-> Hi Ganapatrao,
-> 
-> On Tue, Aug 19, 2014 at 11:08 PM, Ganapatrao Kulkarni
-> <gpkulkarni@gmail.com> wrote:
-> > Hi Lorenzo,
-> >
-> > On Tue, Aug 19, 2014 at 4:06 AM, Lorenzo Pieralisi
-> > <lorenzo.pieralisi@arm.com> wrote:
-> >> On Mon, Aug 18, 2014 at 08:39:48AM +0100, Ganapatrao Kulkarni wrote:
-> >>> How we map non SMT (MT bit24=0) cores of dual/multi socket system with
-> >>> the topology which is using only aff0 and aff1?
-> >>> can we use aff2  ( or concatenating aff2 and aff3)  to represent socket-id?
-> >>
-> >> Can you provide us with a description of the topology and the MPIDR_EL1
-> >> list please ?
-> >>
-> >> I think that DT squashes the levels above cluster so that's how it could
-> >> be implemented but first I would like to see what s the CPUs layout
-> >> of the system.
-> >
-> > Our Soc has 48 core(Cavium's  thunderX) design. 48 cores are
-> > sub-grouped in to 3 clusters.
-> > In turn each cluster is having 16 cores.
-> > We do have support for connecting 2 SoCs and making single system of 96 cores.
-> >
-> > the MPIDR mapping for this topology is,
-> >
-> > Aff0 is mapped to 16 cores within a cluster. Valid range is 0 to 0xf
-> > Aff1 is mapped to cluster number, valid values are 0,1 and 2.
-> > Aff2 is mapped to Socket-id or SoC number. Valid values are 0 and 1.
-> 
-> So, we went back and forth a few times and finally settled on what's
-> merged into 3.17, due to lack of visibility into hardware that'll be
-> shipped.
-> 
-> At one point, we had something approximating behavior of DT-based
-> topology, along the lines of:
-> 
->         if (mpidr & MPIDR_MT_BITMASK) {
->                 /* Multiprocessor system : Multi-threads per core */
->                 cpuid_topo->thread_id  = MPIDR_AFFINITY_LEVEL(mpidr, 0);
->                 cpuid_topo->core_id    = MPIDR_AFFINITY_LEVEL(mpidr, 1);
->                 cpuid_topo->cluster_id = MPIDR_AFFINITY_LEVEL(mpidr, 2) |
->                                          MPIDR_AFFINITY_LEVEL(mpidr, 3) << 8;
->         } else {
->                 /* Multiprocessor system : Single-thread per core */
->                 cpuid_topo->thread_id  = -1;
->                 cpuid_topo->core_id    = MPIDR_AFFINITY_LEVEL(mpidr, 0);
->                 cpuid_topo->cluster_id = MPIDR_AFFINITY_LEVEL(mpidr, 1) |
->                                          MPIDR_AFFINITY_LEVEL(mpidr, 2) << 8 |
->                                          MPIDR_AFFINITY_LEVEL(mpidr, 3) << 16;
->         }
-> 
-> BTW, Mark Brown just posted "[PATCH] arm64: topology: Fix handling of
-> multi-level cluster MPIDR-based detection" which reintroduces the
-> above, albeit only for MT case.
-> 
-> I suspect you're looking for something above for the non-MT case?
-> As a workaround, have you considered defining your topology in DT?
-> 
-> Lorenzo,
-> 
-> Are you open to the above "workaround" given that Thunder is facing
-> the current deficiency for non-MT case?
-> Or is it time to introduce socket_id or something equivalent?
+Am 25.07.2014 21:44, schrieb Ajay Kumar:
+> Add DT nodes for ptn3460 bridge chip and panel-simple panel.
 
-Well, we have to do something for certain, I think M. Brown's patch
-seems a reasonable solution to this problem, I will give it more thought
-and come back to you beginning of September (I am currently on holiday).
+"simple-panel"
 
-Thank you,
-Lorenzo
+> Add backlight enable pin and backlight power supply for pwm-backlight.
+> Also add bridge phandle needed by dp to enable display on snow.
+> 
+> Signed-off-by: Ajay Kumar <ajaykumar.rs@samsung.com>
+> ---
+>  arch/arm/boot/dts/exynos5250-snow.dts |   40 +++++++++++++++++----------------
+>  1 file changed, 21 insertions(+), 19 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/exynos5250-snow.dts b/arch/arm/boot/dts/exynos5250-snow.dts
+> index 6c36d41..f57f993 100644
+> --- a/arch/arm/boot/dts/exynos5250-snow.dts
+> +++ b/arch/arm/boot/dts/exynos5250-snow.dts
+> @@ -270,7 +270,7 @@
+>  					dcdc3 {
+>  						ti,enable-ext-control;
+>  					};
+> -					fet1 {
+> +					fet1: fet1 {
+>  						regulator-name = "vcd_led";
+>  						ti,overcurrent-wait = <3>;
+>  					};
+> @@ -293,7 +293,7 @@
+>  						regulator-always-on;
+>  						ti,overcurrent-wait = <3>;
+>  					};
+> -					fet6 {
+> +					fet6: fet6 {
+>  						regulator-name = "lcd_vdd";
+>  						ti,overcurrent-wait = <3>;
+>  					};
+> @@ -342,6 +342,15 @@
+>  			pinctrl-0 = <&max98095_en>;
+>  			pinctrl-names = "default";
+>  		};
+> +
+> +		ptn3460: ptn3460-bridge at 20 {
+
+"lvds-bridge"? (AF)
+
+> +			compatible = "nxp,ptn3460";
+> +			reg = <0x20>;
+> +			powerdown-gpios = <&gpy2 5 0>;
+> +			reset-gpios = <&gpx1 5 0>;
+> +			edid-emulation = <5>;
+> +			panel = <&panel>;
+> +		};
+>  	};
+>  
+>  	i2s0: i2s at 03830000 {
+> @@ -389,11 +398,13 @@
+>  		vdd_pll-supply = <&ldo8_reg>;
+>  	};
+>  
+> -	backlight {
+> +	backlight: backlight {
+>  		compatible = "pwm-backlight";
+>  		pwms = <&pwm 0 1000000 0>;
+>  		brightness-levels = <0 100 500 1000 1500 2000 2500 2800>;
+>  		default-brightness-level = <7>;
+> +		enable-gpios = <&gpx3 0 0>;
+> +		power-supply = <&fet1>;
+>  		pinctrl-0 = <&pwm0_out>;
+>  		pinctrl-names = "default";
+>  	};
+> @@ -403,6 +414,12 @@
+>  		samsung,invert-vclk;
+>  	};
+>  
+> +	panel: panel-simple {
+
+Just "panel"? (AF)
+
+> +		compatible = "simple-panel";
+
+Use something more concrete than "simple-panel"? (Thierry)
+
+> +		power-supply = <&fet6>;
+> +		backlight = <&backlight>;
+> +	};
+> +
+>  	dp-controller at 145B0000 {
+>  		status = "okay";
+>  		pinctrl-names = "default";
+> @@ -414,21 +431,6 @@
+>  		samsung,link-rate = <0x0a>;
+>  		samsung,lane-count = <2>;
+>  		samsung,hpd-gpio = <&gpx0 7 0>;
+> -
+> -		display-timings {
+> -			native-mode = <&timing1>;
+> -
+> -			timing1: timing at 1 {
+> -				clock-frequency = <70589280>;
+> -				hactive = <1366>;
+> -				vactive = <768>;
+> -				hfront-porch = <40>;
+> -				hback-porch = <40>;
+> -				hsync-len = <32>;
+> -				vback-porch = <10>;
+> -				vfront-porch = <12>;
+> -				vsync-len = <6>;
+> -			};
+> -		};
+> +		bridge = <&ptn3460>;
+>  	};
+>  };
+
+This patch will trivially conflict with my Snow cleanup [1]; ptn3460
+would go into the appropriate &i2c_* and this hunk into &dp then.
+
+Regards,
+Andreas
+
+[1] https://patchwork.kernel.org/patch/4664801/
+
+-- 
+SUSE LINUX Products GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
+GF: Jeff Hawn, Jennifer Guild, Felix Imend?rffer; HRB 16746 AG N?rnberg
