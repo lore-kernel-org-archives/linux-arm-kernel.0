@@ -1,119 +1,91 @@
-From: afaerber@suse.de (=?ISO-8859-15?Q?Andreas_F=E4rber?=)
-Date: Sat, 23 Aug 2014 12:35:49 +0200
-Subject: [PATCH 2/3] ARM: dts: Add DT changes for display on peach_pit
-In-Reply-To: <1406317464-7525-3-git-send-email-ajaykumar.rs@samsung.com>
-References: <1406317464-7525-1-git-send-email-ajaykumar.rs@samsung.com>
- <1406317464-7525-3-git-send-email-ajaykumar.rs@samsung.com>
-Message-ID: <53F86E85.3050200@suse.de>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Sat, 23 Aug 2014 11:43:42 +0100
+Subject: [PATCH] arm64: topology: add MPIDR-based detection
+In-Reply-To: <CAMDttNenA5UPJMPVScsP6BcVZS3D5brX5V7sYzPV_M+WAQpbHQ@mail.gmail.com>
+References: <20140604115751.GH2520@sirena.org.uk>
+ <20140604130114.GB10775@e102568-lin.cambridge.arm.com>
+ <20140604135431.GL2520@sirena.org.uk>
+ <20140604155129.GD10775@e102568-lin.cambridge.arm.com>
+ <20140604163400.GQ2520@sirena.org.uk>
+ <20140604171030.GE10775@e102568-lin.cambridge.arm.com>
+ <CAFpQJXVmj0v=L_5NSGs1TdNuZDuKv_zxEoSVpCVSSsjSqFgiMg@mail.gmail.com>
+ <20140818223659.GC5032@e102568-lin.cambridge.arm.com>
+ <CAFpQJXW7MGGYTa6ChboGCCFUVnkUjjnGMMVc9MKfYNnchsOwAw@mail.gmail.com>
+ <CAMDttNenA5UPJMPVScsP6BcVZS3D5brX5V7sYzPV_M+WAQpbHQ@mail.gmail.com>
+Message-ID: <20140823104342.GD15601@e102568-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 25.07.2014 21:44, schrieb Ajay Kumar:
-> Add DT nodes for ps8622 bridge chip and panel-simple panel.
-
-"simple-panel"
-
-> Add backlight power supply for pwm-backlight.
-> Also add bridge phandle needed by dp to enable display on peach_pit.
-
-Note that peach_pi[t] is inconsistent with the file names being
-peach-pi[t] here and in the two subjects.
-
+On Thu, Aug 21, 2014 at 06:15:40AM +0100, Zi Shen Lim wrote:
+> Hi Ganapatrao,
 > 
-> Note that, peach_pit doesn't support "chunghwa,claa101wb01" panel,
-> but still we choose to reuse the binding since "chunghwa,claa101wb01"
-> has similar LCD timings.
+> On Tue, Aug 19, 2014 at 11:08 PM, Ganapatrao Kulkarni
+> <gpkulkarni@gmail.com> wrote:
+> > Hi Lorenzo,
+> >
+> > On Tue, Aug 19, 2014 at 4:06 AM, Lorenzo Pieralisi
+> > <lorenzo.pieralisi@arm.com> wrote:
+> >> On Mon, Aug 18, 2014 at 08:39:48AM +0100, Ganapatrao Kulkarni wrote:
+> >>> How we map non SMT (MT bit24=0) cores of dual/multi socket system with
+> >>> the topology which is using only aff0 and aff1?
+> >>> can we use aff2  ( or concatenating aff2 and aff3)  to represent socket-id?
+> >>
+> >> Can you provide us with a description of the topology and the MPIDR_EL1
+> >> list please ?
+> >>
+> >> I think that DT squashes the levels above cluster so that's how it could
+> >> be implemented but first I would like to see what s the CPUs layout
+> >> of the system.
+> >
+> > Our Soc has 48 core(Cavium's  thunderX) design. 48 cores are
+> > sub-grouped in to 3 clusters.
+> > In turn each cluster is having 16 cores.
+> > We do have support for connecting 2 SoCs and making single system of 96 cores.
+> >
+> > the MPIDR mapping for this topology is,
+> >
+> > Aff0 is mapped to 16 cores within a cluster. Valid range is 0 to 0xf
+> > Aff1 is mapped to cluster number, valid values are 0,1 and 2.
+> > Aff2 is mapped to Socket-id or SoC number. Valid values are 0 and 1.
 > 
-> Signed-off-by: Ajay Kumar <ajaykumar.rs@samsung.com>
-> ---
->  arch/arm/boot/dts/exynos5420-peach-pit.dts |   36 +++++++++++++++-------------
->  1 file changed, 19 insertions(+), 17 deletions(-)
+> So, we went back and forth a few times and finally settled on what's
+> merged into 3.17, due to lack of visibility into hardware that'll be
+> shipped.
 > 
-> diff --git a/arch/arm/boot/dts/exynos5420-peach-pit.dts b/arch/arm/boot/dts/exynos5420-peach-pit.dts
-> index 228a6b1..79beba8 100644
-> --- a/arch/arm/boot/dts/exynos5420-peach-pit.dts
-> +++ b/arch/arm/boot/dts/exynos5420-peach-pit.dts
-> @@ -30,11 +30,12 @@
->  		i2c20 = "/spi at 12d40000/cros-ec at 0/i2c-tunnel";
->  	};
->  
-> -	backlight {
-> +	backlight: backlight {
->  		compatible = "pwm-backlight";
->  		pwms = <&pwm 0 1000000 0>;
->  		brightness-levels = <0 100 500 1000 1500 2000 2500 2800>;
->  		default-brightness-level = <7>;
-> +		power-supply = <&tps65090_fet1>;
->  		pinctrl-0 = <&pwm0_out>;
->  		pinctrl-names = "default";
->  	};
-> @@ -100,6 +101,12 @@
->  		regulator-boot-on;
->  		regulator-always-on;
->  	};
-> +
-> +	panel: panel-simple {
+> At one point, we had something approximating behavior of DT-based
+> topology, along the lines of:
+> 
+>         if (mpidr & MPIDR_MT_BITMASK) {
+>                 /* Multiprocessor system : Multi-threads per core */
+>                 cpuid_topo->thread_id  = MPIDR_AFFINITY_LEVEL(mpidr, 0);
+>                 cpuid_topo->core_id    = MPIDR_AFFINITY_LEVEL(mpidr, 1);
+>                 cpuid_topo->cluster_id = MPIDR_AFFINITY_LEVEL(mpidr, 2) |
+>                                          MPIDR_AFFINITY_LEVEL(mpidr, 3) << 8;
+>         } else {
+>                 /* Multiprocessor system : Single-thread per core */
+>                 cpuid_topo->thread_id  = -1;
+>                 cpuid_topo->core_id    = MPIDR_AFFINITY_LEVEL(mpidr, 0);
+>                 cpuid_topo->cluster_id = MPIDR_AFFINITY_LEVEL(mpidr, 1) |
+>                                          MPIDR_AFFINITY_LEVEL(mpidr, 2) << 8 |
+>                                          MPIDR_AFFINITY_LEVEL(mpidr, 3) << 16;
+>         }
+> 
+> BTW, Mark Brown just posted "[PATCH] arm64: topology: Fix handling of
+> multi-level cluster MPIDR-based detection" which reintroduces the
+> above, albeit only for MT case.
+> 
+> I suspect you're looking for something above for the non-MT case?
+> As a workaround, have you considered defining your topology in DT?
+> 
+> Lorenzo,
+> 
+> Are you open to the above "workaround" given that Thunder is facing
+> the current deficiency for non-MT case?
+> Or is it time to introduce socket_id or something equivalent?
 
-Just "panel"? (AF)
+Well, we have to do something for certain, I think M. Brown's patch
+seems a reasonable solution to this problem, I will give it more thought
+and come back to you beginning of September (I am currently on holiday).
 
-> +		compatible = "chunghwa,claa101wb01", "simple-panel";
-
-Drop "simple-panel" (Thierry)
-
-> +		power-supply = <&tps65090_fet6>;
-> +		backlight = <&backlight>;
-> +	};
->  };
->  
->  &dp {
-> @@ -113,22 +120,7 @@
->  	samsung,link-rate = <0x06>;
->  	samsung,lane-count = <2>;
->  	samsung,hpd-gpio = <&gpx2 6 0>;
-> -
-> -	display-timings {
-> -		native-mode = <&timing1>;
-> -
-> -		timing1: timing at 1 {
-> -			clock-frequency = <70589280>;
-> -			hactive = <1366>;
-> -			vactive = <768>;
-> -			hfront-porch = <40>;
-> -			hback-porch = <40>;
-> -			hsync-len = <32>;
-> -			vback-porch = <10>;
-> -			vfront-porch = <12>;
-> -			vsync-len = <6>;
-> -		};
-> -	};
-> +	bridge = <&ps8625>;
->  };
->  
->  &fimd {
-> @@ -155,6 +147,16 @@
->  		pinctrl-names = "default";
->  		pinctrl-0 = <&max98090_irq>;
->  	};
-> +
-> +	ps8625: ps8625-bridge at 48 {
-
-"lvds-bridge"? (AF)
-
-> +		compatible = "parade,ps8625";
-> +		reg = <0x48>;
-> +		sleep-gpios = <&gpx3 5 0>;
-> +		reset-gpios = <&gpy7 7 0>;
-> +		lane-count = <2>;
-> +		panel = <&panel>;
-> +		backlight = <&backlight>;
-> +	};
->  };
->  
->  &hsi2c_9 {
-
-Regards,
-Andreas
-
--- 
-SUSE LINUX Products GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
-GF: Jeff Hawn, Jennifer Guild, Felix Imend?rffer; HRB 16746 AG N?rnberg
+Thank you,
+Lorenzo
