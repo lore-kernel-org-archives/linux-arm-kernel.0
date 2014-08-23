@@ -1,37 +1,59 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Sat, 23 Aug 2014 11:57:06 -0500
-Subject: [PATCH v9 12/12] PCI: Introduce pci_remap_iospace() for remapping
- PCI I/O bus resources into CPU space
-In-Reply-To: <20140822124326.GL13147@bart.dudau.co.uk>
-References: <1407860725-25202-1-git-send-email-Liviu.Dudau@arm.com>
- <1407860725-25202-13-git-send-email-Liviu.Dudau@arm.com>
- <CAL_JsqK6XiuS7OJ_2F16ySA8oj9AHqP0fAft21AOtJxXP2SqnQ@mail.gmail.com>
- <20140822124326.GL13147@bart.dudau.co.uk>
-Message-ID: <CAL_JsqLP3K1p3Q-B1rBtdRcRwpWJqCLQaML8uX0EXrX5GcO1CA@mail.gmail.com>
+From: afaerber@suse.de (=?ISO-8859-1?Q?Andreas_F=E4rber?=)
+Date: Sat, 23 Aug 2014 19:11:49 +0200
+Subject: [PATCH v7 04/11] arm: Support restart through restart handler
+ call chain
+In-Reply-To: <20140822021947.GA17788@roeck-us.net>
+References: <1408495538-27480-1-git-send-email-linux@roeck-us.net>
+ <1408495538-27480-5-git-send-email-linux@roeck-us.net>
+ <53F69DBA.4070806@suse.de> <20140822021947.GA17788@roeck-us.net>
+Message-ID: <53F8CB55.5030209@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 22, 2014 at 7:43 AM, Liviu Dudau <liviu@dudau.co.uk> wrote:
-> On Thu, Aug 21, 2014 at 11:16:16PM -0500, Rob Herring wrote:
->> On Tue, Aug 12, 2014 at 11:25 AM, Liviu Dudau <Liviu.Dudau@arm.com> wrote:
->> > Introduce a default implementation for remapping PCI bus I/O resources
->> > onto the CPU address space. Architectures with special needs may
->> > provide their own version, but most should be able to use this one.
->> >
->> > Cc: Bjorn Helgaas <bhelgaas@google.com>
->> > Cc: Arnd Bergmann <arnd@arndb.de>
->> > Cc: Rob Herring <robh+dt@kernel.org>
->> > Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
+Am 22.08.2014 04:19, schrieb Guenter Roeck:
+> On Fri, Aug 22, 2014 at 03:32:42AM +0200, Andreas F?rber wrote:
+>> Am 20.08.2014 02:45, schrieb Guenter Roeck:
+>>> The kernel core now supports a restart handler call chain for system
+>>> restart functions.
+>>>
+>>> With this change, the arm_pm_restart callback is now optional, so
+>>> drop its initialization and check if it is set before calling it.
+>>> Only call the kernel restart handler if arm_pm_restart is not set.
+>> [...]
+>>> diff --git a/arch/arm/kernel/process.c b/arch/arm/kernel/process.c
+>>> index 81ef686..ea279f7 100644
+>>> --- a/arch/arm/kernel/process.c
+>>> +++ b/arch/arm/kernel/process.c
+>>> @@ -114,17 +114,13 @@ void soft_restart(unsigned long addr)
+>>>  	BUG();
+>>>  }
+>>>  
+>>> -static void null_restart(enum reboot_mode reboot_mode, const char *cmd)
+>>> -{
+>>> -}
+>>> -
+>>>  /*
+>>>   * Function pointers to optional machine specific functions
+>>>   */
+>>>  void (*pm_power_off)(void);
+>>>  EXPORT_SYMBOL(pm_power_off);
+>>>  
+>>> -void (*arm_pm_restart)(enum reboot_mode reboot_mode, const char *cmd) = null_restart;
+>>> +void (*arm_pm_restart)(enum reboot_mode reboot_mode, const char *cmd);
 >>
->> Reviewed-by: Rob Herring <robh@kernel.org>
->
-> Thanks, Rob, much appreciated!
->
+>> Stupid newbie question maybe, but isn't this variable uninitialized now,
+>> like any non-static variable in C99? Or does the kernel assure that all
+>> such "fields" are zero-initialized?
 >>
->> However, I would like to see ARM pci_ioremap_io converted over to this function.
->
-> Do you care if this is done as a separate patch?
+> It is initialized with NULL, like all other global and static variables in the
+> kernel (and like pm_power_off a few lines above).
 
-Yes, that's fine hence the reviewed-by.
+Thanks for the explanation. In that case FWIW
 
-Rob
+Reviewed-by: Andreas F?rber <afaerber@suse.de>
+
+Andreas
+
+-- 
+SUSE LINUX Products GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
+GF: Jeff Hawn, Jennifer Guild, Felix Imend?rffer; HRB 16746 AG N?rnberg
