@@ -1,51 +1,39 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Sat, 23 Aug 2014 10:43:34 +0900
-Subject: [PATCH 5/8] ARM: shmobile: ape6evm: Use shmobile_init_delay()
+Date: Sat, 23 Aug 2014 10:43:35 +0900
+Subject: [PATCH 6/8] ARM: shmobile: marzen: Remove NR_IRQS_LEGACY
 In-Reply-To: <cover.1408671094.git.horms+renesas@verge.net.au>
 References: <cover.1408671094.git.horms+renesas@verge.net.au>
-Message-ID: <911f7cec78af1445d4b0f5f79907cb5bd4522ce5.1408671094.git.horms+renesas@verge.net.au>
+Message-ID: <322163c437b200b70ecb87ab102dfedce0ba0e91.1408671094.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Magnus Damm <damm+renesas@opensource.se>
 
-The r8a73a4 DTS includes CPU Frequency information so
-adjust the APE6EVM board code to use shmobile_init_delay()
-instead of relying on CPU Frequency information included
-in r8a73a4_init_delay() that is specified in C.
+Remove NR_IRQS_LEGACY from the Marzen Reference code.
+The Marzen Reference machine vector requires use of
+Multiplatform, and in such case SPARSE_IRQ is enabled
+by default. This in turns means that the default value
+of .nr_irqs equals NR_IRQS and NR_IRQS_LEGACY. Because
+of this we can simply remove NR_IRQS_LEGACY and move one
+step closer to a cruft-free environment.
 
 Signed-off-by: Magnus Damm <damm+renesas@opensource.se>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/board-ape6evm-reference.c | 2 +-
- arch/arm/mach-shmobile/board-ape6evm.c           | 2 +-
- 2 files changed, 2 insertions(+), 2 deletions(-)
+ arch/arm/mach-shmobile/board-marzen-reference.c | 1 -
+ 1 file changed, 1 deletion(-)
 
-diff --git a/arch/arm/mach-shmobile/board-ape6evm-reference.c b/arch/arm/mach-shmobile/board-ape6evm-reference.c
-index 1ecda4b..9e99b15 100644
---- a/arch/arm/mach-shmobile/board-ape6evm-reference.c
-+++ b/arch/arm/mach-shmobile/board-ape6evm-reference.c
-@@ -59,7 +59,7 @@ static const char *ape6evm_boards_compat_dt[] __initdata = {
- };
- 
- DT_MACHINE_START(APE6EVM_DT, "ape6evm")
--	.init_early	= r8a73a4_init_early,
-+	.init_early	= shmobile_init_delay,
- 	.init_machine	= ape6evm_add_standard_devices,
+diff --git a/arch/arm/mach-shmobile/board-marzen-reference.c b/arch/arm/mach-shmobile/board-marzen-reference.c
+index 9194bce..c3dfa6c 100644
+--- a/arch/arm/mach-shmobile/board-marzen-reference.c
++++ b/arch/arm/mach-shmobile/board-marzen-reference.c
+@@ -64,7 +64,6 @@ DT_MACHINE_START(MARZEN, "marzen")
+ 	.map_io		= r8a7779_map_io,
+ 	.init_early	= shmobile_init_delay,
+ 	.init_time	= marzen_init_timer,
+-	.nr_irqs	= NR_IRQS_LEGACY,
+ 	.init_irq	= r8a7779_init_irq_dt,
+ 	.init_machine	= marzen_init,
  	.init_late	= shmobile_init_late,
- 	.dt_compat	= ape6evm_boards_compat_dt,
-diff --git a/arch/arm/mach-shmobile/board-ape6evm.c b/arch/arm/mach-shmobile/board-ape6evm.c
-index befbae03..b222f68 100644
---- a/arch/arm/mach-shmobile/board-ape6evm.c
-+++ b/arch/arm/mach-shmobile/board-ape6evm.c
-@@ -283,7 +283,7 @@ static const char *ape6evm_boards_compat_dt[] __initdata = {
- };
- 
- DT_MACHINE_START(APE6EVM_DT, "ape6evm")
--	.init_early	= r8a73a4_init_early,
-+	.init_early	= shmobile_init_delay,
- 	.init_machine	= ape6evm_add_standard_devices,
- 	.init_late	= shmobile_init_late,
- 	.dt_compat	= ape6evm_boards_compat_dt,
 -- 
 2.0.1
