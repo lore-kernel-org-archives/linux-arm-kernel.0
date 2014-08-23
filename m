@@ -1,60 +1,29 @@
-From: gang.chen.5i5j@gmail.com (Chen Gang)
-Date: Sat, 23 Aug 2014 10:31:15 +0800
-Subject: [PATCH v2] arch: Kconfig: Let all little endian architectures
- define CPU_LITTLE_ENDIAN explicitly
-In-Reply-To: <53F724DD.1080605@suse.cz>
-References: <53EA99C3.90203@gmail.com>
- <CAMuHMdV_2b-A+eE--cXEFA68=72HK6mqx8+TCXRMVkyhESLYxQ@mail.gmail.com>
- <53F724DD.1080605@suse.cz>
-Message-ID: <53F7FCF3.4000800@gmail.com>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Fri, 22 Aug 2014 22:10:42 -0500
+Subject: [PATCH v3 0/7] i2c: Relax mandatory I2C ID table passing
+In-Reply-To: <20140820160157.GO4266@lee--X1>
+References: <1403265753-25851-1-git-send-email-lee.jones@linaro.org>
+ <20140717102342.GD30888@lee--X1> <20140717130306.GG2740@katana>
+ <20140820160157.GO4266@lee--X1>
+Message-ID: <20140823031042.GB1305@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 8/22/14 19:09, Michal Marek wrote:
-> Dne 13.8.2014 10:03, Geert Uytterhoeven napsal(a):
->> CC kbuild
->>
->> On Wed, Aug 13, 2014 at 12:48 AM, Chen Gang <gang.chen.5i5j@gmail.com> wrote:
->>> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
->>> index c49a775..0510a5d 100644
->>> --- a/arch/arm/Kconfig
->>> +++ b/arch/arm/Kconfig
->>> @@ -199,6 +199,11 @@ config NEED_DMA_MAP_STATE
->>>  config ARCH_SUPPORTS_UPROBES
->>>         def_bool y
->>>
->>> +config CPU_LITTLE_ENDIAN
->>> +       depends on !CPU_BIG_ENDIAN
->>> +       def_bool y
->>> +
->>> +
->>>  config ARCH_HAS_DMA_SET_COHERENT_MASK
->>>         bool
->>
->> As this is a common symbol, and replicated for all affected architectures,
->> I'm wondering if we should have the "config CPU_LITTLE_ENDIAN" in
->> common Kconfig code instead, and make the individual architectures do a
->> "select CPU_LITTLE_ENDIAN"?
+> > Sure thing, yet I won't make it for 3.17, sadly :( It has high priority
+> > for 3.18, though.
 > 
-> Yes!
-> 
-> 
->> Also we could have "config CPU_BIG_ENDIAN", too, and error out
->> if none or both are selected (can Kconfig error out?).
-> 
-> We can error out in the Makefile, if there is consensus that we should
-> be doing so.
-> 
+> Do you want me to re-send now the -rc1 had been released?
 
-OK, thanks. I have sent patch v3 for it, and did not check related error
-in Kconfig files.
+I think this version will do for an initial review.
 
-Please check the related patches (excuse me, I send the patch v3 only
-according to "scripts/maintainers.pl", maybe not cc to you explicitly).
+Thanks,
 
+   Wolfram
 
-Thanks.
--- 
-Chen Gang
-
-Open, share, and attitude like air, water, and life which God blessed
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140822/ab4ae65e/attachment.sig>
