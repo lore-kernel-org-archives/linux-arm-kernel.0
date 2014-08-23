@@ -1,34 +1,59 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Sat, 23 Aug 2014 10:44:13 +0900
-Subject: [PATCH 8/8] ARM: shmobile: defconfig: enable initrd
-In-Reply-To: <cover.1408670623.git.horms+renesas@verge.net.au>
-References: <cover.1408670623.git.horms+renesas@verge.net.au>
-Message-ID: <874ee23c83d888f8824305c277e047c7799f30b9.1408670623.git.horms+renesas@verge.net.au>
+Date: Sat, 23 Aug 2014 10:44:20 +0900
+Subject: [GIT PULL] Renesas ARM Based SoC Updates for v3.18
+Message-ID: <cover.1408671240.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Kevin Hilman <khilman@linaro.org>
+Hi Olof, Hi Kevin, Hi Arnd,
 
-Enable initrd support.
+Please consider these Renesas ARM based SoC updates for v3.18.
 
-Signed-off-by: Kevin Hilman <khilman@linaro.org>
-[horms+renesas at verge.net.au: dropped enabling atag dtb compat]
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/configs/shmobile_defconfig | 1 +
- 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/configs/shmobile_defconfig b/arch/arm/configs/shmobile_defconfig
-index 0cd63f5..b7ebf1e 100644
---- a/arch/arm/configs/shmobile_defconfig
-+++ b/arch/arm/configs/shmobile_defconfig
-@@ -3,6 +3,7 @@ CONFIG_NO_HZ=y
- CONFIG_IKCONFIG=y
- CONFIG_IKCONFIG_PROC=y
- CONFIG_LOG_BUF_SHIFT=16
-+CONFIG_BLK_DEV_INITRD=y
- CONFIG_CC_OPTIMIZE_FOR_SIZE=y
- CONFIG_SYSCTL_SYSCALL=y
- CONFIG_EMBEDDED=y
--- 
-2.0.1
+The following changes since commit 7d1311b93e58ed55f3a31cc8f94c4b8fe988a2b9:
+
+  Linux 3.17-rc1 (2014-08-16 10:40:26 -0600)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-soc-for-v3.18
+
+for you to fetch changes up to 5ac9e7f35db00e630c9f95a1f73ac329371cdbbf:
+
+  ARM: shmobile: sh73a0: Remove unneeded nr_irqs initialization (2014-08-20 09:09:24 +0900)
+
+----------------------------------------------------------------
+Renesas ARM Based SoC Updates for v3.18
+
+* Remove unnecessary nr_irqs initialisation on sh73a0, sh7372,
+  and r8a7779 SoCs
+* Use defines hardcoded numbers for DMA
+* Rework multiplatform include workaround
+* Correctly use shmobile_init_late on a wider range of SoCs
+
+----------------------------------------------------------------
+Geert Uytterhoeven (4):
+      ARM: shmobile: r8a7778: Add missing call to shmobile_init_late()
+      ARM: shmobile: dma: Use defines instead of hardcoded numbers
+      ARM: shmobile: sh7372: Remove unneeded nr_irqs initialization
+      ARM: shmobile: sh73a0: Remove unneeded nr_irqs initialization
+
+Magnus Damm (7):
+      ARM: shmobile: sh73a0: Add shmobile_init_late()
+      ARM: shmobile: r8a7779: Fix shmobile_init_late()
+      ARM: shmobile: r8a7778: Fix shmobile_init_late()
+      ARM: shmobile: r8a73a4: Add shmobile_init_late()
+      ARM: shmobile: r7s72100: Add shmobile_init_late()
+      ARM: shmobile: Rework multiplatform include workaround
+      ARM: shmobile: r8a7779: Remove NR_IRQS_LEGACY
+
+ arch/arm/mach-shmobile/Makefile         | 2 --
+ arch/arm/mach-shmobile/dma-register.h   | 4 ++--
+ arch/arm/mach-shmobile/irqs.h           | 2 +-
+ arch/arm/mach-shmobile/setup-r7s72100.c | 1 +
+ arch/arm/mach-shmobile/setup-r8a73a4.c  | 1 +
+ arch/arm/mach-shmobile/setup-r8a7778.c  | 3 ++-
+ arch/arm/mach-shmobile/setup-r8a7779.c  | 3 +--
+ arch/arm/mach-shmobile/setup-sh7372.c   | 1 -
+ arch/arm/mach-shmobile/setup-sh73a0.c   | 2 +-
+ 9 files changed, 9 insertions(+), 10 deletions(-)
