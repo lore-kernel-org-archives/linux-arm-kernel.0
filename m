@@ -1,48 +1,19 @@
-From: afaerber@suse.de (=?ISO-8859-1?Q?Andreas_F=E4rber?=)
-Date: Sat, 23 Aug 2014 14:24:33 +0200
-Subject: [PATCH 7/7] ARM: meson: update documentation (uart, timer and
- vendors)
-In-Reply-To: <1408272594-10814-8-git-send-email-carlo@caione.org>
-References: <1408272594-10814-1-git-send-email-carlo@caione.org>
- <1408272594-10814-8-git-send-email-carlo@caione.org>
-Message-ID: <53F88801.4050300@suse.de>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Sat, 23 Aug 2014 10:32:23 -0300
+Subject: [PATCH 6/6] ARM: dts: hummingboard: gpio-ir on gpio 3,5
+In-Reply-To: <E1XL7MR-0002yX-6N@rmk-PC.arm.linux.org.uk>
+References: <20140823091058.GO30401@n2100.arm.linux.org.uk>
+ <E1XL7MR-0002yX-6N@rmk-PC.arm.linux.org.uk>
+Message-ID: <CAOMZO5C=xyYLLBX1PDsJQ9NwzXZxCWTvPMTUWzYcoohOOvA_qA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 17.08.2014 12:49, schrieb Carlo Caione:
-> New UART and timer bindings are documented. A new vendor is added to the
-> vendors list.
-> 
-> Signed-off-by: Carlo Caione <carlo@caione.org>
-> ---
->  .../devicetree/bindings/serial/amlogic,meson-uart.txt   | 17 +++++++++++++++++
->  .../devicetree/bindings/timer/amlogic,meson6-timer.txt  | 16 ++++++++++++++++
->  Documentation/devicetree/bindings/vendor-prefixes.txt   |  1 +
->  3 files changed, 34 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/serial/amlogic,meson-uart.txt
->  create mode 100644 Documentation/devicetree/bindings/timer/amlogic,meson6-timer.txt
-[...]
-> diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
-> index ac7269f..5cf0618 100644
-> --- a/Documentation/devicetree/bindings/vendor-prefixes.txt
-> +++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
-> @@ -14,6 +14,7 @@ allwinner	Allwinner Technology Co., Ltd.
->  altr	Altera Corp.
->  amcc	Applied Micro Circuits Corporation (APM, formally AMCC)
->  amd	Advanced Micro Devices (AMD), Inc.
-> +amlogic	Amlogic, Inc.
->  ams	AMS AG
->  amstaos	AMS-Taos Inc.
->  apm	Applied Micro Circuits Corporation (APM)
+On Sat, Aug 23, 2014 at 6:11 AM, Russell King
+<rmk+kernel@arm.linux.org.uk> wrote:
 
-Sorry, here's the vendor prefix I was asking about. Please split it off
-into its own patch and best order it before the first use.
+> -                               MX6QDL_PAD_GPIO_2__GPIO1_IO02 0x80000000
+> +                               MX6QDL_PAD_EIM_DA5__GPIO3_IO05 0x80000000
 
-Documentation of SoC and board seem to be indeed missing though.
-
-Cheers,
-Andreas
-
--- 
-SUSE LINUX Products GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
-GF: Jeff Hawn, Jennifer Guild, Felix Imend?rffer; HRB 16746 AG N?rnberg
+It would be better to replace the '0x80000000' with the real iomux
+value (like 0x1b0b0 for example), so that we do not need to rely on
+the bootloader doing the correct configuration for us.
