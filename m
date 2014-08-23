@@ -1,60 +1,51 @@
-From: caesar.wang@rock-chips.com (Caesar Wang)
-Date: Sat, 23 Aug 2014 08:15:33 +0800
-Subject: [PATCH 1/2] dt-bindings: document Rockchip thermal
-In-Reply-To: <1408752934-18318-1-git-send-email-caesar.wang@rock-chips.com>
-References: <1408752934-18318-1-git-send-email-caesar.wang@rock-chips.com>
-Message-ID: <1408752934-18318-2-git-send-email-caesar.wang@rock-chips.com>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Sat, 23 Aug 2014 10:43:35 +0900
+Subject: [GIT PULL] Renesas ARM Based SoC Boards Updates for v3.18
+Message-ID: <cover.1408671094.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This add the necessary binding documentation for the thermal
-found on Rockchip SoCs
+Hi Olof, Hi Kevin, Hi Arnd,
 
-Signed-off-by: zhaoyifeng <zyf@rock-chips.com>
-Signed-off-by: Caesar Wang <caesar.wang@rock-chips.com>
----
- .../bindings/thermal/rockchip-thermal.txt          |   33 ++++++++++++++++++++
- 1 file changed, 33 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/thermal/rockchip-thermal.txt
+Please consider these Renesas ARM based SoC boards updates for v3.18.
 
-diff --git a/Documentation/devicetree/bindings/thermal/rockchip-thermal.txt b/Documentation/devicetree/bindings/thermal/rockchip-thermal.txt
-new file mode 100644
-index 0000000..b556eae
---- /dev/null
-+++ b/Documentation/devicetree/bindings/thermal/rockchip-thermal.txt
-@@ -0,0 +1,33 @@
-+* Temperature Sensor ADC (TSADC) on rockchip SoCs
-+
-+Required properties:
-+- compatible : "rockchip,rk3288-tsadc"
-+- reg : physical base address of the controller and length of memory mapped
-+  region.
-+- interrupts : The interrupt number to the cpu. The interrupt specifier format
-+  depends on the interrupt controller.
-+- clocks : Must contain an entry for each entry in clock-names.
-+- clock-names : Shall be "tsadc_clk" for the transfer-clock, and "tsadc_pclk" for
-+    the peripheral clock.
-+Optional properties:
-+- clock-frequency : Thermal sensor's clock frequency.
-+- pinctrl-names : Should contain only one value - "default".
-+- pinctrl-0 : Should contain only one value - &tsadc_int.
-+- passive-temp : Temperature of trip 0.
-+- critical-temp : Temperature of trip 1.
-+- force-shut-temp : Temperature of force shut down.
-+Example:
-+
-+tsadc: tsadc at ff280000 {
-+	compatible = "rockchip,rk3288-tsadc";
-+	reg = <0xff280000 0x100>;
-+	interrupts = <GIC_SPI 37 IRQ_TYPE_LEVEL_HIGH>;
-+	clock-frequency = <10000>;
-+	clocks = <&cru SCLK_TSADC>, <&cru PCLK_TSADC>;
-+	clock-names = "tsadc_clk", "tsadc_pclk";
-+	pinctrl-names = "default";
-+	pinctrl-1 = <&tsadc_int>;
-+	passive-temp = <80>;
-+	critical-temp = <100>;
-+	force-shut-temp = <120>;
-+};
--- 
-1.7.9.5
+
+The following changes since commit 7d1311b93e58ed55f3a31cc8f94c4b8fe988a2b9:
+
+  Linux 3.17-rc1 (2014-08-16 10:40:26 -0600)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-boards-for-v3.18
+
+for you to fetch changes up to 3969d6490ba35b01f84bb12472c29c6029f7298b:
+
+  ARM: shmobile: kzm9g-reference: Remove unneeded nr_irqs initialization (2014-08-20 09:06:37 +0900)
+
+----------------------------------------------------------------
+Renesas ARM Based SoC Boards Updates for v3.18
+
+* Remove unnecessary nr_irqs initialisation on kzm9g and marzen
+* Use shmobile_init_delay and shmobile_init_late on a wider
+  range of boards
+
+----------------------------------------------------------------
+Geert Uytterhoeven (2):
+      ARM: shmobile: kzm9g: Remove unneeded nr_irqs initialization
+      ARM: shmobile: kzm9g-reference: Remove unneeded nr_irqs initialization
+
+Magnus Damm (6):
+      ARM: shmobile: kzm9g: Add shmobile_init_late()
+      ARM: shmobile: marzen: Add shmobile_init_late()
+      ARM: shmobile: bockw: Add shmobile_init_late()
+      ARM: shmobile: ape6evm: Add shmobile_init_late()
+      ARM: shmobile: ape6evm: Use shmobile_init_delay()
+      ARM: shmobile: marzen: Remove NR_IRQS_LEGACY
+
+ arch/arm/mach-shmobile/board-ape6evm-reference.c | 3 ++-
+ arch/arm/mach-shmobile/board-ape6evm.c           | 3 ++-
+ arch/arm/mach-shmobile/board-bockw-reference.c   | 1 +
+ arch/arm/mach-shmobile/board-kzm9g-reference.c   | 2 +-
+ arch/arm/mach-shmobile/board-kzm9g.c             | 1 -
+ arch/arm/mach-shmobile/board-marzen-reference.c  | 2 +-
+ 6 files changed, 7 insertions(+), 5 deletions(-)
