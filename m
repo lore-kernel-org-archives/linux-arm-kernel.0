@@ -1,43 +1,52 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Sat, 23 Aug 2014 22:43:57 +0400
-Subject: [PATCH v8 2/3] ahci_xgene: Skip the PHY and clock initialization
- if already configured by the firmware.
-In-Reply-To: <1408819047-17224-3-git-send-email-stripathi@apm.com>
-References: <1408819047-17224-1-git-send-email-stripathi@apm.com>
- <1408819047-17224-3-git-send-email-stripathi@apm.com>
-Message-ID: <53F8E0ED.6030802@cogentembedded.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Sat, 23 Aug 2014 20:54:38 +0200
+Subject: [PATCH v3 0/6] Migrate PXA27x platforms to clock framework
+In-Reply-To: <87ha1342ei.fsf@free.fr>
+References: <1406753464-15000-1-git-send-email-robert.jarzmik@free.fr>
+ <CAN1soZwDDwiLuVkT7kRJX-wy-UmyDj-2yiReGrpBrTOJkKpuSA@mail.gmail.com>
+ <87ha1342ei.fsf@free.fr>
+Message-ID: <1465795.XsPpj3dZHX@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+On Saturday 23 August 2014 18:05:41 Robert Jarzmik wrote:
+> Haojian Zhuang <haojian.zhuang@gmail.com> writes:
+> > Acked-by: Haojian Zhuang <haojian.zhuang@gmail.com>
+> >
+> > Only with a small comment.
+> >
+> > Regards
+> > Haojian
+> Hi Mike and Arnd,
+> 
+> I suppose this patchset didn't make it to 3.17 timeframe, right ?
+> And I don't see it scheduled either for linux-next.
+> 
+> Is there something blocking it ?
 
-On 08/23/2014 10:37 PM, Suman Tripathi wrote:
+I didn't know we were supposed to merge it. There was no reason
+against merging it when you posted it, but you didn't make it clear
+what you want to happen.
 
-> This patch implements the feature to skip the PHY and clock
-> initialization if it is already configured by the firmware.
+By default, I'd expect Haojian to pick up the patches and send
+us a pull request. He sent an Ack, but also didn't make it clear
+that we should pick them up.
 
-> Signed-off-by: Loc Ho <lho@apm.com>
-> Signed-off-by: Suman Tripathi <stripathi@apm.com>
-> ---
->   drivers/ata/ahci_xgene.c | 16 ++++++++++++++++
->   1 file changed, 16 insertions(+)
+If you want code to be merged directly through arm-soc, please
+send the pull request "To:" arm at kernel.org (with all interested
+parties the mailing lists in Cc) and ask us directly to pull it,
+to avoid all ambiguity.
 
-> diff --git a/drivers/ata/ahci_xgene.c b/drivers/ata/ahci_xgene.c
-> index f416495..fd9c137 100644
-> --- a/drivers/ata/ahci_xgene.c
-> +++ b/drivers/ata/ahci_xgene.c
-> @@ -145,6 +145,15 @@ static unsigned int xgene_ahci_qc_issue(struct ata_queued_cmd *qc)
->   	return rc;
->   }
->
-> +static bool xgene_ahci_is_memram_inited(struct xgene_ahci_context *ctx)
-> +{
-> +	void __iomem *diagcsr = ctx->csr_diag;
-> +
-> +	return (readl(diagcsr + CFG_MEM_RAM_SHUTDOWN) == 0 &&
-> +	        readl(diagcsr + BLOCK_MEM_RDY) == 0xFFFFFFFF) ?
-> +		true : false;
+Sometimes we can miss patches (as opposed to pull requests) since
+at least I tend to scan my inbox for the 'GIT PULL' keyword. If
+we don't seem to react within a week, just send a friendly reminder.
 
-    Just return the result of &&, that should be enough.
+For the specific case of PXA, I wonder if we should update the
+maintainer entry. As far as I can tell, Eric and Russell are no
+longer actively involved in the maintenance of PXA, and Haojian
+is doing only the bare minimum and is kept busy by other platforms
+these days (mach-hisi, mach-mmp). Should we perhaps add you and/or
+Daniel and remove some of the others if they are no longer as
+actively working on PXA?
 
-WBR, Sergei
+	Arnd
