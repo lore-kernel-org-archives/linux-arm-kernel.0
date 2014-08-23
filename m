@@ -1,137 +1,290 @@
-From: srv_yingjoe.chen@mediatek.com (Joe.C)
-Date: Sat, 23 Aug 2014 13:28:58 +0800
-Subject: [RESEND PATCH v2 1/4] irqchip: gic: Change irq type check when
- extension is present
-In-Reply-To: <53F724F5.3040004@arm.com>
-References: <1407895884-18131-1-git-send-email-srv_yingjoe.chen@mediatek.com>
- <1407895884-18131-2-git-send-email-srv_yingjoe.chen@mediatek.com>
- <53F724F5.3040004@arm.com>
-Message-ID: <1408771738.25080.65.camel@mtksdaap41>
+From: keescook@chromium.org (Kees Cook)
+Date: Fri, 22 Aug 2014 22:45:19 -0700
+Subject: [PATCHv3 5/7] arm64: Factor out fixmap initialiation from ioremap
+In-Reply-To: <1408584039-12735-6-git-send-email-lauraa@codeaurora.org>
+References: <1408584039-12735-1-git-send-email-lauraa@codeaurora.org>
+ <1408584039-12735-6-git-send-email-lauraa@codeaurora.org>
+Message-ID: <CAGXu5jK64cOKkh0pSj63P3O0ZXuyCJET7w-W=9qd6b74pxRH4w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Wed, Aug 20, 2014 at 6:20 PM, Laura Abbott <lauraa@codeaurora.org> wrote:
+>
+> The fixmap API was originally added for arm64 for
+> early_ioremap purposes. It can be used for other purposes too
+> so move the initialization from ioremap to somewhere more
+> generic. This makes it obvious where the fixmap is being set
+> up and allows for a cleaner implementation of __set_fixmap.
+>
+> Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
+> ---
+>  arch/arm64/include/asm/fixmap.h |  7 +--
+>  arch/arm64/kernel/setup.c       |  3 +-
+>  arch/arm64/mm/ioremap.c         | 93 ++--------------------------------------
+>  arch/arm64/mm/mmu.c             | 94 +++++++++++++++++++++++++++++++++++++++++
+>  4 files changed, 103 insertions(+), 94 deletions(-)
+>
+> diff --git a/arch/arm64/include/asm/fixmap.h b/arch/arm64/include/asm/fixmap.h
+> index 5f7bfe6..db26a2f2 100644
+> --- a/arch/arm64/include/asm/fixmap.h
+> +++ b/arch/arm64/include/asm/fixmap.h
+> @@ -56,10 +56,11 @@ enum fixed_addresses {
+>
+>  #define FIXMAP_PAGE_IO     __pgprot(PROT_DEVICE_nGnRE)
+>
+> -extern void __early_set_fixmap(enum fixed_addresses idx,
+> -                              phys_addr_t phys, pgprot_t flags);
+> +void __init early_fixmap_init(void);
+>
+> -#define __set_fixmap __early_set_fixmap
+> +#define __early_set_fixmap __set_fixmap
+> +
+> +extern void __set_fixmap(enum fixed_addresses idx, phys_addr_t phys, pgprot_t prot);
+>
+>  #include <asm-generic/fixmap.h>
+>
+> diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
+> index f6f0ccf..9244e20 100644
+> --- a/arch/arm64/kernel/setup.c
+> +++ b/arch/arm64/kernel/setup.c
+> @@ -378,7 +378,8 @@ void __init setup_arch(char **cmdline_p)
+>
+>         *cmdline_p = boot_command_line;
+>
+> -       early_ioremap_init();
+> +       early_fixmap_init();
+> +       early_ioremap_setup();
+>
+>         parse_early_param();
+>
+> diff --git a/arch/arm64/mm/ioremap.c b/arch/arm64/mm/ioremap.c
+> index fa324bd..cbb99c8 100644
+> --- a/arch/arm64/mm/ioremap.c
+> +++ b/arch/arm64/mm/ioremap.c
+> @@ -103,97 +103,10 @@ void __iomem *ioremap_cache(phys_addr_t phys_addr, size_t size)
+>  }
+>  EXPORT_SYMBOL(ioremap_cache);
+>
+> -static pte_t bm_pte[PTRS_PER_PTE] __page_aligned_bss;
+> -#if CONFIG_ARM64_PGTABLE_LEVELS > 2
+> -static pte_t bm_pmd[PTRS_PER_PMD] __page_aligned_bss;
+> -#endif
+> -#if CONFIG_ARM64_PGTABLE_LEVELS > 3
+> -static pte_t bm_pud[PTRS_PER_PUD] __page_aligned_bss;
+> -#endif
+> -
+> -static inline pud_t * __init early_ioremap_pud(unsigned long addr)
+> -{
+> -       pgd_t *pgd;
+> -
+> -       pgd = pgd_offset_k(addr);
+> -       BUG_ON(pgd_none(*pgd) || pgd_bad(*pgd));
+> -
+> -       return pud_offset(pgd, addr);
+> -}
+> -
+> -static inline pmd_t * __init early_ioremap_pmd(unsigned long addr)
+> -{
+> -       pud_t *pud = early_ioremap_pud(addr);
+> -
+> -       BUG_ON(pud_none(*pud) || pud_bad(*pud));
+> -
+> -       return pmd_offset(pud, addr);
+> -}
+> -
+> -static inline pte_t * __init early_ioremap_pte(unsigned long addr)
+> -{
+> -       pmd_t *pmd = early_ioremap_pmd(addr);
+> -
+> -       BUG_ON(pmd_none(*pmd) || pmd_bad(*pmd));
+> -
+> -       return pte_offset_kernel(pmd, addr);
+> -}
+> -
+> +/*
+> + * Must be called after early_fixmap_init
+> + */
+>  void __init early_ioremap_init(void)
+>  {
+> -       pgd_t *pgd;
+> -       pud_t *pud;
+> -       pmd_t *pmd;
+> -       unsigned long addr = fix_to_virt(FIX_BTMAP_BEGIN);
+> -
+> -       pgd = pgd_offset_k(addr);
+> -       pgd_populate(&init_mm, pgd, bm_pud);
+> -       pud = pud_offset(pgd, addr);
+> -       pud_populate(&init_mm, pud, bm_pmd);
+> -       pmd = pmd_offset(pud, addr);
+> -       pmd_populate_kernel(&init_mm, pmd, bm_pte);
+> -
+> -       /*
+> -        * The boot-ioremap range spans multiple pmds, for which
+> -        * we are not prepared:
+> -        */
+> -       BUILD_BUG_ON((__fix_to_virt(FIX_BTMAP_BEGIN) >> PMD_SHIFT)
+> -                    != (__fix_to_virt(FIX_BTMAP_END) >> PMD_SHIFT));
+> -
+> -       if (pmd != early_ioremap_pmd(fix_to_virt(FIX_BTMAP_END))) {
+> -               WARN_ON(1);
+> -               pr_warn("pmd %p != %p\n",
+> -                       pmd, early_ioremap_pmd(fix_to_virt(FIX_BTMAP_END)));
+> -               pr_warn("fix_to_virt(FIX_BTMAP_BEGIN): %08lx\n",
+> -                       fix_to_virt(FIX_BTMAP_BEGIN));
+> -               pr_warn("fix_to_virt(FIX_BTMAP_END):   %08lx\n",
+> -                       fix_to_virt(FIX_BTMAP_END));
+> -
+> -               pr_warn("FIX_BTMAP_END:       %d\n", FIX_BTMAP_END);
+> -               pr_warn("FIX_BTMAP_BEGIN:     %d\n",
+> -                       FIX_BTMAP_BEGIN);
+> -       }
+> -
+>         early_ioremap_setup();
+>  }
+> -
+> -void __init __early_set_fixmap(enum fixed_addresses idx,
+> -                              phys_addr_t phys, pgprot_t flags)
+> -{
+> -       unsigned long addr = __fix_to_virt(idx);
+> -       pte_t *pte;
+> -
+> -       if (idx >= __end_of_fixed_addresses) {
+> -               BUG();
+> -               return;
+> -       }
+> -
+> -       pte = early_ioremap_pte(addr);
+> -
+> -       if (pgprot_val(flags))
+> -               set_pte(pte, pfn_pte(phys >> PAGE_SHIFT, flags));
+> -       else {
+> -               pte_clear(&init_mm, addr, pte);
+> -               flush_tlb_kernel_range(addr, addr+PAGE_SIZE);
+> -       }
+> -}
+> diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
+> index c555672..bd549a3 100644
+> --- a/arch/arm64/mm/mmu.c
+> +++ b/arch/arm64/mm/mmu.c
+> @@ -28,6 +28,7 @@
+>  #include <linux/io.h>
+>
+>  #include <asm/cputype.h>
+> +#include <asm/fixmap.h>
+>  #include <asm/sections.h>
+>  #include <asm/setup.h>
+>  #include <asm/sizes.h>
+> @@ -459,3 +460,96 @@ void vmemmap_free(unsigned long start, unsigned long end)
+>  {
+>  }
+>  #endif /* CONFIG_SPARSEMEM_VMEMMAP */
+> +
+> +static pte_t bm_pte[PTRS_PER_PTE] __page_aligned_bss;
+> +#if CONFIG_ARM64_PGTABLE_LEVELS > 2
+> +static pte_t bm_pmd[PTRS_PER_PMD] __page_aligned_bss;
+> +#endif
+> +#if CONFIG_ARM64_PGTABLE_LEVELS > 3
+> +static pte_t bm_pud[PTRS_PER_PUD] __page_aligned_bss;
+> +#endif
+> +
+> +static inline pud_t * fixmap_pud(unsigned long addr)
+> +{
+> +       pgd_t *pgd = pgd_offset_k(addr);
+> +
+> +       BUG_ON(pgd_none(*pgd) || pgd_bad(*pgd));
+> +
+> +       return pud_offset(pgd, addr);
+> +}
+> +
+> +static inline pmd_t * fixmap_pmd(unsigned long addr)
+> +{
+> +       pud_t *pud = fixmap_pud(addr);
+> +
+> +       BUG_ON(pud_none(*pud) || pud_bad(*pud));
+> +
+> +       return pmd_offset(pud, addr);
+> +}
+> +
+> +static inline pte_t * fixmap_pte(unsigned long addr)
+> +{
+> +       pmd_t *pmd = fixmap_pmd(addr);
+> +
+> +       BUG_ON(pmd_none(*pmd) || pmd_bad(*pmd));
+> +
+> +       return pte_offset_kernel(pmd, addr);
+> +}
+> +
+> +void __init early_fixmap_init(void)
+> +{
+> +       pgd_t *pgd;
+> +       pud_t *pud;
+> +       pmd_t *pmd;
+> +       unsigned long addr = FIXADDR_START;
+> +
+> +       pgd = pgd_offset_k(addr);
+> +       pgd_populate(&init_mm, pgd, bm_pud);
+> +       pud = pud_offset(pgd, addr);
+> +       pud_populate(&init_mm, pud, bm_pmd);
+> +       pmd = pmd_offset(pud, addr);
+> +       pmd_populate_kernel(&init_mm, pmd, bm_pte);
+> +
+> +       /*
+> +        * The boot-ioremap range spans multiple pmds, for which
+> +        * we are not preparted:
+> +        */
+> +       BUILD_BUG_ON((__fix_to_virt(FIX_BTMAP_BEGIN) >> PMD_SHIFT)
+> +                    != (__fix_to_virt(FIX_BTMAP_END) >> PMD_SHIFT));
+> +
+> +       if ((pmd != fixmap_pmd(fix_to_virt(FIX_BTMAP_BEGIN)))
+> +            || pmd != fixmap_pmd(fix_to_virt(FIX_BTMAP_END))) {
+> +               WARN_ON(1);
+> +               pr_warn("pmd %p != %p, %p\n",
+> +                       pmd, fixmap_pmd(fix_to_virt(FIX_BTMAP_BEGIN)),
+> +                       fixmap_pmd(fix_to_virt(FIX_BTMAP_END)));
+> +               pr_warn("fix_to_virt(FIX_BTMAP_BEGIN): %08lx\n",
+> +                       fix_to_virt(FIX_BTMAP_BEGIN));
+> +               pr_warn("fix_to_virt(FIX_BTMAP_END):   %08lx\n",
+> +                       fix_to_virt(FIX_BTMAP_END));
+> +
+> +               pr_warn("FIX_BTMAP_END:       %d\n", FIX_BTMAP_END);
+> +               pr_warn("FIX_BTMAP_BEGIN:     %d\n", FIX_BTMAP_BEGIN);
+> +       }
+> +}
+> +
+> +void __set_fixmap(enum fixed_addresses idx,
+> +                              phys_addr_t phys, pgprot_t flags)
+> +{
+> +       unsigned long addr = __fix_to_virt(idx);
+> +       pte_t *pte;
+> +
+> +       if (idx >= __end_of_fixed_addresses) {
+> +               BUG();
+> +               return;
+> +       }
+
+Is it worth cleaning this up into BUG_ON instead of BUG; return; ?
+
+Reviewed-by: Kees Cook <keescook@chromium.org>
+
+-Kees
+
+> +
+> +       pte = fixmap_pte(addr);
+> +
+> +       if (pgprot_val(flags)) {
+> +               set_pte(pte, pfn_pte(phys >> PAGE_SHIFT, flags));
+> +       } else {
+> +               pte_clear(&init_mm, addr, pte);
+> +               flush_tlb_kernel_range(addr, addr+PAGE_SIZE);
+> +       }
+> +}
+> --
+> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+> hosted by The Linux Foundation
+>
 
 
-Hi,
 
-Thanks for your suggestions.
-
-On Fri, 2014-08-22 at 12:09 +0100, Marc Zyngier wrote:
-> Hi Joe,
-> 
-> On 13/08/14 03:11, Joe.C wrote:
-> > From: "Joe.C" <yingjoe.chen@mediatek.com>
-> > 
-> > GIC supports the combination with external extensions. But this
-> > is not reflected in the checks of the interrupt type flag.
-> > This patch allows interrupt types other than the one supported by GIC,
-> > if an architecture extension is present and supports them.
-> > 
-> > Signed-off-by: Joe.C <yingjoe.chen@mediatek.com>
-> > ---
-> >  drivers/irqchip/irq-gic.c | 27 ++++++++++++++++++---------
-> >  1 file changed, 18 insertions(+), 9 deletions(-)
-> > 
-> > diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
-> > index 57d165e..66485ab 100644
-> > --- a/drivers/irqchip/irq-gic.c
-> > +++ b/drivers/irqchip/irq-gic.c
-> > @@ -194,23 +194,32 @@ static int gic_set_type(struct irq_data *d, unsigned int type)
-> >  	u32 confoff = (gicirq / 16) * 4;
-> >  	bool enabled = false;
-> >  	u32 val;
-> > +	int ret = 0;
-> >  
-> >  	/* Interrupt configuration for SGIs can't be changed */
-> >  	if (gicirq < 16)
-> >  		return -EINVAL;
-> >  
-> > -	if (type != IRQ_TYPE_LEVEL_HIGH && type != IRQ_TYPE_EDGE_RISING)
-> > -		return -EINVAL;
-> > -
-> >  	raw_spin_lock(&irq_controller_lock);
-> >  
-> > -	if (gic_arch_extn.irq_set_type)
-> > -		gic_arch_extn.irq_set_type(d, type);
-> > +	if (gic_arch_extn.irq_set_type) {
-> > +		ret = gic_arch_extn.irq_set_type(d, type);
-> > +		if (ret)
-> > +			goto out;
-> > +	} else if (type != IRQ_TYPE_LEVEL_HIGH &&
-> > +		type != IRQ_TYPE_EDGE_RISING) {
-> > +			ret = -EINVAL;
-> > +			goto out;
-> > +	}
-> >  
-> >  	val = readl_relaxed(base + GIC_DIST_CONFIG + confoff);
-> > -	if (type == IRQ_TYPE_LEVEL_HIGH)
-> > +	/* Check for both edge and level here, so we can support GIC irq
-> > +	   polarity extension in gic_arch_extn.irq_set_type. If arch
-> > +	   doesn't support polarity extension, the check above will reject
-> > +	   improper type. */
-> > +	if (type & IRQ_TYPE_LEVEL_MASK)
-> >  		val &= ~confmask;
-> > -	else if (type == IRQ_TYPE_EDGE_RISING)
-> > +	else if (type & IRQ_TYPE_EDGE_BOTH)
-> >  		val |= confmask;
-> >  
-> >  	/*
-> > @@ -226,10 +235,10 @@ static int gic_set_type(struct irq_data *d, unsigned int type)
-> >  
-> >  	if (enabled)
-> >  		writel_relaxed(enablemask, base + GIC_DIST_ENABLE_SET + enableoff);
-> > -
-> > +out:
-> >  	raw_spin_unlock(&irq_controller_lock);
-> >  
-> > -	return 0;
-> > +	return ret;
-> >  }
-> >  
-> >  static int gic_retrigger(struct irq_data *d)
-> > 
-> 
-> You're really abusing the gic_arch_extn feature. I know this is
-> tempting, but this is pushing it a bit too far.
-> 
-> This feature exist for one particular reason: if your GIC is in the same
-> power-domain as the CPUs, it will go down as well when you suspend the
-> system, hence being enable to wake the CPU up. You then need a shadow
-> interrupt controller to take over. This is exactly why we call the hook
-> on every GIC-related operation.
-
-Actually we are doing this too, it is called SYS_CIRQ in our IC, and
-we'll need to support that in the future. This intpol is part of CIRQ
-function block. Does it make more senses if I add skeleton for CIRQ
-support, and implement intpol inside it?
-
-> Here, you're using it to program something that sits between the device
-> and the GIC. This is a separate block, with its own hardware
-> configuration, that modifies the interrupt signal. This should be
-> reflected in the device-tree and the code paths.
-> 
-> You can probably model this as a separate irqchip for the few interrupts
-> that require this, or have it configured at boot time (assuming the
-> configuration never changes).
-
-The boot loader did setup interrupt polarity for those used in boot
-loader, but not all of them. 
-
-Datasheet lists components irqs as low active, so I think it makes more
-sense to allow driver to use IRQF_TRIGGER_LOW instead of having them to
-notice GIC only support high active and use IRQF_TRIGGER_HIGH. This
-rule out configure it at boot loader or kernel init irq time.
-
-If I implement this as a separate irqchip, I need to reuse most gic
-irqchip functions. Without changing irq-gic.c to make them global,
-I can only think of hack like this:
-
-        gic_init_bases(..) /* init gic */
-        gic_chip = irq_get_chip(0);  /* to get gic irq_chip */
-        org_gic_set_type = gic_chip->irq_set_type;
-        gic_chip->irq_set_type = mt_irq_polarity_set_type;
-
-and calling original gic_set_type from mt_irq_polarity_set_type with irq
-type fixup.
-
-Joe.C
+-- 
+Kees Cook
+Chrome OS Security
