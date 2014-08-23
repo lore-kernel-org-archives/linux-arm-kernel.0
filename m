@@ -1,87 +1,24 @@
-From: ohaugan@codeaurora.org (Olav Haugan)
-Date: Fri, 22 Aug 2014 17:12:32 -0700
-Subject: [PATCH v4 1/1] iommu/arm-smmu: Do not access non-existing S2CR
- registers
-Message-ID: <1408752752-15601-1-git-send-email-ohaugan@codeaurora.org>
+From: caesar.wang@rock-chips.com (Caesar Wang)
+Date: Sat, 23 Aug 2014 08:15:32 +0800
+Subject: [PATCH 0/2] Rockchip SoC thermal driver
+Message-ID: <1408752934-18318-1-git-send-email-caesar.wang@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The number of S2CR registers is not properly set when stream
-matching is not supported. Fix this and add check that we do not try to
-access outside of the number of S2CR regisrers.
+This series adds support for the thermal Found on Rockhip SoCs.
 
-Signed-off-by: Olav Haugan <ohaugan@codeaurora.org>
----
- drivers/iommu/arm-smmu.c | 28 ++++++++++++++++++++--------
- 1 file changed, 20 insertions(+), 8 deletions(-)
+Caesar Wang (2):
+  dt-bindings: document Rockchip thermal
+  thermal: rockchip: add driver for Rockchip thermal
 
-diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
-index 9fd8754d..1d06ca8 100644
---- a/drivers/iommu/arm-smmu.c
-+++ b/drivers/iommu/arm-smmu.c
-@@ -548,9 +548,18 @@ static int register_smmu_master(struct arm_smmu_device *smmu,
- 	master->of_node			= masterspec->np;
- 	master->cfg.num_streamids	= masterspec->args_count;
- 
--	for (i = 0; i < master->cfg.num_streamids; ++i)
--		master->cfg.streamids[i] = masterspec->args[i];
--
-+	for (i = 0; i < master->cfg.num_streamids; ++i) {
-+		u16 streamid = masterspec->args[i];
-+
-+		if (!(smmu->features & ARM_SMMU_FEAT_STREAM_MATCH) &&
-+		     (streamid >= smmu->num_mapping_groups)) {
-+			dev_err(dev,
-+				"stream ID for master device %s greater than maximum allowed (%d)\n",
-+				masterspec->np->name, smmu->num_mapping_groups);
-+			return -ERANGE;
-+		}
-+		master->cfg.streamids[i] = streamid;
-+	}
- 	return insert_smmu_master(smmu, master);
- }
- 
-@@ -1734,7 +1743,7 @@ static void arm_smmu_device_reset(struct arm_smmu_device *smmu)
- 
- 	/* Mark all SMRn as invalid and all S2CRn as bypass */
- 	for (i = 0; i < smmu->num_mapping_groups; ++i) {
--		writel_relaxed(~SMR_VALID, gr0_base + ARM_SMMU_GR0_SMR(i));
-+		writel_relaxed(0, gr0_base + ARM_SMMU_GR0_SMR(i));
- 		writel_relaxed(S2CR_TYPE_BYPASS,
- 			gr0_base + ARM_SMMU_GR0_S2CR(i));
- 	}
-@@ -1875,6 +1884,9 @@ static int arm_smmu_device_cfg_probe(struct arm_smmu_device *smmu)
- 		dev_notice(smmu->dev,
- 			   "\tstream matching with %u register groups, mask 0x%x",
- 			   smmu->num_mapping_groups, mask);
-+	} else {
-+		smmu->num_mapping_groups = (id >> ID0_NUMSIDB_SHIFT) &
-+					   ID0_NUMSIDB_MASK;
- 	}
- 	smmu->idr[0] = id;
- 
-@@ -2011,6 +2023,10 @@ static int arm_smmu_device_dt_probe(struct platform_device *pdev)
- 		smmu->irqs[i] = irq;
- 	}
- 
-+	err = arm_smmu_device_cfg_probe(smmu);
-+	if (err)
-+		return err;
-+
- 	i = 0;
- 	smmu->masters = RB_ROOT;
- 	while (!of_parse_phandle_with_args(dev->of_node, "mmu-masters",
-@@ -2027,10 +2043,6 @@ static int arm_smmu_device_dt_probe(struct platform_device *pdev)
- 	}
- 	dev_notice(dev, "registered %d master devices\n", i);
- 
--	err = arm_smmu_device_cfg_probe(smmu);
--	if (err)
--		goto out_put_masters;
--
- 	parse_driver_options(smmu);
- 
- 	if (smmu->version > 1 &&
+Tested on rk3288 Board.
+ .../bindings/thermal/rockchip-thermal.txt          |   33 +
+ drivers/thermal/Kconfig                            |    9 +
+ drivers/thermal/Makefile                           |    1 +
+ drivers/thermal/rockchip_thermal.c                 |  659 ++++++++++++++++++++
+ 4 files changed, 702 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/thermal/rockchip-thermal.txt
+ create mode 100644 drivers/thermal/rockchip_thermal.c
+
 -- 
-The Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+1.7.9.5
