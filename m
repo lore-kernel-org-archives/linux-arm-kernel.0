@@ -1,84 +1,35 @@
-From: lho@apm.com (Loc Ho)
-Date: Sat, 23 Aug 2014 00:28:40 -0700
-Subject: [PATCH v5 0/4] edac: Add APM X-Gene SoC EDAC driver
-In-Reply-To: <1408778588-3215-1-git-send-email-lho@apm.com>
-References: <1408778588-3215-1-git-send-email-lho@apm.com>
-Message-ID: <CAPw-ZTmRK8VuYjrjBYfVCk1J+j+fuc8T-e-3HreKOYbuK56wVw@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sat, 23 Aug 2014 10:10:58 +0100
+Subject: [PATCH 0/6] SolidRun Hummingboard/Cubox-i DT updates
+Message-ID: <20140823091058.GO30401@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
+Here's a set of patches updating the Cubox-i/Hummingboard DT files.
 
-Any update on the ARM64 memory scrub patch since posted v3?
+The first two are fairly important fixes, so should at least go in
+for -rc kernels.
 
--Loc
+The SPDIF patch is something which could go in -rc as well as it's a
+cosmetic patch, changing the name displayed in (eg) pulseaudio for the
+SPDIF output from the developer-centric "imx-spdif" to "Integrated SPDIF".
 
-On Sat, Aug 23, 2014 at 12:23 AM, Loc Ho <lho@apm.com> wrote:
-> This patch adds support for the APM X-Gene SoC EDAC driver.
->
-> v5:
-> * Rebase to 3.17.rc1 (next)
-> * Update binding documentation for additional SoC node binding resource
-> * Enable MCU correctable and uncorrectable interrupts if not enabled by
->   firmware
-> * Enable top level interrupt only after all MCU registered. Otherwise,
->   error interrupt will never get cleared by the corresponding MCU.
-> * Remove clearing of L1 and L2 errors during initialization time. Otherwise,
->   they will not be captured between firmware booting and error configuration.
-> * Add capture and clearing SoC register bus errors
-> * Add register bus resource to SoC DT node
->
-> v4:
-> * Fix PMD l1/l2 error reading address due to wrong variable type
-> * Fix clearing of software generated and HW errors for l1/l2
->
-> v3:
-> * Update binding documentation for PMD DT node and exampples
-> * Add binding documentation for SoC DT node
-> * Change MC, PMD, and L3C driver error injection to use debugfs
-> * Add missing IRQ for MC correctable error (code and DT)
-> * Use true/false where appropriate instead 1/0
-> * Add bit definition for L1 MMUESR register and fully decode this error
-> * Remove the un-necessary dev variable from xgene_edac_pmd_ctx structure
-> * Add check for disabled PMD (code and DT)
-> * Switch to edac_printk instead pr_err
-> * Some minor comments update
->
-> v2:
-> * Add EDAC entry in MAINTAINERS for APM EDAC driver
-> * Remove the MC scrub patch
-> * Remove the word 'Caches' from Kconfig
-> * Change all MASK defines to use BIT(x)
-> * Update comment or remove them
-> * Wrap error injection code around CONFIG_EDAC_DEBUG
-> * Change function name xgene_edac_mc_hw_init to xgene_edac_mc_irq_ctl
-> * Change all function XXX_hw_init to XXX_hw_ctl
-> * Fix typo 'activie'
-> * Move calling function edac_mc_alloc after resource retrieval
-> * Check for NULL on platform_get_resource return if reference directly
-> * Add documentation for struct xgene_edac_pmd_ctx
-> * Move L1 and L2 check out of function xgene_edac_pmd_check to its own
->   functions
-> * Use for loop for configure each CPU of an PMD
-> * Replace /2 by >> 1
-> * Remove unnecessary comment on edac_device_add_device failure
-> * Make mem_err_ip static const
-> * Unwind EDAC register correctly if failed
-> ---
-> Loc Ho (4):
->   MAINTAINERS: Add entry for APM X-Gene SoC EDAC driver
->   Documentation: Add documentation for the APM X-Gene SoC EDAC DTS
->     binding
->   edac: Add APM X-Gene SoC EDAC driver
->   arm64: Add APM X-Gene SoC EDAC DTS entries
->
->  .../devicetree/bindings/edac/apm-xgene-edac.txt    |   83 +
->  MAINTAINERS                                        |    8 +
->  arch/arm64/boot/dts/apm-storm.dtsi                 |   98 +
->  drivers/edac/Kconfig                               |    9 +-
->  drivers/edac/Makefile                              |    3 +
->  drivers/edac/xgene_edac.c                          | 2132 ++++++++++++++++++++
->  6 files changed, 2332 insertions(+), 1 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/edac/apm-xgene-edac.txt
->  create mode 100644 drivers/edac/xgene_edac.c
->
+Patch 4 updates the Hummingboard support as SolidRun now have a Dual
+version of this platform, which needs imx6q.dtsi instead of imx6dl.dtsi,
+and also has mSATA support.
+
+Patch 5 adds the mSATA support for the Dual version of the Hummingboard.
+
+Patch 6 is the first patch which breaks something on the initial version
+of the Hummingboard, aka Carrier1, specifically the IrDA receiver.  In
+hindsight, we should not have used the name "Hummingboard" for the
+Carrier1.  The Carrier1 is obsolete, and people are being encouraged to
+dispose of the C1 hardware.
+
+Out of these, I think it would be worth getting the first five patches
+in for 3.17 (even though we're in -rc), but patch 6 should certainly
+wait for the next merge window.
+
+-- 
+FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
+according to speedtest.net.
