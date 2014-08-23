@@ -1,65 +1,92 @@
-From: edubezval@gmail.com (Eduardo Valentin)
-Date: Fri, 29 Aug 2014 22:39:30 -0400
-Subject: [PATCHv6 0/2] thermal: exynos: Add support for TRIMINFO feature
- of Exynos3250
-In-Reply-To: <1409713743-6124-1-git-send-email-cw00.choi@samsung.com>
-References: <1409713743-6124-1-git-send-email-cw00.choi@samsung.com>
-Message-ID: <20140830023928.GC23645@developer>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Sun, 24 Aug 2014 00:45:15 +0200
+Subject: [PATCH v3 1/9] ACPI / PM: Let acpi_dev_pm_detach() return an
+ error code
+In-Reply-To: <1409838756-31963-2-git-send-email-ulf.hansson@linaro.org>
+References: <1409838756-31963-1-git-send-email-ulf.hansson@linaro.org>
+ <1409838756-31963-2-git-send-email-ulf.hansson@linaro.org>
+Message-ID: <20140823224515.GA19046@xo-6d-61-c0.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Thu 2014-09-04 15:52:28, Ulf Hansson wrote:
+> To give callers the option of acting on a errors while removing the
+> pm_domain ops for the device in the ACPI PM domain, let
+> acpi_dev_pm_detach() return an int to provide the error code.
+> 
+> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+> Tested-by: Philipp Zabel <p.zabel@pengutronix.de>
 
-On Wed, Sep 03, 2014 at 12:09:01PM +0900, Chanwoo Choi wrote:
-> This patchset add the support of TRIMINFO_RELOAD feature for Exynos3250.
-> But Exynos3250 has two TRIMINFO_CTRL register instead other Exynos has only one
-> TRIMINFO_CTRL register. So, this patchset support the some Exynos SoC which
-> has more than one TRIMINF_CTRL.
-> 
-> Also, this patchset fix wrong value of TRIMINFO_RELOAD_SHIFT and remove
-> duplicate code when reading triminfo register of Exynos5440.
-> 
-> Changes from v5:
-> - Rebase this patchset on next branch of linux-soc-thermal.git
-> 
+Acked-by: Pavel Machek <Pavel@ucw.cz>
 
-Pulled into my next branch. Thanks.
-
-> Changes from v4:
-> - Remove un-necessary triminfo_ctrl_{shift, mask} field
-> - Includes Bartlomiej's patch[1] that Exynos5260 / Exynos5420 should not use
-> TRIM_RELOAD flag
-> [2] https://lkml.org/lkml/2014/8/20/481
+> ---
+>  drivers/acpi/device_pm.c | 8 +++++++-
+>  include/linux/acpi.h     | 7 +++++--
+>  2 files changed, 12 insertions(+), 3 deletions(-)
 > 
-> Changes from v3:
-> - Add reviewed message of Amit Daniel Kachhap <amit.daniel@samsung.com>
-> - Split RELOAD patch as two patch
-> - Fix 'TRIMINFO_RELOAD_SHIFT' value
-> - This series includes separate patch[1]
-> [1] https://lkml.org/lkml/2014/8/20/5
-> - Drop ACTIME bit setting because TRM includes not enough information of ACTIME bit.
-> 
-> Changes from v2:
-> - Fix build break because of missing 'or' operation.
-> 
-> Changes from v1:
-> - Add missing 'TMU_SUPPORT_TRIM_RELOAD' features
-> 
-> Chanwoo Choi (2):
->   thermal: exynos: Add support for many TRIMINFO_CTRL registers
->   thermal: exynos: Add support for TRIM_RELOAD feature at Exynos3250
-> 
->  drivers/thermal/samsung/exynos_thermal_common.h |  1 +
->  drivers/thermal/samsung/exynos_tmu.c            | 15 ++++++++++++---
->  drivers/thermal/samsung/exynos_tmu.h            |  7 +++++--
->  drivers/thermal/samsung/exynos_tmu_data.c       | 11 +++++++++--
->  drivers/thermal/samsung/exynos_tmu_data.h       |  8 ++++++--
->  5 files changed, 33 insertions(+), 9 deletions(-)
-> 
+> diff --git a/drivers/acpi/device_pm.c b/drivers/acpi/device_pm.c
+> index 67075f8..0d52ce1 100644
+> --- a/drivers/acpi/device_pm.c
+> +++ b/drivers/acpi/device_pm.c
+> @@ -1055,6 +1055,8 @@ static struct dev_pm_domain acpi_general_pm_domain = {
+>   *
+>   * Callers must ensure proper synchronization of this function with power
+>   * management callbacks.
+> + *
+> + * Returns 0 on successfully attached PM domain or negative error code.
+>   */
+>  int acpi_dev_pm_attach(struct device *dev, bool power_on)
+>  {
+> @@ -1087,8 +1089,10 @@ EXPORT_SYMBOL_GPL(acpi_dev_pm_attach);
+>   *
+>   * Callers must ensure proper synchronization of this function with power
+>   * management callbacks.
+> + *
+> + * Returns 0 on successfully detached PM domain or negative error code.
+>   */
+> -void acpi_dev_pm_detach(struct device *dev, bool power_off)
+> +int acpi_dev_pm_detach(struct device *dev, bool power_off)
+>  {
+>  	struct acpi_device *adev = ACPI_COMPANION(dev);
+>  
+> @@ -1107,7 +1111,9 @@ void acpi_dev_pm_detach(struct device *dev, bool power_off)
+>  			acpi_device_wakeup(adev, ACPI_STATE_S0, false);
+>  			acpi_dev_pm_low_power(dev, adev, ACPI_STATE_S0);
+>  		}
+> +		return 0;
+>  	}
+> +	return -EINVAL;
+>  }
+>  EXPORT_SYMBOL_GPL(acpi_dev_pm_detach);
+>  #endif /* CONFIG_PM */
+> diff --git a/include/linux/acpi.h b/include/linux/acpi.h
+> index 807cbc4..c83cca5 100644
+> --- a/include/linux/acpi.h
+> +++ b/include/linux/acpi.h
+> @@ -587,7 +587,7 @@ static inline int acpi_subsys_freeze(struct device *dev) { return 0; }
+>  #if defined(CONFIG_ACPI) && defined(CONFIG_PM)
+>  struct acpi_device *acpi_dev_pm_get_node(struct device *dev);
+>  int acpi_dev_pm_attach(struct device *dev, bool power_on);
+> -void acpi_dev_pm_detach(struct device *dev, bool power_off);
+> +int acpi_dev_pm_detach(struct device *dev, bool power_off);
+>  #else
+>  static inline struct acpi_device *acpi_dev_pm_get_node(struct device *dev)
+>  {
+> @@ -597,7 +597,10 @@ static inline int acpi_dev_pm_attach(struct device *dev, bool power_on)
+>  {
+>  	return -ENODEV;
+>  }
+> -static inline void acpi_dev_pm_detach(struct device *dev, bool power_off) {}
+> +static inline int acpi_dev_pm_detach(struct device *dev, bool power_off)
+> +{
+> +	return -ENODEV;
+> +}
+>  #endif
+>  
+>  #ifdef CONFIG_ACPI
 > -- 
-> 1.8.0
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-pm" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 1.9.1
+
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
