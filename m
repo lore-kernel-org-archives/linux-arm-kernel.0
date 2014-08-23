@@ -1,36 +1,35 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Sat, 23 Aug 2014 10:44:13 +0900
-Subject: [PATCH 03/11] ARM: shmobile: r8a7779: Fix shmobile_init_late()
+Date: Sat, 23 Aug 2014 10:44:18 +0900
+Subject: [PATCH 08/11] ARM: shmobile: dma: Use defines instead of hardcoded
+ numbers
 In-Reply-To: <cover.1408671240.git.horms+renesas@verge.net.au>
 References: <cover.1408671240.git.horms+renesas@verge.net.au>
-Message-ID: <d5b00b90705d5fff53f611ba4746d79fedbb52be.1408671240.git.horms+renesas@verge.net.au>
+Message-ID: <fe8abe0bc2afb20b126e7e0759081dc0df2cd60d.1408671240.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Magnus Damm <damm+renesas@opensource.se>
+From: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Fix r8a7779 SoC machine vector to include shmobile_init_late()
-so Suspend-to-RAM and CPUIdle are setup and platform devices
-are omitted as expected.
-
-Signed-off-by: Magnus Damm <damm+renesas@opensource.se>
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/setup-r8a7779.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/mach-shmobile/dma-register.h | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-shmobile/setup-r8a7779.c b/arch/arm/mach-shmobile/setup-r8a7779.c
-index 236c1be..6875a9f 100644
---- a/arch/arm/mach-shmobile/setup-r8a7779.c
-+++ b/arch/arm/mach-shmobile/setup-r8a7779.c
-@@ -774,7 +774,7 @@ DT_MACHINE_START(R8A7779_DT, "Generic R8A7779 (Flattened Device Tree)")
- 	.nr_irqs	= NR_IRQS_LEGACY,
- 	.init_irq	= r8a7779_init_irq_dt,
- 	.init_machine	= r8a7779_add_standard_devices_dt,
--	.init_late	= r8a7779_init_late,
-+	.init_late	= shmobile_init_late,
- 	.dt_compat	= r8a7779_compat_dt,
- MACHINE_END
- #endif /* CONFIG_USE_OF */
+diff --git a/arch/arm/mach-shmobile/dma-register.h b/arch/arm/mach-shmobile/dma-register.h
+index 97c40bd..52a2f66 100644
+--- a/arch/arm/mach-shmobile/dma-register.h
++++ b/arch/arm/mach-shmobile/dma-register.h
+@@ -52,8 +52,8 @@ static const unsigned int dma_ts_shift[] = {
+ 	((((i) & TS_LOW_BIT) << TS_LOW_SHIFT) |\
+ 	 (((i) & TS_HI_BIT)  << TS_HI_SHIFT))
+ 
+-#define CHCR_TX(xmit_sz) (DM_FIX | SM_INC | 0x800 | TS_INDEX2VAL((xmit_sz)))
+-#define CHCR_RX(xmit_sz) (DM_INC | SM_FIX | 0x800 | TS_INDEX2VAL((xmit_sz)))
++#define CHCR_TX(xmit_sz) (DM_FIX | SM_INC | RS_ERS | TS_INDEX2VAL((xmit_sz)))
++#define CHCR_RX(xmit_sz) (DM_INC | SM_FIX | RS_ERS | TS_INDEX2VAL((xmit_sz)))
+ 
+ 
+ /*
 -- 
 2.0.1
