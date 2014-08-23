@@ -1,33 +1,43 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Sat, 23 Aug 2014 19:31:55 +0200
-Subject: [PATCH] ARM: nomadik: set proper compatible for accelerometer
-Message-ID: <1408815115-5861-1-git-send-email-linus.walleij@linaro.org>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Sat, 23 Aug 2014 22:43:57 +0400
+Subject: [PATCH v8 2/3] ahci_xgene: Skip the PHY and clock initialization
+ if already configured by the firmware.
+In-Reply-To: <1408819047-17224-3-git-send-email-stripathi@apm.com>
+References: <1408819047-17224-1-git-send-email-stripathi@apm.com>
+ <1408819047-17224-3-git-send-email-stripathi@apm.com>
+Message-ID: <53F8E0ED.6030802@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adjust device tree entry to the proper registered compatible
-string for LIS3LV02DL.
+Hello.
 
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
- arch/arm/boot/dts/ste-nomadik-stn8815.dtsi | 5 +++--
- 1 file changed, 3 insertions(+), 2 deletions(-)
+On 08/23/2014 10:37 PM, Suman Tripathi wrote:
 
-diff --git a/arch/arm/boot/dts/ste-nomadik-stn8815.dtsi b/arch/arm/boot/dts/ste-nomadik-stn8815.dtsi
-index dbcf521b017f..258876b67050 100644
---- a/arch/arm/boot/dts/ste-nomadik-stn8815.dtsi
-+++ b/arch/arm/boot/dts/ste-nomadik-stn8815.dtsi
-@@ -744,8 +744,9 @@
- 			   reg = <0x1a>;
- 		};
- 		lis3lv02dl at 1d {
--			   compatible = "st,lis3lv02dl";
--			   reg = <0x1d>;
-+			/* Accelerometer */
-+			compatible = "st,lis3lv02dl-accel";
-+			reg = <0x1d>;
- 		};
- 	};
- 
--- 
-1.9.3
+> This patch implements the feature to skip the PHY and clock
+> initialization if it is already configured by the firmware.
+
+> Signed-off-by: Loc Ho <lho@apm.com>
+> Signed-off-by: Suman Tripathi <stripathi@apm.com>
+> ---
+>   drivers/ata/ahci_xgene.c | 16 ++++++++++++++++
+>   1 file changed, 16 insertions(+)
+
+> diff --git a/drivers/ata/ahci_xgene.c b/drivers/ata/ahci_xgene.c
+> index f416495..fd9c137 100644
+> --- a/drivers/ata/ahci_xgene.c
+> +++ b/drivers/ata/ahci_xgene.c
+> @@ -145,6 +145,15 @@ static unsigned int xgene_ahci_qc_issue(struct ata_queued_cmd *qc)
+>   	return rc;
+>   }
+>
+> +static bool xgene_ahci_is_memram_inited(struct xgene_ahci_context *ctx)
+> +{
+> +	void __iomem *diagcsr = ctx->csr_diag;
+> +
+> +	return (readl(diagcsr + CFG_MEM_RAM_SHUTDOWN) == 0 &&
+> +	        readl(diagcsr + BLOCK_MEM_RDY) == 0xFFFFFFFF) ?
+> +		true : false;
+
+    Just return the result of &&, that should be enough.
+
+WBR, Sergei
