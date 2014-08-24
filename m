@@ -1,306 +1,128 @@
 From: hauke@hauke-m.de (Hauke Mehrtens)
-Date: Sun, 24 Aug 2014 23:24:39 +0200
-Subject: [RFC 1/7] MIPS: BCM47XX: move the nvram header file into common space
-In-Reply-To: <1408915485-8078-1-git-send-email-hauke@hauke-m.de>
-References: <1408915485-8078-1-git-send-email-hauke@hauke-m.de>
-Message-ID: <1408915485-8078-3-git-send-email-hauke@hauke-m.de>
+Date: Sun, 24 Aug 2014 23:24:37 +0200
+Subject: [RFC 0/7] bcma: add device tree support
+Message-ID: <1408915485-8078-1-git-send-email-hauke@hauke-m.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Moving mach-bcm47xx/bcm47xx_nvram.h to include/linux/bcm47xx_nvram.h
-makes it possible to reuse this header on the ARM based bcm47xx/bcm53xx
-SoCs (e.g. BCM5301X devices). Broadcom uses ARM CPUs in their new SoC
-form the bcm47xx and bcm53xx line, but many other things like nvram
-stayed the same.
+This adds device tree support to bcma. In addition it also provides the 
+sprom needed by bcma through a device tree driver.
+This is needed for the Broadcom BCM47XX/BCM53XX ARM SoCs (NorthStar).
 
-This is a preparation for adding a new nvram driver, which can be used
-by the ARM SoC and the MIPS SoC code. The device drivers accessing
-nvram do not have to care about ARM or MIPS SoC version.
+bcma drives the system AIX bus. This bus is scanable, so we 
+automatically detect the cores attached to this bus. We only have to 
+provide the address of the first core, this can now be done through 
+device tree.
+It is not possible to find out what IRQ is associated to a specific 
+core, we have to provide this through device tree.
 
-Signed-off-by: Hauke Mehrtens <hauke@hauke-m.de>
----
- arch/mips/bcm47xx/board.c                          |  2 +-
- arch/mips/bcm47xx/nvram.c                          |  2 +-
- arch/mips/bcm47xx/setup.c                          |  2 +-
- arch/mips/bcm47xx/sprom.c                          |  2 +-
- arch/mips/bcm47xx/time.c                           |  2 +-
- arch/mips/include/asm/mach-bcm47xx/bcm47xx_nvram.h | 53 -----------------
- drivers/net/ethernet/broadcom/b44.c                |  8 +--
- drivers/net/ethernet/broadcom/bgmac.c              |  2 +-
- drivers/ssb/driver_chipcommon_pmu.c                |  6 +-
- include/linux/bcm47xx_nvram.h                      | 66 ++++++++++++++++++++++
- 10 files changed, 74 insertions(+), 71 deletions(-)
+Broadcom uses a nvram which is a key value store on the flash chip. 
+This nvram contains the mac addresses to be used by the wifi and 
+Ethernet devices, the configuration data for the switch, the 
+calibration data for the wifi cores and some more stuff. Currently bcma 
+assumes to get some sprom when it gets initialized on a SoC. This sprom 
+is a structure with all the data which are originally stored in the 
+nvram. When bcma is used on a PCIe wifi card this data is fetched from 
+some eeporm on the card. The nvram could contains more than one sprom, 
+in case there is a main Baordocm SoC and a Broadcom wifi card connected 
+via PCIe this PCIe cards mostly use the nvram to store the sprom with 
+the calibration data.
+
+This patch series adds two drivers, the nvram driver which reads the 
+nvram and provides an interface to fetch values by giving a key and a 
+driver which creates a sprom based on a given nvram. These two things 
+are no real drivers, they are just converting stuff. I made them 
+drivers so they can be replaced with some other drivers which are 
+fetching the sprom from other storages. I know that the BCM63XX SoCs 
+are also using an sprom, but there it is stored in a file on the file 
+system. 
+
+Some code was copied from the mips code at arch/mips/bcm47xx/ in the 
+end I want to make this mips code also use these new drivers.
+
+There is no device I know of which uses more than one nvram and I do 
+not think there will ever be such a device. With this patch you have to 
+provide a reference to the nvram you want to fetch data from which is a 
+little bit annoying, should I remove this parameter and assume there is 
+just one nvram driver in the system?
+
+I am interested on comments if this architecture is correct or if there 
+are some improvements I could do. I haven't fond similar code in the 
+kernel.
+
+Through which tree should I merge the final patches?
+
+This is based on linus 3.17-rc1.
+
+Log output:
+bcma: bus0: Found chip with id 0xCF12, rev 0x00 and package 0x02
+bcma: bus0: Core 0 found: ChipCommon (manuf 0x4BF, id 0x800, rev 0x2A, class 0x0)
+bcma: bus0: Core 1 found: Chipcommon B (manuf 0x4BF, id 0x50B, rev 0x01, class 0x0)
+bcma: bus0: Core 2 found: DMA (manuf 0x4BF, id 0x502, rev 0x01, class 0x0)
+bcma: bus0: Core 3 found: GBit MAC (manuf 0x4BF, id 0x82D, rev 0x04, class 0x0)
+bcma: bus0: Core 4 found: GBit MAC (manuf 0x4BF, id 0x82D, rev 0x04, class 0x0)
+bcma: bus0: Core 5 found: GBit MAC (manuf 0x4BF, id 0x82D, rev 0x04, class 0x0)
+bcma: bus0: Core 6 found: GBit MAC (manuf 0x4BF, id 0x82D, rev 0x04, class 0x0)
+bcma: bus0: Core 7 found: PCIe Gen 2 (manuf 0x4BF, id 0x501, rev 0x01, class 0x0)
+bcma: bus0: Core 8 found: PCIe Gen 2 (manuf 0x4BF, id 0x501, rev 0x01, class 0x0)
+bcma: bus0: Core 9 found: ARM Cortex A9 core (ihost) (manuf 0x4BF, id 0x510, rev 0x01, class 0x0)
+bcma: bus0: Core 10 found: USB 2.0 (manuf 0x4BF, id 0x504, rev 0x01, class 0x0)
+bcma: bus0: Core 11 found: USB 3.0 (manuf 0x4BF, id 0x505, rev 0x01, class 0x0)
+bcma: bus0: Core 12 found: SDIO3 (manuf 0x4BF, id 0x503, rev 0x01, class 0x0)
+bcma: bus0: Core 13 found: ARM Cortex A9 JTAG (manuf 0x4BF, id 0x506, rev 0x01, class 0x0)
+bcma: bus0: Core 14 found: Denali DDR2/DDR3 memory controller (manuf 0x4BF, id 0x507, rev 0x01, class 0x0)
+bcma: bus0: Core 15 found: ROM (manuf 0x4BF, id 0x508, rev 0x01, class 0x0)
+bcma: bus0: Core 16 found: NAND flash controller (manuf 0x4BF, id 0x509, rev 0x01, class 0x0)
+bcma: bus0: Core 17 found: SPI flash controller (manuf 0x4BF, id 0x50A, rev 0x01, class 0x0)
+bcma: bus0: Found sprom from device tree provider
+bgmac bcma0:1: Found PHY addr: 30 (NOREGS)
+bgmac bcma0:1: Support for Roboswitch not implemented
+libphy: bgmac mii bus: probed
+b53_common: found switch: BCM53011, rev 2
+bgmac bcma0:2: Found PHY addr: 0
+bgmac bcma0:2: Support for Roboswitch not implemented
+libphy: bgmac mii bus: probed
+
+
+Hauke Mehrtens (7):
+  MIPS: BCM47XX: move the nvram header file into common space
+  bcm47xx-nvram: add new broadcom nvram driver with dt support
+  bcm47xx-sprom: add Broadcom sprom parser driver
+  bcma: register bcma as device tree driver
+  bcma: get IRQ numbers from dt
+  bcma: get sprom from devicetree
+  ARM: BCM5301X: register bcma bus
+
+ Documentation/devicetree/bindings/bus/bcma.txt     |  46 ++
+ .../devicetree/bindings/misc/bcm47xx-nvram.txt     |  19 +
+ .../devicetree/bindings/misc/bcm47xx-sprom.txt     |  16 +
+ arch/arm/boot/dts/bcm4708.dtsi                     |  58 ++
+ arch/mips/bcm47xx/board.c                          |  42 +-
+ arch/mips/bcm47xx/nvram.c                          |   9 +-
+ arch/mips/bcm47xx/setup.c                          |   6 +-
+ arch/mips/bcm47xx/sprom.c                          |   6 +-
+ arch/mips/bcm47xx/time.c                           |   4 +-
+ arch/mips/include/asm/mach-bcm47xx/bcm47xx_nvram.h |  53 --
+ drivers/bcma/host_soc.c                            |  70 +++
+ drivers/bcma/main.c                                |  42 +-
+ drivers/bcma/sprom.c                               |  51 +-
+ drivers/misc/Kconfig                               |  27 +
+ drivers/misc/Makefile                              |   2 +
+ drivers/misc/bcm47xx-nvram.c                       | 215 +++++++
+ drivers/misc/bcm47xx-sprom.c                       | 690 +++++++++++++++++++++
+ drivers/net/ethernet/broadcom/b44.c                |  10 +-
+ drivers/net/ethernet/broadcom/bgmac.c              |   7 +-
+ drivers/ssb/driver_chipcommon_pmu.c                |   9 +-
+ include/linux/bcm47xx_nvram.h                      |  71 +++
+ include/linux/bcma/bcma.h                          |   2 +
+ 22 files changed, 1350 insertions(+), 105 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/bus/bcma.txt
+ create mode 100644 Documentation/devicetree/bindings/misc/bcm47xx-nvram.txt
+ create mode 100644 Documentation/devicetree/bindings/misc/bcm47xx-sprom.txt
  delete mode 100644 arch/mips/include/asm/mach-bcm47xx/bcm47xx_nvram.h
+ create mode 100644 drivers/misc/bcm47xx-nvram.c
+ create mode 100644 drivers/misc/bcm47xx-sprom.c
  create mode 100644 include/linux/bcm47xx_nvram.h
 
-diff --git a/arch/mips/bcm47xx/board.c b/arch/mips/bcm47xx/board.c
-index b3ae068..ec46fd7 100644
---- a/arch/mips/bcm47xx/board.c
-+++ b/arch/mips/bcm47xx/board.c
-@@ -2,7 +2,7 @@
- #include <linux/export.h>
- #include <linux/string.h>
- #include <bcm47xx_board.h>
--#include <bcm47xx_nvram.h>
-+#include <linux/bcm47xx_nvram.h>
- 
- struct bcm47xx_board_type {
- 	const enum bcm47xx_board board;
-diff --git a/arch/mips/bcm47xx/nvram.c b/arch/mips/bcm47xx/nvram.c
-index 2bed73a..c47a4a8 100644
---- a/arch/mips/bcm47xx/nvram.c
-+++ b/arch/mips/bcm47xx/nvram.c
-@@ -17,7 +17,7 @@
- #include <linux/kernel.h>
- #include <linux/string.h>
- #include <asm/addrspace.h>
--#include <bcm47xx_nvram.h>
-+#include <linux/bcm47xx_nvram.h>
- #include <asm/mach-bcm47xx/bcm47xx.h>
- 
- static char nvram_buf[NVRAM_SPACE];
-diff --git a/arch/mips/bcm47xx/setup.c b/arch/mips/bcm47xx/setup.c
-index 2b63e7e..deadb71 100644
---- a/arch/mips/bcm47xx/setup.c
-+++ b/arch/mips/bcm47xx/setup.c
-@@ -42,7 +42,7 @@
- #include <asm/reboot.h>
- #include <asm/time.h>
- #include <bcm47xx.h>
--#include <bcm47xx_nvram.h>
-+#include <linux/bcm47xx_nvram.h>
- #include <bcm47xx_board.h>
- 
- union bcm47xx_bus bcm47xx_bus;
-diff --git a/arch/mips/bcm47xx/sprom.c b/arch/mips/bcm47xx/sprom.c
-index 41226b6..29ced12 100644
---- a/arch/mips/bcm47xx/sprom.c
-+++ b/arch/mips/bcm47xx/sprom.c
-@@ -27,7 +27,7 @@
-  */
- 
- #include <bcm47xx.h>
--#include <bcm47xx_nvram.h>
-+#include <linux/bcm47xx_nvram.h>
- #include <linux/if_ether.h>
- #include <linux/etherdevice.h>
- 
-diff --git a/arch/mips/bcm47xx/time.c b/arch/mips/bcm47xx/time.c
-index 2c85d92..c57a515 100644
---- a/arch/mips/bcm47xx/time.c
-+++ b/arch/mips/bcm47xx/time.c
-@@ -27,7 +27,7 @@
- #include <linux/ssb/ssb.h>
- #include <asm/time.h>
- #include <bcm47xx.h>
--#include <bcm47xx_nvram.h>
-+#include <linux/bcm47xx_nvram.h>
- #include <bcm47xx_board.h>
- 
- void __init plat_time_init(void)
-diff --git a/arch/mips/include/asm/mach-bcm47xx/bcm47xx_nvram.h b/arch/mips/include/asm/mach-bcm47xx/bcm47xx_nvram.h
-deleted file mode 100644
-index 36a3fc1..0000000
---- a/arch/mips/include/asm/mach-bcm47xx/bcm47xx_nvram.h
-+++ /dev/null
-@@ -1,53 +0,0 @@
--/*
-- *  Copyright (C) 2005, Broadcom Corporation
-- *  Copyright (C) 2006, Felix Fietkau <nbd@openwrt.org>
-- *
-- *  This program is free software; you can redistribute  it and/or modify it
-- *  under  the terms of  the GNU General  Public License as published by the
-- *  Free Software Foundation;  either version 2 of the  License, or (at your
-- *  option) any later version.
-- */
--
--#ifndef __BCM47XX_NVRAM_H
--#define __BCM47XX_NVRAM_H
--
--#include <linux/types.h>
--#include <linux/kernel.h>
--
--struct nvram_header {
--	u32 magic;
--	u32 len;
--	u32 crc_ver_init;	/* 0:7 crc, 8:15 ver, 16:31 sdram_init */
--	u32 config_refresh;	/* 0:15 sdram_config, 16:31 sdram_refresh */
--	u32 config_ncdl;	/* ncdl values for memc */
--};
--
--#define NVRAM_HEADER		0x48534C46	/* 'FLSH' */
--#define NVRAM_VERSION		1
--#define NVRAM_HEADER_SIZE	20
--#define NVRAM_SPACE		0x8000
--
--#define FLASH_MIN		0x00020000	/* Minimum flash size */
--
--#define NVRAM_MAX_VALUE_LEN 255
--#define NVRAM_MAX_PARAM_LEN 64
--
--extern int bcm47xx_nvram_getenv(char *name, char *val, size_t val_len);
--
--static inline void bcm47xx_nvram_parse_macaddr(char *buf, u8 macaddr[6])
--{
--	if (strchr(buf, ':'))
--		sscanf(buf, "%hhx:%hhx:%hhx:%hhx:%hhx:%hhx", &macaddr[0],
--			&macaddr[1], &macaddr[2], &macaddr[3], &macaddr[4],
--			&macaddr[5]);
--	else if (strchr(buf, '-'))
--		sscanf(buf, "%hhx-%hhx-%hhx-%hhx-%hhx-%hhx", &macaddr[0],
--			&macaddr[1], &macaddr[2], &macaddr[3], &macaddr[4],
--			&macaddr[5]);
--	else
--		printk(KERN_WARNING "Can not parse mac address: %s\n", buf);
--}
--
--int bcm47xx_nvram_gpio_pin(const char *name);
--
--#endif /* __BCM47XX_NVRAM_H */
-diff --git a/drivers/net/ethernet/broadcom/b44.c b/drivers/net/ethernet/broadcom/b44.c
-index 4a7028d..d2714a2 100644
---- a/drivers/net/ethernet/broadcom/b44.c
-+++ b/drivers/net/ethernet/broadcom/b44.c
-@@ -31,6 +31,7 @@
- #include <linux/ssb/ssb.h>
- #include <linux/slab.h>
- #include <linux/phy.h>
-+#include <linux/bcm47xx_nvram.h>
- 
- #include <asm/uaccess.h>
- #include <asm/io.h>
-@@ -399,8 +400,6 @@ static void b44_set_flow_ctrl(struct b44 *bp, u32 local, u32 remote)
- 	__b44_set_flow_ctrl(bp, pause_enab);
- }
- 
--#ifdef CONFIG_BCM47XX
--#include <bcm47xx_nvram.h>
- static void b44_wap54g10_workaround(struct b44 *bp)
- {
- 	char buf[20];
-@@ -429,11 +428,6 @@ static void b44_wap54g10_workaround(struct b44 *bp)
- error:
- 	pr_warning("PHY: cannot reset MII transceiver isolate bit\n");
- }
--#else
--static inline void b44_wap54g10_workaround(struct b44 *bp)
--{
--}
--#endif
- 
- static int b44_setup_phy(struct b44 *bp)
- {
-diff --git a/drivers/net/ethernet/broadcom/bgmac.c b/drivers/net/ethernet/broadcom/bgmac.c
-index 05c6af6..bdda57b 100644
---- a/drivers/net/ethernet/broadcom/bgmac.c
-+++ b/drivers/net/ethernet/broadcom/bgmac.c
-@@ -16,7 +16,7 @@
- #include <linux/phy.h>
- #include <linux/interrupt.h>
- #include <linux/dma-mapping.h>
--#include <bcm47xx_nvram.h>
-+#include <linux/bcm47xx_nvram.h>
- 
- static const struct bcma_device_id bgmac_bcma_tbl[] = {
- 	BCMA_CORE(BCMA_MANUF_BCM, BCMA_CORE_4706_MAC_GBIT, BCMA_ANY_REV, BCMA_ANY_CLASS),
-diff --git a/drivers/ssb/driver_chipcommon_pmu.c b/drivers/ssb/driver_chipcommon_pmu.c
-index 1173a09..8d07d4d 100644
---- a/drivers/ssb/driver_chipcommon_pmu.c
-+++ b/drivers/ssb/driver_chipcommon_pmu.c
-@@ -13,9 +13,7 @@
- #include <linux/ssb/ssb_driver_chipcommon.h>
- #include <linux/delay.h>
- #include <linux/export.h>
--#ifdef CONFIG_BCM47XX
--#include <bcm47xx_nvram.h>
--#endif
-+#include <linux/bcm47xx_nvram.h>
- 
- #include "ssb_private.h"
- 
-@@ -320,11 +318,9 @@ static void ssb_pmu_pll_init(struct ssb_chipcommon *cc)
- 	u32 crystalfreq = 0; /* in kHz. 0 = keep default freq. */
- 
- 	if (bus->bustype == SSB_BUSTYPE_SSB) {
--#ifdef CONFIG_BCM47XX
- 		char buf[20];
- 		if (bcm47xx_nvram_getenv("xtalfreq", buf, sizeof(buf)) >= 0)
- 			crystalfreq = simple_strtoul(buf, NULL, 0);
--#endif
- 	}
- 
- 	switch (bus->chip_id) {
-diff --git a/include/linux/bcm47xx_nvram.h b/include/linux/bcm47xx_nvram.h
-new file mode 100644
-index 0000000..333d32c
---- /dev/null
-+++ b/include/linux/bcm47xx_nvram.h
-@@ -0,0 +1,66 @@
-+/*
-+ *  Copyright (C) 2005, Broadcom Corporation
-+ *  Copyright (C) 2006, Felix Fietkau <nbd@openwrt.org>
-+ *  Copyright (C) 2014 Hauke Mehrtens <hauke@hauke-m.de>
-+ *
-+ *  This program is free software; you can redistribute  it and/or modify it
-+ *  under  the terms of  the GNU General  Public License as published by the
-+ *  Free Software Foundation;  either version 2 of the  License, or (at your
-+ *  option) any later version.
-+ */
-+
-+#ifndef __BCM47XX_NVRAM_H
-+#define __BCM47XX_NVRAM_H
-+
-+#include <linux/types.h>
-+#include <linux/kernel.h>
-+
-+struct nvram_header {
-+	u32 magic;
-+	u32 len;
-+	u32 crc_ver_init;	/* 0:7 crc, 8:15 ver, 16:31 sdram_init */
-+	u32 config_refresh;	/* 0:15 sdram_config, 16:31 sdram_refresh */
-+	u32 config_ncdl;	/* ncdl values for memc */
-+};
-+
-+#define NVRAM_HEADER		0x48534C46	/* 'FLSH' */
-+#define NVRAM_VERSION		1
-+#define NVRAM_HEADER_SIZE	20
-+#define NVRAM_SPACE		0x8000
-+
-+#define FLASH_MIN		0x00020000	/* Minimum flash size */
-+
-+#define NVRAM_MAX_VALUE_LEN 255
-+#define NVRAM_MAX_PARAM_LEN 64
-+
-+#ifdef CONFIG_BCM47XX
-+int bcm47xx_nvram_getenv(const char *name, char *val, size_t val_len);
-+
-+int bcm47xx_nvram_gpio_pin(const char *name);
-+#else
-+static inline int bcm47xx_nvram_getenv(const char *name, char *val,
-+				       size_t val_len)
-+{
-+	return -ENXIO;
-+}
-+
-+static inline int bcm47xx_nvram_gpio_pin(const char *name)
-+{
-+	return -ENXIO;
-+}
-+#endif
-+
-+static inline void bcm47xx_nvram_parse_macaddr(char *buf, u8 macaddr[6])
-+{
-+	if (strchr(buf, ':'))
-+		sscanf(buf, "%hhx:%hhx:%hhx:%hhx:%hhx:%hhx", &macaddr[0],
-+			&macaddr[1], &macaddr[2], &macaddr[3], &macaddr[4],
-+			&macaddr[5]);
-+	else if (strchr(buf, '-'))
-+		sscanf(buf, "%hhx-%hhx-%hhx-%hhx-%hhx-%hhx", &macaddr[0],
-+			&macaddr[1], &macaddr[2], &macaddr[3], &macaddr[4],
-+			&macaddr[5]);
-+	else
-+		pr_warn("Can not parse mac address: %s\n", buf);
-+}
-+#endif /* __BCM47XX_NVRAM_H */
 -- 
 1.9.1
