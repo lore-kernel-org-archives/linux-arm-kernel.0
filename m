@@ -1,100 +1,26 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Sun, 24 Aug 2014 11:40:35 -0700
-Subject: [GIT PULL] ARM: SoC fixes for 3.17-rc
-Message-ID: <20140824184035.GA13254@localhost>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Sun, 24 Aug 2014 22:17:40 +0200
+Subject: [PATCH linux-next] irq: export handle_fasteoi_irq
+In-Reply-To: <1408663880-29179-1-git-send-email-vincent.stehle@laposte.net>
+References: <1408663880-29179-1-git-send-email-vincent.stehle@laposte.net>
+Message-ID: <4865705.6YRejgXUhp@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+On Friday 22 August 2014 01:31:20 Vincent Stehl? wrote:
+> Export handle_fasteoi_irq to be able to use it in e.g. the Zynq gpio driver
+> since commit 6dd859508336 ("gpio: zynq: Fix IRQ handlers").
+> 
+> This fixes the following link issue:
+> 
+>   ERROR: "handle_fasteoi_irq" [drivers/gpio/gpio-zynq.ko] undefined!
+> 
+> Signed-off-by: Vincent Stehl? <vincent.stehle@laposte.net>
+> Cc: Thomas Gleixner <tglx@linutronix.de>
+> Cc: Lars-Peter Clausen <lars@metafoo.de>
+> Cc: Linus Walleij <linus.walleij@linaro.org>
+> 
 
-The following changes since commit 7d1311b93e58ed55f3a31cc8f94c4b8fe988a2b9:
+Acked-by: Arnd Bergmann <arnd@arndb.de>
 
-  Linux 3.17-rc1 (2014-08-16 10:40:26 -0600)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git fixes
-
-for you to fetch changes up to bf87bb12bd7062bf577163f3f6d765debbae6200:
-
-  bus: arm-ccn: Fix warning message (2014-08-24 11:28:30 -0700)
-
-----------------------------------------------------------------
-ARM: SoC fixes for 3.17-rc
-
-A collection of fixes from this week, it's been pretty quiet and nothing
-really stands out as particularly noteworthy here -- mostly minor fixes
-across the field:
-
-- ODROID booting was fixed due to PMIC interrupts missing in DT
-- A collection of i.MX fixes
-- Minor Tegra fix for regulators
-- Rockchip fix and addition of SoC-specific mailing list to make it
-  easier to find posted patches.
-
-----------------------------------------------------------------
-Anson Huang (1):
-      ARM: imx: correct gpu2d_axi and gpu3d_axi clock setting
-
-Arnd Bergmann (1):
-      ARM: imx6: fix SMP compilation again
-
-Bill Pringlemeir (1):
-      ARM: dts: vf610-twr: Fix pinctrl_esdhc1 pin definitions.
-
-Chen-Yu Tsai (1):
-      ARM: dt: sun6i: Add #address-cells and #size-cells to i2c controller nodes
-
-Daniel Drake (2):
-      ARM: dts: Enable PMIC interrupts on ODROID
-      ARM: dts: ODROID i2c improvements
-
-Fugang Duan (1):
-      ARM: dts: imx6sx: fix the pad setting for uart CTS_B
-
-Geert Uytterhoeven (1):
-      ARM: shmobile: koelsch: Remove non-existent i2c6 pinmux
-
-Heiko Stuebner (2):
-      ARM: dts: rockchip: readd missing mmc0 pinctrl settings
-      MAINTAINERS: add new Rockchip SoC list
-
-Lothar Wa??mann (1):
-      ARM: dts: i.MX53: fix apparent bug in VPU clks
-
-Marcel Ziswiler (1):
-      ARM: tegra: apalis/colibri t30: fix on-module 5v0 supplies
-
-Olof Johansson (3):
-      Merge tag 'imx-fixes-3.17' of git://git.kernel.org/.../shawnguo/linux into fixes
-      Merge tag 'sunxi-dt-for-3.17-2' of git://git.kernel.org/.../mripard/linux into fixes
-      Merge tag 'v3.17-rockchip-fixes1' of git://git.kernel.org/.../mmind/linux-rockchip into fixes
-
-Pawel Moll (1):
-      bus: arm-ccn: Fix warning message
-
-Shawn Guo (2):
-      ARM: imx: fix TLB missing of IOMUXC base address during suspend
-      ARM: imx: remove unnecessary ARCH_HAS_OPP select
-
-Silvio Fricke (1):
-      ARM: dts: imx6: edmqmx6: change enet reset pin
-
- MAINTAINERS                                     |    1 +
- arch/arm/boot/dts/exynos4412-odroid-common.dtsi |   13 ++++++++++++
- arch/arm/boot/dts/imx53.dtsi                    |    2 +-
- arch/arm/boot/dts/imx6q-dmo-edmqmx6.dts         |    3 ++-
- arch/arm/boot/dts/imx6sx-pinfunc.h              |   26 +++++++++++------------
- arch/arm/boot/dts/r8a7791-koelsch.dts           |    7 ------
- arch/arm/boot/dts/rk3066a-bqcurie2.dts          |    2 ++
- arch/arm/boot/dts/rk3188-radxarock.dts          |    2 ++
- arch/arm/boot/dts/sun6i-a31.dtsi                |    8 +++++++
- arch/arm/boot/dts/tegra30-apalis.dtsi           |   11 +++++++++-
- arch/arm/boot/dts/tegra30-colibri.dtsi          |   11 +++++++++-
- arch/arm/boot/dts/vf610-twr.dts                 |    2 +-
- arch/arm/mach-imx/Kconfig                       |    2 --
- arch/arm/mach-imx/Makefile                      |    2 ++
- arch/arm/mach-imx/clk-imx6q.c                   |   10 +++++++--
- arch/arm/mach-imx/suspend-imx6.S                |    2 ++
- drivers/bus/arm-ccn.c                           |    2 +-
- 17 files changed, 76 insertions(+), 30 deletions(-)
+I saw the same thing here and came up with the same fix.
