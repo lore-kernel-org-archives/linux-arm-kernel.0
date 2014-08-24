@@ -1,128 +1,629 @@
 From: hauke@hauke-m.de (Hauke Mehrtens)
-Date: Sun, 24 Aug 2014 23:24:37 +0200
-Subject: [RFC 0/7] bcma: add device tree support
-Message-ID: <1408915485-8078-1-git-send-email-hauke@hauke-m.de>
+Date: Sun, 24 Aug 2014 23:24:40 +0200
+Subject: [RFC 2/7] bcm47xx-nvram: add new broadcom nvram driver with dt support
+In-Reply-To: <1408915485-8078-1-git-send-email-hauke@hauke-m.de>
+References: <1408915485-8078-1-git-send-email-hauke@hauke-m.de>
+Message-ID: <1408915485-8078-4-git-send-email-hauke@hauke-m.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds device tree support to bcma. In addition it also provides the 
-sprom needed by bcma through a device tree driver.
-This is needed for the Broadcom BCM47XX/BCM53XX ARM SoCs (NorthStar).
+This adds a new driver which searches at a given memory range for a
+nvram like it is used on the bcm47xx and bcm53xx SoCs with ARM and MIPS
+CPUs. This driver provides acces to this nvram to other device in the
+device tree. You have to specify the memory ranges where the content of
+the flash chip is memory mapped and this driver will search there for
+some nvram and parse it. Other drivers can use this driver to access the
+device nvram. The nvram is used to store board configurations like the
+mac addresses, the switch configuration and the calibration data for
+the wifi devices.
 
-bcma drives the system AIX bus. This bus is scanable, so we 
-automatically detect the cores attached to this bus. We only have to 
-provide the address of the first core, this can now be done through 
-device tree.
-It is not possible to find out what IRQ is associated to a specific 
-core, we have to provide this through device tree.
+This was copied from arch/mips/bcm47xx/nvram.c and modified to interact
+with device tree. My plan is to make the MIPS bcm47xx also use this new
+driver some time later.
 
-Broadcom uses a nvram which is a key value store on the flash chip. 
-This nvram contains the mac addresses to be used by the wifi and 
-Ethernet devices, the configuration data for the switch, the 
-calibration data for the wifi cores and some more stuff. Currently bcma 
-assumes to get some sprom when it gets initialized on a SoC. This sprom 
-is a structure with all the data which are originally stored in the 
-nvram. When bcma is used on a PCIe wifi card this data is fetched from 
-some eeporm on the card. The nvram could contains more than one sprom, 
-in case there is a main Baordocm SoC and a Broadcom wifi card connected 
-via PCIe this PCIe cards mostly use the nvram to store the sprom with 
-the calibration data.
-
-This patch series adds two drivers, the nvram driver which reads the 
-nvram and provides an interface to fetch values by giving a key and a 
-driver which creates a sprom based on a given nvram. These two things 
-are no real drivers, they are just converting stuff. I made them 
-drivers so they can be replaced with some other drivers which are 
-fetching the sprom from other storages. I know that the BCM63XX SoCs 
-are also using an sprom, but there it is stored in a file on the file 
-system. 
-
-Some code was copied from the mips code at arch/mips/bcm47xx/ in the 
-end I want to make this mips code also use these new drivers.
-
-There is no device I know of which uses more than one nvram and I do 
-not think there will ever be such a device. With this patch you have to 
-provide a reference to the nvram you want to fetch data from which is a 
-little bit annoying, should I remove this parameter and assume there is 
-just one nvram driver in the system?
-
-I am interested on comments if this architecture is correct or if there 
-are some improvements I could do. I haven't fond similar code in the 
-kernel.
-
-Through which tree should I merge the final patches?
-
-This is based on linus 3.17-rc1.
-
-Log output:
-bcma: bus0: Found chip with id 0xCF12, rev 0x00 and package 0x02
-bcma: bus0: Core 0 found: ChipCommon (manuf 0x4BF, id 0x800, rev 0x2A, class 0x0)
-bcma: bus0: Core 1 found: Chipcommon B (manuf 0x4BF, id 0x50B, rev 0x01, class 0x0)
-bcma: bus0: Core 2 found: DMA (manuf 0x4BF, id 0x502, rev 0x01, class 0x0)
-bcma: bus0: Core 3 found: GBit MAC (manuf 0x4BF, id 0x82D, rev 0x04, class 0x0)
-bcma: bus0: Core 4 found: GBit MAC (manuf 0x4BF, id 0x82D, rev 0x04, class 0x0)
-bcma: bus0: Core 5 found: GBit MAC (manuf 0x4BF, id 0x82D, rev 0x04, class 0x0)
-bcma: bus0: Core 6 found: GBit MAC (manuf 0x4BF, id 0x82D, rev 0x04, class 0x0)
-bcma: bus0: Core 7 found: PCIe Gen 2 (manuf 0x4BF, id 0x501, rev 0x01, class 0x0)
-bcma: bus0: Core 8 found: PCIe Gen 2 (manuf 0x4BF, id 0x501, rev 0x01, class 0x0)
-bcma: bus0: Core 9 found: ARM Cortex A9 core (ihost) (manuf 0x4BF, id 0x510, rev 0x01, class 0x0)
-bcma: bus0: Core 10 found: USB 2.0 (manuf 0x4BF, id 0x504, rev 0x01, class 0x0)
-bcma: bus0: Core 11 found: USB 3.0 (manuf 0x4BF, id 0x505, rev 0x01, class 0x0)
-bcma: bus0: Core 12 found: SDIO3 (manuf 0x4BF, id 0x503, rev 0x01, class 0x0)
-bcma: bus0: Core 13 found: ARM Cortex A9 JTAG (manuf 0x4BF, id 0x506, rev 0x01, class 0x0)
-bcma: bus0: Core 14 found: Denali DDR2/DDR3 memory controller (manuf 0x4BF, id 0x507, rev 0x01, class 0x0)
-bcma: bus0: Core 15 found: ROM (manuf 0x4BF, id 0x508, rev 0x01, class 0x0)
-bcma: bus0: Core 16 found: NAND flash controller (manuf 0x4BF, id 0x509, rev 0x01, class 0x0)
-bcma: bus0: Core 17 found: SPI flash controller (manuf 0x4BF, id 0x50A, rev 0x01, class 0x0)
-bcma: bus0: Found sprom from device tree provider
-bgmac bcma0:1: Found PHY addr: 30 (NOREGS)
-bgmac bcma0:1: Support for Roboswitch not implemented
-libphy: bgmac mii bus: probed
-b53_common: found switch: BCM53011, rev 2
-bgmac bcma0:2: Found PHY addr: 0
-bgmac bcma0:2: Support for Roboswitch not implemented
-libphy: bgmac mii bus: probed
-
-
-Hauke Mehrtens (7):
-  MIPS: BCM47XX: move the nvram header file into common space
-  bcm47xx-nvram: add new broadcom nvram driver with dt support
-  bcm47xx-sprom: add Broadcom sprom parser driver
-  bcma: register bcma as device tree driver
-  bcma: get IRQ numbers from dt
-  bcma: get sprom from devicetree
-  ARM: BCM5301X: register bcma bus
-
- Documentation/devicetree/bindings/bus/bcma.txt     |  46 ++
- .../devicetree/bindings/misc/bcm47xx-nvram.txt     |  19 +
- .../devicetree/bindings/misc/bcm47xx-sprom.txt     |  16 +
- arch/arm/boot/dts/bcm4708.dtsi                     |  58 ++
- arch/mips/bcm47xx/board.c                          |  42 +-
- arch/mips/bcm47xx/nvram.c                          |   9 +-
- arch/mips/bcm47xx/setup.c                          |   6 +-
- arch/mips/bcm47xx/sprom.c                          |   6 +-
- arch/mips/bcm47xx/time.c                           |   4 +-
- arch/mips/include/asm/mach-bcm47xx/bcm47xx_nvram.h |  53 --
- drivers/bcma/host_soc.c                            |  70 +++
- drivers/bcma/main.c                                |  42 +-
- drivers/bcma/sprom.c                               |  51 +-
- drivers/misc/Kconfig                               |  27 +
- drivers/misc/Makefile                              |   2 +
- drivers/misc/bcm47xx-nvram.c                       | 215 +++++++
- drivers/misc/bcm47xx-sprom.c                       | 690 +++++++++++++++++++++
- drivers/net/ethernet/broadcom/b44.c                |  10 +-
- drivers/net/ethernet/broadcom/bgmac.c              |   7 +-
- drivers/ssb/driver_chipcommon_pmu.c                |   9 +-
- include/linux/bcm47xx_nvram.h                      |  71 +++
- include/linux/bcma/bcma.h                          |   2 +
- 22 files changed, 1350 insertions(+), 105 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/bus/bcma.txt
+Signed-off-by: Hauke Mehrtens <hauke@hauke-m.de>
+---
+ .../devicetree/bindings/misc/bcm47xx-nvram.txt     |  19 ++
+ arch/mips/bcm47xx/board.c                          |  40 ++--
+ arch/mips/bcm47xx/nvram.c                          |   7 +-
+ arch/mips/bcm47xx/setup.c                          |   4 +-
+ arch/mips/bcm47xx/sprom.c                          |   4 +-
+ arch/mips/bcm47xx/time.c                           |   2 +-
+ drivers/misc/Kconfig                               |  13 ++
+ drivers/misc/Makefile                              |   1 +
+ drivers/misc/bcm47xx-nvram.c                       | 215 +++++++++++++++++++++
+ drivers/net/ethernet/broadcom/b44.c                |   2 +-
+ drivers/net/ethernet/broadcom/bgmac.c              |   5 +-
+ drivers/ssb/driver_chipcommon_pmu.c                |   3 +-
+ include/linux/bcm47xx_nvram.h                      |  17 +-
+ 13 files changed, 294 insertions(+), 38 deletions(-)
  create mode 100644 Documentation/devicetree/bindings/misc/bcm47xx-nvram.txt
- create mode 100644 Documentation/devicetree/bindings/misc/bcm47xx-sprom.txt
- delete mode 100644 arch/mips/include/asm/mach-bcm47xx/bcm47xx_nvram.h
  create mode 100644 drivers/misc/bcm47xx-nvram.c
- create mode 100644 drivers/misc/bcm47xx-sprom.c
- create mode 100644 include/linux/bcm47xx_nvram.h
 
+diff --git a/Documentation/devicetree/bindings/misc/bcm47xx-nvram.txt b/Documentation/devicetree/bindings/misc/bcm47xx-nvram.txt
+new file mode 100644
+index 0000000..ed979a8
+--- /dev/null
++++ b/Documentation/devicetree/bindings/misc/bcm47xx-nvram.txt
+@@ -0,0 +1,19 @@
++Broadcom bcm47xx/bcm53xx nvram access driver
++
++This driver provides access to the nvram for other drivers.
++
++Required properties:
++
++- compatible : brcm,bcm47xx-nvram
++
++- reg : iomem address range
++
++On NorthStar ARM SoCs the NAND flash is available at 0x1c000000 and the
++NOR flash is at 0x1e000000
++
++Example:
++
++nvram0: nvram at 0 {
++	compatible = "brcm,bcm47xx-nvram";
++	reg = <0x1c000000 0x01000000>;
++};
+diff --git a/arch/mips/bcm47xx/board.c b/arch/mips/bcm47xx/board.c
+index ec46fd7..2c98f74 100644
+--- a/arch/mips/bcm47xx/board.c
++++ b/arch/mips/bcm47xx/board.c
+@@ -218,36 +218,36 @@ static __init const struct bcm47xx_board_type *bcm47xx_board_get_nvram(void)
+ 	const struct bcm47xx_board_type_list2 *e2;
+ 	const struct bcm47xx_board_type_list3 *e3;
+ 
+-	if (bcm47xx_nvram_getenv("model_name", buf1, sizeof(buf1)) >= 0) {
++	if (bcm47xx_nvram_getenv(NULL, "model_name", buf1, sizeof(buf1)) >= 0) {
+ 		for (e1 = bcm47xx_board_list_model_name; e1->value1; e1++) {
+ 			if (!strcmp(buf1, e1->value1))
+ 				return &e1->board;
+ 		}
+ 	}
+ 
+-	if (bcm47xx_nvram_getenv("model_no", buf1, sizeof(buf1)) >= 0) {
++	if (bcm47xx_nvram_getenv(NULL, "model_no", buf1, sizeof(buf1)) >= 0) {
+ 		for (e1 = bcm47xx_board_list_model_no; e1->value1; e1++) {
+ 			if (strstarts(buf1, e1->value1))
+ 				return &e1->board;
+ 		}
+ 	}
+ 
+-	if (bcm47xx_nvram_getenv("machine_name", buf1, sizeof(buf1)) >= 0) {
++	if (bcm47xx_nvram_getenv(NULL, "machine_name", buf1, sizeof(buf1)) >= 0) {
+ 		for (e1 = bcm47xx_board_list_machine_name; e1->value1; e1++) {
+ 			if (strstarts(buf1, e1->value1))
+ 				return &e1->board;
+ 		}
+ 	}
+ 
+-	if (bcm47xx_nvram_getenv("hardware_version", buf1, sizeof(buf1)) >= 0) {
++	if (bcm47xx_nvram_getenv(NULL, "hardware_version", buf1, sizeof(buf1)) >= 0) {
+ 		for (e1 = bcm47xx_board_list_hardware_version; e1->value1; e1++) {
+ 			if (strstarts(buf1, e1->value1))
+ 				return &e1->board;
+ 		}
+ 	}
+ 
+-	if (bcm47xx_nvram_getenv("hardware_version", buf1, sizeof(buf1)) >= 0 &&
+-	    bcm47xx_nvram_getenv("boardtype", buf2, sizeof(buf2)) >= 0) {
++	if (bcm47xx_nvram_getenv(NULL, "hardware_version", buf1, sizeof(buf1)) >= 0 &&
++	    bcm47xx_nvram_getenv(NULL, "boardtype", buf2, sizeof(buf2)) >= 0) {
+ 		for (e2 = bcm47xx_board_list_boot_hw; e2->value1; e2++) {
+ 			if (!strstarts(buf1, e2->value1) &&
+ 			    !strcmp(buf2, e2->value2))
+@@ -255,22 +255,22 @@ static __init const struct bcm47xx_board_type *bcm47xx_board_get_nvram(void)
+ 		}
+ 	}
+ 
+-	if (bcm47xx_nvram_getenv("productid", buf1, sizeof(buf1)) >= 0) {
++	if (bcm47xx_nvram_getenv(NULL, "productid", buf1, sizeof(buf1)) >= 0) {
+ 		for (e1 = bcm47xx_board_list_productid; e1->value1; e1++) {
+ 			if (!strcmp(buf1, e1->value1))
+ 				return &e1->board;
+ 		}
+ 	}
+ 
+-	if (bcm47xx_nvram_getenv("ModelId", buf1, sizeof(buf1)) >= 0) {
++	if (bcm47xx_nvram_getenv(NULL, "ModelId", buf1, sizeof(buf1)) >= 0) {
+ 		for (e1 = bcm47xx_board_list_ModelId; e1->value1; e1++) {
+ 			if (!strcmp(buf1, e1->value1))
+ 				return &e1->board;
+ 		}
+ 	}
+ 
+-	if (bcm47xx_nvram_getenv("melco_id", buf1, sizeof(buf1)) >= 0 ||
+-	    bcm47xx_nvram_getenv("buf1falo_id", buf1, sizeof(buf1)) >= 0) {
++	if (bcm47xx_nvram_getenv(NULL, "melco_id", buf1, sizeof(buf1)) >= 0 ||
++	    bcm47xx_nvram_getenv(NULL, "buf1falo_id", buf1, sizeof(buf1)) >= 0) {
+ 		/* buffalo hardware, check id for specific hardware matches */
+ 		for (e1 = bcm47xx_board_list_melco_id; e1->value1; e1++) {
+ 			if (!strcmp(buf1, e1->value1))
+@@ -278,8 +278,8 @@ static __init const struct bcm47xx_board_type *bcm47xx_board_get_nvram(void)
+ 		}
+ 	}
+ 
+-	if (bcm47xx_nvram_getenv("boot_hw_model", buf1, sizeof(buf1)) >= 0 &&
+-	    bcm47xx_nvram_getenv("boot_hw_ver", buf2, sizeof(buf2)) >= 0) {
++	if (bcm47xx_nvram_getenv(NULL, "boot_hw_model", buf1, sizeof(buf1)) >= 0 &&
++	    bcm47xx_nvram_getenv(NULL, "boot_hw_ver", buf2, sizeof(buf2)) >= 0) {
+ 		for (e2 = bcm47xx_board_list_boot_hw; e2->value1; e2++) {
+ 			if (!strcmp(buf1, e2->value1) &&
+ 			    !strcmp(buf2, e2->value2))
+@@ -287,16 +287,16 @@ static __init const struct bcm47xx_board_type *bcm47xx_board_get_nvram(void)
+ 		}
+ 	}
+ 
+-	if (bcm47xx_nvram_getenv("board_id", buf1, sizeof(buf1)) >= 0) {
++	if (bcm47xx_nvram_getenv(NULL, "board_id", buf1, sizeof(buf1)) >= 0) {
+ 		for (e1 = bcm47xx_board_list_board_id; e1->value1; e1++) {
+ 			if (!strcmp(buf1, e1->value1))
+ 				return &e1->board;
+ 		}
+ 	}
+ 
+-	if (bcm47xx_nvram_getenv("boardtype", buf1, sizeof(buf1)) >= 0 &&
+-	    bcm47xx_nvram_getenv("boardnum", buf2, sizeof(buf2)) >= 0 &&
+-	    bcm47xx_nvram_getenv("boardrev", buf3, sizeof(buf3)) >= 0) {
++	if (bcm47xx_nvram_getenv(NULL, "boardtype", buf1, sizeof(buf1)) >= 0 &&
++	    bcm47xx_nvram_getenv(NULL, "boardnum", buf2, sizeof(buf2)) >= 0 &&
++	    bcm47xx_nvram_getenv(NULL, "boardrev", buf3, sizeof(buf3)) >= 0) {
+ 		for (e3 = bcm47xx_board_list_board; e3->value1; e3++) {
+ 			if (!strcmp(buf1, e3->value1) &&
+ 			    !strcmp(buf2, e3->value2) &&
+@@ -305,9 +305,9 @@ static __init const struct bcm47xx_board_type *bcm47xx_board_get_nvram(void)
+ 		}
+ 	}
+ 
+-	if (bcm47xx_nvram_getenv("boardtype", buf1, sizeof(buf1)) >= 0 &&
+-	    bcm47xx_nvram_getenv("boardrev", buf2, sizeof(buf2)) >= 0 &&
+-	    bcm47xx_nvram_getenv("boardnum", buf3, sizeof(buf3)) ==  -ENOENT) {
++	if (bcm47xx_nvram_getenv(NULL, "boardtype", buf1, sizeof(buf1)) >= 0 &&
++	    bcm47xx_nvram_getenv(NULL, "boardrev", buf2, sizeof(buf2)) >= 0 &&
++	    bcm47xx_nvram_getenv(NULL, "boardnum", buf3, sizeof(buf3)) ==  -ENOENT) {
+ 		for (e2 = bcm47xx_board_list_board_type_rev; e2->value1; e2++) {
+ 			if (!strcmp(buf1, e2->value1) &&
+ 			    !strcmp(buf2, e2->value2))
+@@ -327,7 +327,7 @@ void __init bcm47xx_board_detect(void)
+ 		return;
+ 
+ 	/* check if the nvram is available */
+-	err = bcm47xx_nvram_getenv("boardtype", buf, sizeof(buf));
++	err = bcm47xx_nvram_getenv(NULL, "boardtype", buf, sizeof(buf));
+ 
+ 	/* init of nvram failed, probably too early now */
+ 	if (err == -ENXIO) {
+diff --git a/arch/mips/bcm47xx/nvram.c b/arch/mips/bcm47xx/nvram.c
+index c47a4a8..b2112c7 100644
+--- a/arch/mips/bcm47xx/nvram.c
++++ b/arch/mips/bcm47xx/nvram.c
+@@ -158,7 +158,8 @@ static int nvram_init(void)
+ 	return -ENXIO;
+ }
+ 
+-int bcm47xx_nvram_getenv(char *name, char *val, size_t val_len)
++int bcm47xx_nvram_getenv(const struct device *dev, const char *name, char *val,
++			 size_t val_len)
+ {
+ 	char *var, *value, *end, *eq;
+ 	int err;
+@@ -190,7 +191,7 @@ int bcm47xx_nvram_getenv(char *name, char *val, size_t val_len)
+ }
+ EXPORT_SYMBOL(bcm47xx_nvram_getenv);
+ 
+-int bcm47xx_nvram_gpio_pin(const char *name)
++int bcm47xx_nvram_gpio_pin(const struct device *dev, const char *name)
+ {
+ 	int i, err;
+ 	char nvram_var[10];
+@@ -200,7 +201,7 @@ int bcm47xx_nvram_gpio_pin(const char *name)
+ 		err = snprintf(nvram_var, sizeof(nvram_var), "gpio%i", i);
+ 		if (err <= 0)
+ 			continue;
+-		err = bcm47xx_nvram_getenv(nvram_var, buf, sizeof(buf));
++		err = bcm47xx_nvram_getenv(dev, nvram_var, buf, sizeof(buf));
+ 		if (err <= 0)
+ 			continue;
+ 		if (!strcmp(name, buf))
+diff --git a/arch/mips/bcm47xx/setup.c b/arch/mips/bcm47xx/setup.c
+index deadb71..d87709d 100644
+--- a/arch/mips/bcm47xx/setup.c
++++ b/arch/mips/bcm47xx/setup.c
+@@ -123,7 +123,7 @@ static int bcm47xx_get_invariants(struct ssb_bus *bus,
+ 	memset(&iv->sprom, 0, sizeof(struct ssb_sprom));
+ 	bcm47xx_fill_sprom(&iv->sprom, NULL, false);
+ 
+-	if (bcm47xx_nvram_getenv("cardbus", buf, sizeof(buf)) >= 0)
++	if (bcm47xx_nvram_getenv(NULL, "cardbus", buf, sizeof(buf)) >= 0)
+ 		iv->has_cardbus_slot = !!simple_strtoul(buf, NULL, 10);
+ 
+ 	return 0;
+@@ -146,7 +146,7 @@ static void __init bcm47xx_register_ssb(void)
+ 		panic("Failed to initialize SSB bus (err %d)", err);
+ 
+ 	mcore = &bcm47xx_bus.ssb.mipscore;
+-	if (bcm47xx_nvram_getenv("kernel_args", buf, sizeof(buf)) >= 0) {
++	if (bcm47xx_nvram_getenv(NULL, "kernel_args", buf, sizeof(buf)) >= 0) {
+ 		if (strstr(buf, "console=ttyS1")) {
+ 			struct ssb_serial_port port;
+ 
+diff --git a/arch/mips/bcm47xx/sprom.c b/arch/mips/bcm47xx/sprom.c
+index 29ced12..f88f49b 100644
+--- a/arch/mips/bcm47xx/sprom.c
++++ b/arch/mips/bcm47xx/sprom.c
+@@ -52,10 +52,10 @@ static int get_nvram_var(const char *prefix, const char *postfix,
+ 
+ 	create_key(prefix, postfix, name, key, sizeof(key));
+ 
+-	err = bcm47xx_nvram_getenv(key, buf, len);
++	err = bcm47xx_nvram_getenv(NULL, key, buf, len);
+ 	if (fallback && err == -ENOENT && prefix) {
+ 		create_key(NULL, postfix, name, key, sizeof(key));
+-		err = bcm47xx_nvram_getenv(key, buf, len);
++		err = bcm47xx_nvram_getenv(NULL, key, buf, len);
+ 	}
+ 	return err;
+ }
+diff --git a/arch/mips/bcm47xx/time.c b/arch/mips/bcm47xx/time.c
+index c57a515..b2c3c7d 100644
+--- a/arch/mips/bcm47xx/time.c
++++ b/arch/mips/bcm47xx/time.c
+@@ -61,7 +61,7 @@ void __init plat_time_init(void)
+ 	}
+ 
+ 	if (chip_id == 0x5354) {
+-		len = bcm47xx_nvram_getenv("clkfreq", buf, sizeof(buf));
++		len = bcm47xx_nvram_getenv(NULL, "clkfreq", buf, sizeof(buf));
+ 		if (len >= 0 && !strncmp(buf, "200", 4))
+ 			hz = 100000000;
+ 	}
+diff --git a/drivers/misc/Kconfig b/drivers/misc/Kconfig
+index b841180..b306c02 100644
+--- a/drivers/misc/Kconfig
++++ b/drivers/misc/Kconfig
+@@ -515,6 +515,19 @@ config VEXPRESS_SYSCFG
+ 	  bus. System Configuration interface is one of the possible means
+ 	  of generating transactions on this bus.
+ 
++config BCM47XX_NVRAM
++	tristate "BCM47XX nvram driver"
++	depends on OF
++	help
++	  This driver parses the nvram from a given memory range and
++	  provides its values to other drivers.
++
++	  The nvram is a key value store used on bcm47xx/bcm53xx SoC 
++	  with ARM and MIPS CPUs. It contains the board specific 
++	  configuration.
++
++	  If unsure, say N.
++
+ source "drivers/misc/c2port/Kconfig"
+ source "drivers/misc/eeprom/Kconfig"
+ source "drivers/misc/cb710/Kconfig"
+diff --git a/drivers/misc/Makefile b/drivers/misc/Makefile
+index 5497d02..2331208 100644
+--- a/drivers/misc/Makefile
++++ b/drivers/misc/Makefile
+@@ -55,3 +55,4 @@ obj-y				+= mic/
+ obj-$(CONFIG_GENWQE)		+= genwqe/
+ obj-$(CONFIG_ECHO)		+= echo/
+ obj-$(CONFIG_VEXPRESS_SYSCFG)	+= vexpress-syscfg.o
++obj-$(CONFIG_BCM47XX_NVRAM)	+= bcm47xx-nvram.o
+diff --git a/drivers/misc/bcm47xx-nvram.c b/drivers/misc/bcm47xx-nvram.c
+new file mode 100644
+index 0000000..6ea715c
+--- /dev/null
++++ b/drivers/misc/bcm47xx-nvram.c
+@@ -0,0 +1,215 @@
++/*
++ * BCM947xx nvram variable access
++ *
++ * Copyright (C) 2005 Broadcom Corporation
++ * Copyright (C) 2006 Felix Fietkau <nbd@openwrt.org>
++ * Copyright (C) 2010-2014 Hauke Mehrtens <hauke@hauke-m.de>
++ *
++ * This program is free software; you can redistribute	it and/or modify it
++ * under  the terms of	the GNU General	 Public License as published by the
++ * Free Software Foundation;  either version 2 of the  License, or (at your
++ * option) any later version.
++ */
++
++#include <linux/types.h>
++#include <linux/module.h>
++#include <linux/kernel.h>
++#include <linux/string.h>
++#include <linux/of_address.h>
++#include <linux/device.h>
++#include <linux/platform_device.h>
++#include <linux/io.h>
++#include <linux/bcm47xx_nvram.h>
++
++struct bcm47xx_nvram {
++	size_t nvram_len;
++	char *nvram_buf;
++};
++
++static const u32 nvram_sizes[] = {0x8000, 0xF000, 0x10000};
++
++static u32 find_nvram_size(void __iomem *end)
++{
++	struct nvram_header __iomem *header;
++	int i;
++
++	for (i = 0; i < ARRAY_SIZE(nvram_sizes); i++) {
++		header = (struct nvram_header __iomem *)(end - nvram_sizes[i]);
++		if (__raw_readl(&header->magic) == NVRAM_HEADER)
++			return nvram_sizes[i];
++	}
++
++	return 0;
++}
++
++/* Probe for NVRAM header */
++static int nvram_find_and_copy(struct device *dev, void __iomem *base,
++			       size_t len, char **nvram_buf,
++			       size_t *nvram_len)
++{
++	struct nvram_header __iomem *header;
++	int i;
++	u32 off;
++	u32 *dst;
++	__le32 __iomem *src;
++	u32 size;
++
++	/* TODO: when nvram is on nand flash check for bad blocks first. */
++	off = FLASH_MIN;
++	while (off <= len) {
++		/* Windowed flash access */
++		size = find_nvram_size(base + off);
++		if (size) {
++			header = (struct nvram_header __iomem *)
++					(base + off - size);
++			goto found;
++		}
++		off += 0x10000;
++	}
++
++	/* Try embedded NVRAM@4 KB and 1 KB as last resorts */
++	header = (struct nvram_header __iomem *)(base + 4096);
++	if (__raw_readl(&header->magic) == NVRAM_HEADER) {
++		size = NVRAM_SPACE;
++		goto found;
++	}
++
++	header = (struct nvram_header __iomem *)(base + 1024);
++	if (__raw_readl(&header->magic) == NVRAM_HEADER) {
++		size = NVRAM_SPACE;
++		goto found;
++	}
++
++	*nvram_buf = NULL;
++	*nvram_len = 0;
++	pr_err("no nvram found\n");
++	return -ENXIO;
++
++found:
++	if (readl(&header->len) > size)
++		pr_err("The nvram size accoridng to the header seems to be bigger than the partition on flash\n");
++	*nvram_len = min_t(u32, readl(&header->len), size);
++
++	*nvram_buf = devm_kzalloc(dev, *nvram_len, GFP_KERNEL);
++	if (!*nvram_buf)
++		return -ENOMEM;
++
++	src = (__le32 __iomem *) header;
++	dst = (u32 *) *nvram_buf;
++	for (i = 0; i < sizeof(struct nvram_header); i += 4)
++		*dst++ = __raw_readl(src++);
++	for (; i < *nvram_len; i += 4)
++		*dst++ = readl(src++);
++
++	return 0;
++}
++
++int bcm47xx_nvram_getenv(const struct device *dev, const char *name, char *val,
++			 size_t val_len)
++{
++	char *var, *value, *end, *eq;
++	struct bcm47xx_nvram *nvram;
++
++	if (!dev)
++		return -ENODEV;
++
++	nvram = dev_get_drvdata(dev);
++
++	if (!name || !nvram || !nvram->nvram_len)
++		return -EINVAL;
++
++	/* Look for name=value and return value */
++	var = nvram->nvram_buf + sizeof(struct nvram_header);
++	end = nvram->nvram_buf + nvram->nvram_len - 2;
++	end[0] = end[1] = '\0';
++	for (; *var; var = value + strlen(value) + 1) {
++		eq = strchr(var, '=');
++		if (!eq)
++			break;
++		value = eq + 1;
++		if ((eq - var) == strlen(name) &&
++			strncmp(var, name, (eq - var)) == 0) {
++			return snprintf(val, val_len, "%s", value);
++		}
++	}
++	return -ENOENT;
++}
++EXPORT_SYMBOL(bcm47xx_nvram_getenv);
++
++int bcm47xx_nvram_gpio_pin(const struct device *dev, const char *name)
++{
++	int i, err;
++	char nvram_var[10];
++	char buf[30];
++
++	if (!dev)
++		return -ENODEV;
++
++	for (i = 0; i < 32; i++) {
++		err = snprintf(nvram_var, sizeof(nvram_var), "gpio%i", i);
++		if (err <= 0)
++			continue;
++		err = bcm47xx_nvram_getenv(dev, nvram_var, buf, sizeof(buf));
++		if (err <= 0)
++			continue;
++		if (!strcmp(name, buf))
++			return i;
++	}
++	return -ENOENT;
++}
++EXPORT_SYMBOL(bcm47xx_nvram_gpio_pin);
++
++static int bcm47xx_nvram_probe(struct platform_device *pdev)
++{
++	struct device *dev = &pdev->dev;
++	struct device_node *np = dev->of_node;
++	struct bcm47xx_nvram *nvram;
++	int err;
++	struct resource flash_mem;
++	void __iomem *mmio;
++
++	/* Alloc */
++	nvram = devm_kzalloc(dev, sizeof(*nvram), GFP_KERNEL);
++	if (!nvram)
++		return -ENOMEM;
++
++	err = of_address_to_resource(np, 0, &flash_mem);
++	if (err)
++		return err;
++
++	mmio = ioremap_nocache(flash_mem.start, resource_size(&flash_mem));
++	if (!mmio)
++		return -ENOMEM;
++
++	err = nvram_find_and_copy(dev, mmio, resource_size(&flash_mem),
++				  &nvram->nvram_buf, &nvram->nvram_len);
++	if (err)
++		goto err_unmap_mmio;
++
++	platform_set_drvdata(pdev, nvram);
++
++err_unmap_mmio:
++	iounmap(mmio);
++	return err;
++}
++
++static const struct of_device_id bcm47xx_nvram_of_match_table[] = {
++	{ .compatible = "brcm,bcm47xx-nvram", },
++	{},
++};
++MODULE_DEVICE_TABLE(of, mvebu_pcie_of_match_table);
++
++static struct platform_driver bcm47xx_nvram_driver = {
++	.driver = {
++		.owner = THIS_MODULE,
++		.name = "bcm47xx-nvram",
++		.of_match_table = bcm47xx_nvram_of_match_table,
++		/* driver unloading/unbinding currently not supported */
++		.suppress_bind_attrs = true,
++	},
++	.probe = bcm47xx_nvram_probe,
++};
++module_platform_driver(bcm47xx_nvram_driver);
++
++MODULE_AUTHOR("Hauke Mehrtens <hauke@hauke-m.de>");
++MODULE_LICENSE("GPLv2");
+diff --git a/drivers/net/ethernet/broadcom/b44.c b/drivers/net/ethernet/broadcom/b44.c
+index d2714a2..8340498 100644
+--- a/drivers/net/ethernet/broadcom/b44.c
++++ b/drivers/net/ethernet/broadcom/b44.c
+@@ -411,7 +411,7 @@ static void b44_wap54g10_workaround(struct b44 *bp)
+ 	 * see https://dev.openwrt.org/ticket/146
+ 	 * check and reset bit "isolate"
+ 	 */
+-	if (bcm47xx_nvram_getenv("boardnum", buf, sizeof(buf)) < 0)
++	if (bcm47xx_nvram_getenv(NULL, "boardnum", buf, sizeof(buf)) < 0)
+ 		return;
+ 	if (simple_strtoul(buf, NULL, 0) == 2) {
+ 		err = __b44_readphy(bp, 0, MII_BMCR, &val);
+diff --git a/drivers/net/ethernet/broadcom/bgmac.c b/drivers/net/ethernet/broadcom/bgmac.c
+index bdda57b..1df7fb0 100644
+--- a/drivers/net/ethernet/broadcom/bgmac.c
++++ b/drivers/net/ethernet/broadcom/bgmac.c
+@@ -952,7 +952,8 @@ static void bgmac_chip_reset(struct bgmac *bgmac)
+ 			     BGMAC_CHIPCTL_1_IF_TYPE_MII;
+ 		char buf[4];
+ 
+-		if (bcm47xx_nvram_getenv("et_swtype", buf, sizeof(buf)) > 0) {
++		if (bcm47xx_nvram_getenv(NULL, "et_swtype", buf,
++					 sizeof(buf)) > 0) {
+ 			if (kstrtou8(buf, 0, &et_swtype))
+ 				bgmac_err(bgmac, "Failed to parse et_swtype (%s)\n",
+ 					  buf);
+@@ -1501,7 +1502,7 @@ static int bgmac_probe(struct bcma_device *core)
+ 	}
+ 
+ 	bgmac->int_mask = BGMAC_IS_ERRMASK | BGMAC_IS_RX | BGMAC_IS_TX_MASK;
+-	if (bcm47xx_nvram_getenv("et0_no_txint", NULL, 0) == 0)
++	if (bcm47xx_nvram_getenv(NULL, "et0_no_txint", NULL, 0) == 0)
+ 		bgmac->int_mask &= ~BGMAC_IS_TX_MASK;
+ 
+ 	/* TODO: reset the external phy. Specs are needed */
+diff --git a/drivers/ssb/driver_chipcommon_pmu.c b/drivers/ssb/driver_chipcommon_pmu.c
+index 8d07d4d..b611ea1 100644
+--- a/drivers/ssb/driver_chipcommon_pmu.c
++++ b/drivers/ssb/driver_chipcommon_pmu.c
+@@ -319,7 +319,8 @@ static void ssb_pmu_pll_init(struct ssb_chipcommon *cc)
+ 
+ 	if (bus->bustype == SSB_BUSTYPE_SSB) {
+ 		char buf[20];
+-		if (bcm47xx_nvram_getenv("xtalfreq", buf, sizeof(buf)) >= 0)
++		if (bcm47xx_nvram_getenv(NULL, "xtalfreq", buf,
++					 sizeof(buf)) >= 0)
+ 			crystalfreq = simple_strtoul(buf, NULL, 0);
+ 	}
+ 
+diff --git a/include/linux/bcm47xx_nvram.h b/include/linux/bcm47xx_nvram.h
+index 333d32c..515fc06 100644
+--- a/include/linux/bcm47xx_nvram.h
++++ b/include/linux/bcm47xx_nvram.h
+@@ -15,9 +15,11 @@
+ #include <linux/types.h>
+ #include <linux/kernel.h>
+ 
++struct device;
++
+ struct nvram_header {
+ 	u32 magic;
+-	u32 len;
++	__le32 len;
+ 	u32 crc_ver_init;	/* 0:7 crc, 8:15 ver, 16:31 sdram_init */
+ 	u32 config_refresh;	/* 0:15 sdram_config, 16:31 sdram_refresh */
+ 	u32 config_ncdl;	/* ncdl values for memc */
+@@ -33,18 +35,21 @@ struct nvram_header {
+ #define NVRAM_MAX_VALUE_LEN 255
+ #define NVRAM_MAX_PARAM_LEN 64
+ 
+-#ifdef CONFIG_BCM47XX
+-int bcm47xx_nvram_getenv(const char *name, char *val, size_t val_len);
++#if defined(CONFIG_BCM47XX) || defined(CONFIG_BCM47XX_NVRAM)
++int bcm47xx_nvram_getenv(const struct device *dev, const char *name, char *val,
++			 size_t val_len);
+ 
+-int bcm47xx_nvram_gpio_pin(const char *name);
++int bcm47xx_nvram_gpio_pin(const struct device *dev, const char *name);
+ #else
+-static inline int bcm47xx_nvram_getenv(const char *name, char *val,
++static inline int bcm47xx_nvram_getenv(const struct device *dev,
++				       const char *name, char *val,
+ 				       size_t val_len)
+ {
+ 	return -ENXIO;
+ }
+ 
+-static inline int bcm47xx_nvram_gpio_pin(const char *name)
++static inline int bcm47xx_nvram_gpio_pin(const struct device *dev,
++					 const char *name)
+ {
+ 	return -ENXIO;
+ }
 -- 
 1.9.1
