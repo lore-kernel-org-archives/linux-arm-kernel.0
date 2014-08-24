@@ -1,30 +1,37 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Sun, 24 Aug 2014 11:21:51 -0700
-Subject: [PATCH] ARM: tegra: apalis/colibri t30: fix on-module 5v0 supplies
-In-Reply-To: <1408735510-2654-1-git-send-email-swarren@wwwdotorg.org>
-References: <1408735510-2654-1-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <20140824182151.GA11563@localhost>
+Date: Sun, 24 Aug 2014 11:23:44 -0700
+Subject: [PATCH] ARM: shmobile: koelsch: Remove non-existent i2c6 pinmux
+In-Reply-To: <1408054750-9642-1-git-send-email-horms+renesas@verge.net.au>
+References: <1408054750-9642-1-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <20140824182344.GB11563@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 22, 2014 at 01:25:10PM -0600, Stephen Warren wrote:
-> From: Marcel Ziswiler <marcel@ziswiler.com>
+On Fri, Aug 15, 2014 at 07:19:10AM +0900, Simon Horman wrote:
+> From: Geert Uytterhoeven <geert+renesas@glider.be>
 > 
-> Working on Gigabit/PCIe support in U-Boot for Apalis T30 I realised
-> that the current device tree source includes for our modules only
-> happen to work due to referencing the on-carrier 5v0 supply from USB
-> which is not at all available on-module. The modules actually contain
-> TPS60150 charge pumps to generate the PMIC required 5 volts from the
-> one and only 3.3 volt module supply. This patch fixes this.
+> On r8a7791, i2c6 (aka iic3) doesn't need pinmux, but the koelsch dts
+> refers to non-existent pinmux configuration data:
 > 
-> (Note: When back-porting this to v3.16 stable releases, simply drop the
-> change to tegra30-apalis.dtsi; that file was added in v3.17)
+> pinmux core: sh-pfc does not support function i2c6
+> sh-pfc e6060000.pfc: invalid function i2c6 in map table
 > 
-> Cc: <stable@vger.kernel.org> #v3.16+
-> Signed-off-by: Marcel Ziswiler <marcel@ziswiler.com>
-> Signed-off-by: Stephen Warren <swarren@nvidia.com>
+> Remove it to fix this.
+> 
+> Fixes: commit 1d41f36a68c0f4e9b01d563ce33bab5201858b54 ("ARM: shmobile:
+>        koelsch dts: Add VDD MPU regulator for DVFS")
+> 
+> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> ---
+>  arch/arm/boot/dts/r8a7791-koelsch.dts | 7 -------
+>  1 file changed, 7 deletions(-)
+> 
+> Hi Olof, Arnd, Kevin,
+> 
+> please consider this as a fix for v3.17.
 
-Applied, thanks.
+Applied.
 
 
 -Olof
