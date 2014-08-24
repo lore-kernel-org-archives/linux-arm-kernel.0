@@ -1,26 +1,33 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Sun, 24 Aug 2014 22:17:40 +0200
-Subject: [PATCH linux-next] irq: export handle_fasteoi_irq
-In-Reply-To: <1408663880-29179-1-git-send-email-vincent.stehle@laposte.net>
-References: <1408663880-29179-1-git-send-email-vincent.stehle@laposte.net>
-Message-ID: <4865705.6YRejgXUhp@wuerfel>
+From: eparis@redhat.com (Eric Paris)
+Date: Sun, 24 Aug 2014 16:35:34 -0400
+Subject: arm64 audit build failures in -next
+In-Reply-To: <20140823155043.GM24407@sirena.org.uk>
+References: <E1XLCyO-0007E5-P1@cassiel.sirena.org.uk>
+ <20140823155043.GM24407@sirena.org.uk>
+Message-ID: <1408912534.4481.1.camel@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 22 August 2014 01:31:20 Vincent Stehl? wrote:
-> Export handle_fasteoi_irq to be able to use it in e.g. the Zynq gpio driver
-> since commit 6dd859508336 ("gpio: zynq: Fix IRQ handlers").
-> 
-> This fixes the following link issue:
-> 
->   ERROR: "handle_fasteoi_irq" [drivers/gpio/gpio-zynq.ko] undefined!
-> 
-> Signed-off-by: Vincent Stehl? <vincent.stehle@laposte.net>
-> Cc: Thomas Gleixner <tglx@linutronix.de>
-> Cc: Lars-Peter Clausen <lars@metafoo.de>
-> Cc: Linus Walleij <linus.walleij@linaro.org>
-> 
+I just pushed a clean copy of Linus' tree to my audit tree.  So my API
+change is gone when he next pull for -next.  I'm on vacation this week
+and really wanted to get it fixed right before I left.  It didn't
+happen.  when I push a new tree into next I will pick up the arm audit
+patch and fix the api in my tree.
 
-Acked-by: Arnd Bergmann <arnd@arndb.de>
+-Eric
 
-I saw the same thing here and came up with the same fix.
+On Sat, 2014-08-23 at 10:50 -0500, Mark Brown wrote:
+> On Sat, Aug 23, 2014 at 04:11:20PM +0100, Build bot for Mark Brown wrote:
+> 
+> > 	arm64-allmodconfig
+> > ../arch/arm64/kernel/ptrace.c:1120:3: error: too many arguments to function 'audit_syscall_entry'
+> 
+> This has now been broken in -next for about a month with a fix available
+> and since the merge window the arm64 audit support is in mainline so the
+> fix can be directly applied without cross tree issues (the audit changes
+> didn't get sent during the merge window).  Catalin and Will have also
+> indicated that they want to remove the workaround that's in -next
+> currently to allow defconfig to build which would make the situation
+> even more pressing.
+> 
+> Do we have any idea when it will be possible to get a fix into -next?
