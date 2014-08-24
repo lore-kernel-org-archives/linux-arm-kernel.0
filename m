@@ -1,118 +1,26 @@
-From: marcin.jabrzyk@gmail.com (Marcin Jabrzyk)
-Date: Sun, 24 Aug 2014 23:38:29 +0200
-Subject: [PATCH 09/11 v4] coresight: adding support for beagle and beagleXM
-In-Reply-To: <1408554231-24321-10-git-send-email-mathieu.poirier@linaro.org>
-References: <1408554231-24321-1-git-send-email-mathieu.poirier@linaro.org>
- <1408554231-24321-10-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <53FA5B55.4000603@gmail.com>
+From: zajec5@gmail.com (=?UTF-8?B?UmFmYcWCIE1pxYJlY2tp?=)
+Date: Sun, 24 Aug 2014 21:45:38 +0000
+Subject: [RFC 2/7] bcm47xx-nvram: add new broadcom nvram driver with dt
+ support
+In-Reply-To: <1408915485-8078-4-git-send-email-hauke@hauke-m.de>
+References: <1408915485-8078-1-git-send-email-hauke@hauke-m.de>
+ <1408915485-8078-4-git-send-email-hauke@hauke-m.de>
+Message-ID: <CACna6rx_V46wAAkRFA+XnZNX80tAdWkaYrTUV5VHxLwbC6GvfQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 24 August 2014 21:24, Hauke Mehrtens <hauke@hauke-m.de> wrote:
+> This was copied from arch/mips/bcm47xx/nvram.c and modified to interact
+> with device tree. My plan is to make the MIPS bcm47xx also use this new
+> driver some time later.
 
-W dniu 20.08.2014 o 19:03, mathieu.poirier at linaro.org pisze:
-> From: Mathieu Poirier <mathieu.poirier@linaro.org>
->
-> Currently supporting ETM and ETB.  Support for TPIU
-> and SDTI are yet to be added.
-Did you tried running the drivers on board or are there any special
-preparation needed?
-I've BeagleBoard-xM Rev. C applied your patches and enabled the
-functions the in menuconfig.
-But on dmesg I see that:
+I don't like this.
 
-[    0.685028] of_amba_device_create(): amba_device_add() failed (-19)
-for /etb at 5401b000
-[    0.685119] of_amba_device_create(): amba_device_add() failed (-19)
-for /etm at 54010000
+First, you change API (_getenv call), without explanation why/if we
+really need this. We decided we're very unlikely to ever find devices
+with multiple (separated) NVRAMs. So what's the point of having nvram
+per device?
 
-There are no nodes according coresight in /sys/kernel/debug/ .
-
-Best regards,
-Marcin
-
->
-> Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
-> ---
->  arch/arm/boot/dts/omap3-beagle-xm.dts | 28 ++++++++++++++++++++++++++++
->  arch/arm/boot/dts/omap3-beagle.dts    | 28 ++++++++++++++++++++++++++++
->  2 files changed, 56 insertions(+)
->
-> diff --git a/arch/arm/boot/dts/omap3-beagle-xm.dts b/arch/arm/boot/dts/omap3-beagle-xm.dts
-> index 1becefc..eec73d8 100644
-> --- a/arch/arm/boot/dts/omap3-beagle-xm.dts
-> +++ b/arch/arm/boot/dts/omap3-beagle-xm.dts
-> @@ -145,6 +145,34 @@
->  			};
->  		};
->  	};
-> +
-> +	etb at 5401b000 {
-> +		compatible = "arm,coresight-etb10", "arm,primecell";
-> +		reg = <0x5401b000 0x1000>;
-> +
-> +		coresight-default-sink;
-> +		clocks = <&emu_src_ck>;
-> +		clock-names = "apb_pclk";
-> +		port {
-> +			etb_in: endpoint {
-> +				slave-mode;
-> +				remote-endpoint = <&etm_out>;
-> +			};
-> +		};
-> +	};
-> +
-> +	etm at 54010000 {
-> +		compatible = "arm,coresight-etm3x", "arm,primecell";
-> +		reg = <0x54010000 0x1000>;
-> +
-> +		clocks = <&emu_src_ck>;
-> +		clock-names = "apb_pclk";
-> +		port {
-> +			etm_out: endpoint {
-> +				remote-endpoint = <&etb_in>;
-> +			};
-> +		};
-> +	};
->  };
->  
->  &omap3_pmx_wkup {
-> diff --git a/arch/arm/boot/dts/omap3-beagle.dts b/arch/arm/boot/dts/omap3-beagle.dts
-> index 3c3e6da..a151daf 100644
-> --- a/arch/arm/boot/dts/omap3-beagle.dts
-> +++ b/arch/arm/boot/dts/omap3-beagle.dts
-> @@ -140,6 +140,34 @@
->  			};
->  		};
->  	};
-> +
-> +	etb at 540000000 {
-> +		compatible = "arm,coresight-etb10", "arm,primecell";
-> +		reg = <0x5401b000 0x1000>;
-> +
-> +		coresight-default-sink;
-> +		clocks = <&emu_src_ck>;
-> +		clock-names = "apb_pclk";
-> +		port {
-> +			etb_in: endpoint {
-> +				slave-mode;
-> +				remote-endpoint = <&etm_out>;
-> +			};
-> +		};
-> +	};
-> +
-> +	etm at 54010000 {
-> +		compatible = "arm,coresight-etm3x", "arm,primecell";
-> +		reg = <0x54010000 0x1000>;
-> +
-> +		clocks = <&emu_src_ck>;
-> +		clock-names = "apb_pclk";
-> +		port {
-> +			etm_out: endpoint {
-> +				remote-endpoint = <&etb_in>;
-> +			};
-> +		};
-> +	};
->  };
->  
->  &omap3_pmx_wkup {
+Secondly, don't duplicate the code. If you're going to switch bcm47xx
+to this new code, handle it smarter. Modify bcm47xx mode, move it to
+the "misc" and re-use in bcm53xx.
