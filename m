@@ -1,96 +1,118 @@
-From: hauke@hauke-m.de (Hauke Mehrtens)
-Date: Sun, 24 Aug 2014 23:24:44 +0200
-Subject: [RFC 6/7] bcma: get sprom from devicetree
-In-Reply-To: <1408915485-8078-1-git-send-email-hauke@hauke-m.de>
-References: <1408915485-8078-1-git-send-email-hauke@hauke-m.de>
-Message-ID: <1408915485-8078-8-git-send-email-hauke@hauke-m.de>
+From: marcin.jabrzyk@gmail.com (Marcin Jabrzyk)
+Date: Sun, 24 Aug 2014 23:38:29 +0200
+Subject: [PATCH 09/11 v4] coresight: adding support for beagle and beagleXM
+In-Reply-To: <1408554231-24321-10-git-send-email-mathieu.poirier@linaro.org>
+References: <1408554231-24321-1-git-send-email-mathieu.poirier@linaro.org>
+ <1408554231-24321-10-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <53FA5B55.4000603@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch make it possible to device an sprom provider in device tree
-and get the sprom from this driver. Every time there is such a provider
-it gets asked for a sprom.
+Hi,
 
-Signed-off-by: Hauke Mehrtens <hauke@hauke-m.de>
----
- drivers/bcma/sprom.c | 51 ++++++++++++++++++++++++++++++++++++++++++++++++++-
- 1 file changed, 50 insertions(+), 1 deletion(-)
+W dniu 20.08.2014 o 19:03, mathieu.poirier at linaro.org pisze:
+> From: Mathieu Poirier <mathieu.poirier@linaro.org>
+>
+> Currently supporting ETM and ETB.  Support for TPIU
+> and SDTI are yet to be added.
+Did you tried running the drivers on board or are there any special
+preparation needed?
+I've BeagleBoard-xM Rev. C applied your patches and enabled the
+functions the in menuconfig.
+But on dmesg I see that:
 
-diff --git a/drivers/bcma/sprom.c b/drivers/bcma/sprom.c
-index efb037f..ebe495d 100644
---- a/drivers/bcma/sprom.c
-+++ b/drivers/bcma/sprom.c
-@@ -15,6 +15,8 @@
- #include <linux/io.h>
- #include <linux/dma-mapping.h>
- #include <linux/slab.h>
-+#include <linux/of.h>
-+#include <linux/of_platform.h>
- 
- static int(*get_fallback_sprom)(struct bcma_bus *dev, struct ssb_sprom *out);
- 
-@@ -46,6 +48,46 @@ int bcma_arch_register_fallback_sprom(int (*sprom_callback)(struct bcma_bus *bus
- 	return 0;
- }
- 
-+#ifdef CONFIG_OF
-+static int bcma_fill_sprom_with_dt(struct bcma_bus *bus,
-+				   struct ssb_sprom *out)
-+{
-+	const __be32 *handle;
-+	struct device_node *sprom_node;
-+	struct platform_device *sprom_dev;
-+	struct ssb_sprom *sprom;
-+
-+	if (!bus->host_pdev || !bus->host_pdev->dev.of_node)
-+		return -ENOENT;
-+
-+	handle = of_get_property(bus->host_pdev->dev.of_node, "sprom", NULL);
-+	if (!handle)
-+		return -ENOENT;
-+
-+	sprom_node = of_find_node_by_phandle(be32_to_cpup(handle));
-+	if (!sprom_node)
-+		return -ENOENT;
-+
-+	sprom_dev = of_find_device_by_node(sprom_node);
-+	if (!sprom_dev)
-+		return -ENOENT;
-+
-+	sprom = platform_get_drvdata(sprom_dev);
-+	if (!sprom)
-+		return -ENOENT;
-+
-+	memcpy(out, sprom, sizeof(*out));
-+
-+	return 0;
-+}
-+#else
-+static int bcma_fill_sprom_with_dt(struct bcma_bus *bus,
-+				   struct ssb_sprom *out)
-+{
-+	return -ENOENT;
-+}
-+#endif
-+
- static int bcma_fill_sprom_with_fallback(struct bcma_bus *bus,
- 					 struct ssb_sprom *out)
- {
-@@ -580,7 +622,14 @@ int bcma_sprom_get(struct bcma_bus *bus)
- 	u16 *sprom;
- 	size_t sprom_sizes[] = { SSB_SPROMSIZE_WORDS_R4,
- 				 SSB_SPROMSIZE_WORDS_R10, };
--	int i, err = 0;
-+	int i, err;
-+
-+	err = bcma_fill_sprom_with_dt(bus, &bus->sprom);
-+	if (err == 0) {
-+		bcma_info(bus, "Found sprom from device tree provider\n");
-+		return 0;
-+	}
-+	err = 0;
- 
- 	if (!bus->drv_cc.core)
- 		return -EOPNOTSUPP;
--- 
-1.9.1
+[    0.685028] of_amba_device_create(): amba_device_add() failed (-19)
+for /etb at 5401b000
+[    0.685119] of_amba_device_create(): amba_device_add() failed (-19)
+for /etm at 54010000
+
+There are no nodes according coresight in /sys/kernel/debug/ .
+
+Best regards,
+Marcin
+
+>
+> Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+> ---
+>  arch/arm/boot/dts/omap3-beagle-xm.dts | 28 ++++++++++++++++++++++++++++
+>  arch/arm/boot/dts/omap3-beagle.dts    | 28 ++++++++++++++++++++++++++++
+>  2 files changed, 56 insertions(+)
+>
+> diff --git a/arch/arm/boot/dts/omap3-beagle-xm.dts b/arch/arm/boot/dts/omap3-beagle-xm.dts
+> index 1becefc..eec73d8 100644
+> --- a/arch/arm/boot/dts/omap3-beagle-xm.dts
+> +++ b/arch/arm/boot/dts/omap3-beagle-xm.dts
+> @@ -145,6 +145,34 @@
+>  			};
+>  		};
+>  	};
+> +
+> +	etb at 5401b000 {
+> +		compatible = "arm,coresight-etb10", "arm,primecell";
+> +		reg = <0x5401b000 0x1000>;
+> +
+> +		coresight-default-sink;
+> +		clocks = <&emu_src_ck>;
+> +		clock-names = "apb_pclk";
+> +		port {
+> +			etb_in: endpoint {
+> +				slave-mode;
+> +				remote-endpoint = <&etm_out>;
+> +			};
+> +		};
+> +	};
+> +
+> +	etm at 54010000 {
+> +		compatible = "arm,coresight-etm3x", "arm,primecell";
+> +		reg = <0x54010000 0x1000>;
+> +
+> +		clocks = <&emu_src_ck>;
+> +		clock-names = "apb_pclk";
+> +		port {
+> +			etm_out: endpoint {
+> +				remote-endpoint = <&etb_in>;
+> +			};
+> +		};
+> +	};
+>  };
+>  
+>  &omap3_pmx_wkup {
+> diff --git a/arch/arm/boot/dts/omap3-beagle.dts b/arch/arm/boot/dts/omap3-beagle.dts
+> index 3c3e6da..a151daf 100644
+> --- a/arch/arm/boot/dts/omap3-beagle.dts
+> +++ b/arch/arm/boot/dts/omap3-beagle.dts
+> @@ -140,6 +140,34 @@
+>  			};
+>  		};
+>  	};
+> +
+> +	etb at 540000000 {
+> +		compatible = "arm,coresight-etb10", "arm,primecell";
+> +		reg = <0x5401b000 0x1000>;
+> +
+> +		coresight-default-sink;
+> +		clocks = <&emu_src_ck>;
+> +		clock-names = "apb_pclk";
+> +		port {
+> +			etb_in: endpoint {
+> +				slave-mode;
+> +				remote-endpoint = <&etm_out>;
+> +			};
+> +		};
+> +	};
+> +
+> +	etm at 54010000 {
+> +		compatible = "arm,coresight-etm3x", "arm,primecell";
+> +		reg = <0x54010000 0x1000>;
+> +
+> +		clocks = <&emu_src_ck>;
+> +		clock-names = "apb_pclk";
+> +		port {
+> +			etm_out: endpoint {
+> +				remote-endpoint = <&etb_in>;
+> +			};
+> +		};
+> +	};
+>  };
+>  
+>  &omap3_pmx_wkup {
