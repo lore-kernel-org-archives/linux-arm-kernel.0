@@ -1,50 +1,54 @@
-From: ipaton0@gmail.com (Iain Paton)
-Date: Sun, 24 Aug 2014 10:44:54 +0100
-Subject: [PATCH 1/6] ARM: dts: microsom-ar8035: MDIO pad must be set open
- drain
-In-Reply-To: <E1XL7M1-0002yD-K3@rmk-PC.arm.linux.org.uk>
-References: <20140823091058.GO30401@n2100.arm.linux.org.uk>
- <E1XL7M1-0002yD-K3@rmk-PC.arm.linux.org.uk>
-Message-ID: <53F9B416.5030907@gmail.com>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Sun, 24 Aug 2014 11:49:51 +0200
+Subject: [PATCH v3 0/6] Migrate PXA27x platforms to clock framework
+In-Reply-To: <1465795.XsPpj3dZHX@wuerfel> (Arnd Bergmann's message of "Sat, 23
+ Aug 2014 20:54:38 +0200")
+References: <1406753464-15000-1-git-send-email-robert.jarzmik@free.fr>
+ <CAN1soZwDDwiLuVkT7kRJX-wy-UmyDj-2yiReGrpBrTOJkKpuSA@mail.gmail.com>
+ <87ha1342ei.fsf@free.fr> <1465795.XsPpj3dZHX@wuerfel>
+Message-ID: <87d2bq43pc.fsf@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23/08/14 10:11, Russell King wrote:
-> From: Rabeeh Khoury <rabeeh@solid-run.com>
-> To: Shawn Guo <shawn.guo@freescale.com>
-> 
-> MDIO pad must be set open drain.
-> 
-> Signed-off-by: Rabeeh Khoury <rabeeh@solid-run.com>
-> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> ---
->  arch/arm/boot/dts/imx6qdl-microsom-ar8035.dtsi | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/boot/dts/imx6qdl-microsom-ar8035.dtsi b/arch/arm/boot/dts/imx6qdl-microsom-ar8035.dtsi
-> index d16066608e21..db9f45b2c573 100644
-> --- a/arch/arm/boot/dts/imx6qdl-microsom-ar8035.dtsi
-> +++ b/arch/arm/boot/dts/imx6qdl-microsom-ar8035.dtsi
-> @@ -17,7 +17,7 @@
->  	enet {
->  		pinctrl_microsom_enet_ar8035: microsom-enet-ar8035 {
->  			fsl,pins = <
-> -				MX6QDL_PAD_ENET_MDIO__ENET_MDIO		0x1b0b0
-> +				MX6QDL_PAD_ENET_MDIO__ENET_MDIO		0x1b8b0
->  				MX6QDL_PAD_ENET_MDC__ENET_MDC		0x1b0b0
->  				/* AR8035 reset */
->  				MX6QDL_PAD_KEY_ROW4__GPIO4_IO15		0x130b0
-> 
+Arnd Bergmann <arnd@arndb.de> writes:
 
-Can you elaborate some more on the reasons for this?  
+> I didn't know we were supposed to merge it. There was no reason
+> against merging it when you posted it, but you didn't make it clear
+> what you want to happen.
+Right.
 
-I'd like to understand if it's something specific to the hardware on that 
-board, or if other i.MX6 boards using the ar8035 are doing it wrong as well.
+> By default, I'd expect Haojian to pick up the patches and send
+> us a pull request. He sent an Ack, but also didn't make it clear
+> that we should pick them up.
+I was thinking that they would go through the clk maintainers, hence Haojian's
+ack. If they should go through arm-soc, they would need Mike's ack.
 
-The datasheet strongly suggests this is the correct thing to do as MDIO 
-should electrically be open drain. However that suggests many more instances 
-of this incorrect configuration exist which also need changed, and not just 
-for ar8035.
+> If you want code to be merged directly through arm-soc, please
+> send the pull request "To:" arm at kernel.org (with all interested
+> parties the mailing lists in Cc) and ask us directly to pull it,
+> to avoid all ambiguity.
+OK, I can do it with Mike's ack first.
 
-While I'm reluctant to attribute something like this to the fec/interrupt 
-problems some people are seeing, I'd also like to be able to rule it out.
+> Sometimes we can miss patches (as opposed to pull requests) since
+> at least I tend to scan my inbox for the 'GIT PULL' keyword. If
+> we don't seem to react within a week, just send a friendly reminder.
+No problem, it's not as if this was a business critical platform :)
+
+> For the specific case of PXA, I wonder if we should update the
+> maintainer entry. As far as I can tell, Eric and Russell are no
+> longer actively involved in the maintenance of PXA, and Haojian
+> is doing only the bare minimum and is kept busy by other platforms
+> these days (mach-hisi, mach-mmp). Should we perhaps add you and/or
+> Daniel and remove some of the others if they are no longer as
+> actively working on PXA?
+
+Sure, I'll send a patch to add myself to the MAINTAINERS of pxa. Would be great
+if Daniel stepped in too, as my pxa3xx knowledge is poor.
+
+As to removing Russell and Eric, we should get their opinion, it's as they want,
+I can send it in the maintainers patch if they agree.
+
+Cheers.
+
+-- 
+Robert
