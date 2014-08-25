@@ -1,68 +1,48 @@
 From: jonas.jensen@gmail.com (Jonas Jensen)
-Date: Mon, 25 Aug 2014 16:22:22 +0200
-Subject: [PATCH v6 2/4] net: moxa: replace build_skb() with
- netdev_alloc_skb_ip_align() / memcpy()
-In-Reply-To: <1408544342-32058-1-git-send-email-jonas.jensen@gmail.com>
-References: <1408544342-32058-1-git-send-email-jonas.jensen@gmail.com>
-Message-ID: <1408976542-15624-1-git-send-email-jonas.jensen@gmail.com>
+Date: Mon, 25 Aug 2014 16:22:32 +0200
+Subject: [PATCH v6 3/4] net: moxa: synchronize DMA memory
+Message-ID: <1408976552-15659-1-git-send-email-jonas.jensen@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-build_skb() is used to make skbs out of existing RX ring memory
-which is bad because the RX ring is allocated only once, on probe.
-Memory corruption occur because said memory is reclaimed, i.e.
-__kfree_skb() (and eventually put_page()).
+DMA memory should be synchronized before data is passed
+to/from controller.
 
-Replace build_skb() with netdev_alloc_skb_ip_align() and use memcpy().
-
-Remove SKB_DATA_ALIGN() from RX buffer size while we're at it.
-
-Addresses https://bugzilla.kernel.org/show_bug.cgi?id=69041
+Add dma_sync_single_for_cpu(.., DMA_FROM_DEVICE) to RX path
+and dma_sync_single_for_device(.., DMA_TO_DEVICE) to TX path.
 
 Signed-off-by: Jonas Jensen <jonas.jensen@gmail.com>
 ---
 
 Notes:
-    Changes since v5:
-    
-    1. broke out DMA synchronization to separate patch
-    
     Applies to next-20140825
 
- drivers/net/ethernet/moxa/moxart_ether.c | 9 +++++----
- 1 file changed, 5 insertions(+), 4 deletions(-)
+ drivers/net/ethernet/moxa/moxart_ether.c | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
 diff --git a/drivers/net/ethernet/moxa/moxart_ether.c b/drivers/net/ethernet/moxa/moxart_ether.c
-index eed70d9..d66058d 100644
+index d66058d..983d019 100644
 --- a/drivers/net/ethernet/moxa/moxart_ether.c
 +++ b/drivers/net/ethernet/moxa/moxart_ether.c
-@@ -226,13 +226,15 @@ static int moxart_rx_poll(struct napi_struct *napi, int budget)
+@@ -226,6 +226,9 @@ static int moxart_rx_poll(struct napi_struct *napi, int budget)
  		if (len > RX_BUF_SIZE)
  			len = RX_BUF_SIZE;
  
--		skb = build_skb(priv->rx_buf[rx_head], priv->rx_buf_size);
-+		skb = netdev_alloc_skb_ip_align(ndev, len);
-+
++		dma_sync_single_for_cpu(&ndev->dev,
++					priv->rx_mapping[rx_head],
++					priv->rx_buf_size, DMA_FROM_DEVICE);
+ 		skb = netdev_alloc_skb_ip_align(ndev, len);
+ 
  		if (unlikely(!skb)) {
--			net_dbg_ratelimited("build_skb failed\n");
-+			net_dbg_ratelimited("netdev_alloc_skb_ip_align failed\n");
- 			priv->stats.rx_dropped++;
- 			priv->stats.rx_errors++;
- 		}
+@@ -348,6 +351,9 @@ static int moxart_mac_start_xmit(struct sk_buff *skb, struct net_device *ndev)
+ 		len = ETH_ZLEN;
+ 	}
  
-+		memcpy(skb->data, priv->rx_buf[rx_head], len);
- 		skb_put(skb, len);
- 		skb->protocol = eth_type_trans(skb, ndev);
- 		napi_gro_receive(&priv->napi, skb);
-@@ -464,8 +466,7 @@ static int moxart_mac_probe(struct platform_device *pdev)
- 	spin_lock_init(&priv->txlock);
- 
- 	priv->tx_buf_size = TX_BUF_SIZE;
--	priv->rx_buf_size = RX_BUF_SIZE +
--			    SKB_DATA_ALIGN(sizeof(struct skb_shared_info));
-+	priv->rx_buf_size = RX_BUF_SIZE;
- 
- 	priv->tx_desc_base = dma_alloc_coherent(NULL, TX_REG_DESC_SIZE *
- 						TX_DESC_NUM, &priv->tx_base,
++	dma_sync_single_for_device(&ndev->dev, priv->tx_mapping[tx_head],
++				   priv->tx_buf_size, DMA_TO_DEVICE);
++
+ 	txdes1 = TX_DESC1_LTS | TX_DESC1_FTS | (len & TX_DESC1_BUF_SIZE_MASK);
+ 	if (tx_head == TX_DESC_NUM_MASK)
+ 		txdes1 |= TX_DESC1_END;
 -- 
 1.8.2.1
