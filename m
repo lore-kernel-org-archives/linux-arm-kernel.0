@@ -1,53 +1,47 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 25 Aug 2014 10:04:33 +0200
-Subject: [RFC 6/7] bcma: get sprom from devicetree
-In-Reply-To: <1408915485-8078-8-git-send-email-hauke@hauke-m.de>
-References: <1408915485-8078-1-git-send-email-hauke@hauke-m.de>
- <1408915485-8078-8-git-send-email-hauke@hauke-m.de>
-Message-ID: <4882662.VtlSfZ0rSN@wuerfel>
+From: marex@denx.de (Marek Vasut)
+Date: Mon, 25 Aug 2014 10:07:22 +0200
+Subject: [PATCH v4] spi: spi-imx: add DMA support
+In-Reply-To: <1408752835-10995-1-git-send-email-b38343@freescale.com>
+References: <1408752835-10995-1-git-send-email-b38343@freescale.com>
+Message-ID: <201408251007.22393.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sunday 24 August 2014 23:24:44 Hauke Mehrtens wrote:
-> +#ifdef CONFIG_OF
-> +static int bcma_fill_sprom_with_dt(struct bcma_bus *bus,
-> +                                  struct ssb_sprom *out)
-> +{
-> +       const __be32 *handle;
-> +       struct device_node *sprom_node;
-> +       struct platform_device *sprom_dev;
-> +       struct ssb_sprom *sprom;
-> +
-> +       if (!bus->host_pdev || !bus->host_pdev->dev.of_node)
-> +               return -ENOENT;
+On Saturday, August 23, 2014 at 02:13:55 AM, Robin Gong wrote:
+> After enable DMA
 
-You can remove the #ifdef above if you change this into
+Please also add a commit message which describes the change, not only some test 
+results.
 
-	if (!IS_ENABLED(CONFIG_OF) || !bus->host_pdev ||
-	    !bus->host_pdev->dev.of_node)
-		return -ENOENT;
+[...]
 
-> +       handle = of_get_property(bus->host_pdev->dev.of_node, "sprom", NULL);
-> +       if (!handle)
-> +               return -ENOENT;
-> +
-> +       sprom_node = of_find_node_by_phandle(be32_to_cpup(handle));
-> +       if (!sprom_node)
-> +               return -ENOENT;
-> +
-> +       sprom_dev = of_find_device_by_node(sprom_node);
-> +       if (!sprom_dev)
-> +               return -ENOENT;
-> +
-> +       sprom = platform_get_drvdata(sprom_dev);
-> +       if (!sprom)
-> +               return -ENOENT;
-> +
-> +       memcpy(out, sprom, sizeof(*out));
-> +
-> +       return 0;
-> +}
+> @@ -911,6 +1194,13 @@ static int spi_imx_probe(struct platform_device
+> *pdev) goto out_put_per;
+> 
+>  	spi_imx->spi_clk = clk_get_rate(spi_imx->clk_per);
+> +	/*
+> +	 * Only validated on i.mx6 now, can remove the constrain if validated on
+> +	 * other chips.
+> +	 */
 
-missing of_node_put().
+Given that the check below tests for imx51_ecspi_devtype_data ... does that 
+mean, that this code was never tested on MX51 and MX53, yet will be enabled
+for those chips and might possibly break them ?
 
-	Arnd
+> +	if (spi_imx->devtype_data == &imx51_ecspi_devtype_data
+> +	    && spi_imx_sdma_init(&pdev->dev, spi_imx, master, res))
+> +		dev_err(&pdev->dev, "dma setup error,use pio instead\n");
+> 
+>  	spi_imx->devtype_data->reset(spi_imx);
+> 
+> @@ -949,6 +1239,7 @@ static int spi_imx_remove(struct platform_device
+> *pdev) writel(0, spi_imx->base + MXC_CSPICTRL);
+>  	clk_unprepare(spi_imx->clk_ipg);
+>  	clk_unprepare(spi_imx->clk_per);
+> +	spi_imx_sdma_exit(spi_imx);
+>  	spi_master_put(master);
+> 
+>  	return 0;
+
+Best regards,
+Marek Vasut
