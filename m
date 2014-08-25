@@ -1,68 +1,39 @@
-From: mpa@pengutronix.de (Markus Pargmann)
-Date: Mon, 25 Aug 2014 08:43:35 +0200
-Subject: [PATCH] watchdog: imx2_wdt: Remove seperate big endian handling
-Message-ID: <1408949015-28759-1-git-send-email-mpa@pengutronix.de>
+From: haojian.zhuang@gmail.com (Haojian Zhuang)
+Date: Mon, 25 Aug 2014 14:53:09 +0800
+Subject: [PATCH 1/2] ARM: pxa: dts: fix mmc controller compatible string
+In-Reply-To: <1408009573-24523-1-git-send-email-zonque@gmail.com>
+References: <1408009573-24523-1-git-send-email-zonque@gmail.com>
+Message-ID: <CAN1soZyeXsKFHsUU8d8-7SFBECa_ExrMSCvf5WE578LVaMVaLw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-3.18 will contain a patch that handles endianess within the regmap
-framework. It does not need any parsing of DT properties within the
-driver, so we can savely remove it here.
-The required mainline patch is
-	(regmap: add DT endianness binding support.)
+On Thu, Aug 14, 2014 at 5:46 PM, Daniel Mack <zonque@gmail.com> wrote:
+> The vendor prefix was renamed from "mrvl" to "marvell". Follow this
+> change in the dts file.
+>
+> Signed-off-by: Daniel Mack <zonque@gmail.com>
+> ---
+>  arch/arm/boot/dts/pxa2xx.dtsi | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+>
+> diff --git a/arch/arm/boot/dts/pxa2xx.dtsi b/arch/arm/boot/dts/pxa2xx.dtsi
+> index febd391..f188f8c 100644
+> --- a/arch/arm/boot/dts/pxa2xx.dtsi
+> +++ b/arch/arm/boot/dts/pxa2xx.dtsi
+> @@ -128,7 +128,7 @@
+>                 };
+>
+>                 mmc0: mmc at 41100000 {
+> -                       compatible = "mrvl,pxa-mmc";
+> +                       compatible = "marvell,pxa-mmc";
+>                         reg = <0x41100000 0x1000>;
+>                         interrupts = <23>;
+>                         dmas = <&dma 21
+> --
+> 2.0.4
+>
 
-Cc: Xiubo Li <Li.Xiubo@freescale.com>
-Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
----
-Hi,
+Applied these 2 patches.
 
-This is the topic branch with the patches which replace the functionality of
-this code.
-https://git.kernel.org/cgit/linux/kernel/git/broonie/regmap.git/log/?h=topic/dt-endian
-
-Best regards,
-
-Markus
-
-
- drivers/watchdog/imx2_wdt.c | 7 -------
- 1 file changed, 7 deletions(-)
-
-diff --git a/drivers/watchdog/imx2_wdt.c b/drivers/watchdog/imx2_wdt.c
-index 68c3d379ffa8..9d4874f09948 100644
---- a/drivers/watchdog/imx2_wdt.c
-+++ b/drivers/watchdog/imx2_wdt.c
-@@ -28,7 +28,6 @@
- #include <linux/kernel.h>
- #include <linux/module.h>
- #include <linux/moduleparam.h>
--#include <linux/of_address.h>
- #include <linux/platform_device.h>
- #include <linux/regmap.h>
- #include <linux/timer.h>
-@@ -191,12 +190,10 @@ static struct regmap_config imx2_wdt_regmap_config = {
- 
- static int __init imx2_wdt_probe(struct platform_device *pdev)
- {
--	struct device_node *np = pdev->dev.of_node;
- 	struct imx2_wdt_device *wdev;
- 	struct watchdog_device *wdog;
- 	struct resource *res;
- 	void __iomem *base;
--	bool big_endian;
- 	int ret;
- 	u32 val;
- 
-@@ -204,10 +201,6 @@ static int __init imx2_wdt_probe(struct platform_device *pdev)
- 	if (!wdev)
- 		return -ENOMEM;
- 
--	big_endian = of_property_read_bool(np, "big-endian");
--	if (big_endian)
--		imx2_wdt_regmap_config.val_format_endian = REGMAP_ENDIAN_BIG;
--
- 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
- 	base = devm_ioremap_resource(&pdev->dev, res);
- 	if (IS_ERR(base))
--- 
-2.1.0.rc1
+Regards
+Haojian
