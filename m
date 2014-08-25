@@ -1,38 +1,46 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 25 Aug 2014 09:02:25 -0700
-Subject: [PATCH v5 7/7] arm: dts: am33xx, Add syscon phandle to cpsw node
-In-Reply-To: <1408947828-22316-8-git-send-email-mpa@pengutronix.de>
-References: <1408947828-22316-1-git-send-email-mpa@pengutronix.de>
- <1408947828-22316-8-git-send-email-mpa@pengutronix.de>
-Message-ID: <20140825160225.GI17254@atomide.com>
+From: nm@ti.com (Nishanth Menon)
+Date: Mon, 25 Aug 2014 11:36:07 -0500
+Subject: [PATCH 00/10] ARM: OMAP5 / DRA7: Add framework for suspend and
+ cpuidle
+In-Reply-To: <1408716154-26101-1-git-send-email-nm@ti.com>
+References: <1408716154-26101-1-git-send-email-nm@ti.com>
+Message-ID: <53FB65F7.6010704@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Markus Pargmann <mpa@pengutronix.de> [140824 23:24]:
-> There are 2 MACIDs stored in the control module of the am33xx. These are
-> read by the cpsw driver if no valid MACID was found in the devicetree.
+On 08/22/2014 09:02 AM, Nishanth Menon wrote:
+[...]
+> An complete integrated branch is available here: https://github.com/nmenon/linux-2.6-playground/commits/testing/v3.17/cpu-idle-suspend-dra7-omap5-framework
 > 
-> Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
-> Reviewed-by: Wolfram Sang <wsa@the-dreams.de>
+> Example test log:
+> DRA7 based BeagleBoard X15: http://slexy.org/view/s2jgsH8bos (wakeup from external using pinctrl wakeup).
+> OMAP5UEVM: http://slexy.org/view/s20MiQJQIq (external pinctrl not hooked)
 
-Acked-by: Tony Lindgren <tony@atomide.com>
+Tony wanted a slightly wider test coverage including OMAP4 platforms:
+So using
+https://github.com/nmenon/linux-2.6-playground/commit/92e5e7407aa707ad6be8ae3b5bf21cfc741daab6
+wakeup timer as a wakeup source (remote boards):
 
-> ---
->  arch/arm/boot/dts/am33xx.dtsi | 1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
-> index 25e38b6ac376..13e44b0f5adc 100644
-> --- a/arch/arm/boot/dts/am33xx.dtsi
-> +++ b/arch/arm/boot/dts/am33xx.dtsi
-> @@ -701,6 +701,7 @@
->  			 */
->  			interrupts = <40 41 42 43>;
->  			ranges;
-> +			syscon = <&cm>;
->  			status = "disabled";
->  
->  			davinci_mdio: mdio at 4a101000 {
-> -- 
-> 2.1.0.rc1
-> 
+am37x-evm: http://slexy.org/raw/s2l2vPAlBi
+BeagleBoard-XM: http://slexy.org/raw/s2HvJHuZ8K
+beagleboard-vanilla: http://slexy.org/raw/s2re4CjsVS
+n900: http://slexy.org/raw/s21kRad9UC
+sdp3430: http://slexy.org/raw/s217hjHveS
+pandaboard-es: http://slexy.org/raw/s21Vhfl96g
+pandaboard-vanilla: http://slexy.org/raw/s21uPHllrR
+sdp4430: http://slexy.org/raw/s20Jl3cika
+
+Vs:
+3.17-rc1:
+am37x-evm: http://slexy.org/raw/s21FKtfXlb
+BeagleBoard-XM: http://slexy.org/raw/s2q3LCSDkd
+beagleboard-vanilla: http://slexy.org/raw/s21ioe8utf
+n900: http://slexy.org/raw/s20E3oQhCl
+sdp3430: http://slexy.org/raw/s21XQDe1s3
+pandaboard-es: http://slexy.org/raw/s21DcS0IIt
+pandaboard-vanilla: http://slexy.org/raw/s25W1A4JsP
+sdp4430: http://slexy.org/raw/s2019HPstN
+
+-- 
+Regards,
+Nishanth Menon
