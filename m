@@ -1,73 +1,69 @@
-From: sjoerd.simons@collabora.co.uk (Sjoerd Simons)
-Date: Mon, 25 Aug 2014 10:11:37 +0200
-Subject: [PATCH v9 4/6] ARM: Exynos: switch to using generic cpufreq
- driver for Exynos4210/5250/5420
-In-Reply-To: <7hbnrc6px3.fsf@paris.lan>
-References: <1406707663-16656-1-git-send-email-thomas.ab@samsung.com>
- <1406707663-16656-5-git-send-email-thomas.ab@samsung.com>
- <53DA8BB9.6020702@samsung.com> <53DA8D85.3050106@gmail.com>
- <7hbnrc6px3.fsf@paris.lan>
-Message-ID: <1408954297.31096.7.camel@collabora.co.uk>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Mon, 25 Aug 2014 10:13:28 +0200
+Subject: [PATCH V2 3/3] mmc: dw_mmc: Dont cut off vqmmc and vmmc
+In-Reply-To: <CAPz6YkXH1mMOTwcLkKdffdUHN+TaCAhpa8oG0h+rFn9i+GMoCw@mail.gmail.com>
+References: <1408715272-13833-1-git-send-email-yuvaraj.cd@samsung.com>
+ <1408715272-13833-4-git-send-email-yuvaraj.cd@samsung.com>
+ <CAPDyKFqz8sGj2td=ihZXN4zvAqmu9FHZjWdCn-ZRcdHugNHe2g@mail.gmail.com>
+ <CAPz6YkXH1mMOTwcLkKdffdUHN+TaCAhpa8oG0h+rFn9i+GMoCw@mail.gmail.com>
+Message-ID: <CAPDyKFqp7oEt9ASmdxrgUwbQ8aTZzAuJ7uD1oGN50iuzPzBfVg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hey,
+On 22 August 2014 20:27, Sonny Rao <sonnyrao@chromium.org> wrote:
+> On Fri, Aug 22, 2014 at 8:31 AM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
+>> On 22 August 2014 15:47, Yuvaraj Kumar C D <yuvaraj.cd@gmail.com> wrote:
+>>> Exynos 5250 and 5420 based boards uses built-in CD# line for card
+>>> detection.But unfortunately CD# line is on the same voltage rails
+>>> as of I/O voltage rails. When we cut off vqmmc,the consequent card
+>>> detection will break in these boards.
+>>
+>> I am not sure I follow here.
+>>
+>> Is the card detect mechanism handled internally by the dw_mmc controller?
+>
+> Yes
 
-On Fri, 2014-08-22 at 16:54 -0700, Kevin Hilman wrote:
-> Tomasz Figa <tomasz.figa@gmail.com> writes:
-> 
-> > Kukjin,
-> >
-> > On 31.07.2014 20:32, Kukjin Kim wrote:
-> >> On 07/30/14 17:07, Thomas Abraham wrote:
-> >>> The new CPU clock type allows the use of generic CPUfreq drivers. So for
-> >>> Exynos4210/5250, switch to using generic cpufreq driver. For Exynos5420,
-> >>> which did not have CPUfreq driver support, enable the use of generic
-> >>> CPUfreq driver.
-> >>>
-> >>> Suggested-by: Tomasz Figa<t.figa@samsung.com>
-> >>> Cc: Kukjin Kim<kgene.kim@samsung.com>
-> >> 
-> >> Looks good to me,
-> >> 
-> >> Acked-by: Kukjin Kim <kgene.kim@samsung.com>
-> >> 
-> >> BTW, who will handle this series? I hope see this series in 3.17.
-> >
-> > This series consists mostly of clock changes and it likely depends on
-> > patches already in my for-next, so I would be inclined toward taking it
-> > through samsung-clk tree. 
-> 
-> So has this series been picked up anywhere?  I don't see it in your
-> samsung-clk tree, nor in Kukjin's for-next.
-> 
-> Also, I'm curious whether or how this is has been tested on big.LITTLE
-> SoCs.  
-> 
-> I'm trying it on the 5800/Chromebook2 and it's not terribly stable.  I'm
-> testing along with CPUidle, so there may be some untested interactions
-> there as it seems a bit more stable without CPUidle enabled.
-> 
-> I'd love to hear from anyone else that's testing CPUidle and CPUfreq
-> together big.LITTLE 5420/5800, with or without the switcher.
-> 
-> Also, the patch below[2] is needed for 5800.
+Just out of curiosity.
 
-For reference, I had the same patch in a kernel tree we recently used
-for a demo on the chromebook 2 13" (Exynos 5800). We didn't see any
-stability issues due to this without CPUidle (using the ondemand
-govenor). The kernel we ended up using had CONFIG_BL_SWITCHER disabled,
-but i don't remember seeing stability issues when i did a testrun with
-that enabled.  
+Do you know how the power to the actual dw_mmc controller is handled?
+I expect it to be SoC specific and I am guessing power domain
+regulators may be involved!?
 
+>
+>>
+>> I thought HW engineers long time ago realized that this should be done
+>> separately on a GPIO line to be able to save power while waiting for a
+>> card to be inserted. But that's not case then?
+>
+> At least in my limited experience, this seems to be common among SoC
+> vendors who are using dw_mmc, as we've seen this elsewhere as well and
+> after seeing it here we know that we need to ignore the CD pin that's
+> routed to dw_mmc and use a separately powered GPIO on the board, but
+> still there are probably many SoCs/boards which are doing it this way.
+>
+>>>
+>>> These hosts (obviously) need to keep vqmmc (and thus vmmc) on all the
+>>> time, even when the mmc core tells them to power off. However, one
+>>> problem is that these cards won't properly handle mmc_power_cycle().
+>>> That's needed to handle error cases when trying to switch voltages
+>>> (see 0797e5f mmc:core: Fixup signal voltage switch).
+>>>
+>>> This patch adds a new MMC_POWER_OFF_HARD mode when it's doing a power
+>>> cycle.  This mode differs from the normal MMC_POWER_OFF mode in that
+>>> the mmc core will promise to power the slot back on before it expects
+>>> the host to detect card insertion or removal.
+>
+> This patch is based off of one that Doug wrote (sent privately to
+> Yuvaraj) which just modifies the MMC core, and should be split into
+> two patches.
+> One that modifies the mmc core and one that implements this in dw_mmc.
 
--- 
-Sjoerd Simons <sjoerd.simons@collabora.co.uk>
-Collabora Ltd.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: smime.p7s
-Type: application/x-pkcs7-signature
-Size: 6170 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140825/e02aa78e/attachment.bin>
+I looked at the mmc core parts, it seems like the wrong approach.
+
+I think you shall be able use MMC_CAP_NEEDS_POLL, to handle this
+broken card detect mechanism. We even have a DT binding for that,
+"broken-cd".
+
+Kind regards
+Uffe
