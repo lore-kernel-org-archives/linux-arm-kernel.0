@@ -1,38 +1,43 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Mon, 25 Aug 2014 08:50:07 -0700
-Subject: [PATCH] clk: rockchip: Fix the clocks for i2c1 and i2c2
-In-Reply-To: <4584014.Iu24cpYxxY@phil>
-References: <1408725508-24066-1-git-send-email-dianders@chromium.org>
- <4584014.Iu24cpYxxY@phil>
-Message-ID: <CAD=FV=XH4wj-3vCobd_D5F1-Ef_jrLm-=hv8MknUBcYVLg5Jzg@mail.gmail.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Mon, 25 Aug 2014 23:50:19 +0800
+Subject: [PATCH] i2c: mv64xxx: continue probe when clock-frequency is missing
+Message-ID: <1408981819-3477-1-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+The "clock-frequency" DT property is listed as optional, However,
+the current code stores the return value of of_property_read_u32 in
+the return code of mv64xxx_of_config, but then forgets to clear it
+after setting the default value of "clock-frequency". It is then
+passed out to the main probe function, resulting in a probe failure
+when "clock-frequency" is missing.
 
-On Fri, Aug 22, 2014 at 9:46 AM, Heiko St?bner <heiko@sntech.de> wrote:
-> Am Freitag, 22. August 2014, 09:38:28 schrieb Doug Anderson:
->> The clocks for i2c1 and i2c2 are flipped.  The clock tree matched the
->> Technical Reference Manual (TRM) but the TRM was wrong.  Swap them in
->> the clock tree.  This was determined experimentally (by Addy) and
->> confirmed by the Rockchip IC team.
->>
->> Seires-cc: Eddie Cai <eddie.cai@rock-chips.com>
->
-> I guess this is a typo...
->
->
->> Signed-off-by: Doug Anderson <dianders@chromium.org>
->> Reported-by: Addy Ke <addy.ke@rock-chips.com>
->
-> The error-case we discussed yesterday was quite clear, so
->
-> Reviewed-by: Heiko Stuebner <heiko@sntech.de>
+This patch checks and then throws away the result of
+of_property_read_u32, instead of storing it and having to clear it
+afterwards.
 
-Just in case anyone reading was wondering: I've now received a new
-version of the TRM (technical reference manual) the confirms the
-correctness of this patch.
+This issue was discovered after the property was removed from all
+sunxi DTs.
 
-Mike: maybe you could apply it to 3.17 fixups?
+Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+Cc: stable at vger.kernel.org
+---
+ drivers/i2c/busses/i2c-mv64xxx.c | 3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
 
--Doug
+diff --git a/drivers/i2c/busses/i2c-mv64xxx.c b/drivers/i2c/busses/i2c-mv64xxx.c
+index 6dc5ded..2f64273 100644
+--- a/drivers/i2c/busses/i2c-mv64xxx.c
++++ b/drivers/i2c/busses/i2c-mv64xxx.c
+@@ -746,8 +746,7 @@ mv64xxx_of_config(struct mv64xxx_i2c_data *drv_data,
+ 	}
+ 	tclk = clk_get_rate(drv_data->clk);
+ 
+-	rc = of_property_read_u32(np, "clock-frequency", &bus_freq);
+-	if (rc)
++	if (of_property_read_u32(np, "clock-frequency", &bus_freq))
+ 		bus_freq = 100000; /* 100kHz by default */
+ 
+ 	if (!mv64xxx_find_baud_factors(bus_freq, tclk,
+-- 
+2.1.0
