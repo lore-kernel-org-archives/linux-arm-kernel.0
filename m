@@ -1,43 +1,72 @@
 From: ajaynumb@gmail.com (Ajay kumar)
-Date: Mon, 25 Aug 2014 11:31:50 +0530
-Subject: [PATCH 2/3] ARM: dts: Add DT changes for display on peach_pit
-In-Reply-To: <53F86E85.3050200@suse.de>
+Date: Mon, 25 Aug 2014 11:38:56 +0530
+Subject: [PATCH 1/3] ARM: dts: Add DT changes for display on snow
+In-Reply-To: <53F8713E.5040408@suse.de>
 References: <1406317464-7525-1-git-send-email-ajaykumar.rs@samsung.com>
- <1406317464-7525-3-git-send-email-ajaykumar.rs@samsung.com>
- <53F86E85.3050200@suse.de>
-Message-ID: <CAEC9eQP1wAJwC6-9YMjHvA+O=4c93SJNA5YG90t2aWj4P1S6kg@mail.gmail.com>
+ <1406317464-7525-2-git-send-email-ajaykumar.rs@samsung.com>
+ <53F8713E.5040408@suse.de>
+Message-ID: <CAEC9eQNrTW8TJsCNwtQv6Tr15gfz1HJbJkSfUR8NLchvCGbVOQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Aug 23, 2014 at 4:05 PM, Andreas F?rber <afaerber@suse.de> wrote:
+On Sat, Aug 23, 2014 at 4:17 PM, Andreas F?rber <afaerber@suse.de> wrote:
 > Am 25.07.2014 21:44, schrieb Ajay Kumar:
->> Add DT nodes for ps8622 bridge chip and panel-simple panel.
+>> Add DT nodes for ptn3460 bridge chip and panel-simple panel.
 >
 > "simple-panel"
 Ok.
 
->> Add backlight power supply for pwm-backlight.
->> Also add bridge phandle needed by dp to enable display on peach_pit.
->
-> Note that peach_pi[t] is inconsistent with the file names being
-> peach-pi[t] here and in the two subjects.
-Ok.
->>
->> Note that, peach_pit doesn't support "chunghwa,claa101wb01" panel,
->> but still we choose to reuse the binding since "chunghwa,claa101wb01"
->> has similar LCD timings.
+>> Add backlight enable pin and backlight power supply for pwm-backlight.
+>> Also add bridge phandle needed by dp to enable display on snow.
 >>
 >> Signed-off-by: Ajay Kumar <ajaykumar.rs@samsung.com>
 >> ---
->>  arch/arm/boot/dts/exynos5420-peach-pit.dts |   36 +++++++++++++++-------------
->>  1 file changed, 19 insertions(+), 17 deletions(-)
+>>  arch/arm/boot/dts/exynos5250-snow.dts |   40 +++++++++++++++++----------------
+>>  1 file changed, 21 insertions(+), 19 deletions(-)
 >>
->> diff --git a/arch/arm/boot/dts/exynos5420-peach-pit.dts b/arch/arm/boot/dts/exynos5420-peach-pit.dts
->> index 228a6b1..79beba8 100644
->> --- a/arch/arm/boot/dts/exynos5420-peach-pit.dts
->> +++ b/arch/arm/boot/dts/exynos5420-peach-pit.dts
->> @@ -30,11 +30,12 @@
->>               i2c20 = "/spi at 12d40000/cros-ec at 0/i2c-tunnel";
+>> diff --git a/arch/arm/boot/dts/exynos5250-snow.dts b/arch/arm/boot/dts/exynos5250-snow.dts
+>> index 6c36d41..f57f993 100644
+>> --- a/arch/arm/boot/dts/exynos5250-snow.dts
+>> +++ b/arch/arm/boot/dts/exynos5250-snow.dts
+>> @@ -270,7 +270,7 @@
+>>                                       dcdc3 {
+>>                                               ti,enable-ext-control;
+>>                                       };
+>> -                                     fet1 {
+>> +                                     fet1: fet1 {
+>>                                               regulator-name = "vcd_led";
+>>                                               ti,overcurrent-wait = <3>;
+>>                                       };
+>> @@ -293,7 +293,7 @@
+>>                                               regulator-always-on;
+>>                                               ti,overcurrent-wait = <3>;
+>>                                       };
+>> -                                     fet6 {
+>> +                                     fet6: fet6 {
+>>                                               regulator-name = "lcd_vdd";
+>>                                               ti,overcurrent-wait = <3>;
+>>                                       };
+>> @@ -342,6 +342,15 @@
+>>                       pinctrl-0 = <&max98095_en>;
+>>                       pinctrl-names = "default";
+>>               };
+>> +
+>> +             ptn3460: ptn3460-bridge at 20 {
+>
+> "lvds-bridge"? (AF)
+Ok.
+>> +                     compatible = "nxp,ptn3460";
+>> +                     reg = <0x20>;
+>> +                     powerdown-gpios = <&gpy2 5 0>;
+>> +                     reset-gpios = <&gpx1 5 0>;
+>> +                     edid-emulation = <5>;
+>> +                     panel = <&panel>;
+>> +             };
+>>       };
+>>
+>>       i2s0: i2s at 03830000 {
+>> @@ -389,11 +398,13 @@
+>>               vdd_pll-supply = <&ldo8_reg>;
 >>       };
 >>
 >> -     backlight {
@@ -46,83 +75,57 @@ Ok.
 >>               pwms = <&pwm 0 1000000 0>;
 >>               brightness-levels = <0 100 500 1000 1500 2000 2500 2800>;
 >>               default-brightness-level = <7>;
->> +             power-supply = <&tps65090_fet1>;
+>> +             enable-gpios = <&gpx3 0 0>;
+>> +             power-supply = <&fet1>;
 >>               pinctrl-0 = <&pwm0_out>;
 >>               pinctrl-names = "default";
 >>       };
->> @@ -100,6 +101,12 @@
->>               regulator-boot-on;
->>               regulator-always-on;
+>> @@ -403,6 +414,12 @@
+>>               samsung,invert-vclk;
 >>       };
->> +
+>>
 >> +     panel: panel-simple {
 >
 > Just "panel"? (AF)
 >
->> +             compatible = "chunghwa,claa101wb01", "simple-panel";
+>> +             compatible = "simple-panel";
 >
-> Drop "simple-panel" (Thierry)
+> Use something more concrete than "simple-panel"? (Thierry)
 Right.
-
->> +             power-supply = <&tps65090_fet6>;
+>> +             power-supply = <&fet6>;
 >> +             backlight = <&backlight>;
 >> +     };
->>  };
->>
->>  &dp {
->> @@ -113,22 +120,7 @@
->>       samsung,link-rate = <0x06>;
->>       samsung,lane-count = <2>;
->>       samsung,hpd-gpio = <&gpx2 6 0>;
->> -
->> -     display-timings {
->> -             native-mode = <&timing1>;
->> -
->> -             timing1: timing at 1 {
->> -                     clock-frequency = <70589280>;
->> -                     hactive = <1366>;
->> -                     vactive = <768>;
->> -                     hfront-porch = <40>;
->> -                     hback-porch = <40>;
->> -                     hsync-len = <32>;
->> -                     vback-porch = <10>;
->> -                     vfront-porch = <12>;
->> -                     vsync-len = <6>;
->> -             };
->> -     };
->> +     bridge = <&ps8625>;
->>  };
->>
->>  &fimd {
->> @@ -155,6 +147,16 @@
->>               pinctrl-names = "default";
->>               pinctrl-0 = <&max98090_irq>;
->>       };
 >> +
->> +     ps8625: ps8625-bridge at 48 {
+>>       dp-controller at 145B0000 {
+>>               status = "okay";
+>>               pinctrl-names = "default";
+>> @@ -414,21 +431,6 @@
+>>               samsung,link-rate = <0x0a>;
+>>               samsung,lane-count = <2>;
+>>               samsung,hpd-gpio = <&gpx0 7 0>;
+>> -
+>> -             display-timings {
+>> -                     native-mode = <&timing1>;
+>> -
+>> -                     timing1: timing at 1 {
+>> -                             clock-frequency = <70589280>;
+>> -                             hactive = <1366>;
+>> -                             vactive = <768>;
+>> -                             hfront-porch = <40>;
+>> -                             hback-porch = <40>;
+>> -                             hsync-len = <32>;
+>> -                             vback-porch = <10>;
+>> -                             vfront-porch = <12>;
+>> -                             vsync-len = <6>;
+>> -                     };
+>> -             };
+>> +             bridge = <&ptn3460>;
+>>       };
+>>  };
 >
-> "lvds-bridge"? (AF)
-Ok.
-
-I will fix all these nits and resend along with the driver patches.
+> This patch will trivially conflict with my Snow cleanup [1]; ptn3460
+> would go into the appropriate &i2c_* and this hunk into &dp then.
+Yes, display-timings node should be removed from the DP DT node.
+Should I rebase these DT patches on top of your cleanup series?
 
 Ajay
-
->> +             compatible = "parade,ps8625";
->> +             reg = <0x48>;
->> +             sleep-gpios = <&gpx3 5 0>;
->> +             reset-gpios = <&gpy7 7 0>;
->> +             lane-count = <2>;
->> +             panel = <&panel>;
->> +             backlight = <&backlight>;
->> +     };
->>  };
->>
->>  &hsi2c_9 {
->
-> Regards,
-> Andreas
->
-> --
-> SUSE LINUX Products GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
-> GF: Jeff Hawn, Jennifer Guild, Felix Imend?rffer; HRB 16746 AG N?rnberg
