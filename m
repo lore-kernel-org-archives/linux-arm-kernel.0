@@ -1,30 +1,24 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 25 Aug 2014 11:18:32 +0100
-Subject: Oops: 17 SMP ARM (v3.16-rc2)
-In-Reply-To: <C4A61A5CA4AD2246942F4BA6F20ACB80435774FD@ALVA-EXMB04.alv.autoliv.int>
-References: <C4A61A5CA4AD2246942F4BA6F20ACB8043575072@ALVA-EXMB04.alv.autoliv.int>
- <20140806095012.GN30282@n2100.arm.linux.org.uk>
- <C4A61A5CA4AD2246942F4BA6F20ACB8043575172@ALVA-EXMB04.alv.autoliv.int>
- <20140806125550.GO30282@n2100.arm.linux.org.uk>
- <C4A61A5CA4AD2246942F4BA6F20ACB804357526C@ALVA-EXMB04.alv.autoliv.int>
- <20140807121248.GY30282@n2100.arm.linux.org.uk>
- <20140808180900.GG30282@n2100.arm.linux.org.uk>
- <C4A61A5CA4AD2246942F4BA6F20ACB8043576356@ALVA-EXMB04.alv.autoliv.int>
- <CAOMZO5B8GR+ABBoJ=dJcFqw3Wagfaip7HM+C1FTz+aE4CmqiPw@mail.gmail.com>
- <C4A61A5CA4AD2246942F4BA6F20ACB80435774FD@ALVA-EXMB04.alv.autoliv.int>
-Message-ID: <20140825101832.GT30401@n2100.arm.linux.org.uk>
+From: matt@console-pimps.org (Matt Fleming)
+Date: Mon, 25 Aug 2014 11:24:26 +0100
+Subject: [PATCH 1/7] efi: move noefi early param code out of x86 arch code
+In-Reply-To: <20140814092638.GB6330@darkstar.nay.redhat.com>
+References: <1408007731-15081-1-git-send-email-dyoung@redhat.com>
+ <20140814092638.GB6330@darkstar.nay.redhat.com>
+Message-ID: <20140825102426.GO29733@console-pimps.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 13, 2014 at 01:39:27PM +0000, Mattis Lorentzon wrote:
-> All our tests seem to behave the same way on the Sabrelite as on our own board.
-> A working theory is that the switch (3Com Switch 4400) triggers the degeneration
-> of the network stack from which Linux does not seem to recover, even if we later
-> bypass the switch and directly connect the board to the server machine.
+On Thu, 14 Aug, at 05:26:38PM, Dave Young wrote:
+> Hi,
+> 
+> I addressed several comments from Matt, Randy and Will in this post.
+> 
+> Also rewrote the patch for efi=noruntime with using a generic param handling
+> function.
+> 
+> CCed Xen and SGI people, removed rtc list in cc for [1-6]/7 patches
 
-Please can you try something - what happens if you completely disable
-pause frame support (flow control) on all machines on the switch?
+Thanks Dave, I picked all of these patches up into the 'next' branch.
 
 -- 
-FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
-according to speedtest.net.
+Matt Fleming, Intel Open Source Technology Center
