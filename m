@@ -1,215 +1,95 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 25 Aug 2014 16:14:50 -0700
-Subject: [PATCH] pstore/ram_core: Fix hang on ARMs because of pgprot_noncached
-Message-ID: <20140825231449.GS17254@atomide.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Tue, 26 Aug 2014 01:39:21 +0200
+Subject: [PATCH v4 00/11] drm: add support for Atmel HLCDC Display
+ Controller
+In-Reply-To: <20140821192633.69f6b21b@bbrezillon>
+References: <1406034695-15534-1-git-send-email-boris.brezillon@free-electrons.com>
+ <2138720.5GSxsvjVxS@avalon> <20140821192633.69f6b21b@bbrezillon>
+Message-ID: <1997793.CWhjU3F32E@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently trying to use pstore on ARMs can hang as we're mapping the
-peristent RAM with pgprot_noncached(). On ARMs, this will actually
-make the memory strongly ordered, and as the atomic operations pstore
-uses are implementation defined for strongly ordered memory, they
-may not work.
+Hi Boris,
 
-An earlier fix was done by Rob Herring <robherring2@gmail.com> to
-change the mapping to be pgprot_writecombine() instead as that's often
-defined as pgprot_noncached() anyways. However, as pointed out by
-Colin Cross <ccross@android.com>, in some cases you do want to use
-pgprot_noncached() on ARMs if the SoC supports it to see a debug
-printk just before a write hanging the system.
+On Thursday 21 August 2014 19:26:33 Boris BREZILLON wrote:
+> On Thu, 21 Aug 2014 19:08:53 +0200
+> Laurent Pinchart <laurent.pinchart@ideasonboard.com> wrote:
+> 
+> [...]
+> 
+> >>>> While this could be acceptable when all drivers are statically linked
+> >>>> in the kernel, it might be problematic when you're using modules,
+> >>>> meaning that you won't be able to display anything on your LCD panel
+> >>>> until your HDMI bridge module has been loaded.
+> >>> 
+> >>> No. HDMI should be using proper hotplugging anyway, hence it should be
+> >>> always be loaded anyway. You're in for a world of pain if you think
+> >>> you can run DRM with a driver that's composed of separate kernel
+> >>> modules.
+> >> 
+> >> I was talking about the external RGB to HDMI encoder, should the driver
+> >> for this encoder (which is not on On Chip block) be compiled
+> >> statically too ?
+> > 
+> > Given the move to multiplatform kernels we need to aim for as few modules
+> > compiled in as possible. I'd say this includes HDMI encoders, panels and
+> > display controllers.
+> > 
+> >>> Also if you don't want to use deferred probe, then you're in for the
+> >>> full hotplugging panel dance and that implies that you need to fix a
+> >>> bunch of things in DRM (one being the framebuffer console
+> >>> instantiation
+> >>> that I referred to in the other thread).
+> >> 
+> >> For now, I wait until there is a device connected on the RGB connector
+> >> (connector status set to connector_status_connected) before creating an
+> >> fbdev. It might not be the cleanest way to solve this issue, but it
+> >> works :-).
+> > 
+> > Do you create a new drm_encoder at runtime for the HDMI encoder when it
+> > appears ? I thought the DRM core and API were not able to correctly cope
+> > with that.
+> 
+> I haven't started to work on the HDMI encoder yet, and ATM I only have
+> a single connector (which is true from an HW POV), which is then bound
+> to an LCD panel (the only type of remote endpoint I currently support).
+> 
+> BTW, I wonder how my use case should be represented in the DRM
+> subsystem. As I said, from an HW POV I only have one RGB (or whatever
+> name you choose for it) connector. But on such kind of connectors you
+> can connect several output devices (panels, encoders, ...).
+> And in my case I have 2 devices on the same RGB connector: a panel and
+> an RGB to HDMI converter.
 
-So let's fix this issue by adding a module parameter for mem_cached,
-and default to having it set. This fixes pstore at least for omaps,
-and does not change the default for x86. And people debugging system
-hangs can set the mem_cached to zero as needed.
+The DRM connector object was initially meant to model a physical user-
+accessible connector on a board (VGA, DVI, HDMI, ...) and the properties of 
+the monitor plugged into it. It has then been (ab)used to represent panels, as 
+they're similar to monitors.
 
-Cc: Rob Herring <robherring2@gmail.com>
-Cc: Randy Dunlap <rdunlap@infradead.org>
-Cc: Russell King <linux@arm.linux.org.uk>
-Signed-off-by: Tony Lindgren <tony@atomide.com>
+In your case the VGA and HDMI connectors should be modeled as DRM connectors, 
+the RGB to HDMI encoder as a DRM encoder, and the LCDC as a DRM CRTC.
 
---- a/Documentation/ramoops.txt
-+++ b/Documentation/ramoops.txt
-@@ -14,11 +14,18 @@ survive after a restart.
- 
- 1. Ramoops concepts
- 
--Ramoops uses a predefined memory area to store the dump. The start and size of
--the memory area are set using two variables:
-+Ramoops uses a predefined memory area to store the dump. The start and size
-+and type of the memory area are set using three variables:
-   * "mem_address" for the start
-   * "mem_size" for the size. The memory size will be rounded down to a
-   power of two.
-+  * "mem_cached" to specifiy if the memory is cached or not.
-+
-+Note disabling "mem_cached" may not be supported on all architectures as
-+pstore depends on atomic operations. At least on ARM, clearing "mem_cached"
-+will cause the memory to be mapped strongly ordered. And atomic operations
-+on strongly ordered memory are implementation defined, and won't work on
-+many ARMs such as omap.
- 
- The memory area is divided into "record_size" chunks (also rounded down to
- power of two) and each oops/panic writes a "record_size" chunk of
-@@ -55,6 +62,7 @@ Setting the ramoops parameters can be done in 2 different manners:
- static struct ramoops_platform_data ramoops_data = {
-         .mem_size               = <...>,
-         .mem_address            = <...>,
-+        .mem_cached             = <...>,
-         .record_size            = <...>,
-         .dump_oops              = <...>,
-         .ecc                    = <...>,
---- a/fs/pstore/ram.c
-+++ b/fs/pstore/ram.c
-@@ -61,6 +61,11 @@ module_param(mem_size, ulong, 0400);
- MODULE_PARM_DESC(mem_size,
- 		"size of reserved RAM used to store oops/panic logs");
- 
-+static unsigned int mem_cached = 1;
-+module_param(mem_cached, uint, 0600);
-+MODULE_PARM_DESC(mem_cached,
-+		"set to 1 to use cached memory, 0 to use uncached (default 1)");
-+
- static int dump_oops = 1;
- module_param(dump_oops, int, 0600);
- MODULE_PARM_DESC(dump_oops,
-@@ -79,6 +84,7 @@ struct ramoops_context {
- 	struct persistent_ram_zone *fprz;
- 	phys_addr_t phys_addr;
- 	unsigned long size;
-+	unsigned int cached;
- 	size_t record_size;
- 	size_t console_size;
- 	size_t ftrace_size;
-@@ -358,7 +364,8 @@ static int ramoops_init_przs(struct device *dev, struct ramoops_context *cxt,
- 		size_t sz = cxt->record_size;
- 
- 		cxt->przs[i] = persistent_ram_new(*paddr, sz, 0,
--						  &cxt->ecc_info);
-+						  &cxt->ecc_info,
-+						  cxt->cached);
- 		if (IS_ERR(cxt->przs[i])) {
- 			err = PTR_ERR(cxt->przs[i]);
- 			dev_err(dev, "failed to request mem region (0x%zx at 0x%llx): %d\n",
-@@ -388,7 +395,7 @@ static int ramoops_init_prz(struct device *dev, struct ramoops_context *cxt,
- 		return -ENOMEM;
- 	}
- 
--	*prz = persistent_ram_new(*paddr, sz, sig, &cxt->ecc_info);
-+	*prz = persistent_ram_new(*paddr, sz, sig, &cxt->ecc_info, cxt->cached);
- 	if (IS_ERR(*prz)) {
- 		int err = PTR_ERR(*prz);
- 
-@@ -435,6 +442,7 @@ static int ramoops_probe(struct platform_device *pdev)
- 
- 	cxt->size = pdata->mem_size;
- 	cxt->phys_addr = pdata->mem_address;
-+	cxt->cached = pdata->mem_cached;
- 	cxt->record_size = pdata->record_size;
- 	cxt->console_size = pdata->console_size;
- 	cxt->ftrace_size = pdata->ftrace_size;
---- a/fs/pstore/ram_core.c
-+++ b/fs/pstore/ram_core.c
-@@ -380,7 +380,8 @@ void persistent_ram_zap(struct persistent_ram_zone *prz)
- 	persistent_ram_update_header_ecc(prz);
- }
- 
--static void *persistent_ram_vmap(phys_addr_t start, size_t size)
-+static void *persistent_ram_vmap(phys_addr_t start, size_t size,
-+		unsigned int cached)
- {
- 	struct page **pages;
- 	phys_addr_t page_start;
-@@ -392,7 +393,10 @@ static void *persistent_ram_vmap(phys_addr_t start, size_t size)
- 	page_start = start - offset_in_page(start);
- 	page_count = DIV_ROUND_UP(size + offset_in_page(start), PAGE_SIZE);
- 
--	prot = pgprot_noncached(PAGE_KERNEL);
-+	if (cached)
-+		prot = pgprot_writecombine(PAGE_KERNEL);
-+	else
-+		prot = pgprot_noncached(PAGE_KERNEL);
- 
- 	pages = kmalloc_array(page_count, sizeof(struct page *), GFP_KERNEL);
- 	if (!pages) {
-@@ -411,8 +415,11 @@ static void *persistent_ram_vmap(phys_addr_t start, size_t size)
- 	return vaddr;
- }
- 
--static void *persistent_ram_iomap(phys_addr_t start, size_t size)
-+static void *persistent_ram_iomap(phys_addr_t start, size_t size,
-+		unsigned int cached)
- {
-+	void *va;
-+
- 	if (!request_mem_region(start, size, "persistent_ram")) {
- 		pr_err("request mem region (0x%llx at 0x%llx) failed\n",
- 			(unsigned long long)size, (unsigned long long)start);
-@@ -422,19 +429,24 @@ static void *persistent_ram_iomap(phys_addr_t start, size_t size)
- 	buffer_start_add = buffer_start_add_locked;
- 	buffer_size_add = buffer_size_add_locked;
- 
--	return ioremap(start, size);
-+	if (cached)
-+		va = ioremap(start, size);
-+	else
-+		va = ioremap_wc(start, size);
-+
-+	return va;
- }
- 
- static int persistent_ram_buffer_map(phys_addr_t start, phys_addr_t size,
--		struct persistent_ram_zone *prz)
-+		struct persistent_ram_zone *prz, int cached)
- {
- 	prz->paddr = start;
- 	prz->size = size;
- 
- 	if (pfn_valid(start >> PAGE_SHIFT))
--		prz->vaddr = persistent_ram_vmap(start, size);
-+		prz->vaddr = persistent_ram_vmap(start, size, cached);
- 	else
--		prz->vaddr = persistent_ram_iomap(start, size);
-+		prz->vaddr = persistent_ram_iomap(start, size, cached);
- 
- 	if (!prz->vaddr) {
- 		pr_err("%s: Failed to map 0x%llx pages at 0x%llx\n", __func__,
-@@ -500,7 +512,8 @@ void persistent_ram_free(struct persistent_ram_zone *prz)
- }
- 
- struct persistent_ram_zone *persistent_ram_new(phys_addr_t start, size_t size,
--			u32 sig, struct persistent_ram_ecc_info *ecc_info)
-+			u32 sig, struct persistent_ram_ecc_info *ecc_info,
-+			unsigned int cached)
- {
- 	struct persistent_ram_zone *prz;
- 	int ret = -ENOMEM;
-@@ -511,7 +524,7 @@ struct persistent_ram_zone *persistent_ram_new(phys_addr_t start, size_t size,
- 		goto err;
- 	}
- 
--	ret = persistent_ram_buffer_map(start, size, prz);
-+	ret = persistent_ram_buffer_map(start, size, prz, cached);
- 	if (ret)
- 		goto err;
- 
---- a/include/linux/pstore_ram.h
-+++ b/include/linux/pstore_ram.h
-@@ -53,7 +53,8 @@ struct persistent_ram_zone {
- };
- 
- struct persistent_ram_zone *persistent_ram_new(phys_addr_t start, size_t size,
--			u32 sig, struct persistent_ram_ecc_info *ecc_info);
-+			u32 sig, struct persistent_ram_ecc_info *ecc_info,
-+			unsigned int cached);
- void persistent_ram_free(struct persistent_ram_zone *prz);
- void persistent_ram_zap(struct persistent_ram_zone *prz);
- 
-@@ -76,6 +77,7 @@ ssize_t persistent_ram_ecc_string(struct persistent_ram_zone *prz,
- struct ramoops_platform_data {
- 	unsigned long	mem_size;
- 	unsigned long	mem_address;
-+	unsigned int	mem_cached;
- 	unsigned long	record_size;
- 	unsigned long	console_size;
- 	unsigned long	ftrace_size;
+As DRM hardcodes the pipeline model to CRTC -> encoder -> connector, you will 
+also need a DRM encoder in the VGA path. I suppose your board has a VGA DAC, 
+that's the component you should expose as a DRM encoder (even if it can't be 
+controlled and doesn't limit the valid modes).
+
+> >>> You also can't be using the current device tree bindings because they
+> >>> all assume a dependency from the display controller/output to the
+> >>> panel. For hotplugging you'd need the dependency the other way around
+> >>> (the panel needs to refer to the output by phandle).
+> >> 
+> >> Here [1] is a proposal for notification support in the drm_panel
+> >> infrastructure (which is not that complicated), and here [2] is how
+> >> I use it in my atmel-hlcdc driver to generate hotplug events.
+> > 
+> > Is there a way we could use the component framework for that ? I know that
+> > partial notification isn't supported at the moment, but Russell agreed it
+> > was a real use case that should be implemented at some point.
+> 
+> I'll give it a try.
+
+-- 
+Regards,
+
+Laurent Pinchart
