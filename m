@@ -1,187 +1,82 @@
-From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Mon, 25 Aug 2014 19:37:25 +0900
-Subject: [PATCHv4 2/4] thermal: exynos: Add support for many TRIMINFO_CTRL
- registers
-In-Reply-To: <5071235.4ralWIzmJe@amdc1032>
-References: <1408951825-2639-1-git-send-email-cw00.choi@samsung.com>
- <1408951825-2639-3-git-send-email-cw00.choi@samsung.com>
- <5071235.4ralWIzmJe@amdc1032>
-Message-ID: <53FB11E5.2070503@samsung.com>
+From: yuvaraj.lkml@gmail.com (Yuvaraj Cd)
+Date: Mon, 25 Aug 2014 16:16:06 +0530
+Subject: [PATCH v9 1/2] regulator: Add driver for max77802 PMIC PMIC
+ regulators
+In-Reply-To: <53FAFCBC.2050407@collabora.co.uk>
+References: <1408350762-15520-1-git-send-email-javier.martinez@collabora.co.uk>
+ <1408350762-15520-2-git-send-email-javier.martinez@collabora.co.uk>
+ <CA+NduCDL65=Y=PyU3FfXsTz0FfbmYzicGrY4U7ji3_V+nXhtCQ@mail.gmail.com>
+ <53F73472.8010609@collabora.co.uk>
+ <20140822144531.GV24407@sirena.org.uk>
+ <53F7838F.8060906@collabora.co.uk>
+ <20140822183054.GY24407@sirena.org.uk>
+ <53F7BDD8.7060500@collabora.co.uk>
+ <CAD=FV=WC0h7fYm2QFqu3Zka7CsU4BtG-oyPpJav+ygC+gmCR+A@mail.gmail.com>
+ <CA+NduCCT-KQ=gh7QWkBE4qkA2YOJ8KCVqbkC6Tkmb1aPvCsGFQ@mail.gmail.com>
+ <53FAFCBC.2050407@collabora.co.uk>
+Message-ID: <CA+NduCDWnPBxJPGKSN1yg-kUCYJjSw4NP5eiCPnTQoMikYhGHA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Bartlomiej,
-
-On 08/25/2014 07:15 PM, Bartlomiej Zolnierkiewicz wrote:
-> 
-> Hi,
-> 
-> On Monday, August 25, 2014 04:30:23 PM Chanwoo Choi wrote:
->> This patch support many TRIMINFO_CTRL registers if specific Exynos SoC
->> has one more TRIMINFO_CTRL registers. Also this patch uses proper 'RELOAD'
->> shift/mask bit operation to set RELOAD feature instead of static value.
->>
->> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
->> Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
->> Cc: Zhang Rui <rui.zhang@intel.com>
->> Cc: Eduardo Valentin <edubezval@gmail.com>
->> Cc: Amit Daniel Kachhap <amit.daniel@samsung.com>
->> Reviewed-by: Amit Daniel Kachhap <amit.daniel@samsung.com>
->> ---
->>  drivers/thermal/samsung/exynos_thermal_common.h |  1 +
->>  drivers/thermal/samsung/exynos_tmu.c            | 23 ++++++++++++++++++++---
->>  drivers/thermal/samsung/exynos_tmu.h            |  9 +++++++--
->>  drivers/thermal/samsung/exynos_tmu_data.c       |  5 ++++-
->>  drivers/thermal/samsung/exynos_tmu_data.h       |  3 +++
->>  5 files changed, 35 insertions(+), 6 deletions(-)
->>
->> diff --git a/drivers/thermal/samsung/exynos_thermal_common.h b/drivers/thermal/samsung/exynos_thermal_common.h
->> index 3eb2ed9..b211976 100644
->> --- a/drivers/thermal/samsung/exynos_thermal_common.h
->> +++ b/drivers/thermal/samsung/exynos_thermal_common.h
->> @@ -28,6 +28,7 @@
->>  #define MAX_TRIP_COUNT	8
->>  #define MAX_COOLING_DEVICE 4
->>  #define MAX_THRESHOLD_LEVS 5
->> +#define MAX_TRIMINFO_CTRL_REG	2
->>  
->>  #define ACTIVE_INTERVAL 500
->>  #define IDLE_INTERVAL 10000
->> diff --git a/drivers/thermal/samsung/exynos_tmu.c b/drivers/thermal/samsung/exynos_tmu.c
->> index acbff14..7234f38 100644
->> --- a/drivers/thermal/samsung/exynos_tmu.c
->> +++ b/drivers/thermal/samsung/exynos_tmu.c
->> @@ -147,7 +147,7 @@ static int exynos_tmu_initialize(struct platform_device *pdev)
->>  	struct exynos_tmu_data *data = platform_get_drvdata(pdev);
->>  	struct exynos_tmu_platform_data *pdata = data->pdata;
->>  	const struct exynos_tmu_registers *reg = pdata->registers;
->> -	unsigned int status, trim_info = 0, con;
->> +	unsigned int status, trim_info = 0, con, ctrl;
->>  	unsigned int rising_threshold = 0, falling_threshold = 0;
->>  	int ret = 0, threshold_code, i, trigger_levs = 0;
->>  
->> @@ -164,8 +164,25 @@ static int exynos_tmu_initialize(struct platform_device *pdev)
->>  		}
->>  	}
->>  
->> -	if (TMU_SUPPORTS(pdata, TRIM_RELOAD))
->> -		__raw_writel(1, data->base + reg->triminfo_ctrl);
->> +	if (TMU_SUPPORTS(pdata, TRIM_RELOAD)) {
->> +		if (reg->triminfo_ctrl_count > MAX_TRIMINFO_CTRL_REG) {
-> 
-> Please remove this check and MAX_TRIMINFO_CTRL_REG define.
-> 
-> We do not want such runtime checks for development time errors.
-
-OK, I'll remove it.
-
-> 
->> +			ret = -EINVAL;
->> +			goto out;
->> +		}
->> +
->> +		for (i = 0; i < reg->triminfo_ctrl_count; i++) {
->> +			if (pdata->triminfo_reload[i]) {
->> +				ctrl = readl(data->base +
->> +						reg->triminfo_ctrl[i]);
->> +				ctrl &= ~(reg->triminfo_reload_mask <<
->> +						reg->triminfo_reload_shift);
->> +				ctrl |= pdata->triminfo_reload[i] <<
->> +						reg->triminfo_reload_shift;
-> 
-> triminfo_reload_shift and triminfo_reload_mask variables have always
-> the same values when this code is run so there is no need for them.
-
-I don't understand. Do you mean that timinfo_reload_{shift/mask} variable is un-needed?
-If you possible, I need more detailed comment.
-
-> 
-> They should be added only when needed instead of doing it now.
-> 
->> +				__raw_writel(ctrl, data->base +
->> +						reg->triminfo_ctrl[i]);
->> +			}
->> +		}
->> +	}
->>  
->>  	if (pdata->cal_mode == HW_MODE)
->>  		goto skip_calib_data;
->> diff --git a/drivers/thermal/samsung/exynos_tmu.h b/drivers/thermal/samsung/exynos_tmu.h
->> index 1b4a644..d7674ad 100644
->> --- a/drivers/thermal/samsung/exynos_tmu.h
->> +++ b/drivers/thermal/samsung/exynos_tmu.h
->> @@ -85,8 +85,11 @@ enum soc_type {
->>   * @triminfo_25_shift: shift bit of the 25 C trim value in triminfo_data reg.
->>   * @triminfo_85_shift: shift bit of the 85 C trim value in triminfo_data reg.
->>   * @triminfo_ctrl: trim info controller register.
->> + * @triminfo_ctrl_count: the number of trim info controller register.
->>   * @triminfo_reload_shift: shift of triminfo reload enable bit in triminfo_ctrl
->>  	reg.
->> + * @triminfo_reload_mask: mask of triminfo reload enable bit in triminfo_ctrl
->> +	reg.
->>   * @tmu_ctrl: TMU main controller register.
->>   * @test_mux_addr_shift: shift bits of test mux address.
->>   * @buf_vref_sel_shift: shift bits of reference voltage in tmu_ctrl register.
->> @@ -151,9 +154,10 @@ struct exynos_tmu_registers {
->>  	u32	triminfo_25_shift;
->>  	u32	triminfo_85_shift;
->>  
->> -	u32	triminfo_ctrl;
->> -	u32	triminfo_ctrl1;
->> +	u32	triminfo_ctrl[MAX_TRIMINFO_CTRL_REG];
->> +	u32	triminfo_ctrl_count;
->>  	u32	triminfo_reload_shift;
->> +	u32	triminfo_reload_mask;
->>  
->>  	u32	tmu_ctrl;
->>  	u32     test_mux_addr_shift;
->> @@ -295,6 +299,7 @@ struct exynos_tmu_platform_data {
->>  	u8 second_point_trim;
->>  	u8 default_temp_offset;
->>  	u8 test_mux;
->> +	u8 triminfo_reload[MAX_TRIMINFO_CTRL_REG];
->>  
->>  	enum calibration_type cal_type;
->>  	enum calibration_mode cal_mode;
->> diff --git a/drivers/thermal/samsung/exynos_tmu_data.c b/drivers/thermal/samsung/exynos_tmu_data.c
->> index aa8e0de..754c638 100644
->> --- a/drivers/thermal/samsung/exynos_tmu_data.c
->> +++ b/drivers/thermal/samsung/exynos_tmu_data.c
->> @@ -184,8 +184,10 @@ static const struct exynos_tmu_registers exynos4412_tmu_registers = {
->>  	.triminfo_data = EXYNOS_TMU_REG_TRIMINFO,
->>  	.triminfo_25_shift = EXYNOS_TRIMINFO_25_SHIFT,
->>  	.triminfo_85_shift = EXYNOS_TRIMINFO_85_SHIFT,
->> -	.triminfo_ctrl = EXYNOS_TMU_TRIMINFO_CON,
->> +	.triminfo_ctrl[0] = EXYNOS_TMU_TRIMINFO_CON,
->> +	.triminfo_ctrl_count = 1,
->>  	.triminfo_reload_shift = EXYNOS_TRIMINFO_RELOAD_SHIFT,
->> +	.triminfo_reload_mask = EXYNOS_TRIMINFO_RELOAD_MASK,
->>  	.tmu_ctrl = EXYNOS_TMU_REG_CONTROL,
->>  	.test_mux_addr_shift = EXYNOS4412_MUX_ADDR_SHIFT,
->>  	.buf_vref_sel_shift = EXYNOS_TMU_REF_VOLTAGE_SHIFT,
->> @@ -252,6 +254,7 @@ static const struct exynos_tmu_registers exynos4412_tmu_registers = {
->>  		.temp_level = 95, \
->>  	}, \
->>  	.freq_tab_count = 2, \
->> +	.triminfo_reload[0] = EXYNOS_TRIMINFO_RELOAD_ENABLE, \
->>  	.registers = &exynos4412_tmu_registers, \
->>  	.features = (TMU_SUPPORT_EMULATION | TMU_SUPPORT_TRIM_RELOAD | \
->>  			TMU_SUPPORT_FALLING_TRIP | TMU_SUPPORT_READY_STATUS | \
->> diff --git a/drivers/thermal/samsung/exynos_tmu_data.h b/drivers/thermal/samsung/exynos_tmu_data.h
->> index 401bab7..87454f63 100644
->> --- a/drivers/thermal/samsung/exynos_tmu_data.h
->> +++ b/drivers/thermal/samsung/exynos_tmu_data.h
->> @@ -64,6 +64,9 @@
->>  #define EXYNOS_EMUL_CON		0x80
->>  
->>  #define EXYNOS_TRIMINFO_RELOAD_SHIFT	0
->> +#define EXYNOS_TRIMINFO_RELOAD_MASK	0x1
->> +#define EXYNOS_TRIMINFO_RELOAD_ENABLE	1
->> +#define EXYNOS_TRIMINFO_RELOAD_DISABLE	0
-> 
-> This define is never used please remove it.
-
-OK, I'll remove it. Thanks.
-
-Beset Regards,
-Chanwoo CHoi
+On Mon, Aug 25, 2014 at 2:37 PM, Javier Martinez Canillas
+<javier.martinez@collabora.co.uk> wrote:
+> Hello Yuvaraj,
+>
+> On 08/25/2014 10:22 AM, Yuvaraj Cd wrote:
+>>>> Good question. I'm not that familiar with the dw_mmc host controller nor
+>>>> its driver implementation so I'll let Yuvaraj or Doug to answer that.
+>> Well,here it goes!
+>> 1. Power ON the board LDO4CTRL1[7:6] 11b
+>> 2. dw_mmc driver enable the vqmmc.
+>> 3. checks for UHS support, complete the voltage switching t0 1.8V
+>> 4. Does warm reset by reboot command.
+>> 5. mmc core calls mmc_set_ios() with MMC_POWER_OFF.
+>> 6. dw_mmc driver cut-off the regulator with LDO4CTRL1[7:6] is 00b
+>> 7.dw_mmc driver enable the vqmmc.
+>>  But after step 7 also, LD4CTRL[7:6] is 00b.
+>
+> Ok, so the dw_mmc driver is enabling vqmmc, that's good.
+>
+>>>
+>>> I haven't seen the issue that Yuvaraj is reporting (but I also haven't
+>>> picked up all of the relevant patches and tried to reproduce), so I'm
+>>> going to have to leave it to Yuvaraj to answer.
+>>     static int max77802_enable(struct regulator_dev *rdev)
+>>     {
+>>       struct max77802_regulator_prv *max77802 = rdev_get_drvdata(rdev);
+>>      int id = rdev_get_id(rdev);
+>>      int shift = max77802_get_opmode_shift(id);
+>>      return regmap_update_bits(rdev->regmap,
+>> rdev->desc->enable_reg,rdev->desc->enable_mask,max77802->opmode[id] <<
+>> shift);
+>>   }
+>> I think in the above code snippet, the "val" is what we got it during
+>> the probe.We always write that value for enabling this regulator(which
+>> is LDO4CTRL1[7:6] 00b after warm reset) which is not correct according
+>> the MAX77802 manual.
+>>>
+>
+> I see, so probably until we have a way to define the operating mode for
+> each regulator using DT we should set the opmode to normal when enabling a
+> regulator independently of the value the hardware register reported on probe.
+>
+> Can you please test the following change [0] so I can post as a proper
+> patch? Doug, Mark do you think that forcing the regulator to opmode normal
+> when enabling is the right solution here?
+>
+> Best regards,
+> Javier
+>
+> [0]
+> diff --git a/drivers/regulator/max77802.c b/drivers/regulator/max77802.c
+> index ad1caa9..917b5ab 100644
+> --- a/drivers/regulator/max77802.c
+> +++ b/drivers/regulator/max77802.c
+> @@ -180,7 +180,7 @@ static int max77802_enable(struct regulator_dev *rdev)
+>
+>         return regmap_update_bits(rdev->regmap, rdev->desc->enable_reg,
+>                                   rdev->desc->enable_mask,
+> -                                 max77802->opmode[id] << shift);
+> +                                 MAX77802_OPMODE_NORMAL << shift);
+>  }
+It works.
