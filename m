@@ -1,63 +1,160 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Mon, 25 Aug 2014 17:56:36 +0200
-Subject: [PATCH v9 4/6] ARM: Exynos: switch to using generic cpufreq driver
- for Exynos4210/5250/5420
-In-Reply-To: <7h8umc60we.fsf@paris.lan>
-References: <1406707663-16656-1-git-send-email-thomas.ab@samsung.com>
- <1406707663-16656-5-git-send-email-thomas.ab@samsung.com>
- <53DA8BB9.6020702@samsung.com> <53DA8D85.3050106@gmail.com>
- <7hbnrc6px3.fsf@paris.lan> <53F7DA13.6090305@gmail.com>
- <CADWw7OgAS-z-UOrJU-hL2fzuefJmLtCTg57jYk2Df7f5KfLJmA@mail.gmail.com>
- <7h8umc60we.fsf@paris.lan>
-Message-ID: <53FB5CB4.4050705@samsung.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 25 Aug 2014 09:01:19 -0700
+Subject: [PATCH v5 5/7] net: cpsw: Add am33xx MACID readout
+In-Reply-To: <1408947828-22316-6-git-send-email-mpa@pengutronix.de>
+References: <1408947828-22316-1-git-send-email-mpa@pengutronix.de>
+ <1408947828-22316-6-git-send-email-mpa@pengutronix.de>
+Message-ID: <20140825160118.GG17254@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25.08.2014 17:32, Kevin Hilman wrote:
-> Hi Chander,
+* Markus Pargmann <mpa@pengutronix.de> [140824 23:24]:
+> This patch adds a function to get the MACIDs from the am33xx SoC
+> control module registers which hold unique vendor MACIDs. This is only
+> used if of_get_mac_address() fails to get a valid mac address.
 > 
-> Chander Kashyap <k.chander@samsung.com> writes:
+> Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
+> Reviewed-by: Wolfram Sang <wsa@the-dreams.de>
+> Tested-by: Steven Rostedt <rostedt@goodmis.org>
+> ---
 > 
-> [...]
+> Notes:
+>     Changes in v5:
+>      - Fixed indention
 > 
->>>> I'm trying it on the 5800/Chromebook2 and it's not terribly stable.  I'm
->>>> testing along with CPUidle, so there may be some untested interactions
->>>> there as it seems a bit more stable without CPUidle enabled.
->>>>
->>>> I'd love to hear from anyone else that's testing CPUidle and CPUfreq
->>>> together big.LITTLE 5420/5800, with or without the switcher.
->>
->> I have tested this patch series on SMDK5420 with cpuidle (with and
->> without b.L switcher enabled).
->>
->> As of now voltage scaling support is not there in generic big-little
->> cpufreq driver (arm_big_little.c).
->> Hence need to tie arm and kfc voltages to highest level for testing.
+>  Documentation/devicetree/bindings/net/cpsw.txt |  4 +++
+>  drivers/net/ethernet/ti/Kconfig                |  2 ++
+>  drivers/net/ethernet/ti/cpsw.c                 | 43 +++++++++++++++++++++++++-
+>  3 files changed, 48 insertions(+), 1 deletion(-)
 > 
->> Without this change stability issues are there, but with this change
->> everything is stable.
-> 
-> Can you clarify how you're setting the voltages to ensure stability?
-> 
-> Tomasz, I didn't mean to suggest this isn't ready for mainline.
+> diff --git a/Documentation/devicetree/bindings/net/cpsw.txt b/Documentation/devicetree/bindings/net/cpsw.txt
+> index 107caf174a0e..33fe8462edf4 100644
+> --- a/Documentation/devicetree/bindings/net/cpsw.txt
+> +++ b/Documentation/devicetree/bindings/net/cpsw.txt
+> @@ -24,6 +24,8 @@ Optional properties:
+>  - ti,hwmods		: Must be "cpgmac0"
+>  - no_bd_ram		: Must be 0 or 1
+>  - dual_emac		: Specifies Switch to act as Dual EMAC
+> +- syscon		: Phandle to the system control device node, which is
+> +			  the control module device of the am33x
+>  
+>  Slave Properties:
+>  Required properties:
+> @@ -57,6 +59,7 @@ Examples:
+>  		active_slave = <0>;
+>  		cpts_clock_mult = <0x80000000>;
+>  		cpts_clock_shift = <29>;
+> +		syscon = <&cm>;
+>  		cpsw_emac0: slave at 0 {
+>  			phy_id = <&davinci_mdio>, <0>;
+>  			phy-mode = "rgmii-txid";
+> @@ -85,6 +88,7 @@ Examples:
+>  		active_slave = <0>;
+>  		cpts_clock_mult = <0x80000000>;
+>  		cpts_clock_shift = <29>;
+> +		syscon = <&cm>;
+>  		cpsw_emac0: slave at 0 {
+>  			phy_id = <&davinci_mdio>, <0>;
+>  			phy-mode = "rgmii-txid";
+> diff --git a/drivers/net/ethernet/ti/Kconfig b/drivers/net/ethernet/ti/Kconfig
+> index 1769700a6070..5d8cb7956113 100644
+> --- a/drivers/net/ethernet/ti/Kconfig
+> +++ b/drivers/net/ethernet/ti/Kconfig
+> @@ -62,6 +62,8 @@ config TI_CPSW
+>  	select TI_DAVINCI_CPDMA
+>  	select TI_DAVINCI_MDIO
+>  	select TI_CPSW_PHY_SEL
+> +	select MFD_SYSCON
+> +	select REGMAP
+>  	---help---
+>  	  This driver supports TI's CPSW Ethernet Switch.
+>  
+> diff --git a/drivers/net/ethernet/ti/cpsw.c b/drivers/net/ethernet/ti/cpsw.c
+> index 0bc2c2a2c236..7c94a0fb24bc 100644
+> --- a/drivers/net/ethernet/ti/cpsw.c
+> +++ b/drivers/net/ethernet/ti/cpsw.c
+> @@ -33,6 +33,8 @@
+>  #include <linux/of_net.h>
+>  #include <linux/of_device.h>
+>  #include <linux/if_vlan.h>
+> +#include <linux/mfd/syscon.h>
+> +#include <linux/regmap.h>
+>  
+>  #include <linux/pinctrl/consumer.h>
+>  
+> @@ -1816,6 +1818,39 @@ static void cpsw_slave_init(struct cpsw_slave *slave, struct cpsw_priv *priv,
+>  	slave->port_vlan = data->dual_emac_res_vlan;
+>  }
+>  
+> +#define AM33XX_CTRL_MAC_LO_REG(id) (0x630 + 0x8 * id)
+> +#define AM33XX_CTRL_MAC_HI_REG(id) (0x630 + 0x8 * id + 0x4)
+> +
+> +static int cpsw_am33xx_cm_get_macid(struct device *dev, int slave,
+> +		u8 *mac_addr)
+> +{
+> +	u32 macid_lo;
+> +	u32 macid_hi;
+> +	struct regmap *syscon;
+> +
+> +	if (!of_machine_is_compatible("ti,am33xx"))
+> +		return 0;
+> +
+> +	syscon = syscon_regmap_lookup_by_phandle(dev->of_node, "syscon");
+> +	if (IS_ERR(syscon)) {
+> +		if (PTR_ERR(syscon) == -ENODEV)
+> +			return 0;
+> +		return PTR_ERR(syscon);
+> +	}
+> +
+> +	regmap_read(syscon, AM33XX_CTRL_MAC_LO_REG(slave), &macid_lo);
+> +	regmap_read(syscon, AM33XX_CTRL_MAC_HI_REG(slave), &macid_hi);
+> +
+> +	mac_addr[5] = (macid_lo >> 8) & 0xff;
+> +	mac_addr[4] = macid_lo & 0xff;
+> +	mac_addr[3] = (macid_hi >> 24) & 0xff;
+> +	mac_addr[2] = (macid_hi >> 16) & 0xff;
+> +	mac_addr[1] = (macid_hi >> 8) & 0xff;
+> +	mac_addr[0] = macid_hi & 0xff;
+> +
+> +	return 0;
+> +}
 
-I haven't said that either. I'd just like to know in what state this
-series is in case of those SoCs. However, if there are stability issues
-on them, there is also a chance that the same is true for other boards.
+I think this only works for the first instance of the cpsw?
 
-Anyway, we're early in releasy cycle, so probably we could get better
-test coverage with this series in linux-next.
+Can the other instances of cpsw use this too and just increment
+some value in it?
 
-Kukjin, Viresh, how would you want to proceed with merging it? It
-touches mach-exynos, cpufreq and samsung-clk, so it is non-trivial to
-merge. However as far as I can see the cpufreq-related changes are just
-a number of full file deletes and minor Makefile/Kconfig updates. It
-will be more difficult with mach-exynos changes, as they are more likely
-to produce conflict.
+>  static int cpsw_probe_dt(struct cpsw_platform_data *data,
+>  			 struct platform_device *pdev)
+>  {
+> @@ -1928,8 +1963,14 @@ static int cpsw_probe_dt(struct cpsw_platform_data *data,
+>  			 PHY_ID_FMT, mdio->name, phyid);
+>  
+>  		mac_addr = of_get_mac_address(slave_node);
+> -		if (mac_addr)
+> +		if (mac_addr) {
+>  			memcpy(slave_data->mac_addr, mac_addr, ETH_ALEN);
+> +		} else {
+> +			ret = cpsw_am33xx_cm_get_macid(&pdev->dev, i,
+> +						       slave_data->mac_addr);
+> +			if (ret)
+> +				return ret;
+> +		}
+>  
+>  		slave_data->phy_if = of_get_phy_mode(slave_node);
+>  		if (slave_data->phy_if < 0) {
 
-The only solution that comes to my mind is that I first apply patches 1
-and 2, create a stable branch for Kukjin, then he applies patches 3, 4,
-and 5 and creates a stable branch for me, on top of which I apply patch 6.
+The cpsw_am33xx_cm_get_macid() should only get called based on the
+compatible flag to avoid random register access on other SoCs.
 
-Best regards,
-Tomasz
+So how about add the of_machine_is_compatible("ti,am33xx")
+check here instead and skip calling cpsw_am33xx_cm_get_macid()
+otherwise?
+
+That allows adding support for other omaps as we already have
+ti,am4372-cpsw and people have pointed out issues with dra7xx
+already.
+
+Regards,
+
+Tony
