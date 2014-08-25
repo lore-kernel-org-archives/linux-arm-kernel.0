@@ -1,50 +1,47 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Mon, 25 Aug 2014 15:39:55 +0200
-Subject: [PATCH 4/4] simplefb: add clock handling code
-In-Reply-To: <20140825124410.GZ15297@lukather>
-References: <1407914239-12054-1-git-send-email-libv@skynet.be>
- <1407914239-12054-5-git-send-email-libv@skynet.be>
- <53EB9471.3090204@wwwdotorg.org> <20140813170106.GT15297@lukather>
- <20140825121228.GB4163@ulmo.nvidia.com>
- <20140825124410.GZ15297@lukather>
-Message-ID: <20140825133953.GJ4163@ulmo.nvidia.com>
+From: guodong.xu@linaro.org (Guodong Xu)
+Date: Mon, 25 Aug 2014 21:39:39 +0800
+Subject: [PATCH 0/2] Hi6421 MFD driver
+Message-ID: <1408973982-2072-1-git-send-email-guodong.xu@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 25, 2014 at 02:44:10PM +0200, Maxime Ripard wrote:
-> On Mon, Aug 25, 2014 at 02:12:30PM +0200, Thierry Reding wrote:
-> > On Wed, Aug 13, 2014 at 07:01:06PM +0200, Maxime Ripard wrote:
-> > > On Wed, Aug 13, 2014 at 10:38:09AM -0600, Stephen Warren wrote:
-> > [...]
-> > > > If not, perhaps the clock driver should force the clock to be
-> > > > enabled (perhaps only if the DRM/KMS driver isn't enabled?).
-> > > 
-> > > I'm sorry, but I'm not going to take any code that will do that in our
-> > > clock driver.
-> > > 
-> > > I'm not going to have a huge list of ifdef depending on configuration
-> > > options to know which clock to enable, especially when clk_get should
-> > > have the consumer device as an argument.
-> > 
-> > Are you saying is that you want to solve a platform-specific problem by
-> > pushing code into simple, generic drivers so that your platform code can
-> > stay "clean"?
-> 
-> Are you saying that this driver would become "dirty" with such a patch?
+This patchset add MFD driver for Hi6421 SoC.
 
-Yes. Others have said the same and even provided alternative solutions
-on how to solve what's seemingly a platform-specific problem in a
-platform-specific way.
+It's based on my previous v6 patchset for Hi6421 MFD & regulator driver. But
+since regulator part is applied, I rebased the MFD part to v3.17-rc1, merged
+review feedback from Lee Jones, solved conflict in Makefile, and fixed a build
+error.
 
-> If so, we really have an issue in the kernel.
+Hi6421 is a PMIC SoC designed and manufactured by HiSilicon Ltd. It includes
+multi-functions, such as regulators, codec, ADCs, Coulomb counter, etc.
+Hi6421 can be used in various Hi3620 SoC based boards. Registers in Hi6421 are
+memory bus mapped, so in this design they are accessed by regmap-mmio APIs.
 
-Can you elaborate?
+---
+changes in this version:
+ * merge conflict in drivers/mfd/Makefile
+ * use devm_ioremap_resource, as devm_request_and_ioremap is deprecated and
+    now removed.
+ * incorporate feedback from maintainer
+    - Documentation as a separate patch
+    - dts node rename from 'pmic' to 'hi6421'
+based on v6 patchset for Hi6421 MFD & regulator
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140825/68317adf/attachment.sig>
+Guodong Xu (3):
+  Documentation: mfd: add docs for hi6421 dt
+  mfd: Add hi6421 PMIC core driver
+  ARM: dts: hi3620-hi4511: Add HI6421 MFD and regulator nodes
+
+ Documentation/devicetree/bindings/mfd/hi6421.txt |  38 ++++
+ arch/arm/boot/dts/hi3620-hi4511.dts              | 233 +++++++++++++++++++++++
+ drivers/mfd/Kconfig                              |  13 ++
+ drivers/mfd/Makefile                             |   1 +
+ drivers/mfd/hi6421-pmic-core.c                   | 112 +++++++++++
+ include/linux/mfd/hi6421-pmic.h                  |  42 ++++
+ 6 files changed, 439 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/mfd/hi6421.txt
+ create mode 100644 drivers/mfd/hi6421-pmic-core.c
+ create mode 100644 include/linux/mfd/hi6421-pmic.h
+
+-- 
+1.9.1
