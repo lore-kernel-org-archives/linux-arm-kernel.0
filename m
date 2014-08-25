@@ -1,53 +1,30 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 25 Aug 2014 10:14:47 -0700
-Subject: [PATCH] ARM: OMAP2+: hwmod: Rearm wake-up interrupts for DT when
- MUSB is idled
-Message-ID: <20140825171446.GL17254@atomide.com>
+From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
+Date: Mon, 25 Aug 2014 19:20:07 +0200
+Subject: [PATCH v9 1/2] regulator: Add driver for max77802 PMIC PMIC
+ regulators
+In-Reply-To: <CAD=FV=V4TSKsbjj3dXCdSzVrh3sxH-FkpFEbEo+JA1bN9R-XWA@mail.gmail.com>
+References: <1408350762-15520-1-git-send-email-javier.martinez@collabora.co.uk>	<1408350762-15520-2-git-send-email-javier.martinez@collabora.co.uk>	<CA+NduCDL65=Y=PyU3FfXsTz0FfbmYzicGrY4U7ji3_V+nXhtCQ@mail.gmail.com>	<53F73472.8010609@collabora.co.uk>	<20140822144531.GV24407@sirena.org.uk>	<53F7838F.8060906@collabora.co.uk>	<20140822183054.GY24407@sirena.org.uk>	<53F7BDD8.7060500@collabora.co.uk>	<CAD=FV=WC0h7fYm2QFqu3Zka7CsU4BtG-oyPpJav+ygC+gmCR+A@mail.gmail.com>	<CA+NduCCT-KQ=gh7QWkBE4qkA2YOJ8KCVqbkC6Tkmb1aPvCsGFQ@mail.gmail.com>	<53FAFCBC.2050407@collabora.co.uk>
+ <CAD=FV=V4TSKsbjj3dXCdSzVrh3sxH-FkpFEbEo+JA1bN9R-XWA@mail.gmail.com>
+Message-ID: <53FB7047.7080508@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Looks like MUSB cable removal can cause wake-up interrupts to
-stop working for device tree based booting at least for UART3
-even as nothing is dynamically remuxed. This can be fixed by
-calling reconfigure_io_chain() for device tree based booting
-in hwmod code. Note that we already do that for legacy booting
-if the legacy mux is configured.
+Hello Doug,
 
-My guess is that this is related to UART3 and MUSB ULPI
-hsusb0_data0 and hsusb0_data1 support for Carkit mode that
-somehow affect the configured IO chain for UART3 and require
-rearming the wake-up interrupts.
+On 08/25/2014 05:40 PM, Doug Anderson wrote:
+>>
+>> I see, so probably until we have a way to define the operating mode for
+>> each regulator using DT we should set the opmode to normal when enabling a
+>> regulator independently of the value the hardware register reported on probe.
+>>
+>> Can you please test the following change [0] so I can post as a proper
+>> patch? Doug, Mark do you think that forcing the regulator to opmode normal
+>> when enabling is the right solution here?
+> 
+> IMHO that makes sense.
+> 
 
-In general, for device tree based booting, pinctrl-single
-calls the rearm hook that in turn calls reconfigure_io_chain
-so calling reconfigure_io_chain should not be needed from the
-hwmod code for other events.
+Thanks, I'll post it as a proper patch tomorrow then.
 
-So let's limit the hwmod rearming of iochain only to
-HWMOD_FORCE_MSTANDBY where MUSB is currently the only user
-of it. If we see other devices needing similar changes we can
-add more checks for it.
-
-Cc: Paul Walmsley <paul@pwsan.com>
-Signed-off-by: Tony Lindgren <tony@atomide.com>
-
---- a/arch/arm/mach-omap2/omap_hwmod.c
-+++ b/arch/arm/mach-omap2/omap_hwmod.c
-@@ -2185,6 +2185,8 @@ static int _enable(struct omap_hwmod *oh)
- 			 oh->mux->pads_dynamic))) {
- 		omap_hwmod_mux(oh->mux, _HWMOD_STATE_ENABLED);
- 		_reconfigure_io_chain();
-+	} else if (oh->flags & HWMOD_FORCE_MSTANDBY) {
-+		_reconfigure_io_chain();
- 	}
- 
- 	_add_initiator_dep(oh, mpu_oh);
-@@ -2291,6 +2293,8 @@ static int _idle(struct omap_hwmod *oh)
- 	if (oh->mux && oh->mux->pads_dynamic) {
- 		omap_hwmod_mux(oh->mux, _HWMOD_STATE_IDLE);
- 		_reconfigure_io_chain();
-+	} else if (oh->flags & HWMOD_FORCE_MSTANDBY) {
-+		_reconfigure_io_chain();
- 	}
- 
- 	oh->_state = _HWMOD_STATE_IDLE;
+Best regards,
+Javier
