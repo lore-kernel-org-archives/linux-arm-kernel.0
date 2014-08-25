@@ -1,62 +1,112 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Mon, 25 Aug 2014 11:55:48 +0200 (CEST)
-Subject: [PATCH] arm: use cpu_online_mask when using forced
- irq_set_affinity
-In-Reply-To: <53C79E43.6040009@arm.com>
-References: <1399653640-21559-1-git-send-email-sudeep.holla@arm.com>
- <20140523121032.GV3693@n2100.arm.linux.org.uk> <537F4453.5000709@arm.com>
- <53A43174.503@arm.com> <20140620151638.GS32514@n2100.arm.linux.org.uk>
- <53C79E43.6040009@arm.com>
-Message-ID: <alpine.DEB.2.10.1408251136380.3323@nanos>
+From: broonie@kernel.org (Mark Brown)
+Date: Sun, 24 Aug 2014 19:51:34 -0500
+Subject: [PATCH] ARM: cns3xxx: Don't allocate PCI addresses on stack
+Message-ID: <1408927894-30858-1-git-send-email-broonie@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 17 Jul 2014, Sudeep Holla wrote:
-> > > Any suggestions on this ? Since commit 01f8fa4f01d8 and ffde1de64012 are
-> > > now in
-> > > stable releases, CPU0 hotplug is broken there now.
-> > 
-> > Maybe we should ask Thomas, as he's (a) the maintainer of the irqchip
-> > stuff, and (b) the author of the patch causing the breakage.
-> > 
-> >  From what I can see looking at the x86 code, the work-around in
-> > ffde1de64012 is wrong.
-> > 
-> 
-> Can provide your thoughts on how to solve this issue ?
+From: Mark Brown <broonie@linaro.org>
 
-ffde1de64012 is not about offlining a cpu, it's about onlining where
-we need to make sure that we assign the affinity to a not yet online
-marked cpu.
+The cns3xxx PCIe code allocates a PCI bus structure on the stack, causing
+warnings due to the excessibe size of the resulting stack frame:
+
+arch/arm/mach-cns3xxx/pcie.c:311:1: warning: the frame size of 1072 bytes is larger than 1024 bytes [-Wframe-larger-than=]
+
+Avoid this by dynamically allocating the structure, though I am not
+convinced that we should be locally creating the struct pci_bus in the
+first place.
+
+Signed-off-by: Mark Brown <broonie@linaro.org>
+---
+ arch/arm/mach-cns3xxx/pcie.c | 49 ++++++++++++++++++++++++++------------------
+ 1 file changed, 29 insertions(+), 20 deletions(-)
+
+diff --git a/arch/arm/mach-cns3xxx/pcie.c b/arch/arm/mach-cns3xxx/pcie.c
+index 413134c..67964f9 100644
+--- a/arch/arm/mach-cns3xxx/pcie.c
++++ b/arch/arm/mach-cns3xxx/pcie.c
+@@ -19,6 +19,7 @@
+ #include <linux/ioport.h>
+ #include <linux/interrupt.h>
+ #include <linux/ptrace.h>
++#include <linux/slab.h>
+ #include <asm/mach/map.h>
+ #include "cns3xxx.h"
+ #include "core.h"
+@@ -266,11 +267,7 @@ static void __init cns3xxx_pcie_hw_init(struct cns3xxx_pcie *cnspci)
+ 	struct pci_sys_data sd = {
+ 		.domain = port,
+ 	};
+-	struct pci_bus bus = {
+-		.number = 0,
+-		.ops = &cns3xxx_pcie_ops,
+-		.sysdata = &sd,
+-	};
++	struct pci_bus *bus;
+ 	u16 mem_base  = cnspci->res_mem.start >> 16;
+ 	u16 mem_limit = cnspci->res_mem.end   >> 16;
+ 	u16 io_base   = cnspci->res_io.start  >> 16;
+@@ -280,34 +277,46 @@ static void __init cns3xxx_pcie_hw_init(struct cns3xxx_pcie *cnspci)
+ 	u16 pos;
+ 	u16 dc;
  
-> Is it expected from all the irqchip implementation to use force flag in
-> irq_set_affinity to ignore cpu_online_mask similar to GIC ?
-
-No, it's only relevant for the cases where we need to route irqs to
-not yet online cpus.
-
-Now the wreckage of offlining was definitely not intended and I wonder
-why set_affinity() is called there with force = true. This was
-introduced in commit 1dbfa187dad. I acked it back then, but I have no
-idea why, because the force argument did not have any effect at that
-time.
-
-Changing it to false should solve the issue.
-
-Thanks,
-
-	tglx
-
-diff --git a/arch/arm/kernel/irq.c b/arch/arm/kernel/irq.c
-index 2c4257604513..5c4d38e32a51 100644
---- a/arch/arm/kernel/irq.c
-+++ b/arch/arm/kernel/irq.c
-@@ -175,7 +175,7 @@ static bool migrate_one_irq(struct irq_desc *desc)
- 	c = irq_data_get_irq_chip(d);
- 	if (!c->irq_set_affinity)
- 		pr_debug("IRQ%u: unable to set affinity\n", d->irq);
--	else if (c->irq_set_affinity(d, affinity, true) == IRQ_SET_MASK_OK && ret)
-+	else if (c->irq_set_affinity(d, affinity, false) == IRQ_SET_MASK_OK && ret)
- 		cpumask_copy(d->affinity, affinity);
+-	pci_bus_write_config_byte(&bus, devfn, PCI_PRIMARY_BUS, 0);
+-	pci_bus_write_config_byte(&bus, devfn, PCI_SECONDARY_BUS, 1);
+-	pci_bus_write_config_byte(&bus, devfn, PCI_SUBORDINATE_BUS, 1);
++	bus = kzalloc(sizeof(*bus), GFP_KERNEL);
++	if (!bus)
++		return;
++
++	bus->number = 0;
++	bus->ops = &cns3xxx_pcie_ops;
++	bus->sysdata = &sd;
  
- 	return ret;
+-	pci_bus_read_config_byte(&bus, devfn, PCI_PRIMARY_BUS, &tmp8);
+-	pci_bus_read_config_byte(&bus, devfn, PCI_SECONDARY_BUS, &tmp8);
+-	pci_bus_read_config_byte(&bus, devfn, PCI_SUBORDINATE_BUS, &tmp8);
++	pci_bus_write_config_byte(bus, devfn, PCI_PRIMARY_BUS, 0);
++	pci_bus_write_config_byte(bus, devfn, PCI_SECONDARY_BUS, 1);
++	pci_bus_write_config_byte(bus, devfn, PCI_SUBORDINATE_BUS, 1);
+ 
+-	pci_bus_write_config_word(&bus, devfn, PCI_MEMORY_BASE, mem_base);
+-	pci_bus_write_config_word(&bus, devfn, PCI_MEMORY_LIMIT, mem_limit);
+-	pci_bus_write_config_word(&bus, devfn, PCI_IO_BASE_UPPER16, io_base);
+-	pci_bus_write_config_word(&bus, devfn, PCI_IO_LIMIT_UPPER16, io_limit);
++	pci_bus_read_config_byte(bus, devfn, PCI_PRIMARY_BUS, &tmp8);
++	pci_bus_read_config_byte(bus, devfn, PCI_SECONDARY_BUS, &tmp8);
++	pci_bus_read_config_byte(bus, devfn, PCI_SUBORDINATE_BUS, &tmp8);
+ 
+-	if (!cnspci->linked)
++	pci_bus_write_config_word(bus, devfn, PCI_MEMORY_BASE, mem_base);
++	pci_bus_write_config_word(bus, devfn, PCI_MEMORY_LIMIT, mem_limit);
++	pci_bus_write_config_word(bus, devfn, PCI_IO_BASE_UPPER16, io_base);
++	pci_bus_write_config_word(bus, devfn, PCI_IO_LIMIT_UPPER16, io_limit);
++
++	if (!cnspci->linked) {
++		kfree(bus);
+ 		return;
++	}
+ 
+ 	/* Set Device Max_Read_Request_Size to 128 byte */
+ 	devfn = PCI_DEVFN(1, 0);
+-	pos = pci_bus_find_capability(&bus, devfn, PCI_CAP_ID_EXP);
+-	pci_bus_read_config_word(&bus, devfn, pos + PCI_EXP_DEVCTL, &dc);
++	pos = pci_bus_find_capability(bus, devfn, PCI_CAP_ID_EXP);
++	pci_bus_read_config_word(bus, devfn, pos + PCI_EXP_DEVCTL, &dc);
+ 	dc &= ~(0x3 << 12);	/* Clear Device Control Register [14:12] */
+-	pci_bus_write_config_word(&bus, devfn, pos + PCI_EXP_DEVCTL, dc);
+-	pci_bus_read_config_word(&bus, devfn, pos + PCI_EXP_DEVCTL, &dc);
++	pci_bus_write_config_word(bus, devfn, pos + PCI_EXP_DEVCTL, dc);
++	pci_bus_read_config_word(bus, devfn, pos + PCI_EXP_DEVCTL, &dc);
+ 	if (!(dc & (0x3 << 12)))
+ 		pr_info("PCIe: Set Device Max_Read_Request_Size to 128 byte\n");
+ 
+ 	/* Disable PCIe0 Interrupt Mask INTA to INTD */
+ 	__raw_writel(~0x3FFF, MISC_PCIE_INT_MASK(port));
++
++	kfree(bus);
+ }
+ 
+ static int cns3xxx_pcie_abort_handler(unsigned long addr, unsigned int fsr,
+-- 
+2.1.0.rc1
