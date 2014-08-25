@@ -1,54 +1,46 @@
-From: mpa@pengutronix.de (Markus Pargmann)
-Date: Mon, 25 Aug 2014 09:24:55 +0200
-Subject: [PATCH] watchdog: imx2_wdt: Remove seperate big endian handling
-In-Reply-To: <5d35f7c722e14022ba7db0221b9cfdb1@BY2PR0301MB0613.namprd03.prod.outlook.com>
-References: <1408949015-28759-1-git-send-email-mpa@pengutronix.de>
- <4b9a55951535433aada42332b08f664f@BY2PR0301MB0613.namprd03.prod.outlook.com>
- <20140825070550.GA11914@pengutronix.de>
- <5d35f7c722e14022ba7db0221b9cfdb1@BY2PR0301MB0613.namprd03.prod.outlook.com>
-Message-ID: <20140825072455.GB11914@pengutronix.de>
+From: cw00.choi@samsung.com (Chanwoo Choi)
+Date: Mon, 25 Aug 2014 16:30:21 +0900
+Subject: [PATCHv4 0/4] thermal: exynos: Add support for TRIMINFO feature of
+ Exynos3250
+Message-ID: <1408951825-2639-1-git-send-email-cw00.choi@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 25, 2014 at 07:11:36AM +0000, Li.Xiubo at freescale.com wrote:
-> > On Mon, Aug 25, 2014 at 07:01:57AM +0000, Li.Xiubo at freescale.com wrote:
-> > > Hi Markus,
-> > >
-> > > Thanks for your work.
-> > >
-> > > And there has already one patch for this:
-> > >
-> > > "watchdog: imx2_wdt: Convert to use regmap framework's endianness method."
-> > 
-> > Thanks didn't see this one.
-> > 
-> > Best regards,
-> > 
-> > Markus
-> > 
-> 
-> I also hoping for your comments about it if there has any problem.
+This patchset add the support of TRIMINFO_RELOAD feature for Exynos3250.
+But Exynos3250 has two TRIMINFO_CTRL register instead other Exynos has only one
+TRIMINFO_CTRL register. So, this patchset support the some Exynos SoC which
+has more than one TRIMINF_CTRL.
 
-I just noticed that you added an include of of_address.h in your
-original patch:
-f728f4bfc495 (watchdog: imx2_wdt: adds big endianness support.)
+Also, this patchset fix wrong value of TRIMINFO_RELOAD_SHIFT and remove
+duplicate code when reading triminfo register of Exynos5440.
 
-But you don't remove the include in your current patch. Was the include
-missing in the driver?
+Changes from v3:
+- Add reviewed message of Amit Daniel Kachhap <amit.daniel@samsung.com>
+- Split RELOAD patch as two patch
+- Fix 'TRIMINFO_RELOAD_SHIFT' value
+- This series includes separate patch[1]
+  [1] https://lkml.org/lkml/2014/8/20/5
+- Drop ACTIME bit setting because TRM includes not enough information of ACTIME bit.
 
-Best regards,
+Changes from v2:
+- Fix build break because of missing 'or' operation.
 
-Markus
+Changes from v1:
+- Add missing 'TMU_SUPPORT_TRIM_RELOAD' features
+
+Chanwoo Choi (4):
+  thermal: exynos: Fix wrong value of TRIMINFO_RELOAD_SHIFT
+  thermal: exynos: Add support for many TRIMINFO_CTRL registers
+  thermal: exynos: Add support for TRIM_RELOAD feature at Exynos3250
+  thermal: exynos: Remove duplicate code when reading triminfo register
+    of Exynos5440
+
+ drivers/thermal/samsung/exynos_thermal_common.h |  1 +
+ drivers/thermal/samsung/exynos_tmu.c            | 27 +++++++++++++++++++------
+ drivers/thermal/samsung/exynos_tmu.h            |  9 +++++++--
+ drivers/thermal/samsung/exynos_tmu_data.c       | 14 +++++++++++--
+ drivers/thermal/samsung/exynos_tmu_data.h       | 12 ++++++++---
+ 5 files changed, 50 insertions(+), 13 deletions(-)
 
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140825/67a5ccd9/attachment-0001.sig>
+1.8.0
