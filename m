@@ -1,52 +1,250 @@
-From: mperttunen@nvidia.com (Mikko Perttunen)
-Date: Mon, 25 Aug 2014 13:55:11 +0300
-Subject: [PATCH] ARM: tegra: add PCIe-related pins to the Jetson TK1 pinmux
- tables
-In-Reply-To: <53FB10B8.3010408@suse.de>
-References: <1408742308-18004-1-git-send-email-swarren@wwwdotorg.org>
- <53FB10B8.3010408@suse.de>
-Message-ID: <53FB160F.6000700@nvidia.com>
+From: achandran@mvista.com (Arun Chandran)
+Date: Mon, 25 Aug 2014 16:34:15 +0530
+Subject: [PATCH] Arm64: convert soft_restart() to assembly code
+In-Reply-To: <20140818160253.GB3302@leverpostej>
+References: <1407847365-10873-1-git-send-email-achandran@mvista.com>
+ <1408123221.22761.38.camel@smoke>
+ <20140815182157.GD21908@leverpostej>
+ <1408128799.22761.47.camel@smoke>
+ <20140818160253.GB3302@leverpostej>
+Message-ID: <CAFdej02H6q+fGMQnrJR7_r7=RsYjCadrQdPOses2cEZsSD4R3w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25/08/14 13:32, Andreas F?rber wrote:
-> Hi Stephen,
->
-> Am 22.08.2014 23:18, schrieb Stephen Warren:
->> From: Stephen Warren <swarren@nvidia.com>
->>
->> This pinmux tables currently omit any configuration for PCIe clk_req,
->> wake, and rst pins, which in turn causes intermittent failures in
->> U-Boot's PCIe support. Import an updated version of the pinmux tables
->> which rectifies this.
->>
->> (While I'm still hoping to remove the pinmux tables from DTs for
->> Tegra124+ devices, while they're still here, they may as well be
->> complete and correct).
->>
->> Signed-off-by: Stephen Warren <swarren@nvidia.com>
->> ---
->>   arch/arm/boot/dts/tegra124-jetson-tk1.dts | 35 +++++++++++++++++++++++++++++++
->>   1 file changed, 35 insertions(+)
->
-> I've tested this patch on both -rc1 and yesterday's torvalds/linux.git
-> with tegra_defconfig: Both with or without this patch I get empty lspci
-> output.
->
-> There doesn't seem to be a tegra/linux.git for-next branch based on -rc1
-> yet - are patches from other subsystem trees needed to get the on-board
-> Ethernet detected or maybe some config option?
+Hi Mark
 
-git://gitorious.org/thierryreding/linux.git staging/pci
+On Mon, Aug 18, 2014 at 9:32 PM, Mark Rutland <mark.rutland@arm.com> wrote:
+> Hi Geoff,
+>
+> On Fri, Aug 15, 2014 at 07:53:19PM +0100, Geoff Levand wrote:
+>> Hi Mark,
+>>
+>> On Fri, 2014-08-15 at 19:21 +0100, Mark Rutland wrote:
+>> > On Fri, Aug 15, 2014 at 06:20:21PM +0100, Geoff Levand wrote:
+>> > > For the cpu-ops shutdown I'm working on I need a call to move the
+>> > > secondary processors to an identity mapped spin loop after the identity
+>> > > map is enabled.  I want to do this in C code, so it needs to happen
+>> > > after the identity map is enabled, and before the dcache is disabled.
+>> > >
+>> > > I think to do this we can keep the existing soft_restart(addr) routine
+>> > > with something like this:
+>> > >
+>> > > void soft_restart(unsigned long addr)
+>> > > {
+>> > >   setup_mm_for_reboot();
+>> > >
+>> > > #if defined(CONFIG_SMP)
+>> > >   smp_secondary_shutdown();
+>> > > #endif
+>> > >
+>> > >   cpu_soft_restart(addr);
+>> > >
+>> > >   /* Should never get here */
+>> > >   BUG();
+>> > > }
+>> > >
+>> >
+>> > I don't follow why you need a hook in the middle of soft_restart. That
+>> > sounds like a layering violation to me.
+>> >
+>> > I assume this is for implementing the spin-table cpu-return-addr idea?
+>>
+>> Yes.
+>>
+>> > If so, what's wrong with something like:
+>>
+>> > void spin_table_cpu_die(unsigned int cpu)
+>> > {
+>> >     unsigned long release_addr = per_cpu(return_addr, cpu);
+>> >
+>> >     /*
+>> >      * We should have a local_disable(DBG|ASYNC|FIQ|IRQ) function or
+>> >      * something similar as these are all context synchronising and
+>> >      * therefore expensive.
+>> >      */
+>> >     local_dbg_disable();
+>> >     local_async_disable();
+>> >     local_fiq_disable();
+>> >     arch_local_irq_disable();
+>> >
+>> >     soft_restart(release_addr);
+>> > }
+>>
+>> OK, this is a much simpler way than what I was thinking, which
+>> was to have the secondaries spin in the kernel until the main
+>> cpu shutdown.  I'll switch over to this, thanks.
+>
+> I just realised that this is still missing the jump to EL2 that I
+> mentioned a while back.
+>
+> I think what we need to do is:
+>
+> * Have KVM (if present) tears itself down prior to cpu_die, restoring
+>   the __hyp_stub_vectors in VBAR_EL2 and disabling the MMU, and caches.
+>
+> * Add a mechanism to __hyp_stub_vectors to allow a hypercall to
+>   call a function at EL2. We should be able to replace the current
+>   hyp_stub el1_sync handler with that, and rework KVM to call a function
+>   at EL2 to setup VBAR_EL2 appropriately at init time.
+>
+> * Depending on whether EL2 is available, go via soft_restart or the
+>   hypercall to cpu_soft_restart (or something very close to it).
+>
+> How does that sound?
 
->
-> Or did you test PCIe via the on-board slot?
->
-> I used U-Boot v2014.07, in case it matters.
->
-> Thanks,
-> Andreas
->
+Hi Mark,
 
-Cheers,
-Mikko
+What about the implementation below?
+
+##############
+diff --git a/arch/arm/include/asm/virt.h b/arch/arm/include/asm/virt.h
+index 4371f45..799ca8a 100644
+--- a/arch/arm/include/asm/virt.h
++++ b/arch/arm/include/asm/virt.h
+@@ -52,7 +52,7 @@ static inline void sync_boot_mode(void)
+        sync_cache_r(&__boot_cpu_mode);
+ }
+
+-void __hyp_set_vectors(unsigned long phys_vector_base);
++void __hyp_func_call(unsigned long addr);
+ unsigned long __hyp_get_vectors(void);
+ #else
+ #define __boot_cpu_mode        (SVC_MODE)
+diff --git a/arch/arm64/include/asm/proc-fns.h
+b/arch/arm64/include/asm/proc-fns.h
+index ddbc3f5..40d3360 100644
+--- a/arch/arm64/include/asm/proc-fns.h
++++ b/arch/arm64/include/asm/proc-fns.h
+@@ -31,7 +31,7 @@ struct cpu_suspend_ctx;
+ extern void cpu_cache_off(void);
+ extern void cpu_do_idle(void);
+ extern void cpu_do_switch_mm(unsigned long pgd_phys, struct mm_struct *mm);
+-extern void cpu_reset(unsigned long addr) __attribute__((noreturn));
++extern void cpu_reset(unsigned long addr, unsigned long boot_mode)
+__attribute__((noreturn));
+ extern void cpu_soft_restart(phys_addr_t cpu_reset, unsigned long
+addr) __attribute__((noreturn));
+ extern void cpu_do_suspend(struct cpu_suspend_ctx *ptr);
+ extern u64 cpu_do_resume(phys_addr_t ptr, u64 idmap_ttbr);
+diff --git a/arch/arm64/kernel/hyp-stub.S b/arch/arm64/kernel/hyp-stub.S
+index a272f33..4dd86b4 100644
+--- a/arch/arm64/kernel/hyp-stub.S
++++ b/arch/arm64/kernel/hyp-stub.S
+@@ -54,13 +54,20 @@ ENDPROC(__hyp_stub_vectors)
+
+ el1_sync:
+        mrs     x1, esr_el2
+-       lsr     x1, x1, #26
+-       cmp     x1, #0x16
++       lsr     x2, x1, #26
++       cmp     x2, #0x16
+        b.ne    2f                              // Not an HVC trap
+-       cbz     x0, 1f
+-       msr     vbar_el2, x0                    // Set vbar_el2
++
++       and     x1, x1, #1                      // x1=1 -> Func call;
+x1=0 -> get_vectors
++       cbnz    x1, 1f
++       mrs     x0, vbar_el2                    // Return vbar_el2
+        b       2f
+-1:     mrs     x0, vbar_el2                    // Return vbar_el2
++
++       /* Fluch I-cache before calling function @x0 */
++1:     ic      ialluis
++       dsb     sy
++       isb
++       blr     x0
+ 2:     eret
+ ENDPROC(el1_sync)
+
+@@ -101,10 +108,12 @@ ENDPROC(\label)
+  */
+
+ ENTRY(__hyp_get_vectors)
+-       mov     x0, xzr
+-       // fall through
+-ENTRY(__hyp_set_vectors)
+        hvc     #0
+        ret
+ ENDPROC(__hyp_get_vectors)
+-ENDPROC(__hyp_set_vectors)
++
++/* Call a function @x0 */
++ENTRY(__hyp_func_call)
++       hvc     #1
++       ret
++ENDPROC(__hyp_func_call)
+diff --git a/arch/arm64/kernel/process.c b/arch/arm64/kernel/process.c
+index 64733d4..77298c2 100644
+--- a/arch/arm64/kernel/process.c
++++ b/arch/arm64/kernel/process.c
+@@ -65,6 +65,14 @@ void soft_restart(unsigned long addr)
+ //     smp_secondary_shutdown();
+ #endif
+
++       /* Delay primary cpu; allow enough time for
++        * secondaries to enter spin loop
++        */
++#if defined(CONFIG_SMP)
++       if (smp_processor_id() == 0)
++               mdelay(1000);
++#endif
++
+        cpu_soft_restart(virt_to_phys(cpu_reset), addr);
+
+        /* Should never get here */
+
+diff --git a/arch/arm64/mm/proc.S b/arch/arm64/mm/proc.S
+index 3cb6dec..74e11c2 100644
+--- a/arch/arm64/mm/proc.S
++++ b/arch/arm64/mm/proc.S
+@@ -25,6 +25,7 @@
+ #include <asm/hwcap.h>
+ #include <asm/pgtable-hwdef.h>
+ #include <asm/pgtable.h>
++#include <asm/virt.h>
+
+ #include "proc-macros.S"
+
+@@ -69,19 +70,25 @@ ENDPROC(cpu_cache_off)
+  */
+        .align  5
+ ENTRY(cpu_reset)
+-       mrs     x1, sctlr_el1
+-       bic     x1, x1, #1
+-       msr     sctlr_el1, x1                   // disable the MMU
++       mrs     x2, sctlr_el1
++       bic     x2, x2, #1
++       msr     sctlr_el1, x2                   // disable the MMU
+        isb
+ #if defined(CONFIG_SMP)
+ /*     bl      secondary_shutdown */
+ #endif
++       sub     w1, w1, #BOOT_CPU_MODE_EL2
++       cbz     w1, __hyp_func_call
+        ret     x0
+ ENDPROC(cpu_reset)
+
+ ENTRY(cpu_soft_restart)
++       ldr     x3, =__boot_cpu_mode
++       ldr     w2, [x3]
++
+        mov     x19, x0
+        mov     x20, x1
++       mov     w21, w2
+
+        /* Turn D-cache off */
+        bl      cpu_cache_off
+@@ -89,6 +96,7 @@ ENTRY(cpu_soft_restart)
+        bl      flush_cache_all
+
+        mov     x0, x20
++       mov     w1, w21
+        ret     x19
+ ENDPROC(cpu_soft_restart)
+
+###################
+
+Am I anywhere close to your idea?
+
+--Arun
