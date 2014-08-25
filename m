@@ -1,71 +1,38 @@
-From: richard.weinberger@gmail.com (Richard Weinberger)
-Date: Mon, 25 Aug 2014 13:53:30 +0200
-Subject: [PATCH v4 0/8] asm-generic/io.h overhaul
-In-Reply-To: <1407925738-26170-1-git-send-email-thierry.reding@gmail.com>
-References: <1407925738-26170-1-git-send-email-thierry.reding@gmail.com>
-Message-ID: <CAFLxGvyyW5J0En1bFwonZiMwoJK+XDgtHvC2PQOhqgvyF4F-uQ@mail.gmail.com>
+From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
+Date: Mon, 25 Aug 2014 13:54:07 +0200
+Subject: [PATCH v2 1/1] ARM: exynos_defconfig: Enable options for display
+ panel support
+In-Reply-To: <53FB22E4.8040906@suse.de>
+References: <1408956336-17376-1-git-send-email-javier.martinez@collabora.co.uk>
+ <5825205.70RuHaSG5p@amdc1032> <53FB22E4.8040906@suse.de>
+Message-ID: <53FB23DF.70809@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 13, 2014 at 12:28 PM, Thierry Reding
-<thierry.reding@gmail.com> wrote:
-> From: Thierry Reding <treding@nvidia.com>
->
-> Hi,
->
-> Here is the fourth version of a series that started out as an attempt to
-> provide string versions of the read*() and write*() accessors to more
-> architectures so that drivers can use them portably. The series has
-> since evolved into a more general cleanup of asm-generic/io.h and the
-> functions defined therein.
->
-> Patch 1 is trivial and removes a redundant redefinition of PCI_IOBASE
-> from the asm/io.h header on ARC. Patches 2 and 3 remove unnecessary
-> volatile keywoards from some functions, which is a prerequisite to clean
-> up some of the functions in subsequent patches.
->
-> The xlate_dev_{kmem,mem}_ptr() functions are used to map memory when the
-> /dev/mem device is accessed. Patches 4 and 5 use more consistent data
-> types for these functions, which will get a "standard" prototype in the
-> asm-generic/io.h header in a subsequent patch.
->
-> Patch 6 is the bulk of this series. It implements the string variants of
-> the read*() and write*() accessors and cleans up various other parts of
-> the asm-generic/io.h header file. Macros are converted to static inline
-> functions for better type checking. Overriding generic implementations
-> in architectures is handled more consistently.
->
-> Patches 7 and 8, finally, make use of the asm-generic/io.h header on the
-> 32-bit and 64-bit ARM architectures.
->
-> This is compile- and runtime-tested on 32-bit and 64-bit ARM and compile
-> tested on IA64, Microblaze, s390, SPARC, x86 and Xtensa. For ARC,
-> Blackfin, Metag, OpenRISC, Score and Unicore32 which also use
-> asm-generic/io.h I couldn't find or build a cross-compiler that would
-> run on my system. But by code inspection they shouldn't break with this
-> patch.
->
-> To ensure bisectability I built multi_v7_defconfig on 32-bit ARM and the
-> defconfig for 64-bit ARM, IA64, Microblaze, s390, SPARC, x86 and Xtensa
-> after each commit and verified that the series does not introduce any
-> build errors or warnings.
->
-> Provided there are no objections to the patches there's still the matter
-> of how to merge them. Patch 6 depends on patches 1-5 to avoid warnings
-> and/or errors during the build. Patches 7 and 8 depend on patch 6. In my
-> opinion it doesn't make much sense to split them up, so I guess we'll
-> need a volunteer to take them all into one tree. Ideally that tree would
-> feed into linux-next so that we can get as much build and test-coverage
-> as possible during the 3.17 release cycle so that these patches can go
-> into 3.18.
->
-> Arnd, I'm opportunistically sending this To: you in the hopes that you
-> can take it into your asm-generic tree which seems like the best fit for
-> this.
+Hello Andreas,
 
-Do you have a git tree for that?
-Would be nice for testing UML, it depends also on generic io.
+On 08/25/2014 01:49 PM, Andreas F?rber wrote:
+>> 
+>> Could you please also do corresponding update to multi_v7_defconfig?
+> 
+> As was mentioned in v1 (but now below), some of these options depend on
 
--- 
-Thanks,
-//richard
+Sorry for missing the mention about the dependencies on v2...
+
+> patches yet to be respun and be accepted into drm, so I would consider
+> this an RFC patch and suggest to wait with multi_v7.
+> 
+
+Agreed, I just sent an email to Bartlomiej saying the same.
+
+> It could of course be split, as CONFIG_DRM_EXYNOS* and backlight parts
+> are certainly okay.
+>
+
+Also agreed.
+
+> Regards,
+> Andreas
+
+Best regards,
+Javier
