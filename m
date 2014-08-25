@@ -1,30 +1,42 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 25 Aug 2014 13:36:30 -0600
-Subject: [PATCH v2 6/9] usb: xhci: Add NVIDIA Tegra xHCI host-controller
- driver
-In-Reply-To: <1408381705-3623-7-git-send-email-abrestic@chromium.org>
-References: <1408381705-3623-1-git-send-email-abrestic@chromium.org>
- <1408381705-3623-7-git-send-email-abrestic@chromium.org>
-Message-ID: <53FB903E.3050805@wwwdotorg.org>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Mon, 25 Aug 2014 13:05:39 -0700
+Subject: [PATCH 04/29] drivers: base: add notifier for failed driver bind
+In-Reply-To: <1407235677-26324-5-git-send-email-m.szyprowski@samsung.com>
+References: <1407235677-26324-1-git-send-email-m.szyprowski@samsung.com>
+ <1407235677-26324-5-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <20140825200539.GA22076@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/18/2014 11:08 AM, Andrew Bresticker wrote:
-> Add support for the on-chip xHCI host controller present on Tegra SoCs.
->
-> The driver is currently very basic: it loads the controller with its
-> firmware, starts the controller, and is able to service messages sent
-> by the controller's firmware.  The hardware supports device mode as
-> well as lower-power operating modes, but support for these is not yet
-> implemented here.
+On Tue, Aug 05, 2014 at 12:47:32PM +0200, Marek Szyprowski wrote:
+> This patch adds support for getting a notify for failed device driver
+> bind, so all the items done in BUS_NOTIFY_BIND_DRIVER event can be
+> cleaned if the driver fails to bind.
 
-Just one minor comment below.
+But doesn't the bus know if the driver fails to bind, so why would a
+notifier be needed here?  Can't it unwind any problems then?
 
-I'd like an ack from a USB maintainer so that this patch can be taken 
-through the Tegra tree along with the rest of the series, which has 
-various dependencies.
+> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> ---
+>  drivers/base/dd.c      | 10 +++++++---
+>  include/linux/device.h |  4 +++-
+>  2 files changed, 10 insertions(+), 4 deletions(-)
+> 
+> diff --git a/drivers/base/dd.c b/drivers/base/dd.c
+> index e4ffbcf..541a41f 100644
+> --- a/drivers/base/dd.c
+> +++ b/drivers/base/dd.c
+> @@ -237,10 +237,14 @@ static int driver_sysfs_add(struct device *dev)
+>  	return ret;
+>  }
+>  
+> -static void driver_sysfs_remove(struct device *dev)
+> +static void driver_sysfs_remove(struct device *dev, int failed)
 
-> +MODULE_ALIAS("platform:xhci-tegra");
+I _hate_ having functions with a flag that does something different
+depending on it.  If you _really_ need this, just make the notifier call
+before calling this function, which should work just fine, right?
 
-I don't think that's needed; MODULE_DEVICE_TABLE(of, 
-tegra_xhci_of_match) should be enough upstream.
+thanks,
+
+greg k-h
