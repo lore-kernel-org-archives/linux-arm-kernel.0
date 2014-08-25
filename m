@@ -1,54 +1,39 @@
-From: dianders@google.com (Doug Anderson)
-Date: Mon, 25 Aug 2014 08:25:02 -0700
-Subject: [PATCH V2 3/3] mmc: dw_mmc: Dont cut off vqmmc and vmmc
-In-Reply-To: <53FAF8C7.8040007@samsung.com>
-References: <1408715272-13833-1-git-send-email-yuvaraj.cd@samsung.com>
- <1408715272-13833-4-git-send-email-yuvaraj.cd@samsung.com>
- <CAPDyKFqz8sGj2td=ihZXN4zvAqmu9FHZjWdCn-ZRcdHugNHe2g@mail.gmail.com>
- <CAPz6YkXH1mMOTwcLkKdffdUHN+TaCAhpa8oG0h+rFn9i+GMoCw@mail.gmail.com>
- <CAPDyKFqp7oEt9ASmdxrgUwbQ8aTZzAuJ7uD1oGN50iuzPzBfVg@mail.gmail.com>
- <53FAF8C7.8040007@samsung.com>
-Message-ID: <CAD=FV=XbV7R+FqRRucA5Cv2A+=3g8zccASwxcTtJD6YyO-ioCg@mail.gmail.com>
+From: afaerber@suse.de (=?ISO-8859-1?Q?Andreas_F=E4rber?=)
+Date: Mon, 25 Aug 2014 17:25:18 +0200
+Subject: [linux-sunxi] Re: [PATCH 4/4] simplefb: add clock handling code
+In-Reply-To: <53FB3E7F.4000503@redhat.com>
+References: <1407914239-12054-1-git-send-email-libv@skynet.be>
+ <1407914239-12054-5-git-send-email-libv@skynet.be>
+ <53EB9471.3090204@wwwdotorg.org> <20140813170106.GT15297@lukather>
+ <20140825121228.GB4163@ulmo.nvidia.com> <20140825124410.GZ15297@lukather>
+ <20140825133953.GJ4163@ulmo.nvidia.com> <53FB3E7F.4000503@redhat.com>
+Message-ID: <53FB555E.5040409@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Jaehoon,
+Hi,
 
-On Mon, Aug 25, 2014 at 1:50 AM, Jaehoon Chung <jh80.chung@samsung.com> wrote:
-> On 08/25/2014 05:13 PM, Ulf Hansson wrote:
->> On 22 August 2014 20:27, Sonny Rao <sonnyrao@chromium.org> wrote:
->>> On Fri, Aug 22, 2014 at 8:31 AM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
->>>> On 22 August 2014 15:47, Yuvaraj Kumar C D <yuvaraj.cd@gmail.com> wrote:
->>>>> Exynos 5250 and 5420 based boards uses built-in CD# line for card
->>>>> detection.But unfortunately CD# line is on the same voltage rails
->>>>> as of I/O voltage rails. When we cut off vqmmc,the consequent card
->>>>> detection will break in these boards.
->
-> I didn't know that use CD# line for card detect.
-> And if CD# voltage rails and I/O voltage rail are same voltage, it doesn't make sense.
-> Which card is used with same voltages? (eMMC? SD? SDIO?)
->
-> Well, I have checked Exynos5250 and 5420, but it looks like not same rails.
+Am 25.08.2014 15:47, schrieb Hans de Goede:
+> On 08/25/2014 03:39 PM, Thierry Reding wrote:
+>> On Mon, Aug 25, 2014 at 02:44:10PM +0200, Maxime Ripard wrote:
+>>> On Mon, Aug 25, 2014 at 02:12:30PM +0200, Thierry Reding wrote:
+>>>> On Wed, Aug 13, 2014 at 07:01:06PM +0200, Maxime Ripard wrote:
+>>>>> On Wed, Aug 13, 2014 at 10:38:09AM -0600, Stephen Warren wrote:
+>>>>>> If not, perhaps the clock driver should force the clock to be
+>>>>>> enabled (perhaps only if the DRM/KMS driver isn't enabled?).
+[...]
+> As for the suggestion to simply never disable the plls / ahb gates by blocking
+> them from ever being disabled in the sunxi clock driver, that is not really
+> a solution either, as we want to be able to turn these things off to safe
+> power on screen blank once control has been turned over to the kms driver.
 
-I'm not sure I totally understood what you said.  In my manual I have
-a table titled "Table 2-1 Exynos 5420 Pin List".  Look in this table
-for XMMC2CDN and XMMC2DATA_0.  Look to the right of the table and
-you'll see the power domain.  For both it shows VDDQ_MMC2.  If that
-doesn't mean that the two are in the same voltage domain then I don't
-know what does.  Can you point to any examples where they have
-different voltage domains?
+Without wanting to take sides on the simplefb matter, can't you just use
+clk_ignore_unused in bootargs to work around the issue at hand?
+That's what I do on the Spring Chromebook.
 
-I agree that what exynos does is not sensible, but that's what it is.
+Cheers,
+Andreas
 
-
->>>> I am not sure I follow here.
->>>>
->>>> Is the card detect mechanism handled internally by the dw_mmc controller?
->>>
->>> Yes
->
-> What card detect mechanism?
-
-The dw_mmc controller has a way to read the card detect, right?
-That's internal to the controller.  The alternative would be to use a
-generic GPIO for card detect.
+-- 
+SUSE LINUX Products GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
+GF: Jeff Hawn, Jennifer Guild, Felix Imend?rffer; HRB 16746 AG N?rnberg
