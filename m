@@ -1,49 +1,131 @@
 From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Mon, 25 Aug 2014 07:53:15 -0600
-Subject: [PATCH 01/11 v4] coresight: add CoreSight core layer framework
-In-Reply-To: <20140825102445.1ff19682@free-electrons.com>
+Date: Mon, 25 Aug 2014 08:02:43 -0600
+Subject: [PATCH 09/11 v4] coresight: adding support for beagle and beagleXM
+In-Reply-To: <53FA5B55.4000603@gmail.com>
 References: <1408554231-24321-1-git-send-email-mathieu.poirier@linaro.org>
- <1408554231-24321-2-git-send-email-mathieu.poirier@linaro.org>
- <20140825102445.1ff19682@free-electrons.com>
-Message-ID: <CANLsYkzvS8YTACjWSqfALM20C=J_i_94=JaQZaSFeWEUtPpkuQ@mail.gmail.com>
+ <1408554231-24321-10-git-send-email-mathieu.poirier@linaro.org>
+ <53FA5B55.4000603@gmail.com>
+Message-ID: <CANLsYkxCdVm6cPtM9ub3Vwc24G9x6Vy9pt5pVMSPMxcksw6VHA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25 August 2014 02:24, Thomas Petazzoni
-<thomas.petazzoni@free-electrons.com> wrote:
-> Hello,
+On 24 August 2014 15:38, Marcin Jabrzyk <marcin.jabrzyk@gmail.com> wrote:
+> Hi,
 >
-> On Wed, 20 Aug 2014 11:03:41 -0600, mathieu.poirier at linaro.org wrote:
+> W dniu 20.08.2014 o 19:03, mathieu.poirier at linaro.org pisze:
+>> From: Mathieu Poirier <mathieu.poirier@linaro.org>
+>>
+>> Currently supporting ETM and ETB.  Support for TPIU
+>> and SDTI are yet to be added.
+> Did you tried running the drivers on board or are there any special
+> preparation needed?
+> I've BeagleBoard-xM Rev. C applied your patches and enabled the
+> functions the in menuconfig.
+> But on dmesg I see that:
 >
->> diff --git a/drivers/coresight/Makefile b/drivers/coresight/Makefile
->> new file mode 100644
->> index 0000000..fef87bc
->> --- /dev/null
->> +++ b/drivers/coresight/Makefile
->> @@ -0,0 +1,9 @@
->> +#
->> +# Makefile for CoreSight drivers.
->> +#
->> +obj-$(CONFIG_CORESIGHT) += coresight.o
->> +obj-$(CONFIG_OF) += of_coresight.o
->> +obj-$(CONFIG_CORESIGHT_LINKS_AND_SINKS) += coresight-tmc.o coresight-tpiu.o \
->> +                                        coresight-etb10.o coresight-funnel.o \
->> +                                        coresight-replicator.o
->> +obj-$(CONFIG_CORESIGHT_SOURCE_ETM3X) += coresight-etm3x.o coresight-etm-cp14.o
+> [    0.685028] of_amba_device_create(): amba_device_add() failed (-19)
+> for /etb at 5401b000
+> [    0.685119] of_amba_device_create(): amba_device_add() failed (-19)
+> for /etm at 54010000
 >
-> I believe this is a bit messed up with PATCH 02/11. Here you're adding
-> references to many files that aren't part of this patch, but are added
-> in subsequent patches. PATCH 02/11 removes those lines and replaces
-> them by the correct values. Surely an interactive rebase conflict that
-> was not solved properly.
+> There are no nodes according coresight in /sys/kernel/debug/ .
 
-Yeah, that's messed up.  Thanks for pointing it out.
+Right, that is because there is a problem in mainline with enabling
+"emu_src_ck".  The call to "clk_prepare_enable()" returns without
+waiting for the clock to effectively be enabled, preventing the
+components from being discovered properly.
 
-Mathieu
+The work around (non-upstreamable) is to have a driver getting a hold
+of the clock before AMBA devices are probed.  I can send you that code
+(10 lines) if need be.
 
 >
-> Thomas
-> --
-> Thomas Petazzoni, CTO, Free Electrons
-> Embedded Linux, Kernel and Android engineering
-> http://free-electrons.com
+> Best regards,
+> Marcin
+>
+>>
+>> Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+>> ---
+>>  arch/arm/boot/dts/omap3-beagle-xm.dts | 28 ++++++++++++++++++++++++++++
+>>  arch/arm/boot/dts/omap3-beagle.dts    | 28 ++++++++++++++++++++++++++++
+>>  2 files changed, 56 insertions(+)
+>>
+>> diff --git a/arch/arm/boot/dts/omap3-beagle-xm.dts b/arch/arm/boot/dts/omap3-beagle-xm.dts
+>> index 1becefc..eec73d8 100644
+>> --- a/arch/arm/boot/dts/omap3-beagle-xm.dts
+>> +++ b/arch/arm/boot/dts/omap3-beagle-xm.dts
+>> @@ -145,6 +145,34 @@
+>>                       };
+>>               };
+>>       };
+>> +
+>> +     etb at 5401b000 {
+>> +             compatible = "arm,coresight-etb10", "arm,primecell";
+>> +             reg = <0x5401b000 0x1000>;
+>> +
+>> +             coresight-default-sink;
+>> +             clocks = <&emu_src_ck>;
+>> +             clock-names = "apb_pclk";
+>> +             port {
+>> +                     etb_in: endpoint {
+>> +                             slave-mode;
+>> +                             remote-endpoint = <&etm_out>;
+>> +                     };
+>> +             };
+>> +     };
+>> +
+>> +     etm at 54010000 {
+>> +             compatible = "arm,coresight-etm3x", "arm,primecell";
+>> +             reg = <0x54010000 0x1000>;
+>> +
+>> +             clocks = <&emu_src_ck>;
+>> +             clock-names = "apb_pclk";
+>> +             port {
+>> +                     etm_out: endpoint {
+>> +                             remote-endpoint = <&etb_in>;
+>> +                     };
+>> +             };
+>> +     };
+>>  };
+>>
+>>  &omap3_pmx_wkup {
+>> diff --git a/arch/arm/boot/dts/omap3-beagle.dts b/arch/arm/boot/dts/omap3-beagle.dts
+>> index 3c3e6da..a151daf 100644
+>> --- a/arch/arm/boot/dts/omap3-beagle.dts
+>> +++ b/arch/arm/boot/dts/omap3-beagle.dts
+>> @@ -140,6 +140,34 @@
+>>                       };
+>>               };
+>>       };
+>> +
+>> +     etb at 540000000 {
+>> +             compatible = "arm,coresight-etb10", "arm,primecell";
+>> +             reg = <0x5401b000 0x1000>;
+>> +
+>> +             coresight-default-sink;
+>> +             clocks = <&emu_src_ck>;
+>> +             clock-names = "apb_pclk";
+>> +             port {
+>> +                     etb_in: endpoint {
+>> +                             slave-mode;
+>> +                             remote-endpoint = <&etm_out>;
+>> +                     };
+>> +             };
+>> +     };
+>> +
+>> +     etm at 54010000 {
+>> +             compatible = "arm,coresight-etm3x", "arm,primecell";
+>> +             reg = <0x54010000 0x1000>;
+>> +
+>> +             clocks = <&emu_src_ck>;
+>> +             clock-names = "apb_pclk";
+>> +             port {
+>> +                     etm_out: endpoint {
+>> +                             remote-endpoint = <&etb_in>;
+>> +                     };
+>> +             };
+>> +     };
+>>  };
+>>
+>>  &omap3_pmx_wkup {
+>
