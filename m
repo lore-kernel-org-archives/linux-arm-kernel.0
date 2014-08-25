@@ -1,113 +1,215 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Mon, 25 Aug 2014 15:59:26 -0700
-Subject: [PATCH v5 2/3] ARM: dts: Add main PWM info to rk3288
-In-Reply-To: <1409007567-23523-1-git-send-email-dianders@chromium.org>
-References: <1409007567-23523-1-git-send-email-dianders@chromium.org>
-Message-ID: <1409007567-23523-3-git-send-email-dianders@chromium.org>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 25 Aug 2014 16:14:50 -0700
+Subject: [PATCH] pstore/ram_core: Fix hang on ARMs because of pgprot_noncached
+Message-ID: <20140825231449.GS17254@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds the PWM info (other than the VOP PWM) to the main rk3288
-dtsi file.
+Currently trying to use pstore on ARMs can hang as we're mapping the
+peristent RAM with pgprot_noncached(). On ARMs, this will actually
+make the memory strongly ordered, and as the atomic operations pstore
+uses are implementation defined for strongly ordered memory, they
+may not work.
 
-Signed-off-by: Caesar Wang <caesar.wang@rock-chips.com>
-Signed-off-by: Doug Anderson <dianders@chromium.org>
----
-Changes in v5:
-- Back to version 3 (no rockchip,grf).
+An earlier fix was done by Rob Herring <robherring2@gmail.com> to
+change the mapping to be pgprot_writecombine() instead as that's often
+defined as pgprot_noncached() anyways. However, as pointed out by
+Colin Cross <ccross@android.com>, in some cases you do want to use
+pgprot_noncached() on ARMs if the SoC supports it to see a debug
+printk just before a write hanging the system.
 
-Changes in v4:
-- Add rockchip,grf to pwm nodes.
+So let's fix this issue by adding a module parameter for mem_cached,
+and default to having it set. This fixes pstore at least for omaps,
+and does not change the default for x86. And people debugging system
+hangs can set the mem_cached to zero as needed.
 
-Changes in v3: None
+Cc: Rob Herring <robherring2@gmail.com>
+Cc: Randy Dunlap <rdunlap@infradead.org>
+Cc: Russell King <linux@arm.linux.org.uk>
+Signed-off-by: Tony Lindgren <tony@atomide.com>
 
- arch/arm/boot/dts/rk3288.dtsi | 68 +++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 68 insertions(+)
-
-diff --git a/arch/arm/boot/dts/rk3288.dtsi b/arch/arm/boot/dts/rk3288.dtsi
-index 36be7bb..9c9d9c5 100644
---- a/arch/arm/boot/dts/rk3288.dtsi
-+++ b/arch/arm/boot/dts/rk3288.dtsi
-@@ -261,6 +261,50 @@
- 		status = "disabled";
- 	};
+--- a/Documentation/ramoops.txt
++++ b/Documentation/ramoops.txt
+@@ -14,11 +14,18 @@ survive after a restart.
  
-+	pwm0: pwm at ff680000 {
-+		compatible = "rockchip,rk3288-pwm";
-+		reg = <0xff680000 0x10>;
-+		#pwm-cells = <3>;
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pwm0_pin>;
-+		clocks = <&cru PCLK_PWM>;
-+		clock-names = "pwm";
-+		status = "disabled";
-+	};
+ 1. Ramoops concepts
+ 
+-Ramoops uses a predefined memory area to store the dump. The start and size of
+-the memory area are set using two variables:
++Ramoops uses a predefined memory area to store the dump. The start and size
++and type of the memory area are set using three variables:
+   * "mem_address" for the start
+   * "mem_size" for the size. The memory size will be rounded down to a
+   power of two.
++  * "mem_cached" to specifiy if the memory is cached or not.
 +
-+	pwm1: pwm at ff680010 {
-+		compatible = "rockchip,rk3288-pwm";
-+		reg = <0xff680010 0x10>;
-+		#pwm-cells = <3>;
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pwm1_pin>;
-+		clocks = <&cru PCLK_PWM>;
-+		clock-names = "pwm";
-+		status = "disabled";
-+	};
++Note disabling "mem_cached" may not be supported on all architectures as
++pstore depends on atomic operations. At least on ARM, clearing "mem_cached"
++will cause the memory to be mapped strongly ordered. And atomic operations
++on strongly ordered memory are implementation defined, and won't work on
++many ARMs such as omap.
+ 
+ The memory area is divided into "record_size" chunks (also rounded down to
+ power of two) and each oops/panic writes a "record_size" chunk of
+@@ -55,6 +62,7 @@ Setting the ramoops parameters can be done in 2 different manners:
+ static struct ramoops_platform_data ramoops_data = {
+         .mem_size               = <...>,
+         .mem_address            = <...>,
++        .mem_cached             = <...>,
+         .record_size            = <...>,
+         .dump_oops              = <...>,
+         .ecc                    = <...>,
+--- a/fs/pstore/ram.c
++++ b/fs/pstore/ram.c
+@@ -61,6 +61,11 @@ module_param(mem_size, ulong, 0400);
+ MODULE_PARM_DESC(mem_size,
+ 		"size of reserved RAM used to store oops/panic logs");
+ 
++static unsigned int mem_cached = 1;
++module_param(mem_cached, uint, 0600);
++MODULE_PARM_DESC(mem_cached,
++		"set to 1 to use cached memory, 0 to use uncached (default 1)");
 +
-+	pwm2: pwm at ff680020 {
-+		compatible = "rockchip,rk3288-pwm";
-+		reg = <0xff680020 0x10>;
-+		#pwm-cells = <3>;
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pwm2_pin>;
-+		clocks = <&cru PCLK_PWM>;
-+		clock-names = "pwm";
-+		status = "disabled";
-+	};
+ static int dump_oops = 1;
+ module_param(dump_oops, int, 0600);
+ MODULE_PARM_DESC(dump_oops,
+@@ -79,6 +84,7 @@ struct ramoops_context {
+ 	struct persistent_ram_zone *fprz;
+ 	phys_addr_t phys_addr;
+ 	unsigned long size;
++	unsigned int cached;
+ 	size_t record_size;
+ 	size_t console_size;
+ 	size_t ftrace_size;
+@@ -358,7 +364,8 @@ static int ramoops_init_przs(struct device *dev, struct ramoops_context *cxt,
+ 		size_t sz = cxt->record_size;
+ 
+ 		cxt->przs[i] = persistent_ram_new(*paddr, sz, 0,
+-						  &cxt->ecc_info);
++						  &cxt->ecc_info,
++						  cxt->cached);
+ 		if (IS_ERR(cxt->przs[i])) {
+ 			err = PTR_ERR(cxt->przs[i]);
+ 			dev_err(dev, "failed to request mem region (0x%zx at 0x%llx): %d\n",
+@@ -388,7 +395,7 @@ static int ramoops_init_prz(struct device *dev, struct ramoops_context *cxt,
+ 		return -ENOMEM;
+ 	}
+ 
+-	*prz = persistent_ram_new(*paddr, sz, sig, &cxt->ecc_info);
++	*prz = persistent_ram_new(*paddr, sz, sig, &cxt->ecc_info, cxt->cached);
+ 	if (IS_ERR(*prz)) {
+ 		int err = PTR_ERR(*prz);
+ 
+@@ -435,6 +442,7 @@ static int ramoops_probe(struct platform_device *pdev)
+ 
+ 	cxt->size = pdata->mem_size;
+ 	cxt->phys_addr = pdata->mem_address;
++	cxt->cached = pdata->mem_cached;
+ 	cxt->record_size = pdata->record_size;
+ 	cxt->console_size = pdata->console_size;
+ 	cxt->ftrace_size = pdata->ftrace_size;
+--- a/fs/pstore/ram_core.c
++++ b/fs/pstore/ram_core.c
+@@ -380,7 +380,8 @@ void persistent_ram_zap(struct persistent_ram_zone *prz)
+ 	persistent_ram_update_header_ecc(prz);
+ }
+ 
+-static void *persistent_ram_vmap(phys_addr_t start, size_t size)
++static void *persistent_ram_vmap(phys_addr_t start, size_t size,
++		unsigned int cached)
+ {
+ 	struct page **pages;
+ 	phys_addr_t page_start;
+@@ -392,7 +393,10 @@ static void *persistent_ram_vmap(phys_addr_t start, size_t size)
+ 	page_start = start - offset_in_page(start);
+ 	page_count = DIV_ROUND_UP(size + offset_in_page(start), PAGE_SIZE);
+ 
+-	prot = pgprot_noncached(PAGE_KERNEL);
++	if (cached)
++		prot = pgprot_writecombine(PAGE_KERNEL);
++	else
++		prot = pgprot_noncached(PAGE_KERNEL);
+ 
+ 	pages = kmalloc_array(page_count, sizeof(struct page *), GFP_KERNEL);
+ 	if (!pages) {
+@@ -411,8 +415,11 @@ static void *persistent_ram_vmap(phys_addr_t start, size_t size)
+ 	return vaddr;
+ }
+ 
+-static void *persistent_ram_iomap(phys_addr_t start, size_t size)
++static void *persistent_ram_iomap(phys_addr_t start, size_t size,
++		unsigned int cached)
+ {
++	void *va;
 +
-+	pwm3: pwm at ff680030 {
-+		compatible = "rockchip,rk3288-pwm";
-+		reg = <0xff680030 0x10>;
-+		#pwm-cells = <2>;
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pwm3_pin>;
-+		clocks = <&cru PCLK_PWM>;
-+		clock-names = "pwm";
-+		status = "disabled";
-+	};
+ 	if (!request_mem_region(start, size, "persistent_ram")) {
+ 		pr_err("request mem region (0x%llx at 0x%llx) failed\n",
+ 			(unsigned long long)size, (unsigned long long)start);
+@@ -422,19 +429,24 @@ static void *persistent_ram_iomap(phys_addr_t start, size_t size)
+ 	buffer_start_add = buffer_start_add_locked;
+ 	buffer_size_add = buffer_size_add_locked;
+ 
+-	return ioremap(start, size);
++	if (cached)
++		va = ioremap(start, size);
++	else
++		va = ioremap_wc(start, size);
 +
- 	pmu: power-management at ff730000 {
- 		compatible = "rockchip,rk3288-pmu", "syscon";
- 		reg = <0xff730000 0x100>;
-@@ -611,5 +655,29 @@
- 				rockchip,pins = <5 15 3 &pcfg_pull_none>;
- 			};
- 		};
-+
-+		pwm0 {
-+			pwm0_pin: pwm0-pin {
-+				rockchip,pins = <7 0 RK_FUNC_1 &pcfg_pull_none>;
-+			};
-+		};
-+
-+		pwm1 {
-+			pwm1_pin: pwm1-pin {
-+				rockchip,pins = <7 1 RK_FUNC_1 &pcfg_pull_none>;
-+			};
-+		};
-+
-+		pwm2 {
-+			pwm2_pin: pwm2-pin {
-+				rockchip,pins = <7 22 RK_FUNC_3 &pcfg_pull_none>;
-+			};
-+		};
-+
-+		pwm3 {
-+			pwm3_pin: pwm3-pin {
-+				rockchip,pins = <7 23 RK_FUNC_3 &pcfg_pull_none>;
-+			};
-+		};
- 	};
++	return va;
+ }
+ 
+ static int persistent_ram_buffer_map(phys_addr_t start, phys_addr_t size,
+-		struct persistent_ram_zone *prz)
++		struct persistent_ram_zone *prz, int cached)
+ {
+ 	prz->paddr = start;
+ 	prz->size = size;
+ 
+ 	if (pfn_valid(start >> PAGE_SHIFT))
+-		prz->vaddr = persistent_ram_vmap(start, size);
++		prz->vaddr = persistent_ram_vmap(start, size, cached);
+ 	else
+-		prz->vaddr = persistent_ram_iomap(start, size);
++		prz->vaddr = persistent_ram_iomap(start, size, cached);
+ 
+ 	if (!prz->vaddr) {
+ 		pr_err("%s: Failed to map 0x%llx pages at 0x%llx\n", __func__,
+@@ -500,7 +512,8 @@ void persistent_ram_free(struct persistent_ram_zone *prz)
+ }
+ 
+ struct persistent_ram_zone *persistent_ram_new(phys_addr_t start, size_t size,
+-			u32 sig, struct persistent_ram_ecc_info *ecc_info)
++			u32 sig, struct persistent_ram_ecc_info *ecc_info,
++			unsigned int cached)
+ {
+ 	struct persistent_ram_zone *prz;
+ 	int ret = -ENOMEM;
+@@ -511,7 +524,7 @@ struct persistent_ram_zone *persistent_ram_new(phys_addr_t start, size_t size,
+ 		goto err;
+ 	}
+ 
+-	ret = persistent_ram_buffer_map(start, size, prz);
++	ret = persistent_ram_buffer_map(start, size, prz, cached);
+ 	if (ret)
+ 		goto err;
+ 
+--- a/include/linux/pstore_ram.h
++++ b/include/linux/pstore_ram.h
+@@ -53,7 +53,8 @@ struct persistent_ram_zone {
  };
--- 
-2.1.0.rc2.206.gedb03e5
+ 
+ struct persistent_ram_zone *persistent_ram_new(phys_addr_t start, size_t size,
+-			u32 sig, struct persistent_ram_ecc_info *ecc_info);
++			u32 sig, struct persistent_ram_ecc_info *ecc_info,
++			unsigned int cached);
+ void persistent_ram_free(struct persistent_ram_zone *prz);
+ void persistent_ram_zap(struct persistent_ram_zone *prz);
+ 
+@@ -76,6 +77,7 @@ ssize_t persistent_ram_ecc_string(struct persistent_ram_zone *prz,
+ struct ramoops_platform_data {
+ 	unsigned long	mem_size;
+ 	unsigned long	mem_address;
++	unsigned int	mem_cached;
+ 	unsigned long	record_size;
+ 	unsigned long	console_size;
+ 	unsigned long	ftrace_size;
