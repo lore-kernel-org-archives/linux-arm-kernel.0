@@ -1,56 +1,31 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Mon, 25 Aug 2014 11:39:32 +0200
-Subject: [RFC PATCH 0/9] dt: dependencies (for deterministic driver
- initialization order based on the DT)
-In-Reply-To: <20140822131919.GX21734@leverpostej>
-References: <1399913280-6915-1-git-send-email-holler@ahsoftware.de>
- <20140514141914.446F7C4153D@trevor.secretlab.ca>
- <20140821140211.GD19293@ulmo.nvidia.com>
- <53F64624.5000403@ahsoftware.de>
- <20140822131919.GX21734@leverpostej>
-Message-ID: <20140825093931.GB2399@ulmo>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 25 Aug 2014 10:51:07 +0100
+Subject: [PATCH 0/6] SolidRun Hummingboard/Cubox-i DT updates
+In-Reply-To: <20140825062930.GA6928@dragon>
+References: <20140823091058.GO30401@n2100.arm.linux.org.uk>
+ <20140825062930.GA6928@dragon>
+Message-ID: <20140825095106.GS30401@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 22, 2014 at 02:19:19PM +0100, Mark Rutland wrote:
-> On Thu, Aug 21, 2014 at 08:19:00PM +0100, Alexander Holler wrote:
-> > Am 21.08.2014 16:02, schrieb Thierry Reding:
+On Mon, Aug 25, 2014 at 02:29:32PM +0800, Shawn Guo wrote:
+> On Sat, Aug 23, 2014 at 10:10:58AM +0100, Russell King - ARM Linux wrote:
+> > Here's a set of patches updating the Cubox-i/Hummingboard DT files.
 > > 
-> > > Anyway, those are all fairly standard reasons for where deferred probe
-> > > triggers, and since I do like deferred probe for it's simplicity and
-> > > reliability I'd rather not try to work around it if boot time is all
-> > > that people are concerned about.
+> > The first two are fairly important fixes, so should at least go in
+> > for -rc kernels.
 > > 
-> > It's neither simple nor reliable. It's non deterministic brutforcing 
-> > while making it almost impossible to identify real errors.
+> > The SPDIF patch is something which could go in -rc as well as it's a
+> > cosmetic patch, changing the name displayed in (eg) pulseaudio for the
+> > SPDIF output from the developer-centric "imx-spdif" to "Integrated SPDIF".
 > 
-> It's horrible, yes.
-> 
-> > In my humble opinion the worst way to solve something. I'm pretty sure 
-> > if I would have suggest such a solution, the maintainer crowd would have 
-> > eaten me without cooking.
-> 
-> We didn't have a better workable solution at the time.
+> I will sent the first 3 for -rc.  But I second Iain's comment that the
+> first patch should have a better commit log to explain why it's an
+> important fix.
 
-You make it sound like we've come up with a better workable solution in
-the meantime.
+I still have no answer for that, so I suggest dropping it until Rabeeh
+can write a better commit log.
 
-> Having a hack that got boards booting was considered better than not
-> having them boot.
-> I don't remember people being particularly enthralled by the idea.
-
-Odd, I remember things quite differently.
-
-Anyway, instead of going back and forth between "deferred probe is good"
-and "deferred probe is bad", how about we do something useful now and
-concentrate on how to make use of the information we have in DT with the
-goal to reduce the number of cases where deferred probing is required?
-
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140825/3d2fc3ee/attachment.sig>
+-- 
+FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
+according to speedtest.net.
