@@ -1,16 +1,17 @@
 From: shawn.guo@freescale.com (Shawn Guo)
-Date: Mon, 25 Aug 2014 10:45:20 +0800
-Subject: [PATCH] ARM: dts: nitrogen6x: Add Intersil ISL1208 RTC
-In-Reply-To: <1408698782-2327-1-git-send-email-p.zabel@pengutronix.de>
-References: <1408698782-2327-1-git-send-email-p.zabel@pengutronix.de>
-Message-ID: <20140825024519.GK2540@dragon>
+Date: Mon, 25 Aug 2014 10:45:34 +0800
+Subject: [PATCH] ARM: dts: i.MX53: add pmu node
+In-Reply-To: <1408708947-16071-1-git-send-email-s.trumtrar@pengutronix.de>
+References: <1408708947-16071-1-git-send-email-s.trumtrar@pengutronix.de>
+Message-ID: <20140825024533.GL2540@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 22, 2014 at 11:13:02AM +0200, Philipp Zabel wrote:
-> This patch adds the battery backed real time clock connected to I2C1
-> to the device tree.
+On Fri, Aug 22, 2014 at 02:02:27PM +0200, Steffen Trumtrar wrote:
+> The i.MX53 has a Cortex-A8 Performance Monitor Unit.
 > 
-> Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
+> Add it to the dtsi.
+> 
+> Signed-off-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
 
 Applied, thanks.
