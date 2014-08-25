@@ -1,69 +1,85 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Mon, 25 Aug 2014 10:13:28 +0200
-Subject: [PATCH V2 3/3] mmc: dw_mmc: Dont cut off vqmmc and vmmc
-In-Reply-To: <CAPz6YkXH1mMOTwcLkKdffdUHN+TaCAhpa8oG0h+rFn9i+GMoCw@mail.gmail.com>
-References: <1408715272-13833-1-git-send-email-yuvaraj.cd@samsung.com>
- <1408715272-13833-4-git-send-email-yuvaraj.cd@samsung.com>
- <CAPDyKFqz8sGj2td=ihZXN4zvAqmu9FHZjWdCn-ZRcdHugNHe2g@mail.gmail.com>
- <CAPz6YkXH1mMOTwcLkKdffdUHN+TaCAhpa8oG0h+rFn9i+GMoCw@mail.gmail.com>
-Message-ID: <CAPDyKFqp7oEt9ASmdxrgUwbQ8aTZzAuJ7uD1oGN50iuzPzBfVg@mail.gmail.com>
+From: minchan@kernel.org (Minchan Kim)
+Date: Mon, 25 Aug 2014 17:18:37 +0900
+Subject: [PATCH 0/2] ARM: Remove lowmem limit for default CMA region
+In-Reply-To: <53FAED20.60200@samsung.com>
+References: <1408610714-16204-1-git-send-email-m.szyprowski@samsung.com>
+ <20140825012600.GN17372@bbox> <53FAED20.60200@samsung.com>
+Message-ID: <20140825081836.GF32620@bbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22 August 2014 20:27, Sonny Rao <sonnyrao@chromium.org> wrote:
-> On Fri, Aug 22, 2014 at 8:31 AM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
->> On 22 August 2014 15:47, Yuvaraj Kumar C D <yuvaraj.cd@gmail.com> wrote:
->>> Exynos 5250 and 5420 based boards uses built-in CD# line for card
->>> detection.But unfortunately CD# line is on the same voltage rails
->>> as of I/O voltage rails. When we cut off vqmmc,the consequent card
->>> detection will break in these boards.
->>
->> I am not sure I follow here.
->>
->> Is the card detect mechanism handled internally by the dw_mmc controller?
->
-> Yes
+On Mon, Aug 25, 2014 at 10:00:32AM +0200, Marek Szyprowski wrote:
+> Hello,
+> 
+> On 2014-08-25 03:26, Minchan Kim wrote:
+> >Hello,
+> >
+> >On Thu, Aug 21, 2014 at 10:45:12AM +0200, Marek Szyprowski wrote:
+> >>Hello,
+> >>
+> >>Russell King recently noticed that limiting default CMA region only to
+> >>low memory on ARM architecture causes serious memory management issues
+> >>with machines having a lot of memory (which is mainly available as high
+> >>memory). More information can be found the following thread:
+> >>http://thread.gmane.org/gmane.linux.ports.arm.kernel/348441/
+> >>
+> >>Those two patches removes this limit letting kernel to put default CMA
+> >>region into high memory when this is possible (there is enough high
+> >>memory available and architecture specific DMA limit fits).
+> >Agreed. It should be from the beginning because CMA page is effectly
+> >pinned if it is anonymous page and system has no swap.
+> 
+> Nope. Even without swap, anonymous page can be correctly migrated to other
+> location. Migration code doesn't depend on presence of swap.
 
-Just out of curiosity.
+I could be possible only if the zone has freeable page(ie, free pages
++ shrinkable page like page cache). IOW, if the zone is full with
+anon pages, it's efffectively pinned.
 
-Do you know how the power to the actual dw_mmc controller is handled?
-I expect it to be SoC specific and I am guessing power domain
-regulators may be involved!?
+> 
+> >>This should solve strange OOM issues on systems with lots of RAM
+> >>(i.e. >1GiB) and large (>256M) CMA area.
+> >I totally agree with the patchset although I didn't review code
+> >at all.
+> >
+> >Another topic:
+> >It means it should be a problem still if system has CMA in lowmem
+> >by some reason(ex, hardware limit or other purpose of CMA
+> >rather than DMA subsystem)?
+> >
+> >In that case, an idea that just popped in my head is to migrate
+> >pages from cma area to highest zone because they are all
+> >userspace pages which should be in there but not sure it's worth
+> >to implement at this point because how many such cripple platform
+> >are.
+> >
+> >Just for the recording.
+> 
+> Moving pages between low and high zone is not that easy. If I remember
+> correctly you cannot migrate a page from low memory to high zone in
+> generic case, although it should be possible to add exception for
+> anonymous pages. This will definitely improve poor low memory
+> handling in low zone when CMA is enabled.
 
->
->>
->> I thought HW engineers long time ago realized that this should be done
->> separately on a GPIO line to be able to save power while waiting for a
->> card to be inserted. But that's not case then?
->
-> At least in my limited experience, this seems to be common among SoC
-> vendors who are using dw_mmc, as we've seen this elsewhere as well and
-> after seeing it here we know that we need to ignore the CD pin that's
-> routed to dw_mmc and use a separately powered GPIO on the board, but
-> still there are probably many SoCs/boards which are doing it this way.
->
->>>
->>> These hosts (obviously) need to keep vqmmc (and thus vmmc) on all the
->>> time, even when the mmc core tells them to power off. However, one
->>> problem is that these cards won't properly handle mmc_power_cycle().
->>> That's needed to handle error cases when trying to switch voltages
->>> (see 0797e5f mmc:core: Fixup signal voltage switch).
->>>
->>> This patch adds a new MMC_POWER_OFF_HARD mode when it's doing a power
->>> cycle.  This mode differs from the normal MMC_POWER_OFF mode in that
->>> the mmc core will promise to power the slot back on before it expects
->>> the host to detect card insertion or removal.
->
-> This patch is based off of one that Doug wrote (sent privately to
-> Yuvaraj) which just modifies the MMC core, and should be split into
-> two patches.
-> One that modifies the mmc core and one that implements this in dw_mmc.
+Yeb, it's possible for anonymous pages but I just wonder it's worth
+to add more complexitiy to mm and and you are answering it's worth.
+Okay. May I understand your positive feedback means such platform(
+ie, DMA works with only lowmem) are still common?
 
-I looked at the mmc core parts, it seems like the wrong approach.
+Thanks.
 
-I think you shall be able use MMC_CAP_NEEDS_POLL, to handle this
-broken card detect mechanism. We even have a DT binding for that,
-"broken-cd".
+> 
+> Best regards
+> -- 
+> Marek Szyprowski, PhD
+> Samsung R&D Institute Poland
+> 
+> --
+> To unsubscribe, send a message with 'unsubscribe linux-mm' in
+> the body to majordomo at kvack.org.  For more info on Linux MM,
+> see: http://www.linux-mm.org/ .
+> Don't email: <a href=mailto:"dont@kvack.org"> email at kvack.org </a>
 
-Kind regards
-Uffe
+-- 
+Kind regards,
+Minchan Kim
