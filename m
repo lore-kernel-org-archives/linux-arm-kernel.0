@@ -1,239 +1,84 @@
-From: eric.auger@linaro.org (Eric Auger)
-Date: Mon, 25 Aug 2014 14:18:59 +0200
-Subject: [PATCH v2 2/2] KVM: ARM: add irqfd support
-In-Reply-To: <1408969139-14700-1-git-send-email-eric.auger@linaro.org>
-References: <1408969139-14700-1-git-send-email-eric.auger@linaro.org>
-Message-ID: <1408969139-14700-3-git-send-email-eric.auger@linaro.org>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Mon, 25 Aug 2014 14:27:35 +0200
+Subject: [PATCH v4 0/8] asm-generic/io.h overhaul
+In-Reply-To: <CAFLxGvyyW5J0En1bFwonZiMwoJK+XDgtHvC2PQOhqgvyF4F-uQ@mail.gmail.com>
+References: <1407925738-26170-1-git-send-email-thierry.reding@gmail.com>
+ <CAFLxGvyyW5J0En1bFwonZiMwoJK+XDgtHvC2PQOhqgvyF4F-uQ@mail.gmail.com>
+Message-ID: <20140825122734.GD4163@ulmo.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch enables irqfd on ARM.
+On Mon, Aug 25, 2014 at 01:53:30PM +0200, Richard Weinberger wrote:
+> On Wed, Aug 13, 2014 at 12:28 PM, Thierry Reding
+> <thierry.reding@gmail.com> wrote:
+> > From: Thierry Reding <treding@nvidia.com>
+> >
+> > Hi,
+> >
+> > Here is the fourth version of a series that started out as an attempt to
+> > provide string versions of the read*() and write*() accessors to more
+> > architectures so that drivers can use them portably. The series has
+> > since evolved into a more general cleanup of asm-generic/io.h and the
+> > functions defined therein.
+> >
+> > Patch 1 is trivial and removes a redundant redefinition of PCI_IOBASE
+> > from the asm/io.h header on ARC. Patches 2 and 3 remove unnecessary
+> > volatile keywoards from some functions, which is a prerequisite to clean
+> > up some of the functions in subsequent patches.
+> >
+> > The xlate_dev_{kmem,mem}_ptr() functions are used to map memory when the
+> > /dev/mem device is accessed. Patches 4 and 5 use more consistent data
+> > types for these functions, which will get a "standard" prototype in the
+> > asm-generic/io.h header in a subsequent patch.
+> >
+> > Patch 6 is the bulk of this series. It implements the string variants of
+> > the read*() and write*() accessors and cleans up various other parts of
+> > the asm-generic/io.h header file. Macros are converted to static inline
+> > functions for better type checking. Overriding generic implementations
+> > in architectures is handled more consistently.
+> >
+> > Patches 7 and 8, finally, make use of the asm-generic/io.h header on the
+> > 32-bit and 64-bit ARM architectures.
+> >
+> > This is compile- and runtime-tested on 32-bit and 64-bit ARM and compile
+> > tested on IA64, Microblaze, s390, SPARC, x86 and Xtensa. For ARC,
+> > Blackfin, Metag, OpenRISC, Score and Unicore32 which also use
+> > asm-generic/io.h I couldn't find or build a cross-compiler that would
+> > run on my system. But by code inspection they shouldn't break with this
+> > patch.
+> >
+> > To ensure bisectability I built multi_v7_defconfig on 32-bit ARM and the
+> > defconfig for 64-bit ARM, IA64, Microblaze, s390, SPARC, x86 and Xtensa
+> > after each commit and verified that the series does not introduce any
+> > build errors or warnings.
+> >
+> > Provided there are no objections to the patches there's still the matter
+> > of how to merge them. Patch 6 depends on patches 1-5 to avoid warnings
+> > and/or errors during the build. Patches 7 and 8 depend on patch 6. In my
+> > opinion it doesn't make much sense to split them up, so I guess we'll
+> > need a volunteer to take them all into one tree. Ideally that tree would
+> > feed into linux-next so that we can get as much build and test-coverage
+> > as possible during the 3.17 release cycle so that these patches can go
+> > into 3.18.
+> >
+> > Arnd, I'm opportunistically sending this To: you in the hopes that you
+> > can take it into your asm-generic tree which seems like the best fit for
+> > this.
+> 
+> Do you have a git tree for that?
+> Would be nice for testing UML, it depends also on generic io.
 
-irqfd framework enables to inject a virtual IRQ into a guest upon an
-eventfd trigger. User-side uses KVM_IRQFD VM ioctl to provide KVM with
-a kvm_irqfd struct that associates a VM, an eventfd, an IRQ number
-(aka. the gsi). When an actor signals the eventfd (typically a VFIO
-platform driver), the kvm irqfd subsystem injects the provided virtual
-IRQ into the guest.
+Yes, it's all here:
 
-Resamplefd also is supported for level sensitive interrupts, ie. the
-user can provide another eventfd that is triggered when the completion
-of the virtual IRQ (gsi) is detected by the GIC.
+	https://github.com/thierryreding/linux.git staging/asm-generic-io
 
-The gsi must correspond to a shared peripheral interrupt (SPI), ie the
-GIC interrupt ID is gsi+32.
+That branch is based on today's linux-next (next-20140825).
 
-this patch enables CONFIG_HAVE_KVM_EVENTFD and CONFIG_HAVE_KVM_IRQFD.
-
-No IRQ routing table is used.
-
-Signed-off-by: Eric Auger <eric.auger@linaro.org>
-
----
-
-This patch deprecates the previous patch featuring GSI routing
-(https://patches.linaro.org/32261/)
-
-irqchip.c and irq_comm.c are not used at all.
-
-This RFC applies on top of Christoffer Dall's serie
-arm/arm64: KVM: Various VGIC cleanups and improvements
-https://lists.cs.columbia.edu/pipermail/kvmarm/2014-June/009979.html
-
-All pieces can be found on git://git.linaro.org/people/eric.auger/linux.git
-branch irqfd_integ_v5
-
-This work was tested with Calxeda Midway xgmac main interrupt with
-qemu-system-arm and QEMU VFIO platform device.
-
-v1 -> v2:
-- rebase on 3.17rc1
-- move of the dist unlock in process_maintenance
-- remove of dist lock in __kvm_vgic_sync_hwstate
-- rewording of the commit message (add resamplefd reference)
-- remove irq.h
----
- Documentation/virtual/kvm/api.txt |  5 +++-
- arch/arm/include/uapi/asm/kvm.h   |  3 +++
- arch/arm/kvm/Kconfig              |  3 ++-
- arch/arm/kvm/Makefile             |  2 +-
- virt/kvm/arm/vgic.c               | 56 ++++++++++++++++++++++++++++++++++++---
- 5 files changed, 62 insertions(+), 7 deletions(-)
-
-diff --git a/Documentation/virtual/kvm/api.txt b/Documentation/virtual/kvm/api.txt
-index beae3fd..8118b12 100644
---- a/Documentation/virtual/kvm/api.txt
-+++ b/Documentation/virtual/kvm/api.txt
-@@ -2204,7 +2204,7 @@ into the hash PTE second double word).
- 4.75 KVM_IRQFD
- 
- Capability: KVM_CAP_IRQFD
--Architectures: x86 s390
-+Architectures: x86 s390 arm
- Type: vm ioctl
- Parameters: struct kvm_irqfd (in)
- Returns: 0 on success, -1 on error
-@@ -2230,6 +2230,9 @@ Note that closing the resamplefd is not sufficient to disable the
- irqfd.  The KVM_IRQFD_FLAG_RESAMPLE is only necessary on assignment
- and need not be specified with KVM_IRQFD_FLAG_DEASSIGN.
- 
-+On ARM/arm64 the injected must be a shared peripheral interrupt (SPI).
-+This means the programmed GIC interrupt ID is gsi+32.
-+
- 4.76 KVM_PPC_ALLOCATE_HTAB
- 
- Capability: KVM_CAP_PPC_ALLOC_HTAB
-diff --git a/arch/arm/include/uapi/asm/kvm.h b/arch/arm/include/uapi/asm/kvm.h
-index e6ebdd3..3034c66 100644
---- a/arch/arm/include/uapi/asm/kvm.h
-+++ b/arch/arm/include/uapi/asm/kvm.h
-@@ -194,6 +194,9 @@ struct kvm_arch_memory_slot {
- /* Highest supported SPI, from VGIC_NR_IRQS */
- #define KVM_ARM_IRQ_GIC_MAX		127
- 
-+/* One single KVM irqchip, ie. the VGIC */
-+#define KVM_NR_IRQCHIPS          1
-+
- /* PSCI interface */
- #define KVM_PSCI_FN_BASE		0x95c1ba5e
- #define KVM_PSCI_FN(n)			(KVM_PSCI_FN_BASE + (n))
-diff --git a/arch/arm/kvm/Kconfig b/arch/arm/kvm/Kconfig
-index 466bd29..82ccd81 100644
---- a/arch/arm/kvm/Kconfig
-+++ b/arch/arm/kvm/Kconfig
-@@ -24,6 +24,7 @@ config KVM
- 	select KVM_MMIO
- 	select KVM_ARM_HOST
- 	depends on ARM_VIRT_EXT && ARM_LPAE
-+	select HAVE_KVM_EVENTFD
- 	---help---
- 	  Support hosting virtualized guest machines. You will also
- 	  need to select one or more of the processor modules below.
-@@ -55,7 +56,7 @@ config KVM_ARM_MAX_VCPUS
- config KVM_ARM_VGIC
- 	bool "KVM support for Virtual GIC"
- 	depends on KVM_ARM_HOST && OF
--	select HAVE_KVM_IRQCHIP
-+	select HAVE_KVM_IRQFD
- 	default y
- 	---help---
- 	  Adds support for a hardware assisted, in-kernel GIC emulation.
-diff --git a/arch/arm/kvm/Makefile b/arch/arm/kvm/Makefile
-index f7057ed..859db09 100644
---- a/arch/arm/kvm/Makefile
-+++ b/arch/arm/kvm/Makefile
-@@ -15,7 +15,7 @@ AFLAGS_init.o := -Wa,-march=armv7-a$(plus_virt)
- AFLAGS_interrupts.o := -Wa,-march=armv7-a$(plus_virt)
- 
- KVM := ../../../virt/kvm
--kvm-arm-y = $(KVM)/kvm_main.o $(KVM)/coalesced_mmio.o
-+kvm-arm-y = $(KVM)/kvm_main.o $(KVM)/coalesced_mmio.o $(KVM)/eventfd.o
- 
- obj-y += kvm-arm.o init.o interrupts.o
- obj-y += arm.o handle_exit.o guest.o mmu.o emulate.o reset.o
-diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
-index 7164d2e..586bd11 100644
---- a/virt/kvm/arm/vgic.c
-+++ b/virt/kvm/arm/vgic.c
-@@ -1334,7 +1334,10 @@ epilog:
- static bool vgic_process_maintenance(struct kvm_vcpu *vcpu)
- {
- 	u32 status = vgic_get_interrupt_status(vcpu);
-+	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
- 	bool level_pending = false;
-+	struct kvm *kvm = vcpu->kvm;
-+	int is_assigned_irq;
- 
- 	kvm_debug("STATUS = %08x\n", status);
- 
-@@ -1351,6 +1354,7 @@ static bool vgic_process_maintenance(struct kvm_vcpu *vcpu)
- 			struct vgic_lr vlr = vgic_get_lr(vcpu, lr);
- 			BUG_ON(vgic_irq_is_edge(vcpu, vlr.irq));
- 
-+			spin_lock(&dist->lock);
- 			vgic_irq_clear_queued(vcpu, vlr.irq);
- 			WARN_ON(vlr.state & LR_STATE_MASK);
- 			vlr.state = 0;
-@@ -1363,6 +1367,18 @@ static bool vgic_process_maintenance(struct kvm_vcpu *vcpu)
- 			 * interrupt.
- 			 */
- 			vgic_dist_irq_clear_soft_pend(vcpu, vlr.irq);
-+			spin_unlock(&dist->lock);
-+
-+			is_assigned_irq = kvm_irq_has_notifier(kvm, 0,
-+						vlr.irq - VGIC_NR_PRIVATE_IRQS);
-+
-+			if (is_assigned_irq) {
-+				kvm_debug("EOI irqchip routed vIRQ %d\n",
-+					  vlr.irq);
-+				kvm_notify_acked_irq(kvm, 0,
-+					vlr.irq - VGIC_NR_PRIVATE_IRQS);
-+			}
-+			spin_lock(&dist->lock);
- 
- 			/* Any additional pending interrupt? */
- 			if (vgic_dist_irq_get_level(vcpu, vlr.irq)) {
-@@ -1377,6 +1393,8 @@ static bool vgic_process_maintenance(struct kvm_vcpu *vcpu)
- 				vgic_cpu_irq_clear(vcpu, vlr.irq);
- 			}
- 
-+			spin_unlock(&dist->lock);
-+
- 			/*
- 			 * Despite being EOIed, the LR may not have
- 			 * been marked as empty.
-@@ -1441,14 +1459,10 @@ void kvm_vgic_flush_hwstate(struct kvm_vcpu *vcpu)
- 
- void kvm_vgic_sync_hwstate(struct kvm_vcpu *vcpu)
- {
--	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
--
- 	if (!irqchip_in_kernel(vcpu->kvm))
- 		return;
- 
--	spin_lock(&dist->lock);
- 	__kvm_vgic_sync_hwstate(vcpu);
--	spin_unlock(&dist->lock);
- }
- 
- int kvm_vgic_vcpu_pending_irq(struct kvm_vcpu *vcpu)
-@@ -2183,3 +2197,37 @@ struct kvm_device_ops kvm_arm_vgic_v2_ops = {
- 	.get_attr = vgic_get_attr,
- 	.has_attr = vgic_has_attr,
- };
-+
-+int kvm_irq_map_gsi(struct kvm *kvm,
-+		    struct kvm_kernel_irq_routing_entry *entries,
-+		    int gsi)
-+{
-+	return gsi;
-+}
-+
-+int kvm_irq_map_chip_pin(struct kvm *kvm, unsigned irqchip, unsigned pin)
-+{
-+	return pin;
-+}
-+
-+int kvm_set_irq(struct kvm *kvm, int irq_source_id,
-+		u32 irq, int level, bool line_status)
-+{
-+	int r = -EINVAL;
-+	unsigned int spi = irq + VGIC_NR_PRIVATE_IRQS;
-+
-+	if (spi > KVM_ARM_IRQ_GIC_MAX)
-+		return r;
-+
-+	kvm_debug("Inject irqchip routed vIRQ %d\n", irq);
-+	r = kvm_vgic_inject_irq(kvm, 0, spi, level);
-+	return r;
-+}
-+
-+/* MSI not implemented yet */
-+int kvm_set_msi(struct kvm_kernel_irq_routing_entry *e,
-+		struct kvm *kvm, int irq_source_id,
-+		int level, bool line_status)
-+{
-+	return 0;
-+}
--- 
-1.9.1
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140825/384ec028/attachment.sig>
