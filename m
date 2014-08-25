@@ -1,71 +1,39 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 25 Aug 2014 11:29:44 -0600
-Subject: [PATCH] ARM: tegra: Move AHB Kconfig to drivers/amba
-In-Reply-To: <53D7C9EE.60503@wwwdotorg.org>
-References: <1406643934-16301-1-git-send-email-thierry.reding@gmail.com>
- <53D7C9EE.60503@wwwdotorg.org>
-Message-ID: <53FB7288.9050002@wwwdotorg.org>
+Date: Mon, 25 Aug 2014 11:32:20 -0600
+Subject: [PATCH v2 1/3] of: Add NVIDIA Tegra flow controller bindings
+In-Reply-To: <53ADE012.5080401@wwwdotorg.org>
+References: <1403870848-1754-1-git-send-email-thierry.reding@gmail.com>
+ <53ADE012.5080401@wwwdotorg.org>
+Message-ID: <53FB7324.9080109@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/29/2014 10:21 AM, Stephen Warren wrote:
-> On 07/29/2014 08:25 AM, Thierry Reding wrote:
+On 06/27/2014 03:20 PM, Stephen Warren wrote:
+> On 06/27/2014 06:07 AM, Thierry Reding wrote:
 >> From: Thierry Reding <treding@nvidia.com>
 >>
->> This will allow the Kconfig option to be shared among 32-bit and 64-bit
->> ARM.
->
-> This seems fine to me. I'd expect to apply it for 3.18, provided I get
-> an ack from Russell as drivers/amba maintainer (hence CCing him without
-> trimming the quote).
-
-Russell,
-
-Are you OK with this patch? If so, if you could ack it so I can apply 
-it, that would be great.
-
-Thanks.
-
->> Signed-off-by: Thierry Reding <treding@nvidia.com>
->> ---
->>   arch/arm/mach-tegra/Kconfig |  8 --------
->>   drivers/amba/Kconfig        | 11 +++++++++++
->>   2 files changed, 11 insertions(+), 8 deletions(-)
->>   create mode 100644 drivers/amba/Kconfig
->>
->> diff --git a/arch/arm/mach-tegra/Kconfig b/arch/arm/mach-tegra/Kconfig
->> index 052fba07a3cb..fae2eb2f52ea 100644
->> --- a/arch/arm/mach-tegra/Kconfig
->> +++ b/arch/arm/mach-tegra/Kconfig
->> @@ -64,12 +64,4 @@ config ARCH_TEGRA_124_SOC
->>         Support for NVIDIA Tegra T124 processor family, based on the
->>         ARM CortexA15MP CPU
->>
->> -config TEGRA_AHB
->> -    bool "Enable AHB driver for NVIDIA Tegra SoCs"
->> -    default y
->> -    help
->> -      Adds AHB configuration functionality for NVIDIA Tegra SoCs,
->> -      which controls AHB bus master arbitration and some
->> -      performance parameters(priority, prefech size).
->> -
->>   endif
->> diff --git a/drivers/amba/Kconfig b/drivers/amba/Kconfig
->> new file mode 100644
->> index 000000000000..3f7350a03708
->> --- /dev/null
->> +++ b/drivers/amba/Kconfig
->> @@ -0,0 +1,11 @@
->> +if ARM_AMBA
->> +
->> +config TEGRA_AHB
->> +    bool "Enable AHB driver for NVIDIA Tegra SoCs"
->> +    default y if ARCH_TEGRA
->> +    help
->> +      Adds AHB configuration functionality for NVIDIA Tegra SoCs,
->> +      which controls AHB bus master arbitration and some performance
->> +      parameters (priority, prefetch size).
->> +
->> +endif
+>> Add device tree bindings for the flow controller found on NVIDIA Tegra
+>> SoCs.
 >>
 >
+>> diff --git a/Documentation/devicetree/bindings/arm/tegra/nvidia,tegra20-flowctrl.txt b/Documentation/devicetree/bindings/arm/tegra/nvidia,tegra20-flowctrl.txt
+>
+>> +NVIDIA Tegra20 Flow Controller
+>> +
+>> +Required properties:
+>> +- compatible: "nvidia,tegra20-flowctrl"
+>> +- reg: Should contain one register range (address and length)
+>> +
+>> +Example:
+>> +
+>> +	flow-controller at 60007000 {
+>> +		compatible = "nvidia,tegra20-flowctrl";
+>> +		reg = <0x60007000 0x1000>;
+>> +	};
+>
+> The bindings all have the same structure. Can we collapse them all into
+> this one file and just list all the valid compatible values and say pick
+> one?
+
+Thierry, did you post an updated version of this patch? If so, I seem to 
+have lost it, so a repost would be good. Thanks.
