@@ -1,112 +1,95 @@
-From: l.majewski@samsung.com (Lukasz Majewski)
-Date: Mon, 25 Aug 2014 08:53:52 +0200
-Subject: [PATCH v9 4/6] ARM: Exynos: switch to using generic cpufreq driver
- for Exynos4210/5250/5420
-In-Reply-To: <53F7DA13.6090305@gmail.com>
-References: <1406707663-16656-1-git-send-email-thomas.ab@samsung.com>
- <1406707663-16656-5-git-send-email-thomas.ab@samsung.com>
- <53DA8BB9.6020702@samsung.com> <53DA8D85.3050106@gmail.com>
- <7hbnrc6px3.fsf@paris.lan> <53F7DA13.6090305@gmail.com>
-Message-ID: <20140825085352.14290508@amdc2363>
+From: Li.Xiubo@freescale.com (Li.Xiubo at freescale.com)
+Date: Mon, 25 Aug 2014 07:01:57 +0000
+Subject: [PATCH] watchdog: imx2_wdt: Remove seperate big endian handling
+In-Reply-To: <1408949015-28759-1-git-send-email-mpa@pengutronix.de>
+References: <1408949015-28759-1-git-send-email-mpa@pengutronix.de>
+Message-ID: <4b9a55951535433aada42332b08f664f@BY2PR0301MB0613.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tomasz,
+Hi Markus,
 
-> Hi Kevin,
-> 
-> Thanks for taking a look at this.
-> 
-> On 23.08.2014 01:54, Kevin Hilman wrote:
-> > Tomasz Figa <tomasz.figa@gmail.com> writes:
-> > 
-> >> Kukjin,
-> >>
-> >> On 31.07.2014 20:32, Kukjin Kim wrote:
-> >>> On 07/30/14 17:07, Thomas Abraham wrote:
-> >>>> The new CPU clock type allows the use of generic CPUfreq
-> >>>> drivers. So for Exynos4210/5250, switch to using generic cpufreq
-> >>>> driver. For Exynos5420, which did not have CPUfreq driver
-> >>>> support, enable the use of generic CPUfreq driver.
-> >>>>
-> >>>> Suggested-by: Tomasz Figa<t.figa@samsung.com>
-> >>>> Cc: Kukjin Kim<kgene.kim@samsung.com>
-> >>>
-> >>> Looks good to me,
-> >>>
-> >>> Acked-by: Kukjin Kim <kgene.kim@samsung.com>
-> >>>
-> >>> BTW, who will handle this series? I hope see this series in 3.17.
-> >>
-> >> This series consists mostly of clock changes and it likely depends
-> >> on patches already in my for-next, so I would be inclined toward
-> >> taking it through samsung-clk tree. 
-> > 
-> > So has this series been picked up anywhere?  I don't see it in your
-> > samsung-clk tree, nor in Kukjin's for-next.
-> 
-> No, it has not. In general it was already too late in the release
-> cycle when the last version was posted.
-> 
-> I had a plan to take it through clock tree with Kukjin's and Viresh's
-> cooperation, but now as you say it...
-> 
-> > 
-> > Also, I'm curious whether or how this is has been tested on
-> > big.LITTLE SoCs.  
-> > 
-> > I'm trying it on the 5800/Chromebook2 and it's not terribly
-> > stable.  I'm testing along with CPUidle, so there may be some
-> > untested interactions there as it seems a bit more stable without
-> > CPUidle enabled.
-> > 
-> > I'd love to hear from anyone else that's testing CPUidle and CPUfreq
-> > together big.LITTLE 5420/5800, with or without the switcher.
-> 
-> I'd definitely like to see a clarification on this issues, before this
-> series hits mainline or at least its parts related to affected SoCs.
+Thanks for your work.
 
-It is a huge step forward - to be honest it is a serious rework of
-cpufreq subsystem for Exynos SoCs.
+And there has already one patch for this:
 
-> Also I'd like to hear some confirmation from Samsung Poland R&D Center
-> guys (on CC), whether this code works stable on their target boards
-> (Universal C210, Trats, Trats2).
+"watchdog: imx2_wdt: Convert to use regmap framework's endianness method."
+
+Thanks,
+
+BRs
+Xiubo
+
+
+
+> -----Original Message-----
+> From: Markus Pargmann [mailto:mpa at pengutronix.de]
+> Sent: Monday, August 25, 2014 2:44 PM
+> To: Wim Van Sebroeck
+> Cc: linux-watchdog at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
+> kernel at pengutronix.de; Markus Pargmann; Xiubo Li-B47053
+> Subject: [PATCH] watchdog: imx2_wdt: Remove seperate big endian handling
 > 
-
-Since we have missed the merge window with this code, I can declare
-that I will provide code, which means that I will do the cleanup for
-excluded from this series Exynos4 SoCs, to test the cpufreq-cpu0.
-
-However, I'm concerned with Exynos4412, which supports BOOST. It might
-not be trivial to provide support for it.
-
-I think, that we shall not drop behind any functionality during clean
-up.
-
-> > 
-> > Also, the patch below[2] is needed for 5800.
-> > 
-> > FWIW, I have a temporary branch[1] based on the v3.17-rc branch of
-> > the exynos-reference tree where I've added the DT patch needed for
-> > CPUidle, this series (and it's dependencies) which is what I'm
-> > using for testing.
+> 3.18 will contain a patch that handles endianess within the regmap
+> framework. It does not need any parsing of DT properties within the
+> driver, so we can savely remove it here.
+> The required mainline patch is
+> 	(regmap: add DT endianness binding support.)
 > 
-> The patch looks fine to me (well, it's trivial :)), thanks.
+> Cc: Xiubo Li <Li.Xiubo@freescale.com>
+> Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
+> ---
+> Hi,
+> 
+> This is the topic branch with the patches which replace the functionality of
+> this code.
+> https://git.kernel.org/cgit/linux/kernel/git/broonie/regmap.git/log/?h=topic/d
+> t-endian
 > 
 > Best regards,
-> Tomasz
 > 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-
-
-
--- 
-Best regards,
-
-Lukasz Majewski
-
-Samsung R&D Institute Poland (SRPOL) | Linux Platform Group
+> Markus
+> 
+> 
+>  drivers/watchdog/imx2_wdt.c | 7 -------
+>  1 file changed, 7 deletions(-)
+> 
+> diff --git a/drivers/watchdog/imx2_wdt.c b/drivers/watchdog/imx2_wdt.c
+> index 68c3d379ffa8..9d4874f09948 100644
+> --- a/drivers/watchdog/imx2_wdt.c
+> +++ b/drivers/watchdog/imx2_wdt.c
+> @@ -28,7 +28,6 @@
+>  #include <linux/kernel.h>
+>  #include <linux/module.h>
+>  #include <linux/moduleparam.h>
+> -#include <linux/of_address.h>
+>  #include <linux/platform_device.h>
+>  #include <linux/regmap.h>
+>  #include <linux/timer.h>
+> @@ -191,12 +190,10 @@ static struct regmap_config imx2_wdt_regmap_config = {
+> 
+>  static int __init imx2_wdt_probe(struct platform_device *pdev)
+>  {
+> -	struct device_node *np = pdev->dev.of_node;
+>  	struct imx2_wdt_device *wdev;
+>  	struct watchdog_device *wdog;
+>  	struct resource *res;
+>  	void __iomem *base;
+> -	bool big_endian;
+>  	int ret;
+>  	u32 val;
+> 
+> @@ -204,10 +201,6 @@ static int __init imx2_wdt_probe(struct platform_device
+> *pdev)
+>  	if (!wdev)
+>  		return -ENOMEM;
+> 
+> -	big_endian = of_property_read_bool(np, "big-endian");
+> -	if (big_endian)
+> -		imx2_wdt_regmap_config.val_format_endian = REGMAP_ENDIAN_BIG;
+> -
+>  	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+>  	base = devm_ioremap_resource(&pdev->dev, res);
+>  	if (IS_ERR(base))
+> --
+> 2.1.0.rc1
