@@ -1,32 +1,58 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 25 Aug 2014 10:10:00 +0900
-Subject: [PATCH] ARM: shmobile: bockw: Do not disable SUSPEND in defconfig
-In-Reply-To: <cover.1408926588.git.horms+renesas@verge.net.au>
-References: <cover.1408926588.git.horms+renesas@verge.net.au>
-Message-ID: <99923753e7c17a9c9d46bfe4d7fa543e426ec647.1408926588.git.horms+renesas@verge.net.au>
+Date: Mon, 25 Aug 2014 10:10:06 +0900
+Subject: [GIT PULL] Second Round Of Renesas ARM Based SoC DT Updates For v3.18
+Message-ID: <cover.1408928822.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As of "ARM: shmobile: r8a7778: Add missing call to shmobile_init_late()"
-suspend-to-ram is now supported on the r8a7778 SoC and thus the bockw
-board.
+Hi Olof, Hi Kevin, Hi Arnd,
 
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/configs/bockw_defconfig | 1 -
- 1 file changed, 1 deletion(-)
+Please consider these second round of Renesas ARM based SoC DT updates for v3.18.
 
-diff --git a/arch/arm/configs/bockw_defconfig b/arch/arm/configs/bockw_defconfig
-index 70b3f45..1dde5da 100644
---- a/arch/arm/configs/bockw_defconfig
-+++ b/arch/arm/configs/bockw_defconfig
-@@ -29,7 +29,6 @@ CONFIG_ZBOOT_ROM_BSS=0x0
- CONFIG_ARM_APPENDED_DTB=y
- CONFIG_VFP=y
- # CONFIG_CORE_DUMP_DEFAULT_ELF_HEADERS is not set
--# CONFIG_SUSPEND is not set
- CONFIG_PM_RUNTIME=y
- CONFIG_NET=y
- CONFIG_PACKET=y
--- 
-2.0.1
+This pull request is based on the previous round of
+such requests, tagged as renesas-dt-for-v3.18,
+which I have already sent a pull-request for.
+
+
+The following changes since commit d594c9775409a4276133db5e34dbd791329c5eae:
+
+  ARM: shmobile: lager: add VIN1/ADV7180 device nodes (2014-08-17 09:44:07 +0900)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-dt2-for-v3.18
+
+for you to fetch changes up to f170b97c9ad0b8ba3e99f02cbadc7676383fee09:
+
+  ARM: shmobile: sh73a0 dtsi: Move interrupt-parent to the top (2014-08-22 12:34:53 +0900)
+
+----------------------------------------------------------------
+Second Round Of Renesas ARM Based SoC DT Updates For v3.18
+
+* Tidy up interrupt-parents
+* Add clocks register defines for r8a7740 SoC
+* Add JPU clock to r8a7791 and r8a7790 SoCs
+
+----------------------------------------------------------------
+Geert Uytterhoeven (4):
+      ARM: shmobile: r8a7779 dtsi: Remove superfluous interrupt-parent
+      ARM: shmobile: r8a7790 dtsi: Remove superfluous interrupt-parent
+      ARM: shmobile: r8a7791 dtsi: Remove superfluous interrupt-parent
+      ARM: shmobile: sh73a0 dtsi: Move interrupt-parent to the top
+
+Mikhail Ulyanov (2):
+      ARM: shmobile: r8a7790: Add JPU clock dt and CPG define.
+      ARM: shmobile: r8a7791: Add JPU clock dt and CPG define.
+
+Ulrich Hecht (1):
+      ARM: shmobile: r8a7740: clock register bits
+
+ arch/arm/boot/dts/r8a7779.dtsi            |  6 ---
+ arch/arm/boot/dts/r8a7790.dtsi            |  7 ++-
+ arch/arm/boot/dts/r8a7791.dtsi            |  7 ++-
+ arch/arm/boot/dts/sh73a0.dtsi             | 24 +---------
+ include/dt-bindings/clock/r8a7740-clock.h | 77 +++++++++++++++++++++++++++++++
+ include/dt-bindings/clock/r8a7790-clock.h |  1 +
+ include/dt-bindings/clock/r8a7791-clock.h |  1 +
+ 7 files changed, 86 insertions(+), 37 deletions(-)
+ create mode 100644 include/dt-bindings/clock/r8a7740-clock.h
