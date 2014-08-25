@@ -1,115 +1,45 @@
-From: daniel@ffwll.ch (Daniel Vetter)
-Date: Mon, 25 Aug 2014 14:45:39 +0200
-Subject: [PATCH v4 00/11] drm: add support for Atmel HLCDC Display
- Controller
-In-Reply-To: <20140821131552.GA19293@ulmo.nvidia.com>
-References: <1406034695-15534-1-git-send-email-boris.brezillon@free-electrons.com>
- <20140821081619.GZ2452@ldesroches-Latitude-E6320>
- <20140821103706.2349915d@bbrezillon> <20140821090406.GA13733@ulmo>
- <20140821114159.319e741b@bbrezillon> <20140821095202.GA21848@ulmo>
- <20140821150600.37788d82@bbrezillon>
- <20140821131552.GA19293@ulmo.nvidia.com>
-Message-ID: <20140825124539.GC15520@phenom.ffwll.local>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 25 Aug 2014 14:44:10 +0200
+Subject: [PATCH 4/4] simplefb: add clock handling code
+In-Reply-To: <20140825121228.GB4163@ulmo.nvidia.com>
+References: <1407914239-12054-1-git-send-email-libv@skynet.be>
+ <1407914239-12054-5-git-send-email-libv@skynet.be>
+ <53EB9471.3090204@wwwdotorg.org> <20140813170106.GT15297@lukather>
+ <20140825121228.GB4163@ulmo.nvidia.com>
+Message-ID: <20140825124410.GZ15297@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 21, 2014 at 03:16:08PM +0200, Thierry Reding wrote:
-> On Thu, Aug 21, 2014 at 03:06:00PM +0200, Boris BREZILLON wrote:
-> > On Thu, 21 Aug 2014 11:52:03 +0200
-> > Thierry Reding <thierry.reding@gmail.com> wrote:
+On Mon, Aug 25, 2014 at 02:12:30PM +0200, Thierry Reding wrote:
+> On Wed, Aug 13, 2014 at 07:01:06PM +0200, Maxime Ripard wrote:
+> > On Wed, Aug 13, 2014 at 10:38:09AM -0600, Stephen Warren wrote:
+> [...]
+> > > If not, perhaps the clock driver should force the clock to be
+> > > enabled (perhaps only if the DRM/KMS driver isn't enabled?).
 > > 
-> > > On Thu, Aug 21, 2014 at 11:41:59AM +0200, Boris BREZILLON wrote:
-> > > > On Thu, 21 Aug 2014 11:04:07 +0200
-> > > > Thierry Reding <thierry.reding@gmail.com> wrote:
-> > > > 
-> > > > > On Thu, Aug 21, 2014 at 10:37:06AM +0200, Boris BREZILLON wrote:
-> > > > > > Hi Ludovic,
-> > > > > > 
-> > > > > > On Thu, 21 Aug 2014 10:16:19 +0200
-> > > > > > Ludovic Desroches <ludovic.desroches@atmel.com> wrote:
-> > > > > > 
-> > > > > > > Hi Boris,
-> > > > > > > 
-> > > > > > > You can add
-> > > > > > > 
-> > > > > > > Tested-by: Ludovic Desroches <ludovic.desroches@atmel.com>
-> > > > > > 
-> > > > > > Thanks for testing this driver.
-> > > > > > 
-> > > > > > > 
-> > > > > > > Only one issue but not related to your patches, you can't display
-> > > > > > > quickly the bootup logo since the panel detection takes too much
-> > > > > > > time.
-> > > > > > 
-> > > > > > Yes, actually this is related to the device probe order: the
-> > > > > > hlcdc-display-controller device is probed before the simple-panel, thus
-> > > > > > nothing is detected on the RGB connector (I use of_drm_find_panel to
-> > > > > > check for panel availability) when the display controller is
-> > > > > > instantiated. I rely on the default polling infrastructure provided by
-> > > > > > the DRM/KMS framework which polls for a new connector every 10s, and
-> > > > > > this is far more than you kernel boot time.
-> > > > > > 
-> > > > > > Do anyone see a solution to reduce this delay (without changing the
-> > > > > > polling interval). I thought we could add a notifier infrastructure to
-> > > > > > the DRM panel framework, but I'm not sure this is how you want things
-> > > > > > done...
-> > > > > 
-> > > > > Other drivers return -EPROBE_DEFER when a panel hasn't been registered
-> > > > > yet. This will automatically take care of ordering things in a way that
-> > > > > DRM/KMS will only be initialized after the panel has been probed.
-> > > > 
-> > > > Actually I'd like to avoid doing this with a deferred probe, because,
-> > > > AFAIU, the remote endpoint is not tightly linked with the display
-> > > > controller driver (I mean the display controller can still be
-> > > > initialized without having a display connected on it).
-> > > > Moreover the atmel dev kit I'm using has an HDMI bridge connected on
-> > > > the same RGB connector and I'd like to use it in a near future.
-> > > > Returning -EPROBE_DEFER in case of several devices connected on the
-> > > > same connector implies that I'll have to wait for all the remote
-> > > > end-points to be available before my display controller could be
-> > > > instantiated.
-> > > > 
-> > > > While this could be acceptable when all drivers are statically linked
-> > > > in the kernel, it might be problematic when you're using modules,
-> > > > meaning that you won't be able to display anything on your LCD panel
-> > > > until your HDMI bridge module has been loaded.
-> > > 
-> > > No. HDMI should be using proper hotplugging anyway, hence it should be
-> > > always be loaded anyway. You're in for a world of pain if you think you
-> > > can run DRM with a driver that's composed of separate kernel modules.
+> > I'm sorry, but I'm not going to take any code that will do that in our
+> > clock driver.
 > > 
-> > I was talking about the external RGB to HDMI encoder, should the driver
-> > for this encoder (which is not on On Chip block) be compiled
-> > statically too ?
-> > 
-> > > 
-> > > Also if you don't want to use deferred probe, then you're in for the
-> > > full hotplugging panel dance and that implies that you need to fix a
-> > > bunch of things in DRM (one being the framebuffer console instantiation
-> > > that I referred to in the other thread).
-> > 
-> > For now, I wait until there is a device connected on the RGB connector
-> > (connector status set to connector_status_connected) before creating an
-> > fbdev. It might not be the cleanest way to solve this issue, but it
-> > works :-).
+> > I'm not going to have a huge list of ifdef depending on configuration
+> > options to know which clock to enable, especially when clk_get should
+> > have the consumer device as an argument.
 > 
-> Yeah, I guess that's one way to do it. But it's tricky to get right when
-> you have several outputs. Which one should be considered the primary and
-> trigger fbdev creation?
+> Are you saying is that you want to solve a platform-specific problem by
+> pushing code into simple, generic drivers so that your platform code can
+> stay "clean"?
 
-We could just reallocate the fbdev backing storage (probably only increase
-it for safety since fbdev is bonghits) when new outputs show up. There has
-been (and maybe still is) some provisions in the fbdev helper library to
-do just that.
+Are you saying that this driver would become "dirty" with such a patch?
 
-Mostly it would mean to split out drm_fb_helper_single_fb_probe so that
-drivers could call it from their hotplug work. And then adjust the
-->fb_probe callback of drivers which do this to reallocate the fbdev
-buffer if it's only a resize. Overall this shouldn't be too much fuzz to
-get going. Of course only as an opt-in, but imo that's the only sane way
-to do this anyway.
--Daniel
+If so, we really have an issue in the kernel.
+
 -- 
-Daniel Vetter
-Software Engineer, Intel Corporation
-+41 (0) 79 365 57 48 - http://blog.ffwll.ch
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140825/4c060f75/attachment.sig>
