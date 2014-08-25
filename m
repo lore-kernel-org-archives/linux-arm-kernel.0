@@ -1,48 +1,68 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Mon, 25 Aug 2014 14:29:32 +0800
-Subject: [PATCH 0/6] SolidRun Hummingboard/Cubox-i DT updates
-In-Reply-To: <20140823091058.GO30401@n2100.arm.linux.org.uk>
-References: <20140823091058.GO30401@n2100.arm.linux.org.uk>
-Message-ID: <20140825062930.GA6928@dragon>
+From: mpa@pengutronix.de (Markus Pargmann)
+Date: Mon, 25 Aug 2014 08:43:35 +0200
+Subject: [PATCH] watchdog: imx2_wdt: Remove seperate big endian handling
+Message-ID: <1408949015-28759-1-git-send-email-mpa@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Aug 23, 2014 at 10:10:58AM +0100, Russell King - ARM Linux wrote:
-> Here's a set of patches updating the Cubox-i/Hummingboard DT files.
-> 
-> The first two are fairly important fixes, so should at least go in
-> for -rc kernels.
-> 
-> The SPDIF patch is something which could go in -rc as well as it's a
-> cosmetic patch, changing the name displayed in (eg) pulseaudio for the
-> SPDIF output from the developer-centric "imx-spdif" to "Integrated SPDIF".
+3.18 will contain a patch that handles endianess within the regmap
+framework. It does not need any parsing of DT properties within the
+driver, so we can savely remove it here.
+The required mainline patch is
+	(regmap: add DT endianness binding support.)
 
-I will sent the first 3 for -rc.  But I second Iain's comment that the
-first patch should have a better commit log to explain why it's an
-important fix.
+Cc: Xiubo Li <Li.Xiubo@freescale.com>
+Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
+---
+Hi,
 
-> 
-> Patch 4 updates the Hummingboard support as SolidRun now have a Dual
-> version of this platform, which needs imx6q.dtsi instead of imx6dl.dtsi,
-> and also has mSATA support.
+This is the topic branch with the patches which replace the functionality of
+this code.
+https://git.kernel.org/cgit/linux/kernel/git/broonie/regmap.git/log/?h=topic/dt-endian
 
-Though it's mostly just a DTS split, the diff stat looks too scary to
-be a material of -rc.
+Best regards,
 
-> 
-> Patch 5 adds the mSATA support for the Dual version of the Hummingboard.
-> 
-> Patch 6 is the first patch which breaks something on the initial version
-> of the Hummingboard, aka Carrier1, specifically the IrDA receiver.  In
-> hindsight, we should not have used the name "Hummingboard" for the
-> Carrier1.  The Carrier1 is obsolete, and people are being encouraged to
-> dispose of the C1 hardware.
-> 
-> Out of these, I think it would be worth getting the first five patches
-> in for 3.17 (even though we're in -rc), but patch 6 should certainly
-> wait for the next merge window.
+Markus
 
-Patches 4 ~ 6 are not fixes in any way, so I prefer to queue them for
-the next merge window.
 
-Shawn
+ drivers/watchdog/imx2_wdt.c | 7 -------
+ 1 file changed, 7 deletions(-)
+
+diff --git a/drivers/watchdog/imx2_wdt.c b/drivers/watchdog/imx2_wdt.c
+index 68c3d379ffa8..9d4874f09948 100644
+--- a/drivers/watchdog/imx2_wdt.c
++++ b/drivers/watchdog/imx2_wdt.c
+@@ -28,7 +28,6 @@
+ #include <linux/kernel.h>
+ #include <linux/module.h>
+ #include <linux/moduleparam.h>
+-#include <linux/of_address.h>
+ #include <linux/platform_device.h>
+ #include <linux/regmap.h>
+ #include <linux/timer.h>
+@@ -191,12 +190,10 @@ static struct regmap_config imx2_wdt_regmap_config = {
+ 
+ static int __init imx2_wdt_probe(struct platform_device *pdev)
+ {
+-	struct device_node *np = pdev->dev.of_node;
+ 	struct imx2_wdt_device *wdev;
+ 	struct watchdog_device *wdog;
+ 	struct resource *res;
+ 	void __iomem *base;
+-	bool big_endian;
+ 	int ret;
+ 	u32 val;
+ 
+@@ -204,10 +201,6 @@ static int __init imx2_wdt_probe(struct platform_device *pdev)
+ 	if (!wdev)
+ 		return -ENOMEM;
+ 
+-	big_endian = of_property_read_bool(np, "big-endian");
+-	if (big_endian)
+-		imx2_wdt_regmap_config.val_format_endian = REGMAP_ENDIAN_BIG;
+-
+ 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+ 	base = devm_ioremap_resource(&pdev->dev, res);
+ 	if (IS_ERR(base))
+-- 
+2.1.0.rc1
