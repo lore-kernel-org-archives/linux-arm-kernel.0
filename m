@@ -1,81 +1,31 @@
 From: jonas.jensen@gmail.com (Jonas Jensen)
-Date: Mon, 25 Aug 2014 16:22:40 +0200
-Subject: [PATCH v6 4/4] net: moxa: continue loop on skb allocation failure
-Message-ID: <1408976560-15694-1-git-send-email-jonas.jensen@gmail.com>
+Date: Mon, 25 Aug 2014 16:23:09 +0200
+Subject: [PATCH v4 2/2] net: moxa: replace build_skb() with
+ netdev_alloc_skb_ip_align() / memcpy()
+In-Reply-To: <CAHXqBFJ3bWW8NVYcjxLnkk=6qxcRv75iCuBLrHuF91wxcL=61g@mail.gmail.com>
+References: <1408459784-9385-1-git-send-email-jonas.jensen@gmail.com>
+ <1408459784-9385-2-git-send-email-jonas.jensen@gmail.com>
+ <CAHXqBFJ3bWW8NVYcjxLnkk=6qxcRv75iCuBLrHuF91wxcL=61g@mail.gmail.com>
+Message-ID: <CACmBeS010Vbgx8wz9YkiQGi4gF6JNQqVRcgYtkCKGqvNs4sopA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If netdev_alloc_skb_ip_align() fails, subsequent code will
-try to dereference an invalid pointer.
+Thanks for giving feedback.
 
-Continue to next descriptor on error.
+On 21 August 2014 23:43, Micha? Miros?aw <mirqus@gmail.com> wrote:
+> This has implicit: if (!skb) BUG(); There should probably be a return
+> or continue inside the if (!skb).
 
-While we're at it,
+Fixed, see v6 update (broken out to separate patch) which now includes
+increment to RX head counter
 
-1. eliminate the chance of an endless loop, replace the main
-   loop with while(rx < budget)
+> dma_sync_single_for_device() is not needed here as CPU does not and
+> should not write to the DMA_FROM_DEVICE mapping.
 
-2. use napi_complete() and remove the explicit napi_gro_flush()
+Fixed, this was also broken out, dma_sync_single_for_device() moved to TX path.
+Maybe someone can verify this is the correct thing to do.
 
-Signed-off-by: Jonas Jensen <jonas.jensen@gmail.com>
----
 
-Notes:
-    Applies to next-20140825
+Regards,
 
- drivers/net/ethernet/moxa/moxart_ether.c | 12 +++++-------
- 1 file changed, 5 insertions(+), 7 deletions(-)
-
-diff --git a/drivers/net/ethernet/moxa/moxart_ether.c b/drivers/net/ethernet/moxa/moxart_ether.c
-index 983d019..2f12c88 100644
---- a/drivers/net/ethernet/moxa/moxart_ether.c
-+++ b/drivers/net/ethernet/moxa/moxart_ether.c
-@@ -206,7 +206,7 @@ static int moxart_rx_poll(struct napi_struct *napi, int budget)
- 	int rx_head = priv->rx_head;
- 	int rx = 0;
- 
--	while (1) {
-+	while (rx < budget) {
- 		desc = priv->rx_desc_base + (RX_REG_DESC_SIZE * rx_head);
- 		desc0 = readl(desc + RX_REG_OFFSET_DESC0);
- 
-@@ -218,7 +218,7 @@ static int moxart_rx_poll(struct napi_struct *napi, int budget)
- 			net_dbg_ratelimited("packet error\n");
- 			priv->stats.rx_dropped++;
- 			priv->stats.rx_errors++;
--			continue;
-+			goto rx_next;
- 		}
- 
- 		len = desc0 & RX_DESC0_FRAME_LEN_MASK;
-@@ -235,6 +235,7 @@ static int moxart_rx_poll(struct napi_struct *napi, int budget)
- 			net_dbg_ratelimited("netdev_alloc_skb_ip_align failed\n");
- 			priv->stats.rx_dropped++;
- 			priv->stats.rx_errors++;
-+			goto rx_next;
- 		}
- 
- 		memcpy(skb->data, priv->rx_buf[rx_head], len);
-@@ -249,18 +250,15 @@ static int moxart_rx_poll(struct napi_struct *napi, int budget)
- 		if (desc0 & RX_DESC0_MULTICAST)
- 			priv->stats.multicast++;
- 
-+rx_next:
- 		writel(RX_DESC0_DMA_OWN, desc + RX_REG_OFFSET_DESC0);
- 
- 		rx_head = RX_NEXT(rx_head);
- 		priv->rx_head = rx_head;
--
--		if (rx >= budget)
--			break;
- 	}
- 
- 	if (rx < budget) {
--		napi_gro_flush(napi, false);
--		__napi_complete(napi);
-+		napi_complete(napi);
- 	}
- 
- 	priv->reg_imr |= RPKT_FINISH_M;
--- 
-1.8.2.1
+   Jonas
