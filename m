@@ -1,57 +1,41 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Mon, 25 Aug 2014 08:00:37 -0500
-Subject: [PATCH v5 2/4] Documentation: Add documentation for the APM
- X-Gene SoC EDAC DTS binding
-In-Reply-To: <1408778588-3215-3-git-send-email-lho@apm.com>
-References: <1408778588-3215-1-git-send-email-lho@apm.com>
- <1408778588-3215-2-git-send-email-lho@apm.com>
- <1408778588-3215-3-git-send-email-lho@apm.com>
-Message-ID: <CAL_JsqKHV=yY9K3e4cQ4+vSvvVwM56hBuEc5OFXHqAmQZkp3Gw@mail.gmail.com>
+From: jdl@jdl.com (Jon Loeliger)
+Date: Mon, 25 Aug 2014 08:08:59 -0500
+Subject: [RFC PATCH 0/9] dt: dependencies (for deterministic driver
+ initialization order based on the DT)
+In-Reply-To: <20140825093931.GB2399@ulmo>
+References: <1399913280-6915-1-git-send-email-holler@ahsoftware.de>
+ <20140514141914.446F7C4153D@trevor.secretlab.ca>
+ <20140821140211.GD19293@ulmo.nvidia.com> <53F64624.5000403@ahsoftware.de>
+ <20140822131919.GX21734@leverpostej> <20140825093931.GB2399@ulmo>
+Message-ID: <E1XLu15-0002DP-6o@jdl.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Aug 23, 2014 at 2:23 AM, Loc Ho <lho@apm.com> wrote:
-> This patch adds documentation for the APM X-Gene SoC EDAC DTS binding.
->
-> Signed-off-by: Feng Kan <fkan@apm.com>
-> Signed-off-by: Loc Ho <lho@apm.com>
-> ---
->  .../devicetree/bindings/edac/apm-xgene-edac.txt    |   83 ++++++++++++++++++++
->  1 files changed, 83 insertions(+), 0 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/edac/apm-xgene-edac.txt
->
-> diff --git a/Documentation/devicetree/bindings/edac/apm-xgene-edac.txt b/Documentation/devicetree/bindings/edac/apm-xgene-edac.txt
-> new file mode 100644
-> index 0000000..ce8c30e
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/edac/apm-xgene-edac.txt
-> @@ -0,0 +1,83 @@
-> +* APM X-Gene SoC EDAC nodes
-> +
-> +EDAC nodes are defined to describe on-chip error detection and correction.
-> +There are four types of EDAC:
+> 
 
-EDAC is somewhat a Linux term which makes me suspicious. Is this
-really how the h/w is defined (i.e. I would find "EDAC" blocks in the
-h/w reference manual?)?
+> Anyway, instead of going back and forth between "deferred probe is good"
+> and "deferred probe is bad", how about we do something useful now and
+> concentrate on how to make use of the information we have in DT with the
+> goal to reduce the number of cases where deferred probing is required?
 
-> +
-> +  memory controller    - Memory controller
-> +  PMD (L1/L2)          - Processor module unit (PMD) L1/L2 cache
-> +  L3                   - CPU L3 cache
-> +  SoC                  - SoC IP such as SATA, Ethernet, and etc
-> +
-> +The following section describes the memory controller DT node binding.
-> +
-> +Required properties:
-> +- compatible           : Shall be "apm,xgene-edac-mc".
+Good idea.
 
-This is only EDAC registers or the entire memory controller? If they
-are truly separate and only for EDAC, then it is fine. Otherwise, you
-should define the actual h/w block in DT and if a block needs to hook
-up to multiple drivers, then that is a Linux problem in which you
-should use drivers/mfd or drivers/soc.
+The proposal on the table is to allow the probe code
+to make a topological sort of the devices based on
+dependency information either implied, explicitly stated
+or both.  That is likely a fundamentally correct approach.
 
-Similar question for the rest.
+I believe some of the issues that need to be resolved are:
 
-Rob
+    1) What constitutes a dependency?
+    2) How is that dependency expressed?
+    3) How do we add missing dependencies?
+    4) Backward compatability problems.
+
+There are other questions, of course.  Is it a topsort
+per bus?  Are there required "early devices"?  Should
+the inter-node dependencies be expressed at each node,
+or in a separate hierarchy within the DTS?  Others.
+
+HTH,
+jdl
