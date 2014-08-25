@@ -1,38 +1,44 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 25 Aug 2014 10:09:46 +0900
-Subject: [PATCH 1/3] ARM: shmobile: sh73a0: Remove spurious 0x from SCIFB
- clock name
+Date: Mon, 25 Aug 2014 10:09:47 +0900
+Subject: [PATCH 2/3] ARM: shmobile: r8a7790: add missing 0x0100 for SDCKCR
 In-Reply-To: <cover.1408926048.git.horms+renesas@verge.net.au>
 References: <cover.1408926048.git.horms+renesas@verge.net.au>
-Message-ID: <2c3758b01aa6f11382d2b018614b5d48ecf30350.1408926048.git.horms+renesas@verge.net.au>
+Message-ID: <4fb12fe9c34928c1d2bed817e144aec3f44540e9.1408926048.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A stray '0x' crept into a0f7e7496d56ac2d ("ARM: shmobile: sh73a0: add CMT1
-clock support for DT"). This  patch removes it.
+From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 
-This change should not have any run-time affect at this time as
-the clock in question is used by a SCIF device that is not enabled by
-default.
+9f13ee6f83c52065112d3e396e42e3780911ef53
+(ARM: shmobile: r8a7790: add div4 clocks)
+added r8a7790 DIV4 clock support.
 
-Reported-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+But, it is missing
+"0x0100: x 1/8" division ratio.
+This patch fixes hidden bug.
+It is based on R-Car H2 v0.7, R-Car M2 v0.9.
+
+Reported-by: Yusuke Goda <yusuke.goda.sx@renesas.com>
+Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/clock-sh73a0.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/mach-shmobile/clock-r8a7790.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-shmobile/clock-sh73a0.c b/arch/arm/mach-shmobile/clock-sh73a0.c
-index 0d77f65..b0993a5 100644
---- a/arch/arm/mach-shmobile/clock-sh73a0.c
-+++ b/arch/arm/mach-shmobile/clock-sh73a0.c
-@@ -644,7 +644,7 @@ static struct clk_lookup lookups[] = {
- 	CLKDEV_DEV_ID("sh-sci.5", &mstp_clks[MSTP207]), /* SCIFA5 */
- 	CLKDEV_DEV_ID("e6cb0000.serial", &mstp_clks[MSTP207]), /* SCIFA5 */
- 	CLKDEV_DEV_ID("sh-sci.8", &mstp_clks[MSTP206]), /* SCIFB */
--	CLKDEV_DEV_ID("0xe6c3000.serial", &mstp_clks[MSTP206]), /* SCIFB */
-+	CLKDEV_DEV_ID("e6c3000.serial", &mstp_clks[MSTP206]), /* SCIFB */
- 	CLKDEV_DEV_ID("sh-sci.0", &mstp_clks[MSTP204]), /* SCIFA0 */
- 	CLKDEV_DEV_ID("e6c40000.serial", &mstp_clks[MSTP204]), /* SCIFA0 */
- 	CLKDEV_DEV_ID("sh-sci.1", &mstp_clks[MSTP203]), /* SCIFA1 */
+diff --git a/arch/arm/mach-shmobile/clock-r8a7790.c b/arch/arm/mach-shmobile/clock-r8a7790.c
+index 296a057..c62bfe7 100644
+--- a/arch/arm/mach-shmobile/clock-r8a7790.c
++++ b/arch/arm/mach-shmobile/clock-r8a7790.c
+@@ -181,8 +181,8 @@ enum {
+ 
+ static struct clk div4_clks[DIV4_NR] = {
+ 	[DIV4_SDH] = SH_CLK_DIV4(&pll1_clk, SDCKCR, 8, 0x0dff, CLK_ENABLE_ON_INIT),
+-	[DIV4_SD0] = SH_CLK_DIV4(&pll1_clk, SDCKCR, 4, 0x1de0, CLK_ENABLE_ON_INIT),
+-	[DIV4_SD1] = SH_CLK_DIV4(&pll1_clk, SDCKCR, 0, 0x1de0, CLK_ENABLE_ON_INIT),
++	[DIV4_SD0] = SH_CLK_DIV4(&pll1_clk, SDCKCR, 4, 0x1df0, CLK_ENABLE_ON_INIT),
++	[DIV4_SD1] = SH_CLK_DIV4(&pll1_clk, SDCKCR, 0, 0x1df0, CLK_ENABLE_ON_INIT),
+ };
+ 
+ /* DIV6 clocks */
 -- 
 2.0.1
