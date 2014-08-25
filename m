@@ -1,46 +1,36 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 25 Aug 2014 10:10:08 +0900
-Subject: [PATCH 03/10] ARM: shmobile: r8a7778: Update DTS to include CPU
- frequency
+Date: Mon, 25 Aug 2014 10:10:09 +0900
+Subject: [PATCH 04/10] ARM: shmobile: sh7372: Use shmobile_init_delay()
 In-Reply-To: <cover.1408927601.git.horms+renesas@verge.net.au>
 References: <cover.1408927601.git.horms+renesas@verge.net.au>
-Message-ID: <869f92aed207f2f6e595ea41c841bd9ad0c0d0d4.1408927601.git.horms+renesas@verge.net.au>
+Message-ID: <39b22e20a3086002c5abe0c569cf11a71bc17faf.1408927601.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Magnus Damm <damm+renesas@opensource.se>
 
-Add CPU Frequency information to the r8a7778 DTS file. This
-will allow us to use the shared C code on r8a7778 and BockW
-which reads out the clock frequency from DT and calculates the
-delay settings from there.
-
-Also add other missing CPU information to the r8a7778 DTS.
+Adjust the sh7372 SoC support code to use shmobile_init_delay()
+together with CPU Frequency settings from the DTS. Get rid of the
+C code version.
 
 Signed-off-by: Magnus Damm <damm+renesas@opensource.se>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7778.dtsi | 6 ++++++
- 1 file changed, 6 insertions(+)
+ arch/arm/mach-shmobile/setup-sh7372.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/r8a7778.dtsi b/arch/arm/boot/dts/r8a7778.dtsi
-index ecfdf4b..315ec62 100644
---- a/arch/arm/boot/dts/r8a7778.dtsi
-+++ b/arch/arm/boot/dts/r8a7778.dtsi
-@@ -23,8 +23,14 @@
- 	interrupt-parent = <&gic>;
+diff --git a/arch/arm/mach-shmobile/setup-sh7372.c b/arch/arm/mach-shmobile/setup-sh7372.c
+index 3731ecc..ad7a82d 100644
+--- a/arch/arm/mach-shmobile/setup-sh7372.c
++++ b/arch/arm/mach-shmobile/setup-sh7372.c
+@@ -984,7 +984,7 @@ void __init sh7372_add_early_devices(void)
  
- 	cpus {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
- 		cpu at 0 {
-+			device_type = "cpu";
- 			compatible = "arm,cortex-a9";
-+			reg = <0>;
-+			clock-frequency = <800000000>;
- 		};
- 	};
+ void __init sh7372_add_early_devices_dt(void)
+ {
+-	shmobile_setup_delay(800, 1, 3); /* Cortex-A8 @ 800MHz */
++	shmobile_init_delay();
  
+ 	sh7372_add_early_devices();
+ }
 -- 
 2.0.1
