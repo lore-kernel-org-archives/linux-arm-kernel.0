@@ -1,67 +1,98 @@
-From: victor.kamensky@linaro.org (Victor Kamensky)
-Date: Sun, 24 Aug 2014 22:35:37 -0700
-Subject: [RFC PATCH] arm: fix get_user BE behavior for target variable
- with size of 8 bytes
-In-Reply-To: <20140821082740.GI30401@n2100.arm.linux.org.uk>
-References: <1408598949-23050-1-git-send-email-victor.kamensky@linaro.org>
- <20140821082740.GI30401@n2100.arm.linux.org.uk>
-Message-ID: <CAA3XUr0SuiLNyzB1jhJ-EM+DCjtxNLxsD=+Ujv4GVmQYk13eGw@mail.gmail.com>
+From: ajaynumb@gmail.com (Ajay kumar)
+Date: Mon, 25 Aug 2014 11:30:20 +0530
+Subject: [PATCH 3/3] ARM: dts: Add DT changes for display on peach_pi
+In-Reply-To: <53F86CFE.6070307@suse.de>
+References: <1406317464-7525-1-git-send-email-ajaykumar.rs@samsung.com>
+ <1406317464-7525-4-git-send-email-ajaykumar.rs@samsung.com>
+ <53F86CFE.6070307@suse.de>
+Message-ID: <CAEC9eQPKjQGw6bPg_LuF5wV=iSeJ1UzYBmoON4E2OttJ1kGaUQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+On Sat, Aug 23, 2014 at 3:59 PM, Andreas F?rber <afaerber@suse.de> wrote:
+> Seeing a Reviewed-by, I'm recording comments from another thread so that
+> they don't get forgotten:
+I did remember these. Thanks for the reminder though!
 
-On 21 August 2014 01:27, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Wed, Aug 20, 2014 at 10:29:09PM -0700, Victor Kamensky wrote:
->> e38361d 'ARM: 8091/2: add get_user() support for 8 byte types' commit
->> broke V7 BE get_user call when target var size is 64 bit, but '*ptr' size
->> is 32 bit or smaller. e38361d changed type of __r2 from 'register
->> unsigned long' to 'register typeof(x) __r2 asm("r2")' i.e before the change
->> even when target variable size was 64 bit, __r2 was still 32 bit.
->> But after e38361d commit, for target var of 64 bit size, __r2 became 64
->> bit and now it should occupy 2 registers r2, and r3. The issue in BE case
->> that r3 register is least significant word of __r2 and r2 register is most
->> significant word of __r2. But __get_user_4 still copies result into r2 (most
->> significant word of __r2). Subsequent code copies from __r2 into x, but
->> for situation described it will pick up only garbage from r3 register.
+> Am 25.07.2014 21:44, schrieb Ajay Kumar:
+>> Add DT nodes for panel-simple "auo,b133htn01" panel.
+>> Add backlight enable pin and backlight power supply for pwm-backlight.
+>> Also add panel phandle needed by dp to enable display on peach_pi.
 >>
->> It was discovered during 3.17-rc1 V7 BE KVM testing. Simple test case below.
->> Note it works in LE case because r2 in LE case is still least significant
->> word.
+>> Signed-off-by: Ajay Kumar <ajaykumar.rs@samsung.com>
+>> ---
+>>  arch/arm/boot/dts/exynos5800-peach-pi.dts |   27 ++++++++++-----------------
+>>  1 file changed, 10 insertions(+), 17 deletions(-)
 >>
->> Proposed fix uninspiringly restores previous code but now in individual
->> branches of switch statement for '*(__p)' byte sizes 1, 2, 4 and have
->> newer code only for sizeof(*(__p)) == 8. Looking for may be better ideas
->> how to fix the issue.
+>> diff --git a/arch/arm/boot/dts/exynos5800-peach-pi.dts b/arch/arm/boot/dts/exynos5800-peach-pi.dts
+>> index f3ee48b..5342638 100644
+>> --- a/arch/arm/boot/dts/exynos5800-peach-pi.dts
+>> +++ b/arch/arm/boot/dts/exynos5800-peach-pi.dts
+>> @@ -28,11 +28,13 @@
+>>               i2c20 = "/spi at 12d40000/cros-ec at 0/i2c-tunnel";
+>>       };
+>>
+>> -     backlight {
+>> +     backlight: backlight {
+>>               compatible = "pwm-backlight";
+>>               pwms = <&pwm 0 1000000 0>;
+>>               brightness-levels = <0 100 500 1000 1500 2000 2500 2800>;
+>>               default-brightness-level = <7>;
+>> +             enable-gpios = <&gpx2 2 0>;
+>> +             power-supply = <&tps65090_fet1>;
+>>               pinctrl-0 = <&pwm0_out>;
+>>               pinctrl-names = "default";
+>>       };
+>> @@ -98,6 +100,12 @@
+>>               regulator-boot-on;
+>>               regulator-always-on;
+>>       };
+>> +
+>> +     panel: panel-simple {
 >
-> The only down side of this is that it quadruples the number of warnings
-> when get_user() is used incorrectly:
+> Just "panel"? (AF)
+>> +             compatible = "auo,b133htn01", "simple-panel";
 >
-> t-getuser.c: In function ?test_wrong?:
-> t-getuser.c:346:388: warning: assignment discards ?const? qualifier from pointer target type [enabled by default]
-> t-getuser.c:346:581: warning: assignment discards ?const? qualifier from pointer target type [enabled by default]
-> t-getuser.c:346:774: warning: assignment discards ?const? qualifier from pointer target type [enabled by default]
-> t-getuser.c:346:1100: warning: assignment discards ?const? qualifier from pointer target type [enabled by default]
+> Drop "simple-panel" (Thierry)
+I will fix all these nits as per the other patch and resend along with
+the driver patches.
+
+Ajay
+
+>> +             power-supply = <&tps65090_fet6>;
+>> +             backlight = <&backlight>;
+>> +     };
+>>  };
+>>
+>>  &dp {
+>> @@ -111,22 +119,7 @@
+>>       samsung,link-rate = <0x0a>;
+>>       samsung,lane-count = <2>;
+>>       samsung,hpd-gpio = <&gpx2 6 0>;
+>> -
+>> -     display-timings {
+>> -             native-mode = <&timing1>;
+>> -
+>> -             timing1: timing at 1 {
+>> -                     clock-frequency = <150660000>;
+>> -                     hactive = <1920>;
+>> -                     vactive = <1080>;
+>> -                     hfront-porch = <60>;
+>> -                     hback-porch = <172>;
+>> -                     hsync-len = <80>;
+>> -                     vback-porch = <25>;
+>> -                     vfront-porch = <10>;
+>> -                     vsync-len = <10>;
+>> -             };
+>> -     };
+>> +     panel = <&panel>;
+>>  };
+>>
+>>  &fimd {
 >
-> as we now have four assignments instead of one.  It would be nice to have
-> proper behaviour here, with just one warning.
-
-It brings interesting aspect to the issue. I have not thought about
-it from this angle.
-
-I've sent another variant, idea of which was suggested by Daniel
-Thompson. Daniel sent private note to me. As I understood,
-he is traveling now and does not have much capacity to look at
-it till the next week.
-
-The new patch introduces essentially copy of __get_user_(124)
-functions but specially tailored to BE 64bit __r2 cases where result
-should be stored in $r3 register (vs $r2).
-
-Thanks,
-Victor
-
+> Regards,
+> Andreas
+>
 > --
-> FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
-> according to speedtest.net.
+> SUSE LINUX Products GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
+> GF: Jeff Hawn, Jennifer Guild, Felix Imend?rffer; HRB 16746 AG N?rnberg
