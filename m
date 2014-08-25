@@ -1,61 +1,52 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Mon, 25 Aug 2014 22:17:37 +0800
-Subject: [PATCH 07/14] clk: sunxi: Introduce mbus compatible
-In-Reply-To: <1405588134-2396-8-git-send-email-maxime.ripard@free-electrons.com>
-References: <1405588134-2396-1-git-send-email-maxime.ripard@free-electrons.com>
- <1405588134-2396-8-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <CAGb2v64xzwySFcnhAAmPFvUOWGechLZpoxfmb0OmEGOZbV+58Q@mail.gmail.com>
+From: jonas.jensen@gmail.com (Jonas Jensen)
+Date: Mon, 25 Aug 2014 16:22:11 +0200
+Subject: [PATCH v6 1/4] net: moxa: clear DESC1 on ndo_start_xmit()
+In-Reply-To: <1408544322-32023-1-git-send-email-jonas.jensen@gmail.com>
+References: <1408544322-32023-1-git-send-email-jonas.jensen@gmail.com>
+Message-ID: <1408976531-15589-1-git-send-email-jonas.jensen@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+TX buffer length is not cleared on ndo_start_xmit().
+Failing to do so can bug/hang the controller and
+cause TX interrupts to stop altogether.
 
-On Thu, Jul 17, 2014 at 5:08 PM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> Even though the mbus clock is a regular module clock, given its nature, it
-> needs to be enabled all the time.
->
-> Introduce a new compatible, to differentiate it from the other module clocks.
->
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> ---
->  Documentation/devicetree/bindings/clock/sunxi.txt | 1 +
->  drivers/clk/sunxi/clk-sunxi.c                     | 1 +
->  2 files changed, 2 insertions(+)
->
-> diff --git a/Documentation/devicetree/bindings/clock/sunxi.txt b/Documentation/devicetree/bindings/clock/sunxi.txt
-> index d3a5c3c6d677..112d8525b6e0 100644
-> --- a/Documentation/devicetree/bindings/clock/sunxi.txt
-> +++ b/Documentation/devicetree/bindings/clock/sunxi.txt
-> @@ -46,6 +46,7 @@ Required properties:
->         "allwinner,sun6i-a31-apb2-div-clk" - for the APB2 gates on A31
->         "allwinner,sun6i-a31-apb2-gates-clk" - for the APB2 gates on A31
->         "allwinner,sun8i-a23-apb2-gates-clk" - for the APB2 gates on A23
-> +       "allwinner,sun4i-a10-mbus-clk" - for the MBUS clock on A10
+Remove the readl() and compute a new value for DESC1.
 
-This should probably be sun5i-a13-mbus-clk?
-AFAIK the A10 doesn't have MBUS.
+Addresses https://bugzilla.kernel.org/show_bug.cgi?id=69031
 
->         "allwinner,sun4i-a10-mod0-clk" - for the module 0 family of clocks
->         "allwinner,sun7i-a20-out-clk" - for the external output clocks
->         "allwinner,sun7i-a20-gmac-clk" - for the GMAC clock module on A20/A31
-> diff --git a/drivers/clk/sunxi/clk-sunxi.c b/drivers/clk/sunxi/clk-sunxi.c
-> index 130e0d1ae510..bfb82bafbf9b 100644
-> --- a/drivers/clk/sunxi/clk-sunxi.c
-> +++ b/drivers/clk/sunxi/clk-sunxi.c
-> @@ -1110,6 +1110,7 @@ static const struct of_device_id clk_factors_match[] __initconst = {
->         {.compatible = "allwinner,sun7i-a20-pll4-clk", .data = &sun7i_a20_pll4_data,},
->         {.compatible = "allwinner,sun6i-a31-pll6-clk", .data = &sun6i_a31_pll6_data,},
->         {.compatible = "allwinner,sun4i-a10-apb1-clk", .data = &sun4i_apb1_data,},
-> +       {.compatible = "allwinner,sun4i-a10-mbus-clk", .data = &sun4i_mod0_data,},
->         {.compatible = "allwinner,sun4i-a10-mod0-clk", .data = &sun4i_mod0_data,},
->         {.compatible = "allwinner,sun7i-a20-out-clk", .data = &sun7i_a20_out_data,},
->         {}
-> --
-> 2.0.1
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Signed-off-by: Jonas Jensen <jonas.jensen@gmail.com>
+---
+
+Notes:
+    Changes since v5:
+    
+    1. remove readl(desc + TX_REG_OFFSET_DESC1) in moxart_mac_start_xmit()
+    2. compute entirely new values for DESC1
+    3. set TX_DESC1_END if (tx_head == TX_DESC_NUM_MASK)
+    
+    Applies to next-20140825
+
+ drivers/net/ethernet/moxa/moxart_ether.c | 7 +++----
+ 1 file changed, 3 insertions(+), 4 deletions(-)
+
+diff --git a/drivers/net/ethernet/moxa/moxart_ether.c b/drivers/net/ethernet/moxa/moxart_ether.c
+index 5020fd4..eed70d9 100644
+--- a/drivers/net/ethernet/moxa/moxart_ether.c
++++ b/drivers/net/ethernet/moxa/moxart_ether.c
+@@ -346,10 +346,9 @@ static int moxart_mac_start_xmit(struct sk_buff *skb, struct net_device *ndev)
+ 		len = ETH_ZLEN;
+ 	}
+ 
+-	txdes1 = readl(desc + TX_REG_OFFSET_DESC1);
+-	txdes1 |= TX_DESC1_LTS | TX_DESC1_FTS;
+-	txdes1 &= ~(TX_DESC1_FIFO_COMPLETE | TX_DESC1_INTR_COMPLETE);
+-	txdes1 |= (len & TX_DESC1_BUF_SIZE_MASK);
++	txdes1 = TX_DESC1_LTS | TX_DESC1_FTS | (len & TX_DESC1_BUF_SIZE_MASK);
++	if (tx_head == TX_DESC_NUM_MASK)
++		txdes1 |= TX_DESC1_END;
+ 	writel(txdes1, desc + TX_REG_OFFSET_DESC1);
+ 	writel(TX_DESC0_DMA_OWN, desc + TX_REG_OFFSET_DESC0);
+ 
+-- 
+1.8.2.1
