@@ -1,68 +1,89 @@
-From: gabriel.fernandez@st.com (Gabriel FERNANDEZ)
-Date: Mon, 25 Aug 2014 16:44:45 +0200
-Subject: [RESEND PATCH 1/4] ARM: STi: DT: STiH407: 407 DT Entry for clockgen A0
-In-Reply-To: <1408977888-10473-1-git-send-email-gabriel.fernandez@linaro.org>
-References: <1408977888-10473-1-git-send-email-gabriel.fernandez@linaro.org>
-Message-ID: <1408977888-10473-2-git-send-email-gabriel.fernandez@linaro.org>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Mon, 25 Aug 2014 16:53:06 +0200
+Subject: [linux-sunxi] Re: [PATCH 4/4] simplefb: add clock handling code
+In-Reply-To: <53FB46FF.1010208@redhat.com>
+References: <1407914239-12054-1-git-send-email-libv@skynet.be>
+ <1407914239-12054-5-git-send-email-libv@skynet.be>
+ <53EB9471.3090204@wwwdotorg.org> <20140813170106.GT15297@lukather>
+ <20140825121228.GB4163@ulmo.nvidia.com>
+ <20140825124410.GZ15297@lukather>
+ <20140825133953.GJ4163@ulmo.nvidia.com>
+ <53FB3E7F.4000503@redhat.com>
+ <20140825141600.GA14763@ulmo.nvidia.com>
+ <53FB46FF.1010208@redhat.com>
+Message-ID: <20140825145303.GC14763@ulmo.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Patch adds DT entries for clockgen A0
+On Mon, Aug 25, 2014 at 04:23:59PM +0200, Hans de Goede wrote:
+> Hi,
+> 
+> On 08/25/2014 04:16 PM, Thierry Reding wrote:
+> > On Mon, Aug 25, 2014 at 03:47:43PM +0200, Hans de Goede wrote:
+> >> On 08/25/2014 03:39 PM, Thierry Reding wrote:
+> >>> On Mon, Aug 25, 2014 at 02:44:10PM +0200, Maxime Ripard wrote:
+> >>>> On Mon, Aug 25, 2014 at 02:12:30PM +0200, Thierry Reding wrote:
+> >>>>> On Wed, Aug 13, 2014 at 07:01:06PM +0200, Maxime Ripard wrote:
+> >>>>>> On Wed, Aug 13, 2014 at 10:38:09AM -0600, Stephen Warren wrote:
+> >>>>> [...]
+> >>>>>>> If not, perhaps the clock driver should force the clock to be
+> >>>>>>> enabled (perhaps only if the DRM/KMS driver isn't enabled?).
+> >>>>>>
+> >>>>>> I'm sorry, but I'm not going to take any code that will do that in our
+> >>>>>> clock driver.
+> >>>>>>
+> >>>>>> I'm not going to have a huge list of ifdef depending on configuration
+> >>>>>> options to know which clock to enable, especially when clk_get should
+> >>>>>> have the consumer device as an argument.
+> >>>>>
+> >>>>> Are you saying is that you want to solve a platform-specific problem by
+> >>>>> pushing code into simple, generic drivers so that your platform code can
+> >>>>> stay "clean"?
+> >>>>
+> >>>> Are you saying that this driver would become "dirty" with such a patch?
+> >>>
+> >>> Yes. Others have said the same and even provided alternative solutions
+> >>> on how to solve what's seemingly a platform-specific problem in a
+> >>> platform-specific way.
+> >>
+> >> This is not platform specific, any platform with a complete clock driver
+> >> will suffer from the same problem (the clock driver disabling unclaimed
+> >> ahb gates, and thus killing the video output) if it wants to use simplefb
+> >> for early console support.
+> > 
+> > It is platform specific in that your platform may require certain clocks
+> > to remain on. The next platform may require power domains to remain on
+> > during boot and yet another one may rely on regulators to stay on during
+> > boot. By your argument simplefb will need to be taught to handle pretty
+> > much every type of resource that the kernel has.
+> > 
+> >> As for the suggestion to simply never disable the plls / ahb gates by blocking
+> >> them from ever being disabled in the sunxi clock driver, that is not really
+> >> a solution either, as we want to be able to turn these things off to safe
+> >> power on screen blank once control has been turned over to the kms driver.
+> > 
+> > Then perhaps part of the hand-off procedure between simplefb and DRM/KMS
+> > should involve marking PLLs or "gates" as properly managed.
+> 
+> And by your earlier argument also power domains, regulators, etc. So now we need
+> to add code to each of the clock core, power-domain core, regulator core, etc. to
+> have them now about this initially unmanaged state thing you're introducing, as
+> well as modify all involved clock / regulator / etc. drivers to mark certain
+> resources as unmanaged.
 
-Signed-off-by: Gabriel Fernandez <gabriel.fernandez@linaro.org>
-Signed-off-by: Olivier Bideau <olivier.bideau@st.com>
----
- arch/arm/boot/dts/stih407-clock.dtsi | 32 ++++++++++++++++++++++++++++++++
- 1 file changed, 32 insertions(+)
+Hmm... that's true. But we already have a way to deal with exactly this
+situation for regulators. There's a property called regulator-boot-on
+which a bootloader should set whet it has enabled a given regulator. It
+can of course also be set statically in a DTS if it's know upfront that
+a bootloader will always enable it. Perhaps what we need is a similar
+property for clocks so that the clock framework will not inadvertently
+turn off a clock that's still being used.
 
-diff --git a/arch/arm/boot/dts/stih407-clock.dtsi b/arch/arm/boot/dts/stih407-clock.dtsi
-index 800f46f..e03e86e 100644
---- a/arch/arm/boot/dts/stih407-clock.dtsi
-+++ b/arch/arm/boot/dts/stih407-clock.dtsi
-@@ -7,6 +7,10 @@
-  */
- / {
- 	clocks {
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		ranges;
-+
- 		/*
- 		 * Fixed 30MHz oscillator inputs to SoC
- 		 */
-@@ -35,5 +39,33 @@
- 			clock-frequency = <200000000>;
- 			clock-output-names = "clk-s-icn-reg-0";
- 		};
-+
-+		/*
-+		 * ClockGenAs on SASG2
-+		 */
-+		clockgen-a at 090ff000 {
-+			compatible = "st,clkgen-c32";
-+			reg = <0x90ff000 0x1000>;
-+
-+			clk_s_a0_pll: clk-s-a0-pll {
-+				#clock-cells = <1>;
-+				compatible = "st,stih407-plls-c32-a0", "st,clkgen-plls-c32";
-+
-+				clocks = <&clk_sysin>;
-+
-+				clock-output-names = "clk-s-a0-pll-ofd-0";
-+			};
-+
-+			clk_s_a0_flexgen: clk-s-a0-flexgen {
-+				compatible = "st,flexgen";
-+
-+				#clock-cells = <1>;
-+
-+				clocks = <&clk_s_a0_pll 0>,
-+					 <&clk_sysin>;
-+
-+				clock-output-names = "clk-ic-lmi0";
-+			};
-+		};
- 	};
- };
--- 
-1.9.1
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140825/c50267c3/attachment.sig>
