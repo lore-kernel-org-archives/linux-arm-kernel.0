@@ -1,48 +1,61 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Mon, 25 Aug 2014 13:54:54 +0200
-Subject: [PATCH] PWM: atmel: fix incorrect CDTY value after enabling or
- disabling
-In-Reply-To: <20140825101522.GA16960@ulmo.nvidia.com>
-References: <1394823931-2815-1-git-send-email-alexandre.belloni@free-electrons.com>
- <20140825101522.GA16960@ulmo.nvidia.com>
-Message-ID: <20140825115454.GA2077@piout.net>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Mon, 25 Aug 2014 19:59:01 +0800
+Subject: [PATCH v5 3/3] pwm: i.MX: Avoid sample FIFO overflow for i.MX
+ PWM version2
+In-Reply-To: <1401274213-8954-3-git-send-email-Ying.Liu@freescale.com>
+References: <1401274213-8954-1-git-send-email-Ying.Liu@freescale.com>
+ <1401274213-8954-3-git-send-email-Ying.Liu@freescale.com>
+Message-ID: <20140825115628.GA7008@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On 25/08/2014 at 12:15:23 +0200, Thierry Reding wrote :
-> On Fri, Mar 14, 2014 at 08:05:31PM +0100, Alexandre Belloni wrote:
-> > pwm-leds calls .config() and .disable() in a row. This exhibits that it may
-> > happen that the channel gets disabled before CDTY has been updated with CUPD.
-> > The issue gets quite worse with long periods.
-> > So, ensure by reading ISR that at least one period has past before disabling the
-> > channel.
-> > 
-> > The other issue is that it may happen that CUPD is not flushed before enabling
-> > the channel so it will update CDTY/CPRD just after one period. So we always set
-> > CUPD, even when the channel is not enabled.
-> > 
-> > Tested on at91sam9g45 and sama5d31ek.
-> > 
-> > Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-> > ---
-> >  drivers/pwm/pwm-atmel.c | 46 +++++++++++++++++++++++++++++-----------------
-> >  1 file changed, 29 insertions(+), 17 deletions(-)
+On Wed, May 28, 2014 at 06:50:13PM +0800, Liu Ying wrote:
+> The i.MX PWM version2 is embedded in several i.MX SoCs,
+> such as i.MX27, i.MX51 and i.MX6SL.  There is a 4-word(16bit)
+> sample FIFO in this IP.  Each FIFO slot determines the duty
+> period of a PWM waveform in one full cycle.  The IP spec
+> mentions that we should not write a fourth sample because
+> the FIFO will become full and triggers a FIFO write error
+> (FWE) which will prevent the PWM from starting once it is
+> enabled.  In order to avoid any sample FIFO overflow issue,
+> this patch clears all sample FIFO by doing software reset
+> in the configuration hook when the controller is disabled
+> or waits for a full PWM cycle to get a relinquished FIFO
+> slot when the controller is enabled and the FIFO is fully
+> loaded.
 > 
-> going through the list of unapplied patches I came across this old
-> patch. It was never reviewed nor acked by anyone and you didn't ping me,
-> so I always assumed it must no longer be required. Is that so?
+> The FIFO overflow issue can be reproduced by the following
+> commands on the i.MX6SL EVK platform, assuming we use PWM2
+> for the debug LED which is driven by the pin HSIC_STROBE
+> and the maximal brightness is 255.
+> echo 0   > /sys/class/leds/user/brightness
+> echo 0   > /sys/class/leds/user/brightness
+> echo 0   > /sys/class/leds/user/brightness
+> echo 0   > /sys/class/leds/user/brightness
+> echo 255 > /sys/class/leds/user/brightness
+> Here, FWE happens(PWMSR register reads 0x58) and the LED
+> can not be lighten.
 > 
+> Another way to reproduce the FIFO overflow issue is to run
+> this script:
+> while true;
+> 	do echo 255 > /sys/class/leds/user/brightness;
+> done
+> 
+> Cc: Thierry Reding <thierry.reding@gmail.com>
+> Cc: Sascha Hauer <s.hauer@pengutronix.de>
+> Cc: Shawn Guo <shawn.guo@freescale.com>
+> Cc: Lothar Wa?mann <LW@KARO-electronics.de>
+> Cc: linux-pwm at vger.kernel.org
+> Cc: linux-arm-kernel at lists.infradead.org
+> Signed-off-by: Liu Ying <Ying.Liu@freescale.com>
 
-It is still required but Nicolas is not happy with the polling on
-PWM_ISR and he was supposed to discuss that internally with the IP
-designer to understand if there is a better way.
+The whole series,
 
-I'll either ping on that one or send a new version when I'll know a bit
-more.
+Acked-by: Shawn Guo <shawn.guo@freescale.com>
 
--- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Thierry,
+
+Can you pick them up if they look good to you?
+
+Shawn
