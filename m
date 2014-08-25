@@ -1,74 +1,49 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Mon, 25 Aug 2014 15:49:29 +0200
-Subject: [PATCH v5 3/3] pwm: i.MX: Avoid sample FIFO overflow for i.MX
- PWM version2
-In-Reply-To: <20140825115628.GA7008@dragon>
-References: <1401274213-8954-1-git-send-email-Ying.Liu@freescale.com>
- <1401274213-8954-3-git-send-email-Ying.Liu@freescale.com>
- <20140825115628.GA7008@dragon>
-Message-ID: <20140825134927.GK4163@ulmo.nvidia.com>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Mon, 25 Aug 2014 07:53:15 -0600
+Subject: [PATCH 01/11 v4] coresight: add CoreSight core layer framework
+In-Reply-To: <20140825102445.1ff19682@free-electrons.com>
+References: <1408554231-24321-1-git-send-email-mathieu.poirier@linaro.org>
+ <1408554231-24321-2-git-send-email-mathieu.poirier@linaro.org>
+ <20140825102445.1ff19682@free-electrons.com>
+Message-ID: <CANLsYkzvS8YTACjWSqfALM20C=J_i_94=JaQZaSFeWEUtPpkuQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 25, 2014 at 07:59:01PM +0800, Shawn Guo wrote:
-> On Wed, May 28, 2014 at 06:50:13PM +0800, Liu Ying wrote:
-> > The i.MX PWM version2 is embedded in several i.MX SoCs,
-> > such as i.MX27, i.MX51 and i.MX6SL.  There is a 4-word(16bit)
-> > sample FIFO in this IP.  Each FIFO slot determines the duty
-> > period of a PWM waveform in one full cycle.  The IP spec
-> > mentions that we should not write a fourth sample because
-> > the FIFO will become full and triggers a FIFO write error
-> > (FWE) which will prevent the PWM from starting once it is
-> > enabled.  In order to avoid any sample FIFO overflow issue,
-> > this patch clears all sample FIFO by doing software reset
-> > in the configuration hook when the controller is disabled
-> > or waits for a full PWM cycle to get a relinquished FIFO
-> > slot when the controller is enabled and the FIFO is fully
-> > loaded.
-> > 
-> > The FIFO overflow issue can be reproduced by the following
-> > commands on the i.MX6SL EVK platform, assuming we use PWM2
-> > for the debug LED which is driven by the pin HSIC_STROBE
-> > and the maximal brightness is 255.
-> > echo 0   > /sys/class/leds/user/brightness
-> > echo 0   > /sys/class/leds/user/brightness
-> > echo 0   > /sys/class/leds/user/brightness
-> > echo 0   > /sys/class/leds/user/brightness
-> > echo 255 > /sys/class/leds/user/brightness
-> > Here, FWE happens(PWMSR register reads 0x58) and the LED
-> > can not be lighten.
-> > 
-> > Another way to reproduce the FIFO overflow issue is to run
-> > this script:
-> > while true;
-> > 	do echo 255 > /sys/class/leds/user/brightness;
-> > done
-> > 
-> > Cc: Thierry Reding <thierry.reding@gmail.com>
-> > Cc: Sascha Hauer <s.hauer@pengutronix.de>
-> > Cc: Shawn Guo <shawn.guo@freescale.com>
-> > Cc: Lothar Wa?mann <LW@KARO-electronics.de>
-> > Cc: linux-pwm at vger.kernel.org
-> > Cc: linux-arm-kernel at lists.infradead.org
-> > Signed-off-by: Liu Ying <Ying.Liu@freescale.com>
-> 
-> The whole series,
-> 
-> Acked-by: Shawn Guo <shawn.guo@freescale.com>
-> 
-> Thierry,
-> 
-> Can you pick them up if they look good to you?
+On 25 August 2014 02:24, Thomas Petazzoni
+<thomas.petazzoni@free-electrons.com> wrote:
+> Hello,
+>
+> On Wed, 20 Aug 2014 11:03:41 -0600, mathieu.poirier at linaro.org wrote:
+>
+>> diff --git a/drivers/coresight/Makefile b/drivers/coresight/Makefile
+>> new file mode 100644
+>> index 0000000..fef87bc
+>> --- /dev/null
+>> +++ b/drivers/coresight/Makefile
+>> @@ -0,0 +1,9 @@
+>> +#
+>> +# Makefile for CoreSight drivers.
+>> +#
+>> +obj-$(CONFIG_CORESIGHT) += coresight.o
+>> +obj-$(CONFIG_OF) += of_coresight.o
+>> +obj-$(CONFIG_CORESIGHT_LINKS_AND_SINKS) += coresight-tmc.o coresight-tpiu.o \
+>> +                                        coresight-etb10.o coresight-funnel.o \
+>> +                                        coresight-replicator.o
+>> +obj-$(CONFIG_CORESIGHT_SOURCE_ETM3X) += coresight-etm3x.o coresight-etm-cp14.o
+>
+> I believe this is a bit messed up with PATCH 02/11. Here you're adding
+> references to many files that aren't part of this patch, but are added
+> in subsequent patches. PATCH 02/11 removes those lines and replaces
+> them by the correct values. Surely an interactive rebase conflict that
+> was not solved properly.
 
-All three patches applied with your Acked-by (and some minor
-reformatting of the commit message).
+Yeah, that's messed up.  Thanks for pointing it out.
 
-Thanks,
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140825/8900549c/attachment-0001.sig>
+Mathieu
+
+>
+> Thomas
+> --
+> Thomas Petazzoni, CTO, Free Electrons
+> Embedded Linux, Kernel and Android engineering
+> http://free-electrons.com
