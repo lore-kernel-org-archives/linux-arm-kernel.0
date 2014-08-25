@@ -1,51 +1,95 @@
 From: eric.auger@linaro.org (Eric Auger)
-Date: Mon, 25 Aug 2014 15:27:38 +0200
-Subject: [RFC 3/9] VFIO: platform: handler tests whether the IRQ is forwarded
+Date: Mon, 25 Aug 2014 15:27:39 +0200
+Subject: [RFC 4/9] KVM: KVM-VFIO: update user API to program forwarded IRQ
 In-Reply-To: <1408973264-30384-1-git-send-email-eric.auger@linaro.org>
 References: <1408973264-30384-1-git-send-email-eric.auger@linaro.org>
-Message-ID: <1408973264-30384-4-git-send-email-eric.auger@linaro.org>
+Message-ID: <1408973264-30384-5-git-send-email-eric.auger@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In case the IRQ is forwarded, the VFIO platform IRQ handler does not
-need to disable the IRQ anymore. In that mode, when the handler completes
-the IRQ is not deactivated but only its priority is lowered.
+add new device group commands:
+- KVM_DEV_VFIO_DEVICE_ASSIGN_IRQ and
+  KVM_DEV_VFIO_DEVICE_DEASSIGN_IRQ
 
-Some other actor (typically a guest) is supposed to deactivate the IRQ,
-allowing at that time a new physical IRQ to hit.
-
-In virtualization use case, the physical IRQ is automatically completed
-by the interrupt controller when the guest completes the corresponding
-virtual IRQ.
+which enable to turn forwarded IRQ mode on/off.
 
 Signed-off-by: Eric Auger <eric.auger@linaro.org>
 ---
- drivers/vfio/platform/vfio_platform_irq.c | 7 ++++++-
- 1 file changed, 6 insertions(+), 1 deletion(-)
+ Documentation/virtual/kvm/devices/vfio.txt | 25 +++++++++++++++++++++++++
+ arch/arm/include/uapi/asm/kvm.h            |  6 ++++++
+ include/uapi/linux/kvm.h                   |  3 +++
+ 3 files changed, 34 insertions(+)
 
-diff --git a/drivers/vfio/platform/vfio_platform_irq.c b/drivers/vfio/platform/vfio_platform_irq.c
-index 6768508..1f851b2 100644
---- a/drivers/vfio/platform/vfio_platform_irq.c
-+++ b/drivers/vfio/platform/vfio_platform_irq.c
-@@ -88,13 +88,18 @@ static irqreturn_t vfio_irq_handler(int irq, void *dev_id)
- 	struct vfio_platform_irq *irq_ctx = dev_id;
- 	unsigned long flags;
- 	int ret = IRQ_NONE;
-+	struct irq_data *d;
-+	bool is_forwarded;
+diff --git a/Documentation/virtual/kvm/devices/vfio.txt b/Documentation/virtual/kvm/devices/vfio.txt
+index ef51740..c8b3fa1 100644
+--- a/Documentation/virtual/kvm/devices/vfio.txt
++++ b/Documentation/virtual/kvm/devices/vfio.txt
+@@ -13,6 +13,7 @@ VFIO-group is held by KVM.
  
- 	spin_lock_irqsave(&irq_ctx->lock, flags);
+ Groups:
+   KVM_DEV_VFIO_GROUP
++  KVM_DEV_VFIO_DEVICE
  
- 	if (!irq_ctx->masked) {
- 		ret = IRQ_HANDLED;
-+		d = irq_get_irq_data(irq_ctx->hwirq);
-+		is_forwarded = irqd_irq_forwarded(d);
+ KVM_DEV_VFIO_GROUP attributes:
+   KVM_DEV_VFIO_GROUP_ADD: Add a VFIO group to VFIO-KVM device tracking
+@@ -20,3 +21,27 @@ KVM_DEV_VFIO_GROUP attributes:
  
--		if (irq_ctx->flags & VFIO_IRQ_INFO_AUTOMASKED) {
-+		if (irq_ctx->flags & VFIO_IRQ_INFO_AUTOMASKED &&
-+						!is_forwarded) {
- 			disable_irq_nosync(irq_ctx->hwirq);
- 			irq_ctx->masked = true;
- 		}
+ For each, kvm_device_attr.addr points to an int32_t file descriptor
+ for the VFIO group.
++
++KVM_DEV_VFIO_DEVICE attributes:
++  KVM_DEV_VFIO_DEVICE_ASSIGN_IRQ
++  KVM_DEV_VFIO_DEVICE_DEASSIGN_IRQ
++
++For each, kvm_device_attr.addr points to an kvm_arch_forwarded_irq.
++This user API makes possible to create a special IRQ handling mode,
++currently supported only on ARM, where KVM and a VFIO platform driver
++collaborate to improve IRQ handling performance.
++fd represents the file descriptor of a valid VFIO device whose physical
++IRQ, referenced by its irq_index is injected to the VM guest_irq.
++
++On ASSIGN_IRQ, KVM-VFIO device programs:
++- the host, to not complete the physical IRQ itself.
++- the GIC, to automatically complete the physical IRQ when the guest
++  completes the virtual IRQ
++This avoid trapping the end-of-interrupt for level sensitive IRQ.
++
++On DEASSIGN_IRQ, one come back to the mode where the host completes the
++physical IRQ and the guest only completes the virtual IRQ.
++
++It is up to the caller of this API to get the assurance the IRQ is not
++outstanding when the ASSIGN/DEASSIGN is called. This could lead to some
++inconsistency on who is going to complete the IRQ.
+diff --git a/arch/arm/include/uapi/asm/kvm.h b/arch/arm/include/uapi/asm/kvm.h
+index 3034c66..1920b33 100644
+--- a/arch/arm/include/uapi/asm/kvm.h
++++ b/arch/arm/include/uapi/asm/kvm.h
+@@ -109,6 +109,12 @@ struct kvm_sync_regs {
+ struct kvm_arch_memory_slot {
+ };
+ 
++struct kvm_arch_forwarded_irq {
++	__u32 fd; /* file desciptor of the VFIO device */
++	__u32 irq_index; /* platform device index of the IRQ */
++	__u32 guest_irq; /* virtual IRQ number */
++};
++
+ /* If you need to interpret the index values, here is the key: */
+ #define KVM_REG_ARM_COPROC_MASK		0x000000000FFF0000
+ #define KVM_REG_ARM_COPROC_SHIFT	16
+diff --git a/include/uapi/linux/kvm.h b/include/uapi/linux/kvm.h
+index cf3a2ff..b149ba8 100644
+--- a/include/uapi/linux/kvm.h
++++ b/include/uapi/linux/kvm.h
+@@ -954,6 +954,9 @@ struct kvm_device_attr {
+ #define  KVM_DEV_VFIO_GROUP			1
+ #define   KVM_DEV_VFIO_GROUP_ADD			1
+ #define   KVM_DEV_VFIO_GROUP_DEL			2
++#define  KVM_DEV_VFIO_DEVICE			2
++#define   KVM_DEV_VFIO_DEVICE_ASSIGN_IRQ			1
++#define   KVM_DEV_VFIO_DEVICE_DEASSIGN_IRQ			2
+ #define KVM_DEV_TYPE_ARM_VGIC_V2	5
+ #define KVM_DEV_TYPE_FLIC		6
+ 
 -- 
 1.9.1
