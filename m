@@ -1,47 +1,67 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Mon, 25 Aug 2014 11:18:54 +0200
-Subject: [PATCH v7 1/8] clk: Add temporary mapping to the existing API
-In-Reply-To: <20140821181007.GY12769@titan.lakedaemon.net>
-References: <1408375833-10703-1-git-send-email-tomeu.vizoso@collabora.com>
- <1408375833-10703-2-git-send-email-tomeu.vizoso@collabora.com>
- <20140820145006.5251.30923@quantum> <20140821180448.GD10066@atomide.com>
- <20140821181007.GY12769@titan.lakedaemon.net>
-Message-ID: <53FAFF7E.1030401@gmail.com>
+From: javier@dowhile0.org (Javier Martinez Canillas)
+Date: Mon, 25 Aug 2014 11:33:35 +0200
+Subject: [PATCH 2/2] input: cros_ec_keyb: Add of match table
+In-Reply-To: <1408952050.31096.5.camel@collabora.co.uk>
+References: <1408748582-29029-1-git-send-email-sjoerd.simons@collabora.co.uk>
+ <1408748582-29029-3-git-send-email-sjoerd.simons@collabora.co.uk>
+ <53F89A52.60605@cogentembedded.com>
+ <1408952050.31096.5.camel@collabora.co.uk>
+Message-ID: <CABxcv=n0J+xXJpD7d0nZj-urXND-i1yCNMQuG2E4LN_sD5gUbQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/21/2014 08:10 PM, Jason Cooper wrote:
-> On Thu, Aug 21, 2014 at 11:04:48AM -0700, Tony Lindgren wrote:
->> * Mike Turquette <mturquette@linaro.org> [140820 07:53]:
->>> Quoting Tomeu Vizoso (2014-08-18 08:30:27)
->>>> To preserve git-bisectability, add aliases from the future provider API to the
->>>> existing public API.
->>>>
->>>> Also includes clk-provider.h and clk-dev.h in a few places so the right
->>>> functions are defined.
->>>>
->>>> Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
->>>
->>> Cc'ing Tony for the OMAP2+ parts, Simon & Magnus for the SHMobile parts,
->>> Jason & Andrew for the Orion parts, Mauro & Kukjin for the Exynos parts.
->>>
->>> This change is super trivial but it's best not to touch these files
->>> without a heads-up for the owners.
+Hello,
+
+On Mon, Aug 25, 2014 at 9:34 AM, Sjoerd Simons
+<sjoerd.simons@collabora.co.uk> wrote:
+>> >
+>> >   static SIMPLE_DEV_PM_OPS(cros_ec_keyb_pm_ops, NULL, cros_ec_keyb_resume);
+>> >
+>> > +#ifdef CONFIG_OF
+>> > +static const struct of_device_id cros_ec_keyb_of_match[] = {
+>
+>>     Perhaps better to use '__maybe_unused' instead of #ifdef...
+>
+> Hmm, looks like the rtc-ds1742.c driver is the only one in the kernel
+> tree using that strategy, while all others use #ifdef CONFIG_OF. So i'm
+> inclined to keep the #ifdef here, ooi what is your rationale behind
+> suggesting __maybe_unused?
+>
+
+I agree with Sjoerd on this. Not only using the #ifdef guards makes it
+more evident when reading the code that this depends on OF being
+enabled but also if using __maybe_unused an entry in the struct
+of_device_id table will be added for no reason.
+
+>
+>> > +   { .compatible = "google,cros-ec-keyb" },
+>> > +   {},
+>> > +};
+>> > +MODULE_DEVICE_TABLE(of, cros_ec_keyb_of_match);
+>> > +#endif
+>> > +
+>> > +
 >>
->> As long as it compiles omap2plus_defconfig it seems safe to me:
+>>     Too many empty lines.
+>
+>
+>
+>> >   static struct platform_driver cros_ec_keyb_driver = {
+>> >     .probe = cros_ec_keyb_probe,
+>> >     .driver = {
+>> >             .name = "cros-ec-keyb",
+>> > +           .of_match_table = of_match_ptr (cros_ec_keyb_of_match),
 >>
->> Acked-by: Tony Lindgren <tony@atomide.com>
+>>     There shouldn't be space before (.
 >
-> Same here for orion5x_defconfig, dove_defconfig, and mv78xx_defconfig.
+> Will fix the identation issues in a v2.
 >
-> Acked-by: Jason Cooper <jason@lakedaemon.net>
->
-> Also, added Sebastian to the Cc as he's the maintainer of mach-berlin.
+> Thanks for the review,
+>  Sjoerd
 
-If it still compiles for multi_v7,
+After fixing the empty lines:
 
-Acked-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+Reviewed-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
 
-I'll come back to mach-berlin later this week.
-
-Sebastian
+Best regards,
+Javier
