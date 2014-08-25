@@ -1,160 +1,135 @@
-From: dianders@google.com (Doug Anderson)
-Date: Mon, 25 Aug 2014 13:59:39 -0700
-Subject: [PATCH V2 2/3] mmc: dw_mmc: Support voltage changes
-In-Reply-To: <CAPDyKFo4fEppn21ani_p_t2Z-hhafAFRVSA2nPr9fed3iS8Q_A@mail.gmail.com>
-References: <1408715272-13833-1-git-send-email-yuvaraj.cd@samsung.com>
- <1408715272-13833-3-git-send-email-yuvaraj.cd@samsung.com>
- <CAPDyKFrATFrvVNmrt8bxrKZ_4Wea00R7VUKvyJQp-FQUTJghsA@mail.gmail.com>
- <CAD=FV=WAKXV4MuqybN4ypA+2tr1m6CP6=9_O+sYYe_-GYiy7SA@mail.gmail.com>
- <CAPDyKFo4fEppn21ani_p_t2Z-hhafAFRVSA2nPr9fed3iS8Q_A@mail.gmail.com>
-Message-ID: <CAD=FV=X_PMbovmpp4n9LXY5-9rnfcoF4D1x4wvuGOkayb7aArA@mail.gmail.com>
+From: marcin.jabrzyk@gmail.com (Marcin Jabrzyk)
+Date: Mon, 25 Aug 2014 23:01:10 +0200
+Subject: [PATCH 09/11 v4] coresight: adding support for beagle and beagleXM
+In-Reply-To: <CANLsYkxCdVm6cPtM9ub3Vwc24G9x6Vy9pt5pVMSPMxcksw6VHA@mail.gmail.com>
+References: <1408554231-24321-1-git-send-email-mathieu.poirier@linaro.org>	<1408554231-24321-10-git-send-email-mathieu.poirier@linaro.org>	<53FA5B55.4000603@gmail.com>
+ <CANLsYkxCdVm6cPtM9ub3Vwc24G9x6Vy9pt5pVMSPMxcksw6VHA@mail.gmail.com>
+Message-ID: <53FBA416.7060406@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ulf,
+Hello,
 
-On Mon, Aug 25, 2014 at 1:31 AM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
-> On 22 August 2014 22:38, Doug Anderson <dianders@google.com> wrote:
->> Ulf,
+W dniu 25.08.2014 o 16:02, Mathieu Poirier pisze:
+> On 24 August 2014 15:38, Marcin Jabrzyk <marcin.jabrzyk@gmail.com> wrote:
+>> Hi,
 >>
->> On Fri, Aug 22, 2014 at 8:35 AM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
->>> On 22 August 2014 15:47, Yuvaraj Kumar C D <yuvaraj.cd@gmail.com> wrote:
->>>> From: Doug Anderson <dianders@chromium.org>
->>>>
->>>> For UHS cards we need the ability to switch voltages from 3.3V to
->>>> 1.8V.  Add support to the dw_mmc driver to handle this.  Note that
->>>> dw_mmc needs a little bit of extra code since the interface needs a
->>>> special bit programmed to the CMD register while CMD11 is progressing.
->>>> This means adding a few extra states to the state machine to track.
->>>>
->>>> Signed-off-by: Doug Anderson <dianders@chromium.org>
->>>> Signed-off-by: Yuvaraj Kumar C D <yuvaraj.cd@samsung.com>
->>>> ---
->>>> changes since v1:
->>>>         1. Added error message and return error in case of regulator_set_voltage() fail.
->>>>         2. changed  dw_mci_cmd_interrupt(host,pending | SDMMC_INT_CMD_DONE)
->>>>            to dw_mci_cmd_interrupt(host,pending).
->>>>         3. Removed unnecessary comments.
->>>>
->>>>  drivers/mmc/host/dw_mmc.c  |  134 +++++++++++++++++++++++++++++++++++++++++---
->>>>  drivers/mmc/host/dw_mmc.h  |    5 +-
->>>>  include/linux/mmc/dw_mmc.h |    2 +
->>>>  3 files changed, 131 insertions(+), 10 deletions(-)
->>>>
->>>> diff --git a/drivers/mmc/host/dw_mmc.c b/drivers/mmc/host/dw_mmc.c
->>>> index aadb0d6..f20b4b8 100644
->>>> --- a/drivers/mmc/host/dw_mmc.c
->>>> +++ b/drivers/mmc/host/dw_mmc.c
->>>> @@ -29,6 +29,7 @@
->>>>  #include <linux/irq.h>
->>>>  #include <linux/mmc/host.h>
->>>>  #include <linux/mmc/mmc.h>
->>>> +#include <linux/mmc/sd.h>
->>>>  #include <linux/mmc/sdio.h>
->>>>  #include <linux/mmc/dw_mmc.h>
->>>>  #include <linux/bitops.h>
->>>> @@ -234,10 +235,13 @@ err:
->>>>  }
->>>>  #endif /* defined(CONFIG_DEBUG_FS) */
->>>>
->>>> +static void mci_send_cmd(struct dw_mci_slot *slot, u32 cmd, u32 arg);
->>>> +
->>>>  static u32 dw_mci_prepare_command(struct mmc_host *mmc, struct mmc_command *cmd)
->>>>  {
->>>>         struct mmc_data *data;
->>>>         struct dw_mci_slot *slot = mmc_priv(mmc);
->>>> +       struct dw_mci *host = slot->host;
->>>>         const struct dw_mci_drv_data *drv_data = slot->host->drv_data;
->>>>         u32 cmdr;
->>>>         cmd->error = -EINPROGRESS;
->>>> @@ -253,6 +257,31 @@ static u32 dw_mci_prepare_command(struct mmc_host *mmc, struct mmc_command *cmd)
->>>>         else if (cmd->opcode != MMC_SEND_STATUS && cmd->data)
->>>>                 cmdr |= SDMMC_CMD_PRV_DAT_WAIT;
->>>>
->>>> +       if (cmd->opcode == SD_SWITCH_VOLTAGE) {
->>>> +               u32 clk_en_a;
->>>> +
->>>> +               /* Special bit makes CMD11 not die */
->>>> +               cmdr |= SDMMC_CMD_VOLT_SWITCH;
->>>> +
->>>> +               /* Change state to continue to handle CMD11 weirdness */
->>>> +               WARN_ON(slot->host->state != STATE_SENDING_CMD);
->>>> +               slot->host->state = STATE_SENDING_CMD11;
->>>> +
->>>> +               /*
->>>> +                * We need to disable clock stop while doing voltage switch
->>>> +                * according to Voltage Switch Normal Scenario.
->>>> +                * It's assumed that by the next time the CLKENA is updated
->>>> +                * (when we set the clock next) that the voltage change will
->>>> +                * be over, so we don't bother setting any bits to synchronize
->>>> +                * with dw_mci_setup_bus().
->>>> +                */
+>> W dniu 20.08.2014 o 19:03, mathieu.poirier at linaro.org pisze:
+>>> From: Mathieu Poirier <mathieu.poirier@linaro.org>
 >>>
->>> I don't know the details about the dw_mmc controller, but normally a
->>> host driver is expected to gate the clock from it's ->set_ios
->>> callback, when the clk frequency are set to 0.
+>>> Currently supporting ETM and ETB.  Support for TPIU
+>>> and SDTI are yet to be added.
+>> Did you tried running the drivers on board or are there any special
+>> preparation needed?
+>> I've BeagleBoard-xM Rev. C applied your patches and enabled the
+>> functions the in menuconfig.
+>> But on dmesg I see that:
+>>
+>> [    0.685028] of_amba_device_create(): amba_device_add() failed (-19)
+>> for /etb at 5401b000
+>> [    0.685119] of_amba_device_create(): amba_device_add() failed (-19)
+>> for /etm at 54010000
+>>
+>> There are no nodes according coresight in /sys/kernel/debug/ .
+> Right, that is because there is a problem in mainline with enabling
+> "emu_src_ck".  The call to "clk_prepare_enable()" returns without
+> waiting for the clock to effectively be enabled, preventing the
+> components from being discovered properly.
+>
+> The work around (non-upstreamable) is to have a driver getting a hold
+> of the clock before AMBA devices are probed.  I can send you that code
+> (10 lines) if need be.
+Ok I can confirm that this patch works fine for BeagleBoard-xM. After
+applying workaround for that clock the devices are properly discovered
+and visible through sysfs entries.
+
+Thanks,
+Marcin
+>
+>> Best regards,
+>> Marcin
+>>
+>>> Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+>>> ---
+>>>  arch/arm/boot/dts/omap3-beagle-xm.dts | 28 ++++++++++++++++++++++++++++
+>>>  arch/arm/boot/dts/omap3-beagle.dts    | 28 ++++++++++++++++++++++++++++
+>>>  2 files changed, 56 insertions(+)
 >>>
->>> Could you elaborate on why dw_mmc can't do that, but need to handle
->>> this from here?
->>
->> Let's see, it's been a while since I wrote this...
->>
->>
->> So dw_mmc has a special feature where the controller itself will
->> automatically stop the MMC Card clock when nothing is going on.  This
->> is called "low power" mode.  I'm not super familiar with other MMC
->> drivers, I get the impression that this is a special dw_mmc feature
->> and not common to other controllers.  I think other drivers have
->> aggressive runtime PM to get similar power savings.
->
-> I see.
->
-> I am familiar with such "low power" mode features, there are certainly
-> other controllers supporting such as well. My experience tells me,
-> it's hard to get things right for all corner cases. The voltage switch
-> behaviour is just one of these, then you have SDIO irq etc.
->
-> Instead of using the controller HW, yes you may implement clock gating
-> through runtime PM in the host driver.
->
->>
->> The dw_mmc auto clock gating can wreck total havoc on the voltage
->> change procedure, since part of the way that the host and card
->> communicate is that the host is supposed to stop its clock when it
->> gets to a certain phase of the voltage switch sequence.  If the
->> controller is stopping the clock for us then it can confuse the card.
->>
->> The dw_mmc manual says that before starting a voltage change you must
->> turn off low power mode.  That's what we're doing here.
->>
->>
->> The comment above refers to the fact dw_mci_setup_bus() will
->> unconditionally turn low power mode back on for us when called with a
->> non-zero clock.  If dw_mci_setup_bus() might be called with a non-zero
->> clock during the voltage change then this would be disaster (low power
->> mode would be back on!).  ...but the clock will always be zero during
->> the voltage change and when it's finally non-zero then it's the last
->> stage of the voltage change and we can go back to low power mode.
->>
->>
->> Possibly the above was not super clear from the comment (even for
->> those familiar with the oddities of dw_mmc).  If you want me to try to
->> rewrite the comment, let me know.
->
-> I appreciate an updated comment, it's nice to know what goes on. :-)
-
-OK, how about:
-
-/*
- * We need to disable low power mode (automatic clock stop)
- * while doing voltage switch so we don't confuse the card,
- * since stopping the clock is a specific part of the UHS
- * voltage change dance.
- *
- * Note that low power mode (SDMMC_CLKEN_LOW_PWR) will be
- * unconditionally turned back on in dw_mci_setup_bus() if it's
- * ever called with a non-zero clock.  That shouldn't happen
- * until the voltage change is all done.
- */
-
-Yuvaraj: can you include that in the next patch set you send out?
+>>> diff --git a/arch/arm/boot/dts/omap3-beagle-xm.dts b/arch/arm/boot/dts/omap3-beagle-xm.dts
+>>> index 1becefc..eec73d8 100644
+>>> --- a/arch/arm/boot/dts/omap3-beagle-xm.dts
+>>> +++ b/arch/arm/boot/dts/omap3-beagle-xm.dts
+>>> @@ -145,6 +145,34 @@
+>>>                       };
+>>>               };
+>>>       };
+>>> +
+>>> +     etb at 5401b000 {
+>>> +             compatible = "arm,coresight-etb10", "arm,primecell";
+>>> +             reg = <0x5401b000 0x1000>;
+>>> +
+>>> +             coresight-default-sink;
+>>> +             clocks = <&emu_src_ck>;
+>>> +             clock-names = "apb_pclk";
+>>> +             port {
+>>> +                     etb_in: endpoint {
+>>> +                             slave-mode;
+>>> +                             remote-endpoint = <&etm_out>;
+>>> +                     };
+>>> +             };
+>>> +     };
+>>> +
+>>> +     etm at 54010000 {
+>>> +             compatible = "arm,coresight-etm3x", "arm,primecell";
+>>> +             reg = <0x54010000 0x1000>;
+>>> +
+>>> +             clocks = <&emu_src_ck>;
+>>> +             clock-names = "apb_pclk";
+>>> +             port {
+>>> +                     etm_out: endpoint {
+>>> +                             remote-endpoint = <&etb_in>;
+>>> +                     };
+>>> +             };
+>>> +     };
+>>>  };
+>>>
+>>>  &omap3_pmx_wkup {
+>>> diff --git a/arch/arm/boot/dts/omap3-beagle.dts b/arch/arm/boot/dts/omap3-beagle.dts
+>>> index 3c3e6da..a151daf 100644
+>>> --- a/arch/arm/boot/dts/omap3-beagle.dts
+>>> +++ b/arch/arm/boot/dts/omap3-beagle.dts
+>>> @@ -140,6 +140,34 @@
+>>>                       };
+>>>               };
+>>>       };
+>>> +
+>>> +     etb at 540000000 {
+>>> +             compatible = "arm,coresight-etb10", "arm,primecell";
+>>> +             reg = <0x5401b000 0x1000>;
+>>> +
+>>> +             coresight-default-sink;
+>>> +             clocks = <&emu_src_ck>;
+>>> +             clock-names = "apb_pclk";
+>>> +             port {
+>>> +                     etb_in: endpoint {
+>>> +                             slave-mode;
+>>> +                             remote-endpoint = <&etm_out>;
+>>> +                     };
+>>> +             };
+>>> +     };
+>>> +
+>>> +     etm at 54010000 {
+>>> +             compatible = "arm,coresight-etm3x", "arm,primecell";
+>>> +             reg = <0x54010000 0x1000>;
+>>> +
+>>> +             clocks = <&emu_src_ck>;
+>>> +             clock-names = "apb_pclk";
+>>> +             port {
+>>> +                     etm_out: endpoint {
+>>> +                             remote-endpoint = <&etb_in>;
+>>> +                     };
+>>> +             };
+>>> +     };
+>>>  };
+>>>
+>>>  &omap3_pmx_wkup {
