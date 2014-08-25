@@ -1,42 +1,79 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Mon, 25 Aug 2014 13:05:39 -0700
-Subject: [PATCH 04/29] drivers: base: add notifier for failed driver bind
-In-Reply-To: <1407235677-26324-5-git-send-email-m.szyprowski@samsung.com>
-References: <1407235677-26324-1-git-send-email-m.szyprowski@samsung.com>
- <1407235677-26324-5-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <20140825200539.GA22076@kroah.com>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Mon, 25 Aug 2014 13:21:24 -0700
+Subject: [PATCH 3/3] ARM: zynq: DT: Add Ethernet phys
+In-Reply-To: <20140825174610.GA13737@obsidianresearch.com>
+References: <1408550219-19825-1-git-send-email-soren.brinkmann@xilinx.com>
+ <1408550219-19825-3-git-send-email-soren.brinkmann@xilinx.com>
+ <5a7b6f57-b6c0-4fb3-af0d-d403277c0207@BN1AFFO11FD045.protection.gbl>
+ <53F5D8D9.7040604@suse.de>
+ <f166a186-301c-4288-97cf-71f8173c07e7@BN1AFFO11FD010.protection.gbl>
+ <CAGVrzcYWN83tznwvw1M9V_mwWgobs2kwtRvEj4stqE=XGC10fg@mail.gmail.com>
+ <20140825174610.GA13737@obsidianresearch.com>
+Message-ID: <53FB9AC4.8010704@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 05, 2014 at 12:47:32PM +0200, Marek Szyprowski wrote:
-> This patch adds support for getting a notify for failed device driver
-> bind, so all the items done in BUS_NOTIFY_BIND_DRIVER event can be
-> cleaned if the driver fails to bind.
-
-But doesn't the bus know if the driver fails to bind, so why would a
-notifier be needed here?  Can't it unwind any problems then?
-
-> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-> ---
->  drivers/base/dd.c      | 10 +++++++---
->  include/linux/device.h |  4 +++-
->  2 files changed, 10 insertions(+), 4 deletions(-)
+On 08/25/2014 10:46 AM, Jason Gunthorpe wrote:
+> On Fri, Aug 22, 2014 at 01:47:09PM -0700, Florian Fainelli wrote:
 > 
-> diff --git a/drivers/base/dd.c b/drivers/base/dd.c
-> index e4ffbcf..541a41f 100644
-> --- a/drivers/base/dd.c
-> +++ b/drivers/base/dd.c
-> @@ -237,10 +237,14 @@ static int driver_sysfs_add(struct device *dev)
->  	return ret;
->  }
->  
-> -static void driver_sysfs_remove(struct device *dev)
-> +static void driver_sysfs_remove(struct device *dev, int failed)
+>>>  - the ID based strings seem to be not needed since, IIUC, the core
+>>>    reads the ID from the PHY and uses it, so I just left it out not
+>>>    trying to figure out how to obtain the correct ID
+>>
+>> It is not needed, but it is one way to specify a PHY device if you do
+>> not know what compatible string to use instead.
+> 
+> No, it is a way to specify a PHY device if the kernel can't auto probe
+> the Phy ID.
+> 
+> Last I checked, the kernel doesn't support plain text compatible
+> strings for phys - everything is driven on the phy id, either auto
+> probed or specified in the DT.
 
-I _hate_ having functions with a flag that does something different
-depending on it.  If you _really_ need this, just make the notifier call
-before calling this function, which should work just fine, right?
+That's right. Some PHY drivers might be relying on specific compatible
+strings though, but not the core PHY library that probes and maps a
+driver to a PHY node.
 
-thanks,
+> 
+>>>  - the marvell compatible strings are used in our vendor tree. They
+>>>    aren't used anywhere but in our vendor tree. I though keeping them is
+>>>    nice since it identifies the PHY fully. And in case that level of
+>>>    detail is needed at some point it is already there.
+>>
+>> And this is the recommended way to do it in case we ever need to key a
+>> software decision based on the hardware.
+> 
+> All compatible strings need to be documented.
+> 
+> .. and they need to encode more information than you get from the phy
+> id - die revsision, package option, functional options, voltage
+> codes. Etc.
+> 
+> .. and they actually need to be *right*
 
-greg k-h
+Agreed.
+
+> 
+> An example: The kernel reports 88E1318S for all four chips in that
+> family, AFAIK you have to read the package marking to figure out which
+> you have (it is the same die, with options switched on/off at
+> packaging time). People have already posted patches trying to
+> helpfully add a 'marvell,88E1318S' compatible string based on kernel
+> output. Except it is wrong, it isn't actually the '8S version in the
+> HW.
+> 
+> Even worse, Marvell has a whole series of socket compatible phys. Just
+> because the board the DT author looked at has a '318, doesn't mean
+> that every board ever made will. We've actually already been switching
+> between the 318 and 318S for production depending on which has part
+> availability.
+> 
+> Basically: don't try to override self-discoverable hardware in DT
+> without a really good reason.
+
+I think that's a very good point, at the very least let's use a
+compatible string that contains the full 32-bits PHY OUI.
+
+Thanks
+--
+Florian
