@@ -1,38 +1,48 @@
-From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
-Date: Mon, 25 Aug 2014 13:54:07 +0200
-Subject: [PATCH v2 1/1] ARM: exynos_defconfig: Enable options for display
- panel support
-In-Reply-To: <53FB22E4.8040906@suse.de>
-References: <1408956336-17376-1-git-send-email-javier.martinez@collabora.co.uk>
- <5825205.70RuHaSG5p@amdc1032> <53FB22E4.8040906@suse.de>
-Message-ID: <53FB23DF.70809@collabora.co.uk>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Mon, 25 Aug 2014 13:54:54 +0200
+Subject: [PATCH] PWM: atmel: fix incorrect CDTY value after enabling or
+ disabling
+In-Reply-To: <20140825101522.GA16960@ulmo.nvidia.com>
+References: <1394823931-2815-1-git-send-email-alexandre.belloni@free-electrons.com>
+ <20140825101522.GA16960@ulmo.nvidia.com>
+Message-ID: <20140825115454.GA2077@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Andreas,
+Hi,
 
-On 08/25/2014 01:49 PM, Andreas F?rber wrote:
->> 
->> Could you please also do corresponding update to multi_v7_defconfig?
+On 25/08/2014 at 12:15:23 +0200, Thierry Reding wrote :
+> On Fri, Mar 14, 2014 at 08:05:31PM +0100, Alexandre Belloni wrote:
+> > pwm-leds calls .config() and .disable() in a row. This exhibits that it may
+> > happen that the channel gets disabled before CDTY has been updated with CUPD.
+> > The issue gets quite worse with long periods.
+> > So, ensure by reading ISR that at least one period has past before disabling the
+> > channel.
+> > 
+> > The other issue is that it may happen that CUPD is not flushed before enabling
+> > the channel so it will update CDTY/CPRD just after one period. So we always set
+> > CUPD, even when the channel is not enabled.
+> > 
+> > Tested on at91sam9g45 and sama5d31ek.
+> > 
+> > Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+> > ---
+> >  drivers/pwm/pwm-atmel.c | 46 +++++++++++++++++++++++++++++-----------------
+> >  1 file changed, 29 insertions(+), 17 deletions(-)
 > 
-> As was mentioned in v1 (but now below), some of these options depend on
-
-Sorry for missing the mention about the dependencies on v2...
-
-> patches yet to be respun and be accepted into drm, so I would consider
-> this an RFC patch and suggest to wait with multi_v7.
+> going through the list of unapplied patches I came across this old
+> patch. It was never reviewed nor acked by anyone and you didn't ping me,
+> so I always assumed it must no longer be required. Is that so?
 > 
 
-Agreed, I just sent an email to Bartlomiej saying the same.
+It is still required but Nicolas is not happy with the polling on
+PWM_ISR and he was supposed to discuss that internally with the IP
+designer to understand if there is a better way.
 
-> It could of course be split, as CONFIG_DRM_EXYNOS* and backlight parts
-> are certainly okay.
->
+I'll either ping on that one or send a new version when I'll know a bit
+more.
 
-Also agreed.
-
-> Regards,
-> Andreas
-
-Best regards,
-Javier
+-- 
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
