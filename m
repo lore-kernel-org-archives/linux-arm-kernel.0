@@ -1,47 +1,73 @@
-From: marex@denx.de (Marek Vasut)
-Date: Mon, 25 Aug 2014 10:07:22 +0200
-Subject: [PATCH v4] spi: spi-imx: add DMA support
-In-Reply-To: <1408752835-10995-1-git-send-email-b38343@freescale.com>
-References: <1408752835-10995-1-git-send-email-b38343@freescale.com>
-Message-ID: <201408251007.22393.marex@denx.de>
+From: sjoerd.simons@collabora.co.uk (Sjoerd Simons)
+Date: Mon, 25 Aug 2014 10:11:37 +0200
+Subject: [PATCH v9 4/6] ARM: Exynos: switch to using generic cpufreq
+ driver for Exynos4210/5250/5420
+In-Reply-To: <7hbnrc6px3.fsf@paris.lan>
+References: <1406707663-16656-1-git-send-email-thomas.ab@samsung.com>
+ <1406707663-16656-5-git-send-email-thomas.ab@samsung.com>
+ <53DA8BB9.6020702@samsung.com> <53DA8D85.3050106@gmail.com>
+ <7hbnrc6px3.fsf@paris.lan>
+Message-ID: <1408954297.31096.7.camel@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday, August 23, 2014 at 02:13:55 AM, Robin Gong wrote:
-> After enable DMA
+Hey,
 
-Please also add a commit message which describes the change, not only some test 
-results.
-
-[...]
-
-> @@ -911,6 +1194,13 @@ static int spi_imx_probe(struct platform_device
-> *pdev) goto out_put_per;
+On Fri, 2014-08-22 at 16:54 -0700, Kevin Hilman wrote:
+> Tomasz Figa <tomasz.figa@gmail.com> writes:
 > 
->  	spi_imx->spi_clk = clk_get_rate(spi_imx->clk_per);
-> +	/*
-> +	 * Only validated on i.mx6 now, can remove the constrain if validated on
-> +	 * other chips.
-> +	 */
-
-Given that the check below tests for imx51_ecspi_devtype_data ... does that 
-mean, that this code was never tested on MX51 and MX53, yet will be enabled
-for those chips and might possibly break them ?
-
-> +	if (spi_imx->devtype_data == &imx51_ecspi_devtype_data
-> +	    && spi_imx_sdma_init(&pdev->dev, spi_imx, master, res))
-> +		dev_err(&pdev->dev, "dma setup error,use pio instead\n");
+> > Kukjin,
+> >
+> > On 31.07.2014 20:32, Kukjin Kim wrote:
+> >> On 07/30/14 17:07, Thomas Abraham wrote:
+> >>> The new CPU clock type allows the use of generic CPUfreq drivers. So for
+> >>> Exynos4210/5250, switch to using generic cpufreq driver. For Exynos5420,
+> >>> which did not have CPUfreq driver support, enable the use of generic
+> >>> CPUfreq driver.
+> >>>
+> >>> Suggested-by: Tomasz Figa<t.figa@samsung.com>
+> >>> Cc: Kukjin Kim<kgene.kim@samsung.com>
+> >> 
+> >> Looks good to me,
+> >> 
+> >> Acked-by: Kukjin Kim <kgene.kim@samsung.com>
+> >> 
+> >> BTW, who will handle this series? I hope see this series in 3.17.
+> >
+> > This series consists mostly of clock changes and it likely depends on
+> > patches already in my for-next, so I would be inclined toward taking it
+> > through samsung-clk tree. 
 > 
->  	spi_imx->devtype_data->reset(spi_imx);
+> So has this series been picked up anywhere?  I don't see it in your
+> samsung-clk tree, nor in Kukjin's for-next.
 > 
-> @@ -949,6 +1239,7 @@ static int spi_imx_remove(struct platform_device
-> *pdev) writel(0, spi_imx->base + MXC_CSPICTRL);
->  	clk_unprepare(spi_imx->clk_ipg);
->  	clk_unprepare(spi_imx->clk_per);
-> +	spi_imx_sdma_exit(spi_imx);
->  	spi_master_put(master);
+> Also, I'm curious whether or how this is has been tested on big.LITTLE
+> SoCs.  
 > 
->  	return 0;
+> I'm trying it on the 5800/Chromebook2 and it's not terribly stable.  I'm
+> testing along with CPUidle, so there may be some untested interactions
+> there as it seems a bit more stable without CPUidle enabled.
+> 
+> I'd love to hear from anyone else that's testing CPUidle and CPUfreq
+> together big.LITTLE 5420/5800, with or without the switcher.
+> 
+> Also, the patch below[2] is needed for 5800.
 
-Best regards,
-Marek Vasut
+For reference, I had the same patch in a kernel tree we recently used
+for a demo on the chromebook 2 13" (Exynos 5800). We didn't see any
+stability issues due to this without CPUidle (using the ondemand
+govenor). The kernel we ended up using had CONFIG_BL_SWITCHER disabled,
+but i don't remember seeing stability issues when i did a testrun with
+that enabled.  
+
+
+-- 
+Sjoerd Simons <sjoerd.simons@collabora.co.uk>
+Collabora Ltd.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: smime.p7s
+Type: application/x-pkcs7-signature
+Size: 6170 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140825/e02aa78e/attachment.bin>
