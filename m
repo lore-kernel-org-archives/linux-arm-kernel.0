@@ -1,88 +1,61 @@
-From: jh80.chung@samsung.com (Jaehoon Chung)
-Date: Mon, 25 Aug 2014 17:50:15 +0900
-Subject: [PATCH V2 3/3] mmc: dw_mmc: Dont cut off vqmmc and vmmc
-In-Reply-To: <CAPDyKFqp7oEt9ASmdxrgUwbQ8aTZzAuJ7uD1oGN50iuzPzBfVg@mail.gmail.com>
-References: <1408715272-13833-1-git-send-email-yuvaraj.cd@samsung.com>
- <1408715272-13833-4-git-send-email-yuvaraj.cd@samsung.com>
- <CAPDyKFqz8sGj2td=ihZXN4zvAqmu9FHZjWdCn-ZRcdHugNHe2g@mail.gmail.com>
- <CAPz6YkXH1mMOTwcLkKdffdUHN+TaCAhpa8oG0h+rFn9i+GMoCw@mail.gmail.com>
- <CAPDyKFqp7oEt9ASmdxrgUwbQ8aTZzAuJ7uD1oGN50iuzPzBfVg@mail.gmail.com>
-Message-ID: <53FAF8C7.8040007@samsung.com>
+From: wangyijing@huawei.com (Yijing Wang)
+Date: Mon, 25 Aug 2014 17:02:52 +0800
+Subject: [PATCH] ARM: PCI: Use PCI_CLASS_* defines for PCI class
+In-Reply-To: <1408955976.8665.23.camel@umadbro>
+References: <1406904671-19197-1-git-send-email-lisovy@gmail.com>	
+ <53DE3629.2020706@kernel.org> <1407144668.21386.8.camel@umadbro>
+ <1408955976.8665.23.camel@umadbro>
+Message-ID: <53FAFBBC.3070100@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/25/2014 05:13 PM, Ulf Hansson wrote:
-> On 22 August 2014 20:27, Sonny Rao <sonnyrao@chromium.org> wrote:
->> On Fri, Aug 22, 2014 at 8:31 AM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
->>> On 22 August 2014 15:47, Yuvaraj Kumar C D <yuvaraj.cd@gmail.com> wrote:
->>>> Exynos 5250 and 5420 based boards uses built-in CD# line for card
->>>> detection.But unfortunately CD# line is on the same voltage rails
->>>> as of I/O voltage rails. When we cut off vqmmc,the consequent card
->>>> detection will break in these boards.
-
-I didn't know that use CD# line for card detect.
-And if CD# voltage rails and I/O voltage rail are same voltage, it doesn't make sense.
-Which card is used with same voltages? (eMMC? SD? SDIO?)
-
-Well, I have checked Exynos5250 and 5420, but it looks like not same rails.
-
->>>
->>> I am not sure I follow here.
->>>
->>> Is the card detect mechanism handled internally by the dw_mmc controller?
->>
->> Yes
-
-What card detect mechanism?
-
-> 
-> Just out of curiosity.
-> 
-> Do you know how the power to the actual dw_mmc controller is handled?
-> I expect it to be SoC specific and I am guessing power domain
-> regulators may be involved!?
-> 
->>
->>>
->>> I thought HW engineers long time ago realized that this should be done
->>> separately on a GPIO line to be able to save power while waiting for a
->>> card to be inserted. But that's not case then?
->>
->> At least in my limited experience, this seems to be common among SoC
->> vendors who are using dw_mmc, as we've seen this elsewhere as well and
->> after seeing it here we know that we need to ignore the CD pin that's
->> routed to dw_mmc and use a separately powered GPIO on the board, but
->> still there are probably many SoCs/boards which are doing it this way.
->>
+On 2014/8/25 16:39, Rostislav Lisovy wrote:
+> On Mon, 2014-08-04 at 11:31 +0200, Rostislav Lisovy wrote:
+>> On Sun, 2014-08-03 at 09:16 -0400, Sasha Levin wrote:
+>>>> -     /* FIXME: add defines for class 0x68000 and 0x80103 */
+>>>>       if ((dev->class >> 8) == PCI_CLASS_BRIDGE_HOST ||
+>>>> -         dev->class == 0x68000 ||
+>>>> -         dev->class == 0x80103) {
+>>>> +         dev->class == (PCI_CLASS_BRIDGE_OTHER << 8) ||
+>>>> +         dev->class == ((PCI_CLASS_SYSTEM_DMA << 8) | 0x03)) {
+>>>>               for (i = 0; i < PCI_NUM_RESOURCES; i++) {
+>>>>                       dev->resource[i].start = 0;
+>>>>                       dev->resource[i].end   = 0;
 >>>>
->>>> These hosts (obviously) need to keep vqmmc (and thus vmmc) on all the
->>>> time, even when the mmc core tells them to power off. However, one
->>>> problem is that these cards won't properly handle mmc_power_cycle().
->>>> That's needed to handle error cases when trying to switch voltages
->>>> (see 0797e5f mmc:core: Fixup signal voltage switch).
->>>>
->>>> This patch adds a new MMC_POWER_OFF_HARD mode when it's doing a power
->>>> cycle.  This mode differs from the normal MMC_POWER_OFF mode in that
->>>> the mmc core will promise to power the slot back on before it expects
->>>> the host to detect card insertion or removal.
+>>>
+>>> Care to explain how your new code is equivalent to the old one?
 >>
->> This patch is based off of one that Doug wrote (sent privately to
->> Yuvaraj) which just modifies the MMC core, and should be split into
->> two patches.
->> One that modifies the mmc core and one that implements this in dw_mmc.
+>> The header file include/linux/pci_ids.h defines
+>> #define PCI_CLASS_BRIDGE_OTHER          0x0680
+>> #define PCI_CLASS_SYSTEM_DMA            0x0801
+>>
+>> ((struct pci_dev*)dev)->class
+>> corresponds to the 3 bytes Class code in the PCI Configuration space
+>> header -- 1B Base class, 1B Sub-class, 1B Reg-level interface.
+>>
+>> In that case
+>> (PCI_CLASS_BRIDGE_OTHER << 8)
+>> is equivalent to 0x68000 (imagine the leading zero)
+>> and
+>> ((PCI_CLASS_SYSTEM_DMA << 8) | 0x03))
+>> is equivalent to 0x80103.
+>>
 > 
-> I looked at the mmc core parts, it seems like the wrong approach.
-> 
-> I think you shall be able use MMC_CAP_NEEDS_POLL, to handle this
-> broken card detect mechanism. We even have a DT binding for that,
-> "broken-cd".
+> Just a kind reminder in case anyone is interested in reviewing and
+> accepting the patch.
 
-I agreed with Ulf's opinion.
-
-Best Regards,
-Jaehoon Chung
+Reviewed-by : Yijing Wang <wangyijing@huawei.com>
 
 > 
-> Kind regards
-> Uffe
+> Best regards;
+> Rostislav Lisovy
 > 
+> 
+> 
+> .
+> 
+
+
+-- 
+Thanks!
+Yijing
