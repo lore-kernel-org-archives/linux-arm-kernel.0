@@ -1,33 +1,24 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Mon, 25 Aug 2014 19:19:30 +0800
-Subject: [PATCH 0/6] SolidRun Hummingboard/Cubox-i DT updates
-In-Reply-To: <20140825095106.GS30401@n2100.arm.linux.org.uk>
-References: <20140823091058.GO30401@n2100.arm.linux.org.uk>
- <20140825062930.GA6928@dragon>
- <20140825095106.GS30401@n2100.arm.linux.org.uk>
-Message-ID: <20140825111929.GC6928@dragon>
+From: pavel@denx.de (Pavel Machek)
+Date: Mon, 25 Aug 2014 13:21:51 +0200
+Subject: [PATCHv10 0/5] ARM: remove the sub-node and deprecate
+ supports-highspeed property for dwmmc.
+In-Reply-To: <1407397082-32495-1-git-send-email-jh80.chung@samsung.com>
+References: <1407397082-32495-1-git-send-email-jh80.chung@samsung.com>
+Message-ID: <20140825112151.GA21336@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 25, 2014 at 10:51:07AM +0100, Russell King - ARM Linux wrote:
-> On Mon, Aug 25, 2014 at 02:29:32PM +0800, Shawn Guo wrote:
-> > On Sat, Aug 23, 2014 at 10:10:58AM +0100, Russell King - ARM Linux wrote:
-> > > Here's a set of patches updating the Cubox-i/Hummingboard DT files.
-> > > 
-> > > The first two are fairly important fixes, so should at least go in
-> > > for -rc kernels.
-> > > 
-> > > The SPDIF patch is something which could go in -rc as well as it's a
-> > > cosmetic patch, changing the name displayed in (eg) pulseaudio for the
-> > > SPDIF output from the developer-centric "imx-spdif" to "Integrated SPDIF".
-> > 
-> > I will sent the first 3 for -rc.  But I second Iain's comment that the
-> > first patch should have a better commit log to explain why it's an
-> > important fix.
-> 
-> I still have no answer for that, so I suggest dropping it until Rabeeh
-> can write a better commit log.
+On Thu 2014-08-07 16:37:57, Jaehoon Chung wrote:
+> Since used the mmc_of_parse(), didn't parse the sub-node.
+> So we can remove the sub-node, because almost SoC used the only one card per a host.
+> And supports-highspeed can be replaced with "cap-mmc/sd-highspeed"
+>property.
 
-Okay.  #2 and #3 applied on imx/fixes, and #4~6 applied on imx/dt.
+Would it be better to fix parsing of the device tree, and not to
+change all the device trees?
 
-Shawn
+Someone will want to do two slots sooner or later...
+
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
