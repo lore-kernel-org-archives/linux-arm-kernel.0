@@ -1,131 +1,86 @@
 From: ajaynumb@gmail.com (Ajay kumar)
-Date: Mon, 25 Aug 2014 11:38:56 +0530
-Subject: [PATCH 1/3] ARM: dts: Add DT changes for display on snow
-In-Reply-To: <53F8713E.5040408@suse.de>
-References: <1406317464-7525-1-git-send-email-ajaykumar.rs@samsung.com>
- <1406317464-7525-2-git-send-email-ajaykumar.rs@samsung.com>
- <53F8713E.5040408@suse.de>
-Message-ID: <CAEC9eQNrTW8TJsCNwtQv6Tr15gfz1HJbJkSfUR8NLchvCGbVOQ@mail.gmail.com>
+Date: Mon, 25 Aug 2014 11:43:35 +0530
+Subject: [PATCH V3] ARM: dts: Add DT changes for display on peach_pi
+In-Reply-To: <1407145638-3803-1-git-send-email-ajaykumar.rs@samsung.com>
+References: <1407145638-3803-1-git-send-email-ajaykumar.rs@samsung.com>
+Message-ID: <CAEC9eQNSPKdTKbAnNpj1ssc==NHkLUUAb+02wZiO+v41XEvutQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Aug 23, 2014 at 4:17 PM, Andreas F?rber <afaerber@suse.de> wrote:
-> Am 25.07.2014 21:44, schrieb Ajay Kumar:
->> Add DT nodes for ptn3460 bridge chip and panel-simple panel.
+On Mon, Aug 4, 2014 at 3:17 PM, Ajay Kumar <ajaykumar.rs@samsung.com> wrote:
+> Add DT nodes for panel-simple "auo,b133htn01" panel.
+> Add backlight enable pin and backlight power supply for pwm-backlight.
+> Also, add panel phandle needed by dp to enable display on peach_pi.
 >
-> "simple-panel"
-Ok.
-
->> Add backlight enable pin and backlight power supply for pwm-backlight.
->> Also add bridge phandle needed by dp to enable display on snow.
->>
->> Signed-off-by: Ajay Kumar <ajaykumar.rs@samsung.com>
->> ---
->>  arch/arm/boot/dts/exynos5250-snow.dts |   40 +++++++++++++++++----------------
->>  1 file changed, 21 insertions(+), 19 deletions(-)
->>
->> diff --git a/arch/arm/boot/dts/exynos5250-snow.dts b/arch/arm/boot/dts/exynos5250-snow.dts
->> index 6c36d41..f57f993 100644
->> --- a/arch/arm/boot/dts/exynos5250-snow.dts
->> +++ b/arch/arm/boot/dts/exynos5250-snow.dts
->> @@ -270,7 +270,7 @@
->>                                       dcdc3 {
->>                                               ti,enable-ext-control;
->>                                       };
->> -                                     fet1 {
->> +                                     fet1: fet1 {
->>                                               regulator-name = "vcd_led";
->>                                               ti,overcurrent-wait = <3>;
->>                                       };
->> @@ -293,7 +293,7 @@
->>                                               regulator-always-on;
->>                                               ti,overcurrent-wait = <3>;
->>                                       };
->> -                                     fet6 {
->> +                                     fet6: fet6 {
->>                                               regulator-name = "lcd_vdd";
->>                                               ti,overcurrent-wait = <3>;
->>                                       };
->> @@ -342,6 +342,15 @@
->>                       pinctrl-0 = <&max98095_en>;
->>                       pinctrl-names = "default";
->>               };
->> +
->> +             ptn3460: ptn3460-bridge at 20 {
+> Signed-off-by: Ajay Kumar <ajaykumar.rs@samsung.com>
+> ---
+> Changes since V1:
+> Remove "simple-panel" compatible string and use only ""auo,b133htn01".
 >
-> "lvds-bridge"? (AF)
-Ok.
->> +                     compatible = "nxp,ptn3460";
->> +                     reg = <0x20>;
->> +                     powerdown-gpios = <&gpy2 5 0>;
->> +                     reset-gpios = <&gpx1 5 0>;
->> +                     edid-emulation = <5>;
->> +                     panel = <&panel>;
->> +             };
->>       };
->>
->>       i2s0: i2s at 03830000 {
->> @@ -389,11 +398,13 @@
->>               vdd_pll-supply = <&ldo8_reg>;
->>       };
->>
->> -     backlight {
->> +     backlight: backlight {
->>               compatible = "pwm-backlight";
->>               pwms = <&pwm 0 1000000 0>;
->>               brightness-levels = <0 100 500 1000 1500 2000 2500 2800>;
->>               default-brightness-level = <7>;
->> +             enable-gpios = <&gpx3 0 0>;
->> +             power-supply = <&fet1>;
->>               pinctrl-0 = <&pwm0_out>;
->>               pinctrl-names = "default";
->>       };
->> @@ -403,6 +414,12 @@
->>               samsung,invert-vclk;
->>       };
->>
->> +     panel: panel-simple {
+> Changes since V2:
+> As suggested by Andreas,
+> Use GPIO_ACTIVE_HIGH for backlight enable-gpios instead of using 0.
+> Change panel node naming from "panel-simple" to "panel".
 >
-> Just "panel"? (AF)
+>  arch/arm/boot/dts/exynos5800-peach-pi.dts |   27 ++++++++++-----------------
+>  1 file changed, 10 insertions(+), 17 deletions(-)
 >
->> +             compatible = "simple-panel";
+> diff --git a/arch/arm/boot/dts/exynos5800-peach-pi.dts b/arch/arm/boot/dts/exynos5800-peach-pi.dts
+> index f3ee48b..f8c2e61 100644
+> --- a/arch/arm/boot/dts/exynos5800-peach-pi.dts
+> +++ b/arch/arm/boot/dts/exynos5800-peach-pi.dts
+> @@ -28,11 +28,13 @@
+>                 i2c20 = "/spi at 12d40000/cros-ec at 0/i2c-tunnel";
+>         };
 >
-> Use something more concrete than "simple-panel"? (Thierry)
-Right.
->> +             power-supply = <&fet6>;
->> +             backlight = <&backlight>;
->> +     };
->> +
->>       dp-controller at 145B0000 {
->>               status = "okay";
->>               pinctrl-names = "default";
->> @@ -414,21 +431,6 @@
->>               samsung,link-rate = <0x0a>;
->>               samsung,lane-count = <2>;
->>               samsung,hpd-gpio = <&gpx0 7 0>;
->> -
->> -             display-timings {
->> -                     native-mode = <&timing1>;
->> -
->> -                     timing1: timing at 1 {
->> -                             clock-frequency = <70589280>;
->> -                             hactive = <1366>;
->> -                             vactive = <768>;
->> -                             hfront-porch = <40>;
->> -                             hback-porch = <40>;
->> -                             hsync-len = <32>;
->> -                             vback-porch = <10>;
->> -                             vfront-porch = <12>;
->> -                             vsync-len = <6>;
->> -                     };
->> -             };
->> +             bridge = <&ptn3460>;
->>       };
->>  };
+> -       backlight {
+> +       backlight: backlight {
+>                 compatible = "pwm-backlight";
+>                 pwms = <&pwm 0 1000000 0>;
+>                 brightness-levels = <0 100 500 1000 1500 2000 2500 2800>;
+>                 default-brightness-level = <7>;
+> +               enable-gpios = <&gpx2 2 GPIO_ACTIVE_HIGH>;
+> +               power-supply = <&tps65090_fet1>;
+>                 pinctrl-0 = <&pwm0_out>;
+>                 pinctrl-names = "default";
+>         };
+> @@ -98,6 +100,12 @@
+>                 regulator-boot-on;
+>                 regulator-always-on;
+>         };
+> +
+> +       panel: panel {
+> +               compatible = "auo,b133htn01";
+> +               power-supply = <&tps65090_fet6>;
+> +               backlight = <&backlight>;
+> +       };
+>  };
 >
-> This patch will trivially conflict with my Snow cleanup [1]; ptn3460
-> would go into the appropriate &i2c_* and this hunk into &dp then.
-Yes, display-timings node should be removed from the DP DT node.
-Should I rebase these DT patches on top of your cleanup series?
-
-Ajay
+>  &dp {
+> @@ -111,22 +119,7 @@
+>         samsung,link-rate = <0x0a>;
+>         samsung,lane-count = <2>;
+>         samsung,hpd-gpio = <&gpx2 6 0>;
+> -
+> -       display-timings {
+> -               native-mode = <&timing1>;
+> -
+> -               timing1: timing at 1 {
+> -                       clock-frequency = <150660000>;
+> -                       hactive = <1920>;
+> -                       vactive = <1080>;
+> -                       hfront-porch = <60>;
+> -                       hback-porch = <172>;
+> -                       hsync-len = <80>;
+> -                       vback-porch = <25>;
+> -                       vfront-porch = <10>;
+> -                       vsync-len = <10>;
+> -               };
+> -       };
+> +       panel = <&panel>;
+>  };
+>
+>  &fimd {
+> --
+> 1.7.9.5
+>
