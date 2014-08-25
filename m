@@ -1,108 +1,125 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Mon, 25 Aug 2014 16:36:20 +0200
-Subject: [GIT PULL] AT91 reset and ramc rework, Cleanups
-In-Reply-To: <20140717082227.GA31917@lukather>
-References: <20140717082227.GA31917@lukather>
-Message-ID: <53FB49E4.5030801@atmel.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Mon, 25 Aug 2014 16:41:28 +0200
+Subject: [RFC PATCH 0/9] dt: dependencies (for deterministic driver
+ initialization order based on the DT)
+In-Reply-To: <E1XLv1z-0002Jv-VN@jdl.com>
+References: <1399913280-6915-1-git-send-email-holler@ahsoftware.de>
+ <20140514141914.446F7C4153D@trevor.secretlab.ca>
+ <20140821140211.GD19293@ulmo.nvidia.com>
+ <53F64624.5000403@ahsoftware.de>
+ <20140822131919.GX21734@leverpostej> <20140825093931.GB2399@ulmo>
+ <E1XLu15-0002DP-6o@jdl.com> <20140825133714.GH4163@ulmo.nvidia.com>
+ <E1XLv1z-0002Jv-VN@jdl.com>
+Message-ID: <20140825144125.GB14763@ulmo.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17/07/2014 10:22, Maxime Ripard :
-> Hi Nicolas,
+On Mon, Aug 25, 2014 at 09:13:59AM -0500, Jon Loeliger wrote:
+> > 
+> > 
+> > > I believe some of the issues that need to be resolved are:
+> > >
+> > >     1) What constitutes a dependency?
+> > >     2) How is that dependency expressed?
+> > >     3) How do we add missing dependencies?
+> > >     4) Backward compatability problems.
+> > >
+> > > There are other questions, of course.  Is it a topsort
+> > > per bus?  Are there required "early devices"?  Should
+> > > the inter-node dependencies be expressed at each node,
+> > > or in a separate hierarchy within the DTS?  Others.
+> > 
+> > I think Grant already objected to the idea of explicitly adding
+> > dependency information into the device tree sources.
 > 
-> Here is the last pull request with the various cleanups possibles now
-> that we have the poweroff and reset drivers in place.
+> Clearly, the reason to object to the introdcution of such
+> an artificial dependency implies that it would be trying
+> to express something that doesn't actually describe an
+> existing hardware requirement.  That is, it wouldn't be
+> "describing hardware".  That's fine.
 > 
-> Thanks,
-> Maxime
-> 
-> The following changes since commit cb17ad293f38b5b409739c15cbba9e628c6c8786:
-> 
->   Merge branches 'at91/drivers-for-3.17' and 'at91/dt-for-3.17' into at91/cleanup-for-3.17 (2014-07-15 14:57:14 +0200)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/mripard/linux.git tags/at91-cleanup-for-3.17
-> 
-> for you to fetch changes up to d732c88dceda47599f80132d7e885232dd189bac:
-> 
->   ARM: at91: Remove rstc and shdwc headers (2014-07-15 14:58:39 +0200)
-> 
-> ----------------------------------------------------------------
-> AT91 poweroff and reset cleanup
-> 
-> Remove the reset and poweroff code from mach-at91, and convert the various
-> users of the former code to the newly introduced mechanisms
-> 
-> This branch also merges the two first branches in order to preserve
-> bisectability.
-> 
-> ----------------------------------------------------------------
-> Maxime Ripard (12):
->       ARM: at91: setup: Switch to pr_fmt
->       ARM: at91: Rework ramc mapping code
->       ARM: at91: Remove the old-style reset probing
->       ARM: at91/soc: Introduce register_devices callback
->       ARM: at91: Probe the reset driver
->       ARM: at91: Call at91_register_devices in the board files
->       ARM: at91: Remove reset code from the machine code
->       ARM: at91: Register the poweroff driver
->       ARM: at91: Remove poweroff code
->       ARM: at91/pm: Remove show_reset_status function
->       ARM: at91: Remove rstc and shdwnc global base addresses
->       ARM: at91: Remove rstc and shdwc headers
+> But the inverse should also be true.  That is, we should
+> ensure that where there *is* a hardware dependency that
+> is currently not expressed, we should introduce that
+> relationship.
 
-Maxime,
+Agreed. Any dependency currently not expressed probably indicates that
+the device tree isn't complete yet and is a result of us coming up with
+device trees as we go.
 
-Thanks for building this pull-request but I think that I will merge it
-in the "drivers" one: it is about the use of the new drivers anyway and
-it's pretty difficult for "cleanup" code to depend on DT and drivers
-changes as "cleanup" is meant to come first while merging arm-soc
-material upstream.
+Using phandles to describe dependencies makes a lot of sense. As I
+understand it the original intent was for OpenFirmware to use phandle to
+resolve a "service provider" and call functions that it provided. That's
+exactly what we need in Linux, too. Deferred probe is usually triggered
+when one device's driver needs to access services provided by a device
+that hasn't been registered yet. The way to find such a service provider
+is by looking up the phandle (really the struct device_node representing
+the referenced node) in a subsystem-specific registry.
 
-In addition, it seems that your patch ([PATCH v2 13/18] AT91: DT: Remove
-poweroff DT probing) was missing from this pull-request: so I
-re-integrated it in my at91-3.18-drivers branch.
+Therefore it should be possible to resolve all dependencies at boot time
+using nothing but the phandles.
 
-Can you please verify that what I did seem correct to you?
-
-Thanks bye.
-
-
->  .../devicetree/bindings/arm/atmel-at91.txt         |   7 --
->  arch/arm/mach-at91/Kconfig                         |   8 --
->  arch/arm/mach-at91/Makefile                        |   2 -
->  arch/arm/mach-at91/at91_rstc.h                     |  53 ----------
->  arch/arm/mach-at91/at91_shdwc.h                    |  50 ---------
->  arch/arm/mach-at91/at91sam9260.c                   |  45 +++++++-
->  arch/arm/mach-at91/at91sam9261.c                   |  45 +++++++-
->  arch/arm/mach-at91/at91sam9263.c                   |  45 +++++++-
->  arch/arm/mach-at91/at91sam9_alt_reset.S            |  40 --------
->  arch/arm/mach-at91/at91sam9g45.c                   |  49 ++++++++-
->  arch/arm/mach-at91/at91sam9g45_reset.S             |  45 --------
->  arch/arm/mach-at91/at91sam9rl.c                    |  45 +++++++-
->  arch/arm/mach-at91/board-afeb-9260v1.c             |   2 +
->  arch/arm/mach-at91/board-cam60.c                   |   2 +
->  arch/arm/mach-at91/board-cpu9krea.c                |   2 +
->  arch/arm/mach-at91/board-flexibity.c               |   2 +
->  arch/arm/mach-at91/board-sam9-l9260.c              |   2 +
->  arch/arm/mach-at91/board-sam9260ek.c               |   3 +-
->  arch/arm/mach-at91/board-sam9261ek.c               |   3 +-
->  arch/arm/mach-at91/board-sam9263ek.c               |   3 +-
->  arch/arm/mach-at91/board-sam9m10g45ek.c            |   3 +-
->  arch/arm/mach-at91/board-sam9rlek.c                |   3 +-
->  arch/arm/mach-at91/board-snapper9260.c             |   2 +
->  arch/arm/mach-at91/generic.h                       |  10 +-
->  arch/arm/mach-at91/pm.c                            |  72 -------------
->  arch/arm/mach-at91/setup.c                         | 113 +++++++--------------
->  arch/arm/mach-at91/soc.h                           |   1 +
->  27 files changed, 269 insertions(+), 388 deletions(-)
->  delete mode 100644 arch/arm/mach-at91/at91_rstc.h
->  delete mode 100644 arch/arm/mach-at91/at91_shdwc.h
->  delete mode 100644 arch/arm/mach-at91/at91sam9_alt_reset.S
->  delete mode 100644 arch/arm/mach-at91/at91sam9g45_reset.S
+> > For regulators (and regulator-like bindings) the problem is somewhat
+> > more difficult because they property names are not standardized. One way
+> > to solve this would be to look for property names with a -supply suffix,
+> > but that could obviously lead to false positives. One alternative that I
+> > think could eliminate this would be to explicitly list dependencies in
+> > drivers. This would allow core code to step through such a list and
+> > resolve the (phandle, specifier) tuples.
 > 
+> So, express the "additional SW dependencies" in the SW?
 
+Well, not really. They aren't additional dependencies. The problem is
+that if we want to use only phandle references to resolve dependencies
+(which is a requirement if we don't want to rely on DT to provide extra
+metadata), then we need to know what exactly is a phandle. Since the
+final DTB will only have a u32 where a phandle was once referenced, we
+need to provide the driver core with some way to recover that lost
+information. And the best place to do that really is the driver, because
+it implements the binding, hence knows exactly what property and cell in
+that property contains a phandle value.
 
--- 
-Nicolas Ferre
+So what we'd be expressing in software is hints as to where to find the
+list of dependencies.
+
+In addition to that, a lot of boiler-plate code could be eliminated in
+drivers by using that same metadata to automatically request the
+resources.
+
+> > Clocks are usually not a problem with deferred probing since they often
+> > are registered early anyway.
+> 
+> Ah, but how are they known to be needed early?  A toposort should sort
+> them into that position.  That's not currently done.  And I doubt the
+> set of nodes and expressed dependencies would cause them to be done
+> early enough by today's standards.
+
+They aren't really regular device drivers but rather registered using an
+explicit initcall. Clock providers are even initialized before initcalls
+are run. The reason is that they are often required for things like SMP
+or by other non-driver code that needs to run very early.
+
+> > Regulators on the other hand seem to be a fairly common trigger,
+> > though, so they seem like a good candidate to focus on.
+> 
+> Yeah.  And I've seen some debatable IRQ-PHY-PCIe interaction too.
+
+There are probably a couple of these that can be easily identified and
+would eliminate a large percentage of deferred probe triggers already.
+I found a link to Arnd's original proposal[0] for the devm_probe()
+infrastructure and I think that could serve as a useful basis for this.
+
+I would imagine that embedding a pointer to the devm_probe structure
+into a struct device_driver and extending it with a way to resolve the
+dependencies could work well.
+
+Thierry
+
+[0]: http://lists.infradead.org/pipermail/linux-arm-kernel/2013-November/209031.html
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140825/acd38f90/attachment.sig>
