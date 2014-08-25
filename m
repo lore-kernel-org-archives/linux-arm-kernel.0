@@ -1,28 +1,56 @@
-From: javier@dowhile0.org (Javier Martinez Canillas)
-Date: Mon, 25 Aug 2014 11:37:01 +0200
-Subject: [PATCH 1/2] i2c: cros-ec-tunnel: Add of match table
-In-Reply-To: <1408748582-29029-2-git-send-email-sjoerd.simons@collabora.co.uk>
-References: <1408748582-29029-1-git-send-email-sjoerd.simons@collabora.co.uk>
- <1408748582-29029-2-git-send-email-sjoerd.simons@collabora.co.uk>
-Message-ID: <CABxcv==yuxBmed5pZMwfQTXkwpbW1WkXw58tLsBF16BH60-jAQ@mail.gmail.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Mon, 25 Aug 2014 11:39:32 +0200
+Subject: [RFC PATCH 0/9] dt: dependencies (for deterministic driver
+ initialization order based on the DT)
+In-Reply-To: <20140822131919.GX21734@leverpostej>
+References: <1399913280-6915-1-git-send-email-holler@ahsoftware.de>
+ <20140514141914.446F7C4153D@trevor.secretlab.ca>
+ <20140821140211.GD19293@ulmo.nvidia.com>
+ <53F64624.5000403@ahsoftware.de>
+ <20140822131919.GX21734@leverpostej>
+Message-ID: <20140825093931.GB2399@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Sjoerd,
+On Fri, Aug 22, 2014 at 02:19:19PM +0100, Mark Rutland wrote:
+> On Thu, Aug 21, 2014 at 08:19:00PM +0100, Alexander Holler wrote:
+> > Am 21.08.2014 16:02, schrieb Thierry Reding:
+> > 
+> > > Anyway, those are all fairly standard reasons for where deferred probe
+> > > triggers, and since I do like deferred probe for it's simplicity and
+> > > reliability I'd rather not try to work around it if boot time is all
+> > > that people are concerned about.
+> > 
+> > It's neither simple nor reliable. It's non deterministic brutforcing 
+> > while making it almost impossible to identify real errors.
+> 
+> It's horrible, yes.
+> 
+> > In my humble opinion the worst way to solve something. I'm pretty sure 
+> > if I would have suggest such a solution, the maintainer crowd would have 
+> > eaten me without cooking.
+> 
+> We didn't have a better workable solution at the time.
 
-On Sat, Aug 23, 2014 at 1:03 AM, Sjoerd Simons
-<sjoerd.simons@collabora.co.uk> wrote:
-> To enable the cros-ec-tunnel driver to be auto-loaded when build as a
-> module add an of match table (and export it) to match the modalias
-> information passed on to userspace as the Cros EC MFD driver registers
-> the MFD subdevices with an of_compatibility string.
->
-> Signed-off-by: Sjoerd Simons <sjoerd.simons@collabora.co.uk>
-> ---
+You make it sound like we've come up with a better workable solution in
+the meantime.
 
-Looks good to me:
+> Having a hack that got boards booting was considered better than not
+> having them boot.
+> I don't remember people being particularly enthralled by the idea.
 
-Reviewed-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+Odd, I remember things quite differently.
 
-Best regards,
-Javier
+Anyway, instead of going back and forth between "deferred probe is good"
+and "deferred probe is bad", how about we do something useful now and
+concentrate on how to make use of the information we have in DT with the
+goal to reduce the number of cases where deferred probing is required?
+
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140825/3d2fc3ee/attachment.sig>
