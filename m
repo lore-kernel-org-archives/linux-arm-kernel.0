@@ -1,138 +1,92 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 25 Aug 2014 09:52:20 +0200
-Subject: [RFC 3/7] bcm47xx-sprom: add Broadcom sprom parser driver
-In-Reply-To: <1408915485-8078-5-git-send-email-hauke@hauke-m.de>
+Date: Mon, 25 Aug 2014 09:57:36 +0200
+Subject: [RFC 4/7] bcma: register bcma as device tree driver
+In-Reply-To: <1408915485-8078-6-git-send-email-hauke@hauke-m.de>
 References: <1408915485-8078-1-git-send-email-hauke@hauke-m.de>
- <1408915485-8078-5-git-send-email-hauke@hauke-m.de>
-Message-ID: <8344390.rjnOcYBCET@wuerfel>
+ <1408915485-8078-6-git-send-email-hauke@hauke-m.de>
+Message-ID: <2462012.kILSFadzpm@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sunday 24 August 2014 23:24:41 Hauke Mehrtens wrote:
-> This driver needs an nvram driver and fetches the sprom values from the
-> nvram and provides it to any other driver. The calibration data for the
-> wifi chip the mac address and some more board description data is
-> stores in the sprom.
+On Sunday 24 August 2014 23:24:42 Hauke Mehrtens wrote:
+> This driver is used by the bcm53xx ARM SoC code. Now it is possible to
+> give the address of the chipcommon core in device tree and bcma will
+> search for all the other cores.
 > 
-> This is based on a copy of arch/mips/bcm47xx/sprom.c and my plan is to
-> make the bcm47xx MIPS SoCs also use this driver some time later.
-
 > Signed-off-by: Hauke Mehrtens <hauke@hauke-m.de>
-> ---
->  .../devicetree/bindings/misc/bcm47xx-sprom.txt     |  16 +
 
-I'd prefer not to list the binding in a 'misc' category. Maybe we can
-have a new category and move the misc/sram.txt into the same?
+Looks good to me overall. Two small comments:
 
->  drivers/misc/Kconfig                               |  14 +
->  drivers/misc/Makefile                              |   1 +
->  drivers/misc/bcm47xx-sprom.c                       | 690 +++++++++++++++++++++
-
-On a similar note, putting the driver into drivers/misc seems
-suboptimal: misc drivers should by definition be something that
-is for some odd hardware with no external dependencies on it,
-whereas your driver seems to be used by multiple other drivers.
-
-Would it make sense to put it into drivers/bcma when that is the
-only bus it is used on?
-
->  4 files changed, 721 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/misc/bcm47xx-sprom.txt
->  create mode 100644 drivers/misc/bcm47xx-sprom.c
+>  Documentation/devicetree/bindings/bus/bcma.txt | 46 +++++++++++++++++
+>  drivers/bcma/host_soc.c                        | 70 ++++++++++++++++++++++++++
+>  include/linux/bcma/bcma.h                      |  2 +
+>  3 files changed, 118 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/bus/bcma.txt
 > 
-> diff --git a/Documentation/devicetree/bindings/misc/bcm47xx-sprom.txt b/Documentation/devicetree/bindings/misc/bcm47xx-sprom.txt
+> diff --git a/Documentation/devicetree/bindings/bus/bcma.txt b/Documentation/devicetree/bindings/bus/bcma.txt
 > new file mode 100644
-> index 0000000..eed2a4a
+> index 0000000..52fb929
 > --- /dev/null
-> +++ b/Documentation/devicetree/bindings/misc/bcm47xx-sprom.txt
-> @@ -0,0 +1,16 @@
-> +Broadcom bcm47xx/bcm53xx sprom converter
+> +++ b/Documentation/devicetree/bindings/bus/bcma.txt
+> @@ -0,0 +1,46 @@
+> +Broadcom AIX bcma bus driver
 > +
-> +This driver provbides an sprom based on a given nvram.
 > +
 > +Required properties:
 > +
-> +- compatible : brcm,bcm47xx-sprom
-
-Please use a specific SoC here as the compatible string, not something
-with 'x' in it as a wildcard.
-
-
-> +#define NVRAM_READ_VAL(type)						\
-> +static void nvram_read_ ## type (const struct bcm47xx_sprom_fill *fill,	\
-> +				 const char *postfix, const char *name, \
-> +				 type *val, type allset)		\
-> +{									\
-> +	char buf[100];							\
-> +	int err;							\
-> +	type var;							\
-> +									\
-> +	err = get_nvram_var(fill, postfix, name, buf, sizeof(buf));	\
-> +	if (err < 0)							\
-> +		return;							\
-> +	err = kstrto ## type(strim(buf), 0, &var);			\
-> +	if (err) {							\
-> +		pr_warn("can not parse nvram name %s%s%s with value %s got %i\n",	\
-> +			fill->prefix, name, postfix, buf, err);		\
-> +		return;							\
-> +	}								\
-> +	if (allset && var == allset)					\
-> +		return;							\
-> +	*val = var;							\
-> +}
+> +- compatible : brcm,bus-aix
 > +
-> +NVRAM_READ_VAL(u8)
-> +NVRAM_READ_VAL(s8)
-> +NVRAM_READ_VAL(u16)
-> +NVRAM_READ_VAL(u32)
+> +- reg : iomem address range of chipcommon core
 > +
-> +#undef NVRAM_READ_VAL
-
-Hmm, multiline macros are ugly. How about using one function to read
-into an s64 internally using kstrtoll, and simple inline wrappers around
-that for the smaller types, doing the appropriate range check?
-
-> +static void bcm47xx_sprom_fill_r1234589(struct ssb_sprom *sprom,
-> +					const struct bcm47xx_sprom_fill *fill)
-> +{
-> +	nvram_read_u16(fill, NULL, "devid", &sprom->dev_id, 0);
-> +	nvram_read_u8(fill, NULL, "ledbh0", &sprom->gpio0, 0xff);
-> +	nvram_read_u8(fill, NULL, "ledbh1", &sprom->gpio1, 0xff);
-> +	nvram_read_u8(fill, NULL, "ledbh2", &sprom->gpio2, 0xff);
-> +	nvram_read_u8(fill, NULL, "ledbh3", &sprom->gpio3, 0xff);
-> +	nvram_read_u8(fill, NULL, "aa2g", &sprom->ant_available_bg, 0);
-> +	nvram_read_u8(fill, NULL, "aa5g", &sprom->ant_available_a, 0);
-> +	nvram_read_s8(fill, NULL, "ag0", &sprom->antenna_gain.a0, 0);
-> +	nvram_read_s8(fill, NULL, "ag1", &sprom->antenna_gain.a1, 0);
-> +	nvram_read_alpha2(fill, "ccode", sprom->alpha2);
-> +}
-
-Rather than calling the same set of functions multiple times, can you
-do this using a table driven approach for smaller code size and
-improved readability?
-
-> +static int bcm47xx_sprom_probe(struct platform_device *pdev)
-> +{
-> +	struct device *dev = &pdev->dev;
-> +	struct device_node *np = dev->of_node;
-> +	struct ssb_sprom *sprom;
-> +	const __be32 *handle;
-> +	struct device_node *nvram_node;
-> +	struct platform_device *nvram_dev;
-> +	struct bcm47xx_sprom_fill fill;
+> +Optional properties:
 > +
-> +	/* Alloc */
-> +	sprom = devm_kzalloc(dev, sizeof(*sprom), GFP_KERNEL);
-> +	if (!sprom)
-> +		return -ENOMEM;
+> +- sprom: reference to a sprom driver. This is needed for sprom less devices.
+> +        Use bcm47xx_sprom for example.
 > +
-> +	handle = of_get_property(np, "nvram", NULL);
-> +	if (!handle)
-> +		return -ENOMEM;
 > +
-> +	nvram_node = of_find_node_by_phandle(be32_to_cpup(handle));
+> +The cores on the AIX bus are auto detected by bcma. Detection of the
+> +IRQ number is not supported on BCM47xx/BCM53xx ARM SoCs, so it is
+> +possible to provide the IRQ number over device tree. The IRQ number and
+> +the device tree child entry will be added to the core with the matching
+> +reg address.
 
-You can avoid the explicit be32_to_cpup here if you use
-of_property_read_u32 above.
+What is the problem with the interrupt numbers? Is that information
+missing completely from the data available to the brcm bus, or is it
+in an inconvenient format?
+
+> +Example:
+> +
+> +       aix at 18000000 {
+> +               compatible = "brcm,bus-aix";
+> +               reg = <0x18000000 0x1000>;
+> +               ranges = <0x00000000 0x18000000 0x00100000>;
+> +               #address-cells = <1>;
+> +               #size-cells = <1>;
+> +               sprom = <&sprom0>;
+> +
+> +               gmac at 0 {
+> +                       reg = <0x18024000 0x1000>;
+> +                       interrupts = <GIC_SPI 147 IRQ_TYPE_LEVEL_HIGH>;
+> +               };
+
+The @0 part seems wrong here: the address should generally match
+the first entry in the reg property, which would be gmac at 18024000.
+
+Also, you probably mean ethernet@ not gmac at .
+
+> +               gmac at 1 {
+> +                       reg = <0x18025000 0x1000>;
+> +                       interrupts = <GIC_SPI 148 IRQ_TYPE_LEVEL_HIGH>;
+> +               };
+> +
+> +               pcie at 0 {
+> +                       reg = <0x18012000 0x1000>;
+> +                       interrupts = <GIC_SPI 131 IRQ_TYPE_LEVEL_HIGH>;
+> +               };
+> +       };
+
+We may require additional properties for the pcie node, depending on whether
+we want to use the DT probing interfaces for it, or whether it should just
+hardcode the settings used on brcm based on the ID.
 
 	Arnd
