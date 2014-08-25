@@ -1,85 +1,74 @@
-From: minchan@kernel.org (Minchan Kim)
-Date: Mon, 25 Aug 2014 17:18:37 +0900
-Subject: [PATCH 0/2] ARM: Remove lowmem limit for default CMA region
-In-Reply-To: <53FAED20.60200@samsung.com>
-References: <1408610714-16204-1-git-send-email-m.szyprowski@samsung.com>
- <20140825012600.GN17372@bbox> <53FAED20.60200@samsung.com>
-Message-ID: <20140825081836.GF32620@bbox>
+From: yuvaraj.lkml@gmail.com (Yuvaraj Cd)
+Date: Mon, 25 Aug 2014 13:52:04 +0530
+Subject: [PATCH v9 1/2] regulator: Add driver for max77802 PMIC PMIC
+ regulators
+In-Reply-To: <CAD=FV=WC0h7fYm2QFqu3Zka7CsU4BtG-oyPpJav+ygC+gmCR+A@mail.gmail.com>
+References: <1408350762-15520-1-git-send-email-javier.martinez@collabora.co.uk>
+ <1408350762-15520-2-git-send-email-javier.martinez@collabora.co.uk>
+ <CA+NduCDL65=Y=PyU3FfXsTz0FfbmYzicGrY4U7ji3_V+nXhtCQ@mail.gmail.com>
+ <53F73472.8010609@collabora.co.uk>
+ <20140822144531.GV24407@sirena.org.uk>
+ <53F7838F.8060906@collabora.co.uk>
+ <20140822183054.GY24407@sirena.org.uk>
+ <53F7BDD8.7060500@collabora.co.uk>
+ <CAD=FV=WC0h7fYm2QFqu3Zka7CsU4BtG-oyPpJav+ygC+gmCR+A@mail.gmail.com>
+Message-ID: <CA+NduCCT-KQ=gh7QWkBE4qkA2YOJ8KCVqbkC6Tkmb1aPvCsGFQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 25, 2014 at 10:00:32AM +0200, Marek Szyprowski wrote:
-> Hello,
-> 
-> On 2014-08-25 03:26, Minchan Kim wrote:
-> >Hello,
-> >
-> >On Thu, Aug 21, 2014 at 10:45:12AM +0200, Marek Szyprowski wrote:
-> >>Hello,
-> >>
-> >>Russell King recently noticed that limiting default CMA region only to
-> >>low memory on ARM architecture causes serious memory management issues
-> >>with machines having a lot of memory (which is mainly available as high
-> >>memory). More information can be found the following thread:
-> >>http://thread.gmane.org/gmane.linux.ports.arm.kernel/348441/
-> >>
-> >>Those two patches removes this limit letting kernel to put default CMA
-> >>region into high memory when this is possible (there is enough high
-> >>memory available and architecture specific DMA limit fits).
-> >Agreed. It should be from the beginning because CMA page is effectly
-> >pinned if it is anonymous page and system has no swap.
-> 
-> Nope. Even without swap, anonymous page can be correctly migrated to other
-> location. Migration code doesn't depend on presence of swap.
-
-I could be possible only if the zone has freeable page(ie, free pages
-+ shrinkable page like page cache). IOW, if the zone is full with
-anon pages, it's efffectively pinned.
-
-> 
-> >>This should solve strange OOM issues on systems with lots of RAM
-> >>(i.e. >1GiB) and large (>256M) CMA area.
-> >I totally agree with the patchset although I didn't review code
-> >at all.
-> >
-> >Another topic:
-> >It means it should be a problem still if system has CMA in lowmem
-> >by some reason(ex, hardware limit or other purpose of CMA
-> >rather than DMA subsystem)?
-> >
-> >In that case, an idea that just popped in my head is to migrate
-> >pages from cma area to highest zone because they are all
-> >userspace pages which should be in there but not sure it's worth
-> >to implement at this point because how many such cripple platform
-> >are.
-> >
-> >Just for the recording.
-> 
-> Moving pages between low and high zone is not that easy. If I remember
-> correctly you cannot migrate a page from low memory to high zone in
-> generic case, although it should be possible to add exception for
-> anonymous pages. This will definitely improve poor low memory
-> handling in low zone when CMA is enabled.
-
-Yeb, it's possible for anonymous pages but I just wonder it's worth
-to add more complexitiy to mm and and you are answering it's worth.
-Okay. May I understand your positive feedback means such platform(
-ie, DMA works with only lowmem) are still common?
-
-Thanks.
-
-> 
-> Best regards
-> -- 
-> Marek Szyprowski, PhD
-> Samsung R&D Institute Poland
-> 
-> --
-> To unsubscribe, send a message with 'unsubscribe linux-mm' in
-> the body to majordomo at kvack.org.  For more info on Linux MM,
-> see: http://www.linux-mm.org/ .
-> Don't email: <a href=mailto:"dont@kvack.org"> email at kvack.org </a>
-
--- 
-Kind regards,
-Minchan Kim
+On Sat, Aug 23, 2014 at 3:45 AM, Doug Anderson <dianders@chromium.org> wrote:
+> Hi,
+>
+> On Fri, Aug 22, 2014 at 3:02 PM, Javier Martinez Canillas
+> <javier.martinez@collabora.co.uk> wrote:
+>> Hello Mark,
+>>
+>> On 08/22/2014 08:30 PM, Mark Brown wrote:
+>>>
+>>>> The problem is that one of these regulators is used as the vqmmc-supply
+>>>> (VCCQ/VDD_IO) so the mmc host controller driver disables it on
+>>>> MMC_POWER_OFF. Now AFAIK (Yuvaraj can correct me what I got wrong) this
+>>>> shouldn't be an issue since on card detection, the vqmmc supply should be
+>>>> enabled again but on Exynos the built-in card detect line is on the same
+>>>> power rail as vqmmc. That means that disabling the regulator prevents card
+>>>> insertions to be detected.
+>>>
+>>> If the MMC host controller needs a supply enabling in order to do card
+>>> detection and it's supposed to be doing card detection I'd expect it to
+>>> be enabling that supply.  Why is it not doing that?
+>>>
+>>
+>> Good question. I'm not that familiar with the dw_mmc host controller nor
+>> its driver implementation so I'll let Yuvaraj or Doug to answer that.
+Well,here it goes!
+1. Power ON the board LDO4CTRL1[7:6] 11b
+2. dw_mmc driver enable the vqmmc.
+3. checks for UHS support, complete the voltage switching t0 1.8V
+4. Does warm reset by reboot command.
+5. mmc core calls mmc_set_ios() with MMC_POWER_OFF.
+6. dw_mmc driver cut-off the regulator with LDO4CTRL1[7:6] is 00b
+7.dw_mmc driver enable the vqmmc.
+ But after step 7 also, LD4CTRL[7:6] is 00b.
+>
+> I haven't seen the issue that Yuvaraj is reporting (but I also haven't
+> picked up all of the relevant patches and tried to reproduce), so I'm
+> going to have to leave it to Yuvaraj to answer.
+    static int max77802_enable(struct regulator_dev *rdev)
+    {
+      struct max77802_regulator_prv *max77802 = rdev_get_drvdata(rdev);
+     int id = rdev_get_id(rdev);
+     int shift = max77802_get_opmode_shift(id);
+     return regmap_update_bits(rdev->regmap,
+rdev->desc->enable_reg,rdev->desc->enable_mask,max77802->opmode[id] <<
+shift);
+  }
+I think in the above code snippet, the "val" is what we got it during
+the probe.We always write that value for enabling this regulator(which
+is LDO4CTRL1[7:6] 00b after warm reset) which is not correct according
+the MAX77802 manual.
+>
+> As far as I know the dw_mmc driver ought to be enabling vqmmc when it
+> needs it.  Perhaps there's a bug in your patch series that adds vqmmc
+> support to dw_mmc?
+>
+> -Doug
