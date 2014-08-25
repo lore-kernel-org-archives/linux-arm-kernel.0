@@ -1,42 +1,41 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 25 Aug 2014 10:09:48 +0900
-Subject: [PATCH 3/3] ARM: shmobile: r8a7791: add missing 0x0100 for SDCKCR
-In-Reply-To: <cover.1408926048.git.horms+renesas@verge.net.au>
-References: <cover.1408926048.git.horms+renesas@verge.net.au>
-Message-ID: <58b80ad6472c0fa12926dfa1f9103d3a326bdf18.1408926048.git.horms+renesas@verge.net.au>
+Date: Mon, 25 Aug 2014 10:09:57 +0900
+Subject: [GIT PULL] Second Round Of Renesas ARM Based SoC Defconfig Updates
+ For v3.18
+Message-ID: <cover.1408926588.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+Hi Olof, Hi Kevin, Hi Arnd,
 
-4bfb358b1d6cdeff8c6a13677f01ed78e9696b98
-(ARM: shmobile: Add r8a7791 legacy SDHI clocks)
-added r8a7791 SDHI clock support.
+Please consider these second round of Renesas ARM based SoC defconfig updates for v3.18.
 
-But, it is missing
-"0x0100: x 1/8" division ratio.
-This patch fixes hidden bug.
-It is based on R-Car H2 v0.7, R-Car M2 v0.9.
+This pull request is based on the previous round of
+such requests, tagged as renesas-defconfig-for-v3.18,
+which I have already sent a pull-request for.
 
-Reported-by: Yusuke Goda <yusuke.goda.sx@renesas.com>
-Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/mach-shmobile/clock-r8a7791.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-shmobile/clock-r8a7791.c b/arch/arm/mach-shmobile/clock-r8a7791.c
-index e2fdfcc..53161c4 100644
---- a/arch/arm/mach-shmobile/clock-r8a7791.c
-+++ b/arch/arm/mach-shmobile/clock-r8a7791.c
-@@ -152,7 +152,7 @@ enum {
- 
- static struct clk div4_clks[DIV4_NR] = {
- 	[DIV4_SDH] = SH_CLK_DIV4(&pll1_clk, SDCKCR, 8, 0x0dff, CLK_ENABLE_ON_INIT),
--	[DIV4_SD0] = SH_CLK_DIV4(&pll1_clk, SDCKCR, 4, 0x1de0, CLK_ENABLE_ON_INIT),
-+	[DIV4_SD0] = SH_CLK_DIV4(&pll1_clk, SDCKCR, 4, 0x1df0, CLK_ENABLE_ON_INIT),
- };
- 
- /* DIV6 clocks */
--- 
-2.0.1
+The following changes since commit 874ee23c83d888f8824305c277e047c7799f30b9:
+
+  ARM: shmobile: defconfig: enable initrd (2014-08-18 08:07:38 +0900)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-defconfig2-for-v3.18
+
+for you to fetch changes up to 99923753e7c17a9c9d46bfe4d7fa543e426ec647:
+
+  ARM: shmobile: bockw: Do not disable SUSPEND in defconfig (2014-08-22 10:40:31 +0900)
+
+----------------------------------------------------------------
+Second Round Of Renesas ARM Based SoC Defconfig Updates For v3.18
+
+* Do not disable SUSPEND in Bockw defconfig
+  - Suspend to ram is now supported
+
+----------------------------------------------------------------
+Simon Horman (1):
+      ARM: shmobile: bockw: Do not disable SUSPEND in defconfig
+
+ arch/arm/configs/bockw_defconfig | 1 -
+ 1 file changed, 1 deletion(-)
