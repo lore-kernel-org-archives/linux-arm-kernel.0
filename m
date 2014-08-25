@@ -1,32 +1,36 @@
 From: mpa@pengutronix.de (Markus Pargmann)
-Date: Mon, 25 Aug 2014 08:23:44 +0200
-Subject: [PATCH v5 3/7] net: cpsw: header, Add missing include
+Date: Mon, 25 Aug 2014 08:23:42 +0200
+Subject: [PATCH v5 1/7] DT doc: net: cpsw mac-address is optional
 In-Reply-To: <1408947828-22316-1-git-send-email-mpa@pengutronix.de>
 References: <1408947828-22316-1-git-send-email-mpa@pengutronix.de>
-Message-ID: <1408947828-22316-4-git-send-email-mpa@pengutronix.de>
+Message-ID: <1408947828-22316-2-git-send-email-mpa@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-"MII_BUS_ID_SIZE" is defined in linux/phy.h which is not included in the
-cpsw.h file.
+mac-address is an optional property. If no mac-address is set, a random
+mac-address will be generated.
 
 Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
 Reviewed-by: Wolfram Sang <wsa@the-dreams.de>
 ---
- drivers/net/ethernet/ti/cpsw.h | 1 +
- 1 file changed, 1 insertion(+)
+ Documentation/devicetree/bindings/net/cpsw.txt | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/net/ethernet/ti/cpsw.h b/drivers/net/ethernet/ti/cpsw.h
-index 574f49da693f..1b710674630c 100644
---- a/drivers/net/ethernet/ti/cpsw.h
-+++ b/drivers/net/ethernet/ti/cpsw.h
-@@ -15,6 +15,7 @@
- #define __CPSW_H__
+diff --git a/Documentation/devicetree/bindings/net/cpsw.txt b/Documentation/devicetree/bindings/net/cpsw.txt
+index ae2b8b7f9c38..107caf174a0e 100644
+--- a/Documentation/devicetree/bindings/net/cpsw.txt
++++ b/Documentation/devicetree/bindings/net/cpsw.txt
+@@ -29,10 +29,10 @@ Slave Properties:
+ Required properties:
+ - phy_id		: Specifies slave phy id
+ - phy-mode		: See ethernet.txt file in the same directory
+-- mac-address		: See ethernet.txt file in the same directory
  
- #include <linux/if_ether.h>
-+#include <linux/phy.h>
+ Optional properties:
+ - dual_emac_res_vlan	: Specifies VID to be used to segregate the ports
++- mac-address		: See ethernet.txt file in the same directory
  
- struct cpsw_slave_data {
- 	char		phy_id[MII_BUS_ID_SIZE];
+ Note: "ti,hwmods" field is used to fetch the base address and irq
+ resources from TI, omap hwmod data base during device registration.
 -- 
 2.1.0.rc1
