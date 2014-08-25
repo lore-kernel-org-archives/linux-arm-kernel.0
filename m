@@ -1,46 +1,53 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 25 Aug 2014 18:10:34 +0200
-Subject: [PATCH] i2c: mv64xxx: continue probe when clock-frequency is
- missing
-In-Reply-To: <1408981819-3477-1-git-send-email-wens@csie.org>
-References: <1408981819-3477-1-git-send-email-wens@csie.org>
-Message-ID: <20140825161033.GF15297@lukather>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 25 Aug 2014 10:14:47 -0700
+Subject: [PATCH] ARM: OMAP2+: hwmod: Rearm wake-up interrupts for DT when
+ MUSB is idled
+Message-ID: <20140825171446.GL17254@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 25, 2014 at 11:50:19PM +0800, Chen-Yu Tsai wrote:
-> The "clock-frequency" DT property is listed as optional, However,
-> the current code stores the return value of of_property_read_u32 in
-> the return code of mv64xxx_of_config, but then forgets to clear it
-> after setting the default value of "clock-frequency". It is then
-> passed out to the main probe function, resulting in a probe failure
-> when "clock-frequency" is missing.
-> 
-> This patch checks and then throws away the result of
-> of_property_read_u32, instead of storing it and having to clear it
-> afterwards.
-> 
-> This issue was discovered after the property was removed from all
-> sunxi DTs.
-> 
-> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
-> Cc: stable at vger.kernel.org
+Looks like MUSB cable removal can cause wake-up interrupts to
+stop working for device tree based booting at least for UART3
+even as nothing is dynamically remuxed. This can be fixed by
+calling reconfigure_io_chain() for device tree based booting
+in hwmod code. Note that we already do that for legacy booting
+if the legacy mux is configured.
 
-Good catch!
+My guess is that this is related to UART3 and MUSB ULPI
+hsusb0_data0 and hsusb0_data1 support for Carkit mode that
+somehow affect the configured IO chain for UART3 and require
+rearming the wake-up interrupts.
 
-Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+In general, for device tree based booting, pinctrl-single
+calls the rearm hook that in turn calls reconfigure_io_chain
+so calling reconfigure_io_chain should not be needed from the
+hwmod code for other events.
 
-Thanks!
-Maxime
+So let's limit the hwmod rearming of iochain only to
+HWMOD_FORCE_MSTANDBY where MUSB is currently the only user
+of it. If we see other devices needing similar changes we can
+add more checks for it.
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140825/73a862e2/attachment.sig>
+Cc: Paul Walmsley <paul@pwsan.com>
+Signed-off-by: Tony Lindgren <tony@atomide.com>
+
+--- a/arch/arm/mach-omap2/omap_hwmod.c
++++ b/arch/arm/mach-omap2/omap_hwmod.c
+@@ -2185,6 +2185,8 @@ static int _enable(struct omap_hwmod *oh)
+ 			 oh->mux->pads_dynamic))) {
+ 		omap_hwmod_mux(oh->mux, _HWMOD_STATE_ENABLED);
+ 		_reconfigure_io_chain();
++	} else if (oh->flags & HWMOD_FORCE_MSTANDBY) {
++		_reconfigure_io_chain();
+ 	}
+ 
+ 	_add_initiator_dep(oh, mpu_oh);
+@@ -2291,6 +2293,8 @@ static int _idle(struct omap_hwmod *oh)
+ 	if (oh->mux && oh->mux->pads_dynamic) {
+ 		omap_hwmod_mux(oh->mux, _HWMOD_STATE_IDLE);
+ 		_reconfigure_io_chain();
++	} else if (oh->flags & HWMOD_FORCE_MSTANDBY) {
++		_reconfigure_io_chain();
+ 	}
+ 
+ 	oh->_state = _HWMOD_STATE_IDLE;
