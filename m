@@ -1,42 +1,71 @@
-From: computersforpeace@gmail.com (Brian Norris)
-Date: Mon, 25 Aug 2014 10:27:13 -0700
-Subject: [PATCH] ARM: bcm: Don't build brcmstb SMP code when building for
- V6
-In-Reply-To: <20140822144403.GU24407@sirena.org.uk>
-References: <1408673194-16228-1-git-send-email-broonie@kernel.org>
- <20140822050907.GC3246@norris-Latitude-E6410>
- <20140822144403.GU24407@sirena.org.uk>
-Message-ID: <20140825172713.GW18411@ld-irv-0074>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 25 Aug 2014 11:29:44 -0600
+Subject: [PATCH] ARM: tegra: Move AHB Kconfig to drivers/amba
+In-Reply-To: <53D7C9EE.60503@wwwdotorg.org>
+References: <1406643934-16301-1-git-send-email-thierry.reding@gmail.com>
+ <53D7C9EE.60503@wwwdotorg.org>
+Message-ID: <53FB7288.9050002@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 22, 2014 at 09:44:03AM -0500, Mark Brown wrote:
-> On Thu, Aug 21, 2014 at 10:09:07PM -0700, Brian Norris wrote:
-> > On Thu, Aug 21, 2014 at 09:06:34PM -0500, Mark Brown wrote:
-> > > From: Mark Brown <broonie@linaro.org>
-> 
-> > > building for -march=armv6 as happens when building allmodconfig. Since I
-> > > have not been able to identify a way to override the compiler architecture
-> > > selection per file add a Kconfig dependency to ensure this code is not
-> > > built if V6 support is enabled.
-> 
-> > I already proposed this solution to override the compiler architecture,
-> > in the same pattern as other similar code in the same directory.
-> 
-> >   http://article.gmane.org/gmane.linux.drivers.devicetree/84517
-> 
-> > My using 'CFLAGS_<obj> += <flags>', you can compile in v7.
-> 
-> I tried that but it wasn't doing the right thing for me - it appeared
-> since the compiler ends up getting both -march=armv7-a and -march=armv6
-> it complained that it couldn't satisfy both options.  It might be that
-> this is version dependant or the actual cause wsa something else, I
-> didn't investigate too hard.
+On 07/29/2014 10:21 AM, Stephen Warren wrote:
+> On 07/29/2014 08:25 AM, Thierry Reding wrote:
+>> From: Thierry Reding <treding@nvidia.com>
+>>
+>> This will allow the Kconfig option to be shared among 32-bit and 64-bit
+>> ARM.
+>
+> This seems fine to me. I'd expect to apply it for 3.18, provided I get
+> an ack from Russell as drivers/amba maintainer (hence CCing him without
+> trimming the quote).
 
-If you ever see revisit this or see this again, I'd be interested in
-seeing the gcc args (make V=1) and version that failed. My fix worked
-for me, and I'll likely use it for the next revision if I don't find a
-good reason not to.
+Russell,
 
-Thanks,
-Brian
+Are you OK with this patch? If so, if you could ack it so I can apply 
+it, that would be great.
+
+Thanks.
+
+>> Signed-off-by: Thierry Reding <treding@nvidia.com>
+>> ---
+>>   arch/arm/mach-tegra/Kconfig |  8 --------
+>>   drivers/amba/Kconfig        | 11 +++++++++++
+>>   2 files changed, 11 insertions(+), 8 deletions(-)
+>>   create mode 100644 drivers/amba/Kconfig
+>>
+>> diff --git a/arch/arm/mach-tegra/Kconfig b/arch/arm/mach-tegra/Kconfig
+>> index 052fba07a3cb..fae2eb2f52ea 100644
+>> --- a/arch/arm/mach-tegra/Kconfig
+>> +++ b/arch/arm/mach-tegra/Kconfig
+>> @@ -64,12 +64,4 @@ config ARCH_TEGRA_124_SOC
+>>         Support for NVIDIA Tegra T124 processor family, based on the
+>>         ARM CortexA15MP CPU
+>>
+>> -config TEGRA_AHB
+>> -    bool "Enable AHB driver for NVIDIA Tegra SoCs"
+>> -    default y
+>> -    help
+>> -      Adds AHB configuration functionality for NVIDIA Tegra SoCs,
+>> -      which controls AHB bus master arbitration and some
+>> -      performance parameters(priority, prefech size).
+>> -
+>>   endif
+>> diff --git a/drivers/amba/Kconfig b/drivers/amba/Kconfig
+>> new file mode 100644
+>> index 000000000000..3f7350a03708
+>> --- /dev/null
+>> +++ b/drivers/amba/Kconfig
+>> @@ -0,0 +1,11 @@
+>> +if ARM_AMBA
+>> +
+>> +config TEGRA_AHB
+>> +    bool "Enable AHB driver for NVIDIA Tegra SoCs"
+>> +    default y if ARCH_TEGRA
+>> +    help
+>> +      Adds AHB configuration functionality for NVIDIA Tegra SoCs,
+>> +      which controls AHB bus master arbitration and some performance
+>> +      parameters (priority, prefetch size).
+>> +
+>> +endif
+>>
+>
