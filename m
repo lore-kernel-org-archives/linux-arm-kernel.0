@@ -1,31 +1,112 @@
-From: eric@eukrea.com (Eric =?ISO-8859-1?B?QuluYXJk?=)
-Date: Mon, 25 Aug 2014 08:53:20 +0200
-Subject: [PATCH 1/6] ARM: dts: microsom-ar8035: MDIO pad must be set
- open drain
-In-Reply-To: <20140824095854.GR30401@n2100.arm.linux.org.uk>
-References: <20140823091058.GO30401@n2100.arm.linux.org.uk>
- <E1XL7M1-0002yD-K3@rmk-PC.arm.linux.org.uk>
- <53F9B416.5030907@gmail.com>
- <20140824095854.GR30401@n2100.arm.linux.org.uk>
-Message-ID: <20140825085320.7b2c0eca@e6520eb>
+From: l.majewski@samsung.com (Lukasz Majewski)
+Date: Mon, 25 Aug 2014 08:53:52 +0200
+Subject: [PATCH v9 4/6] ARM: Exynos: switch to using generic cpufreq driver
+ for Exynos4210/5250/5420
+In-Reply-To: <53F7DA13.6090305@gmail.com>
+References: <1406707663-16656-1-git-send-email-thomas.ab@samsung.com>
+ <1406707663-16656-5-git-send-email-thomas.ab@samsung.com>
+ <53DA8BB9.6020702@samsung.com> <53DA8D85.3050106@gmail.com>
+ <7hbnrc6px3.fsf@paris.lan> <53F7DA13.6090305@gmail.com>
+Message-ID: <20140825085352.14290508@amdc2363>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+Hi Tomasz,
 
-Le Sun, 24 Aug 2014 10:58:55 +0100,
-Russell King - ARM Linux <linux@arm.linux.org.uk> a ?crit :
-> For me, the problem device right now is that placing the Vivante 2D
-> GPU under stress (using gtkperf) causes the pixel engines to lock up.
-> The Solo is extremely unstable, locking up in less than a second on
-> the first or second test, whereas the Quad is much better, normally
-> taking two runs before locking up in the circle drawing.  The Solo
-> also locks up the 2D pixel engines if it needs ot resize the display
-> (due to HDMI being connected.)
+> Hi Kevin,
 > 
-Maybe the lock you get is related to what this patch is supposed to
-fix in Freescale's kernel ?
-http://git.freescale.com/git/cgit.cgi/imx/linux-2.6-imx.git/commit/?h=imx_3.10.17_1.0.1_ga&id=ba5139e1daa3f5834b061a099bcec8e85575a2c0
+> Thanks for taking a look at this.
+> 
+> On 23.08.2014 01:54, Kevin Hilman wrote:
+> > Tomasz Figa <tomasz.figa@gmail.com> writes:
+> > 
+> >> Kukjin,
+> >>
+> >> On 31.07.2014 20:32, Kukjin Kim wrote:
+> >>> On 07/30/14 17:07, Thomas Abraham wrote:
+> >>>> The new CPU clock type allows the use of generic CPUfreq
+> >>>> drivers. So for Exynos4210/5250, switch to using generic cpufreq
+> >>>> driver. For Exynos5420, which did not have CPUfreq driver
+> >>>> support, enable the use of generic CPUfreq driver.
+> >>>>
+> >>>> Suggested-by: Tomasz Figa<t.figa@samsung.com>
+> >>>> Cc: Kukjin Kim<kgene.kim@samsung.com>
+> >>>
+> >>> Looks good to me,
+> >>>
+> >>> Acked-by: Kukjin Kim <kgene.kim@samsung.com>
+> >>>
+> >>> BTW, who will handle this series? I hope see this series in 3.17.
+> >>
+> >> This series consists mostly of clock changes and it likely depends
+> >> on patches already in my for-next, so I would be inclined toward
+> >> taking it through samsung-clk tree. 
+> > 
+> > So has this series been picked up anywhere?  I don't see it in your
+> > samsung-clk tree, nor in Kukjin's for-next.
+> 
+> No, it has not. In general it was already too late in the release
+> cycle when the last version was posted.
+> 
+> I had a plan to take it through clock tree with Kukjin's and Viresh's
+> cooperation, but now as you say it...
+> 
+> > 
+> > Also, I'm curious whether or how this is has been tested on
+> > big.LITTLE SoCs.  
+> > 
+> > I'm trying it on the 5800/Chromebook2 and it's not terribly
+> > stable.  I'm testing along with CPUidle, so there may be some
+> > untested interactions there as it seems a bit more stable without
+> > CPUidle enabled.
+> > 
+> > I'd love to hear from anyone else that's testing CPUidle and CPUfreq
+> > together big.LITTLE 5420/5800, with or without the switcher.
+> 
+> I'd definitely like to see a clarification on this issues, before this
+> series hits mainline or at least its parts related to affected SoCs.
 
+It is a huge step forward - to be honest it is a serious rework of
+cpufreq subsystem for Exynos SoCs.
+
+> Also I'd like to hear some confirmation from Samsung Poland R&D Center
+> guys (on CC), whether this code works stable on their target boards
+> (Universal C210, Trats, Trats2).
+> 
+
+Since we have missed the merge window with this code, I can declare
+that I will provide code, which means that I will do the cleanup for
+excluded from this series Exynos4 SoCs, to test the cpufreq-cpu0.
+
+However, I'm concerned with Exynos4412, which supports BOOST. It might
+not be trivial to provide support for it.
+
+I think, that we shall not drop behind any functionality during clean
+up.
+
+> > 
+> > Also, the patch below[2] is needed for 5800.
+> > 
+> > FWIW, I have a temporary branch[1] based on the v3.17-rc branch of
+> > the exynos-reference tree where I've added the DT patch needed for
+> > CPUidle, this series (and it's dependencies) which is what I'm
+> > using for testing.
+> 
+> The patch looks fine to me (well, it's trivial :)), thanks.
+> 
+> Best regards,
+> Tomasz
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+
+
+-- 
 Best regards,
-Eric
+
+Lukasz Majewski
+
+Samsung R&D Institute Poland (SRPOL) | Linux Platform Group
