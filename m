@@ -1,60 +1,104 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Mon, 25 Aug 2014 19:21:52 +0800
-Subject: [PATCH V3 3/3] ARM: clk-imx6q: Add missing lvds and anaclk clock
- to the clock tree
-In-Reply-To: <20140825073957.GA7740@audiosh1>
-References: <cover.1407481023.git.shengjiu.wang@freescale.com>
- <9ecf6480464cffb3b4347ad3fd8ec5f07462a0fc.1407481023.git.shengjiu.wang@freescale.com>
- <20140809135841.GB8849@dragon> <20140811030935.GB13158@audiosh1>
- <20140818060521.GA2114@dragon> <20140825073957.GA7740@audiosh1>
-Message-ID: <20140825112151.GD6928@dragon>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Mon, 25 Aug 2014 13:26:33 +0200
+Subject: [PATCH v4 0/8] asm-generic/io.h overhaul
+In-Reply-To: <1407925738-26170-1-git-send-email-thierry.reding@gmail.com>
+References: <1407925738-26170-1-git-send-email-thierry.reding@gmail.com>
+Message-ID: <20140825112630.GA4163@ulmo.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 25, 2014 at 03:40:20PM +0800, Shengjiu Wang wrote:
-> On Mon, Aug 18, 2014 at 02:06:07PM +0800, Shawn Guo wrote:
-> > On Mon, Aug 11, 2014 at 11:09:36AM +0800, Shengjiu Wang wrote:
-> > > On Sat, Aug 09, 2014 at 09:58:42PM +0800, Shawn Guo wrote:
-> > > > On Fri, Aug 08, 2014 at 03:02:49PM +0800, Shengjiu Wang wrote:
-> > > > > @@ -176,8 +182,12 @@ static void __init imx6q_clocks_init(struct device_node *ccm_node)
-> > > > >  	 * the "output_enable" bit as a gate, even though it's really just
-> > > > >  	 * enabling clock output.
-> > > > >  	 */
-> > > > > -	clk[IMX6QDL_CLK_LVDS1_GATE] = imx_clk_gate("lvds1_gate", "lvds1_sel", base + 0x160, 10);
-> > > > > -	clk[IMX6QDL_CLK_LVDS2_GATE] = imx_clk_gate("lvds2_gate", "lvds2_sel", base + 0x160, 11);
-> > > > > +	clk[IMX6QDL_CLK_LVDS1_GATE] = imx_clk_gate2("lvds1_gate", "lvds1_sel", base + 0x160, 10);
-> > > > > +	clk[IMX6QDL_CLK_LVDS2_GATE] = imx_clk_gate2("lvds2_gate", "lvds2_sel", base + 0x160, 11);
-> > > > 
-> > > > I do not think you can simply change to use imx_clk_gate2() here.  It's
-> > > > designed for those CCGR gate clocks, each of which is controlled by two
-> > > > bits.
-> > > > 
-> > > > Shawn
-> > > >
-> > > As Lucas Stach's suggestion, we need to do add some method for mutually exclusive clock, 
-> > > lvds1_gate with lvds1_in, lvds2_gate with lvds2_in. I add imx_clk_gate2_exclusive() function in clk-gate2.c.
-> > > So I change imx_clk_gate() to imx_clk_gate2() here.
-> > > As you said, this is not good solution.
-> > 
-> > It's not just a "not good" solution but wrong and broken one.  The net
-> > result of that is if you call clk_enable() on lvds1_gate, both bit 10
-> > and 11 will be set.
-> > 
-> > > So I need your suggestion, how can I do?
-> > 
-> > I guess we will need a new clock type to handle such mutually exclusive
-> > clocks, rather than patching clk-gate2.
-> > 
-> Could you please help to implement this feature?
-
-Okay, I will give it a try soon.
-
+On Wed, Aug 13, 2014 at 12:28:50PM +0200, Thierry Reding wrote:
+> From: Thierry Reding <treding@nvidia.com>
 > 
-> Furthermore, I'd like to drop patch 2 and patch 3, wait the implementation from
-> you.
+> Hi,
 > 
-> Could you please review the patch 1?  do you have any comments?
+> Here is the fourth version of a series that started out as an attempt to
+> provide string versions of the read*() and write*() accessors to more
+> architectures so that drivers can use them portably. The series has
+> since evolved into a more general cleanup of asm-generic/io.h and the
+> functions defined therein.
+> 
+> Patch 1 is trivial and removes a redundant redefinition of PCI_IOBASE
+> from the asm/io.h header on ARC. Patches 2 and 3 remove unnecessary
+> volatile keywoards from some functions, which is a prerequisite to clean
+> up some of the functions in subsequent patches.
+> 
+> The xlate_dev_{kmem,mem}_ptr() functions are used to map memory when the
+> /dev/mem device is accessed. Patches 4 and 5 use more consistent data
+> types for these functions, which will get a "standard" prototype in the
+> asm-generic/io.h header in a subsequent patch.
+> 
+> Patch 6 is the bulk of this series. It implements the string variants of
+> the read*() and write*() accessors and cleans up various other parts of
+> the asm-generic/io.h header file. Macros are converted to static inline
+> functions for better type checking. Overriding generic implementations
+> in architectures is handled more consistently.
+> 
+> Patches 7 and 8, finally, make use of the asm-generic/io.h header on the
+> 32-bit and 64-bit ARM architectures.
+> 
+> This is compile- and runtime-tested on 32-bit and 64-bit ARM and compile
+> tested on IA64, Microblaze, s390, SPARC, x86 and Xtensa. For ARC,
+> Blackfin, Metag, OpenRISC, Score and Unicore32 which also use
+> asm-generic/io.h I couldn't find or build a cross-compiler that would
+> run on my system. But by code inspection they shouldn't break with this
+> patch.
+> 
+> To ensure bisectability I built multi_v7_defconfig on 32-bit ARM and the
+> defconfig for 64-bit ARM, IA64, Microblaze, s390, SPARC, x86 and Xtensa
+> after each commit and verified that the series does not introduce any
+> build errors or warnings.
+> 
+> Provided there are no objections to the patches there's still the matter
+> of how to merge them. Patch 6 depends on patches 1-5 to avoid warnings
+> and/or errors during the build. Patches 7 and 8 depend on patch 6. In my
+> opinion it doesn't make much sense to split them up, so I guess we'll
+> need a volunteer to take them all into one tree. Ideally that tree would
+> feed into linux-next so that we can get as much build and test-coverage
+> as possible during the 3.17 release cycle so that these patches can go
+> into 3.18.
+> 
+> Arnd, I'm opportunistically sending this To: you in the hopes that you
+> can take it into your asm-generic tree which seems like the best fit for
+> this.
+> 
+> Thierry
+> 
+> Thierry Reding (8):
+>   ARC: Remove redundant PCI_IOBASE declaration
+>   serial: sunzilog: Remove unnecessary volatile keyword
+>   sparc: Remove unnecessary volatile usage
+>   [IA64] Change xlate_dev_{kmem,mem}_ptr() prototypes
+>   /dev/mem: Use more consistent data types
+>   asm-generic/io.h: Implement generic {read,write}s*()
+>   ARM: Use include/asm-generic/io.h
+>   arm64: Use include/asm-generic/io.h
+> 
+>  arch/arc/include/asm/io.h       |   2 -
+>  arch/arm/include/asm/io.h       |  75 ++---
+>  arch/arm/include/asm/memory.h   |   2 +
+>  arch/arm64/Kconfig              |   1 -
+>  arch/arm64/include/asm/io.h     | 122 ++-----
+>  arch/arm64/include/asm/memory.h |   2 +
+>  arch/ia64/include/asm/uaccess.h |  16 +-
+>  arch/s390/include/asm/io.h      |   5 +-
+>  arch/s390/mm/maccess.c          |   4 +-
+>  arch/sparc/include/asm/io_32.h  |  18 +-
+>  arch/x86/include/asm/io.h       |   4 +-
+>  arch/x86/mm/ioremap.c           |   4 +-
+>  drivers/char/mem.c              |  13 +-
+>  drivers/tty/serial/sunzilog.h   |   8 +-
+>  include/asm-generic/io.h        | 683 ++++++++++++++++++++++++++++++++--------
+>  15 files changed, 647 insertions(+), 312 deletions(-)
 
-Just applied #1.
+Arnd, do you think this looks good to take for test-driving in
+linux-next?
 
-Shawn
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140825/2b11edb2/attachment.sig>
