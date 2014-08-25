@@ -1,39 +1,46 @@
-From: afaerber@suse.de (=?ISO-8859-1?Q?Andreas_F=E4rber?=)
-Date: Mon, 25 Aug 2014 17:25:18 +0200
-Subject: [linux-sunxi] Re: [PATCH 4/4] simplefb: add clock handling code
-In-Reply-To: <53FB3E7F.4000503@redhat.com>
-References: <1407914239-12054-1-git-send-email-libv@skynet.be>
- <1407914239-12054-5-git-send-email-libv@skynet.be>
- <53EB9471.3090204@wwwdotorg.org> <20140813170106.GT15297@lukather>
- <20140825121228.GB4163@ulmo.nvidia.com> <20140825124410.GZ15297@lukather>
- <20140825133953.GJ4163@ulmo.nvidia.com> <53FB3E7F.4000503@redhat.com>
-Message-ID: <53FB555E.5040409@suse.de>
+From: dmurphy@ti.com (Dan Murphy)
+Date: Mon, 25 Aug 2014 10:26:51 -0500
+Subject: [PATCH v2 1/2] doc: dt/bindings: input: introduce TI DRV2667 haptic
+ driver description
+Message-ID: <1408980413-8763-1-git-send-email-dmurphy@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+DRV2667 is a haptic/vibrator driver for Linear Resonant Actuators.
+Adding dt binding for this part
 
-Am 25.08.2014 15:47, schrieb Hans de Goede:
-> On 08/25/2014 03:39 PM, Thierry Reding wrote:
->> On Mon, Aug 25, 2014 at 02:44:10PM +0200, Maxime Ripard wrote:
->>> On Mon, Aug 25, 2014 at 02:12:30PM +0200, Thierry Reding wrote:
->>>> On Wed, Aug 13, 2014 at 07:01:06PM +0200, Maxime Ripard wrote:
->>>>> On Wed, Aug 13, 2014 at 10:38:09AM -0600, Stephen Warren wrote:
->>>>>> If not, perhaps the clock driver should force the clock to be
->>>>>> enabled (perhaps only if the DRM/KMS driver isn't enabled?).
-[...]
-> As for the suggestion to simply never disable the plls / ahb gates by blocking
-> them from ever being disabled in the sunxi clock driver, that is not really
-> a solution either, as we want to be able to turn these things off to safe
-> power on screen blank once control has been turned over to the kms driver.
+Signed-off-by: Dan Murphy <dmurphy@ti.com>
+---
 
-Without wanting to take sides on the simplefb matter, can't you just use
-clk_ignore_unused in bootargs to work around the issue at hand?
-That's what I do on the Spring Chromebook.
+v2 - Removed extra tabs, changed node to function not device
+added vbat-supply, and removed confusing description - https://patchwork.kernel.org/patch/4759381/
 
-Cheers,
-Andreas
+ .../devicetree/bindings/input/ti,drv2667.txt       |   17 +++++++++++++++++
+ 1 file changed, 17 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/input/ti,drv2667.txt
 
+diff --git a/Documentation/devicetree/bindings/input/ti,drv2667.txt b/Documentation/devicetree/bindings/input/ti,drv2667.txt
+new file mode 100644
+index 0000000..996382c
+--- /dev/null
++++ b/Documentation/devicetree/bindings/input/ti,drv2667.txt
+@@ -0,0 +1,17 @@
++* Texas Instruments - drv2667 Haptics driver
++
++Required properties:
++	- compatible - "ti,drv2667" - DRV2667
++	- reg -  I2C slave address
++	- vbat-supply - Required supply regulator
++
++Example:
++
++haptics: haptics at 59 {
++	compatible = "ti,drv2667";
++	reg = <0x59>;
++	vbat-supply = <&vbat>;
++};
++
++For more product information please see the link below:
++http://www.ti.com/product/drv2667
 -- 
-SUSE LINUX Products GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
-GF: Jeff Hawn, Jennifer Guild, Felix Imend?rffer; HRB 16746 AG N?rnberg
+1.7.9.5
