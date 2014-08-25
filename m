@@ -1,46 +1,63 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Mon, 25 Aug 2014 11:36:07 -0500
-Subject: [PATCH 00/10] ARM: OMAP5 / DRA7: Add framework for suspend and
- cpuidle
-In-Reply-To: <1408716154-26101-1-git-send-email-nm@ti.com>
-References: <1408716154-26101-1-git-send-email-nm@ti.com>
-Message-ID: <53FB65F7.6010704@ti.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Mon, 25 Aug 2014 18:41:24 +0200
+Subject: [PATCH] i2c: mv64xxx: continue probe when clock-frequency is
+ missing
+In-Reply-To: <1408981819-3477-1-git-send-email-wens@csie.org>
+References: <1408981819-3477-1-git-send-email-wens@csie.org>
+Message-ID: <20140825164124.GA22771@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/22/2014 09:02 AM, Nishanth Menon wrote:
-[...]
-> An complete integrated branch is available here: https://github.com/nmenon/linux-2.6-playground/commits/testing/v3.17/cpu-idle-suspend-dra7-omap5-framework
+On Mon, Aug 25, 2014 at 11:50:19PM +0800, Chen-Yu Tsai wrote:
+> The "clock-frequency" DT property is listed as optional, However,
+> the current code stores the return value of of_property_read_u32 in
+> the return code of mv64xxx_of_config, but then forgets to clear it
+> after setting the default value of "clock-frequency". It is then
+> passed out to the main probe function, resulting in a probe failure
+> when "clock-frequency" is missing.
 > 
-> Example test log:
-> DRA7 based BeagleBoard X15: http://slexy.org/view/s2jgsH8bos (wakeup from external using pinctrl wakeup).
-> OMAP5UEVM: http://slexy.org/view/s20MiQJQIq (external pinctrl not hooked)
+> This patch checks and then throws away the result of
+> of_property_read_u32, instead of storing it and having to clear it
+> afterwards.
+> 
+> This issue was discovered after the property was removed from all
+> sunxi DTs.
+> 
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+> Cc: stable at vger.kernel.org
 
-Tony wanted a slightly wider test coverage including OMAP4 platforms:
-So using
-https://github.com/nmenon/linux-2.6-playground/commit/92e5e7407aa707ad6be8ae3b5bf21cfc741daab6
-wakeup timer as a wakeup source (remote boards):
+It would be good to add
 
-am37x-evm: http://slexy.org/raw/s2l2vPAlBi
-BeagleBoard-XM: http://slexy.org/raw/s2HvJHuZ8K
-beagleboard-vanilla: http://slexy.org/raw/s2re4CjsVS
-n900: http://slexy.org/raw/s21kRad9UC
-sdp3430: http://slexy.org/raw/s217hjHveS
-pandaboard-es: http://slexy.org/raw/s21Vhfl96g
-pandaboard-vanilla: http://slexy.org/raw/s21uPHllrR
-sdp4430: http://slexy.org/raw/s20Jl3cika
+Fixes: 4c730a06c19bb ("i2c: mv64xxx: Set bus frequency to 100kHz if clock-frequency is not provided")
 
-Vs:
-3.17-rc1:
-am37x-evm: http://slexy.org/raw/s21FKtfXlb
-BeagleBoard-XM: http://slexy.org/raw/s2q3LCSDkd
-beagleboard-vanilla: http://slexy.org/raw/s21ioe8utf
-n900: http://slexy.org/raw/s20E3oQhCl
-sdp3430: http://slexy.org/raw/s21XQDe1s3
-pandaboard-es: http://slexy.org/raw/s21DcS0IIt
-pandaboard-vanilla: http://slexy.org/raw/s25W1A4JsP
-sdp4430: http://slexy.org/raw/s2019HPstN
+Acked-by: Andrew Lunn <andrew@lunn.ch>
 
--- 
-Regards,
-Nishanth Menon
+	  Andrew
+
+
+> ---
+>  drivers/i2c/busses/i2c-mv64xxx.c | 3 +--
+>  1 file changed, 1 insertion(+), 2 deletions(-)
+> 
+> diff --git a/drivers/i2c/busses/i2c-mv64xxx.c b/drivers/i2c/busses/i2c-mv64xxx.c
+> index 6dc5ded..2f64273 100644
+> --- a/drivers/i2c/busses/i2c-mv64xxx.c
+> +++ b/drivers/i2c/busses/i2c-mv64xxx.c
+> @@ -746,8 +746,7 @@ mv64xxx_of_config(struct mv64xxx_i2c_data *drv_data,
+>  	}
+>  	tclk = clk_get_rate(drv_data->clk);
+>  
+> -	rc = of_property_read_u32(np, "clock-frequency", &bus_freq);
+> -	if (rc)
+> +	if (of_property_read_u32(np, "clock-frequency", &bus_freq))
+>  		bus_freq = 100000; /* 100kHz by default */
+>  
+>  	if (!mv64xxx_find_baud_factors(bus_freq, tclk,
+> -- 
+> 2.1.0
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
