@@ -1,42 +1,181 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Mon, 25 Aug 2014 12:15:23 +0200
-Subject: [PATCH] PWM: atmel: fix incorrect CDTY value after enabling or
- disabling
-In-Reply-To: <1394823931-2815-1-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1394823931-2815-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <20140825101522.GA16960@ulmo.nvidia.com>
+From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
+Date: Mon, 25 Aug 2014 12:15:56 +0200
+Subject: [PATCHv4 2/4] thermal: exynos: Add support for many TRIMINFO_CTRL
+ registers
+In-Reply-To: <1408951825-2639-3-git-send-email-cw00.choi@samsung.com>
+References: <1408951825-2639-1-git-send-email-cw00.choi@samsung.com>
+ <1408951825-2639-3-git-send-email-cw00.choi@samsung.com>
+Message-ID: <5071235.4ralWIzmJe@amdc1032>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 14, 2014 at 08:05:31PM +0100, Alexandre Belloni wrote:
-> pwm-leds calls .config() and .disable() in a row. This exhibits that it may
-> happen that the channel gets disabled before CDTY has been updated with CUPD.
-> The issue gets quite worse with long periods.
-> So, ensure by reading ISR that at least one period has past before disabling the
-> channel.
+
+Hi,
+
+On Monday, August 25, 2014 04:30:23 PM Chanwoo Choi wrote:
+> This patch support many TRIMINFO_CTRL registers if specific Exynos SoC
+> has one more TRIMINFO_CTRL registers. Also this patch uses proper 'RELOAD'
+> shift/mask bit operation to set RELOAD feature instead of static value.
 > 
-> The other issue is that it may happen that CUPD is not flushed before enabling
-> the channel so it will update CDTY/CPRD just after one period. So we always set
-> CUPD, even when the channel is not enabled.
-> 
-> Tested on at91sam9g45 and sama5d31ek.
-> 
-> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
+> Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
+> Cc: Zhang Rui <rui.zhang@intel.com>
+> Cc: Eduardo Valentin <edubezval@gmail.com>
+> Cc: Amit Daniel Kachhap <amit.daniel@samsung.com>
+> Reviewed-by: Amit Daniel Kachhap <amit.daniel@samsung.com>
 > ---
->  drivers/pwm/pwm-atmel.c | 46 +++++++++++++++++++++++++++++-----------------
->  1 file changed, 29 insertions(+), 17 deletions(-)
+>  drivers/thermal/samsung/exynos_thermal_common.h |  1 +
+>  drivers/thermal/samsung/exynos_tmu.c            | 23 ++++++++++++++++++++---
+>  drivers/thermal/samsung/exynos_tmu.h            |  9 +++++++--
+>  drivers/thermal/samsung/exynos_tmu_data.c       |  5 ++++-
+>  drivers/thermal/samsung/exynos_tmu_data.h       |  3 +++
+>  5 files changed, 35 insertions(+), 6 deletions(-)
+> 
+> diff --git a/drivers/thermal/samsung/exynos_thermal_common.h b/drivers/thermal/samsung/exynos_thermal_common.h
+> index 3eb2ed9..b211976 100644
+> --- a/drivers/thermal/samsung/exynos_thermal_common.h
+> +++ b/drivers/thermal/samsung/exynos_thermal_common.h
+> @@ -28,6 +28,7 @@
+>  #define MAX_TRIP_COUNT	8
+>  #define MAX_COOLING_DEVICE 4
+>  #define MAX_THRESHOLD_LEVS 5
+> +#define MAX_TRIMINFO_CTRL_REG	2
+>  
+>  #define ACTIVE_INTERVAL 500
+>  #define IDLE_INTERVAL 10000
+> diff --git a/drivers/thermal/samsung/exynos_tmu.c b/drivers/thermal/samsung/exynos_tmu.c
+> index acbff14..7234f38 100644
+> --- a/drivers/thermal/samsung/exynos_tmu.c
+> +++ b/drivers/thermal/samsung/exynos_tmu.c
+> @@ -147,7 +147,7 @@ static int exynos_tmu_initialize(struct platform_device *pdev)
+>  	struct exynos_tmu_data *data = platform_get_drvdata(pdev);
+>  	struct exynos_tmu_platform_data *pdata = data->pdata;
+>  	const struct exynos_tmu_registers *reg = pdata->registers;
+> -	unsigned int status, trim_info = 0, con;
+> +	unsigned int status, trim_info = 0, con, ctrl;
+>  	unsigned int rising_threshold = 0, falling_threshold = 0;
+>  	int ret = 0, threshold_code, i, trigger_levs = 0;
+>  
+> @@ -164,8 +164,25 @@ static int exynos_tmu_initialize(struct platform_device *pdev)
+>  		}
+>  	}
+>  
+> -	if (TMU_SUPPORTS(pdata, TRIM_RELOAD))
+> -		__raw_writel(1, data->base + reg->triminfo_ctrl);
+> +	if (TMU_SUPPORTS(pdata, TRIM_RELOAD)) {
+> +		if (reg->triminfo_ctrl_count > MAX_TRIMINFO_CTRL_REG) {
 
-Hi Alexandre,
+Please remove this check and MAX_TRIMINFO_CTRL_REG define.
 
-going through the list of unapplied patches I came across this old
-patch. It was never reviewed nor acked by anyone and you didn't ping me,
-so I always assumed it must no longer be required. Is that so?
+We do not want such runtime checks for development time errors.
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140825/98b64092/attachment.sig>
+> +			ret = -EINVAL;
+> +			goto out;
+> +		}
+> +
+> +		for (i = 0; i < reg->triminfo_ctrl_count; i++) {
+> +			if (pdata->triminfo_reload[i]) {
+> +				ctrl = readl(data->base +
+> +						reg->triminfo_ctrl[i]);
+> +				ctrl &= ~(reg->triminfo_reload_mask <<
+> +						reg->triminfo_reload_shift);
+> +				ctrl |= pdata->triminfo_reload[i] <<
+> +						reg->triminfo_reload_shift;
+
+triminfo_reload_shift and triminfo_reload_mask variables have always
+the same values when this code is run so there is no need for them.
+
+They should be added only when needed instead of doing it now.
+
+> +				__raw_writel(ctrl, data->base +
+> +						reg->triminfo_ctrl[i]);
+> +			}
+> +		}
+> +	}
+>  
+>  	if (pdata->cal_mode == HW_MODE)
+>  		goto skip_calib_data;
+> diff --git a/drivers/thermal/samsung/exynos_tmu.h b/drivers/thermal/samsung/exynos_tmu.h
+> index 1b4a644..d7674ad 100644
+> --- a/drivers/thermal/samsung/exynos_tmu.h
+> +++ b/drivers/thermal/samsung/exynos_tmu.h
+> @@ -85,8 +85,11 @@ enum soc_type {
+>   * @triminfo_25_shift: shift bit of the 25 C trim value in triminfo_data reg.
+>   * @triminfo_85_shift: shift bit of the 85 C trim value in triminfo_data reg.
+>   * @triminfo_ctrl: trim info controller register.
+> + * @triminfo_ctrl_count: the number of trim info controller register.
+>   * @triminfo_reload_shift: shift of triminfo reload enable bit in triminfo_ctrl
+>  	reg.
+> + * @triminfo_reload_mask: mask of triminfo reload enable bit in triminfo_ctrl
+> +	reg.
+>   * @tmu_ctrl: TMU main controller register.
+>   * @test_mux_addr_shift: shift bits of test mux address.
+>   * @buf_vref_sel_shift: shift bits of reference voltage in tmu_ctrl register.
+> @@ -151,9 +154,10 @@ struct exynos_tmu_registers {
+>  	u32	triminfo_25_shift;
+>  	u32	triminfo_85_shift;
+>  
+> -	u32	triminfo_ctrl;
+> -	u32	triminfo_ctrl1;
+> +	u32	triminfo_ctrl[MAX_TRIMINFO_CTRL_REG];
+> +	u32	triminfo_ctrl_count;
+>  	u32	triminfo_reload_shift;
+> +	u32	triminfo_reload_mask;
+>  
+>  	u32	tmu_ctrl;
+>  	u32     test_mux_addr_shift;
+> @@ -295,6 +299,7 @@ struct exynos_tmu_platform_data {
+>  	u8 second_point_trim;
+>  	u8 default_temp_offset;
+>  	u8 test_mux;
+> +	u8 triminfo_reload[MAX_TRIMINFO_CTRL_REG];
+>  
+>  	enum calibration_type cal_type;
+>  	enum calibration_mode cal_mode;
+> diff --git a/drivers/thermal/samsung/exynos_tmu_data.c b/drivers/thermal/samsung/exynos_tmu_data.c
+> index aa8e0de..754c638 100644
+> --- a/drivers/thermal/samsung/exynos_tmu_data.c
+> +++ b/drivers/thermal/samsung/exynos_tmu_data.c
+> @@ -184,8 +184,10 @@ static const struct exynos_tmu_registers exynos4412_tmu_registers = {
+>  	.triminfo_data = EXYNOS_TMU_REG_TRIMINFO,
+>  	.triminfo_25_shift = EXYNOS_TRIMINFO_25_SHIFT,
+>  	.triminfo_85_shift = EXYNOS_TRIMINFO_85_SHIFT,
+> -	.triminfo_ctrl = EXYNOS_TMU_TRIMINFO_CON,
+> +	.triminfo_ctrl[0] = EXYNOS_TMU_TRIMINFO_CON,
+> +	.triminfo_ctrl_count = 1,
+>  	.triminfo_reload_shift = EXYNOS_TRIMINFO_RELOAD_SHIFT,
+> +	.triminfo_reload_mask = EXYNOS_TRIMINFO_RELOAD_MASK,
+>  	.tmu_ctrl = EXYNOS_TMU_REG_CONTROL,
+>  	.test_mux_addr_shift = EXYNOS4412_MUX_ADDR_SHIFT,
+>  	.buf_vref_sel_shift = EXYNOS_TMU_REF_VOLTAGE_SHIFT,
+> @@ -252,6 +254,7 @@ static const struct exynos_tmu_registers exynos4412_tmu_registers = {
+>  		.temp_level = 95, \
+>  	}, \
+>  	.freq_tab_count = 2, \
+> +	.triminfo_reload[0] = EXYNOS_TRIMINFO_RELOAD_ENABLE, \
+>  	.registers = &exynos4412_tmu_registers, \
+>  	.features = (TMU_SUPPORT_EMULATION | TMU_SUPPORT_TRIM_RELOAD | \
+>  			TMU_SUPPORT_FALLING_TRIP | TMU_SUPPORT_READY_STATUS | \
+> diff --git a/drivers/thermal/samsung/exynos_tmu_data.h b/drivers/thermal/samsung/exynos_tmu_data.h
+> index 401bab7..87454f63 100644
+> --- a/drivers/thermal/samsung/exynos_tmu_data.h
+> +++ b/drivers/thermal/samsung/exynos_tmu_data.h
+> @@ -64,6 +64,9 @@
+>  #define EXYNOS_EMUL_CON		0x80
+>  
+>  #define EXYNOS_TRIMINFO_RELOAD_SHIFT	0
+> +#define EXYNOS_TRIMINFO_RELOAD_MASK	0x1
+> +#define EXYNOS_TRIMINFO_RELOAD_ENABLE	1
+> +#define EXYNOS_TRIMINFO_RELOAD_DISABLE	0
+
+This define is never used please remove it.
+
+>  #define EXYNOS_TRIMINFO_25_SHIFT	0
+>  #define EXYNOS_TRIMINFO_85_SHIFT	8
+>  #define EXYNOS_TMU_RISE_INT_MASK	0x111
+
+Best regards,
+--
+Bartlomiej Zolnierkiewicz
+Samsung R&D Institute Poland
+Samsung Electronics
