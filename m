@@ -1,69 +1,117 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Mon, 25 Aug 2014 08:40:40 -0700
-Subject: [PATCH v9 1/2] regulator: Add driver for max77802 PMIC PMIC
- regulators
-In-Reply-To: <53FAFCBC.2050407@collabora.co.uk>
-References: <1408350762-15520-1-git-send-email-javier.martinez@collabora.co.uk>
- <1408350762-15520-2-git-send-email-javier.martinez@collabora.co.uk>
- <CA+NduCDL65=Y=PyU3FfXsTz0FfbmYzicGrY4U7ji3_V+nXhtCQ@mail.gmail.com>
- <53F73472.8010609@collabora.co.uk>
- <20140822144531.GV24407@sirena.org.uk>
- <53F7838F.8060906@collabora.co.uk>
- <20140822183054.GY24407@sirena.org.uk>
- <53F7BDD8.7060500@collabora.co.uk>
- <CAD=FV=WC0h7fYm2QFqu3Zka7CsU4BtG-oyPpJav+ygC+gmCR+A@mail.gmail.com>
- <CA+NduCCT-KQ=gh7QWkBE4qkA2YOJ8KCVqbkC6Tkmb1aPvCsGFQ@mail.gmail.com>
- <53FAFCBC.2050407@collabora.co.uk>
-Message-ID: <CAD=FV=V4TSKsbjj3dXCdSzVrh3sxH-FkpFEbEo+JA1bN9R-XWA@mail.gmail.com>
+From: jonsmirl@gmail.com (jonsmirl at gmail.com)
+Date: Mon, 25 Aug 2014 11:49:24 -0400
+Subject: [linux-sunxi] Re: [PATCH 4/4] simplefb: add clock handling code
+In-Reply-To: <20140825151255.GA14967@ulmo.nvidia.com>
+References: <1407914239-12054-5-git-send-email-libv@skynet.be>
+ <53EB9471.3090204@wwwdotorg.org> <20140813170106.GT15297@lukather>
+ <20140825121228.GB4163@ulmo.nvidia.com>
+ <20140825124410.GZ15297@lukather>
+ <20140825133953.GJ4163@ulmo.nvidia.com>
+ <53FB3E7F.4000503@redhat.com>
+ <20140825141600.GA14763@ulmo.nvidia.com>
+ <CAKON4OyjJ+QcBGOzrUDH9J+DxBEKLmXeOcnUyOHHHV_DtCG0zA@mail.gmail.com>
+ <53FB47B8.2090104@redhat.com>
+ <20140825151255.GA14967@ulmo.nvidia.com>
+Message-ID: <CAKON4OzR=JACaVE2ATm6n95LCTbH2rXBzG_ExkD1kO8Qzzf1CA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Javier,
+On Mon, Aug 25, 2014 at 11:12 AM, Thierry Reding
+<thierry.reding@gmail.com> wrote:
+> On Mon, Aug 25, 2014 at 04:27:04PM +0200, Hans de Goede wrote:
+>> Hi,
+>>
+>> On 08/25/2014 04:23 PM, jonsmirl at gmail.com wrote:
+>> > On Mon, Aug 25, 2014 at 10:16 AM, Thierry Reding
+>> > <thierry.reding@gmail.com> wrote:
+>> >> On Mon, Aug 25, 2014 at 03:47:43PM +0200, Hans de Goede wrote:
+>> >>> On 08/25/2014 03:39 PM, Thierry Reding wrote:
+>> >>>> On Mon, Aug 25, 2014 at 02:44:10PM +0200, Maxime Ripard wrote:
+>> >>>>> On Mon, Aug 25, 2014 at 02:12:30PM +0200, Thierry Reding wrote:
+>> >>>>>> On Wed, Aug 13, 2014 at 07:01:06PM +0200, Maxime Ripard wrote:
+>> >>>>>>> On Wed, Aug 13, 2014 at 10:38:09AM -0600, Stephen Warren wrote:
+>> >>>>>> [...]
+>> >>>>>>>> If not, perhaps the clock driver should force the clock to be
+>> >>>>>>>> enabled (perhaps only if the DRM/KMS driver isn't enabled?).
+>> >>>>>>>
+>> >>>>>>> I'm sorry, but I'm not going to take any code that will do that in our
+>> >>>>>>> clock driver.
+>> >>>>>>>
+>> >>>>>>> I'm not going to have a huge list of ifdef depending on configuration
+>> >>>>>>> options to know which clock to enable, especially when clk_get should
+>> >>>>>>> have the consumer device as an argument.
+>> >>>>>>
+>> >>>>>> Are you saying is that you want to solve a platform-specific problem by
+>> >>>>>> pushing code into simple, generic drivers so that your platform code can
+>> >>>>>> stay "clean"?
+>> >>>>>
+>> >>>>> Are you saying that this driver would become "dirty" with such a patch?
+>> >>>>
+>> >>>> Yes. Others have said the same and even provided alternative solutions
+>> >>>> on how to solve what's seemingly a platform-specific problem in a
+>> >>>> platform-specific way.
+>> >>>
+>> >>> This is not platform specific, any platform with a complete clock driver
+>> >>> will suffer from the same problem (the clock driver disabling unclaimed
+>> >>> ahb gates, and thus killing the video output) if it wants to use simplefb
+>> >>> for early console support.
+>> >>
+>> >> It is platform specific in that your platform may require certain clocks
+>> >> to remain on. The next platform may require power domains to remain on
+>> >> during boot and yet another one may rely on regulators to stay on during
+>> >> boot. By your argument simplefb will need to be taught to handle pretty
+>> >> much every type of resource that the kernel has.
+>> >
+>> > Why can't simplefb be a driver library that is called from a device
+>> > specific device driver that only claims the clocks (or regulators)?
+>> > Then build all of these device specific drivers into the generic ARM
+>> > kernel. They will be quite small since all they do is claim the clocks
+>> > (or regulator).  Maybe we can even figure out some protocol for
+>> > removing the unused ones from memory later.
+>> >
+>> > Later during the boot process the device specific driver can load its
+>> > KMS code which has also been implemented as a driver library. Maybe
+>> > use E_PROBE_DEFER to do this. Match on the device ID, claim the
+>> > clocks, defer until the full KMS library can be loaded.
+>>
+>> There is no need for all this complexity, all that is needed is for the
+>> simplefb driver to be thought to claim + enable any clocks listed in
+>> its dt node.
+>
+> Out of curiosity, how does this work in practice? How does the
+> bootloader create this entry? Does it scan the DT to see which clocks
+> the real hardware device references and then simply copies them to the
+> simplefb node?
 
-On Mon, Aug 25, 2014 at 2:07 AM, Javier Martinez Canillas
-<javier.martinez@collabora.co.uk> wrote:
-> Hello Yuvaraj,
->
-> On 08/25/2014 10:22 AM, Yuvaraj Cd wrote:
->>>> Good question. I'm not that familiar with the dw_mmc host controller nor
->>>> its driver implementation so I'll let Yuvaraj or Doug to answer that.
->> Well,here it goes!
->> 1. Power ON the board LDO4CTRL1[7:6] 11b
->> 2. dw_mmc driver enable the vqmmc.
->> 3. checks for UHS support, complete the voltage switching t0 1.8V
->> 4. Does warm reset by reboot command.
->> 5. mmc core calls mmc_set_ios() with MMC_POWER_OFF.
->> 6. dw_mmc driver cut-off the regulator with LDO4CTRL1[7:6] is 00b
->> 7.dw_mmc driver enable the vqmmc.
->>  But after step 7 also, LD4CTRL[7:6] is 00b.
->
-> Ok, so the dw_mmc driver is enabling vqmmc, that's good.
->
->>>
->>> I haven't seen the issue that Yuvaraj is reporting (but I also haven't
->>> picked up all of the relevant patches and tried to reproduce), so I'm
->>> going to have to leave it to Yuvaraj to answer.
->>     static int max77802_enable(struct regulator_dev *rdev)
->>     {
->>       struct max77802_regulator_prv *max77802 = rdev_get_drvdata(rdev);
->>      int id = rdev_get_id(rdev);
->>      int shift = max77802_get_opmode_shift(id);
->>      return regmap_update_bits(rdev->regmap,
->> rdev->desc->enable_reg,rdev->desc->enable_mask,max77802->opmode[id] <<
->> shift);
->>   }
->> I think in the above code snippet, the "val" is what we got it during
->> the probe.We always write that value for enabling this regulator(which
->> is LDO4CTRL1[7:6] 00b after warm reset) which is not correct according
->> the MAX77802 manual.
->>>
->
-> I see, so probably until we have a way to define the operating mode for
-> each regulator using DT we should set the opmode to normal when enabling a
-> regulator independently of the value the hardware register reported on probe.
->
-> Can you please test the following change [0] so I can post as a proper
-> patch? Doug, Mark do you think that forcing the regulator to opmode normal
-> when enabling is the right solution here?
+That's why this is such a problem. There is a general rule in Linux -
+one device, one driver.  All of the kernel device driver code is
+written around this assumption. We're trying to make two drivers for
+one device and the kernel is not designed to support that. There
+shouldn't be an independent 'simplefb' node. That is creating two
+device descriptions for a single device.
 
-IMHO that makes sense.
+Adding 'chosen' information to the devices nodes might work.
+
+video at 1345 {
+    compatible = "sunxi-a20-video";
+    reg = <...>;
+    clocks = <...>;
+    chosen {
+      compatible = "simplefb";     // dynamically added by uboot
+      buffer = <0x4564>;    // dynamically added by uboot
+   };
+};
+
+This will initialize the simplefb driver without attaching it to any
+specific hardware.  It can then look in its parent node for clocks and
+regulators and claim them.
+
+
+>
+> Thierry
+
+
+
+-- 
+Jon Smirl
+jonsmirl at gmail.com
