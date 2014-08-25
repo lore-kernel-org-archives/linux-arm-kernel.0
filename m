@@ -1,18 +1,17 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 25 Aug 2014 11:41:56 -0600
-Subject: [PATCH 3/8] ARM: tegra: Add PLL_M_UD and PLL_C_UD to tegra124-car
- binding header
-In-Reply-To: <1405088313-20048-4-git-send-email-mperttunen@nvidia.com>
-References: <1405088313-20048-1-git-send-email-mperttunen@nvidia.com>
- <1405088313-20048-4-git-send-email-mperttunen@nvidia.com>
-Message-ID: <53FB7564.7020304@wwwdotorg.org>
+Date: Mon, 25 Aug 2014 11:45:38 -0600
+Subject: [PATCH 0/3] Introduce of_match_machine() helper
+In-Reply-To: <1407452515-2390-1-git-send-email-ttynkkynen@nvidia.com>
+References: <1407452515-2390-1-git-send-email-ttynkkynen@nvidia.com>
+Message-ID: <53FB7642.1000808@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/11/2014 08:18 AM, Mikko Perttunen wrote:
-> Add these clocks to the binding header so that EMC timings that have
-> them as parent can refer to the clocks.
+On 08/07/2014 05:01 PM, Tuomas Tynkkynen wrote:
+> Some mach-specific drivers that don't require their own node in the device tree
+> (for example drivers/soc/*, cpufreq, cpuidle etc.) want to match on the device
+> tree root compatible property instead. Instead of open-coding (and forgetting
+> to call of_node_put on the root node) everywhere, add a helper to the OF core.
 
-Peter, I assume this patch (and patch 4/8 too) will be needed by any EMC 
-driver, whether it's part of this series or Tomeu Vizoso's work. Can you 
-please review/ack those two patches for later reference. Thanks.
+Tuomas, I assume there will be a new version of this series to address 
+the review comments? For now, I'm not intending on applying this.
