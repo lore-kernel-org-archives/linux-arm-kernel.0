@@ -1,47 +1,63 @@
 From: guodong.xu@linaro.org (Guodong Xu)
-Date: Mon, 25 Aug 2014 21:39:39 +0800
-Subject: [PATCH 0/2] Hi6421 MFD driver
-Message-ID: <1408973982-2072-1-git-send-email-guodong.xu@linaro.org>
+Date: Mon, 25 Aug 2014 21:39:40 +0800
+Subject: [PATCH 1/3] Documentation: mfd: add docs for hi6421 dt
+In-Reply-To: <1408973982-2072-1-git-send-email-guodong.xu@linaro.org>
+References: <1408973982-2072-1-git-send-email-guodong.xu@linaro.org>
+Message-ID: <1408973982-2072-2-git-send-email-guodong.xu@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patchset add MFD driver for Hi6421 SoC.
+Add documentation for HiSilicon Hi6421 PMIC dt binding.
 
-It's based on my previous v6 patchset for Hi6421 MFD & regulator driver. But
-since regulator part is applied, I rebased the MFD part to v3.17-rc1, merged
-review feedback from Lee Jones, solved conflict in Makefile, and fixed a build
-error.
-
-Hi6421 is a PMIC SoC designed and manufactured by HiSilicon Ltd. It includes
-multi-functions, such as regulators, codec, ADCs, Coulomb counter, etc.
-Hi6421 can be used in various Hi3620 SoC based boards. Registers in Hi6421 are
-memory bus mapped, so in this design they are accessed by regmap-mmio APIs.
-
+Signed-off-by: Guodong Xu <guodong.xu@linaro.org>
 ---
-changes in this version:
- * merge conflict in drivers/mfd/Makefile
- * use devm_ioremap_resource, as devm_request_and_ioremap is deprecated and
-    now removed.
- * incorporate feedback from maintainer
-    - Documentation as a separate patch
-    - dts node rename from 'pmic' to 'hi6421'
-based on v6 patchset for Hi6421 MFD & regulator
-
-Guodong Xu (3):
-  Documentation: mfd: add docs for hi6421 dt
-  mfd: Add hi6421 PMIC core driver
-  ARM: dts: hi3620-hi4511: Add HI6421 MFD and regulator nodes
-
- Documentation/devicetree/bindings/mfd/hi6421.txt |  38 ++++
- arch/arm/boot/dts/hi3620-hi4511.dts              | 233 +++++++++++++++++++++++
- drivers/mfd/Kconfig                              |  13 ++
- drivers/mfd/Makefile                             |   1 +
- drivers/mfd/hi6421-pmic-core.c                   | 112 +++++++++++
- include/linux/mfd/hi6421-pmic.h                  |  42 ++++
- 6 files changed, 439 insertions(+)
+ Documentation/devicetree/bindings/mfd/hi6421.txt | 38 ++++++++++++++++++++++++
+ 1 file changed, 38 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/mfd/hi6421.txt
- create mode 100644 drivers/mfd/hi6421-pmic-core.c
- create mode 100644 include/linux/mfd/hi6421-pmic.h
 
+diff --git a/Documentation/devicetree/bindings/mfd/hi6421.txt b/Documentation/devicetree/bindings/mfd/hi6421.txt
+new file mode 100644
+index 0000000..0d5a446
+--- /dev/null
++++ b/Documentation/devicetree/bindings/mfd/hi6421.txt
+@@ -0,0 +1,38 @@
++* HI6421 Multi-Functional Device (MFD), by HiSilicon Ltd.
++
++Required parent device properties:
++- compatible	: contains "hisilicon,hi6421-pmic";
++- reg		: register range space of hi6421;
++
++Supported Hi6421 sub-devices include:
++
++Device                     IRQ Names              Supply Names   Description
++------                     ---------              ------------   -----------
++regulators               :  None                 : None         : Regulators
++
++Required child device properties:
++None.
++
++Example:
++	hi6421 {
++		compatible = "hisilicon,hi6421-pmic";
++		reg = <0xfcc00000 0x0180>; /* 0x60 << 2 */
++
++		regulators {
++			// supply for MLC NAND/ eMMC
++			hi6421_vout0_reg: hi6421_vout0 {
++				regulator-name = "VOUT0";
++				regulator-min-microvolt = <2850000>;
++				regulator-max-microvolt = <2850000>;
++			};
++
++			// supply for 26M Oscillator
++			hi6421_vout1_reg: hi6421_vout1 {
++				regulator-name = "VOUT1";
++				regulator-min-microvolt = <1700000>;
++				regulator-max-microvolt = <2000000>;
++				regulator-boot-on;
++				regulator-always-on;
++			};
++		};
++	};
 -- 
 1.9.1
