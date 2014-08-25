@@ -1,61 +1,75 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Mon, 25 Aug 2014 19:59:01 +0800
-Subject: [PATCH v5 3/3] pwm: i.MX: Avoid sample FIFO overflow for i.MX
- PWM version2
-In-Reply-To: <1401274213-8954-3-git-send-email-Ying.Liu@freescale.com>
-References: <1401274213-8954-1-git-send-email-Ying.Liu@freescale.com>
- <1401274213-8954-3-git-send-email-Ying.Liu@freescale.com>
-Message-ID: <20140825115628.GA7008@dragon>
+From: jh80.chung@samsung.com (Jaehoon Chung)
+Date: Mon, 25 Aug 2014 21:09:47 +0900
+Subject: [PATCHv10 0/5] ARM: remove the sub-node and deprecate
+ supports-highspeed property for dwmmc.
+In-Reply-To: <20140825113719.GA31960@amd>
+References: <1407397082-32495-1-git-send-email-jh80.chung@samsung.com>
+ <20140825112151.GA21336@amd> <53FB1DD5.3050207@samsung.com>
+ <20140825113719.GA31960@amd>
+Message-ID: <53FB278B.7010509@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 28, 2014 at 06:50:13PM +0800, Liu Ying wrote:
-> The i.MX PWM version2 is embedded in several i.MX SoCs,
-> such as i.MX27, i.MX51 and i.MX6SL.  There is a 4-word(16bit)
-> sample FIFO in this IP.  Each FIFO slot determines the duty
-> period of a PWM waveform in one full cycle.  The IP spec
-> mentions that we should not write a fourth sample because
-> the FIFO will become full and triggers a FIFO write error
-> (FWE) which will prevent the PWM from starting once it is
-> enabled.  In order to avoid any sample FIFO overflow issue,
-> this patch clears all sample FIFO by doing software reset
-> in the configuration hook when the controller is disabled
-> or waits for a full PWM cycle to get a relinquished FIFO
-> slot when the controller is enabled and the FIFO is fully
-> loaded.
+On 08/25/2014 08:37 PM, Pavel Machek wrote:
+> On Mon 2014-08-25 20:28:21, Jaehoon Chung wrote:
+>> On 08/25/2014 08:21 PM, Pavel Machek wrote:
+>>> On Thu 2014-08-07 16:37:57, Jaehoon Chung wrote:
+>>>> Since used the mmc_of_parse(), didn't parse the sub-node.
+>>>> So we can remove the sub-node, because almost SoC used the only one card per a host.
+>>>> And supports-highspeed can be replaced with "cap-mmc/sd-highspeed"
+>>>> property.
+>>>
+>>> Would it be better to fix parsing of the device tree, and not to
+>>> change all the device trees?
+>>>
+>>> Someone will want to do two slots sooner or later...
+>>>
+>>
+>> First, I had considered that controller can be supported the multiple slot.
+>> But MMC maintainers and other people suggested that consider the only one card per a host.
+>> Two slots or more don't have any benefit, (power or performance, etc).
 > 
-> The FIFO overflow issue can be reproduced by the following
-> commands on the i.MX6SL EVK platform, assuming we use PWM2
-> for the debug LED which is driven by the pin HSIC_STROBE
-> and the maximal brightness is 255.
-> echo 0   > /sys/class/leds/user/brightness
-> echo 0   > /sys/class/leds/user/brightness
-> echo 0   > /sys/class/leds/user/brightness
-> echo 0   > /sys/class/leds/user/brightness
-> echo 255 > /sys/class/leds/user/brightness
-> Here, FWE happens(PWMSR register reads 0x58) and the LED
-> can not be lighten.
+> Would you elaborate?
 > 
-> Another way to reproduce the FIFO overflow issue is to run
-> this script:
-> while true;
-> 	do echo 255 > /sys/class/leds/user/brightness;
-> done
+> If I have a device like a phone, I may want to put one "slot" inside
+> phone for basic system, and offer second slot for user expansion
+> (initially empty).
+
+if multiple slot is supported, then a mmcqd should be processing for multiple slots.
+It's too inefficient, and affect the whole performance reduction.
+
+If want to offer the second slot for user expansion, add the host for expansion slot.
+Almost All SoC didn't use the multiple slot per a host controller for eMMC/SD/SDIO.
+
+If Some device(Phone) supports the SD-card and eMMC, then there are two Host IP.
+One Host IP is used for eMMC, other is used for SD-card.
+
+this is H/W design issue.
+
+a) You means the below,
+
+One Host IP -------- eMMC
+		|
+		---- SD
+		|
+		---- SDIO
+
+b) We means the below
+One Host IP -------- eMMC
+One Host IP -------- SD
+One Host IP -------- SDIO
+
+In now, I knew every SoC have used like b) type. I didn't see a) type (especially, dwmmc's case).
+
+If i missed something, let me know, plz.
+
+Best Regards,
+Jaehoon Chung
+
 > 
-> Cc: Thierry Reding <thierry.reding@gmail.com>
-> Cc: Sascha Hauer <s.hauer@pengutronix.de>
-> Cc: Shawn Guo <shawn.guo@freescale.com>
-> Cc: Lothar Wa?mann <LW@KARO-electronics.de>
-> Cc: linux-pwm at vger.kernel.org
-> Cc: linux-arm-kernel at lists.infradead.org
-> Signed-off-by: Liu Ying <Ying.Liu@freescale.com>
-
-The whole series,
-
-Acked-by: Shawn Guo <shawn.guo@freescale.com>
-
-Thierry,
-
-Can you pick them up if they look good to you?
-
-Shawn
+> Or I may want to have internal slot with a card to boot from and have
+> external slot (initially empty) for system update for embedded system.
+> 
+> I see quite an obvious benefit there.
+> 									Pavel
+> 
