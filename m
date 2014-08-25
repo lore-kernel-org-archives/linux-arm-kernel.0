@@ -1,62 +1,83 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Sun, 24 Aug 2014 17:03:14 -0700
-Subject: [GIT PULL] ARM: SoC fixes for 3.17-rc
-In-Reply-To: <CA+55aFzW676RhCgu8Wp2SMcnKT2q82_DB9Aof74fwZPuXNtjZw@mail.gmail.com>
-References: <20140824184035.GA13254@localhost>
- <CA+55aFzW676RhCgu8Wp2SMcnKT2q82_DB9Aof74fwZPuXNtjZw@mail.gmail.com>
-Message-ID: <CAOesGMg+CMMgHm=arDM_JuL0SMknPTKzoa-FMuf_UOGZyDx+6g@mail.gmail.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Mon, 25 Aug 2014 09:41:30 +0900
+Subject: [GIT PULL] Renesas ARM Based SoC Updates for v3.18
+In-Reply-To: <cover.1408671240.git.horms+renesas@verge.net.au>
+References: <cover.1408671240.git.horms+renesas@verge.net.au>
+Message-ID: <20140825004130.GA17055@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Aug 24, 2014 at 3:58 PM, Linus Torvalds
-<torvalds@linux-foundation.org> wrote:
-> On Sun, Aug 24, 2014 at 11:40 AM, Olof Johansson <olof@lixom.net> wrote:
->>
->> are available in the git repository at:
->>
->>   git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git fixes
->
-> Grr. Yes and no.
->
-> You didn't really mean for me to pull that branch, you meant for me to
-> pull your tag "fixes-for-linus".
+On Sat, Aug 23, 2014 at 10:44:20AM +0900, Simon Horman wrote:
+> Hi Olof, Hi Kevin, Hi Arnd,
+> 
+> Please consider these Renesas ARM based SoC updates for v3.18.
+> 
+> 
+> The following changes since commit 7d1311b93e58ed55f3a31cc8f94c4b8fe988a2b9:
+> 
+>   Linux 3.17-rc1 (2014-08-16 10:40:26 -0600)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-soc-for-v3.18
+> 
+> for you to fetch changes up to 5ac9e7f35db00e630c9f95a1f73ac329371cdbbf:
+> 
+>   ARM: shmobile: sh73a0: Remove unneeded nr_irqs initialization (2014-08-20 09:09:24 +0900)
 
-Yes, of course -- and I missed that.
+This pull request has a minor conflict in
+arch/arm/mach-shmobile/setup-r8a7779.c with
+"ARM: shmobile: marzen-reference: Enable TMU0 in device tree" which
+is included in the pull request "Renesas ARM Based SoC DT Timers Updates
+for v3.18" which is tagged as renesas-dt-timers-for-v3.18.
 
-> Where did this fail? Do you still run an old broken git version that
-> guesses at what the pull target is, and makes sh*t up? Please update
-> if so.
->
-> And if not, how did the tag contents get added to the pull request
-> despite the pull request not mentioning the tag?
+The resolution is to take the changes from both branches.
+The DT_MACHINE_START stanza should end up as follows:
 
-TL;DR: My fault, I'll double-check this in the future.
+DT_MACHINE_START(R8A7779_DT, "Generic R8A7779 (Flattened Device Tree)")
+        .map_io         = r8a7779_map_io,
+        .init_early     = shmobile_init_delay,
+        .init_irq       = r8a7779_init_irq_dt,
+        .init_late      = shmobile_init_late,
+        .dt_compat      = r8a7779_compat_dt,
+MACHINE_END
 
-Long version:
+This resolution is available in renesas-next-20140820-v3.17-rc1
+tag of the next branch of the renesas tree.
 
-100% operator error due to the tools changing. I'm still used to
-looking for the warning that it doesn't find/use the remote tag as a
-safety for these mistakes.
-
-I'm still used to the older version that figured out tag name on its
-own, so I did my usual:
-
- * run request-pull to double-check what's in the branch
- * create the tag
- * push the tag
- * rerun request-pull with the tag, redirect to file
-...and then finally send the email with the file contents.
-
-What I forgot to do was change the command line between the first and
-the second run -- the first one referenced the branch, the second
-should have referenced the tag but I just reused the same command from
-history.
-
-The old version of git that auto-guessed branch/tag name used to warn
-if it used a tag to create the pull request, but didn't find the tag
-in the remote repo. I suppose it'd be useful if the current version
-warned if the third argument wasn't referring to the same tag as well,
-it would definitely have saved me here.
-
-
--Olof
+> ----------------------------------------------------------------
+> Renesas ARM Based SoC Updates for v3.18
+> 
+> * Remove unnecessary nr_irqs initialisation on sh73a0, sh7372,
+>   and r8a7779 SoCs
+> * Use defines hardcoded numbers for DMA
+> * Rework multiplatform include workaround
+> * Correctly use shmobile_init_late on a wider range of SoCs
+> 
+> ----------------------------------------------------------------
+> Geert Uytterhoeven (4):
+>       ARM: shmobile: r8a7778: Add missing call to shmobile_init_late()
+>       ARM: shmobile: dma: Use defines instead of hardcoded numbers
+>       ARM: shmobile: sh7372: Remove unneeded nr_irqs initialization
+>       ARM: shmobile: sh73a0: Remove unneeded nr_irqs initialization
+> 
+> Magnus Damm (7):
+>       ARM: shmobile: sh73a0: Add shmobile_init_late()
+>       ARM: shmobile: r8a7779: Fix shmobile_init_late()
+>       ARM: shmobile: r8a7778: Fix shmobile_init_late()
+>       ARM: shmobile: r8a73a4: Add shmobile_init_late()
+>       ARM: shmobile: r7s72100: Add shmobile_init_late()
+>       ARM: shmobile: Rework multiplatform include workaround
+>       ARM: shmobile: r8a7779: Remove NR_IRQS_LEGACY
+> 
+>  arch/arm/mach-shmobile/Makefile         | 2 --
+>  arch/arm/mach-shmobile/dma-register.h   | 4 ++--
+>  arch/arm/mach-shmobile/irqs.h           | 2 +-
+>  arch/arm/mach-shmobile/setup-r7s72100.c | 1 +
+>  arch/arm/mach-shmobile/setup-r8a73a4.c  | 1 +
+>  arch/arm/mach-shmobile/setup-r8a7778.c  | 3 ++-
+>  arch/arm/mach-shmobile/setup-r8a7779.c  | 3 +--
+>  arch/arm/mach-shmobile/setup-sh7372.c   | 1 -
+>  arch/arm/mach-shmobile/setup-sh73a0.c   | 2 +-
+>  9 files changed, 9 insertions(+), 10 deletions(-)
+> 
