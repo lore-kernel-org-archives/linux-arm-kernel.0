@@ -1,31 +1,62 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 25 Aug 2014 10:51:07 +0100
-Subject: [PATCH 0/6] SolidRun Hummingboard/Cubox-i DT updates
-In-Reply-To: <20140825062930.GA6928@dragon>
-References: <20140823091058.GO30401@n2100.arm.linux.org.uk>
- <20140825062930.GA6928@dragon>
-Message-ID: <20140825095106.GS30401@n2100.arm.linux.org.uk>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Mon, 25 Aug 2014 11:55:48 +0200 (CEST)
+Subject: [PATCH] arm: use cpu_online_mask when using forced
+ irq_set_affinity
+In-Reply-To: <53C79E43.6040009@arm.com>
+References: <1399653640-21559-1-git-send-email-sudeep.holla@arm.com>
+ <20140523121032.GV3693@n2100.arm.linux.org.uk> <537F4453.5000709@arm.com>
+ <53A43174.503@arm.com> <20140620151638.GS32514@n2100.arm.linux.org.uk>
+ <53C79E43.6040009@arm.com>
+Message-ID: <alpine.DEB.2.10.1408251136380.3323@nanos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 25, 2014 at 02:29:32PM +0800, Shawn Guo wrote:
-> On Sat, Aug 23, 2014 at 10:10:58AM +0100, Russell King - ARM Linux wrote:
-> > Here's a set of patches updating the Cubox-i/Hummingboard DT files.
+On Thu, 17 Jul 2014, Sudeep Holla wrote:
+> > > Any suggestions on this ? Since commit 01f8fa4f01d8 and ffde1de64012 are
+> > > now in
+> > > stable releases, CPU0 hotplug is broken there now.
 > > 
-> > The first two are fairly important fixes, so should at least go in
-> > for -rc kernels.
+> > Maybe we should ask Thomas, as he's (a) the maintainer of the irqchip
+> > stuff, and (b) the author of the patch causing the breakage.
 > > 
-> > The SPDIF patch is something which could go in -rc as well as it's a
-> > cosmetic patch, changing the name displayed in (eg) pulseaudio for the
-> > SPDIF output from the developer-centric "imx-spdif" to "Integrated SPDIF".
+> >  From what I can see looking at the x86 code, the work-around in
+> > ffde1de64012 is wrong.
+> > 
 > 
-> I will sent the first 3 for -rc.  But I second Iain's comment that the
-> first patch should have a better commit log to explain why it's an
-> important fix.
+> Can provide your thoughts on how to solve this issue ?
 
-I still have no answer for that, so I suggest dropping it until Rabeeh
-can write a better commit log.
+ffde1de64012 is not about offlining a cpu, it's about onlining where
+we need to make sure that we assign the affinity to a not yet online
+marked cpu.
+ 
+> Is it expected from all the irqchip implementation to use force flag in
+> irq_set_affinity to ignore cpu_online_mask similar to GIC ?
 
--- 
-FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
-according to speedtest.net.
+No, it's only relevant for the cases where we need to route irqs to
+not yet online cpus.
+
+Now the wreckage of offlining was definitely not intended and I wonder
+why set_affinity() is called there with force = true. This was
+introduced in commit 1dbfa187dad. I acked it back then, but I have no
+idea why, because the force argument did not have any effect at that
+time.
+
+Changing it to false should solve the issue.
+
+Thanks,
+
+	tglx
+
+diff --git a/arch/arm/kernel/irq.c b/arch/arm/kernel/irq.c
+index 2c4257604513..5c4d38e32a51 100644
+--- a/arch/arm/kernel/irq.c
++++ b/arch/arm/kernel/irq.c
+@@ -175,7 +175,7 @@ static bool migrate_one_irq(struct irq_desc *desc)
+ 	c = irq_data_get_irq_chip(d);
+ 	if (!c->irq_set_affinity)
+ 		pr_debug("IRQ%u: unable to set affinity\n", d->irq);
+-	else if (c->irq_set_affinity(d, affinity, true) == IRQ_SET_MASK_OK && ret)
++	else if (c->irq_set_affinity(d, affinity, false) == IRQ_SET_MASK_OK && ret)
+ 		cpumask_copy(d->affinity, affinity);
+ 
+ 	return ret;
