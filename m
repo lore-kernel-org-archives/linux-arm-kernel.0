@@ -1,38 +1,83 @@
 From: lauraa@codeaurora.org (Laura Abbott)
-Date: Mon, 25 Aug 2014 11:23:53 -0700
-Subject: [PATCHv3 1/7] arm64: Treat handle_arch_irq as a function pointer
-In-Reply-To: <CAGXu5jLur_gdXs2X5BCmxB6L5HwgyP12jkrufK7bpS0Cxhp_+Q@mail.gmail.com>
-References: <1408584039-12735-1-git-send-email-lauraa@codeaurora.org>	<1408584039-12735-2-git-send-email-lauraa@codeaurora.org>
- <CAGXu5jLur_gdXs2X5BCmxB6L5HwgyP12jkrufK7bpS0Cxhp_+Q@mail.gmail.com>
-Message-ID: <53FB7F39.8050406@codeaurora.org>
+Date: Mon, 25 Aug 2014 11:34:34 -0700
+Subject: [PATCHv3 5/7] arm64: Factor out fixmap initialiation from ioremap
+In-Reply-To: <CAGXu5jK64cOKkh0pSj63P3O0ZXuyCJET7w-W=9qd6b74pxRH4w@mail.gmail.com>
+References: <1408584039-12735-1-git-send-email-lauraa@codeaurora.org>	<1408584039-12735-6-git-send-email-lauraa@codeaurora.org>
+ <CAGXu5jK64cOKkh0pSj63P3O0ZXuyCJET7w-W=9qd6b74pxRH4w@mail.gmail.com>
+Message-ID: <53FB81BA.2040908@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 8/22/2014 10:41 PM, Kees Cook wrote:
->
->
->
-> On Wed, Aug 20, 2014 at 6:20 PM, Laura Abbott <lauraa@codeaurora.org
-> <mailto:lauraa@codeaurora.org>> wrote:
->
->     handle_arch_irq isn't actually text, it's just a function pointer.
->     It doesn't need to be stored in the text section and doing so
->     causes problesm if we ever want to make the kernel text read only.
->     Declare handle_arch_irq as a proper function pointer stored in
->     the data section.
->
->     Signed-off-by: Laura Abbott <lauraa@codeaurora.org
->     <mailto:lauraa@codeaurora.org>>
->
->
-> Out of curiosity, did you find these cases via inspection, or were you
-> debugging faults after making stuff RO/NX?
->
+On 8/22/2014 10:45 PM, Kees Cook wrote:
+> On Wed, Aug 20, 2014 at 6:20 PM, Laura Abbott <lauraa@codeaurora.org> wrote:
+>>
+>> The fixmap API was originally added for arm64 for
+>> early_ioremap purposes. It can be used for other purposes too
+>> so move the initialization from ioremap to somewhere more
+>> generic. This makes it obvious where the fixmap is being set
+>> up and allows for a cleaner implementation of __set_fixmap.
+>>
+>> Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
+>> ---
+...
+>> +void __init early_fixmap_init(void)
+>> +{
+>> +       pgd_t *pgd;
+>> +       pud_t *pud;
+>> +       pmd_t *pmd;
+>> +       unsigned long addr = FIXADDR_START;
+>> +
+>> +       pgd = pgd_offset_k(addr);
+>> +       pgd_populate(&init_mm, pgd, bm_pud);
+>> +       pud = pud_offset(pgd, addr);
+>> +       pud_populate(&init_mm, pud, bm_pmd);
+>> +       pmd = pmd_offset(pud, addr);
+>> +       pmd_populate_kernel(&init_mm, pmd, bm_pte);
+>> +
+>> +       /*
+>> +        * The boot-ioremap range spans multiple pmds, for which
+>> +        * we are not preparted:
+>> +        */
+>> +       BUILD_BUG_ON((__fix_to_virt(FIX_BTMAP_BEGIN) >> PMD_SHIFT)
+>> +                    != (__fix_to_virt(FIX_BTMAP_END) >> PMD_SHIFT));
+>> +
+>> +       if ((pmd != fixmap_pmd(fix_to_virt(FIX_BTMAP_BEGIN)))
+>> +            || pmd != fixmap_pmd(fix_to_virt(FIX_BTMAP_END))) {
+>> +               WARN_ON(1);
+>> +               pr_warn("pmd %p != %p, %p\n",
+>> +                       pmd, fixmap_pmd(fix_to_virt(FIX_BTMAP_BEGIN)),
+>> +                       fixmap_pmd(fix_to_virt(FIX_BTMAP_END)));
+>> +               pr_warn("fix_to_virt(FIX_BTMAP_BEGIN): %08lx\n",
+>> +                       fix_to_virt(FIX_BTMAP_BEGIN));
+>> +               pr_warn("fix_to_virt(FIX_BTMAP_END):   %08lx\n",
+>> +                       fix_to_virt(FIX_BTMAP_END));
+>> +
+>> +               pr_warn("FIX_BTMAP_END:       %d\n", FIX_BTMAP_END);
+>> +               pr_warn("FIX_BTMAP_BEGIN:     %d\n", FIX_BTMAP_BEGIN);
+>> +       }
+>> +}
+>> +
+>> +void __set_fixmap(enum fixed_addresses idx,
+>> +                              phys_addr_t phys, pgprot_t flags)
+>> +{
+>> +       unsigned long addr = __fix_to_virt(idx);
+>> +       pte_t *pte;
+>> +
+>> +       if (idx >= __end_of_fixed_addresses) {
+>> +               BUG();
+>> +               return;
+>> +       }
+> 
+> Is it worth cleaning this up into BUG_ON instead of BUG; return; ?
+> 
+> Reviewed-by: Kees Cook <keescook@chromium.org>
+> 
+> -Kees
 
+I'm guessing this was set up for error handling even if CONFIG_BUG
+is turned off.
 
-These were all faults after making things RO/NX. It was a good way to know
-that the code was working as expected.
-
+Thanks,
 Laura
 
 -- 
