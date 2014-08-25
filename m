@@ -1,79 +1,79 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Mon, 25 Aug 2014 13:21:24 -0700
-Subject: [PATCH 3/3] ARM: zynq: DT: Add Ethernet phys
-In-Reply-To: <20140825174610.GA13737@obsidianresearch.com>
-References: <1408550219-19825-1-git-send-email-soren.brinkmann@xilinx.com>
- <1408550219-19825-3-git-send-email-soren.brinkmann@xilinx.com>
- <5a7b6f57-b6c0-4fb3-af0d-d403277c0207@BN1AFFO11FD045.protection.gbl>
- <53F5D8D9.7040604@suse.de>
- <f166a186-301c-4288-97cf-71f8173c07e7@BN1AFFO11FD010.protection.gbl>
- <CAGVrzcYWN83tznwvw1M9V_mwWgobs2kwtRvEj4stqE=XGC10fg@mail.gmail.com>
- <20140825174610.GA13737@obsidianresearch.com>
-Message-ID: <53FB9AC4.8010704@gmail.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Mon, 25 Aug 2014 13:34:19 -0700
+Subject: [PATCHv3 3/7] arm64: Move cpu_resume into the text section
+In-Reply-To: <1408584039-12735-4-git-send-email-lauraa@codeaurora.org>
+References: <1408584039-12735-1-git-send-email-lauraa@codeaurora.org>
+ <1408584039-12735-4-git-send-email-lauraa@codeaurora.org>
+Message-ID: <53FB9DCB.3080602@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/25/2014 10:46 AM, Jason Gunthorpe wrote:
-> On Fri, Aug 22, 2014 at 01:47:09PM -0700, Florian Fainelli wrote:
-> 
->>>  - the ID based strings seem to be not needed since, IIUC, the core
->>>    reads the ID from the PHY and uses it, so I just left it out not
->>>    trying to figure out how to obtain the correct ID
->>
->> It is not needed, but it is one way to specify a PHY device if you do
->> not know what compatible string to use instead.
-> 
-> No, it is a way to specify a PHY device if the kernel can't auto probe
-> the Phy ID.
-> 
-> Last I checked, the kernel doesn't support plain text compatible
-> strings for phys - everything is driven on the phy id, either auto
-> probed or specified in the DT.
+On 08/20/14 18:20, Laura Abbott wrote:
+> The function cpu_resume currently lives in the .data
+> section. This breaks functionality to make .data no
+> execute. Move cpu_resume to .text which is where it
+> actually belongs.
+>
+> Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
+> ---
 
-That's right. Some PHY drivers might be relying on specific compatible
-strings though, but not the core PHY library that probes and maps a
-driver to a PHY node.
+This is similar to arm (where I don't see a similar patch to this in
+Kees' patchset for RO). In arm we have this comment:
 
-> 
->>>  - the marvell compatible strings are used in our vendor tree. They
->>>    aren't used anywhere but in our vendor tree. I though keeping them is
->>>    nice since it identifies the PHY fully. And in case that level of
->>>    detail is needed at some point it is already there.
->>
->> And this is the recommended way to do it in case we ever need to key a
->> software decision based on the hardware.
-> 
-> All compatible strings need to be documented.
-> 
-> .. and they need to encode more information than you get from the phy
-> id - die revsision, package option, functional options, voltage
-> codes. Etc.
-> 
-> .. and they actually need to be *right*
+/*
+ * Note: Yes, part of the following code is located into the .data section.
+ *       This is to allow sleep_save_sp to be accessed with a relative load
+ *       while we can't rely on any MMU translation.  We could have put
+ *       sleep_save_sp in the .text section as well, but some setups might
+ *       insist on it to be truly read-only.
+ */
 
-Agreed.
+Doesn't the same situation apply here? How is this problem overcome?
 
-> 
-> An example: The kernel reports 88E1318S for all four chips in that
-> family, AFAIK you have to read the package marking to figure out which
-> you have (it is the same die, with options switched on/off at
-> packaging time). People have already posted patches trying to
-> helpfully add a 'marvell,88E1318S' compatible string based on kernel
-> output. Except it is wrong, it isn't actually the '8S version in the
-> HW.
-> 
-> Even worse, Marvell has a whole series of socket compatible phys. Just
-> because the board the DT author looked at has a '318, doesn't mean
-> that every board ever made will. We've actually already been switching
-> between the 318 and 318S for production depending on which has part
-> availability.
-> 
-> Basically: don't try to override self-discoverable hardware in DT
-> without a really good reason.
+But I'm a little confused, shouldn't this code run with the MMU disabled?
 
-I think that's a very good point, at the very least let's use a
-compatible string that contains the full 32-bits PHY OUI.
+>  ENDPROC(cpu_resume_after_mmu)
+>  
+> -	.data
+>  ENTRY(cpu_resume)
+>  	bl	el2_setup		// if in EL2 drop to EL1 cleanly
+>  #ifdef CONFIG_SMP
+>  	mrs	x1, mpidr_el1
+> -	adr	x4, mpidr_hash_ptr
+> +	adrp	x4, mpidr_hash_ptr
+> +	add	x4, x4, #:lo12:mpidr_hash_ptr
+>  	ldr	x5, [x4]
+>  	add	x8, x4, x5		// x8 = struct mpidr_hash phys address
+>          /* retrieve mpidr_hash members to compute the hash */
+> @@ -143,14 +143,15 @@ ENTRY(cpu_resume)
+>  #else
+>  	mov	x7, xzr
+>  #endif
+> -	adr	x0, sleep_save_sp
+> +	adrp	x0, sleep_save_sp
+> +	add	x0, x0, #:lo12:sleep_save_sp
+>  	ldr	x0, [x0, #SLEEP_SAVE_SP_PHYS]
+>  	ldr	x0, [x0, x7, lsl #3]
+>  	/* load sp from context */
+>  	ldr	x2, [x0, #CPU_CTX_SP]
+> -	adr	x1, sleep_idmap_phys
+> +	adrp	x1, sleep_idmap_phys
+>  	/* load physical address of identity map page table in x1 */
+> -	ldr	x1, [x1]
+> +	ldr	x1, [x1, #:lo12:sleep_idmap_phys]
+>  	mov	sp, x2
+>  	/*
+>  	 * cpu_do_resume expects x0 to contain context physical address
+> @@ -160,6 +161,7 @@ ENTRY(cpu_resume)
+>  	b	cpu_resume_mmu		// Resume MMU, never returns
+>  ENDPROC(cpu_resume)
+>  
+> +	.data
+>  	.align 3
+>  mpidr_hash_ptr:
+>  	/*
 
-Thanks
---
-Florian
+
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
