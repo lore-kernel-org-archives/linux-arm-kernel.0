@@ -1,26 +1,55 @@
-From: libv@skynet.be (Luc Verhaegen)
-Date: Mon, 25 Aug 2014 17:18:22 +0200
-Subject: [linux-sunxi] Re: [PATCH 4/4] simplefb: add clock handling code
-In-Reply-To: <20140825151255.GA14967@ulmo.nvidia.com>
-References: <53EB9471.3090204@wwwdotorg.org> <20140813170106.GT15297@lukather>
- <20140825121228.GB4163@ulmo.nvidia.com> <20140825124410.GZ15297@lukather>
- <20140825133953.GJ4163@ulmo.nvidia.com> <53FB3E7F.4000503@redhat.com>
- <20140825141600.GA14763@ulmo.nvidia.com>
- <CAKON4OyjJ+QcBGOzrUDH9J+DxBEKLmXeOcnUyOHHHV_DtCG0zA@mail.gmail.com>
- <53FB47B8.2090104@redhat.com> <20140825151255.GA14967@ulmo.nvidia.com>
-Message-ID: <20140825151822.GC21020@skynet.be>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 25 Aug 2014 17:18:47 +0200
+Subject: [PATCH 07/14] clk: sunxi: Introduce mbus compatible
+In-Reply-To: <CAGb2v64xzwySFcnhAAmPFvUOWGechLZpoxfmb0OmEGOZbV+58Q@mail.gmail.com>
+References: <1405588134-2396-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1405588134-2396-8-git-send-email-maxime.ripard@free-electrons.com>
+ <CAGb2v64xzwySFcnhAAmPFvUOWGechLZpoxfmb0OmEGOZbV+58Q@mail.gmail.com>
+Message-ID: <20140825151847.GD15297@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 25, 2014 at 05:12:58PM +0200, Thierry Reding wrote:
+On Mon, Aug 25, 2014 at 10:17:37PM +0800, Chen-Yu Tsai wrote:
+> Hi,
 > 
-> Out of curiosity, how does this work in practice? How does the
-> bootloader create this entry? Does it scan the DT to see which clocks
-> the real hardware device references and then simply copies them to the
-> simplefb node?
+> On Thu, Jul 17, 2014 at 5:08 PM, Maxime Ripard
+> <maxime.ripard@free-electrons.com> wrote:
+> > Even though the mbus clock is a regular module clock, given its nature, it
+> > needs to be enabled all the time.
+> >
+> > Introduce a new compatible, to differentiate it from the other module clocks.
+> >
+> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> > ---
+> >  Documentation/devicetree/bindings/clock/sunxi.txt | 1 +
+> >  drivers/clk/sunxi/clk-sunxi.c                     | 1 +
+> >  2 files changed, 2 insertions(+)
+> >
+> > diff --git a/Documentation/devicetree/bindings/clock/sunxi.txt b/Documentation/devicetree/bindings/clock/sunxi.txt
+> > index d3a5c3c6d677..112d8525b6e0 100644
+> > --- a/Documentation/devicetree/bindings/clock/sunxi.txt
+> > +++ b/Documentation/devicetree/bindings/clock/sunxi.txt
+> > @@ -46,6 +46,7 @@ Required properties:
+> >         "allwinner,sun6i-a31-apb2-div-clk" - for the APB2 gates on A31
+> >         "allwinner,sun6i-a31-apb2-gates-clk" - for the APB2 gates on A31
+> >         "allwinner,sun8i-a23-apb2-gates-clk" - for the APB2 gates on A23
+> > +       "allwinner,sun4i-a10-mbus-clk" - for the MBUS clock on A10
 > 
-> Thierry
+> This should probably be sun5i-a13-mbus-clk?
+> AFAIK the A10 doesn't have MBUS.
 
-https://www.mail-archive.com/linux-sunxi at googlegroups.com/msg06619.html
+Ah, right, thanks!
 
-Luc Verhaegen.
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140825/f24c7562/attachment.sig>
