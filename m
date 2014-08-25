@@ -1,30 +1,23 @@
-From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
-Date: Mon, 25 Aug 2014 19:20:07 +0200
-Subject: [PATCH v9 1/2] regulator: Add driver for max77802 PMIC PMIC
- regulators
-In-Reply-To: <CAD=FV=V4TSKsbjj3dXCdSzVrh3sxH-FkpFEbEo+JA1bN9R-XWA@mail.gmail.com>
-References: <1408350762-15520-1-git-send-email-javier.martinez@collabora.co.uk>	<1408350762-15520-2-git-send-email-javier.martinez@collabora.co.uk>	<CA+NduCDL65=Y=PyU3FfXsTz0FfbmYzicGrY4U7ji3_V+nXhtCQ@mail.gmail.com>	<53F73472.8010609@collabora.co.uk>	<20140822144531.GV24407@sirena.org.uk>	<53F7838F.8060906@collabora.co.uk>	<20140822183054.GY24407@sirena.org.uk>	<53F7BDD8.7060500@collabora.co.uk>	<CAD=FV=WC0h7fYm2QFqu3Zka7CsU4BtG-oyPpJav+ygC+gmCR+A@mail.gmail.com>	<CA+NduCCT-KQ=gh7QWkBE4qkA2YOJ8KCVqbkC6Tkmb1aPvCsGFQ@mail.gmail.com>	<53FAFCBC.2050407@collabora.co.uk>
- <CAD=FV=V4TSKsbjj3dXCdSzVrh3sxH-FkpFEbEo+JA1bN9R-XWA@mail.gmail.com>
-Message-ID: <53FB7047.7080508@collabora.co.uk>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 25 Aug 2014 11:23:29 -0600
+Subject: [PATCH v3 2/8] ARM: tegra: Add SATA controller to Tegra124 device
+ tree
+In-Reply-To: <1405500863-19696-3-git-send-email-mperttunen@nvidia.com>
+References: <1405500863-19696-1-git-send-email-mperttunen@nvidia.com>
+ <1405500863-19696-3-git-send-email-mperttunen@nvidia.com>
+Message-ID: <53FB7111.2000602@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Doug,
+On 07/16/2014 02:54 AM, Mikko Perttunen wrote:
+> This adds the integrated AHCI-compliant Serial ATA controller present
+> in Tegra124 systems-on-chip to the Tegra124 device tree.
 
-On 08/25/2014 05:40 PM, Doug Anderson wrote:
->>
->> I see, so probably until we have a way to define the operating mode for
->> each regulator using DT we should set the opmode to normal when enabling a
->> regulator independently of the value the hardware register reported on probe.
->>
->> Can you please test the following change [0] so I can post as a proper
->> patch? Doug, Mark do you think that forcing the regulator to opmode normal
->> when enabling is the right solution here?
-> 
-> IMHO that makes sense.
-> 
+I have applied patches 2 and 3 to Tegra's for-3.18/dt branch. I fixed 
+the DT node sort order when doing so.
 
-Thanks, I'll post it as a proper patch tomorrow then.
+I can't apply patch 8 (the defconfig change) until 3.17-rc2 is out, or 
+there will be a build failure, but I will do so ASAP.
 
-Best regards,
-Javier
+BTW, once 3.17-rc2 is out, can you please sent a patch to 
+multi_v7_defconfig enabling Tegra SATA support there too. Thanks.
