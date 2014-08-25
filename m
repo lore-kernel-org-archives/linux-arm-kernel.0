@@ -1,79 +1,36 @@
-From: jh80.chung@samsung.com (Jaehoon Chung)
-Date: Mon, 25 Aug 2014 21:11:51 +0900
-Subject: [PATCHv10 0/5] ARM: remove the sub-node and deprecate
- supports-highspeed property for dwmmc.
-In-Reply-To: <53FB278B.7010509@samsung.com>
-References: <1407397082-32495-1-git-send-email-jh80.chung@samsung.com>
- <20140825112151.GA21336@amd> <53FB1DD5.3050207@samsung.com>
- <20140825113719.GA31960@amd> <53FB278B.7010509@samsung.com>
-Message-ID: <53FB2807.7070503@samsung.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Mon, 25 Aug 2014 14:12:30 +0200
+Subject: [PATCH 4/4] simplefb: add clock handling code
+In-Reply-To: <20140813170106.GT15297@lukather>
+References: <1407914239-12054-1-git-send-email-libv@skynet.be>
+ <1407914239-12054-5-git-send-email-libv@skynet.be>
+ <53EB9471.3090204@wwwdotorg.org> <20140813170106.GT15297@lukather>
+Message-ID: <20140825121228.GB4163@ulmo.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/25/2014 09:09 PM, Jaehoon Chung wrote:
-> On 08/25/2014 08:37 PM, Pavel Machek wrote:
->> On Mon 2014-08-25 20:28:21, Jaehoon Chung wrote:
->>> On 08/25/2014 08:21 PM, Pavel Machek wrote:
->>>> On Thu 2014-08-07 16:37:57, Jaehoon Chung wrote:
->>>>> Since used the mmc_of_parse(), didn't parse the sub-node.
->>>>> So we can remove the sub-node, because almost SoC used the only one card per a host.
->>>>> And supports-highspeed can be replaced with "cap-mmc/sd-highspeed"
->>>>> property.
->>>>
->>>> Would it be better to fix parsing of the device tree, and not to
->>>> change all the device trees?
->>>>
->>>> Someone will want to do two slots sooner or later...
->>>>
->>>
->>> First, I had considered that controller can be supported the multiple slot.
->>> But MMC maintainers and other people suggested that consider the only one card per a host.
->>> Two slots or more don't have any benefit, (power or performance, etc).
->>
->> Would you elaborate?
->>
->> If I have a device like a phone, I may want to put one "slot" inside
->> phone for basic system, and offer second slot for user expansion
->> (initially empty).
+On Wed, Aug 13, 2014 at 07:01:06PM +0200, Maxime Ripard wrote:
+> On Wed, Aug 13, 2014 at 10:38:09AM -0600, Stephen Warren wrote:
+[...]
+> > If not, perhaps the clock driver should force the clock to be
+> > enabled (perhaps only if the DRM/KMS driver isn't enabled?).
 > 
-> if multiple slot is supported, then a mmcqd should be processing for multiple slots.
-> It's too inefficient, and affect the whole performance reduction.
-Sorry, Discard this comment. it means dwmci, not mmcqd.
+> I'm sorry, but I'm not going to take any code that will do that in our
+> clock driver.
+> 
+> I'm not going to have a huge list of ifdef depending on configuration
+> options to know which clock to enable, especially when clk_get should
+> have the consumer device as an argument.
 
-> 
-> If want to offer the second slot for user expansion, add the host for expansion slot.
-> Almost All SoC didn't use the multiple slot per a host controller for eMMC/SD/SDIO.
-> 
-> If Some device(Phone) supports the SD-card and eMMC, then there are two Host IP.
-> One Host IP is used for eMMC, other is used for SD-card.
-> 
-> this is H/W design issue.
-> 
-> a) You means the below,
-> 
-> One Host IP -------- eMMC
-> 		|
-> 		---- SD
-> 		|
-> 		---- SDIO
-> 
-> b) We means the below
-> One Host IP -------- eMMC
-> One Host IP -------- SD
-> One Host IP -------- SDIO
-> 
-> In now, I knew every SoC have used like b) type. I didn't see a) type (especially, dwmmc's case).
-> 
-> If i missed something, let me know, plz.
-> 
-> Best Regards,
-> Jaehoon Chung
-> 
->>
->> Or I may want to have internal slot with a card to boot from and have
->> external slot (initially empty) for system update for embedded system.
->>
->> I see quite an obvious benefit there.
->> 									Pavel
->>
-> 
+Are you saying is that you want to solve a platform-specific problem by
+pushing code into simple, generic drivers so that your platform code can
+stay "clean"?
+
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140825/ea172bb2/attachment.sig>
