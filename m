@@ -1,82 +1,70 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Mon, 25 Aug 2014 17:05:04 +0200
-Subject: [linux-sunxi] Re: [PATCH 4/4] simplefb: add clock handling code
-In-Reply-To: <20140825145854.GA15297@lukather>
-References: <1407914239-12054-1-git-send-email-libv@skynet.be>
- <1407914239-12054-5-git-send-email-libv@skynet.be>
- <53EB9471.3090204@wwwdotorg.org> <20140813170106.GT15297@lukather>
- <20140825121228.GB4163@ulmo.nvidia.com>
- <20140825124410.GZ15297@lukather>
- <20140825133953.GJ4163@ulmo.nvidia.com>
- <53FB3E7F.4000503@redhat.com>
- <20140825141600.GA14763@ulmo.nvidia.com>
- <20140825145854.GA15297@lukather>
-Message-ID: <20140825150501.GE14763@ulmo.nvidia.com>
+From: dianders@google.com (Doug Anderson)
+Date: Mon, 25 Aug 2014 08:06:50 -0700
+Subject: [PATCH V2 1/3] mmc: dw_mmc: use mmc_regulator_get_supply to
+ handle regulators
+In-Reply-To: <53FB2CC2.9070905@samsung.com>
+References: <1408715272-13833-1-git-send-email-yuvaraj.cd@samsung.com>
+ <1408715272-13833-2-git-send-email-yuvaraj.cd@samsung.com>
+ <53FB2CC2.9070905@samsung.com>
+Message-ID: <CAD=FV=U-izXxh2DcBs=ZmS5vhvByHYL9yX7xOsDq-0te=dmC8Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 25, 2014 at 04:58:54PM +0200, Maxime Ripard wrote:
-> On Mon, Aug 25, 2014 at 04:16:29PM +0200, Thierry Reding wrote:
-> > On Mon, Aug 25, 2014 at 03:47:43PM +0200, Hans de Goede wrote:
-> > > On 08/25/2014 03:39 PM, Thierry Reding wrote:
-> > > > On Mon, Aug 25, 2014 at 02:44:10PM +0200, Maxime Ripard wrote:
-> > > >> On Mon, Aug 25, 2014 at 02:12:30PM +0200, Thierry Reding wrote:
-> > > >>> On Wed, Aug 13, 2014 at 07:01:06PM +0200, Maxime Ripard wrote:
-> > > >>>> On Wed, Aug 13, 2014 at 10:38:09AM -0600, Stephen Warren wrote:
-> > > >>> [...]
-> > > >>>>> If not, perhaps the clock driver should force the clock to be
-> > > >>>>> enabled (perhaps only if the DRM/KMS driver isn't enabled?).
-> > > >>>>
-> > > >>>> I'm sorry, but I'm not going to take any code that will do that in our
-> > > >>>> clock driver.
-> > > >>>>
-> > > >>>> I'm not going to have a huge list of ifdef depending on configuration
-> > > >>>> options to know which clock to enable, especially when clk_get should
-> > > >>>> have the consumer device as an argument.
-> > > >>>
-> > > >>> Are you saying is that you want to solve a platform-specific problem by
-> > > >>> pushing code into simple, generic drivers so that your platform code can
-> > > >>> stay "clean"?
-> > > >>
-> > > >> Are you saying that this driver would become "dirty" with such a patch?
-> > > > 
-> > > > Yes. Others have said the same and even provided alternative solutions
-> > > > on how to solve what's seemingly a platform-specific problem in a
-> > > > platform-specific way.
-> > > 
-> > > This is not platform specific, any platform with a complete clock driver
-> > > will suffer from the same problem (the clock driver disabling unclaimed
-> > > ahb gates, and thus killing the video output) if it wants to use simplefb
-> > > for early console support.
-> > 
-> > It is platform specific in that your platform may require certain clocks
-> > to remain on.
-> 
-> The platform doesn't. simplefb does. simplefb is the obvious consumer
-> for these clocks, and given the current API and abstraction we have,
-> it should be the one claiming the clocks too.
+Jaehoon,
 
-No. simplefb just wants to write to some memory that hardware has been
-set up to scan out. The platform requires that the clocks be on. Other
-platforms may not even allow turning off the clocks.
+On Mon, Aug 25, 2014 at 5:32 AM, Jaehoon Chung <jh80.chung@samsung.com> wrote:
+> On 08/22/2014 10:47 PM, Yuvaraj Kumar C D wrote:
+>> This patch makes use of mmc_regulator_get_supply() to handle
+>> the vmmc and vqmmc regulators.Also it moves the code handling
+>> the these regulators to dw_mci_set_ios().It turned on the vmmc
+>> and vqmmc during MMC_POWER_UP and MMC_POWER_ON,and turned off
+>> during MMC_POWER_OFF.
+>>
+>> Signed-off-by: Yuvaraj Kumar C D <yuvaraj.cd@samsung.com>
+>> ---
+>> changes from v1:
+>>       1.Used mmc_regulator_set_ocr() instead of regulator_enable() for vmmc.
+>>       2.Turned on vmmc and vqmmc during MMC_POWER_UP.
+>>       3. Removed the flags DW_MMC_CARD_POWERED and DW_MMC_IO_POWERED which
+>>          added during the initial version of this patch.
+>>       4. Added error message, if it failed to turn on regulator's.
+>>
+>>  drivers/mmc/host/dw_mmc.c  |   72 +++++++++++++++++++++-----------------------
+>>  include/linux/mmc/dw_mmc.h |    2 +-
+>>  2 files changed, 36 insertions(+), 38 deletions(-)
+>>
+>> diff --git a/drivers/mmc/host/dw_mmc.c b/drivers/mmc/host/dw_mmc.c
+>> index 7f227e9..aadb0d6 100644
+>> --- a/drivers/mmc/host/dw_mmc.c
+>> +++ b/drivers/mmc/host/dw_mmc.c
+>> @@ -936,6 +936,7 @@ static void dw_mci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
+>>       struct dw_mci_slot *slot = mmc_priv(mmc);
+>>       const struct dw_mci_drv_data *drv_data = slot->host->drv_data;
+>>       u32 regs;
+>> +     int ret;
+>>
+>>       switch (ios->bus_width) {
+>>       case MMC_BUS_WIDTH_4:
+>> @@ -974,12 +975,38 @@ static void dw_mci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
+>>
+>>       switch (ios->power_mode) {
+>>       case MMC_POWER_UP:
+>> +             if (!IS_ERR(mmc->supply.vmmc)) {
+>> +                     ret = mmc_regulator_set_ocr(mmc, mmc->supply.vmmc,
+>> +                                     ios->vdd);
+>> +                     if (ret) {
+>> +                             dev_err(slot->host->dev,
+>> +                                     "failed to enable vmmc regulator\n");
+>> +                             /*return, if failed turn on vmmc*/
+>> +                             return;
+>> +                     }
+>> +             }
+>> +             if (!IS_ERR(mmc->supply.vqmmc) && !slot->host->vqmmc_enabled) {
+>
+> Can't use the regulator_is_enabled() instead of "slot->host->vqmmc_enabled"?
 
-> > The next platform may require power domains to remain on during boot
-> > and yet another one may rely on regulators to stay on during
-> > boot. By your argument simplefb will need to be taught to handle
-> > pretty much every type of resource that the kernel has.
-> 
-> And I wouldn't find anything wrong with that. We're already doing so
-> for any generic driver in the kernel (AHCI, EHCI comes to my mind
-> first, there's probably a lot of others). Why wouldn't we do as such
-> for this one?
+I think we mentioned this before, but regulator_is_enabled() won't do
+what you want with shared regulators since they are refcounted.  You
+need to keep track of whether you've enabled the regulator yourself.
 
-Yes, and we've had similar discussions in those subsystems too.
-
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140825/32926166/attachment.sig>
+-Doug
