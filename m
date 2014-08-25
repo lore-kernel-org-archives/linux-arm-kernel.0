@@ -1,29 +1,42 @@
-From: info@lategoodbye.de (Stefan Wahren)
-Date: Mon, 25 Aug 2014 12:30:25 +0200
-Subject: ARM: mx28: cpufreq-cpu0 support?
-In-Reply-To: <20140825080123.GA12289@dragon>
-References: <53F9B4BF.2050802@lategoodbye.de> <20140825080123.GA12289@dragon>
-Message-ID: <53FB1041.5010208@lategoodbye.de>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Mon, 25 Aug 2014 12:15:23 +0200
+Subject: [PATCH] PWM: atmel: fix incorrect CDTY value after enabling or
+ disabling
+In-Reply-To: <1394823931-2815-1-git-send-email-alexandre.belloni@free-electrons.com>
+References: <1394823931-2815-1-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <20140825101522.GA16960@ulmo.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 25.08.2014 10:01, schrieb Shawn Guo:
-> On Sun, Aug 24, 2014 at 11:47:43AM +0200, Stefan Wahren wrote:
->> Hi,
->>
->> could you please tell me, is i.MX28 supported by cpufreq-cpu0?
->>
->> Do we need only the necessary DT entries like operating points or is
->> it more?
->
-> Clock might as simple as adding DT entries, but I'm not sure we have
-> voltage scaling support for i.MX28 in kernel.
->
-> Shawn
->
+On Fri, Mar 14, 2014 at 08:05:31PM +0100, Alexandre Belloni wrote:
+> pwm-leds calls .config() and .disable() in a row. This exhibits that it may
+> happen that the channel gets disabled before CDTY has been updated with CUPD.
+> The issue gets quite worse with long periods.
+> So, ensure by reading ISR that at least one period has past before disabling the
+> channel.
+> 
+> The other issue is that it may happen that CUPD is not flushed before enabling
+> the channel so it will update CDTY/CPRD just after one period. So we always set
+> CUPD, even when the channel is not enabled.
+> 
+> Tested on at91sam9g45 and sama5d31ek.
+> 
+> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+> ---
+>  drivers/pwm/pwm-atmel.c | 46 +++++++++++++++++++++++++++++-----------------
+>  1 file changed, 29 insertions(+), 17 deletions(-)
 
-As far as i know, the old Freescale BSP (2.6.35) contains a cpufreq 
-driver for mxs, which never goes to mainline. So i'm not sure what would 
-be the best way: porting the old driver or using cpufreq-cpu0.
+Hi Alexandre,
 
-Stefan
+going through the list of unapplied patches I came across this old
+patch. It was never reviewed nor acked by anyone and you didn't ping me,
+so I always assumed it must no longer be required. Is that so?
+
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140825/98b64092/attachment.sig>
