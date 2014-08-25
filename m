@@ -1,75 +1,60 @@
-From: jh80.chung@samsung.com (Jaehoon Chung)
-Date: Mon, 25 Aug 2014 21:09:47 +0900
-Subject: [PATCHv10 0/5] ARM: remove the sub-node and deprecate
- supports-highspeed property for dwmmc.
-In-Reply-To: <20140825113719.GA31960@amd>
-References: <1407397082-32495-1-git-send-email-jh80.chung@samsung.com>
- <20140825112151.GA21336@amd> <53FB1DD5.3050207@samsung.com>
- <20140825113719.GA31960@amd>
-Message-ID: <53FB278B.7010509@samsung.com>
+From: mperttunen@nvidia.com (Mikko Perttunen)
+Date: Mon, 25 Aug 2014 15:10:19 +0300
+Subject: [PATCH] ARM: tegra: add PCIe-related pins to the Jetson TK1 pinmux
+ tables
+In-Reply-To: <53FB160F.6000700@nvidia.com>
+References: <1408742308-18004-1-git-send-email-swarren@wwwdotorg.org>
+ <53FB10B8.3010408@suse.de> <53FB160F.6000700@nvidia.com>
+Message-ID: <53FB27AB.8010608@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/25/2014 08:37 PM, Pavel Machek wrote:
-> On Mon 2014-08-25 20:28:21, Jaehoon Chung wrote:
->> On 08/25/2014 08:21 PM, Pavel Machek wrote:
->>> On Thu 2014-08-07 16:37:57, Jaehoon Chung wrote:
->>>> Since used the mmc_of_parse(), didn't parse the sub-node.
->>>> So we can remove the sub-node, because almost SoC used the only one card per a host.
->>>> And supports-highspeed can be replaced with "cap-mmc/sd-highspeed"
->>>> property.
->>>
->>> Would it be better to fix parsing of the device tree, and not to
->>> change all the device trees?
->>>
->>> Someone will want to do two slots sooner or later...
->>>
+.. and apparently the device tree patches are in staging/tegra.
+
+On 25/08/14 13:55, Mikko Perttunen wrote:
+> On 25/08/14 13:32, Andreas F?rber wrote:
+>> Hi Stephen,
 >>
->> First, I had considered that controller can be supported the multiple slot.
->> But MMC maintainers and other people suggested that consider the only one card per a host.
->> Two slots or more don't have any benefit, (power or performance, etc).
-> 
-> Would you elaborate?
-> 
-> If I have a device like a phone, I may want to put one "slot" inside
-> phone for basic system, and offer second slot for user expansion
-> (initially empty).
-
-if multiple slot is supported, then a mmcqd should be processing for multiple slots.
-It's too inefficient, and affect the whole performance reduction.
-
-If want to offer the second slot for user expansion, add the host for expansion slot.
-Almost All SoC didn't use the multiple slot per a host controller for eMMC/SD/SDIO.
-
-If Some device(Phone) supports the SD-card and eMMC, then there are two Host IP.
-One Host IP is used for eMMC, other is used for SD-card.
-
-this is H/W design issue.
-
-a) You means the below,
-
-One Host IP -------- eMMC
-		|
-		---- SD
-		|
-		---- SDIO
-
-b) We means the below
-One Host IP -------- eMMC
-One Host IP -------- SD
-One Host IP -------- SDIO
-
-In now, I knew every SoC have used like b) type. I didn't see a) type (especially, dwmmc's case).
-
-If i missed something, let me know, plz.
-
-Best Regards,
-Jaehoon Chung
-
-> 
-> Or I may want to have internal slot with a card to boot from and have
-> external slot (initially empty) for system update for embedded system.
-> 
-> I see quite an obvious benefit there.
-> 									Pavel
-> 
+>> Am 22.08.2014 23:18, schrieb Stephen Warren:
+>>> From: Stephen Warren <swarren@nvidia.com>
+>>>
+>>> This pinmux tables currently omit any configuration for PCIe clk_req,
+>>> wake, and rst pins, which in turn causes intermittent failures in
+>>> U-Boot's PCIe support. Import an updated version of the pinmux tables
+>>> which rectifies this.
+>>>
+>>> (While I'm still hoping to remove the pinmux tables from DTs for
+>>> Tegra124+ devices, while they're still here, they may as well be
+>>> complete and correct).
+>>>
+>>> Signed-off-by: Stephen Warren <swarren@nvidia.com>
+>>> ---
+>>>   arch/arm/boot/dts/tegra124-jetson-tk1.dts | 35
+>>> +++++++++++++++++++++++++++++++
+>>>   1 file changed, 35 insertions(+)
+>>
+>> I've tested this patch on both -rc1 and yesterday's torvalds/linux.git
+>> with tegra_defconfig: Both with or without this patch I get empty lspci
+>> output.
+>>
+>> There doesn't seem to be a tegra/linux.git for-next branch based on -rc1
+>> yet - are patches from other subsystem trees needed to get the on-board
+>> Ethernet detected or maybe some config option?
+>
+> git://gitorious.org/thierryreding/linux.git staging/pci
+>
+>>
+>> Or did you test PCIe via the on-board slot?
+>>
+>> I used U-Boot v2014.07, in case it matters.
+>>
+>> Thanks,
+>> Andreas
+>>
+>
+> Cheers,
+> Mikko
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-tegra" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
