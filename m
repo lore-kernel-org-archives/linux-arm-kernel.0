@@ -1,80 +1,61 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Mon, 25 Aug 2014 16:16:29 +0200
-Subject: [linux-sunxi] Re: [PATCH 4/4] simplefb: add clock handling code
-In-Reply-To: <53FB3E7F.4000503@redhat.com>
-References: <1407914239-12054-1-git-send-email-libv@skynet.be>
- <1407914239-12054-5-git-send-email-libv@skynet.be>
- <53EB9471.3090204@wwwdotorg.org> <20140813170106.GT15297@lukather>
- <20140825121228.GB4163@ulmo.nvidia.com>
- <20140825124410.GZ15297@lukather>
- <20140825133953.GJ4163@ulmo.nvidia.com>
- <53FB3E7F.4000503@redhat.com>
-Message-ID: <20140825141600.GA14763@ulmo.nvidia.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Mon, 25 Aug 2014 22:17:37 +0800
+Subject: [PATCH 07/14] clk: sunxi: Introduce mbus compatible
+In-Reply-To: <1405588134-2396-8-git-send-email-maxime.ripard@free-electrons.com>
+References: <1405588134-2396-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1405588134-2396-8-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <CAGb2v64xzwySFcnhAAmPFvUOWGechLZpoxfmb0OmEGOZbV+58Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 25, 2014 at 03:47:43PM +0200, Hans de Goede wrote:
-> On 08/25/2014 03:39 PM, Thierry Reding wrote:
-> > On Mon, Aug 25, 2014 at 02:44:10PM +0200, Maxime Ripard wrote:
-> >> On Mon, Aug 25, 2014 at 02:12:30PM +0200, Thierry Reding wrote:
-> >>> On Wed, Aug 13, 2014 at 07:01:06PM +0200, Maxime Ripard wrote:
-> >>>> On Wed, Aug 13, 2014 at 10:38:09AM -0600, Stephen Warren wrote:
-> >>> [...]
-> >>>>> If not, perhaps the clock driver should force the clock to be
-> >>>>> enabled (perhaps only if the DRM/KMS driver isn't enabled?).
-> >>>>
-> >>>> I'm sorry, but I'm not going to take any code that will do that in our
-> >>>> clock driver.
-> >>>>
-> >>>> I'm not going to have a huge list of ifdef depending on configuration
-> >>>> options to know which clock to enable, especially when clk_get should
-> >>>> have the consumer device as an argument.
-> >>>
-> >>> Are you saying is that you want to solve a platform-specific problem by
-> >>> pushing code into simple, generic drivers so that your platform code can
-> >>> stay "clean"?
-> >>
-> >> Are you saying that this driver would become "dirty" with such a patch?
-> > 
-> > Yes. Others have said the same and even provided alternative solutions
-> > on how to solve what's seemingly a platform-specific problem in a
-> > platform-specific way.
-> 
-> This is not platform specific, any platform with a complete clock driver
-> will suffer from the same problem (the clock driver disabling unclaimed
-> ahb gates, and thus killing the video output) if it wants to use simplefb
-> for early console support.
+Hi,
 
-It is platform specific in that your platform may require certain clocks
-to remain on. The next platform may require power domains to remain on
-during boot and yet another one may rely on regulators to stay on during
-boot. By your argument simplefb will need to be taught to handle pretty
-much every type of resource that the kernel has.
+On Thu, Jul 17, 2014 at 5:08 PM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> Even though the mbus clock is a regular module clock, given its nature, it
+> needs to be enabled all the time.
+>
+> Introduce a new compatible, to differentiate it from the other module clocks.
+>
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> ---
+>  Documentation/devicetree/bindings/clock/sunxi.txt | 1 +
+>  drivers/clk/sunxi/clk-sunxi.c                     | 1 +
+>  2 files changed, 2 insertions(+)
+>
+> diff --git a/Documentation/devicetree/bindings/clock/sunxi.txt b/Documentation/devicetree/bindings/clock/sunxi.txt
+> index d3a5c3c6d677..112d8525b6e0 100644
+> --- a/Documentation/devicetree/bindings/clock/sunxi.txt
+> +++ b/Documentation/devicetree/bindings/clock/sunxi.txt
+> @@ -46,6 +46,7 @@ Required properties:
+>         "allwinner,sun6i-a31-apb2-div-clk" - for the APB2 gates on A31
+>         "allwinner,sun6i-a31-apb2-gates-clk" - for the APB2 gates on A31
+>         "allwinner,sun8i-a23-apb2-gates-clk" - for the APB2 gates on A23
+> +       "allwinner,sun4i-a10-mbus-clk" - for the MBUS clock on A10
 
-> As for the suggestion to simply never disable the plls / ahb gates by blocking
-> them from ever being disabled in the sunxi clock driver, that is not really
-> a solution either, as we want to be able to turn these things off to safe
-> power on screen blank once control has been turned over to the kms driver.
+This should probably be sun5i-a13-mbus-clk?
+AFAIK the A10 doesn't have MBUS.
 
-Then perhaps part of the hand-off procedure between simplefb and DRM/KMS
-should involve marking PLLs or "gates" as properly managed.
-
-> And while at it let me also tackle the don't use simplefb only use kms argument,
-> that means that the clocks will be turned off until the kms module loads, which
-> will cause noticable screen flicker / video output resync, something which we've
-> been trying to get rid of for years now.
-> 
-> And no, build in the kms driver is not an answer either. That works nicely for
-> firmware, but not for generic Linux distributions supporting a wide range
-> of boards.
-
-Odd... I didn't offer any of those two as solutions to the problem.
-
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140825/5a2fa3c4/attachment-0001.sig>
+>         "allwinner,sun4i-a10-mod0-clk" - for the module 0 family of clocks
+>         "allwinner,sun7i-a20-out-clk" - for the external output clocks
+>         "allwinner,sun7i-a20-gmac-clk" - for the GMAC clock module on A20/A31
+> diff --git a/drivers/clk/sunxi/clk-sunxi.c b/drivers/clk/sunxi/clk-sunxi.c
+> index 130e0d1ae510..bfb82bafbf9b 100644
+> --- a/drivers/clk/sunxi/clk-sunxi.c
+> +++ b/drivers/clk/sunxi/clk-sunxi.c
+> @@ -1110,6 +1110,7 @@ static const struct of_device_id clk_factors_match[] __initconst = {
+>         {.compatible = "allwinner,sun7i-a20-pll4-clk", .data = &sun7i_a20_pll4_data,},
+>         {.compatible = "allwinner,sun6i-a31-pll6-clk", .data = &sun6i_a31_pll6_data,},
+>         {.compatible = "allwinner,sun4i-a10-apb1-clk", .data = &sun4i_apb1_data,},
+> +       {.compatible = "allwinner,sun4i-a10-mbus-clk", .data = &sun4i_mod0_data,},
+>         {.compatible = "allwinner,sun4i-a10-mod0-clk", .data = &sun4i_mod0_data,},
+>         {.compatible = "allwinner,sun7i-a20-out-clk", .data = &sun7i_a20_out_data,},
+>         {}
+> --
+> 2.0.1
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
