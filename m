@@ -1,46 +1,82 @@
-From: jogo@openwrt.org (Jonas Gorski)
-Date: Mon, 25 Aug 2014 17:01:27 +0200
-Subject: [RFC 3/7] bcm47xx-sprom: add Broadcom sprom parser driver
-In-Reply-To: <8344390.rjnOcYBCET@wuerfel>
-References: <1408915485-8078-1-git-send-email-hauke@hauke-m.de>
- <1408915485-8078-5-git-send-email-hauke@hauke-m.de>
- <8344390.rjnOcYBCET@wuerfel>
-Message-ID: <CAOiHx=kcnZqkUxTc64oWWnyet2wXZe+3A1Lt2C5kvjgVjgwcVw@mail.gmail.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Mon, 25 Aug 2014 17:05:04 +0200
+Subject: [linux-sunxi] Re: [PATCH 4/4] simplefb: add clock handling code
+In-Reply-To: <20140825145854.GA15297@lukather>
+References: <1407914239-12054-1-git-send-email-libv@skynet.be>
+ <1407914239-12054-5-git-send-email-libv@skynet.be>
+ <53EB9471.3090204@wwwdotorg.org> <20140813170106.GT15297@lukather>
+ <20140825121228.GB4163@ulmo.nvidia.com>
+ <20140825124410.GZ15297@lukather>
+ <20140825133953.GJ4163@ulmo.nvidia.com>
+ <53FB3E7F.4000503@redhat.com>
+ <20140825141600.GA14763@ulmo.nvidia.com>
+ <20140825145854.GA15297@lukather>
+Message-ID: <20140825150501.GE14763@ulmo.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 25, 2014 at 9:52 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Sunday 24 August 2014 23:24:41 Hauke Mehrtens wrote:
->> This driver needs an nvram driver and fetches the sprom values from the
->> nvram and provides it to any other driver. The calibration data for the
->> wifi chip the mac address and some more board description data is
->> stores in the sprom.
->>
->> This is based on a copy of arch/mips/bcm47xx/sprom.c and my plan is to
->> make the bcm47xx MIPS SoCs also use this driver some time later.
->
->> Signed-off-by: Hauke Mehrtens <hauke@hauke-m.de>
->> ---
->>  .../devicetree/bindings/misc/bcm47xx-sprom.txt     |  16 +
->
-> I'd prefer not to list the binding in a 'misc' category. Maybe we can
-> have a new category and move the misc/sram.txt into the same?
->
->>  drivers/misc/Kconfig                               |  14 +
->>  drivers/misc/Makefile                              |   1 +
->>  drivers/misc/bcm47xx-sprom.c                       | 690 +++++++++++++++++++++
->
-> On a similar note, putting the driver into drivers/misc seems
-> suboptimal: misc drivers should by definition be something that
-> is for some odd hardware with no external dependencies on it,
-> whereas your driver seems to be used by multiple other drivers.
->
-> Would it make sense to put it into drivers/bcma when that is the
-> only bus it is used on?
+On Mon, Aug 25, 2014 at 04:58:54PM +0200, Maxime Ripard wrote:
+> On Mon, Aug 25, 2014 at 04:16:29PM +0200, Thierry Reding wrote:
+> > On Mon, Aug 25, 2014 at 03:47:43PM +0200, Hans de Goede wrote:
+> > > On 08/25/2014 03:39 PM, Thierry Reding wrote:
+> > > > On Mon, Aug 25, 2014 at 02:44:10PM +0200, Maxime Ripard wrote:
+> > > >> On Mon, Aug 25, 2014 at 02:12:30PM +0200, Thierry Reding wrote:
+> > > >>> On Wed, Aug 13, 2014 at 07:01:06PM +0200, Maxime Ripard wrote:
+> > > >>>> On Wed, Aug 13, 2014 at 10:38:09AM -0600, Stephen Warren wrote:
+> > > >>> [...]
+> > > >>>>> If not, perhaps the clock driver should force the clock to be
+> > > >>>>> enabled (perhaps only if the DRM/KMS driver isn't enabled?).
+> > > >>>>
+> > > >>>> I'm sorry, but I'm not going to take any code that will do that in our
+> > > >>>> clock driver.
+> > > >>>>
+> > > >>>> I'm not going to have a huge list of ifdef depending on configuration
+> > > >>>> options to know which clock to enable, especially when clk_get should
+> > > >>>> have the consumer device as an argument.
+> > > >>>
+> > > >>> Are you saying is that you want to solve a platform-specific problem by
+> > > >>> pushing code into simple, generic drivers so that your platform code can
+> > > >>> stay "clean"?
+> > > >>
+> > > >> Are you saying that this driver would become "dirty" with such a patch?
+> > > > 
+> > > > Yes. Others have said the same and even provided alternative solutions
+> > > > on how to solve what's seemingly a platform-specific problem in a
+> > > > platform-specific way.
+> > > 
+> > > This is not platform specific, any platform with a complete clock driver
+> > > will suffer from the same problem (the clock driver disabling unclaimed
+> > > ahb gates, and thus killing the video output) if it wants to use simplefb
+> > > for early console support.
+> > 
+> > It is platform specific in that your platform may require certain clocks
+> > to remain on.
+> 
+> The platform doesn't. simplefb does. simplefb is the obvious consumer
+> for these clocks, and given the current API and abstraction we have,
+> it should be the one claiming the clocks too.
 
-If the driver will be used for bcm47xx/mips, it will be used for two
-busses, bcma and ssb, so it will need to be at a common
-location.
+No. simplefb just wants to write to some memory that hardware has been
+set up to scan out. The platform requires that the clocks be on. Other
+platforms may not even allow turning off the clocks.
 
+> > The next platform may require power domains to remain on during boot
+> > and yet another one may rely on regulators to stay on during
+> > boot. By your argument simplefb will need to be taught to handle
+> > pretty much every type of resource that the kernel has.
+> 
+> And I wouldn't find anything wrong with that. We're already doing so
+> for any generic driver in the kernel (AHCI, EHCI comes to my mind
+> first, there's probably a lot of others). Why wouldn't we do as such
+> for this one?
 
-Jonas
+Yes, and we've had similar discussions in those subsystems too.
+
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140825/32926166/attachment.sig>
