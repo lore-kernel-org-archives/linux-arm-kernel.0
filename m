@@ -1,41 +1,32 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 25 Aug 2014 10:09:57 +0900
-Subject: [GIT PULL] Second Round Of Renesas ARM Based SoC Defconfig Updates
- For v3.18
-Message-ID: <cover.1408926588.git.horms+renesas@verge.net.au>
+Date: Mon, 25 Aug 2014 10:10:00 +0900
+Subject: [PATCH] ARM: shmobile: bockw: Do not disable SUSPEND in defconfig
+In-Reply-To: <cover.1408926588.git.horms+renesas@verge.net.au>
+References: <cover.1408926588.git.horms+renesas@verge.net.au>
+Message-ID: <99923753e7c17a9c9d46bfe4d7fa543e426ec647.1408926588.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof, Hi Kevin, Hi Arnd,
+As of "ARM: shmobile: r8a7778: Add missing call to shmobile_init_late()"
+suspend-to-ram is now supported on the r8a7778 SoC and thus the bockw
+board.
 
-Please consider these second round of Renesas ARM based SoC defconfig updates for v3.18.
-
-This pull request is based on the previous round of
-such requests, tagged as renesas-defconfig-for-v3.18,
-which I have already sent a pull-request for.
-
-
-The following changes since commit 874ee23c83d888f8824305c277e047c7799f30b9:
-
-  ARM: shmobile: defconfig: enable initrd (2014-08-18 08:07:38 +0900)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-defconfig2-for-v3.18
-
-for you to fetch changes up to 99923753e7c17a9c9d46bfe4d7fa543e426ec647:
-
-  ARM: shmobile: bockw: Do not disable SUSPEND in defconfig (2014-08-22 10:40:31 +0900)
-
-----------------------------------------------------------------
-Second Round Of Renesas ARM Based SoC Defconfig Updates For v3.18
-
-* Do not disable SUSPEND in Bockw defconfig
-  - Suspend to ram is now supported
-
-----------------------------------------------------------------
-Simon Horman (1):
-      ARM: shmobile: bockw: Do not disable SUSPEND in defconfig
-
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
  arch/arm/configs/bockw_defconfig | 1 -
  1 file changed, 1 deletion(-)
+
+diff --git a/arch/arm/configs/bockw_defconfig b/arch/arm/configs/bockw_defconfig
+index 70b3f45..1dde5da 100644
+--- a/arch/arm/configs/bockw_defconfig
++++ b/arch/arm/configs/bockw_defconfig
+@@ -29,7 +29,6 @@ CONFIG_ZBOOT_ROM_BSS=0x0
+ CONFIG_ARM_APPENDED_DTB=y
+ CONFIG_VFP=y
+ # CONFIG_CORE_DUMP_DEFAULT_ELF_HEADERS is not set
+-# CONFIG_SUSPEND is not set
+ CONFIG_PM_RUNTIME=y
+ CONFIG_NET=y
+ CONFIG_PACKET=y
+-- 
+2.0.1
