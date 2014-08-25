@@ -1,10 +1,10 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Mon, 25 Aug 2014 18:41:24 +0200
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 25 Aug 2014 18:10:34 +0200
 Subject: [PATCH] i2c: mv64xxx: continue probe when clock-frequency is
  missing
 In-Reply-To: <1408981819-3477-1-git-send-email-wens@csie.org>
 References: <1408981819-3477-1-git-send-email-wens@csie.org>
-Message-ID: <20140825164124.GA22771@lunn.ch>
+Message-ID: <20140825161033.GF15297@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -26,38 +26,21 @@ On Mon, Aug 25, 2014 at 11:50:19PM +0800, Chen-Yu Tsai wrote:
 > Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 > Cc: stable at vger.kernel.org
 
-It would be good to add
+Good catch!
 
-Fixes: 4c730a06c19bb ("i2c: mv64xxx: Set bus frequency to 100kHz if clock-frequency is not provided")
+Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 
-Acked-by: Andrew Lunn <andrew@lunn.ch>
+Thanks!
+Maxime
 
-	  Andrew
-
-
-> ---
->  drivers/i2c/busses/i2c-mv64xxx.c | 3 +--
->  1 file changed, 1 insertion(+), 2 deletions(-)
-> 
-> diff --git a/drivers/i2c/busses/i2c-mv64xxx.c b/drivers/i2c/busses/i2c-mv64xxx.c
-> index 6dc5ded..2f64273 100644
-> --- a/drivers/i2c/busses/i2c-mv64xxx.c
-> +++ b/drivers/i2c/busses/i2c-mv64xxx.c
-> @@ -746,8 +746,7 @@ mv64xxx_of_config(struct mv64xxx_i2c_data *drv_data,
->  	}
->  	tclk = clk_get_rate(drv_data->clk);
->  
-> -	rc = of_property_read_u32(np, "clock-frequency", &bus_freq);
-> -	if (rc)
-> +	if (of_property_read_u32(np, "clock-frequency", &bus_freq))
->  		bus_freq = 100000; /* 100kHz by default */
->  
->  	if (!mv64xxx_find_baud_factors(bus_freq, tclk,
-> -- 
-> 2.1.0
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140825/73a862e2/attachment.sig>
