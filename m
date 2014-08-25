@@ -1,131 +1,69 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Mon, 25 Aug 2014 08:02:43 -0600
-Subject: [PATCH 09/11 v4] coresight: adding support for beagle and beagleXM
-In-Reply-To: <53FA5B55.4000603@gmail.com>
-References: <1408554231-24321-1-git-send-email-mathieu.poirier@linaro.org>
- <1408554231-24321-10-git-send-email-mathieu.poirier@linaro.org>
- <53FA5B55.4000603@gmail.com>
-Message-ID: <CANLsYkxCdVm6cPtM9ub3Vwc24G9x6Vy9pt5pVMSPMxcksw6VHA@mail.gmail.com>
+From: jdl@jdl.com (Jon Loeliger)
+Date: Mon, 25 Aug 2014 09:13:59 -0500
+Subject: [RFC PATCH 0/9] dt: dependencies (for deterministic driver
+ initialization order based on the DT)
+In-Reply-To: <20140825133714.GH4163@ulmo.nvidia.com>
+References: <1399913280-6915-1-git-send-email-holler@ahsoftware.de>
+ <20140514141914.446F7C4153D@trevor.secretlab.ca>
+ <20140821140211.GD19293@ulmo.nvidia.com> <53F64624.5000403@ahsoftware.de>
+ <20140822131919.GX21734@leverpostej> <20140825093931.GB2399@ulmo>
+ <E1XLu15-0002DP-6o@jdl.com> <20140825133714.GH4163@ulmo.nvidia.com>
+Message-ID: <E1XLv1z-0002Jv-VN@jdl.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24 August 2014 15:38, Marcin Jabrzyk <marcin.jabrzyk@gmail.com> wrote:
-> Hi,
->
-> W dniu 20.08.2014 o 19:03, mathieu.poirier at linaro.org pisze:
->> From: Mathieu Poirier <mathieu.poirier@linaro.org>
->>
->> Currently supporting ETM and ETB.  Support for TPIU
->> and SDTI are yet to be added.
-> Did you tried running the drivers on board or are there any special
-> preparation needed?
-> I've BeagleBoard-xM Rev. C applied your patches and enabled the
-> functions the in menuconfig.
-> But on dmesg I see that:
->
-> [    0.685028] of_amba_device_create(): amba_device_add() failed (-19)
-> for /etb at 5401b000
-> [    0.685119] of_amba_device_create(): amba_device_add() failed (-19)
-> for /etm at 54010000
->
-> There are no nodes according coresight in /sys/kernel/debug/ .
+> 
+> 
+> > I believe some of the issues that need to be resolved are:
+> >
+> >     1) What constitutes a dependency?
+> >     2) How is that dependency expressed?
+> >     3) How do we add missing dependencies?
+> >     4) Backward compatability problems.
+> >
+> > There are other questions, of course.  Is it a topsort
+> > per bus?  Are there required "early devices"?  Should
+> > the inter-node dependencies be expressed at each node,
+> > or in a separate hierarchy within the DTS?  Others.
+> 
+> I think Grant already objected to the idea of explicitly adding
+> dependency information into the device tree sources.
 
-Right, that is because there is a problem in mainline with enabling
-"emu_src_ck".  The call to "clk_prepare_enable()" returns without
-waiting for the clock to effectively be enabled, preventing the
-components from being discovered properly.
+Clearly, the reason to object to the introdcution of such
+an artificial dependency implies that it would be trying
+to express something that doesn't actually describe an
+existing hardware requirement.  That is, it wouldn't be
+"describing hardware".  That's fine.
 
-The work around (non-upstreamable) is to have a driver getting a hold
-of the clock before AMBA devices are probed.  I can send you that code
-(10 lines) if need be.
+But the inverse should also be true.  That is, we should
+ensure that where there *is* a hardware dependency that
+is currently not expressed, we should introduce that
+relationship.
 
->
-> Best regards,
-> Marcin
->
->>
->> Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
->> ---
->>  arch/arm/boot/dts/omap3-beagle-xm.dts | 28 ++++++++++++++++++++++++++++
->>  arch/arm/boot/dts/omap3-beagle.dts    | 28 ++++++++++++++++++++++++++++
->>  2 files changed, 56 insertions(+)
->>
->> diff --git a/arch/arm/boot/dts/omap3-beagle-xm.dts b/arch/arm/boot/dts/omap3-beagle-xm.dts
->> index 1becefc..eec73d8 100644
->> --- a/arch/arm/boot/dts/omap3-beagle-xm.dts
->> +++ b/arch/arm/boot/dts/omap3-beagle-xm.dts
->> @@ -145,6 +145,34 @@
->>                       };
->>               };
->>       };
->> +
->> +     etb at 5401b000 {
->> +             compatible = "arm,coresight-etb10", "arm,primecell";
->> +             reg = <0x5401b000 0x1000>;
->> +
->> +             coresight-default-sink;
->> +             clocks = <&emu_src_ck>;
->> +             clock-names = "apb_pclk";
->> +             port {
->> +                     etb_in: endpoint {
->> +                             slave-mode;
->> +                             remote-endpoint = <&etm_out>;
->> +                     };
->> +             };
->> +     };
->> +
->> +     etm at 54010000 {
->> +             compatible = "arm,coresight-etm3x", "arm,primecell";
->> +             reg = <0x54010000 0x1000>;
->> +
->> +             clocks = <&emu_src_ck>;
->> +             clock-names = "apb_pclk";
->> +             port {
->> +                     etm_out: endpoint {
->> +                             remote-endpoint = <&etb_in>;
->> +                     };
->> +             };
->> +     };
->>  };
->>
->>  &omap3_pmx_wkup {
->> diff --git a/arch/arm/boot/dts/omap3-beagle.dts b/arch/arm/boot/dts/omap3-beagle.dts
->> index 3c3e6da..a151daf 100644
->> --- a/arch/arm/boot/dts/omap3-beagle.dts
->> +++ b/arch/arm/boot/dts/omap3-beagle.dts
->> @@ -140,6 +140,34 @@
->>                       };
->>               };
->>       };
->> +
->> +     etb at 540000000 {
->> +             compatible = "arm,coresight-etb10", "arm,primecell";
->> +             reg = <0x5401b000 0x1000>;
->> +
->> +             coresight-default-sink;
->> +             clocks = <&emu_src_ck>;
->> +             clock-names = "apb_pclk";
->> +             port {
->> +                     etb_in: endpoint {
->> +                             slave-mode;
->> +                             remote-endpoint = <&etm_out>;
->> +                     };
->> +             };
->> +     };
->> +
->> +     etm at 54010000 {
->> +             compatible = "arm,coresight-etm3x", "arm,primecell";
->> +             reg = <0x54010000 0x1000>;
->> +
->> +             clocks = <&emu_src_ck>;
->> +             clock-names = "apb_pclk";
->> +             port {
->> +                     etm_out: endpoint {
->> +                             remote-endpoint = <&etb_in>;
->> +                     };
->> +             };
->> +     };
->>  };
->>
->>  &omap3_pmx_wkup {
->
+
+> For regulators (and regulator-like bindings) the problem is somewhat
+> more difficult because they property names are not standardized. One way
+> to solve this would be to look for property names with a -supply suffix,
+> but that could obviously lead to false positives. One alternative that I
+> think could eliminate this would be to explicitly list dependencies in
+> drivers. This would allow core code to step through such a list and
+> resolve the (phandle, specifier) tuples.
+
+So, express the "additional SW dependencies" in the SW?
+
+> Clocks are usually not a problem with deferred probing since they often
+> are registered early anyway.
+
+Ah, but how are they known to be needed early?  A toposort should sort
+them into that position.  That's not currently done.  And I doubt the
+set of nodes and expressed dependencies would cause them to be done
+early enough by today's standards.
+
+> Regulators on the other hand seem to be a fairly common trigger,
+> though, so they seem like a good candidate to focus on.
+
+Yeah.  And I've seen some debatable IRQ-PHY-PCIe interaction too.
+
+> Thierry
+
+jdl
