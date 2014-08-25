@@ -1,50 +1,44 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 25 Aug 2014 10:10:22 +0900
-Subject: [GIT PULL] Second Round Of Renesas ARM Based SoC Updates For v3.18
-Message-ID: <cover.1408927858.git.horms+renesas@verge.net.au>
+Date: Mon, 25 Aug 2014 10:10:21 +0900
+Subject: [PATCH 1/3] ARM: shmobile: sh73a0: Remove duplicate CPUFreq bits
+In-Reply-To: <cover.1408927858.git.horms+renesas@verge.net.au>
+References: <cover.1408927858.git.horms+renesas@verge.net.au>
+Message-ID: <aa0bdc303b0f8bc59fc0a0645560917810ba041b.1408927858.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof, Hi Kevin, Hi Arnd,
+From: Magnus Damm <damm+renesas@opensource.se>
 
-Please consider these second round of Renesas ARM based SoC updates for v3.18.
+The CPUFreq platform device is already registered by
+shmobile_init_late(), so get rid of sh73a0 specific bits.
 
-This pull request is based on the previous round of
-such requests, tagged as renesas-soc-for-v3.18,
-which I have already sent a pull-request for.
+Signed-off-by: Magnus Damm <damm+renesas@opensource.se>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ arch/arm/mach-shmobile/setup-sh73a0.c | 5 -----
+ 1 file changed, 5 deletions(-)
 
-
-The following changes since commit 5ac9e7f35db00e630c9f95a1f73ac329371cdbbf:
-
-  ARM: shmobile: sh73a0: Remove unneeded nr_irqs initialization (2014-08-20 09:09:24 +0900)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-soc2-for-v3.18
-
-for you to fetch changes up to 86155b35d173317518458c6f9c0a3ea8c5324bed:
-
-  ARM: shmobile: Move legacy INTC definitions from irqs.h to intc.h (2014-08-22 12:23:32 +0900)
-
-----------------------------------------------------------------
-Second Round Of Renesas ARM Based SoC Updates For v3.18
-
-* Move legacy INTC definitions from irqs.h to intc.h
-* Remove duplicate CPUFreq bits on r8a73a0/ape6evm
-
-----------------------------------------------------------------
-Geert Uytterhoeven (1):
-      ARM: shmobile: Move legacy INTC definitions from irqs.h to intc.h
-
-Magnus Damm (2):
-      ARM: shmobile: sh73a0: Remove duplicate CPUFreq bits
-      ARM: shmobile: ape6evm: Remove duplicate CPUFreq bits
-
- arch/arm/mach-shmobile/board-ape6evm-reference.c | 1 -
- arch/arm/mach-shmobile/board-kzm9g.c             | 1 +
- arch/arm/mach-shmobile/board-mackerel.c          | 1 +
- arch/arm/mach-shmobile/intc.h                    | 5 +++++
- arch/arm/mach-shmobile/irqs.h                    | 6 ------
- arch/arm/mach-shmobile/setup-sh7372.c            | 1 +
- arch/arm/mach-shmobile/setup-sh73a0.c            | 6 +-----
- 7 files changed, 9 insertions(+), 12 deletions(-)
+diff --git a/arch/arm/mach-shmobile/setup-sh73a0.c b/arch/arm/mach-shmobile/setup-sh73a0.c
+index e7a0296..8ff9679 100644
+--- a/arch/arm/mach-shmobile/setup-sh73a0.c
++++ b/arch/arm/mach-shmobile/setup-sh73a0.c
+@@ -775,17 +775,12 @@ void __init sh73a0_add_early_devices(void)
+ 
+ void __init sh73a0_add_standard_devices_dt(void)
+ {
+-	struct platform_device_info devinfo = { .name = "cpufreq-cpu0", .id = -1, };
+-
+ 	/* clocks are setup late during boot in the case of DT */
+ 	sh73a0_clock_init();
+ 
+ 	platform_add_devices(sh73a0_devices_dt,
+ 			     ARRAY_SIZE(sh73a0_devices_dt));
+ 	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+-
+-	/* Instantiate cpufreq-cpu0 */
+-	platform_device_register_full(&devinfo);
+ }
+ 
+ static const char *sh73a0_boards_compat_dt[] __initdata = {
+-- 
+2.0.1
