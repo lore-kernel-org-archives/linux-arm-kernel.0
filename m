@@ -1,95 +1,53 @@
-From: Li.Xiubo@freescale.com (Li.Xiubo at freescale.com)
-Date: Mon, 25 Aug 2014 07:01:57 +0000
-Subject: [PATCH] watchdog: imx2_wdt: Remove seperate big endian handling
-In-Reply-To: <1408949015-28759-1-git-send-email-mpa@pengutronix.de>
-References: <1408949015-28759-1-git-send-email-mpa@pengutronix.de>
-Message-ID: <4b9a55951535433aada42332b08f664f@BY2PR0301MB0613.namprd03.prod.outlook.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Mon, 25 Aug 2014 09:04:27 +0200
+Subject: [PATCH] arm64/crypto: remove redundant update of data
+In-Reply-To: <1408912715-9719-1-git-send-email-colin.king@canonical.com>
+References: <1408912715-9719-1-git-send-email-colin.king@canonical.com>
+Message-ID: <CAKv+Gu8GjSi4r2hCbnhQ2rDFJaO_PH3=JmfKKTsELDqCuf_cLw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Markus,
+On 24 August 2014 22:38, Colin King <colin.king@canonical.com> wrote:
+> From: Colin Ian King <colin.king@canonical.com>
+>
+> Originally found by cppcheck:
+>
+> [arch/arm64/crypto/sha2-ce-glue.c:153]: (warning) Assignment of
+>   function parameter has no effect outside the function. Did you
+>   forget dereferencing it?
+>
+> Updating data by blocks * SHA256_BLOCK_SIZE at the end of
+> ha2_finup is redundant code and can be removed.
+>
 
-Thanks for your work.
+^^^ typo here
 
-And there has already one patch for this:
+> Signed-off-by: Colin Ian King <colin.king@canonical.com>
 
-"watchdog: imx2_wdt: Convert to use regmap framework's endianness method."
-
-Thanks,
-
-BRs
-Xiubo
+Acked-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 
 
-
-> -----Original Message-----
-> From: Markus Pargmann [mailto:mpa at pengutronix.de]
-> Sent: Monday, August 25, 2014 2:44 PM
-> To: Wim Van Sebroeck
-> Cc: linux-watchdog at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
-> kernel at pengutronix.de; Markus Pargmann; Xiubo Li-B47053
-> Subject: [PATCH] watchdog: imx2_wdt: Remove seperate big endian handling
-> 
-> 3.18 will contain a patch that handles endianess within the regmap
-> framework. It does not need any parsing of DT properties within the
-> driver, so we can savely remove it here.
-> The required mainline patch is
-> 	(regmap: add DT endianness binding support.)
-> 
-> Cc: Xiubo Li <Li.Xiubo@freescale.com>
-> Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
 > ---
-> Hi,
-> 
-> This is the topic branch with the patches which replace the functionality of
-> this code.
-> https://git.kernel.org/cgit/linux/kernel/git/broonie/regmap.git/log/?h=topic/d
-> t-endian
-> 
-> Best regards,
-> 
-> Markus
-> 
-> 
->  drivers/watchdog/imx2_wdt.c | 7 -------
->  1 file changed, 7 deletions(-)
-> 
-> diff --git a/drivers/watchdog/imx2_wdt.c b/drivers/watchdog/imx2_wdt.c
-> index 68c3d379ffa8..9d4874f09948 100644
-> --- a/drivers/watchdog/imx2_wdt.c
-> +++ b/drivers/watchdog/imx2_wdt.c
-> @@ -28,7 +28,6 @@
->  #include <linux/kernel.h>
->  #include <linux/module.h>
->  #include <linux/moduleparam.h>
-> -#include <linux/of_address.h>
->  #include <linux/platform_device.h>
->  #include <linux/regmap.h>
->  #include <linux/timer.h>
-> @@ -191,12 +190,10 @@ static struct regmap_config imx2_wdt_regmap_config = {
-> 
->  static int __init imx2_wdt_probe(struct platform_device *pdev)
->  {
-> -	struct device_node *np = pdev->dev.of_node;
->  	struct imx2_wdt_device *wdev;
->  	struct watchdog_device *wdog;
->  	struct resource *res;
->  	void __iomem *base;
-> -	bool big_endian;
->  	int ret;
->  	u32 val;
-> 
-> @@ -204,10 +201,6 @@ static int __init imx2_wdt_probe(struct platform_device
-> *pdev)
->  	if (!wdev)
->  		return -ENOMEM;
-> 
-> -	big_endian = of_property_read_bool(np, "big-endian");
-> -	if (big_endian)
-> -		imx2_wdt_regmap_config.val_format_endian = REGMAP_ENDIAN_BIG;
-> -
->  	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
->  	base = devm_ioremap_resource(&pdev->dev, res);
->  	if (IS_ERR(base))
+>  arch/arm64/crypto/sha2-ce-glue.c | 1 -
+>  1 file changed, 1 deletion(-)
+>
+> diff --git a/arch/arm64/crypto/sha2-ce-glue.c b/arch/arm64/crypto/sha2-ce-glue.c
+> index c294e67..ae67e88 100644
+> --- a/arch/arm64/crypto/sha2-ce-glue.c
+> +++ b/arch/arm64/crypto/sha2-ce-glue.c
+> @@ -150,7 +150,6 @@ static void sha2_finup(struct shash_desc *desc, const u8 *data,
+>         kernel_neon_begin_partial(28);
+>         sha2_ce_transform(blocks, data, sctx->state, NULL, len);
+>         kernel_neon_end();
+> -       data += blocks * SHA256_BLOCK_SIZE;
+>  }
+>
+>  static int sha224_finup(struct shash_desc *desc, const u8 *data,
 > --
-> 2.1.0.rc1
+> 2.1.0
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
