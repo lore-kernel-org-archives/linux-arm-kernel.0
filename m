@@ -1,48 +1,16 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 26 Aug 2014 18:46:38 +0100
-Subject: [PATCH v6 1/6] arm64: ptrace: add PTRACE_SET_SYSCALL
-In-Reply-To: <53F68C81.6020807@linaro.org>
-References: <1408611405-8943-1-git-send-email-takahiro.akashi@linaro.org>
- <1408611405-8943-2-git-send-email-takahiro.akashi@linaro.org>
- <CAGXu5jJrTEhdDZ8fipNeaVm1_wto7u2f=uq_KzyMcVHJMT57vw@mail.gmail.com>
- <53F68C81.6020807@linaro.org>
-Message-ID: <20140826174637.GC23445@arm.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Tue, 26 Aug 2014 11:46:41 -0600
+Subject: [PATCH v3 8/8] ARM: tegra: Add options for Tegra AHCI support
+ to tegra_defconfig
+In-Reply-To: <1405500863-19696-9-git-send-email-mperttunen@nvidia.com>
+References: <1405500863-19696-1-git-send-email-mperttunen@nvidia.com>
+ <1405500863-19696-9-git-send-email-mperttunen@nvidia.com>
+Message-ID: <53FCC801.5000703@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 22, 2014 at 01:19:13AM +0100, AKASHI Takahiro wrote:
-> On 08/22/2014 01:47 AM, Kees Cook wrote:
-> > On Thu, Aug 21, 2014 at 3:56 AM, AKASHI Takahiro
-> > <takahiro.akashi@linaro.org> wrote:
-> >> To allow tracer to be able to change/skip a system call by re-writing
-> >> a syscall number, there are several approaches:
-> >>
-> >> (1) modify x8 register with ptrace(PTRACE_SETREGSET), and handle this case
-> >>      later on in syscall_trace_enter(), or
-> >> (2) support ptrace(PTRACE_SET_SYSCALL) as on arm
-> >>
-> >> Thinking of the fact that user_pt_regs doesn't expose 'syscallno' to
-> >> tracer as well as that secure_computing() expects a changed syscall number
-> >> to be visible, especially case of -1, before this function returns in
-> >> syscall_trace_enter(), we'd better take (2).
-> >>
-> >> Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
-> >
-> > Thanks, I like having this on both arm and arm64.
-> 
-> Yeah, having this simplified the code of syscall_trace_enter() a bit, but
-> also imposes some restriction on arm64, too.
-> 
->  > I wonder if other archs should add this option too.
-> 
-> Do you think so? I assumed that SET_SYSCALL is to be avoided if possible.
-> 
-> I also think that SET_SYSCALL should take an extra argument for a return value
-> just in case of -1 (or we have SKIP_SYSCALL?).
+On 07/16/2014 02:54 AM, Mikko Perttunen wrote:
+> This adds ATA, SATA_AHCI and AHCI_TEGRA support to tegra_defconfig
+> so that the SATA support will be automatically enabled.
 
-I think we should propose this as a new request in the generic ptrace code.
-We can have an architecture-hook for actually setting the syscall, and allow
-architectures to define their own implementation of the request so they can
-be moved over one by one.
-
-Will
+I've applied this to Tegra's for-3.18/dt branch.
