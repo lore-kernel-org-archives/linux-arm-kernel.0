@@ -1,56 +1,44 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Mon, 25 Aug 2014 19:57:13 -0700
-Subject: [RFC] PCI: pcie-designware: allow drivers as loadable modules
-In-Reply-To: <CAOesGMgJtP-A9x_OSAkGd9HNPt9sTCtDQJJ1BZMmuQZm-nZoUg@mail.gmail.com>
-References: <5303286.K45Li7B92z@wuerfel> <20140813172155.GB7298@google.com>
- <CAOesGMgJtP-A9x_OSAkGd9HNPt9sTCtDQJJ1BZMmuQZm-nZoUg@mail.gmail.com>
-Message-ID: <CAOesGMgJADdKxCaCmiu-t1NOg9ZP7bPPkBb6vD9Q33nqvgmOrQ@mail.gmail.com>
+Date: Mon, 25 Aug 2014 20:04:49 -0700
+Subject: [PATCH] ARM: shmobile: lager: correct memory map
+In-Reply-To: <1409021623-10633-1-git-send-email-horms+renesas@verge.net.au>
+References: <1409021623-10633-1-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <CAOesGMieRk4Dvg=gxTgcVssARkK6DeoaVyK8619B2N5=wwo=Uw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 25, 2014 at 7:56 PM, Olof Johansson <olof@lixom.net> wrote:
-> On Wed, Aug 13, 2014 at 10:21 AM, Bjorn Helgaas <bhelgaas@google.com> wrote:
->> On Thu, Jul 24, 2014 at 11:17:45AM +0200, Arnd Bergmann wrote:
->>> From 0ee79c7451851a34e5a7c33eb6020befcdcb2b24 Mon Sep 17 00:00:00 2001
->>> From: Arnd Bergmann <arnd@arndb.de>
->>> Date: Thu, 24 Jul 2014 11:12:48 +0200
->>> Subject: [PATCH] PCI: pcie-designware: allow drivers as loadable modules
->>>
->>> The new pcie-spear13xx driver uses the pcie-designware library
->>> and in the current form it can be built as a loadable module.
->>> However, the functions it uses from the base driver are not exported,
->>> so this results in a build failure and a module that can never
->>> be loaded:
->>>
->>> ERROR: "dw_pcie_host_init" [drivers/pci/host/pcie-spear13xx.ko] undefined!
->>> ERROR: "dw_handle_msi_irq" [drivers/pci/host/pcie-spear13xx.ko] undefined!
->>> ERROR: "dw_pcie_msi_init" [drivers/pci/host/pcie-spear13xx.ko] undefined!
->>> ERROR: "dw_pcie_cfg_write" [drivers/pci/host/pcie-spear13xx.ko] undefined!
->>> ERROR: "dw_pcie_cfg_read" [drivers/pci/host/pcie-spear13xx.ko] undefined!
->>> ERROR: "dw_pcie_setup_rc" [drivers/pci/host/pcie-spear13xx.ko] undefined!
->>> ERROR: "dw_pcie_link_up" [drivers/pci/host/pcie-spear13xx.ko] undefined!
->>>
->>> If we want to allow loadable pcie-designware drivers, we have to
->>> export all those symbols and ensure none of them are marked as __init.
->>> This also requires making pci_assign_unassigned_resources available
->>> after boot.
->>>
->>> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
->>> ---
->>> If we don't want this patch for some reason, we should instead mark
->>> this driver 'bool' in Kconfig, so it becomes impossible to encounter
->>> this build error.
->>
->> I'm not opposed to doing this, but I applied Sachin's patch that changes
->> the Kconfig option to bool, so I'll drop this one for now.
->
->
-> Hi Bjorn,
->
-> Are you going to send this as a 3.17 fix, or is it queued only for
-> 3.18? The former would be preferrable here.
+Hi,
 
-Nevermind, next time I'll go look at your tree directly instead. :-)
+On Mon, Aug 25, 2014 at 7:53 PM, Simon Horman
+<horms+renesas@verge.net.au> wrote:
+> The base address of the second memory region on the lager
+> board is 0x140000000. Update the tag used in the dts file accordingly.
+>
+> This is a documentation fix and should have no run-time affect.
+>
+> This problem was introduced when the second memory region
+> was added to the lager dts file by 62bc32a2573c4219
+> ("ARM: shmobile: Include all 4 GiB of memory on Lager)"
+> in v3.14.
+>
+> Reported-by: NAOYA SHIIBA <naoya.shiiba.nx@renesas.com>
+> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> ---
+>  arch/arm/boot/dts/r8a7790-lager.dts | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+>
+> diff --git a/arch/arm/boot/dts/r8a7790-lager.dts b/arch/arm/boot/dts/r8a7790-lager.dts
+> index 0118cbf..84dcafa 100644
+> --- a/arch/arm/boot/dts/r8a7790-lager.dts
+> +++ b/arch/arm/boot/dts/r8a7790-lager.dts
+> @@ -32,7 +32,7 @@
+>                 reg = <0 0x40000000 0 0x40000000>;
+>         };
+>
+> -       memory at 180000000 {
+> +       memory at 140000000 {
+
+That should even be "memory at 1,40000000".
 
 
 -Olof
