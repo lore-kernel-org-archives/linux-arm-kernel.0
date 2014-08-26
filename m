@@ -1,50 +1,43 @@
-From: b38343@freescale.com (Robin Gong)
-Date: Tue, 26 Aug 2014 15:52:22 +0800
-Subject: [PATCH v4] spi: spi-imx: add DMA support
-In-Reply-To: <201408260926.41038.marex@denx.de>
-References: <1408752835-10995-1-git-send-email-b38343@freescale.com>
- <201408251007.22393.marex@denx.de>
- <20140826071757.GA32751@Robin-OptiPlex-780>
- <201408260926.41038.marex@denx.de>
-Message-ID: <20140826075220.GA820@Robin-OptiPlex-780>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 26 Aug 2014 09:43:50 +0200
+Subject: [PATCH v2 2/9] mailbox: Add NVIDIA Tegra XUSB mailbox driver
+In-Reply-To: <20140826065729.GC15573@ulmo>
+References: <1408381705-3623-1-git-send-email-abrestic@chromium.org>
+ <53FB8820.4010202@wwwdotorg.org> <20140826065729.GC15573@ulmo>
+Message-ID: <3804028.YQzQ4uAVsf@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 26, 2014 at 09:26:40AM +0200, Marek Vasut wrote:
-> On Tuesday, August 26, 2014 at 09:17:59 AM, Robin Gong wrote:
-> > On Mon, Aug 25, 2014 at 10:07:22AM +0200, Marek Vasut wrote:
-> > > On Saturday, August 23, 2014 at 02:13:55 AM, Robin Gong wrote:
-> > > > After enable DMA
-> > > 
-> > > Please also add a commit message which describes the change, not only
-> > > some test results.
-> > > 
-> > > [...]
+On Tuesday 26 August 2014 08:57:31 Thierry Reding wrote:
+> On Mon, Aug 25, 2014 at 01:01:52PM -0600, Stephen Warren wrote:
+> > On 08/18/2014 11:08 AM, Andrew Bresticker wrote:
+> [...]
+> > >+static int tegra_xusb_mbox_probe(struct platform_device *pdev)
 > > 
-> >  Ok, I will enrich it in next version.
+> > >+    res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> > >+    if (!res)
+> > >+            return -ENODEV;
 > > 
-> > > > @@ -911,6 +1194,13 @@ static int spi_imx_probe(struct platform_device
-> > > > *pdev) goto out_put_per;
-> > > > 
-> > > >  	spi_imx->spi_clk = clk_get_rate(spi_imx->clk_per);
-> > > > 
-> > > > +	/*
-> > > > +	 * Only validated on i.mx6 now, can remove the constrain if validated
-> > > > on +	 * other chips.
-> > > > +	 */
-> > > 
-> > > Given that the check below tests for imx51_ecspi_devtype_data ... does
-> > > that mean, that this code was never tested on MX51 and MX53, yet will be
-> > > enabled for those chips and might possibly break them ?
+> > Should devm_request_mem_region() be called here to claim the region?
 > > 
-> > Yes, because there is no available mx51 mx53 boards in my hands. But I
-> > think it won't bring too much trouble, since they share the same IP.
-> > No, the patch won't break current MX51 and MX53, because they didn't enable
-> > dma in dts setting,and they will keep use pio mode.
+> > >+    mbox->regs = devm_ioremap_nocache(&pdev->dev, res->start,
+> > >+                                      resource_size(res));
+> > >+    if (!mbox->regs)
+> > >+            return -ENOMEM;
+> > 
+> > Is _nocache required? I don't see other drivers using it. I assume there's
+> > nothing special about the mbox registers.
 > 
-> Thanks for clearing this up, this was the important piece of information for me. 
-> Please put it into the commit message.
->
- Okay. Thanks for your reminding.
-> Best regards,
-> Marek Vasut
+> Most drivers should be using devm_ioremap_resource() which will use the
+> _nocache variant of devm_ioremap() when appropriate. Usually the region
+> will not be marked cacheable (IORESOURCE_CACHEABLE) and therefore be
+> remapped uncached.
+> 
+
+Note that ioremap() and ioremap_nocache() are the same. We really shouldn't
+ever call ioremap_nocache().
+
+devm_ioremap_resource() and pci_iomap() checking for IORESOURCE_CACHEABLE is
+rather silly, since it doesn't call ioremap_cache() in that case.
+
+	Arnd
