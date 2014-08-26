@@ -1,82 +1,47 @@
-From: k.chander@samsung.com (Chander Kashyap)
-Date: Tue, 26 Aug 2014 10:55:05 +0530
-Subject: [PATCH v9 4/6] ARM: Exynos: switch to using generic cpufreq
- driver for Exynos4210/5250/5420
-In-Reply-To: <7h8umc60we.fsf@paris.lan>
-References: <1406707663-16656-1-git-send-email-thomas.ab@samsung.com>
- <1406707663-16656-5-git-send-email-thomas.ab@samsung.com>
- <53DA8BB9.6020702@samsung.com> <53DA8D85.3050106@gmail.com>
- <7hbnrc6px3.fsf@paris.lan> <53F7DA13.6090305@gmail.com>
- <CADWw7OgAS-z-UOrJU-hL2fzuefJmLtCTg57jYk2Df7f5KfLJmA@mail.gmail.com>
- <7h8umc60we.fsf@paris.lan>
-Message-ID: <CADWw7OgW+o3tB=ptnsy-PsmXmNv8oXzt_WfK6NswQiEWWwAzNA@mail.gmail.com>
+From: jonghwa3.lee@samsung.com (Jonghwa Lee)
+Date: Tue, 26 Aug 2014 14:25:24 +0900
+Subject: [PATCH] arm: exynos: Allow rtc alarm and tick wakeup irq for
+ exynos3250.
+Message-ID: <1409030724-21103-1-git-send-email-jonghwa3.lee@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kevin,
+Add rtc alarm and tick irq to wakeup sources in exynos3250.
 
-On Mon, Aug 25, 2014 at 9:02 PM, Kevin Hilman <khilman@linaro.org> wrote:
-> Hi Chander,
->
-> Chander Kashyap <k.chander@samsung.com> writes:
->
-> [...]
->
->>>> I'm trying it on the 5800/Chromebook2 and it's not terribly stable.  I'm
->>>> testing along with CPUidle, so there may be some untested interactions
->>>> there as it seems a bit more stable without CPUidle enabled.
->>>>
->>>> I'd love to hear from anyone else that's testing CPUidle and CPUfreq
->>>> together big.LITTLE 5420/5800, with or without the switcher.
->>
->> I have tested this patch series on SMDK5420 with cpuidle (with and
->> without b.L switcher enabled).
->>
->> As of now voltage scaling support is not there in generic big-little
->> cpufreq driver (arm_big_little.c).
->> Hence need to tie arm and kfc voltages to highest level for testing.
->
->> Without this change stability issues are there, but with this change
->> everything is stable.
->
-> Can you clarify how you're setting the voltages to ensure stability?
+Signed-off-by: Jonghwa Lee <jonghwa3.lee@samsung.com>
+Acked-by : Chanwoo choi <cw00.choi@samsung.com>
+---
+ arch/arm/mach-exynos/pm.c |    9 ++++++++-
+ 1 file changed, 8 insertions(+), 1 deletion(-)
 
-below is the diff :  wip/exynos/integ
-
---- a/arch/arm/boot/dts/exynos5800-peach-pi.dts
-+++ b/arch/arm/boot/dts/exynos5800-peach-pi.dts
-@@ -225,7 +225,7 @@
-
-                        buck2_reg: BUCK2 {
-                                regulator-name = "vdd_arm";
--                               regulator-min-microvolt = <800000>;
-+                               regulator-min-microvolt = <1500000>;
-                                regulator-max-microvolt = <1500000>;
-                                regulator-always-on;
-                                regulator-boot-on;
-@@ -260,7 +260,7 @@
-
-                        buck6_reg: BUCK6 {
-                                regulator-name = "vdd_kfc";
--                               regulator-min-microvolt = <800000>;
-+                               regulator-min-microvolt = <1500000>;
-                                regulator-max-microvolt = <1500000>;
-                                regulator-always-on;
-                                regulator-boot-on;
-
->
-> Tomasz, I didn't mean to suggest this isn't ready for mainline.  For the
-> 5420/5800 it seems cpufreq support is a new feature, so this isn't a
-> regression against previous (mainline) behavior.  Maybe the big.LITTLE
-> cpufreq support should've been separated out from the cleanup since it's
-> more of a new feature, but that's up to you.
->
-> Kevin
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-
-regards,
-Chander
+diff --git a/arch/arm/mach-exynos/pm.c b/arch/arm/mach-exynos/pm.c
+index fa7218a..d78dcf9 100644
+--- a/arch/arm/mach-exynos/pm.c
++++ b/arch/arm/mach-exynos/pm.c
+@@ -66,6 +66,12 @@ static struct sleep_save exynos_core_save[] = {
+ 
+ static u32 exynos_irqwake_intmask = 0xffffffff;
+ 
++static const struct exynos_wkup_irq exynos3250_wkup_irq[] = {
++	{ 105, BIT(1) }, /* RTC alarm */
++	{ 106, BIT(2) }, /* RTC tick */
++	{ /* sentinel */ },
++};
++
+ static const struct exynos_wkup_irq exynos4_wkup_irq[] = {
+ 	{ 76, BIT(1) }, /* RTC alarm */
+ 	{ 77, BIT(2) }, /* RTC tick */
+@@ -81,9 +87,10 @@ static const struct exynos_wkup_irq exynos5250_wkup_irq[] = {
+ static int exynos_irq_set_wake(struct irq_data *data, unsigned int state)
+ {
+ 	const struct exynos_wkup_irq *wkup_irq;
+-
+ 	if (soc_is_exynos5250())
+ 		wkup_irq = exynos5250_wkup_irq;
++	else if (soc_is_exynos3250())
++		wkup_irq = exynos3250_wkup_irq;
+ 	else
+ 		wkup_irq = exynos4_wkup_irq;
+ 
+-- 
+1.7.9.5
