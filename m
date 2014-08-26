@@ -1,36 +1,45 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 26 Aug 2014 19:14:06 +0100
-Subject: [PATCH 3/6] arm64: Add support for hooks to handle undefined
- instructions
-In-Reply-To: <9hhy4ube1tz.fsf@arm.com>
-References: <1409048930-21598-1-git-send-email-punit.agrawal@arm.com>
- <1409048930-21598-4-git-send-email-punit.agrawal@arm.com>
- <20140826131339.GO23445@arm.com> <9hhy4ube1tz.fsf@arm.com>
-Message-ID: <20140826181405.GG23445@arm.com>
+From: geoff@infradead.org (Geoff Levand)
+Date: Tue, 26 Aug 2014 11:18:00 -0700
+Subject: [PATCH 2/9] arm64: Fix INVALID_HWID definition
+In-Reply-To: <20140826155715.GH16482@arm.com>
+References: <cover.1408736066.git.geoff@infradead.org>
+ <6f84108ac880ef48548208738cbb169fba2fa51a.1408736066.git.geoff@infradead.org>
+ <20140826155715.GH16482@arm.com>
+Message-ID: <1409077080.11425.22.camel@smoke>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 26, 2014 at 03:56:56PM +0100, Punit Agrawal wrote:
-> Will Deacon <will.deacon@arm.com> writes:
-> > On Tue, Aug 26, 2014 at 11:28:47AM +0100, Punit Agrawal wrote:
-> >>  asmlinkage void __exception do_undefinstr(struct pt_regs *regs)
-> >>  {
-> >>  	siginfo_t info;
-> >> @@ -266,6 +329,9 @@ asmlinkage void __exception do_undefinstr(struct pt_regs *regs)
-> >>  	if (!aarch32_break_handler(regs))
-> >>  		return;
-> >>  
-> >> +	if (call_undef_hook(regs) == 0)
-> >> +		return;
-> >
-> > I'd like to reuse this hook for the aarch32 break hooks (you can see the
-> > direct call in the context above). That means adding support for thumb
-> > after all. Is there a reason you've been avoiding that?
+Hi Catalin,
+
+On Tue, 2014-08-26 at 16:57 +0100, Catalin Marinas wrote:
+> On Fri, Aug 22, 2014 at 08:49:16PM +0100, Geoff Levand wrote:
+> > Change the preprocessor macro INVALID_HWID definition from ULONG_MAX to (~0)
+> > to allow INVALID_HWID to be used within assembly source files.
+> > 
+> > --- a/arch/arm64/include/asm/cputype.h
+> > +++ b/arch/arm64/include/asm/cputype.h
+> > @@ -16,7 +16,7 @@
+> >  #ifndef __ASM_CPUTYPE_H
+> >  #define __ASM_CPUTYPE_H
+> >  
+> > -#define INVALID_HWID		ULONG_MAX
+> > +#define INVALID_HWID		UL(~0)
 > 
-> None, other than to not add code before it's needed. I've just had a
-> quick look at break handler and it looks pretty straight forward to fold
-> that change in this set. Are you OK with that?
+> Does it actually expand to ULONG_MAX? ~0 is an int.
 
-Just do it as a separate patch on top of this one.
+It seems to be OK, in C:
 
-Will
+volatile unsigned long secondary_holding_pen_release = INVALID_HWID;
+
+Disassembly of section .data:
+
+0000000000000000 <secondary_holding_pen_release>:
+   0:   ffffffff        .word   0xffffffff
+   4:   ffffffff        .word   0xffffffff
+
+In .S:
+
+        mov     x10, INVALID_HWID               // clear secondary_holding_pen_release
+ 2b0:   9280000a        mov     x10, #0xffffffffffffffff        // #-1
+
+-Geoff
