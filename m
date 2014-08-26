@@ -1,37 +1,90 @@
-From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Tue, 26 Aug 2014 12:52:16 +0300
-Subject: [PATCH v2] video: ARM CLCD: Fix calculation of bits-per-pixel
-In-Reply-To: <1408538464.3858.43.camel@linaro1.home>
-References: <1408538464.3858.43.camel@linaro1.home>
-Message-ID: <53FC58D0.6080700@ti.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 26 Aug 2014 11:54:43 +0200
+Subject: [PATCH v2 2/9] mailbox: Add NVIDIA Tegra XUSB mailbox driver
+In-Reply-To: <20140826090810.GH17263@ulmo>
+References: <1408381705-3623-1-git-send-email-abrestic@chromium.org>
+ <6589717.GOLq1GlTCJ@wuerfel> <20140826090810.GH17263@ulmo>
+Message-ID: <5184912.mY2hCPH20k@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20/08/14 15:41, Jon Medhurst (Tixy) wrote:
-> If the device-tree specifies a max-memory-bandwidth property then the
-> CLCD driver uses that to calculate the bits-per-pixel supported,
-> however, this calculation is faulty for two reasons.
+On Tuesday 26 August 2014 11:08:11 Thierry Reding wrote:
+> On Tue, Aug 26, 2014 at 10:09:25AM +0200, Arnd Bergmann wrote:
+> > On Tuesday 26 August 2014 09:50:25 Thierry Reding wrote:
+> > > On Tue, Aug 26, 2014 at 09:43:50AM +0200, Arnd Bergmann wrote:
+> > > > On Tuesday 26 August 2014 08:57:31 Thierry Reding wrote:
+> > > > > On Mon, Aug 25, 2014 at 01:01:52PM -0600, Stephen Warren wrote:
+> > > > > > On 08/18/2014 11:08 AM, Andrew Bresticker wrote:
+> > > > > [...]
+> > > > > > >+static int tegra_xusb_mbox_probe(struct platform_device *pdev)
+> > > > > > 
+> > > > > > >+    res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> > > > > > >+    if (!res)
+> > > > > > >+            return -ENODEV;
+> > > > > > 
+> > > > > > Should devm_request_mem_region() be called here to claim the region?
+> > > > > > 
+> > > > > > >+    mbox->regs = devm_ioremap_nocache(&pdev->dev, res->start,
+> > > > > > >+                                      resource_size(res));
+> > > > > > >+    if (!mbox->regs)
+> > > > > > >+            return -ENOMEM;
+> > > > > > 
+> > > > > > Is _nocache required? I don't see other drivers using it. I assume there's
+> > > > > > nothing special about the mbox registers.
+> > > > > 
+> > > > > Most drivers should be using devm_ioremap_resource() which will use the
+> > > > > _nocache variant of devm_ioremap() when appropriate. Usually the region
+> > > > > will not be marked cacheable (IORESOURCE_CACHEABLE) and therefore be
+> > > > > remapped uncached.
+> > > > > 
+> > > > 
+> > > > Note that ioremap() and ioremap_nocache() are the same. We really shouldn't
+> > > > ever call ioremap_nocache().
+> > > 
+> > > Perhaps we should remove ioremap_nocache() in that case. Or ioremap(),
+> > > really, and keep only those variants that do what they claim to do.
+> > 
+> > That would be good, but there are many instances of either one:
+> > 
+> > arnd at wuerfel:/git/arm-soc$ git grep -w ioremap | wc
+> >    2156   13402  183732
+> > arnd at wuerfel:/git/arm-soc$ git grep -w ioremap_nocache | wc
+> >     485    2529   42955
 > 
-> 1. It doesn't ensure that the result is a sane value, i.e. a power of 2
->    and <= 32 as the rest of the code assumes.
+> Ugh... nothing that I currently have time for. Perhaps this is a good
+> one for the Janitors? I'm not sure if the kernelnewbies.org TODO list is
+> still frequented since many pages seem to be very old. Is there some
+> other place where I could add this?
+
+I'm not sure if it's really worth it. One thing we might do is just
+remove all definitions of ioremap_nocache and add a wrapper to
+include/linux/io.h, to make it more obvious what is going on.
+
+> > > > devm_ioremap_resource() and pci_iomap() checking for IORESOURCE_CACHEABLE is
+> > > > rather silly, since it doesn't call ioremap_cache() in that case.
+> > > 
+> > > Then that should be fixed.
+> > 
+> > Yes. I'd suggest we just ignore that flag and always call ioremap here.
+> > 
+> > When I checked this before, IORESOURCE_CACHEABLE only ever gets set for
+> > PCI ROM BARs, which we don't map into the kernel.
 > 
-> 2. It uses the displayed resolution and calculates the average bandwidth
->    across the whole frame. It should instead calculate the peak
->    bandwidth based on the pixel clock.
-> 
-> This patch fixes both the above.
-> 
-> Signed-off-by: Jon Medhurst <tixy@linaro.org>
+> There's still a few users of ioremap_cache() around and they are
+> potential candidates for a conversion to devm_ioremap_resource(), so I
+> think it'd still make sense to keep the check.
 
-Thanks, queued for 3.17 fbdev fixes.
+Possibly. Note that these are all in architecture-specific code, as
+evidenced by the fact that we have multiple names for this function:
 
- Tomi
+ioremap_cache:    arm, arm64, x86, ia64, sh
+ioremap_cached:   metag, unicore32
+ioremap_cachable: mips
 
+All other architectures have none of the above.
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140826/0523d2cc/attachment-0001.sig>
+An alternative approach would be to kill off IORESOURCE_CACHEABLE
+and introduce a devm_ioremap_resource_cache() helper when the first
+driver wants it.
+
+	Arnd
