@@ -1,90 +1,57 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 26 Aug 2014 11:54:43 +0200
-Subject: [PATCH v2 2/9] mailbox: Add NVIDIA Tegra XUSB mailbox driver
-In-Reply-To: <20140826090810.GH17263@ulmo>
-References: <1408381705-3623-1-git-send-email-abrestic@chromium.org>
- <6589717.GOLq1GlTCJ@wuerfel> <20140826090810.GH17263@ulmo>
-Message-ID: <5184912.mY2hCPH20k@wuerfel>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 26 Aug 2014 10:54:59 +0100
+Subject: [RFC PATCH 0/9] dt: dependencies (for deterministic driver
+ initialization order based on the DT)
+In-Reply-To: <20140825093931.GB2399@ulmo>
+References: <1399913280-6915-1-git-send-email-holler@ahsoftware.de>
+ <20140514141914.446F7C4153D@trevor.secretlab.ca>
+ <20140821140211.GD19293@ulmo.nvidia.com>
+ <53F64624.5000403@ahsoftware.de>
+ <20140822131919.GX21734@leverpostej> <20140825093931.GB2399@ulmo>
+Message-ID: <20140826095459.GB32315@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 26 August 2014 11:08:11 Thierry Reding wrote:
-> On Tue, Aug 26, 2014 at 10:09:25AM +0200, Arnd Bergmann wrote:
-> > On Tuesday 26 August 2014 09:50:25 Thierry Reding wrote:
-> > > On Tue, Aug 26, 2014 at 09:43:50AM +0200, Arnd Bergmann wrote:
-> > > > On Tuesday 26 August 2014 08:57:31 Thierry Reding wrote:
-> > > > > On Mon, Aug 25, 2014 at 01:01:52PM -0600, Stephen Warren wrote:
-> > > > > > On 08/18/2014 11:08 AM, Andrew Bresticker wrote:
-> > > > > [...]
-> > > > > > >+static int tegra_xusb_mbox_probe(struct platform_device *pdev)
-> > > > > > 
-> > > > > > >+    res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> > > > > > >+    if (!res)
-> > > > > > >+            return -ENODEV;
-> > > > > > 
-> > > > > > Should devm_request_mem_region() be called here to claim the region?
-> > > > > > 
-> > > > > > >+    mbox->regs = devm_ioremap_nocache(&pdev->dev, res->start,
-> > > > > > >+                                      resource_size(res));
-> > > > > > >+    if (!mbox->regs)
-> > > > > > >+            return -ENOMEM;
-> > > > > > 
-> > > > > > Is _nocache required? I don't see other drivers using it. I assume there's
-> > > > > > nothing special about the mbox registers.
-> > > > > 
-> > > > > Most drivers should be using devm_ioremap_resource() which will use the
-> > > > > _nocache variant of devm_ioremap() when appropriate. Usually the region
-> > > > > will not be marked cacheable (IORESOURCE_CACHEABLE) and therefore be
-> > > > > remapped uncached.
-> > > > > 
-> > > > 
-> > > > Note that ioremap() and ioremap_nocache() are the same. We really shouldn't
-> > > > ever call ioremap_nocache().
+On Mon, Aug 25, 2014 at 10:39:32AM +0100, Thierry Reding wrote:
+> On Fri, Aug 22, 2014 at 02:19:19PM +0100, Mark Rutland wrote:
+> > On Thu, Aug 21, 2014 at 08:19:00PM +0100, Alexander Holler wrote:
+> > > Am 21.08.2014 16:02, schrieb Thierry Reding:
 > > > 
-> > > Perhaps we should remove ioremap_nocache() in that case. Or ioremap(),
-> > > really, and keep only those variants that do what they claim to do.
-> > 
-> > That would be good, but there are many instances of either one:
-> > 
-> > arnd at wuerfel:/git/arm-soc$ git grep -w ioremap | wc
-> >    2156   13402  183732
-> > arnd at wuerfel:/git/arm-soc$ git grep -w ioremap_nocache | wc
-> >     485    2529   42955
-> 
-> Ugh... nothing that I currently have time for. Perhaps this is a good
-> one for the Janitors? I'm not sure if the kernelnewbies.org TODO list is
-> still frequented since many pages seem to be very old. Is there some
-> other place where I could add this?
-
-I'm not sure if it's really worth it. One thing we might do is just
-remove all definitions of ioremap_nocache and add a wrapper to
-include/linux/io.h, to make it more obvious what is going on.
-
-> > > > devm_ioremap_resource() and pci_iomap() checking for IORESOURCE_CACHEABLE is
-> > > > rather silly, since it doesn't call ioremap_cache() in that case.
+> > > > Anyway, those are all fairly standard reasons for where deferred probe
+> > > > triggers, and since I do like deferred probe for it's simplicity and
+> > > > reliability I'd rather not try to work around it if boot time is all
+> > > > that people are concerned about.
 > > > 
-> > > Then that should be fixed.
+> > > It's neither simple nor reliable. It's non deterministic brutforcing 
+> > > while making it almost impossible to identify real errors.
 > > 
-> > Yes. I'd suggest we just ignore that flag and always call ioremap here.
+> > It's horrible, yes.
 > > 
-> > When I checked this before, IORESOURCE_CACHEABLE only ever gets set for
-> > PCI ROM BARs, which we don't map into the kernel.
+> > > In my humble opinion the worst way to solve something. I'm pretty sure 
+> > > if I would have suggest such a solution, the maintainer crowd would have 
+> > > eaten me without cooking.
+> > 
+> > We didn't have a better workable solution at the time.
 > 
-> There's still a few users of ioremap_cache() around and they are
-> potential candidates for a conversion to devm_ioremap_resource(), so I
-> think it'd still make sense to keep the check.
+> You make it sound like we've come up with a better workable solution in
+> the meantime.
 
-Possibly. Note that these are all in architecture-specific code, as
-evidenced by the fact that we have multiple names for this function:
+That wasn't the intention, but my sloppy wording does make it come
+across that way.
 
-ioremap_cache:    arm, arm64, x86, ia64, sh
-ioremap_cached:   metag, unicore32
-ioremap_cachable: mips
+> > Having a hack that got boards booting was considered better than not
+> > having them boot.
+> > I don't remember people being particularly enthralled by the idea.
+> 
+> Odd, I remember things quite differently.
 
-All other architectures have none of the above.
+Then perhaps my memory is faulty. :)
 
-An alternative approach would be to kill off IORESOURCE_CACHEABLE
-and introduce a devm_ioremap_resource_cache() helper when the first
-driver wants it.
+> Anyway, instead of going back and forth between "deferred probe is good"
+> and "deferred probe is bad", how about we do something useful now and
+> concentrate on how to make use of the information we have in DT with the
+> goal to reduce the number of cases where deferred probing is required?
 
-	Arnd
+Certainly.
+
+Mark.
