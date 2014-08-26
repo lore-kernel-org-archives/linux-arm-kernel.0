@@ -1,104 +1,94 @@
 From: lauraa@codeaurora.org (Laura Abbott)
-Date: Mon, 25 Aug 2014 17:32:27 -0700
-Subject: [PATCHv3 4/7] arm64: Move some head.text functions to executable
- section
-In-Reply-To: <20140822094857.GP21734@leverpostej>
+Date: Mon, 25 Aug 2014 17:43:32 -0700
+Subject: [PATCHv3 3/7] arm64: Move cpu_resume into the text section
+In-Reply-To: <53FB9DCB.3080602@codeaurora.org>
 References: <1408584039-12735-1-git-send-email-lauraa@codeaurora.org>
- <1408584039-12735-5-git-send-email-lauraa@codeaurora.org>
- <20140821103455.GJ21734@leverpostej> <53F667B5.6010609@codeaurora.org>
- <20140822094857.GP21734@leverpostej>
-Message-ID: <53FBD59B.6080807@codeaurora.org>
+ <1408584039-12735-4-git-send-email-lauraa@codeaurora.org>
+ <53FB9DCB.3080602@codeaurora.org>
+Message-ID: <53FBD834.30507@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 8/22/2014 2:48 AM, Mark Rutland wrote:
-> On Thu, Aug 21, 2014 at 10:42:13PM +0100, Laura Abbott wrote:
->> On 8/21/2014 3:34 AM, Mark Rutland wrote:
->>> Hi Laura,
->>>
->>> On Thu, Aug 21, 2014 at 02:20:36AM +0100, Laura Abbott wrote:
->>>> The code in the head.text section of the kernel exists in the
->>>> same section as the swapper_pg_dir which means it needs the
->>>> same page table permissions. The swapper_pg_dir needs to be
->>>> writeable but shouldn't be executable.
->>>
->>> I think we can drop the above. As far as I can tell as of commit
->>> bd00cd5f8c8c (arm64: place initial page tables above the kernel) it's no
->>> longer relevant.
->>>
+On 8/25/2014 1:34 PM, Stephen Boyd wrote:
+> On 08/20/14 18:20, Laura Abbott wrote:
+>> The function cpu_resume currently lives in the .data
+>> section. This breaks functionality to make .data no
+>> execute. Move cpu_resume to .text which is where it
+>> actually belongs.
 >>
->> Yes, this should be changed. Instead of citing swapper_pg_dir, I need
->> to cite the fact that there may still be memory outside of stext which
->> will get freed to the buddy allocator and therefore should be RW/NX.
+>> Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
+>> ---
 > 
-> Ok. I must be missing something here; we don't seem to free any of
-> .head.text to the buddy allocator at the moment. Are we just trying to
-> have the bare minimum remain executable regardless?
+> This is similar to arm (where I don't see a similar patch to this in
+> Kees' patchset for RO). In arm we have this comment:
 > 
-
-It's not head.text per se, but we do 
-
-memblock_reserve(__pa(_text), _end - _text);
-
-to reserve the text area. On the system I was testing on, _text did not
-start at PAGE_OFFSET so there was still some not reserved memory
-between PAGE_OFFSET and _text which was freed to the buddy allocator.
-
->>>> The head.text section
->>>> is intended to be run at early bootup before any of the regular
->>>> kernel mappings have been setup so there is no issue at bootup.
->>>> The suspend/resume/hotplug code path requires some of these
->>>> head.S functions to run however which means they need to be
->>>> executable. We can't easily move all of the head.text to
->>>> an executable section, so split it into two parts: that which
->>>> is used only at early head.S bootup and that which is used
->>>> after bootup. There is a small bit of code duplication because
->>>> of some relocation issues related to accessing code more than
->>>> 1MB away.
->>>
->>> From a cursory glance it looks like the only things we need write access
->>> to in .head.text are __cpu_boot_mode and __switch_data. Can't we instead
->>> place those in .data and make .head.text executable?
->>>
->>> We currently find them with adr, which should be easy to replace with
->>> adrp + add to get around relocation issues.
->>>
->>
->> __boot_cpu_mode should be placed in data with a push section and
->> __switch_data is only modified before the permissions are set up.
+> /*
+>  * Note: Yes, part of the following code is located into the .data section.
+>  *       This is to allow sleep_save_sp to be accessed with a relative load
+>  *       while we can't rely on any MMU translation.  We could have put
+>  *       sleep_save_sp in the .text section as well, but some setups might
+>  *       insist on it to be truly read-only.
+>  */
 > 
-> Ok, so those are fine then.
+> Doesn't the same situation apply here? How is this problem overcome?
 > 
->> I took a closer look at the code and the only thing that actually
->> needs to be executable from head.S is __secondary_switched so
->> the following patch should be sufficient to cover it:
->>
->> diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
->> index caa9557..5c17599 100644
->> --- a/arch/arm64/kernel/head.S
->> +++ b/arch/arm64/kernel/head.S
->> @@ -414,12 +414,14 @@ ENTRY(secondary_startup)
->>         b       __enable_mmu
->>  ENDPROC(secondary_startup)
+> But I'm a little confused, shouldn't this code run with the MMU disabled?
+> 
+>>  ENDPROC(cpu_resume_after_mmu)
 >>  
->> +       .pushsection    .text, "ax"
->>  ENTRY(__secondary_switched)
->>         ldr     x0, [x21]                       // get secondary_data.stack
->>         mov     sp, x0
->>         mov     x29, #0
->>         b       secondary_start_kernel
->>  ENDPROC(__secondary_switched)
->> +       .popsection
->>  #endif /* CONFIG_SMP */
+>> -	.data
+>>  ENTRY(cpu_resume)
+>>  	bl	el2_setup		// if in EL2 drop to EL1 cleanly
+>>  #ifdef CONFIG_SMP
+>>  	mrs	x1, mpidr_el1
+>> -	adr	x4, mpidr_hash_ptr
+>> +	adrp	x4, mpidr_hash_ptr
+>> +	add	x4, x4, #:lo12:mpidr_hash_ptr
+>>  	ldr	x5, [x4]
+>>  	add	x8, x4, x5		// x8 = struct mpidr_hash phys address
+>>          /* retrieve mpidr_hash members to compute the hash */
+>> @@ -143,14 +143,15 @@ ENTRY(cpu_resume)
+>>  #else
+>>  	mov	x7, xzr
+>>  #endif
+>> -	adr	x0, sleep_save_sp
+>> +	adrp	x0, sleep_save_sp
+>> +	add	x0, x0, #:lo12:sleep_save_sp
+>>  	ldr	x0, [x0, #SLEEP_SAVE_SP_PHYS]
+>>  	ldr	x0, [x0, x7, lsl #3]
+>>  	/* load sp from context */
+>>  	ldr	x2, [x0, #CPU_CTX_SP]
+>> -	adr	x1, sleep_idmap_phys
+>> +	adrp	x1, sleep_idmap_phys
+>>  	/* load physical address of identity map page table in x1 */
+>> -	ldr	x1, [x1]
+>> +	ldr	x1, [x1, #:lo12:sleep_idmap_phys]
+>>  	mov	sp, x2
+>>  	/*
+>>  	 * cpu_do_resume expects x0 to contain context physical address
+>> @@ -160,6 +161,7 @@ ENTRY(cpu_resume)
+>>  	b	cpu_resume_mmu		// Resume MMU, never returns
+>>  ENDPROC(cpu_resume)
+>>  
+>> +	.data
+>>  	.align 3
+>>  mpidr_hash_ptr:
+>>  	/*
 > 
-> If we need to cover __secondary_switched, don't we need to cover
-> __turn_mmu_on as well, given that will turn the MMU on and branch to
-> __secondary_switched?
 > 
 
-You should be right but when I was testing this I seemed to get away
-without needing it. It's probably just luck and I should move
-__turn_mmu_on to text just to be on the safe side as well.
+Good point. I think this was a patch I added when I was debugging other
+issues and assumed it would be needed (code in .data segment, seems
+naturally a problem, right?) . When I revert the patch though it seems
+to work just fine. I suspect the comment about pc relative load is no
+longer relevant since I use the relocation trick to properly access
+sleep_save_sp in the data section.
+
+Since it's not technically needed, I could drop the patch and add one
+adding the comment back saying this was done on purpose. On the other
+hand, I wonder if I could do something 'interesting' by modifying
+the cpu_resume code since it's writable if I was a malicious
+program.
 
 Thanks,
 Laura
