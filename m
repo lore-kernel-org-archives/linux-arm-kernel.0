@@ -1,48 +1,57 @@
-From: sjoerd.simons@collabora.co.uk (Sjoerd Simons)
-Date: Tue, 26 Aug 2014 09:47:51 +0200
-Subject: [PATCH 2/2 v2] input: cros_ec_keyb: Add of match table
-In-Reply-To: <1409039271-10687-1-git-send-email-sjoerd.simons@collabora.co.uk>
-References: <1409039271-10687-1-git-send-email-sjoerd.simons@collabora.co.uk>
-Message-ID: <1409039271-10687-3-git-send-email-sjoerd.simons@collabora.co.uk>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Tue, 26 Aug 2014 09:50:25 +0200
+Subject: [PATCH v2 2/9] mailbox: Add NVIDIA Tegra XUSB mailbox driver
+In-Reply-To: <3804028.YQzQ4uAVsf@wuerfel>
+References: <1408381705-3623-1-git-send-email-abrestic@chromium.org>
+ <53FB8820.4010202@wwwdotorg.org> <20140826065729.GC15573@ulmo>
+ <3804028.YQzQ4uAVsf@wuerfel>
+Message-ID: <20140826075023.GB17263@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To enable the cros_ec_keyb driver to be auto-loaded when build as
-module add an of match table (and export it) to match the modalias
-information passed on to userspace as the Cros EC MFD driver registers
-the MFD subdevices with an of_compatibility string.
+On Tue, Aug 26, 2014 at 09:43:50AM +0200, Arnd Bergmann wrote:
+> On Tuesday 26 August 2014 08:57:31 Thierry Reding wrote:
+> > On Mon, Aug 25, 2014 at 01:01:52PM -0600, Stephen Warren wrote:
+> > > On 08/18/2014 11:08 AM, Andrew Bresticker wrote:
+> > [...]
+> > > >+static int tegra_xusb_mbox_probe(struct platform_device *pdev)
+> > > 
+> > > >+    res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> > > >+    if (!res)
+> > > >+            return -ENODEV;
+> > > 
+> > > Should devm_request_mem_region() be called here to claim the region?
+> > > 
+> > > >+    mbox->regs = devm_ioremap_nocache(&pdev->dev, res->start,
+> > > >+                                      resource_size(res));
+> > > >+    if (!mbox->regs)
+> > > >+            return -ENOMEM;
+> > > 
+> > > Is _nocache required? I don't see other drivers using it. I assume there's
+> > > nothing special about the mbox registers.
+> > 
+> > Most drivers should be using devm_ioremap_resource() which will use the
+> > _nocache variant of devm_ioremap() when appropriate. Usually the region
+> > will not be marked cacheable (IORESOURCE_CACHEABLE) and therefore be
+> > remapped uncached.
+> > 
+> 
+> Note that ioremap() and ioremap_nocache() are the same. We really shouldn't
+> ever call ioremap_nocache().
 
-Signed-off-by: Sjoerd Simons <sjoerd.simons@collabora.co.uk>
-Reviewed-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
----
- Changes in v2: none
+Perhaps we should remove ioremap_nocache() in that case. Or ioremap(),
+really, and keep only those variants that do what they claim to do.
 
- drivers/input/keyboard/cros_ec_keyb.c | 9 +++++++++
- 1 file changed, 9 insertions(+)
+> devm_ioremap_resource() and pci_iomap() checking for IORESOURCE_CACHEABLE is
+> rather silly, since it doesn't call ioremap_cache() in that case.
 
-diff --git a/drivers/input/keyboard/cros_ec_keyb.c b/drivers/input/keyboard/cros_ec_keyb.c
-index 791781a..e1903ec 100644
---- a/drivers/input/keyboard/cros_ec_keyb.c
-+++ b/drivers/input/keyboard/cros_ec_keyb.c
-@@ -342,10 +342,19 @@ static int cros_ec_keyb_resume(struct device *dev)
- 
- static SIMPLE_DEV_PM_OPS(cros_ec_keyb_pm_ops, NULL, cros_ec_keyb_resume);
- 
-+#ifdef CONFIG_OF
-+static const struct of_device_id cros_ec_keyb_of_match[] = {
-+	{ .compatible = "google,cros-ec-keyb" },
-+	{},
-+};
-+MODULE_DEVICE_TABLE(of, cros_ec_keyb_of_match);
-+#endif
-+
- static struct platform_driver cros_ec_keyb_driver = {
- 	.probe = cros_ec_keyb_probe,
- 	.driver = {
- 		.name = "cros-ec-keyb",
-+		.of_match_table = of_match_ptr(cros_ec_keyb_of_match),
- 		.pm	= &cros_ec_keyb_pm_ops,
- 	},
- };
--- 
-2.1.0
+Then that should be fixed.
+
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140826/a91ef206/attachment.sig>
