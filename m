@@ -1,44 +1,35 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Mon, 25 Aug 2014 20:04:49 -0700
-Subject: [PATCH] ARM: shmobile: lager: correct memory map
-In-Reply-To: <1409021623-10633-1-git-send-email-horms+renesas@verge.net.au>
-References: <1409021623-10633-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <CAOesGMieRk4Dvg=gxTgcVssARkK6DeoaVyK8619B2N5=wwo=Uw@mail.gmail.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Tue, 26 Aug 2014 11:54:56 +0800
+Subject: [PATCH resend v5 2/2] rtc: sunxi: Depend on platforms sun4i/sun7i
+ that actually have the rtc
+In-Reply-To: <1409025296-6342-1-git-send-email-wens@csie.org>
+References: <1409025296-6342-1-git-send-email-wens@csie.org>
+Message-ID: <1409025296-6342-3-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Now that we have Kconfig options for individual sunxi platforms, let
+the rtc-sunxi driver depend on the platforms that actually have this
+hardware, sun4i and sun7i.
 
-On Mon, Aug 25, 2014 at 7:53 PM, Simon Horman
-<horms+renesas@verge.net.au> wrote:
-> The base address of the second memory region on the lager
-> board is 0x140000000. Update the tag used in the dts file accordingly.
->
-> This is a documentation fix and should have no run-time affect.
->
-> This problem was introduced when the second memory region
-> was added to the lager dts file by 62bc32a2573c4219
-> ("ARM: shmobile: Include all 4 GiB of memory on Lager)"
-> in v3.14.
->
-> Reported-by: NAOYA SHIIBA <naoya.shiiba.nx@renesas.com>
-> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-> ---
->  arch/arm/boot/dts/r8a7790-lager.dts | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
->
-> diff --git a/arch/arm/boot/dts/r8a7790-lager.dts b/arch/arm/boot/dts/r8a7790-lager.dts
-> index 0118cbf..84dcafa 100644
-> --- a/arch/arm/boot/dts/r8a7790-lager.dts
-> +++ b/arch/arm/boot/dts/r8a7790-lager.dts
-> @@ -32,7 +32,7 @@
->                 reg = <0 0x40000000 0 0x40000000>;
->         };
->
-> -       memory at 180000000 {
-> +       memory at 140000000 {
+Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+---
+ drivers/rtc/Kconfig | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-That should even be "memory at 1,40000000".
-
-
--Olof
+diff --git a/drivers/rtc/Kconfig b/drivers/rtc/Kconfig
+index f2300b4..6b34bc9 100644
+--- a/drivers/rtc/Kconfig
++++ b/drivers/rtc/Kconfig
+@@ -1184,7 +1184,7 @@ config RTC_DRV_SUN6I
+ 
+ config RTC_DRV_SUNXI
+ 	tristate "Allwinner sun4i/sun7i RTC"
+-	depends on ARCH_SUNXI
++	depends on MACH_SUN4I || MACH_SUN7I
+ 	help
+ 	  If you say Y here you will get support for the RTC found on
+ 	  Allwinner A10/A20.
+-- 
+2.1.0
