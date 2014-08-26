@@ -1,63 +1,39 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Tue, 26 Aug 2014 09:52:10 +0200
-Subject: [PATCH] ARM: shmobile: lager: correct memory map
-In-Reply-To: <20140826042055.GA12108@verge.net.au>
-References: <1409021623-10633-1-git-send-email-horms+renesas@verge.net.au>
- <CAOesGMieRk4Dvg=gxTgcVssARkK6DeoaVyK8619B2N5=wwo=Uw@mail.gmail.com>
- <20140826042055.GA12108@verge.net.au>
-Message-ID: <CAMuHMdVqZ29-jaS+kLwdVycLOMSbz9H7oJGuq3dLH2y-81mVcQ@mail.gmail.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Tue, 26 Aug 2014 09:52:49 +0200
+Subject: [linux-sunxi] Re: [PATCH 4/4] simplefb: add clock handling code
+In-Reply-To: <20140825150900.GB21020@skynet.be>
+References: <53EB9471.3090204@wwwdotorg.org> <20140813170106.GT15297@lukather>
+ <20140825121228.GB4163@ulmo.nvidia.com>
+ <20140825124410.GZ15297@lukather>
+ <20140825133953.GJ4163@ulmo.nvidia.com>
+ <53FB3E7F.4000503@redhat.com>
+ <20140825141600.GA14763@ulmo.nvidia.com>
+ <20140825145854.GA15297@lukather>
+ <20140825150501.GE14763@ulmo.nvidia.com>
+ <20140825150900.GB21020@skynet.be>
+Message-ID: <20140826075247.GC17263@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 26, 2014 at 6:20 AM, Simon Horman <horms@verge.net.au> wrote:
->> > diff --git a/arch/arm/boot/dts/r8a7790-lager.dts b/arch/arm/boot/dts/r8a7790-lager.dts
->> > index 0118cbf..84dcafa 100644
->> > --- a/arch/arm/boot/dts/r8a7790-lager.dts
->> > +++ b/arch/arm/boot/dts/r8a7790-lager.dts
->> > @@ -32,7 +32,7 @@
->> >                 reg = <0 0x40000000 0 0x40000000>;
->> >         };
->> >
->> > -       memory at 180000000 {
->> > +       memory at 140000000 {
->>
->> That should even be "memory at 1,40000000".
->
-> Two comma-separated 32bit values in the case
-> where a memory range starts above 4Gb?
+On Mon, Aug 25, 2014 at 05:09:00PM +0200, Luc Verhaegen wrote:
+> On Mon, Aug 25, 2014 at 05:05:04PM +0200, Thierry Reding wrote:
+> > 
+> > No. simplefb just wants to write to some memory that hardware has been
+> > set up to scan out. The platform requires that the clocks be on.
+> 
+> Simplefb also requires that the memory is there and is persistent. Fine 
+> for discrete graphics cards, fine for rpi where most things are hidden 
+> from the ARM core anyway, not so fine for anybody else.
 
-Yes. As #address-cells is 2, there should be two values after the "@"
-(the first one may be optional if it's zero, I don't know for sure?)
+I don't understand. This patch series isn't changing anything about the
+memory aspects of the driver yet it's working for you on sunxi, isn't
+it? So it can't be all that broken.
 
-> If so it looks like this will be the first user of that syntax
-> (I don't see any in linux-next today).
-
-No, "git grep '@.*,' -- arch/arm/boot/dts" shows several users.
-Not all of them are 64-bit memory addresses, but some are.
-
-> I do however see several users of memrory at 64bit_value.
-> Mostly other renesas fds files; ecx-2000.dts being the exception.
-> Should they be fixed too?
->
-> $ find -name "*.dts" | xargs grep memory@[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]
-> ./arch/arm/boot/dts/r8a7791-henninger.dts:      memory at 200000000 {
-> ./arch/arm/boot/dts/r8a7791-koelsch.dts:        memory at 200000000 {
-> ./arch/arm/boot/dts/ecx-2000.dts:       memory at 200000000 {
-> ./arch/arm/boot/dts/r8a73a4-ape6evm-reference.dts:      memory at 200000000 {
-> ./arch/arm/boot/dts/r8a7790-lager.dts:  memory at 180000000 {
-> ./arch/arm/boot/dts/r8a73a4-ape6evm.dts:        memory at 200000000 {
-
-Yes, these should be fixed, too.
-
-It's a pity dtc doesn't complain about this.
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140826/9b9b9f75/attachment.sig>
