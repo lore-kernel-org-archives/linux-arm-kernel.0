@@ -1,16 +1,17 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 26 Aug 2014 11:46:41 -0600
-Subject: [PATCH v3 8/8] ARM: tegra: Add options for Tegra AHCI support
- to tegra_defconfig
-In-Reply-To: <1405500863-19696-9-git-send-email-mperttunen@nvidia.com>
-References: <1405500863-19696-1-git-send-email-mperttunen@nvidia.com>
- <1405500863-19696-9-git-send-email-mperttunen@nvidia.com>
-Message-ID: <53FCC801.5000703@wwwdotorg.org>
+Date: Tue, 26 Aug 2014 11:49:06 -0600
+Subject: [PATCH v3 1/3] of: Add NVIDIA Tegra flow controller bindings
+In-Reply-To: <1409033644-24376-1-git-send-email-thierry.reding@gmail.com>
+References: <1409033644-24376-1-git-send-email-thierry.reding@gmail.com>
+Message-ID: <53FCC892.1040905@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/16/2014 02:54 AM, Mikko Perttunen wrote:
-> This adds ATA, SATA_AHCI and AHCI_TEGRA support to tegra_defconfig
-> so that the SATA support will be automatically enabled.
+On 08/26/2014 12:14 AM, Thierry Reding wrote:
+> From: Thierry Reding <treding@nvidia.com>
+>
+> Add device tree bindings for the flow controller found on NVIDIA Tegra
+> SoCs.
 
-I've applied this to Tegra's for-3.18/dt branch.
+I have applied patches 1,3 to Tegra's for-3.18/soc branch, and patch 2 
+to Tegra's for-3.18/dt branch.
