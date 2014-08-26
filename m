@@ -1,41 +1,76 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 26 Aug 2014 10:12:26 +0100
-Subject: [PATCH v9 1/2] regulator: Add driver for max77802 PMIC PMIC
- regulators
-In-Reply-To: <53FC4E77.2090205@collabora.co.uk>
-References: <20140822144531.GV24407@sirena.org.uk>
- <53F7838F.8060906@collabora.co.uk>
- <20140822183054.GY24407@sirena.org.uk>
- <53F7BDD8.7060500@collabora.co.uk>
- <CAD=FV=WC0h7fYm2QFqu3Zka7CsU4BtG-oyPpJav+ygC+gmCR+A@mail.gmail.com>
- <CA+NduCCT-KQ=gh7QWkBE4qkA2YOJ8KCVqbkC6Tkmb1aPvCsGFQ@mail.gmail.com>
- <53FAFCBC.2050407@collabora.co.uk>
- <CAD=FV=V4TSKsbjj3dXCdSzVrh3sxH-FkpFEbEo+JA1bN9R-XWA@mail.gmail.com>
- <20140826071721.GV17528@sirena.org.uk>
- <53FC4E77.2090205@collabora.co.uk>
-Message-ID: <20140826091226.GD17528@sirena.org.uk>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 26 Aug 2014 11:16:13 +0200
+Subject: [PATCH] pstore/ram_core: Fix hang on ARMs because of
+ pgprot_noncached
+In-Reply-To: <20140825231449.GS17254@atomide.com>
+References: <20140825231449.GS17254@atomide.com>
+Message-ID: <4959575.hJIGzK9yj7@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 26, 2014 at 11:08:07AM +0200, Javier Martinez Canillas wrote:
-> On 08/26/2014 09:17 AM, Mark Brown wrote:
+On Monday 25 August 2014 16:14:50 Tony Lindgren wrote:
+> -static void *persistent_ram_vmap(phys_addr_t start, size_t size)
+> +static void *persistent_ram_vmap(phys_addr_t start, size_t size,
+> +               unsigned int cached)
+>  {
+>         struct page **pages;
+>         phys_addr_t page_start;
+> @@ -392,7 +393,10 @@ static void *persistent_ram_vmap(phys_addr_t start, size_t size)
+>         page_start = start - offset_in_page(start);
+>         page_count = DIV_ROUND_UP(size + offset_in_page(start), PAGE_SIZE);
+>  
+> -       prot = pgprot_noncached(PAGE_KERNEL);
+> +       if (cached)
+> +               prot = pgprot_writecombine(PAGE_KERNEL);
+> +       else
+> +               prot = pgprot_noncached(PAGE_KERNEL);
+>  
+>         pages = kmalloc_array(page_count, sizeof(struct page *), GFP_KERNEL);
+>         if (!pages) {
 
-> > No, this doesn't make any obvious sense to me at all.  Picking normal as
-> > a default if the hardware reads back off due to overlapping
-> > impelementation or something *might* make sense but not overwriting the
-> > hardware state without explicit permission from the machine integration
-> > is a key goal for the regulator API.
+If you have a 'struct page', you also have a cacheable mapping in the kernel already,
+so you are not really supposed to add another uncached mapping. On some architectures
+(e.g. powerpc) that will cause the CPU to checkstop, on others it is undefined
+behavior. What is the reason for using an uncached mapping here in the first place?
 
-> Just to be sure I understood you correctly, what might makes sense to you
-> then is to set the opmode to normal as default on probe only if off is
-> read back from the hardware register but leaving the enable function as it
-> is now using the opmode set on probe?
+> @@ -411,8 +415,11 @@ static void *persistent_ram_vmap(phys_addr_t start, size_t size)
+>         return vaddr;
+>  }
+>  
+> -static void *persistent_ram_iomap(phys_addr_t start, size_t size)
+> +static void *persistent_ram_iomap(phys_addr_t start, size_t size,
+> +               unsigned int cached)
+>  {
+> +       void *va;
+> +
+>         if (!request_mem_region(start, size, "persistent_ram")) {
+>                 pr_err("request mem region (0x%llx at 0x%llx) failed\n",
+>                         (unsigned long long)size, (unsigned long long)start);
+> @@ -422,19 +429,24 @@ static void *persistent_ram_iomap(phys_addr_t start, size_t size)
+>         buffer_start_add = buffer_start_add_locked;
+>         buffer_size_add = buffer_size_add_locked;
+>  
+> -       return ioremap(start, size);
+> +       if (cached)
+> +               va = ioremap(start, size);
+> +       else
+> +               va = ioremap_wc(start, size);
+> +
+> +       return va;
+>  }
 
-Yes.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140826/076569dc/attachment.sig>
+This seems confusing at best, but is probably just wrong: so you use
+an uncached mapping if someone asks for cached, but use a (more relaxed)
+write-combining mapping if someone asked for a stricter mapping?
+It's also the other way round for persistent_ram_vmap above.
+
+According to your description, the intention is to make atomic operations
+work, however most architectures don't allow atomics on either type of
+uncached mapping, since atomicity is a feature of the cache coherency
+fabric.
+
+The only way I see to actually make atomics work here is to use a cached
+mapping and explicit dcache flushes to actually force the data into
+persistent storage.
+
+	Arnd
