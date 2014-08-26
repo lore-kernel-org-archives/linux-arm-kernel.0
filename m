@@ -1,185 +1,81 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Tue, 26 Aug 2014 14:07:17 +0200
-Subject: [PATCH 9/9] ARM: exynos: Move to generic power domain bindings
-In-Reply-To: <1409054837-5667-1-git-send-email-ulf.hansson@linaro.org>
-References: <1409054837-5667-1-git-send-email-ulf.hansson@linaro.org>
-Message-ID: <1409054837-5667-10-git-send-email-ulf.hansson@linaro.org>
+From: ipaton0@gmail.com (Iain Paton)
+Date: Tue, 26 Aug 2014 13:08:09 +0100
+Subject: [PATCH 1/6] ARM: dts: microsom-ar8035: MDIO pad must be set open
+ drain
+In-Reply-To: <20140824095854.GR30401@n2100.arm.linux.org.uk>
+References: <20140823091058.GO30401@n2100.arm.linux.org.uk>
+ <E1XL7M1-0002yD-K3@rmk-PC.arm.linux.org.uk> <53F9B416.5030907@gmail.com>
+ <20140824095854.GR30401@n2100.arm.linux.org.uk>
+Message-ID: <53FC78A9.2020907@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Tomasz Figa <t.figa@samsung.com>
+On 24/08/14 10:58, Russell King - ARM Linux wrote:
+> On Sun, Aug 24, 2014 at 10:44:54AM +0100, Iain Paton wrote:
+>> On 23/08/14 10:11, Russell King wrote:
+>>> From: Rabeeh Khoury <rabeeh@solid-run.com>
+>>> To: Shawn Guo <shawn.guo@freescale.com>
+>>>
+>>> MDIO pad must be set open drain.
+>>>
+>>> Signed-off-by: Rabeeh Khoury <rabeeh@solid-run.com>
+>>> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+>>> ---
+>>>  arch/arm/boot/dts/imx6qdl-microsom-ar8035.dtsi | 2 +-
+>>>  1 file changed, 1 insertion(+), 1 deletion(-)
+>>>
+>>> diff --git a/arch/arm/boot/dts/imx6qdl-microsom-ar8035.dtsi b/arch/arm/boot/dts/imx6qdl-microsom-ar8035.dtsi
+>>> index d16066608e21..db9f45b2c573 100644
+>>> --- a/arch/arm/boot/dts/imx6qdl-microsom-ar8035.dtsi
+>>> +++ b/arch/arm/boot/dts/imx6qdl-microsom-ar8035.dtsi
+>>> @@ -17,7 +17,7 @@
+>>>  	enet {
+>>>  		pinctrl_microsom_enet_ar8035: microsom-enet-ar8035 {
+>>>  			fsl,pins = <
+>>> -				MX6QDL_PAD_ENET_MDIO__ENET_MDIO		0x1b0b0
+>>> +				MX6QDL_PAD_ENET_MDIO__ENET_MDIO		0x1b8b0
+>>>  				MX6QDL_PAD_ENET_MDC__ENET_MDC		0x1b0b0
+>>>  				/* AR8035 reset */
+>>>  				MX6QDL_PAD_KEY_ROW4__GPIO4_IO15		0x130b0
+>>>
+>>
+>> Can you elaborate some more on the reasons for this?  
+>>
+>> I'd like to understand if it's something specific to the hardware on that 
+>> board, or if other i.MX6 boards using the ar8035 are doing it wrong as well.
+>>
+>> The datasheet strongly suggests this is the correct thing to do as MDIO 
+>> should electrically be open drain. However that suggests many more instances 
+>> of this incorrect configuration exist which also need changed, and not just 
+>> for ar8035.
+>>
+>> While I'm reluctant to attribute something like this to the fec/interrupt 
+>> problems some people are seeing, I'd also like to be able to rule it out.
+> 
+> I'm merely passing the patch along; I've forwarded your question to
+> Rabeeh via IRC, and may have an answer soon.
+> 
+> FYI, I've run for a long time (close to a year now) on various iMX6
+> SolidRun platforms without the above patch and haven't seen a problem.
+> I've now also running with it on Solo and Quad and haven't seen any
+> ill effects there, despite the machines running root-NFS, doing
+> regular compiles and git activity.
 
-This patch moves Exynos power domain code to use the new generic power
-domain look-up framework introduced in previous patches, thus also
-allowing the new code to be compiled with CONFIG_ARCH_EXYNOS as well.
+I've not seen any problems either.  Digging through IEEE 802.3 clause 22
+only provides references to MDIO being implemented using a tri-state 
+driver. Then in Clause 45 (10gig) there's a one liner saying it 'may' be 
+implemented using open drain.
 
-Signed-off-by: Tomasz Figa <t.figa@samsung.com>
-Cc: linux-samsung-soc at vger.kernel.org
-Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
-[Ulf:Rebased and resolved conflicts]
----
- .../bindings/arm/exynos/power_domain.txt           | 13 ++--
- arch/arm/mach-exynos/pm_domains.c                  | 78 +---------------------
- kernel/power/Kconfig                               |  2 +-
- 3 files changed, 8 insertions(+), 85 deletions(-)
+The i.MX6 manual specifically states support for Clause 22.
 
-diff --git a/Documentation/devicetree/bindings/arm/exynos/power_domain.txt b/Documentation/devicetree/bindings/arm/exynos/power_domain.txt
-index 8b4f7b7f..abde1ea 100644
---- a/Documentation/devicetree/bindings/arm/exynos/power_domain.txt
-+++ b/Documentation/devicetree/bindings/arm/exynos/power_domain.txt
-@@ -8,6 +8,8 @@ Required Properties:
-     * samsung,exynos4210-pd - for exynos4210 type power domain.
- - reg: physical base address of the controller and length of memory mapped
-     region.
-+- #power-domain-cells: number of cells in power domain specifier;
-+    must be 0.
- 
- Optional Properties:
- - clocks: List of clock handles. The parent clocks of the input clocks to the
-@@ -29,6 +31,7 @@ Example:
- 	lcd0: power-domain-lcd0 {
- 		compatible = "samsung,exynos4210-pd";
- 		reg = <0x10023C00 0x10>;
-+		#power-domain-cells = <0>;
- 	};
- 
- 	mfc_pd: power-domain at 10044060 {
-@@ -37,12 +40,8 @@ Example:
- 		clocks = <&clock CLK_FIN_PLL>, <&clock CLK_MOUT_SW_ACLK333>,
- 			<&clock CLK_MOUT_USER_ACLK333>;
- 		clock-names = "oscclk", "pclk0", "clk0";
-+		#power-domain-cells = <0>;
- 	};
- 
--Example of the node using power domain:
--
--	node {
--		/* ... */
--		samsung,power-domain = <&lcd0>;
--		/* ... */
--	};
-+See Documentation/devicetree/bindings/power/power_domain.txt for description
-+of consumer-side bindings.
-diff --git a/arch/arm/mach-exynos/pm_domains.c b/arch/arm/mach-exynos/pm_domains.c
-index 797cb13..d05ecd1 100644
---- a/arch/arm/mach-exynos/pm_domains.c
-+++ b/arch/arm/mach-exynos/pm_domains.c
-@@ -106,78 +106,6 @@ static int exynos_pd_power_off(struct generic_pm_domain *domain)
- 	return exynos_pd_power(domain, false);
- }
- 
--static void exynos_add_device_to_domain(struct exynos_pm_domain *pd,
--					 struct device *dev)
--{
--	int ret;
--
--	dev_dbg(dev, "adding to power domain %s\n", pd->pd.name);
--
--	while (1) {
--		ret = pm_genpd_add_device(&pd->pd, dev);
--		if (ret != -EAGAIN)
--			break;
--		cond_resched();
--	}
--
--	pm_genpd_dev_need_restore(dev, true);
--}
--
--static void exynos_remove_device_from_domain(struct device *dev)
--{
--	struct generic_pm_domain *genpd = dev_to_genpd(dev);
--	int ret;
--
--	dev_dbg(dev, "removing from power domain %s\n", genpd->name);
--
--	while (1) {
--		ret = pm_genpd_remove_device(genpd, dev);
--		if (ret != -EAGAIN)
--			break;
--		cond_resched();
--	}
--}
--
--static void exynos_read_domain_from_dt(struct device *dev)
--{
--	struct platform_device *pd_pdev;
--	struct exynos_pm_domain *pd;
--	struct device_node *node;
--
--	node = of_parse_phandle(dev->of_node, "samsung,power-domain", 0);
--	if (!node)
--		return;
--	pd_pdev = of_find_device_by_node(node);
--	if (!pd_pdev)
--		return;
--	pd = platform_get_drvdata(pd_pdev);
--	exynos_add_device_to_domain(pd, dev);
--}
--
--static int exynos_pm_notifier_call(struct notifier_block *nb,
--				    unsigned long event, void *data)
--{
--	struct device *dev = data;
--
--	switch (event) {
--	case BUS_NOTIFY_BIND_DRIVER:
--		if (dev->of_node)
--			exynos_read_domain_from_dt(dev);
--
--		break;
--
--	case BUS_NOTIFY_UNBOUND_DRIVER:
--		exynos_remove_device_from_domain(dev);
--
--		break;
--	}
--	return NOTIFY_DONE;
--}
--
--static struct notifier_block platform_nb = {
--	.notifier_call = exynos_pm_notifier_call,
--};
--
- static __init int exynos4_pm_init_power_domain(void)
- {
- 	struct platform_device *pdev;
-@@ -203,7 +131,6 @@ static __init int exynos4_pm_init_power_domain(void)
- 		pd->base = of_iomap(np, 0);
- 		pd->pd.power_off = exynos_pd_power_off;
- 		pd->pd.power_on = exynos_pd_power_on;
--		pd->pd.of_node = np;
- 
- 		pd->oscclk = clk_get(dev, "oscclk");
- 		if (IS_ERR(pd->oscclk))
-@@ -229,15 +156,12 @@ static __init int exynos4_pm_init_power_domain(void)
- 			clk_put(pd->oscclk);
- 
- no_clk:
--		platform_set_drvdata(pdev, pd);
--
- 		on = __raw_readl(pd->base + 0x4) & S5P_INT_LOCAL_PWR_EN;
- 
- 		pm_genpd_init(&pd->pd, NULL, !on);
-+		of_genpd_add_provider(np, of_genpd_xlate_simple, &pd->pd);
- 	}
- 
--	bus_register_notifier(&platform_bus_type, &platform_nb);
--
- 	return 0;
- }
- arch_initcall(exynos4_pm_init_power_domain);
-diff --git a/kernel/power/Kconfig b/kernel/power/Kconfig
-index 897619b..bbef57f 100644
---- a/kernel/power/Kconfig
-+++ b/kernel/power/Kconfig
-@@ -304,7 +304,7 @@ config PM_GENERIC_DOMAINS_RUNTIME
- 
- config PM_GENERIC_DOMAINS_OF
- 	def_bool y
--	depends on PM_GENERIC_DOMAINS && OF && !ARCH_EXYNOS
-+	depends on PM_GENERIC_DOMAINS && OF
- 
- config CPU_PM
- 	bool
--- 
-1.9.1
+However, as 802.3 requires the pull-up be present, it seems unlikely there 
+will be any practical difference between an implementation using open drain 
+and tri-state signalling. Indeed, open drain would seem to be the logical
+way to implement it electrically.
+
+The AR8035 datasheet specifically marks MDIO and INT as being open drain,
+however the KSZ9021 (as used on sabre-lite) datasheet doesn't, instead it 
+marks them as Ipu/O (for Input with internal pull-up/Output).
+
+I'd suggest that this is a question of correctness more than a practical 
+problem and I have no objection to the patch being applied. 
