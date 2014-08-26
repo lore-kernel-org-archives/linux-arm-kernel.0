@@ -1,84 +1,64 @@
-From: alex.williamson@redhat.com (Alex Williamson)
-Date: Tue, 26 Aug 2014 13:02:30 -0600
-Subject: [RFC 8/9] KVM: KVM-VFIO: add kvm_vfio_arch_data and accessors
-In-Reply-To: <1408973264-30384-9-git-send-email-eric.auger@linaro.org>
-References: <1408973264-30384-1-git-send-email-eric.auger@linaro.org>
- <1408973264-30384-9-git-send-email-eric.auger@linaro.org>
-Message-ID: <1409079750.2906.130.camel@ul30vt.home>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 26 Aug 2014 20:02:30 +0100
+Subject: Generic communication of boot loader state to the OS
+In-Reply-To: <CAKON4Oy7SU9kj=DdJ+Oq14ukL7kHP7Qn9bPrQ3PKUL6ZJww=gw@mail.gmail.com>
+References: <CAKON4Oz-PRgXyNKj=T9ymzOOhCMPjBMdYdE1Mr1CHWv3boskiw@mail.gmail.com>
+ <20140826182816.GW30401@n2100.arm.linux.org.uk>
+ <CAKON4Oy7SU9kj=DdJ+Oq14ukL7kHP7Qn9bPrQ3PKUL6ZJww=gw@mail.gmail.com>
+Message-ID: <20140826190230.GX30401@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2014-08-25 at 15:27 +0200, Eric Auger wrote:
-> add a pointer to architecture specific data in kvm_vfio struct
-> add accessors to keep kvm_vfio private
+On Tue, Aug 26, 2014 at 02:39:45PM -0400, jonsmirl at gmail.com wrote:
+> On Tue, Aug 26, 2014 at 2:28 PM, Russell King - ARM Linux
+> <linux@arm.linux.org.uk> wrote:
+> > On Tue, Aug 26, 2014 at 12:10:00PM -0400, jonsmirl at gmail.com wrote:
+> >> As a side effect this will eliminate the need for kernel command line
+> >> parameters describing boot state. Like console="". Over time it might
+> >> even be able to pass a DHCP IP address from uboot into the kernel.
+> >
+> > Err no.  Don't even think about that.  DHCP may be wonderful and all,
+> > but there's a fundamental issue with it: entries time out unless they
+> > are renewed.
+> >
+> > Why is that a problem?  Well, take a DHCP server which hands out
+> > dynamic addresses, and updates the DNS.  When the lease expires, it
+> > tears down the DNS entry.
+> >
+> > Now take a target booting using DHCP in uboot, which then mounts its
+> > root NFS.  If it tries to startup a DHCP client, the first thing the
+> > DHCP client does is to clean up the interface... resulting in it
+> > killing the root NFS connection.  If that doesn't happen, then you
+> > end up with a problem at shutdown, because DHCP clients always
+> > deconfigure the interface when they're killed off - resulting in
+> > "reboot" not being functional.
 > 
-> Signed-off-by: Eric Auger <eric.auger@linaro.org>
-> ---
->  arch/arm/include/asm/kvm_host.h |  8 ++++++++
->  virt/kvm/vfio.c                 | 21 +++++++++++++++++++++
->  2 files changed, 29 insertions(+)
+> I run the same configuration  -  uboot in flash, tftp to load kernel,
+> nfs mount the root. And I do reboot fifty times a day too.  I just put
+> everything on static IPs to avoid problems.
 > 
-> diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
-> index 62cbf5b..4f1edbf 100644
-> --- a/arch/arm/include/asm/kvm_host.h
-> +++ b/arch/arm/include/asm/kvm_host.h
-> @@ -177,6 +177,14 @@ void kvm_vfio_device_put_external_user(struct vfio_device *vdev);
->  int kvm_vfio_external_get_type(struct vfio_device *vdev);
->  struct device *kvm_vfio_external_get_base_device(struct vfio_device *vdev);
->  
-> +struct kvm_vfio;
-> +struct kvm_vfio_arch_data;
-> +void kvm_vfio_device_set_arch_data(struct kvm_vfio *kv,
-> +				   struct kvm_vfio_arch_data *ptr);
-> +struct kvm_vfio_arch_data *kvm_vfio_device_get_arch_data(struct kvm_vfio *kv);
-> +void kvm_vfio_lock(struct kvm_vfio *kv);
-> +void kvm_vfio_unlock(struct kvm_vfio *kv);
-> +
->  /* We do not have shadow page tables, hence the empty hooks */
->  static inline int kvm_age_hva(struct kvm *kvm, unsigned long hva)
->  {
-> diff --git a/virt/kvm/vfio.c b/virt/kvm/vfio.c
-> index f1c4e35..177b71e 100644
-> --- a/virt/kvm/vfio.c
-> +++ b/virt/kvm/vfio.c
-> @@ -28,6 +28,7 @@ struct kvm_vfio {
->  	struct list_head group_list;
->  	struct mutex lock;
->  	bool noncoherent;
-> +	struct kvm_vfio_arch_data *arch_data;
->  };
->  
->  static struct vfio_group *kvm_vfio_group_get_external_user(struct file *filep)
-> @@ -338,6 +339,26 @@ static int kvm_vfio_create(struct kvm_device *dev, u32 type)
->  	return 0;
->  }
->  
-> +void kvm_vfio_device_set_arch_data(struct kvm_vfio *kv,
-> +				   struct kvm_vfio_arch_data *ptr)
-> +{
-> +	kv->arch_data = ptr;
-> +}
-> +
-> +struct kvm_vfio_arch_data *kvm_vfio_device_get_arch_data(struct kvm_vfio *kv)
-> +{
+> Would this work if the DHCP client was notified that there already was
+> an IP lease in place?  It could remember that lease and then be
+> responsible for setting it into the interface and renewing it. Right
+> now there is no way to pass this information.
+> 
+> Doesn't the DHCP client do the wrong thing simply because it lacks the
+> info to do something better?
 
-My preference would be s/get_//
+It can get the already configured IP address if the kernel (or initramfs)
+has already configured the interface - it's already available from the
+interface itself.  So it's not that there's no way to pass this to DHCP,
+it's that DHCP always starts out assuming that it's the new kid on the
+block.
 
-> +	return kv->arch_data;
-> +}
-> +
-> +void kvm_vfio_lock(struct kvm_vfio *kv)
-> +{
-> +	mutex_lock(&kv->lock);
-> +}
-> +
-> +void kvm_vfio_unlock(struct kvm_vfio *kv)
-> +{
-> +	mutex_unlock(&kv->lock);
-> +}
+Solving that problem doesn't get away from the shutdown problem though.
+You can partially avoid it by not having interfaces brought down, but
+one of the things that distros commonly do is kill all processes during
+shutdown... which kills the DHCP client, and then causes the interface
+to be deconfigured... which then stalls the reboot operation because
+suddenly the root-NFS server is no longer available... Gosh, why did
+that happen I wonder...
 
-Gosh, what could go wrong...
-
->  
->  struct kvm_device_ops kvm_vfio_ops = {
->  	.name = "kvm-vfio",
+-- 
+FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
+according to speedtest.net.
