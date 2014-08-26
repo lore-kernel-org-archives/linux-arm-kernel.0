@@ -1,139 +1,35 @@
-From: zonque@gmail.com (Daniel Mack)
-Date: Tue, 26 Aug 2014 10:52:53 +0200
-Subject: [PATCH v9] ARM: omap: edma: add suspend resume hook
-Message-ID: <1409043173-24357-1-git-send-email-zonque@gmail.com>
+From: David.Laight@ACULAB.COM (David Laight)
+Date: Tue, 26 Aug 2014 08:54:53 +0000
+Subject: [PATCH v2 2/9] mailbox: Add NVIDIA Tegra XUSB mailbox driver
+In-Reply-To: <20140826065729.GC15573@ulmo>
+References: <1408381705-3623-1-git-send-email-abrestic@chromium.org>
+ <1408381705-3623-3-git-send-email-abrestic@chromium.org>
+ <53FB8820.4010202@wwwdotorg.org> <20140826065729.GC15573@ulmo>
+Message-ID: <063D6719AE5E284EB5DD2968C1650D6D17481234@AcuExch.aculab.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch makes the edma driver resume correctly after suspend. Tested
-on an AM33xx platform with cyclic audio streams and omap_hsmmc.
+From: Thierry Reding
+...
+> > Is _nocache required? I don't see other drivers using it. I assume there's
+> > nothing special about the mbox registers.
+> 
+> Most drivers should be using devm_ioremap_resource() which will use the
+> _nocache variant of devm_ioremap() when appropriate. Usually the region
+> will not be marked cacheable (IORESOURCE_CACHEABLE) and therefore be
+> remapped uncached.
 
-All information can be reconstructed by already known runtime
-information.
+A related question:
+Is there any way for a driver to force that part of a PCIe BAR be mapped
+through the data cache even when the BAR isn't actually marked cacheable?
 
-As we now use some functions that were previously only used from __init
-context, annotations had to be dropped.
+Some hardware has address regions (which might not be an entire BAR)
+that are actually memory and mapping through the data cache will
+generate longer PCIe transfers [1].
+Clearly the driver will have to be very careful about cache flushes
+and invalidates to make this work.
 
-[nm at ti.com: added error handling for runtime + suspend_late/early_resume]
-Signed-off-by: Nishanth Menon <nm@ti.com>
-Signed-off-by: Daniel Mack <zonque@gmail.com>
-Tested-by: Joel Fernandes <joelf@ti.com>
-Acked-by: Joel Fernandes <joelf@ti.com>
----
-Changes from v8:
+[1] PCIe is high throughput and high latency, single word reads can
+be much slower that PCI, much nearer x86 ISA bus speeds.
 
-	* Drop the edma_suspend hook altogether. Even though back then
-	  when I wrote the code I was sure disabling the interrupts
-	  during suspend is necessary, tests now show it in fact isn't.
-	  My test setup still works if that code is omitted.
-	* Use SET_LATE_SYSTEM_SLEEP_PM_OPS in the dev_pm_ops
-	  declaration.
-
-	Thanks to Sekhar for pointing out the above.
-
- arch/arm/common/edma.c | 60 ++++++++++++++++++++++++++++++++++++++++++++++++--
- 1 file changed, 58 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm/common/edma.c b/arch/arm/common/edma.c
-index 485be42..c623dd0 100644
---- a/arch/arm/common/edma.c
-+++ b/arch/arm/common/edma.c
-@@ -244,6 +244,8 @@ struct edma {
- 	/* list of channels with no even trigger; terminated by "-1" */
- 	const s8	*noevent;
- 
-+	struct edma_soc_info *info;
-+
- 	/* The edma_inuse bit for each PaRAM slot is clear unless the
- 	 * channel is in use ... by ARM or DSP, for QDMA, or whatever.
- 	 */
-@@ -295,7 +297,7 @@ static void map_dmach_queue(unsigned ctlr, unsigned ch_no,
- 			~(0x7 << bit), queue_no << bit);
- }
- 
--static void __init assign_priority_to_queue(unsigned ctlr, int queue_no,
-+static void assign_priority_to_queue(unsigned ctlr, int queue_no,
- 		int priority)
- {
- 	int bit = queue_no * 4;
-@@ -314,7 +316,7 @@ static void __init assign_priority_to_queue(unsigned ctlr, int queue_no,
-  * included in that particular EDMA variant (Eg : dm646x)
-  *
-  */
--static void __init map_dmach_param(unsigned ctlr)
-+static void map_dmach_param(unsigned ctlr)
- {
- 	int i;
- 	for (i = 0; i < EDMA_MAX_DMACH; i++)
-@@ -1762,15 +1764,69 @@ static int edma_probe(struct platform_device *pdev)
- 			edma_write_array2(j, EDMA_DRAE, i, 1, 0x0);
- 			edma_write_array(j, EDMA_QRAE, i, 0x0);
- 		}
-+		edma_cc[j]->info = info[j];
- 		arch_num_cc++;
- 	}
- 
- 	return 0;
- }
- 
-+static int edma_pm_resume(struct device *dev)
-+{
-+	int i, j, r;
-+
-+	r = pm_runtime_get_sync(dev);
-+	if (r < 0) {
-+		dev_err(dev, "%s: get_sync returned %d\n", __func__, r);
-+		return r;
-+	}
-+
-+	for (j = 0; j < arch_num_cc; j++) {
-+		struct edma *cc = edma_cc[j];
-+
-+		s8 (*queue_priority_mapping)[2];
-+
-+		queue_priority_mapping = cc->info->queue_priority_mapping;
-+
-+		/* Event queue priority mapping */
-+		for (i = 0; queue_priority_mapping[i][0] != -1; i++)
-+			assign_priority_to_queue(j,
-+						 queue_priority_mapping[i][0],
-+						 queue_priority_mapping[i][1]);
-+
-+		/*
-+		 * Map the channel to param entry if channel mapping logic
-+		 * exist
-+		 */
-+		if (edma_read(j, EDMA_CCCFG) & CHMAP_EXIST)
-+			map_dmach_param(j);
-+
-+		for (i = 0; i < cc->num_channels; i++) {
-+			if (test_bit(i, cc->edma_inuse)) {
-+				/* ensure access through shadow region 0 */
-+				edma_or_array2(j, EDMA_DRAE, 0, i >> 5,
-+					       BIT(i & 0x1f));
-+
-+				setup_dma_interrupt(i,
-+						    cc->intr_data[i].callback,
-+						    cc->intr_data[i].data);
-+			}
-+		}
-+	}
-+
-+	pm_runtime_put_sync(dev);
-+
-+	return 0;
-+}
-+
-+static const struct dev_pm_ops edma_pm_ops = {
-+	SET_LATE_SYSTEM_SLEEP_PM_OPS(NULL, edma_pm_resume)
-+};
-+
- static struct platform_driver edma_driver = {
- 	.driver = {
- 		.name	= "edma",
-+		.pm	= &edma_pm_ops,
- 		.of_match_table = edma_of_ids,
- 	},
- 	.probe = edma_probe,
--- 
-2.1.0
+	David
