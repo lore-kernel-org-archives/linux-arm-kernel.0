@@ -1,7 +1,7 @@
 From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Wed, 27 Aug 2014 00:04:30 +0200
-Subject: [PATCH] MAINTAINERS: catch special Rockchip code locations
-Message-ID: <3113538.Qqp6JyMU4p@diego>
+Date: Wed, 27 Aug 2014 00:05:50 +0200
+Subject: [PATCH RESEND] MAINTAINERS: catch special Rockchip code locations
+Message-ID: <3644024.F4LLe7dWA4@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -20,6 +20,7 @@ better matching it should've been automatic.
 
 This could either go into 3.17 as fix, or could be queued for 3.18
 
+[resent, as I forgot the linux-rockchip list, sorry for the noise]
 
  MAINTAINERS | 5 +++++
  1 file changed, 5 insertions(+)
