@@ -1,9 +1,9 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 26 Aug 2014 11:03:33 +0100
-Subject: [PATCH v2 18/26] irqchip: GICv3: convert to handle_domain_irq
+Date: Tue, 26 Aug 2014 11:03:35 +0100
+Subject: [PATCH v2 20/26] irqchip: atmel-aic5: convert to handle_domain_irq
 In-Reply-To: <1409047421-27649-1-git-send-email-marc.zyngier@arm.com>
 References: <1409047421-27649-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1409047421-27649-19-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1409047421-27649-21-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -11,33 +11,26 @@ Use the new handle_domain_irq method to handle interrupts.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- drivers/irqchip/irq-gic-v3.c | 13 ++++++-------
- 1 file changed, 6 insertions(+), 7 deletions(-)
+ drivers/irqchip/irq-atmel-aic5.c | 4 +---
+ 1 file changed, 1 insertion(+), 3 deletions(-)
 
-diff --git a/drivers/irqchip/irq-gic-v3.c b/drivers/irqchip/irq-gic-v3.c
-index 57eaa5a..9e31449 100644
---- a/drivers/irqchip/irq-gic-v3.c
-+++ b/drivers/irqchip/irq-gic-v3.c
-@@ -274,14 +274,13 @@ static asmlinkage void __exception_irq_entry gic_handle_irq(struct pt_regs *regs
- 		irqnr = gic_read_iar();
+diff --git a/drivers/irqchip/irq-atmel-aic5.c b/drivers/irqchip/irq-atmel-aic5.c
+index edb2270..04fe2c1 100644
+--- a/drivers/irqchip/irq-atmel-aic5.c
++++ b/drivers/irqchip/irq-atmel-aic5.c
+@@ -78,12 +78,10 @@ aic5_handle(struct pt_regs *regs)
+ 	irqnr = irq_reg_readl(gc->reg_base + AT91_AIC5_IVR);
+ 	irqstat = irq_reg_readl(gc->reg_base + AT91_AIC5_ISR);
  
- 		if (likely(irqnr > 15 && irqnr < 1020)) {
--			u64 irq = irq_find_mapping(gic_data.domain, irqnr);
--			if (likely(irq)) {
--				handle_IRQ(irq, regs);
--				continue;
-+			int err;
-+			err = handle_domain_irq(gic_data.domain, irqnr, regs);
-+			if (err) {
-+				WARN_ONCE(true, "Unexpected SPI received!\n");
-+				gic_write_eoir(irqnr);
- 			}
+-	irqnr = irq_find_mapping(aic5_domain, irqnr);
 -
--			WARN_ONCE(true, "Unexpected SPI received!\n");
--			gic_write_eoir(irqnr);
-+			continue;
- 		}
- 		if (irqnr < 16) {
- 			gic_write_eoir(irqnr);
+ 	if (!irqstat)
+ 		irq_reg_writel(0, gc->reg_base + AT91_AIC5_EOICR);
+ 	else
+-		handle_IRQ(irqnr, regs);
++		handle_domain_irq(aic5_domain, irqnr, regs);
+ }
+ 
+ static void aic5_mask(struct irq_data *d)
 -- 
 2.0.4
