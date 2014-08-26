@@ -1,100 +1,78 @@
 From: vincent.guittot@linaro.org (Vincent Guittot)
-Date: Tue, 26 Aug 2014 13:06:45 +0200
-Subject: [PATCH v5 02/12] sched: remove a wake_affine condition
+Date: Tue, 26 Aug 2014 13:06:47 +0200
+Subject: [PATCH v5 04/12] sched: Allow all archs to set the capacity_orig
 In-Reply-To: <1409051215-16788-1-git-send-email-vincent.guittot@linaro.org>
 References: <1409051215-16788-1-git-send-email-vincent.guittot@linaro.org>
-Message-ID: <1409051215-16788-3-git-send-email-vincent.guittot@linaro.org>
+Message-ID: <1409051215-16788-5-git-send-email-vincent.guittot@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I have tried to understand the meaning of the condition :
- (this_load <= load &&
-  this_load + target_load(prev_cpu, idx) <= tl_per_task)
-but i failed to find a use case that can take advantage of it and i haven't
-found clear description in the previous commits' log.
-Futhermore, the comment of the condition refers to the task_hot function that
-was used before being replaced by the current condition:
-/*
- * This domain has SD_WAKE_AFFINE and
- * p is cache cold in this domain, and
- * there is no bad imbalance.
- */
+capacity_orig is only changed for system with a SMT sched_domain level in order
+to reflect the lower capacity of CPUs. Heterogenous system also have to reflect an
+original capacity that is different from the default value.
 
-If we look more deeply the below condition
- this_load + target_load(prev_cpu, idx) <= tl_per_task
+Create a more generic function arch_scale_cpu_capacity that can be also used by
+non SMT platform to set capacity_orig.
 
-When sync is clear, we have :
- tl_per_task = runnable_load_avg / nr_running
- this_load = max(runnable_load_avg, cpuload[idx])
- target_load =  max(runnable_load_avg', cpuload'[idx])
+The weak behavior of arch_scale_cpu_capacity is the previous SMT one in order to
+keep backward compatibility in the use of capacity_orig.
 
-It implies that runnable_load_avg' == 0 and nr_running <= 1 in order to match the
-condition. This implies that runnable_load_avg == 0 too because of the
-condition: this_load <= load
-but if this _load is null, balanced is already set and the test is redundant.
-
-If sync is set, it's not as straight forward as above (especially if cgroup
-are involved) but the policy should be similar as we have removed a task that's
-going to sleep in order to get a more accurate load and this_load values.
-
-The current conclusion is that these additional condition don't give any benefit
-so we can remove them.
+arch_scale_smt_capacity and default_scale_smt_capacity have been removed as
+they were not use elsewhere than in arch_scale_cpu_capacity.
 
 Signed-off-by: Vincent Guittot <vincent.guittot@linaro.org>
 ---
- kernel/sched/fair.c | 30 ++++++------------------------
- 1 file changed, 6 insertions(+), 24 deletions(-)
+ kernel/sched/fair.c | 25 ++++++-------------------
+ 1 file changed, 6 insertions(+), 19 deletions(-)
 
 diff --git a/kernel/sched/fair.c b/kernel/sched/fair.c
-index 085e853..87b9dc7 100644
+index b85e9f7..8176bda 100644
 --- a/kernel/sched/fair.c
 +++ b/kernel/sched/fair.c
-@@ -4282,7 +4282,6 @@ static int wake_affine(struct sched_domain *sd, struct task_struct *p, int sync)
- {
- 	s64 this_load, load;
- 	int idx, this_cpu, prev_cpu;
--	unsigned long tl_per_task;
- 	struct task_group *tg;
- 	unsigned long weight;
- 	int balanced;
-@@ -4340,32 +4339,15 @@ static int wake_affine(struct sched_domain *sd, struct task_struct *p, int sync)
- 		balanced = this_eff_load <= prev_eff_load;
- 	} else
- 		balanced = true;
--
--	/*
--	 * If the currently running task will sleep within
--	 * a reasonable amount of time then attract this newly
--	 * woken task:
--	 */
--	if (sync && balanced)
--		return 1;
--
- 	schedstat_inc(p, se.statistics.nr_wakeups_affine_attempts);
--	tl_per_task = cpu_avg_load_per_task(this_cpu);
- 
--	if (balanced ||
--	    (this_load <= load &&
--	     this_load + target_load(prev_cpu, idx) <= tl_per_task)) {
--		/*
--		 * This domain has SD_WAKE_AFFINE and
--		 * p is cache cold in this domain, and
--		 * there is no bad imbalance.
--		 */
--		schedstat_inc(sd, ttwu_move_affine);
--		schedstat_inc(p, se.statistics.nr_wakeups_affine);
-+	if (!balanced)
-+		return 0;
- 
--		return 1;
--	}
--	return 0;
-+	schedstat_inc(sd, ttwu_move_affine);
-+	schedstat_inc(p, se.statistics.nr_wakeups_affine);
-+
-+	return 1;
+@@ -5705,19 +5705,12 @@ unsigned long __weak arch_scale_freq_capacity(struct sched_domain *sd, int cpu)
+ 	return default_scale_capacity(sd, cpu);
  }
  
- /*
+-static unsigned long default_scale_smt_capacity(struct sched_domain *sd, int cpu)
++unsigned long __weak arch_scale_cpu_capacity(struct sched_domain *sd, int cpu)
+ {
+-	unsigned long weight = sd->span_weight;
+-	unsigned long smt_gain = sd->smt_gain;
++	if ((sd->flags & SD_SHARE_CPUCAPACITY) && (sd->span_weight > 1))
++		return sd->smt_gain / sd->span_weight;
+ 
+-	smt_gain /= weight;
+-
+-	return smt_gain;
+-}
+-
+-unsigned long __weak arch_scale_smt_capacity(struct sched_domain *sd, int cpu)
+-{
+-	return default_scale_smt_capacity(sd, cpu);
++	return SCHED_CAPACITY_SCALE;
+ }
+ 
+ static unsigned long scale_rt_capacity(int cpu)
+@@ -5756,18 +5749,12 @@ static unsigned long scale_rt_capacity(int cpu)
+ 
+ static void update_cpu_capacity(struct sched_domain *sd, int cpu)
+ {
+-	unsigned long weight = sd->span_weight;
+ 	unsigned long capacity = SCHED_CAPACITY_SCALE;
+ 	struct sched_group *sdg = sd->groups;
+ 
+-	if ((sd->flags & SD_SHARE_CPUCAPACITY) && weight > 1) {
+-		if (sched_feat(ARCH_CAPACITY))
+-			capacity *= arch_scale_smt_capacity(sd, cpu);
+-		else
+-			capacity *= default_scale_smt_capacity(sd, cpu);
++	capacity *= arch_scale_cpu_capacity(sd, cpu);
+ 
+-		capacity >>= SCHED_CAPACITY_SHIFT;
+-	}
++	capacity >>= SCHED_CAPACITY_SHIFT;
+ 
+ 	sdg->sgc->capacity_orig = capacity;
+ 
 -- 
 1.9.1
