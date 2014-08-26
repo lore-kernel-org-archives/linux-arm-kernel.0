@@ -1,168 +1,144 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon, 25 Aug 2014 19:17:15 -0700
-Subject: [PATCH v4 4/8] qcom: spm-devices: Add SPM device manager for
- the SoC
-In-Reply-To: <20140826003153.GA72292@ilina-mac.local>
-References: <1408486537-6358-1-git-send-email-lina.iyer@linaro.org>
- <1408486537-6358-5-git-send-email-lina.iyer@linaro.org>
- <53FBC971.1070102@codeaurora.org> <20140826003153.GA72292@ilina-mac.local>
-Message-ID: <53FBEE2B.7020008@codeaurora.org>
+From: minchan@kernel.org (Minchan Kim)
+Date: Tue, 26 Aug 2014 11:43:55 +0900
+Subject: [PATCH 0/2] ARM: Remove lowmem limit for default CMA region
+In-Reply-To: <53FAF4EE.6060201@samsung.com>
+References: <1408610714-16204-1-git-send-email-m.szyprowski@samsung.com>
+ <20140825012600.GN17372@bbox> <53FAED20.60200@samsung.com>
+ <20140825081836.GF32620@bbox> <53FAF4EE.6060201@samsung.com>
+Message-ID: <20140826024355.GB11319@bbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/25/14 17:31, Lina Iyer wrote:
-> On Mon, Aug 25, 2014 at 04:40:33PM -0700, Stephen Boyd wrote:
->> On 08/19/14 15:15, Lina Iyer wrote:
->>> diff --git a/Documentation/devicetree/bindings/arm/msm/spm.txt
->>> b/Documentation/devicetree/bindings/arm/msm/spm.txt
->>> new file mode 100644
->>> index 0000000..318e024
->>> --- /dev/null
->>> +++ b/Documentation/devicetree/bindings/arm/msm/spm.txt
->>
->> We already have a binding document for SAW. Please add stuff there
->> because SPM is just a component of SAW.
->>
-> I agree that SPM is just a component of the SAW. But the document there
-> seems to indicate regulator details, totally unrelated to the actual SAW
-> hardware functionality.
+Hey Marek,
 
-Huh? The SAW binding should be extended with whatever properties are
-necessary. Probably the only thing we need is the delays. Everything
-else can be determined from the compatible?
+On Mon, Aug 25, 2014 at 10:33:50AM +0200, Marek Szyprowski wrote:
+> Hello,
+> 
+> On 2014-08-25 10:18, Minchan Kim wrote:
+> >On Mon, Aug 25, 2014 at 10:00:32AM +0200, Marek Szyprowski wrote:
+> >>On 2014-08-25 03:26, Minchan Kim wrote:
+> >>>On Thu, Aug 21, 2014 at 10:45:12AM +0200, Marek Szyprowski wrote:
+> >>>>Russell King recently noticed that limiting default CMA region only to
+> >>>>low memory on ARM architecture causes serious memory management issues
+> >>>>with machines having a lot of memory (which is mainly available as high
+> >>>>memory). More information can be found the following thread:
+> >>>>http://thread.gmane.org/gmane.linux.ports.arm.kernel/348441/
+> >>>>
+> >>>>Those two patches removes this limit letting kernel to put default CMA
+> >>>>region into high memory when this is possible (there is enough high
+> >>>>memory available and architecture specific DMA limit fits).
+> >>>Agreed. It should be from the beginning because CMA page is effectly
+> >>>pinned if it is anonymous page and system has no swap.
+> >>Nope. Even without swap, anonymous page can be correctly migrated to other
+> >>location. Migration code doesn't depend on presence of swap.
+> >I could be possible only if the zone has freeable page(ie, free pages
+> >+ shrinkable page like page cache). IOW, if the zone is full with
+> >anon pages, it's efffectively pinned.
+> 
+> Why? __alloc_contig_migrate_range() uses alloc_migrate_target()
+> function, which
+> can take free page from any zone matching given flags.
 
-SAW has a connection to the PMIC, does it not? If it isn't directly
-connected we can come up with a different name for the node, but just
-because the node name in the example is misleading doesn't mean we
-should completely disregard what we already have.
+Strictly speaking, it's not any zones. It allows zones which are
+equal or lower with zone of source page.
 
->
->>> @@ -0,0 +1,47 @@
->>> +* Subsystem Power Manager (SAW2)
->>> +
->>> +S4 generation of MSMs have SPM hardware blocks to control the
->>> Application
->>> +Processor Sub-System power. These SPM blocks run individual state
->>> machine
->>> +to determine what the core (L2 or Krait/Scorpion) would do when the
->>> WFI
->>> +instruction is executed by the core.
->>> +
->>> +The devicetree representation of the SPM block should be:
->>> +
->>> +Required properties
->>> +
->>> +- compatible: Could be one of -
->>> +        "qcom,spm-v2.1"
->>> +        "qcom,spm-v3.0"
->>> +- reg: The physical address and the size of the SPM's memory mapped
->>> registers
->>> +- qcom,cpu: phandle for the CPU that the SPM block is attached to.
->>> +    This field is required on only for SPMs that control the CPU.
->>
->> We have a phandle from the CPU/L2 to the SAW, so this isn't necessary.
->>
-> Sorry, I dont understand. Care to explain pls? Its necessary to know
-> what SPM instance controls which CPU or L2, so as to pick the right SPM
-> device to configure.
+Pz, look at Russell's case.
+The pgd_alloc is trying to allocate order 2 page on normal zone,
+which is lowest zone so there is no fallback zones to migrate
+anonymous pages in normal zone out and alloc_migrate_target doesn't
+allocate target page from higher zones of source page at the moment.
+That's why I call it as effectively pinned.
 
-We have a phandle in the CPU nodes pointing to the SAW that is
-associated with that CPU (qcom,saw). SPM is a part of a SAW. Thus there
-is no need for this qcom,cpu property once the SAW node is used.
-Instead, we can search the CPU and cache nodes for a qcom,saw that
-matches the of_node for the platform device we're probing.
+> 
+> >>>>This should solve strange OOM issues on systems with lots of RAM
+> >>>>(i.e. >1GiB) and large (>256M) CMA area.
+> >>>I totally agree with the patchset although I didn't review code
+> >>>at all.
+> >>>
+> >>>Another topic:
+> >>>It means it should be a problem still if system has CMA in lowmem
+> >>>by some reason(ex, hardware limit or other purpose of CMA
+> >>>rather than DMA subsystem)?
+> >>>
+> >>>In that case, an idea that just popped in my head is to migrate
+> >>>pages from cma area to highest zone because they are all
+> >>>userspace pages which should be in there but not sure it's worth
+> >>>to implement at this point because how many such cripple platform
+> >>>are.
+> >>>
+> >>>Just for the recording.
+> >>Moving pages between low and high zone is not that easy. If I remember
+> >>correctly you cannot migrate a page from low memory to high zone in
+> >>generic case, although it should be possible to add exception for
+> >>anonymous pages. This will definitely improve poor low memory
+> >>handling in low zone when CMA is enabled.
+> >Yeb, it's possible for anonymous pages but I just wonder it's worth
+> >to add more complexitiy to mm and and you are answering it's worth.
+> >Okay. May I understand your positive feedback means such platform(
+> >ie, DMA works with only lowmem) are still common?
+> 
+> There are still some platforms, which have limited DMA capabilities. However
 
->
->>> +- qcom,saw2-cfg: SAW2 configuration register
->>
->> Why? Compatible should indicate where this register is.
->>
-> There are multiple versions of saw handled by the same driver and
-> distinguished by the version register. These SAW revisions differ in the
-> register offset organization. The variable holds the value to be
-> configured in the saw2-cfg register. I will update the documentation to
-> be more clear.
->>> +- qcom,saw2-spm-ctl: The SPM control register
->>
->> Why? Compatible should indicate where this register is.
->>
-> See above. 
+Thanks for your comment.
+I just wanted to know it's worth before I dive into that but it seems
+I was driving wrong way. See below.
 
-Ah this is more register jam table in DT? cfg should probably be
-described in desired clock rate and then the driver can figure out the
-value by multiplying that the input clock rate. spm-ctl looks like it's
-usually used to describe "enable", which seems rather obvious. Why isn't
-the driver always writing the enable bit (bit 0)?
+> the ability to move anonymous a page from lowmem to highmem will be
+> a benefit
+> in any case, as low memory is really much more precious.
 
->
->>> +- qcom,saw2-spm-dly: Provides the values for the SPM delay command
->>> in the SPM
->>> +    sequence
->>
->> This is actually three values packed into one register for three
->> different selectable delays, right? We don't typically do register jam
->> tables in DT. Perhaps it should be split out into 3 different
->> properties. Or maybe it shouldn't be specified in DT at all and should
->> be determined algorithmically from the command sequences? From what I
->> can tell most of the sequences don't even use these delays.
->>
-> Not at all sequences use the delays. These cannot be determined
-> algorithmatically, They may be added to the sequence for changes in
-> hardware. Let me revisit the sequences to see if they need to be set
-> with the current sequence in use.
->
+Maybe, but in case of this report, even if we move anonymous pages
+into higher zones, the problem(ie, OOM) is still there because
+pgd_alloc wanted high order page in no cma area in normal zone.
 
-I was thinking perhaps these should be more structured binary blobs that
-indicate the delays that would be necessary in the first 3 bytes or
-something and then the command sequence after that.
+The feature which move CMA pages into higher zones would help CMA alloc
+latency if there are lots of free pages in higher zone but no freeable
+page in the zone which source page located in. But it wouldn't help
+this OOM problem.
 
-        <delay1> <delay2> <delay3> <sequence>
+> 
+> It also doesn't look to be really hard to add this exception for anonymous
+> pages from low memory. It will be just a matter of setting __GFP_HIGHMEM
+> flag if source page is anonymous page in alloc_migrate_target() function.
+> Am i right?
 
-Or perhaps
+When I read source code, yes, it might work(but not sure I didn't test it)
+for anonymous page but as I read report from Russell in detail,
+fundamental problem is that why compaction didn't work although it has
+lots of free pages in normal zone.
 
-        <num delays=N> <delayN-1> <delayN> <sequence>
+Normal free:159400kB min:3440kB low:4300kB high:5160kB active_anon:54336kB
+inactive_anon:2580kB active_file:56kB inactive_file:204kB unevictable:0kB
+isolated(anon):0kB isolated(file):0kB present:778240kB managed:740044kB
+mlocked:0kB dirty:0kB writeback:0kB mapped:5336kB shmem:5428kB
+slab_reclaimable:14420kB slab_unreclaimable:383976kB kernel_stack:2512kB
+pagetables:1088kB unstable:0kB bounce:0kB free_cma:150788kB
+writeback_tmp:0kB pages_scanned:0 all_unreclaimable? no
 
-and then the code would parse these first few bytes and compress them
-into 3 values that are written into the register.
+As you can see, there are lots of CMA free pages in normal zone and
+there are (54M + 2M) anon pages so compaction should migrate 64M anon pages
+into CMA area but it didn't.
 
-BTW, I wonder if these sequences should be firmware blobs? Or at least,
-different files that we then /incbin/ into the final DT blob (if DT
-reviewers approve putting blobs like this into the kernel, Cc'ed the DT
-list just in case).
+I think it's primary reason of the problem and moving CMA area into higher zone
+by default can hide the problem and it's not a exact solution of this problem.
+(But still I support this patch, default CMA area should be higher zones if
+possible)
 
->
->
->>> +
->>> +Optional properties
->>> +
->>> +- qcom,saw2-spm-cmd-wfi: The WFI command sequence
->>> +- qcom,saw2-spm-cmd-ret: The Retention command sequence
->>> +- qcom,saw2-spm-cmd-spc: The Standalone PC command sequence
->>> +- qcom,saw2-spm-cmd-pc: The Power Collapse command sequence. This
->>> sequence may
->>> +    turn off other SoC components.
->>> +- qcom,saw2-spm-cmd-gdhs: GDHS (Globally Distributed Head Switch)
->>> command
->>> +    sequence. This sequence will retain the memory but turn off the
->>> logic.
->>
->> I wonder if these should be properties of the idle states? That way the
->> driver isn't searching for them by name in DT, instead it knows what
->> state is associated with what sequence that the SPM needs to have
->> programmed.
->>
-> I see the relation you are seeing. But its not a property of the idle
-> state. Its an SoC specific property that the idle uses to indicate a
-> state. Better off lying here. I doubt there would be a good support for
-> holding SoC specific stuff in the ARM idle-states nodes.
->
->
+Thesedays, there are some of reports about compaction fail although
+there are lots of free pages. I think the report is just one example.
 
-What isn't specifically related to the 1) idle state and 2) CPU/L2/etc.
-that the idle state is used in? I would think that by pointing to
-different idle states from different CPU nodes we could cover all cases.
-What is the SoC specific stuff in here?
+> 
+> Best regards
+> -- 
+> Marek Szyprowski, PhD
+> Samsung R&D Institute Poland
+> 
+> --
+> To unsubscribe, send a message with 'unsubscribe linux-mm' in
+> the body to majordomo at kvack.org.  For more info on Linux MM,
+> see: http://www.linux-mm.org/ .
+> Don't email: <a href=mailto:"dont@kvack.org"> email at kvack.org </a>
 
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+Kind regards,
+Minchan Kim
