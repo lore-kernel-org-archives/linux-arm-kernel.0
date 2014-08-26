@@ -1,81 +1,80 @@
-From: vincent.guittot@linaro.org (Vincent Guittot)
-Date: Tue, 26 Aug 2014 13:06:53 +0200
-Subject: [PATCH v5 10/12] sched: get CPU's utilization statistic
-In-Reply-To: <1409051215-16788-1-git-send-email-vincent.guittot@linaro.org>
-References: <1409051215-16788-1-git-send-email-vincent.guittot@linaro.org>
-Message-ID: <1409051215-16788-11-git-send-email-vincent.guittot@linaro.org>
+From: holler@ahsoftware.de (Alexander Holler)
+Date: Tue, 26 Aug 2014 13:23:54 +0200
+Subject: [RFC PATCH 0/9] dt: dependencies (for deterministic driver
+ initialization order based on the DT)
+In-Reply-To: <20140826110827.GA31350@ulmo>
+References: <53F64624.5000403@ahsoftware.de>
+ <20140822131919.GX21734@leverpostej> <20140825093931.GB2399@ulmo>
+ <E1XLu15-0002DP-6o@jdl.com> <20140825133714.GH4163@ulmo.nvidia.com>
+ <20140826084208.AE5F0C40989@trevor.secretlab.ca>
+ <20140826084922.GG17263@ulmo> <53FC566C.30904@ahsoftware.de>
+ <20140826102503.GC31124@ulmo> <53FC6513.5040800@ahsoftware.de>
+ <20140826110827.GA31350@ulmo>
+Message-ID: <53FC6E4A.6030407@ahsoftware.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Monitor the utilization level of each group of each sched_domain level. The
-utilization is the amount of cpu_capacity that is currently used on a CPU or
-group of CPUs. We use the usage_load_avg to evaluate this utilization level.
-In the special use case where the CPU is fully loaded by more than 1 task,
-the activity level is set above the cpu_capacity in order to reflect the overload
-of the CPU
+Am 26.08.2014 13:08, schrieb Thierry Reding:
+> On Tue, Aug 26, 2014 at 12:44:35PM +0200, Alexander Holler wrote:
+>> Am 26.08.2014 12:25, schrieb Thierry Reding:
+>>> On Tue, Aug 26, 2014 at 11:42:04AM +0200, Alexander Holler wrote:
+>>
+>>>> You need either the type information in the DTB (that's why I've add those
+>>>> "dependencies" to identify phandles), or you need to know every binding (at
+>>>> "dependency-resolve-time" to identify phandles. The latter is impracticable
+>>>> to implement in a generic way (for use with every possible binding).
+>>>
+>>> Like I already mentioned, this could be done in drivers who contain that
+>>> information already anyway. Or parts of it could be done in subsystem-
+>>> specific callbacks where a generic binding is available.
+>>
+>> That would end up with almost the same ugly driver-based workarounds as now.
+>> It's much better if a driver author only has to define it's prerequisits (in
+>> form of dependencies in the dts) and could be sure the driver will only be
+>> probed if those are met, than to do that stuff based on a subsystem or even
+>> driver level.
+>>
+>> If you add dependency-information to drivers, you have two problems:
+>
+> We already have all that dependency information in drivers anyway. Each
+> driver requests the resources at .probe() time. What I proposed (it was
+> really Arnd who proposed it first) is to move that information out of
+> code and into some sort of table that could be used by the driver core
+> to figure out dependencies.
+>
+>> - How do you get these information from the driver (remember, currently
+>> there is only one initial call, a initcall which might do almost anything)
+>
+> While I don't think it's necessary, that's something that could be
+> changed. I mean, we have access to the full source code of this
+> operating system, so we can change every aspect of it. If we can't find
+> a way to make this work with the current initcall sequence it's always
+> an option to extend that sequence so that it meets our needs.
+>
+>> - These information might become outdated and you would have to change all
+>> drivers. E.g. if the name of a dependency (driver) changes it wouldn't be
+>> done with changing the dts (maybe plural), but you would have to change the
+>> source of all dependant drivers too.
+>
+> No. Drivers implement a DT binding. That binding defines what power
+> supplies, clocks, pinmux, ... the device needs. Those constitute the
+> dependencies. We most certainly don't want to depend on driver names
+> since there can be a multitude of different drivers that provide a given
+> dependency.
+>
+> What drivers should provide (and what they already provide today) is the
+> name of the property and the index of the cell that they expect to find
+> a phandle in as well as the type of the phandle. That's all that's
+> necessary, really. Everything else can be derived from that phandle and
+> the type.
 
-Signed-off-by: Vincent Guittot <vincent.guittot@linaro.org>
----
- kernel/sched/fair.c | 19 ++++++++++++++++++-
- 1 file changed, 18 insertions(+), 1 deletion(-)
+Drivers don't provide that information (dependencies) in any usable way. 
+And as you said yourself, it's already contained in phandles. So what we 
+are discussing here about? The proposal to use phandles for that is 
+already on the table since several month. ;)
 
-diff --git a/kernel/sched/fair.c b/kernel/sched/fair.c
-index 1fd2131..2f95d1c 100644
---- a/kernel/sched/fair.c
-+++ b/kernel/sched/fair.c
-@@ -4126,6 +4126,11 @@ static unsigned long capacity_of(int cpu)
- 	return cpu_rq(cpu)->cpu_capacity;
- }
- 
-+static unsigned long capacity_orig_of(int cpu)
-+{
-+	return cpu_rq(cpu)->cpu_capacity_orig;
-+}
-+
- static unsigned long cpu_avg_load_per_task(int cpu)
- {
- 	struct rq *rq = cpu_rq(cpu);
-@@ -4514,6 +4519,17 @@ static int select_idle_sibling(struct task_struct *p, int target)
- 	return target;
- }
- 
-+static int get_cpu_utilization(int cpu)
-+{
-+	unsigned long usage = cpu_rq(cpu)->cfs.usage_load_avg;
-+	unsigned long capacity = capacity_of(cpu);
-+
-+	if (usage >= SCHED_LOAD_SCALE)
-+		return capacity + 1;
-+
-+	return (usage * capacity) >> SCHED_LOAD_SHIFT;
-+}
-+
- /*
-  * select_task_rq_fair: Select target runqueue for the waking task in domains
-  * that have the 'sd_flag' flag set. In practice, this is SD_BALANCE_WAKE,
-@@ -5657,6 +5673,7 @@ struct sg_lb_stats {
- 	unsigned long sum_weighted_load; /* Weighted load of group's tasks */
- 	unsigned long load_per_task;
- 	unsigned long group_capacity;
-+	unsigned long group_utilization; /* Total utilization of the group */
- 	unsigned int sum_nr_running; /* Nr tasks running in the group */
- 	unsigned int group_capacity_factor;
- 	unsigned int idle_cpus;
-@@ -6011,6 +6028,7 @@ static inline void update_sg_lb_stats(struct lb_env *env,
- 			load = source_load(i, load_idx);
- 
- 		sgs->group_load += load;
-+		sgs->group_utilization += get_cpu_utilization(i);
- 		sgs->sum_nr_running += rq->cfs.h_nr_running;
- 
- 		if (rq->nr_running > 1)
-@@ -6188,7 +6206,6 @@ static inline void update_sd_lb_stats(struct lb_env *env, struct sd_lb_stats *sd
- 		/* Now, start updating sd_lb_stats */
- 		sds->total_load += sgs->group_load;
- 		sds->total_capacity += sgs->group_capacity;
--
- 		sg = sg->next;
- 	} while (sg != env->sd->groups);
- 
--- 
-1.9.1
+Sorry, but I don't understand what you want to propose.
+
+Regards,
+
+Alexander Holler
