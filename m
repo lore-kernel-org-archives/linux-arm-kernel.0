@@ -1,9 +1,9 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 26 Aug 2014 11:03:36 +0100
-Subject: [PATCH v2 21/26] irqchip: or1k-pic: convert to handle_domain_irq
+Date: Tue, 26 Aug 2014 11:03:37 +0100
+Subject: [PATCH v2 22/26] ARM: imx: avic: convert to handle_domain_irq
 In-Reply-To: <1409047421-27649-1-git-send-email-marc.zyngier@arm.com>
 References: <1409047421-27649-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1409047421-27649-22-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1409047421-27649-23-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -11,30 +11,21 @@ Use the new handle_domain_irq method to handle interrupts.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- drivers/irqchip/irq-or1k-pic.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ arch/arm/mach-imx/avic.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/irqchip/irq-or1k-pic.c b/drivers/irqchip/irq-or1k-pic.c
-index 17ff033..e93d079 100644
---- a/drivers/irqchip/irq-or1k-pic.c
-+++ b/drivers/irqchip/irq-or1k-pic.c
-@@ -113,7 +113,7 @@ static inline int pic_get_irq(int first)
- 	else
- 		hwirq = hwirq + first - 1;
+diff --git a/arch/arm/mach-imx/avic.c b/arch/arm/mach-imx/avic.c
+index 24b103c..1a89323 100644
+--- a/arch/arm/mach-imx/avic.c
++++ b/arch/arm/mach-imx/avic.c
+@@ -144,7 +144,7 @@ static void __exception_irq_entry avic_handle_irq(struct pt_regs *regs)
+ 		if (nivector == 0xffff)
+ 			break;
  
--	return irq_find_mapping(root_domain, hwirq);
-+	return hwirq;
+-		handle_IRQ(irq_find_mapping(domain, nivector), regs);
++		handle_domain_irq(domain, nivector, regs);
+ 	} while (1);
  }
  
- static void or1k_pic_handle_irq(struct pt_regs *regs)
-@@ -121,7 +121,7 @@ static void or1k_pic_handle_irq(struct pt_regs *regs)
- 	int irq = -1;
- 
- 	while ((irq = pic_get_irq(irq + 1)) != NO_IRQ)
--		handle_IRQ(irq, regs);
-+		handle_domain_irq(root_domain, irq, regs);
- }
- 
- static int or1k_map(struct irq_domain *d, unsigned int irq, irq_hw_number_t hw)
 -- 
 2.0.4
