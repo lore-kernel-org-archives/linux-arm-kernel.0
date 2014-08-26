@@ -1,61 +1,36 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 26 Aug 2014 19:07:03 +0100
-Subject: [PATCH v2 01/26] genirq: add irq_domain-aware core IRQ handler
-In-Reply-To: <53FCC714.3090206@codeaurora.org>
-References: <1409047421-27649-1-git-send-email-marc.zyngier@arm.com>
- <1409047421-27649-2-git-send-email-marc.zyngier@arm.com>
- <53FCC714.3090206@codeaurora.org>
-Message-ID: <53FCCCC7.9070801@arm.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 26 Aug 2014 19:14:06 +0100
+Subject: [PATCH 3/6] arm64: Add support for hooks to handle undefined
+ instructions
+In-Reply-To: <9hhy4ube1tz.fsf@arm.com>
+References: <1409048930-21598-1-git-send-email-punit.agrawal@arm.com>
+ <1409048930-21598-4-git-send-email-punit.agrawal@arm.com>
+ <20140826131339.GO23445@arm.com> <9hhy4ube1tz.fsf@arm.com>
+Message-ID: <20140826181405.GG23445@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26/08/14 18:42, Stephen Boyd wrote:
-> On 08/26/14 03:03, Marc Zyngier wrote:
->> Calling irq_find_mapping from outside a irq_{enter,exit} section is
->> unsafe and produces ugly messages if CONFIG_PROVE_RCU is enabled:
->> If coming from the idle state, the rcu_read_lock call in irq_find_mapping
->> will generate an unpleasant warning:
->>
->> <quote>
->> ===============================
->> [ INFO: suspicious RCU usage. ]
->> 3.16.0-rc1+ #135 Not tainted
->> -------------------------------
->> include/linux/rcupdate.h:871 rcu_read_lock() used illegally while idle!
->>
->> other info that might help us debug this:
->>
->> RCU used illegally from idle CPU!
->> rcu_scheduler_active = 1, debug_locks = 0
->> RCU used illegally from extended quiescent state!
->> 1 lock held by swapper/0/0:
->>  #0:  (rcu_read_lock){......}, at: [<ffffffc00010206c>]
->> irq_find_mapping+0x4c/0x198
+On Tue, Aug 26, 2014 at 03:56:56PM +0100, Punit Agrawal wrote:
+> Will Deacon <will.deacon@arm.com> writes:
+> > On Tue, Aug 26, 2014 at 11:28:47AM +0100, Punit Agrawal wrote:
+> >>  asmlinkage void __exception do_undefinstr(struct pt_regs *regs)
+> >>  {
+> >>  	siginfo_t info;
+> >> @@ -266,6 +329,9 @@ asmlinkage void __exception do_undefinstr(struct pt_regs *regs)
+> >>  	if (!aarch32_break_handler(regs))
+> >>  		return;
+> >>  
+> >> +	if (call_undef_hook(regs) == 0)
+> >> +		return;
+> >
+> > I'd like to reuse this hook for the aarch32 break hooks (you can see the
+> > direct call in the context above). That means adding support for thumb
+> > after all. Is there a reason you've been avoiding that?
 > 
-> Do you have the whole stacktrace? I don't see where this is called
-> outside of irq_enter() from within the idle loop, but maybe I missed
-> something.
-> 
+> None, other than to not add code before it's needed. I've just had a
+> quick look at break handler and it looks pretty straight forward to fold
+> that change in this set. Are you OK with that?
 
-Hi Stephen,
+Just do it as a separate patch on top of this one.
 
-Digging into my email, one of the traces looked like this:
-
-stack backtrace:
-CPU: 0 PID: 0 Comm: swapper/0 Not tainted 3.16.0-rc1+ #135
-Call trace:
-[<ffffffc0000882cc>] dump_backtrace+0x0/0x12c
-[<ffffffc000088408>] show_stack+0x10/0x1c
-[<ffffffc0004ee5f0>] dump_stack+0x74/0xc4
-[<ffffffc0000edfbc>] lockdep_rcu_suspicious+0xe8/0x124
-[<ffffffc00010218c>] irq_find_mapping+0x16c/0x198
-[<ffffffc00008130c>] gic_handle_irq+0x38/0xcc
-
-Most drivers call irq_find_mapping outside of irq_enter()/irq_exit(), as
-this is in handle_IRQ().
-
-Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Will
