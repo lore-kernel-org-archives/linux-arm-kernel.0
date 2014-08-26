@@ -1,31 +1,118 @@
 From: shawn.guo@freescale.com (Shawn Guo)
-Date: Tue, 26 Aug 2014 23:35:11 +0800
-Subject: [RFC PATCH 0/2] ARM: imx6: add BYPASS support for PLLs
-Message-ID: <1409067313-32063-1-git-send-email-shawn.guo@freescale.com>
+Date: Tue, 26 Aug 2014 23:35:13 +0800
+Subject: [RFC PATCH 2/2] ARM: imx: remove ENABLE and BYPASS bits from
+ clk-pllv3 driver
+In-Reply-To: <1409067313-32063-1-git-send-email-shawn.guo@freescale.com>
+References: <1409067313-32063-1-git-send-email-shawn.guo@freescale.com>
+Message-ID: <1409067313-32063-3-git-send-email-shawn.guo@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This RFC patch series adds BYPASS support for i.MX6 PLLs.  It's
-motivated by an ESAI audio use case, where on-board audio codec provides
-the master clock to ESAI controller via path anaclk pad -->
-PLL_AUDIO --> ESAI.  This is not possible with the current clock driver
-implementation, where clock source of PLL is hard-coded to be OSC24M.
-The first patch adds an example implementation for i.MX6Q clock driver
-to make above clock path become possible.
+Since ENABLE and BYPASS bits of PLLs are now implemented as separate
+gate and mux clocks by clock drivers, the code handling these two bits
+can be removed from clk-pllv3 driver.
 
-The second patch is only for showing code removal from clk-pllv3 driver,
-and shouldn't be applied until all i.MX6 clock drivers handle BYPASS and
-ENABLE on their own, just like i.MX6Q clock driver does in the first
-patch.
+Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
+---
+ arch/arm/mach-imx/clk-pllv3.c | 37 -------------------------------------
+ 1 file changed, 37 deletions(-)
 
-Shawn Guo (2):
-  ARM: imx: add BYPASS support for PLL clocks
-  ARM: imx: remove ENABLE and BYPASS bits from clk-pllv3 driver
-
- arch/arm/mach-imx/clk-imx6q.c             | 57 ++++++++++++++++++++++++++-----
- arch/arm/mach-imx/clk-pllv3.c             | 37 --------------------
- include/dt-bindings/clock/imx6qdl-clock.h | 23 ++++++++++++-
- 3 files changed, 71 insertions(+), 46 deletions(-)
-
+diff --git a/arch/arm/mach-imx/clk-pllv3.c b/arch/arm/mach-imx/clk-pllv3.c
+index 61364050fccd..57de74da0acf 100644
+--- a/arch/arm/mach-imx/clk-pllv3.c
++++ b/arch/arm/mach-imx/clk-pllv3.c
+@@ -23,8 +23,6 @@
+ #define PLL_DENOM_OFFSET	0x20
+ 
+ #define BM_PLL_POWER		(0x1 << 12)
+-#define BM_PLL_ENABLE		(0x1 << 13)
+-#define BM_PLL_BYPASS		(0x1 << 16)
+ #define BM_PLL_LOCK		(0x1 << 31)
+ 
+ /**
+@@ -84,10 +82,6 @@ static int clk_pllv3_prepare(struct clk_hw *hw)
+ 	if (ret)
+ 		return ret;
+ 
+-	val = readl_relaxed(pll->base);
+-	val &= ~BM_PLL_BYPASS;
+-	writel_relaxed(val, pll->base);
+-
+ 	return 0;
+ }
+ 
+@@ -97,7 +91,6 @@ static void clk_pllv3_unprepare(struct clk_hw *hw)
+ 	u32 val;
+ 
+ 	val = readl_relaxed(pll->base);
+-	val |= BM_PLL_BYPASS;
+ 	if (pll->powerup_set)
+ 		val &= ~BM_PLL_POWER;
+ 	else
+@@ -105,28 +98,6 @@ static void clk_pllv3_unprepare(struct clk_hw *hw)
+ 	writel_relaxed(val, pll->base);
+ }
+ 
+-static int clk_pllv3_enable(struct clk_hw *hw)
+-{
+-	struct clk_pllv3 *pll = to_clk_pllv3(hw);
+-	u32 val;
+-
+-	val = readl_relaxed(pll->base);
+-	val |= BM_PLL_ENABLE;
+-	writel_relaxed(val, pll->base);
+-
+-	return 0;
+-}
+-
+-static void clk_pllv3_disable(struct clk_hw *hw)
+-{
+-	struct clk_pllv3 *pll = to_clk_pllv3(hw);
+-	u32 val;
+-
+-	val = readl_relaxed(pll->base);
+-	val &= ~BM_PLL_ENABLE;
+-	writel_relaxed(val, pll->base);
+-}
+-
+ static unsigned long clk_pllv3_recalc_rate(struct clk_hw *hw,
+ 					   unsigned long parent_rate)
+ {
+@@ -169,8 +140,6 @@ static int clk_pllv3_set_rate(struct clk_hw *hw, unsigned long rate,
+ static const struct clk_ops clk_pllv3_ops = {
+ 	.prepare	= clk_pllv3_prepare,
+ 	.unprepare	= clk_pllv3_unprepare,
+-	.enable		= clk_pllv3_enable,
+-	.disable	= clk_pllv3_disable,
+ 	.recalc_rate	= clk_pllv3_recalc_rate,
+ 	.round_rate	= clk_pllv3_round_rate,
+ 	.set_rate	= clk_pllv3_set_rate,
+@@ -225,8 +194,6 @@ static int clk_pllv3_sys_set_rate(struct clk_hw *hw, unsigned long rate,
+ static const struct clk_ops clk_pllv3_sys_ops = {
+ 	.prepare	= clk_pllv3_prepare,
+ 	.unprepare	= clk_pllv3_unprepare,
+-	.enable		= clk_pllv3_enable,
+-	.disable	= clk_pllv3_disable,
+ 	.recalc_rate	= clk_pllv3_sys_recalc_rate,
+ 	.round_rate	= clk_pllv3_sys_round_rate,
+ 	.set_rate	= clk_pllv3_sys_set_rate,
+@@ -299,8 +266,6 @@ static int clk_pllv3_av_set_rate(struct clk_hw *hw, unsigned long rate,
+ static const struct clk_ops clk_pllv3_av_ops = {
+ 	.prepare	= clk_pllv3_prepare,
+ 	.unprepare	= clk_pllv3_unprepare,
+-	.enable		= clk_pllv3_enable,
+-	.disable	= clk_pllv3_disable,
+ 	.recalc_rate	= clk_pllv3_av_recalc_rate,
+ 	.round_rate	= clk_pllv3_av_round_rate,
+ 	.set_rate	= clk_pllv3_av_set_rate,
+@@ -315,8 +280,6 @@ static unsigned long clk_pllv3_enet_recalc_rate(struct clk_hw *hw,
+ static const struct clk_ops clk_pllv3_enet_ops = {
+ 	.prepare	= clk_pllv3_prepare,
+ 	.unprepare	= clk_pllv3_unprepare,
+-	.enable		= clk_pllv3_enable,
+-	.disable	= clk_pllv3_disable,
+ 	.recalc_rate	= clk_pllv3_enet_recalc_rate,
+ };
+ 
 -- 
 1.9.1
