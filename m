@@ -1,41 +1,46 @@
 From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 26 Aug 2014 16:57:16 +0100
-Subject: [PATCH 2/9] arm64: Fix INVALID_HWID definition
-In-Reply-To: <6f84108ac880ef48548208738cbb169fba2fa51a.1408736066.git.geoff@infradead.org>
+Date: Tue, 26 Aug 2014 17:04:43 +0100
+Subject: [PATCH 6/9] arm64: Add new routine local_disable
+In-Reply-To: <7e5a554e19c9c7bfbdf3d85b75a8e87c9ffde706.1408736066.git.geoff@infradead.org>
 References: <cover.1408736066.git.geoff@infradead.org>
- <6f84108ac880ef48548208738cbb169fba2fa51a.1408736066.git.geoff@infradead.org>
-Message-ID: <20140826155715.GH16482@arm.com>
+ <7e5a554e19c9c7bfbdf3d85b75a8e87c9ffde706.1408736066.git.geoff@infradead.org>
+Message-ID: <20140826160443.GI16482@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Fri, Aug 22, 2014 at 08:49:16PM +0100, Geoff Levand wrote:
-> Change the preprocessor macro INVALID_HWID definition from ULONG_MAX to (~0)
-> to allow INVALID_HWID to be used within assembly source files.
-> 
-> Commit 3e98fdacc59bbbdbb659be1a144ccc48ed4860fa (arm64: kernel: make the pen of
-> the secondary a 64-bit unsigned value) added the preprocessor macro INVALID_HWID
-> to asm/cputype.h with it defined to be ULONG_MAX.  Use of INVALID_HWID in an
-> assembly source file that includes cputype.h will generate an assembler
-> undefined symbol ULONG_MAX build error.  The kernel does define a ULONG_MAX in
-> kernel.h, but that file not setup to be included in assembly files.
+> Add the new arm64 routine local_disable() to allow the masking of several DAIF
+> flags in one operation.  Currently, we only have routines to mask individual
+> flags, and to mask several flags multiple calls to daifset are required.
 > 
 > Signed-off-by: Geoff Levand <geoff@infradead.org>
 > ---
->  arch/arm64/include/asm/cputype.h | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+>  arch/arm64/include/asm/irqflags.h | 13 +++++++++++++
+>  1 file changed, 13 insertions(+)
 > 
-> diff --git a/arch/arm64/include/asm/cputype.h b/arch/arm64/include/asm/cputype.h
-> index 379d0b8..6b68380 100644
-> --- a/arch/arm64/include/asm/cputype.h
-> +++ b/arch/arm64/include/asm/cputype.h
-> @@ -16,7 +16,7 @@
->  #ifndef __ASM_CPUTYPE_H
->  #define __ASM_CPUTYPE_H
+> diff --git a/arch/arm64/include/asm/irqflags.h b/arch/arm64/include/asm/irqflags.h
+> index 11cc941..28521d4 100644
+> --- a/arch/arm64/include/asm/irqflags.h
+> +++ b/arch/arm64/include/asm/irqflags.h
+> @@ -113,5 +113,18 @@ static inline int arch_irqs_disabled_flags(unsigned long flags)
+>  #define local_dbg_enable()	asm("msr	daifclr, #8" : : : "memory")
+>  #define local_dbg_disable()	asm("msr	daifset, #8" : : : "memory")
 >  
-> -#define INVALID_HWID		ULONG_MAX
-> +#define INVALID_HWID		UL(~0)
+> +enum daif_flag {
+> +	DAIF_FIQ   = (1UL << 6),
+> +	DAIF_IRQ   = (1UL << 7),
+> +	DAIF_ASYNC = (1UL << 8),
+> +	DAIF_DBG   = (1UL << 9),
+> +	DAIF_ALL   = (0xffUL << 6),
+> +};
+> +
+> +static inline void local_disable(unsigned long daif_flags)
+> +{
+> +	arch_local_irq_restore(daif_flags | arch_local_save_flags());
+> +}
 
-Does it actually expand to ULONG_MAX? ~0 is an int.
+Who's using this function? I don't see any patch in this series calling
+it.
 
 -- 
 Catalin
