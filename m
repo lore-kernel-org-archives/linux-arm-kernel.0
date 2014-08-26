@@ -1,166 +1,164 @@
 From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Tue, 26 Aug 2014 14:09:46 +0200
-Subject: [PATCH 5/7] media: s5p-mfc: replace custom reserved memory init code
- with generic one
+Date: Tue, 26 Aug 2014 14:09:43 +0200
+Subject: [PATCH 2/7] drivers: of: add support for named memory regions
 In-Reply-To: <1409054988-32758-1-git-send-email-m.szyprowski@samsung.com>
 References: <1409054988-32758-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <1409054988-32758-6-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <1409054988-32758-3-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch removes custom initialization of reserved memory regions from
-s5p-mfc driver and adds a new code for handling reserved memory with
-generic named reserved memory regions read from device tree.
-
-s5p-mfc driver now handles two reserved memory regions: "left" and
-"right", defined by generic reserved memory bindings. Support for non-dt
-platform has been removed, because all supported platforms have been
-converted to device tree.
+This patch adds a code to initialize memory regions also for child devices
+if parent device has "memory-region" and "memory-region-names" device tree
+properties and given device's name matches "<parent_name>:<region_name>"
+template.
 
 Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
 ---
- drivers/media/platform/s5p-mfc/s5p_mfc.c | 102 +++++++++++--------------------
- 1 file changed, 35 insertions(+), 67 deletions(-)
+ .../bindings/reserved-memory/reserved-memory.txt   |   6 +-
+ drivers/of/of_reserved_mem.c                       | 101 ++++++++++++++-------
+ 2 files changed, 74 insertions(+), 33 deletions(-)
 
-diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc.c b/drivers/media/platform/s5p-mfc/s5p_mfc.c
-index d35b0418ab37..668e82247a3f 100644
---- a/drivers/media/platform/s5p-mfc/s5p_mfc.c
-+++ b/drivers/media/platform/s5p-mfc/s5p_mfc.c
-@@ -22,6 +22,7 @@
- #include <media/v4l2-event.h>
- #include <linux/workqueue.h>
- #include <linux/of.h>
-+#include <linux/of_reserved_mem.h>
- #include <media/videobuf2-core.h>
- #include "s5p_mfc_common.h"
- #include "s5p_mfc_ctrl.h"
-@@ -996,55 +997,40 @@ static const struct v4l2_file_operations s5p_mfc_fops = {
- 	.mmap = s5p_mfc_mmap,
- };
+diff --git a/Documentation/devicetree/bindings/reserved-memory/reserved-memory.txt b/Documentation/devicetree/bindings/reserved-memory/reserved-memory.txt
+index 3da0ebdba8d9..69d28288ed37 100644
+--- a/Documentation/devicetree/bindings/reserved-memory/reserved-memory.txt
++++ b/Documentation/devicetree/bindings/reserved-memory/reserved-memory.txt
+@@ -73,7 +73,11 @@ Device node references to reserved memory
+ Regions in the /reserved-memory node may be referenced by other device
+ nodes by adding a memory-region property to the device node.
  
--static int match_child(struct device *dev, void *data)
-+static struct device *s5p_mfc_alloc_memdev(struct device *dev, const char *name)
- {
--	if (!dev_name(dev))
--		return 0;
--	return !strcmp(dev_name(dev), (char *)data);
--}
--
--static void *mfc_get_drv_data(struct platform_device *pdev);
--
--static int s5p_mfc_alloc_memdevs(struct s5p_mfc_dev *dev)
--{
--	unsigned int mem_info[2] = { };
-+	struct device *child;
-+	int ret;
+-memory-region (optional) - phandle, specifier pairs to children of /reserved-memory
++memory-region (optional) - arrays of phandles, specifier pairs to children
++      of /reserved-memory, first phandle is used as a default memory
++      region
++memory-region-names (optional) - array of strings with names of memory
++      regions, used when more than one region has been defined
  
--	dev->mem_dev_l = devm_kzalloc(&dev->plat_dev->dev,
--			sizeof(struct device), GFP_KERNEL);
--	if (!dev->mem_dev_l) {
--		mfc_err("Not enough memory\n");
--		return -ENOMEM;
--	}
--	device_initialize(dev->mem_dev_l);
--	of_property_read_u32_array(dev->plat_dev->dev.of_node,
--			"samsung,mfc-l", mem_info, 2);
--	if (dma_declare_coherent_memory(dev->mem_dev_l, mem_info[0],
--				mem_info[0], mem_info[1],
--				DMA_MEMORY_MAP | DMA_MEMORY_EXCLUSIVE) == 0) {
--		mfc_err("Failed to declare coherent memory for\n"
--		"MFC device\n");
--		return -ENOMEM;
-+	child = devm_kzalloc(dev, sizeof(struct device), GFP_KERNEL);
-+	if (!child)
-+		return NULL;
-+
-+	device_initialize(child);
-+	dev_set_name(child, "%s:%s", dev_name(dev), name);
-+	child->parent = dev;
-+	child->bus = dev->bus;
-+	child->coherent_dma_mask = dev->coherent_dma_mask;
-+	child->dma_mask = dev->dma_mask;
-+
-+	if (device_add(child) == 0) {
-+		ret = of_reserved_mem_device_init(child);
-+		if (ret == 0)
-+			return child;
- 	}
- 
--	dev->mem_dev_r = devm_kzalloc(&dev->plat_dev->dev,
--			sizeof(struct device), GFP_KERNEL);
--	if (!dev->mem_dev_r) {
--		mfc_err("Not enough memory\n");
--		return -ENOMEM;
--	}
--	device_initialize(dev->mem_dev_r);
--	of_property_read_u32_array(dev->plat_dev->dev.of_node,
--			"samsung,mfc-r", mem_info, 2);
--	if (dma_declare_coherent_memory(dev->mem_dev_r, mem_info[0],
--				mem_info[0], mem_info[1],
--				DMA_MEMORY_MAP | DMA_MEMORY_EXCLUSIVE) == 0) {
--		pr_err("Failed to declare coherent memory for\n"
--		"MFC device\n");
--		return -ENOMEM;
--	}
--	return 0;
-+	put_device(child);
-+	return NULL;
+ Example
+ -------
+diff --git a/drivers/of/of_reserved_mem.c b/drivers/of/of_reserved_mem.c
+index 7e7de03585f9..3ab9446ffa43 100644
+--- a/drivers/of/of_reserved_mem.c
++++ b/drivers/of/of_reserved_mem.c
+@@ -237,32 +237,82 @@ static inline struct reserved_mem *__find_rmem(struct device_node *node)
+ 	return NULL;
  }
  
-+void s5p_mfc_free_memdev(struct device *dev)
+-/**
+- * of_reserved_mem_device_init() - assign reserved memory region to given device
+- *
+- * This function assign memory region pointed by "memory-region" device tree
+- * property to the given device.
+- */
+-int of_reserved_mem_device_init(struct device *dev)
++static int __rmem_dev_init(struct device *dev, struct device_node *np)
+ {
+-	struct reserved_mem *rmem;
+-	struct device_node *np;
+-
+-	np = of_parse_phandle(dev->of_node, "memory-region", 0);
+-	if (!np)
+-		return;
+-
+-	rmem = __find_rmem(np);
+-	of_node_put(np);
+-
++	struct reserved_mem *rmem = __find_rmem(np);
+ 	if (!rmem || !rmem->ops || !rmem->ops->device_init)
+-		return;
++		return -EINVAL;
+ 
+ 	rmem->ops->device_init(rmem, dev);
+ 	dev_info(dev, "assigned reserved memory node %s\n", rmem->name);
+ 	return 0;
+ }
+ 
++static int __rmem_dev_release(struct device *dev, struct device_node *np)
 +{
-+	of_reserved_mem_device_release(dev);
-+	put_device(dev);
++	struct reserved_mem *rmem = __find_rmem(np);
++	if (!rmem || !rmem->ops)
++		return -EINVAL;
++
++	if (rmem->ops->device_release)
++		rmem->ops->device_release(rmem, dev);
++	return 0;
 +}
 +
-+static void *mfc_get_drv_data(struct platform_device *pdev);
++static int __rmem_dev_call(struct device *dev,
++			int (*func)(struct device *dev, struct device_node *np))
++{
++	int ret = -ENODEV;
++	if (of_get_property(dev->of_node, "memory-region", NULL)) {
++		struct device_node *np;
++		np = of_parse_phandle(dev->of_node, "memory-region", 0);
++		if (!np)
++			return -ENODEV;
++		ret = func(dev, np);
++		of_node_put(np);
++	} else if (dev->parent &&
++		   of_get_property(dev->parent->of_node, "memory-region",
++				   NULL)) {
++		struct device *parent = dev->parent;
++		struct device_node *np;
++		char *name;
++		int idx;
 +
- /* MFC probe function */
- static int s5p_mfc_probe(struct platform_device *pdev)
++		name = strrchr(dev_name(dev), ':');
++		if (!name)
++			return -ENODEV;
++		name++;
++
++		idx = of_property_match_string(parent->of_node,
++					       "memory-region-names", name);
++		if (idx < 0)
++			return -ENODEV;
++
++		np = of_parse_phandle(parent->of_node, "memory-region", idx);
++		if (!np)
++			return -ENODEV;
++
++		ret = func(dev, np);
++		of_node_put(np);
++	}
++	return ret;
++}
++
++/**
++ * of_reserved_mem_device_init() - assign reserved memory region to given device
++ *
++ * This function assigns default memory region pointed by first entry of
++ * "memory-region" device tree property (if available) to the given device or
++ * checks if the given device can be used to give access to named memory region
++ * if parent device has "memory-region" and "memory-region-names" device tree
++ * properties and given device's name matches "<parent_name>:<region_name>"
++ * template.
++ */
++int of_reserved_mem_device_init(struct device *dev)
++{
++	return __rmem_dev_call(dev, __rmem_dev_init);
++}
++
+ /**
+  * of_reserved_mem_device_release() - release reserved memory device structures
+  *
+@@ -271,18 +321,5 @@ int of_reserved_mem_device_init(struct device *dev)
+  */
+ void of_reserved_mem_device_release(struct device *dev)
  {
-@@ -1096,26 +1082,8 @@ static int s5p_mfc_probe(struct platform_device *pdev)
- 		goto err_res;
- 	}
- 
--	if (pdev->dev.of_node) {
--		ret = s5p_mfc_alloc_memdevs(dev);
--		if (ret < 0)
--			goto err_res;
--	} else {
--		dev->mem_dev_l = device_find_child(&dev->plat_dev->dev,
--				"s5p-mfc-l", match_child);
--		if (!dev->mem_dev_l) {
--			mfc_err("Mem child (L) device get failed\n");
--			ret = -ENODEV;
--			goto err_res;
--		}
--		dev->mem_dev_r = device_find_child(&dev->plat_dev->dev,
--				"s5p-mfc-r", match_child);
--		if (!dev->mem_dev_r) {
--			mfc_err("Mem child (R) device get failed\n");
--			ret = -ENODEV;
--			goto err_res;
--		}
--	}
-+	dev->mem_dev_l = s5p_mfc_alloc_memdev(&dev->plat_dev->dev, "left");
-+	dev->mem_dev_r = s5p_mfc_alloc_memdev(&dev->plat_dev->dev, "right");
- 
- 	dev->alloc_ctx[0] = vb2_dma_contig_init_ctx(dev->mem_dev_l);
- 	if (IS_ERR(dev->alloc_ctx[0])) {
-@@ -1246,10 +1214,10 @@ static int s5p_mfc_remove(struct platform_device *pdev)
- 	s5p_mfc_release_firmware(dev);
- 	vb2_dma_contig_cleanup_ctx(dev->alloc_ctx[0]);
- 	vb2_dma_contig_cleanup_ctx(dev->alloc_ctx[1]);
--	if (pdev->dev.of_node) {
--		put_device(dev->mem_dev_l);
--		put_device(dev->mem_dev_r);
--	}
-+	if (dev->mem_dev_l)
-+		s5p_mfc_free_memdev(dev->mem_dev_l);
-+	if (dev->mem_dev_r)
-+		s5p_mfc_free_memdev(dev->mem_dev_r);
- 
- 	s5p_mfc_final_pm(dev);
- 	return 0;
+-	struct reserved_mem *rmem;
+-	struct device_node *np;
+-
+-	np = of_parse_phandle(dev->of_node, "memory-region", 0);
+-	if (!np)
+-		return;
+-
+-	rmem = __find_rmem(np);
+-	of_node_put(np);
+-
+-	if (!rmem || !rmem->ops || !rmem->ops->device_release)
+-		return;
+-
+-	rmem->ops->device_release(rmem, dev);
++	__rmem_dev_call(dev, __rmem_dev_release);
+ }
 -- 
 1.9.2
