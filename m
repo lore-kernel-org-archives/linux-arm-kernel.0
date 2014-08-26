@@ -1,58 +1,53 @@
 From: punit.agrawal@arm.com (Punit Agrawal)
-Date: Tue, 26 Aug 2014 11:28:45 +0100
-Subject: [PATCH 1/6] arm: Fix in-correct barrier usage in SWP{B} emulation
+Date: Tue, 26 Aug 2014 11:28:46 +0100
+Subject: [PATCH 2/6] arm64: Create arch debugfs directory
 In-Reply-To: <1409048930-21598-1-git-send-email-punit.agrawal@arm.com>
 References: <1409048930-21598-1-git-send-email-punit.agrawal@arm.com>
-Message-ID: <1409048930-21598-2-git-send-email-punit.agrawal@arm.com>
+Message-ID: <1409048930-21598-3-git-send-email-punit.agrawal@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-According to the ARM ARMv7, explicit barriers are necessary when using
-synchronisation primitives such as SWP{B}. The use of these
-instructions does not automatically imply a barrier and any ordering
-requirements by the software must be explicitly expressed with the use
-of suitable barriers.
+Create an arm64 directory in debugfs as a container for the
+arch related debug entries. The patch provides the arch_debugfs_dir
+prototype expected by core layers.
 
-Based on this, remove the barriers from SWP{B} emulation.
-
-Cc: Russell King <linux@arm.linux.org.uk>
+Acked-by: Will Deacon <will.deacon@arm.com>
 Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
 ---
- arch/arm/kernel/swp_emulate.c |   15 ---------------
- 1 file changed, 15 deletions(-)
+ arch/arm64/kernel/setup.c |   14 ++++++++++++++
+ 1 file changed, 14 insertions(+)
 
-diff --git a/arch/arm/kernel/swp_emulate.c b/arch/arm/kernel/swp_emulate.c
-index b1b8988..74117b5 100644
---- a/arch/arm/kernel/swp_emulate.c
-+++ b/arch/arm/kernel/swp_emulate.c
-@@ -141,14 +141,6 @@ static int emulate_swpX(unsigned int address, unsigned int *data,
- 	while (1) {
- 		unsigned long temp;
+diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
+index 7ec7846..cf4cec0 100644
+--- a/arch/arm64/kernel/setup.c
++++ b/arch/arm64/kernel/setup.c
+@@ -17,6 +17,7 @@
+  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+  */
  
--		/*
--		 * Barrier required between accessing protected resource and
--		 * releasing a lock for it. Legacy code might not have done
--		 * this, and we cannot determine that this is not the case
--		 * being emulated, so insert always.
--		 */
--		smp_mb();
--
- 		if (type == TYPE_SWPB)
- 			__user_swpb_asm(*data, address, res, temp);
- 		else
-@@ -161,13 +153,6 @@ static int emulate_swpX(unsigned int address, unsigned int *data,
- 	}
++#include <linux/debugfs.h>
+ #include <linux/export.h>
+ #include <linux/kernel.h>
+ #include <linux/stddef.h>
+@@ -398,6 +399,19 @@ static int __init arm64_device_init(void)
+ }
+ arch_initcall_sync(arm64_device_init);
  
- 	if (res == 0) {
--		/*
--		 * Barrier also required between acquiring a lock for a
--		 * protected resource and accessing the resource. Inserted for
--		 * same reason as above.
--		 */
--		smp_mb();
--
- 		if (type == TYPE_SWPB)
- 			swpbcounter++;
- 		else
++struct dentry *arch_debugfs_dir;
++EXPORT_SYMBOL(arch_debugfs_dir);
++
++static int __init arch_kdebugfs_init(void)
++{
++	arch_debugfs_dir = debugfs_create_dir("arm64", NULL);
++	if (IS_ERR_OR_NULL(arch_debugfs_dir))
++		return -ENOMEM;
++
++	return 0;
++}
++arch_initcall(arch_kdebugfs_init);
++
+ static DEFINE_PER_CPU(struct cpu, cpu_data);
+ 
+ static int __init topology_init(void)
 -- 
 1.7.10.4
