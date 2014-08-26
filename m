@@ -1,44 +1,106 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Tue, 26 Aug 2014 10:40:27 +0200
-Subject: [linux-sunxi] Re: [PATCH 4/4] simplefb: add clock handling code
-In-Reply-To: <20140825151822.GC21020@skynet.be>
-References: <20140813170106.GT15297@lukather>
- <20140825121228.GB4163@ulmo.nvidia.com>
- <20140825124410.GZ15297@lukather>
- <20140825133953.GJ4163@ulmo.nvidia.com>
- <53FB3E7F.4000503@redhat.com>
- <20140825141600.GA14763@ulmo.nvidia.com>
- <CAKON4OyjJ+QcBGOzrUDH9J+DxBEKLmXeOcnUyOHHHV_DtCG0zA@mail.gmail.com>
- <53FB47B8.2090104@redhat.com>
- <20140825151255.GA14967@ulmo.nvidia.com>
- <20140825151822.GC21020@skynet.be>
-Message-ID: <20140826084026.GF17263@ulmo>
+From: grant.likely@linaro.org (Grant Likely)
+Date: Tue, 26 Aug 2014 09:42:08 +0100
+Subject: [RFC PATCH 0/9] dt: dependencies (for deterministic driver
+ initialization order based on the DT)
+In-Reply-To: <20140825133714.GH4163@ulmo.nvidia.com>
+References: <1399913280-6915-1-git-send-email-holler@ahsoftware.de>
+ <20140514141914.446F7C4153D@trevor.secretlab.ca>
+ <20140821140211.GD19293@ulmo.nvidia.com> <53F64624.5000403@ahsoftware.de>
+ <20140822131919.GX21734@leverpostej> <20140825093931.GB2399@ulmo>
+ <E1XLu15-0002DP-6o@jdl.com> <20140825133714.GH4163@ulmo.nvidia.com>
+Message-ID: <20140826084208.AE5F0C40989@trevor.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 25, 2014 at 05:18:22PM +0200, Luc Verhaegen wrote:
-> On Mon, Aug 25, 2014 at 05:12:58PM +0200, Thierry Reding wrote:
+On Mon, 25 Aug 2014 15:37:16 +0200, Thierry Reding <thierry.reding@gmail.com> wrote:
+> On Mon, Aug 25, 2014 at 08:08:59AM -0500, Jon Loeliger wrote:
+> > > 
 > > 
-> > Out of curiosity, how does this work in practice? How does the
-> > bootloader create this entry? Does it scan the DT to see which clocks
-> > the real hardware device references and then simply copies them to the
-> > simplefb node?
+> > > Anyway, instead of going back and forth between "deferred probe is good"
+> > > and "deferred probe is bad", how about we do something useful now and
+> > > concentrate on how to make use of the information we have in DT with the
+> > > goal to reduce the number of cases where deferred probing is required?
 > > 
-> > Thierry
+> > Good idea.
+> > 
+> > The proposal on the table is to allow the probe code
+> > to make a topological sort of the devices based on
+> > dependency information either implied, explicitly stated
+> > or both.  That is likely a fundamentally correct approach.
+> > 
+> > I believe some of the issues that need to be resolved are:
+> > 
+> >     1) What constitutes a dependency?
+> >     2) How is that dependency expressed?
+> >     3) How do we add missing dependencies?
+> >     4) Backward compatability problems.
+> > 
+> > There are other questions, of course.  Is it a topsort
+> > per bus?  Are there required "early devices"?  Should
+> > the inter-node dependencies be expressed at each node,
+> > or in a separate hierarchy within the DTS?  Others.
 > 
-> https://www.mail-archive.com/linux-sunxi at googlegroups.com/msg06619.html
+> I think Grant already objected to the idea of explicitly adding
+> dependency information into the device tree sources. Rather, if I
+> understand correctly, we should be using the information readily
+> available (phandle references) as much as possible before resorting to
+> additional properties.
 
-That looks like a royal pain. Again, I think it'd be much simpler (but
-not less code, unfortunately) to do this on a per-resource basis. That
-way these low-level firmware drivers in the kernel can stay trivial,
-keeping the real complexity where they belong: in hardware-specific
-drivers such as DRM/KMS.
+My objection is primarily around the concern that the dependency data
+will get stale if firmware modifies the tree or that the kernel will
+break when by relying on incorrect dependency information.
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140826/6bf72076/attachment.sig>
+If the kernel can handle incorrect dependencies gracefully (like falling
+back to deferred probe) then we can consider additional properties.
+
+> So far we've been operating under the assumption that a dependency is
+> modeled as a phandle reference and that the dependent would contain the
+> phandle reference to the dependency. That's for example how clocks and
+> regulators (to name only a few) work. A simplified example would look
+> like this:
+> 
+> 	clock: clock at ... {
+> 		...
+> 		#clock-cells = <1>;
+> 		...
+> 	};
+> 
+> 	pmic: pmic at ... {
+> 		regulators {
+> 			vdd_foo: ldo0 {
+> 				...
+> 			};
+> 
+> 			vdd_bar: ldo1 {
+> 				...
+> 			};
+> 	};
+> 
+> 	device at ... {
+> 		vdd-supply = <&vdd_foo>;
+> 		clocks = <&clock 0>;
+> 	};
+> 
+> 	device at ... {
+> 		vdd-supply = <&vdd_bar>;
+> 		clocks = <&clock 1>;
+> 	};
+> 
+> There are somewhat standardized bindings for the above and especially
+> for bindings of the type that clocks implement this is trivial. We can
+> simply iterate over each (phandle, specifier) tuple and check that the
+> corresponding clock provider can be resolved (which typically means that
+> it's been registered with the common clock framework).
+> 
+> For regulators (and regulator-like bindings) the problem is somewhat
+> more difficult because they property names are not standardized. One way
+> to solve this would be to look for property names with a -supply suffix,
+> but that could obviously lead to false positives. One alternative that I
+> think could eliminate this would be to explicitly list dependencies in
+> drivers. This would allow core code to step through such a list and
+> resolve the (phandle, specifier) tuples.
+
+False positives and negatives may not actually be a problem. It is
+suboptimal, certainly, but it shouldn't outright break the kernel.
+
+g.
