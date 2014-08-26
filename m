@@ -1,267 +1,82 @@
-From: achandran@mvista.com (Arun Chandran)
-Date: Tue, 26 Aug 2014 18:30:01 +0530
-Subject: [PATCH] Arm64: convert soft_restart() to assembly code
-In-Reply-To: <20140821143155.GN21734@leverpostej>
-References: <1407847365-10873-1-git-send-email-achandran@mvista.com>
- <1408123221.22761.38.camel@smoke>
- <20140815182157.GD21908@leverpostej>
- <CAFdej01kDMSTpzdGiRmX8g=E4mZU2_5oiiKzyQ_z7z1jxeCF-A@mail.gmail.com>
- <20140820105408.GG21174@leverpostej>
- <CAFdej00s9ZYXnE4AfU0vUqTb4dmUg4U=fOhc3KS1_JK+0=+mdw@mail.gmail.com>
- <20140820141623.GF21734@leverpostej>
- <CAFdej023ABj=xstTS_vddr2PMoqE4Fe1qBN9Gr0P69hW+u=YBA@mail.gmail.com>
- <20140821143155.GN21734@leverpostej>
-Message-ID: <CAFdej01NQoVVB6QhZ=jSO5OACZ4293xKPJR9sDboZOOX5DMeig@mail.gmail.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Tue, 26 Aug 2014 15:00:28 +0200
+Subject: [PATCH v2 0/4] CMA & device tree, once again
+In-Reply-To: <53E56B16.5030402@codeaurora.org>
+References: <1405321966-28184-1-git-send-email-m.szyprowski@samsung.com>
+ <53E56B16.5030402@codeaurora.org>
+Message-ID: <53FC84EC.1050800@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 21, 2014 at 8:01 PM, Mark Rutland <mark.rutland@arm.com> wrote:
-> On Thu, Aug 21, 2014 at 02:34:46PM +0100, Arun Chandran wrote:
->> Hi Mark,
+Hello,
+
+On 2014-08-09 02:28, Laura Abbott wrote:
+> On 7/14/2014 12:12 AM, Marek Szyprowski wrote:
+>> Hello,
 >>
->> On Wed, Aug 20, 2014 at 7:46 PM, Mark Rutland <mark.rutland@arm.com> wrote:
->> > [...]
->> >
->> >> I am trying to kexec a UP-LE kernel from and SMP-LE kernel.
->> >>
->> >> > As I mentioned we do need to ensure that the CPUs are in the mode they
->> >> > started in, though I'm not sure I follow what you mean by "not waiting".
->> >> > This could be an orthogonal issue.
->> >>
->> >> If I verify the secondary CPUs from u-boot I can see that
->> >> they are all looping at
->> >>
->> >>     Core number       : 1
->> >>     Core state        : debug (AArch64 EL2)
->> >>     Debug entry cause : External Debug Request
->> >>     Current PC        : 0x0000000000000238
->> >>     Current CPSR      : 0x200003c9 (EL2h)
->> >>
->> >> But after the kexec calls soft_restar(0) for all secondary CPUs
->> >> they are looping at
->> >>
->> >>     Core number       : 1
->> >>     Core state        : debug (AArch64 EL1)
->> >>     Debug entry cause : External Debug Request
->> >>     Current PC        : 0xffffffc000083200
->> >>     Current CPSR      : 0x600003c5 (EL1h)
->> >>
->> >> This is what I mean by they are not waiting for
->> >> the secondary start-up address to jump.
->> >
->> > Ok.
->> >
->> >> >
->> >> > What exactly do you see, do the CPUs leave the spin-table, are they
->> >> > taking exceptions, are they getting stuck in the spin-table, etc?
->> >> >
->> >> They all are clearly resetting to address "0"(Put a breakpoint and
->> >> verified) but somehow they end up @0xffffffc000083200.
->> >> I still don't know why.
->> >>
->> >> ########
->> >> ffffffc00008319c:       d503201f        nop
->> >>         ...
->> >> ffffffc000083200:       14000260        b       ffffffc000083b80 <el1_sync>
->> >> ffffffc000083204:       d503201f        nop
->> >> ffffffc000083208:       d503201f        nop
->> >> ########
->> >
->> > That's the EL1 exception vector table.
->> >
->> > What looks to be happening is that something causes the CPUs to take an
->> > exception (at EL1). Because translation isn't enabled and the vector
->> > address doesn't map to anything, they'll take some sort of exception.
->> > Because the vectors aren't mapped that will go recursive.
->> >
->> > Your spin-table implementation might be poking something that's not
->> > accessible at EL1, in which case you require the jump to EL2 for
->> > correctness. I can't say for certain either way.
->> >
+>> This is one more respin of the patches which add support for creating
+>> reserved memory regions defined in device tree. The last attempt
+>> (http://lists.linaro.org/pipermail/linaro-mm-sig/2014-February/003738.html)
+>> ended in merging only half of the code, so right now we have complete
+>> documentation merged and only basic code, which implements a half of it
+>> is written in the documentation. Although the merged patches allow to
+>> reserve memory, there is no way of using it for devices and drivers.
 >>
->> Yes you are right I needed a jump to EL2 for putting the
->> secondary CPUs at correct spinning loop.
+>> This situation makes CMA rather useless, as the main architecture (ARM),
+>> which used it, has been converted from board-file based system
+>> initialization to device tree. Thus there is no place to use direct
+>> calls to dma_declare_contiguous() and some new solution, which bases on
+>> device tree, is urgently needed.
+>>
+>> This patch series fixes this issue. It provides two, already widely
+>> discussed and already present in the kernel, drivers for reserved
+>> memory: first based on DMA-coherent allocator, second using Contiguous
+>> Memory Allocator. The first one nicely implements typical 'carved out'
+>> reserved memory way of allocating contiguous buffers in a kernel-style
+>> way. The memory is used exclusively by devices assigned to the given
+>> memory region. The second one allows to reuse reserved memory for
+>> movable kernel pages (like disk buffers, anonymous memory) and migrates
+>> it out when device to allocates contiguous memory buffer. Both driver
+>> provides memory buffers via standard dma-mapping API.
+>>
+>> The patches have been rebased on top of latest CMA and mm changes merged
+>> to akmp kernel tree.
+>>
+>> To define a 64MiB CMA region following node is needed:
+>>
+>> multimedia_reserved: multimedia_mem_region {
+>> 	compatible = "shared-dma-pool";
+>> 	reusable;
+>> 	size = <0x4000000>;
+>> 	alignment = <0x400000>;
+>> };
+>>
+>> Similarly, one can define 64MiB region with DMA coherent memory:
+>>
+>> multimedia_reserved: multimedia_mem_region {
+>> 	compatible = "shared-dma-pool";
+>> 	no-map;
+>> 	size = <0x4000000>;
+>> 	alignment = <0x400000>;
+>> };
+>>
+> Longer term, I think it would be good if we didn't have to use no-map with
+> the coherent memory. With no-map and dma-coherent.c right now, not only
+> do you lose out on the physical memory space, you also have to give up
+> the same amount of vmalloc space for mapping. On arm32, if you have the default
+> 240MB vmalloc space, 64M is ~25% of the vmalloc space. At least on arm you can
+> make this up by remapping the memory as coherent.
 >
-> Ok. So we need to do what I have suggested elsewhere w.r.t. jumping back
-> up to EL2. As you point out below we need to synchronise with the CPUs
-> on their way out too we can add a spin-table cpu_kill with a slightly
-> dodgy delay to ensure that, given we have no other mechanism for
-> synchronising.
+> I haven't seen this picked up anywhere yet so you are welcome to add
 >
+> Tested-by: Laura Abbott <lauraa@codeaurora.org>
 
-I was able to remove the delay by pushing "set_cpu_online(cpu, false);"
-further down.
+Right, when the code reaches mainline I will add code which will remove 
+no-map
+requirement. Changing memory attributes can be handled in this case the same
+way as for CMA.
 
-############
-diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
-index 3fb64cb..200e49e 100644
---- a/arch/arm64/kernel/smp.c
-+++ b/arch/arm64/kernel/smp.c
-@@ -543,8 +543,6 @@ static void ipi_cpu_stop(unsigned int cpu)
-                raw_spin_unlock(&stop_lock);
-        }
-
--       set_cpu_online(cpu, false);
--
-        local_irq_disable();
-
-        /* If we have the cpu ops use them. */
-@@ -554,6 +552,8 @@ static void ipi_cpu_stop(unsigned int cpu)
-                && !cpu_ops[cpu]->cpu_disable(cpu))
-                cpu_ops[cpu]->cpu_die(cpu);
-
-+
-+       set_cpu_online(cpu, false);
-        /* Otherwise spin here. */
-
-        while (1)
-diff --git a/arch/arm64/kernel/smp_spin_table.c
-b/arch/arm64/kernel/smp_spin_table.c
-index e7275b3..8dcca88 100644
---- a/arch/arm64/kernel/smp_spin_table.c
-+++ b/arch/arm64/kernel/smp_spin_table.c
-@@ -149,6 +149,7 @@ static void smp_spin_table_cpu_die(unsigned int cpu)
-        *release_addr = 0;
-        __flush_dcache_area(release_addr, 8);
-
-+       set_cpu_online(cpu, false);
-        mb();
-
-        soft_restart(0);
-##############
-
-This will
-
-a) Make the waiting loop inside smp_send_stop() more meaningful
-
-b) Make sure that at least cpu-release-addr is invalidated.
-
---Arun
-
-
->> I made some progress with the below changes.
->>
->> ###########
->> diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
->> index 607d4bb..8969922 100644
->> --- a/arch/arm64/kernel/head.S
->> +++ b/arch/arm64/kernel/head.S
->> @@ -343,6 +343,11 @@ CPU_LE(    movk    x0, #0x30d0, lsl #16    )
->>  // Clear EE and E0E on LE systems
->>                       PSR_MODE_EL1h)
->>         msr     spsr_el2, x0
->>         msr     elr_el2, lr
->> +       mov     x0, #0x33ff
->> +       movk    x0, #0x801f, lsl #16
->> +       msr     cptr_el2, x0                    // Enable traps to el2
->> when CPACR or CPACR_EL1 is accessed
->> +       mov     x0, #3 << 20
->> +       msr     cpacr_el1, x0                   // Enable FP/ASIMD
->>         mov     w20, #BOOT_CPU_MODE_EL2         // This CPU booted in EL2
->>         eret
->>  ENDPROC(el2_setup)
->> diff --git a/arch/arm64/kernel/hyp-stub.S b/arch/arm64/kernel/hyp-stub.S
->> index a272f33..d8e806c 100644
->> --- a/arch/arm64/kernel/hyp-stub.S
->> +++ b/arch/arm64/kernel/hyp-stub.S
->> @@ -66,6 +66,14 @@ ENDPROC(el1_sync)
->>
->>  .macro invalid_vector  label
->>  \label:
->> +       mov     x1, #0x33ff
->> +       msr     cptr_el2, x1                    // Disable copro. traps to EL2
->> +
->> +       ic      ialluis
->> +       isb
->> +       dsb     sy
->
-> As far as I am aware an "isb; dsb" sequence never makes sense. It should
-> be "dsb; isb". You want the I-side maintenance to complete (for which
-> you have the DSB) _then_ you want to synchronise the execution context
-> with the newly-visible instructions (for which you have the ISB).
->
->> +
->> +       br  x0
->>         b \label
->>  ENDPROC(\label)
->>  .endm
->> diff --git a/arch/arm64/kernel/process.c b/arch/arm64/kernel/process.c
->> index 64733d4..8ca929c 100644
->> --- a/arch/arm64/kernel/process.c
->> +++ b/arch/arm64/kernel/process.c
->> @@ -65,6 +65,12 @@ void soft_restart(unsigned long addr)
->>  //     smp_secondary_shutdown();
->>  #endif
->>
->> +       /* Delay primary cpu; allow enough time for
->> +        * secondaries to enter spin loop
->> +        */
->> +       if (smp_processor_id() == 0)
->> +               mdelay(1000);
->> +
->>         cpu_soft_restart(virt_to_phys(cpu_reset), addr);
->>
->>         /* Should never get here */
->> diff --git a/arch/arm64/mm/proc.S b/arch/arm64/mm/proc.S
->> index 3cb6dec..f6ab468 100644
->> --- a/arch/arm64/mm/proc.S
->> +++ b/arch/arm64/mm/proc.S
->> @@ -76,6 +76,10 @@ ENTRY(cpu_reset)
->>  #if defined(CONFIG_SMP)
->>  /*     bl      secondary_shutdown */
->>  #endif
->> +
->> +       /* Trap to EL2 */
->> +       mov     x1, #3 << 20
->> +       msr     cpacr_el1, x1                   // Enable FP/ASIMD
->>         ret     x0
->>  ENDPROC(cpu_reset)
->>
->> @@ -200,8 +204,6 @@ ENTRY(__cpu_setup)
->>         tlbi    vmalle1is                       // invalidate I + D TLBs
->>         dsb     ish
->>
->> -       mov     x0, #3 << 20
->> -       msr     cpacr_el1, x0                   // Enable FP/ASIMD
->>         msr     mdscr_el1, xzr                  // Reset mdscr_el1
->>         /*
->>          * Memory region attributes for LPAE:
->> #########
->>
->> With the above code I was able to manually kexec
->> an SMP kernel (With the help of debugger).
->>
->> Basically the branch instruction (br x0) is not working
->> in the el2 vector.
->> ------------------
->> CPU#0>h
->>     Core number       : 0
->>     Core state        : debug (AArch64 EL2)
->>     Debug entry cause : External Debug Request
->>     Current PC        : 0x0000004000089800
->
-> Does this address look similar to the VBAR_EL2, perhaps?
->
->>     Current CPSR      : 0x600003c9 (EL2h)
->> CPU#0>rd
->> GPR00: 00000043eb891000 0000000000000018 0000000000000006 0000000000000004
->> GPR04: 000000000000001f 000000000000001b 0000000000000000 ffffffffffffffff
->> GPR08: ffffffc3ffe80614 ffffffffffffffff 0000000000000000 0000000000000002
->> GPR12: ffffffc0000968f0 00000040008c0000 00000043eb949002 ffffffffffffffff
->> GPR16: ffffffc0000c1244 0000000000435260 0000007ff9c5d490 00000040000968c0
->> GPR20: 00000043eb891000 ffffffc3eb891000 ffffffc3eb973c00 0000000000000110
->> GPR24: ffffffc000094000 ffffffc000094cd8 000000000000008e ffffffc00082f000
->> GPR28: ffffffc3e9888000 ffffffc3e988bd00 ffffffc000095d88 00000043efb24430
->> CPU#0>go 0x00000043eb891000
->> --------------------
->>
->> I had to use the debugger  to make cpu0 jump to kexec-boot code.
->> Similarly I had to manually put other CPUs to spinning code
->> using debugger. Could you please throw some light here?
->
-> I really can't say. I know nothing of your platform or spin-table
-> implementation, and this is nothing like what I'd expect the jump to EL2
-> code to look like.
->
-> Thanks,
-> Mark.
+Best regards
+-- 
+Marek Szyprowski, PhD
+Samsung R&D Institute Poland
