@@ -1,100 +1,96 @@
-From: punit.agrawal@arm.com (Punit Agrawal)
-Date: Tue, 26 Aug 2014 15:56:56 +0100
-Subject: [PATCH 3/6] arm64: Add support for hooks to handle undefined
- instructions
-In-Reply-To: <20140826131339.GO23445@arm.com> (Will Deacon's message of "Tue,
- 26 Aug 2014 14:13:39 +0100")
-References: <1409048930-21598-1-git-send-email-punit.agrawal@arm.com>
- <1409048930-21598-4-git-send-email-punit.agrawal@arm.com>
- <20140826131339.GO23445@arm.com>
-Message-ID: <9hhy4ube1tz.fsf@arm.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Tue, 26 Aug 2014 16:03:34 +0100
+Subject: [PATCH 1/2] GICv3: refactor gic_enable_redist to support both
+ enabling and disabling
+In-Reply-To: <1409065415-20176-1-git-send-email-sudeep.holla@arm.com>
+References: <1409065415-20176-1-git-send-email-sudeep.holla@arm.com>
+Message-ID: <1409065415-20176-2-git-send-email-sudeep.holla@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Will Deacon <will.deacon@arm.com> writes:
+From: Sudeep Holla <sudeep.holla@arm.com>
 
-> Hi Punit,
->
-> On Tue, Aug 26, 2014 at 11:28:47AM +0100, Punit Agrawal wrote:
->> Add support to register hooks for undefined instructions. The handlers
->> will be called when the undefined instruction and the processor state
->> (as contained in pstate) match criteria used at registration.
->> 
->> Note: The patch only deals with ARM instruction encodings and needs
->> fixing to handle thumb instructions as well.
->
-> [...]
->
->> +static int call_undef_hook(struct pt_regs *regs)
->> +{
->> +	struct undef_hook *hook;
->> +	unsigned long flags;
->> +	u32 instr;
->> +	int (*fn)(struct pt_regs *regs, u32 instr) = NULL;
->> +	void __user *pc = (void __user *)instruction_pointer(regs);
->> +
->> +	/*
->> +	 * Currently, undefined instruction patching is only supported
->> +	 * for user mode. Also, as we're not emulating any thumb
->> +	 * instructions lets not add thumb instruction decoding until
->> +	 * it is needed.
->> +	 */
->> +	if (!compat_user_mode(regs) || compat_thumb_mode(regs))
->> +		return 1;
->
-> What do you mean by `undefined instruction patching'? 
+Currently gic_enable_redist configures the redistributors to never
+assert WakeRequest signal. However when powering down the processors
+with wake-up enabled(i.e suspend), we need to configure it to assert
+that signal.
 
-That's poorly worded. I'll improve upon it.
+This patch extends gic_enable_redist so that the redistributor can be
+configure to assert WakeRequest and hold interrupts as pending. This is
+useful in suspending the processors.
 
-> I don't see anything
-> in the mechanism that means this can't be reused for kernel code, then we
-> just register the SWP emulation hook for userspace only using the mode (like
-> we do for kgdb).
+This patch also adds check to make sure GICR_WAKER is accessible when
+configuring it.
 
-There's nothing in the mechanism to prevent it's use for kernel code. I
-was erring on the side of caution as I hadn't tested it.
+Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+[maz: removed reference to GICD_CTLR.DS and added read-back of
+      GICR_WAKER to check that it is not RAZ/WI]
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ drivers/irqchip/irq-gic-v3.c | 30 ++++++++++++++++++++----------
+ 1 file changed, 20 insertions(+), 10 deletions(-)
 
->
->> +	get_user(instr, (u32 __user *)pc);
->> +	instr = le32_to_cpu(instr);
->> +
->> +	raw_spin_lock_irqsave(&undef_lock, flags);
->> +	list_for_each_entry(hook, &undef_hook, node)
->> +		if ((instr & hook->instr_mask) == hook->instr_val &&
->> +			(regs->pstate & hook->pstate_mask) == hook->pstate_val)
->> +			fn = hook->fn;
->> +
->> +	raw_spin_unlock_irqrestore(&undef_lock, flags);
->> +
->> +	return fn ? fn(regs, instr) : 1;
->> +}
->> +
->>  asmlinkage void __exception do_undefinstr(struct pt_regs *regs)
->>  {
->>  	siginfo_t info;
->> @@ -266,6 +329,9 @@ asmlinkage void __exception do_undefinstr(struct pt_regs *regs)
->>  	if (!aarch32_break_handler(regs))
->>  		return;
->>  
->> +	if (call_undef_hook(regs) == 0)
->> +		return;
->
-> I'd like to reuse this hook for the aarch32 break hooks (you can see the
-> direct call in the context above). That means adding support for thumb
-> after all. Is there a reason you've been avoiding that?
-
-None, other than to not add code before it's needed. I've just had a
-quick look at break handler and it looks pretty straight forward to fold
-that change in this set. Are you OK with that?
-
-The code started out when it wasn't clear if the code would target
-upstream kernels. I tried to not enable too many, what was by some
-considered, hacks.
-
->
-> Will
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+diff --git a/drivers/irqchip/irq-gic-v3.c b/drivers/irqchip/irq-gic-v3.c
+index 57eaa5a0b1e3..37062ba6704b 100644
+--- a/drivers/irqchip/irq-gic-v3.c
++++ b/drivers/irqchip/irq-gic-v3.c
+@@ -155,7 +155,7 @@ static void gic_enable_sre(void)
+ 		pr_err("GIC: unable to set SRE (disabled at EL2), panic ahead\n");
+ }
+ 
+-static void gic_enable_redist(void)
++static void gic_enable_redist(bool enable)
+ {
+ 	void __iomem *rbase;
+ 	u32 count = 1000000;	/* 1s! */
+@@ -163,20 +163,30 @@ static void gic_enable_redist(void)
+ 
+ 	rbase = gic_data_rdist_rd_base();
+ 
+-	/* Wake up this CPU redistributor */
+ 	val = readl_relaxed(rbase + GICR_WAKER);
+-	val &= ~GICR_WAKER_ProcessorSleep;
++	if (enable)
++		/* Wake up this CPU redistributor */
++		val &= ~GICR_WAKER_ProcessorSleep;
++	else
++		val |= GICR_WAKER_ProcessorSleep;
+ 	writel_relaxed(val, rbase + GICR_WAKER);
+ 
+-	while (readl_relaxed(rbase + GICR_WAKER) & GICR_WAKER_ChildrenAsleep) {
+-		count--;
+-		if (!count) {
+-			pr_err_ratelimited("redist didn't wake up...\n");
+-			return;
+-		}
++	if (!enable) {		/* Check that GICR_WAKER is writeable */
++		val = readl_relaxed(rbase + GICR_WAKER);
++		if (!(val & GICR_WAKER_ProcessorSleep))
++			return;	/* No PM support in this redistributor */
++	}
++
++	while (count--) {
++		val = readl_relaxed(rbase + GICR_WAKER);
++		if (enable ^ (val & GICR_WAKER_ChildrenAsleep))
++			break;
+ 		cpu_relax();
+ 		udelay(1);
+ 	};
++	if (!count)
++		pr_err_ratelimited("redistributor failed to %s...\n",
++				   enable ? "wakeup" : "sleep");
+ }
+ 
+ /*
+@@ -381,7 +391,7 @@ static void gic_cpu_init(void)
+ 	if (gic_populate_rdist())
+ 		return;
+ 
+-	gic_enable_redist();
++	gic_enable_redist(true);
+ 
+ 	rbase = gic_data_rdist_sgi_base();
+ 
+-- 
+1.8.3.2
