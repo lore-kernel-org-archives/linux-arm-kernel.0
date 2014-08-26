@@ -1,61 +1,59 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 26 Aug 2014 18:55:26 +0100
-Subject: [PATCH v6 5/6] arm64: add SIGSYS siginfo for compat task
-In-Reply-To: <1408611405-8943-6-git-send-email-takahiro.akashi@linaro.org>
-References: <1408611405-8943-1-git-send-email-takahiro.akashi@linaro.org>
- <1408611405-8943-6-git-send-email-takahiro.akashi@linaro.org>
-Message-ID: <20140826175526.GF23445@arm.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Tue, 26 Aug 2014 11:59:13 -0600
+Subject: [PATCH v3 1/5] of: Add NVIDIA Tegra Legacy Interrupt Controller
+ binding
+In-Reply-To: <1409035264-16999-1-git-send-email-thierry.reding@gmail.com>
+References: <1409035264-16999-1-git-send-email-thierry.reding@gmail.com>
+Message-ID: <53FCCAF1.9050504@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 21, 2014 at 09:56:44AM +0100, AKASHI Takahiro wrote:
-> SIGSYS is primarily used in secure computing to notify tracer.
-> This patch allows signal handler on compat task to get correct information
-> with SA_SYSINFO specified when this signal is delivered.
-> 
-> Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
-> ---
->  arch/arm64/include/asm/compat.h |    7 +++++++
->  arch/arm64/kernel/signal32.c    |    8 ++++++++
->  2 files changed, 15 insertions(+)
-> 
-> diff --git a/arch/arm64/include/asm/compat.h b/arch/arm64/include/asm/compat.h
-> index 253e33b..c877915 100644
-> --- a/arch/arm64/include/asm/compat.h
-> +++ b/arch/arm64/include/asm/compat.h
-> @@ -205,6 +205,13 @@ typedef struct compat_siginfo {
->  			compat_long_t _band;	/* POLL_IN, POLL_OUT, POLL_MSG */
->  			int _fd;
->  		} _sigpoll;
-> +
-> +		/* SIGSYS */
-> +		struct {
-> +			compat_uptr_t _call_addr; /* calling user insn */
-> +			int _syscall;	/* triggering system call number */
-> +			unsigned int _arch;	/* AUDIT_ARCH_* of syscall */
-> +		} _sigsys;
->  	} _sifields;
->  } compat_siginfo_t;
->  
-> diff --git a/arch/arm64/kernel/signal32.c b/arch/arm64/kernel/signal32.c
-> index 1b9ad02..aa550d6 100644
-> --- a/arch/arm64/kernel/signal32.c
-> +++ b/arch/arm64/kernel/signal32.c
-> @@ -186,6 +186,14 @@ int copy_siginfo_to_user32(compat_siginfo_t __user *to, const siginfo_t *from)
->  		err |= __put_user(from->si_uid, &to->si_uid);
->  		err |= __put_user((compat_uptr_t)(unsigned long)from->si_ptr, &to->si_ptr);
->  		break;
-> +#ifdef __ARCH_SIGSYS
-> +	case __SI_SYS:
-> +		err |= __put_user((compat_uptr_t)(unsigned long)
-> +				from->si_call_addr, &to->si_call_addr);
-> +		err |= __put_user(from->si_syscall, &to->si_syscall);
-> +		err |= __put_user(from->si_arch, &to->si_arch);
-> +		break;
-> +#endif
+On 08/26/2014 12:41 AM, Thierry Reding wrote:
+> From: Thierry Reding <treding@nvidia.com>
+>
+> The Legacy Interrupt Controller found on NVIDIA Tegra SoCs is used by
+> the AVP coprocessor and can also serve as a backup for the ARM Cortex
+> CPU's local interrupt controller (GIC).
+>
+> The LIC is subdivided into multiple identical units, each handling 32
+> possible interrupt sources.
 
-I think you should drop this #ifdef. We care about whether arch/arm/ defines
-__ARCH_SIGSYS, not whether arm64 defines it (they both happen to define it
-anyway).
+If I apply this series without patch 2, which is necessary to test the 
+support for compatibility with old DTs, then I get the following very 
+early on in boot:
 
-Will
+Other than that, I would apply this.
+
+> [    0.000000] Preemptible hierarchical RCU implementation.
+> [    0.000000] NR_IRQS:16 nr_irqs:16 16
+> [    0.000000] ------------[ cut here ]------------
+> [    0.000000] WARNING: CPU: 0 PID: 0 at drivers/soc/tegra/fuse/tegra-apbmisc.c:42 tegra_get_chip_id+0x30/0x44()
+> [    0.000000] Tegra Chip ID not yet available
+> [    0.000000] Modules linked in:
+> [    0.000000] CPU: 0 PID: 0 Comm: swapper/0 Not tainted 3.17.0-rc2-00016-g6a550998848e #32
+> [    0.000000] [<c00157a0>] (unwind_backtrace) from [<c0011344>] (show_stack+0x10/0x14)
+> [    0.000000] [<c0011344>] (show_stack) from [<c06045e8>] (dump_stack+0x84/0xd0)
+> [    0.000000] [<c06045e8>] (dump_stack) from [<c0024f44>] (warn_slowpath_common+0x64/0x88)
+> [    0.000000] [<c0024f44>] (warn_slowpath_common) from [<c0024ffc>] (warn_slowpath_fmt+0x30/0x40)
+> [    0.000000] [<c0024ffc>] (warn_slowpath_fmt) from [<c0267acc>] (tegra_get_chip_id+0x30/0x44)
+> [    0.000000] [<c0267acc>] (tegra_get_chip_id) from [<c08576a8>] (tegra_init_irq+0xb0/0x2d0)
+> [    0.000000] [<c08576a8>] (tegra_init_irq) from [<c0857d60>] (tegra_dt_init_irq+0x8/0x14)
+> [    0.000000] [<c0857d60>] (tegra_dt_init_irq) from [<c08525a8>] (init_IRQ+0x28/0x7c)
+> [    0.000000] [<c08525a8>] (init_IRQ) from [<c0850a48>] (start_kernel+0x21c/0x3a8)
+> [    0.000000] [<c0850a48>] (start_kernel) from [<80008074>] (0x80008074)
+> [    0.000000] ---[ end trace cb88537fdc8fa200 ]---
+> [    0.000000] ------------[ cut here ]------------
+> [    0.000000] WARNING: CPU: 0 PID: 0 at arch/arm/mach-tegra/irq.c:343 tegra_init_irq+0x184/0x2d0()
+> [    0.000000] Found 5 interrupt controllers; expected 4.
+> [    0.000000] Modules linked in:
+> [    0.000000] CPU: 0 PID: 0 Comm: swapper/0 Tainted: G        W      3.17.0-rc2-00016-g6a550998848e #32
+> [    0.000000] [<c00157a0>] (unwind_backtrace) from [<c0011344>] (show_stack+0x10/0x14)
+> [    0.000000] [<c0011344>] (show_stack) from [<c06045e8>] (dump_stack+0x84/0xd0)
+> [    0.000000] [<c06045e8>] (dump_stack) from [<c0024f44>] (warn_slowpath_common+0x64/0x88)
+> [    0.000000] [<c0024f44>] (warn_slowpath_common) from [<c0024ffc>] (warn_slowpath_fmt+0x30/0x40)
+> [    0.000000] [<c0024ffc>] (warn_slowpath_fmt) from [<c085777c>] (tegra_init_irq+0x184/0x2d0)
+> [    0.000000] [<c085777c>] (tegra_init_irq) from [<c0857d60>] (tegra_dt_init_irq+0x8/0x14)
+> [    0.000000] [<c0857d60>] (tegra_dt_init_irq) from [<c08525a8>] (init_IRQ+0x28/0x7c)
+> [    0.000000] [<c08525a8>] (init_IRQ) from [<c0850a48>] (start_kernel+0x21c/0x3a8)
+> [    0.000000] [<c0850a48>] (start_kernel) from [<80008074>] (0x80008074)
+> [    0.000000] ---[ end trace cb88537fdc8fa201 ]---
