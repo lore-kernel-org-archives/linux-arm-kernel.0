@@ -1,81 +1,123 @@
-From: zhangfei.gao@linaro.org (Zhangfei Gao)
-Date: Tue, 26 Aug 2014 13:46:10 +0800
-Subject: [PATCH resend 4/4] clk: hix5hd2: add I2C clocks
-In-Reply-To: <1409031970-4821-1-git-send-email-zhangfei.gao@linaro.org>
-References: <1409031970-4821-1-git-send-email-zhangfei.gao@linaro.org>
-Message-ID: <1409031970-4821-5-git-send-email-zhangfei.gao@linaro.org>
+From: mpa@pengutronix.de (Markus Pargmann)
+Date: Tue, 26 Aug 2014 07:55:09 +0200
+Subject: [PATCH v5 5/7] net: cpsw: Add am33xx MACID readout
+In-Reply-To: <20140825160118.GG17254@atomide.com>
+References: <1408947828-22316-1-git-send-email-mpa@pengutronix.de>
+ <1408947828-22316-6-git-send-email-mpa@pengutronix.de>
+ <20140825160118.GG17254@atomide.com>
+Message-ID: <20140826055509.GB21770@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Wei Yan <sledge.yanwei@huawei.com>
+Hi,
 
-hix5hd2 add I2C clocks (I2C0~i2C5)
+On Mon, Aug 25, 2014 at 09:01:19AM -0700, Tony Lindgren wrote:
+> > diff --git a/drivers/net/ethernet/ti/cpsw.c b/drivers/net/ethernet/ti/cpsw.c
+> > index 0bc2c2a2c236..7c94a0fb24bc 100644
+> > --- a/drivers/net/ethernet/ti/cpsw.c
+> > +++ b/drivers/net/ethernet/ti/cpsw.c
+> > @@ -33,6 +33,8 @@
+> >  #include <linux/of_net.h>
+> >  #include <linux/of_device.h>
+> >  #include <linux/if_vlan.h>
+> > +#include <linux/mfd/syscon.h>
+> > +#include <linux/regmap.h>
+> >  
+> >  #include <linux/pinctrl/consumer.h>
+> >  
+> > @@ -1816,6 +1818,39 @@ static void cpsw_slave_init(struct cpsw_slave *slave, struct cpsw_priv *priv,
+> >  	slave->port_vlan = data->dual_emac_res_vlan;
+> >  }
+> >  
+> > +#define AM33XX_CTRL_MAC_LO_REG(id) (0x630 + 0x8 * id)
+> > +#define AM33XX_CTRL_MAC_HI_REG(id) (0x630 + 0x8 * id + 0x4)
+> > +
+> > +static int cpsw_am33xx_cm_get_macid(struct device *dev, int slave,
+> > +		u8 *mac_addr)
+> > +{
+> > +	u32 macid_lo;
+> > +	u32 macid_hi;
+> > +	struct regmap *syscon;
+> > +
+> > +	if (!of_machine_is_compatible("ti,am33xx"))
+> > +		return 0;
+> > +
+> > +	syscon = syscon_regmap_lookup_by_phandle(dev->of_node, "syscon");
+> > +	if (IS_ERR(syscon)) {
+> > +		if (PTR_ERR(syscon) == -ENODEV)
+> > +			return 0;
+> > +		return PTR_ERR(syscon);
+> > +	}
+> > +
+> > +	regmap_read(syscon, AM33XX_CTRL_MAC_LO_REG(slave), &macid_lo);
+> > +	regmap_read(syscon, AM33XX_CTRL_MAC_HI_REG(slave), &macid_hi);
+> > +
+> > +	mac_addr[5] = (macid_lo >> 8) & 0xff;
+> > +	mac_addr[4] = macid_lo & 0xff;
+> > +	mac_addr[3] = (macid_hi >> 24) & 0xff;
+> > +	mac_addr[2] = (macid_hi >> 16) & 0xff;
+> > +	mac_addr[1] = (macid_hi >> 8) & 0xff;
+> > +	mac_addr[0] = macid_hi & 0xff;
+> > +
+> > +	return 0;
+> > +}
+> 
+> I think this only works for the first instance of the cpsw?
 
-Signed-off-by: Wei Yan <sledge.yanwei@huawei.com>
-Signed-off-by: Zhangfei Gao <zhangfei.gao@linaro.org>
----
- drivers/clk/hisilicon/clk-hix5hd2.c       |   25 +++++++++++++++++++++++++
- include/dt-bindings/clock/hix5hd2-clock.h |   12 ++++++++++++
- 2 files changed, 37 insertions(+)
+This works for both cpsw slaves on am335x. It does not work for multiple
+cpsw drivers. But we don't have them on am335x. For other platforms this
+function may be used in case they have the same register layout.
 
-diff --git a/drivers/clk/hisilicon/clk-hix5hd2.c b/drivers/clk/hisilicon/clk-hix5hd2.c
-index 232c38a..5f4b5a8 100644
---- a/drivers/clk/hisilicon/clk-hix5hd2.c
-+++ b/drivers/clk/hisilicon/clk-hix5hd2.c
-@@ -100,6 +100,31 @@ static struct hisi_gate_clock hix5hd2_gate_clks[] __initdata = {
- 		CLK_SET_RATE_PARENT, 0x178, 0, 0, },
- 	{ HIX5HD2_WDG0_RST, "rst_wdg0", "clk_wdg0",
- 		CLK_SET_RATE_PARENT, 0x178, 4, CLK_GATE_SET_TO_DISABLE, },
-+	/* I2C */
-+	{HIX5HD2_I2C0_CLK, "clk_i2c0", "100m",
-+		 CLK_SET_RATE_PARENT, 0x06c, 4, 0, },
-+	{HIX5HD2_I2C0_RST, "rst_i2c0", "clk_i2c0",
-+		 CLK_SET_RATE_PARENT, 0x06c, 5, CLK_GATE_SET_TO_DISABLE, },
-+	{HIX5HD2_I2C1_CLK, "clk_i2c1", "100m",
-+		 CLK_SET_RATE_PARENT, 0x06c, 8, 0, },
-+	{HIX5HD2_I2C1_RST, "rst_i2c1", "clk_i2c1",
-+		 CLK_SET_RATE_PARENT, 0x06c, 9, CLK_GATE_SET_TO_DISABLE, },
-+	{HIX5HD2_I2C2_CLK, "clk_i2c2", "100m",
-+		 CLK_SET_RATE_PARENT, 0x06c, 12, 0, },
-+	{HIX5HD2_I2C2_RST, "rst_i2c2", "clk_i2c2",
-+		 CLK_SET_RATE_PARENT, 0x06c, 13, CLK_GATE_SET_TO_DISABLE, },
-+	{HIX5HD2_I2C3_CLK, "clk_i2c3", "100m",
-+		 CLK_SET_RATE_PARENT, 0x06c, 16, 0, },
-+	{HIX5HD2_I2C3_RST, "rst_i2c3", "clk_i2c3",
-+		 CLK_SET_RATE_PARENT, 0x06c, 17, CLK_GATE_SET_TO_DISABLE, },
-+	{HIX5HD2_I2C4_CLK, "clk_i2c4", "100m",
-+		 CLK_SET_RATE_PARENT, 0x06c, 20, 0, },
-+	{HIX5HD2_I2C4_RST, "rst_i2c4", "clk_i2c4",
-+		 CLK_SET_RATE_PARENT, 0x06c, 21, CLK_GATE_SET_TO_DISABLE, },
-+	{HIX5HD2_I2C5_CLK, "clk_i2c5", "100m",
-+		 CLK_SET_RATE_PARENT, 0x06c, 0, 0, },
-+	{HIX5HD2_I2C5_RST, "rst_i2c5", "clk_i2c5",
-+		 CLK_SET_RATE_PARENT, 0x06c, 1, CLK_GATE_SET_TO_DISABLE, },
- };
- 
- enum hix5hd2_clk_type {
-diff --git a/include/dt-bindings/clock/hix5hd2-clock.h b/include/dt-bindings/clock/hix5hd2-clock.h
-index b8e3c9d..fd29c17 100644
---- a/include/dt-bindings/clock/hix5hd2-clock.h
-+++ b/include/dt-bindings/clock/hix5hd2-clock.h
-@@ -62,6 +62,18 @@
- #define HIX5HD2_SD_CIU_RST		138
- #define HIX5HD2_WDG0_CLK		139
- #define HIX5HD2_WDG0_RST		140
-+#define HIX5HD2_I2C0_CLK		141
-+#define HIX5HD2_I2C0_RST		142
-+#define HIX5HD2_I2C1_CLK		143
-+#define HIX5HD2_I2C1_RST		144
-+#define HIX5HD2_I2C2_CLK		145
-+#define HIX5HD2_I2C2_RST		146
-+#define HIX5HD2_I2C3_CLK		147
-+#define HIX5HD2_I2C3_RST		148
-+#define HIX5HD2_I2C4_CLK		149
-+#define HIX5HD2_I2C4_RST		150
-+#define HIX5HD2_I2C5_CLK		151
-+#define HIX5HD2_I2C5_RST		152
- 
- /* complex */
- #define HIX5HD2_MAC0_CLK		192
+> 
+> Can the other instances of cpsw use this too and just increment
+> some value in it?
+> 
+> >  static int cpsw_probe_dt(struct cpsw_platform_data *data,
+> >  			 struct platform_device *pdev)
+> >  {
+> > @@ -1928,8 +1963,14 @@ static int cpsw_probe_dt(struct cpsw_platform_data *data,
+> >  			 PHY_ID_FMT, mdio->name, phyid);
+> >  
+> >  		mac_addr = of_get_mac_address(slave_node);
+> > -		if (mac_addr)
+> > +		if (mac_addr) {
+> >  			memcpy(slave_data->mac_addr, mac_addr, ETH_ALEN);
+> > +		} else {
+> > +			ret = cpsw_am33xx_cm_get_macid(&pdev->dev, i,
+> > +						       slave_data->mac_addr);
+> > +			if (ret)
+> > +				return ret;
+> > +		}
+> >  
+> >  		slave_data->phy_if = of_get_phy_mode(slave_node);
+> >  		if (slave_data->phy_if < 0) {
+> 
+> The cpsw_am33xx_cm_get_macid() should only get called based on the
+> compatible flag to avoid random register access on other SoCs.
+> 
+> So how about add the of_machine_is_compatible("ti,am33xx")
+> check here instead and skip calling cpsw_am33xx_cm_get_macid()
+> otherwise?
+> 
+> That allows adding support for other omaps as we already have
+> ti,am4372-cpsw and people have pointed out issues with dra7xx
+> already.
+
+Okay, I will move the machine check here instead.
+
+Thanks,
+
+Markus
+
 -- 
-1.7.9.5
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140826/d31b6a6e/attachment.sig>
