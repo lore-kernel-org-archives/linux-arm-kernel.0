@@ -1,18 +1,55 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 26 Aug 2014 17:24:43 +0100
-Subject: [PATCH 4/4] arm64: arch_timer: remove unused functions
-In-Reply-To: <1408743797-7648-5-git-send-email-nathan_lynch@mentor.com>
-References: <1408743797-7648-1-git-send-email-nathan_lynch@mentor.com>
- <1408743797-7648-5-git-send-email-nathan_lynch@mentor.com>
-Message-ID: <20140826162443.GL16482@arm.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 26 Aug 2014 17:27:59 +0100
+Subject: [PATCH 5/9] arm64: Fix include header order in vmlinux.lds.S
+In-Reply-To: <314ef77423f90ed407b54b4658ea41a96b6f6170.1408736066.git.geoff@infradead.org>
+References: <cover.1408736066.git.geoff@infradead.org>
+ <314ef77423f90ed407b54b4658ea41a96b6f6170.1408736066.git.geoff@infradead.org>
+Message-ID: <20140826162759.GG4078@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 22, 2014 at 10:43:17PM +0100, Nathan Lynch wrote:
-> The counter access and evtstream configuration are now done in common
-> code, so remove the now-unused arch_counter_set_user_access and
-> arch_timer_evtstrm_enable.
+On Fri, Aug 22, 2014 at 08:49:16PM +0100, Geoff Levand wrote:
+> asm-generic/vmlinux.lds.h should be included after the arch
+> specific headers so that the arch headers can override the
+> generic macro defs in asm-generic/vmlinux.lds.h.
 > 
-> Signed-off-by: Nathan Lynch <nathan_lynch@mentor.com>
+> Fixes preprosessor redefined warnings when adding arch specific
+> macros.
 
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+A sample of those warnings would be nice. What do you see being
+redefined?
+
+Thanks,
+Mark.
+
+> Signed-off-by: Geoff Levand <geoff@infradead.org> for Huawei, Linaro
+> ---
+>  arch/arm64/kernel/vmlinux.lds.S | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm64/kernel/vmlinux.lds.S b/arch/arm64/kernel/vmlinux.lds.S
+> index fbb1af7..8dc1d46 100644
+> --- a/arch/arm64/kernel/vmlinux.lds.S
+> +++ b/arch/arm64/kernel/vmlinux.lds.S
+> @@ -4,10 +4,10 @@
+>   * Written by Martin Mares <mj@atrey.karlin.mff.cuni.cz>
+>   */
+>  
+> -#include <asm-generic/vmlinux.lds.h>
+>  #include <asm/thread_info.h>
+>  #include <asm/memory.h>
+>  #include <asm/page.h>
+> +#include <asm-generic/vmlinux.lds.h>
+>  
+>  #include "image.h"
+>  
+> -- 
+> 1.9.1
+> 
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
