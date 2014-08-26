@@ -1,36 +1,52 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 26 Aug 2014 15:40:23 +0100
-Subject: [PATCHv4 2/2] arm64: Add CONFIG_DEBUG_SET_MODULE_RONX support
-In-Reply-To: <1408477303-2640-3-git-send-email-lauraa@codeaurora.org>
-References: <1408477303-2640-1-git-send-email-lauraa@codeaurora.org>
- <1408477303-2640-3-git-send-email-lauraa@codeaurora.org>
-Message-ID: <20140826144023.GA22256@localhost>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 26 Aug 2014 15:43:03 +0100
+Subject: [PATCH v4 7/8] ARM: mm: allow non-text sections to be
+ non-executable
+In-Reply-To: <CAGXu5jLnXeavr4E4YF9jtB03iA-y4vLZjf83a8ABzUC-hdkz9w@mail.gmail.com>
+References: <1407949593-16121-1-git-send-email-keescook@chromium.org>
+ <1407949593-16121-8-git-send-email-keescook@chromium.org>
+ <20140819123342.GJ23128@arm.com>
+ <CAGXu5jLnXeavr4E4YF9jtB03iA-y4vLZjf83a8ABzUC-hdkz9w@mail.gmail.com>
+Message-ID: <20140826144303.GX23445@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 19, 2014 at 08:41:43PM +0100, Laura Abbott wrote:
-> --- /dev/null
-> +++ b/arch/arm64/mm/pageattr.c
-[...]
-> +static int change_memory_common(unsigned long addr, int numpages,
-> +				pgprot_t set_mask, pgprot_t clear_mask)
-> +{
-> +	unsigned long start = addr;
-> +	unsigned long size = PAGE_SIZE*numpages;
-> +	unsigned long end = start + size;
-> +	int ret;
-> +	struct page_change_data data;
-> +
-> +	if (!IS_ALIGNED(addr, PAGE_SIZE)) {
-> +		addr &= PAGE_MASK;
-> +		WARN_ON_ONCE(1);
-> +	}
-> +
-> +	if (!is_module_address(start) || !is_module_address(end))
-> +		return -EINVAL;
+On Wed, Aug 20, 2014 at 01:37:14PM +0100, Kees Cook wrote:
+> On Tue, Aug 19, 2014 at 7:33 AM, Will Deacon <will.deacon@arm.com> wrote:
+> > On Wed, Aug 13, 2014 at 06:06:32PM +0100, Kees Cook wrote:
+> >> +/*
+> >> + * Updates section permissions only for the current mm (sections are
+> >> + * copied into each mm). During startup, this is the init_mm.
+> >> + */
+> >> +static inline void section_update(unsigned long addr, pmdval_t mask,
+> >> +                               pmdval_t prot)
+> >> +{
+> >> +     struct mm_struct *mm;
+> >> +     pmd_t *pmd;
+> >> +
+> >> +     mm = current->active_mm;
+> >> +     pmd = pmd_offset(pud_offset(pgd_offset(mm, addr), addr), addr);
+> >> +
+> >> +#ifdef CONFIG_ARM_LPAE
+> >> +     pmd[0] = __pmd((pmd_val(pmd[0]) & mask) | prot);
+> >> +#else
+> >> +     if (addr & SECTION_SIZE)
+> >> +             pmd[1] = __pmd((pmd_val(pmd[1]) & mask) | prot);
+> >> +     else
+> >> +             pmd[0] = __pmd((pmd_val(pmd[0]) & mask) | prot);
+> >> +#endif
+> >> +     flush_pmd_entry(pmd);
+> >> +     local_flush_tlb_kernel_range(addr, addr + SECTION_SIZE);
+> >
+> > Why only a local flush? You're changing global mappings here, right?
+> 
+> Yes, but with the a15 errata, it cannot use a global flush. As a
+> result, section_update can only be used by a single CPU which is how
+> the usage is managed. Perhaps I should add some comments to that
+> effect? (There was a thread a few months ago on this problem and this
+> shook out as a solution.)
 
-Minor thing, "end" is exclusive here. Do you still get the right check
-with is_module_address(end)?
+Hmm, so do you mandate that preemption is disabled during sections of code
+where the permissions must be changed after boot? (e.g. ftrace patching)
 
--- 
-Catalin
+Will
