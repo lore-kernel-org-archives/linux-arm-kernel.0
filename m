@@ -1,18 +1,18 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Tue, 26 Aug 2014 21:09:31 +0100
+From: jcm@redhat.com (Jon Masters)
+Date: Tue, 26 Aug 2014 16:12:19 -0400
 Subject: [PATCH] setup: Move unmask of async interrupts after possible
  earlycon setup
 In-Reply-To: <53FCE87C.6030201@redhat.com>
 References: <1409079338-14001-1-git-send-email-jcm@redhat.com>
  <CACxGe6s_s=oufaEaaN6Hgz9rUzuGDX-c0RG_-JtYSP598FOeCw@mail.gmail.com>
  <53FCE87C.6030201@redhat.com>
-Message-ID: <CACxGe6spd4Oesv-+2PdWkNXESk66ObXWCyDqWmQ4o5aEXanqZA@mail.gmail.com>
+Message-ID: <53FCEA23.5030406@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 26, 2014 at 9:05 PM, Jon Masters <jcm@redhat.com> wrote:
+On 08/26/2014 04:05 PM, Jon Masters wrote:
 > Hi Grant,
->
+> 
 > On 08/26/2014 04:01 PM, Grant Likely wrote:
 >> On Tue, Aug 26, 2014 at 7:55 PM, Jon Masters <jcm@redhat.com> wrote:
 >>> The kernel wants to enable reporting of asynchronous interrupts (i.e.
@@ -27,11 +27,12 @@ On Tue, Aug 26, 2014 at 9:05 PM, Jon Masters <jcm@redhat.com> wrote:
 >>
 >> That sounds wrong. Why aren't early log messages getting flushed out
 >> when the console shows up?
->
+> 
 > The problem is that when such an error occurs, we immediately panic. And
 > we've not setup the earlycon yet so there's no way to ever see it. I
 > wasted a bunch of time last week so it's worth saving someone else.
 
-Reasonable reason. Perhaps put that in the patch description.
+Admittedly this is more likely to be an issue for Enterprise vendor
+kernels, where the default config (should be always) is PANIC_ON_OOPS.
 
-g.
+Jon.
