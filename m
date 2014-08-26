@@ -1,20 +1,45 @@
-From: matt@console-pimps.org (Matt Fleming)
-Date: Tue, 26 Aug 2014 19:24:50 +0100
-Subject: [PATCH] efi/arm64: store Runtime Services revision
-In-Reply-To: <20140826090533.GA3193@arm.com>
-References: <1408028122-1784-1-git-send-email-semen.protsenko@linaro.org>
- <20140826090533.GA3193@arm.com>
-Message-ID: <20140826182450.GA28116@console-pimps.org>
+From: pramod.gurav@smartplayin.com (Pramod Gurav)
+Date: Tue, 26 Aug 2014 11:31:06 -0700
+Subject: [PATCH 1/2] ARM: DT: APQ8064: Add pinctrl support This patch adds
+ device tree nodes to support pinctrl for apq8064 SOC
+Message-ID: <1409077867-9446-1-git-send-email-pramod.gurav@smartplayin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 26 Aug, at 10:05:33AM, Will Deacon wrote:
-> 
-> I doubt it makes any difference, but can we assign this before we call
-> efi_native_runtime_setup please?
+CC: Rob Herring <robh+dt@kernel.org>
+CC: Pawel Moll <pawel.moll@arm.com>
+CC: Mark Rutland <mark.rutland@arm.com>
+CC: Ian Campbell <ijc+devicetree@hellion.org.uk>
+CC: Kumar Gala <galak@codeaurora.org>
+CC: devicetree at vger.kernel.org
+CC: linux-arm-kernel at lists.infradead.org
 
-This would have to be a follow up patch, v2 of this patch is already in
-Linus' tree as commit 6a7519e81321.
+Signed-off-by: Pramod Gurav <pramod.gurav@smartplayin.com>
+---
+ arch/arm/boot/dts/qcom-apq8064.dtsi |   11 +++++++++++
+ 1 files changed, 11 insertions(+), 0 deletions(-)
 
+diff --git a/arch/arm/boot/dts/qcom-apq8064.dtsi b/arch/arm/boot/dts/qcom-apq8064.dtsi
+index d66fb25..681e194 100644
+--- a/arch/arm/boot/dts/qcom-apq8064.dtsi
++++ b/arch/arm/boot/dts/qcom-apq8064.dtsi
+@@ -73,6 +73,17 @@
+ 		ranges;
+ 		compatible = "simple-bus";
+ 
++		msm_gpio: pinctrl at 800000 {
++			compatible = "qcom,apq8064-pinctrl";
++			reg = <0x800000 0x4000>;
++
++			gpio-controller;
++			#gpio-cells = <2>;
++			interrupt-controller;
++			#interrupt-cells = <2>;
++			interrupts = <0 32 0x4>;
++		};
++
+ 		intc: interrupt-controller at 2000000 {
+ 			compatible = "qcom,msm-qgic2";
+ 			interrupt-controller;
 -- 
-Matt Fleming, Intel Open Source Technology Center
+1.7.0.4
