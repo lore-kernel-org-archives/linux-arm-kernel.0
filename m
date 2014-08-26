@@ -1,98 +1,97 @@
-From: lauraa@codeaurora.org (Laura Abbott)
-Date: Mon, 25 Aug 2014 17:43:32 -0700
-Subject: [PATCHv3 3/7] arm64: Move cpu_resume into the text section
-In-Reply-To: <53FB9DCB.3080602@codeaurora.org>
-References: <1408584039-12735-1-git-send-email-lauraa@codeaurora.org>
- <1408584039-12735-4-git-send-email-lauraa@codeaurora.org>
- <53FB9DCB.3080602@codeaurora.org>
-Message-ID: <53FBD834.30507@codeaurora.org>
+From: caesar.wang@rock-chips.com (Caesar Wang)
+Date: Tue, 26 Aug 2014 08:50:12 +0800
+Subject: [PATCH 1/2] dt-bindings: document Rockchip thermal
+In-Reply-To: <1504889.nDzfjZj9xp@diego>
+References: <1408752934-18318-1-git-send-email-caesar.wang@rock-chips.com>
+ <1408752934-18318-2-git-send-email-caesar.wang@rock-chips.com>
+ <1504889.nDzfjZj9xp@diego>
+Message-ID: <53FBD9C4.3010309@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 8/25/2014 1:34 PM, Stephen Boyd wrote:
-> On 08/20/14 18:20, Laura Abbott wrote:
->> The function cpu_resume currently lives in the .data
->> section. This breaks functionality to make .data no
->> execute. Move cpu_resume to .text which is where it
->> actually belongs.
+Hi Heiko,
+
+? 2014?08?24? 07:03, Heiko St?bner ??:
+> Hi Caesar,
+>
+> Am Samstag, 23. August 2014, 08:15:33 schrieb Caesar Wang:
+>> This add the necessary binding documentation for the thermal
+>> found on Rockchip SoCs
 >>
->> Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
+>> Signed-off-by: zhaoyifeng <zyf@rock-chips.com>
+>> Signed-off-by: Caesar Wang <caesar.wang@rock-chips.com>
 >> ---
-> 
-> This is similar to arm (where I don't see a similar patch to this in
-> Kees' patchset for RO). In arm we have this comment:
-> 
-> /*
->  * Note: Yes, part of the following code is located into the .data section.
->  *       This is to allow sleep_save_sp to be accessed with a relative load
->  *       while we can't rely on any MMU translation.  We could have put
->  *       sleep_save_sp in the .text section as well, but some setups might
->  *       insist on it to be truly read-only.
->  */
-> 
-> Doesn't the same situation apply here? How is this problem overcome?
-> 
-> But I'm a little confused, shouldn't this code run with the MMU disabled?
-> 
->>  ENDPROC(cpu_resume_after_mmu)
->>  
->> -	.data
->>  ENTRY(cpu_resume)
->>  	bl	el2_setup		// if in EL2 drop to EL1 cleanly
->>  #ifdef CONFIG_SMP
->>  	mrs	x1, mpidr_el1
->> -	adr	x4, mpidr_hash_ptr
->> +	adrp	x4, mpidr_hash_ptr
->> +	add	x4, x4, #:lo12:mpidr_hash_ptr
->>  	ldr	x5, [x4]
->>  	add	x8, x4, x5		// x8 = struct mpidr_hash phys address
->>          /* retrieve mpidr_hash members to compute the hash */
->> @@ -143,14 +143,15 @@ ENTRY(cpu_resume)
->>  #else
->>  	mov	x7, xzr
->>  #endif
->> -	adr	x0, sleep_save_sp
->> +	adrp	x0, sleep_save_sp
->> +	add	x0, x0, #:lo12:sleep_save_sp
->>  	ldr	x0, [x0, #SLEEP_SAVE_SP_PHYS]
->>  	ldr	x0, [x0, x7, lsl #3]
->>  	/* load sp from context */
->>  	ldr	x2, [x0, #CPU_CTX_SP]
->> -	adr	x1, sleep_idmap_phys
->> +	adrp	x1, sleep_idmap_phys
->>  	/* load physical address of identity map page table in x1 */
->> -	ldr	x1, [x1]
->> +	ldr	x1, [x1, #:lo12:sleep_idmap_phys]
->>  	mov	sp, x2
->>  	/*
->>  	 * cpu_do_resume expects x0 to contain context physical address
->> @@ -160,6 +161,7 @@ ENTRY(cpu_resume)
->>  	b	cpu_resume_mmu		// Resume MMU, never returns
->>  ENDPROC(cpu_resume)
->>  
->> +	.data
->>  	.align 3
->>  mpidr_hash_ptr:
->>  	/*
-> 
-> 
+>>   .../bindings/thermal/rockchip-thermal.txt          |   33
+>> ++++++++++++++++++++ 1 file changed, 33 insertions(+)
+>>   create mode 100644
+>> Documentation/devicetree/bindings/thermal/rockchip-thermal.txt
+>>
+>> diff --git a/Documentation/devicetree/bindings/thermal/rockchip-thermal.txt
+>> b/Documentation/devicetree/bindings/thermal/rockchip-thermal.txt new file
+>> mode 100644
+>> index 0000000..b556eae
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/thermal/rockchip-thermal.txt
+>> @@ -0,0 +1,33 @@
+>> +* Temperature Sensor ADC (TSADC) on rockchip SoCs
+>> +
+>> +Required properties:
+>> +- compatible : "rockchip,rk3288-tsadc"
+>> +- reg : physical base address of the controller and length of memory mapped
+>> +  region.
+>> +- interrupts : The interrupt number to the cpu. The interrupt specifier
+>> format +  depends on the interrupt controller.
+>> +- clocks : Must contain an entry for each entry in clock-names.
+>> +- clock-names : Shall be "tsadc_clk" for the transfer-clock, and
+>> "tsadc_pclk" for +    the peripheral clock.
+>> +Optional properties:
+>> +- clock-frequency : Thermal sensor's clock frequency.
+> see comment in patch2, this should probably use assigned-rate if at all
+> necessary (and the assigned-rate is not necessary to document here)
+>
 
-Good point. I think this was a patch I added when I was debugging other
-issues and assumed it would be needed (code in .data segment, seems
-naturally a problem, right?) . When I revert the patch though it seems
-to work just fine. I suspect the comment about pc relative load is no
-longer relevant since I use the relocation trick to properly access
-sleep_save_sp in the data section.
+yeah, it's necessary.
 
-Since it's not technically needed, I could drop the patch and add one
-adding the comment back saying this was done on purpose. On the other
-hand, I wonder if I could do something 'interesting' by modifying
-the cpu_resume code since it's writable if I was a malicious
-program.
-
-Thanks,
-Laura
+ok,I will fix it.
+>> +- pinctrl-names : Should contain only one value - "default".
+>> +- pinctrl-0 : Should contain only one value - &tsadc_int.
+> in general pinctrl settings are just board-specific settings and do not
+> need to be part of the binding documentation.
+> And in this case, are you sure that the tsadc uses some pin as interrupt?
+> Because in the TRM the TS-ADC interrupt is number 69 of the GIC itself
+> and not some pin accessible via pinctrl.
+>
+>
+>> +- passive-temp : Temperature of trip 0.
+>> +- critical-temp : Temperature of trip 1.
+>> +- force-shut-temp : Temperature of force shut down.
+> please use the generic trip-points described in
+> Documentation/devicetree/bindings/thermal/thermal.txt
+> for this, instead of defining new properties
+>
+>
+> Heiko
+Ditto,
+>
+>> +Example:
+>> +
+>> +tsadc: tsadc at ff280000 {
+>> +	compatible = "rockchip,rk3288-tsadc";
+>> +	reg = <0xff280000 0x100>;
+>> +	interrupts = <GIC_SPI 37 IRQ_TYPE_LEVEL_HIGH>;
+>> +	clock-frequency = <10000>;
+>> +	clocks = <&cru SCLK_TSADC>, <&cru PCLK_TSADC>;
+>> +	clock-names = "tsadc_clk", "tsadc_pclk";
+>> +	pinctrl-names = "default";
+>> +	pinctrl-1 = <&tsadc_int>;
+>> +	passive-temp = <80>;
+>> +	critical-temp = <100>;
+>> +	force-shut-temp = <120>;
+>> +};
+>
+>
+>
 
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+Best regards,
+Caesar
