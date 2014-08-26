@@ -1,84 +1,108 @@
-From: dinh.linux@gmail.com (Dinh Nguyen)
-Date: Tue, 26 Aug 2014 16:00:08 -0500
-Subject: 3.17-rc2: root=/dev/mmcblk0p2 command line parsing fails
-In-Reply-To: <20140826114707.GA16372@amd>
-References: <1405397216-909-1-git-send-email-dinguyen@altera.com>
- <53C4D874.2040206@samsung.com>
- <20140814184710.GA11558@amd.pavel.ucw.cz>
- <53ED2262.50604@gmail.com>
- <20140814210252.GB26857@amd.pavel.ucw.cz>
- <20140826114707.GA16372@amd>
-Message-ID: <CADhT+wdx2SsHnk=zML7a6mUVJxvLQ9ARO16QoYYsopAqhw7cow@mail.gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 26 Aug 2014 23:02:48 +0200
+Subject: [linux-sunxi] Re: [PATCH 4/4] simplefb: add clock handling code
+In-Reply-To: <20140826143550.GB3027@ulmo>
+References: <20140825124410.GZ15297@lukather>
+ <20140825133953.GJ4163@ulmo.nvidia.com>
+ <53FB3E7F.4000503@redhat.com>
+ <20140825141600.GA14763@ulmo.nvidia.com>
+ <20140825145854.GA15297@lukather>
+ <20140825150501.GE14763@ulmo.nvidia.com>
+ <20140825152232.GE15297@lukather> <20140826080432.GD17263@ulmo>
+ <20140826135341.GM15297@lukather> <20140826143550.GB3027@ulmo>
+Message-ID: <20140826210248.GO15297@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 26, 2014 at 6:47 AM, Pavel Machek <pavel@denx.de> wrote:
-> Hi!
->
->> > > mmc0: new SDHC card at address b368
->> > > mmcblk0: mmc0:b368 USD   7.45 GiB
->> > >  mmcblk0: p1 p2 p3 p4
->> > > VFS: Cannot open root device "mmcblk0p2" or unknown-block(0,0): error
->> > > -6
->> > > Please append a correct "root=" boot option; here are the available
->> > > partitions:
->> > > b300         7822336 mmcblk0  driver: mmcblk
->> > >   b301          102400 mmcblk0p1 00082434-01
->> > >   b302         1048576 mmcblk0p2 00082434-02
->> > >   b303            1024 mmcblk0p3 00082434-03
->> > >   b304         6086656 mmcblk0p4 00082434-04
->> > > Kernel panic - not syncing: VFS: Unable to mount root fs on
->> > > unknown-block(0,0)
->> > > CPU: 0 PID: 1 Comm: swapper/0 Not tainted 3.16.0-11208-gef74117-dirty
->> > > #2
->> >
->> > Hmm...today's tip-top(899552d6) and ba36899 booted just fine for me. I
->> > noticed something, you must have commits on top of your ba36899? Mine
->> > shows 3.16.0-11149-gba36899.
->>
->> Ok, thanks for info. I went back to 3.16, and it worked in same
->> config, and went to 3.17, and it broke.
->
-> The problem is still there in 3.17-rc2. 3.16 does not have the
-> problem. Messages are still similar:
->
-> mmc0: new high speed SDHC card at address b368
-> mmcblk0: mmc0:b368 USD   7.45 GiB
->  mmcblk0: p1 p2 p3 p4
-> VFS: Cannot open root device "mmcblk0p2" or unknown-block(0,0): error
-> -6
-> Please append a correct "root=" boot option; here are the available
-> partitions:
-> b300         7822336 mmcblk0  driver: mmcblk
->   b301          102400 mmcblk0p1 00082434-01
->   b302         1048576 mmcblk0p2 00082434-02
->   b303            1024 mmcblk0p3 00082434-03
->   b304         6086656 mmcblk0p4 00082434-04
-> Kernel panic - not syncing: VFS: Unable to mount root fs on unknown-block(0,0)
-> CPU: 0 PID: 1 Comm: swapper/0 Not tainted
-> 3.17.0-rc2-00368-gec0400b-dirty #83
->
->
-> What is going on there? Clearly partition table was parsed and
-> partitions are available; does the mention of unknown-block(0,0) mean
-> that kernel failed to parse the command line?
->
-> I replaced "root=/dev/mmcblk0p2" with "root=b302" and have a booting
-> system.
+On Tue, Aug 26, 2014 at 04:35:51PM +0200, Thierry Reding wrote:
+> > > > Any decent enough SoC, with a decent support in the kernel will have
+> > > > clocks for this, and I really wonder how simplefb will behave once its
+> > > > clocks will be turned off...
+> > > 
+> > > There are other devices besides ARM SoCs that may want to use this
+> > > driver and that don't have clock support.
+> > 
+> > And in this case, with this patch, simplefb will not claim any clock,
+> > nor will fail probing.
+> > 
+> > > But you're missing my point. What I'm saying is that the simplefb driver
+> > > is meant to serve as a way to take over whatever framebuffer a firmware
+> > > set up. Therefore I think it makes the most sense to assume that nothing
+> > > needs to be controlled in any way since already been set up by firmware.
+> > > Eventually there should be a driver that takes over from simplefb that
+> > > knows how to properly handle the device's specifics, but that's not
+> > > simplefb.
+> > 
+> > I guess such a hand over if it were to happen in the kernel would
+> > involve the second driver claiming the resources before the first one
+> > release them. How is that different in this case?
+> 
+> It's different in that that driver will be hardware specific and know
+> exactly what clock and other resources are required. It will have a
+> device-specific binding.
 
+Except that you made simplefb a generic driver. So we have two choices
+here: either we don't anything but the trivial case, and no one with a
+rather more advanced hardware will be able to use it, or we try to
+grab any resource that might be of use, which means clocks,
+regulators, reserved memory region, or whatever, so that we pretty
+much cover all cases. It really is as simple as that.
 
-Can you do a bisect? 3.17-rc2 booted fine for me today:
+> > > The goal of this patch series is to keep clocks from being turned off.
+> > > But that's not what it does. What it does is turn clocks on to prevent
+> > > them from being turned off. In my opinion that's a workaround for a
+> > > deficiency in the kernel (and the firmware/kernel interface) and I think
+> > > it should be fixed at the root. So a much better solution would be to
+> > > establish a way for firmware to communicate to the kernel that a given
+> > > resource has been enabled by firmware and shouldn't be disabled. Such a
+> > > solution can be implement for all types of resources and can be reused
+> > > by all drivers since they don't have to worry about these details.
+> > 
+> > Mike Turquette repeatedly said that he was against such a DT property:
+> > https://lkml.org/lkml/2014/5/12/693
+> 
+> Mike says in that email that he's opposing the addition of a property
+> for clocks that is the equivalent of regulator-always-on. That's not
+> what this is about. If at all it'd be a property to mark a clock that
+> should not be disabled by default because it's essential.
 
-EXT3-fs (mmcblk0p2): mounted filesystem with ordered data mode
-VFS: Mounted root (ext3 filesystem) on device 179:2.
-Freeing unused kernel memory: 252K (c052d000 - c056c000)
-random: nonblocking pool is initialized
+It's just semantic. How is "a clock that should not be disabled by
+default because it's essential" not a clock that stays always on?
 
-Poky 8.0 (Yocto Project 1.3 Reference Distro) 1.3 socfpga_cyclone5 ttyS0
+Plus, you should read the mail further. It's clearly said that
+consumer drivers should call clk_prepare_enable themselves, and that
+the only exception to that is the case where we don't have such a
+driver (and only valid as a temporary exception, which I guess you'll
+soon turn into temporary-until-a-drm-kms-driver-is-merged).
 
-socfpga_cyclone5 login: root
-root at socfpga_cyclone5:~# uname -a
-Linux socfpga_cyclone5 3.17.0-rc2-00006-gdd7ad78 #1 SMP Tue Aug 26
-15:51:56 CDT 2014 armv7l GNU/Linux
+> Adding Mike on this subthread too.
+> 
+> Either way, Mark already suggested a different alternative in another
+> subthread, namely to add a new kind of checkpoint at which subsystems
+> can call a "disable unused" function that's called later than a late
+> initcall. This is not going to fix things for you immediately because
+> the clocks will still be switched off (only later) if you don't have
+> a real driver that's claiming the clocks.
 
-Dinh
+Great, I'm glad we found a solution for a completely unrelated issue.
+
+> But you can work around that for now by making the relevant clocks
+> always on and remove that workaround once a real driver is loaded
+> that knows how to handle them properly.
+
+So, let me get this straight. The clock provider driver should behave
+as a clock consumer because it knows that in some cases, it might not
+have any willingful enough consumer? Doesn't that even ring your
+this-is-a-clear-abstraction-violation-bell just a tiny bit?
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140826/93b97b74/attachment-0001.sig>
