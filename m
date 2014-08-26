@@ -1,65 +1,157 @@
 From: shawn.guo@freescale.com (Shawn Guo)
-Date: Tue, 26 Aug 2014 16:58:22 +0800
-Subject: [PATCH 2/2] ARM: imx: add lvds1_in and lvds2_in clocks
-In-Reply-To: <1409043502-29081-1-git-send-email-shawn.guo@freescale.com>
-References: <1409043502-29081-1-git-send-email-shawn.guo@freescale.com>
-Message-ID: <1409043502-29081-2-git-send-email-shawn.guo@freescale.com>
+Date: Tue, 26 Aug 2014 16:58:21 +0800
+Subject: [PATCH 1/2] ARM: imx: add an exclusive gate clock type
+Message-ID: <1409043502-29081-1-git-send-email-shawn.guo@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The lvds_in clocks are coming from external clock source via pad ANACLK.
-Since lvds_in and lvds_gate clocks cannot be enabled simultaneously, we
-need to call imx_clk_gate_exclusive() to register these clocks.
+There are a couple of gate clocks are mutually exclusive on i.MX6, i.e.
+LVDSCLK1_IBEN and LVDSCLK1_OBEN.  They cannot be enabled simultaneously.
+This patches adds an exclusive gate clock type specifically for such
+case.  The clock driver will need to call imx_clk_gate_exclusive() to
+register a gate clock with parameter exclusive_mask indicating the mask
+of gate bits which are mutually exclusive to this gate clock.
+
+Right now, it only handles the exclusive gate clocks which are defined
+in a single hardware register, which is the case we're running into
+today.  But it can be extended to handle exclusive gate clocks defined
+in different registers later if needed.
 
 Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
 ---
- arch/arm/mach-imx/clk-imx6q.c             | 10 ++++++++--
- include/dt-bindings/clock/imx6qdl-clock.h |  6 +++++-
- 2 files changed, 13 insertions(+), 3 deletions(-)
+ arch/arm/mach-imx/Makefile             |  3 +-
+ arch/arm/mach-imx/clk-gate-exclusive.c | 94 ++++++++++++++++++++++++++++++++++
+ arch/arm/mach-imx/clk.h                |  3 ++
+ 3 files changed, 99 insertions(+), 1 deletion(-)
+ create mode 100644 arch/arm/mach-imx/clk-gate-exclusive.c
 
-diff --git a/arch/arm/mach-imx/clk-imx6q.c b/arch/arm/mach-imx/clk-imx6q.c
-index 2edcebf67cee..e6c60188ec14 100644
---- a/arch/arm/mach-imx/clk-imx6q.c
-+++ b/arch/arm/mach-imx/clk-imx6q.c
-@@ -119,6 +119,9 @@ static void __init imx6q_clocks_init(struct device_node *ccm_node)
- 	clk[IMX6QDL_CLK_CKIL] = imx_obtain_fixed_clock("ckil", 0);
- 	clk[IMX6QDL_CLK_CKIH] = imx_obtain_fixed_clock("ckih1", 0);
- 	clk[IMX6QDL_CLK_OSC] = imx_obtain_fixed_clock("osc", 0);
-+	/* Clock source from external clock via ANACLK1/2 PADs */
-+	clk[IMX6QDL_CLK_ANACLK1] = imx_obtain_fixed_clock("anaclk1", 0);
-+	clk[IMX6QDL_CLK_ANACLK2] = imx_obtain_fixed_clock("anaclk2", 0);
+diff --git a/arch/arm/mach-imx/Makefile b/arch/arm/mach-imx/Makefile
+index 9f1c359566bb..3e6476b6a698 100644
+--- a/arch/arm/mach-imx/Makefile
++++ b/arch/arm/mach-imx/Makefile
+@@ -16,7 +16,8 @@ obj-$(CONFIG_SOC_IMX5) += cpu-imx5.o clk-imx51-imx53.o $(imx5-pm-y)
  
- 	np = of_find_compatible_node(NULL, NULL, "fsl,imx6q-anatop");
- 	base = of_iomap(np, 0);
-@@ -176,8 +179,11 @@ static void __init imx6q_clocks_init(struct device_node *ccm_node)
- 	 * the "output_enable" bit as a gate, even though it's really just
- 	 * enabling clock output.
- 	 */
--	clk[IMX6QDL_CLK_LVDS1_GATE] = imx_clk_gate("lvds1_gate", "lvds1_sel", base + 0x160, 10);
--	clk[IMX6QDL_CLK_LVDS2_GATE] = imx_clk_gate("lvds2_gate", "lvds2_sel", base + 0x160, 11);
-+	clk[IMX6QDL_CLK_LVDS1_GATE] = imx_clk_gate_exclusive("lvds1_gate", "lvds1_sel", base + 0x160, 10, BIT(12));
-+	clk[IMX6QDL_CLK_LVDS2_GATE] = imx_clk_gate_exclusive("lvds2_gate", "lvds2_sel", base + 0x160, 11, BIT(13));
+ obj-$(CONFIG_COMMON_CLK) += clk-pllv1.o clk-pllv2.o clk-pllv3.o clk-gate2.o \
+ 			    clk-pfd.o clk-busy.o clk.o \
+-			    clk-fixup-div.o clk-fixup-mux.o
++			    clk-fixup-div.o clk-fixup-mux.o \
++			    clk-gate-exclusive.o
+ 
+ obj-$(CONFIG_IMX_HAVE_IOMUX_V1) += iomux-v1.o
+ obj-$(CONFIG_ARCH_MXC_IOMUX_V3) += iomux-v3.o
+diff --git a/arch/arm/mach-imx/clk-gate-exclusive.c b/arch/arm/mach-imx/clk-gate-exclusive.c
+new file mode 100644
+index 000000000000..c12f5f2e04dc
+--- /dev/null
++++ b/arch/arm/mach-imx/clk-gate-exclusive.c
+@@ -0,0 +1,94 @@
++/*
++ * Copyright 2014 Freescale Semiconductor, Inc.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
 +
-+	clk[IMX6QDL_CLK_LVDS1_IN] = imx_clk_gate_exclusive("lvds1_in", "anaclk1", base + 0x160, 12, BIT(10));
-+	clk[IMX6QDL_CLK_LVDS2_IN] = imx_clk_gate_exclusive("lvds2_in", "anaclk2", base + 0x160, 13, BIT(11));
++#include <linux/clk-provider.h>
++#include <linux/err.h>
++#include <linux/io.h>
++#include <linux/slab.h>
++#include "clk.h"
++
++/**
++ * struct clk_gate_exclusive - i.MX specific gate clock which is mutually
++ * exclusive with other gate clocks
++ *
++ * @gate: the parent class
++ * @exclusive_mask: mask of gate bits which are mutually exclusive to this
++ *	gate clock
++ *
++ * The imx exclusive gate clock is a subclass of basic clk_gate
++ * with an addtional mask to indicate which other gate bits in the same
++ * register is mutually exclusive to this gate clock.
++ */
++struct clk_gate_exclusive {
++	struct clk_gate gate;
++	u32 exclusive_mask;
++};
++
++static int clk_gate_exclusive_enable(struct clk_hw *hw)
++{
++	struct clk_gate *gate = container_of(hw, struct clk_gate, hw);
++	struct clk_gate_exclusive *exgate = container_of(gate,
++					struct clk_gate_exclusive, gate);
++	u32 val = readl(gate->reg);
++
++	if (val & exgate->exclusive_mask)
++		return -EBUSY;
++
++	return clk_gate_ops.enable(hw);
++}
++
++static void clk_gate_exclusive_disable(struct clk_hw *hw)
++{
++	clk_gate_ops.disable(hw);
++}
++
++static int clk_gate_exclusive_is_enabled(struct clk_hw *hw)
++{
++	return clk_gate_ops.is_enabled(hw);
++}
++
++static const struct clk_ops clk_gate_exclusive_ops = {
++	.enable = clk_gate_exclusive_enable,
++	.disable = clk_gate_exclusive_disable,
++	.is_enabled = clk_gate_exclusive_is_enabled,
++};
++
++struct clk *imx_clk_gate_exclusive(const char *name, const char *parent,
++	 void __iomem *reg, u8 shift, u32 exclusive_mask)
++{
++	struct clk_gate_exclusive *exgate;
++	struct clk_gate *gate;
++	struct clk *clk;
++	struct clk_init_data init;
++
++	if (exclusive_mask == 0)
++		return ERR_PTR(-EINVAL);
++
++	exgate = kzalloc(sizeof(*exgate), GFP_KERNEL);
++	if (!exgate)
++		return ERR_PTR(-ENOMEM);
++	gate = &exgate->gate;
++
++	init.name = name;
++	init.ops = &clk_gate_exclusive_ops;
++	init.flags = CLK_SET_RATE_PARENT;
++	init.parent_names = parent ? &parent : NULL;
++	init.num_parents = parent ? 1 : 0;
++
++	gate->reg = reg;
++	gate->bit_idx = shift;
++	gate->lock = &imx_ccm_lock;
++	gate->hw.init = &init;
++	exgate->exclusive_mask = exclusive_mask;
++
++	clk = clk_register(NULL, &gate->hw);
++	if (IS_ERR(clk))
++		kfree(exgate);
++
++	return clk;
++}
+diff --git a/arch/arm/mach-imx/clk.h b/arch/arm/mach-imx/clk.h
+index d5ba76fee115..4cdf8b6a74e8 100644
+--- a/arch/arm/mach-imx/clk.h
++++ b/arch/arm/mach-imx/clk.h
+@@ -36,6 +36,9 @@ struct clk *clk_register_gate2(struct device *dev, const char *name,
+ struct clk * imx_obtain_fixed_clock(
+ 			const char *name, unsigned long rate);
  
- 	/*                                            name              parent_name        reg       idx */
- 	clk[IMX6QDL_CLK_PLL2_PFD0_352M] = imx_clk_pfd("pll2_pfd0_352m", "pll2_bus",     base + 0x100, 0);
-diff --git a/include/dt-bindings/clock/imx6qdl-clock.h b/include/dt-bindings/clock/imx6qdl-clock.h
-index 323e8650f198..e992ce5e05a5 100644
---- a/include/dt-bindings/clock/imx6qdl-clock.h
-+++ b/include/dt-bindings/clock/imx6qdl-clock.h
-@@ -220,6 +220,10 @@
- #define IMX6QDL_CLK_LVDS2_GATE			207
- #define IMX6QDL_CLK_ESAI_IPG			208
- #define IMX6QDL_CLK_ESAI_MEM			209
--#define IMX6QDL_CLK_END				210
-+#define IMX6QDL_CLK_LVDS1_IN			210
-+#define IMX6QDL_CLK_LVDS2_IN			211
-+#define IMX6QDL_CLK_ANACLK1			212
-+#define IMX6QDL_CLK_ANACLK2			213
-+#define IMX6QDL_CLK_END				214
- 
- #endif /* __DT_BINDINGS_CLOCK_IMX6QDL_H */
++struct clk *imx_clk_gate_exclusive(const char *name, const char *parent,
++	 void __iomem *reg, u8 shift, u32 exclusive_mask);
++
+ static inline struct clk *imx_clk_gate2(const char *name, const char *parent,
+ 		void __iomem *reg, u8 shift)
+ {
 -- 
 1.9.1
