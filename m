@@ -1,72 +1,64 @@
-From: holler@ahsoftware.de (Alexander Holler)
-Date: Tue, 26 Aug 2014 11:56:52 +0200
-Subject: [RFC PATCH 0/9] dt: dependencies (for deterministic driver
- initialization order based on the DT)
-In-Reply-To: <20140826085128.958A9C40989@trevor.secretlab.ca>
-References: <1399913280-6915-1-git-send-email-holler@ahsoftware.de>	<20140514141914.446F7C4153D@trevor.secretlab.ca>	<20140821140211.GD19293@ulmo.nvidia.com>
- <53F64624.5000403@ahsoftware.de>	<20140822131919.GX21734@leverpostej>
- <20140825093931.GB2399@ulmo>	<E1XLu15-0002DP-6o@jdl.com>
- <20140826085128.958A9C40989@trevor.secretlab.ca>
-Message-ID: <53FC59E4.8000306@ahsoftware.de>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 26 Aug 2014 10:58:04 +0100
+Subject: [PATCH 00/14] arm64: eBPF JIT compiler
+In-Reply-To: <CABg9mcvU44W5AkPLtyswNWdDdF_nnqvLyKqv7RWhpuRRSWDW3A@mail.gmail.com>
+References: <1405708100-13604-1-git-send-email-zlim.lnx@gmail.com>
+ <20140721091623.GA16122@arm.com>
+ <CAMEtUuyC+MykPDO0ghTc=oex7KPLEy=BLRgWBdW+qJY7JXQmDQ@mail.gmail.com>
+ <20140723103219.GA1366@localhost>
+ <CABg9mcvU44W5AkPLtyswNWdDdF_nnqvLyKqv7RWhpuRRSWDW3A@mail.gmail.com>
+Message-ID: <20140826095804.GB23445@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 26.08.2014 10:51, schrieb Grant Likely:
-> On Mon, 25 Aug 2014 08:08:59 -0500, Jon Loeliger <jdl@jdl.com> wrote:
->>>
->>
->>> Anyway, instead of going back and forth between "deferred probe is good"
->>> and "deferred probe is bad", how about we do something useful now and
->>> concentrate on how to make use of the information we have in DT with the
->>> goal to reduce the number of cases where deferred probing is required?
->>
->> Good idea.
->>
->> The proposal on the table is to allow the probe code
->> to make a topological sort of the devices based on
->> dependency information either implied, explicitly stated
->> or both.  That is likely a fundamentally correct approach.
->>
->> I believe some of the issues that need to be resolved are:
->>
->>      1) What constitutes a dependency?
->>      2) How is that dependency expressed?
->>      3) How do we add missing dependencies?
->>      4) Backward compatability problems.
->>
->> There are other questions, of course.  Is it a topsort
->> per bus?  Are there required "early devices"?  Should
->> the inter-node dependencies be expressed at each node,
->> or in a separate hierarchy within the DTS?  Others.
+Hi Z Lim,
 
-Topsort by bus wouldn't work. That would imply that nothing uses 
-something involved with another bus. And early devices are handled fine 
-by normal dependencies too (as long as they are complete), so there is 
-no need to make an distinction.
+On Thu, Jul 24, 2014 at 05:55:36AM +0100, Z Lim wrote:
+> On Wed, Jul 23, 2014 at 3:32 AM, Catalin Marinas
+> <catalin.marinas@arm.com> wrote:
+> > On Mon, Jul 21, 2014 at 04:49:29PM +0100, Alexei Starovoitov wrote:
+> >> On Mon, Jul 21, 2014 at 2:16 AM, Will Deacon <will.deacon@arm.com> wrote:
+> >> > On Fri, Jul 18, 2014 at 07:28:06PM +0100, Zi Shen Lim wrote:
+> [...]
+> >> >> This series applies against net-next and is tested working
+> >> >> with lib/test_bpf on ARMv8 Foundation Model.
+> >> >
+> >> > Looks like it works on my Juno board too, so:
+> >> >
+> >> >   Acked-by: Will Deacon <will.deacon@arm.com>
+> >> >
+> >> > for the series.
+> >> >
+> >> > It's a bit late for 3.17 now, so I guess we'll queue this for 3.18 (which
+> >> > also means the dependency on -next isn't an issue). Perhaps you could repost
+> >> > around -rc3?
+> >>
+> >> Thanks for testing! Nice to see it working on real hw.
+> >> I'm not sure why you're proposing a 4+ week delay. The patches
+> >> will rot instead of getting used and tested. Imo it makes sense to
+> >> get them into net-next now for 3.17.
+> >> JIT is disabled by sysctl by default anyway.
+> >
+> > We normally like some patches (especially new functionality) to sit in
+> > linux-next for a while before the mering window (ideally starting with
+> > -rc4 or -rc5). We are at -rc6 already, so getting close to the 3.17
+> > merging window.
+> >
+> > Another aspect is that the arm64/bpf branch depends on the net tree, so
+> > it can't easily go in via the arm64 tree for 3.17 (3.18 would not be a
+> > problem).
+> 
+> Hi Catalin, I take it you prefer this series going through arm64 tree,
+> targeting 3.18, is that right?
+> 
+> I understand your preference to have it sitting in linux-next for a
+> longer period for arm64 material, I'll repost this again after 3.17 so
+> it gets more exposure in linux-next.
 
+Any chance you could post a new version of this, based on a 3.17 -rc,
+please? Whilst your current patches apply, I get a bunch of errors if I try
+to build them.
 
-> Getting the dependency tree I think is only half the problem. The other
-> have is how to get the driver model to actually order probing using that
-> list. That problem is hard because the order drivers are probed is
-> currently determined by the interaction of driver link order, driver
-> initcall level, and device registration order. The first devices are
-> registered at an early initcall, before their drivers, and therefore
-> bind order is primarily determined by initcall level and driver link
-> order. However, later devices (ie. i2c clients) are registered by the
-> bus driver (ie. again, i2c) and probe order may be primarily link order
-> (if the driver is not yet registered) or registration order (if the
-> driver was registered before the parent bus).
+Cheers,
 
-That's why I've invented those "well-done"-initcalls. These are 
-initcalls which just register a driver and don't probe it. Thats 
-necessary to build a catalog of existing in-kernel-drivers (you have to 
-know what you are sorting). Fortunately most drivers are already of that 
-type. And those which aren't can be either just used like before (if it 
-works) or they can be changed.
-
-Changing them can be done per board (only enable dependency based order 
-for a board if necessary drivers have changed).
-
-Regards,
-
-Alexander Holler
+Will
