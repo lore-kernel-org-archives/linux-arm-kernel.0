@@ -1,36 +1,80 @@
-From: libv@skynet.be (Luc Verhaegen)
-Date: Tue, 26 Aug 2014 14:02:58 +0200
-Subject: [linux-sunxi] Re: [PATCH 4/4] simplefb: add clock handling code
-In-Reply-To: <20140826075247.GC17263@ulmo>
-References: <20140813170106.GT15297@lukather>
- <20140825121228.GB4163@ulmo.nvidia.com> <20140825124410.GZ15297@lukather>
- <20140825133953.GJ4163@ulmo.nvidia.com> <53FB3E7F.4000503@redhat.com>
- <20140825141600.GA14763@ulmo.nvidia.com> <20140825145854.GA15297@lukather>
- <20140825150501.GE14763@ulmo.nvidia.com> <20140825150900.GB21020@skynet.be>
- <20140826075247.GC17263@ulmo>
-Message-ID: <20140826120258.GA22395@skynet.be>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Tue, 26 Aug 2014 14:07:08 +0200
+Subject: [PATCH 0/9] PM / Domains: Generic OF-based support
+Message-ID: <1409054837-5667-1-git-send-email-ulf.hansson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 26, 2014 at 09:52:49AM +0200, Thierry Reding wrote:
-> On Mon, Aug 25, 2014 at 05:09:00PM +0200, Luc Verhaegen wrote:
-> > On Mon, Aug 25, 2014 at 05:05:04PM +0200, Thierry Reding wrote:
-> > > 
-> > > No. simplefb just wants to write to some memory that hardware has been
-> > > set up to scan out. The platform requires that the clocks be on.
-> > 
-> > Simplefb also requires that the memory is there and is persistent. Fine 
-> > for discrete graphics cards, fine for rpi where most things are hidden 
-> > from the ARM core anyway, not so fine for anybody else.
-> 
-> I don't understand. This patch series isn't changing anything about the
-> memory aspects of the driver yet it's working for you on sunxi, isn't
-> it? So it can't be all that broken.
-> 
-> Thierry
+This patchset has a bit of a history and some parts of it has been posted
+earlier.
 
-Oh, i had to go wrestle with UBoot options and reserve 8MB off the top, 
-which the kernel never gets told about. A nice throwback to x86 IGP 
-bioses, a past i had thought i had left behind forgood.
+http://lists.infradead.org/pipermail/linux-arm-kernel/2014-June/262725.html
 
-Luc Verhaegen.
+I intentially didn't increase version number of the patches, since I think it
+will cause more confusion than clarity.
+
+A summary of changes since the last patchset (link above):
+	- Instead of letting driver core handling the device to power domain
+	binding/unbinding, follow the behavior of how the ACPI power domain
+	is handled.
+
+
+This is a summary of what these patches are intended to do:
+
+1)
+Add generic power domain OF-based support which also includes APIs to handle
+attach/detach of generic power domains to devices.
+
+2)
+Adding a common API to attach/detach power domains and include support for the
+ACPI and the generic power domain in there.
+
+3)
+>From subsystem level code, at probe/remove, convert from invoking the ACPI
+specific power domain attach/detach functions to the new common attach/detach
+APIs.
+
+4)
+Add support for the AMBA bus to attach/detach power domains, using the new
+common APIs.
+
+5)
+Convert Exynos to use the new generic power domain OF support.
+
+Obviously, there are dependencies througout this patchset, which means if they
+get accepted the all need to go together.
+
+
+Tomasz Figa (2):
+  PM / Domains: Add generic OF-based power domain look-up
+  ARM: exynos: Move to generic power domain bindings
+
+Ulf Hansson (7):
+  ACPI / PM: Let acpi_dev_pm_detach() return an error code
+  PM / Domains: Add APIs to attach/detach a power domain for a device
+  drivercore / platform: Convert to dev_pm_domain_attach|detach()
+  i2c: core: Convert to dev_pm_domain_attach|detach()
+  mmc: sdio: Convert to dev_pm_domain_attach|detach()
+  spi: core: Convert to dev_pm_domain_attach|detach()
+  amba: Add support for attach/detach of power domains
+
+ .../bindings/arm/exynos/power_domain.txt           |  13 +-
+ .../devicetree/bindings/power/power_domain.txt     |  51 ++++
+ arch/arm/mach-exynos/pm_domains.c                  |  78 +-----
+ drivers/acpi/device_pm.c                           |   4 +
+ drivers/amba/bus.c                                 |  10 +-
+ drivers/base/platform.c                            |  15 +-
+ drivers/base/power/common.c                        |  58 ++++
+ drivers/base/power/domain.c                        | 291 +++++++++++++++++++++
+ drivers/i2c/i2c-core.c                             |  13 +-
+ drivers/mmc/core/sdio_bus.c                        |   4 +-
+ drivers/spi/spi.c                                  |  12 +-
+ include/linux/acpi.h                               |   7 +-
+ include/linux/pm.h                                 |  14 +
+ include/linux/pm_domain.h                          |  46 ++++
+ kernel/power/Kconfig                               |   4 +
+ 15 files changed, 514 insertions(+), 106 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/power/power_domain.txt
+
+-- 
+1.9.1
