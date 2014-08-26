@@ -1,63 +1,53 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Tue, 26 Aug 2014 12:25:04 +0200
-Subject: [RFC PATCH 0/9] dt: dependencies (for deterministic driver
- initialization order based on the DT)
-In-Reply-To: <53FC566C.30904@ahsoftware.de>
-References: <20140514141914.446F7C4153D@trevor.secretlab.ca>
- <20140821140211.GD19293@ulmo.nvidia.com>
- <53F64624.5000403@ahsoftware.de>
- <20140822131919.GX21734@leverpostej> <20140825093931.GB2399@ulmo>
- <E1XLu15-0002DP-6o@jdl.com> <20140825133714.GH4163@ulmo.nvidia.com>
- <20140826084208.AE5F0C40989@trevor.secretlab.ca>
- <20140826084922.GG17263@ulmo> <53FC566C.30904@ahsoftware.de>
-Message-ID: <20140826102503.GC31124@ulmo>
+From: punit.agrawal@arm.com (Punit Agrawal)
+Date: Tue, 26 Aug 2014 11:28:44 +0100
+Subject: [PATCH 0/6] Legacy instruction emulation for arm64
+Message-ID: <1409048930-21598-1-git-send-email-punit.agrawal@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 26, 2014 at 11:42:04AM +0200, Alexander Holler wrote:
-> Am 26.08.2014 10:49, schrieb Thierry Reding:
-> >On Tue, Aug 26, 2014 at 09:42:08AM +0100, Grant Likely wrote:
-> >>On Mon, 25 Aug 2014 15:37:16 +0200, Thierry Reding <thierry.reding@gmail.com> wrote:
-> >[...]
-> >>>There are somewhat standardized bindings for the above and especially
-> >>>for bindings of the type that clocks implement this is trivial. We can
-> >>>simply iterate over each (phandle, specifier) tuple and check that the
-> >>>corresponding clock provider can be resolved (which typically means that
-> >>>it's been registered with the common clock framework).
-> >>>
-> >>>For regulators (and regulator-like bindings) the problem is somewhat
-> >>>more difficult because they property names are not standardized. One way
-> >>>to solve this would be to look for property names with a -supply suffix,
-> >>>but that could obviously lead to false positives. One alternative that I
-> >>>think could eliminate this would be to explicitly list dependencies in
-> >>>drivers. This would allow core code to step through such a list and
-> >>>resolve the (phandle, specifier) tuples.
-> >>
-> >>False positives and negatives may not actually be a problem. It is
-> >>suboptimal, certainly, but it shouldn't outright break the kernel.
-> >
-> >There could be cases where some random integer in a cell could be
-> >interpreted as a phandle and resolve to a struct device_node. I suppose
-> >it might be unlikely, but not impossible, that the device_node could
-> >even match a device in the correct subsystem and you'd get a wrong
-> >dependency. Granted, a wrong dependency may not be catastrophic in that
-> >it won't lead to a crash, but it could lead to various kinds of
-> >weirdness and hard to diagnose problems.
-> 
-> You need either the type information in the DTB (that's why I've add those
-> "dependencies" to identify phandles), or you need to know every binding (at
-> "dependency-resolve-time" to identify phandles. The latter is impracticable
-> to implement in a generic way (for use with every possible binding).
+Hi,
 
-Like I already mentioned, this could be done in drivers who contain that
-information already anyway. Or parts of it could be done in subsystem-
-specific callbacks where a generic binding is available.
+This patchset adds support for the emulation of certain legacy
+instructions from ARMv7 to the v8 port of Linux. More specifically the
+patches add support for SWP and CP15 barrier instructions emulation.
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140826/77bb1bf7/attachment.sig>
+Patch 1/6 fixes a bug in the SWP emulation in v7 where it incorrectly
+assumes that SWP instruction implies barriers.
+
+Patch 2/6 creates arm64 debugfs directory followed by 3-4/6 which add
+infrastructure code to add support for undefined instruction hooks and
+decoding condition codes.
+
+Patch 5/6 adds support for SWP while 6/6 introduces CP15 barrier
+instructions emulation. The emulation can be individually enabled as
+well as there is support to disable this at runtime via debugfs.
+
+All feedback welcome.
+
+Thanks,
+Punit
+
+Punit Agrawal (6):
+  arm: Fix in-correct barrier usage in SWP{B} emulation
+  arm64: Create arch debugfs directory
+  arm64: Add support for hooks to handle undefined instructions
+  arm64: Add AArch32 instruction set condition code checks
+  arm64: Port SWP/SWPB emulation support from arm
+  arm64: Emulate CP15 Barrier instructions
+
+ arch/arm/kernel/swp_emulate.c    |   15 --
+ arch/arm64/Kconfig               |   56 +++++++
+ arch/arm64/include/asm/insn.h    |   11 ++
+ arch/arm64/include/asm/opcodes.h |    1 +
+ arch/arm64/include/asm/traps.h   |   16 ++
+ arch/arm64/kernel/Makefile       |    6 +-
+ arch/arm64/kernel/insn.c         |   23 +++
+ arch/arm64/kernel/setup.c        |   14 ++
+ arch/arm64/kernel/traps.c        |   66 ++++++++
+ arch/arm64/kernel/v7_obsolete.c  |  332 ++++++++++++++++++++++++++++++++++++++
+ 10 files changed, 524 insertions(+), 16 deletions(-)
+ create mode 100644 arch/arm64/include/asm/opcodes.h
+ create mode 100644 arch/arm64/kernel/v7_obsolete.c
+
+-- 
+1.7.10.4
