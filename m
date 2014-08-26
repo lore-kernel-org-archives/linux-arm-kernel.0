@@ -1,78 +1,47 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Tue, 26 Aug 2014 18:15:39 +0800
-Subject: [PATCH 1/6] ARM: dts: microsom-ar8035: MDIO pad must be set open
- drain
-In-Reply-To: <53F9B416.5030907@gmail.com>
-References: <20140823091058.GO30401@n2100.arm.linux.org.uk>
- <E1XL7M1-0002yD-K3@rmk-PC.arm.linux.org.uk> <53F9B416.5030907@gmail.com>
-Message-ID: <20140826101538.GA28777@dragon>
+From: holler@ahsoftware.de (Alexander Holler)
+Date: Tue, 26 Aug 2014 12:18:35 +0200
+Subject: [RFC PATCH 0/9] dt: dependencies (for deterministic driver
+ initialization order based on the DT)
+In-Reply-To: <20140826085128.958A9C40989@trevor.secretlab.ca>
+References: <1399913280-6915-1-git-send-email-holler@ahsoftware.de>	<20140514141914.446F7C4153D@trevor.secretlab.ca>	<20140821140211.GD19293@ulmo.nvidia.com>
+ <53F64624.5000403@ahsoftware.de>	<20140822131919.GX21734@leverpostej>
+ <20140825093931.GB2399@ulmo>	<E1XLu15-0002DP-6o@jdl.com>
+ <20140826085128.958A9C40989@trevor.secretlab.ca>
+Message-ID: <53FC5EFB.6020109@ahsoftware.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Aug 24, 2014 at 10:44:54AM +0100, Iain Paton wrote:
-> On 23/08/14 10:11, Russell King wrote:
-> > From: Rabeeh Khoury <rabeeh@solid-run.com>
-> > To: Shawn Guo <shawn.guo@freescale.com>
-> > 
-> > MDIO pad must be set open drain.
-> > 
-> > Signed-off-by: Rabeeh Khoury <rabeeh@solid-run.com>
-> > Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> > ---
-> >  arch/arm/boot/dts/imx6qdl-microsom-ar8035.dtsi | 2 +-
-> >  1 file changed, 1 insertion(+), 1 deletion(-)
-> > 
-> > diff --git a/arch/arm/boot/dts/imx6qdl-microsom-ar8035.dtsi b/arch/arm/boot/dts/imx6qdl-microsom-ar8035.dtsi
-> > index d16066608e21..db9f45b2c573 100644
-> > --- a/arch/arm/boot/dts/imx6qdl-microsom-ar8035.dtsi
-> > +++ b/arch/arm/boot/dts/imx6qdl-microsom-ar8035.dtsi
-> > @@ -17,7 +17,7 @@
-> >  	enet {
-> >  		pinctrl_microsom_enet_ar8035: microsom-enet-ar8035 {
-> >  			fsl,pins = <
-> > -				MX6QDL_PAD_ENET_MDIO__ENET_MDIO		0x1b0b0
-> > +				MX6QDL_PAD_ENET_MDIO__ENET_MDIO		0x1b8b0
-> >  				MX6QDL_PAD_ENET_MDC__ENET_MDC		0x1b0b0
-> >  				/* AR8035 reset */
-> >  				MX6QDL_PAD_KEY_ROW4__GPIO4_IO15		0x130b0
-> > 
-> 
-> Can you elaborate some more on the reasons for this?  
+Am 26.08.2014 10:51, schrieb Grant Likely:
 
-I just got the following text from Rabeeh explaining the change.
+> Getting the dependency tree I think is only half the problem. The other
+> have is how to get the driver model to actually order probing using that
+> list. That problem is hard because the order drivers are probed is
+> currently determined by the interaction of driver link order, driver
+> initcall level, and device registration order. The first devices are
+ > registered at an early initcall, before their drivers, and therefore
+ > bind order is primarily determined by initcall level and driver link
+ > order. However, later devices (ie. i2c clients) are registered by the
+ > bus driver (ie. again, i2c) and probe order may be primarily link order
+ > (if the driver is not yet registered) or registration order (if the
+ > driver was registered before the parent bus).
 
-"This patch is important for the MicroSOM implementation due to the
-following details -
+Using my patches, the problem which still exists is how to handle 
+devices (not drivers). I've build the patches based on the assumption 
+that device-handling happens automatically. Unfortunately that isn't 
+really true and device-handling looks awkward. Some drivers build them 
+themself, some require that a device already exists and some require 
+that a device doesn't already exist.
 
-1. VIH of the Atheros phy is 1.7V.
-2. NVCC_ENET which is the power domain of the MDIO pad is driven by the
-   PHY's LDO (i.e. either 1.8v or 2.5v).
-3. The MicroSOM implements an onbouard 1.6kohm pull up to 3.3v (R3000).
+But I haven't looked in deep at that. I'm sure that can be fixed by 
+fixing drivers which do things differently than they should (maybe 
+because they needed to do such for dirty workarounds because no order 
+was guaranteed, which wouldn't be true anymore).
 
-In the case the PHY's LDO was 1.8v then there would be only a 100mV
-margin for the signal to be acknowledged as high (1.8v-1.7v).
-Due to that setting the pad as an open drain will let the 1.6kohm pull
-that signal high to 3.3 that assures enough margins to the PHY to be
-acked as '1' logic.
+Anyway, I've not looked further into that problem (with devices, not 
+drivers) as it already seems quiet impossible to get the other necessary 
+stuff into the kernel in a reasonable time (before 32bit-HW which does 
+use DT will not be available anymore).
 
-Notice that this change is not required to the SabreSD boards since that
-hardware drives the NVCC_EIM power island from a 3.3v power rail."
+Regards,
 
-> 
-> I'd like to understand if it's something specific to the hardware on that 
-> board, or if other i.MX6 boards using the ar8035 are doing it wrong as well.
-
-So from text above, it's a MicroSOM board specific change, I think.
-
-Shawn
-
-> 
-> The datasheet strongly suggests this is the correct thing to do as MDIO 
-> should electrically be open drain. However that suggests many more instances 
-> of this incorrect configuration exist which also need changed, and not just 
-> for ar8035.
-> 
-> While I'm reluctant to attribute something like this to the fec/interrupt 
-> problems some people are seeing, I'd also like to be able to rule it out.
-> 
-> 
+Alexander Holler
