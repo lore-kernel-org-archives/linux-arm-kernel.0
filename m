@@ -1,37 +1,146 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 26 Aug 2014 13:32:23 +0200
-Subject: [PATCH 5/6] arm64: Port SWP/SWPB emulation support from arm
-In-Reply-To: <1409048930-21598-6-git-send-email-punit.agrawal@arm.com>
-References: <1409048930-21598-1-git-send-email-punit.agrawal@arm.com>
- <1409048930-21598-6-git-send-email-punit.agrawal@arm.com>
-Message-ID: <7433994.DUuXUlazW0@wuerfel>
+From: kiran.padwal@smartplayin.com (Kiran Padwal)
+Date: Tue, 26 Aug 2014 17:00:45 +0530
+Subject: [PATCH v3] ARM: apq8064: Add pinmux and i2c pinctrl nodes
+Message-ID: <1409052645-14984-1-git-send-email-kiran.padwal@smartplayin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 26 August 2014 11:28:49 Punit Agrawal wrote:
-> 
-> This patch ports the alternative solution to emulate the SWP and SWPB
-> instructions using LDXR/STXR sequences from the arm port to
-> arm64. Additionaly, the patch also proivdes support to log the
-> emulation statistics via debugfs.
+This patch adds pinmux and i2c pinctrl DT node for IFC6410 board.
+It also adds necessary DT support for i2c eeprom which is present on
+IFC6410.
 
-I'm not sure that putting this into debugfs is a good idea in this
-case: while in general that is considered a good place for this
-kind of debugging information, we already have a precedent on arm32
-for using procfs, and I see no reason to introduce an incompatible
-interface for arm64.
+Tested on IFC6410 board.
 
-You also add an interface for disabling the feature at runtime,
-which we don't have on arm32, but that interface is not available
-if debugfs is disabled or not mounted. Maybe a sysctl would be
-more appropriate? That one could also be shared with arm32.
+Signed-off-by: Kiran Padwal <kiran.padwal@smartplayin.com>
+---
+Changes since v2:
+ - Renamed pinmux i2c subnode "i2c1_pinmux" to "i2c1".
+ - Removed labes of node.
+ - Used canonical value as "okay" instead of "ok".
+ - Used macros.
 
-> +       swp_d = debugfs_create_dir("swp_emulation", arch_debugfs_dir);
-> +       if (!IS_ERR_OR_NULL(swp_d)) {
+Changes since v1:
+ - Renamed pinmux phandle "qcom_pinmux" to "tlmm_pinmux".
+ - Updated pinmux interrupt.
 
-Never use IS_ERR_OR_NULL(). It's enough to check for !swp_d here,
-since debugfs_create_dir returns NULL on error. You don't need to
-check for debugfs being disabled here because you don't do anything
-in the conditional code block if it is disabled. 
+ arch/arm/boot/dts/qcom-apq8064-ifc6410.dts |   27 ++++++++++++++
+ arch/arm/boot/dts/qcom-apq8064.dtsi        |   53 ++++++++++++++++++++++++++++
+ 2 files changed, 80 insertions(+)
 
-	Arnd
+diff --git a/arch/arm/boot/dts/qcom-apq8064-ifc6410.dts b/arch/arm/boot/dts/qcom-apq8064-ifc6410.dts
+index 7c2441d..ef0857e 100644
+--- a/arch/arm/boot/dts/qcom-apq8064-ifc6410.dts
++++ b/arch/arm/boot/dts/qcom-apq8064-ifc6410.dts
+@@ -5,6 +5,24 @@
+ 	compatible = "qcom,apq8064-ifc6410", "qcom,apq8064";
+ 
+ 	soc {
++		gsbi at 12440000 {
++			status = "okay";
++			qcom,mode = <GSBI_PROT_I2C>;
++
++			i2c at 12460000 {
++				status = "okay";
++				clock-frequency = <200000>;
++				pinctrl-0 = <&i2c1_pins>;
++				pinctrl-names = "default";
++
++				eeprom: eeprom at 52 {
++					compatible = "atmel,24c128";
++					reg = <0x52>;
++					pagesize = <32>;
++				};
++			};
++		};
++
+ 		gsbi at 16600000 {
+ 			status = "ok";
+ 			qcom,mode = <GSBI_PROT_I2C_UART>;
+@@ -12,5 +30,14 @@
+ 				status = "ok";
+ 			};
+ 		};
++
++		pinmux at 800000 {
++			i2c1_pins: i2c1 {
++				mux {
++					pins = "gpio20", "gpio21";
++					function = "gsbi1";
++				};
++			};
++		};
+ 	};
+ };
+diff --git a/arch/arm/boot/dts/qcom-apq8064.dtsi b/arch/arm/boot/dts/qcom-apq8064.dtsi
+index 92bf793..5dddbf3 100644
+--- a/arch/arm/boot/dts/qcom-apq8064.dtsi
++++ b/arch/arm/boot/dts/qcom-apq8064.dtsi
+@@ -89,6 +89,17 @@
+ 			cpu-offset = <0x80000>;
+ 		};
+ 
++		tlmm_pinmux: pinmux at 800000 {
++			compatible = "qcom,apq8064-pinctrl";
++			reg = <0x800000 0x4000>;
++
++			gpio-controller;
++			#gpio-cells = <2>;
++			interrupt-controller;
++			#interrupt-cells = <2>;
++			interrupts = <0 16 IRQ_TYPE_LEVEL_HIGH>;
++		};
++
+ 		acc0: clock-controller at 2088000 {
+ 			compatible = "qcom,kpss-acc-v1";
+ 			reg = <0x02088000 0x1000>, <0x02008000 0x1000>;
+@@ -133,6 +144,48 @@
+ 			regulator;
+ 		};
+ 
++		gsbi1: gsbi at 12440000 {
++			status = "disabled";
++			compatible = "qcom,gsbi-v1.0.0";
++			reg = <0x12440000 0x100>;
++			clocks = <&gcc GSBI1_H_CLK>;
++			clock-names = "iface";
++			#address-cells = <1>;
++			#size-cells = <1>;
++			ranges;
++
++			i2c1: i2c at 12460000 {
++				compatible = "qcom,i2c-qup-v1.1.1";
++				reg = <0x12460000 0x1000>;
++				interrupts = <0 194 IRQ_TYPE_NONE>;
++				clocks = <&gcc GSBI1_QUP_CLK>, <&gcc GSBI1_H_CLK>;
++				clock-names = "core", "iface";
++				#address-cells = <1>;
++				#size-cells = <0>;
++			};
++		};
++
++		gsbi2: gsbi at 12480000 {
++			status = "disabled";
++			compatible = "qcom,gsbi-v1.0.0";
++			reg = <0x12480000 0x100>;
++			clocks = <&gcc GSBI2_H_CLK>;
++			clock-names = "iface";
++			#address-cells = <1>;
++			#size-cells = <1>;
++			ranges;
++
++			i2c2: i2c at 124a0000 {
++				compatible = "qcom,i2c-qup-v1.1.1";
++				reg = <0x124a0000 0x1000>;
++				interrupts = <0 196 IRQ_TYPE_NONE>;
++				clocks = <&gcc GSBI2_QUP_CLK>, <&gcc GSBI2_H_CLK>;
++				clock-names = "core", "iface";
++				#address-cells = <1>;
++				#size-cells = <0>;
++			};
++		};
++
+ 		gsbi7: gsbi at 16600000 {
+ 			status = "disabled";
+ 			compatible = "qcom,gsbi-v1.0.0";
+-- 
+1.7.9.5
