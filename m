@@ -1,66 +1,61 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 26 Aug 2014 15:14:13 -0700
-Subject: [GIT PULL] omap fixes against v3.17-rc2
-Message-ID: <20140826221412.GC16006@atomide.com>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Tue, 26 Aug 2014 15:25:48 -0700
+Subject: [PATCH v9 4/6] ARM: Exynos: switch to using generic cpufreq
+ driver for Exynos4210/5250/5420
+In-Reply-To: <CAGa+x85-Anb+HsSUQRaaeex19-HK+yZDW0UpFBwAtsQ8Sf2Aqg@mail.gmail.com>
+References: <1406707663-16656-1-git-send-email-thomas.ab@samsung.com>
+ <1406707663-16656-5-git-send-email-thomas.ab@samsung.com>
+ <53DA8BB9.6020702@samsung.com> <53DA8D85.3050106@gmail.com>
+ <7hbnrc6px3.fsf@paris.lan> <53F7DA13.6090305@gmail.com>
+ <CADWw7OgAS-z-UOrJU-hL2fzuefJmLtCTg57jYk2Df7f5KfLJmA@mail.gmail.com>
+ <7h8umc60we.fsf@paris.lan>
+ <CADWw7OgW+o3tB=ptnsy-PsmXmNv8oXzt_WfK6NswQiEWWwAzNA@mail.gmail.com>
+ <CAGa+x85-Anb+HsSUQRaaeex19-HK+yZDW0UpFBwAtsQ8Sf2Aqg@mail.gmail.com>
+Message-ID: <CAGa+x86jU8MR=r_xuaiorbNNyqrezb0b6Ozy-MPg9HvsARESOw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 52addcf9d6669fa439387610bc65c92fa0980cef:
+On Tue, Aug 26, 2014 at 8:15 AM, Kevin Hilman <khilman@linaro.org> wrote:
+> On Mon, Aug 25, 2014 at 10:25 PM, Chander Kashyap <k.chander@samsung.com> wrote:
 
-  Linux 3.17-rc2 (2014-08-25 15:36:20 -0700)
+[...]
 
-are available in the git repository at:
+>>>
+>>> Can you clarify how you're setting the voltages to ensure stability?
+>>
+>> below is the diff :  wip/exynos/integ
+>
+> Thanks.
+>
+> I've applied your patch, and bootup shows vdd_arm and vdd_kfc at
+> 1500mV, but still when booting with cpuidle enabled (bL switcher
+> disabled), I'm seeing lockups with no kernel output.  With CPUidle
+> disabled, things are pretty stable.
+>
+> What tree are you using to test this out on 5420?  I'm using mainline
+> v3.17-rc1 + DT patch for CPUidle and this cpufreq series.  See my
+> wip/exynos/integ branch at
+> git://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux.git.
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.17/fixes-against-rc2
+I mis-stated this.  Actually my tree is based on the v3.17-rc1 branch
+of the exynos-reference tree[1] + the above mentioned patches for
+cpuidle and cpufreq.
 
-for you to fetch changes up to 8fd46439e1f5a7f86d76a08733459b74debd9468:
+Also, I've narrowed down the instability a bit, and it's not related
+to CPUidle.  I can now trigger a boot hang even without CPUidle
+enabled.  Here's a quick way to cause a boot lockup. With the switcher
+disabled, I enable CPUfreq and set the default governor to
+performance.  As soon as cpufreq driver loads, it tries to use the top
+frequences for both clusters, and it hangs.
 
-  ARM: dts: omap54xx-clocks: Fix the l3 and l4 clock rates (2014-08-26 13:04:00 -0700)
+Selectively disabling frequencies, I narrowed it down to the 1.3GHz
+and 1.2GHz frequencies of the little cluster.  With these commented
+out in the DT, it will fully boot with the performance governor
+enabled.
 
-----------------------------------------------------------------
-Fixes for omaps, mostly to revert NAND back to using software ECC
-by default as that's what many boards expect. Also fixes for omap5
-clocks, PM wake-up events, GPIO interrupt cells for dra7, and few
-other minor fixes.
+So that leads to the question.  Are all of the operating points in
+exynos5420.dtsi valid for exynos5800, and have they been validated?
 
-----------------------------------------------------------------
-Hans Wennborg (1):
-      ARM: OMAP: fix %d confusingly prefixed with 0x in format string
+Kevin
 
-Mark Brown (1):
-      ARM: dts: Remove twl6030 clk32g "regulator"
-
-Markus Pargmann (1):
-      ARM: OMAP2+: omap_device: remove warning that clk alias already exists
-
-Nishanth Menon (1):
-      ARM: dts: DRA7: fix interrupt-cells for GPIO
-
-Roger Quadros (4):
-      mtd: nand: omap: Revert to using software ECC by default
-      ARM: OMAP2+: GPMC: Support Software ECC scheme via DT
-      ARM: dts: omap3430-sdp: Revert to using software ECC for NAND
-      mtd: nand: omap: Fix 1-bit Hamming code scheme, omap_calculate_ecc()
-
-Tero Kristo (1):
-      ARM: dts: omap54xx-clocks: Fix the l3 and l4 clock rates
-
-Tony Lindgren (2):
-      ARM: dts: Enable UART wake-up events for beagleboard
-      ARM: OMAP2+: hwmod: Rearm wake-up interrupts for DT when MUSB is idled
-
- Documentation/devicetree/bindings/mtd/gpmc-nand.txt |  2 +-
- arch/arm/boot/dts/dra7.dtsi                         | 16 ++++++++--------
- arch/arm/boot/dts/omap3-beagle.dts                  |  1 +
- arch/arm/boot/dts/omap3430-sdp.dts                  |  2 +-
- arch/arm/boot/dts/omap54xx-clocks.dtsi              | 16 ++++++++++------
- arch/arm/boot/dts/twl6030.dtsi                      |  4 ----
- arch/arm/mach-omap2/board-flash.c                   |  2 +-
- arch/arm/mach-omap2/gpmc-nand.c                     |  3 ++-
- arch/arm/mach-omap2/gpmc.c                          |  7 +++++--
- arch/arm/mach-omap2/id.c                            |  2 +-
- arch/arm/mach-omap2/omap_device.c                   |  2 +-
- arch/arm/mach-omap2/omap_hwmod.c                    |  4 ++++
- drivers/mtd/nand/omap2.c                            | 16 ++++++++++++----
- include/linux/platform_data/mtd-nand-omap2.h        | 13 +++++++++++--
- 14 files changed, 58 insertions(+), 32 deletions(-)
+[1]https://github.com/exynos-reference/kernel.git
