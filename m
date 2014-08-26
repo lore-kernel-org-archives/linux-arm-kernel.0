@@ -1,49 +1,56 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Tue, 26 Aug 2014 08:17:40 +0200
-Subject: [PATCH v2 1/4] of: Add NVIDIA Tegra Legacy Interrupt Controller
- binding
-In-Reply-To: <53FB73EE.7000508@wwwdotorg.org>
-References: <1403917351-13215-1-git-send-email-thierry.reding@gmail.com>
- <53B1C948.6050603@wwwdotorg.org> <53FB73EE.7000508@wwwdotorg.org>
-Message-ID: <20140826061739.GB15573@ulmo>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Tue, 26 Aug 2014 08:23:01 +0200
+Subject: [PATCH 04/29] drivers: base: add notifier for failed driver bind
+In-Reply-To: <20140825200539.GA22076@kroah.com>
+References: <1407235677-26324-1-git-send-email-m.szyprowski@samsung.com>
+ <1407235677-26324-5-git-send-email-m.szyprowski@samsung.com>
+ <20140825200539.GA22076@kroah.com>
+Message-ID: <53FC27C5.7030400@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 25, 2014 at 11:35:42AM -0600, Stephen Warren wrote:
-> On 06/30/2014 02:32 PM, Stephen Warren wrote:
-> >On 06/27/2014 07:02 PM, Thierry Reding wrote:
-> >>From: Thierry Reding <treding@nvidia.com>
-> >>
-> >>The Legacy Interrupt Controller found on NVIDIA Tegra SoCs is used by
-> >>the AVP coprocessor and can also serve as a backup for the ARM Cortex
-> >>CPU's local interrupt controller (GIC).
-> >>
-> >>The LIC is subdivided into multiple identical units, each handling 32
-> >>possible interrupt sources.
-> >
-> >The series looks OK to me, although I guess there will be a V3 to
-> >address Mark's comments?
-> 
-> Thierry, do you still want this series applied? I'm not sure if it's
-> required by or conflicts with any of your later patches to move code out of
-> arch/arm/mach-tegra/?
-> 
-> If this series should still be applied, I guess I can fix up Mark's
-> remaining comment (the bracketing of the multiple reg entries in the DT)
-> when applying it, at least if you don't want to repost it yourself.
+Hello,
 
-This was originally meant to be moved out of arch/arm/mach-tegra and
-shared for upcoming 64-bit SoCs, but it seems like we may not need this
-code for 64-bit at all.
+On 2014-08-25 22:05, Greg Kroah-Hartman wrote:
+> On Tue, Aug 05, 2014 at 12:47:32PM +0200, Marek Szyprowski wrote:
+>> This patch adds support for getting a notify for failed device driver
+>> bind, so all the items done in BUS_NOTIFY_BIND_DRIVER event can be
+>> cleaned if the driver fails to bind.
+> But doesn't the bus know if the driver fails to bind, so why would a
+> notifier be needed here?  Can't it unwind any problems then?
 
-On the other hand the series is an improvement over what we've had
-before, so there may still be some value in merging it. I'll respin v3.
+Some other subsystems (like IOMMU) might register its own notifiers on
+the given bus. Such notifier is called before driver probe
+(BUS_NOTIFY_BIND_DRIVER event), so one can allocate some resources there.
+However there is no way to do the cleanup if the driver fails to bind,
+because no notifier is called in such case.
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140826/2a86af89/attachment.sig>
+>> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+>> ---
+>>   drivers/base/dd.c      | 10 +++++++---
+>>   include/linux/device.h |  4 +++-
+>>   2 files changed, 10 insertions(+), 4 deletions(-)
+>>
+>> diff --git a/drivers/base/dd.c b/drivers/base/dd.c
+>> index e4ffbcf..541a41f 100644
+>> --- a/drivers/base/dd.c
+>> +++ b/drivers/base/dd.c
+>> @@ -237,10 +237,14 @@ static int driver_sysfs_add(struct device *dev)
+>>   	return ret;
+>>   }
+>>   
+>> -static void driver_sysfs_remove(struct device *dev)
+>> +static void driver_sysfs_remove(struct device *dev, int failed)
+> I _hate_ having functions with a flag that does something different
+> depending on it.  If you _really_ need this, just make the notifier call
+> before calling this function, which should work just fine, right?
+
+Ok, I will fix this. If I remember correctly I followed the 
+driver_sysfs_add()
+function pattern, which (surprisingly, especially when one considers only
+the function name) also calls the bus notifiers.
+
+Best regards
+-- 
+Marek Szyprowski, PhD
+Samsung R&D Institute Poland
