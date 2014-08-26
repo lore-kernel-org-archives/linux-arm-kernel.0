@@ -1,68 +1,43 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 26 Aug 2014 15:30:11 +0100
-Subject: [PATCH 3/6] arm64: Add support for hooks to handle undefined
- instructions
-In-Reply-To: <CAKv+Gu8Nji0Jspk2cMCwVGKeODsiOb0NFUFWucm3rAbNdb_bTQ@mail.gmail.com>
-References: <1409048930-21598-1-git-send-email-punit.agrawal@arm.com>
- <1409048930-21598-4-git-send-email-punit.agrawal@arm.com>
- <20140826131339.GO23445@arm.com>
- <CAKv+Gu8Nji0Jspk2cMCwVGKeODsiOb0NFUFWucm3rAbNdb_bTQ@mail.gmail.com>
-Message-ID: <20140826143011.GV23445@arm.com>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Tue, 26 Aug 2014 16:30:53 +0200
+Subject: [PATCH] MAINTAINERS: Tomasz has moved
+Message-ID: <1409063453-16124-1-git-send-email-t.figa@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 26, 2014 at 03:21:09PM +0100, Ard Biesheuvel wrote:
-> On 26 August 2014 15:13, Will Deacon <will.deacon@arm.com> wrote:
-> > On Tue, Aug 26, 2014 at 11:28:47AM +0100, Punit Agrawal wrote:
-> >> Add support to register hooks for undefined instructions. The handlers
-> >> will be called when the undefined instruction and the processor state
-> >> (as contained in pstate) match criteria used at registration.
-> >>
-> >> Note: The patch only deals with ARM instruction encodings and needs
-> >> fixing to handle thumb instructions as well.
-> >
-> > [...]
-> >
-> >> +static int call_undef_hook(struct pt_regs *regs)
-> >> +{
-> >> +     struct undef_hook *hook;
-> >> +     unsigned long flags;
-> >> +     u32 instr;
-> >> +     int (*fn)(struct pt_regs *regs, u32 instr) = NULL;
-> >> +     void __user *pc = (void __user *)instruction_pointer(regs);
-> >> +
-> >> +     /*
-> >> +      * Currently, undefined instruction patching is only supported
-> >> +      * for user mode. Also, as we're not emulating any thumb
-> >> +      * instructions lets not add thumb instruction decoding until
-> >> +      * it is needed.
-> >> +      */
-> >> +     if (!compat_user_mode(regs) || compat_thumb_mode(regs))
-> >> +             return 1;
-> >
-> > What do you mean by `undefined instruction patching'? I don't see anything
-> > in the mechanism that means this can't be reused for kernel code, then we
-> > just register the SWP emulation hook for userspace only using the mode (like
-> > we do for kgdb).
-> >
-> 
-> You need this patch in order to be able to return from an undef
-> exception taken in EL1:
-> 
-> --- a/arch/arm64/kernel/entry.S
-> +++ b/arch/arm64/kernel/entry.S
-> @@ -287,7 +287,9 @@ el1_undef:
->          */
->         enable_dbg
->         mov     x0, sp
-> -       b       do_undefinstr
-> +       bl      do_undefinstr
-> +
-> +       kernel_exit 1
->  el1_dbg:
->         /*
->          * Debug exception handling
+I am leaving Samsung, so my current e-mail address is not going to work
+any longer. Replace it with my private one. In addition, Sylwester
+Nawrocki is being added as co-maintainer for Samsung clock drivers to
+take some of the responsibilities, as I will be doing my part in my spare
+time.
 
-Hmm, I'm surprised we don't already need something like this for KGDB...
+Signed-off-by: Tomasz Figa <t.figa@samsung.com>
+---
+ MAINTAINERS | 5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
 
-Will
+diff --git a/MAINTAINERS b/MAINTAINERS
+index acd44c3..d57f6ce 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -7062,7 +7062,7 @@ S:	Maintained
+ F:	drivers/pinctrl/sh-pfc/
+ 
+ PIN CONTROLLER - SAMSUNG
+-M:	Tomasz Figa <t.figa@samsung.com>
++M:	Tomasz Figa <tomasz.figa@gmail.com>
+ M:	Thomas Abraham <thomas.abraham@linaro.org>
+ L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+ L:	linux-samsung-soc at vger.kernel.org (moderated for non-subscribers)
+@@ -7908,7 +7908,8 @@ S:	Supported
+ F:	drivers/media/i2c/s5k5baf.c
+ 
+ SAMSUNG SOC CLOCK DRIVERS
+-M:	Tomasz Figa <t.figa@samsung.com>
++M:	Sylwester Nawrocki <s.nawrocki@samsung.com>
++M:	Tomasz Figa <tomasz.figa@gmail.com>
+ S:	Supported
+ L:	linux-samsung-soc at vger.kernel.org (moderated for non-subscribers)
+ F:	drivers/clk/samsung/
+-- 
+2.0.4
