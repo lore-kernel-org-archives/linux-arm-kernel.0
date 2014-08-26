@@ -1,48 +1,61 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 26 Aug 2014 18:53:03 +0100
-Subject: [PATCH v6 4/6] arm64: add seccomp syscall for compat task
-In-Reply-To: <1408611405-8943-5-git-send-email-takahiro.akashi@linaro.org>
+Date: Tue, 26 Aug 2014 18:55:26 +0100
+Subject: [PATCH v6 5/6] arm64: add SIGSYS siginfo for compat task
+In-Reply-To: <1408611405-8943-6-git-send-email-takahiro.akashi@linaro.org>
 References: <1408611405-8943-1-git-send-email-takahiro.akashi@linaro.org>
- <1408611405-8943-5-git-send-email-takahiro.akashi@linaro.org>
-Message-ID: <20140826175303.GE23445@arm.com>
+ <1408611405-8943-6-git-send-email-takahiro.akashi@linaro.org>
+Message-ID: <20140826175526.GF23445@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 21, 2014 at 09:56:43AM +0100, AKASHI Takahiro wrote:
-> This patch allows compat task to issue seccomp() system call.
+On Thu, Aug 21, 2014 at 09:56:44AM +0100, AKASHI Takahiro wrote:
+> SIGSYS is primarily used in secure computing to notify tracer.
+> This patch allows signal handler on compat task to get correct information
+> with SA_SYSINFO specified when this signal is delivered.
 > 
 > Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
 > ---
->  arch/arm64/include/asm/unistd.h   |    2 +-
->  arch/arm64/include/asm/unistd32.h |    3 +++
->  2 files changed, 4 insertions(+), 1 deletion(-)
+>  arch/arm64/include/asm/compat.h |    7 +++++++
+>  arch/arm64/kernel/signal32.c    |    8 ++++++++
+>  2 files changed, 15 insertions(+)
 > 
-> diff --git a/arch/arm64/include/asm/unistd.h b/arch/arm64/include/asm/unistd.h
-> index 4bc95d2..cf6ee31 100644
-> --- a/arch/arm64/include/asm/unistd.h
-> +++ b/arch/arm64/include/asm/unistd.h
-> @@ -41,7 +41,7 @@
->  #define __ARM_NR_compat_cacheflush	(__ARM_NR_COMPAT_BASE+2)
->  #define __ARM_NR_compat_set_tls		(__ARM_NR_COMPAT_BASE+5)
->  
-> -#define __NR_compat_syscalls		383
-> +#define __NR_compat_syscalls		384
->  #endif
->  
->  #define __ARCH_WANT_SYS_CLONE
-> diff --git a/arch/arm64/include/asm/unistd32.h b/arch/arm64/include/asm/unistd32.h
-> index e242600..2922c40 100644
-> --- a/arch/arm64/include/asm/unistd32.h
-> +++ b/arch/arm64/include/asm/unistd32.h
-> @@ -787,3 +787,6 @@ __SYSCALL(__NR_sched_setattr, sys_sched_setattr)
->  __SYSCALL(__NR_sched_getattr, sys_sched_getattr)
->  #define __NR_renameat2 382
->  __SYSCALL(__NR_renameat2, sys_renameat2)
-> +#define __NR_seccomp 383
-> +__SYSCALL(__NR_seccomp, sys_seccomp)
+> diff --git a/arch/arm64/include/asm/compat.h b/arch/arm64/include/asm/compat.h
+> index 253e33b..c877915 100644
+> --- a/arch/arm64/include/asm/compat.h
+> +++ b/arch/arm64/include/asm/compat.h
+> @@ -205,6 +205,13 @@ typedef struct compat_siginfo {
+>  			compat_long_t _band;	/* POLL_IN, POLL_OUT, POLL_MSG */
+>  			int _fd;
+>  		} _sigpoll;
 > +
+> +		/* SIGSYS */
+> +		struct {
+> +			compat_uptr_t _call_addr; /* calling user insn */
+> +			int _syscall;	/* triggering system call number */
+> +			unsigned int _arch;	/* AUDIT_ARCH_* of syscall */
+> +		} _sigsys;
+>  	} _sifields;
+>  } compat_siginfo_t;
+>  
+> diff --git a/arch/arm64/kernel/signal32.c b/arch/arm64/kernel/signal32.c
+> index 1b9ad02..aa550d6 100644
+> --- a/arch/arm64/kernel/signal32.c
+> +++ b/arch/arm64/kernel/signal32.c
+> @@ -186,6 +186,14 @@ int copy_siginfo_to_user32(compat_siginfo_t __user *to, const siginfo_t *from)
+>  		err |= __put_user(from->si_uid, &to->si_uid);
+>  		err |= __put_user((compat_uptr_t)(unsigned long)from->si_ptr, &to->si_ptr);
+>  		break;
+> +#ifdef __ARCH_SIGSYS
+> +	case __SI_SYS:
+> +		err |= __put_user((compat_uptr_t)(unsigned long)
+> +				from->si_call_addr, &to->si_call_addr);
+> +		err |= __put_user(from->si_syscall, &to->si_syscall);
+> +		err |= __put_user(from->si_arch, &to->si_arch);
+> +		break;
+> +#endif
 
-This will need rebasing onto -rc2, as we're hooked up two new compat
-syscalls recently.
+I think you should drop this #ifdef. We care about whether arch/arm/ defines
+__ARCH_SIGSYS, not whether arm64 defines it (they both happen to define it
+anyway).
 
 Will
