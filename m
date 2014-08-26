@@ -1,71 +1,30 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Tue, 26 Aug 2014 13:43:12 +0200
-Subject: [PATCH v3 1/2] KVM: Introduce gfn_to_hva_memslot_prot
-Message-ID: <1409053393-13768-1-git-send-email-christoffer.dall@linaro.org>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Tue, 26 Aug 2014 17:22:08 +0530
+Subject: [PATCH v2 0/6] ARM: DT/davinci: Audio for da850-evm in DT boot
+In-Reply-To: <53FC6069.7000105@ti.com>
+References: <1406873610-5037-1-git-send-email-peter.ujfalusi@ti.com>
+ <53FC6069.7000105@ti.com>
+Message-ID: <53FC74E8.80206@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To support read-only memory regions on arm and arm64, we have a need to
-resolve a gfn to an hva given a pointer to a memslot to avoid looping
-through the memslots twice and to reuse the hva error checking of
-gfn_to_hva_prot(), add a new gfn_to_hva_memslot_prot() function and
-refactor gfn_to_hva_prot() to use this function.
+On Tuesday 26 August 2014 03:54 PM, Sekhar Nori wrote:
+> On Friday 01 August 2014 11:43 AM, Peter Ujfalusi wrote:
+>> Hi,
+>>
+>> Changes since v1:
+>> - fixed the address missmatch for tlv320aic3106 codec (@1b -> 18)
+>> - The edma patches has been taken by Vinod, they should be in linux-next soon.
+> 
+> I assume all of these 6 patches are meant to go through ARM SoC. I have
+> applied all of them for v3.18.
+> 
+>> The following series will enable audio via simple card on the board when booted
+>> with DT.
+> 
+> Thanks for doing this.
 
-Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
-Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
----
-Changelog[v3]:
- - None
-Changelog[v2]:
- - Fix typo in patch title
+Also tested audio playback and record on DA850 EVM. Works great!
 
- include/linux/kvm_host.h |  2 ++
- virt/kvm/kvm_main.c      | 11 +++++++++--
- 2 files changed, 11 insertions(+), 2 deletions(-)
-
-diff --git a/include/linux/kvm_host.h b/include/linux/kvm_host.h
-index ebd7236..6d8a658 100644
---- a/include/linux/kvm_host.h
-+++ b/include/linux/kvm_host.h
-@@ -528,6 +528,8 @@ struct page *gfn_to_page(struct kvm *kvm, gfn_t gfn);
- unsigned long gfn_to_hva(struct kvm *kvm, gfn_t gfn);
- unsigned long gfn_to_hva_prot(struct kvm *kvm, gfn_t gfn, bool *writable);
- unsigned long gfn_to_hva_memslot(struct kvm_memory_slot *slot, gfn_t gfn);
-+unsigned long gfn_to_hva_memslot_prot(struct kvm_memory_slot *slot, gfn_t gfn,
-+				      bool *writable);
- void kvm_release_page_clean(struct page *page);
- void kvm_release_page_dirty(struct page *page);
- void kvm_set_page_accessed(struct page *page);
-diff --git a/virt/kvm/kvm_main.c b/virt/kvm/kvm_main.c
-index 5a0817e..76c92a7 100644
---- a/virt/kvm/kvm_main.c
-+++ b/virt/kvm/kvm_main.c
-@@ -1076,9 +1076,9 @@ EXPORT_SYMBOL_GPL(gfn_to_hva);
-  * If writable is set to false, the hva returned by this function is only
-  * allowed to be read.
-  */
--unsigned long gfn_to_hva_prot(struct kvm *kvm, gfn_t gfn, bool *writable)
-+unsigned long gfn_to_hva_memslot_prot(struct kvm_memory_slot *slot,
-+				      gfn_t gfn, bool *writable)
- {
--	struct kvm_memory_slot *slot = gfn_to_memslot(kvm, gfn);
- 	unsigned long hva = __gfn_to_hva_many(slot, gfn, NULL, false);
- 
- 	if (!kvm_is_error_hva(hva) && writable)
-@@ -1087,6 +1087,13 @@ unsigned long gfn_to_hva_prot(struct kvm *kvm, gfn_t gfn, bool *writable)
- 	return hva;
- }
- 
-+unsigned long gfn_to_hva_prot(struct kvm *kvm, gfn_t gfn, bool *writable)
-+{
-+	struct kvm_memory_slot *slot = gfn_to_memslot(kvm, gfn);
-+
-+	return gfn_to_hva_memslot_prot(slot, gfn, writable);
-+}
-+
- static int kvm_read_hva(void *data, void __user *hva, int len)
- {
- 	return __copy_from_user(data, hva, len);
--- 
-2.0.0
+Thanks,
+Sekhar
