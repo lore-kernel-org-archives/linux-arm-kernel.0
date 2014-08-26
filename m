@@ -1,102 +1,25 @@
-From: afaerber@suse.de (=?ISO-8859-15?Q?Andreas_F=E4rber?=)
-Date: Wed, 27 Aug 2014 00:59:11 +0200
-Subject: [PATCH 1/2 v2] ARM: dts: exynos: Explicitly set dr_mode on
- peach-pit and peach-pi
-In-Reply-To: <1409038230-7242-2-git-send-email-sjoerd.simons@collabora.co.uk>
-References: <1409038230-7242-1-git-send-email-sjoerd.simons@collabora.co.uk>
- <1409038230-7242-2-git-send-email-sjoerd.simons@collabora.co.uk>
-Message-ID: <53FD113F.7080800@suse.de>
+From: akpm@linux-foundation.org (Andrew Morton)
+Date: Tue, 26 Aug 2014 16:10:00 -0700
+Subject: [PATCH 0/2] ARM: Remove lowmem limit for default CMA region
+In-Reply-To: <1408610714-16204-1-git-send-email-m.szyprowski@samsung.com>
+References: <1408610714-16204-1-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <20140826161000.c760fadf0d7223372524d2ce@linux-foundation.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 26.08.2014 09:30, schrieb Sjoerd Simons:
-> In case the optional dr_mode property isn't set in the dwc3 nodes the
-> the controller will go into OTG mode iff both USB host and USB gadget
-> functionality are enabled in the kernel configuration. Unfortunately this
-> results in USB not working on exynos5420-peach-pit and
-> exynos5800-peach-pi with such a kernel configuration unless manually
-> change the mode. To resolve that explicitely configure the dual role
+On Thu, 21 Aug 2014 10:45:12 +0200 Marek Szyprowski <m.szyprowski@samsung.com> wrote:
 
-"explicitly"
-
-> mode as host
+> Russell King recently noticed that limiting default CMA region only to
+> low memory on ARM architecture causes serious memory management issues
+> with machines having a lot of memory (which is mainly available as high
+> memory). More information can be found the following thread:
+> http://thread.gmane.org/gmane.linux.ports.arm.kernel/348441/
 > 
-> Signed-off-by: Sjoerd Simons <sjoerd.simons@collabora.co.uk>
-> ---
->   Changes in v2: alphabetically sort the dts entries
+> Those two patches removes this limit letting kernel to put default CMA
+> region into high memory when this is possible (there is enough high
+> memory available and architecture specific DMA limit fits).
 > 
->  arch/arm/boot/dts/exynos5420-peach-pit.dts | 8 ++++++++
->  arch/arm/boot/dts/exynos5420.dtsi          | 4 ++--
->  arch/arm/boot/dts/exynos5800-peach-pi.dts  | 8 ++++++++
->  3 files changed, 18 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/exynos5420-peach-pit.dts b/arch/arm/boot/dts/exynos5420-peach-pit.dts
-> index 228a6b1..29d3a59 100644
-> --- a/arch/arm/boot/dts/exynos5420-peach-pit.dts
-> +++ b/arch/arm/boot/dts/exynos5420-peach-pit.dts
-> @@ -427,6 +427,14 @@
->  	status = "okay";
->  };
->  
-> +&usbdrd_dwc3_0 {
-> +	dr_mode = "host";
-> +};
-> +
-> +&usbdrd_dwc3_1 {
-> +	dr_mode = "host";
-> +};
-> +
->  &usbdrd_phy0 {
->  	vbus-supply = <&usb300_vbus_reg>;
->  };
-> diff --git a/arch/arm/boot/dts/exynos5420.dtsi b/arch/arm/boot/dts/exynos5420.dtsi
-> index bfe056d..8617a03 100644
-> --- a/arch/arm/boot/dts/exynos5420.dtsi
-> +++ b/arch/arm/boot/dts/exynos5420.dtsi
-> @@ -815,7 +815,7 @@
->  		#size-cells = <1>;
->  		ranges;
->  
-> -		dwc3 {
-> +		usbdrd_dwc3_0: dwc3 {
->  			compatible = "snps,dwc3";
->  			reg = <0x12000000 0x10000>;
->  			interrupts = <0 72 0>;
-> @@ -841,7 +841,7 @@
->  		#size-cells = <1>;
->  		ranges;
->  
-> -		dwc3 {
-> +		usbdrd_dwc3_1: dwc3 {
->  			compatible = "snps,dwc3";
->  			reg = <0x12400000 0x10000>;
->  			interrupts = <0 73 0>;
-> diff --git a/arch/arm/boot/dts/exynos5800-peach-pi.dts b/arch/arm/boot/dts/exynos5800-peach-pi.dts
-> index f3ee48b..2064550 100644
-> --- a/arch/arm/boot/dts/exynos5800-peach-pi.dts
-> +++ b/arch/arm/boot/dts/exynos5800-peach-pi.dts
-> @@ -425,6 +425,14 @@
->  	status = "okay";
->  };
->  
-> +&usbdrd_dwc3_0 {
-> +	dr_mode = "host";
-> +};
-> +
-> +&usbdrd_dwc3_1 {
-> +	dr_mode = "host";
-> +};
-> +
->  &usbdrd_phy0 {
->  	vbus-supply = <&usb300_vbus_reg>;
->  };
+> This should solve strange OOM issues on systems with lots of RAM
+> (i.e. >1GiB) and large (>256M) CMA area.
 
-Thanks,
-
-Reviewed-by: Andreas F?rber <afaerber@suse.de>
-
-Andreas
-
--- 
-SUSE LINUX Products GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
-GF: Jeff Hawn, Jennifer Guild, Felix Imend?rffer; HRB 16746 AG N?rnberg
+What do we think is the priority on these fixes?  3.17 or 3.18?
