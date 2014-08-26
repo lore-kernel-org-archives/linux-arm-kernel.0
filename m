@@ -1,86 +1,59 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Tue, 26 Aug 2014 14:24:00 +0900
-Subject: [PATCH 6/8] ARM: shmobile: armadillo800eva-reference: Enable CMT1 in
- device tree
+Date: Tue, 26 Aug 2014 14:24:02 +0900
+Subject: [PATCH 8/8] ARM: shmobile: r8a7740: Remove
+ r8a7740_add_standard_devices_dt
 In-Reply-To: <cover.1409030383.git.horms+renesas@verge.net.au>
 References: <cover.1409030383.git.horms+renesas@verge.net.au>
-Message-ID: <1145eaabcf1d108993b5c7bea3d86bbef7143135.1409030383.git.horms+renesas@verge.net.au>
+Message-ID: <433306747791845677ba662435a9bbbafaa21df3.1409030383.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Based on work by Magnus Damm
+Now that r8a7740_add_standard_devices_dt() is simply a wrapper
+for a call to of_platform_populate() remove it and call
+of_platform_populate() directly.
 
-Cc: Magnus Damm <magnus.damm@gmail.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7740-armadillo800eva-reference.dts |  4 ++++
- arch/arm/mach-shmobile/setup-r8a7740.c                  | 11 +----------
- 2 files changed, 5 insertions(+), 10 deletions(-)
+ arch/arm/mach-shmobile/r8a7740.h       | 1 -
+ arch/arm/mach-shmobile/setup-r8a7740.c | 7 +------
+ 2 files changed, 1 insertion(+), 7 deletions(-)
 
-diff --git a/arch/arm/boot/dts/r8a7740-armadillo800eva-reference.dts b/arch/arm/boot/dts/r8a7740-armadillo800eva-reference.dts
-index 266c439..5e646e6 100644
---- a/arch/arm/boot/dts/r8a7740-armadillo800eva-reference.dts
-+++ b/arch/arm/boot/dts/r8a7740-armadillo800eva-reference.dts
-@@ -191,6 +191,10 @@
- 	renesas,mode = <0x05>; /* MD_CK0 | MD_CK2 */
- };
- 
-+&cmt1 {
-+	status = "ok";
-+};
-+
- &i2c0 {
- 	status = "okay";
- 	touchscreen at 55 {
+diff --git a/arch/arm/mach-shmobile/r8a7740.h b/arch/arm/mach-shmobile/r8a7740.h
+index 1d1a5fd..3352fb8 100644
+--- a/arch/arm/mach-shmobile/r8a7740.h
++++ b/arch/arm/mach-shmobile/r8a7740.h
+@@ -49,7 +49,6 @@ extern void r8a7740_init_irq_of(void);
+ extern void r8a7740_map_io(void);
+ extern void r8a7740_add_early_devices(void);
+ extern void r8a7740_add_standard_devices(void);
+-extern void r8a7740_add_standard_devices_dt(void);
+ extern void r8a7740_clock_init(u8 md_ck);
+ extern void r8a7740_pinmux_init(void);
+ extern void r8a7740_pm_init(void);
 diff --git a/arch/arm/mach-shmobile/setup-r8a7740.c b/arch/arm/mach-shmobile/setup-r8a7740.c
-index 3d5eaca..dc44a44 100644
+index dc44a44..8fe270d 100644
 --- a/arch/arm/mach-shmobile/setup-r8a7740.c
 +++ b/arch/arm/mach-shmobile/setup-r8a7740.c
-@@ -311,10 +311,6 @@ static struct platform_device ipmmu_device = {
- 	.num_resources  = ARRAY_SIZE(ipmmu_resources),
- };
+@@ -781,11 +781,6 @@ void __init r8a7740_add_early_devices(void)
  
--static struct platform_device *r8a7740_devices_dt[] __initdata = {
--	&cmt1_device,
--};
+ #ifdef CONFIG_USE_OF
+ 
+-void __init r8a7740_add_standard_devices_dt(void)
+-{
+-	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+-}
 -
- static struct platform_device *r8a7740_early_devices[] __initdata = {
- 	&scif0_device,
- 	&scif1_device,
-@@ -331,6 +327,7 @@ static struct platform_device *r8a7740_early_devices[] __initdata = {
- 	&irqpin3_device,
- 	&tmu0_device,
- 	&ipmmu_device,
-+	&cmt1_device,
- };
- 
- /* DMA */
-@@ -756,8 +753,6 @@ void __init r8a7740_add_standard_devices(void)
- 	/* add devices */
- 	platform_add_devices(r8a7740_early_devices,
- 			    ARRAY_SIZE(r8a7740_early_devices));
--	platform_add_devices(r8a7740_devices_dt,
--			    ARRAY_SIZE(r8a7740_devices_dt));
- 	platform_add_devices(r8a7740_late_devices,
- 			     ARRAY_SIZE(r8a7740_late_devices));
- 
-@@ -779,8 +774,6 @@ void __init r8a7740_add_early_devices(void)
+ void __init r8a7740_init_irq_of(void)
  {
- 	early_platform_add_devices(r8a7740_early_devices,
- 				   ARRAY_SIZE(r8a7740_early_devices));
--	early_platform_add_devices(r8a7740_devices_dt,
--				   ARRAY_SIZE(r8a7740_devices_dt));
- 
- 	/* setup early console here as well */
- 	shmobile_setup_console();
-@@ -790,8 +783,6 @@ void __init r8a7740_add_early_devices(void)
- 
- void __init r8a7740_add_standard_devices_dt(void)
+ 	void __iomem *intc_prio_base = ioremap_nocache(0xe6900010, 0x10);
+@@ -819,7 +814,7 @@ void __init r8a7740_init_irq_of(void)
+ static void __init r8a7740_generic_init(void)
  {
--	platform_add_devices(r8a7740_devices_dt,
--			    ARRAY_SIZE(r8a7740_devices_dt));
- 	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+ 	r8a7740_clock_init(0);
+-	r8a7740_add_standard_devices_dt();
++	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
  }
  
+ static const char *r8a7740_boards_compat_dt[] __initdata = {
 -- 
 2.0.1
