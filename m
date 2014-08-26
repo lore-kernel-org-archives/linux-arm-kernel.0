@@ -1,183 +1,148 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 26 Aug 2014 16:22:04 +0100
-Subject: [PATCH] Arm64: convert soft_restart() to assembly code
-In-Reply-To: <CAFdej005x5rYpP+1PM2fDktmEKAO-me4+btYc37UxQxKUPMXoA@mail.gmail.com>
-References: <1407847365-10873-1-git-send-email-achandran@mvista.com>
- <1408123221.22761.38.camel@smoke>
- <20140815182157.GD21908@leverpostej>
- <1408128799.22761.47.camel@smoke>
- <20140818160253.GB3302@leverpostej>
- <CAFdej005x5rYpP+1PM2fDktmEKAO-me4+btYc37UxQxKUPMXoA@mail.gmail.com>
-Message-ID: <20140826152204.GC4078@leverpostej>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 26 Aug 2014 16:26:59 +0100
+Subject: [PATCH v3 2/2] arm/arm64: KVM: Support KVM_CAP_READONLY_MEM
+In-Reply-To: <1409053393-13768-2-git-send-email-christoffer.dall@linaro.org>
+References: <1409053393-13768-1-git-send-email-christoffer.dall@linaro.org>
+ <1409053393-13768-2-git-send-email-christoffer.dall@linaro.org>
+Message-ID: <53FCA743.5020000@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Hi Mark,
-
-Hi Arun,
-
-> Please Ignore my previous mail. I think this version of sample
-> implementation is simple and better. Please give your comments.
-
-If you wish to have this reviewed in any depth, please:
-
- - Base your patches on mainline, or at the very least provide a pointer
-   to the branch the patch is based upon.
-
- - Test that this functions with and without CONFIG_KVM.
-
- - Post this as an RFC PATCH, complete with a rationale (as previously
-   discussed).
-
- - For later revisions, please label the patches with a version and give
-   adequate delay between postings to allow for review.
-
-I've given some comments below, but please post proper patches in
-future.
-
-> ###########
-> diff --git a/arch/arm64/include/asm/proc-fns.h
-> b/arch/arm64/include/asm/proc-fns.h
-> index ddbc3f5..40d3360 100644
-> --- a/arch/arm64/include/asm/proc-fns.h
-> +++ b/arch/arm64/include/asm/proc-fns.h
-> @@ -31,7 +31,7 @@ struct cpu_suspend_ctx;
->  extern void cpu_cache_off(void);
->  extern void cpu_do_idle(void);
->  extern void cpu_do_switch_mm(unsigned long pgd_phys, struct mm_struct *mm);
-> -extern void cpu_reset(unsigned long addr) __attribute__((noreturn));
-> +extern void cpu_reset(unsigned long addr, unsigned long boot_mode)
-> __attribute__((noreturn));
->  extern void cpu_soft_restart(phys_addr_t cpu_reset, unsigned long
-> addr) __attribute__((noreturn));
->  extern void cpu_do_suspend(struct cpu_suspend_ctx *ptr);
->  extern u64 cpu_do_resume(phys_addr_t ptr, u64 idmap_ttbr);
-> diff --git a/arch/arm64/include/asm/virt.h b/arch/arm64/include/asm/virt.h
-> index 215ad46..3976737 100644
-> --- a/arch/arm64/include/asm/virt.h
-> +++ b/arch/arm64/include/asm/virt.h
-> @@ -34,6 +34,7 @@
->   */
->  extern u32 __boot_cpu_mode[2];
+On 26/08/14 12:43, Christoffer Dall wrote:
+> When userspace loads code and data in a read-only memory regions, KVM
+> needs to be able to handle this on arm and arm64.  Specifically this is
+> used when running code directly from a read-only flash device; the
+> common scenario is a UEFI blob loaded with the -bios option in QEMU.
 > 
-> +void __hyp_func_call(phys_addr_t func, ...);
->  void __hyp_set_vectors(phys_addr_t phys_vector_base);
->  phys_addr_t __hyp_get_vectors(void);
+> Note that the MMIO exit on writes to a read-only memory is ABI and can
+> be used to emulate block-erase style flash devices.
 > 
-> diff --git a/arch/arm64/kernel/hyp-stub.S b/arch/arm64/kernel/hyp-stub.S
-> index a272f33..82c2b0d 100644
-> --- a/arch/arm64/kernel/hyp-stub.S
-> +++ b/arch/arm64/kernel/hyp-stub.S
-> @@ -53,14 +53,12 @@ ENDPROC(__hyp_stub_vectors)
->         .align 11
+> Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+
+	M.
+
+> ---
+> Changelog[v3]:
+>  - Remove the check for fault_status != FSC_FAULT in the I/O memory
+>    abort section, since we now do support permission faults on I/O
+>    regions.  Reported-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> Changelog[v2]:
+>  - None
 > 
->  el1_sync:
-> -       mrs     x1, esr_el2
-> -       lsr     x1, x1, #26
-> -       cmp     x1, #0x16
-> +       mrs     x19, esr_el2
-> +       lsr     x19, x19, #26
-> +       cmp     x19, #0x16
->         b.ne    2f                              // Not an HVC trap
-> -       cbz     x0, 1f
-> -       msr     vbar_el2, x0                    // Set vbar_el2
-> -       b       2f
-> -1:     mrs     x0, vbar_el2                    // Return vbar_el2
-> +
-> +1:     blr     x0                              // Jump to the function
-
-You need to stash the orignal lr, or we can't return from
-__hyp_call_func.
-
->  2:     eret
->  ENDPROC(el1_sync)
+>  arch/arm/include/uapi/asm/kvm.h   |  1 +
+>  arch/arm/kvm/arm.c                |  1 +
+>  arch/arm/kvm/mmu.c                | 22 ++++++++--------------
+>  arch/arm64/include/uapi/asm/kvm.h |  1 +
+>  4 files changed, 11 insertions(+), 14 deletions(-)
 > 
-> @@ -101,10 +99,17 @@ ENDPROC(\label)
->   */
-> 
->  ENTRY(__hyp_get_vectors)
-> -       mov     x0, xzr
-> -       // fall through
-> -ENTRY(__hyp_set_vectors)
-> -       hvc     #0
-> +       mrs     x0, vbar_el2                    // Return vbar_el2
->         ret
->  ENDPROC(__hyp_get_vectors)
-> +
-> +ENTRY(__hyp_set_vectors)
-> +       msr     vbar_el2, x1
-> +       ret
->  ENDPROC(__hyp_set_vectors)
-> +
-> +/* Call a function @x0 */
-> +ENTRY(__hyp_func_call)
-> +       hvc     #0
-> +       ret
-> +ENDPROC(__hyp_func_call)
-
-These will be called at EL1, so this breaks KVM.
-
-> diff --git a/arch/arm64/mm/proc.S b/arch/arm64/mm/proc.S
-> index 3cb6dec..e68f42e 100644
-> --- a/arch/arm64/mm/proc.S
-> +++ b/arch/arm64/mm/proc.S
+> diff --git a/arch/arm/include/uapi/asm/kvm.h b/arch/arm/include/uapi/asm/kvm.h
+> index e6ebdd3..51257fd 100644
+> --- a/arch/arm/include/uapi/asm/kvm.h
+> +++ b/arch/arm/include/uapi/asm/kvm.h
 > @@ -25,6 +25,7 @@
->  #include <asm/hwcap.h>
->  #include <asm/pgtable-hwdef.h>
->  #include <asm/pgtable.h>
-> +#include <asm/virt.h>
+>  
+>  #define __KVM_HAVE_GUEST_DEBUG
+>  #define __KVM_HAVE_IRQ_LINE
+> +#define __KVM_HAVE_READONLY_MEM
+>  
+>  #define KVM_REG_SIZE(id)						\
+>  	(1U << (((id) & KVM_REG_SIZE_MASK) >> KVM_REG_SIZE_SHIFT))
+> diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
+> index 9f788eb..ac306b4 100644
+> --- a/arch/arm/kvm/arm.c
+> +++ b/arch/arm/kvm/arm.c
+> @@ -188,6 +188,7 @@ int kvm_vm_ioctl_check_extension(struct kvm *kvm, long ext)
+>  	case KVM_CAP_ONE_REG:
+>  	case KVM_CAP_ARM_PSCI:
+>  	case KVM_CAP_ARM_PSCI_0_2:
+> +	case KVM_CAP_READONLY_MEM:
+>  		r = 1;
+>  		break;
+>  	case KVM_CAP_COALESCED_MMIO:
+> diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
+> index 16e7994..62f5642 100644
+> --- a/arch/arm/kvm/mmu.c
+> +++ b/arch/arm/kvm/mmu.c
+> @@ -747,14 +747,13 @@ static bool transparent_hugepage_adjust(pfn_t *pfnp, phys_addr_t *ipap)
+>  }
+>  
+>  static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+> -			  struct kvm_memory_slot *memslot,
+> +			  struct kvm_memory_slot *memslot, unsigned long hva,
+>  			  unsigned long fault_status)
+>  {
+>  	int ret;
+>  	bool write_fault, writable, hugetlb = false, force_pte = false;
+>  	unsigned long mmu_seq;
+>  	gfn_t gfn = fault_ipa >> PAGE_SHIFT;
+> -	unsigned long hva = gfn_to_hva(vcpu->kvm, gfn);
+>  	struct kvm *kvm = vcpu->kvm;
+>  	struct kvm_mmu_memory_cache *memcache = &vcpu->arch.mmu_page_cache;
+>  	struct vm_area_struct *vma;
+> @@ -863,7 +862,8 @@ int kvm_handle_guest_abort(struct kvm_vcpu *vcpu, struct kvm_run *run)
+>  	unsigned long fault_status;
+>  	phys_addr_t fault_ipa;
+>  	struct kvm_memory_slot *memslot;
+> -	bool is_iabt;
+> +	unsigned long hva;
+> +	bool is_iabt, write_fault, writable;
+>  	gfn_t gfn;
+>  	int ret, idx;
+>  
+> @@ -884,7 +884,10 @@ int kvm_handle_guest_abort(struct kvm_vcpu *vcpu, struct kvm_run *run)
+>  	idx = srcu_read_lock(&vcpu->kvm->srcu);
+>  
+>  	gfn = fault_ipa >> PAGE_SHIFT;
+> -	if (!kvm_is_visible_gfn(vcpu->kvm, gfn)) {
+> +	memslot = gfn_to_memslot(vcpu->kvm, gfn);
+> +	hva = gfn_to_hva_memslot_prot(memslot, gfn, &writable);
+> +	write_fault = kvm_is_write_fault(kvm_vcpu_get_hsr(vcpu));
+> +	if (kvm_is_error_hva(hva) || (write_fault && !writable)) {
+>  		if (is_iabt) {
+>  			/* Prefetch Abort on I/O address */
+>  			kvm_inject_pabt(vcpu, kvm_vcpu_get_hfar(vcpu));
+> @@ -892,13 +895,6 @@ int kvm_handle_guest_abort(struct kvm_vcpu *vcpu, struct kvm_run *run)
+>  			goto out_unlock;
+>  		}
+>  
+> -		if (fault_status != FSC_FAULT) {
+> -			kvm_err("Unsupported fault status on io memory: %#lx\n",
+> -				fault_status);
+> -			ret = -EFAULT;
+> -			goto out_unlock;
+> -		}
+> -
+>  		/*
+>  		 * The IPA is reported as [MAX:12], so we need to
+>  		 * complement it with the bottom 12 bits from the
+> @@ -910,9 +906,7 @@ int kvm_handle_guest_abort(struct kvm_vcpu *vcpu, struct kvm_run *run)
+>  		goto out_unlock;
+>  	}
+>  
+> -	memslot = gfn_to_memslot(vcpu->kvm, gfn);
+> -
+> -	ret = user_mem_abort(vcpu, fault_ipa, memslot, fault_status);
+> +	ret = user_mem_abort(vcpu, fault_ipa, memslot, hva, fault_status);
+>  	if (ret == 0)
+>  		ret = 1;
+>  out_unlock:
+> diff --git a/arch/arm64/include/uapi/asm/kvm.h b/arch/arm64/include/uapi/asm/kvm.h
+> index e633ff8..f4ec5a6 100644
+> --- a/arch/arm64/include/uapi/asm/kvm.h
+> +++ b/arch/arm64/include/uapi/asm/kvm.h
+> @@ -37,6 +37,7 @@
+>  
+>  #define __KVM_HAVE_GUEST_DEBUG
+>  #define __KVM_HAVE_IRQ_LINE
+> +#define __KVM_HAVE_READONLY_MEM
+>  
+>  #define KVM_REG_SIZE(id)						\
+>  	(1U << (((id) & KVM_REG_SIZE_MASK) >> KVM_REG_SIZE_SHIFT))
 > 
->  #include "proc-macros.S"
-> 
-> @@ -69,19 +70,26 @@ ENDPROC(cpu_cache_off)
->   */
->         .align  5
->  ENTRY(cpu_reset)
-> -       mrs     x1, sctlr_el1
-> -       bic     x1, x1, #1
-> -       msr     sctlr_el1, x1                   // disable the MMU
-> +       mrs     x2, sctlr_el1
-> +       bic     x2, x2, #1
-> +       msr     sctlr_el1, x2                   // disable the MMU
->         isb
->  #if defined(CONFIG_SMP)
->  /*     bl      secondary_shutdown */
->  #endif
-> +       sub     w1, w1, #BOOT_CPU_MODE_EL2
-> +       cbz     w1, __hyp_func_call
->         ret     x0
->  ENDPROC(cpu_reset)
 
-Please base your patches on mainline (or if you need the fixed-up
-soft_restart, the arm64 devel branch).
 
-I thought we'd shot down the idea of the secondary_shutdown call.
-
->  ENTRY(cpu_soft_restart)
-> +       ldr     x3, =__boot_cpu_mode
-> +       add     x3, x3, #4
-> +       ldr     w2, [x3]
-> +
->         mov     x19, x0
->         mov     x20, x1
-> +       mov     w21, w2
-> 
->         /* Turn D-cache off */
->         bl      cpu_cache_off
-> @@ -89,6 +97,7 @@ ENTRY(cpu_soft_restart)
->         bl      flush_cache_all
-> 
->         mov     x0, x20
-> +       mov     w1, w21
->         ret     x19
->  ENDPROC(cpu_soft_restart)
-> #########
-> 
-> I have implemented __hyp_func_call; other userscan
-> make use of it to call __hyp_set_vectors/__hyp_get_vectors
-
-The callers of those functions _must_ be updated in this patch to use
-the new hypercall mechanism.
-
-Thanks,
-Mark.
+-- 
+Jazz is not dead. It just smells funny...
