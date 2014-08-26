@@ -1,58 +1,139 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Tue, 26 Aug 2014 17:52:37 +0900
-Subject: [PATCH] ARM: shmobile: lager: correct memory map
-In-Reply-To: <CAMuHMdVqZ29-jaS+kLwdVycLOMSbz9H7oJGuq3dLH2y-81mVcQ@mail.gmail.com>
-References: <1409021623-10633-1-git-send-email-horms+renesas@verge.net.au>
- <CAOesGMieRk4Dvg=gxTgcVssARkK6DeoaVyK8619B2N5=wwo=Uw@mail.gmail.com>
- <20140826042055.GA12108@verge.net.au>
- <CAMuHMdVqZ29-jaS+kLwdVycLOMSbz9H7oJGuq3dLH2y-81mVcQ@mail.gmail.com>
-Message-ID: <20140826085234.GA29667@verge.net.au>
+From: zonque@gmail.com (Daniel Mack)
+Date: Tue, 26 Aug 2014 10:52:53 +0200
+Subject: [PATCH v9] ARM: omap: edma: add suspend resume hook
+Message-ID: <1409043173-24357-1-git-send-email-zonque@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 26, 2014 at 09:52:10AM +0200, Geert Uytterhoeven wrote:
-> On Tue, Aug 26, 2014 at 6:20 AM, Simon Horman <horms@verge.net.au> wrote:
-> >> > diff --git a/arch/arm/boot/dts/r8a7790-lager.dts b/arch/arm/boot/dts/r8a7790-lager.dts
-> >> > index 0118cbf..84dcafa 100644
-> >> > --- a/arch/arm/boot/dts/r8a7790-lager.dts
-> >> > +++ b/arch/arm/boot/dts/r8a7790-lager.dts
-> >> > @@ -32,7 +32,7 @@
-> >> >                 reg = <0 0x40000000 0 0x40000000>;
-> >> >         };
-> >> >
-> >> > -       memory at 180000000 {
-> >> > +       memory at 140000000 {
-> >>
-> >> That should even be "memory at 1,40000000".
-> >
-> > Two comma-separated 32bit values in the case
-> > where a memory range starts above 4Gb?
-> 
-> Yes. As #address-cells is 2, there should be two values after the "@"
-> (the first one may be optional if it's zero, I don't know for sure?)
-> 
-> > If so it looks like this will be the first user of that syntax
-> > (I don't see any in linux-next today).
-> 
-> No, "git grep '@.*,' -- arch/arm/boot/dts" shows several users.
-> Not all of them are 64-bit memory addresses, but some are.
+This patch makes the edma driver resume correctly after suspend. Tested
+on an AM33xx platform with cyclic audio streams and omap_hsmmc.
 
-Thanks, I like your grep better than mine.
+All information can be reconstructed by already known runtime
+information.
 
-> > I do however see several users of memrory at 64bit_value.
-> > Mostly other renesas fds files; ecx-2000.dts being the exception.
-> > Should they be fixed too?
-> >
-> > $ find -name "*.dts" | xargs grep memory@[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]
-> > ./arch/arm/boot/dts/r8a7791-henninger.dts:      memory at 200000000 {
-> > ./arch/arm/boot/dts/r8a7791-koelsch.dts:        memory at 200000000 {
-> > ./arch/arm/boot/dts/ecx-2000.dts:       memory at 200000000 {
-> > ./arch/arm/boot/dts/r8a73a4-ape6evm-reference.dts:      memory at 200000000 {
-> > ./arch/arm/boot/dts/r8a7790-lager.dts:  memory at 180000000 {
-> > ./arch/arm/boot/dts/r8a73a4-ape6evm.dts:        memory at 200000000 {
-> 
-> Yes, these should be fixed, too.
-> 
-> It's a pity dtc doesn't complain about this.
+As we now use some functions that were previously only used from __init
+context, annotations had to be dropped.
 
-Indeed.
+[nm at ti.com: added error handling for runtime + suspend_late/early_resume]
+Signed-off-by: Nishanth Menon <nm@ti.com>
+Signed-off-by: Daniel Mack <zonque@gmail.com>
+Tested-by: Joel Fernandes <joelf@ti.com>
+Acked-by: Joel Fernandes <joelf@ti.com>
+---
+Changes from v8:
+
+	* Drop the edma_suspend hook altogether. Even though back then
+	  when I wrote the code I was sure disabling the interrupts
+	  during suspend is necessary, tests now show it in fact isn't.
+	  My test setup still works if that code is omitted.
+	* Use SET_LATE_SYSTEM_SLEEP_PM_OPS in the dev_pm_ops
+	  declaration.
+
+	Thanks to Sekhar for pointing out the above.
+
+ arch/arm/common/edma.c | 60 ++++++++++++++++++++++++++++++++++++++++++++++++--
+ 1 file changed, 58 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/common/edma.c b/arch/arm/common/edma.c
+index 485be42..c623dd0 100644
+--- a/arch/arm/common/edma.c
++++ b/arch/arm/common/edma.c
+@@ -244,6 +244,8 @@ struct edma {
+ 	/* list of channels with no even trigger; terminated by "-1" */
+ 	const s8	*noevent;
+ 
++	struct edma_soc_info *info;
++
+ 	/* The edma_inuse bit for each PaRAM slot is clear unless the
+ 	 * channel is in use ... by ARM or DSP, for QDMA, or whatever.
+ 	 */
+@@ -295,7 +297,7 @@ static void map_dmach_queue(unsigned ctlr, unsigned ch_no,
+ 			~(0x7 << bit), queue_no << bit);
+ }
+ 
+-static void __init assign_priority_to_queue(unsigned ctlr, int queue_no,
++static void assign_priority_to_queue(unsigned ctlr, int queue_no,
+ 		int priority)
+ {
+ 	int bit = queue_no * 4;
+@@ -314,7 +316,7 @@ static void __init assign_priority_to_queue(unsigned ctlr, int queue_no,
+  * included in that particular EDMA variant (Eg : dm646x)
+  *
+  */
+-static void __init map_dmach_param(unsigned ctlr)
++static void map_dmach_param(unsigned ctlr)
+ {
+ 	int i;
+ 	for (i = 0; i < EDMA_MAX_DMACH; i++)
+@@ -1762,15 +1764,69 @@ static int edma_probe(struct platform_device *pdev)
+ 			edma_write_array2(j, EDMA_DRAE, i, 1, 0x0);
+ 			edma_write_array(j, EDMA_QRAE, i, 0x0);
+ 		}
++		edma_cc[j]->info = info[j];
+ 		arch_num_cc++;
+ 	}
+ 
+ 	return 0;
+ }
+ 
++static int edma_pm_resume(struct device *dev)
++{
++	int i, j, r;
++
++	r = pm_runtime_get_sync(dev);
++	if (r < 0) {
++		dev_err(dev, "%s: get_sync returned %d\n", __func__, r);
++		return r;
++	}
++
++	for (j = 0; j < arch_num_cc; j++) {
++		struct edma *cc = edma_cc[j];
++
++		s8 (*queue_priority_mapping)[2];
++
++		queue_priority_mapping = cc->info->queue_priority_mapping;
++
++		/* Event queue priority mapping */
++		for (i = 0; queue_priority_mapping[i][0] != -1; i++)
++			assign_priority_to_queue(j,
++						 queue_priority_mapping[i][0],
++						 queue_priority_mapping[i][1]);
++
++		/*
++		 * Map the channel to param entry if channel mapping logic
++		 * exist
++		 */
++		if (edma_read(j, EDMA_CCCFG) & CHMAP_EXIST)
++			map_dmach_param(j);
++
++		for (i = 0; i < cc->num_channels; i++) {
++			if (test_bit(i, cc->edma_inuse)) {
++				/* ensure access through shadow region 0 */
++				edma_or_array2(j, EDMA_DRAE, 0, i >> 5,
++					       BIT(i & 0x1f));
++
++				setup_dma_interrupt(i,
++						    cc->intr_data[i].callback,
++						    cc->intr_data[i].data);
++			}
++		}
++	}
++
++	pm_runtime_put_sync(dev);
++
++	return 0;
++}
++
++static const struct dev_pm_ops edma_pm_ops = {
++	SET_LATE_SYSTEM_SLEEP_PM_OPS(NULL, edma_pm_resume)
++};
++
+ static struct platform_driver edma_driver = {
+ 	.driver = {
+ 		.name	= "edma",
++		.pm	= &edma_pm_ops,
+ 		.of_match_table = edma_of_ids,
+ 	},
+ 	.probe = edma_probe,
+-- 
+2.1.0
