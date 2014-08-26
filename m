@@ -1,34 +1,41 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 26 Aug 2014 08:18:37 +0100
-Subject: [PATCH] ARM: cns3xxx: Don't allocate PCI addresses on stack
-In-Reply-To: <2791908.V6o8lplUAt@wuerfel>
-References: <1408927894-30858-1-git-send-email-broonie@kernel.org>
- <2492333.HstnrugmgL@wuerfel> <2791908.V6o8lplUAt@wuerfel>
-Message-ID: <20140826071837.GW17528@sirena.org.uk>
+From: LW@KARO-electronics.de (Lothar =?UTF-8?B?V2HDn21hbm4=?=)
+Date: Tue, 26 Aug 2014 09:24:09 +0200
+Subject: [PATCHv4 0/4] pwm: imx: support output polarity inversion
+In-Reply-To: <1408517756-9412-1-git-send-email-LW@KARO-electronics.de>
+References: <1408517756-9412-1-git-send-email-LW@KARO-electronics.de>
+Message-ID: <20140826092409.7dea5530@ipc1.ka-ro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 25, 2014 at 01:30:22PM +0200, Arnd Bergmann wrote:
-> On Monday 25 August 2014 12:34:25 Arnd Bergmann wrote:
+Hi,
 
-> > However, refactoring the code to do it right seems like actual work
-> > and I'm not sure we can find anybody to do it, so your hack seems
-> > like the best approximation.
+Lothar Wa?mann wrote:
+> This patch series adds support for polarity inversion to the pwm-imx
+> driver. The patches have been tested on i.MX6, i.MX53 and with the
+> ti-ehrpwm.c driver.
+> 
+> Changes wrt. v2:
+> - make the use of '#pwm-cells = <3>' optional, so that the change does
+>   not break existing DT blobs as suggested by Arnd Bergmann and Sascha
+>   Hauer.
+> 
+> Changes wrt. v3:
+> - implemented the approach suggested by Sascha Hauer 
+> - don't modify struct pwm_ops in the imx_pwm probe function
+> 
+> 
+Any further comments?
+Anyone taking care of these patches?
 
-> I may have spoken too fast. Here is a patch that should deal with the
-> problem more cleanly, and also help prepare that code for a potential
-> move to the changed PCI probing infrastructure that is getting
-> done for arm64.
 
-> Completely untested.
+Lothar Wa?mann
+-- 
+___________________________________________________________
 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
+Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
+Gesch?ftsf?hrer: Matthias Kaussen
+Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
 
-Right, this looks reasonably sensible to me.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140826/07eba653/attachment.sig>
+www.karo-electronics.de | info at karo-electronics.de
+___________________________________________________________
