@@ -1,45 +1,75 @@
-From: geoff@infradead.org (Geoff Levand)
-Date: Tue, 26 Aug 2014 11:42:54 -0700
-Subject: [PATCH 1/9] arm64: Fix efi kernel entry
-In-Reply-To: <CAKv+Gu8V1xXtGZm5ae+NiFGDuNr20TUBhL=vCgQ6J2S5CQJakg@mail.gmail.com>
-References: <cover.1408736066.git.geoff@infradead.org>
- <873e73a998c198de69f6f01f92176be2b613c500.1408736066.git.geoff@infradead.org>
- <20140826155505.GG16482@arm.com>
- <CAKv+Gu8V1xXtGZm5ae+NiFGDuNr20TUBhL=vCgQ6J2S5CQJakg@mail.gmail.com>
-Message-ID: <1409078574.11425.29.camel@smoke>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 26 Aug 2014 19:43:43 +0100
+Subject: Generic communication of boot loader state to the OS
+In-Reply-To: <CAKON4OyENsHnPc528zLnimVY-B2x6-gdBQ6iyYHO60PgHdnvWg@mail.gmail.com>
+References: <CAKON4Oz-PRgXyNKj=T9ymzOOhCMPjBMdYdE1Mr1CHWv3boskiw@mail.gmail.com>
+ <20140826171658.GJ4078@leverpostej>
+ <CAKON4OyENsHnPc528zLnimVY-B2x6-gdBQ6iyYHO60PgHdnvWg@mail.gmail.com>
+Message-ID: <20140826184343.GM4078@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Tue, 2014-08-26 at 18:19 +0200, Ard Biesheuvel wrote:
-> First of all, the 'add x13, x18, #0x16' was carefully chosen to be
-> both a "MZ" prefix and an executable instruction without any harmful
-> side effects. 
-
-OK, I didn't look so closely to realize this was an instruction with out
-side effects.
-
-> So currently, the EFI stub jumps to that add
-> instruction, and not to the 'b stext' that comes after. There is an
-> issue with that, which I have already proposed a patch for (arm64/efi:
-> efistub: jump to 'stext' directly, not through the header), but this
-> is related to the guarantees the UEFI spec gives about where the
-> header gets loaded (if at all).
+On Tue, Aug 26, 2014 at 07:31:09PM +0100, jonsmirl at gmail.com wrote:
+> On Tue, Aug 26, 2014 at 1:16 PM, Mark Rutland <mark.rutland@arm.com> wrote:
+> > Hi Jon,
+> >
+> > On Tue, Aug 26, 2014 at 05:10:00PM +0100, jonsmirl at gmail.com wrote:
+> >> New thread split off from the simple-framebuffer discussion....
+> >>
+> >> Is there a generic, underlying problem here that needs to be solved?
+> >> AFAIK no one has designed a general purpose mechanism for
+> >> communicating boot loader state to the OS. There is the existing
+> >> device tree <chosen> node but it is limited compared to what is
+> >> needed. Maybe we should step back and first design a good solution to
+> >> this basic problem. Then specific solutions for things like
+> >> framebuffers would fall out of the basic design.
+> >
+> > I think the fundamental problem here is unfortunately far too abstract
+> > for the general solution to be any more concrete. The solution to "we
+> > don't communicate boot state" is "we should communicate boot state".
+> >
+> > We can perhaps come up with general guidelines (for instance, the clock
+> > subsystem has assigned-* properties), but I don't think there's a
+> > one-size-fits-all solution.
 > 
-> However, going back to your patch, setting ENTRY() only affects the
-> vmlinux ELF image, and this information gets stripped when creating
-> the binary. Do you need the entry point to be set so you can load
-> vmlinux using the debugger, perhaps? In that case, did you have any
-> problems branching to the add instruction? If so, I would like to know
-> about it.
+> I think it worth taking some time to consider if a one-size-fits-all
+> solution exists for the general issues of communicating between the
+> boot loader and the OS. Things are a lot better now, but I can
+> remember have 20K byte long kernel command lines in the past.  Some
+> random thoughts...
 
-kexec-tools [1] can load vmlinux elf files, and uses ehdr.e_entry as the
-kernel entry point.  I tested without this patch (branching to _text),
-and it works OK, so we can drop this patch.
+As I mentioned, I think we can set general guidelines. Some information
+is just going to be device-specific, so enforcing a particular format
+for everything is going to get in the way. There's no reason there can't
+be common conventions, however.
 
--Geoff
+> Do we even need a kernel command line any more?
 
-[1] https://git.linaro.org/people/geoff.levand/kexec-tools.git
+I quite like being able to override options for test purposes, but we
+don't necessarily have to require a non-empty command line.
 
--Geoff
+> Could EARLY_PRINTK be made automatic with cooperation from the bootloader?
+
+I believe Rob Herring's earlycon patches can set up an earlycon based on
+stdout-path.
+
+> Can we make it all the way from the boot loader to the GUI without
+> having the display flash from mode setting?
+
+If we communicate the display mode and the configuration of the clocks,
+regulators, and memory allocations, probably. We already have the basic
+bindings for all of these, so I think the bulk of the work would be
+convincing the subsystems to do interact in the right way.
+
+> Can I not auto-negotiate network links speed twice (a slow process)?
+
+Perhaps. It depends on what information your particular network
+controller setup needs to pass along (perhaps nothing whatsoever).
+
+> Can 23 years of different solutions be collapsed into a general framework?
+
+I think the only common thing here is that something in a subsystem
+needs to parse the DT early and act on it. We already have initcalls.
+
+Thanks,
+Mark.
