@@ -1,47 +1,58 @@
-From: holler@ahsoftware.de (Alexander Holler)
-Date: Tue, 26 Aug 2014 12:44:35 +0200
-Subject: [RFC PATCH 0/9] dt: dependencies (for deterministic driver
- initialization order based on the DT)
-In-Reply-To: <20140826102503.GC31124@ulmo>
-References: <20140514141914.446F7C4153D@trevor.secretlab.ca>
- <20140821140211.GD19293@ulmo.nvidia.com> <53F64624.5000403@ahsoftware.de>
- <20140822131919.GX21734@leverpostej> <20140825093931.GB2399@ulmo>
- <E1XLu15-0002DP-6o@jdl.com> <20140825133714.GH4163@ulmo.nvidia.com>
- <20140826084208.AE5F0C40989@trevor.secretlab.ca>
- <20140826084922.GG17263@ulmo> <53FC566C.30904@ahsoftware.de>
- <20140826102503.GC31124@ulmo>
-Message-ID: <53FC6513.5040800@ahsoftware.de>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 26 Aug 2014 12:54:03 +0200
+Subject: [PATCH] ARM: bcm: Don't build brcmstb SMP code when building for
+ V6
+In-Reply-To: <20140825172713.GW18411@ld-irv-0074>
+References: <1408673194-16228-1-git-send-email-broonie@kernel.org>
+ <20140822144403.GU24407@sirena.org.uk> <20140825172713.GW18411@ld-irv-0074>
+Message-ID: <45082124.LP9dKIUraq@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 26.08.2014 12:25, schrieb Thierry Reding:
-> On Tue, Aug 26, 2014 at 11:42:04AM +0200, Alexander Holler wrote:
+On Monday 25 August 2014 10:27:13 Brian Norris wrote:
+> On Fri, Aug 22, 2014 at 09:44:03AM -0500, Mark Brown wrote:
+> > On Thu, Aug 21, 2014 at 10:09:07PM -0700, Brian Norris wrote:
+> > > On Thu, Aug 21, 2014 at 09:06:34PM -0500, Mark Brown wrote:
+> > > > From: Mark Brown <broonie@linaro.org>
+> > 
+> > > > building for -march=armv6 as happens when building allmodconfig. Since I
+> > > > have not been able to identify a way to override the compiler architecture
+> > > > selection per file add a Kconfig dependency to ensure this code is not
+> > > > built if V6 support is enabled.
+> > 
+> > > I already proposed this solution to override the compiler architecture,
+> > > in the same pattern as other similar code in the same directory.
+> > 
+> > >   http://article.gmane.org/gmane.linux.drivers.devicetree/84517
+> > 
+> > > My using 'CFLAGS_<obj> += <flags>', you can compile in v7.
+> > 
+> > I tried that but it wasn't doing the right thing for me - it appeared
+> > since the compiler ends up getting both -march=armv7-a and -march=armv6
+> > it complained that it couldn't satisfy both options.  It might be that
+> > this is version dependant or the actual cause wsa something else, I
+> > didn't investigate too hard.
 
->> You need either the type information in the DTB (that's why I've add those
->> "dependencies" to identify phandles), or you need to know every binding (at
->> "dependency-resolve-time" to identify phandles. The latter is impracticable
->> to implement in a generic way (for use with every possible binding).
->
-> Like I already mentioned, this could be done in drivers who contain that
-> information already anyway. Or parts of it could be done in subsystem-
-> specific callbacks where a generic binding is available.
+I've never seen that happen. Normally, the last option just overrides
+all previous conflicting ones.
 
-That would end up with almost the same ugly driver-based workarounds as 
-now. It's much better if a driver author only has to define it's 
-prerequisits (in form of dependencies in the dts) and could be sure the 
-driver will only be probed if those are met, than to do that stuff based 
-on a subsystem or even driver level.
+> If you ever see revisit this or see this again, I'd be interested in
+> seeing the gcc args (make V=1) and version that failed. My fix worked
+> for me, and I'll likely use it for the next revision if I don't find a
+> good reason not to.
 
-If you add dependency-information to drivers, you have two problems:
+FWIW, I haven't seen any problems with the version below:
 
-- How do you get these information from the driver (remember, currently 
-there is only one initial call, a initcall which might do almost anything)
+diff --git a/arch/arm/mach-bcm/Makefile b/arch/arm/mach-bcm/Makefile
+index 67c492aabf4d..546d3d3022a4 100644
+--- a/arch/arm/mach-bcm/Makefile
++++ b/arch/arm/mach-bcm/Makefile
+@@ -38,3 +38,5 @@ ifeq ($(CONFIG_ARCH_BRCMSTB),y)
+ obj-y				+= brcmstb.o
+ obj-$(CONFIG_SMP)		+= headsmp-brcmstb.o platsmp-brcmstb.o
+ endif
++
++CFLAGS_platsmp-brcmstb.o	+= -march=armv7-a
 
-- These information might become outdated and you would have to change 
-all drivers. E.g. if the name of a dependency (driver) changes it 
-wouldn't be done with changing the dts (maybe plural), but you would 
-have to change the source of all dependant drivers too.
 
-Regards,
-
-Alexander Holler
+	Arnd
