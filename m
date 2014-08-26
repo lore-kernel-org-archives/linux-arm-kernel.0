@@ -1,64 +1,52 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 26 Aug 2014 20:02:30 +0100
-Subject: Generic communication of boot loader state to the OS
-In-Reply-To: <CAKON4Oy7SU9kj=DdJ+Oq14ukL7kHP7Qn9bPrQ3PKUL6ZJww=gw@mail.gmail.com>
-References: <CAKON4Oz-PRgXyNKj=T9ymzOOhCMPjBMdYdE1Mr1CHWv3boskiw@mail.gmail.com>
- <20140826182816.GW30401@n2100.arm.linux.org.uk>
- <CAKON4Oy7SU9kj=DdJ+Oq14ukL7kHP7Qn9bPrQ3PKUL6ZJww=gw@mail.gmail.com>
-Message-ID: <20140826190230.GX30401@n2100.arm.linux.org.uk>
+From: alex.williamson@redhat.com (Alex Williamson)
+Date: Tue, 26 Aug 2014 13:02:49 -0600
+Subject: [RFC 9/9] KVM: KVM_VFIO: ARM: implement irq forwarding control
+In-Reply-To: <1408973264-30384-10-git-send-email-eric.auger@linaro.org>
+References: <1408973264-30384-1-git-send-email-eric.auger@linaro.org>
+ <1408973264-30384-10-git-send-email-eric.auger@linaro.org>
+Message-ID: <1409079769.2906.131.camel@ul30vt.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 26, 2014 at 02:39:45PM -0400, jonsmirl at gmail.com wrote:
-> On Tue, Aug 26, 2014 at 2:28 PM, Russell King - ARM Linux
-> <linux@arm.linux.org.uk> wrote:
-> > On Tue, Aug 26, 2014 at 12:10:00PM -0400, jonsmirl at gmail.com wrote:
-> >> As a side effect this will eliminate the need for kernel command line
-> >> parameters describing boot state. Like console="". Over time it might
-> >> even be able to pass a DHCP IP address from uboot into the kernel.
-> >
-> > Err no.  Don't even think about that.  DHCP may be wonderful and all,
-> > but there's a fundamental issue with it: entries time out unless they
-> > are renewed.
-> >
-> > Why is that a problem?  Well, take a DHCP server which hands out
-> > dynamic addresses, and updates the DNS.  When the lease expires, it
-> > tears down the DNS entry.
-> >
-> > Now take a target booting using DHCP in uboot, which then mounts its
-> > root NFS.  If it tries to startup a DHCP client, the first thing the
-> > DHCP client does is to clean up the interface... resulting in it
-> > killing the root NFS connection.  If that doesn't happen, then you
-> > end up with a problem at shutdown, because DHCP clients always
-> > deconfigure the interface when they're killed off - resulting in
-> > "reboot" not being functional.
+On Mon, 2014-08-25 at 15:27 +0200, Eric Auger wrote:
+> Implements ARM specific KVM-VFIO device group commands:
+> - KVM_DEV_VFIO_DEVICE_ASSIGN_IRQ
+> - KVM_DEV_VFIO_DEVICE_DEASSIGN_IRQ
+> capability can be queried using KVM_HAS_DEVICE_ATTR.
 > 
-> I run the same configuration  -  uboot in flash, tftp to load kernel,
-> nfs mount the root. And I do reboot fifty times a day too.  I just put
-> everything on static IPs to avoid problems.
+> The new commands enable to set IRQ forwarding on/off for a given
+> IRQ index of a VFIO platform device.
 > 
-> Would this work if the DHCP client was notified that there already was
-> an IP lease in place?  It could remember that lease and then be
-> responsible for setting it into the interface and renewing it. Right
-> now there is no way to pass this information.
+> as soon as a forwarded irq is set, a reference to the VFIO device
+> is taken by the kvm-vfio device.
 > 
-> Doesn't the DHCP client do the wrong thing simply because it lacks the
-> info to do something better?
+> The kvm-vfio device stores in the kvm_vfio_arch_data the list
+> of "assigned" devices (kvm_vfio_device). Each kvm_vfio_device
+> stores the list of assigned IRQs (potentially allowed a subset of
+> IRQ to be forwarded)
+> 
+> The kvm-vfio device programs both the GIC and vGIC. Also it
+> clears the active bit on destruction, in case the guest did not
+> do it itself.
+> 
+> Changing the forwarded state is not allowed in the critical
+> section starting from VFIO IRQ handler to LR programming. It is
+> up to the client to take care of this.
+> 
+> Signed-off-by: Eric Auger <eric.auger@linaro.org>
+> ---
+>  arch/arm/include/asm/kvm_host.h |   2 +
+>  arch/arm/kvm/Makefile           |   2 +-
+>  arch/arm/kvm/kvm_vfio_arm.c     | 599 ++++++++++++++++++++++++++++++++++++++++
+>  3 files changed, 602 insertions(+), 1 deletion(-)
+>  create mode 100644 arch/arm/kvm/kvm_vfio_arm.c
 
-It can get the already configured IP address if the kernel (or initramfs)
-has already configured the interface - it's already available from the
-interface itself.  So it's not that there's no way to pass this to DHCP,
-it's that DHCP always starts out assuming that it's the new kid on the
-block.
+I'm really happy that it seems like the kvm-vfio device is going to work
+for you, but I think too much stuff is being pushed out to arch code
+here.  Exporting the interfaces in patches 7 & 8 are setting the stage
+for duplicate code for anyone wanting to implement device attributes.
+Instead, I think the core code should support the list of
+kvm_vfio_devices with proper cleanup, and we should attempt to access
+the kvm_vfio_ callbacks as little as possible from arch code.  Thanks,
 
-Solving that problem doesn't get away from the shutdown problem though.
-You can partially avoid it by not having interfaces brought down, but
-one of the things that distros commonly do is kill all processes during
-shutdown... which kills the DHCP client, and then causes the interface
-to be deconfigured... which then stalls the reboot operation because
-suddenly the root-NFS server is no longer available... Gosh, why did
-that happen I wonder...
-
--- 
-FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
-according to speedtest.net.
+Alex
