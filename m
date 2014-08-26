@@ -1,9 +1,9 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 26 Aug 2014 11:03:37 +0100
-Subject: [PATCH v2 22/26] ARM: imx: avic: convert to handle_domain_irq
+Date: Tue, 26 Aug 2014 11:03:38 +0100
+Subject: [PATCH v2 23/26] ARM: imx: tzic: convert to handle_domain_irq
 In-Reply-To: <1409047421-27649-1-git-send-email-marc.zyngier@arm.com>
 References: <1409047421-27649-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1409047421-27649-23-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1409047421-27649-24-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -11,21 +11,22 @@ Use the new handle_domain_irq method to handle interrupts.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm/mach-imx/avic.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/mach-imx/tzic.c | 3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-imx/avic.c b/arch/arm/mach-imx/avic.c
-index 24b103c..1a89323 100644
---- a/arch/arm/mach-imx/avic.c
-+++ b/arch/arm/mach-imx/avic.c
-@@ -144,7 +144,7 @@ static void __exception_irq_entry avic_handle_irq(struct pt_regs *regs)
- 		if (nivector == 0xffff)
- 			break;
- 
--		handle_IRQ(irq_find_mapping(domain, nivector), regs);
-+		handle_domain_irq(domain, nivector, regs);
- 	} while (1);
- }
- 
+diff --git a/arch/arm/mach-imx/tzic.c b/arch/arm/mach-imx/tzic.c
+index 1d4f384..4de65ee 100644
+--- a/arch/arm/mach-imx/tzic.c
++++ b/arch/arm/mach-imx/tzic.c
+@@ -141,8 +141,7 @@ static void __exception_irq_entry tzic_handle_irq(struct pt_regs *regs)
+ 			while (stat) {
+ 				handled = 1;
+ 				irqofs = fls(stat) - 1;
+-				handle_IRQ(irq_find_mapping(domain,
+-						irqofs + i * 32), regs);
++				handle_domain_irq(domain, irqofs + i * 32, regs);
+ 				stat &= ~(1 << irqofs);
+ 			}
+ 		}
 -- 
 2.0.4
