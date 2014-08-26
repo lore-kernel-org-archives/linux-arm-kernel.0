@@ -1,53 +1,50 @@
-From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
-Date: Tue, 26 Aug 2014 15:46:18 -0700
-Subject: [PATCH] input: misc: drv260x: add check for ERM mode and LRA
- Libraries
-In-Reply-To: <1408716696-1126-1-git-send-email-dmurphy@ti.com>
-References: <1408716696-1126-1-git-send-email-dmurphy@ti.com>
-Message-ID: <20140826224618.GD8377@core.coreip.homeip.net>
+From: scottwood@freescale.com (Scott Wood)
+Date: Tue, 26 Aug 2014 17:51:03 -0500
+Subject: [RESEND] clk: ppc-corenet: Add Freescale ARM-based platforms
+ CLK_OF_DECLARE support
+In-Reply-To: <1408700096-25415-1-git-send-email-jingchang.lu@freescale.com>
+References: <1408700096-25415-1-git-send-email-jingchang.lu@freescale.com>
+Message-ID: <1409093463.6510.92.camel@snotra.buserror.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 22, 2014 at 09:11:36AM -0500, Dan Murphy wrote:
-> Add a check to ensure that LRA libraries are not mixed with
-> the ERM mode.
-> 
-> If ERM mode and the Library is empty "OR" the
-> LRA library then exit.
-> 
-> As the LRA and empty libraries are not applicable for
-> the ERM actuator.
-> 
-> Signed-off-by: Dan Murphy <dmurphy@ti.com>
-
-Applied, thank you.
-
+On Fri, 2014-08-22 at 17:34 +0800, Jingchang Lu wrote:
+> Signed-off-by: Jingchang Lu <jingchang.lu@freescale.com>
 > ---
->  drivers/input/misc/drv260x.c |    8 ++++++++
->  1 file changed, 8 insertions(+)
+>  drivers/clk/Kconfig           | 7 ++++---
+>  drivers/clk/clk-ppc-corenet.c | 5 +++++
+>  2 files changed, 9 insertions(+), 3 deletions(-)
 > 
-> diff --git a/drivers/input/misc/drv260x.c b/drivers/input/misc/drv260x.c
-> index a7a19e6..d6a26a7 100644
-> --- a/drivers/input/misc/drv260x.c
-> +++ b/drivers/input/misc/drv260x.c
-> @@ -564,6 +564,14 @@ static int drv260x_probe(struct i2c_client *client,
->  		return -EINVAL;
->  	}
+> diff --git a/drivers/clk/Kconfig b/drivers/clk/Kconfig
+> index cfd3af7..8784704 100644
+> --- a/drivers/clk/Kconfig
+> +++ b/drivers/clk/Kconfig
+> @@ -82,11 +82,12 @@ config COMMON_CLK_AXI_CLKGEN
+>  	  FPGAs. It is commonly used in Analog Devices' reference designs.
 >  
-> +	if (haptics->mode == DRV260X_ERM_MODE &&
-> +	    haptics->library == DRV260X_LIB_EMPTY ||
-> +	    haptics->library == DRV260X_LIB_LRA) {
-> +		dev_err(&client->dev,
-> +			"ERM Mode with LRA Library mismatch\n");
-> +		return -EINVAL;
-> +	}
-> +
->  	haptics->regulator = devm_regulator_get(&client->dev, "vbat");
->  	if (IS_ERR(haptics->regulator)) {
->  		error = PTR_ERR(haptics->regulator);
-> -- 
-> 1.7.9.5
-> 
+>  config CLK_PPC_CORENET
+> -	bool "Clock driver for PowerPC corenet platforms"
+> -	depends on PPC_E500MC && OF
+> +	bool "Clock driver for PowerPC corenet and compatible ARM-based platforms"
+> +	depends on (PPC_E500MC || ARM) && OF
 
--- 
-Dmitry
+Should the symbol and driver be renamed to something like CLK_FSL_QORIQ?
+
+> diff --git a/drivers/clk/clk-ppc-corenet.c b/drivers/clk/clk-ppc-corenet.c
+> index 8e58edf..7692cac 100644
+> --- a/drivers/clk/clk-ppc-corenet.c
+> +++ b/drivers/clk/clk-ppc-corenet.c
+> @@ -305,3 +305,8 @@ static int __init ppc_corenet_clk_init(void)
+>  	return platform_driver_register(&ppc_corenet_clk_driver);
+>  }
+>  subsys_initcall(ppc_corenet_clk_init);
+> +
+> +CLK_OF_DECLARE(ppc_core_pll_v1, "fsl,qoriq-core-pll-1.0", core_pll_init);
+> +CLK_OF_DECLARE(ppc_core_pll_v2, "fsl,qoriq-core-pll-2.0", core_pll_init);
+> +CLK_OF_DECLARE(ppc_core_mux_v1, "fsl,qoriq-core-mux-1.0", core_mux_init);
+> +CLK_OF_DECLARE(ppc_core_mux_v2, "fsl,qoriq-core-mux-2.0", core_mux_init);
+
+What does this do that the existing platform driver and match table
+don't?  Why is it needed for ARM when PPC didn't need it?
+
+-Scott
