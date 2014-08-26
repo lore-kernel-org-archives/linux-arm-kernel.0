@@ -1,33 +1,23 @@
-From: gdjakov@mm-sol.com (Georgi Djakov)
-Date: Tue, 26 Aug 2014 18:39:38 +0300
-Subject: [PATCH v1 2/2] ARM: dts: qcom: Enable serial port on IFC6540 boards
-In-Reply-To: <1409067578-30272-1-git-send-email-gdjakov@mm-sol.com>
-References: <1409067578-30272-1-git-send-email-gdjakov@mm-sol.com>
-Message-ID: <1409067578-30272-3-git-send-email-gdjakov@mm-sol.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 26 Aug 2014 16:55:06 +0100
+Subject: [PATCH 1/9] arm64: Fix efi kernel entry
+In-Reply-To: <873e73a998c198de69f6f01f92176be2b613c500.1408736066.git.geoff@infradead.org>
+References: <cover.1408736066.git.geoff@infradead.org>
+ <873e73a998c198de69f6f01f92176be2b613c500.1408736066.git.geoff@infradead.org>
+Message-ID: <20140826155505.GG16482@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable the serial port on the IFC6540 boards.
+On Fri, Aug 22, 2014 at 08:49:15PM +0100, Geoff Levand wrote:
+> The recent addition of EFI support has changed the way the arm64 kernel
+> image is entered based on whether or not CONFIG_EFI is defined.  To support
+> this conditional entry point add a new global symbol start to head.S that
+> marks the entry, and change the the linker script ENTRY() command to define
+> start as the kernel entry.
 
-Signed-off-by: Georgi Djakov <gdjakov@mm-sol.com>
----
- arch/arm/boot/dts/qcom-apq8084-ifc6540.dts |    6 ++++++
- 1 file changed, 6 insertions(+)
+I don't yet understand what the problem is. The _text symbol is
+currently defined in vmlinux.lds.S to be the beginning of the .head.text
+section. Whether we have CONFIG_EFI or not, the entry point is the same.
 
-diff --git a/arch/arm/boot/dts/qcom-apq8084-ifc6540.dts b/arch/arm/boot/dts/qcom-apq8084-ifc6540.dts
-index 4603e91..e41cb8a 100644
---- a/arch/arm/boot/dts/qcom-apq8084-ifc6540.dts
-+++ b/arch/arm/boot/dts/qcom-apq8084-ifc6540.dts
-@@ -3,4 +3,10 @@
- / {
- 	model = "Qualcomm APQ8084/IFC6540";
- 	compatible = "qcom,apq8084-ifc6540", "qcom,apq8084";
-+
-+	soc {
-+		serial at f995e000 {
-+			status = "okay";
-+		};
-+	};
- };
 -- 
-1.7.9.5
+Catalin
