@@ -1,76 +1,31 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Tue, 26 Aug 2014 13:08:28 +0200
-Subject: [RFC PATCH 0/9] dt: dependencies (for deterministic driver
- initialization order based on the DT)
-In-Reply-To: <53FC6513.5040800@ahsoftware.de>
-References: <53F64624.5000403@ahsoftware.de>
- <20140822131919.GX21734@leverpostej> <20140825093931.GB2399@ulmo>
- <E1XLu15-0002DP-6o@jdl.com> <20140825133714.GH4163@ulmo.nvidia.com>
- <20140826084208.AE5F0C40989@trevor.secretlab.ca>
- <20140826084922.GG17263@ulmo> <53FC566C.30904@ahsoftware.de>
- <20140826102503.GC31124@ulmo> <53FC6513.5040800@ahsoftware.de>
-Message-ID: <20140826110827.GA31350@ulmo>
+From: vincent.guittot@linaro.org (Vincent Guittot)
+Date: Tue, 26 Aug 2014 13:06:55 +0200
+Subject: [PATCH v5 12/12] sched: add SD_PREFER_SIBLING for SMT level
+In-Reply-To: <1409051215-16788-1-git-send-email-vincent.guittot@linaro.org>
+References: <1409051215-16788-1-git-send-email-vincent.guittot@linaro.org>
+Message-ID: <1409051215-16788-13-git-send-email-vincent.guittot@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 26, 2014 at 12:44:35PM +0200, Alexander Holler wrote:
-> Am 26.08.2014 12:25, schrieb Thierry Reding:
-> >On Tue, Aug 26, 2014 at 11:42:04AM +0200, Alexander Holler wrote:
-> 
-> >>You need either the type information in the DTB (that's why I've add those
-> >>"dependencies" to identify phandles), or you need to know every binding (at
-> >>"dependency-resolve-time" to identify phandles. The latter is impracticable
-> >>to implement in a generic way (for use with every possible binding).
-> >
-> >Like I already mentioned, this could be done in drivers who contain that
-> >information already anyway. Or parts of it could be done in subsystem-
-> >specific callbacks where a generic binding is available.
-> 
-> That would end up with almost the same ugly driver-based workarounds as now.
-> It's much better if a driver author only has to define it's prerequisits (in
-> form of dependencies in the dts) and could be sure the driver will only be
-> probed if those are met, than to do that stuff based on a subsystem or even
-> driver level.
-> 
-> If you add dependency-information to drivers, you have two problems:
+add the SD_PREFER_SIBLING flag for SMT level in order to ensure that
+the scheduler will put at least 1 task per core.
 
-We already have all that dependency information in drivers anyway. Each
-driver requests the resources at .probe() time. What I proposed (it was
-really Arnd who proposed it first) is to move that information out of
-code and into some sort of table that could be used by the driver core
-to figure out dependencies.
+Signed-off-by: Vincent Guittot <vincent.guittot@linaro.org>
+---
+ kernel/sched/core.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-> - How do you get these information from the driver (remember, currently
-> there is only one initial call, a initcall which might do almost anything)
-
-While I don't think it's necessary, that's something that could be
-changed. I mean, we have access to the full source code of this
-operating system, so we can change every aspect of it. If we can't find
-a way to make this work with the current initcall sequence it's always
-an option to extend that sequence so that it meets our needs.
-
-> - These information might become outdated and you would have to change all
-> drivers. E.g. if the name of a dependency (driver) changes it wouldn't be
-> done with changing the dts (maybe plural), but you would have to change the
-> source of all dependant drivers too.
-
-No. Drivers implement a DT binding. That binding defines what power
-supplies, clocks, pinmux, ... the device needs. Those constitute the
-dependencies. We most certainly don't want to depend on driver names
-since there can be a multitude of different drivers that provide a given
-dependency.
-
-What drivers should provide (and what they already provide today) is the
-name of the property and the index of the cell that they expect to find
-a phandle in as well as the type of the phandle. That's all that's
-necessary, really. Everything else can be derived from that phandle and
-the type.
-
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140826/51d19b22/attachment.sig>
+diff --git a/kernel/sched/core.c b/kernel/sched/core.c
+index 7c3b237..ab5ab60 100644
+--- a/kernel/sched/core.c
++++ b/kernel/sched/core.c
+@@ -6093,6 +6093,7 @@ sd_init(struct sched_domain_topology_level *tl, int cpu)
+ 	 */
+ 
+ 	if (sd->flags & SD_SHARE_CPUCAPACITY) {
++		sd->flags |= SD_PREFER_SIBLING;
+ 		sd->imbalance_pct = 110;
+ 		sd->smt_gain = 1178; /* ~15% */
+ 
+-- 
+1.9.1
