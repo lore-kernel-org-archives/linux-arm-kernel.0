@@ -1,52 +1,48 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 26 Aug 2014 15:22:07 +0200
-Subject: [linux-sunxi] Re: [PATCH 4/4] simplefb: add clock handling code
-In-Reply-To: <20140826084026.GF17263@ulmo>
-References: <20140825121228.GB4163@ulmo.nvidia.com>
- <20140825124410.GZ15297@lukather>
- <20140825133953.GJ4163@ulmo.nvidia.com>
- <53FB3E7F.4000503@redhat.com>
- <20140825141600.GA14763@ulmo.nvidia.com>
- <CAKON4OyjJ+QcBGOzrUDH9J+DxBEKLmXeOcnUyOHHHV_DtCG0zA@mail.gmail.com>
- <53FB47B8.2090104@redhat.com>
- <20140825151255.GA14967@ulmo.nvidia.com>
- <20140825151822.GC21020@skynet.be> <20140826084026.GF17263@ulmo>
-Message-ID: <20140826132207.GL15297@lukather>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 26 Aug 2014 15:26:58 +0200
+Subject: [PATCH 5/6] arm64: Port SWP/SWPB emulation support from arm
+In-Reply-To: <20140826122542.GL23445@arm.com>
+References: <1409048930-21598-1-git-send-email-punit.agrawal@arm.com>
+ <7433994.DUuXUlazW0@wuerfel> <20140826122542.GL23445@arm.com>
+Message-ID: <5600657.GfhaIFRH9n@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 26, 2014 at 10:40:27AM +0200, Thierry Reding wrote:
-> On Mon, Aug 25, 2014 at 05:18:22PM +0200, Luc Verhaegen wrote:
-> > On Mon, Aug 25, 2014 at 05:12:58PM +0200, Thierry Reding wrote:
+On Tuesday 26 August 2014 13:25:43 Will Deacon wrote:
+> On Tue, Aug 26, 2014 at 12:32:23PM +0100, Arnd Bergmann wrote:
+> > On Tuesday 26 August 2014 11:28:49 Punit Agrawal wrote:
 > > > 
-> > > Out of curiosity, how does this work in practice? How does the
-> > > bootloader create this entry? Does it scan the DT to see which clocks
-> > > the real hardware device references and then simply copies them to the
-> > > simplefb node?
-> > > 
-> > > Thierry
+> > > This patch ports the alternative solution to emulate the SWP and SWPB
+> > > instructions using LDXR/STXR sequences from the arm port to
+> > > arm64. Additionaly, the patch also proivdes support to log the
+> > > emulation statistics via debugfs.
 > > 
-> > https://www.mail-archive.com/linux-sunxi at googlegroups.com/msg06619.html
+> > I'm not sure that putting this into debugfs is a good idea in this
+> > case: while in general that is considered a good place for this
+> > kind of debugging information, we already have a precedent on arm32
+> > for using procfs, and I see no reason to introduce an incompatible
+> > interface for arm64.
+> > 
+> > You also add an interface for disabling the feature at runtime,
+> > which we don't have on arm32, but that interface is not available
+> > if debugfs is disabled or not mounted. Maybe a sysctl would be
+> > more appropriate? That one could also be shared with arm32.
 > 
-> That looks like a royal pain. Again, I think it'd be much simpler (but
-> not less code, unfortunately) to do this on a per-resource basis. That
-> way these low-level firmware drivers in the kernel can stay trivial,
-> keeping the real complexity where they belong: in hardware-specific
-> drivers such as DRM/KMS.
+> One advantage of using debugfs is that it provides a place to keep
+> controls/statistics for any emulations that we add in the future, as opposed
+> to littering them around in /proc or (worse) having a mixture of the two.
 
-So we have to write a DRM/KMS driver in order to have display working
-while waiting for a DRM/KMS driver to be worked on? Come on...
+Yes, I understood that. I just had another idea: would it make sense to
+use a tracepoint rather than a simple counter? That way you can actually
+see who is using those instructions with ftrace.
 
-Maxime
+You still wouldn't get the files in the same place as the enable switch
+though. The easiest way to implement that switch btw would be a
+module_param: It can be passed on the command line (using
+swp_emulate.enable=0) or at runtime by writing to
+/sys/module/swp_emulate/parameters/enable.
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140826/9ce87b4d/attachment.sig>
+If we do both, there is no longer a need to have any debugfs file logic,
+which is also a plus.
+
+	Arnd
