@@ -1,50 +1,25 @@
-From: jean.pihet@linaro.org (Jean Pihet)
-Date: Tue, 26 Aug 2014 16:43:10 +0200
-Subject: [PATCH 11/11] arm64: perf: don't rely on layout of pt_regs when
- grabbing sp or pc
-In-Reply-To: <1409062410-25891-12-git-send-email-will.deacon@arm.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Tue, 26 Aug 2014 16:49:37 +0200
+Subject: [PATCH 03/11] KVM: ARM/arm64: avoid returning negative error
+ code as bool
+In-Reply-To: <1409062410-25891-4-git-send-email-will.deacon@arm.com>
 References: <1409062410-25891-1-git-send-email-will.deacon@arm.com>
- <1409062410-25891-12-git-send-email-will.deacon@arm.com>
-Message-ID: <CAFrcx1moWmtAtuJaR79JpabzUfqwgn4hKL4ZtfR1mDxquF3jZw@mail.gmail.com>
+ <1409062410-25891-4-git-send-email-will.deacon@arm.com>
+Message-ID: <20140826144937.GA6689@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will,
-
-On 26 August 2014 16:13, Will Deacon <will.deacon@arm.com> wrote:
-> The current perf_regs code relies on sp and pc sitting just off the end
-> of the pt_regs->regs array. This is ugly and fragile, so this patch
-> checks for these register explicitly and returns the appropriate field.
-That is correct but costs you some code to test the index.
-
-Acked-by: Jean Pihet <jean.pihet@linaro.org>
-
-Jean
-
->
-> Cc: Jean Pihet <jean.pihet@linaro.org>
+On Tue, Aug 26, 2014 at 03:13:22PM +0100, Will Deacon wrote:
+> is_valid_cache returns true if the specified cache is valid.
+> Unfortunately, if the parameter passed it out of range, we return
+> -ENOENT, which ends up as true leading to potential hilarity.
+> 
+> This patch returns false on the failure path instead.
+> 
+> Cc: Christoffer Dall <christoffer.dall@linaro.org>
+> Cc: Marc Zyngier <marc.zyngier@arm.com>
 > Signed-off-by: Will Deacon <will.deacon@arm.com>
-> ---
->  arch/arm64/kernel/perf_regs.c | 6 ++++++
->  1 file changed, 6 insertions(+)
->
-> diff --git a/arch/arm64/kernel/perf_regs.c b/arch/arm64/kernel/perf_regs.c
-> index 422ebd63b619..6762ad705587 100644
-> --- a/arch/arm64/kernel/perf_regs.c
-> +++ b/arch/arm64/kernel/perf_regs.c
-> @@ -24,6 +24,12 @@ u64 perf_reg_value(struct pt_regs *regs, int idx)
->                         return regs->compat_lr;
->         }
->
-> +       if ((u32)idx == PERF_REG_ARM64_SP)
-> +               return regs->sp;
-> +
-> +       if ((u32)idx == PERF_REG_ARM64_PC)
-> +               return regs->pc;
-> +
->         return regs->regs[idx];
->  }
->
-> --
-> 2.1.0.rc1
->
+
+nice one!
+
+Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
