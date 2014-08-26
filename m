@@ -1,164 +1,79 @@
-From: lauraa@codeaurora.org (Laura Abbott)
-Date: Tue, 26 Aug 2014 09:58:43 -0700
-Subject: [PATCHv7 3/5] common: dma-mapping: Introduce common remapping
- functions
-In-Reply-To: <CAAG0J99=wrz4+c49HeDvL0W9rDZKk2HNLdVtHv4ZJxU4-OjewA@mail.gmail.com>
-References: <1407800431-21566-1-git-send-email-lauraa@codeaurora.org>	<1407800431-21566-4-git-send-email-lauraa@codeaurora.org>
- <CAAG0J99=wrz4+c49HeDvL0W9rDZKk2HNLdVtHv4ZJxU4-OjewA@mail.gmail.com>
-Message-ID: <53FCBCC3.5040901@codeaurora.org>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 26 Aug 2014 17:58:47 +0100
+Subject: [PATCH v2 02/26] arm64: convert handle_IRQ to use
+ __handle_domain_irq
+In-Reply-To: <20140826165138.GM16482@arm.com>
+References: <1409047421-27649-1-git-send-email-marc.zyngier@arm.com>
+ <1409047421-27649-3-git-send-email-marc.zyngier@arm.com>
+ <20140826165138.GM16482@arm.com>
+Message-ID: <53FCBCC7.3090004@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 8/26/2014 3:05 AM, James Hogan wrote:
-> On 12 August 2014 00:40, Laura Abbott <lauraa@codeaurora.org> wrote:
+On 26/08/14 17:51, Catalin Marinas wrote:
+> On Tue, Aug 26, 2014 at 11:03:17AM +0100, Marc Zyngier wrote:
+>> In order to limit code duplication, convert the architecture specific
+>> handle_IRQ to use the generic __handle_domain_irq function.
 >>
->> For architectures without coherent DMA, memory for DMA may
->> need to be remapped with coherent attributes. Factor out
->> the the remapping code from arm and put it in a
->> common location to reduce code duplication.
+>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+>> ---
+>>  arch/arm64/Kconfig      |  1 +
+>>  arch/arm64/kernel/irq.c | 18 +-----------------
+>>  2 files changed, 2 insertions(+), 17 deletions(-)
 >>
->> As part of this, the arm APIs are now migrated away from
->> ioremap_page_range to the common APIs which use map_vm_area for remapping.
->> This should be an equivalent change and using map_vm_area is more
->> correct as ioremap_page_range is intended to bring in io addresses
->> into the cpu space and not regular kernel managed memory.
->>
->> Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
->> Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
+>> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+>> index fd4e81a..1f16ed9 100644
+>> --- a/arch/arm64/Kconfig
+>> +++ b/arch/arm64/Kconfig
+>> @@ -30,6 +30,7 @@ config ARM64
+>>  	select GENERIC_STRNCPY_FROM_USER
+>>  	select GENERIC_STRNLEN_USER
+>>  	select GENERIC_TIME_VSYSCALL
+>> +	select HANDLE_DOMAIN_IRQ
+>>  	select HARDIRQS_SW_RESEND
+>>  	select HAVE_ARCH_AUDITSYSCALL
+>>  	select HAVE_ARCH_JUMP_LABEL
+>> diff --git a/arch/arm64/kernel/irq.c b/arch/arm64/kernel/irq.c
+>> index 0f08dfd..2c0e2a7 100644
+>> --- a/arch/arm64/kernel/irq.c
+>> +++ b/arch/arm64/kernel/irq.c
+>> @@ -48,23 +48,7 @@ int arch_show_interrupts(struct seq_file *p, int prec)
+>>   */
+>>  void handle_IRQ(unsigned int irq, struct pt_regs *regs)
+>>  {
+>> -	struct pt_regs *old_regs = set_irq_regs(regs);
+>> -
+>> -	irq_enter();
+>> -
+>> -	/*
+>> -	 * Some hardware gives randomly wrong interrupts.  Rather
+>> -	 * than crashing, do something sensible.
+>> -	 */
+>> -	if (unlikely(irq >= nr_irqs)) {
+>> -		pr_warn_ratelimited("Bad IRQ%u\n", irq);
+>> -		ack_bad_irq(irq);
+>> -	} else {
+>> -		generic_handle_irq(irq);
+>> -	}
+>> -
+>> -	irq_exit();
+>> -	set_irq_regs(old_regs);
+>> +	__handle_domain_irq(NULL, irq, false, regs);
+>>  }
 > 
-> This commit in linux-next () breaks the build for metag:
+> The only thing that's missing is a pr_warn_ratelimited(). Do we still
+> need it? We could add it to ack_bad_irq() though.
+
+Indeed, we could move the warning to ack_bad_irq(), which is always
+architecture specific. I'll add that to the next version of the series.
+
+> Either way:
 > 
-> drivers/base/dma-mapping.c: In function ?dma_common_contiguous_remap?:
-> drivers/base/dma-mapping.c:294: error: implicit declaration of
-> function ?dma_common_pages_remap?
-> drivers/base/dma-mapping.c:294: warning: assignment makes pointer from
-> integer without a cast
-> drivers/base/dma-mapping.c: At top level:
-> drivers/base/dma-mapping.c:308: error: conflicting types for
-> ?dma_common_pages_remap?
-> drivers/base/dma-mapping.c:294: error: previous implicit declaration
-> of ?dma_common_pages_remap? was here
-> 
-> Looks like metag isn't alone either:
-> 
-> $ git grep -L dma-mapping-common arch/*/include/asm/dma-mapping.h
-> arch/arc/include/asm/dma-mapping.h
-> arch/avr32/include/asm/dma-mapping.h
-> arch/blackfin/include/asm/dma-mapping.h
-> arch/c6x/include/asm/dma-mapping.h
-> arch/cris/include/asm/dma-mapping.h
-> arch/frv/include/asm/dma-mapping.h
-> arch/m68k/include/asm/dma-mapping.h
-> arch/metag/include/asm/dma-mapping.h
-> arch/mn10300/include/asm/dma-mapping.h
-> arch/parisc/include/asm/dma-mapping.h
-> arch/xtensa/include/asm/dma-mapping.h
-> 
-> I've checked a couple of these arches (blackfin, xtensa) which don't
-> include dma-mapping-common.h and their builds seem to be broken too.
-> 
-> Cheers
-> James
+> Acked-by: Catalin Marinas <catalin.marinas@arm.com>
 > 
 
-Thanks for the report. Would you mind giving the following patch
-a test (this is theoretical only but I think it should work)
+Thanks,
 
------8<------
-
->From 81c9a5504cbc1d72ff1df084d48502b248cd79d0 Mon Sep 17 00:00:00 2001
-From: Laura Abbott <lauraa@codeaurora.org>
-Date: Tue, 26 Aug 2014 09:50:49 -0700
-Subject: [PATCH] common: dma-mapping: Swap function order
-
-Fix the order of dma_common_contiguous_remap and
-dma_common_pages_remap to avoid function declaration errors:
-
-drivers/base/dma-mapping.c: In function 'dma_common_contiguous_remap':
-drivers/base/dma-mapping.c:294: error: implicit declaration of
-function 'dma_common_pages_remap'
-drivers/base/dma-mapping.c:294: warning: assignment makes pointer from
-integer without a cast
-drivers/base/dma-mapping.c: At top level:
-drivers/base/dma-mapping.c:308: error: conflicting types for
-'dma_common_pages_remap'
-drivers/base/dma-mapping.c:294: error: previous implicit declaration
-of 'dma_common_pages_remap' was here
-
-Change-Id: I65db739114e8f5816a24a279a2ff1a6dc92e2b83
-Reported-by: James Hogan <james.hogan@imgtec.com>
-Reported-by: kbuild test robot <fengguang.wu@intel.com>
-Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
----
- drivers/base/dma-mapping.c | 44 ++++++++++++++++++++++----------------------
- 1 file changed, 22 insertions(+), 22 deletions(-)
-
-diff --git a/drivers/base/dma-mapping.c b/drivers/base/dma-mapping.c
-index 1bc46df..056fd46 100644
---- a/drivers/base/dma-mapping.c
-+++ b/drivers/base/dma-mapping.c
-@@ -271,6 +271,28 @@ int dma_common_mmap(struct device *dev, struct vm_area_struct *vma,
- EXPORT_SYMBOL(dma_common_mmap);
- 
- /*
-+ * remaps an array of PAGE_SIZE pages into another vm_area
-+ * Cannot be used in non-sleeping contexts
-+ */
-+void *dma_common_pages_remap(struct page **pages, size_t size,
-+			unsigned long vm_flags, pgprot_t prot,
-+			const void *caller)
-+{
-+	struct vm_struct *area;
-+
-+	area = get_vm_area_caller(size, vm_flags, caller);
-+	if (!area)
-+		return NULL;
-+
-+	if (map_vm_area(area, prot, pages)) {
-+		vunmap(area->addr);
-+		return NULL;
-+	}
-+
-+	return area->addr;
-+}
-+
-+/*
-  * remaps an allocated contiguous region into another vm_area.
-  * Cannot be used in non-sleeping contexts
-  */
-@@ -299,28 +321,6 @@ void *dma_common_contiguous_remap(struct page *page, size_t size,
- }
- 
- /*
-- * remaps an array of PAGE_SIZE pages into another vm_area
-- * Cannot be used in non-sleeping contexts
-- */
--void *dma_common_pages_remap(struct page **pages, size_t size,
--			unsigned long vm_flags, pgprot_t prot,
--			const void *caller)
--{
--	struct vm_struct *area;
--
--	area = get_vm_area_caller(size, vm_flags, caller);
--	if (!area)
--		return NULL;
--
--	if (map_vm_area(area, prot, pages)) {
--		vunmap(area->addr);
--		return NULL;
--	}
--
--	return area->addr;
--}
--
--/*
-  * unmaps a range previously mapped by dma_common_*_remap
-  */
- void dma_common_free_remap(void *cpu_addr, size_t size, unsigned long vm_flags)
+	M.
 -- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by The Linux Foundation
-
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+Jazz is not dead. It just smells funny...
