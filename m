@@ -1,70 +1,46 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 26 Aug 2014 10:07:06 +0100
-Subject: [PATCH v6 4/6] mfd: Add hi6421 PMIC core driver
-In-Reply-To: <53FAFF03.1000301@linaro.org>
-References: <1408367356-2628-1-git-send-email-guodong.xu@linaro.org>
- <1408367356-2628-5-git-send-email-guodong.xu@linaro.org>
- <20140820080912.GG4266@lee--X1> <53FAFF03.1000301@linaro.org>
-Message-ID: <20140826090706.GF9574@lee--X1>
+From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
+Date: Tue, 26 Aug 2014 11:08:07 +0200
+Subject: [PATCH v9 1/2] regulator: Add driver for max77802 PMIC PMIC
+ regulators
+In-Reply-To: <20140826071721.GV17528@sirena.org.uk>
+References: <CA+NduCDL65=Y=PyU3FfXsTz0FfbmYzicGrY4U7ji3_V+nXhtCQ@mail.gmail.com>
+ <53F73472.8010609@collabora.co.uk> <20140822144531.GV24407@sirena.org.uk>
+ <53F7838F.8060906@collabora.co.uk> <20140822183054.GY24407@sirena.org.uk>
+ <53F7BDD8.7060500@collabora.co.uk>
+ <CAD=FV=WC0h7fYm2QFqu3Zka7CsU4BtG-oyPpJav+ygC+gmCR+A@mail.gmail.com>
+ <CA+NduCCT-KQ=gh7QWkBE4qkA2YOJ8KCVqbkC6Tkmb1aPvCsGFQ@mail.gmail.com>
+ <53FAFCBC.2050407@collabora.co.uk>
+ <CAD=FV=V4TSKsbjj3dXCdSzVrh3sxH-FkpFEbEo+JA1bN9R-XWA@mail.gmail.com>
+ <20140826071721.GV17528@sirena.org.uk>
+Message-ID: <53FC4E77.2090205@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 25 Aug 2014, Guodong Xu wrote:
-> On 08/20/2014 04:09 PM, Lee Jones wrote:
-> > On Mon, 18 Aug 2014, Guodong Xu wrote:
-> >> This adds driver to support HiSilicon Hi6421 PMIC. Hi6421 includes multi-
-> >> functions, such as regulators, codec, ADCs, Coulomb counter, etc.
-> >> This driver includes core APIs _only_.
-> >>
-> >> Drivers for individul components, like voltage regulators, are
-> >> implemented in corresponding driver directories and files.
-> >>
-> >> Registers in Hi6421 are memory mapped, so using regmap-mmio API.
-> >>
-> >> Signed-off-by: Guodong Xu <guodong.xu@linaro.org>
-> >> ---
-> >>  Documentation/devicetree/bindings/mfd/hi6421.txt |  37 +++++++
+Hello Mark,
 
-[...]
-
-> >> + * Author: Guodong Xu <guodong.xu@linaro.org>
-> >> + *
-> >> + * This program is free software; you can redistribute it and/or modify
-> >> + * it under the terms of the GNU General Public License version 2 as
-> >> + * published by the Free Software Foundation.
-> > 
-> > This should also contain a link to the full licence.
-> > 
-> > See: COPYING
-> > 
+On 08/26/2014 09:17 AM, Mark Brown wrote:
+> On Mon, Aug 25, 2014 at 08:40:40AM -0700, Doug Anderson wrote:
+>> > Can you please test the following change [0] so I can post as a proper
+>> > patch? Doug, Mark do you think that forcing the regulator to opmode normal
+>> > when enabling is the right solution here?
 > 
-> Thanks. I checked COPYING, but there is no 'link' to full license. I
-
-I was making reference to the fact that COPYING tells you to provide a
-link to the full notice:
-
-"To do so, attach the following notices to the program.  It is safest
-to attach them to the start of each source file to most effectively
-convey the exclusion of warranty; and each file should have at least
-the "copyright" line and a pointer to where the full notice is found."
-
-> copied a link from other c source: http://www.gnu.org/licenses/
-> is that OK?
-
-Yes, that's fine.
-
-> >> +	platform_set_drvdata(pdev, pmic);
-> > 
-> > It's not _that_ important, but I like to see this at the end after you
-> > know everything else has succeeded.
+>> IMHO that makes sense.
 > 
-> When I move this after mfd_add_devices(), it fails to boot. In mfd
-> devices's probe, pmic->regmap is used.
+> No, this doesn't make any obvious sense to me at all.  Picking normal as
+> a default if the hardware reads back off due to overlapping
+> impelementation or something *might* make sense but not overwriting the
+> hardware state without explicit permission from the machine integration
+> is a key goal for the regulator API.
+> 
 
-You can move it to just before mfd_add_devices().
+Just to be sure I understood you correctly, what might makes sense to you
+then is to set the opmode to normal as default on probe only if off is
+read back from the hardware register but leaving the enable function as it
+is now using the opmode set on probe?
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+That seems like a safer solution indeed since enable won't overwrite other
+values different from off read from the hardware register, I'll prepare a
+patch.
+
+Thanks a lot for your help and best regards,
+Javier
