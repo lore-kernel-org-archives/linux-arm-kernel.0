@@ -1,229 +1,54 @@
-From: kiran.padwal@smartplayin.com (kiran.padwal at smartplayin.com)
-Date: Tue, 26 Aug 2014 05:42:09 -0400 (EDT)
-Subject: [PATCH v2] ARM: apq8064: Add pinmux and i2c pinctrl nodes
-In-Reply-To: <53F4C085.5060101@suse.de>
-References: <1408536133-13824-1-git-send-email-kiran.padwal@smartplayin.com>
- <53F4C085.5060101@suse.de>
-Message-ID: <1409046129.71143501@apps.rackspace.com>
+From: holler@ahsoftware.de (Alexander Holler)
+Date: Tue, 26 Aug 2014 11:42:04 +0200
+Subject: [RFC PATCH 0/9] dt: dependencies (for deterministic driver
+ initialization order based on the DT)
+In-Reply-To: <20140826084922.GG17263@ulmo>
+References: <1399913280-6915-1-git-send-email-holler@ahsoftware.de>
+ <20140514141914.446F7C4153D@trevor.secretlab.ca>
+ <20140821140211.GD19293@ulmo.nvidia.com> <53F64624.5000403@ahsoftware.de>
+ <20140822131919.GX21734@leverpostej> <20140825093931.GB2399@ulmo>
+ <E1XLu15-0002DP-6o@jdl.com> <20140825133714.GH4163@ulmo.nvidia.com>
+ <20140826084208.AE5F0C40989@trevor.secretlab.ca>
+ <20140826084922.GG17263@ulmo>
+Message-ID: <53FC566C.30904@ahsoftware.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On Wednesday, August 20, 2014 11:36am, "Andreas F?rber" <afaerber@suse.de> said:
-
-> Hi,
-> 
-> Am 20.08.2014 14:02, schrieb Kiran Padwal:
->> This patch adds pinmux and i2c pinctrl DT node for IFC6410 board.
->> It also adds necessary DT support for i2c eeprom which is present on
->> IFC6410.
+Am 26.08.2014 10:49, schrieb Thierry Reding:
+> On Tue, Aug 26, 2014 at 09:42:08AM +0100, Grant Likely wrote:
+>> On Mon, 25 Aug 2014 15:37:16 +0200, Thierry Reding <thierry.reding@gmail.com> wrote:
+> [...]
+>>> There are somewhat standardized bindings for the above and especially
+>>> for bindings of the type that clocks implement this is trivial. We can
+>>> simply iterate over each (phandle, specifier) tuple and check that the
+>>> corresponding clock provider can be resolved (which typically means that
+>>> it's been registered with the common clock framework).
+>>>
+>>> For regulators (and regulator-like bindings) the problem is somewhat
+>>> more difficult because they property names are not standardized. One way
+>>> to solve this would be to look for property names with a -supply suffix,
+>>> but that could obviously lead to false positives. One alternative that I
+>>> think could eliminate this would be to explicitly list dependencies in
+>>> drivers. This would allow core code to step through such a list and
+>>> resolve the (phandle, specifier) tuples.
 >>
->> Tested on IFC6410 board.
->>
->> Signed-off-by: Kiran Padwal <kiran.padwal@smartplayin.com>
->> ---
->> Chages since v1:
->> 	- Renamed pinmux phandle "qcom_pinmux" to "tlmm_pinmux".
->> 	- Updated pinmux interrupt.
->>
->>  arch/arm/boot/dts/qcom-apq8064-ifc6410.dts |   29 ++++++++++++++
->>  arch/arm/boot/dts/qcom-apq8064.dtsi        |   59 ++++++++++++++++++++++++++++
->>  2 files changed, 88 insertions(+)
->>
->> diff --git a/arch/arm/boot/dts/qcom-apq8064-ifc6410.dts
->> b/arch/arm/boot/dts/qcom-apq8064-ifc6410.dts
->> index 7c2441d..d52ac3c 100644
->> --- a/arch/arm/boot/dts/qcom-apq8064-ifc6410.dts
->> +++ b/arch/arm/boot/dts/qcom-apq8064-ifc6410.dts
->> @@ -5,6 +5,15 @@
->>  	compatible = "qcom,apq8064-ifc6410", "qcom,apq8064";
->>
->>  	soc {
->> +		pinmux at 800000 {
->> +			i2c1_pins: i2c1_pinmux {
-> 
-> Is there a requirement to have "_pinmux" in the subnode of the "pinmux"
-> node? Otherwise use just "i2c1"? I notice because the general convention
-> seems to be dashes rather than underscores for node names.
+>> False positives and negatives may not actually be a problem. It is
+>> suboptimal, certainly, but it shouldn't outright break the kernel.
+>
+> There could be cases where some random integer in a cell could be
+> interpreted as a phandle and resolve to a struct device_node. I suppose
+> it might be unlikely, but not impossible, that the device_node could
+> even match a device in the correct subsystem and you'd get a wrong
+> dependency. Granted, a wrong dependency may not be catastrophic in that
+> it won't lead to a crash, but it could lead to various kinds of
+> weirdness and hard to diagnose problems.
 
-Ok, I will change it to i2c1.
+You need either the type information in the DTB (that's why I've add 
+those "dependencies" to identify phandles), or you need to know every 
+binding (at "dependency-resolve-time" to identify phandles. The latter 
+is impracticable to implement in a generic way (for use with every 
+possible binding).
 
-> 
->> +				mux {
->> +					pins = "gpio20", "gpio21";
->> +					function = "gsbi1";
->> +				};
->> +			};
->> +		};
->> +
->>  		gsbi at 16600000 {
->>  			status = "ok";
->>  			qcom,mode = <GSBI_PROT_I2C_UART>;
->> @@ -12,5 +21,25 @@
->>  				status = "ok";
->>  			};
->>  		};
->> +
->> +		gsbi1: gsbi at 12440000 {
->> +			qcom,mode = <GSBI_PROT_I2C>;
->> +			status = "ok";
-> 
-> Usually the overridden status property goes first, as seen on the
-> previous gsbi node.
-> 
-> Further, its canonical value is "okay" (although in practice anything
-> other than "disabled" should work), so suggest you adopt it for your new
-> nodes.
-> 
-> Also, you already provide a label "gsbi1" to this node in the .dtsi
-> below, so you don't need to do it here again.
-> Some architectures prefer in such a case that in the .dts the node is
-> referenced as &gsbi1 {...}; below the root node in alphabetical order
-> rather than duplicating the full /soc/foo at bar hierarchy.
+Regards,
 
-Indeed, I'll change on v3.
-
-> 
->> +
->> +			i2c1: i2c at 12460000 {
-> 
-> Suggest to move the i2c1 label to the .dtsi. Then optionally same could
-> be done here as outlined for gsbi1.
-
-Indeed, I'll change on v3.
-
-> 
->> +				status = "ok";
-> 
-> "okay".
-
-Ok.
-
-> 
->> +
->> +				clock-frequency = <200000>;
->> +
->> +				pinctrl-0 = <&i2c1_pins>;
->> +				pinctrl-names = "default";
->> +
->> +				eeprom: eeprom at 52 {
->> +					compatible = "atmel,24c128";
->> +					reg = <0x52>;
->> +					pagesize = <32>;
->> +				};
->> +			};
->> +		};
->>  	};
->>  };
->> diff --git a/arch/arm/boot/dts/qcom-apq8064.dtsi
->> b/arch/arm/boot/dts/qcom-apq8064.dtsi
->> index 92bf793..bb2ccde 100644
->> --- a/arch/arm/boot/dts/qcom-apq8064.dtsi
->> +++ b/arch/arm/boot/dts/qcom-apq8064.dtsi
->> @@ -70,6 +70,17 @@
->>  		ranges;
->>  		compatible = "simple-bus";
->>
->> +		tlmm_pinmux: pinmux at 800000 {
->> +			compatible = "qcom,apq8064-pinctrl";
->> +			reg = <0x800000 0x4000>;
->> +
->> +			gpio-controller;
->> +			#gpio-cells = <2>;
->> +			interrupt-controller;
->> +			#interrupt-cells = <2>;
->> +			interrupts = <0 16 0x4>;
-> 
-> s/0x4/IRQ_TYPE_LEVEL_HIGH/?
-
-Indeed, I'll change on v3.
-
-> 
->> +		};
->> +
->>  		intc: interrupt-controller at 2000000 {
->>  			compatible = "qcom,msm-qgic2";
->>  			interrupt-controller;
->> @@ -133,6 +144,54 @@
->>  			regulator;
->>  		};
->>
->> +		gsbi1: gsbi at 12440000 {
->> +			compatible = "qcom,gsbi-v1.0.0";
->> +			reg = <0x12440000 0x100>;
->> +			clocks = <&gcc GSBI1_H_CLK>;
->> +			clock-names = "iface";
->> +			#address-cells = <1>;
->> +			#size-cells = <1>;
->> +			ranges;
->> +			status = "disabled";
->> +
->> +			i2c at 12460000 {
->> +				compatible = "qcom,i2c-qup-v1.1.1";
->> +				reg = <0x12460000 0x1000>;
->> +				interrupts = <0 194 0>;
-> 
-> The trailing 0 might be IRQ_TYPE_NONE?
-
-Indeed, I'll change on v3.
-
-> 
->> +
->> +				clocks = <&gcc GSBI1_QUP_CLK>, <&gcc GSBI1_H_CLK>;
->> +				clock-names = "core", "iface";
->> +				status = "disabled";
-> 
-> I'd guess this is redundant since the parent is already disabled?
-
-Indeed, I'll change on v3.
-
-> 
->> +
->> +				#address-cells = <1>;
->> +				#size-cells = <0>;
->> +			};
->> +		};
->> +
->> +		gsbi2: gsbi at 12480000 {
->> +			compatible = "qcom,gsbi-v1.0.0";
->> +			reg = <0x12480000 0x100>;
->> +			clocks = <&gcc GSBI2_H_CLK>;
->> +			clock-names = "iface";
->> +			#address-cells = <1>;
->> +			#size-cells = <1>;
->> +			ranges;
->> +			status = "disabled";
->> +
->> +			i2c at 124a0000 {
->> +				compatible = "qcom,i2c-qup-v1.1.1";
->> +				reg = <0x124a0000 0x1000>;
->> +				interrupts = <0 196 0>;
-> 
-> Again, IRQ_TYPE_NONE possibly?
-
-Indeed, I'll change on v3.
-Thanks.
-
-> 
-> Cheers,
-> Andreas
-> 
->> +
->> +				clocks = <&gcc GSBI2_QUP_CLK>, <&gcc GSBI2_H_CLK>;
->> +				clock-names = "core", "iface";
->> +				status = "disabled";
->> +
->> +				#address-cells = <1>;
->> +				#size-cells = <0>;
->> +			};
->> +		};
->> +
->>  		gsbi7: gsbi at 16600000 {
->>  			status = "disabled";
->>  			compatible = "qcom,gsbi-v1.0.0";
-> 
-> --
-> SUSE LINUX Products GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
-> GF: Jeff Hawn, Jennifer Guild, Felix Imend?rffer; HRB 16746 AG N?rnberg
-> 
+Alexander Holler
