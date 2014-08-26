@@ -1,164 +1,265 @@
 From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Tue, 26 Aug 2014 14:09:43 +0200
-Subject: [PATCH 2/7] drivers: of: add support for named memory regions
+Date: Tue, 26 Aug 2014 14:09:44 +0200
+Subject: [PATCH 3/7] drivers: dma-coherent: add initialization from device tree
 In-Reply-To: <1409054988-32758-1-git-send-email-m.szyprowski@samsung.com>
 References: <1409054988-32758-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <1409054988-32758-3-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <1409054988-32758-4-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds a code to initialize memory regions also for child devices
-if parent device has "memory-region" and "memory-region-names" device tree
-properties and given device's name matches "<parent_name>:<region_name>"
-template.
+Initialization procedure of dma coherent pool has been split into two
+parts, so memory pool can now be initialized without assigning to
+particular struct device. Then initialized region can be assigned to
+more than one struct device. To protect from concurent allocations from
+different devices, a spinlock has been added to dma_coherent_mem
+structure. The last part of this patch adds support for handling
+'shared-dma-pool' reserved-memory device tree nodes.
 
 Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
 ---
- .../bindings/reserved-memory/reserved-memory.txt   |   6 +-
- drivers/of/of_reserved_mem.c                       | 101 ++++++++++++++-------
- 2 files changed, 74 insertions(+), 33 deletions(-)
+ drivers/base/dma-coherent.c | 138 ++++++++++++++++++++++++++++++++++++++------
+ 1 file changed, 119 insertions(+), 19 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/reserved-memory/reserved-memory.txt b/Documentation/devicetree/bindings/reserved-memory/reserved-memory.txt
-index 3da0ebdba8d9..69d28288ed37 100644
---- a/Documentation/devicetree/bindings/reserved-memory/reserved-memory.txt
-+++ b/Documentation/devicetree/bindings/reserved-memory/reserved-memory.txt
-@@ -73,7 +73,11 @@ Device node references to reserved memory
- Regions in the /reserved-memory node may be referenced by other device
- nodes by adding a memory-region property to the device node.
+diff --git a/drivers/base/dma-coherent.c b/drivers/base/dma-coherent.c
+index 7d6e84a51424..4e2dfcc16b70 100644
+--- a/drivers/base/dma-coherent.c
++++ b/drivers/base/dma-coherent.c
+@@ -14,11 +14,14 @@ struct dma_coherent_mem {
+ 	int		size;
+ 	int		flags;
+ 	unsigned long	*bitmap;
++	spinlock_t	spinlock;
+ };
  
--memory-region (optional) - phandle, specifier pairs to children of /reserved-memory
-+memory-region (optional) - arrays of phandles, specifier pairs to children
-+      of /reserved-memory, first phandle is used as a default memory
-+      region
-+memory-region-names (optional) - array of strings with names of memory
-+      regions, used when more than one region has been defined
- 
- Example
- -------
-diff --git a/drivers/of/of_reserved_mem.c b/drivers/of/of_reserved_mem.c
-index 7e7de03585f9..3ab9446ffa43 100644
---- a/drivers/of/of_reserved_mem.c
-+++ b/drivers/of/of_reserved_mem.c
-@@ -237,32 +237,82 @@ static inline struct reserved_mem *__find_rmem(struct device_node *node)
- 	return NULL;
- }
- 
--/**
-- * of_reserved_mem_device_init() - assign reserved memory region to given device
-- *
-- * This function assign memory region pointed by "memory-region" device tree
-- * property to the given device.
-- */
--int of_reserved_mem_device_init(struct device *dev)
-+static int __rmem_dev_init(struct device *dev, struct device_node *np)
+-int dma_declare_coherent_memory(struct device *dev, phys_addr_t phys_addr,
+-				dma_addr_t device_addr, size_t size, int flags)
++static int dma_init_coherent_memory(phys_addr_t phys_addr, dma_addr_t device_addr,
++			     size_t size, int flags,
++			     struct dma_coherent_mem **mem)
  {
--	struct reserved_mem *rmem;
--	struct device_node *np;
++	struct dma_coherent_mem *dma_mem = NULL;
+ 	void __iomem *mem_base = NULL;
+ 	int pages = size >> PAGE_SHIFT;
+ 	int bitmap_size = BITS_TO_LONGS(pages) * sizeof(long);
+@@ -27,27 +30,26 @@ int dma_declare_coherent_memory(struct device *dev, phys_addr_t phys_addr,
+ 		goto out;
+ 	if (!size)
+ 		goto out;
+-	if (dev->dma_mem)
+-		goto out;
 -
--	np = of_parse_phandle(dev->of_node, "memory-region", 0);
--	if (!np)
--		return;
--
--	rmem = __find_rmem(np);
--	of_node_put(np);
--
-+	struct reserved_mem *rmem = __find_rmem(np);
- 	if (!rmem || !rmem->ops || !rmem->ops->device_init)
--		return;
-+		return -EINVAL;
+-	/* FIXME: this routine just ignores DMA_MEMORY_INCLUDES_CHILDREN */
  
- 	rmem->ops->device_init(rmem, dev);
- 	dev_info(dev, "assigned reserved memory node %s\n", rmem->name);
+ 	mem_base = ioremap(phys_addr, size);
+ 	if (!mem_base)
+ 		goto out;
+ 
+-	dev->dma_mem = kzalloc(sizeof(struct dma_coherent_mem), GFP_KERNEL);
+-	if (!dev->dma_mem)
++	dma_mem = kzalloc(sizeof(struct dma_coherent_mem), GFP_KERNEL);
++	if (!dma_mem)
+ 		goto out;
+-	dev->dma_mem->bitmap = kzalloc(bitmap_size, GFP_KERNEL);
+-	if (!dev->dma_mem->bitmap)
++	dma_mem->bitmap = kzalloc(bitmap_size, GFP_KERNEL);
++	if (!dma_mem->bitmap)
+ 		goto free1_out;
+ 
+-	dev->dma_mem->virt_base = mem_base;
+-	dev->dma_mem->device_base = device_addr;
+-	dev->dma_mem->pfn_base = PFN_DOWN(phys_addr);
+-	dev->dma_mem->size = pages;
+-	dev->dma_mem->flags = flags;
++	dma_mem->virt_base = mem_base;
++	dma_mem->device_base = device_addr;
++	dma_mem->pfn_base = PFN_DOWN(phys_addr);
++	dma_mem->size = pages;
++	dma_mem->flags = flags;
++	spin_lock_init(&dma_mem->spinlock);
++
++	*mem = dma_mem;
+ 
+ 	if (flags & DMA_MEMORY_MAP)
+ 		return DMA_MEMORY_MAP;
+@@ -55,12 +57,51 @@ int dma_declare_coherent_memory(struct device *dev, phys_addr_t phys_addr,
+ 	return DMA_MEMORY_IO;
+ 
+  free1_out:
+-	kfree(dev->dma_mem);
++	kfree(dma_mem);
+  out:
+ 	if (mem_base)
+ 		iounmap(mem_base);
  	return 0;
  }
- 
-+static int __rmem_dev_release(struct device *dev, struct device_node *np)
-+{
-+	struct reserved_mem *rmem = __find_rmem(np);
-+	if (!rmem || !rmem->ops)
-+		return -EINVAL;
 +
-+	if (rmem->ops->device_release)
-+		rmem->ops->device_release(rmem, dev);
++static void dma_release_coherent_memory(struct dma_coherent_mem *mem)
++{
++	if (!mem)
++		return;
++	iounmap(mem->virt_base);
++	kfree(mem->bitmap);
++	kfree(mem);
++}
++
++static int dma_assign_coherent_memory(struct device *dev,
++				      struct dma_coherent_mem *mem)
++{
++	if (dev->dma_mem)
++		return -EBUSY;
++
++	dev->dma_mem = mem;
++	/* FIXME: this routine just ignores DMA_MEMORY_INCLUDES_CHILDREN */
++
 +	return 0;
 +}
 +
-+static int __rmem_dev_call(struct device *dev,
-+			int (*func)(struct device *dev, struct device_node *np))
++int dma_declare_coherent_memory(struct device *dev, phys_addr_t phys_addr,
++				dma_addr_t device_addr, size_t size, int flags)
 +{
-+	int ret = -ENODEV;
-+	if (of_get_property(dev->of_node, "memory-region", NULL)) {
-+		struct device_node *np;
-+		np = of_parse_phandle(dev->of_node, "memory-region", 0);
-+		if (!np)
-+			return -ENODEV;
-+		ret = func(dev, np);
-+		of_node_put(np);
-+	} else if (dev->parent &&
-+		   of_get_property(dev->parent->of_node, "memory-region",
-+				   NULL)) {
-+		struct device *parent = dev->parent;
-+		struct device_node *np;
-+		char *name;
-+		int idx;
++	struct dma_coherent_mem *mem;
++	int ret;
 +
-+		name = strrchr(dev_name(dev), ':');
-+		if (!name)
-+			return -ENODEV;
-+		name++;
++	ret = dma_init_coherent_memory(phys_addr, device_addr, size, flags,
++				       &mem);
++	if (ret == 0)
++		return 0;
 +
-+		idx = of_property_match_string(parent->of_node,
-+					       "memory-region-names", name);
-+		if (idx < 0)
-+			return -ENODEV;
++	if (dma_assign_coherent_memory(dev, mem) == 0)
++		return ret;
 +
-+		np = of_parse_phandle(parent->of_node, "memory-region", idx);
-+		if (!np)
-+			return -ENODEV;
-+
-+		ret = func(dev, np);
-+		of_node_put(np);
-+	}
-+	return ret;
++	dma_release_coherent_memory(mem);
++	return 0;
 +}
-+
-+/**
-+ * of_reserved_mem_device_init() - assign reserved memory region to given device
-+ *
-+ * This function assigns default memory region pointed by first entry of
-+ * "memory-region" device tree property (if available) to the given device or
-+ * checks if the given device can be used to give access to named memory region
-+ * if parent device has "memory-region" and "memory-region-names" device tree
-+ * properties and given device's name matches "<parent_name>:<region_name>"
-+ * template.
-+ */
-+int of_reserved_mem_device_init(struct device *dev)
-+{
-+	return __rmem_dev_call(dev, __rmem_dev_init);
-+}
-+
- /**
-  * of_reserved_mem_device_release() - release reserved memory device structures
-  *
-@@ -271,18 +321,5 @@ int of_reserved_mem_device_init(struct device *dev)
-  */
- void of_reserved_mem_device_release(struct device *dev)
- {
--	struct reserved_mem *rmem;
--	struct device_node *np;
--
--	np = of_parse_phandle(dev->of_node, "memory-region", 0);
--	if (!np)
--		return;
--
--	rmem = __find_rmem(np);
--	of_node_put(np);
--
--	if (!rmem || !rmem->ops || !rmem->ops->device_release)
--		return;
--
--	rmem->ops->device_release(rmem, dev);
-+	__rmem_dev_call(dev, __rmem_dev_release);
+ EXPORT_SYMBOL(dma_declare_coherent_memory);
+ 
+ void dma_release_declared_memory(struct device *dev)
+@@ -69,10 +110,8 @@ void dma_release_declared_memory(struct device *dev)
+ 
+ 	if (!mem)
+ 		return;
++	dma_release_coherent_memory(mem);
+ 	dev->dma_mem = NULL;
+-	iounmap(mem->virt_base);
+-	kfree(mem->bitmap);
+-	kfree(mem);
  }
+ EXPORT_SYMBOL(dma_release_declared_memory);
+ 
+@@ -80,6 +119,7 @@ void *dma_mark_declared_memory_occupied(struct device *dev,
+ 					dma_addr_t device_addr, size_t size)
+ {
+ 	struct dma_coherent_mem *mem = dev->dma_mem;
++	unsigned long flags;
+ 	int pos, err;
+ 
+ 	size += device_addr & ~PAGE_MASK;
+@@ -87,8 +127,11 @@ void *dma_mark_declared_memory_occupied(struct device *dev,
+ 	if (!mem)
+ 		return ERR_PTR(-EINVAL);
+ 
++	spin_lock_irqsave(&mem->spinlock, flags);
+ 	pos = (device_addr - mem->device_base) >> PAGE_SHIFT;
+ 	err = bitmap_allocate_region(mem->bitmap, pos, get_order(size));
++	spin_unlock_irqrestore(&mem->spinlock, flags);
++
+ 	if (err != 0)
+ 		return ERR_PTR(err);
+ 	return mem->virt_base + (pos << PAGE_SHIFT);
+@@ -115,6 +158,7 @@ int dma_alloc_from_coherent(struct device *dev, ssize_t size,
+ {
+ 	struct dma_coherent_mem *mem;
+ 	int order = get_order(size);
++	unsigned long flags;
+ 	int pageno;
+ 
+ 	if (!dev)
+@@ -124,6 +168,7 @@ int dma_alloc_from_coherent(struct device *dev, ssize_t size,
+ 		return 0;
+ 
+ 	*ret = NULL;
++	spin_lock_irqsave(&mem->spinlock, flags);
+ 
+ 	if (unlikely(size > (mem->size << PAGE_SHIFT)))
+ 		goto err;
+@@ -138,10 +183,12 @@ int dma_alloc_from_coherent(struct device *dev, ssize_t size,
+ 	*dma_handle = mem->device_base + (pageno << PAGE_SHIFT);
+ 	*ret = mem->virt_base + (pageno << PAGE_SHIFT);
+ 	memset(*ret, 0, size);
++	spin_unlock_irqrestore(&mem->spinlock, flags);
+ 
+ 	return 1;
+ 
+ err:
++	spin_unlock_irqrestore(&mem->spinlock, flags);
+ 	/*
+ 	 * In the case where the allocation can not be satisfied from the
+ 	 * per-device area, try to fall back to generic memory if the
+@@ -171,8 +218,11 @@ int dma_release_from_coherent(struct device *dev, int order, void *vaddr)
+ 	if (mem && vaddr >= mem->virt_base && vaddr <
+ 		   (mem->virt_base + (mem->size << PAGE_SHIFT))) {
+ 		int page = (vaddr - mem->virt_base) >> PAGE_SHIFT;
++		unsigned long flags;
+ 
++		spin_lock_irqsave(&mem->spinlock, flags);
+ 		bitmap_release_region(mem->bitmap, page, order);
++		spin_unlock_irqrestore(&mem->spinlock, flags);
+ 		return 1;
+ 	}
+ 	return 0;
+@@ -218,3 +268,53 @@ int dma_mmap_from_coherent(struct device *dev, struct vm_area_struct *vma,
+ 	return 0;
+ }
+ EXPORT_SYMBOL(dma_mmap_from_coherent);
++
++/*
++ * Support for reserved memory regions defined in device tree
++ */
++#ifdef CONFIG_OF_RESERVED_MEM
++#include <linux/of.h>
++#include <linux/of_fdt.h>
++#include <linux/of_reserved_mem.h>
++
++static int rmem_dma_device_init(struct reserved_mem *rmem, struct device *dev)
++{
++	struct dma_coherent_mem *mem = rmem->priv;
++	if (!mem &&
++	    dma_init_coherent_memory(rmem->base, rmem->base, rmem->size,
++				     DMA_MEMORY_MAP | DMA_MEMORY_EXCLUSIVE,
++				     &mem) != DMA_MEMORY_MAP) {
++		pr_info("Reserved memory: failed to init DMA memory pool at %pa, size %ld MiB\n",
++			&rmem->base, (unsigned long)rmem->size / SZ_1M);
++		return -ENODEV;
++	}
++	rmem->priv = mem;
++	dma_assign_coherent_memory(dev, mem);
++	return 0;
++}
++
++static void rmem_dma_device_release(struct reserved_mem *rmem,
++				    struct device *dev)
++{
++	dev->dma_mem = NULL;
++}
++
++static const struct reserved_mem_ops rmem_dma_ops = {
++	.device_init	= rmem_dma_device_init,
++	.device_release	= rmem_dma_device_release,
++};
++
++static int __init rmem_dma_setup(struct reserved_mem *rmem)
++{
++	unsigned long node = rmem->fdt_node;
++
++	if (of_get_flat_dt_prop(node, "reusable", NULL))
++		return -EINVAL;
++
++	rmem->ops = &rmem_dma_ops;
++	pr_info("Reserved memory: created DMA memory pool at %pa, size %ld MiB\n",
++		&rmem->base, (unsigned long)rmem->size / SZ_1M);
++	return 0;
++}
++RESERVEDMEM_OF_DECLARE(dma, "shared-dma-pool", rmem_dma_setup);
++#endif
 -- 
 1.9.2
