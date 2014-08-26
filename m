@@ -1,60 +1,40 @@
-From: henrik@henriknordstrom.net (Henrik =?ISO-8859-1?Q?Nordstr=F6m?=)
-Date: Tue, 26 Aug 2014 20:40:09 +0200
-Subject: [linux-sunxi] Re: [PATCH 4/4] simplefb: add clock handling code
-In-Reply-To: <20140826105451.GD31124@ulmo>
-References: <20140825133953.GJ4163@ulmo.nvidia.com>
- <53FB3E7F.4000503@redhat.com> <20140825141600.GA14763@ulmo.nvidia.com>
- <53FB46FF.1010208@redhat.com> <20140825145303.GC14763@ulmo.nvidia.com>
- <20140825150705.GB15297@lukather> <20140826082626.GE17263@ulmo>
- <20140826090035.GB17528@sirena.org.uk> <20140826091853.GI17263@ulmo>
- <20140826100612.GH17528@sirena.org.uk> <20140826105451.GD31124@ulmo>
-Message-ID: <1409078409.2701.17.camel@localhost>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Tue, 26 Aug 2014 11:46:38 -0700
+Subject: [PATCH v2 01/26] genirq: add irq_domain-aware core IRQ handler
+In-Reply-To: <53FCCCC7.9070801@arm.com>
+References: <1409047421-27649-1-git-send-email-marc.zyngier@arm.com>
+ <1409047421-27649-2-git-send-email-marc.zyngier@arm.com>
+ <53FCC714.3090206@codeaurora.org> <53FCCCC7.9070801@arm.com>
+Message-ID: <53FCD60E.1030009@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-tis 2014-08-26 klockan 12:55 +0200 skrev Thierry Reding:
+On 08/26/14 11:07, Marc Zyngier wrote:
+> Digging into my email, one of the traces looked like this:
+>
+> stack backtrace:
+> CPU: 0 PID: 0 Comm: swapper/0 Not tainted 3.16.0-rc1+ #135
+> Call trace:
+> [<ffffffc0000882cc>] dump_backtrace+0x0/0x12c
+> [<ffffffc000088408>] show_stack+0x10/0x1c
+> [<ffffffc0004ee5f0>] dump_stack+0x74/0xc4
+> [<ffffffc0000edfbc>] lockdep_rcu_suspicious+0xe8/0x124
+> [<ffffffc00010218c>] irq_find_mapping+0x16c/0x198
+> [<ffffffc00008130c>] gic_handle_irq+0x38/0xcc
+>
+> Most drivers call irq_find_mapping outside of irq_enter()/irq_exit(), as
+> this is in handle_IRQ().
+>
 
+Ah ok. This is the multi-irq handler case? Has this been broken since
+v3.2 at least for the gic users? Now that we call irq_enter()/irq_exit()
+a lot more code runs, including things like updating jiffies when
+interrupts arrive and invoking softirq? Do we only call irq_exit() on
+the IPI path otherwise?
 
-> So the firmware does control the resources to a point where the display
-> hardware is initialized and then it will happily forget about them. The
-> device will keep scanning out the framebuffer and simplefb can update it
-> with boot messages. To prevent the console from suddenly disappearing
-> the kernel needs to make sure that the resources aren't inadvertently
-> turned off at some more or less random point in time.
+Are there any plans to send this back to stable trees? Not calling
+irq_enter()/irq_exit() when we get an interrupt seems like a big problem.
 
-Which imho is until simplefb is unbound from the device.
-
-Separately to this there needs to be a in-kernel handover procedure
-where a new driver (i.e. video kms driver) can bind to a device and take
-over resources, but it's completely unrelated to who owns the hardware
-resources while simplefb is the active driver for the device.
-
-It is not clear to me where the hardware resources should be listed in
-DT, being it a simplefb node or part of the actual hardware device node
-properly marked as dynamic boot defaults or something else? It's
-somewhere inbetween hardware and virtual device, and somewhat volatile.
-As far as simplefb is concerned it is a hardware desription of the
-framebuffer, but for a kms driver it's no more than firmware handover of
-boottime settings and ceases to exists once the kms driver have
-reconfigured the hardware.
-
-What I can do is to list some properties that these settings need to
-provide:
-
-1. Handover of hardware settings from bootloader to kernel.
-
-2. Hardware description for simplefb use. It's at this level not really
-any different from any other hardware.
-
-3. Volatile and removed when kms driver have reconfigured the hardware
-or it's been decided that the (virtual) device should not be active.
-
-Regarding 3 and kexec as mentioned earlier. A new set of properties may
-be added again for kexec usage to describe the current framebuffer for
-the new kernel but op to the system which prepares for kexec to
-determine. Should be no different in mechanism from bootloader to kernel
-handover (the kexecing kernel is the bootloader in kexec case).
-
-
-Regards
-Henrik
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
