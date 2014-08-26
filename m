@@ -1,76 +1,166 @@
 From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Tue, 26 Aug 2014 14:09:42 +0200
-Subject: [PATCH 1/7] drivers: of: add return value to
- of_reserved_mem_device_init
+Date: Tue, 26 Aug 2014 14:09:46 +0200
+Subject: [PATCH 5/7] media: s5p-mfc: replace custom reserved memory init code
+ with generic one
 In-Reply-To: <1409054988-32758-1-git-send-email-m.szyprowski@samsung.com>
 References: <1409054988-32758-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <1409054988-32758-2-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <1409054988-32758-6-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Driver calling of_reserved_mem_device_init() might be interested if the
-initialization has been successful or not, so add support for returning
-error code.
+This patch removes custom initialization of reserved memory regions from
+s5p-mfc driver and adds a new code for handling reserved memory with
+generic named reserved memory regions read from device tree.
+
+s5p-mfc driver now handles two reserved memory regions: "left" and
+"right", defined by generic reserved memory bindings. Support for non-dt
+platform has been removed, because all supported platforms have been
+converted to device tree.
 
 Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
 ---
- drivers/of/of_reserved_mem.c    | 3 ++-
- include/linux/of_reserved_mem.h | 9 ++++++---
- 2 files changed, 8 insertions(+), 4 deletions(-)
+ drivers/media/platform/s5p-mfc/s5p_mfc.c | 102 +++++++++++--------------------
+ 1 file changed, 35 insertions(+), 67 deletions(-)
 
-diff --git a/drivers/of/of_reserved_mem.c b/drivers/of/of_reserved_mem.c
-index 59fb12e84e6b..7e7de03585f9 100644
---- a/drivers/of/of_reserved_mem.c
-+++ b/drivers/of/of_reserved_mem.c
-@@ -243,7 +243,7 @@ static inline struct reserved_mem *__find_rmem(struct device_node *node)
-  * This function assign memory region pointed by "memory-region" device tree
-  * property to the given device.
-  */
--void of_reserved_mem_device_init(struct device *dev)
-+int of_reserved_mem_device_init(struct device *dev)
- {
- 	struct reserved_mem *rmem;
- 	struct device_node *np;
-@@ -260,6 +260,7 @@ void of_reserved_mem_device_init(struct device *dev)
- 
- 	rmem->ops->device_init(rmem, dev);
- 	dev_info(dev, "assigned reserved memory node %s\n", rmem->name);
-+	return 0;
- }
- 
- /**
-diff --git a/include/linux/of_reserved_mem.h b/include/linux/of_reserved_mem.h
-index 5b5efae09135..ad2f67054372 100644
---- a/include/linux/of_reserved_mem.h
-+++ b/include/linux/of_reserved_mem.h
-@@ -16,7 +16,7 @@ struct reserved_mem {
+diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc.c b/drivers/media/platform/s5p-mfc/s5p_mfc.c
+index d35b0418ab37..668e82247a3f 100644
+--- a/drivers/media/platform/s5p-mfc/s5p_mfc.c
++++ b/drivers/media/platform/s5p-mfc/s5p_mfc.c
+@@ -22,6 +22,7 @@
+ #include <media/v4l2-event.h>
+ #include <linux/workqueue.h>
+ #include <linux/of.h>
++#include <linux/of_reserved_mem.h>
+ #include <media/videobuf2-core.h>
+ #include "s5p_mfc_common.h"
+ #include "s5p_mfc_ctrl.h"
+@@ -996,55 +997,40 @@ static const struct v4l2_file_operations s5p_mfc_fops = {
+ 	.mmap = s5p_mfc_mmap,
  };
  
- struct reserved_mem_ops {
--	void	(*device_init)(struct reserved_mem *rmem,
-+	int	(*device_init)(struct reserved_mem *rmem,
- 			       struct device *dev);
- 	void	(*device_release)(struct reserved_mem *rmem,
- 				  struct device *dev);
-@@ -28,14 +28,17 @@ typedef int (*reservedmem_of_init_fn)(struct reserved_mem *rmem);
- 	_OF_DECLARE(reservedmem, name, compat, init, reservedmem_of_init_fn)
+-static int match_child(struct device *dev, void *data)
++static struct device *s5p_mfc_alloc_memdev(struct device *dev, const char *name)
+ {
+-	if (!dev_name(dev))
+-		return 0;
+-	return !strcmp(dev_name(dev), (char *)data);
+-}
+-
+-static void *mfc_get_drv_data(struct platform_device *pdev);
+-
+-static int s5p_mfc_alloc_memdevs(struct s5p_mfc_dev *dev)
+-{
+-	unsigned int mem_info[2] = { };
++	struct device *child;
++	int ret;
  
- #ifdef CONFIG_OF_RESERVED_MEM
--void of_reserved_mem_device_init(struct device *dev);
-+int of_reserved_mem_device_init(struct device *dev);
- void of_reserved_mem_device_release(struct device *dev);
+-	dev->mem_dev_l = devm_kzalloc(&dev->plat_dev->dev,
+-			sizeof(struct device), GFP_KERNEL);
+-	if (!dev->mem_dev_l) {
+-		mfc_err("Not enough memory\n");
+-		return -ENOMEM;
+-	}
+-	device_initialize(dev->mem_dev_l);
+-	of_property_read_u32_array(dev->plat_dev->dev.of_node,
+-			"samsung,mfc-l", mem_info, 2);
+-	if (dma_declare_coherent_memory(dev->mem_dev_l, mem_info[0],
+-				mem_info[0], mem_info[1],
+-				DMA_MEMORY_MAP | DMA_MEMORY_EXCLUSIVE) == 0) {
+-		mfc_err("Failed to declare coherent memory for\n"
+-		"MFC device\n");
+-		return -ENOMEM;
++	child = devm_kzalloc(dev, sizeof(struct device), GFP_KERNEL);
++	if (!child)
++		return NULL;
++
++	device_initialize(child);
++	dev_set_name(child, "%s:%s", dev_name(dev), name);
++	child->parent = dev;
++	child->bus = dev->bus;
++	child->coherent_dma_mask = dev->coherent_dma_mask;
++	child->dma_mask = dev->dma_mask;
++
++	if (device_add(child) == 0) {
++		ret = of_reserved_mem_device_init(child);
++		if (ret == 0)
++			return child;
+ 	}
  
- void fdt_init_reserved_mem(void);
- void fdt_reserved_mem_save_node(unsigned long node, const char *uname,
- 			       phys_addr_t base, phys_addr_t size);
- #else
--static inline void of_reserved_mem_device_init(struct device *dev) { }
-+static inline int of_reserved_mem_device_init(struct device *dev)
+-	dev->mem_dev_r = devm_kzalloc(&dev->plat_dev->dev,
+-			sizeof(struct device), GFP_KERNEL);
+-	if (!dev->mem_dev_r) {
+-		mfc_err("Not enough memory\n");
+-		return -ENOMEM;
+-	}
+-	device_initialize(dev->mem_dev_r);
+-	of_property_read_u32_array(dev->plat_dev->dev.of_node,
+-			"samsung,mfc-r", mem_info, 2);
+-	if (dma_declare_coherent_memory(dev->mem_dev_r, mem_info[0],
+-				mem_info[0], mem_info[1],
+-				DMA_MEMORY_MAP | DMA_MEMORY_EXCLUSIVE) == 0) {
+-		pr_err("Failed to declare coherent memory for\n"
+-		"MFC device\n");
+-		return -ENOMEM;
+-	}
+-	return 0;
++	put_device(child);
++	return NULL;
+ }
+ 
++void s5p_mfc_free_memdev(struct device *dev)
 +{
-+	return -ENOSYS;
++	of_reserved_mem_device_release(dev);
++	put_device(dev);
 +}
- static inline void of_reserved_mem_device_release(struct device *pdev) { }
++
++static void *mfc_get_drv_data(struct platform_device *pdev);
++
+ /* MFC probe function */
+ static int s5p_mfc_probe(struct platform_device *pdev)
+ {
+@@ -1096,26 +1082,8 @@ static int s5p_mfc_probe(struct platform_device *pdev)
+ 		goto err_res;
+ 	}
  
- static inline void fdt_init_reserved_mem(void) { }
+-	if (pdev->dev.of_node) {
+-		ret = s5p_mfc_alloc_memdevs(dev);
+-		if (ret < 0)
+-			goto err_res;
+-	} else {
+-		dev->mem_dev_l = device_find_child(&dev->plat_dev->dev,
+-				"s5p-mfc-l", match_child);
+-		if (!dev->mem_dev_l) {
+-			mfc_err("Mem child (L) device get failed\n");
+-			ret = -ENODEV;
+-			goto err_res;
+-		}
+-		dev->mem_dev_r = device_find_child(&dev->plat_dev->dev,
+-				"s5p-mfc-r", match_child);
+-		if (!dev->mem_dev_r) {
+-			mfc_err("Mem child (R) device get failed\n");
+-			ret = -ENODEV;
+-			goto err_res;
+-		}
+-	}
++	dev->mem_dev_l = s5p_mfc_alloc_memdev(&dev->plat_dev->dev, "left");
++	dev->mem_dev_r = s5p_mfc_alloc_memdev(&dev->plat_dev->dev, "right");
+ 
+ 	dev->alloc_ctx[0] = vb2_dma_contig_init_ctx(dev->mem_dev_l);
+ 	if (IS_ERR(dev->alloc_ctx[0])) {
+@@ -1246,10 +1214,10 @@ static int s5p_mfc_remove(struct platform_device *pdev)
+ 	s5p_mfc_release_firmware(dev);
+ 	vb2_dma_contig_cleanup_ctx(dev->alloc_ctx[0]);
+ 	vb2_dma_contig_cleanup_ctx(dev->alloc_ctx[1]);
+-	if (pdev->dev.of_node) {
+-		put_device(dev->mem_dev_l);
+-		put_device(dev->mem_dev_r);
+-	}
++	if (dev->mem_dev_l)
++		s5p_mfc_free_memdev(dev->mem_dev_l);
++	if (dev->mem_dev_r)
++		s5p_mfc_free_memdev(dev->mem_dev_r);
+ 
+ 	s5p_mfc_final_pm(dev);
+ 	return 0;
 -- 
 1.9.2
