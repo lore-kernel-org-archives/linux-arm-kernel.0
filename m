@@ -1,201 +1,324 @@
-From: punit.agrawal@arm.com (Punit Agrawal)
-Date: Tue, 26 Aug 2014 11:28:50 +0100
-Subject: [PATCH 6/6] arm64: Emulate CP15 Barrier instructions
-In-Reply-To: <1409048930-21598-1-git-send-email-punit.agrawal@arm.com>
-References: <1409048930-21598-1-git-send-email-punit.agrawal@arm.com>
-Message-ID: <1409048930-21598-7-git-send-email-punit.agrawal@arm.com>
+From: vikas.sajjan@samsung.com (Vikas Sajjan)
+Date: Tue, 26 Aug 2014 16:21:02 +0545
+Subject: [RESEND PATCH v4 2/2] ARM: EXYNOS: Refactor the pm code to use DT
+ based lookup
+In-Reply-To: <1408431167-14134-3-git-send-email-vikas.sajjan@samsung.com>
+References: <1408431167-14134-1-git-send-email-vikas.sajjan@samsung.com>
+ <1408431167-14134-3-git-send-email-vikas.sajjan@samsung.com>
+Message-ID: <CAGm_ybhE-JDfchJVpf8bN4pYLWjVkp+vdD-gzwC=R+irJsVjCw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The CP15 barrier instructions (CP15ISB, CP15DSB and CP15DMB) are
-deprecated in the ARMv7 architecture, superseded by ISB, DSB and DMB
-instructions respectively. Some implementations may provide support
-for these instructions which can then be enabled by setting the
-CP15BEN bit in the SCTLR in ARMv7 or SCTLR_EL1 in ARMv8. If not
-enabled, the encodings for these instructions become undefined.
+Hi kukjin,
 
-To support legacy software that uses these instructions, this patch
-emulates the barrier instructions by installing an undefined
-instruction handler. The patch also adds a debugfs entry to track
-the occurrence of the deprecated barrier instructions. It is possible
-to runtime disable them from debugfs.
+On Tue, Aug 19, 2014 at 12:37 PM, Vikas Sajjan <vikas.sajjan@samsung.com> wrote:
+> Refactoring the pm.c to avoid using "soc_is_exynos" checks,
+> instead use the DT based lookup.
+>
+> While at it, consolidate the common code across SoCs
+> and create static helper functions.
+>
+> Signed-off-by: Vikas Sajjan <vikas.sajjan@samsung.com>
+> Reviewed-by: Tomasz Figa <t.figa@samsung.com>
 
-Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
----
- arch/arm64/Kconfig              |   15 +++++++
- arch/arm64/include/asm/insn.h   |    2 +
- arch/arm64/kernel/insn.c        |   12 ++++++
- arch/arm64/kernel/v7_obsolete.c |   91 +++++++++++++++++++++++++++++++++++++++
- 4 files changed, 120 insertions(+)
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index ba780b1..135c15f 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -181,6 +181,21 @@ config SWP_EMULATION
- 
- 	  If unsure, say N
- 
-+config CP15_BARRIER_EMULATION
-+	bool "Emulate CP15 Barrier instructions"
-+	help
-+	  ARMv7 architecture deprecates the use of CP15 barrier
-+	  instructions - CP15ISB, CP15DSB and CP15DMB. It is strongly
-+	  recommended to use the ISB, DSB and DMB instructions
-+	  instead.
-+
-+	  Say Y here to enable software emulation of these
-+	  instructions for AArch32 userspace code. When emulation
-+	  is enabled, statistics related to the occurrence of these
-+	  instructions are also made available via debugfs.
-+
-+	  If unsure, say N
-+
- endif
- 
- endmenu
-diff --git a/arch/arm64/include/asm/insn.h b/arch/arm64/include/asm/insn.h
-index 2861cc6..165a8dd 100644
---- a/arch/arm64/include/asm/insn.h
-+++ b/arch/arm64/include/asm/insn.h
-@@ -112,6 +112,8 @@ int aarch64_insn_patch_text(void *addrs[], u32 insns[], int cnt);
- #define RT2_OFFSET	 0
- 
- u32 aarch32_insn_extract_reg_num(u32 insn, int offset);
-+u32 aarch32_insn_mcr_extract_opc2(u32 insn);
-+u32 aarch32_insn_mcr_extract_crm(u32 insn);
- #endif /* CONFIG_V7_OBSOLETE */
- 
- #endif /* __ASSEMBLY__ */
-diff --git a/arch/arm64/kernel/insn.c b/arch/arm64/kernel/insn.c
-index 5db9d35..10c6104 100644
---- a/arch/arm64/kernel/insn.c
-+++ b/arch/arm64/kernel/insn.c
-@@ -312,4 +312,16 @@ u32 aarch32_insn_extract_reg_num(u32 insn, int offset)
- 	return (insn & (0xf << offset)) >> offset;
- }
- 
-+#define OPC2_MASK	0x7
-+#define OPC2_OFFSET	5
-+u32 aarch32_insn_mcr_extract_opc2(u32 insn)
-+{
-+	return (insn & (OPC2_MASK << OPC2_OFFSET)) >> OPC2_OFFSET;
-+}
-+
-+#define CRM_MASK	0xf
-+u32 aarch32_insn_mcr_extract_crm(u32 insn)
-+{
-+	return insn & CRM_MASK;
-+}
- #endif /* CONFIG_V7_OBSOLETE */
-diff --git a/arch/arm64/kernel/v7_obsolete.c b/arch/arm64/kernel/v7_obsolete.c
-index e9427cb..ed77889 100644
---- a/arch/arm64/kernel/v7_obsolete.c
-+++ b/arch/arm64/kernel/v7_obsolete.c
-@@ -227,6 +227,94 @@ static void __init swp_emulation_init(void)
- 		pr_notice("Registered SWP/SWPB emulation handler\n");
- }
- 
-+static atomic_t cp15_barrier_count;
-+static u32 cp15_barrier_enabled = 1;
-+
-+static int cp15barrier_handler(struct pt_regs *regs, u32 instr)
-+{
-+	if (!cp15_barrier_enabled)
-+		return -EFAULT;
-+
-+	perf_sw_event(PERF_COUNT_SW_EMULATION_FAULTS, 1, regs, regs->pc);
-+
-+	switch (arm_check_condition(instr, regs->pstate)) {
-+	case ARM_OPCODE_CONDTEST_PASS:
-+		break;
-+	case ARM_OPCODE_CONDTEST_FAIL:
-+		/* Condition failed - return to next instruction */
-+		goto ret;
-+	case ARM_OPCODE_CONDTEST_UNCOND:
-+		/* If unconditional encoding - not a barrier instruction */
-+		return -EFAULT;
-+	default:
-+		return -EINVAL;
-+	}
-+
-+	switch(aarch32_insn_mcr_extract_crm(instr)) {
-+	case 10:
-+		/*
-+		 * dmb - mcr p15, 0, Rt, c7, c10, 5
-+		 * dsb - mcr p15, 0, Rt, c7, c10, 4
-+		 */
-+		if (aarch32_insn_mcr_extract_opc2(instr) == 5)
-+			dmb();
-+		else
-+			dsb();
-+		break;
-+	case 5:
-+		/*
-+		 * isb - mcr p15, 0, Rt, c7, c5, 4
-+		 */
-+		isb();
-+		break;
-+	}
-+
-+ret:
-+	atomic_inc(&cp15_barrier_count);
-+	pr_warn_ratelimited("\"%s\" (%ld) uses deprecated CP15 Barrier instruction at 0x%llx\n",
-+			current->comm, (unsigned long)current->pid, regs->pc);
-+
-+	regs->pc += 4;
-+	return 0;
-+}
-+
-+/* data barrier */
-+static struct undef_hook cp15db_hook = {
-+	.instr_mask	= 0x0fff0fdf,
-+	.instr_val	= 0x0e070f9a,
-+	.pstate_mask	= COMPAT_PSR_MODE_MASK,
-+	.pstate_val	= COMPAT_PSR_MODE_USR,
-+	.fn		= cp15barrier_handler,
-+};
-+
-+/* instruction barrier */
-+static struct undef_hook cp15isb_hook = {
-+	.instr_mask	= 0x0fff0fff,
-+	.instr_val	= 0x0e070f95,
-+	.pstate_mask	= COMPAT_PSR_MODE_MASK,
-+	.pstate_val	= COMPAT_PSR_MODE_USR,
-+	.fn		= cp15barrier_handler,
-+};
-+
-+static void __init cp15_barrier_emulation_init(void)
-+{
-+	struct dentry *cp15_d;
-+
-+	atomic_set(&cp15_barrier_count, 0);
-+
-+	cp15_d = debugfs_create_dir("cp15_barrier_emulation", arch_debugfs_dir);
-+	if (!IS_ERR_OR_NULL(cp15_d)) {
-+		debugfs_create_atomic_t("cp15_barrier_count", S_IRUGO, cp15_d,
-+				&cp15_barrier_count);
-+		debugfs_create_bool("enabled", S_IRUGO | S_IWUSR, cp15_d,
-+				&cp15_barrier_enabled);
-+	}
-+
-+	if (register_undef_hook(&cp15db_hook) == 0 &&
-+		register_undef_hook(&cp15isb_hook) == 0)
-+		pr_notice("Registered CP15 Barrier emulation handler\n");
-+}
-+
- /*
-  * Invoked as late_initcall, since not needed before init spawned.
-  */
-@@ -235,6 +323,9 @@ static int __init v7_obsolete_init(void)
- 	if (IS_ENABLED(CONFIG_SWP_EMULATION))
- 		swp_emulation_init();
- 
-+	if (IS_ENABLED(CONFIG_CP15_BARRIER_EMULATION))
-+		cp15_barrier_emulation_init();
-+
- 	return 0;
- }
- 
--- 
-1.7.10.4
+Can you apply this patch series.
+
+
+> ---
+>  arch/arm/mach-exynos/pm.c       |  167 +++++++++++++++++++++++++++++----------
+>  arch/arm/mach-exynos/regs-pmu.h |    1 +
+>  2 files changed, 126 insertions(+), 42 deletions(-)
+>
+> diff --git a/arch/arm/mach-exynos/pm.c b/arch/arm/mach-exynos/pm.c
+> index 31e209b..16b23d1 100644
+> --- a/arch/arm/mach-exynos/pm.c
+> +++ b/arch/arm/mach-exynos/pm.c
+> @@ -36,6 +36,8 @@
+>  #include "regs-pmu.h"
+>  #include "regs-sys.h"
+>
+> +#define REG_TABLE_END (-1U)
+> +
+>  /**
+>   * struct exynos_wkup_irq - Exynos GIC to PMU IRQ mapping
+>   * @hwirq: Hardware IRQ signal of the GIC
+> @@ -59,6 +61,21 @@ static struct sleep_save exynos_core_save[] = {
+>         SAVE_ITEM(S5P_SROM_BC3),
+>  };
+>
+> +struct exynos_pm_data {
+> +       const struct exynos_wkup_irq *wkup_irq;
+> +       struct sleep_save *extra_save;
+> +       int num_extra_save;
+> +       unsigned int wake_disable_mask;
+> +       unsigned int *release_ret_regs;
+> +
+> +       void (*pm_prepare)(void);
+> +       void (*pm_resume)(void);
+> +       int (*pm_suspend)(void);
+> +       int (*cpu_suspend)(unsigned long);
+> +};
+> +
+> +struct exynos_pm_data *pm_data;
+> +
+>  /*
+>   * GIC wake-up support
+>   */
+> @@ -77,14 +94,24 @@ static const struct exynos_wkup_irq exynos5250_wkup_irq[] = {
+>         { /* sentinel */ },
+>  };
+>
+> +unsigned int exynos_release_ret_regs[] = {
+> +       S5P_PAD_RET_MAUDIO_OPTION,
+> +       S5P_PAD_RET_GPIO_OPTION,
+> +       S5P_PAD_RET_UART_OPTION,
+> +       S5P_PAD_RET_MMCA_OPTION,
+> +       S5P_PAD_RET_MMCB_OPTION,
+> +       S5P_PAD_RET_EBIA_OPTION,
+> +       S5P_PAD_RET_EBIB_OPTION,
+> +       REG_TABLE_END,
+> +};
+> +
+>  static int exynos_irq_set_wake(struct irq_data *data, unsigned int state)
+>  {
+>         const struct exynos_wkup_irq *wkup_irq;
+>
+> -       if (soc_is_exynos5250())
+> -               wkup_irq = exynos5250_wkup_irq;
+> -       else
+> -               wkup_irq = exynos4_wkup_irq;
+> +       if (!pm_data->wkup_irq)
+> +               return -ENOENT;
+> +       wkup_irq = pm_data->wkup_irq;
+>
+>         while (wkup_irq->mask) {
+>                 if (wkup_irq->hwirq == data->hwirq) {
+> @@ -229,15 +256,8 @@ void exynos_enter_aftr(void)
+>         cpu_pm_exit();
+>  }
+>
+> -static int exynos_cpu_suspend(unsigned long arg)
+> +static int exynos_cpu_do_idle(void)
+>  {
+> -#ifdef CONFIG_CACHE_L2X0
+> -       outer_flush_all();
+> -#endif
+> -
+> -       if (soc_is_exynos5250())
+> -               flush_cache_all();
+> -
+>         /* issue the standby signal into the pm unit. */
+>         cpu_do_idle();
+>
+> @@ -245,29 +265,44 @@ static int exynos_cpu_suspend(unsigned long arg)
+>         return 1; /* Aborting suspend */
+>  }
+>
+> -static void exynos_pm_prepare(void)
+> +static int exynos_cpu_suspend(unsigned long arg)
+>  {
+> -       unsigned int tmp;
+> +       flush_cache_all();
+> +       outer_flush_all();
+> +       return exynos_cpu_do_idle();
+> +}
+>
+> +static void exynos_pm_set_wakeup_mask(void)
+> +{
+>         /* Set wake-up mask registers */
+>         pmu_raw_writel(exynos_get_eint_wake_mask(), S5P_EINT_WAKEUP_MASK);
+>         pmu_raw_writel(exynos_irqwake_intmask & ~(1 << 31), S5P_WAKEUP_MASK);
+> +}
+>
+> -       s3c_pm_do_save(exynos_core_save, ARRAY_SIZE(exynos_core_save));
+> -
+> -       if (soc_is_exynos5250())
+> -               s3c_pm_do_save(exynos5_sys_save, ARRAY_SIZE(exynos5_sys_save));
+> -
+> +static void exynos_pm_enter_sleep_mode(void)
+> +{
+>         /* Set value of power down register for sleep mode */
+> -
+>         exynos_sys_powerdown_conf(SYS_SLEEP);
+>         pmu_raw_writel(S5P_CHECK_SLEEP, S5P_INFORM1);
+>
+>         /* ensure at least INFORM0 has the resume address */
+> -
+>         pmu_raw_writel(virt_to_phys(exynos_cpu_resume), S5P_INFORM0);
+>  }
+>
+> +static void exynos_pm_prepare(void)
+> +{
+> +       /* Set wake-up mask registers */
+> +       exynos_pm_set_wakeup_mask();
+> +
+> +       s3c_pm_do_save(exynos_core_save, ARRAY_SIZE(exynos_core_save));
+> +
+> +        if (pm_data->extra_save)
+> +               s3c_pm_do_save(pm_data->extra_save,
+> +                               pm_data->num_extra_save);
+> +
+> +       exynos_pm_enter_sleep_mode();
+> +}
+> +
+>  static int exynos_pm_suspend(void)
+>  {
+>         unsigned long tmp;
+> @@ -285,6 +320,15 @@ static int exynos_pm_suspend(void)
+>         return 0;
+>  }
+>
+> +static void exynos_pm_release_retention(void)
+> +{
+> +       unsigned int i;
+> +
+> +       for (i = 0; (pm_data->release_ret_regs[i] != REG_TABLE_END); i++)
+> +               pmu_raw_writel(EXYNOS_WAKEUP_FROM_LOWPWR,
+> +                               pm_data->release_ret_regs[i]);
+> +}
+> +
+>  static void exynos_pm_resume(void)
+>  {
+>         if (exynos_pm_central_resume())
+> @@ -294,18 +338,11 @@ static void exynos_pm_resume(void)
+>                 exynos_cpu_restore_register();
+>
+>         /* For release retention */
+> +       exynos_pm_release_retention();
+>
+> -       pmu_raw_writel((1 << 28), S5P_PAD_RET_MAUDIO_OPTION);
+> -       pmu_raw_writel((1 << 28), S5P_PAD_RET_GPIO_OPTION);
+> -       pmu_raw_writel((1 << 28), S5P_PAD_RET_UART_OPTION);
+> -       pmu_raw_writel((1 << 28), S5P_PAD_RET_MMCA_OPTION);
+> -       pmu_raw_writel((1 << 28), S5P_PAD_RET_MMCB_OPTION);
+> -       pmu_raw_writel((1 << 28), S5P_PAD_RET_EBIA_OPTION);
+> -       pmu_raw_writel((1 << 28), S5P_PAD_RET_EBIB_OPTION);
+> -
+> -       if (soc_is_exynos5250())
+> -               s3c_pm_do_restore(exynos5_sys_save,
+> -                       ARRAY_SIZE(exynos5_sys_save));
+> +       if (pm_data->extra_save)
+> +               s3c_pm_do_restore_core(pm_data->extra_save,
+> +                                       pm_data->num_extra_save);
+>
+>         s3c_pm_do_restore_core(exynos_core_save, ARRAY_SIZE(exynos_core_save));
+>
+> @@ -316,15 +353,8 @@ early_wakeup:
+>
+>         /* Clear SLEEP mode set in INFORM1 */
+>         pmu_raw_writel(0x0, S5P_INFORM1);
+> -
+> -       return;
+>  }
+>
+> -static struct syscore_ops exynos_pm_syscore_ops = {
+> -       .suspend        = exynos_pm_suspend,
+> -       .resume         = exynos_pm_resume,
+> -};
+> -
+>  /*
+>   * Suspend Ops
+>   */
+> @@ -348,11 +378,12 @@ static int exynos_suspend_enter(suspend_state_t state)
+>         }
+>
+>         s3c_pm_save_uarts();
+> -       exynos_pm_prepare();
+> +       if (pm_data->pm_prepare)
+> +               pm_data->pm_prepare();
+>         flush_cache_all();
+>         s3c_pm_check_store();
+>
+> -       ret = cpu_suspend(0, exynos_cpu_suspend);
+> +       ret = cpu_suspend(0, pm_data->cpu_suspend);
+>         if (ret)
+>                 return ret;
+>
+> @@ -387,18 +418,70 @@ static const struct platform_suspend_ops exynos_suspend_ops = {
+>         .valid          = suspend_valid_only_mem,
+>  };
+>
+> +static const struct exynos_pm_data exynos4_pm_data = {
+> +       .wkup_irq       = exynos4_wkup_irq,
+> +       .wake_disable_mask = ((0xFF << 8) | (0x1F << 1)),
+> +       .release_ret_regs = exynos_release_ret_regs,
+> +       .pm_suspend     = exynos_pm_suspend,
+> +       .pm_resume      = exynos_pm_resume,
+> +       .pm_prepare     = exynos_pm_prepare,
+> +       .cpu_suspend    = exynos_cpu_suspend,
+> +};
+> +
+> +static const struct exynos_pm_data exynos5250_pm_data = {
+> +       .wkup_irq       = exynos5250_wkup_irq,
+> +       .wake_disable_mask = ((0xFF << 8) | (0x1F << 1)),
+> +       .release_ret_regs = exynos_release_ret_regs,
+> +       .extra_save     = exynos5_sys_save,
+> +       .num_extra_save = ARRAY_SIZE(exynos5_sys_save),
+> +       .pm_suspend     = exynos_pm_suspend,
+> +       .pm_resume      = exynos_pm_resume,
+> +       .pm_prepare     = exynos_pm_prepare,
+> +       .cpu_suspend    = exynos_cpu_suspend,
+> +};
+> +
+> +static struct of_device_id exynos_pmu_of_device_ids[] = {
+> +       {
+> +               .compatible = "samsung,exynos4210-pmu",
+> +               .data = &exynos4_pm_data,
+> +       }, {
+> +               .compatible = "samsung,exynos4212-pmu",
+> +               .data = &exynos4_pm_data,
+> +       }, {
+> +               .compatible = "samsung,exynos4412-pmu",
+> +               .data = &exynos4_pm_data,
+> +       }, {
+> +               .compatible = "samsung,exynos5250-pmu",
+> +               .data = &exynos5250_pm_data,
+> +       },
+> +       { /*sentinel*/ },
+> +};
+> +
+> +static struct syscore_ops exynos_pm_syscore_ops;
+> +
+>  void __init exynos_pm_init(void)
+>  {
+> +       const struct of_device_id *match;
+>         u32 tmp;
+>
+> +       of_find_matching_node_and_match(NULL, exynos_pmu_of_device_ids, &match);
+> +       if (!match) {
+> +               pr_err("Failed to find PMU node\n");
+> +               return;
+> +       }
+> +       pm_data = (struct exynos_pm_data *) match->data;
+> +
+>         /* Platform-specific GIC callback */
+>         gic_arch_extn.irq_set_wake = exynos_irq_set_wake;
+>
+>         /* All wakeup disable */
+>         tmp = pmu_raw_readl(S5P_WAKEUP_MASK);
+> -       tmp |= ((0xFF << 8) | (0x1F << 1));
+> +       tmp |= pm_data->wake_disable_mask;
+>         pmu_raw_writel(tmp, S5P_WAKEUP_MASK);
+>
+> +       exynos_pm_syscore_ops.suspend   = pm_data->pm_suspend;
+> +       exynos_pm_syscore_ops.resume    = pm_data->pm_resume;
+> +
+>         register_syscore_ops(&exynos_pm_syscore_ops);
+>         suspend_set_ops(&exynos_suspend_ops);
+>  }
+> diff --git a/arch/arm/mach-exynos/regs-pmu.h b/arch/arm/mach-exynos/regs-pmu.h
+> index 96a1569..30c0301 100644
+> --- a/arch/arm/mach-exynos/regs-pmu.h
+> +++ b/arch/arm/mach-exynos/regs-pmu.h
+> @@ -21,6 +21,7 @@
+>  #define S5P_USE_STANDBY_WFI0                   (1 << 16)
+>  #define S5P_USE_STANDBY_WFE0                   (1 << 24)
+>
+> +#define EXYNOS_WAKEUP_FROM_LOWPWR              (1 << 28)
+>  #define EXYNOS_SWRESET                         0x0400
+>  #define EXYNOS5440_SWRESET                     0x00C4
+>
+> --
+> 1.7.9.5
+>
