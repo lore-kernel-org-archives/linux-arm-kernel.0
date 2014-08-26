@@ -1,36 +1,42 @@
 From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Tue, 26 Aug 2014 15:46:31 +0200
-Subject: [PATCH v7 5/5] ARM: dts: imx6qdl: Allow disabling the PU regulator,
- add a enable ramp delay
-In-Reply-To: <1409060791-23167-1-git-send-email-p.zabel@pengutronix.de>
-References: <1409060791-23167-1-git-send-email-p.zabel@pengutronix.de>
-Message-ID: <1409060791-23167-6-git-send-email-p.zabel@pengutronix.de>
+Date: Tue, 26 Aug 2014 15:46:26 +0200
+Subject: [PATCH v7 0/5] i.MX6 PU power domain support
+Message-ID: <1409060791-23167-1-git-send-email-p.zabel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The PU regulator is enabled during boot, but not necessarily always-on.
-It can be disabled by the generic pm domain framework when the PU power
-domain is shut down. The ramp delay of 150 us might be a bit conservative,
-the value is taken from the Freescale kernel.
+Hi,
 
-Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
----
- arch/arm/boot/dts/imx6qdl.dtsi | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+this is a rebased and updated version of the series I sent previously:
 
-diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
-index 0b1384c..d8d3d93 100644
---- a/arch/arm/boot/dts/imx6qdl.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl.dtsi
-@@ -579,7 +579,8 @@
- 					regulator-name = "vddpu";
- 					regulator-min-microvolt = <725000>;
- 					regulator-max-microvolt = <1450000>;
--					regulator-always-on;
-+					regulator-enable-ramp-delay = <150>;
-+					regulator-boot-on;
- 					anatop-reg-offset = <0x140>;
- 					anatop-vol-bit-shift = <9>;
- 					anatop-vol-bit-width = <5>;
+http://lists.infradead.org/pipermail/linux-arm-kernel/2014-March/238377.html
+
+It is based on the "PM / Domains: Generic OF-based support" series that Ulf
+Hansson sent recently:
+
+http://www.spinics.net/lists/arm-kernel/msg357003.html
+
+Changes since v6:
+ - imx6qdl.dtsi entry now uses clock name macros instead of index numbers
+
+regards
+Philipp
+
+Philipp Zabel (5):
+  Documentation: Add device tree bindings for Freescale i.MX GPC
+  ARM: imx6: gpc: Add PU power domain for GPU/VPU
+  ARM: dts: imx6qdl: Add power-domain information to gpc node
+  ARM: dts: imx6sl: Add power-domain information to gpc node
+  ARM: dts: imx6qdl: Allow disabling the PU regulator, add a enable ramp
+    delay
+
+ .../devicetree/bindings/power/fsl,imx-gpc.txt      |  54 ++++++
+ arch/arm/boot/dts/imx6qdl.dtsi                     |  11 +-
+ arch/arm/boot/dts/imx6sl.dtsi                      |   4 +
+ arch/arm/mach-imx/Kconfig                          |   1 +
+ arch/arm/mach-imx/gpc.c                            | 203 +++++++++++++++++++++
+ 5 files changed, 272 insertions(+), 1 deletion(-)
+ create mode 100644 Documentation/devicetree/bindings/power/fsl,imx-gpc.txt
+
 -- 
 2.1.0.rc1
