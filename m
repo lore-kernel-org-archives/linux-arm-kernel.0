@@ -1,20 +1,26 @@
 From: davem@davemloft.net (David Miller)
-Date: Mon, 25 Aug 2014 17:26:10 -0700 (PDT)
-Subject: [PATCH v6 3/4] net: moxa: synchronize DMA memory
-In-Reply-To: <1408976552-15659-1-git-send-email-jonas.jensen@gmail.com>
-References: <1408976552-15659-1-git-send-email-jonas.jensen@gmail.com>
-Message-ID: <20140825.172610.496537032439062803.davem@davemloft.net>
+Date: Mon, 25 Aug 2014 17:26:15 -0700 (PDT)
+Subject: [PATCH v6 4/4] net: moxa: continue loop on skb allocation failure
+In-Reply-To: <1408976560-15694-1-git-send-email-jonas.jensen@gmail.com>
+References: <1408976560-15694-1-git-send-email-jonas.jensen@gmail.com>
+Message-ID: <20140825.172615.1598002278628891621.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Jonas Jensen <jonas.jensen@gmail.com>
-Date: Mon, 25 Aug 2014 16:22:32 +0200
+Date: Mon, 25 Aug 2014 16:22:40 +0200
 
-> DMA memory should be synchronized before data is passed
-> to/from controller.
+> If netdev_alloc_skb_ip_align() fails, subsequent code will
+> try to dereference an invalid pointer.
 > 
-> Add dma_sync_single_for_cpu(.., DMA_FROM_DEVICE) to RX path
-> and dma_sync_single_for_device(.., DMA_TO_DEVICE) to TX path.
+> Continue to next descriptor on error.
+> 
+> While we're at it,
+> 
+> 1. eliminate the chance of an endless loop, replace the main
+>    loop with while(rx < budget)
+> 
+> 2. use napi_complete() and remove the explicit napi_gro_flush()
 > 
 > Signed-off-by: Jonas Jensen <jonas.jensen@gmail.com>
 
