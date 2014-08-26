@@ -1,33 +1,33 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 26 Aug 2014 11:14:14 +0100
-Subject: [PATCH] ARM: errata: Workaround for Cortex-A12 erratum 818325
-In-Reply-To: <1408355889-4176-1-git-send-email-kever.yang@rock-chips.com>
-References: <1408355889-4176-1-git-send-email-kever.yang@rock-chips.com>
-Message-ID: <20140826101414.GD23445@arm.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Tue, 26 Aug 2014 15:45:28 +0530
+Subject: [PATCH 2/2] ARM: davinci: board-da850-evm: Add needed regulators
+ for tlv320aic3106 codec
+In-Reply-To: <1406546678-797-2-git-send-email-peter.ujfalusi@ti.com>
+References: <1406546678-797-1-git-send-email-peter.ujfalusi@ti.com>
+ <1406546678-797-2-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <53FC5E40.7020904@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 18, 2014 at 10:58:09AM +0100, Kever Yang wrote:
-> From: Huang Tao <huangtao@rock-chips.com>
+On Monday 28 July 2014 04:54 PM, Peter Ujfalusi wrote:
+> IOVDD: tps65070's dcdc2
+> AVDD and DRVDD: fixed regulator derived from 5V via TPS73701DCQ
+> DVDD: fixed regulator derived from 5V via TPS73701DCQ
 > 
-> On Cortex-A12 (r0p0..r0p1-00lac0-rc11), when a CPU executes a sequence of
-> two conditional store instructions with opposite condition code and
-> updating the same register, the system might enter a deadlock if the
-> second conditional instruction is an UNPREDICTABLE STR or STM
-> instruction. This workaround setting bit[12] of the Feature Register
-> prevents the erratum. This bit disables an optimisation applied to a
-> sequence of 2 instructions that use opposing condition codes.
+> This patch needed to be able to probe the audio codec.
 > 
-> Signed-off-by: Huang Tao <huangtao@rock-chips.com>
-> Signed-off-by: Kever Yang <kever.yang@rock-chips.com>
+> Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
 > ---
+>  arch/arm/mach-davinci/board-da850-evm.c | 13 +++++++++++++
 
-The Rk3288 I have advertises itself as an r0p1 Cortex-A12 CPU, so isn't
-affected by this issue. Until we have an SoC supported in mainline that
-requires this workaround, I don't think we should merge it.
+Applied both for v3.18 while fixing the following:
 
-Also, please consider setting these bits in your firmware if possible.
-The feature register isn't writable from the non-secure side, so if you
-want to use virtualisation you'll need to do this differently.
+CHECK: Please use a blank line after function/struct/union/enum declarations
+#56: FILE: arch/arm/mach-davinci/board-da850-evm.c:845:
+ }
++/* Fixed regulator support */
 
-Will
+total: 0 errors, 0 warnings, 1 checks, 37 lines checked
+
+Thanks,
+Sekhar
