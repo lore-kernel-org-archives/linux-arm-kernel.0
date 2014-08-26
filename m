@@ -1,34 +1,184 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 26 Aug 2014 08:27:27 +0100
-Subject: [PATCH v6 1/3] mfd: devicetree: bindings: Add Qualcomm RPM DT
- binding
-In-Reply-To: <1409029109-28769-2-git-send-email-bjorn.andersson@sonymobile.com>
-References: <1409029109-28769-1-git-send-email-bjorn.andersson@sonymobile.com>
- <1409029109-28769-2-git-send-email-bjorn.andersson@sonymobile.com>
-Message-ID: <20140826072727.GB9574@lee--X1>
+From: kpark3469@gmail.com (kpark3469 at gmail.com)
+Date: Tue, 26 Aug 2014 16:28:59 +0900
+Subject: [PATCHv2] ARM: debug: uncompress debug support for omap2plus
+Message-ID: <1409038140-7433-1-git-send-email-kpark3469@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 25 Aug 2014, Bjorn Andersson wrote:
+From: Sahara <keun-o.park@windriver.com>
 
-> Add binding for the Qualcomm Resource Power Manager (RPM) found in 8660,
-> 8960 and 8064 based devices. The binding currently describes the rpm
-> itself and the regulator subnodes.
-> 
-> Signed-off-by: Bjorn Andersson <bjorn.andersson@sonymobile.com>
-> ---
->  Documentation/devicetree/bindings/mfd/qcom,rpm.txt |  246 ++++++++++++++++++++
->  include/dt-bindings/mfd/qcom,rpm.h                 |  154 ++++++++++++
->  2 files changed, 400 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/mfd/qcom,rpm.txt
->  create mode 100644 include/dt-bindings/mfd/qcom,rpm.h
+Since OMAP low-level debug code places data in the .data section,
+The symbol DEBUG_UNCOMPRESS was defined with !DEBUG_OMAP2PLUS_UART.
+This patch removes the part using data section in debug/omap2plus.S,
+so DEBUG_UNCOMPRESS is now available on OMAP system.
 
-Please use the same filename formatting as the existing files.
+Signed-off-by: Sahara <keun-o.park@windriver.com>
+Tested-by: Afzal Mohammed <afzal.mohd.ma@gmail.com> (on am335x beagle
+bone white)
+---
+ arch/arm/Kconfig.debug             |    3 +-
+ arch/arm/include/debug/omap2plus.S |   96 ++++++++++--------------------------
+ 2 files changed, 27 insertions(+), 72 deletions(-)
 
-[...]
-
+diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+index b11ad54..c0ad3e4 100644
+--- a/arch/arm/Kconfig.debug
++++ b/arch/arm/Kconfig.debug
+@@ -1220,8 +1220,7 @@ config DEBUG_UART_8250_FLOW_CONTROL
+ config DEBUG_UNCOMPRESS
+ 	bool
+ 	depends on ARCH_MULTIPLATFORM || ARCH_MSM || PLAT_SAMSUNG
+-	default y if DEBUG_LL && !DEBUG_OMAP2PLUS_UART && \
+-		     (!DEBUG_TEGRA_UART || !ZBOOT_ROM)
++	default y if DEBUG_LL && (!DEBUG_TEGRA_UART || !ZBOOT_ROM)
+ 	help
+ 	  This option influences the normal decompressor output for
+ 	  multiplatform kernels.  Normally, multiplatform kernels disable
+diff --git a/arch/arm/include/debug/omap2plus.S b/arch/arm/include/debug/omap2plus.S
+index 6d867ae..0b7ec89 100644
+--- a/arch/arm/include/debug/omap2plus.S
++++ b/arch/arm/include/debug/omap2plus.S
+@@ -58,115 +58,71 @@
+ 
+ #define UART_OFFSET(addr)	((addr) & 0x00ffffff)
+ 
+-		.pushsection .data
+-omap_uart_phys:	.word	0
+-omap_uart_virt:	.word	0
+-omap_uart_lsr:	.word	0
+-		.popsection
+-
+ 		.macro	addruart, rp, rv, tmp
+ 
+-		/* Use omap_uart_phys/virt if already configured */
+-10:		adr	\rp, 99f		@ get effective addr of 99f
+-		ldr	\rv, [\rp]		@ get absolute addr of 99f
+-		sub	\rv, \rv, \rp		@ offset between the two
+-		ldr	\rp, [\rp, #4]		@ abs addr of omap_uart_phys
+-		sub	\tmp, \rp, \rv		@ make it effective
+-		ldr	\rp, [\tmp, #0]		@ omap_uart_phys
+-		ldr	\rv, [\tmp, #4]		@ omap_uart_virt
+-		cmp	\rp, #0			@ is port configured?
+-		cmpne	\rv, #0
+-		bne	100f			@ already configured
+-
+ 		/* Configure the UART offset from the phys/virt base */
+-#ifdef CONFIG_DEBUG_OMAP2UART1
++#if defined(CONFIG_DEBUG_OMAP2UART1)
+ 		mov	\rp, #UART_OFFSET(OMAP2_UART1_BASE)	@ omap2/3/4
+ 		b	98f
+-#endif
+-#ifdef CONFIG_DEBUG_OMAP2UART2
++#elif defined(CONFIG_DEBUG_OMAP2UART2)
+ 		mov	\rp, #UART_OFFSET(OMAP2_UART2_BASE)	@ omap2/3/4
+ 		b	98f
+-#endif
+-#ifdef CONFIG_DEBUG_OMAP2UART3
++#elif defined(CONFIG_DEBUG_OMAP2UART3)
+ 		mov	\rp, #UART_OFFSET(OMAP2_UART3_BASE)
+ 		b	98f
+-#endif
+-#ifdef CONFIG_DEBUG_OMAP3UART3
++#elif defined(CONFIG_DEBUG_OMAP3UART3)
+ 		mov	\rp, #UART_OFFSET(OMAP3_UART1_BASE)
+ 		add	\rp, \rp, #0x00fb0000
+ 		add	\rp, \rp, #0x00006000		@ OMAP3_UART3_BASE
+ 		b	98f
+-#endif
+-#ifdef CONFIG_DEBUG_OMAP4UART3
++#elif defined(CONFIG_DEBUG_OMAP4UART3)
+ 		mov	\rp, #UART_OFFSET(OMAP4_UART3_BASE)
+ 		b	98f
+-#endif
+-#ifdef CONFIG_DEBUG_OMAP3UART4
++#elif defined(CONFIG_DEBUG_OMAP3UART4)
+ 		mov	\rp, #UART_OFFSET(OMAP3_UART1_BASE)
+ 		add	\rp, \rp, #0x00fb0000
+ 		add	\rp, \rp, #0x00028000		@ OMAP3_UART4_BASE
+ 		b	98f
+-#endif
+-#ifdef CONFIG_DEBUG_OMAP4UART4
++#elif defined(CONFIG_DEBUG_OMAP4UART4)
+ 		mov	\rp, #UART_OFFSET(OMAP4_UART4_BASE)
+ 		b	98f
+-#endif
+-#ifdef CONFIG_DEBUG_TI81XXUART1
++#elif defined(CONFIG_DEBUG_TI81XXUART1)
+ 		mov	\rp, #UART_OFFSET(TI81XX_UART1_BASE)
+ 		b	98f
+-#endif
+-#ifdef CONFIG_DEBUG_TI81XXUART2
++#elif defined(CONFIG_DEBUG_TI81XXUART2)
+ 		mov	\rp, #UART_OFFSET(TI81XX_UART2_BASE)
+ 		b	98f
+-#endif
+-#ifdef CONFIG_DEBUG_TI81XXUART3
++#elif defined(CONFIG_DEBUG_TI81XXUART3)
+ 		mov	\rp, #UART_OFFSET(TI81XX_UART3_BASE)
+ 		b	98f
+-#endif
+-#ifdef CONFIG_DEBUG_AM33XXUART1
++#elif defined(CONFIG_DEBUG_AM33XXUART1)
+ 		ldr	\rp, =AM33XX_UART1_BASE
+ 		and	\rp, \rp, #0x00ffffff
+ 		b	97f
+-#endif
+-#ifdef CONFIG_DEBUG_ZOOM_UART
++#elif defined(CONFIG_DEBUG_ZOOM_UART)
+ 		ldr	\rp, =ZOOM_UART_BASE
+-		str	\rp, [\tmp, #0]		@ omap_uart_phys
+-		ldr	\rp, =ZOOM_UART_VIRT
+-		str	\rp, [\tmp, #4]		@ omap_uart_virt
+-		mov	\rp, #(UART_LSR << ZOOM_PORT_SHIFT)
+-		str	\rp, [\tmp, #8]		@ omap_uart_lsr
++		ldr	\rv, =ZOOM_UART_VIRT
++		mov	\tmp, #(UART_LSR << ZOOM_PORT_SHIFT)
++		b	100f
++#else
++#error "Error! No proper debug option is defined."
+ #endif
+-		b	10b
+ 
+ 		/* AM33XX: Store both phys and virt address for the uart */
+ 97:		add	\rp, \rp, #0x44000000	@ phys base
+-		str	\rp, [\tmp, #0]		@ omap_uart_phys
+-		sub	\rp, \rp, #0x44000000	@ phys base
+-		add	\rp, \rp, #0xf9000000	@ virt base
+-		str	\rp, [\tmp, #4]		@ omap_uart_virt
+-		mov	\rp, #(UART_LSR << OMAP_PORT_SHIFT)
+-		str	\rp, [\tmp, #8]		@ omap_uart_lsr
++		sub	\rv, \rp, #0x44000000	@ phys base
++		add	\rv, \rv, #0xf9000000	@ virt base
++		mov	\tmp, #(UART_LSR << OMAP_PORT_SHIFT)
+ 
+-		b	10b
++		b	100f
+ 
+ 		/* Store both phys and virt address for the uart */
+ 98:		add	\rp, \rp, #0x48000000	@ phys base
+-		str	\rp, [\tmp, #0]		@ omap_uart_phys
+-		sub	\rp, \rp, #0x48000000	@ phys base
+-		add	\rp, \rp, #0xfa000000	@ virt base
+-		str	\rp, [\tmp, #4]		@ omap_uart_virt
+-		mov	\rp, #(UART_LSR << OMAP_PORT_SHIFT)
+-		str	\rp, [\tmp, #8]		@ omap_uart_lsr
+-
+-		b	10b
+-
+-		.align
+-99:		.word	.
+-		.word	omap_uart_phys
+-		.ltorg
+-
+-100:		/* Pass the UART_LSR reg address */
+-		ldr	\tmp, [\tmp, #8]	@ omap_uart_lsr
++		sub	\rv, \rp, #0x48000000	@ phys base
++		add	\rv, \rv, #0xfa000000	@ virt base
++		mov	\tmp, #(UART_LSR << OMAP_PORT_SHIFT)
++
++100:		/* Add the UART_LSR reg address */
+ 		add	\rp, \rp, \tmp
+ 		add	\rv, \rv, \tmp
+ 		.endm
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+1.7.9.5
