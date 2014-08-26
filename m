@@ -1,91 +1,71 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Tue, 26 Aug 2014 13:47:19 +0200
-Subject: [RFC PATCH 0/9] dt: dependencies (for deterministic driver
- initialization order based on the DT)
-In-Reply-To: <53FC6E4A.6030407@ahsoftware.de>
-References: <20140825093931.GB2399@ulmo> <E1XLu15-0002DP-6o@jdl.com>
- <20140825133714.GH4163@ulmo.nvidia.com>
- <20140826084208.AE5F0C40989@trevor.secretlab.ca>
- <20140826084922.GG17263@ulmo> <53FC566C.30904@ahsoftware.de>
- <20140826102503.GC31124@ulmo> <53FC6513.5040800@ahsoftware.de>
- <20140826110827.GA31350@ulmo> <53FC6E4A.6030407@ahsoftware.de>
-Message-ID: <20140826114718.GB641@ulmo>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Tue, 26 Aug 2014 13:43:12 +0200
+Subject: [PATCH v3 1/2] KVM: Introduce gfn_to_hva_memslot_prot
+Message-ID: <1409053393-13768-1-git-send-email-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 26, 2014 at 01:23:54PM +0200, Alexander Holler wrote:
-> Am 26.08.2014 13:08, schrieb Thierry Reding:
-> >On Tue, Aug 26, 2014 at 12:44:35PM +0200, Alexander Holler wrote:
-> >>Am 26.08.2014 12:25, schrieb Thierry Reding:
-> >>>On Tue, Aug 26, 2014 at 11:42:04AM +0200, Alexander Holler wrote:
-> >>
-> >>>>You need either the type information in the DTB (that's why I've add those
-> >>>>"dependencies" to identify phandles), or you need to know every binding (at
-> >>>>"dependency-resolve-time" to identify phandles. The latter is impracticable
-> >>>>to implement in a generic way (for use with every possible binding).
-> >>>
-> >>>Like I already mentioned, this could be done in drivers who contain that
-> >>>information already anyway. Or parts of it could be done in subsystem-
-> >>>specific callbacks where a generic binding is available.
-> >>
-> >>That would end up with almost the same ugly driver-based workarounds as now.
-> >>It's much better if a driver author only has to define it's prerequisits (in
-> >>form of dependencies in the dts) and could be sure the driver will only be
-> >>probed if those are met, than to do that stuff based on a subsystem or even
-> >>driver level.
-> >>
-> >>If you add dependency-information to drivers, you have two problems:
-> >
-> >We already have all that dependency information in drivers anyway. Each
-> >driver requests the resources at .probe() time. What I proposed (it was
-> >really Arnd who proposed it first) is to move that information out of
-> >code and into some sort of table that could be used by the driver core
-> >to figure out dependencies.
-> >
-> >>- How do you get these information from the driver (remember, currently
-> >>there is only one initial call, a initcall which might do almost anything)
-> >
-> >While I don't think it's necessary, that's something that could be
-> >changed. I mean, we have access to the full source code of this
-> >operating system, so we can change every aspect of it. If we can't find
-> >a way to make this work with the current initcall sequence it's always
-> >an option to extend that sequence so that it meets our needs.
-> >
-> >>- These information might become outdated and you would have to change all
-> >>drivers. E.g. if the name of a dependency (driver) changes it wouldn't be
-> >>done with changing the dts (maybe plural), but you would have to change the
-> >>source of all dependant drivers too.
-> >
-> >No. Drivers implement a DT binding. That binding defines what power
-> >supplies, clocks, pinmux, ... the device needs. Those constitute the
-> >dependencies. We most certainly don't want to depend on driver names
-> >since there can be a multitude of different drivers that provide a given
-> >dependency.
-> >
-> >What drivers should provide (and what they already provide today) is the
-> >name of the property and the index of the cell that they expect to find
-> >a phandle in as well as the type of the phandle. That's all that's
-> >necessary, really. Everything else can be derived from that phandle and
-> >the type.
-> 
-> Drivers don't provide that information (dependencies) in any usable way. And
-> as you said yourself, it's already contained in phandles. So what we are
-> discussing here about? The proposal to use phandles for that is already on
-> the table since several month. ;)
-> 
-> Sorry, but I don't understand what you want to propose.
+To support read-only memory regions on arm and arm64, we have a need to
+resolve a gfn to an hva given a pointer to a memslot to avoid looping
+through the memslots twice and to reuse the hva error checking of
+gfn_to_hva_prot(), add a new gfn_to_hva_memslot_prot() function and
+refactor gfn_to_hva_prot() to use this function.
 
-In many cases we simply don't know where phandles are stored since we
-don't have the type information in DT. But drivers already know the type
-of a specific phandle and where to get it from, so the proposal is to
-make that knowledge more generally useful so that it can be used for
-dependency resolution.
+Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+---
+Changelog[v3]:
+ - None
+Changelog[v2]:
+ - Fix typo in patch title
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140826/65f3f305/attachment.sig>
+ include/linux/kvm_host.h |  2 ++
+ virt/kvm/kvm_main.c      | 11 +++++++++--
+ 2 files changed, 11 insertions(+), 2 deletions(-)
+
+diff --git a/include/linux/kvm_host.h b/include/linux/kvm_host.h
+index ebd7236..6d8a658 100644
+--- a/include/linux/kvm_host.h
++++ b/include/linux/kvm_host.h
+@@ -528,6 +528,8 @@ struct page *gfn_to_page(struct kvm *kvm, gfn_t gfn);
+ unsigned long gfn_to_hva(struct kvm *kvm, gfn_t gfn);
+ unsigned long gfn_to_hva_prot(struct kvm *kvm, gfn_t gfn, bool *writable);
+ unsigned long gfn_to_hva_memslot(struct kvm_memory_slot *slot, gfn_t gfn);
++unsigned long gfn_to_hva_memslot_prot(struct kvm_memory_slot *slot, gfn_t gfn,
++				      bool *writable);
+ void kvm_release_page_clean(struct page *page);
+ void kvm_release_page_dirty(struct page *page);
+ void kvm_set_page_accessed(struct page *page);
+diff --git a/virt/kvm/kvm_main.c b/virt/kvm/kvm_main.c
+index 5a0817e..76c92a7 100644
+--- a/virt/kvm/kvm_main.c
++++ b/virt/kvm/kvm_main.c
+@@ -1076,9 +1076,9 @@ EXPORT_SYMBOL_GPL(gfn_to_hva);
+  * If writable is set to false, the hva returned by this function is only
+  * allowed to be read.
+  */
+-unsigned long gfn_to_hva_prot(struct kvm *kvm, gfn_t gfn, bool *writable)
++unsigned long gfn_to_hva_memslot_prot(struct kvm_memory_slot *slot,
++				      gfn_t gfn, bool *writable)
+ {
+-	struct kvm_memory_slot *slot = gfn_to_memslot(kvm, gfn);
+ 	unsigned long hva = __gfn_to_hva_many(slot, gfn, NULL, false);
+ 
+ 	if (!kvm_is_error_hva(hva) && writable)
+@@ -1087,6 +1087,13 @@ unsigned long gfn_to_hva_prot(struct kvm *kvm, gfn_t gfn, bool *writable)
+ 	return hva;
+ }
+ 
++unsigned long gfn_to_hva_prot(struct kvm *kvm, gfn_t gfn, bool *writable)
++{
++	struct kvm_memory_slot *slot = gfn_to_memslot(kvm, gfn);
++
++	return gfn_to_hva_memslot_prot(slot, gfn, writable);
++}
++
+ static int kvm_read_hva(void *data, void __user *hva, int len)
+ {
+ 	return __copy_from_user(data, hva, len);
+-- 
+2.0.0
