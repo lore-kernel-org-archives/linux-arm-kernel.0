@@ -1,48 +1,68 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 26 Aug 2014 15:29:25 +0100
-Subject: [PATCH 08/11] irqchip: gic-v3: declare rdist as __percpu pointer
- to __iomem pointer
-In-Reply-To: <1409062410-25891-9-git-send-email-will.deacon@arm.com>
-References: <1409062410-25891-1-git-send-email-will.deacon@arm.com>
- <1409062410-25891-9-git-send-email-will.deacon@arm.com>
-Message-ID: <53FC99C5.10209@arm.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 26 Aug 2014 15:30:11 +0100
+Subject: [PATCH 3/6] arm64: Add support for hooks to handle undefined
+ instructions
+In-Reply-To: <CAKv+Gu8Nji0Jspk2cMCwVGKeODsiOb0NFUFWucm3rAbNdb_bTQ@mail.gmail.com>
+References: <1409048930-21598-1-git-send-email-punit.agrawal@arm.com>
+ <1409048930-21598-4-git-send-email-punit.agrawal@arm.com>
+ <20140826131339.GO23445@arm.com>
+ <CAKv+Gu8Nji0Jspk2cMCwVGKeODsiOb0NFUFWucm3rAbNdb_bTQ@mail.gmail.com>
+Message-ID: <20140826143011.GV23445@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26/08/14 15:13, Will Deacon wrote:
-> The __percpu __iomem annotations on the rdist base are contradictory
-> and confuse static checkers such as sparse.
+On Tue, Aug 26, 2014 at 03:21:09PM +0100, Ard Biesheuvel wrote:
+> On 26 August 2014 15:13, Will Deacon <will.deacon@arm.com> wrote:
+> > On Tue, Aug 26, 2014 at 11:28:47AM +0100, Punit Agrawal wrote:
+> >> Add support to register hooks for undefined instructions. The handlers
+> >> will be called when the undefined instruction and the processor state
+> >> (as contained in pstate) match criteria used at registration.
+> >>
+> >> Note: The patch only deals with ARM instruction encodings and needs
+> >> fixing to handle thumb instructions as well.
+> >
+> > [...]
+> >
+> >> +static int call_undef_hook(struct pt_regs *regs)
+> >> +{
+> >> +     struct undef_hook *hook;
+> >> +     unsigned long flags;
+> >> +     u32 instr;
+> >> +     int (*fn)(struct pt_regs *regs, u32 instr) = NULL;
+> >> +     void __user *pc = (void __user *)instruction_pointer(regs);
+> >> +
+> >> +     /*
+> >> +      * Currently, undefined instruction patching is only supported
+> >> +      * for user mode. Also, as we're not emulating any thumb
+> >> +      * instructions lets not add thumb instruction decoding until
+> >> +      * it is needed.
+> >> +      */
+> >> +     if (!compat_user_mode(regs) || compat_thumb_mode(regs))
+> >> +             return 1;
+> >
+> > What do you mean by `undefined instruction patching'? I don't see anything
+> > in the mechanism that means this can't be reused for kernel code, then we
+> > just register the SWP emulation hook for userspace only using the mode (like
+> > we do for kgdb).
+> >
 > 
-> This patch fixes the anotations so that rdist is described as a __percpu
-> pointer to an __iomem pointer.
+> You need this patch in order to be able to return from an undef
+> exception taken in EL1:
 > 
-> Cc: Jason Cooper <jason@lakedaemon.net>
-> Cc: Marc Zyngier <marc.zyngier@arm.com>
-> Signed-off-by: Will Deacon <will.deacon@arm.com>
+> --- a/arch/arm64/kernel/entry.S
+> +++ b/arch/arm64/kernel/entry.S
+> @@ -287,7 +287,9 @@ el1_undef:
+>          */
+>         enable_dbg
+>         mov     x0, sp
+> -       b       do_undefinstr
+> +       bl      do_undefinstr
+> +
+> +       kernel_exit 1
+>  el1_dbg:
+>         /*
+>          * Debug exception handling
 
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+Hmm, I'm surprised we don't already need something like this for KGDB...
 
-	M.
-
-> ---
->  drivers/irqchip/irq-gic-v3.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/drivers/irqchip/irq-gic-v3.c b/drivers/irqchip/irq-gic-v3.c
-> index 57eaa5a0b1e3..4d7b7c28c554 100644
-> --- a/drivers/irqchip/irq-gic-v3.c
-> +++ b/drivers/irqchip/irq-gic-v3.c
-> @@ -36,7 +36,7 @@
->  struct gic_chip_data {
->  	void __iomem		*dist_base;
->  	void __iomem		**redist_base;
-> -	void __percpu __iomem	**rdist;
-> +	void __iomem * __percpu	*rdist;
->  	struct irq_domain	*domain;
->  	u64			redist_stride;
->  	u32			redist_regions;
-> 
-
-
--- 
-Jazz is not dead. It just smells funny...
+Will
