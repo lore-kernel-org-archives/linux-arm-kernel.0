@@ -1,26 +1,47 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 26 Aug 2014 11:37:33 +0100
-Subject: [PATCH v4 1/1] iommu/arm-smmu: Do not access non-existing S2CR
- registers
-In-Reply-To: <1408752752-15601-1-git-send-email-ohaugan@codeaurora.org>
-References: <1408752752-15601-1-git-send-email-ohaugan@codeaurora.org>
-Message-ID: <20140826103730.GE23445@arm.com>
+From: holler@ahsoftware.de (Alexander Holler)
+Date: Tue, 26 Aug 2014 12:44:35 +0200
+Subject: [RFC PATCH 0/9] dt: dependencies (for deterministic driver
+ initialization order based on the DT)
+In-Reply-To: <20140826102503.GC31124@ulmo>
+References: <20140514141914.446F7C4153D@trevor.secretlab.ca>
+ <20140821140211.GD19293@ulmo.nvidia.com> <53F64624.5000403@ahsoftware.de>
+ <20140822131919.GX21734@leverpostej> <20140825093931.GB2399@ulmo>
+ <E1XLu15-0002DP-6o@jdl.com> <20140825133714.GH4163@ulmo.nvidia.com>
+ <20140826084208.AE5F0C40989@trevor.secretlab.ca>
+ <20140826084922.GG17263@ulmo> <53FC566C.30904@ahsoftware.de>
+ <20140826102503.GC31124@ulmo>
+Message-ID: <53FC6513.5040800@ahsoftware.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olav,
+Am 26.08.2014 12:25, schrieb Thierry Reding:
+> On Tue, Aug 26, 2014 at 11:42:04AM +0200, Alexander Holler wrote:
 
-On Sat, Aug 23, 2014 at 01:12:32AM +0100, Olav Haugan wrote:
-> The number of S2CR registers is not properly set when stream
-> matching is not supported. Fix this and add check that we do not try to
-> access outside of the number of S2CR regisrers.
+>> You need either the type information in the DTB (that's why I've add those
+>> "dependencies" to identify phandles), or you need to know every binding (at
+>> "dependency-resolve-time" to identify phandles. The latter is impracticable
+>> to implement in a generic way (for use with every possible binding).
+>
+> Like I already mentioned, this could be done in drivers who contain that
+> information already anyway. Or parts of it could be done in subsystem-
+> specific callbacks where a generic binding is available.
 
-Sorry for the bother, but could you base this on either iommu/devel or
-iommu/staging please? Now that the merge window is well and truly over, I
-moved those branches forward, so you needn't worry about iommu/pci anymore
-(which, as you pointed out, contains a bunch of WIP patches which should
-hold-up useful fixes like this one).
+That would end up with almost the same ugly driver-based workarounds as 
+now. It's much better if a driver author only has to define it's 
+prerequisits (in form of dependencies in the dts) and could be sure the 
+driver will only be probed if those are met, than to do that stuff based 
+on a subsystem or even driver level.
 
-Cheers,
+If you add dependency-information to drivers, you have two problems:
 
-Will
+- How do you get these information from the driver (remember, currently 
+there is only one initial call, a initcall which might do almost anything)
+
+- These information might become outdated and you would have to change 
+all drivers. E.g. if the name of a dependency (driver) changes it 
+wouldn't be done with changing the dts (maybe plural), but you would 
+have to change the source of all dependant drivers too.
+
+Regards,
+
+Alexander Holler
