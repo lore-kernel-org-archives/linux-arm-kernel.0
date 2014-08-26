@@ -1,61 +1,77 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Tue, 26 Aug 2014 13:20:58 +0900
-Subject: [PATCH] ARM: shmobile: lager: correct memory map
-In-Reply-To: <CAOesGMieRk4Dvg=gxTgcVssARkK6DeoaVyK8619B2N5=wwo=Uw@mail.gmail.com>
-References: <1409021623-10633-1-git-send-email-horms+renesas@verge.net.au>
- <CAOesGMieRk4Dvg=gxTgcVssARkK6DeoaVyK8619B2N5=wwo=Uw@mail.gmail.com>
-Message-ID: <20140826042055.GA12108@verge.net.au>
+From: chao.xie@marvell.com (Chao Xie)
+Date: Tue, 26 Aug 2014 12:38:15 +0800
+Subject: [PATCH 03/12] clk: mmp: add init callback for clk-frac
+In-Reply-To: <1409027904-21859-1-git-send-email-chao.xie@marvell.com>
+References: <1409027904-21859-1-git-send-email-chao.xie@marvell.com>
+Message-ID: <1409027904-21859-4-git-send-email-chao.xie@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 25, 2014 at 08:04:49PM -0700, Olof Johansson wrote:
-> Hi,
-> 
-> On Mon, Aug 25, 2014 at 7:53 PM, Simon Horman
-> <horms+renesas@verge.net.au> wrote:
-> > The base address of the second memory region on the lager
-> > board is 0x140000000. Update the tag used in the dts file accordingly.
-> >
-> > This is a documentation fix and should have no run-time affect.
-> >
-> > This problem was introduced when the second memory region
-> > was added to the lager dts file by 62bc32a2573c4219
-> > ("ARM: shmobile: Include all 4 GiB of memory on Lager)"
-> > in v3.14.
-> >
-> > Reported-by: NAOYA SHIIBA <naoya.shiiba.nx@renesas.com>
-> > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-> > ---
-> >  arch/arm/boot/dts/r8a7790-lager.dts | 2 +-
-> >  1 file changed, 1 insertion(+), 1 deletion(-)
-> >
-> > diff --git a/arch/arm/boot/dts/r8a7790-lager.dts b/arch/arm/boot/dts/r8a7790-lager.dts
-> > index 0118cbf..84dcafa 100644
-> > --- a/arch/arm/boot/dts/r8a7790-lager.dts
-> > +++ b/arch/arm/boot/dts/r8a7790-lager.dts
-> > @@ -32,7 +32,7 @@
-> >                 reg = <0 0x40000000 0 0x40000000>;
-> >         };
-> >
-> > -       memory at 180000000 {
-> > +       memory at 140000000 {
-> 
-> That should even be "memory at 1,40000000".
+From: Chao Xie <chao.xie@marvell.com>
 
-Two comma-separated 32bit values in the case
-where a memory range starts above 4Gb?
+For the clk-frac, we need to make sure that the initial
+clock rate is one item of the table.
+If it is not, we use the first item in the table by default.
 
-If so it looks like this will be the first user of that syntax
-(I don't see any in linux-next today).
+Signed-off-by: Chao Xie <chao.xie@marvell.com>
+---
+ drivers/clk/mmp/clk-frac.c | 40 ++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 40 insertions(+)
 
-I do however see several users of memrory at 64bit_value.
-Mostly other renesas fds files; ecx-2000.dts being the exception.
-Should they be fixed too?
-
-$ find -name "*.dts" | xargs grep memory@[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]
-./arch/arm/boot/dts/r8a7791-henninger.dts:	memory at 200000000 {
-./arch/arm/boot/dts/r8a7791-koelsch.dts:	memory at 200000000 {
-./arch/arm/boot/dts/ecx-2000.dts:	memory at 200000000 {
-./arch/arm/boot/dts/r8a73a4-ape6evm-reference.dts:	memory at 200000000 {
-./arch/arm/boot/dts/r8a7790-lager.dts:	memory at 180000000 {
-./arch/arm/boot/dts/r8a73a4-ape6evm.dts:	memory at 200000000 {
+diff --git a/drivers/clk/mmp/clk-frac.c b/drivers/clk/mmp/clk-frac.c
+index e29d006..1876d2c 100644
+--- a/drivers/clk/mmp/clk-frac.c
++++ b/drivers/clk/mmp/clk-frac.c
+@@ -118,10 +118,50 @@ static int clk_factor_set_rate(struct clk_hw *hw, unsigned long drate,
+ 	return 0;
+ }
+ 
++void clk_factor_init(struct clk_hw *hw)
++{
++	struct mmp_clk_factor *factor = to_clk_factor(hw);
++	struct mmp_clk_factor_masks *masks = factor->masks;
++	u32 val, num, den;
++	int i;
++	unsigned long flags = 0;
++
++	if (factor->lock)
++		spin_lock_irqsave(factor->lock, flags);
++
++	val = readl(factor->base);
++
++	/* calculate numerator */
++	num = (val >> masks->num_shift) & masks->num_mask;
++
++	/* calculate denominator */
++	den = (val >> masks->den_shift) & masks->den_mask;
++
++	for (i = 0; i < factor->ftbl_cnt; i++)
++		if (den == factor->ftbl[i].den && num == factor->ftbl[i].num)
++			break;
++
++	if (i >= factor->ftbl_cnt) {
++		val &= ~(masks->num_mask << masks->num_shift);
++		val |= (factor->ftbl[0].num & masks->num_mask) <<
++			masks->num_shift;
++
++		val &= ~(masks->den_mask << masks->den_shift);
++		val |= (factor->ftbl[0].den & masks->den_mask) <<
++			masks->den_shift;
++
++		writel(val, factor->base);
++	}
++
++	if (factor->lock)
++		spin_unlock_irqrestore(factor->lock, flags);
++}
++
+ static struct clk_ops clk_factor_ops = {
+ 	.recalc_rate = clk_factor_recalc_rate,
+ 	.round_rate = clk_factor_round_rate,
+ 	.set_rate = clk_factor_set_rate,
++	.init = clk_factor_init,
+ };
+ 
+ struct clk *mmp_clk_register_factor(const char *name, const char *parent_name,
+-- 
+1.8.3.2
