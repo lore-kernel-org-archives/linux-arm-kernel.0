@@ -1,54 +1,58 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Tue, 26 Aug 2014 11:51:38 +0300
-Subject: [PATCH] ARM: dts: omap54xx-clocks: Fix the l3 and l4 clock rates
-Message-ID: <1409043098-12510-1-git-send-email-t-kristo@ti.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Tue, 26 Aug 2014 17:52:37 +0900
+Subject: [PATCH] ARM: shmobile: lager: correct memory map
+In-Reply-To: <CAMuHMdVqZ29-jaS+kLwdVycLOMSbz9H7oJGuq3dLH2y-81mVcQ@mail.gmail.com>
+References: <1409021623-10633-1-git-send-email-horms+renesas@verge.net.au>
+ <CAOesGMieRk4Dvg=gxTgcVssARkK6DeoaVyK8619B2N5=wwo=Uw@mail.gmail.com>
+ <20140826042055.GA12108@verge.net.au>
+ <CAMuHMdVqZ29-jaS+kLwdVycLOMSbz9H7oJGuq3dLH2y-81mVcQ@mail.gmail.com>
+Message-ID: <20140826085234.GA29667@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Similarly to DRA7, OMAP5 has l3 and l4 clock rates incorrectly calculated.
-Fixed by using proper divider clock types for the clock nodes.
+On Tue, Aug 26, 2014 at 09:52:10AM +0200, Geert Uytterhoeven wrote:
+> On Tue, Aug 26, 2014 at 6:20 AM, Simon Horman <horms@verge.net.au> wrote:
+> >> > diff --git a/arch/arm/boot/dts/r8a7790-lager.dts b/arch/arm/boot/dts/r8a7790-lager.dts
+> >> > index 0118cbf..84dcafa 100644
+> >> > --- a/arch/arm/boot/dts/r8a7790-lager.dts
+> >> > +++ b/arch/arm/boot/dts/r8a7790-lager.dts
+> >> > @@ -32,7 +32,7 @@
+> >> >                 reg = <0 0x40000000 0 0x40000000>;
+> >> >         };
+> >> >
+> >> > -       memory at 180000000 {
+> >> > +       memory at 140000000 {
+> >>
+> >> That should even be "memory at 1,40000000".
+> >
+> > Two comma-separated 32bit values in the case
+> > where a memory range starts above 4Gb?
+> 
+> Yes. As #address-cells is 2, there should be two values after the "@"
+> (the first one may be optional if it's zero, I don't know for sure?)
+> 
+> > If so it looks like this will be the first user of that syntax
+> > (I don't see any in linux-next today).
+> 
+> No, "git grep '@.*,' -- arch/arm/boot/dts" shows several users.
+> Not all of them are 64-bit memory addresses, but some are.
 
-Signed-off-by: Tero Kristo <t-kristo@ti.com>
-Reported-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
----
- arch/arm/boot/dts/omap54xx-clocks.dtsi |   16 ++++++++++------
- 1 file changed, 10 insertions(+), 6 deletions(-)
+Thanks, I like your grep better than mine.
 
-diff --git a/arch/arm/boot/dts/omap54xx-clocks.dtsi b/arch/arm/boot/dts/omap54xx-clocks.dtsi
-index e67a23b..58c2746 100644
---- a/arch/arm/boot/dts/omap54xx-clocks.dtsi
-+++ b/arch/arm/boot/dts/omap54xx-clocks.dtsi
-@@ -367,10 +367,12 @@
- 
- 	l3_iclk_div: l3_iclk_div {
- 		#clock-cells = <0>;
--		compatible = "fixed-factor-clock";
-+		compatible = "ti,divider-clock";
-+		ti,max-div = <2>;
-+		ti,bit-shift = <4>;
-+		reg = <0x100>;
- 		clocks = <&dpll_core_h12x2_ck>;
--		clock-mult = <1>;
--		clock-div = <1>;
-+		ti,index-power-of-two;
- 	};
- 
- 	gpu_l3_iclk: gpu_l3_iclk {
-@@ -383,10 +385,12 @@
- 
- 	l4_root_clk_div: l4_root_clk_div {
- 		#clock-cells = <0>;
--		compatible = "fixed-factor-clock";
-+		compatible = "ti,divider-clock";
-+		ti,max-div = <2>;
-+		ti,bit-shift = <8>;
-+		reg = <0x100>;
- 		clocks = <&l3_iclk_div>;
--		clock-mult = <1>;
--		clock-div = <1>;
-+		ti,index-power-of-two;
- 	};
- 
- 	slimbus1_slimbus_clk: slimbus1_slimbus_clk {
--- 
-1.7.9.5
+> > I do however see several users of memrory at 64bit_value.
+> > Mostly other renesas fds files; ecx-2000.dts being the exception.
+> > Should they be fixed too?
+> >
+> > $ find -name "*.dts" | xargs grep memory@[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]
+> > ./arch/arm/boot/dts/r8a7791-henninger.dts:      memory at 200000000 {
+> > ./arch/arm/boot/dts/r8a7791-koelsch.dts:        memory at 200000000 {
+> > ./arch/arm/boot/dts/ecx-2000.dts:       memory at 200000000 {
+> > ./arch/arm/boot/dts/r8a73a4-ape6evm-reference.dts:      memory at 200000000 {
+> > ./arch/arm/boot/dts/r8a7790-lager.dts:  memory at 180000000 {
+> > ./arch/arm/boot/dts/r8a73a4-ape6evm.dts:        memory at 200000000 {
+> 
+> Yes, these should be fixed, too.
+> 
+> It's a pity dtc doesn't complain about this.
+
+Indeed.
