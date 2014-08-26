@@ -1,70 +1,52 @@
-From: daniel@zonque.org (Daniel Mack)
-Date: Tue, 26 Aug 2014 10:46:56 +0200
-Subject: [PATCH v7 RESEND] ARM: omap: edma: add suspend suspend/resume
- hooks
-In-Reply-To: <53FC2AD4.4070400@ti.com>
-References: <1408693562-18068-1-git-send-email-d-gerlach@ti.com>
- <53FC2AD4.4070400@ti.com>
-Message-ID: <53FC4980.1070606@zonque.org>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Tue, 26 Aug 2014 10:49:24 +0200
+Subject: [RFC PATCH 0/9] dt: dependencies (for deterministic driver
+ initialization order based on the DT)
+In-Reply-To: <20140826084208.AE5F0C40989@trevor.secretlab.ca>
+References: <1399913280-6915-1-git-send-email-holler@ahsoftware.de>
+ <20140514141914.446F7C4153D@trevor.secretlab.ca>
+ <20140821140211.GD19293@ulmo.nvidia.com>
+ <53F64624.5000403@ahsoftware.de>
+ <20140822131919.GX21734@leverpostej> <20140825093931.GB2399@ulmo>
+ <E1XLu15-0002DP-6o@jdl.com> <20140825133714.GH4163@ulmo.nvidia.com>
+ <20140826084208.AE5F0C40989@trevor.secretlab.ca>
+Message-ID: <20140826084922.GG17263@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On 08/26/2014 08:36 AM, Sekhar Nori wrote:
-> On Friday 22 August 2014 01:16 PM, Dave Gerlach wrote:
-
-Thanks for pushing that forward!
-
->> +static int edma_pm_suspend(struct device *dev)
->> +{
->> +	int j, r;
->> +
->> +	r = pm_runtime_get_sync(dev);
->> +	if (r < 0) {
->> +		dev_err(dev, "%s: get_sync returned %d\n", __func__, r);
->> +		return r;
->> +	}
+On Tue, Aug 26, 2014 at 09:42:08AM +0100, Grant Likely wrote:
+> On Mon, 25 Aug 2014 15:37:16 +0200, Thierry Reding <thierry.reding@gmail.com> wrote:
+[...]
+> > There are somewhat standardized bindings for the above and especially
+> > for bindings of the type that clocks implement this is trivial. We can
+> > simply iterate over each (phandle, specifier) tuple and check that the
+> > corresponding clock provider can be resolved (which typically means that
+> > it's been registered with the common clock framework).
+> > 
+> > For regulators (and regulator-like bindings) the problem is somewhat
+> > more difficult because they property names are not standardized. One way
+> > to solve this would be to look for property names with a -supply suffix,
+> > but that could obviously lead to false positives. One alternative that I
+> > think could eliminate this would be to explicitly list dependencies in
+> > drivers. This would allow core code to step through such a list and
+> > resolve the (phandle, specifier) tuples.
 > 
-> The driver currently does a pm_runtime_get_sync() once during probe. And
-> does not do a put(). So this should actually be not required. In fact
-> looks like this additional get() call will prevent the clock from
-> getting disabled which is probably not what you intend.
+> False positives and negatives may not actually be a problem. It is
+> suboptimal, certainly, but it shouldn't outright break the kernel.
 
-Well, the pm runtime is put again ...
+There could be cases where some random integer in a cell could be
+interpreted as a phandle and resolve to a struct device_node. I suppose
+it might be unlikely, but not impossible, that the device_node could
+even match a device in the correct subsystem and you'd get a wrong
+dependency. Granted, a wrong dependency may not be catastrophic in that
+it won't lead to a crash, but it could lead to various kinds of
+weirdness and hard to diagnose problems.
 
->> +
->> +	for (j = 0; j < arch_num_cc; j++) {
->> +		struct edma *ecc = edma_cc[j];
->> +
->> +		disable_irq(ecc->irq_res_start);
->> +		disable_irq(ecc->irq_res_end);
-> 
-> Do we really need to disable these irqs?
-> 
->> +	}
->> +
->> +	pm_runtime_put_sync(dev);
-
-... here, so it's in sync and should be fine.
-
-I was also sure than when I wrote the code, disabling the interrupts
-during suspend was necessary, and even the only thing that has to be
-done at suspend time. Now that I address this again, my tests show that
-in can in fact be omitted.
-
-So I'll send a v9 now that has no edma_pm_suspend() at all anymore.
-
->> +static const struct dev_pm_ops edma_pm_ops = {
->> +	.suspend_late	= edma_pm_suspend,
->> +	.resume_early	= edma_pm_resume,
->> +};
-> 
-> You can use SET_LATE_SYSTEM_SLEEP_PM_OPS() as some other DMA drivers are
-> doing too.
-
-Sure, why not.
-
-
-Thanks,
-Daniel
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140826/e7d7efb9/attachment.sig>
