@@ -1,61 +1,66 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 26 Aug 2014 15:37:25 +0100
-Subject: [PATCH v4 2/8] ARM: expand fixmap region to 3MB
-In-Reply-To: <CAGXu5jJRx8e2_9jpMYApH8maJog_z2YAs2ihoD4SFNfvPqn2Aw@mail.gmail.com>
-References: <1407949593-16121-1-git-send-email-keescook@chromium.org>
- <1407949593-16121-3-git-send-email-keescook@chromium.org>
- <20140819122653.GH23128@arm.com>
- <CAGXu5jJRx8e2_9jpMYApH8maJog_z2YAs2ihoD4SFNfvPqn2Aw@mail.gmail.com>
-Message-ID: <20140826143725.GW23445@arm.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Tue, 26 Aug 2014 16:41:26 +0200
+Subject: [linux-sunxi] Re: [PATCH 4/4] simplefb: add clock handling code
+In-Reply-To: <20140826123357.GB22395@skynet.be>
+References: <20140825133953.GJ4163@ulmo.nvidia.com>
+ <53FB3E7F.4000503@redhat.com>
+ <20140825141600.GA14763@ulmo.nvidia.com>
+ <20140825145854.GA15297@lukather>
+ <20140825150501.GE14763@ulmo.nvidia.com>
+ <20140825150900.GB21020@skynet.be> <20140826075247.GC17263@ulmo>
+ <20140826120258.GA22395@skynet.be> <20140826122112.GC641@ulmo>
+ <20140826123357.GB22395@skynet.be>
+Message-ID: <20140826144125.GC3027@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 20, 2014 at 01:16:34PM +0100, Kees Cook wrote:
-> On Tue, Aug 19, 2014 at 7:26 AM, Will Deacon <will.deacon@arm.com> wrote:
-> > On Wed, Aug 13, 2014 at 06:06:27PM +0100, Kees Cook wrote:
-> >> From: Rob Herring <robh@kernel.org>
-> >>
-> >> With commit a05e54c103b0 ("ARM: 8031/2: change fixmap mapping region to
-> >> support 32 CPUs"), the fixmap region was expanded to 2MB, but it
-> >> precluded any other uses of the fixmap region. In order to support other
-> >> uses the fixmap region needs to be expanded beyond 2MB. Fortunately, the
-> >> adjacent 1MB range 0xffe00000-0xfff00000 is availabe.
-> >>
-> >> Remove fixmap_page_table ptr and lookup the page table via the virtual
-> >> address so that the fixmap region can span more that one pmd. The 2nd
-> >> pmd is already created since it is shared with the vector page.
-> >
-> > [...]
-> >
-> >> diff --git a/arch/arm/mm/highmem.c b/arch/arm/mm/highmem.c
-> >> index 45aeaaca9052..81061987ac45 100644
-> >> --- a/arch/arm/mm/highmem.c
-> >> +++ b/arch/arm/mm/highmem.c
-> >> @@ -18,19 +18,20 @@
-> >>  #include <asm/tlbflush.h>
-> >>  #include "mm.h"
-> >>
-> >> -pte_t *fixmap_page_table;
-> >> -
-> >>  static inline void set_fixmap_pte(int idx, pte_t pte)
-> >>  {
-> >>       unsigned long vaddr = __fix_to_virt(idx);
-> >> -     set_pte_ext(fixmap_page_table + idx, pte, 0);
-> >> +     pte_t *ptep = pte_offset_kernel(pmd_off_k(vaddr), vaddr);
-> >> +
-> >> +     set_pte_ext(ptep, pte, 0);
-> >>       local_flush_tlb_kernel_page(vaddr);
-> >>  }
-> >
-> > Minor comment, but we can drop the ifx parameter here now, right? It looks a
-> > bit weird having a setter/getter pair of functions where the type signatures
-> > aren't the inverse.
+On Tue, Aug 26, 2014 at 02:33:57PM +0200, Luc Verhaegen wrote:
+> On Tue, Aug 26, 2014 at 02:21:16PM +0200, Thierry Reding wrote:
+> > On Tue, Aug 26, 2014 at 02:02:58PM +0200, Luc Verhaegen wrote:
+> > > On Tue, Aug 26, 2014 at 09:52:49AM +0200, Thierry Reding wrote:
+> > > > On Mon, Aug 25, 2014 at 05:09:00PM +0200, Luc Verhaegen wrote:
+> > > > > On Mon, Aug 25, 2014 at 05:05:04PM +0200, Thierry Reding wrote:
+> > > > > > 
+> > > > > > No. simplefb just wants to write to some memory that hardware has been
+> > > > > > set up to scan out. The platform requires that the clocks be on.
+> > > > > 
+> > > > > Simplefb also requires that the memory is there and is persistent. Fine 
+> > > > > for discrete graphics cards, fine for rpi where most things are hidden 
+> > > > > from the ARM core anyway, not so fine for anybody else.
+> > > > 
+> > > > I don't understand. This patch series isn't changing anything about the
+> > > > memory aspects of the driver yet it's working for you on sunxi, isn't
+> > > > it? So it can't be all that broken.
+> > > > 
+> > > > Thierry
+> > > 
+> > > Oh, i had to go wrestle with UBoot options and reserve 8MB off the top, 
+> > > which the kernel never gets told about. A nice throwback to x86 IGP 
+> > > bioses, a past i had thought i had left behind forgood.
+> > 
+> > Can you not use the reserved memory code (drivers/of/of_reserved_mem.c
+> > in the kernel)? I think that's the generally accepted way to do this
+> > with DT.
+> > 
+> > Thierry
 > 
-> idx is used to get the vaddr here. I suppose the various users of
-> these functions in highmem could be reworked, but that doesn't look
-> sensible either. Maybe it's just the names of the functions that are
-> confusing?
+> It was mentioned to me, and I probably could do that, but this seemed 
+> even more DT wrangling from within u-boot, and it didn't seem finished 
+> yet. Plus, all of this already was way more wrangling than i bargained 
+> for, especially with the promise of "simple"-fb. Then there is the 
+> really awkward way in which one gets to define clocks outside of a 
+> dts/compiler (you've seen the code, right?), i really did not feel like 
+> repeating something like that.
 
-Sorry, I misread the context line as a deletion. Leave it like it is.
+It could most probably be turned into fairly generic and reusable code
+so that others can use it. And it would give you a way of recovering
+those 8 MiB of memory that you'd otherwise loose.
 
-Will
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140826/b66e355c/attachment-0001.sig>
