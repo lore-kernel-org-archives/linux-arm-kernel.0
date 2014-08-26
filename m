@@ -1,35 +1,52 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 26 Aug 2014 13:25:43 +0100
-Subject: [PATCH 5/6] arm64: Port SWP/SWPB emulation support from arm
-In-Reply-To: <7433994.DUuXUlazW0@wuerfel>
-References: <1409048930-21598-1-git-send-email-punit.agrawal@arm.com>
- <1409048930-21598-6-git-send-email-punit.agrawal@arm.com>
- <7433994.DUuXUlazW0@wuerfel>
-Message-ID: <20140826122542.GL23445@arm.com>
+From: libv@skynet.be (Luc Verhaegen)
+Date: Tue, 26 Aug 2014 14:33:57 +0200
+Subject: [linux-sunxi] Re: [PATCH 4/4] simplefb: add clock handling code
+In-Reply-To: <20140826122112.GC641@ulmo>
+References: <20140825124410.GZ15297@lukather>
+ <20140825133953.GJ4163@ulmo.nvidia.com> <53FB3E7F.4000503@redhat.com>
+ <20140825141600.GA14763@ulmo.nvidia.com> <20140825145854.GA15297@lukather>
+ <20140825150501.GE14763@ulmo.nvidia.com> <20140825150900.GB21020@skynet.be>
+ <20140826075247.GC17263@ulmo> <20140826120258.GA22395@skynet.be>
+ <20140826122112.GC641@ulmo>
+Message-ID: <20140826123357.GB22395@skynet.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 26, 2014 at 12:32:23PM +0100, Arnd Bergmann wrote:
-> On Tuesday 26 August 2014 11:28:49 Punit Agrawal wrote:
+On Tue, Aug 26, 2014 at 02:21:16PM +0200, Thierry Reding wrote:
+> On Tue, Aug 26, 2014 at 02:02:58PM +0200, Luc Verhaegen wrote:
+> > On Tue, Aug 26, 2014 at 09:52:49AM +0200, Thierry Reding wrote:
+> > > On Mon, Aug 25, 2014 at 05:09:00PM +0200, Luc Verhaegen wrote:
+> > > > On Mon, Aug 25, 2014 at 05:05:04PM +0200, Thierry Reding wrote:
+> > > > > 
+> > > > > No. simplefb just wants to write to some memory that hardware has been
+> > > > > set up to scan out. The platform requires that the clocks be on.
+> > > > 
+> > > > Simplefb also requires that the memory is there and is persistent. Fine 
+> > > > for discrete graphics cards, fine for rpi where most things are hidden 
+> > > > from the ARM core anyway, not so fine for anybody else.
+> > > 
+> > > I don't understand. This patch series isn't changing anything about the
+> > > memory aspects of the driver yet it's working for you on sunxi, isn't
+> > > it? So it can't be all that broken.
+> > > 
+> > > Thierry
 > > 
-> > This patch ports the alternative solution to emulate the SWP and SWPB
-> > instructions using LDXR/STXR sequences from the arm port to
-> > arm64. Additionaly, the patch also proivdes support to log the
-> > emulation statistics via debugfs.
+> > Oh, i had to go wrestle with UBoot options and reserve 8MB off the top, 
+> > which the kernel never gets told about. A nice throwback to x86 IGP 
+> > bioses, a past i had thought i had left behind forgood.
 > 
-> I'm not sure that putting this into debugfs is a good idea in this
-> case: while in general that is considered a good place for this
-> kind of debugging information, we already have a precedent on arm32
-> for using procfs, and I see no reason to introduce an incompatible
-> interface for arm64.
+> Can you not use the reserved memory code (drivers/of/of_reserved_mem.c
+> in the kernel)? I think that's the generally accepted way to do this
+> with DT.
 > 
-> You also add an interface for disabling the feature at runtime,
-> which we don't have on arm32, but that interface is not available
-> if debugfs is disabled or not mounted. Maybe a sysctl would be
-> more appropriate? That one could also be shared with arm32.
+> Thierry
 
-One advantage of using debugfs is that it provides a place to keep
-controls/statistics for any emulations that we add in the future, as opposed
-to littering them around in /proc or (worse) having a mixture of the two.
+It was mentioned to me, and I probably could do that, but this seemed 
+even more DT wrangling from within u-boot, and it didn't seem finished 
+yet. Plus, all of this already was way more wrangling than i bargained 
+for, especially with the promise of "simple"-fb. Then there is the 
+really awkward way in which one gets to define clocks outside of a 
+dts/compiler (you've seen the code, right?), i really did not feel like 
+repeating something like that.
 
-Will
+Luc Verhaegen.
