@@ -1,36 +1,51 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 26 Aug 2014 15:13:25 +0100
-Subject: [PATCH 06/11] KVM: vgic: declare probe function pointer as const
+Date: Tue, 26 Aug 2014 15:13:23 +0100
+Subject: [PATCH 04/11] KVM: ARM/arm64: return -EFAULT if copy_from_user fails
+ in set_timer_reg
 In-Reply-To: <1409062410-25891-1-git-send-email-will.deacon@arm.com>
 References: <1409062410-25891-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1409062410-25891-7-git-send-email-will.deacon@arm.com>
+Message-ID: <1409062410-25891-5-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We extract the vgic probe function from the of_device_id data pointer,
-which is const. Kill the sparse warning by ensuring that the local
-function pointer is also marked as const.
+We currently return the number of bytes not copied if set_timer_reg
+fails, which is almost certainly not what userspace would like.
 
+This patch returns -EFAULT instead.
+
+Cc: Christoffer Dall <christoffer.dall@linaro.org>
 Cc: Marc Zyngier <marc.zyngier@arm.com>
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- virt/kvm/arm/vgic.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ arch/arm/kvm/guest.c   | 2 +-
+ arch/arm64/kvm/guest.c | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
-index d1cfe672b9d7..efe6eee2e7eb 100644
---- a/virt/kvm/arm/vgic.c
-+++ b/virt/kvm/arm/vgic.c
-@@ -1557,8 +1557,8 @@ static const struct of_device_id vgic_ids[] = {
- int kvm_vgic_hyp_init(void)
- {
- 	const struct of_device_id *matched_id;
--	int (*vgic_probe)(struct device_node *,const struct vgic_ops **,
--			  const struct vgic_params **);
-+	const int (*vgic_probe)(struct device_node *,const struct vgic_ops **,
-+				const struct vgic_params **);
- 	struct device_node *vgic_node;
- 	int ret;
+diff --git a/arch/arm/kvm/guest.c b/arch/arm/kvm/guest.c
+index 813e49258690..cc0b78769bd8 100644
+--- a/arch/arm/kvm/guest.c
++++ b/arch/arm/kvm/guest.c
+@@ -163,7 +163,7 @@ static int set_timer_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
  
+ 	ret = copy_from_user(&val, uaddr, KVM_REG_SIZE(reg->id));
+ 	if (ret != 0)
+-		return ret;
++		return -EFAULT;
+ 
+ 	return kvm_arm_timer_set_reg(vcpu, reg->id, val);
+ }
+diff --git a/arch/arm64/kvm/guest.c b/arch/arm64/kvm/guest.c
+index 8d1ec2887a26..76794692c20b 100644
+--- a/arch/arm64/kvm/guest.c
++++ b/arch/arm64/kvm/guest.c
+@@ -174,7 +174,7 @@ static int set_timer_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
+ 
+ 	ret = copy_from_user(&val, uaddr, KVM_REG_SIZE(reg->id));
+ 	if (ret != 0)
+-		return ret;
++		return -EFAULT;
+ 
+ 	return kvm_arm_timer_set_reg(vcpu, reg->id, val);
+ }
 -- 
 2.1.0.rc1
