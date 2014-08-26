@@ -1,157 +1,64 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Tue, 26 Aug 2014 16:58:21 +0800
-Subject: [PATCH 1/2] ARM: imx: add an exclusive gate clock type
-Message-ID: <1409043502-29081-1-git-send-email-shawn.guo@freescale.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 26 Aug 2014 10:00:35 +0100
+Subject: [linux-sunxi] Re: [PATCH 4/4] simplefb: add clock handling code
+In-Reply-To: <20140826082626.GE17263@ulmo>
+References: <20140813170106.GT15297@lukather>
+ <20140825121228.GB4163@ulmo.nvidia.com>
+ <20140825124410.GZ15297@lukather>
+ <20140825133953.GJ4163@ulmo.nvidia.com>
+ <53FB3E7F.4000503@redhat.com>
+ <20140825141600.GA14763@ulmo.nvidia.com>
+ <53FB46FF.1010208@redhat.com>
+ <20140825145303.GC14763@ulmo.nvidia.com>
+ <20140825150705.GB15297@lukather> <20140826082626.GE17263@ulmo>
+Message-ID: <20140826090035.GB17528@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There are a couple of gate clocks are mutually exclusive on i.MX6, i.e.
-LVDSCLK1_IBEN and LVDSCLK1_OBEN.  They cannot be enabled simultaneously.
-This patches adds an exclusive gate clock type specifically for such
-case.  The clock driver will need to call imx_clk_gate_exclusive() to
-register a gate clock with parameter exclusive_mask indicating the mask
-of gate bits which are mutually exclusive to this gate clock.
+On Tue, Aug 26, 2014 at 10:26:27AM +0200, Thierry Reding wrote:
+> On Mon, Aug 25, 2014 at 05:07:05PM +0200, Maxime Ripard wrote:
 
-Right now, it only handles the exclusive gate clocks which are defined
-in a single hardware register, which is the case we're running into
-today.  But it can be extended to handle exclusive gate clocks defined
-in different registers later if needed.
+> > Regulators with regulator-boot-on will still be disabled if there's no
+> > one to claim it. Just like what happens currently for the clocks.
 
-Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
----
- arch/arm/mach-imx/Makefile             |  3 +-
- arch/arm/mach-imx/clk-gate-exclusive.c | 94 ++++++++++++++++++++++++++++++++++
- arch/arm/mach-imx/clk.h                |  3 ++
- 3 files changed, 99 insertions(+), 1 deletion(-)
- create mode 100644 arch/arm/mach-imx/clk-gate-exclusive.c
+> I was somewhat surprised by this, but it can indeed easily be verified.
+> It seems to me somewhat at odds with the definition of such a property.
 
-diff --git a/arch/arm/mach-imx/Makefile b/arch/arm/mach-imx/Makefile
-index 9f1c359566bb..3e6476b6a698 100644
---- a/arch/arm/mach-imx/Makefile
-+++ b/arch/arm/mach-imx/Makefile
-@@ -16,7 +16,8 @@ obj-$(CONFIG_SOC_IMX5) += cpu-imx5.o clk-imx51-imx53.o $(imx5-pm-y)
- 
- obj-$(CONFIG_COMMON_CLK) += clk-pllv1.o clk-pllv2.o clk-pllv3.o clk-gate2.o \
- 			    clk-pfd.o clk-busy.o clk.o \
--			    clk-fixup-div.o clk-fixup-mux.o
-+			    clk-fixup-div.o clk-fixup-mux.o \
-+			    clk-gate-exclusive.o
- 
- obj-$(CONFIG_IMX_HAVE_IOMUX_V1) += iomux-v1.o
- obj-$(CONFIG_ARCH_MXC_IOMUX_V3) += iomux-v3.o
-diff --git a/arch/arm/mach-imx/clk-gate-exclusive.c b/arch/arm/mach-imx/clk-gate-exclusive.c
-new file mode 100644
-index 000000000000..c12f5f2e04dc
---- /dev/null
-+++ b/arch/arm/mach-imx/clk-gate-exclusive.c
-@@ -0,0 +1,94 @@
-+/*
-+ * Copyright 2014 Freescale Semiconductor, Inc.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#include <linux/clk-provider.h>
-+#include <linux/err.h>
-+#include <linux/io.h>
-+#include <linux/slab.h>
-+#include "clk.h"
-+
-+/**
-+ * struct clk_gate_exclusive - i.MX specific gate clock which is mutually
-+ * exclusive with other gate clocks
-+ *
-+ * @gate: the parent class
-+ * @exclusive_mask: mask of gate bits which are mutually exclusive to this
-+ *	gate clock
-+ *
-+ * The imx exclusive gate clock is a subclass of basic clk_gate
-+ * with an addtional mask to indicate which other gate bits in the same
-+ * register is mutually exclusive to this gate clock.
-+ */
-+struct clk_gate_exclusive {
-+	struct clk_gate gate;
-+	u32 exclusive_mask;
-+};
-+
-+static int clk_gate_exclusive_enable(struct clk_hw *hw)
-+{
-+	struct clk_gate *gate = container_of(hw, struct clk_gate, hw);
-+	struct clk_gate_exclusive *exgate = container_of(gate,
-+					struct clk_gate_exclusive, gate);
-+	u32 val = readl(gate->reg);
-+
-+	if (val & exgate->exclusive_mask)
-+		return -EBUSY;
-+
-+	return clk_gate_ops.enable(hw);
-+}
-+
-+static void clk_gate_exclusive_disable(struct clk_hw *hw)
-+{
-+	clk_gate_ops.disable(hw);
-+}
-+
-+static int clk_gate_exclusive_is_enabled(struct clk_hw *hw)
-+{
-+	return clk_gate_ops.is_enabled(hw);
-+}
-+
-+static const struct clk_ops clk_gate_exclusive_ops = {
-+	.enable = clk_gate_exclusive_enable,
-+	.disable = clk_gate_exclusive_disable,
-+	.is_enabled = clk_gate_exclusive_is_enabled,
-+};
-+
-+struct clk *imx_clk_gate_exclusive(const char *name, const char *parent,
-+	 void __iomem *reg, u8 shift, u32 exclusive_mask)
-+{
-+	struct clk_gate_exclusive *exgate;
-+	struct clk_gate *gate;
-+	struct clk *clk;
-+	struct clk_init_data init;
-+
-+	if (exclusive_mask == 0)
-+		return ERR_PTR(-EINVAL);
-+
-+	exgate = kzalloc(sizeof(*exgate), GFP_KERNEL);
-+	if (!exgate)
-+		return ERR_PTR(-ENOMEM);
-+	gate = &exgate->gate;
-+
-+	init.name = name;
-+	init.ops = &clk_gate_exclusive_ops;
-+	init.flags = CLK_SET_RATE_PARENT;
-+	init.parent_names = parent ? &parent : NULL;
-+	init.num_parents = parent ? 1 : 0;
-+
-+	gate->reg = reg;
-+	gate->bit_idx = shift;
-+	gate->lock = &imx_ccm_lock;
-+	gate->hw.init = &init;
-+	exgate->exclusive_mask = exclusive_mask;
-+
-+	clk = clk_register(NULL, &gate->hw);
-+	if (IS_ERR(clk))
-+		kfree(exgate);
-+
-+	return clk;
-+}
-diff --git a/arch/arm/mach-imx/clk.h b/arch/arm/mach-imx/clk.h
-index d5ba76fee115..4cdf8b6a74e8 100644
---- a/arch/arm/mach-imx/clk.h
-+++ b/arch/arm/mach-imx/clk.h
-@@ -36,6 +36,9 @@ struct clk *clk_register_gate2(struct device *dev, const char *name,
- struct clk * imx_obtain_fixed_clock(
- 			const char *name, unsigned long rate);
- 
-+struct clk *imx_clk_gate_exclusive(const char *name, const char *parent,
-+	 void __iomem *reg, u8 shift, u32 exclusive_mask);
-+
- static inline struct clk *imx_clk_gate2(const char *name, const char *parent,
- 		void __iomem *reg, u8 shift)
- {
--- 
-1.9.1
+That depends what you think it should do - it's there for handover from
+the bootloader in cases where we can't read the state.
+
+> that. However the implementation will automatically disable a regulator
+> marked boot-on if it hasn't been claimed by any driver after the
+> initcall stage completes.
+
+> I find that rather odd since I always assumed that a regulator marked
+> boot-on would not be touched by the core at all, assuming that firmware
+> set it up properly and that it would be required (even if not explicitly
+> claimed).
+
+No, there's a separate always-on property if we don't want to disable.
+We can't assume that the "proper" setup is that the supply should be
+left on.
+
+> Two categories of drivers have this issue: drivers built as modules (or
+> that defer probing) and therefore won't be probed until after initcalls
+
+We really need a later initcall to manage handover to userspace
+(probably triggered by a combination of userspace saying it's done doing
+initial module enumeration and the deferred probe grinding to a halt).
+
+> have run and generic low-level drivers that take over firmware devices
+> (simplefb in this case) that don't know anything about the resource that
+> the devices need.
+
+I don't understand this use case, sorry - it sounds like a buggy system
+design and/or integration.  If the firmware is managing the resource
+then Linux really shouldn't be talking to it at all without coordinating
+with firmware.  How can such a system work otherwise?
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140826/f6affe2b/attachment.sig>
