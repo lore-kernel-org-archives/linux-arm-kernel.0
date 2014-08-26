@@ -1,32 +1,33 @@
-From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
-Date: Tue, 26 Aug 2014 17:28:57 +0200
-Subject: [PATCH v2 3/3] ARM: multi_v7_defconfig: Enable Atmel maXTouch support
-In-Reply-To: <1409066937-3574-1-git-send-email-javier.martinez@collabora.co.uk>
-References: <1409066937-3574-1-git-send-email-javier.martinez@collabora.co.uk>
-Message-ID: <1409066937-3574-4-git-send-email-javier.martinez@collabora.co.uk>
+From: tj@kernel.org (Tejun Heo)
+Date: Tue, 26 Aug 2014 11:29:48 -0400
+Subject: [PATCH v8 3/3] ahci_xgene: Fix the link down in first attempt
+ for the APM X-Gene SoC AHCI SATA host controller driver.
+In-Reply-To: <CAOHikRDpLBAnH4pmFzfu_RXFUZNAWPc-Q34zS1_Mx-odOmXonA@mail.gmail.com>
+References: <1408819047-17224-1-git-send-email-stripathi@apm.com>
+ <1408819047-17224-4-git-send-email-stripathi@apm.com>
+ <20140825193002.GC21688@htj.dyndns.org>
+ <CAOHikRDpLBAnH4pmFzfu_RXFUZNAWPc-Q34zS1_Mx-odOmXonA@mail.gmail.com>
+Message-ID: <20140826152948.GC29286@htj.dyndns.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some boards with multi platform support (e.g: Exynos based
-Chromebooks) have an Atmel trackpad so enable support for
-as a module will make easier for users.
+On Tue, Aug 26, 2014 at 12:17:35PM +0530, Suman Tripathi wrote:
+> Didn't I ask you to update the comment to explain what's going on?
+> [suman] : can you specifically tell which part of the comment is not clear
+> and need more explanation?
 
-Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
----
- arch/arm/configs/multi_v7_defconfig | 1 +
- 1 file changed, 1 insertion(+)
+The comment on top of the function doesn't seem to match what's being
+implemented.  In addition, it's generally not very useful to list the
+actual algorithm in text.  Put algorithm in code and explain the
+summary and rationales for it in the comments.  Nothing explains why
+the retries are being done.
 
-diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-index 5fb95fb..d139a8d 100644
---- a/arch/arm/configs/multi_v7_defconfig
-+++ b/arch/arm/configs/multi_v7_defconfig
-@@ -164,6 +164,7 @@ CONFIG_KEYBOARD_ST_KEYSCAN=y
- CONFIG_KEYBOARD_CROS_EC=y
- CONFIG_MOUSE_PS2_ELANTECH=y
- CONFIG_INPUT_TOUCHSCREEN=y
-+CONFIG_TOUCHSCREEN_ATMEL_MXT=m
- CONFIG_TOUCHSCREEN_STMPE=y
- CONFIG_INPUT_MISC=y
- CONFIG_INPUT_MPU3050=y
+> is the existing comment already sufficient?
+> [suman] : The existing comment is sufficient .
+
+No, this isn't.  You don't have to include a novel to explain it but
+there's something different going on here and you should provide
+information on why this sort of deviation is necessary.
+
 -- 
-2.0.1
+tejun
