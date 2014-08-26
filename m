@@ -1,48 +1,40 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 26 Aug 2014 11:03:41 +0100
-Subject: [PATCH v2 26/26] openrisc: get rid of handle_IRQ
+Date: Tue, 26 Aug 2014 11:03:36 +0100
+Subject: [PATCH v2 21/26] irqchip: or1k-pic: convert to handle_domain_irq
 In-Reply-To: <1409047421-27649-1-git-send-email-marc.zyngier@arm.com>
 References: <1409047421-27649-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1409047421-27649-27-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1409047421-27649-22-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The openrisc irqchip driver has been converted to handle_domain_irq,
-making it possible to remove the handle_IRQ stub entierely.
+Use the new handle_domain_irq method to handle interrupts.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/openrisc/include/asm/irq.h | 1 -
- arch/openrisc/kernel/irq.c      | 5 -----
- 2 files changed, 6 deletions(-)
+ drivers/irqchip/irq-or1k-pic.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/openrisc/include/asm/irq.h b/arch/openrisc/include/asm/irq.h
-index b84634c..d9eee0a 100644
---- a/arch/openrisc/include/asm/irq.h
-+++ b/arch/openrisc/include/asm/irq.h
-@@ -24,7 +24,6 @@
+diff --git a/drivers/irqchip/irq-or1k-pic.c b/drivers/irqchip/irq-or1k-pic.c
+index 17ff033..e93d079 100644
+--- a/drivers/irqchip/irq-or1k-pic.c
++++ b/drivers/irqchip/irq-or1k-pic.c
+@@ -113,7 +113,7 @@ static inline int pic_get_irq(int first)
+ 	else
+ 		hwirq = hwirq + first - 1;
  
- #define NO_IRQ		(-1)
- 
--void handle_IRQ(unsigned int, struct pt_regs *);
- extern void set_handle_irq(void (*handle_irq)(struct pt_regs *));
- 
- #endif /* __ASM_OPENRISC_IRQ_H__ */
-diff --git a/arch/openrisc/kernel/irq.c b/arch/openrisc/kernel/irq.c
-index e9aaf28..35e478a 100644
---- a/arch/openrisc/kernel/irq.c
-+++ b/arch/openrisc/kernel/irq.c
-@@ -48,11 +48,6 @@ void __init set_handle_irq(void (*handle_irq)(struct pt_regs *))
- 	handle_arch_irq = handle_irq;
+-	return irq_find_mapping(root_domain, hwirq);
++	return hwirq;
  }
  
--void handle_IRQ(unsigned int irq, struct pt_regs *regs)
--{
--	__handle_domain_irq(NULL, irq, false, regs);
--}
--
- void __irq_entry do_IRQ(struct pt_regs *regs)
- {
- 	handle_arch_irq(regs);
+ static void or1k_pic_handle_irq(struct pt_regs *regs)
+@@ -121,7 +121,7 @@ static void or1k_pic_handle_irq(struct pt_regs *regs)
+ 	int irq = -1;
+ 
+ 	while ((irq = pic_get_irq(irq + 1)) != NO_IRQ)
+-		handle_IRQ(irq, regs);
++		handle_domain_irq(root_domain, irq, regs);
+ }
+ 
+ static int or1k_map(struct irq_domain *d, unsigned int irq, irq_hw_number_t hw)
 -- 
 2.0.4
