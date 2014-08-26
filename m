@@ -1,171 +1,53 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Tue, 26 Aug 2014 12:06:04 +0530
-Subject: [PATCH v7 RESEND] ARM: omap: edma: add suspend suspend/resume
- hooks
-In-Reply-To: <1408693562-18068-1-git-send-email-d-gerlach@ti.com>
-References: <1408693562-18068-1-git-send-email-d-gerlach@ti.com>
-Message-ID: <53FC2AD4.4070400@ti.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Tue, 26 Aug 2014 08:41:00 +0200
+Subject: [PATCH v3 1/5] of: Add NVIDIA Tegra Legacy Interrupt Controller
+ binding
+Message-ID: <1409035264-16999-1-git-send-email-thierry.reding@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 22 August 2014 01:16 PM, Dave Gerlach wrote:
-> From: Daniel Mack <zonque@gmail.com>
-> 
-> This patch makes the edma driver resume correctly after suspend. Tested
-> on an AM33xx platform with cyclic audio streams and omap_hsmmc.
-> 
-> All information can be reconstructed by already known runtime
-> information.
-> 
-> As we now use some functions that were previously only used from __init
-> context, annotations had to be dropped.
-> 
-> [nm at ti.com: added error handling for runtime + suspend_late/early_resume]
-> Signed-off-by: Nishanth Menon <nm@ti.com>
-> Signed-off-by: Daniel Mack <zonque@gmail.com>
-> Tested-by: Joel Fernandes <joelf@ti.com>
-> Acked-by: Joel Fernandes <joelf@ti.com>
-> [d-gerlach at ti.com: updated to remove queue_tc_mapping use]
-> Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
-> ---
-> 
-> Needed for am335x suspend, but never got picked up. Previously
-> sent here: http://marc.info/?l=linux-arm-kernel&m=138556067416051&w=2
-> 
->  arch/arm/common/edma.c | 86 ++++++++++++++++++++++++++++++++++++++++++++++++--
->  1 file changed, 84 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm/common/edma.c b/arch/arm/common/edma.c
-> index 8809917..ece1e3d 100644
-> --- a/arch/arm/common/edma.c
-> +++ b/arch/arm/common/edma.c
-> @@ -244,6 +244,8 @@ struct edma {
->  	/* list of channels with no even trigger; terminated by "-1" */
->  	const s8	*noevent;
->  
-> +	struct edma_soc_info *info;
-> +
->  	/* The edma_inuse bit for each PaRAM slot is clear unless the
->  	 * channel is in use ... by ARM or DSP, for QDMA, or whatever.
->  	 */
-> @@ -295,7 +297,7 @@ static void map_dmach_queue(unsigned ctlr, unsigned ch_no,
->  			~(0x7 << bit), queue_no << bit);
->  }
->  
-> -static void __init assign_priority_to_queue(unsigned ctlr, int queue_no,
-> +static void assign_priority_to_queue(unsigned ctlr, int queue_no,
->  		int priority)
->  {
->  	int bit = queue_no * 4;
-> @@ -314,7 +316,7 @@ static void __init assign_priority_to_queue(unsigned ctlr, int queue_no,
->   * included in that particular EDMA variant (Eg : dm646x)
->   *
->   */
-> -static void __init map_dmach_param(unsigned ctlr)
-> +static void map_dmach_param(unsigned ctlr)
->  {
->  	int i;
->  	for (i = 0; i < EDMA_MAX_DMACH; i++)
-> @@ -1791,15 +1793,95 @@ static int edma_probe(struct platform_device *pdev)
->  			edma_write_array2(j, EDMA_DRAE, i, 1, 0x0);
->  			edma_write_array(j, EDMA_QRAE, i, 0x0);
->  		}
-> +		edma_cc[j]->info = info[j];
->  		arch_num_cc++;
->  	}
->  
->  	return 0;
->  }
->  
-> +static int edma_pm_suspend(struct device *dev)
-> +{
-> +	int j, r;
-> +
-> +	r = pm_runtime_get_sync(dev);
-> +	if (r < 0) {
-> +		dev_err(dev, "%s: get_sync returned %d\n", __func__, r);
-> +		return r;
-> +	}
+From: Thierry Reding <treding@nvidia.com>
 
-The driver currently does a pm_runtime_get_sync() once during probe. And
-does not do a put(). So this should actually be not required. In fact
-looks like this additional get() call will prevent the clock from
-getting disabled which is probably not what you intend.
+The Legacy Interrupt Controller found on NVIDIA Tegra SoCs is used by
+the AVP coprocessor and can also serve as a backup for the ARM Cortex
+CPU's local interrupt controller (GIC).
 
-> +
-> +	for (j = 0; j < arch_num_cc; j++) {
-> +		struct edma *ecc = edma_cc[j];
-> +
-> +		disable_irq(ecc->irq_res_start);
-> +		disable_irq(ecc->irq_res_end);
+The LIC is subdivided into multiple identical units, each handling 32
+possible interrupt sources.
 
-Do we really need to disable these irqs?
+Signed-off-by: Thierry Reding <treding@nvidia.com>
+---
+Changes in v3:
+- bracket individual tuples in the "reg" property
 
-> +	}
-> +
-> +	pm_runtime_put_sync(dev);
-> +
-> +	return 0;
-> +}
-> +
-> +static int edma_pm_resume(struct device *dev)
-> +{
-> +	int i, j, r;
-> +
-> +	r = pm_runtime_get_sync(dev);
-> +	if (r < 0) {
-> +		dev_err(dev, "%s: get_sync returned %d\n", __func__, r);
-> +		return r;
-> +	}
-> +
-> +	for (j = 0; j < arch_num_cc; j++) {
-> +		struct edma *cc = edma_cc[j];
-> +
-> +		s8 (*queue_priority_mapping)[2];
-> +
-> +		queue_priority_mapping = cc->info->queue_priority_mapping;
-> +
-> +		/* Event queue priority mapping */
-> +		for (i = 0; queue_priority_mapping[i][0] != -1; i++)
-> +			assign_priority_to_queue(j,
-> +						 queue_priority_mapping[i][0],
-> +						 queue_priority_mapping[i][1]);
-> +
-> +		/*
-> +		 * Map the channel to param entry if channel mapping logic
-> +		 * exist
-> +		 */
-> +		if (edma_read(j, EDMA_CCCFG) & CHMAP_EXIST)
-> +			map_dmach_param(j);
-> +
-> +		for (i = 0; i < cc->num_channels; i++) {
-> +			if (test_bit(i, cc->edma_inuse)) {
-> +				/* ensure access through shadow region 0 */
-> +				edma_or_array2(j, EDMA_DRAE, 0, i >> 5,
-> +					       BIT(i & 0x1f));
-> +
-> +				setup_dma_interrupt(i,
-> +						    cc->intr_data[i].callback,
-> +						    cc->intr_data[i].data);
-> +			}
-> +		}
-> +
-> +		enable_irq(cc->irq_res_start);
-> +		enable_irq(cc->irq_res_end);
-> +	}
-> +
-> +	pm_runtime_put_sync(dev);
-> +
-> +	return 0;
-> +}
-> +
-> +static const struct dev_pm_ops edma_pm_ops = {
-> +	.suspend_late	= edma_pm_suspend,
-> +	.resume_early	= edma_pm_resume,
-> +};
+ .../interrupt-controller/nvidia,tegra20-ictlr.txt     | 19 +++++++++++++++++++
+ 1 file changed, 19 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/interrupt-controller/nvidia,tegra20-ictlr.txt
 
-You can use SET_LATE_SYSTEM_SLEEP_PM_OPS() as some other DMA drivers are
-doing too.
-
-Thanks,
-Sekhar
+diff --git a/Documentation/devicetree/bindings/interrupt-controller/nvidia,tegra20-ictlr.txt b/Documentation/devicetree/bindings/interrupt-controller/nvidia,tegra20-ictlr.txt
+new file mode 100644
+index 000000000000..1639389b7360
+--- /dev/null
++++ b/Documentation/devicetree/bindings/interrupt-controller/nvidia,tegra20-ictlr.txt
+@@ -0,0 +1,19 @@
++NVIDIA Tegra Legacy Interrupt Controller
++
++The legacy interrupt controller is divided into units that serve 32 interrupts
++each. Tegra20 implements four units, whereas Tegra30 and later implement five.
++
++Required properties:
++- compatible: "nvidia,tegra<chip>-ictlr"
++- reg: Physical base address and length of the controller's registers. There
++  should be one entry for each unit.
++
++Example:
++
++	interrupt-controller at 60004000 {
++		compatible = "nvidia,tegra20-ictlr";
++		reg = <0x60004000 0x40>, /* primary controller */
++		      <0x60004100 0x40>, /* secondary controller */
++		      <0x60004200 0x40>, /* tertiary controller */
++		      <0x60004300 0x40>; /* quaternary controller */
++	};
+-- 
+2.0.4
