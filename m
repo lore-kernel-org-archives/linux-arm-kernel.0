@@ -1,43 +1,86 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Tue, 26 Aug 2014 14:24:01 +0900
-Subject: [PATCH 7/8] ARM: shmobile: armadillo800eva-reference: Do not use
- r8a7740_add_standard_devices_dt()
+Date: Tue, 26 Aug 2014 14:24:00 +0900
+Subject: [PATCH 6/8] ARM: shmobile: armadillo800eva-reference: Enable CMT1 in
+ device tree
 In-Reply-To: <cover.1409030383.git.horms+renesas@verge.net.au>
 References: <cover.1409030383.git.horms+renesas@verge.net.au>
-Message-ID: <5ebb4e849966e9cb3d5450773c86a1bf79e76f2d.1409030383.git.horms+renesas@verge.net.au>
+Message-ID: <1145eaabcf1d108993b5c7bea3d86bbef7143135.1409030383.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that r8a7740_add_standard_devices_dt() is just a wrapper for
-of_platform_populate() call the latter directly.
+Based on work by Magnus Damm
 
-This is in preparation for removing r8a7740_add_standard_devices_dt().
-
+Cc: Magnus Damm <magnus.damm@gmail.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/board-armadillo800eva-reference.c | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/r8a7740-armadillo800eva-reference.dts |  4 ++++
+ arch/arm/mach-shmobile/setup-r8a7740.c                  | 11 +----------
+ 2 files changed, 5 insertions(+), 10 deletions(-)
 
-diff --git a/arch/arm/mach-shmobile/board-armadillo800eva-reference.c b/arch/arm/mach-shmobile/board-armadillo800eva-reference.c
-index 84bc6cb..f06e1f3 100644
---- a/arch/arm/mach-shmobile/board-armadillo800eva-reference.c
-+++ b/arch/arm/mach-shmobile/board-armadillo800eva-reference.c
-@@ -24,6 +24,7 @@
- #include <linux/kernel.h>
- #include <linux/gpio.h>
- #include <linux/io.h>
-+#include <linux/of_platform.h>
+diff --git a/arch/arm/boot/dts/r8a7740-armadillo800eva-reference.dts b/arch/arm/boot/dts/r8a7740-armadillo800eva-reference.dts
+index 266c439..5e646e6 100644
+--- a/arch/arm/boot/dts/r8a7740-armadillo800eva-reference.dts
++++ b/arch/arm/boot/dts/r8a7740-armadillo800eva-reference.dts
+@@ -191,6 +191,10 @@
+ 	renesas,mode = <0x05>; /* MD_CK0 | MD_CK2 */
+ };
  
- #include <asm/mach/arch.h>
- #include <asm/hardware/cache-l2x0.h>
-@@ -170,7 +171,7 @@ static void __init eva_init(void)
- 	l2x0_init(IOMEM(0xf0002000), 0x00400000, 0xc20f0fff);
- #endif
++&cmt1 {
++	status = "ok";
++};
++
+ &i2c0 {
+ 	status = "okay";
+ 	touchscreen at 55 {
+diff --git a/arch/arm/mach-shmobile/setup-r8a7740.c b/arch/arm/mach-shmobile/setup-r8a7740.c
+index 3d5eaca..dc44a44 100644
+--- a/arch/arm/mach-shmobile/setup-r8a7740.c
++++ b/arch/arm/mach-shmobile/setup-r8a7740.c
+@@ -311,10 +311,6 @@ static struct platform_device ipmmu_device = {
+ 	.num_resources  = ARRAY_SIZE(ipmmu_resources),
+ };
  
--	r8a7740_add_standard_devices_dt();
-+	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+-static struct platform_device *r8a7740_devices_dt[] __initdata = {
+-	&cmt1_device,
+-};
+-
+ static struct platform_device *r8a7740_early_devices[] __initdata = {
+ 	&scif0_device,
+ 	&scif1_device,
+@@ -331,6 +327,7 @@ static struct platform_device *r8a7740_early_devices[] __initdata = {
+ 	&irqpin3_device,
+ 	&tmu0_device,
+ 	&ipmmu_device,
++	&cmt1_device,
+ };
  
- 	r8a7740_pm_init();
+ /* DMA */
+@@ -756,8 +753,6 @@ void __init r8a7740_add_standard_devices(void)
+ 	/* add devices */
+ 	platform_add_devices(r8a7740_early_devices,
+ 			    ARRAY_SIZE(r8a7740_early_devices));
+-	platform_add_devices(r8a7740_devices_dt,
+-			    ARRAY_SIZE(r8a7740_devices_dt));
+ 	platform_add_devices(r8a7740_late_devices,
+ 			     ARRAY_SIZE(r8a7740_late_devices));
+ 
+@@ -779,8 +774,6 @@ void __init r8a7740_add_early_devices(void)
+ {
+ 	early_platform_add_devices(r8a7740_early_devices,
+ 				   ARRAY_SIZE(r8a7740_early_devices));
+-	early_platform_add_devices(r8a7740_devices_dt,
+-				   ARRAY_SIZE(r8a7740_devices_dt));
+ 
+ 	/* setup early console here as well */
+ 	shmobile_setup_console();
+@@ -790,8 +783,6 @@ void __init r8a7740_add_early_devices(void)
+ 
+ void __init r8a7740_add_standard_devices_dt(void)
+ {
+-	platform_add_devices(r8a7740_devices_dt,
+-			    ARRAY_SIZE(r8a7740_devices_dt));
+ 	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
  }
+ 
 -- 
 2.0.1
