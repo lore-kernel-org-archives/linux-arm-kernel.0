@@ -1,23 +1,29 @@
 From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Tue, 26 Aug 2014 12:47:22 +0300
-Subject: [PATCH] ARM: dts: omap54xx-clocks: Fix the l3 and l4 clock rates
-In-Reply-To: <1409043098-12510-1-git-send-email-t-kristo@ti.com>
-References: <1409043098-12510-1-git-send-email-t-kristo@ti.com>
-Message-ID: <53FC57AA.5040906@ti.com>
+Date: Tue, 26 Aug 2014 12:52:16 +0300
+Subject: [PATCH v2] video: ARM CLCD: Fix calculation of bits-per-pixel
+In-Reply-To: <1408538464.3858.43.camel@linaro1.home>
+References: <1408538464.3858.43.camel@linaro1.home>
+Message-ID: <53FC58D0.6080700@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26/08/14 11:51, Tero Kristo wrote:
-> Similarly to DRA7, OMAP5 has l3 and l4 clock rates incorrectly calculated.
-> Fixed by using proper divider clock types for the clock nodes.
+On 20/08/14 15:41, Jon Medhurst (Tixy) wrote:
+> If the device-tree specifies a max-memory-bandwidth property then the
+> CLCD driver uses that to calculate the bits-per-pixel supported,
+> however, this calculation is faulty for two reasons.
 > 
-> Signed-off-by: Tero Kristo <t-kristo@ti.com>
-> Reported-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
-> ---
->  arch/arm/boot/dts/omap54xx-clocks.dtsi |   16 ++++++++++------
->  1 file changed, 10 insertions(+), 6 deletions(-)
+> 1. It doesn't ensure that the result is a sane value, i.e. a power of 2
+>    and <= 32 as the rest of the code assumes.
+> 
+> 2. It uses the displayed resolution and calculates the average bandwidth
+>    across the whole frame. It should instead calculate the peak
+>    bandwidth based on the pixel clock.
+> 
+> This patch fixes both the above.
+> 
+> Signed-off-by: Jon Medhurst <tixy@linaro.org>
 
-Tested-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
+Thanks, queued for 3.17 fbdev fixes.
 
  Tomi
 
@@ -28,4 +34,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 819 bytes
 Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140826/a0294f6b/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140826/0523d2cc/attachment-0001.sig>
