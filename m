@@ -1,42 +1,38 @@
 From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Tue, 26 Aug 2014 15:46:26 +0200
-Subject: [PATCH v7 0/5] i.MX6 PU power domain support
-Message-ID: <1409060791-23167-1-git-send-email-p.zabel@pengutronix.de>
+Date: Tue, 26 Aug 2014 15:46:30 +0200
+Subject: [PATCH v7 4/5] ARM: dts: imx6sl: Add power-domain information to gpc
+ node
+In-Reply-To: <1409060791-23167-1-git-send-email-p.zabel@pengutronix.de>
+References: <1409060791-23167-1-git-send-email-p.zabel@pengutronix.de>
+Message-ID: <1409060791-23167-5-git-send-email-p.zabel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+The PGC that is part of GPC controls isolation and power sequencing of the
+power domains. The PU power domain will be handled by the generic pm domain
+framework. It needs a phandle to the PU regulator to turn off power when
+the domain is disabled and a list of clocks to be enabled during powerup
+for reset propagation.
 
-this is a rebased and updated version of the series I sent previously:
+Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
+---
+ arch/arm/boot/dts/imx6sl.dtsi | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-http://lists.infradead.org/pipermail/linux-arm-kernel/2014-March/238377.html
-
-It is based on the "PM / Domains: Generic OF-based support" series that Ulf
-Hansson sent recently:
-
-http://www.spinics.net/lists/arm-kernel/msg357003.html
-
-Changes since v6:
- - imx6qdl.dtsi entry now uses clock name macros instead of index numbers
-
-regards
-Philipp
-
-Philipp Zabel (5):
-  Documentation: Add device tree bindings for Freescale i.MX GPC
-  ARM: imx6: gpc: Add PU power domain for GPU/VPU
-  ARM: dts: imx6qdl: Add power-domain information to gpc node
-  ARM: dts: imx6sl: Add power-domain information to gpc node
-  ARM: dts: imx6qdl: Allow disabling the PU regulator, add a enable ramp
-    delay
-
- .../devicetree/bindings/power/fsl,imx-gpc.txt      |  54 ++++++
- arch/arm/boot/dts/imx6qdl.dtsi                     |  11 +-
- arch/arm/boot/dts/imx6sl.dtsi                      |   4 +
- arch/arm/mach-imx/Kconfig                          |   1 +
- arch/arm/mach-imx/gpc.c                            | 203 +++++++++++++++++++++
- 5 files changed, 272 insertions(+), 1 deletion(-)
- create mode 100644 Documentation/devicetree/bindings/power/fsl,imx-gpc.txt
-
+diff --git a/arch/arm/boot/dts/imx6sl.dtsi b/arch/arm/boot/dts/imx6sl.dtsi
+index c75800c..7ae4847 100644
+--- a/arch/arm/boot/dts/imx6sl.dtsi
++++ b/arch/arm/boot/dts/imx6sl.dtsi
+@@ -581,6 +581,10 @@
+ 				compatible = "fsl,imx6sl-gpc", "fsl,imx6q-gpc";
+ 				reg = <0x020dc000 0x4000>;
+ 				interrupts = <0 89 IRQ_TYPE_LEVEL_HIGH>;
++				pu-supply = <&reg_pu>;
++				clocks = <&clks IMX6SL_CLK_GPU2D_OVG>,
++					 <&clks IMX6SL_CLK_GPU2D_PODF>;
++				#power-domain-cells = <1>;
+ 			};
+ 
+ 			gpr: iomuxc-gpr at 020e0000 {
 -- 
 2.1.0.rc1
