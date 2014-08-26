@@ -1,84 +1,43 @@
 From: thierry.reding@gmail.com (Thierry Reding)
-Date: Tue, 26 Aug 2014 08:41:04 +0200
-Subject: [PATCH v3 5/5] ARM: tegra: Remove unused defines
-In-Reply-To: <1409035264-16999-1-git-send-email-thierry.reding@gmail.com>
-References: <1409035264-16999-1-git-send-email-thierry.reding@gmail.com>
-Message-ID: <1409035264-16999-5-git-send-email-thierry.reding@gmail.com>
+Date: Tue, 26 Aug 2014 08:57:31 +0200
+Subject: [PATCH v2 2/9] mailbox: Add NVIDIA Tegra XUSB mailbox driver
+In-Reply-To: <53FB8820.4010202@wwwdotorg.org>
+References: <1408381705-3623-1-git-send-email-abrestic@chromium.org>
+ <1408381705-3623-3-git-send-email-abrestic@chromium.org>
+ <53FB8820.4010202@wwwdotorg.org>
+Message-ID: <20140826065729.GC15573@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Thierry Reding <treding@nvidia.com>
+On Mon, Aug 25, 2014 at 01:01:52PM -0600, Stephen Warren wrote:
+> On 08/18/2014 11:08 AM, Andrew Bresticker wrote:
+[...]
+> >+static int tegra_xusb_mbox_probe(struct platform_device *pdev)
+> 
+> >+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> >+	if (!res)
+> >+		return -ENODEV;
+> 
+> Should devm_request_mem_region() be called here to claim the region?
+> 
+> >+	mbox->regs = devm_ioremap_nocache(&pdev->dev, res->start,
+> >+					  resource_size(res));
+> >+	if (!mbox->regs)
+> >+		return -ENOMEM;
+> 
+> Is _nocache required? I don't see other drivers using it. I assume there's
+> nothing special about the mbox registers.
 
-Eventually the aim is to get rid of this file because it cannot be built
-on ARM64. Until it can be completely removed, eliminate unused entries
-to make it easier to see which are still used.
+Most drivers should be using devm_ioremap_resource() which will use the
+_nocache variant of devm_ioremap() when appropriate. Usually the region
+will not be marked cacheable (IORESOURCE_CACHEABLE) and therefore be
+remapped uncached.
 
-Reviewed-by: Stephen Warren <swarren@nvidia.com>
-Signed-off-by: Thierry Reding <treding@nvidia.com>
----
-Changes in v3:
-- fixup subject prefix
-
- arch/arm/mach-tegra/iomap.h | 30 ------------------------------
- 1 file changed, 30 deletions(-)
-
-diff --git a/arch/arm/mach-tegra/iomap.h b/arch/arm/mach-tegra/iomap.h
-index 52bbb5c8fe84..c2fd86a9b43f 100644
---- a/arch/arm/mach-tegra/iomap.h
-+++ b/arch/arm/mach-tegra/iomap.h
-@@ -28,21 +28,9 @@
- #define TEGRA_ARM_PERIF_BASE		0x50040000
- #define TEGRA_ARM_PERIF_SIZE		SZ_8K
- 
--#define TEGRA_TMR1_BASE			0x60005000
--#define TEGRA_TMR1_SIZE			SZ_8
--
--#define TEGRA_TMR2_BASE			0x60005008
--#define TEGRA_TMR2_SIZE			SZ_8
--
- #define TEGRA_TMRUS_BASE		0x60005010
- #define TEGRA_TMRUS_SIZE		SZ_64
- 
--#define TEGRA_TMR3_BASE			0x60005050
--#define TEGRA_TMR3_SIZE			SZ_8
--
--#define TEGRA_TMR4_BASE			0x60005058
--#define TEGRA_TMR4_SIZE			SZ_8
--
- #define TEGRA_CLK_RESET_BASE		0x60006000
- #define TEGRA_CLK_RESET_SIZE		SZ_4K
- 
-@@ -58,21 +46,6 @@
- #define TEGRA_APB_MISC_BASE		0x70000000
- #define TEGRA_APB_MISC_SIZE		SZ_4K
- 
--#define TEGRA_UARTA_BASE		0x70006000
--#define TEGRA_UARTA_SIZE		SZ_64
--
--#define TEGRA_UARTB_BASE		0x70006040
--#define TEGRA_UARTB_SIZE		SZ_64
--
--#define TEGRA_UARTC_BASE		0x70006200
--#define TEGRA_UARTC_SIZE		SZ_256
--
--#define TEGRA_UARTD_BASE		0x70006300
--#define TEGRA_UARTD_SIZE		SZ_256
--
--#define TEGRA_UARTE_BASE		0x70006400
--#define TEGRA_UARTE_SIZE		SZ_256
--
- #define TEGRA_PMC_BASE			0x7000E400
- #define TEGRA_PMC_SIZE			SZ_256
- 
-@@ -91,9 +64,6 @@
- #define TEGRA124_EMC_BASE		0x7001B000
- #define TEGRA124_EMC_SIZE		SZ_2K
- 
--#define TEGRA_CSITE_BASE		0x70040000
--#define TEGRA_CSITE_SIZE		SZ_256K
--
- /* On TEGRA, many peripherals are very closely packed in
-  * two 256MB io windows (that actually only use about 64KB
-  * at the start of each).
--- 
-2.0.4
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140826/1b4b4e30/attachment.sig>
