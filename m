@@ -1,96 +1,128 @@
 From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Tue, 26 Aug 2014 16:03:34 +0100
-Subject: [PATCH 1/2] GICv3: refactor gic_enable_redist to support both
- enabling and disabling
+Date: Tue, 26 Aug 2014 16:03:35 +0100
+Subject: [PATCH 2/2] GICv3: implement CPU PM notifier
 In-Reply-To: <1409065415-20176-1-git-send-email-sudeep.holla@arm.com>
 References: <1409065415-20176-1-git-send-email-sudeep.holla@arm.com>
-Message-ID: <1409065415-20176-2-git-send-email-sudeep.holla@arm.com>
+Message-ID: <1409065415-20176-3-git-send-email-sudeep.holla@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Sudeep Holla <sudeep.holla@arm.com>
 
-Currently gic_enable_redist configures the redistributors to never
-assert WakeRequest signal. However when powering down the processors
-with wake-up enabled(i.e suspend), we need to configure it to assert
-that signal.
+When a CPU enters a low power state, the contents of the GICv3/4 system
+registers are lost. They need to be saved and restored if required.
 
-This patch extends gic_enable_redist so that the redistributor can be
-configure to assert WakeRequest and hold interrupts as pending. This is
-useful in suspending the processors.
+For now, since most of the GICv3 register are set some initial values and
+not modified at runtime, it is better to re-initialise rather than saving
+and restoring them. It may need to be saved and restored in future if
+required.
 
-This patch also adds check to make sure GICR_WAKER is accessible when
-configuring it.
+This patch adds a notifier to disable the redistributor(if allowed) and
+Group1 interrupts when powering down the processor and to re-initialise
+the system registers on wakeup.
 
 Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
-[maz: removed reference to GICD_CTLR.DS and added read-back of
-      GICR_WAKER to check that it is not RAZ/WI]
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- drivers/irqchip/irq-gic-v3.c | 30 ++++++++++++++++++++----------
- 1 file changed, 20 insertions(+), 10 deletions(-)
+ drivers/irqchip/irq-gic-v3.c | 57 +++++++++++++++++++++++++++++++++++---------
+ 1 file changed, 46 insertions(+), 11 deletions(-)
 
 diff --git a/drivers/irqchip/irq-gic-v3.c b/drivers/irqchip/irq-gic-v3.c
-index 57eaa5a0b1e3..37062ba6704b 100644
+index 37062ba6704b..4afbbc835939 100644
 --- a/drivers/irqchip/irq-gic-v3.c
 +++ b/drivers/irqchip/irq-gic-v3.c
-@@ -155,7 +155,7 @@ static void gic_enable_sre(void)
- 		pr_err("GIC: unable to set SRE (disabled at EL2), panic ahead\n");
+@@ -16,6 +16,7 @@
+  */
+ 
+ #include <linux/cpu.h>
++#include <linux/cpu_pm.h>
+ #include <linux/delay.h>
+ #include <linux/interrupt.h>
+ #include <linux/of.h>
+@@ -383,6 +384,21 @@ static int gic_populate_rdist(void)
+ 	return -ENODEV;
  }
  
--static void gic_enable_redist(void)
-+static void gic_enable_redist(bool enable)
++static void gic_cpu_sys_reg_init(void)
++{
++	/* Enable system registers */
++	gic_enable_sre();
++
++	/* Set priority mask register */
++	gic_write_pmr(DEFAULT_PMR_VALUE);
++
++	/* EOI deactivates interrupt too (mode 0) */
++	gic_write_ctlr(ICC_CTLR_EL1_EOImode_drop_dir);
++
++	/* ... and let's hit the road... */
++	gic_write_grpen1(1);
++}
++
+ static void gic_cpu_init(void)
  {
  	void __iomem *rbase;
- 	u32 count = 1000000;	/* 1s! */
-@@ -163,20 +163,30 @@ static void gic_enable_redist(void)
+@@ -397,17 +413,8 @@ static void gic_cpu_init(void)
  
- 	rbase = gic_data_rdist_rd_base();
+ 	gic_cpu_config(rbase, gic_redist_wait_for_rwp);
  
--	/* Wake up this CPU redistributor */
- 	val = readl_relaxed(rbase + GICR_WAKER);
--	val &= ~GICR_WAKER_ProcessorSleep;
-+	if (enable)
-+		/* Wake up this CPU redistributor */
-+		val &= ~GICR_WAKER_ProcessorSleep;
-+	else
-+		val |= GICR_WAKER_ProcessorSleep;
- 	writel_relaxed(val, rbase + GICR_WAKER);
- 
--	while (readl_relaxed(rbase + GICR_WAKER) & GICR_WAKER_ChildrenAsleep) {
--		count--;
--		if (!count) {
--			pr_err_ratelimited("redist didn't wake up...\n");
--			return;
--		}
-+	if (!enable) {		/* Check that GICR_WAKER is writeable */
-+		val = readl_relaxed(rbase + GICR_WAKER);
-+		if (!(val & GICR_WAKER_ProcessorSleep))
-+			return;	/* No PM support in this redistributor */
-+	}
-+
-+	while (count--) {
-+		val = readl_relaxed(rbase + GICR_WAKER);
-+		if (enable ^ (val & GICR_WAKER_ChildrenAsleep))
-+			break;
- 		cpu_relax();
- 		udelay(1);
- 	};
-+	if (!count)
-+		pr_err_ratelimited("redistributor failed to %s...\n",
-+				   enable ? "wakeup" : "sleep");
+-	/* Enable system registers */
+-	gic_enable_sre();
+-
+-	/* Set priority mask register */
+-	gic_write_pmr(DEFAULT_PMR_VALUE);
+-
+-	/* EOI deactivates interrupt too (mode 0) */
+-	gic_write_ctlr(ICC_CTLR_EL1_EOImode_drop_dir);
+-
+-	/* ... and let's hit the road... */
+-	gic_write_grpen1(1);
++	/* initialise system registers */
++	gic_cpu_sys_reg_init();
  }
  
- /*
-@@ -381,7 +391,7 @@ static void gic_cpu_init(void)
- 	if (gic_populate_rdist())
- 		return;
+ #ifdef CONFIG_SMP
+@@ -543,6 +550,33 @@ static int gic_set_affinity(struct irq_data *d, const struct cpumask *mask_val,
+ #define gic_smp_init()		do { } while(0)
+ #endif
  
--	gic_enable_redist();
-+	gic_enable_redist(true);
++#ifdef CONFIG_CPU_PM
++static int gic_cpu_pm_notifier(struct notifier_block *self,
++			       unsigned long cmd, void *v)
++{
++	if (cmd == CPU_PM_EXIT) {
++		gic_enable_redist(true);
++		gic_cpu_sys_reg_init();
++	} else if (cmd == CPU_PM_ENTER) {
++		gic_write_grpen1(0);
++		gic_enable_redist(false);
++	}
++	return NOTIFY_OK;
++}
++
++static struct notifier_block gic_cpu_pm_notifier_block = {
++	.notifier_call = gic_cpu_pm_notifier,
++};
++
++static void gic_cpu_pm_init(void)
++{
++	cpu_pm_register_notifier(&gic_cpu_pm_notifier_block);
++}
++
++#else
++static inline void gic_cpu_pm_init(void) { }
++#endif /* CONFIG_CPU_PM */
++
+ static struct irq_chip gic_chip = {
+ 	.name			= "GICv3",
+ 	.irq_mask		= gic_mask_irq,
+@@ -682,6 +716,7 @@ static int __init gic_of_init(struct device_node *node, struct device_node *pare
+ 	gic_smp_init();
+ 	gic_dist_init();
+ 	gic_cpu_init();
++	gic_cpu_pm_init();
  
- 	rbase = gic_data_rdist_sgi_base();
+ 	return 0;
  
 -- 
 1.8.3.2
