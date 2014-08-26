@@ -1,175 +1,254 @@
 From: vincent.guittot@linaro.org (Vincent Guittot)
-Date: Tue, 26 Aug 2014 13:06:51 +0200
-Subject: [PATCH v5 08/12] sched: move cfs task on a CPU with higher capacity
+Date: Tue, 26 Aug 2014 13:06:54 +0200
+Subject: [PATCH v5 11/12] sched: replace capacity_factor by utilization
 In-Reply-To: <1409051215-16788-1-git-send-email-vincent.guittot@linaro.org>
 References: <1409051215-16788-1-git-send-email-vincent.guittot@linaro.org>
-Message-ID: <1409051215-16788-9-git-send-email-vincent.guittot@linaro.org>
+Message-ID: <1409051215-16788-12-git-send-email-vincent.guittot@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If the CPU is used for handling lot of IRQs, trig a load balance to check if
-it's worth moving its tasks on another CPU that has more capacity.
-
-As a sidenote, this will note generate more spurious ilb because we already
-trig an ilb if there is more than 1 busy cpu. If this cpu is the only one that
-has a task, we will trig the ilb once for migrating the task.
-
-The nohz_kick_needed function has been cleaned up a bit while adding the new
-test
+The scheduler tries to compute how many tasks a group of CPUs can handle by
+assuming that a task's load is SCHED_LOAD_SCALE and a CPU capacity is
+SCHED_CAPACITY_SCALE.
+We can now have a better idea of the capacity of a group of CPUs and of the
+utilization of this group thanks to the rework of group_capacity_orig and the
+group_utilization. We can now deduct how many capacity is still available.
 
 Signed-off-by: Vincent Guittot <vincent.guittot@linaro.org>
 ---
- kernel/sched/fair.c | 69 +++++++++++++++++++++++++++++++++++++----------------
- 1 file changed, 49 insertions(+), 20 deletions(-)
+ kernel/sched/fair.c | 121 ++++++++++++++++++++++------------------------------
+ 1 file changed, 51 insertions(+), 70 deletions(-)
 
 diff --git a/kernel/sched/fair.c b/kernel/sched/fair.c
-index 18db43e..60ae1ce 100644
+index 2f95d1c..80bd64e 100644
 --- a/kernel/sched/fair.c
 +++ b/kernel/sched/fair.c
-@@ -6049,6 +6049,14 @@ static bool update_sd_pick_busiest(struct lb_env *env,
- 			return true;
- 	}
- 
-+	/*
-+	 * The group capacity is reduced probably because of activity from other
-+	 * sched class or interrupts which use part of the available capacity
-+	 */
-+	if ((sg->sgc->capacity_orig * 100) > (sgs->group_capacity *
-+				env->sd->imbalance_pct))
-+		return true;
-+
- 	return false;
+@@ -5673,13 +5673,13 @@ struct sg_lb_stats {
+ 	unsigned long sum_weighted_load; /* Weighted load of group's tasks */
+ 	unsigned long load_per_task;
+ 	unsigned long group_capacity;
++	unsigned long group_capacity_orig;
+ 	unsigned long group_utilization; /* Total utilization of the group */
+ 	unsigned int sum_nr_running; /* Nr tasks running in the group */
+-	unsigned int group_capacity_factor;
+ 	unsigned int idle_cpus;
+ 	unsigned int group_weight;
+ 	enum group_type group_type;
+-	int group_has_free_capacity;
++	int group_out_of_capacity;
+ #ifdef CONFIG_NUMA_BALANCING
+ 	unsigned int nr_numa_running;
+ 	unsigned int nr_preferred_running;
+@@ -5901,31 +5901,6 @@ void update_group_capacity(struct sched_domain *sd, int cpu)
  }
- 
-@@ -6534,13 +6542,23 @@ static int need_active_balance(struct lb_env *env)
- 	struct sched_domain *sd = env->sd;
- 
- 	if (env->idle == CPU_NEWLY_IDLE) {
-+		int src_cpu = env->src_cpu;
- 
- 		/*
- 		 * ASYM_PACKING needs to force migrate tasks from busy but
- 		 * higher numbered CPUs in order to pack all tasks in the
- 		 * lowest numbered CPUs.
- 		 */
--		if ((sd->flags & SD_ASYM_PACKING) && env->src_cpu > env->dst_cpu)
-+		if ((sd->flags & SD_ASYM_PACKING) && src_cpu > env->dst_cpu)
-+			return 1;
-+
-+		/*
-+		 * If the CPUs share their cache and the src_cpu's capacity is
-+		 * reduced because of other sched_class or IRQs, we trig an
-+		 * active balance to move the task
-+		 */
-+		if ((capacity_orig_of(src_cpu) * 100) > (capacity_of(src_cpu) *
-+				sd->imbalance_pct))
- 			return 1;
- 	}
- 
-@@ -6643,6 +6661,8 @@ static int load_balance(int this_cpu, struct rq *this_rq,
- 
- 	schedstat_add(sd, lb_imbalance[idle], env.imbalance);
- 
-+	env.src_cpu = busiest->cpu;
-+
- 	ld_moved = 0;
- 	if (busiest->nr_running > 1) {
- 		/*
-@@ -6652,7 +6672,6 @@ static int load_balance(int this_cpu, struct rq *this_rq,
- 		 * correctly treated as an imbalance.
- 		 */
- 		env.flags |= LBF_ALL_PINNED;
--		env.src_cpu   = busiest->cpu;
- 		env.src_rq    = busiest;
- 		env.loop_max  = min(sysctl_sched_nr_migrate, busiest->nr_running);
- 
-@@ -7359,10 +7378,12 @@ static void nohz_idle_balance(struct rq *this_rq, enum cpu_idle_type idle)
  
  /*
-  * Current heuristic for kicking the idle load balancer in the presence
-- * of an idle cpu is the system.
-+ * of an idle cpu in the system.
-  *   - This rq has more than one task.
-- *   - At any scheduler domain level, this cpu's scheduler group has multiple
-- *     busy cpu's exceeding the group's capacity.
-+ *   - This rq has at least one CFS task and the capacity of the CPU is
-+ *     significantly reduced because of RT tasks or IRQs.
-+ *   - At parent of LLC scheduler domain level, this cpu's scheduler group has
-+ *     multiple busy cpu.
-  *   - For SD_ASYM_PACKING, if the lower numbered cpu's in the scheduler
-  *     domain span are idle.
-  */
-@@ -7372,9 +7393,10 @@ static inline int nohz_kick_needed(struct rq *rq)
- 	struct sched_domain *sd;
- 	struct sched_group_capacity *sgc;
- 	int nr_busy, cpu = rq->cpu;
-+	bool kick = false;
- 
- 	if (unlikely(rq->idle_balance))
+- * Try and fix up capacity for tiny siblings, this is needed when
+- * things like SD_ASYM_PACKING need f_b_g to select another sibling
+- * which on its own isn't powerful enough.
+- *
+- * See update_sd_pick_busiest() and check_asym_packing().
+- */
+-static inline int
+-fix_small_capacity(struct sched_domain *sd, struct sched_group *group)
+-{
+-	/*
+-	 * Only siblings can have significantly less than SCHED_CAPACITY_SCALE
+-	 */
+-	if (!(sd->flags & SD_SHARE_CPUCAPACITY))
 -		return 0;
-+		return false;
- 
-        /*
- 	* We may be recently in ticked or tickless idle mode. At the first
-@@ -7388,38 +7410,45 @@ static inline int nohz_kick_needed(struct rq *rq)
- 	 * balancing.
- 	 */
- 	if (likely(!atomic_read(&nohz.nr_cpus)))
--		return 0;
-+		return false;
- 
- 	if (time_before(now, nohz.next_balance))
--		return 0;
-+		return false;
- 
- 	if (rq->nr_running >= 2)
--		goto need_kick;
-+		return true;
- 
- 	rcu_read_lock();
- 	sd = rcu_dereference(per_cpu(sd_busy, cpu));
 -
- 	if (sd) {
- 		sgc = sd->groups->sgc;
- 		nr_busy = atomic_read(&sgc->nr_busy_cpus);
+-	/*
+-	 * If ~90% of the cpu_capacity is still there, we're good.
+-	 */
+-	if (group->sgc->capacity * 32 > group->sgc->capacity_orig * 29)
+-		return 1;
+-
+-	return 0;
+-}
+-
+-/*
+  * Group imbalance indicates (and tries to solve) the problem where balancing
+  * groups is inadequate due to tsk_cpus_allowed() constraints.
+  *
+@@ -5959,38 +5934,37 @@ static inline int sg_imbalanced(struct sched_group *group)
+ 	return group->sgc->imbalance;
+ }
  
--		if (nr_busy > 1)
--			goto need_kick_unlock;
-+		if (nr_busy > 1) {
-+			kick = true;
-+			goto unlock;
-+		}
+-/*
+- * Compute the group capacity factor.
+- *
+- * Avoid the issue where N*frac(smt_capacity) >= 1 creates 'phantom' cores by
+- * first dividing out the smt factor and computing the actual number of cores
+- * and limit unit capacity with that.
+- */
+-static inline int sg_capacity_factor(struct lb_env *env, struct sched_group *group)
++static inline int group_has_free_capacity(struct sg_lb_stats *sgs,
++			struct lb_env *env)
+ {
+-	unsigned int capacity_factor, smt, cpus;
+-	unsigned int capacity, capacity_orig;
++	if ((sgs->group_capacity_orig * 100) >
++			(sgs->group_utilization * env->sd->imbalance_pct))
++		return 1;
 +
++	if (sgs->sum_nr_running < sgs->group_weight)
++		return 1;
+ 
+-	capacity = group->sgc->capacity;
+-	capacity_orig = group->sgc->capacity_orig;
+-	cpus = group->group_weight;
++	return 0;
++}
+ 
+-	/* smt := ceil(cpus / capacity), assumes: 1 < smt_capacity < 2 */
+-	smt = DIV_ROUND_UP(SCHED_CAPACITY_SCALE * cpus, capacity_orig);
+-	capacity_factor = cpus / smt; /* cores */
++static inline int group_is_overloaded(struct sg_lb_stats *sgs,
++			struct lb_env *env)
++{
++	if (sgs->sum_nr_running <= sgs->group_weight)
++		return 0;
+ 
+-	capacity_factor = min_t(unsigned,
+-		capacity_factor, DIV_ROUND_CLOSEST(capacity, SCHED_CAPACITY_SCALE));
+-	if (!capacity_factor)
+-		capacity_factor = fix_small_capacity(env->sd, group);
++	if ((sgs->group_capacity_orig * 100) <
++			(sgs->group_utilization * env->sd->imbalance_pct))
++		return 1;
+ 
+-	return capacity_factor;
++	return 0;
+ }
+ 
+ static enum group_type
+-group_classify(struct sched_group *group, struct sg_lb_stats *sgs)
++group_classify(struct sched_group *group, struct sg_lb_stats *sgs,
++			struct lb_env *env)
+ {
+-	if (sgs->sum_nr_running > sgs->group_capacity_factor)
++	if (group_is_overloaded(sgs, env))
+ 		return group_overloaded;
+ 
+ 	if (sg_imbalanced(group))
+@@ -6043,6 +6017,7 @@ static inline void update_sg_lb_stats(struct lb_env *env,
+ 			sgs->idle_cpus++;
  	}
  
--	sd = rcu_dereference(per_cpu(sd_asym, cpu));
-+	sd = rcu_dereference(rq->sd);
-+	if (sd) {
-+		if ((rq->cfs.h_nr_running >= 1) &&
-+				((rq->cpu_capacity * sd->imbalance_pct) <
-+				(rq->cpu_capacity_orig * 100))) {
-+			kick = true;
-+			goto unlock;
-+		}
-+	}
++	sgs->group_capacity_orig = group->sgc->capacity_orig;
+ 	/* Adjust by relative CPU capacity of the group */
+ 	sgs->group_capacity = group->sgc->capacity;
+ 	sgs->avg_load = (sgs->group_load*SCHED_CAPACITY_SCALE) / sgs->group_capacity;
+@@ -6051,11 +6026,10 @@ static inline void update_sg_lb_stats(struct lb_env *env,
+ 		sgs->load_per_task = sgs->sum_weighted_load / sgs->sum_nr_running;
  
-+	sd = rcu_dereference(per_cpu(sd_asym, cpu));
- 	if (sd && (cpumask_first_and(nohz.idle_cpus_mask,
- 				  sched_domain_span(sd)) < cpu))
--		goto need_kick_unlock;
-+		kick = true;
+ 	sgs->group_weight = group->group_weight;
+-	sgs->group_capacity_factor = sg_capacity_factor(env, group);
+-	sgs->group_type = group_classify(group, sgs);
  
-+unlock:
- 	rcu_read_unlock();
--	return 0;
--
--need_kick_unlock:
--	rcu_read_unlock();
--need_kick:
--	return 1;
-+	return kick;
+-	if (sgs->group_capacity_factor > sgs->sum_nr_running)
+-		sgs->group_has_free_capacity = 1;
++	sgs->group_type = group_classify(group, sgs, env);
++
++	sgs->group_out_of_capacity = group_is_overloaded(sgs, env);
  }
- #else
- static void nohz_idle_balance(struct rq *this_rq, enum cpu_idle_type idle) { }
+ 
+ /**
+@@ -6185,17 +6159,21 @@ static inline void update_sd_lb_stats(struct lb_env *env, struct sd_lb_stats *sd
+ 
+ 		/*
+ 		 * In case the child domain prefers tasks go to siblings
+-		 * first, lower the sg capacity factor to one so that we'll try
++		 * first, lower the sg capacity to one so that we'll try
+ 		 * and move all the excess tasks away. We lower the capacity
+ 		 * of a group only if the local group has the capacity to fit
+-		 * these excess tasks, i.e. nr_running < group_capacity_factor. The
++		 * these excess tasks, i.e. group_capacity > 0. The
+ 		 * extra check prevents the case where you always pull from the
+ 		 * heaviest group when it is already under-utilized (possible
+ 		 * with a large weight task outweighs the tasks on the system).
+ 		 */
+ 		if (prefer_sibling && sds->local &&
+-		    sds->local_stat.group_has_free_capacity)
+-			sgs->group_capacity_factor = min(sgs->group_capacity_factor, 1U);
++		    group_has_free_capacity(&sds->local_stat, env)) {
++			if (sgs->sum_nr_running > 1)
++				sgs->group_out_of_capacity = 1;
++			sgs->group_capacity = min(sgs->group_capacity,
++						SCHED_CAPACITY_SCALE);
++		}
+ 
+ 		if (update_sd_pick_busiest(env, sds, sg, sgs)) {
+ 			sds->busiest = sg;
+@@ -6373,11 +6351,12 @@ static inline void calculate_imbalance(struct lb_env *env, struct sd_lb_stats *s
+ 	 */
+ 	if (busiest->group_type == group_overloaded &&
+ 	    local->group_type   == group_overloaded) {
+-		load_above_capacity =
+-			(busiest->sum_nr_running - busiest->group_capacity_factor);
+-
+-		load_above_capacity *= (SCHED_LOAD_SCALE * SCHED_CAPACITY_SCALE);
+-		load_above_capacity /= busiest->group_capacity;
++		load_above_capacity = busiest->sum_nr_running *
++					SCHED_LOAD_SCALE;
++		if (load_above_capacity > busiest->group_capacity)
++			load_above_capacity -= busiest->group_capacity;
++		else
++			load_above_capacity = ~0UL;
+ 	}
+ 
+ 	/*
+@@ -6440,6 +6419,7 @@ static struct sched_group *find_busiest_group(struct lb_env *env)
+ 	local = &sds.local_stat;
+ 	busiest = &sds.busiest_stat;
+ 
++	/* ASYM feature bypasses nice load balance check */
+ 	if ((env->idle == CPU_IDLE || env->idle == CPU_NEWLY_IDLE) &&
+ 	    check_asym_packing(env, &sds))
+ 		return sds.busiest;
+@@ -6460,8 +6440,9 @@ static struct sched_group *find_busiest_group(struct lb_env *env)
+ 		goto force_balance;
+ 
+ 	/* SD_BALANCE_NEWIDLE trumps SMP nice when underutilized */
+-	if (env->idle == CPU_NEWLY_IDLE && local->group_has_free_capacity &&
+-	    !busiest->group_has_free_capacity)
++	if (env->idle == CPU_NEWLY_IDLE &&
++			group_has_free_capacity(local, env) &&
++			busiest->group_out_of_capacity)
+ 		goto force_balance;
+ 
+ 	/*
+@@ -6519,7 +6500,7 @@ static struct rq *find_busiest_queue(struct lb_env *env,
+ 	int i;
+ 
+ 	for_each_cpu_and(i, sched_group_cpus(group), env->cpus) {
+-		unsigned long capacity, capacity_factor, wl;
++		unsigned long capacity, wl;
+ 		enum fbq_type rt;
+ 
+ 		rq = cpu_rq(i);
+@@ -6548,9 +6529,6 @@ static struct rq *find_busiest_queue(struct lb_env *env,
+ 			continue;
+ 
+ 		capacity = capacity_of(i);
+-		capacity_factor = DIV_ROUND_CLOSEST(capacity, SCHED_CAPACITY_SCALE);
+-		if (!capacity_factor)
+-			capacity_factor = fix_small_capacity(env->sd, group);
+ 
+ 		wl = weighted_cpuload(i);
+ 
+@@ -6558,7 +6536,10 @@ static struct rq *find_busiest_queue(struct lb_env *env,
+ 		 * When comparing with imbalance, use weighted_cpuload()
+ 		 * which is not scaled with the cpu capacity.
+ 		 */
+-		if (capacity_factor && rq->nr_running == 1 && wl > env->imbalance)
++
++		if (rq->nr_running == 1 && wl > env->imbalance &&
++		    ((capacity * env->sd->imbalance_pct) >=
++				(rq->cpu_capacity_orig * 100)))
+ 			continue;
+ 
+ 		/*
 -- 
 1.9.1
