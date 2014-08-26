@@ -1,159 +1,35 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Tue, 26 Aug 2014 10:28:43 -0700
-Subject: [PATCH] ARM: dts: Add rk808 PMIC to rk3288-evb-rk808
-Message-ID: <1409074123-17449-1-git-send-email-dianders@chromium.org>
+From: geoff@infradead.org (Geoff Levand)
+Date: Tue, 26 Aug 2014 10:38:17 -0700
+Subject: [PATCH 2/9] arm64: Fix INVALID_HWID definition
+In-Reply-To: <20140826163134.GH4078@leverpostej>
+References: <cover.1408736066.git.geoff@infradead.org>
+ <6f84108ac880ef48548208738cbb169fba2fa51a.1408736066.git.geoff@infradead.org>
+ <20140826163134.GH4078@leverpostej>
+Message-ID: <1409074697.11425.11.camel@smoke>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds initial support.  For now, regulators are always on and we
-don't specify the input supply for all of the regulators.
+Hi Mark,
 
-Signed-off-by: huang lin <hl@rock-chips.com>
-Signed-off-by: Doug Anderson <dianders@chromium.org>
----
-This patch is based on Chris's WIP rk808 series.
+On Tue, 2014-08-26 at 17:31 +0100, Mark Rutland wrote:
+> On Fri, Aug 22, 2014 at 08:49:16PM +0100, Geoff Levand wrote:
+> > Change the preprocessor macro INVALID_HWID definition from ULONG_MAX to (~0)
+> > to allow INVALID_HWID to be used within assembly source files.
+> > 
+> > Commit 3e98fdacc59bbbdbb659be1a144ccc48ed4860fa (arm64: kernel: make the pen of
+> > the secondary a 64-bit unsigned value) added the preprocessor macro INVALID_HWID
+> > to asm/cputype.h with it defined to be ULONG_MAX.  Use of INVALID_HWID in an
+> > assembly source file that includes cputype.h will generate an assembler
+> > undefined symbol ULONG_MAX build error.  The kernel does define a ULONG_MAX in
+> > kernel.h, but that file not setup to be included in assembly files.
+> 
+> We don't seem to be using INVALID_HWID in any assembly at the moment,
+> and I'm not sure I follow what we'd need it for.
+> 
+> Why do we need this in assembly?
 
- arch/arm/boot/dts/rk3288-evb-rk808.dts | 131 +++++++++++++++++++++++++++++++++
- 1 file changed, 131 insertions(+)
+We currently don't use INVALID_HWID in any assembly files, but I wanted
+to use it for some testing and found the current definition gave an
+error.
 
-diff --git a/arch/arm/boot/dts/rk3288-evb-rk808.dts b/arch/arm/boot/dts/rk3288-evb-rk808.dts
-index 9a88b6c..513c88e 100644
---- a/arch/arm/boot/dts/rk3288-evb-rk808.dts
-+++ b/arch/arm/boot/dts/rk3288-evb-rk808.dts
-@@ -16,3 +16,134 @@
- / {
- 	compatible = "rockchip,rk3288-evb-rk808", "rockchip,rk3288";
- };
-+
-+&i2c0 {
-+	status = "okay";
-+
-+	rk808: pmic at 1b {
-+		compatible = "rockchip,rk808";
-+		clock-output-names = "xin32k", "rk808-clkout2";
-+		interrupt-parent = <&gpio0>;
-+		interrupts = <4 IRQ_TYPE_LEVEL_LOW>;
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pmic_int>;
-+		reg = <0x1b>;
-+		rockchip,system-power-controller;
-+		wakeup-source;
-+		#clock-cells = <1>;
-+
-+		vcc8-supply = <&vcc_18>;
-+		vcc9-supply = <&vcc_io>;
-+		vcc10-supply = <&vcc_io>;
-+		vcc12-supply = <&vcc_io>;
-+		vddio-supply = <&vccio_pmu>;
-+
-+		regulators {
-+			vdd_cpu: DCDC_REG1 {
-+				regulator-always-on;
-+				regulator-boot-on;
-+				regulator-min-microvolt = <750000>;
-+				regulator-max-microvolt = <1300000>;
-+				regulator-name = "vdd_arm";
-+			};
-+
-+			vdd_gpu: DCDC_REG2 {
-+				regulator-always-on;
-+				regulator-boot-on;
-+				regulator-min-microvolt = <850000>;
-+				regulator-max-microvolt = <1250000>;
-+				regulator-name = "vdd_gpu";
-+			};
-+
-+			vcc_ddr: DCDC_REG3 {
-+				regulator-always-on;
-+				regulator-boot-on;
-+				regulator-name = "vcc_ddr";
-+			};
-+
-+			vcc_io: DCDC_REG4 {
-+				regulator-always-on;
-+				regulator-boot-on;
-+				regulator-min-microvolt = <3300000>;
-+				regulator-max-microvolt = <3300000>;
-+				regulator-name = "vcc_io";
-+			};
-+
-+			vccio_pmu: LDO_REG1 {
-+				regulator-always-on;
-+				regulator-boot-on;
-+				regulator-min-microvolt = <3300000>;
-+				regulator-max-microvolt = <3300000>;
-+				regulator-name = "vccio_pmu";
-+			};
-+
-+			vcc_tp: LDO_REG2 {
-+				regulator-always-on;
-+				regulator-boot-on;
-+				regulator-min-microvolt = <3300000>;
-+				regulator-max-microvolt = <3300000>;
-+				regulator-name = "vcc_tp";
-+			};
-+
-+			vdd_10: LDO_REG3 {
-+				regulator-always-on;
-+				regulator-boot-on;
-+				regulator-min-microvolt = <1000000>;
-+				regulator-max-microvolt = <1000000>;
-+				regulator-name = "vdd_10";
-+			};
-+
-+			vcc18_lcd: LDO_REG4 {
-+				regulator-always-on;
-+				regulator-boot-on;
-+				regulator-min-microvolt = <1800000>;
-+				regulator-max-microvolt = <1800000>;
-+				regulator-name = "vcc18_lcd";
-+			};
-+
-+			vccio_sd: LDO_REG5 {
-+				regulator-always-on;
-+				regulator-boot-on;
-+				regulator-min-microvolt = <1800000>;
-+				regulator-max-microvolt = <3300000>;
-+				regulator-name = "vccio_sd";
-+			};
-+
-+			vdd10_lcd: LDO_REG6 {
-+				regulator-always-on;
-+				regulator-boot-on;
-+				regulator-min-microvolt = <1000000>;
-+				regulator-max-microvolt = <1000000>;
-+				regulator-name = "vdd10_lcd";
-+			};
-+
-+			vcc_18: LDO_REG7 {
-+				regulator-always-on;
-+				regulator-boot-on;
-+				regulator-min-microvolt = <1800000>;
-+				regulator-max-microvolt = <1800000>;
-+				regulator-name = "vcc_18";
-+			};
-+
-+			vcca_codec: LDO_REG8 {
-+				regulator-always-on;
-+				regulator-boot-on;
-+				regulator-min-microvolt = <3300000>;
-+				regulator-max-microvolt = <3300000>;
-+				regulator-name = "vcca_codec";
-+			};
-+
-+			vcc_wl: SWITCH_REG1 {
-+				regulator-always-on;
-+				regulator-boot-on;
-+				regulator-name = "vcc_wl";
-+			};
-+
-+			vcc_lcd: SWITCH_REG2 {
-+				regulator-always-on;
-+				regulator-boot-on;
-+				regulator-name = "vcc_lcd";
-+			};
-+		};
-+	};
-+};
--- 
-2.1.0.rc2.206.gedb03e5
+-Geoff
