@@ -1,85 +1,76 @@
 From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Tue, 26 Aug 2014 14:09:41 +0200
-Subject: [PATCH 0/7] CMA & device tree, another approach
-Message-ID: <1409054988-32758-1-git-send-email-m.szyprowski@samsung.com>
+Date: Tue, 26 Aug 2014 14:09:42 +0200
+Subject: [PATCH 1/7] drivers: of: add return value to
+ of_reserved_mem_device_init
+In-Reply-To: <1409054988-32758-1-git-send-email-m.szyprowski@samsung.com>
+References: <1409054988-32758-1-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <1409054988-32758-2-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Driver calling of_reserved_mem_device_init() might be interested if the
+initialization has been successful or not, so add support for returning
+error code.
 
-This is another approach to finish support for reserved memory regions
-defined in device tree. Previous attempts 
-(http://lists.linaro.org/pipermail/linaro-mm-sig/2014-February/003738.html
-and https://lkml.org/lkml/2014/7/14/108) ended in merging parts of the
-code and documentation. Merged patches allow to reserve memory, but
-there is still no reserved memory drivers nor any code that actually
-uses reserved memory regions.
+Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+---
+ drivers/of/of_reserved_mem.c    | 3 ++-
+ include/linux/of_reserved_mem.h | 9 ++++++---
+ 2 files changed, 8 insertions(+), 4 deletions(-)
 
-The final conclusion from the above mentioned threads is that there is
-no automated reserved memory initialization. All drivers that want to
-use reserved memory, should initialize it on their own.
-
-This patch series provides two driver for reserved memory regions (one
-based on CMA and one based on dma_coherent allocator). The main
-improvement comparing to the previous version is removal of automated
-reserved memory for every device and support for named memory regions.
-
-Support for more than one reserved memory region can be considered as a
-separate DMA address space, so support for more than one region per
-device has been implemented the same way as support for separate IO/DMA
-address spaces in my Exynos IOMMU dma-mapping proposal:
-http://thread.gmane.org/gmane.linux.kernel.samsung-soc/36079
-
-Best regards
-Marek Szyprowski
-Samsung R&D Institute Poland
-
-Changes since '[PATCH v2 RESEND 0/4] CMA & device tree, once again' version:
-(https://lkml.org/lkml/2014/7/14/108)
-- added return error value to of_reserved_mem_device_init()
-- added support for named memory regions (so more than one region can be
-  defined per device)
-- added usage example - converted custom reserved memory code used by
-  s5p-mfc driver to the generic reserved memory handling code
-
-Patch summary:
-
-Marek Szyprowski (7):
-  drivers: of: add return value to of_reserved_mem_device_init
-  drivers: of: add support for named memory regions
-  drivers: dma-coherent: add initialization from device tree
-  drivers: dma-contiguous: add initialization from device tree
-  media: s5p-mfc: replace custom reserved memory init code with generic
-    one
-  ARM: Exynos: convert MFC to generic reserved memory bindings
-  ARM: DTS: exynos4412-odroid*: enable MFC device
-
- .../devicetree/bindings/media/s5p-mfc.txt          |  16 +--
- .../bindings/reserved-memory/reserved-memory.txt   |   6 +-
- arch/arm/boot/dts/exynos4210-origen.dts            |  22 +++-
- arch/arm/boot/dts/exynos4210-smdkv310.dts          |  22 +++-
- arch/arm/boot/dts/exynos4412-odroid-common.dtsi    |  24 ++++
- arch/arm/boot/dts/exynos4412-origen.dts            |  22 +++-
- arch/arm/boot/dts/exynos4412-smdk4412.dts          |  22 +++-
- arch/arm/boot/dts/exynos5250-arndale.dts           |  22 +++-
- arch/arm/boot/dts/exynos5250-smdk5250.dts          |  22 +++-
- arch/arm/boot/dts/exynos5420-arndale-octa.dts      |  22 +++-
- arch/arm/boot/dts/exynos5420-smdk5420.dts          |  22 +++-
- arch/arm/mach-exynos/exynos.c                      |  18 ---
- arch/arm/mach-exynos/mfc.h                         |  16 ---
- arch/arm/plat-samsung/Kconfig                      |   5 -
- arch/arm/plat-samsung/Makefile                     |   1 -
- arch/arm/plat-samsung/s5p-dev-mfc.c                |  94 --------------
- drivers/base/dma-coherent.c                        | 138 ++++++++++++++++++---
- drivers/base/dma-contiguous.c                      |  71 +++++++++++
- drivers/media/platform/s5p-mfc/s5p_mfc.c           | 102 ++++++---------
- drivers/of/of_reserved_mem.c                       | 102 ++++++++++-----
- include/linux/cma.h                                |   3 +
- include/linux/of_reserved_mem.h                    |   9 +-
- mm/cma.c                                           |  62 +++++++--
- 23 files changed, 552 insertions(+), 291 deletions(-)
- delete mode 100644 arch/arm/mach-exynos/mfc.h
- delete mode 100644 arch/arm/plat-samsung/s5p-dev-mfc.c
-
+diff --git a/drivers/of/of_reserved_mem.c b/drivers/of/of_reserved_mem.c
+index 59fb12e84e6b..7e7de03585f9 100644
+--- a/drivers/of/of_reserved_mem.c
++++ b/drivers/of/of_reserved_mem.c
+@@ -243,7 +243,7 @@ static inline struct reserved_mem *__find_rmem(struct device_node *node)
+  * This function assign memory region pointed by "memory-region" device tree
+  * property to the given device.
+  */
+-void of_reserved_mem_device_init(struct device *dev)
++int of_reserved_mem_device_init(struct device *dev)
+ {
+ 	struct reserved_mem *rmem;
+ 	struct device_node *np;
+@@ -260,6 +260,7 @@ void of_reserved_mem_device_init(struct device *dev)
+ 
+ 	rmem->ops->device_init(rmem, dev);
+ 	dev_info(dev, "assigned reserved memory node %s\n", rmem->name);
++	return 0;
+ }
+ 
+ /**
+diff --git a/include/linux/of_reserved_mem.h b/include/linux/of_reserved_mem.h
+index 5b5efae09135..ad2f67054372 100644
+--- a/include/linux/of_reserved_mem.h
++++ b/include/linux/of_reserved_mem.h
+@@ -16,7 +16,7 @@ struct reserved_mem {
+ };
+ 
+ struct reserved_mem_ops {
+-	void	(*device_init)(struct reserved_mem *rmem,
++	int	(*device_init)(struct reserved_mem *rmem,
+ 			       struct device *dev);
+ 	void	(*device_release)(struct reserved_mem *rmem,
+ 				  struct device *dev);
+@@ -28,14 +28,17 @@ typedef int (*reservedmem_of_init_fn)(struct reserved_mem *rmem);
+ 	_OF_DECLARE(reservedmem, name, compat, init, reservedmem_of_init_fn)
+ 
+ #ifdef CONFIG_OF_RESERVED_MEM
+-void of_reserved_mem_device_init(struct device *dev);
++int of_reserved_mem_device_init(struct device *dev);
+ void of_reserved_mem_device_release(struct device *dev);
+ 
+ void fdt_init_reserved_mem(void);
+ void fdt_reserved_mem_save_node(unsigned long node, const char *uname,
+ 			       phys_addr_t base, phys_addr_t size);
+ #else
+-static inline void of_reserved_mem_device_init(struct device *dev) { }
++static inline int of_reserved_mem_device_init(struct device *dev)
++{
++	return -ENOSYS;
++}
+ static inline void of_reserved_mem_device_release(struct device *pdev) { }
+ 
+ static inline void fdt_init_reserved_mem(void) { }
 -- 
 1.9.2
