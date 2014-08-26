@@ -1,40 +1,84 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 26 Aug 2014 13:57:29 -0700
-Subject: [PATCH v2 24/26] ARM: omap2: irq: convert to handle_domain_irq
-In-Reply-To: <1409047421-27649-25-git-send-email-marc.zyngier@arm.com>
-References: <1409047421-27649-1-git-send-email-marc.zyngier@arm.com>
- <1409047421-27649-25-git-send-email-marc.zyngier@arm.com>
-Message-ID: <20140826205729.GB16006@atomide.com>
+From: dinh.linux@gmail.com (Dinh Nguyen)
+Date: Tue, 26 Aug 2014 16:00:08 -0500
+Subject: 3.17-rc2: root=/dev/mmcblk0p2 command line parsing fails
+In-Reply-To: <20140826114707.GA16372@amd>
+References: <1405397216-909-1-git-send-email-dinguyen@altera.com>
+ <53C4D874.2040206@samsung.com>
+ <20140814184710.GA11558@amd.pavel.ucw.cz>
+ <53ED2262.50604@gmail.com>
+ <20140814210252.GB26857@amd.pavel.ucw.cz>
+ <20140826114707.GA16372@amd>
+Message-ID: <CADhT+wdx2SsHnk=zML7a6mUVJxvLQ9ARO16QoYYsopAqhw7cow@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Marc Zyngier <marc.zyngier@arm.com> [140826 03:05]:
-> Use the new handle_domain_irq method to handle interrupts.
-> 
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+On Tue, Aug 26, 2014 at 6:47 AM, Pavel Machek <pavel@denx.de> wrote:
+> Hi!
+>
+>> > > mmc0: new SDHC card at address b368
+>> > > mmcblk0: mmc0:b368 USD   7.45 GiB
+>> > >  mmcblk0: p1 p2 p3 p4
+>> > > VFS: Cannot open root device "mmcblk0p2" or unknown-block(0,0): error
+>> > > -6
+>> > > Please append a correct "root=" boot option; here are the available
+>> > > partitions:
+>> > > b300         7822336 mmcblk0  driver: mmcblk
+>> > >   b301          102400 mmcblk0p1 00082434-01
+>> > >   b302         1048576 mmcblk0p2 00082434-02
+>> > >   b303            1024 mmcblk0p3 00082434-03
+>> > >   b304         6086656 mmcblk0p4 00082434-04
+>> > > Kernel panic - not syncing: VFS: Unable to mount root fs on
+>> > > unknown-block(0,0)
+>> > > CPU: 0 PID: 1 Comm: swapper/0 Not tainted 3.16.0-11208-gef74117-dirty
+>> > > #2
+>> >
+>> > Hmm...today's tip-top(899552d6) and ba36899 booted just fine for me. I
+>> > noticed something, you must have commits on top of your ba36899? Mine
+>> > shows 3.16.0-11149-gba36899.
+>>
+>> Ok, thanks for info. I went back to 3.16, and it worked in same
+>> config, and went to 3.17, and it broke.
+>
+> The problem is still there in 3.17-rc2. 3.16 does not have the
+> problem. Messages are still similar:
+>
+> mmc0: new high speed SDHC card at address b368
+> mmcblk0: mmc0:b368 USD   7.45 GiB
+>  mmcblk0: p1 p2 p3 p4
+> VFS: Cannot open root device "mmcblk0p2" or unknown-block(0,0): error
+> -6
+> Please append a correct "root=" boot option; here are the available
+> partitions:
+> b300         7822336 mmcblk0  driver: mmcblk
+>   b301          102400 mmcblk0p1 00082434-01
+>   b302         1048576 mmcblk0p2 00082434-02
+>   b303            1024 mmcblk0p3 00082434-03
+>   b304         6086656 mmcblk0p4 00082434-04
+> Kernel panic - not syncing: VFS: Unable to mount root fs on unknown-block(0,0)
+> CPU: 0 PID: 1 Comm: swapper/0 Not tainted
+> 3.17.0-rc2-00368-gec0400b-dirty #83
+>
+>
+> What is going on there? Clearly partition table was parsed and
+> partitions are available; does the mention of unknown-block(0,0) mean
+> that kernel failed to parse the command line?
+>
+> I replaced "root=/dev/mmcblk0p2" with "root=b302" and have a booting
+> system.
 
-Seems to boot:
 
-Acked-by: Tony Lindgren <tony@atomide.com>
+Can you do a bisect? 3.17-rc2 booted fine for me today:
 
-> ---
->  arch/arm/mach-omap2/irq.c | 3 +--
->  1 file changed, 1 insertion(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm/mach-omap2/irq.c b/arch/arm/mach-omap2/irq.c
-> index 35b8590..a62ba5a 100644
-> --- a/arch/arm/mach-omap2/irq.c
-> +++ b/arch/arm/mach-omap2/irq.c
-> @@ -248,8 +248,7 @@ out:
->  		irqnr &= ACTIVEIRQ_MASK;
->  
->  		if (irqnr) {
-> -			irqnr = irq_find_mapping(domain, irqnr);
-> -			handle_IRQ(irqnr, regs);
-> +			handle_domain_irq(domain, irqnr, regs);
->  			handled_irq = 1;
->  		}
->  	} while (irqnr);
-> -- 
-> 2.0.4
-> 
+EXT3-fs (mmcblk0p2): mounted filesystem with ordered data mode
+VFS: Mounted root (ext3 filesystem) on device 179:2.
+Freeing unused kernel memory: 252K (c052d000 - c056c000)
+random: nonblocking pool is initialized
+
+Poky 8.0 (Yocto Project 1.3 Reference Distro) 1.3 socfpga_cyclone5 ttyS0
+
+socfpga_cyclone5 login: root
+root at socfpga_cyclone5:~# uname -a
+Linux socfpga_cyclone5 3.17.0-rc2-00006-gdd7ad78 #1 SMP Tue Aug 26
+15:51:56 CDT 2014 armv7l GNU/Linux
+
+Dinh
