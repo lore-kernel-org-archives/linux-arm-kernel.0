@@ -1,43 +1,42 @@
 From: vincent.guittot@linaro.org (Vincent Guittot)
-Date: Tue, 26 Aug 2014 13:06:46 +0200
-Subject: [PATCH v5 03/12] sched: fix avg_load computation
+Date: Tue, 26 Aug 2014 13:06:48 +0200
+Subject: [PATCH v5 05/12] ARM: topology: use new cpu_capacity interface
 In-Reply-To: <1409051215-16788-1-git-send-email-vincent.guittot@linaro.org>
 References: <1409051215-16788-1-git-send-email-vincent.guittot@linaro.org>
-Message-ID: <1409051215-16788-4-git-send-email-vincent.guittot@linaro.org>
+Message-ID: <1409051215-16788-6-git-send-email-vincent.guittot@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The computation of avg_load and avg_load_per_task should only takes into
-account the number of cfs tasks. The non cfs task are already taken into
-account by decreasing the cpu's capacity and they will be tracked in the
-CPU's utilization (group_utilization) of the next patches
+Use the new arch_scale_cpu_capacity in order to reflect the original capacity
+of a CPU instead of arch_scale_freq_capacity which is more linked to a scaling
+of the capacity linked to the frequency.
 
 Signed-off-by: Vincent Guittot <vincent.guittot@linaro.org>
 ---
- kernel/sched/fair.c | 4 ++--
+ arch/arm/kernel/topology.c | 4 ++--
  1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/kernel/sched/fair.c b/kernel/sched/fair.c
-index 87b9dc7..b85e9f7 100644
---- a/kernel/sched/fair.c
-+++ b/kernel/sched/fair.c
-@@ -4092,7 +4092,7 @@ static unsigned long capacity_of(int cpu)
- static unsigned long cpu_avg_load_per_task(int cpu)
+diff --git a/arch/arm/kernel/topology.c b/arch/arm/kernel/topology.c
+index e35d880..89cfdd6 100644
+--- a/arch/arm/kernel/topology.c
++++ b/arch/arm/kernel/topology.c
+@@ -42,7 +42,7 @@
+  */
+ static DEFINE_PER_CPU(unsigned long, cpu_scale);
+ 
+-unsigned long arch_scale_freq_capacity(struct sched_domain *sd, int cpu)
++unsigned long arch_scale_cpu_capacity(struct sched_domain *sd, int cpu)
  {
- 	struct rq *rq = cpu_rq(cpu);
--	unsigned long nr_running = ACCESS_ONCE(rq->nr_running);
-+	unsigned long nr_running = ACCESS_ONCE(rq->cfs.h_nr_running);
- 	unsigned long load_avg = rq->cfs.runnable_load_avg;
+ 	return per_cpu(cpu_scale, cpu);
+ }
+@@ -166,7 +166,7 @@ static void update_cpu_capacity(unsigned int cpu)
+ 	set_capacity_scale(cpu, cpu_capacity(cpu) / middle_capacity);
  
- 	if (nr_running)
-@@ -5985,7 +5985,7 @@ static inline void update_sg_lb_stats(struct lb_env *env,
- 			load = source_load(i, load_idx);
+ 	printk(KERN_INFO "CPU%u: update cpu_capacity %lu\n",
+-		cpu, arch_scale_freq_capacity(NULL, cpu));
++		cpu, arch_scale_cpu_capacity(NULL, cpu));
+ }
  
- 		sgs->group_load += load;
--		sgs->sum_nr_running += rq->nr_running;
-+		sgs->sum_nr_running += rq->cfs.h_nr_running;
- 
- 		if (rq->nr_running > 1)
- 			*overload = true;
+ #else
 -- 
 1.9.1
