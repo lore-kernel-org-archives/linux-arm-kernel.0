@@ -1,146 +1,69 @@
-From: kiran.padwal@smartplayin.com (Kiran Padwal)
-Date: Tue, 26 Aug 2014 17:00:45 +0530
-Subject: [PATCH v3] ARM: apq8064: Add pinmux and i2c pinctrl nodes
-Message-ID: <1409052645-14984-1-git-send-email-kiran.padwal@smartplayin.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 26 Aug 2014 12:33:40 +0100
+Subject: [linux-sunxi] Re: [PATCH 4/4] simplefb: add clock handling code
+In-Reply-To: <20140826105451.GD31124@ulmo>
+References: <53FB3E7F.4000503@redhat.com>
+ <20140825141600.GA14763@ulmo.nvidia.com>
+ <53FB46FF.1010208@redhat.com>
+ <20140825145303.GC14763@ulmo.nvidia.com>
+ <20140825150705.GB15297@lukather> <20140826082626.GE17263@ulmo>
+ <20140826090035.GB17528@sirena.org.uk>
+ <20140826091853.GI17263@ulmo>
+ <20140826100612.GH17528@sirena.org.uk>
+ <20140826105451.GD31124@ulmo>
+Message-ID: <20140826113340.GL17528@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds pinmux and i2c pinctrl DT node for IFC6410 board.
-It also adds necessary DT support for i2c eeprom which is present on
-IFC6410.
+On Tue, Aug 26, 2014 at 12:55:06PM +0200, Thierry Reding wrote:
+> On Tue, Aug 26, 2014 at 11:06:12AM +0100, Mark Brown wrote:
+> > On Tue, Aug 26, 2014 at 11:18:54AM +0200, Thierry Reding wrote:
+> > > On Tue, Aug 26, 2014 at 10:00:35AM +0100, Mark Brown wrote:
 
-Tested on IFC6410 board.
+> > > > We can't assume that the "proper" setup is that the supply should be
+> > > > left on.
 
-Signed-off-by: Kiran Padwal <kiran.padwal@smartplayin.com>
----
-Changes since v2:
- - Renamed pinmux i2c subnode "i2c1_pinmux" to "i2c1".
- - Removed labes of node.
- - Used canonical value as "okay" instead of "ok".
- - Used macros.
+> > > Right, we can't assume it, but if we're given appropriate hints I think
+> > > it's fair to keep resources set up by firmware untouched.
 
-Changes since v1:
- - Renamed pinmux phandle "qcom_pinmux" to "tlmm_pinmux".
- - Updated pinmux interrupt.
+> > I really can't see any sensible way to do that in an OS neutral thing
+> > like DT.
 
- arch/arm/boot/dts/qcom-apq8064-ifc6410.dts |   27 ++++++++++++++
- arch/arm/boot/dts/qcom-apq8064.dtsi        |   53 ++++++++++++++++++++++++++++
- 2 files changed, 80 insertions(+)
+> It should be possible to simply define a property for this that the
+> firmware can add to the device tree.
 
-diff --git a/arch/arm/boot/dts/qcom-apq8064-ifc6410.dts b/arch/arm/boot/dts/qcom-apq8064-ifc6410.dts
-index 7c2441d..ef0857e 100644
---- a/arch/arm/boot/dts/qcom-apq8064-ifc6410.dts
-+++ b/arch/arm/boot/dts/qcom-apq8064-ifc6410.dts
-@@ -5,6 +5,24 @@
- 	compatible = "qcom,apq8064-ifc6410", "qcom,apq8064";
- 
- 	soc {
-+		gsbi at 12440000 {
-+			status = "okay";
-+			qcom,mode = <GSBI_PROT_I2C>;
-+
-+			i2c at 12460000 {
-+				status = "okay";
-+				clock-frequency = <200000>;
-+				pinctrl-0 = <&i2c1_pins>;
-+				pinctrl-names = "default";
-+
-+				eeprom: eeprom at 52 {
-+					compatible = "atmel,24c128";
-+					reg = <0x52>;
-+					pagesize = <32>;
-+				};
-+			};
-+		};
-+
- 		gsbi at 16600000 {
- 			status = "ok";
- 			qcom,mode = <GSBI_PROT_I2C_UART>;
-@@ -12,5 +30,14 @@
- 				status = "ok";
- 			};
- 		};
-+
-+		pinmux at 800000 {
-+			i2c1_pins: i2c1 {
-+				mux {
-+					pins = "gpio20", "gpio21";
-+					function = "gsbi1";
-+				};
-+			};
-+		};
- 	};
- };
-diff --git a/arch/arm/boot/dts/qcom-apq8064.dtsi b/arch/arm/boot/dts/qcom-apq8064.dtsi
-index 92bf793..5dddbf3 100644
---- a/arch/arm/boot/dts/qcom-apq8064.dtsi
-+++ b/arch/arm/boot/dts/qcom-apq8064.dtsi
-@@ -89,6 +89,17 @@
- 			cpu-offset = <0x80000>;
- 		};
- 
-+		tlmm_pinmux: pinmux at 800000 {
-+			compatible = "qcom,apq8064-pinctrl";
-+			reg = <0x800000 0x4000>;
-+
-+			gpio-controller;
-+			#gpio-cells = <2>;
-+			interrupt-controller;
-+			#interrupt-cells = <2>;
-+			interrupts = <0 16 IRQ_TYPE_LEVEL_HIGH>;
-+		};
-+
- 		acc0: clock-controller at 2088000 {
- 			compatible = "qcom,kpss-acc-v1";
- 			reg = <0x02088000 0x1000>, <0x02008000 0x1000>;
-@@ -133,6 +144,48 @@
- 			regulator;
- 		};
- 
-+		gsbi1: gsbi at 12440000 {
-+			status = "disabled";
-+			compatible = "qcom,gsbi-v1.0.0";
-+			reg = <0x12440000 0x100>;
-+			clocks = <&gcc GSBI1_H_CLK>;
-+			clock-names = "iface";
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+			ranges;
-+
-+			i2c1: i2c at 12460000 {
-+				compatible = "qcom,i2c-qup-v1.1.1";
-+				reg = <0x12460000 0x1000>;
-+				interrupts = <0 194 IRQ_TYPE_NONE>;
-+				clocks = <&gcc GSBI1_QUP_CLK>, <&gcc GSBI1_H_CLK>;
-+				clock-names = "core", "iface";
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+			};
-+		};
-+
-+		gsbi2: gsbi at 12480000 {
-+			status = "disabled";
-+			compatible = "qcom,gsbi-v1.0.0";
-+			reg = <0x12480000 0x100>;
-+			clocks = <&gcc GSBI2_H_CLK>;
-+			clock-names = "iface";
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+			ranges;
-+
-+			i2c2: i2c at 124a0000 {
-+				compatible = "qcom,i2c-qup-v1.1.1";
-+				reg = <0x124a0000 0x1000>;
-+				interrupts = <0 196 IRQ_TYPE_NONE>;
-+				clocks = <&gcc GSBI2_QUP_CLK>, <&gcc GSBI2_H_CLK>;
-+				clock-names = "core", "iface";
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+			};
-+		};
-+
- 		gsbi7: gsbi at 16600000 {
- 			status = "disabled";
- 			compatible = "qcom,gsbi-v1.0.0";
--- 
-1.7.9.5
+> There are other subsystems for example where we don't touch resources
+> unless they are explicitly accessed. GPIO and pinmux are two examples of
+> those. The reason is precisely so that we don't undo anything that the
+> firmware already set up and that may be needed during boot.
+
+GPIOs and pinmuxes are quite different in both how they get set up (you
+don't typically have their configuration set in ROM and shoehorned into
+the board which is what we're dealing with for a lot of PMICs) and in
+the consequences of leaving them alone.
+
+I really don't think defining a custom property to work around a timing
+issue in a particular OS startup sequence is the best way forwards here
+- we should solve our startup sequencing issue rather than layer on
+hacks, otherwise we're adding fragility and work to the system.  The
+flag would need to be explicitly added and then it means we're stuck
+with the behaviour even if the system gets smarter.
+
+> Before booting the kernel it will modify the DTB and insert a node that
+> contains information about the framebuffer that was set up. The node
+> contains properties that define the resolution, the format and the
+> physical address of the framebuffer memory. An in-kernel driver will
+> then be able to use that information very early in the boot process to
+> show the console (to replace the serial console that's usually not
+> available on consumer devices). Later on when a real driver can be
+> loaded it should take over the resources from simplefb and remove it.
+
+OK, so this is not meaningfully different to just loading the driver
+normally - it's exactly the same scenario.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140826/57d05d8e/attachment.sig>
