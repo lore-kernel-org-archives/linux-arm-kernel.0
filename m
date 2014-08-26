@@ -1,45 +1,29 @@
-From: pramod.gurav@smartplayin.com (Pramod Gurav)
-Date: Tue, 26 Aug 2014 11:31:06 -0700
-Subject: [PATCH 1/2] ARM: DT: APQ8064: Add pinctrl support This patch adds
- device tree nodes to support pinctrl for apq8064 SOC
-Message-ID: <1409077867-9446-1-git-send-email-pramod.gurav@smartplayin.com>
+From: tthayer@opensource.altera.com (Thor Thayer)
+Date: Tue, 26 Aug 2014 13:39:18 -0500
+Subject: [PATCHv10 2/2] arm: dts: Add Altera SDRAM EDAC bindings &
+ devicetree entries.
+In-Reply-To: <20140814184949.GC11558@amd.pavel.ucw.cz>
+References: <1407770293-27190-1-git-send-email-tthayer@opensource.altera.com>
+ <1407770293-27190-3-git-send-email-tthayer@opensource.altera.com>
+ <20140814184949.GC11558@amd.pavel.ucw.cz>
+Message-ID: <53FCD456.3050404@opensource.altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-CC: Rob Herring <robh+dt@kernel.org>
-CC: Pawel Moll <pawel.moll@arm.com>
-CC: Mark Rutland <mark.rutland@arm.com>
-CC: Ian Campbell <ijc+devicetree@hellion.org.uk>
-CC: Kumar Gala <galak@codeaurora.org>
-CC: devicetree at vger.kernel.org
-CC: linux-arm-kernel at lists.infradead.org
 
-Signed-off-by: Pramod Gurav <pramod.gurav@smartplayin.com>
----
- arch/arm/boot/dts/qcom-apq8064.dtsi |   11 +++++++++++
- 1 files changed, 11 insertions(+), 0 deletions(-)
+On 08/14/2014 01:49 PM, Pavel Machek wrote:
+> On Mon 2014-08-11 10:18:13, tthayer at opensource.altera.com wrote:
+>> From: Thor Thayer <tthayer@opensource.altera.com>
+>>
+>> Add the Altera SDRAM EDAC bindings and device tree changes to the Altera SoC project.
+>>
+>> Signed-off-by: Thor Thayer <tthayer@opensource.altera.com>
+> Acked-by: Pavel Machek <pavel@denx.de>
+>
+>
+Hi All,
 
-diff --git a/arch/arm/boot/dts/qcom-apq8064.dtsi b/arch/arm/boot/dts/qcom-apq8064.dtsi
-index d66fb25..681e194 100644
---- a/arch/arm/boot/dts/qcom-apq8064.dtsi
-+++ b/arch/arm/boot/dts/qcom-apq8064.dtsi
-@@ -73,6 +73,17 @@
- 		ranges;
- 		compatible = "simple-bus";
- 
-+		msm_gpio: pinctrl at 800000 {
-+			compatible = "qcom,apq8064-pinctrl";
-+			reg = <0x800000 0x4000>;
-+
-+			gpio-controller;
-+			#gpio-cells = <2>;
-+			interrupt-controller;
-+			#interrupt-cells = <2>;
-+			interrupts = <0 32 0x4>;
-+		};
-+
- 		intc: interrupt-controller at 2000000 {
- 			compatible = "qcom,msm-qgic2";
- 			interrupt-controller;
--- 
-1.7.0.4
+Any further comments or suggestions on this patch series? Thanks for the 
+review, Pavel!
+
+Thor
