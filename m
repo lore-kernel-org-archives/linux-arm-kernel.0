@@ -1,57 +1,64 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 26 Aug 2014 19:36:53 +0100
-Subject: [PATCHv3 6/7] arm64: use fixmap for text patching when text is RO
-In-Reply-To: <53FB82A7.3030806@codeaurora.org>
-References: <1408584039-12735-1-git-send-email-lauraa@codeaurora.org>
- <1408584039-12735-7-git-send-email-lauraa@codeaurora.org>
- <CAGXu5jJKhBZigRYtAa0h554tNoGoMd46_nsNvQS2Wds_DbZM1g@mail.gmail.com>
- <53FB82A7.3030806@codeaurora.org>
-Message-ID: <20140826183653.GL4078@leverpostej>
+From: jonsmirl@gmail.com (jonsmirl at gmail.com)
+Date: Tue, 26 Aug 2014 14:39:45 -0400
+Subject: Generic communication of boot loader state to the OS
+In-Reply-To: <20140826182816.GW30401@n2100.arm.linux.org.uk>
+References: <CAKON4Oz-PRgXyNKj=T9ymzOOhCMPjBMdYdE1Mr1CHWv3boskiw@mail.gmail.com>
+ <20140826182816.GW30401@n2100.arm.linux.org.uk>
+Message-ID: <CAKON4Oy7SU9kj=DdJ+Oq14ukL7kHP7Qn9bPrQ3PKUL6ZJww=gw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[...]
+On Tue, Aug 26, 2014 at 2:28 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Tue, Aug 26, 2014 at 12:10:00PM -0400, jonsmirl at gmail.com wrote:
+>> As a side effect this will eliminate the need for kernel command line
+>> parameters describing boot state. Like console="". Over time it might
+>> even be able to pass a DHCP IP address from uboot into the kernel.
+>
+> Err no.  Don't even think about that.  DHCP may be wonderful and all,
+> but there's a fundamental issue with it: entries time out unless they
+> are renewed.
+>
+> Why is that a problem?  Well, take a DHCP server which hands out
+> dynamic addresses, and updates the DNS.  When the lease expires, it
+> tears down the DNS entry.
+>
+> Now take a target booting using DHCP in uboot, which then mounts its
+> root NFS.  If it tries to startup a DHCP client, the first thing the
+> DHCP client does is to clean up the interface... resulting in it
+> killing the root NFS connection.  If that doesn't happen, then you
+> end up with a problem at shutdown, because DHCP clients always
+> deconfigure the interface when they're killed off - resulting in
+> "reboot" not being functional.
 
-> >> +static int __kprobes __aarch64_insn_write(void *addr, u32 insn, bool patch)
-> >> +{
-> >> +       void *waddr = addr;
-> >> +       unsigned long flags;
-> >> +       int ret;
-> >> +
-> >> +       if (patch)
-> >> +               waddr = patch_map(addr, FIX_TEXT_POKE0, &flags);
-> >> +
-> >> +       ret = probe_kernel_write(waddr, &insn, AARCH64_INSN_SIZE);
-> >> +
-> >> +       if (waddr != addr) {
-> >> +               __flush_dcache_area(waddr, AARCH64_INSN_SIZE);
-> > 
-> > Is this flush to make sure the waddr change has actually made it to
-> > physical memory?
-> > 
-> > Reviewed-by: Kees Cook <keescook@chromium.org>
-> > 
-> > -Kees
-> > 
-> 
-> It's more for the alias flushing to match what arm was doing. This was
-> one of the parts that I wasn't sure if it was necessary or not.
+I run the same configuration  -  uboot in flash, tftp to load kernel,
+nfs mount the root. And I do reboot fifty times a day too.  I just put
+everything on static IPs to avoid problems.
 
-ARMv8 doesn't allow for aliases in the D-cache, so I think we can drop
-the __flush_dcache_area call:
+Would this work if the DHCP client was notified that there already was
+an IP lease in place?  It could remember that lease and then be
+responsible for setting it into the interface and renewing it. Right
+now there is no way to pass this information.
 
-  - D-cache maintenance instructions execute in program-order relative
-    to loads & stores that access an address in Normal memory with Inner
-    Write {Through,Back} attributes within the same cache line. (per
-    ARMv8 ARM, D3-1615).
+Doesn't the DHCP client do the wrong thing simply because it lacks the
+info to do something better?
 
-  - D-cache maintenance for an address is visible at all aliases. (per
-    ARMv8 ARM, D4-1750)
+>
+> Here, I run exactly that setup, and I have found that ubuntu suffers
+> quite a bit from problems if you don't tell it to keep its fingers
+> off the ethernet device configuration when running root-NFS - and
+> believe me, when I'm working on something, I probably do several
+> tens of remote reboots of targets via "reboot" - I know I've done
+> about fifty today so far (many of them having to resort to the reset
+> button because the kernel seems to be locking up rather than rebooting
+> at the final stage.)
+>
+> --
+> FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
+> according to speedtest.net.
 
-So we shouldn't need a barrier between the write and the D-cache
-maintenance, and we don't care which virtual alias we perform the
-maintenance on. As flush_icache_range flushes the VA matching the
-I-cache, that should be sufficient.
 
-Cheers,
-Mark.
+
+-- 
+Jon Smirl
+jonsmirl at gmail.com
