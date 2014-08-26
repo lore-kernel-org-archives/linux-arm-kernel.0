@@ -1,30 +1,52 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Wed, 27 Aug 2014 00:40:16 +0200
-Subject: [PATCH] iio: adc: rockchip_saradc: remove unused variable in probe
-Message-ID: <2134722.Yfu4MZ4klm@diego>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Wed, 27 Aug 2014 00:36:37 +0200
+Subject: [PATCH v7 3/8] cpufreq: kirkwood: Remove use of the clk provider
+ API
+In-Reply-To: <20140826214631.5251.66177@quantum>
+References: <1408375833-10703-1-git-send-email-tomeu.vizoso@collabora.com>
+ <1408375833-10703-4-git-send-email-tomeu.vizoso@collabora.com>
+ <20140820225513.5251.284@quantum> <53F5A587.9030200@collabora.com>
+ <20140821133825.GH8608@lunn.ch> <20140822192933.5251.53733@quantum>
+ <20140822201112.GH17277@lunn.ch>
+ <20140826214631.5251.66177@quantum>
+Message-ID: <20140826223637.GA5324@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The rate variable in the probe function of the saradc is a remnant
-of a previous patch iteration. It is unused and thus produces a
-compile time warning. Therefore remove it.
+> > Not quite true. u-boot might of touch the clock. Weird things happen
+> > with some kirkwood boards. Some don't have the ability to control
+> > there power supplies. So some boards implement "power off" by
+> > rebooting, and letting u-boot spin until a button is pressed. I hope
+> > such a u-boot powers off as much as possible, and e.g. drops the CPU
+> > clock to the lower frequency. One would also hope it puts it back to
+> > high speed before calling the kernel.
+> 
+> I have a doubt about this.
+> 
+> The powersave clock in drivers/clk/mvebu/kirkwood.c does not set
+> CLK_IGNORE_UNUSED, nor do any of the clocks in kirkwood_gating_desc[].
+> 
+> So regardless of what U-boot does, if no driver has called clk_enable() on
+> powersave_clk by late_initcall-time then clk_disable_unused() will
+> disable it as a power-saving mechanism.
+> 
+> So are kirkwood systems that use cpufreq simply getting lucky and not
+> hanging?
 
-Signed-off-by: Heiko Stuebner <heiko@sntech.de>
----
- drivers/iio/adc/rockchip_saradc.c | 1 -
- 1 file changed, 1 deletion(-)
+Hi Mike
 
-diff --git a/drivers/iio/adc/rockchip_saradc.c b/drivers/iio/adc/rockchip_saradc.c
-index 1fad964..e074a0b 100644
---- a/drivers/iio/adc/rockchip_saradc.c
-+++ b/drivers/iio/adc/rockchip_saradc.c
-@@ -141,7 +141,6 @@ static int rockchip_saradc_probe(struct platform_device *pdev)
- 	struct resource	*mem;
- 	int ret;
- 	int irq;
--	u32 rate;
- 
- 	if (!np)
- 		return -ENODEV;
--- 
-2.0.1
+Its a good question.
+
+However, the reset value of the clock is off. off means the CPU is
+running at its high speed. Turning this clock on, actually reduces the
+clock speed! So for 99% of the time, the late_initcall does nothing.
+
+It gets more interesting when uboot, or a previous kernel has turned
+the clock on. I admit, i don't expect this to happen very often, but
+if it does, and there is no cpufreq driver, interesting things could
+happen. The cpufreq driver can only be builtin, not a module. So if it
+is available, it should be guaranteed to claim the clock before the
+late_initcall could turn it off. And since it reads the hardware
+state, it will do the right thing.
+
+       Andrew
