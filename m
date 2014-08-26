@@ -1,44 +1,34 @@
 From: broonie@kernel.org (Mark Brown)
-Date: Tue, 26 Aug 2014 08:17:21 +0100
-Subject: [PATCH v9 1/2] regulator: Add driver for max77802 PMIC PMIC
- regulators
-In-Reply-To: <CAD=FV=V4TSKsbjj3dXCdSzVrh3sxH-FkpFEbEo+JA1bN9R-XWA@mail.gmail.com>
-References: <CA+NduCDL65=Y=PyU3FfXsTz0FfbmYzicGrY4U7ji3_V+nXhtCQ@mail.gmail.com>
- <53F73472.8010609@collabora.co.uk>
- <20140822144531.GV24407@sirena.org.uk>
- <53F7838F.8060906@collabora.co.uk>
- <20140822183054.GY24407@sirena.org.uk>
- <53F7BDD8.7060500@collabora.co.uk>
- <CAD=FV=WC0h7fYm2QFqu3Zka7CsU4BtG-oyPpJav+ygC+gmCR+A@mail.gmail.com>
- <CA+NduCCT-KQ=gh7QWkBE4qkA2YOJ8KCVqbkC6Tkmb1aPvCsGFQ@mail.gmail.com>
- <53FAFCBC.2050407@collabora.co.uk>
- <CAD=FV=V4TSKsbjj3dXCdSzVrh3sxH-FkpFEbEo+JA1bN9R-XWA@mail.gmail.com>
-Message-ID: <20140826071721.GV17528@sirena.org.uk>
+Date: Tue, 26 Aug 2014 08:18:37 +0100
+Subject: [PATCH] ARM: cns3xxx: Don't allocate PCI addresses on stack
+In-Reply-To: <2791908.V6o8lplUAt@wuerfel>
+References: <1408927894-30858-1-git-send-email-broonie@kernel.org>
+ <2492333.HstnrugmgL@wuerfel> <2791908.V6o8lplUAt@wuerfel>
+Message-ID: <20140826071837.GW17528@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 25, 2014 at 08:40:40AM -0700, Doug Anderson wrote:
-> On Mon, Aug 25, 2014 at 2:07 AM, Javier Martinez Canillas
+On Mon, Aug 25, 2014 at 01:30:22PM +0200, Arnd Bergmann wrote:
+> On Monday 25 August 2014 12:34:25 Arnd Bergmann wrote:
 
-> > I see, so probably until we have a way to define the operating mode for
-> > each regulator using DT we should set the opmode to normal when enabling a
-> > regulator independently of the value the hardware register reported on probe.
+> > However, refactoring the code to do it right seems like actual work
+> > and I'm not sure we can find anybody to do it, so your hack seems
+> > like the best approximation.
 
-> > Can you please test the following change [0] so I can post as a proper
-> > patch? Doug, Mark do you think that forcing the regulator to opmode normal
-> > when enabling is the right solution here?
+> I may have spoken too fast. Here is a patch that should deal with the
+> problem more cleanly, and also help prepare that code for a potential
+> move to the changed PCI probing infrastructure that is getting
+> done for arm64.
 
-> IMHO that makes sense.
+> Completely untested.
 
-No, this doesn't make any obvious sense to me at all.  Picking normal as
-a default if the hardware reads back off due to overlapping
-impelementation or something *might* make sense but not overwriting the
-hardware state without explicit permission from the machine integration
-is a key goal for the regulator API.
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+
+Right, this looks reasonably sensible to me.
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
 Size: 819 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140826/c34310de/attachment-0001.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140826/07eba653/attachment.sig>
