@@ -1,47 +1,45 @@
-From: marex@denx.de (Marek Vasut)
-Date: Tue, 26 Aug 2014 09:26:40 +0200
-Subject: [PATCH v4] spi: spi-imx: add DMA support
-In-Reply-To: <20140826071757.GA32751@Robin-OptiPlex-780>
-References: <1408752835-10995-1-git-send-email-b38343@freescale.com>
- <201408251007.22393.marex@denx.de>
- <20140826071757.GA32751@Robin-OptiPlex-780>
-Message-ID: <201408260926.41038.marex@denx.de>
+From: mperttunen@nvidia.com (Mikko Perttunen)
+Date: Tue, 26 Aug 2014 10:42:21 +0300
+Subject: [PATCH 0/8] Tegra124 EMC (external memory controller) support
+In-Reply-To: <53FB7511.9090205@wwwdotorg.org>
+References: <1405088313-20048-1-git-send-email-mperttunen@nvidia.com>
+ <53FB7511.9090205@wwwdotorg.org>
+Message-ID: <53FC3A5D.8030708@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, August 26, 2014 at 09:17:59 AM, Robin Gong wrote:
-> On Mon, Aug 25, 2014 at 10:07:22AM +0200, Marek Vasut wrote:
-> > On Saturday, August 23, 2014 at 02:13:55 AM, Robin Gong wrote:
-> > > After enable DMA
-> > 
-> > Please also add a commit message which describes the change, not only
-> > some test results.
-> > 
-> > [...]
-> 
->  Ok, I will enrich it in next version.
-> 
-> > > @@ -911,6 +1194,13 @@ static int spi_imx_probe(struct platform_device
-> > > *pdev) goto out_put_per;
-> > > 
-> > >  	spi_imx->spi_clk = clk_get_rate(spi_imx->clk_per);
-> > > 
-> > > +	/*
-> > > +	 * Only validated on i.mx6 now, can remove the constrain if validated
-> > > on +	 * other chips.
-> > > +	 */
-> > 
-> > Given that the check below tests for imx51_ecspi_devtype_data ... does
-> > that mean, that this code was never tested on MX51 and MX53, yet will be
-> > enabled for those chips and might possibly break them ?
-> 
-> Yes, because there is no available mx51 mx53 boards in my hands. But I
-> think it won't bring too much trouble, since they share the same IP.
-> No, the patch won't break current MX51 and MX53, because they didn't enable
-> dma in dts setting,and they will keep use pio mode.
+On 25/08/14 20:40, Stephen Warren wrote:
+> On 07/11/2014 08:18 AM, Mikko Perttunen wrote:
+>> Hi everyone,
+>>
+>> this series adds support for the EMC (external memory controller) clock
+>> in the Tegra124 system-on-chip. The series has been tested on Jetson TK1.
+>>
+>> The first two patches remove the old "emc_mux" and "emc" clocks from the
+>> clock tree and the device tree bindings. This is, of course, not
+>> backwards
+>> compatible, but as these clocks have never been useful for anything
+>> (apart from maybe reading the boot rate of the EMC clock). If this is
+>> still
+>> not acceptable, the second patch can be dropped.
+> ...
+>
+> Mikko, this series had some comments, especially on the DT binding
+> (patch 5/8) and how the MC/EMC drivers interact. Is there an updated
+> version of the series? Or, is the series replaced by Tomeu Vizoso's work?
 
-Thanks for clearing this up, this was the important piece of information for me. 
-Please put it into the commit message.
+Yes, I have a v2 with these comments addressed. One concern, though, is 
+the part writing to CLK_SOURCE_EMC. If some other driver also wants to 
+read this register (MC, likely), we might need to have an API for it in 
+the CAR driver. On the other hand, maybe not, since it's only one 
+register. Thierry?
 
-Best regards,
-Marek Vasut
+Another point is that v2 adds a new API to the MC driver, which also 
+doesn't exist yet. The EMC driver can technically work without the MC 
+driver (but with a header for MC added), but I'm not sure the result 
+would be very useful.
+
+I believe the plan is that Tomeu's EMC code will be integrated into this 
+EMC driver once both are ready.
+
+Mikko
