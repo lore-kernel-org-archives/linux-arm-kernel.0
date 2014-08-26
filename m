@@ -1,46 +1,80 @@
-From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
-Date: Tue, 26 Aug 2014 11:08:07 +0200
-Subject: [PATCH v9 1/2] regulator: Add driver for max77802 PMIC PMIC
- regulators
-In-Reply-To: <20140826071721.GV17528@sirena.org.uk>
-References: <CA+NduCDL65=Y=PyU3FfXsTz0FfbmYzicGrY4U7ji3_V+nXhtCQ@mail.gmail.com>
- <53F73472.8010609@collabora.co.uk> <20140822144531.GV24407@sirena.org.uk>
- <53F7838F.8060906@collabora.co.uk> <20140822183054.GY24407@sirena.org.uk>
- <53F7BDD8.7060500@collabora.co.uk>
- <CAD=FV=WC0h7fYm2QFqu3Zka7CsU4BtG-oyPpJav+ygC+gmCR+A@mail.gmail.com>
- <CA+NduCCT-KQ=gh7QWkBE4qkA2YOJ8KCVqbkC6Tkmb1aPvCsGFQ@mail.gmail.com>
- <53FAFCBC.2050407@collabora.co.uk>
- <CAD=FV=V4TSKsbjj3dXCdSzVrh3sxH-FkpFEbEo+JA1bN9R-XWA@mail.gmail.com>
- <20140826071721.GV17528@sirena.org.uk>
-Message-ID: <53FC4E77.2090205@collabora.co.uk>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Tue, 26 Aug 2014 11:08:11 +0200
+Subject: [PATCH v2 2/9] mailbox: Add NVIDIA Tegra XUSB mailbox driver
+In-Reply-To: <6589717.GOLq1GlTCJ@wuerfel>
+References: <1408381705-3623-1-git-send-email-abrestic@chromium.org>
+ <3804028.YQzQ4uAVsf@wuerfel> <20140826075023.GB17263@ulmo>
+ <6589717.GOLq1GlTCJ@wuerfel>
+Message-ID: <20140826090810.GH17263@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Mark,
-
-On 08/26/2014 09:17 AM, Mark Brown wrote:
-> On Mon, Aug 25, 2014 at 08:40:40AM -0700, Doug Anderson wrote:
->> > Can you please test the following change [0] so I can post as a proper
->> > patch? Doug, Mark do you think that forcing the regulator to opmode normal
->> > when enabling is the right solution here?
+On Tue, Aug 26, 2014 at 10:09:25AM +0200, Arnd Bergmann wrote:
+> On Tuesday 26 August 2014 09:50:25 Thierry Reding wrote:
+> > On Tue, Aug 26, 2014 at 09:43:50AM +0200, Arnd Bergmann wrote:
+> > > On Tuesday 26 August 2014 08:57:31 Thierry Reding wrote:
+> > > > On Mon, Aug 25, 2014 at 01:01:52PM -0600, Stephen Warren wrote:
+> > > > > On 08/18/2014 11:08 AM, Andrew Bresticker wrote:
+> > > > [...]
+> > > > > >+static int tegra_xusb_mbox_probe(struct platform_device *pdev)
+> > > > > 
+> > > > > >+    res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> > > > > >+    if (!res)
+> > > > > >+            return -ENODEV;
+> > > > > 
+> > > > > Should devm_request_mem_region() be called here to claim the region?
+> > > > > 
+> > > > > >+    mbox->regs = devm_ioremap_nocache(&pdev->dev, res->start,
+> > > > > >+                                      resource_size(res));
+> > > > > >+    if (!mbox->regs)
+> > > > > >+            return -ENOMEM;
+> > > > > 
+> > > > > Is _nocache required? I don't see other drivers using it. I assume there's
+> > > > > nothing special about the mbox registers.
+> > > > 
+> > > > Most drivers should be using devm_ioremap_resource() which will use the
+> > > > _nocache variant of devm_ioremap() when appropriate. Usually the region
+> > > > will not be marked cacheable (IORESOURCE_CACHEABLE) and therefore be
+> > > > remapped uncached.
+> > > > 
+> > > 
+> > > Note that ioremap() and ioremap_nocache() are the same. We really shouldn't
+> > > ever call ioremap_nocache().
+> > 
+> > Perhaps we should remove ioremap_nocache() in that case. Or ioremap(),
+> > really, and keep only those variants that do what they claim to do.
 > 
->> IMHO that makes sense.
+> That would be good, but there are many instances of either one:
 > 
-> No, this doesn't make any obvious sense to me at all.  Picking normal as
-> a default if the hardware reads back off due to overlapping
-> impelementation or something *might* make sense but not overwriting the
-> hardware state without explicit permission from the machine integration
-> is a key goal for the regulator API.
+> arnd at wuerfel:/git/arm-soc$ git grep -w ioremap | wc
+>    2156   13402  183732
+> arnd at wuerfel:/git/arm-soc$ git grep -w ioremap_nocache | wc
+>     485    2529   42955
+
+Ugh... nothing that I currently have time for. Perhaps this is a good
+one for the Janitors? I'm not sure if the kernelnewbies.org TODO list is
+still frequented since many pages seem to be very old. Is there some
+other place where I could add this?
+
+> > > devm_ioremap_resource() and pci_iomap() checking for IORESOURCE_CACHEABLE is
+> > > rather silly, since it doesn't call ioremap_cache() in that case.
+> > 
+> > Then that should be fixed.
 > 
+> Yes. I'd suggest we just ignore that flag and always call ioremap here.
+> 
+> When I checked this before, IORESOURCE_CACHEABLE only ever gets set for
+> PCI ROM BARs, which we don't map into the kernel.
 
-Just to be sure I understood you correctly, what might makes sense to you
-then is to set the opmode to normal as default on probe only if off is
-read back from the hardware register but leaving the enable function as it
-is now using the opmode set on probe?
+There's still a few users of ioremap_cache() around and they are
+potential candidates for a conversion to devm_ioremap_resource(), so I
+think it'd still make sense to keep the check.
 
-That seems like a safer solution indeed since enable won't overwrite other
-values different from off read from the hardware register, I'll prepare a
-patch.
-
-Thanks a lot for your help and best regards,
-Javier
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140826/ec08b2e6/attachment-0001.sig>
