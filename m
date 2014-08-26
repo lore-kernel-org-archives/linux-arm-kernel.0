@@ -1,43 +1,138 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 26 Aug 2014 12:36:09 +0100
-Subject: [PATCH] ARM: errata: Workaround for Cortex-A12 erratum 818325
-In-Reply-To: <20140826101414.GD23445@arm.com>
-References: <1408355889-4176-1-git-send-email-kever.yang@rock-chips.com>
- <20140826101414.GD23445@arm.com>
-Message-ID: <20140826113609.GV30401@n2100.arm.linux.org.uk>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Tue, 26 Aug 2014 13:43:13 +0200
+Subject: [PATCH v3 2/2] arm/arm64: KVM: Support KVM_CAP_READONLY_MEM
+In-Reply-To: <1409053393-13768-1-git-send-email-christoffer.dall@linaro.org>
+References: <1409053393-13768-1-git-send-email-christoffer.dall@linaro.org>
+Message-ID: <1409053393-13768-2-git-send-email-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 26, 2014 at 11:14:14AM +0100, Will Deacon wrote:
-> On Mon, Aug 18, 2014 at 10:58:09AM +0100, Kever Yang wrote:
-> > From: Huang Tao <huangtao@rock-chips.com>
-> > 
-> > On Cortex-A12 (r0p0..r0p1-00lac0-rc11), when a CPU executes a sequence of
-> > two conditional store instructions with opposite condition code and
-> > updating the same register, the system might enter a deadlock if the
-> > second conditional instruction is an UNPREDICTABLE STR or STM
-> > instruction. This workaround setting bit[12] of the Feature Register
-> > prevents the erratum. This bit disables an optimisation applied to a
-> > sequence of 2 instructions that use opposing condition codes.
-> > 
-> > Signed-off-by: Huang Tao <huangtao@rock-chips.com>
-> > Signed-off-by: Kever Yang <kever.yang@rock-chips.com>
-> > ---
-> 
-> The Rk3288 I have advertises itself as an r0p1 Cortex-A12 CPU, so isn't
-> affected by this issue. Until we have an SoC supported in mainline that
-> requires this workaround, I don't think we should merge it.
-> 
-> Also, please consider setting these bits in your firmware if possible.
-> The feature register isn't writable from the non-secure side, so if you
-> want to use virtualisation you'll need to do this differently.
+When userspace loads code and data in a read-only memory regions, KVM
+needs to be able to handle this on arm and arm64.  Specifically this is
+used when running code directly from a read-only flash device; the
+common scenario is a UEFI blob loaded with the -bios option in QEMU.
 
-I think we're at the point where we start insisting that workarounds
-which are simple enable/disable feature bit operations (in other words,
-which can be handled by updating a control register in the firmware or
-boot loader) must be done that way, and we are not going to add such
-workarounds to the kernel anymore.
+Note that the MMIO exit on writes to a read-only memory is ABI and can
+be used to emulate block-erase style flash devices.
 
+Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+---
+Changelog[v3]:
+ - Remove the check for fault_status != FSC_FAULT in the I/O memory
+   abort section, since we now do support permission faults on I/O
+   regions.  Reported-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Changelog[v2]:
+ - None
+
+ arch/arm/include/uapi/asm/kvm.h   |  1 +
+ arch/arm/kvm/arm.c                |  1 +
+ arch/arm/kvm/mmu.c                | 22 ++++++++--------------
+ arch/arm64/include/uapi/asm/kvm.h |  1 +
+ 4 files changed, 11 insertions(+), 14 deletions(-)
+
+diff --git a/arch/arm/include/uapi/asm/kvm.h b/arch/arm/include/uapi/asm/kvm.h
+index e6ebdd3..51257fd 100644
+--- a/arch/arm/include/uapi/asm/kvm.h
++++ b/arch/arm/include/uapi/asm/kvm.h
+@@ -25,6 +25,7 @@
+ 
+ #define __KVM_HAVE_GUEST_DEBUG
+ #define __KVM_HAVE_IRQ_LINE
++#define __KVM_HAVE_READONLY_MEM
+ 
+ #define KVM_REG_SIZE(id)						\
+ 	(1U << (((id) & KVM_REG_SIZE_MASK) >> KVM_REG_SIZE_SHIFT))
+diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
+index 9f788eb..ac306b4 100644
+--- a/arch/arm/kvm/arm.c
++++ b/arch/arm/kvm/arm.c
+@@ -188,6 +188,7 @@ int kvm_vm_ioctl_check_extension(struct kvm *kvm, long ext)
+ 	case KVM_CAP_ONE_REG:
+ 	case KVM_CAP_ARM_PSCI:
+ 	case KVM_CAP_ARM_PSCI_0_2:
++	case KVM_CAP_READONLY_MEM:
+ 		r = 1;
+ 		break;
+ 	case KVM_CAP_COALESCED_MMIO:
+diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
+index 16e7994..62f5642 100644
+--- a/arch/arm/kvm/mmu.c
++++ b/arch/arm/kvm/mmu.c
+@@ -747,14 +747,13 @@ static bool transparent_hugepage_adjust(pfn_t *pfnp, phys_addr_t *ipap)
+ }
+ 
+ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+-			  struct kvm_memory_slot *memslot,
++			  struct kvm_memory_slot *memslot, unsigned long hva,
+ 			  unsigned long fault_status)
+ {
+ 	int ret;
+ 	bool write_fault, writable, hugetlb = false, force_pte = false;
+ 	unsigned long mmu_seq;
+ 	gfn_t gfn = fault_ipa >> PAGE_SHIFT;
+-	unsigned long hva = gfn_to_hva(vcpu->kvm, gfn);
+ 	struct kvm *kvm = vcpu->kvm;
+ 	struct kvm_mmu_memory_cache *memcache = &vcpu->arch.mmu_page_cache;
+ 	struct vm_area_struct *vma;
+@@ -863,7 +862,8 @@ int kvm_handle_guest_abort(struct kvm_vcpu *vcpu, struct kvm_run *run)
+ 	unsigned long fault_status;
+ 	phys_addr_t fault_ipa;
+ 	struct kvm_memory_slot *memslot;
+-	bool is_iabt;
++	unsigned long hva;
++	bool is_iabt, write_fault, writable;
+ 	gfn_t gfn;
+ 	int ret, idx;
+ 
+@@ -884,7 +884,10 @@ int kvm_handle_guest_abort(struct kvm_vcpu *vcpu, struct kvm_run *run)
+ 	idx = srcu_read_lock(&vcpu->kvm->srcu);
+ 
+ 	gfn = fault_ipa >> PAGE_SHIFT;
+-	if (!kvm_is_visible_gfn(vcpu->kvm, gfn)) {
++	memslot = gfn_to_memslot(vcpu->kvm, gfn);
++	hva = gfn_to_hva_memslot_prot(memslot, gfn, &writable);
++	write_fault = kvm_is_write_fault(kvm_vcpu_get_hsr(vcpu));
++	if (kvm_is_error_hva(hva) || (write_fault && !writable)) {
+ 		if (is_iabt) {
+ 			/* Prefetch Abort on I/O address */
+ 			kvm_inject_pabt(vcpu, kvm_vcpu_get_hfar(vcpu));
+@@ -892,13 +895,6 @@ int kvm_handle_guest_abort(struct kvm_vcpu *vcpu, struct kvm_run *run)
+ 			goto out_unlock;
+ 		}
+ 
+-		if (fault_status != FSC_FAULT) {
+-			kvm_err("Unsupported fault status on io memory: %#lx\n",
+-				fault_status);
+-			ret = -EFAULT;
+-			goto out_unlock;
+-		}
+-
+ 		/*
+ 		 * The IPA is reported as [MAX:12], so we need to
+ 		 * complement it with the bottom 12 bits from the
+@@ -910,9 +906,7 @@ int kvm_handle_guest_abort(struct kvm_vcpu *vcpu, struct kvm_run *run)
+ 		goto out_unlock;
+ 	}
+ 
+-	memslot = gfn_to_memslot(vcpu->kvm, gfn);
+-
+-	ret = user_mem_abort(vcpu, fault_ipa, memslot, fault_status);
++	ret = user_mem_abort(vcpu, fault_ipa, memslot, hva, fault_status);
+ 	if (ret == 0)
+ 		ret = 1;
+ out_unlock:
+diff --git a/arch/arm64/include/uapi/asm/kvm.h b/arch/arm64/include/uapi/asm/kvm.h
+index e633ff8..f4ec5a6 100644
+--- a/arch/arm64/include/uapi/asm/kvm.h
++++ b/arch/arm64/include/uapi/asm/kvm.h
+@@ -37,6 +37,7 @@
+ 
+ #define __KVM_HAVE_GUEST_DEBUG
+ #define __KVM_HAVE_IRQ_LINE
++#define __KVM_HAVE_READONLY_MEM
+ 
+ #define KVM_REG_SIZE(id)						\
+ 	(1U << (((id) & KVM_REG_SIZE_MASK) >> KVM_REG_SIZE_SHIFT))
 -- 
-FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
-according to speedtest.net.
+2.0.0
