@@ -1,83 +1,33 @@
-From: ipaton0@gmail.com (Iain Paton)
-Date: Tue, 26 Aug 2014 14:12:00 +0100
-Subject: Oops: 17 SMP ARM (v3.16-rc2)
-In-Reply-To: <53F5BE3D.5070209@gmail.com>
-References: <20140626151424.GT32514@n2100.arm.linux.org.uk>
- <C4A61A5CA4AD2246942F4BA6F20ACB8043575072@ALVA-EXMB04.alv.autoliv.int>
- <20140806095012.GN30282@n2100.arm.linux.org.uk>
- <C4A61A5CA4AD2246942F4BA6F20ACB8043575172@ALVA-EXMB04.alv.autoliv.int>
- <20140806125550.GO30282@n2100.arm.linux.org.uk>
- <C4A61A5CA4AD2246942F4BA6F20ACB804357526C@ALVA-EXMB04.alv.autoliv.int>
- <20140807121248.GY30282@n2100.arm.linux.org.uk>
- <20140808180900.GG30282@n2100.arm.linux.org.uk>
- <C4A61A5CA4AD2246942F4BA6F20ACB8043576356@ALVA-EXMB04.alv.autoliv.int>
- <CAOMZO5B8GR+ABBoJ=dJcFqw3Wagfaip7HM+C1FTz+aE4CmqiPw@mail.gmail.com>
- <C4A61A5CA4AD2246942F4BA6F20ACB80435776D3@ALVA-EXMB04.alv.autoliv.int>
- <CAOMZO5B7FgzB7ThVyV2Vk7wTwYgjRWjEnkkAN5uwwKMaBKq1yg@mail.gmail.com>
- <C4A61A5CA4AD2246942F4BA6F20ACB8043577770@ALVA-EXMB04.alv.autoliv.int>
- <53F11FF6.8030303@gmail.com>
- <CAOMZO5CDvQDD7gVLFStwv4MPrUyqZE3sEDZwb0gukkXujYG-6Q@mail.gmail.com>
- <53F2E89B.80009@gmail.com> <53F5BE3D.5070209@gmail.com>
-Message-ID: <53FC87A0.4000507@gmail.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Tue, 26 Aug 2014 15:12:43 +0200
+Subject: [PATCH v3] clk: shmobile: div6: support selectable-input clocks
+In-Reply-To: <1403711051-10098-1-git-send-email-ulrich.hecht+renesas@gmail.com>
+References: <1403711051-10098-1-git-send-email-ulrich.hecht+renesas@gmail.com>
+Message-ID: <CAMuHMdV_79XLTTc-6j2FXN=uD_L78ob1EO0x2qvTsxFcLVsPLw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21/08/14 10:39, Iain Paton wrote:
-> On 19/08/14 07:03, Iain Paton wrote:
->> On 17/08/14 22:46, Fabio Estevam wrote:
->>> Iain,
->>>
->>> On Sun, Aug 17, 2014 at 6:34 PM, Iain Paton <ipaton0@gmail.com> wrote:
->>>> On 15/08/14 06:42, Mattis Lorentzon wrote:
->>>>
->>>>> We mostly run SSH with benchmarks using NFS, it can probably be
->>>>> triggered by using only SSH with the following loop:
->>>>>
->>>>> # while : ; do ssh arm-card date; done
->>>>
->>>> Mattis,
->>>>
->>>> What sort of time does it take for you to see a problem?
->>>>
->>>> I've been running the above for nearly two days on 3.16.0 on a board
->>>> with fec interrupts routed through gpio_6 and haven't seen a hint of
->>>> a problem.
->>>
->>> Thanks for testing.
->>>
->>> Which mx6 board have you used on this test?
->>
->> It's currently pointed at a RIoTboard (atheros phy) but I'm happy to 
->> try it against both a Sabre-Lite and a Wandboard B1, all running the 
->> same kernel binary, as well. 
->>
->> I'm interested enough in why different people get different results 
->> with this that I'll put some time towards testing to try to help 
->> narrow down the cause.
->>
-> 
-> two and a half days of running this against both a sabre-lite and a 
-> wandboard quad B1 and I still have no reason to think there's any 
-> sort of a problem.
-> 
-> Up to now, my testing has been done with my own config, I'll now
-> repeat the whole thing using the config Mattis posted to see if 
-> I can reproduce it that way.
-> 
-> Suggestions on a better / easier / quicker way to reproduce it are 
-> welcome.
-> 
+Hi Ulrich,
 
-So I wasn't able to use Mattis exact configuration as I couldn't 
-get it to boot properly on anything. 
+On Wed, Jun 25, 2014 at 5:44 PM, Ulrich Hecht <ulrich.hecht@gmail.com> wrote:
+> From: Ulrich Hecht <ulrich.hecht@gmail.com>
+>
+> Adds support for DIV6 clocks with selectable parents as found in the r8a73a4,
+> r8a7740, sh73a0, and other SoCs.
+>
+> Signed-off-by: Ulrich Hecht <ulrich.hecht+renesas@gmail.com>
 
-I made changes enough to enable mmc/sata and to disable the 
-compiled in kernel command line and appended devicetree and initrd.
-Even then it still won't boot on my WBQUAD. 
-It is running on Sabre-Lite and RIoTboard though, so useful enough 
-to test against the SL in a similar manner to Mattis tests with SL.
+Is this still the latest (and final) version?
 
-I've had the test running against both for approx one day and again 
-no sign of any problems. I'm happy to leave this running, but at 
-this stage I'm not expecting I'll see any problems even if I leave 
-it running for a week.
+Thanks!
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
