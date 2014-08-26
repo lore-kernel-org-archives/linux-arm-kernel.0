@@ -1,64 +1,68 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 26 Aug 2014 10:00:35 +0100
-Subject: [linux-sunxi] Re: [PATCH 4/4] simplefb: add clock handling code
-In-Reply-To: <20140826082626.GE17263@ulmo>
-References: <20140813170106.GT15297@lukather>
- <20140825121228.GB4163@ulmo.nvidia.com>
- <20140825124410.GZ15297@lukather>
- <20140825133953.GJ4163@ulmo.nvidia.com>
- <53FB3E7F.4000503@redhat.com>
- <20140825141600.GA14763@ulmo.nvidia.com>
- <53FB46FF.1010208@redhat.com>
- <20140825145303.GC14763@ulmo.nvidia.com>
- <20140825150705.GB15297@lukather> <20140826082626.GE17263@ulmo>
-Message-ID: <20140826090035.GB17528@sirena.org.uk>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Tue, 26 Aug 2014 14:32:28 +0530
+Subject: [PATCH v7 RESEND] ARM: omap: edma: add suspend suspend/resume
+ hooks
+In-Reply-To: <53FC4980.1070606@zonque.org>
+References: <1408693562-18068-1-git-send-email-d-gerlach@ti.com>
+ <53FC2AD4.4070400@ti.com> <53FC4980.1070606@zonque.org>
+Message-ID: <53FC4D24.3020108@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 26, 2014 at 10:26:27AM +0200, Thierry Reding wrote:
-> On Mon, Aug 25, 2014 at 05:07:05PM +0200, Maxime Ripard wrote:
+On Tuesday 26 August 2014 02:16 PM, Daniel Mack wrote:
+> Hi,
+> 
+> On 08/26/2014 08:36 AM, Sekhar Nori wrote:
+>> On Friday 22 August 2014 01:16 PM, Dave Gerlach wrote:
+> 
+> Thanks for pushing that forward!
+> 
+>>> +static int edma_pm_suspend(struct device *dev)
+>>> +{
+>>> +	int j, r;
+>>> +
+>>> +	r = pm_runtime_get_sync(dev);
+>>> +	if (r < 0) {
+>>> +		dev_err(dev, "%s: get_sync returned %d\n", __func__, r);
+>>> +		return r;
+>>> +	}
+>>
+>> The driver currently does a pm_runtime_get_sync() once during probe. And
+>> does not do a put(). So this should actually be not required. In fact
+>> looks like this additional get() call will prevent the clock from
+>> getting disabled which is probably not what you intend.
+> 
+> Well, the pm runtime is put again ...
+> 
+>>> +
+>>> +	for (j = 0; j < arch_num_cc; j++) {
+>>> +		struct edma *ecc = edma_cc[j];
+>>> +
+>>> +		disable_irq(ecc->irq_res_start);
+>>> +		disable_irq(ecc->irq_res_end);
+>>
+>> Do we really need to disable these irqs?
+>>
+>>> +	}
+>>> +
+>>> +	pm_runtime_put_sync(dev);
+> 
+> ... here, so it's in sync and should be fine.
 
-> > Regulators with regulator-boot-on will still be disabled if there's no
-> > one to claim it. Just like what happens currently for the clocks.
+May be I am missing something but because of the pm_runtime_get_sync()
+in probe() usage count is already 1 when suspend() is called. The
+pm_runtime_get_sync() in this function makes it 2 and therefore
+pm_runtime_put_sync() returns immediately because the usage count is
+greater that 0 after decrementing by 1. That means the module's clocks
+is not disabled after suspend() is finished.
 
-> I was somewhat surprised by this, but it can indeed easily be verified.
-> It seems to me somewhat at odds with the definition of such a property.
+> 
+> I was also sure than when I wrote the code, disabling the interrupts
+> during suspend was necessary, and even the only thing that has to be
+> done at suspend time. Now that I address this again, my tests show that
+> in can in fact be omitted.
 
-That depends what you think it should do - it's there for handover from
-the bootloader in cases where we can't read the state.
+Thanks!
 
-> that. However the implementation will automatically disable a regulator
-> marked boot-on if it hasn't been claimed by any driver after the
-> initcall stage completes.
-
-> I find that rather odd since I always assumed that a regulator marked
-> boot-on would not be touched by the core at all, assuming that firmware
-> set it up properly and that it would be required (even if not explicitly
-> claimed).
-
-No, there's a separate always-on property if we don't want to disable.
-We can't assume that the "proper" setup is that the supply should be
-left on.
-
-> Two categories of drivers have this issue: drivers built as modules (or
-> that defer probing) and therefore won't be probed until after initcalls
-
-We really need a later initcall to manage handover to userspace
-(probably triggered by a combination of userspace saying it's done doing
-initial module enumeration and the deferred probe grinding to a halt).
-
-> have run and generic low-level drivers that take over firmware devices
-> (simplefb in this case) that don't know anything about the resource that
-> the devices need.
-
-I don't understand this use case, sorry - it sounds like a buggy system
-design and/or integration.  If the firmware is managing the resource
-then Linux really shouldn't be talking to it at all without coordinating
-with firmware.  How can such a system work otherwise?
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140826/f6affe2b/attachment.sig>
+Regards,
+Sekhar
