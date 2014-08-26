@@ -1,76 +1,80 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 26 Aug 2014 10:09:25 +0200
-Subject: [PATCH v2 2/9] mailbox: Add NVIDIA Tegra XUSB mailbox driver
-In-Reply-To: <20140826075023.GB17263@ulmo>
-References: <1408381705-3623-1-git-send-email-abrestic@chromium.org>
- <3804028.YQzQ4uAVsf@wuerfel> <20140826075023.GB17263@ulmo>
-Message-ID: <6589717.GOLq1GlTCJ@wuerfel>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Tue, 26 Aug 2014 10:26:27 +0200
+Subject: [linux-sunxi] Re: [PATCH 4/4] simplefb: add clock handling code
+In-Reply-To: <20140825150705.GB15297@lukather>
+References: <53EB9471.3090204@wwwdotorg.org> <20140813170106.GT15297@lukather>
+ <20140825121228.GB4163@ulmo.nvidia.com>
+ <20140825124410.GZ15297@lukather>
+ <20140825133953.GJ4163@ulmo.nvidia.com>
+ <53FB3E7F.4000503@redhat.com>
+ <20140825141600.GA14763@ulmo.nvidia.com>
+ <53FB46FF.1010208@redhat.com>
+ <20140825145303.GC14763@ulmo.nvidia.com>
+ <20140825150705.GB15297@lukather>
+Message-ID: <20140826082626.GE17263@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 26 August 2014 09:50:25 Thierry Reding wrote:
-> On Tue, Aug 26, 2014 at 09:43:50AM +0200, Arnd Bergmann wrote:
-> > On Tuesday 26 August 2014 08:57:31 Thierry Reding wrote:
-> > > On Mon, Aug 25, 2014 at 01:01:52PM -0600, Stephen Warren wrote:
-> > > > On 08/18/2014 11:08 AM, Andrew Bresticker wrote:
-> > > [...]
-> > > > >+static int tegra_xusb_mbox_probe(struct platform_device *pdev)
-> > > > 
-> > > > >+    res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> > > > >+    if (!res)
-> > > > >+            return -ENODEV;
-> > > > 
-> > > > Should devm_request_mem_region() be called here to claim the region?
-> > > > 
-> > > > >+    mbox->regs = devm_ioremap_nocache(&pdev->dev, res->start,
-> > > > >+                                      resource_size(res));
-> > > > >+    if (!mbox->regs)
-> > > > >+            return -ENOMEM;
-> > > > 
-> > > > Is _nocache required? I don't see other drivers using it. I assume there's
-> > > > nothing special about the mbox registers.
-> > > 
-> > > Most drivers should be using devm_ioremap_resource() which will use the
-> > > _nocache variant of devm_ioremap() when appropriate. Usually the region
-> > > will not be marked cacheable (IORESOURCE_CACHEABLE) and therefore be
-> > > remapped uncached.
-> > > 
-> > 
-> > Note that ioremap() and ioremap_nocache() are the same. We really shouldn't
-> > ever call ioremap_nocache().
+On Mon, Aug 25, 2014 at 05:07:05PM +0200, Maxime Ripard wrote:
+> On Mon, Aug 25, 2014 at 04:53:06PM +0200, Thierry Reding wrote:
+> > Hmm... that's true. But we already have a way to deal with exactly this
+> > situation for regulators. There's a property called regulator-boot-on
+> > which a bootloader should set whet it has enabled a given regulator. It
+> > can of course also be set statically in a DTS if it's know upfront that
+> > a bootloader will always enable it. Perhaps what we need is a similar
+> > property for clocks so that the clock framework will not inadvertently
+> > turn off a clock that's still being used.
 > 
-> Perhaps we should remove ioremap_nocache() in that case. Or ioremap(),
-> really, and keep only those variants that do what they claim to do.
+> Except that such a property won't work either.
 
-That would be good, but there are many instances of either one:
+Of course it won't work if it's designed not to work. The solution to
+that is to design it in a way that it works and does exactly what we
+want it to do.
 
-arnd at wuerfel:/git/arm-soc$ git grep -w ioremap | wc
-   2156   13402  183732
-arnd at wuerfel:/git/arm-soc$ git grep -w ioremap_nocache | wc
-    485    2529   42955
+> Regulators with regulator-boot-on will still be disabled if there's no
+> one to claim it. Just like what happens currently for the clocks.
 
-FWIW, I just looked through all architectures and found three on
-which ioremap and ioremap_nocache are not the same, and ioremap
-defaults to cacheable:
+I was somewhat surprised by this, but it can indeed easily be verified.
+It seems to me somewhat at odds with the definition of such a property.
 
-- OpenRISC so far only supports running in a simulator, so this
-  is likely to be a bug that will get hit on actual hardware with
-  MMIO. Jonas should probably look into this.
+Mark,
 
-- mn10300 has no MMU and doesn't really use ioremap, but it should
-  still be fixed for PCI drivers using it on the one board that
-  supports PCI.
+You've probably not read the whole backlog, but the discussion revolves
+around hand-off of resources from firmware to kernel (via DT in this
+case). If firmware initializes a device (display controller in this
+particular case) and enables resources needed by the device to work
+properly then in order to properly hand over resources from firmware to
+kernel we need a way to communicate the state of these resources. For
+regulators the regulator-boot-on property is specified to do exactly
+that. However the implementation will automatically disable a regulator
+marked boot-on if it hasn't been claimed by any driver after the
+initcall stage completes.
 
-- cris seems to have been broken forever.
+I find that rather odd since I always assumed that a regulator marked
+boot-on would not be touched by the core at all, assuming that firmware
+set it up properly and that it would be required (even if not explicitly
+claimed).
 
-> > devm_ioremap_resource() and pci_iomap() checking for IORESOURCE_CACHEABLE is
-> > rather silly, since it doesn't call ioremap_cache() in that case.
-> 
-> Then that should be fixed.
+The issue that this causes is that we can't properly hand-off devices
+initialized by firmware because the regulator will be disabled after the
+initcall stage and then enabled when the driver loads. In case of
+display the result will usually be flicker. The same applies to other
+types of resources (in this case clocks).
 
-Yes. I'd suggest we just ignore that flag and always call ioremap here.
+Two categories of drivers have this issue: drivers built as modules (or
+that defer probing) and therefore won't be probed until after initcalls
+have run and generic low-level drivers that take over firmware devices
+(simplefb in this case) that don't know anything about the resource that
+the devices need.
 
-When I checked this before, IORESOURCE_CACHEABLE only ever gets set for
-PCI ROM BARs, which we don't map into the kernel.
+Also Cc'ing Mike, perhaps he has ideas on how to solve this problem for
+clocks specifically.
 
-	Arnd
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140826/1616b071/attachment.sig>
