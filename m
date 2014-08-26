@@ -1,98 +1,67 @@
-From: caesar.wang@rock-chips.com (Caesar Wang)
-Date: Wed, 27 Aug 2014 00:47:02 +0800
-Subject: [PATCH 1/2] dt-bindings: document Rockchip thermal
-In-Reply-To: <1504889.nDzfjZj9xp@diego>
-References: <1408752934-18318-1-git-send-email-caesar.wang@rock-chips.com>
- <1408752934-18318-2-git-send-email-caesar.wang@rock-chips.com>
- <1504889.nDzfjZj9xp@diego>
-Message-ID: <53FCBA06.90701@rock-chips.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 26 Aug 2014 17:51:38 +0100
+Subject: [PATCH v2 02/26] arm64: convert handle_IRQ to use
+ __handle_domain_irq
+In-Reply-To: <1409047421-27649-3-git-send-email-marc.zyngier@arm.com>
+References: <1409047421-27649-1-git-send-email-marc.zyngier@arm.com>
+ <1409047421-27649-3-git-send-email-marc.zyngier@arm.com>
+Message-ID: <20140826165138.GM16482@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Heiko,
-? 2014/8/24 7:03, Heiko St?bner ??:
-> Hi Caesar,
->
-> Am Samstag, 23. August 2014, 08:15:33 schrieb Caesar Wang:
->> This add the necessary binding documentation for the thermal
->> found on Rockchip SoCs
->>
->> Signed-off-by: zhaoyifeng <zyf@rock-chips.com>
->> Signed-off-by: Caesar Wang <caesar.wang@rock-chips.com>
->> ---
->>   .../bindings/thermal/rockchip-thermal.txt          |   33
->> ++++++++++++++++++++ 1 file changed, 33 insertions(+)
->>   create mode 100644
->> Documentation/devicetree/bindings/thermal/rockchip-thermal.txt
->>
->> diff --git a/Documentation/devicetree/bindings/thermal/rockchip-thermal.txt
->> b/Documentation/devicetree/bindings/thermal/rockchip-thermal.txt new file
->> mode 100644
->> index 0000000..b556eae
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/thermal/rockchip-thermal.txt
->> @@ -0,0 +1,33 @@
->> +* Temperature Sensor ADC (TSADC) on rockchip SoCs
->> +
->> +Required properties:
->> +- compatible : "rockchip,rk3288-tsadc"
->> +- reg : physical base address of the controller and length of memory mapped
->> +  region.
->> +- interrupts : The interrupt number to the cpu. The interrupt specifier
->> format +  depends on the interrupt controller.
->> +- clocks : Must contain an entry for each entry in clock-names.
->> +- clock-names : Shall be "tsadc_clk" for the transfer-clock, and
->> "tsadc_pclk" for +    the peripheral clock.
->> +Optional properties:
->> +- clock-frequency : Thermal sensor's clock frequency.
-> see comment in patch2, this should probably use assigned-rate if at all
-> necessary (and the assigned-rate is not necessary to document here)
->
->
->> +- pinctrl-names : Should contain only one value - "default".
->> +- pinctrl-0 : Should contain only one value - &tsadc_int.
-> in general pinctrl settings are just board-specific settings and do not
-> need to be part of the binding documentation.
-> And in this case, are you sure that the tsadc uses some pin as interrupt?
-> Because in the TRM the TS-ADC interrupt is number 69 of the GIC itself
-> and not some pin accessible via pinctrl.
->
->
->> +- passive-temp : Temperature of trip 0.
->> +- critical-temp : Temperature of trip 1.
->> +- force-shut-temp : Temperature of force shut down.
-> please use the generic trip-points described in
-> Documentation/devicetree/bindings/thermal/thermal.txt
-> for this, instead of defining new properties
+On Tue, Aug 26, 2014 at 11:03:17AM +0100, Marc Zyngier wrote:
+> In order to limit code duplication, convert the architecture specific
+> handle_IRQ to use the generic __handle_domain_irq function.
+> 
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> ---
+>  arch/arm64/Kconfig      |  1 +
+>  arch/arm64/kernel/irq.c | 18 +-----------------
+>  2 files changed, 2 insertions(+), 17 deletions(-)
+> 
+> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+> index fd4e81a..1f16ed9 100644
+> --- a/arch/arm64/Kconfig
+> +++ b/arch/arm64/Kconfig
+> @@ -30,6 +30,7 @@ config ARM64
+>  	select GENERIC_STRNCPY_FROM_USER
+>  	select GENERIC_STRNLEN_USER
+>  	select GENERIC_TIME_VSYSCALL
+> +	select HANDLE_DOMAIN_IRQ
+>  	select HARDIRQS_SW_RESEND
+>  	select HAVE_ARCH_AUDITSYSCALL
+>  	select HAVE_ARCH_JUMP_LABEL
+> diff --git a/arch/arm64/kernel/irq.c b/arch/arm64/kernel/irq.c
+> index 0f08dfd..2c0e2a7 100644
+> --- a/arch/arm64/kernel/irq.c
+> +++ b/arch/arm64/kernel/irq.c
+> @@ -48,23 +48,7 @@ int arch_show_interrupts(struct seq_file *p, int prec)
+>   */
+>  void handle_IRQ(unsigned int irq, struct pt_regs *regs)
+>  {
+> -	struct pt_regs *old_regs = set_irq_regs(regs);
+> -
+> -	irq_enter();
+> -
+> -	/*
+> -	 * Some hardware gives randomly wrong interrupts.  Rather
+> -	 * than crashing, do something sensible.
+> -	 */
+> -	if (unlikely(irq >= nr_irqs)) {
+> -		pr_warn_ratelimited("Bad IRQ%u\n", irq);
+> -		ack_bad_irq(irq);
+> -	} else {
+> -		generic_handle_irq(irq);
+> -	}
+> -
+> -	irq_exit();
+> -	set_irq_regs(old_regs);
+> +	__handle_domain_irq(NULL, irq, false, regs);
+>  }
 
-There are have 4 trip-points mode in thermal.txt.
-It's ACTIVE?PASSAIVE? HOT and  CRITICAL.
+The only thing that's missing is a pr_warn_ratelimited(). Do we still
+need it? We could add it to ack_bad_irq() though.
 
-Do you have some suggestion for fix it if I need add shut-temp mode ?
+Either way:
 
-- Caesar
->
-> Heiko
->
->> +Example:
->> +
->> +tsadc: tsadc at ff280000 {
->> +	compatible = "rockchip,rk3288-tsadc";
->> +	reg = <0xff280000 0x100>;
->> +	interrupts = <GIC_SPI 37 IRQ_TYPE_LEVEL_HIGH>;
->> +	clock-frequency = <10000>;
->> +	clocks = <&cru SCLK_TSADC>, <&cru PCLK_TSADC>;
->> +	clock-names = "tsadc_clk", "tsadc_pclk";
->> +	pinctrl-names = "default";
->> +	pinctrl-1 = <&tsadc_int>;
->> +	passive-temp = <80>;
->> +	critical-temp = <100>;
->> +	force-shut-temp = <120>;
->> +};
->
->
->
-
--- 
-Best regards,
-Caesar
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
