@@ -1,76 +1,78 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 26 Aug 2014 11:16:13 +0200
-Subject: [PATCH] pstore/ram_core: Fix hang on ARMs because of
- pgprot_noncached
-In-Reply-To: <20140825231449.GS17254@atomide.com>
-References: <20140825231449.GS17254@atomide.com>
-Message-ID: <4959575.hJIGzK9yj7@wuerfel>
+From: horms@verge.net.au (Simon Horman)
+Date: Tue, 26 Aug 2014 18:17:39 +0900
+Subject: [GIT PULL] Renesas ARM Based SoC r8a7740 CCF and Timers Updates
+ for v3.18
+In-Reply-To: <cover.1409030383.git.horms+renesas@verge.net.au>
+References: <cover.1409030383.git.horms+renesas@verge.net.au>
+Message-ID: <20140826091739.GB1210@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 25 August 2014 16:14:50 Tony Lindgren wrote:
-> -static void *persistent_ram_vmap(phys_addr_t start, size_t size)
-> +static void *persistent_ram_vmap(phys_addr_t start, size_t size,
-> +               unsigned int cached)
->  {
->         struct page **pages;
->         phys_addr_t page_start;
-> @@ -392,7 +393,10 @@ static void *persistent_ram_vmap(phys_addr_t start, size_t size)
->         page_start = start - offset_in_page(start);
->         page_count = DIV_ROUND_UP(size + offset_in_page(start), PAGE_SIZE);
->  
-> -       prot = pgprot_noncached(PAGE_KERNEL);
-> +       if (cached)
-> +               prot = pgprot_writecombine(PAGE_KERNEL);
-> +       else
-> +               prot = pgprot_noncached(PAGE_KERNEL);
->  
->         pages = kmalloc_array(page_count, sizeof(struct page *), GFP_KERNEL);
->         if (!pages) {
+On Tue, Aug 26, 2014 at 02:23:57PM +0900, Simon Horman wrote:
+> Hi Olof, Hi Kevin, Hi Arnd,
+> 
+> Please consider these Renesas ARM based SoC r8a7740 CCF and timers updates
+> for v3.18.
+> 
+> These changes are in their own branch as there are SoC and board changes
+> that depend on DT changes, the reverse of the usual branch dependencies.
 
-If you have a 'struct page', you also have a cacheable mapping in the kernel already,
-so you are not really supposed to add another uncached mapping. On some architectures
-(e.g. powerpc) that will cause the CPU to checkstop, on others it is undefined
-behavior. What is the reason for using an uncached mapping here in the first place?
+This pull request includes a minor conflict in
+arch/arm/mach-shmobile/board-armadillo800eva-reference.c with
+0eb07c96ee61be10 ("ARM: shmobile: armadillo800eva-reference: Sort
+includes") which is included in the pull request
+"Renesas ARM Based SoC Boards Cleanups For v3.18"
+which is tagged as renesas-boards-cleanups-for-v3.18.
 
-> @@ -411,8 +415,11 @@ static void *persistent_ram_vmap(phys_addr_t start, size_t size)
->         return vaddr;
->  }
->  
-> -static void *persistent_ram_iomap(phys_addr_t start, size_t size)
-> +static void *persistent_ram_iomap(phys_addr_t start, size_t size,
-> +               unsigned int cached)
->  {
-> +       void *va;
-> +
->         if (!request_mem_region(start, size, "persistent_ram")) {
->                 pr_err("request mem region (0x%llx at 0x%llx) failed\n",
->                         (unsigned long long)size, (unsigned long long)start);
-> @@ -422,19 +429,24 @@ static void *persistent_ram_iomap(phys_addr_t start, size_t size)
->         buffer_start_add = buffer_start_add_locked;
->         buffer_size_add = buffer_size_add_locked;
->  
-> -       return ioremap(start, size);
-> +       if (cached)
-> +               va = ioremap(start, size);
-> +       else
-> +               va = ioremap_wc(start, size);
-> +
-> +       return va;
->  }
+The resolution is to take both.
+The resulting #includes should be:
 
-This seems confusing at best, but is probably just wrong: so you use
-an uncached mapping if someone asks for cached, but use a (more relaxed)
-write-combining mapping if someone asked for a stricter mapping?
-It's also the other way round for persistent_ram_vmap above.
+#include <linux/clk.h>
+#include <linux/err.h>
+#include <linux/gpio.h>
+#include <linux/io.h>
+#include <linux/kernel.h>
+#include <linux/of_platform.h>
 
-According to your description, the intention is to make atomic operations
-work, however most architectures don't allow atomics on either type of
-uncached mapping, since atomicity is a feature of the cache coherency
-fabric.
+This resolution can be found in the next branch of the renesas tree.
 
-The only way I see to actually make atomics work here is to use a cached
-mapping and explicit dcache flushes to actually force the data into
-persistent storage.
-
-	Arnd
+> The following changes since commit 7d1311b93e58ed55f3a31cc8f94c4b8fe988a2b9:
+> 
+>   Linux 3.17-rc1 (2014-08-16 10:40:26 -0600)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-r8a7740-ccf-and-timers-for-v3.18
+> 
+> for you to fetch changes up to 433306747791845677ba662435a9bbbafaa21df3:
+> 
+>   ARM: shmobile: r8a7740: Remove r8a7740_add_standard_devices_dt (2014-08-23 19:58:57 +0900)
+> 
+> ----------------------------------------------------------------
+> Renesas ARM Based SoC R8a7740 CCF and Timers Updates for v3.18
+> 
+> When booting using the r8a7740/armadillo800eva using dt-reference:
+> * Use CCF to initialise clocks via DT
+> * Initialise timers via DT
+> 
+> ----------------------------------------------------------------
+> Simon Horman (4):
+>       ARM: shmobile: r8a7740: Add CMT1 device to DT
+>       ARM: shmobile: armadillo800eva-reference: Enable CMT1 in device tree
+>       ARM: shmobile: armadillo800eva-reference: Do not use r8a7740_add_standard_devices_dt()
+>       ARM: shmobile: r8a7740: Remove r8a7740_add_standard_devices_dt
+> 
+> Ulrich Hecht (4):
+>       ARM: shmobile: r8a7740: clock register bits
+>       ARM: shmobile: r8a7740: add SoC clocks to DTS
+>       ARM: shmobile: r8a7740: add MSTP clock assignments to DT
+>       ARM: shmobile: armadillo800eva-reference: add clock overrides to DTS
+> 
+>  .../boot/dts/r8a7740-armadillo800eva-reference.dts |  17 ++
+>  arch/arm/boot/dts/r8a7740.dtsi                     | 220 ++++++++++++++++++++-
+>  .../board-armadillo800eva-reference.c              |   3 +-
+>  arch/arm/mach-shmobile/r8a7740.h                   |   1 -
+>  arch/arm/mach-shmobile/setup-r8a7740.c             |  18 +-
+>  include/dt-bindings/clock/r8a7740-clock.h          |  77 ++++++++
+>  6 files changed, 317 insertions(+), 19 deletions(-)
+>  create mode 100644 include/dt-bindings/clock/r8a7740-clock.h
