@@ -1,52 +1,113 @@
-From: jcm@redhat.com (Jon Masters)
-Date: Tue, 26 Aug 2014 14:55:38 -0400
-Subject: [PATCH] setup: Move unmask of async interrupts after possible
- earlycon setup
-Message-ID: <1409079338-14001-1-git-send-email-jcm@redhat.com>
+From: alex.williamson@redhat.com (Alex Williamson)
+Date: Tue, 26 Aug 2014 13:01:55 -0600
+Subject: [RFC 4/9] KVM: KVM-VFIO: update user API to program forwarded IRQ
+In-Reply-To: <1408973264-30384-5-git-send-email-eric.auger@linaro.org>
+References: <1408973264-30384-1-git-send-email-eric.auger@linaro.org>
+ <1408973264-30384-5-git-send-email-eric.auger@linaro.org>
+Message-ID: <1409079715.2906.127.camel@ul30vt.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The kernel wants to enable reporting of asynchronous interrupts (i.e.
-System Errors) as early as possible. But if this happens too early
-then a pending System Error on initial entry into the kernel will
-never be reported where a user can see it (instead it will remain
-in the kernel ring buffer and be visible only via hardware debug).
-Therefore, move the enabling of asynchronous interrupts to after
-parsing any possible earlycon parameters setting up earlycon.
+On Mon, 2014-08-25 at 15:27 +0200, Eric Auger wrote:
+> add new device group commands:
+> - KVM_DEV_VFIO_DEVICE_ASSIGN_IRQ and
+>   KVM_DEV_VFIO_DEVICE_DEASSIGN_IRQ
+> 
+> which enable to turn forwarded IRQ mode on/off.
+> 
+> Signed-off-by: Eric Auger <eric.auger@linaro.org>
+> ---
+>  Documentation/virtual/kvm/devices/vfio.txt | 25 +++++++++++++++++++++++++
+>  arch/arm/include/uapi/asm/kvm.h            |  6 ++++++
+>  include/uapi/linux/kvm.h                   |  3 +++
+>  3 files changed, 34 insertions(+)
+> 
+> diff --git a/Documentation/virtual/kvm/devices/vfio.txt b/Documentation/virtual/kvm/devices/vfio.txt
+> index ef51740..c8b3fa1 100644
+> --- a/Documentation/virtual/kvm/devices/vfio.txt
+> +++ b/Documentation/virtual/kvm/devices/vfio.txt
+> @@ -13,6 +13,7 @@ VFIO-group is held by KVM.
+>  
+>  Groups:
+>    KVM_DEV_VFIO_GROUP
+> +  KVM_DEV_VFIO_DEVICE
+>  
+>  KVM_DEV_VFIO_GROUP attributes:
+>    KVM_DEV_VFIO_GROUP_ADD: Add a VFIO group to VFIO-KVM device tracking
+> @@ -20,3 +21,27 @@ KVM_DEV_VFIO_GROUP attributes:
+>  
+>  For each, kvm_device_attr.addr points to an int32_t file descriptor
+>  for the VFIO group.
+> +
+> +KVM_DEV_VFIO_DEVICE attributes:
+> +  KVM_DEV_VFIO_DEVICE_ASSIGN_IRQ
+> +  KVM_DEV_VFIO_DEVICE_DEASSIGN_IRQ
+> +
+> +For each, kvm_device_attr.addr points to an kvm_arch_forwarded_irq.
+> +This user API makes possible to create a special IRQ handling mode,
+> +currently supported only on ARM, where KVM and a VFIO platform driver
+> +collaborate to improve IRQ handling performance.
+> +fd represents the file descriptor of a valid VFIO device whose physical
+> +IRQ, referenced by its irq_index is injected to the VM guest_irq.
+> +
+> +On ASSIGN_IRQ, KVM-VFIO device programs:
+> +- the host, to not complete the physical IRQ itself.
+> +- the GIC, to automatically complete the physical IRQ when the guest
+> +  completes the virtual IRQ
+> +This avoid trapping the end-of-interrupt for level sensitive IRQ.
+> +
+> +On DEASSIGN_IRQ, one come back to the mode where the host completes the
+> +physical IRQ and the guest only completes the virtual IRQ.
+> +
+> +It is up to the caller of this API to get the assurance the IRQ is not
+> +outstanding when the ASSIGN/DEASSIGN is called. This could lead to some
+> +inconsistency on who is going to complete the IRQ.
 
-Signed-off-by: Jon Masters <jcm@redhat.com>
----
- arch/arm64/kernel/setup.c | 11 ++++++-----
- 1 file changed, 6 insertions(+), 5 deletions(-)
+Why not call these FORWARD/UNFORWARD or something since the operation
+isn't really doing anything with assignment of the IRQ.  The IRQ is
+already "assigned", we're modifying the behavior.
 
-diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
-index f6f0ccf..f849b88 100644
---- a/arch/arm64/kernel/setup.c
-+++ b/arch/arm64/kernel/setup.c
-@@ -362,11 +362,6 @@ u64 __cpu_logical_map[NR_CPUS] = { [0 ... NR_CPUS-1] = INVALID_HWID };
- 
- void __init setup_arch(char **cmdline_p)
- {
--	/*
--	 * Unmask asynchronous aborts early to catch possible system errors.
--	 */
--	local_async_enable();
--
- 	setup_processor();
- 
- 	setup_machine_fdt(__fdt_pointer);
-@@ -382,6 +377,12 @@ void __init setup_arch(char **cmdline_p)
- 
- 	parse_early_param();
- 
-+	/*
-+	 *  Unmask asynchronous aborts after bringing up possible earlycon.
-+	 * (Report possible System Errors once we can report this occurred)
-+	 */
-+	local_async_enable();
-+
- 	efi_init();
- 	arm64_memblock_init();
- 
--- 
-1.8.3.1
+> diff --git a/arch/arm/include/uapi/asm/kvm.h b/arch/arm/include/uapi/asm/kvm.h
+> index 3034c66..1920b33 100644
+> --- a/arch/arm/include/uapi/asm/kvm.h
+> +++ b/arch/arm/include/uapi/asm/kvm.h
+> @@ -109,6 +109,12 @@ struct kvm_sync_regs {
+>  struct kvm_arch_memory_slot {
+>  };
+>  
+> +struct kvm_arch_forwarded_irq {
+> +	__u32 fd; /* file desciptor of the VFIO device */
+> +	__u32 irq_index; /* platform device index of the IRQ */
+
+The vfio-platform device IRQ index?  ARM is the only implementation we
+have of this, but to keep it generic maybe the comment should read "vfio
+device IRQ index".
+
+> +	__u32 guest_irq; /* virtual IRQ number */
+
+This would be a GSI or similar concept if we were on x86.  I'm a little
+confused that were using an arch structure here rather than trying to
+keep the kvm-vfio device interface neutral.  Maybe it makes sense, I'm
+not sure.  Thanks,
+
+Alex
+
+> +};
+> +
+>  /* If you need to interpret the index values, here is the key: */
+>  #define KVM_REG_ARM_COPROC_MASK		0x000000000FFF0000
+>  #define KVM_REG_ARM_COPROC_SHIFT	16
+> diff --git a/include/uapi/linux/kvm.h b/include/uapi/linux/kvm.h
+> index cf3a2ff..b149ba8 100644
+> --- a/include/uapi/linux/kvm.h
+> +++ b/include/uapi/linux/kvm.h
+> @@ -954,6 +954,9 @@ struct kvm_device_attr {
+>  #define  KVM_DEV_VFIO_GROUP			1
+>  #define   KVM_DEV_VFIO_GROUP_ADD			1
+>  #define   KVM_DEV_VFIO_GROUP_DEL			2
+> +#define  KVM_DEV_VFIO_DEVICE			2
+> +#define   KVM_DEV_VFIO_DEVICE_ASSIGN_IRQ			1
+> +#define   KVM_DEV_VFIO_DEVICE_DEASSIGN_IRQ			2
+>  #define KVM_DEV_TYPE_ARM_VGIC_V2	5
+>  #define KVM_DEV_TYPE_FLIC		6
+>  
