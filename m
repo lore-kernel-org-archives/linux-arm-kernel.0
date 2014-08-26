@@ -1,73 +1,51 @@
-From: ipaton0@gmail.com (Iain Paton)
-Date: Tue, 26 Aug 2014 13:16:46 +0100
-Subject: [PATCH 1/6] ARM: dts: microsom-ar8035: MDIO pad must be set open
- drain
-In-Reply-To: <20140826101538.GA28777@dragon>
-References: <20140823091058.GO30401@n2100.arm.linux.org.uk>
- <E1XL7M1-0002yD-K3@rmk-PC.arm.linux.org.uk> <53F9B416.5030907@gmail.com>
- <20140826101538.GA28777@dragon>
-Message-ID: <53FC7AAE.8090803@gmail.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Tue, 26 Aug 2014 14:21:16 +0200
+Subject: [linux-sunxi] Re: [PATCH 4/4] simplefb: add clock handling code
+In-Reply-To: <20140826120258.GA22395@skynet.be>
+References: <20140825121228.GB4163@ulmo.nvidia.com>
+ <20140825124410.GZ15297@lukather>
+ <20140825133953.GJ4163@ulmo.nvidia.com>
+ <53FB3E7F.4000503@redhat.com>
+ <20140825141600.GA14763@ulmo.nvidia.com>
+ <20140825145854.GA15297@lukather>
+ <20140825150501.GE14763@ulmo.nvidia.com>
+ <20140825150900.GB21020@skynet.be> <20140826075247.GC17263@ulmo>
+ <20140826120258.GA22395@skynet.be>
+Message-ID: <20140826122112.GC641@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26/08/14 11:15, Shawn Guo wrote:
-> On Sun, Aug 24, 2014 at 10:44:54AM +0100, Iain Paton wrote:
->> On 23/08/14 10:11, Russell King wrote:
->>> From: Rabeeh Khoury <rabeeh@solid-run.com>
->>> To: Shawn Guo <shawn.guo@freescale.com>
->>>
->>> MDIO pad must be set open drain.
->>>
->>> Signed-off-by: Rabeeh Khoury <rabeeh@solid-run.com>
->>> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
->>> ---
->>>  arch/arm/boot/dts/imx6qdl-microsom-ar8035.dtsi | 2 +-
->>>  1 file changed, 1 insertion(+), 1 deletion(-)
->>>
->>> diff --git a/arch/arm/boot/dts/imx6qdl-microsom-ar8035.dtsi b/arch/arm/boot/dts/imx6qdl-microsom-ar8035.dtsi
->>> index d16066608e21..db9f45b2c573 100644
->>> --- a/arch/arm/boot/dts/imx6qdl-microsom-ar8035.dtsi
->>> +++ b/arch/arm/boot/dts/imx6qdl-microsom-ar8035.dtsi
->>> @@ -17,7 +17,7 @@
->>>  	enet {
->>>  		pinctrl_microsom_enet_ar8035: microsom-enet-ar8035 {
->>>  			fsl,pins = <
->>> -				MX6QDL_PAD_ENET_MDIO__ENET_MDIO		0x1b0b0
->>> +				MX6QDL_PAD_ENET_MDIO__ENET_MDIO		0x1b8b0
->>>  				MX6QDL_PAD_ENET_MDC__ENET_MDC		0x1b0b0
->>>  				/* AR8035 reset */
->>>  				MX6QDL_PAD_KEY_ROW4__GPIO4_IO15		0x130b0
->>>
->>
->> Can you elaborate some more on the reasons for this?  
+On Tue, Aug 26, 2014 at 02:02:58PM +0200, Luc Verhaegen wrote:
+> On Tue, Aug 26, 2014 at 09:52:49AM +0200, Thierry Reding wrote:
+> > On Mon, Aug 25, 2014 at 05:09:00PM +0200, Luc Verhaegen wrote:
+> > > On Mon, Aug 25, 2014 at 05:05:04PM +0200, Thierry Reding wrote:
+> > > > 
+> > > > No. simplefb just wants to write to some memory that hardware has been
+> > > > set up to scan out. The platform requires that the clocks be on.
+> > > 
+> > > Simplefb also requires that the memory is there and is persistent. Fine 
+> > > for discrete graphics cards, fine for rpi where most things are hidden 
+> > > from the ARM core anyway, not so fine for anybody else.
+> > 
+> > I don't understand. This patch series isn't changing anything about the
+> > memory aspects of the driver yet it's working for you on sunxi, isn't
+> > it? So it can't be all that broken.
+> > 
+> > Thierry
 > 
-> I just got the following text from Rabeeh explaining the change.
-> 
-> "This patch is important for the MicroSOM implementation due to the
-> following details -
-> 
-> 1. VIH of the Atheros phy is 1.7V.
-> 2. NVCC_ENET which is the power domain of the MDIO pad is driven by the
->    PHY's LDO (i.e. either 1.8v or 2.5v).
-> 3. The MicroSOM implements an onbouard 1.6kohm pull up to 3.3v (R3000).
-> 
-> In the case the PHY's LDO was 1.8v then there would be only a 100mV
-> margin for the signal to be acknowledged as high (1.8v-1.7v).
-> Due to that setting the pad as an open drain will let the 1.6kohm pull
-> that signal high to 3.3 that assures enough margins to the PHY to be
-> acked as '1' logic.
-> 
-> Notice that this change is not required to the SabreSD boards since that
-> hardware drives the NVCC_EIM power island from a 3.3v power rail."
-> 
->>
->> I'd like to understand if it's something specific to the hardware on that 
->> board, or if other i.MX6 boards using the ar8035 are doing it wrong as well.
-> 
-> So from text above, it's a MicroSOM board specific change, I think.
+> Oh, i had to go wrestle with UBoot options and reserve 8MB off the top, 
+> which the kernel never gets told about. A nice throwback to x86 IGP 
+> bioses, a past i had thought i had left behind forgood.
 
-Ok, that makes a lot of sense. Practical implementation reasons wins any 
-argument.  
-No objections from me to this, I think we understand the reasons now.
+Can you not use the reserved memory code (drivers/of/of_reserved_mem.c
+in the kernel)? I think that's the generally accepted way to do this
+with DT.
 
-Iain
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140826/18f0c06c/attachment.sig>
