@@ -1,59 +1,82 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Tue, 26 Aug 2014 14:24:02 +0900
-Subject: [PATCH 8/8] ARM: shmobile: r8a7740: Remove
- r8a7740_add_standard_devices_dt
-In-Reply-To: <cover.1409030383.git.horms+renesas@verge.net.au>
-References: <cover.1409030383.git.horms+renesas@verge.net.au>
-Message-ID: <433306747791845677ba662435a9bbbafaa21df3.1409030383.git.horms+renesas@verge.net.au>
+From: k.chander@samsung.com (Chander Kashyap)
+Date: Tue, 26 Aug 2014 10:55:05 +0530
+Subject: [PATCH v9 4/6] ARM: Exynos: switch to using generic cpufreq
+ driver for Exynos4210/5250/5420
+In-Reply-To: <7h8umc60we.fsf@paris.lan>
+References: <1406707663-16656-1-git-send-email-thomas.ab@samsung.com>
+ <1406707663-16656-5-git-send-email-thomas.ab@samsung.com>
+ <53DA8BB9.6020702@samsung.com> <53DA8D85.3050106@gmail.com>
+ <7hbnrc6px3.fsf@paris.lan> <53F7DA13.6090305@gmail.com>
+ <CADWw7OgAS-z-UOrJU-hL2fzuefJmLtCTg57jYk2Df7f5KfLJmA@mail.gmail.com>
+ <7h8umc60we.fsf@paris.lan>
+Message-ID: <CADWw7OgW+o3tB=ptnsy-PsmXmNv8oXzt_WfK6NswQiEWWwAzNA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that r8a7740_add_standard_devices_dt() is simply a wrapper
-for a call to of_platform_populate() remove it and call
-of_platform_populate() directly.
+Hi Kevin,
 
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/mach-shmobile/r8a7740.h       | 1 -
- arch/arm/mach-shmobile/setup-r8a7740.c | 7 +------
- 2 files changed, 1 insertion(+), 7 deletions(-)
+On Mon, Aug 25, 2014 at 9:02 PM, Kevin Hilman <khilman@linaro.org> wrote:
+> Hi Chander,
+>
+> Chander Kashyap <k.chander@samsung.com> writes:
+>
+> [...]
+>
+>>>> I'm trying it on the 5800/Chromebook2 and it's not terribly stable.  I'm
+>>>> testing along with CPUidle, so there may be some untested interactions
+>>>> there as it seems a bit more stable without CPUidle enabled.
+>>>>
+>>>> I'd love to hear from anyone else that's testing CPUidle and CPUfreq
+>>>> together big.LITTLE 5420/5800, with or without the switcher.
+>>
+>> I have tested this patch series on SMDK5420 with cpuidle (with and
+>> without b.L switcher enabled).
+>>
+>> As of now voltage scaling support is not there in generic big-little
+>> cpufreq driver (arm_big_little.c).
+>> Hence need to tie arm and kfc voltages to highest level for testing.
+>
+>> Without this change stability issues are there, but with this change
+>> everything is stable.
+>
+> Can you clarify how you're setting the voltages to ensure stability?
 
-diff --git a/arch/arm/mach-shmobile/r8a7740.h b/arch/arm/mach-shmobile/r8a7740.h
-index 1d1a5fd..3352fb8 100644
---- a/arch/arm/mach-shmobile/r8a7740.h
-+++ b/arch/arm/mach-shmobile/r8a7740.h
-@@ -49,7 +49,6 @@ extern void r8a7740_init_irq_of(void);
- extern void r8a7740_map_io(void);
- extern void r8a7740_add_early_devices(void);
- extern void r8a7740_add_standard_devices(void);
--extern void r8a7740_add_standard_devices_dt(void);
- extern void r8a7740_clock_init(u8 md_ck);
- extern void r8a7740_pinmux_init(void);
- extern void r8a7740_pm_init(void);
-diff --git a/arch/arm/mach-shmobile/setup-r8a7740.c b/arch/arm/mach-shmobile/setup-r8a7740.c
-index dc44a44..8fe270d 100644
---- a/arch/arm/mach-shmobile/setup-r8a7740.c
-+++ b/arch/arm/mach-shmobile/setup-r8a7740.c
-@@ -781,11 +781,6 @@ void __init r8a7740_add_early_devices(void)
- 
- #ifdef CONFIG_USE_OF
- 
--void __init r8a7740_add_standard_devices_dt(void)
--{
--	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
--}
--
- void __init r8a7740_init_irq_of(void)
- {
- 	void __iomem *intc_prio_base = ioremap_nocache(0xe6900010, 0x10);
-@@ -819,7 +814,7 @@ void __init r8a7740_init_irq_of(void)
- static void __init r8a7740_generic_init(void)
- {
- 	r8a7740_clock_init(0);
--	r8a7740_add_standard_devices_dt();
-+	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
- }
- 
- static const char *r8a7740_boards_compat_dt[] __initdata = {
--- 
-2.0.1
+below is the diff :  wip/exynos/integ
+
+--- a/arch/arm/boot/dts/exynos5800-peach-pi.dts
++++ b/arch/arm/boot/dts/exynos5800-peach-pi.dts
+@@ -225,7 +225,7 @@
+
+                        buck2_reg: BUCK2 {
+                                regulator-name = "vdd_arm";
+-                               regulator-min-microvolt = <800000>;
++                               regulator-min-microvolt = <1500000>;
+                                regulator-max-microvolt = <1500000>;
+                                regulator-always-on;
+                                regulator-boot-on;
+@@ -260,7 +260,7 @@
+
+                        buck6_reg: BUCK6 {
+                                regulator-name = "vdd_kfc";
+-                               regulator-min-microvolt = <800000>;
++                               regulator-min-microvolt = <1500000>;
+                                regulator-max-microvolt = <1500000>;
+                                regulator-always-on;
+                                regulator-boot-on;
+
+>
+> Tomasz, I didn't mean to suggest this isn't ready for mainline.  For the
+> 5420/5800 it seems cpufreq support is a new feature, so this isn't a
+> regression against previous (mainline) behavior.  Maybe the big.LITTLE
+> cpufreq support should've been separated out from the cleanup since it's
+> more of a new feature, but that's up to you.
+>
+> Kevin
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+regards,
+Chander
