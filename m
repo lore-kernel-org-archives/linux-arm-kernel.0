@@ -1,64 +1,45 @@
-From: jonsmirl@gmail.com (jonsmirl at gmail.com)
-Date: Tue, 26 Aug 2014 14:39:45 -0400
-Subject: Generic communication of boot loader state to the OS
-In-Reply-To: <20140826182816.GW30401@n2100.arm.linux.org.uk>
-References: <CAKON4Oz-PRgXyNKj=T9ymzOOhCMPjBMdYdE1Mr1CHWv3boskiw@mail.gmail.com>
- <20140826182816.GW30401@n2100.arm.linux.org.uk>
-Message-ID: <CAKON4Oy7SU9kj=DdJ+Oq14ukL7kHP7Qn9bPrQ3PKUL6ZJww=gw@mail.gmail.com>
+From: geoff@infradead.org (Geoff Levand)
+Date: Tue, 26 Aug 2014 11:42:54 -0700
+Subject: [PATCH 1/9] arm64: Fix efi kernel entry
+In-Reply-To: <CAKv+Gu8V1xXtGZm5ae+NiFGDuNr20TUBhL=vCgQ6J2S5CQJakg@mail.gmail.com>
+References: <cover.1408736066.git.geoff@infradead.org>
+ <873e73a998c198de69f6f01f92176be2b613c500.1408736066.git.geoff@infradead.org>
+ <20140826155505.GG16482@arm.com>
+ <CAKv+Gu8V1xXtGZm5ae+NiFGDuNr20TUBhL=vCgQ6J2S5CQJakg@mail.gmail.com>
+Message-ID: <1409078574.11425.29.camel@smoke>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 26, 2014 at 2:28 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Tue, Aug 26, 2014 at 12:10:00PM -0400, jonsmirl at gmail.com wrote:
->> As a side effect this will eliminate the need for kernel command line
->> parameters describing boot state. Like console="". Over time it might
->> even be able to pass a DHCP IP address from uboot into the kernel.
->
-> Err no.  Don't even think about that.  DHCP may be wonderful and all,
-> but there's a fundamental issue with it: entries time out unless they
-> are renewed.
->
-> Why is that a problem?  Well, take a DHCP server which hands out
-> dynamic addresses, and updates the DNS.  When the lease expires, it
-> tears down the DNS entry.
->
-> Now take a target booting using DHCP in uboot, which then mounts its
-> root NFS.  If it tries to startup a DHCP client, the first thing the
-> DHCP client does is to clean up the interface... resulting in it
-> killing the root NFS connection.  If that doesn't happen, then you
-> end up with a problem at shutdown, because DHCP clients always
-> deconfigure the interface when they're killed off - resulting in
-> "reboot" not being functional.
+Hi,
 
-I run the same configuration  -  uboot in flash, tftp to load kernel,
-nfs mount the root. And I do reboot fifty times a day too.  I just put
-everything on static IPs to avoid problems.
+On Tue, 2014-08-26 at 18:19 +0200, Ard Biesheuvel wrote:
+> First of all, the 'add x13, x18, #0x16' was carefully chosen to be
+> both a "MZ" prefix and an executable instruction without any harmful
+> side effects. 
 
-Would this work if the DHCP client was notified that there already was
-an IP lease in place?  It could remember that lease and then be
-responsible for setting it into the interface and renewing it. Right
-now there is no way to pass this information.
+OK, I didn't look so closely to realize this was an instruction with out
+side effects.
 
-Doesn't the DHCP client do the wrong thing simply because it lacks the
-info to do something better?
+> So currently, the EFI stub jumps to that add
+> instruction, and not to the 'b stext' that comes after. There is an
+> issue with that, which I have already proposed a patch for (arm64/efi:
+> efistub: jump to 'stext' directly, not through the header), but this
+> is related to the guarantees the UEFI spec gives about where the
+> header gets loaded (if at all).
+> 
+> However, going back to your patch, setting ENTRY() only affects the
+> vmlinux ELF image, and this information gets stripped when creating
+> the binary. Do you need the entry point to be set so you can load
+> vmlinux using the debugger, perhaps? In that case, did you have any
+> problems branching to the add instruction? If so, I would like to know
+> about it.
 
->
-> Here, I run exactly that setup, and I have found that ubuntu suffers
-> quite a bit from problems if you don't tell it to keep its fingers
-> off the ethernet device configuration when running root-NFS - and
-> believe me, when I'm working on something, I probably do several
-> tens of remote reboots of targets via "reboot" - I know I've done
-> about fifty today so far (many of them having to resort to the reset
-> button because the kernel seems to be locking up rather than rebooting
-> at the final stage.)
->
-> --
-> FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
-> according to speedtest.net.
+kexec-tools [1] can load vmlinux elf files, and uses ehdr.e_entry as the
+kernel entry point.  I tested without this patch (branching to _text),
+and it works OK, so we can drop this patch.
 
+-Geoff
 
+[1] https://git.linaro.org/people/geoff.levand/kexec-tools.git
 
--- 
-Jon Smirl
-jonsmirl at gmail.com
+-Geoff
