@@ -1,105 +1,32 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 26 Aug 2014 07:53:11 -0700
-Subject: [PATCH] pstore/ram_core: Fix hang on ARMs because of
- pgprot_noncached
-In-Reply-To: <4959575.hJIGzK9yj7@wuerfel>
-References: <20140825231449.GS17254@atomide.com> <4959575.hJIGzK9yj7@wuerfel>
-Message-ID: <20140826145311.GT17254@atomide.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Tue, 26 Aug 2014 16:56:14 +0200
+Subject: [PATCH 00/11] Fix arm64 issues highlighted by sparse and smatch
+In-Reply-To: <1409062410-25891-1-git-send-email-will.deacon@arm.com>
+References: <1409062410-25891-1-git-send-email-will.deacon@arm.com>
+Message-ID: <20140826145614.GE6689@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Arnd Bergmann <arnd@arndb.de> [140826 02:16]:
-> On Monday 25 August 2014 16:14:50 Tony Lindgren wrote:
-> > -static void *persistent_ram_vmap(phys_addr_t start, size_t size)
-> > +static void *persistent_ram_vmap(phys_addr_t start, size_t size,
-> > +               unsigned int cached)
-> >  {
-> >         struct page **pages;
-> >         phys_addr_t page_start;
-> > @@ -392,7 +393,10 @@ static void *persistent_ram_vmap(phys_addr_t start, size_t size)
-> >         page_start = start - offset_in_page(start);
-> >         page_count = DIV_ROUND_UP(size + offset_in_page(start), PAGE_SIZE);
-> >  
-> > -       prot = pgprot_noncached(PAGE_KERNEL);
-> > +       if (cached)
-> > +               prot = pgprot_writecombine(PAGE_KERNEL);
-> > +       else
-> > +               prot = pgprot_noncached(PAGE_KERNEL);
-> >  
-> >         pages = kmalloc_array(page_count, sizeof(struct page *), GFP_KERNEL);
-> >         if (!pages) {
+On Tue, Aug 26, 2014 at 03:13:19PM +0100, Will Deacon wrote:
+> Hi all,
 > 
-> If you have a 'struct page', you also have a cacheable mapping in the kernel already,
-> so you are not really supposed to add another uncached mapping. On some architectures
-> (e.g. powerpc) that will cause the CPU to checkstop, on others it is undefined
-> behavior. What is the reason for using an uncached mapping here in the first place?
-
-The reason for using uncached mapping (really strongly ordered for ARM)
-here is because Colin observed lost debug prints just before hanging register
-writes because of the write buffer.
-
-But it also sounds like pstore is broken for powerpc in addition to a bunch of
-ARMs, and possibly other architectures too.
- 
-> > @@ -411,8 +415,11 @@ static void *persistent_ram_vmap(phys_addr_t start, size_t size)
-> >         return vaddr;
-> >  }
-> >  
-> > -static void *persistent_ram_iomap(phys_addr_t start, size_t size)
-> > +static void *persistent_ram_iomap(phys_addr_t start, size_t size,
-> > +               unsigned int cached)
-> >  {
-> > +       void *va;
-> > +
-> >         if (!request_mem_region(start, size, "persistent_ram")) {
-> >                 pr_err("request mem region (0x%llx at 0x%llx) failed\n",
-> >                         (unsigned long long)size, (unsigned long long)start);
-> > @@ -422,19 +429,24 @@ static void *persistent_ram_iomap(phys_addr_t start, size_t size)
-> >         buffer_start_add = buffer_start_add_locked;
-> >         buffer_size_add = buffer_size_add_locked;
-> >  
-> > -       return ioremap(start, size);
-> > +       if (cached)
-> > +               va = ioremap(start, size);
-> > +       else
-> > +               va = ioremap_wc(start, size);
-> > +
-> > +       return va;
-> >  }
+> After the static checking talk at kernel summit, I felt empowered to go
+> and run sparse and smatch over the arm64 defconfig. As I anticipated,
+> this spotted a few issues in the arch code, so I've fixed up the ones
+> that aren't just noise in this series. Most are simply incorrect
+> address space annotations, but fixing these is useful for spotting real
+> issues in the future.
 > 
-> This seems confusing at best, but is probably just wrong: so you use
-> an uncached mapping if someone asks for cached, but use a (more relaxed)
-> write-combining mapping if someone asked for a stricter mapping?
-> It's also the other way round for persistent_ram_vmap above.
-
-Indeed, the cached test for the ioremap is the wrong way around here.
- 
-> According to your description, the intention is to make atomic operations
-> work, however most architectures don't allow atomics on either type of
-> uncached mapping, since atomicity is a feature of the cache coherency
-> fabric.
+> I don't think any of these fix critical bugs, but they all deserve to be
+> addressed. I tagged the compat watchpoint fix for stable, as that code
+> has been broken since we merged the architecture port.
 > 
-> The only way I see to actually make atomics work here is to use a cached
-> mapping and explicit dcache flushes to actually force the data into
-> persistent storage.
+Thanks for these!
 
-Right, that's what Rob attempted to patch a while back:
+Do you want me to queue the kvm ones or did you have other plans to
+upstream this entire series as one?
 
-https://lkml.org/lkml/2013/4/9/831
+Also, do you consider these fixes for 3.17 (what about cc for stable in
+that case), or for 3.18?
 
-See also the comments from Colin in that thread:
-
-https://lkml.org/lkml/2013/4/9/854
-
-The reason why I added the module_param is because Rob's fix did not
-go anywhere for over a year now. And adding the module_param seemed to
-help with the concerns Colin had. Personally I don't need the strongly
-ordered option though, I just need pgprot_writecombine :)
-
-It's starting to sound that we should first apply Rob's original fix
-to get pstore working. Then we can figure out how to deal with the
-unbuffered mapping for architectures and SoCs that support it.
-
-Regards,
-
-Tony
+-Christoffer
