@@ -1,50 +1,49 @@
 From: t.figa@samsung.com (Tomasz Figa)
-Date: Tue, 26 Aug 2014 16:10:27 +0200
-Subject: [PATCH v3 4/5] ARM: dts: exynos4x12: Add utility macro to define pin
- sleep states
+Date: Tue, 26 Aug 2014 16:10:26 +0200
+Subject: [PATCH v3 3/5] ARM: dts: exynos4412-trats2: Keep eMMC regulators
+ soft-disabled
 In-Reply-To: <1409062228-14690-1-git-send-email-t.figa@samsung.com>
 References: <1409062228-14690-1-git-send-email-t.figa@samsung.com>
-Message-ID: <1409062228-14690-5-git-send-email-t.figa@samsung.com>
+Message-ID: <1409062228-14690-4-git-send-email-t.figa@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds a convenient macro which constructs an Exynos pinctrl
-pinconf node containing properties needed to configure sleep state of
-given pin with given parameters. It will be used by further patch which
-adds a large number of sleep states for pins that need such
-configuration on certain boards.
+In MAX77686 PMIC two regulators dedicated for eMMC memory can be
+controlled both by I2C interface and a GPIO pin, with the resulting
+regulator state being a logical OR of both. Since the GPIO control is
+used both by the kernel and the lowest level bootloader at reset, the
+regulator should be disabled by I2C control to allow it to be turned off
+by GPIO control.
+
+This patch removes regulator-always-on properties from both regulators
+and, while at it, also unsupported regulator-mem-off.
 
 Signed-off-by: Tomasz Figa <t.figa@samsung.com>
 ---
- arch/arm/boot/dts/exynos4x12-pinctrl.dtsi | 16 ++++++++++++++++
- 1 file changed, 16 insertions(+)
+ arch/arm/boot/dts/exynos4412-trats2.dts | 4 ----
+ 1 file changed, 4 deletions(-)
 
-diff --git a/arch/arm/boot/dts/exynos4x12-pinctrl.dtsi b/arch/arm/boot/dts/exynos4x12-pinctrl.dtsi
-index 99b26df..927fec6 100644
---- a/arch/arm/boot/dts/exynos4x12-pinctrl.dtsi
-+++ b/arch/arm/boot/dts/exynos4x12-pinctrl.dtsi
-@@ -12,6 +12,22 @@
-  * published by the Free Software Foundation.
- */
+diff --git a/arch/arm/boot/dts/exynos4412-trats2.dts b/arch/arm/boot/dts/exynos4412-trats2.dts
+index 5e066cd..a75034c 100644
+--- a/arch/arm/boot/dts/exynos4412-trats2.dts
++++ b/arch/arm/boot/dts/exynos4412-trats2.dts
+@@ -399,8 +399,6 @@
+ 					regulator-name = "VMEM_VDD_2.8V";
+ 					regulator-min-microvolt = <2800000>;
+ 					regulator-max-microvolt = <2800000>;
+-					regulator-always-on;
+-					regulator-mem-off;
+ 				};
  
-+#define PIN_PULL_NONE		0
-+#define PIN_PULL_DOWN		1
-+#define PIN_PULL_UP		3
-+
-+#define PIN_PDN_OUT0		0
-+#define PIN_PDN_OUT1		1
-+#define PIN_PDN_INPUT		2
-+#define PIN_PDN_PREV		3
-+
-+#define PIN_SLP(_pin, _mode, _pull)				\
-+	_pin {							\
-+		samsung,pins = #_pin;				\
-+		samsung,pin-con-pdn = <PIN_PDN_ ##_mode>;	\
-+		samsung,pin-pud-pdn = <PIN_PULL_ ##_pull>;	\
-+	}
-+
- / {
- 	pinctrl at 11400000 {
- 		gpa0: gpa0 {
+ 				ldo23_reg: ldo23 {
+@@ -503,8 +501,6 @@
+ 					regulator-name = "VMEM_VDDF_3.0V";
+ 					regulator-min-microvolt = <2850000>;
+ 					regulator-max-microvolt = <2850000>;
+-					regulator-always-on;
+-					regulator-mem-off;
+ 				};
+ 
+ 				buck9_reg: buck9 {
 -- 
 2.0.4
