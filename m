@@ -1,84 +1,63 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Tue, 26 Aug 2014 16:17:58 +0200
-Subject: [PATCH v4 5/7] ARM: EXYNOS: Add .write_sec outer cache callback for
- L2C-310
-In-Reply-To: <1409062680-15906-1-git-send-email-t.figa@samsung.com>
-References: <1409062680-15906-1-git-send-email-t.figa@samsung.com>
-Message-ID: <1409062680-15906-6-git-send-email-t.figa@samsung.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 26 Aug 2014 15:21:06 +0100
+Subject: [PATCH 01/11] KVM: ARM/arm64: fix non-const declaration of
+ function returning const
+In-Reply-To: <1409062410-25891-2-git-send-email-will.deacon@arm.com>
+References: <1409062410-25891-1-git-send-email-will.deacon@arm.com>
+ <1409062410-25891-2-git-send-email-will.deacon@arm.com>
+Message-ID: <53FC97D2.4010904@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Exynos4 SoCs equipped with an L2C-310 cache controller and running under
-secure firmware require certain registers of aforementioned IP to be
-accessed only from secure mode. This means that SMC calls are required
-for certain register writes. To handle this, an implementation of
-.write_sec and .configure callbacks is provided by this patch.
+On 26/08/14 15:13, Will Deacon wrote:
+> Sparse kicks up about a type mismatch for kvm_target_cpu:
+> 
+> arch/arm64/kvm/guest.c:271:25: error: symbol 'kvm_target_cpu' redeclared with different type (originally declared at ./arch/arm64/include/asm/kvm_host.h:45) - different modifiers
+> 
+> so fix this by adding the missing const attribute to the function
+> declaration.
+> 
+> Cc: Christoffer Dall <christoffer.dall@linaro.org>
+> Cc: Marc Zyngier <marc.zyngier@arm.com>
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
 
-Signed-off-by: Tomasz Figa <t.figa@samsung.com>
----
- arch/arm/mach-exynos/firmware.c | 38 ++++++++++++++++++++++++++++++++++++++
- 1 file changed, 38 insertions(+)
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
 
-diff --git a/arch/arm/mach-exynos/firmware.c b/arch/arm/mach-exynos/firmware.c
-index f5e626d..554b350 100644
---- a/arch/arm/mach-exynos/firmware.c
-+++ b/arch/arm/mach-exynos/firmware.c
-@@ -17,6 +17,7 @@
- #include <asm/cacheflush.h>
- #include <asm/cputype.h>
- #include <asm/firmware.h>
-+#include <asm/hardware/cache-l2x0.h>
- #include <asm/suspend.h>
- 
- #include <mach/map.h>
-@@ -120,6 +121,31 @@ static const struct firmware_ops exynos_firmware_ops = {
- 	.resume			= exynos_resume,
- };
- 
-+static void exynos_l2_write_sec(unsigned long val, unsigned reg)
-+{
-+	switch (reg) {
-+	case L2X0_CTRL:
-+		if (val & L2X0_CTRL_EN)
-+			exynos_smc(SMC_CMD_L2X0INVALL, 0, 0, 0);
-+		exynos_smc(SMC_CMD_L2X0CTRL, val, 0, 0);
-+		break;
-+
-+	case L2X0_DEBUG_CTRL:
-+		exynos_smc(SMC_CMD_L2X0DEBUG, val, 0, 0);
-+		break;
-+
-+	default:
-+		WARN_ONCE(1, "%s: ignoring write to reg 0x%x\n", __func__, reg);
-+	}
-+}
-+
-+static void exynos_l2_configure(const struct l2x0_regs *regs)
-+{
-+	exynos_smc(SMC_CMD_L2X0SETUP1, regs->tag_latency, regs->data_latency,
-+			regs->prefetch_ctrl);
-+	exynos_smc(SMC_CMD_L2X0SETUP2, regs->pwr_ctrl, regs->aux_ctrl, 0);
-+}
-+
- void __init exynos_firmware_init(void)
- {
- 	struct device_node *nd;
-@@ -139,4 +165,16 @@ void __init exynos_firmware_init(void)
- 	pr_info("Running under secure firmware.\n");
- 
- 	register_firmware_ops(&exynos_firmware_ops);
-+
-+	/*
-+	 * Exynos 4 SoCs (based on Cortex A9 and equipped with L2C-310),
-+	 * running under secure firmware, require certain registers of L2
-+	 * cache controller to be written in secure mode. Here .write_sec
-+	 * callback is provided to perform necessary SMC calls.
-+	 */
-+	if (IS_ENABLED(CONFIG_CACHE_L2X0)
-+	    && read_cpuid_part() == ARM_CPU_PART_CORTEX_A9) {
-+		outer_cache.write_sec = exynos_l2_write_sec;
-+		outer_cache.configure = exynos_l2_configure;
-+	}
- }
+	M.
+
+> ---
+>  arch/arm/include/asm/kvm_host.h   | 2 +-
+>  arch/arm64/include/asm/kvm_host.h | 2 +-
+>  2 files changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
+> index 6dfb404f6c46..fcb12a6f7db5 100644
+> --- a/arch/arm/include/asm/kvm_host.h
+> +++ b/arch/arm/include/asm/kvm_host.h
+> @@ -42,7 +42,7 @@
+>  
+>  struct kvm_vcpu;
+>  u32 *kvm_vcpu_reg(struct kvm_vcpu *vcpu, u8 reg_num, u32 mode);
+> -int kvm_target_cpu(void);
+> +int __attribute_const__ kvm_target_cpu(void);
+>  int kvm_reset_vcpu(struct kvm_vcpu *vcpu);
+>  void kvm_reset_coprocs(struct kvm_vcpu *vcpu);
+>  
+> diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+> index e10c45a578e3..44094e559848 100644
+> --- a/arch/arm64/include/asm/kvm_host.h
+> +++ b/arch/arm64/include/asm/kvm_host.h
+> @@ -42,7 +42,7 @@
+>  #define KVM_VCPU_MAX_FEATURES 3
+>  
+>  struct kvm_vcpu;
+> -int kvm_target_cpu(void);
+> +int __attribute_const__ kvm_target_cpu(void);
+>  int kvm_reset_vcpu(struct kvm_vcpu *vcpu);
+>  int kvm_arch_dev_ioctl_check_extension(long ext);
+>  
+> 
+
+
 -- 
-2.0.4
+Jazz is not dead. It just smells funny...
