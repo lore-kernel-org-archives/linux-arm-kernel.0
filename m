@@ -1,66 +1,36 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Tue, 26 Aug 2014 16:41:26 +0200
-Subject: [linux-sunxi] Re: [PATCH 4/4] simplefb: add clock handling code
-In-Reply-To: <20140826123357.GB22395@skynet.be>
-References: <20140825133953.GJ4163@ulmo.nvidia.com>
- <53FB3E7F.4000503@redhat.com>
- <20140825141600.GA14763@ulmo.nvidia.com>
- <20140825145854.GA15297@lukather>
- <20140825150501.GE14763@ulmo.nvidia.com>
- <20140825150900.GB21020@skynet.be> <20140826075247.GC17263@ulmo>
- <20140826120258.GA22395@skynet.be> <20140826122112.GC641@ulmo>
- <20140826123357.GB22395@skynet.be>
-Message-ID: <20140826144125.GC3027@ulmo>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 26 Aug 2014 15:40:23 +0100
+Subject: [PATCHv4 2/2] arm64: Add CONFIG_DEBUG_SET_MODULE_RONX support
+In-Reply-To: <1408477303-2640-3-git-send-email-lauraa@codeaurora.org>
+References: <1408477303-2640-1-git-send-email-lauraa@codeaurora.org>
+ <1408477303-2640-3-git-send-email-lauraa@codeaurora.org>
+Message-ID: <20140826144023.GA22256@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 26, 2014 at 02:33:57PM +0200, Luc Verhaegen wrote:
-> On Tue, Aug 26, 2014 at 02:21:16PM +0200, Thierry Reding wrote:
-> > On Tue, Aug 26, 2014 at 02:02:58PM +0200, Luc Verhaegen wrote:
-> > > On Tue, Aug 26, 2014 at 09:52:49AM +0200, Thierry Reding wrote:
-> > > > On Mon, Aug 25, 2014 at 05:09:00PM +0200, Luc Verhaegen wrote:
-> > > > > On Mon, Aug 25, 2014 at 05:05:04PM +0200, Thierry Reding wrote:
-> > > > > > 
-> > > > > > No. simplefb just wants to write to some memory that hardware has been
-> > > > > > set up to scan out. The platform requires that the clocks be on.
-> > > > > 
-> > > > > Simplefb also requires that the memory is there and is persistent. Fine 
-> > > > > for discrete graphics cards, fine for rpi where most things are hidden 
-> > > > > from the ARM core anyway, not so fine for anybody else.
-> > > > 
-> > > > I don't understand. This patch series isn't changing anything about the
-> > > > memory aspects of the driver yet it's working for you on sunxi, isn't
-> > > > it? So it can't be all that broken.
-> > > > 
-> > > > Thierry
-> > > 
-> > > Oh, i had to go wrestle with UBoot options and reserve 8MB off the top, 
-> > > which the kernel never gets told about. A nice throwback to x86 IGP 
-> > > bioses, a past i had thought i had left behind forgood.
-> > 
-> > Can you not use the reserved memory code (drivers/of/of_reserved_mem.c
-> > in the kernel)? I think that's the generally accepted way to do this
-> > with DT.
-> > 
-> > Thierry
-> 
-> It was mentioned to me, and I probably could do that, but this seemed 
-> even more DT wrangling from within u-boot, and it didn't seem finished 
-> yet. Plus, all of this already was way more wrangling than i bargained 
-> for, especially with the promise of "simple"-fb. Then there is the 
-> really awkward way in which one gets to define clocks outside of a 
-> dts/compiler (you've seen the code, right?), i really did not feel like 
-> repeating something like that.
+On Tue, Aug 19, 2014 at 08:41:43PM +0100, Laura Abbott wrote:
+> --- /dev/null
+> +++ b/arch/arm64/mm/pageattr.c
+[...]
+> +static int change_memory_common(unsigned long addr, int numpages,
+> +				pgprot_t set_mask, pgprot_t clear_mask)
+> +{
+> +	unsigned long start = addr;
+> +	unsigned long size = PAGE_SIZE*numpages;
+> +	unsigned long end = start + size;
+> +	int ret;
+> +	struct page_change_data data;
+> +
+> +	if (!IS_ALIGNED(addr, PAGE_SIZE)) {
+> +		addr &= PAGE_MASK;
+> +		WARN_ON_ONCE(1);
+> +	}
+> +
+> +	if (!is_module_address(start) || !is_module_address(end))
+> +		return -EINVAL;
 
-It could most probably be turned into fairly generic and reusable code
-so that others can use it. And it would give you a way of recovering
-those 8 MiB of memory that you'd otherwise loose.
+Minor thing, "end" is exclusive here. Do you still get the right check
+with is_module_address(end)?
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140826/b66e355c/attachment-0001.sig>
+-- 
+Catalin
