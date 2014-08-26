@@ -1,57 +1,98 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 26 Aug 2014 17:31:34 +0100
-Subject: [PATCH 2/9] arm64: Fix INVALID_HWID definition
-In-Reply-To: <6f84108ac880ef48548208738cbb169fba2fa51a.1408736066.git.geoff@infradead.org>
-References: <cover.1408736066.git.geoff@infradead.org>
- <6f84108ac880ef48548208738cbb169fba2fa51a.1408736066.git.geoff@infradead.org>
-Message-ID: <20140826163134.GH4078@leverpostej>
+From: caesar.wang@rock-chips.com (Caesar Wang)
+Date: Wed, 27 Aug 2014 00:47:02 +0800
+Subject: [PATCH 1/2] dt-bindings: document Rockchip thermal
+In-Reply-To: <1504889.nDzfjZj9xp@diego>
+References: <1408752934-18318-1-git-send-email-caesar.wang@rock-chips.com>
+ <1408752934-18318-2-git-send-email-caesar.wang@rock-chips.com>
+ <1504889.nDzfjZj9xp@diego>
+Message-ID: <53FCBA06.90701@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 22, 2014 at 08:49:16PM +0100, Geoff Levand wrote:
-> Change the preprocessor macro INVALID_HWID definition from ULONG_MAX to (~0)
-> to allow INVALID_HWID to be used within assembly source files.
-> 
-> Commit 3e98fdacc59bbbdbb659be1a144ccc48ed4860fa (arm64: kernel: make the pen of
-> the secondary a 64-bit unsigned value) added the preprocessor macro INVALID_HWID
-> to asm/cputype.h with it defined to be ULONG_MAX.  Use of INVALID_HWID in an
-> assembly source file that includes cputype.h will generate an assembler
-> undefined symbol ULONG_MAX build error.  The kernel does define a ULONG_MAX in
-> kernel.h, but that file not setup to be included in assembly files.
+Heiko,
+? 2014/8/24 7:03, Heiko St?bner ??:
+> Hi Caesar,
+>
+> Am Samstag, 23. August 2014, 08:15:33 schrieb Caesar Wang:
+>> This add the necessary binding documentation for the thermal
+>> found on Rockchip SoCs
+>>
+>> Signed-off-by: zhaoyifeng <zyf@rock-chips.com>
+>> Signed-off-by: Caesar Wang <caesar.wang@rock-chips.com>
+>> ---
+>>   .../bindings/thermal/rockchip-thermal.txt          |   33
+>> ++++++++++++++++++++ 1 file changed, 33 insertions(+)
+>>   create mode 100644
+>> Documentation/devicetree/bindings/thermal/rockchip-thermal.txt
+>>
+>> diff --git a/Documentation/devicetree/bindings/thermal/rockchip-thermal.txt
+>> b/Documentation/devicetree/bindings/thermal/rockchip-thermal.txt new file
+>> mode 100644
+>> index 0000000..b556eae
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/thermal/rockchip-thermal.txt
+>> @@ -0,0 +1,33 @@
+>> +* Temperature Sensor ADC (TSADC) on rockchip SoCs
+>> +
+>> +Required properties:
+>> +- compatible : "rockchip,rk3288-tsadc"
+>> +- reg : physical base address of the controller and length of memory mapped
+>> +  region.
+>> +- interrupts : The interrupt number to the cpu. The interrupt specifier
+>> format +  depends on the interrupt controller.
+>> +- clocks : Must contain an entry for each entry in clock-names.
+>> +- clock-names : Shall be "tsadc_clk" for the transfer-clock, and
+>> "tsadc_pclk" for +    the peripheral clock.
+>> +Optional properties:
+>> +- clock-frequency : Thermal sensor's clock frequency.
+> see comment in patch2, this should probably use assigned-rate if at all
+> necessary (and the assigned-rate is not necessary to document here)
+>
+>
+>> +- pinctrl-names : Should contain only one value - "default".
+>> +- pinctrl-0 : Should contain only one value - &tsadc_int.
+> in general pinctrl settings are just board-specific settings and do not
+> need to be part of the binding documentation.
+> And in this case, are you sure that the tsadc uses some pin as interrupt?
+> Because in the TRM the TS-ADC interrupt is number 69 of the GIC itself
+> and not some pin accessible via pinctrl.
+>
+>
+>> +- passive-temp : Temperature of trip 0.
+>> +- critical-temp : Temperature of trip 1.
+>> +- force-shut-temp : Temperature of force shut down.
+> please use the generic trip-points described in
+> Documentation/devicetree/bindings/thermal/thermal.txt
+> for this, instead of defining new properties
 
-We don't seem to be using INVALID_HWID in any assembly at the moment,
-and I'm not sure I follow what we'd need it for.
+There are have 4 trip-points mode in thermal.txt.
+It's ACTIVE?PASSAIVE? HOT and  CRITICAL.
 
-Why do we need this in assembly?
+Do you have some suggestion for fix it if I need add shut-temp mode ?
 
-Thanks,
-Mark.
+- Caesar
+>
+> Heiko
+>
+>> +Example:
+>> +
+>> +tsadc: tsadc at ff280000 {
+>> +	compatible = "rockchip,rk3288-tsadc";
+>> +	reg = <0xff280000 0x100>;
+>> +	interrupts = <GIC_SPI 37 IRQ_TYPE_LEVEL_HIGH>;
+>> +	clock-frequency = <10000>;
+>> +	clocks = <&cru SCLK_TSADC>, <&cru PCLK_TSADC>;
+>> +	clock-names = "tsadc_clk", "tsadc_pclk";
+>> +	pinctrl-names = "default";
+>> +	pinctrl-1 = <&tsadc_int>;
+>> +	passive-temp = <80>;
+>> +	critical-temp = <100>;
+>> +	force-shut-temp = <120>;
+>> +};
+>
+>
+>
 
-> Signed-off-by: Geoff Levand <geoff@infradead.org>
-> ---
->  arch/arm64/include/asm/cputype.h | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm64/include/asm/cputype.h b/arch/arm64/include/asm/cputype.h
-> index 379d0b8..6b68380 100644
-> --- a/arch/arm64/include/asm/cputype.h
-> +++ b/arch/arm64/include/asm/cputype.h
-> @@ -16,7 +16,7 @@
->  #ifndef __ASM_CPUTYPE_H
->  #define __ASM_CPUTYPE_H
->  
-> -#define INVALID_HWID		ULONG_MAX
-> +#define INVALID_HWID		UL(~0)
->  
->  #define MPIDR_UP_BITMASK	(0x1 << 30)
->  #define MPIDR_MT_BITMASK	(0x1 << 24)
-> -- 
-> 1.9.1
-> 
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+-- 
+Best regards,
+Caesar
