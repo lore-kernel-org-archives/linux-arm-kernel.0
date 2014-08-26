@@ -1,47 +1,41 @@
-From: David.Laight@ACULAB.COM (David Laight)
-Date: Tue, 26 Aug 2014 09:10:19 +0000
-Subject: [PATCH v6 2/4] net: moxa: replace build_skb() with
- netdev_alloc_skb_ip_align() / memcpy()
-In-Reply-To: <4449672.aCJ5J5rv4r@wuerfel>
-References: <1408544342-32058-1-git-send-email-jonas.jensen@gmail.com>
- <1408976542-15624-1-git-send-email-jonas.jensen@gmail.com>
- <4449672.aCJ5J5rv4r@wuerfel>
-Message-ID: <063D6719AE5E284EB5DD2968C1650D6D1748126F@AcuExch.aculab.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 26 Aug 2014 10:12:26 +0100
+Subject: [PATCH v9 1/2] regulator: Add driver for max77802 PMIC PMIC
+ regulators
+In-Reply-To: <53FC4E77.2090205@collabora.co.uk>
+References: <20140822144531.GV24407@sirena.org.uk>
+ <53F7838F.8060906@collabora.co.uk>
+ <20140822183054.GY24407@sirena.org.uk>
+ <53F7BDD8.7060500@collabora.co.uk>
+ <CAD=FV=WC0h7fYm2QFqu3Zka7CsU4BtG-oyPpJav+ygC+gmCR+A@mail.gmail.com>
+ <CA+NduCCT-KQ=gh7QWkBE4qkA2YOJ8KCVqbkC6Tkmb1aPvCsGFQ@mail.gmail.com>
+ <53FAFCBC.2050407@collabora.co.uk>
+ <CAD=FV=V4TSKsbjj3dXCdSzVrh3sxH-FkpFEbEo+JA1bN9R-XWA@mail.gmail.com>
+ <20140826071721.GV17528@sirena.org.uk>
+ <53FC4E77.2090205@collabora.co.uk>
+Message-ID: <20140826091226.GD17528@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Arnd Bergmann
-> On Monday 25 August 2014 16:22:22 Jonas Jensen wrote:
-> > @@ -226,13 +226,15 @@ static int moxart_rx_poll(struct napi_struct *napi, int budget)
-> >                 if (len > RX_BUF_SIZE)
-> >                         len = RX_BUF_SIZE;
-> >
-> > -               skb = build_skb(priv->rx_buf[rx_head], priv->rx_buf_size);
-> > +               skb = netdev_alloc_skb_ip_align(ndev, len);
-> > +
-> >                 if (unlikely(!skb)) {
-> > -                       net_dbg_ratelimited("build_skb failed\n");
-> > +                       net_dbg_ratelimited("netdev_alloc_skb_ip_align failed\n");
-> >                         priv->stats.rx_dropped++;
-> >                         priv->stats.rx_errors++;
-> >                 }
-> >
-> > +               memcpy(skb->data, priv->rx_buf[rx_head], len);
+On Tue, Aug 26, 2014 at 11:08:07AM +0200, Javier Martinez Canillas wrote:
+> On 08/26/2014 09:17 AM, Mark Brown wrote:
 
-Is this memcpy() aligned?
-If the hardware can receive to a 4n+2 offset it is probably better to
-copy the two bytes before the frame data and to round the length of to
-a whole number of words.
+> > No, this doesn't make any obvious sense to me at all.  Picking normal as
+> > a default if the hardware reads back off due to overlapping
+> > impelementation or something *might* make sense but not overwriting the
+> > hardware state without explicit permission from the machine integration
+> > is a key goal for the regulator API.
 
-> >                 skb_put(skb, len);
-> >                 skb->protocol = eth_type_trans(skb, ndev);
-> >                 napi_gro_receive(&priv->napi, skb);
-> 
-> While this seems correct, I wonder why you don't do the normal approach of
-> dequeuing the skb from the chain and adding a newly allocated skb to it to
-> save the memcpy.
+> Just to be sure I understood you correctly, what might makes sense to you
+> then is to set the opmode to normal as default on probe only if off is
+> read back from the hardware register but leaving the enable function as it
+> is now using the opmode set on probe?
 
-Because the receive buffer area isn't made of skbs.
-Post-allocating the skb also reduces the 'true size' of the skb.
-
-	David
+Yes.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140826/076569dc/attachment.sig>
