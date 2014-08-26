@@ -1,9 +1,9 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 26 Aug 2014 11:03:21 +0100
-Subject: [PATCH v2 06/26] irqchip: armada-370-xp: convert to handle_domain_irq
+Date: Tue, 26 Aug 2014 11:03:31 +0100
+Subject: [PATCH v2 16/26] irqchip: vt8500: convert to handle_domain_irq
 In-Reply-To: <1409047421-27649-1-git-send-email-marc.zyngier@arm.com>
 References: <1409047421-27649-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1409047421-27649-7-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1409047421-27649-17-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -11,46 +11,31 @@ Use the new handle_domain_irq method to handle interrupts.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- drivers/irqchip/irq-armada-370-xp.c | 19 ++++++++++---------
- 1 file changed, 10 insertions(+), 9 deletions(-)
+ drivers/irqchip/irq-vt8500.c | 5 ++---
+ 1 file changed, 2 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/irqchip/irq-armada-370-xp.c b/drivers/irqchip/irq-armada-370-xp.c
-index 574aba0..fa75a29 100644
---- a/drivers/irqchip/irq-armada-370-xp.c
-+++ b/drivers/irqchip/irq-armada-370-xp.c
-@@ -393,13 +393,15 @@ static void armada_370_xp_handle_msi_irq(struct pt_regs *regs, bool is_chained)
- 		if (!(msimask & BIT(msinr)))
- 			continue;
+diff --git a/drivers/irqchip/irq-vt8500.c b/drivers/irqchip/irq-vt8500.c
+index eb6e91e..b7af816 100644
+--- a/drivers/irqchip/irq-vt8500.c
++++ b/drivers/irqchip/irq-vt8500.c
+@@ -181,7 +181,7 @@ static struct irq_domain_ops vt8500_irq_domain_ops = {
+ static void __exception_irq_entry vt8500_handle_irq(struct pt_regs *regs)
+ {
+ 	u32 stat, i;
+-	int irqnr, virq;
++	int irqnr;
+ 	void __iomem *base;
  
--		irq = irq_find_mapping(armada_370_xp_msi_domain,
--				       msinr - 16);
--
--		if (is_chained)
-+		if (is_chained) {
-+			irq = irq_find_mapping(armada_370_xp_msi_domain,
-+					       msinr - 16);
- 			generic_handle_irq(irq);
--		else
--			handle_IRQ(irq, regs);
-+		} else {
-+			irq = msinr - 16;
-+			handle_domain_irq(armada_370_xp_msi_domain,
-+					  irq, regs);
-+		}
+ 	/* Loop through each active controller */
+@@ -198,8 +198,7 @@ static void __exception_irq_entry vt8500_handle_irq(struct pt_regs *regs)
+ 				continue;
+ 		}
+ 
+-		virq = irq_find_mapping(intc[i].domain, irqnr);
+-		handle_IRQ(virq, regs);
++		handle_domain_irq(intc[i].domain, irqnr, regs);
  	}
  }
- #else
-@@ -444,9 +446,8 @@ armada_370_xp_handle_irq(struct pt_regs *regs)
- 			break;
- 
- 		if (irqnr > 1) {
--			irqnr =	irq_find_mapping(armada_370_xp_mpic_domain,
--					irqnr);
--			handle_IRQ(irqnr, regs);
-+			handle_domain_irq(armada_370_xp_mpic_domain,
-+					  irqnr, regs);
- 			continue;
- 		}
  
 -- 
 2.0.4
