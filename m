@@ -1,45 +1,33 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Tue, 26 Aug 2014 12:05:51 -0700
-Subject: [PATCH v2 01/26] genirq: add irq_domain-aware core IRQ handler
-In-Reply-To: <53FCD60E.1030009@codeaurora.org>
-References: <1409047421-27649-1-git-send-email-marc.zyngier@arm.com>
- <1409047421-27649-2-git-send-email-marc.zyngier@arm.com>
- <53FCC714.3090206@codeaurora.org> <53FCCCC7.9070801@arm.com>
- <53FCD60E.1030009@codeaurora.org>
-Message-ID: <53FCDA8F.7070703@codeaurora.org>
+From: geoff@infradead.org (Geoff Levand)
+Date: Tue, 26 Aug 2014 12:27:30 -0700
+Subject: [PATCH 5/9] arm64: Fix include header order in vmlinux.lds.S
+In-Reply-To: <20140826162759.GG4078@leverpostej>
+References: <cover.1408736066.git.geoff@infradead.org>
+ <314ef77423f90ed407b54b4658ea41a96b6f6170.1408736066.git.geoff@infradead.org>
+ <20140826162759.GG4078@leverpostej>
+Message-ID: <1409081250.11425.32.camel@smoke>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/26/14 11:46, Stephen Boyd wrote:
-> On 08/26/14 11:07, Marc Zyngier wrote:
->> Digging into my email, one of the traces looked like this:
->>
->> stack backtrace:
->> CPU: 0 PID: 0 Comm: swapper/0 Not tainted 3.16.0-rc1+ #135
->> Call trace:
->> [<ffffffc0000882cc>] dump_backtrace+0x0/0x12c
->> [<ffffffc000088408>] show_stack+0x10/0x1c
->> [<ffffffc0004ee5f0>] dump_stack+0x74/0xc4
->> [<ffffffc0000edfbc>] lockdep_rcu_suspicious+0xe8/0x124
->> [<ffffffc00010218c>] irq_find_mapping+0x16c/0x198
->> [<ffffffc00008130c>] gic_handle_irq+0x38/0xcc
->>
->> Most drivers call irq_find_mapping outside of irq_enter()/irq_exit(), as
->> this is in handle_IRQ().
->>
-> Ah ok. This is the multi-irq handler case? Has this been broken since
-> v3.2 at least for the gic users? Now that we call irq_enter()/irq_exit()
-> a lot more code runs, including things like updating jiffies when
-> interrupts arrive and invoking softirq? Do we only call irq_exit() on
-> the IPI path otherwise?
->
-> Are there any plans to send this back to stable trees? Not calling
-> irq_enter()/irq_exit() when we get an interrupt seems like a big problem.
->
+Hi Mark,
 
-Hmm I see we still call handle_IRQ eventually. So it's not as bad as I
-first thought.
+On Tue, 2014-08-26 at 17:27 +0100, Mark Rutland wrote:
+> On Fri, Aug 22, 2014 at 08:49:16PM +0100, Geoff Levand wrote:
+> > asm-generic/vmlinux.lds.h should be included after the arch
+> > specific headers so that the arch headers can override the
+> > generic macro defs in asm-generic/vmlinux.lds.h.
+> > 
+> > Fixes preprosessor redefined warnings when adding arch specific
+> > macros.
+> 
+> A sample of those warnings would be nice. What do you see being
+> redefined?
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+In testing I wanted to set LOAD_OFFSET.  If gave warnings like
+these:
+
+  arch/arm64/include/asm/page.h: warning: "LOAD_OFFSET" redefined [enabled by default]
+
+I'll send out another patch with updated message.
+
+-Geoff
