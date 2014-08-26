@@ -1,78 +1,44 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Tue, 26 Aug 2014 16:19:12 +0100
-Subject: [PATCH] arm: use cpu_online_mask when using forced
- irq_set_affinity
-In-Reply-To: <alpine.DEB.2.10.1408251136380.3323@nanos>
-References: <1399653640-21559-1-git-send-email-sudeep.holla@arm.com>
- <20140523121032.GV3693@n2100.arm.linux.org.uk> <537F4453.5000709@arm.com>
- <53A43174.503@arm.com> <20140620151638.GS32514@n2100.arm.linux.org.uk>
- <53C79E43.6040009@arm.com> <alpine.DEB.2.10.1408251136380.3323@nanos>
-Message-ID: <53FCA570.1090809@arm.com>
+From: stwiss.opensource@diasemi.com (Opensource [Steve Twiss])
+Date: Tue, 26 Aug 2014 15:21:53 +0000
+Subject: [PATCH v5] watchdog: Add DA9063 PMIC watchdog driver.
+In-Reply-To: <1409034367-15228-1-git-send-email-mpa@pengutronix.de>
+References: <1409034367-15228-1-git-send-email-mpa@pengutronix.de>
+Message-ID: <6ED8E3B22081A4459DAC7699F3695FB7D0B39787@SW-EX-MBX02.diasemi.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas,
 
-Thanks for your feedback.
+On 26 August 2014 07:26, Markus Pargmann wrote
 
-On 25/08/14 10:55, Thomas Gleixner wrote:
-> On Thu, 17 Jul 2014, Sudeep Holla wrote:
->>>> Any suggestions on this ? Since commit 01f8fa4f01d8 and ffde1de64012 are
->>>> now in
->>>> stable releases, CPU0 hotplug is broken there now.
->>>
->>> Maybe we should ask Thomas, as he's (a) the maintainer of the irqchip
->>> stuff, and (b) the author of the patch causing the breakage.
->>>
->>>   From what I can see looking at the x86 code, the work-around in
->>> ffde1de64012 is wrong.
->>>
->>
->> Can provide your thoughts on how to solve this issue ?
->
-> ffde1de64012 is not about offlining a cpu, it's about onlining where
-> we need to make sure that we assign the affinity to a not yet online
-> marked cpu.
->
->> Is it expected from all the irqchip implementation to use force flag in
->> irq_set_affinity to ignore cpu_online_mask similar to GIC ?
->
-> No, it's only relevant for the cases where we need to route irqs to
-> not yet online cpus.
->
+> Subject: [PATCH v5] watchdog: Add DA9063 PMIC watchdog driver.
+> 
 
-Ok. IIUC Russell's main concern was if irqchip implementation uses force
-flag differently, then we can't change the core code to false. Also
-x86 core code also uses forced irq_set_affinity in arch/x86/kernel/irq.c
+[...]
 
-Russell, any comments on this or are you fine with changing to false.
+> +
+> +static int da9063_wdt_stop(struct watchdog_device *wdd)
+> +{
+> +	struct da9063_watchdog *wdt = watchdog_get_drvdata(wdd);
+> +	int ret;
+> +
+> +	mutex_lock(&wdt->lock);
+> +	ret = regmap_update_bits(da9063->regmap, DA9063_REG_CONTROL_D,
+> +			DA9063_TWDSCALE_MASK,
+> +			DA9063_TWDSCALE_DISABLE);
+> +	if (ret)
+> +		dev_alert(wdt->da9063->dev, "Watchdog failed to stop (err = %d)\n",
+> +				ret);
+> +	mutex_unlock(&wdt->lock);
+> +
+> +	return ret;
+> +}
+> +
+
+Hi Markus,
+
+A quick typo.
+ret = regmap_update_bits(da9063->regmap, DA9063_REG_CONTROL_D,
+should probably be wdt->da9063->regmap
 
 Regards,
-Sudeep
-
-> Now the wreckage of offlining was definitely not intended and I wonder
-> why set_affinity() is called there with force = true. This was
-> introduced in commit 1dbfa187dad. I acked it back then, but I have no
-> idea why, because the force argument did not have any effect at that
-> time.
->
-> Changing it to false should solve the issue.
->
-> Thanks,
->
-> 	tglx
->
-> diff --git a/arch/arm/kernel/irq.c b/arch/arm/kernel/irq.c
-> index 2c4257604513..5c4d38e32a51 100644
-> --- a/arch/arm/kernel/irq.c
-> +++ b/arch/arm/kernel/irq.c
-> @@ -175,7 +175,7 @@ static bool migrate_one_irq(struct irq_desc *desc)
->   	c = irq_data_get_irq_chip(d);
->   	if (!c->irq_set_affinity)
->   		pr_debug("IRQ%u: unable to set affinity\n", d->irq);
-> -	else if (c->irq_set_affinity(d, affinity, true) == IRQ_SET_MASK_OK && ret)
-> +	else if (c->irq_set_affinity(d, affinity, false) == IRQ_SET_MASK_OK && ret)
->   		cpumask_copy(d->affinity, affinity);
->
->   	return ret;
->
+Steve
