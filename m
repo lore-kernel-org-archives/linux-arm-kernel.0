@@ -1,52 +1,36 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 26 Aug 2014 15:13:29 +0100
-Subject: [PATCH 10/11] arm64: ptrace: fix compat reg getter/setter return
- values
+Date: Tue, 26 Aug 2014 15:13:25 +0100
+Subject: [PATCH 06/11] KVM: vgic: declare probe function pointer as const
 In-Reply-To: <1409062410-25891-1-git-send-email-will.deacon@arm.com>
 References: <1409062410-25891-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1409062410-25891-11-git-send-email-will.deacon@arm.com>
+Message-ID: <1409062410-25891-7-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-copy_{to,from}_user return the number of bytes remaining on failure, not
-an error code.
+We extract the vgic probe function from the of_device_id data pointer,
+which is const. Kill the sparse warning by ensuring that the local
+function pointer is also marked as const.
 
-This patch returns -EFAULT when the copy operation didn't complete,
-rather than expose the number of bytes not copied directly to userspace.
-
+Cc: Marc Zyngier <marc.zyngier@arm.com>
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm64/kernel/ptrace.c | 10 +++++++---
- 1 file changed, 7 insertions(+), 3 deletions(-)
+ virt/kvm/arm/vgic.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm64/kernel/ptrace.c b/arch/arm64/kernel/ptrace.c
-index 2ac998878001..fe63ac5e9bf5 100644
---- a/arch/arm64/kernel/ptrace.c
-+++ b/arch/arm64/kernel/ptrace.c
-@@ -663,8 +663,10 @@ static int compat_gpr_get(struct task_struct *target,
- 			kbuf += sizeof(reg);
- 		} else {
- 			ret = copy_to_user(ubuf, &reg, sizeof(reg));
--			if (ret)
-+			if (ret) {
-+				ret = -EFAULT;
- 				break;
-+			}
+diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
+index d1cfe672b9d7..efe6eee2e7eb 100644
+--- a/virt/kvm/arm/vgic.c
++++ b/virt/kvm/arm/vgic.c
+@@ -1557,8 +1557,8 @@ static const struct of_device_id vgic_ids[] = {
+ int kvm_vgic_hyp_init(void)
+ {
+ 	const struct of_device_id *matched_id;
+-	int (*vgic_probe)(struct device_node *,const struct vgic_ops **,
+-			  const struct vgic_params **);
++	const int (*vgic_probe)(struct device_node *,const struct vgic_ops **,
++				const struct vgic_params **);
+ 	struct device_node *vgic_node;
+ 	int ret;
  
- 			ubuf += sizeof(reg);
- 		}
-@@ -702,8 +704,10 @@ static int compat_gpr_set(struct task_struct *target,
- 			kbuf += sizeof(reg);
- 		} else {
- 			ret = copy_from_user(&reg, ubuf, sizeof(reg));
--			if (ret)
--				return ret;
-+			if (ret) {
-+				ret = -EFAULT;
-+				break;
-+			}
- 
- 			ubuf += sizeof(reg);
- 		}
 -- 
 2.1.0.rc1
