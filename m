@@ -1,105 +1,53 @@
-From: jonsmirl@gmail.com (jonsmirl at gmail.com)
-Date: Tue, 26 Aug 2014 12:10:00 -0400
-Subject: Generic communication of boot loader state to the OS
-Message-ID: <CAKON4Oz-PRgXyNKj=T9ymzOOhCMPjBMdYdE1Mr1CHWv3boskiw@mail.gmail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 26 Aug 2014 17:11:28 +0100
+Subject: [PATCH 3/9] arm64: Remove unneeded extern keyword
+In-Reply-To: <1e9885b2581bae7e296b59411b26e03ba44a43e5.1408736066.git.geoff@infradead.org>
+References: <cover.1408736066.git.geoff@infradead.org>
+ <1e9885b2581bae7e296b59411b26e03ba44a43e5.1408736066.git.geoff@infradead.org>
+Message-ID: <20140826161128.GE4078@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-New thread split off from the simple-framebuffer discussion....
+Hi Geoff,
 
-Is there a generic, underlying problem here that needs to be solved?
-AFAIK no one has designed a general purpose mechanism for
-communicating boot loader state to the OS. There is the existing
-device tree <chosen> node but it is limited compared to what is
-needed. Maybe we should step back and first design a good solution to
-this basic problem. Then specific solutions for things like
-framebuffers would fall out of the basic design.
+On Fri, Aug 22, 2014 at 08:49:16PM +0100, Geoff Levand wrote:
+> Function prototypes are never definitions, so remove any 'extern' keyword
+> from the funcion prototypes in cpu_ops.h. Fixes warnings emited by
+> checkpatch.
+> 
+> Signed-off-by: Geoff Levand <geoff@infradead.org>
 
-So what are the requirements?
-1) Indicate that the boot loader has set up a device
-2) Indicate the purpose of that device
-3) Protect the resources in use
-4) Provide for a handoff to the OS specific device driver
-5) Communicate all of this via the device tree
+Looks sane to me:
 
-So what is a device tree syntax that would solve this general problem?
-As a first design attempt, I would propose <boot> (or <chosen>) child
-nodes be added to the various core devices. By core device I mean the
-top level device, like the framebuffer, not each dependent clock and
-regulator.
+Acked-by: Mark Rutland <mark.rutland@arm.com>
 
-Inside the <boot> nodes a compatible string would be used to designate
-a device class the bootloader has assigned to the devices. For example
-- serial, framebuffer, media, input, network.
+Mark.
 
-Some examples, I've deleted a lot of properties to make them smaller.
-The boot loader could add these nodes either statically or
-dynamically.
-
-uart0: uart at 01c18000 {
-        compatible = "allwinner,sun4i-a10-uart";
-        clocks = <&ahb_gates 20>, <&uart2_clk>;
-        clock-names = "ahb", "mod";
-        boot {
-                compatible = "boot,serial";
-                baud = <192000>;
-                console;
-       };
-};
-
-reserved-memory {
-        display_reserved: framebuffer at 78000000 {
-                reg = <0x78000000 0x800000>;
-        };
-};
-
-fb0: fb at 01c10000 {
-        compatible = "allwinner,sun4i-a10-framebuffer";
-        clocks = <&ahb_gates 18>, <&fb2_clk>;
-        clock-names = "ahb", "mod";
-        boot {
-                compatible = "boot,framebuffer";
-                memory-region = <&display_reserved>;
-        };
-};
-
-spi1: spi at 01c16000 {
-        compatible = "allwinner,sun4i-a10-spi";
-        clocks = <&ahb_gates 22>, <&spi2_clk>;
-        clock-names = "ahb", "mod";
-
-        flash0: flash at 2 {
-        compatible = "atmel,at12345";
-        reg = <2>;
-        spi-max-frequency = <100000>;
-                boot {
-                        compatible = "boot,media";
-                };
-        };
-};
-
-An OS booting off from a device tree like this can then implement
-support for boot,xxxx drivers if it chooses. If it doesn't implement
-support for the boot tags, nothing changes from the current situation.
-
-The problem with clocks and regulators can be addressed by following
-the chains of clocks/regulators in the parent nodes of the boot
-sections. This would be implement by these frameworks providing a
-"claim_all_xxx(DT node)" function.  A boot,framebuffer driver would
-first call claim_all_clk(parent node) and claim_all_regulator(parent
-node). Need to figure out exactly how these functions would work.
-
-Driver handoff is the OS's problem. Under Linux the device specific
-drivers could soft-link to the boot,xxx code. After the device
-specific driver is fully initialized it would tell the boot,xxx driver
-to let go.
-
-As a side effect this will eliminate the need for kernel command line
-parameters describing boot state. Like console="". Over time it might
-even be able to pass a DHCP IP address from uboot into the kernel.
-
-This is just a first attempt, how can we improve on this?
-
--- 
-Jon Smirl
-jonsmirl at gmail.com
+> ---
+>  arch/arm64/include/asm/cpu_ops.h | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm64/include/asm/cpu_ops.h b/arch/arm64/include/asm/cpu_ops.h
+> index d7b4b38..150ce63 100644
+> --- a/arch/arm64/include/asm/cpu_ops.h
+> +++ b/arch/arm64/include/asm/cpu_ops.h
+> @@ -61,7 +61,7 @@ struct cpu_operations {
+>  };
+>  
+>  extern const struct cpu_operations *cpu_ops[NR_CPUS];
+> -extern int __init cpu_read_ops(struct device_node *dn, int cpu);
+> -extern void __init cpu_read_bootcpu_ops(void);
+> +int __init cpu_read_ops(struct device_node *dn, int cpu);
+> +void __init cpu_read_bootcpu_ops(void);
+>  
+>  #endif /* ifndef __ASM_CPU_OPS_H */
+> -- 
+> 1.9.1
+> 
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
