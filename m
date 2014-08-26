@@ -1,36 +1,42 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 26 Aug 2014 11:04:30 +0200
-Subject: [PATCH v6 2/4] net: moxa: replace build_skb() with
- netdev_alloc_skb_ip_align() / memcpy()
-In-Reply-To: <1408976542-15624-1-git-send-email-jonas.jensen@gmail.com>
-References: <1408544342-32058-1-git-send-email-jonas.jensen@gmail.com>
- <1408976542-15624-1-git-send-email-jonas.jensen@gmail.com>
-Message-ID: <4449672.aCJ5J5rv4r@wuerfel>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 26 Aug 2014 10:05:33 +0100
+Subject: [PATCH] efi/arm64: store Runtime Services revision
+In-Reply-To: <1408028122-1784-1-git-send-email-semen.protsenko@linaro.org>
+References: <1408028122-1784-1-git-send-email-semen.protsenko@linaro.org>
+Message-ID: <20140826090533.GA3193@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 25 August 2014 16:22:22 Jonas Jensen wrote:
-> @@ -226,13 +226,15 @@ static int moxart_rx_poll(struct napi_struct *napi, int budget)
->                 if (len > RX_BUF_SIZE)
->                         len = RX_BUF_SIZE;
+On Thu, Aug 14, 2014 at 03:55:22PM +0100, Semen Protsenko wrote:
+> "efi" global data structure contains "runtime_version" field which must
+> be assigned in order to use it later in Runtime Services virtual calls
+> (virt_efi_* functions).
+> 
+> Before this patch "runtime_version" was unassigned (0), so each
+> Runtime Service virtual call that checks revision would fail.
+> 
+> Runtime Services revision being passed in UEFI system table from UEFI
+> to kernel (see efi_entry() function). In UEFI it's being stored at
+> MdePkg/Include/Uefi/UefiSpec.h as EFI_RUNTIME_SERVICES_REVISION.
+> 
+> Signed-off-by: Semen Protsenko <semen.protsenko@linaro.org>
+> ---
+>  arch/arm64/kernel/efi.c | 2 ++
+>  1 file changed, 2 insertions(+)
+> 
+> diff --git a/arch/arm64/kernel/efi.c b/arch/arm64/kernel/efi.c
+> index e72f310..5dbb7bd 100644
+> --- a/arch/arm64/kernel/efi.c
+> +++ b/arch/arm64/kernel/efi.c
+> @@ -463,6 +463,8 @@ static int __init arm64_enter_virtual_mode(void)
+>  	efi_native_runtime_setup();
+>  	set_bit(EFI_RUNTIME_SERVICES, &efi.flags);
 >  
-> -               skb = build_skb(priv->rx_buf[rx_head], priv->rx_buf_size);
-> +               skb = netdev_alloc_skb_ip_align(ndev, len);
+> +	efi.runtime_version = efi.systab->hdr.revision;
 > +
->                 if (unlikely(!skb)) {
-> -                       net_dbg_ratelimited("build_skb failed\n");
-> +                       net_dbg_ratelimited("netdev_alloc_skb_ip_align failed\n");
->                         priv->stats.rx_dropped++;
->                         priv->stats.rx_errors++;
->                 }
->  
-> +               memcpy(skb->data, priv->rx_buf[rx_head], len);
->                 skb_put(skb, len);
->                 skb->protocol = eth_type_trans(skb, ndev);
->                 napi_gro_receive(&priv->napi, skb);
+>  	return 0;
 
-While this seems correct, I wonder why you don't do the normal approach of
-dequeuing the skb from the chain and adding a newly allocated skb to it to
-save the memcpy.
+I doubt it makes any difference, but can we assign this before we call
+efi_native_runtime_setup please?
 
-	Arnd
+Will
