@@ -1,9 +1,9 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 26 Aug 2014 11:03:27 +0100
-Subject: [PATCH v2 12/26] irqchip: sirfsoc: convert to handle_domain_irq
+Date: Tue, 26 Aug 2014 11:03:34 +0100
+Subject: [PATCH v2 19/26] irqchip: atmel-aic: convert to handle_domain_irq
 In-Reply-To: <1409047421-27649-1-git-send-email-marc.zyngier@arm.com>
 References: <1409047421-27649-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1409047421-27649-13-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1409047421-27649-20-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -11,27 +11,26 @@ Use the new handle_domain_irq method to handle interrupts.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- drivers/irqchip/irq-sirfsoc.c | 6 ++----
- 1 file changed, 2 insertions(+), 4 deletions(-)
+ drivers/irqchip/irq-atmel-aic.c | 4 +---
+ 1 file changed, 1 insertion(+), 3 deletions(-)
 
-diff --git a/drivers/irqchip/irq-sirfsoc.c b/drivers/irqchip/irq-sirfsoc.c
-index 5e54f6d..a469355 100644
---- a/drivers/irqchip/irq-sirfsoc.c
-+++ b/drivers/irqchip/irq-sirfsoc.c
-@@ -50,12 +50,10 @@ sirfsoc_alloc_gc(void __iomem *base, unsigned int irq_start, unsigned int num)
- static void __exception_irq_entry sirfsoc_handle_irq(struct pt_regs *regs)
- {
- 	void __iomem *base = sirfsoc_irqdomain->host_data;
--	u32 irqstat, irqnr;
-+	u32 irqstat;
+diff --git a/drivers/irqchip/irq-atmel-aic.c b/drivers/irqchip/irq-atmel-aic.c
+index a82869e..9a2cf3c 100644
+--- a/drivers/irqchip/irq-atmel-aic.c
++++ b/drivers/irqchip/irq-atmel-aic.c
+@@ -68,12 +68,10 @@ aic_handle(struct pt_regs *regs)
+ 	irqnr = irq_reg_readl(gc->reg_base + AT91_AIC_IVR);
+ 	irqstat = irq_reg_readl(gc->reg_base + AT91_AIC_ISR);
  
- 	irqstat = readl_relaxed(base + SIRFSOC_INIT_IRQ_ID);
--	irqnr = irq_find_mapping(sirfsoc_irqdomain, irqstat & 0xff);
+-	irqnr = irq_find_mapping(aic_domain, irqnr);
 -
--	handle_IRQ(irqnr, regs);
-+	handle_domain_irq(sirfsoc_irqdomain, irqstat & 0xff, regs);
+ 	if (!irqstat)
+ 		irq_reg_writel(0, gc->reg_base + AT91_AIC_EOICR);
+ 	else
+-		handle_IRQ(irqnr, regs);
++		handle_domain_irq(aic_domain, irqnr, regs);
  }
  
- static int __init sirfsoc_irq_init(struct device_node *np,
+ static int aic_retrigger(struct irq_data *d)
 -- 
 2.0.4
