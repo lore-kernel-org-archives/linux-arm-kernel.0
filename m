@@ -1,58 +1,55 @@
-From: anup.patel@linaro.org (Anup Patel)
-Date: Wed, 27 Aug 2014 11:25:42 +0530
-Subject: [PATCH] arm64: Fix GIC addresses for APM X-Gene
-Message-ID: <1409118942-7290-1-git-send-email-anup.patel@linaro.org>
+From: takahiro.akashi@linaro.org (AKASHI Takahiro)
+Date: Wed, 27 Aug 2014 14:57:08 +0900
+Subject: [PATCH v6 4/6] arm64: add seccomp syscall for compat task
+In-Reply-To: <20140826175303.GE23445@arm.com>
+References: <1408611405-8943-1-git-send-email-takahiro.akashi@linaro.org>
+ <1408611405-8943-5-git-send-email-takahiro.akashi@linaro.org>
+ <20140826175303.GE23445@arm.com>
+Message-ID: <53FD7334.1070308@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The APM X-Gene CPU does not implement security extensions but uses
-GIC-400 which has security extensions implemented. To take care of
-this situation APM HW designers provided two sets of GIC addresses
-for accessing secured and non-secured GIC registers seperately.
+On 08/27/2014 02:53 AM, Will Deacon wrote:
+> On Thu, Aug 21, 2014 at 09:56:43AM +0100, AKASHI Takahiro wrote:
+>> This patch allows compat task to issue seccomp() system call.
+>>
+>> Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
+>> ---
+>>   arch/arm64/include/asm/unistd.h   |    2 +-
+>>   arch/arm64/include/asm/unistd32.h |    3 +++
+>>   2 files changed, 4 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/arch/arm64/include/asm/unistd.h b/arch/arm64/include/asm/unistd.h
+>> index 4bc95d2..cf6ee31 100644
+>> --- a/arch/arm64/include/asm/unistd.h
+>> +++ b/arch/arm64/include/asm/unistd.h
+>> @@ -41,7 +41,7 @@
+>>   #define __ARM_NR_compat_cacheflush	(__ARM_NR_COMPAT_BASE+2)
+>>   #define __ARM_NR_compat_set_tls		(__ARM_NR_COMPAT_BASE+5)
+>>
+>> -#define __NR_compat_syscalls		383
+>> +#define __NR_compat_syscalls		384
+>>   #endif
+>>
+>>   #define __ARCH_WANT_SYS_CLONE
+>> diff --git a/arch/arm64/include/asm/unistd32.h b/arch/arm64/include/asm/unistd32.h
+>> index e242600..2922c40 100644
+>> --- a/arch/arm64/include/asm/unistd32.h
+>> +++ b/arch/arm64/include/asm/unistd32.h
+>> @@ -787,3 +787,6 @@ __SYSCALL(__NR_sched_setattr, sys_sched_setattr)
+>>   __SYSCALL(__NR_sched_getattr, sys_sched_getattr)
+>>   #define __NR_renameat2 382
+>>   __SYSCALL(__NR_renameat2, sys_renameat2)
+>> +#define __NR_seccomp 383
+>> +__SYSCALL(__NR_seccomp, sys_seccomp)
+>> +
+>
+> This will need rebasing onto -rc2, as we're hooked up two new compat
+> syscalls recently.
 
-Currently, the APM X-Gene DTS file points to secured GIC registers
-and uses GIC Group0 for all irqs. This works fine in most cases
-but does not work when routing host irqs to guest or VM using the
-GICH_LRn.HW bit. It happens because if Guest or VM EOIs routed irqs
-using GICV_EOI register then GIC-400 treats that Guest or VM is
-trying to EOI a Group0 irq (i.e. secured irq) from non-secured mode
-hence GIC-400 does not deactivate the routed irq.
+Thanks for heads-up. Fixed it.
 
-To take care of the above issue, we initialize secured GIC registers
-from bootloader such that all host irqs are treated as Group1 irqs
-(i.e. non-secured irqs) and we only access non-secured GIC registers
-from Linux, Xen and other hypervisors. The bootloader GIC initialization
-part is already taken care and is available to all APM Mustang users
-in latest APM SW release. This patch updates Linux DTS files to use
-non-secured GIC registers for Linux and Xen.
+-Takahiro AKASHI
 
-Folks who want to try this patch, please update your APM Mustang
-u-boot from any APM SW release after 7th July 2014.
-
-Signed-off-by: Anup Patel <anup.patel@linaro.org>
-Signed-off-by: Pranavkumar Sawargaonkar <pranavkumar@linaro.org>
----
- arch/arm64/boot/dts/apm-storm.dtsi |    8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
-
-diff --git a/arch/arm64/boot/dts/apm-storm.dtsi b/arch/arm64/boot/dts/apm-storm.dtsi
-index c0aceef..2b162f1 100644
---- a/arch/arm64/boot/dts/apm-storm.dtsi
-+++ b/arch/arm64/boot/dts/apm-storm.dtsi
-@@ -81,10 +81,10 @@
- 		compatible = "arm,cortex-a15-gic";
- 		#interrupt-cells = <3>;
- 		interrupt-controller;
--		reg = <0x0 0x78010000 0x0 0x1000>,	/* GIC Dist */
--		      <0x0 0x78020000 0x0 0x1000>,	/* GIC CPU */
--		      <0x0 0x78040000 0x0 0x2000>,	/* GIC VCPU Control */
--		      <0x0 0x78060000 0x0 0x2000>;	/* GIC VCPU */
-+		reg = <0x0 0x78090000 0x0 0x1000>,	/* GIC Dist */
-+		      <0x0 0x780A0000 0x0 0x1000>,	/* GIC CPU */
-+		      <0x0 0x780C0000 0x0 0x2000>,	/* GIC VCPU Control */
-+		      <0x0 0x780E0000 0x0 0x2000>;	/* GIC VCPU */
- 		interrupts = <1 9 0xf04>;	/* GIC Maintenence IRQ */
- 	};
- 
--- 
-1.7.9.5
+> Will
+>
