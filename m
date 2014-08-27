@@ -1,56 +1,48 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed, 27 Aug 2014 14:00:00 +0900
-Subject: [PATCH 3/3] clocksource: sh_tmu: Document r8a7779 binding
-In-Reply-To: <1409115600-26192-1-git-send-email-horms+renesas@verge.net.au>
-References: <1409115600-26192-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1409115600-26192-4-git-send-email-horms+renesas@verge.net.au>
+From: horms@verge.net.au (Simon Horman)
+Date: Wed, 27 Aug 2014 14:02:22 +0900
+Subject: [PATCH v2 0/5] ARM: shmobile: correct memory maps
+In-Reply-To: <CAOesGMhV8Z1T67rwpSN4HVEFixSCApt4p0puRP36AH2MJyviZQ@mail.gmail.com>
+References: <1409099726-21814-1-git-send-email-horms+renesas@verge.net.au>
+ <CANqRtoTSxB3GQoYg6ecpKQ4N7JO2ahotjaAL3oEebE1h3PGtZg@mail.gmail.com>
+ <CAOesGMiZPNkpoe1UJ0VG0yL1qHq-q7OOQUrJSdw_Z0sVFgDcwA@mail.gmail.com>
+ <20140827040349.GA9830@verge.net.au>
+ <CAOesGMhV8Z1T67rwpSN4HVEFixSCApt4p0puRP36AH2MJyviZQ@mail.gmail.com>
+Message-ID: <20140827050222.GA1343@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In general Renesas hardware is not documented to the extent
-where the relationship between IP blocks on different SoCs can be assumed
-although they may appear to operate the same way. Furthermore the
-documentation typically does not specify a version for individual
-IP blocks. For these reasons a convention of using the SoC name in place
-of a version and providing SoC-specific compat strings has been adopted.
+On Tue, Aug 26, 2014 at 09:13:56PM -0700, Olof Johansson wrote:
+> On Tue, Aug 26, 2014 at 9:03 PM, Simon Horman <horms@verge.net.au> wrote:
+> > On Tue, Aug 26, 2014 at 07:27:53PM -0700, Olof Johansson wrote:
+> >> On Tue, Aug 26, 2014 at 6:45 PM, Magnus Damm <magnus.damm@gmail.com> wrote:
+> >> > Hi Simon,
+> >> >
+> >> > On Wed, Aug 27, 2014 at 9:35 AM, Simon Horman
+> >> > <horms+renesas@verge.net.au> wrote:
+> >> >> This short series builds on a previous posting
+> >> >> of a patch to correct the value of the second memory region
+> >> >> of the lager. It does that and also corrects the syntax
+> >> >> used for the lager and other shmobile boards.
+> >> >>
+> >> >> Simon Horman (5):
+> >> >>   ARM: shmobile: lager: correct memory map value and syntax
+> >> >>   ARM: shmobile: henninger: correct memory map syntax
+> >> >>   ARM: shmobile: koelsch: correct memory map syntax
+> >> >>   ARM: shmobile: ape6evm-reference: correct memory map syntax
+> >> >>   ARM: shmobile: ape6evm: correct memory map syntax
+> >> >
+> >> > Thanks for improving the current state. The patches look fine to me.
+> >> >
+> >> > Acked-by: Magnus Damm <damm+renesas@opensource.se>
+> >>
+> >> Yep, agreed.
+> >>
+> >> Acked-by: Olof Johansson <olof@lixom.net>
+> >
+> > Thanks, I have queued these up as fixes for v3.17.
+> > I'll send you a pull-request in the not to distant future.
+> 
+> This is 3.18 cleanup material as far as I am concerned, so please send
+> it as such. :)
 
-Although not universally liked this convention is used in the bindings
-for the drivers a number of drivers for Renesas hardware. The purpose
-of this patch is to update the Renesas R-Car Timer Unit (TMU)
-driver to follow this convention.
-
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-
----
-* I plan to follow up with a patch patch to use the new binding in the
-  dtsi files for the r8a7779 SoC.
----
- Documentation/devicetree/bindings/timer/renesas,tmu.txt | 6 ++++--
- 1 file changed, 4 insertions(+), 2 deletions(-)
-
-diff --git a/Documentation/devicetree/bindings/timer/renesas,tmu.txt b/Documentation/devicetree/bindings/timer/renesas,tmu.txt
-index 425d0c5..712ddfa 100644
---- a/Documentation/devicetree/bindings/timer/renesas,tmu.txt
-+++ b/Documentation/devicetree/bindings/timer/renesas,tmu.txt
-@@ -8,7 +8,9 @@ are independent. The TMU hardware supports up to three channels.
- 
- Required Properties:
- 
--  - compatible: must contain "renesas,tmu"
-+  - compatible: must contain one of the following.
-+    - "renesas,tmu" generic TMU
-+    - "renesas,tmu-r8a7779" R8A7779 TMU
- 
-   - reg: base address and length of the registers block for the timer module.
- 
-@@ -27,7 +29,7 @@ Optional Properties:
- Example: R8A7779 (R-Car H1) TMU0 node
- 
- 	tmu0: timer at ffd80000 {
--		compatible = "renesas,tmu";
-+		compatible = "renesas,tmu-r8a7779", "renesas,tmu";
- 		reg = <0xffd80000 0x30>;
- 		interrupts = <0 32 IRQ_TYPE_LEVEL_HIGH>,
- 			     <0 33 IRQ_TYPE_LEVEL_HIGH>,
--- 
-2.0.1
+Sure, will do.
