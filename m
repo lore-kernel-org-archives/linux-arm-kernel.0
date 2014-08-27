@@ -1,64 +1,27 @@
-From: ch.naveen@samsung.com (Naveen Krishna Chatradhi)
-Date: Wed, 27 Aug 2014 15:16:35 +0530
-Subject: [PATCH 14/14] tty/serial: samsung: add support for exynos7
-Message-ID: <1409132795-1991-1-git-send-email-ch.naveen@samsung.com>
+From: sean@mess.org (Sean Young)
+Date: Wed, 27 Aug 2014 10:51:06 +0100
+Subject: [PATCH v2 2/3] rc: Introduce hix5hd2 IR transmitter driver
+In-Reply-To: <53FD9BB7.6080207@linaro.org>
+References: <1408613086-12538-1-git-send-email-zhangfei.gao@linaro.org>
+ <1408613086-12538-3-git-send-email-zhangfei.gao@linaro.org>
+ <20140821100739.GA3252@gofer.mess.org>
+ <53FD9BB7.6080207@linaro.org>
+Message-ID: <20140827095106.GA2712@gofer.mess.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Alim Akhtar <alim.akhtar@samsung.com>
+On Wed, Aug 27, 2014 at 04:49:59PM +0800, zhangfei wrote:
+> On 08/21/2014 06:07 PM, Sean Young wrote:
+> >On Thu, Aug 21, 2014 at 05:24:44PM +0800, Zhangfei Gao wrote:
+> >It would be useful is rdev->input_phys, rdev->input_id,
+> >rdev->timeout, rdev->rx_resolution are set correctly.
+> 
+> OK, will set rdev->timeout, rdev->rx_resolution
+> Not sure the usage of rdev->input_id, why is it required?
 
-This patch enables upcoming exynos7 SoCs serial driver.
-This also modifies various dependencies for Kconfig
+This is for the EVIOCGID ioctl on the input device which will be created 
+for the rc device. This is used for delivering input events from decoded
+IR. There is be no reason to run lircd if you use this method.
 
-Signed-off-by: Alim Akhtar <alim.akhtar@samsung.com>
-Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
----
- drivers/tty/serial/Kconfig   |    6 +++---
- drivers/tty/serial/samsung.c |    2 +-
- 2 files changed, 4 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/tty/serial/Kconfig b/drivers/tty/serial/Kconfig
-index 26cec64..f858d57 100644
---- a/drivers/tty/serial/Kconfig
-+++ b/drivers/tty/serial/Kconfig
-@@ -220,7 +220,7 @@ config SERIAL_CLPS711X_CONSOLE
- 
- config SERIAL_SAMSUNG
- 	tristate "Samsung SoC serial support"
--	depends on PLAT_SAMSUNG
-+	depends on PLAT_SAMSUNG || ARCH_EXYNOS7
- 	select SERIAL_CORE
- 	help
- 	  Support for the on-chip UARTs on the Samsung S3C24XX series CPUs,
-@@ -230,14 +230,14 @@ config SERIAL_SAMSUNG
- 
- config SERIAL_SAMSUNG_UARTS_4
- 	bool
--	depends on PLAT_SAMSUNG
-+	depends on SERIAL_SAMSUNG
- 	default y if !(CPU_S3C2410 || CPU_S3C2412 || CPU_S3C2440 || CPU_S3C2442)
- 	help
- 	  Internal node for the common case of 4 Samsung compatible UARTs
- 
- config SERIAL_SAMSUNG_UARTS
- 	int
--	depends on PLAT_SAMSUNG
-+	depends on SERIAL_SAMSUNG
- 	default 4 if SERIAL_SAMSUNG_UARTS_4 || CPU_S3C2416
- 	default 3
- 	help
-diff --git a/drivers/tty/serial/samsung.c b/drivers/tty/serial/samsung.c
-index c78f43a..31be983 100644
---- a/drivers/tty/serial/samsung.c
-+++ b/drivers/tty/serial/samsung.c
-@@ -1770,7 +1770,7 @@ static struct s3c24xx_serial_drv_data s5pv210_serial_drv_data = {
- #define S5PV210_SERIAL_DRV_DATA	(kernel_ulong_t)NULL
- #endif
- 
--#if defined(CONFIG_ARCH_EXYNOS)
-+#if defined(CONFIG_ARCH_EXYNOS) || defined(CONFIG_ARCH_EXYNOS7)
- static struct s3c24xx_serial_drv_data exynos4210_serial_drv_data = {
- 	.info = &(struct s3c24xx_uart_info) {
- 		.name		= "Samsung Exynos4 UART",
--- 
-1.7.9.5
+Sean
