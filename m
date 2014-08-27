@@ -1,90 +1,97 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 27 Aug 2014 22:11:29 +0200
-Subject: [PATCH v2] ethernet: arc: Add support for Rockchip SoC layer
- device tree bindings
-In-Reply-To: <1409122527-17673-1-git-send-email-romain.perier@gmail.com>
-References: <1409122527-17673-1-git-send-email-romain.perier@gmail.com>
-Message-ID: <3619843.a6HHkMsuOu@wuerfel>
+From: lina.iyer@linaro.org (Lina Iyer)
+Date: Wed, 27 Aug 2014 14:14:35 -0600
+Subject: [PATCH v3 0/4] PM QoS: per-cpu PM QoS support
+Message-ID: <1409170479-29955-1-git-send-email-lina.iyer@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 27 August 2014 06:55:27 Romain Perier wrote:
-> This patch defines a platform glue layer for Rockchip SoCs which
-> support arc-emac driver. It ensures that regulator for the rmii is on
-> before trying to connect to the ethernet controller. It applies right
-> speed and mode changes to the grf when ethernet settings change.
-> 
-> Signed-off-by: Romain Perier <romain.perier@gmail.com>
-> ---
->  drivers/net/ethernet/arc/Kconfig         |  15 +++
->  drivers/net/ethernet/arc/Makefile        |   1 +
->  drivers/net/ethernet/arc/emac.h          |   2 +
->  drivers/net/ethernet/arc/emac_main.c     |   2 +
->  drivers/net/ethernet/arc/emac_rockchip.c | 224 +++++++++++++++++++++++++++++++
->  5 files changed, 244 insertions(+)
->  create mode 100644 drivers/net/ethernet/arc/emac_rockchip.c
-> 
-> diff --git a/drivers/net/ethernet/arc/Kconfig b/drivers/net/ethernet/arc/Kconfig
-> index 89e04fd..6d96a82 100644
-> --- a/drivers/net/ethernet/arc/Kconfig
-> +++ b/drivers/net/ethernet/arc/Kconfig
-> @@ -32,4 +32,19 @@ config ARC_EMAC
->  	  non-standard on-chip ethernet device ARC EMAC 10/100 is used.
->  	  Say Y here if you have such a board.  If unsure, say N.
->  
-> +config EMAC_ROCKCHIP
-> +       tristate "Rockchip EMAC support"
-> +       select ARC_EMAC_CORE
-> +       depends on OF_IRQ
-> +       depends on OF_NET
-> +       depends on ARCH_ROCKCHIP
-> +       depends on REGULATOR_ACT8865
-> +       depends on SMSC_PHY
-> +       depends on MFD_SYSCON
+Changes since v2:
+[ http://marc.info/?l=linux-pm&m=140794570012619&w=2 ]
+- Amend commit texts
 
-You should generally not add 'depends on' for specific drivers out
-of a subsystems. Just list the build-time dependencies, like
+This patchset enables drivers to set per-cpu PM QoS. PM QoS requests currently
+apply to all cpus. However, drivers may be interested in only a few cpu(s) that
+need to gaurantee the QoS requirement. The reason being, some requests may be
+needed only to allow a quicker response to an IRQ, while requests may apply to
+a certain cpu or a cluster of cpus, as dictated by an usecase. For example, in
+ARM architectures, it may be benefical to set a QoS requirement to handle use
+cases on big/Little cluster, while the other cluster can be in the deepest idle
+state it can be.
 
-	depends on OF_IRQ && OF_NET && PHYLIB && REGULATOR && MFD_SYSCON
+An intended application of this feature could be the cpuidle governor. For
+example, governor can now look at a CPU_DMA_LATENCY request only for that cpu
+when deciding the allowable C-States. In a clustered environment, the governor
+would look at the QoS request for a set of cpus before deciding the cluster's
+low power mode.
 
-You can add the ARCH_ROCKCHIPS part if you think that's valuable, but
-add an '|| COMPILE_TEST' so it's possible to still build it elsewhere.
+With these requirements in mind, the patches do the following -
 
-> +#define GRF_MODE_MII   BIT(0)
-> +#define GRF_MODE_RMII  0x0
-> +#define GRF_SPEED_10M  0x0
-> +#define GRF_SPEED_100M BIT(1)
+- Reorganize the PM QoS and dev-PM QoS frameworks to pass around data structures
+rather than member variables. Do not want to pass plist around. It is much more
+scalable, if we pass the pm_qos_request object rather than its member.
 
-Just use 0x... for consistency for all of these.
+- Enhance PM QoS framework to support the per-cpu requests. This is done by
+adding a per-cpu array for each constraint. This array holds the per-cpu QoS
+value for each constraint. The intelligence behind the per-cpu is on the driver.
+The framework just adds the request against the list held by the constraint
+structure. Adding a request adds the request to the list of requests
+against a constraint and also parses the array to see if this request superseeds
+any existing QoS value for the cpus that this request has specified. The
+workload of parsing the request is borne when updating the request.
 
-> +static const struct of_device_id emac_rockchip_dt_ids[];
+- The driver that does an add request passes in the PM QoS request
+  structure, can now pass in an additional request type that indicates if the
+request is to be applied to all cores (default and existing behavior) or applies
+to a subset of the cpus using a cpumask.
 
-Can you rearrange it to avoid the forward declaration?
+- To get the request value of a constraint back, you could use the
+pm_qos_request() or its new cpu variants pm_qos_request_for_cpu() and
+pm_qos_request_for_cpumask(). The _for_cpu() allows returns an s32 value without
+locking.
 
-> +       priv->soc_data = (struct emac_rockchip_soc_data *)match->data;
+- The next feature builds up on the per-cpu PM QoS feature to provide the
+ability to allow a driver to tag a QoS request against an IRQ instead of a cpu.
+Drivers may be concerned with an IRQ handling latency because of CPU low
+power states, for example. When adding a request, they could specify the request
+type to tag an IRQ and provide the IRQ numbers. When using tools like
+irq-balancer, the IRQ affinity may jump from one cpu to another and in such a
+case, the request needs to be modified correctly. irq/manage.c provides such
+notification whenever the affinity changes. However, the current mechanism
+allows for only one notification callback. 
 
-This cast turns a 'const' pointer into a non-const pointer, which is
-bad. Mark the soc_data pointer as const as well so you can remove the
-cast here.
+	- Change to the smp_affinity_notifications. Modify the exisiting
+	  mechanism of a single callback to support a list of requests. Drivers
+	  can register for change notifications.
 
-> +	/* write-enable bits */
-> +	data = BIT(16) | BIT(17);
-> +
-> +	data |= GRF_SPEED_100M;
-> +	data |= GRF_MODE_RMII;
+	- From PM QoS register for notification on behalf of a driver whenever
+	  a request with IRQ is specified. When the notification arrives, modify
+	  the cpu affinity of the QoS request to the cpus, that the IRQ is affine to.
 
-If you have macros for some bits, you should have them for all of them.
+- Remarks
+I do not have the cpuidle governor changes here at this point. Also, there is
+no change to userspace at this point, i.e, userspace cannot specify a QoS
+request against a cpu or specify an IRQ to tag this request against.
 
-> +	rate = 50000000;
+Thanks,
+Lina
 
-Where does this number come from?
+Lina Iyer (4):
+  QoS: Modify data structures and function arguments for scalability.
+  QoS: Enhance framework to support per-cpu PM QoS request
+  irq: Allow multiple clients to register for irq affinity notification
+  QoS: Enable PM QoS requests to apply only on smp_affinity of an IRQ
 
-> +static const struct of_device_id emac_rockchip_dt_ids[] = {
-> +	{ .compatible = "rockchip,rk3066-emac", .data = (void *)&emac_rockchip_dt_data[0]},
-> +	{ .compatible = "rockchip,rk3188-emac", .data = (void *)&emac_rockchip_dt_data[1]},
-> +	{ /* Sentinel */ }
-> +};
+ Documentation/power/pm_qos_interface.txt |  18 +++
+ drivers/base/power/qos.c                 |  14 +--
+ drivers/infiniband/hw/qib/qib_iba7322.c  |   4 +-
+ include/linux/interrupt.h                |  12 +-
+ include/linux/irqdesc.h                  |   6 +-
+ include/linux/pm_qos.h                   |  25 +++-
+ kernel/irq/irqdesc.c                     |   1 +
+ kernel/irq/manage.c                      |  85 +++++++++-----
+ kernel/power/qos.c                       | 191 ++++++++++++++++++++++++++++++-
+ lib/cpu_rmap.c                           |   2 +-
+ 10 files changed, 305 insertions(+), 53 deletions(-)
 
-This cast is harmless, but I'd remove it as well.
-
-	Arnd
+-- 
+1.9.1
