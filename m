@@ -1,123 +1,48 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Wed, 27 Aug 2014 11:37:55 +0200
-Subject: [linux-sunxi] Re: [PATCH 4/4] simplefb: add clock handling code
-In-Reply-To: <53FD9017.40705@redhat.com>
-References: <20140825141600.GA14763@ulmo.nvidia.com>
- <20140825145854.GA15297@lukather>
- <20140825150501.GE14763@ulmo.nvidia.com>
- <20140825152232.GE15297@lukather> <20140826080432.GD17263@ulmo>
- <20140826135341.GM15297@lukather> <20140826143550.GB3027@ulmo>
- <20140826210248.GO15297@lukather> <20140827065440.GG15640@ulmo>
- <53FD9017.40705@redhat.com>
-Message-ID: <20140827093753.GB23186@ulmo>
+From: pramod.gurav@smartplayin.com (Pramod Gurav)
+Date: Wed, 27 Aug 2014 15:13:54 +0530
+Subject: [PATCH 4/4] ARM: DT: APQ8064: Add node for ps_hold function in pinctrl
+In-Reply-To: <1409132634-15208-1-git-send-email-pramod.gurav@smartplayin.com>
+References: <1409132634-15208-1-git-send-email-pramod.gurav@smartplayin.com>
+Message-ID: <1409132634-15208-2-git-send-email-pramod.gurav@smartplayin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 27, 2014 at 10:00:23AM +0200, Hans de Goede wrote:
-> Hi,
-> 
-> On 08/27/2014 08:54 AM, Thierry Reding wrote:
-> > On Tue, Aug 26, 2014 at 11:02:48PM +0200, Maxime Ripard wrote:
-> >> On Tue, Aug 26, 2014 at 04:35:51PM +0200, Thierry Reding wrote:
-> >>>>>> Any decent enough SoC, with a decent support in the kernel will have
-> >>>>>> clocks for this, and I really wonder how simplefb will behave once its
-> >>>>>> clocks will be turned off...
-> >>>>>
-> >>>>> There are other devices besides ARM SoCs that may want to use this
-> >>>>> driver and that don't have clock support.
-> >>>>
-> >>>> And in this case, with this patch, simplefb will not claim any clock,
-> >>>> nor will fail probing.
-> >>>>
-> >>>>> But you're missing my point. What I'm saying is that the simplefb driver
-> >>>>> is meant to serve as a way to take over whatever framebuffer a firmware
-> >>>>> set up. Therefore I think it makes the most sense to assume that nothing
-> >>>>> needs to be controlled in any way since already been set up by firmware.
-> >>>>> Eventually there should be a driver that takes over from simplefb that
-> >>>>> knows how to properly handle the device's specifics, but that's not
-> >>>>> simplefb.
-> >>>>
-> >>>> I guess such a hand over if it were to happen in the kernel would
-> >>>> involve the second driver claiming the resources before the first one
-> >>>> release them. How is that different in this case?
-> >>>
-> >>> It's different in that that driver will be hardware specific and know
-> >>> exactly what clock and other resources are required. It will have a
-> >>> device-specific binding.
-> >>
-> >> Except that you made simplefb a generic driver. So we have two choices
-> >> here: either we don't anything but the trivial case, and no one with a
-> >> rather more advanced hardware will be able to use it, or we try to
-> >> grab any resource that might be of use, which means clocks,
-> >> regulators, reserved memory region, or whatever, so that we pretty
-> >> much cover all cases. It really is as simple as that.
-> > 
-> > No, it should be even simpler. simplefb shouldn't have to know any of
-> > this. It's just taking what firmware has set up and uses that. It's a
-> > stop-gap solution to provide information on the display until a real
-> > driver can be loaded and initializes the display hardware properly.
-> > 
-> >>>>> The goal of this patch series is to keep clocks from being turned off.
-> >>>>> But that's not what it does. What it does is turn clocks on to prevent
-> >>>>> them from being turned off. In my opinion that's a workaround for a
-> >>>>> deficiency in the kernel (and the firmware/kernel interface) and I think
-> >>>>> it should be fixed at the root. So a much better solution would be to
-> >>>>> establish a way for firmware to communicate to the kernel that a given
-> >>>>> resource has been enabled by firmware and shouldn't be disabled. Such a
-> >>>>> solution can be implement for all types of resources and can be reused
-> >>>>> by all drivers since they don't have to worry about these details.
-> >>>>
-> >>>> Mike Turquette repeatedly said that he was against such a DT property:
-> >>>> https://lkml.org/lkml/2014/5/12/693
-> >>>
-> >>> Mike says in that email that he's opposing the addition of a property
-> >>> for clocks that is the equivalent of regulator-always-on. That's not
-> >>> what this is about. If at all it'd be a property to mark a clock that
-> >>> should not be disabled by default because it's essential.
-> >>
-> >> It's just semantic. How is "a clock that should not be disabled by
-> >> default because it's essential" not a clock that stays always on?
-> > 
-> > Because a clock that should not be disabled by default can be turned off
-> > when appropriate. A clock that is always on can't be turned off.
-> > 
-> >> Plus, you should read the mail further. It's clearly said that
-> >> consumer drivers should call clk_prepare_enable themselves, and that
-> >> the only exception to that is the case where we don't have such a
-> >> driver (and only valid as a temporary exception, which I guess you'll
-> >> soon turn into temporary-until-a-drm-kms-driver-is-merged).
-> > 
-> > Exactly. simplefb is only a temporary measure. It's not meant to be used
-> > as a full-blown framebuffer driver. There are two use-cases where it is
-> > an appropriate solution:
-> > 
-> >   1) As a stop-gap solution for when the platform doesn't support a full
-> >      display driver yet. In that case you will want simplefb to stay
-> >      around forever.
-> > 
-> >   2) To get early boot output before a full display driver can be loaded
-> >      in which case simplefb should go away after the display driver has
-> >      taken over.
-> > 
-> > In case of 2) the most straightforward solution is to not disable any
-> > clocks until all drivers have had a chance to claim them. When the full
-> > driver has been probed it should have claimed the clocks so they would
-> > no longer get disabled.
-> 
-> Please read my long reply from yesterday evening why this will never
-> work, as there is not a well defined moment when "all drivers have had a
-> chance to claim them"
-> 
-> I've been doing low level Linux development for 10 years now and I've
-> worked a lot on storage (raid, iscsi, fcoe support, etc.) in the past.
+This patch adds DT support to configure GPIO_78 as function ps_hold
+on apq8064.
 
-Ah, so this is now officially a pissing contest, is it?
+CC: Rob Herring <robh+dt@kernel.org>
+CC: Pawel Moll <pawel.moll@arm.com>
+CC: Mark Rutland <mark.rutland@arm.com>
+CC: Ian Campbell <ijc+devicetree@hellion.org.uk>
+CC: Kumar Gala <galak@codeaurora.org>
+CC: devicetree at vger.kernel.org
+CC: linux-arm-kernel at lists.infradead.org
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140827/e93f0c96/attachment.sig>
+Signed-off-by: Pramod Gurav <pramod.gurav@smartplayin.com>
+---
+ arch/arm/boot/dts/qcom-apq8064.dtsi |   10 ++++++++++
+ 1 file changed, 10 insertions(+)
+
+diff --git a/arch/arm/boot/dts/qcom-apq8064.dtsi b/arch/arm/boot/dts/qcom-apq8064.dtsi
+index 681e194..0873b24 100644
+--- a/arch/arm/boot/dts/qcom-apq8064.dtsi
++++ b/arch/arm/boot/dts/qcom-apq8064.dtsi
+@@ -82,6 +82,16 @@
+ 			interrupt-controller;
+ 			#interrupt-cells = <2>;
+ 			interrupts = <0 32 0x4>;
++
++			pinctrl-names = "default";
++			pinctrl-0 = <&ps_hold>;
++
++			ps_hold: ps_hold {
++				mux {
++					pins = "gpio78";
++					function = "ps_hold";
++				};
++			};
+ 		};
+ 
+ 		intc: interrupt-controller at 2000000 {
+-- 
+1.7.9.5
