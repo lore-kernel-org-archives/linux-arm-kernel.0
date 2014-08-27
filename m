@@ -1,96 +1,51 @@
-From: c.tirumalesh@gmail.com (c.tirumalesh at gmail.com)
-Date: Wed, 27 Aug 2014 11:02:21 -0700
-Subject: [PATCH] iommu/arm-smmu: Allow size of stage 1 output to max possible
- value for sateg 2 bypass
-Message-ID: <1409162541-3940-1-git-send-email-c.tirumalesh@gmail.com>
+From: abrestic@chromium.org (Andrew Bresticker)
+Date: Wed, 27 Aug 2014 11:13:47 -0700
+Subject: [PATCH v2 2/9] mailbox: Add NVIDIA Tegra XUSB mailbox driver
+In-Reply-To: <53FE1A7A.4010906@wwwdotorg.org>
+References: <1408381705-3623-1-git-send-email-abrestic@chromium.org>
+ <1408381705-3623-3-git-send-email-abrestic@chromium.org>
+ <53FB8820.4010202@wwwdotorg.org>
+ <CAL1qeaERHeKKNpqh9qHOppgT7ymvntisdjVvZheP78U6NaPz-A@mail.gmail.com>
+ <53FE1A7A.4010906@wwwdotorg.org>
+Message-ID: <CAL1qeaGPr=BeYL1-=ddRL7rSuvYdQcd6vCEEHDrNA-KYst6bnw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Tirumalesh Chalamarla <tchalamarla@cavium.com>
+On Wed, Aug 27, 2014 at 10:50 AM, Stephen Warren <swarren@wwwdotorg.org> wrote:
+> On 08/27/2014 11:38 AM, Andrew Bresticker wrote:
+>>
+>> On Mon, Aug 25, 2014 at 12:01 PM, Stephen Warren <swarren@wwwdotorg.org>
+>> wrote:
+>>>
+>>> On 08/18/2014 11:08 AM, Andrew Bresticker wrote:
+>>>>
+>>>> +static int tegra_xusb_mbox_probe(struct platform_device *pdev)
+>>>
+>>>
+>>>
+>>>> +       res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+>>>>
+>>>> +       if (!res)
+>>>> +               return -ENODEV;
+>>>
+>>>
+>>>
+>>> Should devm_request_mem_region() be called here to claim the region?
+>>
+>>
+>> No, the xHCI host driver also needs to map these registers, so they
+>> cannot be mapped exclusively here.
+>
+>
+> That's unfortunate. Having multiple drivers with overlapping register
+> regions is not a good idea. Can we instead have a top-level driver map all
+> the IO regions, then instantiate the various different sub-components
+> internally, and divide up the address space. Probably via MFD or similar.
+> That would prevent multiple drivers from touching the same register region.
 
-This patch modifes output_mask calculation logic for stage 1 and allow
-max possible value supported by SMMU implementaions for translations,
-where stage 2 is bypassed.
-
-Erlier it is not possible to access full supported PA address with stage 1,
-even if it is supported by SMMU and stage 2 is bypass.
-
-Signed-off-by: Tirumalesh Chalamarla <tchalamarla@cavium.com>
----
- drivers/iommu/arm-smmu.c | 31 +++++++++++++++++++++++--------
- 1 file changed, 23 insertions(+), 8 deletions(-)
-
-diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
-index a6b00bd..56cf42d 100644
---- a/drivers/iommu/arm-smmu.c
-+++ b/drivers/iommu/arm-smmu.c
-@@ -707,6 +707,17 @@ static void arm_smmu_init_context_bank(struct arm_smmu_domain *smmu_domain)
- 	struct arm_smmu_cfg *cfg = &smmu_domain->cfg;
- 	struct arm_smmu_device *smmu = smmu_domain->smmu;
- 	void __iomem *cb_base, *gr0_base, *gr1_base;
-+	unsigned long s1_out_size;
-+
-+	if (cfg->cbar == CBAR_TYPE_S1_TRANS_S2_BYPASS) {
-+		s1_out_size = smmu->s1_output_size;
-+	} else {
-+#ifdef CONFIG_64BIT
-+		s1_out_size = min((unsigned long)VA_BITS, smmu->s1_output_size);
-+#else
-+		s1_out_size = min(32UL, smmu->s1_output_size);
-+#endif
-+	}
- 
- 	gr0_base = ARM_SMMU_GR0(smmu);
- 	gr1_base = ARM_SMMU_GR1(smmu);
-@@ -762,7 +773,7 @@ static void arm_smmu_init_context_bank(struct arm_smmu_domain *smmu_domain)
- 			break;
- 		}
- 
--		switch (smmu->s1_output_size) {
-+		switch (s1_out_size) {
- 		case 32:
- 			reg |= (TTBCR2_ADDR_32 << TTBCR2_PASIZE_SHIFT);
- 			break;
-@@ -808,7 +819,7 @@ static void arm_smmu_init_context_bank(struct arm_smmu_domain *smmu_domain)
- 			reg = TTBCR_TG0_64K;
- 
- 		if (!stage1) {
--			reg |= (64 - smmu->s1_output_size) << TTBCR_T0SZ_SHIFT;
-+			reg |= (64 - s1_out_size) << TTBCR_T0SZ_SHIFT;
- 
- 			switch (smmu->s2_output_size) {
- 			case 32:
-@@ -1411,9 +1422,17 @@ static int arm_smmu_handle_mapping(struct arm_smmu_domain *smmu_domain,
- 	if (cfg->cbar == CBAR_TYPE_S2_TRANS) {
- 		stage = 2;
- 		output_mask = (1ULL << smmu->s2_output_size) - 1;
--	} else {
-+	} else if (cfg->cbar == CBAR_TYPE_S1_TRANS_S2_BYPASS) {
- 		stage = 1;
- 		output_mask = (1ULL << smmu->s1_output_size) - 1;
-+	} else {
-+		stage = 1;
-+#ifdef CONFIG_64BIT
-+		output_mask = (1ULL << min((unsigned long)VA_BITS,
-+					smmu->s1_output_size)) - 1;
-+#else
-+		output_mask = (1ULL << min(32UL, smmu->s1_output_size)) - 1;
-+#endif
- 	}
- 
- 	if (!pgd)
-@@ -1777,11 +1796,7 @@ static int arm_smmu_device_cfg_probe(struct arm_smmu_device *smmu)
- 	 * Stage-1 output limited by stage-2 input size due to pgd
- 	 * allocation (PTRS_PER_PGD).
- 	 */
--#ifdef CONFIG_64BIT
--	smmu->s1_output_size = min((unsigned long)VA_BITS, size);
--#else
--	smmu->s1_output_size = min(32UL, size);
--#endif
-+	smmu->s1_output_size = size;
- 
- 	/* The stage-2 output mask is also applied for bypass */
- 	size = arm_smmu_id_size_to_bits((id >> ID2_OAS_SHIFT) & ID2_OAS_MASK);
--- 
-1.9.3
+Perhaps I'm misunderstanding, but I don't see how MFD would prevent us
+from having to map this register space in two different locations -
+the XUSB FPCI address space cannot be divided cleanly between host and
+mailbox registers.  Or are you saying that there should be a separate
+device driver that exposes an API for accessing this register space,
+like the Tegra fuse or PMC drivers?
