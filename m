@@ -1,47 +1,39 @@
-From: dianders@google.com (Doug Anderson)
-Date: Wed, 27 Aug 2014 08:52:50 -0700
-Subject: [PATCH V2 3/3] mmc: dw_mmc: Dont cut off vqmmc and vmmc
-In-Reply-To: <CAPDyKFpUU643iXVbxuu9Vx1zY0K7x4z-ZxxVEWd+Lsuwp0iA+g@mail.gmail.com>
-References: <1408715272-13833-1-git-send-email-yuvaraj.cd@samsung.com>
- <1408715272-13833-4-git-send-email-yuvaraj.cd@samsung.com>
- <CAPDyKFqz8sGj2td=ihZXN4zvAqmu9FHZjWdCn-ZRcdHugNHe2g@mail.gmail.com>
- <CAPz6YkXH1mMOTwcLkKdffdUHN+TaCAhpa8oG0h+rFn9i+GMoCw@mail.gmail.com>
- <CAPDyKFqp7oEt9ASmdxrgUwbQ8aTZzAuJ7uD1oGN50iuzPzBfVg@mail.gmail.com>
- <CAD=FV=VQWzhiSU+iULACj+Dp_tDf3SszQ8ELLEGqVEyJJRQy1Q@mail.gmail.com>
- <CAPDyKFo9-5=uPqD8RvLGsYtSCynBFnGGeSCpwLZuzDtW+652hA@mail.gmail.com>
- <CAD=FV=VveHTYmiBu42DJeFFGARV2+1bS6Y2CQM995YkX_O9SQA@mail.gmail.com>
- <CAPDyKFpUU643iXVbxuu9Vx1zY0K7x4z-ZxxVEWd+Lsuwp0iA+g@mail.gmail.com>
-Message-ID: <CAD=FV=Vqz=kA=D5KDyq_QuPi-6B05VixYManTsFe2PC-fzxRkw@mail.gmail.com>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Wed, 27 Aug 2014 09:58:44 -0600
+Subject: [PATCH v7 3/8] cpufreq: kirkwood: Remove use of the clk provider
+ API
+In-Reply-To: <20140826233008.5251.50447@quantum>
+References: <1408375833-10703-1-git-send-email-tomeu.vizoso@collabora.com>
+ <1408375833-10703-4-git-send-email-tomeu.vizoso@collabora.com>
+ <20140820225513.5251.284@quantum> <53F5A587.9030200@collabora.com>
+ <20140821133825.GH8608@lunn.ch> <20140822192933.5251.53733@quantum>
+ <20140822201112.GH17277@lunn.ch>
+ <20140826214631.5251.66177@quantum> <20140826223637.GA5324@lunn.ch>
+ <20140826233008.5251.50447@quantum>
+Message-ID: <20140827155844.GA911@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ulf,
+On Tue, Aug 26, 2014 at 04:30:08PM -0700, Mike Turquette wrote:
 
-On Wed, Aug 27, 2014 at 4:17 AM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
->> Now, we've got MMC_CAP_NEEDS_POLL, so dw_mmc will periodically be
->> called to check the card detect line, but with vmmc and vqmmc off.  It
->> will be unable to return a sensible value without actually turning on
->> vmmc and vqmmc.
->
-> Currently MMC_CAP_NEEDS_POLL mean the mmc rescan work will reschedule
-> itself with HZ interval. This to check for card insert/removal.
->
-> Now, mmc_rescan() will, if present, invoke host's ->get_cd() callback
-> to check whether it's worth to continue initialization sequence or if
-> it should re-schedule itself again.
->
-> If your host driver can distinguish whether a card is inserted, which
-> in this case are when vccq is turned off, your ->get_cd() callback need
-> to return 1. That will allow mmc_rescan() to continue it's
-> initialization sequence and do mmc_power_up().
+> 2) for the kexec-kernel-case, the responsibility is on the first kernel
+> to set things up in a good state for the second kernel, with the
+> exception of using kexec to debug/examime/recover from a kernel crash,
+> in which case you likely don't care about this stuff as much
 
-As per my other email, we can't tell whether a card is inserted when
-vqmmc is off.
+FWIW, we frequently use a kexec flow on Kirkwood for development here
+- and I have not been able to get the initial kernel to cleanly shut
+down before kexec'ing the second kernel.
 
-Does this mean that you have removed your objections to a solution
-like Yuvaraj has posted?  We still need to break it into two patches
-(the core part and the dwmmc part), but otherwise is it OK?  I can
-post the original patch I sent Yuvaraj if it's helpful (or he can just
-include my patch as part 1 of his series).
+The flow we've had to use involved including a pre-kernel stub in the
+kexec flow that goes around and cleans up all the registers enough so
+that the 2nd kernel will work properly. Critically it does things like
+turn off ethernet DMA, because the initial kernel won't even do that
+:|
 
--Doug
+There is some kind of support for doing this, but I ran out of time
+unraveling the mess of config options to actually turn it on for
+kirkwood.. It is tied to PM support which was/is missing elements on
+Kirkwood..
+
+Jason
