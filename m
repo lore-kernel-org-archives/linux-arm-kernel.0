@@ -1,109 +1,52 @@
 From: ch.naveen@samsung.com (Naveen Krishna Chatradhi)
-Date: Wed, 27 Aug 2014 15:14:19 +0530
-Subject: [PATCH 12/14] arm64: dts: add Exynos7 based Espresso board dts file
+Date: Wed, 27 Aug 2014 15:14:20 +0530
+Subject: [PATCH 13/14] arm64: exynos7: Enable ARMv8 based Exynos7 (SoC) support
 In-Reply-To: <1409132660-1898-1-git-send-email-ch.naveen@samsung.com>
 References: <1409132660-1898-1-git-send-email-ch.naveen@samsung.com>
-Message-ID: <1409132660-1898-4-git-send-email-ch.naveen@samsung.com>
+Message-ID: <1409132660-1898-5-git-send-email-ch.naveen@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds initial dts file for the Espresso board
-based on Exynos7 from Samsung.
+From: Alim Akhtar <alim.akhtar@samsung.com>
 
+This patch adds the necessary Kconfig entries to enable
+support for the ARMv8 based Exynos7 SoC.
+
+Signed-off-by: Alim Akhtar <alim.akhtar@samsung.com>
 Signed-off-by: Naveen Krishna Chatradhi <ch.naveen@samsung.com>
 Cc: Rob Herring <robh@kernel.org>
 Cc: Catalin Marinas <catalin.marinas@arm.com>
 ---
- arch/arm64/boot/dts/Makefile             |    1 +
- arch/arm64/boot/dts/exynos7-espresso.dts |   69 ++++++++++++++++++++++++++++++
- 2 files changed, 70 insertions(+)
- create mode 100644 arch/arm64/boot/dts/exynos7-espresso.dts
+ arch/arm64/Kconfig |   17 +++++++++++++++++
+ 1 file changed, 17 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/Makefile b/arch/arm64/boot/dts/Makefile
-index c52bdb0..d160de1 100644
---- a/arch/arm64/boot/dts/Makefile
-+++ b/arch/arm64/boot/dts/Makefile
-@@ -1,5 +1,6 @@
- dtb-$(CONFIG_ARCH_VEXPRESS) += rtsm_ve-aemv8a.dtb foundation-v8.dtb
- dtb-$(CONFIG_ARCH_XGENE) += apm-mustang.dtb
-+dtb-$(CONFIG_ARCH_EXYNOS7) += exynos7-espresso.dtb
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index fd4e81a..d555558 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -134,6 +134,23 @@ source "kernel/Kconfig.freezer"
  
- targets += dtbs
- targets += $(dtb-y)
-diff --git a/arch/arm64/boot/dts/exynos7-espresso.dts b/arch/arm64/boot/dts/exynos7-espresso.dts
-new file mode 100644
-index 0000000..e35e83c
---- /dev/null
-+++ b/arch/arm64/boot/dts/exynos7-espresso.dts
-@@ -0,0 +1,69 @@
-+/*
-+ * SAMSUNG Espresso board device tree source
-+ *
-+ * Copyright (c) 2014 Samsung Electronics Co., Ltd.
-+ *		http://www.samsung.com
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+*/
+ menu "Platform selection"
+ 
++config ARCH_EXYNOS7
++	bool "ARMv8 based SAMSUNG EXYNOS7"
++	select HAVE_S3C2410_WATCHDOG if WATCHDOG
++	select CLKSRC_OF
++	select COMMON_CLK_SAMSUNG
++	select GPIOLIB
++	select PINCTRL
++	select PINCTRL_EXYNOS
++	select RTC_CLASS
++	select HAVE_S3C_RTC
++	select GENERIC_GPIO
++	select ARCH_REQUIRE_GPIOLIB
++	select HAVE_CLK
++	select HAVE_SMP
++	help
++	  This enables support for SAMSUNG exynos7 SoC family
 +
-+/dts-v1/;
-+#include <dt-bindings/gpio/gpio.h>
-+#include "exynos7.dtsi"
-+
-+/ {
-+	model = "Samsung ESPRESSO board based on EXYNOS7";
-+	compatible = "samsung,espresso", "samsung,exynos7";
-+
-+	chosen {
-+		bootargs = "console=ttySAC2,115200n8 root=/dev/ram0 ramdisk=16384 initrd=0x42000000,16M init=/linuxrc";
-+	};
-+
-+	memory at 40000000 {
-+		device_type = "memory";
-+		reg = <0x40000000 0xC0000000>;
-+	};
-+
-+	mmc at 15740000 {
-+		status = "okay";
-+		num-slots = <1>;
-+		broken-cd;
-+		caps2-mmc-hs200-1_8v;
-+		supports-highspeed;
-+		non-removable;
-+		card-detect-delay = <200>;
-+		clock-frequency = <800000000>;
-+		samsung,dw-mshc-ciu-div = <3>;
-+		samsung,dw-mshc-sdr-timing = <0 4>;
-+		samsung,dw-mshc-ddr-timing = <0 2>;
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&sd0_clk &sd0_cmd &sd0_rdqs &sd0_bus1 &sd0_bus4 &sd0_bus8>;
-+		bus-width = <8>;
-+
-+		slot at 0 {
-+			reg = <0>;
-+			bus-width = <8>;
-+		};
-+	};
-+
-+	mmc at 15560000 {
-+		num-slots = <1>;
-+		supports-highspeed;
-+		card-detect-delay = <200>;
-+		clock-frequency = <400000000>;
-+		samsung,dw-mshc-ciu-div = <3>;
-+		samsung,dw-mshc-sdr-timing = <2 3>;
-+		samsung,dw-mshc-ddr-timing = <1 2>;
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&sd2_clk &sd2_cmd &sd2_cd &sd2_bus1 &sd2_bus4>;
-+		bus-width = <4>;
-+
-+		slot at 0 {
-+			reg = <0>;
-+			disable-wp;
-+			bus-width = <4>;
-+		};
-+	};
-+};
+ config ARCH_VEXPRESS
+ 	bool "ARMv8 software model (Versatile Express)"
+ 	select ARCH_REQUIRE_GPIOLIB
 -- 
 1.7.9.5
