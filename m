@@ -1,166 +1,180 @@
-From: james.hogan@imgtec.com (James Hogan)
-Date: Wed, 27 Aug 2014 10:30:10 +0100
-Subject: [PATCHv7 3/5] common: dma-mapping: Introduce common remapping
- functions
-In-Reply-To: <53FCBCC3.5040901@codeaurora.org>
-References: <1407800431-21566-1-git-send-email-lauraa@codeaurora.org>	<1407800431-21566-4-git-send-email-lauraa@codeaurora.org>
- <CAAG0J99=wrz4+c49HeDvL0W9rDZKk2HNLdVtHv4ZJxU4-OjewA@mail.gmail.com>
- <53FCBCC3.5040901@codeaurora.org>
-Message-ID: <53FDA522.2010106@imgtec.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Wed, 27 Aug 2014 11:31:24 +0200
+Subject: [linux-sunxi] Re: [PATCH 4/4] simplefb: add clock handling code
+In-Reply-To: <53FCE704.4030103@redhat.com>
+References: <20140825133953.GJ4163@ulmo.nvidia.com>
+ <53FB3E7F.4000503@redhat.com>
+ <20140825141600.GA14763@ulmo.nvidia.com>
+ <20140825145854.GA15297@lukather>
+ <20140825150501.GE14763@ulmo.nvidia.com>
+ <20140825152232.GE15297@lukather> <20140826080432.GD17263@ulmo>
+ <20140826135341.GM15297@lukather> <20140826143550.GB3027@ulmo>
+ <53FCE704.4030103@redhat.com>
+Message-ID: <20140827093121.GA23186@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26/08/14 17:58, Laura Abbott wrote:
-> On 8/26/2014 3:05 AM, James Hogan wrote:
->> On 12 August 2014 00:40, Laura Abbott <lauraa@codeaurora.org> wrote:
->>>
->>> For architectures without coherent DMA, memory for DMA may
->>> need to be remapped with coherent attributes. Factor out
->>> the the remapping code from arm and put it in a
->>> common location to reduce code duplication.
->>>
->>> As part of this, the arm APIs are now migrated away from
->>> ioremap_page_range to the common APIs which use map_vm_area for remapping.
->>> This should be an equivalent change and using map_vm_area is more
->>> correct as ioremap_page_range is intended to bring in io addresses
->>> into the cpu space and not regular kernel managed memory.
->>>
->>> Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
->>> Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
->>
->> This commit in linux-next () breaks the build for metag:
->>
->> drivers/base/dma-mapping.c: In function ?dma_common_contiguous_remap?:
->> drivers/base/dma-mapping.c:294: error: implicit declaration of
->> function ?dma_common_pages_remap?
->> drivers/base/dma-mapping.c:294: warning: assignment makes pointer from
->> integer without a cast
->> drivers/base/dma-mapping.c: At top level:
->> drivers/base/dma-mapping.c:308: error: conflicting types for
->> ?dma_common_pages_remap?
->> drivers/base/dma-mapping.c:294: error: previous implicit declaration
->> of ?dma_common_pages_remap? was here
->>
->> Looks like metag isn't alone either:
->>
->> $ git grep -L dma-mapping-common arch/*/include/asm/dma-mapping.h
->> arch/arc/include/asm/dma-mapping.h
->> arch/avr32/include/asm/dma-mapping.h
->> arch/blackfin/include/asm/dma-mapping.h
->> arch/c6x/include/asm/dma-mapping.h
->> arch/cris/include/asm/dma-mapping.h
->> arch/frv/include/asm/dma-mapping.h
->> arch/m68k/include/asm/dma-mapping.h
->> arch/metag/include/asm/dma-mapping.h
->> arch/mn10300/include/asm/dma-mapping.h
->> arch/parisc/include/asm/dma-mapping.h
->> arch/xtensa/include/asm/dma-mapping.h
->>
->> I've checked a couple of these arches (blackfin, xtensa) which don't
->> include dma-mapping-common.h and their builds seem to be broken too.
->>
->> Cheers
->> James
->>
-> 
-> Thanks for the report. Would you mind giving the following patch
-> a test (this is theoretical only but I think it should work)
+Can you please fix you mail setup. You're addressing me directly in this
+email, yet I'm neither in To: nor Cc: headers. That's really annoying.
 
-It certainly fixes the build for metag.
+On Tue, Aug 26, 2014 at 09:59:00PM +0200, Hans de Goede wrote:
+> Hi,
+> 
+> On 08/26/2014 04:35 PM, Thierry Reding wrote:
+> >On Tue, Aug 26, 2014 at 03:53:41PM +0200, Maxime Ripard wrote:
+> >>On Tue, Aug 26, 2014 at 10:04:33AM +0200, Thierry Reding wrote:
+> >>>>>No. simplefb just wants to write to some memory that hardware has been
+> >>>>>set up to scan out. The platform requires that the clocks be on. Other
+> >>>>>platforms may not even allow turning off the clocks.
+> >>>>
+> >>>>Like what? the rpi? Come on. Just because the videocore is some black
+> >>>>box we know nothing about doesn't mean we should use it as an example.
+> >>>
+> >>>You make it sound like the Raspberry Pi is somehow less important than
+> >>>sunxi.
+> >>
+> >>No. What I mean is that it seems like we are somehow punished, or at
+> >>least blamed, for having a better and more complete kernel support.
+> >
+> >This isn't a competition. Nobody's punishing or blaming anyone. This is
+> >about finding the best solution for the problem at hand.
+> >
+> >>>>Any decent enough SoC, with a decent support in the kernel will have
+> >>>>clocks for this, and I really wonder how simplefb will behave once its
+> >>>>clocks will be turned off...
+> >>>
+> >>>There are other devices besides ARM SoCs that may want to use this
+> >>>driver and that don't have clock support.
+> >>
+> >>And in this case, with this patch, simplefb will not claim any clock,
+> >>nor will fail probing.
+> >>
+> >>>But you're missing my point. What I'm saying is that the simplefb driver
+> >>>is meant to serve as a way to take over whatever framebuffer a firmware
+> >>>set up. Therefore I think it makes the most sense to assume that nothing
+> >>>needs to be controlled in any way since already been set up by firmware.
+> >>>Eventually there should be a driver that takes over from simplefb that
+> >>>knows how to properly handle the device's specifics, but that's not
+> >>>simplefb.
+> >>
+> >>I guess such a hand over if it were to happen in the kernel would
+> >>involve the second driver claiming the resources before the first one
+> >>release them. How is that different in this case?
+> >
+> >It's different in that that driver will be hardware specific and know
+> >exactly what clock and other resources are required. It will have a
+> >device-specific binding.
+> >
+> >>>The goal of this patch series is to keep clocks from being turned off.
+> >>>But that's not what it does. What it does is turn clocks on to prevent
+> >>>them from being turned off. In my opinion that's a workaround for a
+> >>>deficiency in the kernel (and the firmware/kernel interface) and I think
+> >>>it should be fixed at the root. So a much better solution would be to
+> >>>establish a way for firmware to communicate to the kernel that a given
+> >>>resource has been enabled by firmware and shouldn't be disabled. Such a
+> >>>solution can be implement for all types of resources and can be reused
+> >>>by all drivers since they don't have to worry about these details.
+> >>
+> >>Mike Turquette repeatedly said that he was against such a DT property:
+> >>https://lkml.org/lkml/2014/5/12/693
+> >
+> >Mike says in that email that he's opposing the addition of a property
+> >for clocks that is the equivalent of regulator-always-on. That's not
+> >what this is about. If at all it'd be a property to mark a clock that
+> >should not be disabled by default because it's essential.
+> >
+> >Adding Mike on this subthread too.
+> >
+> >Either way, Mark already suggested a different alternative in another
+> >subthread, namely to add a new kind of checkpoint at which subsystems
+> >can call a "disable unused" function that's called later than a late
+> >initcall. This is not going to fix things for you immediately because
+> >the clocks will still be switched off (only later) if you don't have
+> >a real driver that's claiming the clocks. But you can work around that
+> >for now by making the relevant clocks always on and remove that
+> >workaround once a real driver is loaded that knows how to handle them
+> >properly.
+> 
+> This will simply not work, and is a ton more complicated then
+> simply teaching simplefb about a clocks property, which is a really simple
+> and clean patch.
+> 
+> First of all let me explain why this won't work. When should those
+> subsystems call this "later then a late initcall" call ? the kms driver
+> may very well be a kernel module, which will be loaded by userspace,
+> so we would need this to be triggered by userspace, but when ?
+> 
+> When the initrd is done? What then if the kms driver is not in the initrd,
+> so maybe when udev is done enumerating devices, but what then if the kernel
+> is still enumerating hardware at this time?
 
-Thanks
-James
+Usually an initrd knows how to wait for all or a given set of devices to
+be probed. udev is pretty good for that.
 
-> 
-> -----8<------
-> 
-> From 81c9a5504cbc1d72ff1df084d48502b248cd79d0 Mon Sep 17 00:00:00 2001
-> From: Laura Abbott <lauraa@codeaurora.org>
-> Date: Tue, 26 Aug 2014 09:50:49 -0700
-> Subject: [PATCH] common: dma-mapping: Swap function order
-> 
-> Fix the order of dma_common_contiguous_remap and
-> dma_common_pages_remap to avoid function declaration errors:
-> 
-> drivers/base/dma-mapping.c: In function 'dma_common_contiguous_remap':
-> drivers/base/dma-mapping.c:294: error: implicit declaration of
-> function 'dma_common_pages_remap'
-> drivers/base/dma-mapping.c:294: warning: assignment makes pointer from
-> integer without a cast
-> drivers/base/dma-mapping.c: At top level:
-> drivers/base/dma-mapping.c:308: error: conflicting types for
-> 'dma_common_pages_remap'
-> drivers/base/dma-mapping.c:294: error: previous implicit declaration
-> of 'dma_common_pages_remap' was here
-> 
-> Change-Id: I65db739114e8f5816a24a279a2ff1a6dc92e2b83
-> Reported-by: James Hogan <james.hogan@imgtec.com>
-> Reported-by: kbuild test robot <fengguang.wu@intel.com>
-> Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
-> ---
->  drivers/base/dma-mapping.c | 44 ++++++++++++++++++++++----------------------
->  1 file changed, 22 insertions(+), 22 deletions(-)
-> 
-> diff --git a/drivers/base/dma-mapping.c b/drivers/base/dma-mapping.c
-> index 1bc46df..056fd46 100644
-> --- a/drivers/base/dma-mapping.c
-> +++ b/drivers/base/dma-mapping.c
-> @@ -271,6 +271,28 @@ int dma_common_mmap(struct device *dev, struct vm_area_struct *vma,
->  EXPORT_SYMBOL(dma_common_mmap);
->  
->  /*
-> + * remaps an array of PAGE_SIZE pages into another vm_area
-> + * Cannot be used in non-sleeping contexts
-> + */
-> +void *dma_common_pages_remap(struct page **pages, size_t size,
-> +			unsigned long vm_flags, pgprot_t prot,
-> +			const void *caller)
-> +{
-> +	struct vm_struct *area;
-> +
-> +	area = get_vm_area_caller(size, vm_flags, caller);
-> +	if (!area)
-> +		return NULL;
-> +
-> +	if (map_vm_area(area, prot, pages)) {
-> +		vunmap(area->addr);
-> +		return NULL;
-> +	}
-> +
-> +	return area->addr;
-> +}
-> +
-> +/*
->   * remaps an allocated contiguous region into another vm_area.
->   * Cannot be used in non-sleeping contexts
->   */
-> @@ -299,28 +321,6 @@ void *dma_common_contiguous_remap(struct page *page, size_t size,
->  }
->  
->  /*
-> - * remaps an array of PAGE_SIZE pages into another vm_area
-> - * Cannot be used in non-sleeping contexts
-> - */
-> -void *dma_common_pages_remap(struct page **pages, size_t size,
-> -			unsigned long vm_flags, pgprot_t prot,
-> -			const void *caller)
-> -{
-> -	struct vm_struct *area;
-> -
-> -	area = get_vm_area_caller(size, vm_flags, caller);
-> -	if (!area)
-> -		return NULL;
-> -
-> -	if (map_vm_area(area, prot, pages)) {
-> -		vunmap(area->addr);
-> -		return NULL;
-> -	}
-> -
-> -	return area->addr;
-> -}
-> -
-> -/*
->   * unmaps a range previously mapped by dma_common_*_remap
->   */
->  void dma_common_free_remap(void *cpu_addr, size_t size, unsigned long vm_flags)
-> 
+> Will we just put a sleep 30
+> in our initscripts to make sure the kernel is done scanning all busses,
+> will that be long enough? Maybe we need to re-introduce the scsi_wait_done
+> kernel module which was added as an ugly hack to allow userspace to wait
+> for the kernel to have finished scanning scsi (and ata / sata) busses,
+> for controllers found at the time the module was load. Which never worked
+> reliable, because it would be possible that the controller itself still
+> needed to be discovered. We've spend years cleaning up userspace enough
+> to be able to kill scsi_wait_done. We've already been down this road of
+> waiting for hw enumeration to be done, and the problem is that on
+> modern systems *it is never done*.
+
+Those are mostly integration issues. If you don't load the driver from
+initrd then I don't think anybody will complain when there's flicker
+when it finally gets loaded. The whole point of this is to have early
+access to the framebuffer and get display and graphics going as soon as
+possible, so please don't pull in hypothetical scenarios where people
+manually load drivers half an hour after the system has booted.
+
+> So second of all, Thierry, what exactly is the technical argument against
+> adding support for dealing with clocks to simplefb ?
+
+I've already stated technical arguments against it. You could just go
+back and read the thread again, or would you rather want me to repeat
+them for your convenience?
+
+> I've heard a lot of people in favor of it,
+
+Of course you have, all the people in favour of it are sunxi people that
+really want to see this merged because it gives them working display
+after U-Boot.
+
+> and only pretty much you against it,
+
+At least Stephen also spoke out about it. But this quickly devolved into
+the kind of thread you want to get out of as quickly as possible, so I
+can't blame him for not continuing this discussion. In fact I'm very
+much regretting getting into this in the first place. You clearly have
+no intention to even consider any possible other solution that what was
+posted, so it's pretty useless to try and convince you.
+
+> and your argument so far seems to boil down to "I don't like it",
+
+I'm not surprised that you think so since you seem to be very selective
+in what you read (or register) and what you don't.
+
+> is not really a technical sound argument IMHO. Moreover all the
+> alternatives seem to be horribly complicated and most of them also
+> seem to have several issues which will make them simply not work
+> reliable.
+
+I'm not an unreasonable person, or at least I like to think so, and if
+there really isn't a better solution then I won't object to this patch
+any longer. But as it stands I am not convinced that this is the best
+solution, so I think we should keep the discussion going for a bit and
+see if we really can't come up with something that will fix this for a
+more general case rather than just your particular use-case. It's
+evidently a recurring problem that others suffer from, too.
+
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140827/0eb53001/attachment.sig>
