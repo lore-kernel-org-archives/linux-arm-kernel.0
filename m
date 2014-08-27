@@ -1,9 +1,9 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed, 27 Aug 2014 13:59:58 +0900
-Subject: [PATCH 1/3] clocksource: sh_cmt: Document SoC specific bindings
+Date: Wed, 27 Aug 2014 13:59:59 +0900
+Subject: [PATCH 2/3] clocksource: sh_mtu2: Document r7s72100 binding
 In-Reply-To: <1409115600-26192-1-git-send-email-horms+renesas@verge.net.au>
 References: <1409115600-26192-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1409115600-26192-2-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1409115600-26192-3-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -16,65 +16,41 @@ of a version and providing SoC-specific compat strings has been adopted.
 
 Although not universally liked this convention is used in the bindings
 for the drivers a number of drivers for Renesas hardware. The purpose
-of this patch is to update the Renesas R-Car Compare Match Timer (CMT)
-driver to follow this convention.
+of this patch is to update the Renesas R-Car Multi-Function Timer Pulse
+Unit 2 (MTU2) driver to follow this convention.
 
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 
 ---
-* I plan to follow up with patches to use these new bindings in the
-  dtsi files for the affected SoCs.
+* I plan to follow up with a patch patch to use the new binding in the
+  dtsi files for the r7s72100 SoC.
 ---
- .../devicetree/bindings/timer/renesas,cmt.txt      | 26 +++++++++++++++++++++-
- 1 file changed, 25 insertions(+), 1 deletion(-)
+ Documentation/devicetree/bindings/timer/renesas,mtu2.txt | 6 ++++--
+ 1 file changed, 4 insertions(+), 2 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/timer/renesas,cmt.txt b/Documentation/devicetree/bindings/timer/renesas,cmt.txt
-index a17418b..500bad2 100644
---- a/Documentation/devicetree/bindings/timer/renesas,cmt.txt
-+++ b/Documentation/devicetree/bindings/timer/renesas,cmt.txt
-@@ -16,10 +16,34 @@ Required Properties:
- 		(CMT0 on sh7372, sh73a0 and r8a7740)
-     - "renesas,cmt-32-fast" for the 32-bit CMT with fast clock support
- 		(CMT[234] on sh7372, sh73a0 and r8a7740)
-+    - "renesas,cmt-32-fast-r8a7740" for the R8A7740 32-bit CMT with fast
-+		clock support (CMT[234])
-+    - "renesas,cmt-32-fast-sh7372" for the SH7372 32-bit CMT with fast
-+		clock support (CMT[234])
-+    - "renesas,cmt-32-fast-sh73a0" for the SH73A0 32-bit CMT with fast
-+		clock support (CMT[234])
-+    - "renesas,cmt-32-r8a7740" for the R8a7740 32-bit CMT
-+		(CMT0)
-+    - "renesas,cmt-32-sh7372" for the SH7372 32-bit CMT
-+		(CMT0)
-+    - "renesas,cmt-32-sh73a0" for the SH73a0 32-bit CMT
-+		(CMT0)
-     - "renesas,cmt-48" for the 48-bit CMT
- 		(CMT1 on sh7372, sh73a0 and r8a7740)
-     - "renesas,cmt-48-gen2" for the second generation 48-bit CMT
- 		(CMT[01] on r8a73a4, r8a7790 and r8a7791)
-+    - "renesas,cmt-48-r8a73a4" for the R8A73A4 48-bit CMT
-+		(CMT[01])
-+    - "renesas,cmt-48-r8a7740" for the R8A7740 48-bit CMT
-+		(CMT1)
-+    - "renesas,cmt-48-r8a7790" for the R8A7790 48-bit CMT
-+		(CMT[01])
-+    - "renesas,cmt-48-r8a7791" for the R8A7791 48-bit CMT
-+		(CMT[01])
-+    - "renesas,cmt-48-sh7372" for the SH7372 48-bit CMT
-+		(CMT1)
-+    - "renesas,cmt-48-sh73a0" for the SH73A0 48-bit CMT
-+		(CMT1)
+diff --git a/Documentation/devicetree/bindings/timer/renesas,mtu2.txt b/Documentation/devicetree/bindings/timer/renesas,mtu2.txt
+index 917453f..ec4d334 100644
+--- a/Documentation/devicetree/bindings/timer/renesas,mtu2.txt
++++ b/Documentation/devicetree/bindings/timer/renesas,mtu2.txt
+@@ -8,7 +8,9 @@ are independent. The MTU2 hardware supports five channels indexed from 0 to 4.
+ 
+ Required Properties:
+ 
+-  - compatible: must contain "renesas,mtu2"
++  - compatible: must be one of the following.
++    - "renesas,mtu2" for generic MTU2
++    - "renesas,mtu2-r7s72100" for R7S72100 MTU2
  
    - reg: base address and length of the registers block for the timer module.
-   - interrupts: interrupt-specifier for the timer, one per channel.
-@@ -36,7 +60,7 @@ Example: R8A7790 (R-Car H2) CMT0 node
- 	them channels 0 and 1 in the documentation.
  
- 	cmt0: timer at ffca0000 {
--		compatible = "renesas,cmt-48-gen2";
-+		compatible = "renesas,cmt-48-r8a7790", "renesas,cmt-48-gen2";
- 		reg = <0 0xffca0000 0 0x1004>;
- 		interrupts = <0 142 IRQ_TYPE_LEVEL_HIGH>,
- 			     <0 142 IRQ_TYPE_LEVEL_HIGH>;
+@@ -26,7 +28,7 @@ Required Properties:
+ Example: R7S72100 (RZ/A1H) MTU2 node
+ 
+ 	mtu2: timer at fcff0000 {
+-		compatible = "renesas,mtu2";
++		compatible = "renesas,mtu2-r7s72100", "renesas,mtu2";
+ 		reg = <0xfcff0000 0x400>;
+ 		interrupts = <0 139 IRQ_TYPE_LEVEL_HIGH>,
+ 			     <0 146 IRQ_TYPE_LEVEL_HIGH>,
 -- 
 2.0.1
