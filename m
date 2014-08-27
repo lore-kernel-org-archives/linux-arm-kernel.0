@@ -1,47 +1,51 @@
-From: bjorn@kryo.se (Bjorn Andersson)
-Date: Wed, 27 Aug 2014 11:24:49 -0700
-Subject: use IORESOURCE_REG resource type for non-translatable addresses
- in DT
-In-Reply-To: <20140730060619.GC19933@codeaurora.org>
-References: <53D788A7.4020303@mm-sol.com> <3794875.CZFbAag5Sv@wuerfel>
- <53D7AA72.6010309@mm-sol.com>
- <20140729234522.E9FF1C40738@trevor.secretlab.ca>
- <53D84558.7060406@codeaurora.org>
- <CAL_JsqJjH0OH+X=fzwqAPeWarjoLev7v6Nv_QhAa+nZyztMnFA@mail.gmail.com>
- <20140730060619.GC19933@codeaurora.org>
-Message-ID: <CAJAp7OhoRQ1eWack1e=OL0cS4Fxmgxc7OWeNxcj1qt7Q-x-sQA@mail.gmail.com>
+From: khilman@deeprootsystems.com (Kevin Hilman)
+Date: Wed, 27 Aug 2014 11:27:38 -0700
+Subject: [PATCH 4/7] ARM: OMAP2+: powerdomain: introduce logic for finding
+ valid power domain
+In-Reply-To: <1408715373-25791-5-git-send-email-nm@ti.com> (Nishanth Menon's
+ message of "Fri, 22 Aug 2014 08:49:30 -0500")
+References: <1408715373-25791-1-git-send-email-nm@ti.com>
+ <1408715373-25791-5-git-send-email-nm@ti.com>
+Message-ID: <7h1ts1eqjp.fsf@paris.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 29, 2014 at 11:06 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
-> On 07/29, Rob Herring wrote:
-[..]
->>
->> You might as well do of_property_read_u32 in the below example.
->>
+Nishanth Menon <nm@ti.com> writes:
+
+> powerdomain configuration in OMAP is done using PWRSTCTRL register for
+> each power domain. However, PRCM lets us write any value we'd like to
+> the logic and power domain target states, however the SoC integration
+> tends to actually function only at a few discrete states. These valid
+> states are already in our powerdomains_xxx_data.c file.
 >
-> Fair enough. The example is probably too simple. Things are
-> sometimes slightly more complicated and a simple
-> of_property_read_u32() isn't going to work in the case of
-> multiple reg values or when reg-names is in play.
+> So, provide a function to easily query valid low power state that the
+> power domain is allowed to go to.
 >
+> Based on work originally done by Jean Pihet <j-pihet@ti.com>
+> https://patchwork.kernel.org/patch/1325091/ . There is no attempt to
+> create a new powerdomain solution here, except fixing issues seen
+> attempting invalid programming attempts. Future consolidation to the
+> generic powerdomain framework should consider this requirement as
+> well.
+>
+> Similar solutions have been done in product kernels in the past such
+> as:
+> https://android.googlesource.com/kernel/omap.git/+blame/android-omap-panda-3.0/arch/arm/mach-omap2/pm44xx.c
+>
+> Signed-off-by: Nishanth Menon <nm@ti.com>
+> ---
 
-But do we have such cases in the Qualcomm PMICs?
+nit: this is part of a fixes series, but it's more of a new feature.
 
-The only case I've hit so far is for gpios and mpps, where it feels
-like reg should be base, size and not simply base reg of first gpio -
-but that's a different thing.
+That being said, the feature is needed and looks OK, except for...
 
-Also, so far it seems like most drivers just code the base address in
-the driver, as we have very specific compatibles.
+> +up_search:
+> +	/* OK, no deeper ones, can we get a higher match? */
+> +	new_pwrst = req_state + 1;
+> +	while (!(pwrdm_states & BIT(new_pwrst))) {
+> +		/* BUG if we have messed up database */
+> +		BUG_ON(new_pwrst > PWRDM_POWER_ON);
 
+I don't think this is BUG() worthy, and should have a saner way to recover.
 
-How about we stop trying so hard to make this "perfect" and just merge
-something close to Josh's original proposal and ignore this problem?
-Currently all we're doing is delaying any possibility of getting
-drivers for the individual blocks merged.
-If we have the dt bindings require the reg to be there, we can discuss
-and change this all we want later!
-
-Regards,
-Bjorn
+Kevin
