@@ -1,140 +1,117 @@
 From: eric.auger@linaro.org (Eric Auger)
-Date: Wed, 27 Aug 2014 17:19:00 +0200
-Subject: [RFC 4/9] KVM: KVM-VFIO: update user API to program forwarded IRQ
-In-Reply-To: <1409079715.2906.127.camel@ul30vt.home>
+Date: Wed, 27 Aug 2014 17:20:46 +0200
+Subject: [RFC 5/9] VFIO: Extend external user API
+In-Reply-To: <1409079734.2906.129.camel@ul30vt.home>
 References: <1408973264-30384-1-git-send-email-eric.auger@linaro.org>	
- <1408973264-30384-5-git-send-email-eric.auger@linaro.org>
- <1409079715.2906.127.camel@ul30vt.home>
-Message-ID: <53FDF6E4.7090203@linaro.org>
+ <1408973264-30384-6-git-send-email-eric.auger@linaro.org>
+ <1409079734.2906.129.camel@ul30vt.home>
+Message-ID: <53FDF74E.6000201@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/26/2014 09:01 PM, Alex Williamson wrote:
+On 08/26/2014 09:02 PM, Alex Williamson wrote:
 > On Mon, 2014-08-25 at 15:27 +0200, Eric Auger wrote:
->> add new device group commands:
->> - KVM_DEV_VFIO_DEVICE_ASSIGN_IRQ and
->>   KVM_DEV_VFIO_DEVICE_DEASSIGN_IRQ
+>> New functions are added to be called from ARM KVM-VFIO device.
 >>
->> which enable to turn forwarded IRQ mode on/off.
+>> - vfio_device_get_external_user enables to get a vfio device from
+>>   its fd
+>> - vfio_device_put_external_user puts the vfio device
+>> - vfio_external_get_type enables to retrieve the type of the device
+>>   (PCI or platform)
+>> - vfio_external_get_base_device enables to get the
+>>   struct device*, useful to access the platform_device
 >>
 >> Signed-off-by: Eric Auger <eric.auger@linaro.org>
 >> ---
->>  Documentation/virtual/kvm/devices/vfio.txt | 25 +++++++++++++++++++++++++
->>  arch/arm/include/uapi/asm/kvm.h            |  6 ++++++
->>  include/uapi/linux/kvm.h                   |  3 +++
->>  3 files changed, 34 insertions(+)
+>>  drivers/vfio/vfio.c  | 35 +++++++++++++++++++++++++++++++++++
+>>  include/linux/vfio.h |  4 ++++
+>>  2 files changed, 39 insertions(+)
 >>
->> diff --git a/Documentation/virtual/kvm/devices/vfio.txt b/Documentation/virtual/kvm/devices/vfio.txt
->> index ef51740..c8b3fa1 100644
->> --- a/Documentation/virtual/kvm/devices/vfio.txt
->> +++ b/Documentation/virtual/kvm/devices/vfio.txt
->> @@ -13,6 +13,7 @@ VFIO-group is held by KVM.
+>> diff --git a/drivers/vfio/vfio.c b/drivers/vfio/vfio.c
+>> index 8e84471..c93b9e4 100644
+>> --- a/drivers/vfio/vfio.c
+>> +++ b/drivers/vfio/vfio.c
+>> @@ -1401,6 +1401,41 @@ void vfio_group_put_external_user(struct vfio_group *group)
+>>  }
+>>  EXPORT_SYMBOL_GPL(vfio_group_put_external_user);
 >>  
->>  Groups:
->>    KVM_DEV_VFIO_GROUP
->> +  KVM_DEV_VFIO_DEVICE
->>  
->>  KVM_DEV_VFIO_GROUP attributes:
->>    KVM_DEV_VFIO_GROUP_ADD: Add a VFIO group to VFIO-KVM device tracking
->> @@ -20,3 +21,27 @@ KVM_DEV_VFIO_GROUP attributes:
->>  
->>  For each, kvm_device_attr.addr points to an int32_t file descriptor
->>  for the VFIO group.
+>> +struct vfio_device *vfio_device_get_external_user(struct file *filep)
+>> +{
+>> +	struct vfio_device *vdev = filep->private_data;
 >> +
->> +KVM_DEV_VFIO_DEVICE attributes:
->> +  KVM_DEV_VFIO_DEVICE_ASSIGN_IRQ
->> +  KVM_DEV_VFIO_DEVICE_DEASSIGN_IRQ
+>> +	if (filep->f_op != &vfio_device_fops)
+>> +		return ERR_PTR(-EINVAL);
 >> +
->> +For each, kvm_device_attr.addr points to an kvm_arch_forwarded_irq.
->> +This user API makes possible to create a special IRQ handling mode,
->> +currently supported only on ARM, where KVM and a VFIO platform driver
->> +collaborate to improve IRQ handling performance.
->> +fd represents the file descriptor of a valid VFIO device whose physical
->> +IRQ, referenced by its irq_index is injected to the VM guest_irq.
+>> +	vfio_device_get(vdev);
+>> +	return vdev;
+>> +}
+>> +EXPORT_SYMBOL_GPL(vfio_device_get_external_user);
 >> +
->> +On ASSIGN_IRQ, KVM-VFIO device programs:
->> +- the host, to not complete the physical IRQ itself.
->> +- the GIC, to automatically complete the physical IRQ when the guest
->> +  completes the virtual IRQ
->> +This avoid trapping the end-of-interrupt for level sensitive IRQ.
+>> +void vfio_device_put_external_user(struct vfio_device *vdev)
+>> +{
+>> +	vfio_device_put(vdev);
+>> +}
+>> +EXPORT_SYMBOL_GPL(vfio_device_put_external_user);
 >> +
->> +On DEASSIGN_IRQ, one come back to the mode where the host completes the
->> +physical IRQ and the guest only completes the virtual IRQ.
->> +
->> +It is up to the caller of this API to get the assurance the IRQ is not
->> +outstanding when the ASSIGN/DEASSIGN is called. This could lead to some
->> +inconsistency on who is going to complete the IRQ.
+>> +int vfio_external_get_type(struct vfio_device *vdev)
+>> +{
+>> +	if (!strcmp(vdev->ops->name,  "vfio-platform"))
+>> +		return VFIO_DEVICE_FLAGS_PLATFORM;
+>> +	else if (!strcmp(vdev->ops->name,  "vfio-pci"))
+>> +		return VFIO_DEVICE_FLAGS_PCI;
+>> +	else
+>> +		return -EINVAL;
+>> +}
+>> +EXPORT_SYMBOL_GPL(vfio_external_get_type);
 > 
-> Why not call these FORWARD/UNFORWARD or something since the operation
-> isn't really doing anything with assignment of the IRQ.  The IRQ is
-> already "assigned", we're modifying the behavior.
+> Returning the bit of the flag we use in get_device_info looks rather
+> sloppy here.  Should we define a new enum for use with this?  Actually,
+> is this interface even necessary?  If we can get the struct device then
+> we can get the bus_type and keep vfio out of this.
 
-Sure I will change the name.
-
+thanks for the nit. I will try to get rid of it using it.
 > 
->> diff --git a/arch/arm/include/uapi/asm/kvm.h b/arch/arm/include/uapi/asm/kvm.h
->> index 3034c66..1920b33 100644
->> --- a/arch/arm/include/uapi/asm/kvm.h
->> +++ b/arch/arm/include/uapi/asm/kvm.h
->> @@ -109,6 +109,12 @@ struct kvm_sync_regs {
->>  struct kvm_arch_memory_slot {
->>  };
->>  
->> +struct kvm_arch_forwarded_irq {
->> +	__u32 fd; /* file desciptor of the VFIO device */
->> +	__u32 irq_index; /* platform device index of the IRQ */
-> 
-> The vfio-platform device IRQ index?  ARM is the only implementation we
-> have of this, but to keep it generic maybe the comment should read "vfio
-> device IRQ index".
+> For both of these last two, I like to use the convention that where
+> there is a "get" there is a matching "put".  These aren't reference
+> counting anything, so let's not use get in the name.
 
-I will replace by vfio device IRQ index.
-
-> 
->> +	__u32 guest_irq; /* virtual IRQ number */
-> 
-> This would be a GSI or similar concept if we were on x86.
-
-ok for GSI now this naming seems better understood by the ARM community
-too;-)
-
-  I'm a little
-> confused that were using an arch structure here rather than trying to
-> keep the kvm-vfio device interface neutral.
-
-I will move much more things on the generic side then then assuming that
-someone in the future may use such functionality. Actually the only ARM
-specific implementation is the GIC interrupt controller programming. As
-far as I see the rest is generic, in terms of API.
+I will rename.
 
 Thanks
 
 Eric
-
-  Maybe it makes sense, I'm
-> not sure.  Thanks,
+> 
+>> +
+>> +struct device *vfio_external_get_base_device(struct vfio_device *vdev)
+>> +{
+>> +	return vdev->dev;
+>> +}
+>> +EXPORT_SYMBOL_GPL(vfio_external_get_base_device);
+>> +
+> 
+> Looks almost too simple, but reviewing the object lifecycles, this all
+> looks safe.  Thanks,
 > 
 > Alex
 > 
->> +};
->> +
->>  /* If you need to interpret the index values, here is the key: */
->>  #define KVM_REG_ARM_COPROC_MASK		0x000000000FFF0000
->>  #define KVM_REG_ARM_COPROC_SHIFT	16
->> diff --git a/include/uapi/linux/kvm.h b/include/uapi/linux/kvm.h
->> index cf3a2ff..b149ba8 100644
->> --- a/include/uapi/linux/kvm.h
->> +++ b/include/uapi/linux/kvm.h
->> @@ -954,6 +954,9 @@ struct kvm_device_attr {
->>  #define  KVM_DEV_VFIO_GROUP			1
->>  #define   KVM_DEV_VFIO_GROUP_ADD			1
->>  #define   KVM_DEV_VFIO_GROUP_DEL			2
->> +#define  KVM_DEV_VFIO_DEVICE			2
->> +#define   KVM_DEV_VFIO_DEVICE_ASSIGN_IRQ			1
->> +#define   KVM_DEV_VFIO_DEVICE_DEASSIGN_IRQ			2
->>  #define KVM_DEV_TYPE_ARM_VGIC_V2	5
->>  #define KVM_DEV_TYPE_FLIC		6
+>>  int vfio_external_user_iommu_id(struct vfio_group *group)
+>>  {
+>>  	return iommu_group_id(group->iommu_group);
+>> diff --git a/include/linux/vfio.h b/include/linux/vfio.h
+>> index ffe04ed..19e98eb 100644
+>> --- a/include/linux/vfio.h
+>> +++ b/include/linux/vfio.h
+>> @@ -99,6 +99,10 @@ extern void vfio_group_put_external_user(struct vfio_group *group);
+>>  extern int vfio_external_user_iommu_id(struct vfio_group *group);
+>>  extern long vfio_external_check_extension(struct vfio_group *group,
+>>  					  unsigned long arg);
+>> +extern struct vfio_device *vfio_device_get_external_user(struct file *filep);
+>> +extern void vfio_device_put_external_user(struct vfio_device *vdev);
+>> +extern int vfio_external_get_type(struct vfio_device *vdev);
+>> +extern struct device *vfio_external_get_base_device(struct vfio_device *vdev);
 >>  
+>>  struct pci_dev;
+>>  #ifdef CONFIG_EEH
 > 
 > 
 > 
