@@ -1,88 +1,42 @@
-From: lv.zheng@intel.com (Zheng, Lv)
-Date: Wed, 27 Aug 2014 05:43:07 +0000
-Subject: [PATCH 1/9] ACPI / PM: Let acpi_dev_pm_detach() return an error
- code
-In-Reply-To: <1409054837-5667-2-git-send-email-ulf.hansson@linaro.org>
-References: <1409054837-5667-1-git-send-email-ulf.hansson@linaro.org>
- <1409054837-5667-2-git-send-email-ulf.hansson@linaro.org>
-Message-ID: <1AE640813FDE7649BE1B193DEA596E880265FDCA@SHSMSX101.ccr.corp.intel.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Wed, 27 Aug 2014 13:51:12 +0800
+Subject: [GIT PULL] ARM: imx: fixes for 3.17, 2nd take
+Message-ID: <20140827055110.GB28777@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+The following changes since commit 3bc4d037c6791c5089a04845995410aac4fdb514:
 
-> From: linux-acpi-owner at vger.kernel.org [mailto:linux-acpi-owner at vger.kernel.org] On Behalf Of Ulf Hansson
-> Sent: Tuesday, August 26, 2014 8:07 PM
-> To: Rafael J. Wysocki; Brown, Len; Pavel Machek; Greg Kroah-Hartman; linux-pm at vger.kernel.org
-> 
-> To give callers the option of acting on a errors while removing the
-> pm_domain ops for the device in the ACPI power domain, let
-> acpi_dev_pm_detach() return an int to provide the error code.
-> 
-> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
-> ---
->  drivers/acpi/device_pm.c | 4 ++++
->  include/linux/acpi.h     | 7 +++++--
->  2 files changed, 9 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/acpi/device_pm.c b/drivers/acpi/device_pm.c
-> index 67075f8..fa78abb 100644
-> --- a/drivers/acpi/device_pm.c
-> +++ b/drivers/acpi/device_pm.c
-> @@ -1087,6 +1087,8 @@ EXPORT_SYMBOL_GPL(acpi_dev_pm_attach);
->   *
->   * Callers must ensure proper synchronization of this function with power
->   * management callbacks.
-> + *
-> + * Returns 0 on successfully detached power domain or negative error code.
->   */
->  void acpi_dev_pm_detach(struct device *dev, bool power_off)
+  ARM: dts: imx6sx: fix the pad setting for uart CTS_B (2014-08-19 20:06:59 +0800)
 
-Should the return type be "int" here?
+are available in the git repository at:
 
-Thanks and best regards
--Lv
+  git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git tags/imx-fixes-3.17-2
 
->  {
-> @@ -1107,7 +1109,9 @@ void acpi_dev_pm_detach(struct device *dev, bool power_off)
->  			acpi_device_wakeup(adev, ACPI_STATE_S0, false);
->  			acpi_dev_pm_low_power(dev, adev, ACPI_STATE_S0);
->  		}
-> +		return 0;
->  	}
-> +	return -ENODEV;
->  }
->  EXPORT_SYMBOL_GPL(acpi_dev_pm_detach);
->  #endif /* CONFIG_PM */
-> diff --git a/include/linux/acpi.h b/include/linux/acpi.h
-> index 5320153..a7bfdf6 100644
-> --- a/include/linux/acpi.h
-> +++ b/include/linux/acpi.h
-> @@ -576,7 +576,7 @@ static inline int acpi_subsys_freeze(struct device *dev) { return 0; }
->  #if defined(CONFIG_ACPI) && defined(CONFIG_PM)
->  struct acpi_device *acpi_dev_pm_get_node(struct device *dev);
->  int acpi_dev_pm_attach(struct device *dev, bool power_on);
-> -void acpi_dev_pm_detach(struct device *dev, bool power_off);
-> +int acpi_dev_pm_detach(struct device *dev, bool power_off);
->  #else
->  static inline struct acpi_device *acpi_dev_pm_get_node(struct device *dev)
->  {
-> @@ -586,7 +586,10 @@ static inline int acpi_dev_pm_attach(struct device *dev, bool power_on)
->  {
->  	return -ENODEV;
->  }
-> -static inline void acpi_dev_pm_detach(struct device *dev, bool power_off) {}
-> +static inline int acpi_dev_pm_detach(struct device *dev, bool power_off)
-> +{
-> +	return -ENODEV;
-> +}
->  #endif
-> 
->  #ifdef CONFIG_ACPI
-> --
-> 1.9.1
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-acpi" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+for you to fetch changes up to bf8147208eab4a026558dcd686f76410de6c1643:
+
+  ARM: dts: microsom-ar8035: MDIO pad must be set open drain (2014-08-27 13:32:26 +0800)
+
+----------------------------------------------------------------
+i.MX fixes for 3.17, 2nd take:
+ - Fixes suspend/resume issue on imx53-qsrb due to PMIC IRQ pin
+   configuration missing
+ - A couple small SolidRun board fixes/correction from Rabeeh
+   and Russell
+
+----------------------------------------------------------------
+Fabio Estevam (1):
+      ARM: dts: imx53-qsrb: Fix suspend/resume
+
+Rabeeh Khoury (1):
+      ARM: dts: microsom-ar8035: MDIO pad must be set open drain
+
+Russell King (2):
+      ARM: dts: hummingboard/cubox-i: add USB OC pinctrl configuration
+      ARM: dts: hummingboard/cubox-i: change SPDIF output to be more descriptive
+
+ arch/arm/boot/dts/imx53-qsrb.dts               |  8 ++++++++
+ arch/arm/boot/dts/imx6dl-hummingboard.dts      |  4 +++-
+ arch/arm/boot/dts/imx6qdl-cubox-i.dtsi         | 19 ++++++++++++++-----
+ arch/arm/boot/dts/imx6qdl-microsom-ar8035.dtsi |  2 +-
+ 4 files changed, 26 insertions(+), 7 deletions(-)
