@@ -1,86 +1,87 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 27 Aug 2014 09:54:42 +0100
-Subject: [PATH V2 1/6] mm: Introduce a general RCU get_user_pages_fast.
-In-Reply-To: <1408635812-31584-2-git-send-email-steve.capper@linaro.org>
-References: <1408635812-31584-1-git-send-email-steve.capper@linaro.org>
- <1408635812-31584-2-git-send-email-steve.capper@linaro.org>
-Message-ID: <20140827085442.GD16376@arm.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 27 Aug 2014 10:55:38 +0200
+Subject: [linux-sunxi] Re: [PATCH 4/4] simplefb: add clock handling code
+In-Reply-To: <CAMuHMdVkEPBtVT0dcDqQOQ_J0p+zYJwaUW8LqQX0Z+h6CHihRg@mail.gmail.com>
+References: <20140825150705.GB15297@lukather> <20140826082626.GE17263@ulmo>
+ <20140826090035.GB17528@sirena.org.uk>
+ <20140826091853.GI17263@ulmo>
+ <20140826100612.GH17528@sirena.org.uk>
+ <20140826105451.GD31124@ulmo> <1409078409.2701.17.camel@localhost>
+ <20140827074057.GS17528@sirena.org.uk>
+ <20140827082208.GQ15297@lukather>
+ <CAMuHMdVkEPBtVT0dcDqQOQ_J0p+zYJwaUW8LqQX0Z+h6CHihRg@mail.gmail.com>
+Message-ID: <20140827085538.GS15297@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Steve,
+Hi!
 
-A few minor comments (took me a while to understand how this works, so I
-thought I'd make some noise :)
-
-On Thu, Aug 21, 2014 at 04:43:27PM +0100, Steve Capper wrote:
-> get_user_pages_fast attempts to pin user pages by walking the page
-> tables directly and avoids taking locks. Thus the walker needs to be
-> protected from page table pages being freed from under it, and needs
-> to block any THP splits.
+On Wed, Aug 27, 2014 at 10:37:36AM +0200, Geert Uytterhoeven wrote:
+> Hi Maxime,
 > 
-> One way to achieve this is to have the walker disable interrupts, and
-> rely on IPIs from the TLB flushing code blocking before the page table
-> pages are freed.
+> On Wed, Aug 27, 2014 at 10:22 AM, Maxime Ripard
+> <maxime.ripard@free-electrons.com> wrote:
+> > On Wed, Aug 27, 2014 at 08:40:57AM +0100, Mark Brown wrote:
+> >> On Tue, Aug 26, 2014 at 08:40:09PM +0200, Henrik Nordstr?m wrote:
+> >>
+> >> > It is not clear to me where the hardware resources should be listed in
+> >> > DT, being it a simplefb node or part of the actual hardware device node
+> >> > properly marked as dynamic boot defaults or something else? It's
+> >> > somewhere inbetween hardware and virtual device, and somewhat volatile.
+> >> > As far as simplefb is concerned it is a hardware desription of the
+> >> > framebuffer, but for a kms driver it's no more than firmware handover of
+> >> > boottime settings and ceases to exists once the kms driver have
+> >> > reconfigured the hardware.
+> >>
+> >> Is simplefb something that should be in the device tree distinctly in
+> >> the first place - shouldn't it be a subset of the functionality of the
+> >> video nodes?  It's the same hardware being driven differently.
+> >
+> > Therorically, yes, but that would mean knowing beforehand what the
+> > final binding will look like, even before submitting the driver. Since
+> > the bindings are always reviewed, and most of the time changed
+> > slightly, that wouldn't work very well with the DT as a stable ABI
+> > policy I guess.
 > 
-> On some platforms we have hardware broadcast of TLB invalidations, thus
-> the TLB flushing code doesn't necessarily need to broadcast IPIs; and
-> spuriously broadcasting IPIs can hurt system performance if done too
-> often.
+> If you don't know how the bindings for a device will look like at the time of
+> writing your DTS, you're always screwed, whether you add a simpefb
+> node or not.
 > 
-> This problem has been solved on PowerPC and Sparc by batching up page
-> table pages belonging to more than one mm_user, then scheduling an
-> rcu_sched callback to free the pages. This RCU page table free logic
-> has been promoted to core code and is activated when one enables
-> HAVE_RCU_TABLE_FREE. Unfortunately, these architectures implement
-> their own get_user_pages_fast routines.
-> 
-> The RCU page table free logic coupled with a an IPI broadcast on THP
-> split (which is a rare event), allows one to protect a page table
-> walker by merely disabling the interrupts during the walk.
+> If you know how the bindings look like, just add the device, with an extra
+> "linux,simplefb" compatibility value.
+> If you don't know how the bindings look like, do your utter best in
+> guessing. Your DTS must be amended later anyway, either because
+> you guessed wrong[*] (in case you added a node to have simplefb
+> working), or because you have to add a real device node (in case you
+> didn't add one for simplefb).
 
-Disabling interrupts isn't completely free (it's a self-synchronising
-operation on ARM). It would be interesting to see if your futex workload
-performance is improved by my simple irq_save optimisation for ARM:
+Let's be conservative and consider the case where we would guess
+wrong.
 
-  https://git.kernel.org/cgit/linux/kernel/git/will/linux.git/commit/?h=misc-patches&id=312a70adfa6f22e9d62803dd21400f481253e58b
+If we just rely on a simplefb node, when reviewing and integrating the
+"new" bindings to describe accureately the various IPs involved in the
+display path, we would obviously create new compatibles for
+them. Since it's new compatibles, we can come up with any binding we'd
+like, without have to consider the backward compatibility, since it's
+a new binding.
 
-(I've been struggling to show anything other than tiny improvements from
-that patch).
+Then, we just remove the simplefb, all is good.
 
-> This patch provides a general RCU implementation of get_user_pages_fast
-> that can be used by architectures that perform hardware broadcast of
-> TLB invalidations.
-> 
-> It is based heavily on the PowerPC implementation by Nick Piggin.
+If we were to try to create our bindings for all the IPs involved, and
+were not pleased with the binding anymore when merging the driver,
+then we would have to break the bindings, since we don't introduce a
+new compatible anymore, but modifying an existing one.
 
-[...]
+Maxime
 
-> diff --git a/mm/gup.c b/mm/gup.c
-> index 91d044b..2f684fa 100644
-> --- a/mm/gup.c
-> +++ b/mm/gup.c
-> @@ -10,6 +10,10 @@
->  #include <linux/swap.h>
->  #include <linux/swapops.h>
->  
-> +#include <linux/sched.h>
-> +#include <linux/rwsem.h>
-> +#include <asm/pgtable.h>
-> +
->  #include "internal.h"
->  
->  static struct page *no_page_table(struct vm_area_struct *vma,
-> @@ -672,3 +676,277 @@ struct page *get_dump_page(unsigned long addr)
->  	return page;
->  }
->  #endif /* CONFIG_ELF_CORE */
-> +
-> +#ifdef CONFIG_HAVE_RCU_GUP
-> +
-> +#ifdef __HAVE_ARCH_PTE_SPECIAL
-
-Do we actually require this (pte special) if hugepages are disabled or
-not supported?
-
-Will
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140827/c3b72ee2/attachment.sig>
