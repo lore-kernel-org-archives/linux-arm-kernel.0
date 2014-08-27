@@ -1,79 +1,57 @@
 From: b29396@freescale.com (Dong Aisheng)
-Date: Wed, 27 Aug 2014 15:26:29 +0800
-Subject: [PATCH V3 3/6] mmc: sdhci: add platform set_timeout hook
+Date: Wed, 27 Aug 2014 15:26:30 +0800
+Subject: [PATCH V3 4/6] mmc: sdhci-esdhc-imx: set the correct max timeout
+ value for uSDHC
 In-Reply-To: <1409124392-28899-1-git-send-email-b29396@freescale.com>
 References: <1409124392-28899-1-git-send-email-b29396@freescale.com>
-Message-ID: <1409124392-28899-4-git-send-email-b29396@freescale.com>
+Message-ID: <1409124392-28899-5-git-send-email-b29396@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently the common code assume 0xE is the maximum timeout counter
-value and use it to write into the timeout counter register.
-However, it's fairly possible that some other SoCs may have different
-max timeout register value. That means 0xE may be incorrect and
-becomes meaningless.
+The default sdhci driver write 0xE into timeout counter register to
+set the maximum timeout. The value is not correct for uSDHC since the
+max counter value for uSDHC is 0xF.
+Instead of using common timeout code in sdhci, we implement esdhc_set_timeout
+to handle the difference between eSDHC and uSDHC.
 
-It's also possible that other platforms has different timeout
-calculation algorithm. To be flexible, this patch provides a .set_timeout
-hook for those platforms to set the timeout on their way if they need.
+Currently we simply set the max timeout value as before.
+But in the future, we probably may implement IMX specific timeout
+setting algorithm and use suitable timeout for different CMDs.
 
 Reviewed-by: Shawn Guo <shawn.guo@linaro.org>
 Signed-off-by: Dong Aisheng <b29396@freescale.com>
 ---
- drivers/mmc/host/sdhci.c |   19 ++++++++++++++-----
- drivers/mmc/host/sdhci.h |    2 ++
- 2 files changed, 16 insertions(+), 5 deletions(-)
+ drivers/mmc/host/sdhci-esdhc-imx.c |   11 +++++++++++
+ 1 files changed, 11 insertions(+), 0 deletions(-)
 
-diff --git a/drivers/mmc/host/sdhci.c b/drivers/mmc/host/sdhci.c
-index d633f288..881a7a0 100644
---- a/drivers/mmc/host/sdhci.c
-+++ b/drivers/mmc/host/sdhci.c
-@@ -707,19 +707,28 @@ static void sdhci_set_transfer_irqs(struct sdhci_host *host)
- 	sdhci_writel(host, host->ier, SDHCI_SIGNAL_ENABLE);
+diff --git a/drivers/mmc/host/sdhci-esdhc-imx.c b/drivers/mmc/host/sdhci-esdhc-imx.c
+index 546ed02..587ee0e 100644
+--- a/drivers/mmc/host/sdhci-esdhc-imx.c
++++ b/drivers/mmc/host/sdhci-esdhc-imx.c
+@@ -888,6 +888,16 @@ static unsigned int esdhc_get_max_timeout_count(struct sdhci_host *host)
+ 	return esdhc_is_usdhc(imx_data) ? 1 << 28 : 1 << 27;
  }
  
--static void sdhci_prepare_data(struct sdhci_host *host, struct mmc_command *cmd)
-+static void sdhci_set_timeout(struct sdhci_host *host, struct mmc_command *cmd)
- {
- 	u8 count;
++static void esdhc_set_timeout(struct sdhci_host *host, struct mmc_command *cmd)
++{
++	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
++	struct pltfm_imx_data *imx_data = pltfm_host->priv;
 +
-+	if (host->ops->set_timeout) {
-+		host->ops->set_timeout(host, cmd);
-+	} else {
-+		count = sdhci_calc_timeout(host, cmd);
-+		sdhci_writeb(host, count, SDHCI_TIMEOUT_CONTROL);
-+	}
++	/* use maximum timeout counter */
++	sdhci_writeb(host, esdhc_is_usdhc(imx_data) ? 0xF : 0xE,
++			SDHCI_TIMEOUT_CONTROL);
 +}
 +
-+static void sdhci_prepare_data(struct sdhci_host *host, struct mmc_command *cmd)
-+{
- 	u8 ctrl;
- 	struct mmc_data *data = cmd->data;
- 	int ret;
- 
- 	WARN_ON(host->data);
- 
--	if (data || (cmd->flags & MMC_RSP_BUSY)) {
--		count = sdhci_calc_timeout(host, cmd);
--		sdhci_writeb(host, count, SDHCI_TIMEOUT_CONTROL);
--	}
-+	if (data || (cmd->flags & MMC_RSP_BUSY))
-+		sdhci_set_timeout(host, cmd);
- 
- 	if (!data)
- 		return;
-diff --git a/drivers/mmc/host/sdhci.h b/drivers/mmc/host/sdhci.h
-index b130509..9828ff8 100644
---- a/drivers/mmc/host/sdhci.h
-+++ b/drivers/mmc/host/sdhci.h
-@@ -282,6 +282,8 @@ struct sdhci_ops {
- 	unsigned int	(*get_min_clock)(struct sdhci_host *host);
- 	unsigned int	(*get_timeout_clock)(struct sdhci_host *host);
- 	unsigned int	(*get_max_timeout_count)(struct sdhci_host *host);
-+	void		(*set_timeout)(struct sdhci_host *host,
-+				       struct mmc_command *cmd);
- 	void		(*set_bus_width)(struct sdhci_host *host, int width);
- 	void (*platform_send_init_74_clocks)(struct sdhci_host *host,
- 					     u8 power_mode);
+ static struct sdhci_ops sdhci_esdhc_ops = {
+ 	.read_l = esdhc_readl_le,
+ 	.read_w = esdhc_readw_le,
+@@ -899,6 +909,7 @@ static struct sdhci_ops sdhci_esdhc_ops = {
+ 	.get_min_clock = esdhc_pltfm_get_min_clock,
+ 	.get_max_timeout_count = esdhc_get_max_timeout_count,
+ 	.get_ro = esdhc_pltfm_get_ro,
++	.set_timeout = esdhc_set_timeout,
+ 	.set_bus_width = esdhc_pltfm_set_bus_width,
+ 	.set_uhs_signaling = esdhc_set_uhs_signaling,
+ 	.reset = esdhc_reset,
 -- 
 1.7.8
