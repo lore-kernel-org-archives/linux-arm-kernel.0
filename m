@@ -1,41 +1,63 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 27 Aug 2014 09:40:58 +0100
-Subject: [PATCH 4/9] arm64: Remove unused variable in head.S
-In-Reply-To: <6930ff21b3945aa6a2575f5a8b9bb712fcac688f.1408736066.git.geoff@infradead.org>
-References: <cover.1408736066.git.geoff@infradead.org>
- <6930ff21b3945aa6a2575f5a8b9bb712fcac688f.1408736066.git.geoff@infradead.org>
-Message-ID: <20140827084058.GC16376@arm.com>
+From: zhangfei.gao@linaro.org (zhangfei)
+Date: Wed, 27 Aug 2014 16:42:34 +0800
+Subject: [PATCH v2 3/3] [media] rc: remove change_protocol in rc-ir-raw.c
+In-Reply-To: <20140821065006.6d831ec4@concha.lan>
+References: <1408613086-12538-1-git-send-email-zhangfei.gao@linaro.org>	<1408613086-12538-4-git-send-email-zhangfei.gao@linaro.org>
+ <20140821065006.6d831ec4@concha.lan>
+Message-ID: <53FD99FA.4030207@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 22, 2014 at 08:49:16PM +0100, Geoff Levand wrote:
-> Remove an unused local variable from head.S.  It seems this was never
-> used even from the initial commit
-> 9703d9d7f77ce129621f7d80a844822e2daa7008 (arm64: Kernel booting and
-> initialisation), and is a left over from a previous implementation
-> of __calc_phys_offset.
-> 
-> Signed-off-by: Geoff Levand <geoff@infradead.org>
-> ---
->  arch/arm64/kernel/head.S | 4 ----
->  1 file changed, 4 deletions(-)
-> 
-> diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
-> index 4019b85..607d4bb 100644
-> --- a/arch/arm64/kernel/head.S
-> +++ b/arch/arm64/kernel/head.S
-> @@ -377,10 +377,6 @@ ENTRY(__boot_cpu_mode)
->  	.long	0
->  	.popsection
->  
-> -	.align	3
-> -2:	.quad	.
-> -	.quad	PAGE_OFFSET
-> -
->  #ifdef CONFIG_SMP
->  	.align	3
->  1:	.quad	.
 
-Thanks, I'll take this one into the arm64 tree.
 
-Will
+On 08/21/2014 07:50 PM, Mauro Carvalho Chehab wrote:
+> Em Thu, 21 Aug 2014 17:24:45 +0800
+> Zhangfei Gao <zhangfei.gao@linaro.org> escreveu:
+>
+>> With commit 4924a311a62f ("[media] rc-core: rename ir-raw.c"),
+>> empty change_protocol was introduced.
+>
+> No. This was introduced on this changeset:
+>
+> commit da6e162d6a4607362f8478c715c797d84d449f8b
+> Author: David H?rdeman <david@hardeman.nu>
+> Date:   Thu Apr 3 20:32:16 2014 -0300
+>
+>      [media] rc-core: simplify sysfs code
+>
+>> As a result, rc_register_device will set dev->enabled_protocols
+>> addording to rc_map->rc_type, which prevent using all protocols.
+>
+> I strongly suspect that this patch will break some things, as
+> the new code seems to expect that this is always be set.
+>
+> See the code at store_protocols(): if this callback is not set,
+> then it won't allow to disable a protocol.
+>
+> Also, this doesn't prevent using all protocols. You can still use
+> "ir-keytable -p all" to enable all protocols (the "all" protocol
+> type were introduced recently at the userspace tool).
+>
+>  From the way I see, setting the protocol when a table is loaded
+> is not a bad thing, as:
+> - if RC tables are loaded, the needed protocol to decode it is
+>    already known;
+> - by running just one IR decoder, the IR handling routine will
+>    be faster and will consume less power;
+> - on a real case scenario, it is a way more likely that just one
+>    decoder will ever be needed by the end user.
+>
+> So, I think that this is just annoying for developers when are checking
+> if all decoders are working, by sending keycodes from different IR types
+> at the same time.
+>
+
+Thanks Mauro for the kind explanation.
+
+ir-keytable seems also enalbe specific protocol
+-p, --protocol=PROTOCOL
+
+Currently we use lirc user space decoder/keymap and only need 
+pulse-length information from kernel.
+
+Thanks for the info.
