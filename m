@@ -1,135 +1,112 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Wed, 27 Aug 2014 10:00:23 +0200
-Subject: [linux-sunxi] Re: [PATCH 4/4] simplefb: add clock handling code
-In-Reply-To: <20140827065440.GG15640@ulmo>
-References: <20140825133953.GJ4163@ulmo.nvidia.com>
- <53FB3E7F.4000503@redhat.com> <20140825141600.GA14763@ulmo.nvidia.com>
- <20140825145854.GA15297@lukather> <20140825150501.GE14763@ulmo.nvidia.com>
- <20140825152232.GE15297@lukather> <20140826080432.GD17263@ulmo>
- <20140826135341.GM15297@lukather> <20140826143550.GB3027@ulmo>
- <20140826210248.GO15297@lukather> <20140827065440.GG15640@ulmo>
-Message-ID: <53FD9017.40705@redhat.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Wed, 27 Aug 2014 17:09:47 +0900
+Subject: [PATCH 1/3 repost] clocksource: sh_cmt: Document SoC specific
+ bindings
+In-Reply-To: <CAMuHMdUv6bwSjHLhHumiuaBFS8WAw0y1sNq4PcofjOz6UiOfrA@mail.gmail.com>
+References: <1409117300-2133-1-git-send-email-horms+renesas@verge.net.au>
+ <1409117300-2133-2-git-send-email-horms+renesas@verge.net.au>
+ <CAMuHMdUv6bwSjHLhHumiuaBFS8WAw0y1sNq4PcofjOz6UiOfrA@mail.gmail.com>
+Message-ID: <20140827080946.GD5936@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On 08/27/2014 08:54 AM, Thierry Reding wrote:
-> On Tue, Aug 26, 2014 at 11:02:48PM +0200, Maxime Ripard wrote:
->> On Tue, Aug 26, 2014 at 04:35:51PM +0200, Thierry Reding wrote:
->>>>>> Any decent enough SoC, with a decent support in the kernel will have
->>>>>> clocks for this, and I really wonder how simplefb will behave once its
->>>>>> clocks will be turned off...
->>>>>
->>>>> There are other devices besides ARM SoCs that may want to use this
->>>>> driver and that don't have clock support.
->>>>
->>>> And in this case, with this patch, simplefb will not claim any clock,
->>>> nor will fail probing.
->>>>
->>>>> But you're missing my point. What I'm saying is that the simplefb driver
->>>>> is meant to serve as a way to take over whatever framebuffer a firmware
->>>>> set up. Therefore I think it makes the most sense to assume that nothing
->>>>> needs to be controlled in any way since already been set up by firmware.
->>>>> Eventually there should be a driver that takes over from simplefb that
->>>>> knows how to properly handle the device's specifics, but that's not
->>>>> simplefb.
->>>>
->>>> I guess such a hand over if it were to happen in the kernel would
->>>> involve the second driver claiming the resources before the first one
->>>> release them. How is that different in this case?
->>>
->>> It's different in that that driver will be hardware specific and know
->>> exactly what clock and other resources are required. It will have a
->>> device-specific binding.
->>
->> Except that you made simplefb a generic driver. So we have two choices
->> here: either we don't anything but the trivial case, and no one with a
->> rather more advanced hardware will be able to use it, or we try to
->> grab any resource that might be of use, which means clocks,
->> regulators, reserved memory region, or whatever, so that we pretty
->> much cover all cases. It really is as simple as that.
+On Wed, Aug 27, 2014 at 08:55:36AM +0200, Geert Uytterhoeven wrote:
+> Hi Simon,
 > 
-> No, it should be even simpler. simplefb shouldn't have to know any of
-> this. It's just taking what firmware has set up and uses that. It's a
-> stop-gap solution to provide information on the display until a real
-> driver can be loaded and initializes the display hardware properly.
+> On Wed, Aug 27, 2014 at 7:28 AM, Simon Horman
+> <horms+renesas@verge.net.au> wrote:
+> > n general Renesas hardware is not documented to the extent
+> > where the relationship between IP blocks on different SoCs can be assumed
+> > although they may appear to operate the same way. Furthermore the
+> > documentation typically does not specify a version for individual
+> > IP blocks. For these reasons a convention of using the SoC name in place
+> > of a version and providing SoC-specific compat strings has been adopted.
+> >
+> > Although not universally liked this convention is used in the bindings
+> > for the drivers a number of drivers for Renesas hardware. The purpose
 > 
->>>>> The goal of this patch series is to keep clocks from being turned off.
->>>>> But that's not what it does. What it does is turn clocks on to prevent
->>>>> them from being turned off. In my opinion that's a workaround for a
->>>>> deficiency in the kernel (and the firmware/kernel interface) and I think
->>>>> it should be fixed at the root. So a much better solution would be to
->>>>> establish a way for firmware to communicate to the kernel that a given
->>>>> resource has been enabled by firmware and shouldn't be disabled. Such a
->>>>> solution can be implement for all types of resources and can be reused
->>>>> by all drivers since they don't have to worry about these details.
->>>>
->>>> Mike Turquette repeatedly said that he was against such a DT property:
->>>> https://lkml.org/lkml/2014/5/12/693
->>>
->>> Mike says in that email that he's opposing the addition of a property
->>> for clocks that is the equivalent of regulator-always-on. That's not
->>> what this is about. If at all it'd be a property to mark a clock that
->>> should not be disabled by default because it's essential.
->>
->> It's just semantic. How is "a clock that should not be disabled by
->> default because it's essential" not a clock that stays always on?
+> s/the drivers //
+
+Thanks.
+
 > 
-> Because a clock that should not be disabled by default can be turned off
-> when appropriate. A clock that is always on can't be turned off.
+> > of this patch is to update the Renesas R-Car Compare Match Timer (CMT)
+> > driver to follow this convention.
+> >
+> > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 > 
->> Plus, you should read the mail further. It's clearly said that
->> consumer drivers should call clk_prepare_enable themselves, and that
->> the only exception to that is the case where we don't have such a
->> driver (and only valid as a temporary exception, which I guess you'll
->> soon turn into temporary-until-a-drm-kms-driver-is-merged).
 > 
-> Exactly. simplefb is only a temporary measure. It's not meant to be used
-> as a full-blown framebuffer driver. There are two use-cases where it is
-> an appropriate solution:
 > 
->   1) As a stop-gap solution for when the platform doesn't support a full
->      display driver yet. In that case you will want simplefb to stay
->      around forever.
+> > ---
+> > * I plan to follow up with patches to use these new bindings in the
+> >   dtsi files for the affected SoCs.
+> > ---
+> >  .../devicetree/bindings/timer/renesas,cmt.txt      | 26 +++++++++++++++++++++-
+> >  1 file changed, 25 insertions(+), 1 deletion(-)
+> >
+> > diff --git a/Documentation/devicetree/bindings/timer/renesas,cmt.txt b/Documentation/devicetree/bindings/timer/renesas,cmt.txt
+> > index a17418b..500bad2 100644
+> > --- a/Documentation/devicetree/bindings/timer/renesas,cmt.txt
+> > +++ b/Documentation/devicetree/bindings/timer/renesas,cmt.txt
+> > @@ -16,10 +16,34 @@ Required Properties:
+> >                 (CMT0 on sh7372, sh73a0 and r8a7740)
+> >      - "renesas,cmt-32-fast" for the 32-bit CMT with fast clock support
+> >                 (CMT[234] on sh7372, sh73a0 and r8a7740)
+> > +    - "renesas,cmt-32-fast-r8a7740" for the R8A7740 32-bit CMT with fast
+> > +               clock support (CMT[234])
+> > +    - "renesas,cmt-32-fast-sh7372" for the SH7372 32-bit CMT with fast
+> > +               clock support (CMT[234])
+> > +    - "renesas,cmt-32-fast-sh73a0" for the SH73A0 32-bit CMT with fast
+> > +               clock support (CMT[234])
 > 
->   2) To get early boot output before a full display driver can be loaded
->      in which case simplefb should go away after the display driver has
->      taken over.
+> > +    - "renesas,cmt-32-r8a7740" for the R8a7740 32-bit CMT
+> > +               (CMT0)
+> > +    - "renesas,cmt-32-sh7372" for the SH7372 32-bit CMT
+> > +               (CMT0)
+> > +    - "renesas,cmt-32-sh73a0" for the SH73a0 32-bit CMT
+> > +               (CMT0)
 > 
-> In case of 2) the most straightforward solution is to not disable any
-> clocks until all drivers have had a chance to claim them. When the full
-> driver has been probed it should have claimed the clocks so they would
-> no longer get disabled.
+> I'd move these 3 non-fast "renesas,cmt-32-*" values up, under
+> "renesas,cmt-32".
+> 
+> >      - "renesas,cmt-48" for the 48-bit CMT
+> >                 (CMT1 on sh7372, sh73a0 and r8a7740)
+> >      - "renesas,cmt-48-gen2" for the second generation 48-bit CMT
+> >                 (CMT[01] on r8a73a4, r8a7790 and r8a7791)
+> > +    - "renesas,cmt-48-r8a73a4" for the R8A73A4 48-bit CMT
+> > +               (CMT[01])
+> > +    - "renesas,cmt-48-r8a7740" for the R8A7740 48-bit CMT
+> > +               (CMT1)
+> > +    - "renesas,cmt-48-r8a7790" for the R8A7790 48-bit CMT
+> > +               (CMT[01])
+> > +    - "renesas,cmt-48-r8a7791" for the R8A7791 48-bit CMT
+> > +               (CMT[01])
+> > +    - "renesas,cmt-48-sh7372" for the SH7372 48-bit CMT
+> > +               (CMT1)
+> > +    - "renesas,cmt-48-sh73a0" for the SH73A0 48-bit CMT
+> > +               (CMT1)
+> 
+> I'd split the above in original and gen2.
 
-Please read my long reply from yesterday evening why this will never
-work, as there is not a well defined moment when "all drivers have had a
-chance to claim them"
+Sure. I'll re-order things as you suggest.
 
-I've been doing low level Linux development for 10 years now and I've
-worked a lot on storage (raid, iscsi, fcoe support, etc.) in the past.
+> Perhaps you can also add blank lines in between the 4 blocks of
+> types; the list is getting long?
 
-We've been down this road before, and all it leads to is pain, some more
-pain and then even more pain. Followed by the conclusion that everything
-needed to be refactored to use a hotplug model, and that instead of
-waiting for hardware / disk-enumeration to be done (so we can mount
-filesystems), the right thing to do is to actually wait for the block
-device(s) holding said filesystems to show up.
+Good idea.
 
-The same applies here, the right thing to do is to wait for the kms
-driver claiming the clocks to actually show up. And the easiest and
-cleanest way to do that is to have simplefb claim the clocks, and
-have it release them when the kms driver loads and asks simplefb
-to unload.
-
-Oh and one more thing, this whole make a list of special clocks which
-should be disabled later model is flawed too, because it assumes a
-fixed list of clocks, but which clocks actually get used may very well
-depend on whether e.g. a vga or hdmi monitor is attached, so u-boot
-would then still need to communicate the list of clocks actually used
-somehow, and if it needs to pass a list of clocks, the most natural
-way to do so is through a clocks property...
-
-Regards,
-
-Hans
+> Apart from the minor issues above
+> Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> (for the whole series)
+> 
+> Gr{oetje,eeting}s,
+> 
+>                         Geert
+> 
+> --
+> Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+> 
+> In personal conversations with technical people, I call myself a hacker. But
+> when I'm talking to journalists I just say "programmer" or something like that.
+>                                 -- Linus Torvalds
+> 
