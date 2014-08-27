@@ -1,85 +1,64 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Wed, 27 Aug 2014 17:22:05 +0200 (CEST)
-Subject: [RESEND PATCH v2 1/4] irqchip: gic: Change irq type check when
- extension is present
-In-Reply-To: <20140827142935.GA9490@leverpostej>
-References: <1407895884-18131-1-git-send-email-srv_yingjoe.chen@mediatek.com>
- <1407895884-18131-2-git-send-email-srv_yingjoe.chen@mediatek.com>
- <53F724F5.3040004@arm.com>
- <1409133344.25382.37.camel@coredoba.hi.pengutronix.de>
- <53FDB4B3.6000400@arm.com>
- <alpine.DEB.2.10.1408271347210.3323@nanos>
- <87ppfmoxxz.fsf@approximate.cambridge.arm.com>
- <20140827142935.GA9490@leverpostej>
-Message-ID: <alpine.DEB.2.10.1408271657310.3323@nanos>
+From: eric.auger@linaro.org (Eric Auger)
+Date: Wed, 27 Aug 2014 17:24:26 +0200
+Subject: [RFC 9/9] KVM: KVM_VFIO: ARM: implement irq forwarding control
+In-Reply-To: <1409079769.2906.131.camel@ul30vt.home>
+References: <1408973264-30384-1-git-send-email-eric.auger@linaro.org>	
+ <1408973264-30384-10-git-send-email-eric.auger@linaro.org>
+ <1409079769.2906.131.camel@ul30vt.home>
+Message-ID: <53FDF82A.4090606@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 27 Aug 2014, Mark Rutland wrote:
-> On Wed, Aug 27, 2014 at 02:37:44PM +0100, Marc Zyngier wrote:
-> > We need to work out how to drive the whole stacking from a DT
-> > perspective: Mark, any idea?
+On 08/26/2014 09:02 PM, Alex Williamson wrote:
+> On Mon, 2014-08-25 at 15:27 +0200, Eric Auger wrote:
+>> Implements ARM specific KVM-VFIO device group commands:
+>> - KVM_DEV_VFIO_DEVICE_ASSIGN_IRQ
+>> - KVM_DEV_VFIO_DEVICE_DEASSIGN_IRQ
+>> capability can be queried using KVM_HAS_DEVICE_ATTR.
+>>
+>> The new commands enable to set IRQ forwarding on/off for a given
+>> IRQ index of a VFIO platform device.
+>>
+>> as soon as a forwarded irq is set, a reference to the VFIO device
+>> is taken by the kvm-vfio device.
+>>
+>> The kvm-vfio device stores in the kvm_vfio_arch_data the list
+>> of "assigned" devices (kvm_vfio_device). Each kvm_vfio_device
+>> stores the list of assigned IRQs (potentially allowed a subset of
+>> IRQ to be forwarded)
+>>
+>> The kvm-vfio device programs both the GIC and vGIC. Also it
+>> clears the active bit on destruction, in case the guest did not
+>> do it itself.
+>>
+>> Changing the forwarded state is not allowed in the critical
+>> section starting from VFIO IRQ handler to LR programming. It is
+>> up to the client to take care of this.
+>>
+>> Signed-off-by: Eric Auger <eric.auger@linaro.org>
+>> ---
+>>  arch/arm/include/asm/kvm_host.h |   2 +
+>>  arch/arm/kvm/Makefile           |   2 +-
+>>  arch/arm/kvm/kvm_vfio_arm.c     | 599 ++++++++++++++++++++++++++++++++++++++++
+>>  3 files changed, 602 insertions(+), 1 deletion(-)
+>>  create mode 100644 arch/arm/kvm/kvm_vfio_arm.c
 > 
-> Describing the lines the magic irqchip has to its parent irqchip is
-> simple, the standard interrupts property can handle that:
+> I'm really happy that it seems like the kvm-vfio device is going to work
+> for you, but I think too much stuff is being pushed out to arch code
+> here.  Exporting the interfaces in patches 7 & 8 are setting the stage
+> for duplicate code for anyone wanting to implement device attributes.
+> Instead, I think the core code should support the list of
+> kvm_vfio_devices with proper cleanup, and we should attempt to access
+> the kvm_vfio_ callbacks as little as possible from arch code.  Thanks,
+
+OK. my next iteration will feature much more generic code.
+
+Thanks for the review
+
+Best Regards
+
+Eric
+
 > 
-> parent: parent {
-> 	...
-> 	#interrupt-cells = <1>;
-> };
+> Alex
 > 
-> magic {
-> 	...
-> 	interrupt-parent = <&parent>;
-> 	interrupts = <3>, <6>, <17>, <2>;
-> 	#interrupt-cells = <1>;
-> };
-> 
-> The harder part is describing the configuration of each interrupt to the
-> magic irqchip (e.g. edge vs level triggered), which is inseparable form
-> the line identifier in the interrupt-specifier.
-
-Do we really need to decribe that at the this level?
-
-You have the parent ARMGIC and the maGIC with a specified (or even
-dynamic) routing of the maGIC lines to the ARMGIC.
-
-Now the device which uses a maGIC interrupt specifies the interrupt
-type at the maGIC.
-
-So the type setter function of the maGIC configures the maGIC hardware
-in such a way that the output to the ARMGIC results in a type which
-the ARMGIC can handle and calls the type setter function of the maGIC
-with that type.
-
-I don't think you need to decribe this in the magic/parent relation
-ship at all. maGIC should know what kind of output it can provide to
-ARMGIC so that should just work, unless I'm missing something.
-
-> If there interrupts don't share the same configuration then I'm not sure
-> how we describe that in the DT. That's especially problematic if the
-> assignment of parent line is dynamic (as with the crossbar iirc).
-
-Why is this an issue?
-
-There are two ways to solve that:
-
-1) You can do a fully dynamic allocation at the parent level, which of
-   course requires that the whole parent range is dynamically
-   managed. That's what we are planning for the MSI/Remap/Vector
-   stacking
-
-2) You define the irq lines at the parent which are available for
-   dynamic stacking and let the allocation code hand one out.
-
-3) You tell the maGIC controller which lines of the parent are
-   available for it, so it can only stack onto those lines and instead
-   of letting the parent allocate a free one, the maGIC needs to map
-   its stuff to one of those ARMGIC lines.
-
-Which one to chose depends on the particular maGIC incarnation, but
-its not a big issue to select one ...
-
-Thanks,
-
-	tglx
