@@ -1,97 +1,63 @@
-From: holler@ahsoftware.de (Alexander Holler)
-Date: Wed, 27 Aug 2014 18:58:54 +0200
-Subject: [RFC PATCH 0/9] dt: dependencies (for deterministic driver
- initialization order based on the DT)
-In-Reply-To: <53FE0966.5020206@wwwdotorg.org>
-References: <53F64624.5000403@ahsoftware.de>
- <20140822131919.GX21734@leverpostej> <20140825093931.GB2399@ulmo>
- <E1XLu15-0002DP-6o@jdl.com> <20140825133714.GH4163@ulmo.nvidia.com>
- <20140826084208.AE5F0C40989@trevor.secretlab.ca>
- <20140826084922.GG17263@ulmo> <53FC566C.30904@ahsoftware.de>
- <20140826101107.GC32315@leverpostej>
- <20140827103432.64927C409CB@trevor.secretlab.ca>
- <20140827144403.GB13850@arm.com> <53FE05AE.9000406@wwwdotorg.org>
- <53FE07BE.7000809@ahsoftware.de> <53FE0966.5020206@wwwdotorg.org>
-Message-ID: <53FE0E4E.7080000@ahsoftware.de>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 27 Aug 2014 10:00:26 -0700
+Subject: [PATCH] ARM: OMAP2+: hwmod: Rearm wake-up interrupts for DT when
+ MUSB is idled
+In-Reply-To: <alpine.DEB.2.02.1408271632550.21249@utopia.booyaka.com>
+References: <20140825171446.GL17254@atomide.com>
+ <alpine.DEB.2.02.1408271632550.21249@utopia.booyaka.com>
+Message-ID: <20140827170025.GD16006@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 27.08.2014 18:37, schrieb Stephen Warren:
-> On 08/27/2014 10:30 AM, Alexander Holler wrote:
->> Am 27.08.2014 18:22, schrieb Stephen Warren:
->>> On 08/27/2014 08:44 AM, Catalin Marinas wrote:
->>
->>>> It's not just optimisation but an important feature for new arm64 SoCs.
->>>> Given some Tegra discussions recently, in many cases the machine_desc
->>>> use on arm is primarily to initialise devices in the right order. If we
->>>> can solve this in a more deterministic way (other than deferred
->>>> probing), we avoid the need for a dedicated SoC platform driver (or
->>>> machine_desc) or workarounds like different initcall levels and
->>>> explicit
->>>> DT parsing.
->>>
->>> A lot of the ordering is SW driver dependencies. I'm not sure how much
->>> of that can accurately be claimed as HW dependencies. As such, I'm not
->>> sure that putting dependencies into DT would be a good idea; it doesn't
->>> feel like HW data, and might well change if we restructure SW. It'd need
->>> some detailed research though.
->>
->> Almost every phandle is a dependency, so the DT is already full with
->> them.
->
-> That's true, but not entirely relevant.
->
-> phandles in DT should only be present where there's an obvious HW
-> dependency. It's obvious that, for example, there's a real HW dependency
-> between an IRQ controller and a device that has an IRQ signal fed into
-> the IRQ controller. It makes perfect sense to represent that as a
-> phandle (+args).
->
-> However, most of the ordering imposed by the Tegra machine descriptor
-> callbacks is nothing to do with this. It's more that the SW driver for
-> component X needs some low level data (e.g. SKU/fuse information) before
-> it can run. However, there's no real HW dependency between the HW
-> component X and the fuse module. As such, it doesn't make sense to
-> represent such a dependency in DT, using a phandle or by any other means.
->
-> Of course, there are probably cases where we could/should add some more
-> phandles/... and likewise cases where we shouldn't. That's why detailed
-> research is needed.
->
-> Irrespective though, a new kernel needs to work against an old DT, so
-> always needs to work without any (of these new) dependencies being
-> represented in DT, since they aren't represented there today. So, I
-> think pushing the issue into DT is a non-starter either way, unless we
-> accept yet another ABI-breaking change, in which case we should just
-> give up on any claims of ABI and make everyone's lives simpler.
+* Paul Walmsley <paul@pwsan.com> [140827 09:38]:
+> On Mon, 25 Aug 2014, Tony Lindgren wrote:
+> 
+> > Looks like MUSB cable removal can cause wake-up interrupts to
+> > stop working for device tree based booting at least for UART3
+> > even as nothing is dynamically remuxed. This can be fixed by
+> > calling reconfigure_io_chain() for device tree based booting
+> > in hwmod code. 
+> 
+> Weird, nice find.  Do you know if this applies to all OMAPs, or just 
+> OMAP3?
 
-If I hear research, my response is usually "how many years"?
+I guess it may also apply to others too, but so far I've only
+seen this on omap3 occasionally.
 
-Fact is that there are already a lot of usable dependencies in the DT, 
-they just didn't find their way into the kernel and weren't used.
+> > Note that we already do that for legacy booting
+> > if the legacy mux is configured.
+> > 
+> > My guess is that this is related to UART3 and MUSB ULPI
+> > hsusb0_data0 and hsusb0_data1 support for Carkit mode that
+> > somehow affect the configured IO chain for UART3 and require
+> > rearming the wake-up interrupts.
+> > 
+> > In general, for device tree based booting, pinctrl-single
+> > calls the rearm hook that in turn calls reconfigure_io_chain
+> > so calling reconfigure_io_chain should not be needed from the
+> > hwmod code for other events.
+> > 
+> > So let's limit the hwmod rearming of iochain only to
+> > HWMOD_FORCE_MSTANDBY where MUSB is currently the only user
+> > of it. If we see other devices needing similar changes we can
+> > add more checks for it.
+> 
+> Could you please add a new hwmod flag for this case?  Maybe something like 
+> HWMOD_RECONFIG_IO_CHAIN?  I think that would make the code easier to read 
+> and more maintainable, since the workaround would then be explicitly 
+> connected with that particular workaround's flag.  Looks like we have 
+> several flag bits left.  Plus if we wind up having to set 
+> HWMOD_FORCE_MSTANDBY for other devices that might not need the I/O chain 
+> reconfiguration, we won't have to reimplement this flag workaround.
 
-And I think it doesn't help much to make the picture more complicated 
-than it already is. Solve one step by another and not try to solve 
-everything at once.
+OK that's a good idea as this may not be always HWMOD_FORCE_MSTANDBY.
+I guess I initially assumed that this was always related to
+HWMOD_FORCE_MSTANDBY as that's what seemed to hang the system until
+I figured it was just the wake-up events that stopped working :)
 
-So first enable the kernel to use dependencies at all. I've shown that 
-it doesn't need magic to do so. Afterwards you can extend or change the 
-existing solution. It's not always the best approach, but for 
-complicated things it often doesn't make sense trying to solve 
-everything at first.
-
-Of course, my approach isn't perfect, but at least it is something 
-people can already use to play with.
-
-Ok, the way how my patches do handle devices (not drivers) might be 
-completely wrong, but that's just because I've never got in contact with 
-the device-model before, it always just worked. So I haven't spend any 
-time to look into that before and I didn't spend much time to look into 
-that for my patches (I just discoverd that device-handling by drivers 
-looks sometimes awkward). I was happy with what I've achieved in the 
-short time I've spend, and therfor posted the patches to give other 
-people an easy possibility to try the stuff themself.
+I'll do that as a follow-up patch as I already sent the pull request
+for the $subject one as it was hanging my tests occasionally.
 
 Regards,
 
-Alexander Holler
+Tony
