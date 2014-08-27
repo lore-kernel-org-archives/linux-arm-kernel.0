@@ -1,52 +1,70 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 27 Aug 2014 09:30:22 +0100
-Subject: [PATCH 9/9] arm64: Add new cpu-return-addr device tree binding
-In-Reply-To: <4192d403bb9703063c59a052293faa19d38d2f02.1408736066.git.geoff@infradead.org>
-References: <cover.1408736066.git.geoff@infradead.org>
- <4192d403bb9703063c59a052293faa19d38d2f02.1408736066.git.geoff@infradead.org>
-Message-ID: <20140827083022.GE6968@arm.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Wed, 27 Aug 2014 10:37:36 +0200
+Subject: [linux-sunxi] Re: [PATCH 4/4] simplefb: add clock handling code
+In-Reply-To: <20140827082208.GQ15297@lukather>
+References: <53FB46FF.1010208@redhat.com>
+ <20140825145303.GC14763@ulmo.nvidia.com>
+ <20140825150705.GB15297@lukather> <20140826082626.GE17263@ulmo>
+ <20140826090035.GB17528@sirena.org.uk>
+ <20140826091853.GI17263@ulmo>
+ <20140826100612.GH17528@sirena.org.uk>
+ <20140826105451.GD31124@ulmo> <1409078409.2701.17.camel@localhost>
+ <20140827074057.GS17528@sirena.org.uk>
+ <20140827082208.GQ15297@lukather>
+Message-ID: <CAMuHMdVkEPBtVT0dcDqQOQ_J0p+zYJwaUW8LqQX0Z+h6CHihRg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 22, 2014 at 08:49:17PM +0100, Geoff Levand wrote:
-> Add a new arm64 device tree binding cpu-return-addr.  This binding is recomended
-> for all ARM v8 CPUs that have an "enable-method" property value of "spin-table".
-> The value is a 64 bit physical address that secondary CPU execution will transfer
-> to upon CPU shutdown.
-> 
-> Signed-off-by: Geoff Levand <geoff@infradead.org>
-> ---
->  Documentation/devicetree/bindings/arm/cpus.txt | 25 +++++++++++++++++++++++++
->  1 file changed, 25 insertions(+)
-> 
-> diff --git a/Documentation/devicetree/bindings/arm/cpus.txt b/Documentation/devicetree/bindings/arm/cpus.txt
-> index 1fe72a0..42d5d5f 100644
-> --- a/Documentation/devicetree/bindings/arm/cpus.txt
-> +++ b/Documentation/devicetree/bindings/arm/cpus.txt
-> @@ -201,6 +201,15 @@ nodes to be present and contain the properties described below.
->  			  property identifying a 64-bit zero-initialised
->  			  memory location.
->  
-> +	- cpu-return-addr
-> +		Usage: recomended for all ARM v8 CPUs that have an
-> +		       "enable-method" property value of "spin-table".
-> +		Value type: <prop-encoded-array>
-> +		Definition:
-> +			# On ARM v8 64-bit systems must be a two cell property.
-> +			The value is a 64 bit physical address that secondary
-> +			CPU execution will transfer to upon CPU shutdown.
+Hi Maxime,
 
-As I've been away for most of the past four weeks, I haven't read all
-the threads around this topic. But I don't think we ended up with a
-clearly agreed recommendation for cpu-return-addr. If we do, we also
-need to be clear on what state the CPU should be in when returned to
-such address (ELx, MMU, caches).
+On Wed, Aug 27, 2014 at 10:22 AM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> On Wed, Aug 27, 2014 at 08:40:57AM +0100, Mark Brown wrote:
+>> On Tue, Aug 26, 2014 at 08:40:09PM +0200, Henrik Nordstr?m wrote:
+>>
+>> > It is not clear to me where the hardware resources should be listed in
+>> > DT, being it a simplefb node or part of the actual hardware device node
+>> > properly marked as dynamic boot defaults or something else? It's
+>> > somewhere inbetween hardware and virtual device, and somewhat volatile.
+>> > As far as simplefb is concerned it is a hardware desription of the
+>> > framebuffer, but for a kms driver it's no more than firmware handover of
+>> > boottime settings and ceases to exists once the kms driver have
+>> > reconfigured the hardware.
+>>
+>> Is simplefb something that should be in the device tree distinctly in
+>> the first place - shouldn't it be a subset of the functionality of the
+>> video nodes?  It's the same hardware being driven differently.
+>
+> Therorically, yes, but that would mean knowing beforehand what the
+> final binding will look like, even before submitting the driver. Since
+> the bindings are always reviewed, and most of the time changed
+> slightly, that wouldn't work very well with the DT as a stable ABI
+> policy I guess.
 
-In general, if we need returning to firmware I would strongly recommend
-PSCI but I know there is the Applied board which does not have EL3, so
-something like this may work. But we need to get them into discussion as
-well since I assume cpu-return-addr would be a firmware provided
-address.
+If you don't know how the bindings for a device will look like at the time of
+writing your DTS, you're always screwed, whether you add a simpefb
+node or not.
 
--- 
-Catalin
+If you know how the bindings look like, just add the device, with an extra
+"linux,simplefb" compatibility value.
+If you don't know how the bindings look like, do your utter best in
+guessing. Your DTS must be amended later anyway, either because
+you guessed wrong[*] (in case you added a node to have simplefb
+working), or because you have to add a real device node (in case you
+didn't add one for simplefb).
+
+[*] Actually you may have guessed right, in which case it'll continue
+    working as-is, and everybody will be happy.
+    Whether you want to keep backwards-compatibility in your future driver
+    with the "guessed wrong" node is up to you.
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
