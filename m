@@ -1,61 +1,94 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 27 Aug 2014 17:42:21 +0200
-Subject: [linux-sunxi] Re: [PATCH 4/4] simplefb: add clock handling code
-In-Reply-To: <20140827095241.GC23186@ulmo>
-References: <20140825145854.GA15297@lukather>
- <20140825150501.GE14763@ulmo.nvidia.com>
- <20140825152232.GE15297@lukather> <20140826080432.GD17263@ulmo>
- <20140826135341.GM15297@lukather> <20140826143550.GB3027@ulmo>
- <20140826210248.GO15297@lukather> <20140827065440.GG15640@ulmo>
- <20140827084526.GR15297@lukather> <20140827095241.GC23186@ulmo>
-Message-ID: <20140827154221.GX15297@lukather>
+From: jassisinghbrar@gmail.com (Jassi Brar)
+Date: Wed, 27 Aug 2014 21:15:24 +0530
+Subject: [PATCH 1/2] ARM: LPAE: load upper bits of early TTBR0/TTBR1
+In-Reply-To: <CALYGNiN-SHr6YJ53_deizb1VoXTBzD7dn8hcwqd4zLjx6utCDw@mail.gmail.com>
+References: <20140722153623.25088.37742.stgit@buzz>
+ <20140728181224.GN15536@arm.com>
+ <CALYGNiNrK1d32ecz4rw0sgn0GyN-M6hTBuTLGQV53Z4Br-bpYQ@mail.gmail.com>
+ <20140728184741.GT15536@arm.com>
+ <CALYGNiOd+Dy-2q_woZ9UDbMO24q58jN1Nsq7E8cJMMg_YBK9pA@mail.gmail.com>
+ <CABb+yY17Y18oAivi_VxPJqDEGLTbEy_PfsdeK9jXWZ0iV3vZ=w@mail.gmail.com>
+ <CALYGNiN-SHr6YJ53_deizb1VoXTBzD7dn8hcwqd4zLjx6utCDw@mail.gmail.com>
+Message-ID: <CABb+yY1VsEwDi5XCRkKbSNPW_+_MgL4gdAChKgX_NGHRzXq6qw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 27, 2014 at 11:52:48AM +0200, Thierry Reding wrote:
-> On Wed, Aug 27, 2014 at 10:45:26AM +0200, Maxime Ripard wrote:
-> > On Wed, Aug 27, 2014 at 08:54:41AM +0200, Thierry Reding wrote:
-> > > On Tue, Aug 26, 2014 at 11:02:48PM +0200, Maxime Ripard wrote:
-> > > > On Tue, Aug 26, 2014 at 04:35:51PM +0200, Thierry Reding wrote:
-> [...]
-> > > > > > Mike Turquette repeatedly said that he was against such a DT property:
-> > > > > > https://lkml.org/lkml/2014/5/12/693
-> > > > > 
-> > > > > Mike says in that email that he's opposing the addition of a property
-> > > > > for clocks that is the equivalent of regulator-always-on. That's not
-> > > > > what this is about. If at all it'd be a property to mark a clock that
-> > > > > should not be disabled by default because it's essential.
-> > > > 
-> > > > It's just semantic. How is "a clock that should not be disabled by
-> > > > default because it's essential" not a clock that stays always on?
-> > > 
-> > > Because a clock that should not be disabled by default can be turned off
-> > > when appropriate. A clock that is always on can't be turned off.
-> > 
-> > If a clock is essential, then it should never be disabled. Or we don't
-> > share the same meaning of essential.
-> 
-> Essential for the particular use-case.
+On Wed, Aug 27, 2014 at 9:01 PM, Konstantin Khlebnikov <koct9i@gmail.com> wrote:
+> On Wed, Aug 27, 2014 at 7:26 PM, Jassi Brar <jassisinghbrar@gmail.com> wrote:
+>> On Tue, Jul 29, 2014 at 5:59 PM, Konstantin Khlebnikov <koct9i@gmail.com> wrote:
 
-So, how would the clock driver would know about which use case we're
-in? How would it know about which display engine is currently running?
-How would it know about which video output is being set?
+>>>>> >> This patch fixes booting when idmap pgd lays above 4gb. Commit
+>>>>> >> 4756dcbfd37 mostly had fixed this, but it'd failed to load upper bits.
+>>>>> >>
+>>>>> >> Also this fixes adding TTBR1_OFFSET to TTRR1: if lower part overflows
+>>>>> >> carry flag must be added to the upper part.
+>>>>> >>
+>>>>> >> Signed-off-by: Konstantin Khlebnikov <k.khlebnikov@samsung.com>
+>>>>> >> Cc: Cyril Chemparathy <cyril@ti.com>
+>>>>> >> Cc: Vitaly Andrianov <vitalya@ti.com>
+>>>>> >> ---
+>>>>> >>  arch/arm/mm/proc-v7-3level.S |    7 +++----
+>>>>> >>  1 file changed, 3 insertions(+), 4 deletions(-)
+>>>>> >>
+>>>>> >> diff --git a/arch/arm/mm/proc-v7-3level.S b/arch/arm/mm/proc-v7-3level.S
+>>>>> >> index 22e3ad6..f0481dd 100644
+>>>>> >> --- a/arch/arm/mm/proc-v7-3level.S
+>>>>> >> +++ b/arch/arm/mm/proc-v7-3level.S
+>>>>> >> @@ -140,12 +140,11 @@ ENDPROC(cpu_v7_set_pte_ext)
+>>>>> >>       mov     \tmp, \ttbr1, lsr #(32 - ARCH_PGD_SHIFT)        @ upper bits
+>>>>> >>       mov     \ttbr1, \ttbr1, lsl #ARCH_PGD_SHIFT             @ lower bits
+>>>>> >>       addls   \ttbr1, \ttbr1, #TTBR1_OFFSET
+>>>>> >> -     mcrr    p15, 1, \ttbr1, \zero, c2                       @ load TTBR1
+>>>>> >> +     adcls   \tmp, \tmp, #0
+>>>>> >> +     mcrr    p15, 1, \ttbr1, \tmp, c2                        @ load TTBR1
+>>>>> >>       mov     \tmp, \ttbr0, lsr #(32 - ARCH_PGD_SHIFT)        @ upper bits
+>>>>> >>       mov     \ttbr0, \ttbr0, lsl #ARCH_PGD_SHIFT             @ lower bits
+>>>>> >> -     mcrr    p15, 0, \ttbr0, \zero, c2                       @ load TTBR0
+>>>>> >> -     mcrr    p15, 1, \ttbr1, \zero, c2                       @ load TTBR1
+>>>>> >> -     mcrr    p15, 0, \ttbr0, \zero, c2                       @ load TTBR0
+>>>>> >> +     mcrr    p15, 0, \ttbr0, \tmp, c2                        @ load TTBR0
+>>>>> >
+>>>>> > I must admit, the code you are removing here looks really strange. Was there
+>>>>> > a badly resolved conflict somewhere along the way? It would be nice to see
+>>>>> > if your fix (which seems ok to me) was actually present in the mailing list
+>>>>> > posting of the patch that ended in the above mess.
+>>>>>
+>>>>> Nope, no merge conflicts, source in original patch
+>>>>> https://lkml.org/lkml/2012/9/11/346
+>>>>>
+>>>>> That mess completely harmless, this code is used only once on boot.
+>>>>> I don't have that email, so replying isn't trivial for me.
+>>>>
+>>>> How bizarre. Also, Cyril doesn't work for TI anymore (his email is
+>>>> bouncing), so it's tricky to know what he meant here.
+>>>>
+>>>> Your patch looks better than what we currently have though. Have you managed
+>>>> to test it on a keystone platform (I don't have one)?
+>>>
+>>> No, I don't have it too. As well as I don't have direct access to the
+>>> platform where
+>>> problem was found. I've debugged this in patched qemu.
+>>>
+>> It seems the patch wasn't tested on any real platform, I did on my
+>> CA15 based platform - it breaks boot. Simply reverting the patch gets
+>> it going again. I am happy to try any fix.
+>>
+>
+> Please try to remove adcls line.
+> Seems like this affects only systems where PHYS_OFFSET == PAGE_OFFSET.
+>
+> --- a/arch/arm/mm/proc-v7-3level.S
+> +++ b/arch/arm/mm/proc-v7-3level.S
+> @@ -146,7 +146,6 @@ ENDPROC(cpu_v7_set_pte_ext)
+>         mov     \tmp, \ttbr1, lsr #(32 - ARCH_PGD_SHIFT)        @ upper bits
+>         mov     \ttbr1, \ttbr1, lsl #ARCH_PGD_SHIFT             @ lower bits
+>         addls   \ttbr1, \ttbr1, #TTBR1_OFFSET
+> -       adcls   \tmp, \tmp, #0
+>         mcrr    p15, 1, \ttbr1, \tmp, c2                        @ load TTBR1
+>         mov     \tmp, \ttbr0, lsr #(32 - ARCH_PGD_SHIFT)        @ upper bits
+>         mov     \ttbr0, \ttbr0, lsl #ARCH_PGD_SHIFT             @ lower bits
+>
+Yup, restores boot.
 
-Currently, we have two separate display engines, which can each output
-either to 4 different outputs (HDMI, RGB/LVDS, 2 DSI). Each and every
-one of these combinations would require different clocks. What clocks
-will we put in the driver? All of them?
-
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140827/d9967896/attachment.sig>
+Thanks
+Jassi
