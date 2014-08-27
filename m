@@ -1,102 +1,159 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Wed, 27 Aug 2014 08:55:36 +0200
-Subject: [PATCH 1/3 repost] clocksource: sh_cmt: Document SoC specific
- bindings
-In-Reply-To: <1409117300-2133-2-git-send-email-horms+renesas@verge.net.au>
-References: <1409117300-2133-1-git-send-email-horms+renesas@verge.net.au>
- <1409117300-2133-2-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <CAMuHMdUv6bwSjHLhHumiuaBFS8WAw0y1sNq4PcofjOz6UiOfrA@mail.gmail.com>
+From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
+Date: Wed, 27 Aug 2014 09:13:44 +0200
+Subject: [PATCH v2 1/3] ARM: dts: Add Peach Pit dts entry for Atmel
+ touchpad
+In-Reply-To: <53FD1001.30701@suse.de>
+References: <1409066937-3574-1-git-send-email-javier.martinez@collabora.co.uk>
+ <1409066937-3574-2-git-send-email-javier.martinez@collabora.co.uk>
+ <53FD1001.30701@suse.de>
+Message-ID: <53FD8528.7090504@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Simon,
+Hello Andreas,
 
-On Wed, Aug 27, 2014 at 7:28 AM, Simon Horman
-<horms+renesas@verge.net.au> wrote:
-> n general Renesas hardware is not documented to the extent
-> where the relationship between IP blocks on different SoCs can be assumed
-> although they may appear to operate the same way. Furthermore the
-> documentation typically does not specify a version for individual
-> IP blocks. For these reasons a convention of using the SoC name in place
-> of a version and providing SoC-specific compat strings has been adopted.
+On 08/27/2014 12:53 AM, Andreas F?rber wrote:
+>>  
+>> +&hsi2c_8 {
+>> +	status = "okay";
+>> +	clock-frequency = <333000>;
+>> +
+>> +	trackpad at 4b {
+>> +		compatible="atmel,maxtouch";
+>> +		reg=<0x4b>;
+>> +		interrupt-parent=<&gpx1>;
+>> +		interrupts=<1 IRQ_TYPE_EDGE_FALLING>;
+> 
+> Nit: Here's a style break (4x spaces around '=' missing).
 >
-> Although not universally liked this convention is used in the bindings
-> for the drivers a number of drivers for Renesas hardware. The purpose
 
-s/the drivers //
+True, these bits were copied from the downstream Chrome OS verbatim and
+the missing space around '=' was there, I missed that when reviewing.
 
-> of this patch is to update the Renesas R-Car Compare Match Timer (CMT)
-> driver to follow this convention.
+I'll re-spin and fix those style issues.
+
+>> +		wakeup-source;
+>> +		pinctrl-names = "default";
+>> +		pinctrl-0 = <&trackpad_irq>;
+>> +		linux,gpio-keymap = < KEY_RESERVED
+>> +				      KEY_RESERVED
+>> +				      0		/* GPIO 0 */
+>> +				      0		/* GPIO 1 */
+>> +				      0		/* GPIO 2 */
+>> +				      BTN_LEFT 	/* GPIO 3 */
+>> +				      KEY_RESERVED
+>> +				      KEY_RESERVED >;
+>> +	};
+> 
+> Coincidentally, I experimentally came up with a very similar DT node for
+> Spring the weekend:
+> 
+> +	trackpad at 4b {
+> +		compatible = "atmel,maxtouch";
+> +		reg = <0x4b>;
+> +		interrupt-parent = <&gpx1>;
+> +		interrupts = <2 IRQ_TYPE_NONE>;
+> +		pinctrl-names = "default";
+> +		pinctrl-0 = <&trackpad_irq>;
+> +		linux,gpio-keymap = <KEY_RESERVED
+> +		                     KEY_RESERVED
+> +		                     KEY_RESERVED
+> +		                     KEY_RESERVED
+> +		                     KEY_RESERVED
+> +		                     BTN_LEFT>;
+> +		wakeup-source;
+> +	};
+> 
+> 0 == KEY_RESERVED, so you can consistently use it for GPIO 0-2, too. :)
+> 
+
+I know that the value of KEY_RESERVED is 0 but I didn't use KEY_RESERVED
+for the GPIO on purpose.
+
+What I understood is that the SPT_GPIOPWN_T19 object sends messages using
+a status byte so you have a maximum of 8 GPIO but not every maXTouch
+devices use all of them. So in the particular case of the device in the
+Peach Pit, from the 8 possible GPIO only 4 can be used and these are pins
+2-5. So in theory you could connect 3 more GPIO in case you had more
+buttons (e.g: BTN_RIGHT, BTN_MIDDLE) but only 1 is used since the
+Chromebook just have BTN_LEFT.
+
+Nick sent a patch [0] that extend the atmel touchpad DT binding and the
+doc says "Use KEY_RESERVED for unused padding values". But is not clear
+what value you should use for GPIO that are actually supported by the
+device but have no keycode associated.
+
+So by using 0 instead of KEY_RESERVED I wanted to document that pins 2-4
+are actually supported and not reserved by the device but there is no
+keycode associated with that GPIO.
+
+If there was a BTN_NONE or KEY_UNUSED it would had been better but I think
+that making a distinction between these two cases (reserved pin vs GPIO
+available but not used) is useful.
+
+> I probably should add the two trailing _RESERVEDs, too?
+> 
+
+I see that is used for properties that are arrays, for example
+"linux,keymap" in Documentation/devicetree/bindings/input/matrix-keymap.txt.
+
+> With my above snippet I got an awful lot of "Interrupt triggered but
+> zero messages" warnings (which I simply commented out as quickfix).
+> Is that why you are using _EDGE_FALLING? Or pin-function 0xf?
+> (In my case the ChromeOS DT had IRQ_TYPE_NONE and pin-function 0x0.)
 >
-> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 
+These are two separate but related things:
 
+a) IRQF_TRIGGER_FALLING:
 
-> ---
-> * I plan to follow up with patches to use these new bindings in the
->   dtsi files for the affected SoCs.
-> ---
->  .../devicetree/bindings/timer/renesas,cmt.txt      | 26 +++++++++++++++++++++-
->  1 file changed, 25 insertions(+), 1 deletion(-)
->
-> diff --git a/Documentation/devicetree/bindings/timer/renesas,cmt.txt b/Documentation/devicetree/bindings/timer/renesas,cmt.txt
-> index a17418b..500bad2 100644
-> --- a/Documentation/devicetree/bindings/timer/renesas,cmt.txt
-> +++ b/Documentation/devicetree/bindings/timer/renesas,cmt.txt
-> @@ -16,10 +16,34 @@ Required Properties:
->                 (CMT0 on sh7372, sh73a0 and r8a7740)
->      - "renesas,cmt-32-fast" for the 32-bit CMT with fast clock support
->                 (CMT[234] on sh7372, sh73a0 and r8a7740)
-> +    - "renesas,cmt-32-fast-r8a7740" for the R8A7740 32-bit CMT with fast
-> +               clock support (CMT[234])
-> +    - "renesas,cmt-32-fast-sh7372" for the SH7372 32-bit CMT with fast
-> +               clock support (CMT[234])
-> +    - "renesas,cmt-32-fast-sh73a0" for the SH73A0 32-bit CMT with fast
-> +               clock support (CMT[234])
+Yes, the Chrome OS DT for Peach Pit also has IRQ_TYPE_NONE but the DTS is
+not correct.
 
-> +    - "renesas,cmt-32-r8a7740" for the R8a7740 32-bit CMT
-> +               (CMT0)
-> +    - "renesas,cmt-32-sh7372" for the SH7372 32-bit CMT
-> +               (CMT0)
-> +    - "renesas,cmt-32-sh73a0" for the SH73a0 32-bit CMT
-> +               (CMT0)
+If you look at the Chrome OS atmel driver
+(drivers/input/touchscreen/atmel_mxt_ts.c), it passes IRQF_TRIGGER_FALLING
+to request_threaded_irq():
 
-I'd move these 3 non-fast "renesas,cmt-32-*" values up, under
-"renesas,cmt-32".
+/* Default to falling edge if no platform data provided */
+irqflags = data->pdata ? data->pdata->irqflags : IRQF_TRIGGER_FALLING;
+error = request_threaded_irq(client->irq, NULL, mxt_interrupt,
+			     irqflags | IRQF_ONESHOT,
+			     client->name, data);
 
->      - "renesas,cmt-48" for the 48-bit CMT
->                 (CMT1 on sh7372, sh73a0 and r8a7740)
->      - "renesas,cmt-48-gen2" for the second generation 48-bit CMT
->                 (CMT[01] on r8a73a4, r8a7790 and r8a7791)
-> +    - "renesas,cmt-48-r8a73a4" for the R8A73A4 48-bit CMT
-> +               (CMT[01])
-> +    - "renesas,cmt-48-r8a7740" for the R8A7740 48-bit CMT
-> +               (CMT1)
-> +    - "renesas,cmt-48-r8a7790" for the R8A7790 48-bit CMT
-> +               (CMT[01])
-> +    - "renesas,cmt-48-r8a7791" for the R8A7791 48-bit CMT
-> +               (CMT[01])
-> +    - "renesas,cmt-48-sh7372" for the SH7372 48-bit CMT
-> +               (CMT1)
-> +    - "renesas,cmt-48-sh73a0" for the SH73A0 48-bit CMT
-> +               (CMT1)
+The above code is wrong since is overwriting the edge/level type flags set
+by OF when parsing the "interrupts" property so you have to use the
+expected IRQ flags in your DTS.
 
-I'd split the above in original and gen2.
+b) pin-function 0xf instead of 0x0:
 
-Perhaps you can also add blank lines in between the 4 blocks of
-types; the list is getting long?
+The pin-function 0x0 is GPIO input while 0xf is GPIO IRQ. Usually on other
+SoCs to use a GPIO IRQ you just configure the pad as GPIO input and then
+enable the pin as an interrupt but on Exynos SoC these are really two
+different functions. So if you configure the pin as GPIO input and this
+happens after the pin is configured as GPIO IRQ, interrupts are not triggered.
 
-Apart from the minor issues above
-Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
-(for the whole series)
+I faced that issue before [1] and was solved with Tomasz's commit:
 
-Gr{oetje,eeting}s,
+f6a8249 pinctrl: exynos: Lock GPIOs as interrupts when used as EINTs
 
-                        Geert
+which changes the pinctrl-exynos driver to setup a pin as GPIO IRQ on
+.irq_request_resources instead of .irq_set_type. So, with that patch even
+when pin-function re-configures the function to GPIO input, is then
+configured as GPIO IRQ when request_threaded_irq() is called.
 
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+So probably is working for you just because you tested on linux-next that
+already has Tomasz's changes but still the correct thing to do is to setup
+the pin as 0xf. This change probably is needed on other pins used as GPIO
+IRQ that are using 0x0 now.
 
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Sorry, the email became longer than I wanted but I hope is helpful to you.
+
+> Regards,
+> Andreas
+> 
+
+Best regards,
+Javier
+
+[0]: https://lkml.org/lkml/2014/8/15/244
+[1]: https://lkml.org/lkml/2014/8/8/621
