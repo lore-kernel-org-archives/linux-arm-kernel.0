@@ -1,71 +1,110 @@
-From: abrestic@chromium.org (Andrew Bresticker)
-Date: Wed, 27 Aug 2014 09:44:02 -0700
-Subject: [PATCH v2 4/9] pinctrl: tegra-xusb: Add USB PHY support
-In-Reply-To: <53FB8CFE.3090007@wwwdotorg.org>
-References: <1408381705-3623-1-git-send-email-abrestic@chromium.org>
- <1408381705-3623-5-git-send-email-abrestic@chromium.org>
- <53FB8CFE.3090007@wwwdotorg.org>
-Message-ID: <CAL1qeaHMa_KrqQyPgvJssOnW8mefQ8KPO9+WdkVODbY2XJe_LQ@mail.gmail.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Wed, 27 Aug 2014 16:44:38 +0000 (UTC)
+Subject: OMAP baseline test results for v3.17-rc2
+Message-ID: <alpine.DEB.2.02.1408271643400.21249@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 25, 2014 at 12:22 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
-> On 08/18/2014 11:08 AM, Andrew Bresticker wrote:
->>
->> In addition to the PCIe and SATA PHYs, the XUSB pad controller also
->> supports 3 UTMI, 2 HSIC, and 2 USB3 PHYs.  Each USB3 PHY uses a single
->> PCIe or SATA lane and is mapped to one of the three UTMI ports.
->>
->> The xHCI controller will also send messages intended for the PHY driver,
->> so request and listen for messages on the mailbox's PHY channel.
->
->
-> I'd like a review from Thierry here as the HW expert.
->
-> I need an ack from LinusW in order to take this pinctrl patch through the
-> Tegra tree.
->
->> diff --git a/drivers/pinctrl/pinctrl-tegra-xusb.c
->> b/drivers/pinctrl/pinctrl-tegra-xusb.c
->
->
->> +static int usb3_phy_power_on(struct phy *phy)
->> +{
->> +       struct tegra_xusb_padctl *padctl = phy_get_drvdata(phy);
->> +       int port = usb3_phy_to_port(phy);
->> +       int lane = padctl->usb3_ports[port].lane;
->> +       u32 value, offset;
->> +
->> +       if (!is_pcie_or_sata_lane(lane)) {
->> +               dev_err(padctl->dev, "USB3 PHY %d mapped to invalid lane:
->> %d\n",
->> +                       port, lane);
->> +               return -EINVAL;
->> +       }
->
->
-> An aside: This implies that the SATA driver should be talking to this
-> pinctrl driver and explicitly powering on the XUSB pins. However, the SATA
-> driver doesn't depend on this series. I'm a bit confused how that works.
-> Perhaps it's just by accident? Mikko, can you comment?
 
-As Mikko mentioned, the enabling of the SATA lane in
-usb3_phy_power_on() is for when the SATA lane is being used for USB3.
+Here are some basic OMAP test results for Linux v3.17-rc2.
+Logs and other details at:
 
->> +static int utmi_phy_to_port(struct phy *phy)
->> +{
->> +       struct tegra_xusb_padctl *padctl = phy_get_drvdata(phy);
->> +       int i;
->> +
->> +       for (i = 0; i < TEGRA_XUSB_UTMI_PHYS; i++) {
->> +               if (phy == padctl->phys[TEGRA_XUSB_PADCTL_UTMI_P0 + i])
->> +                       break;
->> +       }
->> +       BUG_ON(i == TEGRA_XUSB_UTMI_PHYS);
->
->
-> Can this be triggered by e.g. bad DT content? If so, returning an error
-> would be nicer. The comment applies to other xxx_to_port() functions.
+    http://www.pwsan.com/omap/testlogs/test_v3.17-rc2/20140825183438/
 
-No, it cannot.  The struct phy that's passed in here comes from the
-PHY core and must be a PHY that we registered earlier in probe().
+
+Test summary
+------------
+
+Build: uImage+dtb:
+    Pass (10/10): omap2plus_defconfig_am33xx_only/am335x-bone,
+		  omap2plus_defconfig/omap4-panda,
+		  omap2plus_defconfig/omap4-panda-es,
+		  omap2plus_defconfig/am3517-evm,
+		  omap2plus_defconfig/omap2430-sdp,
+		  omap2plus_defconfig/omap3-beagle,
+		  omap2plus_defconfig/omap3-beagle-xm,
+		  omap2plus_defconfig/omap3-evm-37xx,
+		  omap2plus_defconfig/omap4-var-som,
+		  omap2plus_defconfig/omap5-uevm
+
+Build: uImage:
+    Pass ( 3/ 3): omap1_defconfig, omap1_defconfig_1510innovator_only,
+		  omap1_defconfig_5912osk_only
+
+Build: zImage:
+    Pass (16/16): multi_v7_defconfig, omap2plus_defconfig,
+		  omap2plus_defconfig_am33xx_only,
+		  omap2plus_defconfig_am43xx_only,
+		  omap2plus_defconfig_2430sdp_only,
+		  omap2plus_defconfig_cpupm, omap2plus_defconfig_no_pm,
+		  omap2plus_defconfig_n800_only_a,
+		  omap2plus_defconfig_n800_multi_omap2xxx,
+		  omap2plus_defconfig_omap2_4_only,
+		  omap2plus_defconfig_omap3_4_only,
+		  omap2plus_defconfig_dra7xx_only,
+		  rmk_omap3430_ldp_allnoconfig,
+		  rmk_omap3430_ldp_oldconfig,
+		  rmk_omap4430_sdp_allnoconfig,
+		  rmk_omap4430_sdp_oldconfig
+
+Boot to userspace:
+    FAIL ( 1/14): 2430sdp
+    skip ( 1/14): 5912osk
+    Pass (12/14): 2420n800, 3517evm, 3530es3beagle, 3730beaglexm,
+		  37xxevm, 4430es2panda, 4460pandaes, am335xbone,
+		  am335xbonelt, cmt3517, 4460varsomom, 5430es2uevm
+
+PM: chip retention via suspend:
+    FAIL ( 4/ 7): 2430sdp, 4430es2panda, 4460pandaes, 4460varsomom
+    Pass ( 3/ 7): 3530es3beagle, 3730beaglexm, 37xxevm
+
+PM: chip retention via dynamic idle:
+    FAIL ( 5/ 7): 2430sdp, 3530es3beagle, 4430es2panda, 4460pandaes,
+		  4460varsomom
+    Pass ( 2/ 7): 3730beaglexm, 37xxevm
+
+PM: chip off except CORE via suspend:
+    Pass ( 1/ 1): 3730beaglexm
+
+PM: chip off except CORE via dynamic idle:
+    Pass ( 1/ 1): 3730beaglexm
+
+PM: chip off via suspend:
+    FAIL ( 4/ 5): 3530es3beagle, 4430es2panda, 4460pandaes,
+		  4460varsomom
+    Pass ( 1/ 5): 37xxevm
+
+PM: chip off via dynamic idle:
+    FAIL ( 4/ 5): 3530es3beagle, 4430es2panda, 4460pandaes,
+		  4460varsomom
+    Pass ( 1/ 5): 37xxevm
+
+
+vmlinux object size
+(delta in bytes from test_v3.17-rc1 (7d1311b93e58ed55f3a31cc8f94c4b8fe988a2b9)):
+   text     data      bss    total  kernel
+   +980      +32        0    +1012  omap1_defconfig
+  +1012       -8        0    +1004  omap1_defconfig_1510innovator_only
+  +1012        0        0    +1012  omap1_defconfig_5912osk_only
+  +1644      +16        0    +1660  multi_v7_defconfig
+   +900      +16        0     +916  omap2plus_defconfig
+   +836      -16        0     +820  omap2plus_defconfig_2430sdp_only
+   +836       +8        0     +844  omap2plus_defconfig_am33xx_only
+   +900       +8        0     +908  omap2plus_defconfig_am43xx_only
+   +900      +48        0     +948  omap2plus_defconfig_cpupm
+   +836       +8        0     +844  omap2plus_defconfig_dra7xx_only
+   +316       +8        0     +324  omap2plus_defconfig_n800_multi_omap2xxx
+   +316      -16        0     +300  omap2plus_defconfig_n800_only_a
+   +900      -24        0     +876  omap2plus_defconfig_no_pm
+   +900      -16        0     +884  omap2plus_defconfig_omap2_4_only
+   +836       +8        0     +844  omap2plus_defconfig_omap3_4_only
+   +836      -16        0     +820  omap2plus_defconfig_omap5_only
+   +180      +16      -32     +164  rmk_omap3430_ldp_allnoconfig
+   +852       +8        0     +860  rmk_omap3430_ldp_oldconfig
+   +212      +12      -32     +192  rmk_omap4430_sdp_allnoconfig
+   +852      -16        0     +836  rmk_omap4430_sdp_oldconfig
+
+Boot-time memory difference
+(delta in bytes from test_v3.17-rc1 (7d1311b93e58ed55f3a31cc8f94c4b8fe988a2b9))
+  avail  rsrvd   high  freed  board          kconfig
+  (no differences)
