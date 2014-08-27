@@ -1,69 +1,40 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 27 Aug 2014 10:53:08 +0100
-Subject: [PATCH 3/3 repost] clocksource: sh_tmu: Document r8a7779 binding
-In-Reply-To: <1409117300-2133-4-git-send-email-horms+renesas@verge.net.au>
-References: <1409117300-2133-1-git-send-email-horms+renesas@verge.net.au>
- <1409117300-2133-4-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <20140827095308.GD7295@leverpostej>
+From: jlu@pengutronix.de (Jan =?ISO-8859-1?Q?L=FCbbe?=)
+Date: Wed, 27 Aug 2014 11:55:44 +0200
+Subject: [RESEND PATCH v2 1/4] irqchip: gic: Change irq type check when
+ extension is present
+In-Reply-To: <53F724F5.3040004@arm.com>
+References: <1407895884-18131-1-git-send-email-srv_yingjoe.chen@mediatek.com>
+ <1407895884-18131-2-git-send-email-srv_yingjoe.chen@mediatek.com>
+ <53F724F5.3040004@arm.com>
+Message-ID: <1409133344.25382.37.camel@coredoba.hi.pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 27, 2014 at 06:28:20AM +0100, Simon Horman wrote:
-> In general Renesas hardware is not documented to the extent
-> where the relationship between IP blocks on different SoCs can be assumed
-> although they may appear to operate the same way. Furthermore the
-> documentation typically does not specify a version for individual
-> IP blocks. For these reasons a convention of using the SoC name in place
-> of a version and providing SoC-specific compat strings has been adopted.
-> 
-> Although not universally liked this convention is used in the bindings
-> for the drivers a number of drivers for Renesas hardware. The purpose
-> of this patch is to update the Renesas R-Car Timer Unit (TMU)
-> driver to follow this convention.
-> 
-> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-> 
-> ---
-> * I plan to follow up with a patch patch to use the new binding in the
->   dtsi files for the r8a7779 SoC.
-> ---
->  Documentation/devicetree/bindings/timer/renesas,tmu.txt | 6 ++++--
->  1 file changed, 4 insertions(+), 2 deletions(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/timer/renesas,tmu.txt b/Documentation/devicetree/bindings/timer/renesas,tmu.txt
-> index 425d0c5..712ddfa 100644
-> --- a/Documentation/devicetree/bindings/timer/renesas,tmu.txt
-> +++ b/Documentation/devicetree/bindings/timer/renesas,tmu.txt
-> @@ -8,7 +8,9 @@ are independent. The TMU hardware supports up to three channels.
->  
->  Required Properties:
->  
-> -  - compatible: must contain "renesas,tmu"
-> +  - compatible: must contain one of the following.
-> +    - "renesas,tmu" generic TMU
-> +    - "renesas,tmu-r8a7779" R8A7779 TMU
+Marc,
 
-Similarly to patch 2, "one or more" and swap the order here?
-
-Mark.
-
->  
->    - reg: base address and length of the registers block for the timer module.
->  
-> @@ -27,7 +29,7 @@ Optional Properties:
->  Example: R8A7779 (R-Car H1) TMU0 node
->  
->  	tmu0: timer at ffd80000 {
-> -		compatible = "renesas,tmu";
-> +		compatible = "renesas,tmu-r8a7779", "renesas,tmu";
->  		reg = <0xffd80000 0x30>;
->  		interrupts = <0 32 IRQ_TYPE_LEVEL_HIGH>,
->  			     <0 33 IRQ_TYPE_LEVEL_HIGH>,
-> -- 
-> 2.0.1
+On Fri, 2014-08-22 at 12:09 +0100, Marc Zyngier wrote:
+> Here, you're using it to program something that sits between the
+> device and the GIC. This is a separate block, with its own hardware
+> configuration, that modifies the interrupt signal. This should be
+> reflected in the device-tree and the code paths.
 > 
-> --
-> To unsubscribe from this list: send the line "unsubscribe devicetree" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+> You can probably model this as a separate irqchip for the few
+> interrupts that require this, or have it configured at boot time
+> (assuming the configuration never changes).
+
+It seems to me that using a separate irqchip for a simple inverter would
+add the run-time overhead of passing through wrapper functions on every
+IRQ. Do you have an idea how this could be avoided without using the
+gic_arch_extn feature?
+
+As in the DT the actual IRQ polarity should be used, simply configuring
+the HW IRQ polarity in the bootloader is not enough without telling the
+GIC driver which polarity is supported on which IRQ, right?
+
+Regards,
+Jan
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
