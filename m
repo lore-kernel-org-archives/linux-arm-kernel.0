@@ -1,57 +1,64 @@
 From: b29396@freescale.com (Dong Aisheng)
-Date: Wed, 27 Aug 2014 15:26:30 +0800
-Subject: [PATCH V3 4/6] mmc: sdhci-esdhc-imx: set the correct max timeout
- value for uSDHC
+Date: Wed, 27 Aug 2014 15:26:32 +0800
+Subject: [PATCH V3 6/6] mmc: sdhci: move timeout_clk dynamically calculation
+ code into common code
 In-Reply-To: <1409124392-28899-1-git-send-email-b29396@freescale.com>
 References: <1409124392-28899-1-git-send-email-b29396@freescale.com>
-Message-ID: <1409124392-28899-5-git-send-email-b29396@freescale.com>
+Message-ID: <1409124392-28899-7-git-send-email-b29396@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The default sdhci driver write 0xE into timeout counter register to
-set the maximum timeout. The value is not correct for uSDHC since the
-max counter value for uSDHC is 0xF.
-Instead of using common timeout code in sdhci, we implement esdhc_set_timeout
-to handle the difference between eSDHC and uSDHC.
+The timeout_clk calculation code for SDHCI_QUIRK_DATA_TIMEOUT_USES_SDCLK case
+is common and could be moved into common sdhci_do_set_ios, then platform code
+which is not using sdhci_set_clock does not need to write the same code again.
 
-Currently we simply set the max timeout value as before.
-But in the future, we probably may implement IMX specific timeout
-setting algorithm and use suitable timeout for different CMDs.
-
-Reviewed-by: Shawn Guo <shawn.guo@linaro.org>
 Signed-off-by: Dong Aisheng <b29396@freescale.com>
 ---
- drivers/mmc/host/sdhci-esdhc-imx.c |   11 +++++++++++
- 1 files changed, 11 insertions(+), 0 deletions(-)
+ drivers/mmc/host/sdhci.c |   24 +++++++++++++-----------
+ 1 files changed, 13 insertions(+), 11 deletions(-)
 
-diff --git a/drivers/mmc/host/sdhci-esdhc-imx.c b/drivers/mmc/host/sdhci-esdhc-imx.c
-index 546ed02..587ee0e 100644
---- a/drivers/mmc/host/sdhci-esdhc-imx.c
-+++ b/drivers/mmc/host/sdhci-esdhc-imx.c
-@@ -888,6 +888,16 @@ static unsigned int esdhc_get_max_timeout_count(struct sdhci_host *host)
- 	return esdhc_is_usdhc(imx_data) ? 1 << 28 : 1 << 27;
- }
+diff --git a/drivers/mmc/host/sdhci.c b/drivers/mmc/host/sdhci.c
+index 0253eb1..f6a683b 100644
+--- a/drivers/mmc/host/sdhci.c
++++ b/drivers/mmc/host/sdhci.c
+@@ -1201,18 +1201,8 @@ void sdhci_set_clock(struct sdhci_host *host, unsigned int clock)
+ 	}
  
-+static void esdhc_set_timeout(struct sdhci_host *host, struct mmc_command *cmd)
-+{
-+	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
-+	struct pltfm_imx_data *imx_data = pltfm_host->priv;
+ clock_set:
+-	if (real_div) {
++	if (real_div)
+ 		host->mmc->actual_clock = (host->max_clk * clk_mul) / real_div;
+-		if (host->quirks & SDHCI_QUIRK_DATA_TIMEOUT_USES_SDCLK) {
+-			host->timeout_clk = host->mmc->actual_clock / 1000;
+-			mmc->max_busy_timeout =
+-					host->ops->get_max_timeout_count ?
+-					host->ops->get_max_timeout_count(host) :
+-					1 << 27;
+-			mmc->max_busy_timeout /= host->timeout_clk;
+-		}
+-	}
+-
+ 	clk |= (div & SDHCI_DIV_MASK) << SDHCI_DIVIDER_SHIFT;
+ 	clk |= ((div & SDHCI_DIV_HI_MASK) >> SDHCI_DIV_MASK_LEN)
+ 		<< SDHCI_DIVIDER_HI_SHIFT;
+@@ -1489,6 +1479,18 @@ static void sdhci_do_set_ios(struct sdhci_host *host, struct mmc_ios *ios)
+ 	if (!ios->clock || ios->clock != host->clock) {
+ 		host->ops->set_clock(host, ios->clock);
+ 		host->clock = ios->clock;
 +
-+	/* use maximum timeout counter */
-+	sdhci_writeb(host, esdhc_is_usdhc(imx_data) ? 0xF : 0xE,
-+			SDHCI_TIMEOUT_CONTROL);
-+}
-+
- static struct sdhci_ops sdhci_esdhc_ops = {
- 	.read_l = esdhc_readl_le,
- 	.read_w = esdhc_readw_le,
-@@ -899,6 +909,7 @@ static struct sdhci_ops sdhci_esdhc_ops = {
- 	.get_min_clock = esdhc_pltfm_get_min_clock,
- 	.get_max_timeout_count = esdhc_get_max_timeout_count,
- 	.get_ro = esdhc_pltfm_get_ro,
-+	.set_timeout = esdhc_set_timeout,
- 	.set_bus_width = esdhc_pltfm_set_bus_width,
- 	.set_uhs_signaling = esdhc_set_uhs_signaling,
- 	.reset = esdhc_reset,
++		if (host->quirks & SDHCI_QUIRK_DATA_TIMEOUT_USES_SDCLK &&
++		    host->clock) {
++			host->timeout_clk = host->mmc->actual_clock ?
++						host->mmc->actual_clock / 1000 :
++						host->clock / 1000;
++			host->mmc->max_busy_timeout =
++				host->ops->get_max_timeout_count ?
++				host->ops->get_max_timeout_count(host) :
++				1 << 27;
++			host->mmc->max_busy_timeout /= host->timeout_clk;
++		}
+ 	}
+ 
+ 	sdhci_set_power(host, ios->power_mode, ios->vdd);
 -- 
 1.7.8
