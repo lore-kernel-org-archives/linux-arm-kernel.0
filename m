@@ -1,45 +1,44 @@
 From: behanw@converseincode.com (behanw at converseincode.com)
-Date: Tue, 26 Aug 2014 21:29:33 -0700
-Subject: [PATCH V2 5/6] arm64: LLVMLinux: Use global stack register variable
- for aarch64
+Date: Tue, 26 Aug 2014 21:29:34 -0700
+Subject: [PATCH V2 6/6] arm64: LLVMLinux: Use global stack pointer in
+ return_address()
 In-Reply-To: <1409113774-3172-1-git-send-email-behanw@converseincode.com>
 References: <20140826141608.GT23445@arm.com>
  <1409113774-3172-1-git-send-email-behanw@converseincode.com>
-Message-ID: <1409113774-3172-6-git-send-email-behanw@converseincode.com>
+Message-ID: <1409113774-3172-7-git-send-email-behanw@converseincode.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Mark Charlebois <charlebm@gmail.com>
+From: Behan Webster <behanw@converseincode.com>
 
-To support both Clang and GCC, use the global stack register variable vs
-a local register variable.
+The global register current_stack_pointer holds the current stack pointer.
+This change supports being able to compile the kernel with both gcc and clang.
 
 Author: Mark Charlebois <charlebm@gmail.com>
 Signed-off-by: Mark Charlebois <charlebm@gmail.com>
 Signed-off-by: Behan Webster <behanw@converseincode.com>
 ---
- arch/arm64/include/asm/percpu.h | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ arch/arm64/kernel/return_address.c | 3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
 
-diff --git a/arch/arm64/include/asm/percpu.h b/arch/arm64/include/asm/percpu.h
-index 453a179..5279e57 100644
---- a/arch/arm64/include/asm/percpu.h
-+++ b/arch/arm64/include/asm/percpu.h
-@@ -26,13 +26,13 @@ static inline void set_my_cpu_offset(unsigned long off)
- static inline unsigned long __my_cpu_offset(void)
+diff --git a/arch/arm64/kernel/return_address.c b/arch/arm64/kernel/return_address.c
+index 89102a6..6c4fd28 100644
+--- a/arch/arm64/kernel/return_address.c
++++ b/arch/arm64/kernel/return_address.c
+@@ -36,13 +36,12 @@ void *return_address(unsigned int level)
  {
- 	unsigned long off;
--	register unsigned long *sp asm ("sp");
+ 	struct return_address_data data;
+ 	struct stackframe frame;
+-	register unsigned long current_sp asm ("sp");
  
- 	/*
- 	 * We want to allow caching the value, so avoid using volatile and
- 	 * instead use a fake stack read to hazard against barrier().
- 	 */
--	asm("mrs %0, tpidr_el1" : "=r" (off) : "Q" (*sp));
-+	asm("mrs %0, tpidr_el1" : "=r" (off) :
-+		"Q" (*(const unsigned long *)current_stack_pointer));
+ 	data.level = level + 2;
+ 	data.addr = NULL;
  
- 	return off;
- }
+ 	frame.fp = (unsigned long)__builtin_frame_address(0);
+-	frame.sp = current_sp;
++	frame.sp = current_stack_pointer;
+ 	frame.pc = (unsigned long)return_address; /* dummy */
+ 
+ 	walk_stackframe(&frame, save_return_addr, &data);
 -- 
 1.9.1
