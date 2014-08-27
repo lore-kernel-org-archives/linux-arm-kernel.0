@@ -1,84 +1,106 @@
-From: holler@ahsoftware.de (Alexander Holler)
-Date: Wed, 27 Aug 2014 09:16:23 +0200
-Subject: [RFC PATCH 0/9] dt: dependencies (for deterministic driver
- initialization order based on the DT)
-In-Reply-To: <E1XMHGc-0008TS-CQ@jdl.com>
-References: <20140825093931.GB2399@ulmo> <E1XLu15-0002DP-6o@jdl.com>
- <20140825133714.GH4163@ulmo.nvidia.com>
- <20140826084208.AE5F0C40989@trevor.secretlab.ca>
- <20140826084922.GG17263@ulmo> <53FC566C.30904@ahsoftware.de>
- <20140826102503.GC31124@ulmo> <53FC6513.5040800@ahsoftware.de>
- <20140826110827.GA31350@ulmo> <53FC6E4A.6030407@ahsoftware.de>
- <20140826114718.GB641@ulmo> <53FC76E8.5050009@ahsoftware.de>
- <E1XMHGc-0008TS-CQ@jdl.com>
-Message-ID: <53FD85C7.4080900@ahsoftware.de>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Wed, 27 Aug 2014 09:25:21 +0200
+Subject: [PATCH 1/9] ACPI / PM: Let acpi_dev_pm_detach() return an error
+ code
+In-Reply-To: <1959719.tXfePhObS9@vostro.rjw.lan>
+References: <1409054837-5667-1-git-send-email-ulf.hansson@linaro.org>
+ <1409054837-5667-2-git-send-email-ulf.hansson@linaro.org>
+ <1959719.tXfePhObS9@vostro.rjw.lan>
+Message-ID: <CAPDyKFpgf+Qn5xa7FLFvk3KGNW_6k8XPVECHb2+6aZbiQccwgg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 26.08.2014 15:58, schrieb Jon Loeliger:
-
-> I think we need to do the complete topsort *before* we attempt
-> to do any probing.  So three steps:
+On 27 August 2014 02:16, Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
+> On Tuesday, August 26, 2014 02:07:09 PM Ulf Hansson wrote:
+>> To give callers the option of acting on a errors while removing the
+>> pm_domain ops for the device in the ACPI power domain, let
+>> acpi_dev_pm_detach() return an int to provide the error code.
+>>
+>> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+>> ---
+>>  drivers/acpi/device_pm.c | 4 ++++
+>>  include/linux/acpi.h     | 7 +++++--
+>>  2 files changed, 9 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/drivers/acpi/device_pm.c b/drivers/acpi/device_pm.c
+>> index 67075f8..fa78abb 100644
+>> --- a/drivers/acpi/device_pm.c
+>> +++ b/drivers/acpi/device_pm.c
+>> @@ -1087,6 +1087,8 @@ EXPORT_SYMBOL_GPL(acpi_dev_pm_attach);
+>>   *
+>>   * Callers must ensure proper synchronization of this function with power
+>>   * management callbacks.
+>> + *
+>> + * Returns 0 on successfully detached power domain or negative error code.
 >
->     1) Graph Construction
->         Add a new "emit dependencies" function to driver bindings.
->         Iterate over known devices or nodes in the DT in any order.
-> 	    Call the "emit dependencies" function.  It adds all
-> 	    dependency edges to a global graph by knowing what
-> 	    phandles or other pieces it will need.
-> 	    A driver with no "emit dependencies" function can be
-> 	    added to the graph anywhere without loss of generality.
->         Add any additional edges for whatever reason.
+> "PM domain" here, please, not "power domain".
 >
->     2) Topsort the generated driver graph
+
+Sure.
+
+If you prefer that term, I can also change on the other patches in
+this patchset. There are commit-msg etc , where I think I have used
+"power domain".
+
+>>   */
+>>  void acpi_dev_pm_detach(struct device *dev, bool power_off)
 >
->     3) Call probe for real in topsort order
+> It looks like you've never compiled this, have you?
+
+You are absolutely right. There were quite some combinations of
+CONFIG_PM_* that I tried out, but I totally forgot ACPI, sorry! I will
+make sure to do it in v2.
+
 >
-> Alexander, I don't recall the details of your patch series.
-> Can you please remind us if it took this approach in the kernel?
+>>  {
+>> @@ -1107,7 +1109,9 @@ void acpi_dev_pm_detach(struct device *dev, bool power_off)
+>>                       acpi_device_wakeup(adev, ACPI_STATE_S0, false);
+>>                       acpi_dev_pm_low_power(dev, adev, ACPI_STATE_S0);
+>>               }
+>> +             return 0;
+>>       }
+>> +     return -ENODEV;
 >
->> Anyway, I'm leaving this discussion. I've already made a proposal
->> which solved most mentioned problems (imho) and even offered usable
->> patches
+> -EINVAL perhaps?
 
-Why should I? I've posted patches along with a lot of comments and
-explanations, and e.g. you are just talking that it should be made like
-my patches already did. And others do talk too like my patches and the
-accompanying comments from me which explain most stuff never have 
-existed and just repeat what the patches already do without refering to 
-them.
+Sure!
 
-> Darn.  I think you clearly have a pony in this race, and it
-> would be good if you still participated.  Really.
-
-Thanks. But I don't see it as a race and I don't want to take part in a 
-race (and I usually avoid those silly contests which have become chic in 
-the IT world). I just offered a solution (or at least a working starting 
-point to a solution).
-
->> (ok, they suffer under the "not invented here" syndrom, but ...). ;)
 >
-> There isn't a single thing in the entire Linux Kernel community
-> that was "invented here"; every aspect of it was NIH'ed by *someone*.
-> That's how it gets built, changed, maintained, fixed, etc.
+>>  }
+>>  EXPORT_SYMBOL_GPL(acpi_dev_pm_detach);
+>>  #endif /* CONFIG_PM */
+>> diff --git a/include/linux/acpi.h b/include/linux/acpi.h
+>> index 5320153..a7bfdf6 100644
+>> --- a/include/linux/acpi.h
+>> +++ b/include/linux/acpi.h
+>> @@ -576,7 +576,7 @@ static inline int acpi_subsys_freeze(struct device *dev) { return 0; }
+>>  #if defined(CONFIG_ACPI) && defined(CONFIG_PM)
+>>  struct acpi_device *acpi_dev_pm_get_node(struct device *dev);
+>>  int acpi_dev_pm_attach(struct device *dev, bool power_on);
+>> -void acpi_dev_pm_detach(struct device *dev, bool power_off);
+>> +int acpi_dev_pm_detach(struct device *dev, bool power_off);
+>>  #else
+>>  static inline struct acpi_device *acpi_dev_pm_get_node(struct device *dev)
+>>  {
+>> @@ -586,7 +586,10 @@ static inline int acpi_dev_pm_attach(struct device *dev, bool power_on)
+>>  {
+>>       return -ENODEV;
+>>  }
+>> -static inline void acpi_dev_pm_detach(struct device *dev, bool power_off) {}
+>> +static inline int acpi_dev_pm_detach(struct device *dev, bool power_off)
+>> +{
+>> +     return -ENODEV;
+>> +}
+>>  #endif
+>>
+>>  #ifdef CONFIG_ACPI
+>>
+>
+> --
+> I speak only for myself.
+> Rafael J. Wysocki, Intel Open Source Technology Center.
 
-Might be true in an ideal open source world and might have been true for 
-past kernel development when most people weren't full time kernel 
-developers. But nowadays it appears to me like many parts of the kernel 
-have become in the hands of closed groups. And they build and enforce 
-hurdles that high, that nobody else can take them without spending an 
-idiotic amount of time. Just like many other "consortiums" do, you only 
-have to build enough rules to protect from the outside while still 
-looking open.
+Thanks for reviewing!
 
-E.g. an example I've seen often is that someone spend a lot of time to 
-examine and fix a bug and write a commented patch. And the only response 
-from the maintainer was that he should add an emtpy line before a return 
-statement and similiar silly things to enforce patch-ping-pong. Such 
-just drives people on the other end crazy and they likely won't spend 
-the time to post another patch (they still might  fix other bugs, but 
-just for themself).
-
-Regards,
-
-Alexander Holler
+Kind regards
+Uffe
