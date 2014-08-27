@@ -1,17 +1,22 @@
 From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Wed, 27 Aug 2014 09:25:21 +0200
+Date: Wed, 27 Aug 2014 09:26:21 +0200
 Subject: [PATCH 1/9] ACPI / PM: Let acpi_dev_pm_detach() return an error
  code
-In-Reply-To: <1959719.tXfePhObS9@vostro.rjw.lan>
+In-Reply-To: <1AE640813FDE7649BE1B193DEA596E880265FDCA@SHSMSX101.ccr.corp.intel.com>
 References: <1409054837-5667-1-git-send-email-ulf.hansson@linaro.org>
  <1409054837-5667-2-git-send-email-ulf.hansson@linaro.org>
- <1959719.tXfePhObS9@vostro.rjw.lan>
-Message-ID: <CAPDyKFpgf+Qn5xa7FLFvk3KGNW_6k8XPVECHb2+6aZbiQccwgg@mail.gmail.com>
+ <1AE640813FDE7649BE1B193DEA596E880265FDCA@SHSMSX101.ccr.corp.intel.com>
+Message-ID: <CAPDyKFruPum0Xb_pF1x8GW=SC4Q5Eexa96WBAU-q7iTKFfNrUA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27 August 2014 02:16, Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
-> On Tuesday, August 26, 2014 02:07:09 PM Ulf Hansson wrote:
+On 27 August 2014 07:43, Zheng, Lv <lv.zheng@intel.com> wrote:
+> Hi,
+>
+>> From: linux-acpi-owner at vger.kernel.org [mailto:linux-acpi-owner at vger.kernel.org] On Behalf Of Ulf Hansson
+>> Sent: Tuesday, August 26, 2014 8:07 PM
+>> To: Rafael J. Wysocki; Brown, Len; Pavel Machek; Greg Kroah-Hartman; linux-pm at vger.kernel.org
+>>
 >> To give callers the option of acting on a errors while removing the
 >> pm_domain ops for the device in the ACPI power domain, let
 >> acpi_dev_pm_detach() return an int to provide the error code.
@@ -32,25 +37,19 @@ On 27 August 2014 02:16, Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
 >>   * management callbacks.
 >> + *
 >> + * Returns 0 on successfully detached power domain or negative error code.
->
-> "PM domain" here, please, not "power domain".
->
-
-Sure.
-
-If you prefer that term, I can also change on the other patches in
-this patchset. There are commit-msg etc , where I think I have used
-"power domain".
-
 >>   */
 >>  void acpi_dev_pm_detach(struct device *dev, bool power_off)
 >
-> It looks like you've never compiled this, have you?
+> Should the return type be "int" here?
 
-You are absolutely right. There were quite some combinations of
-CONFIG_PM_* that I tried out, but I totally forgot ACPI, sorry! I will
-make sure to do it in v2.
+You are right, thanks!
 
+Kind regards
+Uffe
+
+>
+> Thanks and best regards
+> -Lv
 >
 >>  {
 >> @@ -1107,7 +1109,9 @@ void acpi_dev_pm_detach(struct device *dev, bool power_off)
@@ -60,12 +59,6 @@ make sure to do it in v2.
 >> +             return 0;
 >>       }
 >> +     return -ENODEV;
->
-> -EINVAL perhaps?
-
-Sure!
-
->
 >>  }
 >>  EXPORT_SYMBOL_GPL(acpi_dev_pm_detach);
 >>  #endif /* CONFIG_PM */
@@ -94,13 +87,10 @@ Sure!
 >>  #endif
 >>
 >>  #ifdef CONFIG_ACPI
+>> --
+>> 1.9.1
 >>
->
-> --
-> I speak only for myself.
-> Rafael J. Wysocki, Intel Open Source Technology Center.
-
-Thanks for reviewing!
-
-Kind regards
-Uffe
+>> --
+>> To unsubscribe from this list: send the line "unsubscribe linux-acpi" in
+>> the body of a message to majordomo at vger.kernel.org
+>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
