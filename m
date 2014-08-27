@@ -1,57 +1,102 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 27 Aug 2014 14:55:45 -0700
-Subject: use IORESOURCE_REG resource type for non-translatable addresses
- in DT
-In-Reply-To: <CAJAp7OhoRQ1eWack1e=OL0cS4Fxmgxc7OWeNxcj1qt7Q-x-sQA@mail.gmail.com>
-References: <53D788A7.4020303@mm-sol.com>	<3794875.CZFbAag5Sv@wuerfel>	<53D7AA72.6010309@mm-sol.com>	<20140729234522.E9FF1C40738@trevor.secretlab.ca>	<53D84558.7060406@codeaurora.org>	<CAL_JsqJjH0OH+X=fzwqAPeWarjoLev7v6Nv_QhAa+nZyztMnFA@mail.gmail.com>	<20140730060619.GC19933@codeaurora.org>
- <CAJAp7OhoRQ1eWack1e=OL0cS4Fxmgxc7OWeNxcj1qt7Q-x-sQA@mail.gmail.com>
-Message-ID: <53FE53E1.9030605@codeaurora.org>
+From: abrestic@chromium.org (Andrew Bresticker)
+Date: Wed, 27 Aug 2014 14:56:41 -0700
+Subject: [PATCH v2 2/9] mailbox: Add NVIDIA Tegra XUSB mailbox driver
+In-Reply-To: <53FE2129.6080305@wwwdotorg.org>
+References: <1408381705-3623-1-git-send-email-abrestic@chromium.org>
+ <1408381705-3623-3-git-send-email-abrestic@chromium.org>
+ <53FB8820.4010202@wwwdotorg.org>
+ <CAL1qeaERHeKKNpqh9qHOppgT7ymvntisdjVvZheP78U6NaPz-A@mail.gmail.com>
+ <53FE1A7A.4010906@wwwdotorg.org>
+ <CAL1qeaGPr=BeYL1-=ddRL7rSuvYdQcd6vCEEHDrNA-KYst6bnw@mail.gmail.com>
+ <53FE2129.6080305@wwwdotorg.org>
+Message-ID: <CAL1qeaGHz1+L8r-AXetw422ZWSJX1h025YOx9kB+EE4yJpOowQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/27/14 11:24, Bjorn Andersson wrote:
-> On Tue, Jul 29, 2014 at 11:06 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
->> On 07/29, Rob Herring wrote:
-> [..]
->>> You might as well do of_property_read_u32 in the below example.
->>>
->> Fair enough. The example is probably too simple. Things are
->> sometimes slightly more complicated and a simple
->> of_property_read_u32() isn't going to work in the case of
->> multiple reg values or when reg-names is in play.
+On Wed, Aug 27, 2014 at 11:19 AM, Stephen Warren <swarren@wwwdotorg.org> wrote:
+> On 08/27/2014 12:13 PM, Andrew Bresticker wrote:
 >>
-> But do we have such cases in the Qualcomm PMICs?
-
-At the least we have reg-names users.
-
+>> On Wed, Aug 27, 2014 at 10:50 AM, Stephen Warren <swarren@wwwdotorg.org>
+>> wrote:
+>>>
+>>> On 08/27/2014 11:38 AM, Andrew Bresticker wrote:
+>>>>
+>>>>
+>>>> On Mon, Aug 25, 2014 at 12:01 PM, Stephen Warren <swarren@wwwdotorg.org>
+>>>> wrote:
+>>>>>
+>>>>>
+>>>>> On 08/18/2014 11:08 AM, Andrew Bresticker wrote:
+>>>>>>
+>>>>>>
+>>>>>> +static int tegra_xusb_mbox_probe(struct platform_device *pdev)
+>>>>>
+>>>>>
+>>>>>
+>>>>>
+>>>>>> +       res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+>>>>>>
+>>>>>> +       if (!res)
+>>>>>> +               return -ENODEV;
+>>>>>
+>>>>>
+>>>>>
+>>>>>
+>>>>> Should devm_request_mem_region() be called here to claim the region?
+>>>>
+>>>>
+>>>>
+>>>> No, the xHCI host driver also needs to map these registers, so they
+>>>> cannot be mapped exclusively here.
+>>>
+>>>
+>>>
+>>> That's unfortunate. Having multiple drivers with overlapping register
+>>> regions is not a good idea. Can we instead have a top-level driver map
+>>> all
+>>> the IO regions, then instantiate the various different sub-components
+>>> internally, and divide up the address space. Probably via MFD or similar.
+>>> That would prevent multiple drivers from touching the same register
+>>> region.
+>>
+>>
+>> Perhaps I'm misunderstanding, but I don't see how MFD would prevent us
+>> from having to map this register space in two different locations -
+>> the XUSB FPCI address space cannot be divided cleanly between host and
+>> mailbox registers.  Or are you saying that there should be a separate
+>> device driver that exposes an API for accessing this register space,
+>> like the Tegra fuse or PMC drivers?
 >
-> The only case I've hit so far is for gpios and mpps, where it feels
-> like reg should be base, size and not simply base reg of first gpio -
-> but that's a different thing.
 >
-> Also, so far it seems like most drivers just code the base address in
-> the driver, as we have very specific compatibles.
-
-It would be nice if the drivers didn't have to do this. It annoys me
-that platform drivers need to know that they're using DT to figure out
-things that are standard platform features: registers, irqs, etc.
-
+> With MFD, there's typically a top-level driver for the HW module (or
+> register space) that gets instantiated by the DT node. This driver then
+> instantiates all the different sub-drivers that use that register space, and
+> provides APIs for the sub-drivers to access the registers (either custom
+> APIs or more recently by passing a regmap object down to the sub-drivers).
 >
->
-> How about we stop trying so hard to make this "perfect" and just merge
-> something close to Josh's original proposal and ignore this problem?
-> Currently all we're doing is delaying any possibility of getting
-> drivers for the individual blocks merged.
-> If we have the dt bindings require the reg to be there, we can discuss
-> and change this all we want later!
+> This top-level driver is the only driver that maps the space, and can manage
+> sharing the space between the various sub-drivers.
 
-What's Josh's original proposal? We've already punted on this for SSBI
-PMICs and just required them to put registers in DT for use some day and
-I don't see anyone blocking individual SPMI pmic drivers from merging
-over this. So I guess I agree with you that we can move forward with the
-other drivers. I'd still like to see us make this better though, so it
-seems worthwhile to have the discussion and get to some conclusion.
+So if I'm understanding correctly, we end up with something like this:
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+usb at 70090000 {
+        compatible = "nvidia,tegra124-xusb";
+        reg = <0x0 0x70090000 0x0 0x8000>, // xHCI host registers
+              <0x0 0x70098000 0x0 0x1000>, // FPCI registers
+              <0x0 0x70099000 0x0 0x1000>; // IPFS registers
+        interrupts = <GIC_SPI 39 IRQ_TYPE_LEVEL_HIGH>, // host interrupt
+                     <GIC_SPI 40 IRQ_TYPE_LEVEL_HIGH"; // mailbox interrupt
+
+        host-controller {
+                compatible = "nvidia,tegra124-xhci";
+                ...
+        };
+
+        mailbox {
+                compatible = "nvidia,tegra124-xusb-mailbox";
+               ...
+        };
+};
+
+To be honest though, this seems like overkill to share a couple of
+registers when no other resources are shared between the two.
