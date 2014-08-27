@@ -1,28 +1,39 @@
-From: kamalesh@linux.vnet.ibm.com (Kamalesh Babulal)
-Date: Wed, 27 Aug 2014 18:42:45 +0530
-Subject: [PATCH v5 04/12] sched: Allow all archs to set the capacity_orig
-In-Reply-To: <1409051215-16788-5-git-send-email-vincent.guittot@linaro.org>
-References: <1409051215-16788-1-git-send-email-vincent.guittot@linaro.org>
- <1409051215-16788-5-git-send-email-vincent.guittot@linaro.org>
-Message-ID: <20140827131208.GB13808@linux.vnet.ibm.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 27 Aug 2014 14:14:45 +0100
+Subject: [PATH V2 1/6] mm: Introduce a general RCU get_user_pages_fast.
+In-Reply-To: <20140827125027.GA7765@linaro.org>
+References: <1408635812-31584-1-git-send-email-steve.capper@linaro.org>
+ <1408635812-31584-2-git-send-email-steve.capper@linaro.org>
+ <20140827085442.GD16376@arm.com> <20140827125027.GA7765@linaro.org>
+Message-ID: <20140827131445.GB17601@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Vincent Guittot <vincent.guittot@linaro.org> [2014-08-26 13:06:47]:
+On Wed, Aug 27, 2014 at 01:50:28PM +0100, Steve Capper wrote:
+> On Wed, Aug 27, 2014 at 09:54:42AM +0100, Will Deacon wrote:
+> > On Thu, Aug 21, 2014 at 04:43:27PM +0100, Steve Capper wrote:
+> > > @@ -672,3 +676,277 @@ struct page *get_dump_page(unsigned long addr)
+> > >  	return page;
+> > >  }
+> > >  #endif /* CONFIG_ELF_CORE */
+> > > +
+> > > +#ifdef CONFIG_HAVE_RCU_GUP
+> > > +
+> > > +#ifdef __HAVE_ARCH_PTE_SPECIAL
+> > 
+> > Do we actually require this (pte special) if hugepages are disabled or
+> > not supported?
+> 
+> We need this logic if we want use fast_gup on normal pages safely. The special
+> bit indicates that we should not attempt to take a reference to the underlying
+> page.
+> 
+> Huge pages are guaranteed not to be special.
 
-> capacity_orig is only changed for system with a SMT sched_domain level in order
-> to reflect the lower capacity of CPUs. Heterogenous system also have to reflect an
-> original capacity that is different from the default value.
-> 
-> Create a more generic function arch_scale_cpu_capacity that can be also used by
-> non SMT platform to set capacity_orig.
-> 
-> The weak behavior of arch_scale_cpu_capacity is the previous SMT one in order to
-> keep backward compatibility in the use of capacity_orig.
-> 
-> arch_scale_smt_capacity and default_scale_smt_capacity have been removed as
-> they were not use elsewhere than in arch_scale_cpu_capacity.
-> 
-> Signed-off-by: Vincent Guittot <vincent.guittot@linaro.org>
+Gah, I somehow mixed up sp-litting and sp-ecial. Step away from the
+computer.
 
-Reviewed-by: Kamalesh Babulal <kamalesh@linux.vnet.ibm.com>
+In which case, the patch looks fine. You might need to repost with '[PATCH]'
+instead of '[PATH]', in case you confused people's filters.
+
+Will
