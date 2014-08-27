@@ -1,44 +1,97 @@
 From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
-Date: Wed, 27 Aug 2014 16:24:44 +0200
-Subject: [PATCH v3 0/3] Add Atmel maXTouch support for Peach Pit
-Message-ID: <1409149487-23582-1-git-send-email-javier.martinez@collabora.co.uk>
+Date: Wed, 27 Aug 2014 16:24:45 +0200
+Subject: [PATCH v3 1/3] ARM: dts: Add Peach Pit dts entry for Atmel touchpad
+In-Reply-To: <1409149487-23582-1-git-send-email-javier.martinez@collabora.co.uk>
+References: <1409149487-23582-1-git-send-email-javier.martinez@collabora.co.uk>
+Message-ID: <1409149487-23582-2-git-send-email-javier.martinez@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is a third version of the series that adds support
-for the atmel trackpad found on the Exynos5420 Peach Pit.
-The first version was [0] but I missunderstood the DT
-bindings since I don't have documentation about this hw.
-After the feedback provided by Nick Dyer and Yufeng Shen
-I think I now understand how it works and why my earlier
-(wrong) attempt used to work as well.
+From: Sjoerd Simons <sjoerd.simons@collabora.co.uk>
 
-I've dropped support for Peach Pi since the Atmel chip
-in that machine uses a different T100 touchscreen object
-instead of the T9 used by the touchpad in Peach Pit. And
-that object is not supported by the Atmel mXT driver yet.
+The Peach Pit board has an Atmel maXTouch trackpad device.
+Add the needed Device Tree nodes to support it.
 
-The first patch adds the needed DTS changes to the Peach
-Pit device tree file, the second patch enables the driver
-in the Exynos-specific kernel config and the third patch
-enables the driver on the ARMv7 multi-platform config file.
+This Device Tree change is based on the Chrome OS 3.8 tree
+but adapted to use the mainline Atmel maXTouch DT binding.
 
-I chose to build as a module in the later because only some
-multi-platform supported machines have this touchpad device.
+Signed-off-by: Sjoerd Simons <sjoerd.simons@collabora.co.uk>
+[javier.martinez: added linux,gpio-keymap property and changed IRQ type]
+Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+---
 
-Javier Martinez Canillas (2):
-  ARM: exynos_defconfig: Enable Atmel maXTouch support
-  ARM: multi_v7_defconfig: Enable Atmel maXTouch support
+Changes since v2:
+ - Add spaces around '=' on properties. Suggested by Andreas Faerber.
 
-Sjoerd Simons (1):
-  ARM: dts: Add Peach Pit dts entry for Atmel touchpad
-
+Changes since v1:
+ - Change trackpad IRQ pad function from 0x0 (GPIO input) to 0xf (GPIO IRQ).
+   suggested by Tomasz Figa.
+ - Remove BTN_TOOL_* from "linux,gpio-keymap" property since those are set
+   by input mt core if INPUT_MT_POINTER is set. Suggested by Nick Dyer.
+ - Use correct values for "linux,gpio-keymap" property. Suggested by Nick Dyer.
+ - Remove support for Peach Pi board since it uses a different Atmel touchpad
+   that requires an Atmel object protocol  (T100) not supported by the driver.
+ - Use IRQ type constants from <dt-bindings/interrupt-controller/irq.h> instead
+   of magic numbers. Suggested by Andreas Faerber.
+---
  arch/arm/boot/dts/exynos5420-peach-pit.dts | 31 ++++++++++++++++++++++++++++++
- arch/arm/configs/exynos_defconfig          |  1 +
- arch/arm/configs/multi_v7_defconfig        |  1 +
- 3 files changed, 33 insertions(+)
+ 1 file changed, 31 insertions(+)
 
-Best regards,
-Javier
-
-[0]: https://lkml.org/lkml/2014/8/6/589
+diff --git a/arch/arm/boot/dts/exynos5420-peach-pit.dts b/arch/arm/boot/dts/exynos5420-peach-pit.dts
+index ab06148..a3358fc 100644
+--- a/arch/arm/boot/dts/exynos5420-peach-pit.dts
++++ b/arch/arm/boot/dts/exynos5420-peach-pit.dts
+@@ -11,6 +11,7 @@
+ /dts-v1/;
+ #include <dt-bindings/input/input.h>
+ #include <dt-bindings/gpio/gpio.h>
++#include <dt-bindings/interrupt-controller/irq.h>
+ #include "exynos5420.dtsi"
+ 
+ / {
+@@ -157,6 +158,29 @@
+ 	};
+ };
+ 
++&hsi2c_8 {
++	status = "okay";
++	clock-frequency = <333000>;
++
++	trackpad at 4b {
++		compatible = "atmel,maxtouch";
++		reg = <0x4b>;
++		interrupt-parent = <&gpx1>;
++		interrupts = <1 IRQ_TYPE_EDGE_FALLING>;
++		wakeup-source;
++		pinctrl-names = "default";
++		pinctrl-0 = <&trackpad_irq>;
++		linux,gpio-keymap = < KEY_RESERVED
++				      KEY_RESERVED
++				      0		/* GPIO 0 */
++				      0		/* GPIO 1 */
++				      0		/* GPIO 2 */
++				      BTN_LEFT 	/* GPIO 3 */
++				      KEY_RESERVED
++				      KEY_RESERVED >;
++	};
++};
++
+ &hsi2c_9 {
+ 	status = "okay";
+ 	clock-frequency = <400000>;
+@@ -241,6 +265,13 @@
+ 		samsung,pin-drv = <0>;
+ 	};
+ 
++	trackpad_irq: trackpad-irq {
++		samsung,pins = "gpx1-1";
++		samsung,pin-function = <0xf>;
++		samsung,pin-pud = <0>;
++		samsung,pin-drv = <0>;
++	};
++
+ 	power_key_irq: power-key-irq {
+ 		samsung,pins = "gpx1-2";
+ 		samsung,pin-function = <0>;
+-- 
+2.0.1
