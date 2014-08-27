@@ -1,28 +1,23 @@
-From: luto@amacapital.net (Andy Lutomirski)
-Date: Wed, 27 Aug 2014 14:42:41 -0700
-Subject: [PATCH v9 0/6] ARM: VDSO
-In-Reply-To: <53FE4448.9070708@codeaurora.org>
-References: <1408744351-7814-1-git-send-email-nathan_lynch@mentor.com>
- <53FE4448.9070708@codeaurora.org>
-Message-ID: <CALCETrULQ2y1z7FzXw7xHAk0Kv4M1_=0WBQvC219Mb9A6Tu=YQ@mail.gmail.com>
+From: agross@codeaurora.org (Andy Gross)
+Date: Wed, 27 Aug 2014 16:53:05 -0500
+Subject: [PATCH v2 1/3] pinctrl: qcom: Add APQ8084 pinctrl support
+In-Reply-To: <1409057156-1201-2-git-send-email-gdjakov@mm-sol.com>
+References: <1409057156-1201-1-git-send-email-gdjakov@mm-sol.com>
+ <1409057156-1201-2-git-send-email-gdjakov@mm-sol.com>
+Message-ID: <20140827215305.GA19106@qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 27, 2014 at 1:49 PM, Christopher Covington
-<cov@codeaurora.org> wrote:
-> It appears to me that there is code in several architecture subdirectories
-> (I'm aware of x86, arm64, and with these patches arm[32] and I would be
-> surprised if there weren't more) doing largely the same setup of special
-> mappings at randomized offsets, checking ELF magic etc. Not that these patches
-> should necessarily do it, but is there a reasonable amount of consolidation
-> that could be done, or am I underestimating how much of this really does vary
-> per architecture?
->
+On Tue, Aug 26, 2014 at 03:45:54PM +0300, Georgi Djakov wrote:
+> This patchset adds pinctrl support for the Qualcomm APQ8084 platform.
+> 
+> Signed-off-by: Georgi Djakov <gdjakov@mm-sol.com>
 
-There's certainly code that could be consolidated, but it would be a
-decently large project.
+Looks good.  I'll try to test this tomorrow, but for now....
 
-Some day, I'd like to see everyone use vdso2c, but it needs to stop
-knowing that it's targetting x86 for that to happen.
+Reviewed-by: Andy Gross <agross@codeaurora.org>
 
---Andy
+-- 
+sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
