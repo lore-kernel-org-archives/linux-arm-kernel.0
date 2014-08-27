@@ -1,44 +1,46 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed, 27 Aug 2014 09:35:26 +0900
-Subject: [PATCH v2 5/5] ARM: shmobile: ape6evm: correct memory map syntax
-In-Reply-To: <1409099726-21814-1-git-send-email-horms+renesas@verge.net.au>
-References: <1409099726-21814-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1409099726-21814-6-git-send-email-horms+renesas@verge.net.au>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Wed, 27 Aug 2014 02:35:27 +0200
+Subject: [PATCH v7 3/8] cpufreq: kirkwood: Remove use of the clk provider
+ API
+In-Reply-To: <20140826233008.5251.50447@quantum>
+References: <1408375833-10703-1-git-send-email-tomeu.vizoso@collabora.com>
+ <1408375833-10703-4-git-send-email-tomeu.vizoso@collabora.com>
+ <20140820225513.5251.284@quantum> <53F5A587.9030200@collabora.com>
+ <20140821133825.GH8608@lunn.ch> <20140822192933.5251.53733@quantum>
+ <20140822201112.GH17277@lunn.ch>
+ <20140826214631.5251.66177@quantum> <20140826223637.GA5324@lunn.ch>
+ <20140826233008.5251.50447@quantum>
+Message-ID: <20140827003527.GA6149@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Correct a syntax error by using two comma-delimited 32 bit values
-rather than a single 64 bit value.
+> One final thought I have had is that it might be a good idea to have a
+> mux clock which represents the clock signal that feeds into the cpu. It
+> seems that a mux is exactly what is going on here with cpuclk rate and
+> ddrclk rate.
 
-This is a documentation fix and should have no run-time affect.
+I did think of this when i implemented the cpufreq driver. What makes
+it hard is that this bit is mixed in the same 32 bit register as the
+gate clocks. It would mean two clock providers sharing the same
+register, sharing a spinlock, etc. And the gating provider is shared
+with all mvebu platforms, dove, kirkword, orion5x, and four different
+armada SoCs. So i'm pushing complexity into this shared code, which
+none of the others need. Does the standard mux clock do what is
+needed? Or would i have to write a new clock provider?
 
-This problem was introduced when the second memory region
-was added to the ape6evm dts file by by 8353f09f579631d09
-("ARM: shmobile: Include all 2 GiB of memory on APE6EVM") in v3.13.
+> I even wonder if it is even appropriate to model this transition with a
+> clock enable operation? Maybe it is only a multiplex operation, or
+> perhaps a combination of enabling the powersave clock and changing the
+> parent input to the cpu?
+> 
+> My idea is instead of relying on a cpufreq driver to parse the state of
+> your clocks and understand the multiplexing, you can use the clock
+> framework for that. In fact that might help you get one step closer to
+> using the cpufreq-cpu0.c/cpufreq-generic.c implementation.
 
-Cc: Olof Johansson <olof@lixom.net>
-Cc: Geert Uytterhoeven <geert@linux-m68k.org>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+So you want the whole disabling of interrupt delivery to the cpu,
+flipping the mux, wait for interrupt and re-enabling of interrupt
+delivery to the cpu inside the clock provider? That is way past a
+simple mux clock.
 
----
-v2
-* First post
----
- arch/arm/boot/dts/r8a73a4-ape6evm.dts | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/arch/arm/boot/dts/r8a73a4-ape6evm.dts b/arch/arm/boot/dts/r8a73a4-ape6evm.dts
-index ce085fa..6d3e8fd 100644
---- a/arch/arm/boot/dts/r8a73a4-ape6evm.dts
-+++ b/arch/arm/boot/dts/r8a73a4-ape6evm.dts
-@@ -25,7 +25,7 @@
- 		reg = <0 0x40000000 0 0x40000000>;
- 	};
- 
--	memory at 200000000 {
-+	memory at 2,00000000 {
- 		device_type = "memory";
- 		reg = <2 0x00000000 0 0x40000000>;
- 	};
--- 
-2.0.1
+       Andrew
