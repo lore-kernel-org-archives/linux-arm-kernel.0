@@ -1,38 +1,38 @@
-From: henrik@henriknordstrom.net (Henrik =?ISO-8859-1?Q?Nordstr=F6m?=)
-Date: Wed, 27 Aug 2014 10:17:04 +0200
-Subject: [linux-sunxi] Re: [PATCH 4/4] simplefb: add clock handling code
-In-Reply-To: <20140826135341.GM15297@lukather>
-References: <20140813170106.GT15297@lukather>
- <20140825121228.GB4163@ulmo.nvidia.com> <20140825124410.GZ15297@lukather>
- <20140825133953.GJ4163@ulmo.nvidia.com> <53FB3E7F.4000503@redhat.com>
- <20140825141600.GA14763@ulmo.nvidia.com> <20140825145854.GA15297@lukather>
- <20140825150501.GE14763@ulmo.nvidia.com> <20140825152232.GE15297@lukather>
- <20140826080432.GD17263@ulmo> <20140826135341.GM15297@lukather>
-Message-ID: <1409127424.2701.27.camel@localhost>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 27 Aug 2014 09:24:21 +0100
+Subject: [PATCH 5/9] arm64: Fix include header order in vmlinux.lds.S
+In-Reply-To: <1409081250.11425.32.camel@smoke>
+References: <cover.1408736066.git.geoff@infradead.org>
+ <314ef77423f90ed407b54b4658ea41a96b6f6170.1408736066.git.geoff@infradead.org>
+ <20140826162759.GG4078@leverpostej>
+ <1409081250.11425.32.camel@smoke>
+Message-ID: <20140827082420.GC6968@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-tis 2014-08-26 klockan 15:53 +0200 skrev Maxime Ripard:
-> > it should be fixed at the root. So a much better solution would be to
-> > establish a way for firmware to communicate to the kernel that a given
-> > resource has been enabled by firmware and shouldn't be disabled. Such a
-> > solution can be implement for all types of resources and can be reused
-> > by all drivers since they don't have to worry about these details.
+On Tue, Aug 26, 2014 at 08:27:30PM +0100, Geoff Levand wrote:
+> On Tue, 2014-08-26 at 17:27 +0100, Mark Rutland wrote:
+> > On Fri, Aug 22, 2014 at 08:49:16PM +0100, Geoff Levand wrote:
+> > > asm-generic/vmlinux.lds.h should be included after the arch
+> > > specific headers so that the arch headers can override the
+> > > generic macro defs in asm-generic/vmlinux.lds.h.
+> > > 
+> > > Fixes preprosessor redefined warnings when adding arch specific
+> > > macros.
+> > 
+> > A sample of those warnings would be nice. What do you see being
+> > redefined?
 > 
-> Mike Turquette repeatedly said that he was against such a DT property:
-> https://lkml.org/lkml/2014/5/12/693
+> In testing I wanted to set LOAD_OFFSET.  If gave warnings like
+> these:
+> 
+>   arch/arm64/include/asm/page.h: warning: "LOAD_OFFSET" redefined [enabled by default]
+> 
+> I'll send out another patch with updated message.
 
-And not really what we want here. The clocks should be turned off if not
-in use, i.e. when simplefb is unbound from the device and no other
-driver has taken over. Maybe even in the case where there is no simplefb
-driver in-kernel, but if the use case is to be generalized then this
-kind of resources need to be held until explicitly released to allow
-resources to be held until their driver is loaded, which may happen long
-after kernel bootup.
+We currently don't define LOAD_OFFSET, so it would be good to see
+what/why it is defined to. You could keep this patch as part of the
+series introducing LOAD_OFFSET.
 
-But again, for many use cases it is a virtual hardware property, not
-really hardware in it's own but still smells a lot like hardware. These
-parameters is only valid until the hardware have been reconfigured.
-
-Regards
-Henrik
+-- 
+Catalin
