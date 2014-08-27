@@ -1,133 +1,140 @@
-From: m.smarduch@samsung.com (Mario Smarduch)
-Date: Tue, 26 Aug 2014 16:58:46 -0700
-Subject: [PATCH v10 6/6] arm: KVM: ARMv7 dirty page logging 2nd stage page
- fault handling support
-Message-ID: <1409097526-1225-1-git-send-email-m.smarduch@samsung.com>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Wed, 27 Aug 2014 02:20:49 +0200
+Subject: [PATCH 3/9] PM / Domains: Add APIs to attach/detach a power
+ domain for a device
+In-Reply-To: <1409054837-5667-4-git-send-email-ulf.hansson@linaro.org>
+References: <1409054837-5667-1-git-send-email-ulf.hansson@linaro.org>
+ <1409054837-5667-4-git-send-email-ulf.hansson@linaro.org>
+Message-ID: <4718058.Ou8igBffVK@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds support for handling 2nd stage page faults during migration,
-it disables faulting in huge pages, and dissolves huge pages to page tables.
-In case migration is canceled huge pages may be used again.
+On Tuesday, August 26, 2014 02:07:11 PM Ulf Hansson wrote:
+> To maintain scalability let's add common methods to attach and detach
+> a power domain for a device, dev_pm_domain_attach|detach().
+> 
+> Typically dev_pm_domain_attach() shall be invoked from subsystem level
+> code at the probe phase to try to attach a device to it's power domain.
+> The reversed actions may be done a the remove phase and then by invoking
+> dev_pm_domain_detach().
+> 
+> The supported power domains at this point are the ACPI and the generic
+> power domains.
+> 
+> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+> ---
+>  drivers/base/power/common.c | 58 +++++++++++++++++++++++++++++++++++++++++++++
+>  include/linux/pm.h          | 14 +++++++++++
+>  2 files changed, 72 insertions(+)
+> 
+> diff --git a/drivers/base/power/common.c b/drivers/base/power/common.c
+> index df2e5ee..f544128 100644
+> --- a/drivers/base/power/common.c
+> +++ b/drivers/base/power/common.c
+> @@ -11,6 +11,8 @@
+>  #include <linux/export.h>
+>  #include <linux/slab.h>
+>  #include <linux/pm_clock.h>
+> +#include <linux/acpi.h>
+> +#include <linux/pm_domain.h>
+>  
+>  /**
+>   * dev_pm_get_subsys_data - Create or refcount power.subsys_data for device.
+> @@ -82,3 +84,59 @@ int dev_pm_put_subsys_data(struct device *dev)
+>  	return ret;
+>  }
+>  EXPORT_SYMBOL_GPL(dev_pm_put_subsys_data);
+> +
+> +/**
+> + * dev_pm_domain_attach - Attach a device to it's power domain.
+> + * @dev: Device to attach.
+> + * @power_on: Used to indicate whether we should power on the device.
+> + *
+> + * The @dev may only be attached to a single power domain. By iterating through
+> + * the available alternatives we try to find a valid domain for the device.
+> + *
+> + * This function should typically be invoked from subsystem level code during
+> + * the probe phase. Especially for those that's hold devices which requires
+> + * power management through power domains.
+> + *
+> + * Callers must ensure proper synchronization of this function with power
+> + * management callbacks.
+> + *
+> + * Returns 0 on successfully attached power domain or negative error code.
+> + */
+> +int dev_pm_domain_attach(struct device *dev, bool power_on)
+> +{
+> +	int ret;
+> +
+> +	ret = acpi_dev_pm_attach(dev, power_on);
+> +	if (ret == -EPROBE_DEFER)
 
-Signed-off-by: Mario Smaduch <m.smarduch@samsung.com>
----
- arch/arm/kvm/mmu.c | 45 +++++++++++++++++++++++++++++++++++++++------
- 1 file changed, 39 insertions(+), 6 deletions(-)
+This doesn't seem to be possible today.  At least I'm not sure how it can
+happen.
 
-diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
-index f176edf..0d79db04 100644
---- a/arch/arm/kvm/mmu.c
-+++ b/arch/arm/kvm/mmu.c
-@@ -47,6 +47,15 @@ static phys_addr_t hyp_idmap_vector;
- #define kvm_pmd_huge(_x)	(pmd_huge(_x) || pmd_trans_huge(_x))
- #define kvm_pud_huge(_x)	pud_huge(_x)
- 
-+static bool kvm_get_logging_state(unsigned long *dirty_bitmap)
-+{
-+#ifdef CONFIG_ARM
-+	return !!dirty_bitmap;
-+#else
-+	return false;
-+#endif
-+}
-+
- static void kvm_tlb_flush_vmid_ipa(struct kvm *kvm, phys_addr_t ipa)
- {
- 	/*
-@@ -626,7 +635,8 @@ static int stage2_set_pmd_huge(struct kvm *kvm, struct kvm_mmu_memory_cache
- }
- 
- static int stage2_set_pte(struct kvm *kvm, struct kvm_mmu_memory_cache *cache,
--			  phys_addr_t addr, const pte_t *new_pte, bool iomap)
-+			  phys_addr_t addr, const pte_t *new_pte, bool iomap,
-+			  bool logging_active)
- {
- 	pmd_t *pmd;
- 	pte_t *pte, old_pte;
-@@ -641,6 +651,18 @@ static int stage2_set_pte(struct kvm *kvm, struct kvm_mmu_memory_cache *cache,
- 		return 0;
- 	}
- 
-+	/*
-+	 * While dirty memory logging, clear PMD entry for huge page and split
-+	 * into smaller pages, to track dirty memory at page granularity.
-+	 */
-+	if (logging_active && kvm_pmd_huge(*pmd)) {
-+		phys_addr_t ipa = pmd_pfn(*pmd) << PAGE_SHIFT;
-+
-+		pmd_clear(pmd);
-+		kvm_tlb_flush_vmid_ipa(kvm, ipa);
-+		put_page(virt_to_page(pmd));
-+	}
-+
- 	/* Create stage-2 page mappings - Level 2 */
- 	if (pmd_none(*pmd)) {
- 		if (!cache)
-@@ -693,7 +715,7 @@ int kvm_phys_addr_ioremap(struct kvm *kvm, phys_addr_t guest_ipa,
- 		if (ret)
- 			goto out;
- 		spin_lock(&kvm->mmu_lock);
--		ret = stage2_set_pte(kvm, &cache, addr, &pte, true);
-+		ret = stage2_set_pte(kvm, &cache, addr, &pte, true, false);
- 		spin_unlock(&kvm->mmu_lock);
- 		if (ret)
- 			goto out;
-@@ -909,6 +931,7 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
- 	struct kvm_mmu_memory_cache *memcache = &vcpu->arch.mmu_page_cache;
- 	struct vm_area_struct *vma;
- 	pfn_t pfn;
-+	bool logging_active = kvm_get_logging_state(memslot->dirty_bitmap);
- 
- 	write_fault = kvm_is_write_fault(kvm_vcpu_get_hsr(vcpu));
- 	if (fault_status == FSC_PERM && !write_fault) {
-@@ -919,7 +942,7 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
- 	/* Let's check if we will get back a huge page backed by hugetlbfs */
- 	down_read(&current->mm->mmap_sem);
- 	vma = find_vma_intersection(current->mm, hva, hva + 1);
--	if (is_vm_hugetlb_page(vma)) {
-+	if (is_vm_hugetlb_page(vma) && !logging_active) {
- 		hugetlb = true;
- 		gfn = (fault_ipa & PMD_MASK) >> PAGE_SHIFT;
- 	} else {
-@@ -962,7 +985,7 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
- 	spin_lock(&kvm->mmu_lock);
- 	if (mmu_notifier_retry(kvm, mmu_seq))
- 		goto out_unlock;
--	if (!hugetlb && !force_pte)
-+	if (!hugetlb && !force_pte && !logging_active)
- 		hugetlb = transparent_hugepage_adjust(&pfn, &fault_ipa);
- 
- 	if (hugetlb) {
-@@ -981,9 +1004,12 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
- 			kvm_set_pfn_dirty(pfn);
- 		}
- 		coherent_cache_guest_page(vcpu, hva, PAGE_SIZE);
--		ret = stage2_set_pte(kvm, memcache, fault_ipa, &new_pte, false);
-+		ret = stage2_set_pte(kvm, memcache, fault_ipa, &new_pte, false,
-+					logging_active);
- 	}
- 
-+	if (write_fault)
-+		mark_page_dirty(kvm, gfn);
- 
- out_unlock:
- 	spin_unlock(&kvm->mmu_lock);
-@@ -1134,7 +1160,14 @@ static void kvm_set_spte_handler(struct kvm *kvm, gpa_t gpa, void *data)
- {
- 	pte_t *pte = (pte_t *)data;
- 
--	stage2_set_pte(kvm, NULL, gpa, pte, false);
-+	/*
-+	 * We can always call stage2_set_pte with logging_active == false,
-+	 * because MMU notifiers will have unmapped a huge PMD before calling
-+	 * ->change_pte() (which in turn calls kvm_set_spte_hva()) and therefore
-+	 * stage2_set_pte() never needs to clear out a huge PMD through this
-+	 * calling path.
-+	 */
-+	stage2_set_pte(kvm, NULL, gpa, pte, false, false);
- }
- 
- 
+> +		return ret;
+> +	else
+> +		ret = genpd_dev_pm_attach(dev);
+> +
+> +	return ret;
+> +}
+> +EXPORT_SYMBOL_GPL(dev_pm_domain_attach);
+
+On a more general note, are you sure that the place where we call
+acpi_dev_pm_attach() will always be suitable for calling genpd_dev_pm_attach()?
+
+> +
+> +/**
+> + * dev_pm_domain_detach - Detach a device from it's power domain.
+> + * @dev: Device to attach.
+> + * @power_off: Used to indicate whether we should power off the device.
+> + *
+> + * The @dev may be attached to a power domain. By iterating through the
+> + * available alternatives we detach it from it's power domain.
+> + *
+> + * This functions will reverse the actions from dev_pm_domain_attach() and
+> + * thus detach the @dev from it's power domain. Typically it should be invoked
+> + * from subsystem level code during the remove phase.
+> + *
+> + * Callers must ensure proper synchronization of this function with power
+> + * management callbacks.
+> + *
+> + * Returns 0 on successfully detached power domain or negative error code.
+> + */
+> +int dev_pm_domain_detach(struct device *dev, bool power_off)
+> +{
+> +	if (acpi_dev_pm_detach(dev, power_off))
+> +		return genpd_dev_pm_detach(dev);
+> +	return 0;
+> +}
+> +EXPORT_SYMBOL_GPL(dev_pm_domain_detach);
+> diff --git a/include/linux/pm.h b/include/linux/pm.h
+> index 72c0fe0..8176b07 100644
+> --- a/include/linux/pm.h
+> +++ b/include/linux/pm.h
+> @@ -621,6 +621,20 @@ struct dev_pm_domain {
+>  	struct dev_pm_ops	ops;
+>  };
+>  
+> +#ifdef CONFIG_PM
+> +extern int dev_pm_domain_attach(struct device *dev, bool power_on);
+> +extern int dev_pm_domain_detach(struct device *dev, bool power_off);
+> +#else
+> +static inline int dev_pm_domain_attach(struct device *dev, bool power_on)
+> +{
+> +	return -ENODEV;
+> +}
+> +static inline int dev_pm_domain_detach(struct device *dev, bool power_off)
+> +{
+> +	return -ENODEV;
+> +}
+> +#endif
+> +
+>  /*
+>   * The PM_EVENT_ messages are also used by drivers implementing the legacy
+>   * suspend framework, based on the ->suspend() and ->resume() callbacks common
+> 
+
 -- 
-1.8.3.2
+I speak only for myself.
+Rafael J. Wysocki, Intel Open Source Technology Center.
