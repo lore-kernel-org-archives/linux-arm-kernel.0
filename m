@@ -1,97 +1,61 @@
-From: eric.auger@linaro.org (Eric Auger)
-Date: Wed, 27 Aug 2014 17:42:58 +0200
-Subject: [RFC 8/9] KVM: KVM-VFIO: add kvm_vfio_arch_data and accessors
-In-Reply-To: <1409153842.2906.255.camel@ul30vt.home>
-References: <1408973264-30384-1-git-send-email-eric.auger@linaro.org>		
- <1408973264-30384-9-git-send-email-eric.auger@linaro.org>	
- <1409079750.2906.130.camel@ul30vt.home> <53FDF7B6.507@linaro.org>
- <1409153842.2906.255.camel@ul30vt.home>
-Message-ID: <53FDFC82.1050505@linaro.org>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 27 Aug 2014 17:42:21 +0200
+Subject: [linux-sunxi] Re: [PATCH 4/4] simplefb: add clock handling code
+In-Reply-To: <20140827095241.GC23186@ulmo>
+References: <20140825145854.GA15297@lukather>
+ <20140825150501.GE14763@ulmo.nvidia.com>
+ <20140825152232.GE15297@lukather> <20140826080432.GD17263@ulmo>
+ <20140826135341.GM15297@lukather> <20140826143550.GB3027@ulmo>
+ <20140826210248.GO15297@lukather> <20140827065440.GG15640@ulmo>
+ <20140827084526.GR15297@lukather> <20140827095241.GC23186@ulmo>
+Message-ID: <20140827154221.GX15297@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/27/2014 05:37 PM, Alex Williamson wrote:
-> On Wed, 2014-08-27 at 17:22 +0200, Eric Auger wrote:
->> On 08/26/2014 09:02 PM, Alex Williamson wrote:
->>> On Mon, 2014-08-25 at 15:27 +0200, Eric Auger wrote:
->>>> add a pointer to architecture specific data in kvm_vfio struct
->>>> add accessors to keep kvm_vfio private
->>>>
->>>> Signed-off-by: Eric Auger <eric.auger@linaro.org>
->>>> ---
->>>>  arch/arm/include/asm/kvm_host.h |  8 ++++++++
->>>>  virt/kvm/vfio.c                 | 21 +++++++++++++++++++++
->>>>  2 files changed, 29 insertions(+)
->>>>
->>>> diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
->>>> index 62cbf5b..4f1edbf 100644
->>>> --- a/arch/arm/include/asm/kvm_host.h
->>>> +++ b/arch/arm/include/asm/kvm_host.h
->>>> @@ -177,6 +177,14 @@ void kvm_vfio_device_put_external_user(struct vfio_device *vdev);
->>>>  int kvm_vfio_external_get_type(struct vfio_device *vdev);
->>>>  struct device *kvm_vfio_external_get_base_device(struct vfio_device *vdev);
->>>>  
->>>> +struct kvm_vfio;
->>>> +struct kvm_vfio_arch_data;
->>>> +void kvm_vfio_device_set_arch_data(struct kvm_vfio *kv,
->>>> +				   struct kvm_vfio_arch_data *ptr);
->>>> +struct kvm_vfio_arch_data *kvm_vfio_device_get_arch_data(struct kvm_vfio *kv);
->>>> +void kvm_vfio_lock(struct kvm_vfio *kv);
->>>> +void kvm_vfio_unlock(struct kvm_vfio *kv);
->>>> +
->>>>  /* We do not have shadow page tables, hence the empty hooks */
->>>>  static inline int kvm_age_hva(struct kvm *kvm, unsigned long hva)
->>>>  {
->>>> diff --git a/virt/kvm/vfio.c b/virt/kvm/vfio.c
->>>> index f1c4e35..177b71e 100644
->>>> --- a/virt/kvm/vfio.c
->>>> +++ b/virt/kvm/vfio.c
->>>> @@ -28,6 +28,7 @@ struct kvm_vfio {
->>>>  	struct list_head group_list;
->>>>  	struct mutex lock;
->>>>  	bool noncoherent;
->>>> +	struct kvm_vfio_arch_data *arch_data;
->>>>  };
->>>>  
->>>>  static struct vfio_group *kvm_vfio_group_get_external_user(struct file *filep)
->>>> @@ -338,6 +339,26 @@ static int kvm_vfio_create(struct kvm_device *dev, u32 type)
->>>>  	return 0;
->>>>  }
->>>>  
->>>> +void kvm_vfio_device_set_arch_data(struct kvm_vfio *kv,
->>>> +				   struct kvm_vfio_arch_data *ptr)
->>>> +{
->>>> +	kv->arch_data = ptr;
->>>> +}
->>>> +
->>>> +struct kvm_vfio_arch_data *kvm_vfio_device_get_arch_data(struct kvm_vfio *kv)
->>>> +{
->>>
->>> My preference would be s/get_//
->> ok
->>>
->>>> +	return kv->arch_data;
->>>> +}
->>>> +
->>>> +void kvm_vfio_lock(struct kvm_vfio *kv)
->>>> +{
->>>> +	mutex_lock(&kv->lock);
->>>> +}
->>>> +
->>>> +void kvm_vfio_unlock(struct kvm_vfio *kv)
->>>> +{
->>>> +	mutex_unlock(&kv->lock);
->>>> +}
->>>
->>> Gosh, what could go wrong...
->> Hum sorry I did not understand what you meant here
+On Wed, Aug 27, 2014 at 11:52:48AM +0200, Thierry Reding wrote:
+> On Wed, Aug 27, 2014 at 10:45:26AM +0200, Maxime Ripard wrote:
+> > On Wed, Aug 27, 2014 at 08:54:41AM +0200, Thierry Reding wrote:
+> > > On Tue, Aug 26, 2014 at 11:02:48PM +0200, Maxime Ripard wrote:
+> > > > On Tue, Aug 26, 2014 at 04:35:51PM +0200, Thierry Reding wrote:
+> [...]
+> > > > > > Mike Turquette repeatedly said that he was against such a DT property:
+> > > > > > https://lkml.org/lkml/2014/5/12/693
+> > > > > 
+> > > > > Mike says in that email that he's opposing the addition of a property
+> > > > > for clocks that is the equivalent of regulator-always-on. That's not
+> > > > > what this is about. If at all it'd be a property to mark a clock that
+> > > > > should not be disabled by default because it's essential.
+> > > > 
+> > > > It's just semantic. How is "a clock that should not be disabled by
+> > > > default because it's essential" not a clock that stays always on?
+> > > 
+> > > Because a clock that should not be disabled by default can be turned off
+> > > when appropriate. A clock that is always on can't be turned off.
+> > 
+> > If a clock is essential, then it should never be disabled. Or we don't
+> > share the same meaning of essential.
 > 
-> Sorry, I was just sarcastically noting that exposing an internal lock
-> like this seems to be asking for trouble.  As you rework it to pull more
-> into the common code and generalize the architecture callouts, I hope we
-> can avoid exporting these locks.  Thanks,
-ok thanks. No problem I learnt a new word ;-)
+> Essential for the particular use-case.
 
-> 
-> Alex
-> 
+So, how would the clock driver would know about which use case we're
+in? How would it know about which display engine is currently running?
+How would it know about which video output is being set?
+
+Currently, we have two separate display engines, which can each output
+either to 4 different outputs (HDMI, RGB/LVDS, 2 DSI). Each and every
+one of these combinations would require different clocks. What clocks
+will we put in the driver? All of them?
+
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140827/d9967896/attachment.sig>
