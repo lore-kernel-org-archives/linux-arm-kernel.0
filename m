@@ -1,43 +1,61 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Wed, 27 Aug 2014 22:56:41 +0200 (CEST)
-Subject: [PATCH v3 3/4] irq: Allow multiple clients to register for irq
- affinity notification
-In-Reply-To: <1409170479-29955-4-git-send-email-lina.iyer@linaro.org>
-References: <1409170479-29955-1-git-send-email-lina.iyer@linaro.org>
- <1409170479-29955-4-git-send-email-lina.iyer@linaro.org>
-Message-ID: <alpine.DEB.2.10.1408272239190.3323@nanos>
+From: hramrach@gmail.com (Michal Suchanek)
+Date: Wed, 27 Aug 2014 22:57:29 +0200
+Subject: [linux-sunxi] Re: [PATCH 4/4] simplefb: add clock handling code
+In-Reply-To: <20140827154221.GX15297@lukather>
+References: <20140825145854.GA15297@lukather>
+ <20140825150501.GE14763@ulmo.nvidia.com>
+ <20140825152232.GE15297@lukather> <20140826080432.GD17263@ulmo>
+ <20140826135341.GM15297@lukather> <20140826143550.GB3027@ulmo>
+ <20140826210248.GO15297@lukather> <20140827065440.GG15640@ulmo>
+ <20140827084526.GR15297@lukather> <20140827095241.GC23186@ulmo>
+ <20140827154221.GX15297@lukather>
+Message-ID: <CAOMqctSY7AJKHthe+aG8--Ok6JiY1g2zM_tN10S2nELOSe=qMw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 27 Aug 2014, Lina Iyer wrote:
+Hello,
 
-> PM QoS and other idle frameworks can do a better job of addressing power
-> and performance requirements for a cpu, knowing the IRQs that are
-> affine to that cpu. If a performance request is placed against serving
-> the IRQ faster and if the IRQ is affine to a set of cpus, then setting
-> the performance requirements only on those cpus help save power on the
-> rest of the cpus. PM QoS framework is one such framework interested in
-> knowing the smp_affinity of an IRQ and the change notificiation in this
-> regard. QoS requests for the CPU_DMA_LATENCY constraint currently apply
-> to all cpus, but when attached to an IRQ, can be applied only to the set
-> of cpus that IRQ's smp_affinity is set to. This allows other cpus to
-> enter deeper sleep states to save power. More than one framework/driver
-> can be interested in such information.
+On 27 August 2014 17:42, Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
+> On Wed, Aug 27, 2014 at 11:52:48AM +0200, Thierry Reding wrote:
+>> On Wed, Aug 27, 2014 at 10:45:26AM +0200, Maxime Ripard wrote:
+>> > On Wed, Aug 27, 2014 at 08:54:41AM +0200, Thierry Reding wrote:
+>> > > On Tue, Aug 26, 2014 at 11:02:48PM +0200, Maxime Ripard wrote:
+>> > > > On Tue, Aug 26, 2014 at 04:35:51PM +0200, Thierry Reding wrote:
+>> [...]
+>> > > > > > Mike Turquette repeatedly said that he was against such a DT property:
+>> > > > > > https://lkml.org/lkml/2014/5/12/693
+>> > > > >
+>> > > > > Mike says in that email that he's opposing the addition of a property
+>> > > > > for clocks that is the equivalent of regulator-always-on. That's not
+>> > > > > what this is about. If at all it'd be a property to mark a clock that
+>> > > > > should not be disabled by default because it's essential.
+>> > > >
+>> > > > It's just semantic. How is "a clock that should not be disabled by
+>> > > > default because it's essential" not a clock that stays always on?
+>> > >
+>> > > Because a clock that should not be disabled by default can be turned off
+>> > > when appropriate. A clock that is always on can't be turned off.
+>> >
+>> > If a clock is essential, then it should never be disabled. Or we don't
+>> > share the same meaning of essential.
+>>
+>> Essential for the particular use-case.
+>
+> So, how would the clock driver would know about which use case we're
+> in? How would it know about which display engine is currently running?
+> How would it know about which video output is being set?
+>
+> Currently, we have two separate display engines, which can each output
+> either to 4 different outputs (HDMI, RGB/LVDS, 2 DSI). Each and every
+> one of these combinations would require different clocks. What clocks
+> will we put in the driver? All of them?
+>
 
-All you are describing is the fact, that there is only a single
-notifier possible right now, but you completely miss to describe WHY
-you need multiple ones.
+since simplefb cannot be extended how about adding, say, dtfb which
+claims the resources from dt and then instantiates a simplefb once the
+resources are claimed? That is have a dtfb which has the clocks
+assigned and has simplefb as child dt node.
 
-The existing notifier was introduced to tell the driver that the irq
-affinity has changed, so it can move its buffers to the proper NUMA
-node. So if that driver gets this information then it can tell the PM
-QoS code that its affinity changed so that stuff can react
-accordingly, right?
+Thanks
 
-This is going nowhere unless you provide a proper usecase and
-arguments why this is necessary. Handwaving and I want a pony
-arguments are not sufficient.
-
-Thanks,
-
-	tglx
+Michal
