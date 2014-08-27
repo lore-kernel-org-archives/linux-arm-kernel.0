@@ -1,71 +1,90 @@
-From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
-Date: Wed, 27 Aug 2014 21:54:33 +0200
-Subject: [PATCH 15/15] tty: serial: 8250: omap: add dma support
-In-Reply-To: <20140821184416.GF10066@atomide.com>
-References: <1408124563-31541-1-git-send-email-bigeasy@linutronix.de>
- <1408124563-31541-16-git-send-email-bigeasy@linutronix.de>
- <20140815210211.GD9239@atomide.com> <53F5AF0D.5060409@linutronix.de>
- <20140821184416.GF10066@atomide.com>
-Message-ID: <53FE3779.5090908@linutronix.de>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 27 Aug 2014 22:11:29 +0200
+Subject: [PATCH v2] ethernet: arc: Add support for Rockchip SoC layer
+ device tree bindings
+In-Reply-To: <1409122527-17673-1-git-send-email-romain.perier@gmail.com>
+References: <1409122527-17673-1-git-send-email-romain.perier@gmail.com>
+Message-ID: <3619843.a6HHkMsuOu@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/21/2014 08:44 PM, Tony Lindgren wrote:
->>> Also, with DMA enabled, looks like omap deeper idle states are
->>> blocked as the DMA stays reserved. After I commented out the
->>> DMA info for my console UART, PM started working.
->>
->> Hmm. This would explain something. This would mean that I should cancel
->> the RX DMA transfer in the PM-suspend routine. Let me see how that
->> works.
+On Wednesday 27 August 2014 06:55:27 Romain Perier wrote:
+> This patch defines a platform glue layer for Rockchip SoCs which
+> support arc-emac driver. It ensures that regulator for the rmii is on
+> before trying to connect to the ethernet controller. It applies right
+> speed and mode changes to the grf when ethernet settings change.
 > 
-> OK and if the DMA works with PM, then I don't see why we would not
-> want to have it automatically enabled.
-
-I re-did that part where the registers are restored. Mostly for that
-reason to use function in runtime_resume() as in set_termios(). I think
-that is cute :) _And_ if somebody changes here something and breaks it
-then it doesn't work with and without runtime-pm. It looks like the
-omap-serial doesn't restore the XON1 & XOFF1 registers.
-
-While at it I made sure that it works as good as I could and that means:
-
-core_pwrdm
-(ON),OFF:182,RET:21,INA:131,ON:335,RET-LOGIC-OFF:0,RET-MEMBANK1-OFF:0,RET-MEMBANK2-OFF:0
-
-The core off part with DMA looks like a no no:
-I #if 0 the block in where it assigned up.dma. With this I hit
-core-off. Step two was
-
-|static void omap8250_update_scr(struct uart_8250_port *up,
-|                 struct omap8250_priv *priv)
-|{
-|serial_out(up, UART_OMAP_SCR, priv->scr | OMAP_UART_SCR_DMAMODE_CTL);
-|serial_out(up, UART_OMAP_SCR, priv->scr | OMAP_UART_SCR_DMAMODE_CTL |
-OMAP_UART_SCR_DMAMODE_1);
-|serial_out(up, UART_OMAP_SCR, priv->scr | |OMAP_UART_SCR_DMAMODE_CTL);
-|serial_out(up, UART_OMAP_SCR, priv->scr);
-|}
-
-which means I just enable DMA mode in UART and disable it. No DMA
-operations were performed.
-With this change I see a lost character now and then which means the
-UART-IP goes into off and loses its context. Good. However I don't see
-core off anymore. This looks like a bug beyond my responsibilities :)
-
-I added code to cancel & and start DMA transfers in runtime suspend
-callbacks.
-However core-off with DMA won't work. I think we could document this in
-the binding document. What do you think?
-
-> BTW, looks like the ports move around now though. If set a port
-> to disabled with status = "disabled"; in the .dts file, you'll get
-> a different console which does not happen with omap-serial I believe.
-
-You a right. I fixed it in the 8250-core code.
-
-> Regards,
+> Signed-off-by: Romain Perier <romain.perier@gmail.com>
+> ---
+>  drivers/net/ethernet/arc/Kconfig         |  15 +++
+>  drivers/net/ethernet/arc/Makefile        |   1 +
+>  drivers/net/ethernet/arc/emac.h          |   2 +
+>  drivers/net/ethernet/arc/emac_main.c     |   2 +
+>  drivers/net/ethernet/arc/emac_rockchip.c | 224 +++++++++++++++++++++++++++++++
+>  5 files changed, 244 insertions(+)
+>  create mode 100644 drivers/net/ethernet/arc/emac_rockchip.c
 > 
-> Tony
+> diff --git a/drivers/net/ethernet/arc/Kconfig b/drivers/net/ethernet/arc/Kconfig
+> index 89e04fd..6d96a82 100644
+> --- a/drivers/net/ethernet/arc/Kconfig
+> +++ b/drivers/net/ethernet/arc/Kconfig
+> @@ -32,4 +32,19 @@ config ARC_EMAC
+>  	  non-standard on-chip ethernet device ARC EMAC 10/100 is used.
+>  	  Say Y here if you have such a board.  If unsure, say N.
+>  
+> +config EMAC_ROCKCHIP
+> +       tristate "Rockchip EMAC support"
+> +       select ARC_EMAC_CORE
+> +       depends on OF_IRQ
+> +       depends on OF_NET
+> +       depends on ARCH_ROCKCHIP
+> +       depends on REGULATOR_ACT8865
+> +       depends on SMSC_PHY
+> +       depends on MFD_SYSCON
 
-Sebastian
+You should generally not add 'depends on' for specific drivers out
+of a subsystems. Just list the build-time dependencies, like
+
+	depends on OF_IRQ && OF_NET && PHYLIB && REGULATOR && MFD_SYSCON
+
+You can add the ARCH_ROCKCHIPS part if you think that's valuable, but
+add an '|| COMPILE_TEST' so it's possible to still build it elsewhere.
+
+> +#define GRF_MODE_MII   BIT(0)
+> +#define GRF_MODE_RMII  0x0
+> +#define GRF_SPEED_10M  0x0
+> +#define GRF_SPEED_100M BIT(1)
+
+Just use 0x... for consistency for all of these.
+
+> +static const struct of_device_id emac_rockchip_dt_ids[];
+
+Can you rearrange it to avoid the forward declaration?
+
+> +       priv->soc_data = (struct emac_rockchip_soc_data *)match->data;
+
+This cast turns a 'const' pointer into a non-const pointer, which is
+bad. Mark the soc_data pointer as const as well so you can remove the
+cast here.
+
+> +	/* write-enable bits */
+> +	data = BIT(16) | BIT(17);
+> +
+> +	data |= GRF_SPEED_100M;
+> +	data |= GRF_MODE_RMII;
+
+If you have macros for some bits, you should have them for all of them.
+
+> +	rate = 50000000;
+
+Where does this number come from?
+
+> +static const struct of_device_id emac_rockchip_dt_ids[] = {
+> +	{ .compatible = "rockchip,rk3066-emac", .data = (void *)&emac_rockchip_dt_data[0]},
+> +	{ .compatible = "rockchip,rk3188-emac", .data = (void *)&emac_rockchip_dt_data[1]},
+> +	{ /* Sentinel */ }
+> +};
+
+This cast is harmless, but I'd remove it as well.
+
+	Arnd
