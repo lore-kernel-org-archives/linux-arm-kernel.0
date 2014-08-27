@@ -1,33 +1,52 @@
 From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 27 Aug 2014 09:25:29 +0100
-Subject: [PATCH 7/9] arm64: Add atomic macros to assembler.h
-In-Reply-To: <1409082053.11425.43.camel@smoke>
+Date: Wed, 27 Aug 2014 09:30:22 +0100
+Subject: [PATCH 9/9] arm64: Add new cpu-return-addr device tree binding
+In-Reply-To: <4192d403bb9703063c59a052293faa19d38d2f02.1408736066.git.geoff@infradead.org>
 References: <cover.1408736066.git.geoff@infradead.org>
- <73d234924f6de3b3b274d5d5648e4bbea6810450.1408736066.git.geoff@infradead.org>
- <20140826160526.GJ16482@arm.com> <1409082053.11425.43.camel@smoke>
-Message-ID: <20140827082529.GD6968@arm.com>
+ <4192d403bb9703063c59a052293faa19d38d2f02.1408736066.git.geoff@infradead.org>
+Message-ID: <20140827083022.GE6968@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 26, 2014 at 08:40:53PM +0100, Geoff Levand wrote:
-> On Tue, 2014-08-26 at 17:05 +0100, Catalin Marinas wrote:
-> > On Fri, Aug 22, 2014 at 08:49:16PM +0100, Geoff Levand wrote:
-> > > Add an assembler macro definition 'atomic' for performing generic
-> > > atomic operations.  Also add macro definitions for atomic_add,
-> > > atomic_sub, atomic_inc, and atomic_dec.
-> > 
-> > Same question as before. Why are this needed?
+On Fri, Aug 22, 2014 at 08:49:17PM +0100, Geoff Levand wrote:
+> Add a new arm64 device tree binding cpu-return-addr.  This binding is recomended
+> for all ARM v8 CPUs that have an "enable-method" property value of "spin-table".
+> The value is a 64 bit physical address that secondary CPU execution will transfer
+> to upon CPU shutdown.
 > 
-> I use these in the smp-spin-table re-work I am doing to keep a
-> count of CPUs in the secondary_holding_pen, but those patches
-> are not yet ready for review.
+> Signed-off-by: Geoff Levand <geoff@infradead.org>
+> ---
+>  Documentation/devicetree/bindings/arm/cpus.txt | 25 +++++++++++++++++++++++++
+>  1 file changed, 25 insertions(+)
 > 
-> I thought I'd post this now thinking theses macros might be of use
-> to someone else.  I could just put them into the smp-spin-table
-> series, please let me know.
+> diff --git a/Documentation/devicetree/bindings/arm/cpus.txt b/Documentation/devicetree/bindings/arm/cpus.txt
+> index 1fe72a0..42d5d5f 100644
+> --- a/Documentation/devicetree/bindings/arm/cpus.txt
+> +++ b/Documentation/devicetree/bindings/arm/cpus.txt
+> @@ -201,6 +201,15 @@ nodes to be present and contain the properties described below.
+>  			  property identifying a 64-bit zero-initialised
+>  			  memory location.
+>  
+> +	- cpu-return-addr
+> +		Usage: recomended for all ARM v8 CPUs that have an
+> +		       "enable-method" property value of "spin-table".
+> +		Value type: <prop-encoded-array>
+> +		Definition:
+> +			# On ARM v8 64-bit systems must be a two cell property.
+> +			The value is a 64 bit physical address that secondary
+> +			CPU execution will transfer to upon CPU shutdown.
 
-Keeping them all together would be better. I don't like introducing
-unused code.
+As I've been away for most of the past four weeks, I haven't read all
+the threads around this topic. But I don't think we ended up with a
+clearly agreed recommendation for cpu-return-addr. If we do, we also
+need to be clear on what state the CPU should be in when returned to
+such address (ELx, MMU, caches).
+
+In general, if we need returning to firmware I would strongly recommend
+PSCI but I know there is the Applied board which does not have EL3, so
+something like this may work. But we need to get them into discussion as
+well since I assume cpu-return-addr would be a firmware provided
+address.
 
 -- 
 Catalin
