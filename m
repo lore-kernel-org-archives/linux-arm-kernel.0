@@ -1,56 +1,35 @@
-From: wangnan0@huawei.com (Wang Nan)
-Date: Wed, 27 Aug 2014 13:08:29 +0800
-Subject: [PATCH] ARM: probes: return directly when emulate not set
-Message-ID: <1409116109-67330-1-git-send-email-wangnan0@huawei.com>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Wed, 27 Aug 2014 14:28:17 +0900
+Subject: [PATCH 0/3 repost] clocksource: Document Renesas SoC specific bindings
+Message-ID: <1409117300-2133-1-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When kprobe decoding instruction, original code calls instruction
-specific decoder if emulate is set to false.  However, instructions with
-DECODE_TYPE_EMULATE are in fact don't have their decoder. What in the
-action table are in fact handlers.  For example:
+[Repost with correct deviceetree email address]
 
-	/* LDRD (immediate)	cccc 000x x1x0 xxxx xxxx xxxx 1101 xxxx */
-	/* STRD (immediate)	cccc 000x x1x0 xxxx xxxx xxxx 1111 xxxx */
-	DECODE_EMULATEX	(0x0e5000d0, 0x004000d0, PROBES_LDRSTRD,
-						 REGS(NOPCWB, NOPCX, 0, 0, 0)),
+In general Renesas hardware is not documented to the extent where the
+relationship between IP blocks on different SoCs can be assumed although
+they may appear to operate the same way. Furthermore the documentation
+typically does not specify a version for individual IP blocks. For these
+reasons a convention of using the SoC name in place of a version and
+providing SoC-specific compat strings has been adopted.
 
-	and
+Although not universally liked this convention is used in the bindings for
+the drivers a number of drivers for Renesas hardware. The purpose of this
+patch is to update the Renesas clocksource drivers to follow this convention.
 
-const union decode_action kprobes_arm_actions[NUM_PROBES_ARM_ACTIONS] = {
-	...
-	[PROBES_LDRSTRD] = {.handler = emulate_ldrdstrd},
-	...
+I plan to follow up with patches to use these new bindings in the
+dtsi files for the affected SoCs.
 
-In this situation, original code calls 'emulate_ldrdstrd' as a decoder,
-which is obviously incorrect.
+Simon Horman (3):
+  clocksource: sh_cmt: Document SoC specific bindings
+  clocksource: sh_mtu2: Document r7s72100 binding
+  clocksource: sh_tmu: Document r8a7779 binding
 
-This patch makes it returns INSN_GOOD directly when 'emulate' is not
-true.
+ .../devicetree/bindings/timer/renesas,cmt.txt      | 26 +++++++++++++++++++++-
+ .../devicetree/bindings/timer/renesas,mtu2.txt     |  6 +++--
+ .../devicetree/bindings/timer/renesas,tmu.txt      |  6 +++--
+ 3 files changed, 33 insertions(+), 5 deletions(-)
 
-Signed-off-by: Wang Nan <wangnan0@huawei.com>
-Cc: "David A. Long" <dave.long@linaro.org>
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: Jon Medhurst <tixy@linaro.org>
-Cc: Taras Kondratiuk <taras.kondratiuk@linaro.org>
-Cc: Ben Dooks <ben.dooks@codethink.co.uk>
----
- arch/arm/kernel/probes.c | 3 +--
- 1 file changed, 1 insertion(+), 2 deletions(-)
-
-diff --git a/arch/arm/kernel/probes.c b/arch/arm/kernel/probes.c
-index a8ab540..1c77b8d 100644
---- a/arch/arm/kernel/probes.c
-+++ b/arch/arm/kernel/probes.c
-@@ -436,8 +436,7 @@ probes_decode_insn(probes_opcode_t insn, struct arch_probes_insn *asi,
- 			struct decode_emulate *d = (struct decode_emulate *)h;
- 
- 			if (!emulate)
--				return actions[d->handler.action].decoder(insn,
--					asi, h);
-+				return INSN_GOOD;
- 
- 			asi->insn_handler = actions[d->handler.action].handler;
- 			set_emulated_insn(insn, asi, thumb);
 -- 
-1.8.4
+2.0.1
