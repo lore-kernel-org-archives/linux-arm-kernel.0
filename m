@@ -1,94 +1,58 @@
-From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Wed, 27 Aug 2014 14:55:46 +0900
-Subject: [PATCH v6 2/6] arm64: ptrace: allow tracer to skip a system call
-In-Reply-To: <20140826175128.GD23445@arm.com>
-References: <1408611405-8943-1-git-send-email-takahiro.akashi@linaro.org>
- <1408611405-8943-3-git-send-email-takahiro.akashi@linaro.org>
- <CAGXu5jJCyqpXkdvNDCu+eMr0qnqwbqUUo4u+2p_7DvFMzfKoEw@mail.gmail.com>
- <53F69045.7010301@linaro.org> <20140826175128.GD23445@arm.com>
-Message-ID: <53FD72E2.4020103@linaro.org>
+From: anup.patel@linaro.org (Anup Patel)
+Date: Wed, 27 Aug 2014 11:25:42 +0530
+Subject: [PATCH] arm64: Fix GIC addresses for APM X-Gene
+Message-ID: <1409118942-7290-1-git-send-email-anup.patel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/27/2014 02:51 AM, Will Deacon wrote:
-> On Fri, Aug 22, 2014 at 01:35:17AM +0100, AKASHI Takahiro wrote:
->> On 08/22/2014 02:08 AM, Kees Cook wrote:
->>> On Thu, Aug 21, 2014 at 3:56 AM, AKASHI Takahiro
->>> <takahiro.akashi@linaro.org> wrote:
->>>> diff --git a/arch/arm64/kernel/ptrace.c b/arch/arm64/kernel/ptrace.c
->>>> index 8876049..c54dbcc 100644
->>>> --- a/arch/arm64/kernel/ptrace.c
->>>> +++ b/arch/arm64/kernel/ptrace.c
->>>> @@ -1121,9 +1121,29 @@ static void tracehook_report_syscall(struct pt_regs *regs,
->>>>
->>>>    asmlinkage int syscall_trace_enter(struct pt_regs *regs)
->>>>    {
->>>> +       unsigned int saved_syscallno = regs->syscallno;
->>>> +
->>>>           if (test_thread_flag(TIF_SYSCALL_TRACE))
->>>>                   tracehook_report_syscall(regs, PTRACE_SYSCALL_ENTER);
->>>>
->>>> +       if (IS_SKIP_SYSCALL(regs->syscallno)) {
->>>> +               /*
->>>> +                * RESTRICTION: we can't modify a return value of user
->>>> +                * issued syscall(-1) here. In order to ease this flavor,
->>>> +                * we need to treat whatever value in x0 as a return value,
->>>> +                * but this might result in a bogus value being returned.
->>>> +                */
->>>> +               /*
->>>> +                * NOTE: syscallno may also be set to -1 if fatal signal is
->>>> +                * detected in tracehook_report_syscall_entry(), but since
->>>> +                * a value set to x0 here is not used in this case, we may
->>>> +                * neglect the case.
->>>> +                */
->>>> +               if (!test_thread_flag(TIF_SYSCALL_TRACE) ||
->>>> +                               (IS_SKIP_SYSCALL(saved_syscallno)))
->>>> +                       regs->regs[0] = -ENOSYS;
->>>> +       }
->>>> +
->>>
->>> I don't have a runtime environment yet for arm64, so I can't test this
->>> directly myself, so I'm just trying to eyeball this. :)
->>>
->>> Once the seccomp logic is added here, I don't think using -2 as a
->>> special value will work. Doesn't this mean the Oops is possible by the
->>> user issuing a "-2" syscall? As in, if TIF_SYSCALL_WORK is set, and
->>> the user passed -2 as the syscall, audit will be called only on entry,
->>> and then skipped on exit?
->>
->> Oops, you're absolutely right. I didn't think of this case.
->> syscall_trace_enter() should not return a syscallno directly, but always
->> return -1 if syscallno < 0. (except when secure_computing() returns with -1)
->> This also implies that tracehook_report_syscall() should also have a return value.
->>
->> Will, is this fine with you?
->
-> Well, the first thing that jumps out at me is why this is being done
-> completely differently for arm64 and arm. I thought adding the new ptrace
-> requests would reconcile the differences?
+The APM X-Gene CPU does not implement security extensions but uses
+GIC-400 which has security extensions implemented. To take care of
+this situation APM HW designers provided two sets of GIC addresses
+for accessing secured and non-secured GIC registers seperately.
 
-I'm not sure what portion of my code you mentioned as "completely different", but
+Currently, the APM X-Gene DTS file points to secured GIC registers
+and uses GIC Group0 for all irqs. This works fine in most cases
+but does not work when routing host irqs to guest or VM using the
+GICH_LRn.HW bit. It happens because if Guest or VM EOIs routed irqs
+using GICV_EOI register then GIC-400 treats that Guest or VM is
+trying to EOI a Group0 irq (i.e. secured irq) from non-secured mode
+hence GIC-400 does not deactivate the routed irq.
 
-1)
-setting x0 to -ENOSYS is necessary because, otherwise, user-issued syscall(-1) will
-return a bogus value when audit tracing is on.
+To take care of the above issue, we initialize secured GIC registers
+from bootloader such that all host irqs are treated as Group1 irqs
+(i.e. non-secured irqs) and we only access non-secured GIC registers
+from Linux, Xen and other hypervisors. The bootloader GIC initialization
+part is already taken care and is available to all APM Mustang users
+in latest APM SW release. This patch updates Linux DTS files to use
+non-secured GIC registers for Linux and Xen.
 
-Please note that, on arm,
-                  not traced      traced
-                  ------          ------
-syscall(-1)      aborted         OOPs(BUG_ON)
-syscall(-3000)   aborted         aborted
-syscall(1000)    ENOSYS          ENOSYS
+Folks who want to try this patch, please update your APM Mustang
+u-boot from any APM SW release after 7th July 2014.
 
-So, anyhow, its a bit difficult and meaningless to mimic these invalid cases.
+Signed-off-by: Anup Patel <anup.patel@linaro.org>
+Signed-off-by: Pranavkumar Sawargaonkar <pranavkumar@linaro.org>
+---
+ arch/arm64/boot/dts/apm-storm.dtsi |    8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
 
-2)
-branching a new label, syscall_trace_return_skip (see entry.S), after syscall_trace_enter()
-is necessary in order to avoid OOPS in audit_syscall_enter() as we discussed.
-
-Did I make it clear?
-
--Takahiro AKASHI
-
-> Will
->
+diff --git a/arch/arm64/boot/dts/apm-storm.dtsi b/arch/arm64/boot/dts/apm-storm.dtsi
+index c0aceef..2b162f1 100644
+--- a/arch/arm64/boot/dts/apm-storm.dtsi
++++ b/arch/arm64/boot/dts/apm-storm.dtsi
+@@ -81,10 +81,10 @@
+ 		compatible = "arm,cortex-a15-gic";
+ 		#interrupt-cells = <3>;
+ 		interrupt-controller;
+-		reg = <0x0 0x78010000 0x0 0x1000>,	/* GIC Dist */
+-		      <0x0 0x78020000 0x0 0x1000>,	/* GIC CPU */
+-		      <0x0 0x78040000 0x0 0x2000>,	/* GIC VCPU Control */
+-		      <0x0 0x78060000 0x0 0x2000>;	/* GIC VCPU */
++		reg = <0x0 0x78090000 0x0 0x1000>,	/* GIC Dist */
++		      <0x0 0x780A0000 0x0 0x1000>,	/* GIC CPU */
++		      <0x0 0x780C0000 0x0 0x2000>,	/* GIC VCPU Control */
++		      <0x0 0x780E0000 0x0 0x2000>;	/* GIC VCPU */
+ 		interrupts = <1 9 0xf04>;	/* GIC Maintenence IRQ */
+ 	};
+ 
+-- 
+1.7.9.5
