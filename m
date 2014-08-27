@@ -1,48 +1,68 @@
-From: sjoerd.simons@collabora.co.uk (Sjoerd Simons)
-Date: Wed, 27 Aug 2014 09:44:04 +0200
-Subject: [PATCH 0/2 v2] Fix Exynos peach USB on kernels with USB Gadget
- support
-In-Reply-To: <53FD3D97.3010002@suse.de>
-References: <1409038230-7242-1-git-send-email-sjoerd.simons@collabora.co.uk>
- <53FD3D97.3010002@suse.de>
-Message-ID: <1409125444.31096.44.camel@collabora.co.uk>
+From: b29396@freescale.com (Dong Aisheng)
+Date: Wed, 27 Aug 2014 15:26:26 +0800
+Subject: [PATCH V3 0/6] mmc: sdhci: a few fixes on timeout and max_discard_to
+Message-ID: <1409124392-28899-1-git-send-email-b29396@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2014-08-27 at 04:08 +0200, Andreas F?rber wrote:
-> Hi,
-> 
-> Am 26.08.2014 09:30, schrieb Sjoerd Simons:
-> > I suspect other boards base using exynos5420/5800 might need the similar fixes
-> > (Arndale Octa and Samsung SMDK5420) to their dts files, so would be great if
-> > folks with those board could verify this.
-> 
-> usbdrd_dwc3_1 is indeed required for the Arndale Octa. Not sure about 0.
-> 
-> I tested my attaching a USB 3.0 disk - is there an easier way to tell?
+This series mainly is a rebase version due to it's somehow missed.
+See the original one at here:
+http://marc.info/?l=linux-mmc&m=138726995528304&w=2
+The issue is still exist on latest kernel.
 
-That seems to be the easiest way to tell. In my testing when things
-broke no USB host functionality would work, so USB 3 isn't a
-requirement.  You can also build with USB_DWC3_DEBUG enabled and check
-the mode file it generates in debugfs to see & set the controller mode
-to see how it gets setup by default and change the mode without
-rebuilding the dts.
+Comparing to V2, the old patch 5 is removed due to someone already pushed one
+simalar patch in the tree.
+Patch 5 and 6 in this series is newly added for a few clean up and make
+timeout_clk calculate more common for other platforms.
 
->From looking at the board on the arndaleboard wiki[0], it looks like it
-has one USB 3 host (which i guess is usbdrd_dwc3_1?) and a USB 2 OTG
-port which might be usbdrd_dwc3_0 (in which case the default setting for
-otg is correct). 
+Details patch description is as follows:
+Patch 1~4 mainly fixes the issue that the max timeout counter for uSDHC is
+1 << 28 rather than 1 << 27. 1~2 fix getting the max timeout counter
+while 3~4 fix setting the max timeout.
+Thus it introduces two new platform hook: get_max_timeout_count and set_timeout
+for those platform which have different timeout setting.
 
+This issue is firstly reported here by Ed Sutter:
+http://www.spinics.net/lists/linux-mmc/msg23375.html
+The root cause is the max_discard_to got from uSDHC is too small, only 677ms,
+which cause the max_discard_bytes for eMMC is only 512, then the discard operation
+of mkfs.ext3 for an eMMC card is too slow, just like dead.
+With above patches, the issue can be fixed.
 
-0: http://www.arndaleboard.org/wiki/index.php/O_WiKi#Detail_of_Arndale_Board
+Originally the max_discard_to for a high speed sdhc card may be:
+mmc1: new high speed SDHC card at address aaaa
+mmc1: calculated max. discard sectors 49152 for timeout 1355 ms
+After fix:
+mmc1: new high speed SDHC card@address aaaa
+mmc1: calculated max. discard sectors 712704 for timeout 5422 ms
+
+It also improves the card discard performance a lot due to max_discard_sectors
+increase a lot.
+
+ChangeLog:
+v2->v3:
+ 1. rebase to Ulf's latest mmc tree
+ 2. make timeout_clk calcuation common for SDHCI_QUIRK_DATA_TIMEOUT_USES_SDCLK
+
+ChangeLog:
+v1->v2:
+ 1. change .get_max_timeout to .get_max_timeout_count to reuse some code
+ 2. some other minor changes based on Shawn's comment.
+ 3. patch 6 in v1 is dropped since not need anymore after change 1
+
+Dong Aisheng (6):
+  mmc: sdhci: add platfrom get_max_timeout_count hook
+  mmc: sdhci-esdhc-imx: fix incorrect max timeout cout for uSDHC
+  mmc: sdhci: add platform set_timeout hook
+  mmc: sdhci-esdhc-imx: set the correct max timeout value for uSDHC
+  mmc: sdhci: calculate timeout_clk conditionally in sdhci_add_host
+  mmc: sdhci: move timeout_clk dynamically calculation code into common
+    code
+
+ drivers/mmc/host/sdhci-esdhc-imx.c |   20 ++++++++++
+ drivers/mmc/host/sdhci.c           |   74 ++++++++++++++++++++++--------------
+ drivers/mmc/host/sdhci.h           |    3 +
+ 3 files changed, 68 insertions(+), 29 deletions(-)
 
 -- 
-Sjoerd Simons <sjoerd.simons@collabora.co.uk>
-Collabora Ltd.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: smime.p7s
-Type: application/x-pkcs7-signature
-Size: 6170 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140827/e7fd14cd/attachment.bin>
+1.7.8
