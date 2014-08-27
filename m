@@ -1,51 +1,66 @@
-From: khilman@deeprootsystems.com (Kevin Hilman)
-Date: Wed, 27 Aug 2014 11:30:55 -0700
-Subject: [PATCH 0/7] ARM: OMAP4+: powerdomain fixes
-In-Reply-To: <1408715373-25791-1-git-send-email-nm@ti.com> (Nishanth Menon's
- message of "Fri, 22 Aug 2014 08:49:26 -0500")
+From: nm@ti.com (Nishanth Menon)
+Date: Wed, 27 Aug 2014 13:35:46 -0500
+Subject: [PATCH 4/7] ARM: OMAP2+: powerdomain: introduce logic for finding
+ valid power domain
+In-Reply-To: <7h1ts1eqjp.fsf@paris.lan>
 References: <1408715373-25791-1-git-send-email-nm@ti.com>
-Message-ID: <7hwq9tdbts.fsf@paris.lan>
+ <1408715373-25791-5-git-send-email-nm@ti.com>
+ <7h1ts1eqjp.fsf@paris.lan>
+Message-ID: <CAGo_u6rVNsmeuuaTre87eThh3_uo_1aWBgsW+ixiRtif=tnjLA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Nishanth Menon <nm@ti.com> writes:
-
-> The following series are various fixes and improvements for
-> powerdomain support in OMAP4+.
-
-Ah, here I see "fixes and improvements" since I was about to nipick that
-the series contains more than just fixes.
-
-Anyways, the series looks good to me.  After fixing up the BUG_ON issue,
-feel free to add
-
-Reviewed-by: Kevin Hilman <khilman@linaro.org>
-
-> This is part 1/6 series which eventually enables framework for
-> suspend-to-ram and cpuidle for OMAP5 and DRA7
+On Wed, Aug 27, 2014 at 1:27 PM, Kevin Hilman
+<khilman@deeprootsystems.com> wrote:
+> Nishanth Menon <nm@ti.com> writes:
 >
-> Each of series is based on v3.17-rc1 and this specific series is available:
-> weblink: https://github.com/nmenon/linux-2.6-playground/commits/push/v3.17/powerdomain-fixes
+>> powerdomain configuration in OMAP is done using PWRSTCTRL register for
+>> each power domain. However, PRCM lets us write any value we'd like to
+>> the logic and power domain target states, however the SoC integration
+>> tends to actually function only at a few discrete states. These valid
+>> states are already in our powerdomains_xxx_data.c file.
+>>
+>> So, provide a function to easily query valid low power state that the
+>> power domain is allowed to go to.
+>>
+>> Based on work originally done by Jean Pihet <j-pihet@ti.com>
+>> https://patchwork.kernel.org/patch/1325091/ . There is no attempt to
+>> create a new powerdomain solution here, except fixing issues seen
+>> attempting invalid programming attempts. Future consolidation to the
+>> generic powerdomain framework should consider this requirement as
+>> well.
+>>
+>> Similar solutions have been done in product kernels in the past such
+>> as:
+>> https://android.googlesource.com/kernel/omap.git/+blame/android-omap-panda-3.0/arch/arm/mach-omap2/pm44xx.c
+>>
+>> Signed-off-by: Nishanth Menon <nm@ti.com>
+>> ---
 >
-> git repo: https://github.com/nmenon/linux-2.6-playground.git push/v3.17/powerdomain-fixes
+> nit: this is part of a fixes series, but it's more of a new feature.
 >
-> An complete integrated branch is available here: https://github.com/nmenon/linux-2.6-playground/commits/testing/v3.17/cpu-idle-suspend-dra7-omap5-framework
+> That being said, the feature is needed and looks OK, except for...
 >
-> Nishanth Menon (7):
->   ARM: OMAP: DRA7: powerdomain data: fix powerdomain powerstate
->   ARM: OMAP5: powerdomain data: fix powerdomain powerstate
->   ARM: OMAP2+: powerdomain: pwrdm_for_each_clkdm iterate only valid
->     clkdms
->   ARM: OMAP2+: powerdomain: introduce logic for finding valid power
->     domain
->   ARM: OMAP4+: PM: Make logic state programmable
->   ARM: OMAP4+: PM: use only valid low power state for suspend
->   ARM: OMAP4+: PM: Use only valid low power state for CPU hotplug
+>> +up_search:
+>> +     /* OK, no deeper ones, can we get a higher match? */
+>> +     new_pwrst = req_state + 1;
+>> +     while (!(pwrdm_states & BIT(new_pwrst))) {
+>> +             /* BUG if we have messed up database */
+>> +             BUG_ON(new_pwrst > PWRDM_POWER_ON);
 >
->  arch/arm/mach-omap2/omap-mpuss-lowpower.c   |    4 ++
->  arch/arm/mach-omap2/pm44xx.c                |    9 +++-
->  arch/arm/mach-omap2/powerdomain.c           |   76 ++++++++++++++++++++++++++-
->  arch/arm/mach-omap2/powerdomain.h           |    4 ++
->  arch/arm/mach-omap2/powerdomains54xx_data.c |   12 ++---
->  arch/arm/mach-omap2/powerdomains7xx_data.c  |   14 ++---
->  6 files changed, 103 insertions(+), 16 deletions(-)
+> I don't think this is BUG() worthy, and should have a saner way to recover.
+
+it is not even a legal value to have a power state higher than ON. I
+mean, yeah, we can do
+if (new_pwrst > PWRDM_POWER_ON) {
+         pr_debug("powerdomain: %s: fix my powerdomain max to ON\n",
+pwrdm->name);
+         return PWRDM_POWER_ON;
+}
+
+if that is your suggestion here, personally, I would use a WARN at least here..
+
+-- 
+---
+Regards,
+Nishanth Menon
