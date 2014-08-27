@@ -1,35 +1,41 @@
 From: abrestic@chromium.org (Andrew Bresticker)
-Date: Wed, 27 Aug 2014 09:33:59 -0700
-Subject: [PATCH v2 1/9] of: Add NVIDIA Tegra XUSB mailbox binding
-In-Reply-To: <53FB84F7.8030509@wwwdotorg.org>
+Date: Wed, 27 Aug 2014 09:36:33 -0700
+Subject: [PATCH v2 3/9] of: Update Tegra XUSB pad controller binding for
+ USB
+In-Reply-To: <53FB8A8C.8040107@wwwdotorg.org>
 References: <1408381705-3623-1-git-send-email-abrestic@chromium.org>
- <1408381705-3623-2-git-send-email-abrestic@chromium.org>
- <53FB84F7.8030509@wwwdotorg.org>
-Message-ID: <CAL1qeaEkTPcn2C+KTO539NgAW_9DS0W+D8q5L9GwSwVop9Du0Q@mail.gmail.com>
+ <1408381705-3623-4-git-send-email-abrestic@chromium.org>
+ <53FB8A8C.8040107@wwwdotorg.org>
+Message-ID: <CAL1qeaGHuMegpeyumD8GrFRmeufkiiUygAdqu1ECHrfSkixwOQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 25, 2014 at 11:48 AM, Stephen Warren <swarren@wwwdotorg.org> wrote:
+On Mon, Aug 25, 2014 at 12:12 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
 > On 08/18/2014 11:08 AM, Andrew Bresticker wrote:
+>>   - #phy-cells: Should be 1. The specifier is the index of the PHY to
+>> reference.
+>>     See <dt-bindings/pinctrl/pinctrl-tegra-xusb.h> for the list of valid
+>> values.
+>> +- mboxes: Must contain an entry for the XUSB PHY mailbox channel.
+>> +  See ../mailbox/mailbox.txt for details.
 >
->> diff --git a/include/dt-bindings/mailbox/tegra-xusb-mailbox.h
->> b/include/dt-bindings/mailbox/tegra-xusb-mailbox.h
 >
->
->> +#define TEGRA_XUSB_MBOX_CHAN_HOST      0
->> +#define TEGRA_XUSB_MBOX_CHAN_PHY       1
->
->
-> I can't work out how these values relate to hardware at all. Are they in
-> fact properties of the particular firmware that's loaded into the XUSB
-> module? If so, I don't think the DT should contain these values at all.
+> Can we require the mbox-names property here, so that everything is looked up
+> by names. I know that the proposed mbox binding states that using indexes is
+> preferred over names, but that's just silly considering that names are
+> widely used in most other similar bindings, and are much easier to extend in
+> a backwards compatible fashion in the face of optional entries. As such, I'd
+> prefer that all Tegra bindings use foo-names properties where they exist.
 
-Yes this is rather ugly... they're used by software for the demuxing
-of messages and don't correspond to actual hardware.
+Sure, will do.
 
-> I wonder if the individual MBOX_CMD_* values from patch 2 are any
-> better, although I think those are also defined by the firmware, not the
-> hardware?
+>> +Optional properties:
+>> +-------------------
+>> +- vbus-otg-{0,1,2}-supply: VBUS regulator for the corresponding UTMI pad.
+>
+>
+> Why "-otg"? It's quite possible to have a regulator for VBUS even on systems
+> that don't support OTG, but rather simply have the ability to turn VBUS off.
 
-They are indeed defined by the firmware, so this would become an issue
-if the firmware API ever changed.
+Because they're the VBUS supplies for the OTG 'lanes'.  It doesn't
+really add anything, so I'll omit the "-otg".
