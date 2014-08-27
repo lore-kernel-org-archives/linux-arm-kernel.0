@@ -1,31 +1,37 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 27 Aug 2014 13:42:16 +0100
-Subject: [PATCH 1/9] ARM: multi-v7: Enable ST BCH NAND
+Date: Wed, 27 Aug 2014 13:42:19 +0100
+Subject: [PATCH 4/9] ARM: sti: Enable BCH NAND for STiH416 B2020-RevE
 In-Reply-To: <1409143344-22458-1-git-send-email-lee.jones@linaro.org>
 References: <1409143344-22458-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1409143344-22458-2-git-send-email-lee.jones@linaro.org>
+Message-ID: <1409143344-22458-5-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
+
+Also supply the platform specific clocks required by the NAND driver.
 
 Reviewed-By: Pekon Gupta <pekon@pek-sem.com>
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- arch/arm/configs/multi_v7_defconfig | 2 ++
- 1 file changed, 2 insertions(+)
+ arch/arm/boot/dts/stih416-b2020e.dts | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-index 18e2cd8..b1a507b 100644
---- a/arch/arm/configs/multi_v7_defconfig
-+++ b/arch/arm/configs/multi_v7_defconfig
-@@ -126,7 +126,9 @@ CONFIG_DMA_CMA=y
- CONFIG_CMA_SIZE_MBYTES=64
- CONFIG_OMAP_OCP2SCP=y
- CONFIG_MTD=y
-+CONFIG_MTD_NAND=y
- CONFIG_MTD_M25P80=y
-+CONFIG_MTD_NAND_STM_BCH=y
- CONFIG_BLK_DEV_LOOP=y
- CONFIG_ICS932S401=y
- CONFIG_APDS9802ALS=y
+diff --git a/arch/arm/boot/dts/stih416-b2020e.dts b/arch/arm/boot/dts/stih416-b2020e.dts
+index ba0fa2c..f4b92d5 100644
+--- a/arch/arm/boot/dts/stih416-b2020e.dts
++++ b/arch/arm/boot/dts/stih416-b2020e.dts
+@@ -31,5 +31,13 @@
+ 		ethernet1: dwmac at fef08000 {
+ 			snps,reset-gpio = <&PIO0 7>;
+ 		};
++
++		nand at fe901000 {
++			clock-names = "emi", "bch";
++			clocks = <&clk_s_a0_ls CLK_EMISS>,
++				 <&clk_s_a1_ls CLK_NAND_CTRL>;
++
++			status = "okay";
++		};
+ 	};
+ };
 -- 
 1.9.1
