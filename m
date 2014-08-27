@@ -1,80 +1,64 @@
-From: m.chehab@samsung.com (Mauro Carvalho Chehab)
-Date: Wed, 27 Aug 2014 08:34:47 -0300
-Subject: [PATCH v2 3/3] [media] rc: remove change_protocol in rc-ir-raw.c
-In-Reply-To: <53FD99FA.4030207@linaro.org>
-References: <1408613086-12538-1-git-send-email-zhangfei.gao@linaro.org>
- <1408613086-12538-4-git-send-email-zhangfei.gao@linaro.org>
- <20140821065006.6d831ec4@concha.lan> <53FD99FA.4030207@linaro.org>
-Message-ID: <20140827083447.6af0157f.m.chehab@samsung.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 27 Aug 2014 12:50:10 +0100
+Subject: [PATH V2 3/6] arm: mm: Enable HAVE_RCU_TABLE_FREE logic
+In-Reply-To: <1408635812-31584-4-git-send-email-steve.capper@linaro.org>
+References: <1408635812-31584-1-git-send-email-steve.capper@linaro.org>
+ <1408635812-31584-4-git-send-email-steve.capper@linaro.org>
+Message-ID: <20140827115010.GJ6968@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Em Wed, 27 Aug 2014 16:42:34 +0800
-zhangfei <zhangfei.gao@linaro.org> escreveu:
+On Thu, Aug 21, 2014 at 04:43:29PM +0100, Steve Capper wrote:
+> --- a/arch/arm/include/asm/tlb.h
+> +++ b/arch/arm/include/asm/tlb.h
+> @@ -35,12 +35,39 @@
+>  
+>  #define MMU_GATHER_BUNDLE	8
+>  
+> +#ifdef CONFIG_HAVE_RCU_TABLE_FREE
+> +static inline void __tlb_remove_table(void *_table)
+> +{
+> +	free_page_and_swap_cache((struct page *)_table);
+> +}
+> +
+> +struct mmu_table_batch {
+> +	struct rcu_head		rcu;
+> +	unsigned int		nr;
+> +	void			*tables[0];
+> +};
+> +
+> +#define MAX_TABLE_BATCH		\
+> +	((PAGE_SIZE - sizeof(struct mmu_table_batch)) / sizeof(void *))
+> +
+> +extern void tlb_table_flush(struct mmu_gather *tlb);
+> +extern void tlb_remove_table(struct mmu_gather *tlb, void *table);
+> +
+> +#define tlb_remove_entry(tlb, entry)	tlb_remove_table(tlb, entry)
+> +#else
+> +#define tlb_remove_entry(tlb, entry)	tlb_remove_page(tlb, entry)
+> +#endif /* CONFIG_HAVE_RCU_TABLE_FREE */
+> +
+>  /*
+>   * TLB handling.  This allows us to remove pages from the page
+>   * tables, and efficiently handle the TLB issues.
+>   */
+>  struct mmu_gather {
+>  	struct mm_struct	*mm;
+> +#ifdef CONFIG_HAVE_RCU_TABLE_FREE
+> +	struct mmu_table_batch	*batch;
+> +	unsigned int		need_flush;
+> +#endif
 
-> 
-> 
-> On 08/21/2014 07:50 PM, Mauro Carvalho Chehab wrote:
-> > Em Thu, 21 Aug 2014 17:24:45 +0800
-> > Zhangfei Gao <zhangfei.gao@linaro.org> escreveu:
-> >
-> >> With commit 4924a311a62f ("[media] rc-core: rename ir-raw.c"),
-> >> empty change_protocol was introduced.
-> >
-> > No. This was introduced on this changeset:
-> >
-> > commit da6e162d6a4607362f8478c715c797d84d449f8b
-> > Author: David H?rdeman <david@hardeman.nu>
-> > Date:   Thu Apr 3 20:32:16 2014 -0300
-> >
-> >      [media] rc-core: simplify sysfs code
-> >
-> >> As a result, rc_register_device will set dev->enabled_protocols
-> >> addording to rc_map->rc_type, which prevent using all protocols.
-> >
-> > I strongly suspect that this patch will break some things, as
-> > the new code seems to expect that this is always be set.
-> >
-> > See the code at store_protocols(): if this callback is not set,
-> > then it won't allow to disable a protocol.
-> >
-> > Also, this doesn't prevent using all protocols. You can still use
-> > "ir-keytable -p all" to enable all protocols (the "all" protocol
-> > type were introduced recently at the userspace tool).
-> >
-> >  From the way I see, setting the protocol when a table is loaded
-> > is not a bad thing, as:
-> > - if RC tables are loaded, the needed protocol to decode it is
-> >    already known;
-> > - by running just one IR decoder, the IR handling routine will
-> >    be faster and will consume less power;
-> > - on a real case scenario, it is a way more likely that just one
-> >    decoder will ever be needed by the end user.
-> >
-> > So, I think that this is just annoying for developers when are checking
-> > if all decoders are working, by sending keycodes from different IR types
-> > at the same time.
-> >
-> 
-> Thanks Mauro for the kind explanation.
-> 
-> ir-keytable seems also enalbe specific protocol
-> -p, --protocol=PROTOCOL
-> 
-> Currently we use lirc user space decoder/keymap and only need 
-> pulse-length information from kernel.
+We add need_flush here just because it is set by tlb_remove_table() but
+it won't actually be checked by anything since arch/arm uses its own
+version of tlb_flush_mmu(). But I wouldn't go for #ifdefs in the core
+code either.
 
-Well, you can use ir-keytable to disable everything but lirc, not
-compile the other hardware decoders or directly write "lirc" to 
-/sys/class/rc/rc0/protocols (see Documentation/ABI/testing/sysfs-class-rc).
+We should (as a separate patchset) convert arch/arm to generic
+mmu_gather. I know Russell had objections in the past but mmu_gather has
+evolved since and it's not longer inefficient (I think the only case is
+shift_arg_pages but that's pretty much lost in the noise).
 
-Anyway, I suggest you to use the hardware decoder instead of lirc,
-as the in-kernel decoders should be lighter than lirc and works pretty
-well, but this is, of course, your decision. 
+For this patch:
 
-Btw, it would make sense, IMHO, to have a way to setup LIRC daemon to
-enable LIRC output on a given remote controller, and, optionally,
-disabling the hardware decoders that are needlessly enabled.
-
-Regards,
-Mauro
+Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
