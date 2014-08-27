@@ -1,22 +1,34 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Wed, 27 Aug 2014 14:40:10 -0400
-Subject: [PATCH 0/6] ARM: OMAP3+: PRM: fix up prm_handling
-In-Reply-To: <1408715513-25851-1-git-send-email-nm@ti.com>
-References: <1408715513-25851-1-git-send-email-nm@ti.com>
-Message-ID: <53FE260A.3080602@ti.com>
+From: zajec5@gmail.com (=?UTF-8?B?UmFmYcWCIE1pxYJlY2tp?=)
+Date: Wed, 27 Aug 2014 20:43:40 +0200
+Subject: [RFC 2/7] bcm47xx-nvram: add new broadcom nvram driver with dt
+ support
+In-Reply-To: <53FE217B.7000401@gmail.com>
+References: <1408915485-8078-1-git-send-email-hauke@hauke-m.de>
+ <1408915485-8078-4-git-send-email-hauke@hauke-m.de>
+ <CACna6rwJBDpg9VS4h5hfP4wtGRVwAdRUq5mELeA0OFWWzH9jsA@mail.gmail.com>
+ <53FE217B.7000401@gmail.com>
+Message-ID: <CACna6ryXtFwJxBhEoJe+2mZWut24egtgXzzybxQ=rtPn9+X+2g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 22 August 2014 09:51 AM, Nishanth Menon wrote:
-> The following series are various fixes and improvements for
-> PRM for I/O Daisy chain support in OMAP4+ with device tree.
-> 
-> This is part 2/6 series which eventually enables framework for
-> suspend-to-ram and cpuidle for OMAP5 and DRA7
-> 
-> Each of series is based on v3.17-rc1 and this specific series is available:
-> weblink: https://github.com/nmenon/linux-2.6-playground/commits/push/v3.17/prm-fixes
-> 
+On 27 August 2014 20:20, Florian Fainelli <f.fainelli@gmail.com> wrote:
+> On 08/26/2014 10:54 PM, Rafa? Mi?ecki wrote:
+>> Could we avoid that? Type of flash can easily be checked in the code.
+>> All we need to do is to read BCMA_IOST register of BCMA_CORE_NS_ROM
+>> core.
 >
-Series also looks reasonable.
-Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> So there is a boot status register you can read to tell what type of
+> flash you booted from, but does that also give you the resource ranges
+> for these type of flashes? Presumably they will be mapped into different
+> addresses (at least bcm63xx is like that), that information needs to be
+> listed somewhere.
+
+Take a look at find_nvram in nvram_rw.c. It scans the whole region
+which is up to 0x02000000 (SI_FLASH2_SZ) size.
+
+In case of NAND limit is slightly different (nfl_boot_size function):
+1) On ARM it's 0x800000 or 0x2600000
+2) On MIPS it's 0x200000
+
+-- 
+Rafa?
