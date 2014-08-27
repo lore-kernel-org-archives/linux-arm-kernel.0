@@ -1,47 +1,45 @@
 From: behanw@converseincode.com (behanw at converseincode.com)
-Date: Tue, 26 Aug 2014 21:29:32 -0700
-Subject: [PATCH V2 4/6] arm64: LLVMLinux: Use current_stack_pointer in
- kernel/traps.c
+Date: Tue, 26 Aug 2014 21:29:33 -0700
+Subject: [PATCH V2 5/6] arm64: LLVMLinux: Use global stack register variable
+ for aarch64
 In-Reply-To: <1409113774-3172-1-git-send-email-behanw@converseincode.com>
 References: <20140826141608.GT23445@arm.com>
  <1409113774-3172-1-git-send-email-behanw@converseincode.com>
-Message-ID: <1409113774-3172-5-git-send-email-behanw@converseincode.com>
+Message-ID: <1409113774-3172-6-git-send-email-behanw@converseincode.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Behan Webster <behanw@converseincode.com>
+From: Mark Charlebois <charlebm@gmail.com>
 
-Use the global current_stack_pointer to get the value of the stack pointer.
-This change supports being able to compile the kernel with both gcc and clang.
+To support both Clang and GCC, use the global stack register variable vs
+a local register variable.
 
-Signed-off-by: Behan Webster <behanw@converseincode.com>
+Author: Mark Charlebois <charlebm@gmail.com>
 Signed-off-by: Mark Charlebois <charlebm@gmail.com>
-Reviewed-by: Olof Johansson <olof@lixom.net>
-Acked-by: Will Deacon <will.deacon@arm.com>
+Signed-off-by: Behan Webster <behanw@converseincode.com>
 ---
- arch/arm64/kernel/traps.c | 3 +--
- 1 file changed, 1 insertion(+), 2 deletions(-)
+ arch/arm64/include/asm/percpu.h | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm64/kernel/traps.c b/arch/arm64/kernel/traps.c
-index 02cd3f0..de1b085 100644
---- a/arch/arm64/kernel/traps.c
-+++ b/arch/arm64/kernel/traps.c
-@@ -132,7 +132,6 @@ static void dump_instr(const char *lvl, struct pt_regs *regs)
- static void dump_backtrace(struct pt_regs *regs, struct task_struct *tsk)
+diff --git a/arch/arm64/include/asm/percpu.h b/arch/arm64/include/asm/percpu.h
+index 453a179..5279e57 100644
+--- a/arch/arm64/include/asm/percpu.h
++++ b/arch/arm64/include/asm/percpu.h
+@@ -26,13 +26,13 @@ static inline void set_my_cpu_offset(unsigned long off)
+ static inline unsigned long __my_cpu_offset(void)
  {
- 	struct stackframe frame;
--	const register unsigned long current_sp asm ("sp");
+ 	unsigned long off;
+-	register unsigned long *sp asm ("sp");
  
- 	pr_debug("%s(regs = %p tsk = %p)\n", __func__, regs, tsk);
+ 	/*
+ 	 * We want to allow caching the value, so avoid using volatile and
+ 	 * instead use a fake stack read to hazard against barrier().
+ 	 */
+-	asm("mrs %0, tpidr_el1" : "=r" (off) : "Q" (*sp));
++	asm("mrs %0, tpidr_el1" : "=r" (off) :
++		"Q" (*(const unsigned long *)current_stack_pointer));
  
-@@ -145,7 +144,7 @@ static void dump_backtrace(struct pt_regs *regs, struct task_struct *tsk)
- 		frame.pc = regs->pc;
- 	} else if (tsk == current) {
- 		frame.fp = (unsigned long)__builtin_frame_address(0);
--		frame.sp = current_sp;
-+		frame.sp = current_stack_pointer;
- 		frame.pc = (unsigned long)dump_backtrace;
- 	} else {
- 		/*
+ 	return off;
+ }
 -- 
 1.9.1
