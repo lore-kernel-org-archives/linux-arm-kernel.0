@@ -1,97 +1,85 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 27 Aug 2014 15:24:59 +0200
-Subject: [linux-sunxi] Re: [PATCH 4/4] simplefb: add clock handling code
-In-Reply-To: <CAGRGNgWy=ijkakoKtXiEnFuVQpQT6WXW45-nL4x9DvfTKoA1OA@mail.gmail.com>
-References: <20140826082626.GE17263@ulmo>
- <20140826090035.GB17528@sirena.org.uk>
- <20140826091853.GI17263@ulmo>
- <20140826100612.GH17528@sirena.org.uk>
- <20140826105451.GD31124@ulmo> <1409078409.2701.17.camel@localhost>
- <20140827074057.GS17528@sirena.org.uk>
- <20140827082208.GQ15297@lukather>
- <CAMuHMdVkEPBtVT0dcDqQOQ_J0p+zYJwaUW8LqQX0Z+h6CHihRg@mail.gmail.com>
- <CAGRGNgWy=ijkakoKtXiEnFuVQpQT6WXW45-nL4x9DvfTKoA1OA@mail.gmail.com>
-Message-ID: <20140827132459.GU15297@lukather>
+From: afaerber@suse.de (=?UTF-8?B?QW5kcmVhcyBGw6RyYmVy?=)
+Date: Wed, 27 Aug 2014 15:29:19 +0200
+Subject: [PATCH] ARM: tegra: add PCIe-related pins to the Jetson TK1 pinmux
+ tables
+In-Reply-To: <20140827055247.GC15640@ulmo>
+References: <1408742308-18004-1-git-send-email-swarren@wwwdotorg.org>
+ <53FB10B8.3010408@suse.de> <53FB160F.6000700@nvidia.com>
+ <53FB27AB.8010608@nvidia.com> <53FD0980.2010803@suse.de>
+ <20140827055247.GC15640@ulmo>
+Message-ID: <53FDDD2F.20503@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Julian,
-
-On Wed, Aug 27, 2014 at 10:45:14PM +1000, Julian Calaby wrote:
-> Hi All,
+Am 27.08.2014 07:52, schrieb Thierry Reding:
+> On Wed, Aug 27, 2014 at 12:26:08AM +0200, Andreas F?rber wrote:
+>> Am 25.08.2014 14:10, schrieb Mikko Perttunen:
+>>> On 25/08/14 13:55, Mikko Perttunen wrote:
+>>>> On 25/08/14 13:32, Andreas F?rber wrote:
+>>>>> Am 22.08.2014 23:18, schrieb Stephen Warren:
+>>>>>> From: Stephen Warren <swarren@nvidia.com>
+>>>>>>
+>>>>>> This pinmux tables currently omit any configuration for PCIe clk_req,
+>>>>>> wake, and rst pins, which in turn causes intermittent failures in
+>>>>>> U-Boot's PCIe support. Import an updated version of the pinmux tables
+>>>>>> which rectifies this.
+>>>>>>
+>>>>>> (While I'm still hoping to remove the pinmux tables from DTs for
+>>>>>> Tegra124+ devices, while they're still here, they may as well be
+>>>>>> complete and correct).
+>>>>>>
+>>>>>> Signed-off-by: Stephen Warren <swarren@nvidia.com>
+>>>>>> ---
+>>>>>>   arch/arm/boot/dts/tegra124-jetson-tk1.dts | 35
+>>>>>> +++++++++++++++++++++++++++++++
+>>>>>>   1 file changed, 35 insertions(+)
+>>>>>
+>>>>> I've tested this patch on both -rc1 and yesterday's torvalds/linux.git
+>>>>> with tegra_defconfig: Both with or without this patch I get empty lspci
+>>>>> output.
+>>>>>
+>>>>> There doesn't seem to be a tegra/linux.git for-next branch based on -rc1
+>>>>> yet - are patches from other subsystem trees needed to get the on-board
+>>>>> Ethernet detected or maybe some config option?
+>>>>
+>>>> git://gitorious.org/thierryreding/linux.git staging/pci
+>>>
+>>> .. and apparently the device tree patches are in staging/tegra.
+>>
+>> Thanks for the URLs. I tested yesterday's staging/master, but booting
+>> from SD seemed broked, sdhci-tegra probe kept deferring. Is that a known
+>> issue?
 > 
-> On Wed, Aug 27, 2014 at 6:37 PM, Geert Uytterhoeven
-> <geert@linux-m68k.org> wrote:
-> > Hi Maxime,
-> >
-> > On Wed, Aug 27, 2014 at 10:22 AM, Maxime Ripard
-> > <maxime.ripard@free-electrons.com> wrote:
-> >> On Wed, Aug 27, 2014 at 08:40:57AM +0100, Mark Brown wrote:
-> >>> On Tue, Aug 26, 2014 at 08:40:09PM +0200, Henrik Nordstr?m wrote:
-> >>>
-> >>> > It is not clear to me where the hardware resources should be listed in
-> >>> > DT, being it a simplefb node or part of the actual hardware device node
-> >>> > properly marked as dynamic boot defaults or something else? It's
-> >>> > somewhere inbetween hardware and virtual device, and somewhat volatile.
-> >>> > As far as simplefb is concerned it is a hardware desription of the
-> >>> > framebuffer, but for a kms driver it's no more than firmware handover of
-> >>> > boottime settings and ceases to exists once the kms driver have
-> >>> > reconfigured the hardware.
-> >>>
-> >>> Is simplefb something that should be in the device tree distinctly in
-> >>> the first place - shouldn't it be a subset of the functionality of the
-> >>> video nodes?  It's the same hardware being driven differently.
-> >>
-> >> Therorically, yes, but that would mean knowing beforehand what the
-> >> final binding will look like, even before submitting the driver. Since
-> >> the bindings are always reviewed, and most of the time changed
-> >> slightly, that wouldn't work very well with the DT as a stable ABI
-> >> policy I guess.
-> >
-> > If you don't know how the bindings for a device will look like at the time of
-> > writing your DTS, you're always screwed, whether you add a simpefb
-> > node or not.
-> >
-> > If you know how the bindings look like, just add the device, with an extra
-> > "linux,simplefb" compatibility value.
-> > If you don't know how the bindings look like, do your utter best in
-> > guessing. Your DTS must be amended later anyway, either because
-> > you guessed wrong[*] (in case you added a node to have simplefb
-> > working), or because you have to add a real device node (in case you
-> > didn't add one for simplefb).
-> >
-> > [*] Actually you may have guessed right, in which case it'll continue
-> >     working as-is, and everybody will be happy.
-> >     Whether you want to keep backwards-compatibility in your future driver
-> >     with the "guessed wrong" node is up to you.
+> Yes, this is a known issue. The root is that currently there's no way to
+> allow deferred probing if an IOMMU hasn't been probed, so a driver needs
+> to continue without IOMMU support even if the IOMMU would come up later
+> in the boot process. The staging/iommu branch contains a patch to fix it
+> but it looks as if that won't be merged.
 > 
-> I apologise if I'm stepping on anyone's toes or horribly
-> misrepresenting device tree's capabilities, but couldn't we start out
-> with something like:
+> I've since removed the code that registers the Tegra SMMU with the code
+> that I introduced but haven't removed the registry patch yet, which will
+> cause the SMMU never to show up and therefore indefinitely deferring
+> probe. You can easily solve this by removing the iommus property from
+> the sdhci nodes in DTS or by removing the calls to iommu_attach() and
+> iommu_detach() from the SDHCI driver (reverting "mmc: sdhci-tegra: Add
+> IOMMU support").
 > 
-> disp at whatever {
->     compatible = "sunxi,sun4i-disp";
->     clocks = <&stuff 1>, <&stuff 2>, <&stuff 3>;
+> I'll see if I can find the time today to fix up the branches.
 
-Unfortunately, it's slightly more complicated than that, since there
-is several clocks involved, that feed several different IPs that need
-to stay on.
+No hurry! I switched to testing the newly updated for-next branch, which
+works fine so far (been using a USB Ethernet adapter).
 
-In this patch, and given the current code we have, we need to have the
-gates for the HDMI controller, the LCD controller and the display
-backend, which are three different IPs, with one clock each, that
-would be described by three different nodes.
-
-Maxime
+Thanks,
+Andreas
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+SUSE LINUX Products GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
+GF: Jeff Hawn, Jennifer Guild, Felix Imend?rffer; HRB 16746 AG N?rnberg
+
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140827/a190f9d6/attachment.sig>
+Size: 836 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140827/fef1992e/attachment-0001.sig>
