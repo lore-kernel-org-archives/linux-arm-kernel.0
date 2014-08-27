@@ -1,82 +1,30 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Wed, 27 Aug 2014 16:38:31 +0000 (UTC)
-Subject: [PATCH] ARM: OMAP2+: hwmod: Rearm wake-up interrupts for DT when
- MUSB is idled
-In-Reply-To: <20140825171446.GL17254@atomide.com>
-References: <20140825171446.GL17254@atomide.com>
-Message-ID: <alpine.DEB.2.02.1408271632550.21249@utopia.booyaka.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 27 Aug 2014 17:40:17 +0100
+Subject: [PATCH 1/6] arm: Fix in-correct barrier usage in SWP{B} emulation
+In-Reply-To: <1409048930-21598-2-git-send-email-punit.agrawal@arm.com>
+References: <1409048930-21598-1-git-send-email-punit.agrawal@arm.com>
+ <1409048930-21598-2-git-send-email-punit.agrawal@arm.com>
+Message-ID: <20140827164016.GE13850@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 25 Aug 2014, Tony Lindgren wrote:
-
-> Looks like MUSB cable removal can cause wake-up interrupts to
-> stop working for device tree based booting at least for UART3
-> even as nothing is dynamically remuxed. This can be fixed by
-> calling reconfigure_io_chain() for device tree based booting
-> in hwmod code. 
-
-Weird, nice find.  Do you know if this applies to all OMAPs, or just 
-OMAP3?
-
-> Note that we already do that for legacy booting
-> if the legacy mux is configured.
+On Tue, Aug 26, 2014 at 11:28:45AM +0100, Punit Agrawal wrote:
+> According to the ARM ARMv7, explicit barriers are necessary when using
+> synchronisation primitives such as SWP{B}. The use of these
+> instructions does not automatically imply a barrier and any ordering
+> requirements by the software must be explicitly expressed with the use
+> of suitable barriers.
 > 
-> My guess is that this is related to UART3 and MUSB ULPI
-> hsusb0_data0 and hsusb0_data1 support for Carkit mode that
-> somehow affect the configured IO chain for UART3 and require
-> rearming the wake-up interrupts.
+> Based on this, remove the barriers from SWP{B} emulation.
 > 
-> In general, for device tree based booting, pinctrl-single
-> calls the rearm hook that in turn calls reconfigure_io_chain
-> so calling reconfigure_io_chain should not be needed from the
-> hwmod code for other events.
-> 
-> So let's limit the hwmod rearming of iochain only to
-> HWMOD_FORCE_MSTANDBY where MUSB is currently the only user
-> of it. If we see other devices needing similar changes we can
-> add more checks for it.
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
 
-Could you please add a new hwmod flag for this case?  Maybe something like 
-HWMOD_RECONFIG_IO_CHAIN?  I think that would make the code easier to read 
-and more maintainable, since the workaround would then be explicitly 
-connected with that particular workaround's flag.  Looks like we have 
-several flag bits left.  Plus if we wind up having to set 
-HWMOD_FORCE_MSTANDBY for other devices that might not need the I/O chain 
-reconfiguration, we won't have to reimplement this flag workaround.
+This patch is independent to the SWP emulation for arm64 series. Unless
+Russell has any objections, you should send it to his patch system (git
+send-email to patches at arm.linux.org.uk with "KernelVersion: v3..." after
+the commit log; I hope Russell drops the KernelVersion requirement some
+day ;)).
 
-
-regards
-
-
-- Paul
-
-
-> 
-> Cc: Paul Walmsley <paul@pwsan.com>
-> Signed-off-by: Tony Lindgren <tony@atomide.com>
-> 
-> --- a/arch/arm/mach-omap2/omap_hwmod.c
-> +++ b/arch/arm/mach-omap2/omap_hwmod.c
-> @@ -2185,6 +2185,8 @@ static int _enable(struct omap_hwmod *oh)
->  			 oh->mux->pads_dynamic))) {
->  		omap_hwmod_mux(oh->mux, _HWMOD_STATE_ENABLED);
->  		_reconfigure_io_chain();
-> +	} else if (oh->flags & HWMOD_FORCE_MSTANDBY) {
-> +		_reconfigure_io_chain();
->  	}
->  
->  	_add_initiator_dep(oh, mpu_oh);
-> @@ -2291,6 +2293,8 @@ static int _idle(struct omap_hwmod *oh)
->  	if (oh->mux && oh->mux->pads_dynamic) {
->  		omap_hwmod_mux(oh->mux, _HWMOD_STATE_IDLE);
->  		_reconfigure_io_chain();
-> +	} else if (oh->flags & HWMOD_FORCE_MSTANDBY) {
-> +		_reconfigure_io_chain();
->  	}
->  
->  	oh->_state = _HWMOD_STATE_IDLE;
-> 
-
-
-- Paul
+-- 
+Catalin
