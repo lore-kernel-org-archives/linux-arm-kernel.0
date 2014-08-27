@@ -1,117 +1,85 @@
-From: eric.auger@linaro.org (Eric Auger)
-Date: Wed, 27 Aug 2014 17:20:46 +0200
-Subject: [RFC 5/9] VFIO: Extend external user API
-In-Reply-To: <1409079734.2906.129.camel@ul30vt.home>
-References: <1408973264-30384-1-git-send-email-eric.auger@linaro.org>	
- <1408973264-30384-6-git-send-email-eric.auger@linaro.org>
- <1409079734.2906.129.camel@ul30vt.home>
-Message-ID: <53FDF74E.6000201@linaro.org>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Wed, 27 Aug 2014 17:22:05 +0200 (CEST)
+Subject: [RESEND PATCH v2 1/4] irqchip: gic: Change irq type check when
+ extension is present
+In-Reply-To: <20140827142935.GA9490@leverpostej>
+References: <1407895884-18131-1-git-send-email-srv_yingjoe.chen@mediatek.com>
+ <1407895884-18131-2-git-send-email-srv_yingjoe.chen@mediatek.com>
+ <53F724F5.3040004@arm.com>
+ <1409133344.25382.37.camel@coredoba.hi.pengutronix.de>
+ <53FDB4B3.6000400@arm.com>
+ <alpine.DEB.2.10.1408271347210.3323@nanos>
+ <87ppfmoxxz.fsf@approximate.cambridge.arm.com>
+ <20140827142935.GA9490@leverpostej>
+Message-ID: <alpine.DEB.2.10.1408271657310.3323@nanos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/26/2014 09:02 PM, Alex Williamson wrote:
-> On Mon, 2014-08-25 at 15:27 +0200, Eric Auger wrote:
->> New functions are added to be called from ARM KVM-VFIO device.
->>
->> - vfio_device_get_external_user enables to get a vfio device from
->>   its fd
->> - vfio_device_put_external_user puts the vfio device
->> - vfio_external_get_type enables to retrieve the type of the device
->>   (PCI or platform)
->> - vfio_external_get_base_device enables to get the
->>   struct device*, useful to access the platform_device
->>
->> Signed-off-by: Eric Auger <eric.auger@linaro.org>
->> ---
->>  drivers/vfio/vfio.c  | 35 +++++++++++++++++++++++++++++++++++
->>  include/linux/vfio.h |  4 ++++
->>  2 files changed, 39 insertions(+)
->>
->> diff --git a/drivers/vfio/vfio.c b/drivers/vfio/vfio.c
->> index 8e84471..c93b9e4 100644
->> --- a/drivers/vfio/vfio.c
->> +++ b/drivers/vfio/vfio.c
->> @@ -1401,6 +1401,41 @@ void vfio_group_put_external_user(struct vfio_group *group)
->>  }
->>  EXPORT_SYMBOL_GPL(vfio_group_put_external_user);
->>  
->> +struct vfio_device *vfio_device_get_external_user(struct file *filep)
->> +{
->> +	struct vfio_device *vdev = filep->private_data;
->> +
->> +	if (filep->f_op != &vfio_device_fops)
->> +		return ERR_PTR(-EINVAL);
->> +
->> +	vfio_device_get(vdev);
->> +	return vdev;
->> +}
->> +EXPORT_SYMBOL_GPL(vfio_device_get_external_user);
->> +
->> +void vfio_device_put_external_user(struct vfio_device *vdev)
->> +{
->> +	vfio_device_put(vdev);
->> +}
->> +EXPORT_SYMBOL_GPL(vfio_device_put_external_user);
->> +
->> +int vfio_external_get_type(struct vfio_device *vdev)
->> +{
->> +	if (!strcmp(vdev->ops->name,  "vfio-platform"))
->> +		return VFIO_DEVICE_FLAGS_PLATFORM;
->> +	else if (!strcmp(vdev->ops->name,  "vfio-pci"))
->> +		return VFIO_DEVICE_FLAGS_PCI;
->> +	else
->> +		return -EINVAL;
->> +}
->> +EXPORT_SYMBOL_GPL(vfio_external_get_type);
+On Wed, 27 Aug 2014, Mark Rutland wrote:
+> On Wed, Aug 27, 2014 at 02:37:44PM +0100, Marc Zyngier wrote:
+> > We need to work out how to drive the whole stacking from a DT
+> > perspective: Mark, any idea?
 > 
-> Returning the bit of the flag we use in get_device_info looks rather
-> sloppy here.  Should we define a new enum for use with this?  Actually,
-> is this interface even necessary?  If we can get the struct device then
-> we can get the bus_type and keep vfio out of this.
+> Describing the lines the magic irqchip has to its parent irqchip is
+> simple, the standard interrupts property can handle that:
+> 
+> parent: parent {
+> 	...
+> 	#interrupt-cells = <1>;
+> };
+> 
+> magic {
+> 	...
+> 	interrupt-parent = <&parent>;
+> 	interrupts = <3>, <6>, <17>, <2>;
+> 	#interrupt-cells = <1>;
+> };
+> 
+> The harder part is describing the configuration of each interrupt to the
+> magic irqchip (e.g. edge vs level triggered), which is inseparable form
+> the line identifier in the interrupt-specifier.
 
-thanks for the nit. I will try to get rid of it using it.
-> 
-> For both of these last two, I like to use the convention that where
-> there is a "get" there is a matching "put".  These aren't reference
-> counting anything, so let's not use get in the name.
+Do we really need to decribe that at the this level?
 
-I will rename.
+You have the parent ARMGIC and the maGIC with a specified (or even
+dynamic) routing of the maGIC lines to the ARMGIC.
 
-Thanks
+Now the device which uses a maGIC interrupt specifies the interrupt
+type at the maGIC.
 
-Eric
-> 
->> +
->> +struct device *vfio_external_get_base_device(struct vfio_device *vdev)
->> +{
->> +	return vdev->dev;
->> +}
->> +EXPORT_SYMBOL_GPL(vfio_external_get_base_device);
->> +
-> 
-> Looks almost too simple, but reviewing the object lifecycles, this all
-> looks safe.  Thanks,
-> 
-> Alex
-> 
->>  int vfio_external_user_iommu_id(struct vfio_group *group)
->>  {
->>  	return iommu_group_id(group->iommu_group);
->> diff --git a/include/linux/vfio.h b/include/linux/vfio.h
->> index ffe04ed..19e98eb 100644
->> --- a/include/linux/vfio.h
->> +++ b/include/linux/vfio.h
->> @@ -99,6 +99,10 @@ extern void vfio_group_put_external_user(struct vfio_group *group);
->>  extern int vfio_external_user_iommu_id(struct vfio_group *group);
->>  extern long vfio_external_check_extension(struct vfio_group *group,
->>  					  unsigned long arg);
->> +extern struct vfio_device *vfio_device_get_external_user(struct file *filep);
->> +extern void vfio_device_put_external_user(struct vfio_device *vdev);
->> +extern int vfio_external_get_type(struct vfio_device *vdev);
->> +extern struct device *vfio_external_get_base_device(struct vfio_device *vdev);
->>  
->>  struct pci_dev;
->>  #ifdef CONFIG_EEH
-> 
-> 
-> 
+So the type setter function of the maGIC configures the maGIC hardware
+in such a way that the output to the ARMGIC results in a type which
+the ARMGIC can handle and calls the type setter function of the maGIC
+with that type.
+
+I don't think you need to decribe this in the magic/parent relation
+ship at all. maGIC should know what kind of output it can provide to
+ARMGIC so that should just work, unless I'm missing something.
+
+> If there interrupts don't share the same configuration then I'm not sure
+> how we describe that in the DT. That's especially problematic if the
+> assignment of parent line is dynamic (as with the crossbar iirc).
+
+Why is this an issue?
+
+There are two ways to solve that:
+
+1) You can do a fully dynamic allocation at the parent level, which of
+   course requires that the whole parent range is dynamically
+   managed. That's what we are planning for the MSI/Remap/Vector
+   stacking
+
+2) You define the irq lines at the parent which are available for
+   dynamic stacking and let the allocation code hand one out.
+
+3) You tell the maGIC controller which lines of the parent are
+   available for it, so it can only stack onto those lines and instead
+   of letting the parent allocate a free one, the maGIC needs to map
+   its stuff to one of those ARMGIC lines.
+
+Which one to chose depends on the particular maGIC incarnation, but
+its not a big issue to select one ...
+
+Thanks,
+
+	tglx
