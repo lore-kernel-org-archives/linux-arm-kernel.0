@@ -1,54 +1,40 @@
-From: dan.carpenter@oracle.com (Dan Carpenter)
-Date: Wed, 27 Aug 2014 13:13:53 +0300
-Subject: [PATCH 11/14] ARM: brcmstb: delete unneeded test before
- of_node_put
-In-Reply-To: <20140814065310.GK11952@brian-ubuntu>
-References: <1407492475-26283-11-git-send-email-Julia.Lawall@lip6.fr>
- <20140813222212.GB18411@ld-irv-0074>
- <alpine.DEB.2.02.1408140733190.2053@localhost6.localdomain6>
- <20140814065310.GK11952@brian-ubuntu>
-Message-ID: <20140827101353.GG5046@mwanda>
+From: henrik@henriknordstrom.net (Henrik =?ISO-8859-1?Q?Nordstr=F6m?=)
+Date: Wed, 27 Aug 2014 12:14:14 +0200
+Subject: [linux-sunxi] Re: Generic communication of boot loader state to
+ the OS
+In-Reply-To: <CAKON4OwG2XfGYv+BMqMStWvAf_K_AYdarhpQQw3FLHWE+D8Sxg@mail.gmail.com>
+References: <CAKON4Oz-PRgXyNKj=T9ymzOOhCMPjBMdYdE1Mr1CHWv3boskiw@mail.gmail.com>
+ <20140826182816.GW30401@n2100.arm.linux.org.uk>
+ <CAKON4Oy7SU9kj=DdJ+Oq14ukL7kHP7Qn9bPrQ3PKUL6ZJww=gw@mail.gmail.com>
+ <20140826190230.GX30401@n2100.arm.linux.org.uk>
+ <CAKON4OwG2XfGYv+BMqMStWvAf_K_AYdarhpQQw3FLHWE+D8Sxg@mail.gmail.com>
+Message-ID: <1409134454.2701.46.camel@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 13, 2014 at 11:53:10PM -0700, Brian Norris wrote:
-> > > >  cleanup:
-> > > > -	if (syscon_np)
-> > > > -		of_node_put(syscon_np);
-> > > > -
-> > > > +	of_node_put(syscon_np);
-> > > > +out:
-> > > 
-> > > Is there a good reason for this new label? I thought part of the point
-> > > of this semantic patch is that the previous line (of_node_put()) is a
-> > > no-op for NULL arguments.
-> > 
-> > Personally, I prefer code to only be executed if it needs to be.  It is 
-> > helpful from a program analysis point of view, and I think it helps 
-> > someone trying to understand the code.
-> > 
-> > That is, when I am trying to understand some unknown code, I may look at 
-> > the cleanup code and try to figure out why each piece of it is executed.  
-> > If some of it is statically known to be irrelevant, it is confusing.
-> > 
-> > But I you think the other way around, and would rather have just one label 
-> > that contains anything that might ever be useful, then I guess that is a 
-> > reasonable point of view as well.
-> 
-> Yeah, I personally just look to avoid unnecessary labels.
-> 
+tis 2014-08-26 klockan 16:50 -0400 skrev jonsmirl at gmail.com:
 
-Having more than one label is better because it helps you avoid "One Err
-Bugs".  This is a common kind of bug which is cause when functions have
-only one "err:" label which does all the error handling.
+> I wonder if DHCP client couldn't be replaced with a udev event. Set a
+> timer in the kernel for the length of the lease. Then generate a udev
+> event when it is ready to expire. Udev event runs an app that gets a
+> new lease.  Now there is no process to kill on reboot and everyone is
+> happy.
 
-Some examples of this type of bug are:
-234ad18249a4 ('staging: gdm7240: fix error handling of probe()')
-85a258b70d48 ('ocfs2: fix error handling in ocfs2_ioctl_move_extents()')
-920c4f4c3651 ('drivers/leds/leds-tca6507.c: cleanup error handling in tca6507_probe()')
+DHCP clients should release their IP back to the DHCP pool when no
+longer in use and is why this is normally down on shutdown/reboot.
+Special care is needed for doing this when your rootfs is on NFS, but
+that's all an OS support issue in how to properly supporting NFS root,
+not at all related to devicetree or bootloaders.
 
-If you unwind in the exact reversed order of how things were allocated
-then it makes the code a lot easier to understand so it avoids bugs.
+The question on communicating DHCP lease details between bootloader and
+OS is partially valid for this discussion as an example of possible user
+of such communication. It is not strictly required as we can have (and
+do have) an initrd that requests a dhcp lease before kernel needs IP
+running for NFS etc, but reusing the existing lease is faster (in the
+range of seconds in many networks). There is however a lot of small
+details in DHCP that may make that infeasible in the end, but those are
+again all OS implementation details not related to how to communicate
+existing lease information from bootloader to OS.
 
-regards,
-dan carpenter
+Regards
+Henrik
