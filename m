@@ -1,34 +1,19 @@
-From: punit.agrawal@arm.com (Punit Agrawal)
-Date: Wed, 27 Aug 2014 18:05:24 +0100
-Subject: [PATCH 1/6] arm: Fix in-correct barrier usage in SWP{B} emulation
-In-Reply-To: <20140827164016.GE13850@arm.com> (Catalin Marinas's message of
- "Wed, 27 Aug 2014 17:40:17 +0100")
-References: <1409048930-21598-1-git-send-email-punit.agrawal@arm.com>
- <1409048930-21598-2-git-send-email-punit.agrawal@arm.com>
- <20140827164016.GE13850@arm.com>
-Message-ID: <9hh8um9eucr.fsf@arm.com>
+From: stefan.kristiansson@saunalahti.fi (Stefan Kristiansson)
+Date: Wed, 27 Aug 2014 20:09:06 +0300
+Subject: [PATCH v2 21/26] irqchip: or1k-pic: convert to handle_domain_irq
+In-Reply-To: <1409047421-27649-22-git-send-email-marc.zyngier@arm.com>
+References: <1409047421-27649-1-git-send-email-marc.zyngier@arm.com>
+ <1409047421-27649-22-git-send-email-marc.zyngier@arm.com>
+Message-ID: <20140827170905.GA5838@chokladfabriken.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Catalin Marinas <catalin.marinas@arm.com> writes:
+On Tue, Aug 26, 2014 at 11:03:36AM +0100, Marc Zyngier wrote:
+> Use the new handle_domain_irq method to handle interrupts.
+> 
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 
-> On Tue, Aug 26, 2014 at 11:28:45AM +0100, Punit Agrawal wrote:
->> According to the ARM ARMv7, explicit barriers are necessary when using
->> synchronisation primitives such as SWP{B}. The use of these
->> instructions does not automatically imply a barrier and any ordering
->> requirements by the software must be explicitly expressed with the use
->> of suitable barriers.
->> 
->> Based on this, remove the barriers from SWP{B} emulation.
->> 
->> Cc: Russell King <linux@arm.linux.org.uk>
->> Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
->
-> This patch is independent to the SWP emulation for arm64 series. Unless
-> Russell has any objections, you should send it to his patch system (git
-> send-email to patches at arm.linux.org.uk with "KernelVersion: v3..." after
-> the commit log; I hope Russell drops the KernelVersion requirement some
-> day ;)).
+This (and the other two openrisc related patches in this series) works fine
+in my setup at least.
 
-OK. Unless I hear any objections, I'll send the patch to Russell's
-system tomorrow.
+Acked-by: Stefan Kristiansson <stefan.kristiansson@saunalahti.fi>
