@@ -1,61 +1,77 @@
-From: hramrach@gmail.com (Michal Suchanek)
-Date: Wed, 27 Aug 2014 22:57:29 +0200
-Subject: [linux-sunxi] Re: [PATCH 4/4] simplefb: add clock handling code
-In-Reply-To: <20140827154221.GX15297@lukather>
-References: <20140825145854.GA15297@lukather>
- <20140825150501.GE14763@ulmo.nvidia.com>
- <20140825152232.GE15297@lukather> <20140826080432.GD17263@ulmo>
- <20140826135341.GM15297@lukather> <20140826143550.GB3027@ulmo>
- <20140826210248.GO15297@lukather> <20140827065440.GG15640@ulmo>
- <20140827084526.GR15297@lukather> <20140827095241.GC23186@ulmo>
- <20140827154221.GX15297@lukather>
-Message-ID: <CAOMqctSY7AJKHthe+aG8--Ok6JiY1g2zM_tN10S2nELOSe=qMw@mail.gmail.com>
+From: msalter@redhat.com (Mark Salter)
+Date: Wed, 27 Aug 2014 17:01:18 -0400
+Subject: [PATCHv7 3/5] common: dma-mapping: Introduce common remapping
+ functions
+In-Reply-To: <53FCBCC3.5040901@codeaurora.org>
+References: <1407800431-21566-1-git-send-email-lauraa@codeaurora.org>
+ <1407800431-21566-4-git-send-email-lauraa@codeaurora.org>
+ <CAAG0J99=wrz4+c49HeDvL0W9rDZKk2HNLdVtHv4ZJxU4-OjewA@mail.gmail.com>
+ <53FCBCC3.5040901@codeaurora.org>
+Message-ID: <1409173278.9919.29.camel@deneb.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Tue, 2014-08-26 at 09:58 -0700, Laura Abbott wrote:
+> On 8/26/2014 3:05 AM, James Hogan wrote:
+> > On 12 August 2014 00:40, Laura Abbott <lauraa@codeaurora.org> wrote:
+> >>
+> >> For architectures without coherent DMA, memory for DMA may
+> >> need to be remapped with coherent attributes. Factor out
+> >> the the remapping code from arm and put it in a
+> >> common location to reduce code duplication.
+> >>
+> >> As part of this, the arm APIs are now migrated away from
+> >> ioremap_page_range to the common APIs which use map_vm_area for remapping.
+> >> This should be an equivalent change and using map_vm_area is more
+> >> correct as ioremap_page_range is intended to bring in io addresses
+> >> into the cpu space and not regular kernel managed memory.
+> >>
+> >> Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
+> >> Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
+> > 
+> > This commit in linux-next () breaks the build for metag:
+> > 
+> > drivers/base/dma-mapping.c: In function ?dma_common_contiguous_remap?:
+> > drivers/base/dma-mapping.c:294: error: implicit declaration of
+> > function ?dma_common_pages_remap?
+> > drivers/base/dma-mapping.c:294: warning: assignment makes pointer from
+> > integer without a cast
+> > drivers/base/dma-mapping.c: At top level:
+> > drivers/base/dma-mapping.c:308: error: conflicting types for
+> > ?dma_common_pages_remap?
+> > drivers/base/dma-mapping.c:294: error: previous implicit declaration
+> > of ?dma_common_pages_remap? was here
+> > 
+> > Looks like metag isn't alone either:
+> > 
+> > $ git grep -L dma-mapping-common arch/*/include/asm/dma-mapping.h
+> > arch/arc/include/asm/dma-mapping.h
+> > arch/avr32/include/asm/dma-mapping.h
+> > arch/blackfin/include/asm/dma-mapping.h
+> > arch/c6x/include/asm/dma-mapping.h
+> > arch/cris/include/asm/dma-mapping.h
+> > arch/frv/include/asm/dma-mapping.h
+> > arch/m68k/include/asm/dma-mapping.h
+> > arch/metag/include/asm/dma-mapping.h
+> > arch/mn10300/include/asm/dma-mapping.h
+> > arch/parisc/include/asm/dma-mapping.h
+> > arch/xtensa/include/asm/dma-mapping.h
+> > 
+> > I've checked a couple of these arches (blackfin, xtensa) which don't
+> > include dma-mapping-common.h and their builds seem to be broken too.
+> > 
+> > Cheers
+> > James
+> > 
+> 
+> Thanks for the report. Would you mind giving the following patch
+> a test (this is theoretical only but I think it should work)
 
-On 27 August 2014 17:42, Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
-> On Wed, Aug 27, 2014 at 11:52:48AM +0200, Thierry Reding wrote:
->> On Wed, Aug 27, 2014 at 10:45:26AM +0200, Maxime Ripard wrote:
->> > On Wed, Aug 27, 2014 at 08:54:41AM +0200, Thierry Reding wrote:
->> > > On Tue, Aug 26, 2014 at 11:02:48PM +0200, Maxime Ripard wrote:
->> > > > On Tue, Aug 26, 2014 at 04:35:51PM +0200, Thierry Reding wrote:
->> [...]
->> > > > > > Mike Turquette repeatedly said that he was against such a DT property:
->> > > > > > https://lkml.org/lkml/2014/5/12/693
->> > > > >
->> > > > > Mike says in that email that he's opposing the addition of a property
->> > > > > for clocks that is the equivalent of regulator-always-on. That's not
->> > > > > what this is about. If at all it'd be a property to mark a clock that
->> > > > > should not be disabled by default because it's essential.
->> > > >
->> > > > It's just semantic. How is "a clock that should not be disabled by
->> > > > default because it's essential" not a clock that stays always on?
->> > >
->> > > Because a clock that should not be disabled by default can be turned off
->> > > when appropriate. A clock that is always on can't be turned off.
->> >
->> > If a clock is essential, then it should never be disabled. Or we don't
->> > share the same meaning of essential.
->>
->> Essential for the particular use-case.
->
-> So, how would the clock driver would know about which use case we're
-> in? How would it know about which display engine is currently running?
-> How would it know about which video output is being set?
->
-> Currently, we have two separate display engines, which can each output
-> either to 4 different outputs (HDMI, RGB/LVDS, 2 DSI). Each and every
-> one of these combinations would require different clocks. What clocks
-> will we put in the driver? All of them?
->
+There's a further problem with c6x (no  MMU):
 
-since simplefb cannot be extended how about adding, say, dtfb which
-claims the resources from dt and then instantiates a simplefb once the
-resources are claimed? That is have a dtfb which has the clocks
-assigned and has simplefb as child dt node.
-
-Thanks
-
-Michal
+drivers/built-in.o: In function `dma_common_pages_remap':
+(.text+0x220c4): undefined reference to `get_vm_area_caller'
+drivers/built-in.o: In function `dma_common_pages_remap':
+(.text+0x22108): undefined reference to `map_vm_area'
+drivers/built-in.o: In function `dma_common_free_remap':
+(.text+0x22278): undefined reference to `find_vm_area'
