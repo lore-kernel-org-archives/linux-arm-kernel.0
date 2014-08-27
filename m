@@ -1,60 +1,52 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Wed, 27 Aug 2014 15:33:15 -0700
-Subject: [PATCH] clocksource: arch_timer: Fix code to use physical timers
- when requested
-In-Reply-To: <53FE5B09.2020403@codeaurora.org>
-References: <1409173419-13076-1-git-send-email-sonnyrao@chromium.org>
- <CAOesGMjK65Rc-K0fyFUUJLw6huLT82E-nqJwZO4PqhgopF96Ow@mail.gmail.com>
- <CAPz6YkWAPtuy4sAuAK9GtpDgfGsccxeS+pqqe_t_R818Jt01qA@mail.gmail.com>
- <53FE5B09.2020403@codeaurora.org>
-Message-ID: <CAOesGMhTivDzJFuxONggcJ6N5UvZopKa=+tv9PoPX593cpnm0A@mail.gmail.com>
+Date: Wed, 27 Aug 2014 15:03:10 -0700
+Subject: [GIT PULL][for v3.17] pull request on fixing PXA DT
+In-Reply-To: <CAN1soZz_j2=DzazzLC1FV+kDtyhHRb4CYY3=vm+OmwEhQ1SqWA@mail.gmail.com>
+References: <CAN1soZz_j2=DzazzLC1FV+kDtyhHRb4CYY3=vm+OmwEhQ1SqWA@mail.gmail.com>
+Message-ID: <20140827220310.GA13392@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 27, 2014 at 3:26 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
-> +Mark (author of change in question)
->
-> On 08/27/14 14:27, Sonny Rao wrote:
->> On Wed, Aug 27, 2014 at 2:19 PM, Olof Johansson <olof@lixom.net> wrote:
->>> On Wed, Aug 27, 2014 at 2:03 PM, Sonny Rao <sonnyrao@chromium.org> wrote:
->>>> This is a bug fix for using physical arch timers when
->>>> the arch_timer_use_virtual boolean is false.  It restores the
->>>> arch_counter_get_cntpct() function after removal in
->>>>
->>>> 0d651e4e "clocksource: arch_timer: use virtual counters"
->>>>
->>>> and completes the implementation of memory mapped access for physical
->>>> timers, so if a system is trying to use physical timers, it will
->>>> function properly.
->>>>
->>>> Signed-off-by: Sonny Rao <sonnyrao@chromium.org>
->>> Acked-by: Olof Johansson <olof@lixom.net>
->>>
->>> This should have a:
->>>
->>> Fixes: 0d651e4e65e9 ("clocksource: arch_timer: use virtual counters")
->>>
->>> tag too, and possibly cc stable?
->> Ok, as far as stable goes, this patch wouldn't apply cleanly going all
->> the way back to  0d651e4e65e9
->> As-is, it would need to go after 220069945b29 "clocksource:
->> arch_timer: Add support for memory mapped timers" and there would need
->> to be another, simpler, version that went between those two commits.
->>
->> So, I'm not sure what to do in this situation regarding stable?
+On Mon, Aug 25, 2014 at 03:37:13PM +0800, Haojian Zhuang wrote:
+> Hi Olof, Arnd, Kevin,
+> 
+> Please help to merge the pull request from PXA git tree.
+> 
+> Best Regards
+> Haojian
+> 
+> The following changes since commit 7d1311b93e58ed55f3a31cc8f94c4b8fe988a2b9:
+> 
+>   Linux 3.17-rc1 (2014-08-16 10:40:26 -0600)
+> 
+> are available in the git repository at:
+> 
+>   https://git.kernel.org/pub/scm/linux/kernel/git/hzhuang1/linux.git
+> tags/fix-pxa-dt-v3.17
+> 
+> for you to fetch changes up to 960a1042caf5e2f96fe9ddff98a4735aa9288080:
+> 
+>   ARM: pxa3xx: provide specific platform_devices for all ssp ports
+> (2014-08-25 15:10:54 +0800)
+> 
+> ----------------------------------------------------------------
+> Fix DT bindings on PXA MMC/USB/SOUND
+> 
+> ----------------------------------------------------------------
+> Daniel Mack (4):
+>       ARM: pxa: dts: fix mmc controller compatible string
+>       ARM: pxa: dts: fix ohci controller compatible string
+>       ARM: pxa: ssp: provide platform_device_id for PXA3xx
+>       ARM: pxa3xx: provide specific platform_devices for all ssp ports
 
-Greg tends to make a best-effort, you'll find out when he looks at
-backporting and can reply with a "punt" or "here's the right patch"
-then.
+Hi,
 
-> Is there any reason why the virtual counter can't be read? Maybe we're
-> the hyp and we need to make sure we don't use the virtual timer so that
-> the guest can use it, but that doesn't have any effect on the usage of
-> the virtual counter for the clocksource.
+I replied to one of the compatible string emails -- those should be done
+for 3.18 and the driver regression needs to be fixed.
 
-There are several cases where virtual is unusable -- in particular it
-might not have been configured properly (i.e. the phys/virt offset is
-at a bad value).
+For the latter two fixes, what's not explained in the changelogs is what
+is actually broken. How does this breakage affect a user? If it is a
+regression, please also include what caused the breakage.
 
 
 -Olof
