@@ -1,110 +1,74 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Wed, 27 Aug 2014 16:44:38 +0000 (UTC)
-Subject: OMAP baseline test results for v3.17-rc2
-Message-ID: <alpine.DEB.2.02.1408271643400.21249@utopia.booyaka.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 27 Aug 2014 17:47:14 +0100
+Subject: [PATCH 3/6] arm64: Add support for hooks to handle undefined
+ instructions
+In-Reply-To: <20140826143011.GV23445@arm.com>
+References: <1409048930-21598-1-git-send-email-punit.agrawal@arm.com>
+ <1409048930-21598-4-git-send-email-punit.agrawal@arm.com>
+ <20140826131339.GO23445@arm.com>
+ <CAKv+Gu8Nji0Jspk2cMCwVGKeODsiOb0NFUFWucm3rAbNdb_bTQ@mail.gmail.com>
+ <20140826143011.GV23445@arm.com>
+Message-ID: <20140827164714.GF13850@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tue, Aug 26, 2014 at 03:30:11PM +0100, Will Deacon wrote:
+> On Tue, Aug 26, 2014 at 03:21:09PM +0100, Ard Biesheuvel wrote:
+> > On 26 August 2014 15:13, Will Deacon <will.deacon@arm.com> wrote:
+> > > On Tue, Aug 26, 2014 at 11:28:47AM +0100, Punit Agrawal wrote:
+> > >> Add support to register hooks for undefined instructions. The handlers
+> > >> will be called when the undefined instruction and the processor state
+> > >> (as contained in pstate) match criteria used at registration.
+> > >>
+> > >> Note: The patch only deals with ARM instruction encodings and needs
+> > >> fixing to handle thumb instructions as well.
+> > >
+> > > [...]
+> > >
+> > >> +static int call_undef_hook(struct pt_regs *regs)
+> > >> +{
+> > >> +     struct undef_hook *hook;
+> > >> +     unsigned long flags;
+> > >> +     u32 instr;
+> > >> +     int (*fn)(struct pt_regs *regs, u32 instr) = NULL;
+> > >> +     void __user *pc = (void __user *)instruction_pointer(regs);
+> > >> +
+> > >> +     /*
+> > >> +      * Currently, undefined instruction patching is only supported
+> > >> +      * for user mode. Also, as we're not emulating any thumb
+> > >> +      * instructions lets not add thumb instruction decoding until
+> > >> +      * it is needed.
+> > >> +      */
+> > >> +     if (!compat_user_mode(regs) || compat_thumb_mode(regs))
+> > >> +             return 1;
+> > >
+> > > What do you mean by `undefined instruction patching'? I don't see anything
+> > > in the mechanism that means this can't be reused for kernel code, then we
+> > > just register the SWP emulation hook for userspace only using the mode (like
+> > > we do for kgdb).
+> > 
+> > You need this patch in order to be able to return from an undef
+> > exception taken in EL1:
+> > 
+> > --- a/arch/arm64/kernel/entry.S
+> > +++ b/arch/arm64/kernel/entry.S
+> > @@ -287,7 +287,9 @@ el1_undef:
+> >          */
+> >         enable_dbg
+> >         mov     x0, sp
+> > -       b       do_undefinstr
+> > +       bl      do_undefinstr
+> > +
+> > +       kernel_exit 1
+> >  el1_dbg:
+> >         /*
+> >          * Debug exception handling
+> 
+> Hmm, I'm surprised we don't already need something like this for KGDB...
 
-Here are some basic OMAP test results for Linux v3.17-rc2.
-Logs and other details at:
+We don't expect undef exceptions at EL1, so far they are fatal as we
+don't have any hooks for them. Doesn't KGDB use dedicated breakpoint
+instructions?
 
-    http://www.pwsan.com/omap/testlogs/test_v3.17-rc2/20140825183438/
-
-
-Test summary
-------------
-
-Build: uImage+dtb:
-    Pass (10/10): omap2plus_defconfig_am33xx_only/am335x-bone,
-		  omap2plus_defconfig/omap4-panda,
-		  omap2plus_defconfig/omap4-panda-es,
-		  omap2plus_defconfig/am3517-evm,
-		  omap2plus_defconfig/omap2430-sdp,
-		  omap2plus_defconfig/omap3-beagle,
-		  omap2plus_defconfig/omap3-beagle-xm,
-		  omap2plus_defconfig/omap3-evm-37xx,
-		  omap2plus_defconfig/omap4-var-som,
-		  omap2plus_defconfig/omap5-uevm
-
-Build: uImage:
-    Pass ( 3/ 3): omap1_defconfig, omap1_defconfig_1510innovator_only,
-		  omap1_defconfig_5912osk_only
-
-Build: zImage:
-    Pass (16/16): multi_v7_defconfig, omap2plus_defconfig,
-		  omap2plus_defconfig_am33xx_only,
-		  omap2plus_defconfig_am43xx_only,
-		  omap2plus_defconfig_2430sdp_only,
-		  omap2plus_defconfig_cpupm, omap2plus_defconfig_no_pm,
-		  omap2plus_defconfig_n800_only_a,
-		  omap2plus_defconfig_n800_multi_omap2xxx,
-		  omap2plus_defconfig_omap2_4_only,
-		  omap2plus_defconfig_omap3_4_only,
-		  omap2plus_defconfig_dra7xx_only,
-		  rmk_omap3430_ldp_allnoconfig,
-		  rmk_omap3430_ldp_oldconfig,
-		  rmk_omap4430_sdp_allnoconfig,
-		  rmk_omap4430_sdp_oldconfig
-
-Boot to userspace:
-    FAIL ( 1/14): 2430sdp
-    skip ( 1/14): 5912osk
-    Pass (12/14): 2420n800, 3517evm, 3530es3beagle, 3730beaglexm,
-		  37xxevm, 4430es2panda, 4460pandaes, am335xbone,
-		  am335xbonelt, cmt3517, 4460varsomom, 5430es2uevm
-
-PM: chip retention via suspend:
-    FAIL ( 4/ 7): 2430sdp, 4430es2panda, 4460pandaes, 4460varsomom
-    Pass ( 3/ 7): 3530es3beagle, 3730beaglexm, 37xxevm
-
-PM: chip retention via dynamic idle:
-    FAIL ( 5/ 7): 2430sdp, 3530es3beagle, 4430es2panda, 4460pandaes,
-		  4460varsomom
-    Pass ( 2/ 7): 3730beaglexm, 37xxevm
-
-PM: chip off except CORE via suspend:
-    Pass ( 1/ 1): 3730beaglexm
-
-PM: chip off except CORE via dynamic idle:
-    Pass ( 1/ 1): 3730beaglexm
-
-PM: chip off via suspend:
-    FAIL ( 4/ 5): 3530es3beagle, 4430es2panda, 4460pandaes,
-		  4460varsomom
-    Pass ( 1/ 5): 37xxevm
-
-PM: chip off via dynamic idle:
-    FAIL ( 4/ 5): 3530es3beagle, 4430es2panda, 4460pandaes,
-		  4460varsomom
-    Pass ( 1/ 5): 37xxevm
-
-
-vmlinux object size
-(delta in bytes from test_v3.17-rc1 (7d1311b93e58ed55f3a31cc8f94c4b8fe988a2b9)):
-   text     data      bss    total  kernel
-   +980      +32        0    +1012  omap1_defconfig
-  +1012       -8        0    +1004  omap1_defconfig_1510innovator_only
-  +1012        0        0    +1012  omap1_defconfig_5912osk_only
-  +1644      +16        0    +1660  multi_v7_defconfig
-   +900      +16        0     +916  omap2plus_defconfig
-   +836      -16        0     +820  omap2plus_defconfig_2430sdp_only
-   +836       +8        0     +844  omap2plus_defconfig_am33xx_only
-   +900       +8        0     +908  omap2plus_defconfig_am43xx_only
-   +900      +48        0     +948  omap2plus_defconfig_cpupm
-   +836       +8        0     +844  omap2plus_defconfig_dra7xx_only
-   +316       +8        0     +324  omap2plus_defconfig_n800_multi_omap2xxx
-   +316      -16        0     +300  omap2plus_defconfig_n800_only_a
-   +900      -24        0     +876  omap2plus_defconfig_no_pm
-   +900      -16        0     +884  omap2plus_defconfig_omap2_4_only
-   +836       +8        0     +844  omap2plus_defconfig_omap3_4_only
-   +836      -16        0     +820  omap2plus_defconfig_omap5_only
-   +180      +16      -32     +164  rmk_omap3430_ldp_allnoconfig
-   +852       +8        0     +860  rmk_omap3430_ldp_oldconfig
-   +212      +12      -32     +192  rmk_omap4430_sdp_allnoconfig
-   +852      -16        0     +836  rmk_omap4430_sdp_oldconfig
-
-Boot-time memory difference
-(delta in bytes from test_v3.17-rc1 (7d1311b93e58ed55f3a31cc8f94c4b8fe988a2b9))
-  avail  rsrvd   high  freed  board          kconfig
-  (no differences)
+-- 
+Catalin
