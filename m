@@ -1,101 +1,42 @@
-From: koct9i@gmail.com (Konstantin Khlebnikov)
-Date: Wed, 27 Aug 2014 19:33:49 +0400
-Subject: [PATCH 1/2] ARM: LPAE: load upper bits of early TTBR0/TTBR1
-In-Reply-To: <CALYGNiN-SHr6YJ53_deizb1VoXTBzD7dn8hcwqd4zLjx6utCDw@mail.gmail.com>
-References: <20140722153623.25088.37742.stgit@buzz>
- <20140728181224.GN15536@arm.com>
- <CALYGNiNrK1d32ecz4rw0sgn0GyN-M6hTBuTLGQV53Z4Br-bpYQ@mail.gmail.com>
- <20140728184741.GT15536@arm.com>
- <CALYGNiOd+Dy-2q_woZ9UDbMO24q58jN1Nsq7E8cJMMg_YBK9pA@mail.gmail.com>
- <CABb+yY17Y18oAivi_VxPJqDEGLTbEy_PfsdeK9jXWZ0iV3vZ=w@mail.gmail.com>
- <CALYGNiN-SHr6YJ53_deizb1VoXTBzD7dn8hcwqd4zLjx6utCDw@mail.gmail.com>
-Message-ID: <CALYGNiP3J15OGBe2Kn7=0x+F5GnZ2LO4j6+7=RtS4WWT4Pyfzw@mail.gmail.com>
+From: mperttunen@nvidia.com (Mikko Perttunen)
+Date: Wed, 27 Aug 2014 18:36:07 +0300
+Subject: [PATCH v5 0/4] Tegra124 soctherm driver
+In-Reply-To: <20140821160127.GA17621@developer>
+References: <1408616242-21009-1-git-send-email-mperttunen@nvidia.com>
+ <20140821122011.GA99564@sandfort.unics.fi> <20140821160127.GA17621@developer>
+Message-ID: <53FDFAE7.7020407@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 27, 2014 at 7:31 PM, Konstantin Khlebnikov <koct9i@gmail.com> wrote:
-> On Wed, Aug 27, 2014 at 7:26 PM, Jassi Brar <jassisinghbrar@gmail.com> wrote:
->> On Tue, Jul 29, 2014 at 5:59 PM, Konstantin Khlebnikov <koct9i@gmail.com> wrote:
->>> On Mon, Jul 28, 2014 at 10:47 PM, Will Deacon <will.deacon@arm.com> wrote:
->>>> On Mon, Jul 28, 2014 at 07:40:58PM +0100, Konstantin Khlebnikov wrote:
->>>>> On Mon, Jul 28, 2014 at 10:12 PM, Will Deacon <will.deacon@arm.com> wrote:
->>>>> > On Tue, Jul 22, 2014 at 04:36:23PM +0100, Konstantin Khlebnikov wrote:
->>>>> >> This patch fixes booting when idmap pgd lays above 4gb. Commit
->>>>> >> 4756dcbfd37 mostly had fixed this, but it'd failed to load upper bits.
->>>>> >>
->>>>> >> Also this fixes adding TTBR1_OFFSET to TTRR1: if lower part overflows
->>>>> >> carry flag must be added to the upper part.
->>>>> >>
->>>>> >> Signed-off-by: Konstantin Khlebnikov <k.khlebnikov@samsung.com>
->>>>> >> Cc: Cyril Chemparathy <cyril@ti.com>
->>>>> >> Cc: Vitaly Andrianov <vitalya@ti.com>
->>>>> >> ---
->>>>> >>  arch/arm/mm/proc-v7-3level.S |    7 +++----
->>>>> >>  1 file changed, 3 insertions(+), 4 deletions(-)
->>>>> >>
->>>>> >> diff --git a/arch/arm/mm/proc-v7-3level.S b/arch/arm/mm/proc-v7-3level.S
->>>>> >> index 22e3ad6..f0481dd 100644
->>>>> >> --- a/arch/arm/mm/proc-v7-3level.S
->>>>> >> +++ b/arch/arm/mm/proc-v7-3level.S
->>>>> >> @@ -140,12 +140,11 @@ ENDPROC(cpu_v7_set_pte_ext)
->>>>> >>       mov     \tmp, \ttbr1, lsr #(32 - ARCH_PGD_SHIFT)        @ upper bits
->>>>> >>       mov     \ttbr1, \ttbr1, lsl #ARCH_PGD_SHIFT             @ lower bits
->>>>> >>       addls   \ttbr1, \ttbr1, #TTBR1_OFFSET
->>>>> >> -     mcrr    p15, 1, \ttbr1, \zero, c2                       @ load TTBR1
->>>>> >> +     adcls   \tmp, \tmp, #0
->>>>> >> +     mcrr    p15, 1, \ttbr1, \tmp, c2                        @ load TTBR1
->>>>> >>       mov     \tmp, \ttbr0, lsr #(32 - ARCH_PGD_SHIFT)        @ upper bits
->>>>> >>       mov     \ttbr0, \ttbr0, lsl #ARCH_PGD_SHIFT             @ lower bits
->>>>> >> -     mcrr    p15, 0, \ttbr0, \zero, c2                       @ load TTBR0
->>>>> >> -     mcrr    p15, 1, \ttbr1, \zero, c2                       @ load TTBR1
->>>>> >> -     mcrr    p15, 0, \ttbr0, \zero, c2                       @ load TTBR0
->>>>> >> +     mcrr    p15, 0, \ttbr0, \tmp, c2                        @ load TTBR0
->>>>> >
->>>>> > I must admit, the code you are removing here looks really strange. Was there
->>>>> > a badly resolved conflict somewhere along the way? It would be nice to see
->>>>> > if your fix (which seems ok to me) was actually present in the mailing list
->>>>> > posting of the patch that ended in the above mess.
->>>>>
->>>>> Nope, no merge conflicts, source in original patch
->>>>> https://lkml.org/lkml/2012/9/11/346
->>>>>
->>>>> That mess completely harmless, this code is used only once on boot.
->>>>> I don't have that email, so replying isn't trivial for me.
->>>>
->>>> How bizarre. Also, Cyril doesn't work for TI anymore (his email is
->>>> bouncing), so it's tricky to know what he meant here.
->>>>
->>>> Your patch looks better than what we currently have though. Have you managed
->>>> to test it on a keystone platform (I don't have one)?
->>>
->>> No, I don't have it too. As well as I don't have direct access to the
->>> platform where
->>> problem was found. I've debugged this in patched qemu.
->>>
->> It seems the patch wasn't tested on any real platform, I did on my
->> CA15 based platform - it breaks boot. Simply reverting the patch gets
->> it going again. I am happy to try any fix.
+Moi Eduardo,
+
+can you ack this series or is there still something to do?
+
+Thanks,
+Mikko
+
+On 21/08/14 19:01, Eduardo Valentin wrote:
+> Hello Juha-Matti,
+>
+> On Thu, Aug 21, 2014 at 03:20:11PM +0300, Juha-Matti Tilli wrote:
+>> On Thu, Aug 21, 2014 at 01:17:18PM +0300, Mikko Perttunen wrote:
+>>> this series adds support for the thermal monitoring features of the
+>>> soctherm unit on the Tegra124 SoC.
 >>
+>> For all patches in this series:
+>>
+>> Reviewed-by: Juha-Matti Tilli <jtilli@nvidia.com>
+>> Tested-by: Juha-Matti Tilli <jtilli@nvidia.com>
 >
-> Please try to remove adcls line.
-> Seems like this affects only systems where PHYS_OFFSET == PAGE_OFFSET.
+> I suppose the 4 C to 5 C difference is not seen anymore in this version,
+> right?
 >
-> --- a/arch/arm/mm/proc-v7-3level.S
-> +++ b/arch/arm/mm/proc-v7-3level.S
-> @@ -146,7 +146,6 @@ ENDPROC(cpu_v7_set_pte_ext)
->         mov     \tmp, \ttbr1, lsr #(32 - ARCH_PGD_SHIFT)        @ upper bits
->         mov     \ttbr1, \ttbr1, lsl #ARCH_PGD_SHIFT             @ lower bits
->         addls   \ttbr1, \ttbr1, #TTBR1_OFFSET
-> -       adcls   \tmp, \tmp, #0
->         mcrr    p15, 1, \ttbr1, \tmp, c2                        @ load TTBR1
->         mov     \tmp, \ttbr0, lsr #(32 - ARCH_PGD_SHIFT)        @ upper bits
->         mov     \ttbr0, \ttbr0, lsl #ARCH_PGD_SHIFT             @ lower bits
+> Cheers,
 >
+> Eduardo
 >
-
-...
-I've dropped cyril at ti.com from CC, his email address is dead.
-
-
->> Thanks
->> Jassi
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-tegra" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>
