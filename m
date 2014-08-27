@@ -1,87 +1,47 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Wed, 27 Aug 2014 11:22:01 -0700
-Subject: [RFC 7/7] ARM: BCM5301X: register bcma bus
-In-Reply-To: <1408915485-8078-9-git-send-email-hauke@hauke-m.de>
-References: <1408915485-8078-1-git-send-email-hauke@hauke-m.de>
- <1408915485-8078-9-git-send-email-hauke@hauke-m.de>
-Message-ID: <53FE21C9.7060909@gmail.com>
+From: bjorn@kryo.se (Bjorn Andersson)
+Date: Wed, 27 Aug 2014 11:24:49 -0700
+Subject: use IORESOURCE_REG resource type for non-translatable addresses
+ in DT
+In-Reply-To: <20140730060619.GC19933@codeaurora.org>
+References: <53D788A7.4020303@mm-sol.com> <3794875.CZFbAag5Sv@wuerfel>
+ <53D7AA72.6010309@mm-sol.com>
+ <20140729234522.E9FF1C40738@trevor.secretlab.ca>
+ <53D84558.7060406@codeaurora.org>
+ <CAL_JsqJjH0OH+X=fzwqAPeWarjoLev7v6Nv_QhAa+nZyztMnFA@mail.gmail.com>
+ <20140730060619.GC19933@codeaurora.org>
+Message-ID: <CAJAp7OhoRQ1eWack1e=OL0cS4Fxmgxc7OWeNxcj1qt7Q-x-sQA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/24/2014 02:24 PM, Hauke Mehrtens wrote:
-> ---
->  arch/arm/boot/dts/bcm4708.dtsi | 58 ++++++++++++++++++++++++++++++++++++++++++
->  1 file changed, 58 insertions(+)
+On Tue, Jul 29, 2014 at 11:06 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
+> On 07/29, Rob Herring wrote:
+[..]
+>>
+>> You might as well do of_property_read_u32 in the below example.
+>>
+>
+> Fair enough. The example is probably too simple. Things are
+> sometimes slightly more complicated and a simple
+> of_property_read_u32() isn't going to work in the case of
+> multiple reg values or when reg-names is in play.
+>
 
-We probably want a compatible string for each of these aix subnodes you
-are adding, so we can match them.
+But do we have such cases in the Qualcomm PMICs?
 
-> 
-> diff --git a/arch/arm/boot/dts/bcm4708.dtsi b/arch/arm/boot/dts/bcm4708.dtsi
-> index 31141e8..7c240ab 100644
-> --- a/arch/arm/boot/dts/bcm4708.dtsi
-> +++ b/arch/arm/boot/dts/bcm4708.dtsi
-> @@ -31,4 +31,62 @@
->  		};
->  	};
->  
-> +	nvram0: nvram at 0 {
-> +		compatible = "brcm,bcm47xx-nvram";
-> +		reg = <0x1c000000 0x01000000>;
-> +	};
-> +
-> +	sprom0: sprom at 0 {
-> +		compatible = "brcm,bcm47xx-sprom";
-> +		nvram = <&nvram0>;
-> +	};
-> +
-> +	aix at 18000000 {
-> +		compatible = "brcm,bus-aix";
-> +		reg = <0x18000000 0x1000>;
-> +		ranges = <0x00000000 0x18000000 0x00100000>;
-> +		#address-cells = <1>;
-> +		#size-cells = <1>;
-> +		sprom = <&sprom0>;
-> +
-> +		usb2 at 0 {
-> +			reg = <0x18021000 0x1000>;
-> +			interrupts = <GIC_SPI 79 IRQ_TYPE_LEVEL_HIGH>;
-> +		};
-> +
-> +		usb3 at 0 {
-> +			reg = <0x18023000 0x1000>;
-> +			interrupts = <GIC_SPI 80 IRQ_TYPE_LEVEL_HIGH>;
-> +		};
-> +
-> +		gmac at 0 {
-> +			reg = <0x18024000 0x1000>;
-> +			interrupts = <GIC_SPI 147 IRQ_TYPE_LEVEL_HIGH>;
-> +		};
-> +
-> +		gmac at 1 {
-> +			reg = <0x18025000 0x1000>;
-> +			interrupts = <GIC_SPI 148 IRQ_TYPE_LEVEL_HIGH>;
-> +		};
-> +
-> +		gmac at 2 {
-> +			reg = <0x18026000 0x1000>;
-> +			interrupts = <GIC_SPI 149 IRQ_TYPE_LEVEL_HIGH>;
-> +		};
-> +
-> +		gmac at 3 {
-> +			reg = <0x18027000 0x1000>;
-> +			interrupts = <GIC_SPI 150 IRQ_TYPE_LEVEL_HIGH>;
-> +		};
-> +
-> +		pcie at 0 {
-> +			reg = <0x18012000 0x1000>;
-> +			interrupts = <GIC_SPI 131 IRQ_TYPE_LEVEL_HIGH>;
-> +		};
-> +
-> +		pcie at 1 {
-> +			reg = <0x18013000 0x1000>;
-> +			interrupts = <GIC_SPI 137 IRQ_TYPE_LEVEL_HIGH>;
-> +		};
-> +	};
->  };
-> 
+The only case I've hit so far is for gpios and mpps, where it feels
+like reg should be base, size and not simply base reg of first gpio -
+but that's a different thing.
+
+Also, so far it seems like most drivers just code the base address in
+the driver, as we have very specific compatibles.
+
+
+How about we stop trying so hard to make this "perfect" and just merge
+something close to Josh's original proposal and ignore this problem?
+Currently all we're doing is delaying any possibility of getting
+drivers for the individual blocks merged.
+If we have the dt bindings require the reg to be there, we can discuss
+and change this all we want later!
+
+Regards,
+Bjorn
