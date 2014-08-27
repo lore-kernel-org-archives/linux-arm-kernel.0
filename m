@@ -1,59 +1,41 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Wed, 27 Aug 2014 18:06:51 +0200
-Subject: [PATCH] ARM: at91: fix ramc standby function registration
-Message-ID: <1409155611-7574-1-git-send-email-alexandre.belloni@free-electrons.com>
+From: afaerber@suse.de (=?ISO-8859-15?Q?Andreas_F=E4rber?=)
+Date: Wed, 27 Aug 2014 18:10:14 +0200
+Subject: [PATCH 1/2] ARM: exynos_defconfig: Enable Control Groups support
+In-Reply-To: <1409137341-20516-1-git-send-email-javier.martinez@collabora.co.uk>
+References: <1409137341-20516-1-git-send-email-javier.martinez@collabora.co.uk>
+Message-ID: <53FE02E6.3030302@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-After the for_each_matching_node loop, we end up with a null value for np. Then,
-of_match_node() is not matching anything and we can't register the standby
-function and "ramc no standby function available" is printed.
+Am 27.08.2014 13:02, schrieb Javier Martinez Canillas:
+> systemd needs control groups support to be enabled in the
+> kernel so let's enable it by default since is quite likely
+> that a user-space with systemd will be used.
+> 
+> Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+> ---
+>  arch/arm/configs/exynos_defconfig | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/arch/arm/configs/exynos_defconfig b/arch/arm/configs/exynos_defconfig
+> index 676c744..590abde 100644
+> --- a/arch/arm/configs/exynos_defconfig
+> +++ b/arch/arm/configs/exynos_defconfig
+> @@ -1,6 +1,7 @@
+>  CONFIG_SYSVIPC=y
+>  CONFIG_NO_HZ=y
+>  CONFIG_HIGH_RES_TIMERS=y
+> +CONFIG_CGROUPS=y
+>  CONFIG_BLK_DEV_INITRD=y
+>  CONFIG_KALLSYMS_ALL=y
+>  CONFIG_MODULES=y
 
-Fix that by selecting the first available standby function. For now,
-at91_pm_set_standby doesn't support multiple different standby functions and no
-existing SoCs have different RAM controllers.
+CONFIG_FHANDLE=y is also needed for systemd to get a serial console.
+multi_v7 has that already.
 
-Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
----
- arch/arm/mach-at91/setup.c | 11 +++++++----
- 1 file changed, 7 insertions(+), 4 deletions(-)
+Regards,
+Andreas
 
-diff --git a/arch/arm/mach-at91/setup.c b/arch/arm/mach-at91/setup.c
-index 28ae63b8eb16..d2cade21ebd7 100644
---- a/arch/arm/mach-at91/setup.c
-+++ b/arch/arm/mach-at91/setup.c
-@@ -343,25 +343,28 @@ static void at91_dt_ramc(void)
- 	struct device_node *np;
- 	const struct of_device_id *of_id;
- 	int idx = 0;
-+	const void *standby = NULL;
- 
--	for_each_matching_node(np, ramc_ids) {
-+	for_each_matching_node_and_match(np, ramc_ids, &of_id) {
- 		at91_ramc_base[idx] = of_iomap(np, 0);
- 		if (!at91_ramc_base[idx])
- 			panic(pr_fmt("unable to map ramc[%d] cpu registers\n"), idx);
- 
-+		if (!standby)
-+			standby = of_id->data;
-+
- 		idx++;
- 	}
- 
- 	if (!idx)
- 		panic(pr_fmt("unable to find compatible ram controller node in dtb\n"));
- 
--	of_id = of_match_node(ramc_ids, np);
--	if (!of_id) {
-+	if (!standby) {
- 		pr_warn("ramc no standby function available\n");
- 		return;
- 	}
- 
--	at91_pm_set_standby(of_id->data);
-+	at91_pm_set_standby(standby);
- }
- 
- void __init at91rm9200_dt_initialize(void)
 -- 
-1.9.1
+SUSE LINUX Products GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
+GF: Jeff Hawn, Jennifer Guild, Felix Imend?rffer; HRB 16746 AG N?rnberg
