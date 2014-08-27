@@ -1,69 +1,20 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Wed, 27 Aug 2014 22:19:22 +0200
-Subject: [PATCH v2] ethernet: arc: Add support for Rockchip SoC layer
- device tree bindings
-In-Reply-To: <3619843.a6HHkMsuOu@wuerfel>
-References: <1409122527-17673-1-git-send-email-romain.perier@gmail.com>
- <3619843.a6HHkMsuOu@wuerfel>
-Message-ID: <33554745.SgNonHnYhV@diego>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 27 Aug 2014 22:17:19 +0200
+Subject: [PATCH v2 2/2] dt-bindings: document Rockchip thermal
+In-Reply-To: <1409096503-7081-3-git-send-email-caesar.wang@rock-chips.com>
+References: <1409096503-7081-1-git-send-email-caesar.wang@rock-chips.com>
+ <1409096503-7081-3-git-send-email-caesar.wang@rock-chips.com>
+Message-ID: <5911166.ElkaNhDZrP@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Mittwoch, 27. August 2014, 22:11:29 schrieb Arnd Bergmann:
-> On Wednesday 27 August 2014 06:55:27 Romain Perier wrote:
-> > This patch defines a platform glue layer for Rockchip SoCs which
-> > support arc-emac driver. It ensures that regulator for the rmii is on
-> > before trying to connect to the ethernet controller. It applies right
-> > speed and mode changes to the grf when ethernet settings change.
-> > 
-> > Signed-off-by: Romain Perier <romain.perier@gmail.com>
-> > ---
-> > 
-> >  drivers/net/ethernet/arc/Kconfig         |  15 +++
-> >  drivers/net/ethernet/arc/Makefile        |   1 +
-> >  drivers/net/ethernet/arc/emac.h          |   2 +
-> >  drivers/net/ethernet/arc/emac_main.c     |   2 +
-> >  drivers/net/ethernet/arc/emac_rockchip.c | 224
-> >  +++++++++++++++++++++++++++++++ 5 files changed, 244 insertions(+)
-> >  create mode 100644 drivers/net/ethernet/arc/emac_rockchip.c
-> > 
-> > diff --git a/drivers/net/ethernet/arc/Kconfig
-> > b/drivers/net/ethernet/arc/Kconfig index 89e04fd..6d96a82 100644
-> > --- a/drivers/net/ethernet/arc/Kconfig
-> > +++ b/drivers/net/ethernet/arc/Kconfig
-> > @@ -32,4 +32,19 @@ config ARC_EMAC
-> > 
-> >  	  non-standard on-chip ethernet device ARC EMAC 10/100 is used.
-> >  	  Say Y here if you have such a board.  If unsure, say N.
-> > 
-> > +config EMAC_ROCKCHIP
-> > +       tristate "Rockchip EMAC support"
-> > +       select ARC_EMAC_CORE
-> > +       depends on OF_IRQ
-> > +       depends on OF_NET
-> > +       depends on ARCH_ROCKCHIP
-> > +       depends on REGULATOR_ACT8865
-> > +       depends on SMSC_PHY
-> > +       depends on MFD_SYSCON
+On Wednesday 27 August 2014 07:41:43 Caesar Wang wrote:
+> +- clock-names : Shall be "tsadc_clk" for the transfer-clock, and "tsadc_pclk" for
+> +    the peripheral clock.
 > 
-> You should generally not add 'depends on' for specific drivers out
-> of a subsystems. Just list the build-time dependencies, like
-> 
-> 	depends on OF_IRQ && OF_NET && PHYLIB && REGULATOR && MFD_SYSCON
 
-in this case even MFD_SYSCON can go away, as the syscon functions provide 
-stubs for !MFD_SYSCON .
+Why not just name them "clk" and "pclk"? The "tsadc" part seems highly redundant.
 
+Alternatively, how about "transfer" and "peripheral"?
 
-[...]
-
-> > +	rate = 50000000;
-> 
-> Where does this number come from?
-
-The RMII interface needs always a rate of 50MHz ... my questions would be why 
-the 50000000 are not in the clk_set_rate directly and need an extra var :-)
-
-
-
-Heiko
+	Arnd
