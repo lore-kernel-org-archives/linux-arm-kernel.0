@@ -1,144 +1,314 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Wed, 27 Aug 2014 08:54:41 +0200
-Subject: [linux-sunxi] Re: [PATCH 4/4] simplefb: add clock handling code
-In-Reply-To: <20140826210248.GO15297@lukather>
-References: <20140825133953.GJ4163@ulmo.nvidia.com>
- <53FB3E7F.4000503@redhat.com>
- <20140825141600.GA14763@ulmo.nvidia.com>
- <20140825145854.GA15297@lukather>
- <20140825150501.GE14763@ulmo.nvidia.com>
- <20140825152232.GE15297@lukather> <20140826080432.GD17263@ulmo>
- <20140826135341.GM15297@lukather> <20140826143550.GB3027@ulmo>
- <20140826210248.GO15297@lukather>
-Message-ID: <20140827065440.GG15640@ulmo>
+From: romain.perier@gmail.com (Romain Perier)
+Date: Wed, 27 Aug 2014 06:55:27 +0000
+Subject: [PATCH v2] ethernet: arc: Add support for Rockchip SoC layer device
+ tree bindings
+Message-ID: <1409122527-17673-1-git-send-email-romain.perier@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 26, 2014 at 11:02:48PM +0200, Maxime Ripard wrote:
-> On Tue, Aug 26, 2014 at 04:35:51PM +0200, Thierry Reding wrote:
-> > > > > Any decent enough SoC, with a decent support in the kernel will have
-> > > > > clocks for this, and I really wonder how simplefb will behave once its
-> > > > > clocks will be turned off...
-> > > > 
-> > > > There are other devices besides ARM SoCs that may want to use this
-> > > > driver and that don't have clock support.
-> > > 
-> > > And in this case, with this patch, simplefb will not claim any clock,
-> > > nor will fail probing.
-> > > 
-> > > > But you're missing my point. What I'm saying is that the simplefb driver
-> > > > is meant to serve as a way to take over whatever framebuffer a firmware
-> > > > set up. Therefore I think it makes the most sense to assume that nothing
-> > > > needs to be controlled in any way since already been set up by firmware.
-> > > > Eventually there should be a driver that takes over from simplefb that
-> > > > knows how to properly handle the device's specifics, but that's not
-> > > > simplefb.
-> > > 
-> > > I guess such a hand over if it were to happen in the kernel would
-> > > involve the second driver claiming the resources before the first one
-> > > release them. How is that different in this case?
-> > 
-> > It's different in that that driver will be hardware specific and know
-> > exactly what clock and other resources are required. It will have a
-> > device-specific binding.
-> 
-> Except that you made simplefb a generic driver. So we have two choices
-> here: either we don't anything but the trivial case, and no one with a
-> rather more advanced hardware will be able to use it, or we try to
-> grab any resource that might be of use, which means clocks,
-> regulators, reserved memory region, or whatever, so that we pretty
-> much cover all cases. It really is as simple as that.
+This patch defines a platform glue layer for Rockchip SoCs which
+support arc-emac driver. It ensures that regulator for the rmii is on
+before trying to connect to the ethernet controller. It applies right
+speed and mode changes to the grf when ethernet settings change.
 
-No, it should be even simpler. simplefb shouldn't have to know any of
-this. It's just taking what firmware has set up and uses that. It's a
-stop-gap solution to provide information on the display until a real
-driver can be loaded and initializes the display hardware properly.
+Signed-off-by: Romain Perier <romain.perier@gmail.com>
+---
+ drivers/net/ethernet/arc/Kconfig         |  15 +++
+ drivers/net/ethernet/arc/Makefile        |   1 +
+ drivers/net/ethernet/arc/emac.h          |   2 +
+ drivers/net/ethernet/arc/emac_main.c     |   2 +
+ drivers/net/ethernet/arc/emac_rockchip.c | 224 +++++++++++++++++++++++++++++++
+ 5 files changed, 244 insertions(+)
+ create mode 100644 drivers/net/ethernet/arc/emac_rockchip.c
 
-> > > > The goal of this patch series is to keep clocks from being turned off.
-> > > > But that's not what it does. What it does is turn clocks on to prevent
-> > > > them from being turned off. In my opinion that's a workaround for a
-> > > > deficiency in the kernel (and the firmware/kernel interface) and I think
-> > > > it should be fixed at the root. So a much better solution would be to
-> > > > establish a way for firmware to communicate to the kernel that a given
-> > > > resource has been enabled by firmware and shouldn't be disabled. Such a
-> > > > solution can be implement for all types of resources and can be reused
-> > > > by all drivers since they don't have to worry about these details.
-> > > 
-> > > Mike Turquette repeatedly said that he was against such a DT property:
-> > > https://lkml.org/lkml/2014/5/12/693
-> > 
-> > Mike says in that email that he's opposing the addition of a property
-> > for clocks that is the equivalent of regulator-always-on. That's not
-> > what this is about. If at all it'd be a property to mark a clock that
-> > should not be disabled by default because it's essential.
-> 
-> It's just semantic. How is "a clock that should not be disabled by
-> default because it's essential" not a clock that stays always on?
-
-Because a clock that should not be disabled by default can be turned off
-when appropriate. A clock that is always on can't be turned off.
-
-> Plus, you should read the mail further. It's clearly said that
-> consumer drivers should call clk_prepare_enable themselves, and that
-> the only exception to that is the case where we don't have such a
-> driver (and only valid as a temporary exception, which I guess you'll
-> soon turn into temporary-until-a-drm-kms-driver-is-merged).
-
-Exactly. simplefb is only a temporary measure. It's not meant to be used
-as a full-blown framebuffer driver. There are two use-cases where it is
-an appropriate solution:
-
-  1) As a stop-gap solution for when the platform doesn't support a full
-     display driver yet. In that case you will want simplefb to stay
-     around forever.
-
-  2) To get early boot output before a full display driver can be loaded
-     in which case simplefb should go away after the display driver has
-     taken over.
-
-In case of 2) the most straightforward solution is to not disable any
-clocks until all drivers have had a chance to claim them. When the full
-driver has been probed it should have claimed the clocks so they would
-no longer get disabled.
-
-For 1) I think it's fair to say that it's only a temporary solution to
-get something on the screen. There won't be any kind of acceleration at
-all, no power saving. Nothing but a dumb framebuffer. In that case it
-should be a simple matter of keeping a select number of clocks always on
-in the clock driver until support is more complete and it can be
-properly handled. It's not like it's going to make a difference anyway
-since simplefb won't ever disable them either.
-
-> > Adding Mike on this subthread too.
-> > 
-> > Either way, Mark already suggested a different alternative in another
-> > subthread, namely to add a new kind of checkpoint at which subsystems
-> > can call a "disable unused" function that's called later than a late
-> > initcall. This is not going to fix things for you immediately because
-> > the clocks will still be switched off (only later) if you don't have
-> > a real driver that's claiming the clocks.
-> 
-> Great, I'm glad we found a solution for a completely unrelated issue.
-
-It's not at all unrelated. See above.
-
-> > But you can work around that for now by making the relevant clocks
-> > always on and remove that workaround once a real driver is loaded
-> > that knows how to handle them properly.
-> 
-> So, let me get this straight. The clock provider driver should behave
-> as a clock consumer because it knows that in some cases, it might not
-> have any willingful enough consumer? Doesn't that even ring your
-> this-is-a-clear-abstraction-violation-bell just a tiny bit?
-
-No. The clock driver should simply not allow the clocks to be disabled
-if it isn't safe to do so.
-
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140827/612db42c/attachment-0001.sig>
+diff --git a/drivers/net/ethernet/arc/Kconfig b/drivers/net/ethernet/arc/Kconfig
+index 89e04fd..6d96a82 100644
+--- a/drivers/net/ethernet/arc/Kconfig
++++ b/drivers/net/ethernet/arc/Kconfig
+@@ -32,4 +32,19 @@ config ARC_EMAC
+ 	  non-standard on-chip ethernet device ARC EMAC 10/100 is used.
+ 	  Say Y here if you have such a board.  If unsure, say N.
+ 
++config EMAC_ROCKCHIP
++       tristate "Rockchip EMAC support"
++       select ARC_EMAC_CORE
++       depends on OF_IRQ
++       depends on OF_NET
++       depends on ARCH_ROCKCHIP
++       depends on REGULATOR_ACT8865
++       depends on SMSC_PHY
++       depends on MFD_SYSCON
++       ---help---
++         Support for Rockchip RK3066/RK3188 EMAC ethernet controllers.
++         This selects Rockchip SoC glue layer support for the
++         emac device driver. This driver is used for RK3066/RK3188
++         EMAC ethernet controller.
++
+ endif # NET_VENDOR_ARC
+diff --git a/drivers/net/ethernet/arc/Makefile b/drivers/net/ethernet/arc/Makefile
+index 241bb80..79108af 100644
+--- a/drivers/net/ethernet/arc/Makefile
++++ b/drivers/net/ethernet/arc/Makefile
+@@ -5,3 +5,4 @@
+ arc_emac-objs := emac_main.o emac_mdio.o
+ obj-$(CONFIG_ARC_EMAC_CORE) += arc_emac.o
+ obj-$(CONFIG_ARC_EMAC) += emac_arc.o
++obj-$(CONFIG_EMAC_ROCKCHIP) += emac_rockchip.o
+diff --git a/drivers/net/ethernet/arc/emac.h b/drivers/net/ethernet/arc/emac.h
+index 164b1c7..2bfe8c76 100644
+--- a/drivers/net/ethernet/arc/emac.h
++++ b/drivers/net/ethernet/arc/emac.h
+@@ -127,6 +127,8 @@ struct buffer_state {
+ struct arc_emac_priv {
+ 	const char *drv_name;
+ 	const char *drv_version;
++	void (*set_mac_speed)(void *priv, unsigned int speed);
++
+ 	/* Devices */
+ 	struct device *dev;
+ 	struct phy_device *phy_dev;
+diff --git a/drivers/net/ethernet/arc/emac_main.c b/drivers/net/ethernet/arc/emac_main.c
+index b35c69e..a08f343 100644
+--- a/drivers/net/ethernet/arc/emac_main.c
++++ b/drivers/net/ethernet/arc/emac_main.c
+@@ -48,6 +48,8 @@ static void arc_emac_adjust_link(struct net_device *ndev)
+ 	if (priv->speed != phy_dev->speed) {
+ 		priv->speed = phy_dev->speed;
+ 		state_changed = 1;
++		if (priv->set_mac_speed)
++			priv->set_mac_speed(priv, priv->speed);
+ 	}
+ 
+ 	if (priv->duplex != phy_dev->duplex) {
+diff --git a/drivers/net/ethernet/arc/emac_rockchip.c b/drivers/net/ethernet/arc/emac_rockchip.c
+new file mode 100644
+index 0000000..ff1a657
+--- /dev/null
++++ b/drivers/net/ethernet/arc/emac_rockchip.c
+@@ -0,0 +1,224 @@
++/**
++ * emac-rockchip.c - Rockchip EMAC specific glue layer
++ *
++ * Copyright (C) 2014 Romain Perier
++ *
++ * Romain Perier  <romain.perier@gmail.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
++#include <linux/etherdevice.h>
++#include <linux/mfd/syscon.h>
++#include <linux/module.h>
++#include <linux/of_net.h>
++#include <linux/platform_device.h>
++#include <linux/regmap.h>
++#include <linux/regulator/consumer.h>
++
++#include "emac.h"
++
++#define DRV_NAME        "rockchip_emac"
++#define DRV_VERSION     "1.0"
++
++#define GRF_MODE_MII   BIT(0)
++#define GRF_MODE_RMII  0x0
++#define GRF_SPEED_10M  0x0
++#define GRF_SPEED_100M BIT(1)
++
++struct emac_rockchip_soc_data {
++	int grf_offset;
++};
++
++struct rockchip_priv_data {
++	struct arc_emac_priv emac;
++	struct regmap *grf;
++	struct emac_rockchip_soc_data *soc_data;
++	struct regulator *regulator;
++	struct clk *refclk;
++};
++
++static const struct of_device_id emac_rockchip_dt_ids[];
++
++static void emac_rockchip_set_mac_speed(void *priv, unsigned int speed)
++{
++	struct rockchip_priv_data *emac = priv;
++	u32 data;
++	int err = 0;
++
++	/* write-enable bits */
++	data = BIT(17);
++
++	switch(speed) {
++	case 10:
++		data |= GRF_SPEED_10M;
++		break;
++	case 100:
++		data |= GRF_SPEED_100M;
++		break;
++	default:
++		pr_err("speed %u not supported\n", speed);
++		return;
++	}
++
++	err = regmap_write(emac->grf, emac->soc_data->grf_offset, data);
++	if (err)
++		pr_err("unable to apply speed %u to grf (%d)\n", speed, err);
++}
++
++static int emac_rockchip_probe(struct platform_device *pdev)
++{
++	struct device *dev = &pdev->dev;
++	struct net_device *ndev;
++	struct rockchip_priv_data *priv;
++	const struct of_device_id *match;
++	u32 data, rate;
++	int err, interface;
++
++	if (!pdev->dev.of_node)
++		return -ENODEV;
++
++	ndev = alloc_etherdev(sizeof(struct rockchip_priv_data));
++	if (!ndev)
++		return -ENOMEM;
++	platform_set_drvdata(pdev, ndev);
++	SET_NETDEV_DEV(ndev, dev);
++
++	priv = netdev_priv(ndev);
++	priv->emac.drv_name = DRV_NAME;
++	priv->emac.drv_version = DRV_VERSION;
++	priv->emac.set_mac_speed = emac_rockchip_set_mac_speed;
++
++	interface = of_get_phy_mode(dev->of_node);
++
++	/* RK3066 and RK3188 SoCs only support RMII */
++	if (interface != PHY_INTERFACE_MODE_RMII) {
++		dev_err(dev, "unsupported phy interface mode %d\n", interface);
++		err = -ENOTSUPP;
++		goto out_netdev;
++	}
++
++	priv->grf = syscon_regmap_lookup_by_phandle(dev->of_node, "rockchip,grf");
++	if (IS_ERR(priv->grf)) {
++		dev_err(dev, "failed to retrieve global register file from the device tree (%ld)\n", PTR_ERR(priv->grf));
++		err = PTR_ERR(priv->grf);
++		goto out_netdev;
++	}
++
++	match = of_match_node(emac_rockchip_dt_ids, dev->of_node);
++	priv->soc_data = (struct emac_rockchip_soc_data *)match->data;
++
++	priv->emac.clk = devm_clk_get(dev, "hclk");
++	if (IS_ERR(priv->emac.clk)) {
++		dev_err(dev, "failed to retrieve host clock from device tree (%ld)\n", PTR_ERR(priv->emac.clk));
++		err = PTR_ERR(priv->emac.clk);
++		goto out_netdev;
++	}
++
++	priv->refclk = devm_clk_get(dev, "macref");
++	if (IS_ERR(priv->refclk)) {
++		dev_err(dev, "failed to retrieve reference clock from device tree (%ld)\n", PTR_ERR(priv->refclk));
++		err = PTR_ERR(priv->refclk);
++		goto out_netdev;
++	}
++
++	err = clk_prepare_enable(priv->refclk);
++	if (err) {
++		dev_err(dev, "failed to enable reference clock (%d)\n", err);
++		goto out_netdev;
++	}
++
++        /* Optional regulator for PHY */
++	priv->regulator = devm_regulator_get_optional(dev, "phy");
++	if (IS_ERR(priv->regulator)) {
++		if (PTR_ERR(priv->regulator) == -EPROBE_DEFER)
++			return -EPROBE_DEFER;
++		dev_err(dev, "no regulator found\n");
++		priv->regulator = NULL;
++	}
++
++	if (priv->regulator) {
++		err = regulator_enable(priv->regulator);
++		if (err) {
++			dev_err(dev, "failed to enable phy-supply (%d)\n", err);
++			goto out_netdev;
++		}
++	}
++
++	err = arc_emac_probe(ndev, interface);
++	if (err)
++		goto out_netdev;
++
++	/* write-enable bits */
++	data = BIT(16) | BIT(17);
++
++	data |= GRF_SPEED_100M;
++	data |= GRF_MODE_RMII;
++	rate = 50000000;
++
++	err = regmap_write(priv->grf, priv->soc_data->grf_offset, data);
++	if (err) {
++		dev_err(dev, "unable to apply initial settings to grf (%d)\n", err);
++		goto out_netdev;
++	}
++
++	err = clk_set_rate(priv->refclk, rate);
++	if (err)
++		dev_err(dev, "failed to change reference clock rate (%d)\n", err);
++
++out_netdev:
++	if (err)
++		free_netdev(ndev);
++	return err;
++}
++
++static int emac_rockchip_remove(struct platform_device *pdev)
++{
++	struct net_device *ndev = platform_get_drvdata(pdev);
++	struct rockchip_priv_data *priv = netdev_priv(ndev);
++	int err;
++
++	clk_disable_unprepare(priv->refclk);
++
++	if (priv->regulator)
++		regulator_disable(priv->regulator);
++	err = arc_emac_remove(ndev);
++	free_netdev(ndev);
++	return err;
++}
++
++static const struct emac_rockchip_soc_data emac_rockchip_dt_data[] = {
++	{ .grf_offset = 0x154 }, /* rk3066 */
++	{ .grf_offset = 0x0a4 }, /* rk3188 */
++};
++
++static const struct of_device_id emac_rockchip_dt_ids[] = {
++	{ .compatible = "rockchip,rk3066-emac", .data = (void *)&emac_rockchip_dt_data[0]},
++	{ .compatible = "rockchip,rk3188-emac", .data = (void *)&emac_rockchip_dt_data[1]},
++	{ /* Sentinel */ }
++};
++
++MODULE_DEVICE_TABLE(of, emac_rockchip_dt_ids);
++
++static struct platform_driver emac_rockchip_driver = {
++	.probe = emac_rockchip_probe,
++	.remove = emac_rockchip_remove,
++	.driver = {
++		.name = DRV_NAME,
++		.of_match_table  = emac_rockchip_dt_ids,
++	},
++};
++
++module_platform_driver(emac_rockchip_driver);
++
++MODULE_AUTHOR("Romain Perier <romain.perier@gmail.com>");
++MODULE_DESCRIPTION("Rockchip EMAC platform driver");
++MODULE_LICENSE("GPL");
+-- 
+1.9.1
