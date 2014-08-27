@@ -1,76 +1,72 @@
-From: jonsmirl@gmail.com (jonsmirl at gmail.com)
-Date: Wed, 27 Aug 2014 08:56:44 -0400
-Subject: [linux-sunxi] Re: [PATCH 4/4] simplefb: add clock handling code
-In-Reply-To: <53FDD40A.3040106@redhat.com>
-References: <20140825133953.GJ4163@ulmo.nvidia.com>
- <53FB3E7F.4000503@redhat.com>
- <20140825141600.GA14763@ulmo.nvidia.com>
- <20140825145854.GA15297@lukather>
- <20140825150501.GE14763@ulmo.nvidia.com>
- <20140825152232.GE15297@lukather> <20140826080432.GD17263@ulmo>
- <20140826135341.GM15297@lukather> <20140826143550.GB3027@ulmo>
- <53FCE704.4030103@redhat.com> <20140827093121.GA23186@ulmo>
- <53FDB46C.5010609@redhat.com>
- <CAKON4Owj=b7r_iuOOrr_5R++oSbxqF0G0i4puFz7aTaUF+weuw@mail.gmail.com>
- <53FDD40A.3040106@redhat.com>
-Message-ID: <CAKON4OyLVa8dxxaON4x7DUSck6w_zBhB+grbd-xOUugpeYSZ6A@mail.gmail.com>
+From: steve.capper@linaro.org (Steve Capper)
+Date: Wed, 27 Aug 2014 13:59:25 +0100
+Subject: [PATH V2 3/6] arm: mm: Enable HAVE_RCU_TABLE_FREE logic
+In-Reply-To: <20140827115010.GJ6968@arm.com>
+References: <1408635812-31584-1-git-send-email-steve.capper@linaro.org>
+ <1408635812-31584-4-git-send-email-steve.capper@linaro.org>
+ <20140827115010.GJ6968@arm.com>
+Message-ID: <20140827125924.GC7765@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 27, 2014 at 8:50 AM, Hans de Goede <hdegoede@redhat.com> wrote:
-> Hi,
->
-> On 08/27/2014 02:44 PM, jonsmirl at gmail.com wrote:
->
-> <snip>
->
->>> 1) Serving as *the* fb until a kms driver is present
->>
->> Why can't we whip together a real device specific fbdev driver and
->> quit trying to run without a device specific driver in place? History
->> has shown that to be bad idea except during early boot when there
->> isn't a choice.
->
-> Writing a kms driver and getting it upstream is not a simple task, and
-> starting with a too limited implementation is dangerous as we need to get
-> the devicetree binding first from the get go.
+On Wed, Aug 27, 2014 at 12:50:10PM +0100, Catalin Marinas wrote:
+> On Thu, Aug 21, 2014 at 04:43:29PM +0100, Steve Capper wrote:
+> > --- a/arch/arm/include/asm/tlb.h
+> > +++ b/arch/arm/include/asm/tlb.h
+> > @@ -35,12 +35,39 @@
+> >  
+> >  #define MMU_GATHER_BUNDLE	8
+> >  
+> > +#ifdef CONFIG_HAVE_RCU_TABLE_FREE
+> > +static inline void __tlb_remove_table(void *_table)
+> > +{
+> > +	free_page_and_swap_cache((struct page *)_table);
+> > +}
+> > +
+> > +struct mmu_table_batch {
+> > +	struct rcu_head		rcu;
+> > +	unsigned int		nr;
+> > +	void			*tables[0];
+> > +};
+> > +
+> > +#define MAX_TABLE_BATCH		\
+> > +	((PAGE_SIZE - sizeof(struct mmu_table_batch)) / sizeof(void *))
+> > +
+> > +extern void tlb_table_flush(struct mmu_gather *tlb);
+> > +extern void tlb_remove_table(struct mmu_gather *tlb, void *table);
+> > +
+> > +#define tlb_remove_entry(tlb, entry)	tlb_remove_table(tlb, entry)
+> > +#else
+> > +#define tlb_remove_entry(tlb, entry)	tlb_remove_page(tlb, entry)
+> > +#endif /* CONFIG_HAVE_RCU_TABLE_FREE */
+> > +
+> >  /*
+> >   * TLB handling.  This allows us to remove pages from the page
+> >   * tables, and efficiently handle the TLB issues.
+> >   */
+> >  struct mmu_gather {
+> >  	struct mm_struct	*mm;
+> > +#ifdef CONFIG_HAVE_RCU_TABLE_FREE
+> > +	struct mmu_table_batch	*batch;
+> > +	unsigned int		need_flush;
+> > +#endif
+> 
+> We add need_flush here just because it is set by tlb_remove_table() but
+> it won't actually be checked by anything since arch/arm uses its own
+> version of tlb_flush_mmu(). But I wouldn't go for #ifdefs in the core
+> code either.
+> 
+> We should (as a separate patchset) convert arch/arm to generic
+> mmu_gather. I know Russell had objections in the past but mmu_gather has
+> evolved since and it's not longer inefficient (I think the only case is
+> shift_arg_pages but that's pretty much lost in the noise).
 
-I didn't say write a kms driver, I said write a fbdev driver.  Look in
-drivers/video/fbdev. fbdev drivers are used on many embedded systems.
-Its what we used for years before kms came along.
+I would be happy to help out with a conversion to generic mmu_gather if
+it's wanted for arm.
 
->
-> IOW this is not really a realistic answer to problem 1.
->
-> <snip>
->
->>> 2) Allowing for output of early kernel boot messages.
->>
->> For this to work the kernel needs to know two things - address of the
->> framebuffer and the x/y layout. Then just nuke this display when the
->> kernel finishes the boot process.
->
-> Please read my earlier mails on how completely flawed it is to write
-> "when the kernel finishes the boot process". The problem is that there
-> is no way to really determine when this happens.
+> 
+> For this patch:
+> 
+> Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
 
-Let me rephrase that, when the existing code in the clk system and
-regulator systems decide to do their clean up the display will get
-nuked.
-
-
->
-> Regards,
->
-> Hans
->
-> --
-> You received this message because you are subscribed to the Google Groups "linux-sunxi" group.
-> To unsubscribe from this group and stop receiving emails from it, send an email to linux-sunxi+unsubscribe at googlegroups.com.
-> For more options, visit https://groups.google.com/d/optout.
-
-
-
--- 
-Jon Smirl
-jonsmirl at gmail.com
+Cheers.
