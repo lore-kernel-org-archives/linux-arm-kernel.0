@@ -1,56 +1,56 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed, 27 Aug 2014 14:28:19 +0900
-Subject: [PATCH 2/3 repost] clocksource: sh_mtu2: Document r7s72100 binding
-In-Reply-To: <1409117300-2133-1-git-send-email-horms+renesas@verge.net.au>
-References: <1409117300-2133-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1409117300-2133-3-git-send-email-horms+renesas@verge.net.au>
+From: takahiro.akashi@linaro.org (AKASHI Takahiro)
+Date: Wed, 27 Aug 2014 14:32:44 +0900
+Subject: [PATCH v6 1/6] arm64: ptrace: add PTRACE_SET_SYSCALL
+In-Reply-To: <20140826174637.GC23445@arm.com>
+References: <1408611405-8943-1-git-send-email-takahiro.akashi@linaro.org>
+ <1408611405-8943-2-git-send-email-takahiro.akashi@linaro.org>
+ <CAGXu5jJrTEhdDZ8fipNeaVm1_wto7u2f=uq_KzyMcVHJMT57vw@mail.gmail.com>
+ <53F68C81.6020807@linaro.org> <20140826174637.GC23445@arm.com>
+Message-ID: <53FD6D7C.8030700@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In general Renesas hardware is not documented to the extent
-where the relationship between IP blocks on different SoCs can be assumed
-although they may appear to operate the same way. Furthermore the
-documentation typically does not specify a version for individual
-IP blocks. For these reasons a convention of using the SoC name in place
-of a version and providing SoC-specific compat strings has been adopted.
+Kees,
 
-Although not universally liked this convention is used in the bindings
-for the drivers a number of drivers for Renesas hardware. The purpose
-of this patch is to update the Renesas R-Car Multi-Function Timer Pulse
-Unit 2 (MTU2) driver to follow this convention.
+On 08/27/2014 02:46 AM, Will Deacon wrote:
+> On Fri, Aug 22, 2014 at 01:19:13AM +0100, AKASHI Takahiro wrote:
+>> On 08/22/2014 01:47 AM, Kees Cook wrote:
+>>> On Thu, Aug 21, 2014 at 3:56 AM, AKASHI Takahiro
+>>> <takahiro.akashi@linaro.org> wrote:
+>>>> To allow tracer to be able to change/skip a system call by re-writing
+>>>> a syscall number, there are several approaches:
+>>>>
+>>>> (1) modify x8 register with ptrace(PTRACE_SETREGSET), and handle this case
+>>>>       later on in syscall_trace_enter(), or
+>>>> (2) support ptrace(PTRACE_SET_SYSCALL) as on arm
+>>>>
+>>>> Thinking of the fact that user_pt_regs doesn't expose 'syscallno' to
+>>>> tracer as well as that secure_computing() expects a changed syscall number
+>>>> to be visible, especially case of -1, before this function returns in
+>>>> syscall_trace_enter(), we'd better take (2).
+>>>>
+>>>> Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
+>>>
+>>> Thanks, I like having this on both arm and arm64.
+>>
+>> Yeah, having this simplified the code of syscall_trace_enter() a bit, but
+>> also imposes some restriction on arm64, too.
+>>
+>>   > I wonder if other archs should add this option too.
+>>
+>> Do you think so? I assumed that SET_SYSCALL is to be avoided if possible.
+>>
+>> I also think that SET_SYSCALL should take an extra argument for a return value
+>> just in case of -1 (or we have SKIP_SYSCALL?).
+>
+> I think we should propose this as a new request in the generic ptrace code.
+> We can have an architecture-hook for actually setting the syscall, and allow
+> architectures to define their own implementation of the request so they can
+> be moved over one by one.
 
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+What do you think about this request?
 
----
-* I plan to follow up with a patch patch to use the new binding in the
-  dtsi files for the r7s72100 SoC.
----
- Documentation/devicetree/bindings/timer/renesas,mtu2.txt | 6 ++++--
- 1 file changed, 4 insertions(+), 2 deletions(-)
+-Takahiro AKASHI
 
-diff --git a/Documentation/devicetree/bindings/timer/renesas,mtu2.txt b/Documentation/devicetree/bindings/timer/renesas,mtu2.txt
-index 917453f..ec4d334 100644
---- a/Documentation/devicetree/bindings/timer/renesas,mtu2.txt
-+++ b/Documentation/devicetree/bindings/timer/renesas,mtu2.txt
-@@ -8,7 +8,9 @@ are independent. The MTU2 hardware supports five channels indexed from 0 to 4.
- 
- Required Properties:
- 
--  - compatible: must contain "renesas,mtu2"
-+  - compatible: must be one of the following.
-+    - "renesas,mtu2" for generic MTU2
-+    - "renesas,mtu2-r7s72100" for R7S72100 MTU2
- 
-   - reg: base address and length of the registers block for the timer module.
- 
-@@ -26,7 +28,7 @@ Required Properties:
- Example: R7S72100 (RZ/A1H) MTU2 node
- 
- 	mtu2: timer at fcff0000 {
--		compatible = "renesas,mtu2";
-+		compatible = "renesas,mtu2-r7s72100", "renesas,mtu2";
- 		reg = <0xfcff0000 0x400>;
- 		interrupts = <0 139 IRQ_TYPE_LEVEL_HIGH>,
- 			     <0 146 IRQ_TYPE_LEVEL_HIGH>,
--- 
-2.0.1
+> Will
+>
