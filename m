@@ -1,97 +1,77 @@
-From: luto@amacapital.net (Andy Lutomirski)
-Date: Wed, 27 Aug 2014 09:19:15 -0700
-Subject: [PATCH 0/3] virtio: Clean up scatterlists and use the DMA API
-In-Reply-To: <53FE03C3.90309@codeaurora.org>
-References: <cover.1409087794.git.luto@amacapital.net>
- <CAJSP0QUcXQ+JV0wys2Mr-+OsFKt=hTGbUxNqfpk-JuyULiQABQ@mail.gmail.com>
- <CALCETrUWR8p7XSiTALd19LL4mTgkXu_XEewobouz6Jbkb4KjLw@mail.gmail.com>
- <20140827154537.GB18900@redhat.com>
- <CALCETrVUg3fCQS0rjOD1BbauXHfnydPyP3mNMeiGu4NqBgLK6A@mail.gmail.com>
- <53FE03C3.90309@codeaurora.org>
-Message-ID: <CALCETrWcMO_zkNEuXBeqSAt6FSvUaFve+_5JC-rk5vObvBZWSg@mail.gmail.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Wed, 27 Aug 2014 10:22:06 -0600
+Subject: [RFC PATCH 0/9] dt: dependencies (for deterministic driver
+ initialization order based on the DT)
+In-Reply-To: <20140827144403.GB13850@arm.com>
+References: <53F64624.5000403@ahsoftware.de>
+ <20140822131919.GX21734@leverpostej> <20140825093931.GB2399@ulmo>
+ <E1XLu15-0002DP-6o@jdl.com> <20140825133714.GH4163@ulmo.nvidia.com>
+ <20140826084208.AE5F0C40989@trevor.secretlab.ca>
+ <20140826084922.GG17263@ulmo> <53FC566C.30904@ahsoftware.de>
+ <20140826101107.GC32315@leverpostej>
+ <20140827103432.64927C409CB@trevor.secretlab.ca>
+ <20140827144403.GB13850@arm.com>
+Message-ID: <53FE05AE.9000406@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 27, 2014 at 9:13 AM, Christopher Covington
-<cov@codeaurora.org> wrote:
-> On 08/27/2014 11:50 AM, Andy Lutomirski wrote:
->> On Wed, Aug 27, 2014 at 8:45 AM, Michael S. Tsirkin <mst@redhat.com> wrote:
->>> On Wed, Aug 27, 2014 at 08:11:15AM -0700, Andy Lutomirski wrote:
->>>> On Aug 26, 2014 11:46 PM, "Stefan Hajnoczi" <stefanha@gmail.com> wrote:
+On 08/27/2014 08:44 AM, Catalin Marinas wrote:
+> On Wed, Aug 27, 2014 at 11:34:32AM +0100, Grant Likely wrote:
+>> On Tue, 26 Aug 2014 11:11:07 +0100, Mark Rutland <mark.rutland@arm.com> wrote:
+>>> On Tue, Aug 26, 2014 at 10:42:04AM +0100, Alexander Holler wrote:
+>>>> Am 26.08.2014 10:49, schrieb Thierry Reding:
+>>>>> On Tue, Aug 26, 2014 at 09:42:08AM +0100, Grant Likely wrote:
+>>>>>> On Mon, 25 Aug 2014 15:37:16 +0200, Thierry Reding <thierry.reding@gmail.com> wrote:
+>>>>> [...]
+>>>>>>> There are somewhat standardized bindings for the above and especially
+>>>>>>> for bindings of the type that clocks implement this is trivial. We can
+>>>>>>> simply iterate over each (phandle, specifier) tuple and check that the
+>>>>>>> corresponding clock provider can be resolved (which typically means that
+>>>>>>> it's been registered with the common clock framework).
+>>>>>>>
+>>>>>>> For regulators (and regulator-like bindings) the problem is somewhat
+>>>>>>> more difficult because they property names are not standardized. One way
+>>>>>>> to solve this would be to look for property names with a -supply suffix,
+>>>>>>> but that could obviously lead to false positives. One alternative that I
+>>>>>>> think could eliminate this would be to explicitly list dependencies in
+>>>>>>> drivers. This would allow core code to step through such a list and
+>>>>>>> resolve the (phandle, specifier) tuples.
+>>>>>>
+>>>>>> False positives and negatives may not actually be a problem. It is
+>>>>>> suboptimal, certainly, but it shouldn't outright break the kernel.
 >>>>>
->>>>> On Tue, Aug 26, 2014 at 10:16 PM, Andy Lutomirski <luto@amacapital.net> wrote:
->>>>>> There are two outstanding issues.  virtio_net warns if DMA debugging
->>>>>> is on because it does DMA from the stack.  (The warning is correct.)
->>>>>> This also is likely to do something unpleasant to s390.
->>>>>> (Maintainers are cc'd -- I don't know what to do about it.)
->>>>>
->>>>> This changes the semantics of vring and breaks existing guests when
->>>>> bus address != physical address.
->>>>>
->>>>> Can you use a transport feature bit to indicate that bus addresses are
->>>>> used?  That way both approaches can be supported.
+>>>>> There could be cases where some random integer in a cell could be
+>>>>> interpreted as a phandle and resolve to a struct device_node. I suppose
+>>>>> it might be unlikely, but not impossible, that the device_node could
+>>>>> even match a device in the correct subsystem and you'd get a wrong
+>>>>> dependency. Granted, a wrong dependency may not be catastrophic in that
+>>>>> it won't lead to a crash, but it could lead to various kinds of
+>>>>> weirdness and hard to diagnose problems.
 >>>>
->>>> I can try to support both styles of addressing, but I don't think that
->>>> this can be negotiated between the device (i.e. host or physical
->>>> virtio-speaking device) and the guest.  In the Xen case that I care
->>>> about (Linux on Xen on KVM), the host doesn't know about the
->>>> translation at all -- Xen is an intermediate layer that only the guest
->>>> is aware of.  In this case, there are effectively two layers of
->>>> virtualization, and only the inner one (Xen) knows about the
->>>> translation despite the fact that the the outer layer is the one
->>>> providing the virtio device.
->>>>
->>>> I could change virtio_ring to use the DMA API only if requested by the
->>>> lower driver (virtio_pci, etc) and to have only virtio_pci enable that
->>>> feature.  Will that work for all cases?
->>>>
->>>> On s390, this shouldn't work just like the current code.  On x86, I
->>>> think that if QEMU ever starts exposing an IOMMU attached to a
->>>> virtio-pci device, then QEMU should expect that IOMMU to be used.  If
->>>> QEMU expects to see physical addresses, then it shouldn't advertise an
->>>> IOMMU.  Since QEMU doesn't currently support guest IOMMUs, this should
->>>> be fine for everything that uses QEMU.
->>>>
->>>> At least x86's implementation of the DMA ops for devices that aren't
->>>> behind an IOMMU should be very fast.
->>>>
->>>> Are there any other weird cases for which this might be a problem?
->>>>
->>>>>
->>>>> Please also update the virtio specification:
->>>>> https://tools.oasis-open.org/version-control/browse/wsvn/virtio/
->>>>>
->>>>
->>>> I'm not sure it will need an update.  Perhaps a note in the PCI
->>>> section indicating that, if the host expects the guest to program an
->>>> IOMMU, then it should use the appropriate platform-specific mechanism
->>>> to expose that IOMMU.
->>>>
->>>> --Andy
+>>>> You need either the type information in the DTB (that's why I've add
+>>>> those "dependencies" to identify phandles), or you need to know every
+>>>> binding (at "dependency-resolve-time" to identify phandles.
 >>>
->>> If there's no virtio mechanism to negotate enabling/disabling
->>> translations, then specification does not need an extension.
+>>> While having type information in the DTB would be fantastic, it's not
+>>> something we can expect from the systems already in the wild, and I
+>>> worry how it would interact with bootloaders that modify the DTB (I
+>>> don't know if any modify properties with phandles).
 >>
->> It wouldn't shock me if someone wants to negotiate this for
->> virtio_mmio some day, but that might be more of a device tree thing.
->> I have no idea how that works, but I think it can wait until someone
->> wants it.
+>> Anything we do here is firmly in the realm of optimization and
+>> improvement. Adding data to the tree is fine as long as we don't make
+>> the kernel depend on it. Older platforms will continue to work without
+>> the optimization.
 >
-> At one point I wanted VirtIO-MMIO to not fail miserably on ARM LPAE systems.
->
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2014-March/241613.html
->
+> It's not just optimisation but an important feature for new arm64 SoCs.
+> Given some Tegra discussions recently, in many cases the machine_desc
+> use on arm is primarily to initialise devices in the right order. If we
+> can solve this in a more deterministic way (other than deferred
+> probing), we avoid the need for a dedicated SoC platform driver (or
+> machine_desc) or workarounds like different initcall levels and explicit
+> DT parsing.
 
-Since I know nothing about LPAE, I'll leave this to you :)  But I'll
-cc you on patch v2 soon, and please tell me whether my code makes
-sense on ARM.
-
-(My attempt to boot-test s390 failed because I have no clue what
-command-line options to pass to QEMU.  If anyone wants to give me some
-pointers to get a working configuration with -kernel and some kind of
-console, I can add support to virtme.  Alas, I think that no one ever
-bothered to implement 9p over virtio-ccw in QEMU.  Why exactly does
-the virtio stuff in QEMU require that you instantiate virtio-9p-pci
-instead of just asking for an appropriate virtio dievice?)
-
---Andy
+A lot of the ordering is SW driver dependencies. I'm not sure how much 
+of that can accurately be claimed as HW dependencies. As such, I'm not 
+sure that putting dependencies into DT would be a good idea; it doesn't 
+feel like HW data, and might well change if we restructure SW. It'd need 
+some detailed research though.
