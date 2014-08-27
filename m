@@ -1,68 +1,71 @@
-From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Wed, 27 Aug 2014 14:58:30 +0900
-Subject: [PATCH v6 5/6] arm64: add SIGSYS siginfo for compat task
-In-Reply-To: <20140826175526.GF23445@arm.com>
-References: <1408611405-8943-1-git-send-email-takahiro.akashi@linaro.org>
- <1408611405-8943-6-git-send-email-takahiro.akashi@linaro.org>
- <20140826175526.GF23445@arm.com>
-Message-ID: <53FD7386.3070805@linaro.org>
+From: Mattis.Lorentzon@autoliv.com (Mattis Lorentzon)
+Date: Wed, 27 Aug 2014 06:32:39 +0000
+Subject: Oops: 17 SMP ARM (v3.16-rc2)
+In-Reply-To: <53F71D1B.8090004@gmail.com>
+References: <20140626151424.GT32514@n2100.arm.linux.org.uk>
+ <20140806095012.GN30282@n2100.arm.linux.org.uk>
+ <C4A61A5CA4AD2246942F4BA6F20ACB8043575172@ALVA-EXMB04.alv.autoliv.int>
+ <20140806125550.GO30282@n2100.arm.linux.org.uk>
+ <C4A61A5CA4AD2246942F4BA6F20ACB804357526C@ALVA-EXMB04.alv.autoliv.int>
+ <20140807121248.GY30282@n2100.arm.linux.org.uk>
+ <20140808180900.GG30282@n2100.arm.linux.org.uk>
+ <C4A61A5CA4AD2246942F4BA6F20ACB8043576356@ALVA-EXMB04.alv.autoliv.int>
+ <CAOMZO5B8GR+ABBoJ=dJcFqw3Wagfaip7HM+C1FTz+aE4CmqiPw@mail.gmail.com>
+ <C4A61A5CA4AD2246942F4BA6F20ACB80435776D3@ALVA-EXMB04.alv.autoliv.int>
+ <CAOMZO5B7FgzB7ThVyV2Vk7wTwYgjRWjEnkkAN5uwwKMaBKq1yg@mail.gmail.com>
+ <C4A61A5CA4AD2246942F4BA6F20ACB8043577770@ALVA-EXMB04.alv.autoliv.int>
+ <53F11FF6.8030303@gmail.com>
+ <CAOMZO5CDvQDD7gVLFStwv4MPrUyqZE3sEDZwb0gukkXujYG-6Q@mail.gmail.com>
+ <53F2E89B.80009@gmail.com> <53F5BE3D.5070209@gmail.com>
+ <CAOMZO5A3CgaVCKxNDG-zEdwprYdRDXD_XZ2ikW+mns-iieYHsg@mail.gmail.com>
+ <53F71D1B.8090004@gmail.com>
+Message-ID: <C4A61A5CA4AD2246942F4BA6F20ACB8043578CB2@ALVA-EXMB04.alv.autoliv.int>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/27/2014 02:55 AM, Will Deacon wrote:
-> On Thu, Aug 21, 2014 at 09:56:44AM +0100, AKASHI Takahiro wrote:
->> SIGSYS is primarily used in secure computing to notify tracer.
->> This patch allows signal handler on compat task to get correct information
->> with SA_SYSINFO specified when this signal is delivered.
->>
->> Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
->> ---
->>   arch/arm64/include/asm/compat.h |    7 +++++++
->>   arch/arm64/kernel/signal32.c    |    8 ++++++++
->>   2 files changed, 15 insertions(+)
->>
->> diff --git a/arch/arm64/include/asm/compat.h b/arch/arm64/include/asm/compat.h
->> index 253e33b..c877915 100644
->> --- a/arch/arm64/include/asm/compat.h
->> +++ b/arch/arm64/include/asm/compat.h
->> @@ -205,6 +205,13 @@ typedef struct compat_siginfo {
->>   			compat_long_t _band;	/* POLL_IN, POLL_OUT, POLL_MSG */
->>   			int _fd;
->>   		} _sigpoll;h
->> +
->> +		/* SIGSYS */
->> +		struct {
->> +			compat_uptr_t _call_addr; /* calling user insn */
->> +			int _syscall;	/* triggering system call number */
->> +			unsigned int _arch;	/* AUDIT_ARCH_* of syscall */
->> +		} _sigsys;
->>   	} _sifields;
->>   } compat_siginfo_t;
->>
->> diff --git a/arch/arm64/kernel/signal32.c b/arch/arm64/kernel/signal32.c
->> index 1b9ad02..aa550d6 100644
->> --- a/arch/arm64/kernel/signal32.c
->> +++ b/arch/arm64/kernel/signal32.c
->> @@ -186,6 +186,14 @@ int copy_siginfo_to_user32(compat_siginfo_t __user *to, const siginfo_t *from)
->>   		err |= __put_user(from->si_uid, &to->si_uid);
->>   		err |= __put_user((compat_uptr_t)(unsigned long)from->si_ptr, &to->si_ptr);
->>   		break;
->> +#ifdef __ARCH_SIGSYS
->> +	case __SI_SYS:
->> +		err |= __put_user((compat_uptr_t)(unsigned long)
->> +				from->si_call_addr, &to->si_call_addr);
->> +		err |= __put_user(from->si_syscall, &to->si_syscall);
->> +		err |= __put_user(from->si_arch, &to->si_arch);
->> +		break;
->> +#endif
->
-> I think you should drop this #ifdef. We care about whether arch/arm/ defines
-> __ARCH_SIGSYS, not whether arm64 defines it (they both happen to define it
-> anyway).
+Hi Iain, Russell and Fabio,
 
-Thanks. Done
+> The config is attached. Note that there's a lot of additional stuff enabled as
+> I'm aiming for a single general purpose kernel that covers i.MX6, AM3359,
+> Allwinner A10/A20 along with several versions of boards using those
+> particular SoCs.
+> 
+> Same kernel binary on all the boards I've tried this on, only real differences
+> will be the devicetree and u-boot
 
--Takahiro AKASHI
+Amazingly we have been able to run a complete nightly test on eight i.MX6
+boards without hickups using Iain's config! We had to modify it slightly to get
+it to boot, please find attached patch and Iain's patched config.
 
-> Will
->
+On Russell's suggestion we also began to disable flow control on the machines.
+However it did not seem to make a difference because all our Zynq cards
+stalled during the same test run (using our own Zynq config).
+
+Iain's config seems promising and we will continue to run tests during the
+next couple of days. We will also try to adapt Iain's config to our Zynq board.
+
+Many thanks for all suggestions, patches and configs so far!
+
+Best regards,
+Mattis Lorentzon
+
+***************************************************************
+Consider the environment before printing this message.
+
+To read Autoliv's Information and Confidentiality Notice, follow this link:
+http://www.autoliv.com/disclaimer.html
+***************************************************************
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: config.patch
+Type: application/octet-stream
+Size: 692 bytes
+Desc: config.patch
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140827/44ff0458/attachment-0001.obj>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: config.gz
+Type: application/x-gzip
+Size: 23527 bytes
+Desc: config.gz
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140827/44ff0458/attachment-0001.bin>
