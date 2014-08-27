@@ -1,64 +1,76 @@
-From: eric.auger@linaro.org (Eric Auger)
-Date: Wed, 27 Aug 2014 17:24:26 +0200
-Subject: [RFC 9/9] KVM: KVM_VFIO: ARM: implement irq forwarding control
-In-Reply-To: <1409079769.2906.131.camel@ul30vt.home>
-References: <1408973264-30384-1-git-send-email-eric.auger@linaro.org>	
- <1408973264-30384-10-git-send-email-eric.auger@linaro.org>
- <1409079769.2906.131.camel@ul30vt.home>
-Message-ID: <53FDF82A.4090606@linaro.org>
+From: jassisinghbrar@gmail.com (Jassi Brar)
+Date: Wed, 27 Aug 2014 20:56:50 +0530
+Subject: [PATCH 1/2] ARM: LPAE: load upper bits of early TTBR0/TTBR1
+In-Reply-To: <CALYGNiOd+Dy-2q_woZ9UDbMO24q58jN1Nsq7E8cJMMg_YBK9pA@mail.gmail.com>
+References: <20140722153623.25088.37742.stgit@buzz>
+ <20140728181224.GN15536@arm.com>
+ <CALYGNiNrK1d32ecz4rw0sgn0GyN-M6hTBuTLGQV53Z4Br-bpYQ@mail.gmail.com>
+ <20140728184741.GT15536@arm.com>
+ <CALYGNiOd+Dy-2q_woZ9UDbMO24q58jN1Nsq7E8cJMMg_YBK9pA@mail.gmail.com>
+Message-ID: <CABb+yY17Y18oAivi_VxPJqDEGLTbEy_PfsdeK9jXWZ0iV3vZ=w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/26/2014 09:02 PM, Alex Williamson wrote:
-> On Mon, 2014-08-25 at 15:27 +0200, Eric Auger wrote:
->> Implements ARM specific KVM-VFIO device group commands:
->> - KVM_DEV_VFIO_DEVICE_ASSIGN_IRQ
->> - KVM_DEV_VFIO_DEVICE_DEASSIGN_IRQ
->> capability can be queried using KVM_HAS_DEVICE_ATTR.
+On Tue, Jul 29, 2014 at 5:59 PM, Konstantin Khlebnikov <koct9i@gmail.com> wrote:
+> On Mon, Jul 28, 2014 at 10:47 PM, Will Deacon <will.deacon@arm.com> wrote:
+>> On Mon, Jul 28, 2014 at 07:40:58PM +0100, Konstantin Khlebnikov wrote:
+>>> On Mon, Jul 28, 2014 at 10:12 PM, Will Deacon <will.deacon@arm.com> wrote:
+>>> > On Tue, Jul 22, 2014 at 04:36:23PM +0100, Konstantin Khlebnikov wrote:
+>>> >> This patch fixes booting when idmap pgd lays above 4gb. Commit
+>>> >> 4756dcbfd37 mostly had fixed this, but it'd failed to load upper bits.
+>>> >>
+>>> >> Also this fixes adding TTBR1_OFFSET to TTRR1: if lower part overflows
+>>> >> carry flag must be added to the upper part.
+>>> >>
+>>> >> Signed-off-by: Konstantin Khlebnikov <k.khlebnikov@samsung.com>
+>>> >> Cc: Cyril Chemparathy <cyril@ti.com>
+>>> >> Cc: Vitaly Andrianov <vitalya@ti.com>
+>>> >> ---
+>>> >>  arch/arm/mm/proc-v7-3level.S |    7 +++----
+>>> >>  1 file changed, 3 insertions(+), 4 deletions(-)
+>>> >>
+>>> >> diff --git a/arch/arm/mm/proc-v7-3level.S b/arch/arm/mm/proc-v7-3level.S
+>>> >> index 22e3ad6..f0481dd 100644
+>>> >> --- a/arch/arm/mm/proc-v7-3level.S
+>>> >> +++ b/arch/arm/mm/proc-v7-3level.S
+>>> >> @@ -140,12 +140,11 @@ ENDPROC(cpu_v7_set_pte_ext)
+>>> >>       mov     \tmp, \ttbr1, lsr #(32 - ARCH_PGD_SHIFT)        @ upper bits
+>>> >>       mov     \ttbr1, \ttbr1, lsl #ARCH_PGD_SHIFT             @ lower bits
+>>> >>       addls   \ttbr1, \ttbr1, #TTBR1_OFFSET
+>>> >> -     mcrr    p15, 1, \ttbr1, \zero, c2                       @ load TTBR1
+>>> >> +     adcls   \tmp, \tmp, #0
+>>> >> +     mcrr    p15, 1, \ttbr1, \tmp, c2                        @ load TTBR1
+>>> >>       mov     \tmp, \ttbr0, lsr #(32 - ARCH_PGD_SHIFT)        @ upper bits
+>>> >>       mov     \ttbr0, \ttbr0, lsl #ARCH_PGD_SHIFT             @ lower bits
+>>> >> -     mcrr    p15, 0, \ttbr0, \zero, c2                       @ load TTBR0
+>>> >> -     mcrr    p15, 1, \ttbr1, \zero, c2                       @ load TTBR1
+>>> >> -     mcrr    p15, 0, \ttbr0, \zero, c2                       @ load TTBR0
+>>> >> +     mcrr    p15, 0, \ttbr0, \tmp, c2                        @ load TTBR0
+>>> >
+>>> > I must admit, the code you are removing here looks really strange. Was there
+>>> > a badly resolved conflict somewhere along the way? It would be nice to see
+>>> > if your fix (which seems ok to me) was actually present in the mailing list
+>>> > posting of the patch that ended in the above mess.
+>>>
+>>> Nope, no merge conflicts, source in original patch
+>>> https://lkml.org/lkml/2012/9/11/346
+>>>
+>>> That mess completely harmless, this code is used only once on boot.
+>>> I don't have that email, so replying isn't trivial for me.
 >>
->> The new commands enable to set IRQ forwarding on/off for a given
->> IRQ index of a VFIO platform device.
+>> How bizarre. Also, Cyril doesn't work for TI anymore (his email is
+>> bouncing), so it's tricky to know what he meant here.
 >>
->> as soon as a forwarded irq is set, a reference to the VFIO device
->> is taken by the kvm-vfio device.
->>
->> The kvm-vfio device stores in the kvm_vfio_arch_data the list
->> of "assigned" devices (kvm_vfio_device). Each kvm_vfio_device
->> stores the list of assigned IRQs (potentially allowed a subset of
->> IRQ to be forwarded)
->>
->> The kvm-vfio device programs both the GIC and vGIC. Also it
->> clears the active bit on destruction, in case the guest did not
->> do it itself.
->>
->> Changing the forwarded state is not allowed in the critical
->> section starting from VFIO IRQ handler to LR programming. It is
->> up to the client to take care of this.
->>
->> Signed-off-by: Eric Auger <eric.auger@linaro.org>
->> ---
->>  arch/arm/include/asm/kvm_host.h |   2 +
->>  arch/arm/kvm/Makefile           |   2 +-
->>  arch/arm/kvm/kvm_vfio_arm.c     | 599 ++++++++++++++++++++++++++++++++++++++++
->>  3 files changed, 602 insertions(+), 1 deletion(-)
->>  create mode 100644 arch/arm/kvm/kvm_vfio_arm.c
-> 
-> I'm really happy that it seems like the kvm-vfio device is going to work
-> for you, but I think too much stuff is being pushed out to arch code
-> here.  Exporting the interfaces in patches 7 & 8 are setting the stage
-> for duplicate code for anyone wanting to implement device attributes.
-> Instead, I think the core code should support the list of
-> kvm_vfio_devices with proper cleanup, and we should attempt to access
-> the kvm_vfio_ callbacks as little as possible from arch code.  Thanks,
+>> Your patch looks better than what we currently have though. Have you managed
+>> to test it on a keystone platform (I don't have one)?
+>
+> No, I don't have it too. As well as I don't have direct access to the
+> platform where
+> problem was found. I've debugged this in patched qemu.
+>
+It seems the patch wasn't tested on any real platform, I did on my
+CA15 based platform - it breaks boot. Simply reverting the patch gets
+it going again. I am happy to try any fix.
 
-OK. my next iteration will feature much more generic code.
-
-Thanks for the review
-
-Best Regards
-
-Eric
-
-> 
-> Alex
-> 
+Thanks
+Jassi
