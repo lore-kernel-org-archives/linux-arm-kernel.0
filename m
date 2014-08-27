@@ -1,33 +1,29 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Wed, 27 Aug 2014 15:12:35 -0700
-Subject: [GIT PULL] ARM: imx: fixes for 3.17, 2nd take
-In-Reply-To: <20140827055110.GB28777@dragon>
-References: <20140827055110.GB28777@dragon>
-Message-ID: <20140827221235.GC13392@localhost>
+Date: Wed, 27 Aug 2014 15:13:06 -0700
+Subject: [PATCH RESEND] MAINTAINERS: catch special Rockchip code locations
+In-Reply-To: <3644024.F4LLe7dWA4@diego>
+References: <3644024.F4LLe7dWA4@diego>
+Message-ID: <20140827221306.GD13392@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 27, 2014 at 01:51:12PM +0800, Shawn Guo wrote:
-> The following changes since commit 3bc4d037c6791c5089a04845995410aac4fdb514:
+On Wed, Aug 27, 2014 at 12:05:50AM +0200, Heiko St?bner wrote:
+> Add some more locations that aren't catched by the general wildcard.
+> This includes the devicetree files, clock directory, rk3x i2c driver,
+> everything in a third layer under drivers like iio/adc/rockchip_saradc.c
+> and the i2s driver.
 > 
->   ARM: dts: imx6sx: fix the pad setting for uart CTS_B (2014-08-19 20:06:59 +0800)
+> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+> ---
+> Main reason behind this, is that I only accidentially stumbled over the
+> clock api refactoring series [0] from Toneu Vizoso, wheras with the
+> better matching it should've been automatic.
 > 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git tags/imx-fixes-3.17-2
-> 
-> for you to fetch changes up to bf8147208eab4a026558dcd686f76410de6c1643:
-> 
->   ARM: dts: microsom-ar8035: MDIO pad must be set open drain (2014-08-27 13:32:26 +0800)
-> 
-> ----------------------------------------------------------------
-> i.MX fixes for 3.17, 2nd take:
->  - Fixes suspend/resume issue on imx53-qsrb due to PMIC IRQ pin
->    configuration missing
->  - A couple small SolidRun board fixes/correction from Rabeeh
->    and Russell
+> [0] https://lkml.org/lkml/2014/8/18/481
 
-Merged, thanks.
+Applied for 3.17.
 
+
+Thanks,
 
 -Olof
