@@ -1,43 +1,86 @@
-From: zhangfei.gao@linaro.org (zhangfei)
-Date: Wed, 27 Aug 2014 16:49:59 +0800
-Subject: [PATCH v2 2/3] rc: Introduce hix5hd2 IR transmitter driver
-In-Reply-To: <20140821100739.GA3252@gofer.mess.org>
-References: <1408613086-12538-1-git-send-email-zhangfei.gao@linaro.org>
- <1408613086-12538-3-git-send-email-zhangfei.gao@linaro.org>
- <20140821100739.GA3252@gofer.mess.org>
-Message-ID: <53FD9BB7.6080207@linaro.org>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 27 Aug 2014 09:54:42 +0100
+Subject: [PATH V2 1/6] mm: Introduce a general RCU get_user_pages_fast.
+In-Reply-To: <1408635812-31584-2-git-send-email-steve.capper@linaro.org>
+References: <1408635812-31584-1-git-send-email-steve.capper@linaro.org>
+ <1408635812-31584-2-git-send-email-steve.capper@linaro.org>
+Message-ID: <20140827085442.GD16376@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Steve,
 
+A few minor comments (took me a while to understand how this works, so I
+thought I'd make some noise :)
 
-On 08/21/2014 06:07 PM, Sean Young wrote:
-> On Thu, Aug 21, 2014 at 05:24:44PM +0800, Zhangfei Gao wrote:
->> From: Guoxiong Yan <yanguoxiong@huawei.com>
+On Thu, Aug 21, 2014 at 04:43:27PM +0100, Steve Capper wrote:
+> get_user_pages_fast attempts to pin user pages by walking the page
+> tables directly and avoids taking locks. Thus the walker needs to be
+> protected from page table pages being freed from under it, and needs
+> to block any THP splits.
+> 
+> One way to achieve this is to have the walker disable interrupts, and
+> rely on IPIs from the TLB flushing code blocking before the page table
+> pages are freed.
+> 
+> On some platforms we have hardware broadcast of TLB invalidations, thus
+> the TLB flushing code doesn't necessarily need to broadcast IPIs; and
+> spuriously broadcasting IPIs can hurt system performance if done too
+> often.
+> 
+> This problem has been solved on PowerPC and Sparc by batching up page
+> table pages belonging to more than one mm_user, then scheduling an
+> rcu_sched callback to free the pages. This RCU page table free logic
+> has been promoted to core code and is activated when one enables
+> HAVE_RCU_TABLE_FREE. Unfortunately, these architectures implement
+> their own get_user_pages_fast routines.
+> 
+> The RCU page table free logic coupled with a an IPI broadcast on THP
+> split (which is a rare event), allows one to protect a page table
+> walker by merely disabling the interrupts during the walk.
 
->> +	rdev->driver_type = RC_DRIVER_IR_RAW;
->> +	rdev->allowed_protocols = RC_BIT_ALL;
->> +	rdev->priv = priv;
->> +	rdev->open = hix5hd2_ir_open;
->> +	rdev->close = hix5hd2_ir_close;
->> +	rdev->driver_name = IR_HIX5HD2_NAME;
->> +	rdev->map_name = RC_MAP_LIRC;
->
-> I'm not sure RC_MAP_LIRC is appropriate. If the hardware has no implicit
-> remote, can this be stored in device tree like the sunxi-cir.c driver does?
+Disabling interrupts isn't completely free (it's a self-synchronising
+operation on ARM). It would be interesting to see if your futex workload
+performance is improved by my simple irq_save optimisation for ARM:
 
-OK? got it.
-Will set optional property "linux,rc-map-name" for the map_name.
-We usually use user space lirc decoder, so this optional property may 
-not need to be set in dts.
+  https://git.kernel.org/cgit/linux/kernel/git/will/linux.git/commit/?h=misc-patches&id=312a70adfa6f22e9d62803dd21400f481253e58b
 
->
->> +	rdev->input_name = "Hisilicon hix5hd2 Remote Control Receiver";
->
-> It would be useful is rdev->input_phys, rdev->input_id,
-> rdev->timeout, rdev->rx_resolution are set correctly.
+(I've been struggling to show anything other than tiny improvements from
+that patch).
 
-OK, will set rdev->timeout, rdev->rx_resolution
-Not sure the usage of rdev->input_id, why is it required?
+> This patch provides a general RCU implementation of get_user_pages_fast
+> that can be used by architectures that perform hardware broadcast of
+> TLB invalidations.
+> 
+> It is based heavily on the PowerPC implementation by Nick Piggin.
 
-Thanks for the suggestion.
+[...]
+
+> diff --git a/mm/gup.c b/mm/gup.c
+> index 91d044b..2f684fa 100644
+> --- a/mm/gup.c
+> +++ b/mm/gup.c
+> @@ -10,6 +10,10 @@
+>  #include <linux/swap.h>
+>  #include <linux/swapops.h>
+>  
+> +#include <linux/sched.h>
+> +#include <linux/rwsem.h>
+> +#include <asm/pgtable.h>
+> +
+>  #include "internal.h"
+>  
+>  static struct page *no_page_table(struct vm_area_struct *vma,
+> @@ -672,3 +676,277 @@ struct page *get_dump_page(unsigned long addr)
+>  	return page;
+>  }
+>  #endif /* CONFIG_ELF_CORE */
+> +
+> +#ifdef CONFIG_HAVE_RCU_GUP
+> +
+> +#ifdef __HAVE_ARCH_PTE_SPECIAL
+
+Do we actually require this (pte special) if hugepages are disabled or
+not supported?
+
+Will
