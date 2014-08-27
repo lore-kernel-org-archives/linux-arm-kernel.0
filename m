@@ -1,91 +1,100 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Wed, 27 Aug 2014 14:10:13 +0200
-Subject: [PATCH 01/14] clk: samsung: add support for 145xx and 1460x PLLs
-In-Reply-To: <1409132889-2080-1-git-send-email-ch.naveen@samsung.com>
-References: <1409132889-2080-1-git-send-email-ch.naveen@samsung.com>
-Message-ID: <53FDCAA5.1080302@samsung.com>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Wed, 27 Aug 2014 14:23:48 +0200 (CEST)
+Subject: [RESEND PATCH v2 1/4] irqchip: gic: Change irq type check when
+ extension is present
+In-Reply-To: <53FDB4B3.6000400@arm.com>
+References: <1407895884-18131-1-git-send-email-srv_yingjoe.chen@mediatek.com>
+ <1407895884-18131-2-git-send-email-srv_yingjoe.chen@mediatek.com>
+ <53F724F5.3040004@arm.com>
+ <1409133344.25382.37.camel@coredoba.hi.pengutronix.de>
+ <53FDB4B3.6000400@arm.com>
+Message-ID: <alpine.DEB.2.10.1408271347210.3323@nanos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27.08.2014 11:48, Naveen Krishna Chatradhi wrote:
-> By registers bits and offsets the 145xx PLL is similar to
-> pll_type "pll_35xx". Also, 1460x PLL is similar to pll_type
-> "pll_46xx".
+On Wed, 27 Aug 2014, Marc Zyngier wrote:
+> > As in the DT the actual IRQ polarity should be used, simply configuring
+> > the HW IRQ polarity in the bootloader is not enough without telling the
+> > GIC driver which polarity is supported on which IRQ, right?
 > 
-> Hence, reusing the functions defined for pll_35xx and pll_46xx
-> to support 145xx and 1460x PLLs respectively.
+> Looking a bit closer at things, what you describe in DT is the IRQ
+> polarity the interrupt controller sees. Nothing else should interpret
+> that field.
+> 
+> So it is legal (IMO) to have a device with an interrupt specifier
+> describing a rising edge interrupt, and yet have the device generating a
+> falling edge, with Mediatek's special sauce doing the conversion in between.
+> 
+> Something will have to configure the polarity widget though, but that
+> can be left outside of the GIC.
 
-[snip]
+This seems to become a popular topic and it looks like the whole GIC
+extension thing is going to explode sooner than later.
 
-> @@ -139,6 +140,7 @@ static const struct clk_ops samsung_pll3000_clk_ops = {
->  #define PLL35XX_PDIV_SHIFT      (8)
->  #define PLL35XX_SDIV_SHIFT      (0)
->  #define PLL35XX_LOCK_STAT_SHIFT	(29)
-> +#define PLL145XX_ENABLE		BIT(31)
+We are currently discussing hierarchical irq domains to solve a
+different issue in x86 land. See the related discussion here:
 
-The same bit is also present in PLL35XX.
+	  https://lkml.org/lkml/2014/8/1/67
 
->  
->  static unsigned long samsung_pll35xx_recalc_rate(struct clk_hw *hw,
->  				unsigned long parent_rate)
-> @@ -186,6 +188,10 @@ static int samsung_pll35xx_set_rate(struct clk_hw *hw, unsigned long drate,
->  
->  	tmp = __raw_readl(pll->con_reg);
->  
-> +	/* Enable PLL */
-> +	if (pll->type == (pll_1450x || pll_1451x || pll_1452x))
-> +		tmp |= PLL145XX_ENABLE;
+Now looking at these GIC plus extra sauce problems, I wonder whether
+this wouldn't be solvable in a similar way. If you look at it from the
+HW perspective you have:
 
-I believe that the need to enable the PLL is not really specific to
-pll_145xx. Any PLL which is initially disabled, should be enabled before
-trying to wait until it stabilizes.
+   ---------      ---------
+---| MAGIC |------|ARM GIC|
+---|       |------|       |
+---|       |------|       |
+---|       |------|       |
+---|       |------|       |
+   ---------      ---------
 
-> +
->  	if (!(samsung_pll35xx_mp_change(rate, tmp))) {
->  		/* If only s change, change just s value only*/
->  		tmp &= ~(PLL35XX_SDIV_MASK << PLL35XX_SDIV_SHIFT);
-> @@ -196,8 +202,12 @@ static int samsung_pll35xx_set_rate(struct clk_hw *hw, unsigned long drate,
->  	}
->  
->  	/* Set PLL lock time. */
-> -	__raw_writel(rate->pdiv * PLL35XX_LOCK_FACTOR,
-> -			pll->lock_reg);
-> +	if (pll->type == (pll_1450x || pll_1451x || pll_1452x))
-> +		__raw_writel(rate->pdiv * PLL145XX_LOCK_FACTOR,
-> +				pll->lock_reg);
+The MAGIC interrupt controller only provides functionality which is
+not available from the ARM architected GIC but maps 1:1 to the ARM GIC
+interrupt lines. So it looks like a variation to the more dynamic
+mapping of MSI -> Remap -> CPU-Vector problem we need to solve on x86.
 
-If we already have lock_reg in pll, then maybe lock_factor could be
-added there too and this code simply parametrized?
+The idea is to have two irq domains: magic_domain and armgic_domain.
 
-> +	else
-> +		__raw_writel(rate->pdiv * PLL35XX_LOCK_FACTOR,
-> +				pll->lock_reg);
->  
->  	/* Change PLL PMS values */
->  	tmp &= ~((PLL35XX_MDIV_MASK << PLL35XX_MDIV_SHIFT) |
-> @@ -356,7 +366,6 @@ static const struct clk_ops samsung_pll36xx_clk_min_ops = {
->  
->  #define PLL45XX_ENABLE		BIT(31)
->  #define PLL45XX_LOCKED		BIT(29)
-> -
+The magic_domain is the frontend facing the devices and the
+armgic_domain is the parent domain. This is also reflected in
+hierarchical data structures, i.e. irq_desc->irq_data will get a new
+field parent_data, which points to the irq_data of the parent
+interrupt controller, which is allocated separately when the interrupt
+line is instantiated.
 
-Stray change?
+So in the above case the hotpath ack/eoi functions of the irq chip
+associated to the device interrupt, i.e. magic_chip, would do:
 
->  static unsigned long samsung_pll45xx_recalc_rate(struct clk_hw *hw,
->  				unsigned long parent_rate)
->  {
+irq_ack(struct irq_data *d)
+{
+	struct irq_data *pd = d->parent_data;
 
-[snip]
+	pd->chip->irq_ack(pd);
+}
 
-> @@ -573,14 +588,23 @@ static int samsung_pll46xx_set_rate(struct clk_hw *hw, unsigned long drate,
->  		lock = 0xffff;
->  
->  	/* Set PLL PMS and VSEL values. */
-> -	con0 &= ~((PLL46XX_MDIV_MASK << PLL46XX_MDIV_SHIFT) |
-> +	if (pll->type == pll_1460x) {
-> +		con0 &= ~((PLL46XX_MDIV_MASK << PLL46XX_MDIV_SHIFT) |
+Granted, that's another level of indirection, but this is going to be
+more efficient than a boatload of conditional hooks in the GIC code
+proper. Not to talk about the maintainability of the whole maze.
 
-Shouldn't PLL1460X_MDIV_MASK be used here instead?
+The irq_set_type() function would do:
 
-Best regards,
-Tomasz
+irq_set_type(struct irq_data *d, int type)
+{
+	struct irq_data *pd = d->parent_data;
+
+	gic_type = set_magic_chip_type(d, type);
+
+	return pd->chip->irq_set_type(d, gic_type);
+}
+
+Switching to this allows to completely avoid the gazillion of hooks in
+the gic code and should work nicely with multiplatform kernels by
+simpling hooking up the domain parent relation ship to the proper
+magic domain or leave the armgic as the direct device interface in
+case the SoC does not have the magic chip in front of the arm gic.
+
+Thoughts?
+
+Thanks,
+
+	tglx
