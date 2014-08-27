@@ -1,60 +1,28 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Wed, 27 Aug 2014 23:44:56 +0200
-Subject: [PATCH 1/2] ARM: dts: rockchip: add hym8563 rtc to Radxa Rock
- board
-In-Reply-To: <2306550.nl6CA81PdX@phil>
-References: <2306550.nl6CA81PdX@phil>
-Message-ID: <6745529.KGldgCPX1B@diego>
+From: luto@amacapital.net (Andy Lutomirski)
+Date: Wed, 27 Aug 2014 14:42:41 -0700
+Subject: [PATCH v9 0/6] ARM: VDSO
+In-Reply-To: <53FE4448.9070708@codeaurora.org>
+References: <1408744351-7814-1-git-send-email-nathan_lynch@mentor.com>
+ <53FE4448.9070708@codeaurora.org>
+Message-ID: <CALCETrULQ2y1z7FzXw7xHAk0Kv4M1_=0WBQvC219Mb9A6Tu=YQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Mittwoch, 20. August 2014, 21:07:22 schrieb Heiko St?bner:
-> The Radxa Rock uses a hym8563 as rtc. Add the i2c device and necessary
-> pinconfig for the interrupt pin - labeled rtc_int in the schematics.
-> 
-> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+On Wed, Aug 27, 2014 at 1:49 PM, Christopher Covington
+<cov@codeaurora.org> wrote:
+> It appears to me that there is code in several architecture subdirectories
+> (I'm aware of x86, arm64, and with these patches arm[32] and I would be
+> surprised if there weren't more) doing largely the same setup of special
+> mappings at randomized offsets, checking ELF magic etc. Not that these patches
+> should necessarily do it, but is there a reasonable amount of consolidation
+> that could be done, or am I underestimating how much of this really does vary
+> per architecture?
+>
 
-Added both patches to my v3.18-next/dts branch.
+There's certainly code that could be consolidated, but it would be a
+decently large project.
 
+Some day, I'd like to see everyone use vdso2c, but it needs to stop
+knowing that it's targetting x86 for that to happen.
 
-> ---
-> if nobody complains I'll queue this into my v3.18-next/dts branch
-> 
->  arch/arm/boot/dts/rk3188-radxarock.dts | 17 +++++++++++++++++
->  1 file changed, 17 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/rk3188-radxarock.dts
-> b/arch/arm/boot/dts/rk3188-radxarock.dts index ef72faf..ff35acfa 100644
-> --- a/arch/arm/boot/dts/rk3188-radxarock.dts
-> +++ b/arch/arm/boot/dts/rk3188-radxarock.dts
-> @@ -80,6 +80,17 @@
->  	status = "okay";
->  	clock-frequency = <400000>;
-> 
-> +	rtc at 51 {
-> +		compatible = "haoyu,hym8563";
-> +		reg = <0x51>;
-> +		interrupt-parent = <&gpio0>;
-> +		interrupts = <13 IRQ_TYPE_EDGE_FALLING>;
-> +		pinctrl-names = "default";
-> +		pinctrl-0 = <&rtc_int>;
-> +		#clock-cells = <0>;
-> +		clock-output-names = "xin32k";
-> +	};
-> +
->  	act8846: act8846 at 5a {
->  		compatible = "active-semi,act8846";
->  		reg = <0x5a>;
-> @@ -196,6 +207,12 @@
->  		};
->  	};
-> 
-> +	hym8563 {
-> +		rtc_int: rtc-int {
-> +			rockchip,pins = <RK_GPIO0 0 RK_FUNC_GPIO &pcfg_pull_up>;
-> +		};
-> +	};
-> +
->  	ir-receiver {
->  		ir_recv_pin: ir-recv-pin {
->  			rockchip,pins = <RK_GPIO0 10 RK_FUNC_GPIO &pcfg_pull_none>;
+--Andy
