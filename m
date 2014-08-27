@@ -1,114 +1,75 @@
-From: achandran@mvista.com (Arun Chandran)
-Date: Wed, 27 Aug 2014 15:58:34 +0530
-Subject: [RFC PATCH] Arm64: introduce __hyp_func_call
-Message-ID: <1409135314-27266-1-git-send-email-achandran@mvista.com>
+From: grant.likely@linaro.org (Grant Likely)
+Date: Wed, 27 Aug 2014 11:34:32 +0100
+Subject: [RFC PATCH 0/9] dt: dependencies (for deterministic driver
+ initialization order based on the DT)
+In-Reply-To: <20140826101107.GC32315@leverpostej>
+References: <20140514141914.446F7C4153D@trevor.secretlab.ca>
+ <20140821140211.GD19293@ulmo.nvidia.com> <53F64624.5000403@ahsoftware.de>
+ <20140822131919.GX21734@leverpostej> <20140825093931.GB2399@ulmo>
+ <E1XLu15-0002DP-6o@jdl.com> <20140825133714.GH4163@ulmo.nvidia.com>
+ <20140826084208.AE5F0C40989@trevor.secretlab.ca>
+ <20140826084922.GG17263@ulmo> <53FC566C.30904@ahsoftware.de>
+ <20140826101107.GC32315@leverpostej>
+Message-ID: <20140827103432.64927C409CB@trevor.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds a mechanism to __hyp_stub_vectors to allow a hypercall to
-call a function at EL2. It is needed for users who want to
-run a part of code with EL2 permissions. The current usecase is for
-KVM and kexec.
+On Tue, 26 Aug 2014 11:11:07 +0100, Mark Rutland <mark.rutland@arm.com> wrote:
+> On Tue, Aug 26, 2014 at 10:42:04AM +0100, Alexander Holler wrote:
+> > Am 26.08.2014 10:49, schrieb Thierry Reding:
+> > > On Tue, Aug 26, 2014 at 09:42:08AM +0100, Grant Likely wrote:
+> > >> On Mon, 25 Aug 2014 15:37:16 +0200, Thierry Reding <thierry.reding@gmail.com> wrote:
+> > > [...]
+> > >>> There are somewhat standardized bindings for the above and especially
+> > >>> for bindings of the type that clocks implement this is trivial. We can
+> > >>> simply iterate over each (phandle, specifier) tuple and check that the
+> > >>> corresponding clock provider can be resolved (which typically means that
+> > >>> it's been registered with the common clock framework).
+> > >>>
+> > >>> For regulators (and regulator-like bindings) the problem is somewhat
+> > >>> more difficult because they property names are not standardized. One way
+> > >>> to solve this would be to look for property names with a -supply suffix,
+> > >>> but that could obviously lead to false positives. One alternative that I
+> > >>> think could eliminate this would be to explicitly list dependencies in
+> > >>> drivers. This would allow core code to step through such a list and
+> > >>> resolve the (phandle, specifier) tuples.
+> > >>
+> > >> False positives and negatives may not actually be a problem. It is
+> > >> suboptimal, certainly, but it shouldn't outright break the kernel.
+> > >
+> > > There could be cases where some random integer in a cell could be
+> > > interpreted as a phandle and resolve to a struct device_node. I suppose
+> > > it might be unlikely, but not impossible, that the device_node could
+> > > even match a device in the correct subsystem and you'd get a wrong
+> > > dependency. Granted, a wrong dependency may not be catastrophic in that
+> > > it won't lead to a crash, but it could lead to various kinds of
+> > > weirdness and hard to diagnose problems.
+> > 
+> > You need either the type information in the DTB (that's why I've add 
+> > those "dependencies" to identify phandles), or you need to know every 
+> > binding (at "dependency-resolve-time" to identify phandles.
+> 
+> While having type information in the DTB would be fantastic, it's not
+> something we can expect from the systems already in the wild, and I
+> worry how it would interact with bootloaders that modify the DTB (I
+> don't know if any modify properties with phandles).
 
-For kexec we need to move the final CPU up to the mode it started
-in before we branch to the new kernel. If we don't do that
+Anything we do here is firmly in the realm of optimization and
+improvement. Adding data to the tree is fine as long as we don't make
+the kernel depend on it. Older platforms will continue to work without
+the optimization.
 
-* We loose EL2 in the next boot
-* Arm64 bootwrapper may not be able to put CPUs at the spin-table
-  code. It expects the final jump from kernel to cpu-return-addr to be
-  done in EL2.
+> > The latter is impracticable to implement in a generic way (for use
+> > with every possible binding).
+> 
+> I don't think we necessarily need dependency information for every
+> binding and driver. We only need dependency information where a device
+> has a dependency on another device and we don't currently have an
+> explicit probe ordering guaranteed by Linux.
+> 
+> Where a device driver lacks dependency information and fails to probe,
+> we can fall back to the current deferred probing.
 
-KVM can use this to set/get VBAR_EL2
+Exactly.
 
-Signed-off-by: Arun Chandran <achandran@mvista.com>
----
-Idea is from "Mark Rutland <mark.rutland@arm.com>"
-http://lists.infradead.org/pipermail/linux-arm-kernel/2014-August/280026.html
----
- arch/arm64/include/asm/virt.h |   15 +++++++++++++++
- arch/arm64/kernel/hyp-stub.S  |   33 +++++++++++++++++++++------------
- 2 files changed, 36 insertions(+), 12 deletions(-)
-
-diff --git a/arch/arm64/include/asm/virt.h b/arch/arm64/include/asm/virt.h
-index 7a5df52..910a163 100644
---- a/arch/arm64/include/asm/virt.h
-+++ b/arch/arm64/include/asm/virt.h
-@@ -34,9 +34,24 @@
-  */
- extern u32 __boot_cpu_mode[2];
- 
-+void *__hyp_func_call(u64 __tmp, phys_addr_t func, ...);
- void __hyp_set_vectors(phys_addr_t phys_vector_base);
- phys_addr_t __hyp_get_vectors(void);
- 
-+#define __hyp_set_vectors(__vbase)					    \
-+({									    \
-+	u64 __tmp = 0;							    \
-+	__hyp_func_call(__tmp, virt_to_phys(__hyp_set_vectors), __vbase);   \
-+})
-+
-+#define __hyp_get_vectors()						    \
-+({									    \
-+	u64 __tmp = 0;							    \
-+	phys_addr_t ret = (phys_addr_t) __hyp_func_call(__tmp,		    \
-+					virt_to_phys(__hyp_get_vectors));   \
-+	ret;								    \
-+})
-+
- /* Reports the availability of HYP mode */
- static inline bool is_hyp_mode_available(void)
- {
-diff --git a/arch/arm64/kernel/hyp-stub.S b/arch/arm64/kernel/hyp-stub.S
-index a272f33..2144a3f 100644
---- a/arch/arm64/kernel/hyp-stub.S
-+++ b/arch/arm64/kernel/hyp-stub.S
-@@ -53,15 +53,14 @@ ENDPROC(__hyp_stub_vectors)
- 	.align 11
- 
- el1_sync:
--	mrs	x1, esr_el2
--	lsr	x1, x1, #26
--	cmp	x1, #0x16
-+	mrs	x0, esr_el2
-+	lsr	x0, x0, #26
-+	cmp	x0, #0x16
- 	b.ne	2f				// Not an HVC trap
--	cbz	x0, 1f
--	msr	vbar_el2, x0			// Set vbar_el2
--	b	2f
--1:	mrs	x0, vbar_el2			// Return vbar_el2
--2:	eret
-+
-+1:	blr	x1 				// Jump to the function
-+2:	mov	x0, xzr				// esr_el2 not readable <= el2
-+	eret
- ENDPROC(el1_sync)
- 
- .macro invalid_vector	label
-@@ -101,10 +100,20 @@ ENDPROC(\label)
-  */
- 
- ENTRY(__hyp_get_vectors)
--	mov	x0, xzr
--	// fall through
--ENTRY(__hyp_set_vectors)
--	hvc	#0
-+	mrs	x0, vbar_el2			// Return vbar_el2
- 	ret
- ENDPROC(__hyp_get_vectors)
-+
-+ENTRY(__hyp_set_vectors)
-+	msr	vbar_el2, x2
-+	ret
- ENDPROC(__hyp_set_vectors)
-+
-+/* Call a function @x1 */
-+ENTRY(__hyp_func_call)
-+	/* Save lr here */
-+	msr	elr_el1, x30
-+	hvc	#0
-+	mrs	x30, elr_el1
-+	ret
-+ENDPROC(__hyp_func_call)
--- 
-1.7.9.5
+g.
