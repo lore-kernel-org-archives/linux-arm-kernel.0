@@ -1,41 +1,63 @@
-From: abrestic@chromium.org (Andrew Bresticker)
-Date: Wed, 27 Aug 2014 09:36:33 -0700
-Subject: [PATCH v2 3/9] of: Update Tegra XUSB pad controller binding for
- USB
-In-Reply-To: <53FB8A8C.8040107@wwwdotorg.org>
-References: <1408381705-3623-1-git-send-email-abrestic@chromium.org>
- <1408381705-3623-4-git-send-email-abrestic@chromium.org>
- <53FB8A8C.8040107@wwwdotorg.org>
-Message-ID: <CAL1qeaGHuMegpeyumD8GrFRmeufkiiUygAdqu1ECHrfSkixwOQ@mail.gmail.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Wed, 27 Aug 2014 10:37:58 -0600
+Subject: [RFC PATCH 0/9] dt: dependencies (for deterministic driver
+ initialization order based on the DT)
+In-Reply-To: <53FE07BE.7000809@ahsoftware.de>
+References: <53F64624.5000403@ahsoftware.de>
+ <20140822131919.GX21734@leverpostej> <20140825093931.GB2399@ulmo>
+ <E1XLu15-0002DP-6o@jdl.com> <20140825133714.GH4163@ulmo.nvidia.com>
+ <20140826084208.AE5F0C40989@trevor.secretlab.ca>
+ <20140826084922.GG17263@ulmo> <53FC566C.30904@ahsoftware.de>
+ <20140826101107.GC32315@leverpostej>
+ <20140827103432.64927C409CB@trevor.secretlab.ca>
+ <20140827144403.GB13850@arm.com> <53FE05AE.9000406@wwwdotorg.org>
+ <53FE07BE.7000809@ahsoftware.de>
+Message-ID: <53FE0966.5020206@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 25, 2014 at 12:12 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
-> On 08/18/2014 11:08 AM, Andrew Bresticker wrote:
->>   - #phy-cells: Should be 1. The specifier is the index of the PHY to
->> reference.
->>     See <dt-bindings/pinctrl/pinctrl-tegra-xusb.h> for the list of valid
->> values.
->> +- mboxes: Must contain an entry for the XUSB PHY mailbox channel.
->> +  See ../mailbox/mailbox.txt for details.
+On 08/27/2014 10:30 AM, Alexander Holler wrote:
+> Am 27.08.2014 18:22, schrieb Stephen Warren:
+>> On 08/27/2014 08:44 AM, Catalin Marinas wrote:
 >
+>>> It's not just optimisation but an important feature for new arm64 SoCs.
+>>> Given some Tegra discussions recently, in many cases the machine_desc
+>>> use on arm is primarily to initialise devices in the right order. If we
+>>> can solve this in a more deterministic way (other than deferred
+>>> probing), we avoid the need for a dedicated SoC platform driver (or
+>>> machine_desc) or workarounds like different initcall levels and explicit
+>>> DT parsing.
+>>
+>> A lot of the ordering is SW driver dependencies. I'm not sure how much
+>> of that can accurately be claimed as HW dependencies. As such, I'm not
+>> sure that putting dependencies into DT would be a good idea; it doesn't
+>> feel like HW data, and might well change if we restructure SW. It'd need
+>> some detailed research though.
 >
-> Can we require the mbox-names property here, so that everything is looked up
-> by names. I know that the proposed mbox binding states that using indexes is
-> preferred over names, but that's just silly considering that names are
-> widely used in most other similar bindings, and are much easier to extend in
-> a backwards compatible fashion in the face of optional entries. As such, I'd
-> prefer that all Tegra bindings use foo-names properties where they exist.
+> Almost every phandle is a dependency, so the DT is already full with them.
 
-Sure, will do.
+That's true, but not entirely relevant.
 
->> +Optional properties:
->> +-------------------
->> +- vbus-otg-{0,1,2}-supply: VBUS regulator for the corresponding UTMI pad.
->
->
-> Why "-otg"? It's quite possible to have a regulator for VBUS even on systems
-> that don't support OTG, but rather simply have the ability to turn VBUS off.
+phandles in DT should only be present where there's an obvious HW 
+dependency. It's obvious that, for example, there's a real HW dependency 
+between an IRQ controller and a device that has an IRQ signal fed into 
+the IRQ controller. It makes perfect sense to represent that as a 
+phandle (+args).
 
-Because they're the VBUS supplies for the OTG 'lanes'.  It doesn't
-really add anything, so I'll omit the "-otg".
+However, most of the ordering imposed by the Tegra machine descriptor 
+callbacks is nothing to do with this. It's more that the SW driver for 
+component X needs some low level data (e.g. SKU/fuse information) before 
+it can run. However, there's no real HW dependency between the HW 
+component X and the fuse module. As such, it doesn't make sense to 
+represent such a dependency in DT, using a phandle or by any other means.
+
+Of course, there are probably cases where we could/should add some more 
+phandles/... and likewise cases where we shouldn't. That's why detailed 
+research is needed.
+
+Irrespective though, a new kernel needs to work against an old DT, so 
+always needs to work without any (of these new) dependencies being 
+represented in DT, since they aren't represented there today. So, I 
+think pushing the issue into DT is a non-starter either way, unless we 
+accept yet another ABI-breaking change, in which case we should just 
+give up on any claims of ABI and make everyone's lives simpler.
