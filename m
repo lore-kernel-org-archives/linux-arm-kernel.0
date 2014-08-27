@@ -1,156 +1,166 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 27 Aug 2014 11:42:31 +0100
-Subject: [PATCH 11/14] arm64: dts: Add initial device tree support for
- EXYNOS7
-In-Reply-To: <1409132660-1898-3-git-send-email-ch.naveen@samsung.com>
-References: <1409132660-1898-1-git-send-email-ch.naveen@samsung.com>
- <1409132660-1898-3-git-send-email-ch.naveen@samsung.com>
-Message-ID: <20140827104231.GB7773@leverpostej>
+From: ipaton0@gmail.com (Iain Paton)
+Date: Wed, 27 Aug 2014 11:43:21 +0100
+Subject: Oops: 17 SMP ARM (v3.16-rc2)
+In-Reply-To: <C4A61A5CA4AD2246942F4BA6F20ACB8043578CB2@ALVA-EXMB04.alv.autoliv.int>
+References: <20140626151424.GT32514@n2100.arm.linux.org.uk>
+ <20140806125550.GO30282@n2100.arm.linux.org.uk>
+ <C4A61A5CA4AD2246942F4BA6F20ACB804357526C@ALVA-EXMB04.alv.autoliv.int>
+ <20140807121248.GY30282@n2100.arm.linux.org.uk>
+ <20140808180900.GG30282@n2100.arm.linux.org.uk>
+ <C4A61A5CA4AD2246942F4BA6F20ACB8043576356@ALVA-EXMB04.alv.autoliv.int>
+ <CAOMZO5B8GR+ABBoJ=dJcFqw3Wagfaip7HM+C1FTz+aE4CmqiPw@mail.gmail.com>
+ <C4A61A5CA4AD2246942F4BA6F20ACB80435776D3@ALVA-EXMB04.alv.autoliv.int>
+ <CAOMZO5B7FgzB7ThVyV2Vk7wTwYgjRWjEnkkAN5uwwKMaBKq1yg@mail.gmail.com>
+ <C4A61A5CA4AD2246942F4BA6F20ACB8043577770@ALVA-EXMB04.alv.autoliv.int>
+ <53F11FF6.8030303@gmail.com>
+ <CAOMZO5CDvQDD7gVLFStwv4MPrUyqZE3sEDZwb0gukkXujYG-6Q@mail.gmail.com>
+ <53F2E89B.80009@gmail.com> <53F5BE3D.5070209@gmail.com>
+ <CAOMZO5A3CgaVCKxNDG-zEdwprYdRDXD_XZ2ikW+mns-iieYHsg@mail.gmail.com>
+ <53F71D1B.8090004@gmail.com>
+ <C4A61A5CA4AD2246942F4BA6F20ACB8043578CB2@ALVA-EXMB04.alv.autoliv.int>
+Message-ID: <53FDB649.2070506@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Naveen,
-
-On Wed, Aug 27, 2014 at 10:44:18AM +0100, Naveen Krishna Chatradhi wrote:
-> Add initial device tree nodes for EXYNOS7 SoC.
-> Also, includes the dt-binding definitions for clock ids.
-
-Fallout from a rebase? That latter part doesn't seem to be relevant.
-
-> Signed-off-by: Naveen Krishna Chatradhi <ch.naveen@samsung.com>
-> Cc: Thomas Abraham <thomas.ab@samsung.com>
-> Cc: Rob Herring <robh@kernel.org>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> ---
->  arch/arm64/boot/dts/exynos7.dtsi |  553 ++++++++++++++++++++++++++++++++++++++
->  1 file changed, 553 insertions(+)
->  create mode 100644 arch/arm64/boot/dts/exynos7.dtsi
+On 27/08/14 07:32, Mattis Lorentzon wrote:
+> Hi Iain, Russell and Fabio,
 > 
-> diff --git a/arch/arm64/boot/dts/exynos7.dtsi b/arch/arm64/boot/dts/exynos7.dtsi
-> new file mode 100644
-> index 0000000..6b9eaf4
-> --- /dev/null
-> +++ b/arch/arm64/boot/dts/exynos7.dtsi
-> @@ -0,0 +1,553 @@
-> +/*
-> + * SAMSUNG EXYNOS7 SoC device tree source
-> + *
-> + * Copyright (c) 2014 Samsung Electronics Co., Ltd.
-> + *             http://www.samsung.com
-> + *
-> + * SAMSUNG EXYNOS7 SoC device nodes are listed in this file.
-> + * EXYNOS7 based board files can include this file and provide
-> + * values for board specfic bindings.
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + */
-> +
-> +#include <dt-bindings/clock/exynos7-clk.h>
-> +
-> +/ {
-> +       compatible = "samsung,exynos7";
-> +       interrupt-parent = <&gic>;
-> +       #address-cells = <1>;
-> +       #size-cells = <1>;
+>> The config is attached. Note that there's a lot of additional stuff enabled as
+>> I'm aiming for a single general purpose kernel that covers i.MX6, AM3359,
+>> Allwinner A10/A20 along with several versions of boards using those
+>> particular SoCs.
+>>
+>> Same kernel binary on all the boards I've tried this on, only real differences
+>> will be the devicetree and u-boot
+> 
+> Amazingly we have been able to run a complete nightly test on eight i.MX6
+> boards without hickups using Iain's config! We had to modify it slightly to get
+> it to boot, please find attached patch and Iain's patched config.
 
-Can we guarantee everything going to live within 0x0 - 0xffffffff for
-all boards using the SoC?
+Interesting. We obviously have some differences in how we boot, my changes to 
+your config to get it to boot basically amount to reverting the patch you attached 
+and then enabling sata and mmc. So far I've been unable to get your config to fail.
 
-I suspect that we can't, so the addresses and sizes at the top level
-should be two cells. At some point there is bound to be something above
-4GB that we'll need to map, so to save us from a painful dts refactoring
-we should have the dts organised to support that from the outside.
+I'm attaching the patch showing what I changed in case it sheds any light on 
+what's going on, although I don't see why any of the changes make any difference.
 
-[...]
+My kernel command line is also fairly obvious with nothing I'd think is odd:
+console=ttymxc1,115200n8 root=/dev/sda1 ro rootfstype=ext2 rootwait video= ahci-imx.hotplug=1
 
-> +       cpus {
-> +               #address-cells = <2>;
-> +               #size-cells = <0>;
-> +
-> +               cpu at 0 {
-> +                       device_type = "cpu";
-> +                       compatible = "arm,cortex-a57", "arm,armv8";
-> +                       reg = <0x0 0x0>;
-> +               };
-> +       };
+It would be good to know what makes my config work for you, I don't think I've 
+done anything special with it.
 
-Only UP?
+Iain
 
-[...]
-
-> +       gic: interrupt-controller at 11001000 {
-> +               compatible = "arm,gic-400";
-> +               #interrupt-cells = <3>;
-> +               #address-cells = <0>;
-> +               interrupt-controller;
-> +               reg =   <0x11001000 0x1000>,
-> +                       <0x11002000 0x1000>,
-> +                       <0x11004000 0x2000>,
-> +                       <0x11006000 0x2000>;
-> +       };
-
-Nice to see GICV and GICH.
-
-[...]
-
-> +       mct at 101C0000 {
-> +               compatible = "samsung,exynos4210-mct";
-> +               reg = <0x101C0000 0x800>;
-> +               interrupt-controller;
-> +               #interrupt-cells = <1>;
-> +               interrupt-parent = <&mct_map>;
-> +               interrupts =    <0>, <1>, <2>, <3>,
-> +                               <4>, <5>, <6>, <7>,
-> +                               <8>, <9>, <10>, <11>;
-> +               clocks = <&fin_pll>, <&clock_peris PCLK_MCT>;
-> +               clock-names = "fin_pll", "mct";
-> +
-> +               mct_map: mct-map {
-> +                       #interrupt-cells = <1>;
-> +                       #address-cells = <0>;
-> +                       #size-cells = <0>;
-> +                       interrupt-map = <0 &gic 0 112 0>,
-> +                                       <1 &gic 0 113 0>,
-> +                                       <2 &gic 0 114 0>,
-> +                                       <3 &gic 0 115 0>,
-> +                                       <4 &gic 0 116 0>,
-> +                                       <5 &gic 0 117 0>,
-> +                                       <6 &gic 0 118 0>,
-> +                                       <7 &gic 0 119 0>,
-> +                                       <8 &gic 0 120 0>,
-> +                                       <9 &gic 0 121 0>,
-> +                                       <10 &gic 0 122 0>,
-> +                                       <11 &gic 0 123 0>;
-> +               };
-> +       };
-
-I don't see why need the map here. Why can't we describe the GIC
-interrupts directly?
-
-[...]
-
-> +       timer {
-> +               compatible = "arm,armv8-timer";
-> +               interrupts = <1 13 0xff01>,
-> +                            <1 14 0xff01>,
-> +                            <1 11 0xff01>,
-> +                            <1 10 0xff01>;
-> +               clock-frequency = <24000000>;
-
-Your firmware/bootloader should configure CNTFRQ, and this shouldn't be
-necessary. The clock-frequency property is an incomplete workaround for
-broken firmware that in an ideal world we could kill off.
-
-> +               use-clocksource-only;
-> +               use-physical-timer;
-
-Neither of these properties were introduced by this series, and no
-rationale was given.
-
-What are these properties for, and why do you believe they are
-necessary?
-
-Thanks,
-Mark.
+-------------- next part --------------
+3c3
+< # Linux/arm 3.16.0 Kernel Configuration
+---
+> # Linux/arm 3.16.0-rc2 Kernel Configuration
+38c38
+< CONFIG_KERNEL_GZIP=y
+---
+> # CONFIG_KERNEL_GZIP is not set
+41c41
+< # CONFIG_KERNEL_LZO is not set
+---
+> CONFIG_KERNEL_LZO=y
+233,239c233
+< CONFIG_PARTITION_ADVANCED=y
+< # CONFIG_ACORN_PARTITION is not set
+< # CONFIG_AIX_PARTITION is not set
+< # CONFIG_OSF_PARTITION is not set
+< # CONFIG_AMIGA_PARTITION is not set
+< # CONFIG_ATARI_PARTITION is not set
+< # CONFIG_MAC_PARTITION is not set
+---
+> # CONFIG_PARTITION_ADVANCED is not set
+241,249d234
+< # CONFIG_BSD_DISKLABEL is not set
+< # CONFIG_MINIX_SUBPARTITION is not set
+< # CONFIG_SOLARIS_X86_PARTITION is not set
+< # CONFIG_UNIXWARE_DISKLABEL is not set
+< # CONFIG_LDM_PARTITION is not set
+< # CONFIG_SGI_PARTITION is not set
+< # CONFIG_ULTRIX_PARTITION is not set
+< # CONFIG_SUN_PARTITION is not set
+< # CONFIG_KARMA_PARTITION is not set
+251,252d235
+< # CONFIG_SYSV68_PARTITION is not set
+< # CONFIG_CMDLINE_PARTITION is not set
+265,266d247
+< CONFIG_ARCH_SUPPORTS_ATOMIC_RMW=y
+< CONFIG_RWSEM_SPIN_ON_OWNER=y
+533,534c514,521
+< # CONFIG_ARM_APPENDED_DTB is not set
+< CONFIG_CMDLINE=""
+---
+> CONFIG_ARM_APPENDED_DTB=y
+> CONFIG_ARM_ATAG_DTB_COMPAT=y
+> CONFIG_ARM_ATAG_DTB_COMPAT_CMDLINE_FROM_BOOTLOADER=y
+> # CONFIG_ARM_ATAG_DTB_COMPAT_CMDLINE_EXTEND is not set
+> CONFIG_CMDLINE="___console=ttymxc0,115200 ___debug ___LOGLEVEL=8 ___initrd=0x11800040,12383491 ___dyndbg=\"file * +p\""
+> CONFIG_CMDLINE_FROM_BOOTLOADER=y
+> # CONFIG_CMDLINE_EXTEND is not set
+> # CONFIG_CMDLINE_FORCE is not set
+591c578
+< # CONFIG_PM_TEST_SUSPEND is not set
+---
+> CONFIG_PM_TEST_SUSPEND=y
+919d905
+< CONFIG_ARCH_MIGHT_HAVE_PC_PARPORT=y
+920a907
+> CONFIG_ARCH_MIGHT_HAVE_PC_PARPORT=y
+1045,1059c1032
+< CONFIG_ATA=y
+< # CONFIG_ATA_NONSTANDARD is not set
+< CONFIG_ATA_VERBOSE_ERROR=y
+< CONFIG_SATA_PMP=y
+< 
+< #
+< # Controllers with non-SFF native interface
+< #
+< CONFIG_SATA_AHCI=y
+< CONFIG_SATA_AHCI_PLATFORM=y
+< CONFIG_AHCI_IMX=y
+< # CONFIG_SATA_INIC162X is not set
+< # CONFIG_SATA_ACARD_AHCI is not set
+< # CONFIG_SATA_SIL24 is not set
+< # CONFIG_ATA_SFF is not set
+---
+> # CONFIG_ATA is not set
+1786,1815c1759
+< CONFIG_MMC=y
+< # CONFIG_MMC_DEBUG is not set
+< # CONFIG_MMC_CLKGATE is not set
+< 
+< #
+< # MMC/SD/SDIO Card Drivers
+< #
+< CONFIG_MMC_BLOCK=y
+< CONFIG_MMC_BLOCK_MINORS=8
+< CONFIG_MMC_BLOCK_BOUNCE=y
+< # CONFIG_SDIO_UART is not set
+< # CONFIG_MMC_TEST is not set
+< 
+< #
+< # MMC/SD/SDIO Host Controller Drivers
+< #
+< CONFIG_MMC_SDHCI=y
+< CONFIG_MMC_SDHCI_IO_ACCESSORS=y
+< # CONFIG_MMC_SDHCI_PCI is not set
+< CONFIG_MMC_SDHCI_PLTFM=y
+< # CONFIG_MMC_SDHCI_OF_ARASAN is not set
+< CONFIG_MMC_SDHCI_ESDHC_IMX=y
+< # CONFIG_MMC_SDHCI_PXAV3 is not set
+< # CONFIG_MMC_SDHCI_PXAV2 is not set
+< # CONFIG_MMC_MXC is not set
+< # CONFIG_MMC_TIFM_SD is not set
+< # CONFIG_MMC_CB710 is not set
+< # CONFIG_MMC_VIA_SDMMC is not set
+< # CONFIG_MMC_DW is not set
+< # CONFIG_MMC_USDHI6ROL0 is not set
+---
+> # CONFIG_MMC is not set
+1968d1911
+< # CONFIG_WIMAX_GDM72XX is not set
