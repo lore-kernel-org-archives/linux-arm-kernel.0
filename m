@@ -1,95 +1,94 @@
-From: eric.auger@linaro.org (Eric Auger)
-Date: Wed, 27 Aug 2014 17:22:30 +0200
-Subject: [RFC 8/9] KVM: KVM-VFIO: add kvm_vfio_arch_data and accessors
-In-Reply-To: <1409079750.2906.130.camel@ul30vt.home>
-References: <1408973264-30384-1-git-send-email-eric.auger@linaro.org>	
- <1408973264-30384-9-git-send-email-eric.auger@linaro.org>
- <1409079750.2906.130.camel@ul30vt.home>
-Message-ID: <53FDF7B6.507@linaro.org>
+From: koct9i@gmail.com (Konstantin Khlebnikov)
+Date: Wed, 27 Aug 2014 19:31:29 +0400
+Subject: [PATCH 1/2] ARM: LPAE: load upper bits of early TTBR0/TTBR1
+In-Reply-To: <CABb+yY17Y18oAivi_VxPJqDEGLTbEy_PfsdeK9jXWZ0iV3vZ=w@mail.gmail.com>
+References: <20140722153623.25088.37742.stgit@buzz>
+ <20140728181224.GN15536@arm.com>
+ <CALYGNiNrK1d32ecz4rw0sgn0GyN-M6hTBuTLGQV53Z4Br-bpYQ@mail.gmail.com>
+ <20140728184741.GT15536@arm.com>
+ <CALYGNiOd+Dy-2q_woZ9UDbMO24q58jN1Nsq7E8cJMMg_YBK9pA@mail.gmail.com>
+ <CABb+yY17Y18oAivi_VxPJqDEGLTbEy_PfsdeK9jXWZ0iV3vZ=w@mail.gmail.com>
+Message-ID: <CALYGNiN-SHr6YJ53_deizb1VoXTBzD7dn8hcwqd4zLjx6utCDw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/26/2014 09:02 PM, Alex Williamson wrote:
-> On Mon, 2014-08-25 at 15:27 +0200, Eric Auger wrote:
->> add a pointer to architecture specific data in kvm_vfio struct
->> add accessors to keep kvm_vfio private
+On Wed, Aug 27, 2014 at 7:26 PM, Jassi Brar <jassisinghbrar@gmail.com> wrote:
+> On Tue, Jul 29, 2014 at 5:59 PM, Konstantin Khlebnikov <koct9i@gmail.com> wrote:
+>> On Mon, Jul 28, 2014 at 10:47 PM, Will Deacon <will.deacon@arm.com> wrote:
+>>> On Mon, Jul 28, 2014 at 07:40:58PM +0100, Konstantin Khlebnikov wrote:
+>>>> On Mon, Jul 28, 2014 at 10:12 PM, Will Deacon <will.deacon@arm.com> wrote:
+>>>> > On Tue, Jul 22, 2014 at 04:36:23PM +0100, Konstantin Khlebnikov wrote:
+>>>> >> This patch fixes booting when idmap pgd lays above 4gb. Commit
+>>>> >> 4756dcbfd37 mostly had fixed this, but it'd failed to load upper bits.
+>>>> >>
+>>>> >> Also this fixes adding TTBR1_OFFSET to TTRR1: if lower part overflows
+>>>> >> carry flag must be added to the upper part.
+>>>> >>
+>>>> >> Signed-off-by: Konstantin Khlebnikov <k.khlebnikov@samsung.com>
+>>>> >> Cc: Cyril Chemparathy <cyril@ti.com>
+>>>> >> Cc: Vitaly Andrianov <vitalya@ti.com>
+>>>> >> ---
+>>>> >>  arch/arm/mm/proc-v7-3level.S |    7 +++----
+>>>> >>  1 file changed, 3 insertions(+), 4 deletions(-)
+>>>> >>
+>>>> >> diff --git a/arch/arm/mm/proc-v7-3level.S b/arch/arm/mm/proc-v7-3level.S
+>>>> >> index 22e3ad6..f0481dd 100644
+>>>> >> --- a/arch/arm/mm/proc-v7-3level.S
+>>>> >> +++ b/arch/arm/mm/proc-v7-3level.S
+>>>> >> @@ -140,12 +140,11 @@ ENDPROC(cpu_v7_set_pte_ext)
+>>>> >>       mov     \tmp, \ttbr1, lsr #(32 - ARCH_PGD_SHIFT)        @ upper bits
+>>>> >>       mov     \ttbr1, \ttbr1, lsl #ARCH_PGD_SHIFT             @ lower bits
+>>>> >>       addls   \ttbr1, \ttbr1, #TTBR1_OFFSET
+>>>> >> -     mcrr    p15, 1, \ttbr1, \zero, c2                       @ load TTBR1
+>>>> >> +     adcls   \tmp, \tmp, #0
+>>>> >> +     mcrr    p15, 1, \ttbr1, \tmp, c2                        @ load TTBR1
+>>>> >>       mov     \tmp, \ttbr0, lsr #(32 - ARCH_PGD_SHIFT)        @ upper bits
+>>>> >>       mov     \ttbr0, \ttbr0, lsl #ARCH_PGD_SHIFT             @ lower bits
+>>>> >> -     mcrr    p15, 0, \ttbr0, \zero, c2                       @ load TTBR0
+>>>> >> -     mcrr    p15, 1, \ttbr1, \zero, c2                       @ load TTBR1
+>>>> >> -     mcrr    p15, 0, \ttbr0, \zero, c2                       @ load TTBR0
+>>>> >> +     mcrr    p15, 0, \ttbr0, \tmp, c2                        @ load TTBR0
+>>>> >
+>>>> > I must admit, the code you are removing here looks really strange. Was there
+>>>> > a badly resolved conflict somewhere along the way? It would be nice to see
+>>>> > if your fix (which seems ok to me) was actually present in the mailing list
+>>>> > posting of the patch that ended in the above mess.
+>>>>
+>>>> Nope, no merge conflicts, source in original patch
+>>>> https://lkml.org/lkml/2012/9/11/346
+>>>>
+>>>> That mess completely harmless, this code is used only once on boot.
+>>>> I don't have that email, so replying isn't trivial for me.
+>>>
+>>> How bizarre. Also, Cyril doesn't work for TI anymore (his email is
+>>> bouncing), so it's tricky to know what he meant here.
+>>>
+>>> Your patch looks better than what we currently have though. Have you managed
+>>> to test it on a keystone platform (I don't have one)?
 >>
->> Signed-off-by: Eric Auger <eric.auger@linaro.org>
->> ---
->>  arch/arm/include/asm/kvm_host.h |  8 ++++++++
->>  virt/kvm/vfio.c                 | 21 +++++++++++++++++++++
->>  2 files changed, 29 insertions(+)
+>> No, I don't have it too. As well as I don't have direct access to the
+>> platform where
+>> problem was found. I've debugged this in patched qemu.
 >>
->> diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
->> index 62cbf5b..4f1edbf 100644
->> --- a/arch/arm/include/asm/kvm_host.h
->> +++ b/arch/arm/include/asm/kvm_host.h
->> @@ -177,6 +177,14 @@ void kvm_vfio_device_put_external_user(struct vfio_device *vdev);
->>  int kvm_vfio_external_get_type(struct vfio_device *vdev);
->>  struct device *kvm_vfio_external_get_base_device(struct vfio_device *vdev);
->>  
->> +struct kvm_vfio;
->> +struct kvm_vfio_arch_data;
->> +void kvm_vfio_device_set_arch_data(struct kvm_vfio *kv,
->> +				   struct kvm_vfio_arch_data *ptr);
->> +struct kvm_vfio_arch_data *kvm_vfio_device_get_arch_data(struct kvm_vfio *kv);
->> +void kvm_vfio_lock(struct kvm_vfio *kv);
->> +void kvm_vfio_unlock(struct kvm_vfio *kv);
->> +
->>  /* We do not have shadow page tables, hence the empty hooks */
->>  static inline int kvm_age_hva(struct kvm *kvm, unsigned long hva)
->>  {
->> diff --git a/virt/kvm/vfio.c b/virt/kvm/vfio.c
->> index f1c4e35..177b71e 100644
->> --- a/virt/kvm/vfio.c
->> +++ b/virt/kvm/vfio.c
->> @@ -28,6 +28,7 @@ struct kvm_vfio {
->>  	struct list_head group_list;
->>  	struct mutex lock;
->>  	bool noncoherent;
->> +	struct kvm_vfio_arch_data *arch_data;
->>  };
->>  
->>  static struct vfio_group *kvm_vfio_group_get_external_user(struct file *filep)
->> @@ -338,6 +339,26 @@ static int kvm_vfio_create(struct kvm_device *dev, u32 type)
->>  	return 0;
->>  }
->>  
->> +void kvm_vfio_device_set_arch_data(struct kvm_vfio *kv,
->> +				   struct kvm_vfio_arch_data *ptr)
->> +{
->> +	kv->arch_data = ptr;
->> +}
->> +
->> +struct kvm_vfio_arch_data *kvm_vfio_device_get_arch_data(struct kvm_vfio *kv)
->> +{
-> 
-> My preference would be s/get_//
-ok
-> 
->> +	return kv->arch_data;
->> +}
->> +
->> +void kvm_vfio_lock(struct kvm_vfio *kv)
->> +{
->> +	mutex_lock(&kv->lock);
->> +}
->> +
->> +void kvm_vfio_unlock(struct kvm_vfio *kv)
->> +{
->> +	mutex_unlock(&kv->lock);
->> +}
-> 
-> Gosh, what could go wrong...
-Hum sorry I did not understand what you meant here
+> It seems the patch wasn't tested on any real platform, I did on my
+> CA15 based platform - it breaks boot. Simply reverting the patch gets
+> it going again. I am happy to try any fix.
+>
 
-Thanks
+Please try to remove adcls line.
+Seems like this affects only systems where PHYS_OFFSET == PAGE_OFFSET.
 
-Eric
-> 
->>  
->>  struct kvm_device_ops kvm_vfio_ops = {
->>  	.name = "kvm-vfio",
-> 
-> 
-> 
+--- a/arch/arm/mm/proc-v7-3level.S
++++ b/arch/arm/mm/proc-v7-3level.S
+@@ -146,7 +146,6 @@ ENDPROC(cpu_v7_set_pte_ext)
+        mov     \tmp, \ttbr1, lsr #(32 - ARCH_PGD_SHIFT)        @ upper bits
+        mov     \ttbr1, \ttbr1, lsl #ARCH_PGD_SHIFT             @ lower bits
+        addls   \ttbr1, \ttbr1, #TTBR1_OFFSET
+-       adcls   \tmp, \tmp, #0
+        mcrr    p15, 1, \ttbr1, \tmp, c2                        @ load TTBR1
+        mov     \tmp, \ttbr0, lsr #(32 - ARCH_PGD_SHIFT)        @ upper bits
+        mov     \ttbr0, \ttbr0, lsl #ARCH_PGD_SHIFT             @ lower bits
+
+
+> Thanks
+> Jassi
