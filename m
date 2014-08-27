@@ -1,49 +1,49 @@
-From: zhangfei.gao@linaro.org (zhangfei)
-Date: Wed, 27 Aug 2014 23:01:32 +0800
-Subject: [PATCH 1/6] ARM: dts: hix5hd2: add gmac node
-In-Reply-To: <20140827145406.GA9737@leverpostej>
-References: <1409143114-23311-1-git-send-email-zhangfei.gao@linaro.org>
- <1409143114-23311-2-git-send-email-zhangfei.gao@linaro.org>
- <20140827145406.GA9737@leverpostej>
-Message-ID: <53FDF2CC.8080302@linaro.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 27 Aug 2014 16:01:39 +0100
+Subject: [PATH V2 1/6] mm: Introduce a general RCU get_user_pages_fast.
+In-Reply-To: <1408635812-31584-2-git-send-email-steve.capper@linaro.org>
+References: <1408635812-31584-1-git-send-email-steve.capper@linaro.org>
+ <1408635812-31584-2-git-send-email-steve.capper@linaro.org>
+Message-ID: <20140827150139.GZ30401@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Thu, Aug 21, 2014 at 04:43:27PM +0100, Steve Capper wrote:
+> +int get_user_pages_fast(unsigned long start, int nr_pages, int write,
+> +			struct page **pages)
+> +{
+> +	struct mm_struct *mm = current->mm;
+> +	int nr, ret;
+> +
+> +	start &= PAGE_MASK;
+> +	nr = __get_user_pages_fast(start, nr_pages, write, pages);
+> +	ret = nr;
+> +
+> +	if (nr < nr_pages) {
+> +		/* Try to get the remaining pages with get_user_pages */
+> +		start += nr << PAGE_SHIFT;
+> +		pages += nr;
 
+When I read this, my first reaction was... what if nr is negative?  In
+that case, if nr_pages is positive, we fall through into this if, and
+start to wind things backwards - which isn't what we want.
 
-On 08/27/2014 10:54 PM, Mark Rutland wrote:
-> On Wed, Aug 27, 2014 at 01:38:29PM +0100, Zhangfei Gao wrote:
->> Signed-off-by: Zhangfei Gao <zhangfei.gao@linaro.org>
->> ---
->>   arch/arm/boot/dts/hisi-x5hd2-dkb.dts |   26 ++++++++++++++++++++++++++
->>   arch/arm/boot/dts/hisi-x5hd2.dtsi    |   16 ++++++++++++++++
->>   2 files changed, 42 insertions(+)
->>
->> diff --git a/arch/arm/boot/dts/hisi-x5hd2-dkb.dts b/arch/arm/boot/dts/hisi-x5hd2-dkb.dts
->> index 05b44c2..0344de0 100644
->> --- a/arch/arm/boot/dts/hisi-x5hd2-dkb.dts
->> +++ b/arch/arm/boot/dts/hisi-x5hd2-dkb.dts
->> @@ -51,3 +51,29 @@
->>   &uart0 {
->>   	status = "okay";
->>   };
->> +
->> +&gmac0 {
->> +	#address-cells = <1>;
->> +	#size-cells = <0>;
->> +	phy-handle = <&phy2>;
->> +	phy-mode = "mii";
->> +	mac-address = [00 00 00 00 00 00];
->
-> If this is just so space is pre-allocated for the bootloader to patch
-> this, please place a comment to that effect.
->
-> Otherwise that doesn't look right.
+It looks like that can't happen... right?  __get_user_pages_fast() only
+returns greater-or-equal to zero right now, but what about the future?
 
-Yes, it is placeholder, bootloader will overwrite field.
+> +
+> +		down_read(&mm->mmap_sem);
+> +		ret = get_user_pages(current, mm, start,
+> +				     nr_pages - nr, write, 0, pages, NULL);
+> +		up_read(&mm->mmap_sem);
+> +
+> +		/* Have to be a bit careful with return values */
+> +		if (nr > 0) {
 
-Also net driver will use random address if if not valid addr.
-if (!is_valid_ether_addr(ndev->dev_addr))
-	eth_hw_addr_random(ndev);	
+This kind'a makes it look like nr could be negative.
 
-Thanks
+Other than that, I don't see anything obviously wrong with it.
+
+-- 
+FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
+according to speedtest.net.
