@@ -1,55 +1,46 @@
-From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Wed, 27 Aug 2014 14:57:08 +0900
-Subject: [PATCH v6 4/6] arm64: add seccomp syscall for compat task
-In-Reply-To: <20140826175303.GE23445@arm.com>
-References: <1408611405-8943-1-git-send-email-takahiro.akashi@linaro.org>
- <1408611405-8943-5-git-send-email-takahiro.akashi@linaro.org>
- <20140826175303.GE23445@arm.com>
-Message-ID: <53FD7334.1070308@linaro.org>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Wed, 27 Aug 2014 07:58:30 +0200
+Subject: [PATCH v3 1/5] of: Add NVIDIA Tegra Legacy Interrupt Controller
+ binding
+In-Reply-To: <53FCCAF1.9050504@wwwdotorg.org>
+References: <1409035264-16999-1-git-send-email-thierry.reding@gmail.com>
+ <53FCCAF1.9050504@wwwdotorg.org>
+Message-ID: <20140827055829.GD15640@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/27/2014 02:53 AM, Will Deacon wrote:
-> On Thu, Aug 21, 2014 at 09:56:43AM +0100, AKASHI Takahiro wrote:
->> This patch allows compat task to issue seccomp() system call.
->>
->> Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
->> ---
->>   arch/arm64/include/asm/unistd.h   |    2 +-
->>   arch/arm64/include/asm/unistd32.h |    3 +++
->>   2 files changed, 4 insertions(+), 1 deletion(-)
->>
->> diff --git a/arch/arm64/include/asm/unistd.h b/arch/arm64/include/asm/unistd.h
->> index 4bc95d2..cf6ee31 100644
->> --- a/arch/arm64/include/asm/unistd.h
->> +++ b/arch/arm64/include/asm/unistd.h
->> @@ -41,7 +41,7 @@
->>   #define __ARM_NR_compat_cacheflush	(__ARM_NR_COMPAT_BASE+2)
->>   #define __ARM_NR_compat_set_tls		(__ARM_NR_COMPAT_BASE+5)
->>
->> -#define __NR_compat_syscalls		383
->> +#define __NR_compat_syscalls		384
->>   #endif
->>
->>   #define __ARCH_WANT_SYS_CLONE
->> diff --git a/arch/arm64/include/asm/unistd32.h b/arch/arm64/include/asm/unistd32.h
->> index e242600..2922c40 100644
->> --- a/arch/arm64/include/asm/unistd32.h
->> +++ b/arch/arm64/include/asm/unistd32.h
->> @@ -787,3 +787,6 @@ __SYSCALL(__NR_sched_setattr, sys_sched_setattr)
->>   __SYSCALL(__NR_sched_getattr, sys_sched_getattr)
->>   #define __NR_renameat2 382
->>   __SYSCALL(__NR_renameat2, sys_renameat2)
->> +#define __NR_seccomp 383
->> +__SYSCALL(__NR_seccomp, sys_seccomp)
->> +
->
-> This will need rebasing onto -rc2, as we're hooked up two new compat
-> syscalls recently.
+On Tue, Aug 26, 2014 at 11:59:13AM -0600, Stephen Warren wrote:
+> On 08/26/2014 12:41 AM, Thierry Reding wrote:
+> >From: Thierry Reding <treding@nvidia.com>
+> >
+> >The Legacy Interrupt Controller found on NVIDIA Tegra SoCs is used by
+> >the AVP coprocessor and can also serve as a backup for the ARM Cortex
+> >CPU's local interrupt controller (GIC).
+> >
+> >The LIC is subdivided into multiple identical units, each handling 32
+> >possible interrupt sources.
+> 
+> If I apply this series without patch 2, which is necessary to test the
+> support for compatibility with old DTs, then I get the following very early
+> on in boot:
+> 
+> Other than that, I would apply this.
 
-Thanks for heads-up. Fixed it.
+Ugh... this is because before patch 3 the code would always initialize
+all five controllers, even on Tegra20 where it doesn't exist. Patch 3
+adds a check for that based on the chip ID, which due to other patches
+merged for v3.17 isn't available at this point. One solution would be
+for this to be moved into an initcall to make sure it's called after
+initialization of the fuse driver so that tegra_get_chip_id() can read
+the chip ID. But since you're not at all a fan of that I guess the best
+we can do is to match on the top-level machine compatible instead of
+using the chip ID.
 
--Takahiro AKASHI
-
-> Will
->
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140827/82920ae3/attachment.sig>
