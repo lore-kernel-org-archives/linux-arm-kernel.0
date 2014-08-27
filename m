@@ -1,121 +1,113 @@
 From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Wed, 27 Aug 2014 23:32:49 +0200
-Subject: [PATCH v5 2/3] ARM: dts: Add main PWM info to rk3288
-In-Reply-To: <1409007567-23523-3-git-send-email-dianders@chromium.org>
+Date: Wed, 27 Aug 2014 23:33:48 +0200
+Subject: [PATCH v5 3/3] ARM: dts: Enable PWM backlight on rk3288-evb
+In-Reply-To: <1409007567-23523-4-git-send-email-dianders@chromium.org>
 References: <1409007567-23523-1-git-send-email-dianders@chromium.org>
- <1409007567-23523-3-git-send-email-dianders@chromium.org>
-Message-ID: <3711416.XmBfSOmzxP@diego>
+ <1409007567-23523-4-git-send-email-dianders@chromium.org>
+Message-ID: <6587991.MejnFpP876@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Montag, 25. August 2014, 15:59:26 schrieb Doug Anderson:
-> This adds the PWM info (other than the VOP PWM) to the main rk3288
-> dtsi file.
+Am Montag, 25. August 2014, 15:59:27 schrieb Doug Anderson:
+> PWM0 is the PWM associated with the LCD backlight.  Enable it.
 > 
-> Signed-off-by: Caesar Wang <caesar.wang@rock-chips.com>
 > Signed-off-by: Doug Anderson <dianders@chromium.org>
-> ---
 
 Applied to my v3.18-next/dts branch.
 
-I've changed the RK_FUNC_3 to its numerical equivalent for now, as the pinctrl 
-binding change is probably going through the pinctrl tree at some point.
 
-
-> Changes in v5:
-> - Back to version 3 (no rockchip,grf).
+> ---
+> Changes in v5: None
+> Changes in v4: None
+> Changes in v3:
+> - Fix space to tab in 2 places in DTS.
+> - Make sure PWM is upper case in prose.
 > 
-> Changes in v4:
-> - Add rockchip,grf to pwm nodes.
+>  arch/arm/boot/dts/rk3288-evb.dtsi | 53
+> +++++++++++++++++++++++++++++++++++++++ 1 file changed, 53 insertions(+)
 > 
-> Changes in v3: None
+> diff --git a/arch/arm/boot/dts/rk3288-evb.dtsi
+> b/arch/arm/boot/dts/rk3288-evb.dtsi index 2964370..98b69d0 100644
+> --- a/arch/arm/boot/dts/rk3288-evb.dtsi
+> +++ b/arch/arm/boot/dts/rk3288-evb.dtsi
+> @@ -10,6 +10,7 @@
+>   * GNU General Public License for more details.
+>   */
 > 
->  arch/arm/boot/dts/rk3288.dtsi | 68
-> +++++++++++++++++++++++++++++++++++++++++++ 1 file changed, 68
-> insertions(+)
+> +#include <dt-bindings/pwm/pwm.h>
+>  #include "rk3288.dtsi"
 > 
-> diff --git a/arch/arm/boot/dts/rk3288.dtsi b/arch/arm/boot/dts/rk3288.dtsi
-> index 36be7bb..9c9d9c5 100644
-> --- a/arch/arm/boot/dts/rk3288.dtsi
-> +++ b/arch/arm/boot/dts/rk3288.dtsi
-> @@ -261,6 +261,50 @@
->  		status = "disabled";
+>  / {
+> @@ -17,6 +18,48 @@
+>  		reg = <0x0 0x80000000>;
 >  	};
 > 
-> +	pwm0: pwm at ff680000 {
-> +		compatible = "rockchip,rk3288-pwm";
-> +		reg = <0xff680000 0x10>;
-> +		#pwm-cells = <3>;
+> +	backlight {
+> +		compatible = "pwm-backlight";
+> +		brightness-levels = <
+> +			  0   1   2   3   4   5   6   7
+> +			  8   9  10  11  12  13  14  15
+> +			 16  17  18  19  20  21  22  23
+> +			 24  25  26  27  28  29  30  31
+> +			 32  33  34  35  36  37  38  39
+> +			 40  41  42  43  44  45  46  47
+> +			 48  49  50  51  52  53  54  55
+> +			 56  57  58  59  60  61  62  63
+> +			 64  65  66  67  68  69  70  71
+> +			 72  73  74  75  76  77  78  79
+> +			 80  81  82  83  84  85  86  87
+> +			 88  89  90  91  92  93  94  95
+> +			 96  97  98  99 100 101 102 103
+> +			104 105 106 107 108 109 110 111
+> +			112 113 114 115 116 117 118 119
+> +			120 121 122 123 124 125 126 127
+> +			128 129 130 131 132 133 134 135
+> +			136 137 138 139 140 141 142 143
+> +			144 145 146 147 148 149 150 151
+> +			152 153 154 155 156 157 158 159
+> +			160 161 162 163 164 165 166 167
+> +			168 169 170 171 172 173 174 175
+> +			176 177 178 179 180 181 182 183
+> +			184 185 186 187 188 189 190 191
+> +			192 193 194 195 196 197 198 199
+> +			200 201 202 203 204 205 206 207
+> +			208 209 210 211 212 213 214 215
+> +			216 217 218 219 220 221 222 223
+> +			224 225 226 227 228 229 230 231
+> +			232 233 234 235 236 237 238 239
+> +			240 241 242 243 244 245 246 247
+> +			248 249 250 251 252 253 254 255>;
+> +		default-brightness-level = <128>;
+> +		enable-gpios = <&gpio7 2 GPIO_ACTIVE_HIGH>;
 > +		pinctrl-names = "default";
-> +		pinctrl-0 = <&pwm0_pin>;
-> +		clocks = <&cru PCLK_PWM>;
-> +		clock-names = "pwm";
-> +		status = "disabled";
+> +		pinctrl-0 = <&bl_en>;
+> +		pwms = <&pwm0 0 1000000 PWM_POLARITY_INVERTED>;
 > +	};
 > +
-> +	pwm1: pwm at ff680010 {
-> +		compatible = "rockchip,rk3288-pwm";
-> +		reg = <0xff680010 0x10>;
-> +		#pwm-cells = <3>;
-> +		pinctrl-names = "default";
-> +		pinctrl-0 = <&pwm1_pin>;
-> +		clocks = <&cru PCLK_PWM>;
-> +		clock-names = "pwm";
-> +		status = "disabled";
-> +	};
-> +
-> +	pwm2: pwm at ff680020 {
-> +		compatible = "rockchip,rk3288-pwm";
-> +		reg = <0xff680020 0x10>;
-> +		#pwm-cells = <3>;
-> +		pinctrl-names = "default";
-> +		pinctrl-0 = <&pwm2_pin>;
-> +		clocks = <&cru PCLK_PWM>;
-> +		clock-names = "pwm";
-> +		status = "disabled";
-> +	};
-> +
-> +	pwm3: pwm at ff680030 {
-> +		compatible = "rockchip,rk3288-pwm";
-> +		reg = <0xff680030 0x10>;
-> +		#pwm-cells = <2>;
-> +		pinctrl-names = "default";
-> +		pinctrl-0 = <&pwm3_pin>;
-> +		clocks = <&cru PCLK_PWM>;
-> +		clock-names = "pwm";
-> +		status = "disabled";
-> +	};
-> +
->  	pmu: power-management at ff730000 {
->  		compatible = "rockchip,rk3288-pmu", "syscon";
->  		reg = <0xff730000 0x100>;
-> @@ -611,5 +655,29 @@
->  				rockchip,pins = <5 15 3 &pcfg_pull_none>;
->  			};
->  		};
-> +
-> +		pwm0 {
-> +			pwm0_pin: pwm0-pin {
-> +				rockchip,pins = <7 0 RK_FUNC_1 &pcfg_pull_none>;
-> +			};
-> +		};
-> +
-> +		pwm1 {
-> +			pwm1_pin: pwm1-pin {
-> +				rockchip,pins = <7 1 RK_FUNC_1 &pcfg_pull_none>;
-> +			};
-> +		};
-> +
-> +		pwm2 {
-> +			pwm2_pin: pwm2-pin {
-> +				rockchip,pins = <7 22 RK_FUNC_3 &pcfg_pull_none>;
-> +			};
-> +		};
-> +
-> +		pwm3 {
-> +			pwm3_pin: pwm3-pin {
-> +				rockchip,pins = <7 23 RK_FUNC_3 &pcfg_pull_none>;
-> +			};
-> +		};
->  	};
+>  	gpio-keys {
+>  		compatible = "gpio-keys";
+>  		#address-cells = <1>;
+> @@ -81,6 +124,10 @@
+>  	status = "okay";
 >  };
+> 
+> +&pwm0 {
+> +	status = "okay";
+> +};
+> +
+>  &uart0 {
+>  	status = "okay";
+>  };
+> @@ -102,6 +149,12 @@
+>  };
+> 
+>  &pinctrl {
+> +	backlight {
+> +		bl_en: bl-en {
+> +			rockchip,pins = <7 2 RK_FUNC_GPIO &pcfg_pull_none>;
+> +		};
+> +	};
+> +
+>  	buttons {
+>  		pwrbtn: pwrbtn {
+>  			rockchip,pins = <0 5 RK_FUNC_GPIO &pcfg_pull_up>;
