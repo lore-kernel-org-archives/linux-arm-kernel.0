@@ -1,67 +1,43 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Wed, 27 Aug 2014 13:54:10 -0700
-Subject: [PATCH v7 7/8] clk: per-user clock accounting for debug
-In-Reply-To: <1408375833-10703-7-git-send-email-tomeu.vizoso@collabora.com>
-References: <1408375833-10703-1-git-send-email-tomeu.vizoso@collabora.com>
- <1408375833-10703-7-git-send-email-tomeu.vizoso@collabora.com>
-Message-ID: <20140827205410.5251.27621@quantum>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Wed, 27 Aug 2014 22:56:41 +0200 (CEST)
+Subject: [PATCH v3 3/4] irq: Allow multiple clients to register for irq
+ affinity notification
+In-Reply-To: <1409170479-29955-4-git-send-email-lina.iyer@linaro.org>
+References: <1409170479-29955-1-git-send-email-lina.iyer@linaro.org>
+ <1409170479-29955-4-git-send-email-lina.iyer@linaro.org>
+Message-ID: <alpine.DEB.2.10.1408272239190.3323@nanos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Tomeu Vizoso (2014-08-18 08:30:32)
-> @@ -936,10 +939,25 @@ EXPORT_SYMBOL_GPL(clk_provider_disable);
->   */
->  void clk_disable(struct clk *clk_user)
->  {
-> +       struct clk_core *clk;
-> +       unsigned long flags;
-> +
->         if (IS_ERR_OR_NULL(clk_user))
->                 return;
->  
-> -       clk_provider_disable(clk_to_clk_core(clk_user));
-> +       clk = clk_to_clk_core(clk_user);
-> +
-> +       flags = clk_enable_lock();
-> +       if (!WARN(clk_user->enable_count == 0,
-> +                 "incorrect disable clk dev %s con %s last disabler %pF\n",
-> +                 clk_user->dev_id, clk_user->con_id, clk_user->last_disable)) {
-> +
-> +               clk_user->last_disable = __builtin_return_address(0);
-> +               clk_user->enable_count--;
-> +
-> +               __clk_disable(clk);
-> +       }
-> +       clk_enable_unlock(flags);
->  }
->  EXPORT_SYMBOL_GPL(clk_disable);
->  
-> @@ -1000,10 +1018,22 @@ EXPORT_SYMBOL_GPL(clk_provider_enable);
->   */
->  int clk_enable(struct clk *clk_user)
->  {
-> +       struct clk_core *clk;
-> +       unsigned long flags;
-> +       int ret;
-> +
->         if (!clk_user)
->                 return 0;
->  
-> -       return clk_provider_enable(clk_to_clk_core(clk_user));
-> +       clk = clk_to_clk_core(clk_user);
-> +
-> +       flags = clk_enable_lock();
-> +       ret = __clk_enable(clk);
-> +       if (!ret)
-> +               clk_user->enable_count++;
-> +       clk_enable_unlock(flags);
-> +
-> +       return ret;
->  }
->  EXPORT_SYMBOL_GPL(clk_enable);
->  
+On Wed, 27 Aug 2014, Lina Iyer wrote:
 
-While we're at it, why not do per-using accounting for clk_{un}prepare?
+> PM QoS and other idle frameworks can do a better job of addressing power
+> and performance requirements for a cpu, knowing the IRQs that are
+> affine to that cpu. If a performance request is placed against serving
+> the IRQ faster and if the IRQ is affine to a set of cpus, then setting
+> the performance requirements only on those cpus help save power on the
+> rest of the cpus. PM QoS framework is one such framework interested in
+> knowing the smp_affinity of an IRQ and the change notificiation in this
+> regard. QoS requests for the CPU_DMA_LATENCY constraint currently apply
+> to all cpus, but when attached to an IRQ, can be applied only to the set
+> of cpus that IRQ's smp_affinity is set to. This allows other cpus to
+> enter deeper sleep states to save power. More than one framework/driver
+> can be interested in such information.
 
-Regards,
-Mike
+All you are describing is the fact, that there is only a single
+notifier possible right now, but you completely miss to describe WHY
+you need multiple ones.
+
+The existing notifier was introduced to tell the driver that the irq
+affinity has changed, so it can move its buffers to the proper NUMA
+node. So if that driver gets this information then it can tell the PM
+QoS code that its affinity changed so that stuff can react
+accordingly, right?
+
+This is going nowhere unless you provide a proper usecase and
+arguments why this is necessary. Handwaving and I want a pony
+arguments are not sufficient.
+
+Thanks,
+
+	tglx
