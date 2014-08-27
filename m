@@ -1,98 +1,69 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 27 Aug 2014 11:50:50 -0600
-Subject: [PATCH v2 2/9] mailbox: Add NVIDIA Tegra XUSB mailbox driver
-In-Reply-To: <CAL1qeaERHeKKNpqh9qHOppgT7ymvntisdjVvZheP78U6NaPz-A@mail.gmail.com>
-References: <1408381705-3623-1-git-send-email-abrestic@chromium.org>	<1408381705-3623-3-git-send-email-abrestic@chromium.org>	<53FB8820.4010202@wwwdotorg.org>
- <CAL1qeaERHeKKNpqh9qHOppgT7ymvntisdjVvZheP78U6NaPz-A@mail.gmail.com>
-Message-ID: <53FE1A7A.4010906@wwwdotorg.org>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 27 Aug 2014 18:52:43 +0100
+Subject: [RFC PATCH 0/9] dt: dependencies (for deterministic driver
+ initialization order based on the DT)
+In-Reply-To: <53FE0966.5020206@wwwdotorg.org>
+References: <20140825133714.GH4163@ulmo.nvidia.com>
+ <20140826084208.AE5F0C40989@trevor.secretlab.ca>
+ <20140826084922.GG17263@ulmo> <53FC566C.30904@ahsoftware.de>
+ <20140826101107.GC32315@leverpostej>
+ <20140827103432.64927C409CB@trevor.secretlab.ca>
+ <20140827144403.GB13850@arm.com> <53FE05AE.9000406@wwwdotorg.org>
+ <53FE07BE.7000809@ahsoftware.de> <53FE0966.5020206@wwwdotorg.org>
+Message-ID: <20140827175243.GJ13850@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/27/2014 11:38 AM, Andrew Bresticker wrote:
-> On Mon, Aug 25, 2014 at 12:01 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
->> On 08/18/2014 11:08 AM, Andrew Bresticker wrote:
->>>
->>> The Tegra xHCI controller's firmware communicates requests to the host
->>> processor through a mailbox interface.  While there is only a single
->>> communication channel, messages sent by the controller can be divided
->>> into two groups: those intended for the PHY driver and those intended
->>> for the host-controller driver.  This mailbox driver exposes the two
->>> channels and routes incoming messages to the appropriate channel based
->>> on the command encoded in the message.
->>
->>
->>> diff --git a/drivers/mailbox/tegra-xusb-mailbox.c
->>> b/drivers/mailbox/tegra-xusb-mailbox.c
+On Wed, Aug 27, 2014 at 05:37:58PM +0100, Stephen Warren wrote:
+> On 08/27/2014 10:30 AM, Alexander Holler wrote:
+> > Am 27.08.2014 18:22, schrieb Stephen Warren:
+> >> On 08/27/2014 08:44 AM, Catalin Marinas wrote:
+> >
+> >>> It's not just optimisation but an important feature for new arm64 SoCs.
+> >>> Given some Tegra discussions recently, in many cases the machine_desc
+> >>> use on arm is primarily to initialise devices in the right order. If we
+> >>> can solve this in a more deterministic way (other than deferred
+> >>> probing), we avoid the need for a dedicated SoC platform driver (or
+> >>> machine_desc) or workarounds like different initcall levels and explicit
+> >>> DT parsing.
+> >>
+> >> A lot of the ordering is SW driver dependencies. I'm not sure how much
+> >> of that can accurately be claimed as HW dependencies. As such, I'm not
+> >> sure that putting dependencies into DT would be a good idea; it doesn't
+> >> feel like HW data, and might well change if we restructure SW. It'd need
+> >> some detailed research though.
+> >
+> > Almost every phandle is a dependency, so the DT is already full with them.
+> 
+> That's true, but not entirely relevant.
+> 
+> phandles in DT should only be present where there's an obvious HW 
+> dependency. It's obvious that, for example, there's a real HW dependency 
+> between an IRQ controller and a device that has an IRQ signal fed into 
+> the IRQ controller. It makes perfect sense to represent that as a 
+> phandle (+args).
 
->>> +static struct mbox_chan *mbox_cmd_to_chan(struct tegra_xusb_mbox *mbox,
->>> u32 cmd)
->>> +{
->>> +       switch (cmd) {
->>> +       case MBOX_CMD_INC_FALC_CLOCK:
->>> +       case MBOX_CMD_DEC_FALC_CLOCK:
->>> +       case MBOX_CMD_INC_SSPI_CLOCK:
->>> +       case MBOX_CMD_DEC_SSPI_CLOCK:
->>> +       case MBOX_CMD_SET_BW:
->>> +               return &mbox->mbox.chans[TEGRA_XUSB_MBOX_CHAN_HOST];
->>> +       case MBOX_CMD_SAVE_DFE_CTLE_CTX:
->>> +       case MBOX_CMD_START_HSIC_IDLE:
->>> +       case MBOX_CMD_STOP_HSIC_IDLE:
->>> +               return &mbox->mbox.chans[TEGRA_XUSB_MBOX_CHAN_PHY];
->>> +       default:
->>> +               return NULL;
->>> +       }
->>> +}
->>
->>
->> This makes me think that the CHAN_HOST/CHAN_PHY values are purely a facet of
->> the Linux driver's message de-multiplexing, rather than anything to do with
->> the HW.
->
-> Yup, they are...
->
->> I'm not even sure if it's appropriate for the low-level mailbox driver to
->> know about the semantics of the message, rather than simply sending them on
->> to the client driver? Perhaps when drivers register(?) for callbacks(?) for
->> messages, they should state which types of messages they want to listen to?
->
-> So there's not really a way for the client driver to tell the mailbox
-> driver which types of messages it wants to listen to on a particular
-> channel with the mailbox framework - it simply provides a way for
-> clients to bind with channels.  I think there are a couple of options
-> here, either: a) have a channel per message (as you mentioned in the
-> previous patch), which allows the client to only register for messages
-> (channels) it wants to handle, or b) extend the mailbox framework to
-> allow shared channels so that both clients can receive messages on the
-> single channel and handle messages appropriately.   The disadvantage
-> of (a) is that the commands are firmware defined and could
-> theoretically change between releases of the firmware, though I'm not
-> sure how common that is in practice.  So that leaves (b) - Jassi, what
-> do you think about having shared (non-exclusive) channels?
+Other examples are power controllers or some MFD device (as we have on
+vexpress). For these we normally have phandles.
 
-Another alternative might be for each client driver to hard-code a 
-unique dummy channel ID so that each client still gets a separate 
-exclusive channel, but then have the mbox driver broadcast each message 
-to each of those channels. I'm not sure that would be any better though; 
-adding (b) as an explicit option to the mbox subsystem would almost 
-certainly be cleaner.
+> However, most of the ordering imposed by the Tegra machine descriptor 
+> callbacks is nothing to do with this. It's more that the SW driver for 
+> component X needs some low level data (e.g. SKU/fuse information) before 
+> it can run. However, there's no real HW dependency between the HW 
+> component X and the fuse module. As such, it doesn't make sense to 
+> represent such a dependency in DT, using a phandle or by any other means.
 
->>> +static int tegra_xusb_mbox_probe(struct platform_device *pdev)
->>
->>
->>> +       res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
->>>
->>> +       if (!res)
->>> +               return -ENODEV;
->>
->>
->> Should devm_request_mem_region() be called here to claim the region?
->
-> No, the xHCI host driver also needs to map these registers, so they
-> cannot be mapped exclusively here.
+But isn't fuse some piece of hardware? We don't have a model for it, so
+I guess you just present it as a library that accesses the hardware.
+Anyway, in such case something like Pawel's SoC driver proposal would
+work. Now if anything inside the SoC bus (I have to re-read, I don't
+fully remember the details) is probed after the SoC driver, you could
+even initialise your SoC at device_initcall() level.
 
-That's unfortunate. Having multiple drivers with overlapping register 
-regions is not a good idea. Can we instead have a top-level driver map 
-all the IO regions, then instantiate the various different 
-sub-components internally, and divide up the address space. Probably via 
-MFD or similar. That would prevent multiple drivers from touching the 
-same register region.
+> Irrespective though, a new kernel needs to work against an old DT,
+
+I fully agree. But we shouldn't really extend the "old DT" statement to
+a new ARMv8 SoC ;).
+
+-- 
+Catalin
