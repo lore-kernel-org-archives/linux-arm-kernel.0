@@ -1,68 +1,50 @@
 From: b29396@freescale.com (Dong Aisheng)
-Date: Wed, 27 Aug 2014 15:26:27 +0800
-Subject: [PATCH V3 1/6] mmc: sdhci: add platfrom get_max_timeout_count hook
+Date: Wed, 27 Aug 2014 15:26:28 +0800
+Subject: [PATCH V3 2/6] mmc: sdhci-esdhc-imx: fix incorrect max timeout cout
+ for uSDHC
 In-Reply-To: <1409124392-28899-1-git-send-email-b29396@freescale.com>
 References: <1409124392-28899-1-git-send-email-b29396@freescale.com>
-Message-ID: <1409124392-28899-2-git-send-email-b29396@freescale.com>
+Message-ID: <1409124392-28899-3-git-send-email-b29396@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently the max timeout count is hardcode to 1 << 27 for calcuate
-the max_busy_timeout, however, for some platforms the max timeout
-count may not be 1 << 27, e.g. i.MX uSDHC is 1 << 28.
-Thus 1 << 27 is not correct for such platform.
-
-It is also possible that other platforms may have different values.
-To be flexible, we add a get_max_timeout_count hook to get the correct
-maximum timeout value for these platforms.
+The default sdhci code use the 1 << 27 as the max timeout counter to
+to calculate the max_busy_timeout, however it's not correct for uSDHC
+since its the max counter is 1 << 28.
+Implement esdhc_get_max_timeout_cout to handle it correctly.
 
 Reviewed-by: Shawn Guo <shawn.guo@linaro.org>
 Signed-off-by: Dong Aisheng <b29396@freescale.com>
 ---
- drivers/mmc/host/sdhci.c |   11 ++++++++---
- drivers/mmc/host/sdhci.h |    1 +
- 2 files changed, 9 insertions(+), 3 deletions(-)
+ drivers/mmc/host/sdhci-esdhc-imx.c |    9 +++++++++
+ 1 files changed, 9 insertions(+), 0 deletions(-)
 
-diff --git a/drivers/mmc/host/sdhci.c b/drivers/mmc/host/sdhci.c
-index 4cc2ff9..d633f288 100644
---- a/drivers/mmc/host/sdhci.c
-+++ b/drivers/mmc/host/sdhci.c
-@@ -1196,8 +1196,11 @@ clock_set:
- 		host->mmc->actual_clock = (host->max_clk * clk_mul) / real_div;
- 		if (host->quirks & SDHCI_QUIRK_DATA_TIMEOUT_USES_SDCLK) {
- 			host->timeout_clk = host->mmc->actual_clock / 1000;
--			host->mmc->max_busy_timeout =
--				(1 << 27) / host->timeout_clk;
-+			mmc->max_busy_timeout =
-+					host->ops->get_max_timeout_count ?
-+					host->ops->get_max_timeout_count(host) :
-+					1 << 27;
-+			mmc->max_busy_timeout /= host->timeout_clk;
- 		}
- 	}
+diff --git a/drivers/mmc/host/sdhci-esdhc-imx.c b/drivers/mmc/host/sdhci-esdhc-imx.c
+index 46677f0..546ed02 100644
+--- a/drivers/mmc/host/sdhci-esdhc-imx.c
++++ b/drivers/mmc/host/sdhci-esdhc-imx.c
+@@ -880,6 +880,14 @@ static void esdhc_reset(struct sdhci_host *host, u8 mask)
+ 	sdhci_writel(host, host->ier, SDHCI_SIGNAL_ENABLE);
+ }
  
-@@ -2937,7 +2940,9 @@ int sdhci_add_host(struct sdhci_host *host)
- 	if (host->quirks & SDHCI_QUIRK_DATA_TIMEOUT_USES_SDCLK)
- 		host->timeout_clk = mmc->f_max / 1000;
- 
--	mmc->max_busy_timeout = (1 << 27) / host->timeout_clk;
-+	mmc->max_busy_timeout = host->ops->get_max_timeout_count ?
-+			host->ops->get_max_timeout_count(host) : 1 << 27;
-+	mmc->max_busy_timeout /= host->timeout_clk;
- 
- 	mmc->caps |= MMC_CAP_SDIO_IRQ | MMC_CAP_ERASE | MMC_CAP_CMD23;
- 	mmc->caps2 |= MMC_CAP2_SDIO_IRQ_NOTHREAD;
-diff --git a/drivers/mmc/host/sdhci.h b/drivers/mmc/host/sdhci.h
-index 4a5cd5e..b130509 100644
---- a/drivers/mmc/host/sdhci.h
-+++ b/drivers/mmc/host/sdhci.h
-@@ -281,6 +281,7 @@ struct sdhci_ops {
- 	unsigned int	(*get_max_clock)(struct sdhci_host *host);
- 	unsigned int	(*get_min_clock)(struct sdhci_host *host);
- 	unsigned int	(*get_timeout_clock)(struct sdhci_host *host);
-+	unsigned int	(*get_max_timeout_count)(struct sdhci_host *host);
- 	void		(*set_bus_width)(struct sdhci_host *host, int width);
- 	void (*platform_send_init_74_clocks)(struct sdhci_host *host,
- 					     u8 power_mode);
++static unsigned int esdhc_get_max_timeout_count(struct sdhci_host *host)
++{
++	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
++	struct pltfm_imx_data *imx_data = pltfm_host->priv;
++
++	return esdhc_is_usdhc(imx_data) ? 1 << 28 : 1 << 27;
++}
++
+ static struct sdhci_ops sdhci_esdhc_ops = {
+ 	.read_l = esdhc_readl_le,
+ 	.read_w = esdhc_readw_le,
+@@ -889,6 +897,7 @@ static struct sdhci_ops sdhci_esdhc_ops = {
+ 	.set_clock = esdhc_pltfm_set_clock,
+ 	.get_max_clock = esdhc_pltfm_get_max_clock,
+ 	.get_min_clock = esdhc_pltfm_get_min_clock,
++	.get_max_timeout_count = esdhc_get_max_timeout_count,
+ 	.get_ro = esdhc_pltfm_get_ro,
+ 	.set_bus_width = esdhc_pltfm_set_bus_width,
+ 	.set_uhs_signaling = esdhc_set_uhs_signaling,
 -- 
 1.7.8
