@@ -1,65 +1,47 @@
-From: mpa@pengutronix.de (Markus Pargmann)
-Date: Wed, 27 Aug 2014 10:12:17 +0200
-Subject: [PATCH v5] watchdog: Add DA9063 PMIC watchdog driver.
-In-Reply-To: <6ED8E3B22081A4459DAC7699F3695FB7D0B39787@SW-EX-MBX02.diasemi.com>
-References: <1409034367-15228-1-git-send-email-mpa@pengutronix.de>
- <6ED8E3B22081A4459DAC7699F3695FB7D0B39787@SW-EX-MBX02.diasemi.com>
-Message-ID: <20140827081217.GD21770@pengutronix.de>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 27 Aug 2014 09:21:39 +0100
+Subject: [PATCH 2/9] arm64: Fix INVALID_HWID definition
+In-Reply-To: <1409077080.11425.22.camel@smoke>
+References: <cover.1408736066.git.geoff@infradead.org>
+ <6f84108ac880ef48548208738cbb169fba2fa51a.1408736066.git.geoff@infradead.org>
+ <20140826155715.GH16482@arm.com> <1409077080.11425.22.camel@smoke>
+Message-ID: <20140827082138.GB6968@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Steve,
-
-On Tue, Aug 26, 2014 at 03:21:53PM +0000, Opensource [Steve Twiss] wrote:
-> 
-> On 26 August 2014 07:26, Markus Pargmann wrote
-> 
-> > Subject: [PATCH v5] watchdog: Add DA9063 PMIC watchdog driver.
+On Tue, Aug 26, 2014 at 07:18:00PM +0100, Geoff Levand wrote:
+> On Tue, 2014-08-26 at 16:57 +0100, Catalin Marinas wrote:
+> > On Fri, Aug 22, 2014 at 08:49:16PM +0100, Geoff Levand wrote:
+> > > Change the preprocessor macro INVALID_HWID definition from ULONG_MAX to (~0)
+> > > to allow INVALID_HWID to be used within assembly source files.
+> > > 
+> > > --- a/arch/arm64/include/asm/cputype.h
+> > > +++ b/arch/arm64/include/asm/cputype.h
+> > > @@ -16,7 +16,7 @@
+> > >  #ifndef __ASM_CPUTYPE_H
+> > >  #define __ASM_CPUTYPE_H
+> > >  
+> > > -#define INVALID_HWID		ULONG_MAX
+> > > +#define INVALID_HWID		UL(~0)
 > > 
+> > Does it actually expand to ULONG_MAX? ~0 is an int.
 > 
-> [...]
+> It seems to be OK, in C:
 > 
-> > +
-> > +static int da9063_wdt_stop(struct watchdog_device *wdd)
-> > +{
-> > +	struct da9063_watchdog *wdt = watchdog_get_drvdata(wdd);
-> > +	int ret;
-> > +
-> > +	mutex_lock(&wdt->lock);
-> > +	ret = regmap_update_bits(da9063->regmap, DA9063_REG_CONTROL_D,
-> > +			DA9063_TWDSCALE_MASK,
-> > +			DA9063_TWDSCALE_DISABLE);
-> > +	if (ret)
-> > +		dev_alert(wdt->da9063->dev, "Watchdog failed to stop (err = %d)\n",
-> > +				ret);
-> > +	mutex_unlock(&wdt->lock);
-> > +
-> > +	return ret;
-> > +}
-> > +
+> volatile unsigned long secondary_holding_pen_release = INVALID_HWID;
 > 
-> Hi Markus,
+> Disassembly of section .data:
 > 
-> A quick typo.
-> ret = regmap_update_bits(da9063->regmap, DA9063_REG_CONTROL_D,
-> should probably be wdt->da9063->regmap
+> 0000000000000000 <secondary_holding_pen_release>:
+>    0:   ffffffff        .word   0xffffffff
+>    4:   ffffffff        .word   0xffffffff
 
-yes, thank you. It seems I forgot to execute my checkpatch script before
-sending. Sorry, will send a new version.
+OK, it looks like it's sign-extending from int to unsigned long (an
+alternative would have been to write (~UL(0)) but the above should do as
+well).
 
-Best regards,
-
-Markus
+Anyway, the patch should come with the series that makes use of such
+change.
 
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140827/30fdac58/attachment.sig>
+Catalin
