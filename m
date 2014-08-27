@@ -1,38 +1,84 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Wed, 27 Aug 2014 16:03:22 +0200 (CEST)
-Subject: [RESEND PATCH v2 1/4] irqchip: gic: Change irq type check when
- extension is present
-In-Reply-To: <87ppfmoxxz.fsf@approximate.cambridge.arm.com>
-References: <1407895884-18131-1-git-send-email-srv_yingjoe.chen@mediatek.com>
- <1407895884-18131-2-git-send-email-srv_yingjoe.chen@mediatek.com>
- <53F724F5.3040004@arm.com>
- <1409133344.25382.37.camel@coredoba.hi.pengutronix.de>
- <53FDB4B3.6000400@arm.com>
- <alpine.DEB.2.10.1408271347210.3323@nanos>
- <87ppfmoxxz.fsf@approximate.cambridge.arm.com>
-Message-ID: <alpine.DEB.2.10.1408271556350.3323@nanos>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 27 Aug 2014 15:11:27 +0100
+Subject: [PATCH 2/3] mfd: Add hi6421 PMIC core driver
+In-Reply-To: <1408973982-2072-3-git-send-email-guodong.xu@linaro.org>
+References: <1408973982-2072-1-git-send-email-guodong.xu@linaro.org>
+ <1408973982-2072-3-git-send-email-guodong.xu@linaro.org>
+Message-ID: <20140827141127.GA24579@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 27 Aug 2014, Marc Zyngier wrote:
-> I very much like that kind of approach. Stacking domains seems to solve
-> a number of issues at once:
+> This adds driver to support HiSilicon Hi6421 PMIC. Hi6421 includes multi-
+> functions, such as regulators, codec, ADCs, Coulomb counter, etc.
+> This driver includes core APIs _only_.
 > 
-> - NVIDIA's gic extension
-> - TI's crossbar
-> - ARM's GICv2m
-> - Mediatek's glorified line inverter
-> - ... and probably the next madness that's going to land tomorrow
+> Drivers for individul components, like voltage regulators, are
+> implemented in corresponding driver directories and files.
+> 
+> Registers in Hi6421 are memory mapped, so using regmap-mmio API.
+> 
+> Signed-off-by: Guodong Xu <guodong.xu@linaro.org>
+> ---
 
-Its probably already there you just don't know about it yet :)
- 
-> I haven't completly groked the way we're going to allocate domains and
-> irq_data structures, but this is definitely something worth
+The patch is missing version information normally indicated to in the
+?SUBJECT line with a full description added here.  This looks like a
+first submission, but we both know that it's not. 
 
-All we have for now is a rough idea and some pseudo code in my lengthy
-reply to Jiang, but it shouldn't be hard to implement something
-useful.
+>  drivers/mfd/Kconfig             |  13 +++++
+>  drivers/mfd/Makefile            |   1 +
+>  drivers/mfd/hi6421-pmic-core.c  | 112 ++++++++++++++++++++++++++++++++++++++++
+>  include/linux/mfd/hi6421-pmic.h |  42 +++++++++++++++
+>  4 files changed, 168 insertions(+)
+>  create mode 100644 drivers/mfd/hi6421-pmic-core.c
+>  create mode 100644 include/linux/mfd/hi6421-pmic.h
 
-Thanks,
+[...]
 
-	tglx
+> diff --git a/drivers/mfd/hi6421-pmic-core.c b/drivers/mfd/hi6421-pmic-core.c
+> new file mode 100644
+> index 0000000..c6cba8f
+> --- /dev/null
+> +++ b/drivers/mfd/hi6421-pmic-core.c
+> @@ -0,0 +1,112 @@
+
+[...]
+
+> +#include <linux/device.h>
+> +#include <linux/err.h>
+> +#include <linux/mfd/core.h>
+> +#include <linux/module.h>
+> +#include <linux/of.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/regmap.h>
+> +#include <linux/mfd/hi6421-pmic.h>
+> +
+> +static struct of_device_id of_hi6421_pmic_match_tbl[] = {
+> +	{ .compatible = "hisilicon,hi6421-pmic", },
+> +	{ },
+> +};
+
+Unless you're going to use this to of_match() on in future, this
+should be down by the definition of 'struct platform_driver'.
+
+> +static int hi6421_pmic_probe(struct platform_device *pdev)
+> +{
+
+[...]
+
+> +	/* set over-current protection debounce 8ms */
+> +	regmap_update_bits(pmic->regmap, HI6421_OCP_DEB_CTRL_REG,
+> +		(HI6421_OCP_DEB_SEL_MASK | HI6421_OCP_EN_DEBOUNCE_MASK |
+> +		 HI6421_OCP_AUTO_STOP_MASK),
+> +		(HI6421_OCP_DEB_SEL_8MS | HI6421_OCP_EN_DEBOUNCE_ENABLE));
+
+These might read a little better stacked and aligned.
+
+> +	pmic->dev = &pdev->dev;
+
+Can't you retrieve this via dev->parent?
+
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
