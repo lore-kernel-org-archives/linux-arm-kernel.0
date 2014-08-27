@@ -1,64 +1,46 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Wed, 27 Aug 2014 15:09:31 +0400
-Subject: [PATCH 2/3] clocksource: sh_mtu2: Document r7s72100 binding
-In-Reply-To: <1409115600-26192-3-git-send-email-horms+renesas@verge.net.au>
-References: <1409115600-26192-1-git-send-email-horms+renesas@verge.net.au>
- <1409115600-26192-3-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <53FDBC6B.5090801@cogentembedded.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 27 Aug 2014 12:09:48 +0100
+Subject: [PATH V2 6/6] arm64: mm: Enable RCU fast_gup
+In-Reply-To: <1408635812-31584-7-git-send-email-steve.capper@linaro.org>
+References: <1408635812-31584-1-git-send-email-steve.capper@linaro.org>
+ <1408635812-31584-7-git-send-email-steve.capper@linaro.org>
+Message-ID: <20140827110947.GI6968@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+On Thu, Aug 21, 2014 at 04:43:32PM +0100, Steve Capper wrote:
+> --- a/arch/arm64/include/asm/pgtable.h
+> +++ b/arch/arm64/include/asm/pgtable.h
+> @@ -256,7 +256,13 @@ static inline pmd_t pte_pmd(pte_t pte)
+>  #ifdef CONFIG_TRANSPARENT_HUGEPAGE
+>  #define pmd_trans_huge(pmd)	(pmd_val(pmd) && !(pmd_val(pmd) & PMD_TABLE_BIT))
+>  #define pmd_trans_splitting(pmd)	pte_special(pmd_pte(pmd))
+> -#endif
+> +#ifdef CONFIG_HAVE_RCU_TABLE_FREE
+> +#define __HAVE_ARCH_PMDP_SPLITTING_FLUSH
+> +struct vm_area_struct;
+> +void pmdp_splitting_flush(struct vm_area_struct *vma, unsigned long address,
+> +			  pmd_t *pmdp);
+> +#endif /* CONFIG_HAVE_RCU_TABLE_FREE */
+> +#endif /* CONFIG_TRANSPARENT_HUGEPAGE */
+>  
+>  #define pmd_young(pmd)		pte_young(pmd_pte(pmd))
+>  #define pmd_wrprotect(pmd)	pte_pmd(pte_wrprotect(pmd_pte(pmd)))
+> @@ -277,6 +283,7 @@ static inline pmd_t pte_pmd(pte_t pte)
+>  #define mk_pmd(page,prot)	pfn_pmd(page_to_pfn(page),prot)
+>  
+>  #define pmd_page(pmd)           pfn_to_page(__phys_to_pfn(pmd_val(pmd) & PHYS_MASK))
+> +#define pud_write(pud)		pmd_write(__pmd(pud_val(pud)))
+>  #define pud_pfn(pud)		(((pud_val(pud) & PUD_MASK) & PHYS_MASK) >> PAGE_SHIFT)
+>  
+>  #define set_pmd_at(mm, addr, pmdp, pmd)	set_pte_at(mm, addr, (pte_t *)pmdp, pmd_pte(pmd))
+> @@ -376,6 +383,8 @@ static inline pmd_t *pmd_offset(pud_t *pud, unsigned long addr)
+>  	return (pmd_t *)pud_page_vaddr(*pud) + pmd_index(addr);
+>  }
+>  
+> +#define pud_page(pud)           pmd_page(__pmd(pud_val(pud)))
 
-On 8/27/2014 8:59 AM, Simon Horman wrote:
+I think you could define a pud_pte as you've done for pmd. The
+conversion would look slightly cleaner. Otherwise:
 
-> In general Renesas hardware is not documented to the extent
-> where the relationship between IP blocks on different SoCs can be assumed
-> although they may appear to operate the same way. Furthermore the
-> documentation typically does not specify a version for individual
-> IP blocks. For these reasons a convention of using the SoC name in place
-> of a version and providing SoC-specific compat strings has been adopted.
-
-> Although not universally liked this convention is used in the bindings
-> for the drivers a number of drivers for Renesas hardware. The purpose
-> of this patch is to update the Renesas R-Car Multi-Function Timer Pulse
-> Unit 2 (MTU2) driver to follow this convention.
-
-> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-
-> ---
-> * I plan to follow up with a patch patch to use the new binding in the
->    dtsi files for the r7s72100 SoC.
-> ---
->   Documentation/devicetree/bindings/timer/renesas,mtu2.txt | 6 ++++--
->   1 file changed, 4 insertions(+), 2 deletions(-)
->
-> diff --git a/Documentation/devicetree/bindings/timer/renesas,mtu2.txt b/Documentation/devicetree/bindings/timer/renesas,mtu2.txt
-> index 917453f..ec4d334 100644
-> --- a/Documentation/devicetree/bindings/timer/renesas,mtu2.txt
-> +++ b/Documentation/devicetree/bindings/timer/renesas,mtu2.txt
-> @@ -8,7 +8,9 @@ are independent. The MTU2 hardware supports five channels indexed from 0 to 4.
->
->   Required Properties:
->
-> -  - compatible: must contain "renesas,mtu2"
-> +  - compatible: must be one of the following.
-
-    Your example below has both.
-
-> +    - "renesas,mtu2" for generic MTU2
-> +    - "renesas,mtu2-r7s72100" for R7S72100 MTU2
->
->     - reg: base address and length of the registers block for the timer module.
->
-> @@ -26,7 +28,7 @@ Required Properties:
->   Example: R7S72100 (RZ/A1H) MTU2 node
->
->   	mtu2: timer at fcff0000 {
-> -		compatible = "renesas,mtu2";
-> +		compatible = "renesas,mtu2-r7s72100", "renesas,mtu2";
->   		reg = <0xfcff0000 0x400>;
->   		interrupts = <0 139 IRQ_TYPE_LEVEL_HIGH>,
->   			     <0 146 IRQ_TYPE_LEVEL_HIGH>,
-
-WBR, Sergei
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
