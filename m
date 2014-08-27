@@ -1,97 +1,32 @@
 From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
-Date: Wed, 27 Aug 2014 16:24:45 +0200
-Subject: [PATCH v3 1/3] ARM: dts: Add Peach Pit dts entry for Atmel touchpad
+Date: Wed, 27 Aug 2014 16:24:47 +0200
+Subject: [PATCH v3 3/3] ARM: multi_v7_defconfig: Enable Atmel maXTouch support
 In-Reply-To: <1409149487-23582-1-git-send-email-javier.martinez@collabora.co.uk>
 References: <1409149487-23582-1-git-send-email-javier.martinez@collabora.co.uk>
-Message-ID: <1409149487-23582-2-git-send-email-javier.martinez@collabora.co.uk>
+Message-ID: <1409149487-23582-4-git-send-email-javier.martinez@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sjoerd Simons <sjoerd.simons@collabora.co.uk>
+Some boards with multi platform support (e.g: Exynos based
+Chromebooks) have an Atmel trackpad so enable support for
+as a module will make easier for users.
 
-The Peach Pit board has an Atmel maXTouch trackpad device.
-Add the needed Device Tree nodes to support it.
-
-This Device Tree change is based on the Chrome OS 3.8 tree
-but adapted to use the mainline Atmel maXTouch DT binding.
-
-Signed-off-by: Sjoerd Simons <sjoerd.simons@collabora.co.uk>
-[javier.martinez: added linux,gpio-keymap property and changed IRQ type]
 Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
 ---
+ arch/arm/configs/multi_v7_defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-Changes since v2:
- - Add spaces around '=' on properties. Suggested by Andreas Faerber.
-
-Changes since v1:
- - Change trackpad IRQ pad function from 0x0 (GPIO input) to 0xf (GPIO IRQ).
-   suggested by Tomasz Figa.
- - Remove BTN_TOOL_* from "linux,gpio-keymap" property since those are set
-   by input mt core if INPUT_MT_POINTER is set. Suggested by Nick Dyer.
- - Use correct values for "linux,gpio-keymap" property. Suggested by Nick Dyer.
- - Remove support for Peach Pi board since it uses a different Atmel touchpad
-   that requires an Atmel object protocol  (T100) not supported by the driver.
- - Use IRQ type constants from <dt-bindings/interrupt-controller/irq.h> instead
-   of magic numbers. Suggested by Andreas Faerber.
----
- arch/arm/boot/dts/exynos5420-peach-pit.dts | 31 ++++++++++++++++++++++++++++++
- 1 file changed, 31 insertions(+)
-
-diff --git a/arch/arm/boot/dts/exynos5420-peach-pit.dts b/arch/arm/boot/dts/exynos5420-peach-pit.dts
-index ab06148..a3358fc 100644
---- a/arch/arm/boot/dts/exynos5420-peach-pit.dts
-+++ b/arch/arm/boot/dts/exynos5420-peach-pit.dts
-@@ -11,6 +11,7 @@
- /dts-v1/;
- #include <dt-bindings/input/input.h>
- #include <dt-bindings/gpio/gpio.h>
-+#include <dt-bindings/interrupt-controller/irq.h>
- #include "exynos5420.dtsi"
- 
- / {
-@@ -157,6 +158,29 @@
- 	};
- };
- 
-+&hsi2c_8 {
-+	status = "okay";
-+	clock-frequency = <333000>;
-+
-+	trackpad at 4b {
-+		compatible = "atmel,maxtouch";
-+		reg = <0x4b>;
-+		interrupt-parent = <&gpx1>;
-+		interrupts = <1 IRQ_TYPE_EDGE_FALLING>;
-+		wakeup-source;
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&trackpad_irq>;
-+		linux,gpio-keymap = < KEY_RESERVED
-+				      KEY_RESERVED
-+				      0		/* GPIO 0 */
-+				      0		/* GPIO 1 */
-+				      0		/* GPIO 2 */
-+				      BTN_LEFT 	/* GPIO 3 */
-+				      KEY_RESERVED
-+				      KEY_RESERVED >;
-+	};
-+};
-+
- &hsi2c_9 {
- 	status = "okay";
- 	clock-frequency = <400000>;
-@@ -241,6 +265,13 @@
- 		samsung,pin-drv = <0>;
- 	};
- 
-+	trackpad_irq: trackpad-irq {
-+		samsung,pins = "gpx1-1";
-+		samsung,pin-function = <0xf>;
-+		samsung,pin-pud = <0>;
-+		samsung,pin-drv = <0>;
-+	};
-+
- 	power_key_irq: power-key-irq {
- 		samsung,pins = "gpx1-2";
- 		samsung,pin-function = <0>;
+diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+index 7cfa5fa..ac5c10c 100644
+--- a/arch/arm/configs/multi_v7_defconfig
++++ b/arch/arm/configs/multi_v7_defconfig
+@@ -167,6 +167,7 @@ CONFIG_KEYBOARD_ST_KEYSCAN=y
+ CONFIG_KEYBOARD_CROS_EC=y
+ CONFIG_MOUSE_PS2_ELANTECH=y
+ CONFIG_INPUT_TOUCHSCREEN=y
++CONFIG_TOUCHSCREEN_ATMEL_MXT=m
+ CONFIG_TOUCHSCREEN_STMPE=y
+ CONFIG_INPUT_MISC=y
+ CONFIG_INPUT_MPU3050=y
 -- 
 2.0.1
