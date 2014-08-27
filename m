@@ -1,75 +1,57 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Wed, 27 Aug 2014 15:41:43 -0400
-Subject: [PATCH 08/10] ARM: OMAP5/DRA7: PM: cpuidle MPU CSWR support
-In-Reply-To: <CAGo_u6o7vAf=syzDTyxh0-kOhmzAmtdG_ardgFgoPQofrGdxUQ@mail.gmail.com>
-References: <1408716154-26101-1-git-send-email-nm@ti.com>	<1408716154-26101-9-git-send-email-nm@ti.com>	<7hvbpdbvb1.fsf@paris.lan>
- <CAGo_u6o7vAf=syzDTyxh0-kOhmzAmtdG_ardgFgoPQofrGdxUQ@mail.gmail.com>
-Message-ID: <53FE3477.2020207@ti.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 27 Aug 2014 12:41:56 -0700
+Subject: [PATCH 07/10] ARM: OMAP5 / DRA7: Enable CPU RET on suspend
+In-Reply-To: <53FE2BF2.3020006@ti.com>
+References: <1408716154-26101-1-git-send-email-nm@ti.com>
+ <1408716154-26101-8-git-send-email-nm@ti.com>
+ <7hbnr5dake.fsf@paris.lan> <53FE2BF2.3020006@ti.com>
+Message-ID: <20140827194156.GE16006@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 27 August 2014 03:35 PM, Nishanth Menon wrote:
-> On Wed, Aug 27, 2014 at 2:13 PM, Kevin Hilman
-> <khilman@deeprootsystems.com> wrote:
->> + Daniel (cpuidle maintainer)
-> [...]
->>> +static int omap_enter_idle_smp(struct cpuidle_device *dev,
->>> +                            struct cpuidle_driver *drv,
->>> +                            int index)
->>> +{
->>> +     struct idle_statedata *cx = state_ptr + index;
->>> +     unsigned long flag;
->>> +
->>> +     raw_spin_lock_irqsave(&mpu_lock, flag);
->>> +     cx->mpu_state_vote++;
->>> +     if (cx->mpu_state_vote == num_online_cpus()) {
->>> +             pwrdm_set_logic_retst(mpu_pd, cx->mpu_logic_state);
->>> +             omap_set_pwrdm_state(mpu_pd, cx->mpu_state);
->>> +     }
->>> +     raw_spin_unlock_irqrestore(&mpu_lock, flag);
->>> +
->>> +     omap4_enter_lowpower(dev->cpu, cx->cpu_state);
->>> +
->>> +     raw_spin_lock_irqsave(&mpu_lock, flag);
->>> +     if (cx->mpu_state_vote == num_online_cpus())
->>> +             omap_set_pwrdm_state(mpu_pd, PWRDM_POWER_ON);
->>> +     cx->mpu_state_vote--;
->>> +     raw_spin_unlock_irqrestore(&mpu_lock, flag);
->>> +
->>> +     return index;
->>> +}
->>
->> Hmm, maybe OMAP5/DRA7 CPUidle driver should be a new one based on MCPM?
+* Nishanth Menon <nm@ti.com> [140827 12:05]:
+> On 08/27/2014 01:58 PM, Kevin Hilman wrote:
+> > Nishanth Menon <nm@ti.com> writes:
+> > 
+> >> From: Rajendra Nayak <rnayak@ti.com>
+> >>
+> >> On OMAP5 / DRA7, prevent a CPU powerdomain OFF and resulting MPU OSWR
+> >> and instead attempt a CPU RET and side effect, MPU RET in suspend.
+> >>
+> >> Signed-off-by: Rajendra Nayak <rnayak@ti.com>
+> >> [nm at ti.com: update to do save_state only on DRA7]
+> >> Signed-off-by: Nishanth Menon <nm@ti.com>
+> >> ---
+> >>  arch/arm/mach-omap2/omap-mpuss-lowpower.c |    4 ++++
+> >>  arch/arm/mach-omap2/omap-wakeupgen.c      |    2 +-
+> >>  arch/arm/mach-omap2/pm44xx.c              |    9 +++++++--
+> >>  3 files changed, 12 insertions(+), 3 deletions(-)
+> >>
+> >> diff --git a/arch/arm/mach-omap2/omap-mpuss-lowpower.c b/arch/arm/mach-omap2/omap-mpuss-lowpower.c
+> >> index 207fce2..0d640eb 100644
+> >> --- a/arch/arm/mach-omap2/omap-mpuss-lowpower.c
+> >> +++ b/arch/arm/mach-omap2/omap-mpuss-lowpower.c
+> >> @@ -242,6 +242,10 @@ int omap4_enter_lowpower(unsigned int cpu, unsigned int power_state)
+> >>  		save_state = 1;
+> >>  		break;
+> >>  	case PWRDM_POWER_RET:
+> >> +		if (soc_is_omap54xx() || soc_is_dra7xx()) {
+> > 
+> > Aren't we trying to get away from these soc_* checks for anything other
+> > than init code?
 > 
-> Trying to understand benefit of MCPM here - at least without a deeper
-> understanding of mcpm infrastructure benefits (first look seemed a
-> little heavy for OMAP5/DRA7 needs).
-> 
-> Neither DRA7/OMAP5 are multi-cluster, the SoCs are not targetted for
-> "OFF" of CPU1/0, we have mercury hardware to help with context and
-> sync issues.
-> 
-> Being able to reuse most of existing OMAP4 infrastructure code is
-> useful as well to leave the existing omap4 framework as being lighter
-> in complexity -esp in a cpuidle like hot path?
-> 
-> The spin_lock is only for the programming of MPU power domain in a
-> consistent manner - I suppose might have been the trigger for
-> proposing mcpm?
-> 
-Mostly not....
+> I would expect that to take place in stages as part of which the next
+> level of cleanup is to move PRM into drivers. Currently our wakeupgen,
+> prm code does have quiet a few needs of dealing with soc_is checks
+> primarily from having to re-architect code in two different directions
+> - we want to move into just one direction eventually - to prm drivers
+> and as less code in mach-omap2 which is already in the works.
 
-I think this is coming because last time Nicolas Pitre tried to convert
-the OMAP CPUIdle into MCPM but because of various ordering requirements,
-OMAP wasn't suitable and then the plan was dropped later.
-
-Just to make clear, OMAP OMAP5/DRA7 as well the ordering requirement
-remains the same for deeper states. Its just the mercury retention state
-which we are able to enter without ordering requirements and hence
-the voting scheme.
-
-Hope this clarifies to you as well as Kevin just in case he missed the
-part of the deeper C-states requirements.
+Why don't you just set some flag at init time based on the
+soc_is check and then test that here? That limits the use of
+soc_is to init code only which makes it easier to phase it
+out completely eventually.
 
 Regards,
-Santosh
+
+Tony
