@@ -1,34 +1,59 @@
-From: stwiss.opensource@diasemi.com (Opensource [Steve Twiss])
-Date: Wed, 27 Aug 2014 16:03:30 +0000
-Subject: [PATCH v5] watchdog: Add DA9063 PMIC watchdog driver.
-In-Reply-To: <20140827081217.GD21770@pengutronix.de>
-References: <1409034367-15228-1-git-send-email-mpa@pengutronix.de>
- <6ED8E3B22081A4459DAC7699F3695FB7D0B39787@SW-EX-MBX02.diasemi.com>
- <20140827081217.GD21770@pengutronix.de>
-Message-ID: <6ED8E3B22081A4459DAC7699F3695FB7D0B39B4B@SW-EX-MBX02.diasemi.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Wed, 27 Aug 2014 18:06:51 +0200
+Subject: [PATCH] ARM: at91: fix ramc standby function registration
+Message-ID: <1409155611-7574-1-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27 August 2014 09:12 Markus Pargmann wrote:
+After the for_each_matching_node loop, we end up with a null value for np. Then,
+of_match_node() is not matching anything and we can't register the standby
+function and "ramc no standby function available" is printed.
 
-> Hi Steve,
-> On Tue, Aug 26, 2014 at 03:21:53PM +0000, Opensource [Steve Twiss] wrote:
-> > On 26 August 2014 07:26, Markus Pargmann wrote
-> > > Subject: [PATCH v5] watchdog: Add DA9063 PMIC watchdog driver.
-> > >
+Fix that by selecting the first available standby function. For now,
+at91_pm_set_standby doesn't support multiple different standby functions and no
+existing SoCs have different RAM controllers.
 
-[...]
+Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+---
+ arch/arm/mach-at91/setup.c | 11 +++++++----
+ 1 file changed, 7 insertions(+), 4 deletions(-)
 
-> 
-> [...] will send a new version.
-> 
-> Best regards,
-> Markus
-
-Thanks Markus,
-
-Hopefully -- if time permits I am also able to run a couple of tests on the watchdog driver.
-I will let you know the results as soon as I have them..
-
-Regards,
-Steve
+diff --git a/arch/arm/mach-at91/setup.c b/arch/arm/mach-at91/setup.c
+index 28ae63b8eb16..d2cade21ebd7 100644
+--- a/arch/arm/mach-at91/setup.c
++++ b/arch/arm/mach-at91/setup.c
+@@ -343,25 +343,28 @@ static void at91_dt_ramc(void)
+ 	struct device_node *np;
+ 	const struct of_device_id *of_id;
+ 	int idx = 0;
++	const void *standby = NULL;
+ 
+-	for_each_matching_node(np, ramc_ids) {
++	for_each_matching_node_and_match(np, ramc_ids, &of_id) {
+ 		at91_ramc_base[idx] = of_iomap(np, 0);
+ 		if (!at91_ramc_base[idx])
+ 			panic(pr_fmt("unable to map ramc[%d] cpu registers\n"), idx);
+ 
++		if (!standby)
++			standby = of_id->data;
++
+ 		idx++;
+ 	}
+ 
+ 	if (!idx)
+ 		panic(pr_fmt("unable to find compatible ram controller node in dtb\n"));
+ 
+-	of_id = of_match_node(ramc_ids, np);
+-	if (!of_id) {
++	if (!standby) {
+ 		pr_warn("ramc no standby function available\n");
+ 		return;
+ 	}
+ 
+-	at91_pm_set_standby(of_id->data);
++	at91_pm_set_standby(standby);
+ }
+ 
+ void __init at91rm9200_dt_initialize(void)
+-- 
+1.9.1
