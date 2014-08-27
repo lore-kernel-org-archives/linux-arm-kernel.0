@@ -1,31 +1,178 @@
-From: steve.capper@linaro.org (Steve Capper)
-Date: Wed, 27 Aug 2014 14:08:25 +0100
-Subject: [PATH V2 5/6] arm64: mm: Enable HAVE_RCU_TABLE_FREE logic
-In-Reply-To: <20140827104840.GH6968@arm.com>
-References: <1408635812-31584-1-git-send-email-steve.capper@linaro.org>
- <1408635812-31584-6-git-send-email-steve.capper@linaro.org>
- <20140827104840.GH6968@arm.com>
-Message-ID: <20140827130824.GB8210@linaro.org>
+From: afaerber@suse.de (=?ISO-8859-15?Q?Andreas_F=E4rber?=)
+Date: Wed, 27 Aug 2014 15:11:48 +0200
+Subject: [PATCH v2 1/3] ARM: dts: Add Peach Pit dts entry for Atmel
+ touchpad
+In-Reply-To: <53FD8528.7090504@collabora.co.uk>
+References: <1409066937-3574-1-git-send-email-javier.martinez@collabora.co.uk>
+ <1409066937-3574-2-git-send-email-javier.martinez@collabora.co.uk>
+ <53FD1001.30701@suse.de> <53FD8528.7090504@collabora.co.uk>
+Message-ID: <53FDD914.5090208@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 27, 2014 at 11:48:41AM +0100, Catalin Marinas wrote:
-> On Thu, Aug 21, 2014 at 04:43:31PM +0100, Steve Capper wrote:
-> > In order to implement fast_get_user_pages we need to ensure that the
-> > page table walker is protected from page table pages being freed from
-> > under it.
-> > 
-> > This patch enables HAVE_RCU_TABLE_FREE, any page table pages belonging
-> > to address spaces with multiple users will be call_rcu_sched freed.
-> > Meaning that disabling interrupts will block the free and protect the
-> > fast gup page walker.
-> > 
-> > Signed-off-by: Steve Capper <steve.capper@linaro.org>
-> 
-> I'm happy to take this patch independently of this series. But if the
-> whole series goes in via some other tree (mm):
-> 
-> Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+Hi Javier,
 
-Thanks. If patch #1 looks okay to the mm folks, I'm hoping this patch
-can be merged via the same tree.
+Am 27.08.2014 09:13, schrieb Javier Martinez Canillas:
+> On 08/27/2014 12:53 AM, Andreas F?rber wrote:
+>>>  
+>>> +&hsi2c_8 {
+>>> +	status = "okay";
+>>> +	clock-frequency = <333000>;
+>>> +
+>>> +	trackpad at 4b {
+>>> +		compatible="atmel,maxtouch";
+>>> +		reg=<0x4b>;
+>>> +		interrupt-parent=<&gpx1>;
+>>> +		interrupts=<1 IRQ_TYPE_EDGE_FALLING>;
+>>
+>> Nit: Here's a style break (4x spaces around '=' missing).
+>>
+> 
+> True, these bits were copied from the downstream Chrome OS verbatim and
+> the missing space around '=' was there, I missed that when reviewing.
+> 
+> I'll re-spin and fix those style issues.
+> 
+>>> +		wakeup-source;
+>>> +		pinctrl-names = "default";
+>>> +		pinctrl-0 = <&trackpad_irq>;
+>>> +		linux,gpio-keymap = < KEY_RESERVED
+>>> +				      KEY_RESERVED
+>>> +				      0		/* GPIO 0 */
+>>> +				      0		/* GPIO 1 */
+>>> +				      0		/* GPIO 2 */
+>>> +				      BTN_LEFT 	/* GPIO 3 */
+>>> +				      KEY_RESERVED
+>>> +				      KEY_RESERVED >;
+>>> +	};
+>>
+>> Coincidentally, I experimentally came up with a very similar DT node for
+>> Spring the weekend:
+>>
+>> +	trackpad at 4b {
+>> +		compatible = "atmel,maxtouch";
+>> +		reg = <0x4b>;
+>> +		interrupt-parent = <&gpx1>;
+>> +		interrupts = <2 IRQ_TYPE_NONE>;
+>> +		pinctrl-names = "default";
+>> +		pinctrl-0 = <&trackpad_irq>;
+>> +		linux,gpio-keymap = <KEY_RESERVED
+>> +		                     KEY_RESERVED
+>> +		                     KEY_RESERVED
+>> +		                     KEY_RESERVED
+>> +		                     KEY_RESERVED
+>> +		                     BTN_LEFT>;
+>> +		wakeup-source;
+>> +	};
+>>
+>> 0 == KEY_RESERVED, so you can consistently use it for GPIO 0-2, too. :)
+>>
+> 
+> I know that the value of KEY_RESERVED is 0 but I didn't use KEY_RESERVED
+> for the GPIO on purpose.
+> 
+> What I understood is that the SPT_GPIOPWN_T19 object sends messages using
+> a status byte so you have a maximum of 8 GPIO but not every maXTouch
+> devices use all of them. So in the particular case of the device in the
+> Peach Pit, from the 8 possible GPIO only 4 can be used and these are pins
+> 2-5. So in theory you could connect 3 more GPIO in case you had more
+> buttons (e.g: BTN_RIGHT, BTN_MIDDLE) but only 1 is used since the
+> Chromebook just have BTN_LEFT.
+
+FWIW when I press to the bottom right of my touchpad, I do get
+right-click functionality even with just BTN_LEFT specified in the
+keymap. Magic. :)
+
+> Nick sent a patch [0] that extend the atmel touchpad DT binding and the
+> doc says "Use KEY_RESERVED for unused padding values". But is not clear
+> what value you should use for GPIO that are actually supported by the
+> device but have no keycode associated.
+> 
+> So by using 0 instead of KEY_RESERVED I wanted to document that pins 2-4
+> are actually supported and not reserved by the device but there is no
+> keycode associated with that GPIO.
+
+You already documented that via comments though.
+
+> If there was a BTN_NONE or KEY_UNUSED it would had been better but I think
+> that making a distinction between these two cases (reserved pin vs GPIO
+> available but not used) is useful.
+
+Maybe Nick can comment here.
+
+>> I probably should add the two trailing _RESERVEDs, too?
+>>
+> 
+> I see that is used for properties that are arrays, for example
+> "linux,keymap" in Documentation/devicetree/bindings/input/matrix-keymap.txt.
+
+That does not answer my question: Do all maxTouch touchpads (or
+specifically that in Spring) need eight entries, padded with said
+KEY_RESERVED? In my experiments using just six entries (i.e., until the
+non-zero entry) worked okay - so does this T19 message have specifically
+eight bits? Tegra used just four entries iirc.
+
+>> With my above snippet I got an awful lot of "Interrupt triggered but
+>> zero messages" warnings (which I simply commented out as quickfix).
+>> Is that why you are using _EDGE_FALLING? Or pin-function 0xf?
+>> (In my case the ChromeOS DT had IRQ_TYPE_NONE and pin-function 0x0.)
+>>
+> 
+> These are two separate but related things:
+> 
+> a) IRQF_TRIGGER_FALLING:
+> 
+> Yes, the Chrome OS DT for Peach Pit also has IRQ_TYPE_NONE but the DTS is
+> not correct.
+> 
+> If you look at the Chrome OS atmel driver
+> (drivers/input/touchscreen/atmel_mxt_ts.c), it passes IRQF_TRIGGER_FALLING
+> to request_threaded_irq():
+> 
+> /* Default to falling edge if no platform data provided */
+> irqflags = data->pdata ? data->pdata->irqflags : IRQF_TRIGGER_FALLING;
+> error = request_threaded_irq(client->irq, NULL, mxt_interrupt,
+> 			     irqflags | IRQF_ONESHOT,
+> 			     client->name, data);
+> 
+> The above code is wrong since is overwriting the edge/level type flags set
+> by OF when parsing the "interrupts" property so you have to use the
+> expected IRQ flags in your DTS.
+> 
+> b) pin-function 0xf instead of 0x0:
+> 
+> The pin-function 0x0 is GPIO input while 0xf is GPIO IRQ. Usually on other
+> SoCs to use a GPIO IRQ you just configure the pad as GPIO input and then
+> enable the pin as an interrupt but on Exynos SoC these are really two
+> different functions. So if you configure the pin as GPIO input and this
+> happens after the pin is configured as GPIO IRQ, interrupts are not triggered.
+> 
+> I faced that issue before [1] and was solved with Tomasz's commit:
+> 
+> f6a8249 pinctrl: exynos: Lock GPIOs as interrupts when used as EINTs
+> 
+> which changes the pinctrl-exynos driver to setup a pin as GPIO IRQ on
+> .irq_request_resources instead of .irq_set_type. So, with that patch even
+> when pin-function re-configures the function to GPIO input, is then
+> configured as GPIO IRQ when request_threaded_irq() is called.
+> 
+> So probably is working for you just because you tested on linux-next that
+> already has Tomasz's changes but still the correct thing to do is to setup
+> the pin as 0xf. This change probably is needed on other pins used as GPIO
+> IRQ that are using 0x0 now.
+> 
+> Sorry, the email became longer than I wanted but I hope is helpful to you.
+
+Thanks for the explanations, I'll test those settings on Spring then.
+
+Could you point me to what ChromeOS tree and branch I should be looking
+at? For instance, the linux-next.git chromeos-3.8 branch did not have
+any DT for Spring. Therefore my series is based on /proc/device-tree
+rather than any ChromeOS source code.
+
+Thanks,
+Andreas
+
+-- 
+SUSE LINUX Products GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
+GF: Jeff Hawn, Jennifer Guild, Felix Imend?rffer; HRB 16746 AG N?rnberg
