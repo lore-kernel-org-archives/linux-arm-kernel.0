@@ -1,32 +1,29 @@
-From: magnus.damm@gmail.com (Magnus Damm)
-Date: Wed, 27 Aug 2014 10:45:54 +0900
-Subject: [PATCH v2 0/5] ARM: shmobile: correct memory maps
-In-Reply-To: <1409099726-21814-1-git-send-email-horms+renesas@verge.net.au>
-References: <1409099726-21814-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <CANqRtoTSxB3GQoYg6ecpKQ4N7JO2ahotjaAL3oEebE1h3PGtZg@mail.gmail.com>
+From: ykai007@gmail.com (Kever Yang)
+Date: Wed, 27 Aug 2014 09:47:40 +0800
+Subject: [PATCH] ARM: dts: make arch-timer always on in rk3288 soc
+Message-ID: <1409104060-26294-1-git-send-email-kever.yang@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Simon,
+We need use the hrtimer, which need the arch-timer to be 'always-on'
 
-On Wed, Aug 27, 2014 at 9:35 AM, Simon Horman
-<horms+renesas@verge.net.au> wrote:
-> This short series builds on a previous posting
-> of a patch to correct the value of the second memory region
-> of the lager. It does that and also corrects the syntax
-> used for the lager and other shmobile boards.
->
-> Simon Horman (5):
->   ARM: shmobile: lager: correct memory map value and syntax
->   ARM: shmobile: henninger: correct memory map syntax
->   ARM: shmobile: koelsch: correct memory map syntax
->   ARM: shmobile: ape6evm-reference: correct memory map syntax
->   ARM: shmobile: ape6evm: correct memory map syntax
+Signed-off-by: Kever Yang <kever.yang@rock-chips.com>
+---
 
-Thanks for improving the current state. The patches look fine to me.
+ arch/arm/boot/dts/rk3288.dtsi | 1 +
+ 1 file changed, 1 insertion(+)
 
-Acked-by: Magnus Damm <damm+renesas@opensource.se>
-
-Cheers,
-
-/ magnus
+diff --git a/arch/arm/boot/dts/rk3288.dtsi b/arch/arm/boot/dts/rk3288.dtsi
+index 5950b0a..698e6ea 100644
+--- a/arch/arm/boot/dts/rk3288.dtsi
++++ b/arch/arm/boot/dts/rk3288.dtsi
+@@ -76,6 +76,7 @@
+ 			     <GIC_PPI 11 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>,
+ 			     <GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>;
+ 		clock-frequency = <24000000>;
++		always-on;
+ 	};
+ 
+ 	i2c1: i2c at ff140000 {
+-- 
+1.9.1
