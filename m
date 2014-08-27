@@ -1,58 +1,159 @@
-From: sjoerd.simons@collabora.co.uk (Sjoerd Simons)
-Date: Wed, 27 Aug 2014 09:28:29 +0200
-Subject: [PATCH 2/2 v2] ARM: exynos_defconfig: enable USB gadget support
-In-Reply-To: <53FD36AD.1020509@suse.de>
-References: <1409038230-7242-1-git-send-email-sjoerd.simons@collabora.co.uk>
- <1409038230-7242-3-git-send-email-sjoerd.simons@collabora.co.uk>
- <53FD36AD.1020509@suse.de>
-Message-ID: <1409124509.31096.42.camel@collabora.co.uk>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Wed, 27 Aug 2014 09:37:38 +0200
+Subject: [PATCH 3/9] PM / Domains: Add APIs to attach/detach a power
+ domain for a device
+In-Reply-To: <4718058.Ou8igBffVK@vostro.rjw.lan>
+References: <1409054837-5667-1-git-send-email-ulf.hansson@linaro.org>
+ <1409054837-5667-4-git-send-email-ulf.hansson@linaro.org>
+ <4718058.Ou8igBffVK@vostro.rjw.lan>
+Message-ID: <CAPDyKFoMjYaTzD1+Z9dxByMYZv3Qo4xKyMFT7XKRyq7oijr9ng@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2014-08-27 at 03:38 +0200, Andreas F?rber wrote:
-> Am 26.08.2014 09:30, schrieb Sjoerd Simons:
-> > Enable USB gadget support without support for any specific gadgets to
-> > more easily catch cases where a devices dts doesn't specify the usb
-> > controllers dr_mode while it should.
-> > 
-> > Signed-off-by: Sjoerd Simons <sjoerd.simons@collabora.co.uk>
-> > ---
-> >  Changes in v2: none
-> > 
-> >  arch/arm/configs/exynos_defconfig | 1 +
-> >  1 file changed, 1 insertion(+)
-> > 
-> > diff --git a/arch/arm/configs/exynos_defconfig b/arch/arm/configs/exynos_defconfig
-> > index fc7d168..3664120 100644
-> > --- a/arch/arm/configs/exynos_defconfig
-> > +++ b/arch/arm/configs/exynos_defconfig
-> > @@ -54,6 +54,7 @@ CONFIG_SMSC911X=y
-> >  CONFIG_USB_USBNET=y
-> >  CONFIG_USB_NET_SMSC75XX=y
-> >  CONFIG_USB_NET_SMSC95XX=y
-> > +CONFIG_USB_GADGET=y
-> 
-> Do we also need CONFIG_USB_DWC3_DUAL_ROLE=y? The default seemed to be
-> CONFIG_USB_DWC3_HOST.
+On 27 August 2014 02:20, Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
+> On Tuesday, August 26, 2014 02:07:11 PM Ulf Hansson wrote:
+>> To maintain scalability let's add common methods to attach and detach
+>> a power domain for a device, dev_pm_domain_attach|detach().
+>>
+>> Typically dev_pm_domain_attach() shall be invoked from subsystem level
+>> code at the probe phase to try to attach a device to it's power domain.
+>> The reversed actions may be done a the remove phase and then by invoking
+>> dev_pm_domain_detach().
+>>
+>> The supported power domains at this point are the ACPI and the generic
+>> power domains.
+>>
+>> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+>> ---
+>>  drivers/base/power/common.c | 58 +++++++++++++++++++++++++++++++++++++++++++++
+>>  include/linux/pm.h          | 14 +++++++++++
+>>  2 files changed, 72 insertions(+)
+>>
+>> diff --git a/drivers/base/power/common.c b/drivers/base/power/common.c
+>> index df2e5ee..f544128 100644
+>> --- a/drivers/base/power/common.c
+>> +++ b/drivers/base/power/common.c
+>> @@ -11,6 +11,8 @@
+>>  #include <linux/export.h>
+>>  #include <linux/slab.h>
+>>  #include <linux/pm_clock.h>
+>> +#include <linux/acpi.h>
+>> +#include <linux/pm_domain.h>
+>>
+>>  /**
+>>   * dev_pm_get_subsys_data - Create or refcount power.subsys_data for device.
+>> @@ -82,3 +84,59 @@ int dev_pm_put_subsys_data(struct device *dev)
+>>       return ret;
+>>  }
+>>  EXPORT_SYMBOL_GPL(dev_pm_put_subsys_data);
+>> +
+>> +/**
+>> + * dev_pm_domain_attach - Attach a device to it's power domain.
+>> + * @dev: Device to attach.
+>> + * @power_on: Used to indicate whether we should power on the device.
+>> + *
+>> + * The @dev may only be attached to a single power domain. By iterating through
+>> + * the available alternatives we try to find a valid domain for the device.
+>> + *
+>> + * This function should typically be invoked from subsystem level code during
+>> + * the probe phase. Especially for those that's hold devices which requires
+>> + * power management through power domains.
+>> + *
+>> + * Callers must ensure proper synchronization of this function with power
+>> + * management callbacks.
+>> + *
+>> + * Returns 0 on successfully attached power domain or negative error code.
+>> + */
+>> +int dev_pm_domain_attach(struct device *dev, bool power_on)
+>> +{
+>> +     int ret;
+>> +
+>> +     ret = acpi_dev_pm_attach(dev, power_on);
+>> +     if (ret == -EPROBE_DEFER)
+>
+> This doesn't seem to be possible today.  At least I'm not sure how it can
+> happen.
 
-Nope that gets set by this Kconfig snippet:
+You are right, but I did this intentionally. The reason for having
+this check, was that I didn't want the new API to put the limit on
+handling deferred probe.
 
-choice
-   bool "DWC3 Mode Selection"
-   default USB_DWC3_DUAL_ROLE if (USB && USB_GADGET)
-   default USB_DWC3_HOST if (USB && !USB_GADGET)
-   default USB_DWC3_GADGET if (!USB && USB_GADGET)
+I happy the above check, if you think it's better!?
 
-Iotw by both enable USB and USB_GADGET the default will switch form
-CONFIG_USB_DWC3_HOST to CONFIG_USB_DWC3_DUAL_ROLE=y
+Kind regards
+Uffe
 
--- 
-Sjoerd Simons <sjoerd.simons@collabora.co.uk>
-Collabora Ltd.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: smime.p7s
-Type: application/x-pkcs7-signature
-Size: 6170 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140827/ecf9bbfd/attachment.bin>
+>
+>> +             return ret;
+>> +     else
+>> +             ret = genpd_dev_pm_attach(dev);
+>> +
+>> +     return ret;
+>> +}
+>> +EXPORT_SYMBOL_GPL(dev_pm_domain_attach);
+>
+> On a more general note, are you sure that the place where we call
+> acpi_dev_pm_attach() will always be suitable for calling genpd_dev_pm_attach()?
+>
+
+Currently, I haven't seen any place where it doesn't make sense.
+
+Additionally if such place is found, we may either just ignore it and
+let the caller of the API worry about the returned error or invoke the
+genpd/acpi API immediately instead.
+
+>> +
+>> +/**
+>> + * dev_pm_domain_detach - Detach a device from it's power domain.
+>> + * @dev: Device to attach.
+>> + * @power_off: Used to indicate whether we should power off the device.
+>> + *
+>> + * The @dev may be attached to a power domain. By iterating through the
+>> + * available alternatives we detach it from it's power domain.
+>> + *
+>> + * This functions will reverse the actions from dev_pm_domain_attach() and
+>> + * thus detach the @dev from it's power domain. Typically it should be invoked
+>> + * from subsystem level code during the remove phase.
+>> + *
+>> + * Callers must ensure proper synchronization of this function with power
+>> + * management callbacks.
+>> + *
+>> + * Returns 0 on successfully detached power domain or negative error code.
+>> + */
+>> +int dev_pm_domain_detach(struct device *dev, bool power_off)
+>> +{
+>> +     if (acpi_dev_pm_detach(dev, power_off))
+>> +             return genpd_dev_pm_detach(dev);
+>> +     return 0;
+>> +}
+>> +EXPORT_SYMBOL_GPL(dev_pm_domain_detach);
+>> diff --git a/include/linux/pm.h b/include/linux/pm.h
+>> index 72c0fe0..8176b07 100644
+>> --- a/include/linux/pm.h
+>> +++ b/include/linux/pm.h
+>> @@ -621,6 +621,20 @@ struct dev_pm_domain {
+>>       struct dev_pm_ops       ops;
+>>  };
+>>
+>> +#ifdef CONFIG_PM
+>> +extern int dev_pm_domain_attach(struct device *dev, bool power_on);
+>> +extern int dev_pm_domain_detach(struct device *dev, bool power_off);
+>> +#else
+>> +static inline int dev_pm_domain_attach(struct device *dev, bool power_on)
+>> +{
+>> +     return -ENODEV;
+>> +}
+>> +static inline int dev_pm_domain_detach(struct device *dev, bool power_off)
+>> +{
+>> +     return -ENODEV;
+>> +}
+>> +#endif
+>> +
+>>  /*
+>>   * The PM_EVENT_ messages are also used by drivers implementing the legacy
+>>   * suspend framework, based on the ->suspend() and ->resume() callbacks common
+>>
+>
+> --
+> I speak only for myself.
+> Rafael J. Wysocki, Intel Open Source Technology Center.
