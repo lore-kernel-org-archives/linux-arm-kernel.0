@@ -1,33 +1,41 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 27 Aug 2014 10:16:59 +0100
-Subject: [PATCH V2] setup: Move unmask of async interrupts after possible
- earlycon setup
-In-Reply-To: <1409084618-14693-1-git-send-email-jcm@redhat.com>
-References: <1409084618-14693-1-git-send-email-jcm@redhat.com>
-Message-ID: <20140827091659.GF6968@arm.com>
+From: holler@ahsoftware.de (Alexander Holler)
+Date: Wed, 27 Aug 2014 11:26:59 +0200
+Subject: [RFC PATCH 0/9] dt: dependencies (for deterministic driver
+ initialization order based on the DT)
+In-Reply-To: <53FD85C7.4080900@ahsoftware.de>
+References: <20140825093931.GB2399@ulmo> <E1XLu15-0002DP-6o@jdl.com>
+ <20140825133714.GH4163@ulmo.nvidia.com>
+ <20140826084208.AE5F0C40989@trevor.secretlab.ca>
+ <20140826084922.GG17263@ulmo> <53FC566C.30904@ahsoftware.de>
+ <20140826102503.GC31124@ulmo> <53FC6513.5040800@ahsoftware.de>
+ <20140826110827.GA31350@ulmo> <53FC6E4A.6030407@ahsoftware.de>
+ <20140826114718.GB641@ulmo> <53FC76E8.5050009@ahsoftware.de>
+ <E1XMHGc-0008TS-CQ@jdl.com> <53FD85C7.4080900@ahsoftware.de>
+Message-ID: <53FDA463.8040704@ahsoftware.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 26, 2014 at 09:23:38PM +0100, Jon Masters wrote:
-> The kernel wants to enable reporting of asynchronous interrupts (i.e.
-> System Errors) as early as possible. But if this happens too early then
-> any pending System Error on initial entry into the kernel may never be
-> reported where a user can see it. This situation will occur if the kernel
-> is configured with CONFIG_PANIC_ON_OOPS set and (default or command line)
-> enabled, in which case the kernel will panic as intended, however the
-> associated logging messages indicating this failure condition will remain
-> only in the kernel ring buffer and never be flushed out to the (not yet
-> configured) console. Therefore, this patch moves the enabling of
-> asynchronous interrupts during early setup to as early as reasonable,
-> but after parsing any possible earlycon parameters setting up earlycon.
-> 
-> Signed-off-by: Jon Masters <jcm@redhat.com>
+Am 27.08.2014 09:16, schrieb Alexander Holler:
 
-The patch looks fine, we'll pick it up. We initially didn't have this at
-all and it was only showing when it got to user space. But I moved it
-too early afterwards.
+> Why should I? I've posted patches along with a lot of comments and
+> explanations, and e.g. you are just talking that it should be made like
+> my patches already did. And others do talk too like my patches and the
+> accompanying comments from me which explain most stuff never have
+> existed and just repeat what the patches already do without refering to
+> them.
 
-Thanks.
+Just to repeat myself:
 
--- 
-Catalin
+These patches which started this thread are not just some ideas without 
+any sense for the amount of work necessary to implement them (as seen so 
+often).
+
+These patches are real working code everyone can apply to the mentioned 
+kernel version and see what happens with his board. They are even 
+checkpatched to avoid bean counting discussion.
+
+(Don't forget to use patch 10/9 too)
+
+Regards,
+
+Alexander Holler
