@@ -1,48 +1,83 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 27 Aug 2014 18:40:01 +0100
-Subject: [PATCH 6/6] arm64: Emulate CP15 Barrier instructions
-In-Reply-To: <1409048930-21598-7-git-send-email-punit.agrawal@arm.com>
-References: <1409048930-21598-1-git-send-email-punit.agrawal@arm.com>
- <1409048930-21598-7-git-send-email-punit.agrawal@arm.com>
-Message-ID: <20140827174001.GI13850@arm.com>
+From: cov@codeaurora.org (Christopher Covington)
+Date: Wed, 27 Aug 2014 13:50:08 -0400
+Subject: [PATCH 0/3] virtio: Clean up scatterlists and use the DMA API
+In-Reply-To: <CALCETrUGka4jpDUKkQwATYOe-FwOwprom8yEBtWR0w0y-nrdZw@mail.gmail.com>
+References: <cover.1409087794.git.luto@amacapital.net>
+ <CAJSP0QUcXQ+JV0wys2Mr-+OsFKt=hTGbUxNqfpk-JuyULiQABQ@mail.gmail.com>
+ <CALCETrUWR8p7XSiTALd19LL4mTgkXu_XEewobouz6Jbkb4KjLw@mail.gmail.com>
+ <20140827154537.GB18900@redhat.com>
+ <CALCETrVUg3fCQS0rjOD1BbauXHfnydPyP3mNMeiGu4NqBgLK6A@mail.gmail.com>
+ <53FE03C3.90309@codeaurora.org>
+ <CALCETrWcMO_zkNEuXBeqSAt6FSvUaFve+_5JC-rk5vObvBZWSg@mail.gmail.com>
+ <53FE16C2.4010104@codeaurora.org>
+ <CALCETrUGka4jpDUKkQwATYOe-FwOwprom8yEBtWR0w0y-nrdZw@mail.gmail.com>
+Message-ID: <53FE1A50.3050408@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 26, 2014 at 11:28:50AM +0100, Punit Agrawal wrote:
-> diff --git a/arch/arm64/kernel/v7_obsolete.c b/arch/arm64/kernel/v7_obsolete.c
-> index e9427cb..ed77889 100644
-> --- a/arch/arm64/kernel/v7_obsolete.c
-> +++ b/arch/arm64/kernel/v7_obsolete.c
-> @@ -227,6 +227,94 @@ static void __init swp_emulation_init(void)
->  		pr_notice("Registered SWP/SWPB emulation handler\n");
->  }
->  
-> +static atomic_t cp15_barrier_count;
+On 08/27/2014 01:37 PM, Andy Lutomirski wrote:
+> On Wed, Aug 27, 2014 at 10:34 AM, Christopher Covington
+> <cov@codeaurora.org> wrote:
+>> On 08/27/2014 12:19 PM, Andy Lutomirski wrote:
+>>> On Wed, Aug 27, 2014 at 9:13 AM, Christopher Covington
+>>> <cov@codeaurora.org> wrote:
+>>
+>> Virtme looks interesting. If it's any use, here is my modest QEMU command line
+>> collection.
+>>
+>> $dir/bin/x86_64-linux-gnu/qemu-system-x86_64 \
+>>   -m 1024 \
+>>   -kernel $dir/boot/x86_64-linux-gnu/bzImage-x86_64 \
+>>   -append 'root=/dev/root init=/sbin/x86_64-linux-gnu/init rootfstype=9p
+>> rootflags=trans=virtio,version=9p2000.L ro console=ttyS0' \
+>>   -serial stdio \
+>>   -fsdev local,id=root,path=$dir,security_model=none \
+>>   -device virtio-9p-pci,fsdev=root,mount_tag=/dev/root \
+>>   -monitor none
+> 
+> This is similar to what virtme does, except that virtme will give you
+> a much more functional system at the cost of a small fraction of a
+> second of additional boot time.  And virtme sometimes supports modules
+> :)
+> 
+>>
+>> $dir/bin/x86_64-linux-gnu/qemu-system-arm \
+>>   -M virt \
+>>   -cpu cortex-a15 \
+>>   -m 1024 \
+>>   -kernel $dir/boot/arm-linux-gnueabihf/Image \
+>>   -append 'root=/dev/root init=/sbin/arm-linux-gnueabihf/init rootfstype=9p
+>> rootflags=trans=virtio,version=9p2000.L ro console=ttyAMA0' \
+>>   -serial stdio \
+>>   -fsdev local,id=root,path=$dir,security_model=none \
+>>   -device virtio-9p-device,fsdev=root,mount_tag=/dev/root \
+>>   -monitor none
+> 
+> Can you give me some hints as to how to configure a kernel for this?
+> I tried to get anything other than versatilepb working and gave up.
 
-Should we add counters for each barrier type? It may be more
-informative.
+I think you can just use vexpress_defconfig. If you want to from there you can
+unselect CONFIG_ARCH_VEXPRESS and set CONFIG_ARCH_VIRT=y, but I don't think
+that's strictly necessary.
 
-> +/* data barrier */
-> +static struct undef_hook cp15db_hook = {
-> +	.instr_mask	= 0x0fff0fdf,
-> +	.instr_val	= 0x0e070f9a,
-> +	.pstate_mask	= COMPAT_PSR_MODE_MASK,
-> +	.pstate_val	= COMPAT_PSR_MODE_USR,
-> +	.fn		= cp15barrier_handler,
-> +};
-> +
-> +/* instruction barrier */
-> +static struct undef_hook cp15isb_hook = {
-> +	.instr_mask	= 0x0fff0fff,
-> +	.instr_val	= 0x0e070f95,
-> +	.pstate_mask	= COMPAT_PSR_MODE_MASK,
-> +	.pstate_val	= COMPAT_PSR_MODE_USR,
-> +	.fn		= cp15barrier_handler,
-> +};
+>> $dir/bin/x86_64-linux-gnu/qemu-system-aarch64 \
+>>   -M virt \
+>>   -cpu cortex-a57 \
+>>   -m 1024 \
+>>   -kernel $dir/boot/aarch64-linux-gnu/Image \
+>>   -append 'root=/dev/root init=/sbin/aarch64-linux-gnu/init rootfstype=9p
+>> rootflags=trans=virtio,version=9p2000.L ro console=ttyAMA0' \
+>>   -serial stdio \
+>>   -fsdev local,id=root,path=$dir,security_model=none \
+>>   -device virtio-9p-device,fsdev=root,mount_tag=/dev/root -monitor none
+>>
+> 
+> Ooh, thanks!  I'll add support for this to virtme.
 
-It now crossed my mind that these CP15 barriers are valid in Thumb-2 as
-well, same encoding. But we need the hook and the masks here to trap
-them.
+Cheers,
+Christopher
 
 -- 
-Catalin
+Employee of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by the Linux Foundation.
