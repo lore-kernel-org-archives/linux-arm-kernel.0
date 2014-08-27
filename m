@@ -1,77 +1,123 @@
-From: msalter@redhat.com (Mark Salter)
-Date: Wed, 27 Aug 2014 17:01:18 -0400
-Subject: [PATCHv7 3/5] common: dma-mapping: Introduce common remapping
- functions
-In-Reply-To: <53FCBCC3.5040901@codeaurora.org>
-References: <1407800431-21566-1-git-send-email-lauraa@codeaurora.org>
- <1407800431-21566-4-git-send-email-lauraa@codeaurora.org>
- <CAAG0J99=wrz4+c49HeDvL0W9rDZKk2HNLdVtHv4ZJxU4-OjewA@mail.gmail.com>
- <53FCBCC3.5040901@codeaurora.org>
-Message-ID: <1409173278.9919.29.camel@deneb.redhat.com>
+From: sonnyrao@chromium.org (Sonny Rao)
+Date: Wed, 27 Aug 2014 14:03:39 -0700
+Subject: [PATCH] clocksource: arch_timer: Fix code to use physical timers when
+ requested
+Message-ID: <1409173419-13076-1-git-send-email-sonnyrao@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2014-08-26 at 09:58 -0700, Laura Abbott wrote:
-> On 8/26/2014 3:05 AM, James Hogan wrote:
-> > On 12 August 2014 00:40, Laura Abbott <lauraa@codeaurora.org> wrote:
-> >>
-> >> For architectures without coherent DMA, memory for DMA may
-> >> need to be remapped with coherent attributes. Factor out
-> >> the the remapping code from arm and put it in a
-> >> common location to reduce code duplication.
-> >>
-> >> As part of this, the arm APIs are now migrated away from
-> >> ioremap_page_range to the common APIs which use map_vm_area for remapping.
-> >> This should be an equivalent change and using map_vm_area is more
-> >> correct as ioremap_page_range is intended to bring in io addresses
-> >> into the cpu space and not regular kernel managed memory.
-> >>
-> >> Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
-> >> Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
-> > 
-> > This commit in linux-next () breaks the build for metag:
-> > 
-> > drivers/base/dma-mapping.c: In function ?dma_common_contiguous_remap?:
-> > drivers/base/dma-mapping.c:294: error: implicit declaration of
-> > function ?dma_common_pages_remap?
-> > drivers/base/dma-mapping.c:294: warning: assignment makes pointer from
-> > integer without a cast
-> > drivers/base/dma-mapping.c: At top level:
-> > drivers/base/dma-mapping.c:308: error: conflicting types for
-> > ?dma_common_pages_remap?
-> > drivers/base/dma-mapping.c:294: error: previous implicit declaration
-> > of ?dma_common_pages_remap? was here
-> > 
-> > Looks like metag isn't alone either:
-> > 
-> > $ git grep -L dma-mapping-common arch/*/include/asm/dma-mapping.h
-> > arch/arc/include/asm/dma-mapping.h
-> > arch/avr32/include/asm/dma-mapping.h
-> > arch/blackfin/include/asm/dma-mapping.h
-> > arch/c6x/include/asm/dma-mapping.h
-> > arch/cris/include/asm/dma-mapping.h
-> > arch/frv/include/asm/dma-mapping.h
-> > arch/m68k/include/asm/dma-mapping.h
-> > arch/metag/include/asm/dma-mapping.h
-> > arch/mn10300/include/asm/dma-mapping.h
-> > arch/parisc/include/asm/dma-mapping.h
-> > arch/xtensa/include/asm/dma-mapping.h
-> > 
-> > I've checked a couple of these arches (blackfin, xtensa) which don't
-> > include dma-mapping-common.h and their builds seem to be broken too.
-> > 
-> > Cheers
-> > James
-> > 
-> 
-> Thanks for the report. Would you mind giving the following patch
-> a test (this is theoretical only but I think it should work)
+This is a bug fix for using physical arch timers when
+the arch_timer_use_virtual boolean is false.  It restores the
+arch_counter_get_cntpct() function after removal in
 
-There's a further problem with c6x (no  MMU):
+0d651e4e "clocksource: arch_timer: use virtual counters"
 
-drivers/built-in.o: In function `dma_common_pages_remap':
-(.text+0x220c4): undefined reference to `get_vm_area_caller'
-drivers/built-in.o: In function `dma_common_pages_remap':
-(.text+0x22108): undefined reference to `map_vm_area'
-drivers/built-in.o: In function `dma_common_free_remap':
-(.text+0x22278): undefined reference to `find_vm_area'
+and completes the implementation of memory mapped access for physical
+timers, so if a system is trying to use physical timers, it will
+function properly.
+
+Signed-off-by: Sonny Rao <sonnyrao@chromium.org>
+---
+ arch/arm/include/asm/arch_timer.h    |  9 +++++++++
+ arch/arm64/include/asm/arch_timer.h  | 10 ++++++++++
+ drivers/clocksource/arm_arch_timer.c | 30 ++++++++++++++++++++++++++----
+ 3 files changed, 45 insertions(+), 4 deletions(-)
+
+diff --git a/arch/arm/include/asm/arch_timer.h b/arch/arm/include/asm/arch_timer.h
+index 0704e0c..e72aa4d 100644
+--- a/arch/arm/include/asm/arch_timer.h
++++ b/arch/arm/include/asm/arch_timer.h
+@@ -78,6 +78,15 @@ static inline u32 arch_timer_get_cntfrq(void)
+ 	return val;
+ }
+ 
++static inline u64 arch_counter_get_cntpct(void)
++{
++	u64 cval;
++
++	isb();
++	asm volatile("mrrc p15, 0, %Q0, %R0, c14" : "=r" (cval));
++	return cval;
++}
++
+ static inline u64 arch_counter_get_cntvct(void)
+ {
+ 	u64 cval;
+diff --git a/arch/arm64/include/asm/arch_timer.h b/arch/arm64/include/asm/arch_timer.h
+index 9400596..58657c4 100644
+--- a/arch/arm64/include/asm/arch_timer.h
++++ b/arch/arm64/include/asm/arch_timer.h
+@@ -135,6 +135,16 @@ static inline void arch_timer_evtstrm_enable(int divider)
+ #endif
+ }
+ 
++static inline u64 arch_counter_get_cntpct(void)
++{
++	u64 cval;
++
++	isb();
++	asm volatile("mrs %0, cntpct_el0" : "=r" (cval));
++
++	return cval;
++}
++
+ static inline u64 arch_counter_get_cntvct(void)
+ {
+ 	u64 cval;
+diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
+index 5163ec1..ad723cb 100644
+--- a/drivers/clocksource/arm_arch_timer.c
++++ b/drivers/clocksource/arm_arch_timer.c
+@@ -30,6 +30,8 @@
+ #define CNTTIDR		0x08
+ #define CNTTIDR_VIRT(n)	(BIT(1) << ((n) * 4))
+ 
++#define CNTPCT_LO	0x00
++#define CNTPCT_HI	0x04
+ #define CNTVCT_LO	0x08
+ #define CNTVCT_HI	0x0c
+ #define CNTFRQ		0x10
+@@ -386,6 +388,19 @@ static u64 arch_counter_get_cntvct_mem(void)
+ 	return ((u64) vct_hi << 32) | vct_lo;
+ }
+ 
++static u64 arch_counter_get_cntpct_mem(void)
++{
++	u32 pct_lo, pct_hi, tmp_hi;
++
++	do {
++		pct_hi = readl_relaxed(arch_counter_base + CNTPCT_HI);
++		pct_lo = readl_relaxed(arch_counter_base + CNTPCT_LO);
++		tmp_hi = readl_relaxed(arch_counter_base + CNTPCT_HI);
++	} while (pct_hi != tmp_hi);
++
++	return ((u64) pct_hi << 32) | pct_lo;
++}
++
+ /*
+  * Default to cp15 based access because arm64 uses this function for
+  * sched_clock() before DT is probed and the cp15 method is guaranteed
+@@ -429,10 +444,17 @@ static void __init arch_counter_register(unsigned type)
+ 	u64 start_count;
+ 
+ 	/* Register the CP15 based counter if we have one */
+-	if (type & ARCH_CP15_TIMER)
+-		arch_timer_read_counter = arch_counter_get_cntvct;
+-	else
+-		arch_timer_read_counter = arch_counter_get_cntvct_mem;
++	if (type & ARCH_CP15_TIMER) {
++		if (arch_timer_use_virtual)
++			arch_timer_read_counter = arch_counter_get_cntvct;
++		else
++			arch_timer_read_counter = arch_counter_get_cntpct;
++	} else {
++		if (arch_timer_use_virtual)
++			arch_timer_read_counter = arch_counter_get_cntvct_mem;
++		else
++			arch_timer_read_counter = arch_counter_get_cntpct_mem;
++	}
+ 
+ 	start_count = arch_timer_read_counter();
+ 	clocksource_register_hz(&clocksource_counter, arch_timer_rate);
+-- 
+1.8.3.2
