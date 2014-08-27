@@ -1,68 +1,64 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 27 Aug 2014 12:09:28 +0100
-Subject: [PATCH 13/14] arm64: exynos7: Enable ARMv8 based Exynos7 (SoC)
- support
-In-Reply-To: <1409132660-1898-5-git-send-email-ch.naveen@samsung.com>
-References: <1409132660-1898-1-git-send-email-ch.naveen@samsung.com>
- <1409132660-1898-5-git-send-email-ch.naveen@samsung.com>
-Message-ID: <20140827110927.GC7773@leverpostej>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Wed, 27 Aug 2014 15:09:31 +0400
+Subject: [PATCH 2/3] clocksource: sh_mtu2: Document r7s72100 binding
+In-Reply-To: <1409115600-26192-3-git-send-email-horms+renesas@verge.net.au>
+References: <1409115600-26192-1-git-send-email-horms+renesas@verge.net.au>
+ <1409115600-26192-3-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <53FDBC6B.5090801@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hello.
 
-On Wed, Aug 27, 2014 at 10:44:20AM +0100, Naveen Krishna Chatradhi wrote:
-> From: Alim Akhtar <alim.akhtar@samsung.com>
-> 
-> This patch adds the necessary Kconfig entries to enable
-> support for the ARMv8 based Exynos7 SoC.
-> 
-> Signed-off-by: Alim Akhtar <alim.akhtar@samsung.com>
-> Signed-off-by: Naveen Krishna Chatradhi <ch.naveen@samsung.com>
-> Cc: Rob Herring <robh@kernel.org>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
+On 8/27/2014 8:59 AM, Simon Horman wrote:
+
+> In general Renesas hardware is not documented to the extent
+> where the relationship between IP blocks on different SoCs can be assumed
+> although they may appear to operate the same way. Furthermore the
+> documentation typically does not specify a version for individual
+> IP blocks. For these reasons a convention of using the SoC name in place
+> of a version and providing SoC-specific compat strings has been adopted.
+
+> Although not universally liked this convention is used in the bindings
+> for the drivers a number of drivers for Renesas hardware. The purpose
+> of this patch is to update the Renesas R-Car Multi-Function Timer Pulse
+> Unit 2 (MTU2) driver to follow this convention.
+
+> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+
 > ---
->  arch/arm64/Kconfig |   17 +++++++++++++++++
->  1 file changed, 17 insertions(+)
-> 
-> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-> index fd4e81a..d555558 100644
-> --- a/arch/arm64/Kconfig
-> +++ b/arch/arm64/Kconfig
-> @@ -134,6 +134,23 @@ source "kernel/Kconfig.freezer"
->  
->  menu "Platform selection"
->  
-> +config ARCH_EXYNOS7
-> +	bool "ARMv8 based SAMSUNG EXYNOS7"
-> +	select HAVE_S3C2410_WATCHDOG if WATCHDOG
-> +	select CLKSRC_OF
+> * I plan to follow up with a patch patch to use the new binding in the
+>    dtsi files for the r7s72100 SoC.
+> ---
+>   Documentation/devicetree/bindings/timer/renesas,mtu2.txt | 6 ++++--
+>   1 file changed, 4 insertions(+), 2 deletions(-)
+>
+> diff --git a/Documentation/devicetree/bindings/timer/renesas,mtu2.txt b/Documentation/devicetree/bindings/timer/renesas,mtu2.txt
+> index 917453f..ec4d334 100644
+> --- a/Documentation/devicetree/bindings/timer/renesas,mtu2.txt
+> +++ b/Documentation/devicetree/bindings/timer/renesas,mtu2.txt
+> @@ -8,7 +8,9 @@ are independent. The MTU2 hardware supports five channels indexed from 0 to 4.
+>
+>   Required Properties:
+>
+> -  - compatible: must contain "renesas,mtu2"
+> +  - compatible: must be one of the following.
 
-This seems to be implied by ARM_ARCH_TIMER in the core arm64 Kconfig, so
-I'm not sure this is necessary.
+    Your example below has both.
 
-> +	select COMMON_CLK_SAMSUNG
-> +	select GPIOLIB
+> +    - "renesas,mtu2" for generic MTU2
+> +    - "renesas,mtu2-r7s72100" for R7S72100 MTU2
+>
+>     - reg: base address and length of the registers block for the timer module.
+>
+> @@ -26,7 +28,7 @@ Required Properties:
+>   Example: R7S72100 (RZ/A1H) MTU2 node
+>
+>   	mtu2: timer at fcff0000 {
+> -		compatible = "renesas,mtu2";
+> +		compatible = "renesas,mtu2-r7s72100", "renesas,mtu2";
+>   		reg = <0xfcff0000 0x400>;
+>   		interrupts = <0 139 IRQ_TYPE_LEVEL_HIGH>,
+>   			     <0 146 IRQ_TYPE_LEVEL_HIGH>,
 
-You select ARCH_REQUIRE_GPIOLIB below, so is this necessary?
-
-> +	select PINCTRL
-> +	select PINCTRL_EXYNOS
-> +	select RTC_CLASS
-> +	select HAVE_S3C_RTC
-> +	select GENERIC_GPIO
-> +	select ARCH_REQUIRE_GPIOLIB
-> +	select HAVE_CLK
-
-Isn't this selected already through the core arm64 Kconfig?
-
-It looks like we have COMMON_CLK, which selects CLKDEV_LOOKUP, which
-selects HAVE_CLK.
-
-> +	select HAVE_SMP
-
-I may have missed something, but I didn't see any SMP support in this
-series.
-
-Thanks,
-Mark.
+WBR, Sergei
