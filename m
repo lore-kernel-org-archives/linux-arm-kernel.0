@@ -1,30 +1,46 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 27 Aug 2014 17:40:17 +0100
-Subject: [PATCH 1/6] arm: Fix in-correct barrier usage in SWP{B} emulation
-In-Reply-To: <1409048930-21598-2-git-send-email-punit.agrawal@arm.com>
-References: <1409048930-21598-1-git-send-email-punit.agrawal@arm.com>
- <1409048930-21598-2-git-send-email-punit.agrawal@arm.com>
-Message-ID: <20140827164016.GE13850@arm.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Wed, 27 Aug 2014 10:42:19 -0600
+Subject: [PATCH v2 3/9] of: Update Tegra XUSB pad controller binding for
+ USB
+In-Reply-To: <CAL1qeaGHuMegpeyumD8GrFRmeufkiiUygAdqu1ECHrfSkixwOQ@mail.gmail.com>
+References: <1408381705-3623-1-git-send-email-abrestic@chromium.org>	<1408381705-3623-4-git-send-email-abrestic@chromium.org>	<53FB8A8C.8040107@wwwdotorg.org>
+ <CAL1qeaGHuMegpeyumD8GrFRmeufkiiUygAdqu1ECHrfSkixwOQ@mail.gmail.com>
+Message-ID: <53FE0A6B.8000607@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 26, 2014 at 11:28:45AM +0100, Punit Agrawal wrote:
-> According to the ARM ARMv7, explicit barriers are necessary when using
-> synchronisation primitives such as SWP{B}. The use of these
-> instructions does not automatically imply a barrier and any ordering
-> requirements by the software must be explicitly expressed with the use
-> of suitable barriers.
-> 
-> Based on this, remove the barriers from SWP{B} emulation.
-> 
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
+On 08/27/2014 10:36 AM, Andrew Bresticker wrote:
+> On Mon, Aug 25, 2014 at 12:12 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
+>> On 08/18/2014 11:08 AM, Andrew Bresticker wrote:
+>>>    - #phy-cells: Should be 1. The specifier is the index of the PHY to
+>>> reference.
+>>>      See <dt-bindings/pinctrl/pinctrl-tegra-xusb.h> for the list of valid
+>>> values.
+>>> +- mboxes: Must contain an entry for the XUSB PHY mailbox channel.
+>>> +  See ../mailbox/mailbox.txt for details.
+>>
+>>
+>> Can we require the mbox-names property here, so that everything is looked up
+>> by names. I know that the proposed mbox binding states that using indexes is
+>> preferred over names, but that's just silly considering that names are
+>> widely used in most other similar bindings, and are much easier to extend in
+>> a backwards compatible fashion in the face of optional entries. As such, I'd
+>> prefer that all Tegra bindings use foo-names properties where they exist.
+>
+> Sure, will do.
+>
+>>> +Optional properties:
+>>> +-------------------
+>>> +- vbus-otg-{0,1,2}-supply: VBUS regulator for the corresponding UTMI pad.
+>>
+>>
+>> Why "-otg"? It's quite possible to have a regulator for VBUS even on systems
+>> that don't support OTG, but rather simply have the ability to turn VBUS off.
+>
+> Because they're the VBUS supplies for the OTG 'lanes'.  It doesn't
+> really add anything, so I'll omit the "-otg".
 
-This patch is independent to the SWP emulation for arm64 series. Unless
-Russell has any objections, you should send it to his patch system (git
-send-email to patches at arm.linux.org.uk with "KernelVersion: v3..." after
-the commit log; I hope Russell drops the KernelVersion requirement some
-day ;)).
-
--- 
-Catalin
+Ah right. In that case, if the lanes are named "OTG" lanes in the HW 
+docs, I'm happy either way. If you did decide to keep the "-otg", 
+rewording as "VBUS regulator for the corresponding OTG UTMI pad" would 
+make the meaning clearer.
