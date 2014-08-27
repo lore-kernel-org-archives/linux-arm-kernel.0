@@ -1,89 +1,43 @@
-From: khilman@linaro.org (Kevin Hilman)
-Date: Wed, 27 Aug 2014 13:22:43 -0700
-Subject: [PATCH 08/10] ARM: OMAP5/DRA7: PM: cpuidle MPU CSWR support
-In-Reply-To: <53FE3477.2020207@ti.com> (Santosh Shilimkar's message of "Wed,
- 27 Aug 2014 15:41:43 -0400")
-References: <1408716154-26101-1-git-send-email-nm@ti.com>
- <1408716154-26101-9-git-send-email-nm@ti.com>
- <7hvbpdbvb1.fsf@paris.lan>
- <CAGo_u6o7vAf=syzDTyxh0-kOhmzAmtdG_ardgFgoPQofrGdxUQ@mail.gmail.com>
- <53FE3477.2020207@ti.com>
-Message-ID: <7hegw1bs30.fsf@paris.lan>
+From: caesar.wang@rock-chips.com (Caesar Wang)
+Date: Thu, 28 Aug 2014 04:36:35 +0800
+Subject: [PATCH v2 2/2] dt-bindings: document Rockchip thermal
+In-Reply-To: <5911166.ElkaNhDZrP@wuerfel>
+References: <1409096503-7081-1-git-send-email-caesar.wang@rock-chips.com>
+ <1409096503-7081-3-git-send-email-caesar.wang@rock-chips.com>
+ <5911166.ElkaNhDZrP@wuerfel>
+Message-ID: <53FE4153.3080601@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Santosh Shilimkar <santosh.shilimkar@ti.com> writes:
+Arnd,
 
-> On Wednesday 27 August 2014 03:35 PM, Nishanth Menon wrote:
->> On Wed, Aug 27, 2014 at 2:13 PM, Kevin Hilman
->> <khilman@deeprootsystems.com> wrote:
->>> + Daniel (cpuidle maintainer)
->> [...]
->>>> +static int omap_enter_idle_smp(struct cpuidle_device *dev,
->>>> +                            struct cpuidle_driver *drv,
->>>> +                            int index)
->>>> +{
->>>> +     struct idle_statedata *cx = state_ptr + index;
->>>> +     unsigned long flag;
->>>> +
->>>> +     raw_spin_lock_irqsave(&mpu_lock, flag);
->>>> +     cx->mpu_state_vote++;
->>>> +     if (cx->mpu_state_vote == num_online_cpus()) {
->>>> +             pwrdm_set_logic_retst(mpu_pd, cx->mpu_logic_state);
->>>> +             omap_set_pwrdm_state(mpu_pd, cx->mpu_state);
->>>> +     }
->>>> +     raw_spin_unlock_irqrestore(&mpu_lock, flag);
->>>> +
->>>> +     omap4_enter_lowpower(dev->cpu, cx->cpu_state);
->>>> +
->>>> +     raw_spin_lock_irqsave(&mpu_lock, flag);
->>>> +     if (cx->mpu_state_vote == num_online_cpus())
->>>> +             omap_set_pwrdm_state(mpu_pd, PWRDM_POWER_ON);
->>>> +     cx->mpu_state_vote--;
->>>> +     raw_spin_unlock_irqrestore(&mpu_lock, flag);
->>>> +
->>>> +     return index;
->>>> +}
->>>
->>> Hmm, maybe OMAP5/DRA7 CPUidle driver should be a new one based on MCPM?
->> 
->> Trying to understand benefit of MCPM here - at least without a deeper
->> understanding of mcpm infrastructure benefits (first look seemed a
->> little heavy for OMAP5/DRA7 needs).
->> 
->> Neither DRA7/OMAP5 are multi-cluster, the SoCs are not targetted for
->> "OFF" of CPU1/0, we have mercury hardware to help with context and
->> sync issues.
->> 
->> Being able to reuse most of existing OMAP4 infrastructure code is
->> useful as well to leave the existing omap4 framework as being lighter
->> in complexity -esp in a cpuidle like hot path?
->> 
->> The spin_lock is only for the programming of MPU power domain in a
->> consistent manner - I suppose might have been the trigger for
->> proposing mcpm?
->> 
-> Mostly not....
+
+? 2014?08?28? 04:17, Arnd Bergmann ??:
+> On Wednesday 27 August 2014 07:41:43 Caesar Wang wrote:
+>> +- clock-names : Shall be "tsadc_clk" for the transfer-clock, and "tsadc_pclk" for
+>> +    the peripheral clock.
+>>
+> Why not just name them "clk" and "pclk"? The "tsadc" part seems highly redundant.
 >
-> I think this is coming because last time Nicolas Pitre tried to convert
-> the OMAP CPUIdle into MCPM but because of various ordering requirements,
-> OMAP wasn't suitable and then the plan was dropped later.
+> Alternatively, how about "transfer" and "peripheral"?
+
+It seems  nappropriate description.
+
+But,I will fix  as the following:
+
+-clock-names ? Shall be "tsadc" for the converter-clock, and "apb_pclk" for
+               the peripheral clock.
+
+Thanks!
+
+
+
 >
-> Just to make clear, OMAP OMAP5/DRA7 as well the ordering requirement
-> remains the same for deeper states. Its just the mercury retention state
-> which we are able to enter without ordering requirements and hence
-> the voting scheme.
+> 	Arnd
+>
+>
+>
 
-Ah, OK.  This is the part that I'm missing.  So for deeper states you'll
-need to be using omap_enter_idle_coupled()
-
-> Hope this clarifies to you as well as Kevin just in case he missed the
-> part of the deeper C-states requirements.
-
-Yes, thanks for clarifying.
-
-That being said, I think MCPM can now do essentially what the coupled
-states code is doing. Even so, that's probably not a reason to hold up
-this patch, but Daniel gets to make that call.
-
-Kevin
+-- 
+Best regards,
+Caesar
