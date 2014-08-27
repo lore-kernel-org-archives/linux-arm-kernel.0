@@ -1,71 +1,32 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Wed, 27 Aug 2014 15:05:55 +0200
-Subject: [linux-sunxi] Re: [PATCH 4/4] simplefb: add clock handling code
-In-Reply-To: <53FDD40A.3040106@redhat.com>
-References: <20140825150501.GE14763@ulmo.nvidia.com>
- <20140825152232.GE15297@lukather> <20140826080432.GD17263@ulmo>
- <20140826135341.GM15297@lukather> <20140826143550.GB3027@ulmo>
- <53FCE704.4030103@redhat.com> <20140827093121.GA23186@ulmo>
- <53FDB46C.5010609@redhat.com>
- <CAKON4Owj=b7r_iuOOrr_5R++oSbxqF0G0i4puFz7aTaUF+weuw@mail.gmail.com>
- <53FDD40A.3040106@redhat.com>
-Message-ID: <20140827130554.GG23186@ulmo>
+From: dinguyen@opensource.altera.com (Dinh Nguyen)
+Date: Wed, 27 Aug 2014 08:06:32 -0500
+Subject: [PATCHv10 2/2] arm: dts: Add Altera SDRAM EDAC bindings &
+ devicetree entries.
+In-Reply-To: <20140827063638.GA28234@nazgul.tnic>
+References: <1407770293-27190-1-git-send-email-tthayer@opensource.altera.com>
+ <1407770293-27190-3-git-send-email-tthayer@opensource.altera.com>
+ <20140814184949.GC11558@amd.pavel.ucw.cz>
+ <53FCD456.3050404@opensource.altera.com>
+ <53FCEDDA.4060906@opensource.altera.com> <20140827063638.GA28234@nazgul.tnic>
+Message-ID: <53FDD7D8.5050602@opensource.altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 27, 2014 at 02:50:18PM +0200, Hans de Goede wrote:
-> Hi,
-> 
-> On 08/27/2014 02:44 PM, jonsmirl at gmail.com wrote:
-> 
-> <snip>
-> 
-> >> 1) Serving as *the* fb until a kms driver is present
-> > 
-> > Why can't we whip together a real device specific fbdev driver and
-> > quit trying to run without a device specific driver in place? History
-> > has shown that to be bad idea except during early boot when there
-> > isn't a choice.
-> 
-> Writing a kms driver and getting it upstream is not a simple task, and
-> starting with a too limited implementation is dangerous as we need to get
-> the devicetree binding first from the get go.
-> 
-> IOW this is not really a realistic answer to problem 1.
-> 
-> <snip>
-> 
-> >> 2) Allowing for output of early kernel boot messages.
-> > 
-> > For this to work the kernel needs to know two things - address of the
-> > framebuffer and the x/y layout. Then just nuke this display when the
-> > kernel finishes the boot process.
-> 
-> Please read my earlier mails on how completely flawed it is to write
-> "when the kernel finishes the boot process". The problem is that there
-> is no way to really determine when this happens.
+Hi Boris
 
-That doesn't mean we can't create new ways to signal this. One option
-would be for userspace to signal this, another would be to have critical
-subsystems broadcast such events so that things like the clock framework
-can listen for those and react accordingly. The fact remains that
-disabling all unused clocks unconditinally at late_initcall time is not
-(always) the right thing to do.
+On 8/27/14, 1:36 AM, Borislav Petkov wrote:
+> On Tue, Aug 26, 2014 at 03:28:10PM -0500, Dinh Nguyen wrote:
+>> If Boris is okay with driver part and everyone else is OK with the DTS
+>> portion, then I can apply the DTS patch to my tree, and Boris take the
+>> driver patch into his tree?
+> 
+> Actually, it would be easier for everyone involved if those patches go
+> together due to their dependency. So if you want me to take a look at
+> the EDAC parts again and give you my ack so that you can pick them all
+> up together and they go through your tree, let me know.
+> 
 
-What this really is is a policy decision and traditionally we don't like
-to dictate policy in the kernel, so having something like an optional
-feature that would allow userspace to notify the kernel that it's
-initialized doesn't sound like a bad idea. This doesn't necessarily have
-to mean that all possible devices have been probed (users could choose
-to blacklist modules, etc.) but just an indication that the system is
-done with essential tasks (for desktop distributions I would assume that
-means the graphical login manager has started).
+That would be great!
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140827/fd1a80e0/attachment.sig>
+Thanks,
+Dinh
