@@ -1,159 +1,84 @@
-From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
-Date: Wed, 27 Aug 2014 09:13:44 +0200
-Subject: [PATCH v2 1/3] ARM: dts: Add Peach Pit dts entry for Atmel
- touchpad
-In-Reply-To: <53FD1001.30701@suse.de>
-References: <1409066937-3574-1-git-send-email-javier.martinez@collabora.co.uk>
- <1409066937-3574-2-git-send-email-javier.martinez@collabora.co.uk>
- <53FD1001.30701@suse.de>
-Message-ID: <53FD8528.7090504@collabora.co.uk>
+From: holler@ahsoftware.de (Alexander Holler)
+Date: Wed, 27 Aug 2014 09:16:23 +0200
+Subject: [RFC PATCH 0/9] dt: dependencies (for deterministic driver
+ initialization order based on the DT)
+In-Reply-To: <E1XMHGc-0008TS-CQ@jdl.com>
+References: <20140825093931.GB2399@ulmo> <E1XLu15-0002DP-6o@jdl.com>
+ <20140825133714.GH4163@ulmo.nvidia.com>
+ <20140826084208.AE5F0C40989@trevor.secretlab.ca>
+ <20140826084922.GG17263@ulmo> <53FC566C.30904@ahsoftware.de>
+ <20140826102503.GC31124@ulmo> <53FC6513.5040800@ahsoftware.de>
+ <20140826110827.GA31350@ulmo> <53FC6E4A.6030407@ahsoftware.de>
+ <20140826114718.GB641@ulmo> <53FC76E8.5050009@ahsoftware.de>
+ <E1XMHGc-0008TS-CQ@jdl.com>
+Message-ID: <53FD85C7.4080900@ahsoftware.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Andreas,
+Am 26.08.2014 15:58, schrieb Jon Loeliger:
 
-On 08/27/2014 12:53 AM, Andreas F?rber wrote:
->>  
->> +&hsi2c_8 {
->> +	status = "okay";
->> +	clock-frequency = <333000>;
->> +
->> +	trackpad at 4b {
->> +		compatible="atmel,maxtouch";
->> +		reg=<0x4b>;
->> +		interrupt-parent=<&gpx1>;
->> +		interrupts=<1 IRQ_TYPE_EDGE_FALLING>;
-> 
-> Nit: Here's a style break (4x spaces around '=' missing).
+> I think we need to do the complete topsort *before* we attempt
+> to do any probing.  So three steps:
 >
-
-True, these bits were copied from the downstream Chrome OS verbatim and
-the missing space around '=' was there, I missed that when reviewing.
-
-I'll re-spin and fix those style issues.
-
->> +		wakeup-source;
->> +		pinctrl-names = "default";
->> +		pinctrl-0 = <&trackpad_irq>;
->> +		linux,gpio-keymap = < KEY_RESERVED
->> +				      KEY_RESERVED
->> +				      0		/* GPIO 0 */
->> +				      0		/* GPIO 1 */
->> +				      0		/* GPIO 2 */
->> +				      BTN_LEFT 	/* GPIO 3 */
->> +				      KEY_RESERVED
->> +				      KEY_RESERVED >;
->> +	};
-> 
-> Coincidentally, I experimentally came up with a very similar DT node for
-> Spring the weekend:
-> 
-> +	trackpad at 4b {
-> +		compatible = "atmel,maxtouch";
-> +		reg = <0x4b>;
-> +		interrupt-parent = <&gpx1>;
-> +		interrupts = <2 IRQ_TYPE_NONE>;
-> +		pinctrl-names = "default";
-> +		pinctrl-0 = <&trackpad_irq>;
-> +		linux,gpio-keymap = <KEY_RESERVED
-> +		                     KEY_RESERVED
-> +		                     KEY_RESERVED
-> +		                     KEY_RESERVED
-> +		                     KEY_RESERVED
-> +		                     BTN_LEFT>;
-> +		wakeup-source;
-> +	};
-> 
-> 0 == KEY_RESERVED, so you can consistently use it for GPIO 0-2, too. :)
-> 
-
-I know that the value of KEY_RESERVED is 0 but I didn't use KEY_RESERVED
-for the GPIO on purpose.
-
-What I understood is that the SPT_GPIOPWN_T19 object sends messages using
-a status byte so you have a maximum of 8 GPIO but not every maXTouch
-devices use all of them. So in the particular case of the device in the
-Peach Pit, from the 8 possible GPIO only 4 can be used and these are pins
-2-5. So in theory you could connect 3 more GPIO in case you had more
-buttons (e.g: BTN_RIGHT, BTN_MIDDLE) but only 1 is used since the
-Chromebook just have BTN_LEFT.
-
-Nick sent a patch [0] that extend the atmel touchpad DT binding and the
-doc says "Use KEY_RESERVED for unused padding values". But is not clear
-what value you should use for GPIO that are actually supported by the
-device but have no keycode associated.
-
-So by using 0 instead of KEY_RESERVED I wanted to document that pins 2-4
-are actually supported and not reserved by the device but there is no
-keycode associated with that GPIO.
-
-If there was a BTN_NONE or KEY_UNUSED it would had been better but I think
-that making a distinction between these two cases (reserved pin vs GPIO
-available but not used) is useful.
-
-> I probably should add the two trailing _RESERVEDs, too?
-> 
-
-I see that is used for properties that are arrays, for example
-"linux,keymap" in Documentation/devicetree/bindings/input/matrix-keymap.txt.
-
-> With my above snippet I got an awful lot of "Interrupt triggered but
-> zero messages" warnings (which I simply commented out as quickfix).
-> Is that why you are using _EDGE_FALLING? Or pin-function 0xf?
-> (In my case the ChromeOS DT had IRQ_TYPE_NONE and pin-function 0x0.)
+>     1) Graph Construction
+>         Add a new "emit dependencies" function to driver bindings.
+>         Iterate over known devices or nodes in the DT in any order.
+> 	    Call the "emit dependencies" function.  It adds all
+> 	    dependency edges to a global graph by knowing what
+> 	    phandles or other pieces it will need.
+> 	    A driver with no "emit dependencies" function can be
+> 	    added to the graph anywhere without loss of generality.
+>         Add any additional edges for whatever reason.
 >
+>     2) Topsort the generated driver graph
+>
+>     3) Call probe for real in topsort order
+>
+> Alexander, I don't recall the details of your patch series.
+> Can you please remind us if it took this approach in the kernel?
+>
+>> Anyway, I'm leaving this discussion. I've already made a proposal
+>> which solved most mentioned problems (imho) and even offered usable
+>> patches
 
-These are two separate but related things:
+Why should I? I've posted patches along with a lot of comments and
+explanations, and e.g. you are just talking that it should be made like
+my patches already did. And others do talk too like my patches and the
+accompanying comments from me which explain most stuff never have 
+existed and just repeat what the patches already do without refering to 
+them.
 
-a) IRQF_TRIGGER_FALLING:
+> Darn.  I think you clearly have a pony in this race, and it
+> would be good if you still participated.  Really.
 
-Yes, the Chrome OS DT for Peach Pit also has IRQ_TYPE_NONE but the DTS is
-not correct.
+Thanks. But I don't see it as a race and I don't want to take part in a 
+race (and I usually avoid those silly contests which have become chic in 
+the IT world). I just offered a solution (or at least a working starting 
+point to a solution).
 
-If you look at the Chrome OS atmel driver
-(drivers/input/touchscreen/atmel_mxt_ts.c), it passes IRQF_TRIGGER_FALLING
-to request_threaded_irq():
+>> (ok, they suffer under the "not invented here" syndrom, but ...). ;)
+>
+> There isn't a single thing in the entire Linux Kernel community
+> that was "invented here"; every aspect of it was NIH'ed by *someone*.
+> That's how it gets built, changed, maintained, fixed, etc.
 
-/* Default to falling edge if no platform data provided */
-irqflags = data->pdata ? data->pdata->irqflags : IRQF_TRIGGER_FALLING;
-error = request_threaded_irq(client->irq, NULL, mxt_interrupt,
-			     irqflags | IRQF_ONESHOT,
-			     client->name, data);
+Might be true in an ideal open source world and might have been true for 
+past kernel development when most people weren't full time kernel 
+developers. But nowadays it appears to me like many parts of the kernel 
+have become in the hands of closed groups. And they build and enforce 
+hurdles that high, that nobody else can take them without spending an 
+idiotic amount of time. Just like many other "consortiums" do, you only 
+have to build enough rules to protect from the outside while still 
+looking open.
 
-The above code is wrong since is overwriting the edge/level type flags set
-by OF when parsing the "interrupts" property so you have to use the
-expected IRQ flags in your DTS.
+E.g. an example I've seen often is that someone spend a lot of time to 
+examine and fix a bug and write a commented patch. And the only response 
+from the maintainer was that he should add an emtpy line before a return 
+statement and similiar silly things to enforce patch-ping-pong. Such 
+just drives people on the other end crazy and they likely won't spend 
+the time to post another patch (they still might  fix other bugs, but 
+just for themself).
 
-b) pin-function 0xf instead of 0x0:
+Regards,
 
-The pin-function 0x0 is GPIO input while 0xf is GPIO IRQ. Usually on other
-SoCs to use a GPIO IRQ you just configure the pad as GPIO input and then
-enable the pin as an interrupt but on Exynos SoC these are really two
-different functions. So if you configure the pin as GPIO input and this
-happens after the pin is configured as GPIO IRQ, interrupts are not triggered.
-
-I faced that issue before [1] and was solved with Tomasz's commit:
-
-f6a8249 pinctrl: exynos: Lock GPIOs as interrupts when used as EINTs
-
-which changes the pinctrl-exynos driver to setup a pin as GPIO IRQ on
-.irq_request_resources instead of .irq_set_type. So, with that patch even
-when pin-function re-configures the function to GPIO input, is then
-configured as GPIO IRQ when request_threaded_irq() is called.
-
-So probably is working for you just because you tested on linux-next that
-already has Tomasz's changes but still the correct thing to do is to setup
-the pin as 0xf. This change probably is needed on other pins used as GPIO
-IRQ that are using 0x0 now.
-
-Sorry, the email became longer than I wanted but I hope is helpful to you.
-
-> Regards,
-> Andreas
-> 
-
-Best regards,
-Javier
-
-[0]: https://lkml.org/lkml/2014/8/15/244
-[1]: https://lkml.org/lkml/2014/8/8/621
+Alexander Holler
