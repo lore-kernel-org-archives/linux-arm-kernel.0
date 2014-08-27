@@ -1,79 +1,88 @@
-From: dianders@google.com (Doug Anderson)
-Date: Tue, 26 Aug 2014 21:14:11 -0700
-Subject: [PATCH V2 3/3] mmc: dw_mmc: Dont cut off vqmmc and vmmc
-In-Reply-To: <53FD5501.1010007@samsung.com>
-References: <1408715272-13833-1-git-send-email-yuvaraj.cd@samsung.com>
- <1408715272-13833-4-git-send-email-yuvaraj.cd@samsung.com>
- <CAPDyKFqz8sGj2td=ihZXN4zvAqmu9FHZjWdCn-ZRcdHugNHe2g@mail.gmail.com>
- <CAPz6YkXH1mMOTwcLkKdffdUHN+TaCAhpa8oG0h+rFn9i+GMoCw@mail.gmail.com>
- <CAPDyKFqp7oEt9ASmdxrgUwbQ8aTZzAuJ7uD1oGN50iuzPzBfVg@mail.gmail.com>
- <53FAF8C7.8040007@samsung.com>
- <CAD=FV=XbV7R+FqRRucA5Cv2A+=3g8zccASwxcTtJD6YyO-ioCg@mail.gmail.com>
- <53FD5501.1010007@samsung.com>
-Message-ID: <CAD=FV=VCw1mLpArSY1uj+1zorWROjqGeT3dcTJYzr_1J6jdsBQ@mail.gmail.com>
+From: zlim.lnx@gmail.com (Zi Shen Lim)
+Date: Tue, 26 Aug 2014 21:15:16 -0700
+Subject: [PATCHv2 00/14] arm64: eBPF JIT compiler
+Message-ID: <1409112930-25677-1-git-send-email-zlim.lnx@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Jaehoon,
+Hi Will, Catalin,
 
-On Tue, Aug 26, 2014 at 8:48 PM, Jaehoon Chung <jh80.chung@samsung.com> wrote:
-> Hi, Doug,
->
-> On 08/26/2014 12:25 AM, Doug Anderson wrote:
->> Jaehoon,
->>
->> On Mon, Aug 25, 2014 at 1:50 AM, Jaehoon Chung <jh80.chung@samsung.com> wrote:
->>> On 08/25/2014 05:13 PM, Ulf Hansson wrote:
->>>> On 22 August 2014 20:27, Sonny Rao <sonnyrao@chromium.org> wrote:
->>>>> On Fri, Aug 22, 2014 at 8:31 AM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
->>>>>> On 22 August 2014 15:47, Yuvaraj Kumar C D <yuvaraj.cd@gmail.com> wrote:
->>>>>>> Exynos 5250 and 5420 based boards uses built-in CD# line for card
->>>>>>> detection.But unfortunately CD# line is on the same voltage rails
->>>>>>> as of I/O voltage rails. When we cut off vqmmc,the consequent card
->>>>>>> detection will break in these boards.
->>>
->>> I didn't know that use CD# line for card detect.
->>> And if CD# voltage rails and I/O voltage rail are same voltage, it doesn't make sense.
->>> Which card is used with same voltages? (eMMC? SD? SDIO?)
->>>
->>> Well, I have checked Exynos5250 and 5420, but it looks like not same rails.
->>
->> I'm not sure I totally understood what you said.  In my manual I have
->> a table titled "Table 2-1 Exynos 5420 Pin List".  Look in this table
->> for XMMC2CDN and XMMC2DATA_0.  Look to the right of the table and
->> you'll see the power domain.  For both it shows VDDQ_MMC2.  If that
->> doesn't mean that the two are in the same voltage domain then I don't
->> know what does.  Can you point to any examples where they have
->> different voltage domains?
-> I think you're mis-understanding for it.
-> Right, It's described at exynos5420, but it's not connected.
+This is a respin of series implementing eBPF JIT compiler for arm64,
+on top of 3.17-rc2. The v1 series [1] missed the previous merge window.
 
-"It's not connected".  What do you mean?  If I were to guess I'd say
-that on some particular board you're looking at they don't happen to
-use the "CD" pin for card detect.  If this is what you mean, it
-doesn't help me.  exynos5420-peach-pit does use the CD pin for card
-detect.  You can look at the DTS file and confirm it.
+Patches [1-13/14] implement code generation functions. Unchanged from v1.
 
-...or are you saying that the CD pin somehow changes voltage domains
-when configured as a GPIO?  I find that very hard to believe.  What
-voltage domain does it go to?  If it goes to a 1.8V voltage domain
-then that would be bad when vqmmc was 3.3V.  If it goes to a 3.3V
-voltage domain then that would be bad when vqmmc was 1.8V.  Remember
-that externally we've got a pull up to vqmmc.
+Patch [14/14] implements the actual eBPF JIT compiler. Updated from v1:
+straightforward fixups due to changes from net.
+Please see [14/14] for detailed change log.
 
-Even if somehow magically we can read the card detect pin with vqmmc
-off, we have an external pullup on this line that goes directly to the
-"vqmmc" power rail.  If the vqmmc power rail is off then this external
-pull up would not work and would actually act as an external pull down
-if you could somehow configure the internal line to be a pullup.
+This series is applies cleanly against 3.17-rc2 and is tested working
+with lib/test_bpf on ARMv8 Foundation Model.
 
+Will had previously reported that v1 series works on Juno platform.
+Since v2 only involves straightforward renaming in [14/14], I don't
+anticipate any regressions.
 
-> Exynos4 series are also described, but we used the broken card detection scheme and power used one of "always-on" powers.
-> Because Card-detection rail need to enable as "always-on".
->
-> We don't need to consider this. I checked the circuit, this patch didn't need.
->
-> exynos5 also used the gpio-pin for card-detection. And we can use the slot-gpio API.
+Thanks,
+z
 
-When you say "exynos5", what do you mean here?  Do you mean the smdk
-for 5250, or something else?
+[1] https://lkml.org/lkml/2014/7/18/683
+
+--------
+The following changes since commit 52addcf9d6669fa439387610bc65c92fa0980cef:
+
+  Linux 3.17-rc2 (2014-08-25 15:36:20 -0700)
+
+are available in the git repository at:
+
+  https://github.com/zlim/linux.git tags/arm64/bpf-v2
+
+for you to fetch changes up to 2f4a4b8df4ba1cbd24957fb1a8371d30b1976174:
+
+  arm64: eBPF JIT compiler (2014-08-26 19:04:43 -0700)
+
+----------------------------------------------------------------
+ Documentation/networking/filter.txt |   6 +-
+ arch/arm64/Kconfig                  |   1 +
+ arch/arm64/Makefile                 |   1 +
+ arch/arm64/include/asm/insn.h       | 249 +++++++++++++
+ arch/arm64/kernel/insn.c            | 646 +++++++++++++++++++++++++++++++++-
+ arch/arm64/net/Makefile             |   4 +
+ arch/arm64/net/bpf_jit.h            | 169 +++++++++
+ arch/arm64/net/bpf_jit_comp.c       | 677 ++++++++++++++++++++++++++++++++++++
+ 8 files changed, 1743 insertions(+), 10 deletions(-)
+ create mode 100644 arch/arm64/net/Makefile
+ create mode 100644 arch/arm64/net/bpf_jit.h
+ create mode 100644 arch/arm64/net/bpf_jit_comp.c
+
+Zi Shen Lim (14):
+  arm64: introduce aarch64_insn_gen_comp_branch_imm()
+  arm64: introduce aarch64_insn_gen_branch_reg()
+  arm64: introduce aarch64_insn_gen_cond_branch_imm()
+  arm64: introduce aarch64_insn_gen_load_store_reg()
+  arm64: introduce aarch64_insn_gen_load_store_pair()
+  arm64: introduce aarch64_insn_gen_add_sub_imm()
+  arm64: introduce aarch64_insn_gen_bitfield()
+  arm64: introduce aarch64_insn_gen_movewide()
+  arm64: introduce aarch64_insn_gen_add_sub_shifted_reg()
+  arm64: introduce aarch64_insn_gen_data1()
+  arm64: introduce aarch64_insn_gen_data2()
+  arm64: introduce aarch64_insn_gen_data3()
+  arm64: introduce aarch64_insn_gen_logical_shifted_reg()
+  arm64: eBPF JIT compiler
+
+ Documentation/networking/filter.txt |   6 +-
+ arch/arm64/Kconfig                  |   1 +
+ arch/arm64/Makefile                 |   1 +
+ arch/arm64/include/asm/insn.h       | 249 +++++++++++++
+ arch/arm64/kernel/insn.c            | 646 +++++++++++++++++++++++++++++++++-
+ arch/arm64/net/Makefile             |   4 +
+ arch/arm64/net/bpf_jit.h            | 169 +++++++++
+ arch/arm64/net/bpf_jit_comp.c       | 677 ++++++++++++++++++++++++++++++++++++
+ 8 files changed, 1743 insertions(+), 10 deletions(-)
+ create mode 100644 arch/arm64/net/Makefile
+ create mode 100644 arch/arm64/net/bpf_jit.h
+ create mode 100644 arch/arm64/net/bpf_jit_comp.c
+
+-- 
+1.9.1
