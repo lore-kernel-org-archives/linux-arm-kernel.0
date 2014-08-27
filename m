@@ -1,46 +1,45 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 27 Aug 2014 10:33:44 +0100
-Subject: [PATCH v2 00/26] genirq: fix use of irq_find_mapping outside of
- legal RCU context
-In-Reply-To: <alpine.DEB.2.10.1408262333420.3323@nanos> (Thomas Gleixner's
- message of "Tue, 26 Aug 2014 22:34:51 +0100")
-References: <1409047421-27649-1-git-send-email-marc.zyngier@arm.com>
- <alpine.DEB.2.10.1408262333420.3323@nanos>
-Message-ID: <87y4uap98n.fsf@approximate.cambridge.arm.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 27 Aug 2014 10:36:16 +0100
+Subject: imx6 eSATA
+In-Reply-To: <CAL8zT=iVVmkT36idmkPFX7PxM7P3A489ThZqirqP3dZNkgmYTQ@mail.gmail.com>
+References: <20140118184427.GJ15937@n2100.arm.linux.org.uk>
+ <CAL8zT=iVVmkT36idmkPFX7PxM7P3A489ThZqirqP3dZNkgmYTQ@mail.gmail.com>
+Message-ID: <20140827093616.GY30401@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas,
+On Wed, Aug 27, 2014 at 11:11:15AM +0200, Jean-Michel Hautbois wrote:
+> Hi Russel,
+> 
+> 2014-01-18 19:44 GMT+01:00 Russell King - ARM Linux <linux@arm.linux.org.uk>:
+> > So, I see we have AHCI support for SATA on the iMX6.  Great... but it
+> > doesn't work on the cubox-i, because the phy settings are wrong.
+> >
+> > The Cubox-i requires GPR13 set to 0x0593A044 - I haven't decoded what
+> > this means yet, but it's different from the 0x0593E4A4 which is
+> > currently hard-coded into the driver (and I've independently tested
+> > that this is indeed required.)
+> 
+> Pardon me if this is a naive question, but how do you know which value
+> is required for a specific board ?
 
-On Tue, Aug 26 2014 at 10:34:51 pm BST, Thomas Gleixner <tglx@linutronix.de> wrote:
-> On Tue, 26 Aug 2014, Marc Zyngier wrote:
->
->> A number of irqchip drivers are directly calling irq_find_mapping,
->> which may use a rcu_read_lock call when walking the radix tree.
->> 
->> Turns out that if you hit that point with CONFIG_PROVE_RCU enabled,
->> the kernel will shout at you, as using RCU in this context may be
->> illegal (specially if coming from the idle state, where RCU would be
->> in a quiescent state).
->> 
->> A possible fix would be to wrap calls to irq_find_mapping into a
->> RCU_NONIDLE macro, but that really looks ugly.
->> 
->> This patch series introduce another generic IRQ entry point
->> (handle_domain_irq), which has the exact same behaviour as handle_IRQ
->> (as defined on arm, arm64 and openrisc), except that it also takes a
->> irq_domain pointer. This allows the logical IRQ lookup to be done
->> inside the irq_{enter,exit} section, which contains a
->> rcu_irq_{enter,exit}, making it safe.
->
-> Looks good. Should this be routed to the genirq tree?
+It's not something that one just knows.  The register defines the
+electrical characteristics of the port, which is dependent on the
+PCB layout of the platform.
 
-I'm happy for you to take this series, provided the architecture
-maintainers agree on it (I'm still to hear from the openrisc guys, and
-their mailing-list seems to positively hate my guts).
+The SATA spec includes requirements for the signal properties at the
+connector, and the values in this register need to be adjusted to
+meet the specification.
 
-Thanks,
+The problem that this presents for open source software folk is that
+they generally do not have the expensive equipment to be able to
+perform this validation, so one must rely on someone who does
+(hopefully the platform manufacturer has done that.)  The alternative
+is to look at the register definition, and adjust each property until
+you get something which works - though the likelyhood of that method
+working for a wide range of SATA devices is pretty small, especially
+as there will be some interdependence between the various properties.
 
-	M.
 -- 
-Jazz is not dead. It just smells funny.
+FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
+according to speedtest.net.
