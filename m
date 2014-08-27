@@ -1,51 +1,36 @@
-From: khilman@deeprootsystems.com (Kevin Hilman)
-Date: Wed, 27 Aug 2014 11:27:38 -0700
-Subject: [PATCH 4/7] ARM: OMAP2+: powerdomain: introduce logic for finding
- valid power domain
-In-Reply-To: <1408715373-25791-5-git-send-email-nm@ti.com> (Nishanth Menon's
- message of "Fri, 22 Aug 2014 08:49:30 -0500")
-References: <1408715373-25791-1-git-send-email-nm@ti.com>
- <1408715373-25791-5-git-send-email-nm@ti.com>
-Message-ID: <7h1ts1eqjp.fsf@paris.lan>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 27 Aug 2014 20:30:07 +0200
+Subject: [PATCH 5/6] arm64: Port SWP/SWPB emulation support from arm
+In-Reply-To: <9hh4mwxesz8.fsf@arm.com>
+References: <1409048930-21598-1-git-send-email-punit.agrawal@arm.com>
+ <20140826135623.GR23445@arm.com> <9hh4mwxesz8.fsf@arm.com>
+Message-ID: <201408272030.07434.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Nishanth Menon <nm@ti.com> writes:
+On Wednesday 27 August 2014, Punit Agrawal wrote:
+> I'll replace the counters with trace points.
+> 
+> There is still the pr_warn which informs the user about applications
+> using legacy instructions. Hopefully, this should encourage updating the
+> software.
 
-> powerdomain configuration in OMAP is done using PWRSTCTRL register for
-> each power domain. However, PRCM lets us write any value we'd like to
-> the logic and power domain target states, however the SoC integration
-> tends to actually function only at a few discrete states. These valid
-> states are already in our powerdomains_xxx_data.c file.
->
-> So, provide a function to easily query valid low power state that the
-> power domain is allowed to go to.
->
-> Based on work originally done by Jean Pihet <j-pihet@ti.com>
-> https://patchwork.kernel.org/patch/1325091/ . There is no attempt to
-> create a new powerdomain solution here, except fixing issues seen
-> attempting invalid programming attempts. Future consolidation to the
-> generic powerdomain framework should consider this requirement as
-> well.
->
-> Similar solutions have been done in product kernels in the past such
-> as:
-> https://android.googlesource.com/kernel/omap.git/+blame/android-omap-panda-3.0/arch/arm/mach-omap2/pm44xx.c
->
-> Signed-off-by: Nishanth Menon <nm@ti.com>
-> ---
+pr_warn_ratelimit() please. There is no point printing this all the time
+if nobody reads the messages.
 
-nit: this is part of a fixes series, but it's more of a new feature.
+> >> If we do both, there is no longer a need to have any debugfs file logic,
+> >> which is also a plus.
+> >
+> > Sounds good to me.
+> 
+> Just a note: instead of being 'swp_emulate.enable=0' this'll be
+> 'v7_obsolete.swp_emulate=0' and correspondingly for the other features.
 
-That being said, the feature is needed and looks OK, except for...
+It would be nice if the module name could be the same for arm32 and arm64,
+and I don't know if we want to rename swp_emulate.c to v7_obsolete.c
+on arm32.
 
-> +up_search:
-> +	/* OK, no deeper ones, can we get a higher match? */
-> +	new_pwrst = req_state + 1;
-> +	while (!(pwrdm_states & BIT(new_pwrst))) {
-> +		/* BUG if we have messed up database */
-> +		BUG_ON(new_pwrst > PWRDM_POWER_ON);
+Other than that, I have no opinion on the specific name of the module
+or the option.
 
-I don't think this is BUG() worthy, and should have a saner way to recover.
-
-Kevin
+	Arnd
