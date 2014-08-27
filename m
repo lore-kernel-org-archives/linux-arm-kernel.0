@@ -1,48 +1,82 @@
-From: pramod.gurav@smartplayin.com (Pramod Gurav)
-Date: Wed, 27 Aug 2014 15:13:54 +0530
-Subject: [PATCH 4/4] ARM: DT: APQ8064: Add node for ps_hold function in pinctrl
-In-Reply-To: <1409132634-15208-1-git-send-email-pramod.gurav@smartplayin.com>
-References: <1409132634-15208-1-git-send-email-pramod.gurav@smartplayin.com>
-Message-ID: <1409132634-15208-2-git-send-email-pramod.gurav@smartplayin.com>
+From: ch.naveen@samsung.com (Naveen Krishna Chatradhi)
+Date: Wed, 27 Aug 2014 15:14:16 +0530
+Subject: [PATCH 00/14] Support 64bit Cortex A57 based Exynos7 SoC
+Message-ID: <1409132660-1898-1-git-send-email-ch.naveen@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds DT support to configure GPIO_78 as function ps_hold
-on apq8064.
+This patchset supports new Exynos7 Samsung SoC based on Cortex-A57.
+Exynos7 is a System-On-Chip (SoC) that is based on 64-bit
+ARMv8 RISC processor.
 
-CC: Rob Herring <robh+dt@kernel.org>
-CC: Pawel Moll <pawel.moll@arm.com>
-CC: Mark Rutland <mark.rutland@arm.com>
-CC: Ian Campbell <ijc+devicetree@hellion.org.uk>
-CC: Kumar Gala <galak@codeaurora.org>
-CC: devicetree at vger.kernel.org
-CC: linux-arm-kernel at lists.infradead.org
+This patchset includes the following:
+- Support for pinctrl on Exynos7
+- Support for clock control on Exynos7 using common clk framework
+- DTS and DTSI file addition for Exynos7 based Espresso board
+- Support for serial driver on Exynos7
+- Support for HSI2C driver on Exynos7
+- Support for Watchdog driver on Exynos7
 
-Signed-off-by: Pramod Gurav <pramod.gurav@smartplayin.com>
----
- arch/arm/boot/dts/qcom-apq8064.dtsi |   10 ++++++++++
- 1 file changed, 10 insertions(+)
+NOTE:
+We tested these patches with the 
+"arm64: dts: add <dt-bindings/> symlink" change posted @
+http://lists.infradead.org/pipermail/linux-arm-kernel/2014-January/224629.html
 
-diff --git a/arch/arm/boot/dts/qcom-apq8064.dtsi b/arch/arm/boot/dts/qcom-apq8064.dtsi
-index 681e194..0873b24 100644
---- a/arch/arm/boot/dts/qcom-apq8064.dtsi
-+++ b/arch/arm/boot/dts/qcom-apq8064.dtsi
-@@ -82,6 +82,16 @@
- 			interrupt-controller;
- 			#interrupt-cells = <2>;
- 			interrupts = <0 32 0x4>;
-+
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&ps_hold>;
-+
-+			ps_hold: ps_hold {
-+				mux {
-+					pins = "gpio78";
-+					function = "ps_hold";
-+				};
-+			};
- 		};
- 
- 		intc: interrupt-controller at 2000000 {
+The following patches are tested based on Kgene's for-next tree.
+https://git.kernel.org/cgit/linux/kernel/git/kgene/linux-samsung.git/log/?h=for-next
+
+Alim Akhtar (2):
+  arm64: exynos7: Enable ARMv8 based Exynos7 (SoC) support
+  tty/serial: samsung: add support for exynos7
+
+Naveen Krishna Chatradhi (12):
+  clk: samsung: add support for 145xx and 1460x PLLs
+  clk: samsung: Factor out the common code to clk.c
+  clk: samsung: Add fixed_factor_clocks field to struct exynos_cmu_info
+  clk: samsung: Add clock description for basic CMU blocks
+  pinctrl: exynos: Add driver data for Exynos7
+  pinctrl: samsung: use CONFIG_PINCTRL_SAMSUNG symbol in makefile
+  i2c: exynos: add support for HSI2C module on Exynos7
+  i2c: exynos5: Add Kconfig dependencies
+  watchdog: s3c2410_wdt: Add support for Watchdog device on Exynos7
+  arm64: dts: add pinctrl support to EXYNOS7
+  arm64: dts: Add initial device tree support for EXYNOS7
+  arm64: dts: add Exynos7 based Espresso board dts file
+
+ .../devicetree/bindings/clock/exynos7-clock.txt    |  209 +++
+ .../devicetree/bindings/i2c/i2c-exynos5.txt        |    2 +
+ .../bindings/pinctrl/samsung-pinctrl.txt           |    1 +
+ .../devicetree/bindings/watchdog/samsung-wdt.txt   |    1 +
+ arch/arm64/Kconfig                                 |   17 +
+ arch/arm64/boot/dts/Makefile                       |    1 +
+ arch/arm64/boot/dts/exynos7-espresso.dts           |   69 +
+ arch/arm64/boot/dts/exynos7-pinctrl.dtsi           |  691 +++++++
+ arch/arm64/boot/dts/exynos7.dtsi                   |  553 ++++++
+ drivers/clk/samsung/Makefile                       |    1 +
+ drivers/clk/samsung/clk-exynos5260.c               |  181 +-
+ drivers/clk/samsung/clk-exynos7.c                  | 1929 ++++++++++++++++++++
+ drivers/clk/samsung/clk-pll.c                      |   50 +-
+ drivers/clk/samsung/clk-pll.h                      |    4 +
+ drivers/clk/samsung/clk.c                          |  104 ++
+ drivers/clk/samsung/clk.h                          |   37 +
+ drivers/i2c/busses/Kconfig                         |    2 +-
+ drivers/i2c/busses/i2c-exynos5.c                   |   71 +-
+ drivers/pinctrl/Makefile                           |    2 +-
+ drivers/pinctrl/samsung/Kconfig                    |    2 +-
+ drivers/pinctrl/samsung/pinctrl-exynos.c           |  145 ++
+ drivers/pinctrl/samsung/pinctrl-samsung.c          |    2 +
+ drivers/pinctrl/samsung/pinctrl-samsung.h          |    1 +
+ drivers/tty/serial/Kconfig                         |    6 +-
+ drivers/tty/serial/samsung.c                       |    2 +-
+ drivers/watchdog/s3c2410_wdt.c                     |   11 +
+ include/dt-bindings/clock/exynos7-clk.h            |  236 +++
+ 27 files changed, 4151 insertions(+), 179 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/clock/exynos7-clock.txt
+ create mode 100644 arch/arm64/boot/dts/exynos7-espresso.dts
+ create mode 100644 arch/arm64/boot/dts/exynos7-pinctrl.dtsi
+ create mode 100644 arch/arm64/boot/dts/exynos7.dtsi
+ create mode 100644 drivers/clk/samsung/clk-exynos7.c
+ create mode 100644 include/dt-bindings/clock/exynos7-clk.h
+
 -- 
 1.7.9.5
