@@ -1,140 +1,140 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 27 Aug 2014 18:29:44 +0100
-Subject: [PATCH 5/6] arm64: Port SWP/SWPB emulation support from arm
-In-Reply-To: <1409048930-21598-6-git-send-email-punit.agrawal@arm.com>
-References: <1409048930-21598-1-git-send-email-punit.agrawal@arm.com>
- <1409048930-21598-6-git-send-email-punit.agrawal@arm.com>
-Message-ID: <20140827172944.GH13850@arm.com>
+From: cov@codeaurora.org (Christopher Covington)
+Date: Wed, 27 Aug 2014 13:34:58 -0400
+Subject: [PATCH 0/3] virtio: Clean up scatterlists and use the DMA API
+In-Reply-To: <CALCETrWcMO_zkNEuXBeqSAt6FSvUaFve+_5JC-rk5vObvBZWSg@mail.gmail.com>
+References: <cover.1409087794.git.luto@amacapital.net>
+ <CAJSP0QUcXQ+JV0wys2Mr-+OsFKt=hTGbUxNqfpk-JuyULiQABQ@mail.gmail.com>
+ <CALCETrUWR8p7XSiTALd19LL4mTgkXu_XEewobouz6Jbkb4KjLw@mail.gmail.com>
+ <20140827154537.GB18900@redhat.com>
+ <CALCETrVUg3fCQS0rjOD1BbauXHfnydPyP3mNMeiGu4NqBgLK6A@mail.gmail.com>
+ <53FE03C3.90309@codeaurora.org>
+ <CALCETrWcMO_zkNEuXBeqSAt6FSvUaFve+_5JC-rk5vObvBZWSg@mail.gmail.com>
+Message-ID: <53FE16C2.4010104@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 26, 2014 at 11:28:49AM +0100, Punit Agrawal wrote:
-> The SWP instruction was deprecated in the ARMv6 architecture,
-> superseded by the LDREX/STREX family of instructions for
-> load-linked/store-conditional operations. The ARMv7 multiprocessing
-> extensions mandate that SWP/SWPB instructions are treated as undefined
-> from reset, with the ability to enable them through the System Control
-> Register SW bit. With ARMv8, the option to enable these instructions
-> through System Control Register was dropped as well.
+On 08/27/2014 12:19 PM, Andy Lutomirski wrote:
+> On Wed, Aug 27, 2014 at 9:13 AM, Christopher Covington
+> <cov@codeaurora.org> wrote:
+>> On 08/27/2014 11:50 AM, Andy Lutomirski wrote:
+>>> On Wed, Aug 27, 2014 at 8:45 AM, Michael S. Tsirkin <mst@redhat.com> wrote:
+>>>> On Wed, Aug 27, 2014 at 08:11:15AM -0700, Andy Lutomirski wrote:
+>>>>> On Aug 26, 2014 11:46 PM, "Stefan Hajnoczi" <stefanha@gmail.com> wrote:
+>>>>>>
+>>>>>> On Tue, Aug 26, 2014 at 10:16 PM, Andy Lutomirski <luto@amacapital.net> wrote:
+>>>>>>> There are two outstanding issues.  virtio_net warns if DMA debugging
+>>>>>>> is on because it does DMA from the stack.  (The warning is correct.)
+>>>>>>> This also is likely to do something unpleasant to s390.
+>>>>>>> (Maintainers are cc'd -- I don't know what to do about it.)
+>>>>>>
+>>>>>> This changes the semantics of vring and breaks existing guests when
+>>>>>> bus address != physical address.
+>>>>>>
+>>>>>> Can you use a transport feature bit to indicate that bus addresses are
+>>>>>> used?  That way both approaches can be supported.
+>>>>>
+>>>>> I can try to support both styles of addressing, but I don't think that
+>>>>> this can be negotiated between the device (i.e. host or physical
+>>>>> virtio-speaking device) and the guest.  In the Xen case that I care
+>>>>> about (Linux on Xen on KVM), the host doesn't know about the
+>>>>> translation at all -- Xen is an intermediate layer that only the guest
+>>>>> is aware of.  In this case, there are effectively two layers of
+>>>>> virtualization, and only the inner one (Xen) knows about the
+>>>>> translation despite the fact that the the outer layer is the one
+>>>>> providing the virtio device.
+>>>>>
+>>>>> I could change virtio_ring to use the DMA API only if requested by the
+>>>>> lower driver (virtio_pci, etc) and to have only virtio_pci enable that
+>>>>> feature.  Will that work for all cases?
+>>>>>
+>>>>> On s390, this shouldn't work just like the current code.  On x86, I
+>>>>> think that if QEMU ever starts exposing an IOMMU attached to a
+>>>>> virtio-pci device, then QEMU should expect that IOMMU to be used.  If
+>>>>> QEMU expects to see physical addresses, then it shouldn't advertise an
+>>>>> IOMMU.  Since QEMU doesn't currently support guest IOMMUs, this should
+>>>>> be fine for everything that uses QEMU.
+>>>>>
+>>>>> At least x86's implementation of the DMA ops for devices that aren't
+>>>>> behind an IOMMU should be very fast.
+>>>>>
+>>>>> Are there any other weird cases for which this might be a problem?
+>>>>>
+>>>>>>
+>>>>>> Please also update the virtio specification:
+>>>>>> https://tools.oasis-open.org/version-control/browse/wsvn/virtio/
+>>>>>>
+>>>>>
+>>>>> I'm not sure it will need an update.  Perhaps a note in the PCI
+>>>>> section indicating that, if the host expects the guest to program an
+>>>>> IOMMU, then it should use the appropriate platform-specific mechanism
+>>>>> to expose that IOMMU.
+>>>>>
+>>>>> --Andy
+>>>>
+>>>> If there's no virtio mechanism to negotate enabling/disabling
+>>>> translations, then specification does not need an extension.
+>>>
+>>> It wouldn't shock me if someone wants to negotiate this for
+>>> virtio_mmio some day, but that might be more of a device tree thing.
+>>> I have no idea how that works, but I think it can wait until someone
+>>> wants it.
+>>
+>> At one point I wanted VirtIO-MMIO to not fail miserably on ARM LPAE systems.
+>>
+>> http://lists.infradead.org/pipermail/linux-arm-kernel/2014-March/241613.html
+>>
 > 
-> This patch ports the alternative solution to emulate the SWP and SWPB
-> instructions using LDXR/STXR sequences from the arm port to
-> arm64. Additionaly, the patch also proivdes support to log the
+> Since I know nothing about LPAE, I'll leave this to you :)  But I'll
+> cc you on patch v2 soon, and please tell me whether my code makes
+> sense on ARM.
+>
+> (My attempt to boot-test s390 failed because I have no clue what
+> command-line options to pass to QEMU.  If anyone wants to give me some
+> pointers to get a working configuration with -kernel and some kind of
+> console, I can add support to virtme.  Alas, I think that no one ever
+> bothered to implement 9p over virtio-ccw in QEMU.  Why exactly does
+> the virtio stuff in QEMU require that you instantiate virtio-9p-pci
+> instead of just asking for an appropriate virtio dievice?)
 
-s/proivdes/provides/
+Virtme looks interesting. If it's any use, here is my modest QEMU command line
+collection.
 
-> emulation statistics via debugfs.
-> 
-> Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
-> ---
->  arch/arm64/Kconfig              |   41 +++++++
->  arch/arm64/include/asm/insn.h   |    9 ++
->  arch/arm64/kernel/Makefile      |    1 +
->  arch/arm64/kernel/insn.c        |   11 ++
->  arch/arm64/kernel/v7_obsolete.c |  241 +++++++++++++++++++++++++++++++++++++++
->  5 files changed, 303 insertions(+)
->  create mode 100644 arch/arm64/kernel/v7_obsolete.c
-> 
-> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-> index c52894e..ba780b1 100644
-> --- a/arch/arm64/Kconfig
-> +++ b/arch/arm64/Kconfig
-> @@ -142,6 +142,47 @@ config ARCH_XGENE
->  	help
->  	  This enables support for AppliedMicro X-Gene SOC Family
->  
-> +comment "Processor Features"
-> +
-> +config V7_OBSOLETE
+$dir/bin/x86_64-linux-gnu/qemu-system-x86_64 \
+  -m 1024 \
+  -kernel $dir/boot/x86_64-linux-gnu/bzImage-x86_64 \
+  -append 'root=/dev/root init=/sbin/x86_64-linux-gnu/init rootfstype=9p
+rootflags=trans=virtio,version=9p2000.L ro console=ttyS0' \
+  -serial stdio \
+  -fsdev local,id=root,path=$dir,security_model=none \
+  -device virtio-9p-pci,fsdev=root,mount_tag=/dev/root \
+  -monitor none
 
-We could place this under a sub-menu (I haven't checked how it would
-look like).
+$dir/bin/x86_64-linux-gnu/qemu-system-arm \
+  -M virt \
+  -cpu cortex-a15 \
+  -m 1024 \
+  -kernel $dir/boot/arm-linux-gnueabihf/Image \
+  -append 'root=/dev/root init=/sbin/arm-linux-gnueabihf/init rootfstype=9p
+rootflags=trans=virtio,version=9p2000.L ro console=ttyAMA0' \
+  -serial stdio \
+  -fsdev local,id=root,path=$dir,security_model=none \
+  -device virtio-9p-device,fsdev=root,mount_tag=/dev/root \
+  -monitor none
 
-> +	bool "Emulate obsolete ARMv7 instructions"
-> +	depends on COMPAT
-> +	help
-> +	  AArch32 legacy software support may require certain
-> +	  instructions that have been deprecated or obsoleted in the
-> +	  architecture.
-> +
-> +	  Enable this config to enable selective emulation of these
-> +	  features.
-> +
-> +	  If unsure, say N
+$dir/bin/x86_64-linux-gnu/qemu-system-aarch64 \
+  -M virt \
+  -cpu cortex-a57 \
+  -m 1024 \
+  -kernel $dir/boot/aarch64-linux-gnu/Image \
+  -append 'root=/dev/root init=/sbin/aarch64-linux-gnu/init rootfstype=9p
+rootflags=trans=virtio,version=9p2000.L ro console=ttyAMA0' \
+  -serial stdio \
+  -fsdev local,id=root,path=$dir,security_model=none \
+  -device virtio-9p-device,fsdev=root,mount_tag=/dev/root -monitor none
 
-I think we need to get some terminology right:
-
-deprecated:	no longer recommended, usually with a configuration
-		option to be enabled/disabled
-obsolete:	no longer present
-
-So what we are adding here is deprecated ARMv7 features that have been
-obsolete in ARMv8. You could as well say "Emulate deprecated/obsolete
-ARMv8 A32 instructions". "Deprecated ARMv7..." could work but we may
-want to add options for features that haven't been deprecated in ARMv7,
-just ARMv8 A32.
-
-You could also change the config option (and file/function names) for
-consistency to something like a32_obsolete (for config option, maybe
-CONFIG_ARM64_A32_OBSOLETE, it gets even more confusing ;)).
-
-> +config SWP_EMULATION
-> +	bool "Emulate SWP/SWPB instructions"
-> +	help
-> +	  ARMv8 obsoletes the use of SWP/SWPB instructions such that
-
-"... the use of A32 SWP/SWPB" to be clearer.
-
-> +	  they are always undefined. Say Y here to enable software
-> +	  emulation of these instructions for userspace (not kernel)
-> +	  using LDXR/STXR.
-
-No need to say "not kernel" since the kernel uses the A64 ISA.
-
-> diff --git a/arch/arm64/include/asm/insn.h b/arch/arm64/include/asm/insn.h
-> index dc1f73b..2861cc6 100644
-> --- a/arch/arm64/include/asm/insn.h
-> +++ b/arch/arm64/include/asm/insn.h
-> @@ -105,6 +105,15 @@ bool aarch64_insn_hotpatch_safe(u32 old_insn, u32 new_insn);
->  int aarch64_insn_patch_text_nosync(void *addr, u32 insn);
->  int aarch64_insn_patch_text_sync(void *addrs[], u32 insns[], int cnt);
->  int aarch64_insn_patch_text(void *addrs[], u32 insns[], int cnt);
-> +
-> +#ifdef CONFIG_V7_OBSOLETE
-> +#define RN_OFFSET	16
-> +#define RT_OFFSET	12
-> +#define RT2_OFFSET	 0
-> +
-> +u32 aarch32_insn_extract_reg_num(u32 insn, int offset);
-> +#endif /* CONFIG_V7_OBSOLETE */
-> +
->  #endif /* __ASSEMBLY__ */
->  
->  #endif	/* __ASM_INSN_H */
-
-[...]
-
-> --- a/arch/arm64/kernel/insn.c
-> +++ b/arch/arm64/kernel/insn.c
-> @@ -302,3 +302,14 @@ u32 __kprobes aarch64_insn_gen_nop(void)
->  {
->  	return aarch64_insn_gen_hint(AARCH64_INSN_HINT_NOP);
->  }
-> +
-> +#ifdef CONFIG_V7_OBSOLETE
-> +/*
-> + * Macros/defines for extracting register numbers from instruction.
-> + */
-> +u32 aarch32_insn_extract_reg_num(u32 insn, int offset)
-> +{
-> +	return (insn & (0xf << offset)) >> offset;
-> +}
-> +
-> +#endif /* CONFIG_V7_OBSOLETE */
-
-I don't think we need to bother with an #ifdef here and in the header.
-The code is small enough to affect the compilation time and the linker
-should get rid of it if not used.
+Christopher
 
 -- 
-Catalin
+Employee of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by the Linux Foundation.
