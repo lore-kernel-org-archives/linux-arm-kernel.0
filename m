@@ -1,46 +1,89 @@
 From: khilman@linaro.org (Kevin Hilman)
-Date: Wed, 27 Aug 2014 13:25:43 -0700
-Subject: [PATCH V2 4/7] ARM: OMAP2+: powerdomain: introduce logic for
- finding valid power domain
-In-Reply-To: <1409165694-26568-1-git-send-email-nm@ti.com> (Nishanth Menon's
- message of "Wed, 27 Aug 2014 13:54:54 -0500")
-References: <1408715373-25791-1-git-send-email-nm@ti.com>
- <1409165694-26568-1-git-send-email-nm@ti.com>
-Message-ID: <7h1ts1bry0.fsf@paris.lan>
+Date: Wed, 27 Aug 2014 13:22:43 -0700
+Subject: [PATCH 08/10] ARM: OMAP5/DRA7: PM: cpuidle MPU CSWR support
+In-Reply-To: <53FE3477.2020207@ti.com> (Santosh Shilimkar's message of "Wed,
+ 27 Aug 2014 15:41:43 -0400")
+References: <1408716154-26101-1-git-send-email-nm@ti.com>
+ <1408716154-26101-9-git-send-email-nm@ti.com>
+ <7hvbpdbvb1.fsf@paris.lan>
+ <CAGo_u6o7vAf=syzDTyxh0-kOhmzAmtdG_ardgFgoPQofrGdxUQ@mail.gmail.com>
+ <53FE3477.2020207@ti.com>
+Message-ID: <7hegw1bs30.fsf@paris.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Nishanth Menon <nm@ti.com> writes:
+Santosh Shilimkar <santosh.shilimkar@ti.com> writes:
 
-> powerdomain configuration in OMAP is done using PWRSTCTRL register for
-> each power domain. However, PRCM lets us write any value we'd like to
-> the logic and power domain target states, however the SoC integration
-> tends to actually function only at a few discrete states. These valid
-> states are already in our powerdomains_xxx_data.c file.
+> On Wednesday 27 August 2014 03:35 PM, Nishanth Menon wrote:
+>> On Wed, Aug 27, 2014 at 2:13 PM, Kevin Hilman
+>> <khilman@deeprootsystems.com> wrote:
+>>> + Daniel (cpuidle maintainer)
+>> [...]
+>>>> +static int omap_enter_idle_smp(struct cpuidle_device *dev,
+>>>> +                            struct cpuidle_driver *drv,
+>>>> +                            int index)
+>>>> +{
+>>>> +     struct idle_statedata *cx = state_ptr + index;
+>>>> +     unsigned long flag;
+>>>> +
+>>>> +     raw_spin_lock_irqsave(&mpu_lock, flag);
+>>>> +     cx->mpu_state_vote++;
+>>>> +     if (cx->mpu_state_vote == num_online_cpus()) {
+>>>> +             pwrdm_set_logic_retst(mpu_pd, cx->mpu_logic_state);
+>>>> +             omap_set_pwrdm_state(mpu_pd, cx->mpu_state);
+>>>> +     }
+>>>> +     raw_spin_unlock_irqrestore(&mpu_lock, flag);
+>>>> +
+>>>> +     omap4_enter_lowpower(dev->cpu, cx->cpu_state);
+>>>> +
+>>>> +     raw_spin_lock_irqsave(&mpu_lock, flag);
+>>>> +     if (cx->mpu_state_vote == num_online_cpus())
+>>>> +             omap_set_pwrdm_state(mpu_pd, PWRDM_POWER_ON);
+>>>> +     cx->mpu_state_vote--;
+>>>> +     raw_spin_unlock_irqrestore(&mpu_lock, flag);
+>>>> +
+>>>> +     return index;
+>>>> +}
+>>>
+>>> Hmm, maybe OMAP5/DRA7 CPUidle driver should be a new one based on MCPM?
+>> 
+>> Trying to understand benefit of MCPM here - at least without a deeper
+>> understanding of mcpm infrastructure benefits (first look seemed a
+>> little heavy for OMAP5/DRA7 needs).
+>> 
+>> Neither DRA7/OMAP5 are multi-cluster, the SoCs are not targetted for
+>> "OFF" of CPU1/0, we have mercury hardware to help with context and
+>> sync issues.
+>> 
+>> Being able to reuse most of existing OMAP4 infrastructure code is
+>> useful as well to leave the existing omap4 framework as being lighter
+>> in complexity -esp in a cpuidle like hot path?
+>> 
+>> The spin_lock is only for the programming of MPU power domain in a
+>> consistent manner - I suppose might have been the trigger for
+>> proposing mcpm?
+>> 
+> Mostly not....
 >
-> So, provide a function to easily query valid low power state that the
-> power domain is allowed to go to.
+> I think this is coming because last time Nicolas Pitre tried to convert
+> the OMAP CPUIdle into MCPM but because of various ordering requirements,
+> OMAP wasn't suitable and then the plan was dropped later.
 >
-> Based on work originally done by Jean Pihet <j-pihet@ti.com>
-> https://patchwork.kernel.org/patch/1325091/ . There is no attempt to
-> create a new powerdomain solution here, except fixing issues seen
-> attempting invalid programming attempts. Future consolidation to the
-> generic powerdomain framework should consider this requirement as
-> well.
->
-> Similar solutions have been done in product kernels in the past such
-> as:
-> https://android.googlesource.com/kernel/omap.git/+blame/android-omap-panda-3.0/arch/arm/mach-omap2/pm44xx.c
->
-> Reviewed-by: Kevin Hilman <khilman@linaro.org>
-> Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> Signed-off-by: Nishanth Menon <nm@ti.com>
-> ---
->
-> Not posting the entire series again and updating just this patch..
->
-> V2: drop BUG in favor of WARN, picked up Santosh and Kevin's acks.
+> Just to make clear, OMAP OMAP5/DRA7 as well the ordering requirement
+> remains the same for deeper states. Its just the mercury retention state
+> which we are able to enter without ordering requirements and hence
+> the voting scheme.
 
-Looks good, thanks,
+Ah, OK.  This is the part that I'm missing.  So for deeper states you'll
+need to be using omap_enter_idle_coupled()
+
+> Hope this clarifies to you as well as Kevin just in case he missed the
+> part of the deeper C-states requirements.
+
+Yes, thanks for clarifying.
+
+That being said, I think MCPM can now do essentially what the coupled
+states code is doing. Even so, that's probably not a reason to hold up
+this patch, but Daniel gets to make that call.
 
 Kevin
