@@ -1,49 +1,62 @@
-From: jaswinder.singh@linaro.org (Jassi Brar)
-Date: Thu, 28 Aug 2014 00:56:35 +0530
-Subject: [PATCH v2 2/9] mailbox: Add NVIDIA Tegra XUSB mailbox driver
-In-Reply-To: <CAL1qeaERHeKKNpqh9qHOppgT7ymvntisdjVvZheP78U6NaPz-A@mail.gmail.com>
-References: <1408381705-3623-1-git-send-email-abrestic@chromium.org>
- <1408381705-3623-3-git-send-email-abrestic@chromium.org>
- <53FB8820.4010202@wwwdotorg.org>
- <CAL1qeaERHeKKNpqh9qHOppgT7ymvntisdjVvZheP78U6NaPz-A@mail.gmail.com>
-Message-ID: <CAJe_ZhexxKSDfJeojY5FETdzvnA6082mcXjpfQ-oaMNRTN=-Sw@mail.gmail.com>
+From: nm@ti.com (Nishanth Menon)
+Date: Wed, 27 Aug 2014 14:35:01 -0500
+Subject: [PATCH 08/10] ARM: OMAP5/DRA7: PM: cpuidle MPU CSWR support
+In-Reply-To: <7hvbpdbvb1.fsf@paris.lan>
+References: <1408716154-26101-1-git-send-email-nm@ti.com>
+ <1408716154-26101-9-git-send-email-nm@ti.com>
+ <7hvbpdbvb1.fsf@paris.lan>
+Message-ID: <CAGo_u6o7vAf=syzDTyxh0-kOhmzAmtdG_ardgFgoPQofrGdxUQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27 August 2014 23:08, Andrew Bresticker <abrestic@chromium.org> wrote:
-> On Mon, Aug 25, 2014 at 12:01 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
-
->> I'm not even sure if it's appropriate for the low-level mailbox driver to
->> know about the semantics of the message, rather than simply sending them on
->> to the client driver? Perhaps when drivers register(?) for callbacks(?) for
->> messages, they should state which types of messages they want to listen to?
+On Wed, Aug 27, 2014 at 2:13 PM, Kevin Hilman
+<khilman@deeprootsystems.com> wrote:
+> + Daniel (cpuidle maintainer)
+[...]
+>> +static int omap_enter_idle_smp(struct cpuidle_device *dev,
+>> +                            struct cpuidle_driver *drv,
+>> +                            int index)
+>> +{
+>> +     struct idle_statedata *cx = state_ptr + index;
+>> +     unsigned long flag;
+>> +
+>> +     raw_spin_lock_irqsave(&mpu_lock, flag);
+>> +     cx->mpu_state_vote++;
+>> +     if (cx->mpu_state_vote == num_online_cpus()) {
+>> +             pwrdm_set_logic_retst(mpu_pd, cx->mpu_logic_state);
+>> +             omap_set_pwrdm_state(mpu_pd, cx->mpu_state);
+>> +     }
+>> +     raw_spin_unlock_irqrestore(&mpu_lock, flag);
+>> +
+>> +     omap4_enter_lowpower(dev->cpu, cx->cpu_state);
+>> +
+>> +     raw_spin_lock_irqsave(&mpu_lock, flag);
+>> +     if (cx->mpu_state_vote == num_online_cpus())
+>> +             omap_set_pwrdm_state(mpu_pd, PWRDM_POWER_ON);
+>> +     cx->mpu_state_vote--;
+>> +     raw_spin_unlock_irqrestore(&mpu_lock, flag);
+>> +
+>> +     return index;
+>> +}
 >
-> So there's not really a way for the client driver to tell the mailbox
-> driver which types of messages it wants to listen to on a particular
-> channel with the mailbox framework - it simply provides a way for
-> clients to bind with channels.  I think there are a couple of options
-> here, either: a) have a channel per message (as you mentioned in the
-> previous patch), which allows the client to only register for messages
-> (channels) it wants to handle, or b) extend the mailbox framework to
-> allow shared channels so that both clients can receive messages on the
-> single channel and handle messages appropriately.   The disadvantage
-> of (a) is that the commands are firmware defined and could
-> theoretically change between releases of the firmware, though I'm not
-> sure how common that is in practice.  So that leaves (b) - Jassi, what
-> do you think about having shared (non-exclusive) channels?
->
-n++ ... 'mailbox' is one such device that imbibes properties of local
-controller hardware and the remote firmware. Change in remote f/w's
-behavior might require the controller driver to change besides our
-client driver. A typical example is format of payloads (if
-involved).... a client and mailbox controller driver have direct
-understanding of the packet format ... which is likely to change with
-remote f/w.  So if the original concern "why are we doing s/w protocol
-stuff in controller driver?" won't go away by providing for shared
-channels (which would have its own tradeoffs).
+> Hmm, maybe OMAP5/DRA7 CPUidle driver should be a new one based on MCPM?
 
-BTW, on DMAEngine we are moving towards virtual channels backed by
-limited physical ones ... your setup looks quite similar. So your
-demuxer doesn't hurt my eyes at all.
+Trying to understand benefit of MCPM here - at least without a deeper
+understanding of mcpm infrastructure benefits (first look seemed a
+little heavy for OMAP5/DRA7 needs).
 
--jassi
+Neither DRA7/OMAP5 are multi-cluster, the SoCs are not targetted for
+"OFF" of CPU1/0, we have mercury hardware to help with context and
+sync issues.
+
+Being able to reuse most of existing OMAP4 infrastructure code is
+useful as well to leave the existing omap4 framework as being lighter
+in complexity -esp in a cpuidle like hot path?
+
+The spin_lock is only for the programming of MPU power domain in a
+consistent manner - I suppose might have been the trigger for
+proposing mcpm?
+
+---
+Regards,
+Nishanth Menon
