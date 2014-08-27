@@ -1,33 +1,26 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Wed, 27 Aug 2014 15:15:46 -0700
-Subject: [GIT PULL] Renesas ARM Based SoC Clock Fixes For v3.17
-In-Reply-To: <cover.1408926048.git.horms+renesas@verge.net.au>
-References: <cover.1408926048.git.horms+renesas@verge.net.au>
-Message-ID: <20140827221546.GE13392@localhost>
+Date: Wed, 27 Aug 2014 15:11:45 -0700
+Subject: [GIT PULL] omap fixes against v3.17-rc2
+In-Reply-To: <20140826221412.GC16006@atomide.com>
+References: <20140826221412.GC16006@atomide.com>
+Message-ID: <20140827221145.GB13392@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 25, 2014 at 10:09:47AM +0900, Simon Horman wrote:
-> Hi Olof, Hi Kevin, Hi Arnd,
+On Tue, Aug 26, 2014 at 03:14:13PM -0700, Tony Lindgren wrote:
+> The following changes since commit 52addcf9d6669fa439387610bc65c92fa0980cef:
 > 
-> Please consider these Renesas ARM based SoC clock fixes for v3.17.
-> 
-> This pull request is based on third round of Renesas ARM based SoC
-> lock updates for v3.17, tagged as renesas-clock3-for-v3.17,
-> which you have previously pulled.
-> 
-> I would like the first to patches considered for -stable.
-> 
-> 
-> The following changes since commit a0f7e7496d56ac2da7c684e2035815318c17973a:
-> 
->   ARM: shmobile: sh73a0: add CMT1 clock support for DT (2014-07-15 13:34:17 +0900)
+>   Linux 3.17-rc2 (2014-08-25 15:36:20 -0700)
 > 
 > are available in the git repository at:
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-clock-fixes-for-v3.17
+>   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.17/fixes-against-rc2
+> 
+> for you to fetch changes up to 8fd46439e1f5a7f86d76a08733459b74debd9468:
+> 
+>   ARM: dts: omap54xx-clocks: Fix the l3 and l4 clock rates (2014-08-26 13:04:00 -0700)
 
-Merged.
+Pulled, thanks.
 
 
 -Olof
