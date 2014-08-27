@@ -1,37 +1,48 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 27 Aug 2014 08:40:57 +0100
-Subject: [linux-sunxi] Re: [PATCH 4/4] simplefb: add clock handling code
-In-Reply-To: <1409078409.2701.17.camel@localhost>
-References: <20140825141600.GA14763@ulmo.nvidia.com>
- <53FB46FF.1010208@redhat.com>
- <20140825145303.GC14763@ulmo.nvidia.com>
- <20140825150705.GB15297@lukather> <20140826082626.GE17263@ulmo>
- <20140826090035.GB17528@sirena.org.uk>
- <20140826091853.GI17263@ulmo>
- <20140826100612.GH17528@sirena.org.uk>
- <20140826105451.GD31124@ulmo> <1409078409.2701.17.camel@localhost>
-Message-ID: <20140827074057.GS17528@sirena.org.uk>
+From: sjoerd.simons@collabora.co.uk (Sjoerd Simons)
+Date: Wed, 27 Aug 2014 09:44:04 +0200
+Subject: [PATCH 0/2 v2] Fix Exynos peach USB on kernels with USB Gadget
+ support
+In-Reply-To: <53FD3D97.3010002@suse.de>
+References: <1409038230-7242-1-git-send-email-sjoerd.simons@collabora.co.uk>
+ <53FD3D97.3010002@suse.de>
+Message-ID: <1409125444.31096.44.camel@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 26, 2014 at 08:40:09PM +0200, Henrik Nordstr?m wrote:
+On Wed, 2014-08-27 at 04:08 +0200, Andreas F?rber wrote:
+> Hi,
+> 
+> Am 26.08.2014 09:30, schrieb Sjoerd Simons:
+> > I suspect other boards base using exynos5420/5800 might need the similar fixes
+> > (Arndale Octa and Samsung SMDK5420) to their dts files, so would be great if
+> > folks with those board could verify this.
+> 
+> usbdrd_dwc3_1 is indeed required for the Arndale Octa. Not sure about 0.
+> 
+> I tested my attaching a USB 3.0 disk - is there an easier way to tell?
 
-> It is not clear to me where the hardware resources should be listed in
-> DT, being it a simplefb node or part of the actual hardware device node
-> properly marked as dynamic boot defaults or something else? It's
-> somewhere inbetween hardware and virtual device, and somewhat volatile.
-> As far as simplefb is concerned it is a hardware desription of the
-> framebuffer, but for a kms driver it's no more than firmware handover of
-> boottime settings and ceases to exists once the kms driver have
-> reconfigured the hardware.
+That seems to be the easiest way to tell. In my testing when things
+broke no USB host functionality would work, so USB 3 isn't a
+requirement.  You can also build with USB_DWC3_DEBUG enabled and check
+the mode file it generates in debugfs to see & set the controller mode
+to see how it gets setup by default and change the mode without
+rebuilding the dts.
 
-Is simplefb something that should be in the device tree distinctly in
-the first place - shouldn't it be a subset of the functionality of the
-video nodes?  It's the same hardware being driven differently.
+>From looking at the board on the arndaleboard wiki[0], it looks like it
+has one USB 3 host (which i guess is usbdrd_dwc3_1?) and a USB 2 OTG
+port which might be usbdrd_dwc3_0 (in which case the default setting for
+otg is correct). 
+
+
+0: http://www.arndaleboard.org/wiki/index.php/O_WiKi#Detail_of_Arndale_Board
+
+-- 
+Sjoerd Simons <sjoerd.simons@collabora.co.uk>
+Collabora Ltd.
 -------------- next part --------------
 A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140827/b867ffed/attachment.sig>
+Name: smime.p7s
+Type: application/x-pkcs7-signature
+Size: 6170 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140827/e7fd14cd/attachment.bin>
