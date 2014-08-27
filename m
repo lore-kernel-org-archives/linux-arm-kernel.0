@@ -1,62 +1,43 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Wed, 27 Aug 2014 15:10:44 +0400
-Subject: [PATCH 3/3] clocksource: sh_tmu: Document r8a7779 binding
-In-Reply-To: <1409115600-26192-4-git-send-email-horms+renesas@verge.net.au>
-References: <1409115600-26192-1-git-send-email-horms+renesas@verge.net.au>
- <1409115600-26192-4-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <53FDBCB4.6090806@cogentembedded.com>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Wed, 27 Aug 2014 13:14:06 +0200
+Subject: [PATCH 10/14] arm64: dts: add pinctrl support to EXYNOS7
+In-Reply-To: <1409132660-1898-2-git-send-email-ch.naveen@samsung.com>
+References: <1409132660-1898-1-git-send-email-ch.naveen@samsung.com>
+ <1409132660-1898-2-git-send-email-ch.naveen@samsung.com>
+Message-ID: <53FDBD7E.3050102@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 8/27/2014 9:00 AM, Simon Horman wrote:
+Hi Naveen,
 
-> In general Renesas hardware is not documented to the extent
-> where the relationship between IP blocks on different SoCs can be assumed
-> although they may appear to operate the same way. Furthermore the
-> documentation typically does not specify a version for individual
-> IP blocks. For these reasons a convention of using the SoC name in place
-> of a version and providing SoC-specific compat strings has been adopted.
+Please see my comments inline.
 
-> Although not universally liked this convention is used in the bindings
-> for the drivers a number of drivers for Renesas hardware. The purpose
-> of this patch is to update the Renesas R-Car Timer Unit (TMU)
-> driver to follow this convention.
+On 27.08.2014 11:44, Naveen Krishna Chatradhi wrote:
+> Add the required pin configuration support to EXYNOS7
 
-> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+[snip]
 
-> ---
-> * I plan to follow up with a patch patch to use the new binding in the
->    dtsi files for the r8a7779 SoC.
-> ---
->   Documentation/devicetree/bindings/timer/renesas,tmu.txt | 6 ++++--
->   1 file changed, 4 insertions(+), 2 deletions(-)
+> +/ {
+> +	/* ALIVE block @10580000 */
+> +	pinctrl at 10580000 {
 
-> diff --git a/Documentation/devicetree/bindings/timer/renesas,tmu.txt b/Documentation/devicetree/bindings/timer/renesas,tmu.txt
-> index 425d0c5..712ddfa 100644
-> --- a/Documentation/devicetree/bindings/timer/renesas,tmu.txt
-> +++ b/Documentation/devicetree/bindings/timer/renesas,tmu.txt
-> @@ -8,7 +8,9 @@ are independent. The TMU hardware supports up to three channels.
->
->   Required Properties:
->
-> -  - compatible: must contain "renesas,tmu"
-> +  - compatible: must contain one of the following.
+This syntax repeating the whole hierarchy of nodes in every dts file is
+considered obsolete in case of Exynos DT sources. Please switch to
+reference-based one. Please see related files for Exynos5260 and 5800 as
+examples.
 
-    Likewise, the example has both.
+[snip]
 
-> +    - "renesas,tmu" generic TMU
-> +    - "renesas,tmu-r8a7779" R8A7779 TMU
->
->     - reg: base address and length of the registers block for the timer module.
->
-> @@ -27,7 +29,7 @@ Optional Properties:
->   Example: R8A7779 (R-Car H1) TMU0 node
->
->   	tmu0: timer at ffd80000 {
-> -		compatible = "renesas,tmu";
-> +		compatible = "renesas,tmu-r8a7779", "renesas,tmu";
->   		reg = <0xffd80000 0x30>;
->   		interrupts = <0 32 IRQ_TYPE_LEVEL_HIGH>,
->   			     <0 33 IRQ_TYPE_LEVEL_HIGH>,
+> +		disp_teson: disp_teson {
+> +			samsung,pins = "gpg0-1";
+> +			samsung,pin-function = <2>;
+> +		};
+> +
+> +		disp_tesoff: disp_tesoff {
+> +			samsung,pins = "gpg0-1";
+> +			samsung,pin-function = <0>;
 
-WBR, Sergei
+This is not a special function, so I don't think it belongs to this file.
+
+Best regards,
+Tomasz
