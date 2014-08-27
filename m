@@ -1,46 +1,97 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Wed, 27 Aug 2014 02:35:27 +0200
-Subject: [PATCH v7 3/8] cpufreq: kirkwood: Remove use of the clk provider
- API
-In-Reply-To: <20140826233008.5251.50447@quantum>
-References: <1408375833-10703-1-git-send-email-tomeu.vizoso@collabora.com>
- <1408375833-10703-4-git-send-email-tomeu.vizoso@collabora.com>
- <20140820225513.5251.284@quantum> <53F5A587.9030200@collabora.com>
- <20140821133825.GH8608@lunn.ch> <20140822192933.5251.53733@quantum>
- <20140822201112.GH17277@lunn.ch>
- <20140826214631.5251.66177@quantum> <20140826223637.GA5324@lunn.ch>
- <20140826233008.5251.50447@quantum>
-Message-ID: <20140827003527.GA6149@lunn.ch>
+From: luto@amacapital.net (Andy Lutomirski)
+Date: Tue, 26 Aug 2014 18:32:23 -0700
+Subject: Post-merge-window ping (Re: [PATCH v4 0/5] x86: two-phase syscall
+ tracing and seccomp fastpath)
+Message-ID: <CALCETrUaZ8w92g96SmFEZDE0Jr+0Moeo+S24-TyW8crrK5reSg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> One final thought I have had is that it might be a good idea to have a
-> mux clock which represents the clock signal that feeds into the cpu. It
-> seems that a mux is exactly what is going on here with cpuclk rate and
-> ddrclk rate.
+On Mon, Jul 28, 2014 at 8:38 PM, Andy Lutomirski <luto@amacapital.net> wrote:
+> This applies to:
+> git://git.kernel.org/pub/scm/linux/kernel/git/kees/linux.git seccomp-fastpath
+>
+> Gitweb:
+> https://git.kernel.org/cgit/linux/kernel/git/kees/linux.git/log/?h=seccomp/fastpath
 
-I did think of this when i implemented the cpufreq driver. What makes
-it hard is that this bit is mixed in the same 32 bit register as the
-gate clocks. It would mean two clock providers sharing the same
-register, sharing a spinlock, etc. And the gating provider is shared
-with all mvebu platforms, dove, kirkword, orion5x, and four different
-armada SoCs. So i'm pushing complexity into this shared code, which
-none of the others need. Does the standard mux clock do what is
-needed? Or would i have to write a new clock provider?
+Hi all-
 
-> I even wonder if it is even appropriate to model this transition with a
-> clock enable operation? Maybe it is only a multiplex operation, or
-> perhaps a combination of enabling the powersave clock and changing the
-> parent input to the cpu?
-> 
-> My idea is instead of relying on a cpufreq driver to parse the state of
-> your clocks and understand the multiplexing, you can use the clock
-> framework for that. In fact that might help you get one step closer to
-> using the cpufreq-cpu0.c/cpufreq-generic.c implementation.
+AFAIK the only thing that's changed since I submitted it is that the
+3.17 merge window is closed.  Kees rebased the tree this applies to,
+but I think the patches all still apply.  What, if anything, do I need
+to do to help this along for 3.18?
 
-So you want the whole disabling of interrupt delivery to the cpu,
-flipping the mux, wait for interrupt and re-enabling of interrupt
-delivery to the cpu inside the clock provider? That is way past a
-simple mux clock.
+--Andy
 
-       Andrew
+>
+> This is both a cleanup and a speedup.  It reduces overhead due to
+> installing a trivial seccomp filter by 87%.  The speedup comes from
+> avoiding the full syscall tracing mechanism for filters that don't
+> return SECCOMP_RET_TRACE.
+>
+> This series depends on splitting the seccomp hooks into two phases.
+> The first phase evaluates the filter; it can skip syscalls, allow
+> them, kill the calling task, or pass a u32 to the second phase.  The
+> second phase requires a full tracing context, and it sends ptrace
+> events if necessary.  The seccomp core part is in Kees' seccomp/fastpath
+> tree.
+>
+> These patches implement a similar split for the x86 syscall
+> entry work.  The C callback is invoked in two phases: the first has
+> only a partial frame, and it can request phase 2 processing with a
+> full frame.
+>
+> Finally, I switch the 64-bit system_call code to use the new split
+> entry work.  This is a net deletion of assembly code: it replaces
+> all of the audit entry muck.
+>
+> In the process, I fixed some bugs.
+>
+> If this is acceptable, someone can do the same tweak for the
+> ia32entry and entry_32 code.
+>
+> This passes all seccomp tests that I know of.
+>
+> Changes from v3:
+>  - Dropped the core seccomp changes from the email -- Kees has applied them.
+>  - Add patch 2 (the TIF_NOHZ change).
+>  - Fix TIF_NOHZ in the two-phase entry code (thanks, Oleg).
+>
+> Changes from v2:
+>  - Fixed 32-bit x86 build (and the tests pass).
+>  - Put the doc patch where it belongs.
+>
+> Changes from v1:
+>  - Rebased on top of Kees' shiny new seccomp tree (no effect on the x86
+>    part).
+>  - Improved patch 6 vs patch 7 split (thanks Alexei!)
+>  - Fixed bogus -ENOSYS in patch 5 (thanks Kees!)
+>  - Improved changelog message in patch 6.
+>
+> Changes from RFC version:
+>  - The first three patches are more or less the same
+>  - The rest is more or less a rewrite
+>
+>
+> Andy Lutomirski (5):
+>   x86,x32,audit: Fix x32's AUDIT_ARCH wrt audit
+>   x86,entry: Only call user_exit if TIF_NOHZ
+>   x86: Split syscall_trace_enter into two phases
+>   x86_64,entry: Treat regs->ax the same in fastpath and slowpath
+>     syscalls
+>   x86_64,entry: Use split-phase syscall_trace_enter for 64-bit syscalls
+>
+>  arch/x86/include/asm/calling.h |   6 +-
+>  arch/x86/include/asm/ptrace.h  |   5 ++
+>  arch/x86/kernel/entry_64.S     |  51 +++++--------
+>  arch/x86/kernel/ptrace.c       | 159 ++++++++++++++++++++++++++++++++++-------
+>  4 files changed, 161 insertions(+), 60 deletions(-)
+>
+> --
+> 1.9.3
+>
+
+
+
+-- 
+Andy Lutomirski
+AMA Capital Management, LLC
