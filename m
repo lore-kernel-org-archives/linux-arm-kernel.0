@@ -1,47 +1,38 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 27 Aug 2014 09:21:39 +0100
-Subject: [PATCH 2/9] arm64: Fix INVALID_HWID definition
-In-Reply-To: <1409077080.11425.22.camel@smoke>
-References: <cover.1408736066.git.geoff@infradead.org>
- <6f84108ac880ef48548208738cbb169fba2fa51a.1408736066.git.geoff@infradead.org>
- <20140826155715.GH16482@arm.com> <1409077080.11425.22.camel@smoke>
-Message-ID: <20140827082138.GB6968@arm.com>
+From: henrik@henriknordstrom.net (Henrik =?ISO-8859-1?Q?Nordstr=F6m?=)
+Date: Wed, 27 Aug 2014 10:17:04 +0200
+Subject: [linux-sunxi] Re: [PATCH 4/4] simplefb: add clock handling code
+In-Reply-To: <20140826135341.GM15297@lukather>
+References: <20140813170106.GT15297@lukather>
+ <20140825121228.GB4163@ulmo.nvidia.com> <20140825124410.GZ15297@lukather>
+ <20140825133953.GJ4163@ulmo.nvidia.com> <53FB3E7F.4000503@redhat.com>
+ <20140825141600.GA14763@ulmo.nvidia.com> <20140825145854.GA15297@lukather>
+ <20140825150501.GE14763@ulmo.nvidia.com> <20140825152232.GE15297@lukather>
+ <20140826080432.GD17263@ulmo> <20140826135341.GM15297@lukather>
+Message-ID: <1409127424.2701.27.camel@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 26, 2014 at 07:18:00PM +0100, Geoff Levand wrote:
-> On Tue, 2014-08-26 at 16:57 +0100, Catalin Marinas wrote:
-> > On Fri, Aug 22, 2014 at 08:49:16PM +0100, Geoff Levand wrote:
-> > > Change the preprocessor macro INVALID_HWID definition from ULONG_MAX to (~0)
-> > > to allow INVALID_HWID to be used within assembly source files.
-> > > 
-> > > --- a/arch/arm64/include/asm/cputype.h
-> > > +++ b/arch/arm64/include/asm/cputype.h
-> > > @@ -16,7 +16,7 @@
-> > >  #ifndef __ASM_CPUTYPE_H
-> > >  #define __ASM_CPUTYPE_H
-> > >  
-> > > -#define INVALID_HWID		ULONG_MAX
-> > > +#define INVALID_HWID		UL(~0)
-> > 
-> > Does it actually expand to ULONG_MAX? ~0 is an int.
+tis 2014-08-26 klockan 15:53 +0200 skrev Maxime Ripard:
+> > it should be fixed at the root. So a much better solution would be to
+> > establish a way for firmware to communicate to the kernel that a given
+> > resource has been enabled by firmware and shouldn't be disabled. Such a
+> > solution can be implement for all types of resources and can be reused
+> > by all drivers since they don't have to worry about these details.
 > 
-> It seems to be OK, in C:
-> 
-> volatile unsigned long secondary_holding_pen_release = INVALID_HWID;
-> 
-> Disassembly of section .data:
-> 
-> 0000000000000000 <secondary_holding_pen_release>:
->    0:   ffffffff        .word   0xffffffff
->    4:   ffffffff        .word   0xffffffff
+> Mike Turquette repeatedly said that he was against such a DT property:
+> https://lkml.org/lkml/2014/5/12/693
 
-OK, it looks like it's sign-extending from int to unsigned long (an
-alternative would have been to write (~UL(0)) but the above should do as
-well).
+And not really what we want here. The clocks should be turned off if not
+in use, i.e. when simplefb is unbound from the device and no other
+driver has taken over. Maybe even in the case where there is no simplefb
+driver in-kernel, but if the use case is to be generalized then this
+kind of resources need to be held until explicitly released to allow
+resources to be held until their driver is loaded, which may happen long
+after kernel bootup.
 
-Anyway, the patch should come with the series that makes use of such
-change.
+But again, for many use cases it is a virtual hardware property, not
+really hardware in it's own but still smells a lot like hardware. These
+parameters is only valid until the hardware have been reconfigured.
 
--- 
-Catalin
+Regards
+Henrik
