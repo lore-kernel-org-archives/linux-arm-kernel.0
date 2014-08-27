@@ -1,314 +1,102 @@
-From: romain.perier@gmail.com (Romain Perier)
-Date: Wed, 27 Aug 2014 06:55:27 +0000
-Subject: [PATCH v2] ethernet: arc: Add support for Rockchip SoC layer device
- tree bindings
-Message-ID: <1409122527-17673-1-git-send-email-romain.perier@gmail.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Wed, 27 Aug 2014 08:55:36 +0200
+Subject: [PATCH 1/3 repost] clocksource: sh_cmt: Document SoC specific
+ bindings
+In-Reply-To: <1409117300-2133-2-git-send-email-horms+renesas@verge.net.au>
+References: <1409117300-2133-1-git-send-email-horms+renesas@verge.net.au>
+ <1409117300-2133-2-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <CAMuHMdUv6bwSjHLhHumiuaBFS8WAw0y1sNq4PcofjOz6UiOfrA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch defines a platform glue layer for Rockchip SoCs which
-support arc-emac driver. It ensures that regulator for the rmii is on
-before trying to connect to the ethernet controller. It applies right
-speed and mode changes to the grf when ethernet settings change.
+Hi Simon,
 
-Signed-off-by: Romain Perier <romain.perier@gmail.com>
----
- drivers/net/ethernet/arc/Kconfig         |  15 +++
- drivers/net/ethernet/arc/Makefile        |   1 +
- drivers/net/ethernet/arc/emac.h          |   2 +
- drivers/net/ethernet/arc/emac_main.c     |   2 +
- drivers/net/ethernet/arc/emac_rockchip.c | 224 +++++++++++++++++++++++++++++++
- 5 files changed, 244 insertions(+)
- create mode 100644 drivers/net/ethernet/arc/emac_rockchip.c
+On Wed, Aug 27, 2014 at 7:28 AM, Simon Horman
+<horms+renesas@verge.net.au> wrote:
+> n general Renesas hardware is not documented to the extent
+> where the relationship between IP blocks on different SoCs can be assumed
+> although they may appear to operate the same way. Furthermore the
+> documentation typically does not specify a version for individual
+> IP blocks. For these reasons a convention of using the SoC name in place
+> of a version and providing SoC-specific compat strings has been adopted.
+>
+> Although not universally liked this convention is used in the bindings
+> for the drivers a number of drivers for Renesas hardware. The purpose
 
-diff --git a/drivers/net/ethernet/arc/Kconfig b/drivers/net/ethernet/arc/Kconfig
-index 89e04fd..6d96a82 100644
---- a/drivers/net/ethernet/arc/Kconfig
-+++ b/drivers/net/ethernet/arc/Kconfig
-@@ -32,4 +32,19 @@ config ARC_EMAC
- 	  non-standard on-chip ethernet device ARC EMAC 10/100 is used.
- 	  Say Y here if you have such a board.  If unsure, say N.
- 
-+config EMAC_ROCKCHIP
-+       tristate "Rockchip EMAC support"
-+       select ARC_EMAC_CORE
-+       depends on OF_IRQ
-+       depends on OF_NET
-+       depends on ARCH_ROCKCHIP
-+       depends on REGULATOR_ACT8865
-+       depends on SMSC_PHY
-+       depends on MFD_SYSCON
-+       ---help---
-+         Support for Rockchip RK3066/RK3188 EMAC ethernet controllers.
-+         This selects Rockchip SoC glue layer support for the
-+         emac device driver. This driver is used for RK3066/RK3188
-+         EMAC ethernet controller.
-+
- endif # NET_VENDOR_ARC
-diff --git a/drivers/net/ethernet/arc/Makefile b/drivers/net/ethernet/arc/Makefile
-index 241bb80..79108af 100644
---- a/drivers/net/ethernet/arc/Makefile
-+++ b/drivers/net/ethernet/arc/Makefile
-@@ -5,3 +5,4 @@
- arc_emac-objs := emac_main.o emac_mdio.o
- obj-$(CONFIG_ARC_EMAC_CORE) += arc_emac.o
- obj-$(CONFIG_ARC_EMAC) += emac_arc.o
-+obj-$(CONFIG_EMAC_ROCKCHIP) += emac_rockchip.o
-diff --git a/drivers/net/ethernet/arc/emac.h b/drivers/net/ethernet/arc/emac.h
-index 164b1c7..2bfe8c76 100644
---- a/drivers/net/ethernet/arc/emac.h
-+++ b/drivers/net/ethernet/arc/emac.h
-@@ -127,6 +127,8 @@ struct buffer_state {
- struct arc_emac_priv {
- 	const char *drv_name;
- 	const char *drv_version;
-+	void (*set_mac_speed)(void *priv, unsigned int speed);
-+
- 	/* Devices */
- 	struct device *dev;
- 	struct phy_device *phy_dev;
-diff --git a/drivers/net/ethernet/arc/emac_main.c b/drivers/net/ethernet/arc/emac_main.c
-index b35c69e..a08f343 100644
---- a/drivers/net/ethernet/arc/emac_main.c
-+++ b/drivers/net/ethernet/arc/emac_main.c
-@@ -48,6 +48,8 @@ static void arc_emac_adjust_link(struct net_device *ndev)
- 	if (priv->speed != phy_dev->speed) {
- 		priv->speed = phy_dev->speed;
- 		state_changed = 1;
-+		if (priv->set_mac_speed)
-+			priv->set_mac_speed(priv, priv->speed);
- 	}
- 
- 	if (priv->duplex != phy_dev->duplex) {
-diff --git a/drivers/net/ethernet/arc/emac_rockchip.c b/drivers/net/ethernet/arc/emac_rockchip.c
-new file mode 100644
-index 0000000..ff1a657
---- /dev/null
-+++ b/drivers/net/ethernet/arc/emac_rockchip.c
-@@ -0,0 +1,224 @@
-+/**
-+ * emac-rockchip.c - Rockchip EMAC specific glue layer
-+ *
-+ * Copyright (C) 2014 Romain Perier
-+ *
-+ * Romain Perier  <romain.perier@gmail.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+#include <linux/etherdevice.h>
-+#include <linux/mfd/syscon.h>
-+#include <linux/module.h>
-+#include <linux/of_net.h>
-+#include <linux/platform_device.h>
-+#include <linux/regmap.h>
-+#include <linux/regulator/consumer.h>
-+
-+#include "emac.h"
-+
-+#define DRV_NAME        "rockchip_emac"
-+#define DRV_VERSION     "1.0"
-+
-+#define GRF_MODE_MII   BIT(0)
-+#define GRF_MODE_RMII  0x0
-+#define GRF_SPEED_10M  0x0
-+#define GRF_SPEED_100M BIT(1)
-+
-+struct emac_rockchip_soc_data {
-+	int grf_offset;
-+};
-+
-+struct rockchip_priv_data {
-+	struct arc_emac_priv emac;
-+	struct regmap *grf;
-+	struct emac_rockchip_soc_data *soc_data;
-+	struct regulator *regulator;
-+	struct clk *refclk;
-+};
-+
-+static const struct of_device_id emac_rockchip_dt_ids[];
-+
-+static void emac_rockchip_set_mac_speed(void *priv, unsigned int speed)
-+{
-+	struct rockchip_priv_data *emac = priv;
-+	u32 data;
-+	int err = 0;
-+
-+	/* write-enable bits */
-+	data = BIT(17);
-+
-+	switch(speed) {
-+	case 10:
-+		data |= GRF_SPEED_10M;
-+		break;
-+	case 100:
-+		data |= GRF_SPEED_100M;
-+		break;
-+	default:
-+		pr_err("speed %u not supported\n", speed);
-+		return;
-+	}
-+
-+	err = regmap_write(emac->grf, emac->soc_data->grf_offset, data);
-+	if (err)
-+		pr_err("unable to apply speed %u to grf (%d)\n", speed, err);
-+}
-+
-+static int emac_rockchip_probe(struct platform_device *pdev)
-+{
-+	struct device *dev = &pdev->dev;
-+	struct net_device *ndev;
-+	struct rockchip_priv_data *priv;
-+	const struct of_device_id *match;
-+	u32 data, rate;
-+	int err, interface;
-+
-+	if (!pdev->dev.of_node)
-+		return -ENODEV;
-+
-+	ndev = alloc_etherdev(sizeof(struct rockchip_priv_data));
-+	if (!ndev)
-+		return -ENOMEM;
-+	platform_set_drvdata(pdev, ndev);
-+	SET_NETDEV_DEV(ndev, dev);
-+
-+	priv = netdev_priv(ndev);
-+	priv->emac.drv_name = DRV_NAME;
-+	priv->emac.drv_version = DRV_VERSION;
-+	priv->emac.set_mac_speed = emac_rockchip_set_mac_speed;
-+
-+	interface = of_get_phy_mode(dev->of_node);
-+
-+	/* RK3066 and RK3188 SoCs only support RMII */
-+	if (interface != PHY_INTERFACE_MODE_RMII) {
-+		dev_err(dev, "unsupported phy interface mode %d\n", interface);
-+		err = -ENOTSUPP;
-+		goto out_netdev;
-+	}
-+
-+	priv->grf = syscon_regmap_lookup_by_phandle(dev->of_node, "rockchip,grf");
-+	if (IS_ERR(priv->grf)) {
-+		dev_err(dev, "failed to retrieve global register file from the device tree (%ld)\n", PTR_ERR(priv->grf));
-+		err = PTR_ERR(priv->grf);
-+		goto out_netdev;
-+	}
-+
-+	match = of_match_node(emac_rockchip_dt_ids, dev->of_node);
-+	priv->soc_data = (struct emac_rockchip_soc_data *)match->data;
-+
-+	priv->emac.clk = devm_clk_get(dev, "hclk");
-+	if (IS_ERR(priv->emac.clk)) {
-+		dev_err(dev, "failed to retrieve host clock from device tree (%ld)\n", PTR_ERR(priv->emac.clk));
-+		err = PTR_ERR(priv->emac.clk);
-+		goto out_netdev;
-+	}
-+
-+	priv->refclk = devm_clk_get(dev, "macref");
-+	if (IS_ERR(priv->refclk)) {
-+		dev_err(dev, "failed to retrieve reference clock from device tree (%ld)\n", PTR_ERR(priv->refclk));
-+		err = PTR_ERR(priv->refclk);
-+		goto out_netdev;
-+	}
-+
-+	err = clk_prepare_enable(priv->refclk);
-+	if (err) {
-+		dev_err(dev, "failed to enable reference clock (%d)\n", err);
-+		goto out_netdev;
-+	}
-+
-+        /* Optional regulator for PHY */
-+	priv->regulator = devm_regulator_get_optional(dev, "phy");
-+	if (IS_ERR(priv->regulator)) {
-+		if (PTR_ERR(priv->regulator) == -EPROBE_DEFER)
-+			return -EPROBE_DEFER;
-+		dev_err(dev, "no regulator found\n");
-+		priv->regulator = NULL;
-+	}
-+
-+	if (priv->regulator) {
-+		err = regulator_enable(priv->regulator);
-+		if (err) {
-+			dev_err(dev, "failed to enable phy-supply (%d)\n", err);
-+			goto out_netdev;
-+		}
-+	}
-+
-+	err = arc_emac_probe(ndev, interface);
-+	if (err)
-+		goto out_netdev;
-+
-+	/* write-enable bits */
-+	data = BIT(16) | BIT(17);
-+
-+	data |= GRF_SPEED_100M;
-+	data |= GRF_MODE_RMII;
-+	rate = 50000000;
-+
-+	err = regmap_write(priv->grf, priv->soc_data->grf_offset, data);
-+	if (err) {
-+		dev_err(dev, "unable to apply initial settings to grf (%d)\n", err);
-+		goto out_netdev;
-+	}
-+
-+	err = clk_set_rate(priv->refclk, rate);
-+	if (err)
-+		dev_err(dev, "failed to change reference clock rate (%d)\n", err);
-+
-+out_netdev:
-+	if (err)
-+		free_netdev(ndev);
-+	return err;
-+}
-+
-+static int emac_rockchip_remove(struct platform_device *pdev)
-+{
-+	struct net_device *ndev = platform_get_drvdata(pdev);
-+	struct rockchip_priv_data *priv = netdev_priv(ndev);
-+	int err;
-+
-+	clk_disable_unprepare(priv->refclk);
-+
-+	if (priv->regulator)
-+		regulator_disable(priv->regulator);
-+	err = arc_emac_remove(ndev);
-+	free_netdev(ndev);
-+	return err;
-+}
-+
-+static const struct emac_rockchip_soc_data emac_rockchip_dt_data[] = {
-+	{ .grf_offset = 0x154 }, /* rk3066 */
-+	{ .grf_offset = 0x0a4 }, /* rk3188 */
-+};
-+
-+static const struct of_device_id emac_rockchip_dt_ids[] = {
-+	{ .compatible = "rockchip,rk3066-emac", .data = (void *)&emac_rockchip_dt_data[0]},
-+	{ .compatible = "rockchip,rk3188-emac", .data = (void *)&emac_rockchip_dt_data[1]},
-+	{ /* Sentinel */ }
-+};
-+
-+MODULE_DEVICE_TABLE(of, emac_rockchip_dt_ids);
-+
-+static struct platform_driver emac_rockchip_driver = {
-+	.probe = emac_rockchip_probe,
-+	.remove = emac_rockchip_remove,
-+	.driver = {
-+		.name = DRV_NAME,
-+		.of_match_table  = emac_rockchip_dt_ids,
-+	},
-+};
-+
-+module_platform_driver(emac_rockchip_driver);
-+
-+MODULE_AUTHOR("Romain Perier <romain.perier@gmail.com>");
-+MODULE_DESCRIPTION("Rockchip EMAC platform driver");
-+MODULE_LICENSE("GPL");
--- 
-1.9.1
+s/the drivers //
+
+> of this patch is to update the Renesas R-Car Compare Match Timer (CMT)
+> driver to follow this convention.
+>
+> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+
+
+
+> ---
+> * I plan to follow up with patches to use these new bindings in the
+>   dtsi files for the affected SoCs.
+> ---
+>  .../devicetree/bindings/timer/renesas,cmt.txt      | 26 +++++++++++++++++++++-
+>  1 file changed, 25 insertions(+), 1 deletion(-)
+>
+> diff --git a/Documentation/devicetree/bindings/timer/renesas,cmt.txt b/Documentation/devicetree/bindings/timer/renesas,cmt.txt
+> index a17418b..500bad2 100644
+> --- a/Documentation/devicetree/bindings/timer/renesas,cmt.txt
+> +++ b/Documentation/devicetree/bindings/timer/renesas,cmt.txt
+> @@ -16,10 +16,34 @@ Required Properties:
+>                 (CMT0 on sh7372, sh73a0 and r8a7740)
+>      - "renesas,cmt-32-fast" for the 32-bit CMT with fast clock support
+>                 (CMT[234] on sh7372, sh73a0 and r8a7740)
+> +    - "renesas,cmt-32-fast-r8a7740" for the R8A7740 32-bit CMT with fast
+> +               clock support (CMT[234])
+> +    - "renesas,cmt-32-fast-sh7372" for the SH7372 32-bit CMT with fast
+> +               clock support (CMT[234])
+> +    - "renesas,cmt-32-fast-sh73a0" for the SH73A0 32-bit CMT with fast
+> +               clock support (CMT[234])
+
+> +    - "renesas,cmt-32-r8a7740" for the R8a7740 32-bit CMT
+> +               (CMT0)
+> +    - "renesas,cmt-32-sh7372" for the SH7372 32-bit CMT
+> +               (CMT0)
+> +    - "renesas,cmt-32-sh73a0" for the SH73a0 32-bit CMT
+> +               (CMT0)
+
+I'd move these 3 non-fast "renesas,cmt-32-*" values up, under
+"renesas,cmt-32".
+
+>      - "renesas,cmt-48" for the 48-bit CMT
+>                 (CMT1 on sh7372, sh73a0 and r8a7740)
+>      - "renesas,cmt-48-gen2" for the second generation 48-bit CMT
+>                 (CMT[01] on r8a73a4, r8a7790 and r8a7791)
+> +    - "renesas,cmt-48-r8a73a4" for the R8A73A4 48-bit CMT
+> +               (CMT[01])
+> +    - "renesas,cmt-48-r8a7740" for the R8A7740 48-bit CMT
+> +               (CMT1)
+> +    - "renesas,cmt-48-r8a7790" for the R8A7790 48-bit CMT
+> +               (CMT[01])
+> +    - "renesas,cmt-48-r8a7791" for the R8A7791 48-bit CMT
+> +               (CMT[01])
+> +    - "renesas,cmt-48-sh7372" for the SH7372 48-bit CMT
+> +               (CMT1)
+> +    - "renesas,cmt-48-sh73a0" for the SH73A0 48-bit CMT
+> +               (CMT1)
+
+I'd split the above in original and gen2.
+
+Perhaps you can also add blank lines in between the 4 blocks of
+types; the list is getting long?
+
+Apart from the minor issues above
+Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
+(for the whole series)
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
