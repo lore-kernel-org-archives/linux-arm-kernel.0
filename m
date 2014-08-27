@@ -1,63 +1,82 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 27 Aug 2014 10:37:58 -0600
-Subject: [RFC PATCH 0/9] dt: dependencies (for deterministic driver
- initialization order based on the DT)
-In-Reply-To: <53FE07BE.7000809@ahsoftware.de>
-References: <53F64624.5000403@ahsoftware.de>
- <20140822131919.GX21734@leverpostej> <20140825093931.GB2399@ulmo>
- <E1XLu15-0002DP-6o@jdl.com> <20140825133714.GH4163@ulmo.nvidia.com>
- <20140826084208.AE5F0C40989@trevor.secretlab.ca>
- <20140826084922.GG17263@ulmo> <53FC566C.30904@ahsoftware.de>
- <20140826101107.GC32315@leverpostej>
- <20140827103432.64927C409CB@trevor.secretlab.ca>
- <20140827144403.GB13850@arm.com> <53FE05AE.9000406@wwwdotorg.org>
- <53FE07BE.7000809@ahsoftware.de>
-Message-ID: <53FE0966.5020206@wwwdotorg.org>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Wed, 27 Aug 2014 16:38:31 +0000 (UTC)
+Subject: [PATCH] ARM: OMAP2+: hwmod: Rearm wake-up interrupts for DT when
+ MUSB is idled
+In-Reply-To: <20140825171446.GL17254@atomide.com>
+References: <20140825171446.GL17254@atomide.com>
+Message-ID: <alpine.DEB.2.02.1408271632550.21249@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/27/2014 10:30 AM, Alexander Holler wrote:
-> Am 27.08.2014 18:22, schrieb Stephen Warren:
->> On 08/27/2014 08:44 AM, Catalin Marinas wrote:
->
->>> It's not just optimisation but an important feature for new arm64 SoCs.
->>> Given some Tegra discussions recently, in many cases the machine_desc
->>> use on arm is primarily to initialise devices in the right order. If we
->>> can solve this in a more deterministic way (other than deferred
->>> probing), we avoid the need for a dedicated SoC platform driver (or
->>> machine_desc) or workarounds like different initcall levels and explicit
->>> DT parsing.
->>
->> A lot of the ordering is SW driver dependencies. I'm not sure how much
->> of that can accurately be claimed as HW dependencies. As such, I'm not
->> sure that putting dependencies into DT would be a good idea; it doesn't
->> feel like HW data, and might well change if we restructure SW. It'd need
->> some detailed research though.
->
-> Almost every phandle is a dependency, so the DT is already full with them.
+On Mon, 25 Aug 2014, Tony Lindgren wrote:
 
-That's true, but not entirely relevant.
+> Looks like MUSB cable removal can cause wake-up interrupts to
+> stop working for device tree based booting at least for UART3
+> even as nothing is dynamically remuxed. This can be fixed by
+> calling reconfigure_io_chain() for device tree based booting
+> in hwmod code. 
 
-phandles in DT should only be present where there's an obvious HW 
-dependency. It's obvious that, for example, there's a real HW dependency 
-between an IRQ controller and a device that has an IRQ signal fed into 
-the IRQ controller. It makes perfect sense to represent that as a 
-phandle (+args).
+Weird, nice find.  Do you know if this applies to all OMAPs, or just 
+OMAP3?
 
-However, most of the ordering imposed by the Tegra machine descriptor 
-callbacks is nothing to do with this. It's more that the SW driver for 
-component X needs some low level data (e.g. SKU/fuse information) before 
-it can run. However, there's no real HW dependency between the HW 
-component X and the fuse module. As such, it doesn't make sense to 
-represent such a dependency in DT, using a phandle or by any other means.
+> Note that we already do that for legacy booting
+> if the legacy mux is configured.
+> 
+> My guess is that this is related to UART3 and MUSB ULPI
+> hsusb0_data0 and hsusb0_data1 support for Carkit mode that
+> somehow affect the configured IO chain for UART3 and require
+> rearming the wake-up interrupts.
+> 
+> In general, for device tree based booting, pinctrl-single
+> calls the rearm hook that in turn calls reconfigure_io_chain
+> so calling reconfigure_io_chain should not be needed from the
+> hwmod code for other events.
+> 
+> So let's limit the hwmod rearming of iochain only to
+> HWMOD_FORCE_MSTANDBY where MUSB is currently the only user
+> of it. If we see other devices needing similar changes we can
+> add more checks for it.
 
-Of course, there are probably cases where we could/should add some more 
-phandles/... and likewise cases where we shouldn't. That's why detailed 
-research is needed.
+Could you please add a new hwmod flag for this case?  Maybe something like 
+HWMOD_RECONFIG_IO_CHAIN?  I think that would make the code easier to read 
+and more maintainable, since the workaround would then be explicitly 
+connected with that particular workaround's flag.  Looks like we have 
+several flag bits left.  Plus if we wind up having to set 
+HWMOD_FORCE_MSTANDBY for other devices that might not need the I/O chain 
+reconfiguration, we won't have to reimplement this flag workaround.
 
-Irrespective though, a new kernel needs to work against an old DT, so 
-always needs to work without any (of these new) dependencies being 
-represented in DT, since they aren't represented there today. So, I 
-think pushing the issue into DT is a non-starter either way, unless we 
-accept yet another ABI-breaking change, in which case we should just 
-give up on any claims of ABI and make everyone's lives simpler.
+
+regards
+
+
+- Paul
+
+
+> 
+> Cc: Paul Walmsley <paul@pwsan.com>
+> Signed-off-by: Tony Lindgren <tony@atomide.com>
+> 
+> --- a/arch/arm/mach-omap2/omap_hwmod.c
+> +++ b/arch/arm/mach-omap2/omap_hwmod.c
+> @@ -2185,6 +2185,8 @@ static int _enable(struct omap_hwmod *oh)
+>  			 oh->mux->pads_dynamic))) {
+>  		omap_hwmod_mux(oh->mux, _HWMOD_STATE_ENABLED);
+>  		_reconfigure_io_chain();
+> +	} else if (oh->flags & HWMOD_FORCE_MSTANDBY) {
+> +		_reconfigure_io_chain();
+>  	}
+>  
+>  	_add_initiator_dep(oh, mpu_oh);
+> @@ -2291,6 +2293,8 @@ static int _idle(struct omap_hwmod *oh)
+>  	if (oh->mux && oh->mux->pads_dynamic) {
+>  		omap_hwmod_mux(oh->mux, _HWMOD_STATE_IDLE);
+>  		_reconfigure_io_chain();
+> +	} else if (oh->flags & HWMOD_FORCE_MSTANDBY) {
+> +		_reconfigure_io_chain();
+>  	}
+>  
+>  	oh->_state = _HWMOD_STATE_IDLE;
+> 
+
+
+- Paul
