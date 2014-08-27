@@ -1,66 +1,25 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Wed, 27 Aug 2014 11:05:29 +0200
-Subject: [linux-sunxi] Re: [PATCH 4/4] simplefb: add clock handling code
-In-Reply-To: <20140827085538.GS15297@lukather>
-References: <20140825150705.GB15297@lukather> <20140826082626.GE17263@ulmo>
- <20140826090035.GB17528@sirena.org.uk>
- <20140826091853.GI17263@ulmo>
- <20140826100612.GH17528@sirena.org.uk>
- <20140826105451.GD31124@ulmo> <1409078409.2701.17.camel@localhost>
- <20140827074057.GS17528@sirena.org.uk>
- <20140827082208.GQ15297@lukather>
- <CAMuHMdVkEPBtVT0dcDqQOQ_J0p+zYJwaUW8LqQX0Z+h6CHihRg@mail.gmail.com>
- <20140827085538.GS15297@lukather>
-Message-ID: <CAMuHMdURvJaM7qge+Po5e=F45k9-NeHsTiQykCjCmwr6_ud08A@mail.gmail.com>
+From: jhautbois@gmail.com (Jean-Michel Hautbois)
+Date: Wed, 27 Aug 2014 11:11:15 +0200
+Subject: imx6 eSATA
+In-Reply-To: <20140118184427.GJ15937@n2100.arm.linux.org.uk>
+References: <20140118184427.GJ15937@n2100.arm.linux.org.uk>
+Message-ID: <CAL8zT=iVVmkT36idmkPFX7PxM7P3A489ThZqirqP3dZNkgmYTQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 27, 2014 at 10:55 AM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
->> >> Is simplefb something that should be in the device tree distinctly in
->> >> the first place - shouldn't it be a subset of the functionality of the
->> >> video nodes?  It's the same hardware being driven differently.
->> >
->> > Therorically, yes, but that would mean knowing beforehand what the
->> > final binding will look like, even before submitting the driver. Since
->> > the bindings are always reviewed, and most of the time changed
->> > slightly, that wouldn't work very well with the DT as a stable ABI
->> > policy I guess.
->>
->> If you don't know how the bindings for a device will look like at the time of
->> writing your DTS, you're always screwed, whether you add a simpefb
->> node or not.
->>
->> If you know how the bindings look like, just add the device, with an extra
->> "linux,simplefb" compatibility value.
->> If you don't know how the bindings look like, do your utter best in
->> guessing. Your DTS must be amended later anyway, either because
->> you guessed wrong[*] (in case you added a node to have simplefb
->> working), or because you have to add a real device node (in case you
->> didn't add one for simplefb).
+Hi Russel,
+
+2014-01-18 19:44 GMT+01:00 Russell King - ARM Linux <linux@arm.linux.org.uk>:
+> So, I see we have AHCI support for SATA on the iMX6.  Great... but it
+> doesn't work on the cubox-i, because the phy settings are wrong.
 >
-> Let's be conservative and consider the case where we would guess
-> wrong.
->
-> If we just rely on a simplefb node, when reviewing and integrating the
-> "new" bindings to describe accureately the various IPs involved in the
-> display path, we would obviously create new compatibles for
-> them. Since it's new compatibles, we can come up with any binding we'd
-> like, without have to consider the backward compatibility, since it's
-> a new binding.
->
-> Then, we just remove the simplefb, all is good.
+> The Cubox-i requires GPR13 set to 0x0593A044 - I haven't decoded what
+> this means yet, but it's different from the 0x0593E4A4 which is
+> currently hard-coded into the driver (and I've independently tested
+> that this is indeed required.)
 
-I would keep the simplefb compatible value. Else you break compatibility
-with old kernels that don't have your new driver.
+Pardon me if this is a naive question, but how do you know which value
+is required for a specific board ?
 
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Thanks,
+JM
