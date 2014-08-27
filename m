@@ -1,117 +1,78 @@
-From: boris.brezillon@free-electrons.com (Boris BREZILLON)
-Date: Wed, 27 Aug 2014 09:52:35 +0200
-Subject: [PATCH v4 00/11] drm: add support for Atmel HLCDC Display
- Controller
-In-Reply-To: <1997793.CWhjU3F32E@avalon>
-References: <1406034695-15534-1-git-send-email-boris.brezillon@free-electrons.com>
- <2138720.5GSxsvjVxS@avalon> <20140821192633.69f6b21b@bbrezillon>
- <1997793.CWhjU3F32E@avalon>
-Message-ID: <20140827095235.20334e2d@bbrezillon>
+From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
+Date: Wed, 27 Aug 2014 09:59:37 +0200
+Subject: [PATCH] ARM: multi_v7_defconfig: major refresh
+In-Reply-To: <CAOesGMihWucg0HJ1ecdq_98j+hR=C=DhU8cyjrC+5s7rUJM2MQ@mail.gmail.com>
+References: <1406052070-6207-1-git-send-email-olof@lixom.net>
+ <CAOesGMjo0AY=eGcfTh1sVxKkURK9bzK8SBAeEbvBFN4R0sF34A@mail.gmail.com>
+ <CAOesGMihWucg0HJ1ecdq_98j+hR=C=DhU8cyjrC+5s7rUJM2MQ@mail.gmail.com>
+Message-ID: <5183639.cXydHclPsr@amdc1032>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Laurent,
 
-On Tue, 26 Aug 2014 01:39:21 +0200
-Laurent Pinchart <laurent.pinchart@ideasonboard.com> wrote:
+Hi Olof,
 
-> Hi Boris,
+On Sunday, August 10, 2014 08:05:23 PM Olof Johansson wrote:
+> On Tue, Jul 22, 2014 at 1:28 PM, Olof Johansson <olof@lixom.net> wrote:
+> > On Tue, Jul 22, 2014 at 11:36 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> >> On Tuesday 22 July 2014 11:01:10 Olof Johansson wrote:
+> >>> This is a major refresh of the multi_v7_defconfig:
+> >>>
+> >>> - Bring over a bunch of Samsung drivers to make ODROID-U3 and Chromebooks usable
+> >>>  * Enable big.LITTLE
+> >>>  * MCPM
+> >>>  * CYAPA touchpad
+> >>>  * Samsung-related MTD/regulator/clk/pinmux drivers
+> >>>  * Add some of the CrOS EC drivers
+> >>> - Turn on TPM, HW_RANDOM
+> >>> - OMAP_USB3 -> TI_PIPE3 option rename
+> >>> - Enable MCPM/b.L for VEXPRESS
+> >>> - Add new CONFIG_MTD_SPI_NOR since it otherwise masks off SPI NOR drivers
+> >>> - CONFIG_LOGO, because penguins.
+> >>>
+> >>> I took care to keep the new options that have been added for whose the
+> >>> drivers are not yet in our for-next branch. This was pretty awkward so
+> >>> we should sort out how to handle those better in the future.
+> >>
+> >> Since you've already done all those, how about enabling THUMB2_KERNEL?
+> >> For the multi_v7_defconfig, it should actually give some benefits,
+> >> since it's rather large, and it would be good to have some more testing
+> >> with this option enabled.
+> >>
+> >> I guess the first step would be to enable it and just see if your
+> >> boot farm survives the change.
+> >
+> > Good point, I'll definitely give that a go once the current issues are resolved.
+> >
+> > Which are: These changes make 5250-based machines (snow and arndale)
+> > break. Lots of i2c timeouts on SATA and hdmi-phy. Looks like arndale
+> > might be missing pinctrl setups for it?
+> >
+> > Tushar, Kukjin, any chance you can investigate from your end? I'd like
+> > to get this change in since it allows for better multiplatform
+> > coverage, but the Exynos breakage must be fixed...
 > 
-> On Thursday 21 August 2014 19:26:33 Boris BREZILLON wrote:
-> > On Thu, 21 Aug 2014 19:08:53 +0200
-> > Laurent Pinchart <laurent.pinchart@ideasonboard.com> wrote:
-> > 
-> > [...]
-> > 
-> > >>>> While this could be acceptable when all drivers are statically linked
-> > >>>> in the kernel, it might be problematic when you're using modules,
-> > >>>> meaning that you won't be able to display anything on your LCD panel
-> > >>>> until your HDMI bridge module has been loaded.
-> > >>> 
-> > >>> No. HDMI should be using proper hotplugging anyway, hence it should be
-> > >>> always be loaded anyway. You're in for a world of pain if you think
-> > >>> you can run DRM with a driver that's composed of separate kernel
-> > >>> modules.
-> > >> 
-> > >> I was talking about the external RGB to HDMI encoder, should the driver
-> > >> for this encoder (which is not on On Chip block) be compiled
-> > >> statically too ?
-> > > 
-> > > Given the move to multiplatform kernels we need to aim for as few modules
-> > > compiled in as possible. I'd say this includes HDMI encoders, panels and
-> > > display controllers.
-> > > 
-> > >>> Also if you don't want to use deferred probe, then you're in for the
-> > >>> full hotplugging panel dance and that implies that you need to fix a
-> > >>> bunch of things in DRM (one being the framebuffer console
-> > >>> instantiation
-> > >>> that I referred to in the other thread).
-> > >> 
-> > >> For now, I wait until there is a device connected on the RGB connector
-> > >> (connector status set to connector_status_connected) before creating an
-> > >> fbdev. It might not be the cleanest way to solve this issue, but it
-> > >> works :-).
-> > > 
-> > > Do you create a new drm_encoder at runtime for the HDMI encoder when it
-> > > appears ? I thought the DRM core and API were not able to correctly cope
-> > > with that.
-> > 
-> > I haven't started to work on the HDMI encoder yet, and ATM I only have
-> > a single connector (which is true from an HW POV), which is then bound
-> > to an LCD panel (the only type of remote endpoint I currently support).
-> > 
-> > BTW, I wonder how my use case should be represented in the DRM
-> > subsystem. As I said, from an HW POV I only have one RGB (or whatever
-> > name you choose for it) connector. But on such kind of connectors you
-> > can connect several output devices (panels, encoders, ...).
-> > And in my case I have 2 devices on the same RGB connector: a panel and
-> > an RGB to HDMI converter.
+> This is still broken on 5250:
+> http://arm-soc.lixom.net/bootlogs/misc/v3.16-10143-gccefc7a/ is with
+> this patch applied on top of current mainline and the few fixes we
+> have queued up.
 > 
-> The DRM connector object was initially meant to model a physical user-
-> accessible connector on a board (VGA, DVI, HDMI, ...) and the properties of 
-> the monitor plugged into it. It has then been (ab)used to represent panels, as 
-> they're similar to monitors.
+> I2C_S3C2410 is enabled with that config now.
 > 
-> In your case the VGA and HDMI connectors should be modeled as DRM connectors, 
-> the RGB to HDMI encoder as a DRM encoder, and the LCDC as a DRM CRTC.
+> Tushar is no longer on a Linaro landing team, so he's not looking
+> after Arndale. Kukjin?
 
-I don't have any VGA connector (or I'm missing something :-)), but I
-have an LCD panel and an RGB to HDMI encoder connected on the same RGB
-connector.
+I'm not responsible for Arndale but I took a look at the issue and
+managed to fix it on my setup.
 
-> 
-> As DRM hardcodes the pipeline model to CRTC -> encoder -> connector, you will 
-> also need a DRM encoder in the VGA path. I suppose your board has a VGA DAC, 
-> that's the component you should expose as a DRM encoder (even if it can't be 
-> controlled and doesn't limit the valid modes).
+Please see:
 
-Actually, my problem is that both devices are connected on the same RGB
-connector, and thus share the same display mode (resolution, HSYNC,
-VSYNC, RGB output mode, ...).
-This means that all remote devices have to agree on a specific mode if
-we want to mirror the display on several output devices, otherwise we
-must disable one of the output devices.
+  https://lkml.org/lkml/2014/8/27/116
 
-> 
-> > >>> You also can't be using the current device tree bindings because they
-> > >>> all assume a dependency from the display controller/output to the
-> > >>> panel. For hotplugging you'd need the dependency the other way around
-> > >>> (the panel needs to refer to the output by phandle).
-> > >> 
-> > >> Here [1] is a proposal for notification support in the drm_panel
-> > >> infrastructure (which is not that complicated), and here [2] is how
-> > >> I use it in my atmel-hlcdc driver to generate hotplug events.
-> > > 
-> > > Is there a way we could use the component framework for that ? I know that
-> > > partial notification isn't supported at the moment, but Russell agreed it
-> > > was a real use case that should be implemented at some point.
-> > 
-> > I'll give it a try.
-> 
+for details.
 
-
-
--- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+Best regards,
+--
+Bartlomiej Zolnierkiewicz
+Samsung R&D Institute Poland
+Samsung Electronics
