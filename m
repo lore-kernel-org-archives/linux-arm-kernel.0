@@ -1,106 +1,77 @@
-From: jh80.chung@samsung.com (Jaehoon Chung)
-Date: Wed, 27 Aug 2014 13:47:02 +0900
-Subject: [PATCH V2 3/3] mmc: dw_mmc: Dont cut off vqmmc and vmmc
-In-Reply-To: <CAD=FV=VCw1mLpArSY1uj+1zorWROjqGeT3dcTJYzr_1J6jdsBQ@mail.gmail.com>
-References: <1408715272-13833-1-git-send-email-yuvaraj.cd@samsung.com>
- <1408715272-13833-4-git-send-email-yuvaraj.cd@samsung.com>
- <CAPDyKFqz8sGj2td=ihZXN4zvAqmu9FHZjWdCn-ZRcdHugNHe2g@mail.gmail.com>
- <CAPz6YkXH1mMOTwcLkKdffdUHN+TaCAhpa8oG0h+rFn9i+GMoCw@mail.gmail.com>
- <CAPDyKFqp7oEt9ASmdxrgUwbQ8aTZzAuJ7uD1oGN50iuzPzBfVg@mail.gmail.com>
- <53FAF8C7.8040007@samsung.com>
- <CAD=FV=XbV7R+FqRRucA5Cv2A+=3g8zccASwxcTtJD6YyO-ioCg@mail.gmail.com>
- <53FD5501.1010007@samsung.com>
- <CAD=FV=VCw1mLpArSY1uj+1zorWROjqGeT3dcTJYzr_1J6jdsBQ@mail.gmail.com>
-Message-ID: <53FD62C6.8010100@samsung.com>
+From: achandran@mvista.com (Arun Chandran)
+Date: Wed, 27 Aug 2014 10:26:45 +0530
+Subject: Kexec on arm64
+In-Reply-To: <1409092348.21254.9.camel@smoke>
+References: <CAFdej00J2mJwcg2Cy6CHVuuQZ4uQ2zZg8oErGPi0uPejievB+Q@mail.gmail.com>
+ <1406162287.4062.39.camel@smoke>
+ <20140724093603.GC4079@leverpostej>
+ <1406247468.4062.59.camel@smoke>
+ <CAFdej01w_pE6vv+13cCCyfDs4Rbdkzx4CMUj9q97HBKV0B53ow@mail.gmail.com>
+ <1406333901.4062.69.camel@smoke>
+ <CAFdej014ohCFYvoUAXWiYGb4_4UmSY2G1MH-NEE_cF1cC-6Mow@mail.gmail.com>
+ <20140728153812.GA2576@leverpostej>
+ <1406592548.28348.49.camel@smoke>
+ <CAFdej00is0kC-1q5uMNJL5APL1WezdNBg0jASgwYamsg5NO_Tg@mail.gmail.com>
+ <20140729133557.GQ2576@leverpostej>
+ <1406668741.28348.75.camel@smoke>
+ <CAFdej02sTBsjHz+FCqjKkY9pF5sPF6n6QUtEadHi0hK3MxRxGA@mail.gmail.com>
+ <CAFdej01ZHkTVZuN_0RrGbFmoG4_NTnwm6KDAPM_sf=zHBHSRwg@mail.gmail.com>
+ <1407172869.8971.54.camel@smoke>
+ <CAFdej02ZsLuxd84fb-n9Q2yuhzqRba5cmx6G8pHk3QeqzpTLaQ@mail.gmail.com>
+ <1407442058.8971.106.camel@smoke>
+ <CAFdej03udSLMEneKM4YGiNe-HTQwZrGQ5J6DfB6qaq8X8A27CQ@mail.gmail.com>
+ <CAFdej02gA7mpkdarjZ+66C252K+grhCa4uXm8PTV4ioKXZKqjQ@mail.gmail.com>
+ <CAFdej01msBA8Ry=Ek3NpYPUBgvw_4G6w+68oRvGC6_AVRvudjQ@mail.gmail.com>
+ <CAFdej03fgXQz1Pey4HtCBy5ePxMgJwkBGHWd7f8=jWBx1WvDgA@mail.gmail.com>
+ <1409092348.21254.9.camel@smoke>
+Message-ID: <CAFdej00aikr8t0X3eFGUCpGPZeEvtm3JK22OoyZtAgzx2K40Vw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Doug,
+Hi Geoff,
 
-On 08/27/2014 01:14 PM, Doug Anderson wrote:
-> Jaehoon,
-> 
-> On Tue, Aug 26, 2014 at 8:48 PM, Jaehoon Chung <jh80.chung@samsung.com> wrote:
->> Hi, Doug,
+On Wed, Aug 27, 2014 at 4:02 AM, Geoff Levand <geoff@infradead.org> wrote:
+> Hi Arun,
+>
+> On Wed, 2014-08-13 at 16:39 +0530, Arun Chandran wrote:
+>> I have one more concern regarding flushing of D-cache area corresponding
+>> to the kexec_list entrees.
 >>
->> On 08/26/2014 12:25 AM, Doug Anderson wrote:
->>> Jaehoon,
->>>
->>> On Mon, Aug 25, 2014 at 1:50 AM, Jaehoon Chung <jh80.chung@samsung.com> wrote:
->>>> On 08/25/2014 05:13 PM, Ulf Hansson wrote:
->>>>> On 22 August 2014 20:27, Sonny Rao <sonnyrao@chromium.org> wrote:
->>>>>> On Fri, Aug 22, 2014 at 8:31 AM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
->>>>>>> On 22 August 2014 15:47, Yuvaraj Kumar C D <yuvaraj.cd@gmail.com> wrote:
->>>>>>>> Exynos 5250 and 5420 based boards uses built-in CD# line for card
->>>>>>>> detection.But unfortunately CD# line is on the same voltage rails
->>>>>>>> as of I/O voltage rails. When we cut off vqmmc,the consequent card
->>>>>>>> detection will break in these boards.
->>>>
->>>> I didn't know that use CD# line for card detect.
->>>> And if CD# voltage rails and I/O voltage rail are same voltage, it doesn't make sense.
->>>> Which card is used with same voltages? (eMMC? SD? SDIO?)
->>>>
->>>> Well, I have checked Exynos5250 and 5420, but it looks like not same rails.
->>>
->>> I'm not sure I totally understood what you said.  In my manual I have
->>> a table titled "Table 2-1 Exynos 5420 Pin List".  Look in this table
->>> for XMMC2CDN and XMMC2DATA_0.  Look to the right of the table and
->>> you'll see the power domain.  For both it shows VDDQ_MMC2.  If that
->>> doesn't mean that the two are in the same voltage domain then I don't
->>> know what does.  Can you point to any examples where they have
->>> different voltage domains?
->> I think you're mis-understanding for it.
->> Right, It's described at exynos5420, but it's not connected.
-> 
-> "It's not connected".  What do you mean?  If I were to guess I'd say
-> that on some particular board you're looking at they don't happen to
-> use the "CD" pin for card detect.  If this is what you mean, it
-> doesn't help me.  exynos5420-peach-pit does use the CD pin for card
-> detect.  You can look at the DTS file and confirm it.
-
-I didn't know how exynos5420-peach-pit's circuit is configured.
-But i guess that almost all exynos5 boards are configured with the similar circuit.
-
-At Almost all Exynos5 board, CD-pin is used, but not included in Same power domain.
-(CD-pin is external card-detect pin. - like XEINT_# pin)
-You mentioned CD# and DATA# lines is used the same power domain, right?
-In Circuit (not exynos5420-peach-pit), DATA# line and CMD/CLK(vqmmc) is same power supply, and vdd is used other power supply.
-Not use the CD# pin, used the XEINT_# pin.
-So i think we don't need to consider the CD#.
-If exynos5420-peach-pit board is used the CD#-pin, then our discussion can be changed.
-Your commit message looks like all exynos5250/5420 board are used CD# line.
-
-> 
-> ...or are you saying that the CD pin somehow changes voltage domains
-> when configured as a GPIO?  I find that very hard to believe.  What
-> voltage domain does it go to?  If it goes to a 1.8V voltage domain
-> then that would be bad when vqmmc was 3.3V.  If it goes to a 3.3V
-> voltage domain then that would be bad when vqmmc was 1.8V.  Remember
-> that externally we've got a pull up to vqmmc.
-
-It is used with XEINT_# pin instead of CD# pin.
-As i mentioned above, if exynos5420-peach-pit is used CD# line and not used XEINT_# pin,
-my point is meaningless. :)
-
-Is exynos5420-peach-pit board used with CD#pin, not XEINT_# pin?
-
-Best Regards,
-Jaehoon Chung
-> 
-> Even if somehow magically we can read the card detect pin with vqmmc
-> off, we have an external pullup on this line that goes directly to the
-> "vqmmc" power rail.  If the vqmmc power rail is off then this external
-> pull up would not work and would actually act as an external pull down
-> if you could somehow configure the internal line to be a pullup.
-> 
-> 
->> Exynos4 series are also described, but we used the broken card detection scheme and power used one of "always-on" powers.
->> Because Card-detection rail need to enable as "always-on".
+>> Currently kexec_list_walk() is doing
 >>
->> We don't need to consider this. I checked the circuit, this patch didn't need.
+>> 1) flush_dcache_area of the kexec_list[0] till PAGE_SIZE
 >>
->> exynos5 also used the gpio-pin for card-detection. And we can use the slot-gpio API.
-> 
-> When you say "exynos5", what do you mean here?  Do you mean the smdk
-> for 5250, or something else?
-> 
+>> 2) continue accessing entries in kexec_list[0] to PAGE_SIZE
+>>
+>> 3) switch to next kexec_list depending upon kexec_list[entry] & flag
+>> ==  IND_INDIRECTION
+>>
+>> 4) goto 1
+>>
+>> Shouldn't that be doing flush_dcache_area() after completely using the list??
+>
+> We just want to get any data in the dcache out to the PoC before
+> disabling the dcache, so as long as there are only reads, and no writes
+> to those addresses, kexec_list_walk() should work OK.
+>
+Yes. I missed that point. If we don't perform any writes flushing
+works just fine.
+
+> I will move the flush of the new kernel image to after it is copied in
+> relocate_new_kernel().  I think that your L3 cache may not work with
+> what we have now:
+>
+>   current:  invalidate dcache -> turn off dcache -> write data to PoC
+>   proposed: turn off dcache -> write data to PoC -> invalidate dcache
+>
+
+Yes this exactly what I have done here
+http://lists.infradead.org/pipermail/linux-arm-kernel/2014-August/278857.html
+; that code should live inside relocate_new_kernel().
+
+I am doing the cache invalidation(only invalidation) in
+relocate_new_kernel(). As we run that code after cache's are off(L3 only
+comes to picture when lower level caches are on) we are writing
+to data (new kernel) to PoC.
+
+--Arun
