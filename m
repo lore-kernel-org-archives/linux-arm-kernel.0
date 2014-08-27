@@ -1,37 +1,73 @@
-From: zhangfei.gao@linaro.org (Zhangfei Gao)
-Date: Wed, 27 Aug 2014 20:38:34 +0800
-Subject: [PATCH 6/6] ARM: dts: hix5hd2: add wdg node
-In-Reply-To: <1409143114-23311-1-git-send-email-zhangfei.gao@linaro.org>
-References: <1409143114-23311-1-git-send-email-zhangfei.gao@linaro.org>
-Message-ID: <1409143114-23311-7-git-send-email-zhangfei.gao@linaro.org>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 27 Aug 2014 13:42:15 +0100
+Subject: [PATCH v3 0/9] mtd: nand: Support for new DT NAND driver
+Message-ID: <1409143344-22458-1-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Jiancheng Xue <xuejiancheng@huawei.com>
-Signed-off-by: Zhangfei Gao <zhangfei.gao@linaro.org>
----
- arch/arm/boot/dts/hisi-x5hd2.dtsi |    9 +++++++++
- 1 file changed, 9 insertions(+)
-
-diff --git a/arch/arm/boot/dts/hisi-x5hd2.dtsi b/arch/arm/boot/dts/hisi-x5hd2.dtsi
-index 152f3ad..7b1cb53 100644
---- a/arch/arm/boot/dts/hisi-x5hd2.dtsi
-+++ b/arch/arm/boot/dts/hisi-x5hd2.dtsi
-@@ -365,6 +365,15 @@
- 				#interrupt-cells = <2>;
- 				status = "disabled";
- 			};
-+
-+			wdg0: wdg at a2c000 {
-+				compatible = "arm,sp805", "arm,primecell";
-+				arm,primecell-periphid = <0x00141805>;
-+				reg = <0xa2c000 0x1000>;
-+				interrupts = <0 29 4>;
-+				clocks = <&clock HIX5HD2_WDG0_RST>;
-+				clock-names = "apb_pclk";
-+                       };
- 		};
+Hi Brian,
  
- 		local_timer at 00a00600 {
+I believe all of your queries have either been answered or addressed
+and I am hoping this will be the last submission. :)
+ 
+This is v3 of the squashed submission.  v1 had a small typo which
+prevented the BBT code from being truly configurable and v2 had some
+build issues due to a silly 'post testing' fixup mistake.  This has now
+been rectified.
+
+Also:
+
+  Builds	Pass
+  Smatch	Pass
+  Sparse	Pass
+  Bisectability	Pass
+  NAND Test	Pass
+  MTD Tests	Pass (accept OOB test which is not applicable with
+      		      this controller.  I will rectify this in the
+		      near future though, as it _can be_ useful for
+		      debugging/testing.)
+
+Kind regards,
+Lee
+
+Lee Jones (9):
+  ARM: multi-v7: Enable ST BCH NAND
+  ARM: sti: Add two new clock definitions for use with ST's NAND
+    controllers
+  ARM: sti: Add BCH (NAND Flash) Controller support for STiH41x (Orly)
+    SoCs
+  ARM: sti: Enable BCH NAND for STiH416 B2020-RevE
+  mtd: nand: stm_nand_bch: provide Device Tree documentation
+  mtd: nand: stm_nand_bch: add shared register defines for ST's NAND
+    Controller drivers
+  mtd: nand: stm_nand_bch: adding BBT header
+  mtd: nand: stm_nand_bch: add support for ST's BCH NAND controller
+  mtd: nand: stm_nand_bch: provide ST's implementation of Back Block
+    Table
+
+ Documentation/devicetree/bindings/mtd/stm-nand.txt |   74 +
+ arch/arm/boot/dts/stih416-b2020e.dts               |    8 +
+ arch/arm/boot/dts/stih41x-b2020.dtsi               |   38 +
+ arch/arm/configs/multi_v7_defconfig                |    2 +
+ drivers/mtd/nand/Kconfig                           |   15 +
+ drivers/mtd/nand/Makefile                          |    2 +
+ drivers/mtd/nand/stm_nand_bbt.c                    |  601 ++++++++
+ drivers/mtd/nand/stm_nand_bch.c                    | 1616 ++++++++++++++++++++
+ drivers/mtd/nand/stm_nand_dt.c                     |  110 ++
+ drivers/mtd/nand/stm_nand_dt.h                     |   24 +
+ drivers/mtd/nand/stm_nand_regs.h                   |  304 ++++
+ include/dt-bindings/clock/stih416-clks.h           |    2 +
+ include/linux/mtd/stm_nand.h                       |  147 ++
+ include/linux/mtd/stm_nand_bbt.h                   |   17 +
+ 14 files changed, 2960 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/mtd/stm-nand.txt
+ create mode 100644 drivers/mtd/nand/stm_nand_bbt.c
+ create mode 100644 drivers/mtd/nand/stm_nand_bch.c
+ create mode 100644 drivers/mtd/nand/stm_nand_dt.c
+ create mode 100644 drivers/mtd/nand/stm_nand_dt.h
+ create mode 100644 drivers/mtd/nand/stm_nand_regs.h
+ create mode 100644 include/linux/mtd/stm_nand.h
+ create mode 100644 include/linux/mtd/stm_nand_bbt.h
+
 -- 
-1.7.9.5
+1.9.1
