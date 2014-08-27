@@ -1,41 +1,86 @@
-From: afaerber@suse.de (=?ISO-8859-15?Q?Andreas_F=E4rber?=)
-Date: Wed, 27 Aug 2014 18:10:14 +0200
-Subject: [PATCH 1/2] ARM: exynos_defconfig: Enable Control Groups support
-In-Reply-To: <1409137341-20516-1-git-send-email-javier.martinez@collabora.co.uk>
-References: <1409137341-20516-1-git-send-email-javier.martinez@collabora.co.uk>
-Message-ID: <53FE02E6.3030302@suse.de>
+From: cov@codeaurora.org (Christopher Covington)
+Date: Wed, 27 Aug 2014 12:13:55 -0400
+Subject: [PATCH 0/3] virtio: Clean up scatterlists and use the DMA API
+In-Reply-To: <CALCETrVUg3fCQS0rjOD1BbauXHfnydPyP3mNMeiGu4NqBgLK6A@mail.gmail.com>
+References: <cover.1409087794.git.luto@amacapital.net>
+ <CAJSP0QUcXQ+JV0wys2Mr-+OsFKt=hTGbUxNqfpk-JuyULiQABQ@mail.gmail.com>
+ <CALCETrUWR8p7XSiTALd19LL4mTgkXu_XEewobouz6Jbkb4KjLw@mail.gmail.com>
+ <20140827154537.GB18900@redhat.com>
+ <CALCETrVUg3fCQS0rjOD1BbauXHfnydPyP3mNMeiGu4NqBgLK6A@mail.gmail.com>
+Message-ID: <53FE03C3.90309@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 27.08.2014 13:02, schrieb Javier Martinez Canillas:
-> systemd needs control groups support to be enabled in the
-> kernel so let's enable it by default since is quite likely
-> that a user-space with systemd will be used.
+On 08/27/2014 11:50 AM, Andy Lutomirski wrote:
+> On Wed, Aug 27, 2014 at 8:45 AM, Michael S. Tsirkin <mst@redhat.com> wrote:
+>> On Wed, Aug 27, 2014 at 08:11:15AM -0700, Andy Lutomirski wrote:
+>>> On Aug 26, 2014 11:46 PM, "Stefan Hajnoczi" <stefanha@gmail.com> wrote:
+>>>>
+>>>> On Tue, Aug 26, 2014 at 10:16 PM, Andy Lutomirski <luto@amacapital.net> wrote:
+>>>>> There are two outstanding issues.  virtio_net warns if DMA debugging
+>>>>> is on because it does DMA from the stack.  (The warning is correct.)
+>>>>> This also is likely to do something unpleasant to s390.
+>>>>> (Maintainers are cc'd -- I don't know what to do about it.)
+>>>>
+>>>> This changes the semantics of vring and breaks existing guests when
+>>>> bus address != physical address.
+>>>>
+>>>> Can you use a transport feature bit to indicate that bus addresses are
+>>>> used?  That way both approaches can be supported.
+>>>
+>>> I can try to support both styles of addressing, but I don't think that
+>>> this can be negotiated between the device (i.e. host or physical
+>>> virtio-speaking device) and the guest.  In the Xen case that I care
+>>> about (Linux on Xen on KVM), the host doesn't know about the
+>>> translation at all -- Xen is an intermediate layer that only the guest
+>>> is aware of.  In this case, there are effectively two layers of
+>>> virtualization, and only the inner one (Xen) knows about the
+>>> translation despite the fact that the the outer layer is the one
+>>> providing the virtio device.
+>>>
+>>> I could change virtio_ring to use the DMA API only if requested by the
+>>> lower driver (virtio_pci, etc) and to have only virtio_pci enable that
+>>> feature.  Will that work for all cases?
+>>>
+>>> On s390, this shouldn't work just like the current code.  On x86, I
+>>> think that if QEMU ever starts exposing an IOMMU attached to a
+>>> virtio-pci device, then QEMU should expect that IOMMU to be used.  If
+>>> QEMU expects to see physical addresses, then it shouldn't advertise an
+>>> IOMMU.  Since QEMU doesn't currently support guest IOMMUs, this should
+>>> be fine for everything that uses QEMU.
+>>>
+>>> At least x86's implementation of the DMA ops for devices that aren't
+>>> behind an IOMMU should be very fast.
+>>>
+>>> Are there any other weird cases for which this might be a problem?
+>>>
+>>>>
+>>>> Please also update the virtio specification:
+>>>> https://tools.oasis-open.org/version-control/browse/wsvn/virtio/
+>>>>
+>>>
+>>> I'm not sure it will need an update.  Perhaps a note in the PCI
+>>> section indicating that, if the host expects the guest to program an
+>>> IOMMU, then it should use the appropriate platform-specific mechanism
+>>> to expose that IOMMU.
+>>>
+>>> --Andy
+>>
+>> If there's no virtio mechanism to negotate enabling/disabling
+>> translations, then specification does not need an extension.
 > 
-> Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
-> ---
->  arch/arm/configs/exynos_defconfig | 1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/arch/arm/configs/exynos_defconfig b/arch/arm/configs/exynos_defconfig
-> index 676c744..590abde 100644
-> --- a/arch/arm/configs/exynos_defconfig
-> +++ b/arch/arm/configs/exynos_defconfig
-> @@ -1,6 +1,7 @@
->  CONFIG_SYSVIPC=y
->  CONFIG_NO_HZ=y
->  CONFIG_HIGH_RES_TIMERS=y
-> +CONFIG_CGROUPS=y
->  CONFIG_BLK_DEV_INITRD=y
->  CONFIG_KALLSYMS_ALL=y
->  CONFIG_MODULES=y
+> It wouldn't shock me if someone wants to negotiate this for
+> virtio_mmio some day, but that might be more of a device tree thing.
+> I have no idea how that works, but I think it can wait until someone
+> wants it.
 
-CONFIG_FHANDLE=y is also needed for systemd to get a serial console.
-multi_v7 has that already.
+At one point I wanted VirtIO-MMIO to not fail miserably on ARM LPAE systems.
 
-Regards,
-Andreas
+http://lists.infradead.org/pipermail/linux-arm-kernel/2014-March/241613.html
+
+Christopher
 
 -- 
-SUSE LINUX Products GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
-GF: Jeff Hawn, Jennifer Guild, Felix Imend?rffer; HRB 16746 AG N?rnberg
+Employee of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by the Linux Foundation.
