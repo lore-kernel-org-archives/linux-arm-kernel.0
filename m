@@ -1,207 +1,115 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Fri, 29 Aug 2014 08:23:43 +0900
-Subject: [PATCH 1/2] ARM: multi_v7_defconfig: Enable shmobile platforms
-In-Reply-To: <1409234429-1916-1-git-send-email-geert+renesas@glider.be>
-References: <1409234429-1916-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <20140828232342.GB16165@verge.net.au>
+Date: Fri, 29 Aug 2014 08:30:06 +0900
+Subject: [PATCH 11/14] arm64: dts: Add initial device tree support for
+ EXYNOS7
+In-Reply-To: <CAOesGMhsayvhBK_gVgzB3+69YC1Ca6hsBHsONJm_QEcSKpVZOw@mail.gmail.com>
+References: <1409132660-1898-1-git-send-email-ch.naveen@samsung.com>
+ <1409132660-1898-3-git-send-email-ch.naveen@samsung.com>
+ <20140828035639.GB4972@localhost>
+ <20140828094846.GD14650@leverpostej>
+ <CAOesGMjY8wfAcq2fLgs=ZWHdiWtFqxr+ncUKTje0SnXqO-CCgQ@mail.gmail.com>
+ <20140828170306.GQ14650@leverpostej>
+ <CAOesGMgYeFObKHA9znzBq9t2mLv8WWT1QaKugQ6yf7RgV09Qyg@mail.gmail.com>
+ <CAL_JsqLVsjJVL+GoJVMoXGiGxVKSh0oyJ-nwKEkXfa+fWid7yA@mail.gmail.com>
+ <CAOesGMhsayvhBK_gVgzB3+69YC1Ca6hsBHsONJm_QEcSKpVZOw@mail.gmail.com>
+Message-ID: <20140828233006.GC16165@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 28, 2014 at 04:00:28PM +0200, Geert Uytterhoeven wrote:
-> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-
-Acked-by: Simon Horman <horms+renesas@verge.net.au>
-
-Arnd, will you take this?
-
-> ---
-> Based on next-20140828
-> For now excluding r8a7740/armadillo, as it fails to boot on armadillo
+On Thu, Aug 28, 2014 at 03:23:49PM -0700, Olof Johansson wrote:
+> On Thu, Aug 28, 2014 at 10:54 AM, Rob Herring <robh@kernel.org> wrote:
+> > On Thu, Aug 28, 2014 at 12:19 PM, Olof Johansson <olof@lixom.net> wrote:
+> >> On Thu, Aug 28, 2014 at 10:03 AM, Mark Rutland <mark.rutland@arm.com> wrote:
+> >>> On Thu, Aug 28, 2014 at 05:28:22PM +0100, Olof Johansson wrote:
+> >>>> On Thu, Aug 28, 2014 at 2:48 AM, Mark Rutland <mark.rutland@arm.com> wrote:
+> >>>> > Hi,
+> >>>> >
+> >>>> >> > +   cpus {
+> >>>> >> > +           #address-cells = <2>;
+> >>>> >> > +           #size-cells = <0>;
+> >>>> >>
+> >>>> >> Why size-cells=2? Can you not fit a cpuid in 32 bits?
+> >>>> >
+> >>>> > As of commit 72aea393a2e7 (arm64: smp: honour #address-size when parsing
+> >>>> > CPU reg property) Linux can handle single-cell cpu node reg entries
+> >>>> > where /cpus/#address-cells = <1>.
+> >>>> >
+> >>>> > I can't make any guarantees about other code (e.g. bootloaders) which
+> >>>> > might try to do things with cpu nodes, YMMV.
+> >>>>
+> >>>> Ok. If address-cells is kept at 2 the unit address needs to be changed
+> >>>> to "0,0". So one or the other has to be changed.
+> >>>
+> >>> I'm happy either way.
+> >>>
+> >>> I'm not sure the rest of the tree had "0," prefixes on all of the
+> >>> unit-addresses for 64-bit addresses that were under 4GB, and I'm not
+> >>> sure that existing dts consistently do that either.
+> >>>
+> >>> Do we want to enforce that for all 64-bit unit-addresses?
+> >>
+> >> Yeah, I believe that's the only valid format for a 2-address-cell unit address.
+> >
+> > But we don't do leading 0's anywhere else like single cell unit
+> > addresses. Buses expressed with ranges and offsets are one example.
+> > Also, I2C addresses have a 32-bit size in DT yet are only 8-bit and we
+> > don't do leading zero's there.
 > 
->  arch/arm/configs/multi_v7_defconfig | 51 +++++++++++++++++++++++++++++++++++--
->  1 file changed, 49 insertions(+), 2 deletions(-)
+> Ok, I'm happily proven wrong here, also by confirming how this is done
+> on "real" OF.
 > 
-> diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-> index 7cfa5fa5f7ac..077134eaa95e 100644
-> --- a/arch/arm/configs/multi_v7_defconfig
-> +++ b/arch/arm/configs/multi_v7_defconfig
-> @@ -53,6 +53,15 @@ CONFIG_MACH_SPEAR1310=y
->  CONFIG_MACH_SPEAR1340=y
->  CONFIG_ARCH_STI=y
->  CONFIG_ARCH_EXYNOS=y
-> +CONFIG_ARCH_SHMOBILE_MULTI=y
-> +CONFIG_ARCH_EMEV2=y
-> +CONFIG_ARCH_R7S72100=y
-> +CONFIG_ARCH_R8A7779=y
-> +CONFIG_ARCH_R8A7790=y
-> +CONFIG_ARCH_R8A7791=y
-> +CONFIG_MACH_KOELSCH=y
-> +CONFIG_MACH_LAGER=y
-> +CONFIG_MACH_MARZEN=y
->  CONFIG_ARCH_SUNXI=y
->  CONFIG_ARCH_SIRF=y
->  CONFIG_ARCH_TEGRA=y
-> @@ -74,6 +83,8 @@ CONFIG_PCI=y
->  CONFIG_PCI_MSI=y
->  CONFIG_PCI_MVEBU=y
->  CONFIG_PCI_TEGRA=y
-> +CONFIG_PCI_RCAR_GEN2=y
-> +CONFIG_PCI_RCAR_GEN2_PCIE=y
->  CONFIG_SMP=y
->  CONFIG_NR_CPUS=8
->  CONFIG_HIGHPTE=y
-> @@ -121,6 +132,7 @@ CONFIG_CMA_SIZE_MBYTES=64
->  CONFIG_OMAP_OCP2SCP=y
->  CONFIG_MTD=y
->  CONFIG_MTD_M25P80=y
-> +CONFIG_MTD_SPI_NOR=y
->  CONFIG_BLK_DEV_LOOP=y
->  CONFIG_ICS932S401=y
->  CONFIG_APDS9802ALS=y
-> @@ -136,6 +148,7 @@ CONFIG_AHCI_ST=y
->  CONFIG_AHCI_SUNXI=y
->  CONFIG_SATA_HIGHBANK=y
->  CONFIG_SATA_MV=y
-> +CONFIG_SATA_RCAR=y
->  CONFIG_NETDEVICES=y
->  CONFIG_SUN4I_EMAC=y
->  CONFIG_MACB=y
-> @@ -145,6 +158,7 @@ CONFIG_MV643XX_ETH=y
->  CONFIG_MVNETA=y
->  CONFIG_KS8851=y
->  CONFIG_R8169=y
-> +CONFIG_SH_ETH=y
->  CONFIG_SMSC911X=y
->  CONFIG_STMMAC_ETH=y
->  CONFIG_TI_CPSW=y
-> @@ -174,6 +188,7 @@ CONFIG_SERIO_AMBAKMI=y
->  CONFIG_SERIAL_8250=y
->  CONFIG_SERIAL_8250_CONSOLE=y
->  CONFIG_SERIAL_8250_DW=y
-> +CONFIG_SERIAL_8250_EM=y
->  CONFIG_SERIAL_AMBA_PL011=y
->  CONFIG_SERIAL_AMBA_PL011_CONSOLE=y
->  CONFIG_SERIAL_SAMSUNG=y
-> @@ -183,6 +198,9 @@ CONFIG_SERIAL_SIRFSOC_CONSOLE=y
->  CONFIG_SERIAL_TEGRA=y
->  CONFIG_SERIAL_IMX=y
->  CONFIG_SERIAL_IMX_CONSOLE=y
-> +CONFIG_SERIAL_SH_SCI=y
-> +CONFIG_SERIAL_SH_SCI_NR_UARTS=20
-> +CONFIG_SERIAL_SH_SCI_CONSOLE=y
->  CONFIG_SERIAL_MSM=y
->  CONFIG_SERIAL_MSM_CONSOLE=y
->  CONFIG_SERIAL_VT8500=y
-> @@ -204,15 +222,21 @@ CONFIG_I2C_CADENCE=y
->  CONFIG_I2C_DESIGNWARE_PLATFORM=y
->  CONFIG_I2C_EXYNOS5=y
->  CONFIG_I2C_MV64XXX=y
-> +CONFIG_I2C_RIIC=y
-> +CONFIG_I2C_SH_MOBILE=y
->  CONFIG_I2C_SIRF=y
->  CONFIG_I2C_TEGRA=y
->  CONFIG_I2C_ST=y
-> -CONFIG_SPI=y
->  CONFIG_I2C_XILINX=y
-> +CONFIG_I2C_RCAR=y
-> +CONFIG_SPI=y
->  CONFIG_SPI_CADENCE=y
->  CONFIG_SPI_OMAP24XX=y
->  CONFIG_SPI_ORION=y
->  CONFIG_SPI_PL022=y
-> +CONFIG_SPI_RSPI=y
-> +CONFIG_SPI_SH_MSIOF=y
-> +CONFIG_SPI_SH_HSPI=y
->  CONFIG_SPI_SIRF=y
->  CONFIG_SPI_SUN4I=y
->  CONFIG_SPI_SUN6I=y
-> @@ -225,6 +249,8 @@ CONFIG_PINCTRL_PALMAS=y
->  CONFIG_GPIO_SYSFS=y
->  CONFIG_GPIO_GENERIC_PLATFORM=y
->  CONFIG_GPIO_DWAPB=y
-> +CONFIG_GPIO_EM=y
-> +CONFIG_GPIO_RCAR=y
->  CONFIG_GPIO_XILINX=y
->  CONFIG_GPIO_ZYNQ=y
->  CONFIG_GPIO_PCA953X=y
-> @@ -241,6 +267,7 @@ CONFIG_POWER_RESET_SUN6I=y
->  CONFIG_SENSORS_LM90=y
->  CONFIG_SENSORS_LM95245=y
->  CONFIG_THERMAL=y
-> +CONFIG_RCAR_THERMAL=y
->  CONFIG_ARMADA_THERMAL=y
->  CONFIG_ST_THERMAL_SYSCFG=y
->  CONFIG_ST_THERMAL_MEMMAP=y
-> @@ -263,6 +290,7 @@ CONFIG_REGULATOR_VIRTUAL_CONSUMER=y
->  CONFIG_REGULATOR_AB8500=y
->  CONFIG_REGULATOR_AS3722=y
->  CONFIG_REGULATOR_BCM590XX=y
-> +CONFIG_REGULATOR_DA9210=y
->  CONFIG_REGULATOR_GPIO=y
->  CONFIG_REGULATOR_MAX8907=y
->  CONFIG_REGULATOR_PALMAS=y
-> @@ -277,10 +305,21 @@ CONFIG_REGULATOR_TWL4030=y
->  CONFIG_REGULATOR_VEXPRESS=y
->  CONFIG_MEDIA_SUPPORT=y
->  CONFIG_MEDIA_CAMERA_SUPPORT=y
-> +CONFIG_MEDIA_CONTROLLER=y
-> +CONFIG_VIDEO_V4L2_SUBDEV_API=y
->  CONFIG_MEDIA_USB_SUPPORT=y
->  CONFIG_USB_VIDEO_CLASS=y
->  CONFIG_USB_GSPCA=y
-> +CONFIG_V4L_PLATFORM_DRIVERS=y
-> +CONFIG_SOC_CAMERA=y
-> +CONFIG_SOC_CAMERA_PLATFORM=y
-> +CONFIG_VIDEO_RCAR_VIN=y
-> +CONFIG_V4L_MEM2MEM_DRIVERS=y
-> +CONFIG_VIDEO_RENESAS_VSP1=y
-> +# CONFIG_MEDIA_SUBDRV_AUTOSELECT is not set
-> +CONFIG_VIDEO_ADV7180=y
->  CONFIG_DRM=y
-> +CONFIG_DRM_RCAR_DU=y
->  CONFIG_DRM_TEGRA=y
->  CONFIG_DRM_PANEL_SIMPLE=y
->  CONFIG_FB_ARMCLCD=y
-> @@ -293,6 +332,7 @@ CONFIG_FRAMEBUFFER_CONSOLE=y
->  CONFIG_SOUND=y
->  CONFIG_SND=y
->  CONFIG_SND_SOC=y
-> +CONFIG_SND_SOC_RCAR=y
->  CONFIG_SND_SOC_TEGRA=y
->  CONFIG_SND_SOC_TEGRA_RT5640=y
->  CONFIG_SND_SOC_TEGRA_WM8753=y
-> @@ -309,6 +349,7 @@ CONFIG_USB_EHCI_HCD_PLATFORM=y
->  CONFIG_USB_ISP1760_HCD=y
->  CONFIG_USB_OHCI_HCD=y
->  CONFIG_USB_OHCI_HCD_PLATFORM=y
-> +CONFIG_USB_RENESAS_USBHS=y
->  CONFIG_USB_STORAGE=y
->  CONFIG_USB_CHIPIDEA=y
->  CONFIG_USB_CHIPIDEA_HOST=y
-> @@ -319,6 +360,10 @@ CONFIG_SAMSUNG_USB3PHY=y
->  CONFIG_USB_GPIO_VBUS=y
->  CONFIG_USB_ISP1301=y
->  CONFIG_USB_MXS_PHY=y
-> +CONFIG_USB_RCAR_PHY=y
-> +CONFIG_USB_RCAR_GEN2_PHY=y
-> +CONFIG_USB_GADGET=y
-> +CONFIG_USB_RENESAS_USBHS_UDC=y
->  CONFIG_MMC=y
->  CONFIG_MMC_BLOCK_MINORS=16
->  CONFIG_MMC_ARMMMCI=y
-> @@ -337,9 +382,11 @@ CONFIG_MMC_SDHCI_ST=y
->  CONFIG_MMC_OMAP=y
->  CONFIG_MMC_OMAP_HS=y
->  CONFIG_MMC_MVSDIO=y
-> -CONFIG_MMC_SUNXI=y
-> +CONFIG_MMC_SDHI=y
->  CONFIG_MMC_DW=y
->  CONFIG_MMC_DW_EXYNOS=y
-> +CONFIG_MMC_SH_MMCIF=y
-> +CONFIG_MMC_SUNXI=y
->  CONFIG_NEW_LEDS=y
->  CONFIG_LEDS_CLASS=y
->  CONFIG_LEDS_PWM=y
-> -- 
-> 1.9.1
+> According to benh:
 > 
+> 15:20 <benh> ojn: 0,0 is not quite right, it's supposed to be used
+> when the two numbers are different things, like device,fn on PCI
+> 
+> The same is true for >2^32 unit addresses, they just use the one
+> integer instead of x,y.
+> 
+> So, I take back all I've said on this in the last 72 hours. :) It
+> looks like we might need to revisit some of the 32-bit DTs.  Simon,
+> drop the series you had. :)
+
+Thanks will do.
+
+Is the way forward for me to apply my original patch to
+change memory at 180000000 to memory at 140000000? And abandon all
+the ',' only changes?This one:
+
+This is the original patch:
+
+From: Simon Horman <horms+renesas@verge.net.au>
+
+[PATCH] ARM: shmobile: lager: correct memory map
+
+The base address of the second memory region on the lager
+board is 0x140000000. Update the tag used in the dts file accordingly.
+
+This is a documentation fix and should have no run-time affect.
+
+This problem was introduced when the second memory region
+was added to the lager dts file by 62bc32a2573c4219
+("ARM: shmobile: Include all 4 GiB of memory on Lager)"
+in v3.14.
+
+Reported-by: NAOYA SHIIBA <naoya.shiiba.nx@renesas.com>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ arch/arm/boot/dts/r8a7790-lager.dts | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm/boot/dts/r8a7790-lager.dts b/arch/arm/boot/dts/r8a7790-lager.dts
+index 0118cbf..84dcafa 100644
+--- a/arch/arm/boot/dts/r8a7790-lager.dts
++++ b/arch/arm/boot/dts/r8a7790-lager.dts
+@@ -32,7 +32,7 @@
+ 		reg = <0 0x40000000 0 0x40000000>;
+ 	};
+ 
+-	memory at 180000000 {
++	memory at 140000000 {
+ 		device_type = "memory";
+ 		reg = <1 0x40000000 0 0xc0000000>;
+ 	};
+-- 
+2.0.1
