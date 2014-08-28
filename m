@@ -1,34 +1,53 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 28 Aug 2014 11:20:21 +0100
-Subject: [PATCH v5 1/3] ARM: probes: check stack operation when decoding
-In-Reply-To: <53FEFB93.2010009@hitachi.com>
-References: <1409144552-12751-1-git-send-email-wangnan0@huawei.com>
- <1409144552-12751-2-git-send-email-wangnan0@huawei.com>
- <53FEFB93.2010009@hitachi.com>
-Message-ID: <20140828102021.GC30401@n2100.arm.linux.org.uk>
+From: punit.agrawal@arm.com (Punit Agrawal)
+Date: Thu, 28 Aug 2014 11:21:02 +0100
+Subject: [PATCH 5/6] arm64: Port SWP/SWPB emulation support from arm
+In-Reply-To: <201408272030.07434.arnd@arndb.de> (Arnd Bergmann's message of
+ "Wed, 27 Aug 2014 20:30:07 +0200")
+References: <1409048930-21598-1-git-send-email-punit.agrawal@arm.com>
+ <20140826135623.GR23445@arm.com> <9hh4mwxesz8.fsf@arm.com>
+ <201408272030.07434.arnd@arndb.de>
+Message-ID: <9hhvbpcdiep.fsf@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 28, 2014 at 06:51:15PM +0900, Masami Hiramatsu wrote:
-> (2014/08/27 22:02), Wang Nan wrote:
-> > This patch improves arm instruction decoder, allows it check whether an
-> > instruction is a stack store operation. This information is important
-> > for kprobe optimization.
-> > 
-> > For normal str instruction, this patch add a series of _SP_STACK
-> > register indicator in the decoder to test the base and offset register
-> > in ldr <Rt>, [<Rn>, <Rm>] against sp.
-> > 
-> > For stm instruction, it check sp register in instruction specific
-> > decoder.
-> 
-> OK, reviewed. but since I'm not so sure about arm32 ISA,
-> I need help from ARM32 maintainer to ack this.
+Arnd Bergmann <arnd@arndb.de> writes:
 
-What you actually need is an ack from the ARM kprobes people who
-understand this code.  That would be much more meaningful than my
-ack.  They're already on the Cc list.
+> On Wednesday 27 August 2014, Punit Agrawal wrote:
+>> I'll replace the counters with trace points.
+>> 
+>> There is still the pr_warn which informs the user about applications
+>> using legacy instructions. Hopefully, this should encourage updating the
+>> software.
+>
+> pr_warn_ratelimit() please. There is no point printing this all the time
+> if nobody reads the messages.
 
--- 
-FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
-according to speedtest.net.
+Agreed. The patch indeed uses pr_warn_ratelimit().
+
+>
+>> >> If we do both, there is no longer a need to have any debugfs file logic,
+>> >> which is also a plus.
+>> >
+>> > Sounds good to me.
+>> 
+>> Just a note: instead of being 'swp_emulate.enable=0' this'll be
+>> 'v7_obsolete.swp_emulate=0' and correspondingly for the other features.
+>
+> It would be nice if the module name could be the same for arm32 and arm64,
+> and I don't know if we want to rename swp_emulate.c to v7_obsolete.c
+> on arm32.
+
+Catalin was suggesting renaming v7_obsolete.c, so I'll wait to see what
+is the outcome there. Calling it swp_emulate.c feels wrong as in the
+subsequent patch we add CP15 barrier emulation to it.
+
+>
+> Other than that, I have no opinion on the specific name of the module
+> or the option.
+>
+> 	Arnd
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
