@@ -1,153 +1,78 @@
-From: dianders@google.com (Doug Anderson)
-Date: Thu, 28 Aug 2014 08:52:13 -0700
-Subject: [PATCH V2 3/3] mmc: dw_mmc: Dont cut off vqmmc and vmmc
-In-Reply-To: <53FEEBCA.3040909@samsung.com>
-References: <1408715272-13833-1-git-send-email-yuvaraj.cd@samsung.com>
- <1408715272-13833-4-git-send-email-yuvaraj.cd@samsung.com>
- <CAPDyKFqz8sGj2td=ihZXN4zvAqmu9FHZjWdCn-ZRcdHugNHe2g@mail.gmail.com>
- <CAPz6YkXH1mMOTwcLkKdffdUHN+TaCAhpa8oG0h+rFn9i+GMoCw@mail.gmail.com>
- <CAPDyKFqp7oEt9ASmdxrgUwbQ8aTZzAuJ7uD1oGN50iuzPzBfVg@mail.gmail.com>
- <53FAF8C7.8040007@samsung.com>
- <CAD=FV=XbV7R+FqRRucA5Cv2A+=3g8zccASwxcTtJD6YyO-ioCg@mail.gmail.com>
- <53FD5501.1010007@samsung.com>
- <CAD=FV=VCw1mLpArSY1uj+1zorWROjqGeT3dcTJYzr_1J6jdsBQ@mail.gmail.com>
- <53FD62C6.8010100@samsung.com>
- <CAD=FV=X+BsvTth4J3oqLJ=pMw_NB-GoYnaqJgyOSr9foLreLvQ@mail.gmail.com>
- <53FEEBCA.3040909@samsung.com>
-Message-ID: <CAD=FV=V1+xC3xzFvq_E2W1aRWvgwK20JZkUJzfnHV+_63C95ZQ@mail.gmail.com>
+From: daniel.thompson@linaro.org (Daniel Thompson)
+Date: Thu, 28 Aug 2014 16:54:25 +0100
+Subject: [PATCH v10 03/19] arm: fiq: Replace default FIQ handler
+In-Reply-To: <20140828150112.GD30401@n2100.arm.linux.org.uk>
+References: <1408369264-14242-1-git-send-email-daniel.thompson@linaro.org>
+ <1408466769-20004-1-git-send-email-daniel.thompson@linaro.org>
+ <1408466769-20004-4-git-send-email-daniel.thompson@linaro.org>
+ <20140819173742.GG30401@n2100.arm.linux.org.uk> <53F39377.1070308@linaro.org>
+ <20140828150112.GD30401@n2100.arm.linux.org.uk>
+Message-ID: <53FF50B1.20009@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Jaehoon,
+On 28/08/14 16:01, Russell King - ARM Linux wrote:
+> On Tue, Aug 19, 2014 at 07:12:07PM +0100, Daniel Thompson wrote:
+>> On 19/08/14 18:37, Russell King - ARM Linux wrote:
+>>> On Tue, Aug 19, 2014 at 05:45:53PM +0100, Daniel Thompson wrote:
+>>>> +int register_fiq_nmi_notifier(struct notifier_block *nb)
+>>>> +{
+>>>> +	return atomic_notifier_chain_register(&fiq_nmi_chain, nb);
+>>>> +}
+>>>> +
+>>>> +asmlinkage void __exception_irq_entry fiq_nmi_handler(struct pt_regs *regs)
+>>>> +{
+>>>> +	struct pt_regs *old_regs = set_irq_regs(regs);
+>>>> +
+>>>> +	nmi_enter();
+>>>> +	atomic_notifier_call_chain(&fiq_nmi_chain, (unsigned long)regs, NULL);
+>>>> +	nmi_exit();
+>>>> +	set_irq_regs(old_regs);
+>>>> +}
+>>>
+>>> Really not happy with this.  What happens if a FIQ occurs while we're
+>>> inside register_fiq_nmi_notifier() - more specifically inside
+>>> atomic_notifier_chain_register() ?
+>>
+>> Should depend on which side of the rcu update we're on.
+> 
+> I just asked Paul McKenney, our RCU expert... essentially, yes, RCU
+> stuff itself is safe in this context.  However, RCU stuff can call into
+> lockdep if lockdep is configured, and there are questions over lockdep.
 
-On Thu, Aug 28, 2014 at 1:43 AM, Jaehoon Chung <jh80.chung@samsung.com> wrote:
-> On 08/28/2014 12:49 AM, Doug Anderson wrote:
->> Jaehoon,
->>
->> On Tue, Aug 26, 2014 at 9:47 PM, Jaehoon Chung <jh80.chung@samsung.com> wrote:
->>> Doug,
->>>
->>> On 08/27/2014 01:14 PM, Doug Anderson wrote:
->>>> Jaehoon,
->>>>
->>>> On Tue, Aug 26, 2014 at 8:48 PM, Jaehoon Chung <jh80.chung@samsung.com> wrote:
->>>>> Hi, Doug,
->>>>>
->>>>> On 08/26/2014 12:25 AM, Doug Anderson wrote:
->>>>>> Jaehoon,
->>>>>>
->>>>>> On Mon, Aug 25, 2014 at 1:50 AM, Jaehoon Chung <jh80.chung@samsung.com> wrote:
->>>>>>> On 08/25/2014 05:13 PM, Ulf Hansson wrote:
->>>>>>>> On 22 August 2014 20:27, Sonny Rao <sonnyrao@chromium.org> wrote:
->>>>>>>>> On Fri, Aug 22, 2014 at 8:31 AM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
->>>>>>>>>> On 22 August 2014 15:47, Yuvaraj Kumar C D <yuvaraj.cd@gmail.com> wrote:
->>>>>>>>>>> Exynos 5250 and 5420 based boards uses built-in CD# line for card
->>>>>>>>>>> detection.But unfortunately CD# line is on the same voltage rails
->>>>>>>>>>> as of I/O voltage rails. When we cut off vqmmc,the consequent card
->>>>>>>>>>> detection will break in these boards.
->>>>>>>
->>>>>>> I didn't know that use CD# line for card detect.
->>>>>>> And if CD# voltage rails and I/O voltage rail are same voltage, it doesn't make sense.
->>>>>>> Which card is used with same voltages? (eMMC? SD? SDIO?)
->>>>>>>
->>>>>>> Well, I have checked Exynos5250 and 5420, but it looks like not same rails.
->>>>>>
->>>>>> I'm not sure I totally understood what you said.  In my manual I have
->>>>>> a table titled "Table 2-1 Exynos 5420 Pin List".  Look in this table
->>>>>> for XMMC2CDN and XMMC2DATA_0.  Look to the right of the table and
->>>>>> you'll see the power domain.  For both it shows VDDQ_MMC2.  If that
->>>>>> doesn't mean that the two are in the same voltage domain then I don't
->>>>>> know what does.  Can you point to any examples where they have
->>>>>> different voltage domains?
->>>>> I think you're mis-understanding for it.
->>>>> Right, It's described at exynos5420, but it's not connected.
->>>>
->>>> "It's not connected".  What do you mean?  If I were to guess I'd say
->>>> that on some particular board you're looking at they don't happen to
->>>> use the "CD" pin for card detect.  If this is what you mean, it
->>>> doesn't help me.  exynos5420-peach-pit does use the CD pin for card
->>>> detect.  You can look at the DTS file and confirm it.
->>>
->>> I didn't know how exynos5420-peach-pit's circuit is configured.
->>> But i guess that almost all exynos5 boards are configured with the similar circuit.
->>>
->>> At Almost all Exynos5 board, CD-pin is used, but not included in Same power domain.
->>> (CD-pin is external card-detect pin. - like XEINT_# pin)
->>> You mentioned CD# and DATA# lines is used the same power domain, right?
->>> In Circuit (not exynos5420-peach-pit), DATA# line and CMD/CLK(vqmmc) is same power supply, and vdd is used other power supply.
->>> Not use the CD# pin, used the XEINT_# pin.
->>> So i think we don't need to consider the CD#.
->>> If exynos5420-peach-pit board is used the CD#-pin, then our discussion can be changed.
->>
->> Maybe on your board you have CD connected to a "gpx" line.  ...but not
->> mine.  The guys who designed our hardware followed the SMDK5420
->> reference schematics which connect the SD card slot card detect to
->> "gpc2_2", which is the card detect pin.
->>
->> See "arch/arm/boot/dts/exynos5420-smdk5420.dts", specifically noting
->> the lack of a GPIO card detect and the inclusion of "sd2_cd"
->>
->> mmc at 12220000 {
->>   status = "okay";
->>   card-detect-delay = <200>;
->>   samsung,dw-mshc-ciu-div = <3>;
->>   samsung,dw-mshc-sdr-timing = <2 3>;
->>   samsung,dw-mshc-ddr-timing = <1 2>;
->>   pinctrl-names = "default";
->>   pinctrl-0 = <&sd2_clk &sd2_cmd &sd2_cd &sd2_bus4>;
->>   bus-width = <4>;
->>   cap-sd-highspeed;
->> };
->>
->> See "arch/arm/boot/dts/exynos5420-peach-pit.dts" too:
->>
->> &mmc_2 {
->>   status = "okay";
->>   num-slots = <1>;
->>   cap-sd-highspeed;
->>   card-detect-delay = <200>;
->>   clock-frequency = <400000000>;
->>   samsung,dw-mshc-ciu-div = <3>;
->>   samsung,dw-mshc-sdr-timing = <2 3>;
->>   samsung,dw-mshc-ddr-timing = <1 2>;
->>   pinctrl-names = "default";
->>   pinctrl-0 = <&sd2_clk &sd2_cmd &sd2_cd &sd2_bus4>;
->>   bus-width = <4>;
->> };
->>
->>
->> Here, see this ASCII art that shows how some lines are hooked up on
->> peach-pit.  You might need to paste this into something with a
->> fixed-width font.
->>
->>                      +--------------------
->>                      |    Exynos 5420
->>                      |
->>                      |
->> P2.8V_LOUT4 ---------|- VDDQ_MMC2 (AK7)
->>     |                |
->>     |                |
->>   +-+- 10K res -+----|- XMMC2CDN (AK6)
->>   |             |    |
->>   |             |    |
->>   |             |    |
->>   |           Ext CD |
->>   |                  |
->>   +-- 10K res-+--+---|- XMMC2CMD (AK8)
->>                  |
->>                  |
->>                Ext CMD
->>
->> You can see from the above that the external card detect signal (that
->> goes to the connector) named "Ext CD" is pulled up to the same voltage
->> as the external CMD signal (that also goes to the connector).  This is
->> vqmmc.  If we turn off vqmmc then the 10K resistor will (I think) act
->> as a pull down, or in the best case it will be floating.
->>
->> Said another way: we can't read card detect when vqmmc is off.
+Thanks for following this up.
+
+I originally formed the opinion RCU was safe from FIQ because it is also
+used to manage the NMI notification handlers for x86
+(register_nmi_handler) and I understood the runtime constraints on FIQ
+to be very similar.
+
+Note that x86 manages the notifiers itself so it uses
+list_for_each_entry_rcu() rather atomic_notifier_call_chain() but
+nevertheless I think this boils down to the same thing w.r.t. safety
+concerns.
+
+
+> There's some things which can be done to reduce the lockdep exposure
+> to it, such as ensuring that rcu_read_lock() is first called outside
+> of FIQ context.
+
+lockdep is automatically disabled by calling nmi_enter() so all the
+lockdep calls should end up following the early exit path based on
+current->lockdep_recursion.
+
+
+> There's concerns with whether either printk() in check_flags() could
+> be reached too (flags there should always indicate that IRQs were
+> disabled, so that reduces down to a question about just the first
+> printk() there.)
+> 
+> There's also the very_verbose() stuff for RCU lockdep classes which
+> Paul says must not be enabled.
+> 
+> Lastly, Paul isn't a lockdep expert, but he sees nothing that prevents
+> lockdep doing the deadlock checking as a result of the above call.
 >
-> If that's the case, it makes sense. But i wonder why designed like that.
-> Anyway, then we need to consider that controls the vqmmc power for card-detection.
-
-Maybe you can send a message to the SoC designers at Samsung not to
-design the chip incorrectly in the future?
+> So... this coupled with my feeling that notifiers make it too easy for
+> unreviewed code to be hooked into this path, I'm fairly sure that we
+> don't want to be calling atomic notifier chains from FIQ context.
