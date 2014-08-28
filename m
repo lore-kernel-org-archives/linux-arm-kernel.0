@@ -1,82 +1,49 @@
-From: zhangfei.gao@linaro.org (zhangfei)
-Date: Thu, 28 Aug 2014 17:18:38 +0800
-Subject: [PATCH v2 3/3] [media] rc: remove change_protocol in rc-ir-raw.c
-In-Reply-To: <20140827083447.6af0157f.m.chehab@samsung.com>
-References: <1408613086-12538-1-git-send-email-zhangfei.gao@linaro.org>
- <1408613086-12538-4-git-send-email-zhangfei.gao@linaro.org>
- <20140821065006.6d831ec4@concha.lan> <53FD99FA.4030207@linaro.org>
- <20140827083447.6af0157f.m.chehab@samsung.com>
-Message-ID: <53FEF3EE.1040708@linaro.org>
+From: dinh.linux@gmail.com (Dinh Nguyen)
+Date: Thu, 28 Aug 2014 04:21:43 -0500
+Subject: [PATCH v2 6/6] ARM: dts: hix5hd2: add wdg node
+In-Reply-To: <1409204060-9223-7-git-send-email-zhangfei.gao@linaro.org>
+References: <1409204060-9223-1-git-send-email-zhangfei.gao@linaro.org>
+ <1409204060-9223-7-git-send-email-zhangfei.gao@linaro.org>
+Message-ID: <53FEF4A7.2040001@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 
-On 08/27/2014 07:34 PM, Mauro Carvalho Chehab wrote:
+On 8/28/14, 12:34 AM, Zhangfei Gao wrote:
+> Signed-off-by: Jiancheng Xue <xuejiancheng@huawei.com>
+> Signed-off-by: Zhangfei Gao <zhangfei.gao@linaro.org>
+> ---
+>  arch/arm/boot/dts/hisi-x5hd2.dtsi |    9 +++++++++
+>  1 file changed, 9 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/hisi-x5hd2.dtsi b/arch/arm/boot/dts/hisi-x5hd2.dtsi
+> index 152f3ad..7b1cb53 100644
+> --- a/arch/arm/boot/dts/hisi-x5hd2.dtsi
+> +++ b/arch/arm/boot/dts/hisi-x5hd2.dtsi
+> @@ -365,6 +365,15 @@
+>  				#interrupt-cells = <2>;
+>  				status = "disabled";
+>  			};
+> +
+> +			wdg0: wdg at a2c000 {
 
->>>> With commit 4924a311a62f ("[media] rc-core: rename ir-raw.c"),
->>>> empty change_protocol was introduced.
->>>
->>> No. This was introduced on this changeset:
->>>
->>> commit da6e162d6a4607362f8478c715c797d84d449f8b
->>> Author: David H?rdeman <david@hardeman.nu>
->>> Date:   Thu Apr 3 20:32:16 2014 -0300
->>>
->>>       [media] rc-core: simplify sysfs code
->>>
->>>> As a result, rc_register_device will set dev->enabled_protocols
->>>> addording to rc_map->rc_type, which prevent using all protocols.
->>>
->>> I strongly suspect that this patch will break some things, as
->>> the new code seems to expect that this is always be set.
->>>
->>> See the code at store_protocols(): if this callback is not set,
->>> then it won't allow to disable a protocol.
->>>
->>> Also, this doesn't prevent using all protocols. You can still use
->>> "ir-keytable -p all" to enable all protocols (the "all" protocol
->>> type were introduced recently at the userspace tool).
->>>
->>>   From the way I see, setting the protocol when a table is loaded
->>> is not a bad thing, as:
->>> - if RC tables are loaded, the needed protocol to decode it is
->>>     already known;
->>> - by running just one IR decoder, the IR handling routine will
->>>     be faster and will consume less power;
->>> - on a real case scenario, it is a way more likely that just one
->>>     decoder will ever be needed by the end user.
->>>
->>> So, I think that this is just annoying for developers when are checking
->>> if all decoders are working, by sending keycodes from different IR types
->>> at the same time.
->>>
->>
->> Thanks Mauro for the kind explanation.
->>
->> ir-keytable seems also enalbe specific protocol
->> -p, --protocol=PROTOCOL
->>
->> Currently we use lirc user space decoder/keymap and only need
->> pulse-length information from kernel.
->
-> Well, you can use ir-keytable to disable everything but lirc, not
-> compile the other hardware decoders or directly write "lirc" to
-> /sys/class/rc/rc0/protocols (see Documentation/ABI/testing/sysfs-class-rc).
->
-> Anyway, I suggest you to use the hardware decoder instead of lirc,
-> as the in-kernel decoders should be lighter than lirc and works pretty
-> well, but this is, of course, your decision.
->
-> Btw, it would make sense, IMHO, to have a way to setup LIRC daemon to
-> enable LIRC output on a given remote controller, and, optionally,
-> disabling the hardware decoders that are needlessly enabled.
->
+A nit-pick here, but everybody else is using 'wdt' for a watchdog timer
+node.
 
-Thanks Mauro
+> +				compatible = "arm,sp805", "arm,primecell";
 
-Double checked, both ir-keytable and /sys/class/rc/rc0/protocols can 
-enable/disable protocols, which is much easier than dts passing 
-information, and by default all protocols are disabled.
+I didn't see an entry for "arm,sp805" in Documentations, should there be
+one?
 
-Thanks for this kind information.
+Dinh
+> +				arm,primecell-periphid = <0x00141805>;
+> +				reg = <0xa2c000 0x1000>;
+> +				interrupts = <0 29 4>;
+> +				clocks = <&clock HIX5HD2_WDG0_RST>;
+> +				clock-names = "apb_pclk";
+> +                       };
+>  		};
+>  
+>  		local_timer at 00a00600 {
+> 
