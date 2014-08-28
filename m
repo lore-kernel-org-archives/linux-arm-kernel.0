@@ -1,65 +1,144 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Thu, 28 Aug 2014 11:21:55 +0200
-Subject: [PATCH v9 3/5] rtc: max77686: Fail to probe if no RTC regmap
- irqchip is set
-In-Reply-To: <1408350877-15921-4-git-send-email-javier.martinez@collabora.co.uk>
-References: <1408350877-15921-1-git-send-email-javier.martinez@collabora.co.uk>
- <1408350877-15921-4-git-send-email-javier.martinez@collabora.co.uk>
-Message-ID: <1409217715.20020.7.camel@AMDC1943>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 28 Aug 2014 10:23:27 +0100
+Subject: [PATCH] clocksource: arch_timer: Fix code to use physical timers
+ when requested
+In-Reply-To: <1409173419-13076-1-git-send-email-sonnyrao@chromium.org>
+References: <1409173419-13076-1-git-send-email-sonnyrao@chromium.org>
+Message-ID: <53FEF50F.8030206@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On pon, 2014-08-18 at 10:34 +0200, Javier Martinez Canillas wrote:
-> The max77686 mfd driver adds a regmap IRQ chip which creates an
-> IRQ domain that is used to map the virtual RTC alarm1 interrupt.
+[cc-ing Will for the VDSO bits]
+
+Hi Sonny,
+
+On 27/08/14 22:03, Sonny Rao wrote:
+> This is a bug fix for using physical arch timers when
+> the arch_timer_use_virtual boolean is false.  It restores the
+> arch_counter_get_cntpct() function after removal in
 > 
-> The RTC driver assumes that this will always be true since the
-> PMIC IRQ is a required property according to the max77686 DT
-> binding doc. If an "interrupts" property is not defined for a
-> max77686 PMIC, then the mfd probe function will fail and the
-> RTC platform driver will never be probed. But even when it is
-> not possible to probe the rtc-max77686 driver without a regmap
-> IRQ chip, it's better to explicitly check if the IRQ chip data
-> is not NULL and gracefully fail instead of getting an OOPS.
+> 0d651e4e "clocksource: arch_timer: use virtual counters"
 
-The OOPS was possible only with Bartlomiej's patch because he changed
-the MFD driver probe function to skip IRQ setup on lack of interrupts.
-In current state the OOPS should not happen so mentioning OOPS in commit
-message may be misleading. Maybe just don't put the OOPS here?
+This isn't a bug, but rather a feature. It allows the kernel to
+consistently use the virtual counter everywhere (including userspace),
+no matter if it behaves as a host or a guest, without worrying about the
+accessibility of the physical counter (hint: you have no way of knowing
+if it is accessible or not).
 
-Anyway the patch looks good and a check for non-null
-regmap_irq_chip_data is still a valid precaution so:
-
-Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-
-Best regards,
-Krzysztof
-
-
+> and completes the implementation of memory mapped access for physical
+> timers, so if a system is trying to use physical timers, it will
+> function properly.
 > 
-> Reported-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+> Signed-off-by: Sonny Rao <sonnyrao@chromium.org>
 > ---
+>  arch/arm/include/asm/arch_timer.h    |  9 +++++++++
+>  arch/arm64/include/asm/arch_timer.h  | 10 ++++++++++
+>  drivers/clocksource/arm_arch_timer.c | 30 ++++++++++++++++++++++++++----
+>  3 files changed, 45 insertions(+), 4 deletions(-)
 > 
-> Fixes the issue reported by Krzystof in: https://lkml.org/lkml/2014/8/8/121
-> ---
->  drivers/rtc/rtc-max77686.c | 6 ++++++
->  1 file changed, 6 insertions(+)
-> 
-> diff --git a/drivers/rtc/rtc-max77686.c b/drivers/rtc/rtc-max77686.c
-> index 7bb5433..55396bb 100644
-> --- a/drivers/rtc/rtc-max77686.c
-> +++ b/drivers/rtc/rtc-max77686.c
-> @@ -466,6 +466,12 @@ static int max77686_rtc_probe(struct platform_device *pdev)
->  		goto err_rtc;
->  	}
+> diff --git a/arch/arm/include/asm/arch_timer.h b/arch/arm/include/asm/arch_timer.h
+> index 0704e0c..e72aa4d 100644
+> --- a/arch/arm/include/asm/arch_timer.h
+> +++ b/arch/arm/include/asm/arch_timer.h
+> @@ -78,6 +78,15 @@ static inline u32 arch_timer_get_cntfrq(void)
+>  	return val;
+>  }
 >  
-> +	if (!max77686->rtc_irq_data) {
-> +		ret = -EINVAL;
-> +		dev_err(&pdev->dev, "%s: no RTC regmap IRQ chip\n", __func__);
-> +		goto err_rtc;
-> +	}
+> +static inline u64 arch_counter_get_cntpct(void)
+> +{
+> +	u64 cval;
 > +
->  	info->virq = regmap_irq_get_virq(max77686->rtc_irq_data,
->  					 MAX77686_RTCIRQ_RTCA1);
->  	if (!info->virq) {
+> +	isb();
+> +	asm volatile("mrrc p15, 0, %Q0, %R0, c14" : "=r" (cval));
+> +	return cval;
+> +}
+> +
+>  static inline u64 arch_counter_get_cntvct(void)
+>  {
+>  	u64 cval;
+> diff --git a/arch/arm64/include/asm/arch_timer.h b/arch/arm64/include/asm/arch_timer.h
+> index 9400596..58657c4 100644
+> --- a/arch/arm64/include/asm/arch_timer.h
+> +++ b/arch/arm64/include/asm/arch_timer.h
+> @@ -135,6 +135,16 @@ static inline void arch_timer_evtstrm_enable(int divider)
+>  #endif
+>  }
+>  
+> +static inline u64 arch_counter_get_cntpct(void)
+> +{
+> +	u64 cval;
+> +
+> +	isb();
+> +	asm volatile("mrs %0, cntpct_el0" : "=r" (cval));
+> +
+> +	return cval;
+> +}
+> +
+>  static inline u64 arch_counter_get_cntvct(void)
+>  {
+>  	u64 cval;
+> diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
+> index 5163ec1..ad723cb 100644
+> --- a/drivers/clocksource/arm_arch_timer.c
+> +++ b/drivers/clocksource/arm_arch_timer.c
+> @@ -30,6 +30,8 @@
+>  #define CNTTIDR		0x08
+>  #define CNTTIDR_VIRT(n)	(BIT(1) << ((n) * 4))
+>  
+> +#define CNTPCT_LO	0x00
+> +#define CNTPCT_HI	0x04
+>  #define CNTVCT_LO	0x08
+>  #define CNTVCT_HI	0x0c
+>  #define CNTFRQ		0x10
+> @@ -386,6 +388,19 @@ static u64 arch_counter_get_cntvct_mem(void)
+>  	return ((u64) vct_hi << 32) | vct_lo;
+>  }
+>  
+> +static u64 arch_counter_get_cntpct_mem(void)
+> +{
+> +	u32 pct_lo, pct_hi, tmp_hi;
+> +
+> +	do {
+> +		pct_hi = readl_relaxed(arch_counter_base + CNTPCT_HI);
+> +		pct_lo = readl_relaxed(arch_counter_base + CNTPCT_LO);
+> +		tmp_hi = readl_relaxed(arch_counter_base + CNTPCT_HI);
+> +	} while (pct_hi != tmp_hi);
+> +
+> +	return ((u64) pct_hi << 32) | pct_lo;
+> +}
+> +
+>  /*
+>   * Default to cp15 based access because arm64 uses this function for
+>   * sched_clock() before DT is probed and the cp15 method is guaranteed
+> @@ -429,10 +444,17 @@ static void __init arch_counter_register(unsigned type)
+>  	u64 start_count;
+>  
+>  	/* Register the CP15 based counter if we have one */
+> -	if (type & ARCH_CP15_TIMER)
+> -		arch_timer_read_counter = arch_counter_get_cntvct;
+> -	else
+> -		arch_timer_read_counter = arch_counter_get_cntvct_mem;
+> +	if (type & ARCH_CP15_TIMER) {
+> +		if (arch_timer_use_virtual)
+> +			arch_timer_read_counter = arch_counter_get_cntvct;
+> +		else
+> +			arch_timer_read_counter = arch_counter_get_cntpct;
+> +	} else {
+> +		if (arch_timer_use_virtual)
+> +			arch_timer_read_counter = arch_counter_get_cntvct_mem;
+> +		else
+> +			arch_timer_read_counter = arch_counter_get_cntpct_mem;
+> +	}
+>  
+>  	start_count = arch_timer_read_counter();
+>  	clocksource_register_hz(&clocksource_counter, arch_timer_rate);
+> 
+
+What will be the effect on arm64 where the VDSO uses the virtual counter
+to implement gettimeofday?
+
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
