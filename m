@@ -1,49 +1,65 @@
-From: dinh.linux@gmail.com (Dinh Nguyen)
-Date: Thu, 28 Aug 2014 04:21:43 -0500
-Subject: [PATCH v2 6/6] ARM: dts: hix5hd2: add wdg node
-In-Reply-To: <1409204060-9223-7-git-send-email-zhangfei.gao@linaro.org>
-References: <1409204060-9223-1-git-send-email-zhangfei.gao@linaro.org>
- <1409204060-9223-7-git-send-email-zhangfei.gao@linaro.org>
-Message-ID: <53FEF4A7.2040001@gmail.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Thu, 28 Aug 2014 11:21:55 +0200
+Subject: [PATCH v9 3/5] rtc: max77686: Fail to probe if no RTC regmap
+ irqchip is set
+In-Reply-To: <1408350877-15921-4-git-send-email-javier.martinez@collabora.co.uk>
+References: <1408350877-15921-1-git-send-email-javier.martinez@collabora.co.uk>
+ <1408350877-15921-4-git-send-email-javier.martinez@collabora.co.uk>
+Message-ID: <1409217715.20020.7.camel@AMDC1943>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On pon, 2014-08-18 at 10:34 +0200, Javier Martinez Canillas wrote:
+> The max77686 mfd driver adds a regmap IRQ chip which creates an
+> IRQ domain that is used to map the virtual RTC alarm1 interrupt.
+> 
+> The RTC driver assumes that this will always be true since the
+> PMIC IRQ is a required property according to the max77686 DT
+> binding doc. If an "interrupts" property is not defined for a
+> max77686 PMIC, then the mfd probe function will fail and the
+> RTC platform driver will never be probed. But even when it is
+> not possible to probe the rtc-max77686 driver without a regmap
+> IRQ chip, it's better to explicitly check if the IRQ chip data
+> is not NULL and gracefully fail instead of getting an OOPS.
+
+The OOPS was possible only with Bartlomiej's patch because he changed
+the MFD driver probe function to skip IRQ setup on lack of interrupts.
+In current state the OOPS should not happen so mentioning OOPS in commit
+message may be misleading. Maybe just don't put the OOPS here?
+
+Anyway the patch looks good and a check for non-null
+regmap_irq_chip_data is still a valid precaution so:
+
+Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+
+Best regards,
+Krzysztof
 
 
-On 8/28/14, 12:34 AM, Zhangfei Gao wrote:
-> Signed-off-by: Jiancheng Xue <xuejiancheng@huawei.com>
-> Signed-off-by: Zhangfei Gao <zhangfei.gao@linaro.org>
+> 
+> Reported-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
 > ---
->  arch/arm/boot/dts/hisi-x5hd2.dtsi |    9 +++++++++
->  1 file changed, 9 insertions(+)
 > 
-> diff --git a/arch/arm/boot/dts/hisi-x5hd2.dtsi b/arch/arm/boot/dts/hisi-x5hd2.dtsi
-> index 152f3ad..7b1cb53 100644
-> --- a/arch/arm/boot/dts/hisi-x5hd2.dtsi
-> +++ b/arch/arm/boot/dts/hisi-x5hd2.dtsi
-> @@ -365,6 +365,15 @@
->  				#interrupt-cells = <2>;
->  				status = "disabled";
->  			};
-> +
-> +			wdg0: wdg at a2c000 {
-
-A nit-pick here, but everybody else is using 'wdt' for a watchdog timer
-node.
-
-> +				compatible = "arm,sp805", "arm,primecell";
-
-I didn't see an entry for "arm,sp805" in Documentations, should there be
-one?
-
-Dinh
-> +				arm,primecell-periphid = <0x00141805>;
-> +				reg = <0xa2c000 0x1000>;
-> +				interrupts = <0 29 4>;
-> +				clocks = <&clock HIX5HD2_WDG0_RST>;
-> +				clock-names = "apb_pclk";
-> +                       };
->  		};
+> Fixes the issue reported by Krzystof in: https://lkml.org/lkml/2014/8/8/121
+> ---
+>  drivers/rtc/rtc-max77686.c | 6 ++++++
+>  1 file changed, 6 insertions(+)
+> 
+> diff --git a/drivers/rtc/rtc-max77686.c b/drivers/rtc/rtc-max77686.c
+> index 7bb5433..55396bb 100644
+> --- a/drivers/rtc/rtc-max77686.c
+> +++ b/drivers/rtc/rtc-max77686.c
+> @@ -466,6 +466,12 @@ static int max77686_rtc_probe(struct platform_device *pdev)
+>  		goto err_rtc;
+>  	}
 >  
->  		local_timer at 00a00600 {
-> 
+> +	if (!max77686->rtc_irq_data) {
+> +		ret = -EINVAL;
+> +		dev_err(&pdev->dev, "%s: no RTC regmap IRQ chip\n", __func__);
+> +		goto err_rtc;
+> +	}
+> +
+>  	info->virq = regmap_irq_get_virq(max77686->rtc_irq_data,
+>  					 MAX77686_RTCIRQ_RTCA1);
+>  	if (!info->virq) {
