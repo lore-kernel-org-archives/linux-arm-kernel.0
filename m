@@ -1,54 +1,52 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 28 Aug 2014 10:52:11 +0100
-Subject: [PATCH V2 1/2] ARM: dts: Add DT changes for display on snow
-In-Reply-To: <CAEC9eQN+EJmrG70O+2Sg5GD0OHudhqo5beGDN8K4_kmOKKPOmw@mail.gmail.com>
-References: <1409150908-12801-1-git-send-email-ajaykumar.rs@samsung.com>
- <20140827150146.GB9737@leverpostej>
- <CAEC9eQMKfso-rmMdqyDZeCdaxf21O1fqN6Z2YrS=njqGHh5d5Q@mail.gmail.com>
- <20140828091509.GA14650@leverpostej>
- <CAEC9eQN+EJmrG70O+2Sg5GD0OHudhqo5beGDN8K4_kmOKKPOmw@mail.gmail.com>
-Message-ID: <20140828095211.GE14650@leverpostej>
+From: b38343@freescale.com (Robin Gong)
+Date: Thu, 28 Aug 2014 17:59:41 +0800
+Subject: [PATCH v4] spi: spi-imx: add DMA support
+In-Reply-To: <CAGUYZuQre3RAQy+qqwq5HthrjnT85V5RKu2xwXOC=gL6Yk33TQ@mail.gmail.com>
+References: <1408752835-10995-1-git-send-email-b38343@freescale.com>
+ <CAGUYZuQre3RAQy+qqwq5HthrjnT85V5RKu2xwXOC=gL6Yk33TQ@mail.gmail.com>
+Message-ID: <20140828095939.GA13274@Robin-OptiPlex-780>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 28, 2014 at 10:34:32AM +0100, Ajay kumar wrote:
-> On Thu, Aug 28, 2014 at 2:45 PM, Mark Rutland <mark.rutland@arm.com> wrote:
-> > On Thu, Aug 28, 2014 at 06:34:33AM +0100, Ajay kumar wrote:
-> >> On Wed, Aug 27, 2014 at 8:31 PM, Mark Rutland <mark.rutland@arm.com> wrote:
-> >> > On Wed, Aug 27, 2014 at 03:48:27PM +0100, Ajay Kumar wrote:
-> >> >> Add DT nodes for ptn3460 bridge chip and panel.
-> >> >> Add backlight enable pin and backlight power supply for pwm-backlight.
-> >> >> Also add bridge phandle needed by dp to enable display on snow.
-> >> >>
-> >> >> Note that, snow doesn't support "chunghwa,claa101wb01" panel,
-> >> >> but still we choose to reuse the binding since "chunghwa,claa101wb01"
-> >> >> has similar LCD timings.
-> >> >
-> >> > What does it actually have?
-> >> >
-> >> > It's fine to have "chunghwa,claa101wb01" as a fallback but we should
-> >> > have an identifier for the actual display, too.
-> >> Actual display used is "AUO,B116XTN0", for which no data currently exists
-> >> in panel file. Instead of adding a new panel_desc for B116XTN0,
-> >> why not we reuse existing ones? what is the "identifier" you are talking about?
-> >
-> > The compatible string.
-> >
-> > So in the dts we'd have compatible = "au0,b116xtn0", "chunghwa,claa101wb01";
-> Sorry, hardware engineer says actual LCD name is "auo,b116xw03".
-
-Ok.
-
-> > That way if we need specific data we can add it later.
-> I think we can add a new panel_desc for "auo,b116xw03".
-> Because its actual LCD dimension is 256x144, but "chungwa, claa101wb01" has
-> LCD dimension 223x125.
-> What is Thierry's opinion on adding this new LCD?
+On Wed, Aug 27, 2014 at 11:12:08AM +0530, sanjeev sharma wrote:
+> On Sat, Aug 23, 2014 at 5:43 AM, Robin Gong <b38343@freescale.com> wrote:
 > 
-> > What vendor is AU0? Can we add a vendor-prefix in parallel?
-> its "auo" (already present: AU Optronics Corporation)
-
-Ah, whoops. Mistook 'O' for '0'.
-
-Thanks,
-Mark.
+> > +       /*
+> > +        * Configure the DMA register: setup the watermark
+> > +        * and enable DMA request.
+> > +        */
+> > +       if (spi_imx->dma_is_inited) {
+> > +               dma = readl(spi_imx->base + MX51_ECSPI_DMA);
+> > +
+> > +               spi_imx->tx_wml = spi_imx_get_fifosize(spi_imx) / 2;
+> > +               spi_imx->rx_wml = spi_imx_get_fifosize(spi_imx) / 2;
+> > +               spi_imx->rxt_wml = spi_imx_get_fifosize(spi_imx) / 2;
+> > +               rx_wml_cfg = spi_imx->rx_wml <<
+> > MX51_ECSPI_DMA_RX_WML_OFFSET;
+> > +               tx_wml_cfg = spi_imx->tx_wml <<
+> > MX51_ECSPI_DMA_TX_WML_OFFSET;
+> > +               rxt_wml_cfg = spi_imx->rxt_wml <<
+> > MX51_ECSPI_DMA_RXT_WML_OFFSET;
+> > +               dma = (dma & ~MX51_ECSPI_DMA_TX_WML_MASK
+> > +                               & ~MX51_ECSPI_DMA_RX_WML_MASK
+> > +                               & ~MX51_ECSPI_DMA_RXT_WML_MASK)
+> > +                               | rx_wml_cfg | tx_wml_cfg | rxt_wml_cfg
+> > +                               |(1 << MX51_ECSPI_DMA_TEDEN_OFFSET)
+> > +                               |(1 << MX51_ECSPI_DMA_RXDEN_OFFSET)
+> > +                               |(1 << MX51_ECSPI_DMA_RXTDEN_OFFSET);
+> > +
+> >
+> 
+> IMO, we should have an seperate function for dmactrl,rx_threshold &
+> tx_threshold for better visiblity.
+> 
+>
+I understood your concern, but I don't want to create one function only for
+setting some bit fields of the register.
+> >
+> > --
+> > To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> > the body of a message to majordomo at vger.kernel.org
+> > More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> > Please read the FAQ at  http://www.tux.org/lkml/
+> >
