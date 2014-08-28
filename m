@@ -1,73 +1,104 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 28 Aug 2014 19:37:04 +0100
-Subject: [PATCH] Doc: dt: arch_timer: discourage clock-frequency use
-Message-ID: <1409251024-19103-1-git-send-email-mark.rutland@arm.com>
+Date: Thu, 28 Aug 2014 19:48:47 +0100
+Subject: [PATCH 1/5] usb: dwc3: exynos: Add support for SCLK present on
+ Exynos7
+In-Reply-To: <1409212920-28526-2-git-send-email-gautam.vivek@samsung.com>
+References: <1409212920-28526-1-git-send-email-gautam.vivek@samsung.com>
+ <1409212920-28526-2-git-send-email-gautam.vivek@samsung.com>
+Message-ID: <20140828184847.GA18464@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This was previously posted inline in another thread [1]. This version has the
-requested fixups and a few more CCs for others who might be interested.
+On Thu, Aug 28, 2014 at 09:01:56AM +0100, Vivek Gautam wrote:
+> Exynos7 also has a separate special gate clock going to the IP
+> apart from the usual AHB clock. So add support for the same.
+> 
+> Signed-off-by: Vivek Gautam <gautam.vivek@samsung.com>
+> ---
+>  drivers/usb/dwc3/dwc3-exynos.c |   16 ++++++++++++++++
+>  1 file changed, 16 insertions(+)
+> 
+> diff --git a/drivers/usb/dwc3/dwc3-exynos.c b/drivers/usb/dwc3/dwc3-exynos.c
+> index f9fb8ad..bab6395 100644
+> --- a/drivers/usb/dwc3/dwc3-exynos.c
+> +++ b/drivers/usb/dwc3/dwc3-exynos.c
+> @@ -35,6 +35,7 @@ struct dwc3_exynos {
+>  	struct device		*dev;
+>  
+>  	struct clk		*clk;
+> +	struct clk		*sclk;
+>  	struct regulator	*vdd33;
+>  	struct regulator	*vdd10;
+>  };
+> @@ -141,10 +142,17 @@ static int dwc3_exynos_probe(struct platform_device *pdev)
+>  		return -EINVAL;
+>  	}
+>  
+> +	/* Exynos7 has a special gate clock going to this IP */
+> +	exynos->sclk = devm_clk_get(dev, "usbdrd30_sclk");
+> +	if (IS_ERR(exynos->sclk))
+> +		dev_warn(dev, "couldn't get sclk\n");
+
+Doesn't this introduce a pointless warning for Exynos SoCs other than
+Exynos7?
+
+> +
+>  	exynos->dev	= dev;
+>  	exynos->clk	= clk;
+>  
+>  	clk_prepare_enable(exynos->clk);
+> +	if (!IS_ERR(exynos->sclk))
+> +		clk_prepare_enable(exynos->sclk);
+
+If you replaced the returned err value with NULL you could avoid these
+IS_ERR cases.
 
 Mark.
 
-[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2014-August/282804.html
-
----->8----
-The ARM Generic Timer (AKA the architected timer, arm_arch_timer)
-features a CPU register (CNTFRQ) which firmware is intended to
-initialize, and non-secure software can read to determine the frequency
-of the timer. On CPUs with secure state, this register cannot be written
-from non-secure states.
-
-The firmware of early SoCs featuring the timer did not correctly
-initialize CNTFRQ correctly on all CPUs, requiring the frequency to be
-described in DT as a workaround. This workaround is not complete however
-as it is exposed to all software in a privileged non-secure mode
-(including guests running under a hypervisor). The firmware and DTs for
-recent SoCs have followed the example set by these early SoCs.
-
-This patch updates the arch timer binding documentation to make it
-clearer that the use of the clock-frequency property is a poor
-work-around. The MMIO generic timer binding is similarly updated, though
-this is less of a concern as there is generally no need to expose the
-MMIO timers to guest OSs.
-
-Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-Acked-by: Olof Johansson <olof@lixom.net>
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
-Cc: Rob Herring <robh+dt@kernel.org>
-Cc: Stephen Boyd <sboyd@codeaurora.org>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
----
- Documentation/devicetree/bindings/arm/arch_timer.txt | 8 ++++++--
- 1 file changed, 6 insertions(+), 2 deletions(-)
-
-diff --git a/Documentation/devicetree/bindings/arm/arch_timer.txt b/Documentation/devicetree/bindings/arm/arch_timer.txt
-index 37b2caf..620ac0c 100644
---- a/Documentation/devicetree/bindings/arm/arch_timer.txt
-+++ b/Documentation/devicetree/bindings/arm/arch_timer.txt
-@@ -17,7 +17,10 @@ to deliver its interrupts via SPIs.
- - interrupts : Interrupt list for secure, non-secure, virtual and
-   hypervisor timers, in that order.
- 
--- clock-frequency : The frequency of the main counter, in Hz. Optional.
-+- clock-frequency : The frequency of the main counter, in Hz. Should be present
-+  only where necessary to work around broken firmware which does not configure
-+  CNTFRQ on all CPUs to a uniform correct value. Use of this property is
-+  strongly discouraged; fix your firmware unless absolutely impossible.
- 
- - always-on : a boolean property. If present, the timer is powered through an
-   always-on power domain, therefore it never loses context.
-@@ -38,7 +41,8 @@ Example:
- 
- - compatible : Should at least contain "arm,armv7-timer-mem".
- 
--- clock-frequency : The frequency of the main counter, in Hz. Optional.
-+- clock-frequency : The frequency of the main counter, in Hz. Should be present
-+  only when firmware has not configured the MMIO CNTFRQ registers.
- 
- - reg : The control frame base address.
- 
--- 
-1.9.1
+>  
+>  	exynos->vdd33 = devm_regulator_get(dev, "vdd33");
+>  	if (IS_ERR(exynos->vdd33)) {
+> @@ -187,6 +195,8 @@ err4:
+>  err3:
+>  	regulator_disable(exynos->vdd33);
+>  err2:
+> +	if (!IS_ERR(exynos->sclk))
+> +		clk_disable_unprepare(exynos->sclk);
+>  	clk_disable_unprepare(clk);
+>  	return ret;
+>  }
+> @@ -199,6 +209,8 @@ static int dwc3_exynos_remove(struct platform_device *pdev)
+>  	platform_device_unregister(exynos->usb2_phy);
+>  	platform_device_unregister(exynos->usb3_phy);
+>  
+> +	if (!IS_ERR(exynos->sclk))
+> +		clk_disable_unprepare(exynos->sclk);
+>  	clk_disable_unprepare(exynos->clk);
+>  
+>  	regulator_disable(exynos->vdd33);
+> @@ -220,6 +232,8 @@ static int dwc3_exynos_suspend(struct device *dev)
+>  {
+>  	struct dwc3_exynos *exynos = dev_get_drvdata(dev);
+>  
+> +	if (!IS_ERR(exynos->sclk))
+> +		clk_disable(exynos->sclk);
+>  	clk_disable(exynos->clk);
+>  
+>  	regulator_disable(exynos->vdd33);
+> @@ -245,6 +259,8 @@ static int dwc3_exynos_resume(struct device *dev)
+>  	}
+>  
+>  	clk_enable(exynos->clk);
+> +	if (!IS_ERR(exynos->sclk))
+> +		clk_enable(exynos->sclk);
+>  
+>  	/* runtime set active to reflect active state. */
+>  	pm_runtime_disable(dev);
+> -- 
+> 1.7.10.4
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe devicetree" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
