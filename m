@@ -1,43 +1,57 @@
-From: maxime.coquelin@st.com (Maxime Coquelin)
-Date: Thu, 28 Aug 2014 16:31:49 +0200
-Subject: [STLinux Kernel] [PATCH 1/1] i2c: i2c-st: Rename clock reference
- to something that exists
-In-Reply-To: <1409234523-20240-1-git-send-email-lee.jones@linaro.org>
-References: <1409234523-20240-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <53FF3D55.40006@st.com>
+From: jonsmirl@gmail.com (jonsmirl at gmail.com)
+Date: Thu, 28 Aug 2014 10:33:43 -0400
+Subject: [linux-sunxi] Re: [PATCH 4/4] simplefb: add clock handling code
+In-Reply-To: <CAMuHMdU+zxUCU05YOpyuP1fx=Dgb5SZu=vbaJW13sQAaMBwU_w@mail.gmail.com>
+References: <20140825150501.GE14763@ulmo.nvidia.com>
+ <20140825152232.GE15297@lukather> <20140826080432.GD17263@ulmo>
+ <20140826135341.GM15297@lukather> <20140826143550.GB3027@ulmo>
+ <53FCE704.4030103@redhat.com> <20140827093121.GA23186@ulmo>
+ <53FDB46C.5010609@redhat.com> <20140827125613.GF23186@ulmo>
+ <53FDE0CE.5030807@redhat.com> <20140827141632.GB32243@ulmo>
+ <53FF1D6C.6090205@redhat.com>
+ <CAKON4OyXPjXx4q828kFgMsC_u7u3nqLPLxOp-kRZbS27yRKOEg@mail.gmail.com>
+ <CAMuHMdU+zxUCU05YOpyuP1fx=Dgb5SZu=vbaJW13sQAaMBwU_w@mail.gmail.com>
+Message-ID: <CAKON4Oy8X9CSpZjYnTRgZ_MsxXQ=zaP+kxiZ2b7Es4GjN+1iJw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lee,
-
-On 08/28/2014 04:02 PM, Lee Jones wrote:
-> CLK_S_ICN_REG_0 hasn't existed for a while now.  This was renamed
-> over a few commits, then finally removed in commit 5aa02b9 (ARM:
-> STi: DT: STiH415: Remove unused CLK_S_ICN_REG_0 fixed clock).
+On Thu, Aug 28, 2014 at 10:20 AM, Geert Uytterhoeven
+<geert@linux-m68k.org> wrote:
+> On Thu, Aug 28, 2014 at 3:22 PM, jonsmirl at gmail.com <jonsmirl@gmail.com> wrote:
+>>> 2) We don't want to hardcode these clocks into the kernel (sunxi) clk
+>>> driver, instead the bootloader should tell the kernel about these clocks.
+>>>
+>>> So the only point of discussion left seems to be how to do 2...
+>>
+>> Wouldn't it be a lot simpler just to use existing fbdev (not KMS) and
+>> whip together a device specific driver that claims the proper
+>> resources? And just implement the minimal about of fbdev possible?
+>> fbdev already is a driver library.
 >
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> Like... drivers/video/fbdev/offb.c?
 
-Maybe it will be part of my next pull-requests, but in case it is not, 
-you can add my:
-Acked-by: Maxime Coquelin <maxime.coquelin@st.com>
+I'd probably reclassify drivers/video/fbdev/simplefb.c as a skeleton
+and use it as a template for making device specific versions of it.
 
-Thanks,
-Maxime
-> ---
->   Documentation/devicetree/bindings/i2c/i2c-st.txt | 2 +-
->   1 file changed, 1 insertion(+), 1 deletion(-)
+I don't see why there is so much resistance to just making device
+specific fb drivers.  Whenever the KMS driver gets written just
+disable the device specific fb driver in the build.
+
+
 >
-> diff --git a/Documentation/devicetree/bindings/i2c/i2c-st.txt b/Documentation/devicetree/bindings/i2c/i2c-st.txt
-> index 437e0db..4c26fda 100644
-> --- a/Documentation/devicetree/bindings/i2c/i2c-st.txt
-> +++ b/Documentation/devicetree/bindings/i2c/i2c-st.txt
-> @@ -31,7 +31,7 @@ i2c0: i2c at fed40000 {
->   	compatible	= "st,comms-ssc4-i2c";
->   	reg		= <0xfed40000 0x110>;
->   	interrupts	=  <GIC_SPI 187 IRQ_TYPE_LEVEL_HIGH>;
-> -	clocks		= <&CLK_S_ICN_REG_0>;
-> +	clocks		= <&clk_s_a0_ls CLK_ICN_REG>;
->   	clock-names	= "ssc";
->   	clock-frequency = <400000>;
->   	pinctrl-names	= "default";
+> Gr{oetje,eeting}s,
 >
+>                         Geert
+>
+> --
+> Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+>
+> In personal conversations with technical people, I call myself a hacker. But
+> when I'm talking to journalists I just say "programmer" or something like that.
+>                                 -- Linus Torvalds
+
+
+
+-- 
+Jon Smirl
+jonsmirl at gmail.com
