@@ -1,25 +1,27 @@
-From: vincent.guittot@linaro.org (Vincent Guittot)
-Date: Thu, 28 Aug 2014 09:34:09 +0200
-Subject: [PATCH v5 06/12] sched: add per rq cpu_capacity_orig
-In-Reply-To: <20140827133033.GC13808@linux.vnet.ibm.com>
-References: <1409051215-16788-1-git-send-email-vincent.guittot@linaro.org>
- <1409051215-16788-7-git-send-email-vincent.guittot@linaro.org>
- <20140827133033.GC13808@linux.vnet.ibm.com>
-Message-ID: <CAKfTPtAkT9yk4jLP_W9LNeqP_=Ycyda6vgk2YrnCuq6+=Y_UGA@mail.gmail.com>
+From: carlo@caione.org (Carlo Caione)
+Date: Thu, 28 Aug 2014 09:51:15 +0200
+Subject: [PATCH 2/7] ARM: meson: serial: add MesonX SoC on-chip uart driver
+In-Reply-To: <1408272594-10814-3-git-send-email-carlo@caione.org>
+References: <1408272594-10814-1-git-send-email-carlo@caione.org>
+ <1408272594-10814-3-git-send-email-carlo@caione.org>
+Message-ID: <20140828075115.GA2601@carlo-MacBookPro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27 August 2014 15:32, Kamalesh Babulal <kamalesh@linux.vnet.ibm.com> wrote:
-> * Vincent Guittot <vincent.guittot@linaro.org> [2014-08-26 13:06:49]:
->
->> This new field cpu_capacity_orig reflects the available capacity of a CPUs
->> unlike the cpu_capacity which reflects the current capacity that can be altered
->> by frequency and rt tasks.
->>
->> Signed-off-by: Vincent Guittot <vincent.guittot@linaro.org>
->
-> Reviewed-by: Kamalesh Babulal <kamalesh@linux.vnet.ibm.com>
+On Sun, Aug 17, 2014 at 12:49:49PM +0200, Carlo Caione wrote:
+> The SoC has four fully functional UARTs which use the same programming
+> model. They are named UART_A, UART_B, UART_C and UART_AO (Always-On)
+> which cannot be powered off.
+> 
+> Signed-off-by: Carlo Caione <carlo@caione.org>
+> ---
 
-Thanks
+<cut>
 
->
+Hi,
+Any feedback on this patch before submitting v2?
+
+Thanks,
+
+-- 
+Carlo Caione
