@@ -1,98 +1,77 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 28 Aug 2014 19:04:23 +0100
-Subject: [PATCH] clocksource: arch_timer: Fix code to use physical timers
- when requested
-In-Reply-To: <53FF624C.3090002@codeaurora.org>
-References: <1409173419-13076-1-git-send-email-sonnyrao@chromium.org>
- <CAOesGMjK65Rc-K0fyFUUJLw6huLT82E-nqJwZO4PqhgopF96Ow@mail.gmail.com>
- <CAPz6YkWAPtuy4sAuAK9GtpDgfGsccxeS+pqqe_t_R818Jt01qA@mail.gmail.com>
- <53FE5B09.2020403@codeaurora.org>
- <CAOesGMhTivDzJFuxONggcJ6N5UvZopKa=+tv9PoPX593cpnm0A@mail.gmail.com>
- <53FE7E3B.1010500@codeaurora.org>
- <CAOesGMgXnsqttHwAxEW4a7-Rx-nmSwpJd_Dt1iCcFOvzDwbzdA@mail.gmail.com>
- <CAD=FV=VjN6Xam-nRRcxvOoN-gokU6DbGVjoPXN_fkTJssH1RWA@mail.gmail.com>
- <20140828093505.GC14650@leverpostej>
- <53FF624C.3090002@codeaurora.org>
-Message-ID: <20140828180423.GE18005@leverpostej>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 28 Aug 2014 11:07:58 -0700
+Subject: [PATCH 2/4] arm: omap3: Add Technexion TAO3530 SOM
+ omap3-tao3530.dtsi
+In-Reply-To: <1409245829-3938-2-git-send-email-sr@denx.de>
+References: <1409245829-3938-1-git-send-email-sr@denx.de>
+ <1409245829-3938-2-git-send-email-sr@denx.de>
+Message-ID: <20140828180757.GJ16006@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 28, 2014 at 06:09:32PM +0100, Christopher Covington wrote:
-> Hi Mark,
+* Stefan Roese <sr@denx.de> [140828 10:10]:
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/omap3-tao3530.dtsi
+...
 
-Hi Christopher,
+> +&omap3_pmx_core {
+> +	hsusbb2_pins: pinmux_hsusbb2_pins {
+> +		pinctrl-single,pins = <
+> +			0x5c0 (PIN_OUTPUT | MUX_MODE3)		/* etk_d10.hsusb2_clk */
+> +			0x5c2 (PIN_OUTPUT | MUX_MODE3)		/* etk_d11.hsusb2_stp */
+> +			0x5c4 (PIN_INPUT_PULLDOWN | MUX_MODE3)	/* etk_d12.hsusb2_dir */
+> +			0x5c6 (PIN_INPUT_PULLDOWN | MUX_MODE3)	/* etk_d13.hsusb2_nxt */
+> +			0x5c8 (PIN_INPUT_PULLDOWN | MUX_MODE3)	/* etk_d14.hsusb2_data0 */
+> +			0x5cA (PIN_INPUT_PULLDOWN | MUX_MODE3)	/* etk_d15.hsusb2_data1 */
+> +			0x1a4 (PIN_INPUT_PULLDOWN | MUX_MODE3)	/* mcspi1_cs3.hsusb2_data2 */
+> +			0x1a6 (PIN_INPUT_PULLDOWN | MUX_MODE3)	/* mcspi2_clk.hsusb2_data7 */
+> +			0x1a8 (PIN_INPUT_PULLDOWN | MUX_MODE3)	/* mcspi2_simo.hsusb2_data4 */
+> +			0x1aa (PIN_INPUT_PULLDOWN | MUX_MODE3)	/* mcspi2_somi.hsusb2_data5 */
+> +			0x1ac (PIN_INPUT_PULLDOWN | MUX_MODE3)	/* mcspi2_cs0.hsusb2_data6 */
+> +			0x1ae (PIN_INPUT_PULLDOWN | MUX_MODE3)	/* mcspi2_cs1.hsusb2_data3 */
+> +		>;
+> +	};
+> +
+> +	mmc1_pins: pinmux_mmc1_pins {
+> +		pinctrl-single,pins = <
+> +			0x114 (PIN_OUTPUT_PULLUP | MUX_MODE0)	/* sdmmc1_clk.sdmmc1_clk */
+> +			0x116 (PIN_INPUT_PULLUP | MUX_MODE0)	/* sdmmc1_cmd.sdmmc1_cmd */
+> +			0x118 (PIN_INPUT_PULLUP | MUX_MODE0) 	/* sdmmc1_dat0.sdmmc1_dat0 */
+> +			0x11a (PIN_INPUT_PULLUP | MUX_MODE0) 	/* sdmmc1_dat1.sdmmc1_dat1 */
+> +			0x11c (PIN_INPUT_PULLUP | MUX_MODE0) 	/* sdmmc1_dat2.sdmmc1_dat2 */
+> +			0x11e (PIN_INPUT_PULLUP | MUX_MODE0) 	/* sdmmc1_dat3.sdmmc1_dat3 */
+> +			0x120 (PIN_INPUT_PULLUP | MUX_MODE0) 	/* sdmmc1_dat4.sdmmc1_dat4 */
+> +			0x122 (PIN_INPUT_PULLUP | MUX_MODE0) 	/* sdmmc1_dat5.sdmmc1_dat5 */
+> +			0x124 (PIN_INPUT_PULLUP | MUX_MODE0) 	/* sdmmc1_dat6.sdmmc1_dat6 */
+> +			0x126 (PIN_INPUT_PULLUP | MUX_MODE0) 	/* sdmmc1_dat7.sdmmc1_dat7 */
+> +		>;
+> +	};
+> +
+> +	mmc2_pins: pinmux_mmc2_pins {
+> +		pinctrl-single,pins = <
+> +			OMAP3_CORE1_IOPAD(0x2158, PIN_INPUT_PULLUP | MUX_MODE0)		/* sdmmc2_clk.sdmmc2_clk */
+> +			OMAP3_CORE1_IOPAD(0x215a, PIN_INPUT_PULLUP | MUX_MODE0)		/* sdmmc2_cmd.sdmmc2_cmd */
+> +			OMAP3_CORE1_IOPAD(0x215c, PIN_INPUT_PULLUP | MUX_MODE0)		/* sdmmc2_dat0.sdmmc2_dat0 */
+> +			OMAP3_CORE1_IOPAD(0x215e, PIN_INPUT_PULLUP | MUX_MODE0)		/* sdmmc2_dat1.sdmmc2_dat1 */
+> +			OMAP3_CORE1_IOPAD(0x2160, PIN_INPUT_PULLUP | MUX_MODE0)		/* sdmmc2_dat2.sdmmc2_dat2 */
+> +			OMAP3_CORE1_IOPAD(0x2162, PIN_INPUT_PULLUP | MUX_MODE0)		/* sdmmc2_dat3.sdmmc2_dat3 */
+> +		>;
+> +	};
 
-> On 08/28/2014 05:35 AM, Mark Rutland wrote:
-> > On Thu, Aug 28, 2014 at 04:33:31AM +0100, Doug Anderson wrote:
-> >> Hi,
-> >>
-> >> On Wed, Aug 27, 2014 at 7:58 PM, Olof Johansson <olof@lixom.net> wrote:
-> >>> On Wed, Aug 27, 2014 at 5:56 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
-> >>>> On 08/27/14 15:33, Olof Johansson wrote:
-> >>>>> On Wed, Aug 27, 2014 at 3:26 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
-> >>>>>
-> >>>>>> Is there any reason why the virtual counter can't be read? Maybe we're
-> >>>>>> the hyp and we need to make sure we don't use the virtual timer so that
-> >>>>>> the guest can use it, but that doesn't have any effect on the usage of
-> >>>>>> the virtual counter for the clocksource.
-> >>>>>
-> >>>>> There are several cases where virtual is unusable -- in particular it
-> >>>>> might not have been configured properly (i.e. the phys/virt offset is
-> >>>>> at a bad value).
-> >>>>
-> >>>> Any specifics? It would be nice to say so in the commit text so that
-> >>>> others using such devices know they need this patch. I'm guessing the
-> >>>> firmware can't be fixed?
-> >>
-> >> Even if we could change things to use a virtual timer in some cases,
-> >> Sonny's patch still fixes a bug.  The code as written right now makes
-> >> pretenses about supporting the physical timer, but it doesn't work.
-> >> That should be fixed.
-> > 
-> > The code does support the physical timer. It does not support the
-> > physical counter (and makes no pretenses that it does).
-> 
-> I think if you could please explain the following code, that may help clear up
-> some of the confusion.
-> 
-> 		if (arch_timer_use_virtual) {
-> 			clk->irq = arch_timer_ppi[VIRT_PPI];
-> 			clk->set_mode = arch_timer_set_mode_virt;
-> 			clk->set_next_event = arch_timer_set_next_event_virt;
-> 		} else {
-> 			clk->irq = arch_timer_ppi[PHYS_SECURE_PPI];
-> 			clk->set_mode = arch_timer_set_mode_phys;
-> 			clk->set_next_event = arch_timer_set_next_event_phys;
-> 		}
-> 
-> http://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/tree/drivers/clocksource/arm_arch_timer.c#n272
-> 
-> Perhaps you mean to say the code does not support *non-secure access* to the
-> physical timer?
+Can you please use the macros above as well for the other mux
+entries like you do here?
 
-Not quite, and one issue here is conflating the timer and the counter.
+> +&gpmc {
 
-We use the physical timer iff we know it is accessible and correct to
-use (e.g. when we have been booted at Hyp). If we don't know that,
-arch_timer_use_virtual is set and we use the virtual timer. In that
-sense, we support the use of the physical timer.
+Aren't you missing the ranges entry here for the GPMC
+CS mapping? AFAIK it should be just the minimal 16 MB
+range.
 
-If the system is sane (with uniform CNTVOFF), that is fine. The fact
-that we have a broken system to work around does not mean that the
-driver is broken nor that it is making false pretenses. The driver is
-perfectly functional given a sane environment.
+> +	nand at 0,0 {
+> +		reg = <0 0 0>; /* CS0, offset 0 */
+> +		nand-bus-width = <16>;
+...
 
-The use of virtual/physical is not a feature that falls to personal
-preference; it is a requirement for correctness that we only use the
-physical timer when we have an absolute guarantee that it is possible
-and correct to do so. So saying that we "support" the physical timer is
-also somewhat misleading; we use what we must.
+Regards,
 
-We _always_ use the virtual counter rather than the physical counter as
-this saved on having different paths for host and guest (which is
-important for the 64-bit VDSO, for example). In that sense we do not
-support the use of the physical counter. We don't need to use it in a
-sane system.
-
-Thanks,
-Mark.
+Tony
