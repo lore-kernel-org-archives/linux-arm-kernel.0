@@ -1,58 +1,42 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 28 Aug 2014 14:14:08 +0100
-Subject: [PATCH 02/11] misc: st_core: Protect unsigned value against becoming
- negative
+Date: Thu, 28 Aug 2014 14:14:11 +0100
+Subject: [PATCH 05/11] mfd: htc-i2cpld: Use '!variable' instead of 'variable
+ == NULL'
 In-Reply-To: <1409231657-18294-1-git-send-email-lee.jones@linaro.org>
 References: <1409231657-18294-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1409231657-18294-2-git-send-email-lee.jones@linaro.org>
+Message-ID: <1409231657-18294-5-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Coverity reported:
-  This less-than-zero comparison of an unsigned value is never true.
+This aids in consistency, as the rest of the checks in the file use this
+notation.
 
-In answer to that, we only ever decrement if protos_registered is
-positive.  We can subsequently remove the paranoid checking during
-unregister.
-
-Cc: gregkh at linuxfoundation.org
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- drivers/misc/ti-st/st_core.c | 11 +++++------
- 1 file changed, 5 insertions(+), 6 deletions(-)
+ drivers/mfd/htc-i2cpld.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/misc/ti-st/st_core.c b/drivers/misc/ti-st/st_core.c
-index 1972d57a..54be83d 100644
---- a/drivers/misc/ti-st/st_core.c
-+++ b/drivers/misc/ti-st/st_core.c
-@@ -153,8 +153,9 @@ static void st_reg_complete(struct st_data_s *st_gdata, char err)
- 				(st_gdata->list[i]->priv_data, err);
- 			pr_info("protocol %d's cb sent %d\n", i, err);
- 			if (err) { /* cleanup registered protocol */
--				st_gdata->protos_registered--;
- 				st_gdata->is_registered[i] = false;
-+				if (st_gdata->protos_registered)
-+					st_gdata->protos_registered--;
- 			}
- 		}
- 	}
-@@ -639,14 +640,12 @@ long st_unregister(struct st_proto_s *proto)
- 		return -EPROTONOSUPPORT;
- 	}
+diff --git a/drivers/mfd/htc-i2cpld.c b/drivers/mfd/htc-i2cpld.c
+index 8e3ea07..073e180 100644
+--- a/drivers/mfd/htc-i2cpld.c
++++ b/drivers/mfd/htc-i2cpld.c
+@@ -232,7 +232,7 @@ static void htcpld_chip_set(struct gpio_chip *chip, unsigned offset, int val)
+ 	unsigned long flags;
  
--	st_gdata->protos_registered--;
-+	if (st_gdata->protos_registered)
-+		st_gdata->protos_registered--;
-+
- 	remove_channel_from_table(st_gdata, proto);
- 	spin_unlock_irqrestore(&st_gdata->lock, flags);
+ 	client = chip_data->client;
+-	if (client == NULL)
++	if (!client)
+ 		return;
  
--	/* paranoid check */
--	if (st_gdata->protos_registered < ST_EMPTY)
--		st_gdata->protos_registered = ST_EMPTY;
--
- 	if ((st_gdata->protos_registered == ST_EMPTY) &&
- 	    (!test_bit(ST_REG_PENDING, &st_gdata->st_state))) {
- 		pr_info(" all chnl_ids unregistered ");
+ 	spin_lock_irqsave(&chip_data->lock, flags);
+@@ -373,7 +373,7 @@ static int htcpld_register_chip_i2c(
+ 	plat_chip_data = &pdata->chip[chip_index];
+ 
+ 	adapter = i2c_get_adapter(pdata->i2c_adapter_id);
+-	if (adapter == NULL) {
++	if (!adapter) {
+ 		/* Eek, no such I2C adapter!  Bail out. */
+ 		dev_warn(dev, "Chip at i2c address 0x%x: Invalid i2c adapter %d\n",
+ 			 plat_chip_data->addr, pdata->i2c_adapter_id);
 -- 
 1.9.1
