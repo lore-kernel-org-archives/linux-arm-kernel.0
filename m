@@ -1,78 +1,77 @@
-From: daniel.thompson@linaro.org (Daniel Thompson)
-Date: Thu, 28 Aug 2014 16:54:25 +0100
-Subject: [PATCH v10 03/19] arm: fiq: Replace default FIQ handler
-In-Reply-To: <20140828150112.GD30401@n2100.arm.linux.org.uk>
-References: <1408369264-14242-1-git-send-email-daniel.thompson@linaro.org>
- <1408466769-20004-1-git-send-email-daniel.thompson@linaro.org>
- <1408466769-20004-4-git-send-email-daniel.thompson@linaro.org>
- <20140819173742.GG30401@n2100.arm.linux.org.uk> <53F39377.1070308@linaro.org>
- <20140828150112.GD30401@n2100.arm.linux.org.uk>
-Message-ID: <53FF50B1.20009@linaro.org>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Thu, 28 Aug 2014 18:11:43 +0200
+Subject: [PATCH v3 1/4] thermal: rockchip: add driver for thermal
+In-Reply-To: <20140828143733.GA18084@developer>
+References: <1409187562-12370-1-git-send-email-caesar.wang@rock-chips.com>
+ <2852853.mfRZfFVSev@wuerfel> <20140828143733.GA18084@developer>
+Message-ID: <3440260.edal29kzlR@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 28/08/14 16:01, Russell King - ARM Linux wrote:
-> On Tue, Aug 19, 2014 at 07:12:07PM +0100, Daniel Thompson wrote:
->> On 19/08/14 18:37, Russell King - ARM Linux wrote:
->>> On Tue, Aug 19, 2014 at 05:45:53PM +0100, Daniel Thompson wrote:
->>>> +int register_fiq_nmi_notifier(struct notifier_block *nb)
->>>> +{
->>>> +	return atomic_notifier_chain_register(&fiq_nmi_chain, nb);
->>>> +}
->>>> +
->>>> +asmlinkage void __exception_irq_entry fiq_nmi_handler(struct pt_regs *regs)
->>>> +{
->>>> +	struct pt_regs *old_regs = set_irq_regs(regs);
->>>> +
->>>> +	nmi_enter();
->>>> +	atomic_notifier_call_chain(&fiq_nmi_chain, (unsigned long)regs, NULL);
->>>> +	nmi_exit();
->>>> +	set_irq_regs(old_regs);
->>>> +}
->>>
->>> Really not happy with this.  What happens if a FIQ occurs while we're
->>> inside register_fiq_nmi_notifier() - more specifically inside
->>> atomic_notifier_chain_register() ?
->>
->> Should depend on which side of the rcu update we're on.
+Am Donnerstag, 28. August 2014, 10:37:35 schrieb Eduardo Valentin:
+> Ceasar and Arnd,
 > 
-> I just asked Paul McKenney, our RCU expert... essentially, yes, RCU
-> stuff itself is safe in this context.  However, RCU stuff can call into
-> lockdep if lockdep is configured, and there are questions over lockdep.
-
-Thanks for following this up.
-
-I originally formed the opinion RCU was safe from FIQ because it is also
-used to manage the NMI notification handlers for x86
-(register_nmi_handler) and I understood the runtime constraints on FIQ
-to be very similar.
-
-Note that x86 manages the notifiers itself so it uses
-list_for_each_entry_rcu() rather atomic_notifier_call_chain() but
-nevertheless I think this boils down to the same thing w.r.t. safety
-concerns.
-
-
-> There's some things which can be done to reduce the lockdep exposure
-> to it, such as ensuring that rcu_read_lock() is first called outside
-> of FIQ context.
-
-lockdep is automatically disabled by calling nmi_enter() so all the
-lockdep calls should end up following the early exit path based on
-current->lockdep_recursion.
-
-
-> There's concerns with whether either printk() in check_flags() could
-> be reached too (flags there should always indicate that IRQs were
-> disabled, so that reduces down to a question about just the first
-> printk() there.)
+> On Thu, Aug 28, 2014 at 10:48:23AM +0200, Arnd Bergmann wrote:
+> > On Thursday 28 August 2014 08:59:19 Caesar Wang wrote:
+> > > Thermal is TS-ADC Controller module supports user-defined mode and
+> > > automatic mode.
+> > > 
+> > > User-defined mode refers,TSADC all the control signals entirely by
+> > > software
+> > > writing to register for direct control.
+> > > 
+> > > Automaic mode refers to the module automatically poll TSADC output,and
+> > > the results Were checked.
+> > > 
+> > > If you find that the temperature High in a period of time, an interrupt
+> > > is generated to the processor down-measures taken;if the temperature
+> > > over a period of time High, the resulting TSHUT gave CRU module,let it
+> > > reset the entire chip, or via GPIO give PMIC.
+> > > 
+> > > Signed-off-by: zhaoyifeng <zyf@rock-chips.com>
+> > > Signed-off-by: Caesar Wang <caesar.wang@rock-chips.com>
+> > 
+> > Hi Caesar,
+> > 
+> > After looking at the driver (last time I only received the patch for
+> > the binding), I have a more general comment:
+> > 
+> > This looks like a general-purpose ADC device, not an IP block that is
+> > specific to thermal management. The binding looks ok for that purpose
+> > but should probably be moved into
+> > Documentation/devicetree/bindings/iio/adc/ as a minor change.
 > 
-> There's also the very_verbose() stuff for RCU lockdep classes which
-> Paul says must not be enabled.
+> I agree with Arnd's point here. It makes sense to me to have this driver
+> under the IIO umbrella.
+
+interesting suggestion :-)
+
+I've just taken another look at the registers of the ts-adc on the rk3066 
+which is completely different from the rk3288 one. Interestingly the rk3066 one 
+is "just" another saradc IP, so for this one it would really make sense.
+
+
+> > On the driver side, I believe the correct way to deal with this setup
+> > is to split your driver into a generic drivers/iio/adc/rockchips-tsadc.c
+> > file, and a smaller thermal driver that uses the iio in-kernel interfaces,
+> > ideally one that is independent of the underlying hardware and can
+> > work on any ADC implementation.
 > 
-> Lastly, Paul isn't a lockdep expert, but he sees nothing that prevents
-> lockdep doing the deadlock checking as a result of the above call.
->
-> So... this coupled with my feeling that notifiers make it too easy for
-> unreviewed code to be hooked into this path, I'm fairly sure that we
-> don't want to be calling atomic notifier chains from FIQ context.
+> Agreed. If you can write such interface and make your driver to work in
+> such way, that would be great.
+
+But I currently don't see how you would model the temperature handling parts 
+from a generic thermal driver to a generic adc driver for the rk3288-tsadc.
+
+I guess the general temperature irq handling would use iio-triggers? But how 
+does the target temperature get into the TSADC_COMP1_INT register.
+
+Also when getting the temperature, Caesar's driver compares it to its trip 
+points and sets the next trip point depending on the current temperature 
+(passive <-> critical) in rockchip_get_temp.
+
+Maybe there is some completely easy way for this, but currently I don't see 
+it.
+
+
+Heiko
