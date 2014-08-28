@@ -1,62 +1,54 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Thu, 28 Aug 2014 12:11:41 +0200
-Subject: [linux-sunxi] Re: [PATCH 4/4] simplefb: add clock handling code
-In-Reply-To: <20140827154221.GX15297@lukather>
-References: <20140825150501.GE14763@ulmo.nvidia.com>
- <20140825152232.GE15297@lukather> <20140826080432.GD17263@ulmo>
- <20140826135341.GM15297@lukather> <20140826143550.GB3027@ulmo>
- <20140826210248.GO15297@lukather> <20140827065440.GG15640@ulmo>
- <20140827084526.GR15297@lukather> <20140827095241.GC23186@ulmo>
- <20140827154221.GX15297@lukather>
-Message-ID: <20140828101140.GB14388@ulmo>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Thu, 28 Aug 2014 11:12:15 +0100
+Subject: [PATCH] arm: use cpu_online_mask when using forced
+ irq_set_affinity
+In-Reply-To: <alpine.DEB.2.10.1408281130140.23342@nanos>
+References: <1399653640-21559-1-git-send-email-sudeep.holla@arm.com>
+ <20140523121032.GV3693@n2100.arm.linux.org.uk> <537F4453.5000709@arm.com>
+ <53A43174.503@arm.com> <20140620151638.GS32514@n2100.arm.linux.org.uk>
+ <53C79E43.6040009@arm.com> <alpine.DEB.2.10.1408251136380.3323@nanos>
+ <53FCA570.1090809@arm.com> <alpine.DEB.2.10.1408281130140.23342@nanos>
+Message-ID: <53FF007F.6030004@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 27, 2014 at 05:42:21PM +0200, Maxime Ripard wrote:
-> On Wed, Aug 27, 2014 at 11:52:48AM +0200, Thierry Reding wrote:
-> > On Wed, Aug 27, 2014 at 10:45:26AM +0200, Maxime Ripard wrote:
-> > > On Wed, Aug 27, 2014 at 08:54:41AM +0200, Thierry Reding wrote:
-> > > > On Tue, Aug 26, 2014 at 11:02:48PM +0200, Maxime Ripard wrote:
-> > > > > On Tue, Aug 26, 2014 at 04:35:51PM +0200, Thierry Reding wrote:
-> > [...]
-> > > > > > > Mike Turquette repeatedly said that he was against such a DT property:
-> > > > > > > https://lkml.org/lkml/2014/5/12/693
-> > > > > > 
-> > > > > > Mike says in that email that he's opposing the addition of a property
-> > > > > > for clocks that is the equivalent of regulator-always-on. That's not
-> > > > > > what this is about. If at all it'd be a property to mark a clock that
-> > > > > > should not be disabled by default because it's essential.
-> > > > > 
-> > > > > It's just semantic. How is "a clock that should not be disabled by
-> > > > > default because it's essential" not a clock that stays always on?
-> > > > 
-> > > > Because a clock that should not be disabled by default can be turned off
-> > > > when appropriate. A clock that is always on can't be turned off.
-> > > 
-> > > If a clock is essential, then it should never be disabled. Or we don't
-> > > share the same meaning of essential.
-> > 
-> > Essential for the particular use-case.
-> 
-> So, how would the clock driver would know about which use case we're
-> in? How would it know about which display engine is currently running?
-> How would it know about which video output is being set?
-> 
-> Currently, we have two separate display engines, which can each output
-> either to 4 different outputs (HDMI, RGB/LVDS, 2 DSI). Each and every
-> one of these combinations would require different clocks. What clocks
-> will we put in the driver? All of them?
 
-Ideally the solution wouldn't involve hard-coding this into the clock
-driver at all. There should be a way for firmware to communicate to the
-kernel that a given clock shouldn't be disabled. Then since firmware
-already knows what it set up it can tell the kernel to not touch those.
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140828/6599c7b1/attachment.sig>
+On 28/08/14 10:32, Thomas Gleixner wrote:
+> On Tue, 26 Aug 2014, Sudeep Holla wrote:
+>>>> Can provide your thoughts on how to solve this issue ?
+>>>
+>>> ffde1de64012 is not about offlining a cpu, it's about onlining where
+>>> we need to make sure that we assign the affinity to a not yet online
+>>> marked cpu.
+>>>
+>>>> Is it expected from all the irqchip implementation to use force flag in
+>>>> irq_set_affinity to ignore cpu_online_mask similar to GIC ?
+>>>
+>>> No, it's only relevant for the cases where we need to route irqs to
+>>> not yet online cpus.
+>>>
+>>
+>> Ok. IIUC Russell's main concern was if irqchip implementation uses force
+>> flag differently, then we can't change the core code to false. Also
+>> x86 core code also uses forced irq_set_affinity in arch/x86/kernel/irq.c
+>
+> Which is pointless as none of the x86 irq chip implementations
+> actually honours the force argument.
+>
+> In fact until the point where I implemented it in the GIC driver,
+> nothing ever used that argument. So the GIC conversion actually added
+> semantics to the argument. Any driver which will make use of it, has
+> to follow that now. I'll add documentation to the core code for it ...
+>
+
+Thanks Thomas for confirming.
+
+Hi Russell,
+
+Can I post the patch changing force to false in irq_set_affinity call
+to fix the issue and cc stable ? It's broken in stable kernels(v3.10 and
+v3.14)
+
+Regards,
+Sudeep
