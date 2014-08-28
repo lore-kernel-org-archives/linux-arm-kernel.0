@@ -1,39 +1,35 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 28 Aug 2014 14:14:07 +0100
-Subject: [PATCH 01/11] iio: sensors-core: st: Check
- st_sensors_set_drdy_int_pin()'s return value
-Message-ID: <1409231657-18294-1-git-send-email-lee.jones@linaro.org>
+Date: Thu, 28 Aug 2014 14:14:09 +0100
+Subject: [PATCH 03/11] misc: st_kim: Increase size of dev_name buffer to
+ incorporate termination
+In-Reply-To: <1409231657-18294-1-git-send-email-lee.jones@linaro.org>
+References: <1409231657-18294-1-git-send-email-lee.jones@linaro.org>
+Message-ID: <1409231657-18294-3-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Value from st_sensors_set_drdy_int_pin() is assigned to err here,
-but that stored value is not used before it is overwritten.  To fix
-this we're enforcing a check on st_sensors_set_drdy_int_pin()'s
-return value and if it's an error, we're returning right away.
+Calling strncpy with a maximum size argument of 32 bytes on destination
+array kim_gdata->dev_name of size 32 bytes might leave the destination
+string unterminated.
 
-Cc: jic23 at kernel.org
-Cc: linux-iio at vger.kernel.org
+Cc: gregkh at linuxfoundation.org
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- drivers/iio/common/st_sensors/st_sensors_core.c | 5 ++++-
- 1 file changed, 4 insertions(+), 1 deletion(-)
+ include/linux/ti_wilink_st.h | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/iio/common/st_sensors/st_sensors_core.c b/drivers/iio/common/st_sensors/st_sensors_core.c
-index 8a4ec00..24cfe4e 100644
---- a/drivers/iio/common/st_sensors/st_sensors_core.c
-+++ b/drivers/iio/common/st_sensors/st_sensors_core.c
-@@ -306,8 +306,11 @@ int st_sensors_init_sensor(struct iio_dev *indio_dev,
- 	if (of_pdata)
- 		pdata = of_pdata;
- 
--	if (pdata)
-+	if (pdata) {
- 		err = st_sensors_set_drdy_int_pin(indio_dev, pdata);
-+		if (err < 0)
-+			return err;
-+	}
- 
- 	err = st_sensors_set_enable(indio_dev, false);
- 	if (err < 0)
+diff --git a/include/linux/ti_wilink_st.h b/include/linux/ti_wilink_st.h
+index 932b7639..884d626 100644
+--- a/include/linux/ti_wilink_st.h
++++ b/include/linux/ti_wilink_st.h
+@@ -268,7 +268,7 @@ struct kim_data_s {
+ 	struct st_data_s *core_data;
+ 	struct chip_version version;
+ 	unsigned char ldisc_install;
+-	unsigned char dev_name[UART_DEV_NAME_LEN];
++	unsigned char dev_name[UART_DEV_NAME_LEN + 1];
+ 	unsigned char flow_cntrl;
+ 	unsigned long baud_rate;
+ };
 -- 
 1.9.1
