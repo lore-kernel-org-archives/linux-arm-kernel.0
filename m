@@ -1,78 +1,113 @@
-From: steve.capper@linaro.org (Steve Capper)
-Date: Thu, 28 Aug 2014 09:59:40 +0100
-Subject: [PATH V2 1/6] mm: Introduce a general RCU get_user_pages_fast.
-In-Reply-To: <20140827150139.GZ30401@n2100.arm.linux.org.uk>
-References: <1408635812-31584-1-git-send-email-steve.capper@linaro.org>
- <1408635812-31584-2-git-send-email-steve.capper@linaro.org>
- <20140827150139.GZ30401@n2100.arm.linux.org.uk>
-Message-ID: <20140828085939.GA15409@linaro.org>
+From: suravee.suthikulpanit@amd.com (Suravee Suthikulpanit)
+Date: Thu, 28 Aug 2014 04:03:02 -0500
+Subject: [PATCH 1/2 V4] irqchip: gic: Add supports for ARM GICv2m MSI(-X)
+In-Reply-To: <20140814175525.GI24018@leverpostej>
+References: <1407942041-3291-1-git-send-email-suravee.suthikulpanit@amd.com>
+ <1407942041-3291-2-git-send-email-suravee.suthikulpanit@amd.com>
+ <20140814175525.GI24018@leverpostej>
+Message-ID: <53FEF046.4030804@amd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 27, 2014 at 04:01:39PM +0100, Russell King - ARM Linux wrote:
 
-Hi Russell,
 
-> On Thu, Aug 21, 2014 at 04:43:27PM +0100, Steve Capper wrote:
-> > +int get_user_pages_fast(unsigned long start, int nr_pages, int write,
-> > +			struct page **pages)
-> > +{
-> > +	struct mm_struct *mm = current->mm;
-> > +	int nr, ret;
-> > +
-> > +	start &= PAGE_MASK;
-> > +	nr = __get_user_pages_fast(start, nr_pages, write, pages);
-> > +	ret = nr;
-> > +
-> > +	if (nr < nr_pages) {
-> > +		/* Try to get the remaining pages with get_user_pages */
-> > +		start += nr << PAGE_SHIFT;
-> > +		pages += nr;
-> 
-> When I read this, my first reaction was... what if nr is negative?  In
-> that case, if nr_pages is positive, we fall through into this if, and
-> start to wind things backwards - which isn't what we want.
-> 
-> It looks like that can't happen... right?  __get_user_pages_fast() only
-> returns greater-or-equal to zero right now, but what about the future?
+On 08/14/2014 12:55 PM, Mark Rutland wrote:
+> On Wed, Aug 13, 2014 at 04:00:40PM +0100, suravee.suthikulpanit at amd.com wrote:
+>> From: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
+>>
+>> ARM GICv2m specification extends GICv2 to support MSI(-X) with
+>> a new set of register frame. This patch introduces support for
+>> the non-secure GICv2m register frame. Currently, GICV2m is available
+>> in certain version of GIC-400.
+>>
+>> The patch introduces a new property in ARM gic binding, the v2m subnode.
+>> It is optional.
+>>
+>> Signed-off-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
+>> Cc: Mark Rutland <Mark.Rutland@arm.com>
+>> Cc: Marc Zyngier <Marc.Zyngier@arm.com>
+>> Cc: Jason Cooper <jason@lakedaemon.net>
+>> Cc: Catalin Marinas <Catalin.Marinas@arm.com>
+>> Cc: Will Deacon <Will.Deacon@arm.com>
+>> ---
+>>   Documentation/devicetree/bindings/arm/gic.txt |  32 ++++
+>>   drivers/irqchip/Kconfig                       |   7 +
+>>   drivers/irqchip/Makefile                      |   1 +
+>>   drivers/irqchip/irq-gic-v2m.c                 | 215 ++++++++++++++++++++++++++
+>>   drivers/irqchip/irq-gic.c                     |  75 +++++----
+>>   drivers/irqchip/irq-gic.h                     |  48 ++++++
+>>   6 files changed, 348 insertions(+), 30 deletions(-)
+>>   create mode 100644 drivers/irqchip/irq-gic-v2m.c
+>>   create mode 100644 drivers/irqchip/irq-gic.h
+>>
+>> diff --git a/Documentation/devicetree/bindings/arm/gic.txt b/Documentation/devicetree/bindings/arm/gic.txt
+>> index 5573c08..8a64179 100644
+>> --- a/Documentation/devicetree/bindings/arm/gic.txt
+>> +++ b/Documentation/devicetree/bindings/arm/gic.txt
+>> @@ -95,3 +95,35 @@ Example:
+>>                        <0x2c006000 0x2000>;
+>>                  interrupts = <1 9 0xf04>;
+>>          };
+>> +
+>> +
+>> +* GICv2m extension for MSI/MSI-x support (Optional)
+>> +
+>> +Certain revision of GIC-400 supports MSI/MSI-x via V2M register frame.
+>> +This is enabled by specifying v2m sub-node.
+>> +
+>> +Required properties:
+>> +
+>> +- msi-controller : Identifies the node as an MSI controller.
+>> +
+>> +- reg : GICv2m MSI interface register base and size
+>> +
+>> +Example:
+>> +
+>> +       interrupt-controller at e1101000 {
+>> +               compatible = "arm,gic-400";
+>> +               #interrupt-cells = <3>;
+>> +               #address-cells = <2>;
+>> +               #size-cells = <2>;
+>> +               interrupt-controller;
+>> +               interrupts = <1 8 0xf04>;
+>> +               ranges = <0 0 0 0xe1100000 0 0x100000>;
+>> +               reg = <0x0 0xe1110000 0 0x01000>,
+>> +                     <0x0 0xe112f000 0 0x02000>,
+>> +                     <0x0 0xe1140000 0 0x10000>,
+>> +                     <0x0 0xe1160000 0 0x10000>;
+>> +               v2m {
+>> +                       msi-controller;
+>> +                       reg = <0x0 0x80000 0 0x1000>;
+>> +               };
+>> +       };
+>
+> [...]
+>
+>> @@ -1009,6 +1012,16 @@ gic_of_init(struct device_node *node, struct device_node *parent)
+>>          if (of_property_read_u32(node, "cpu-offset", &percpu_offset))
+>>                  percpu_offset = 0;
+>>
+>> +       gic_data[gic_cnt].irq_chip = &gic_chip;
+>> +
+>> +       /* Currently, we only support one v2m subnode. */
+>> +       child = of_get_child_by_name(node, "v2m");
+>> +       if (child) {
+>> +               ret = gicv2m_of_init(child, &gic_data[gic_cnt]);
+>> +               if (ret)
+>> +                       return ret;
+>> +       }
+>
+> I can't see how you'd sanely expand this to multiple children, which was
+> the main point of having a separate node for the M block.
+>
+> Give the M block a compatible string and look for children with that
+> string.
+>
+> Thanks,
+> Mark.
+>
+Good point. I can try that.
 
-__get_user_pages_fast is a strict fast path, it will grab as many page
-references as it can and if something gets in its way it backs off. As
-it can't take locks, it can't inspect the VMA, thus it really isn't in
-a position to know if there's an error. It may be possible for the
-slow path to take a write fault for a read only pte, for instance.
-(we could in theory return an error on pte_special and save a fallback
-to the slowpath but I don't believe it's worth doing as special ptes
-should be encountered very rarely by the fast_gup).
+Thank,
 
-I think it's safe to assume that __get_use_pages_fast has non-negative
-return values; also it is logically contained in the same area as
-get_user_pages_fast, so if this does change we can apply changes below
-it too.
-
-get_user_pages_fast attempts the fast path but is allowed to fallback
-to the slowpath, so is in a position to return an error code thus can
-return negative values.
-
-> 
-> > +
-> > +		down_read(&mm->mmap_sem);
-> > +		ret = get_user_pages(current, mm, start,
-> > +				     nr_pages - nr, write, 0, pages, NULL);
-> > +		up_read(&mm->mmap_sem);
-> > +
-> > +		/* Have to be a bit careful with return values */
-> > +		if (nr > 0) {
-> 
-> This kind'a makes it look like nr could be negative.
-
-I read it as "did the fast path get at least one page?".
-
-> 
-> Other than that, I don't see anything obviously wrong with it.
-
-Thank you for giving this a going over.
-
-Cheers,
--- 
-Steve
+Suravee
