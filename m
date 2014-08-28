@@ -1,69 +1,29 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Wed, 27 Aug 2014 20:33:31 -0700
-Subject: [PATCH] clocksource: arch_timer: Fix code to use physical timers
- when requested
-In-Reply-To: <CAOesGMgXnsqttHwAxEW4a7-Rx-nmSwpJd_Dt1iCcFOvzDwbzdA@mail.gmail.com>
-References: <1409173419-13076-1-git-send-email-sonnyrao@chromium.org>
- <CAOesGMjK65Rc-K0fyFUUJLw6huLT82E-nqJwZO4PqhgopF96Ow@mail.gmail.com>
- <CAPz6YkWAPtuy4sAuAK9GtpDgfGsccxeS+pqqe_t_R818Jt01qA@mail.gmail.com>
- <53FE5B09.2020403@codeaurora.org>
- <CAOesGMhTivDzJFuxONggcJ6N5UvZopKa=+tv9PoPX593cpnm0A@mail.gmail.com>
- <53FE7E3B.1010500@codeaurora.org>
- <CAOesGMgXnsqttHwAxEW4a7-Rx-nmSwpJd_Dt1iCcFOvzDwbzdA@mail.gmail.com>
-Message-ID: <CAD=FV=VjN6Xam-nRRcxvOoN-gokU6DbGVjoPXN_fkTJssH1RWA@mail.gmail.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Wed, 27 Aug 2014 20:47:58 -0700
+Subject: [PATCH 00/14] Support 64bit Cortex A57 based Exynos7 SoC
+In-Reply-To: <1409132660-1898-1-git-send-email-ch.naveen@samsung.com>
+References: <1409132660-1898-1-git-send-email-ch.naveen@samsung.com>
+Message-ID: <20140828034758.GA4972@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Naveen,
 
-On Wed, Aug 27, 2014 at 7:58 PM, Olof Johansson <olof@lixom.net> wrote:
-> On Wed, Aug 27, 2014 at 5:56 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
->> On 08/27/14 15:33, Olof Johansson wrote:
->>> On Wed, Aug 27, 2014 at 3:26 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
->>>
->>>> Is there any reason why the virtual counter can't be read? Maybe we're
->>>> the hyp and we need to make sure we don't use the virtual timer so that
->>>> the guest can use it, but that doesn't have any effect on the usage of
->>>> the virtual counter for the clocksource.
->>> There are several cases where virtual is unusable -- in particular it
->>> might not have been configured properly (i.e. the phys/virt offset is
->>> at a bad value).
->>>
->>
->> Any specifics? It would be nice to say so in the commit text so that
->> others using such devices know they need this patch. I'm guessing the
->> firmware can't be fixed?
+On Wed, Aug 27, 2014 at 03:14:16PM +0530, Naveen Krishna Chatradhi wrote:
+> This patchset supports new Exynos7 Samsung SoC based on Cortex-A57.
+> Exynos7 is a System-On-Chip (SoC) that is based on 64-bit
+> ARMv8 RISC processor.
 
-Even if we could change things to use a virtual timer in some cases,
-Sonny's patch still fixes a bug.  The code as written right now makes
-pretenses about supporting the physical timer, but it doesn't work.
-That should be fixed.
+Your emails haven't threaded properly, so the series of patches are not
+recognized as comments to the envelope (00/14) email. It makes it harder
+to review them in order, and some mailers might not group them well.
+
+> We tested these patches with the 
+> "arm64: dts: add <dt-bindings/> symlink" change posted @
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2014-January/224629.html
+
+That means that these patches can't be picked up until a permanent
+solution for that has gone in.
 
 
-> Yeah, there are a few. The big.LITTLE on the Chromebook 2 models have
-> this issue, due to the A7 cluster having an incorrect offset
-> programmed. However, arch timers aren't supported on that SoC in the
-> first place, so it's not a problem in reality.
->
-> The other known platform is rk3288. It has products out in the wild
-> where firmware updates are unlikely.
-
-One other reason is that (I'm told) that the virtual offset is lost in
-certain power down conditions (powering down a core, going into S3,
-etc).  When we power back up the offset is effectively reset to a
-random value.  That means we need something to reprogram the virtual
-timer offset whenever we power things back up.
-
-If we've got a hypervisor then the hypervisor will definitely be
-involved in powering things back up and it can reset the virtual
-offset.  ...but forcing systems to implement a hypervisor (or somehow
-adding an interface for the kernel to call back into firmware) is a
-huge effort and it means more hard-to-update code sitting in firmware.
-
-Note: having the virtual offset initted to a random value seems like
-an unfortunate design choice for the virtual timer offset
-(guaranteeing it was initted to 0 would have avoided the problem), but
-that's what we seem to have.
-
-
--Doug
+-Olof
