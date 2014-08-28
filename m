@@ -1,65 +1,76 @@
-From: punit.agrawal@arm.com (Punit Agrawal)
-Date: Thu, 28 Aug 2014 10:34:58 +0100
-Subject: [PATCH 6/6] arm64: Emulate CP15 Barrier instructions
-In-Reply-To: <20140827174001.GI13850@arm.com> (Catalin Marinas's message of
- "Wed, 27 Aug 2014 18:40:01 +0100")
-References: <1409048930-21598-1-git-send-email-punit.agrawal@arm.com>
- <1409048930-21598-7-git-send-email-punit.agrawal@arm.com>
- <20140827174001.GI13850@arm.com>
-Message-ID: <9hhzjepc5z1.fsf@arm.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 28 Aug 2014 10:35:05 +0100
+Subject: [PATCH] clocksource: arch_timer: Fix code to use physical timers
+ when requested
+In-Reply-To: <CAD=FV=VjN6Xam-nRRcxvOoN-gokU6DbGVjoPXN_fkTJssH1RWA@mail.gmail.com>
+References: <1409173419-13076-1-git-send-email-sonnyrao@chromium.org>
+ <CAOesGMjK65Rc-K0fyFUUJLw6huLT82E-nqJwZO4PqhgopF96Ow@mail.gmail.com>
+ <CAPz6YkWAPtuy4sAuAK9GtpDgfGsccxeS+pqqe_t_R818Jt01qA@mail.gmail.com>
+ <53FE5B09.2020403@codeaurora.org>
+ <CAOesGMhTivDzJFuxONggcJ6N5UvZopKa=+tv9PoPX593cpnm0A@mail.gmail.com>
+ <53FE7E3B.1010500@codeaurora.org>
+ <CAOesGMgXnsqttHwAxEW4a7-Rx-nmSwpJd_Dt1iCcFOvzDwbzdA@mail.gmail.com>
+ <CAD=FV=VjN6Xam-nRRcxvOoN-gokU6DbGVjoPXN_fkTJssH1RWA@mail.gmail.com>
+Message-ID: <20140828093505.GC14650@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Catalin Marinas <catalin.marinas@arm.com> writes:
+On Thu, Aug 28, 2014 at 04:33:31AM +0100, Doug Anderson wrote:
+> Hi,
+> 
+> On Wed, Aug 27, 2014 at 7:58 PM, Olof Johansson <olof@lixom.net> wrote:
+> > On Wed, Aug 27, 2014 at 5:56 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
+> >> On 08/27/14 15:33, Olof Johansson wrote:
+> >>> On Wed, Aug 27, 2014 at 3:26 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
+> >>>
+> >>>> Is there any reason why the virtual counter can't be read? Maybe we're
+> >>>> the hyp and we need to make sure we don't use the virtual timer so that
+> >>>> the guest can use it, but that doesn't have any effect on the usage of
+> >>>> the virtual counter for the clocksource.
+> >>> There are several cases where virtual is unusable -- in particular it
+> >>> might not have been configured properly (i.e. the phys/virt offset is
+> >>> at a bad value).
+> >>>
+> >>
+> >> Any specifics? It would be nice to say so in the commit text so that
+> >> others using such devices know they need this patch. I'm guessing the
+> >> firmware can't be fixed?
+> 
+> Even if we could change things to use a virtual timer in some cases,
+> Sonny's patch still fixes a bug.  The code as written right now makes
+> pretenses about supporting the physical timer, but it doesn't work.
+> That should be fixed.
 
-> On Tue, Aug 26, 2014 at 11:28:50AM +0100, Punit Agrawal wrote:
->> diff --git a/arch/arm64/kernel/v7_obsolete.c b/arch/arm64/kernel/v7_obsolete.c
->> index e9427cb..ed77889 100644
->> --- a/arch/arm64/kernel/v7_obsolete.c
->> +++ b/arch/arm64/kernel/v7_obsolete.c
->> @@ -227,6 +227,94 @@ static void __init swp_emulation_init(void)
->>  		pr_notice("Registered SWP/SWPB emulation handler\n");
->>  }
->>  
->> +static atomic_t cp15_barrier_count;
->
-> Should we add counters for each barrier type? It may be more
-> informative.
+The code does support the physical timer. It does not support the
+physical counter (and makes no pretenses that it does).
 
-Arnd proposed to use trace points instead of counters. I can emit
-different trace points for the different barrier types.
+I had hoped we wouldn't encounter cases where CNTVOFF was hopelessly
+ill-configured on a platform, but evidently we have. So we need some
+workaround for that.
 
-I am not sure if there is any benefit in providing this extra
-information. IIUC, the stats being presented (whether they be via
-procfs, debugfs or ftrace) are intended to highglight the presence of
-legacy instructions and encourage migration away from using these
-features.
+> > Yeah, there are a few. The big.LITTLE on the Chromebook 2 models have
+> > this issue, due to the A7 cluster having an incorrect offset
+> > programmed. However, arch timers aren't supported on that SoC in the
+> > first place, so it's not a problem in reality.
+> >
+> > The other known platform is rk3288. It has products out in the wild
+> > where firmware updates are unlikely.
+> 
+> One other reason is that (I'm told) that the virtual offset is lost in
+> certain power down conditions (powering down a core, going into S3,
+> etc).  When we power back up the offset is effectively reset to a
+> random value.  That means we need something to reprogram the virtual
+> timer offset whenever we power things back up.
+> 
+> If we've got a hypervisor then the hypervisor will definitely be
+> involved in powering things back up and it can reset the virtual
+> offset.  ...but forcing systems to implement a hypervisor (or somehow
+> adding an interface for the kernel to call back into firmware) is a
+> huge effort and it means more hard-to-update code sitting in firmware.
 
-But I am happy to defer to your judgement if you see the benefit.
+Not if you boot Linux at hyp, as we've recommended for this precise
+reason. That doesn't fix other things like CNTFRQ if the secure
+initialisation doesn't poke that, however.
 
->
->> +/* data barrier */
->> +static struct undef_hook cp15db_hook = {
->> +	.instr_mask	= 0x0fff0fdf,
->> +	.instr_val	= 0x0e070f9a,
->> +	.pstate_mask	= COMPAT_PSR_MODE_MASK,
->> +	.pstate_val	= COMPAT_PSR_MODE_USR,
->> +	.fn		= cp15barrier_handler,
->> +};
->> +
->> +/* instruction barrier */
->> +static struct undef_hook cp15isb_hook = {
->> +	.instr_mask	= 0x0fff0fff,
->> +	.instr_val	= 0x0e070f95,
->> +	.pstate_mask	= COMPAT_PSR_MODE_MASK,
->> +	.pstate_val	= COMPAT_PSR_MODE_USR,
->> +	.fn		= cp15barrier_handler,
->> +};
->
-> It now crossed my mind that these CP15 barriers are valid in Thumb-2 as
-> well, same encoding. But we need the hook and the masks here to trap
-> them.
-
-Right. I'll add the masks. This coupled with the decoding of
-instructions in thumb mode for undef exception, should take care of CP15
-barriers in Thumb-2.
+Thanks,
+Mark.
