@@ -1,80 +1,190 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Thu, 28 Aug 2014 16:42:47 +0800
-Subject: [PATCH 6/6] ARM: dts: hummingboard: gpio-ir on gpio 3,5
-In-Reply-To: <20140827184354.GA30401@n2100.arm.linux.org.uk>
-References: <20140823091058.GO30401@n2100.arm.linux.org.uk>
- <E1XL7MR-0002yX-6N@rmk-PC.arm.linux.org.uk>
- <CAOMZO5C=xyYLLBX1PDsJQ9NwzXZxCWTvPMTUWzYcoohOOvA_qA@mail.gmail.com>
- <20140823133649.GP30401@n2100.arm.linux.org.uk>
- <CAOMZO5DrtrEJxmCZSO6RVZom8kzZhu2dikntRwYZeq5j_QZ9sw@mail.gmail.com>
- <20140823143305.GQ30401@n2100.arm.linux.org.uk>
- <CAOMZO5DgPLHwDsRPkssRDT5tKyfOo=Udg6vD5VPUQ43wsV346w@mail.gmail.com>
- <20140827184354.GA30401@n2100.arm.linux.org.uk>
-Message-ID: <20140828084246.GF28777@dragon>
+From: jh80.chung@samsung.com (Jaehoon Chung)
+Date: Thu, 28 Aug 2014 17:43:54 +0900
+Subject: [PATCH V2 3/3] mmc: dw_mmc: Dont cut off vqmmc and vmmc
+In-Reply-To: <CAD=FV=X+BsvTth4J3oqLJ=pMw_NB-GoYnaqJgyOSr9foLreLvQ@mail.gmail.com>
+References: <1408715272-13833-1-git-send-email-yuvaraj.cd@samsung.com>
+ <1408715272-13833-4-git-send-email-yuvaraj.cd@samsung.com>
+ <CAPDyKFqz8sGj2td=ihZXN4zvAqmu9FHZjWdCn-ZRcdHugNHe2g@mail.gmail.com>
+ <CAPz6YkXH1mMOTwcLkKdffdUHN+TaCAhpa8oG0h+rFn9i+GMoCw@mail.gmail.com>
+ <CAPDyKFqp7oEt9ASmdxrgUwbQ8aTZzAuJ7uD1oGN50iuzPzBfVg@mail.gmail.com>
+ <53FAF8C7.8040007@samsung.com>
+ <CAD=FV=XbV7R+FqRRucA5Cv2A+=3g8zccASwxcTtJD6YyO-ioCg@mail.gmail.com>
+ <53FD5501.1010007@samsung.com>
+ <CAD=FV=VCw1mLpArSY1uj+1zorWROjqGeT3dcTJYzr_1J6jdsBQ@mail.gmail.com>
+ <53FD62C6.8010100@samsung.com>
+ <CAD=FV=X+BsvTth4J3oqLJ=pMw_NB-GoYnaqJgyOSr9foLreLvQ@mail.gmail.com>
+Message-ID: <53FEEBCA.3040909@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 27, 2014 at 07:43:54PM +0100, Russell King - ARM Linux wrote:
-> On Sat, Aug 23, 2014 at 12:02:05PM -0300, Fabio Estevam wrote:
-> > On Sat, Aug 23, 2014 at 11:33 AM, Russell King - ARM Linux
-> > <linux@arm.linux.org.uk> wrote:
-> > 
-> > > Most of the pins not associated with booting the kernel are left
-> > > unconfigured by the boot loader - that's because uboot SPL has very
-> > > little space for such things.
-> > >
-> > > Rabeeh has just told me that 0x1b0b1 would be a better value for it.
-> > > I'll add an additional patch to the series for that, rather than
-> > > modifying Rabeeh's original patch.
-> > 
-> > Sounds good, thanks.
+On 08/28/2014 12:49 AM, Doug Anderson wrote:
+> Jaehoon,
 > 
-> Right, here's the patch to make that change.  Shawn, can you pick this
-> one up as well please?
+> On Tue, Aug 26, 2014 at 9:47 PM, Jaehoon Chung <jh80.chung@samsung.com> wrote:
+>> Doug,
+>>
+>> On 08/27/2014 01:14 PM, Doug Anderson wrote:
+>>> Jaehoon,
+>>>
+>>> On Tue, Aug 26, 2014 at 8:48 PM, Jaehoon Chung <jh80.chung@samsung.com> wrote:
+>>>> Hi, Doug,
+>>>>
+>>>> On 08/26/2014 12:25 AM, Doug Anderson wrote:
+>>>>> Jaehoon,
+>>>>>
+>>>>> On Mon, Aug 25, 2014 at 1:50 AM, Jaehoon Chung <jh80.chung@samsung.com> wrote:
+>>>>>> On 08/25/2014 05:13 PM, Ulf Hansson wrote:
+>>>>>>> On 22 August 2014 20:27, Sonny Rao <sonnyrao@chromium.org> wrote:
+>>>>>>>> On Fri, Aug 22, 2014 at 8:31 AM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
+>>>>>>>>> On 22 August 2014 15:47, Yuvaraj Kumar C D <yuvaraj.cd@gmail.com> wrote:
+>>>>>>>>>> Exynos 5250 and 5420 based boards uses built-in CD# line for card
+>>>>>>>>>> detection.But unfortunately CD# line is on the same voltage rails
+>>>>>>>>>> as of I/O voltage rails. When we cut off vqmmc,the consequent card
+>>>>>>>>>> detection will break in these boards.
+>>>>>>
+>>>>>> I didn't know that use CD# line for card detect.
+>>>>>> And if CD# voltage rails and I/O voltage rail are same voltage, it doesn't make sense.
+>>>>>> Which card is used with same voltages? (eMMC? SD? SDIO?)
+>>>>>>
+>>>>>> Well, I have checked Exynos5250 and 5420, but it looks like not same rails.
+>>>>>
+>>>>> I'm not sure I totally understood what you said.  In my manual I have
+>>>>> a table titled "Table 2-1 Exynos 5420 Pin List".  Look in this table
+>>>>> for XMMC2CDN and XMMC2DATA_0.  Look to the right of the table and
+>>>>> you'll see the power domain.  For both it shows VDDQ_MMC2.  If that
+>>>>> doesn't mean that the two are in the same voltage domain then I don't
+>>>>> know what does.  Can you point to any examples where they have
+>>>>> different voltage domains?
+>>>> I think you're mis-understanding for it.
+>>>> Right, It's described at exynos5420, but it's not connected.
+>>>
+>>> "It's not connected".  What do you mean?  If I were to guess I'd say
+>>> that on some particular board you're looking at they don't happen to
+>>> use the "CD" pin for card detect.  If this is what you mean, it
+>>> doesn't help me.  exynos5420-peach-pit does use the CD pin for card
+>>> detect.  You can look at the DTS file and confirm it.
+>>
+>> I didn't know how exynos5420-peach-pit's circuit is configured.
+>> But i guess that almost all exynos5 boards are configured with the similar circuit.
+>>
+>> At Almost all Exynos5 board, CD-pin is used, but not included in Same power domain.
+>> (CD-pin is external card-detect pin. - like XEINT_# pin)
+>> You mentioned CD# and DATA# lines is used the same power domain, right?
+>> In Circuit (not exynos5420-peach-pit), DATA# line and CMD/CLK(vqmmc) is same power supply, and vdd is used other power supply.
+>> Not use the CD# pin, used the XEINT_# pin.
+>> So i think we don't need to consider the CD#.
+>> If exynos5420-peach-pit board is used the CD#-pin, then our discussion can be changed.
 > 
-> Thanks.
+> Maybe on your board you have CD connected to a "gpx" line.  ...but not
+> mine.  The guys who designed our hardware followed the SMDK5420
+> reference schematics which connect the SD card slot card detect to
+> "gpc2_2", which is the card detect pin.
 > 
-> 8<===
-> From 5cebff8f6232fbafde7af564eca61447f951040e Mon Sep 17 00:00:00 2001
-> From: Russell King <rmk+kernel@arm.linux.org.uk>
-> Date: Sat, 23 Aug 2014 15:34:07 +0100
-> Subject: [PATCH] ARM: dts: hummingboard: fix configuration of IR input
+> See "arch/arm/boot/dts/exynos5420-smdk5420.dts", specifically noting
+> the lack of a GPIO card detect and the inclusion of "sd2_cd"
 > 
-> Add the IOMUX setting for the IR input, rather than relying on the
-> boot loader.
+> mmc at 12220000 {
+>   status = "okay";
+>   card-detect-delay = <200>;
+>   samsung,dw-mshc-ciu-div = <3>;
+>   samsung,dw-mshc-sdr-timing = <2 3>;
+>   samsung,dw-mshc-ddr-timing = <1 2>;
+>   pinctrl-names = "default";
+>   pinctrl-0 = <&sd2_clk &sd2_cmd &sd2_cd &sd2_bus4>;
+>   bus-width = <4>;
+>   cap-sd-highspeed;
+> };
 > 
-> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> See "arch/arm/boot/dts/exynos5420-peach-pit.dts" too:
+> 
+> &mmc_2 {
+>   status = "okay";
+>   num-slots = <1>;
+>   cap-sd-highspeed;
+>   card-detect-delay = <200>;
+>   clock-frequency = <400000000>;
+>   samsung,dw-mshc-ciu-div = <3>;
+>   samsung,dw-mshc-sdr-timing = <2 3>;
+>   samsung,dw-mshc-ddr-timing = <1 2>;
+>   pinctrl-names = "default";
+>   pinctrl-0 = <&sd2_clk &sd2_cmd &sd2_cd &sd2_bus4>;
+>   bus-width = <4>;
+> };
+> 
+> 
+> Here, see this ASCII art that shows how some lines are hooked up on
+> peach-pit.  You might need to paste this into something with a
+> fixed-width font.
+> 
+>                      +--------------------
+>                      |    Exynos 5420
+>                      |
+>                      |
+> P2.8V_LOUT4 ---------|- VDDQ_MMC2 (AK7)
+>     |                |
+>     |                |
+>   +-+- 10K res -+----|- XMMC2CDN (AK6)
+>   |             |    |
+>   |             |    |
+>   |             |    |
+>   |           Ext CD |
+>   |                  |
+>   +-- 10K res-+--+---|- XMMC2CMD (AK8)
+>                  |
+>                  |
+>                Ext CMD
+> 
+> You can see from the above that the external card detect signal (that
+> goes to the connector) named "Ext CD" is pulled up to the same voltage
+> as the external CMD signal (that also goes to the connector).  This is
+> vqmmc.  If we turn off vqmmc then the 10K resistor will (I think) act
+> as a pull down, or in the best case it will be floating.
+> 
+> Said another way: we can't read card detect when vqmmc is off.
 
-Applied, thanks.
+If that's the case, it makes sense. But i wonder why designed like that.
+Anyway, then we need to consider that controls the vqmmc power for card-detection.
 
-Shawn
+But if polling system uses, it seems to detect the card.
+Polling is the method that sends the status command.
+At that time, we can notice whether card is insert/remove. Is it impossible?
 
-> ---
->  arch/arm/boot/dts/imx6qdl-hummingboard.dtsi | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
 > 
-> diff --git a/arch/arm/boot/dts/imx6qdl-hummingboard.dtsi b/arch/arm/boot/dts/imx6qdl-hummingboard.dtsi
-> index 4aa0ae357b00..7fe29de89e9d 100644
-> --- a/arch/arm/boot/dts/imx6qdl-hummingboard.dtsi
-> +++ b/arch/arm/boot/dts/imx6qdl-hummingboard.dtsi
-> @@ -130,7 +130,7 @@
->  
->  		pinctrl_hummingboard_gpio3_5: hummingboard-gpio3_5 {
->  			fsl,pins = <
-> -				MX6QDL_PAD_EIM_DA5__GPIO3_IO05 0x80000000
-> +				MX6QDL_PAD_EIM_DA5__GPIO3_IO05 0x1b0b1
->  			>;
->  		};
->  
-> -- 
-> 1.8.3.1
+>> Your commit message looks like all exynos5250/5420 board are used CD# line.
+> 
+> The commit message should be clearer, agreed.  I think I asked Yuvaraj
+> to make sure that the code only invoked this quirk on exynos and only
+> if a GPIO was not used for card detect.  Yuvaraj: can you make it more
+> obvious that not all exynos5250/5420 boards need this, only those that
+> use the "official" card detect line?
 > 
 > 
+>>> ...or are you saying that the CD pin somehow changes voltage domains
+>>> when configured as a GPIO?  I find that very hard to believe.  What
+>>> voltage domain does it go to?  If it goes to a 1.8V voltage domain
+>>> then that would be bad when vqmmc was 3.3V.  If it goes to a 3.3V
+>>> voltage domain then that would be bad when vqmmc was 1.8V.  Remember
+>>> that externally we've got a pull up to vqmmc.
+>>
+>> It is used with XEINT_# pin instead of CD# pin.
+>> As i mentioned above, if exynos5420-peach-pit is used CD# line and not used XEINT_# pin,
+>> my point is meaningless. :)
+>>
+>> Is exynos5420-peach-pit board used with CD#pin, not XEINT_# pin?
 > 
-> -- 
-> FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
-> according to speedtest.net.
+> Yes.  It is using CD#.  Do you remove your objections to this patch,
+> then (once the commit message is clearer)?
+
+Sure.
+And I will also effort to find it, if we can find the more generic approach.
+
+Best Regards,
+Jaehoon Chung
+
+> 
+> -Doug
 > --
-> To unsubscribe from this list: send the line "unsubscribe devicetree" in
+> To unsubscribe from this list: send the line "unsubscribe linux-mmc" in
 > the body of a message to majordomo at vger.kernel.org
 > More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
