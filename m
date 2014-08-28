@@ -1,103 +1,207 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Thu, 28 Aug 2014 16:01:08 -0700
-Subject: [PATCH 2/5] arm64, thunder: Add initial dts for Cavium Thunder SoC
-In-Reply-To: <20140828181429.GO4703@rric.localhost>
-References: <1406732794-20920-1-git-send-email-rric@kernel.org>
- <1406732794-20920-3-git-send-email-rric@kernel.org>
- <CAOesGMh9KkdKB_ytJ7CCbkPW7dHTX91NdfDMsMNfbmOBVOJ8PQ@mail.gmail.com>
- <20140828161556.GN4703@rric.localhost>
- <20140828162549.GP14650@leverpostej>
- <CAOesGMjtjcgUNV8WLp6_Zbok-0zq5afg_KS8QJYp=kDVabrQvg@mail.gmail.com>
- <20140828181429.GO4703@rric.localhost>
-Message-ID: <CAOesGMh3TEKZkyPjopfSm07C2ydw5=2VrzY0xQ=9jkhoA-Z_kQ@mail.gmail.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Fri, 29 Aug 2014 08:23:43 +0900
+Subject: [PATCH 1/2] ARM: multi_v7_defconfig: Enable shmobile platforms
+In-Reply-To: <1409234429-1916-1-git-send-email-geert+renesas@glider.be>
+References: <1409234429-1916-1-git-send-email-geert+renesas@glider.be>
+Message-ID: <20140828232342.GB16165@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 28, 2014 at 11:14 AM, Robert Richter <rric@kernel.org> wrote:
-> On 28.08.14 09:31:43, Olof Johansson wrote:
->> On Thu, Aug 28, 2014 at 9:25 AM, Mark Rutland <mark.rutland@arm.com> wrote:
->> > On Thu, Aug 28, 2014 at 05:15:56PM +0100, Robert Richter wrote:
->> >> Olof,
->> >>
->> >> On 30.07.14 11:14:23, Olof Johansson wrote:
->> >> > On Wed, Jul 30, 2014 at 8:06 AM, Robert Richter <rric@kernel.org> wrote:
->> >> > > From: Radha Mohan Chintakuntla <rchintakuntla@cavium.com>
->> >> > >
->> >> > > Add initial device tree nodes for Cavium Thunder SoCs with support of
->> >> > > 48 cores and gicv3. The dts file requires further changes, esp. for
->> >> > > pci, gicv3-its and smmu. This changes will be added later together
->> >> > > with the device drivers.
->> >> > >
->> >> > > Signed-off-by: Radha Mohan Chintakuntla <rchintakuntla@cavium.com>
->> >> > > Signed-off-by: Robert Richter <rrichter@cavium.com>
->> >> > > ---
->> >> > >  arch/arm64/boot/dts/Makefile         |   1 +
->> >> > >  arch/arm64/boot/dts/thunder-88xx.dts | 387 +++++++++++++++++++++++++++++++++++
->> >> > >  2 files changed, 388 insertions(+)
->> >> > >  create mode 100644 arch/arm64/boot/dts/thunder-88xx.dts
->> >> > >
->> >> > > diff --git a/arch/arm64/boot/dts/Makefile b/arch/arm64/boot/dts/Makefile
->> >> > > index c52bdb051f66..f8001a62029c 100644
->> >> > > --- a/arch/arm64/boot/dts/Makefile
->> >> > > +++ b/arch/arm64/boot/dts/Makefile
->> >> > > @@ -1,3 +1,4 @@
->> >> > > +dtb-$(CONFIG_ARCH_THUNDER) += thunder-88xx.dtb
->> >> > >  dtb-$(CONFIG_ARCH_VEXPRESS) += rtsm_ve-aemv8a.dtb foundation-v8.dtb
->> >> > >  dtb-$(CONFIG_ARCH_XGENE) += apm-mustang.dtb
->> >> >
->> >> > Oh, and:
->> >> >
->> >> > Let's fix the mistake we made on 32-bit here (that we can't undo
->> >> > unless we move all dts files now, which is too much churn), and put
->> >> > each SoC vendor in its own subdirectory.
->> >> >
->> >> > So, please add a arch/arm64/boot/dts/cavium/ directory, add a Makefile
->> >> > and the dts there.
->> >> >
->> >> > We should move vexpress under arm/   and xgene under apm/ too.
->> >>
->> >> I was looking into this. It turned out that this would introduce more
->> >> pain than it solves. The problem with introducing vendor subdirs for
->> >> .dts files is that this will require also subdirs for .dtb files to
->> >> avoid name conflicts. This means that dtb files are no longer in a
->> >> single directory. Current build scripts and makefiles rely on this.
->> >> E.g.:
->> >>
->> >>  scripts/Makefile.lib:$(obj)/%.dtb.S: $(obj)/%.dtb
->> >>
->> >> Thus, the introduction of vendor subdirs is not easy to implement and
->> >> may break existing workflows. Also, no other arch has vendor subdirs.
->> >>
->> >> A solution would be to have a naming scheme for dts files which
->> >> requires the vendor in the file name, such as cavium-thunder-88xx.dtb.
->> >> Though, these long names may look a bit ugly.
->> >>
->> >> Hmm... Any thoughts?
->> >
->> > That would make it possible to search, but the number of files in one
->> > place might become somewhat overwelming (which I believe was Olof's
->> > concern).
->> >
->> > Olof, thoughts?
->>
->> Yeah, on 32 bit we've got an ever-growing and very large directory
->> today that is becoming a headache. Carving it up in directories to
->> reduce plain directory size would come a long way.
->>
->> I think we would catch name conflicts quickly with the automatic
->> builders we have today -- and it's likely that the files will have a
->> platform prefix anyway so it shouldn't be a big issue. I think we can
->> live with that.
->
-> So you mean, having the source files with subdirectories, but the dtb
-> files in a single obj dir?
+On Thu, Aug 28, 2014 at 04:00:28PM +0200, Geert Uytterhoeven wrote:
+> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Thinking about it a bit more, the even more obvious solution that I
-for some reason didn't think of at the time, is to have the
-dtbs_install target create the appropriate subdirectories on the
-install side, so that the structure is preserved.
+Acked-by: Simon Horman <horms+renesas@verge.net.au>
 
-That comes a bit closer to how modules are handled as well.
+Arnd, will you take this?
 
-
--Olof
+> ---
+> Based on next-20140828
+> For now excluding r8a7740/armadillo, as it fails to boot on armadillo
+> 
+>  arch/arm/configs/multi_v7_defconfig | 51 +++++++++++++++++++++++++++++++++++--
+>  1 file changed, 49 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+> index 7cfa5fa5f7ac..077134eaa95e 100644
+> --- a/arch/arm/configs/multi_v7_defconfig
+> +++ b/arch/arm/configs/multi_v7_defconfig
+> @@ -53,6 +53,15 @@ CONFIG_MACH_SPEAR1310=y
+>  CONFIG_MACH_SPEAR1340=y
+>  CONFIG_ARCH_STI=y
+>  CONFIG_ARCH_EXYNOS=y
+> +CONFIG_ARCH_SHMOBILE_MULTI=y
+> +CONFIG_ARCH_EMEV2=y
+> +CONFIG_ARCH_R7S72100=y
+> +CONFIG_ARCH_R8A7779=y
+> +CONFIG_ARCH_R8A7790=y
+> +CONFIG_ARCH_R8A7791=y
+> +CONFIG_MACH_KOELSCH=y
+> +CONFIG_MACH_LAGER=y
+> +CONFIG_MACH_MARZEN=y
+>  CONFIG_ARCH_SUNXI=y
+>  CONFIG_ARCH_SIRF=y
+>  CONFIG_ARCH_TEGRA=y
+> @@ -74,6 +83,8 @@ CONFIG_PCI=y
+>  CONFIG_PCI_MSI=y
+>  CONFIG_PCI_MVEBU=y
+>  CONFIG_PCI_TEGRA=y
+> +CONFIG_PCI_RCAR_GEN2=y
+> +CONFIG_PCI_RCAR_GEN2_PCIE=y
+>  CONFIG_SMP=y
+>  CONFIG_NR_CPUS=8
+>  CONFIG_HIGHPTE=y
+> @@ -121,6 +132,7 @@ CONFIG_CMA_SIZE_MBYTES=64
+>  CONFIG_OMAP_OCP2SCP=y
+>  CONFIG_MTD=y
+>  CONFIG_MTD_M25P80=y
+> +CONFIG_MTD_SPI_NOR=y
+>  CONFIG_BLK_DEV_LOOP=y
+>  CONFIG_ICS932S401=y
+>  CONFIG_APDS9802ALS=y
+> @@ -136,6 +148,7 @@ CONFIG_AHCI_ST=y
+>  CONFIG_AHCI_SUNXI=y
+>  CONFIG_SATA_HIGHBANK=y
+>  CONFIG_SATA_MV=y
+> +CONFIG_SATA_RCAR=y
+>  CONFIG_NETDEVICES=y
+>  CONFIG_SUN4I_EMAC=y
+>  CONFIG_MACB=y
+> @@ -145,6 +158,7 @@ CONFIG_MV643XX_ETH=y
+>  CONFIG_MVNETA=y
+>  CONFIG_KS8851=y
+>  CONFIG_R8169=y
+> +CONFIG_SH_ETH=y
+>  CONFIG_SMSC911X=y
+>  CONFIG_STMMAC_ETH=y
+>  CONFIG_TI_CPSW=y
+> @@ -174,6 +188,7 @@ CONFIG_SERIO_AMBAKMI=y
+>  CONFIG_SERIAL_8250=y
+>  CONFIG_SERIAL_8250_CONSOLE=y
+>  CONFIG_SERIAL_8250_DW=y
+> +CONFIG_SERIAL_8250_EM=y
+>  CONFIG_SERIAL_AMBA_PL011=y
+>  CONFIG_SERIAL_AMBA_PL011_CONSOLE=y
+>  CONFIG_SERIAL_SAMSUNG=y
+> @@ -183,6 +198,9 @@ CONFIG_SERIAL_SIRFSOC_CONSOLE=y
+>  CONFIG_SERIAL_TEGRA=y
+>  CONFIG_SERIAL_IMX=y
+>  CONFIG_SERIAL_IMX_CONSOLE=y
+> +CONFIG_SERIAL_SH_SCI=y
+> +CONFIG_SERIAL_SH_SCI_NR_UARTS=20
+> +CONFIG_SERIAL_SH_SCI_CONSOLE=y
+>  CONFIG_SERIAL_MSM=y
+>  CONFIG_SERIAL_MSM_CONSOLE=y
+>  CONFIG_SERIAL_VT8500=y
+> @@ -204,15 +222,21 @@ CONFIG_I2C_CADENCE=y
+>  CONFIG_I2C_DESIGNWARE_PLATFORM=y
+>  CONFIG_I2C_EXYNOS5=y
+>  CONFIG_I2C_MV64XXX=y
+> +CONFIG_I2C_RIIC=y
+> +CONFIG_I2C_SH_MOBILE=y
+>  CONFIG_I2C_SIRF=y
+>  CONFIG_I2C_TEGRA=y
+>  CONFIG_I2C_ST=y
+> -CONFIG_SPI=y
+>  CONFIG_I2C_XILINX=y
+> +CONFIG_I2C_RCAR=y
+> +CONFIG_SPI=y
+>  CONFIG_SPI_CADENCE=y
+>  CONFIG_SPI_OMAP24XX=y
+>  CONFIG_SPI_ORION=y
+>  CONFIG_SPI_PL022=y
+> +CONFIG_SPI_RSPI=y
+> +CONFIG_SPI_SH_MSIOF=y
+> +CONFIG_SPI_SH_HSPI=y
+>  CONFIG_SPI_SIRF=y
+>  CONFIG_SPI_SUN4I=y
+>  CONFIG_SPI_SUN6I=y
+> @@ -225,6 +249,8 @@ CONFIG_PINCTRL_PALMAS=y
+>  CONFIG_GPIO_SYSFS=y
+>  CONFIG_GPIO_GENERIC_PLATFORM=y
+>  CONFIG_GPIO_DWAPB=y
+> +CONFIG_GPIO_EM=y
+> +CONFIG_GPIO_RCAR=y
+>  CONFIG_GPIO_XILINX=y
+>  CONFIG_GPIO_ZYNQ=y
+>  CONFIG_GPIO_PCA953X=y
+> @@ -241,6 +267,7 @@ CONFIG_POWER_RESET_SUN6I=y
+>  CONFIG_SENSORS_LM90=y
+>  CONFIG_SENSORS_LM95245=y
+>  CONFIG_THERMAL=y
+> +CONFIG_RCAR_THERMAL=y
+>  CONFIG_ARMADA_THERMAL=y
+>  CONFIG_ST_THERMAL_SYSCFG=y
+>  CONFIG_ST_THERMAL_MEMMAP=y
+> @@ -263,6 +290,7 @@ CONFIG_REGULATOR_VIRTUAL_CONSUMER=y
+>  CONFIG_REGULATOR_AB8500=y
+>  CONFIG_REGULATOR_AS3722=y
+>  CONFIG_REGULATOR_BCM590XX=y
+> +CONFIG_REGULATOR_DA9210=y
+>  CONFIG_REGULATOR_GPIO=y
+>  CONFIG_REGULATOR_MAX8907=y
+>  CONFIG_REGULATOR_PALMAS=y
+> @@ -277,10 +305,21 @@ CONFIG_REGULATOR_TWL4030=y
+>  CONFIG_REGULATOR_VEXPRESS=y
+>  CONFIG_MEDIA_SUPPORT=y
+>  CONFIG_MEDIA_CAMERA_SUPPORT=y
+> +CONFIG_MEDIA_CONTROLLER=y
+> +CONFIG_VIDEO_V4L2_SUBDEV_API=y
+>  CONFIG_MEDIA_USB_SUPPORT=y
+>  CONFIG_USB_VIDEO_CLASS=y
+>  CONFIG_USB_GSPCA=y
+> +CONFIG_V4L_PLATFORM_DRIVERS=y
+> +CONFIG_SOC_CAMERA=y
+> +CONFIG_SOC_CAMERA_PLATFORM=y
+> +CONFIG_VIDEO_RCAR_VIN=y
+> +CONFIG_V4L_MEM2MEM_DRIVERS=y
+> +CONFIG_VIDEO_RENESAS_VSP1=y
+> +# CONFIG_MEDIA_SUBDRV_AUTOSELECT is not set
+> +CONFIG_VIDEO_ADV7180=y
+>  CONFIG_DRM=y
+> +CONFIG_DRM_RCAR_DU=y
+>  CONFIG_DRM_TEGRA=y
+>  CONFIG_DRM_PANEL_SIMPLE=y
+>  CONFIG_FB_ARMCLCD=y
+> @@ -293,6 +332,7 @@ CONFIG_FRAMEBUFFER_CONSOLE=y
+>  CONFIG_SOUND=y
+>  CONFIG_SND=y
+>  CONFIG_SND_SOC=y
+> +CONFIG_SND_SOC_RCAR=y
+>  CONFIG_SND_SOC_TEGRA=y
+>  CONFIG_SND_SOC_TEGRA_RT5640=y
+>  CONFIG_SND_SOC_TEGRA_WM8753=y
+> @@ -309,6 +349,7 @@ CONFIG_USB_EHCI_HCD_PLATFORM=y
+>  CONFIG_USB_ISP1760_HCD=y
+>  CONFIG_USB_OHCI_HCD=y
+>  CONFIG_USB_OHCI_HCD_PLATFORM=y
+> +CONFIG_USB_RENESAS_USBHS=y
+>  CONFIG_USB_STORAGE=y
+>  CONFIG_USB_CHIPIDEA=y
+>  CONFIG_USB_CHIPIDEA_HOST=y
+> @@ -319,6 +360,10 @@ CONFIG_SAMSUNG_USB3PHY=y
+>  CONFIG_USB_GPIO_VBUS=y
+>  CONFIG_USB_ISP1301=y
+>  CONFIG_USB_MXS_PHY=y
+> +CONFIG_USB_RCAR_PHY=y
+> +CONFIG_USB_RCAR_GEN2_PHY=y
+> +CONFIG_USB_GADGET=y
+> +CONFIG_USB_RENESAS_USBHS_UDC=y
+>  CONFIG_MMC=y
+>  CONFIG_MMC_BLOCK_MINORS=16
+>  CONFIG_MMC_ARMMMCI=y
+> @@ -337,9 +382,11 @@ CONFIG_MMC_SDHCI_ST=y
+>  CONFIG_MMC_OMAP=y
+>  CONFIG_MMC_OMAP_HS=y
+>  CONFIG_MMC_MVSDIO=y
+> -CONFIG_MMC_SUNXI=y
+> +CONFIG_MMC_SDHI=y
+>  CONFIG_MMC_DW=y
+>  CONFIG_MMC_DW_EXYNOS=y
+> +CONFIG_MMC_SH_MMCIF=y
+> +CONFIG_MMC_SUNXI=y
+>  CONFIG_NEW_LEDS=y
+>  CONFIG_LEDS_CLASS=y
+>  CONFIG_LEDS_PWM=y
+> -- 
+> 1.9.1
+> 
