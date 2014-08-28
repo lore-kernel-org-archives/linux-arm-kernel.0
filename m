@@ -1,89 +1,189 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Thu, 28 Aug 2014 09:31:43 -0700
-Subject: [PATCH 2/5] arm64, thunder: Add initial dts for Cavium Thunder SoC
-In-Reply-To: <20140828162549.GP14650@leverpostej>
-References: <1406732794-20920-1-git-send-email-rric@kernel.org>
- <1406732794-20920-3-git-send-email-rric@kernel.org>
- <CAOesGMh9KkdKB_ytJ7CCbkPW7dHTX91NdfDMsMNfbmOBVOJ8PQ@mail.gmail.com>
- <20140828161556.GN4703@rric.localhost>
- <20140828162549.GP14650@leverpostej>
-Message-ID: <CAOesGMjtjcgUNV8WLp6_Zbok-0zq5afg_KS8QJYp=kDVabrQvg@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 28 Aug 2014 09:46:46 -0700
+Subject: [PATCH 15/15] tty: serial: 8250: omap: add dma support
+In-Reply-To: <20140828082348.GA5413@linutronix.de>
+References: <1408124563-31541-1-git-send-email-bigeasy@linutronix.de>
+ <1408124563-31541-16-git-send-email-bigeasy@linutronix.de>
+ <20140815210211.GD9239@atomide.com>
+ <53F5AF0D.5060409@linutronix.de>
+ <20140821184416.GF10066@atomide.com>
+ <53FE3779.5090908@linutronix.de>
+ <20140827202313.GF16006@atomide.com>
+ <20140828082348.GA5413@linutronix.de>
+Message-ID: <20140828164645.GG16006@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 28, 2014 at 9:25 AM, Mark Rutland <mark.rutland@arm.com> wrote:
-> On Thu, Aug 28, 2014 at 05:15:56PM +0100, Robert Richter wrote:
->> Olof,
->>
->> On 30.07.14 11:14:23, Olof Johansson wrote:
->> > On Wed, Jul 30, 2014 at 8:06 AM, Robert Richter <rric@kernel.org> wrote:
->> > > From: Radha Mohan Chintakuntla <rchintakuntla@cavium.com>
->> > >
->> > > Add initial device tree nodes for Cavium Thunder SoCs with support of
->> > > 48 cores and gicv3. The dts file requires further changes, esp. for
->> > > pci, gicv3-its and smmu. This changes will be added later together
->> > > with the device drivers.
->> > >
->> > > Signed-off-by: Radha Mohan Chintakuntla <rchintakuntla@cavium.com>
->> > > Signed-off-by: Robert Richter <rrichter@cavium.com>
->> > > ---
->> > >  arch/arm64/boot/dts/Makefile         |   1 +
->> > >  arch/arm64/boot/dts/thunder-88xx.dts | 387 +++++++++++++++++++++++++++++++++++
->> > >  2 files changed, 388 insertions(+)
->> > >  create mode 100644 arch/arm64/boot/dts/thunder-88xx.dts
->> > >
->> > > diff --git a/arch/arm64/boot/dts/Makefile b/arch/arm64/boot/dts/Makefile
->> > > index c52bdb051f66..f8001a62029c 100644
->> > > --- a/arch/arm64/boot/dts/Makefile
->> > > +++ b/arch/arm64/boot/dts/Makefile
->> > > @@ -1,3 +1,4 @@
->> > > +dtb-$(CONFIG_ARCH_THUNDER) += thunder-88xx.dtb
->> > >  dtb-$(CONFIG_ARCH_VEXPRESS) += rtsm_ve-aemv8a.dtb foundation-v8.dtb
->> > >  dtb-$(CONFIG_ARCH_XGENE) += apm-mustang.dtb
->> >
->> > Oh, and:
->> >
->> > Let's fix the mistake we made on 32-bit here (that we can't undo
->> > unless we move all dts files now, which is too much churn), and put
->> > each SoC vendor in its own subdirectory.
->> >
->> > So, please add a arch/arm64/boot/dts/cavium/ directory, add a Makefile
->> > and the dts there.
->> >
->> > We should move vexpress under arm/   and xgene under apm/ too.
->>
->> I was looking into this. It turned out that this would introduce more
->> pain than it solves. The problem with introducing vendor subdirs for
->> .dts files is that this will require also subdirs for .dtb files to
->> avoid name conflicts. This means that dtb files are no longer in a
->> single directory. Current build scripts and makefiles rely on this.
->> E.g.:
->>
->>  scripts/Makefile.lib:$(obj)/%.dtb.S: $(obj)/%.dtb
->>
->> Thus, the introduction of vendor subdirs is not easy to implement and
->> may break existing workflows. Also, no other arch has vendor subdirs.
->>
->> A solution would be to have a naming scheme for dts files which
->> requires the vendor in the file name, such as cavium-thunder-88xx.dtb.
->> Though, these long names may look a bit ugly.
->>
->> Hmm... Any thoughts?
->
-> That would make it possible to search, but the number of files in one
-> place might become somewhat overwelming (which I believe was Olof's
-> concern).
->
-> Olof, thoughts?
+* Sebastian Andrzej Siewior <bigeasy@linutronix.de> [140828 01:24]:
+> * Tony Lindgren | 2014-08-27 13:23:14 [-0700]:
+> >
+> >Do you mean just the OMAP_UART_SCR_DMAMODE_CTL related code, or
+> >also the dmaengine calls?
+> 
+> dmaengine calls are unused because up.dma is not assigned. It is 
+> basically like you wouldn't have the dma properties in the devicetree.
+> And while in that non-DMA mode I just set and unset the DMAMODE_CTL + 
+> DMAMODE_1 bits in the SCR register. Nothing else. Based on some testing
+> I just did, DMAMODE_CTL does not make the difference. DMAMODE_CTL +
+> DMAMODE_1 does.
 
-Yeah, on 32 bit we've got an ever-growing and very large directory
-today that is becoming a headache. Carving it up in directories to
-reduce plain directory size would come a long way.
+OK
+ 
+> >> However core-off with DMA won't work. I think we could document this in
+> >> the binding document. What do you think?
+> >
+> >There should not be such a limitation though. Maybe dump out the values
+> >of cm_idlest_per and cm_idlest1_core for working and failing off idle
+> >cases and see what the difference is?
+> 
+> I can't follow here. This is the working case:
+...
+ 
+> so per_pwrdm and core_pwrdm remain on and I guess the former is where
+> the UART sits.
 
-I think we would catch name conflicts quickly with the automatic
-builders we have today -- and it's likely that the files will have a
-platform prefix anyway so it shouldn't be a big issue. I think we can
-live with that.
+That won't show the cm_idlest_per and cm_idlest1_core currently though.
 
+Below is a test patch that allows you to dump those too. Then you
+can see which bits show up as blockers. Sounds like it will be the
+serial port with dma enabled based on your description.
+ 
+> >It could be the either the dma or the uart hardware blocking. I guess
+> >it could be also an issue with runtime pm use somewhere.
+> 
+> So I just toggle the two DMA bits in SCR and the UART seems to block
+> since the DMA hw is not involved. Reading SCR back says that those bits
+> are not set.
 
--Olof
+Oh that's interesting.
+
+> To use DMA you don't have to enable it in SCR register you can also use
+> the FCR register. The manual says that you can only write this DMA
+> enable bit in the FCR register if the baud clock is not running. And
+> guess what: same thing: I only *toggle* the DMA enable bit here (it
+> remains 0 later) and the core won't hit idle.
+> Same effect if I toggle this bit while the baud clock is running (the
+> manual says that this bit can only be written if the baud clock is not
+> running). Seems like the UART is following its own specification and it
+> remains blocking once the DMA was enabled.
+> It would be nice if someone from the UART-IP team could ACK this.
+
+Sounds like there should be some way to clear that state.. I wonder
+if omap-serial.c had something before it's DMA support was removed?
+
+I'd assume when the UART is powered down by runtime PM it's state
+is completetely reset and we could restore the non-DMA state?
+
+Maybe post your current patches and a test patch to try to toggle
+the DMA on and off?
+
+> Bah. Does it make sense to use runtime-PM if we can't hit core-off? I'm
+> thinking to add a printk once dma is enabled says that runtime-pm is
+> switched off.
+
+Well if we can't find a way to unset the DMA registers in the UART,
+how about only enable it if a kernel cmdline option is specified?
+
+We do have runtime PM working without it, and the serial console
+super important for any kind of debugging no matter what idle
+mode the SoC hits.. So let's not break that.
+
+Regards,
+
+Tony
+
+8<-----------------
+From: Tony Lindgren <tony@atomide.com>
+Date: Tue, 26 Aug 2014 14:25:33 -0700
+Subject: [PATCH] Test patch for dumping omap3 off idle blocking bits
+
+Allows seeing the deeper idle state blockers in
+/sys/kernel/debug/pm_debug/count. For example, when
+off idle is working on beaglboard xm, this is what
+i see:
+
+# sleep 5; cat /sys/kernel/debug/pm_debug/count
+...
+0006ffff 48005020 (fa005020) cm_idlest_per blocking bits: 00010000
+e7ffffbd 48004a20 (fa004a20) cm_idlest1_core blocking bits: 00000042
+0000000d 48004a28 (fa004a28) cm_idlest3_core
+
+--- a/arch/arm/mach-omap2/pm-debug.c
++++ b/arch/arm/mach-omap2/pm-debug.c
+@@ -142,10 +142,76 @@ static int pwrdm_dbg_show_timer(struct powerdomain *pwrdm, void *user)
+ 	return 0;
+ }
+ 
++#include "iomap.h"
++
++struct dregs {
++	const char	*desc;
++	u32		phys;
++	void __iomem	*virt;
++	u32		mask;
++};
++
++#define PER_CM_BASE	0x48005000
++#define PER_CM_REG(name, offset, mask)				\
++	{ name, PER_CM_BASE + offset,				\
++	OMAP2_L4_IO_ADDRESS(PER_CM_BASE + offset), mask, }
++
++static struct dregs cm_per[] = {
++	PER_CM_REG("cm_idlest_per", 0x20, 0xfff80000), /* p 513 */
++	{ NULL, },
++};
++
++#define CORE_CM_BASE	0x48004a00
++#define CORE_CM_REG(name, offset, mask)				\
++	{ name, CORE_CM_BASE + offset,				\
++	OMAP2_L4_IO_ADDRESS(CORE_CM_BASE + offset), mask, }
++
++static struct dregs cm_core[] = {
++	CORE_CM_REG("cm_idlest1_core", 0x20, 0x9c800109), /* p 467 */
++	CORE_CM_REG("cm_idlest3_core", 0x28, 0xfffffffb),
++	{ NULL, },
++};
++
++void __dregs_dump(struct dregs *dregs, struct seq_file *s)
++{
++	for (; dregs->desc; dregs++) {
++		u32 val, blockers;
++
++		val = __raw_readl(dregs->virt);
++
++		seq_printf(s, "%08x %08x (%p) %s",
++			   val, dregs->phys, dregs->virt,
++			   dregs->desc);
++
++		if (dregs->mask) {
++			blockers = ~val;
++			blockers &= ~dregs->mask;
++
++			if (blockers)
++				seq_printf(s, " blocking bits: %08x",
++					   blockers);
++		}
++
++		seq_printf(s, "\n");
++	}
++}
++
++void cm_per_dump(struct seq_file *s)
++{
++	__dregs_dump(cm_per, s);
++}
++
++void cm_core_dump(struct seq_file *s)
++{
++	__dregs_dump(cm_core, s);
++}
++
+ static int pm_dbg_show_counters(struct seq_file *s, void *unused)
+ {
+ 	pwrdm_for_each(pwrdm_dbg_show_counter, s);
+ 	clkdm_for_each(clkdm_dbg_show_counter, s);
++	cm_per_dump(s);
++	cm_core_dump(s);
+ 
+ 	return 0;
+ }
