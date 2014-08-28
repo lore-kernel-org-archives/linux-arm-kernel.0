@@ -1,119 +1,62 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Thu, 28 Aug 2014 12:36:11 +0530
-Subject: [PATCH 1/7] dmaengine: edma: fix two faults which happen with
- the 8250_dma user
-In-Reply-To: <53F5EF78.2050800@linutronix.de>
-References: <1406660344-25307-1-git-send-email-bigeasy@linutronix.de>
- <1406660344-25307-2-git-send-email-bigeasy@linutronix.de>
- <20140731121702.GU8181@intel.com>
- <20140808162950.GA12080@linutronix.de>
- <20140819151216.GO13288@intel.com> <53F5EF78.2050800@linutronix.de>
-Message-ID: <20140828070611.GI13288@intel.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Thu, 28 Aug 2014 09:25:55 +0200
+Subject: [PATCH V2 3/3] mmc: dw_mmc: Dont cut off vqmmc and vmmc
+In-Reply-To: <CAD=FV=Vqz=kA=D5KDyq_QuPi-6B05VixYManTsFe2PC-fzxRkw@mail.gmail.com>
+References: <1408715272-13833-1-git-send-email-yuvaraj.cd@samsung.com>
+ <1408715272-13833-4-git-send-email-yuvaraj.cd@samsung.com>
+ <CAPDyKFqz8sGj2td=ihZXN4zvAqmu9FHZjWdCn-ZRcdHugNHe2g@mail.gmail.com>
+ <CAPz6YkXH1mMOTwcLkKdffdUHN+TaCAhpa8oG0h+rFn9i+GMoCw@mail.gmail.com>
+ <CAPDyKFqp7oEt9ASmdxrgUwbQ8aTZzAuJ7uD1oGN50iuzPzBfVg@mail.gmail.com>
+ <CAD=FV=VQWzhiSU+iULACj+Dp_tDf3SszQ8ELLEGqVEyJJRQy1Q@mail.gmail.com>
+ <CAPDyKFo9-5=uPqD8RvLGsYtSCynBFnGGeSCpwLZuzDtW+652hA@mail.gmail.com>
+ <CAD=FV=VveHTYmiBu42DJeFFGARV2+1bS6Y2CQM995YkX_O9SQA@mail.gmail.com>
+ <CAPDyKFpUU643iXVbxuu9Vx1zY0K7x4z-ZxxVEWd+Lsuwp0iA+g@mail.gmail.com>
+ <CAD=FV=Vqz=kA=D5KDyq_QuPi-6B05VixYManTsFe2PC-fzxRkw@mail.gmail.com>
+Message-ID: <CAPDyKFrcA183V-R-nbZcY8wXCRqONb1WUu3BS_0vNJe2+Ej2_w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 21, 2014 at 03:09:12PM +0200, Sebastian Andrzej Siewior wrote:
-> On 08/19/2014 05:12 PM, Vinod Koul wrote:
-> >>
-> >>     desc = dmaengine_prep_slave_single(rxchan, ?);
-> >>     rx_cookie = dmaengine_submit(desc);
-> >>     dma_async_issue_pending(rxchan);
-> >>
-> >>     ssleep(2);
-> >>     /* Now assume that the transfer did not start */
-> >>     st = dmaengine_tx_status(rxchan, rx_cookie, NULL);
-> >>     /* st is now DMA_IN_PROGRESS as expected */
-> >>
-> >>     dmaengine_terminate_all(rxchan);
-> >>     st = dmaengine_tx_status(rxchan, rx_cookie, NULL);
-> > and here is the culprit. You have terminated the channel. This means that
-> > dmaengine driver is free to clean up all the allocated descriptors on the
-> > channels and do whatever it decides to do with them.
-> 
-> descriptors, yes.
-and by that logic when you query the driver would have freed up!
+On 27 August 2014 17:52, Doug Anderson <dianders@google.com> wrote:
+> Ulf,
+>
+> On Wed, Aug 27, 2014 at 4:17 AM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
+>>> Now, we've got MMC_CAP_NEEDS_POLL, so dw_mmc will periodically be
+>>> called to check the card detect line, but with vmmc and vqmmc off.  It
+>>> will be unable to return a sensible value without actually turning on
+>>> vmmc and vqmmc.
+>>
+>> Currently MMC_CAP_NEEDS_POLL mean the mmc rescan work will reschedule
+>> itself with HZ interval. This to check for card insert/removal.
+>>
+>> Now, mmc_rescan() will, if present, invoke host's ->get_cd() callback
+>> to check whether it's worth to continue initialization sequence or if
+>> it should re-schedule itself again.
+>>
+>> If your host driver can distinguish whether a card is inserted, which
+>> in this case are when vccq is turned off, your ->get_cd() callback need
+>> to return 1. That will allow mmc_rescan() to continue it's
+>> initialization sequence and do mmc_power_up().
+>
+> As per my other email, we can't tell whether a card is inserted when
+> vqmmc is off.
 
-> > You have already terminated the channel so what is the point in querying the
-> > status of the cookie, which you shouldn't use anyway after invoking
-> > terminate_all() as its result is not correct.
-> 
-> The point is to check (later, after terminate_all()) if there is an
-> outstanding DMA transfer or not _and_ how much data was really
-> transfered. Looking at edma it does not really support the latter if
-> the transfer is already completed. On the plus side the HW does not
-> support partly transfers :)
-well that can be achieved properly and differently!
-Why don't we pause the channel, get the residue, status and then
-terminate.
+I understand.
 
-> But where is it written that the life time of the cookie is limited?
-> Looking at the "cooking check" code there is no such thing. It is
-> simply compare of completed vs passed number but okay, this is an
-> implementation detail.
-> From [0] it says under "4. Submit the transaction":
-> 
-> | This returns a cookie can be used to check the progress of DMA engine
-> | activity via other DMA engine calls not covered in this document.
-> 
-> no life time limit mentioned here. Which brings to the question: Why is
-> it okay to use the cookie after the transaction "terminated" normally
-> but not if it has been canceled?
-Due to the special nature of terminate. The point here is that you don't
-terminate a transaction but channel operation
+The solution I proposed above, is:
 
-> And from [0] the API explanation  "4. ? dma_async_is_tx_complete()":
+1) Enable MMC_CAP_NEEDS_POLL.
+2) Make ->get_cd() return 1, when you can't distinguish if the card is inserted.
 
+That will solve this issue and without messing up the mmc core.
 
-> 
-> |Note:
-> |    Not all DMA engine drivers can return reliable information for
-> |    a running DMA channel.  It is recommended that DMA engine users
-> |    pause or stop (via dmaengine_terminate_all) the channel before
-> |    using this API.
-> 
-> So the documentation says to use the cookie with
-> dma_async_is_tx_complete() and before doing so it is recommended that
-> the transfer should be paused or stopped. _Exactly_ what is done here.
-> 
-> >>     /* st is still DMA_IN_PROGRESS but _I_ expect DMA_COMPLETE because
-> >>      * it has been terminated / canceled
-> >>      */
-> >>
-> >> Both dma driver clean up all / terminate all descriptors as required but
-> >> _none_ of them completes the cookie. As a result dma_cookie_status()
-> >> still thinks that the transfer is in progress.
-> > 
-> > Btw how does it matter in the driver here if the transaction completed or
-> > not after terminate_all() was invoked. What is the purpose of querying
-> > status.
-> 
-> In the RX interrupt (of the 8250 unit), the code checks if the transfer
-> has been already started or not via querying the status. So if it
-> returns DMA_COMPLETE then a new transfer will be started. If it returns
-> DMA_IN_PROGRESS then the code returns doing nothing because the DMA
-> engine should start moving data anytime now so the RX interrupt goes
-> away.
-> 
-> That means: If the transfer is canceled then it won't be started again.
-> 
-> Btw: the current (probably only) dma driver that is used by 8250-dma is
-> dw/core.c. That one does cookie complete on terminate:
->  dwc_control(DMA_TERMINATE_ALL) -> dwc_descriptor_complete() ->
->  dma_cookie_complete().
-Yes but would above flow work for you :)
+>
+> Does this mean that you have removed your objections to a solution
+> like Yuvaraj has posted?  We still need to break it into two patches
+> (the core part and the dwmmc part), but otherwise is it OK?  I can
+> post the original patch I sent Yuvaraj if it's helpful (or he can just
+> include my patch as part 1 of his series).
 
--- 
-~Vinod
+No. This can entirely be fixed in the host driver. As suggested above.
 
-> 
-> That is why it works for them?
-> 
-> [0] Documentation/dmaengine.txt
-> 
-> > 
-> > Thanks
-> > 
-> 
-> Sebastian
-
--- 
+Kind regards
+Uffe
