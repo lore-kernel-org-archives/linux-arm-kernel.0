@@ -1,106 +1,98 @@
 From: gautam.vivek@samsung.com (Vivek Gautam)
-Date: Thu, 28 Aug 2014 13:31:57 +0530
-Subject: [PATCH 2/5] phy: exynos5-usbdrd: Add pipe-clk and utmi-clk support
+Date: Thu, 28 Aug 2014 13:31:58 +0530
+Subject: [PATCH 3/5] phy: exynos5-usbdrd: Add facility for VBUS-BOOST-5V supply
 In-Reply-To: <1409212920-28526-1-git-send-email-gautam.vivek@samsung.com>
 References: <1409212920-28526-1-git-send-email-gautam.vivek@samsung.com>
-Message-ID: <1409212920-28526-3-git-send-email-gautam.vivek@samsung.com>
+Message-ID: <1409212920-28526-4-git-send-email-gautam.vivek@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Exynos7 SoC has now separate gate control for 125MHz pipe3 phy
-clock, as well as 60MHz utmi phy clock.
-So get the same and control in the phy-exynos5-usbdrd driver.
+Some Exynos SoCs have a separate regulator controlling a
+Boost 5V supply which goes as input for VBUS regulator.
+So adding a control for the same in driver, to enable
+vbus supply on the port.
 
 Signed-off-by: Vivek Gautam <gautam.vivek@samsung.com>
 ---
- .../devicetree/bindings/phy/samsung-phy.txt        |    4 ++++
- drivers/phy/phy-exynos5-usbdrd.c                   |   24 ++++++++++++++++++++
- 2 files changed, 28 insertions(+)
+ drivers/phy/phy-exynos5-usbdrd.c |   27 +++++++++++++++++++++++++--
+ 1 file changed, 25 insertions(+), 2 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/phy/samsung-phy.txt b/Documentation/devicetree/bindings/phy/samsung-phy.txt
-index 7a6feea..b64d616 100644
---- a/Documentation/devicetree/bindings/phy/samsung-phy.txt
-+++ b/Documentation/devicetree/bindings/phy/samsung-phy.txt
-@@ -135,6 +135,10 @@ Required properties:
- 	       PHY operations, associated by phy name. It is used to
- 	       determine bit values for clock settings register.
- 	       For Exynos5420 this is given as 'sclk_usbphy30' in CMU.
-+	- optional clocks: Next gen Exynos SoCs have following additional
-+			   gate clocks available:
-+			   - phy_pipe: for PIPE3 phy
-+			   - phy_utmi: for UTMI+ phy
- - samsung,pmu-syscon: phandle for PMU system controller interface, used to
- 		      control pmu registers for power isolation.
- - #phy-cells : from the generic PHY bindings, must be 1;
 diff --git a/drivers/phy/phy-exynos5-usbdrd.c b/drivers/phy/phy-exynos5-usbdrd.c
-index b05302b..685c108 100644
+index 685c108..a6d0cb7 100644
 --- a/drivers/phy/phy-exynos5-usbdrd.c
 +++ b/drivers/phy/phy-exynos5-usbdrd.c
-@@ -148,6 +148,8 @@ struct exynos5_usbdrd_phy_drvdata {
-  * @dev: pointer to device instance of this platform device
-  * @reg_phy: usb phy controller register memory base
-  * @clk: phy clock for register access
-+ * @pipeclk: clock for pipe3 phy
-+ * @utmiclk: clock for utmi+ phy
-  * @drv_data: pointer to SoC level driver data structure
-  * @phys[]: array for 'EXYNOS5_DRDPHYS_NUM' number of PHY
-  *	    instances each with its 'phy' and 'phy_cfg'.
-@@ -161,6 +163,8 @@ struct exynos5_usbdrd_phy {
- 	struct device *dev;
- 	void __iomem *reg_phy;
- 	struct clk *clk;
-+	struct clk *pipeclk;
-+	struct clk *utmiclk;
- 	const struct exynos5_usbdrd_phy_drvdata *drv_data;
- 	struct phy_usb_instance {
- 		struct phy *phy;
-@@ -446,6 +450,10 @@ static int exynos5_usbdrd_phy_power_on(struct phy *phy)
+@@ -176,6 +176,7 @@ struct exynos5_usbdrd_phy {
+ 	u32 extrefclk;
+ 	struct clk *ref_clk;
+ 	struct regulator *vbus;
++	struct regulator *vbus_boost;
+ };
  
- 	dev_dbg(phy_drd->dev, "Request to power_on usbdrd_phy phy\n");
- 
-+	if (!IS_ERR(phy_drd->utmiclk))
-+		clk_prepare_enable(phy_drd->utmiclk);
-+	if (!IS_ERR(phy_drd->pipeclk))
-+		clk_prepare_enable(phy_drd->pipeclk);
+ static inline
+@@ -457,11 +458,19 @@ static int exynos5_usbdrd_phy_power_on(struct phy *phy)
  	clk_prepare_enable(phy_drd->ref_clk);
  
  	/* Enable VBUS supply */
-@@ -464,6 +472,10 @@ static int exynos5_usbdrd_phy_power_on(struct phy *phy)
- 
- fail_vbus:
- 	clk_disable_unprepare(phy_drd->ref_clk);
-+	if (!IS_ERR(phy_drd->pipeclk))
-+		clk_disable_unprepare(phy_drd->pipeclk);
-+	if (!IS_ERR(phy_drd->utmiclk))
-+		clk_disable_unprepare(phy_drd->utmiclk);
- 
- 	return ret;
- }
-@@ -483,6 +495,10 @@ static int exynos5_usbdrd_phy_power_off(struct phy *phy)
- 		regulator_disable(phy_drd->vbus);
- 
- 	clk_disable_unprepare(phy_drd->ref_clk);
-+	if (!IS_ERR(phy_drd->pipeclk))
-+		clk_disable_unprepare(phy_drd->pipeclk);
-+	if (!IS_ERR(phy_drd->utmiclk))
-+		clk_disable_unprepare(phy_drd->utmiclk);
- 
- 	return 0;
- }
-@@ -581,6 +597,14 @@ static int exynos5_usbdrd_phy_probe(struct platform_device *pdev)
- 		return PTR_ERR(phy_drd->clk);
++	if (phy_drd->vbus_boost) {
++		ret = regulator_enable(phy_drd->vbus_boost);
++		if (ret) {
++			dev_err(phy_drd->dev,
++				"Failed to enable VBUS boost supply\n");
++			goto fail_vbus;
++		}
++	}
+ 	if (phy_drd->vbus) {
+ 		ret = regulator_enable(phy_drd->vbus);
+ 		if (ret) {
+ 			dev_err(phy_drd->dev, "Failed to enable VBUS supply\n");
+-			goto fail_vbus;
++			goto fail_vbus_boost;
+ 		}
  	}
  
-+	phy_drd->pipeclk = devm_clk_get(dev, "phy_pipe");
-+	if (IS_ERR(phy_drd->pipeclk))
-+		dev_warn(dev, "Failed to get pipe3 phy operational clock\n");
+@@ -470,6 +479,9 @@ static int exynos5_usbdrd_phy_power_on(struct phy *phy)
+ 
+ 	return 0;
+ 
++fail_vbus_boost:
++	if (phy_drd->vbus_boost)
++		regulator_disable(phy_drd->vbus_boost);
+ fail_vbus:
+ 	clk_disable_unprepare(phy_drd->ref_clk);
+ 	if (!IS_ERR(phy_drd->pipeclk))
+@@ -493,6 +505,8 @@ static int exynos5_usbdrd_phy_power_off(struct phy *phy)
+ 	/* Disable VBUS supply */
+ 	if (phy_drd->vbus)
+ 		regulator_disable(phy_drd->vbus);
++	if (phy_drd->vbus_boost)
++		regulator_disable(phy_drd->vbus_boost);
+ 
+ 	clk_disable_unprepare(phy_drd->ref_clk);
+ 	if (!IS_ERR(phy_drd->pipeclk))
+@@ -645,7 +659,7 @@ static int exynos5_usbdrd_phy_probe(struct platform_device *pdev)
+ 		break;
+ 	}
+ 
+-	/* Get Vbus regulator */
++	/* Get Vbus regulators */
+ 	phy_drd->vbus = devm_regulator_get(dev, "vbus");
+ 	if (IS_ERR(phy_drd->vbus)) {
+ 		ret = PTR_ERR(phy_drd->vbus);
+@@ -655,6 +669,15 @@ static int exynos5_usbdrd_phy_probe(struct platform_device *pdev)
+ 		dev_warn(dev, "Failed to get VBUS supply regulator\n");
+ 		phy_drd->vbus = NULL;
+ 	}
++	phy_drd->vbus_boost = devm_regulator_get(dev, "vbus-boost");
++	if (IS_ERR(phy_drd->vbus_boost)) {
++		ret = PTR_ERR(phy_drd->vbus_boost);
++		if (ret == -EPROBE_DEFER)
++			return ret;
 +
-+	phy_drd->utmiclk = devm_clk_get(dev, "phy_utmi");
-+	if (IS_ERR(phy_drd->utmiclk))
-+		dev_warn(dev, "Failed to get utmi phy operational clock\n");
-+
- 	phy_drd->ref_clk = devm_clk_get(dev, "ref");
- 	if (IS_ERR(phy_drd->ref_clk)) {
- 		dev_err(dev, "Failed to get reference clock of usbdrd phy\n");
++		dev_warn(dev, "Failed to get VBUS boost supply regulator\n");
++		phy_drd->vbus_boost = NULL;
++	}
+ 
+ 	dev_vdbg(dev, "Creating usbdrd_phy phy\n");
+ 
 -- 
 1.7.10.4
