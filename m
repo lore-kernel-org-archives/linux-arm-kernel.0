@@ -1,187 +1,107 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Wed, 27 Aug 2014 20:56:39 -0700
-Subject: [PATCH 11/14] arm64: dts: Add initial device tree support for
- EXYNOS7
-In-Reply-To: <1409132660-1898-3-git-send-email-ch.naveen@samsung.com>
+Date: Wed, 27 Aug 2014 21:00:15 -0700
+Subject: [PATCH 12/14] arm64: dts: add Exynos7 based Espresso board dts
+ file
+In-Reply-To: <1409132660-1898-4-git-send-email-ch.naveen@samsung.com>
 References: <1409132660-1898-1-git-send-email-ch.naveen@samsung.com>
- <1409132660-1898-3-git-send-email-ch.naveen@samsung.com>
-Message-ID: <20140828035639.GB4972@localhost>
+ <1409132660-1898-4-git-send-email-ch.naveen@samsung.com>
+Message-ID: <20140828040015.GC4972@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-On Wed, Aug 27, 2014 at 03:14:18PM +0530, Naveen Krishna Chatradhi wrote:
-> Add initial device tree nodes for EXYNOS7 SoC.
-> Also, includes the dt-binding definitions for clock ids.
-
-Uh, no -- it just adds the dtsi.
-
+On Wed, Aug 27, 2014 at 03:14:19PM +0530, Naveen Krishna Chatradhi wrote:
+> This patch adds initial dts file for the Espresso board
+> based on Exynos7 from Samsung.
+> 
 > Signed-off-by: Naveen Krishna Chatradhi <ch.naveen@samsung.com>
-> Cc: Thomas Abraham <thomas.ab@samsung.com>
 > Cc: Rob Herring <robh@kernel.org>
 > Cc: Catalin Marinas <catalin.marinas@arm.com>
 > ---
->  arch/arm64/boot/dts/exynos7.dtsi |  553 ++++++++++++++++++++++++++++++++++++++
->  1 file changed, 553 insertions(+)
->  create mode 100644 arch/arm64/boot/dts/exynos7.dtsi
+>  arch/arm64/boot/dts/Makefile             |    1 +
+>  arch/arm64/boot/dts/exynos7-espresso.dts |   69 ++++++++++++++++++++++++++++++
+>  2 files changed, 70 insertions(+)
+>  create mode 100644 arch/arm64/boot/dts/exynos7-espresso.dts
 > 
-> diff --git a/arch/arm64/boot/dts/exynos7.dtsi b/arch/arm64/boot/dts/exynos7.dtsi
+> diff --git a/arch/arm64/boot/dts/Makefile b/arch/arm64/boot/dts/Makefile
+> index c52bdb0..d160de1 100644
+> --- a/arch/arm64/boot/dts/Makefile
+> +++ b/arch/arm64/boot/dts/Makefile
+> @@ -1,5 +1,6 @@
+>  dtb-$(CONFIG_ARCH_VEXPRESS) += rtsm_ve-aemv8a.dtb foundation-v8.dtb
+>  dtb-$(CONFIG_ARCH_XGENE) += apm-mustang.dtb
+> +dtb-$(CONFIG_ARCH_EXYNOS7) += exynos7-espresso.dtb
+
+As mentioned on the dtsi patch, please create a subdirectory.
+
+>  targets += dtbs
+>  targets += $(dtb-y)
+> diff --git a/arch/arm64/boot/dts/exynos7-espresso.dts b/arch/arm64/boot/dts/exynos7-espresso.dts
 > new file mode 100644
-> index 0000000..6b9eaf4
+> index 0000000..e35e83c
 > --- /dev/null
-> +++ b/arch/arm64/boot/dts/exynos7.dtsi
-
-Let's not make the same mistake as on 32-bit, and go with a directory
-hierarchy here from day one.
-
-So, please create a exynos subdirectory for this file. You also need
-a Makefile when you add a board dts.
-
-> @@ -0,0 +1,553 @@
+> +++ b/arch/arm64/boot/dts/exynos7-espresso.dts
+> @@ -0,0 +1,69 @@
 > +/*
-> + * SAMSUNG EXYNOS7 SoC device tree source
+> + * SAMSUNG Espresso board device tree source
 > + *
 > + * Copyright (c) 2014 Samsung Electronics Co., Ltd.
 > + *		http://www.samsung.com
 > + *
-> + * SAMSUNG EXYNOS7 SoC device nodes are listed in this file.
-> + * EXYNOS7 based board files can include this file and provide
-> + * values for board specfic bindings.
-> + *
 > + * This program is free software; you can redistribute it and/or modify
 > + * it under the terms of the GNU General Public License version 2 as
 > + * published by the Free Software Foundation.
-> + */
+> +*/
 > +
-> +#include <dt-bindings/clock/exynos7-clk.h>
+> +/dts-v1/;
+> +#include <dt-bindings/gpio/gpio.h>
+> +#include "exynos7.dtsi"
 > +
 > +/ {
-> +	compatible = "samsung,exynos7";
-> +	interrupt-parent = <&gic>;
-> +	#address-cells = <1>;
-> +	#size-cells = <1>;
+> +	model = "Samsung ESPRESSO board based on EXYNOS7";
+> +	compatible = "samsung,espresso", "samsung,exynos7";
+> +
+> +	chosen {
+> +		bootargs = "console=ttySAC2,115200n8 root=/dev/ram0 ramdisk=16384 initrd=0x42000000,16M init=/linuxrc";
 
-You should probably use address-cells/size-cells 2/2 on a 64-bit platform.
+Having ramdisk bootargs like these in the upstream dts doesn't make much
+sense. Configure your bootloader to pass them in instead.
 
-> +	aliases {
-> +		pinctrl0 = &pinctrl_0;
-> +		pinctrl1 = &pinctrl_1;
-> +		pinctrl2 = &pinctrl_2;
-> +		pinctrl3 = &pinctrl_3;
-> +		pinctrl4 = &pinctrl_4;
-> +		pinctrl5 = &pinctrl_5;
-> +		pinctrl6 = &pinctrl_6;
-> +		pinctrl7 = &pinctrl_7;
-> +		pinctrl8 = &pinctrl_8;
-> +		pinctrl9 = &pinctrl_9;
-> +		mshc0 = &mmc_0;
-> +		mshc2 = &mmc_2;
+You might want to specify the console through chosen instead, there's
+been recent support added for that.
+
+> +
+> +	memory at 40000000 {
+> +		device_type = "memory";
+> +		reg = <0x40000000 0xC0000000>;
 > +	};
 > +
-> +	chipid at 10000000 {
-> +		compatible = "samsung,exynos4210-chipid";
-> +		reg = <0x10000000 0x100>;
-> +	};
+> +	mmc at 15740000 {
+> +		status = "okay";
+> +		num-slots = <1>;
+> +		broken-cd;
+> +		caps2-mmc-hs200-1_8v;
+> +		supports-highspeed;
+> +		non-removable;
+> +		card-detect-delay = <200>;
+> +		clock-frequency = <800000000>;
+> +		samsung,dw-mshc-ciu-div = <3>;
+> +		samsung,dw-mshc-sdr-timing = <0 4>;
+> +		samsung,dw-mshc-ddr-timing = <0 2>;
+> +		pinctrl-names = "default";
+> +		pinctrl-0 = <&sd0_clk &sd0_cmd &sd0_rdqs &sd0_bus1 &sd0_bus4 &sd0_bus8>;
+> +		bus-width = <8>;
 > +
-> +	cpus {
-> +		#address-cells = <2>;
-> +		#size-cells = <0>;
-
-Why size-cells=2? Can you not fit a cpuid in 32 bits?
-
-> +		cpu at 0 {
-> +			device_type = "cpu";
-> +			compatible = "arm,cortex-a57", "arm,armv8";
-> +			reg = <0x0 0x0>;
+> +		slot at 0 {
+> +			reg = <0>;
+> +			bus-width = <8>;
 > +		};
-> +	};
-> +
-> +	fin_pll: xxti {
-> +		compatible = "fixed-clock";
-> +		clock-frequency = <24000000>;
-> +		clock-output-names = "fin_pll";
-> +		#clock-cells = <0>;
-> +	};
-> +
-> +	gic: interrupt-controller at 11001000 {
-> +		compatible = "arm,gic-400";
-> +		#interrupt-cells = <3>;
-> +		#address-cells = <0>;
-> +		interrupt-controller;
-> +		reg =	<0x11001000 0x1000>,
-> +			<0x11002000 0x1000>,
-> +			<0x11004000 0x2000>,
-> +			<0x11006000 0x2000>;
-> +	};
-> +
-> +	hsi2c_0: hsi2c at 13640000 {
-> +		compatible = "samsung,exynos7-hsi2c";
 
-Is the i2c controller here completely new?
+I thought the use of slot was deprecated. Why do you have it here?
 
-Also, please use 'i2c' for node name on these nodes.
-
-> +		reg = <0x13640000 0x1000>;
-> +		interrupts = <0 441 0>;
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +		pinctrl-names = "default";
-> +		pinctrl-0 = <&hs_i2c0_bus>;
-> +		clocks = <&clock_peric0 PCLK_HSI2C0>;
-> +		clock-names = "hsi2c";
-> +		status = "disabled";
-> +	};
-> +
-> +	hsi2c_1: hsi2c at 13650000 {
-> +		compatible = "samsung,exynos7-hsi2c";
-> +		reg = <0x13650000 0x1000>;
-> +		interrupts = <0 442 0>;
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +		pinctrl-names = "default";
-> +		pinctrl-0 = <&hs_i2c1_bus>;
-> +		clocks = <&clock_peric0 PCLK_HSI2C1>;
-> +		clock-names = "hsi2c";
-> +		status = "disabled";
-> +	};
-> +
-> +	hsi2c_2: hsi2c at 14E60000 {
-
-I much prefer lowercase hex in unit addresses (and reg entries) below. I
-know 32-bit uses uppercase, but let's switch going forward here.
-
-> +	mct at 101C0000 {
-> +		compatible = "samsung,exynos4210-mct";
-
-Please just do away with MCT here, and use architected timers going
-forward. There really shouldn't be a need to keep supporting MCT any
-more -- it's a construct from before arch timers on Cortex-A9.
-
-> +	mmc_0: mmc at 15740000 {
-> +		compatible = "samsung,exynos7-dw-mshc-smu";
-
-Is this controller backwards compatible with exynos5 ones?
-
-> +	/* The Clock nodes are ordered as per the usermanual. */
-
-"The clock"
-
-"user manual"
-
-> +	timer {
-> +	        compatible = "arm,armv8-timer";
-> +	        interrupts = <1 13 0xff01>,
-> +	                     <1 14 0xff01>,
-> +	                     <1 11 0xff01>,
-> +	                     <1 10 0xff01>;
-> +	        clock-frequency = <24000000>;
-> +		use-clocksource-only;
-> +		use-physical-timer;
-
-These two properties are not standard, and I would expect any 64-bit
-platform to come with PSCI such that you have a way to initialize the
-virtual timers.
+Also, as mentioned by others elsewhere, please use references instead
+of duplicating the structure here.
 
 
 -Olof
