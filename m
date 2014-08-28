@@ -1,51 +1,72 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Thu, 28 Aug 2014 17:26:43 -0400
-Subject: [PATCH 0/2] IO voltage domain support for rk3188 and rk3288
-In-Reply-To: <1409254565-10677-1-git-send-email-dianders@chromium.org>
-References: <1409254565-10677-1-git-send-email-dianders@chromium.org>
-Message-ID: <53FF9E93.3040601@ti.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Thu, 28 Aug 2014 15:23:49 -0700
+Subject: [PATCH 11/14] arm64: dts: Add initial device tree support for
+ EXYNOS7
+In-Reply-To: <CAL_JsqLVsjJVL+GoJVMoXGiGxVKSh0oyJ-nwKEkXfa+fWid7yA@mail.gmail.com>
+References: <1409132660-1898-1-git-send-email-ch.naveen@samsung.com>
+ <1409132660-1898-3-git-send-email-ch.naveen@samsung.com>
+ <20140828035639.GB4972@localhost>
+ <20140828094846.GD14650@leverpostej>
+ <CAOesGMjY8wfAcq2fLgs=ZWHdiWtFqxr+ncUKTje0SnXqO-CCgQ@mail.gmail.com>
+ <20140828170306.GQ14650@leverpostej>
+ <CAOesGMgYeFObKHA9znzBq9t2mLv8WWT1QaKugQ6yf7RgV09Qyg@mail.gmail.com>
+ <CAL_JsqLVsjJVL+GoJVMoXGiGxVKSh0oyJ-nwKEkXfa+fWid7yA@mail.gmail.com>
+Message-ID: <CAOesGMhsayvhBK_gVgzB3+69YC1Ca6hsBHsONJm_QEcSKpVZOw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 28 August 2014 03:36 PM, Doug Anderson wrote:
-> These two patches add support for automatically configuring the IO
-> voltage domains on rk3188 and rk3288 SoCs.  The first patch adds some
-> new notification types to the regulator code.  It's used by the second
-> patch which actually implements the IO voltage domain driver.
-> 
-> These two patches were co-developed by Heiko St?bner and Doug Anderson
-> (proof of concept patches were written by Heiko).  They were tested in
-> a private branch on an rk3288 board using rk808 instead of mainline
-> since rk808 support isn't finalized in mainline yet.
-> 
-> (sorry if you got this series twice; my mailer seems unhappy with me)
-> 
-> Heiko St?bner (2):
->   regulator: core: Add REGULATOR_EVENT_PRE_VOLTAGE_CHANGE (and ABORT)
->   soc/rockchip: io-domain: add driver handling io domains
-> 
-Sorry to shot down but your IO domains are nothing but voltage domains
-and you should really build something in the drivers/power/*
+On Thu, Aug 28, 2014 at 10:54 AM, Rob Herring <robh@kernel.org> wrote:
+> On Thu, Aug 28, 2014 at 12:19 PM, Olof Johansson <olof@lixom.net> wrote:
+>> On Thu, Aug 28, 2014 at 10:03 AM, Mark Rutland <mark.rutland@arm.com> wrote:
+>>> On Thu, Aug 28, 2014 at 05:28:22PM +0100, Olof Johansson wrote:
+>>>> On Thu, Aug 28, 2014 at 2:48 AM, Mark Rutland <mark.rutland@arm.com> wrote:
+>>>> > Hi,
+>>>> >
+>>>> >> > +   cpus {
+>>>> >> > +           #address-cells = <2>;
+>>>> >> > +           #size-cells = <0>;
+>>>> >>
+>>>> >> Why size-cells=2? Can you not fit a cpuid in 32 bits?
+>>>> >
+>>>> > As of commit 72aea393a2e7 (arm64: smp: honour #address-size when parsing
+>>>> > CPU reg property) Linux can handle single-cell cpu node reg entries
+>>>> > where /cpus/#address-cells = <1>.
+>>>> >
+>>>> > I can't make any guarantees about other code (e.g. bootloaders) which
+>>>> > might try to do things with cpu nodes, YMMV.
+>>>>
+>>>> Ok. If address-cells is kept at 2 the unit address needs to be changed
+>>>> to "0,0". So one or the other has to be changed.
+>>>
+>>> I'm happy either way.
+>>>
+>>> I'm not sure the rest of the tree had "0," prefixes on all of the
+>>> unit-addresses for 64-bit addresses that were under 4GB, and I'm not
+>>> sure that existing dts consistently do that either.
+>>>
+>>> Do we want to enforce that for all 64-bit unit-addresses?
+>>
+>> Yeah, I believe that's the only valid format for a 2-address-cell unit address.
+>
+> But we don't do leading 0's anywhere else like single cell unit
+> addresses. Buses expressed with ranges and offsets are one example.
+> Also, I2C addresses have a 32-bit size in DT yet are only 8-bit and we
+> don't do leading zero's there.
 
-Please have a look at the RFC [1]. You should really go on those
-lines and collaborate to make a generic voltage domain layer instead of throwing
-the driver under drivers/soc. 
+Ok, I'm happily proven wrong here, also by confirming how this is done
+on "real" OF.
 
->  .../devicetree/bindings/arm/rockchip/io-domain.txt |  60 ++++
->  drivers/regulator/core.c                           |  63 +++-
->  drivers/soc/Kconfig                                |   1 +
->  drivers/soc/Makefile                               |   1 +
->  drivers/soc/rockchip/Kconfig                       |  10 +
->  drivers/soc/rockchip/Makefile                      |   1 +
->  drivers/soc/rockchip/io-domain.c                   | 333 +++++++++++++++++++++
->  include/linux/regulator/consumer.h                 |  20 ++
->  8 files changed, 482 insertions(+), 7 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/arm/rockchip/io-domain.txt
->  create mode 100644 drivers/soc/rockchip/Kconfig
->  create mode 100644 drivers/soc/rockchip/Makefile
->  create mode 100644 drivers/soc/rockchip/io-domain.c
-> 
+According to benh:
 
-Regards,
-Santosh
-[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2014-February/233819.html
+15:20 <benh> ojn: 0,0 is not quite right, it's supposed to be used
+when the two numbers are different things, like device,fn on PCI
+
+The same is true for >2^32 unit addresses, they just use the one
+integer instead of x,y.
+
+So, I take back all I've said on this in the last 72 hours. :) It
+looks like we might need to revisit some of the 32-bit DTs.  Simon,
+drop the series you had. :)
+
+
+-Olof
