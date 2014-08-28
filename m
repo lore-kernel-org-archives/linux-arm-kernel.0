@@ -1,40 +1,73 @@
-From: soren.brinkmann@xilinx.com (Soren Brinkmann)
-Date: Thu, 28 Aug 2014 09:22:53 -0700
-Subject: [PATCH] ARM: zynq: DT: Add LEDs to zc702 DT
-Message-ID: <1409242973-2735-1-git-send-email-soren.brinkmann@xilinx.com>
+From: scottwood@freescale.com (Scott Wood)
+Date: Thu, 28 Aug 2014 11:25:45 -0500
+Subject: [RESEND] clk: ppc-corenet: Add Freescale ARM-based platforms
+ CLK_OF_DECLARE support
+In-Reply-To: <f7b4263f189346a391d66c85756b4907@BL2PR03MB467.namprd03.prod.outlook.com>
+References: <1408700096-25415-1-git-send-email-jingchang.lu@freescale.com>
+ <1409093463.6510.92.camel@snotra.buserror.net>
+ <164af7b3be3747a0be3fe3a6cf83d3b1@BL2PR03MB467.namprd03.prod.outlook.com>
+ <1409182412.6510.129.camel@snotra.buserror.net>
+ <f7b4263f189346a391d66c85756b4907@BL2PR03MB467.namprd03.prod.outlook.com>
+Message-ID: <1409243145.6510.160.camel@snotra.buserror.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ezra Savard <ezra.savard@xilinx.com>
+On Thu, 2014-08-28 at 05:05 -0500, Lu Jingchang-B35083 wrote:
+> >-----Original Message-----
+> >From: Wood Scott-B07421
+> >Sent: Thursday, August 28, 2014 7:34 AM
+> >To: Lu Jingchang-B35083
+> >Cc: mturquette at linaro.org; linuxppc-dev at lists.ozlabs.org; linux-
+> >kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org
+> >Subject: Re: [RESEND] clk: ppc-corenet: Add Freescale ARM-based platforms
+> >CLK_OF_DECLARE support
+> >
+> >On Tue, 2014-08-26 at 21:19 -0500, Lu Jingchang-B35083 wrote:
+> >> >-----Original Message-----
+> >> >From: Wood Scott-B07421
+> >> >Sent: Wednesday, August 27, 2014 6:51 AM
+> >> >To: Lu Jingchang-B35083
+> >> >Cc: mturquette at linaro.org; linuxppc-dev at lists.ozlabs.org; linux-
+> >> >kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org
+> >> >Subject: Re: [RESEND] clk: ppc-corenet: Add Freescale ARM-based
+> >> >platforms CLK_OF_DECLARE support
+> >> >
+> >> >On Fri, 2014-08-22 at 17:34 +0800, Jingchang Lu wrote:
+> >> >> +CLK_OF_DECLARE(ppc_core_pll_v1, "fsl,qoriq-core-pll-1.0",
+> >> >core_pll_init);
+> >> >> +CLK_OF_DECLARE(ppc_core_pll_v2, "fsl,qoriq-core-pll-2.0",
+> >> >core_pll_init);
+> >> >> +CLK_OF_DECLARE(ppc_core_mux_v1, "fsl,qoriq-core-mux-1.0",
+> >> >core_mux_init);
+> >> >> +CLK_OF_DECLARE(ppc_core_mux_v2, "fsl,qoriq-core-mux-2.0",
+> >> >core_mux_init);
+> >> >
+> >> >What does this do that the existing platform driver and match table
+> >> >don't?  Why is it needed for ARM when PPC didn't need it?
+> >> >
+> >> >-Scott
+> >> >
+> >> Common clk init on ARM platform is initialized earlier via
+> >> of_clk_init() instead of driver probe method, the of_clk_init will
+> >> walk a __clk_of_table to init each clk provider in the table, the
+> >> CLK_OF_DECLARE() macro puts a supported clk in the __clk_of_table for it
+> >initializing on starup, and the clk system has added some common clk such
+> >as "fixed-clk"
+> >> to this table already.
+> >> So here I add our specific clk init declaration to consist this
+> >> framework, and the driver probe function will not be needed on ARM.
+> >
+> >OK... Is there any reason why the new method won't work on PPC?
+> >
+> PPC has little dependence on the clock tree but frequency, it will work well
+> if adopted I think.
 
-Adds LEDs to the zc702 devicetree for use with the leds-gpio driver.
+I'm just saying it seems redundant to have both.  Even on ARM, won't
+this result in the clock getting registered twice (albeit with one of
+those times being too late)?
 
-Signed-off-by: Ezra Savard <ezra.savard@xilinx.com>
-Reviewed-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
----
- arch/arm/boot/dts/zynq-zc702.dts | 10 ++++++++++
- 1 file changed, 10 insertions(+)
+Regardless of what dependence PPC has on the clock tree, what stops this
+method of enumeration from working on PPC?  Is there anything required
+other than inserting a call to of_clk_init(NULL) in the arch init code?
 
-diff --git a/arch/arm/boot/dts/zynq-zc702.dts b/arch/arm/boot/dts/zynq-zc702.dts
-index 835c3089c61c..4e9fe26b3e85 100644
---- a/arch/arm/boot/dts/zynq-zc702.dts
-+++ b/arch/arm/boot/dts/zynq-zc702.dts
-@@ -27,6 +27,16 @@
- 		bootargs = "console=ttyPS0,115200 earlyprintk";
- 	};
- 
-+	gpio-leds {
-+		compatible = "gpio-leds";
-+
-+		led-ds23 {
-+			label = "ds23";
-+			gpios = <&gpio0 10 0>;
-+			linux,default-trigger = "heartbeat";
-+		};
-+	};
-+
- };
- 
- &can0 {
--- 
-2.1.0.1.g27b9230
+-Scott
