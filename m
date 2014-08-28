@@ -1,62 +1,28 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 28 Aug 2014 16:01:12 +0100
-Subject: [PATCH v10 03/19] arm: fiq: Replace default FIQ handler
-In-Reply-To: <53F39377.1070308@linaro.org>
-References: <1408369264-14242-1-git-send-email-daniel.thompson@linaro.org>
- <1408466769-20004-1-git-send-email-daniel.thompson@linaro.org>
- <1408466769-20004-4-git-send-email-daniel.thompson@linaro.org>
- <20140819173742.GG30401@n2100.arm.linux.org.uk> <53F39377.1070308@linaro.org>
-Message-ID: <20140828150112.GD30401@n2100.arm.linux.org.uk>
+From: dforsi@gmail.com (Daniele Forsi)
+Date: Thu, 28 Aug 2014 17:06:58 +0200
+Subject: [PATCH 5/5] phy: exynos5-usbdrd: Adding Kconfig dependency for
+ Exynos7
+In-Reply-To: <1409212920-28526-6-git-send-email-gautam.vivek@samsung.com>
+References: <1409212920-28526-1-git-send-email-gautam.vivek@samsung.com>
+ <1409212920-28526-6-git-send-email-gautam.vivek@samsung.com>
+Message-ID: <CAN_we7MQAqEsRaQc_pkRE_KXx9zZNLDBR2aHUrazM30Nv3udmQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 19, 2014 at 07:12:07PM +0100, Daniel Thompson wrote:
-> On 19/08/14 18:37, Russell King - ARM Linux wrote:
-> > On Tue, Aug 19, 2014 at 05:45:53PM +0100, Daniel Thompson wrote:
-> >> +int register_fiq_nmi_notifier(struct notifier_block *nb)
-> >> +{
-> >> +	return atomic_notifier_chain_register(&fiq_nmi_chain, nb);
-> >> +}
-> >> +
-> >> +asmlinkage void __exception_irq_entry fiq_nmi_handler(struct pt_regs *regs)
-> >> +{
-> >> +	struct pt_regs *old_regs = set_irq_regs(regs);
-> >> +
-> >> +	nmi_enter();
-> >> +	atomic_notifier_call_chain(&fiq_nmi_chain, (unsigned long)regs, NULL);
-> >> +	nmi_exit();
-> >> +	set_irq_regs(old_regs);
-> >> +}
-> > 
-> > Really not happy with this.  What happens if a FIQ occurs while we're
-> > inside register_fiq_nmi_notifier() - more specifically inside
-> > atomic_notifier_chain_register() ?
-> 
-> Should depend on which side of the rcu update we're on.
+2014-08-28 10:02 GMT+02:00 Vivek Gautam:
 
-I just asked Paul McKenney, our RCU expert... essentially, yes, RCU
-stuff itself is safe in this context.  However, RCU stuff can call into
-lockdep if lockdep is configured, and there are questions over lockdep.
+> This USB 3.0 PHY controller is also present on Exynos7
+> platform, so adding the dependency on ARCH_EXYNOS7 for this driver.
 
-There's some things which can be done to reduce the lockdep exposure
-to it, such as ensuring that rcu_read_lock() is first called outside
-of FIQ context.
+> +++ b/drivers/phy/Kconfig
+> @@ -186,7 +186,7 @@ config PHY_EXYNOS5250_USB2
+>
+>  config PHY_EXYNOS5_USBDRD
+>         tristate "Exynos5 SoC series USB DRD PHY driver"
+> -       depends on ARCH_EXYNOS5 && OF
+> +       depends on (ARCH_EXYNOS5 || ARCH_EXYNOS7) && OF
 
-There's concerns with whether either printk() in check_flags() could
-be reached too (flags there should always indicate that IRQs were
-disabled, so that reduces down to a question about just the first
-printk() there.)
-
-There's also the very_verbose() stuff for RCU lockdep classes which
-Paul says must not be enabled.
-
-Lastly, Paul isn't a lockdep expert, but he sees nothing that prevents
-lockdep doing the deadlock checking as a result of the above call.
-
-So... this coupled with my feeling that notifiers make it too easy for
-unreviewed code to be hooked into this path, I'm fairly sure that we
-don't want to be calling atomic notifier chains from FIQ context.
+shouldn't that prompt and its help text be updated to mention also Exynos7?
 
 -- 
-FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
-according to speedtest.net.
+Daniele Forsi
