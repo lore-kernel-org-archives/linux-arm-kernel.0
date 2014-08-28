@@ -1,49 +1,98 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 28 Aug 2014 11:01:07 -0700
-Subject: [PATCH 1/4] arm: omap: tao3530: Add pdata-quirk for the mmc2
- internal clock
-In-Reply-To: <1409245829-3938-1-git-send-email-sr@denx.de>
-References: <1409245829-3938-1-git-send-email-sr@denx.de>
-Message-ID: <20140828180106.GI16006@atomide.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 28 Aug 2014 19:04:23 +0100
+Subject: [PATCH] clocksource: arch_timer: Fix code to use physical timers
+ when requested
+In-Reply-To: <53FF624C.3090002@codeaurora.org>
+References: <1409173419-13076-1-git-send-email-sonnyrao@chromium.org>
+ <CAOesGMjK65Rc-K0fyFUUJLw6huLT82E-nqJwZO4PqhgopF96Ow@mail.gmail.com>
+ <CAPz6YkWAPtuy4sAuAK9GtpDgfGsccxeS+pqqe_t_R818Jt01qA@mail.gmail.com>
+ <53FE5B09.2020403@codeaurora.org>
+ <CAOesGMhTivDzJFuxONggcJ6N5UvZopKa=+tv9PoPX593cpnm0A@mail.gmail.com>
+ <53FE7E3B.1010500@codeaurora.org>
+ <CAOesGMgXnsqttHwAxEW4a7-Rx-nmSwpJd_Dt1iCcFOvzDwbzdA@mail.gmail.com>
+ <CAD=FV=VjN6Xam-nRRcxvOoN-gokU6DbGVjoPXN_fkTJssH1RWA@mail.gmail.com>
+ <20140828093505.GC14650@leverpostej>
+ <53FF624C.3090002@codeaurora.org>
+Message-ID: <20140828180423.GE18005@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Stefan Roese <sr@denx.de> [140828 10:10]:
+On Thu, Aug 28, 2014 at 06:09:32PM +0100, Christopher Covington wrote:
+> Hi Mark,
 
-Missing description..
+Hi Christopher,
 
-> Signed-off-by: Stefan Roese <sr@denx.de>
-> Cc: Thorsten Eisbein <thorsten.eisbein@head-acoustics.de>
-> Cc: Tapani Utriainen <tapani@technexion.com>
-> Cc: Tony Lindgren <tony@atomide.com>
-> ---
->  arch/arm/mach-omap2/pdata-quirks.c | 6 ++++++
->  1 file changed, 6 insertions(+)
+> On 08/28/2014 05:35 AM, Mark Rutland wrote:
+> > On Thu, Aug 28, 2014 at 04:33:31AM +0100, Doug Anderson wrote:
+> >> Hi,
+> >>
+> >> On Wed, Aug 27, 2014 at 7:58 PM, Olof Johansson <olof@lixom.net> wrote:
+> >>> On Wed, Aug 27, 2014 at 5:56 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
+> >>>> On 08/27/14 15:33, Olof Johansson wrote:
+> >>>>> On Wed, Aug 27, 2014 at 3:26 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
+> >>>>>
+> >>>>>> Is there any reason why the virtual counter can't be read? Maybe we're
+> >>>>>> the hyp and we need to make sure we don't use the virtual timer so that
+> >>>>>> the guest can use it, but that doesn't have any effect on the usage of
+> >>>>>> the virtual counter for the clocksource.
+> >>>>>
+> >>>>> There are several cases where virtual is unusable -- in particular it
+> >>>>> might not have been configured properly (i.e. the phys/virt offset is
+> >>>>> at a bad value).
+> >>>>
+> >>>> Any specifics? It would be nice to say so in the commit text so that
+> >>>> others using such devices know they need this patch. I'm guessing the
+> >>>> firmware can't be fixed?
+> >>
+> >> Even if we could change things to use a virtual timer in some cases,
+> >> Sonny's patch still fixes a bug.  The code as written right now makes
+> >> pretenses about supporting the physical timer, but it doesn't work.
+> >> That should be fixed.
+> > 
+> > The code does support the physical timer. It does not support the
+> > physical counter (and makes no pretenses that it does).
 > 
-> diff --git a/arch/arm/mach-omap2/pdata-quirks.c b/arch/arm/mach-omap2/pdata-quirks.c
-> index 90c88d4..b9d091b 100644
-> --- a/arch/arm/mach-omap2/pdata-quirks.c
-> +++ b/arch/arm/mach-omap2/pdata-quirks.c
-> @@ -253,6 +253,11 @@ static void __init nokia_n900_legacy_init(void)
->  
->  	}
->  }
-> +
-> +static void __init omap3_tao3530_legacy_init(void)
-> +{
-> +	hsmmc2_internal_input_clk();
-> +}
->  #endif /* CONFIG_ARCH_OMAP3 */
->  
->  #ifdef CONFIG_ARCH_OMAP4
-> @@ -377,6 +382,7 @@ static struct pdata_init pdata_quirks[] __initdata = {
->  	{ "ti,omap3-evm-37xx", omap3_evm_legacy_init, },
->  	{ "ti,omap3-zoom3", omap3_zoom_legacy_init, },
->  	{ "ti,am3517-evm", am3517_evm_legacy_init, },
-> +	{ "technexion,omap3-tao3530", omap3_tao3530_legacy_init, },
->  #endif
->  #ifdef CONFIG_ARCH_OMAP4
->  	{ "ti,omap4-sdp", omap4_sdp_legacy_init, },
-> -- 
-> 2.1.0
+> I think if you could please explain the following code, that may help clear up
+> some of the confusion.
 > 
+> 		if (arch_timer_use_virtual) {
+> 			clk->irq = arch_timer_ppi[VIRT_PPI];
+> 			clk->set_mode = arch_timer_set_mode_virt;
+> 			clk->set_next_event = arch_timer_set_next_event_virt;
+> 		} else {
+> 			clk->irq = arch_timer_ppi[PHYS_SECURE_PPI];
+> 			clk->set_mode = arch_timer_set_mode_phys;
+> 			clk->set_next_event = arch_timer_set_next_event_phys;
+> 		}
+> 
+> http://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/tree/drivers/clocksource/arm_arch_timer.c#n272
+> 
+> Perhaps you mean to say the code does not support *non-secure access* to the
+> physical timer?
+
+Not quite, and one issue here is conflating the timer and the counter.
+
+We use the physical timer iff we know it is accessible and correct to
+use (e.g. when we have been booted at Hyp). If we don't know that,
+arch_timer_use_virtual is set and we use the virtual timer. In that
+sense, we support the use of the physical timer.
+
+If the system is sane (with uniform CNTVOFF), that is fine. The fact
+that we have a broken system to work around does not mean that the
+driver is broken nor that it is making false pretenses. The driver is
+perfectly functional given a sane environment.
+
+The use of virtual/physical is not a feature that falls to personal
+preference; it is a requirement for correctness that we only use the
+physical timer when we have an absolute guarantee that it is possible
+and correct to do so. So saying that we "support" the physical timer is
+also somewhat misleading; we use what we must.
+
+We _always_ use the virtual counter rather than the physical counter as
+this saved on having different paths for host and guest (which is
+important for the 64-bit VDSO, for example). In that sense we do not
+support the use of the physical counter. We don't need to use it in a
+sane system.
+
+Thanks,
+Mark.
