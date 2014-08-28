@@ -1,189 +1,30 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 28 Aug 2014 09:46:46 -0700
-Subject: [PATCH 15/15] tty: serial: 8250: omap: add dma support
-In-Reply-To: <20140828082348.GA5413@linutronix.de>
-References: <1408124563-31541-1-git-send-email-bigeasy@linutronix.de>
- <1408124563-31541-16-git-send-email-bigeasy@linutronix.de>
- <20140815210211.GD9239@atomide.com>
- <53F5AF0D.5060409@linutronix.de>
- <20140821184416.GF10066@atomide.com>
- <53FE3779.5090908@linutronix.de>
- <20140827202313.GF16006@atomide.com>
- <20140828082348.GA5413@linutronix.de>
-Message-ID: <20140828164645.GG16006@atomide.com>
+From: libv@skynet.be (Luc Verhaegen)
+Date: Thu, 28 Aug 2014 18:50:31 +0200
+Subject: [linux-sunxi] Re: [PATCH 4/4] simplefb: add clock handling code
+In-Reply-To: <CAKON4OyB55L5q7fVo43V8kgtqHRZ3vkBMaA+Htxpob-FA1obaA@mail.gmail.com>
+References: <53FDB46C.5010609@redhat.com> <20140827125613.GF23186@ulmo>
+ <53FDE0CE.5030807@redhat.com> <20140827141632.GB32243@ulmo>
+ <53FF1D6C.6090205@redhat.com>
+ <CAKON4OyXPjXx4q828kFgMsC_u7u3nqLPLxOp-kRZbS27yRKOEg@mail.gmail.com>
+ <CAMuHMdU+zxUCU05YOpyuP1fx=Dgb5SZu=vbaJW13sQAaMBwU_w@mail.gmail.com>
+ <CAKON4Oy8X9CSpZjYnTRgZ_MsxXQ=zaP+kxiZ2b7Es4GjN+1iJw@mail.gmail.com>
+ <CAOMqctRvNbvFTb9dixCO1D0PfOWDgmBBs2U3yR5pvL8dFM_Lvw@mail.gmail.com>
+ <CAKON4OyB55L5q7fVo43V8kgtqHRZ3vkBMaA+Htxpob-FA1obaA@mail.gmail.com>
+Message-ID: <20140828165031.GA7654@skynet.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Sebastian Andrzej Siewior <bigeasy@linutronix.de> [140828 01:24]:
-> * Tony Lindgren | 2014-08-27 13:23:14 [-0700]:
-> >
-> >Do you mean just the OMAP_UART_SCR_DMAMODE_CTL related code, or
-> >also the dmaengine calls?
+On Thu, Aug 28, 2014 at 12:34:58PM -0400, jonsmirl at gmail.com wrote:
 > 
-> dmaengine calls are unused because up.dma is not assigned. It is 
-> basically like you wouldn't have the dma properties in the devicetree.
-> And while in that non-DMA mode I just set and unset the DMAMODE_CTL + 
-> DMAMODE_1 bits in the SCR register. Nothing else. Based on some testing
-> I just did, DMAMODE_CTL does not make the difference. DMAMODE_CTL +
-> DMAMODE_1 does.
+> 2) Spend a day implementing a device specific fbdev driver that does
+> the correct thing all of the time. These drivers would sit in initrd
+> and load before the clock/regulator clean up shuts everything off. Use
+> the existing simplefb code as a template for doing this.
 
-OK
- 
-> >> However core-off with DMA won't work. I think we could document this in
-> >> the binding document. What do you think?
-> >
-> >There should not be such a limitation though. Maybe dump out the values
-> >of cm_idlest_per and cm_idlest1_core for working and failing off idle
-> >cases and see what the difference is?
-> 
-> I can't follow here. This is the working case:
-...
- 
-> so per_pwrdm and core_pwrdm remain on and I guess the former is where
-> the UART sits.
+If that finally ends this discussion, i'll more than happily do it. I'm 
+sure that we've all could've done this a hundred times in the time we've
+wasted here.
 
-That won't show the cm_idlest_per and cm_idlest1_core currently though.
+Good call Geert.
 
-Below is a test patch that allows you to dump those too. Then you
-can see which bits show up as blockers. Sounds like it will be the
-serial port with dma enabled based on your description.
- 
-> >It could be the either the dma or the uart hardware blocking. I guess
-> >it could be also an issue with runtime pm use somewhere.
-> 
-> So I just toggle the two DMA bits in SCR and the UART seems to block
-> since the DMA hw is not involved. Reading SCR back says that those bits
-> are not set.
-
-Oh that's interesting.
-
-> To use DMA you don't have to enable it in SCR register you can also use
-> the FCR register. The manual says that you can only write this DMA
-> enable bit in the FCR register if the baud clock is not running. And
-> guess what: same thing: I only *toggle* the DMA enable bit here (it
-> remains 0 later) and the core won't hit idle.
-> Same effect if I toggle this bit while the baud clock is running (the
-> manual says that this bit can only be written if the baud clock is not
-> running). Seems like the UART is following its own specification and it
-> remains blocking once the DMA was enabled.
-> It would be nice if someone from the UART-IP team could ACK this.
-
-Sounds like there should be some way to clear that state.. I wonder
-if omap-serial.c had something before it's DMA support was removed?
-
-I'd assume when the UART is powered down by runtime PM it's state
-is completetely reset and we could restore the non-DMA state?
-
-Maybe post your current patches and a test patch to try to toggle
-the DMA on and off?
-
-> Bah. Does it make sense to use runtime-PM if we can't hit core-off? I'm
-> thinking to add a printk once dma is enabled says that runtime-pm is
-> switched off.
-
-Well if we can't find a way to unset the DMA registers in the UART,
-how about only enable it if a kernel cmdline option is specified?
-
-We do have runtime PM working without it, and the serial console
-super important for any kind of debugging no matter what idle
-mode the SoC hits.. So let's not break that.
-
-Regards,
-
-Tony
-
-8<-----------------
-From: Tony Lindgren <tony@atomide.com>
-Date: Tue, 26 Aug 2014 14:25:33 -0700
-Subject: [PATCH] Test patch for dumping omap3 off idle blocking bits
-
-Allows seeing the deeper idle state blockers in
-/sys/kernel/debug/pm_debug/count. For example, when
-off idle is working on beaglboard xm, this is what
-i see:
-
-# sleep 5; cat /sys/kernel/debug/pm_debug/count
-...
-0006ffff 48005020 (fa005020) cm_idlest_per blocking bits: 00010000
-e7ffffbd 48004a20 (fa004a20) cm_idlest1_core blocking bits: 00000042
-0000000d 48004a28 (fa004a28) cm_idlest3_core
-
---- a/arch/arm/mach-omap2/pm-debug.c
-+++ b/arch/arm/mach-omap2/pm-debug.c
-@@ -142,10 +142,76 @@ static int pwrdm_dbg_show_timer(struct powerdomain *pwrdm, void *user)
- 	return 0;
- }
- 
-+#include "iomap.h"
-+
-+struct dregs {
-+	const char	*desc;
-+	u32		phys;
-+	void __iomem	*virt;
-+	u32		mask;
-+};
-+
-+#define PER_CM_BASE	0x48005000
-+#define PER_CM_REG(name, offset, mask)				\
-+	{ name, PER_CM_BASE + offset,				\
-+	OMAP2_L4_IO_ADDRESS(PER_CM_BASE + offset), mask, }
-+
-+static struct dregs cm_per[] = {
-+	PER_CM_REG("cm_idlest_per", 0x20, 0xfff80000), /* p 513 */
-+	{ NULL, },
-+};
-+
-+#define CORE_CM_BASE	0x48004a00
-+#define CORE_CM_REG(name, offset, mask)				\
-+	{ name, CORE_CM_BASE + offset,				\
-+	OMAP2_L4_IO_ADDRESS(CORE_CM_BASE + offset), mask, }
-+
-+static struct dregs cm_core[] = {
-+	CORE_CM_REG("cm_idlest1_core", 0x20, 0x9c800109), /* p 467 */
-+	CORE_CM_REG("cm_idlest3_core", 0x28, 0xfffffffb),
-+	{ NULL, },
-+};
-+
-+void __dregs_dump(struct dregs *dregs, struct seq_file *s)
-+{
-+	for (; dregs->desc; dregs++) {
-+		u32 val, blockers;
-+
-+		val = __raw_readl(dregs->virt);
-+
-+		seq_printf(s, "%08x %08x (%p) %s",
-+			   val, dregs->phys, dregs->virt,
-+			   dregs->desc);
-+
-+		if (dregs->mask) {
-+			blockers = ~val;
-+			blockers &= ~dregs->mask;
-+
-+			if (blockers)
-+				seq_printf(s, " blocking bits: %08x",
-+					   blockers);
-+		}
-+
-+		seq_printf(s, "\n");
-+	}
-+}
-+
-+void cm_per_dump(struct seq_file *s)
-+{
-+	__dregs_dump(cm_per, s);
-+}
-+
-+void cm_core_dump(struct seq_file *s)
-+{
-+	__dregs_dump(cm_core, s);
-+}
-+
- static int pm_dbg_show_counters(struct seq_file *s, void *unused)
- {
- 	pwrdm_for_each(pwrdm_dbg_show_counter, s);
- 	clkdm_for_each(clkdm_dbg_show_counter, s);
-+	cm_per_dump(s);
-+	cm_core_dump(s);
- 
- 	return 0;
- }
+Luc Verhaegen.
