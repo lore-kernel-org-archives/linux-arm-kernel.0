@@ -1,44 +1,69 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 28 Aug 2014 12:03:00 +0100
-Subject: [PATCH 1/2] ARM: LPAE: load upper bits of early TTBR0/TTBR1
-In-Reply-To: <CABb+yY1VsEwDi5XCRkKbSNPW_+_MgL4gdAChKgX_NGHRzXq6qw@mail.gmail.com>
-References: <20140722153623.25088.37742.stgit@buzz>
- <20140728181224.GN15536@arm.com>
- <CALYGNiNrK1d32ecz4rw0sgn0GyN-M6hTBuTLGQV53Z4Br-bpYQ@mail.gmail.com>
- <20140728184741.GT15536@arm.com>
- <CALYGNiOd+Dy-2q_woZ9UDbMO24q58jN1Nsq7E8cJMMg_YBK9pA@mail.gmail.com>
- <CABb+yY17Y18oAivi_VxPJqDEGLTbEy_PfsdeK9jXWZ0iV3vZ=w@mail.gmail.com>
- <CALYGNiN-SHr6YJ53_deizb1VoXTBzD7dn8hcwqd4zLjx6utCDw@mail.gmail.com>
- <CABb+yY1VsEwDi5XCRkKbSNPW_+_MgL4gdAChKgX_NGHRzXq6qw@mail.gmail.com>
-Message-ID: <20140828110300.GJ22580@arm.com>
+From: wangnan0@huawei.com (Wang Nan)
+Date: Thu, 28 Aug 2014 19:07:25 +0800
+Subject: [PATCH v5 2/3] kprobes: copy ainsn after alloc aggr kprobe
+In-Reply-To: <53FEF8DC.5010607@hitachi.com>
+References: <1409144552-12751-1-git-send-email-wangnan0@huawei.com>
+ <1409144552-12751-3-git-send-email-wangnan0@huawei.com>
+ <53FEF8DC.5010607@hitachi.com>
+Message-ID: <53FF0D6D.9080302@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 27, 2014 at 04:45:24PM +0100, Jassi Brar wrote:
-> On Wed, Aug 27, 2014 at 9:01 PM, Konstantin Khlebnikov <koct9i@gmail.com> wrote:
-> > On Wed, Aug 27, 2014 at 7:26 PM, Jassi Brar <jassisinghbrar@gmail.com> wrote:
-> >> It seems the patch wasn't tested on any real platform, I did on my
-> >> CA15 based platform - it breaks boot. Simply reverting the patch gets
-> >> it going again. I am happy to try any fix.
-> >>
-> >
-> > Please try to remove adcls line.
-> > Seems like this affects only systems where PHYS_OFFSET == PAGE_OFFSET.
-> >
-> > --- a/arch/arm/mm/proc-v7-3level.S
-> > +++ b/arch/arm/mm/proc-v7-3level.S
-> > @@ -146,7 +146,6 @@ ENDPROC(cpu_v7_set_pte_ext)
-> >         mov     \tmp, \ttbr1, lsr #(32 - ARCH_PGD_SHIFT)        @ upper bits
-> >         mov     \ttbr1, \ttbr1, lsl #ARCH_PGD_SHIFT             @ lower bits
-> >         addls   \ttbr1, \ttbr1, #TTBR1_OFFSET
-> > -       adcls   \tmp, \tmp, #0
-> >         mcrr    p15, 1, \ttbr1, \tmp, c2                        @ load TTBR1
-> >         mov     \tmp, \ttbr0, lsr #(32 - ARCH_PGD_SHIFT)        @ upper bits
-> >         mov     \ttbr0, \ttbr0, lsl #ARCH_PGD_SHIFT             @ lower bits
-> >
-> Yup, restores boot.
+On 2014/8/28 17:39, Masami Hiramatsu wrote:
+> (2014/08/27 22:02), Wang Nan wrote:
+>> Copy old kprobe to newly alloced optimized_kprobe before
+>> arch_prepare_optimized_kprobe(). Original kprove can brings more
+>> information to optimizer.
+>>
+>> Signed-off-by: Wang Nan <wangnan0@huawei.com>
+>> Cc: Russell King <linux@arm.linux.org.uk>
+>> Cc: "David A. Long" <dave.long@linaro.org> 
+>> Cc: Jon Medhurst <tixy@linaro.org>
+>> Cc: Taras Kondratiuk <taras.kondratiuk@linaro.org>
+>> Cc: Ben Dooks <ben.dooks@codethink.co.uk>
+>> Cc: Ananth N Mavinakayanahalli <ananth@in.ibm.com>
+>> Cc: Anil S Keshavamurthy <anil.s.keshavamurthy@intel.com>
+>> Cc: "David S. Miller" <davem@davemloft.net>
+>> Cc: Masami Hiramatsu <masami.hiramatsu.pt@hitachi.com>
+>> Cc: Will Deacon <will.deacon@arm.com>
+>> ---
+>>  kernel/kprobes.c | 7 ++++++-
+>>  1 file changed, 6 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/kernel/kprobes.c b/kernel/kprobes.c
+>> index 3995f54..33cf568 100644
+>> --- a/kernel/kprobes.c
+>> +++ b/kernel/kprobes.c
+>> @@ -730,7 +730,12 @@ static struct kprobe *alloc_aggr_kprobe(struct kprobe *p)
+>>  		return NULL;
+>>  
+>>  	INIT_LIST_HEAD(&op->list);
+>> -	op->kp.addr = p->addr;
+> 
+> Do not remove this, since copy_kprobe() doesn't copy kp.addr.
+> 
+> static inline void copy_kprobe(struct kprobe *ap, struct kprobe *p)
+> {
+>         memcpy(&p->opcode, &ap->opcode, sizeof(kprobe_opcode_t));
+>         memcpy(&p->ainsn, &ap->ainsn, sizeof(struct arch_specific_insn));
+> }
+> 
+> Thank you,
+> 
 
-Can somebody write this up as a proper patch and put it in the patch system
-please?
+It is my fault. I'll fix it in next version.
 
-Will
+Thank you for your comment!
+
+>> +
+>> +	/*
+>> +	 * copy gives arch_prepare_optimized_kprobe
+>> +	 * more information
+>> +	 */
+>> +	copy_kprobe(p, &op->kp);
+>>  	arch_prepare_optimized_kprobe(op);
+>>  
+>>  	return &op->kp;
+>>
+> 
+> 
