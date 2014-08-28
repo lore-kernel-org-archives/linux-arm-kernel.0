@@ -1,45 +1,60 @@
 From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Thu, 28 Aug 2014 10:38:59 +0200
-Subject: [PATCH v2 6/9] mmc: sdio: Convert to dev_pm_domain_attach|detach()
+Date: Thu, 28 Aug 2014 10:39:01 +0200
+Subject: [PATCH v2 8/9] amba: Add support for attach/detach of power domains
 In-Reply-To: <1409215142-8218-1-git-send-email-ulf.hansson@linaro.org>
 References: <1409215142-8218-1-git-send-email-ulf.hansson@linaro.org>
-Message-ID: <1409215142-8218-7-git-send-email-ulf.hansson@linaro.org>
+Message-ID: <1409215142-8218-9-git-send-email-ulf.hansson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Previously only the ACPI power domain was supported by the sdio bus.
+AMBA devices may on some SoCs resides in power domains. To be able to
+manage these devices from there, let's try to attach devices to their
+corresponding power domain during the probe phase.
 
-Let's convert to the common attach/detach functions for power domains,
-which currently means we are extending the support to include the
-generic power domain as well.
+To reverse these actions at the remove phase, we try to detach the
+device from it's power domain.
 
-Cc: linux-mmc at vger.kernel.org
 Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
 ---
- drivers/mmc/core/sdio_bus.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ drivers/amba/bus.c | 10 +++++++++-
+ 1 file changed, 9 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/mmc/core/sdio_bus.c b/drivers/mmc/core/sdio_bus.c
-index 4fa8fef9..1df0fc6 100644
---- a/drivers/mmc/core/sdio_bus.c
-+++ b/drivers/mmc/core/sdio_bus.c
-@@ -315,7 +315,7 @@ int sdio_add_func(struct sdio_func *func)
- 	ret = device_add(&func->dev);
- 	if (ret == 0) {
- 		sdio_func_set_present(func);
--		acpi_dev_pm_attach(&func->dev, false);
-+		dev_pm_domain_attach(&func->dev, false);
- 	}
+diff --git a/drivers/amba/bus.c b/drivers/amba/bus.c
+index 3cf61a1..8f52393 100644
+--- a/drivers/amba/bus.c
++++ b/drivers/amba/bus.c
+@@ -182,9 +182,15 @@ static int amba_probe(struct device *dev)
+ 	int ret;
+ 
+ 	do {
++		ret = dev_pm_domain_attach(dev, true);
++		if (ret == -EPROBE_DEFER)
++			break;
++
+ 		ret = amba_get_enable_pclk(pcdev);
+-		if (ret)
++		if (ret) {
++			dev_pm_domain_detach(dev, true);
+ 			break;
++		}
+ 
+ 		pm_runtime_get_noresume(dev);
+ 		pm_runtime_set_active(dev);
+@@ -199,6 +205,7 @@ static int amba_probe(struct device *dev)
+ 		pm_runtime_put_noidle(dev);
+ 
+ 		amba_put_disable_pclk(pcdev);
++		dev_pm_domain_detach(dev, true);
+ 	} while (0);
  
  	return ret;
-@@ -332,7 +332,7 @@ void sdio_remove_func(struct sdio_func *func)
- 	if (!sdio_func_present(func))
- 		return;
+@@ -220,6 +227,7 @@ static int amba_remove(struct device *dev)
+ 	pm_runtime_put_noidle(dev);
  
--	acpi_dev_pm_detach(&func->dev, false);
-+	dev_pm_domain_detach(&func->dev, false);
- 	device_del(&func->dev);
- 	put_device(&func->dev);
+ 	amba_put_disable_pclk(pcdev);
++	dev_pm_domain_detach(dev, true);
+ 
+ 	return ret;
  }
 -- 
 1.9.1
