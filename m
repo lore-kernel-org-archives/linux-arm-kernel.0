@@ -1,54 +1,49 @@
-From: robh@kernel.org (Rob Herring)
-Date: Thu, 28 Aug 2014 12:54:11 -0500
-Subject: [PATCH 11/14] arm64: dts: Add initial device tree support for
- EXYNOS7
-In-Reply-To: <CAOesGMgYeFObKHA9znzBq9t2mLv8WWT1QaKugQ6yf7RgV09Qyg@mail.gmail.com>
-References: <1409132660-1898-1-git-send-email-ch.naveen@samsung.com>
- <1409132660-1898-3-git-send-email-ch.naveen@samsung.com>
- <20140828035639.GB4972@localhost>
- <20140828094846.GD14650@leverpostej>
- <CAOesGMjY8wfAcq2fLgs=ZWHdiWtFqxr+ncUKTje0SnXqO-CCgQ@mail.gmail.com>
- <20140828170306.GQ14650@leverpostej>
- <CAOesGMgYeFObKHA9znzBq9t2mLv8WWT1QaKugQ6yf7RgV09Qyg@mail.gmail.com>
-Message-ID: <CAL_JsqLVsjJVL+GoJVMoXGiGxVKSh0oyJ-nwKEkXfa+fWid7yA@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 28 Aug 2014 11:01:07 -0700
+Subject: [PATCH 1/4] arm: omap: tao3530: Add pdata-quirk for the mmc2
+ internal clock
+In-Reply-To: <1409245829-3938-1-git-send-email-sr@denx.de>
+References: <1409245829-3938-1-git-send-email-sr@denx.de>
+Message-ID: <20140828180106.GI16006@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 28, 2014 at 12:19 PM, Olof Johansson <olof@lixom.net> wrote:
-> On Thu, Aug 28, 2014 at 10:03 AM, Mark Rutland <mark.rutland@arm.com> wrote:
->> On Thu, Aug 28, 2014 at 05:28:22PM +0100, Olof Johansson wrote:
->>> On Thu, Aug 28, 2014 at 2:48 AM, Mark Rutland <mark.rutland@arm.com> wrote:
->>> > Hi,
->>> >
->>> >> > +   cpus {
->>> >> > +           #address-cells = <2>;
->>> >> > +           #size-cells = <0>;
->>> >>
->>> >> Why size-cells=2? Can you not fit a cpuid in 32 bits?
->>> >
->>> > As of commit 72aea393a2e7 (arm64: smp: honour #address-size when parsing
->>> > CPU reg property) Linux can handle single-cell cpu node reg entries
->>> > where /cpus/#address-cells = <1>.
->>> >
->>> > I can't make any guarantees about other code (e.g. bootloaders) which
->>> > might try to do things with cpu nodes, YMMV.
->>>
->>> Ok. If address-cells is kept at 2 the unit address needs to be changed
->>> to "0,0". So one or the other has to be changed.
->>
->> I'm happy either way.
->>
->> I'm not sure the rest of the tree had "0," prefixes on all of the
->> unit-addresses for 64-bit addresses that were under 4GB, and I'm not
->> sure that existing dts consistently do that either.
->>
->> Do we want to enforce that for all 64-bit unit-addresses?
->
-> Yeah, I believe that's the only valid format for a 2-address-cell unit address.
+* Stefan Roese <sr@denx.de> [140828 10:10]:
 
-But we don't do leading 0's anywhere else like single cell unit
-addresses. Buses expressed with ranges and offsets are one example.
-Also, I2C addresses have a 32-bit size in DT yet are only 8-bit and we
-don't do leading zero's there.
+Missing description..
 
-Rob
+> Signed-off-by: Stefan Roese <sr@denx.de>
+> Cc: Thorsten Eisbein <thorsten.eisbein@head-acoustics.de>
+> Cc: Tapani Utriainen <tapani@technexion.com>
+> Cc: Tony Lindgren <tony@atomide.com>
+> ---
+>  arch/arm/mach-omap2/pdata-quirks.c | 6 ++++++
+>  1 file changed, 6 insertions(+)
+> 
+> diff --git a/arch/arm/mach-omap2/pdata-quirks.c b/arch/arm/mach-omap2/pdata-quirks.c
+> index 90c88d4..b9d091b 100644
+> --- a/arch/arm/mach-omap2/pdata-quirks.c
+> +++ b/arch/arm/mach-omap2/pdata-quirks.c
+> @@ -253,6 +253,11 @@ static void __init nokia_n900_legacy_init(void)
+>  
+>  	}
+>  }
+> +
+> +static void __init omap3_tao3530_legacy_init(void)
+> +{
+> +	hsmmc2_internal_input_clk();
+> +}
+>  #endif /* CONFIG_ARCH_OMAP3 */
+>  
+>  #ifdef CONFIG_ARCH_OMAP4
+> @@ -377,6 +382,7 @@ static struct pdata_init pdata_quirks[] __initdata = {
+>  	{ "ti,omap3-evm-37xx", omap3_evm_legacy_init, },
+>  	{ "ti,omap3-zoom3", omap3_zoom_legacy_init, },
+>  	{ "ti,am3517-evm", am3517_evm_legacy_init, },
+> +	{ "technexion,omap3-tao3530", omap3_tao3530_legacy_init, },
+>  #endif
+>  #ifdef CONFIG_ARCH_OMAP4
+>  	{ "ti,omap4-sdp", omap4_sdp_legacy_init, },
+> -- 
+> 2.1.0
+> 
