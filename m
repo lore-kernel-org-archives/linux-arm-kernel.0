@@ -1,77 +1,59 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Thu, 28 Aug 2014 18:11:43 +0200
-Subject: [PATCH v3 1/4] thermal: rockchip: add driver for thermal
-In-Reply-To: <20140828143733.GA18084@developer>
-References: <1409187562-12370-1-git-send-email-caesar.wang@rock-chips.com>
- <2852853.mfRZfFVSev@wuerfel> <20140828143733.GA18084@developer>
-Message-ID: <3440260.edal29kzlR@diego>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 28 Aug 2014 18:10:55 +0200
+Subject: [PATCH v4 3/5] ARM: tegra: Initialize interrupt controller from DT
+In-Reply-To: <1409239879-12376-3-git-send-email-thierry.reding@gmail.com>
+References: <1409239879-12376-1-git-send-email-thierry.reding@gmail.com>
+ <1409239879-12376-3-git-send-email-thierry.reding@gmail.com>
+Message-ID: <3056623.fB9uqpleQ5@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Donnerstag, 28. August 2014, 10:37:35 schrieb Eduardo Valentin:
-> Ceasar and Arnd,
-> 
-> On Thu, Aug 28, 2014 at 10:48:23AM +0200, Arnd Bergmann wrote:
-> > On Thursday 28 August 2014 08:59:19 Caesar Wang wrote:
-> > > Thermal is TS-ADC Controller module supports user-defined mode and
-> > > automatic mode.
-> > > 
-> > > User-defined mode refers,TSADC all the control signals entirely by
-> > > software
-> > > writing to register for direct control.
-> > > 
-> > > Automaic mode refers to the module automatically poll TSADC output,and
-> > > the results Were checked.
-> > > 
-> > > If you find that the temperature High in a period of time, an interrupt
-> > > is generated to the processor down-measures taken;if the temperature
-> > > over a period of time High, the resulting TSHUT gave CRU module,let it
-> > > reset the entire chip, or via GPIO give PMIC.
-> > > 
-> > > Signed-off-by: zhaoyifeng <zyf@rock-chips.com>
-> > > Signed-off-by: Caesar Wang <caesar.wang@rock-chips.com>
-> > 
-> > Hi Caesar,
-> > 
-> > After looking at the driver (last time I only received the patch for
-> > the binding), I have a more general comment:
-> > 
-> > This looks like a general-purpose ADC device, not an IP block that is
-> > specific to thermal management. The binding looks ok for that purpose
-> > but should probably be moved into
-> > Documentation/devicetree/bindings/iio/adc/ as a minor change.
-> 
-> I agree with Arnd's point here. It makes sense to me to have this driver
-> under the IIO umbrella.
+On Thursday 28 August 2014 17:31:17 Thierry Reding wrote:
 
-interesting suggestion :-)
+>  void __init tegra_init_irq(void)
+>  {
+> -	int i;
+> -	void __iomem *distbase;
+> +	unsigned int max_ictlrs = ARRAY_SIZE(ictlr_regs), i;
+> +	const struct of_device_id *match;
+> +	struct device_node *np;
+> +	struct resource res;
+> +
+> +	np = of_find_matching_node_and_match(NULL, ictlr_matches, &match);
+> +	if (np) {
+> +		const struct tegra_ictlr_soc *soc = match->data;
+> +
+> +		for (i = 0; i < soc->num_ictlrs; i++) {
+> +			if (of_address_to_resource(np, i, &res) < 0)
+> +				break;
+> +
+> +			ictlr_regs[i] = res;
+> +		}
+> +
+> +		WARN(i != soc->num_ictlrs,
+> +		     "Found %u interrupt controllers in DT; expected %u.\n",
+> +		     i, soc->num_ictlrs);
+> +
+> +		max_ictlrs = soc->num_ictlrs;
+> +		of_node_put(np);
+> +	} else {
+> +		/*
+> +		 * If no matching device node was found, fall back to using
+> +		 * the chip ID.
+> +		 */
+> +
+> +		/* Tegra30 and later have five interrupt controllers, ... */
+> +		max_ictlrs = ARRAY_SIZE(ictlr_regs);
+> +
+> +		/* ..., but Tegra20 only has four. */
+> +		if (of_machine_is_compatible("nvidia,tegra20"))
+> +			max_ictlrs--;
+> +	}
 
-I've just taken another look at the registers of the ts-adc on the rk3066 
-which is completely different from the rk3288 one. Interestingly the rk3066 one 
-is "just" another saradc IP, so for this one it would really make sense.
+How about moving the entire file to drivers/irqchip and using the
+IRQCHIP_DECLARE() helper for the DT case?
 
+For the fallback, you can have an entry into that file that just takes
+the address and number, which you can call from platform code here.
 
-> > On the driver side, I believe the correct way to deal with this setup
-> > is to split your driver into a generic drivers/iio/adc/rockchips-tsadc.c
-> > file, and a smaller thermal driver that uses the iio in-kernel interfaces,
-> > ideally one that is independent of the underlying hardware and can
-> > work on any ADC implementation.
-> 
-> Agreed. If you can write such interface and make your driver to work in
-> such way, that would be great.
-
-But I currently don't see how you would model the temperature handling parts 
-from a generic thermal driver to a generic adc driver for the rk3288-tsadc.
-
-I guess the general temperature irq handling would use iio-triggers? But how 
-does the target temperature get into the TSADC_COMP1_INT register.
-
-Also when getting the temperature, Caesar's driver compares it to its trip 
-points and sets the next trip point depending on the current temperature 
-(passive <-> critical) in rockchip_get_temp.
-
-Maybe there is some completely easy way for this, but currently I don't see 
-it.
-
-
-Heiko
+	Arnd
