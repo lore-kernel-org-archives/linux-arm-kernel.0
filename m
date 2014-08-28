@@ -1,39 +1,98 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Thu, 28 Aug 2014 16:20:00 +0200
-Subject: [linux-sunxi] Re: [PATCH 4/4] simplefb: add clock handling code
-In-Reply-To: <CAKON4OyXPjXx4q828kFgMsC_u7u3nqLPLxOp-kRZbS27yRKOEg@mail.gmail.com>
-References: <20140825150501.GE14763@ulmo.nvidia.com>
- <20140825152232.GE15297@lukather> <20140826080432.GD17263@ulmo>
- <20140826135341.GM15297@lukather> <20140826143550.GB3027@ulmo>
- <53FCE704.4030103@redhat.com> <20140827093121.GA23186@ulmo>
- <53FDB46C.5010609@redhat.com> <20140827125613.GF23186@ulmo>
- <53FDE0CE.5030807@redhat.com> <20140827141632.GB32243@ulmo>
- <53FF1D6C.6090205@redhat.com>
- <CAKON4OyXPjXx4q828kFgMsC_u7u3nqLPLxOp-kRZbS27yRKOEg@mail.gmail.com>
-Message-ID: <CAMuHMdU+zxUCU05YOpyuP1fx=Dgb5SZu=vbaJW13sQAaMBwU_w@mail.gmail.com>
+From: boris.brezillon@free-electrons.com (Boris BREZILLON)
+Date: Thu, 28 Aug 2014 16:21:00 +0200
+Subject: [PATCH v4 00/11] drm: add support for Atmel HLCDC Display
+ Controller
+In-Reply-To: <1805054.en0m884lPo@avalon>
+References: <1406034695-15534-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1997793.CWhjU3F32E@avalon> <20140827095235.20334e2d@bbrezillon>
+ <1805054.en0m884lPo@avalon>
+Message-ID: <20140828162100.71543859@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 28, 2014 at 3:22 PM, jonsmirl at gmail.com <jonsmirl@gmail.com> wrote:
->> 2) We don't want to hardcode these clocks into the kernel (sunxi) clk
->> driver, instead the bootloader should tell the kernel about these clocks.
->>
->> So the only point of discussion left seems to be how to do 2...
->
-> Wouldn't it be a lot simpler just to use existing fbdev (not KMS) and
-> whip together a device specific driver that claims the proper
-> resources? And just implement the minimal about of fbdev possible?
-> fbdev already is a driver library.
+Hi Laurent,
 
-Like... drivers/video/fbdev/offb.c?
+On Thu, 28 Aug 2014 14:19:22 +0200
+Laurent Pinchart <laurent.pinchart@ideasonboard.com> wrote:
 
-Gr{oetje,eeting}s,
+> Hi Boris,
 
-                        Geert
+[...]
 
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+> >
+> > I don't have any VGA connector (or I'm missing something :-)),
+> 
+> My bad.
 
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+No problem.
+
+> 
+> > but I have an LCD panel and an RGB to HDMI encoder connected on the same RGB
+> > connector.
+> 
+> There's no such thing as an RGB connector in DRM. Your SoC has a parallel RGB 
+> video output (I assume it's a DPI bus). From a DRM point of view, that bus 
+> corresponds to the output of the CRTC.
+
+Okay, this mean I'll have to dispatch some of the code I've put in
+atmel_hlcdc_output.c into atmel_hlcdc_crtc.c (BTW, any chance you could
+take a look at this files ?).
+
+> 
+> > > As DRM hardcodes the pipeline model to CRTC -> encoder -> connector, you
+> > > will also need a DRM encoder in the VGA path. I suppose your board has a
+> > > VGA DAC, that's the component you should expose as a DRM encoder (even if
+> > > it can't be controlled and doesn't limit the valid modes).
+> > 
+> > Actually, my problem is that both devices are connected on the same RGB
+> > connector, and thus share the same display mode (resolution, HSYNC,
+> > VSYNC, RGB output mode, ...).
+> > This means that all remote devices have to agree on a specific mode if
+> > we want to mirror the display on several output devices, otherwise we
+> > must disable one of the output devices.
+> 
+> That's not really a problem. From a DRM perspective you need to model your 
+> device as
+> 
+> ,------.       ,---------------.       ,-----------------.
+> | CRTC | -+--> | Dummy Encoder | ----> | Panel Connector |
+> `------?  |    `---------------?       `-----------------?
+>           |    ,---------------.       ,-----------------.
+>           \--> | HDMI Encoder  | ----> | HDMI Connector  |
+>                `---------------?       `-----------------?
+> 
+> The HDMI pipeline is pretty straightforward.
+> 
+> You have told me that the panel has a parallel RGB input without any encoder 
+> in the panel pipeline (by the way, which panel model are you using ?). 
+> However, DRM requires an encoder in every pipeline. You will thus need to 
+> instantiate a dummy encoder. One option would be to set the encoder and 
+> connector types to DRM_MODE_ENCODER_LVDS and DRM_MODE_CONNECTOR_LVDS 
+> respectively, as that's what userspace usually expects for panels. That 
+> doesn't reflect the reality in your case though, so creating a new 
+> DRM_MODE_CONNECTOR_DPI type might be needed, possibly to be used with 
+> DRM_MODE_ENCODER_NONE.
+> 
+> As neither encoder can modify the mode, the same mode will be output on the 
+> two connectors.
+
+There are still several things to I'd like to understand:
+ 1) who's gonna configure the RGB bus output format (RGB444, RGB666,
+    RGB888) which directly depends on the device connected on this bus:
+    the CRTC or the dummy and HDMI encoders.
+ 2) Where should the HDMI encoder/connector support be implemented:
+    in drivers/gpu/drm/atmel-hlcdc, drivers/gpu/drm/bridge or somewhere
+    else. My point is that I don't want to add specific support for the
+    Sil902x transmitter chip in the hlcdc driver.
+
+Sorry if these are silly questions, but I'm still trying to understand
+how my case should be modeled :-).
+
+Best Regards,
+
+Boris
+
+-- 
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
