@@ -1,66 +1,70 @@
-From: jingchang.lu@freescale.com (Jingchang Lu)
-Date: Thu, 28 Aug 2014 10:05:15 +0000
-Subject: [RESEND] clk: ppc-corenet: Add Freescale ARM-based platforms
- CLK_OF_DECLARE support
-In-Reply-To: <1409182412.6510.129.camel@snotra.buserror.net>
-References: <1408700096-25415-1-git-send-email-jingchang.lu@freescale.com>
- <1409093463.6510.92.camel@snotra.buserror.net>
- <164af7b3be3747a0be3fe3a6cf83d3b1@BL2PR03MB467.namprd03.prod.outlook.com>
- <1409182412.6510.129.camel@snotra.buserror.net>
-Message-ID: <f7b4263f189346a391d66c85756b4907@BL2PR03MB467.namprd03.prod.outlook.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Thu, 28 Aug 2014 12:08:35 +0200
+Subject: [linux-sunxi] Re: [PATCH 4/4] simplefb: add clock handling code
+In-Reply-To: <CAOMqctSY7AJKHthe+aG8--Ok6JiY1g2zM_tN10S2nELOSe=qMw@mail.gmail.com>
+References: <20140825152232.GE15297@lukather> <20140826080432.GD17263@ulmo>
+ <20140826135341.GM15297@lukather> <20140826143550.GB3027@ulmo>
+ <20140826210248.GO15297@lukather> <20140827065440.GG15640@ulmo>
+ <20140827084526.GR15297@lukather> <20140827095241.GC23186@ulmo>
+ <20140827154221.GX15297@lukather>
+ <CAOMqctSY7AJKHthe+aG8--Ok6JiY1g2zM_tN10S2nELOSe=qMw@mail.gmail.com>
+Message-ID: <20140828100834.GA14388@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->-----Original Message-----
->From: Wood Scott-B07421
->Sent: Thursday, August 28, 2014 7:34 AM
->To: Lu Jingchang-B35083
->Cc: mturquette at linaro.org; linuxppc-dev at lists.ozlabs.org; linux-
->kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org
->Subject: Re: [RESEND] clk: ppc-corenet: Add Freescale ARM-based platforms
->CLK_OF_DECLARE support
->
->On Tue, 2014-08-26 at 21:19 -0500, Lu Jingchang-B35083 wrote:
->> >-----Original Message-----
->> >From: Wood Scott-B07421
->> >Sent: Wednesday, August 27, 2014 6:51 AM
->> >To: Lu Jingchang-B35083
->> >Cc: mturquette at linaro.org; linuxppc-dev at lists.ozlabs.org; linux-
->> >kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org
->> >Subject: Re: [RESEND] clk: ppc-corenet: Add Freescale ARM-based
->> >platforms CLK_OF_DECLARE support
->> >
->> >On Fri, 2014-08-22 at 17:34 +0800, Jingchang Lu wrote:
->> >> +CLK_OF_DECLARE(ppc_core_pll_v1, "fsl,qoriq-core-pll-1.0",
->> >core_pll_init);
->> >> +CLK_OF_DECLARE(ppc_core_pll_v2, "fsl,qoriq-core-pll-2.0",
->> >core_pll_init);
->> >> +CLK_OF_DECLARE(ppc_core_mux_v1, "fsl,qoriq-core-mux-1.0",
->> >core_mux_init);
->> >> +CLK_OF_DECLARE(ppc_core_mux_v2, "fsl,qoriq-core-mux-2.0",
->> >core_mux_init);
->> >
->> >What does this do that the existing platform driver and match table
->> >don't?  Why is it needed for ARM when PPC didn't need it?
->> >
->> >-Scott
->> >
->> Common clk init on ARM platform is initialized earlier via
->> of_clk_init() instead of driver probe method, the of_clk_init will
->> walk a __clk_of_table to init each clk provider in the table, the
->> CLK_OF_DECLARE() macro puts a supported clk in the __clk_of_table for it
->initializing on starup, and the clk system has added some common clk such
->as "fixed-clk"
->> to this table already.
->> So here I add our specific clk init declaration to consist this
->> framework, and the driver probe function will not be needed on ARM.
->
->OK... Is there any reason why the new method won't work on PPC?
->
-PPC has little dependence on the clock tree but frequency, it will work well
-if adopted I think.
+On Wed, Aug 27, 2014 at 10:57:29PM +0200, Michal Suchanek wrote:
+> Hello,
+> 
+> On 27 August 2014 17:42, Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
+> > On Wed, Aug 27, 2014 at 11:52:48AM +0200, Thierry Reding wrote:
+> >> On Wed, Aug 27, 2014 at 10:45:26AM +0200, Maxime Ripard wrote:
+> >> > On Wed, Aug 27, 2014 at 08:54:41AM +0200, Thierry Reding wrote:
+> >> > > On Tue, Aug 26, 2014 at 11:02:48PM +0200, Maxime Ripard wrote:
+> >> > > > On Tue, Aug 26, 2014 at 04:35:51PM +0200, Thierry Reding wrote:
+> >> [...]
+> >> > > > > > Mike Turquette repeatedly said that he was against such a DT property:
+> >> > > > > > https://lkml.org/lkml/2014/5/12/693
+> >> > > > >
+> >> > > > > Mike says in that email that he's opposing the addition of a property
+> >> > > > > for clocks that is the equivalent of regulator-always-on. That's not
+> >> > > > > what this is about. If at all it'd be a property to mark a clock that
+> >> > > > > should not be disabled by default because it's essential.
+> >> > > >
+> >> > > > It's just semantic. How is "a clock that should not be disabled by
+> >> > > > default because it's essential" not a clock that stays always on?
+> >> > >
+> >> > > Because a clock that should not be disabled by default can be turned off
+> >> > > when appropriate. A clock that is always on can't be turned off.
+> >> >
+> >> > If a clock is essential, then it should never be disabled. Or we don't
+> >> > share the same meaning of essential.
+> >>
+> >> Essential for the particular use-case.
+> >
+> > So, how would the clock driver would know about which use case we're
+> > in? How would it know about which display engine is currently running?
+> > How would it know about which video output is being set?
+> >
+> > Currently, we have two separate display engines, which can each output
+> > either to 4 different outputs (HDMI, RGB/LVDS, 2 DSI). Each and every
+> > one of these combinations would require different clocks. What clocks
+> > will we put in the driver? All of them?
+> >
+> 
+> since simplefb cannot be extended how about adding, say, dtfb which
+> claims the resources from dt and then instantiates a simplefb once the
+> resources are claimed? That is have a dtfb which has the clocks
+> assigned and has simplefb as child dt node.
 
+I don't see how that changes anything. All you do is add another layer
+of indirection. The fundamental problem remains the same and isn't
+solved.
 
-
-Best Regards,
-Jingchang
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140828/f3eec559/attachment-0001.sig>
