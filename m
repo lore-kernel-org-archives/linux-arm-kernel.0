@@ -1,23 +1,53 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 28 Aug 2014 16:23:20 +0100
-Subject: [PATCH V3 0/6] RCU get_user_pages_fast and __get_user_pages_fast
-In-Reply-To: <1409237107-24228-1-git-send-email-steve.capper@linaro.org>
-References: <1409237107-24228-1-git-send-email-steve.capper@linaro.org>
-Message-ID: <20140828152320.GN22580@arm.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Thu, 28 Aug 2014 17:31:15 +0200
+Subject: [PATCH v4 1/5] of: Add NVIDIA Tegra Legacy Interrupt Controller
+ binding
+Message-ID: <1409239879-12376-1-git-send-email-thierry.reding@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 28, 2014 at 03:45:01PM +0100, Steve Capper wrote:
-> I would like to get this series into 3.18 as it fixes quite a big problem
-> with THP on arm and arm64. This series is split into a core mm part, an
-> arm part and an arm64 part.
-> 
-> Could somebody please take patch #1 (if it looks okay)?
-> Russell, would you be happy with patches #2, #3, #4? (if we get #1 merged)
-> Catalin, would you be happy taking patches #5, #6? (if we get #1 merged)
+From: Thierry Reding <treding@nvidia.com>
 
-Pretty sure we're happy to take the arm64 bits once you've got the core
-changes sorted out. Failing that, Catalin's acked them so they could go via
-an mm tree if it's easier.
+The Legacy Interrupt Controller found on NVIDIA Tegra SoCs is used by
+the AVP coprocessor and can also serve as a backup for the ARM Cortex
+CPU's local interrupt controller (GIC).
 
-Will
+The LIC is subdivided into multiple identical units, each handling 32
+possible interrupt sources.
+
+Signed-off-by: Thierry Reding <treding@nvidia.com>
+---
+Changes in v3:
+- bracket individual tuples in the "reg" property
+
+ .../interrupt-controller/nvidia,tegra20-ictlr.txt     | 19 +++++++++++++++++++
+ 1 file changed, 19 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/interrupt-controller/nvidia,tegra20-ictlr.txt
+
+diff --git a/Documentation/devicetree/bindings/interrupt-controller/nvidia,tegra20-ictlr.txt b/Documentation/devicetree/bindings/interrupt-controller/nvidia,tegra20-ictlr.txt
+new file mode 100644
+index 000000000000..1639389b7360
+--- /dev/null
++++ b/Documentation/devicetree/bindings/interrupt-controller/nvidia,tegra20-ictlr.txt
+@@ -0,0 +1,19 @@
++NVIDIA Tegra Legacy Interrupt Controller
++
++The legacy interrupt controller is divided into units that serve 32 interrupts
++each. Tegra20 implements four units, whereas Tegra30 and later implement five.
++
++Required properties:
++- compatible: "nvidia,tegra<chip>-ictlr"
++- reg: Physical base address and length of the controller's registers. There
++  should be one entry for each unit.
++
++Example:
++
++	interrupt-controller at 60004000 {
++		compatible = "nvidia,tegra20-ictlr";
++		reg = <0x60004000 0x40>, /* primary controller */
++		      <0x60004100 0x40>, /* secondary controller */
++		      <0x60004200 0x40>, /* tertiary controller */
++		      <0x60004300 0x40>; /* quaternary controller */
++	};
+-- 
+2.0.4
