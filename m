@@ -1,57 +1,63 @@
-From: jonsmirl@gmail.com (jonsmirl at gmail.com)
-Date: Thu, 28 Aug 2014 10:33:43 -0400
-Subject: [linux-sunxi] Re: [PATCH 4/4] simplefb: add clock handling code
-In-Reply-To: <CAMuHMdU+zxUCU05YOpyuP1fx=Dgb5SZu=vbaJW13sQAaMBwU_w@mail.gmail.com>
-References: <20140825150501.GE14763@ulmo.nvidia.com>
- <20140825152232.GE15297@lukather> <20140826080432.GD17263@ulmo>
- <20140826135341.GM15297@lukather> <20140826143550.GB3027@ulmo>
- <53FCE704.4030103@redhat.com> <20140827093121.GA23186@ulmo>
- <53FDB46C.5010609@redhat.com> <20140827125613.GF23186@ulmo>
- <53FDE0CE.5030807@redhat.com> <20140827141632.GB32243@ulmo>
- <53FF1D6C.6090205@redhat.com>
- <CAKON4OyXPjXx4q828kFgMsC_u7u3nqLPLxOp-kRZbS27yRKOEg@mail.gmail.com>
- <CAMuHMdU+zxUCU05YOpyuP1fx=Dgb5SZu=vbaJW13sQAaMBwU_w@mail.gmail.com>
-Message-ID: <CAKON4Oy8X9CSpZjYnTRgZ_MsxXQ=zaP+kxiZ2b7Es4GjN+1iJw@mail.gmail.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Thu, 28 Aug 2014 15:35:30 +0100
+Subject: [PATCH RESEND 0/8] i2c: Relax mandatory I2C ID table passing
+Message-ID: <1409236538-21274-1-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 28, 2014 at 10:20 AM, Geert Uytterhoeven
-<geert@linux-m68k.org> wrote:
-> On Thu, Aug 28, 2014 at 3:22 PM, jonsmirl at gmail.com <jonsmirl@gmail.com> wrote:
->>> 2) We don't want to hardcode these clocks into the kernel (sunxi) clk
->>> driver, instead the bootloader should tell the kernel about these clocks.
->>>
->>> So the only point of discussion left seems to be how to do 2...
->>
->> Wouldn't it be a lot simpler just to use existing fbdev (not KMS) and
->> whip together a device specific driver that claims the proper
->> resources? And just implement the minimal about of fbdev possible?
->> fbdev already is a driver library.
->
-> Like... drivers/video/fbdev/offb.c?
+Hi Wolfram,
 
-I'd probably reclassify drivers/video/fbdev/simplefb.c as a skeleton
-and use it as a template for making device specific versions of it.
+Placing this firmly back on your plate.  I truly hope we don't miss
+another merge-window.  This patch-set has the support of some pretty
+senior kernel maintainers, so I hope acceptance shouldn't be too
+difficult.
 
-I don't see why there is so much resistance to just making device
-specific fb drivers.  Whenever the KMS driver gets written just
-disable the device specific fb driver in the build.
+As previously discussed I believe it should be okay for an I2C device
+driver _not_ supply an I2C ID table to match to.  The I2C subsystem
+should be able to match via other means, such as via OF tables.  The
+blocking factor during our previous conversation was to keep
+registering via sysfs up and running.  This set does that.
 
+After thinking more deeply about the problem, it occurred to me that
+any I2C device driver which uses the sysfs method and issues an
+of_match_device() would also fail their probe().  Bolted on to this
+set is a new, more generic way for these devices to match against
+either of the I2C/OF tables.
 
->
-> Gr{oetje,eeting}s,
->
->                         Geert
->
-> --
-> Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
->
-> In personal conversations with technical people, I call myself a hacker. But
-> when I'm talking to journalists I just say "programmer" or something like that.
->                                 -- Linus Torvalds
+I hope this ticks all of your boxes.
 
+v3:
+  - Insist on passing 'struct i2c_client' instead of 'struct device'
+  - Remove hook from of_match_device()
 
+v2:
+  - Removal of ACPI support (this is really an OF issue).
+  - Add a new .probe2( with will seamlessly replace
+  - Supply a warning on devices matching via OF without a suitable compatible
+  - Remove unified match_device() - bad idea as it subverts type-safe behaviour
+  - Provide examples of the kind of clean-up possible after this set.
+    - I already have the full support from the maintainer of these drivers =;-)
+
+Kind regards,
+Lee
+
+Lee Jones (8):
+  i2c: Add pointer dereference protection to i2c_match_id()
+  i2c: Add the ability to match device to compatible string without an
+    of_node
+  i2c: Match using traditional OF methods, then by vendor-less
+    compatible strings
+  i2c: Make I2C ID tables non-mandatory for DT'ed devices
+  i2c: Export i2c_match_id() for direct use by device drivers
+  i2c: Provide a temporary .probe2() call-back type
+  mfd: 88pm860x: Move over to new I2C device .probe() call
+  mfd: as3722: Rid driver of superfluous I2C device ID structure
+
+ drivers/i2c/i2c-core.c      | 72 +++++++++++++++++++++++++++++++++++++++------
+ drivers/mfd/88pm860x-core.c |  5 ++--
+ drivers/mfd/as3722.c        | 12 ++------
+ include/linux/i2c.h         | 22 +++++++++++++-
+ 4 files changed, 88 insertions(+), 23 deletions(-)
 
 -- 
-Jon Smirl
-jonsmirl at gmail.com
+1.9.1
