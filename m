@@ -1,77 +1,93 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 28 Aug 2014 11:07:58 -0700
-Subject: [PATCH 2/4] arm: omap3: Add Technexion TAO3530 SOM
- omap3-tao3530.dtsi
-In-Reply-To: <1409245829-3938-2-git-send-email-sr@denx.de>
-References: <1409245829-3938-1-git-send-email-sr@denx.de>
- <1409245829-3938-2-git-send-email-sr@denx.de>
-Message-ID: <20140828180757.GJ16006@atomide.com>
+From: rric@kernel.org (Robert Richter)
+Date: Thu, 28 Aug 2014 20:14:29 +0200
+Subject: [PATCH 2/5] arm64, thunder: Add initial dts for Cavium Thunder SoC
+In-Reply-To: <CAOesGMjtjcgUNV8WLp6_Zbok-0zq5afg_KS8QJYp=kDVabrQvg@mail.gmail.com>
+References: <1406732794-20920-1-git-send-email-rric@kernel.org>
+ <1406732794-20920-3-git-send-email-rric@kernel.org>
+ <CAOesGMh9KkdKB_ytJ7CCbkPW7dHTX91NdfDMsMNfbmOBVOJ8PQ@mail.gmail.com>
+ <20140828161556.GN4703@rric.localhost>
+ <20140828162549.GP14650@leverpostej>
+ <CAOesGMjtjcgUNV8WLp6_Zbok-0zq5afg_KS8QJYp=kDVabrQvg@mail.gmail.com>
+Message-ID: <20140828181429.GO4703@rric.localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Stefan Roese <sr@denx.de> [140828 10:10]:
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/omap3-tao3530.dtsi
-...
+On 28.08.14 09:31:43, Olof Johansson wrote:
+> On Thu, Aug 28, 2014 at 9:25 AM, Mark Rutland <mark.rutland@arm.com> wrote:
+> > On Thu, Aug 28, 2014 at 05:15:56PM +0100, Robert Richter wrote:
+> >> Olof,
+> >>
+> >> On 30.07.14 11:14:23, Olof Johansson wrote:
+> >> > On Wed, Jul 30, 2014 at 8:06 AM, Robert Richter <rric@kernel.org> wrote:
+> >> > > From: Radha Mohan Chintakuntla <rchintakuntla@cavium.com>
+> >> > >
+> >> > > Add initial device tree nodes for Cavium Thunder SoCs with support of
+> >> > > 48 cores and gicv3. The dts file requires further changes, esp. for
+> >> > > pci, gicv3-its and smmu. This changes will be added later together
+> >> > > with the device drivers.
+> >> > >
+> >> > > Signed-off-by: Radha Mohan Chintakuntla <rchintakuntla@cavium.com>
+> >> > > Signed-off-by: Robert Richter <rrichter@cavium.com>
+> >> > > ---
+> >> > >  arch/arm64/boot/dts/Makefile         |   1 +
+> >> > >  arch/arm64/boot/dts/thunder-88xx.dts | 387 +++++++++++++++++++++++++++++++++++
+> >> > >  2 files changed, 388 insertions(+)
+> >> > >  create mode 100644 arch/arm64/boot/dts/thunder-88xx.dts
+> >> > >
+> >> > > diff --git a/arch/arm64/boot/dts/Makefile b/arch/arm64/boot/dts/Makefile
+> >> > > index c52bdb051f66..f8001a62029c 100644
+> >> > > --- a/arch/arm64/boot/dts/Makefile
+> >> > > +++ b/arch/arm64/boot/dts/Makefile
+> >> > > @@ -1,3 +1,4 @@
+> >> > > +dtb-$(CONFIG_ARCH_THUNDER) += thunder-88xx.dtb
+> >> > >  dtb-$(CONFIG_ARCH_VEXPRESS) += rtsm_ve-aemv8a.dtb foundation-v8.dtb
+> >> > >  dtb-$(CONFIG_ARCH_XGENE) += apm-mustang.dtb
+> >> >
+> >> > Oh, and:
+> >> >
+> >> > Let's fix the mistake we made on 32-bit here (that we can't undo
+> >> > unless we move all dts files now, which is too much churn), and put
+> >> > each SoC vendor in its own subdirectory.
+> >> >
+> >> > So, please add a arch/arm64/boot/dts/cavium/ directory, add a Makefile
+> >> > and the dts there.
+> >> >
+> >> > We should move vexpress under arm/   and xgene under apm/ too.
+> >>
+> >> I was looking into this. It turned out that this would introduce more
+> >> pain than it solves. The problem with introducing vendor subdirs for
+> >> .dts files is that this will require also subdirs for .dtb files to
+> >> avoid name conflicts. This means that dtb files are no longer in a
+> >> single directory. Current build scripts and makefiles rely on this.
+> >> E.g.:
+> >>
+> >>  scripts/Makefile.lib:$(obj)/%.dtb.S: $(obj)/%.dtb
+> >>
+> >> Thus, the introduction of vendor subdirs is not easy to implement and
+> >> may break existing workflows. Also, no other arch has vendor subdirs.
+> >>
+> >> A solution would be to have a naming scheme for dts files which
+> >> requires the vendor in the file name, such as cavium-thunder-88xx.dtb.
+> >> Though, these long names may look a bit ugly.
+> >>
+> >> Hmm... Any thoughts?
+> >
+> > That would make it possible to search, but the number of files in one
+> > place might become somewhat overwelming (which I believe was Olof's
+> > concern).
+> >
+> > Olof, thoughts?
+> 
+> Yeah, on 32 bit we've got an ever-growing and very large directory
+> today that is becoming a headache. Carving it up in directories to
+> reduce plain directory size would come a long way.
+> 
+> I think we would catch name conflicts quickly with the automatic
+> builders we have today -- and it's likely that the files will have a
+> platform prefix anyway so it shouldn't be a big issue. I think we can
+> live with that.
 
-> +&omap3_pmx_core {
-> +	hsusbb2_pins: pinmux_hsusbb2_pins {
-> +		pinctrl-single,pins = <
-> +			0x5c0 (PIN_OUTPUT | MUX_MODE3)		/* etk_d10.hsusb2_clk */
-> +			0x5c2 (PIN_OUTPUT | MUX_MODE3)		/* etk_d11.hsusb2_stp */
-> +			0x5c4 (PIN_INPUT_PULLDOWN | MUX_MODE3)	/* etk_d12.hsusb2_dir */
-> +			0x5c6 (PIN_INPUT_PULLDOWN | MUX_MODE3)	/* etk_d13.hsusb2_nxt */
-> +			0x5c8 (PIN_INPUT_PULLDOWN | MUX_MODE3)	/* etk_d14.hsusb2_data0 */
-> +			0x5cA (PIN_INPUT_PULLDOWN | MUX_MODE3)	/* etk_d15.hsusb2_data1 */
-> +			0x1a4 (PIN_INPUT_PULLDOWN | MUX_MODE3)	/* mcspi1_cs3.hsusb2_data2 */
-> +			0x1a6 (PIN_INPUT_PULLDOWN | MUX_MODE3)	/* mcspi2_clk.hsusb2_data7 */
-> +			0x1a8 (PIN_INPUT_PULLDOWN | MUX_MODE3)	/* mcspi2_simo.hsusb2_data4 */
-> +			0x1aa (PIN_INPUT_PULLDOWN | MUX_MODE3)	/* mcspi2_somi.hsusb2_data5 */
-> +			0x1ac (PIN_INPUT_PULLDOWN | MUX_MODE3)	/* mcspi2_cs0.hsusb2_data6 */
-> +			0x1ae (PIN_INPUT_PULLDOWN | MUX_MODE3)	/* mcspi2_cs1.hsusb2_data3 */
-> +		>;
-> +	};
-> +
-> +	mmc1_pins: pinmux_mmc1_pins {
-> +		pinctrl-single,pins = <
-> +			0x114 (PIN_OUTPUT_PULLUP | MUX_MODE0)	/* sdmmc1_clk.sdmmc1_clk */
-> +			0x116 (PIN_INPUT_PULLUP | MUX_MODE0)	/* sdmmc1_cmd.sdmmc1_cmd */
-> +			0x118 (PIN_INPUT_PULLUP | MUX_MODE0) 	/* sdmmc1_dat0.sdmmc1_dat0 */
-> +			0x11a (PIN_INPUT_PULLUP | MUX_MODE0) 	/* sdmmc1_dat1.sdmmc1_dat1 */
-> +			0x11c (PIN_INPUT_PULLUP | MUX_MODE0) 	/* sdmmc1_dat2.sdmmc1_dat2 */
-> +			0x11e (PIN_INPUT_PULLUP | MUX_MODE0) 	/* sdmmc1_dat3.sdmmc1_dat3 */
-> +			0x120 (PIN_INPUT_PULLUP | MUX_MODE0) 	/* sdmmc1_dat4.sdmmc1_dat4 */
-> +			0x122 (PIN_INPUT_PULLUP | MUX_MODE0) 	/* sdmmc1_dat5.sdmmc1_dat5 */
-> +			0x124 (PIN_INPUT_PULLUP | MUX_MODE0) 	/* sdmmc1_dat6.sdmmc1_dat6 */
-> +			0x126 (PIN_INPUT_PULLUP | MUX_MODE0) 	/* sdmmc1_dat7.sdmmc1_dat7 */
-> +		>;
-> +	};
-> +
-> +	mmc2_pins: pinmux_mmc2_pins {
-> +		pinctrl-single,pins = <
-> +			OMAP3_CORE1_IOPAD(0x2158, PIN_INPUT_PULLUP | MUX_MODE0)		/* sdmmc2_clk.sdmmc2_clk */
-> +			OMAP3_CORE1_IOPAD(0x215a, PIN_INPUT_PULLUP | MUX_MODE0)		/* sdmmc2_cmd.sdmmc2_cmd */
-> +			OMAP3_CORE1_IOPAD(0x215c, PIN_INPUT_PULLUP | MUX_MODE0)		/* sdmmc2_dat0.sdmmc2_dat0 */
-> +			OMAP3_CORE1_IOPAD(0x215e, PIN_INPUT_PULLUP | MUX_MODE0)		/* sdmmc2_dat1.sdmmc2_dat1 */
-> +			OMAP3_CORE1_IOPAD(0x2160, PIN_INPUT_PULLUP | MUX_MODE0)		/* sdmmc2_dat2.sdmmc2_dat2 */
-> +			OMAP3_CORE1_IOPAD(0x2162, PIN_INPUT_PULLUP | MUX_MODE0)		/* sdmmc2_dat3.sdmmc2_dat3 */
-> +		>;
-> +	};
+So you mean, having the source files with subdirectories, but the dtb
+files in a single obj dir?
 
-Can you please use the macros above as well for the other mux
-entries like you do here?
-
-> +&gpmc {
-
-Aren't you missing the ranges entry here for the GPMC
-CS mapping? AFAIK it should be just the minimal 16 MB
-range.
-
-> +	nand at 0,0 {
-> +		reg = <0 0 0>; /* CS0, offset 0 */
-> +		nand-bus-width = <16>;
-...
-
-Regards,
-
-Tony
+-Robert
