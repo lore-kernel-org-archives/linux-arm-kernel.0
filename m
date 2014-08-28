@@ -1,123 +1,141 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Thu, 28 Aug 2014 14:15:40 +0200
-Subject: [linux-sunxi] Re: [PATCH 4/4] simplefb: add clock handling code
-In-Reply-To: <20140827141632.GB32243@ulmo>
-References: <20140825150501.GE14763@ulmo.nvidia.com>
- <20140825152232.GE15297@lukather> <20140826080432.GD17263@ulmo>
- <20140826135341.GM15297@lukather> <20140826143550.GB3027@ulmo>
- <53FCE704.4030103@redhat.com> <20140827093121.GA23186@ulmo>
- <53FDB46C.5010609@redhat.com> <20140827125613.GF23186@ulmo>
- <53FDE0CE.5030807@redhat.com> <20140827141632.GB32243@ulmo>
-Message-ID: <53FF1D6C.6090205@redhat.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Thu, 28 Aug 2014 14:19:22 +0200
+Subject: [PATCH v4 00/11] drm: add support for Atmel HLCDC Display
+ Controller
+In-Reply-To: <20140827095235.20334e2d@bbrezillon>
+References: <1406034695-15534-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1997793.CWhjU3F32E@avalon> <20140827095235.20334e2d@bbrezillon>
+Message-ID: <1805054.en0m884lPo@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Boris,
 
-On 08/27/2014 04:16 PM, Thierry Reding wrote:
+On Wednesday 27 August 2014 09:52:35 Boris BREZILLON wrote:
+> On Tue, 26 Aug 2014 01:39:21 +0200 Laurent Pinchart wrote:
+> > On Thursday 21 August 2014 19:26:33 Boris BREZILLON wrote:
+> >> On Thu, 21 Aug 2014 19:08:53 +0200
+> >> Laurent Pinchart <laurent.pinchart@ideasonboard.com> wrote:
+> >> 
+> >> [...]
+> >> 
+> >>>>>> While this could be acceptable when all drivers are statically
+> >>>>>> linked in the kernel, it might be problematic when you're using
+> >>>>>> modules, meaning that you won't be able to display anything on your
+> >>>>>> LCD panel until your HDMI bridge module has been loaded.
+> >>>>> 
+> >>>>> No. HDMI should be using proper hotplugging anyway, hence it should
+> >>>>> be always be loaded anyway. You're in for a world of pain if you
+> >>>>> think you can run DRM with a driver that's composed of separate
+> >>>>> kernel modules.
+> >>>> 
+> >>>> I was talking about the external RGB to HDMI encoder, should the
+> >>>> driver for this encoder (which is not on On Chip block) be compiled
+> >>>> statically too ?
+> >>> 
+> >>> Given the move to multiplatform kernels we need to aim for as few
+> >>> modules compiled in as possible. I'd say this includes HDMI encoders,
+> >>> panels and display controllers.
+> >>> 
+> >>>>> Also if you don't want to use deferred probe, then you're in for the
+> >>>>> full hotplugging panel dance and that implies that you need to fix a
+> >>>>> bunch of things in DRM (one being the framebuffer console
+> >>>>> instantiation that I referred to in the other thread).
+> >>>> 
+> >>>> For now, I wait until there is a device connected on the RGB
+> >>>> connector (connector status set to connector_status_connected) before
+> >>>> creating an fbdev. It might not be the cleanest way to solve this
+> >>>> issue, but it works :-).
+> >>> 
+> >>> Do you create a new drm_encoder at runtime for the HDMI encoder when
+> >>> it appears ? I thought the DRM core and API were not able to correctly
+> >>> cope with that.
+> >> 
+> >> I haven't started to work on the HDMI encoder yet, and ATM I only have
+> >> a single connector (which is true from an HW POV), which is then bound
+> >> to an LCD panel (the only type of remote endpoint I currently support).
+> >> 
+> >> BTW, I wonder how my use case should be represented in the DRM
+> >> subsystem. As I said, from an HW POV I only have one RGB (or whatever
+> >> name you choose for it) connector. But on such kind of connectors you
+> >> can connect several output devices (panels, encoders, ...).
+> >> And in my case I have 2 devices on the same RGB connector: a panel and
+> >> an RGB to HDMI converter.
+> > 
+> > The DRM connector object was initially meant to model a physical user-
+> > accessible connector on a board (VGA, DVI, HDMI, ...) and the properties
+> > of the monitor plugged into it. It has then been (ab)used to represent
+> > panels, as they're similar to monitors.
+> > 
+> > In your case the VGA and HDMI connectors should be modeled as DRM
+> > connectors, the RGB to HDMI encoder as a DRM encoder, and the LCDC as a
+> > DRM CRTC.
+>
+> I don't have any VGA connector (or I'm missing something :-)),
 
-<snip>
+My bad.
 
->> The problems your talking about here all have to do with ordering how
->> things are enabled, but what we're talking about here is keeping things
->> enabled which are already enabled by the bootloader, so there is no
->> ordering problem.
+> but I have an LCD panel and an RGB to HDMI encoder connected on the same RGB
+> connector.
+
+There's no such thing as an RGB connector in DRM. Your SoC has a parallel RGB 
+video output (I assume it's a DPI bus). From a DRM point of view, that bus 
+corresponds to the output of the CRTC.
+
+> > As DRM hardcodes the pipeline model to CRTC -> encoder -> connector, you
+> > will also need a DRM encoder in the VGA path. I suppose your board has a
+> > VGA DAC, that's the component you should expose as a DRM encoder (even if
+> > it can't be controlled and doesn't limit the valid modes).
 > 
-> See what I did there? I tricked you into saying what I've been saying
-> all along. =) 
+> Actually, my problem is that both devices are connected on the same RGB
+> connector, and thus share the same display mode (resolution, HSYNC,
+> VSYNC, RGB output mode, ...).
+> This means that all remote devices have to agree on a specific mode if
+> we want to mirror the display on several output devices, otherwise we
+> must disable one of the output devices.
 
-He he :)
+That's not really a problem. From a DRM perspective you need to model your 
+device as
 
-> It's about keeping things enabled which have been enabled
-> by the bootloader. That's the root of the problem.
+,------.       ,---------------.       ,-----------------.
+| CRTC | -+--> | Dummy Encoder | ----> | Panel Connector |
+`------?  |    `---------------?       `-----------------?
+          |    ,---------------.       ,-----------------.
+          \--> | HDMI Encoder  | ----> | HDMI Connector  |
+               `---------------?       `-----------------?
 
-Ok so we all seem to largely agree on most things here:
+The HDMI pipeline is pretty straightforward.
 
-1) Somehow some clks must be marked used so as to not get disabled
-2) We don't want to hardcode these clocks into the kernel (sunxi) clk
-driver, instead the bootloader should tell the kernel about these clocks.
+You have told me that the panel has a parallel RGB input without any encoder 
+in the panel pipeline (by the way, which panel model are you using ?). 
+However, DRM requires an encoder in every pipeline. You will thus need to 
+instantiate a dummy encoder. One option would be to set the encoder and 
+connector types to DRM_MODE_ENCODER_LVDS and DRM_MODE_CONNECTOR_LVDS 
+respectively, as that's what userspace usually expects for panels. That 
+doesn't reflect the reality in your case though, so creating a new 
+DRM_MODE_CONNECTOR_DPI type might be needed, possibly to be used with 
+DRM_MODE_ENCODER_NONE.
 
-So the only point of discussion left seems to be how to do 2...
+As neither encoder can modify the mode, the same mode will be output on the 
+two connectors.
 
-<snip>
+> >>>>> You also can't be using the current device tree bindings because
+> >>>>> they all assume a dependency from the display controller/output to
+> >>>>> the panel. For hotplugging you'd need the dependency the other way
+> >>>>> around (the panel needs to refer to the output by phandle).
+> >>>> 
+> >>>> Here [1] is a proposal for notification support in the drm_panel
+> >>>> infrastructure (which is not that complicated), and here [2] is how
+> >>>> I use it in my atmel-hlcdc driver to generate hotplug events.
+> >>> 
+> >>> Is there a way we could use the component framework for that ? I know
+> >>> that partial notification isn't supported at the moment, but Russell
+> >>> agreed it was a real use case that should be implemented at some
+> >>> point.
+> >> 
+> >> I'll give it a try.
 
->> Hmm I see, in my mind the problem is not that the clk framework disables
->> unused clocks, but that no one is marking the clocks in question as used.
->> Someone should mark these clocks as used so that they do not get disabled.
->>
->> We could add a clk_mark_in_use function and have the simplefb patch call
->> that instead of clk_prepare_and_enable, or maybe even better just only
->> claim the clks and teach the clk framework to not disable claimed clk
->> in its cleanup run. That would make it clear that simplefb is not enabling
->> anything, just claiming resource its need to avoid them getting removed
->> from underneath simplefb, would that work for you ?
-> 
-> That would be more accurate, but it boils down to the same problem where
-> we still need a driver to claim the resources in some way whereas the
-> problem is fundamentally one where the bootloader should be telling the
-> kernel not to disable it. It's in fact the bootloader that's claiming
-> the resources.
-
-Yes, but those resources do not belong to the bootloader in a sense
-that traditional bootloader / firmware claimed resources (e.g. acpi
-reserved resources) do. These traditional resources are claimed for ever.
-
-Where as these resources are claimed by the bootloader to keep the simplefb
-it provides working, as soon as the simplefb is no longer used, they become
-unused.
-
-<snip off-topic generic-ehci discussion>
-
->> No, there are a lot of other drivers which were written before someone
->> decided that having 10-20 drivers which were 90% copy and paste of each
->> other was a bad idea, but we're really going offtopic here.
-> 
-> The copy and paste is for code that's platform specific. The clocks have
-> different names, resets are different, supplies are different. The fact
-> that many can currently use the same driver is likely just coincidence
-> rather than design and it's entirely possible that at some point they'll
-> add support for a more advanced feature that makes them incompatible
-> with the rest of the generic drivers. And then you have a big mess
-> because you need to add quirks all over the place.
-> 
-> And this isn't all that far off-topic, since simplefb also needs to deal
-> with this kind of situation. And what I've been arguing is that in order
-> to really be generic it has to make assumptions, one of which is that it
-> uses only resources that it doesn't need to explicitly handle.
-
-I can understand that you're worried about generic ?hci drivers dealing with
-clocks / resets / etc. As there may be strict ordering requirements there,
-but for simplefb that is not the case.
-
-All we're asking for is for a way to communicate 2 things to the kernel:
-
-1) These resources are in use (we are not asking the kernel to do anything
-with them, rather the opposite, we're asking to leave them alone so no
-ordering issues)
-
-2) Tie these resources to simplefb so that the kernel can know when they
-are no longer in use, and it may e.g. re-use the memory
-
-To me the most logical and also most "correct" way of modelling this is to
-put the resources inside the simplefb dt node.
-
-<snip>
-
->> The key word here is "the used resources" to me this is not about simlefb
->> managing resources, but marking them as used as long as it needs them, like
->> it will need to do for the reserved mem chunk.
-> 
-> The difference between the clocks and the memory resource is that the
-> driver needs to directly access the memory (it needs to map it and
-> provide a userspace mapping for it) whereas it doesn't need to touch the
-> clocks (except to workaround a Linux-specific implementation detail).
-
-Erm, no, the need to map the memory and the memory being a resource
-which may be released are an orthogonal problem. E.g. a system with
-dedicated framebuffer memory won't need to use a reserved main-memory
-chunk, nor need to worry about returning that mem when simplefb is no
-longer in use.
-
+-- 
 Regards,
 
-Hans
+Laurent Pinchart
