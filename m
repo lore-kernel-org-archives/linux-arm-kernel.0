@@ -1,26 +1,52 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 28 Aug 2014 18:02:01 +0100
-Subject: [PATCHv3 1/7] arm64: Treat handle_arch_irq as a function pointer
-In-Reply-To: <1408584039-12735-2-git-send-email-lauraa@codeaurora.org>
-References: <1408584039-12735-1-git-send-email-lauraa@codeaurora.org>
- <1408584039-12735-2-git-send-email-lauraa@codeaurora.org>
-Message-ID: <20140828170200.GD31111@arm.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 28 Aug 2014 10:02:58 -0700
+Subject: [GIT PULL] ARM: OMAP2+: DRA72x/DRA74x basic support
+In-Reply-To: <alpine.DEB.2.02.1408280617360.21985@utopia.booyaka.com>
+References: <alpine.DEB.2.02.1408280617360.21985@utopia.booyaka.com>
+Message-ID: <20140828170258.GH16006@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 21, 2014 at 02:20:33AM +0100, Laura Abbott wrote:
-> --- a/arch/arm64/kernel/entry.S
-> +++ b/arch/arm64/kernel/entry.S
-> @@ -168,7 +168,8 @@ tsk	.req	x28		// current thread_info
->   * Interrupt handling.
->   */
->  	.macro	irq_handler
-> -	ldr	x1, handle_arch_irq
-> +	adrp x1, handle_arch_irq
-> +	ldr x1, [x1, #:lo12:handle_arch_irq]
+Arnd & Olof,
 
-Nitpick: please keep the tabs between instructions and registers, it
-looks nicer with the rest of the code.
+Can you please pick this one up for the -rc cycle so the TI guys
+can boot test dra7 with mainline properly?
 
--- 
-Catalin
+Regards,
+
+Tony
+
+* Paul Walmsley <paul@pwsan.com> [140827 23:18]:
+> Hi Tony,
+> 
+> The following changes since commit 52addcf9d6669fa439387610bc65c92fa0980cef:
+> 
+>   Linux 3.17-rc2 (2014-08-25 15:36:20 -0700)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/pjw/omap-pending.git tags/for-v3.17-rc/omap-dra72x-d74x-support-a
+> 
+> for you to fetch changes up to f7f7a29bf0cf25af23f37e5b5bf1368b85705286:
+> 
+>   ARM: DRA7: hwmod: Add dra74x and dra72x specific ocp interface lists (2014-08-27 19:38:23 -0600)
+> 
+> ----------------------------------------------------------------
+> Add basic subarchitecture support for the DRA72x and DRA74x.  These
+> are OMAP2+ derivative SoCs.  This should be low-risk to existing OMAP
+> platforms.
+> 
+> Basic build, boot, and PM test logs are available here:
+> 
+> http://www.pwsan.com/omap/testlogs/hwmod-a-early-v3.17-rc/20140827194314/
+> 
+> ----------------------------------------------------------------
+> Rajendra Nayak (2):
+>       ARM: DRA7: Add support for soc_is_dra74x() and soc_is_dra72x() variants
+>       ARM: DRA7: hwmod: Add dra74x and dra72x specific ocp interface lists
+> 
+>  arch/arm/mach-omap2/omap_hwmod.c          |  3 +++
+>  arch/arm/mach-omap2/omap_hwmod_7xx_data.c | 22 ++++++++++++++++++++--
+>  arch/arm/mach-omap2/soc.h                 |  6 ++++++
+>  3 files changed, 29 insertions(+), 2 deletions(-)
+> 
