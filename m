@@ -1,232 +1,62 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 28 Aug 2014 15:56:35 +0100
-Subject: [PATCH V2 4/6] arm64: Add DTS support for FSL's LS2085A SoC
-In-Reply-To: <1409219706-14843-5-git-send-email-bhupesh.sharma@freescale.com>
-References: <1409219706-14843-1-git-send-email-bhupesh.sharma@freescale.com>
- <1409219706-14843-5-git-send-email-bhupesh.sharma@freescale.com>
-Message-ID: <20140828145635.GL14650@leverpostej>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 28 Aug 2014 16:01:12 +0100
+Subject: [PATCH v10 03/19] arm: fiq: Replace default FIQ handler
+In-Reply-To: <53F39377.1070308@linaro.org>
+References: <1408369264-14242-1-git-send-email-daniel.thompson@linaro.org>
+ <1408466769-20004-1-git-send-email-daniel.thompson@linaro.org>
+ <1408466769-20004-4-git-send-email-daniel.thompson@linaro.org>
+ <20140819173742.GG30401@n2100.arm.linux.org.uk> <53F39377.1070308@linaro.org>
+Message-ID: <20140828150112.GD30401@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Bhupesh,
-
-This looks generally good, I just have a few questions and minor change
-suggestions below.
-
-On Thu, Aug 28, 2014 at 10:55:04AM +0100, Bhupesh Sharma wrote:
-> This patch adds the device tree support for FSL LS2085A SoC
-> based on ARMv8 architecture.
+On Tue, Aug 19, 2014 at 07:12:07PM +0100, Daniel Thompson wrote:
+> On 19/08/14 18:37, Russell King - ARM Linux wrote:
+> > On Tue, Aug 19, 2014 at 05:45:53PM +0100, Daniel Thompson wrote:
+> >> +int register_fiq_nmi_notifier(struct notifier_block *nb)
+> >> +{
+> >> +	return atomic_notifier_chain_register(&fiq_nmi_chain, nb);
+> >> +}
+> >> +
+> >> +asmlinkage void __exception_irq_entry fiq_nmi_handler(struct pt_regs *regs)
+> >> +{
+> >> +	struct pt_regs *old_regs = set_irq_regs(regs);
+> >> +
+> >> +	nmi_enter();
+> >> +	atomic_notifier_call_chain(&fiq_nmi_chain, (unsigned long)regs, NULL);
+> >> +	nmi_exit();
+> >> +	set_irq_regs(old_regs);
+> >> +}
+> > 
+> > Really not happy with this.  What happens if a FIQ occurs while we're
+> > inside register_fiq_nmi_notifier() - more specifically inside
+> > atomic_notifier_chain_register() ?
 > 
-> Following levels of DTSI/DTS files have been created for the
-> LS2085A SoC family:
-> 
-> - fsl-ls2085a.dtsi:
-> DTS-Include file for FSL LS2085A SoC.
-> 
-> - fsl-ls2085a-simu.dts:
-> DTS file for FSL LS2085a software simulator model.
-> 
-> Signed-off-by: Bhupesh Sharma <bhupesh.sharma@freescale.com>
-> Signed-off-by: Arnab Basu <arnab.basu@freescale.com>
-> Signed-off-by: Stuart Yoder <stuart.yoder@freescale.com>
-> ---
->  arch/arm64/boot/dts/fsl-ls2085a-simu.dts |   26 +++++++
->  arch/arm64/boot/dts/fsl-ls2085a.dtsi     |  120 ++++++++++++++++++++++++++++++
->  2 files changed, 146 insertions(+)
->  create mode 100644 arch/arm64/boot/dts/fsl-ls2085a-simu.dts
->  create mode 100644 arch/arm64/boot/dts/fsl-ls2085a.dtsi
-> 
-> diff --git a/arch/arm64/boot/dts/fsl-ls2085a-simu.dts b/arch/arm64/boot/dts/fsl-ls2085a-simu.dts
-> new file mode 100644
-> index 0000000..3c0f953
-> --- /dev/null
-> +++ b/arch/arm64/boot/dts/fsl-ls2085a-simu.dts
-> @@ -0,0 +1,26 @@
-> +/*
-> + * Device Tree file for Freescale LS2085a software Simulator model
-> + *
-> + * Copyright (C) 2014, Freescale Semiconductor
-> + *
-> + * Bhupesh Sharma <bhupesh.sharma@freescale.com>
-> + *
-> + * This file is licensed under the terms of the GNU General Public
-> + * License version 2.  This program is licensed "as is" without any
-> + * warranty of any kind, whether express or implied.
-> + */
-> +
-> +/dts-v1/;
-> +
-> +/include/ "fsl-ls2085a.dtsi"
-> +
-> +/ {
-> +	model = "Freescale Layerscape 2085a software Simulator model";
-> +	compatible = "fsl,ls2085a-simu", "fsl,ls2085a";
-> +
-> +	ethernet at 2210000 {
-> +		compatible = "smsc,lan91c111";
-> +		reg = <0x0 0x2210000 0x0 0x100>;
-> +		interrupts = <0 58 0x1>;
-> +	};
-> +};
-> diff --git a/arch/arm64/boot/dts/fsl-ls2085a.dtsi b/arch/arm64/boot/dts/fsl-ls2085a.dtsi
-> new file mode 100644
-> index 0000000..a1692c2
-> --- /dev/null
-> +++ b/arch/arm64/boot/dts/fsl-ls2085a.dtsi
-> @@ -0,0 +1,120 @@
-> +/*
-> + * Device Tree Include file for Freescale Layerscape-2085A family SoC.
-> + *
-> + * Copyright (C) 2014, Freescale Semiconductor
-> + *
-> + * Bhupesh Sharma <bhupesh.sharma@freescale.com>
-> + *
-> + * This file is licensed under the terms of the GNU General Public
-> + * License version 2.  This program is licensed "as is" without any
-> + * warranty of any kind, whether express or implied.
-> + */
-> +
-> +/ {
-> +	compatible = "fsl,ls2085a";
-> +	interrupt-parent = <&gic>;
-> +	#address-cells = <2>;
-> +	#size-cells = <2>;
-> +
-> +	cpus {
-> +		#address-cells = <2>;
-> +		#size-cells = <0>;
-> +
-> +		/* We have 4 clusters having 2 Cortex-A57 cores each */
-> +		cpu at 0 {
-> +			device_type = "cpu";
-> +			compatible = "arm,cortex-a57";
-> +			reg = <0x0 0x0>;
-> +		};
-> +
-> +		cpu at 1 {
-> +			device_type = "cpu";
-> +			compatible = "arm,cortex-a57";
-> +			reg = <0x0 0x1>;
-> +		};
-> +
-> +		cpu at 100 {
-> +			device_type = "cpu";
-> +			compatible = "arm,cortex-a57";
-> +			reg = <0x0 0x100>;
-> +		};
-> +
-> +		cpu at 101 {
-> +			device_type = "cpu";
-> +			compatible = "arm,cortex-a57";
-> +			reg = <0x0 0x101>;
-> +		};
-> +
-> +		cpu at 200 {
-> +			device_type = "cpu";
-> +			compatible = "arm,cortex-a57";
-> +			reg = <0x0 0x200>;
-> +		};
-> +
-> +		cpu at 201 {
-> +			device_type = "cpu";
-> +			compatible = "arm,cortex-a57";
-> +			reg = <0x0 0x201>;
-> +		};
-> +
-> +		cpu at 300 {
-> +			device_type = "cpu";
-> +			compatible = "arm,cortex-a57";
-> +			reg = <0x0 0x300>;
-> +		};
-> +
-> +		cpu at 301 {
-> +			device_type = "cpu";
-> +			compatible = "arm,cortex-a57";
-> +			reg = <0x0 0x301>;
-> +		};
-> +	};
-> +
-> +	gic: interrupt-controller at 6000000 {
-> +		compatible = "arm,gic-v3";
-> +		reg = <0x0 0x06000000 0 0x10000>, /* GIC Dist */
-> +		      <0x0 0x06100000 0 0x100000>; /* GICR (RD_base + SGI_base) */
-> +		#interrupt-cells = <3>;
-> +		#address-cells = <2>;
-> +		#size-cells = <2>;
-> +		ranges;
-> +		interrupt-controller;
-> +		interrupts = <1 9 0x4>;
-> +	};
+> Should depend on which side of the rcu update we're on.
 
-The GIC node doesn't have any sub-nodes, so I think the #address-cells,
-#size-cells, and ranges properties can go for now.
+I just asked Paul McKenney, our RCU expert... essentially, yes, RCU
+stuff itself is safe in this context.  However, RCU stuff can call into
+lockdep if lockdep is configured, and there are questions over lockdep.
 
-> +
-> +	timer {
-> +		compatible = "arm,armv8-timer";
-> +		interrupts = <1 13 0x1>, /* Physical Secure PPI, edge triggered */
-> +			     <1 14 0x1>, /* Physical Non-Secure PPI, edge triggered */
-> +			     <1 11 0x1>, /* Virtual PPI, edge triggered */
-> +			     <1 10 0x1>; /* Hypervisor PPI, edge triggered */
-> +	};
+There's some things which can be done to reduce the lockdep exposure
+to it, such as ensuring that rcu_read_lock() is first called outside
+of FIQ context.
 
-In this SoC, are there low-power states the CPUs can be placed into
-where the architected timers can lose state?
+There's concerns with whether either printk() in check_flags() could
+be reached too (flags there should always indicate that IRQs were
+disabled, so that reduces down to a question about just the first
+printk() there.)
 
-If so, do you any auxiliary timers that aren't cpu-local?
+There's also the very_verbose() stuff for RCU lockdep classes which
+Paul says must not be enabled.
 
-> +
-> +	serial0: serial at 21c0500 {
-> +		device_type = "serial";
-> +		compatible = "fsl,ns16550", "ns16550a";
-> +		reg = <0x0 0x21c0500 0x0 0x100>;
-> +		clock-frequency = <0>;	/* Updated by bootloader */
-> +		interrupts = <0 32 0x1>; /* edge triggered */
-> +	};
-> +
-> +	serial1: serial at 21c0600 {
-> +		device_type = "serial";
-> +		compatible = "fsl,ns16550", "ns16550a";
-> +		reg = <0x0 0x21c0600 0x0 0x100>;
-> +		clock-frequency = <0>; 	/* Updated by bootloader */
-> +		interrupts = <0 32 0x1>; /* edge triggered */
-> +	};
+Lastly, Paul isn't a lockdep expert, but he sees nothing that prevents
+lockdep doing the deadlock checking as a result of the above call.
 
-Just to check: do the two UARTs share the same IRQ, or is that a
-copy-paste error?
+So... this coupled with my feeling that notifiers make it too easy for
+unreviewed code to be hooked into this path, I'm fairly sure that we
+don't want to be calling atomic notifier chains from FIQ context.
 
-> +
-> +	fsl_mc: fsl-mc at 80c000000 {
-> +		compatible = "fsl,qoriq-mc";
-> +		reg = <0x00000008 0x0c000000 0 0x40>,	 /* MC portal base */
-> +		      <0x00000000 0x08340000 0 0x40000>; /* MC control reg */
-> +		};
-
-Nit: the '}' is indented a tab too far.
-
-> +
-> +	memory at 80000000 {
-> +		device_type = "memory";
-> +		reg = <0x00000000 0x80000000 0 0x80000000>;
-> +		      /* DRAM space 1 - 2 GB DRAM */
-> +	};
-
-Does that mean:
-
- - This is "DRAM space 1", populated with 2GB?
-
-Or:
-
- - The DRAM space can be populated with 1 to 2 GB?
-
-If the former, s/ - /: / for clarity.
-
-If the latter, it might make sense to move that into board-specific dts
-files. If this can be dynamically populated ideally the firmware/loader
-would fix this up (assuming it can probe the memory).
-
-Also, can we move the memory node up to just after /cpus? That would
-match the other dts files we have.
-
-Cheers,
-Mark.
+-- 
+FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
+according to speedtest.net.
