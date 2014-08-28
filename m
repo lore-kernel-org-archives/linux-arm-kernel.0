@@ -1,98 +1,33 @@
 From: gautam.vivek@samsung.com (Vivek Gautam)
-Date: Thu, 28 Aug 2014 13:31:58 +0530
-Subject: [PATCH 3/5] phy: exynos5-usbdrd: Add facility for VBUS-BOOST-5V supply
+Date: Thu, 28 Aug 2014 13:31:59 +0530
+Subject: [PATCH 4/5] usb: dwc3: Adding Kconfig dependency for Exynos7
 In-Reply-To: <1409212920-28526-1-git-send-email-gautam.vivek@samsung.com>
 References: <1409212920-28526-1-git-send-email-gautam.vivek@samsung.com>
-Message-ID: <1409212920-28526-4-git-send-email-gautam.vivek@samsung.com>
+Message-ID: <1409212920-28526-5-git-send-email-gautam.vivek@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some Exynos SoCs have a separate regulator controlling a
-Boost 5V supply which goes as input for VBUS regulator.
-So adding a control for the same in driver, to enable
-vbus supply on the port.
+The Exynos-DWC3 USB 3.0 DRD controller is also present on
+Exynos7 platform, so adding the dependency on ARCH_EXYNOS7
+for this driver.
 
 Signed-off-by: Vivek Gautam <gautam.vivek@samsung.com>
 ---
- drivers/phy/phy-exynos5-usbdrd.c |   27 +++++++++++++++++++++++++--
- 1 file changed, 25 insertions(+), 2 deletions(-)
+ drivers/usb/dwc3/Kconfig |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/phy/phy-exynos5-usbdrd.c b/drivers/phy/phy-exynos5-usbdrd.c
-index 685c108..a6d0cb7 100644
---- a/drivers/phy/phy-exynos5-usbdrd.c
-+++ b/drivers/phy/phy-exynos5-usbdrd.c
-@@ -176,6 +176,7 @@ struct exynos5_usbdrd_phy {
- 	u32 extrefclk;
- 	struct clk *ref_clk;
- 	struct regulator *vbus;
-+	struct regulator *vbus_boost;
- };
+diff --git a/drivers/usb/dwc3/Kconfig b/drivers/usb/dwc3/Kconfig
+index 785510a..e235894 100644
+--- a/drivers/usb/dwc3/Kconfig
++++ b/drivers/usb/dwc3/Kconfig
+@@ -55,7 +55,7 @@ config USB_DWC3_OMAP
  
- static inline
-@@ -457,11 +458,19 @@ static int exynos5_usbdrd_phy_power_on(struct phy *phy)
- 	clk_prepare_enable(phy_drd->ref_clk);
- 
- 	/* Enable VBUS supply */
-+	if (phy_drd->vbus_boost) {
-+		ret = regulator_enable(phy_drd->vbus_boost);
-+		if (ret) {
-+			dev_err(phy_drd->dev,
-+				"Failed to enable VBUS boost supply\n");
-+			goto fail_vbus;
-+		}
-+	}
- 	if (phy_drd->vbus) {
- 		ret = regulator_enable(phy_drd->vbus);
- 		if (ret) {
- 			dev_err(phy_drd->dev, "Failed to enable VBUS supply\n");
--			goto fail_vbus;
-+			goto fail_vbus_boost;
- 		}
- 	}
- 
-@@ -470,6 +479,9 @@ static int exynos5_usbdrd_phy_power_on(struct phy *phy)
- 
- 	return 0;
- 
-+fail_vbus_boost:
-+	if (phy_drd->vbus_boost)
-+		regulator_disable(phy_drd->vbus_boost);
- fail_vbus:
- 	clk_disable_unprepare(phy_drd->ref_clk);
- 	if (!IS_ERR(phy_drd->pipeclk))
-@@ -493,6 +505,8 @@ static int exynos5_usbdrd_phy_power_off(struct phy *phy)
- 	/* Disable VBUS supply */
- 	if (phy_drd->vbus)
- 		regulator_disable(phy_drd->vbus);
-+	if (phy_drd->vbus_boost)
-+		regulator_disable(phy_drd->vbus_boost);
- 
- 	clk_disable_unprepare(phy_drd->ref_clk);
- 	if (!IS_ERR(phy_drd->pipeclk))
-@@ -645,7 +659,7 @@ static int exynos5_usbdrd_phy_probe(struct platform_device *pdev)
- 		break;
- 	}
- 
--	/* Get Vbus regulator */
-+	/* Get Vbus regulators */
- 	phy_drd->vbus = devm_regulator_get(dev, "vbus");
- 	if (IS_ERR(phy_drd->vbus)) {
- 		ret = PTR_ERR(phy_drd->vbus);
-@@ -655,6 +669,15 @@ static int exynos5_usbdrd_phy_probe(struct platform_device *pdev)
- 		dev_warn(dev, "Failed to get VBUS supply regulator\n");
- 		phy_drd->vbus = NULL;
- 	}
-+	phy_drd->vbus_boost = devm_regulator_get(dev, "vbus-boost");
-+	if (IS_ERR(phy_drd->vbus_boost)) {
-+		ret = PTR_ERR(phy_drd->vbus_boost);
-+		if (ret == -EPROBE_DEFER)
-+			return ret;
-+
-+		dev_warn(dev, "Failed to get VBUS boost supply regulator\n");
-+		phy_drd->vbus_boost = NULL;
-+	}
- 
- 	dev_vdbg(dev, "Creating usbdrd_phy phy\n");
- 
+ config USB_DWC3_EXYNOS
+ 	tristate "Samsung Exynos Platform"
+-	depends on ARCH_EXYNOS || COMPILE_TEST
++	depends on (ARCH_EXYNOS || ARCH_EXYNOS7) || COMPILE_TEST
+ 	default USB_DWC3
+ 	help
+ 	  Recent Exynos5 SoCs ship with one DesignWare Core USB3 IP inside,
 -- 
 1.7.10.4
