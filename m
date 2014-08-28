@@ -1,106 +1,121 @@
-From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Thu, 28 Aug 2014 10:05:20 +0200
-Subject: [PATCH v2] ARM: dts: Add shmobile platform device tree bindings
- documentation
-Message-ID: <1409213120-5291-1-git-send-email-geert+renesas@glider.be>
+From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
+Date: Thu, 28 Aug 2014 10:23:48 +0200
+Subject: [PATCH 15/15] tty: serial: 8250: omap: add dma support
+In-Reply-To: <20140827202313.GF16006@atomide.com>
+References: <1408124563-31541-1-git-send-email-bigeasy@linutronix.de>
+ <1408124563-31541-16-git-send-email-bigeasy@linutronix.de>
+ <20140815210211.GD9239@atomide.com>
+ <53F5AF0D.5060409@linutronix.de>
+ <20140821184416.GF10066@atomide.com>
+ <53FE3779.5090908@linutronix.de>
+ <20140827202313.GF16006@atomide.com>
+Message-ID: <20140828082348.GA5413@linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add Renesas SH-Mobile, R-Mobile, and R-Car Platform Device Tree Bindings
-Documentation, listing supported SoCs and boards.
+* Tony Lindgren | 2014-08-27 13:23:14 [-0700]:
 
-This allows to use checkpatch to validate DTSes referring to Renesas
-shmobile SoCs, and boards containing those SoCs.
+>> which means I just enable DMA mode in UART and disable it. No DMA
+>> operations were performed.
+>> With this change I see a lost character now and then which means the
+>> UART-IP goes into off and loses its context. Good. However I don't see
+>> core off anymore. This looks like a bug beyond my responsibilities :)
+>
+>OK, that sounds like a bug still lurking around somewhere. The core
+>domain won't hit idle if there are any hardware pieces blocking.
 
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
----
-v2:
-  - Drop RFC
-  - Move sh7372/sh73a0 up, before r8a73a4
-  - Add r8a7793/Gose
-  - Drop bogus EMEV2 before KZM9D board name
-  - Drop armadillo-reference, as it's on its way out
----
- Documentation/devicetree/bindings/arm/shmobile.txt | 71 ++++++++++++++++++++++
- 1 file changed, 71 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/arm/shmobile.txt
+Yes.
 
-diff --git a/Documentation/devicetree/bindings/arm/shmobile.txt b/Documentation/devicetree/bindings/arm/shmobile.txt
-new file mode 100644
-index 000000000000..5d1c5c0085dc
---- /dev/null
-+++ b/Documentation/devicetree/bindings/arm/shmobile.txt
-@@ -0,0 +1,71 @@
-+Renesas SH-Mobile, R-Mobile, and R-Car Platform Device Tree Bindings
-+--------------------------------------------------------------------
-+
-+SoCs:
-+
-+  - Emma Mobile EV2
-+    compatible = "renesas,emev2"
-+  - RZ/A1H (R7S72100)
-+    compatible = "renesas,r7s72100"
-+  - SH-Mobile AP4 (R8A73720/SH7372)
-+    compatible = "renesas,sh7372"
-+  - SH-Mobile AG5 (R8A73A00/SH73A0)
-+    compatible = "renesas,sh73a0"
-+  - R-Mobile APE6 (R8A73A40)
-+    compatible = "renesas,r8a73a4"
-+  - R-Mobile A1 (R8A77400)
-+    compatible = "renesas,r8a7740"
-+  - R-Car M1A (R8A77781)
-+    compatible = "renesas,r8a7778"
-+  - R-Car H1 (R8A77790)
-+    compatible = "renesas,r8a7779"
-+  - R-Car H2 (R8A77900)
-+    compatible = "renesas,r8a7790"
-+  - R-Car M2-W (R8A77910)
-+    compatible = "renesas,r8a7791"
-+  - R-Car V2H (R8A77920)
-+    compatible = "renesas,r8a7792"
-+  - R-Car M2-N (R8A77930)
-+    compatible = "renesas,r8a7793"
-+  - R-Car E2 (R8A77940)
-+    compatible = "renesas,r8a7794"
-+
-+
-+Boards:
-+
-+  - Alt
-+    compatible = "renesas,alt", "renesas,r8a7794"
-+  - APE6-EVM
-+    compatible = "renesas,ape6evm", "renesas,r8a73a4"
-+  - APE6-EVM - Reference Device Tree Implementation
-+    compatible = "renesas,ape6evm-reference", "renesas,r8a73a4"
-+  - Atmark Techno Armadillo-800 EVA
-+    compatible = "renesas,armadillo800eva"
-+  - BOCK-W
-+    compatible = "renesas,bockw", "renesas,r8a7778"
-+  - BOCK-W - Reference Device Tree Implementation
-+    compatible = "renesas,bockw-reference", "renesas,r8a7778"
-+  - Genmai (RTK772100BC00000BR)
-+    compatible = "renesas,genmai", "renesas,r7s72100"
-+  - Gose
-+    compatible = "renesas,gose", "renesas,r8a7793"
-+  - Henninger
-+    compatible = "renesas,henninger", "renesas,r8a7791"
-+  - Koelsch (RTP0RC7791SEB00010S)
-+    compatible = "renesas,koelsch", "renesas,r8a7791"
-+  - KZM9D
-+    compatible = "renesas,kzm9d", "renesas,emev2"
-+  - KZM-A9-GT
-+    compatible = "renesas,kzm9g", "renesas,sh73a0"
-+  - KZM-A9-GT - Reference Device Tree Implementation
-+    compatible = "renesas,kzm9g-reference", "renesas,sh73a0"
-+  - Lager (RTP0RC7790SEB00010S)
-+    compatible = "renesas,lager", "renesas,r8a7790"
-+  - Mackerel (R0P7372LC0016RL, AP4 EVM 2nd)
-+    compatible = "renesas,mackerel"
-+  - Marzen
-+    compatible = "renesas,marzen", "renesas,r8a7779"
-+
-+Note: Reference Device Tree Implementations are temporary implementations
-+      to ease the migration from platform devices to Device Tree, and are
-+      intended to be removed in the future.
--- 
-1.9.1
+>> I added code to cancel & and start DMA transfers in runtime suspend
+>> callbacks.
+>
+>Do you mean just the OMAP_UART_SCR_DMAMODE_CTL related code, or
+>also the dmaengine calls?
+
+dmaengine calls are unused because up.dma is not assigned. It is 
+basically like you wouldn't have the dma properties in the devicetree.
+And while in that non-DMA mode I just set and unset the DMAMODE_CTL + 
+DMAMODE_1 bits in the SCR register. Nothing else. Based on some testing
+I just did, DMAMODE_CTL does not make the difference. DMAMODE_CTL +
+DMAMODE_1 does.
+
+>> However core-off with DMA won't work. I think we could document this in
+>> the binding document. What do you think?
+>
+>There should not be such a limitation though. Maybe dump out the values
+>of cm_idlest_per and cm_idlest1_core for working and failing off idle
+>cases and see what the difference is?
+
+I can't follow here. This is the working case:
+
+usbhost_pwrdm (OFF),OFF:1,RET:1,INA:0,ON:2,RET-LOGIC-OFF:0,RET-MEMBANK1-OFF:0
+sgx_pwrdm (OFF),OFF:1,RET:0,INA:0,ON:1,RET-LOGIC-OFF:0,RET-MEMBANK1-OFF:0
+core_pwrdm (ON),OFF:109,RET:22,INA:71,ON:203,RET-LOGIC-OFF:0,RET-MEMBANK1-OFF:0,RET-MEMBANK2-OFF:0
+per_pwrdm (ON),OFF:137,RET:126,INA:0,ON:264,RET-LOGIC-OFF:0,RET-MEMBANK1-OFF:0
+dss_pwrdm (ON),OFF:383,RET:861,INA:0,ON:1245,RET-LOGIC-OFF:0,RET-MEMBANK1-OFF:0
+cam_pwrdm (OFF),OFF:1,RET:1,INA:0,ON:2,RET-LOGIC-OFF:0,RET-MEMBANK1-OFF:0
+neon_pwrdm (ON),OFF:311,RET:889,INA:44,ON:1245,RET-LOGIC-OFF:0
+mpu_pwrdm (ON),OFF:311,RET:889,INA:44,ON:1245,RET-LOGIC-OFF:0,RET-MEMBANK1-OFF:0
+iva2_pwrdm (OFF),OFF:1,RET:1,INA:0,ON:2,RET-LOGIC-OFF:0,RET-MEMBANK1-OFF:0,RET-MEMBANK2-OFF:0,RET-MEMBANK3-OFF:0,RET-MEMBANK4-OFF:0
+usbhost_clkdm->usbhost_pwrdm (0)
+sgx_clkdm->sgx_pwrdm (0)
+per_clkdm->per_pwrdm (15)
+cam_clkdm->cam_pwrdm (0)
+dss_clkdm->dss_pwrdm (1)
+d2d_clkdm->core_pwrdm (0)
+iva2_clkdm->iva2_pwrdm (0)
+mpu_clkdm->mpu_pwrdm (0)
+core_l4_clkdm->core_pwrdm (20)
+core_l3_clkdm->core_pwrdm (1)
+neon_clkdm->neon_pwrdm (0)
+
+non-working:
+
+usbhost_pwrdm (OFF),OFF:1,RET:1,INA:0,ON:2,RET-LOGIC-OFF:0,RET-MEMBANK1-OFF:0
+sgx_pwrdm (OFF),OFF:1,RET:0,INA:0,ON:1,RET-LOGIC-OFF:0,RET-MEMBANK1-OFF:0
+core_pwrdm (ON),OFF:0,RET:0,INA:0,ON:1,RET-LOGIC-OFF:0,RET-MEMBANK1-OFF:0,RET-MEMBANK2-OFF:0
+per_pwrdm (ON),OFF:0,RET:0,INA:0,ON:1,RET-LOGIC-OFF:0,RET-MEMBANK1-OFF:0
+dss_pwrdm (ON),OFF:253,RET:159,INA:0,ON:413,RET-LOGIC-OFF:0,RET-MEMBANK1-OFF:0
+cam_pwrdm (OFF),OFF:1,RET:1,INA:0,ON:2,RET-LOGIC-OFF:0,RET-MEMBANK1-OFF:0
+neon_pwrdm (ON),OFF:135,RET:242,INA:35,ON:413,RET-LOGIC-OFF:0
+mpu_pwrdm (ON),OFF:135,RET:242,INA:35,ON:413,RET-LOGIC-OFF:0,RET-MEMBANK1-OFF:0
+iva2_pwrdm (OFF),OFF:1,RET:1,INA:0,ON:2,RET-LOGIC-OFF:0,RET-MEMBANK1-OFF:0,RET-MEMBANK2-OFF:0,RET-MEMBANK3-OFF:0,RET-MEMBANK4-OFF:0
+usbhost_clkdm->usbhost_pwrdm (0)
+sgx_clkdm->sgx_pwrdm (0)
+per_clkdm->per_pwrdm (15)
+cam_clkdm->cam_pwrdm (0)
+dss_clkdm->dss_pwrdm (1)
+d2d_clkdm->core_pwrdm (0)
+iva2_clkdm->iva2_pwrdm (0)
+mpu_clkdm->mpu_pwrdm (0)
+core_l4_clkdm->core_pwrdm (21)
+core_l3_clkdm->core_pwrdm (1)
+neon_clkdm->neon_pwrdm (0)
+
+so per_pwrdm and core_pwrdm remain on and I guess the former is where
+the UART sits.
+
+>It could be the either the dma or the uart hardware blocking. I guess
+>it could be also an issue with runtime pm use somewhere.
+
+So I just toggle the two DMA bits in SCR and the UART seems to block
+since the DMA hw is not involved. Reading SCR back says that those bits
+are not set.
+To use DMA you don't have to enable it in SCR register you can also use
+the FCR register. The manual says that you can only write this DMA
+enable bit in the FCR register if the baud clock is not running. And
+guess what: same thing: I only *toggle* the DMA enable bit here (it
+remains 0 later) and the core won't hit idle.
+Same effect if I toggle this bit while the baud clock is running (the
+manual says that this bit can only be written if the baud clock is not
+running). Seems like the UART is following its own specification and it
+remains blocking once the DMA was enabled.
+It would be nice if someone from the UART-IP team could ACK this.
+
+Bah. Does it make sense to use runtime-PM if we can't hit core-off? I'm
+thinking to add a printk once dma is enabled says that runtime-pm is
+switched off.
+
+>Tony
+
+Sebastian
