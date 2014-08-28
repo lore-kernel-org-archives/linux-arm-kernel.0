@@ -1,96 +1,99 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 28 Aug 2014 18:30:37 +0100
-Subject: [PATCH 11/14] arm64: dts: Add initial device tree support for
- EXYNOS7
-In-Reply-To: <53FF6668.4080502@arm.com>
-References: <1409132660-1898-1-git-send-email-ch.naveen@samsung.com>
- <1409132660-1898-3-git-send-email-ch.naveen@samsung.com>
- <20140828035639.GB4972@localhost>
- <20140828094846.GD14650@leverpostej>
- <CAOesGMjY8wfAcq2fLgs=ZWHdiWtFqxr+ncUKTje0SnXqO-CCgQ@mail.gmail.com>
- <20140828170306.GQ14650@leverpostej> <53FF6668.4080502@arm.com>
-Message-ID: <20140828173037.GA18005@leverpostej>
+From: grygorii.strashko@ti.com (Grygorii Strashko)
+Date: Thu, 28 Aug 2014 20:32:25 +0300
+Subject: [PATCH v2 0/3] gpio: syscon: reuse for keystone 2 socs
+In-Reply-To: <1408639874.873856101@f420.i.mail.ru>
+References: <53ECE9B1.4060303@ti.com>
+ <1408638203-8246-1-git-send-email-grygorii.strashko@ti.com>
+ <1408639874.873856101@f420.i.mail.ru>
+Message-ID: <53FF67A9.4080504@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 28, 2014 at 06:27:04PM +0100, Marc Zyngier wrote:
-> On 28/08/14 18:03, Mark Rutland wrote:
-> 
-> > From 67104ad5a56e4c18f9c41f06af028b7561740afd Mon Sep 17 00:00:00 2001
-> > From: Mark Rutland <mark.rutland@arm.com>
-> > Date: Thu, 28 Aug 2014 17:41:03 +0100
-> > Subject: [PATCH] Doc: dt: arch_timer: discourage clock-frequency use
-> > 
-> > The ARM Generic Timer (AKA the architected timer, arm_arch_timer)
-> > features a CPU register (CNTFRQ) which firmware is intended to
-> > initialize, and non-secure software can read to determine the frequency
-> > of the timer. On CPUs with secure state, this register cannot be written
-> > from non-secure states.
-> > 
-> > The firmware of early SoCs featuring the timer did not correctly
-> > initialize CNTFRQ correctly on all CPUs, requiring the frequency to be
-> > described in DT as a workaround. This workaround is not complete however
-> > as CNTFRQ is exposed to all software in a privileged non-secure mode,
-> > including KVM guests. The firmware and DTs for recent SoCs have followed
-> 
-> I believe Xen is also affected by this.
+Hi Alexander, All,
 
-True.
-
-s/KVM/KVM\/Xen/, then?
-
-> > the example set by these early SoCs.
-> > 
-> > This patch updates the arch timer binding documentation to make it
-> > clearer that the use of the clock-frequency property is a poor
-> > work-around. The MMIO generic timer binding is similarly updated, though
-> > this is less of a concern as there is generally no need to expose the
-> > MMIO timers to guest OSs.
-> > 
-> > Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> > Cc: Marc Zyngier <marc.zyngier@arm.com>
+On 08/21/2014 07:51 PM, Alexander Shiyan wrote:
+> Thu, 21 Aug 2014 19:23:20 +0300 ?? Grygorii Strashko <grygorii.strashko@ti.com>:
+>> Hi All,
+>>
+>> Alexander,
+>>
+>> I've updated gpio-syscon as requested in [3].
+>> I still don't like it, but any way I did it :(
+>>
+>> Linus,
+>>
+>> I'd very appreciated if you can comment on these series.
+>> Personally, I like v1 [3], because this v2 is not elegant and will
+>> require constant code patching in case of adding new SoCs or new SoC's versions.
+>>
+>> This series intended to integrate Keystone 2 DSP GPIO controller functionality
+>> into gpio-syscon driver (drivers/gpio/gpio-syscon.c) as requested
+>> by Linus Walleij in [1].
+>>
+>> On Keystone SOCs, ARM host can send interrupts to DSP cores using the
+>> DSP GPIO controller IP. Each DSP GPIO controller provides 28 IRQ signals for
+>> each DSP core. This is one of the component used by the IPC mechanism used
+>> on Keystone SOCs.
+>>
+>> Keystone 2 DSP GPIO controller has specific features:
+>> - each GPIO can be configured only as output pin;
+>> - setting GPIO value to 1 causes IRQ generation on target DSP core;
+>> - reading pin value returns 0 - if IRQ was handled or 1 - IRQ is still
+>>    pending.
+>>
+>> The gpio-syscon driver was need to be updated to satisfy Keystone 2 SoC
+>> requirements:
+>> - special sequence of operations need to be used to assign output GPIO value.
+>>     As result, first patch introduces SoC specific callback .set() to configure
+>>     output GPIO value.
+>>
+>> Also, patch 3 was added to illustrate DSP GPIO configuration in DT used by Keystone 2.
+>>
+>> Related sicussions:
+>>   [1] https://lkml.org/lkml/2014/7/16/170
+>>   [2] https://lkml.org/lkml/2014/7/23/352
+>>   [3] https://www.mail-archive.com/devicetree at vger.kernel.org/msg37863.html
+>>
+>> Grygorii Strashko (3):
+>>    gpio: syscon: add soc specific callback to assign output value
+>>    gpio: syscon: reuse for keystone 2 socs
+>>    ARM: dts: keystone-k2hk: add dsp gpio controllers nodes
+>>
+>>   .../bindings/gpio/gpio-mctrl-keystone.txt          |   42 ++++++
+>>   arch/arm/boot/dts/k2hk.dtsi                        |   48 +++++++
+>>   drivers/gpio/gpio-syscon.c                         |  140 ++++++++++++++++++++
+>>   3 files changed, 230 insertions(+)
+>>   create mode 100644 Documentation/devicetree/bindings/gpio/gpio-mctrl-keystone.txt
 > 
-> Short of more explicit threats:
+> 1. mctrl -> dsp in filenames
+> 2. mctrl -> dsp in documentation.
+> 3. Here is a more elegant solution for first part.
 > 
-> Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+> --- gpio-syscon.c.old	2014-08-19 09:46:09.000000000 +0400
+> +++ gpio-syscon.c	2014-08-21 20:45:49.357529323 +0400
+> @@ -111,7 +111,7 @@
+>   				   BIT(offs % SYSCON_REG_BITS));
+>   	}
+>   
+> -	syscon_gpio_set(chip, offset, val);
+> +	priv->data->set(chip, offset, val);
+>   
+>   	return 0;
+>   }
+> @@ -159,7 +159,7 @@
+>   	if (priv->data->flags & GPIO_SYSCON_FEAT_IN)
+>   		priv->chip.direction_input = syscon_gpio_dir_in;
+>   	if (priv->data->flags & GPIO_SYSCON_FEAT_OUT) {
+> -		priv->chip.set = syscon_gpio_set;
+> +		priv->chip.set = priv->data->set ? : syscon_gpio_set;
+>   		priv->chip.direction_output = syscon_gpio_dir_out;
+>   	}
 
-Cheers.
+yep. It's better.
 
-Mark.
+Thanks for your comments.
+I'll wait few days with hope to get some comments from comunity
+(as I'm still thinking v1 is better :) then will update it and re-send.
 
-> 
-> > ---
-> >  Documentation/devicetree/bindings/arm/arch_timer.txt | 8 ++++++--
-> >  1 file changed, 6 insertions(+), 2 deletions(-)
-> > 
-> > diff --git a/Documentation/devicetree/bindings/arm/arch_timer.txt b/Documentation/devicetree/bindings/arm/arch_timer.txt
-> > index 37b2caf..5ca3f95 100644
-> > --- a/Documentation/devicetree/bindings/arm/arch_timer.txt
-> > +++ b/Documentation/devicetree/bindings/arm/arch_timer.txt
-> > @@ -17,7 +17,10 @@ to deliver its interrupts via SPIs.
-> >  - interrupts : Interrupt list for secure, non-secure, virtual and
-> >    hypervisor timers, in that order.
-> >  
-> > -- clock-frequency : The frequency of the main counter, in Hz. Optional.
-> > +- clock-frequency : The frequency of the main counter, in Hz. Should be present
-> > +  only where necessary to work around BROKEN firmware which does not configure
-> > +  CNTFRQ on all CPUs to a uniform correct value. Use of this property is
-> > +  STRONGLY DISCOURAGED; fix your firmware unless absolutely impossible.
-> >  
-> >  - always-on : a boolean property. If present, the timer is powered through an
-> >    always-on power domain, therefore it never loses context.
-> > @@ -38,7 +41,8 @@ Example:
-> >  
-> >  - compatible : Should at least contain "arm,armv7-timer-mem".
-> >  
-> > -- clock-frequency : The frequency of the main counter, in Hz. Optional.
-> > +- clock-frequency : The frequency of the main counter, in Hz. Should be present
-> > +  only when firmware has not configured the MMIO CNTFRQ registers.
-> >  
-> >  - reg : The control frame base address.
-> >  
-> > 
-> 
-> 
-> -- 
-> Jazz is not dead. It just smells funny...
+Regards,
+-grygorii
