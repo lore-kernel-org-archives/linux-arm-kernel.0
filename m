@@ -1,76 +1,67 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 28 Aug 2014 10:35:05 +0100
-Subject: [PATCH] clocksource: arch_timer: Fix code to use physical timers
- when requested
-In-Reply-To: <CAD=FV=VjN6Xam-nRRcxvOoN-gokU6DbGVjoPXN_fkTJssH1RWA@mail.gmail.com>
-References: <1409173419-13076-1-git-send-email-sonnyrao@chromium.org>
- <CAOesGMjK65Rc-K0fyFUUJLw6huLT82E-nqJwZO4PqhgopF96Ow@mail.gmail.com>
- <CAPz6YkWAPtuy4sAuAK9GtpDgfGsccxeS+pqqe_t_R818Jt01qA@mail.gmail.com>
- <53FE5B09.2020403@codeaurora.org>
- <CAOesGMhTivDzJFuxONggcJ6N5UvZopKa=+tv9PoPX593cpnm0A@mail.gmail.com>
- <53FE7E3B.1010500@codeaurora.org>
- <CAOesGMgXnsqttHwAxEW4a7-Rx-nmSwpJd_Dt1iCcFOvzDwbzdA@mail.gmail.com>
- <CAD=FV=VjN6Xam-nRRcxvOoN-gokU6DbGVjoPXN_fkTJssH1RWA@mail.gmail.com>
-Message-ID: <20140828093505.GC14650@leverpostej>
+From: masami.hiramatsu.pt@hitachi.com (Masami Hiramatsu)
+Date: Thu, 28 Aug 2014 18:39:40 +0900
+Subject: [PATCH v5 2/3] kprobes: copy ainsn after alloc aggr kprobe
+In-Reply-To: <1409144552-12751-3-git-send-email-wangnan0@huawei.com>
+References: <1409144552-12751-1-git-send-email-wangnan0@huawei.com>
+ <1409144552-12751-3-git-send-email-wangnan0@huawei.com>
+Message-ID: <53FEF8DC.5010607@hitachi.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 28, 2014 at 04:33:31AM +0100, Doug Anderson wrote:
-> Hi,
+(2014/08/27 22:02), Wang Nan wrote:
+> Copy old kprobe to newly alloced optimized_kprobe before
+> arch_prepare_optimized_kprobe(). Original kprove can brings more
+> information to optimizer.
 > 
-> On Wed, Aug 27, 2014 at 7:58 PM, Olof Johansson <olof@lixom.net> wrote:
-> > On Wed, Aug 27, 2014 at 5:56 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
-> >> On 08/27/14 15:33, Olof Johansson wrote:
-> >>> On Wed, Aug 27, 2014 at 3:26 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
-> >>>
-> >>>> Is there any reason why the virtual counter can't be read? Maybe we're
-> >>>> the hyp and we need to make sure we don't use the virtual timer so that
-> >>>> the guest can use it, but that doesn't have any effect on the usage of
-> >>>> the virtual counter for the clocksource.
-> >>> There are several cases where virtual is unusable -- in particular it
-> >>> might not have been configured properly (i.e. the phys/virt offset is
-> >>> at a bad value).
-> >>>
-> >>
-> >> Any specifics? It would be nice to say so in the commit text so that
-> >> others using such devices know they need this patch. I'm guessing the
-> >> firmware can't be fixed?
+> Signed-off-by: Wang Nan <wangnan0@huawei.com>
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Cc: "David A. Long" <dave.long@linaro.org> 
+> Cc: Jon Medhurst <tixy@linaro.org>
+> Cc: Taras Kondratiuk <taras.kondratiuk@linaro.org>
+> Cc: Ben Dooks <ben.dooks@codethink.co.uk>
+> Cc: Ananth N Mavinakayanahalli <ananth@in.ibm.com>
+> Cc: Anil S Keshavamurthy <anil.s.keshavamurthy@intel.com>
+> Cc: "David S. Miller" <davem@davemloft.net>
+> Cc: Masami Hiramatsu <masami.hiramatsu.pt@hitachi.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> ---
+>  kernel/kprobes.c | 7 ++++++-
+>  1 file changed, 6 insertions(+), 1 deletion(-)
 > 
-> Even if we could change things to use a virtual timer in some cases,
-> Sonny's patch still fixes a bug.  The code as written right now makes
-> pretenses about supporting the physical timer, but it doesn't work.
-> That should be fixed.
+> diff --git a/kernel/kprobes.c b/kernel/kprobes.c
+> index 3995f54..33cf568 100644
+> --- a/kernel/kprobes.c
+> +++ b/kernel/kprobes.c
+> @@ -730,7 +730,12 @@ static struct kprobe *alloc_aggr_kprobe(struct kprobe *p)
+>  		return NULL;
+>  
+>  	INIT_LIST_HEAD(&op->list);
+> -	op->kp.addr = p->addr;
 
-The code does support the physical timer. It does not support the
-physical counter (and makes no pretenses that it does).
+Do not remove this, since copy_kprobe() doesn't copy kp.addr.
 
-I had hoped we wouldn't encounter cases where CNTVOFF was hopelessly
-ill-configured on a platform, but evidently we have. So we need some
-workaround for that.
+static inline void copy_kprobe(struct kprobe *ap, struct kprobe *p)
+{
+        memcpy(&p->opcode, &ap->opcode, sizeof(kprobe_opcode_t));
+        memcpy(&p->ainsn, &ap->ainsn, sizeof(struct arch_specific_insn));
+}
 
-> > Yeah, there are a few. The big.LITTLE on the Chromebook 2 models have
-> > this issue, due to the A7 cluster having an incorrect offset
-> > programmed. However, arch timers aren't supported on that SoC in the
-> > first place, so it's not a problem in reality.
-> >
-> > The other known platform is rk3288. It has products out in the wild
-> > where firmware updates are unlikely.
+Thank you,
+
+> +
+> +	/*
+> +	 * copy gives arch_prepare_optimized_kprobe
+> +	 * more information
+> +	 */
+> +	copy_kprobe(p, &op->kp);
+>  	arch_prepare_optimized_kprobe(op);
+>  
+>  	return &op->kp;
 > 
-> One other reason is that (I'm told) that the virtual offset is lost in
-> certain power down conditions (powering down a core, going into S3,
-> etc).  When we power back up the offset is effectively reset to a
-> random value.  That means we need something to reprogram the virtual
-> timer offset whenever we power things back up.
-> 
-> If we've got a hypervisor then the hypervisor will definitely be
-> involved in powering things back up and it can reset the virtual
-> offset.  ...but forcing systems to implement a hypervisor (or somehow
-> adding an interface for the kernel to call back into firmware) is a
-> huge effort and it means more hard-to-update code sitting in firmware.
 
-Not if you boot Linux at hyp, as we've recommended for this precise
-reason. That doesn't fix other things like CNTFRQ if the secure
-initialisation doesn't poke that, however.
 
-Thanks,
-Mark.
+-- 
+Masami HIRAMATSU
+Software Platform Research Dept. Linux Technology Research Center
+Hitachi, Ltd., Yokohama Research Laboratory
+E-mail: masami.hiramatsu.pt at hitachi.com
