@@ -1,98 +1,58 @@
-From: boris.brezillon@free-electrons.com (Boris BREZILLON)
-Date: Thu, 28 Aug 2014 16:21:00 +0200
-Subject: [PATCH v4 00/11] drm: add support for Atmel HLCDC Display
- Controller
-In-Reply-To: <1805054.en0m884lPo@avalon>
-References: <1406034695-15534-1-git-send-email-boris.brezillon@free-electrons.com>
- <1997793.CWhjU3F32E@avalon> <20140827095235.20334e2d@bbrezillon>
- <1805054.en0m884lPo@avalon>
-Message-ID: <20140828162100.71543859@bbrezillon>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 28 Aug 2014 15:28:39 +0100
+Subject: [PATCH V2 1/2] ARM: dts: Add DT changes for display on snow
+In-Reply-To: <20140828131017.GD14388@ulmo>
+References: <1409150908-12801-1-git-send-email-ajaykumar.rs@samsung.com>
+ <20140827150146.GB9737@leverpostej>
+ <CAEC9eQMKfso-rmMdqyDZeCdaxf21O1fqN6Z2YrS=njqGHh5d5Q@mail.gmail.com>
+ <20140828091509.GA14650@leverpostej>
+ <CAEC9eQN+EJmrG70O+2Sg5GD0OHudhqo5beGDN8K4_kmOKKPOmw@mail.gmail.com>
+ <20140828131017.GD14388@ulmo>
+Message-ID: <20140828142839.GK14650@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Laurent,
-
-On Thu, 28 Aug 2014 14:19:22 +0200
-Laurent Pinchart <laurent.pinchart@ideasonboard.com> wrote:
-
-> Hi Boris,
-
-[...]
-
-> >
-> > I don't have any VGA connector (or I'm missing something :-)),
-> 
-> My bad.
-
-No problem.
-
-> 
-> > but I have an LCD panel and an RGB to HDMI encoder connected on the same RGB
-> > connector.
-> 
-> There's no such thing as an RGB connector in DRM. Your SoC has a parallel RGB 
-> video output (I assume it's a DPI bus). From a DRM point of view, that bus 
-> corresponds to the output of the CRTC.
-
-Okay, this mean I'll have to dispatch some of the code I've put in
-atmel_hlcdc_output.c into atmel_hlcdc_crtc.c (BTW, any chance you could
-take a look at this files ?).
-
-> 
-> > > As DRM hardcodes the pipeline model to CRTC -> encoder -> connector, you
-> > > will also need a DRM encoder in the VGA path. I suppose your board has a
-> > > VGA DAC, that's the component you should expose as a DRM encoder (even if
-> > > it can't be controlled and doesn't limit the valid modes).
+On Thu, Aug 28, 2014 at 02:10:18PM +0100, Thierry Reding wrote:
+> On Thu, Aug 28, 2014 at 03:04:32PM +0530, Ajay kumar wrote:
+> > On Thu, Aug 28, 2014 at 2:45 PM, Mark Rutland <mark.rutland@arm.com> wrote:
+> > > On Thu, Aug 28, 2014 at 06:34:33AM +0100, Ajay kumar wrote:
+> > >> On Wed, Aug 27, 2014 at 8:31 PM, Mark Rutland <mark.rutland@arm.com> wrote:
+> > >> > On Wed, Aug 27, 2014 at 03:48:27PM +0100, Ajay Kumar wrote:
+> > >> >> Add DT nodes for ptn3460 bridge chip and panel.
+> > >> >> Add backlight enable pin and backlight power supply for pwm-backlight.
+> > >> >> Also add bridge phandle needed by dp to enable display on snow.
+> > >> >>
+> > >> >> Note that, snow doesn't support "chunghwa,claa101wb01" panel,
+> > >> >> but still we choose to reuse the binding since "chunghwa,claa101wb01"
+> > >> >> has similar LCD timings.
+> > >> >
+> > >> > What does it actually have?
+> > >> >
+> > >> > It's fine to have "chunghwa,claa101wb01" as a fallback but we should
+> > >> > have an identifier for the actual display, too.
+> > >> Actual display used is "AUO,B116XTN0", for which no data currently exists
+> > >> in panel file. Instead of adding a new panel_desc for B116XTN0,
+> > >> why not we reuse existing ones? what is the "identifier" you are talking about?
+> > >
+> > > The compatible string.
+> > >
+> > > So in the dts we'd have compatible = "au0,b116xtn0", "chunghwa,claa101wb01";
+> > Sorry, hardware engineer says actual LCD name is "auo,b116xw03".
 > > 
-> > Actually, my problem is that both devices are connected on the same RGB
-> > connector, and thus share the same display mode (resolution, HSYNC,
-> > VSYNC, RGB output mode, ...).
-> > This means that all remote devices have to agree on a specific mode if
-> > we want to mirror the display on several output devices, otherwise we
-> > must disable one of the output devices.
+> > > That way if we need specific data we can add it later.
+> > I think we can add a new panel_desc for "auo,b116xw03".
+> > Because its actual LCD dimension is 256x144, but "chungwa, claa101wb01" has
+> > LCD dimension 223x125.
+> > What is Thierry's opinion on adding this new LCD?
 > 
-> That's not really a problem. From a DRM perspective you need to model your 
-> device as
+> I think you should simply add a new panel_desc for the panel. It may use
+> similar timings, but it's likely not "compatible" in the way required by
+> device tree. As you say, dimensions are different and those may have an
+> influence on the DPI setting. There's really no reason why this should
+> share the panel_desc with another panel.
 > 
-> ,------.       ,---------------.       ,-----------------.
-> | CRTC | -+--> | Dummy Encoder | ----> | Panel Connector |
-> `------?  |    `---------------?       `-----------------?
->           |    ,---------------.       ,-----------------.
->           \--> | HDMI Encoder  | ----> | HDMI Connector  |
->                `---------------?       `-----------------?
-> 
-> The HDMI pipeline is pretty straightforward.
-> 
-> You have told me that the panel has a parallel RGB input without any encoder 
-> in the panel pipeline (by the way, which panel model are you using ?). 
-> However, DRM requires an encoder in every pipeline. You will thus need to 
-> instantiate a dummy encoder. One option would be to set the encoder and 
-> connector types to DRM_MODE_ENCODER_LVDS and DRM_MODE_CONNECTOR_LVDS 
-> respectively, as that's what userspace usually expects for panels. That 
-> doesn't reflect the reality in your case though, so creating a new 
-> DRM_MODE_CONNECTOR_DPI type might be needed, possibly to be used with 
-> DRM_MODE_ENCODER_NONE.
-> 
-> As neither encoder can modify the mode, the same mode will be output on the 
-> two connectors.
+> Thierry
 
-There are still several things to I'd like to understand:
- 1) who's gonna configure the RGB bus output format (RGB444, RGB666,
-    RGB888) which directly depends on the device connected on this bus:
-    the CRTC or the dummy and HDMI encoders.
- 2) Where should the HDMI encoder/connector support be implemented:
-    in drivers/gpu/drm/atmel-hlcdc, drivers/gpu/drm/bridge or somewhere
-    else. My point is that I don't want to add specific support for the
-    Sil902x transmitter chip in the hlcdc driver.
+This sounds sane to me.
 
-Sorry if these are silly questions, but I'm still trying to understand
-how my case should be modeled :-).
-
-Best Regards,
-
-Boris
-
--- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+Mark.
