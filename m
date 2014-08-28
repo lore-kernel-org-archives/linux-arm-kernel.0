@@ -1,58 +1,43 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 28 Aug 2014 15:28:39 +0100
-Subject: [PATCH V2 1/2] ARM: dts: Add DT changes for display on snow
-In-Reply-To: <20140828131017.GD14388@ulmo>
-References: <1409150908-12801-1-git-send-email-ajaykumar.rs@samsung.com>
- <20140827150146.GB9737@leverpostej>
- <CAEC9eQMKfso-rmMdqyDZeCdaxf21O1fqN6Z2YrS=njqGHh5d5Q@mail.gmail.com>
- <20140828091509.GA14650@leverpostej>
- <CAEC9eQN+EJmrG70O+2Sg5GD0OHudhqo5beGDN8K4_kmOKKPOmw@mail.gmail.com>
- <20140828131017.GD14388@ulmo>
-Message-ID: <20140828142839.GK14650@leverpostej>
+From: maxime.coquelin@st.com (Maxime Coquelin)
+Date: Thu, 28 Aug 2014 16:31:49 +0200
+Subject: [STLinux Kernel] [PATCH 1/1] i2c: i2c-st: Rename clock reference
+ to something that exists
+In-Reply-To: <1409234523-20240-1-git-send-email-lee.jones@linaro.org>
+References: <1409234523-20240-1-git-send-email-lee.jones@linaro.org>
+Message-ID: <53FF3D55.40006@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 28, 2014 at 02:10:18PM +0100, Thierry Reding wrote:
-> On Thu, Aug 28, 2014 at 03:04:32PM +0530, Ajay kumar wrote:
-> > On Thu, Aug 28, 2014 at 2:45 PM, Mark Rutland <mark.rutland@arm.com> wrote:
-> > > On Thu, Aug 28, 2014 at 06:34:33AM +0100, Ajay kumar wrote:
-> > >> On Wed, Aug 27, 2014 at 8:31 PM, Mark Rutland <mark.rutland@arm.com> wrote:
-> > >> > On Wed, Aug 27, 2014 at 03:48:27PM +0100, Ajay Kumar wrote:
-> > >> >> Add DT nodes for ptn3460 bridge chip and panel.
-> > >> >> Add backlight enable pin and backlight power supply for pwm-backlight.
-> > >> >> Also add bridge phandle needed by dp to enable display on snow.
-> > >> >>
-> > >> >> Note that, snow doesn't support "chunghwa,claa101wb01" panel,
-> > >> >> but still we choose to reuse the binding since "chunghwa,claa101wb01"
-> > >> >> has similar LCD timings.
-> > >> >
-> > >> > What does it actually have?
-> > >> >
-> > >> > It's fine to have "chunghwa,claa101wb01" as a fallback but we should
-> > >> > have an identifier for the actual display, too.
-> > >> Actual display used is "AUO,B116XTN0", for which no data currently exists
-> > >> in panel file. Instead of adding a new panel_desc for B116XTN0,
-> > >> why not we reuse existing ones? what is the "identifier" you are talking about?
-> > >
-> > > The compatible string.
-> > >
-> > > So in the dts we'd have compatible = "au0,b116xtn0", "chunghwa,claa101wb01";
-> > Sorry, hardware engineer says actual LCD name is "auo,b116xw03".
-> > 
-> > > That way if we need specific data we can add it later.
-> > I think we can add a new panel_desc for "auo,b116xw03".
-> > Because its actual LCD dimension is 256x144, but "chungwa, claa101wb01" has
-> > LCD dimension 223x125.
-> > What is Thierry's opinion on adding this new LCD?
-> 
-> I think you should simply add a new panel_desc for the panel. It may use
-> similar timings, but it's likely not "compatible" in the way required by
-> device tree. As you say, dimensions are different and those may have an
-> influence on the DPI setting. There's really no reason why this should
-> share the panel_desc with another panel.
-> 
-> Thierry
+Hi Lee,
 
-This sounds sane to me.
+On 08/28/2014 04:02 PM, Lee Jones wrote:
+> CLK_S_ICN_REG_0 hasn't existed for a while now.  This was renamed
+> over a few commits, then finally removed in commit 5aa02b9 (ARM:
+> STi: DT: STiH415: Remove unused CLK_S_ICN_REG_0 fixed clock).
+>
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
 
-Mark.
+Maybe it will be part of my next pull-requests, but in case it is not, 
+you can add my:
+Acked-by: Maxime Coquelin <maxime.coquelin@st.com>
+
+Thanks,
+Maxime
+> ---
+>   Documentation/devicetree/bindings/i2c/i2c-st.txt | 2 +-
+>   1 file changed, 1 insertion(+), 1 deletion(-)
+>
+> diff --git a/Documentation/devicetree/bindings/i2c/i2c-st.txt b/Documentation/devicetree/bindings/i2c/i2c-st.txt
+> index 437e0db..4c26fda 100644
+> --- a/Documentation/devicetree/bindings/i2c/i2c-st.txt
+> +++ b/Documentation/devicetree/bindings/i2c/i2c-st.txt
+> @@ -31,7 +31,7 @@ i2c0: i2c at fed40000 {
+>   	compatible	= "st,comms-ssc4-i2c";
+>   	reg		= <0xfed40000 0x110>;
+>   	interrupts	=  <GIC_SPI 187 IRQ_TYPE_LEVEL_HIGH>;
+> -	clocks		= <&CLK_S_ICN_REG_0>;
+> +	clocks		= <&clk_s_a0_ls CLK_ICN_REG>;
+>   	clock-names	= "ssc";
+>   	clock-frequency = <400000>;
+>   	pinctrl-names	= "default";
+>
