@@ -1,107 +1,42 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Wed, 27 Aug 2014 21:00:15 -0700
-Subject: [PATCH 12/14] arm64: dts: add Exynos7 based Espresso board dts
- file
-In-Reply-To: <1409132660-1898-4-git-send-email-ch.naveen@samsung.com>
-References: <1409132660-1898-1-git-send-email-ch.naveen@samsung.com>
- <1409132660-1898-4-git-send-email-ch.naveen@samsung.com>
-Message-ID: <20140828040015.GC4972@localhost>
+Date: Wed, 27 Aug 2014 21:03:11 -0700
+Subject: [PATCH 08/14] i2c: exynos5: Add Kconfig dependencies
+In-Reply-To: <1409132740-1954-2-git-send-email-ch.naveen@samsung.com>
+References: <1409132740-1954-1-git-send-email-ch.naveen@samsung.com>
+ <1409132740-1954-2-git-send-email-ch.naveen@samsung.com>
+Message-ID: <20140828040311.GD4972@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Wed, Aug 27, 2014 at 03:14:19PM +0530, Naveen Krishna Chatradhi wrote:
-> This patch adds initial dts file for the Espresso board
-> based on Exynos7 from Samsung.
+On Wed, Aug 27, 2014 at 03:15:40PM +0530, Naveen Krishna Chatradhi wrote:
+> The i2c-exynos5.c driver can be reused for the HSI2C controller
+> on Exynos7 SoCs from Samsung.
+> 
+> This patch adds the Kconfig dependency to choose i2c-exynos5.c
+> for CONFIG_ARCH_EXYNOS7.
 > 
 > Signed-off-by: Naveen Krishna Chatradhi <ch.naveen@samsung.com>
-> Cc: Rob Herring <robh@kernel.org>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> To: linux-i2c at vger.kernel.org
+> Cc: Wolfram Sang <wsa@the-dreams.de>
 > ---
->  arch/arm64/boot/dts/Makefile             |    1 +
->  arch/arm64/boot/dts/exynos7-espresso.dts |   69 ++++++++++++++++++++++++++++++
->  2 files changed, 70 insertions(+)
->  create mode 100644 arch/arm64/boot/dts/exynos7-espresso.dts
+>  drivers/i2c/busses/Kconfig |    2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 > 
-> diff --git a/arch/arm64/boot/dts/Makefile b/arch/arm64/boot/dts/Makefile
-> index c52bdb0..d160de1 100644
-> --- a/arch/arm64/boot/dts/Makefile
-> +++ b/arch/arm64/boot/dts/Makefile
-> @@ -1,5 +1,6 @@
->  dtb-$(CONFIG_ARCH_VEXPRESS) += rtsm_ve-aemv8a.dtb foundation-v8.dtb
->  dtb-$(CONFIG_ARCH_XGENE) += apm-mustang.dtb
-> +dtb-$(CONFIG_ARCH_EXYNOS7) += exynos7-espresso.dtb
+> diff --git a/drivers/i2c/busses/Kconfig b/drivers/i2c/busses/Kconfig
+> index 2ac87fa..bd18fa6 100644
+> --- a/drivers/i2c/busses/Kconfig
+> +++ b/drivers/i2c/busses/Kconfig
+> @@ -465,7 +465,7 @@ config I2C_EG20T
+>  
+>  config I2C_EXYNOS5
+>  	tristate "Exynos5 high-speed I2C driver"
+> -	depends on ARCH_EXYNOS5 && OF
+> +	depends on (ARCH_EXYNOS5 || ARCH_EXYNOS7) && OF
 
-As mentioned on the dtsi patch, please create a subdirectory.
+Ick, this will keep growing. Please use ARCH_EXYNOS instead. Yes,
+this means you need to add it to the arm64 Kconfig and select it from
+ARCH_EXYNOS7.
 
->  targets += dtbs
->  targets += $(dtb-y)
-> diff --git a/arch/arm64/boot/dts/exynos7-espresso.dts b/arch/arm64/boot/dts/exynos7-espresso.dts
-> new file mode 100644
-> index 0000000..e35e83c
-> --- /dev/null
-> +++ b/arch/arm64/boot/dts/exynos7-espresso.dts
-> @@ -0,0 +1,69 @@
-> +/*
-> + * SAMSUNG Espresso board device tree source
-> + *
-> + * Copyright (c) 2014 Samsung Electronics Co., Ltd.
-> + *		http://www.samsung.com
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> +*/
-> +
-> +/dts-v1/;
-> +#include <dt-bindings/gpio/gpio.h>
-> +#include "exynos7.dtsi"
-> +
-> +/ {
-> +	model = "Samsung ESPRESSO board based on EXYNOS7";
-> +	compatible = "samsung,espresso", "samsung,exynos7";
-> +
-> +	chosen {
-> +		bootargs = "console=ttySAC2,115200n8 root=/dev/ram0 ramdisk=16384 initrd=0x42000000,16M init=/linuxrc";
-
-Having ramdisk bootargs like these in the upstream dts doesn't make much
-sense. Configure your bootloader to pass them in instead.
-
-You might want to specify the console through chosen instead, there's
-been recent support added for that.
-
-> +
-> +	memory at 40000000 {
-> +		device_type = "memory";
-> +		reg = <0x40000000 0xC0000000>;
-> +	};
-> +
-> +	mmc at 15740000 {
-> +		status = "okay";
-> +		num-slots = <1>;
-> +		broken-cd;
-> +		caps2-mmc-hs200-1_8v;
-> +		supports-highspeed;
-> +		non-removable;
-> +		card-detect-delay = <200>;
-> +		clock-frequency = <800000000>;
-> +		samsung,dw-mshc-ciu-div = <3>;
-> +		samsung,dw-mshc-sdr-timing = <0 4>;
-> +		samsung,dw-mshc-ddr-timing = <0 2>;
-> +		pinctrl-names = "default";
-> +		pinctrl-0 = <&sd0_clk &sd0_cmd &sd0_rdqs &sd0_bus1 &sd0_bus4 &sd0_bus8>;
-> +		bus-width = <8>;
-> +
-> +		slot at 0 {
-> +			reg = <0>;
-> +			bus-width = <8>;
-> +		};
-
-I thought the use of slot was deprecated. Why do you have it here?
-
-Also, as mentioned by others elsewhere, please use references instead
-of duplicating the structure here.
 
 
 -Olof
