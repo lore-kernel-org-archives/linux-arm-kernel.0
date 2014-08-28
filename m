@@ -1,49 +1,17 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Thu, 28 Aug 2014 14:16:25 -0500
-Subject: [PATCH 3/5] phy: exynos5-usbdrd: Add facility for VBUS-BOOST-5V
- supply
-In-Reply-To: <1409212920-28526-4-git-send-email-gautam.vivek@samsung.com>
-References: <1409212920-28526-1-git-send-email-gautam.vivek@samsung.com>
- <1409212920-28526-4-git-send-email-gautam.vivek@samsung.com>
-Message-ID: <20140828191625.GQ16689@saruman.home>
+From: joel.schopp@amd.com (Joel Schopp)
+Date: Thu, 28 Aug 2014 14:26:10 -0500
+Subject: [PATCH v10 0/6] arm: dirty page logging support for ARMv7
+In-Reply-To: <1409097072-1096-1-git-send-email-m.smarduch@samsung.com>
+References: <1409097072-1096-1-git-send-email-m.smarduch@samsung.com>
+Message-ID: <53FF8252.2030304@amd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-hi,
 
-On Thu, Aug 28, 2014 at 01:31:58PM +0530, Vivek Gautam wrote:
-> @@ -457,11 +458,19 @@ static int exynos5_usbdrd_phy_power_on(struct phy *phy)
->  	clk_prepare_enable(phy_drd->ref_clk);
->  
->  	/* Enable VBUS supply */
-> +	if (phy_drd->vbus_boost) {
-> +		ret = regulator_enable(phy_drd->vbus_boost);
-> +		if (ret) {
-> +			dev_err(phy_drd->dev,
-> +				"Failed to enable VBUS boost supply\n");
-> +			goto fail_vbus;
-> +		}
-> +	}
-
-really this is nitpicking, but can you add a blank line here just make
-my inner child happy ? :-)
-
-> @@ -470,6 +479,9 @@ static int exynos5_usbdrd_phy_power_on(struct phy *phy)
->  
->  	return 0;
->  
-> +fail_vbus_boost:
-> +	if (phy_drd->vbus_boost)
-> +		regulator_disable(phy_drd->vbus_boost);
-
-same here
-
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140828/065ab536/attachment.sig>
+On 08/26/2014 06:51 PM, Mario Smarduch wrote:
+> This patch adds support for ARMv7 dirty page logging. Some functions of dirty
+> page logging have been split to generic and arch specific implementations,
+> details below. Dirty page logging is one of serveral features required for
+> live migration, live migration has been tested for ARMv7.
+Any reason not to cc the kvm arm list?  I almost missed this patch set.  
+kvmarm at lists.cs.columbia.edu
