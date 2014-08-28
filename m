@@ -1,41 +1,36 @@
-From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Thu, 28 Aug 2014 16:00:29 +0200
-Subject: [PATCH 2/2] [RFC] ARM: Set CONFIG_LOCALVERSION in multi v5/v7
- defconfigs
-In-Reply-To: <1409234429-1916-1-git-send-email-geert+renesas@glider.be>
-References: <1409234429-1916-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <1409234429-1916-2-git-send-email-geert+renesas@glider.be>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Thu, 28 Aug 2014 14:59:50 +0100
+Subject: [PATCH] phy: miphy365x: Fix off-by-one error
+Message-ID: <1409234390-20168-1-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This allows to derive the kernel flavor from the kernel version, as
-reported by "uname -r".
+We index the RX/TX speed select values in the following way:
 
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+  rx_tx_spd[miphy_phy->sata_gen];
+
+However rx_tx_spd[] starts at index zero and the SATA_GENx's start
+at one.  In this patch we pad out the first element in rx_tx_spd[]
+in an attempt to realign the values.
+
+Cc: Alexandre Torgue <alexandre.torgue@st.com>
+Reported-by: Gabriel Fernandez <gabriel.fernandez@linaro.org>
+Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
-Do you like this? m68k has been using this for years.
+ drivers/phy/phy-miphy365x.c | 1 +
+ 1 file changed, 1 insertion(+)
 
- arch/arm/configs/multi_v5_defconfig | 1 +
- arch/arm/configs/multi_v7_defconfig | 1 +
- 2 files changed, 2 insertions(+)
-
-diff --git a/arch/arm/configs/multi_v5_defconfig b/arch/arm/configs/multi_v5_defconfig
-index 018bef9fa7e8..a4a2e8ee2536 100644
---- a/arch/arm/configs/multi_v5_defconfig
-+++ b/arch/arm/configs/multi_v5_defconfig
-@@ -1,3 +1,4 @@
-+CONFIG_LOCALVERSION="-multi_v5"
- CONFIG_SYSVIPC=y
- CONFIG_NO_HZ=y
- CONFIG_HIGH_RES_TIMERS=y
-diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-index e36baadbacc7..7d7f49778b52 100644
---- a/arch/arm/configs/multi_v7_defconfig
-+++ b/arch/arm/configs/multi_v7_defconfig
-@@ -1,3 +1,4 @@
-+CONFIG_LOCALVERSION="-multi_v7"
- CONFIG_SYSVIPC=y
- CONFIG_FHANDLE=y
- CONFIG_IRQ_DOMAIN_DEBUG=y
+diff --git a/drivers/phy/phy-miphy365x.c b/drivers/phy/phy-miphy365x.c
+index e111baf..e0fb7a1 100644
+--- a/drivers/phy/phy-miphy365x.c
++++ b/drivers/phy/phy-miphy365x.c
+@@ -163,6 +163,7 @@ enum miphy_sata_gen {
+ };
+ 
+ static u8 rx_tx_spd[] = {
++	0, /* GEN0 doesn't exist. */
+ 	TX_SPDSEL_GEN1_VAL | RX_SPDSEL_GEN1_VAL,
+ 	TX_SPDSEL_GEN2_VAL | RX_SPDSEL_GEN2_VAL,
+ 	TX_SPDSEL_GEN3_VAL | RX_SPDSEL_GEN3_VAL
 -- 
 1.9.1
