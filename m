@@ -1,34 +1,44 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 27 Aug 2014 17:56:27 -0700
-Subject: [PATCH] clocksource: arch_timer: Fix code to use physical timers
- when requested
-In-Reply-To: <CAOesGMhTivDzJFuxONggcJ6N5UvZopKa=+tv9PoPX593cpnm0A@mail.gmail.com>
-References: <1409173419-13076-1-git-send-email-sonnyrao@chromium.org>	<CAOesGMjK65Rc-K0fyFUUJLw6huLT82E-nqJwZO4PqhgopF96Ow@mail.gmail.com>	<CAPz6YkWAPtuy4sAuAK9GtpDgfGsccxeS+pqqe_t_R818Jt01qA@mail.gmail.com>	<53FE5B09.2020403@codeaurora.org>
- <CAOesGMhTivDzJFuxONggcJ6N5UvZopKa=+tv9PoPX593cpnm0A@mail.gmail.com>
-Message-ID: <53FE7E3B.1010500@codeaurora.org>
+From: caesar.wang@rock-chips.com (Caesar Wang)
+Date: Thu, 28 Aug 2014 08:59:18 +0800
+Subject: [PATCH v3 0/4] Rockchip soc theamal driver
+Message-ID: <1409187562-12370-1-git-send-email-caesar.wang@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/27/14 15:33, Olof Johansson wrote:
-> On Wed, Aug 27, 2014 at 3:26 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
->
->> Is there any reason why the virtual counter can't be read? Maybe we're
->> the hyp and we need to make sure we don't use the virtual timer so that
->> the guest can use it, but that doesn't have any effect on the usage of
->> the virtual counter for the clocksource.
-> There are several cases where virtual is unusable -- in particular it
-> might not have been configured properly (i.e. the phys/virt offset is
-> at a bad value).
->
 
-Any specifics? It would be nice to say so in the commit text so that
-others using such devices know they need this patch. I'm guessing the
-firmware can't be fixed?
+Changes in v3:(add dts configure)
+        * address comments from Dmitry Torokhov and Arnd Bergmann:
+        - fix clock-names in rockchip-thermal.txt
+        - remove rockchip_thermal_control() in rockchip_set_mode()
+        - fix some code style.
+        - add dts configure.
 
-In this particular case is there actually a virtual interrupt but we've
-explicitly removed it from the DT so that the driver can be forced into
-using the physical counter? Or are we getting saved by the hyp check?
+Changes in v2:
+        * address comments from Heiko Stubner:
+        - fix dt-bindings in rockchip-thermal.txt
+        - remove Author mark
+        - rename TSADC_XXX->TSADCV2_XXX,it eill ready to merge compatible other SoCs.
+        - fix a identation
+        - remove clk_set_rate(),it's no necessary.
+        - fix the SIMPLE_DEV_PM_OPS() function  style.
+
+Tested On rk3288 SDK board.
+
+Caesar Wang (4):
+  thermal: rockchip: add driver for thermal
+  dt-bindings: document Rockchip thermal
+  ARM: dts: add main Thermal info to rk3288
+  ARM: dts: enable Thermal on rk3288-evb board
+
+ .../bindings/thermal/rockchip-thermal.txt          |  20 +
+ arch/arm/boot/dts/rk3288-evb.dtsi                  |   7 +
+ arch/arm/boot/dts/rk3288.dtsi                      |  18 +
+ drivers/thermal/Kconfig                            |   9 +
+ drivers/thermal/Makefile                           |   1 +
+ drivers/thermal/rockchip_thermal.c                 | 669 +++++++++++++++++++++
+ 6 files changed, 724 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/thermal/rockchip-thermal.txt
+ create mode 100644 drivers/thermal/rockchip_thermal.c
 
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+1.9.1
