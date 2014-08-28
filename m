@@ -1,63 +1,100 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 28 Aug 2014 11:16:32 +0100
-Subject: [PATCH] arm: use cpu_online_mask when using forced
- irq_set_affinity
-In-Reply-To: <53FF007F.6030004@arm.com>
-References: <1399653640-21559-1-git-send-email-sudeep.holla@arm.com>
- <20140523121032.GV3693@n2100.arm.linux.org.uk> <537F4453.5000709@arm.com>
- <53A43174.503@arm.com> <20140620151638.GS32514@n2100.arm.linux.org.uk>
- <53C79E43.6040009@arm.com> <alpine.DEB.2.10.1408251136380.3323@nanos>
- <53FCA570.1090809@arm.com> <alpine.DEB.2.10.1408281130140.23342@nanos>
- <53FF007F.6030004@arm.com>
-Message-ID: <20140828101632.GB30401@n2100.arm.linux.org.uk>
+From: masami.hiramatsu.pt@hitachi.com (Masami Hiramatsu)
+Date: Thu, 28 Aug 2014 19:20:15 +0900
+Subject: [PATCH v5 3/3] kprobes: arm: enable OPTPROBES for ARM 32
+In-Reply-To: <1409144552-12751-4-git-send-email-wangnan0@huawei.com>
+References: <1409144552-12751-1-git-send-email-wangnan0@huawei.com>
+ <1409144552-12751-4-git-send-email-wangnan0@huawei.com>
+Message-ID: <53FF025F.4080206@hitachi.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 28, 2014 at 11:12:15AM +0100, Sudeep Holla wrote:
->
->
-> On 28/08/14 10:32, Thomas Gleixner wrote:
->> On Tue, 26 Aug 2014, Sudeep Holla wrote:
->>>>> Can provide your thoughts on how to solve this issue ?
->>>>
->>>> ffde1de64012 is not about offlining a cpu, it's about onlining where
->>>> we need to make sure that we assign the affinity to a not yet online
->>>> marked cpu.
->>>>
->>>>> Is it expected from all the irqchip implementation to use force flag in
->>>>> irq_set_affinity to ignore cpu_online_mask similar to GIC ?
->>>>
->>>> No, it's only relevant for the cases where we need to route irqs to
->>>> not yet online cpus.
->>>>
->>>
->>> Ok. IIUC Russell's main concern was if irqchip implementation uses force
->>> flag differently, then we can't change the core code to false. Also
->>> x86 core code also uses forced irq_set_affinity in arch/x86/kernel/irq.c
->>
->> Which is pointless as none of the x86 irq chip implementations
->> actually honours the force argument.
->>
->> In fact until the point where I implemented it in the GIC driver,
->> nothing ever used that argument. So the GIC conversion actually added
->> semantics to the argument. Any driver which will make use of it, has
->> to follow that now. I'll add documentation to the core code for it ...
->>
->
-> Thanks Thomas for confirming.
->
-> Hi Russell,
->
-> Can I post the patch changing force to false in irq_set_affinity call
-> to fix the issue and cc stable ? It's broken in stable kernels(v3.10 and
-> v3.14)
+(2014/08/27 22:02), Wang Nan wrote:
+> +/*
+> + * ARM can always optimize an instruction when using ARM ISA.
+> + */
 
-I think it's up to Thomas to suggest what the correct solution is to
-the problem he introduced, and it's not clear from Thomas' email you
-quote above what he thinks would be the right solution.  It sounds
-like passing false there would be the right thing, but really it needs
-a clear and unambiguous statement from Thomas.
+Hmm, this comment looks not correct anymore :)
+
+> +int arch_prepared_optinsn(struct arch_optimized_insn *optinsn)
+> +{
+> +	return optinsn->prepared;
+> +}
+
+BTW, why don't you check optinsn->insn != NULL ?
+If it is not prepared for optimizing,  optinsn->insn always be NULL.
+
+[...]
+> +int arch_prepare_optimized_kprobe(struct optimized_kprobe *op)
+> +{
+> +	u8 *buf;
+> +	unsigned long rel_chk;
+> +	unsigned long val;
+> +
+> +	if (!can_optimize(op))
+> +		return -EILSEQ;
+> +
+> +	op->optinsn.insn = get_optinsn_slot();
+> +	if (!op->optinsn.insn)
+> +		return -ENOMEM;
+> +
+> +	/*
+> +	 * Verify if the address gap is in 32MiB range, because this uses
+> +	 * a relative jump.
+> +	 *
+> +	 * kprobe opt use a 'b' instruction to branch to optinsn.insn.
+> +	 * According to ARM manual, branch instruction is:
+> +	 *
+> +	 *   31  28 27           24 23             0
+> +	 *  +------+---+---+---+---+----------------+
+> +	 *  | cond | 1 | 0 | 1 | 0 |      imm24     |
+> +	 *  +------+---+---+---+---+----------------+
+> +	 *
+> +	 * imm24 is a signed 24 bits integer. The real branch offset is computed
+> +	 * by: imm32 = SignExtend(imm24:'00', 32);
+> +	 *
+> +	 * So the maximum forward branch should be:
+> +	 *   (0x007fffff << 2) = 0x01fffffc =  0x1fffffc
+> +	 * The maximum backword branch should be:
+> +	 *   (0xff800000 << 2) = 0xfe000000 = -0x2000000
+> +	 *
+> +	 * We can simply check (rel & 0xfe000003):
+> +	 *  if rel is positive, (rel & 0xfe000000) shoule be 0
+> +	 *  if rel is negitive, (rel & 0xfe000000) should be 0xfe000000
+> +	 *  the last '3' is used for alignment checking.
+> +	 */
+> +	rel_chk = (unsigned long)((long)op->optinsn.insn -
+> +			(long)op->kp.addr + 8) & 0xfe000003;
+> +
+> +	if ((rel_chk != 0) && (rel_chk != 0xfe000000)) {
+> +		__arch_remove_optimized_kprobe(op, 0);
+> +		return -ERANGE;
+> +	}
+> +
+> +	buf = (u8 *)op->optinsn.insn;
+> +
+> +	/* Copy arch-dep-instance from template */
+> +	memcpy(buf, &optprobe_template_entry, TMPL_END_IDX);
+> +
+> +	/* Set probe information */
+> +	val = (unsigned long)op;
+> +	memcpy(buf + TMPL_VAL_IDX, &val, sizeof(val));
+> +
+> +	/* Set probe function call */
+> +	val = (unsigned long)optimized_callback;
+> +	memcpy(buf + TMPL_CALL_IDX, &val, sizeof(val));
+> +
+> +	flush_icache_range((unsigned long)buf,
+> +			   (unsigned long)buf + TMPL_END_IDX);
+> +
+> +	op->optinsn.prepared = true;
+> +	return 0;
+> +}
+> +
+
+Thank you,
 
 -- 
-FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
-according to speedtest.net.
+Masami HIRAMATSU
+Software Platform Research Dept. Linux Technology Research Center
+Hitachi, Ltd., Yokohama Research Laboratory
+E-mail: masami.hiramatsu.pt at hitachi.com
