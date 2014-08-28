@@ -1,84 +1,73 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Thu, 28 Aug 2014 17:31:19 +0200
-Subject: [PATCH v4 5/5] ARM: tegra: Remove unused defines
-In-Reply-To: <1409239879-12376-1-git-send-email-thierry.reding@gmail.com>
-References: <1409239879-12376-1-git-send-email-thierry.reding@gmail.com>
-Message-ID: <1409239879-12376-5-git-send-email-thierry.reding@gmail.com>
+From: paulmck@linux.vnet.ibm.com (Paul E. McKenney)
+Date: Thu, 28 Aug 2014 08:43:09 -0700
+Subject: [PATCH v10 03/19] arm: fiq: Replace default FIQ handler
+In-Reply-To: <20140828150112.GD30401@n2100.arm.linux.org.uk>
+References: <1408369264-14242-1-git-send-email-daniel.thompson@linaro.org>
+ <1408466769-20004-1-git-send-email-daniel.thompson@linaro.org>
+ <1408466769-20004-4-git-send-email-daniel.thompson@linaro.org>
+ <20140819173742.GG30401@n2100.arm.linux.org.uk>
+ <53F39377.1070308@linaro.org>
+ <20140828150112.GD30401@n2100.arm.linux.org.uk>
+Message-ID: <20140828154309.GA5001@linux.vnet.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Thierry Reding <treding@nvidia.com>
+On Thu, Aug 28, 2014 at 04:01:12PM +0100, Russell King - ARM Linux wrote:
+> On Tue, Aug 19, 2014 at 07:12:07PM +0100, Daniel Thompson wrote:
+> > On 19/08/14 18:37, Russell King - ARM Linux wrote:
+> > > On Tue, Aug 19, 2014 at 05:45:53PM +0100, Daniel Thompson wrote:
+> > >> +int register_fiq_nmi_notifier(struct notifier_block *nb)
+> > >> +{
+> > >> +	return atomic_notifier_chain_register(&fiq_nmi_chain, nb);
+> > >> +}
+> > >> +
+> > >> +asmlinkage void __exception_irq_entry fiq_nmi_handler(struct pt_regs *regs)
+> > >> +{
+> > >> +	struct pt_regs *old_regs = set_irq_regs(regs);
+> > >> +
+> > >> +	nmi_enter();
+> > >> +	atomic_notifier_call_chain(&fiq_nmi_chain, (unsigned long)regs, NULL);
+> > >> +	nmi_exit();
+> > >> +	set_irq_regs(old_regs);
+> > >> +}
+> > > 
+> > > Really not happy with this.  What happens if a FIQ occurs while we're
+> > > inside register_fiq_nmi_notifier() - more specifically inside
+> > > atomic_notifier_chain_register() ?
+> > 
+> > Should depend on which side of the rcu update we're on.
+> 
+> I just asked Paul McKenney, our RCU expert... essentially, yes, RCU
+> stuff itself is safe in this context.  However, RCU stuff can call into
+> lockdep if lockdep is configured, and there are questions over lockdep.
+> 
+> There's some things which can be done to reduce the lockdep exposure
+> to it, such as ensuring that rcu_read_lock() is first called outside
+> of FIQ context.
+> 
+> There's concerns with whether either printk() in check_flags() could
+> be reached too (flags there should always indicate that IRQs were
+> disabled, so that reduces down to a question about just the first
+> printk() there.)
+> 
+> There's also the very_verbose() stuff for RCU lockdep classes which
+> Paul says must not be enabled.
+> 
+> Lastly, Paul isn't a lockdep expert, but he sees nothing that prevents
+> lockdep doing the deadlock checking as a result of the above call.
+> 
+> So... this coupled with my feeling that notifiers make it too easy for
+> unreviewed code to be hooked into this path, I'm fairly sure that we
+> don't want to be calling atomic notifier chains from FIQ context.
 
-Eventually the aim is to get rid of this file because it cannot be built
-on ARM64. Until it can be completely removed, eliminate unused entries
-to make it easier to see which are still used.
+In the worst case, it would be possible to create a parallel notifier
+that was intended for use from NMI.  There would be no need for
+rcu_read_lock() in that case, we would instead be using RCU-sched,
+for which NMI handlers are automatically RCU-sched read-side critical
+sections.  Instead of synchronize_rcu(), this NMI version would use
+synchronize_sched().
 
-Reviewed-by: Stephen Warren <swarren@nvidia.com>
-Signed-off-by: Thierry Reding <treding@nvidia.com>
----
-Changes in v3:
-- fixup subject prefix
+But if lockdep works from NMI, then the current notifiers would work
+just fine.
 
- arch/arm/mach-tegra/iomap.h | 30 ------------------------------
- 1 file changed, 30 deletions(-)
-
-diff --git a/arch/arm/mach-tegra/iomap.h b/arch/arm/mach-tegra/iomap.h
-index 52bbb5c8fe84..c2fd86a9b43f 100644
---- a/arch/arm/mach-tegra/iomap.h
-+++ b/arch/arm/mach-tegra/iomap.h
-@@ -28,21 +28,9 @@
- #define TEGRA_ARM_PERIF_BASE		0x50040000
- #define TEGRA_ARM_PERIF_SIZE		SZ_8K
- 
--#define TEGRA_TMR1_BASE			0x60005000
--#define TEGRA_TMR1_SIZE			SZ_8
--
--#define TEGRA_TMR2_BASE			0x60005008
--#define TEGRA_TMR2_SIZE			SZ_8
--
- #define TEGRA_TMRUS_BASE		0x60005010
- #define TEGRA_TMRUS_SIZE		SZ_64
- 
--#define TEGRA_TMR3_BASE			0x60005050
--#define TEGRA_TMR3_SIZE			SZ_8
--
--#define TEGRA_TMR4_BASE			0x60005058
--#define TEGRA_TMR4_SIZE			SZ_8
--
- #define TEGRA_CLK_RESET_BASE		0x60006000
- #define TEGRA_CLK_RESET_SIZE		SZ_4K
- 
-@@ -58,21 +46,6 @@
- #define TEGRA_APB_MISC_BASE		0x70000000
- #define TEGRA_APB_MISC_SIZE		SZ_4K
- 
--#define TEGRA_UARTA_BASE		0x70006000
--#define TEGRA_UARTA_SIZE		SZ_64
--
--#define TEGRA_UARTB_BASE		0x70006040
--#define TEGRA_UARTB_SIZE		SZ_64
--
--#define TEGRA_UARTC_BASE		0x70006200
--#define TEGRA_UARTC_SIZE		SZ_256
--
--#define TEGRA_UARTD_BASE		0x70006300
--#define TEGRA_UARTD_SIZE		SZ_256
--
--#define TEGRA_UARTE_BASE		0x70006400
--#define TEGRA_UARTE_SIZE		SZ_256
--
- #define TEGRA_PMC_BASE			0x7000E400
- #define TEGRA_PMC_SIZE			SZ_256
- 
-@@ -91,9 +64,6 @@
- #define TEGRA124_EMC_BASE		0x7001B000
- #define TEGRA124_EMC_SIZE		SZ_2K
- 
--#define TEGRA_CSITE_BASE		0x70040000
--#define TEGRA_CSITE_SIZE		SZ_256K
--
- /* On TEGRA, many peripherals are very closely packed in
-  * two 256MB io windows (that actually only use about 64KB
-  * at the start of each).
--- 
-2.0.4
+							Thanx, Paul
