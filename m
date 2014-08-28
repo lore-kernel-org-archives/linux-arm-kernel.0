@@ -1,64 +1,101 @@
-From: edubezval@gmail.com (Eduardo Valentin)
-Date: Thu, 28 Aug 2014 10:37:35 -0400
-Subject: [PATCH v3 1/4] thermal: rockchip: add driver for thermal
-In-Reply-To: <2852853.mfRZfFVSev@wuerfel>
-References: <1409187562-12370-1-git-send-email-caesar.wang@rock-chips.com>
- <1409187562-12370-2-git-send-email-caesar.wang@rock-chips.com>
- <2852853.mfRZfFVSev@wuerfel>
-Message-ID: <20140828143733.GA18084@developer>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Thu, 28 Aug 2014 15:44:43 +0100
+Subject: [PATCH 1/4] mfd: 88pm860x-i2c: Purge unused functions
+Message-ID: <1409237086-21421-1-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+The following functions appear to be unused since v2.6.39:
 
-Ceasar and Arnd,
+  pm860x_page_reg_read()
+  pm860x_page_bulk_write()
+  pm860x_page_set_bits()
 
-On Thu, Aug 28, 2014 at 10:48:23AM +0200, Arnd Bergmann wrote:
-> On Thursday 28 August 2014 08:59:19 Caesar Wang wrote:
-> > Thermal is TS-ADC Controller module supports user-defined mode and automatic mode.
-> > 
-> > User-defined mode refers,TSADC all the control signals entirely by software
-> > writing to register for direct control.
-> > 
-> > Automaic mode refers to the module automatically poll TSADC output,and the results
-> > Were checked.
-> > 
-> > If you find that the temperature High in a period of time, an interrupt is generated
-> > to the processor down-measures taken;if the temperature over a period of time High,
-> > the resulting TSHUT gave CRU module,let it reset the entire chip, or via GPIO give PMIC.
-> > 
-> > Signed-off-by: zhaoyifeng <zyf@rock-chips.com>
-> > Signed-off-by: Caesar Wang <caesar.wang@rock-chips.com>
-> 
-> Hi Caesar,
-> 
-> After looking at the driver (last time I only received the patch for
-> the binding), I have a more general comment:
-> 
-> This looks like a general-purpose ADC device, not an IP block that is
-> specific to thermal management. The binding looks ok for that purpose
-> but should probably be moved into Documentation/devicetree/bindings/iio/adc/
-> as a minor change.
-> 
+Let's remove them.
 
-I agree with Arnd's point here. It makes sense to me to have this driver
-under the IIO umbrella. 
+Signed-off-by: Lee Jones <lee.jones@linaro.org>
+---
+ drivers/mfd/88pm860x-i2c.c | 64 ----------------------------------------------
+ 1 file changed, 64 deletions(-)
 
-> On the driver side, I believe the correct way to deal with this setup
-> is to split your driver into a generic drivers/iio/adc/rockchips-tsadc.c
-> file, and a smaller thermal driver that uses the iio in-kernel interfaces,
-> ideally one that is independent of the underlying hardware and can
-> work on any ADC implementation.
-> 
-
-Agreed. If you can write such interface and make your driver to work in
-such way, that would be great.
-
-> I've put the IIO maintainer on Cc in this mail, maybe Jonathan or someone
-> else on the linux-iio mailing list has some extra insight.
-> 
-> 	Arnd
-
-
-Cheers,
-
-Eduardo
+diff --git a/drivers/mfd/88pm860x-i2c.c b/drivers/mfd/88pm860x-i2c.c
+index a93b4d0..7063cfd 100644
+--- a/drivers/mfd/88pm860x-i2c.c
++++ b/drivers/mfd/88pm860x-i2c.c
+@@ -140,26 +140,6 @@ static int write_device(struct i2c_client *i2c, int reg,
+ 	return 0;
+ }
+ 
+-int pm860x_page_reg_read(struct i2c_client *i2c, int reg)
+-{
+-	unsigned char zero = 0;
+-	unsigned char data;
+-	int ret;
+-
+-	i2c_lock_adapter(i2c->adapter);
+-	read_device(i2c, 0xFA, 0, &zero);
+-	read_device(i2c, 0xFB, 0, &zero);
+-	read_device(i2c, 0xFF, 0, &zero);
+-	ret = read_device(i2c, reg, 1, &data);
+-	if (ret >= 0)
+-		ret = (int)data;
+-	read_device(i2c, 0xFE, 0, &zero);
+-	read_device(i2c, 0xFC, 0, &zero);
+-	i2c_unlock_adapter(i2c->adapter);
+-	return ret;
+-}
+-EXPORT_SYMBOL(pm860x_page_reg_read);
+-
+ int pm860x_page_reg_write(struct i2c_client *i2c, int reg,
+ 			  unsigned char data)
+ {
+@@ -195,47 +175,3 @@ int pm860x_page_bulk_read(struct i2c_client *i2c, int reg,
+ 	return ret;
+ }
+ EXPORT_SYMBOL(pm860x_page_bulk_read);
+-
+-int pm860x_page_bulk_write(struct i2c_client *i2c, int reg,
+-			   int count, unsigned char *buf)
+-{
+-	unsigned char zero = 0;
+-	int ret;
+-
+-	i2c_lock_adapter(i2c->adapter);
+-	read_device(i2c, 0xFA, 0, &zero);
+-	read_device(i2c, 0xFB, 0, &zero);
+-	read_device(i2c, 0xFF, 0, &zero);
+-	ret = write_device(i2c, reg, count, buf);
+-	read_device(i2c, 0xFE, 0, &zero);
+-	read_device(i2c, 0xFC, 0, &zero);
+-	i2c_unlock_adapter(i2c->adapter);
+-	i2c_unlock_adapter(i2c->adapter);
+-	return ret;
+-}
+-EXPORT_SYMBOL(pm860x_page_bulk_write);
+-
+-int pm860x_page_set_bits(struct i2c_client *i2c, int reg,
+-			 unsigned char mask, unsigned char data)
+-{
+-	unsigned char zero;
+-	unsigned char value;
+-	int ret;
+-
+-	i2c_lock_adapter(i2c->adapter);
+-	read_device(i2c, 0xFA, 0, &zero);
+-	read_device(i2c, 0xFB, 0, &zero);
+-	read_device(i2c, 0xFF, 0, &zero);
+-	ret = read_device(i2c, reg, 1, &value);
+-	if (ret < 0)
+-		goto out;
+-	value &= ~mask;
+-	value |= data;
+-	ret = write_device(i2c, reg, 1, &value);
+-out:
+-	read_device(i2c, 0xFE, 0, &zero);
+-	read_device(i2c, 0xFC, 0, &zero);
+-	i2c_unlock_adapter(i2c->adapter);
+-	return ret;
+-}
+-EXPORT_SYMBOL(pm860x_page_set_bits);
+-- 
+1.9.1
