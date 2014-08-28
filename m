@@ -1,78 +1,54 @@
-From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
-Date: Thu, 28 Aug 2014 21:37:03 +0200
-Subject: [PATCH 15/15] tty: serial: 8250: omap: add dma support
-In-Reply-To: <20140828164645.GG16006@atomide.com>
-References: <1408124563-31541-1-git-send-email-bigeasy@linutronix.de>
- <1408124563-31541-16-git-send-email-bigeasy@linutronix.de>
- <20140815210211.GD9239@atomide.com> <53F5AF0D.5060409@linutronix.de>
- <20140821184416.GF10066@atomide.com> <53FE3779.5090908@linutronix.de>
- <20140827202313.GF16006@atomide.com> <20140828082348.GA5413@linutronix.de>
- <20140828164645.GG16006@atomide.com>
-Message-ID: <53FF84DF.7080406@linutronix.de>
+From: dmurphy@ti.com (Murphy, Dan)
+Date: Thu, 28 Aug 2014 19:51:30 +0000
+Subject: [PATCH v2 1/2] doc: dt/bindings: input: introduce TI DRV2667
+ haptic driver description
+References: <1408980413-8763-1-git-send-email-dmurphy@ti.com>
+Message-ID: <00FC9A978A94B7418C33AFAE8A35ED49E1B3F6@DFLE09.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/28/2014 06:46 PM, Tony Lindgren wrote:
->> To use DMA you don't have to enable it in SCR register you can also use
->> the FCR register. The manual says that you can only write this DMA
->> enable bit in the FCR register if the baud clock is not running. And
->> guess what: same thing: I only *toggle* the DMA enable bit here (it
->> remains 0 later) and the core won't hit idle.
->> Same effect if I toggle this bit while the baud clock is running (the
->> manual says that this bit can only be written if the baud clock is not
->> running). Seems like the UART is following its own specification and it
->> remains blocking once the DMA was enabled.
->> It would be nice if someone from the UART-IP team could ACK this.
+Bump
+
+On 08/25/2014 10:26 AM, Murphy, Dan wrote:
+> DRV2667 is a haptic/vibrator driver for Linear Resonant Actuators.
+> Adding dt binding for this part
 > 
-> Sounds like there should be some way to clear that state.. I wonder
-> if omap-serial.c had something before it's DMA support was removed?
-
-Its DMA was removed? Like there was DMA support?
-
-> I'd assume when the UART is powered down by runtime PM it's state
-> is completetely reset and we could restore the non-DMA state?
-
-I tried that by canceling the RX-DMA request and removing the DMA-enable
-bits from UART but it didn't help. Then I noticed that once that DMA en
-bit is set, the UART won't do any idle.
-
-> Maybe post your current patches and a test patch to try to toggle
-> the DMA on and off?
-
-Oh. I pushed my dirty tree to
- git://git.breakpoint.cc/bigeasy/linux.git uart_v8_wip
-
-The top most commit does not setup dma at all and adds commented out
-code how to enable DMA via SCR or FCR register. With this I hit
-core-off. Once _one_ of the modes are enabled, it doesn't work anymore.
-
-I will try to address review comments tomorrow and hopefully post a v8
-based on -rc2. The same goes for your patch (which I will try tomorrow).
-
->> Bah. Does it make sense to use runtime-PM if we can't hit core-off? I'm
->> thinking to add a printk once dma is enabled says that runtime-pm is
->> switched off.
+> Signed-off-by: Dan Murphy <dmurphy@ti.com>
+> ---
 > 
-> Well if we can't find a way to unset the DMA registers in the UART,
-> how about only enable it if a kernel cmdline option is specified?
-
-Hmmm. So removing DMA properties from DT is not an option? Currently I
-added a message that DMA might forbid low power mode so people might
-remove "dma-names" from DT (or assign "") and DMA is off. However if
-this is no good, then I guess I could add kernel module which enables
-DMA.
-
+> v2 - Removed extra tabs, changed node to function not device
+> added vbat-supply, and removed confusing description - https://patchwork.kernel.org/patch/4759381/
 > 
-> We do have runtime PM working without it, and the serial console
-> super important for any kind of debugging no matter what idle
-> mode the SoC hits.. So let's not break that.
-
-Yeah, I know. I've been debugging while I broke something which means
-uart wasn't working :)
-
+>  .../devicetree/bindings/input/ti,drv2667.txt       |   17 +++++++++++++++++
+>  1 file changed, 17 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/input/ti,drv2667.txt
 > 
-> Regards,
+> diff --git a/Documentation/devicetree/bindings/input/ti,drv2667.txt b/Documentation/devicetree/bindings/input/ti,drv2667.txt
+> new file mode 100644
+> index 0000000..996382c
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/input/ti,drv2667.txt
+> @@ -0,0 +1,17 @@
+> +* Texas Instruments - drv2667 Haptics driver
+> +
+> +Required properties:
+> +	- compatible - "ti,drv2667" - DRV2667
+> +	- reg -  I2C slave address
+> +	- vbat-supply - Required supply regulator
+> +
+> +Example:
+> +
+> +haptics: haptics at 59 {
+> +	compatible = "ti,drv2667";
+> +	reg = <0x59>;
+> +	vbat-supply = <&vbat>;
+> +};
+> +
+> +For more product information please see the link below:
+> +http://www.ti.com/product/drv2667
 > 
-> Tony
 
-Sebastian
+
+-- 
+------------------
+Dan Murphy
