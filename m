@@ -1,38 +1,89 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Thu, 28 Aug 2014 10:36:39 +0200
-Subject: [PATCH v9 4/5] rtc: max77686: Remove unneded info log
-In-Reply-To: <1408350877-15921-5-git-send-email-javier.martinez@collabora.co.uk>
-References: <1408350877-15921-1-git-send-email-javier.martinez@collabora.co.uk>
- <1408350877-15921-5-git-send-email-javier.martinez@collabora.co.uk>
-Message-ID: <1409214999.20020.0.camel@AMDC1943>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Thu, 28 Aug 2014 10:38:53 +0200
+Subject: [PATCH v2 0/9] PM / Domains: Generic OF-based support
+Message-ID: <1409215142-8218-1-git-send-email-ulf.hansson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On pon, 2014-08-18 at 10:34 +0200, Javier Martinez Canillas wrote:
-> If devm_rtc_device_register() fails a dev_err() is already
-> reported so there is no need to do an additional dev_info().
-> 
-> Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+Changes in v2:
+	- Fix the ACPI patch, it didn't even compile for CONFIG_ACPI.
+	- Updated some comments in code and in commit messages.
+	- Fixed the dev_pm_domain_attach API to handle EPROBE_DEFER properly.
+	- Rebased the ARM Exynos patch.
+	- Added some Tested-by tags.
 
-Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 
-Best regards,
-Krzysztof
+This patchset has a bit of a history and some parts of it has been posted
+earlier.
 
-> ---
->  drivers/rtc/rtc-max77686.c | 2 --
->  1 file changed, 2 deletions(-)
-> 
-> diff --git a/drivers/rtc/rtc-max77686.c b/drivers/rtc/rtc-max77686.c
-> index 55396bb..b177ba1 100644
-> --- a/drivers/rtc/rtc-max77686.c
-> +++ b/drivers/rtc/rtc-max77686.c
-> @@ -457,8 +457,6 @@ static int max77686_rtc_probe(struct platform_device *pdev)
->  					&max77686_rtc_ops, THIS_MODULE);
->  
->  	if (IS_ERR(info->rtc_dev)) {
-> -		dev_info(&pdev->dev, "%s: fail\n", __func__);
-> -
->  		ret = PTR_ERR(info->rtc_dev);
->  		dev_err(&pdev->dev, "Failed to register RTC device: %d\n", ret);
->  		if (ret == 0)
+http://lists.infradead.org/pipermail/linux-arm-kernel/2014-June/262725.html
+
+In the first revision I intentially didn't increase version number of the
+patches, since I think it would have cause more confusion than clarity.
+
+A summary of changes in V1 and since the last patchset, from the link above:
+	- Instead of letting driver core handling the device to power domain
+	binding/unbinding, follow the behavior of how the ACPI power domain
+	is handled.
+
+
+This is a summary of what these patches are intended to do:
+
+1)
+Add generic power domain OF-based support which also includes APIs to handle
+attach/detach of generic power domains to devices.
+
+2)
+Adding a common API to attach/detach power domains and include support for the
+ACPI and the generic power domain in there.
+
+3)
+>From subsystem level code, at probe/remove, convert from invoking the ACPI
+specific power domain attach/detach functions to the new common attach/detach
+APIs.
+
+4)
+Add support for the AMBA bus to attach/detach power domains, using the new
+common APIs.
+
+5)
+Convert Exynos to use the new generic power domain OF support.
+
+Obviously, there are dependencies througout this patchset, which means if they
+get accepted the all need to go together. It might also be convenient to share
+them through an immutable branch.
+
+
+Tomasz Figa (2):
+  PM / Domains: Add generic OF-based power domain look-up
+  ARM: exynos: Move to generic power domain bindings
+
+Ulf Hansson (7):
+  ACPI / PM: Let acpi_dev_pm_detach() return an error code
+  PM / Domains: Add APIs to attach/detach a PM domain for a device
+  drivercore / platform: Convert to dev_pm_domain_attach|detach()
+  i2c: core: Convert to dev_pm_domain_attach|detach()
+  mmc: sdio: Convert to dev_pm_domain_attach|detach()
+  spi: core: Convert to dev_pm_domain_attach|detach()
+  amba: Add support for attach/detach of power domains
+
+ .../bindings/arm/exynos/power_domain.txt           |  13 +-
+ .../devicetree/bindings/power/power_domain.txt     |  51 ++++
+ arch/arm/mach-exynos/pm_domains.c                  |  78 +-----
+ drivers/acpi/device_pm.c                           |   8 +-
+ drivers/amba/bus.c                                 |  10 +-
+ drivers/base/platform.c                            |  15 +-
+ drivers/base/power/common.c                        |  56 ++++
+ drivers/base/power/domain.c                        | 291 +++++++++++++++++++++
+ drivers/i2c/i2c-core.c                             |  13 +-
+ drivers/mmc/core/sdio_bus.c                        |   4 +-
+ drivers/spi/spi.c                                  |  12 +-
+ include/linux/acpi.h                               |   7 +-
+ include/linux/pm.h                                 |  14 +
+ include/linux/pm_domain.h                          |  46 ++++
+ kernel/power/Kconfig                               |   4 +
+ 15 files changed, 515 insertions(+), 107 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/power/power_domain.txt
+
+-- 
+1.9.1
