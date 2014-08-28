@@ -1,56 +1,64 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Thu, 28 Aug 2014 16:37:37 +0200
-Subject: [linux-sunxi] Re: [PATCH 4/4] simplefb: add clock handling code
-In-Reply-To: <CAKON4Oy8X9CSpZjYnTRgZ_MsxXQ=zaP+kxiZ2b7Es4GjN+1iJw@mail.gmail.com>
-References: <20140825150501.GE14763@ulmo.nvidia.com>
- <20140825152232.GE15297@lukather> <20140826080432.GD17263@ulmo>
- <20140826135341.GM15297@lukather> <20140826143550.GB3027@ulmo>
- <53FCE704.4030103@redhat.com> <20140827093121.GA23186@ulmo>
- <53FDB46C.5010609@redhat.com> <20140827125613.GF23186@ulmo>
- <53FDE0CE.5030807@redhat.com> <20140827141632.GB32243@ulmo>
- <53FF1D6C.6090205@redhat.com>
- <CAKON4OyXPjXx4q828kFgMsC_u7u3nqLPLxOp-kRZbS27yRKOEg@mail.gmail.com>
- <CAMuHMdU+zxUCU05YOpyuP1fx=Dgb5SZu=vbaJW13sQAaMBwU_w@mail.gmail.com>
- <CAKON4Oy8X9CSpZjYnTRgZ_MsxXQ=zaP+kxiZ2b7Es4GjN+1iJw@mail.gmail.com>
-Message-ID: <CAMuHMdXwDbpcyQuXMBZuNKBF0DmJ+F7BN8vJiupDNe3sqTSqYQ@mail.gmail.com>
+From: edubezval@gmail.com (Eduardo Valentin)
+Date: Thu, 28 Aug 2014 10:37:35 -0400
+Subject: [PATCH v3 1/4] thermal: rockchip: add driver for thermal
+In-Reply-To: <2852853.mfRZfFVSev@wuerfel>
+References: <1409187562-12370-1-git-send-email-caesar.wang@rock-chips.com>
+ <1409187562-12370-2-git-send-email-caesar.wang@rock-chips.com>
+ <2852853.mfRZfFVSev@wuerfel>
+Message-ID: <20140828143733.GA18084@developer>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 28, 2014 at 4:33 PM, jonsmirl at gmail.com <jonsmirl@gmail.com> wrote:
-> On Thu, Aug 28, 2014 at 10:20 AM, Geert Uytterhoeven
-> <geert@linux-m68k.org> wrote:
->> On Thu, Aug 28, 2014 at 3:22 PM, jonsmirl at gmail.com <jonsmirl@gmail.com> wrote:
->>>> 2) We don't want to hardcode these clocks into the kernel (sunxi) clk
->>>> driver, instead the bootloader should tell the kernel about these clocks.
->>>>
->>>> So the only point of discussion left seems to be how to do 2...
->>>
->>> Wouldn't it be a lot simpler just to use existing fbdev (not KMS) and
->>> whip together a device specific driver that claims the proper
->>> resources? And just implement the minimal about of fbdev possible?
->>> fbdev already is a driver library.
->>
->> Like... drivers/video/fbdev/offb.c?
->
-> I'd probably reclassify drivers/video/fbdev/simplefb.c as a skeleton
-> and use it as a template for making device specific versions of it.
->
-> I don't see why there is so much resistance to just making device
-> specific fb drivers.  Whenever the KMS driver gets written just
-> disable the device specific fb driver in the build.
 
-I explicitly named offb, because it already supports living with the
-video mode initialized by Open Firmware, which is passed to the kernel
-in a device tree.
+Ceasar and Arnd,
 
--- 
-Gr{oetje,eeting}s,
+On Thu, Aug 28, 2014 at 10:48:23AM +0200, Arnd Bergmann wrote:
+> On Thursday 28 August 2014 08:59:19 Caesar Wang wrote:
+> > Thermal is TS-ADC Controller module supports user-defined mode and automatic mode.
+> > 
+> > User-defined mode refers,TSADC all the control signals entirely by software
+> > writing to register for direct control.
+> > 
+> > Automaic mode refers to the module automatically poll TSADC output,and the results
+> > Were checked.
+> > 
+> > If you find that the temperature High in a period of time, an interrupt is generated
+> > to the processor down-measures taken;if the temperature over a period of time High,
+> > the resulting TSHUT gave CRU module,let it reset the entire chip, or via GPIO give PMIC.
+> > 
+> > Signed-off-by: zhaoyifeng <zyf@rock-chips.com>
+> > Signed-off-by: Caesar Wang <caesar.wang@rock-chips.com>
+> 
+> Hi Caesar,
+> 
+> After looking at the driver (last time I only received the patch for
+> the binding), I have a more general comment:
+> 
+> This looks like a general-purpose ADC device, not an IP block that is
+> specific to thermal management. The binding looks ok for that purpose
+> but should probably be moved into Documentation/devicetree/bindings/iio/adc/
+> as a minor change.
+> 
 
-                        Geert
+I agree with Arnd's point here. It makes sense to me to have this driver
+under the IIO umbrella. 
 
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+> On the driver side, I believe the correct way to deal with this setup
+> is to split your driver into a generic drivers/iio/adc/rockchips-tsadc.c
+> file, and a smaller thermal driver that uses the iio in-kernel interfaces,
+> ideally one that is independent of the underlying hardware and can
+> work on any ADC implementation.
+> 
 
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Agreed. If you can write such interface and make your driver to work in
+such way, that would be great.
+
+> I've put the IIO maintainer on Cc in this mail, maybe Jonathan or someone
+> else on the linux-iio mailing list has some extra insight.
+> 
+> 	Arnd
+
+
+Cheers,
+
+Eduardo
