@@ -1,157 +1,78 @@
-From: suravee.suthikulpanit@amd.com (Suravee Suthikulpanit)
-Date: Thu, 28 Aug 2014 03:59:40 -0500
-Subject: [PATCH 1/2 V4] irqchip: gic: Add supports for ARM GICv2m MSI(-X)
-In-Reply-To: <87fvgxrgte.fsf@approximate.cambridge.arm.com>
-References: <1407942041-3291-1-git-send-email-suravee.suthikulpanit@amd.com>
- <1407942041-3291-2-git-send-email-suravee.suthikulpanit@amd.com>
- <87fvgxrgte.fsf@approximate.cambridge.arm.com>
-Message-ID: <53FEEF7C.1090902@amd.com>
+From: steve.capper@linaro.org (Steve Capper)
+Date: Thu, 28 Aug 2014 09:59:40 +0100
+Subject: [PATH V2 1/6] mm: Introduce a general RCU get_user_pages_fast.
+In-Reply-To: <20140827150139.GZ30401@n2100.arm.linux.org.uk>
+References: <1408635812-31584-1-git-send-email-steve.capper@linaro.org>
+ <1408635812-31584-2-git-send-email-steve.capper@linaro.org>
+ <20140827150139.GZ30401@n2100.arm.linux.org.uk>
+Message-ID: <20140828085939.GA15409@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Wed, Aug 27, 2014 at 04:01:39PM +0100, Russell King - ARM Linux wrote:
 
+Hi Russell,
 
-On 08/15/2014 09:03 AM, Marc Zyngier wrote:
->> +
->> +static struct irq_chip gicv2m_chip;
->> +
->> +#ifdef CONFIG_OF
->
-> Is there any reason why this should be guarded by CONFIG_OF? Surely the
-> v2m capability should only be enabled if OF is.
+> On Thu, Aug 21, 2014 at 04:43:27PM +0100, Steve Capper wrote:
+> > +int get_user_pages_fast(unsigned long start, int nr_pages, int write,
+> > +			struct page **pages)
+> > +{
+> > +	struct mm_struct *mm = current->mm;
+> > +	int nr, ret;
+> > +
+> > +	start &= PAGE_MASK;
+> > +	nr = __get_user_pages_fast(start, nr_pages, write, pages);
+> > +	ret = nr;
+> > +
+> > +	if (nr < nr_pages) {
+> > +		/* Try to get the remaining pages with get_user_pages */
+> > +		start += nr << PAGE_SHIFT;
+> > +		pages += nr;
+> 
+> When I read this, my first reaction was... what if nr is negative?  In
+> that case, if nr_pages is positive, we fall through into this if, and
+> start to wind things backwards - which isn't what we want.
+> 
+> It looks like that can't happen... right?  __get_user_pages_fast() only
+> returns greater-or-equal to zero right now, but what about the future?
 
-[Suravee]
-We are also planning to support ACPI in the future also, which will be 
-using a different init function.  Also, there is the same #ifdef in the 
-irq-gic.c for the gic_of_init().  So, I am just trying to be consistent 
-here.
+__get_user_pages_fast is a strict fast path, it will grab as many page
+references as it can and if something gets in its way it backs off. As
+it can't take locks, it can't inspect the VMA, thus it really isn't in
+a position to know if there's an error. It may be possible for the
+slow path to take a write fault for a read only pte, for instance.
+(we could in theory return an error on pte_special and save a fallback
+to the slowpath but I don't believe it's worth doing as special ptes
+should be encountered very rarely by the fast_gup).
 
+I think it's safe to assume that __get_use_pages_fast has non-negative
+return values; also it is logically contained in the same area as
+get_user_pages_fast, so if this does change we can apply changes below
+it too.
 
->> +
->> +       memcpy(&gicv2m_chip, gic->irq_chip, sizeof(struct irq_chip));
->> +       gicv2m_chip.name = "GICv2m",
->> +       gicv2m_chip.irq_mask = gicv2m_mask_irq;
->> +       gicv2m_chip.irq_unmask = gicv2m_unmask_irq;
->> +       gic->irq_chip = &gicv2m_chip;
->
-> I liked it until this last line. You're overriding the irq_chip for the
-> whole GIC. I was expecting you'd only use it for the MSI range
-> (basically return a range to the caller, together with your brand new
-> irq_chip).
+get_user_pages_fast attempts the fast path but is allowed to fallback
+to the slowpath, so is in a position to return an error code thus can
+return negative values.
 
-[Suravee]
-I'm not sure if I understand you point here. Actually, I don't see the 
-whole point of the need to have a whole different irq_chip for v2m 
-stuff.  All I need is just a way to overwrite the irq_chip.irq_mask() 
-and irq_chip.irq_unmask() with the v2m version which should check for 
-MSI before calling mask/unmask_msi_irq(). I should be able to just do:
+> 
+> > +
+> > +		down_read(&mm->mmap_sem);
+> > +		ret = get_user_pages(current, mm, start,
+> > +				     nr_pages - nr, write, 0, pages, NULL);
+> > +		up_read(&mm->mmap_sem);
+> > +
+> > +		/* Have to be a bit careful with return values */
+> > +		if (nr > 0) {
+> 
+> This kind'a makes it look like nr could be negative.
 
-	gic->irq_chip.irq_mask = gicv2m_mask_irq;
-	gic->irq_chip.irq_unmask = gicv2m_unmask_irq;
+I read it as "did the fast path get at least one page?".
 
+> 
+> Other than that, I don't see anything obviously wrong with it.
 
->> @@ -768,19 +768,21 @@ void __init gic_init_physaddr(struct device_node *node)
->>   static int gic_irq_domain_map(struct irq_domain *d, unsigned int irq,
->>                                  irq_hw_number_t hw)
->>   {
->> +       struct gic_chip_data *gic = d->host_data;
->> +
->>          if (hw < 32) {
->>                  irq_set_percpu_devid(irq);
->> -               irq_set_chip_and_handler(irq, &gic_chip,
->> +               irq_set_chip_and_handler(irq, gic->irq_chip,
->>                                           handle_percpu_devid_irq);
->>                  set_irq_flags(irq, IRQF_VALID | IRQF_NOAUTOEN);
->>          } else {
->> -               irq_set_chip_and_handler(irq, &gic_chip,
->> +               irq_set_chip_and_handler(irq, gic->irq_chip,
->>                                           handle_fasteoi_irq);
->
-> And here you should discriminate on whether this is MSI or not, based on
-> the range you got from above.
->
+Thank you for giving this a going over.
 
-[Suravee]
- From above, since we only use one irq_chip (i.e. the gic_chip), there 
-is no need to differentiate here, and I don't need to make these two 
-line changes.
-
->> @@ -1009,6 +1012,16 @@ gic_of_init(struct device_node *node, struct device_node *parent)
->>          if (of_property_read_u32(node, "cpu-offset", &percpu_offset))
->>                  percpu_offset = 0;
->>
->> +       gic_data[gic_cnt].irq_chip = &gic_chip;
->> +
->> +       /* Currently, we only support one v2m subnode. */
->> +       child = of_get_child_by_name(node, "v2m");
->
-> If you only support one v2m node, then you should also enforce it for
-> potential secondaty GICs (just probing it for gic_cnt == 0 should be
-> enough).
-
-[Suravee]
-Actually, if we have multiple (N) GICs, we should be able to also 
-support multiple (N) V2Ms with the followings entries.
-	gic0 {
-		.....
-		v2m {
-			....
-		}
-	}
-
-	gic1 {
-		.....
-		v2m {
-			....
-		}
-	}
-
-What I am not trying to support at this point is the following:
-
-	gic0 {
-		....
-		v2m {
-			....
-		}
-		v2m {
-			....
-		}
-	}
-
-
->> diff --git a/drivers/irqchip/irq-gic.h b/drivers/irqchip/irq-gic.h
->> new file mode 100644
->> index 0000000..2ec6bc3
->> --- /dev/null
->> +++ b/drivers/irqchip/irq-gic.h
->> @@ -0,0 +1,48 @@
->> +#ifndef _IRQ_GIC_H_
->> +#define _IRQ_GIC_H_
->> +
->> +#include <linux/msi.h>
->> +
->> +union gic_base {
->> +       void __iomem *common_base;
->> +       void __percpu * __iomem *percpu_base;
->> +};
->> +
->> +#ifdef CONFIG_ARM_GIC_V2M
->> +struct v2m_data {
->> +       spinlock_t msi_cnt_lock;
->> +       struct msi_chip msi_chip;
->> +       struct resource res;      /* GICv2m resource */
->> +       void __iomem *base;       /* GICv2m virt address */
->> +       unsigned int spi_start;   /* The SPI number that MSIs start */
->> +       unsigned int nr_spis;     /* The number of SPIs for MSIs */
->> +       unsigned long *bm;        /* MSI vector bitmap */
->> +};
->> +#endif
->
-> So if you put the #ifdef/#endif *inside* the v2m_data structure...
-
-[Suravee] Are you suggesting an empty struct v2m_data{}; Hm.. I guess I 
-can do that.
-
-Thanks,
-
-Suravee
+Cheers,
+-- 
+Steve
