@@ -1,75 +1,42 @@
-From: cov@codeaurora.org (Christopher Covington)
-Date: Thu, 28 Aug 2014 13:09:32 -0400
-Subject: [PATCH] clocksource: arch_timer: Fix code to use physical timers
- when requested
-In-Reply-To: <20140828093505.GC14650@leverpostej>
-References: <1409173419-13076-1-git-send-email-sonnyrao@chromium.org>
- <CAOesGMjK65Rc-K0fyFUUJLw6huLT82E-nqJwZO4PqhgopF96Ow@mail.gmail.com>
- <CAPz6YkWAPtuy4sAuAK9GtpDgfGsccxeS+pqqe_t_R818Jt01qA@mail.gmail.com>
- <53FE5B09.2020403@codeaurora.org>
- <CAOesGMhTivDzJFuxONggcJ6N5UvZopKa=+tv9PoPX593cpnm0A@mail.gmail.com>
- <53FE7E3B.1010500@codeaurora.org>
- <CAOesGMgXnsqttHwAxEW4a7-Rx-nmSwpJd_Dt1iCcFOvzDwbzdA@mail.gmail.com>
- <CAD=FV=VjN6Xam-nRRcxvOoN-gokU6DbGVjoPXN_fkTJssH1RWA@mail.gmail.com>
- <20140828093505.GC14650@leverpostej>
-Message-ID: <53FF624C.3090002@codeaurora.org>
+From: sr@denx.de (Stefan Roese)
+Date: Thu, 28 Aug 2014 19:10:26 +0200
+Subject: [PATCH 1/4] arm: omap: tao3530: Add pdata-quirk for the mmc2 internal
+ clock
+Message-ID: <1409245829-3938-1-git-send-email-sr@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+Signed-off-by: Stefan Roese <sr@denx.de>
+Cc: Thorsten Eisbein <thorsten.eisbein@head-acoustics.de>
+Cc: Tapani Utriainen <tapani@technexion.com>
+Cc: Tony Lindgren <tony@atomide.com>
+---
+ arch/arm/mach-omap2/pdata-quirks.c | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-On 08/28/2014 05:35 AM, Mark Rutland wrote:
-> On Thu, Aug 28, 2014 at 04:33:31AM +0100, Doug Anderson wrote:
->> Hi,
->>
->> On Wed, Aug 27, 2014 at 7:58 PM, Olof Johansson <olof@lixom.net> wrote:
->>> On Wed, Aug 27, 2014 at 5:56 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
->>>> On 08/27/14 15:33, Olof Johansson wrote:
->>>>> On Wed, Aug 27, 2014 at 3:26 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
->>>>>
->>>>>> Is there any reason why the virtual counter can't be read? Maybe we're
->>>>>> the hyp and we need to make sure we don't use the virtual timer so that
->>>>>> the guest can use it, but that doesn't have any effect on the usage of
->>>>>> the virtual counter for the clocksource.
->>>>>
->>>>> There are several cases where virtual is unusable -- in particular it
->>>>> might not have been configured properly (i.e. the phys/virt offset is
->>>>> at a bad value).
->>>>
->>>> Any specifics? It would be nice to say so in the commit text so that
->>>> others using such devices know they need this patch. I'm guessing the
->>>> firmware can't be fixed?
->>
->> Even if we could change things to use a virtual timer in some cases,
->> Sonny's patch still fixes a bug.  The code as written right now makes
->> pretenses about supporting the physical timer, but it doesn't work.
->> That should be fixed.
-> 
-> The code does support the physical timer. It does not support the
-> physical counter (and makes no pretenses that it does).
-
-I think if you could please explain the following code, that may help clear up
-some of the confusion.
-
-		if (arch_timer_use_virtual) {
-			clk->irq = arch_timer_ppi[VIRT_PPI];
-			clk->set_mode = arch_timer_set_mode_virt;
-			clk->set_next_event = arch_timer_set_next_event_virt;
-		} else {
-			clk->irq = arch_timer_ppi[PHYS_SECURE_PPI];
-			clk->set_mode = arch_timer_set_mode_phys;
-			clk->set_next_event = arch_timer_set_next_event_phys;
-		}
-
-http://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/tree/drivers/clocksource/arm_arch_timer.c#n272
-
-Perhaps you mean to say the code does not support *non-secure access* to the
-physical timer?
-
-Thanks,
-Christopher
-
+diff --git a/arch/arm/mach-omap2/pdata-quirks.c b/arch/arm/mach-omap2/pdata-quirks.c
+index 90c88d4..b9d091b 100644
+--- a/arch/arm/mach-omap2/pdata-quirks.c
++++ b/arch/arm/mach-omap2/pdata-quirks.c
+@@ -253,6 +253,11 @@ static void __init nokia_n900_legacy_init(void)
+ 
+ 	}
+ }
++
++static void __init omap3_tao3530_legacy_init(void)
++{
++	hsmmc2_internal_input_clk();
++}
+ #endif /* CONFIG_ARCH_OMAP3 */
+ 
+ #ifdef CONFIG_ARCH_OMAP4
+@@ -377,6 +382,7 @@ static struct pdata_init pdata_quirks[] __initdata = {
+ 	{ "ti,omap3-evm-37xx", omap3_evm_legacy_init, },
+ 	{ "ti,omap3-zoom3", omap3_zoom_legacy_init, },
+ 	{ "ti,am3517-evm", am3517_evm_legacy_init, },
++	{ "technexion,omap3-tao3530", omap3_tao3530_legacy_init, },
+ #endif
+ #ifdef CONFIG_ARCH_OMAP4
+ 	{ "ti,omap4-sdp", omap4_sdp_legacy_init, },
 -- 
-Employee of Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by the Linux Foundation.
+2.1.0
