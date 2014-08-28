@@ -1,34 +1,29 @@
-From: caesar.wang@rock-chips.com (Caesar Wang)
-Date: Thu, 28 Aug 2014 08:59:22 +0800
-Subject: [PATCH v4 4/4] ARM: dts: enable Thermal on rk3288-evb board
-In-Reply-To: <1409187562-12370-1-git-send-email-caesar.wang@rock-chips.com>
-References: <1409187562-12370-1-git-send-email-caesar.wang@rock-chips.com>
-Message-ID: <1409187562-12370-5-git-send-email-caesar.wang@rock-chips.com>
+From: kever.yang@rock-chips.com (Kever Yang)
+Date: Thu, 28 Aug 2014 09:40:17 +0800
+Subject: [RESEND PATCH] ARM: dts: make arch-timer always on in rk3288 soc
+Message-ID: <1409190017-12656-1-git-send-email-kever.yang@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Caesar Wang <caesar.wang@rock-chips.com>
----
- arch/arm/boot/dts/rk3288-evb.dtsi | 7 +++++++
- 1 file changed, 7 insertions(+)
+We need use the hrtimer, which need the arch-timer to be 'always-on'
 
-diff --git a/arch/arm/boot/dts/rk3288-evb.dtsi b/arch/arm/boot/dts/rk3288-evb.dtsi
-index 2964370..fe85dde 100644
---- a/arch/arm/boot/dts/rk3288-evb.dtsi
-+++ b/arch/arm/boot/dts/rk3288-evb.dtsi
-@@ -101,6 +101,13 @@
- 	status = "okay";
- };
+Signed-off-by: Kever Yang <kever.yang@rock-chips.com>
+---
+
+ arch/arm/boot/dts/rk3288.dtsi | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/arch/arm/boot/dts/rk3288.dtsi b/arch/arm/boot/dts/rk3288.dtsi
+index 5950b0a..698e6ea 100644
+--- a/arch/arm/boot/dts/rk3288.dtsi
++++ b/arch/arm/boot/dts/rk3288.dtsi
+@@ -76,6 +76,7 @@
+ 			     <GIC_PPI 11 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>,
+ 			     <GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>;
+ 		clock-frequency = <24000000>;
++		always-on;
+ 	};
  
-+&tsadc {
-+	passive-temp = <80>;
-+	critical-temp = <100>;
-+	force-shut-temp = <120>;
-+	status = "okay";
-+};
-+
- &pinctrl {
- 	buttons {
- 		pwrbtn: pwrbtn {
+ 	i2c1: i2c at ff140000 {
 -- 
 1.9.1
