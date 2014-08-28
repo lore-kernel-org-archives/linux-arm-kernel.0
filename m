@@ -1,42 +1,39 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Thu, 28 Aug 2014 14:28:39 -0500
-Subject: [PATCH 4/5] usb: dwc3: Adding Kconfig dependency for Exynos7
-In-Reply-To: <1409212920-28526-5-git-send-email-gautam.vivek@samsung.com>
-References: <1409212920-28526-1-git-send-email-gautam.vivek@samsung.com>
- <1409212920-28526-5-git-send-email-gautam.vivek@samsung.com>
-Message-ID: <20140828192824.GR16689@saruman.home>
+From: dianders@chromium.org (Doug Anderson)
+Date: Thu, 28 Aug 2014 12:36:03 -0700
+Subject: [PATCH 0/2] IO voltage domain support for rk3188 and rk3288
+Message-ID: <1409254565-10677-1-git-send-email-dianders@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 28, 2014 at 01:31:59PM +0530, Vivek Gautam wrote:
-> The Exynos-DWC3 USB 3.0 DRD controller is also present on
-> Exynos7 platform, so adding the dependency on ARCH_EXYNOS7
-> for this driver.
-> 
-> Signed-off-by: Vivek Gautam <gautam.vivek@samsung.com>
-> ---
->  drivers/usb/dwc3/Kconfig |    2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/drivers/usb/dwc3/Kconfig b/drivers/usb/dwc3/Kconfig
-> index 785510a..e235894 100644
-> --- a/drivers/usb/dwc3/Kconfig
-> +++ b/drivers/usb/dwc3/Kconfig
-> @@ -55,7 +55,7 @@ config USB_DWC3_OMAP
->  
->  config USB_DWC3_EXYNOS
->  	tristate "Samsung Exynos Platform"
-> -	depends on ARCH_EXYNOS || COMPILE_TEST
-> +	depends on (ARCH_EXYNOS || ARCH_EXYNOS7) || COMPILE_TEST
+These two patches add support for automatically configuring the IO
+voltage domains on rk3188 and rk3288 SoCs.  The first patch adds some
+new notification types to the regulator code.  It's used by the second
+patch which actually implements the IO voltage domain driver.
 
-wait when building for ARCH_EXYNOS7 you don't get ARCH_EXYNOS ?
+These two patches were co-developed by Heiko St?bner and Doug Anderson
+(proof of concept patches were written by Heiko).  They were tested in
+a private branch on an rk3288 board using rk808 instead of mainline
+since rk808 support isn't finalized in mainline yet.
+
+(sorry if you got this series twice; my mailer seems unhappy with me)
+
+Heiko St?bner (2):
+  regulator: core: Add REGULATOR_EVENT_PRE_VOLTAGE_CHANGE (and ABORT)
+  soc/rockchip: io-domain: add driver handling io domains
+
+ .../devicetree/bindings/arm/rockchip/io-domain.txt |  60 ++++
+ drivers/regulator/core.c                           |  63 +++-
+ drivers/soc/Kconfig                                |   1 +
+ drivers/soc/Makefile                               |   1 +
+ drivers/soc/rockchip/Kconfig                       |  10 +
+ drivers/soc/rockchip/Makefile                      |   1 +
+ drivers/soc/rockchip/io-domain.c                   | 333 +++++++++++++++++++++
+ include/linux/regulator/consumer.h                 |  20 ++
+ 8 files changed, 482 insertions(+), 7 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/rockchip/io-domain.txt
+ create mode 100644 drivers/soc/rockchip/Kconfig
+ create mode 100644 drivers/soc/rockchip/Makefile
+ create mode 100644 drivers/soc/rockchip/io-domain.c
 
 -- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140828/623b8d20/attachment.sig>
+2.1.0.rc2.206.gedb03e5
