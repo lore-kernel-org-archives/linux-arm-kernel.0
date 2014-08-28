@@ -1,57 +1,56 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 28 Aug 2014 15:35:38 +0100
-Subject: [PATCH 8/8] mfd: as3722: Rid driver of superfluous I2C device ID
- structure
-In-Reply-To: <1409236538-21274-1-git-send-email-lee.jones@linaro.org>
-References: <1409236538-21274-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1409236538-21274-9-git-send-email-lee.jones@linaro.org>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Thu, 28 Aug 2014 16:37:37 +0200
+Subject: [linux-sunxi] Re: [PATCH 4/4] simplefb: add clock handling code
+In-Reply-To: <CAKON4Oy8X9CSpZjYnTRgZ_MsxXQ=zaP+kxiZ2b7Es4GjN+1iJw@mail.gmail.com>
+References: <20140825150501.GE14763@ulmo.nvidia.com>
+ <20140825152232.GE15297@lukather> <20140826080432.GD17263@ulmo>
+ <20140826135341.GM15297@lukather> <20140826143550.GB3027@ulmo>
+ <53FCE704.4030103@redhat.com> <20140827093121.GA23186@ulmo>
+ <53FDB46C.5010609@redhat.com> <20140827125613.GF23186@ulmo>
+ <53FDE0CE.5030807@redhat.com> <20140827141632.GB32243@ulmo>
+ <53FF1D6C.6090205@redhat.com>
+ <CAKON4OyXPjXx4q828kFgMsC_u7u3nqLPLxOp-kRZbS27yRKOEg@mail.gmail.com>
+ <CAMuHMdU+zxUCU05YOpyuP1fx=Dgb5SZu=vbaJW13sQAaMBwU_w@mail.gmail.com>
+ <CAKON4Oy8X9CSpZjYnTRgZ_MsxXQ=zaP+kxiZ2b7Es4GjN+1iJw@mail.gmail.com>
+Message-ID: <CAMuHMdXwDbpcyQuXMBZuNKBF0DmJ+F7BN8vJiupDNe3sqTSqYQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Also remove unused second probe() parameter 'i2c_device_id'.
+On Thu, Aug 28, 2014 at 4:33 PM, jonsmirl at gmail.com <jonsmirl@gmail.com> wrote:
+> On Thu, Aug 28, 2014 at 10:20 AM, Geert Uytterhoeven
+> <geert@linux-m68k.org> wrote:
+>> On Thu, Aug 28, 2014 at 3:22 PM, jonsmirl at gmail.com <jonsmirl@gmail.com> wrote:
+>>>> 2) We don't want to hardcode these clocks into the kernel (sunxi) clk
+>>>> driver, instead the bootloader should tell the kernel about these clocks.
+>>>>
+>>>> So the only point of discussion left seems to be how to do 2...
+>>>
+>>> Wouldn't it be a lot simpler just to use existing fbdev (not KMS) and
+>>> whip together a device specific driver that claims the proper
+>>> resources? And just implement the minimal about of fbdev possible?
+>>> fbdev already is a driver library.
+>>
+>> Like... drivers/video/fbdev/offb.c?
+>
+> I'd probably reclassify drivers/video/fbdev/simplefb.c as a skeleton
+> and use it as a template for making device specific versions of it.
+>
+> I don't see why there is so much resistance to just making device
+> specific fb drivers.  Whenever the KMS driver gets written just
+> disable the device specific fb driver in the build.
 
-Acked-by: Grant Likely <grant.likely@linaro.org>
-Signed-off-by: Lee Jones <lee.jones@linaro.org>
----
- drivers/mfd/as3722.c | 12 ++----------
- 1 file changed, 2 insertions(+), 10 deletions(-)
+I explicitly named offb, because it already supports living with the
+video mode initialized by Open Firmware, which is passed to the kernel
+in a device tree.
 
-diff --git a/drivers/mfd/as3722.c b/drivers/mfd/as3722.c
-index 39fa554..cb2fcf9 100644
---- a/drivers/mfd/as3722.c
-+++ b/drivers/mfd/as3722.c
-@@ -354,8 +354,7 @@ static int as3722_i2c_of_probe(struct i2c_client *i2c,
- 	return 0;
- }
- 
--static int as3722_i2c_probe(struct i2c_client *i2c,
--			const struct i2c_device_id *id)
-+static int as3722_i2c_probe(struct i2c_client *i2c)
- {
- 	struct as3722 *as3722;
- 	unsigned long irq_flags;
-@@ -428,21 +427,14 @@ static const struct of_device_id as3722_of_match[] = {
- };
- MODULE_DEVICE_TABLE(of, as3722_of_match);
- 
--static const struct i2c_device_id as3722_i2c_id[] = {
--	{ "as3722", 0 },
--	{},
--};
--MODULE_DEVICE_TABLE(i2c, as3722_i2c_id);
--
- static struct i2c_driver as3722_i2c_driver = {
- 	.driver = {
- 		.name = "as3722",
- 		.owner = THIS_MODULE,
- 		.of_match_table = as3722_of_match,
- 	},
--	.probe = as3722_i2c_probe,
-+	.probe2 = as3722_i2c_probe,
- 	.remove = as3722_i2c_remove,
--	.id_table = as3722_i2c_id,
- };
- 
- module_i2c_driver(as3722_i2c_driver);
 -- 
-1.9.1
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
