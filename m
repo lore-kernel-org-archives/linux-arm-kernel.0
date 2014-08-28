@@ -1,145 +1,75 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 28 Aug 2014 18:03:06 +0100
-Subject: [PATCH 11/14] arm64: dts: Add initial device tree support for
- EXYNOS7
-In-Reply-To: <CAOesGMjY8wfAcq2fLgs=ZWHdiWtFqxr+ncUKTje0SnXqO-CCgQ@mail.gmail.com>
-References: <1409132660-1898-1-git-send-email-ch.naveen@samsung.com>
- <1409132660-1898-3-git-send-email-ch.naveen@samsung.com>
- <20140828035639.GB4972@localhost>
- <20140828094846.GD14650@leverpostej>
- <CAOesGMjY8wfAcq2fLgs=ZWHdiWtFqxr+ncUKTje0SnXqO-CCgQ@mail.gmail.com>
-Message-ID: <20140828170306.GQ14650@leverpostej>
+From: cov@codeaurora.org (Christopher Covington)
+Date: Thu, 28 Aug 2014 13:09:32 -0400
+Subject: [PATCH] clocksource: arch_timer: Fix code to use physical timers
+ when requested
+In-Reply-To: <20140828093505.GC14650@leverpostej>
+References: <1409173419-13076-1-git-send-email-sonnyrao@chromium.org>
+ <CAOesGMjK65Rc-K0fyFUUJLw6huLT82E-nqJwZO4PqhgopF96Ow@mail.gmail.com>
+ <CAPz6YkWAPtuy4sAuAK9GtpDgfGsccxeS+pqqe_t_R818Jt01qA@mail.gmail.com>
+ <53FE5B09.2020403@codeaurora.org>
+ <CAOesGMhTivDzJFuxONggcJ6N5UvZopKa=+tv9PoPX593cpnm0A@mail.gmail.com>
+ <53FE7E3B.1010500@codeaurora.org>
+ <CAOesGMgXnsqttHwAxEW4a7-Rx-nmSwpJd_Dt1iCcFOvzDwbzdA@mail.gmail.com>
+ <CAD=FV=VjN6Xam-nRRcxvOoN-gokU6DbGVjoPXN_fkTJssH1RWA@mail.gmail.com>
+ <20140828093505.GC14650@leverpostej>
+Message-ID: <53FF624C.3090002@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 28, 2014 at 05:28:22PM +0100, Olof Johansson wrote:
-> On Thu, Aug 28, 2014 at 2:48 AM, Mark Rutland <mark.rutland@arm.com> wrote:
-> > Hi,
-> >
-> >> > +   cpus {
-> >> > +           #address-cells = <2>;
-> >> > +           #size-cells = <0>;
-> >>
-> >> Why size-cells=2? Can you not fit a cpuid in 32 bits?
-> >
-> > As of commit 72aea393a2e7 (arm64: smp: honour #address-size when parsing
-> > CPU reg property) Linux can handle single-cell cpu node reg entries
-> > where /cpus/#address-cells = <1>.
-> >
-> > I can't make any guarantees about other code (e.g. bootloaders) which
-> > might try to do things with cpu nodes, YMMV.
+Hi Mark,
+
+On 08/28/2014 05:35 AM, Mark Rutland wrote:
+> On Thu, Aug 28, 2014 at 04:33:31AM +0100, Doug Anderson wrote:
+>> Hi,
+>>
+>> On Wed, Aug 27, 2014 at 7:58 PM, Olof Johansson <olof@lixom.net> wrote:
+>>> On Wed, Aug 27, 2014 at 5:56 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
+>>>> On 08/27/14 15:33, Olof Johansson wrote:
+>>>>> On Wed, Aug 27, 2014 at 3:26 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
+>>>>>
+>>>>>> Is there any reason why the virtual counter can't be read? Maybe we're
+>>>>>> the hyp and we need to make sure we don't use the virtual timer so that
+>>>>>> the guest can use it, but that doesn't have any effect on the usage of
+>>>>>> the virtual counter for the clocksource.
+>>>>>
+>>>>> There are several cases where virtual is unusable -- in particular it
+>>>>> might not have been configured properly (i.e. the phys/virt offset is
+>>>>> at a bad value).
+>>>>
+>>>> Any specifics? It would be nice to say so in the commit text so that
+>>>> others using such devices know they need this patch. I'm guessing the
+>>>> firmware can't be fixed?
+>>
+>> Even if we could change things to use a virtual timer in some cases,
+>> Sonny's patch still fixes a bug.  The code as written right now makes
+>> pretenses about supporting the physical timer, but it doesn't work.
+>> That should be fixed.
 > 
-> Ok. If address-cells is kept at 2 the unit address needs to be changed
-> to "0,0". So one or the other has to be changed.
+> The code does support the physical timer. It does not support the
+> physical counter (and makes no pretenses that it does).
 
-I'm happy either way.
+I think if you could please explain the following code, that may help clear up
+some of the confusion.
 
-I'm not sure the rest of the tree had "0," prefixes on all of the
-unit-addresses for 64-bit addresses that were under 4GB, and I'm not
-sure that existing dts consistently do that either.
+		if (arch_timer_use_virtual) {
+			clk->irq = arch_timer_ppi[VIRT_PPI];
+			clk->set_mode = arch_timer_set_mode_virt;
+			clk->set_next_event = arch_timer_set_next_event_virt;
+		} else {
+			clk->irq = arch_timer_ppi[PHYS_SECURE_PPI];
+			clk->set_mode = arch_timer_set_mode_phys;
+			clk->set_next_event = arch_timer_set_next_event_phys;
+		}
 
-Do we want to enforce that for all 64-bit unit-addresses?
+http://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/tree/drivers/clocksource/arm_arch_timer.c#n272
 
-> > [...]
-> >
-> >> > +   hsi2c_2: hsi2c at 14E60000 {
-> >>
-> >> I much prefer lowercase hex in unit addresses (and reg entries) below. I
-> >> know 32-bit uses uppercase, but let's switch going forward here.
-> >
-> > My preference also; I'm happy to enforce that on new dts.
-> >
-> > [...]
-> >
-> >> > +   timer {
-> >> > +           compatible = "arm,armv8-timer";
-> >> > +           interrupts = <1 13 0xff01>,
-> >> > +                        <1 14 0xff01>,
-> >> > +                        <1 11 0xff01>,
-> >> > +                        <1 10 0xff01>;
-> >> > +           clock-frequency = <24000000>;
-> >> > +           use-clocksource-only;
-> >> > +           use-physical-timer;
-> >>
-> >> These two properties are not standard, and I would expect any 64-bit
-> >> platform to come with PSCI such that you have a way to initialize the
-> >> virtual timers.
-> >
-> > Likewise with clock-frequency. It's not a full workaround, and it's not
-> > hard to initialise CNTFRQ on each CPU.
-> 
-> Technically clock-frequency is documented, but not recommended to be
-> used unless needed for working around firmware that doesn't setup the
-> register value. :)
+Perhaps you mean to say the code does not support *non-secure access* to the
+physical timer?
 
-True. 
+Thanks,
+Christopher
 
-> In this case it's likely a cargo cult carry over from 5250 where the
-> CNTFRQ requirement happened around the same time as we were working on
-> it so that generation firmware lacked support for it -- it should
-> since then have been fixed properly.
-
-It's probably unhelpful that the documentation isn't explicit about
-that. On that front, how about the patch below?
-
-Mark.
-
----->8----
->From 67104ad5a56e4c18f9c41f06af028b7561740afd Mon Sep 17 00:00:00 2001
-From: Mark Rutland <mark.rutland@arm.com>
-Date: Thu, 28 Aug 2014 17:41:03 +0100
-Subject: [PATCH] Doc: dt: arch_timer: discourage clock-frequency use
-
-The ARM Generic Timer (AKA the architected timer, arm_arch_timer)
-features a CPU register (CNTFRQ) which firmware is intended to
-initialize, and non-secure software can read to determine the frequency
-of the timer. On CPUs with secure state, this register cannot be written
-from non-secure states.
-
-The firmware of early SoCs featuring the timer did not correctly
-initialize CNTFRQ correctly on all CPUs, requiring the frequency to be
-described in DT as a workaround. This workaround is not complete however
-as CNTFRQ is exposed to all software in a privileged non-secure mode,
-including KVM guests. The firmware and DTs for recent SoCs have followed
-the example set by these early SoCs.
-
-This patch updates the arch timer binding documentation to make it
-clearer that the use of the clock-frequency property is a poor
-work-around. The MMIO generic timer binding is similarly updated, though
-this is less of a concern as there is generally no need to expose the
-MMIO timers to guest OSs.
-
-Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-Cc: Marc Zyngier <marc.zyngier@arm.com>
----
- Documentation/devicetree/bindings/arm/arch_timer.txt | 8 ++++++--
- 1 file changed, 6 insertions(+), 2 deletions(-)
-
-diff --git a/Documentation/devicetree/bindings/arm/arch_timer.txt b/Documentation/devicetree/bindings/arm/arch_timer.txt
-index 37b2caf..5ca3f95 100644
---- a/Documentation/devicetree/bindings/arm/arch_timer.txt
-+++ b/Documentation/devicetree/bindings/arm/arch_timer.txt
-@@ -17,7 +17,10 @@ to deliver its interrupts via SPIs.
- - interrupts : Interrupt list for secure, non-secure, virtual and
-   hypervisor timers, in that order.
- 
--- clock-frequency : The frequency of the main counter, in Hz. Optional.
-+- clock-frequency : The frequency of the main counter, in Hz. Should be present
-+  only where necessary to work around BROKEN firmware which does not configure
-+  CNTFRQ on all CPUs to a uniform correct value. Use of this property is
-+  STRONGLY DISCOURAGED; fix your firmware unless absolutely impossible.
- 
- - always-on : a boolean property. If present, the timer is powered through an
-   always-on power domain, therefore it never loses context.
-@@ -38,7 +41,8 @@ Example:
- 
- - compatible : Should at least contain "arm,armv7-timer-mem".
- 
--- clock-frequency : The frequency of the main counter, in Hz. Optional.
-+- clock-frequency : The frequency of the main counter, in Hz. Should be present
-+  only when firmware has not configured the MMIO CNTFRQ registers.
- 
- - reg : The control frame base address.
- 
 -- 
-1.9.1
+Employee of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by the Linux Foundation.
