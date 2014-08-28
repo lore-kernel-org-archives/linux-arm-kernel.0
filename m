@@ -1,52 +1,64 @@
-From: b38343@freescale.com (Robin Gong)
-Date: Thu, 28 Aug 2014 17:59:41 +0800
-Subject: [PATCH v4] spi: spi-imx: add DMA support
-In-Reply-To: <CAGUYZuQre3RAQy+qqwq5HthrjnT85V5RKu2xwXOC=gL6Yk33TQ@mail.gmail.com>
-References: <1408752835-10995-1-git-send-email-b38343@freescale.com>
- <CAGUYZuQre3RAQy+qqwq5HthrjnT85V5RKu2xwXOC=gL6Yk33TQ@mail.gmail.com>
-Message-ID: <20140828095939.GA13274@Robin-OptiPlex-780>
+From: bhupesh.sharma@freescale.com (Bhupesh Sharma)
+Date: Thu, 28 Aug 2014 15:25:00 +0530
+Subject: [PATCH V2 0/6] ARM64: Add support for FSL's LS2085A SoC
+Message-ID: <1409219706-14843-1-git-send-email-bhupesh.sharma@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 27, 2014 at 11:12:08AM +0530, sanjeev sharma wrote:
-> On Sat, Aug 23, 2014 at 5:43 AM, Robin Gong <b38343@freescale.com> wrote:
-> 
-> > +       /*
-> > +        * Configure the DMA register: setup the watermark
-> > +        * and enable DMA request.
-> > +        */
-> > +       if (spi_imx->dma_is_inited) {
-> > +               dma = readl(spi_imx->base + MX51_ECSPI_DMA);
-> > +
-> > +               spi_imx->tx_wml = spi_imx_get_fifosize(spi_imx) / 2;
-> > +               spi_imx->rx_wml = spi_imx_get_fifosize(spi_imx) / 2;
-> > +               spi_imx->rxt_wml = spi_imx_get_fifosize(spi_imx) / 2;
-> > +               rx_wml_cfg = spi_imx->rx_wml <<
-> > MX51_ECSPI_DMA_RX_WML_OFFSET;
-> > +               tx_wml_cfg = spi_imx->tx_wml <<
-> > MX51_ECSPI_DMA_TX_WML_OFFSET;
-> > +               rxt_wml_cfg = spi_imx->rxt_wml <<
-> > MX51_ECSPI_DMA_RXT_WML_OFFSET;
-> > +               dma = (dma & ~MX51_ECSPI_DMA_TX_WML_MASK
-> > +                               & ~MX51_ECSPI_DMA_RX_WML_MASK
-> > +                               & ~MX51_ECSPI_DMA_RXT_WML_MASK)
-> > +                               | rx_wml_cfg | tx_wml_cfg | rxt_wml_cfg
-> > +                               |(1 << MX51_ECSPI_DMA_TEDEN_OFFSET)
-> > +                               |(1 << MX51_ECSPI_DMA_RXDEN_OFFSET)
-> > +                               |(1 << MX51_ECSPI_DMA_RXTDEN_OFFSET);
-> > +
-> >
-> 
-> IMO, we should have an seperate function for dmactrl,rx_threshold &
-> tx_threshold for better visiblity.
-> 
->
-I understood your concern, but I don't want to create one function only for
-setting some bit fields of the register.
-> >
-> > --
-> > To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> > the body of a message to majordomo at vger.kernel.org
-> > More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> > Please read the FAQ at  http://www.tux.org/lkml/
-> >
+This patchset adds the support for FSL's LS2085A SoC which is based on
+ARMv8 architecture.
+
+This patchset also has patches which addresses DT compatible strings for
+nodes which appear un-documented.
+
+In this version, the enable-method for the CPU nodes is left for the
+bootloader (u-boot or UEFI) to patch-up. This DTS has been tested for
+PSCI v0.2 CPU_ON method (and corresponding secondary boot) using the
+following ARMv8 u-boot patches:
+
+http://patchwork.ozlabs.org/patch/383556/
+http://patchwork.ozlabs.org/patch/383555/
+http://patchwork.ozlabs.org/patch/383557/
+http://patchwork.ozlabs.org/patch/383558/
+http://patchwork.ozlabs.org/patch/383559/
+http://patchwork.ozlabs.org/patch/383560/
+http://patchwork.ozlabs.org/patch/383561/
+http://patchwork.ozlabs.org/patch/383562/
+
+Changes from v1:
+----------------
+* Addressed review comments:
+	- PSCI v0.2 enable method for CPU patched by corresponding
+	  u-boot patches for ARMv8 (which are referred-to above):
+	- Moved the NS16550 DT documentation to a new location:
+		devicetree/bindings/serial/of-serial.txt
+	- Minor nit-pick in FSL Management Complex DT node in regs
+	  section.
+	- Minor nit-pick in smsc ethernet DT node.
+	- Removed GICv3-ITS node from the DTS.
+	- Addressed Virtual timer PPI interrupt number and some other
+	  minor nit-picks.
+
+Bhupesh Sharma (6):
+  Documentation: DT: Add bindings for FSL NS16550A UART
+  Documentation: DT: Add entry for FSL LS2085A SoC and Simulator model
+  Documentation: DT: Add entry for FSL Management Complex
+  arm64: Add DTS support for FSL's LS2085A SoC
+  arm64: dts/Makefile: Add support for FSL's LS2085A simulator model
+  arm64: Add support for FSL's LS2085A SoC in Kconfig and defconfig
+
+ Documentation/devicetree/bindings/arm/fsl.txt      |    8 ++
+ .../devicetree/bindings/misc/fsl,qoriq-mc.txt      |   40 +++++++
+ .../devicetree/bindings/serial/of-serial.txt       |   12 ++
+ arch/arm64/Kconfig                                 |    5 +
+ arch/arm64/boot/dts/Makefile                       |    1 +
+ arch/arm64/boot/dts/fsl-ls2085a-simu.dts           |   26 +++++
+ arch/arm64/boot/dts/fsl-ls2085a.dtsi               |  120 ++++++++++++++++++++
+ arch/arm64/configs/defconfig                       |    1 +
+ 8 files changed, 213 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/misc/fsl,qoriq-mc.txt
+ create mode 100644 arch/arm64/boot/dts/fsl-ls2085a-simu.dts
+ create mode 100644 arch/arm64/boot/dts/fsl-ls2085a.dtsi
+
+-- 
+1.7.9.5
