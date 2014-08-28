@@ -1,223 +1,147 @@
-From: yuvaraj.cd@gmail.com (Yuvaraj Kumar C D)
-Date: Thu, 28 Aug 2014 18:48:53 +0530
-Subject: [PATCH] mmc: dw_mmc: exynos: Add support for exynos7
-Message-ID: <1409231933-14796-1-git-send-email-yuvaraj.cd@samsung.com>
+From: jonsmirl@gmail.com (jonsmirl at gmail.com)
+Date: Thu, 28 Aug 2014 09:22:21 -0400
+Subject: [linux-sunxi] Re: [PATCH 4/4] simplefb: add clock handling code
+In-Reply-To: <53FF1D6C.6090205@redhat.com>
+References: <20140825150501.GE14763@ulmo.nvidia.com>
+ <20140825152232.GE15297@lukather> <20140826080432.GD17263@ulmo>
+ <20140826135341.GM15297@lukather> <20140826143550.GB3027@ulmo>
+ <53FCE704.4030103@redhat.com> <20140827093121.GA23186@ulmo>
+ <53FDB46C.5010609@redhat.com> <20140827125613.GF23186@ulmo>
+ <53FDE0CE.5030807@redhat.com> <20140827141632.GB32243@ulmo>
+ <53FF1D6C.6090205@redhat.com>
+Message-ID: <CAKON4OyXPjXx4q828kFgMsC_u7u3nqLPLxOp-kRZbS27yRKOEg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Abhilash Kesavan <a.kesavan@samsung.com>
+On Thu, Aug 28, 2014 at 8:15 AM, Hans de Goede <hdegoede@redhat.com> wrote:
+> Hi,
+>
+> On 08/27/2014 04:16 PM, Thierry Reding wrote:
+>
+> <snip>
+>
+>>> The problems your talking about here all have to do with ordering how
+>>> things are enabled, but what we're talking about here is keeping things
+>>> enabled which are already enabled by the bootloader, so there is no
+>>> ordering problem.
+>>
+>> See what I did there? I tricked you into saying what I've been saying
+>> all along. =)
+>
+> He he :)
+>
+>> It's about keeping things enabled which have been enabled
+>> by the bootloader. That's the root of the problem.
+>
+> Ok so we all seem to largely agree on most things here:
+>
+> 1) Somehow some clks must be marked used so as to not get disabled
+> 2) We don't want to hardcode these clocks into the kernel (sunxi) clk
+> driver, instead the bootloader should tell the kernel about these clocks.
+>
+> So the only point of discussion left seems to be how to do 2...
 
-The Exynos7 has a DWMMC controller (v2.70a) which is different from
-prior versions. This patch adds new compatible strings for exynos7.
-This patch also fixes the CLKSEL register offset on exynos7.
+Wouldn't it be a lot simpler just to use existing fbdev (not KMS) and
+whip together a device specific driver that claims the proper
+resources? And just implement the minimal about of fbdev possible?
+fbdev already is a driver library.
 
-Signed-off-by: Abhilash Kesavan <a.kesavan@samsung.com>
-Signed-off-by: Yuvaraj Kumar C D <yuvaraj.cd@samsung.com>
 ---
- .../devicetree/bindings/mmc/exynos-dw-mshc.txt     |    4 +
- drivers/mmc/host/dw_mmc-exynos.c                   |   91 +++++++++++++++++---
- 2 files changed, 82 insertions(+), 13 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/mmc/exynos-dw-mshc.txt b/Documentation/devicetree/bindings/mmc/exynos-dw-mshc.txt
-index 6cd3525..ee4fc05 100644
---- a/Documentation/devicetree/bindings/mmc/exynos-dw-mshc.txt
-+++ b/Documentation/devicetree/bindings/mmc/exynos-dw-mshc.txt
-@@ -18,6 +18,10 @@ Required Properties:
- 	  specific extensions.
- 	- "samsung,exynos5420-dw-mshc": for controllers with Samsung Exynos5420
- 	  specific extensions.
-+	- "samsung,exynos7-dw-mshc": for controllers with Samsung Exynos7
-+	  specific extensions.
-+	- "samsung,exynos7-dw-mshc-smu": for controllers with Samsung Exynos7
-+	  specific extensions having an SMU.
- 
- * samsung,dw-mshc-ciu-div: Specifies the divider value for the card interface
-   unit (ciu) clock. This property is applicable only for Exynos5 SoC's and
-diff --git a/drivers/mmc/host/dw_mmc-exynos.c b/drivers/mmc/host/dw_mmc-exynos.c
-index 0fbc53a..509365c 100644
---- a/drivers/mmc/host/dw_mmc-exynos.c
-+++ b/drivers/mmc/host/dw_mmc-exynos.c
-@@ -25,6 +25,7 @@
- #define NUM_PINS(x)			(x + 2)
- 
- #define SDMMC_CLKSEL			0x09C
-+#define SDMMC_CLKSEL64			0x0A8
- #define SDMMC_CLKSEL_CCLK_SAMPLE(x)	(((x) & 7) << 0)
- #define SDMMC_CLKSEL_CCLK_DRIVE(x)	(((x) & 7) << 16)
- #define SDMMC_CLKSEL_CCLK_DIVIDER(x)	(((x) & 7) << 24)
-@@ -65,6 +66,8 @@ enum dw_mci_exynos_type {
- 	DW_MCI_TYPE_EXYNOS5250,
- 	DW_MCI_TYPE_EXYNOS5420,
- 	DW_MCI_TYPE_EXYNOS5420_SMU,
-+	DW_MCI_TYPE_EXYNOS7,
-+	DW_MCI_TYPE_EXYNOS7_SMU,
- };
- 
- /* Exynos implementation specific driver private data */
-@@ -95,6 +98,12 @@ static struct dw_mci_exynos_compatible {
- 	}, {
- 		.compatible	= "samsung,exynos5420-dw-mshc-smu",
- 		.ctrl_type	= DW_MCI_TYPE_EXYNOS5420_SMU,
-+	}, {
-+		.compatible	= "samsung,exynos7-dw-mshc",
-+		.ctrl_type	= DW_MCI_TYPE_EXYNOS7,
-+	}, {
-+		.compatible	= "samsung,exynos7-dw-mshc-smu",
-+		.ctrl_type	= DW_MCI_TYPE_EXYNOS7_SMU,
- 	},
- };
- 
-@@ -102,7 +111,8 @@ static int dw_mci_exynos_priv_init(struct dw_mci *host)
- {
- 	struct dw_mci_exynos_priv_data *priv = host->priv;
- 
--	if (priv->ctrl_type == DW_MCI_TYPE_EXYNOS5420_SMU) {
-+	if (priv->ctrl_type == DW_MCI_TYPE_EXYNOS5420_SMU ||
-+		priv->ctrl_type == DW_MCI_TYPE_EXYNOS7_SMU) {
- 		mci_writel(host, MPSBEGIN0, 0);
- 		mci_writel(host, MPSEND0, DWMCI_BLOCK_NUM);
- 		mci_writel(host, MPSCTRL0, DWMCI_MPSCTRL_SECURE_WRITE_BIT |
-@@ -153,11 +163,22 @@ static int dw_mci_exynos_resume(struct device *dev)
- static int dw_mci_exynos_resume_noirq(struct device *dev)
- {
- 	struct dw_mci *host = dev_get_drvdata(dev);
-+	struct dw_mci_exynos_priv_data *priv = host->priv;
- 	u32 clksel;
- 
--	clksel = mci_readl(host, CLKSEL);
--	if (clksel & SDMMC_CLKSEL_WAKEUP_INT)
--		mci_writel(host, CLKSEL, clksel);
-+	if (priv->ctrl_type == DW_MCI_TYPE_EXYNOS7 ||
-+		priv->ctrl_type == DW_MCI_TYPE_EXYNOS7_SMU)
-+		clksel = mci_readl(host, CLKSEL64);
-+	else
-+		clksel = mci_readl(host, CLKSEL);
-+
-+	if (clksel & SDMMC_CLKSEL_WAKEUP_INT) {
-+		if (priv->ctrl_type == DW_MCI_TYPE_EXYNOS7 ||
-+			priv->ctrl_type == DW_MCI_TYPE_EXYNOS7_SMU)
-+			mci_writel(host, CLKSEL64, clksel);
-+		else
-+			mci_writel(host, CLKSEL, clksel);
-+	}
- 
- 	return 0;
- }
-@@ -169,6 +190,7 @@ static int dw_mci_exynos_resume_noirq(struct device *dev)
- 
- static void dw_mci_exynos_prepare_command(struct dw_mci *host, u32 *cmdr)
- {
-+	struct dw_mci_exynos_priv_data *priv = host->priv;
- 	/*
- 	 * Exynos4412 and Exynos5250 extends the use of CMD register with the
- 	 * use of bit 29 (which is reserved on standard MSHC controllers) for
-@@ -176,8 +198,14 @@ static void dw_mci_exynos_prepare_command(struct dw_mci *host, u32 *cmdr)
- 	 * HOLD register should be bypassed in case there is no phase shift
- 	 * applied on CMD/DATA that is sent to the card.
- 	 */
--	if (SDMMC_CLKSEL_GET_DRV_WD3(mci_readl(host, CLKSEL)))
--		*cmdr |= SDMMC_CMD_USE_HOLD_REG;
-+	if (priv->ctrl_type == DW_MCI_TYPE_EXYNOS7 ||
-+		priv->ctrl_type == DW_MCI_TYPE_EXYNOS7_SMU) {
-+		if (SDMMC_CLKSEL_GET_DRV_WD3(mci_readl(host, CLKSEL64)))
-+			*cmdr |= SDMMC_CMD_USE_HOLD_REG;
-+	 } else {
-+		if (SDMMC_CLKSEL_GET_DRV_WD3(mci_readl(host, CLKSEL)))
-+			*cmdr |= SDMMC_CMD_USE_HOLD_REG;
-+	}
- }
- 
- static void dw_mci_exynos_set_ios(struct dw_mci *host, struct mmc_ios *ios)
-@@ -188,12 +216,20 @@ static void dw_mci_exynos_set_ios(struct dw_mci *host, struct mmc_ios *ios)
- 	u8 div = priv->ciu_div + 1;
- 
- 	if (ios->timing == MMC_TIMING_MMC_DDR52) {
--		mci_writel(host, CLKSEL, priv->ddr_timing);
-+		if (priv->ctrl_type == DW_MCI_TYPE_EXYNOS7 ||
-+			priv->ctrl_type == DW_MCI_TYPE_EXYNOS7_SMU)
-+			mci_writel(host, CLKSEL64, priv->ddr_timing);
-+		else
-+			mci_writel(host, CLKSEL, priv->ddr_timing);
- 		/* Should be double rate for DDR mode */
- 		if (ios->bus_width == MMC_BUS_WIDTH_8)
- 			wanted <<= 1;
- 	} else {
--		mci_writel(host, CLKSEL, priv->sdr_timing);
-+		if (priv->ctrl_type == DW_MCI_TYPE_EXYNOS7 ||
-+			priv->ctrl_type == DW_MCI_TYPE_EXYNOS7_SMU)
-+			mci_writel(host, CLKSEL64, priv->sdr_timing);
-+		else
-+			mci_writel(host, CLKSEL, priv->sdr_timing);
- 	}
- 
- 	/* Don't care if wanted clock is zero */
-@@ -265,26 +301,51 @@ static int dw_mci_exynos_parse_dt(struct dw_mci *host)
- 
- static inline u8 dw_mci_exynos_get_clksmpl(struct dw_mci *host)
- {
--	return SDMMC_CLKSEL_CCLK_SAMPLE(mci_readl(host, CLKSEL));
-+	struct dw_mci_exynos_priv_data *priv = host->priv;
-+
-+	if (priv->ctrl_type == DW_MCI_TYPE_EXYNOS7 ||
-+		priv->ctrl_type == DW_MCI_TYPE_EXYNOS7_SMU)
-+		return SDMMC_CLKSEL_CCLK_SAMPLE(mci_readl(host, CLKSEL64));
-+	else
-+		return SDMMC_CLKSEL_CCLK_SAMPLE(mci_readl(host, CLKSEL));
- }
- 
- static inline void dw_mci_exynos_set_clksmpl(struct dw_mci *host, u8 sample)
- {
- 	u32 clksel;
--	clksel = mci_readl(host, CLKSEL);
-+	struct dw_mci_exynos_priv_data *priv = host->priv;
-+
-+	if (priv->ctrl_type == DW_MCI_TYPE_EXYNOS7 ||
-+		priv->ctrl_type == DW_MCI_TYPE_EXYNOS7_SMU)
-+		clksel = mci_readl(host, CLKSEL64);
-+	else
-+		clksel = mci_readl(host, CLKSEL);
- 	clksel = (clksel & ~0x7) | SDMMC_CLKSEL_CCLK_SAMPLE(sample);
--	mci_writel(host, CLKSEL, clksel);
-+	if (priv->ctrl_type == DW_MCI_TYPE_EXYNOS7 ||
-+		priv->ctrl_type == DW_MCI_TYPE_EXYNOS7_SMU)
-+		mci_writel(host, CLKSEL64, clksel);
-+	else
-+		mci_writel(host, CLKSEL, clksel);
- }
- 
- static inline u8 dw_mci_exynos_move_next_clksmpl(struct dw_mci *host)
- {
-+	struct dw_mci_exynos_priv_data *priv = host->priv;
- 	u32 clksel;
- 	u8 sample;
- 
--	clksel = mci_readl(host, CLKSEL);
-+	if (priv->ctrl_type == DW_MCI_TYPE_EXYNOS7 ||
-+		priv->ctrl_type == DW_MCI_TYPE_EXYNOS7_SMU)
-+		clksel = mci_readl(host, CLKSEL64);
-+	else
-+		clksel = mci_readl(host, CLKSEL);
- 	sample = (clksel + 1) & 0x7;
- 	clksel = (clksel & ~0x7) | sample;
--	mci_writel(host, CLKSEL, clksel);
-+	if (priv->ctrl_type == DW_MCI_TYPE_EXYNOS7 ||
-+		priv->ctrl_type == DW_MCI_TYPE_EXYNOS7_SMU)
-+		mci_writel(host, CLKSEL64, clksel);
-+	else
-+		mci_writel(host, CLKSEL, clksel);
- 	return sample;
- }
- 
-@@ -411,6 +472,10 @@ static const struct of_device_id dw_mci_exynos_match[] = {
- 			.data = &exynos_drv_data, },
- 	{ .compatible = "samsung,exynos5420-dw-mshc-smu",
- 			.data = &exynos_drv_data, },
-+	{ .compatible = "samsung,exynos7-dw-mshc",
-+			.data = &exynos_drv_data, },
-+	{ .compatible = "samsung,exynos7-dw-mshc-smu",
-+			.data = &exynos_drv_data, },
- 	{},
- };
- MODULE_DEVICE_TABLE(of, dw_mci_exynos_match);
+An independent issue is the early printk equivalent. For that you need
+an address and the x/y layout
+
+>
+> <snip>
+>
+>>> Hmm I see, in my mind the problem is not that the clk framework disables
+>>> unused clocks, but that no one is marking the clocks in question as used.
+>>> Someone should mark these clocks as used so that they do not get disabled.
+>>>
+>>> We could add a clk_mark_in_use function and have the simplefb patch call
+>>> that instead of clk_prepare_and_enable, or maybe even better just only
+>>> claim the clks and teach the clk framework to not disable claimed clk
+>>> in its cleanup run. That would make it clear that simplefb is not enabling
+>>> anything, just claiming resource its need to avoid them getting removed
+>>> from underneath simplefb, would that work for you ?
+>>
+>> That would be more accurate, but it boils down to the same problem where
+>> we still need a driver to claim the resources in some way whereas the
+>> problem is fundamentally one where the bootloader should be telling the
+>> kernel not to disable it. It's in fact the bootloader that's claiming
+>> the resources.
+>
+> Yes, but those resources do not belong to the bootloader in a sense
+> that traditional bootloader / firmware claimed resources (e.g. acpi
+> reserved resources) do. These traditional resources are claimed for ever.
+>
+> Where as these resources are claimed by the bootloader to keep the simplefb
+> it provides working, as soon as the simplefb is no longer used, they become
+> unused.
+>
+> <snip off-topic generic-ehci discussion>
+>
+>>> No, there are a lot of other drivers which were written before someone
+>>> decided that having 10-20 drivers which were 90% copy and paste of each
+>>> other was a bad idea, but we're really going offtopic here.
+>>
+>> The copy and paste is for code that's platform specific. The clocks have
+>> different names, resets are different, supplies are different. The fact
+>> that many can currently use the same driver is likely just coincidence
+>> rather than design and it's entirely possible that at some point they'll
+>> add support for a more advanced feature that makes them incompatible
+>> with the rest of the generic drivers. And then you have a big mess
+>> because you need to add quirks all over the place.
+>>
+>> And this isn't all that far off-topic, since simplefb also needs to deal
+>> with this kind of situation. And what I've been arguing is that in order
+>> to really be generic it has to make assumptions, one of which is that it
+>> uses only resources that it doesn't need to explicitly handle.
+>
+> I can understand that you're worried about generic ?hci drivers dealing with
+> clocks / resets / etc. As there may be strict ordering requirements there,
+> but for simplefb that is not the case.
+>
+> All we're asking for is for a way to communicate 2 things to the kernel:
+>
+> 1) These resources are in use (we are not asking the kernel to do anything
+> with them, rather the opposite, we're asking to leave them alone so no
+> ordering issues)
+>
+> 2) Tie these resources to simplefb so that the kernel can know when they
+> are no longer in use, and it may e.g. re-use the memory
+>
+> To me the most logical and also most "correct" way of modelling this is to
+> put the resources inside the simplefb dt node.
+>
+> <snip>
+>
+>>> The key word here is "the used resources" to me this is not about simlefb
+>>> managing resources, but marking them as used as long as it needs them, like
+>>> it will need to do for the reserved mem chunk.
+>>
+>> The difference between the clocks and the memory resource is that the
+>> driver needs to directly access the memory (it needs to map it and
+>> provide a userspace mapping for it) whereas it doesn't need to touch the
+>> clocks (except to workaround a Linux-specific implementation detail).
+>
+> Erm, no, the need to map the memory and the memory being a resource
+> which may be released are an orthogonal problem. E.g. a system with
+> dedicated framebuffer memory won't need to use a reserved main-memory
+> chunk, nor need to worry about returning that mem when simplefb is no
+> longer in use.
+>
+> Regards,
+>
+> Hans
+>
+> --
+> You received this message because you are subscribed to the Google Groups "linux-sunxi" group.
+> To unsubscribe from this group and stop receiving emails from it, send an email to linux-sunxi+unsubscribe at googlegroups.com.
+> For more options, visit https://groups.google.com/d/optout.
+
+
+
 -- 
-1.7.10.4
+Jon Smirl
+jonsmirl at gmail.com
