@@ -1,77 +1,73 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 28 Aug 2014 19:17:28 +0100
-Subject: [PATCH 11/14] arm64: dts: Add initial device tree support for
- EXYNOS7
-In-Reply-To: <CAMuHMdXTo+JN+eSgvU_HkMKcv3RS1Dr+D3VnHF8x+EdKiK8j1g@mail.gmail.com>
-References: <1409132660-1898-1-git-send-email-ch.naveen@samsung.com>
- <1409132660-1898-3-git-send-email-ch.naveen@samsung.com>
- <20140828035639.GB4972@localhost>
- <20140828094846.GD14650@leverpostej>
- <CAOesGMjY8wfAcq2fLgs=ZWHdiWtFqxr+ncUKTje0SnXqO-CCgQ@mail.gmail.com>
- <20140828170306.GQ14650@leverpostej>
- <CAOesGMgYeFObKHA9znzBq9t2mLv8WWT1QaKugQ6yf7RgV09Qyg@mail.gmail.com>
- <20140828173931.GB18005@leverpostej>
- <CAMuHMdXTo+JN+eSgvU_HkMKcv3RS1Dr+D3VnHF8x+EdKiK8j1g@mail.gmail.com>
-Message-ID: <20140828181728.GF18005@leverpostej>
+Date: Thu, 28 Aug 2014 19:37:04 +0100
+Subject: [PATCH] Doc: dt: arch_timer: discourage clock-frequency use
+Message-ID: <1409251024-19103-1-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 28, 2014 at 06:47:00PM +0100, Geert Uytterhoeven wrote:
-> Hi Mark,
-> 
-> On Thu, Aug 28, 2014 at 7:39 PM, Mark Rutland <mark.rutland@arm.com> wrote:
-> >> >> Ok. If address-cells is kept at 2 the unit address needs to be changed
-> >> >> to "0,0". So one or the other has to be changed.
-> >> >
-> >> > I'm happy either way.
-> >> >
-> >> > I'm not sure the rest of the tree had "0," prefixes on all of the
-> >> > unit-addresses for 64-bit addresses that were under 4GB, and I'm not
-> >> > sure that existing dts consistently do that either.
-> >> >
-> >> > Do we want to enforce that for all 64-bit unit-addresses?
-> >>
-> >> Yeah, I believe that's the only valid format for a 2-address-cell unit address.
-> >
-> > Fair enough. I didn't spot this explicitly mentioned anywhere in ePAPR,
-> > but the examples match.
-> 
-> I couldn't find much about how the unit-addresses should really look like.
-> 
-> Power_ePAPR_APPROVED_v1.1.pdf:
-> "The unit-address component of the name is specific to the bus type on
-> which the node sits. It consists
-> of one or more ASCII characters from the set of characters in Table
-> 2-1. The unit-address must
-> match the first address specified in the reg property of the node. If
-> the node has no reg property, the
-> @ and unit-address must be omitted and the node-name alone
-> differentiates the node from other nodes
-> at the same level in the tree. The binding for a particular bus may
-> specify additional, more specific
-> requirements for the format of reg and the unit-address."
-> 
-> "Table 2.1" contains lot of characters, definitely not limited to hex numbers.
-> Also nothing about (not) needing a "0x" prefix.
-
-This is unfortunate. I guess this was assumed to be implied by way of
-the examples. :/
-
-> > I should probably re-jig that checkpatch test I had for unit-addresses.
-> 
-> It would be great if dtc started complaining about unit-addresses not
-> matching the first reg property.
-
-Agreed.
-
-When I last tried I thought that required more complex parsing than
-could be done with a regex.
-
-That said, I'd forgotten that properties must come before child nodes,
-so I though I had to at least balance '{' and '}' for children. I guess
-all we need to do is find a line beginning with '\s*reg\s*=\s*<' before
-the next '{' or '}'.
-
-Maybe this will be easier than previously thought. :)
+This was previously posted inline in another thread [1]. This version has the
+requested fixups and a few more CCs for others who might be interested.
 
 Mark.
+
+[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2014-August/282804.html
+
+---->8----
+The ARM Generic Timer (AKA the architected timer, arm_arch_timer)
+features a CPU register (CNTFRQ) which firmware is intended to
+initialize, and non-secure software can read to determine the frequency
+of the timer. On CPUs with secure state, this register cannot be written
+from non-secure states.
+
+The firmware of early SoCs featuring the timer did not correctly
+initialize CNTFRQ correctly on all CPUs, requiring the frequency to be
+described in DT as a workaround. This workaround is not complete however
+as it is exposed to all software in a privileged non-secure mode
+(including guests running under a hypervisor). The firmware and DTs for
+recent SoCs have followed the example set by these early SoCs.
+
+This patch updates the arch timer binding documentation to make it
+clearer that the use of the clock-frequency property is a poor
+work-around. The MMIO generic timer binding is similarly updated, though
+this is less of a concern as there is generally no need to expose the
+MMIO timers to guest OSs.
+
+Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+Acked-by: Olof Johansson <olof@lixom.net>
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+Cc: Rob Herring <robh+dt@kernel.org>
+Cc: Stephen Boyd <sboyd@codeaurora.org>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+---
+ Documentation/devicetree/bindings/arm/arch_timer.txt | 8 ++++++--
+ 1 file changed, 6 insertions(+), 2 deletions(-)
+
+diff --git a/Documentation/devicetree/bindings/arm/arch_timer.txt b/Documentation/devicetree/bindings/arm/arch_timer.txt
+index 37b2caf..620ac0c 100644
+--- a/Documentation/devicetree/bindings/arm/arch_timer.txt
++++ b/Documentation/devicetree/bindings/arm/arch_timer.txt
+@@ -17,7 +17,10 @@ to deliver its interrupts via SPIs.
+ - interrupts : Interrupt list for secure, non-secure, virtual and
+   hypervisor timers, in that order.
+ 
+-- clock-frequency : The frequency of the main counter, in Hz. Optional.
++- clock-frequency : The frequency of the main counter, in Hz. Should be present
++  only where necessary to work around broken firmware which does not configure
++  CNTFRQ on all CPUs to a uniform correct value. Use of this property is
++  strongly discouraged; fix your firmware unless absolutely impossible.
+ 
+ - always-on : a boolean property. If present, the timer is powered through an
+   always-on power domain, therefore it never loses context.
+@@ -38,7 +41,8 @@ Example:
+ 
+ - compatible : Should at least contain "arm,armv7-timer-mem".
+ 
+-- clock-frequency : The frequency of the main counter, in Hz. Optional.
++- clock-frequency : The frequency of the main counter, in Hz. Should be present
++  only when firmware has not configured the MMIO CNTFRQ registers.
+ 
+ - reg : The control frame base address.
+ 
+-- 
+1.9.1
