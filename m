@@ -1,21 +1,19 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 28 Aug 2014 14:22:33 +0200
-Subject: [PATCH V6 3/3] arm64:dts: Add APM X-Gene SoC GPIO controller DTS
- entries
-In-Reply-To: <1406833407-28316-4-git-send-email-fkan@apm.com>
-References: <1406833407-28316-1-git-send-email-fkan@apm.com>
- <1406833407-28316-4-git-send-email-fkan@apm.com>
-Message-ID: <CACRpkdZ2aYkSSG0QJgbwVxuWW=vine1LGtH7+savAnoWS7XHew@mail.gmail.com>
+Date: Thu, 28 Aug 2014 14:34:43 +0200
+Subject: [PATCH] pinctrl: Add i.MX21 pincontrol driver
+In-Reply-To: <1406440371-3996-1-git-send-email-shc_work@mail.ru>
+References: <1406440371-3996-1-git-send-email-shc_work@mail.ru>
+Message-ID: <CACRpkdZpBtK61RyUTR=0jG37uU1Vpbuu7XmNpQSJWRL7EPUUqg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 31, 2014 at 9:03 PM, Feng Kan <fkan@apm.com> wrote:
+On Sun, Jul 27, 2014 at 7:52 AM, Alexander Shiyan <shc_work@mail.ru> wrote:
 
-> Add gpio dts node for APM X-Gene SoC platform.
+> This patch adds pincontrol driver for Freescale i.MX21 SOCs.
 >
-> Signed-off-by: Feng Kan <fkan@apm.com>
+> Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
 
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
+Patch applied with Shawn's ACK, sorry for the delay!
 
 Yours,
 Linus Walleij
