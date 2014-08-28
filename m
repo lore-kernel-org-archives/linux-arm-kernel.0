@@ -1,32 +1,39 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 28 Aug 2014 15:02:03 +0100
-Subject: [PATCH 1/1] i2c: i2c-st: Rename clock reference to something that
- exists
-Message-ID: <1409234523-20240-1-git-send-email-lee.jones@linaro.org>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Thu, 28 Aug 2014 16:20:00 +0200
+Subject: [linux-sunxi] Re: [PATCH 4/4] simplefb: add clock handling code
+In-Reply-To: <CAKON4OyXPjXx4q828kFgMsC_u7u3nqLPLxOp-kRZbS27yRKOEg@mail.gmail.com>
+References: <20140825150501.GE14763@ulmo.nvidia.com>
+ <20140825152232.GE15297@lukather> <20140826080432.GD17263@ulmo>
+ <20140826135341.GM15297@lukather> <20140826143550.GB3027@ulmo>
+ <53FCE704.4030103@redhat.com> <20140827093121.GA23186@ulmo>
+ <53FDB46C.5010609@redhat.com> <20140827125613.GF23186@ulmo>
+ <53FDE0CE.5030807@redhat.com> <20140827141632.GB32243@ulmo>
+ <53FF1D6C.6090205@redhat.com>
+ <CAKON4OyXPjXx4q828kFgMsC_u7u3nqLPLxOp-kRZbS27yRKOEg@mail.gmail.com>
+Message-ID: <CAMuHMdU+zxUCU05YOpyuP1fx=Dgb5SZu=vbaJW13sQAaMBwU_w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-CLK_S_ICN_REG_0 hasn't existed for a while now.  This was renamed
-over a few commits, then finally removed in commit 5aa02b9 (ARM:
-STi: DT: STiH415: Remove unused CLK_S_ICN_REG_0 fixed clock).
+On Thu, Aug 28, 2014 at 3:22 PM, jonsmirl at gmail.com <jonsmirl@gmail.com> wrote:
+>> 2) We don't want to hardcode these clocks into the kernel (sunxi) clk
+>> driver, instead the bootloader should tell the kernel about these clocks.
+>>
+>> So the only point of discussion left seems to be how to do 2...
+>
+> Wouldn't it be a lot simpler just to use existing fbdev (not KMS) and
+> whip together a device specific driver that claims the proper
+> resources? And just implement the minimal about of fbdev possible?
+> fbdev already is a driver library.
 
-Signed-off-by: Lee Jones <lee.jones@linaro.org>
----
- Documentation/devicetree/bindings/i2c/i2c-st.txt | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Like... drivers/video/fbdev/offb.c?
 
-diff --git a/Documentation/devicetree/bindings/i2c/i2c-st.txt b/Documentation/devicetree/bindings/i2c/i2c-st.txt
-index 437e0db..4c26fda 100644
---- a/Documentation/devicetree/bindings/i2c/i2c-st.txt
-+++ b/Documentation/devicetree/bindings/i2c/i2c-st.txt
-@@ -31,7 +31,7 @@ i2c0: i2c at fed40000 {
- 	compatible	= "st,comms-ssc4-i2c";
- 	reg		= <0xfed40000 0x110>;
- 	interrupts	=  <GIC_SPI 187 IRQ_TYPE_LEVEL_HIGH>;
--	clocks		= <&CLK_S_ICN_REG_0>;
-+	clocks		= <&clk_s_a0_ls CLK_ICN_REG>;
- 	clock-names	= "ssc";
- 	clock-frequency = <400000>;
- 	pinctrl-names	= "default";
--- 
-1.9.1
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
