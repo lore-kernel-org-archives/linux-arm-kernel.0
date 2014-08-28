@@ -1,55 +1,78 @@
-From: caesar.wang@rock-chips.com (Caesar Wang)
-Date: Fri, 29 Aug 2014 03:36:36 +0800
-Subject: [PATCH v3 1/4] thermal: rockchip: add driver for thermal
-In-Reply-To: <4488604.oBeB6it8Vr@wuerfel>
-References: <1409187562-12370-1-git-send-email-caesar.wang@rock-chips.com>
- <20140828143733.GA18084@developer> <3440260.edal29kzlR@diego>
- <4488604.oBeB6it8Vr@wuerfel>
-Message-ID: <53FF84C4.9080902@rock-chips.com>
+From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
+Date: Thu, 28 Aug 2014 21:37:03 +0200
+Subject: [PATCH 15/15] tty: serial: 8250: omap: add dma support
+In-Reply-To: <20140828164645.GG16006@atomide.com>
+References: <1408124563-31541-1-git-send-email-bigeasy@linutronix.de>
+ <1408124563-31541-16-git-send-email-bigeasy@linutronix.de>
+ <20140815210211.GD9239@atomide.com> <53F5AF0D.5060409@linutronix.de>
+ <20140821184416.GF10066@atomide.com> <53FE3779.5090908@linutronix.de>
+ <20140827202313.GF16006@atomide.com> <20140828082348.GA5413@linutronix.de>
+ <20140828164645.GG16006@atomide.com>
+Message-ID: <53FF84DF.7080406@linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd & Heiko & Eduardo,
+On 08/28/2014 06:46 PM, Tony Lindgren wrote:
+>> To use DMA you don't have to enable it in SCR register you can also use
+>> the FCR register. The manual says that you can only write this DMA
+>> enable bit in the FCR register if the baud clock is not running. And
+>> guess what: same thing: I only *toggle* the DMA enable bit here (it
+>> remains 0 later) and the core won't hit idle.
+>> Same effect if I toggle this bit while the baud clock is running (the
+>> manual says that this bit can only be written if the baud clock is not
+>> running). Seems like the UART is following its own specification and it
+>> remains blocking once the DMA was enabled.
+>> It would be nice if someone from the UART-IP team could ACK this.
+> 
+> Sounds like there should be some way to clear that state.. I wonder
+> if omap-serial.c had something before it's DMA support was removed?
 
-OK. Maybe you are right.
+Its DMA was removed? Like there was DMA support?
 
-This driver should be put into drivers/iio/adc/* ,
-Anyway,I will re-edit it ASAP.
+> I'd assume when the UART is powered down by runtime PM it's state
+> is completetely reset and we could restore the non-DMA state?
 
+I tried that by canceling the RX-DMA request and removing the DMA-enable
+bits from UART but it didn't help. Then I noticed that once that DMA en
+bit is set, the UART won't do any idle.
 
-? 2014/8/29 0:16, Arnd Bergmann ??:
-> On Thursday 28 August 2014 18:11:43 Heiko St?bner wrote:
->> Am Donnerstag, 28. August 2014, 10:37:35 schrieb Eduardo Valentin:
->>>> On the driver side, I believe the correct way to deal with this setup
->>>> is to split your driver into a generic drivers/iio/adc/rockchips-tsadc.c
->>>> file, and a smaller thermal driver that uses the iio in-kernel interfaces,
->>>> ideally one that is independent of the underlying hardware and can
->>>> work on any ADC implementation.
->>> Agreed. If you can write such interface and make your driver to work in
->>> such way, that would be great.
->> But I currently don't see how you would model the temperature handling parts
->> from a generic thermal driver to a generic adc driver for the rk3288-tsadc.
->>
->> I guess the general temperature irq handling would use iio-triggers? But how
->> does the target temperature get into the TSADC_COMP1_INT register.
->>
->> Also when getting the temperature, Caesar's driver compares it to its trip
->> points and sets the next trip point depending on the current temperature
->> (passive <-> critical) in rockchip_get_temp.
->>
->> Maybe there is some completely easy way for this, but currently I don't see
->> it.
-> Eduardo earlier today replied to an email about a generic driver for
-> thermal, which was posted in February but hasn't been merged.
-> See https://lkml.org/lkml/2014/2/5/810
->
-> There may be a newer version of this patch, which I haven't found.
->
-> 	Arnd
->
->
->
+> Maybe post your current patches and a test patch to try to toggle
+> the DMA on and off?
 
--- 
-Best regards,
-Caesar
+Oh. I pushed my dirty tree to
+ git://git.breakpoint.cc/bigeasy/linux.git uart_v8_wip
+
+The top most commit does not setup dma at all and adds commented out
+code how to enable DMA via SCR or FCR register. With this I hit
+core-off. Once _one_ of the modes are enabled, it doesn't work anymore.
+
+I will try to address review comments tomorrow and hopefully post a v8
+based on -rc2. The same goes for your patch (which I will try tomorrow).
+
+>> Bah. Does it make sense to use runtime-PM if we can't hit core-off? I'm
+>> thinking to add a printk once dma is enabled says that runtime-pm is
+>> switched off.
+> 
+> Well if we can't find a way to unset the DMA registers in the UART,
+> how about only enable it if a kernel cmdline option is specified?
+
+Hmmm. So removing DMA properties from DT is not an option? Currently I
+added a message that DMA might forbid low power mode so people might
+remove "dma-names" from DT (or assign "") and DMA is off. However if
+this is no good, then I guess I could add kernel module which enables
+DMA.
+
+> 
+> We do have runtime PM working without it, and the serial console
+> super important for any kind of debugging no matter what idle
+> mode the SoC hits.. So let's not break that.
+
+Yeah, I know. I've been debugging while I broke something which means
+uart wasn't working :)
+
+> 
+> Regards,
+> 
+> Tony
+
+Sebastian
