@@ -1,105 +1,76 @@
-From: rric@kernel.org (Robert Richter)
-Date: Fri, 29 Aug 2014 15:49:42 +0200
-Subject: [PATCH] arm64, dts: Add dtbs_install make target
-In-Reply-To: <20140829121023.GW13038@rric.localhost>
-References: <1406732794-20920-1-git-send-email-rric@kernel.org>
- <1406732794-20920-3-git-send-email-rric@kernel.org>
- <CAOesGMh9KkdKB_ytJ7CCbkPW7dHTX91NdfDMsMNfbmOBVOJ8PQ@mail.gmail.com>
- <20140828161556.GN4703@rric.localhost>
- <20140828162549.GP14650@leverpostej>
- <CAOesGMjtjcgUNV8WLp6_Zbok-0zq5afg_KS8QJYp=kDVabrQvg@mail.gmail.com>
- <20140828181429.GO4703@rric.localhost>
- <CAOesGMh3TEKZkyPjopfSm07C2ydw5=2VrzY0xQ=9jkhoA-Z_kQ@mail.gmail.com>
- <20140829121023.GW13038@rric.localhost>
-Message-ID: <20140829134942.GP4703@rric.localhost>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Fri, 29 Aug 2014 15:57:08 +0200
+Subject: [linux-sunxi] Re: [PATCH 4/4] simplefb: add clock handling code
+In-Reply-To: <20140829062932.GB13106@ulmo>
+References: <20140826135341.GM15297@lukather> <20140826143550.GB3027@ulmo>
+ <20140826210248.GO15297@lukather> <20140827065440.GG15640@ulmo>
+ <20140827084526.GR15297@lukather> <20140827095241.GC23186@ulmo>
+ <20140827154221.GX15297@lukather> <20140828101140.GB14388@ulmo>
+ <20140828204603.GB15297@lukather> <20140829062932.GB13106@ulmo>
+Message-ID: <20140829135708.GG15297@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Olof,
-
-On 29.08.14 14:10:23, Robert Richter wrote:
-> On 28.08.14 16:01:08, Olof Johansson wrote:
-> > Thinking about it a bit more, the even more obvious solution that I
-> > for some reason didn't think of at the time, is to have the
-> > dtbs_install target create the appropriate subdirectories on the
-> > install side, so that the structure is preserved.
+On Fri, Aug 29, 2014 at 08:29:33AM +0200, Thierry Reding wrote:
+> On Thu, Aug 28, 2014 at 10:46:03PM +0200, Maxime Ripard wrote:
+> > On Thu, Aug 28, 2014 at 12:11:41PM +0200, Thierry Reding wrote:
+> [...]
+> > > Then since firmware already knows what it set up it can tell the
+> > > kernel to not touch those.
 > > 
-> > That comes a bit closer to how modules are handled as well.
+> > Somehow, I've been raised kernel-wise into thinking that you can never
+> > fully trust your firmware. Or at least that you should have a way to
+> > recover from any bug/bad behaviour from it.
 > 
-> Yes, dtbs_install target would be useful.
+> If you don't trust your firmware then you shouldn't be taking over a
+> device that it's set up for you. Rather you should write a proper driver
+> that sets things up from the start.
 > 
-> Will come with a solution for this too.
+> This whole "we don't trust firmware" isn't going to work if we want to
+> have hand-off from firmware to kernel. And it's already been decided in
+> other threads that moving more code out of the kernel and into firmware
+> is a requirement (c.f. ARM64).
 
-below is a patch that adds the dtbs_install target to arm64. Taken
-from arm where this was already implemented.
+Except that in ARM64 case, it has been asked before having any
+SoC/boards out. We're definitely not in this situation there.
 
--Robert
+> Also in this case you wrote the firmware, so why wouldn't you trust it?
 
+We partly wrote the firmware, on some of the available SoCs. Some
+other just have allwinner's own. But yeah, in this case they wouldn't
+even set up the framebuffer in the first place.
 
+> > Moreover, the way I see it, there's a major flaw in having an
+> > attribute in the clock node: you don't even know if the clock is ever
+> > going to be used.
+> > 
+> > If simplefb is not compiled in, you won't claim the clocks, and they
+> > will be disabled, which is imho a good thing. This case wouldn't be
+> > covered with an attribute at the clock node, because you don't have a
+> > link to what device/feature actually uses it in the system, and so you
+> > have to make the assumption that it will be used. And you will end up
+> > with clocks with a rather high rate running for nothing.
+> 
+> That's completely hypothetical. If simplefb isn't enabled and the clock
+> isn't claimed there's probably still going to be some other driver
+> taking over eventually. If there isn't, what's the point of firmware
+> setting up display in the first case?
 
->From bbb09a3775a385f4a549b1c4b8518658bcbc382d Mon Sep 17 00:00:00 2001
-From: Robert Richter <rrichter@cavium.com>
-Date: Fri, 29 Aug 2014 14:17:02 +0200
-Subject: [PATCH] arm64, dts: Add dtbs_install make target
+And now, here is a new requirement for the firmware: that in addition
+to being reliable, that it must not be dumb, or take shortcuts, like
+setting up the framebuffer in every case, no matter wether there's a
+screen or not.
 
-This adds the dtbs_install make target to arm64. The target has been
-introduced already to arch/arm with the following commit:
+Maxime
 
- f4d4ffc03efc kbuild: dtbs_install: new make target
-
-Implementation for arm64 is the same as for arm.
-
-With 'dtbs_install' all config enabled dtb files are installed to
-either the INSTALL_DTBS_PATH directory or the default location:
-
- $INSTALL_PATH/dtbs/$KERNELRELEASE
-
-Signed-off-by: Robert Richter <rrichter@cavium.com>
----
- arch/arm64/Makefile          | 6 ++++--
- arch/arm64/boot/dts/Makefile | 4 +++-
- 2 files changed, 7 insertions(+), 3 deletions(-)
-
-diff --git a/arch/arm64/Makefile b/arch/arm64/Makefile
-index 8185a913c5ed..c68efa07c5f3 100644
---- a/arch/arm64/Makefile
-+++ b/arch/arm64/Makefile
-@@ -66,8 +66,9 @@ zinstall install: vmlinux
- %.dtb: scripts
- 	$(Q)$(MAKE) $(build)=$(boot)/dts $(boot)/dts/$@
- 
--dtbs: scripts
--	$(Q)$(MAKE) $(build)=$(boot)/dts dtbs
-+PHONY += dtbs dtbs_install
-+dtbs dtbs_install: prepare scripts
-+	$(Q)$(MAKE) $(build)=$(boot)/dts $@
- 
- PHONY += vdso_install
- vdso_install:
-@@ -81,6 +82,7 @@ define archhelp
-   echo  '* Image.gz      - Compressed kernel image (arch/$(ARCH)/boot/Image.gz)'
-   echo  '  Image         - Uncompressed kernel image (arch/$(ARCH)/boot/Image)'
-   echo  '* dtbs          - Build device tree blobs for enabled boards'
-+  echo  '  dtbs_install  - Install dtbs to $(INSTALL_DTBS_PATH)'
-   echo  '  install       - Install uncompressed kernel'
-   echo  '  zinstall      - Install compressed kernel'
-   echo  '                  Install using (your) ~/bin/installkernel or'
-diff --git a/arch/arm64/boot/dts/Makefile b/arch/arm64/boot/dts/Makefile
-index f8001a62029c..3a75cdc2d087 100644
---- a/arch/arm64/boot/dts/Makefile
-+++ b/arch/arm64/boot/dts/Makefile
-@@ -2,9 +2,11 @@ dtb-$(CONFIG_ARCH_THUNDER) += thunder-88xx.dtb
- dtb-$(CONFIG_ARCH_VEXPRESS) += rtsm_ve-aemv8a.dtb foundation-v8.dtb
- dtb-$(CONFIG_ARCH_XGENE) += apm-mustang.dtb
- 
--targets += dtbs
-+targets += dtbs dtbs_install
- targets += $(dtb-y)
- 
- dtbs: $(addprefix $(obj)/, $(dtb-y))
- 
- clean-files := *.dtb
-+
-+dtbs_install: $(addsuffix _dtbinst_, $(dtb-y))
 -- 
-2.0.1
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140829/c00013f8/attachment.sig>
