@@ -1,38 +1,63 @@
 From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Fri, 29 Aug 2014 15:50:14 +0200
-Subject: [PATCH 08/11] [WIP] ARM: shmobile: r8a7740: Add D4 pm domain support
+Date: Fri, 29 Aug 2014 15:50:09 +0200
+Subject: [PATCH 03/11] [WIP] ARM: shmobile: armadillo800eva legacy: Add
+ missing A3SP pm domain devices
 In-Reply-To: <1409320217-13278-1-git-send-email-geert+renesas@glider.be>
 References: <1409320217-13278-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <1409320217-13278-9-git-send-email-geert+renesas@glider.be>
+Message-ID: <1409320217-13278-4-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for the D4 power domain.
-This domain contains the Coresight-ETM hardware block.
+Commit 802a5639aa7041b2 ("ARM: shmobile: r8a7740: add A3SP pm domain
+support") added the A3SP power domain, but forgot to hook up the TPU,
+SDHI0/1, and MMCIF hardware blocks.
 
-FIXME: D4 is not added, as this breaks resume (dbg_cpu_pm_notify() calls
-       reset_ctrl_regs(), which crashes as D4 is powered down, and commit
-       0d352e3d006c9589 ("ARM: hw_breakpoint: trap undef instruction
-       exceptions in reset_ctrl_regs") doesn't seem to work...)
+FIXME: As the default PM QoS latency constraint for SDHI is only 100 ?s
+       (cfr. commit c419e611c3c59c0e ("tmio_mmc / PM: Use PM QoS latency
+       constraint"), while DEFAULT_DEV_LATENCY_NS is 250000, suspend
+       fails with -EBUSY, unless the constraint is increased first to
+       more than 500 ?s using e.g.
+
+	echo 501 > /sys/devices/platform/sh_mobile_sdhi.0/power/pm_qos_resume_latency_us
 
 Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 ---
- arch/arm/mach-shmobile/pm-r8a7740.c |    3 +++
- 1 file changed, 3 insertions(+)
+ arch/arm/mach-shmobile/board-armadillo800eva.c |    8 +++++++-
+ 1 file changed, 7 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-shmobile/pm-r8a7740.c b/arch/arm/mach-shmobile/pm-r8a7740.c
-index 86b2df8b5391..cbdb87c67711 100644
---- a/arch/arm/mach-shmobile/pm-r8a7740.c
-+++ b/arch/arm/mach-shmobile/pm-r8a7740.c
-@@ -40,6 +40,9 @@ static struct rmobile_pm_domain r8a7740_pm_domains[] = {
- //		.genpd.name	= "A4MP",
- //		.bit_shift	= 2,
- //	}, {
-+//		.genpd.name	= "D4",
-+//		.bit_shift	= 3,
-+//	}, {
- 		.genpd.name	= "A3RV",
- 		.bit_shift	= 6,
- 	}, {
+diff --git a/arch/arm/mach-shmobile/board-armadillo800eva.c b/arch/arm/mach-shmobile/board-armadillo800eva.c
+index f19459a8c3ed..64a68450c28a 100644
+--- a/arch/arm/mach-shmobile/board-armadillo800eva.c
++++ b/arch/arm/mach-shmobile/board-armadillo800eva.c
+@@ -1234,8 +1234,11 @@ static void __init eva_init(void)
+ 	static struct pm_domain_device domain_devices[] __initdata = {
+ 		{ "A4LC", &lcdc0_device },
+ 		{ "A4LC", &hdmi_lcdc_device },
++		{ "A3SP", &pwm_device },
++		{ "A3SP", &sdhi0_device },
++		{ "A3SP", &sh_mmcif_device },
+ 	};
+-	struct platform_device *usb = NULL;
++	struct platform_device *usb = NULL, *sdhi1 = NULL;
+ 
+ 	regulator_register_always_on(0, "fixed-3.3V", fixed3v3_power_consumers,
+ 				     ARRAY_SIZE(fixed3v3_power_consumers), 3300000);
+@@ -1304,6 +1307,7 @@ static void __init eva_init(void)
+ 
+ 		platform_device_register(&vcc_sdhi1);
+ 		platform_device_register(&sdhi1_device);
++		sdhi1 = &sdhi1_device;
+ 	}
+ 
+ 
+@@ -1324,6 +1328,8 @@ static void __init eva_init(void)
+ 				       ARRAY_SIZE(domain_devices));
+ 	if (usb)
+ 		rmobile_add_device_to_domain("A3SP", usb);
++	if (sdhi1)
++		rmobile_add_device_to_domain("A3SP", sdhi1);
+ 
+ 	r8a7740_pm_init();
+ }
 -- 
 1.7.9.5
