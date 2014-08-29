@@ -1,10 +1,11 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 29 Aug 2014 08:40:42 +0200
-Subject: [PATCH 3/6] pinctrl: atlas6: take mclk pin out of i2s pingroup
-In-Reply-To: <1408351765-18253-3-git-send-email-Baohua.Song@csr.com>
+Date: Fri, 29 Aug 2014 08:41:49 +0200
+Subject: [PATCH 4/6] ARM: dts: atlas6: add a separate pingroup for i2s
+ mclk output
+In-Reply-To: <1408351765-18253-4-git-send-email-Baohua.Song@csr.com>
 References: <1408351765-18253-1-git-send-email-Baohua.Song@csr.com>
- <1408351765-18253-3-git-send-email-Baohua.Song@csr.com>
-Message-ID: <CACRpkdZ9-NAsd4=89pC0B9wXNs_pQbs9qeP84ZGXsnWKgtPjgQ@mail.gmail.com>
+ <1408351765-18253-4-git-send-email-Baohua.Song@csr.com>
+Message-ID: <CACRpkdb-10u7wq2nbC8DEfSY0na6=RkN8_J7EY=Jm8FZ8jukiA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -20,7 +21,9 @@ On Mon, Aug 18, 2014 at 10:49 AM, Barry Song <Baohua.Song@csr.com> wrote:
 > Signed-off-by: Rongjun Ying <rongjun.ying@csr.com>
 > Signed-off-by: Barry Song <Baohua.Song@csr.com>
 
-Patch applied.
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
+
+Pls take this through the ARM SoC tree / Sirf platform tree.
 
 Yours,
 Linus Walleij
