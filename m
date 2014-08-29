@@ -1,50 +1,37 @@
 From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Fri, 29 Aug 2014 15:50:17 +0200
-Subject: [PATCH 11/11] [WIP] ARM: shmobile: r8a7740: Add A3SM pm domain support
+Date: Fri, 29 Aug 2014 15:50:07 +0200
+Subject: [PATCH 01/11] ARM: shmobile: r8a7740: Add missing A3SP pm domain
+ devices
 In-Reply-To: <1409320217-13278-1-git-send-email-geert+renesas@glider.be>
 References: <1409320217-13278-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <1409320217-13278-12-git-send-email-geert+renesas@glider.be>
+Message-ID: <1409320217-13278-2-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for the A3SM power domain, and hook it up as a subdomain of
-A4S.
-
-This domain contains the System CPU (Cortex-A9) hardware block, and thus
-must be controlled by the always-on governor.
-
-FIXME: A3SM is never powered down during s2ram, even when adding a
-       .suspend method like A4S has.
-       As A3SM is a subdomain of A4S, A4S is no longer powered down
-       during s2ram.
+Commit 802a5639aa7041b2 ("ARM: shmobile: r8a7740: add A3SP pm domain
+support") added the A3SP power domain, but forgot to hook up the IPPMU,
+DMAC0/1/2, and USBDMAC hardware blocks.
 
 Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 ---
- arch/arm/mach-shmobile/pm-r8a7740.c |    5 +++++
+ arch/arm/mach-shmobile/setup-r8a7740.c |    5 +++++
  1 file changed, 5 insertions(+)
 
-diff --git a/arch/arm/mach-shmobile/pm-r8a7740.c b/arch/arm/mach-shmobile/pm-r8a7740.c
-index d563e623bcb5..23254c31efd9 100644
---- a/arch/arm/mach-shmobile/pm-r8a7740.c
-+++ b/arch/arm/mach-shmobile/pm-r8a7740.c
-@@ -61,6 +61,10 @@ static struct rmobile_pm_domain r8a7740_pm_domains[] = {
- 		.no_debug	= true,
- 		.suspend	= r8a7740_pd_a3sp_suspend,
- 	}, {
-+		.genpd.name	= "A3SM",
-+		.bit_shift	= 12,
-+		.gov		= &pm_domain_always_on_gov,
-+	}, {
- 		.genpd.name	= "A3SG",
- 		.bit_shift	= 13,
- 	}, {
-@@ -74,6 +78,7 @@ void __init r8a7740_init_pm_domains(void)
- 	rmobile_init_domains(r8a7740_pm_domains, ARRAY_SIZE(r8a7740_pm_domains));
- 	pm_genpd_add_subdomain_names("A4R", "A3RV");
- 	pm_genpd_add_subdomain_names("A4S", "A3SP");
-+	pm_genpd_add_subdomain_names("A4S", "A3SM");
- 	pm_genpd_add_subdomain_names("A4S", "A3SG");
- }
- #endif /* CONFIG_PM && !CONFIG_ARCH_MULTIPLATFORM */
+diff --git a/arch/arm/mach-shmobile/setup-r8a7740.c b/arch/arm/mach-shmobile/setup-r8a7740.c
+index 8894e1b7ab0e..6992d4013ef0 100644
+--- a/arch/arm/mach-shmobile/setup-r8a7740.c
++++ b/arch/arm/mach-shmobile/setup-r8a7740.c
+@@ -756,6 +756,11 @@ void __init r8a7740_add_standard_devices(void)
+ 		{ "A3SP", &scif7_device },
+ 		{ "A3SP", &scif8_device },
+ 		{ "A3SP", &i2c1_device },
++		{ "A3SP", &ipmmu_device },
++		{ "A3SP", &dma0_device },
++		{ "A3SP", &dma1_device },
++		{ "A3SP", &dma2_device },
++		{ "A3SP", &usb_dma_device },
+ 	};
+ 
+ 	/* I2C work-around */
 -- 
 1.7.9.5
