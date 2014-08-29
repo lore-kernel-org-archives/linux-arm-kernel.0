@@ -1,61 +1,37 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 29 Aug 2014 21:53:42 +0200
-Subject: [PATCH v4 3/5] ARM: tegra: Initialize interrupt controller from DT
-In-Reply-To: <20140829150422.GA11035@ulmo>
-References: <1409239879-12376-1-git-send-email-thierry.reding@gmail.com>
- <20140829142408.GA31264@ulmo> <20140829150422.GA11035@ulmo>
-Message-ID: <3113165.EcqFA5vr07@wuerfel>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Fri, 29 Aug 2014 22:07:55 +0200
+Subject: [PATCH] MAINTAINERS: update ARM pxa maintainers
+Message-ID: <1409342875-31720-1-git-send-email-robert.jarzmik@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 29 August 2014 17:04:28 Thierry Reding wrote:
->         static struct irq_chip *extn;
-> 
->         void gic_arch_register(const struct irqchip *chip)
->         {
->                 if (WARN(extn != NULL))
->                         return;
-> 
->                 gic_chip.flags |= chip->flags;
->                 extn = chip;
->         }
-> 
-> Any preferences, or other ideas? Adding Thomas and Jason, perhaps they
-> can provide more input on how to solve this.
+Change pxa active maintainers, and remove more busy people.
+Remove Eric's tree as it is not accessible anymore.
 
-I think the entire gic_arch_extn method is done in a rather odd way
-and we should try to come up with a replacement.
+Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
+---
+ MAINTAINERS | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
-These are the users at the moment:
-
-arch/arm/mach-exynos/pm.c:      gic_arch_extn.irq_set_wake = exynos_irq_set_wake;
-arch/arm/mach-imx/gpc.c:        gic_arch_extn.irq_mask = imx_gpc_irq_mask;
-arch/arm/mach-imx/gpc.c:        gic_arch_extn.irq_unmask = imx_gpc_irq_unmask;
-arch/arm/mach-imx/gpc.c:        gic_arch_extn.irq_set_wake = imx_gpc_irq_set_wake;
-arch/arm/mach-omap2/omap-wakeupgen.c:   gic_arch_extn.irq_mask = wakeupgen_mask;
-arch/arm/mach-omap2/omap-wakeupgen.c:   gic_arch_extn.irq_unmask = wakeupgen_unmask;
-arch/arm/mach-omap2/omap-wakeupgen.c:   gic_arch_extn.flags = IRQCHIP_MASK_ON_SUSPEND | IRQCHIP_SKIP_SET_W
-arch/arm/mach-shmobile/intc-sh73a0.c:   gic_arch_extn.irq_set_wake = sh73a0_set_wake;
-arch/arm/mach-shmobile/setup-r8a7779.c: gic_arch_extn.irq_set_wake = r8a7779_set_wake;
-arch/arm/mach-tegra/irq.c:      gic_arch_extn.irq_ack = tegra_ack;
-arch/arm/mach-tegra/irq.c:      gic_arch_extn.irq_eoi = tegra_eoi;
-arch/arm/mach-tegra/irq.c:      gic_arch_extn.irq_mask = tegra_mask;
-arch/arm/mach-tegra/irq.c:      gic_arch_extn.irq_unmask = tegra_unmask;
-arch/arm/mach-tegra/irq.c:      gic_arch_extn.irq_retrigger = tegra_retrigger;
-arch/arm/mach-tegra/irq.c:      gic_arch_extn.irq_set_wake = tegra_set_wake;
-arch/arm/mach-tegra/irq.c:      gic_arch_extn.flags = IRQCHIP_MASK_ON_SUSPEND;
-arch/arm/mach-ux500/cpu.c:      gic_arch_extn.flags = IRQCHIP_SKIP_SET_WAKE | IRQCHIP_MASK_ON_SUSPEND;
-arch/arm/mach-zynq/common.c:    gic_arch_extn.flags = IRQCHIP_SKIP_SET_WAKE | IRQCHIP_MASK_ON_SUSPEND;
-
-I have to admit I don't really understand how these work, but what
-I'd expect to work better is a way to turn the gic code into more
-of a library that can be used by specialized drivers. In that
-case you would register a driver for the tegra gic using IRQCHIP_DECLARE
-and that driver would call a variation of gic_of_init() or gic_init_bases()
-with the extra stuff as arguments.
-
-We'd have to hack around the fact that all these platforms currently
-don't list a specialized compatible string, but at least for the future
-we should be able to do this without special hacks.
-
-	Arnd
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 217dc54..76ee718 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -7291,12 +7291,12 @@ F:	drivers/video/backlight/pwm_bl.c
+ F:	include/linux/pwm_backlight.h
+ 
+ PXA2xx/PXA3xx SUPPORT
+-M:	Eric Miao <eric.y.miao@gmail.com>
+-M:	Russell King <linux@arm.linux.org.uk>
+ M:	Haojian Zhuang <haojian.zhuang@gmail.com>
++M:	Robert Jarzmik <robert.jarzmik@free.fr>
++M:	Daniel Mack <daniel@zonque.org>
+ L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+ T:	git git://github.com/hzhuang1/linux.git
+-T:	git git://git.linaro.org/people/ycmiao/pxa-linux.git
++T:	git git://github.com/rjarzmik/linux.git
+ S:	Maintained
+ F:	arch/arm/mach-pxa/
+ F:	drivers/pcmcia/pxa2xx*
+-- 
+2.0.0.rc2
