@@ -1,71 +1,134 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 29 Aug 2014 20:59:31 +0200
-Subject: [RFC PATCH 1/1] drivers: introduce ARM SBSA generic UART driver
-In-Reply-To: <1409328803-1953-2-git-send-email-andre.przywara@arm.com>
-References: <1409328803-1953-1-git-send-email-andre.przywara@arm.com>
- <1409328803-1953-2-git-send-email-andre.przywara@arm.com>
-Message-ID: <8453809.d9xRztN9Sq@wuerfel>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Fri, 29 Aug 2014 19:19:47 +0200
+Subject: [PATCH] ARM: sunxi: Remove sun4i reboot code from mach directory
+Message-ID: <1409332787-23923-1-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 29 August 2014 17:13:23 Andre Przywara wrote:
-> The ARM Server Base System Architecture (SBSA) describes a generic
-> UART which all compliant level 1 systems should implement. This is
-> actually a PL011 subset, so a full PL011 implementation will satisfy
-> this requirement.
-> However if a system does not have a PL011, a very stripped down
-> implementation complying to the SBSA defined specification will
-> suffice. The Linux PL011 driver is not guaranteed to drive this
-> limited device (and indeed the fast model implentation hangs the
-> kernel if driven by the PL011 driver).
-> So introduce a new driver just implementing the part specified by the
-> SBSA (which lacks DMA, the modem control signals and many of the
-> registers including baud rate control). This driver has been derived
-> by the actual PL011 one, removing all unnecessary code.
-> 
-> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+Now that the restart code has been merged in the watchdog driver, we don't need
+the restart code in the mach-sunxi directory anymore.
 
+Remove it entirely.
 
-Hi Andre,
+Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+---
 
-Thanks for getting this driver ready. There is one high-level comment
-I have: As mentioned in the discussion in
-https://lkml.org/lkml/2014/7/28/386 , I think this should really be
-a tty driver using tty_port, not a serial driver using uart_port.
+Hi Arnd, Kevin, Olof,
 
-What is the reason you chose to do a uart_port driver?
+I don't know if this can be considered 3.17 material, but if so, it would be
+great if you could merge it directly.
 
-A few more details below:
+Thanks!
+Maxime
 
-> +}
-> +EARLYCON_DECLARE(pl011, sbsa_uart_early_console_setup);
-> +OF_EARLYCON_DECLARE(pl011, "arm,sbsa-uart", sbsa_uart_early_console_setup);
+ arch/arm/mach-sunxi/sunxi.c | 76 ---------------------------------------------
+ 1 file changed, 76 deletions(-)
 
-Stray 'pl011' left from copying the code?
-
-> +static struct uart_driver sbsa_uart_reg = {
-> +	.owner			= THIS_MODULE,
-> +	.driver_name		= "sbsa_uart",
-> +	.dev_name		= "ttyAMA",
-> +	.nr			= UART_NR,
-> +	.cons			= SBSA_UART_CONSOLE,
-> +};
-
-I don't think we should overload the ttyAMA name.
-
-> +#ifdef CONFIG_OF
-> +
-> +static int dt_probe_serial_alias(int index, struct device *dev)
-> +{
-> +	struct device_node *np;
-> +	static bool seen_dev_with_alias;
-> +	static bool seen_dev_without_alias;
-> +	int ret = index;
-> +
-> +	if (!IS_ENABLED(CONFIG_OF))
-> +		return ret;
-
-The #ifdef should go away since you already have the if
-(!IS_ENABLED(CONFIG_OF)) logic here.
-
-	Arnd
+diff --git a/arch/arm/mach-sunxi/sunxi.c b/arch/arm/mach-sunxi/sunxi.c
+index 42d4753683ce..d7598aeed803 100644
+--- a/arch/arm/mach-sunxi/sunxi.c
++++ b/arch/arm/mach-sunxi/sunxi.c
+@@ -12,81 +12,9 @@
+ 
+ #include <linux/clk-provider.h>
+ #include <linux/clocksource.h>
+-#include <linux/delay.h>
+-#include <linux/kernel.h>
+ #include <linux/init.h>
+-#include <linux/of_address.h>
+-#include <linux/of_irq.h>
+-#include <linux/of_platform.h>
+-#include <linux/io.h>
+-#include <linux/reboot.h>
+ 
+ #include <asm/mach/arch.h>
+-#include <asm/mach/map.h>
+-#include <asm/system_misc.h>
+-
+-#define SUN4I_WATCHDOG_CTRL_REG		0x00
+-#define SUN4I_WATCHDOG_CTRL_RESTART		BIT(0)
+-#define SUN4I_WATCHDOG_MODE_REG		0x04
+-#define SUN4I_WATCHDOG_MODE_ENABLE		BIT(0)
+-#define SUN4I_WATCHDOG_MODE_RESET_ENABLE	BIT(1)
+-
+-#define SUN6I_WATCHDOG1_IRQ_REG		0x00
+-#define SUN6I_WATCHDOG1_CTRL_REG	0x10
+-#define SUN6I_WATCHDOG1_CTRL_RESTART		BIT(0)
+-#define SUN6I_WATCHDOG1_CONFIG_REG	0x14
+-#define SUN6I_WATCHDOG1_CONFIG_RESTART		BIT(0)
+-#define SUN6I_WATCHDOG1_CONFIG_IRQ		BIT(1)
+-#define SUN6I_WATCHDOG1_MODE_REG	0x18
+-#define SUN6I_WATCHDOG1_MODE_ENABLE		BIT(0)
+-
+-static void __iomem *wdt_base;
+-
+-static void sun4i_restart(enum reboot_mode mode, const char *cmd)
+-{
+-	if (!wdt_base)
+-		return;
+-
+-	/* Enable timer and set reset bit in the watchdog */
+-	writel(SUN4I_WATCHDOG_MODE_ENABLE | SUN4I_WATCHDOG_MODE_RESET_ENABLE,
+-	       wdt_base + SUN4I_WATCHDOG_MODE_REG);
+-
+-	/*
+-	 * Restart the watchdog. The default (and lowest) interval
+-	 * value for the watchdog is 0.5s.
+-	 */
+-	writel(SUN4I_WATCHDOG_CTRL_RESTART, wdt_base + SUN4I_WATCHDOG_CTRL_REG);
+-
+-	while (1) {
+-		mdelay(5);
+-		writel(SUN4I_WATCHDOG_MODE_ENABLE | SUN4I_WATCHDOG_MODE_RESET_ENABLE,
+-		       wdt_base + SUN4I_WATCHDOG_MODE_REG);
+-	}
+-}
+-
+-static struct of_device_id sunxi_restart_ids[] = {
+-	{ .compatible = "allwinner,sun4i-a10-wdt" },
+-	{ /*sentinel*/ }
+-};
+-
+-static void sunxi_setup_restart(void)
+-{
+-	struct device_node *np;
+-
+-	np = of_find_matching_node(NULL, sunxi_restart_ids);
+-	if (WARN(!np, "unable to setup watchdog restart"))
+-		return;
+-
+-	wdt_base = of_iomap(np, 0);
+-	WARN(!wdt_base, "failed to map watchdog base address");
+-}
+-
+-static void __init sunxi_dt_init(void)
+-{
+-	sunxi_setup_restart();
+-
+-	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+-}
+ 
+ static const char * const sunxi_board_dt_compat[] = {
+ 	"allwinner,sun4i-a10",
+@@ -96,9 +24,7 @@ static const char * const sunxi_board_dt_compat[] = {
+ };
+ 
+ DT_MACHINE_START(SUNXI_DT, "Allwinner A1X (Device Tree)")
+-	.init_machine	= sunxi_dt_init,
+ 	.dt_compat	= sunxi_board_dt_compat,
+-	.restart	= sun4i_restart,
+ MACHINE_END
+ 
+ static const char * const sun6i_board_dt_compat[] = {
+@@ -126,9 +52,7 @@ static const char * const sun7i_board_dt_compat[] = {
+ };
+ 
+ DT_MACHINE_START(SUN7I_DT, "Allwinner sun7i (A20) Family")
+-	.init_machine	= sunxi_dt_init,
+ 	.dt_compat	= sun7i_board_dt_compat,
+-	.restart	= sun4i_restart,
+ MACHINE_END
+ 
+ static const char * const sun8i_board_dt_compat[] = {
+-- 
+2.0.2
