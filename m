@@ -1,79 +1,70 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri, 29 Aug 2014 18:12:48 +0200
-Subject: [PATCH 2/2] efi/arm64: use UEFI for system reset
-In-Reply-To: <20140829160448.GF4995@arm.com>
-References: <1409324757-12607-1-git-send-email-ard.biesheuvel@linaro.org>
- <1409324757-12607-2-git-send-email-ard.biesheuvel@linaro.org>
- <20140829160448.GF4995@arm.com>
-Message-ID: <CAKv+Gu-u6Q_t9yU4Cb=0-XmEkmejuMwpy2AN8cBABUHEZxg4dg@mail.gmail.com>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Fri, 29 Aug 2014 17:13:22 +0100
+Subject: [RFC PATCH 0/1] ARM SBSA UART driver
+Message-ID: <1409328803-1953-1-git-send-email-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29 August 2014 18:04, Catalin Marinas <catalin.marinas@arm.com> wrote:
-> On Fri, Aug 29, 2014 at 04:05:57PM +0100, Ard Biesheuvel wrote:
->> If UEFI Runtime Services are available, they are preferred over direct
->> PSCI calls or other methods to reset the system.
->>
->> For the reset case, we need to hook into machine_restart(), as the
->> arm_pm_restart function pointer may be overwritten by modules.
->>
->> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->> ---
->>  arch/arm64/kernel/process.c | 7 +++++++
->>  1 file changed, 7 insertions(+)
->>
->> diff --git a/arch/arm64/kernel/process.c b/arch/arm64/kernel/process.c
->> index 1309d64aa926..335a93da5eeb 100644
->> --- a/arch/arm64/kernel/process.c
->> +++ b/arch/arm64/kernel/process.c
->> @@ -177,6 +177,13 @@ void machine_restart(char *cmd)
->>       local_irq_disable();
->>       smp_send_stop();
->>
->> +     /*
->> +      * arm_pm_restart is exported to modules, so the only way to supersede
->> +      * it with efi_reboot() is to call it here.
->> +      */
->
-> Why do you make this the preferred method? Is there a risk that UEFI is
-> broken and we want to override it with a SoC-specific driver (I wouldn't
-> like it but it's still an option).
->
+Hi,
 
-For poweroff (the other patch), it may not make a huge difference, but
-the SBBR does state it explicitly.
+this is my first try on a driver for the generic UART defined in the
+ARM Server Base System Architecture (SBSA) [1] document.
+It it basically a severly restricted subset of the PL011 driver,
+removing DMA, modem control, baud rate setting and other features.
+The idea of it is to let it be initialized by the firmware, so Linux
+can just use it without fiddling with the parameters.
+Given the subset nature of the spec, a full featured PL011 can be
+driven by this driver - given it has been initialized before.
 
-For reboot, we *have* to use EFI reboot in order to support capsules:
-when using capsules (for instance, for updating the firmware), you
-need to use EFI reboot as you need to pass the return code of
-UpdateCapsule() (a runtime service) to ResetSystem()
+So this version is a stripped copy of the AMBA PL011 driver, removing
+everything not needed (including the AMBA bindings, instead just use
+the device tree).
+This works for me on a hardware PL011 and on the fast model. My
+version of it allows to restrict the register set to the SBSA subset.
 
-> There are also some patches here that try to get rid of arm_pm_restart:
->
-> https://lkml.org/lkml/2014/8/19/665
->
-> Once there are no drivers for arm64 setting arm_pm_restart explicitly
-> I'll remove it.
->
+I tried deriving it from the goldfish TTY driver before, but that
+didn't work very well - it had no TX IRQ support and required an ugly
+hack to convert the line endings on the console.
 
-OK, good to know. I will revisit this once that stuff is in.
+To avoid further churn with the device namings, this driver also uses
+the ttyAMA prefix. That seems to make sense given the relationship
+of the two devices and the possibility to drive real PL011s with this
+driver. However there is an issue when both drivers are active: the
+numbering could possibly be wrong, causing udev to complain.
+
+So there is the possibility to fold this driver back into
+amba-pl011.c, providing a separate _probe function and a separate
+struct uart_ops, possibly reusing PL011 functions, while using
+extra functions for the incompatible part of it. Not sure if it's
+worth it, though.
+
+I'd love to have some feedback on how to proceed from here:
+
+Is this separate driver (file) OK?
+Should this be part of the PL011 driver?
+Should it use a different tty prefix?
+Does it need the separate config options?
+Should the existing PL011 driver be refactored to support both?
+
+Cheers,
+Andre
+
+P.S. There is an almost trivial patch to add ACPI support for this,
+but which this margin is too narrow to contain ;-)
+
+[1] http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.den0029
+
+Andre Przywara (1):
+  drivers: introduce ARM SBSA generic UART driver
+
+ .../devicetree/bindings/serial/arm_sbsa_uart.txt   |    6 +
+ drivers/tty/serial/Kconfig                         |   28 +
+ drivers/tty/serial/Makefile                        |    1 +
+ drivers/tty/serial/sbsa_uart.c                     |  793 ++++++++++++++++++++
+ include/uapi/linux/serial_core.h                   |    1 +
+ 5 files changed, 829 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/serial/arm_sbsa_uart.txt
+ create mode 100644 drivers/tty/serial/sbsa_uart.c
 
 -- 
-Ard.
-
->> +     if (IS_ENABLED(CONFIG_EFI) && efi_enabled(EFI_RUNTIME_SERVICES))
->
-> efi_enabled always returns false if !IS_ENABLED(CONFIG_EFI).
->
->> +             efi_reboot(REBOOT_WARM, NULL);
->> +
->>       /* Now call the architecture specific reboot code. */
->>       if (arm_pm_restart)
->>               arm_pm_restart(reboot_mode, cmd);
->> --
->> 1.8.3.2
->>
->>
->
-> --
-> Catalin
+1.7.9.5
