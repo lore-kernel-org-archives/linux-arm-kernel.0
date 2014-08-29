@@ -1,122 +1,125 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 29 Aug 2014 16:54:27 +0100
-Subject: [RFC PATCH 4/7] iommu: provide helper function to configure an IOMMU
- for an of master
+Date: Fri, 29 Aug 2014 16:54:24 +0100
+Subject: [RFC PATCH 1/7] iommu: provide early initialisation hook for IOMMU
+ drivers
 In-Reply-To: <1409327670-3495-1-git-send-email-will.deacon@arm.com>
 References: <1409327670-3495-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1409327670-3495-5-git-send-email-will.deacon@arm.com>
+Message-ID: <1409327670-3495-2-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The generic IOMMU device-tree bindings can be used to add arbitrary OF
-masters to an IOMMU with a compliant binding.
+IOMMU drivers must be initialised before any of their upstream devices,
+otherwise the relevant iommu_ops won't be configured for the bus in
+question. To solve this, a number of IOMMU drivers use initcalls to
+initialise the driver before anything has a chance to be probed.
 
-This patch introduces of_iommu_configure, which does exactly that.
+Whilst this solves the immediate problem, it leaves the job of probing
+the IOMMU completely separate from the iommu_ops to configure the IOMMU,
+which are called on a per-bus basis and require the driver to figure out
+exactly which instance of the IOMMU is being requested. In particular,
+the add_device callback simply passes a struct device to the driver,
+which then has to parse firmware tables or probe buses to identify the
+relevant IOMMU instance.
+
+This patch takes the first step in addressing this problem by adding an
+early initialisation pass for IOMMU drivers, giving them the ability to
+set some per-instance data on their of_node. This data can then be
+passed back to a new add_device function (added in a later patch) to
+identify the IOMMU instance in question.
 
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- drivers/iommu/Kconfig    |  2 +-
- drivers/iommu/of_iommu.c | 36 ++++++++++++++++++++++++++++++++++++
- include/linux/of_iommu.h |  6 ++++++
- 3 files changed, 43 insertions(+), 1 deletion(-)
+ drivers/iommu/of_iommu.c          | 14 ++++++++++++++
+ include/asm-generic/vmlinux.lds.h |  2 ++
+ include/linux/of_iommu.h          | 21 +++++++++++++++++++++
+ 3 files changed, 37 insertions(+)
 
-diff --git a/drivers/iommu/Kconfig b/drivers/iommu/Kconfig
-index dd5112265cc9..6d13f962f156 100644
---- a/drivers/iommu/Kconfig
-+++ b/drivers/iommu/Kconfig
-@@ -15,7 +15,7 @@ if IOMMU_SUPPORT
- 
- config OF_IOMMU
-        def_bool y
--       depends on OF
-+       depends on OF && IOMMU_API
- 
- config FSL_PAMU
- 	bool "Freescale IOMMU support"
 diff --git a/drivers/iommu/of_iommu.c b/drivers/iommu/of_iommu.c
-index f9209666157c..a7d3b3a13b83 100644
+index e550ccb7634e..f9209666157c 100644
 --- a/drivers/iommu/of_iommu.c
 +++ b/drivers/iommu/of_iommu.c
-@@ -19,6 +19,7 @@
- 
- #include <linux/export.h>
- #include <linux/limits.h>
-+#include <linux/iommu.h>
- #include <linux/of.h>
- #include <linux/of_iommu.h>
- 
-@@ -90,6 +91,41 @@ int of_get_dma_window(struct device_node *dn, const char *prefix, int index,
+@@ -89,3 +89,17 @@ int of_get_dma_window(struct device_node *dn, const char *prefix, int index,
+ 	return 0;
  }
  EXPORT_SYMBOL_GPL(of_get_dma_window);
- 
-+int of_iommu_configure(struct device *dev)
++
++void __init of_iommu_init(void)
 +{
-+	struct of_phandle_args iommu_spec;
-+	struct bus_type *bus = dev->bus;
-+	const struct iommu_ops *ops = bus->iommu_ops;
-+	int ret = -EINVAL, idx = 0;
++	struct device_node *np;
++	const struct of_device_id *match, *matches = &__iommu_of_table;
 +
-+	if (!iommu_present(bus))
-+		return -ENODEV;
++	for_each_matching_node_and_match(np, matches, &match) {
++		const int (*init_fn)(struct device_node *) = match->data;
 +
-+	/*
-+	 * We don't currently walk up the tree looking for a parent IOMMU.
-+	 * See the `Notes:' section of
-+	 * Documentation/devicetree/bindings/iommu/iommu.txt
-+	 */
-+	while (!of_parse_phandle_with_args(dev->of_node, "iommus",
-+					   "#iommu-cells", idx,
-+					   &iommu_spec)) {
-+		void *data = of_iommu_get_data(iommu_spec.np);
-+
-+		of_node_put(iommu_spec.np);
-+		if (!ops->add_device_master_ids)
-+			return -ENODEV;
-+
-+		ret = ops->add_device_master_ids(dev, iommu_spec.args_count,
-+						 iommu_spec.args, data);
-+		if (ret)
-+			break;
-+
-+		idx++;
++		if (init_fn(np))
++			pr_err("Failed to initialise IOMMU %s\n",
++				of_node_full_name(np));
 +	}
-+
-+	return ret;
 +}
-+
- void __init of_iommu_init(void)
- {
- 	struct device_node *np;
+diff --git a/include/asm-generic/vmlinux.lds.h b/include/asm-generic/vmlinux.lds.h
+index 5ba0360663a7..b75ede8f99ae 100644
+--- a/include/asm-generic/vmlinux.lds.h
++++ b/include/asm-generic/vmlinux.lds.h
+@@ -162,6 +162,7 @@
+ #define CLKSRC_OF_TABLES()	OF_TABLE(CONFIG_CLKSRC_OF, clksrc)
+ #define IRQCHIP_OF_MATCH_TABLE() OF_TABLE(CONFIG_IRQCHIP, irqchip)
+ #define CLK_OF_TABLES()		OF_TABLE(CONFIG_COMMON_CLK, clk)
++#define IOMMU_OF_TABLES()	OF_TABLE(CONFIG_OF_IOMMU, iommu)
+ #define RESERVEDMEM_OF_TABLES()	OF_TABLE(CONFIG_OF_RESERVED_MEM, reservedmem)
+ #define CPU_METHOD_OF_TABLES()	OF_TABLE(CONFIG_SMP, cpu_method)
+ #define EARLYCON_OF_TABLES()	OF_TABLE(CONFIG_SERIAL_EARLYCON, earlycon)
+@@ -495,6 +496,7 @@
+ 	CLK_OF_TABLES()							\
+ 	RESERVEDMEM_OF_TABLES()						\
+ 	CLKSRC_OF_TABLES()						\
++	IOMMU_OF_TABLES()						\
+ 	CPU_METHOD_OF_TABLES()						\
+ 	KERNEL_DTB()							\
+ 	IRQCHIP_OF_MATCH_TABLE()					\
 diff --git a/include/linux/of_iommu.h b/include/linux/of_iommu.h
-index 29f2f3f88d6a..85c6d1152624 100644
+index 51a560f34bca..29f2f3f88d6a 100644
 --- a/include/linux/of_iommu.h
 +++ b/include/linux/of_iommu.h
-@@ -1,6 +1,7 @@
+@@ -1,12 +1,16 @@
  #ifndef __OF_IOMMU_H
  #define __OF_IOMMU_H
  
-+#include <linux/device.h>
- #include <linux/of.h>
- 
++#include <linux/of.h>
++
  #ifdef CONFIG_OF_IOMMU
-@@ -10,6 +11,7 @@ extern int of_get_dma_window(struct device_node *dn, const char *prefix,
+ 
+ extern int of_get_dma_window(struct device_node *dn, const char *prefix,
+ 			     int index, unsigned long *busno, dma_addr_t *addr,
  			     size_t *size);
  
- extern void of_iommu_init(void);
-+extern int of_iommu_configure(struct device *dev);
- 
++extern void of_iommu_init(void);
++
  #else
  
-@@ -21,6 +23,10 @@ static inline int of_get_dma_window(struct device_node *dn, const char *prefix,
+ static inline int of_get_dma_window(struct device_node *dn, const char *prefix,
+@@ -16,6 +20,23 @@ static inline int of_get_dma_window(struct device_node *dn, const char *prefix,
+ 	return -EINVAL;
  }
  
- static inline void of_iommu_init(void) { }
-+static inline int of_iommu_configure(struct device *dev)
-+{
-+	return -ENODEV;
-+}
- 
++static inline void of_iommu_init(void) { }
++
  #endif	/* CONFIG_OF_IOMMU */
  
++static inline void of_iommu_set_data(struct device_node *np, void *data)
++{
++	np->data = data;
++}
++
++static inline void *of_iommu_get_data(struct device_node *np)
++{
++	return np->data;
++}
++
++extern struct of_device_id __iommu_of_table;
++
++#define IOMMU_OF_DECLARE(name, compat, fn) \
++	OF_DECLARE_1(iommu, name, compat, fn)
++
+ #endif /* __OF_IOMMU_H */
 -- 
 2.1.0
