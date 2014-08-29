@@ -1,39 +1,42 @@
-From: stwiss.opensource@diasemi.com (Opensource [Steve Twiss])
-Date: Fri, 29 Aug 2014 09:54:00 +0000
-Subject: [GIT PULL] MFD: ARM (IMX & R8): Immutable branch for Dialog
- Semiconductor - vendor prefix consolidation
-In-Reply-To: <20140829091359.GF24579@lee--X1>
-References: <201408221446.s7MEkNVF001775@swsrvapps-01.diasemi.com>
- <20140829091359.GF24579@lee--X1>
-Message-ID: <6ED8E3B22081A4459DAC7699F3695FB7D0B3BF98@SW-EX-MBX02.diasemi.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Fri, 29 Aug 2014 11:59:14 +0200
+Subject: [GIT PULL 0/2] KVM/ARM Fixes for v3.17-rc3
+Message-ID: <1409306356-11170-1-git-send-email-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29 August 2014 10:14, Lee Jones wrote
+Hi Paolo and Gleb,
 
-> Subject: [GIT PULL] MFD: ARM (IMX & R8): Immutable branch for Dialog
-> Semiconductor - vendor prefix consolidation
-> 
-> IMX and R8 sub-arch Maintainers,
-> 
-> The following changes since commit
-> 52addcf9d6669fa439387610bc65c92fa0980cef:
-> 
->   Linux 3.17-rc2 (2014-08-25 15:36:20 -0700)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/lee/mfd.git tags/ib-mfd-arm-
-> v3.18
-> 
-> for you to fetch changes up to bd597f47ca4bf7a522a0298a95c7f9b2f0a75b9e:
-> 
->   devicetree: Dialog Semiconductor consolidate existing vendor prefixes to
-> standardise on 'dlg' (2014-08-29 09:26:29 +0100)
-> 
+The following changes since commit 30d1e0e806e5b2fadc297ba78f2d7afd6ba309cf:
 
-[...]
+  virt/kvm/assigned-dev.c: Set 'dev->irq_source_id' to '-1' after free it (2014-08-19 15:12:28 +0200)
 
-Thank you for doing this.
-Regards,
-Steve
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/kvmarm/kvmarm.git tags/kvm-arm-for-v3.17-rc3
+
+for you to fetch changes up to 05e0127f9e362b36aa35f17b1a3d52bca9322a3a:
+
+  arm/arm64: KVM: Complete WFI/WFE instructions (2014-08-29 11:53:53 +0200)
+
+Thanks,
+-Christoffer
+
+----------------------------------------------------------------
+These fixes fix two issues in KVM for arm/arm64:
+ - hyp mode initialization issues on certian boards/bootloader combos.
+ - incorrect return address from trapped WFI/WFE instrucitons, which
+   breaks non-linux guests.
+
+----------------------------------------------------------------
+Christoffer Dall (1):
+      arm/arm64: KVM: Complete WFI/WFE instructions
+
+Pranavkumar Sawargaonkar (1):
+      ARM/ARM64: KVM: Nuke Hyp-mode tlbs before enabling MMU
+
+ arch/arm/kvm/handle_exit.c   | 2 ++
+ arch/arm/kvm/init.S          | 4 ++++
+ arch/arm64/kvm/handle_exit.c | 2 ++
+ arch/arm64/kvm/hyp-init.S    | 4 ++++
+ 4 files changed, 12 insertions(+)
