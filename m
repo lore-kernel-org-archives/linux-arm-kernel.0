@@ -1,54 +1,101 @@
-From: pbonzini@redhat.com (Paolo Bonzini)
-Date: Fri, 29 Aug 2014 12:26:08 +0200
-Subject: [GIT PULL 0/2] KVM/ARM Fixes for v3.17-rc3
-In-Reply-To: <1409306356-11170-1-git-send-email-christoffer.dall@linaro.org>
-References: <1409306356-11170-1-git-send-email-christoffer.dall@linaro.org>
-Message-ID: <54005540.2030900@redhat.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Fri, 29 Aug 2014 18:33:31 +0800
+Subject: [RFC PATCH 1/2] ARM: imx: add BYPASS support for PLL clocks
+In-Reply-To: <20140829093236.GA503@audiosh1>
+References: <1409067313-32063-1-git-send-email-shawn.guo@freescale.com>
+ <1409067313-32063-2-git-send-email-shawn.guo@freescale.com>
+ <20140828084420.GG28777@dragon> <20140829014947.GA2741@audiosh1>
+ <20140829025349.GH28777@dragon> <20140829033344.GA2910@audiosh1>
+ <20140829084125.GB3135@dragon> <20140829093236.GA503@audiosh1>
+Message-ID: <20140829103328.GA13258@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Il 29/08/2014 11:59, Christoffer Dall ha scritto:
-> Hi Paolo and Gleb,
-> 
-> The following changes since commit 30d1e0e806e5b2fadc297ba78f2d7afd6ba309cf:
-> 
->   virt/kvm/assigned-dev.c: Set 'dev->irq_source_id' to '-1' after free it (2014-08-19 15:12:28 +0200)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/kvmarm/kvmarm.git tags/kvm-arm-for-v3.17-rc3
-> 
-> for you to fetch changes up to 05e0127f9e362b36aa35f17b1a3d52bca9322a3a:
-> 
->   arm/arm64: KVM: Complete WFI/WFE instructions (2014-08-29 11:53:53 +0200)
-> 
-> Thanks,
-> -Christoffer
-> 
-> ----------------------------------------------------------------
-> These fixes fix two issues in KVM for arm/arm64:
->  - hyp mode initialization issues on certian boards/bootloader combos.
->  - incorrect return address from trapped WFI/WFE instrucitons, which
->    breaks non-linux guests.
-> 
-> ----------------------------------------------------------------
-> Christoffer Dall (1):
->       arm/arm64: KVM: Complete WFI/WFE instructions
-> 
-> Pranavkumar Sawargaonkar (1):
->       ARM/ARM64: KVM: Nuke Hyp-mode tlbs before enabling MMU
-> 
->  arch/arm/kvm/handle_exit.c   | 2 ++
->  arch/arm/kvm/init.S          | 4 ++++
->  arch/arm64/kvm/handle_exit.c | 2 ++
->  arch/arm64/kvm/hyp-init.S    | 4 ++++
->  4 files changed, 12 insertions(+)
-> --
-> To unsubscribe from this list: send the line "unsubscribe kvm" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+On Fri, Aug 29, 2014 at 05:32:40PM +0800, Shengjiu Wang wrote:
+> > diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
+> > index 6692115b0138..9fe4169c79dd 100644
+> > --- a/arch/arm/boot/dts/imx6qdl.dtsi
+> > +++ b/arch/arm/boot/dts/imx6qdl.dtsi
+> > @@ -268,8 +268,18 @@
+> >                                 };
+> > 
+> >                                 esai: esai at 02024000 {
+> > +                                       compatible = "fsl,imx6q-esai", "fsl,imx35-esai";
+> >                                         reg = <0x02024000 0x4000>;
+> >                                         interrupts = <0 51 IRQ_TYPE_LEVEL_HIGH>;
+> > +                                       clocks = <&clks IMX6QDL_CLK_ESAI_IPG>,
+> > +                                                <&clks IMX6QDL_CLK_ESAI_EXTAL>,
+> > +                                                <&clks IMX6QDL_CLK_ESAI_IPG>;
+> > +                                       clock-names = "core", "extal", "fsys";
+> > +                                       dmas = <&sdma 23 21 0>, <&sdma 24 21 0>;
+> > +                                       dma-names = "rx", "tx";
+> > +                                       fsl,fifo-depth = <128>;
+> > +                                       fsl,esai-synchronous;
+> we alway don't set fsl,fifo-depth and fsl,esai-synchronous, just use the
+> default value in driver.
 
-Thanks, picked this up.
+Okay.  The change here is just to get ESAI driver probed, so that the
+assigned-clocks in ESAI node can be handled.  I suppose you will send me
+a patch to get ESAI node ready for working.
 
-Paolo
+> > +                                       status = "disabled";
+> >                                 };
+> > 
+> >                                 ssi1: ssi at 02028000 {
+> > 
+> > diff --git a/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi b/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
+> > index 009abd69385d..1084394197ad 100644
+> > --- a/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
+> > +++ b/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
+> > @@ -17,6 +17,14 @@
+> >                 reg = <0x10000000 0x80000000>;
+> >         };
+> > 
+> > +       clocks {
+> > +               anaclk2 { /* on-board 24.576MHz audio oscillator */
+> > +                       compatible = "fixed-clock";
+> > +                       #clock-cells = <0>;
+> > +                       clock-frequency = <24576000>;
+> > +               };
+> > +       };
+> > +
+> >         leds {
+> >                 compatible = "gpio-leds";
+> >                 pinctrl-names = "default";
+> > @@ -45,6 +53,17 @@
+> >         };
+> >  };
+> > 
+> > +&clks {
+> > +       assigned-clocks = <&clks IMX6QDL_PLL4_BYPASS_SRC>,
+> > +                         <&clks IMX6QDL_PLL4_BYPASS>,
+> > +                         <&clks IMX6QDL_CLK_ESAI_SEL>,
+> > +                         <&clks IMX6QDL_CLK_PLL4_POST_DIV>;
+> > +       assigned-clock-parents = <&clks IMX6QDL_CLK_LVDS2_IN>,
+> > +                                <&clks IMX6QDL_PLL4_BYPASS_SRC>,
+> > +                                <&clks IMX6QDL_CLK_PLL4_AUDIO_DIV>;
+> > +       assigned-clock-rates = <0>, <0>, <0>, <24576000>;
+> > +};
+> > +
+> >  &ecspi1 {
+> >         fsl,spi-num-chipselects = <1>;
+> >         cs-gpios = <&gpio3 19 0>;
+> > @@ -61,6 +80,12 @@
+> >         };
+> >  };
+> > 
+> > +&esai {
+> > +       assigned-clocks = <&clks IMX6QDL_CLK_ESAI_EXTAL>;
+> > +       assigned-clock-rates = <24576000>;
+> > +       status = "okay";
+> > +};
+> > +
+> 
+> Can we move the clocks for &esai to &clks ? I just think that will look better.
+> Anyway, this is just my view. you can do it follow the formal principle.
+
+The general principle is that clocks used by multiple clients like bus
+clock and pll are configured in &clk node, and leaf clocks only used by
+particular client device should be configured in that device node.
+
+Shawn
