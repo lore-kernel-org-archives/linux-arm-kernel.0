@@ -1,48 +1,105 @@
-From: michal.simek@xilinx.com (Michal Simek)
-Date: Fri, 29 Aug 2014 06:57:15 +0200
-Subject: [PATCH] ARM: zynq: DT: Add LEDs to zc702 DT
-In-Reply-To: <20140828171536.GB4345@xsjandreislx>
-References: <1409242973-2735-1-git-send-email-soren.brinkmann@xilinx.com>
- <20140828171536.GB4345@xsjandreislx>
-Message-ID: <93dd8f20-f13a-4446-8b11-e8508fc0ebb7@BY2FFO11FD047.protection.gbl>
+From: hramrach@gmail.com (Michal Suchanek)
+Date: Fri, 29 Aug 2014 07:13:22 +0200
+Subject: [linux-sunxi] Re: [PATCH 4/4] simplefb: add clock handling code
+In-Reply-To: <20140828100834.GA14388@ulmo>
+References: <20140825152232.GE15297@lukather> <20140826080432.GD17263@ulmo>
+ <20140826135341.GM15297@lukather> <20140826143550.GB3027@ulmo>
+ <20140826210248.GO15297@lukather> <20140827065440.GG15640@ulmo>
+ <20140827084526.GR15297@lukather> <20140827095241.GC23186@ulmo>
+ <20140827154221.GX15297@lukather>
+ <CAOMqctSY7AJKHthe+aG8--Ok6JiY1g2zM_tN10S2nELOSe=qMw@mail.gmail.com>
+ <20140828100834.GA14388@ulmo>
+Message-ID: <CAOMqctSwhQHJynn=tW==uuznJW+0CrivNP=os+xem1MAuDP7ZQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/28/2014 07:15 PM, S?ren Brinkmann wrote:
-> On Thu, 2014-08-28 at 09:22AM -0700, Soren Brinkmann wrote:
->> From: Ezra Savard <ezra.savard@xilinx.com>
+On 28 August 2014 12:08, Thierry Reding <thierry.reding@gmail.com> wrote:
+> On Wed, Aug 27, 2014 at 10:57:29PM +0200, Michal Suchanek wrote:
+>> Hello,
 >>
->> Adds LEDs to the zc702 devicetree for use with the leds-gpio driver.
+>> On 27 August 2014 17:42, Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
+>> > On Wed, Aug 27, 2014 at 11:52:48AM +0200, Thierry Reding wrote:
+>> >> On Wed, Aug 27, 2014 at 10:45:26AM +0200, Maxime Ripard wrote:
+>> >> > On Wed, Aug 27, 2014 at 08:54:41AM +0200, Thierry Reding wrote:
+>> >> > > On Tue, Aug 26, 2014 at 11:02:48PM +0200, Maxime Ripard wrote:
+>> >> > > > On Tue, Aug 26, 2014 at 04:35:51PM +0200, Thierry Reding wrote:
+>> >> [...]
+>> >> > > > > > Mike Turquette repeatedly said that he was against such a DT property:
+>> >> > > > > > https://lkml.org/lkml/2014/5/12/693
+>> >> > > > >
+>> >> > > > > Mike says in that email that he's opposing the addition of a property
+>> >> > > > > for clocks that is the equivalent of regulator-always-on. That's not
+>> >> > > > > what this is about. If at all it'd be a property to mark a clock that
+>> >> > > > > should not be disabled by default because it's essential.
+>> >> > > >
+>> >> > > > It's just semantic. How is "a clock that should not be disabled by
+>> >> > > > default because it's essential" not a clock that stays always on?
+>> >> > >
+>> >> > > Because a clock that should not be disabled by default can be turned off
+>> >> > > when appropriate. A clock that is always on can't be turned off.
+>> >> >
+>> >> > If a clock is essential, then it should never be disabled. Or we don't
+>> >> > share the same meaning of essential.
+>> >>
+>> >> Essential for the particular use-case.
+>> >
+>> > So, how would the clock driver would know about which use case we're
+>> > in? How would it know about which display engine is currently running?
+>> > How would it know about which video output is being set?
+>> >
+>> > Currently, we have two separate display engines, which can each output
+>> > either to 4 different outputs (HDMI, RGB/LVDS, 2 DSI). Each and every
+>> > one of these combinations would require different clocks. What clocks
+>> > will we put in the driver? All of them?
+>> >
 >>
->> Signed-off-by: Ezra Savard <ezra.savard@xilinx.com>
->> Reviewed-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
->> ---
->>  arch/arm/boot/dts/zynq-zc702.dts | 10 ++++++++++
->>  1 file changed, 10 insertions(+)
->>
->> diff --git a/arch/arm/boot/dts/zynq-zc702.dts b/arch/arm/boot/dts/zynq-zc702.dts
->> index 835c3089c61c..4e9fe26b3e85 100644
->> --- a/arch/arm/boot/dts/zynq-zc702.dts
->> +++ b/arch/arm/boot/dts/zynq-zc702.dts
->> @@ -27,6 +27,16 @@
->>  		bootargs = "console=ttyPS0,115200 earlyprintk";
->>  	};
->>  
->> +	gpio-leds {
-> The node name should rather be just 'leds'. That slipped through, sorry.
-> Do you want a v2 for that?
+>> since simplefb cannot be extended how about adding, say, dtfb which
+>> claims the resources from dt and then instantiates a simplefb once the
+>> resources are claimed? That is have a dtfb which has the clocks
+>> assigned and has simplefb as child dt node.
+>
+> I don't see how that changes anything. All you do is add another layer
+> of indirection. The fundamental problem remains the same and isn't
+> solved.
 
-yes, please send v2.
+It keeps clock code out of simplefb and provides driver for the kind
+of framebuffer set up by firmware that exists on sunxi, exynos, and
+probably many other SoCs. That is a framebuffer that needs some clocks
+and possibly regulators enabled to keep running because the reality of
+the platform is that it has clocks and regulators unlike some other
+platforms that do not.
 
-Thanks,
+These clocks and regulators are used but not configured by the
+framebuffer and should be reclaimed when firmware framebuffer is
+disabled. This is the same as the chunk of  memory used by simplefb
+which is currently lost but should be reclaimed when simplefb is
+disabled.
+
+This memory is not 'reserved for firmware' and unusable but reserved
+for framebuffer and the regulators are not 'always on' or 'should
+never be disabled' but should be enabled while framebuffer is used.
+
+As far as I can tell in DT this is expressed by creating a DT node
+associated with the framebuffer driver that tells the kernel that this
+memory, clocks and regulators are associated with the framebuffer
+driver and can be reclaimed if this driver is stopped or not enabled
+in the kernel at all. If you are going to be asinine about simplefb
+not getting support for managing any resource other than the memory
+chunk then another layer of indirection is required for platforms that
+have more resources to manage.
+
+If there is another way to associate resources with a driver in DT
+then please enlighten me.
+
+AFAICT simplefb is the framebuffer driver already in kernel closest to
+the driver that is required for sunxi - simplefb also relies on
+firmware to set up the framebuffer but unlike vesafb or efifb it
+already has DT integration. So the most efficient way to implement
+framebuffer for sunxi is to extend simplefb or if necessary add
+another layer of indirection under simplefb. If there is a better
+fitting driver in the kernel then please enlighten me and the
+developer that wrote this patch what driver it would be.
+
+Thanks
+
 Michal
-
-
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140829/66e2de46/attachment.sig>
