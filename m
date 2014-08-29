@@ -1,81 +1,46 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Fri, 29 Aug 2014 18:47:17 +0200
-Subject: [PATCH 0/5] ARM: Berlin: Ethernet support
-In-Reply-To: <1409320263-10295-1-git-send-email-antoine.tenart@free-electrons.com>
-References: <1409320263-10295-1-git-send-email-antoine.tenart@free-electrons.com>
-Message-ID: <5400AE95.2040308@gmail.com>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Fri, 29 Aug 2014 11:31:02 -0600
+Subject: [PATCH 3/3] ARM: zynq: DT: Add Ethernet phys
+In-Reply-To: <e52ebd6c-2f0d-4ea9-a01f-882212956ace@BL2FFO11FD029.protection.gbl>
+References: <1408550219-19825-3-git-send-email-soren.brinkmann@xilinx.com>
+ <5a7b6f57-b6c0-4fb3-af0d-d403277c0207@BN1AFFO11FD045.protection.gbl>
+ <53F5D8D9.7040604@suse.de>
+ <f166a186-301c-4288-97cf-71f8173c07e7@BN1AFFO11FD010.protection.gbl>
+ <CAGVrzcYWN83tznwvw1M9V_mwWgobs2kwtRvEj4stqE=XGC10fg@mail.gmail.com>
+ <20140825174610.GA13737@obsidianresearch.com>
+ <53FB9AC4.8010704@gmail.com>
+ <660fe929-1f16-4e22-8bd3-0388cd363978@BY2FFO11FD038.protection.gbl>
+ <540099AF.4020005@suse.de>
+ <e52ebd6c-2f0d-4ea9-a01f-882212956ace@BL2FFO11FD029.protection.gbl>
+Message-ID: <20140829173102.GA30917@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/29/2014 03:50 PM, Antoine Tenart wrote:
-> This series introduce the Marvell Berlin Ethernet driver, allowing to
-> handle the fast Ethernet port. This driver is based on the mv643xx_eth
-> driver and reuse some of its functions. While I wanted to make these
-> functions common to the two drivers at first, I finally do think this
-> is not a great idea:
-> - Registers are very different.
-> - The mv643xx_eth supports up to 1000Mbps interfaces and performance
->   issues may occur, whereas the mvberlin_eth is only for fast Ethernet.
-> - The mvberlin_eth driver uses a hash table to filter incoming packets.
-> - A few other differences.
-> 
-> I tried to stay close to the mv643xx_eth implementation, so that the
-> discussion is still open, but I still ended up with lots of tiny
-> differences that can be hard to manage for both cases. In the end I do
-> think having two separate drivers is a good choice.
+On Fri, Aug 29, 2014 at 08:35:36AM -0700, S?ren Brinkmann wrote:
 
-Antoine,
+> The compatible string is listed as optional property for PHYs. So, not
+> having one is an option, I guess. But, I'd also prefer to at least keep
+> the -c22 one, since I saw problems when I tried using -c45 (the Zed phy
+> should support it...).
 
-first of all, thanks a lot for providing this driver! I checked the
-usual Marvell datasheets to see where the ethernet IP in Berlin comes
-from and I hate to say it but it very much looks like PXA168, see [1]
-A.22. Also, there is already a driver for pxa168_eth available.
+-c45 and -c22 use a completely different MDIO protocol, Zed doesn't
+have a 10GE port, so it certainly doesn't use -c45.
 
-I'll test and review you current driver on BG2 asap, but I guess it
-should be merged with pxa168_eth _if_ the registers are really
-compatible.
+If there is no compatible string at all the defined default is to use
+-c22.
 
-Sebastian
+> Also, so far, we haven't had any phy nodes in our Zynq dts files and
+> Ethernet worked, so the auto-detection there works pretty well
+> apparently. But it may be problematic if more than a single PHY is on
+> the MDIO bus, I'd assume.
 
-[1]
-http://www.marvell.com/application-processors/armada-100/assets/armada_16x_software_manual.pdf
+Phy autodetection has always worked in some cases, but for DT ethernet
+bindings it is expected that there is an option to specify an explicit
+MDIO bus, and a phy-handle phandle to point to the phy. The phy should
+be explicitly called out with the fixed MDIO address specified to
+avoid sketchy MDIO address auto probing.
 
-> That being said, I tested the Ethernet communication with ICMP pings,
-> netcat, tried to use some network related softwares (such as ssh). Here
-> is an iperf output:
-> 
->  ------------------------------------------------------------
->  Client connecting to 192.168.0.11, TCP port 5001
->  TCP window size: 85.0 KByte (default)
->  ------------------------------------------------------------
->  [  3] local 192.168.0.20 port 44183 connected with 192.168.0.11 port 5001
->  [ ID] Interval       Transfer     Bandwidth
->  [  3]  0.0-10.0 sec   113 MBytes  94.8 Mbits/sec
-> 
-> Tests were done on a BG2Q DMP, and this series currently does not add
-> other device tree nodes than the ones for this board.
-> 
-> Thanks!
-> 
-> Antoine
-> 
-> 
-> Antoine Tenart (5):
->   net: mvberlin_eth: add an Ethernet driver for Marvell Berlin
->   Documentation: bindings: net: add the Marvell Berlin Ethernet
->     controller
->   Documentation: devicetree: net: mention Marvell Berlin
->   ARM: dts: berlin: add ethernet and mdio nodes
->   ARM: dts: berlin: enable the Ethernet port on the BG2Q DMP
-> 
->  .../devicetree/bindings/net/marvell-berlin.txt     |   23 +
->  .../devicetree/bindings/net/marvell-orion-mdio.txt |    6 +-
->  arch/arm/boot/dts/berlin2q-marvell-dmp.dts         |   13 +
->  arch/arm/boot/dts/berlin2q.dtsi                    |   19 +
->  drivers/net/ethernet/marvell/Kconfig               |    9 +
->  drivers/net/ethernet/marvell/Makefile              |    1 +
->  drivers/net/ethernet/marvell/mvberlin_eth.c        | 2081 ++++++++++++++++++++
->  7 files changed, 2149 insertions(+), 3 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/net/marvell-berlin.txt
->  create mode 100644 drivers/net/ethernet/marvell/mvberlin_eth.c
-> 
+This provides the framework to specify interrupts and register
+overrides for the phy in the DT.
+
+Jason
