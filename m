@@ -1,73 +1,71 @@
-From: cmetcalf@tilera.com (Chris Metcalf)
-Date: Fri, 29 Aug 2014 14:43:13 -0400
-Subject: [PATCH 2/5] char: tile-srom: Remove reference to platform_bus
-In-Reply-To: <1407515691.31897.26.camel@hornet>
-References: <1406298233-27876-1-git-send-email-pawel.moll@arm.com>	
- <1406298233-27876-2-git-send-email-pawel.moll@arm.com>	
- <53DAA605.2030500@tilera.com> <1406913678.22529.46.camel@hornet>	
- <53E139C8.9000502@tilera.com> <1407515691.31897.26.camel@hornet>
-Message-ID: <5400C9C1.4060904@tilera.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 29 Aug 2014 20:59:31 +0200
+Subject: [RFC PATCH 1/1] drivers: introduce ARM SBSA generic UART driver
+In-Reply-To: <1409328803-1953-2-git-send-email-andre.przywara@arm.com>
+References: <1409328803-1953-1-git-send-email-andre.przywara@arm.com>
+ <1409328803-1953-2-git-send-email-andre.przywara@arm.com>
+Message-ID: <8453809.d9xRztN9Sq@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-(Resending with text/plain.)
+On Friday 29 August 2014 17:13:23 Andre Przywara wrote:
+> The ARM Server Base System Architecture (SBSA) describes a generic
+> UART which all compliant level 1 systems should implement. This is
+> actually a PL011 subset, so a full PL011 implementation will satisfy
+> this requirement.
+> However if a system does not have a PL011, a very stripped down
+> implementation complying to the SBSA defined specification will
+> suffice. The Linux PL011 driver is not guaranteed to drive this
+> limited device (and indeed the fast model implentation hangs the
+> kernel if driven by the PL011 driver).
+> So introduce a new driver just implementing the part specified by the
+> SBSA (which lacks DMA, the modem control signals and many of the
+> registers including baud rate control). This driver has been derived
+> by the actual PL011 one, removing all unnecessary code.
+> 
+> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
 
-First, sorry for the delayed response, with summer vacation and then
-trying to catch up.  :-)
 
-On 8/8/2014 12:34 PM, Pawel Moll wrote:
-> On Tue, 2014-08-05 at 21:08 +0100, Chris Metcalf wrote:
->>>> In addition, we also have user binaries
->>>> in the wild that know to look for /sys/devices/platform/srom/ paths,
->>>> so I'm pretty reluctant to change this path without good reason.
->>> So what is the srom class for then if not for device discovery? And why
->>> do they look for them in the first place? To get relevant character
->>> device's data, if I understand it right?
->>>
->>> Maybe you could just register a simple "proper" platform device for all
->>> the sroms and then hang the class devices from it? I can type some code
->>> doing this if it sound reasonably?
->> By "device discovery" I meant the way you find the way in your devices
->> in /sysfs. You seem to be traversing /sys/devices/... tree, while you've
->> got almost direct access to them through /sys/class/srom and you can (I
->> believe, correct me if I'm wrong, Greg) rely on this path being stable.
+Hi Andre,
 
-Yes, this is an excellent point.  I will change the user tool to use
-/sys/class instead and then it will work with the existing kernel as well
-as with future kernels that incorporate your suggested change.
+Thanks for getting this driver ready. There is one high-level comment
+I have: As mentioned in the discussion in
+https://lkml.org/lkml/2014/7/28/386 , I think this should really be
+a tty driver using tty_port, not a serial driver using uart_port.
 
->> The
->> subdirectories under /sys/devices/platform/srom/ correspond to partitions
->> in the SPI-ROM, which are software constructs created by the Tilera hypervisor.
->> By default we have three, where the first holds boot data that the chip
->> can use to boot out of hardware, and the other two are smaller partitions
->> for boot- and user-specific data.  We use the /sys files primarily to get the
->> page size and sector size for the sroms, and also export other interesting
->> information like the total size of the particular srom device.
->>
->> Thank you for volunteering to write a bit of code; if that's the best
->> way to clarify this for us, fantastic, or else pointing us at existing
->> good practices or documentation would be great too.
-> [...]
-> @@ -350,7 +351,7 @@ static int srom_setup_minor(struct srom_dev *srom, int index)
->  		       SROM_PAGE_SIZE_OFF, sizeof(srom->page_size)) < 0)
->  		return -EIO;
->
-> -	dev = device_create(srom_class, &platform_bus,
-> +	dev = device_create(srom_class, srom_parent,
->  			    MKDEV(srom_major, index), srom, "%d", index);
->  	return PTR_ERR_OR_ZERO(dev);
->  }
+What is the reason you chose to do a uart_port driver?
 
-The second argument should be &srom_parent.dev though, I think.  Right?
+A few more details below:
 
-> Would that work for you? Note that it will move the srom class devices
-> one level deeper in /sys/devices/... hierarchy.
+> +}
+> +EARLYCON_DECLARE(pl011, sbsa_uart_early_console_setup);
+> +OF_EARLYCON_DECLARE(pl011, "arm,sbsa-uart", sbsa_uart_early_console_setup);
 
-Yes, that seems slightly unfortunately but not too problematic.  If the
-consensus is that this is the way to go, I can certainly take this change
-into the Tile tree.
+Stray 'pl011' left from copying the code?
 
--- 
-Chris Metcalf, Tilera Corp.
-http://www.tilera.com
+> +static struct uart_driver sbsa_uart_reg = {
+> +	.owner			= THIS_MODULE,
+> +	.driver_name		= "sbsa_uart",
+> +	.dev_name		= "ttyAMA",
+> +	.nr			= UART_NR,
+> +	.cons			= SBSA_UART_CONSOLE,
+> +};
+
+I don't think we should overload the ttyAMA name.
+
+> +#ifdef CONFIG_OF
+> +
+> +static int dt_probe_serial_alias(int index, struct device *dev)
+> +{
+> +	struct device_node *np;
+> +	static bool seen_dev_with_alias;
+> +	static bool seen_dev_without_alias;
+> +	int ret = index;
+> +
+> +	if (!IS_ENABLED(CONFIG_OF))
+> +		return ret;
+
+The #ifdef should go away since you already have the if
+(!IS_ENABLED(CONFIG_OF)) logic here.
+
+	Arnd
