@@ -1,77 +1,40 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri, 29 Aug 2014 18:43:48 +0200
-Subject: [PATCH 2/2] efi/arm64: use UEFI for system reset
-In-Reply-To: <20140829162534.GG4995@arm.com>
-References: <1409324757-12607-1-git-send-email-ard.biesheuvel@linaro.org>
- <1409324757-12607-2-git-send-email-ard.biesheuvel@linaro.org>
- <20140829160448.GF4995@arm.com>
- <CAKv+Gu-u6Q_t9yU4Cb=0-XmEkmejuMwpy2AN8cBABUHEZxg4dg@mail.gmail.com>
- <20140829162534.GG4995@arm.com>
-Message-ID: <CAKv+Gu9b=v1=4Jp5bvVeCh7jihNph3dtfuoAaTtYOjPshonuKg@mail.gmail.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Fri, 29 Aug 2014 18:46:41 +0200
+Subject: [PATCH] ARM: at91/dt: sam9x5: fix ADC compatible string
+In-Reply-To: <1406038067-14697-1-git-send-email-alexandre.belloni@free-electrons.com>
+References: <1406038067-14697-1-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <5400AE71.9040104@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29 August 2014 18:25, Catalin Marinas <catalin.marinas@arm.com> wrote:
-> On Fri, Aug 29, 2014 at 05:12:48PM +0100, Ard Biesheuvel wrote:
->> On 29 August 2014 18:04, Catalin Marinas <catalin.marinas@arm.com> wrote:
->> > On Fri, Aug 29, 2014 at 04:05:57PM +0100, Ard Biesheuvel wrote:
->> >> If UEFI Runtime Services are available, they are preferred over direct
->> >> PSCI calls or other methods to reset the system.
->> >>
->> >> For the reset case, we need to hook into machine_restart(), as the
->> >> arm_pm_restart function pointer may be overwritten by modules.
->> >>
->> >> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->> >> ---
->> >>  arch/arm64/kernel/process.c | 7 +++++++
->> >>  1 file changed, 7 insertions(+)
->> >>
->> >> diff --git a/arch/arm64/kernel/process.c b/arch/arm64/kernel/process.c
->> >> index 1309d64aa926..335a93da5eeb 100644
->> >> --- a/arch/arm64/kernel/process.c
->> >> +++ b/arch/arm64/kernel/process.c
->> >> @@ -177,6 +177,13 @@ void machine_restart(char *cmd)
->> >>       local_irq_disable();
->> >>       smp_send_stop();
->> >>
->> >> +     /*
->> >> +      * arm_pm_restart is exported to modules, so the only way to supersede
->> >> +      * it with efi_reboot() is to call it here.
->> >> +      */
->> >
->> > Why do you make this the preferred method? Is there a risk that UEFI is
->> > broken and we want to override it with a SoC-specific driver (I wouldn't
->> > like it but it's still an option).
->> >
->>
->> For poweroff (the other patch), it may not make a huge difference, but
->> the SBBR does state it explicitly.
->
-> The SBBR scope reads like this:
->
->   This document defines the boot and Runtime Services that are expected
->   by an enterprise platform Operating System or hypervisor, for an ARM
->   AArch64 server, which is SBSA-compliant and follows the UEFI and ACPI
->   specifications.
->
-> Which means that it does not apply to non-SBSA or SBSA systems that use
-> UEFI but not ACPI?
->
+On 22/07/2014 16:07, Alexandre Belloni :
+> Use the correct compatible string for the ADC of the at91sam9x5 family of SoCs.
+> 
+> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 
-Good question.
+Yep!
 
->> For reboot, we *have* to use EFI reboot in order to support capsules:
->> when using capsules (for instance, for updating the firmware), you
->> need to use EFI reboot as you need to pass the return code of
->> UpdateCapsule() (a runtime service) to ResetSystem()
->
-> That's a better argument ;). But I think with the restart patches you
-> could set some priority and if absolutely needed on a platform as
-> workaround we could register a driver with a higher priority (and losing
-> the above features).
->
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 
-I will wait for those patches to land then.
+> ---
+>  arch/arm/boot/dts/at91sam9x5.dtsi | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/boot/dts/at91sam9x5.dtsi b/arch/arm/boot/dts/at91sam9x5.dtsi
+> index 2c0d6ea3ab41..5d7cf394f537 100644
+> --- a/arch/arm/boot/dts/at91sam9x5.dtsi
+> +++ b/arch/arm/boot/dts/at91sam9x5.dtsi
+> @@ -964,7 +964,7 @@
+>  			adc0: adc at f804c000 {
+>  				#address-cells = <1>;
+>  				#size-cells = <0>;
+> -				compatible = "atmel,at91sam9260-adc";
+> +				compatible = "atmel,at91sam9x5-adc";
+>  				reg = <0xf804c000 0x100>;
+>  				interrupts = <19 IRQ_TYPE_LEVEL_HIGH 0>;
+>  				clocks = <&adc_clk>,
+> 
+
 
 -- 
-Ard.
+Nicolas Ferre
