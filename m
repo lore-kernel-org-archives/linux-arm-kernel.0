@@ -1,234 +1,215 @@
-From: jh80.chung@samsung.com (Jaehoon Chung)
-Date: Fri, 29 Aug 2014 19:44:32 +0900
-Subject: [PATCH] mmc: dw_mmc: exynos: Add support for exynos7
-In-Reply-To: <1409231933-14796-1-git-send-email-yuvaraj.cd@samsung.com>
-References: <1409231933-14796-1-git-send-email-yuvaraj.cd@samsung.com>
-Message-ID: <54005990.8070306@samsung.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Fri, 29 Aug 2014 11:56:19 +0100
+Subject: [PATCH] mfd: palmas: Add support for optional wakeup
+In-Reply-To: <1408457197-30487-1-git-send-email-nm@ti.com>
+References: <1408457197-30487-1-git-send-email-nm@ti.com>
+Message-ID: <20140829105619.GH24579@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Abhilash.
+On Tue, 19 Aug 2014, Nishanth Menon wrote:
 
-On 08/28/2014 10:18 PM, Yuvaraj Kumar C D wrote:
-> From: Abhilash Kesavan <a.kesavan@samsung.com>
+> With the recent pinctrl-single changes, omaps can treat wake-up events
+> from deeper idle states as interrupts.
 > 
-> The Exynos7 has a DWMMC controller (v2.70a) which is different from
-> prior versions. This patch adds new compatible strings for exynos7.
-> This patch also fixes the CLKSEL register offset on exynos7.
-
-If support the 64bit, dw-mmc.c need to modify.(according to v2.70, some offset is changed for 64-bit address)
-But i didn't see any patches at mailing. 
-Do you have the plan which send patch of dw-mmc.c?
-
-Best Regards,
-Jaehoon Chung
+> Let's add support for the optional second interrupt for wake-up
+> events. And then SoC can wakeup and handle the event using it's
+> regular handler.
 > 
-> Signed-off-by: Abhilash Kesavan <a.kesavan@samsung.com>
-> Signed-off-by: Yuvaraj Kumar C D <yuvaraj.cd@samsung.com>
+> Finally, to pass the wake-up interrupt in the dts file,
+> interrupts-extended property needs to be passed.
+> 
+> This is similar in approach to commit 2a0b965cfb6e ("serial: omap: Add
+> support for optional wake-up")
+> 
+> Signed-off-by: Nishanth Menon <nm@ti.com>
 > ---
->  .../devicetree/bindings/mmc/exynos-dw-mshc.txt     |    4 +
->  drivers/mmc/host/dw_mmc-exynos.c                   |   91 +++++++++++++++++---
->  2 files changed, 82 insertions(+), 13 deletions(-)
+>  Documentation/devicetree/bindings/mfd/palmas.txt |   20 ++++++++
+
+DT Ack please.
+
+>  drivers/mfd/palmas.c                             |   59 ++++++++++++++++++++++
+>  include/linux/mfd/palmas.h                       |    2 +
+>  3 files changed, 81 insertions(+)
 > 
-> diff --git a/Documentation/devicetree/bindings/mmc/exynos-dw-mshc.txt b/Documentation/devicetree/bindings/mmc/exynos-dw-mshc.txt
-> index 6cd3525..ee4fc05 100644
-> --- a/Documentation/devicetree/bindings/mmc/exynos-dw-mshc.txt
-> +++ b/Documentation/devicetree/bindings/mmc/exynos-dw-mshc.txt
-> @@ -18,6 +18,10 @@ Required Properties:
->  	  specific extensions.
->  	- "samsung,exynos5420-dw-mshc": for controllers with Samsung Exynos5420
->  	  specific extensions.
-> +	- "samsung,exynos7-dw-mshc": for controllers with Samsung Exynos7
-> +	  specific extensions.
-> +	- "samsung,exynos7-dw-mshc-smu": for controllers with Samsung Exynos7
-> +	  specific extensions having an SMU.
->  
->  * samsung,dw-mshc-ciu-div: Specifies the divider value for the card interface
->    unit (ciu) clock. This property is applicable only for Exynos5 SoC's and
-> diff --git a/drivers/mmc/host/dw_mmc-exynos.c b/drivers/mmc/host/dw_mmc-exynos.c
-> index 0fbc53a..509365c 100644
-> --- a/drivers/mmc/host/dw_mmc-exynos.c
-> +++ b/drivers/mmc/host/dw_mmc-exynos.c
-> @@ -25,6 +25,7 @@
->  #define NUM_PINS(x)			(x + 2)
->  
->  #define SDMMC_CLKSEL			0x09C
-> +#define SDMMC_CLKSEL64			0x0A8
->  #define SDMMC_CLKSEL_CCLK_SAMPLE(x)	(((x) & 7) << 0)
->  #define SDMMC_CLKSEL_CCLK_DRIVE(x)	(((x) & 7) << 16)
->  #define SDMMC_CLKSEL_CCLK_DIVIDER(x)	(((x) & 7) << 24)
-> @@ -65,6 +66,8 @@ enum dw_mci_exynos_type {
->  	DW_MCI_TYPE_EXYNOS5250,
->  	DW_MCI_TYPE_EXYNOS5420,
->  	DW_MCI_TYPE_EXYNOS5420_SMU,
-> +	DW_MCI_TYPE_EXYNOS7,
-> +	DW_MCI_TYPE_EXYNOS7_SMU,
->  };
->  
->  /* Exynos implementation specific driver private data */
-> @@ -95,6 +98,12 @@ static struct dw_mci_exynos_compatible {
->  	}, {
->  		.compatible	= "samsung,exynos5420-dw-mshc-smu",
->  		.ctrl_type	= DW_MCI_TYPE_EXYNOS5420_SMU,
-> +	}, {
-> +		.compatible	= "samsung,exynos7-dw-mshc",
-> +		.ctrl_type	= DW_MCI_TYPE_EXYNOS7,
-> +	}, {
-> +		.compatible	= "samsung,exynos7-dw-mshc-smu",
-> +		.ctrl_type	= DW_MCI_TYPE_EXYNOS7_SMU,
->  	},
->  };
->  
-> @@ -102,7 +111,8 @@ static int dw_mci_exynos_priv_init(struct dw_mci *host)
->  {
->  	struct dw_mci_exynos_priv_data *priv = host->priv;
->  
-> -	if (priv->ctrl_type == DW_MCI_TYPE_EXYNOS5420_SMU) {
-> +	if (priv->ctrl_type == DW_MCI_TYPE_EXYNOS5420_SMU ||
-> +		priv->ctrl_type == DW_MCI_TYPE_EXYNOS7_SMU) {
->  		mci_writel(host, MPSBEGIN0, 0);
->  		mci_writel(host, MPSEND0, DWMCI_BLOCK_NUM);
->  		mci_writel(host, MPSCTRL0, DWMCI_MPSCTRL_SECURE_WRITE_BIT |
-> @@ -153,11 +163,22 @@ static int dw_mci_exynos_resume(struct device *dev)
->  static int dw_mci_exynos_resume_noirq(struct device *dev)
->  {
->  	struct dw_mci *host = dev_get_drvdata(dev);
-> +	struct dw_mci_exynos_priv_data *priv = host->priv;
->  	u32 clksel;
->  
-> -	clksel = mci_readl(host, CLKSEL);
-> -	if (clksel & SDMMC_CLKSEL_WAKEUP_INT)
-> -		mci_writel(host, CLKSEL, clksel);
-> +	if (priv->ctrl_type == DW_MCI_TYPE_EXYNOS7 ||
-> +		priv->ctrl_type == DW_MCI_TYPE_EXYNOS7_SMU)
-> +		clksel = mci_readl(host, CLKSEL64);
-> +	else
-> +		clksel = mci_readl(host, CLKSEL);
+> diff --git a/Documentation/devicetree/bindings/mfd/palmas.txt b/Documentation/devicetree/bindings/mfd/palmas.txt
+> index eda8989..2627842 100644
+> --- a/Documentation/devicetree/bindings/mfd/palmas.txt
+> +++ b/Documentation/devicetree/bindings/mfd/palmas.txt
+> @@ -51,3 +51,23 @@ palmas {
+>  		....
+>  	};
+>  }
 > +
-> +	if (clksel & SDMMC_CLKSEL_WAKEUP_INT) {
-> +		if (priv->ctrl_type == DW_MCI_TYPE_EXYNOS7 ||
-> +			priv->ctrl_type == DW_MCI_TYPE_EXYNOS7_SMU)
-> +			mci_writel(host, CLKSEL64, clksel);
-> +		else
-> +			mci_writel(host, CLKSEL, clksel);
-> +	}
+> +Example: with interrupts extended
+> + See Documentation/devicetree/bindings/interrupt-controller/interrupts.txt
+> + Use pinmux 0x418 as wakeup interrupt and gpio1_0 as interrupt source
+> +
+> +palmas {
+
+Should this be 'palmas at 40 {'?
+
+> +	compatible = "ti,twl6035", "ti,palmas";
+> +	reg = <0x48>
+> +	interrupt-parent = <&intc>;
+> +	interrupt-controller;
+> +	#interrupt-cells = <2>;
+> +	#address-cells = <1>;
+> +	#size-cells = <0>;
+> +	interrupts-extended = <&gpio1 0 IRQ_TYPE_LEVEL_HIGH
+> +			       &pinmux 0x418>;
+
+Can I get a DT Ack, that this is being used correctly?  It doesn't
+match the syntax given in:
+
+  Documentation/devicetree/bindings/interrupt-controller/interrupts.txt
+
+> +	pmic {
+> +		compatible = "ti,twl6035-pmic", "ti,palmas-pmic";
+> +		....
+> +	};
+> +}
+> diff --git a/drivers/mfd/palmas.c b/drivers/mfd/palmas.c
+> index 28cb048..11186ab 100644
+> --- a/drivers/mfd/palmas.c
+> +++ b/drivers/mfd/palmas.c
+> @@ -24,6 +24,7 @@
+>  #include <linux/mfd/core.h>
+>  #include <linux/mfd/palmas.h>
+>  #include <linux/of_device.h>
+> +#include <linux/of_irq.h>
 >  
+>  static const struct regmap_config palmas_regmap_config[PALMAS_NUM_CLIENTS] = {
+>  	{
+> @@ -326,6 +327,16 @@ static struct regmap_irq_chip tps65917_irq_chip = {
+>  			PALMAS_INT1_MASK),
+>  };
+>  
+> +static irqreturn_t palmas_wake_irq(int irq, void *_palmas)
+> +{
+> +	/*
+> +	 * Return Not handled so that interrupt is disabled.
+> +	 * Level event ensures that the event is eventually handled
+> +	 * by the appropriate chip handler already registered
+> +	 */
+
+This looks okay to me, but could do with a second opinion from someone
+who is a little more familier with this kind of h/w.
+
+How does this differ from threading IRQs?
+
+> +	return IRQ_NONE;
+> +}
+> +
+>  int palmas_ext_control_req_config(struct palmas *palmas,
+>  	enum palmas_external_requestor_id id,  int ext_ctrl, bool enable)
+>  {
+> @@ -409,6 +420,7 @@ static void palmas_dt_to_pdata(struct i2c_client *i2c,
+>  		pdata->mux_from_pdata = 1;
+>  		pdata->pad2 = prop;
+>  	}
+> +	pdata->wakeirq = irq_of_parse_and_map(node, 1);
+>  
+>  	/* The default for this register is all masked */
+>  	ret = of_property_read_u32(node, "ti,power-ctrl", &prop);
+> @@ -521,6 +533,7 @@ static int palmas_i2c_probe(struct i2c_client *i2c,
+>  	i2c_set_clientdata(i2c, palmas);
+>  	palmas->dev = &i2c->dev;
+>  	palmas->irq = i2c->irq;
+> +	palmas->wakeirq = pdata->wakeirq;
+>  
+>  	match = of_match_device(of_palmas_match_tbl, &i2c->dev);
+>  
+> @@ -587,6 +600,22 @@ static int palmas_i2c_probe(struct i2c_client *i2c,
+>  	if (ret < 0)
+>  		goto err_i2c;
+>  
+> +	if (!palmas->wakeirq)
+> +		goto no_wake_irq;
+> +
+> +	ret = devm_request_irq(palmas->dev, palmas->wakeirq,
+> +			       palmas_wake_irq,
+> +			       IRQF_ONESHOT | pdata->irq_flags,
+> +			       dev_name(palmas->dev),
+> +			       &palmas);
+> +	if (ret < 0)
+> +		goto err_i2c;
+> +
+> +	/* We use wakeirq only during suspend-resume path */
+> +	device_set_wakeup_capable(palmas->dev, true);
+> +	disable_irq_nosync(palmas->wakeirq);
+> +
+> +no_wake_irq:
+>  no_irq:
+>  	slave = PALMAS_BASE_TO_SLAVE(PALMAS_PU_PD_OD_BASE);
+>  	addr = PALMAS_BASE_TO_REG(PALMAS_PU_PD_OD_BASE,
+> @@ -706,6 +735,34 @@ static int palmas_i2c_remove(struct i2c_client *i2c)
 >  	return 0;
 >  }
-> @@ -169,6 +190,7 @@ static int dw_mci_exynos_resume_noirq(struct device *dev)
 >  
->  static void dw_mci_exynos_prepare_command(struct dw_mci *host, u32 *cmdr)
->  {
-> +	struct dw_mci_exynos_priv_data *priv = host->priv;
->  	/*
->  	 * Exynos4412 and Exynos5250 extends the use of CMD register with the
->  	 * use of bit 29 (which is reserved on standard MSHC controllers) for
-> @@ -176,8 +198,14 @@ static void dw_mci_exynos_prepare_command(struct dw_mci *host, u32 *cmdr)
->  	 * HOLD register should be bypassed in case there is no phase shift
->  	 * applied on CMD/DATA that is sent to the card.
->  	 */
-> -	if (SDMMC_CLKSEL_GET_DRV_WD3(mci_readl(host, CLKSEL)))
-> -		*cmdr |= SDMMC_CMD_USE_HOLD_REG;
-> +	if (priv->ctrl_type == DW_MCI_TYPE_EXYNOS7 ||
-> +		priv->ctrl_type == DW_MCI_TYPE_EXYNOS7_SMU) {
-> +		if (SDMMC_CLKSEL_GET_DRV_WD3(mci_readl(host, CLKSEL64)))
-> +			*cmdr |= SDMMC_CMD_USE_HOLD_REG;
-> +	 } else {
-> +		if (SDMMC_CLKSEL_GET_DRV_WD3(mci_readl(host, CLKSEL)))
-> +			*cmdr |= SDMMC_CMD_USE_HOLD_REG;
-> +	}
->  }
->  
->  static void dw_mci_exynos_set_ios(struct dw_mci *host, struct mmc_ios *ios)
-> @@ -188,12 +216,20 @@ static void dw_mci_exynos_set_ios(struct dw_mci *host, struct mmc_ios *ios)
->  	u8 div = priv->ciu_div + 1;
->  
->  	if (ios->timing == MMC_TIMING_MMC_DDR52) {
-> -		mci_writel(host, CLKSEL, priv->ddr_timing);
-> +		if (priv->ctrl_type == DW_MCI_TYPE_EXYNOS7 ||
-> +			priv->ctrl_type == DW_MCI_TYPE_EXYNOS7_SMU)
-> +			mci_writel(host, CLKSEL64, priv->ddr_timing);
-> +		else
-> +			mci_writel(host, CLKSEL, priv->ddr_timing);
->  		/* Should be double rate for DDR mode */
->  		if (ios->bus_width == MMC_BUS_WIDTH_8)
->  			wanted <<= 1;
->  	} else {
-> -		mci_writel(host, CLKSEL, priv->sdr_timing);
-> +		if (priv->ctrl_type == DW_MCI_TYPE_EXYNOS7 ||
-> +			priv->ctrl_type == DW_MCI_TYPE_EXYNOS7_SMU)
-> +			mci_writel(host, CLKSEL64, priv->sdr_timing);
-> +		else
-> +			mci_writel(host, CLKSEL, priv->sdr_timing);
->  	}
->  
->  	/* Don't care if wanted clock is zero */
-> @@ -265,26 +301,51 @@ static int dw_mci_exynos_parse_dt(struct dw_mci *host)
->  
->  static inline u8 dw_mci_exynos_get_clksmpl(struct dw_mci *host)
->  {
-> -	return SDMMC_CLKSEL_CCLK_SAMPLE(mci_readl(host, CLKSEL));
-> +	struct dw_mci_exynos_priv_data *priv = host->priv;
+> +static int palmas_i2c_suspend(struct i2c_client *i2c,  pm_message_t mesg)
+> +{
+> +	struct palmas *palmas = i2c_get_clientdata(i2c);
+> +	struct device *dev = &i2c->dev;
 > +
-> +	if (priv->ctrl_type == DW_MCI_TYPE_EXYNOS7 ||
-> +		priv->ctrl_type == DW_MCI_TYPE_EXYNOS7_SMU)
-> +		return SDMMC_CLKSEL_CCLK_SAMPLE(mci_readl(host, CLKSEL64));
-> +	else
-> +		return SDMMC_CLKSEL_CCLK_SAMPLE(mci_readl(host, CLKSEL));
->  }
->  
->  static inline void dw_mci_exynos_set_clksmpl(struct dw_mci *host, u8 sample)
->  {
->  	u32 clksel;
-> -	clksel = mci_readl(host, CLKSEL);
-> +	struct dw_mci_exynos_priv_data *priv = host->priv;
+> +	if (!palmas->wakeirq)
+> +		return 0;
 > +
-> +	if (priv->ctrl_type == DW_MCI_TYPE_EXYNOS7 ||
-> +		priv->ctrl_type == DW_MCI_TYPE_EXYNOS7_SMU)
-> +		clksel = mci_readl(host, CLKSEL64);
-> +	else
-> +		clksel = mci_readl(host, CLKSEL);
->  	clksel = (clksel & ~0x7) | SDMMC_CLKSEL_CCLK_SAMPLE(sample);
-> -	mci_writel(host, CLKSEL, clksel);
-> +	if (priv->ctrl_type == DW_MCI_TYPE_EXYNOS7 ||
-> +		priv->ctrl_type == DW_MCI_TYPE_EXYNOS7_SMU)
-> +		mci_writel(host, CLKSEL64, clksel);
-> +	else
-> +		mci_writel(host, CLKSEL, clksel);
->  }
+> +	if (device_may_wakeup(dev))
+> +		enable_irq(palmas->wakeirq);
+> +
+> +	return 0;
+> +}
+> +
+> +static int palmas_i2c_resume(struct i2c_client *i2c)
+> +{
+> +	struct palmas *palmas = i2c_get_clientdata(i2c);
+> +	struct device *dev = &i2c->dev;
+> +
+> +	if (!palmas->wakeirq)
+> +		return 0;
+> +
+> +	if (device_may_wakeup(dev))
+> +		disable_irq_nosync(palmas->wakeirq);
+> +
+> +	return 0;
+> +}
+> +
+>  static const struct i2c_device_id palmas_i2c_id[] = {
+>  	{ "palmas", },
+>  	{ "twl6035", },
+> @@ -721,6 +778,8 @@ static struct i2c_driver palmas_i2c_driver = {
+>  		   .of_match_table = of_palmas_match_tbl,
+>  		   .owner = THIS_MODULE,
+>  	},
+> +	.suspend = palmas_i2c_suspend,
+> +	.resume = palmas_i2c_resume,
+>  	.probe = palmas_i2c_probe,
+>  	.remove = palmas_i2c_remove,
+>  	.id_table = palmas_i2c_id,
+> diff --git a/include/linux/mfd/palmas.h b/include/linux/mfd/palmas.h
+> index fb0390a..e8cf4c2 100644
+> --- a/include/linux/mfd/palmas.h
+> +++ b/include/linux/mfd/palmas.h
+> @@ -75,6 +75,7 @@ struct palmas {
+>  	/* IRQ Data */
+>  	int irq;
+>  	u32 irq_mask;
+> +	int wakeirq;
+>  	struct mutex irq_lock;
+>  	struct regmap_irq_chip_data *irq_data;
 >  
->  static inline u8 dw_mci_exynos_move_next_clksmpl(struct dw_mci *host)
->  {
-> +	struct dw_mci_exynos_priv_data *priv = host->priv;
->  	u32 clksel;
->  	u8 sample;
+> @@ -377,6 +378,7 @@ struct palmas_clk_platform_data {
 >  
-> -	clksel = mci_readl(host, CLKSEL);
-> +	if (priv->ctrl_type == DW_MCI_TYPE_EXYNOS7 ||
-> +		priv->ctrl_type == DW_MCI_TYPE_EXYNOS7_SMU)
-> +		clksel = mci_readl(host, CLKSEL64);
-> +	else
-> +		clksel = mci_readl(host, CLKSEL);
->  	sample = (clksel + 1) & 0x7;
->  	clksel = (clksel & ~0x7) | sample;
-> -	mci_writel(host, CLKSEL, clksel);
-> +	if (priv->ctrl_type == DW_MCI_TYPE_EXYNOS7 ||
-> +		priv->ctrl_type == DW_MCI_TYPE_EXYNOS7_SMU)
-> +		mci_writel(host, CLKSEL64, clksel);
-> +	else
-> +		mci_writel(host, CLKSEL, clksel);
->  	return sample;
->  }
+>  struct palmas_platform_data {
+>  	int irq_flags;
+> +	int wakeirq;
+>  	int gpio_base;
 >  
-> @@ -411,6 +472,10 @@ static const struct of_device_id dw_mci_exynos_match[] = {
->  			.data = &exynos_drv_data, },
->  	{ .compatible = "samsung,exynos5420-dw-mshc-smu",
->  			.data = &exynos_drv_data, },
-> +	{ .compatible = "samsung,exynos7-dw-mshc",
-> +			.data = &exynos_drv_data, },
-> +	{ .compatible = "samsung,exynos7-dw-mshc-smu",
-> +			.data = &exynos_drv_data, },
->  	{},
->  };
->  MODULE_DEVICE_TABLE(of, dw_mci_exynos_match);
-> 
+>  	/* bit value to be loaded to the POWER_CTRL register */
+
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
