@@ -1,145 +1,145 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Fri, 29 Aug 2014 07:41:57 -0500
-Subject: [PATCH] mfd: palmas: Add support for optional wakeup
-In-Reply-To: <20140829105619.GH24579@lee--X1>
-References: <1408457197-30487-1-git-send-email-nm@ti.com>
- <20140829105619.GH24579@lee--X1>
-Message-ID: <54007515.5080506@ti.com>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Fri, 29 Aug 2014 14:48:36 +0200
+Subject: [PATCH 1/4] clk: mvebu: Fix clk frequency value if SSCG is enabled
+In-Reply-To: <1409312620-20631-2-git-send-email-gregory.clement@free-electrons.com>
+References: <1409312620-20631-1-git-send-email-gregory.clement@free-electrons.com>
+ <1409312620-20631-2-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <540076A4.5000303@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/29/2014 05:56 AM, Lee Jones wrote:
-> On Tue, 19 Aug 2014, Nishanth Menon wrote:
-> 
->> With the recent pinctrl-single changes, omaps can treat wake-up events
->> from deeper idle states as interrupts.
->>
->> Let's add support for the optional second interrupt for wake-up
->> events. And then SoC can wakeup and handle the event using it's
->> regular handler.
->>
->> Finally, to pass the wake-up interrupt in the dts file,
->> interrupts-extended property needs to be passed.
->>
->> This is similar in approach to commit 2a0b965cfb6e ("serial: omap: Add
->> support for optional wake-up")
->>
->> Signed-off-by: Nishanth Menon <nm@ti.com>
->> ---
->>  Documentation/devicetree/bindings/mfd/palmas.txt |   20 ++++++++
-> 
-> DT Ack please.
-> 
->>  drivers/mfd/palmas.c                             |   59 ++++++++++++++++++++++
->>  include/linux/mfd/palmas.h                       |    2 +
->>  3 files changed, 81 insertions(+)
->>
->> diff --git a/Documentation/devicetree/bindings/mfd/palmas.txt b/Documentation/devicetree/bindings/mfd/palmas.txt
->> index eda8989..2627842 100644
->> --- a/Documentation/devicetree/bindings/mfd/palmas.txt
->> +++ b/Documentation/devicetree/bindings/mfd/palmas.txt
->> @@ -51,3 +51,23 @@ palmas {
->>  		....
->>  	};
->>  }
->> +
->> +Example: with interrupts extended
->> + See Documentation/devicetree/bindings/interrupt-controller/interrupts.txt
->> + Use pinmux 0x418 as wakeup interrupt and gpio1_0 as interrupt source
->> +
->> +palmas {
-> 
-> Should this be 'palmas at 40 {'?
+On 08/29/2014 01:43 PM, Gregory CLEMENT wrote:
+> When the SSCG (Spread Spectrum Clock Generator) is enabled, it shifts
+> the frequency of the clock. The percentage is no more than 1% but when
+> the clock is used for a timer it leads to a clock drift.
+>
+> This patch allows to correct the affected clock when the SSCG is
+> enabled. The check is done in an new optional function related to each
+> SoC: is_sscg_enabled(). If this function is not present then no
+> correction is done on the clock frequency.
 
-I might have preferred that as well.. I kept the existing style in the
-documentation. Would you like me to change existing doc style too?
+Gregory,
 
-> 
->> +	compatible = "ti,twl6035", "ti,palmas";
->> +	reg = <0x48>
->> +	interrupt-parent = <&intc>;
->> +	interrupt-controller;
->> +	#interrupt-cells = <2>;
->> +	#address-cells = <1>;
->> +	#size-cells = <0>;
->> +	interrupts-extended = <&gpio1 0 IRQ_TYPE_LEVEL_HIGH
->> +			       &pinmux 0x418>;
-> 
-> Can I get a DT Ack, that this is being used correctly?  It doesn't
-> match the syntax given in:
-> 
->   Documentation/devicetree/bindings/interrupt-controller/interrupts.txt
-Did you mean:
-<&gpio1 0 IRQ_TYPE_LEVEL_HIGH>, <&pinmux 0x418>;
+I think computing the SSCG inside the common clk part is a no-go. I
+flipped through KW, Dove, Armada 370, and Armada XP FS looking at
+SSCG config register layout. Guess what: Dove is different.
 
-Yes, I can fix that - sorry, both usage seem to be functional.
+How about we have a .get_sscg_deviation() callback instead and move
+the one below to some common place where KW, Armada 370, and XP can
+set it for their callback struct?
 
-> 
->> +	pmic {
->> +		compatible = "ti,twl6035-pmic", "ti,palmas-pmic";
->> +		....
->> +	};
->> +}
->> diff --git a/drivers/mfd/palmas.c b/drivers/mfd/palmas.c
->> index 28cb048..11186ab 100644
->> --- a/drivers/mfd/palmas.c
->> +++ b/drivers/mfd/palmas.c
->> @@ -24,6 +24,7 @@
->>  #include <linux/mfd/core.h>
->>  #include <linux/mfd/palmas.h>
->>  #include <linux/of_device.h>
->> +#include <linux/of_irq.h>
->>  
->>  static const struct regmap_config palmas_regmap_config[PALMAS_NUM_CLIENTS] = {
->>  	{
->> @@ -326,6 +327,16 @@ static struct regmap_irq_chip tps65917_irq_chip = {
->>  			PALMAS_INT1_MASK),
->>  };
->>  
->> +static irqreturn_t palmas_wake_irq(int irq, void *_palmas)
->> +{
->> +	/*
->> +	 * Return Not handled so that interrupt is disabled.
->> +	 * Level event ensures that the event is eventually handled
->> +	 * by the appropriate chip handler already registered
->> +	 */
-> 
-> This looks okay to me, but could do with a second opinion from someone
-> who is a little more familier with this kind of h/w.
-> 
-> How does this differ from threading IRQs?
+Sebastian
 
-I could try with an example:
-consider a GPIO block 7 gpio 4 connected to a pinctrl pin 234 as the
-interrupt source for palmas.
-
-When the system is active, the GPIO block 7, gpio 4 happily functions
-as the interrupt source. However, the SoC might not capable of
-achieving SoC wide deepsleep when GPIO block 7 is active, So we have
-to power off GPIO block 7. However on achieving low power, the system
-needs to be capable of waking backup, for this, SoC uses the hardware
-at the pin itself(TI calls it control module, others have other names,
-lets for the discussion, call it pinctrl), on going to sleep the
-action of enabling the pinctrl irq - enables the wakeup capability of
-the pin, and disabling it disabled the wakeup capability. when the
-wakeup event does take place, in some cases, it might be a edge event,
-where by the time we have recofigured GPIO block, the interrupt event
-is long gone - to support this, pinctrl invokes the driver interrupt
-handler to ensure this functions. in our case(palmas), we are level
-event and can depend on GPIO block to handle it when it is configured.
-
-Basically two interrupt sources when SoC is in deep sleep(1 to exit
-from deepsleep, and other from the module handling the actual event) -
-Example: powerbutton press OR palmas RTC wakeup OR Palmas GPIO
-generated wakeup.
-
-However, this is not the same as threading IRQ as the wakeup event is
-involved only during suspend path.
-
-commit 2a0b965cfb6e ("serial: omap: Add support for optional wake-up")
-
-is a good reference from serial port handling perspective.
-
--- 
-Regards,
-Nishanth Menon
+> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> ---
+>   drivers/clk/mvebu/common.c | 74 ++++++++++++++++++++++++++++++++++++++++++++++
+>   drivers/clk/mvebu/common.h |  1 +
+>   2 files changed, 75 insertions(+)
+>
+> diff --git a/drivers/clk/mvebu/common.c b/drivers/clk/mvebu/common.c
+> index 25ceccf939ad..834d36cf79b0 100644
+> --- a/drivers/clk/mvebu/common.c
+> +++ b/drivers/clk/mvebu/common.c
+> @@ -26,8 +26,78 @@
+>    * Core Clocks
+>    */
+>
+> +#define SSCG_CONF_MODE(reg)	(((reg) >> 16) & 0x3)
+> +#define SSCG_SPREAD_DOWN	0x0
+> +#define SSCG_SPREAD_UP		0x1
+> +#define SSCG_SPREAD_CENTRAL	0x2
+> +#define SSCG_CONF_LOW(reg)	(((reg) >> 8) & 0xFF)
+> +#define SSCG_CONF_HIGH(reg)	((reg) & 0xFF)
+> +
+>   static struct clk_onecell_data clk_data;
+>
+> +static u32 fix_sscg_deviation(struct device_node *np, u32 system_clk)
+> +{
+> +	struct device_node *sscg_np = NULL;
+> +	void __iomem *sscg_map;
+> +	u32 sscg_reg;
+> +	s32 low_bound, high_bound;
+> +	u64 freq_swing_half;
+> +
+> +	sscg_np = of_find_node_by_name(np, "sscg");
+> +	if (sscg_np == NULL) {
+> +		pr_err("cannot get SSCG register node\n");
+> +		return system_clk;
+> +	}
+> +
+> +	sscg_map = of_iomap(sscg_np, 0);
+> +	if (sscg_map == NULL) {
+> +		pr_err("cannot map SSCG register\n");
+> +		goto out;
+> +	}
+> +
+> +	sscg_reg = readl(sscg_map);
+> +	high_bound = SSCG_CONF_HIGH(sscg_reg);
+> +	low_bound = SSCG_CONF_LOW(sscg_reg);
+> +
+> +	if ((high_bound - low_bound) <= 0)
+> +		goto out;
+> +	/*
+> +	 * From the datasheet we got the following formula
+> +	 * Spread percentage = 1/96 * (H - L) / H
+> +	 * H = SSCG_High_Boundary
+> +	 * L = SSCG_Low_Boundary
+> +	 *
+> +	 * As the deviation is half of spread then it lead to the
+> +	 * following formula in the code.
+> +	 *
+> +	 * To avoid an overflow and not lose any significant digit in
+> +	 * the same time we have to use a 64 bit integer.
+> +	 */
+> +
+> +	freq_swing_half = (((u64)high_bound - (u64)low_bound)
+> +			* (u64)system_clk);
+> +	do_div(freq_swing_half, (2 * 96 * high_bound));
+> +
+> +	switch (SSCG_CONF_MODE(sscg_reg)) {
+> +	case SSCG_SPREAD_DOWN:
+> +		system_clk -= freq_swing_half;
+> +		break;
+> +	case SSCG_SPREAD_UP:
+> +		system_clk += freq_swing_half;
+> +		break;
+> +	case SSCG_SPREAD_CENTRAL:
+> +	default:
+> +		break;
+> +	}
+> +
+> +	iounmap(sscg_map);
+> +
+> +out:
+> +	of_node_put(sscg_np);
+> +
+> +	return system_clk;
+> +}
+> +
+>   void __init mvebu_coreclk_setup(struct device_node *np,
+>   				const struct coreclk_soc_desc *desc)
+>   {
+> @@ -62,6 +132,10 @@ void __init mvebu_coreclk_setup(struct device_node *np,
+>   	of_property_read_string_index(np, "clock-output-names", 1,
+>   				      &cpuclk_name);
+>   	rate = desc->get_cpu_freq(base);
+> +
+> +	if (desc->is_sscg_enabled && desc->is_sscg_enabled(base))
+> +		rate = fix_sscg_deviation(np, rate);
+> +
+>   	clk_data.clks[1] = clk_register_fixed_rate(NULL, cpuclk_name, NULL,
+>   						   CLK_IS_ROOT, rate);
+>   	WARN_ON(IS_ERR(clk_data.clks[1]));
+> diff --git a/drivers/clk/mvebu/common.h b/drivers/clk/mvebu/common.h
+> index f968b4d9df92..495f94ff4c90 100644
+> --- a/drivers/clk/mvebu/common.h
+> +++ b/drivers/clk/mvebu/common.h
+> @@ -28,6 +28,7 @@ struct coreclk_soc_desc {
+>   	u32 (*get_tclk_freq)(void __iomem *sar);
+>   	u32 (*get_cpu_freq)(void __iomem *sar);
+>   	void (*get_clk_ratio)(void __iomem *sar, int id, int *mult, int *div);
+> +	bool (*is_sscg_enabled)(void __iomem *sar);
+>   	const struct coreclk_ratio *ratios;
+>   	int num_ratios;
+>   };
+>
