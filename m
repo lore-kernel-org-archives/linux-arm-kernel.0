@@ -1,87 +1,140 @@
-From: khilman@kernel.org (Kevin Hilman)
-Date: Fri, 29 Aug 2014 08:03:12 -0700
-Subject: [PATCH v9 4/6] ARM: Exynos: switch to using generic cpufreq
- driver for Exynos4210/5250/5420
-In-Reply-To: <CAJuA9ajtsrY7zSDMs=c6BZ0AqERoBgvq++dTF4Dn673zGMfcgQ@mail.gmail.com>
-References: <1406707663-16656-1-git-send-email-thomas.ab@samsung.com>
- <1406707663-16656-5-git-send-email-thomas.ab@samsung.com>
- <53DA8BB9.6020702@samsung.com> <53DA8D85.3050106@gmail.com>
- <7hbnrc6px3.fsf@paris.lan> <53F7DA13.6090305@gmail.com>
- <CADWw7OgAS-z-UOrJU-hL2fzuefJmLtCTg57jYk2Df7f5KfLJmA@mail.gmail.com>
- <7h8umc60we.fsf@paris.lan>
- <CADWw7OgW+o3tB=ptnsy-PsmXmNv8oXzt_WfK6NswQiEWWwAzNA@mail.gmail.com>
- <CAGa+x85-Anb+HsSUQRaaeex19-HK+yZDW0UpFBwAtsQ8Sf2Aqg@mail.gmail.com>
- <CAGa+x86jU8MR=r_xuaiorbNNyqrezb0b6Ozy-MPg9HvsARESOw@mail.gmail.com>
- <CAJuA9ajtsrY7zSDMs=c6BZ0AqERoBgvq++dTF4Dn673zGMfcgQ@mail.gmail.com>
-Message-ID: <CAMAWPa-8h5PNhgT+ApBhA8p=i+4oFOnYnQsQ4mK1JKwwAhpvpQ@mail.gmail.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Fri, 29 Aug 2014 17:04:28 +0200
+Subject: [PATCH v4 3/5] ARM: tegra: Initialize interrupt controller from DT
+In-Reply-To: <20140829142408.GA31264@ulmo>
+References: <1409239879-12376-1-git-send-email-thierry.reding@gmail.com>
+ <1409239879-12376-3-git-send-email-thierry.reding@gmail.com>
+ <3056623.fB9uqpleQ5@wuerfel> <20140829073139.GG13106@ulmo>
+ <20140829142408.GA31264@ulmo>
+Message-ID: <20140829150422.GA11035@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas,
+On Fri, Aug 29, 2014 at 04:24:10PM +0200, Thierry Reding wrote:
+> On Fri, Aug 29, 2014 at 09:31:40AM +0200, Thierry Reding wrote:
+> > On Thu, Aug 28, 2014 at 06:10:55PM +0200, Arnd Bergmann wrote:
+> > > On Thursday 28 August 2014 17:31:17 Thierry Reding wrote:
+> > > 
+> > > >  void __init tegra_init_irq(void)
+> > > >  {
+> > > > -	int i;
+> > > > -	void __iomem *distbase;
+> > > > +	unsigned int max_ictlrs = ARRAY_SIZE(ictlr_regs), i;
+> > > > +	const struct of_device_id *match;
+> > > > +	struct device_node *np;
+> > > > +	struct resource res;
+> > > > +
+> > > > +	np = of_find_matching_node_and_match(NULL, ictlr_matches, &match);
+> > > > +	if (np) {
+> > > > +		const struct tegra_ictlr_soc *soc = match->data;
+> > > > +
+> > > > +		for (i = 0; i < soc->num_ictlrs; i++) {
+> > > > +			if (of_address_to_resource(np, i, &res) < 0)
+> > > > +				break;
+> > > > +
+> > > > +			ictlr_regs[i] = res;
+> > > > +		}
+> > > > +
+> > > > +		WARN(i != soc->num_ictlrs,
+> > > > +		     "Found %u interrupt controllers in DT; expected %u.\n",
+> > > > +		     i, soc->num_ictlrs);
+> > > > +
+> > > > +		max_ictlrs = soc->num_ictlrs;
+> > > > +		of_node_put(np);
+> > > > +	} else {
+> > > > +		/*
+> > > > +		 * If no matching device node was found, fall back to using
+> > > > +		 * the chip ID.
+> > > > +		 */
+> > > > +
+> > > > +		/* Tegra30 and later have five interrupt controllers, ... */
+> > > > +		max_ictlrs = ARRAY_SIZE(ictlr_regs);
+> > > > +
+> > > > +		/* ..., but Tegra20 only has four. */
+> > > > +		if (of_machine_is_compatible("nvidia,tegra20"))
+> > > > +			max_ictlrs--;
+> > > > +	}
+> > > 
+> > > How about moving the entire file to drivers/irqchip and using the
+> > > IRQCHIP_DECLARE() helper for the DT case?
+> > > 
+> > > For the fallback, you can have an entry into that file that just takes
+> > > the address and number, which you can call from platform code here.
+> > 
+> > I think I did try that at some point, but there were issues that I don't
+> > remember. I'll give it another shot.
+> 
+> So I got pretty far with this and the system still boots. But for some
+> reason suspend/resume is now broken. The difference seems to be that
+> earlier the legacy interrupt controller would be registered first, and
+> the GIC second. When the legacy interrupt controller is initialized
+> after the GIC (which happens when I use IRQCHIP_DECLARE), then suspend
+> and resume won't work (for some yet unknown reason). Unfortunately the
+> of_irq_init() code is too clever, so I can't even work around it by
+> changing link order or device tree order.
+> 
+> I'll see if I can find out what causes this combination to malfunction
+> when initialized in the opposite order.
 
-On Fri, Aug 29, 2014 at 5:52 AM, Thomas Abraham <ta.omasab@gmail.com> wrote:
-> Hi Kevin,
->
-> On Wed, Aug 27, 2014 at 3:55 AM, Kevin Hilman <khilman@linaro.org> wrote:
->> On Tue, Aug 26, 2014 at 8:15 AM, Kevin Hilman <khilman@linaro.org> wrote:
->>> On Mon, Aug 25, 2014 at 10:25 PM, Chander Kashyap <k.chander@samsung.com> wrote:
->>
->> [...]
->>
->>>>>
->>>>> Can you clarify how you're setting the voltages to ensure stability?
->>>>
->>>> below is the diff :  wip/exynos/integ
->>>
->>> Thanks.
->>>
->>> I've applied your patch, and bootup shows vdd_arm and vdd_kfc at
->>> 1500mV, but still when booting with cpuidle enabled (bL switcher
->>> disabled), I'm seeing lockups with no kernel output.  With CPUidle
->>> disabled, things are pretty stable.
->>>
->>> What tree are you using to test this out on 5420?  I'm using mainline
->>> v3.17-rc1 + DT patch for CPUidle and this cpufreq series.  See my
->>> wip/exynos/integ branch at
->>> git://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux.git.
->>
->> I mis-stated this.  Actually my tree is based on the v3.17-rc1 branch
->> of the exynos-reference tree[1] + the above mentioned patches for
->> cpuidle and cpufreq.
->>
->> Also, I've narrowed down the instability a bit, and it's not related
->> to CPUidle.  I can now trigger a boot hang even without CPUidle
->> enabled.  Here's a quick way to cause a boot lockup. With the switcher
->> disabled, I enable CPUfreq and set the default governor to
->> performance.  As soon as cpufreq driver loads, it tries to use the top
->> frequences for both clusters, and it hangs.
->>
->> Selectively disabling frequencies, I narrowed it down to the 1.3GHz
->> and 1.2GHz frequencies of the little cluster.  With these commented
->> out in the DT, it will fully boot with the performance governor
->> enabled.
->>
->> So that leads to the question.  Are all of the operating points in
->> exynos5420.dtsi valid for exynos5800, and have they been validated?
->
-> I tried to recreate the boot lockup issue using the same steps you
-> listed above for the Exynos5800 peach-pi platform (Chromebook2), but I
-> do not see any issues. I can see both clusters with max clock speed
-> after boot (1.8GHz and 1.3GHz).
->
-> I am using v3.17-rc2 + CPUFreq Patches + max77802 regulator support
-> patches for Chromebook2 + temp hack to set A15 voltage to 1.35V and A7
-> voltage to 1.3V.
+The reason for why ordering matters is this line from the GIC driver
+(see drivers/irqchip/irq-gic.c):
 
-Can you share your branch and temp hack(s) as well as your defconfig?
+	static int gic_init_bases(...)
+	{
+		...
+		gic_chip.flags |= gic_arch_extn.flags;
+		...
+	}
 
-I'm using the v3.17-rc1 branch from the exynos tree (which includes
-the max77802 series) but also has a bunch of other stuff which may be
-causing the issue.
+So there's an implicit dependency on having the architecture-specific
+extension initialized before the GIC.
 
-It would be good if I can reproduce your exact tree/branch and see if
-I still have the same problem.
+If I manually add in the flags set by the LIC (IRQCHIP_MASK_ON_SUSPEND)
+the suspend/resume issue that I observed goes away.
 
-Thanks for looking into this,
+Perhaps a better way to handle this would be to add an API that GIC IRQ
+extensions can use to register with the GIC independent of the
+initialization order?
 
-Kevin
+In this particular case something like:
+
+	void gic_arch_register(unsigned long flags)
+	{
+		gic_chip.flags |= flags;
+	}
+
+would work irrespective of the ordering. But perhaps something more
+elaborate would be more futureproof:
+
+	void gic_arch_register(const struct irqchip *extn)
+	{
+		gic_chip.flags |= extn->flags;
+		gic_arch_extn = *extn;
+	}
+
+Or perhaps gic_arch_extn could be turned into a pointer so that checks
+for already registered extension drivers can be more easily done. That
+is:
+
+	static struct irq_chip *extn;
+
+	void gic_arch_register(const struct irqchip *chip)
+	{
+		if (WARN(extn != NULL))
+			return;
+
+		gic_chip.flags |= chip->flags;
+		extn = chip;
+	}
+
+Any preferences, or other ideas? Adding Thomas and Jason, perhaps they
+can provide more input on how to solve this.
+
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140829/1ed9c444/attachment-0001.sig>
