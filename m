@@ -1,64 +1,36 @@
-From: edubezval@gmail.com (Eduardo Valentin)
-Date: Thu, 28 Aug 2014 10:53:12 -0400
-Subject: [PATCHv5 4/4] thermal: exynos: Remove duplicate code when
- reading triminfo register of Exynos5440
-In-Reply-To: <53FEAF2A.1080400@samsung.com>
-References: <1409016665-3824-1-git-send-email-cw00.choi@samsung.com>
- <1409016665-3824-5-git-send-email-cw00.choi@samsung.com>
- <53FEAF2A.1080400@samsung.com>
-Message-ID: <20140828145310.GC18194@developer>
+From: pramod.gurav@smartplayin.com (Pramod Gurav)
+Date: Thu, 28 Aug 2014 20:22:46 -0700
+Subject: [PATCH 0/4] Add reset support for apq8064
+Message-ID: <1409282570-27299-1-git-send-email-pramod.gurav@smartplayin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 28, 2014 at 01:25:14PM +0900, Chanwoo Choi wrote:
-> Dear Eduardo,
-> 
-> This patch is wrong. It is my mistake.
-> 
-> Please ignore only this patch because
-> the offset calculation of 'case 0' is different from 'case 2'.
+The reset on apq8064 is provided on gpio78 function1. We need to configure
+gpio78 to function as ps_hold and write to base of the register to get the
+device rebooted. 
 
+First two patches in this patchset adds necessary DT support for apq8064-pinctrl
+and DT support to mux gpio_78 as ps_hold function.
 
-Do patches 1 - 3 are still correct? Patch 1, from Barlomiej, seams to be
-a common agreement. 
+Third patch documents the ps_hold function in apq8064-pinctrl DT binding
 
-> 
-> Best Regards,
-> Chanwoo Choi
-> 
-> On 08/26/2014 10:31 AM, Chanwoo Choi wrote:
-> > This patch remove simply duplicate code when reading triminfo register of Exynos5440.
-> > 
-> > Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
-> > Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
-> > Cc: Zhang Rui <rui.zhang@intel.com>
-> > Cc: Eduardo Valentin <edubezval@gmail.com>
-> > Cc: Amit Daniel Kachhap <amit.daniel@samsung.com>
-> > Reviewed-by: Amit Daniel Kachhap <amit.daniel@samsung.com>
-> > ---
-> >  drivers/thermal/samsung/exynos_tmu.c | 4 +---
-> >  1 file changed, 1 insertion(+), 3 deletions(-)
-> > 
-> > diff --git a/drivers/thermal/samsung/exynos_tmu.c b/drivers/thermal/samsung/exynos_tmu.c
-> > index 64c702a..5888467 100644
-> > --- a/drivers/thermal/samsung/exynos_tmu.c
-> > +++ b/drivers/thermal/samsung/exynos_tmu.c
-> > @@ -187,15 +187,13 @@ static int exynos_tmu_initialize(struct platform_device *pdev)
-> >  		 */
-> >  		switch (data->id) {
-> >  		case 0:
-> > +		case 2:
-> >  			trim_info = readl(data->base +
-> >  			EXYNOS5440_EFUSE_SWAP_OFFSET + reg->triminfo_data);
-> >  			break;
-> >  		case 1:
-> >  			trim_info = readl(data->base + reg->triminfo_data);
-> >  			break;
-> > -		case 2:
-> > -			trim_info = readl(data->base -
-> > -			EXYNOS5440_EFUSE_SWAP_OFFSET + reg->triminfo_data);
-> >  		}
-> >  	} else {
-> >  		/* On exynos5420 the triminfo register is in the shared space */
-> > 
-> 
+Fourth implements the actual reset by initialising arm_pm_restart to a reset
+function if ps_hold function is programmed in the pinctrl driver.
+
+This is v2 with below changes since v1:
+1. Added #error log as suggested by Kumar Gala 
+2. Correct interrupts in DT from 32 to 16 based on Bjorn's new patch in bindings
+3. Replaced hardcoding in DT with IRQ_TYPE_LEVEL_HIGH for interrupt level type
+
+Pramod Gurav (4):
+  ARM: DT: APQ8064: Add pinctrl support
+  ARM: DT: APQ8064: Add node for ps_hold function in pinctrl
+  pinctrl: msm: Add ps_hold function in pinctrl-apq8064 binding
+    documentation
+  pinctrl: qcom: Add support for reset for apq8064
+
+ .../bindings/pinctrl/qcom,apq8064-pinctrl.txt      |    2 +-
+ arch/arm/boot/dts/qcom-apq8064.dtsi                |   21 +++++++++++
+ drivers/pinctrl/qcom/pinctrl-apq8064.c             |    7 +++-
+ drivers/pinctrl/qcom/pinctrl-msm.c                 |   38 ++++++++++++++++++++
+ 4 files changed, 66 insertions(+), 2 deletions(-)
