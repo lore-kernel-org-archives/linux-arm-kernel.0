@@ -1,46 +1,62 @@
-From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Fri, 29 Aug 2014 11:31:02 -0600
-Subject: [PATCH 3/3] ARM: zynq: DT: Add Ethernet phys
-In-Reply-To: <e52ebd6c-2f0d-4ea9-a01f-882212956ace@BL2FFO11FD029.protection.gbl>
-References: <1408550219-19825-3-git-send-email-soren.brinkmann@xilinx.com>
- <5a7b6f57-b6c0-4fb3-af0d-d403277c0207@BN1AFFO11FD045.protection.gbl>
- <53F5D8D9.7040604@suse.de>
- <f166a186-301c-4288-97cf-71f8173c07e7@BN1AFFO11FD010.protection.gbl>
- <CAGVrzcYWN83tznwvw1M9V_mwWgobs2kwtRvEj4stqE=XGC10fg@mail.gmail.com>
- <20140825174610.GA13737@obsidianresearch.com>
- <53FB9AC4.8010704@gmail.com>
- <660fe929-1f16-4e22-8bd3-0388cd363978@BY2FFO11FD038.protection.gbl>
- <540099AF.4020005@suse.de>
- <e52ebd6c-2f0d-4ea9-a01f-882212956ace@BL2FFO11FD029.protection.gbl>
-Message-ID: <20140829173102.GA30917@obsidianresearch.com>
+From: peter.maydell@linaro.org (Peter Maydell)
+Date: Fri, 29 Aug 2014 18:39:09 +0100
+Subject: [PATCH 06/16] KVM: Add KVM_EXIT_SYSTEM_EVENT to user space API
+ header
+In-Reply-To: <1401041942-23471-7-git-send-email-christoffer.dall@linaro.org>
+References: <1401041942-23471-1-git-send-email-christoffer.dall@linaro.org>
+ <1401041942-23471-7-git-send-email-christoffer.dall@linaro.org>
+Message-ID: <CAFEAcA-yWadPiE4v7f-C1-V71=QHYLB=fzC78xhNMnNkVSJAhg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 29, 2014 at 08:35:36AM -0700, S?ren Brinkmann wrote:
+On 25 May 2014 19:18, Christoffer Dall <christoffer.dall@linaro.org> wrote:
+> From: Anup Patel <anup.patel@linaro.org>
+>
+> Currently, we don't have an exit reason to notify user space about
+> a system-level event (for e.g. system reset or shutdown) triggered
+> by the VCPU. This patch adds exit reason KVM_EXIT_SYSTEM_EVENT for
+> this purpose. We can also inform user space about the 'type' and
+> architecture specific 'flags' of a system-level event using the
+> kvm_run structure.
+>
+> This newly added KVM_EXIT_SYSTEM_EVENT will be used by KVM ARM/ARM64
+> in-kernel PSCI v0.2 support to reset/shutdown VMs.
 
-> The compatible string is listed as optional property for PHYs. So, not
-> having one is an option, I guess. But, I'd also prefer to at least keep
-> the -c22 one, since I saw problems when I tried using -c45 (the Zed phy
-> should support it...).
+> --- a/Documentation/virtual/kvm/api.txt
+> +++ b/Documentation/virtual/kvm/api.txt
+> @@ -2740,6 +2740,21 @@ It gets triggered whenever both KVM_CAP_PPC_EPR are enabled and an
+>  external interrupt has just been delivered into the guest. User space
+>  should put the acknowledged interrupt vector into the 'epr' field.
+>
+> +               /* KVM_EXIT_SYSTEM_EVENT */
+> +               struct {
+> +#define KVM_SYSTEM_EVENT_SHUTDOWN       1
+> +#define KVM_SYSTEM_EVENT_RESET          2
+> +                       __u32 type;
+> +                       __u64 flags;
+> +               } system_event;
+> +
+> +If exit_reason is KVM_EXIT_SYSTEM_EVENT then the vcpu has triggered
+> +a system-level event using some architecture specific mechanism (hypercall
+> +or some special instruction). In case of ARM/ARM64, this is triggered using
+> +HVC instruction based PSCI call from the vcpu. The 'type' field describes
+> +the system-level event type. The 'flags' field describes architecture
+> +specific flags for the system-level event.
 
--c45 and -c22 use a completely different MDIO protocol, Zed doesn't
-have a 10GE port, so it certainly doesn't use -c45.
+Talking with Ard I realised that there's actually a hole in the
+specification of this new ABI. Did we intend these shutdown
+and reset exits to be:
+ (1) requests from the guest for the shutdown/reset to be
+   scheduled in the near future (and we'll continue to execute
+   the guest until the shutdown actually happens)
+ (2) requests for shutdown/reset right now, with no further
+   guest instructions to be executed
 
-If there is no compatible string at all the defined default is to use
--c22.
+?
 
-> Also, so far, we haven't had any phy nodes in our Zynq dts files and
-> Ethernet worked, so the auto-detection there works pretty well
-> apparently. But it may be problematic if more than a single PHY is on
-> the MDIO bus, I'd assume.
+As currently implemented in QEMU we get behaviour (1),
+but I think the kernel PSCI implementation assumes
+behaviour (2). Who's right?
 
-Phy autodetection has always worked in some cases, but for DT ethernet
-bindings it is expected that there is an option to specify an explicit
-MDIO bus, and a phy-handle phandle to point to the phy. The phy should
-be explicitly called out with the fixed MDIO address specified to
-avoid sketchy MDIO address auto probing.
-
-This provides the framework to specify interrupts and register
-overrides for the phy in the DT.
-
-Jason
+thanks
+-- PMM
