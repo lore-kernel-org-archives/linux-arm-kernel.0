@@ -1,54 +1,145 @@
-From: shengjiu.wang@freescale.com (Shengjiu Wang)
-Date: Fri, 29 Aug 2014 11:33:47 +0800
-Subject: [RFC PATCH 1/2] ARM: imx: add BYPASS support for PLL clocks
-In-Reply-To: <20140829025349.GH28777@dragon>
-References: <1409067313-32063-1-git-send-email-shawn.guo@freescale.com>
- <1409067313-32063-2-git-send-email-shawn.guo@freescale.com>
- <20140828084420.GG28777@dragon> <20140829014947.GA2741@audiosh1>
- <20140829025349.GH28777@dragon>
-Message-ID: <20140829033344.GA2910@audiosh1>
+From: varkabhadram@gmail.com (Varka Bhadram)
+Date: Fri, 29 Aug 2014 09:11:41 +0530
+Subject: [PATCH v3 2/3] rc: Introduce hix5hd2 IR transmitter driver
+In-Reply-To: <1409238977-19444-3-git-send-email-zhangfei.gao@linaro.org>
+References: <1409238977-19444-1-git-send-email-zhangfei.gao@linaro.org>
+ <1409238977-19444-3-git-send-email-zhangfei.gao@linaro.org>
+Message-ID: <53FFF675.7020702@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 29, 2014 at 10:53:51AM +0800, Shawn Guo wrote:
-> On Fri, Aug 29, 2014 at 09:49:50AM +0800, Shengjiu Wang wrote:
-> > On Thu, Aug 28, 2014 at 04:44:21PM +0800, Shawn Guo wrote:
-> > > On Tue, Aug 26, 2014 at 11:35:12PM +0800, Shawn Guo wrote:
-> > > > The i.MX6 clock drivers currently hard-code all PLL clocks sourcing from
-> > > > OSC24M without BYPASS support.  The patch adds BYPASS and BYPASS_CLK_SRC
-> > > > selection for PLL clocks as per Figure 10-3. Primary Clock Generation
-> > > > in IMX6DQRM, i.e. both BYPASS_CLK_SRC and BYPASS bits are implemented as
-> > > > mux clocks, and ENABLE bit of PLL clocks is implemented as a gate clock
-> > > > after BYPASS mux.
-> > > > 
-> > > > Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
-> > > 
-> > > Shengjiu,
-> > > 
-> > > Can you please test if this BYPASS support works good for your ESAI use
-> > > case?
-> > > 
-> > > Shawn
-> > 
-> > Yes, after test, one issue found. Please check.
-> > 
-> > -static const char *pll_bypass_src_sels[] = { "osc", "anaclk1", "anaclk2", "dummy", };
-> > +static const char *pll_bypass_src_sels[] = { "osc", "lvds1_in", "lvds2_in", "dummy", };
-> 
-> Ah, yes.  I will fix my code.
-> 
-> So doest that mean with the above fix, we can now source 24.576MHz from
-> board directly to ESAI with audio PLL in bypass mode?
-> 
-> Shawn
+On 08/28/2014 08:46 PM, Zhangfei Gao wrote:
+> From: Guoxiong Yan <yanguoxiong@huawei.com>
+>
+> IR transmitter driver for Hisilicon hix5hd2 soc
+>
+> By default all protocols are disabled.
+> For example nec decoder can be enabled by either
+> 1. ir-keytable -p nec
+> 2. echo nec > /sys/class/rc/rc0/protocols
+> See see Documentation/ABI/testing/sysfs-class-rc
+>
+(...)
 
-Otherwise I still need to do some step in below to source the clock to ESAI.
+> +static irqreturn_t hix5hd2_ir_rx_interrupt(int irq, void *data)
+> +{
+> +	u32 symb_num, symb_val, symb_time;
+> +	u32 data_l, data_h;
+> +	u32 irq_sr, i;
+> +	struct hix5hd2_ir_priv *priv = data;
+> +
+> +	irq_sr = readl_relaxed(priv->base + IR_INTS);
+> +	if (irq_sr & INTMS_OVERFLOW) {
+> +		/*
+> +		 * we must read IR_DATAL first, then we can clean up
+> +		 * IR_INTS availably since logic would not clear
+> +		 * fifo when overflow, drv do the job
+> +		 */
+> +		ir_raw_event_reset(priv->rdev);
+> +		symb_num = readl_relaxed(priv->base + IR_DATAH);
+> +		for (i = 0; i < symb_num; i++)
+> +			readl_relaxed(priv->base + IR_DATAL);
+> +
+> +		writel_relaxed(INT_CLR_OVERFLOW, priv->base + IR_INTC);
+> +		dev_info(priv->dev, "overflow, level=%d\n",
+> +			 IR_CFG_INT_THRESHOLD);
+> +	}
+> +
+> +	if ((irq_sr & INTMS_SYMBRCV) || (irq_sr & INTMS_TIMEOUT)) {
+> +		DEFINE_IR_RAW_EVENT(ev);
+> +
+> +		symb_num = readl_relaxed(priv->base + IR_DATAH);
+> +		for (i = 0; i < symb_num; i++) {
+> +			symb_val = readl_relaxed(priv->base + IR_DATAL);
+> +			data_l = ((symb_val & 0xffff) * 10);
+> +			data_h =  ((symb_val >> 16) & 0xffff) * 10;
+> +			symb_time = (data_l + data_h) / 10;
+> +
+> +			ev.duration = US_TO_NS(data_l);
+> +			ev.pulse = true;
+> +			ir_raw_event_store(priv->rdev, &ev);
+> +
+> +			if (symb_time < IR_CFG_SYMBOL_MAXWIDTH) {
+> +				ev.duration = US_TO_NS(data_h);
+> +				ev.pulse = false;
+> +				ir_raw_event_store(priv->rdev, &ev);
+> +			} else {
+> +				hix5hd2_ir_send_lirc_timeout(priv->rdev);
+> +			}
+> +		}
+> +
+> +		if (irq_sr & INTMS_SYMBRCV)
+> +			writel_relaxed(INT_CLR_RCV, priv->base + IR_INTC);
+> +		if (irq_sr & INTMS_TIMEOUT)
+> +			writel_relaxed(INT_CLR_TIMEOUT, priv->base + IR_INTC);
+> +	}
+> +
+> +	/* Empty software fifo */
+> +	ir_raw_event_handle(priv->rdev);
+> +	return IRQ_HANDLED;
+> +}
+> +
 
-        clk_set_parent(pll4_bypass_src, lvds2_in);
-        clk_set_parent(pll4_bypass, pll4_bypass_src);
-        clk_set_rate(pll4_audio_div, 24576000);
-        clk_set_rate(esai_extal, 24576000);
+It looks good if the entire ISR() above the probe()/remove() functionalities
+of the driver. Maximum of the developers follows this structure.
 
-I think it is what we can expect, right? if yes, the patch is ok for ESAI.
+(...)
 
-wang shengjiu
+> +static struct of_device_id hix5hd2_ir_table[] = {
+> +	{ .compatible = "hisilicon,hix5hd2-ir", },
+> +	{},
+> +};
+> +MODULE_DEVICE_TABLE(of, hix5hd2_ir_table);
+> +
+
+Every driver put these device ids above *struct platform_driver* definition.
+So that we can see the of_match_table....
+
+> +static int hix5hd2_ir_probe(struct platform_device *pdev)
+> +{
+> +	int ret;
+> +	struct rc_dev *rdev;
+> +	struct device *dev = &pdev->dev;
+> +	struct resource *res;
+> +	struct hix5hd2_ir_priv *priv;
+> +	struct device_node *node = pdev->dev.of_node;
+> +
+> +	priv = devm_kzalloc(dev, sizeof(struct hix5hd2_ir_priv), GFP_KERNEL);
+
+sizeof(*priv)...?
+
+> +	if (!priv)
+> +		return -ENOMEM;
+> +
+
+(...)
+
+> +#endif
+> +
+> +static SIMPLE_DEV_PM_OPS(hix5hd2_ir_pm_ops, hix5hd2_ir_suspend,
+> +			 hix5hd2_ir_resume);
+> +
+
+We can move the device ids here....
+
+> +static struct platform_driver hix5hd2_ir_driver = {
+> +	.driver = {
+> +		.name = IR_HIX5HD2_NAME,
+> +		.of_match_table = hix5hd2_ir_table,
+> +		.pm     = &hix5hd2_ir_pm_ops,
+> +	},
+> +	.probe = hix5hd2_ir_probe,
+> +	.remove = hix5hd2_ir_remove,
+> +};
+> +
+> +module_platform_driver(hix5hd2_ir_driver);
+> +
+> +MODULE_DESCRIPTION("RC Transceiver driver for hix5hd2 platforms");
+> +MODULE_AUTHOR("Guoxiong Yan <yanguoxiong@huawei.com>");
+> +MODULE_LICENSE("GPL v2");
+> +MODULE_ALIAS("platform:hix5hd2-ir");
+
+
+-- 
+Regards,
+Varka Bhadram.
