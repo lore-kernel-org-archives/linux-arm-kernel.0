@@ -1,22 +1,41 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Fri, 29 Aug 2014 12:08:03 +0100
-Subject: [PATCH] spi/rockchip: Avoid accidentally turning off the clock
-In-Reply-To: <1409269428-24680-1-git-send-email-dianders@chromium.org>
-References: <1409269428-24680-1-git-send-email-dianders@chromium.org>
-Message-ID: <20140829110803.GO29327@sirena.org.uk>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Fri, 29 Aug 2014 13:10:08 +0200
+Subject: [PATCH] mmc: sunxi: Declare ERASE capability
+In-Reply-To: <1408541960-14788-1-git-send-email-wens@csie.org>
+References: <1408541960-14788-1-git-send-email-wens@csie.org>
+Message-ID: <CAPDyKFrjOEpAcyu-eXVuqKhESYgpMQbdyDrvkcyN0Q4gGNG2OQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 28, 2014 at 04:43:48PM -0700, Doug Anderson wrote:
-> If our client is requesting a clock that is above the maximum clock
-> then the following division will result in 0:
->   rs->max_freq / rs->speed
+On 20 August 2014 15:39, Chen-Yu Tsai <wens@csie.org> wrote:
+> Declare ERASE capability so we can use filesystems with the discard
+> option and the fstrim tool.
+>
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 
-Applied, thanks.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140829/8107a85b/attachment.sig>
+Thanks! Applied for next!
+
+Kind regards
+Uffe
+
+> ---
+>  drivers/mmc/host/sunxi-mmc.c | 3 ++-
+>  1 file changed, 2 insertions(+), 1 deletion(-)
+>
+> diff --git a/drivers/mmc/host/sunxi-mmc.c b/drivers/mmc/host/sunxi-mmc.c
+> index 024f67c..7bf5c1c 100644
+> --- a/drivers/mmc/host/sunxi-mmc.c
+> +++ b/drivers/mmc/host/sunxi-mmc.c
+> @@ -990,7 +990,8 @@ static int sunxi_mmc_probe(struct platform_device *pdev)
+>         /* 400kHz ~ 50MHz */
+>         mmc->f_min              =   400000;
+>         mmc->f_max              = 50000000;
+> -       mmc->caps              |= MMC_CAP_MMC_HIGHSPEED | MMC_CAP_SD_HIGHSPEED;
+> +       mmc->caps              |= MMC_CAP_MMC_HIGHSPEED | MMC_CAP_SD_HIGHSPEED |
+> +                                 MMC_CAP_ERASE;
+>
+>         ret = mmc_of_parse(mmc);
+>         if (ret)
+> --
+> 2.1.0
+>
