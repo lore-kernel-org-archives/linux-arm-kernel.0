@@ -1,26 +1,143 @@
-From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
-Date: Fri, 29 Aug 2014 17:52:53 +0200
-Subject: [PATCH 07/15] tty: serial: 8250_dma: enqueue RX dma again on
- completion.
-In-Reply-To: <20140818115249.537b3e42@alan.etchedpixels.co.uk>
-References: <1408124563-31541-1-git-send-email-bigeasy@linutronix.de>	<1408124563-31541-8-git-send-email-bigeasy@linutronix.de>
- <20140818115249.537b3e42@alan.etchedpixels.co.uk>
-Message-ID: <5400A1D5.705@linutronix.de>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 29 Aug 2014 16:54:25 +0100
+Subject: [RFC PATCH 2/7] dma-mapping: replace set_arch_dma_coherent_ops with
+ arch_setup_dma_ops
+In-Reply-To: <1409327670-3495-1-git-send-email-will.deacon@arm.com>
+References: <1409327670-3495-1-git-send-email-will.deacon@arm.com>
+Message-ID: <1409327670-3495-3-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/18/2014 12:52 PM, One Thousand Gnomes wrote:
-> 
->>  		if (!up->dma || dma_err)
->>  			status = serial8250_rx_chars(up, status);
->> +
->> +		if (dma_err && port->type == PORT_OMAP_16750)
->> +			serial8250_rx_dma(up, 0);
-> 
-> Can we stick to a 'has dma' flag and port->rx_dma() type usages so that
-> we don't have to rewrite it again to add them the next slightly odd DMA
-> user we add 8)
+set_arch_dma_coherent_ops is called from of_dma_configure in order to
+swizzle the architectural dma-mapping functions over to a cache-coherent
+implementation. This is currently implemented only for ARM.
 
-I hide this behind a bug flag, something like UART_NEEDS_DMA_RX_PENDING.
+In anticipation of re-using this mechanism for IOMMU-backed dma-mapping
+ops too, this patch replaces the function with a broader
+arch_setup_dma_ops callback which is also responsible for setting the
+DMA mask and offset as well as selecting the correct mapping functions.
 
-Sebastian
+A further advantage of this split is that it nicely isolates the
+of-specific code from the dma-mapping code, allowing potential reuse by
+other buses (e.g. PCI) in the future.
+
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm/include/asm/dma-mapping.h | 20 ++++++++++++++----
+ drivers/of/platform.c              | 42 ++++++++++----------------------------
+ include/linux/dma-mapping.h        |  8 +++-----
+ 3 files changed, 30 insertions(+), 40 deletions(-)
+
+diff --git a/arch/arm/include/asm/dma-mapping.h b/arch/arm/include/asm/dma-mapping.h
+index c45b61a4b4a5..936125ef3f3f 100644
+--- a/arch/arm/include/asm/dma-mapping.h
++++ b/arch/arm/include/asm/dma-mapping.h
+@@ -121,12 +121,24 @@ static inline unsigned long dma_max_pfn(struct device *dev)
+ }
+ #define dma_max_pfn(dev) dma_max_pfn(dev)
+ 
+-static inline int set_arch_dma_coherent_ops(struct device *dev)
++static inline void arch_setup_dma_ops(struct device *dev, u64 mask,
++				      unsigned long offset, bool coherent)
+ {
+-	set_dma_ops(dev, &arm_coherent_dma_ops);
+-	return 0;
++	dev->coherent_dma_mask = mask;
++
++	/*
++	 * Set dma_mask to coherent_dma_mask by default if the architecture
++	 * code has not set it.
++	 */
++	if (!dev->dma_mask)
++		dev->dma_mask = &dev->coherent_dma_mask;
++
++	dev->dma_pfn_offset = offset;
++
++	if (coherent)
++		set_dma_ops(dev, &arm_coherent_dma_ops);
+ }
+-#define set_arch_dma_coherent_ops(dev)	set_arch_dma_coherent_ops(dev)
++#define arch_setup_dma_ops arch_setup_dma_ops
+ 
+ static inline dma_addr_t phys_to_dma(struct device *dev, phys_addr_t paddr)
+ {
+diff --git a/drivers/of/platform.c b/drivers/of/platform.c
+index 0197725e033a..484c558c63a6 100644
+--- a/drivers/of/platform.c
++++ b/drivers/of/platform.c
+@@ -164,43 +164,23 @@ static void of_dma_configure(struct platform_device *pdev)
+ {
+ 	u64 dma_addr, paddr, size;
+ 	int ret;
++	bool coherent;
++	unsigned long offset;
+ 	struct device *dev = &pdev->dev;
+ 
+-	/*
+-	 * Set default dma-mask to 32 bit. Drivers are expected to setup
+-	 * the correct supported dma_mask.
+-	 */
+-	dev->coherent_dma_mask = DMA_BIT_MASK(32);
+-
+-	/*
+-	 * Set it to coherent_dma_mask by default if the architecture
+-	 * code has not set it.
+-	 */
+-	if (!dev->dma_mask)
+-		dev->dma_mask = &dev->coherent_dma_mask;
++	ret = of_dma_get_range(dev->of_node, &dma_addr, &paddr, &size);
++	offset = ret < 0 ? 0 : PFN_DOWN(paddr - dma_addr);
++	dev_dbg(dev, "dma_pfn_offset(%#08lx)\n", dev->dma_pfn_offset);
+ 
+-	/*
+-	 * if dma-coherent property exist, call arch hook to setup
+-	 * dma coherent operations.
+-	 */
+-	if (of_dma_is_coherent(dev->of_node)) {
+-		set_arch_dma_coherent_ops(dev);
+-		dev_dbg(dev, "device is dma coherent\n");
+-	}
++	coherent = of_dma_is_coherent(dev->of_node);
++	dev_dbg(dev, "device is%sdma coherent\n",
++		coherent ? " " : " not ");
+ 
+ 	/*
+-	 * if dma-ranges property doesn't exist - just return else
+-	 * setup the dma offset
++	 * Set default dma-mask to 32 bit. Drivers are expected to setup
++	 * the correct supported dma_mask.
+ 	 */
+-	ret = of_dma_get_range(dev->of_node, &dma_addr, &paddr, &size);
+-	if (ret < 0) {
+-		dev_dbg(dev, "no dma range information to setup\n");
+-		return;
+-	}
+-
+-	/* DMA ranges found. Calculate and set dma_pfn_offset */
+-	dev->dma_pfn_offset = PFN_DOWN(paddr - dma_addr);
+-	dev_dbg(dev, "dma_pfn_offset(%#08lx)\n", dev->dma_pfn_offset);
++	arch_setup_dma_ops(dev, DMA_BIT_MASK(32), offset, coherent);
+ }
+ 
+ /**
+diff --git a/include/linux/dma-mapping.h b/include/linux/dma-mapping.h
+index 931b70986272..0f7f7b68b0db 100644
+--- a/include/linux/dma-mapping.h
++++ b/include/linux/dma-mapping.h
+@@ -129,11 +129,9 @@ static inline int dma_coerce_mask_and_coherent(struct device *dev, u64 mask)
+ 
+ extern u64 dma_get_required_mask(struct device *dev);
+ 
+-#ifndef set_arch_dma_coherent_ops
+-static inline int set_arch_dma_coherent_ops(struct device *dev)
+-{
+-	return 0;
+-}
++#ifndef arch_setup_dma_ops
++static inline void arch_setup_dma_ops(struct device *dev, u64 mask,
++				      unsigned long offset, bool coherent) { }
+ #endif
+ 
+ static inline unsigned int dma_get_max_seg_size(struct device *dev)
+-- 
+2.1.0
