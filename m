@@ -1,49 +1,54 @@
 From: huangtao@rock-chips.com (Huang Tao)
-Date: Fri, 29 Aug 2014 19:44:33 +0800
-Subject: [RESEND PATCH] ARM: dts: make arch-timer always on in rk3288 soc
-In-Reply-To: <20140829112242.GC21473@leverpostej>
-References: <1409190017-12656-1-git-send-email-kever.yang@rock-chips.com>
- <20140828091758.GB14650@leverpostej> <20140828151121.GM14650@leverpostej>
- <53FFEE40.3010001@rock-chips.com> <20140829112242.GC21473@leverpostej>
-Message-ID: <540067A1.6090005@rock-chips.com>
+Date: Fri, 29 Aug 2014 20:08:44 +0800
+Subject: [PATCH v3 1/4] thermal: rockchip: add driver for thermal
+In-Reply-To: <CAC-25o-winy6jVjh9_hQ-t2VO2UfxG67pW5DpOve8A2o39EJSw@mail.gmail.com>
+References: <1409187562-12370-1-git-send-email-caesar.wang@rock-chips.com>	<2852853.mfRZfFVSev@wuerfel>	<20140828143733.GA18084@developer>	<3440260.edal29kzlR@diego>	<2014082909531345696848@rock-chips.com>
+ <CAC-25o-winy6jVjh9_hQ-t2VO2UfxG67pW5DpOve8A2o39EJSw@mail.gmail.com>
+Message-ID: <54006D4C.2070404@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Dear Eduardo Bezerra Valentin:
 
-? 2014?08?29? 19:22, Mark Rutland ??:
->> ? 2014?08?28? 23:11, Mark Rutland ??:
->>> To clarify: if there are low power states that the CPU can enter where
->>> we lose state, then this patch isn't correct.
->> Right now, the software of RK3288 SoC only support CPU hotplug
->> (cpu_on/off) and power off all CPUs on suspend.
-> Sure, but that's a Linux implementation detail rather than a fixed
-> property of the hardware. Given those states exist, the "always-on"
-> property is not appropriate.
+? 2014?08?29? 19:39, edubezval at gmail.com ??:
+> Hello Zhao,
 >
->> We do not implement cpuidle to power off CPU. Do you think we should
->> introduce a broadcast timer?
-> If one is present, yes. 
+> On Thu, Aug 28, 2014 at 9:54 PM, ??? <zyf@rock-chips.com> wrote:
+>> Hi Heiko?
+>>
+>>    The TS-ADC on RK3288 has two component, a tsadc and a tsadc controller.
+>> The tsadc controller is similar like the thermal manager unit on other SOCs.
+>> We followed the naming of 3066, but not named as the Thermal Manager.
+>>
+>>    Moreover,there is only one set of apb registers to access the tsadc
+>> controller,and the tsadc is controlled by the tsadc controller,could not
+>> access directly. If we write a general tsadc driver by accessed tsadc
+>> controller registers, and it hardly to write a driver for the tsadc
+>> controller.
+> As suggested by Arnd, you can use the generic driver as interface
+> between thermal framework and IIO layer. The driver you are going to
+> write to your ADC is going to be in the IIO subsystem. The only
+> difference is that the generic driver would work for any ADC driver in
+> the IIO subsystem.
+> https://lkml.org/lkml/2014/2/5/810
 >
->> On our early kernel, I never see any interrupt on a broadcast timer
->> (yes, we implement it with a external timer).
-> That's fine; Linux doesn't need to use it just yet. However, when we
-> want to use low power states later, it will be necessary to enable
-> placing all CPUS into a low power state.
+> In fact, there is already a generic driver. We just need to get it up
+> to date.  I see some testing has been already done, and results sound
+> promising.
+This iio_thermal driver only support get temperature from the ADC IIO
+channel.
+It dose not support any advanced feature such as configure the
+temperature when system should be reset.
+So if we adapt it, we will access the register form both TSADC IIO
+driver and  thermal driver.
+I don't thank this is a good ideal.
+
+In fact, we should ignore the "ADC" stuff. This sensor use ADC internal,
+but it is transparent to software, especially in automatic mode.
 >
-> If your external timer is already supported by an existing driver, there
-> is no reason not to add it now.
->
->>> A more general approach would be to enable the broadcast hrtimer for
->>> arm, as has been done for arm64.
->> Yes. I think it should be done by arm framework.
-> Patches welcome.
->
-> I also think it would make sense to enable this for arm.
->
-> Thanks,
-> Mark.
->
->
-Okay, so this patch is wrong as I expected.
-Thank you!
+>>    So, I do not agree to write a generic adc driver for the rk3288-tsadc.
+>>
+>> ________________________________
+>> Yifeng Zhao
+>>
+>>
