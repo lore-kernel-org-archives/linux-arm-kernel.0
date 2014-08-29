@@ -1,32 +1,37 @@
-From: scottwood@freescale.com (Scott Wood)
-Date: Fri, 29 Aug 2014 14:38:15 -0500
-Subject: [PATCHv2] clk: ppc-corenet: rename to ppc-qoriq and add
- CLK_OF_DECLARE support
-In-Reply-To: <1409301354-13699-1-git-send-email-jingchang.lu@freescale.com>
-References: <1409301354-13699-1-git-send-email-jingchang.lu@freescale.com>
-Message-ID: <1409341095.24184.18.camel@snotra.buserror.net>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Fri, 29 Aug 2014 12:49:26 -0700
+Subject: [PATCH] clk: qcom: Fix sdc 144kHz frequency entry
+Message-ID: <1409341766-24366-1-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2014-08-29 at 16:35 +0800, Jingchang Lu wrote:
-> The IP is shared on PPC and ARM, this rename it to qoriq for better
-> represention, and this also add the CLK_OF_DECLARE support for being
-> initialized by of_clk_init() on ARM.
-> 
-> Signed-off-by: Jingchang Lu <jingchang.lu@freescale.com>
-> ---
-> changes in v2:
->  rename the driver name to ppc-qoriq.c for shared on PPC and ARM.
-> 
->  drivers/clk/Kconfig           |   9 +-
->  drivers/clk/Makefile          |   2 +-
->  drivers/clk/clk-ppc-corenet.c | 307 -----------------------------------------
->  drivers/clk/clk-qoriq.c       | 312 ++++++++++++++++++++++++++++++++++++++++++
->  4 files changed, 318 insertions(+), 312 deletions(-)
->  delete mode 100644 drivers/clk/clk-ppc-corenet.c
->  create mode 100644 drivers/clk/clk-qoriq.c
+The pre-divider for the sdc clocks only has 2 bits in it, so we
+can't possibly divide by anything larger than 4 here.
+Furthermore, we program the value of ~(n - m) and the n value is
+larger than 8 bits (max of 256). Replace this entry with 200kHz
+which is close enough to 144kHz to be usable.
 
-Please use -M -C with git format-patch to detect the rename, so we can
-see what changed during the rename.
+Cc: Kumar Gala <galak@codeaurora.org>
+Cc: Andy Gross <agross@codeaurora.org>
+Fixes: 24d8fba44af3 "clk: qcom: Add support for IPQ8064's global clock controller (GCC)"
+Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+---
+ drivers/clk/qcom/gcc-ipq806x.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
--Scott
+diff --git a/drivers/clk/qcom/gcc-ipq806x.c b/drivers/clk/qcom/gcc-ipq806x.c
+index 4032e510d9aa..3b83b7dd78c7 100644
+--- a/drivers/clk/qcom/gcc-ipq806x.c
++++ b/drivers/clk/qcom/gcc-ipq806x.c
+@@ -1095,7 +1095,7 @@ static struct clk_branch prng_clk = {
+ };
+ 
+ static const struct freq_tbl clk_tbl_sdc[] = {
+-	{    144000, P_PXO,   5, 18,625 },
++	{    200000, P_PXO,   2, 2, 125 },
+ 	{    400000, P_PLL8,  4, 1, 240 },
+ 	{  16000000, P_PLL8,  4, 1,   6 },
+ 	{  17070000, P_PLL8,  1, 2,  45 },
+-- 
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
