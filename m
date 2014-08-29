@@ -1,147 +1,65 @@
-From: hramrach@gmail.com (Michal Suchanek)
-Date: Fri, 29 Aug 2014 08:48:42 +0200
-Subject: [linux-sunxi] Re: [PATCH 4/4] simplefb: add clock handling code
-In-Reply-To: <20140829061910.GA13106@ulmo>
-References: <20140826135341.GM15297@lukather> <20140826143550.GB3027@ulmo>
- <20140826210248.GO15297@lukather> <20140827065440.GG15640@ulmo>
- <20140827084526.GR15297@lukather> <20140827095241.GC23186@ulmo>
- <20140827154221.GX15297@lukather>
- <CAOMqctSY7AJKHthe+aG8--Ok6JiY1g2zM_tN10S2nELOSe=qMw@mail.gmail.com>
- <20140828100834.GA14388@ulmo>
- <CAOMqctSwhQHJynn=tW==uuznJW+0CrivNP=os+xem1MAuDP7ZQ@mail.gmail.com>
- <20140829061910.GA13106@ulmo>
-Message-ID: <CAOMqctTUZA-Fx1pOaqxvC9W0G5BGNFYq-gh1019pqXZ1mNynJA@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 29 Aug 2014 08:53:15 +0200
+Subject: [PATCH] ARM: tegra: remove pinmux setup from Tegra124 boards
+In-Reply-To: <53F22B10.1010106@wwwdotorg.org>
+References: <1403563506-6461-1-git-send-email-swarren@wwwdotorg.org>
+ <1407921548.5835.20.camel@weser.hi.pengutronix.de>
+ <53F22B10.1010106@wwwdotorg.org>
+Message-ID: <CACRpkdbJai_40OOKPMFT9RaDs5o2ZQCG48fFA4EUFbParqQKaQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29 August 2014 08:19, Thierry Reding <thierry.reding@gmail.com> wrote:
-> On Fri, Aug 29, 2014 at 07:13:22AM +0200, Michal Suchanek wrote:
->> On 28 August 2014 12:08, Thierry Reding <thierry.reding@gmail.com> wrote:
->> > On Wed, Aug 27, 2014 at 10:57:29PM +0200, Michal Suchanek wrote:
->> >> Hello,
->> >>
->> >> On 27 August 2014 17:42, Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
->> >> > On Wed, Aug 27, 2014 at 11:52:48AM +0200, Thierry Reding wrote:
->> >> >> On Wed, Aug 27, 2014 at 10:45:26AM +0200, Maxime Ripard wrote:
->> >> >> > On Wed, Aug 27, 2014 at 08:54:41AM +0200, Thierry Reding wrote:
->> >> >> > > On Tue, Aug 26, 2014 at 11:02:48PM +0200, Maxime Ripard wrote:
->> >> >> > > > On Tue, Aug 26, 2014 at 04:35:51PM +0200, Thierry Reding wrote:
->> >> >> [...]
->> >> >> > > > > > Mike Turquette repeatedly said that he was against such a DT property:
->> >> >> > > > > > https://lkml.org/lkml/2014/5/12/693
->> >> >> > > > >
->> >> >> > > > > Mike says in that email that he's opposing the addition of a property
->> >> >> > > > > for clocks that is the equivalent of regulator-always-on. That's not
->> >> >> > > > > what this is about. If at all it'd be a property to mark a clock that
->> >> >> > > > > should not be disabled by default because it's essential.
->> >> >> > > >
->> >> >> > > > It's just semantic. How is "a clock that should not be disabled by
->> >> >> > > > default because it's essential" not a clock that stays always on?
->> >> >> > >
->> >> >> > > Because a clock that should not be disabled by default can be turned off
->> >> >> > > when appropriate. A clock that is always on can't be turned off.
->> >> >> >
->> >> >> > If a clock is essential, then it should never be disabled. Or we don't
->> >> >> > share the same meaning of essential.
->> >> >>
->> >> >> Essential for the particular use-case.
->> >> >
->> >> > So, how would the clock driver would know about which use case we're
->> >> > in? How would it know about which display engine is currently running?
->> >> > How would it know about which video output is being set?
->> >> >
->> >> > Currently, we have two separate display engines, which can each output
->> >> > either to 4 different outputs (HDMI, RGB/LVDS, 2 DSI). Each and every
->> >> > one of these combinations would require different clocks. What clocks
->> >> > will we put in the driver? All of them?
->> >> >
->> >>
->> >> since simplefb cannot be extended how about adding, say, dtfb which
->> >> claims the resources from dt and then instantiates a simplefb once the
->> >> resources are claimed? That is have a dtfb which has the clocks
->> >> assigned and has simplefb as child dt node.
->> >
->> > I don't see how that changes anything. All you do is add another layer
->> > of indirection. The fundamental problem remains the same and isn't
->> > solved.
+On Mon, Aug 18, 2014 at 6:34 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
+> On 08/13/2014 03:19 AM, Lucas Stach wrote:
 >>
->> It keeps clock code out of simplefb and provides driver for the kind
->> of framebuffer set up by firmware that exists on sunxi, exynos, and
->> probably many other SoCs. That is a framebuffer that needs some clocks
->> and possibly regulators enabled to keep running because the reality of
->> the platform is that it has clocks and regulators unlike some other
->> platforms that do not.
+>> Hi Stephen,
 >>
->> These clocks and regulators are used but not configured by the
->> framebuffer and should be reclaimed when firmware framebuffer is
->> disabled. This is the same as the chunk of  memory used by simplefb
->> which is currently lost but should be reclaimed when simplefb is
->> disabled.
+>> sorry for getting on this late, I completely missed this and only now
+>> stumbled upon this.
 >>
->> This memory is not 'reserved for firmware' and unusable but reserved
->> for framebuffer and the regulators are not 'always on' or 'should
->> never be disabled' but should be enabled while framebuffer is used.
+>> I'm not really fond of this change. The barebox bootloader completely
+>> probes itself from DT, including the pinmux. We try to stay as close as
+>> possible to the upstream kernel DTs and only introduce minimal changes.
+>> Removing the pinmux from the DTS will completely break barebox, as we
+>> don't have any static pinmux tables there.
 >>
->> As far as I can tell in DT this is expressed by creating a DT node
->> associated with the framebuffer driver that tells the kernel that this
->> memory, clocks and regulators are associated with the framebuffer
->> driver and can be reclaimed if this driver is stopped or not enabled
->> in the kernel at all. If you are going to be asinine about simplefb
->> not getting support for managing any resource other than the memory
->> chunk then another layer of indirection is required for platforms that
->> have more resources to manage.
+>> In order to not break the bootloader use-case I strongly advocate to
+>> keep the static pinmux in the DT. Can't we just rename the the state to
+>> something like "initial", so Linux won't try to set it by default? This
+>> way we could still keep the information in the DT, while being able to
+>> say "if you are going to program the initial pinmux state you need to
+>> follow the sequence defined by NVIDIA syseng".
 >>
->> If there is another way to associate resources with a driver in DT
->> then please enlighten me.
->>
->> AFAICT simplefb is the framebuffer driver already in kernel closest to
->> the driver that is required for sunxi - simplefb also relies on
->> firmware to set up the framebuffer but unlike vesafb or efifb it
->> already has DT integration. So the most efficient way to implement
->> framebuffer for sunxi is to extend simplefb or if necessary add
->> another layer of indirection under simplefb. If there is a better
->> fitting driver in the kernel then please enlighten me and the
->> developer that wrote this patch what driver it would be.
+>> This obviously would make the naming of the state part of the binding,
+>> but I think this may be acceptable.
 >
-> I think simplefb is exactly the right driver to use for this case. But I
-> don't think making it manage all the resources is the right thing to do.
-
-And what is supposed to manage resources used by simplefb when not simplefb?
-
-> While it's fairly easy to do it, it's also something that needs to be
-> done for every other driver with similar requirements.
-
-Other drivers that require clocks do manage them, yes. And some
-drivers that did not do that in the past were extended for that.
-
-> Consider for
-> example what happens if you want to play some welcome sound in the
-> bootloader and keep it playing while the kernel is booting. You'd need
-> to repeat exactly what this driver does to keep clocks for audio
-> hardware running. And there are possibly other similar use-cases as
-> well.
-
-Why would you want to do that? If the kernel boots fast the welcome
-sound can be played from userspace when all drivers all in place. If
-it boots slow you can just play the sound and let the kernel boot.
-
-If you implement enough of audio driver that the kernel can actually
-change the startup sound then there is not much left out. You cannot
-just place random data in a buffer but have to synchronize with the
-hardware for audio playback to work.
-
 >
-> One other issue with simplefb is that it isn't a real device to begin
-> with. It's completely virtual, so in the same way that it doesn't
-> program any device-specific registers I don't think it should claim any
-> resources.
+> Linus, what do you think of Lucas's proposal?
 
-OK, so the framebuffer memory that simplefb uses for scanout should
-not be claimed by it ever, either?
+I guess we say the DTs should be neutral to OS, whether they should
+be neutral to the use case for boot loaders is another question, but
+I think the more info is in the DT, the better actually as it avoids spreading
+relevant information across places where it's hard-coded.
 
-So how is it supposed to be handled? Reserved as unusable memory
-forever as it is now?
+> As background, the Tegra HW design implies that all initial pinmux setup
+> should be applied one time early during boot before peripherals are used.
+> That means it should happen early in boot code, not once an OS like Linux
+> has been loaded, since loading the OS requires use of at least some
+> peripheral(s). Hence, there's no point the kernel re-applying the same
+> configuration.
+>
+> I had suggested (in this patch) removing the pinmux completely from the DT,
+> since no OS should need it. However, the Barebox bootloader is configured
+> via DT, and so wants to keep the pinmux configuration in the DT, rather than
+> embedding the pinmux tables into the bootloader's board support code. Lucas
+> has suggested simply changing the pinmux state name in the DT so that the
+> kernel won't apply the pinmux configuration yet it's still there for the
+> bootloader to use if it wants.
+>
+> I'd suggest "boot" rather than "initial" myself for the new state name, but
+> that's just bike-shedding.
 
-Thanks
+I'm game for "boot".
 
-Michal
+Yours,
+Linus Walleij
