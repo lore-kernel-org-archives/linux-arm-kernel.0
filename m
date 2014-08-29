@@ -1,52 +1,64 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 29 Aug 2014 12:22:42 +0100
-Subject: [RESEND PATCH] ARM: dts: make arch-timer always on in rk3288 soc
-In-Reply-To: <53FFEE40.3010001@rock-chips.com>
-References: <1409190017-12656-1-git-send-email-kever.yang@rock-chips.com>
- <20140828091758.GB14650@leverpostej>
- <20140828151121.GM14650@leverpostej>
- <53FFEE40.3010001@rock-chips.com>
-Message-ID: <20140829112242.GC21473@leverpostej>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Fri, 29 Aug 2014 08:30:05 -0300
+Subject: Oops: 17 SMP ARM (v3.16-rc2)
+In-Reply-To: <C4A61A5CA4AD2246942F4BA6F20ACB80435790DF@ALVA-EXMB04.alv.autoliv.int>
+References: <20140626151424.GT32514@n2100.arm.linux.org.uk>
+ <20140806125550.GO30282@n2100.arm.linux.org.uk>
+ <C4A61A5CA4AD2246942F4BA6F20ACB804357526C@ALVA-EXMB04.alv.autoliv.int>
+ <20140807121248.GY30282@n2100.arm.linux.org.uk>
+ <20140808180900.GG30282@n2100.arm.linux.org.uk>
+ <C4A61A5CA4AD2246942F4BA6F20ACB8043576356@ALVA-EXMB04.alv.autoliv.int>
+ <CAOMZO5B8GR+ABBoJ=dJcFqw3Wagfaip7HM+C1FTz+aE4CmqiPw@mail.gmail.com>
+ <C4A61A5CA4AD2246942F4BA6F20ACB80435776D3@ALVA-EXMB04.alv.autoliv.int>
+ <CAOMZO5B7FgzB7ThVyV2Vk7wTwYgjRWjEnkkAN5uwwKMaBKq1yg@mail.gmail.com>
+ <C4A61A5CA4AD2246942F4BA6F20ACB8043577770@ALVA-EXMB04.alv.autoliv.int>
+ <53F11FF6.8030303@gmail.com>
+ <CAOMZO5CDvQDD7gVLFStwv4MPrUyqZE3sEDZwb0gukkXujYG-6Q@mail.gmail.com>
+ <53F2E89B.80009@gmail.com> <53F5BE3D.5070209@gmail.com>
+ <CAOMZO5A3CgaVCKxNDG-zEdwprYdRDXD_XZ2ikW+mns-iieYHsg@mail.gmail.com>
+ <53F71D1B.8090004@gmail.com>
+ <C4A61A5CA4AD2246942F4BA6F20ACB8043578CB2@ALVA-EXMB04.alv.autoliv.int>
+ <53FDB649.2070506@gmail.com>
+ <C4A61A5CA4AD2246942F4BA6F20ACB80435790DF@ALVA-EXMB04.alv.autoliv.int>
+Message-ID: <CAOMZO5CY7cDRspdgcPKr0LVBx3PGsBu5jGeQk+_DdVnvL_sSEg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 29, 2014 at 04:06:40AM +0100, Huang Tao wrote:
-> Hi, Mark:
+Hi Mattis,
 
-Hi,
+On Fri, Aug 29, 2014 at 7:57 AM, Mattis Lorentzon
+<Mattis.Lorentzon@autoliv.com> wrote:
+> Iain,
+>
+>> Interesting. We obviously have some differences in how we boot, my
+>> changes to your config to get it to boot basically amount to reverting the
+>> patch you attached and then enabling sata and mmc. So far I've been unable
+>> to get your config to fail.
+>
+> Our version of U-boot doesn't support specifying a device tree separate from
+> the kernel, so we append it to the end of the kernel binary. We also enable
+> automatic configuration of IP addresses (CONFIG_IP_PNP). Our bootargs are:
+> console=ttymxc1,115200
+> ip=192.168.2.157:192.168.2.1:192.168.2.1:255.255.255.0:armcard:eth0:on
+> earlyprintk enable_wait_mode=off
 
-> ? 2014?08?28? 23:11, Mark Rutland ??:
-> > To clarify: if there are low power states that the CPU can enter where
-> > we lose state, then this patch isn't correct.
-> Right now, the software of RK3288 SoC only support CPU hotplug
-> (cpu_on/off) and power off all CPUs on suspend.
+I suppose that this 'enable_wait_mode=off' is a left over from the
+time you used the FSL BSP.
 
-Sure, but that's a Linux implementation detail rather than a fixed
-property of the hardware. Given those states exist, the "always-on"
-property is not appropriate.
+This is not needed in mainline.
 
-> We do not implement cpuidle to power off CPU. Do you think we should
-> introduce a broadcast timer?
+>> It would be good to know what makes my config work for you, I don't think
+>> I've done anything special with it.
+>
+> With a couple of modifications (attached) we have been able to get your
+> config running on our Zynq boards as well, solving our ethernet issues.
+>
+> The serial port and ethernet are essentially the only things we use. No disks,
+> no graphics, no USB, etc. which is why we tried to reduce the kernel
+> configuration to a bare minimum. We have no idea which disabled and/or
+> enabled options that are causing the stalls.
 
-If one is present, yes. 
-
-> On our early kernel, I never see any interrupt on a broadcast timer
-> (yes, we implement it with a external timer).
-
-That's fine; Linux doesn't need to use it just yet. However, when we
-want to use low power states later, it will be necessary to enable
-placing all CPUS into a low power state.
-
-If your external timer is already supported by an existing driver, there
-is no reason not to add it now.
-
-> > A more general approach would be to enable the broadcast hrtimer for
-> > arm, as has been done for arm64.
-> Yes. I think it should be done by arm framework.
-
-Patches welcome.
-
-I also think it would make sense to enable this for arm.
-
-Thanks,
-Mark.
+It's good to hear you do not have the lockups anymore, but this is
+still a big mistery for us as we have not yet understood the root
+cause and what is the 'guilty' kernel config option that makes things
+FEC to work unreliably.
