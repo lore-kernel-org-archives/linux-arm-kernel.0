@@ -1,125 +1,125 @@
 From: soren.brinkmann@xilinx.com (Soren Brinkmann)
-Date: Fri, 29 Aug 2014 10:58:46 -0700
-Subject: [PATCH 2/3] gpio: zynq: Fixed broken wakeup implementation
+Date: Fri, 29 Aug 2014 10:58:47 -0700
+Subject: [PATCH 3/3] gpio: lib-sysfs: Add 'wakeup' attribute
 In-Reply-To: <1409335127-26712-1-git-send-email-soren.brinkmann@xilinx.com>
 References: <1409335127-26712-1-git-send-email-soren.brinkmann@xilinx.com>
-Message-ID: <1409335127-26712-3-git-send-email-soren.brinkmann@xilinx.com>
+Message-ID: <1409335127-26712-4-git-send-email-soren.brinkmann@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ezra Savard <ezra.savard@xilinx.com>
+Add an attribute 'wakeup' to the GPIO sysfs interface which allows
+marking/unmarking a GPIO as wake IRQ.
+The file 'wakeup' is created in each exported GPIOs directory, if an IRQ
+is associated with that GPIO and the irqchip implements set_wake().
+Writing 'enabled' to that file will enable wake for that GPIO, while
+writing 'disabled' will disable wake.
+Reading that file will return either 'disabled' or 'enabled' depening on
+the currently set flag for the GPIO's IRQ.
 
-Use of unmask/mask in set_wake was an incorrect implementation. The new
-implementation correctly sets wakeup for the gpio chip's IRQ so the gpio chip
-will not sleep while wakeup-enabled gpio are in use.
-
-Signed-off-by: Ezra Savard <ezra.savard@xilinx.com>
-Reviewed-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
+Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
 ---
- drivers/gpio/gpio-zynq.c | 34 ++++++++++++++++++++--------------
- 1 file changed, 20 insertions(+), 14 deletions(-)
+ drivers/gpio/gpiolib-sysfs.c | 75 ++++++++++++++++++++++++++++++++++++++++----
+ 1 file changed, 69 insertions(+), 6 deletions(-)
 
-diff --git a/drivers/gpio/gpio-zynq.c b/drivers/gpio/gpio-zynq.c
-index d80d722529ad..1e6f19a07454 100644
---- a/drivers/gpio/gpio-zynq.c
-+++ b/drivers/gpio/gpio-zynq.c
-@@ -88,16 +88,17 @@
-  * @chip:	instance of the gpio_chip
-  * @base_addr:	base address of the GPIO device
-  * @clk:	clock resource for this controller
-+ * @irq:	interrupt for the GPIO device
-  */
- struct zynq_gpio {
- 	struct gpio_chip chip;
- 	void __iomem *base_addr;
- 	struct clk *clk;
-+	int irq;
- };
+diff --git a/drivers/gpio/gpiolib-sysfs.c b/drivers/gpio/gpiolib-sysfs.c
+index 5f2150b619a7..aaf021eaaff5 100644
+--- a/drivers/gpio/gpiolib-sysfs.c
++++ b/drivers/gpio/gpiolib-sysfs.c
+@@ -286,6 +286,56 @@ found:
  
- static struct irq_chip zynq_gpio_level_irqchip;
- static struct irq_chip zynq_gpio_edge_irqchip;
--
- /**
-  * zynq_gpio_get_bank_pin - Get the bank number and pin number within that bank
-  * for a given pin in the GPIO device
-@@ -434,10 +435,9 @@ static int zynq_gpio_set_irq_type(struct irq_data *irq_data, unsigned int type)
+ static DEVICE_ATTR(edge, 0644, gpio_edge_show, gpio_edge_store);
  
- static int zynq_gpio_set_wake(struct irq_data *data, unsigned int on)
- {
--	if (on)
--		zynq_gpio_irq_unmask(data);
--	else
--		zynq_gpio_irq_mask(data);
-+	struct zynq_gpio *gpio = irq_data_get_irq_chip_data(data);
++static ssize_t gpio_wakeup_show(struct device *dev,
++		struct device_attribute *attr, char *buf)
++{
++	ssize_t			status;
++	const struct gpio_desc	*desc = dev_get_drvdata(dev);
++	int			irq = gpiod_to_irq(desc);
++	struct irq_desc		*irq_desc = irq_to_desc(irq);
 +
-+	irq_set_irq_wake(gpio->irq, on);
- 
- 	return 0;
- }
-@@ -518,7 +518,11 @@ static void zynq_gpio_irqhandler(unsigned int irq, struct irq_desc *desc)
- 
- static int __maybe_unused zynq_gpio_suspend(struct device *dev)
- {
--	if (!device_may_wakeup(dev))
-+	struct platform_device *pdev = to_platform_device(dev);
-+	int irq = platform_get_irq(pdev, 0);
-+	struct irq_data *data = irq_get_irq_data(irq);
++	mutex_lock(&sysfs_lock);
 +
-+	if (!irqd_is_wakeup_set(data))
- 		return pm_runtime_force_suspend(dev);
- 
- 	return 0;
-@@ -526,7 +530,11 @@ static int __maybe_unused zynq_gpio_suspend(struct device *dev)
- 
- static int __maybe_unused zynq_gpio_resume(struct device *dev)
- {
--	if (!device_may_wakeup(dev))
-+	struct platform_device *pdev = to_platform_device(dev);
-+	int irq = platform_get_irq(pdev, 0);
-+	struct irq_data *data = irq_get_irq_data(irq);
++	if (irqd_is_wakeup_set(&irq_desc->irq_data))
++		status = sprintf(buf, "enabled\n");
++	else
++		status = sprintf(buf, "disabled\n");
 +
-+	if (!irqd_is_wakeup_set(data))
- 		return pm_runtime_force_resume(dev);
- 
- 	return 0;
-@@ -587,7 +595,7 @@ static const struct dev_pm_ops zynq_gpio_dev_pm_ops = {
-  */
- static int zynq_gpio_probe(struct platform_device *pdev)
++	mutex_unlock(&sysfs_lock);
++
++	return status;
++}
++
++static ssize_t gpio_wakeup_store(struct device *dev,
++		struct device_attribute *attr, const char *buf, size_t size)
++{
++	int			ret;
++	unsigned int		on;
++	struct gpio_desc	*desc = dev_get_drvdata(dev);
++	int			irq = gpiod_to_irq(desc);
++
++	mutex_lock(&sysfs_lock);
++
++	if (sysfs_streq("enabled", buf))
++		on = true;
++	else if (sysfs_streq("disabled", buf))
++		on = false;
++	else
++		return -EINVAL;
++
++	ret = irq_set_irq_wake(irq, on);
++
++	mutex_unlock(&sysfs_lock);
++
++	if (ret)
++		pr_warn("%s: failed to %s wake\n", __func__,
++				on ? "enable" : "disable");
++
++	return size;
++}
++
++static DEVICE_ATTR(wakeup, 0644, gpio_wakeup_show, gpio_wakeup_store);
++
+ static int sysfs_set_active_low(struct gpio_desc *desc, struct device *dev,
+ 				int value)
  {
--	int ret, bank_num, irq;
-+	int ret, bank_num;
- 	struct zynq_gpio *gpio;
- 	struct gpio_chip *chip;
- 	struct resource *res;
-@@ -603,10 +611,10 @@ static int zynq_gpio_probe(struct platform_device *pdev)
- 	if (IS_ERR(gpio->base_addr))
- 		return PTR_ERR(gpio->base_addr);
- 
--	irq = platform_get_irq(pdev, 0);
--	if (irq < 0) {
-+	gpio->irq = platform_get_irq(pdev, 0);
-+	if (gpio->irq < 0) {
- 		dev_err(&pdev->dev, "invalid IRQ\n");
--		return irq;
-+		return gpio->irq;
+@@ -526,7 +576,7 @@ static struct class gpio_class = {
+ int gpiod_export(struct gpio_desc *desc, bool direction_may_change)
+ {
+ 	unsigned long		flags;
+-	int			status;
++	int			status, irq;
+ 	const char		*ioname = NULL;
+ 	struct device		*dev;
+ 	int			offset;
+@@ -582,11 +632,24 @@ int gpiod_export(struct gpio_desc *desc, bool direction_may_change)
+ 			goto fail_unregister_device;
  	}
  
- 	/* configure the gpio chip */
-@@ -654,14 +662,12 @@ static int zynq_gpio_probe(struct platform_device *pdev)
- 		goto err_rm_gpiochip;
+-	if (gpiod_to_irq(desc) >= 0 && (direction_may_change ||
+-				       !test_bit(FLAG_IS_OUT, &desc->flags))) {
+-		status = device_create_file(dev, &dev_attr_edge);
+-		if (status)
+-			goto fail_unregister_device;
++	irq = gpiod_to_irq(desc);
++	if (irq >= 0) {
++		struct irq_desc *irq_desc = irq_to_desc(irq);
++		struct irq_chip	*irqchip = irq_desc_get_chip(irq_desc);
++
++		if (direction_may_change ||
++				!test_bit(FLAG_IS_OUT, &desc->flags)) {
++			status = device_create_file(dev, &dev_attr_edge);
++			if (status)
++				goto fail_unregister_device;
++		}
++
++		if (irqchip->flags & IRQCHIP_SKIP_SET_WAKE ||
++				irqchip->irq_set_wake) {
++			status = device_create_file(dev, &dev_attr_wakeup);
++			if (status)
++				goto fail_unregister_device;
++		}
  	}
  
--	gpiochip_set_chained_irqchip(chip, &zynq_gpio_edge_irqchip, irq,
-+	gpiochip_set_chained_irqchip(chip, &zynq_gpio_edge_irqchip, gpio->irq,
- 				     zynq_gpio_irqhandler);
- 
- 	pm_runtime_set_active(&pdev->dev);
- 	pm_runtime_enable(&pdev->dev);
- 
--	device_set_wakeup_capable(&pdev->dev, 1);
--
- 	return 0;
- 
- err_rm_gpiochip:
+ 	set_bit(FLAG_EXPORT, &desc->flags);
 -- 
 2.1.0.1.g27b9230
