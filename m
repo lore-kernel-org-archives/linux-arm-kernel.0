@@ -1,46 +1,43 @@
-From: bjorn.andersson@sonymobile.com (Bjorn Andersson)
-Date: Thu, 28 Aug 2014 23:09:42 -0700
-Subject: [PATCH v2 2/3] dt: Document Qualcomm APQ8084 pinctrl binding
-In-Reply-To: <1409057156-1201-3-git-send-email-gdjakov@mm-sol.com>
-References: <1409057156-1201-1-git-send-email-gdjakov@mm-sol.com>
- <1409057156-1201-3-git-send-email-gdjakov@mm-sol.com>
-Message-ID: <20140829060941.GH12494@sonymobile.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 29 Aug 2014 08:19:13 +0200
+Subject: [PATCH 1/4] gpio: syscon: add soc specific callback to assign
+ output value
+In-Reply-To: <1407946582-20927-2-git-send-email-grygorii.strashko@ti.com>
+References: <1407946582-20927-1-git-send-email-grygorii.strashko@ti.com>
+ <1407946582-20927-2-git-send-email-grygorii.strashko@ti.com>
+Message-ID: <CACRpkdaq2=f92yEEZgGHOtixDk35O9tmN2PZkSPKrGwGVDS_mQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue 26 Aug 05:45 PDT 2014, Georgi Djakov wrote:
+On Wed, Aug 13, 2014 at 6:16 PM, Grygorii Strashko
+<grygorii.strashko@ti.com> wrote:
 
-> Define a new binding for the Qualcomm TLMM (Top-Level Mode Mux) based pin
-> controller inside the APQ8084.
-> 
-> Signed-off-by: Georgi Djakov <gdjakov@mm-sol.com>
-[...]
-> +Valid values for function are:
-> +adsp_ext, audio_ref, blsp_i2c1, blsp_i2c2, blsp_i2c3, blsp_i2c4, blsp_i2c5,
-> +blsp_i2c6, blsp_i2c7, blsp_i2c8, blsp_i2c9, blsp_i2c10, blsp_i2c11, blsp_i2c12,
-> +blsp_spi1, blsp_spi2, blsp_spi3, blsp_spi4, blsp_spi5, blsp_spi6, blsp_spi7,
-> +blsp_spi8, blsp_spi9, blsp_spi10, blsp_spi11, blsp_spi12, blsp_uart1,
-> +blsp_uart2, blsp_uart3, blsp_uart4, blsp_uart5, blsp_uart6, blsp_uart7,
-> +blsp_uart8, blsp_uart9, blsp_uart10, blsp_uart11, blsp_uart12, blsp_uim1,
-> +blsp_uim2, blsp_uim3, blsp_uim4, blsp_uim5, blsp_uim6, blsp_uim7, blsp_uim8,
-> +blsp_uim9, blsp_uim10, blsp_uim11, blsp_uim12, cam_mclk0, cam_mclk1, cam_mclk2,
-> +cam_mclk3, cci_async, cci_async_in0, cci_i2c0, cci_i2c1, cci_timer0, cci_timer1,
-> +cci_timer2, cci_timer3, cci_timer4, edp_hpd, gcc_gp1, gcc_gp2, gcc_gp3, gcc_obt,
-> +gcc_vtt, gp_mn, gp_pdm0, gp_pdm1, gp_pdm2, gp0_clk, gp1_clk, gpio, hdmi_cec,
-> +hdmi_ddc, hdmi_dtest, hdmi_hpd, hdmi_rcv, hsic, ldo_en, ldo_update, mdp_vsync,
-> +pci_e0, pci_e0_n, pci_e0_rst, pci_e1, pci_e1_rst, pci_e1_rst_n, pci_e1_clkreq_n,
-> +pri_mi2s, qua_mi2s, sata_act, sata_devsleep, sata_devsleep_n, sd_write,
-> +sdc_emmc_mode, sdc3, sdc4, sec_mi2s, slimbus, spdif_tx, spkr_i2s, spkr_i2s_ws,
-> +spss_geni, ter_mi2s, tsif1, tsif2, uim, uim_batt_alarm, gpio
+> Some SoCs (like Keystone) may require to perform special
+> sequence of operations to assign output GPIO value, so default
+> implementation of .set() callback from gpio-syscon driver
+> can't be used.
+>
+> Hence, add optional, SoC specific callback to assign output
+> gpio value.
+>
+> Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
 
-It would be nice if these where indented.
+Hm :-/
 
-Also, the last binding I sent up was for msm8960, where I got some comments
-that made me change the format completely. I don't require you to follow that
-instead, but I have to vent my opinion saying that it would be nice if you
-did ;)
+I didn't realize this wasn't a quite so straight-forward a
+syscon GPIO driver.
 
-Otherwise, Acked-by: Bjorn Andersson <bjorn.andersson@sonymobile.com>
+Now I start to think that it looks kludgy to bolt this onto
+the other driver and think we may need to go back to the
+other version which puts it as a separate driver. I guess
+that is what you refer to as v1?
 
-Regards,
-Bjorn
+I have a hard time to make my mind up about these
+syscon things, sorry :-(
+
+Now I have to ask you: which way do you prefer to do it,
+if you can choose freely? The initial driver or augmenting
+the syscon driver (patch v1)?
+
+Yours,
+Linus Walleij
