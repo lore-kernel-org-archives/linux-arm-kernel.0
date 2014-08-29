@@ -1,52 +1,57 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 29 Aug 2014 17:01:51 +0100
-Subject: [PATCH 1/2] efi/arm64: use UEFI for system poweroff
-In-Reply-To: <1409324757-12607-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1409324757-12607-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <20140829160151.GA18555@leverpostej>
+From: bp@alien8.de (Borislav Petkov)
+Date: Fri, 29 Aug 2014 18:02:04 +0200
+Subject: [PATCHv10 1/2] edac: altera: Add Altera SDRAM EDAC support.
+In-Reply-To: <1407770293-27190-2-git-send-email-tthayer@opensource.altera.com>
+References: <1407770293-27190-1-git-send-email-tthayer@opensource.altera.com>
+ <1407770293-27190-2-git-send-email-tthayer@opensource.altera.com>
+Message-ID: <20140829160204.GA8835@nazgul.tnic>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ard,
-
-On Fri, Aug 29, 2014 at 04:05:56PM +0100, Ard Biesheuvel wrote:
-> If UEFI Runtime Services are available, they are preferred over direct
-> PSCI calls or other methods to power down the system.
-
-Could you elaborate on why they should be preferred?
-
-Mark.
-
-> Enable the existing efi_reboot() code by supplying a definition of
-> efi_poweroff_required() that returns true.
+On Mon, Aug 11, 2014 at 10:18:12AM -0500, tthayer at opensource.altera.com wrote:
+> From: Thor Thayer <tthayer@opensource.altera.com>
 > 
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> This patch adds support for the CycloneV and ArriaV SDRAM controllers.
+> Correction and reporting of SBEs, Panic on DBEs.
+> 
+> Signed-off-by: Thor Thayer <tthayer@opensource.altera.com>
 > ---
->  arch/arm64/kernel/efi.c | 8 ++++++++
->  1 file changed, 8 insertions(+)
+> v2: Use the SDRAM controller registers to calculate memory size
+>     instead of the Device Tree. Update To & Cc list. Add maintainer
+>     information.
 > 
-> diff --git a/arch/arm64/kernel/efi.c b/arch/arm64/kernel/efi.c
-> index e72f3100958f..78c85c4252bc 100644
-> --- a/arch/arm64/kernel/efi.c
-> +++ b/arch/arm64/kernel/efi.c
-> @@ -475,3 +475,11 @@ err_unmap:
->  	return -1;
->  }
->  early_initcall(arm64_enter_virtual_mode);
-> +
-> +/*
-> + * Override the weak definition in drivers/firmware/efi/reboot.c
-> + */
-> +bool efi_poweroff_required(void)
-> +{
-> +	return true;
-> +}
-> -- 
-> 1.8.3.2
+> v3: EDAC driver cleanup based on comments from Mailing list.
 > 
+> v4: Panic on DBE. Add macro around inject-error reads to prevent
+>     them from being optimized out. Remove of_match_ptr since this
+>     will always use Device Tree.
 > 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> v5: Addition of printk to trigger function to ensure read vars
+>     are not optimized out.
 > 
+> v6: Changes to split out shared SDRAM controller reg (offset 0x00)
+>     as a syscon device and allocate ECC specific SDRAM registers
+>     to EDAC.
+> 
+> v7: No changes. Bump for consistency.
+> 
+> v8: Alphabetize headers.
+> 
+> v9: Changes to support a MFD SDRAM controller with nested EDAC.
+> 
+> v10: Revert to version 5 (syscon) and fix errors found in v5.
+
+EDAC bits look ok to me,
+
+Acked-by: Borislav Petkov <bp@suse.de>
+
+Dinh, please convert that version information above to a nice commit
+message and add it when applying as it is very useful for future
+reference.
+
+Thanks.
+
+-- 
+Regards/Gruss,
+    Boris.
+--
