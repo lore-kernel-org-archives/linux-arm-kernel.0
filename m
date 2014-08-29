@@ -1,37 +1,93 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Fri, 29 Aug 2014 15:08:21 +0200
-Subject: [PATCH 2/4] clk: mvebu: armada-370: Fix timer drift caused by
- the SSCG deviation
-In-Reply-To: <1409312620-20631-3-git-send-email-gregory.clement@free-electrons.com>
-References: <1409312620-20631-1-git-send-email-gregory.clement@free-electrons.com>
- <1409312620-20631-3-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <20140829150821.66f1d03d@free-electrons.com>
+From: gdjakov@mm-sol.com (Georgi Djakov)
+Date: Fri, 29 Aug 2014 16:09:30 +0300
+Subject: [PATCH v2 1/3] pinctrl: qcom: Add APQ8084 pinctrl support
+In-Reply-To: <20140829060059.GG12494@sonymobile.com>
+References: <1409057156-1201-1-git-send-email-gdjakov@mm-sol.com>
+ <1409057156-1201-2-git-send-email-gdjakov@mm-sol.com>
+ <20140829060059.GG12494@sonymobile.com>
+Message-ID: <54007B8A.50503@mm-sol.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Gregory CLEMENT,
+On 08/29/2014 09:01 AM, Bjorn Andersson wrote:
+> On Tue 26 Aug 05:45 PDT 2014, Georgi Djakov wrote:
+> 
+> Hi Georgi,
+> 
+> Sorry for missing this before, but I did a quick walkthrough and unfortunately
+> the gpio configuration needs a few updates.
+> 
+>> diff --git a/drivers/pinctrl/qcom/pinctrl-apq8084.c b/drivers/pinctrl/qcom/pinctrl-apq8084.c
+> [...]
+>> +
+>> +#define PINGROUP(id, f1, f2, f3, f4, f5, f6, f7)        \
+>> +       {                                               \
+>> +               .name = "gpio" #id,                     \
+>> +               .pins = gpio##id##_pins,                \
+>> +               .npins = ARRAY_SIZE(gpio##id##_pins),   \
+>> +               .funcs = (int[]){                       \
+>> +                       APQ_MUX_gpio,                   \
+>> +                       APQ_MUX_##f1,                   \
+>> +                       APQ_MUX_##f2,                   \
+>> +                       APQ_MUX_##f3,                   \
+>> +                       APQ_MUX_##f4,                   \
+>> +                       APQ_MUX_##f5,                   \
+>> +                       APQ_MUX_##f6,                   \
+>> +                       APQ_MUX_##f7                    \
+>> +               },                                      \
+>> +               .nfuncs = 8,                            \
+>> +               .ctl_reg = 0x1000 + 0x10 * id,          \
+>> +               .io_reg = 0x1004 + 0x10 * id,           \
+>> +               .intr_cfg_reg = 0x1008 + 0x10 * id,     \
+>> +               .intr_status_reg = 0x100c + 0x10 * id,  \
+>> +               .intr_target_reg = 0x400 + 0x4 * id,    \
+> 
+> The routing of the interrupt is specified in TLMM_GPIO_INTR_CFG(n),
+> i.e: 0x1008 + 0x10 * n
+> 
+> Apparently the HW guys wanted to give us more work, so in 8084 they use 3 to
+> specify routing the interrupts to KPSS, instead of the previous 4. So the
+> static define of INTR_TARGET_PROC_APPS is no longer adequate.
+> 
+> My suggestion is that you create an additional patch and add to your series
+> that moves todays hardcoded 4 into the soc_data for the existing platforms (or
+> include it in this struct).
+> 
+>> +               .mux_bit = 2,                           \
+>> +               .pull_bit = 0,                          \
+>> +               .drv_bit = 6,                           \
+>> +               .oe_bit = 9,                            \
+>> +               .in_bit = 0,                            \
+>> +               .out_bit = 1,                           \
+>> +               .intr_enable_bit = 0,                   \
+>> +               .intr_status_bit = 0,                   \
+>> +               .intr_ack_high = 1,                     \
+> 
+> With the 8084 TLMM chip you ack the interrupt status by clearing this bit, so
+> intr_ack_high should be 0.
+> 
+>> +               .intr_target_bit = 0,                   \
+> 
+> Target bit is 5.
+> 
+>> +               .intr_raw_status_bit = 3,               \
+> 
+> Raw interrupt status bit is 4.
+> 
+>> +               .intr_polarity_bit = 1,                 \
+>> +               .intr_detection_bit = 2,                \
+>> +               .intr_detection_width = 1,              \
+> 
+> You can do level, raise, fall and both edge detection with 8084, so the width
+> of his part is 2.
+> 
+>> +       }
+>> +
+> 
 
-On Fri, 29 Aug 2014 13:43:38 +0200, Gregory CLEMENT wrote:
+Thanks Bjorn. I'll search for some more information regarding this and will
+update accordingly, including the INTR_TARGET_PROC_APPS for each platform.
+Thanks again for your time!
 
-> +bool a370_is_sscg_enabled(void __iomem *sar)
-
-Minor nit: "static" is missing here.
-
-> +{
-> +	return !(readl(sar) & SARL_A370_SSCG_ENABLE);
-> +}
-> +
->  static const struct coreclk_soc_desc a370_coreclks = {
->  	.get_tclk_freq = a370_get_tclk_freq,
->  	.get_cpu_freq = a370_get_cpu_freq,
->  	.get_clk_ratio = a370_get_clk_ratio,
-> +	.is_sscg_enabled = a370_is_sscg_enabled,
->  	.ratios = a370_coreclk_ratios,
->  	.num_ratios = ARRAY_SIZE(a370_coreclk_ratios),
->  };
-
-Thomas
--- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+BR,
+Georgi
