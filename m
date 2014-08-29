@@ -1,55 +1,42 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 29 Aug 2014 09:58:04 +0100
-Subject: [PATCH RESEND 0/8] i2c: Relax mandatory I2C ID table passing
-In-Reply-To: <20140829084538.GC1329@katana>
-References: <1409236538-21274-1-git-send-email-lee.jones@linaro.org>
- <20140829084538.GC1329@katana>
-Message-ID: <20140829085804.GE24579@lee--X1>
+Date: Fri, 29 Aug 2014 10:13:59 +0100
+Subject: [GIT PULL] MFD: ARM (IMX & R8): Immutable branch for Dialog
+ Semiconductor - vendor prefix consolidation
+In-Reply-To: <201408221446.s7MEkNVF001775@swsrvapps-01.diasemi.com>
+References: <201408221446.s7MEkNVF001775@swsrvapps-01.diasemi.com>
+Message-ID: <20140829091359.GF24579@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 29 Aug 2014, Wolfram Sang wrote:
-> > Placing this firmly back on your plate.  I truly hope we don't miss
-> > another merge-window.
-> 
-> Nope, we won't. I'll still need a week or so due to other duties.
+IMX and R8 sub-arch Maintainers,
 
-Perfectly reasonable.
+The following changes since commit 52addcf9d6669fa439387610bc65c92fa0980cef:
 
-> > This patch-set has the support of some pretty
-> > senior kernel maintainers, so I hope acceptance shouldn't be too
-> > difficult.
-> 
-> Cool, then they could ack it like Grant did? That surely helps.
+  Linux 3.17-rc2 (2014-08-25 15:36:20 -0700)
 
-I was talking about Grant (and Linus - I'll poke him seperately). ;)
+are available in the git repository at:
 
-> > As previously discussed I believe it should be okay for an I2C device
-> > driver _not_ supply an I2C ID table to match to.
-> 
-> I agree...
-> 
-> > The I2C subsystem
-> > should be able to match via other means, such as via OF tables.  The
-> > blocking factor during our previous conversation was to keep
-> > registering via sysfs up and running.  This set does that.
-> 
-> ... yet it also should not cause regressions. If you fixed that, sounds
-> great!
->
-> > After thinking more deeply about the problem, it occurred to me that
-> > any I2C device driver which uses the sysfs method and issues an
-> > of_match_device() would also fail their probe().  Bolted on to this
-> > set is a new, more generic way for these devices to match against
-> > either of the I2C/OF tables.
-> 
-> Even better :) I am generally positive with your patchset, but need to
-> review the implementation. For core stuff, this simply needs more
-> attention.
+  git://git.kernel.org/pub/scm/linux/kernel/git/lee/mfd.git tags/ib-mfd-arm-v3.18
 
-Agree.
+for you to fetch changes up to bd597f47ca4bf7a522a0298a95c7f9b2f0a75b9e:
 
-Thanks Wolfram.
+  devicetree: Dialog Semiconductor consolidate existing vendor prefixes to standardise on 'dlg' (2014-08-29 09:26:29 +0100)
+
+----------------------------------------------------------------
+Immutable branch between MFD and some ARM sub-arch maintainers.
+----------------------------------------------------------------
+Steve Twiss (1):
+      devicetree: Dialog Semiconductor consolidate existing vendor prefixes to standardise on 'dlg'
+
+ .../devicetree/bindings/i2c/trivial-devices.txt    |  2 +-
+ .../devicetree/bindings/regulator/da9210.txt       |  4 ++--
+ .../devicetree/bindings/vendor-prefixes.txt        |  1 +
+ arch/arm/boot/dts/imx53-smd.dts                    |  2 +-
+ arch/arm/boot/dts/imx6qdl-phytec-pfla02.dtsi       |  2 +-
+ arch/arm/boot/dts/r8a7790-lager.dts                |  2 +-
+ arch/arm/boot/dts/r8a7791-koelsch.dts              |  2 +-
+ drivers/mfd/da9055-core.c                          | 26 +++++++++++-----------
+ 8 files changed, 21 insertions(+), 20 deletions(-)
 
 -- 
 Lee Jones
