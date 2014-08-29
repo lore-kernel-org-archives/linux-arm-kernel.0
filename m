@@ -1,52 +1,66 @@
-From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Fri, 29 Aug 2014 15:50:13 +0200
-Subject: [PATCH 07/11] [WIP] ARM: shmobile: r8a7740/armadillo legacy: Add A4MP
- pm domain support
-In-Reply-To: <1409320217-13278-1-git-send-email-geert+renesas@glider.be>
-References: <1409320217-13278-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <1409320217-13278-8-git-send-email-geert+renesas@glider.be>
+From: antoine.tenart@free-electrons.com (Antoine Tenart)
+Date: Fri, 29 Aug 2014 15:50:58 +0200
+Subject: [PATCH 0/5] ARM: Berlin: Ethernet support
+Message-ID: <1409320263-10295-1-git-send-email-antoine.tenart@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for the A4MP power domain, and hook up the FSI hardware block.
-This domain also contains the SPU2, FMSI, and BBIF2 hardware blocks,
-but these are currently not used by any driver.
+Hi all,
 
-FIXME: A4PM is not added, as it causes "irq 163: nobody cared" (irq 163
-       is registered by sh-mobile-hdmi), either on boot, or, when trying
-       to fix it using pm_domain_always_on_gov, on resume.
+This series introduce the Marvell Berlin Ethernet driver, allowing to
+handle the fast Ethernet port. This driver is based on the mv643xx_eth
+driver and reuse some of its functions. While I wanted to make these
+functions common to the two drivers at first, I finally do think this
+is not a great idea:
+- Registers are very different.
+- The mv643xx_eth supports up to 1000Mbps interfaces and performance
+  issues may occur, whereas the mvberlin_eth is only for fast Ethernet.
+- The mvberlin_eth driver uses a hash table to filter incoming packets.
+- A few other differences.
 
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
----
- arch/arm/mach-shmobile/board-armadillo800eva.c |    1 +
- arch/arm/mach-shmobile/pm-r8a7740.c            |    3 +++
- 2 files changed, 4 insertions(+)
+I tried to stay close to the mv643xx_eth implementation, so that the
+discussion is still open, but I still ended up with lots of tiny
+differences that can be hard to manage for both cases. In the end I do
+think having two separate drivers is a good choice.
 
-diff --git a/arch/arm/mach-shmobile/board-armadillo800eva.c b/arch/arm/mach-shmobile/board-armadillo800eva.c
-index 735036038951..c2ac4ee51710 100644
---- a/arch/arm/mach-shmobile/board-armadillo800eva.c
-+++ b/arch/arm/mach-shmobile/board-armadillo800eva.c
-@@ -1234,6 +1234,7 @@ static void __init eva_init(void)
- 	static struct pm_domain_device domain_devices[] __initdata = {
- 		{ "A4LC", &lcdc0_device },
- 		{ "A4LC", &hdmi_lcdc_device },
-+		{ "A4MP", &fsi_device },
- 		{ "A4S",  &sh_eth_device },
- 		{ "A3SP", &pwm_device },
- 		{ "A3SP", &sdhi0_device },
-diff --git a/arch/arm/mach-shmobile/pm-r8a7740.c b/arch/arm/mach-shmobile/pm-r8a7740.c
-index 84b94d1d96db..86b2df8b5391 100644
---- a/arch/arm/mach-shmobile/pm-r8a7740.c
-+++ b/arch/arm/mach-shmobile/pm-r8a7740.c
-@@ -37,6 +37,9 @@ static struct rmobile_pm_domain r8a7740_pm_domains[] = {
- 		.genpd.name	= "A4LC",
- 		.bit_shift	= 1,
- 	}, {
-+//		.genpd.name	= "A4MP",
-+//		.bit_shift	= 2,
-+//	}, {
- 		.genpd.name	= "A3RV",
- 		.bit_shift	= 6,
- 	}, {
+That being said, I tested the Ethernet communication with ICMP pings,
+netcat, tried to use some network related softwares (such as ssh). Here
+is an iperf output:
+
+ ------------------------------------------------------------
+ Client connecting to 192.168.0.11, TCP port 5001
+ TCP window size: 85.0 KByte (default)
+ ------------------------------------------------------------
+ [  3] local 192.168.0.20 port 44183 connected with 192.168.0.11 port 5001
+ [ ID] Interval       Transfer     Bandwidth
+ [  3]  0.0-10.0 sec   113 MBytes  94.8 Mbits/sec
+
+Tests were done on a BG2Q DMP, and this series currently does not add
+other device tree nodes than the ones for this board.
+
+Thanks!
+
+Antoine
+
+
+Antoine Tenart (5):
+  net: mvberlin_eth: add an Ethernet driver for Marvell Berlin
+  Documentation: bindings: net: add the Marvell Berlin Ethernet
+    controller
+  Documentation: devicetree: net: mention Marvell Berlin
+  ARM: dts: berlin: add ethernet and mdio nodes
+  ARM: dts: berlin: enable the Ethernet port on the BG2Q DMP
+
+ .../devicetree/bindings/net/marvell-berlin.txt     |   23 +
+ .../devicetree/bindings/net/marvell-orion-mdio.txt |    6 +-
+ arch/arm/boot/dts/berlin2q-marvell-dmp.dts         |   13 +
+ arch/arm/boot/dts/berlin2q.dtsi                    |   19 +
+ drivers/net/ethernet/marvell/Kconfig               |    9 +
+ drivers/net/ethernet/marvell/Makefile              |    1 +
+ drivers/net/ethernet/marvell/mvberlin_eth.c        | 2081 ++++++++++++++++++++
+ 7 files changed, 2149 insertions(+), 3 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/net/marvell-berlin.txt
+ create mode 100644 drivers/net/ethernet/marvell/mvberlin_eth.c
+
 -- 
-1.7.9.5
+1.9.1
