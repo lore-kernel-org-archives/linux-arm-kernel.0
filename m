@@ -1,80 +1,193 @@
 From: victor.kamensky@linaro.org (Victor Kamensky)
-Date: Thu, 28 Aug 2014 22:51:05 -0700
+Date: Thu, 28 Aug 2014 22:51:06 -0700
 Subject: [PATCH V3] arm: fix get_user BE behavior for target variable with
  size of 8 bytes
-Message-ID: <1409291466-4064-1-git-send-email-victor.kamensky@linaro.org>
+In-Reply-To: <1409291466-4064-1-git-send-email-victor.kamensky@linaro.org>
+References: <1409291466-4064-1-git-send-email-victor.kamensky@linaro.org>
+Message-ID: <1409291466-4064-2-git-send-email-victor.kamensky@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Here is non-RFC proposal to fix get_user for 8 bytes target variable
-in BE v7 images. Patch follows this cover letter. Changes compared 
-with previous RFC v2 version are very minor.
+e38361d 'ARM: 8091/2: add get_user() support for 8 byte types' commit
+broke V7 BE get_user call when target var size is 64 bit, but '*ptr' size
+is 32 bit or smaller. e38361d changed type of __r2 from 'register
+unsigned long' to 'register typeof(x) __r2 asm("r2")' i.e before the change
+even when target variable size was 64 bit, __r2 was still 32 bit.
+But after e38361d commit, for target var of 64 bit size, __r2 became 64
+bit and now it should occupy 2 registers r2, and r3. The issue in BE case
+that r3 register is least significant word of __r2 and r2 register is most
+significant word of __r2. But __get_user_4 still copies result into r2 (most
+significant word of __r2). Subsequent code copies from __r2 into x, but
+for situation described it will pick up only garbage from r3 register.
 
-Note for LE image it is no change in resulting generated code diff,
-i.e it affects only v7 BE code.
+Special __get_user_64t_(124) functions are introduced. They are similar to
+corresponding __get_user_(124) function but result stored in r3 register
+(lsw in case of 64 bit __r2 in BE image). Those function are used by
+get_user macro in case of BE and target var size is 64bit.
 
-Will wait a bit more for folk's feedback before posting it into
-Russell's patch system.
+Also changed __get_user_lo8 name into __get_user_32t_8 to get consistent
+naming accross all cases.
 
-Changelog:
-
-v3: - dropped RFC from proposed patch
-    - addressed Daniel's comments
-    - edited commit message to be more appropriate for final commit log,
-    i.e moving history info and example into this cover letter
-
-v2: this version: uses __get_user_64t_(124) special function of BE
-sizeof(__r2) == 64 case
-
-v1: first variant, that used different types for __r2 depending on brach
-in switch statement, has problem of generating multiple warnings in case
-of incorrect but single get_user usage.
-
-The issue was discovered during 3.17-rc1 V7 BE KVM testing. Simple test case 
-follows. Note it works in LE case because r2 in LE case is still least 
-significant word.
-
-Tested on TC2 for BE/LE and ARM/Thumb2 combinations.
-
-Small test case C code
-
-char gut_lower_v64_p32 (int *ptr) {
-       long long value = 0;
-       get_user(value, ptr);
-       return 0xff & value;
-}
-
-the following code in BE V7 image will be generated. Note uxtb access to
-r3 register, but __get_user_4 retrieves data into r2.
-
-(gdb) disassemble gut_lower_v64_p32
-Dump of assembler code for function gut_lower_v64_p32:
-   0xc0022ec8 <+0>:	push	{lr}		; (str lr, [sp, #-4]!)
-   0xc0022ecc <+4>:	mov	r2, sp
-   0xc0022ed0 <+8>:	bic	r3, r2, #8128	; 0x1fc0
-   0xc0022ed4 <+12>:	bic	r3, r3, #63	; 0x3f
-   0xc0022ed8 <+16>:	ldr	r1, [r3, #8]
-   0xc0022edc <+20>:	sub	r1, r1, #1
-   0xc0022ee0 <+24>:	bl	0xc03792ac <__get_user_4>
-   0xc0022ee4 <+28>:	uxtb	r0, r3
-   0xc0022ee8 <+32>:	pop	{pc}		; (ldr pc, [sp], #4)
-End of assembler dump.
-(gdb) disassemble __get_user_4
-Dump of assembler code for function __get_user_4:
-   0xc03792ac <+0>:	adds	r2, r0, #3
-   0xc03792b0 <+4>:	sbcscc	r2, r2, r1
-   0xc03792b4 <+8>:	bcs	0xc03792fc <__get_user_bad>
-   0xc03792b8 <+12>:	ldr	r2, [r0]
-   0xc03792bc <+16>:	mov	r0, #0
-   0xc03792c0 <+20>:	bx	lr
-End of assembler dump.
-
-Victor Kamensky (1):
-  arm: fix get_user BE behavior for target variable with size of 8 bytes
-
+Signed-off-by: Victor Kamensky <victor.kamensky@linaro.org>
+Suggested-by: Daniel Thompson <daniel.thompson@linaro.org>
+Reviewed-by: Daniel Thompson <daniel.thompson@linaro.org>
+---
  arch/arm/include/asm/uaccess.h | 48 ++++++++++++++++++++++++++++++++++--------
  arch/arm/lib/getuser.S         | 38 +++++++++++++++++++++++++++++++--
  2 files changed, 75 insertions(+), 11 deletions(-)
 
+diff --git a/arch/arm/include/asm/uaccess.h b/arch/arm/include/asm/uaccess.h
+index a4cd7af..4767eb9 100644
+--- a/arch/arm/include/asm/uaccess.h
++++ b/arch/arm/include/asm/uaccess.h
+@@ -107,8 +107,11 @@ static inline void set_fs(mm_segment_t fs)
+ extern int __get_user_1(void *);
+ extern int __get_user_2(void *);
+ extern int __get_user_4(void *);
+-extern int __get_user_lo8(void *);
++extern int __get_user_32t_8(void *);
+ extern int __get_user_8(void *);
++extern int __get_user_64t_1(void *);
++extern int __get_user_64t_2(void *);
++extern int __get_user_64t_4(void *);
+ 
+ #define __GUP_CLOBBER_1	"lr", "cc"
+ #ifdef CONFIG_CPU_USE_DOMAINS
+@@ -117,7 +120,7 @@ extern int __get_user_8(void *);
+ #define __GUP_CLOBBER_2 "lr", "cc"
+ #endif
+ #define __GUP_CLOBBER_4	"lr", "cc"
+-#define __GUP_CLOBBER_lo8 "lr", "cc"
++#define __GUP_CLOBBER_32t_8 "lr", "cc"
+ #define __GUP_CLOBBER_8	"lr", "cc"
+ 
+ #define __get_user_x(__r2,__p,__e,__l,__s)				\
+@@ -131,12 +134,30 @@ extern int __get_user_8(void *);
+ 
+ /* narrowing a double-word get into a single 32bit word register: */
+ #ifdef __ARMEB__
+-#define __get_user_xb(__r2, __p, __e, __l, __s)				\
+-	__get_user_x(__r2, __p, __e, __l, lo8)
++#define __get_user_x_32t(__r2, __p, __e, __l, __s)				\
++	__get_user_x(__r2, __p, __e, __l, 32t_8)
+ #else
+-#define __get_user_xb __get_user_x
++#define __get_user_x_32t __get_user_x
+ #endif
+ 
++/*
++ * storing result into proper least significant word of 64bit target var,
++ * different only for big endian case where 64 bit __r2 lsw is r3:
++ */
++#ifdef __ARMEB__
++#define __get_user_x_64t(__r2, __p, __e, __l, __s)		        \
++	   __asm__ __volatile__ (					\
++		__asmeq("%0", "r0") __asmeq("%1", "r2")			\
++		__asmeq("%3", "r1")					\
++		"bl	__get_user_64t_" #__s				\
++		: "=&r" (__e), "=r" (__r2)				\
++		: "0" (__p), "r" (__l)					\
++		: __GUP_CLOBBER_##__s)
++#else
++#define __get_user_x_64t __get_user_x
++#endif
++
++
+ #define __get_user_check(x,p)							\
+ 	({								\
+ 		unsigned long __limit = current_thread_info()->addr_limit - 1; \
+@@ -146,17 +167,26 @@ extern int __get_user_8(void *);
+ 		register int __e asm("r0");				\
+ 		switch (sizeof(*(__p))) {				\
+ 		case 1:							\
+-			__get_user_x(__r2, __p, __e, __l, 1);		\
++			if (sizeof((x)) >= 8)				\
++				__get_user_x_64t(__r2, __p, __e, __l, 1); \
++			else						\
++				__get_user_x(__r2, __p, __e, __l, 1);	\
+ 			break;						\
+ 		case 2:							\
+-			__get_user_x(__r2, __p, __e, __l, 2);		\
++			if (sizeof((x)) >= 8)				\
++				__get_user_x_64t(__r2, __p, __e, __l, 2); \
++			else						\
++				__get_user_x(__r2, __p, __e, __l, 2);	\
+ 			break;						\
+ 		case 4:							\
+-			__get_user_x(__r2, __p, __e, __l, 4);		\
++			if (sizeof((x)) >= 8)				\
++				__get_user_x_64t(__r2, __p, __e, __l, 4); \
++			else						\
++				__get_user_x(__r2, __p, __e, __l, 4);	\
+ 			break;						\
+ 		case 8:							\
+ 			if (sizeof((x)) < 8)				\
+-				__get_user_xb(__r2, __p, __e, __l, 4);	\
++				__get_user_x_32t(__r2, __p, __e, __l, 4); \
+ 			else						\
+ 				__get_user_x(__r2, __p, __e, __l, 8);	\
+ 			break;						\
+diff --git a/arch/arm/lib/getuser.S b/arch/arm/lib/getuser.S
+index 9386000..8ecfd15 100644
+--- a/arch/arm/lib/getuser.S
++++ b/arch/arm/lib/getuser.S
+@@ -80,7 +80,7 @@ ENTRY(__get_user_8)
+ ENDPROC(__get_user_8)
+ 
+ #ifdef __ARMEB__
+-ENTRY(__get_user_lo8)
++ENTRY(__get_user_32t_8)
+ 	check_uaccess r0, 8, r1, r2, __get_user_bad
+ #ifdef CONFIG_CPU_USE_DOMAINS
+ 	add	r0, r0, #4
+@@ -90,7 +90,37 @@ ENTRY(__get_user_lo8)
+ #endif
+ 	mov	r0, #0
+ 	ret	lr
+-ENDPROC(__get_user_lo8)
++ENDPROC(__get_user_32t_8)
++
++ENTRY(__get_user_64t_1)
++	check_uaccess r0, 1, r1, r2, __get_user_bad8
++8: TUSER(ldrb)	r3, [r0]
++	mov	r0, #0
++	ret	lr
++ENDPROC(__get_user_64t_1)
++
++ENTRY(__get_user_64t_2)
++	check_uaccess r0, 2, r1, r2, __get_user_bad8
++#ifdef CONFIG_CPU_USE_DOMAINS
++rb	.req	ip
++9:	ldrbt	r3, [r0], #1
++10:	ldrbt	rb, [r0], #0
++#else
++rb	.req	r0
++9:	ldrb	r3, [r0]
++10:	ldrb	rb, [r0, #1]
++#endif
++	orr	r3, rb, r3, lsl #8
++	mov	r0, #0
++	ret	lr
++ENDPROC(__get_user_64t_2)
++
++ENTRY(__get_user_64t_4)
++	check_uaccess r0, 4, r1, r2, __get_user_bad8
++11: TUSER(ldr)	r3, [r0]
++	mov	r0, #0
++	ret	lr
++ENDPROC(__get_user_64t_4)
+ #endif
+ 
+ __get_user_bad8:
+@@ -111,5 +141,9 @@ ENDPROC(__get_user_bad8)
+ 	.long	6b, __get_user_bad8
+ #ifdef __ARMEB__
+ 	.long   7b, __get_user_bad
++	.long	8b, __get_user_bad8
++	.long	9b, __get_user_bad8
++	.long	10b, __get_user_bad8
++	.long	11b, __get_user_bad8
+ #endif
+ .popsection
 -- 
 1.8.1.4
