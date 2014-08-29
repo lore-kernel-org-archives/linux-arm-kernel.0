@@ -1,56 +1,52 @@
-From: msalter@redhat.com (Mark Salter)
-Date: Fri, 29 Aug 2014 11:57:50 -0400
-Subject: [PATCH 2/2] efi/arm64: use UEFI for system reset
-In-Reply-To: <1409324757-12607-2-git-send-email-ard.biesheuvel@linaro.org>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 29 Aug 2014 17:01:51 +0100
+Subject: [PATCH 1/2] efi/arm64: use UEFI for system poweroff
+In-Reply-To: <1409324757-12607-1-git-send-email-ard.biesheuvel@linaro.org>
 References: <1409324757-12607-1-git-send-email-ard.biesheuvel@linaro.org>
- <1409324757-12607-2-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1409327870.9919.41.camel@deneb.redhat.com>
+Message-ID: <20140829160151.GA18555@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2014-08-29 at 17:05 +0200, Ard Biesheuvel wrote:
+Hi Ard,
+
+On Fri, Aug 29, 2014 at 04:05:56PM +0100, Ard Biesheuvel wrote:
 > If UEFI Runtime Services are available, they are preferred over direct
-> PSCI calls or other methods to reset the system.
-> 
-> For the reset case, we need to hook into machine_restart(), as the
-> arm_pm_restart function pointer may be overwritten by modules.
+> PSCI calls or other methods to power down the system.
+
+Could you elaborate on why they should be preferred?
+
+Mark.
+
+> Enable the existing efi_reboot() code by supplying a definition of
+> efi_poweroff_required() that returns true.
 > 
 > Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 > ---
->  arch/arm64/kernel/process.c | 7 +++++++
->  1 file changed, 7 insertions(+)
+>  arch/arm64/kernel/efi.c | 8 ++++++++
+>  1 file changed, 8 insertions(+)
 > 
-> diff --git a/arch/arm64/kernel/process.c b/arch/arm64/kernel/process.c
-> index 1309d64aa926..335a93da5eeb 100644
-> --- a/arch/arm64/kernel/process.c
-> +++ b/arch/arm64/kernel/process.c
-
-I get:
-
-  arch/arm64/kernel/process.c: In function ?machine_restart?:
-  arch/arm64/kernel/process.c:188:2: error: implicit declaration of function ?efi_reboot?
-
-unless I add
-
-  #include <linux/efi.h>
-
-
-> @@ -177,6 +177,13 @@ void machine_restart(char *cmd)
->  	local_irq_disable();
->  	smp_send_stop();
->  
-> +	/*
-> +	 * arm_pm_restart is exported to modules, so the only way to supersede
-> +	 * it with efi_reboot() is to call it here.
-> +	 */
-> +	if (IS_ENABLED(CONFIG_EFI) && efi_enabled(EFI_RUNTIME_SERVICES))
-This test isn't necessary.
-
-> +		efi_reboot(REBOOT_WARM, NULL);
-
-Why not pass reboot_mode instead?
-
+> diff --git a/arch/arm64/kernel/efi.c b/arch/arm64/kernel/efi.c
+> index e72f3100958f..78c85c4252bc 100644
+> --- a/arch/arm64/kernel/efi.c
+> +++ b/arch/arm64/kernel/efi.c
+> @@ -475,3 +475,11 @@ err_unmap:
+>  	return -1;
+>  }
+>  early_initcall(arm64_enter_virtual_mode);
 > +
->  	/* Now call the architecture specific reboot code. */
->  	if (arm_pm_restart)
->  		arm_pm_restart(reboot_mode, cmd);
+> +/*
+> + * Override the weak definition in drivers/firmware/efi/reboot.c
+> + */
+> +bool efi_poweroff_required(void)
+> +{
+> +	return true;
+> +}
+> -- 
+> 1.8.3.2
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
