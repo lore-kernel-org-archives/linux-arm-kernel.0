@@ -1,57 +1,58 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 29 Aug 2014 08:27:16 +0200
-Subject: [PATCH 4/4] gpio: pca953x: Add DT binding for reset gpio
-In-Reply-To: <1408008113.4035.29.camel@paszta.hi.pengutronix.de>
-References: <1406618686-22385-1-git-send-email-mpa@pengutronix.de>
- <1406618686-22385-5-git-send-email-mpa@pengutronix.de>
- <CACRpkdY0TqVH1tJR1H89S5hvdJUboQdVtNvZnL3NeWit4f+amw@mail.gmail.com>
- <1407507094.3354.11.camel@paszta.hi.pengutronix.de>
- <CACRpkdY1x41=b_q83fejkTHXGG8GYDFNRUXdt=1AR_R4N18Rwg@mail.gmail.com>
- <1408008113.4035.29.camel@paszta.hi.pengutronix.de>
-Message-ID: <CACRpkda7Bsff9EyWyF0WvVK50WQKcmABYX50pXkohUEoQ0ahQA@mail.gmail.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Fri, 29 Aug 2014 08:29:33 +0200
+Subject: [linux-sunxi] Re: [PATCH 4/4] simplefb: add clock handling code
+In-Reply-To: <20140828204603.GB15297@lukather>
+References: <20140826080432.GD17263@ulmo> <20140826135341.GM15297@lukather>
+ <20140826143550.GB3027@ulmo> <20140826210248.GO15297@lukather>
+ <20140827065440.GG15640@ulmo> <20140827084526.GR15297@lukather>
+ <20140827095241.GC23186@ulmo> <20140827154221.GX15297@lukather>
+ <20140828101140.GB14388@ulmo> <20140828204603.GB15297@lukather>
+Message-ID: <20140829062932.GB13106@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 14, 2014 at 11:21 AM, Philipp Zabel <p.zabel@pengutronix.de> wrote:
-> Am Montag, den 11.08.2014, 10:43 +0200 schrieb Linus Walleij:
->> On Fri, Aug 8, 2014 at 4:11 PM, Philipp Zabel <p.zabel@pengutronix.de> wrote:
->> > Am Freitag, den 08.08.2014, 15:14 +0200 schrieb Linus Walleij:
+On Thu, Aug 28, 2014 at 10:46:03PM +0200, Maxime Ripard wrote:
+> On Thu, Aug 28, 2014 at 12:11:41PM +0200, Thierry Reding wrote:
+[...]
+> > Then since firmware already knows what it set up it can tell the
+> > kernel to not touch those.
+> 
+> Somehow, I've been raised kernel-wise into thinking that you can never
+> fully trust your firmware. Or at least that you should have a way to
+> recover from any bug/bad behaviour from it.
 
->> >> As it happens, Houcheng Lin has already proposed such a
->> >> driver:
->> >> http://marc.info/?l=linux-kernel&m=140309916607115&w=2
->> >
->> > That is a different issue, as there the device does not appear on the
->> > bus until the reset is released.
->>
->> You're just looking at the patch description. Look at what the
->> driver does.
->>
->> I wrote this reply to the patch:
->> http://marc.info/?l=linux-kernel&m=140480593524472&w=2
->>
->> With a delay of zero, the reset will be released
->> immediately, by the use of a helper OF node and this driver
->> from the reset subsystem. It's nice, generic code that solves
->> a generic problem of deasserting GPIO lines for
->> some reset.
->
-> Yes, it does what you want. But its purpose is different, it's a bit
-> indirect for the use case at hand,
+If you don't trust your firmware then you shouldn't be taking over a
+device that it's set up for you. Rather you should write a proper driver
+that sets things up from the start.
 
-I think a generic driver is always best, define what you mean
-by "indirect" in this context.
+This whole "we don't trust firmware" isn't going to work if we want to
+have hand-off from firmware to kernel. And it's already been decided in
+other threads that moving more code out of the kernel and into firmware
+is a requirement (c.f. ARM64).
 
-> and we'll still find cases where this
-> won't work (interaction with other pins).
+Also in this case you wrote the firmware, so why wouldn't you trust it?
 
-But that is not what you're trying to solve right now.
+> Moreover, the way I see it, there's a major flaw in having an
+> attribute in the clock node: you don't even know if the clock is ever
+> going to be used.
+> 
+> If simplefb is not compiled in, you won't claim the clocks, and they
+> will be disabled, which is imho a good thing. This case wouldn't be
+> covered with an attribute at the clock node, because you don't have a
+> link to what device/feature actually uses it in the system, and so you
+> have to make the assumption that it will be used. And you will end up
+> with clocks with a rather high rate running for nothing.
 
-> As to whether the sub-node
-> might conflict with existing bindings, I don't know. This is something
-> that should be taken to devicetree discussion list.
+That's completely hypothetical. If simplefb isn't enabled and the clock
+isn't claimed there's probably still going to be some other driver
+taking over eventually. If there isn't, what's the point of firmware
+setting up display in the first case?
 
-Um? I don't get this.
-
-Yours,
-Linus Walleij
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140829/98a81fed/attachment.sig>
