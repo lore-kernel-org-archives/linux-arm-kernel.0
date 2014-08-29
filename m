@@ -1,50 +1,207 @@
-From: gdjakov@mm-sol.com (Georgi Djakov)
-Date: Fri, 29 Aug 2014 16:10:26 +0300
-Subject: [PATCH v2 2/3] dt: Document Qualcomm APQ8084 pinctrl binding
-In-Reply-To: <20140829060941.GH12494@sonymobile.com>
-References: <1409057156-1201-1-git-send-email-gdjakov@mm-sol.com>
- <1409057156-1201-3-git-send-email-gdjakov@mm-sol.com>
- <20140829060941.GH12494@sonymobile.com>
-Message-ID: <54007BC2.4080809@mm-sol.com>
+From: pramod.gurav@smartplayin.com (Pramod Gurav)
+Date: Fri, 29 Aug 2014 19:02:54 +0530
+Subject: [PATCH 4/4] pinctrl: qcom: Add support for reset for apq8064
+In-Reply-To: <20140829012819.GE12494@sonymobile.com>
+References: <1409282570-27299-1-git-send-email-pramod.gurav@smartplayin.com>
+ <1409282570-27299-5-git-send-email-pramod.gurav@smartplayin.com>
+ <20140829012819.GE12494@sonymobile.com>
+Message-ID: <54008106.90207@smartplayin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/29/2014 09:09 AM, Bjorn Andersson wrote:
-> On Tue 26 Aug 05:45 PDT 2014, Georgi Djakov wrote:
+Hi Bjorn,
+
+On 29-08-2014 06:58 AM, Bjorn Andersson wrote:
+> On Thu 28 Aug 20:22 PDT 2014, Pramod Gurav wrote:
 > 
->> Define a new binding for the Qualcomm TLMM (Top-Level Mode Mux) based pin
->> controller inside the APQ8084.
+>> This patch adds support for reset functions to reboot the boards
+>> with soc apq8064.
 >>
->> Signed-off-by: Georgi Djakov <gdjakov@mm-sol.com>
-> [...]
->> +Valid values for function are:
->> +adsp_ext, audio_ref, blsp_i2c1, blsp_i2c2, blsp_i2c3, blsp_i2c4, blsp_i2c5,
->> +blsp_i2c6, blsp_i2c7, blsp_i2c8, blsp_i2c9, blsp_i2c10, blsp_i2c11, blsp_i2c12,
->> +blsp_spi1, blsp_spi2, blsp_spi3, blsp_spi4, blsp_spi5, blsp_spi6, blsp_spi7,
->> +blsp_spi8, blsp_spi9, blsp_spi10, blsp_spi11, blsp_spi12, blsp_uart1,
->> +blsp_uart2, blsp_uart3, blsp_uart4, blsp_uart5, blsp_uart6, blsp_uart7,
->> +blsp_uart8, blsp_uart9, blsp_uart10, blsp_uart11, blsp_uart12, blsp_uim1,
->> +blsp_uim2, blsp_uim3, blsp_uim4, blsp_uim5, blsp_uim6, blsp_uim7, blsp_uim8,
->> +blsp_uim9, blsp_uim10, blsp_uim11, blsp_uim12, cam_mclk0, cam_mclk1, cam_mclk2,
->> +cam_mclk3, cci_async, cci_async_in0, cci_i2c0, cci_i2c1, cci_timer0, cci_timer1,
->> +cci_timer2, cci_timer3, cci_timer4, edp_hpd, gcc_gp1, gcc_gp2, gcc_gp3, gcc_obt,
->> +gcc_vtt, gp_mn, gp_pdm0, gp_pdm1, gp_pdm2, gp0_clk, gp1_clk, gpio, hdmi_cec,
->> +hdmi_ddc, hdmi_dtest, hdmi_hpd, hdmi_rcv, hsic, ldo_en, ldo_update, mdp_vsync,
->> +pci_e0, pci_e0_n, pci_e0_rst, pci_e1, pci_e1_rst, pci_e1_rst_n, pci_e1_clkreq_n,
->> +pri_mi2s, qua_mi2s, sata_act, sata_devsleep, sata_devsleep_n, sd_write,
->> +sdc_emmc_mode, sdc3, sdc4, sec_mi2s, slimbus, spdif_tx, spkr_i2s, spkr_i2s_ws,
->> +spss_geni, ter_mi2s, tsif1, tsif2, uim, uim_batt_alarm, gpio
+>> CC: Linus Walleij <linus.walleij@linaro.org>
+>> CC: Bjorn Andersson <bjorn.andersson@sonymobile.com>
+>> CC: "Ivan T. Ivanov" <iivanov@mm-sol.com>
+>> CC: Stephen Boyd <sboyd@codeaurora.org>
+>> CC: Andy Gross <agross@codeaurora.org>
+>> Signed-off-by: Pramod Gurav <pramod.gurav@smartplayin.com>
+>> ---
+>>  drivers/pinctrl/qcom/pinctrl-apq8064.c |    7 +++++-
+>>  drivers/pinctrl/qcom/pinctrl-msm.c     |   38 ++++++++++++++++++++++++++++++++
+>>  2 files changed, 44 insertions(+), 1 deletions(-)
+>>
+>> diff --git a/drivers/pinctrl/qcom/pinctrl-apq8064.c b/drivers/pinctrl/qcom/pinctrl-apq8064.c
+>> index feb6f15..ef1263c 100644
+>> --- a/drivers/pinctrl/qcom/pinctrl-apq8064.c
+>> +++ b/drivers/pinctrl/qcom/pinctrl-apq8064.c
+>> @@ -324,6 +324,7 @@ enum apq8064_functions {
+>>  	APQ_MUX_tsif1,
+>>  	APQ_MUX_tsif2,
+>>  	APQ_MUX_usb2_hsic,
+>> +	APQ_MUX_ps_hold,
+>>  	APQ_MUX_NA,
+>>  };
+>>  
+>> @@ -351,6 +352,9 @@ static const char * const gpio_groups[] = {
+>>  	"gpio78", "gpio79", "gpio80", "gpio81", "gpio82", "gpio83", "gpio84",
+>>  	"gpio85", "gpio86", "gpio87", "gpio88", "gpio89"
+>>  };
+>> +static const char * const ps_hold_groups[] = {
+>> +	"gpio78"
+>> +};
+>>  static const char * const gsbi1_groups[] = {
+>>  	"gpio18", "gpio19", "gpio20", "gpio21"
+>>  };
+>> @@ -477,6 +481,7 @@ static const struct msm_function apq8064_functions[] = {
+>>  	FUNCTION(tsif1),
+>>  	FUNCTION(tsif2),
+>>  	FUNCTION(usb2_hsic),
+>> +	FUNCTION(ps_hold),
+>>  };
+>>  
+>>  static const struct msm_pingroup apq8064_groups[] = {
+>> @@ -558,7 +563,7 @@ static const struct msm_pingroup apq8064_groups[] = {
+>>  	PINGROUP(75, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA),
+>>  	PINGROUP(76, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA),
+>>  	PINGROUP(77, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA),
+>> -	PINGROUP(78, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA),
+>> +	PINGROUP(78, ps_hold, NA, NA, NA, NA, NA, NA, NA, NA, NA),
+>>  	PINGROUP(79, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA),
+>>  	PINGROUP(80, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA),
+>>  	PINGROUP(81, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA),
+>> diff --git a/drivers/pinctrl/qcom/pinctrl-msm.c b/drivers/pinctrl/qcom/pinctrl-msm.c
+>> index 2738108..be43e7a 100644
+>> --- a/drivers/pinctrl/qcom/pinctrl-msm.c
+>> +++ b/drivers/pinctrl/qcom/pinctrl-msm.c
+>> @@ -12,6 +12,7 @@
+>>   * GNU General Public License for more details.
+>>   */
+>>  
+>> +#include <linux/delay.h>
+>>  #include <linux/err.h>
+>>  #include <linux/io.h>
+>>  #include <linux/module.h>
+>> @@ -27,12 +28,17 @@
+>>  #include <linux/interrupt.h>
+>>  #include <linux/spinlock.h>
+>>  
+>> +#include <asm/system_misc.h>
+>> +
+>>  #include "../core.h"
+>>  #include "../pinconf.h"
+>>  #include "pinctrl-msm.h"
+>>  #include "../pinctrl-utils.h"
+>>  
+>>  #define MAX_NR_GPIO 300
+>> +#define PS_HOLD_OFFSET 0x820
+>> +
+>> +static void __iomem *msm_ps_hold;
+>>  
+>>  /**
+>>   * struct msm_pinctrl - state for a pinctrl-msm device
+>> @@ -848,10 +854,31 @@ static int msm_gpio_init(struct msm_pinctrl *pctrl)
+>>  	return 0;
+>>  }
+>>  
+>> +static void qcom_reset(enum reboot_mode reboot_mode, const char *cmd)
 > 
-> It would be nice if these where indented.
+> This doesn't follow the naming used in this.
 > 
-> Also, the last binding I sent up was for msm8960, where I got some comments
-> that made me change the format completely. I don't require you to follow that
-> instead, but I have to vent my opinion saying that it would be nice if you
-> did ;)
+>> +{
+>> +	writel(0, msm_ps_hold);
+>> +	mdelay(10000);
 > 
+> Why 10 seconds? What happens after that?
 
-Oh, sorry for missing that and thank you for pointing it out! I will update
-and resend.
+This I copied from existing msm-poweroff.c driver for apq8074. Not sure
+why such a long delay. I will exclude this from mine as I have no valid
+reason.
 
-BR,
-Georgi
+> 
+>> +}
+>> +
+>> +const struct msm_function
+>> +*find_pshold_function(const struct msm_function *functions,
+>> +					unsigned nfunctions, const char *name)
+> 
+> This should be static. But that would cause a compile warning on non-ARM
+> platforms, see below.
+> 
+>> +{
+>> +	int i = 0;
+>> +	const struct msm_function *func;
+>> +
+>> +	for (func = functions; i <= nfunctions; func++, i++)
+> 
+> Why do you have 'func' and why do you iterate over that and i?
+> 
+> for (i = 0; i < nfunctions; i++)
+> 	if (strcmp(functions[i]->name, name) == 0)
+> 		return true; (or &functions[i] if you really need it)
+> 
+> But as you only uses this once I would prefer if you just merge in the setting
+> of msm_ps_hold and arm_pm_restart here as well, see below.
+> 
+>> +		if (!strcmp(func->name, name))
+>> +			return func;
+>> +
+>> +	return NULL;
+>> +}
+>> +
+>>  int msm_pinctrl_probe(struct platform_device *pdev,
+>>  		      const struct msm_pinctrl_soc_data *soc_data)
+>>  {
+>>  	struct msm_pinctrl *pctrl;
+>> +	const struct msm_function *func;
+>>  	struct resource *res;
+>>  	int ret;
+>>  
+>> @@ -871,6 +898,17 @@ int msm_pinctrl_probe(struct platform_device *pdev,
+>>  	if (IS_ERR(pctrl->regs))
+>>  		return PTR_ERR(pctrl->regs);
+>>  
+>> +#ifdef CONFIG_ARM
+>> +	func = find_pshold_function(soc_data->functions,
+>> +					soc_data->nfunctions, "ps_hold");
+>> +	if (func) {
+>> +		dev_dbg(&pdev->dev, "Found Function %s\n", func->name);
+> 
+> Guess what, it will print "ps_hold" here. I would prefer if you just skip this
+> line, as this will always be true on 8960 and 8064.
+> 
+>> +		msm_ps_hold = pctrl->regs + PS_HOLD_OFFSET;
+>> +		arm_pm_restart = qcom_reset;
+>> +	}
+>> +#else
+>> +#error "not supported on this arch"
+> 
+> There is no reason for you to break compilation of this driver on non-ARM
+> platforms. This #else/#error should be removed.
+> 
+> I would prefer if you did not #ifdef at all within the function, but rather
+> merge this piece of logic with the search above into a static function that's
+> surrounded by a check for CONFIG_ARM - providing a no-op for non-arm boards.
+> 
+> I.e
+> 
+> #ifdef CONFIG_ARM
+> static void qcom_reset(enum reboot_mode reboot_mode, const char *cmd)
+> {
+> 	...
+> }
+> 
+> static void msm_pinctrl_setup_pm_reset(pctrl)
+> {
+> 	...
+> }
+> #else
+> static void msm_pinctrl_setup_pm_reset(pctrl) {}
+> #endif
+
+Will put this in a single function which takes pctrl and address you
+comments there in v3.
+Thanks for review. :-)
+> 
+>> +#endif
+> 
+> Regards,
+> Bjorn
+> 
