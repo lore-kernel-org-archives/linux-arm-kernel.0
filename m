@@ -1,41 +1,52 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Fri, 29 Aug 2014 13:10:08 +0200
-Subject: [PATCH] mmc: sunxi: Declare ERASE capability
-In-Reply-To: <1408541960-14788-1-git-send-email-wens@csie.org>
-References: <1408541960-14788-1-git-send-email-wens@csie.org>
-Message-ID: <CAPDyKFrjOEpAcyu-eXVuqKhESYgpMQbdyDrvkcyN0Q4gGNG2OQ@mail.gmail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 29 Aug 2014 12:22:42 +0100
+Subject: [RESEND PATCH] ARM: dts: make arch-timer always on in rk3288 soc
+In-Reply-To: <53FFEE40.3010001@rock-chips.com>
+References: <1409190017-12656-1-git-send-email-kever.yang@rock-chips.com>
+ <20140828091758.GB14650@leverpostej>
+ <20140828151121.GM14650@leverpostej>
+ <53FFEE40.3010001@rock-chips.com>
+Message-ID: <20140829112242.GC21473@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20 August 2014 15:39, Chen-Yu Tsai <wens@csie.org> wrote:
-> Declare ERASE capability so we can use filesystems with the discard
-> option and the fstrim tool.
->
-> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+On Fri, Aug 29, 2014 at 04:06:40AM +0100, Huang Tao wrote:
+> Hi, Mark:
 
-Thanks! Applied for next!
+Hi,
 
-Kind regards
-Uffe
+> ? 2014?08?28? 23:11, Mark Rutland ??:
+> > To clarify: if there are low power states that the CPU can enter where
+> > we lose state, then this patch isn't correct.
+> Right now, the software of RK3288 SoC only support CPU hotplug
+> (cpu_on/off) and power off all CPUs on suspend.
 
-> ---
->  drivers/mmc/host/sunxi-mmc.c | 3 ++-
->  1 file changed, 2 insertions(+), 1 deletion(-)
->
-> diff --git a/drivers/mmc/host/sunxi-mmc.c b/drivers/mmc/host/sunxi-mmc.c
-> index 024f67c..7bf5c1c 100644
-> --- a/drivers/mmc/host/sunxi-mmc.c
-> +++ b/drivers/mmc/host/sunxi-mmc.c
-> @@ -990,7 +990,8 @@ static int sunxi_mmc_probe(struct platform_device *pdev)
->         /* 400kHz ~ 50MHz */
->         mmc->f_min              =   400000;
->         mmc->f_max              = 50000000;
-> -       mmc->caps              |= MMC_CAP_MMC_HIGHSPEED | MMC_CAP_SD_HIGHSPEED;
-> +       mmc->caps              |= MMC_CAP_MMC_HIGHSPEED | MMC_CAP_SD_HIGHSPEED |
-> +                                 MMC_CAP_ERASE;
->
->         ret = mmc_of_parse(mmc);
->         if (ret)
-> --
-> 2.1.0
->
+Sure, but that's a Linux implementation detail rather than a fixed
+property of the hardware. Given those states exist, the "always-on"
+property is not appropriate.
+
+> We do not implement cpuidle to power off CPU. Do you think we should
+> introduce a broadcast timer?
+
+If one is present, yes. 
+
+> On our early kernel, I never see any interrupt on a broadcast timer
+> (yes, we implement it with a external timer).
+
+That's fine; Linux doesn't need to use it just yet. However, when we
+want to use low power states later, it will be necessary to enable
+placing all CPUS into a low power state.
+
+If your external timer is already supported by an existing driver, there
+is no reason not to add it now.
+
+> > A more general approach would be to enable the broadcast hrtimer for
+> > arm, as has been done for arm64.
+> Yes. I think it should be done by arm framework.
+
+Patches welcome.
+
+I also think it would make sense to enable this for arm.
+
+Thanks,
+Mark.
