@@ -1,76 +1,99 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 29 Aug 2014 15:57:08 +0200
-Subject: [linux-sunxi] Re: [PATCH 4/4] simplefb: add clock handling code
-In-Reply-To: <20140829062932.GB13106@ulmo>
-References: <20140826135341.GM15297@lukather> <20140826143550.GB3027@ulmo>
- <20140826210248.GO15297@lukather> <20140827065440.GG15640@ulmo>
- <20140827084526.GR15297@lukather> <20140827095241.GC23186@ulmo>
- <20140827154221.GX15297@lukather> <20140828101140.GB14388@ulmo>
- <20140828204603.GB15297@lukather> <20140829062932.GB13106@ulmo>
-Message-ID: <20140829135708.GG15297@lukather>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Fri, 29 Aug 2014 16:08:20 +0200
+Subject: [PATCH 3/3] ARM: zynq: DT: Add Ethernet phys
+In-Reply-To: <53FB9AC4.8010704@gmail.com>
+References: <1408550219-19825-1-git-send-email-soren.brinkmann@xilinx.com>
+ <1408550219-19825-3-git-send-email-soren.brinkmann@xilinx.com>
+ <5a7b6f57-b6c0-4fb3-af0d-d403277c0207@BN1AFFO11FD045.protection.gbl>
+ <53F5D8D9.7040604@suse.de>
+ <f166a186-301c-4288-97cf-71f8173c07e7@BN1AFFO11FD010.protection.gbl>
+ <CAGVrzcYWN83tznwvw1M9V_mwWgobs2kwtRvEj4stqE=XGC10fg@mail.gmail.com>
+ <20140825174610.GA13737@obsidianresearch.com> <53FB9AC4.8010704@gmail.com>
+Message-ID: <660fe929-1f16-4e22-8bd3-0388cd363978@BY2FFO11FD038.protection.gbl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 29, 2014 at 08:29:33AM +0200, Thierry Reding wrote:
-> On Thu, Aug 28, 2014 at 10:46:03PM +0200, Maxime Ripard wrote:
-> > On Thu, Aug 28, 2014 at 12:11:41PM +0200, Thierry Reding wrote:
-> [...]
-> > > Then since firmware already knows what it set up it can tell the
-> > > kernel to not touch those.
-> > 
-> > Somehow, I've been raised kernel-wise into thinking that you can never
-> > fully trust your firmware. Or at least that you should have a way to
-> > recover from any bug/bad behaviour from it.
+On 08/25/2014 10:21 PM, Florian Fainelli wrote:
+> On 08/25/2014 10:46 AM, Jason Gunthorpe wrote:
+>> On Fri, Aug 22, 2014 at 01:47:09PM -0700, Florian Fainelli wrote:
+>>
+>>>>  - the ID based strings seem to be not needed since, IIUC, the core
+>>>>    reads the ID from the PHY and uses it, so I just left it out not
+>>>>    trying to figure out how to obtain the correct ID
+>>>
+>>> It is not needed, but it is one way to specify a PHY device if you do
+>>> not know what compatible string to use instead.
+>>
+>> No, it is a way to specify a PHY device if the kernel can't auto probe
+>> the Phy ID.
+>>
+>> Last I checked, the kernel doesn't support plain text compatible
+>> strings for phys - everything is driven on the phy id, either auto
+>> probed or specified in the DT.
 > 
-> If you don't trust your firmware then you shouldn't be taking over a
-> device that it's set up for you. Rather you should write a proper driver
-> that sets things up from the start.
+> That's right. Some PHY drivers might be relying on specific compatible
+> strings though, but not the core PHY library that probes and maps a
+> driver to a PHY node.
 > 
-> This whole "we don't trust firmware" isn't going to work if we want to
-> have hand-off from firmware to kernel. And it's already been decided in
-> other threads that moving more code out of the kernel and into firmware
-> is a requirement (c.f. ARM64).
-
-Except that in ARM64 case, it has been asked before having any
-SoC/boards out. We're definitely not in this situation there.
-
-> Also in this case you wrote the firmware, so why wouldn't you trust it?
-
-We partly wrote the firmware, on some of the available SoCs. Some
-other just have allwinner's own. But yeah, in this case they wouldn't
-even set up the framebuffer in the first place.
-
-> > Moreover, the way I see it, there's a major flaw in having an
-> > attribute in the clock node: you don't even know if the clock is ever
-> > going to be used.
-> > 
-> > If simplefb is not compiled in, you won't claim the clocks, and they
-> > will be disabled, which is imho a good thing. This case wouldn't be
-> > covered with an attribute at the clock node, because you don't have a
-> > link to what device/feature actually uses it in the system, and so you
-> > have to make the assumption that it will be used. And you will end up
-> > with clocks with a rather high rate running for nothing.
+>>
+>>>>  - the marvell compatible strings are used in our vendor tree. They
+>>>>    aren't used anywhere but in our vendor tree. I though keeping them is
+>>>>    nice since it identifies the PHY fully. And in case that level of
+>>>>    detail is needed at some point it is already there.
+>>>
+>>> And this is the recommended way to do it in case we ever need to key a
+>>> software decision based on the hardware.
+>>
+>> All compatible strings need to be documented.
+>>
+>> .. and they need to encode more information than you get from the phy
+>> id - die revsision, package option, functional options, voltage
+>> codes. Etc.
+>>
+>> .. and they actually need to be *right*
 > 
-> That's completely hypothetical. If simplefb isn't enabled and the clock
-> isn't claimed there's probably still going to be some other driver
-> taking over eventually. If there isn't, what's the point of firmware
-> setting up display in the first case?
+> Agreed.
+> 
+>>
+>> An example: The kernel reports 88E1318S for all four chips in that
+>> family, AFAIK you have to read the package marking to figure out which
+>> you have (it is the same die, with options switched on/off at
+>> packaging time). People have already posted patches trying to
+>> helpfully add a 'marvell,88E1318S' compatible string based on kernel
+>> output. Except it is wrong, it isn't actually the '8S version in the
+>> HW.
+>>
+>> Even worse, Marvell has a whole series of socket compatible phys. Just
+>> because the board the DT author looked at has a '318, doesn't mean
+>> that every board ever made will. We've actually already been switching
+>> between the 318 and 318S for production depending on which has part
+>> availability.
+>>
+>> Basically: don't try to override self-discoverable hardware in DT
+>> without a really good reason.
+> 
+> I think that's a very good point, at the very least let's use a
+> compatible string that contains the full 32-bits PHY OUI.
 
-And now, here is a new requirement for the firmware: that in addition
-to being reliable, that it must not be dumb, or take shortcuts, like
-setting up the framebuffer in every case, no matter wether there's a
-screen or not.
+I think resolution is:
+1. Do not use marvell,88e1518 because it is not listed anywhere
+2. Do not add ethernet-phy-idAAAA.BBBB because it breaks autodetection
+if there is different phy on the board and we shouldn't restrict us in this.
+In spite of autodetection takes some time.
+3. "ethernet-phy-ieee802.3-c22" is optional that's why doesn't need to be added
+4. Any listed compatible string has to be parsed which takes time
 
-Maxime
+That's why I think make sense not to use any compatible string.
+This should give us all flexibility which we want to have.
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Thanks,
+Michal
+
+
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140829/c00013f8/attachment.sig>
+Size: 198 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140829/9f6b9847/attachment-0001.sig>
