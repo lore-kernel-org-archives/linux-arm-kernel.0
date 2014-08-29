@@ -1,193 +1,59 @@
-From: bjorn.andersson@sonymobile.com (Bjorn Andersson)
-Date: Thu, 28 Aug 2014 18:28:21 -0700
-Subject: [PATCH 4/4] pinctrl: qcom: Add support for reset for apq8064
-In-Reply-To: <1409282570-27299-5-git-send-email-pramod.gurav@smartplayin.com>
-References: <1409282570-27299-1-git-send-email-pramod.gurav@smartplayin.com>
- <1409282570-27299-5-git-send-email-pramod.gurav@smartplayin.com>
-Message-ID: <20140829012819.GE12494@sonymobile.com>
+From: holler@ahsoftware.de (Alexander Holler)
+Date: Fri, 29 Aug 2014 03:43:26 +0200
+Subject: [RFC PATCH 0/9] dt: dependencies (for deterministic driver
+ initialization order based on the DT)
+In-Reply-To: <20140828092308.GA31111@arm.com>
+References: <20140826084208.AE5F0C40989@trevor.secretlab.ca>
+ <20140826084922.GG17263@ulmo> <53FC566C.30904@ahsoftware.de>
+ <20140826101107.GC32315@leverpostej>
+ <20140827103432.64927C409CB@trevor.secretlab.ca>
+ <20140827144403.GB13850@arm.com> <53FE05AE.9000406@wwwdotorg.org>
+ <53FE07BE.7000809@ahsoftware.de> <53FE0966.5020206@wwwdotorg.org>
+ <53FED13C.4070606@ahsoftware.de> <20140828092308.GA31111@arm.com>
+Message-ID: <53FFDABE.3000507@ahsoftware.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu 28 Aug 20:22 PDT 2014, Pramod Gurav wrote:
+Am 28.08.2014 11:23, schrieb Catalin Marinas:
+> On Thu, Aug 28, 2014 at 07:50:36AM +0100, Alexander Holler wrote:
 
-> This patch adds support for reset functions to reboot the boards
-> with soc apq8064.
-> 
-> CC: Linus Walleij <linus.walleij@linaro.org>
-> CC: Bjorn Andersson <bjorn.andersson@sonymobile.com>
-> CC: "Ivan T. Ivanov" <iivanov@mm-sol.com>
-> CC: Stephen Boyd <sboyd@codeaurora.org>
-> CC: Andy Gross <agross@codeaurora.org>
-> Signed-off-by: Pramod Gurav <pramod.gurav@smartplayin.com>
-> ---
->  drivers/pinctrl/qcom/pinctrl-apq8064.c |    7 +++++-
->  drivers/pinctrl/qcom/pinctrl-msm.c     |   38 ++++++++++++++++++++++++++++++++
->  2 files changed, 44 insertions(+), 1 deletions(-)
-> 
-> diff --git a/drivers/pinctrl/qcom/pinctrl-apq8064.c b/drivers/pinctrl/qcom/pinctrl-apq8064.c
-> index feb6f15..ef1263c 100644
-> --- a/drivers/pinctrl/qcom/pinctrl-apq8064.c
-> +++ b/drivers/pinctrl/qcom/pinctrl-apq8064.c
-> @@ -324,6 +324,7 @@ enum apq8064_functions {
->  	APQ_MUX_tsif1,
->  	APQ_MUX_tsif2,
->  	APQ_MUX_usb2_hsic,
-> +	APQ_MUX_ps_hold,
->  	APQ_MUX_NA,
->  };
->  
-> @@ -351,6 +352,9 @@ static const char * const gpio_groups[] = {
->  	"gpio78", "gpio79", "gpio80", "gpio81", "gpio82", "gpio83", "gpio84",
->  	"gpio85", "gpio86", "gpio87", "gpio88", "gpio89"
->  };
-> +static const char * const ps_hold_groups[] = {
-> +	"gpio78"
-> +};
->  static const char * const gsbi1_groups[] = {
->  	"gpio18", "gpio19", "gpio20", "gpio21"
->  };
-> @@ -477,6 +481,7 @@ static const struct msm_function apq8064_functions[] = {
->  	FUNCTION(tsif1),
->  	FUNCTION(tsif2),
->  	FUNCTION(usb2_hsic),
-> +	FUNCTION(ps_hold),
->  };
->  
->  static const struct msm_pingroup apq8064_groups[] = {
-> @@ -558,7 +563,7 @@ static const struct msm_pingroup apq8064_groups[] = {
->  	PINGROUP(75, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA),
->  	PINGROUP(76, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA),
->  	PINGROUP(77, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA),
-> -	PINGROUP(78, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA),
-> +	PINGROUP(78, ps_hold, NA, NA, NA, NA, NA, NA, NA, NA, NA),
->  	PINGROUP(79, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA),
->  	PINGROUP(80, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA),
->  	PINGROUP(81, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA),
-> diff --git a/drivers/pinctrl/qcom/pinctrl-msm.c b/drivers/pinctrl/qcom/pinctrl-msm.c
-> index 2738108..be43e7a 100644
-> --- a/drivers/pinctrl/qcom/pinctrl-msm.c
-> +++ b/drivers/pinctrl/qcom/pinctrl-msm.c
-> @@ -12,6 +12,7 @@
->   * GNU General Public License for more details.
->   */
->  
-> +#include <linux/delay.h>
->  #include <linux/err.h>
->  #include <linux/io.h>
->  #include <linux/module.h>
-> @@ -27,12 +28,17 @@
->  #include <linux/interrupt.h>
->  #include <linux/spinlock.h>
->  
-> +#include <asm/system_misc.h>
-> +
->  #include "../core.h"
->  #include "../pinconf.h"
->  #include "pinctrl-msm.h"
->  #include "../pinctrl-utils.h"
->  
->  #define MAX_NR_GPIO 300
-> +#define PS_HOLD_OFFSET 0x820
-> +
-> +static void __iomem *msm_ps_hold;
->  
->  /**
->   * struct msm_pinctrl - state for a pinctrl-msm device
-> @@ -848,10 +854,31 @@ static int msm_gpio_init(struct msm_pinctrl *pctrl)
->  	return 0;
->  }
->  
-> +static void qcom_reset(enum reboot_mode reboot_mode, const char *cmd)
+>> And I wonder how the ACPI world solves that problem. My guess would be
+>> hardcoded stuff in the firmware-blob (BIOS), just like it happened with
+>> board files, but I've never seen BIOS code and my knowledge about ACPI
+>> is almost zero. ;)
+>
+> ACPI doesn't even attempt to solve such problems at the OS level. SoCs
+> aimed at ACPI should have simple hardware configuration (from a Linux
+> perspective) initialised by firmware (e.g. clocks) and devices living on
+> a standard bus like PCIe. If a SoC requires specific low-level code to
+> initialise the hardware in a specific order (other than architected
+> peripherals like GIC, timers; e.g. MFD devices), we should deem it
+> unsuitable for ACPI.
+>
+> ACPI should only be used by vendors who know exactly why they need and
+> how to implement it properly and not just because the marketing
+> department told them to (it would also be nice if the Linux kernel
+> community was informed about such reasons).
 
-This doesn't follow the naming used in this.
+Hmm, Jon Masters from Red Hat sounds too like UEFI/ACPI is the way to go.
 
-> +{
-> +	writel(0, msm_ps_hold);
-> +	mdelay(10000);
+But maybe he's right and hiding ugly code in proprietary/binary firmware 
+blobs where no one can see and criticize it is really the way to go.
 
-Why 10 seconds? What happens after that?
+Personally I think it's a way back to the past ("when everything was 
+better", at least that is what most human brains do like to suggest) and 
+just a dream. And I don't believe that the stuff which was and is hidden 
+away always just works and doesn't need fixes (one can't do themself). 
+In my humble opinion that's a nice but wrong myth and doesn't take into 
+consideration that HW (and SW) gets more and more complicated too (and 
+thus more faulty).
 
-> +}
-> +
-> +const struct msm_function
-> +*find_pshold_function(const struct msm_function *functions,
-> +					unsigned nfunctions, const char *name)
-
-This should be static. But that would cause a compile warning on non-ARM
-platforms, see below.
-
-> +{
-> +	int i = 0;
-> +	const struct msm_function *func;
-> +
-> +	for (func = functions; i <= nfunctions; func++, i++)
-
-Why do you have 'func' and why do you iterate over that and i?
-
-for (i = 0; i < nfunctions; i++)
-	if (strcmp(functions[i]->name, name) == 0)
-		return true; (or &functions[i] if you really need it)
-
-But as you only uses this once I would prefer if you just merge in the setting
-of msm_ps_hold and arm_pm_restart here as well, see below.
-
-> +		if (!strcmp(func->name, name))
-> +			return func;
-> +
-> +	return NULL;
-> +}
-> +
->  int msm_pinctrl_probe(struct platform_device *pdev,
->  		      const struct msm_pinctrl_soc_data *soc_data)
->  {
->  	struct msm_pinctrl *pctrl;
-> +	const struct msm_function *func;
->  	struct resource *res;
->  	int ret;
->  
-> @@ -871,6 +898,17 @@ int msm_pinctrl_probe(struct platform_device *pdev,
->  	if (IS_ERR(pctrl->regs))
->  		return PTR_ERR(pctrl->regs);
->  
-> +#ifdef CONFIG_ARM
-> +	func = find_pshold_function(soc_data->functions,
-> +					soc_data->nfunctions, "ps_hold");
-> +	if (func) {
-> +		dev_dbg(&pdev->dev, "Found Function %s\n", func->name);
-
-Guess what, it will print "ps_hold" here. I would prefer if you just skip this
-line, as this will always be true on 8960 and 8064.
-
-> +		msm_ps_hold = pctrl->regs + PS_HOLD_OFFSET;
-> +		arm_pm_restart = qcom_reset;
-> +	}
-> +#else
-> +#error "not supported on this arch"
-
-There is no reason for you to break compilation of this driver on non-ARM
-platforms. This #else/#error should be removed.
-
-I would prefer if you did not #ifdef at all within the function, but rather
-merge this piece of logic with the search above into a static function that's
-surrounded by a check for CONFIG_ARM - providing a no-op for non-arm boards.
-
-I.e
-
-#ifdef CONFIG_ARM
-static void qcom_reset(enum reboot_mode reboot_mode, const char *cmd)
-{
-	...
-}
-
-static void msm_pinctrl_setup_pm_reset(pctrl)
-{
-	...
-}
-#else
-static void msm_pinctrl_setup_pm_reset(pctrl) {}
-#endif
-
-> +#endif
+And even the biggest companies already have problems to produce stuff
+which just works (they just employ humans too), not to speak from 
+smaller board vendors. So it's much better to keep the source as visible 
+as possible to as much people as possible (in the OS) and not to rely on 
+some binary blob as most BIOSes are.
 
 Regards,
-Bjorn
+
+Alexander Holler
