@@ -1,43 +1,86 @@
-From: pramod.gurav@smartplayin.com (Pramod Gurav)
-Date: Fri, 29 Aug 2014 20:00:55 +0530
-Subject: [PATCH v3 0/4] Add reset support for apq8064
-Message-ID: <1409322659-17693-1-git-send-email-pramod.gurav@smartplayin.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Fri, 29 Aug 2014 16:31:49 +0200
+Subject: [linux-sunxi] Re: [PATCH 4/4] simplefb: add clock handling code
+In-Reply-To: <20140829135708.GG15297@lukather>
+References: <20140826143550.GB3027@ulmo> <20140826210248.GO15297@lukather>
+ <20140827065440.GG15640@ulmo> <20140827084526.GR15297@lukather>
+ <20140827095241.GC23186@ulmo> <20140827154221.GX15297@lukather>
+ <20140828101140.GB14388@ulmo> <20140828204603.GB15297@lukather>
+ <20140829062932.GB13106@ulmo> <20140829135708.GG15297@lukather>
+Message-ID: <20140829143148.GB31264@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The reset on apq8064 is provided on gpio78 function1. We need to configure
-gpio78 to function as ps_hold and write to base of the register to get the
-device rebooted. 
+On Fri, Aug 29, 2014 at 03:57:08PM +0200, Maxime Ripard wrote:
+> On Fri, Aug 29, 2014 at 08:29:33AM +0200, Thierry Reding wrote:
+> > On Thu, Aug 28, 2014 at 10:46:03PM +0200, Maxime Ripard wrote:
+> > > On Thu, Aug 28, 2014 at 12:11:41PM +0200, Thierry Reding wrote:
+> > [...]
+> > > > Then since firmware already knows what it set up it can tell the
+> > > > kernel to not touch those.
+> > > 
+> > > Somehow, I've been raised kernel-wise into thinking that you can never
+> > > fully trust your firmware. Or at least that you should have a way to
+> > > recover from any bug/bad behaviour from it.
+> > 
+> > If you don't trust your firmware then you shouldn't be taking over a
+> > device that it's set up for you. Rather you should write a proper driver
+> > that sets things up from the start.
+> > 
+> > This whole "we don't trust firmware" isn't going to work if we want to
+> > have hand-off from firmware to kernel. And it's already been decided in
+> > other threads that moving more code out of the kernel and into firmware
+> > is a requirement (c.f. ARM64).
+> 
+> Except that in ARM64 case, it has been asked before having any
+> SoC/boards out. We're definitely not in this situation there.
 
-First two patches in this patchset adds necessary DT support for apq8064-pinctrl
-and DT support to mux gpio_78 as ps_hold function.
+You're still in the situation where you need to trust your firmware, so
+my point remains valid.
 
-Third patch documents the ps_hold function in apq8064-pinctrl DT binding
+> > Also in this case you wrote the firmware, so why wouldn't you trust it?
+> 
+> We partly wrote the firmware, on some of the available SoCs. Some
+> other just have allwinner's own. But yeah, in this case they wouldn't
+> even set up the framebuffer in the first place.
 
-Fourth implements the actual reset by initialising arm_pm_restart to a reset
-function if ps_hold function is programmed in the pinctrl driver.
+Even if you didn't write it, you could still trust it provided that you
+had the source code for it. The whole argument of "never trust firmware"
+is based on the assumption that you can't fix it. And even if that's the
+case, it's still perfectly acceptable to not trust firmware. But if you
+don't trust firmware then you really shouldn't be using simplefb in the
+first place and do everything in the kernel.
 
-Changes since v2 to v3:
-1. As per Bjorn's review suggestions consolidated all code which detects ps_hold function and
-   initializes arm_pm_restart in a single function named msm_pinctrl_setup_pm_reset under 
-   #ifdef CONFIG_ARM
-2. Removed 10 second delay after carrying out reset which was copied by mistake
-3. Renamed pinctl DT node to tlmm_pinumux from msm_gpio 
+> > > Moreover, the way I see it, there's a major flaw in having an
+> > > attribute in the clock node: you don't even know if the clock is ever
+> > > going to be used.
+> > > 
+> > > If simplefb is not compiled in, you won't claim the clocks, and they
+> > > will be disabled, which is imho a good thing. This case wouldn't be
+> > > covered with an attribute at the clock node, because you don't have a
+> > > link to what device/feature actually uses it in the system, and so you
+> > > have to make the assumption that it will be used. And you will end up
+> > > with clocks with a rather high rate running for nothing.
+> > 
+> > That's completely hypothetical. If simplefb isn't enabled and the clock
+> > isn't claimed there's probably still going to be some other driver
+> > taking over eventually. If there isn't, what's the point of firmware
+> > setting up display in the first case?
+> 
+> And now, here is a new requirement for the firmware: that in addition
+> to being reliable, that it must not be dumb, or take shortcuts, like
+> setting up the framebuffer in every case, no matter wether there's a
+> screen or not.
 
-Changes since v1 to v2:
-1. Added #error log as suggested by Kumar Gala 
-2. Correct interrupts in DT from 32 to 16 based on Bjorn's new patch in bindings
-3. Replaced hardcoding in DT with IRQ_TYPE_LEVEL_HIGH for interrupt level type
+Firmware should never do that anyway. The whole point of firmware is to
+be device-specific and therefore it already knows when there's a need to
+activate a framebuffer or not.
 
-Pramod Gurav (4):
-  ARM: DT: APQ8064: Add pinctrl support
-  ARM: DT: APQ8064: Add node for ps_hold function in pinctrl
-  pinctrl: msm: Add ps_hold function in pinctrl-apq8064 binding
-    documentation
-  pinctrl: qcom: Add support for reset for apq8064
-
- .../bindings/pinctrl/qcom,apq8064-pinctrl.txt      |    2 +-
- arch/arm/boot/dts/qcom-apq8064.dtsi                |   21 ++++++++++++++
- drivers/pinctrl/qcom/pinctrl-apq8064.c             |    7 ++++-
- drivers/pinctrl/qcom/pinctrl-msm.c                 |   30 ++++++++++++++++++++
- 4 files changed, 58 insertions(+), 2 deletions(-)
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140829/7e24e17e/attachment-0001.sig>
