@@ -1,132 +1,83 @@
-From: pramod.gurav@smartplayin.com (Pramod Gurav)
-Date: Fri, 29 Aug 2014 20:00:59 +0530
-Subject: [PATCH v3 4/4] pinctrl: qcom: Add support for reset for apq8064
-In-Reply-To: <1409322659-17693-1-git-send-email-pramod.gurav@smartplayin.com>
-References: <1409322659-17693-1-git-send-email-pramod.gurav@smartplayin.com>
-Message-ID: <1409322659-17693-5-git-send-email-pramod.gurav@smartplayin.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Fri, 29 Aug 2014 16:38:14 +0200
+Subject: [linux-sunxi] Re: [PATCH 4/4] simplefb: add clock handling code
+In-Reply-To: <20140829141244.GH15297@lukather>
+References: <20140826143550.GB3027@ulmo> <53FCE704.4030103@redhat.com>
+ <20140827093121.GA23186@ulmo> <53FDB46C.5010609@redhat.com>
+ <20140827125613.GF23186@ulmo> <53FDE0CE.5030807@redhat.com>
+ <20140827141632.GB32243@ulmo> <53FF1D6C.6090205@redhat.com>
+ <20140829070116.GC13106@ulmo> <20140829141244.GH15297@lukather>
+Message-ID: <20140829143812.GC31264@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds support for reset functions to reboot the boards
-with soc apq8064.
+On Fri, Aug 29, 2014 at 04:12:44PM +0200, Maxime Ripard wrote:
+> On Fri, Aug 29, 2014 at 09:01:17AM +0200, Thierry Reding wrote:
+> > I would think the memory should still be reserved anyway to make sure
+> > nothing else is writing over it. And it's in the device tree anyway
+> > because the driver needs to know where to put framebuffer content. So
+> > the point I was trying to make is that we can't treat the memory in the
+> > same way as clocks because it needs to be explicitly managed. Whereas
+> > clocks don't. The driver is simply too generic to know what to do with
+> > the clocks.
+> 
+> You agreed on the fact that the only thing we need to do with the
+> clocks is claim them. Really, I don't find what's complicated there
+> (or not generic).
 
-CC: Linus Walleij <linus.walleij@linaro.org>
-CC: Bjorn Andersson <bjorn.andersson@sonymobile.com>
-CC: "Ivan T. Ivanov" <iivanov@mm-sol.com>
-CC: Stephen Boyd <sboyd@codeaurora.org>
-CC: Andy Gross <agross@codeaurora.org>
-Signed-off-by: Pramod Gurav <pramod.gurav@smartplayin.com>
----
- drivers/pinctrl/qcom/pinctrl-apq8064.c |    7 ++++++-
- drivers/pinctrl/qcom/pinctrl-msm.c     |   30 ++++++++++++++++++++++++++++++
- 2 files changed, 36 insertions(+), 1 deletions(-)
+That's not what I agreed on. What I said is that the only thing we need
+to do with the clocks is nothing. They are already in the state that
+they need to be.
 
-diff --git a/drivers/pinctrl/qcom/pinctrl-apq8064.c b/drivers/pinctrl/qcom/pinctrl-apq8064.c
-index feb6f15..ef1263c 100644
---- a/drivers/pinctrl/qcom/pinctrl-apq8064.c
-+++ b/drivers/pinctrl/qcom/pinctrl-apq8064.c
-@@ -324,6 +324,7 @@ enum apq8064_functions {
- 	APQ_MUX_tsif1,
- 	APQ_MUX_tsif2,
- 	APQ_MUX_usb2_hsic,
-+	APQ_MUX_ps_hold,
- 	APQ_MUX_NA,
- };
- 
-@@ -351,6 +352,9 @@ static const char * const gpio_groups[] = {
- 	"gpio78", "gpio79", "gpio80", "gpio81", "gpio82", "gpio83", "gpio84",
- 	"gpio85", "gpio86", "gpio87", "gpio88", "gpio89"
- };
-+static const char * const ps_hold_groups[] = {
-+	"gpio78"
-+};
- static const char * const gsbi1_groups[] = {
- 	"gpio18", "gpio19", "gpio20", "gpio21"
- };
-@@ -477,6 +481,7 @@ static const struct msm_function apq8064_functions[] = {
- 	FUNCTION(tsif1),
- 	FUNCTION(tsif2),
- 	FUNCTION(usb2_hsic),
-+	FUNCTION(ps_hold),
- };
- 
- static const struct msm_pingroup apq8064_groups[] = {
-@@ -558,7 +563,7 @@ static const struct msm_pingroup apq8064_groups[] = {
- 	PINGROUP(75, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA),
- 	PINGROUP(76, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA),
- 	PINGROUP(77, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA),
--	PINGROUP(78, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA),
-+	PINGROUP(78, ps_hold, NA, NA, NA, NA, NA, NA, NA, NA, NA),
- 	PINGROUP(79, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA),
- 	PINGROUP(80, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA),
- 	PINGROUP(81, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA),
-diff --git a/drivers/pinctrl/qcom/pinctrl-msm.c b/drivers/pinctrl/qcom/pinctrl-msm.c
-index 9175bbc..80a64ca 100644
---- a/drivers/pinctrl/qcom/pinctrl-msm.c
-+++ b/drivers/pinctrl/qcom/pinctrl-msm.c
-@@ -12,6 +12,7 @@
-  * GNU General Public License for more details.
-  */
- 
-+#include <linux/delay.h>
- #include <linux/err.h>
- #include <linux/io.h>
- #include <linux/module.h>
-@@ -27,12 +28,15 @@
- #include <linux/interrupt.h>
- #include <linux/spinlock.h>
- 
-+#include <asm/system_misc.h>
-+
- #include "../core.h"
- #include "../pinconf.h"
- #include "pinctrl-msm.h"
- #include "../pinctrl-utils.h"
- 
- #define MAX_NR_GPIO 300
-+#define PS_HOLD_OFFSET 0x820
- 
- /**
-  * struct msm_pinctrl - state for a pinctrl-msm device
-@@ -850,6 +854,30 @@ static int msm_gpio_init(struct msm_pinctrl *pctrl)
- 	return 0;
- }
- 
-+#ifdef CONFIG_ARM
-+static void __iomem *msm_ps_hold;
-+
-+static void msm_reset(enum reboot_mode reboot_mode, const char *cmd)
-+{
-+	writel(0, msm_ps_hold);
-+	mdelay(10000);
-+}
-+
-+static void msm_pinctrl_setup_pm_reset(struct msm_pinctrl *pctrl)
-+{
-+	int i = 0;
-+	const struct msm_function *func = pctrl->soc->functions;
-+
-+	for (; i <= pctrl->soc->nfunctions; i++)
-+		if (!strcmp(func[i].name, "ps_hold")) {
-+			msm_ps_hold = pctrl->regs + PS_HOLD_OFFSET;
-+			arm_pm_restart = msm_reset;
-+		}
-+}
-+#else
-+static void msm_pinctrl_setup_pm_reset(const struct msm_pinctrl *pctrl) {}
-+#endif
-+
- int msm_pinctrl_probe(struct platform_device *pdev,
- 		      const struct msm_pinctrl_soc_data *soc_data)
- {
-@@ -873,6 +901,8 @@ int msm_pinctrl_probe(struct platform_device *pdev,
- 	if (IS_ERR(pctrl->regs))
- 		return PTR_ERR(pctrl->regs);
- 
-+	msm_pinctrl_setup_pm_reset(pctrl);
-+
- 	pctrl->irq = platform_get_irq(pdev, 0);
- 	if (pctrl->irq < 0) {
- 		dev_err(&pdev->dev, "No interrupt defined for msmgpio\n");
--- 
-1.7.0.4
+> > It doesn't know what frequency they should be running at
+> 
+> We don't care about that. Just like we don't care about which
+> frequency is the memory bus running at. It will just run at whatever
+> frequency is appropriate.
+
+Exactly. And you shouldn't have to care about them at all. Firmware has
+already configured the clocks to run at the correct frequencies, and it
+has made sure that they are enabled.
+
+> > or what they're used for
+> 
+> And we don't care about that either. You're not interested in what
+> output the framebuffer is setup to use, which is pretty much the same
+> here, this is the same thing here.
+
+That's precisely what I've been saying. The only thing that simplefb
+cares about is the memory it should be using and the format of the
+pixels (and how many of them) it writes into that memory. Everything
+else is assumed to have been set up.
+
+Including clocks.
+
+> > so by any definition of what DT should describe they're useless for
+> > this virtual device.
+> >
+> > Furthermore it's fairly likely that as your kernel support progresses
+> > you'll find that the driver all of a sudden needs to manage some other
+> > type of resource that you just haven't needed until now because it may
+> > default to being always on. Then you'll have a hard time keeping
+> > backwards-compatibility and will have to resort to the kinds of hacks
+> > that you don't want to see in the kernel.
+> 
+> Not such a hard time. An older DT wouldn't define the new requirements
+> anyway, so they wouldn't be used, and we would end up in pretty much
+> the current case.
+
+Except that you have firmware in the wild that sets up an incomplete
+simplefb node and if you don't want to break compatibility you need to
+provide fallbacks for the resources that aren't listed in the DT node.
+And given that those fallbacks are all very board specific you'll need
+to find ways to keep them enabled if you want to keep existing setups
+working.
+
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140829/d35e608e/attachment.sig>
