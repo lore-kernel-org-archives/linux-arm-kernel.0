@@ -1,48 +1,121 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Fri, 29 Aug 2014 10:26:01 +0200
-Subject: [PATCH v2] ARM: dts: Add shmobile platform device tree bindings
- documentation
-In-Reply-To: <20140829003456.GM16165@verge.net.au>
-References: <1409213120-5291-1-git-send-email-geert+renesas@glider.be>
- <20140829003456.GM16165@verge.net.au>
-Message-ID: <CAMuHMdXNPk2ACbFsXcPic_zZBDCjF+5j6-jQNgZxGePPcTRUBQ@mail.gmail.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Fri, 29 Aug 2014 16:41:28 +0800
+Subject: [RFC PATCH 1/2] ARM: imx: add BYPASS support for PLL clocks
+In-Reply-To: <20140829033344.GA2910@audiosh1>
+References: <1409067313-32063-1-git-send-email-shawn.guo@freescale.com>
+ <1409067313-32063-2-git-send-email-shawn.guo@freescale.com>
+ <20140828084420.GG28777@dragon> <20140829014947.GA2741@audiosh1>
+ <20140829025349.GH28777@dragon> <20140829033344.GA2910@audiosh1>
+Message-ID: <20140829084125.GB3135@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Simon,
+On Fri, Aug 29, 2014 at 11:33:47AM +0800, Shengjiu Wang wrote:
+> Otherwise I still need to do some step in below to source the clock to ESAI.
+> 
+>         clk_set_parent(pll4_bypass_src, lvds2_in);
+>         clk_set_parent(pll4_bypass, pll4_bypass_src);
+>         clk_set_rate(pll4_audio_div, 24576000);
+>         clk_set_rate(esai_extal, 24576000);
+> 
+> I think it is what we can expect, right? if yes, the patch is ok for ESAI.
 
-On Fri, Aug 29, 2014 at 2:34 AM, Simon Horman <horms@verge.net.au> wrote:
-> On Thu, Aug 28, 2014 at 10:05:20AM +0200, Geert Uytterhoeven wrote:
->> Add Renesas SH-Mobile, R-Mobile, and R-Car Platform Device Tree Bindings
->> Documentation, listing supported SoCs and boards.
->>
->> This allows to use checkpatch to validate DTSes referring to Renesas
->> shmobile SoCs, and boards containing those SoCs.
->>
->> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
->
-> Thanks Geert, this looks good to me.
-> Is it for me to pick up?
+Yes, we still need to set up parent and rate specifically for
+sabreauto ESAI use case.
 
-I think so.
+But these setup can be done in device tree now with commit 86be408bfbd8
+(clk: Support for clock parents and rates assigned from device tree).
+Here is change that I tested with.  (Not sure if the info in esai node
+is all correct)
 
-> If so I would prefer a slightly re-structured title:
->
-> ARM: shmobile: Add platform device tree bindings documentation
+diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
+index 6692115b0138..9fe4169c79dd 100644
+--- a/arch/arm/boot/dts/imx6qdl.dtsi
++++ b/arch/arm/boot/dts/imx6qdl.dtsi
+@@ -268,8 +268,18 @@
+                                };
 
-Fine for me.
+                                esai: esai at 02024000 {
++                                       compatible = "fsl,imx6q-esai", "fsl,imx35-esai";
+                                        reg = <0x02024000 0x4000>;
+                                        interrupts = <0 51 IRQ_TYPE_LEVEL_HIGH>;
++                                       clocks = <&clks IMX6QDL_CLK_ESAI_IPG>,
++                                                <&clks IMX6QDL_CLK_ESAI_EXTAL>,
++                                                <&clks IMX6QDL_CLK_ESAI_IPG>;
++                                       clock-names = "core", "extal", "fsys";
++                                       dmas = <&sdma 23 21 0>, <&sdma 24 21 0>;
++                                       dma-names = "rx", "tx";
++                                       fsl,fifo-depth = <128>;
++                                       fsl,esai-synchronous;
++                                       status = "disabled";
+                                };
 
-Do you want me to resend, or will you amend yourself?
+                                ssi1: ssi at 02028000 {
 
-Thanks!
+diff --git a/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi b/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
+index 009abd69385d..1084394197ad 100644
+--- a/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
+@@ -17,6 +17,14 @@
+                reg = <0x10000000 0x80000000>;
+        };
 
-Gr{oetje,eeting}s,
++       clocks {
++               anaclk2 { /* on-board 24.576MHz audio oscillator */
++                       compatible = "fixed-clock";
++                       #clock-cells = <0>;
++                       clock-frequency = <24576000>;
++               };
++       };
++
+        leds {
+                compatible = "gpio-leds";
+                pinctrl-names = "default";
+@@ -45,6 +53,17 @@
+        };
+ };
 
-                        Geert
++&clks {
++       assigned-clocks = <&clks IMX6QDL_PLL4_BYPASS_SRC>,
++                         <&clks IMX6QDL_PLL4_BYPASS>,
++                         <&clks IMX6QDL_CLK_ESAI_SEL>,
++                         <&clks IMX6QDL_CLK_PLL4_POST_DIV>;
++       assigned-clock-parents = <&clks IMX6QDL_CLK_LVDS2_IN>,
++                                <&clks IMX6QDL_PLL4_BYPASS_SRC>,
++                                <&clks IMX6QDL_CLK_PLL4_AUDIO_DIV>;
++       assigned-clock-rates = <0>, <0>, <0>, <24576000>;
++};
++
+ &ecspi1 {
+        fsl,spi-num-chipselects = <1>;
+        cs-gpios = <&gpio3 19 0>;
+@@ -61,6 +80,12 @@
+        };
+ };
 
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
++&esai {
++       assigned-clocks = <&clks IMX6QDL_CLK_ESAI_EXTAL>;
++       assigned-clock-rates = <24576000>;
++       status = "okay";
++};
++
+ &fec {
+        pinctrl-names = "default";
+        pinctrl-0 = <&pinctrl_enet>;
 
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+
+With above dts changes, I can get the following clock setup for ESAI.
+
+ anaclk2                                  0            0    24576000          0
+    lvds2_in                              0            0    24576000          0
+       pll4_bypass_src                    0            0    24576000          0
+          pll4_bypass                     0            0    24576000          0
+             pll4_audio                   0            0    24576000          0
+                pll4_post_div             0            0    24576000          0
+                   pll4_audio_div           0            0    24576000          0
+                      esai_sel            0            0    24576000          0
+                         esai_pred           0            0    24576000          0
+                            esai_podf           0            0    24576000          0
+                               esai_extal           0            0    24576000          0
+
+Shawn
