@@ -1,30 +1,40 @@
-From: huangtao@rock-chips.com (Huang Tao)
-Date: Fri, 29 Aug 2014 11:06:40 +0800
-Subject: [RESEND PATCH] ARM: dts: make arch-timer always on in rk3288 soc
-In-Reply-To: <20140828151121.GM14650@leverpostej>
-References: <1409190017-12656-1-git-send-email-kever.yang@rock-chips.com>
- <20140828091758.GB14650@leverpostej> <20140828151121.GM14650@leverpostej>
-Message-ID: <53FFEE40.3010001@rock-chips.com>
+From: varkabhadram@gmail.com (Varka Bhadram)
+Date: Fri, 29 Aug 2014 08:57:49 +0530
+Subject: [PATCH v4 3/5] ARM: tegra: Initialize interrupt controller from DT
+In-Reply-To: <1409239879-12376-3-git-send-email-thierry.reding@gmail.com>
+References: <1409239879-12376-1-git-send-email-thierry.reding@gmail.com>
+ <1409239879-12376-3-git-send-email-thierry.reding@gmail.com>
+Message-ID: <53FFF335.1020402@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Mark:
+On 08/28/2014 09:01 PM, Thierry Reding wrote:
+> From: Thierry Reding <treding@nvidia.com>
+>
+> Obtains the register ranges for the legacy interrupt controller from DT
+> and provide hard-coded values as fallback.
+>
+(...)
 
-? 2014?08?28? 23:11, Mark Rutland ??:
-> To clarify: if there are low power states that the CPU can enter where
-> we lose state, then this patch isn't correct.
-Right now, the software of RK3288 SoC only support CPU hotplug
-(cpu_on/off) and power off all CPUs on suspend.
-We do not implement cpuidle to power off CPU. Do you think we should
-introduce a broadcast timer?
-On our early kernel, I never see any interrupt on a broadcast timer
-(yes, we implement it with a external timer).
+> +static const struct tegra_ictlr_soc tegra30_ictlr_soc = {
+> +	.num_ictlrs = 5,
+> +};
+> +
+> +static const struct of_device_id ictlr_matches[] = {
+> +	{ .compatible = "nvidia,tegra30-ictlr", .data = &tegra30_ictlr_soc },
+> +	{ .compatible = "nvidia,tegra20-ictlr", .data = &tegra20_ictlr_soc },
+> +	{ }
+> +};
+> +
+> +static const struct of_device_id gic_matches[] = {
+> +	{ .compatible = "arm,cortex-a15-gic", },
+> +	{ .compatible = "arm,cortex-a9-gic", },
+> +	{ }
+> +};
+> +
 >
-> A more general approach would be to enable the broadcast hrtimer for
-> arm, as has been done for arm64.
-Yes. I think it should be done by arm framework.
->
-> See commit 5d1638acb9f6 (tick: Introduce hrtimer based broadcast) which
-> introduced the broadcast hrtimer, and commit 9358d755bd5c (arm64:
-> kernel: initialize broadcast hrtimer based clock event device) which
-> added the requisite plumbing for arm64.
+Missed MODULE_DEVICE_TABLE(of, ...)....?
+
+-- 
+Regards,
+Varka Bhadram.
