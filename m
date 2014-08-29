@@ -1,21 +1,26 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 29 Aug 2014 07:30:15 +0200
-Subject: [PATCH v2 1/3] pinctrl: qcom: Add APQ8084 pinctrl support
-In-Reply-To: <1409057156-1201-2-git-send-email-gdjakov@mm-sol.com>
-References: <1409057156-1201-1-git-send-email-gdjakov@mm-sol.com>
- <1409057156-1201-2-git-send-email-gdjakov@mm-sol.com>
-Message-ID: <CACRpkdYj3n-N58OLd7Qom1LTDQ3=3KWY4m39zmPxrKjJow=f1w@mail.gmail.com>
+Date: Fri, 29 Aug 2014 07:46:45 +0200
+Subject: [PATCH] gpio: zynq: Remove .owner field for driver
+In-Reply-To: <78682b5ace6f31f2b52496823823116076eefd61.1407931277.git.michal.simek@xilinx.com>
+References: <78682b5ace6f31f2b52496823823116076eefd61.1407931277.git.michal.simek@xilinx.com>
+Message-ID: <CACRpkdYBbonERHWMWF3X5VfwWaiwc7OfwadyR0Nbr=x0NixBMQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 26, 2014 at 2:45 PM, Georgi Djakov <gdjakov@mm-sol.com> wrote:
+On Wed, Aug 13, 2014 at 2:01 PM, Michal Simek <michal.simek@xilinx.com> wrote:
 
-> This patchset adds pinctrl support for the Qualcomm APQ8084 platform.
+> There is no need to init .owner field.
 >
-> Signed-off-by: Georgi Djakov <gdjakov@mm-sol.com>
+> Based on the patch from Peter Griffin <peter.griffin@linaro.org>
+> "mmc: remove .owner field for drivers using module_platform_driver"
+>
+> This patch removes the superflous .owner field for drivers which
+> use the module_platform_driver API, as this is overriden in
+> platform_driver_register anyway."
+>
+> Signed-off-by: Michal Simek <michal.simek@xilinx.com>
 
-Looks good to me, but waiting for Bj?rn's review before
-merging.
+Patch applied.
 
 Yours,
 Linus Walleij
