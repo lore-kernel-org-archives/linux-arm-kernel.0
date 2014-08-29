@@ -1,51 +1,50 @@
-From: geoff@infradead.org (Geoff Levand)
-Date: Fri, 29 Aug 2014 14:53:55 -0700
-Subject: [PATCH 5/9] arm64: Fix include header order in vmlinux.lds.S
-In-Reply-To: <20140827082420.GC6968@arm.com>
-References: <cover.1408736066.git.geoff@infradead.org>
- <314ef77423f90ed407b54b4658ea41a96b6f6170.1408736066.git.geoff@infradead.org>
- <20140826162759.GG4078@leverpostej> <1409081250.11425.32.camel@smoke>
- <20140827082420.GC6968@arm.com>
-Message-ID: <1409349235.21254.103.camel@smoke>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Fri, 29 Aug 2014 21:45:03 +0200
+Subject: [PATCH resend v5 0/2] ARM: sunxi: RTC support for A31/A23
+In-Reply-To: <1409025296-6342-1-git-send-email-wens@csie.org>
+References: <1409025296-6342-1-git-send-email-wens@csie.org>
+Message-ID: <20140829194503.GJ15297@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Catalin,
+Hi Alessandro,
 
-On Wed, 2014-08-27 at 09:24 +0100, Catalin Marinas wrote:
-> On Tue, Aug 26, 2014 at 08:27:30PM +0100, Geoff Levand wrote:
-> > On Tue, 2014-08-26 at 17:27 +0100, Mark Rutland wrote:
-> > > On Fri, Aug 22, 2014 at 08:49:16PM +0100, Geoff Levand wrote:
-> > > > asm-generic/vmlinux.lds.h should be included after the arch
-> > > > specific headers so that the arch headers can override the
-> > > > generic macro defs in asm-generic/vmlinux.lds.h.
-> > > > 
-> > > > Fixes preprosessor redefined warnings when adding arch specific
-> > > > macros.
-> > > 
-> > > A sample of those warnings would be nice. What do you see being
-> > > redefined?
-> > 
-> > In testing I wanted to set LOAD_OFFSET.  If gave warnings like
-> > these:
-> > 
-> >   arch/arm64/include/asm/page.h: warning: "LOAD_OFFSET" redefined [enabled by default]
-> > 
-> > I'll send out another patch with updated message.
+On Tue, Aug 26, 2014 at 11:54:54AM +0800, Chen-Yu Tsai wrote:
+> Hi everyone,
 > 
-> We currently don't define LOAD_OFFSET, so it would be good to see
-> what/why it is defined to. You could keep this patch as part of the
-> series introducing LOAD_OFFSET.
+> Resending the sun6i RTC series, rebased onto 3.17-rc1.
+> The DT/defconfig patches have been queued for 3.18, and therefore
+> dropped from this series. Hope we can get the driver parts in as
+> well.
+> 
+> The A31 has a new RTC block that is separate from the timer block.
+> It has separate interrupts for each of the alarms, and a different
+> format for the counter alarm. The driver has been tested on the
+> A31 Hummingbird, and the A23 tablet I'm using to work on sun8i
+> support.
+> 
+> Patch 1 adds the driver for the RTC.
+> 
+> Patch 2 is a minor cleanup. This makes rtc-sunxi depend on sun4i or
+> sun7i, the 2 platforms the driver is actually used on.
 
-Sorry I wasn't clear on this, but I have no plan to define an arm64
-specific LOAD_OFFSET.  This patch was intended to add consistency
-to the output section definitions in the arm64 linker script, and to
-also make the output section definitions in the arm64 linker script
-consistent with the way other architectures have their output sections
-defined.
+I'm quite happy with these patches. Are you?
 
-If this is not enough motivation for you to be interested in this,
-then I won't bother to send out that updated patch.  Please let me
-know.
+IIRC, you prefer that we merge these kind of patches by our tree, are
+you still ok with that? I'd feel more comfortable having an Acked-by
+from you on this.
 
--Geoff
+Thanks!
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140829/0d12e54e/attachment.sig>
