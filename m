@@ -1,125 +1,195 @@
-From: soren.brinkmann@xilinx.com (Soren Brinkmann)
-Date: Fri, 29 Aug 2014 10:58:47 -0700
-Subject: [PATCH 3/3] gpio: lib-sysfs: Add 'wakeup' attribute
-In-Reply-To: <1409335127-26712-1-git-send-email-soren.brinkmann@xilinx.com>
-References: <1409335127-26712-1-git-send-email-soren.brinkmann@xilinx.com>
-Message-ID: <1409335127-26712-4-git-send-email-soren.brinkmann@xilinx.com>
+From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
+Date: Fri, 29 Aug 2014 20:05:49 +0200
+Subject: [PATCH 1/2] ARM: multi_v7_defconfig: Enable shmobile platforms
+In-Reply-To: <1409234429-1916-1-git-send-email-geert+renesas@glider.be>
+References: <1409234429-1916-1-git-send-email-geert+renesas@glider.be>
+Message-ID: <1965890.bT7bZyQJt8@amdc1032>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add an attribute 'wakeup' to the GPIO sysfs interface which allows
-marking/unmarking a GPIO as wake IRQ.
-The file 'wakeup' is created in each exported GPIOs directory, if an IRQ
-is associated with that GPIO and the irqchip implements set_wake().
-Writing 'enabled' to that file will enable wake for that GPIO, while
-writing 'disabled' will disable wake.
-Reading that file will return either 'disabled' or 'enabled' depening on
-the currently set flag for the GPIO's IRQ.
 
-Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
----
- drivers/gpio/gpiolib-sysfs.c | 75 ++++++++++++++++++++++++++++++++++++++++----
- 1 file changed, 69 insertions(+), 6 deletions(-)
+Hi,
 
-diff --git a/drivers/gpio/gpiolib-sysfs.c b/drivers/gpio/gpiolib-sysfs.c
-index 5f2150b619a7..aaf021eaaff5 100644
---- a/drivers/gpio/gpiolib-sysfs.c
-+++ b/drivers/gpio/gpiolib-sysfs.c
-@@ -286,6 +286,56 @@ found:
- 
- static DEVICE_ATTR(edge, 0644, gpio_edge_show, gpio_edge_store);
- 
-+static ssize_t gpio_wakeup_show(struct device *dev,
-+		struct device_attribute *attr, char *buf)
-+{
-+	ssize_t			status;
-+	const struct gpio_desc	*desc = dev_get_drvdata(dev);
-+	int			irq = gpiod_to_irq(desc);
-+	struct irq_desc		*irq_desc = irq_to_desc(irq);
-+
-+	mutex_lock(&sysfs_lock);
-+
-+	if (irqd_is_wakeup_set(&irq_desc->irq_data))
-+		status = sprintf(buf, "enabled\n");
-+	else
-+		status = sprintf(buf, "disabled\n");
-+
-+	mutex_unlock(&sysfs_lock);
-+
-+	return status;
-+}
-+
-+static ssize_t gpio_wakeup_store(struct device *dev,
-+		struct device_attribute *attr, const char *buf, size_t size)
-+{
-+	int			ret;
-+	unsigned int		on;
-+	struct gpio_desc	*desc = dev_get_drvdata(dev);
-+	int			irq = gpiod_to_irq(desc);
-+
-+	mutex_lock(&sysfs_lock);
-+
-+	if (sysfs_streq("enabled", buf))
-+		on = true;
-+	else if (sysfs_streq("disabled", buf))
-+		on = false;
-+	else
-+		return -EINVAL;
-+
-+	ret = irq_set_irq_wake(irq, on);
-+
-+	mutex_unlock(&sysfs_lock);
-+
-+	if (ret)
-+		pr_warn("%s: failed to %s wake\n", __func__,
-+				on ? "enable" : "disable");
-+
-+	return size;
-+}
-+
-+static DEVICE_ATTR(wakeup, 0644, gpio_wakeup_show, gpio_wakeup_store);
-+
- static int sysfs_set_active_low(struct gpio_desc *desc, struct device *dev,
- 				int value)
- {
-@@ -526,7 +576,7 @@ static struct class gpio_class = {
- int gpiod_export(struct gpio_desc *desc, bool direction_may_change)
- {
- 	unsigned long		flags;
--	int			status;
-+	int			status, irq;
- 	const char		*ioname = NULL;
- 	struct device		*dev;
- 	int			offset;
-@@ -582,11 +632,24 @@ int gpiod_export(struct gpio_desc *desc, bool direction_may_change)
- 			goto fail_unregister_device;
- 	}
- 
--	if (gpiod_to_irq(desc) >= 0 && (direction_may_change ||
--				       !test_bit(FLAG_IS_OUT, &desc->flags))) {
--		status = device_create_file(dev, &dev_attr_edge);
--		if (status)
--			goto fail_unregister_device;
-+	irq = gpiod_to_irq(desc);
-+	if (irq >= 0) {
-+		struct irq_desc *irq_desc = irq_to_desc(irq);
-+		struct irq_chip	*irqchip = irq_desc_get_chip(irq_desc);
-+
-+		if (direction_may_change ||
-+				!test_bit(FLAG_IS_OUT, &desc->flags)) {
-+			status = device_create_file(dev, &dev_attr_edge);
-+			if (status)
-+				goto fail_unregister_device;
-+		}
-+
-+		if (irqchip->flags & IRQCHIP_SKIP_SET_WAKE ||
-+				irqchip->irq_set_wake) {
-+			status = device_create_file(dev, &dev_attr_wakeup);
-+			if (status)
-+				goto fail_unregister_device;
-+		}
- 	}
- 
- 	set_bit(FLAG_EXPORT, &desc->flags);
--- 
-2.1.0.1.g27b9230
+On Thursday, August 28, 2014 04:00:28 PM Geert Uytterhoeven wrote:
+> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> ---
+> Based on next-20140828
+> For now excluding r8a7740/armadillo, as it fails to boot on armadillo
+> 
+>  arch/arm/configs/multi_v7_defconfig | 51 +++++++++++++++++++++++++++++++++++--
+>  1 file changed, 49 insertions(+), 2 deletions(-)
+
+I've been looking lately into making it possible to easily go
+from multi_v7_defconfig config to a single platform one (in my
+case Exynos one) and removing the need to keep the latter (i.e.
+exynos_defconfig) in the kernel tree in the long-term.
+
+Because of this I've noticed that some config options for platform
+specific hardware that are selected in multi_v7_defconfig don't
+have proper dependencies.  This results in more complex than
+necessary single platform configs (obtained from a multiplatform
+config) and unnecessarily bigger resulting kernel images.
+
+Your patch also adds/uncovers some such config options.
+
+Lets first look at sizes of resulting vmlinux images for single
+platform Exynos config before and after your patch:
+
+  $ size vmlinux.*
+     text    data     bss     dec     hex filename
+  7817317  517188  278992 8613497  836e79 vmlinux.before
+  7978325  527012  279056 8784393  860a09 vmlinux.after
+
+  (=> the patch results in 170kB bigger vmlinux size)
+
+and the configs diff later:
+
+--- multi_v7_exynos_only	2014-08-29 12:29:31.881485357 +0200
++++ multi_v7_exynos_only_shmobile	2014-08-29 12:36:24.361496247 +0200
+@@ -70,6 +70,8 @@
+ CONFIG_BRCMSTB_GISB_ARB=y
+ CONFIG_VEXPRESS_CONFIG=y
+ CONFIG_MTD=y
++CONFIG_MTD_M25P80=y
++CONFIG_MTD_SPI_NOR=y
+ CONFIG_BLK_DEV_LOOP=y
+ CONFIG_ICS932S401=y
+ CONFIG_APDS9802ALS=y
+@@ -86,11 +88,13 @@
+ CONFIG_MVMDIO=y
+ CONFIG_KS8851=y
+ CONFIG_R8169=y
++CONFIG_SH_ETH=y
+
+This seems to be option for Renesas specific hardware and it has
+a footprint of 23kB.
+
+[ I think that this option should depend on ARCH_SHMOBILE || ARCH_SH. ]
+
+ CONFIG_SMSC911X=y
+ CONFIG_STMMAC_ETH=y
+ CONFIG_AT803X_PHY=y
+ CONFIG_MARVELL_PHY=y
+ CONFIG_ICPLUS_PHY=y
++CONFIG_MICREL_PHY=y
+
+This gets selected by CONFIG_SH_ETH and costs us 4kB.
+
+ CONFIG_USB_PEGASUS=y
+ CONFIG_USB_USBNET=y
+ CONFIG_USB_NET_SMSC75XX=y
+@@ -110,6 +114,7 @@
+ CONFIG_SERIAL_8250=y
+ CONFIG_SERIAL_8250_CONSOLE=y
+ CONFIG_SERIAL_8250_DW=y
++CONFIG_SERIAL_8250_EM=y
+ CONFIG_SERIAL_AMBA_PL011=y
+ CONFIG_SERIAL_AMBA_PL011_CONSOLE=y
+ CONFIG_SERIAL_SAMSUNG=y
+@@ -122,11 +127,13 @@
+ CONFIG_SERIAL_ST_ASC=y
+ CONFIG_SERIAL_ST_ASC_CONSOLE=y
+ CONFIG_I2C_CHARDEV=y
++CONFIG_I2C_MUX=y
+ CONFIG_I2C_MUX_PCA954x=y
+ CONFIG_I2C_MUX_PINCTRL=y
+ CONFIG_I2C_DESIGNWARE_PLATFORM=y
+ CONFIG_I2C_NOMADIK=y
+ CONFIG_I2C_XILINX=y
++CONFIG_SPI=y
+ CONFIG_SPI_CADENCE=y
+ CONFIG_SPI_PL022=y
+ CONFIG_SPI_XILINX=y
+@@ -135,6 +142,7 @@
+ CONFIG_PINCTRL_PALMAS=y
+ CONFIG_GPIO_SYSFS=y
+ CONFIG_GPIO_DWAPB=y
++CONFIG_GPIO_EM=y
+ CONFIG_GPIO_PL061=y
+ CONFIG_GPIO_PCA953X=y
+ CONFIG_GPIO_PCA953X_IRQ=y
+@@ -173,6 +181,7 @@
+ CONFIG_REGULATOR_VIRTUAL_CONSUMER=y
+ CONFIG_REGULATOR_AS3722=y
+ CONFIG_REGULATOR_BCM590XX=y
++CONFIG_REGULATOR_DA9210=y
+ CONFIG_REGULATOR_GPIO=y
+ CONFIG_REGULATOR_MAX8907=y
+ CONFIG_REGULATOR_PALMAS=y
+@@ -187,9 +196,18 @@
+ CONFIG_REGULATOR_VEXPRESS=y
+ CONFIG_MEDIA_SUPPORT=y
+ CONFIG_MEDIA_CAMERA_SUPPORT=y
++CONFIG_MEDIA_CONTROLLER=y
++CONFIG_VIDEO_V4L2_SUBDEV_API=y
+ CONFIG_MEDIA_USB_SUPPORT=y
+ CONFIG_USB_VIDEO_CLASS=y
+ CONFIG_USB_GSPCA=y
++CONFIG_V4L_PLATFORM_DRIVERS=y
++CONFIG_SOC_CAMERA=y
++CONFIG_SOC_CAMERA_PLATFORM=y
++CONFIG_V4L_MEM2MEM_DRIVERS=y
++CONFIG_VIDEO_RENESAS_VSP1=y
+
+This seems to be another option for Renesas specific hardware and it has
+a footprint of 23kB.
+
+[ I think that this option should depend on ARCH_SHMOBILE. ]
+
++# CONFIG_MEDIA_SUBDRV_AUTOSELECT is not set
++CONFIG_VIDEO_ADV7180=y
+ CONFIG_DRM=y
+ CONFIG_FB=y
+ CONFIG_FB_ARMCLCD=y
+@@ -204,6 +222,7 @@
+ CONFIG_SND_SOC=y
+ CONFIG_SND_SOC_WM8753=y
+ CONFIG_SND_SOC_WM8903=y
++CONFIG_SND_SIMPLE_CARD=y
+ CONFIG_USB=y
+ CONFIG_USB_XHCI_HCD=y
+ CONFIG_USB_EHCI_HCD=y
+@@ -211,6 +230,7 @@
+ CONFIG_USB_ISP1760_HCD=y
+ CONFIG_USB_OHCI_HCD=y
+ CONFIG_USB_OHCI_HCD_PLATFORM=y
++CONFIG_USB_RENESAS_USBHS=y
+
+It seems to be yet another option for Renesas specific hardware and it
+has a footprint of 18kB.
+
+[ I think that this option should depend on ARCH_SHMOBILE || ARCH_SH. ]
+
+ CONFIG_USB_STORAGE=y
+ CONFIG_USB_CHIPIDEA=y
+ CONFIG_USB_CHIPIDEA_HOST=y
+@@ -220,6 +240,8 @@
+ CONFIG_USB_GPIO_VBUS=y
+ CONFIG_USB_ISP1301=y
+ CONFIG_USB_ULPI=y
++CONFIG_USB_GADGET=y
++CONFIG_USB_RENESAS_USBHS_UDC=y
+
+This one depends on CONFIG_USB_RENESAS_USBHS and costs us 3kB.
+
+ CONFIG_MMC=y
+ CONFIG_MMC_BLOCK_MINORS=16
+ CONFIG_MMC_ARMMMCI=y
+
+In total by fixing the above three options to have correct dependencies
+it is possible to recover 86kB out of 170kB of vmlinux size inrease for
+a single platform only config derived from a multiplatform one.
+
+Simon/Magnus, is it okay to send patches fixing
+
+  CONFIG_SH_ETH
+  CONFIG_VIDEO_RENESAS_VSP1
+  CONFIG_USB_RENESAS_USBHS
+
+dependencies?
+
+Best regards,
+--
+Bartlomiej Zolnierkiewicz
+Samsung R&D Institute Poland
+Samsung Electronics
