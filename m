@@ -1,46 +1,46 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 29 Aug 2014 16:54:29 +0100
-Subject: [RFC PATCH 6/7] arm: call iommu_init before of_platform_populate
-In-Reply-To: <1409327670-3495-1-git-send-email-will.deacon@arm.com>
-References: <1409327670-3495-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1409327670-3495-7-git-send-email-will.deacon@arm.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Fri, 29 Aug 2014 10:55:51 -0500
+Subject: [PATCH 15/15] tty: serial: 8250: omap: add dma support
+In-Reply-To: <540048B4.7010807@linutronix.de>
+References: <20140815210211.GD9239@atomide.com>
+ <53F5AF0D.5060409@linutronix.de>
+ <20140821184416.GF10066@atomide.com>
+ <53FE3779.5090908@linutronix.de>
+ <20140827202313.GF16006@atomide.com>
+ <20140828082348.GA5413@linutronix.de>
+ <20140828164645.GG16006@atomide.com>
+ <53FF84DF.7080406@linutronix.de>
+ <20140828225454.GM16006@atomide.com>
+ <540048B4.7010807@linutronix.de>
+Message-ID: <20140829155551.GD2620@saruman.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We need to ensure that the IOMMUs in the system have a chance to perform
-some basic initialisation before we start adding masters to them.
+On Fri, Aug 29, 2014 at 11:32:36AM +0200, Sebastian Andrzej Siewior wrote:
+> On 08/29/2014 12:54 AM, Tony Lindgren wrote:
+> > * Sebastian Andrzej Siewior <bigeasy@linutronix.de> [140828 12:37]:
+> >> On 08/28/2014 06:46 PM, Tony Lindgren wrote:
+> >>>
+> >>> Sounds like there should be some way to clear that state.. I wonder
+> >>> if omap-serial.c had something before it's DMA support was removed?
+> >>
+> >> Its DMA was removed? Like there was DMA support?
+> > 
+> > Yeah see commit 494574304711a333386e7dd5fd3ebbc3b7024994...
+> 
+> Interesting. I've been browsing that file and checking other trees and
+> never noticed that it was there at some point. I only saw the pieces
+> which looked it was there.
 
-This patch adds a call to of_iommu_init before of_platform_populate.
+it was known to be broken and unused. There was no way to even enable
+that code.
 
-Signed-off-by: Will Deacon <will.deacon@arm.com>
----
- arch/arm/kernel/setup.c | 5 ++++-
- 1 file changed, 4 insertions(+), 1 deletion(-)
-
-diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
-index 84db893dedc2..38a0203523af 100644
---- a/arch/arm/kernel/setup.c
-+++ b/arch/arm/kernel/setup.c
-@@ -18,6 +18,7 @@
- #include <linux/bootmem.h>
- #include <linux/seq_file.h>
- #include <linux/screen_info.h>
-+#include <linux/of_iommu.h>
- #include <linux/of_platform.h>
- #include <linux/init.h>
- #include <linux/kexec.h>
-@@ -803,9 +804,11 @@ static int __init customize_machine(void)
- 	if (machine_desc->init_machine)
- 		machine_desc->init_machine();
- #ifdef CONFIG_OF
--	else
-+	else {
-+		of_iommu_init();
- 		of_platform_populate(NULL, of_default_bus_match_table,
- 					NULL, NULL);
-+	}
- #endif
- 	return 0;
- }
 -- 
-2.1.0
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140829/9b1134fd/attachment.sig>
