@@ -1,17 +1,23 @@
 From: sr@denx.de (Stefan Roese)
-Date: Fri, 29 Aug 2014 12:40:04 +0200
-Subject: [PATCH 2/4 v2] arm: omap3: Add Technexion TAO3530 SOM
- omap3-tao3530.dtsi
+Date: Fri, 29 Aug 2014 12:40:06 +0200
+Subject: [PATCH 4/4 v2] arm: omap3: Add HEAD acoustics omap3-ha.dts and
+ omap3-ha-lcd.dts (TAO3530 based)
 In-Reply-To: <1409308806-27036-1-git-send-email-sr@denx.de>
 References: <1409308806-27036-1-git-send-email-sr@denx.de>
-Message-ID: <1409308806-27036-2-git-send-email-sr@denx.de>
+Message-ID: <1409308806-27036-4-git-send-email-sr@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Technexion TAO3530 is a OMAP3530 based SOM. This patch adds the
-basic support for it as an dtsi file which can be included by
-baseboard equipped with this SOM. E.g. the Technexion Thunder
-baseboard.
+These baseboards are equipped with the Technexion TAO35030 SOM. So
+they include this dtsi. The common parts are extracted into an "common"
+dtsi file. The main difference between both boards is, that the *lcd
+has DSS support enabled for the LCD.
+
+Some HEAD acoustics specific features are:
+
+- LED handling
+- Special FPGA/DSP audio driver (not included in this series)
+- powerdown GPIO
 
 Signed-off-by: Stefan Roese <sr@denx.de>
 Cc: Thorsten Eisbein <thorsten.eisbein@head-acoustics.de>
@@ -20,20 +26,35 @@ Cc: Tony Lindgren <tony@atomide.com>
 ---
 v2:
 - Used OMAP3_CORE1_IOPAD macros for all mux entries
-- Added ranges entry to gpmc node
-- Added gpmc,device-width = <2> to nand dt node. Otherwise NAND probing
-  would not work
 
- arch/arm/boot/dts/omap3-tao3530.dtsi | 337 +++++++++++++++++++++++++++++++++++
- 1 file changed, 337 insertions(+)
- create mode 100644 arch/arm/boot/dts/omap3-tao3530.dtsi
+ arch/arm/boot/dts/Makefile             |   2 +
+ arch/arm/boot/dts/omap3-ha-common.dtsi |  88 ++++++++++++++++++
+ arch/arm/boot/dts/omap3-ha-lcd.dts     | 165 +++++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/omap3-ha.dts         |  28 ++++++
+ 4 files changed, 283 insertions(+)
+ create mode 100644 arch/arm/boot/dts/omap3-ha-common.dtsi
+ create mode 100644 arch/arm/boot/dts/omap3-ha-lcd.dts
+ create mode 100644 arch/arm/boot/dts/omap3-ha.dts
 
-diff --git a/arch/arm/boot/dts/omap3-tao3530.dtsi b/arch/arm/boot/dts/omap3-tao3530.dtsi
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index e00c889..892b7d2 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -287,6 +287,8 @@ dtb-$(CONFIG_ARCH_OMAP3) += am3517-craneboard.dtb \
+ 	omap3-evm.dtb \
+ 	omap3-evm-37xx.dtb \
+ 	omap3-gta04.dtb \
++	omap3-ha.dtb \
++	omap3-ha-lcd.dtb \
+ 	omap3-igep0020.dtb \
+ 	omap3-igep0030.dtb \
+ 	omap3-ldp.dtb \
+diff --git a/arch/arm/boot/dts/omap3-ha-common.dtsi b/arch/arm/boot/dts/omap3-ha-common.dtsi
 new file mode 100644
-index 0000000..b30f387
+index 0000000..bd66545
 --- /dev/null
-+++ b/arch/arm/boot/dts/omap3-tao3530.dtsi
-@@ -0,0 +1,337 @@
++++ b/arch/arm/boot/dts/omap3-ha-common.dtsi
+@@ -0,0 +1,88 @@
 +/*
 + * Copyright (C) 2012 Texas Instruments Incorporated - http://www.ti.com/
 + * Copyright (C) 2014 Stefan Roese <sr@denx.de>
@@ -42,176 +63,182 @@ index 0000000..b30f387
 + * it under the terms of the GNU General Public License version 2 as
 + * published by the Free Software Foundation.
 + */
-+/dts-v1/;
 +
-+#include "omap34xx-hs.dtsi"
++#include "omap3-tao3530.dtsi"
 +
 +/ {
-+	cpus {
-+		cpu at 0 {
-+			cpu0-supply = <&vcc>;
-+		};
-+	};
++	gpio_poweroff {
++		pinctrl-names = "default";
++		pinctrl-0 = <&poweroff_pins>;
 +
-+	memory {
-+		device_type = "memory";
-+		reg = <0x80000000 0x10000000>; /* 256 MB */
-+	};
-+
-+	/* HS USB Port 2 Power */
-+	hsusb2_power: hsusb2_power_reg {
-+		compatible = "regulator-fixed";
-+		regulator-name = "hsusb2_vbus";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+		gpio = <&twl_gpio 18 0>;	/* GPIO LEDA */
-+		startup-delay-us = <70000>;
-+	};
-+
-+	/* HS USB Host PHY on PORT 2 */
-+	hsusb2_phy: hsusb2_phy {
-+		compatible = "usb-nop-xceiv";
-+		reset-gpios = <&gpio6 2 GPIO_ACTIVE_LOW>;	/* gpio_162 */
-+		vcc-supply = <&hsusb2_power>;
-+	};
-+
-+	sound {
-+		compatible = "ti,omap-twl4030";
-+		ti,model = "omap3beagle";
-+
-+		/* McBSP2 is used for onboard sound, same as on beagle */
-+		ti,mcbsp = <&mcbsp2>;
-+		ti,codec = <&twl_audio>;
-+	};
-+
-+	/* Regulator to enable/switch the vcc of the Wifi module */
-+	mmc2_sdio_poweron: regulator-mmc2-sdio-poweron {
-+		compatible = "regulator-fixed";
-+		regulator-name = "regulator-mmc2-sdio-poweron";
-+		regulator-min-microvolt = <3150000>;
-+		regulator-max-microvolt = <3150000>;
-+		gpio = <&gpio5 29 GPIO_ACTIVE_LOW>;		/* gpio_157 */
-+		enable-active-low;
-+		startup-delay-us = <10000>;
++		compatible = "gpio-poweroff";
++		gpios = <&gpio6 8 GPIO_ACTIVE_LOW>;	/* GPIO 168 */
 +	};
 +};
 +
 +&omap3_pmx_core {
-+	hsusbb2_pins: pinmux_hsusbb2_pins {
++	sound2_pins: pinmux_sound2_pins {
 +		pinctrl-single,pins = <
-+			OMAP3_CORE1_IOPAD(0x25f0, PIN_OUTPUT | MUX_MODE3)		/* etk_d10.hsusb2_clk */
-+			OMAP3_CORE1_IOPAD(0x25f2, PIN_OUTPUT | MUX_MODE3)		/* etk_d11.hsusb2_stp */
-+			OMAP3_CORE1_IOPAD(0x25f4, PIN_INPUT_PULLDOWN | MUX_MODE3)	/* etk_d12.hsusb2_dir */
-+			OMAP3_CORE1_IOPAD(0x25f6, PIN_INPUT_PULLDOWN | MUX_MODE3)	/* etk_d13.hsusb2_nxt */
-+			OMAP3_CORE1_IOPAD(0x25f8, PIN_INPUT_PULLDOWN | MUX_MODE3)	/* etk_d14.hsusb2_data0 */
-+			OMAP3_CORE1_IOPAD(0x25fa, PIN_INPUT_PULLDOWN | MUX_MODE3)	/* etk_d15.hsusb2_data1 */
-+			OMAP3_CORE1_IOPAD(0x21d4, PIN_INPUT_PULLDOWN | MUX_MODE3)	/* mcspi1_cs3.hsusb2_data2 */
-+			OMAP3_CORE1_IOPAD(0x21d6, PIN_INPUT_PULLDOWN | MUX_MODE3)	/* mcspi2_clk.hsusb2_data7 */
-+			OMAP3_CORE1_IOPAD(0x21d8, PIN_INPUT_PULLDOWN | MUX_MODE3)	/* mcspi2_simo.hsusb2_data4 */
-+			OMAP3_CORE1_IOPAD(0x21da, PIN_INPUT_PULLDOWN | MUX_MODE3)	/* mcspi2_somi.hsusb2_data5 */
-+			OMAP3_CORE1_IOPAD(0x21dc, PIN_INPUT_PULLDOWN | MUX_MODE3)	/* mcspi2_cs0.hsusb2_data6 */
-+			OMAP3_CORE1_IOPAD(0x21de, PIN_INPUT_PULLDOWN | MUX_MODE3)	/* mcspi2_cs1.hsusb2_data3 */
++			OMAP3_CORE1_IOPAD(0x209e, PIN_OUTPUT | MUX_MODE4)	/* gpmc_d8 gpio_44 */
 +		>;
 +	};
 +
-+	mmc1_pins: pinmux_mmc1_pins {
++	led_blue_pins: pinmux_led_blue_pins {
 +		pinctrl-single,pins = <
-+			OMAP3_CORE1_IOPAD(0x2144, PIN_INPUT_PULLUP | MUX_MODE0)	/* sdmmc1_clk.sdmmc1_clk */
-+			OMAP3_CORE1_IOPAD(0x2146, PIN_INPUT_PULLUP | MUX_MODE0)	/* sdmmc1_cmd.sdmmc1_cmd */
-+			OMAP3_CORE1_IOPAD(0x2148, PIN_INPUT_PULLUP | MUX_MODE0)	/* sdmmc1_dat0.sdmmc1_dat0 */
-+			OMAP3_CORE1_IOPAD(0x214a, PIN_INPUT_PULLUP | MUX_MODE0)	/* sdmmc1_dat1.sdmmc1_dat1 */
-+			OMAP3_CORE1_IOPAD(0x214c, PIN_INPUT_PULLUP | MUX_MODE0)	/* sdmmc1_dat2.sdmmc1_dat2 */
-+			OMAP3_CORE1_IOPAD(0x214e, PIN_INPUT_PULLUP | MUX_MODE0)	/* sdmmc1_dat3.sdmmc1_dat3 */
-+			OMAP3_CORE1_IOPAD(0x2150, PIN_INPUT_PULLUP | MUX_MODE0) /* sdmmc1_dat4.sdmmc1_dat4 */
-+			OMAP3_CORE1_IOPAD(0x2152, PIN_INPUT_PULLUP | MUX_MODE0) /* sdmmc1_dat5.sdmmc1_dat5 */
-+			OMAP3_CORE1_IOPAD(0x2154, PIN_INPUT_PULLUP | MUX_MODE0) /* sdmmc1_dat6.sdmmc1_dat6 */
-+			OMAP3_CORE1_IOPAD(0x2156, PIN_INPUT_PULLUP | MUX_MODE0) /* sdmmc1_dat7.sdmmc1_dat7 */
++			OMAP3_CORE1_IOPAD(0x2110, PIN_OUTPUT | MUX_MODE4)	/* cam_xclka gpio_96, LED blue */
 +		>;
 +	};
 +
-+	mmc2_pins: pinmux_mmc2_pins {
++	led_green_pins: pinmux_led_green_pins {
 +		pinctrl-single,pins = <
-+			OMAP3_CORE1_IOPAD(0x2158, PIN_INPUT_PULLUP | MUX_MODE0)	/* sdmmc2_clk.sdmmc2_clk */
-+			OMAP3_CORE1_IOPAD(0x215a, PIN_INPUT_PULLUP | MUX_MODE0)	/* sdmmc2_cmd.sdmmc2_cmd */
-+			OMAP3_CORE1_IOPAD(0x215c, PIN_INPUT_PULLUP | MUX_MODE0)	/* sdmmc2_dat0.sdmmc2_dat0 */
-+			OMAP3_CORE1_IOPAD(0x215e, PIN_INPUT_PULLUP | MUX_MODE0)	/* sdmmc2_dat1.sdmmc2_dat1 */
-+			OMAP3_CORE1_IOPAD(0x2160, PIN_INPUT_PULLUP | MUX_MODE0)	/* sdmmc2_dat2.sdmmc2_dat2 */
-+			OMAP3_CORE1_IOPAD(0x2162, PIN_INPUT_PULLUP | MUX_MODE0)	/* sdmmc2_dat3.sdmmc2_dat3 */
++			OMAP3_CORE1_IOPAD(0x2126, PIN_OUTPUT | MUX_MODE4)	/* cam_d8 gpio_107, LED green */
 +		>;
 +	};
 +
-+	/* wlan GPIO output for WLAN_EN */
-+	wlan_gpio: pinmux_wlan_gpio {
++	led_red_pins: pinmux_led_red_pins {
 +		pinctrl-single,pins = <
-+			OMAP3_CORE1_IOPAD(0x218e, PIN_OUTPUT | MUX_MODE4)	/* mcbsp1_fsr gpio_157 */
++			OMAP3_CORE1_IOPAD(0x212e, PIN_OUTPUT_PULLUP | MUX_MODE4)	/* cam_xclkb gpio_111, LED red */
 +		>;
 +	};
 +
-+	uart3_pins: pinmux_uart3_pins {
++	poweroff_pins: pinmux_poweroff_pins {
 +		pinctrl-single,pins = <
-+			OMAP3_CORE1_IOPAD(0x219e, PIN_INPUT | PIN_OFF_WAKEUPENABLE | MUX_MODE0) /* uart3_rx_irrx.uart3_rx_irrx */
-+			OMAP3_CORE1_IOPAD(0x21a0, PIN_OUTPUT | MUX_MODE0)	/* uart3_tx_irtx.uart3_tx_irtx */
++			OMAP3_CORE1_IOPAD(0x21be, PIN_OUTPUT_PULLUP | MUX_MODE4)	/* i2c2_scl gpio_168 */
 +		>;
 +	};
 +
-+	i2c3_pins: pinmux_i2c3_pins {
++	powerdown_input_pins: pinmux_powerdown_input_pins {
 +		pinctrl-single,pins = <
-+			OMAP3_CORE1_IOPAD(0x21c2, PIN_INPUT_PULLUP | MUX_MODE0)	/* i2c3_scl.i2c3_scl */
-+			OMAP3_CORE1_IOPAD(0x21c4, PIN_INPUT_PULLUP | MUX_MODE0)	/* i2c3_sda.i2c3_sda */
++			OMAP3_CORE1_IOPAD(0x21c0, PIN_INPUT_PULLUP | MUX_MODE4)	/* i2c2_sda gpio_183 */
 +		>;
 +	};
 +
-+	mcspi1_pins: pinmux_mcspi1_pins {
++	fpga_boot0_pins: fpga_boot0_pins {
 +		pinctrl-single,pins = <
-+			OMAP3_CORE1_IOPAD(0x21c8, PIN_INPUT | MUX_MODE0)	/* mcspi1_clk.mcspi1_clk */
-+			OMAP3_CORE1_IOPAD(0x21ca, PIN_OUTPUT | MUX_MODE0)	/* mcspi1_simo.mcspi1_simo */
-+			OMAP3_CORE1_IOPAD(0x21cc, PIN_INPUT_PULLUP | MUX_MODE0)	/* mcspi1_somi.mcspi1_somi */
-+			OMAP3_CORE1_IOPAD(0x21ce, PIN_OUTPUT | MUX_MODE0)	/* mcspi1_cs0.mcspi1_cs0 */
++			OMAP3_CORE1_IOPAD(0x211a, PIN_INPUT | MUX_MODE4)	/* cam_d2 gpio_101 */
++			OMAP3_CORE1_IOPAD(0x211c, PIN_OUTPUT | MUX_MODE4)	/* cam_d3 gpio_102 */
++			OMAP3_CORE1_IOPAD(0x211e, PIN_OUTPUT | MUX_MODE4)	/* cam_d4 gpio_103 */
++			OMAP3_CORE1_IOPAD(0x2120, PIN_INPUT_PULLUP | MUX_MODE4)	/* cam_d5 gpio_104 */
 +		>;
 +	};
 +
-+	mcspi3_pins: pinmux_mcspi3_pins {
++	fpga_boot1_pins: fpga_boot1_pins {
 +		pinctrl-single,pins = <
-+                        OMAP3_CORE1_IOPAD(0x25dc, PIN_OUTPUT | MUX_MODE1)	/* etk_d0.mcspi3_simo gpio14 INPUT | MODE1 */
-+                        OMAP3_CORE1_IOPAD(0x25de, PIN_INPUT_PULLUP | MUX_MODE1)	/* etk_d1.mcspi3_somi gpio15 INPUT | MODE1 */
-+                        OMAP3_CORE1_IOPAD(0x25e0, PIN_OUTPUT | MUX_MODE1)	/* etk_d2.mcspi3_cs0 gpio16 INPUT | MODE1 */
-+                        OMAP3_CORE1_IOPAD(0x25e2, PIN_INPUT | MUX_MODE1)	/* etk_d3.mcspi3_clk gpio17 INPUT | MODE1 */
-+		>;
-+	};
-+
-+	mcbsp3_pins: pinmux_mcbsp3_pins {
-+		pinctrl-single,pins = <
-+			OMAP3_CORE1_IOPAD(0x216c, PIN_OUTPUT | MUX_MODE0)	/* mcbsp3_dx.uart2_cts */
-+			OMAP3_CORE1_IOPAD(0x216e, PIN_INPUT | MUX_MODE0)	/* mcbsp3_dr.uart2_rts */
-+			OMAP3_CORE1_IOPAD(0x2170, PIN_INPUT | MUX_MODE0)	/* mcbsp3_clk.uart2_tx */
-+			OMAP3_CORE1_IOPAD(0x2172, PIN_INPUT | MUX_MODE0)	/* mcbsp3_fsx.uart2_rx */
++			OMAP3_CORE1_IOPAD(0x20a2, PIN_INPUT | MUX_MODE4)	/* gpmc_d10 gpio_46 */
++			OMAP3_CORE1_IOPAD(0x20a4, PIN_OUTPUT | MUX_MODE4)	/* gpmc_d11 gpio_47 */
++			OMAP3_CORE1_IOPAD(0x20a6, PIN_OUTPUT | MUX_MODE4)	/* gpmc_d12 gpio_48 */
++			OMAP3_CORE1_IOPAD(0x20a8, PIN_INPUT_PULLUP | MUX_MODE4)	/* gpmc_d13 gpio_49 */
 +		>;
 +	};
 +};
 +
-+/* McBSP1: mux'ed with GPIO158 as clock for HA-DSP */
-+&mcbsp1 {
++/* I2C2: mux'ed with GPIO168 which is connected to nKILL_POWER */
++&i2c2 {
 +	status = "disabled";
 +};
 +
-+&mcbsp2 {
-+	status = "okay";
++&i2c3 {
++	clock-frequency = <100000>;
++
++	pinctrl-names = "default";
++	pinctrl-0 = <&i2c3_pins>;
++};
+diff --git a/arch/arm/boot/dts/omap3-ha-lcd.dts b/arch/arm/boot/dts/omap3-ha-lcd.dts
+new file mode 100644
+index 0000000..11aa28d
+--- /dev/null
++++ b/arch/arm/boot/dts/omap3-ha-lcd.dts
+@@ -0,0 +1,165 @@
++/*
++ * Copyright (C) 2012 Texas Instruments Incorporated - http://www.ti.com/
++ * Copyright (C) 2014 Stefan Roese <sr@denx.de>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++
++#include "omap3-ha-common.dtsi"
++
++/ {
++	model = "TI OMAP3 HEAD acoustics LCD-baseboard with TAO3530 SOM";
++	compatible = "headacoustics,omap3-ha-lcd", "technexion,omap3-tao3530", "ti,omap34xx", "ti,omap3";
 +};
 +
-+&i2c1 {
-+	clock-frequency = <2600000>;
++&omap3_pmx_core {
++	pinctrl-names = "default";
++	pinctrl-0 = <
++		&hsusbb2_pins
++		&powerdown_input_pins
++		&fpga_boot0_pins
++		&fpga_boot1_pins
++		&led_blue_pins
++		&led_green_pins
++		&led_red_pins
++		&touchscreen_wake_pins
++	>;
 +
-+	twl: twl at 48 {
-+		reg = <0x48>;
-+		interrupts = <7>; /* SYS_NIRQ cascaded to intc */
-+		interrupt-parent = <&intc>;
-+
-+		twl_audio: audio {
-+			compatible = "ti,twl4030-audio";
-+			codec {
-+			};
-+		};
++	touchscreen_irq_pins: pinmux_touchscreen_irq_pins {
++		pinctrl-single,pins = <
++			OMAP3_CORE1_IOPAD(0x2164, PIN_INPUT_PULLUP | MUX_MODE4)	/* gpio_136, Touchscreen IRQ */
++		>;
 +	};
++
++	touchscreen_wake_pins: pinmux_touchscreen_wake_pins {
++		pinctrl-single,pins = <
++			OMAP3_CORE1_IOPAD(0x212c, PIN_OUTPUT_PULLUP | MUX_MODE4)	/* gpio_110, Touchscreen Wake */
++		>;
++	};
++
++	dss_dpi_pins: pinmux_dss_dpi_pins {
++		pinctrl-single,pins = <
++			OMAP3_CORE1_IOPAD(0x20d4, PIN_OUTPUT | MUX_MODE0)	/* dss_pclk.dss_pclk */
++			OMAP3_CORE1_IOPAD(0x20d6, PIN_OUTPUT | MUX_MODE0)	/* dss_hsync.dss_hsync */
++			OMAP3_CORE1_IOPAD(0x20d8, PIN_OUTPUT | MUX_MODE0)	/* dss_vsync.dss_vsync */
++			OMAP3_CORE1_IOPAD(0x20da, PIN_OUTPUT | MUX_MODE0)	/* dss_acbias.dss_acbias */
++			OMAP3_CORE1_IOPAD(0x20dc, PIN_OUTPUT | MUX_MODE0)	/* dss_data0.dss_data0 */
++			OMAP3_CORE1_IOPAD(0x20de, PIN_OUTPUT | MUX_MODE0)	/* dss_data1.dss_data1 */
++			OMAP3_CORE1_IOPAD(0x20e0, PIN_OUTPUT | MUX_MODE0)	/* dss_data2.dss_data2 */
++			OMAP3_CORE1_IOPAD(0x20e2, PIN_OUTPUT | MUX_MODE0)	/* dss_data3.dss_data3 */
++			OMAP3_CORE1_IOPAD(0x20e4, PIN_OUTPUT | MUX_MODE0)	/* dss_data4.dss_data4 */
++			OMAP3_CORE1_IOPAD(0x20e6, PIN_OUTPUT | MUX_MODE0)	/* dss_data5.dss_data5 */
++			OMAP3_CORE1_IOPAD(0x20e8, PIN_OUTPUT | MUX_MODE0)	/* dss_data6.dss_data6 */
++			OMAP3_CORE1_IOPAD(0x20ea, PIN_OUTPUT | MUX_MODE0)	/* dss_data7.dss_data7 */
++			OMAP3_CORE1_IOPAD(0x20ec, PIN_OUTPUT | MUX_MODE0)	/* dss_data8.dss_data8 */
++			OMAP3_CORE1_IOPAD(0x20ee, PIN_OUTPUT | MUX_MODE0)	/* dss_data9.dss_data9 */
++			OMAP3_CORE1_IOPAD(0x20f0, PIN_OUTPUT | MUX_MODE0)	/* dss_data10.dss_data10 */
++			OMAP3_CORE1_IOPAD(0x20f2, PIN_OUTPUT | MUX_MODE0)	/* dss_data11.dss_data11 */
++			OMAP3_CORE1_IOPAD(0x20f4, PIN_OUTPUT | MUX_MODE0)	/* dss_data12.dss_data12 */
++			OMAP3_CORE1_IOPAD(0x20f6, PIN_OUTPUT | MUX_MODE0)	/* dss_data13.dss_data13 */
++			OMAP3_CORE1_IOPAD(0x20f8, PIN_OUTPUT | MUX_MODE0)	/* dss_data14.dss_data14 */
++			OMAP3_CORE1_IOPAD(0x20fa, PIN_OUTPUT | MUX_MODE0)	/* dss_data15.dss_data15 */
++			OMAP3_CORE1_IOPAD(0x20fc, PIN_OUTPUT | MUX_MODE0)	/* dss_data16.dss_data16 */
++			OMAP3_CORE1_IOPAD(0x20fe, PIN_OUTPUT | MUX_MODE0)	/* dss_data17.dss_data17 */
++			OMAP3_CORE1_IOPAD(0x2100, PIN_OUTPUT | MUX_MODE0)	/* dss_data18.dss_data18 */
++			OMAP3_CORE1_IOPAD(0x2102, PIN_OUTPUT | MUX_MODE0)	/* dss_data19.dss_data19 */
++			OMAP3_CORE1_IOPAD(0x2104, PIN_OUTPUT | MUX_MODE0)	/* dss_data20.dss_data20 */
++			OMAP3_CORE1_IOPAD(0x2106, PIN_OUTPUT | MUX_MODE0)	/* dss_data21.dss_data21 */
++			OMAP3_CORE1_IOPAD(0x2108, PIN_OUTPUT | MUX_MODE0)	/* dss_data22.dss_data22 */
++			OMAP3_CORE1_IOPAD(0x210a, PIN_OUTPUT | MUX_MODE0)	/* dss_data23.dss_data23 */
++		>;
++	};
++
++	lte430_pins: pinmux_lte430_pins {
++		pinctrl-single,pins = <
++			OMAP3_CORE1_IOPAD(0x2168, PIN_OUTPUT | MUX_MODE4)	/* sdmmc2_dat6.gpio_138 */
++		>;
++	};
++
++	backlight_pins: pinmux_backlight_pins {
++		pinctrl-single,pins = <
++			OMAP3_CORE1_IOPAD(0x216a, PIN_OUTPUT | MUX_MODE4)	/* sdmmc2_dat7.gpio_139 */
++		>;
++	};
++};
++
++/* I2C2: mux'ed with GPIO168 which is connected to nKILL_POWER */
++&i2c2 {
++	status = "disabled";
 +};
 +
 +&i2c3 {
@@ -221,155 +248,105 @@ index 0000000..b30f387
 +	pinctrl-0 = <&i2c3_pins>;
 +};
 +
-+&mcspi1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&mcspi1_pins>;
-+
-+	spidev at 0 {
-+		compatible = "spidev";
-+		spi-max-frequency = <48000000>;
-+		reg = <0>;
-+		spi-cpha;
-+	};
-+};
-+
-+&mcspi3 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&mcspi3_pins>;
-+
-+	spidev at 0 {
-+		compatible = "spidev";
-+		spi-max-frequency = <48000000>;
-+		reg = <0>;
-+		spi-cpha;
-+	};
-+};
-+
-+#include "twl4030.dtsi"
-+#include "twl4030_omap3.dtsi"
-+
-+&mmc1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&mmc1_pins>;
-+	vmmc-supply = <&vmmc1>;
-+	vmmc_aux-supply = <&vsim>;
-+	cd-gpios = <&twl_gpio 0 0>;
-+	bus-width = <8>;
-+};
-+
-+// WiFi (Marvell 88W8686) on MMC2/SDIO
-+&mmc2 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&mmc2_pins>;
-+	vmmc-supply = <&mmc2_sdio_poweron>;
-+	non-removable;
-+	bus-width = <4>;
-+	cap-power-off-card;
-+};
-+
-+&mmc3 {
-+	status = "disabled";
-+};
-+
-+&usbhshost {
-+	port2-mode = "ehci-phy";
-+};
-+
-+&usbhsehci {
-+	phys = <0 &hsusb2_phy>;
-+};
-+
-+&twl_gpio {
-+	ti,use-leds;
-+	/* pullups: BIT(1) */
-+	ti,pullups = <0x000002>;
-+	/*
-+	 * pulldowns:
-+	 * BIT(2), BIT(6), BIT(7), BIT(8), BIT(13)
-+	 * BIT(15), BIT(16), BIT(17)
-+	 */
-+	ti,pulldowns = <0x03a1c4>;
-+};
-+
-+&uart3 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&uart3_pins>;
-+};
-+
-+&mcbsp3 {
-+	status = "okay";
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&mcbsp3_pins>;
-+};
-+
-+&gpmc {
-+	ranges = <0 0 0x00000000 0x01000000>;
-+
-+	nand at 0,0 {
-+		reg = <0 0 0>; /* CS0, offset 0 */
-+		nand-bus-width = <16>;
-+		gpmc,device-width = <2>;	/* GPMC_DEVWIDTH_16BIT */
-+		ti,nand-ecc-opt = "sw";
-+
-+		gpmc,cs-on-ns = <0>;
-+		gpmc,cs-rd-off-ns = <36>;
-+		gpmc,cs-wr-off-ns = <36>;
-+		gpmc,adv-on-ns = <6>;
-+		gpmc,adv-rd-off-ns = <24>;
-+		gpmc,adv-wr-off-ns = <36>;
-+		gpmc,oe-on-ns = <6>;
-+		gpmc,oe-off-ns = <48>;
-+		gpmc,we-on-ns = <6>;
-+		gpmc,we-off-ns = <30>;
-+		gpmc,rd-cycle-ns = <72>;
-+		gpmc,wr-cycle-ns = <72>;
-+		gpmc,access-ns = <54>;
-+		gpmc,wr-access-ns = <30>;
-+
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+
-+		x-loader at 0 {
-+			label = "X-Loader";
-+			reg = <0 0x80000>;
-+		};
-+
-+		bootloaders at 80000 {
-+			label = "U-Boot";
-+			reg = <0x80000 0x1e0000>;
-+		};
-+
-+		bootloaders_env at 260000 {
-+			label = "U-Boot Env";
-+			reg = <0x260000 0x20000>;
-+		};
-+
-+		kernel at 280000 {
-+			label = "Kernel";
-+			reg = <0x280000 0x400000>;
-+		};
-+
-+		filesystem at 680000 {
-+			label = "File System";
-+			reg = <0x680000 0xf980000>;
-+		};
-+	};
-+};
-+
-+&usb_otg_hs {
-+	interface-type = <0>;
-+	usb-phy = <&usb2_phy>;
-+	phys = <&usb2_phy>;
-+	phy-names = "usb2-phy";
-+	mode = <3>;
-+	power = <50>;
-+};
-+
-+&vaux2 {
-+	regulator-name = "vdd_ehci";
-+	regulator-min-microvolt = <1800000>;
-+	regulator-max-microvolt = <1800000>;
++/* Needed to power the DPI pins */
++&vpll2 {
 +	regulator-always-on;
++};
++
++&dss {
++	status = "ok";
++
++	pinctrl-names = "default";
++	pinctrl-0 = <&dss_dpi_pins>;
++
++	port {
++		dpi_out: endpoint {
++			remote-endpoint = <&lcd_in>;
++			data-lines = <24>;
++		};
++	};
++};
++
++/ {
++	aliases {
++		display0 = &lcd0;
++	};
++
++	lcd0: display at 0 {
++		compatible = "panel-dpi";
++		label = "lcd";
++
++		pinctrl-names = "default";
++		pinctrl-0 = <&lte430_pins>;
++		enable-gpios = <&gpio5 10 GPIO_ACTIVE_LOW>;	/* gpio_138 */
++
++		port {
++			lcd_in: endpoint {
++				remote-endpoint = <&dpi_out>;
++			};
++		};
++
++		panel-timing {
++			clock-frequency = <31250000>;
++			hactive = <800>;
++			vactive = <480>;
++			hfront-porch = <40>;
++			hback-porch = <86>;
++			hsync-len = <1>;
++			vback-porch = <30>;
++			vfront-porch = <13>;
++			vsync-len = <3>;
++
++			hsync-active = <0>;
++			vsync-active = <0>;
++			de-active = <1>;
++			pixelclk-active = <1>;
++		};
++	};
++
++	backlight {
++		compatible = "gpio-backlight";
++
++		pinctrl-names = "default";
++		pinctrl-0 = <&backlight_pins>;
++		gpios = <&gpio5 11 GPIO_ACTIVE_HIGH>;		/* gpio_139 */
++
++		default-on;
++	};
++};
+diff --git a/arch/arm/boot/dts/omap3-ha.dts b/arch/arm/boot/dts/omap3-ha.dts
+new file mode 100644
+index 0000000..fde3256
+--- /dev/null
++++ b/arch/arm/boot/dts/omap3-ha.dts
+@@ -0,0 +1,28 @@
++/*
++ * Copyright (C) 2012 Texas Instruments Incorporated - http://www.ti.com/
++ * Copyright (C) 2014 Stefan Roese <sr@denx.de>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++
++#include "omap3-ha-common.dtsi"
++
++/ {
++	model = "TI OMAP3 HEAD acoustics baseboard with TAO3530 SOM";
++	compatible = "headacoustics,omap3-ha", "technexion,omap3-tao3530", "ti,omap34xx", "ti,omap3";
++};
++
++&omap3_pmx_core {
++	pinctrl-names = "default";
++	pinctrl-0 = <
++		&hsusbb2_pins
++		&powerdown_input_pins
++		&fpga_boot0_pins
++		&fpga_boot1_pins
++		&led_blue_pins
++		&led_green_pins
++		&led_red_pins
++	>;
 +};
 -- 
 2.1.0
