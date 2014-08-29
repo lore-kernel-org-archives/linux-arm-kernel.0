@@ -1,42 +1,86 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 29 Aug 2014 07:53:14 +0200
-Subject: [PATCH 3/4] gpio: syscon: reuse for keystone 2 socs
-In-Reply-To: <1407946582-20927-4-git-send-email-grygorii.strashko@ti.com>
-References: <1407946582-20927-1-git-send-email-grygorii.strashko@ti.com>
- <1407946582-20927-4-git-send-email-grygorii.strashko@ti.com>
-Message-ID: <CACRpkdb-JYAu39wE9_Byeh4FUgitB_TJmr+HrNOGFSAu82wk7A@mail.gmail.com>
+From: bjorn.andersson@sonymobile.com (Bjorn Andersson)
+Date: Thu, 28 Aug 2014 23:01:00 -0700
+Subject: [PATCH v2 1/3] pinctrl: qcom: Add APQ8084 pinctrl support
+In-Reply-To: <1409057156-1201-2-git-send-email-gdjakov@mm-sol.com>
+References: <1409057156-1201-1-git-send-email-gdjakov@mm-sol.com>
+ <1409057156-1201-2-git-send-email-gdjakov@mm-sol.com>
+Message-ID: <20140829060059.GG12494@sonymobile.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 13, 2014 at 6:16 PM, Grygorii Strashko
-<grygorii.strashko@ti.com> wrote:
+On Tue 26 Aug 05:45 PDT 2014, Georgi Djakov wrote:
 
-> On Keystone SOCs, ARM host can send interrupts to DSP cores using the
-> DSP GPIO controller IP. Each DSP GPIO controller provides 28 IRQ signals for
-> each DSP core. This is one of the component used by the IPC mechanism used
-> on Keystone SOCs.
->
-> Keystone 2 DSP GPIO controller has specific features:
-> - each GPIO can be configured only as output pin;
-> - setting GPIO value to 1 causes IRQ generation on target DSP core;
-> - reading pin value returns 0 - if IRQ was handled or 1 - IRQ is still
->   pending.
->
-> This patch updates gpio-syscon driver to be reused by Keystone 2 SoCs,
-> because the Keystone 2 DSP GPIO controller is controlled through Syscon
-> devices and, as requested by Linus Walleij, such kind of GPIO controllers
-> should be integrated with drivers/gpio/gpio-syscon.c driver.
->
-> Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
+Hi Georgi,
 
-OK overall I'm getting used to the idea of merging this.
+Sorry for missing this before, but I did a quick walkthrough and unfortunately
+the gpio configuration needs a few updates.
 
-> +#ifdef CONFIG_ARCH_KEYSTONE
-(...)
-> +#endif
+> diff --git a/drivers/pinctrl/qcom/pinctrl-apq8084.c b/drivers/pinctrl/qcom/pinctrl-apq8084.c
+[...]
+> +
+> +#define PINGROUP(id, f1, f2, f3, f4, f5, f6, f7)        \
+> +       {                                               \
+> +               .name = "gpio" #id,                     \
+> +               .pins = gpio##id##_pins,                \
+> +               .npins = ARRAY_SIZE(gpio##id##_pins),   \
+> +               .funcs = (int[]){                       \
+> +                       APQ_MUX_gpio,                   \
+> +                       APQ_MUX_##f1,                   \
+> +                       APQ_MUX_##f2,                   \
+> +                       APQ_MUX_##f3,                   \
+> +                       APQ_MUX_##f4,                   \
+> +                       APQ_MUX_##f5,                   \
+> +                       APQ_MUX_##f6,                   \
+> +                       APQ_MUX_##f7                    \
+> +               },                                      \
+> +               .nfuncs = 8,                            \
+> +               .ctl_reg = 0x1000 + 0x10 * id,          \
+> +               .io_reg = 0x1004 + 0x10 * id,           \
+> +               .intr_cfg_reg = 0x1008 + 0x10 * id,     \
+> +               .intr_status_reg = 0x100c + 0x10 * id,  \
+> +               .intr_target_reg = 0x400 + 0x4 * id,    \
 
-Can you please remove the ifdefs. I don't mind the minimal growth
-in footprint, and it makes the code simpler to read.
+The routing of the interrupt is specified in TLMM_GPIO_INTR_CFG(n),
+i.e: 0x1008 + 0x10 * n
 
-Yours,
-Linus Walleij
+Apparently the HW guys wanted to give us more work, so in 8084 they use 3 to
+specify routing the interrupts to KPSS, instead of the previous 4. So the
+static define of INTR_TARGET_PROC_APPS is no longer adequate.
+
+My suggestion is that you create an additional patch and add to your series
+that moves todays hardcoded 4 into the soc_data for the existing platforms (or
+include it in this struct).
+
+> +               .mux_bit = 2,                           \
+> +               .pull_bit = 0,                          \
+> +               .drv_bit = 6,                           \
+> +               .oe_bit = 9,                            \
+> +               .in_bit = 0,                            \
+> +               .out_bit = 1,                           \
+> +               .intr_enable_bit = 0,                   \
+> +               .intr_status_bit = 0,                   \
+> +               .intr_ack_high = 1,                     \
+
+With the 8084 TLMM chip you ack the interrupt status by clearing this bit, so
+intr_ack_high should be 0.
+
+> +               .intr_target_bit = 0,                   \
+
+Target bit is 5.
+
+> +               .intr_raw_status_bit = 3,               \
+
+Raw interrupt status bit is 4.
+
+> +               .intr_polarity_bit = 1,                 \
+> +               .intr_detection_bit = 2,                \
+> +               .intr_detection_width = 1,              \
+
+You can do level, raise, fall and both edge detection with 8084, so the width
+of his part is 2.
+
+> +       }
+> +
+
+Regards,
+Bjorn
