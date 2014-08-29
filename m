@@ -1,48 +1,40 @@
 From: pramod.gurav@smartplayin.com (Pramod Gurav)
-Date: Thu, 28 Aug 2014 20:22:48 -0700
-Subject: [PATCH 2/4] ARM: DT: APQ8064: Add node for ps_hold function in pinctrl
+Date: Thu, 28 Aug 2014 20:22:49 -0700
+Subject: [PATCH 3/4] pinctrl: msm: Add ps_hold function in pinctrl-apq8064
+ binding documentation
 In-Reply-To: <1409282570-27299-1-git-send-email-pramod.gurav@smartplayin.com>
 References: <1409282570-27299-1-git-send-email-pramod.gurav@smartplayin.com>
-Message-ID: <1409282570-27299-3-git-send-email-pramod.gurav@smartplayin.com>
+Message-ID: <1409282570-27299-4-git-send-email-pramod.gurav@smartplayin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds DT support to configure GPIO_78 as function ps_hold
-on apq8064.
+This adds a function ps_hold (Power Suppy Hold Signal) in pinctrl-ap8064
+documentation which was missing. This function is used to reset the targets
+with apq8064 soc.
 
-CC: Rob Herring <robh+dt@kernel.org>
-CC: Pawel Moll <pawel.moll@arm.com>
-CC: Mark Rutland <mark.rutland@arm.com>
-CC: Ian Campbell <ijc+devicetree@hellion.org.uk>
-CC: Kumar Gala <galak@codeaurora.org>
-CC: devicetree at vger.kernel.org
-CC: linux-arm-kernel at lists.infradead.org
+CC: Linus Walleij <linus.walleij@linaro.org>
+CC: Bjorn Andersson <bjorn.andersson@sonymobile.com>
+CC: "Ivan T. Ivanov" <iivanov@mm-sol.com>
+CC: Stephen Boyd <sboyd@codeaurora.org>
+CC: Andy Gross <agross@codeaurora.org>
 
 Signed-off-by: Pramod Gurav <pramod.gurav@smartplayin.com>
 ---
- arch/arm/boot/dts/qcom-apq8064.dtsi |   10 ++++++++++
- 1 files changed, 10 insertions(+), 0 deletions(-)
+ .../bindings/pinctrl/qcom,apq8064-pinctrl.txt      |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/boot/dts/qcom-apq8064.dtsi b/arch/arm/boot/dts/qcom-apq8064.dtsi
-index e23303e..35c1907 100644
---- a/arch/arm/boot/dts/qcom-apq8064.dtsi
-+++ b/arch/arm/boot/dts/qcom-apq8064.dtsi
-@@ -82,6 +82,16 @@
- 			interrupt-controller;
- 			#interrupt-cells = <2>;
- 			interrupts = <0 16 IRQ_TYPE_LEVEL_HIGH>;
-+
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&ps_hold>;
-+
-+			ps_hold: ps_hold {
-+				mux {
-+					pins = "gpio78";
-+					function = "ps_hold";
-+				};
-+			};
- 		};
+diff --git a/Documentation/devicetree/bindings/pinctrl/qcom,apq8064-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/qcom,apq8064-pinctrl.txt
+index 0211c6d..ca5bfa5 100644
+--- a/Documentation/devicetree/bindings/pinctrl/qcom,apq8064-pinctrl.txt
++++ b/Documentation/devicetree/bindings/pinctrl/qcom,apq8064-pinctrl.txt
+@@ -50,7 +50,7 @@ Valid values for function are:
+   gsbi4_cam_i2c, gsbi5, gsbi5_spi_cs1, gsbi5_spi_cs2, gsbi5_spi_cs3, gsbi6,
+   gsbi6_spi_cs1, gsbi6_spi_cs2, gsbi6_spi_cs3, gsbi7, gsbi7_spi_cs1,
+   gsbi7_spi_cs2, gsbi7_spi_cs3, gsbi_cam_i2c, hdmi, mi2s, riva_bt, riva_fm,
+-  riva_wlan, sdc2, sdc4, slimbus, spkr_i2s, tsif1, tsif2, usb2_hsic,
++  riva_wlan, sdc2, sdc4, slimbus, spkr_i2s, tsif1, tsif2, usb2_hsic, ps_hold
  
- 		intc: interrupt-controller at 2000000 {
+ Example:
+ 
 -- 
 1.7.0.4
