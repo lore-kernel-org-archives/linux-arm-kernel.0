@@ -1,67 +1,145 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Fri, 29 Aug 2014 14:39:06 +0200
-Subject: CPUIdle Armada 370
-In-Reply-To: <1409315625788.95950@vitec.com>
-References: <1407333701627.99622@vitec.com>
- <53E24654.6020008@free-electrons.com> <53E249A1.900@free-electrons.com>
- <53E24D2A.50706@free-electrons.com> <1407340917231.68970@vitec.com>
- <53E25369.60809@free-electrons.com> <1407341774154.51157@vitec.com>
- <53E34744.6080300@free-electrons.com> <20140807132132.GD19574@lunn.ch>,
- <53E390D3.7060805@vitec.com> <1409315625788.95950@vitec.com>
-Message-ID: <5400746A.6030605@free-electrons.com>
+From: nm@ti.com (Nishanth Menon)
+Date: Fri, 29 Aug 2014 07:41:57 -0500
+Subject: [PATCH] mfd: palmas: Add support for optional wakeup
+In-Reply-To: <20140829105619.GH24579@lee--X1>
+References: <1408457197-30487-1-git-send-email-nm@ti.com>
+ <20140829105619.GH24579@lee--X1>
+Message-ID: <54007515.5080506@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Nicolas,
-
-On 29/08/2014 14:33, Nicolas Derouineau wrote:
-> Hello,
-
-> In the end, cpuidle works perfectly fine with the 88F6707 and the
-> 88F6W11 model. I guess something was wrong in my configuration
-> and/or my build process, but now everything's fine. Thanks for your
-> help !
-
-I am happy that it finally works for you and thanks to have kept us
-updated.
-
-Gregory
-
-> Nicolas
-> ________________________________________
-> De : Simon Boulay
-> Envoy? : jeudi 7 ao?t 2014 16:44
-> ? : Andrew Lunn; Gregory CLEMENT
-> Cc : Nicolas Derouineau; Thomas Petazzoni; linux-arm-kernel at lists.infradead.org
-> Objet : Re: CPUIdle Armada 370
+On 08/29/2014 05:56 AM, Lee Jones wrote:
+> On Tue, 19 Aug 2014, Nishanth Menon wrote:
 > 
-> Hi,
-> 
-> On 08/07/2014 03:21 PM, Andrew Lunn wrote:
->>> However I noticed that your base register is 0xf1000000 whereas until now we only
->>> test on platform which have 0xd0000000. Even if the cpu ilde path should not have
->>> any hardcoded value, it could be something to explore.
+>> With the recent pinctrl-single changes, omaps can treat wake-up events
+>> from deeper idle states as interrupts.
 >>
->> This would imply it is a different version of u-boot. Maybe that could
->> have something to do with it?
+>> Let's add support for the optional second interrupt for wake-up
+>> events. And then SoC can wakeup and handle the event using it's
+>> regular handler.
+>>
+>> Finally, to pass the wake-up interrupt in the dts file,
+>> interrupts-extended property needs to be passed.
+>>
+>> This is similar in approach to commit 2a0b965cfb6e ("serial: omap: Add
+>> support for optional wake-up")
+>>
+>> Signed-off-by: Nishanth Menon <nm@ti.com>
+>> ---
+>>  Documentation/devicetree/bindings/mfd/palmas.txt |   20 ++++++++
 > 
-> Our u-boot is based on Marvell's BSP 2014_T1.0. It seems that 0xf1000000
-> is the default, now.
-> For the record we have designed two boards. One is based on the 88F6707
-> and the other is based on the 88F6W11 (which is detected as a 88F6710).
-> We also have an Armada 370 RD board.
+> DT Ack please.
 > 
-> The plan is that Nicolas will make cpuidle support work on the Armada
-> 370 RD first. Then we will try to make it work on our boards.
+>>  drivers/mfd/palmas.c                             |   59 ++++++++++++++++++++++
+>>  include/linux/mfd/palmas.h                       |    2 +
+>>  3 files changed, 81 insertions(+)
+>>
+>> diff --git a/Documentation/devicetree/bindings/mfd/palmas.txt b/Documentation/devicetree/bindings/mfd/palmas.txt
+>> index eda8989..2627842 100644
+>> --- a/Documentation/devicetree/bindings/mfd/palmas.txt
+>> +++ b/Documentation/devicetree/bindings/mfd/palmas.txt
+>> @@ -51,3 +51,23 @@ palmas {
+>>  		....
+>>  	};
+>>  }
+>> +
+>> +Example: with interrupts extended
+>> + See Documentation/devicetree/bindings/interrupt-controller/interrupts.txt
+>> + Use pinmux 0x418 as wakeup interrupt and gpio1_0 as interrupt source
+>> +
+>> +palmas {
 > 
-> Thanks,
-> 
-> Simon
-> 
+> Should this be 'palmas at 40 {'?
 
+I might have preferred that as well.. I kept the existing style in the
+documentation. Would you like me to change existing doc style too?
+
+> 
+>> +	compatible = "ti,twl6035", "ti,palmas";
+>> +	reg = <0x48>
+>> +	interrupt-parent = <&intc>;
+>> +	interrupt-controller;
+>> +	#interrupt-cells = <2>;
+>> +	#address-cells = <1>;
+>> +	#size-cells = <0>;
+>> +	interrupts-extended = <&gpio1 0 IRQ_TYPE_LEVEL_HIGH
+>> +			       &pinmux 0x418>;
+> 
+> Can I get a DT Ack, that this is being used correctly?  It doesn't
+> match the syntax given in:
+> 
+>   Documentation/devicetree/bindings/interrupt-controller/interrupts.txt
+Did you mean:
+<&gpio1 0 IRQ_TYPE_LEVEL_HIGH>, <&pinmux 0x418>;
+
+Yes, I can fix that - sorry, both usage seem to be functional.
+
+> 
+>> +	pmic {
+>> +		compatible = "ti,twl6035-pmic", "ti,palmas-pmic";
+>> +		....
+>> +	};
+>> +}
+>> diff --git a/drivers/mfd/palmas.c b/drivers/mfd/palmas.c
+>> index 28cb048..11186ab 100644
+>> --- a/drivers/mfd/palmas.c
+>> +++ b/drivers/mfd/palmas.c
+>> @@ -24,6 +24,7 @@
+>>  #include <linux/mfd/core.h>
+>>  #include <linux/mfd/palmas.h>
+>>  #include <linux/of_device.h>
+>> +#include <linux/of_irq.h>
+>>  
+>>  static const struct regmap_config palmas_regmap_config[PALMAS_NUM_CLIENTS] = {
+>>  	{
+>> @@ -326,6 +327,16 @@ static struct regmap_irq_chip tps65917_irq_chip = {
+>>  			PALMAS_INT1_MASK),
+>>  };
+>>  
+>> +static irqreturn_t palmas_wake_irq(int irq, void *_palmas)
+>> +{
+>> +	/*
+>> +	 * Return Not handled so that interrupt is disabled.
+>> +	 * Level event ensures that the event is eventually handled
+>> +	 * by the appropriate chip handler already registered
+>> +	 */
+> 
+> This looks okay to me, but could do with a second opinion from someone
+> who is a little more familier with this kind of h/w.
+> 
+> How does this differ from threading IRQs?
+
+I could try with an example:
+consider a GPIO block 7 gpio 4 connected to a pinctrl pin 234 as the
+interrupt source for palmas.
+
+When the system is active, the GPIO block 7, gpio 4 happily functions
+as the interrupt source. However, the SoC might not capable of
+achieving SoC wide deepsleep when GPIO block 7 is active, So we have
+to power off GPIO block 7. However on achieving low power, the system
+needs to be capable of waking backup, for this, SoC uses the hardware
+at the pin itself(TI calls it control module, others have other names,
+lets for the discussion, call it pinctrl), on going to sleep the
+action of enabling the pinctrl irq - enables the wakeup capability of
+the pin, and disabling it disabled the wakeup capability. when the
+wakeup event does take place, in some cases, it might be a edge event,
+where by the time we have recofigured GPIO block, the interrupt event
+is long gone - to support this, pinctrl invokes the driver interrupt
+handler to ensure this functions. in our case(palmas), we are level
+event and can depend on GPIO block to handle it when it is configured.
+
+Basically two interrupt sources when SoC is in deep sleep(1 to exit
+from deepsleep, and other from the module handling the actual event) -
+Example: powerbutton press OR palmas RTC wakeup OR Palmas GPIO
+generated wakeup.
+
+However, this is not the same as threading IRQ as the wakeup event is
+involved only during suspend path.
+
+commit 2a0b965cfb6e ("serial: omap: Add support for optional wake-up")
+
+is a good reference from serial port handling perspective.
 
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Regards,
+Nishanth Menon
