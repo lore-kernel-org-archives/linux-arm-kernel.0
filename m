@@ -1,58 +1,48 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 29 Aug 2014 18:57:22 +0100
-Subject: [PATCH 2/2] efi/arm64: use UEFI for system reset
-In-Reply-To: <CAKv+Gu-u6Q_t9yU4Cb=0-XmEkmejuMwpy2AN8cBABUHEZxg4dg@mail.gmail.com>
-References: <1409324757-12607-1-git-send-email-ard.biesheuvel@linaro.org>
- <1409324757-12607-2-git-send-email-ard.biesheuvel@linaro.org>
- <20140829160448.GF4995@arm.com>
- <CAKv+Gu-u6Q_t9yU4Cb=0-XmEkmejuMwpy2AN8cBABUHEZxg4dg@mail.gmail.com>
-Message-ID: <20140829175722.GE18555@leverpostej>
+From: soren.brinkmann@xilinx.com (Soren Brinkmann)
+Date: Fri, 29 Aug 2014 10:58:44 -0700
+Subject: [PATCH 0/3] gpio: zynq: Fix suspend/wake
+Message-ID: <1409335127-26712-1-git-send-email-soren.brinkmann@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 29, 2014 at 05:12:48PM +0100, Ard Biesheuvel wrote:
-> On 29 August 2014 18:04, Catalin Marinas <catalin.marinas@arm.com> wrote:
-> > On Fri, Aug 29, 2014 at 04:05:57PM +0100, Ard Biesheuvel wrote:
-> >> If UEFI Runtime Services are available, they are preferred over direct
-> >> PSCI calls or other methods to reset the system.
-> >>
-> >> For the reset case, we need to hook into machine_restart(), as the
-> >> arm_pm_restart function pointer may be overwritten by modules.
-> >>
-> >> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> >> ---
-> >>  arch/arm64/kernel/process.c | 7 +++++++
-> >>  1 file changed, 7 insertions(+)
-> >>
-> >> diff --git a/arch/arm64/kernel/process.c b/arch/arm64/kernel/process.c
-> >> index 1309d64aa926..335a93da5eeb 100644
-> >> --- a/arch/arm64/kernel/process.c
-> >> +++ b/arch/arm64/kernel/process.c
-> >> @@ -177,6 +177,13 @@ void machine_restart(char *cmd)
-> >>       local_irq_disable();
-> >>       smp_send_stop();
-> >>
-> >> +     /*
-> >> +      * arm_pm_restart is exported to modules, so the only way to supersede
-> >> +      * it with efi_reboot() is to call it here.
-> >> +      */
-> >
-> > Why do you make this the preferred method? Is there a risk that UEFI is
-> > broken and we want to override it with a SoC-specific driver (I wouldn't
-> > like it but it's still an option).
-> >
-> 
-> For poweroff (the other patch), it may not make a huge difference, but
-> the SBBR does state it explicitly.
-> 
-> For reboot, we *have* to use EFI reboot in order to support capsules:
-> when using capsules (for instance, for updating the firmware), you
-> need to use EFI reboot as you need to pass the return code of
-> UpdateCapsule() (a runtime service) to ResetSystem()
+Hi Linus,
 
-Ah. Could you drop that in the commit message next time around? That's a
-far clearer (and stronger) argument than saying that the runtime
-services are preferred.
+after our discussion during the push of the gpio-zynq driver, we took a
+closer look at the LED and gpio_keys drivers.
 
-Cheers,
-Mark.
+For LEDs and other simple use-cases where you need to control an output,
+that driver is great and a patch to get the LEDs on our boards added to
+DT is pending.
+
+For the keys, and especially wake, things didn't look that good. Testing
+revealed a couple of flaws in the driver's wake-related implementation
+which should be fixed with this series.
+
+I'm still not fully convinced that the gpio_keys are the best
+replacement for the sysfs interface when it comes to inputs. For that
+reason and to have a way to do some quick wake testing, I'd like to
+propose adding the ability to control wake through the sysfs interface
+(patch 3).
+
+The series is based on Linus T's current tip + the Zynq-related patches
+from gpio/for-next + Lars' pending patch 'gpio: zynq: Take bank
+offset into account when reporting a IRQ'.
+A branch with all those patches can be found here:
+https://github.com/sorenb-xlnx/linux-xlnx/commits/gpio
+
+	Thanks,
+	S?ren
+
+Ezra Savard (2):
+  gpio: zynq: Mask non-wakeup GPIO interrupts on suspend
+  gpio: zynq: Fixed broken wakeup implementation
+
+Soren Brinkmann (1):
+  gpio: lib-sysfs: Add 'wakeup' attribute
+
+ drivers/gpio/gpio-zynq.c     | 38 +++++++++++++---------
+ drivers/gpio/gpiolib-sysfs.c | 75 ++++++++++++++++++++++++++++++++++++++++----
+ 2 files changed, 92 insertions(+), 21 deletions(-)
+
+-- 
+2.1.0.1.g27b9230
