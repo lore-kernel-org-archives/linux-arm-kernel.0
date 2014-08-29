@@ -1,37 +1,61 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Fri, 29 Aug 2014 12:49:26 -0700
-Subject: [PATCH] clk: qcom: Fix sdc 144kHz frequency entry
-Message-ID: <1409341766-24366-1-git-send-email-sboyd@codeaurora.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 29 Aug 2014 21:53:42 +0200
+Subject: [PATCH v4 3/5] ARM: tegra: Initialize interrupt controller from DT
+In-Reply-To: <20140829150422.GA11035@ulmo>
+References: <1409239879-12376-1-git-send-email-thierry.reding@gmail.com>
+ <20140829142408.GA31264@ulmo> <20140829150422.GA11035@ulmo>
+Message-ID: <3113165.EcqFA5vr07@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The pre-divider for the sdc clocks only has 2 bits in it, so we
-can't possibly divide by anything larger than 4 here.
-Furthermore, we program the value of ~(n - m) and the n value is
-larger than 8 bits (max of 256). Replace this entry with 200kHz
-which is close enough to 144kHz to be usable.
+On Friday 29 August 2014 17:04:28 Thierry Reding wrote:
+>         static struct irq_chip *extn;
+> 
+>         void gic_arch_register(const struct irqchip *chip)
+>         {
+>                 if (WARN(extn != NULL))
+>                         return;
+> 
+>                 gic_chip.flags |= chip->flags;
+>                 extn = chip;
+>         }
+> 
+> Any preferences, or other ideas? Adding Thomas and Jason, perhaps they
+> can provide more input on how to solve this.
 
-Cc: Kumar Gala <galak@codeaurora.org>
-Cc: Andy Gross <agross@codeaurora.org>
-Fixes: 24d8fba44af3 "clk: qcom: Add support for IPQ8064's global clock controller (GCC)"
-Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
----
- drivers/clk/qcom/gcc-ipq806x.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+I think the entire gic_arch_extn method is done in a rather odd way
+and we should try to come up with a replacement.
 
-diff --git a/drivers/clk/qcom/gcc-ipq806x.c b/drivers/clk/qcom/gcc-ipq806x.c
-index 4032e510d9aa..3b83b7dd78c7 100644
---- a/drivers/clk/qcom/gcc-ipq806x.c
-+++ b/drivers/clk/qcom/gcc-ipq806x.c
-@@ -1095,7 +1095,7 @@ static struct clk_branch prng_clk = {
- };
- 
- static const struct freq_tbl clk_tbl_sdc[] = {
--	{    144000, P_PXO,   5, 18,625 },
-+	{    200000, P_PXO,   2, 2, 125 },
- 	{    400000, P_PLL8,  4, 1, 240 },
- 	{  16000000, P_PLL8,  4, 1,   6 },
- 	{  17070000, P_PLL8,  1, 2,  45 },
--- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by The Linux Foundation
+These are the users at the moment:
+
+arch/arm/mach-exynos/pm.c:      gic_arch_extn.irq_set_wake = exynos_irq_set_wake;
+arch/arm/mach-imx/gpc.c:        gic_arch_extn.irq_mask = imx_gpc_irq_mask;
+arch/arm/mach-imx/gpc.c:        gic_arch_extn.irq_unmask = imx_gpc_irq_unmask;
+arch/arm/mach-imx/gpc.c:        gic_arch_extn.irq_set_wake = imx_gpc_irq_set_wake;
+arch/arm/mach-omap2/omap-wakeupgen.c:   gic_arch_extn.irq_mask = wakeupgen_mask;
+arch/arm/mach-omap2/omap-wakeupgen.c:   gic_arch_extn.irq_unmask = wakeupgen_unmask;
+arch/arm/mach-omap2/omap-wakeupgen.c:   gic_arch_extn.flags = IRQCHIP_MASK_ON_SUSPEND | IRQCHIP_SKIP_SET_W
+arch/arm/mach-shmobile/intc-sh73a0.c:   gic_arch_extn.irq_set_wake = sh73a0_set_wake;
+arch/arm/mach-shmobile/setup-r8a7779.c: gic_arch_extn.irq_set_wake = r8a7779_set_wake;
+arch/arm/mach-tegra/irq.c:      gic_arch_extn.irq_ack = tegra_ack;
+arch/arm/mach-tegra/irq.c:      gic_arch_extn.irq_eoi = tegra_eoi;
+arch/arm/mach-tegra/irq.c:      gic_arch_extn.irq_mask = tegra_mask;
+arch/arm/mach-tegra/irq.c:      gic_arch_extn.irq_unmask = tegra_unmask;
+arch/arm/mach-tegra/irq.c:      gic_arch_extn.irq_retrigger = tegra_retrigger;
+arch/arm/mach-tegra/irq.c:      gic_arch_extn.irq_set_wake = tegra_set_wake;
+arch/arm/mach-tegra/irq.c:      gic_arch_extn.flags = IRQCHIP_MASK_ON_SUSPEND;
+arch/arm/mach-ux500/cpu.c:      gic_arch_extn.flags = IRQCHIP_SKIP_SET_WAKE | IRQCHIP_MASK_ON_SUSPEND;
+arch/arm/mach-zynq/common.c:    gic_arch_extn.flags = IRQCHIP_SKIP_SET_WAKE | IRQCHIP_MASK_ON_SUSPEND;
+
+I have to admit I don't really understand how these work, but what
+I'd expect to work better is a way to turn the gic code into more
+of a library that can be used by specialized drivers. In that
+case you would register a driver for the tegra gic using IRQCHIP_DECLARE
+and that driver would call a variation of gic_of_init() or gic_init_bases()
+with the extra stuff as arguments.
+
+We'd have to hack around the fact that all these platforms currently
+don't list a specialized compatible string, but at least for the future
+we should be able to do this without special hacks.
+
+	Arnd
