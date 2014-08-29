@@ -1,54 +1,41 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Fri, 29 Aug 2014 13:43:38 +0200
-Subject: [PATCH 2/4] clk: mvebu: armada-370: Fix timer drift caused by the
- SSCG deviation
+Date: Fri, 29 Aug 2014 13:43:40 +0200
+Subject: [PATCH 4/4] clk: mvebu: armada-375: Fix the description of the SAR in
+ the comment
 In-Reply-To: <1409312620-20631-1-git-send-email-gregory.clement@free-electrons.com>
 References: <1409312620-20631-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <1409312620-20631-3-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <1409312620-20631-5-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit activates the SSCG deviation correction for the Armada
-370. It uses the optional function introduced by the commit "clk:
-mvebu: Fix clk frequency value if SSCG is enabled".
-
-Without this fix the deviation measured on a Mirabox was of a few
-second each hour, whereas with this fix it was reduced at around
-50ppm (around 4s per day).
+For dealing with the code we use the SAR1 and not the SAR0. The code
+was correct, and now the comments too.
 
 Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 ---
- drivers/clk/mvebu/armada-370.c | 7 +++++++
- 1 file changed, 7 insertions(+)
+ drivers/clk/mvebu/armada-375.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/clk/mvebu/armada-370.c b/drivers/clk/mvebu/armada-370.c
-index bef198a83863..b084a84d8fad 100644
---- a/drivers/clk/mvebu/armada-370.c
-+++ b/drivers/clk/mvebu/armada-370.c
-@@ -23,6 +23,7 @@
+diff --git a/drivers/clk/mvebu/armada-375.c b/drivers/clk/mvebu/armada-375.c
+index c991a4d95e10..c7af2242b796 100644
+--- a/drivers/clk/mvebu/armada-375.c
++++ b/drivers/clk/mvebu/armada-375.c
+@@ -27,14 +27,14 @@
+  * all modified at the same time, and not separately as for the Armada
+  * 370 or the Armada XP SoCs.
+  *
+- * SAR0[21:17]   : CPU frequency    DDR frequency   L2 frequency
++ * SAR1[21:17]   : CPU frequency    DDR frequency   L2 frequency
+  *		 6   =  400 MHz	    400 MHz	    200 MHz
+  *		 15  =  600 MHz	    600 MHz	    300 MHz
+  *		 21  =  800 MHz	    534 MHz	    400 MHz
+  *		 25  = 1000 MHz	    500 MHz	    500 MHz
+  *		 others reserved.
+  *
+- * SAR0[22]   : TCLK frequency
++ * SAR1[22]   : TCLK frequency
+  *		 0 = 166 MHz
+  *		 1 = 200 MHz
   */
- 
- #define SARL				0	/* Low part [0:31] */
-+#define	 SARL_A370_SSCG_ENABLE		BIT(10)
- #define	 SARL_A370_PCLK_FREQ_OPT	11
- #define	 SARL_A370_PCLK_FREQ_OPT_MASK	0xF
- #define	 SARL_A370_FAB_FREQ_OPT		15
-@@ -133,10 +134,16 @@ static void __init a370_get_clk_ratio(
- 	}
- }
- 
-+bool a370_is_sscg_enabled(void __iomem *sar)
-+{
-+	return !(readl(sar) & SARL_A370_SSCG_ENABLE);
-+}
-+
- static const struct coreclk_soc_desc a370_coreclks = {
- 	.get_tclk_freq = a370_get_tclk_freq,
- 	.get_cpu_freq = a370_get_cpu_freq,
- 	.get_clk_ratio = a370_get_clk_ratio,
-+	.is_sscg_enabled = a370_is_sscg_enabled,
- 	.ratios = a370_coreclk_ratios,
- 	.num_ratios = ARRAY_SIZE(a370_coreclk_ratios),
- };
 -- 
 1.9.1
