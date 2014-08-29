@@ -1,66 +1,50 @@
 From: antoine.tenart@free-electrons.com (Antoine Tenart)
-Date: Fri, 29 Aug 2014 15:50:58 +0200
-Subject: [PATCH 0/5] ARM: Berlin: Ethernet support
-Message-ID: <1409320263-10295-1-git-send-email-antoine.tenart@free-electrons.com>
+Date: Fri, 29 Aug 2014 15:51:00 +0200
+Subject: [PATCH 2/5] Documentation: bindings: net: add the Marvell Berlin
+ Ethernet controller
+In-Reply-To: <1409320263-10295-1-git-send-email-antoine.tenart@free-electrons.com>
+References: <1409320263-10295-1-git-send-email-antoine.tenart@free-electrons.com>
+Message-ID: <1409320263-10295-3-git-send-email-antoine.tenart@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+This adds the binding documentation for the Marvell Berlin Ethernet
+controller.
 
-This series introduce the Marvell Berlin Ethernet driver, allowing to
-handle the fast Ethernet port. This driver is based on the mv643xx_eth
-driver and reuse some of its functions. While I wanted to make these
-functions common to the two drivers at first, I finally do think this
-is not a great idea:
-- Registers are very different.
-- The mv643xx_eth supports up to 1000Mbps interfaces and performance
-  issues may occur, whereas the mvberlin_eth is only for fast Ethernet.
-- The mvberlin_eth driver uses a hash table to filter incoming packets.
-- A few other differences.
-
-I tried to stay close to the mv643xx_eth implementation, so that the
-discussion is still open, but I still ended up with lots of tiny
-differences that can be hard to manage for both cases. In the end I do
-think having two separate drivers is a good choice.
-
-That being said, I tested the Ethernet communication with ICMP pings,
-netcat, tried to use some network related softwares (such as ssh). Here
-is an iperf output:
-
- ------------------------------------------------------------
- Client connecting to 192.168.0.11, TCP port 5001
- TCP window size: 85.0 KByte (default)
- ------------------------------------------------------------
- [  3] local 192.168.0.20 port 44183 connected with 192.168.0.11 port 5001
- [ ID] Interval       Transfer     Bandwidth
- [  3]  0.0-10.0 sec   113 MBytes  94.8 Mbits/sec
-
-Tests were done on a BG2Q DMP, and this series currently does not add
-other device tree nodes than the ones for this board.
-
-Thanks!
-
-Antoine
-
-
-Antoine Tenart (5):
-  net: mvberlin_eth: add an Ethernet driver for Marvell Berlin
-  Documentation: bindings: net: add the Marvell Berlin Ethernet
-    controller
-  Documentation: devicetree: net: mention Marvell Berlin
-  ARM: dts: berlin: add ethernet and mdio nodes
-  ARM: dts: berlin: enable the Ethernet port on the BG2Q DMP
-
- .../devicetree/bindings/net/marvell-berlin.txt     |   23 +
- .../devicetree/bindings/net/marvell-orion-mdio.txt |    6 +-
- arch/arm/boot/dts/berlin2q-marvell-dmp.dts         |   13 +
- arch/arm/boot/dts/berlin2q.dtsi                    |   19 +
- drivers/net/ethernet/marvell/Kconfig               |    9 +
- drivers/net/ethernet/marvell/Makefile              |    1 +
- drivers/net/ethernet/marvell/mvberlin_eth.c        | 2081 ++++++++++++++++++++
- 7 files changed, 2149 insertions(+), 3 deletions(-)
+Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
+---
+ .../devicetree/bindings/net/marvell-berlin.txt     | 23 ++++++++++++++++++++++
+ 1 file changed, 23 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/net/marvell-berlin.txt
- create mode 100644 drivers/net/ethernet/marvell/mvberlin_eth.c
 
+diff --git a/Documentation/devicetree/bindings/net/marvell-berlin.txt b/Documentation/devicetree/bindings/net/marvell-berlin.txt
+new file mode 100644
+index 000000000000..0ae468aef13f
+--- /dev/null
++++ b/Documentation/devicetree/bindings/net/marvell-berlin.txt
+@@ -0,0 +1,23 @@
++* Marvell Berlin Ethernet Controller
++
++Required properties:
++- compatible: should be "marvell,berlin-eth".
++- reg: address and length of the register set for the device.
++- interrupts: interrupt for the device.
++- phy-handle: pointer to the Ethernet PHY.
++- clocks: pointer to the clock for the device.
++
++Optional properties:
++- local-mac-address: see ethernet.txt file in the same directory.
++
++
++Example:
++
++	eth0: ethernet at f7b90000 {
++		compatible = "marvell,berlin-eth";
++        	reg = <0xf7b90000 0x10000>;
++		clocks = <&chip CLKID_GETH0>;
++		interrupts = <GIC_SPI 24 IRQ_TYPE_LEVEL_HIGH>;
++		phy-handle = <&ethphy0>;
++		local-mac-address = [00 00 00 00 00 00];
++	};
 -- 
 1.9.1
