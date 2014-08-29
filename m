@@ -1,126 +1,58 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 29 Aug 2014 18:47:57 +0100
-Subject: [PATCH V2 4/6] arm64: Add DTS support for FSL's LS2085A SoC
-In-Reply-To: <18f8ee091e8847c0bcfba1ef04907a71@BN1PR03MB220.namprd03.prod.outlook.com>
-References: <1409219706-14843-1-git-send-email-bhupesh.sharma@freescale.com>
- <1409219706-14843-5-git-send-email-bhupesh.sharma@freescale.com>
- <20140828145635.GL14650@leverpostej>
- <18f8ee091e8847c0bcfba1ef04907a71@BN1PR03MB220.namprd03.prod.outlook.com>
-Message-ID: <20140829174757.GD18555@leverpostej>
+Date: Fri, 29 Aug 2014 18:57:22 +0100
+Subject: [PATCH 2/2] efi/arm64: use UEFI for system reset
+In-Reply-To: <CAKv+Gu-u6Q_t9yU4Cb=0-XmEkmejuMwpy2AN8cBABUHEZxg4dg@mail.gmail.com>
+References: <1409324757-12607-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1409324757-12607-2-git-send-email-ard.biesheuvel@linaro.org>
+ <20140829160448.GF4995@arm.com>
+ <CAKv+Gu-u6Q_t9yU4Cb=0-XmEkmejuMwpy2AN8cBABUHEZxg4dg@mail.gmail.com>
+Message-ID: <20140829175722.GE18555@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Bhupesh,
-
-> > > +	gic: interrupt-controller at 6000000 {
-> > > +		compatible = "arm,gic-v3";
-> > > +		reg = <0x0 0x06000000 0 0x10000>, /* GIC Dist */
-> > > +		      <0x0 0x06100000 0 0x100000>; /* GICR (RD_base +
-> > SGI_base) */
-> > > +		#interrupt-cells = <3>;
-> > > +		#address-cells = <2>;
-> > > +		#size-cells = <2>;
-> > > +		ranges;
-> > > +		interrupt-controller;
-> > > +		interrupts = <1 9 0x4>;
-> > > +	};
-> > 
-> > The GIC node doesn't have any sub-nodes, so I think the #address-cells,
-> > #size-cells, and ranges properties can go for now.
+On Fri, Aug 29, 2014 at 05:12:48PM +0100, Ard Biesheuvel wrote:
+> On 29 August 2014 18:04, Catalin Marinas <catalin.marinas@arm.com> wrote:
+> > On Fri, Aug 29, 2014 at 04:05:57PM +0100, Ard Biesheuvel wrote:
+> >> If UEFI Runtime Services are available, they are preferred over direct
+> >> PSCI calls or other methods to reset the system.
+> >>
+> >> For the reset case, we need to hook into machine_restart(), as the
+> >> arm_pm_restart function pointer may be overwritten by modules.
+> >>
+> >> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> >> ---
+> >>  arch/arm64/kernel/process.c | 7 +++++++
+> >>  1 file changed, 7 insertions(+)
+> >>
+> >> diff --git a/arch/arm64/kernel/process.c b/arch/arm64/kernel/process.c
+> >> index 1309d64aa926..335a93da5eeb 100644
+> >> --- a/arch/arm64/kernel/process.c
+> >> +++ b/arch/arm64/kernel/process.c
+> >> @@ -177,6 +177,13 @@ void machine_restart(char *cmd)
+> >>       local_irq_disable();
+> >>       smp_send_stop();
+> >>
+> >> +     /*
+> >> +      * arm_pm_restart is exported to modules, so the only way to supersede
+> >> +      * it with efi_reboot() is to call it here.
+> >> +      */
+> >
+> > Why do you make this the preferred method? Is there a risk that UEFI is
+> > broken and we want to override it with a SoC-specific driver (I wouldn't
+> > like it but it's still an option).
+> >
 > 
-> Ok. V3 will address the change.
-
-Ok.
-
+> For poweroff (the other patch), it may not make a huge difference, but
+> the SBBR does state it explicitly.
 > 
-> > 
-> > > +
-> > > +	timer {
-> > > +		compatible = "arm,armv8-timer";
-> > > +		interrupts = <1 13 0x1>, /* Physical Secure PPI, edge
-> > triggered */
-> > > +			     <1 14 0x1>, /* Physical Non-Secure PPI, edge
-> > triggered */
-> > > +			     <1 11 0x1>, /* Virtual PPI, edge triggered */
-> > > +			     <1 10 0x1>; /* Hypervisor PPI, edge triggered */
-> > > +	};
-> > 
-> > In this SoC, are there low-power states the CPUs can be placed into where
-> > the architected timers can lose state?
-> 
-> Yes the SoC has low-power states, however we are yet to work on the power management
-> s/w layers. Probably a patch later down the lane would add this capability.
+> For reboot, we *have* to use EFI reboot in order to support capsules:
+> when using capsules (for instance, for updating the firmware), you
+> need to use EFI reboot as you need to pass the return code of
+> UpdateCapsule() (a runtime service) to ResetSystem()
 
-That's fine. I just want to make sure we're not in for some pain with
-timers at the moment.
+Ah. Could you drop that in the commit message next time around? That's a
+far clearer (and stronger) argument than saying that the runtime
+services are preferred.
 
-> 
-> > 
-> > If so, do you any auxiliary timers that aren't cpu-local?
-> 
-> Yes, the SoC has 4 flextimer IP instances, but I am yet to test them and hence support for them
-> is still to be added. Probably a patch later down the lane would add this capability.
-
-Ok. You'll need at least one global timer if you want to place all CPUs
-into low power states. For now things should work regardless.
-
-[...]
-
-> > > +	serial0: serial at 21c0500 {
-> > > +		device_type = "serial";
-> > > +		compatible = "fsl,ns16550", "ns16550a";
-> > > +		reg = <0x0 0x21c0500 0x0 0x100>;
-> > > +		clock-frequency = <0>;	/* Updated by bootloader */
-> > > +		interrupts = <0 32 0x1>; /* edge triggered */
-> > > +	};
-> > > +
-> > > +	serial1: serial at 21c0600 {
-> > > +		device_type = "serial";
-> > > +		compatible = "fsl,ns16550", "ns16550a";
-> > > +		reg = <0x0 0x21c0600 0x0 0x100>;
-> > > +		clock-frequency = <0>; 	/* Updated by bootloader */
-> > > +		interrupts = <0 32 0x1>; /* edge triggered */
-> > > +	};
-> > 
-> > Just to check: do the two UARTs share the same IRQ, or is that a copy-
-> > paste error?
-> 
-> The two UARTs do share the same IRQ.
-
-Ok.
-
-[...]
-
-> > > +	memory at 80000000 {
-> > > +		device_type = "memory";
-> > > +		reg = <0x00000000 0x80000000 0 0x80000000>;
-> > > +		      /* DRAM space 1 - 2 GB DRAM */
-> > > +	};
-> > 
-> > Does that mean:
-> > 
-> >  - This is "DRAM space 1", populated with 2GB?
-> > 
-> > Or:
-> > 
-> >  - The DRAM space can be populated with 1 to 2 GB?
-> > 
-> > If the former, s/ - /: / for clarity.
-> > 
-> > If the latter, it might make sense to move that into board-specific dts
-> > files. If this can be dynamically populated ideally the firmware/loader
-> > would fix this up (assuming it can probe the memory).
-> 
-> If the former. I will fix it up in v3.
-
-Ok. Out of curiosity, are there other DRAM spaces that might be
-populated?
-
-> > Also, can we move the memory node up to just after /cpus? That would
-> > match the other dts files we have.
-> 
-> Sure. V3 will address this change.
-
-Cheers.
-
+Cheers,
 Mark.
