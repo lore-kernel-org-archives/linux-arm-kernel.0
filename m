@@ -1,65 +1,84 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 29 Aug 2014 16:12:44 +0200
-Subject: [linux-sunxi] Re: [PATCH 4/4] simplefb: add clock handling code
-In-Reply-To: <20140829070116.GC13106@ulmo>
-References: <20140826135341.GM15297@lukather> <20140826143550.GB3027@ulmo>
- <53FCE704.4030103@redhat.com> <20140827093121.GA23186@ulmo>
- <53FDB46C.5010609@redhat.com> <20140827125613.GF23186@ulmo>
- <53FDE0CE.5030807@redhat.com> <20140827141632.GB32243@ulmo>
- <53FF1D6C.6090205@redhat.com> <20140829070116.GC13106@ulmo>
-Message-ID: <20140829141244.GH15297@lukather>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Fri, 29 Aug 2014 16:24:10 +0200
+Subject: [PATCH v4 3/5] ARM: tegra: Initialize interrupt controller from DT
+In-Reply-To: <20140829073139.GG13106@ulmo>
+References: <1409239879-12376-1-git-send-email-thierry.reding@gmail.com>
+ <1409239879-12376-3-git-send-email-thierry.reding@gmail.com>
+ <3056623.fB9uqpleQ5@wuerfel> <20140829073139.GG13106@ulmo>
+Message-ID: <20140829142408.GA31264@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 29, 2014 at 09:01:17AM +0200, Thierry Reding wrote:
-> I would think the memory should still be reserved anyway to make sure
-> nothing else is writing over it. And it's in the device tree anyway
-> because the driver needs to know where to put framebuffer content. So
-> the point I was trying to make is that we can't treat the memory in the
-> same way as clocks because it needs to be explicitly managed. Whereas
-> clocks don't. The driver is simply too generic to know what to do with
-> the clocks.
+On Fri, Aug 29, 2014 at 09:31:40AM +0200, Thierry Reding wrote:
+> On Thu, Aug 28, 2014 at 06:10:55PM +0200, Arnd Bergmann wrote:
+> > On Thursday 28 August 2014 17:31:17 Thierry Reding wrote:
+> > 
+> > >  void __init tegra_init_irq(void)
+> > >  {
+> > > -	int i;
+> > > -	void __iomem *distbase;
+> > > +	unsigned int max_ictlrs = ARRAY_SIZE(ictlr_regs), i;
+> > > +	const struct of_device_id *match;
+> > > +	struct device_node *np;
+> > > +	struct resource res;
+> > > +
+> > > +	np = of_find_matching_node_and_match(NULL, ictlr_matches, &match);
+> > > +	if (np) {
+> > > +		const struct tegra_ictlr_soc *soc = match->data;
+> > > +
+> > > +		for (i = 0; i < soc->num_ictlrs; i++) {
+> > > +			if (of_address_to_resource(np, i, &res) < 0)
+> > > +				break;
+> > > +
+> > > +			ictlr_regs[i] = res;
+> > > +		}
+> > > +
+> > > +		WARN(i != soc->num_ictlrs,
+> > > +		     "Found %u interrupt controllers in DT; expected %u.\n",
+> > > +		     i, soc->num_ictlrs);
+> > > +
+> > > +		max_ictlrs = soc->num_ictlrs;
+> > > +		of_node_put(np);
+> > > +	} else {
+> > > +		/*
+> > > +		 * If no matching device node was found, fall back to using
+> > > +		 * the chip ID.
+> > > +		 */
+> > > +
+> > > +		/* Tegra30 and later have five interrupt controllers, ... */
+> > > +		max_ictlrs = ARRAY_SIZE(ictlr_regs);
+> > > +
+> > > +		/* ..., but Tegra20 only has four. */
+> > > +		if (of_machine_is_compatible("nvidia,tegra20"))
+> > > +			max_ictlrs--;
+> > > +	}
+> > 
+> > How about moving the entire file to drivers/irqchip and using the
+> > IRQCHIP_DECLARE() helper for the DT case?
+> > 
+> > For the fallback, you can have an entry into that file that just takes
+> > the address and number, which you can call from platform code here.
+> 
+> I think I did try that at some point, but there were issues that I don't
+> remember. I'll give it another shot.
 
-You agreed on the fact that the only thing we need to do with the
-clocks is claim them. Really, I don't find what's complicated there
-(or not generic).
+So I got pretty far with this and the system still boots. But for some
+reason suspend/resume is now broken. The difference seems to be that
+earlier the legacy interrupt controller would be registered first, and
+the GIC second. When the legacy interrupt controller is initialized
+after the GIC (which happens when I use IRQCHIP_DECLARE), then suspend
+and resume won't work (for some yet unknown reason). Unfortunately the
+of_irq_init() code is too clever, so I can't even work around it by
+changing link order or device tree order.
 
-> It doesn't know what frequency they should be running at
+I'll see if I can find out what causes this combination to malfunction
+when initialized in the opposite order.
 
-We don't care about that. Just like we don't care about which
-frequency is the memory bus running at. It will just run at whatever
-frequency is appropriate.
-
-> or what they're used for
-
-And we don't care about that either. You're not interested in what
-output the framebuffer is setup to use, which is pretty much the same
-here, this is the same thing here.
-
-> so by any definition of what DT should describe they're useless for
-> this virtual device.
->
-> Furthermore it's fairly likely that as your kernel support progresses
-> you'll find that the driver all of a sudden needs to manage some other
-> type of resource that you just haven't needed until now because it may
-> default to being always on. Then you'll have a hard time keeping
-> backwards-compatibility and will have to resort to the kinds of hacks
-> that you don't want to see in the kernel.
-
-Not such a hard time. An older DT wouldn't define the new requirements
-anyway, so they wouldn't be used, and we would end up in pretty much
-the current case.
-
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Thierry
 -------------- next part --------------
 A non-text attachment was scrubbed...
-Name: signature.asc
+Name: not available
 Type: application/pgp-signature
 Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140829/bd8b3639/attachment.sig>
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140829/36bec183/attachment.sig>
