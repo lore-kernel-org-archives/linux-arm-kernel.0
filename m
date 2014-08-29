@@ -1,48 +1,54 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Fri, 29 Aug 2014 13:43:36 +0200
-Subject: [PATCH 0/4] clk:mvebu: Improve clock drift
-Message-ID: <1409312620-20631-1-git-send-email-gregory.clement@free-electrons.com>
+Date: Fri, 29 Aug 2014 13:43:38 +0200
+Subject: [PATCH 2/4] clk: mvebu: armada-370: Fix timer drift caused by the
+ SSCG deviation
+In-Reply-To: <1409312620-20631-1-git-send-email-gregory.clement@free-electrons.com>
+References: <1409312620-20631-1-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <1409312620-20631-3-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mike, Jason, Andrew and Sebastian,
+This commit activates the SSCG deviation correction for the Armada
+370. It uses the optional function introduced by the commit "clk:
+mvebu: Fix clk frequency value if SSCG is enabled".
 
-Few users reported a timer drift on the Armada 370 based board such as
-the mirabox or the Netgear ReadyNAS 102.
+Without this fix the deviation measured on a Mirabox was of a few
+second each hour, whereas with this fix it was reduced at around
+50ppm (around 4s per day).
 
-The reason is that when the SSCG (Spread Spectrum Clock Generator) is
-enabled, it shifts the frequency of the clock. The percentage is no
-more than 1% but when the clock is used for a timer it leads to a
-clock drift.
+Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+---
+ drivers/clk/mvebu/armada-370.c | 7 +++++++
+ 1 file changed, 7 insertions(+)
 
-This series allows to correct the affected clock when the SSCG is
-enabled. This drift can happen on all the mvebu SoC on the cpu clock
-block (ie cpu, ddr and l2 cache). Currently the only notable effect is
-for the Armada 370 because this SoC use the l2cache clock as source
-for the timer. That's why even if the series allow any of the mvebu
-SoC to benefit to this correction, Armada 370 is the only user of it.
-
-The first 2 patches should go through the clk subsystem, whereas the
-third one should go to the arm-soc through the mvebu tree.
-
-The last one is just to fix a typo I found while I was reading the clk
-code.
-
-Thanks,
-
-
-Gregory CLEMENT (4):
-  clk: mvebu: Fix clk frequency value if SSCG is enabled
-  clk: mvebu: armada-370: Fix timer drift caused by the SSCG deviation
-  ARM: mvebu: add SSCG to Armada 370 Device Tree
-  clk: mvebu: armada-375: Fix the description of the SAR in the comment
-
- arch/arm/boot/dts/armada-370.dtsi |  4 +++
- drivers/clk/mvebu/armada-370.c    |  7 ++++
- drivers/clk/mvebu/armada-375.c    |  4 +--
- drivers/clk/mvebu/common.c        | 74 +++++++++++++++++++++++++++++++++++++++
- drivers/clk/mvebu/common.h        |  1 +
- 5 files changed, 88 insertions(+), 2 deletions(-)
-
+diff --git a/drivers/clk/mvebu/armada-370.c b/drivers/clk/mvebu/armada-370.c
+index bef198a83863..b084a84d8fad 100644
+--- a/drivers/clk/mvebu/armada-370.c
++++ b/drivers/clk/mvebu/armada-370.c
+@@ -23,6 +23,7 @@
+  */
+ 
+ #define SARL				0	/* Low part [0:31] */
++#define	 SARL_A370_SSCG_ENABLE		BIT(10)
+ #define	 SARL_A370_PCLK_FREQ_OPT	11
+ #define	 SARL_A370_PCLK_FREQ_OPT_MASK	0xF
+ #define	 SARL_A370_FAB_FREQ_OPT		15
+@@ -133,10 +134,16 @@ static void __init a370_get_clk_ratio(
+ 	}
+ }
+ 
++bool a370_is_sscg_enabled(void __iomem *sar)
++{
++	return !(readl(sar) & SARL_A370_SSCG_ENABLE);
++}
++
+ static const struct coreclk_soc_desc a370_coreclks = {
+ 	.get_tclk_freq = a370_get_tclk_freq,
+ 	.get_cpu_freq = a370_get_cpu_freq,
+ 	.get_clk_ratio = a370_get_clk_ratio,
++	.is_sscg_enabled = a370_is_sscg_enabled,
+ 	.ratios = a370_coreclk_ratios,
+ 	.num_ratios = ARRAY_SIZE(a370_coreclk_ratios),
+ };
 -- 
 1.9.1
