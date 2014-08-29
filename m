@@ -1,12 +1,14 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 29 Aug 2014 17:04:48 +0100
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 29 Aug 2014 17:06:41 +0100
 Subject: [PATCH 2/2] efi/arm64: use UEFI for system reset
 In-Reply-To: <1409324757-12607-2-git-send-email-ard.biesheuvel@linaro.org>
 References: <1409324757-12607-1-git-send-email-ard.biesheuvel@linaro.org>
  <1409324757-12607-2-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <20140829160448.GF4995@arm.com>
+Message-ID: <20140829160641.GB18555@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
+
+Hi Ard,
 
 On Fri, Aug 29, 2014 at 04:05:57PM +0100, Ard Biesheuvel wrote:
 > If UEFI Runtime Services are available, they are preferred over direct
@@ -14,6 +16,15 @@ On Fri, Aug 29, 2014 at 04:05:57PM +0100, Ard Biesheuvel wrote:
 > 
 > For the reset case, we need to hook into machine_restart(), as the
 > arm_pm_restart function pointer may be overwritten by modules.
+
+This is changing with the restart handler callchain series [1]. I think
+you need to rework this atop of that.
+
+Thanks,
+Mark.
+
+[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2014-August/280519.html
+
 > 
 > Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 > ---
@@ -32,22 +43,7 @@ On Fri, Aug 29, 2014 at 04:05:57PM +0100, Ard Biesheuvel wrote:
 > +	 * arm_pm_restart is exported to modules, so the only way to supersede
 > +	 * it with efi_reboot() is to call it here.
 > +	 */
-
-Why do you make this the preferred method? Is there a risk that UEFI is
-broken and we want to override it with a SoC-specific driver (I wouldn't
-like it but it's still an option).
-
-There are also some patches here that try to get rid of arm_pm_restart:
-
-https://lkml.org/lkml/2014/8/19/665
-
-Once there are no drivers for arm64 setting arm_pm_restart explicitly
-I'll remove it.
-
 > +	if (IS_ENABLED(CONFIG_EFI) && efi_enabled(EFI_RUNTIME_SERVICES))
-
-efi_enabled always returns false if !IS_ENABLED(CONFIG_EFI).
-
 > +		efi_reboot(REBOOT_WARM, NULL);
 > +
 >  	/* Now call the architecture specific reboot code. */
@@ -57,6 +53,8 @@ efi_enabled always returns false if !IS_ENABLED(CONFIG_EFI).
 > 1.8.3.2
 > 
 > 
-
--- 
-Catalin
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
