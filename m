@@ -1,145 +1,103 @@
-From: varkabhadram@gmail.com (Varka Bhadram)
-Date: Fri, 29 Aug 2014 09:11:41 +0530
-Subject: [PATCH v3 2/3] rc: Introduce hix5hd2 IR transmitter driver
-In-Reply-To: <1409238977-19444-3-git-send-email-zhangfei.gao@linaro.org>
-References: <1409238977-19444-1-git-send-email-zhangfei.gao@linaro.org>
- <1409238977-19444-3-git-send-email-zhangfei.gao@linaro.org>
-Message-ID: <53FFF675.7020702@gmail.com>
+From: dianders@google.com (Doug Anderson)
+Date: Thu, 28 Aug 2014 21:08:10 -0700
+Subject: [PATCH V2 3/3] mmc: dw_mmc: Dont cut off vqmmc and vmmc
+In-Reply-To: <CAPz6YkXOxunSP9ZT_Ur+i3CicZ+rv-pvTE2M+rvODTqh8PHZrA@mail.gmail.com>
+References: <1408715272-13833-1-git-send-email-yuvaraj.cd@samsung.com>
+ <1408715272-13833-4-git-send-email-yuvaraj.cd@samsung.com>
+ <CAPDyKFqz8sGj2td=ihZXN4zvAqmu9FHZjWdCn-ZRcdHugNHe2g@mail.gmail.com>
+ <CAPz6YkXH1mMOTwcLkKdffdUHN+TaCAhpa8oG0h+rFn9i+GMoCw@mail.gmail.com>
+ <CAPDyKFqp7oEt9ASmdxrgUwbQ8aTZzAuJ7uD1oGN50iuzPzBfVg@mail.gmail.com>
+ <CAD=FV=VQWzhiSU+iULACj+Dp_tDf3SszQ8ELLEGqVEyJJRQy1Q@mail.gmail.com>
+ <CAPDyKFo9-5=uPqD8RvLGsYtSCynBFnGGeSCpwLZuzDtW+652hA@mail.gmail.com>
+ <CAD=FV=VveHTYmiBu42DJeFFGARV2+1bS6Y2CQM995YkX_O9SQA@mail.gmail.com>
+ <CAPDyKFpUU643iXVbxuu9Vx1zY0K7x4z-ZxxVEWd+Lsuwp0iA+g@mail.gmail.com>
+ <CAD=FV=Vqz=kA=D5KDyq_QuPi-6B05VixYManTsFe2PC-fzxRkw@mail.gmail.com>
+ <CAPDyKFrcA183V-R-nbZcY8wXCRqONb1WUu3BS_0vNJe2+Ej2_w@mail.gmail.com>
+ <CAD=FV=UykPjixODXJ-s6vrZVs3O3=rX2iUakm6WnqiqvJNkoqQ@mail.gmail.com>
+ <CAPz6YkXOxunSP9ZT_Ur+i3CicZ+rv-pvTE2M+rvODTqh8PHZrA@mail.gmail.com>
+Message-ID: <CAD=FV=XyBmdd1WZduY5u3S8=Nr_EmdP8JO-RhKitr+ZH64dqTg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/28/2014 08:46 PM, Zhangfei Gao wrote:
-> From: Guoxiong Yan <yanguoxiong@huawei.com>
+Hi,
+
+On Thu, Aug 28, 2014 at 10:50 AM, Sonny Rao <sonnyrao@chromium.org> wrote:
+> On Thu, Aug 28, 2014 at 8:50 AM, Doug Anderson <dianders@google.com> wrote:
+>> Ulf,
+>>
+>> On Thu, Aug 28, 2014 at 12:25 AM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
+>>> On 27 August 2014 17:52, Doug Anderson <dianders@google.com> wrote:
+>>>> Ulf,
+>>>>
+>>>> On Wed, Aug 27, 2014 at 4:17 AM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
+>>>>>> Now, we've got MMC_CAP_NEEDS_POLL, so dw_mmc will periodically be
+>>>>>> called to check the card detect line, but with vmmc and vqmmc off.  It
+>>>>>> will be unable to return a sensible value without actually turning on
+>>>>>> vmmc and vqmmc.
+>>>>>
+>>>>> Currently MMC_CAP_NEEDS_POLL mean the mmc rescan work will reschedule
+>>>>> itself with HZ interval. This to check for card insert/removal.
+>>>>>
+>>>>> Now, mmc_rescan() will, if present, invoke host's ->get_cd() callback
+>>>>> to check whether it's worth to continue initialization sequence or if
+>>>>> it should re-schedule itself again.
+>>>>>
+>>>>> If your host driver can distinguish whether a card is inserted, which
+>>>>> in this case are when vccq is turned off, your ->get_cd() callback need
+>>>>> to return 1. That will allow mmc_rescan() to continue it's
+>>>>> initialization sequence and do mmc_power_up().
+>>>>
+>>>> As per my other email, we can't tell whether a card is inserted when
+>>>> vqmmc is off.
+>>>
+>>> I understand.
+>>>
+>>> The solution I proposed above, is:
+>>>
+>>> 1) Enable MMC_CAP_NEEDS_POLL.
+>>> 2) Make ->get_cd() return 1, when you can't distinguish if the card is inserted.
+>>>
+>>> That will solve this issue and without messing up the mmc core.
+>>
+>> Ah, I see!  So every 1 second, we'll do the following:
+>>
+>> 1. Call get_cd(), which returns 1.
+>>
+>> 2. MMC core will power everything up (turn on all regulators) for MMC.
+>>
+>> 3. We'll start to initialize a card.
+>>
+>> 4. We'll notice that, oops, there's no card there.
+>>
+>> 5. MMC core will shut things down again.
+>>
+>>
+>> That seems awfully expensive to do every second when the card detect
+>> line actually does work (as long as you keep power lines).  Is the
+>> patch to separate out the concepts of "power off because no card is
+>> inserted" and "power off because we're power cycling the card" really
+>> bad enough to warrant forcing us to use the above?
+>>
+>> I'm not an EE, but cycling regulators on and off every second doesn't
+>> seem super ideal, but maybe they're designed for it?
+>>
+>>
+>> Personally, I'd be tempted to just leave the power on all the time and
+>> if a card somehow needs to be power cycled (because UHS negotiation
+>> failed?) then that card just isn't supported.  This could be done in
+>> the dts by saying that the regulator is "always on" and no need to
+>> pollute any source files.
 >
-> IR transmitter driver for Hisilicon hix5hd2 soc
+> Yeah, power cycling the regulators constantly doesn't seem like a
+> great idea, we can ask the EEs what they think.
 >
-> By default all protocols are disabled.
-> For example nec decoder can be enabled by either
-> 1. ir-keytable -p nec
-> 2. echo nec > /sys/class/rc/rc0/protocols
-> See see Documentation/ABI/testing/sysfs-class-rc
->
-(...)
+> This scheme of leaving them on all the time would prevent us from
+> being able to actually power cycle the card, which I think is required
+> by the spec in case UHS negotiation fails.
 
-> +static irqreturn_t hix5hd2_ir_rx_interrupt(int irq, void *data)
-> +{
-> +	u32 symb_num, symb_val, symb_time;
-> +	u32 data_l, data_h;
-> +	u32 irq_sr, i;
-> +	struct hix5hd2_ir_priv *priv = data;
-> +
-> +	irq_sr = readl_relaxed(priv->base + IR_INTS);
-> +	if (irq_sr & INTMS_OVERFLOW) {
-> +		/*
-> +		 * we must read IR_DATAL first, then we can clean up
-> +		 * IR_INTS availably since logic would not clear
-> +		 * fifo when overflow, drv do the job
-> +		 */
-> +		ir_raw_event_reset(priv->rdev);
-> +		symb_num = readl_relaxed(priv->base + IR_DATAH);
-> +		for (i = 0; i < symb_num; i++)
-> +			readl_relaxed(priv->base + IR_DATAL);
-> +
-> +		writel_relaxed(INT_CLR_OVERFLOW, priv->base + IR_INTC);
-> +		dev_info(priv->dev, "overflow, level=%d\n",
-> +			 IR_CFG_INT_THRESHOLD);
-> +	}
-> +
-> +	if ((irq_sr & INTMS_SYMBRCV) || (irq_sr & INTMS_TIMEOUT)) {
-> +		DEFINE_IR_RAW_EVENT(ev);
-> +
-> +		symb_num = readl_relaxed(priv->base + IR_DATAH);
-> +		for (i = 0; i < symb_num; i++) {
-> +			symb_val = readl_relaxed(priv->base + IR_DATAL);
-> +			data_l = ((symb_val & 0xffff) * 10);
-> +			data_h =  ((symb_val >> 16) & 0xffff) * 10;
-> +			symb_time = (data_l + data_h) / 10;
-> +
-> +			ev.duration = US_TO_NS(data_l);
-> +			ev.pulse = true;
-> +			ir_raw_event_store(priv->rdev, &ev);
-> +
-> +			if (symb_time < IR_CFG_SYMBOL_MAXWIDTH) {
-> +				ev.duration = US_TO_NS(data_h);
-> +				ev.pulse = false;
-> +				ir_raw_event_store(priv->rdev, &ev);
-> +			} else {
-> +				hix5hd2_ir_send_lirc_timeout(priv->rdev);
-> +			}
-> +		}
-> +
-> +		if (irq_sr & INTMS_SYMBRCV)
-> +			writel_relaxed(INT_CLR_RCV, priv->base + IR_INTC);
-> +		if (irq_sr & INTMS_TIMEOUT)
-> +			writel_relaxed(INT_CLR_TIMEOUT, priv->base + IR_INTC);
-> +	}
-> +
-> +	/* Empty software fifo */
-> +	ir_raw_event_handle(priv->rdev);
-> +	return IRQ_HANDLED;
-> +}
-> +
-
-It looks good if the entire ISR() above the probe()/remove() functionalities
-of the driver. Maximum of the developers follows this structure.
-
-(...)
-
-> +static struct of_device_id hix5hd2_ir_table[] = {
-> +	{ .compatible = "hisilicon,hix5hd2-ir", },
-> +	{},
-> +};
-> +MODULE_DEVICE_TABLE(of, hix5hd2_ir_table);
-> +
-
-Every driver put these device ids above *struct platform_driver* definition.
-So that we can see the of_match_table....
-
-> +static int hix5hd2_ir_probe(struct platform_device *pdev)
-> +{
-> +	int ret;
-> +	struct rc_dev *rdev;
-> +	struct device *dev = &pdev->dev;
-> +	struct resource *res;
-> +	struct hix5hd2_ir_priv *priv;
-> +	struct device_node *node = pdev->dev.of_node;
-> +
-> +	priv = devm_kzalloc(dev, sizeof(struct hix5hd2_ir_priv), GFP_KERNEL);
-
-sizeof(*priv)...?
-
-> +	if (!priv)
-> +		return -ENOMEM;
-> +
-
-(...)
-
-> +#endif
-> +
-> +static SIMPLE_DEV_PM_OPS(hix5hd2_ir_pm_ops, hix5hd2_ir_suspend,
-> +			 hix5hd2_ir_resume);
-> +
-
-We can move the device ids here....
-
-> +static struct platform_driver hix5hd2_ir_driver = {
-> +	.driver = {
-> +		.name = IR_HIX5HD2_NAME,
-> +		.of_match_table = hix5hd2_ir_table,
-> +		.pm     = &hix5hd2_ir_pm_ops,
-> +	},
-> +	.probe = hix5hd2_ir_probe,
-> +	.remove = hix5hd2_ir_remove,
-> +};
-> +
-> +module_platform_driver(hix5hd2_ir_driver);
-> +
-> +MODULE_DESCRIPTION("RC Transceiver driver for hix5hd2 platforms");
-> +MODULE_AUTHOR("Guoxiong Yan <yanguoxiong@huawei.com>");
-> +MODULE_LICENSE("GPL v2");
-> +MODULE_ALIAS("platform:hix5hd2-ir");
+OK, fair enough.  I guess polling is less bad than nor supporting card
+power cycling.  ...it still feels like adding this quirk to the core
+isn't super ugly, but if everyone is against it...
 
 
--- 
-Regards,
-Varka Bhadram.
+-Doug
