@@ -1,59 +1,36 @@
-From: holler@ahsoftware.de (Alexander Holler)
-Date: Fri, 29 Aug 2014 03:43:26 +0200
-Subject: [RFC PATCH 0/9] dt: dependencies (for deterministic driver
- initialization order based on the DT)
-In-Reply-To: <20140828092308.GA31111@arm.com>
-References: <20140826084208.AE5F0C40989@trevor.secretlab.ca>
- <20140826084922.GG17263@ulmo> <53FC566C.30904@ahsoftware.de>
- <20140826101107.GC32315@leverpostej>
- <20140827103432.64927C409CB@trevor.secretlab.ca>
- <20140827144403.GB13850@arm.com> <53FE05AE.9000406@wwwdotorg.org>
- <53FE07BE.7000809@ahsoftware.de> <53FE0966.5020206@wwwdotorg.org>
- <53FED13C.4070606@ahsoftware.de> <20140828092308.GA31111@arm.com>
-Message-ID: <53FFDABE.3000507@ahsoftware.de>
+From: shengjiu.wang@freescale.com (Shengjiu Wang)
+Date: Fri, 29 Aug 2014 09:49:50 +0800
+Subject: [RFC PATCH 1/2] ARM: imx: add BYPASS support for PLL clocks
+In-Reply-To: <20140828084420.GG28777@dragon>
+References: <1409067313-32063-1-git-send-email-shawn.guo@freescale.com>
+ <1409067313-32063-2-git-send-email-shawn.guo@freescale.com>
+ <20140828084420.GG28777@dragon>
+Message-ID: <20140829014947.GA2741@audiosh1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 28.08.2014 11:23, schrieb Catalin Marinas:
-> On Thu, Aug 28, 2014 at 07:50:36AM +0100, Alexander Holler wrote:
+On Thu, Aug 28, 2014 at 04:44:21PM +0800, Shawn Guo wrote:
+> On Tue, Aug 26, 2014 at 11:35:12PM +0800, Shawn Guo wrote:
+> > The i.MX6 clock drivers currently hard-code all PLL clocks sourcing from
+> > OSC24M without BYPASS support.  The patch adds BYPASS and BYPASS_CLK_SRC
+> > selection for PLL clocks as per Figure 10-3. Primary Clock Generation
+> > in IMX6DQRM, i.e. both BYPASS_CLK_SRC and BYPASS bits are implemented as
+> > mux clocks, and ENABLE bit of PLL clocks is implemented as a gate clock
+> > after BYPASS mux.
+> > 
+> > Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
+> 
+> Shengjiu,
+> 
+> Can you please test if this BYPASS support works good for your ESAI use
+> case?
+> 
+> Shawn
 
->> And I wonder how the ACPI world solves that problem. My guess would be
->> hardcoded stuff in the firmware-blob (BIOS), just like it happened with
->> board files, but I've never seen BIOS code and my knowledge about ACPI
->> is almost zero. ;)
->
-> ACPI doesn't even attempt to solve such problems at the OS level. SoCs
-> aimed at ACPI should have simple hardware configuration (from a Linux
-> perspective) initialised by firmware (e.g. clocks) and devices living on
-> a standard bus like PCIe. If a SoC requires specific low-level code to
-> initialise the hardware in a specific order (other than architected
-> peripherals like GIC, timers; e.g. MFD devices), we should deem it
-> unsuitable for ACPI.
->
-> ACPI should only be used by vendors who know exactly why they need and
-> how to implement it properly and not just because the marketing
-> department told them to (it would also be nice if the Linux kernel
-> community was informed about such reasons).
+Yes, after test, one issue found. Please check.
 
-Hmm, Jon Masters from Red Hat sounds too like UEFI/ACPI is the way to go.
+-static const char *pll_bypass_src_sels[] = { "osc", "anaclk1", "anaclk2", "dummy", };
++static const char *pll_bypass_src_sels[] = { "osc", "lvds1_in", "lvds2_in", "dummy", };
 
-But maybe he's right and hiding ugly code in proprietary/binary firmware 
-blobs where no one can see and criticize it is really the way to go.
-
-Personally I think it's a way back to the past ("when everything was 
-better", at least that is what most human brains do like to suggest) and 
-just a dream. And I don't believe that the stuff which was and is hidden 
-away always just works and doesn't need fixes (one can't do themself). 
-In my humble opinion that's a nice but wrong myth and doesn't take into 
-consideration that HW (and SW) gets more and more complicated too (and 
-thus more faulty).
-
-And even the biggest companies already have problems to produce stuff
-which just works (they just employ humans too), not to speak from 
-smaller board vendors. So it's much better to keep the source as visible 
-as possible to as much people as possible (in the OS) and not to rely on 
-some binary blob as most BIOSes are.
-
-Regards,
-
-Alexander Holler
+best regrads
+wang shengjiu
