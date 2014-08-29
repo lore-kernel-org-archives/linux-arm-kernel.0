@@ -1,26 +1,57 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 29 Aug 2014 07:46:45 +0200
-Subject: [PATCH] gpio: zynq: Remove .owner field for driver
-In-Reply-To: <78682b5ace6f31f2b52496823823116076eefd61.1407931277.git.michal.simek@xilinx.com>
-References: <78682b5ace6f31f2b52496823823116076eefd61.1407931277.git.michal.simek@xilinx.com>
-Message-ID: <CACRpkdYBbonERHWMWF3X5VfwWaiwc7OfwadyR0Nbr=x0NixBMQ@mail.gmail.com>
+From: naveenkrishna.ch@gmail.com (Naveen Krishna Ch)
+Date: Fri, 29 Aug 2014 11:16:35 +0530
+Subject: [PATCH 10/14] arm64: dts: add pinctrl support to EXYNOS7
+In-Reply-To: <53FDBD7E.3050102@samsung.com>
+References: <1409132660-1898-1-git-send-email-ch.naveen@samsung.com>
+ <1409132660-1898-2-git-send-email-ch.naveen@samsung.com>
+ <53FDBD7E.3050102@samsung.com>
+Message-ID: <CAHfPSqBja8z6TLaLoyAYJ33pmNC-FdMEphmdL5UB9p_k1CG_tQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 13, 2014 at 2:01 PM, Michal Simek <michal.simek@xilinx.com> wrote:
+Hello Tomasz,
 
-> There is no need to init .owner field.
+On 27 August 2014 16:44, Tomasz Figa <t.figa@samsung.com> wrote:
+> Hi Naveen,
 >
-> Based on the patch from Peter Griffin <peter.griffin@linaro.org>
-> "mmc: remove .owner field for drivers using module_platform_driver"
+> Please see my comments inline.
 >
-> This patch removes the superflous .owner field for drivers which
-> use the module_platform_driver API, as this is overriden in
-> platform_driver_register anyway."
+> On 27.08.2014 11:44, Naveen Krishna Chatradhi wrote:
+>> Add the required pin configuration support to EXYNOS7
 >
-> Signed-off-by: Michal Simek <michal.simek@xilinx.com>
+> [snip]
+>
+>> +/ {
+>> +     /* ALIVE block @10580000 */
+>> +     pinctrl at 10580000 {
+>
+> This syntax repeating the whole hierarchy of nodes in every dts file is
+> considered obsolete in case of Exynos DT sources. Please switch to
+> reference-based one. Please see related files for Exynos5260 and 5800 as
+> examples.
 
-Patch applied.
+Sure, will respin with reference based usage.
+>
+> [snip]
+>
+>> +             disp_teson: disp_teson {
+>> +                     samsung,pins = "gpg0-1";
+>> +                     samsung,pin-function = <2>;
+>> +             };
+>> +
+>> +             disp_tesoff: disp_tesoff {
+>> +                     samsung,pins = "gpg0-1";
+>> +                     samsung,pin-function = <0>;
+>
+> This is not a special function, so I don't think it belongs to this file.
+>
+> Best regards,
+> Tomasz
 
-Yours,
-Linus Walleij
+Thanks for the in depth review.
+Will fixes the comments.
+
+
+-- 
+Thanks & Regards,
+(: Nav :)
