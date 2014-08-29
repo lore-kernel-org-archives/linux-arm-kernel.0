@@ -1,53 +1,79 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 29 Aug 2014 09:12:22 -0700
-Subject: [PATCH 15/15] tty: serial: 8250: omap: add dma support
-In-Reply-To: <540048B4.7010807@linutronix.de>
-References: <20140815210211.GD9239@atomide.com>
- <53F5AF0D.5060409@linutronix.de>
- <20140821184416.GF10066@atomide.com>
- <53FE3779.5090908@linutronix.de>
- <20140827202313.GF16006@atomide.com>
- <20140828082348.GA5413@linutronix.de>
- <20140828164645.GG16006@atomide.com>
- <53FF84DF.7080406@linutronix.de>
- <20140828225454.GM16006@atomide.com>
- <540048B4.7010807@linutronix.de>
-Message-ID: <20140829161221.GO16006@atomide.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Fri, 29 Aug 2014 18:12:48 +0200
+Subject: [PATCH 2/2] efi/arm64: use UEFI for system reset
+In-Reply-To: <20140829160448.GF4995@arm.com>
+References: <1409324757-12607-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1409324757-12607-2-git-send-email-ard.biesheuvel@linaro.org>
+ <20140829160448.GF4995@arm.com>
+Message-ID: <CAKv+Gu-u6Q_t9yU4Cb=0-XmEkmejuMwpy2AN8cBABUHEZxg4dg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Sebastian Andrzej Siewior <bigeasy@linutronix.de> [140829 02:32]:
-> On 08/29/2014 12:54 AM, Tony Lindgren wrote:
-> > OK thanks, I'm seeing the same issue as you. And the idlest registers
-> > don't show any blockers. Looking at the errata docs, seems like
-> > "Usage Note 2.7" in sprz318f.pdf says:
-> > 
-> >  Details When configured for DMA operations using smartidle mode (SYSC[4:3].IDLEMODE =
-> >  0x2), the UART module will not acknowledge incoming idle requests. As a consequence,
-> >  it can prevent L4 from going to idle.
-> >  When there are additional expected transfers, the UART should be placed in force-idle
-> >  mode.
-> 
-> Ehm. So I haven't found an errata document for omap3630, there is
-> nothing like that in that one I have for am335x or dra7. The document
-> you mentioned is for AM3715. Interesting?
+On 29 August 2014 18:04, Catalin Marinas <catalin.marinas@arm.com> wrote:
+> On Fri, Aug 29, 2014 at 04:05:57PM +0100, Ard Biesheuvel wrote:
+>> If UEFI Runtime Services are available, they are preferred over direct
+>> PSCI calls or other methods to reset the system.
+>>
+>> For the reset case, we need to hook into machine_restart(), as the
+>> arm_pm_restart function pointer may be overwritten by modules.
+>>
+>> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+>> ---
+>>  arch/arm64/kernel/process.c | 7 +++++++
+>>  1 file changed, 7 insertions(+)
+>>
+>> diff --git a/arch/arm64/kernel/process.c b/arch/arm64/kernel/process.c
+>> index 1309d64aa926..335a93da5eeb 100644
+>> --- a/arch/arm64/kernel/process.c
+>> +++ b/arch/arm64/kernel/process.c
+>> @@ -177,6 +177,13 @@ void machine_restart(char *cmd)
+>>       local_irq_disable();
+>>       smp_send_stop();
+>>
+>> +     /*
+>> +      * arm_pm_restart is exported to modules, so the only way to supersede
+>> +      * it with efi_reboot() is to call it here.
+>> +      */
+>
+> Why do you make this the preferred method? Is there a risk that UEFI is
+> broken and we want to override it with a SoC-specific driver (I wouldn't
+> like it but it's still an option).
+>
 
-Yes I would not be suprised if that same bug is in all of them though..
- 
-> > So I've added also Paul to Cc, he may have better suggestions for the
-> > hwmod flags to use. The experimental patch below seems to allow idling
-> > for me, care to give it a try?
-> 
-> Yep, this one works. And I see DMA transfers (for RX side) after the
-> core hit idle so it seems to look good :)
+For poweroff (the other patch), it may not make a huge difference, but
+the SBBR does state it explicitly.
 
-OK great :)
+For reboot, we *have* to use EFI reboot in order to support capsules:
+when using capsules (for instance, for updating the firmware), you
+need to use EFI reboot as you need to pass the return code of
+UpdateCapsule() (a runtime service) to ResetSystem()
 
-Looks like the paste bug is there for sure, doing off idle and pasting
-240 characters to the console can hang the UART RX after few attempts,
-and pasting 16 charactes won't show up at all if the system is idling.
-So you may want to play with that too a bit :)
+> There are also some patches here that try to get rid of arm_pm_restart:
+>
+> https://lkml.org/lkml/2014/8/19/665
+>
+> Once there are no drivers for arm64 setting arm_pm_restart explicitly
+> I'll remove it.
+>
 
-Regards,
+OK, good to know. I will revisit this once that stuff is in.
 
-Tony
+-- 
+Ard.
+
+>> +     if (IS_ENABLED(CONFIG_EFI) && efi_enabled(EFI_RUNTIME_SERVICES))
+>
+> efi_enabled always returns false if !IS_ENABLED(CONFIG_EFI).
+>
+>> +             efi_reboot(REBOOT_WARM, NULL);
+>> +
+>>       /* Now call the architecture specific reboot code. */
+>>       if (arm_pm_restart)
+>>               arm_pm_restart(reboot_mode, cmd);
+>> --
+>> 1.8.3.2
+>>
+>>
+>
+> --
+> Catalin
