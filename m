@@ -1,36 +1,74 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Sat, 30 Aug 2014 14:15:58 -0700
-Subject: [PATCH v2 6/9] usb: xhci: Add NVIDIA Tegra xHCI host-controller
- driver
-In-Reply-To: <1408381705-3623-7-git-send-email-abrestic@chromium.org>
-References: <1408381705-3623-1-git-send-email-abrestic@chromium.org>
- <1408381705-3623-7-git-send-email-abrestic@chromium.org>
-Message-ID: <20140830211558.GA13814@kroah.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sat, 30 Aug 2014 22:33:49 +0100
+Subject: [PATCH RFC v2 3/8] component: add support for component match
+ array
+In-Reply-To: <CAAQKjZOf-UoONHFf=6W4j4rXuo0nSJrhK_QesxNR55CEF7XONw@mail.gmail.com>
+References: <20140624192830.GC20555@n2100.arm.linux.org.uk>
+ <E1WzWOy-0007zc-36@rmk-PC.arm.linux.org.uk>
+ <CA+gwMcdO5P-Yu+-FeHHGxkKwObsATL-ThVDwmEm2_cZ3enUXPQ@mail.gmail.com>
+ <20140626144601.GS32514@n2100.arm.linux.org.uk>
+ <20140701142210.GS32514@n2100.arm.linux.org.uk>
+ <CAAQKjZOf-UoONHFf=6W4j4rXuo0nSJrhK_QesxNR55CEF7XONw@mail.gmail.com>
+Message-ID: <20140830213349.GE30401@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 18, 2014 at 10:08:22AM -0700, Andrew Bresticker wrote:
-> Add support for the on-chip xHCI host controller present on Tegra SoCs.
+On Thu, Jul 03, 2014 at 12:26:39AM +0900, Inki Dae wrote:
+> 2014-07-01 23:22 GMT+09:00 Russell King - ARM Linux <linux@arm.linux.org.uk>:
+> > On Thu, Jun 26, 2014 at 03:46:01PM +0100, Russell King - ARM Linux wrote:
+> >> On Thu, Jun 26, 2014 at 02:34:17PM +0200, Philipp Zabel wrote:
+> >> > Hi Russell,
+> >> >
+> >> > On Tue, Jun 24, 2014 at 9:29 PM, Russell King
+> >> > <rmk+kernel@arm.linux.org.uk> wrote:
+> >> > [...]
+> >> > > +/*
+> >> > > + * Add a component to be matched.
+> >> > > + *
+> >> > > + * The match array is first created or extended if necessary.
+> >> > > + */
+> >> > > +void component_match_add(struct device *dev, struct component_match **matchptr,
+> >> > > +       int (*compare)(struct device *, void *), void *compare_data)
+> >> > > +{
+> >> > > +       struct component_match *match = *matchptr;
+> >> > > +
+> >> > > +       if (IS_ERR(match))
+> >> > > +               return;
+> >> > > +
+> >> > > +       if (!match || match->num == match->alloc) {
+> >> > > +               size_t new_size = match ? match->alloc + 16 : 15;
+> >> > > +
+> >> > > +               match = component_match_realloc(dev, match, new_size);
+> >> > > +
+> >> > > +               *matchptr = match;
+> >> > > +
+> >> > > +               if (IS_ERR(match))
+> >> > > +                       return;
+> >> > > +       }
+> >> > > +
+> >> > > +       match->compare[match->num].fn = compare;
+> >> > > +       match->compare[match->num].data = compare_data;
+> >> > > +       match->num++;
+> >> > > +}
+> >> >
+> >> > component_match_add should be exported.
+> >>
+> >> Fixed, thanks.
+> >
+> > As there's no further comments, and Inki Dae has not responded, I'm
 > 
-> The driver is currently very basic: it loads the controller with its
-> firmware, starts the controller, and is able to service messages sent
-> by the controller's firmware.  The hardware supports device mode as
-> well as lower-power operating modes, but support for these is not yet
-> implemented here.
+> It's has been just a week. I will check and look into your patch
+> series. I think Exynos drm should also be considered for the use of
+> component match array.
 
-So you are saying the device doesn't really work?  Can it handle USB
-transactions properly?
+It has now been almost two months.  What's happening on this?
 
-I have a jetson board here, is this the controller for that hardware?
-Can I test this series on that platform, or is it for something else?
+Please note that I'm planning to push the rest of the component updates
+during the next merge window, which will result in unconverted drivers
+breaking.
 
-> +static const struct tegra_xhci_soc_config tegra124_soc_config = {
-> +	.firmware_file = "nvidia/tegra124/xusb.bin",
-> +};
-> +MODULE_FIRMWARE("nvidia/tegra124/xusb.bin");
+Thanks.
 
-Has this file been submitted to the linux-firmware tree?
-
-thanks,
-
-greg k-h
+-- 
+FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
+according to speedtest.net.
