@@ -1,35 +1,34 @@
 From: andrew@lunn.ch (Andrew Lunn)
-Date: Sat, 30 Aug 2014 18:46:08 +0200
-Subject: [Patch v3] 3/7] thermal: Remove ARCH_KIRKWOOD dependency
+Date: Sat, 30 Aug 2014 18:46:10 +0200
+Subject: [Patch v3] 5/7] rtc: Remove ARCH_KIRKWOOD dependency
 In-Reply-To: <1409417172-6846-1-git-send-email-andrew@lunn.ch>
 References: <1409417172-6846-1-git-send-email-andrew@lunn.ch>
-Message-ID: <1409417172-6846-4-git-send-email-andrew@lunn.ch>
+Message-ID: <1409417172-6846-6-git-send-email-andrew@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 mach-kirkwood has been removed, now that kirkwood lives in mach-mvebu.
-Depend on MACH_KIRKWOOD, which will be set when kirkwood is built as
-part of ARCH_MVEBU.
+ARCH_MVEBU is sufficient.
 
 Signed-off-by: Andrew Lunn <andrew@lunn.ch>
-Cc: Zhang Rui <rui.zhang@intel.com>
-Cc: linux-pm at vger.kernel.org
+Cc: Alessandro Zummo <a.zummo@towertech.it>
+Cc: rtc-linux at googlegroups.com
 ---
- drivers/thermal/Kconfig | 2 +-
+ drivers/rtc/Kconfig | 2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/thermal/Kconfig b/drivers/thermal/Kconfig
-index 693208eb9047..ef5587fe2c69 100644
---- a/drivers/thermal/Kconfig
-+++ b/drivers/thermal/Kconfig
-@@ -143,7 +143,7 @@ config RCAR_THERMAL
+diff --git a/drivers/rtc/Kconfig b/drivers/rtc/Kconfig
+index a168e96142b9..fae9464eed9c 100644
+--- a/drivers/rtc/Kconfig
++++ b/drivers/rtc/Kconfig
+@@ -1198,7 +1198,7 @@ config RTC_DRV_TX4939
  
- config KIRKWOOD_THERMAL
- 	tristate "Temperature sensor on Marvell Kirkwood SoCs"
--	depends on ARCH_KIRKWOOD || MACH_KIRKWOOD
-+	depends on MACH_KIRKWOOD
- 	depends on OF
+ config RTC_DRV_MV
+ 	tristate "Marvell SoC RTC"
+-	depends on ARCH_KIRKWOOD || ARCH_DOVE || ARCH_MVEBU
++	depends on ARCH_DOVE || ARCH_MVEBU
  	help
- 	  Support for the Kirkwood thermal sensor driver into the Linux thermal
+ 	  If you say yes here you will get support for the in-chip RTC
+ 	  that can be found in some of Marvell's SoC devices, such as
 -- 
 2.1.0
