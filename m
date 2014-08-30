@@ -1,134 +1,136 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Sat, 30 Aug 2014 22:03:06 +0200
-Subject: [PATCH v2 07/12] clk: sunxi: Move mod0 clock to a file of its own
+Date: Sat, 30 Aug 2014 22:03:07 +0200
+Subject: [PATCH v2 08/12] clk: sunxi: Move mbus to mod0 file
 In-Reply-To: <1409428991-2442-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1409428991-2442-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1409428991-2442-8-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1409428991-2442-9-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since we know have the ability to declare factors clock outside of clk-sunxi,
-create a new mod0 driver to deal with the mod0 clocks.
+Move the MBUS clock to the module clocks file. It's pretty trivial, but still
+requires to enable the clocks to make sure it won't get disabled.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- drivers/clk/sunxi/Makefile    |  1 +
- drivers/clk/sunxi/clk-mod0.c  | 82 +++++++++++++++++++++++++++++++++++++++++++
- drivers/clk/sunxi/clk-sunxi.c |  1 -
- 3 files changed, 83 insertions(+), 1 deletion(-)
- create mode 100644 drivers/clk/sunxi/clk-mod0.c
+ drivers/clk/sunxi/clk-mod0.c  | 12 +++++++++
+ drivers/clk/sunxi/clk-sunxi.c | 57 -------------------------------------------
+ 2 files changed, 12 insertions(+), 57 deletions(-)
 
-diff --git a/drivers/clk/sunxi/Makefile b/drivers/clk/sunxi/Makefile
-index 6850cba35871..833f086d4a52 100644
---- a/drivers/clk/sunxi/Makefile
-+++ b/drivers/clk/sunxi/Makefile
-@@ -5,6 +5,7 @@
- obj-y += clk-sunxi.o clk-factors.o
- obj-y += clk-a10-hosc.o
- obj-y += clk-a20-gmac.o
-+obj-y += clk-mod0.o
- 
- obj-$(CONFIG_MFD_SUN6I_PRCM) += \
- 	clk-sun6i-ar100.o clk-sun6i-apb0.o clk-sun6i-apb0-gates.o \
 diff --git a/drivers/clk/sunxi/clk-mod0.c b/drivers/clk/sunxi/clk-mod0.c
-new file mode 100644
-index 000000000000..bce09a84ab4f
---- /dev/null
+index bce09a84ab4f..8a7f7036aea3 100644
+--- a/drivers/clk/sunxi/clk-mod0.c
 +++ b/drivers/clk/sunxi/clk-mod0.c
-@@ -0,0 +1,82 @@
-+/*
-+ * Copyright 2013 Emilio L?pez
-+ *
-+ * Emilio L?pez <emilio@elopez.com.ar>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
+@@ -80,3 +80,15 @@ static void __init sun4i_a10_mod0_setup(struct device_node *node)
+ 	sunxi_factors_register(node, &sun4i_a10_mod0_data, &sun4i_a10_mod0_lock);
+ }
+ CLK_OF_DECLARE(sun4i_a10_mod0, "allwinner,sun4i-a10-mod0-clk", sun4i_a10_mod0_setup);
 +
-+#include <linux/clk-provider.h>
-+#include <linux/clkdev.h>
++static DEFINE_SPINLOCK(sun5i_a13_mbus_lock);
 +
-+#include "clk-factors.h"
-+
-+/**
-+ * sun4i_get_mod0_factors() - calculates m, n factors for MOD0-style clocks
-+ * MOD0 rate is calculated as follows
-+ * rate = (parent_rate >> p) / (m + 1);
-+ */
-+
-+static void sun4i_a10_get_mod0_factors(u32 *freq, u32 parent_rate,
-+				       u8 *n, u8 *k, u8 *m, u8 *p)
++static void __init sun5i_a13_mbus_setup(struct device_node *node)
 +{
-+	u8 div, calcm, calcp;
++	struct clk *mbus = sunxi_factors_register(node, &sun4i_a10_mod0_data, &sun5i_a13_mbus_lock);
 +
-+	/* These clocks can only divide, so we will never be able to achieve
-+	 * frequencies higher than the parent frequency */
-+	if (*freq > parent_rate)
-+		*freq = parent_rate;
-+
-+	div = DIV_ROUND_UP(parent_rate, *freq);
-+
-+	if (div < 16)
-+		calcp = 0;
-+	else if (div / 2 < 16)
-+		calcp = 1;
-+	else if (div / 4 < 16)
-+		calcp = 2;
-+	else
-+		calcp = 3;
-+
-+	calcm = DIV_ROUND_UP(div, 1 << calcp);
-+
-+	*freq = (parent_rate >> calcp) / calcm;
-+
-+	/* we were called to round the frequency, we can now return */
-+	if (n == NULL)
-+		return;
-+
-+	*m = calcm - 1;
-+	*p = calcp;
++	/* The MBUS clocks needs to be always enabled */
++	__clk_get(mbus);
++	clk_prepare_enable(mbus);
 +}
-+
-+/* user manual says "n" but it's really "p" */
-+static struct clk_factors_config sun4i_a10_mod0_config = {
-+	.mshift = 0,
-+	.mwidth = 4,
-+	.pshift = 16,
-+	.pwidth = 2,
-+};
-+
-+static const struct factors_data sun4i_a10_mod0_data __initconst = {
-+	.enable = 31,
-+	.mux = 24,
-+	.table = &sun4i_a10_mod0_config,
-+	.getter = sun4i_a10_get_mod0_factors,
-+};
-+
-+static DEFINE_SPINLOCK(sun4i_a10_mod0_lock);
-+
-+static void __init sun4i_a10_mod0_setup(struct device_node *node)
-+{
-+	sunxi_factors_register(node, &sun4i_a10_mod0_data, &sun4i_a10_mod0_lock);
-+}
-+CLK_OF_DECLARE(sun4i_a10_mod0, "allwinner,sun4i-a10-mod0-clk", sun4i_a10_mod0_setup);
++CLK_OF_DECLARE(sun5i_a13_mbus, "allwinner,sun5i-a13-mbus-clk", sun5i_a13_mbus_setup);
 diff --git a/drivers/clk/sunxi/clk-sunxi.c b/drivers/clk/sunxi/clk-sunxi.c
-index a3d8c633c2d6..6eec82b29bb4 100644
+index 6eec82b29bb4..4e189be3e23f 100644
 --- a/drivers/clk/sunxi/clk-sunxi.c
 +++ b/drivers/clk/sunxi/clk-sunxi.c
-@@ -1111,7 +1111,6 @@ static const struct of_device_id clk_factors_match[] __initconst = {
+@@ -320,46 +320,6 @@ static void sun4i_get_apb1_factors(u32 *freq, u32 parent_rate,
+ 
+ 
+ 
+-/**
+- * sun4i_get_mod0_factors() - calculates m, n factors for MOD0-style clocks
+- * MOD0 rate is calculated as follows
+- * rate = (parent_rate >> p) / (m + 1);
+- */
+-
+-static void sun4i_get_mod0_factors(u32 *freq, u32 parent_rate,
+-				   u8 *n, u8 *k, u8 *m, u8 *p)
+-{
+-	u8 div, calcm, calcp;
+-
+-	/* These clocks can only divide, so we will never be able to achieve
+-	 * frequencies higher than the parent frequency */
+-	if (*freq > parent_rate)
+-		*freq = parent_rate;
+-
+-	div = DIV_ROUND_UP(parent_rate, *freq);
+-
+-	if (div < 16)
+-		calcp = 0;
+-	else if (div / 2 < 16)
+-		calcp = 1;
+-	else if (div / 4 < 16)
+-		calcp = 2;
+-	else
+-		calcp = 3;
+-
+-	calcm = DIV_ROUND_UP(div, 1 << calcp);
+-
+-	*freq = (parent_rate >> calcp) / calcm;
+-
+-	/* we were called to round the frequency, we can now return */
+-	if (n == NULL)
+-		return;
+-
+-	*m = calcm - 1;
+-	*p = calcp;
+-}
+-
+-
+ 
+ /**
+  * sun7i_a20_get_out_factors() - calculates m, p factors for CLK_OUT_A/B
+@@ -495,14 +455,6 @@ static struct clk_factors_config sun4i_apb1_config = {
+ };
+ 
+ /* user manual says "n" but it's really "p" */
+-static struct clk_factors_config sun4i_mod0_config = {
+-	.mshift = 0,
+-	.mwidth = 4,
+-	.pshift = 16,
+-	.pwidth = 2,
+-};
+-
+-/* user manual says "n" but it's really "p" */
+ static struct clk_factors_config sun7i_a20_out_config = {
+ 	.mshift = 8,
+ 	.mwidth = 5,
+@@ -559,13 +511,6 @@ static const struct factors_data sun4i_apb1_data __initconst = {
+ 	.getter = sun4i_get_apb1_factors,
+ };
+ 
+-static const struct factors_data sun4i_mod0_data __initconst = {
+-	.enable = 31,
+-	.mux = 24,
+-	.table = &sun4i_mod0_config,
+-	.getter = sun4i_get_mod0_factors,
+-};
+-
+ static const struct factors_data sun7i_a20_out_data __initconst = {
+ 	.enable = 31,
+ 	.mux = 24,
+@@ -1110,7 +1055,6 @@ static const struct of_device_id clk_factors_match[] __initconst = {
+ 	{.compatible = "allwinner,sun7i-a20-pll4-clk", .data = &sun7i_a20_pll4_data,},
  	{.compatible = "allwinner,sun6i-a31-pll6-clk", .data = &sun6i_a31_pll6_data,},
  	{.compatible = "allwinner,sun4i-a10-apb1-clk", .data = &sun4i_apb1_data,},
- 	{.compatible = "allwinner,sun5i-a13-mbus-clk", .data = &sun4i_mod0_data,},
--	{.compatible = "allwinner,sun4i-a10-mod0-clk", .data = &sun4i_mod0_data,},
+-	{.compatible = "allwinner,sun5i-a13-mbus-clk", .data = &sun4i_mod0_data,},
  	{.compatible = "allwinner,sun7i-a20-out-clk", .data = &sun7i_a20_out_data,},
  	{}
+ };
+@@ -1222,7 +1166,6 @@ static void __init sun4i_a10_init_clocks(struct device_node *node)
+ CLK_OF_DECLARE(sun4i_a10_clk_init, "allwinner,sun4i-a10", sun4i_a10_init_clocks);
+ 
+ static const char *sun5i_critical_clocks[] __initdata = {
+-	"mbus",
+ 	"pll5_ddr",
+ 	"ahb_sdram",
  };
 -- 
 2.0.2
