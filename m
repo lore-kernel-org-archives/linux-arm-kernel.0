@@ -1,185 +1,59 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Sat, 30 Aug 2014 22:03:10 +0200
-Subject: [PATCH v2 11/12] mmc: sunxi: Convert MMC driver to the standard clock
- phase API
+Date: Sat, 30 Aug 2014 22:03:05 +0200
+Subject: [PATCH v2 06/12] ARM: sunxi: dt: Switch to the new mbus compatible
 In-Reply-To: <1409428991-2442-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1409428991-2442-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1409428991-2442-12-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1409428991-2442-7-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that we have proper support to use the generic phase API in our clock
-driver, switch the MMC driver to use it.
+Now that we have a compatible of its own for the mbus clock, switch to it.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-Acked-by: Ulf Hansson <ulf.hansson@linaro.org>
 ---
- .../devicetree/bindings/mmc/sunxi-mmc.txt          |  8 +--
- drivers/mmc/host/sunxi-mmc.c                       | 72 +++++++++++++++-------
- 2 files changed, 53 insertions(+), 27 deletions(-)
+ arch/arm/boot/dts/sun5i-a10s.dtsi | 2 +-
+ arch/arm/boot/dts/sun5i-a13.dtsi  | 2 +-
+ arch/arm/boot/dts/sun7i-a20.dtsi  | 2 +-
+ 3 files changed, 3 insertions(+), 3 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/mmc/sunxi-mmc.txt b/Documentation/devicetree/bindings/mmc/sunxi-mmc.txt
-index 91b3a3467150..4bf41d833804 100644
---- a/Documentation/devicetree/bindings/mmc/sunxi-mmc.txt
-+++ b/Documentation/devicetree/bindings/mmc/sunxi-mmc.txt
-@@ -10,8 +10,8 @@ Absolute maximum transfer rate is 200MB/s
- Required properties:
-  - compatible : "allwinner,sun4i-a10-mmc" or "allwinner,sun5i-a13-mmc"
-  - reg : mmc controller base registers
-- - clocks : a list with 2 phandle + clock specifier pairs
-- - clock-names : must contain "ahb" and "mmc"
-+ - clocks : a list with 4 phandle + clock specifier pairs
-+ - clock-names : must contain "ahb", "mmc", "output" and "sample"
-  - interrupts : mmc controller interrupt
+diff --git a/arch/arm/boot/dts/sun5i-a10s.dtsi b/arch/arm/boot/dts/sun5i-a10s.dtsi
+index d73a2287b37a..531272c0e526 100644
+--- a/arch/arm/boot/dts/sun5i-a10s.dtsi
++++ b/arch/arm/boot/dts/sun5i-a10s.dtsi
+@@ -287,7 +287,7 @@
  
- Optional properties:
-@@ -25,8 +25,8 @@ Examples:
- 	mmc0: mmc at 01c0f000 {
- 		compatible = "allwinner,sun5i-a13-mmc";
- 		reg = <0x01c0f000 0x1000>;
--		clocks = <&ahb_gates 8>, <&mmc0_clk>;
--		clock-names = "ahb", "mod";
-+		clocks = <&ahb_gates 8>, <&mmc0_clk>, <&mmc0_output_clk>, <&mmc0_sample_clk>;
-+		clock-names = "ahb", "mod", "output", "sample";
- 		interrupts = <0 32 4>;
- 		status = "disabled";
- 	};
-diff --git a/drivers/mmc/host/sunxi-mmc.c b/drivers/mmc/host/sunxi-mmc.c
-index 024f67c98cdc..8719cefa590d 100644
---- a/drivers/mmc/host/sunxi-mmc.c
-+++ b/drivers/mmc/host/sunxi-mmc.c
-@@ -22,7 +22,6 @@
+ 		mbus_clk: clk at 01c2015c {
+ 			#clock-cells = <0>;
+-			compatible = "allwinner,sun4i-a10-mod0-clk";
++			compatible = "allwinner,sun5i-a13-mbus-clk";
+ 			reg = <0x01c2015c 0x4>;
+ 			clocks = <&osc24M>, <&pll6 1>, <&pll5 1>;
+ 			clock-output-names = "mbus";
+diff --git a/arch/arm/boot/dts/sun5i-a13.dtsi b/arch/arm/boot/dts/sun5i-a13.dtsi
+index c4b5d7825b9f..b131068f4f35 100644
+--- a/arch/arm/boot/dts/sun5i-a13.dtsi
++++ b/arch/arm/boot/dts/sun5i-a13.dtsi
+@@ -285,7 +285,7 @@
  
- #include <linux/clk.h>
- #include <linux/clk-private.h>
--#include <linux/clk/sunxi.h>
+ 		mbus_clk: clk at 01c2015c {
+ 			#clock-cells = <0>;
+-			compatible = "allwinner,sun4i-a10-mod0-clk";
++			compatible = "allwinner,sun5i-a13-mbus-clk";
+ 			reg = <0x01c2015c 0x4>;
+ 			clocks = <&osc24M>, <&pll6 1>, <&pll5 1>;
+ 			clock-output-names = "mbus";
+diff --git a/arch/arm/boot/dts/sun7i-a20.dtsi b/arch/arm/boot/dts/sun7i-a20.dtsi
+index c658e343ce11..ec5603da595e 100644
+--- a/arch/arm/boot/dts/sun7i-a20.dtsi
++++ b/arch/arm/boot/dts/sun7i-a20.dtsi
+@@ -346,7 +346,7 @@
  
- #include <linux/gpio.h>
- #include <linux/platform_device.h>
-@@ -230,6 +229,8 @@ struct sunxi_mmc_host {
- 	/* clock management */
- 	struct clk	*clk_ahb;
- 	struct clk	*clk_mmc;
-+	struct clk	*clk_sample;
-+	struct clk	*clk_output;
- 
- 	/* irq */
- 	spinlock_t	lock;
-@@ -617,7 +618,7 @@ static int sunxi_mmc_oclk_onoff(struct sunxi_mmc_host *host, u32 oclk_en)
- static int sunxi_mmc_clk_set_rate(struct sunxi_mmc_host *host,
- 				  struct mmc_ios *ios)
- {
--	u32 rate, oclk_dly, rval, sclk_dly, src_clk;
-+	u32 rate, oclk_dly, rval, sclk_dly;
- 	int ret;
- 
- 	rate = clk_round_rate(host->clk_mmc, ios->clock);
-@@ -643,34 +644,31 @@ static int sunxi_mmc_clk_set_rate(struct sunxi_mmc_host *host,
- 
- 	/* determine delays */
- 	if (rate <= 400000) {
--		oclk_dly = 0;
--		sclk_dly = 7;
-+		oclk_dly = 180;
-+		sclk_dly = 42;
- 	} else if (rate <= 25000000) {
--		oclk_dly = 0;
--		sclk_dly = 5;
-+		oclk_dly = 180;
-+		sclk_dly = 75;
- 	} else if (rate <= 50000000) {
- 		if (ios->timing == MMC_TIMING_UHS_DDR50) {
--			oclk_dly = 2;
--			sclk_dly = 4;
-+			oclk_dly = 60;
-+			sclk_dly = 120;
- 		} else {
--			oclk_dly = 3;
--			sclk_dly = 5;
-+			oclk_dly = 90;
-+			sclk_dly = 150;
- 		}
-+	} else if (rate <= 100000000) {
-+		oclk_dly = 6;
-+		sclk_dly = 24;
-+	} else if (rate <= 200000000) {
-+		oclk_dly = 3;
-+		sclk_dly = 12;
- 	} else {
--		/* rate > 50000000 */
--		oclk_dly = 2;
--		sclk_dly = 4;
-+		return -EINVAL;
- 	}
- 
--	src_clk = clk_get_rate(clk_get_parent(host->clk_mmc));
--	if (src_clk >= 300000000 && src_clk <= 400000000) {
--		if (oclk_dly)
--			oclk_dly--;
--		if (sclk_dly)
--			sclk_dly--;
--	}
--
--	clk_sunxi_mmc_phase_control(host->clk_mmc, sclk_dly, oclk_dly);
-+	clk_set_phase(host->clk_sample, sclk_dly);
-+	clk_set_phase(host->clk_output, oclk_dly);
- 
- 	return sunxi_mmc_oclk_onoff(host, 1);
- }
-@@ -909,6 +907,18 @@ static int sunxi_mmc_resource_request(struct sunxi_mmc_host *host,
- 		return PTR_ERR(host->clk_mmc);
- 	}
- 
-+	host->clk_output = devm_clk_get(&pdev->dev, "output");
-+	if (IS_ERR(host->clk_output)) {
-+		dev_err(&pdev->dev, "Could not get output clock\n");
-+		return PTR_ERR(host->clk_output);
-+	}
-+
-+	host->clk_sample = devm_clk_get(&pdev->dev, "sample");
-+	if (IS_ERR(host->clk_sample)) {
-+		dev_err(&pdev->dev, "Could not get sample clock\n");
-+		return PTR_ERR(host->clk_sample);
-+	}
-+
- 	host->reset = devm_reset_control_get(&pdev->dev, "ahb");
- 
- 	ret = clk_prepare_enable(host->clk_ahb);
-@@ -923,11 +933,23 @@ static int sunxi_mmc_resource_request(struct sunxi_mmc_host *host,
- 		goto error_disable_clk_ahb;
- 	}
- 
-+	ret = clk_prepare_enable(host->clk_output);
-+	if (ret) {
-+		dev_err(&pdev->dev, "Enable output clk err %d\n", ret);
-+		goto error_disable_clk_mmc;
-+	}
-+
-+	ret = clk_prepare_enable(host->clk_sample);
-+	if (ret) {
-+		dev_err(&pdev->dev, "Enable sample clk err %d\n", ret);
-+		goto error_disable_clk_output;
-+	}
-+
- 	if (!IS_ERR(host->reset)) {
- 		ret = reset_control_deassert(host->reset);
- 		if (ret) {
- 			dev_err(&pdev->dev, "reset err %d\n", ret);
--			goto error_disable_clk_mmc;
-+			goto error_disable_clk_sample;
- 		}
- 	}
- 
-@@ -946,6 +968,10 @@ static int sunxi_mmc_resource_request(struct sunxi_mmc_host *host,
- error_assert_reset:
- 	if (!IS_ERR(host->reset))
- 		reset_control_assert(host->reset);
-+error_disable_clk_sample:
-+	clk_disable_unprepare(host->clk_sample);
-+error_disable_clk_output:
-+	clk_disable_unprepare(host->clk_output);
- error_disable_clk_mmc:
- 	clk_disable_unprepare(host->clk_mmc);
- error_disable_clk_ahb:
+ 		mbus_clk: clk at 01c2015c {
+ 			#clock-cells = <0>;
+-			compatible = "allwinner,sun4i-a10-mod0-clk";
++			compatible = "allwinner,sun5i-a13-mbus-clk";
+ 			reg = <0x01c2015c 0x4>;
+ 			clocks = <&osc24M>, <&pll6 2>, <&pll5 1>;
+ 			clock-output-names = "mbus";
 -- 
 2.0.2
