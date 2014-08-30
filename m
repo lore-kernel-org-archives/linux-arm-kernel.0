@@ -1,53 +1,167 @@
-From: tremyfr@gmail.com (Philippe Reynes)
-Date: Sat, 30 Aug 2014 15:22:12 +0200
-Subject: [PATCH] apf27dev: add max1027 in the dts
-Message-ID: <1409404932-12532-1-git-send-email-tremyfr@gmail.com>
+From: zhangfei.gao@linaro.org (zhangfei)
+Date: Sat, 30 Aug 2014 21:24:52 +0800
+Subject: [PATCH v3 2/3] rc: Introduce hix5hd2 IR transmitter driver
+In-Reply-To: <20140828162231.GA3429@gofer.mess.org>
+References: <1409238977-19444-1-git-send-email-zhangfei.gao@linaro.org>
+ <1409238977-19444-3-git-send-email-zhangfei.gao@linaro.org>
+ <20140828162231.GA3429@gofer.mess.org>
+Message-ID: <5401D0A4.4070504@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi, Sean
 
-Signed-off-by: Philippe Reynes <tremyfr@gmail.com>
----
- arch/arm/boot/dts/imx27-apf27dev.dts |   20 ++++++++++++++++++++
- 1 files changed, 20 insertions(+), 0 deletions(-)
+On 08/29/2014 12:22 AM, Sean Young wrote:
+> On Thu, Aug 28, 2014 at 11:16:16PM +0800, Zhangfei Gao wrote:
+>> From: Guoxiong Yan <yanguoxiong@huawei.com>
+>>
+>> IR transmitter driver for Hisilicon hix5hd2 soc
+>>
+>> By default all protocols are disabled.
+>> For example nec decoder can be enabled by either
+>> 1. ir-keytable -p nec
+>> 2. echo nec > /sys/class/rc/rc0/protocols
+>> See see Documentation/ABI/testing/sysfs-class-rc
+>
+> I'm not sure that's true any more. All protocols are enabled, right?
+By default, all protocols are disabled
 
-diff --git a/arch/arm/boot/dts/imx27-apf27dev.dts b/arch/arm/boot/dts/imx27-apf27dev.dts
-index b982309..25b9ecd 100644
---- a/arch/arm/boot/dts/imx27-apf27dev.dts
-+++ b/arch/arm/boot/dts/imx27-apf27dev.dts
-@@ -82,6 +82,19 @@
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_cspi1 &pinctrl_cspi1_cs>;
- 	status = "okay";
-+
-+	adc at 0 {
-+		compatible = "maxim,max1027";
-+		reg = <0>;
-+		interrupt-parent = <&gpio5>;
-+		interrupts = <15 IRQ_TYPE_EDGE_FALLING>;
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pinctrl_max1027>;
-+		/* SPI mode = 0 */
-+		spi-cpol = <0>;
-+		spi-cpha = <0>;
-+		spi-max-frequency = <10000000>;
-+	};
- };
- 
- &cspi2 {
-@@ -230,6 +243,13 @@
- 		pinctrl_sdhc2_cd: sdhc2cdgrp {
- 			fsl,pins = <MX27_PAD_TOUT__GPIO3_14 0x0>;
- 		};
-+
-+		pinctrl_max1027: max1027 {
-+			 fsl,pins = <
-+				 MX27_PAD_UART1_CTS__GPIO5_14 0
-+				 MX27_PAD_UART1_RTS__GPIO5_15 0
-+			>;
-+		};
- 	};
- };
- 
--- 
-1.7.4.4
+#cat /sys/class/rc/rc0/protocols
+other [unknown] rc-5 nec rc-6 jvc sony rc-5-sz sanyo sharp mce_kbd lirc xmp
+
+>> +config IR_HIX5HD2
+>> +	tristate "Hisilicon hix5hd2 IR remote control"
+>> +	depends on RC_CORE
+>> +	help
+>> +	 Say Y here if you want to use hisilicon remote control.
+>> +	 The driver passes raw pulse and space information to the LIRC decoder.
+>> +	 To compile this driver as a module, choose M here: the module will be
+>> +	 called hisi_ir.
+>
+> The module won't be called that.
+Yes, change to ir-hix5hd2r.
+
+>> +struct hix5hd2_ir_priv {
+>> +	int			irq;
+>> +	void			*base;
+>> +	struct device		*dev;
+>> +	struct rc_dev		*rdev;
+>> +	struct regmap		*regmap;
+>> +	struct clk		*clock;
+>> +	const char		*map_name;
+>
+> map_name member is only assigned, it's unused.
+OK
+
+>> +static irqreturn_t hix5hd2_ir_rx_interrupt(int irq, void *data)
+>> +{
+>> +	u32 symb_num, symb_val, symb_time;
+>> +	u32 data_l, data_h;
+>> +	u32 irq_sr, i;
+>> +	struct hix5hd2_ir_priv *priv = data;
+>> +
+>> +	irq_sr = readl_relaxed(priv->base + IR_INTS);
+>> +	if (irq_sr & INTMS_OVERFLOW) {
+>> +		/*
+>> +		 * we must read IR_DATAL first, then we can clean up
+>> +		 * IR_INTS availably since logic would not clear
+>> +		 * fifo when overflow, drv do the job
+>> +		 */
+>> +		ir_raw_event_reset(priv->rdev);
+>> +		symb_num = readl_relaxed(priv->base + IR_DATAH);
+>> +		for (i = 0; i < symb_num; i++)
+>> +			readl_relaxed(priv->base + IR_DATAL);
+>> +
+>> +		writel_relaxed(INT_CLR_OVERFLOW, priv->base + IR_INTC);
+>> +		dev_info(priv->dev, "overflow, level=%d\n",
+>> +			 IR_CFG_INT_THRESHOLD);
+>> +	}
+>> +
+>> +	if ((irq_sr & INTMS_SYMBRCV) || (irq_sr & INTMS_TIMEOUT)) {
+>> +		DEFINE_IR_RAW_EVENT(ev);
+>> +
+>> +		symb_num = readl_relaxed(priv->base + IR_DATAH);
+>> +		for (i = 0; i < symb_num; i++) {
+>> +			symb_val = readl_relaxed(priv->base + IR_DATAL);
+>> +			data_l = ((symb_val & 0xffff) * 10);
+>> +			data_h =  ((symb_val >> 16) & 0xffff) * 10;
+>> +			symb_time = (data_l + data_h) / 10;
+>> +
+>> +			ev.duration = US_TO_NS(data_l);
+>> +			ev.pulse = true;
+>> +			ir_raw_event_store(priv->rdev, &ev);
+>> +
+>> +			if (symb_time < IR_CFG_SYMBOL_MAXWIDTH) {
+>> +				ev.duration = US_TO_NS(data_h);
+>> +				ev.pulse = false;
+>> +				ir_raw_event_store(priv->rdev, &ev);
+>> +			} else {
+>> +				hix5hd2_ir_send_lirc_timeout(priv->rdev);
+>
+> Surely this is when IR goes idle.
+>
+> 				ir_raw_event_set_idle(priv->rdev, true);
+>
+> This will set up idle processing and send the timeout IR event.
+
+Yes, ir_raw_event_set_idle is simpler.
+
+>> +static int hix5hd2_ir_open(struct rc_dev *rdev)
+>> +{
+>> +	struct hix5hd2_ir_priv *priv = rdev->priv;
+>> +
+>> +	hix5hd2_ir_enable(priv, true);
+>> +	hix5hd2_ir_config(priv);
+>
+> hix5hd2_ir_config can fail, the error can be returned to userspace rather
+> than silently failing.
+
+Change to return hix5hd2_ir_config(priv);
+
+>> +	if (devm_request_irq(dev, priv->irq, hix5hd2_ir_rx_interrupt,
+>> +			     IRQF_NO_SUSPEND, pdev->name, priv) < 0) {
+>> +		dev_err(dev, "IRQ %d register failed\n", priv->irq);
+>> +		return -EINVAL;
+>> +	}
+>
+> You've requested the interrupts too early, if an interrupts arrives before
+> you've set up all the members in priv it'll go bang in the interrupt handler.
+
+Will move request_irq after rc_register_device
+However, ir controller only be enabled in open.
+
+>> +
+>> +	/**
+>> +	 * for LIRC_MODE_MODE2 or LIRC_MODE_PULSE or LIRC_MODE_RAW
+>> +	 * lircd expects a long space first before a signal train to sync.
+>> +	 */
+>> +	hix5hd2_ir_send_lirc_timeout(rdev);
+>
+> I don't know why this is needed, sounds like a lircd oddity.
+To be honst, I don't know either.
+This is refer to st_rc.c
+Currently I only test with nec decoder.
+Will remove this until it is required.
+
+>> +static struct platform_driver hix5hd2_ir_driver = {
+>> +	.driver = {
+>> +		.name = IR_HIX5HD2_NAME,
+>> +		.of_match_table = hix5hd2_ir_table,
+>> +		.pm     = &hix5hd2_ir_pm_ops,
+>> +	},
+>> +	.probe = hix5hd2_ir_probe,
+>> +	.remove = hix5hd2_ir_remove,
+>> +};
+>> +
+>> +module_platform_driver(hix5hd2_ir_driver);
+>> +
+>> +MODULE_DESCRIPTION("RC Transceiver driver for hix5hd2 platforms");
+>
+> A transceiver can transmit as well as receive; this driver can only do one.
+Change to "IR controller driver for hix5hd2 platforms"
+
+
+Thanks for your kind review
+
+Regards
+Zhangfei
