@@ -1,101 +1,44 @@
-From: jic23@kernel.org (Jonathan Cameron)
-Date: Sat, 30 Aug 2014 10:30:37 +0100
-Subject: [PATCH v3 1/4] thermal: rockchip: add driver for thermal
-In-Reply-To: <54006D4C.2070404@rock-chips.com>
-References: <1409187562-12370-1-git-send-email-caesar.wang@rock-chips.com>	<2852853.mfRZfFVSev@wuerfel>	<20140828143733.GA18084@developer>	<3440260.edal29kzlR@diego>	<2014082909531345696848@rock-chips.com>
- <CAC-25o-winy6jVjh9_hQ-t2VO2UfxG67pW5DpOve8A2o39EJSw@mail.gmail.com>
- <54006D4C.2070404@rock-chips.com>
-Message-ID: <540199BD.7000504@kernel.org>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Sat, 30 Aug 2014 11:32:30 +0200
+Subject: [PATCH 1/2] ARM: multi_v7_defconfig: Enable shmobile platforms
+In-Reply-To: <3598124.ze8sbSR9ui@wuerfel>
+References: <1409234429-1916-1-git-send-email-geert+renesas@glider.be>
+ <1965890.bT7bZyQJt8@amdc1032> <3598124.ze8sbSR9ui@wuerfel>
+Message-ID: <CAMuHMdXXUrq3tsiaEym_uuoiYXNt66c5sm+1mSAfX6cHgMbEOQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29/08/14 13:08, Huang Tao wrote:
-> Dear Eduardo Bezerra Valentin:
-> 
-> ? 2014?08?29? 19:39, edubezval at gmail.com ??:
->> Hello Zhao,
->>
->> On Thu, Aug 28, 2014 at 9:54 PM, ??? <zyf@rock-chips.com> wrote:
->>> Hi Heiko?
->>>
->>>    The TS-ADC on RK3288 has two component, a tsadc and a tsadc controller.
->>> The tsadc controller is similar like the thermal manager unit on other SOCs.
->>> We followed the naming of 3066, but not named as the Thermal Manager.
->>>
->>>    Moreover,there is only one set of apb registers to access the tsadc
->>> controller,and the tsadc is controlled by the tsadc controller,could not
->>> access directly. If we write a general tsadc driver by accessed tsadc
->>> controller registers, and it hardly to write a driver for the tsadc
->>> controller.
->> As suggested by Arnd, you can use the generic driver as interface
->> between thermal framework and IIO layer. The driver you are going to
->> write to your ADC is going to be in the IIO subsystem. The only
->> difference is that the generic driver would work for any ADC driver in
->> the IIO subsystem.
->> https://lkml.org/lkml/2014/2/5/810
->>
->> In fact, there is already a generic driver. We just need to get it up
->> to date.  I see some testing has been already done, and results sound
->> promising.
-> This iio_thermal driver only support get temperature from the ADC IIO
-> channel.
-> It dose not support any advanced feature such as configure the
-> temperature when system should be reset.
-> So if we adapt it, we will access the register form both TSADC IIO
-> driver and  thermal driver.
-> I don't thank this is a good ideal.
+Hi Arnd,
 
-Interesting bit of functionality.  I agree this doesn't fit overwelmingly well
-into an iio consumer driver as things currently stand.
+On Fri, Aug 29, 2014 at 10:11 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> A related problem that I think is more significant is that
+> some platforms 'select' a particular driver and when you
+> disable the platform, that driver is suddenly removed from the
+> defconfig for all other platforms as well. This has bitten
+> us a few times in the past, and I'd really like to fix those
+> cases first.
 
-Looking briefly at your code, this is basically a threshold interrupt?
-If so then we do have threshold type event handling in IIO (simply termed
-events).  The snag is that it is the one area that doesn't currently have
-any in kernel interfaces.
+Indeed. "select" is evil, and has a devastating effect on minimal
+defconfigs (lots of churn and nasty surprises like the one you mentioned).
 
-Such an interface would be similar to that used for the buffered data access (raw
-data stream - we should probably rename that as it isn't always buffered anymore).
-The nasty bit (as it was with the buffered interface) is writing a reasonably
-efficient demux that can split out the data to those devices that have registered
-their interest in it. It would involve some additional code in iio_push_event and
-some indirection in the code that controls what events are enabled.
-Actually, you could probably skip this an just squirt all events recieved out through
-the direct IIO to userspace interface (nothing prevents another process turning
-more on anyway!).  We could event for now specify that any in kernel users might
-get other events and it is up to them to sanity check them.
+So it actually makes more sense to derive multi_v7_defconfig
+from the individual platform's defconfigs.
+I also have a script for that, which I wrote to create m68k's multi_defconfig
+a long time ago:
+https://github.com/geertu/linux-scripts/blob/master/linux-config-merge
 
-We'd also need to add some basic access functions to set limits etc.
+In the long run, I think creating defconfigs from DTS is the way to go.
+Extracting dependencies from the build system (both Makefile and
+the myriad of complex dependencies in Kconfig) are the biggest hurdles to
+solve.
 
-I'm afraid the 'events' bit of IIO is one of our least developed elements and is
-lagging way behind the work done on the main data flows. It's been on the
-list for a while, particularly as we need it to finish separating the
-userspace interfaces of IIO from the backend.
+Gr{oetje,eeting}s,
 
-So, looking at the wider picture, with a few additions to IIO we can support
-some ADC based thermal drivers - whether all of them is a bit dependent on
-whether they have weird and wonderful domain specific hardware (which I might
-have missed here, but does not seem to be present).
+                        Geert
 
-Note this is based on a rather brief scan read so I may well have missed some
-important details!
-> 
-> In fact, we should ignore the "ADC" stuff. This sensor use ADC internal,
-> but it is transparent to software, especially in automatic mode.
-Is this adc ever used for anything else?  If so, then there is your reason to
-go through the pain of a generic driver.
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
 
-Jonathan
-
-p.s. I'd never seen the driver Arnd highlighted.  Could anyone working on
-IIO clients cc linux-iio at vger.kernel.org as it's useful to know what people
-are using the interfaces for (particularly as they might change so it is
-good to know what is in the pipeline).
->>
->>>    So, I do not agree to write a generic adc driver for the rk3288-tsadc.
->>>
->>> ________________________________
->>> Yifeng Zhao
->>>
->>>
-> 
-> 
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
