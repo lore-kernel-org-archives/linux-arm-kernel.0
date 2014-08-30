@@ -1,107 +1,79 @@
-From: scottwood@freescale.com (Scott Wood)
-Date: Fri, 29 Aug 2014 20:00:01 -0500
-Subject: [RESEND] clk: ppc-corenet: Add Freescale ARM-based platforms
- CLK_OF_DECLARE support
-In-Reply-To: <c5564f8aa16b4156837a5fc4134036fb@BL2PR03MB467.namprd03.prod.outlook.com>
-References: <1408700096-25415-1-git-send-email-jingchang.lu@freescale.com>
- <1409093463.6510.92.camel@snotra.buserror.net>
- <164af7b3be3747a0be3fe3a6cf83d3b1@BL2PR03MB467.namprd03.prod.outlook.com>
- <1409182412.6510.129.camel@snotra.buserror.net>
- <f7b4263f189346a391d66c85756b4907@BL2PR03MB467.namprd03.prod.outlook.com>
- <1409243145.6510.160.camel@snotra.buserror.net>
- <c5564f8aa16b4156837a5fc4134036fb@BL2PR03MB467.namprd03.prod.outlook.com>
-Message-ID: <1409360401.24184.41.camel@snotra.buserror.net>
+From: wangnan0@huawei.com (Wang Nan)
+Date: Sat, 30 Aug 2014 09:28:37 +0800
+Subject: [PATCH v5 1/3] ARM: probes: check stack operation when decoding
+In-Reply-To: <1409302042.1247.27.camel@computer5.home>
+References: <1409144552-12751-1-git-send-email-wangnan0@huawei.com>	
+ <1409144552-12751-2-git-send-email-wangnan0@huawei.com>	
+ <53FEFB93.2010009@hitachi.com>	
+ <20140828102021.GC30401@n2100.arm.linux.org.uk>	
+ <20140828102406.GH22580@arm.com> <1409302042.1247.27.camel@computer5.home>
+Message-ID: <540128C5.6050101@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2014-08-29 at 02:17 -0500, Lu Jingchang-B35083 wrote:
-> >-----Original Message-----
-> >From: Wood Scott-B07421
-> >Sent: Friday, August 29, 2014 12:26 AM
-> >To: Lu Jingchang-B35083
-> >Cc: mturquette at linaro.org; linuxppc-dev at lists.ozlabs.org; linux-
-> >kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org
-> >Subject: Re: [RESEND] clk: ppc-corenet: Add Freescale ARM-based platforms
-> >CLK_OF_DECLARE support
-> >
-> >On Thu, 2014-08-28 at 05:05 -0500, Lu Jingchang-B35083 wrote:
-> >> >-----Original Message-----
-> >> >From: Wood Scott-B07421
-> >> >Sent: Thursday, August 28, 2014 7:34 AM
-> >> >To: Lu Jingchang-B35083
-> >> >Cc: mturquette at linaro.org; linuxppc-dev at lists.ozlabs.org; linux-
-> >> >kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org
-> >> >Subject: Re: [RESEND] clk: ppc-corenet: Add Freescale ARM-based
-> >> >platforms CLK_OF_DECLARE support
-> >> >
-> >> >On Tue, 2014-08-26 at 21:19 -0500, Lu Jingchang-B35083 wrote:
-> >> >> >-----Original Message-----
-> >> >> >From: Wood Scott-B07421
-> >> >> >Sent: Wednesday, August 27, 2014 6:51 AM
-> >> >> >To: Lu Jingchang-B35083
-> >> >> >Cc: mturquette at linaro.org; linuxppc-dev at lists.ozlabs.org; linux-
-> >> >> >kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org
-> >> >> >Subject: Re: [RESEND] clk: ppc-corenet: Add Freescale ARM-based
-> >> >> >platforms CLK_OF_DECLARE support
-> >> >> >
-> >> >> >On Fri, 2014-08-22 at 17:34 +0800, Jingchang Lu wrote:
-> >> >> >> +CLK_OF_DECLARE(ppc_core_pll_v1, "fsl,qoriq-core-pll-1.0",
-> >> >> >core_pll_init);
-> >> >> >> +CLK_OF_DECLARE(ppc_core_pll_v2, "fsl,qoriq-core-pll-2.0",
-> >> >> >core_pll_init);
-> >> >> >> +CLK_OF_DECLARE(ppc_core_mux_v1, "fsl,qoriq-core-mux-1.0",
-> >> >> >core_mux_init);
-> >> >> >> +CLK_OF_DECLARE(ppc_core_mux_v2, "fsl,qoriq-core-mux-2.0",
-> >> >> >core_mux_init);
-> >> >> >
-> >> >> >What does this do that the existing platform driver and match
-> >> >> >table don't?  Why is it needed for ARM when PPC didn't need it?
-> >> >> >
-> >> >> >-Scott
-> >> >> >
-> >> >> Common clk init on ARM platform is initialized earlier via
-> >> >> of_clk_init() instead of driver probe method, the of_clk_init will
-> >> >> walk a __clk_of_table to init each clk provider in the table, the
-> >> >> CLK_OF_DECLARE() macro puts a supported clk in the __clk_of_table
-> >> >> for it
-> >> >initializing on starup, and the clk system has added some common clk
-> >> >such as "fixed-clk"
-> >> >> to this table already.
-> >> >> So here I add our specific clk init declaration to consist this
-> >> >> framework, and the driver probe function will not be needed on ARM.
-> >> >
-> >> >OK... Is there any reason why the new method won't work on PPC?
-> >> >
-> >> PPC has little dependence on the clock tree but frequency, it will
-> >> work well if adopted I think.
-> >
-> >I'm just saying it seems redundant to have both.  Even on ARM, won't this
-> >result in the clock getting registered twice (albeit with one of those
-> >times being too late)?
-> >
-> >Regardless of what dependence PPC has on the clock tree, what stops this
-> >method of enumeration from working on PPC?  Is there anything required
-> >other than inserting a call to of_clk_init(NULL) in the arch init code?
-> >
-> >-Scott
-> >
-> The of_clk_init is an alternative way to the legacy driver. 
-> Latest ARM standard support a default call to of_clk_init(NULL) in its time_init().
-> So this is the general way for ARM-based platform.
+On 2014/8/29 16:47, Jon Medhurst (Tixy) wrote:
+> On Thu, 2014-08-28 at 11:24 +0100, Will Deacon wrote:
+>> On Thu, Aug 28, 2014 at 11:20:21AM +0100, Russell King - ARM Linux wrote:
+>>> On Thu, Aug 28, 2014 at 06:51:15PM +0900, Masami Hiramatsu wrote:
+>>>> (2014/08/27 22:02), Wang Nan wrote:
+>>>>> This patch improves arm instruction decoder, allows it check whether an
+>>>>> instruction is a stack store operation. This information is important
+>>>>> for kprobe optimization.
+>>>>>
+>>>>> For normal str instruction, this patch add a series of _SP_STACK
+>>>>> register indicator in the decoder to test the base and offset register
+>>>>> in ldr <Rt>, [<Rn>, <Rm>] against sp.
+>>>>>
+>>>>> For stm instruction, it check sp register in instruction specific
+>>>>> decoder.
+>>>>
+>>>> OK, reviewed. but since I'm not so sure about arm32 ISA,
+>>>> I need help from ARM32 maintainer to ack this.
+>>>
+>>> What you actually need is an ack from the ARM kprobes people who
+>>> understand this code.  That would be much more meaningful than my
+>>> ack.  They're already on the Cc list.
+>>
+>> Tixy, can you take a look please?
+> 
+> I'll take an in depth look on Monday as I'm currently on holiday, so for
+> now just some brief and possibly not well thought out comments...
+> 
+> - If the intent is to not optimise stack push operations, then this
+> actually excludes the main use of kprobes which I believe is to insert
+> probes at the start of functions (there's even a specific jprobes API
+> for that) this is because functions usually start by saving registers on
+> the stack.
 
-Why are such things dependent on CPU architecture?
+Agree. If the decoder can bring up more information, kprobeopt can dynamically
+compute the range of stack an instruction require, then adjust stack protection range.
+This need ARM decoder bring up more information. For example: for a "push {r4, r5}"
+instruction, decoder should report it is a stack store operation, require 8 bytes
+of stack, then when composing trampoline code, we can put registers at
+[sp, #-8]. Only instructions such as "str r0, [sp, r1]" should be prevented.
 
-> The clk register layer can detect the twice registration of a same clk and
-> avoid the duplicate registration. The dtb should select the compatible for either,
-> but not both.
+However, this need more improvement on decoder: all store operations should use
+a special decorer then. What do you think?
 
-Either but not both of what?
+> 
+> - Crowbarring in special case testing for stack operations looks a bit
+> inelegant and not a sustainable way of doing this, what about the next
+> special case we need? However, stack push operations _are_ a general
+> special cases for instruction emulation so perhaps that's OK, and leads
+> me to...
+> 
+> - The current 'unoptimised' kprobes implementation allows for pushing on
+> the stack (see __und_svc and the unused (?) jprobe_return) but this is
+> just aimed at stm instructions, not things like "str r0, [sp, -imm]!"
+> that might be used to simultaneously save a register and reserve an
+> arbitrary amount of stack space. Probing such instructions could lead to
+> the kprobes code trashing the kernel stack.
 
-> On LS1021A the driver probe method will not be triggered.
-> And for support of of_clk_init on PPC, I think just add a call to it as ARM do
-> in time_init()[arch/arm/kernel/time.c] would be ok.
+By a quick search I just find tow instructions matching "str.*\[sp,[^\]]*-[^4]",
+one in Ldiv0_64, another in Ldiv0, both are "str     lr, [sp, #-8]!". So I think
+such instructions are very special.
 
-I'd rather see this happen than have the driver have to register itself
-differently on different architectures.
+Furthermore, I thought "unoptimised" kprobe use another stack, could you please
+explain how such probing trashing normal kernel stack?
 
--Scott
+Thank you.
