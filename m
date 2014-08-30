@@ -1,76 +1,40 @@
-From: pramod.gurav@smartplayin.com (Pramod Gurav)
-Date: Sat, 30 Aug 2014 20:15:35 +0530
-Subject: [PATCH] pinctrl: st: Add remove function and remove gpio_chip on
- failure
-Message-ID: <1409409935-8775-1-git-send-email-pramod.gurav@smartplayin.com>
+From: shc_work@mail.ru (=?UTF-8?B?QWxleGFuZGVyIFNoaXlhbg==?=)
+Date: Sat, 30 Aug 2014 19:36:28 +0400
+Subject: =?UTF-8?B?UmU6IFtQQVRDSF0gYXBmMjdkZXY6IGFkZCBtYXgxMDI3IGluIHRoZSBkdHM=?=
+In-Reply-To: <1409404932-12532-1-git-send-email-tremyfr@gmail.com>
+References: <1409404932-12532-1-git-send-email-tremyfr@gmail.com>
+Message-ID: <1409412988.93020165@f362.i.mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds a remove function to platform_driver to unload
-the driver in a cleaner way. This also releases gpiochip related
-resources by calling gpiochip_remove when gpiochip_irqchip_add fails.
+Sat, 30 Aug 2014 15:22:12 +0200 ?? Philippe Reynes <tremyfr@gmail.com>:
+> 
+> Signed-off-by: Philippe Reynes <tremyfr@gmail.com>
+> ---
+>  arch/arm/boot/dts/imx27-apf27dev.dts |   20 ++++++++++++++++++++
+>  1 files changed, 20 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/imx27-apf27dev.dts b/arch/arm/boot/dts/imx27-apf27dev.dts
+> index b982309..25b9ecd 100644
+> --- a/arch/arm/boot/dts/imx27-apf27dev.dts
+> +++ b/arch/arm/boot/dts/imx27-apf27dev.dts
+> @@ -82,6 +82,19 @@
+>  	pinctrl-names = "default";
+>  	pinctrl-0 = <&pinctrl_cspi1 &pinctrl_cspi1_cs>;
+>  	status = "okay";
+> +
+> +	adc at 0 {
+> +		compatible = "maxim,max1027";
+> +		reg = <0>;
+> +		interrupt-parent = <&gpio5>;
+> +		interrupts = <15 IRQ_TYPE_EDGE_FALLING>;
+> +		pinctrl-names = "default";
+> +		pinctrl-0 = <&pinctrl_max1027>;
+> +		/* SPI mode = 0 */
+> +		spi-cpol = <0>;
+> +		spi-cpha = <0>;
 
-CC: Srinivas Kandagatla <srinivas.kandagatla@gmail.com>
-CC: Srinivas Kandagatla <srinivas.kandagatla@linaro.com>
-CC: Maxime Coquelin <maxime.coquelin@st.com>
-CC: Patrice Chotard <patrice.chotard@st.com>
-CC: Linus Walleij <linus.walleij@linaro.org>
-CC: Bjorn Andersson <bjorn.andersson@sonymobile.com>
+Mode0 is default.
+Afaik you not need to specify SPOL & SPHA for this. Is not it?
 
-Signed-off-by: Pramod Gurav <pramod.gurav@smartplayin.com>
 ---
- drivers/pinctrl/pinctrl-st.c |   25 +++++++++++++++++++++++++
- 1 files changed, 25 insertions(+), 0 deletions(-)
-
-diff --git a/drivers/pinctrl/pinctrl-st.c b/drivers/pinctrl/pinctrl-st.c
-index 5475374..9296845 100644
---- a/drivers/pinctrl/pinctrl-st.c
-+++ b/drivers/pinctrl/pinctrl-st.c
-@@ -1517,6 +1517,7 @@ static int st_gpiolib_register_bank(struct st_pinctrl *info,
- 					   0, handle_simple_irq,
- 					   IRQ_TYPE_LEVEL_LOW);
- 		if (err) {
-+			gpiochip_remove(&bank->gpio_chip);
- 			dev_info(dev, "could not add irqchip\n");
- 			return err;
- 		}
-@@ -1685,6 +1686,29 @@ static int st_pctl_probe(struct platform_device *pdev)
- 	return 0;
- }
- 
-+static int st_pctl_remove(struct platform_device *pdev)
-+{
-+	struct st_pinctrl *info = platform_get_drvdata(pdev);
-+	struct device_node *np = pdev->dev.of_node;
-+	struct device_node *child;
-+	struct gpio_chip gpio_chip;
-+	int bank = 0;
-+
-+	if (info->nbanks) {
-+		for_each_child_of_node(np, child) {
-+			if (of_property_read_bool(child, "gpio-controller")) {
-+				gpio_chip = info->banks[bank].gpio_chip;
-+				gpiochip_remove(&gpio_chip);
-+				bank++;
-+			}
-+		}
-+	}
-+
-+	pinctrl_unregister(info->pctl);
-+
-+	return 0;
-+}
-+
- static struct platform_driver st_pctl_driver = {
- 	.driver = {
- 		.name = "st-pinctrl",
-@@ -1692,6 +1716,7 @@ static struct platform_driver st_pctl_driver = {
- 		.of_match_table = st_pctl_of_match,
- 	},
- 	.probe = st_pctl_probe,
-+	.remove = st_pctl_remove,
- };
- 
- static int __init st_pctl_init(void)
--- 
-1.7.0.4
