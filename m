@@ -1,40 +1,71 @@
-From: shc_work@mail.ru (=?UTF-8?B?QWxleGFuZGVyIFNoaXlhbg==?=)
-Date: Sat, 30 Aug 2014 19:36:28 +0400
-Subject: =?UTF-8?B?UmU6IFtQQVRDSF0gYXBmMjdkZXY6IGFkZCBtYXgxMDI3IGluIHRoZSBkdHM=?=
-In-Reply-To: <1409404932-12532-1-git-send-email-tremyfr@gmail.com>
-References: <1409404932-12532-1-git-send-email-tremyfr@gmail.com>
-Message-ID: <1409412988.93020165@f362.i.mail.ru>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Sat, 30 Aug 2014 11:54:59 -0400
+Subject: [PATCH v4 3/5] ARM: tegra: Initialize interrupt controller from DT
+In-Reply-To: <3113165.EcqFA5vr07@wuerfel>
+References: <1409239879-12376-1-git-send-email-thierry.reding@gmail.com>
+ <20140829142408.GA31264@ulmo> <20140829150422.GA11035@ulmo>
+ <3113165.EcqFA5vr07@wuerfel>
+Message-ID: <20140830155459.GI3683@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sat, 30 Aug 2014 15:22:12 +0200 ?? Philippe Reynes <tremyfr@gmail.com>:
-> 
-> Signed-off-by: Philippe Reynes <tremyfr@gmail.com>
-> ---
->  arch/arm/boot/dts/imx27-apf27dev.dts |   20 ++++++++++++++++++++
->  1 files changed, 20 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/imx27-apf27dev.dts b/arch/arm/boot/dts/imx27-apf27dev.dts
-> index b982309..25b9ecd 100644
-> --- a/arch/arm/boot/dts/imx27-apf27dev.dts
-> +++ b/arch/arm/boot/dts/imx27-apf27dev.dts
-> @@ -82,6 +82,19 @@
->  	pinctrl-names = "default";
->  	pinctrl-0 = <&pinctrl_cspi1 &pinctrl_cspi1_cs>;
->  	status = "okay";
-> +
-> +	adc at 0 {
-> +		compatible = "maxim,max1027";
-> +		reg = <0>;
-> +		interrupt-parent = <&gpio5>;
-> +		interrupts = <15 IRQ_TYPE_EDGE_FALLING>;
-> +		pinctrl-names = "default";
-> +		pinctrl-0 = <&pinctrl_max1027>;
-> +		/* SPI mode = 0 */
-> +		spi-cpol = <0>;
-> +		spi-cpha = <0>;
+Arnd,
 
-Mode0 is default.
-Afaik you not need to specify SPOL & SPHA for this. Is not it?
+On Fri, Aug 29, 2014 at 09:53:42PM +0200, Arnd Bergmann wrote:
+> On Friday 29 August 2014 17:04:28 Thierry Reding wrote:
+> >         static struct irq_chip *extn;
+> > 
+> >         void gic_arch_register(const struct irqchip *chip)
+> >         {
+> >                 if (WARN(extn != NULL))
+> >                         return;
+> > 
+> >                 gic_chip.flags |= chip->flags;
+> >                 extn = chip;
+> >         }
+> > 
+> > Any preferences, or other ideas? Adding Thomas and Jason, perhaps they
+> > can provide more input on how to solve this.
+> 
+> I think the entire gic_arch_extn method is done in a rather odd way
+> and we should try to come up with a replacement.
+> 
+> These are the users at the moment:
+> 
+> arch/arm/mach-exynos/pm.c:      gic_arch_extn.irq_set_wake = exynos_irq_set_wake;
+> arch/arm/mach-imx/gpc.c:        gic_arch_extn.irq_mask = imx_gpc_irq_mask;
+> arch/arm/mach-imx/gpc.c:        gic_arch_extn.irq_unmask = imx_gpc_irq_unmask;
+> arch/arm/mach-imx/gpc.c:        gic_arch_extn.irq_set_wake = imx_gpc_irq_set_wake;
+> arch/arm/mach-omap2/omap-wakeupgen.c:   gic_arch_extn.irq_mask = wakeupgen_mask;
+> arch/arm/mach-omap2/omap-wakeupgen.c:   gic_arch_extn.irq_unmask = wakeupgen_unmask;
+> arch/arm/mach-omap2/omap-wakeupgen.c:   gic_arch_extn.flags = IRQCHIP_MASK_ON_SUSPEND | IRQCHIP_SKIP_SET_W
+> arch/arm/mach-shmobile/intc-sh73a0.c:   gic_arch_extn.irq_set_wake = sh73a0_set_wake;
+> arch/arm/mach-shmobile/setup-r8a7779.c: gic_arch_extn.irq_set_wake = r8a7779_set_wake;
+> arch/arm/mach-tegra/irq.c:      gic_arch_extn.irq_ack = tegra_ack;
+> arch/arm/mach-tegra/irq.c:      gic_arch_extn.irq_eoi = tegra_eoi;
+> arch/arm/mach-tegra/irq.c:      gic_arch_extn.irq_mask = tegra_mask;
+> arch/arm/mach-tegra/irq.c:      gic_arch_extn.irq_unmask = tegra_unmask;
+> arch/arm/mach-tegra/irq.c:      gic_arch_extn.irq_retrigger = tegra_retrigger;
+> arch/arm/mach-tegra/irq.c:      gic_arch_extn.irq_set_wake = tegra_set_wake;
+> arch/arm/mach-tegra/irq.c:      gic_arch_extn.flags = IRQCHIP_MASK_ON_SUSPEND;
+> arch/arm/mach-ux500/cpu.c:      gic_arch_extn.flags = IRQCHIP_SKIP_SET_WAKE | IRQCHIP_MASK_ON_SUSPEND;
+> arch/arm/mach-zynq/common.c:    gic_arch_extn.flags = IRQCHIP_SKIP_SET_WAKE | IRQCHIP_MASK_ON_SUSPEND;
+> 
+> I have to admit I don't really understand how these work, but what
+> I'd expect to work better is a way to turn the gic code into more
+> of a library that can be used by specialized drivers. In that
+> case you would register a driver for the tegra gic using IRQCHIP_DECLARE
+> and that driver would call a variation of gic_of_init() or gic_init_bases()
+> with the extra stuff as arguments.
+> 
+> We'd have to hack around the fact that all these platforms currently
+> don't list a specialized compatible string, but at least for the future
+> we should be able to do this without special hacks.
 
----
+Thomas was talking about this just the other day:
+
+  https://lkml.kernel.org/r/alpine.DEB.2.10.1408271347210.3323 at nanos
+
+thx,
+
+Jason.
