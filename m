@@ -1,44 +1,38 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Sat, 30 Aug 2014 11:32:30 +0200
-Subject: [PATCH 1/2] ARM: multi_v7_defconfig: Enable shmobile platforms
-In-Reply-To: <3598124.ze8sbSR9ui@wuerfel>
-References: <1409234429-1916-1-git-send-email-geert+renesas@glider.be>
- <1965890.bT7bZyQJt8@amdc1032> <3598124.ze8sbSR9ui@wuerfel>
-Message-ID: <CAMuHMdXXUrq3tsiaEym_uuoiYXNt66c5sm+1mSAfX6cHgMbEOQ@mail.gmail.com>
+From: jic23@kernel.org (Jonathan Cameron)
+Date: Sat, 30 Aug 2014 10:45:38 +0100
+Subject: [PATCH] iio: adc: rockchip_saradc: remove unused variable in probe
+In-Reply-To: <2134722.Yfu4MZ4klm@diego>
+References: <2134722.Yfu4MZ4klm@diego>
+Message-ID: <54019D42.205@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+On 26/08/14 23:40, Heiko St?bner wrote:
+> The rate variable in the probe function of the saradc is a remnant
+> of a previous patch iteration. It is unused and thus produces a
+> compile time warning. Therefore remove it.
+> 
+> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+Applied to the togreg branch of iio.git - initially pushed out as testing
+for the autobuilders to play.
 
-On Fri, Aug 29, 2014 at 10:11 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> A related problem that I think is more significant is that
-> some platforms 'select' a particular driver and when you
-> disable the platform, that driver is suddenly removed from the
-> defconfig for all other platforms as well. This has bitten
-> us a few times in the past, and I'd really like to fix those
-> cases first.
+Thanks,
 
-Indeed. "select" is evil, and has a devastating effect on minimal
-defconfigs (lots of churn and nasty surprises like the one you mentioned).
-
-So it actually makes more sense to derive multi_v7_defconfig
-from the individual platform's defconfigs.
-I also have a script for that, which I wrote to create m68k's multi_defconfig
-a long time ago:
-https://github.com/geertu/linux-scripts/blob/master/linux-config-merge
-
-In the long run, I think creating defconfigs from DTS is the way to go.
-Extracting dependencies from the build system (both Makefile and
-the myriad of complex dependencies in Kconfig) are the biggest hurdles to
-solve.
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Jonathan
+> ---
+>  drivers/iio/adc/rockchip_saradc.c | 1 -
+>  1 file changed, 1 deletion(-)
+> 
+> diff --git a/drivers/iio/adc/rockchip_saradc.c b/drivers/iio/adc/rockchip_saradc.c
+> index 1fad964..e074a0b 100644
+> --- a/drivers/iio/adc/rockchip_saradc.c
+> +++ b/drivers/iio/adc/rockchip_saradc.c
+> @@ -141,7 +141,6 @@ static int rockchip_saradc_probe(struct platform_device *pdev)
+>  	struct resource	*mem;
+>  	int ret;
+>  	int irq;
+> -	u32 rate;
+>  
+>  	if (!np)
+>  		return -ENODEV;
+> 
