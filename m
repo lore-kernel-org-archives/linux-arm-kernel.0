@@ -1,132 +1,76 @@
-From: zhangfei.gao@linaro.org (zhangfei)
-Date: Sat, 30 Aug 2014 21:58:22 +0800
-Subject: [PATCH v3 2/3] rc: Introduce hix5hd2 IR transmitter driver
-In-Reply-To: <53FFF675.7020702@gmail.com>
-References: <1409238977-19444-1-git-send-email-zhangfei.gao@linaro.org>
- <1409238977-19444-3-git-send-email-zhangfei.gao@linaro.org>
- <53FFF675.7020702@gmail.com>
-Message-ID: <5401D87E.6000804@linaro.org>
+From: pramod.gurav@smartplayin.com (Pramod Gurav)
+Date: Sat, 30 Aug 2014 20:15:35 +0530
+Subject: [PATCH] pinctrl: st: Add remove function and remove gpio_chip on
+ failure
+Message-ID: <1409409935-8775-1-git-send-email-pramod.gurav@smartplayin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+This patch adds a remove function to platform_driver to unload
+the driver in a cleaner way. This also releases gpiochip related
+resources by calling gpiochip_remove when gpiochip_irqchip_add fails.
 
+CC: Srinivas Kandagatla <srinivas.kandagatla@gmail.com>
+CC: Srinivas Kandagatla <srinivas.kandagatla@linaro.com>
+CC: Maxime Coquelin <maxime.coquelin@st.com>
+CC: Patrice Chotard <patrice.chotard@st.com>
+CC: Linus Walleij <linus.walleij@linaro.org>
+CC: Bjorn Andersson <bjorn.andersson@sonymobile.com>
 
-On 08/29/2014 11:41 AM, Varka Bhadram wrote:
-> On 08/28/2014 08:46 PM, Zhangfei Gao wrote:
->> From: Guoxiong Yan <yanguoxiong@huawei.com>
->>
->> IR transmitter driver for Hisilicon hix5hd2 soc
->>
->> By default all protocols are disabled.
->> For example nec decoder can be enabled by either
->> 1. ir-keytable -p nec
->> 2. echo nec > /sys/class/rc/rc0/protocols
->> See see Documentation/ABI/testing/sysfs-class-rc
->>
-> (...)
->
->> +static irqreturn_t hix5hd2_ir_rx_interrupt(int irq, void *data)
->> +{
->> +    u32 symb_num, symb_val, symb_time;
->> +    u32 data_l, data_h;
->> +    u32 irq_sr, i;
->> +    struct hix5hd2_ir_priv *priv = data;
->> +
->> +    irq_sr = readl_relaxed(priv->base + IR_INTS);
->> +    if (irq_sr & INTMS_OVERFLOW) {
->> +        /*
->> +         * we must read IR_DATAL first, then we can clean up
->> +         * IR_INTS availably since logic would not clear
->> +         * fifo when overflow, drv do the job
->> +         */
->> +        ir_raw_event_reset(priv->rdev);
->> +        symb_num = readl_relaxed(priv->base + IR_DATAH);
->> +        for (i = 0; i < symb_num; i++)
->> +            readl_relaxed(priv->base + IR_DATAL);
->> +
->> +        writel_relaxed(INT_CLR_OVERFLOW, priv->base + IR_INTC);
->> +        dev_info(priv->dev, "overflow, level=%d\n",
->> +             IR_CFG_INT_THRESHOLD);
->> +    }
->> +
->> +    if ((irq_sr & INTMS_SYMBRCV) || (irq_sr & INTMS_TIMEOUT)) {
->> +        DEFINE_IR_RAW_EVENT(ev);
->> +
->> +        symb_num = readl_relaxed(priv->base + IR_DATAH);
->> +        for (i = 0; i < symb_num; i++) {
->> +            symb_val = readl_relaxed(priv->base + IR_DATAL);
->> +            data_l = ((symb_val & 0xffff) * 10);
->> +            data_h =  ((symb_val >> 16) & 0xffff) * 10;
->> +            symb_time = (data_l + data_h) / 10;
->> +
->> +            ev.duration = US_TO_NS(data_l);
->> +            ev.pulse = true;
->> +            ir_raw_event_store(priv->rdev, &ev);
->> +
->> +            if (symb_time < IR_CFG_SYMBOL_MAXWIDTH) {
->> +                ev.duration = US_TO_NS(data_h);
->> +                ev.pulse = false;
->> +                ir_raw_event_store(priv->rdev, &ev);
->> +            } else {
->> +                hix5hd2_ir_send_lirc_timeout(priv->rdev);
->> +            }
->> +        }
->> +
->> +        if (irq_sr & INTMS_SYMBRCV)
->> +            writel_relaxed(INT_CLR_RCV, priv->base + IR_INTC);
->> +        if (irq_sr & INTMS_TIMEOUT)
->> +            writel_relaxed(INT_CLR_TIMEOUT, priv->base + IR_INTC);
->> +    }
->> +
->> +    /* Empty software fifo */
->> +    ir_raw_event_handle(priv->rdev);
->> +    return IRQ_HANDLED;
->> +}
->> +
->
-> It looks good if the entire ISR() above the probe()/remove()
-> functionalities
-> of the driver. Maximum of the developers follows this structure.
->
-> (...)
->
->> +static struct of_device_id hix5hd2_ir_table[] = {
->> +    { .compatible = "hisilicon,hix5hd2-ir", },
->> +    {},
->> +};
->> +MODULE_DEVICE_TABLE(of, hix5hd2_ir_table);
->> +
->
-> Every driver put these device ids above *struct platform_driver*
-> definition.
-> So that we can see the of_match_table....
->
->> +static int hix5hd2_ir_probe(struct platform_device *pdev)
->> +{
->> +    int ret;
->> +    struct rc_dev *rdev;
->> +    struct device *dev = &pdev->dev;
->> +    struct resource *res;
->> +    struct hix5hd2_ir_priv *priv;
->> +    struct device_node *node = pdev->dev.of_node;
->> +
->> +    priv = devm_kzalloc(dev, sizeof(struct hix5hd2_ir_priv),
->> GFP_KERNEL);
->
-> sizeof(*priv)...?
->
->> +    if (!priv)
->> +        return -ENOMEM;
->> +
->
-> (...)
->
->> +#endif
->> +
->> +static SIMPLE_DEV_PM_OPS(hix5hd2_ir_pm_ops, hix5hd2_ir_suspend,
->> +             hix5hd2_ir_resume);
->> +
->
-> We can move the device ids here....
+Signed-off-by: Pramod Gurav <pramod.gurav@smartplayin.com>
+---
+ drivers/pinctrl/pinctrl-st.c |   25 +++++++++++++++++++++++++
+ 1 files changed, 25 insertions(+), 0 deletions(-)
 
-Thanks Varka, will change sequence accordingly.
+diff --git a/drivers/pinctrl/pinctrl-st.c b/drivers/pinctrl/pinctrl-st.c
+index 5475374..9296845 100644
+--- a/drivers/pinctrl/pinctrl-st.c
++++ b/drivers/pinctrl/pinctrl-st.c
+@@ -1517,6 +1517,7 @@ static int st_gpiolib_register_bank(struct st_pinctrl *info,
+ 					   0, handle_simple_irq,
+ 					   IRQ_TYPE_LEVEL_LOW);
+ 		if (err) {
++			gpiochip_remove(&bank->gpio_chip);
+ 			dev_info(dev, "could not add irqchip\n");
+ 			return err;
+ 		}
+@@ -1685,6 +1686,29 @@ static int st_pctl_probe(struct platform_device *pdev)
+ 	return 0;
+ }
+ 
++static int st_pctl_remove(struct platform_device *pdev)
++{
++	struct st_pinctrl *info = platform_get_drvdata(pdev);
++	struct device_node *np = pdev->dev.of_node;
++	struct device_node *child;
++	struct gpio_chip gpio_chip;
++	int bank = 0;
++
++	if (info->nbanks) {
++		for_each_child_of_node(np, child) {
++			if (of_property_read_bool(child, "gpio-controller")) {
++				gpio_chip = info->banks[bank].gpio_chip;
++				gpiochip_remove(&gpio_chip);
++				bank++;
++			}
++		}
++	}
++
++	pinctrl_unregister(info->pctl);
++
++	return 0;
++}
++
+ static struct platform_driver st_pctl_driver = {
+ 	.driver = {
+ 		.name = "st-pinctrl",
+@@ -1692,6 +1716,7 @@ static struct platform_driver st_pctl_driver = {
+ 		.of_match_table = st_pctl_of_match,
+ 	},
+ 	.probe = st_pctl_probe,
++	.remove = st_pctl_remove,
+ };
+ 
+ static int __init st_pctl_init(void)
+-- 
+1.7.0.4
