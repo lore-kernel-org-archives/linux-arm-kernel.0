@@ -1,38 +1,46 @@
 From: jic23@kernel.org (Jonathan Cameron)
-Date: Sat, 30 Aug 2014 10:45:38 +0100
-Subject: [PATCH] iio: adc: rockchip_saradc: remove unused variable in probe
-In-Reply-To: <2134722.Yfu4MZ4klm@diego>
-References: <2134722.Yfu4MZ4klm@diego>
-Message-ID: <54019D42.205@kernel.org>
+Date: Sat, 30 Aug 2014 10:49:42 +0100
+Subject: [PATCH 01/11] iio: sensors-core: st: Check
+ st_sensors_set_drdy_int_pin()'s return value
+In-Reply-To: <1409231657-18294-1-git-send-email-lee.jones@linaro.org>
+References: <1409231657-18294-1-git-send-email-lee.jones@linaro.org>
+Message-ID: <54019E36.4030304@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26/08/14 23:40, Heiko St?bner wrote:
-> The rate variable in the probe function of the saradc is a remnant
-> of a previous patch iteration. It is unused and thus produces a
-> compile time warning. Therefore remove it.
+On 28/08/14 14:14, Lee Jones wrote:
+> Value from st_sensors_set_drdy_int_pin() is assigned to err here,
+> but that stored value is not used before it is overwritten.  To fix
+> this we're enforcing a check on st_sensors_set_drdy_int_pin()'s
+> return value and if it's an error, we're returning right away.
 > 
-> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
-Applied to the togreg branch of iio.git - initially pushed out as testing
-for the autobuilders to play.
+> Cc: jic23 at kernel.org
+> Cc: linux-iio at vger.kernel.org
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+Applied to the togreg branch of iio.git
 
 Thanks,
 
 Jonathan
 > ---
->  drivers/iio/adc/rockchip_saradc.c | 1 -
->  1 file changed, 1 deletion(-)
+>  drivers/iio/common/st_sensors/st_sensors_core.c | 5 ++++-
+>  1 file changed, 4 insertions(+), 1 deletion(-)
 > 
-> diff --git a/drivers/iio/adc/rockchip_saradc.c b/drivers/iio/adc/rockchip_saradc.c
-> index 1fad964..e074a0b 100644
-> --- a/drivers/iio/adc/rockchip_saradc.c
-> +++ b/drivers/iio/adc/rockchip_saradc.c
-> @@ -141,7 +141,6 @@ static int rockchip_saradc_probe(struct platform_device *pdev)
->  	struct resource	*mem;
->  	int ret;
->  	int irq;
-> -	u32 rate;
+> diff --git a/drivers/iio/common/st_sensors/st_sensors_core.c b/drivers/iio/common/st_sensors/st_sensors_core.c
+> index 8a4ec00..24cfe4e 100644
+> --- a/drivers/iio/common/st_sensors/st_sensors_core.c
+> +++ b/drivers/iio/common/st_sensors/st_sensors_core.c
+> @@ -306,8 +306,11 @@ int st_sensors_init_sensor(struct iio_dev *indio_dev,
+>  	if (of_pdata)
+>  		pdata = of_pdata;
 >  
->  	if (!np)
->  		return -ENODEV;
+> -	if (pdata)
+> +	if (pdata) {
+>  		err = st_sensors_set_drdy_int_pin(indio_dev, pdata);
+> +		if (err < 0)
+> +			return err;
+> +	}
+>  
+>  	err = st_sensors_set_enable(indio_dev, false);
+>  	if (err < 0)
 > 
