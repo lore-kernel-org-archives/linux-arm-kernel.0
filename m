@@ -1,71 +1,101 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Sat, 30 Aug 2014 18:10:59 +0900
-Subject: [PATCH 1/2] ARM: multi_v7_defconfig: Enable shmobile platforms
-In-Reply-To: <3598124.ze8sbSR9ui@wuerfel>
-References: <1409234429-1916-1-git-send-email-geert+renesas@glider.be>
- <1965890.bT7bZyQJt8@amdc1032> <3598124.ze8sbSR9ui@wuerfel>
-Message-ID: <0a6f01cfc432$507900f0$f16b02d0$@samsung.com>
+From: jic23@kernel.org (Jonathan Cameron)
+Date: Sat, 30 Aug 2014 10:30:37 +0100
+Subject: [PATCH v3 1/4] thermal: rockchip: add driver for thermal
+In-Reply-To: <54006D4C.2070404@rock-chips.com>
+References: <1409187562-12370-1-git-send-email-caesar.wang@rock-chips.com>	<2852853.mfRZfFVSev@wuerfel>	<20140828143733.GA18084@developer>	<3440260.edal29kzlR@diego>	<2014082909531345696848@rock-chips.com>
+ <CAC-25o-winy6jVjh9_hQ-t2VO2UfxG67pW5DpOve8A2o39EJSw@mail.gmail.com>
+ <54006D4C.2070404@rock-chips.com>
+Message-ID: <540199BD.7000504@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd Bergmann wrote:
+On 29/08/14 13:08, Huang Tao wrote:
+> Dear Eduardo Bezerra Valentin:
 > 
-Hi,
+> ? 2014?08?29? 19:39, edubezval at gmail.com ??:
+>> Hello Zhao,
+>>
+>> On Thu, Aug 28, 2014 at 9:54 PM, ??? <zyf@rock-chips.com> wrote:
+>>> Hi Heiko?
+>>>
+>>>    The TS-ADC on RK3288 has two component, a tsadc and a tsadc controller.
+>>> The tsadc controller is similar like the thermal manager unit on other SOCs.
+>>> We followed the naming of 3066, but not named as the Thermal Manager.
+>>>
+>>>    Moreover,there is only one set of apb registers to access the tsadc
+>>> controller,and the tsadc is controlled by the tsadc controller,could not
+>>> access directly. If we write a general tsadc driver by accessed tsadc
+>>> controller registers, and it hardly to write a driver for the tsadc
+>>> controller.
+>> As suggested by Arnd, you can use the generic driver as interface
+>> between thermal framework and IIO layer. The driver you are going to
+>> write to your ADC is going to be in the IIO subsystem. The only
+>> difference is that the generic driver would work for any ADC driver in
+>> the IIO subsystem.
+>> https://lkml.org/lkml/2014/2/5/810
+>>
+>> In fact, there is already a generic driver. We just need to get it up
+>> to date.  I see some testing has been already done, and results sound
+>> promising.
+> This iio_thermal driver only support get temperature from the ADC IIO
+> channel.
+> It dose not support any advanced feature such as configure the
+> temperature when system should be reset.
+> So if we adapt it, we will access the register form both TSADC IIO
+> driver and  thermal driver.
+> I don't thank this is a good ideal.
 
-> On Friday 29 August 2014 20:05:49 Bartlomiej Zolnierkiewicz wrote:
-> > I've been looking lately into making it possible to easily go
-> > from multi_v7_defconfig config to a single platform one (in my
-> > case Exynos one) and removing the need to keep the latter (i.e.
-> > exynos_defconfig) in the kernel tree in the long-term.
-> >
-Why? I don't have any idea why we should use only multi_v7_defconfig for each
-hardware platform. In my understanding, multi_v7_defconfig can be used for one
-kernel image can support all of the platforms but it doesn't mean it should be
-used for each platform. And I think, if we cannot maintain each platform's
-defconfig in mainline, it will be kept in each SoC vendor and it is not a good
-way. I mean both defconfigs has each value in mainline, exynos_defconfig should
-be updated though ;)
+Interesting bit of functionality.  I agree this doesn't fit overwelmingly well
+into an iio consumer driver as things currently stand.
 
-> > Because of this I've noticed that some config options for platform
-> > specific hardware that are selected in multi_v7_defconfig don't
-> > have proper dependencies.  This results in more complex than
-> > necessary single platform configs (obtained from a multiplatform
-> > config) and unnecessarily bigger resulting kernel images.
-> >
-> > Your patch also adds/uncovers some such config options.
-> >
-> > Lets first look at sizes of resulting vmlinux images for single
-> > platform Exynos config before and after your patch:
-> >
-> >   $ size vmlinux.*
-> >      text    data     bss     dec     hex filename
-> >   7817317  517188  278992 8613497  836e79 vmlinux.before
-> >   7978325  527012  279056 8784393  860a09 vmlinux.after
-> >
-> >   (=> the patch results in 170kB bigger vmlinux size)
-> >
+Looking briefly at your code, this is basically a threshold interrupt?
+If so then we do have threshold type event handling in IIO (simply termed
+events).  The snag is that it is the one area that doesn't currently have
+any in kernel interfaces.
+
+Such an interface would be similar to that used for the buffered data access (raw
+data stream - we should probably rename that as it isn't always buffered anymore).
+The nasty bit (as it was with the buffered interface) is writing a reasonably
+efficient demux that can split out the data to those devices that have registered
+their interest in it. It would involve some additional code in iio_push_event and
+some indirection in the code that controls what events are enabled.
+Actually, you could probably skip this an just squirt all events recieved out through
+the direct IIO to userspace interface (nothing prevents another process turning
+more on anyway!).  We could event for now specify that any in kernel users might
+get other events and it is up to them to sanity check them.
+
+We'd also need to add some basic access functions to set limits etc.
+
+I'm afraid the 'events' bit of IIO is one of our least developed elements and is
+lagging way behind the work done on the main data flows. It's been on the
+list for a while, particularly as we need it to finish separating the
+userspace interfaces of IIO from the backend.
+
+So, looking at the wider picture, with a few additions to IIO we can support
+some ADC based thermal drivers - whether all of them is a bit dependent on
+whether they have weird and wonderful domain specific hardware (which I might
+have missed here, but does not seem to be present).
+
+Note this is based on a rather brief scan read so I may well have missed some
+important details!
 > 
-> Interesting work. We don't currently have a policy for this,
-> so we should first talk about whether the behavior that you
-> want is desirable. The alternative would be that everybody
-> who wants to build a platform-specific kernel out of
-> multi_v7_defconfig has to go through the extra work of not
-> only disabling the platforms but also the individual drivers
-> for the other platforms.
-> 
-> This is a bit tricky for drivers that may be shared between
-> a few platforms in multi_v7_defconfig but are meaningless
-> on the others. We could solve that by having more complex
-> dependencies for each of those drivers, but that is where
-> maintaining those gets really messy.
-> 
-Agreed and it is not required.
+> In fact, we should ignore the "ADC" stuff. This sensor use ADC internal,
+> but it is transparent to software, especially in automatic mode.
+Is this adc ever used for anything else?  If so, then there is your reason to
+go through the pain of a generic driver.
 
-> A related problem that I think is more significant is that
-> some platforms 'select' a particular driver and when you
-> disable the platform, that driver is suddenly removed from the
-> defconfig for all other platforms as well. This has bitten
-> us a few times in the past, and I'd really like to fix those
-> cases first.
+Jonathan
 
-- Kukjin
+p.s. I'd never seen the driver Arnd highlighted.  Could anyone working on
+IIO clients cc linux-iio at vger.kernel.org as it's useful to know what people
+are using the interfaces for (particularly as they might change so it is
+good to know what is in the pipeline).
+>>
+>>>    So, I do not agree to write a generic adc driver for the rk3288-tsadc.
+>>>
+>>> ________________________________
+>>> Yifeng Zhao
+>>>
+>>>
+> 
+> 
