@@ -1,328 +1,237 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Sat, 30 Aug 2014 22:03:03 +0200
-Subject: [PATCH v2 04/12] clk: sunxi: factors: Invert the probing logic
+Date: Sat, 30 Aug 2014 22:03:00 +0200
+Subject: [PATCH v2 01/12] clk: introduce clk_set_phase function & callback
 In-Reply-To: <1409428991-2442-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1409428991-2442-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1409428991-2442-5-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1409428991-2442-2-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Until now, the factors clock probing was done directly by sunxi_init_clocks,
-with the factors registration being called directly with the clocks data passed
-as an argument.
+From: Mike Turquette <mturquette@linaro.org>
 
-This approch has shown its limits when we added more clocks, since we couldn't
-really split code with such a logic in smaller files, and led to a huge file
-having all the clocks.
+A common operation for a clock signal generator is to shift the phase of
+that signal. This patch introduces a new function to the clk.h API to
+dynamically adjust the phase of a clock signal. Additionally this patch
+introduces support for the new function in the common clock framework
+via the .set_phase call back in struct clk_ops.
 
-Introduce an intermediate probing function, so that factor clocks will be able
-to directly be called by CLK_OF_DECLARE, which will in turn ease the split into
-several files.
-
+Signed-off-by: Mike Turquette <mturquette@linaro.org>
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- drivers/clk/sunxi/clk-factors.c | 101 +++++++++++++++++++++++++++++++++++++---
- drivers/clk/sunxi/clk-factors.h |  16 ++++++-
- drivers/clk/sunxi/clk-sunxi.c   |  95 ++-----------------------------------
- 3 files changed, 113 insertions(+), 99 deletions(-)
+ drivers/clk/clk.c            | 85 +++++++++++++++++++++++++++++++++++++++++---
+ include/linux/clk-private.h  |  1 +
+ include/linux/clk-provider.h |  5 +++
+ include/linux/clk.h          | 29 +++++++++++++++
+ 4 files changed, 116 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/clk/sunxi/clk-factors.c b/drivers/clk/sunxi/clk-factors.c
-index 2057c8ac648f..f83ba097126c 100644
---- a/drivers/clk/sunxi/clk-factors.c
-+++ b/drivers/clk/sunxi/clk-factors.c
-@@ -9,18 +9,18 @@
-  */
+diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+index b76fa69b44cb..d87661af0c72 100644
+--- a/drivers/clk/clk.c
++++ b/drivers/clk/clk.c
+@@ -117,11 +117,11 @@ static void clk_summary_show_one(struct seq_file *s, struct clk *c, int level)
+ 	if (!c)
+ 		return;
  
- #include <linux/clk-provider.h>
-+#include <linux/delay.h>
-+#include <linux/err.h>
-+#include <linux/io.h>
- #include <linux/module.h>
-+#include <linux/of_address.h>
- #include <linux/slab.h>
--#include <linux/io.h>
--#include <linux/err.h>
- #include <linux/string.h>
- 
--#include <linux/delay.h>
--
- #include "clk-factors.h"
- 
- /*
-- * DOC: basic adjustable factor-based clock that cannot gate
-+ * DOC: basic adjustable factor-based clock
-  *
-  * Traits of this clock:
-  * prepare - clk_prepare only ensures that parents are prepared
-@@ -32,6 +32,8 @@
- 
- #define to_clk_factors(_hw) container_of(_hw, struct clk_factors, hw)
- 
-+#define FACTORS_MAX_PARENTS		5
-+
- #define SETMASK(len, pos)		(((1U << (len)) - 1) << (pos))
- #define CLRMASK(len, pos)		(~(SETMASK(len, pos)))
- #define FACTOR_GET(bit, len, reg)	(((reg) & SETMASK(len, bit)) >> (bit))
-@@ -147,9 +149,96 @@ static int clk_factors_set_rate(struct clk_hw *hw, unsigned long rate,
- 	return 0;
+-	seq_printf(s, "%*s%-*s %11d %12d %11lu %10lu\n",
++	seq_printf(s, "%*s%-*s %11d %12d %11lu %10lu %-3d\n",
+ 		   level * 3 + 1, "",
+ 		   30 - level * 3, c->name,
+ 		   c->enable_count, c->prepare_count, clk_get_rate(c),
+-		   clk_get_accuracy(c));
++		   clk_get_accuracy(c), clk_get_phase(c));
  }
  
--const struct clk_ops clk_factors_ops = {
-+static const struct clk_ops clk_factors_ops = {
- 	.determine_rate = clk_factors_determine_rate,
- 	.recalc_rate = clk_factors_recalc_rate,
- 	.round_rate = clk_factors_round_rate,
- 	.set_rate = clk_factors_set_rate,
- };
+ static void clk_summary_show_subtree(struct seq_file *s, struct clk *c,
+@@ -143,8 +143,8 @@ static int clk_summary_show(struct seq_file *s, void *data)
+ 	struct clk *c;
+ 	struct hlist_head **lists = (struct hlist_head **)s->private;
+ 
+-	seq_puts(s, "   clock                         enable_cnt  prepare_cnt        rate   accuracy\n");
+-	seq_puts(s, "--------------------------------------------------------------------------------\n");
++	seq_puts(s, "   clock                         enable_cnt  prepare_cnt        rate   accuracy   phase\n");
++	seq_puts(s, "----------------------------------------------------------------------------------------\n");
+ 
+ 	clk_prepare_lock();
+ 
+@@ -180,6 +180,7 @@ static void clk_dump_one(struct seq_file *s, struct clk *c, int level)
+ 	seq_printf(s, "\"prepare_count\": %d,", c->prepare_count);
+ 	seq_printf(s, "\"rate\": %lu", clk_get_rate(c));
+ 	seq_printf(s, "\"accuracy\": %lu", clk_get_accuracy(c));
++	seq_printf(s, "\"phase\": %d", clk_get_phase(c));
+ }
+ 
+ static void clk_dump_subtree(struct seq_file *s, struct clk *c, int level)
+@@ -264,6 +265,11 @@ static int clk_debug_create_one(struct clk *clk, struct dentry *pdentry)
+ 	if (!d)
+ 		goto err_out;
+ 
++	d = debugfs_create_u32("clk_phase", S_IRUGO, clk->dentry,
++			(u32 *)&clk->phase);
++	if (!d)
++		goto err_out;
 +
-+struct clk * __init sunxi_factors_register(struct device_node *node,
-+					   const struct factors_data *data,
-+					   spinlock_t *lock)
+ 	d = debugfs_create_x32("clk_flags", S_IRUGO, clk->dentry,
+ 			(u32 *)&clk->flags);
+ 	if (!d)
+@@ -1739,6 +1745,77 @@ out:
+ EXPORT_SYMBOL_GPL(clk_set_parent);
+ 
+ /**
++ * clk_set_phase - adjust the phase shift of a clock signal
++ * @clk: clock signal source
++ * @degrees: number of degrees the signal is shifted
++ *
++ * Shifts the phase of a clock signal by the specified
++ * degrees. Returns 0 on success, -EERROR otherwise.
++ *
++ * This function makes no distinction about the input or reference
++ * signal that we adjust the clock signal phase against. For example
++ * phase locked-loop clock signal generators we may shift phase with
++ * respect to feedback clock signal input, but for other cases the
++ * clock phase may be shifted with respect to some other, unspecified
++ * signal.
++ *
++ * Additionally the concept of phase shift does not propagate through
++ * the clock tree hierarchy, which sets it apart from clock rates and
++ * clock accuracy. A parent clock phase attribute does not have an
++ * impact on the phase attribute of a child clock.
++ */
++int clk_set_phase(struct clk *clk, int degrees)
 +{
-+	struct clk *clk;
-+	struct clk_factors *factors;
-+	struct clk_gate *gate = NULL;
-+	struct clk_mux *mux = NULL;
-+	struct clk_hw *gate_hw = NULL;
-+	struct clk_hw *mux_hw = NULL;
-+	const char *clk_name = node->name;
-+	const char *parents[FACTORS_MAX_PARENTS];
-+	void __iomem *reg;
-+	int i = 0;
++	int ret = 0;
 +
-+	reg = of_iomap(node, 0);
++	if (!clk)
++		goto out;
 +
-+	/* if we have a mux, we will have >1 parents */
-+	while (i < FACTORS_MAX_PARENTS &&
-+	       (parents[i] = of_clk_get_parent_name(node, i)) != NULL)
-+		i++;
++	/* sanity check degrees */
++	degrees %= 360;
++	if (degrees < 0)
++		degrees += 360;
 +
-+	/*
-+	 * some factor clocks, such as pll5 and pll6, may have multiple
-+	 * outputs, and have their name designated in factors_data
-+	 */
-+	if (data->name)
-+		clk_name = data->name;
-+	else
-+		of_property_read_string(node, "clock-output-names", &clk_name);
++	clk_prepare_lock();
 +
-+	factors = kzalloc(sizeof(struct clk_factors), GFP_KERNEL);
-+	if (!factors)
-+		return NULL;
++	if (!clk->ops->set_phase)
++		goto out_unlock;
 +
-+	/* set up factors properties */
-+	factors->reg = reg;
-+	factors->config = data->table;
-+	factors->get_factors = data->getter;
-+	factors->lock = lock;
++	ret = clk->ops->set_phase(clk->hw, degrees);
 +
-+	/* Add a gate if this factor clock can be gated */
-+	if (data->enable) {
-+		gate = kzalloc(sizeof(struct clk_gate), GFP_KERNEL);
-+		if (!gate) {
-+			kfree(factors);
-+			return NULL;
-+		}
++	if (!ret)
++		clk->phase = degrees;
 +
-+		/* set up gate properties */
-+		gate->reg = reg;
-+		gate->bit_idx = data->enable;
-+		gate->lock = factors->lock;
-+		gate_hw = &gate->hw;
-+	}
++out_unlock:
++	clk_prepare_unlock();
 +
-+	/* Add a mux if this factor clock can be muxed */
-+	if (data->mux) {
-+		mux = kzalloc(sizeof(struct clk_mux), GFP_KERNEL);
-+		if (!mux) {
-+			kfree(factors);
-+			kfree(gate);
-+			return NULL;
-+		}
-+
-+		/* set up gate properties */
-+		mux->reg = reg;
-+		mux->shift = data->mux;
-+		mux->mask = SUNXI_FACTORS_MUX_MASK;
-+		mux->lock = factors->lock;
-+		mux_hw = &mux->hw;
-+	}
-+
-+	clk = clk_register_composite(NULL, clk_name,
-+			parents, i,
-+			mux_hw, &clk_mux_ops,
-+			&factors->hw, &clk_factors_ops,
-+			gate_hw, &clk_gate_ops, 0);
-+
-+	if (!IS_ERR(clk)) {
-+		of_clk_add_provider(node, of_clk_src_simple_get, clk);
-+		clk_register_clkdev(clk, clk_name, NULL);
-+	}
-+
-+	return clk;
++out:
++	return ret;
 +}
-diff --git a/drivers/clk/sunxi/clk-factors.h b/drivers/clk/sunxi/clk-factors.h
-index d2d0efa39379..9913840018d3 100644
---- a/drivers/clk/sunxi/clk-factors.h
-+++ b/drivers/clk/sunxi/clk-factors.h
-@@ -3,9 +3,12 @@
- 
- #include <linux/clk-provider.h>
- #include <linux/clkdev.h>
-+#include <linux/spinlock.h>
- 
- #define SUNXI_FACTORS_NOT_APPLICABLE	(0)
- 
-+#define SUNXI_FACTORS_MUX_MASK 0x3
 +
- struct clk_factors_config {
- 	u8 nshift;
- 	u8 nwidth;
-@@ -18,6 +21,14 @@ struct clk_factors_config {
- 	u8 n_start;
- };
- 
-+struct factors_data {
-+	int enable;
-+	int mux;
-+	struct clk_factors_config *table;
-+	void (*getter) (u32 *rate, u32 parent_rate, u8 *n, u8 *k, u8 *m, u8 *p);
-+	const char *name;
-+};
++/**
++ * clk_get_phase - return the phase shift of a clock signal
++ * @clk: clock signal source
++ *
++ * Returns the phase shift of a clock node in degrees, otherwise returns
++ * -EERROR.
++ */
++int clk_get_phase(struct clk *clk)
++{
++	int ret = 0;
 +
- struct clk_factors {
- 	struct clk_hw hw;
- 	void __iomem *reg;
-@@ -26,5 +37,8 @@ struct clk_factors {
- 	spinlock_t *lock;
++	if (!clk)
++		goto out;
++
++	clk_prepare_lock();
++	ret = clk->phase;
++	clk_prepare_unlock();
++
++out:
++	return ret;
++}
++
++/**
+  * __clk_init - initialize the data structures in a struct clk
+  * @dev:	device initializing this clk, placeholder for now
+  * @clk:	clk being initialized
+diff --git a/include/linux/clk-private.h b/include/linux/clk-private.h
+index efbf70b9fd84..845be30be50f 100644
+--- a/include/linux/clk-private.h
++++ b/include/linux/clk-private.h
+@@ -46,6 +46,7 @@ struct clk {
+ 	unsigned int		enable_count;
+ 	unsigned int		prepare_count;
+ 	unsigned long		accuracy;
++	int			phase;
+ 	struct hlist_head	children;
+ 	struct hlist_node	child_node;
+ 	unsigned int		notifier_count;
+diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
+index 411dd7eb2653..201a6195a3eb 100644
+--- a/include/linux/clk-provider.h
++++ b/include/linux/clk-provider.h
+@@ -129,6 +129,10 @@ struct dentry;
+  *		set then clock accuracy will be initialized to parent accuracy
+  *		or 0 (perfect clock) if clock has no parent.
+  *
++ * @set_phase:	Shift the phase this clock signal in degrees specified
++ *		by the second argument. Valid values for degrees are
++ *		0-359. Return 0 on success, otherwise -EERROR.
++ *
+  * @init:	Perform platform-specific initialization magic.
+  *		This is not not used by any of the basic clock types.
+  *		Please consider other ways of solving initialization problems
+@@ -177,6 +181,7 @@ struct clk_ops {
+ 				    unsigned long parent_rate, u8 index);
+ 	unsigned long	(*recalc_accuracy)(struct clk_hw *hw,
+ 					   unsigned long parent_accuracy);
++	int		(*set_phase)(struct clk_hw *hw, int degrees);
+ 	void		(*init)(struct clk_hw *hw);
+ 	int		(*debug_init)(struct clk_hw *hw, struct dentry *dentry);
  };
+diff --git a/include/linux/clk.h b/include/linux/clk.h
+index fb5e097d8f72..38bdedd3e389 100644
+--- a/include/linux/clk.h
++++ b/include/linux/clk.h
+@@ -106,6 +106,25 @@ int clk_notifier_unregister(struct clk *clk, struct notifier_block *nb);
+  */
+ long clk_get_accuracy(struct clk *clk);
  
--extern const struct clk_ops clk_factors_ops;
-+struct clk * __init sunxi_factors_register(struct device_node *node,
-+					   const struct factors_data *data,
-+					   spinlock_t *lock);
++/**
++ * clk_set_phase - adjust the phase shift of a clock signal
++ * @clk: clock signal source
++ * @degrees: number of degrees the signal is shifted
++ *
++ * Shifts the phase of a clock signal by the specified degrees. Returns 0 on
++ * success, -EERROR otherwise.
++ */
++int clk_set_phase(struct clk *clk, int degrees);
++
++/**
++ * clk_get_phase - return the phase shift of a clock signal
++ * @clk: clock signal source
++ *
++ * Returns the phase shift of a clock node in degrees, otherwise returns
++ * -EERROR.
++ */
++int clk_get_phase(struct clk *clk);
++
+ #else
+ 
+ static inline long clk_get_accuracy(struct clk *clk)
+@@ -113,6 +132,16 @@ static inline long clk_get_accuracy(struct clk *clk)
+ 	return -ENOTSUPP;
+ }
+ 
++static inline long clk_set_phase(struct clk *clk, int phase)
++{
++	return -ENOTSUPP;
++}
++
++static inline long clk_get_phase(struct clk *clk)
++{
++	return -ENOTSUPP;
++}
 +
  #endif
-diff --git a/drivers/clk/sunxi/clk-sunxi.c b/drivers/clk/sunxi/clk-sunxi.c
-index b654b7b1d137..953479041431 100644
---- a/drivers/clk/sunxi/clk-sunxi.c
-+++ b/drivers/clk/sunxi/clk-sunxi.c
-@@ -19,6 +19,7 @@
- #include <linux/of.h>
- #include <linux/of_address.h>
- #include <linux/reset-controller.h>
-+#include <linux/spinlock.h>
  
- #include "clk-factors.h"
- 
-@@ -440,16 +441,6 @@ EXPORT_SYMBOL(clk_sunxi_mmc_phase_control);
-  * sunxi_factors_clk_setup() - Setup function for factor clocks
-  */
- 
--#define SUNXI_FACTORS_MUX_MASK 0x3
--
--struct factors_data {
--	int enable;
--	int mux;
--	struct clk_factors_config *table;
--	void (*getter) (u32 *rate, u32 parent_rate, u8 *n, u8 *k, u8 *m, u8 *p);
--	const char *name;
--};
--
- static struct clk_factors_config sun4i_pll1_config = {
- 	.nshift = 8,
- 	.nwidth = 5,
-@@ -583,89 +574,9 @@ static const struct factors_data sun7i_a20_out_data __initconst = {
- };
- 
- static struct clk * __init sunxi_factors_clk_setup(struct device_node *node,
--						const struct factors_data *data)
-+						   const struct factors_data *data)
- {
--	struct clk *clk;
--	struct clk_factors *factors;
--	struct clk_gate *gate = NULL;
--	struct clk_mux *mux = NULL;
--	struct clk_hw *gate_hw = NULL;
--	struct clk_hw *mux_hw = NULL;
--	const char *clk_name = node->name;
--	const char *parents[SUNXI_MAX_PARENTS];
--	void __iomem *reg;
--	int i = 0;
--
--	reg = of_iomap(node, 0);
--
--	/* if we have a mux, we will have >1 parents */
--	while (i < SUNXI_MAX_PARENTS &&
--	       (parents[i] = of_clk_get_parent_name(node, i)) != NULL)
--		i++;
--
--	/*
--	 * some factor clocks, such as pll5 and pll6, may have multiple
--	 * outputs, and have their name designated in factors_data
--	 */
--	if (data->name)
--		clk_name = data->name;
--	else
--		of_property_read_string(node, "clock-output-names", &clk_name);
--
--	factors = kzalloc(sizeof(struct clk_factors), GFP_KERNEL);
--	if (!factors)
--		return NULL;
--
--	/* Add a gate if this factor clock can be gated */
--	if (data->enable) {
--		gate = kzalloc(sizeof(struct clk_gate), GFP_KERNEL);
--		if (!gate) {
--			kfree(factors);
--			return NULL;
--		}
--
--		/* set up gate properties */
--		gate->reg = reg;
--		gate->bit_idx = data->enable;
--		gate->lock = &clk_lock;
--		gate_hw = &gate->hw;
--	}
--
--	/* Add a mux if this factor clock can be muxed */
--	if (data->mux) {
--		mux = kzalloc(sizeof(struct clk_mux), GFP_KERNEL);
--		if (!mux) {
--			kfree(factors);
--			kfree(gate);
--			return NULL;
--		}
--
--		/* set up gate properties */
--		mux->reg = reg;
--		mux->shift = data->mux;
--		mux->mask = SUNXI_FACTORS_MUX_MASK;
--		mux->lock = &clk_lock;
--		mux_hw = &mux->hw;
--	}
--
--	/* set up factors properties */
--	factors->reg = reg;
--	factors->config = data->table;
--	factors->get_factors = data->getter;
--	factors->lock = &clk_lock;
--
--	clk = clk_register_composite(NULL, clk_name,
--			parents, i,
--			mux_hw, &clk_mux_ops,
--			&factors->hw, &clk_factors_ops,
--			gate_hw, &clk_gate_ops, 0);
--
--	if (!IS_ERR(clk)) {
--		of_clk_add_provider(node, of_clk_src_simple_get, clk);
--		clk_register_clkdev(clk, clk_name, NULL);
--	}
--
--	return clk;
-+	return sunxi_factors_register(node, data, &clk_lock);
- }
- 
- 
+ /**
 -- 
 2.0.2
