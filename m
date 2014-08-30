@@ -1,142 +1,90 @@
-From: achandran@mvista.com (Arun Chandran)
-Date: Sat, 30 Aug 2014 16:02:29 +0530
-Subject: [RFC PATCH] Arm64: introduce __hyp_func_call
-In-Reply-To: <53FDB858.5080506@arm.com>
-References: <1409135314-27266-1-git-send-email-achandran@mvista.com>
- <53FDB858.5080506@arm.com>
-Message-ID: <CAFdej03oPoU03LwXcf7ROwp-fkL1AepH7L2=Xss4QXyGkzjQLw@mail.gmail.com>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Sat, 30 Aug 2014 13:27:43 +0200
+Subject: [PATCH 0/2] IO voltage domain support for rk3188 and rk3288
+In-Reply-To: <CAD=FV=Vcj+tAno92c38Prviyi-v2CmuGSzak1ppETL033KAF4w@mail.gmail.com>
+References: <1409254565-10677-1-git-send-email-dianders@chromium.org>
+ <53FF9E93.3040601@ti.com>
+ <CAD=FV=Vcj+tAno92c38Prviyi-v2CmuGSzak1ppETL033KAF4w@mail.gmail.com>
+Message-ID: <1450179.xJuMFg9Vvn@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marc,
+Am Freitag, 29. August 2014, 21:51:46 schrieb Doug Anderson:
+> Santosh,
+> 
+> On Thu, Aug 28, 2014 at 2:26 PM, Santosh Shilimkar
+> 
+> <santosh.shilimkar@ti.com> wrote:
+> > On Thursday 28 August 2014 03:36 PM, Doug Anderson wrote:
+> >> These two patches add support for automatically configuring the IO
+> >> voltage domains on rk3188 and rk3288 SoCs.  The first patch adds some
+> >> new notification types to the regulator code.  It's used by the second
+> >> patch which actually implements the IO voltage domain driver.
+> >> 
+> >> These two patches were co-developed by Heiko St?bner and Doug Anderson
+> >> (proof of concept patches were written by Heiko).  They were tested in
+> >> a private branch on an rk3288 board using rk808 instead of mainline
+> >> since rk808 support isn't finalized in mainline yet.
+> >> 
+> >> (sorry if you got this series twice; my mailer seems unhappy with me)
+> >> 
+> >> Heiko St?bner (2):
+> >>   regulator: core: Add REGULATOR_EVENT_PRE_VOLTAGE_CHANGE (and ABORT)
+> >>   soc/rockchip: io-domain: add driver handling io domains
+> > 
+> > Sorry to shot down but your IO domains are nothing but voltage domains
+> > and you should really build something in the drivers/power/*
+> 
+> If everyone agrees that this belongs in drivers/power that's totally
+> OK.  Neither Heiko nor I was confident that it should be in
+> drivers/soc.  I had even though that the code wouldn't be totally out
+> of place in the Rockchip pinctrl driver (adding Linus W since I think
+> some SoCs did add code to handle 3.3V vs. 1.8V in pinctrl).
 
-On Wed, Aug 27, 2014 at 4:22 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
-> On 27/08/14 11:28, Arun Chandran wrote:
->> This adds a mechanism to __hyp_stub_vectors to allow a hypercall to
->> call a function at EL2. It is needed for users who want to
->> run a part of code with EL2 permissions. The current usecase is for
->> KVM and kexec.
->>
->> For kexec we need to move the final CPU up to the mode it started
->> in before we branch to the new kernel. If we don't do that
->>
->> * We loose EL2 in the next boot
->> * Arm64 bootwrapper may not be able to put CPUs at the spin-table
->>   code. It expects the final jump from kernel to cpu-return-addr to be
->>   done in EL2.
->>
->> KVM can use this to set/get VBAR_EL2
->
-> Ah, looking at this a bit more, I see what you've done (missed the
-> #define trickery below).
->
->> Signed-off-by: Arun Chandran <achandran@mvista.com>
->> ---
->> Idea is from "Mark Rutland <mark.rutland@arm.com>"
->> http://lists.infradead.org/pipermail/linux-arm-kernel/2014-August/280026.html
->> ---
->>  arch/arm64/include/asm/virt.h |   15 +++++++++++++++
->>  arch/arm64/kernel/hyp-stub.S  |   33 +++++++++++++++++++++------------
->>  2 files changed, 36 insertions(+), 12 deletions(-)
->>
->> diff --git a/arch/arm64/include/asm/virt.h b/arch/arm64/include/asm/virt.h
->> index 7a5df52..910a163 100644
->> --- a/arch/arm64/include/asm/virt.h
->> +++ b/arch/arm64/include/asm/virt.h
->> @@ -34,9 +34,24 @@
->>   */
->>  extern u32 __boot_cpu_mode[2];
->>
->> +void *__hyp_func_call(u64 __tmp, phys_addr_t func, ...);
->>  void __hyp_set_vectors(phys_addr_t phys_vector_base);
->>  phys_addr_t __hyp_get_vectors(void);
->>
->> +#define __hyp_set_vectors(__vbase)                                       \
->> +({                                                                       \
->> +     u64 __tmp = 0;                                                      \
->> +     __hyp_func_call(__tmp, virt_to_phys(__hyp_set_vectors), __vbase);   \
->> +})
->> +
->> +#define __hyp_get_vectors()                                              \
->> +({                                                                       \
->> +     u64 __tmp = 0;                                                      \
->> +     phys_addr_t ret = (phys_addr_t) __hyp_func_call(__tmp,              \
->> +                                     virt_to_phys(__hyp_get_vectors));   \
->> +     ret;                                                                \
->> +})
->> +
->
-> This is what has thrown me off the wrong path. Don't do that, this is
-> horrid. Just rename the assembly entry points, it will make things a lot
-> clearer.
->
+a bit of context for Linus ...
 
-Ok. I will post another one.
+This is essentially the continuation of  the thread "io-domain voltages as 
+regulators?" from the beginning of august. After more discussions we found out 
+that the io voltage selection I asked about is not an independent supply, but 
+instead has to reflect the voltage of the real supplying regulator.
 
---Arun
+And setting the io-voltage setting to 1.8V while the regulator is supplying 
+3.3V for example may actually damage the chip.
 
 
-> Thanks,
->
->         M.
->
->>  /* Reports the availability of HYP mode */
->>  static inline bool is_hyp_mode_available(void)
->>  {
->> diff --git a/arch/arm64/kernel/hyp-stub.S b/arch/arm64/kernel/hyp-stub.S
->> index a272f33..2144a3f 100644
->> --- a/arch/arm64/kernel/hyp-stub.S
->> +++ b/arch/arm64/kernel/hyp-stub.S
->> @@ -53,15 +53,14 @@ ENDPROC(__hyp_stub_vectors)
->>       .align 11
->>
->>  el1_sync:
->> -     mrs     x1, esr_el2
->> -     lsr     x1, x1, #26
->> -     cmp     x1, #0x16
->> +     mrs     x0, esr_el2
->> +     lsr     x0, x0, #26
->> +     cmp     x0, #0x16
->>       b.ne    2f                              // Not an HVC trap
->> -     cbz     x0, 1f
->> -     msr     vbar_el2, x0                    // Set vbar_el2
->> -     b       2f
->> -1:   mrs     x0, vbar_el2                    // Return vbar_el2
->> -2:   eret
->> +
->> +1:   blr     x1                              // Jump to the function
->> +2:   mov     x0, xzr                         // esr_el2 not readable <= el2
->> +     eret
->>  ENDPROC(el1_sync)
->>
->>  .macro invalid_vector        label
->> @@ -101,10 +100,20 @@ ENDPROC(\label)
->>   */
->>
->>  ENTRY(__hyp_get_vectors)
->> -     mov     x0, xzr
->> -     // fall through
->> -ENTRY(__hyp_set_vectors)
->> -     hvc     #0
->> +     mrs     x0, vbar_el2                    // Return vbar_el2
->>       ret
->>  ENDPROC(__hyp_get_vectors)
->> +
->> +ENTRY(__hyp_set_vectors)
->> +     msr     vbar_el2, x2
->> +     ret
->>  ENDPROC(__hyp_set_vectors)
->> +
->> +/* Call a function @x1 */
->> +ENTRY(__hyp_func_call)
->> +     /* Save lr here */
->> +     msr     elr_el1, x30
->> +     hvc     #0
->> +     mrs     x30, elr_el1
->> +     ret
->> +ENDPROC(__hyp_func_call)
->>
->
->
-> --
-> Jazz is not dead. It just smells funny...
+So in our current approach here, we added a driver that tracks voltage changes  
+of the supplying regulator via a notifier and sets the register bits 
+accordingly.
+
+
+> 
+> > Please have a look at the RFC [1]. You should really go on those
+> > lines and collaborate to make a generic voltage domain layer instead of
+> > throwing the driver under drivers/soc.
+> 
+> Trying to base things on a 7-month old RFC that hasn't been touched is
+> not something I'm going to do.  Maybe that makes me a bad person...
+> 
+> I would also say that I'm not convinced that we really need a
+> complicated framework here.  Maybe when we're talking about things
+> like ABB and DevFreq and the like then having a nice framework is a
+> good idea.  Really here we're just setting properties associated with
+> IO pins.  There's no decisions about latency, power tradeoffs, etc.
+> If the pin is connected to 1.8V we need to set the 1.8V bit.  If it's
+> connected to 3.3V we need to set the 3.3V bit.  The end.
+> 
+> The only remotely complicated thing (and why this isn't just a pinctrl
+> property) is what happens with dynamic voltages.  SD Card IO lines can
+> change voltage depending on UHS negotiation.  In that case the SD Card
+> Driver will request that its regulator change from 3.3V to 1.8V.  The
+> bit in the IO domain register needs to update in tandem.
+> 
+> 
+> The driver is really quite tiny (333 lines).  If we find that lots of
+> people copy it and they have code that's nearly the same then we
+> should try to abstract things out then.
+> 
+> 
+> I'd be interested in hearing other opinions, though.
+> 
+> -Doug
