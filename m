@@ -1,19 +1,95 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Sat, 30 Aug 2014 14:05:25 -0300
-Subject: ARM: mx28: cpufreq-cpu0 support?
-In-Reply-To: <53FB1041.5010208@lategoodbye.de>
-References: <53F9B4BF.2050802@lategoodbye.de> <20140825080123.GA12289@dragon>
- <53FB1041.5010208@lategoodbye.de>
-Message-ID: <CAOMZO5CG7mw5W4D3fRPE3TGxQ6-3pTtDJrsNnieN8XKE9dGofQ@mail.gmail.com>
+From: preeti@linux.vnet.ibm.com (Preeti U Murthy)
+Date: Sat, 30 Aug 2014 22:37:40 +0530
+Subject: [PATCH v5 04/12] sched: Allow all archs to set the capacity_orig
+In-Reply-To: <1409051215-16788-5-git-send-email-vincent.guittot@linaro.org>
+References: <1409051215-16788-1-git-send-email-vincent.guittot@linaro.org>
+ <1409051215-16788-5-git-send-email-vincent.guittot@linaro.org>
+Message-ID: <540204DC.5090204@linux.vnet.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stefan,
+Hi Vincent,
 
-On Mon, Aug 25, 2014 at 7:30 AM, Stefan Wahren <info@lategoodbye.de> wrote:
+On 08/26/2014 04:36 PM, Vincent Guittot wrote:
+> capacity_orig is only changed for system with a SMT sched_domain level in order
 
-> As far as i know, the old Freescale BSP (2.6.35) contains a cpufreq driver
-> for mxs, which never goes to mainline. So i'm not sure what would be the
-> best way: porting the old driver or using cpufreq-cpu0.
+I think I had asked this before, but why only capacity_orig? The
+capacity of a group is also being updated the same way. This patch fixes
+the capacity of a group to reflect the capacity of the heterogeneous
+CPUs in it, this capacity being both the full capacity of the group:
+capacity_orig and the capacity available for the fair tasks. So I feel
+in the subject as well as the changelog it would suffice to say 'capacity'.
 
-First step would be to port the PMU driver into mainline.
+> to reflect the lower capacity of CPUs. Heterogenous system also have to reflect an
+> original capacity that is different from the default value.
+> 
+> Create a more generic function arch_scale_cpu_capacity that can be also used by
+> non SMT platform to set capacity_orig.
+> 
+> The weak behavior of arch_scale_cpu_capacity is the previous SMT one in order to
+> keep backward compatibility in the use of capacity_orig.
+> 
+> arch_scale_smt_capacity and default_scale_smt_capacity have been removed as
+> they were not use elsewhere than in arch_scale_cpu_capacity.
+> 
+> Signed-off-by: Vincent Guittot <vincent.guittot@linaro.org>
+> ---
+>  kernel/sched/fair.c | 25 ++++++-------------------
+>  1 file changed, 6 insertions(+), 19 deletions(-)
+> 
+> diff --git a/kernel/sched/fair.c b/kernel/sched/fair.c
+> index b85e9f7..8176bda 100644
+> --- a/kernel/sched/fair.c
+> +++ b/kernel/sched/fair.c
+> @@ -5705,19 +5705,12 @@ unsigned long __weak arch_scale_freq_capacity(struct sched_domain *sd, int cpu)
+>  	return default_scale_capacity(sd, cpu);
+>  }
+> 
+> -static unsigned long default_scale_smt_capacity(struct sched_domain *sd, int cpu)
+> +unsigned long __weak arch_scale_cpu_capacity(struct sched_domain *sd, int cpu)
+>  {
+> -	unsigned long weight = sd->span_weight;
+> -	unsigned long smt_gain = sd->smt_gain;
+> +	if ((sd->flags & SD_SHARE_CPUCAPACITY) && (sd->span_weight > 1))
+> +		return sd->smt_gain / sd->span_weight;
+> 
+> -	smt_gain /= weight;
+> -
+> -	return smt_gain;
+> -}
+> -
+> -unsigned long __weak arch_scale_smt_capacity(struct sched_domain *sd, int cpu)
+> -{
+> -	return default_scale_smt_capacity(sd, cpu);
+> +	return SCHED_CAPACITY_SCALE;
+>  }
+> 
+>  static unsigned long scale_rt_capacity(int cpu)
+> @@ -5756,18 +5749,12 @@ static unsigned long scale_rt_capacity(int cpu)
+> 
+>  static void update_cpu_capacity(struct sched_domain *sd, int cpu)
+>  {
+> -	unsigned long weight = sd->span_weight;
+>  	unsigned long capacity = SCHED_CAPACITY_SCALE;
+>  	struct sched_group *sdg = sd->groups;
+> 
+> -	if ((sd->flags & SD_SHARE_CPUCAPACITY) && weight > 1) {
+> -		if (sched_feat(ARCH_CAPACITY))
+
+Aren't you missing this check above? I understand that it is not
+crucial, but that would also mean removing ARCH_CAPACITY sched_feat
+altogether, wouldn't it?
+
+Regards
+Preeti U Murthy
+> -			capacity *= arch_scale_smt_capacity(sd, cpu);
+> -		else
+> -			capacity *= default_scale_smt_capacity(sd, cpu);
+> +	capacity *= arch_scale_cpu_capacity(sd, cpu);
+> 
+> -		capacity >>= SCHED_CAPACITY_SHIFT;
+> -	}
+> +	capacity >>= SCHED_CAPACITY_SHIFT;
+> 
+>  	sdg->sgc->capacity_orig = capacity;
+> 
