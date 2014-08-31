@@ -1,43 +1,50 @@
-From: zhangfei.gao@linaro.org (Zhangfei Gao)
-Date: Sun, 31 Aug 2014 10:39:11 +0800
-Subject: [PATCH v4 3/3] ARM: dts: hix5hd2: add ir node
-In-Reply-To: <1409452751-17463-1-git-send-email-zhangfei.gao@linaro.org>
-References: <1409452751-17463-1-git-send-email-zhangfei.gao@linaro.org>
-Message-ID: <1409452751-17463-4-git-send-email-zhangfei.gao@linaro.org>
+From: leoy@marvell.com (Leo Yan)
+Date: Sun, 31 Aug 2014 13:39:51 +0800
+Subject: [PATCH v1] arm64: fix bug for reloading FPSIMD state after cpu power
+ off
+Message-ID: <1409463591-661-1-git-send-email-leoy@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Zhangfei Gao <zhangfei.gao@linaro.org>
----
- arch/arm/boot/dts/hisi-x5hd2.dtsi |   10 +++++++++-
- 1 file changed, 9 insertions(+), 1 deletion(-)
+Now arm64 defers reloading FPSIMD state, but this optimization also
+introduces the bug after cpu resume back from low power mode.
 
-diff --git a/arch/arm/boot/dts/hisi-x5hd2.dtsi b/arch/arm/boot/dts/hisi-x5hd2.dtsi
-index 7b1cb53..1d7cd04 100644
---- a/arch/arm/boot/dts/hisi-x5hd2.dtsi
-+++ b/arch/arm/boot/dts/hisi-x5hd2.dtsi
-@@ -391,7 +391,7 @@
- 		};
- 
- 		sysctrl: system-controller at 00000000 {
--			compatible = "hisilicon,sysctrl";
-+			compatible = "hisilicon,sysctrl", "syscon";
- 			reg = <0x00000000 0x1000>;
- 			reboot-offset = <0x4>;
- 		};
-@@ -476,5 +476,13 @@
-                         interrupts = <0 70 4>;
-                         clocks = <&clock HIX5HD2_SATA_CLK>;
- 		};
-+
-+		ir: ir at 001000 {
-+			compatible = "hisilicon,hix5hd2-ir";
-+			reg = <0x001000 0x1000>;
-+			interrupts = <0 47 4>;
-+			clocks = <&clock HIX5HD2_FIXED_24M>;
-+			hisilicon,power-syscon = <&sysctrl>;
-+		};
- 	};
- };
+The reason is after the cpu has been powered off, s/w need set the
+cpu's fpsimd_last_state to NULL so that it will force to reload
+FPSIMD state for the thread, otherwise there has the chance to meet
+the condition for both the task's fpsimd_state.cpu field contains the
+id of the current cpu, and the cpu's fpsimd_last_state per-cpu variable
+points to the task's fpsimd_state, so finally kernel will skip to reload
+the context during it return back to userland.
+
+Furthermore, this patch also removes the redundant operation for saving
+the state for idle thread; this operation is needless due kernel's idle
+thread will not use any VFP/NEON instruction. so that this also can
+benefit a bit for the latency during cpu's power off.
+
+Signed-off-by: Leo Yan <leoy@marvell.com>
+---
+ arch/arm64/kernel/fpsimd.c | 6 +-----
+ 1 file changed, 1 insertion(+), 5 deletions(-)
+
+diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
+index ad8aebb..4caef93 100644
+--- a/arch/arm64/kernel/fpsimd.c
++++ b/arch/arm64/kernel/fpsimd.c
+@@ -268,13 +268,9 @@ static int fpsimd_cpu_pm_notifier(struct notifier_block *self,
+ {
+ 	switch (cmd) {
+ 	case CPU_PM_ENTER:
+-		if (current->mm && !test_thread_flag(TIF_FOREIGN_FPSTATE))
+-			fpsimd_save_state(&current->thread.fpsimd_state);
++		this_cpu_write(fpsimd_last_state, NULL);
+ 		break;
+ 	case CPU_PM_EXIT:
+-		if (current->mm)
+-			set_thread_flag(TIF_FOREIGN_FPSTATE);
+-		break;
+ 	case CPU_PM_ENTER_FAILED:
+ 	default:
+ 		return NOTIFY_DONE;
 -- 
-1.7.9.5
+1.9.1
