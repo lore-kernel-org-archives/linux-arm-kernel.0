@@ -1,28 +1,27 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Sun, 31 Aug 2014 13:09:39 +0100
-Subject: [PATCH] ARM: configs: Enable cpufreq-cpu0 for multi_v7_defconfig
-Message-ID: <1409486979-26869-1-git-send-email-broonie@kernel.org>
+From: rabin@rab.in (Rabin Vincent)
+Date: Sun, 31 Aug 2014 16:59:21 +0200
+Subject: [PATCH v4 7/8] ARM: mm: allow non-text sections to be
+ non-executable
+In-Reply-To: <CAGXu5j+OnpaZAJRsSsR=iid8178p+4hR5xzrJ7N3F94DZ7DYMg@mail.gmail.com>
+References: <1407949593-16121-1-git-send-email-keescook@chromium.org>
+ <1407949593-16121-8-git-send-email-keescook@chromium.org>
+ <20140819123342.GJ23128@arm.com>
+ <CAGXu5jLnXeavr4E4YF9jtB03iA-y4vLZjf83a8ABzUC-hdkz9w@mail.gmail.com>
+ <20140826144303.GX23445@arm.com>
+ <CAGXu5j+OnpaZAJRsSsR=iid8178p+4hR5xzrJ7N3F94DZ7DYMg@mail.gmail.com>
+Message-ID: <20140831145921.GA4931@dator>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Many boards share the cpufreq-cpu0 driver meaning that if we enable it in
-multi_v7_defconfig we can get a reasonable amount of functional utility for
-systems and test coverage for a fairly small increase in kernel size.
+On Fri, Aug 29, 2014 at 09:04:41AM -0700, Kees Cook wrote:
+> On Tue, Aug 26, 2014 at 7:43 AM, Will Deacon <will.deacon@arm.com> wrote:
+> > Hmm, so do you mandate that preemption is disabled during sections of code
+> > where the permissions must be changed after boot? (e.g. ftrace patching)
+> 
+> I guess it's not enforced (how do I make sure preempt is off?), but
+> it's only used during the ftrace patching. I'm open to suggestions! (I
+> had avoided going the fixmap route since I would have expected that to
+> be much slower.)
 
-Signed-off-by: Mark Brown <broonie@kernel.org>
----
- arch/arm/configs/multi_v7_defconfig | 2 ++
- 1 file changed, 2 insertions(+)
-
-diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-index 05c0e7c789df..9799e9d2e222 100644
---- a/arch/arm/configs/multi_v7_defconfig
-+++ b/arch/arm/configs/multi_v7_defconfig
-@@ -414,3 +414,5 @@ CONFIG_DEBUG_FS=y
- CONFIG_MAGIC_SYSRQ=y
- CONFIG_LOCKUP_DETECTOR=y
- CONFIG_CRYPTO_DEV_TEGRA_AES=y
-+CONFIG_CPU_FREQ=y
-+CONFIG_GENERIC_CPUFREQ_CPU0=y
--- 
-2.1.0
+For ftrace patching this is called under stop_machine() so preemption is
+already off there.
