@@ -1,45 +1,68 @@
-From: abrestic@chromium.org (Andrew Bresticker)
-Date: Sun, 31 Aug 2014 12:04:08 -0700
-Subject: [PATCH v2 6/9] usb: xhci: Add NVIDIA Tegra xHCI host-controller
- driver
-In-Reply-To: <20140830211558.GA13814@kroah.com>
-References: <1408381705-3623-1-git-send-email-abrestic@chromium.org>
- <1408381705-3623-7-git-send-email-abrestic@chromium.org>
- <20140830211558.GA13814@kroah.com>
-Message-ID: <CAL1qeaGhMQiWqEV7GwjFt-4xXSTceRFm8RcaVs9vvVHJ9U8hRQ@mail.gmail.com>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Sun, 31 Aug 2014 13:15:05 -0700
+Subject: [PATCH] ARM: Kirkwood: Fix DT based DSA.
+In-Reply-To: <1409417668-7169-1-git-send-email-andrew@lunn.ch>
+References: <1409417668-7169-1-git-send-email-andrew@lunn.ch>
+Message-ID: <54038249.4080403@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Aug 30, 2014 at 2:15 PM, Greg Kroah-Hartman
-<gregkh@linuxfoundation.org> wrote:
-> On Mon, Aug 18, 2014 at 10:08:22AM -0700, Andrew Bresticker wrote:
->> Add support for the on-chip xHCI host controller present on Tegra SoCs.
->>
->> The driver is currently very basic: it loads the controller with its
->> firmware, starts the controller, and is able to service messages sent
->> by the controller's firmware.  The hardware supports device mode as
->> well as lower-power operating modes, but support for these is not yet
->> implemented here.
+On 08/30/14 09:54, Andrew Lunn wrote:
+> During the conversion of boards to use DT to instantiate Distributed
+> Switch Architecture, nobody volunteered to test. As to be expected,
+> the conversion was flawed. Testers and access to hardware has now
+> become available, and this patch hopefully fixes the problems.
 >
-> So you are saying the device doesn't really work?  Can it handle USB
-> transactions properly?
-
-Huh?  It's just as functional as any other xHCI platform host.
-Perhaps I should have been more clear about "lower-power operating
-modes": this refers to the runtime powergating of the controller's
-SuperSpeed and host-controller logic and has nothing to do with USB
-link/hub/device power management.
-
-> I have a jetson board here, is this the controller for that hardware?
-> Can I test this series on that platform, or is it for something else?
-
-Yup, that's the platform I primarily used for testing this series.
-
->> +static const struct tegra_xhci_soc_config tegra124_soc_config = {
->> +     .firmware_file = "nvidia/tegra124/xusb.bin",
->> +};
->> +MODULE_FIRMWARE("nvidia/tegra124/xusb.bin");
+> dsa,mii-bus must be a phandle to the top level mdio node, not the port
+> specific subnode of the mdio device.
 >
-> Has this file been submitted to the linux-firmware tree?
+> dsa,ethernet must be a phandle to the port subnode within the ethernet
+> DT node, not the ethernet node.
+>
+> Fixes: e2eaa339af441b3d51cdaa16870065c4154ce13c
+> Fixes: e7c8f3808be854379c9784745663a55371cbf232
 
-It has been posted, see https://patchwork.ozlabs.org/patch/384013/
+Your changes look good with respect to how the binding is defined.
+
+>
+> Signed-off-by: Andrew Lunn <andrew@lunn.ch>
+> ---
+
+[snip]
+
+>   &eth0 {
+> @@ -148,6 +142,7 @@
+>   &eth1 {
+>   	status = "okay";
+>   	ethernet1-port at 0 {
+> -		phy-handle = <&ethphy1>;
+> +		speed = <1000>;
+> +		duple = <1>;
+
+Typo here: should be "duplex".
+
+>   	};
+>   };
+> diff --git a/arch/arm/boot/dts/kirkwood.dtsi b/arch/arm/boot/dts/kirkwood.dtsi
+> index afc640cd80c5..464f09a1a4a5 100644
+> --- a/arch/arm/boot/dts/kirkwood.dtsi
+> +++ b/arch/arm/boot/dts/kirkwood.dtsi
+> @@ -309,7 +309,7 @@
+>   			marvell,tx-checksum-limit = <1600>;
+>   			status = "disabled";
+>
+> -			ethernet0-port at 0 {
+> +			eth0port: ethernet0-port at 0 {
+>   				compatible = "marvell,kirkwood-eth-port";
+>   				reg = <0>;
+>   				interrupts = <11>;
+> @@ -342,7 +342,7 @@
+>   			pinctrl-names = "default";
+>   			status = "disabled";
+>
+> -			ethernet1-port at 0 {
+> +			eth1port: ethernet1-port at 0 {
+>   				compatible = "marvell,kirkwood-eth-port";
+>   				reg = <0>;
+>   				interrupts = <15>;
+>
