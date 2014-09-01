@@ -1,61 +1,65 @@
-From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
-Date: Mon, 01 Sep 2014 12:47:38 +0200
-Subject: [PATCH 1/2] ARM: multi_v7_defconfig: Enable shmobile platforms
-In-Reply-To: <0a6f01cfc432$507900f0$f16b02d0$@samsung.com>
-References: <1409234429-1916-1-git-send-email-geert+renesas@glider.be>
- <3598124.ze8sbSR9ui@wuerfel> <0a6f01cfc432$507900f0$f16b02d0$@samsung.com>
-Message-ID: <3021375.opancsXhz0@amdc1032>
+From: monstr@monstr.eu (Michal Simek)
+Date: Mon, 01 Sep 2014 13:08:40 +0200
+Subject: [PATCH v2] ARM: zynq: DT: Add LEDs to zc702 DT
+In-Reply-To: <1409323117-21711-1-git-send-email-soren.brinkmann@xilinx.com>
+References: <1409323117-21711-1-git-send-email-soren.brinkmann@xilinx.com>
+Message-ID: <540453B8.90403@monstr.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-Hi,
-
-On Saturday, August 30, 2014 06:10:59 PM Kukjin Kim wrote:
-> Arnd Bergmann wrote:
-> > 
-> Hi,
+On 08/29/2014 04:38 PM, Soren Brinkmann wrote:
+> From: Ezra Savard <ezra.savard@xilinx.com>
 > 
-> > On Friday 29 August 2014 20:05:49 Bartlomiej Zolnierkiewicz wrote:
-> > > I've been looking lately into making it possible to easily go
-> > > from multi_v7_defconfig config to a single platform one (in my
-> > > case Exynos one) and removing the need to keep the latter (i.e.
-> > > exynos_defconfig) in the kernel tree in the long-term.
-> > >
-> Why? I don't have any idea why we should use only multi_v7_defconfig for each
-> hardware platform. In my understanding, multi_v7_defconfig can be used for one
-> kernel image can support all of the platforms but it doesn't mean it should be
+> Adds LEDs to the zc702 devicetree for use with the leds-gpio driver.
+> 
+> Signed-off-by: Ezra Savard <ezra.savard@xilinx.com>
+> Reviewed-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
+> ---
+> v2:
+>  - fix node names
+> ---
+>  arch/arm/boot/dts/zynq-zc702.dts | 9 +++++++++
+>  1 file changed, 9 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/zynq-zc702.dts b/arch/arm/boot/dts/zynq-zc702.dts
+> index 835c3089c61c..b29e0f97e764 100644
+> --- a/arch/arm/boot/dts/zynq-zc702.dts
+> +++ b/arch/arm/boot/dts/zynq-zc702.dts
+> @@ -27,6 +27,15 @@
+>  		bootargs = "console=ttyPS0,115200 earlyprintk";
+>  	};
+>  
+> +	leds {
+> +		compatible = "gpio-leds";
+> +
+> +		ds23 {
+> +			label = "ds23";
+> +			gpios = <&gpio0 10 0>;
+> +			linux,default-trigger = "heartbeat";
+> +		};
+> +	};
+>  };
+>  
+>  &can0 {
+> 
 
-In my long-term "plan" both configs should be available but one should
-be generated from the other.  Either way should be okay for me: multi ->
-single platform or single platforms(s) -> multi.
+Applied.
 
-[ Please note that if you take multi_v7_defconfig and disable support
-  for all archs besides Exynos (trivial operation even when done by
-  hand) you end up with platform specific kernel config. ]
+Thanks,
+Michal
 
-Pros:
-- less code in kernel
-- concentrated testing efforts
-- configs don't go out-of-sync with each other
-- less maintainance burden
+-- 
+Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
+w: www.monstr.eu p: +42-0-721842854
+Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
+Maintainer of Linux kernel - Xilinx Zynq ARM architecture
+Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
 
-Cons:
-- fewer config options may be covered than with two independent configs
 
-> used for each platform. And I think, if we cannot maintain each platform's
-> defconfig in mainline, it will be kept in each SoC vendor and it is not a good
-
-It seems that currently in case of our internal kernel trees the custom
-kernel configs are always used instead of either exynos_defconfig or
-multi_v7_defconfig.  I think that there is a big room for improvement
-here.
-
-> way. I mean both defconfigs has each value in mainline, exynos_defconfig should
-> be updated though ;)
-
-Best regards,
---
-Bartlomiej Zolnierkiewicz
-Samsung R&D Institute Poland
-Samsung Electronics
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140901/754de40f/attachment.sig>
