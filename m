@@ -1,52 +1,36 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Mon,  1 Sep 2014 22:28:13 +0800
-Subject: [PATCH v2] i2c: mv64xxx: continue probe when clock-frequency is
- missing
-Message-ID: <1409581693-15943-1-git-send-email-wens@csie.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 01 Sep 2014 16:31:28 +0200
+Subject: [RFC PATCH 1/7] iommu: provide early initialisation hook for
+ IOMMU drivers
+In-Reply-To: <20140901075216.GA24430@ulmo>
+References: <1409327670-3495-1-git-send-email-will.deacon@arm.com>
+ <1409327670-3495-2-git-send-email-will.deacon@arm.com>
+ <20140901075216.GA24430@ulmo>
+Message-ID: <4386980.goxm0OjCmJ@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The "clock-frequency" DT property is listed as optional, However,
-the current code stores the return value of of_property_read_u32 in
-the return code of mv64xxx_of_config, but then forgets to clear it
-after setting the default value of "clock-frequency". It is then
-passed out to the main probe function, resulting in a probe failure
-when "clock-frequency" is missing.
+On Monday 01 September 2014 09:52:19 Thierry Reding wrote:
+> I don't think this is the right direction. We've been preaching that
+> using initcall ordering is a bad thing and people should be using
+> deferred probe instead. Now we have a bunch of these OF tables that do
+> the exact opposite. Note that these are nothing more than a variant of
+> initcalls that get called at platform-specific points in time.
+> 
+> There are also ongoing discussions about how to change the device probe
+> order to use dependencies (such as phandles from device tree) to prevent
+> excessive deferred probing. With that in place this would be solved in a
+> much more generic way.
 
-This patch checks and then throws away the return value of
-of_property_read_u32, instead of storing it and having to clear it
-afterwards.
+We are not creating an ABI here, so it can always be changed later.
+For now, I think iommus are clearly in the same category as irqchips,
+timers, clock controllers and smp operations: we really want them
+to be available before we set up any other devices.
 
-This issue was discovered after the property was removed from all
-sunxi DTs.
+I don't mind finding a more generic solution in the long run, but for
+now, this gets the problem out of the way, and I can't think of any
+realistic corner cases that would prevent it from working. Do you
+think that an IOMMU driver may have a dependency on another device
+driver that is probed later? Do you have an example of such hardware?
 
-Fixes: 4c730a06c19bb ("i2c: mv64xxx: Set bus frequency to 100kHz if clock-frequency is not provided")
-Signed-off-by: Chen-Yu Tsai <wens@csie.org>
-Cc: stable at vger.kernel.org
-Acked-by: Andrew Lunn <andrew@lunn.ch>
-Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
----
-Changes in v2:
-
- - Added Fixes tag, and Acked-bys from Andrew and Maxime.
- - Slightly refined commit message to be clear what we're throwing away.
----
- drivers/i2c/busses/i2c-mv64xxx.c | 3 +--
- 1 file changed, 1 insertion(+), 2 deletions(-)
-
-diff --git a/drivers/i2c/busses/i2c-mv64xxx.c b/drivers/i2c/busses/i2c-mv64xxx.c
-index 6dc5ded..2f64273 100644
---- a/drivers/i2c/busses/i2c-mv64xxx.c
-+++ b/drivers/i2c/busses/i2c-mv64xxx.c
-@@ -746,8 +746,7 @@ mv64xxx_of_config(struct mv64xxx_i2c_data *drv_data,
- 	}
- 	tclk = clk_get_rate(drv_data->clk);
- 
--	rc = of_property_read_u32(np, "clock-frequency", &bus_freq);
--	if (rc)
-+	if (of_property_read_u32(np, "clock-frequency", &bus_freq))
- 		bus_freq = 100000; /* 100kHz by default */
- 
- 	if (!mv64xxx_find_baud_factors(bus_freq, tclk,
--- 
-2.1.0
+	Arnd
