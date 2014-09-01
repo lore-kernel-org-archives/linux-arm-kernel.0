@@ -1,48 +1,30 @@
-From: boris.brezillon@free-electrons.com (Boris BREZILLON)
-Date: Mon, 1 Sep 2014 12:16:26 +0200
-Subject: [PATCH v2 19/26] irqchip: atmel-aic: convert to handle_domain_irq
-In-Reply-To: <1409047421-27649-20-git-send-email-marc.zyngier@arm.com>
-References: <1409047421-27649-1-git-send-email-marc.zyngier@arm.com>
- <1409047421-27649-20-git-send-email-marc.zyngier@arm.com>
-Message-ID: <20140901121626.7bd01dbe@bbrezillon>
+From: broonie@kernel.org (Mark Brown)
+Date: Mon, 1 Sep 2014 11:18:54 +0100
+Subject: [PATCH] ARM: configs: Enable cpufreq-cpu0 for multi_v7_defconfig
+In-Reply-To: <3122457.yORdifPoE7@wuerfel>
+References: <1409486979-26869-1-git-send-email-broonie@kernel.org>
+ <3122457.yORdifPoE7@wuerfel>
+Message-ID: <20140901101854.GL29327@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 26 Aug 2014 11:03:34 +0100
-Marc Zyngier <marc.zyngier@arm.com> wrote:
+On Mon, Sep 01, 2014 at 11:41:01AM +0200, Arnd Bergmann wrote:
+> On Sunday 31 August 2014 13:09:39 Mark Brown wrote:
+> > Many boards share the cpufreq-cpu0 driver meaning that if we enable it in
+> > multi_v7_defconfig we can get a reasonable amount of functional utility for
+> > systems and test coverage for a fairly small increase in kernel size.
 
-> Use the new handle_domain_irq method to handle interrupts.
-> 
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> > Signed-off-by: Mark Brown <broonie@kernel.org>
 
-Acked-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+> Do we need this in 3.17, or should it go in during the merge window?
 
-> ---
->  drivers/irqchip/irq-atmel-aic.c | 4 +---
->  1 file changed, 1 insertion(+), 3 deletions(-)
-> 
-> diff --git a/drivers/irqchip/irq-atmel-aic.c b/drivers/irqchip/irq-atmel-aic.c
-> index a82869e..9a2cf3c 100644
-> --- a/drivers/irqchip/irq-atmel-aic.c
-> +++ b/drivers/irqchip/irq-atmel-aic.c
-> @@ -68,12 +68,10 @@ aic_handle(struct pt_regs *regs)
->  	irqnr = irq_reg_readl(gc->reg_base + AT91_AIC_IVR);
->  	irqstat = irq_reg_readl(gc->reg_base + AT91_AIC_ISR);
->  
-> -	irqnr = irq_find_mapping(aic_domain, irqnr);
-> -
->  	if (!irqstat)
->  		irq_reg_writel(0, gc->reg_base + AT91_AIC_EOICR);
->  	else
-> -		handle_IRQ(irqnr, regs);
-> +		handle_domain_irq(aic_domain, irqnr, regs);
->  }
->  
->  static int aic_retrigger(struct irq_data *d)
-
-
-
--- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+It's not a bug fix; it'd be nice to have it there from the point of view
+of some testing I'm doing on the defconfig and it should be safe but
+it's not a regression or anything.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140901/437d53ce/attachment.sig>
