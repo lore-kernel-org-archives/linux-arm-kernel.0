@@ -1,90 +1,92 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 01 Sep 2014 09:28:15 +0100
-Subject: [RFC PATCH] Arm64: introduce __hyp_func_call
-In-Reply-To: <CAFdej03oPoU03LwXcf7ROwp-fkL1AepH7L2=Xss4QXyGkzjQLw@mail.gmail.com>
-References: <1409135314-27266-1-git-send-email-achandran@mvista.com>
- <53FDB858.5080506@arm.com>
- <CAFdej03oPoU03LwXcf7ROwp-fkL1AepH7L2=Xss4QXyGkzjQLw@mail.gmail.com>
-Message-ID: <54042E1F.7070408@arm.com>
+From: guodong.xu@linaro.org (Guodong Xu)
+Date: Mon,  1 Sep 2014 16:28:32 +0800
+Subject: [PATCH 0/3] Add MFD and regulator drivers for Hi6421 PMIC SoC
+Message-ID: <1409560115-30646-1-git-send-email-guodong.xu@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30/08/14 11:32, Arun Chandran wrote:
-> Hi Marc,
-> 
-> On Wed, Aug 27, 2014 at 4:22 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
->> On 27/08/14 11:28, Arun Chandran wrote:
->>> This adds a mechanism to __hyp_stub_vectors to allow a hypercall to
->>> call a function at EL2. It is needed for users who want to
->>> run a part of code with EL2 permissions. The current usecase is for
->>> KVM and kexec.
->>>
->>> For kexec we need to move the final CPU up to the mode it started
->>> in before we branch to the new kernel. If we don't do that
->>>
->>> * We loose EL2 in the next boot
->>> * Arm64 bootwrapper may not be able to put CPUs at the spin-table
->>>   code. It expects the final jump from kernel to cpu-return-addr to be
->>>   done in EL2.
->>>
->>> KVM can use this to set/get VBAR_EL2
->>
->> Ah, looking at this a bit more, I see what you've done (missed the
->> #define trickery below).
->>
->>> Signed-off-by: Arun Chandran <achandran@mvista.com>
->>> ---
->>> Idea is from "Mark Rutland <mark.rutland@arm.com>"
->>> http://lists.infradead.org/pipermail/linux-arm-kernel/2014-August/280026.html
->>> ---
->>>  arch/arm64/include/asm/virt.h |   15 +++++++++++++++
->>>  arch/arm64/kernel/hyp-stub.S  |   33 +++++++++++++++++++++------------
->>>  2 files changed, 36 insertions(+), 12 deletions(-)
->>>
->>> diff --git a/arch/arm64/include/asm/virt.h b/arch/arm64/include/asm/virt.h
->>> index 7a5df52..910a163 100644
->>> --- a/arch/arm64/include/asm/virt.h
->>> +++ b/arch/arm64/include/asm/virt.h
->>> @@ -34,9 +34,24 @@
->>>   */
->>>  extern u32 __boot_cpu_mode[2];
->>>
->>> +void *__hyp_func_call(u64 __tmp, phys_addr_t func, ...);
->>>  void __hyp_set_vectors(phys_addr_t phys_vector_base);
->>>  phys_addr_t __hyp_get_vectors(void);
->>>
->>> +#define __hyp_set_vectors(__vbase)                                       \
->>> +({                                                                       \
->>> +     u64 __tmp = 0;                                                      \
->>> +     __hyp_func_call(__tmp, virt_to_phys(__hyp_set_vectors), __vbase);   \
->>> +})
->>> +
->>> +#define __hyp_get_vectors()                                              \
->>> +({                                                                       \
->>> +     u64 __tmp = 0;                                                      \
->>> +     phys_addr_t ret = (phys_addr_t) __hyp_func_call(__tmp,              \
->>> +                                     virt_to_phys(__hyp_get_vectors));   \
->>> +     ret;                                                                \
->>> +})
->>> +
->>
->> This is what has thrown me off the wrong path. Don't do that, this is
->> horrid. Just rename the assembly entry points, it will make things a lot
->> clearer.
->>
-> 
-> Ok. I will post another one.
+This patchset adds an MFD core driver and a regulator driver for Hi6421 PMIC
+SoC.
 
-Hold on, there are more problems.
+Hi6421 is a PMIC SoC designed and manufactured by HiSilicon Ltd. It includes
+multi-functions, such as regulators, codec, ADCs, Coulomb counter, etc.
+Hi6421 can be used in various Hi3620 SoC based boards. Registers in Hi6421 are
+memory bus mapped, so in this design they are accessed by regmap-mmio APIs.
 
-You've changed the case that works when KVM is *not* running. But if you
-look at the KVM code, you'll see that it has its own implementation of
-__hyp_get_vectors. What will happen when KVM calls this version of
-__hyp_get_vectors (on a CPU hotplug event, for example)? The code isn't
-mapped in KVM's HYP code, so it will simply burst into flames.
+Hi6421 regulator driver is applied since v5. So move the related patches out.
 
-Thanks,
+---
+changes in v8:
+ * remove unused field in struct hi6421_pmic
+ * fixes of coding style
 
-	M.
+changes in v7:
+ * merge conflict in drivers/mfd/Makefile
+ * use devm_ioremap_resource, as devm_request_and_ioremap is deprecated and
+    now removed.
+ * incorporate feedback from maintainer
+    - Documentation as a separate patch
+    - dts node rename from 'pmic' to 'hi6421'
+
+changes in v6:
+ * rebase to v3.17-rc1:
+  - use devm_ioremap_resource in hi6421 mfd driver
+  - add 'const' before var regulator_ops in new funcs in regulator core
+ * fix build error in drivers/regulator/mc13892-regulator.c
+     due to 'const' in regulator_desc.ops
+ * remove patch to hi3xxx_defconfig
+
+changes in v5:
+ * rename _regulator_delay to _regulator_enable_delay
+ * clean up hi6421_regulator_enable(), add 100us protective gap into
+     regulator_desc's .enable_time
+ * code clean up, fixes for style checking
+
+changes in v4:
+ * regulator: core:
+  - add const qualifier to ops in struct regulator_desc
+  - factor out _regulator_delay from _regulator_do_enable
+  - add guard delay between calling regulator_disable and _enable
+ * hi6421 regulator:
+  - bug fix: missing min_uV for linear regualtor BUCK0~2
+  - bug fix: wrong volt values in buck_3_voltages table
+  - add const to hi6421 regulator_ops
+  - use ldo_linear and ldo_linear_range in applicable LDOs.
+  - rename regulator-name to conform to names in board schematics.
+
+changes in v3:
+ * hi6421: regulator: remove setting of constraints on board-specific
+     capabilities
+ * delete unecessary compatible property "hisilicon,hi6421-regulators"
+ * change regulator enable/disable callback APIs to support protection
+gaps, as
+     required by hi6421 spec
+ * split regulator set_mode/get_mode callback APIs to LDOs and BUCKs
+ * delete hi6421.dtsi, mfd and regulator nodes are now in board config .dts
+
+changes in v2:
+ * use MFD APIs to manage sub-devices of Hi6421
+ * use regmap-mmio for register access
+ * use only generic regulator device tree property
+ * rewrite regulator driver using helper APIs from both regulator and regmap
+
+v1: first drop
+
+Guodong Xu (3):
+  Documentation: mfd: add docs for hi6421 dt
+  mfd: Add hi6421 PMIC core driver
+  ARM: dts: hi3620-hi4511: Add HI6421 MFD and regulator nodes
+
+ Documentation/devicetree/bindings/mfd/hi6421.txt |  38 ++++
+ arch/arm/boot/dts/hi3620-hi4511.dts              | 233 +++++++++++++++++++++++
+ drivers/mfd/Kconfig                              |  13 ++
+ drivers/mfd/Makefile                             |   1 +
+ drivers/mfd/hi6421-pmic-core.c                   | 113 +++++++++++
+ include/linux/mfd/hi6421-pmic.h                  |  41 ++++
+ 6 files changed, 439 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/mfd/hi6421.txt
+ create mode 100644 drivers/mfd/hi6421-pmic-core.c
+ create mode 100644 include/linux/mfd/hi6421-pmic.h
+
 -- 
-Jazz is not dead. It just smells funny...
+1.9.1
