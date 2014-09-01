@@ -1,118 +1,39 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Mon, 1 Sep 2014 16:14:04 +0800
-Subject: [PATCH v2 5/5] ARM: imx: remove ENABLE and BYPASS bits from clk-pllv3
- driver
-In-Reply-To: <1409559244-22483-1-git-send-email-shawn.guo@freescale.com>
-References: <1409559244-22483-1-git-send-email-shawn.guo@freescale.com>
-Message-ID: <1409559244-22483-6-git-send-email-shawn.guo@freescale.com>
+From: pdeschrijver@nvidia.com (Peter De Schrijver)
+Date: Mon, 1 Sep 2014 11:16:10 +0300
+Subject: [PATCH v4 2/5] ARM: tegra: Add legacy interrupt controller nodes
+In-Reply-To: <4707330.BNuO2MquVF@wuerfel>
+References: <1409239879-12376-1-git-send-email-thierry.reding@gmail.com>
+ <1409239879-12376-2-git-send-email-thierry.reding@gmail.com>
+ <4707330.BNuO2MquVF@wuerfel>
+Message-ID: <20140901081610.GN20995@tbergstrom-lnx.Nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since ENABLE and BYPASS bits of PLLs are now implemented as separate
-gate and mux clocks by clock drivers, the code handling these two bits
-can be removed from clk-pllv3 driver.
+On Thu, Aug 28, 2014 at 06:11:53PM +0200, Arnd Bergmann wrote:
+> On Thursday 28 August 2014 17:31:16 Thierry Reding wrote:
+> > +       interrupt-controller at 60004000 {
+> > +               compatible = "nvidia,tegra114-ictlr", "nvidia,tegra30-ictlr";
+> > +               reg = <0x60004000 0x40>, /* primary controller */
+> > +                     <0x60004100 0x40>, /* secondary controller */
+> > +                     <0x60004200 0x40>, /* tertiary controller */
+> > +                     <0x60004300 0x40>, /* quaternary controller */
+> > +                     <0x60004400 0x40>; /* quinary controller */
+> > +       };
+> > +
+> >         timer at 60005000 {
+> >                 compatible = "nvidia,tegra114-timer", "nvidia,tegra20-timer";
+> > 
+> 
+> Don't you need an interrupt-parent and interrupts property here to point to
+> the GIC interrupts? I would assume this is a nested irqchip.
 
-Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
----
- arch/arm/mach-imx/clk-pllv3.c | 37 -------------------------------------
- 1 file changed, 37 deletions(-)
+No. It's not nested. All SoC interrupts are fed into both the LIC and the
+GIC (as SPIs). The LIC also has an interface towards the flowcontroller which
+allows waking up the CPU when an interrupt happens, even if the GIC is off. 
+LIC can also route every interrupt it controls to the AVP.
 
-diff --git a/arch/arm/mach-imx/clk-pllv3.c b/arch/arm/mach-imx/clk-pllv3.c
-index 61364050fccd..57de74da0acf 100644
---- a/arch/arm/mach-imx/clk-pllv3.c
-+++ b/arch/arm/mach-imx/clk-pllv3.c
-@@ -23,8 +23,6 @@
- #define PLL_DENOM_OFFSET	0x20
- 
- #define BM_PLL_POWER		(0x1 << 12)
--#define BM_PLL_ENABLE		(0x1 << 13)
--#define BM_PLL_BYPASS		(0x1 << 16)
- #define BM_PLL_LOCK		(0x1 << 31)
- 
- /**
-@@ -84,10 +82,6 @@ static int clk_pllv3_prepare(struct clk_hw *hw)
- 	if (ret)
- 		return ret;
- 
--	val = readl_relaxed(pll->base);
--	val &= ~BM_PLL_BYPASS;
--	writel_relaxed(val, pll->base);
--
- 	return 0;
- }
- 
-@@ -97,7 +91,6 @@ static void clk_pllv3_unprepare(struct clk_hw *hw)
- 	u32 val;
- 
- 	val = readl_relaxed(pll->base);
--	val |= BM_PLL_BYPASS;
- 	if (pll->powerup_set)
- 		val &= ~BM_PLL_POWER;
- 	else
-@@ -105,28 +98,6 @@ static void clk_pllv3_unprepare(struct clk_hw *hw)
- 	writel_relaxed(val, pll->base);
- }
- 
--static int clk_pllv3_enable(struct clk_hw *hw)
--{
--	struct clk_pllv3 *pll = to_clk_pllv3(hw);
--	u32 val;
--
--	val = readl_relaxed(pll->base);
--	val |= BM_PLL_ENABLE;
--	writel_relaxed(val, pll->base);
--
--	return 0;
--}
--
--static void clk_pllv3_disable(struct clk_hw *hw)
--{
--	struct clk_pllv3 *pll = to_clk_pllv3(hw);
--	u32 val;
--
--	val = readl_relaxed(pll->base);
--	val &= ~BM_PLL_ENABLE;
--	writel_relaxed(val, pll->base);
--}
--
- static unsigned long clk_pllv3_recalc_rate(struct clk_hw *hw,
- 					   unsigned long parent_rate)
- {
-@@ -169,8 +140,6 @@ static int clk_pllv3_set_rate(struct clk_hw *hw, unsigned long rate,
- static const struct clk_ops clk_pllv3_ops = {
- 	.prepare	= clk_pllv3_prepare,
- 	.unprepare	= clk_pllv3_unprepare,
--	.enable		= clk_pllv3_enable,
--	.disable	= clk_pllv3_disable,
- 	.recalc_rate	= clk_pllv3_recalc_rate,
- 	.round_rate	= clk_pllv3_round_rate,
- 	.set_rate	= clk_pllv3_set_rate,
-@@ -225,8 +194,6 @@ static int clk_pllv3_sys_set_rate(struct clk_hw *hw, unsigned long rate,
- static const struct clk_ops clk_pllv3_sys_ops = {
- 	.prepare	= clk_pllv3_prepare,
- 	.unprepare	= clk_pllv3_unprepare,
--	.enable		= clk_pllv3_enable,
--	.disable	= clk_pllv3_disable,
- 	.recalc_rate	= clk_pllv3_sys_recalc_rate,
- 	.round_rate	= clk_pllv3_sys_round_rate,
- 	.set_rate	= clk_pllv3_sys_set_rate,
-@@ -299,8 +266,6 @@ static int clk_pllv3_av_set_rate(struct clk_hw *hw, unsigned long rate,
- static const struct clk_ops clk_pllv3_av_ops = {
- 	.prepare	= clk_pllv3_prepare,
- 	.unprepare	= clk_pllv3_unprepare,
--	.enable		= clk_pllv3_enable,
--	.disable	= clk_pllv3_disable,
- 	.recalc_rate	= clk_pllv3_av_recalc_rate,
- 	.round_rate	= clk_pllv3_av_round_rate,
- 	.set_rate	= clk_pllv3_av_set_rate,
-@@ -315,8 +280,6 @@ static unsigned long clk_pllv3_enet_recalc_rate(struct clk_hw *hw,
- static const struct clk_ops clk_pllv3_enet_ops = {
- 	.prepare	= clk_pllv3_prepare,
- 	.unprepare	= clk_pllv3_unprepare,
--	.enable		= clk_pllv3_enable,
--	.disable	= clk_pllv3_disable,
- 	.recalc_rate	= clk_pllv3_enet_recalc_rate,
- };
- 
--- 
-1.9.1
+See also section 3.4.1.4 Interrupt routing of the TRM.
+
+Cheers,
+
+Peter.
