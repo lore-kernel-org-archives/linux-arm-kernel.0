@@ -1,64 +1,52 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 01 Sep 2014 16:27:30 +0200
-Subject: [RFC PATCH 2/7] dma-mapping: replace set_arch_dma_coherent_ops
- with arch_setup_dma_ops
-In-Reply-To: <1409327670-3495-3-git-send-email-will.deacon@arm.com>
-References: <1409327670-3495-1-git-send-email-will.deacon@arm.com>
- <1409327670-3495-3-git-send-email-will.deacon@arm.com>
-Message-ID: <3185781.KdfsMO5OZS@wuerfel>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Mon,  1 Sep 2014 22:28:13 +0800
+Subject: [PATCH v2] i2c: mv64xxx: continue probe when clock-frequency is
+ missing
+Message-ID: <1409581693-15943-1-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 29 August 2014 16:54:25 Will Deacon wrote:
-> set_arch_dma_coherent_ops is called from of_dma_configure in order to
-> swizzle the architectural dma-mapping functions over to a cache-coherent
-> implementation. This is currently implemented only for ARM.
-> 
-> In anticipation of re-using this mechanism for IOMMU-backed dma-mapping
-> ops too, this patch replaces the function with a broader
-> arch_setup_dma_ops callback which is also responsible for setting the
-> DMA mask and offset as well as selecting the correct mapping functions.
-> 
-> A further advantage of this split is that it nicely isolates the
-> of-specific code from the dma-mapping code, allowing potential reuse by
-> other buses (e.g. PCI) in the future.
-> 
-> Signed-off-by: Will Deacon <will.deacon@arm.com>
+The "clock-frequency" DT property is listed as optional, However,
+the current code stores the return value of of_property_read_u32 in
+the return code of mv64xxx_of_config, but then forgets to clear it
+after setting the default value of "clock-frequency". It is then
+passed out to the main probe function, resulting in a probe failure
+when "clock-frequency" is missing.
 
-Looks good, just one tiny comment
+This patch checks and then throws away the return value of
+of_property_read_u32, instead of storing it and having to clear it
+afterwards.
 
-> ---
->  arch/arm/include/asm/dma-mapping.h | 20 ++++++++++++++----
->  drivers/of/platform.c              | 42 ++++++++++----------------------------
->  include/linux/dma-mapping.h        |  8 +++-----
->  3 files changed, 30 insertions(+), 40 deletions(-)
-> 
-> diff --git a/arch/arm/include/asm/dma-mapping.h b/arch/arm/include/asm/dma-mapping.h
-> index c45b61a4b4a5..936125ef3f3f 100644
-> --- a/arch/arm/include/asm/dma-mapping.h
-> +++ b/arch/arm/include/asm/dma-mapping.h
-> @@ -121,12 +121,24 @@ static inline unsigned long dma_max_pfn(struct device *dev)
->  }
->  #define dma_max_pfn(dev) dma_max_pfn(dev)
->  
-> -static inline int set_arch_dma_coherent_ops(struct device *dev)
-> +static inline void arch_setup_dma_ops(struct device *dev, u64 mask,
-> +                                     unsigned long offset, bool coherent)
->  {
-> -       set_dma_ops(dev, &arm_coherent_dma_ops);
-> -       return 0;
-> +       dev->coherent_dma_mask = mask;
-> +
-> +       /*
-> +        * Set dma_mask to coherent_dma_mask by default if the architecture
-> +        * code has not set it.
-> +        */
-> +       if (!dev->dma_mask)
-> +               dev->dma_mask = &dev->coherent_dma_mask;
-> +
+This issue was discovered after the property was removed from all
+sunxi DTs.
 
-We are in architecture specific code here, and we know that this
-architecture has not set up the dev->dma_mask pointer, so we can
-remove the 'if (!dev->dma_mask)'
+Fixes: 4c730a06c19bb ("i2c: mv64xxx: Set bus frequency to 100kHz if clock-frequency is not provided")
+Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+Cc: stable at vger.kernel.org
+Acked-by: Andrew Lunn <andrew@lunn.ch>
+Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+---
+Changes in v2:
 
-	Arnd
+ - Added Fixes tag, and Acked-bys from Andrew and Maxime.
+ - Slightly refined commit message to be clear what we're throwing away.
+---
+ drivers/i2c/busses/i2c-mv64xxx.c | 3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
+
+diff --git a/drivers/i2c/busses/i2c-mv64xxx.c b/drivers/i2c/busses/i2c-mv64xxx.c
+index 6dc5ded..2f64273 100644
+--- a/drivers/i2c/busses/i2c-mv64xxx.c
++++ b/drivers/i2c/busses/i2c-mv64xxx.c
+@@ -746,8 +746,7 @@ mv64xxx_of_config(struct mv64xxx_i2c_data *drv_data,
+ 	}
+ 	tclk = clk_get_rate(drv_data->clk);
+ 
+-	rc = of_property_read_u32(np, "clock-frequency", &bus_freq);
+-	if (rc)
++	if (of_property_read_u32(np, "clock-frequency", &bus_freq))
+ 		bus_freq = 100000; /* 100kHz by default */
+ 
+ 	if (!mv64xxx_find_baud_factors(bus_freq, tclk,
+-- 
+2.1.0
