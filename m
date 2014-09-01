@@ -1,57 +1,72 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Mon, 1 Sep 2014 09:52:19 +0200
-Subject: [RFC PATCH 1/7] iommu: provide early initialisation hook for
- IOMMU drivers
-In-Reply-To: <1409327670-3495-2-git-send-email-will.deacon@arm.com>
-References: <1409327670-3495-1-git-send-email-will.deacon@arm.com>
- <1409327670-3495-2-git-send-email-will.deacon@arm.com>
-Message-ID: <20140901075216.GA24430@ulmo>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Mon, 01 Sep 2014 09:53:29 +0200
+Subject: [PATCH 10/29] drivers: add DRIVER_HAS_OWN_IOMMU_MANAGER flag
+In-Reply-To: <20140901070748.GA24226@ulmo.nvidia.com>
+References: <1407235677-26324-1-git-send-email-m.szyprowski@samsung.com>
+ <1407235677-26324-11-git-send-email-m.szyprowski@samsung.com>
+ <54040298.9020002@samsung.com> <20140901070748.GA24226@ulmo.nvidia.com>
+Message-ID: <540425F9.7080307@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 29, 2014 at 04:54:24PM +0100, Will Deacon wrote:
-> IOMMU drivers must be initialised before any of their upstream devices,
-> otherwise the relevant iommu_ops won't be configured for the bus in
-> question. To solve this, a number of IOMMU drivers use initcalls to
-> initialise the driver before anything has a chance to be probed.
-> 
-> Whilst this solves the immediate problem, it leaves the job of probing
-> the IOMMU completely separate from the iommu_ops to configure the IOMMU,
-> which are called on a per-bus basis and require the driver to figure out
-> exactly which instance of the IOMMU is being requested. In particular,
-> the add_device callback simply passes a struct device to the driver,
-> which then has to parse firmware tables or probe buses to identify the
-> relevant IOMMU instance.
-> 
-> This patch takes the first step in addressing this problem by adding an
-> early initialisation pass for IOMMU drivers, giving them the ability to
-> set some per-instance data on their of_node. This data can then be
-> passed back to a new add_device function (added in a later patch) to
-> identify the IOMMU instance in question.
-> 
-> Signed-off-by: Will Deacon <will.deacon@arm.com>
-> ---
->  drivers/iommu/of_iommu.c          | 14 ++++++++++++++
->  include/asm-generic/vmlinux.lds.h |  2 ++
->  include/linux/of_iommu.h          | 21 +++++++++++++++++++++
->  3 files changed, 37 insertions(+)
+Hello,
 
-I don't think this is the right direction. We've been preaching that
-using initcall ordering is a bad thing and people should be using
-deferred probe instead. Now we have a bunch of these OF tables that do
-the exact opposite. Note that these are nothing more than a variant of
-initcalls that get called at platform-specific points in time.
+On 2014-09-01 09:07, Thierry Reding wrote:
+> On Mon, Sep 01, 2014 at 07:22:32AM +0200, Marek Szyprowski wrote:
+>> Hi Greg,
+>>
+>> On 2014-08-05 12:47, Marek Szyprowski wrote:
+>>> This patch adds a new flags for device drivers. This flag instructs
+>>> kernel that the device driver does it own management of IOMMU assisted
+>>> IO address space translations, so no default dma-mapping structures
+>>> should be initialized.
+>>>
+>>> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+>>> ---
+>>>    include/linux/device.h | 2 ++
+>>>    1 file changed, 2 insertions(+)
+>>>
+>>> diff --git a/include/linux/device.h b/include/linux/device.h
+>>> index 5f4ff02..2e62371 100644
+>>> --- a/include/linux/device.h
+>>> +++ b/include/linux/device.h
+>>> @@ -253,6 +253,8 @@ struct device_driver {
+>>>    
+>>>    /* disables bind/unbind via sysfs */
+>>>    #define DRIVER_SUPPRESS_BIND_ATTRS	(1 << 0)
+>>> +/* driver uses own methods to manage IO address space */
+>>> +#define DRIVER_HAS_OWN_IOMMU_MANAGER	(1 << 1)
+>>>    
+>>>    extern int __must_check driver_register(struct device_driver *drv);
+>>>    extern void driver_unregister(struct device_driver *drv);
+>> Could you comment if the approach of using flags in the struct driver
+>> could be accepted? I've converted suppress_bind_attrs entry to flags to
+>> avoid extending the structure, please see patch "[PATCH 05/29] drivers:
+>> convert suppress_bind_attrs parameter into flags".
+> Is this really necessary? What I did as part of an RFC series for Tegra
+> IOMMU support is keep this knowledge within the IOMMU driver rather than
+> export it to the driver core.i
 
-There are also ongoing discussions about how to change the device probe
-order to use dependencies (such as phandles from device tree) to prevent
-excessive deferred probing. With that in place this would be solved in a
-much more generic way.
+The problem with embedding the list of drivers that you would need to update
+it everytime when you modify or extend iommu support in the other drivers.
+I've tried also other approach, like adding respective notifiers to 
+individual
+drivers to initialize custom iommu support (or disable default iommu 
+mapping)
+before iommu driver gets initialized, but such solution is in my opinion too
+complex and hard to understand if one is not familiar will all this stuff.
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140901/ce639ee4/attachment-0001.sig>
+All in all it turned out that the simplest and most generic way is to simply
+add the flag to the driver core. Flags might be also used in the future
+to model other kinds of dependencies between device drivers and/or driver
+core.
+
+> The idea being that the IOMMU driver wouldn't create an ARM DMA/IOMMU
+> mapping by default but rather allow individual drivers to be marked as
+> "kernel-internal" and use the DMA/IOMMU glue in that case. Drivers such
+> as DRM would use the IOMMU API directly.
+
+Best regards
+-- 
+Marek Szyprowski, PhD
+Samsung R&D Institute Poland
