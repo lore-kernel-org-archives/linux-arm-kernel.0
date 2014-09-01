@@ -1,264 +1,121 @@
-From: guodong.xu@linaro.org (Guodong Xu)
-Date: Mon,  1 Sep 2014 16:28:35 +0800
-Subject: [PATCH v8 3/3] ARM: dts: hi3620-hi4511: Add HI6421 MFD and regulator
- nodes
-In-Reply-To: <1409560115-30646-1-git-send-email-guodong.xu@linaro.org>
-References: <1409560115-30646-1-git-send-email-guodong.xu@linaro.org>
-Message-ID: <1409560115-30646-4-git-send-email-guodong.xu@linaro.org>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Mon, 1 Sep 2014 10:29:40 +0200
+Subject: [RFC PATCH 4/7] iommu: provide helper function to configure an
+ IOMMU for an of master
+In-Reply-To: <1409327670-3495-5-git-send-email-will.deacon@arm.com>
+References: <1409327670-3495-1-git-send-email-will.deacon@arm.com>
+ <1409327670-3495-5-git-send-email-will.deacon@arm.com>
+Message-ID: <20140901082939.GC24430@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add Hi6421 MFD dts node and regulator nodes into hi3620-hi4511
-board config dts file.
+On Fri, Aug 29, 2014 at 04:54:27PM +0100, Will Deacon wrote:
+> The generic IOMMU device-tree bindings can be used to add arbitrary OF
+> masters to an IOMMU with a compliant binding.
+> 
+> This patch introduces of_iommu_configure, which does exactly that.
+> 
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
+> ---
+>  drivers/iommu/Kconfig    |  2 +-
+>  drivers/iommu/of_iommu.c | 36 ++++++++++++++++++++++++++++++++++++
+>  include/linux/of_iommu.h |  6 ++++++
+>  3 files changed, 43 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/iommu/Kconfig b/drivers/iommu/Kconfig
+> index dd5112265cc9..6d13f962f156 100644
+> --- a/drivers/iommu/Kconfig
+> +++ b/drivers/iommu/Kconfig
+> @@ -15,7 +15,7 @@ if IOMMU_SUPPORT
+>  
+>  config OF_IOMMU
+>         def_bool y
+> -       depends on OF
+> +       depends on OF && IOMMU_API
+>  
+>  config FSL_PAMU
+>  	bool "Freescale IOMMU support"
+> diff --git a/drivers/iommu/of_iommu.c b/drivers/iommu/of_iommu.c
+> index f9209666157c..a7d3b3a13b83 100644
+> --- a/drivers/iommu/of_iommu.c
+> +++ b/drivers/iommu/of_iommu.c
+> @@ -19,6 +19,7 @@
+>  
+>  #include <linux/export.h>
+>  #include <linux/limits.h>
+> +#include <linux/iommu.h>
+>  #include <linux/of.h>
+>  #include <linux/of_iommu.h>
+>  
+> @@ -90,6 +91,41 @@ int of_get_dma_window(struct device_node *dn, const char *prefix, int index,
+>  }
+>  EXPORT_SYMBOL_GPL(of_get_dma_window);
+>  
+> +int of_iommu_configure(struct device *dev)
+> +{
+> +	struct of_phandle_args iommu_spec;
+> +	struct bus_type *bus = dev->bus;
+> +	const struct iommu_ops *ops = bus->iommu_ops;
+> +	int ret = -EINVAL, idx = 0;
+> +
+> +	if (!iommu_present(bus))
+> +		return -ENODEV;
+> +
+> +	/*
+> +	 * We don't currently walk up the tree looking for a parent IOMMU.
+> +	 * See the `Notes:' section of
+> +	 * Documentation/devicetree/bindings/iommu/iommu.txt
+> +	 */
+> +	while (!of_parse_phandle_with_args(dev->of_node, "iommus",
+> +					   "#iommu-cells", idx,
+> +					   &iommu_spec)) {
+> +		void *data = of_iommu_get_data(iommu_spec.np);
+> +
+> +		of_node_put(iommu_spec.np);
+> +		if (!ops->add_device_master_ids)
+> +			return -ENODEV;
+> +
+> +		ret = ops->add_device_master_ids(dev, iommu_spec.args_count,
+> +						 iommu_spec.args, data);
+> +		if (ret)
+> +			break;
 
-Signed-off-by: Guodong Xu <guodong.xu@linaro.org>
----
- arch/arm/boot/dts/hi3620-hi4511.dts | 233 ++++++++++++++++++++++++++++++++++++
- 1 file changed, 233 insertions(+)
+I think this could use a bit more formalization. As I said in another
+reply earlier, there's very little standardization in the IOMMU API.
+That certainly gives us a lot of flexibility but it also has the
+downside that it's difficult to handle these abstractions in the core,
+which is really what the core is all about, isn't it?
 
-diff --git a/arch/arm/boot/dts/hi3620-hi4511.dts b/arch/arm/boot/dts/hi3620-hi4511.dts
-index fe62392..a1aadbb 100644
---- a/arch/arm/boot/dts/hi3620-hi4511.dts
-+++ b/arch/arm/boot/dts/hi3620-hi4511.dts
-@@ -635,6 +635,239 @@
- 				pinctrl-single,bias-pullup = <0 1 0 1>;
- 			};
- 		};
-+
-+		hi6421 {
-+			compatible = "hisilicon,hi6421-pmic";
-+			reg = <0xc00000 0x0180>; /* 0x60 << 2 */
-+
-+			regulators {
-+				// supply for MLC NAND/ eMMC
-+				hi6421_vout0_reg: hi6421_vout0 {
-+					regulator-name = "VOUT0";
-+					regulator-min-microvolt = <2850000>;
-+					regulator-max-microvolt = <2850000>;
-+				};
-+
-+				// supply for 26M Oscillator
-+				hi6421_vout1_reg: hi6421_vout1 {
-+					regulator-name = "VOUT1";
-+					regulator-min-microvolt = <1700000>;
-+					regulator-max-microvolt = <2000000>;
-+					regulator-boot-on;
-+					regulator-always-on;
-+				};
-+
-+				// supply for AP system
-+				hi6421_vout2_reg: hi6421_vout2 {
-+					regulator-name = "VOUT2";
-+					regulator-min-microvolt = <1050000>;
-+					regulator-max-microvolt = <1400000>;
-+					regulator-boot-on;
-+					regulator-always-on;
-+				};
-+
-+				// supply for DDR PHY I/O
-+				hi6421_vout3_reg: hi6421_vout3 {
-+					regulator-name = "VOUT3";
-+					regulator-min-microvolt = <1050000>;
-+					regulator-max-microvolt = <1400000>;
-+					regulator-boot-on;
-+					regulator-always-on;
-+				};
-+
-+				// supply for MIPI, USB2.0, PCIe, PLL Analog
-+				hi6421_vout4_reg: hi6421_vout4 {
-+					regulator-name = "VOUT4";
-+					regulator-min-microvolt = <1500000>;
-+					regulator-max-microvolt = <3000000>;
-+					regulator-boot-on;
-+					regulator-always-on;
-+				};
-+
-+				// supply for I/O 1.8V
-+				hi6421_vout5_reg: hi6421_vout5 {
-+					regulator-name = "VOUT5";
-+					regulator-min-microvolt = <1500000>;
-+					regulator-max-microvolt = <3000000>;
-+					regulator-boot-on;
-+					regulator-always-on;
-+				};
-+
-+				// supply for I/O 2.6V
-+				hi6421_vout6_reg: hi6421_vout6 {
-+					regulator-name = "VOUT6";
-+					regulator-min-microvolt = <1500000>;
-+					regulator-max-microvolt = <3000000>;
-+					regulator-boot-on;
-+					regulator-always-on;
-+				};
-+
-+				// supply for SD I/O
-+				hi6421_vout7_reg: hi6421_vout7 {
-+					regulator-name = "VOUT7";
-+					regulator-min-microvolt = <1500000>;
-+					regulator-max-microvolt = <3000000>;
-+					regulator-boot-on;
-+					regulator-always-on;
-+				};
-+
-+				// supply for USB PHY
-+				hi6421_vout8_reg: hi6421_vout8 {
-+					regulator-name = "VOUT8";
-+					regulator-min-microvolt = <1500000>;
-+					regulator-max-microvolt = <3300000>;
-+					regulator-boot-on;
-+					regulator-always-on;
-+				};
-+
-+				// supply for Efuse power
-+				hi6421_vout9_reg: hi6421_vout9 {
-+					regulator-name = "VOUT9";
-+					regulator-min-microvolt = <1500000>;
-+					regulator-max-microvolt = <3000000>;
-+				};
-+
-+				// supply for BT RF&PA
-+				hi6421_vout10_reg: hi6421_vout10 {
-+					regulator-name = "VOUT10";
-+					regulator-min-microvolt = <1500000>;
-+					regulator-max-microvolt = <3000000>;
-+				};
-+
-+				// supply for GPS RF&PA
-+				hi6421_vout11_reg: hi6421_vout11 {
-+					regulator-name = "VOUT11";
-+					regulator-min-microvolt = <1500000>;
-+					regulator-max-microvolt = <3000000>;
-+				};
-+
-+				// supply for SD card
-+				hi6421_vout12_reg: hi6421_vout12 {
-+					regulator-name = "VOUT12";
-+					regulator-min-microvolt = <2850000>;
-+					regulator-max-microvolt = <2850000>;
-+				};
-+
-+				// supply for CMMB
-+				hi6421_vout13_reg: hi6421_vout13 {
-+					regulator-name = "VOUT13";
-+					regulator-min-microvolt = <1500000>;
-+					regulator-max-microvolt = <3000000>;
-+				};
-+
-+				// supply for WIFI I/O
-+				hi6421_vout14_reg: hi6421_vout14 {
-+					regulator-name = "VOUT14";
-+					regulator-min-microvolt = <1500000>;
-+					regulator-max-microvolt = <3000000>;
-+				};
-+
-+				// supply for WIFI core & PA
-+				hi6421_vout15_reg: hi6421_vout15 {
-+					regulator-name = "VOUT15";
-+					regulator-min-microvolt = <1500000>;
-+					regulator-max-microvolt = <3300000>;
-+				};
-+
-+				// supply for LCD I/O
-+				hi6421_vout16_reg: hi6421_vout16 {
-+					regulator-name = "VOUT16";
-+					regulator-min-microvolt = <1500000>;
-+					regulator-max-microvolt = <3000000>;
-+					regulator-always-on;
-+				};
-+
-+				// supply for LCD Ananlog
-+				hi6421_vout17_reg: hi6421_vout17 {
-+					regulator-name = "VOUT17";
-+					regulator-min-microvolt = <1500000>;
-+					regulator-max-microvolt = <3000000>;
-+					regulator-always-on;
-+				};
-+
-+				// supply for Camera I/O
-+				hi6421_vout18_reg: hi6421_vout18 {
-+					regulator-name = "VOUT18";
-+					regulator-min-microvolt = <1500000>;
-+					regulator-max-microvolt = <3000000>;
-+				};
-+
-+				// supply for Camera Analog
-+				hi6421_vout19_reg: hi6421_vout19 {
-+					regulator-name = "VOUT19";
-+					regulator-min-microvolt = <1500000>;
-+					regulator-max-microvolt = <3000000>;
-+				};
-+
-+				// supply for Camera VCM
-+				hi6421_vout20_reg: hi6421_vout20 {
-+					regulator-name = "VOUT20";
-+					regulator-min-microvolt = <1500000>;
-+					regulator-max-microvolt = <3000000>;
-+				};
-+
-+				// supply for Audio, incl. HKADC
-+				hi6421_vout_audio_reg: hi6421_vout_audio {
-+					regulator-name = "AVDD2";
-+					regulator-min-microvolt = <2800000>;
-+					regulator-max-microvolt = <3300000>;
-+				};
-+
-+				// supply for Cortex-A9 CPU core
-+				hi6421_buck0_reg: hi6421_buck0 {
-+					regulator-name = "VBUCK0";
-+					regulator-min-microvolt = <700000>;
-+					regulator-max-microvolt = <1600000>;
-+					regulator-boot-on;
-+					regulator-always-on;
-+				};
-+
-+				// supply for Cortex-A9 CPU core
-+				hi6421_buck1_reg: hi6421_buck1 {
-+					regulator-name = "VBUCK1";
-+					regulator-min-microvolt = <700000>;
-+					regulator-max-microvolt = <1600000>;
-+					regulator-boot-on;
-+					regulator-always-on;
-+				};
-+
-+				// supply for GPU
-+				hi6421_buck2_reg: hi6421_buck2 {
-+					regulator-name = "VBUCK2";
-+					regulator-min-microvolt = <700000>;
-+					regulator-max-microvolt = <1600000>;
-+					regulator-boot-on;
-+				};
-+
-+				// supply for Peripheral
-+				hi6421_buck3_reg: hi6421_buck3 {
-+					regulator-name = "VBUCK3";
-+					regulator-min-microvolt = <950000>;
-+					regulator-max-microvolt = <1200000>;
-+					regulator-boot-on;
-+					regulator-always-on;
-+				};
-+
-+				// supply for LPDDR2 and AP I/O
-+				hi6421_buck4_reg: hi6421_buck4 {
-+					regulator-name = "VBUCK4";
-+					regulator-min-microvolt = <1150000>;
-+					regulator-max-microvolt = <2000000>;
-+					regulator-boot-on;
-+					regulator-always-on;
-+				};
-+
-+				// supply for Low voltage
-+				hi6421_buck5_reg: hi6421_buck5 {
-+					regulator-name = "VBUCK5";
-+					regulator-min-microvolt = <1150000>;
-+					regulator-max-microvolt = <1900000>;
-+					regulator-boot-on;
-+					regulator-always-on;
-+				};
-+			};
-+		};
-+
- 	};
- 
- 	gpio-keys {
--- 
-1.9.1
+One method that worked really well for this in the past for other
+subsystems is to allow drivers to specify an .of_xlate() function that
+takes the controller device and a struct of_phandle_args. It is that
+function's responsibility to take the information in an of_phandle_args
+structure and use that to create some subsystem specific handle that
+represents this information in a way that it can readily be used.
+
+So I think it would really be helpful if IOMMU gained support for
+something similar. We could create a struct iommu to represent an
+instance of an IOMMU. IOMMU drivers can embed this structure and add
+device-specific fields that they need. That way we can easily pass
+around instances and upcast in the driver in a type-safe way.
+
+At the same time, a struct iommu_master could provide the basis to
+represent a single master interface on an IOMMU. Drivers can again embed
+that in driver-specific structures with additional fields required for
+the particular IOMMU implementation. .of_xlate() could return such an
+IOMMU master for the core to use.
+
+With such structures in place we should be able to eliminate many of the
+loops in IOMMU drivers that serve no other purpose than to find the
+master context from a struct device * and some parameters. It will also
+allow us to keep a central registry of IOMMUs and masters rather than
+duplicating that in every driver.
+
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140901/5f29f373/attachment.sig>
