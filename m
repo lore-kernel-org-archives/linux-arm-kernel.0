@@ -1,93 +1,61 @@
-From: long.wanglong@huawei.com (Wang Long)
-Date: Mon, 1 Sep 2014 19:35:34 +0800
-Subject: [SMP BUG?] the return value of is_smp() is bug?
-Message-ID: <1409571334-2814-1-git-send-email-long.wanglong@huawei.com>
+From: treding@nvidia.com (Thierry Reding)
+Date: Mon, 1 Sep 2014 09:07:49 +0200
+Subject: [PATCH 10/29] drivers: add DRIVER_HAS_OWN_IOMMU_MANAGER flag
+In-Reply-To: <54040298.9020002@samsung.com>
+References: <1407235677-26324-1-git-send-email-m.szyprowski@samsung.com>
+ <1407235677-26324-11-git-send-email-m.szyprowski@samsung.com>
+ <54040298.9020002@samsung.com>
+Message-ID: <20140901070748.GA24226@ulmo.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Mon, Sep 01, 2014 at 07:22:32AM +0200, Marek Szyprowski wrote:
+> Hi Greg,
+> 
+> On 2014-08-05 12:47, Marek Szyprowski wrote:
+> > This patch adds a new flags for device drivers. This flag instructs
+> > kernel that the device driver does it own management of IOMMU assisted
+> > IO address space translations, so no default dma-mapping structures
+> > should be initialized.
+> >
+> > Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> > ---
+> >   include/linux/device.h | 2 ++
+> >   1 file changed, 2 insertions(+)
+> >
+> > diff --git a/include/linux/device.h b/include/linux/device.h
+> > index 5f4ff02..2e62371 100644
+> > --- a/include/linux/device.h
+> > +++ b/include/linux/device.h
+> > @@ -253,6 +253,8 @@ struct device_driver {
+> >   
+> >   /* disables bind/unbind via sysfs */
+> >   #define DRIVER_SUPPRESS_BIND_ATTRS	(1 << 0)
+> > +/* driver uses own methods to manage IO address space */
+> > +#define DRIVER_HAS_OWN_IOMMU_MANAGER	(1 << 1)
+> >   
+> >   extern int __must_check driver_register(struct device_driver *drv);
+> >   extern void driver_unregister(struct device_driver *drv);
+> 
+> Could you comment if the approach of using flags in the struct driver
+> could be accepted? I've converted suppress_bind_attrs entry to flags to
+> avoid extending the structure, please see patch "[PATCH 05/29] drivers:
+> convert suppress_bind_attrs parameter into flags".
 
-Hi,all
+Is this really necessary? What I did as part of an RFC series for Tegra
+IOMMU support is keep this knowledge within the IOMMU driver rather than
+export it to the driver core.
 
-In kernel 3.17-rc2, when i set CONFIG_HAVE_SMP = y and CONFIG_SMP_ON_UP = y 
-in .config file. the secondary core can not boot.
+The idea being that the IOMMU driver wouldn't create an ARM DMA/IOMMU
+mapping by default but rather allow individual drivers to be marked as
+"kernel-internal" and use the DMA/IOMMU glue in that case. Drivers such
+as DRM would use the IOMMU API directly.
 
-when i set CONFIG_HAVE_SMP = y and CONFIG_SMP_ON_UP = n in .config file,
-the secondary core can boot.
-
-But this does not happen in kernel 3.10 lts kernel, Whether the 
-CONFIG_SMP_ON_UP is set yes or no ,the secondary core can boot.
-
-Does the meaning of CONFIG_SMP_ON_UP changed or this is a bug in kernel 3.17-rc2 ? 
-
-
-I write the following patch to test the return value of is_smp().
-
-----------------------------------------
-
-Signed-off-by: Wang Long <long.wanglong@huawei.com>
----
- arch/arm/kernel/setup.c |    5 +++++
- 1 file changed, 5 insertions(+)
-
-diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
-index 84db893d..fbeb67f 100644
---- a/arch/arm/kernel/setup.c
-+++ b/arch/arm/kernel/setup.c
-@@ -925,6 +925,11 @@ void __init setup_arch(char **cmdline_p)
- 	arm_dt_init_cpu_maps();
- 	psci_init();
- #ifdef CONFIG_SMP
-+	
-+	if (is_smp() == 1)
-+		printk("is_smp() return true;\n");
-+	else if (is_smp() == 0)
-+		printk("is_smp() return false;\n");
- 	if (is_smp()) {
- 		if (!mdesc->smp_init || !mdesc->smp_init()) {
- 			if (psci_smp_available())
-
-kernel version: 3.17-rc2
-
-config:     set CONFIG_HAVE_SMP = y and CONFIG_SMP_ON_UP = y
-command:    # qemu-system-arm -M vexpress-a9 -smp 2  -m 128M -kernel arch/arm/boot/zImage -nographic
-The output:
-
-..........
-is_smp() return false;
-CPU: Testing write buffer coherency: ok
-missing device node for CPU 0
-CPU0: thread -1, cpu 0, socket 0, mpidr 80000000
-Setting up static identity map for 0x604643d8 - 0x60464430
-Brought up 1 CPUs
-SMP: Total of 1 processors activated.
-CPU: All CPU(s) started in SVC mode.
-...........
-
-config:     set CONFIG_HAVE_SMP = y and not set CONFIG_SMP_ON_UP 
-command:    # qemu-system-arm -M vexpress-a9 -smp 2  -m 128M -kernel arch/arm/boot/zImage -nographic
-The output:
-
-.....
- Memory policy: Data cache writealloc
-is_smp() return true;
-sched_clock: 32 bits at 24MHz, resolution 41ns, wraps every 178956969942ns
-......
-......
-CPU: Testing write buffer coherency: ok
-missing device node for CPU 0
-missing device node for CPU 1
-CPU0: thread -1, cpu 0, socket 0, mpidr 80000000
-Setting up static identity map for 0x60463ef8 - 0x60463f50
-CPU1: Booted secondary processor
-CPU1: thread -1, cpu 1, socket 0, mpidr 80000001
-Brought up 2 CPUs
-SMP: Total of 2 processors activated.
-CPU: All CPU(s) started in SVC mode.
-devtmpfs: initialized
-.......
-
-Any ideas?
-
-
--- 
-1.7.9.5
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140901/7b534439/attachment-0001.sig>
