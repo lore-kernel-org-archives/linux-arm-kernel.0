@@ -1,49 +1,124 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 01 Sep 2014 12:37:10 +0200
-Subject: [PATCH] mfd: syscon: Decouple syscon interface from syscon devices
-In-Reply-To: <20140901074918.GB6226@lee--X1>
-References: <1408694991-21615-1-git-send-email-pankaj.dubey@samsung.com>
- <20140901074918.GB6226@lee--X1>
-Message-ID: <4121644.3haxjiIdIo@wuerfel>
+From: ajaykumar.rs@samsung.com (Ajay Kumar)
+Date: Mon, 01 Sep 2014 16:06:31 +0530
+Subject: [PATCH V3 1/2] ARM: dts: Add DT changes for display on snow
+Message-ID: <1409567792-8281-1-git-send-email-ajaykumar.rs@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 01 September 2014 08:49:18 Lee Jones wrote:
-> On Fri, 22 Aug 2014, Pankaj Dubey wrote:
-> 
-> > From: Tomasz Figa <t.figa@samsung.com>
-> > 
-> > Currently a syscon entity can be only registered directly through a
-> > platform device that binds to a dedicated driver. However in certain use
-> > cases it is desirable to make a device used with another driver a syscon
-> > interface provider. For example, certain SoCs (e.g. Exynos) contain
-> > system controller blocks which perform various functions such as power
-> > domain control, CPU power management, low power mode control, but in
-> > addition contain certain IP integration glue, such as various signal
-> > masks, coprocessor power control, etc. In such case, there is a need to
-> > have a dedicated driver for such system controller but also share
-> > registers with other drivers. The latter is where the syscon interface
-> > is helpful.
-> > 
-> > This patch decouples syscon object from syscon driver, so that it can be
-> > registered from any driver in addition to the original "syscon" platform
-> > driver.
-> > 
-> > Signed-off-by: Tomasz Figa <t.figa@samsung.com>
-> > Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
-> > ---
-> > 
-> > RFC patch [1] was posted by Tomasz Figa. This patch addresses some of
-> > comments given by Arnd to RFC patch, and further decouples syscon from
-> > device model. It also gives flexibility of registering with syscon at
-> > early stage using device_node object.
-> 
-> It would be helpful if Arnd gave this revision his blessing (Ack).
+Add DT nodes for ptn3460 bridge chip and panel.
+Add backlight enable pin and backlight power supply for pwm-backlight.
+Also add bridge phandle needed by dp to enable display on snow.
 
-I never saw a reason why we don't take this all the way as discussed
-a few times: Completely remove the dependency of syscon on having
-a platform driver for it, and make it possible to just call
-syscon_regmap_lookup_by_phandle() without having to register
-it first.
+Signed-off-by: Ajay Kumar <ajaykumar.rs@samsung.com>
+---
+Changes since V1:
+	-- Remove "simple-panel" compatible string.
+	-- Use GPIO_ACTIVE_HIGH instead of 0.
+	-- Change panel node naming from "panel-simple" to "panel".
 
-	Arnd
+Changes since V2:
+	-- Use proper compatible string: "auo,b116xw03"
+
+ arch/arm/boot/dts/exynos5250-snow.dts |   41 ++++++++++++++++++---------------
+ 1 file changed, 22 insertions(+), 19 deletions(-)
+
+diff --git a/arch/arm/boot/dts/exynos5250-snow.dts b/arch/arm/boot/dts/exynos5250-snow.dts
+index f2b8c41..1ac9709 100644
+--- a/arch/arm/boot/dts/exynos5250-snow.dts
++++ b/arch/arm/boot/dts/exynos5250-snow.dts
+@@ -9,6 +9,7 @@
+ */
+ 
+ /dts-v1/;
++#include <dt-bindings/gpio/gpio.h>
+ #include "exynos5250.dtsi"
+ #include "exynos5250-cros-common.dtsi"
+ 
+@@ -181,7 +182,7 @@
+ 					dcdc3 {
+ 						ti,enable-ext-control;
+ 					};
+-					fet1 {
++					fet1: fet1 {
+ 						regulator-name = "vcd_led";
+ 						ti,overcurrent-wait = <3>;
+ 					};
+@@ -204,7 +205,7 @@
+ 						regulator-always-on;
+ 						ti,overcurrent-wait = <3>;
+ 					};
+-					fet6 {
++					fet6: fet6 {
+ 						regulator-name = "lcd_vdd";
+ 						ti,overcurrent-wait = <3>;
+ 					};
+@@ -253,6 +254,15 @@
+ 			pinctrl-0 = <&max98095_en>;
+ 			pinctrl-names = "default";
+ 		};
++
++		ptn3460: lvds-bridge at 20 {
++			compatible = "nxp,ptn3460";
++			reg = <0x20>;
++			powerdown-gpios = <&gpy2 5 GPIO_ACTIVE_HIGH>;
++			reset-gpios = <&gpx1 5 GPIO_ACTIVE_HIGH>;
++			edid-emulation = <5>;
++			panel = <&panel>;
++		};
+ 	};
+ 
+ 	i2s0: i2s at 03830000 {
+@@ -300,11 +310,13 @@
+ 		vdd_pll-supply = <&ldo8_reg>;
+ 	};
+ 
+-	backlight {
++	backlight: backlight {
+ 		compatible = "pwm-backlight";
+ 		pwms = <&pwm 0 1000000 0>;
+ 		brightness-levels = <0 100 500 1000 1500 2000 2500 2800>;
+ 		default-brightness-level = <7>;
++		enable-gpios = <&gpx3 0 GPIO_ACTIVE_HIGH>;
++		power-supply = <&fet1>;
+ 		pinctrl-0 = <&pwm0_out>;
+ 		pinctrl-names = "default";
+ 	};
+@@ -314,6 +326,12 @@
+ 		samsung,invert-vclk;
+ 	};
+ 
++	panel: panel {
++		compatible = "auo,b116xw03";
++		power-supply = <&fet6>;
++		backlight = <&backlight>;
++	};
++
+ 	dp-controller at 145B0000 {
+ 		status = "okay";
+ 		pinctrl-names = "default";
+@@ -325,22 +343,7 @@
+ 		samsung,link-rate = <0x0a>;
+ 		samsung,lane-count = <2>;
+ 		samsung,hpd-gpio = <&gpx0 7 0>;
+-
+-		display-timings {
+-			native-mode = <&timing1>;
+-
+-			timing1: timing at 1 {
+-				clock-frequency = <70589280>;
+-				hactive = <1366>;
+-				vactive = <768>;
+-				hfront-porch = <40>;
+-				hback-porch = <40>;
+-				hsync-len = <32>;
+-				vback-porch = <10>;
+-				vfront-porch = <12>;
+-				vsync-len = <6>;
+-			};
+-		};
++		bridge = <&ptn3460>;
+ 	};
+ };
+ 
+-- 
+1.7.9.5
