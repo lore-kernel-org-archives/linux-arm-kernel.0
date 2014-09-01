@@ -1,61 +1,106 @@
-From: anders.berg@avagotech.com (Anders Berg)
-Date: Mon,  1 Sep 2014 14:53:41 +0200
-Subject: [PATCH 2/2] Documentation: DT bindings for AXM55xx SSP CS
-In-Reply-To: <1409576021-24828-1-git-send-email-anders.berg@avagotech.com>
-References: <1409576021-24828-1-git-send-email-anders.berg@avagotech.com>
-Message-ID: <1409576021-24828-3-git-send-email-anders.berg@avagotech.com>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Mon, 1 Sep 2014 14:56:04 +0200 (CEST)
+Subject: [PATCH] arm: use irq_set_affinity with force=false when migrating
+ irqs
+In-Reply-To: <20140901115057.GH30401@n2100.arm.linux.org.uk>
+References: <1409571966-18343-1-git-send-email-sudeep.holla@arm.com>
+ <20140901115057.GH30401@n2100.arm.linux.org.uk>
+Message-ID: <alpine.DEB.2.10.1409011421450.3333@nanos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Bindings and documentation for AXM55xx SSP chip select controller.
+On Mon, 1 Sep 2014, Russell King - ARM Linux wrote:
+> On Mon, Sep 01, 2014 at 12:46:06PM +0100, Sudeep Holla wrote:
+> > From: Sudeep Holla <sudeep.holla@arm.com>
+> > 
+> > Commit 01f8fa4f01d8("genirq: Allow forcing cpu affinity of interrupts")
+> > enabled the forced irq_set_affinity which previously refused to route an
+> > interrupt to an offline cpu.
+> > 
+> > Commit ffde1de64012("irqchip: Gic: Support forced affinity setting")
+> > implements this force logic and disables the cpu online check for GIC
+> > interrupt controller.
+> > 
+> > When __cpu_disable calls migrate_irqs, it disables the current cpu in
+> > cpu_online_mask and uses forced irq_set_affinity to migrate the IRQs
+> > away from the cpu but passes affinity mask with the cpu being offlined
+> > also included in it.
+> > 
+> > If irq_set_affinity is called with force=true in a cpu hotplug path,
+> > the caller must ensure that the cpu being offlined is not present in the
+> > affinity mask or it may be selected as the target CPU, leading to the
+> > interrupt not being migrated.
+> > 
+> > This patch fixes the issue by calling irq_set_affinity with force=false
+> > so that cpu_online_mask is checked while setting the affinity in the
+> > cpu hotplug path.
+> > 
+> > Tested on TC2 hotpluging CPU0 in and out. Without this patch the system
+> > locks up as the IRQs are not migrated away from CPU0.
+> > 
+> > Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+> > Cc: Russell King <linux@arm.linux.org.uk>
+> > Cc: Thomas Gleixner <tglx@linutronix.de>
+> > Cc: Mark Rutland <mark.rutland@arm.com>
+> > Cc: <stable@vger.kernel.org> # 3.10.x
+> > ---
+> >  arch/arm/kernel/irq.c | 2 +-
+> >  1 file changed, 1 insertion(+), 1 deletion(-)
+> > 
+> > Hi Russell,
+> > 
+> > If you or tglx has no objections to this patch, I will put it
+> > in your patch tracker.
+> 
+> Post discussion, I have no objections - except to the above comment.  Let
+> me rewrite it in a programming language, and maybe you can spot what's
+> wrong:
+> 
+> 	if (russell_has_no_objection(patch) || tglx_has_no_objection(patch))
+> 		submit_patch_to_tracker(patch);
+> 
+> Personally, I'd like to see tglx's ack on this first.
 
-Signed-off-by: Anders Berg <anders.berg@avagotech.com>
----
- .../devicetree/bindings/gpio/gpio-axxia-sspcs.txt  | 36 ++++++++++++++++++++++
- 1 file changed, 36 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/gpio/gpio-axxia-sspcs.txt
+Acked-by: Thomas Gleixner <tglx@linutronix.de>
 
-diff --git a/Documentation/devicetree/bindings/gpio/gpio-axxia-sspcs.txt b/Documentation/devicetree/bindings/gpio/gpio-axxia-sspcs.txt
-new file mode 100644
-index 0000000..a64c695
---- /dev/null
-+++ b/Documentation/devicetree/bindings/gpio/gpio-axxia-sspcs.txt
-@@ -0,0 +1,36 @@
-+* Axxia SSP GPIO chip-select driver
-+
-+The Axxia device has a ARM PL022 Prime Cell SSP controller with an extension of
-+five chip select signals that may be controlled by software. This driver
-+exports them as GPIOs.
-+
-+Required properties:
-+
-+  * compatible: should be "lsi,ssp-gpio"
-+  * reg: address of the chip select control register.
-+  * gpio-controller: mark the device as gpio controller
-+  * #gpio-cells: should be 1 and this field specifies the chip select number
-+
-+Example:
-+-------
-+
-+	spics: sspgpio at 2010088030 {
-+		compatible = "lsi,ssp-gpio";
-+		#gpio-cells = <1>;
-+		reg = <0x20 0x10088030 0x00 0x4>;
-+		gpio-controller;
-+	};
-+
-+	spi0: ssp at 2010088000 {
-+		compatible = "arm,pl022", "arm,primecell";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		reg = <0x20 0x10088000 0x00 0x1000>;
-+		num-cs = <5>;
-+		cs-gpios = <&spics 0>,
-+			   <&spics 1>,
-+			   <&spics 2>,
-+			   <&spics 3>,
-+			   <&spics 4>;
-+		...
-+      };
--- 
-1.9.1
+I'm just not too happy about the changelog. It's confusing at
+best:
+
+   Call irq_set_affinity() with argument force = false
+
+   Reason: IRQ Core and GIC was changed to force set affinity.
+   	   
+   	   If called from hotplug code, then the caller must ensure
+   	   that the cpu being offlined is not present in the mask
+
+   Therefor call it with force = false	   
+
+That does not make sense. You change something which preceded the
+forced affinity mechanism by 3+ years and completely miss to explain
+why it got there in the first place and never should have been.
+
+What about somthing like the following:
+
+Since commit 1dbfa187dad ("ARM: irq migration: force migration off CPU
+going down") the ARM interrupt migration code on cpu offline calls
+irqchip.irq_set_affinity() with the argument force=true. At the point
+of this change the argument had no effect because it was not used by
+any interrupt chip driver and there was no semantics defined.
+
+This changed with commit 01f8fa4f01d8 ("genirq: Allow forcing cpu
+affinity of interrupts") which made the force argument useful to route
+interrupts to not yet online cpus without checking the target cpu
+against the cpu online mask. The following commit ffde1de64012
+("irqchip: gic: Support forced affinity setting") implemented this for
+the GIC interrupt chip.
+
+As a consequence the ARM cpu offline irq migration fails if CPU0 is
+offlined, because CPU0 is still set in the affinity mask and the
+validataion against cpu online mask is skipped to the force argument
+being true. The following first_cpu(mask) selection always selects
+CPU0 as the target.
+
+Solve the issue by calling irq_set_affinity() with force=false from
+the CPU offline irq migration code so the GIC driver validates the
+affinity mask against CPU online mask and therefor removes CPU0 from
+the possible target candidates.
