@@ -1,83 +1,142 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Mon, 1 Sep 2014 09:13:52 +0800
-Subject: [PATCH] ARM: imx: remove imx_scu_standby_enable()
-In-Reply-To: <1409533338-4111-1-git-send-email-shawn.guo@freescale.com>
-References: <1409533338-4111-1-git-send-email-shawn.guo@freescale.com>
-Message-ID: <20140901011351.GD3135@dragon>
+From: horms@verge.net.au (Simon Horman)
+Date: Mon, 1 Sep 2014 10:45:40 +0900
+Subject: [PATCH v2] ARM: dts: Add shmobile platform device tree bindings
+ documentation
+In-Reply-To: <20140901005544.GB28783@verge.net.au>
+References: <1409213120-5291-1-git-send-email-geert+renesas@glider.be>
+ <20140829003456.GM16165@verge.net.au>
+ <CAMuHMdXNPk2ACbFsXcPic_zZBDCjF+5j6-jQNgZxGePPcTRUBQ@mail.gmail.com>
+ <20140901005544.GB28783@verge.net.au>
+Message-ID: <20140901014539.GA10680@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 01, 2014 at 09:02:18AM +0800, Shawn Guo wrote:
-> With commit c716483c3db1 ("ARM: 8122/1: smp_scu: enable SCU standby
-> support"), the STANDBY bit of SCU is handled by core function
-> scu_enable().  So imx_scu_standby_enable() can be removed now.
+On Mon, Sep 01, 2014 at 09:55:45AM +0900, Simon Horman wrote:
+> On Fri, Aug 29, 2014 at 10:26:01AM +0200, Geert Uytterhoeven wrote:
+> > Hi Simon,
+> > 
+> > On Fri, Aug 29, 2014 at 2:34 AM, Simon Horman <horms@verge.net.au> wrote:
+> > > On Thu, Aug 28, 2014 at 10:05:20AM +0200, Geert Uytterhoeven wrote:
+> > >> Add Renesas SH-Mobile, R-Mobile, and R-Car Platform Device Tree Bindings
+> > >> Documentation, listing supported SoCs and boards.
+> > >>
+> > >> This allows to use checkpatch to validate DTSes referring to Renesas
+> > >> shmobile SoCs, and boards containing those SoCs.
+> > >>
+> > >> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> > >
+> > > Thanks Geert, this looks good to me.
+> > > Is it for me to pick up?
+> > 
+> > I think so.
+> > 
+> > > If so I would prefer a slightly re-structured title:
+> > >
+> > > ARM: shmobile: Add platform device tree bindings documentation
+> > 
+> > Fine for me.
+> > 
+> > Do you want me to resend, or will you amend yourself?
 > 
-> Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
-> ---
->  arch/arm/mach-imx/common.h        | 2 --
->  arch/arm/mach-imx/cpuidle-imx6q.c | 4 ----
->  arch/arm/mach-imx/platsmp.c       | 8 --------
->  3 files changed, 14 deletions(-)
-> 
-> diff --git a/arch/arm/mach-imx/common.h b/arch/arm/mach-imx/common.h
-> index 22ba8973bcb9..1dabf435c592 100644
-> --- a/arch/arm/mach-imx/common.h
-> +++ b/arch/arm/mach-imx/common.h
-> @@ -98,11 +98,9 @@ void imx_set_cpu_arg(int cpu, u32 arg);
->  void v7_secondary_startup(void);
->  void imx_scu_map_io(void);
->  void imx_smp_prepare(void);
-> -void imx_scu_standby_enable(void);
->  #else
->  static inline void imx_scu_map_io(void) {}
->  static inline void imx_smp_prepare(void) {}
-> -static inline void imx_scu_standby_enable(void) {}
->  #endif
->  void imx_src_init(void);
->  void imx_gpc_init(void);
-> diff --git a/arch/arm/mach-imx/cpuidle-imx6q.c b/arch/arm/mach-imx/cpuidle-imx6q.c
-> index 10844d3bb926..aa935787b743 100644
-> --- a/arch/arm/mach-imx/cpuidle-imx6q.c
-> +++ b/arch/arm/mach-imx/cpuidle-imx6q.c
-> @@ -66,10 +66,6 @@ static struct cpuidle_driver imx6q_cpuidle_driver = {
->  
->  int __init imx6q_cpuidle_init(void)
->  {
-> -	/* Need to enable SCU standby for entering WAIT modes */
-> -	if (!cpu_is_imx6sx())
-> -		imx_scu_standby_enable();
-> -
->  	/* Set INT_MEM_CLK_LPM bit to get a reliable WAIT mode support */
->  	imx6q_set_int_mem_clk_lpm(true);
->  
-> diff --git a/arch/arm/mach-imx/platsmp.c b/arch/arm/mach-imx/platsmp.c
-> index 5b57c17c06bd..31edbcd70c27 100644
-> --- a/arch/arm/mach-imx/platsmp.c
-> +++ b/arch/arm/mach-imx/platsmp.c
-> @@ -45,14 +45,6 @@ void __init imx_scu_map_io(void)
->  	scu_base = IMX_IO_ADDRESS(base);
->  }
->  
-> -void imx_scu_standby_enable(void)
-> -{
-> -	u32 val = readl_relaxed(scu_base);
-> -
-> -	val |= SCU_STANDBY_ENABLE;
+> No need to resend at this time :)
 
-The following trunk is missed, since SCU_STANDBY_ENABLE is unused after
-the change.
+I have queued up the following:
 
-Shawn
 
-diff --git a/arch/arm/mach-imx/platsmp.c b/arch/arm/mach-imx/platsmp.c
-index 5b57c17c06bd..771bd25c1025 100644
---- a/arch/arm/mach-imx/platsmp.c
-+++ b/arch/arm/mach-imx/platsmp.c
-@@ -20,8 +20,6 @@
- #include "common.h"
- #include "hardware.h"
+From: Geert Uytterhoeven <geert+renesas@glider.be>
 
--#define SCU_STANDBY_ENABLE     (1 << 5)
--
- u32 g_diag_reg;
- static void __iomem *scu_base;
+[PATCH] ARM: shmobile: Add platform device tree bindings documentation
+
+Add Renesas SH-Mobile, R-Mobile, and R-Car Platform Device Tree Bindings
+Documentation, listing supported SoCs and boards.
+
+This allows to use checkpatch to validate DTSes referring to Renesas
+shmobile SoCs, and boards containing those SoCs.
+
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+[horms+renesas at verge.net.au: tweaked title]
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ Documentation/devicetree/bindings/arm/shmobile.txt | 71 ++++++++++++++++++++++
+ 1 file changed, 71 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/arm/shmobile.txt
+
+diff --git a/Documentation/devicetree/bindings/arm/shmobile.txt b/Documentation/devicetree/bindings/arm/shmobile.txt
+new file mode 100644
+index 0000000..5d1c5c0
+--- /dev/null
++++ b/Documentation/devicetree/bindings/arm/shmobile.txt
+@@ -0,0 +1,71 @@
++Renesas SH-Mobile, R-Mobile, and R-Car Platform Device Tree Bindings
++--------------------------------------------------------------------
++
++SoCs:
++
++  - Emma Mobile EV2
++    compatible = "renesas,emev2"
++  - RZ/A1H (R7S72100)
++    compatible = "renesas,r7s72100"
++  - SH-Mobile AP4 (R8A73720/SH7372)
++    compatible = "renesas,sh7372"
++  - SH-Mobile AG5 (R8A73A00/SH73A0)
++    compatible = "renesas,sh73a0"
++  - R-Mobile APE6 (R8A73A40)
++    compatible = "renesas,r8a73a4"
++  - R-Mobile A1 (R8A77400)
++    compatible = "renesas,r8a7740"
++  - R-Car M1A (R8A77781)
++    compatible = "renesas,r8a7778"
++  - R-Car H1 (R8A77790)
++    compatible = "renesas,r8a7779"
++  - R-Car H2 (R8A77900)
++    compatible = "renesas,r8a7790"
++  - R-Car M2-W (R8A77910)
++    compatible = "renesas,r8a7791"
++  - R-Car V2H (R8A77920)
++    compatible = "renesas,r8a7792"
++  - R-Car M2-N (R8A77930)
++    compatible = "renesas,r8a7793"
++  - R-Car E2 (R8A77940)
++    compatible = "renesas,r8a7794"
++
++
++Boards:
++
++  - Alt
++    compatible = "renesas,alt", "renesas,r8a7794"
++  - APE6-EVM
++    compatible = "renesas,ape6evm", "renesas,r8a73a4"
++  - APE6-EVM - Reference Device Tree Implementation
++    compatible = "renesas,ape6evm-reference", "renesas,r8a73a4"
++  - Atmark Techno Armadillo-800 EVA
++    compatible = "renesas,armadillo800eva"
++  - BOCK-W
++    compatible = "renesas,bockw", "renesas,r8a7778"
++  - BOCK-W - Reference Device Tree Implementation
++    compatible = "renesas,bockw-reference", "renesas,r8a7778"
++  - Genmai (RTK772100BC00000BR)
++    compatible = "renesas,genmai", "renesas,r7s72100"
++  - Gose
++    compatible = "renesas,gose", "renesas,r8a7793"
++  - Henninger
++    compatible = "renesas,henninger", "renesas,r8a7791"
++  - Koelsch (RTP0RC7791SEB00010S)
++    compatible = "renesas,koelsch", "renesas,r8a7791"
++  - KZM9D
++    compatible = "renesas,kzm9d", "renesas,emev2"
++  - KZM-A9-GT
++    compatible = "renesas,kzm9g", "renesas,sh73a0"
++  - KZM-A9-GT - Reference Device Tree Implementation
++    compatible = "renesas,kzm9g-reference", "renesas,sh73a0"
++  - Lager (RTP0RC7790SEB00010S)
++    compatible = "renesas,lager", "renesas,r8a7790"
++  - Mackerel (R0P7372LC0016RL, AP4 EVM 2nd)
++    compatible = "renesas,mackerel"
++  - Marzen
++    compatible = "renesas,marzen", "renesas,r8a7779"
++
++Note: Reference Device Tree Implementations are temporary implementations
++      to ease the migration from platform devices to Device Tree, and are
++      intended to be removed in the future.
+-- 
+2.0.1
