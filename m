@@ -1,159 +1,151 @@
 From: shawn.guo@freescale.com (Shawn Guo)
-Date: Mon, 1 Sep 2014 16:14:00 +0800
-Subject: [PATCH v2 1/5] ARM: imx: add an exclusive gate clock type
+Date: Mon, 1 Sep 2014 16:14:02 +0800
+Subject: [PATCH v2 3/5] ARM: imx6sl: add BYPASS support for PLL clocks
 In-Reply-To: <1409559244-22483-1-git-send-email-shawn.guo@freescale.com>
 References: <1409559244-22483-1-git-send-email-shawn.guo@freescale.com>
-Message-ID: <1409559244-22483-2-git-send-email-shawn.guo@freescale.com>
+Message-ID: <1409559244-22483-4-git-send-email-shawn.guo@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There are a couple of gate clocks are mutually exclusive on i.MX6, i.e.
-LVDSCLK1_IBEN and LVDSCLK1_OBEN.  They cannot be enabled simultaneously.
-This patches adds an exclusive gate clock type specifically for such
-case.  The clock driver will need to call imx_clk_gate_exclusive() to
-register a gate clock with parameter exclusive_mask indicating the mask
-of gate bits which are mutually exclusive to this gate clock.
-
-Right now, it only handles the exclusive gate clocks which are defined
-in a single hardware register, which is the case we're running into
-today.  But it can be extended to handle exclusive gate clocks defined
-in different registers later if needed.
+This is the same change for imx6sl clock driver as "ARM: imx6q: add BYPASS
+support for PLL clocks" for imx6q.  The difference is that only anaclk1
+is available on imx6sl.
 
 Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
 ---
- arch/arm/mach-imx/Makefile             |  3 +-
- arch/arm/mach-imx/clk-gate-exclusive.c | 94 ++++++++++++++++++++++++++++++++++
- arch/arm/mach-imx/clk.h                |  3 ++
- 3 files changed, 99 insertions(+), 1 deletion(-)
- create mode 100644 arch/arm/mach-imx/clk-gate-exclusive.c
+ arch/arm/mach-imx/clk-imx6sl.c           | 69 ++++++++++++++++++++++++++++----
+ include/dt-bindings/clock/imx6sl-clock.h | 27 ++++++++++++-
+ 2 files changed, 87 insertions(+), 9 deletions(-)
 
-diff --git a/arch/arm/mach-imx/Makefile b/arch/arm/mach-imx/Makefile
-index 9f1c359566bb..3e6476b6a698 100644
---- a/arch/arm/mach-imx/Makefile
-+++ b/arch/arm/mach-imx/Makefile
-@@ -16,7 +16,8 @@ obj-$(CONFIG_SOC_IMX5) += cpu-imx5.o clk-imx51-imx53.o $(imx5-pm-y)
- 
- obj-$(CONFIG_COMMON_CLK) += clk-pllv1.o clk-pllv2.o clk-pllv3.o clk-gate2.o \
- 			    clk-pfd.o clk-busy.o clk.o \
--			    clk-fixup-div.o clk-fixup-mux.o
-+			    clk-fixup-div.o clk-fixup-mux.o \
-+			    clk-gate-exclusive.o
- 
- obj-$(CONFIG_IMX_HAVE_IOMUX_V1) += iomux-v1.o
- obj-$(CONFIG_ARCH_MXC_IOMUX_V3) += iomux-v3.o
-diff --git a/arch/arm/mach-imx/clk-gate-exclusive.c b/arch/arm/mach-imx/clk-gate-exclusive.c
-new file mode 100644
-index 000000000000..c12f5f2e04dc
---- /dev/null
-+++ b/arch/arm/mach-imx/clk-gate-exclusive.c
-@@ -0,0 +1,94 @@
-+/*
-+ * Copyright 2014 Freescale Semiconductor, Inc.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#include <linux/clk-provider.h>
-+#include <linux/err.h>
-+#include <linux/io.h>
-+#include <linux/slab.h>
-+#include "clk.h"
-+
-+/**
-+ * struct clk_gate_exclusive - i.MX specific gate clock which is mutually
-+ * exclusive with other gate clocks
-+ *
-+ * @gate: the parent class
-+ * @exclusive_mask: mask of gate bits which are mutually exclusive to this
-+ *	gate clock
-+ *
-+ * The imx exclusive gate clock is a subclass of basic clk_gate
-+ * with an addtional mask to indicate which other gate bits in the same
-+ * register is mutually exclusive to this gate clock.
-+ */
-+struct clk_gate_exclusive {
-+	struct clk_gate gate;
-+	u32 exclusive_mask;
+diff --git a/arch/arm/mach-imx/clk-imx6sl.c b/arch/arm/mach-imx/clk-imx6sl.c
+index 11908e8bf9ab..e5c93d81aecc 100644
+--- a/arch/arm/mach-imx/clk-imx6sl.c
++++ b/arch/arm/mach-imx/clk-imx6sl.c
+@@ -56,6 +56,20 @@ static const char *epdc_pix_sels[]	= { "pll2_bus", "pll3_usb_otg", "pll5_video_d
+ static const char *audio_sels[]		= { "pll4_audio_div", "pll3_pfd2", "pll3_pfd3", "pll3_usb_otg", };
+ static const char *ecspi_sels[]		= { "pll3_60m", "osc", };
+ static const char *uart_sels[]		= { "pll3_80m", "osc", };
++static const char *lvds_sels[]		= {
++	"pll1_sys", "pll2_bus", "pll2_pfd0", "pll2_pfd1", "pll2_pfd2", "dummy", "pll4_audio", "pll5_video",
++	"dummy", "enet_ref", "dummy", "dummy", "pll3_usb_otg", "pll7_usb_host", "pll3_pfd0", "pll3_pfd1",
++	"pll3_pfd2", "pll3_pfd3", "osc", "dummy", "dummy", "dummy", "dummy", "dummy",
++	 "dummy", "dummy", "dummy", "dummy", "dummy", "dummy", "dummy", "dummy",
 +};
-+
-+static int clk_gate_exclusive_enable(struct clk_hw *hw)
-+{
-+	struct clk_gate *gate = container_of(hw, struct clk_gate, hw);
-+	struct clk_gate_exclusive *exgate = container_of(gate,
-+					struct clk_gate_exclusive, gate);
-+	u32 val = readl(gate->reg);
-+
-+	if (val & exgate->exclusive_mask)
-+		return -EBUSY;
-+
-+	return clk_gate_ops.enable(hw);
-+}
-+
-+static void clk_gate_exclusive_disable(struct clk_hw *hw)
-+{
-+	clk_gate_ops.disable(hw);
-+}
-+
-+static int clk_gate_exclusive_is_enabled(struct clk_hw *hw)
-+{
-+	return clk_gate_ops.is_enabled(hw);
-+}
-+
-+static const struct clk_ops clk_gate_exclusive_ops = {
-+	.enable = clk_gate_exclusive_enable,
-+	.disable = clk_gate_exclusive_disable,
-+	.is_enabled = clk_gate_exclusive_is_enabled,
-+};
-+
-+struct clk *imx_clk_gate_exclusive(const char *name, const char *parent,
-+	 void __iomem *reg, u8 shift, u32 exclusive_mask)
-+{
-+	struct clk_gate_exclusive *exgate;
-+	struct clk_gate *gate;
-+	struct clk *clk;
-+	struct clk_init_data init;
-+
-+	if (exclusive_mask == 0)
-+		return ERR_PTR(-EINVAL);
-+
-+	exgate = kzalloc(sizeof(*exgate), GFP_KERNEL);
-+	if (!exgate)
-+		return ERR_PTR(-ENOMEM);
-+	gate = &exgate->gate;
-+
-+	init.name = name;
-+	init.ops = &clk_gate_exclusive_ops;
-+	init.flags = CLK_SET_RATE_PARENT;
-+	init.parent_names = parent ? &parent : NULL;
-+	init.num_parents = parent ? 1 : 0;
-+
-+	gate->reg = reg;
-+	gate->bit_idx = shift;
-+	gate->lock = &imx_ccm_lock;
-+	gate->hw.init = &init;
-+	exgate->exclusive_mask = exclusive_mask;
-+
-+	clk = clk_register(NULL, &gate->hw);
-+	if (IS_ERR(clk))
-+		kfree(exgate);
-+
-+	return clk;
-+}
-diff --git a/arch/arm/mach-imx/clk.h b/arch/arm/mach-imx/clk.h
-index d5ba76fee115..4cdf8b6a74e8 100644
---- a/arch/arm/mach-imx/clk.h
-+++ b/arch/arm/mach-imx/clk.h
-@@ -36,6 +36,9 @@ struct clk *clk_register_gate2(struct device *dev, const char *name,
- struct clk * imx_obtain_fixed_clock(
- 			const char *name, unsigned long rate);
++static const char *pll_bypass_src_sels[] = { "osc", "lvds1_in", };
++static const char *pll1_bypass_sels[]	= { "pll1", "pll1_bypass_src", };
++static const char *pll2_bypass_sels[]	= { "pll2", "pll2_bypass_src", };
++static const char *pll3_bypass_sels[]	= { "pll3", "pll3_bypass_src", };
++static const char *pll4_bypass_sels[]	= { "pll4", "pll4_bypass_src", };
++static const char *pll5_bypass_sels[]	= { "pll5", "pll5_bypass_src", };
++static const char *pll6_bypass_sels[]	= { "pll6", "pll6_bypass_src", };
++static const char *pll7_bypass_sels[]	= { "pll7", "pll7_bypass_src", };
  
-+struct clk *imx_clk_gate_exclusive(const char *name, const char *parent,
-+	 void __iomem *reg, u8 shift, u32 exclusive_mask);
+ static struct clk_div_table clk_enet_ref_table[] = {
+ 	{ .val = 0, .div = 20, },
+@@ -176,20 +190,59 @@ static void __init imx6sl_clocks_init(struct device_node *ccm_node)
+ 	clks[IMX6SL_CLK_DUMMY] = imx_clk_fixed("dummy", 0);
+ 	clks[IMX6SL_CLK_CKIL] = imx_obtain_fixed_clock("ckil", 0);
+ 	clks[IMX6SL_CLK_OSC] = imx_obtain_fixed_clock("osc", 0);
++	/* Clock source from external clock via CLK1 PAD */
++	clks[IMX6SL_CLK_ANACLK1] = imx_obtain_fixed_clock("anaclk1", 0);
+ 
+ 	np = of_find_compatible_node(NULL, NULL, "fsl,imx6sl-anatop");
+ 	base = of_iomap(np, 0);
+ 	WARN_ON(!base);
+ 	anatop_base = base;
+ 
+-	/*                                             type               name            parent  base         div_mask */
+-	clks[IMX6SL_CLK_PLL1_SYS]      = imx_clk_pllv3(IMX_PLLV3_SYS,	  "pll1_sys",	   "osc", base,        0x7f);
+-	clks[IMX6SL_CLK_PLL2_BUS]      = imx_clk_pllv3(IMX_PLLV3_GENERIC, "pll2_bus",	   "osc", base + 0x30, 0x1);
+-	clks[IMX6SL_CLK_PLL3_USB_OTG]  = imx_clk_pllv3(IMX_PLLV3_USB,	  "pll3_usb_otg",  "osc", base + 0x10, 0x3);
+-	clks[IMX6SL_CLK_PLL4_AUDIO]    = imx_clk_pllv3(IMX_PLLV3_AV,	  "pll4_audio",	   "osc", base + 0x70, 0x7f);
+-	clks[IMX6SL_CLK_PLL5_VIDEO]    = imx_clk_pllv3(IMX_PLLV3_AV,	  "pll5_video",	   "osc", base + 0xa0, 0x7f);
+-	clks[IMX6SL_CLK_PLL6_ENET]     = imx_clk_pllv3(IMX_PLLV3_ENET,	  "pll6_enet",	   "osc", base + 0xe0, 0x3);
+-	clks[IMX6SL_CLK_PLL7_USB_HOST] = imx_clk_pllv3(IMX_PLLV3_USB,     "pll7_usb_host", "osc", base + 0x20, 0x3);
++	clks[IMX6SL_PLL1_BYPASS_SRC] = imx_clk_mux("pll1_bypass_src", base + 0x00, 14, 1, pll_bypass_src_sels, ARRAY_SIZE(pll_bypass_src_sels));
++	clks[IMX6SL_PLL2_BYPASS_SRC] = imx_clk_mux("pll2_bypass_src", base + 0x30, 14, 1, pll_bypass_src_sels, ARRAY_SIZE(pll_bypass_src_sels));
++	clks[IMX6SL_PLL3_BYPASS_SRC] = imx_clk_mux("pll3_bypass_src", base + 0x10, 14, 1, pll_bypass_src_sels, ARRAY_SIZE(pll_bypass_src_sels));
++	clks[IMX6SL_PLL4_BYPASS_SRC] = imx_clk_mux("pll4_bypass_src", base + 0x70, 14, 1, pll_bypass_src_sels, ARRAY_SIZE(pll_bypass_src_sels));
++	clks[IMX6SL_PLL5_BYPASS_SRC] = imx_clk_mux("pll5_bypass_src", base + 0xa0, 14, 1, pll_bypass_src_sels, ARRAY_SIZE(pll_bypass_src_sels));
++	clks[IMX6SL_PLL6_BYPASS_SRC] = imx_clk_mux("pll6_bypass_src", base + 0xe0, 14, 1, pll_bypass_src_sels, ARRAY_SIZE(pll_bypass_src_sels));
++	clks[IMX6SL_PLL7_BYPASS_SRC] = imx_clk_mux("pll7_bypass_src", base + 0x20, 14, 1, pll_bypass_src_sels, ARRAY_SIZE(pll_bypass_src_sels));
 +
- static inline struct clk *imx_clk_gate2(const char *name, const char *parent,
- 		void __iomem *reg, u8 shift)
- {
++	/*                                    type               name    parent_name        base         div_mask */
++	clks[IMX6SL_CLK_PLL1] = imx_clk_pllv3(IMX_PLLV3_SYS,     "pll1", "pll1_bypass_src", base + 0x00, 0x7f);
++	clks[IMX6SL_CLK_PLL2] = imx_clk_pllv3(IMX_PLLV3_GENERIC, "pll2", "pll2_bypass_src", base + 0x30, 0x1);
++	clks[IMX6SL_CLK_PLL3] = imx_clk_pllv3(IMX_PLLV3_USB,     "pll3", "pll3_bypass_src", base + 0x10, 0x3);
++	clks[IMX6SL_CLK_PLL4] = imx_clk_pllv3(IMX_PLLV3_AV,      "pll4", "pll4_bypass_src", base + 0x70, 0x7f);
++	clks[IMX6SL_CLK_PLL5] = imx_clk_pllv3(IMX_PLLV3_AV,      "pll5", "pll5_bypass_src", base + 0xa0, 0x7f);
++	clks[IMX6SL_CLK_PLL6] = imx_clk_pllv3(IMX_PLLV3_ENET,    "pll6", "pll6_bypass_src", base + 0xe0, 0x3);
++	clks[IMX6SL_CLK_PLL7] = imx_clk_pllv3(IMX_PLLV3_USB,     "pll7", "pll7_bypass_src", base + 0x20, 0x3);
++
++	clks[IMX6SL_PLL1_BYPASS] = imx_clk_mux_flags("pll1_bypass", base + 0x00, 16, 1, pll1_bypass_sels, ARRAY_SIZE(pll1_bypass_sels), CLK_SET_RATE_PARENT);
++	clks[IMX6SL_PLL2_BYPASS] = imx_clk_mux_flags("pll2_bypass", base + 0x30, 16, 1, pll2_bypass_sels, ARRAY_SIZE(pll2_bypass_sels), CLK_SET_RATE_PARENT);
++	clks[IMX6SL_PLL3_BYPASS] = imx_clk_mux_flags("pll3_bypass", base + 0x10, 16, 1, pll3_bypass_sels, ARRAY_SIZE(pll3_bypass_sels), CLK_SET_RATE_PARENT);
++	clks[IMX6SL_PLL4_BYPASS] = imx_clk_mux_flags("pll4_bypass", base + 0x70, 16, 1, pll4_bypass_sels, ARRAY_SIZE(pll4_bypass_sels), CLK_SET_RATE_PARENT);
++	clks[IMX6SL_PLL5_BYPASS] = imx_clk_mux_flags("pll5_bypass", base + 0xa0, 16, 1, pll5_bypass_sels, ARRAY_SIZE(pll5_bypass_sels), CLK_SET_RATE_PARENT);
++	clks[IMX6SL_PLL6_BYPASS] = imx_clk_mux_flags("pll6_bypass", base + 0xe0, 16, 1, pll6_bypass_sels, ARRAY_SIZE(pll6_bypass_sels), CLK_SET_RATE_PARENT);
++	clks[IMX6SL_PLL7_BYPASS] = imx_clk_mux_flags("pll7_bypass", base + 0x20, 16, 1, pll7_bypass_sels, ARRAY_SIZE(pll7_bypass_sels), CLK_SET_RATE_PARENT);
++
++	/* Do not bypass PLLs initially */
++	clk_set_parent(clks[IMX6SL_PLL1_BYPASS], clks[IMX6SL_CLK_PLL1]);
++	clk_set_parent(clks[IMX6SL_PLL2_BYPASS], clks[IMX6SL_CLK_PLL2]);
++	clk_set_parent(clks[IMX6SL_PLL3_BYPASS], clks[IMX6SL_CLK_PLL3]);
++	clk_set_parent(clks[IMX6SL_PLL4_BYPASS], clks[IMX6SL_CLK_PLL4]);
++	clk_set_parent(clks[IMX6SL_PLL5_BYPASS], clks[IMX6SL_CLK_PLL5]);
++	clk_set_parent(clks[IMX6SL_PLL6_BYPASS], clks[IMX6SL_CLK_PLL6]);
++	clk_set_parent(clks[IMX6SL_PLL7_BYPASS], clks[IMX6SL_CLK_PLL7]);
++
++	clks[IMX6SL_CLK_PLL1_SYS]      = imx_clk_gate("pll1_sys",      "pll1_bypass", base + 0x00, 13);
++	clks[IMX6SL_CLK_PLL2_BUS]      = imx_clk_gate("pll2_bus",      "pll2_bypass", base + 0x30, 13);
++	clks[IMX6SL_CLK_PLL3_USB_OTG]  = imx_clk_gate("pll3_usb_otg",  "pll3_bypass", base + 0x10, 13);
++	clks[IMX6SL_CLK_PLL4_AUDIO]    = imx_clk_gate("pll4_audio",    "pll4_bypass", base + 0x70, 13);
++	clks[IMX6SL_CLK_PLL5_VIDEO]    = imx_clk_gate("pll5_video",    "pll5_bypass", base + 0xa0, 13);
++	clks[IMX6SL_CLK_PLL6_ENET]     = imx_clk_gate("pll6_enet",     "pll6_bypass", base + 0xe0, 13);
++	clks[IMX6SL_CLK_PLL7_USB_HOST] = imx_clk_gate("pll7_usb_host", "pll7_bypass", base + 0xe0, 13);
++
++	clks[IMX6SL_CLK_LVDS1_SEL] = imx_clk_mux("lvds1_sel", base + 0x160, 0, 5, lvds_sels, ARRAY_SIZE(lvds_sels));
++	clks[IMX6SL_CLK_LVDS1_OUT] = imx_clk_gate_exclusive("lvds1_out", "lvds1_sel", base + 0x160, 10, BIT(12));
++	clks[IMX6SL_CLK_LVDS1_IN] = imx_clk_gate_exclusive("lvds1_in", "anaclk1", base + 0x160, 12, BIT(10));
+ 
+ 	/*
+ 	 * usbphy1 and usbphy2 are implemented as dummy gates using reserve
+diff --git a/include/dt-bindings/clock/imx6sl-clock.h b/include/dt-bindings/clock/imx6sl-clock.h
+index b91dd462ba85..f10a928fe2dd 100644
+--- a/include/dt-bindings/clock/imx6sl-clock.h
++++ b/include/dt-bindings/clock/imx6sl-clock.h
+@@ -146,6 +146,31 @@
+ #define IMX6SL_CLK_PLL4_AUDIO_DIV	133
+ #define IMX6SL_CLK_SPBA			134
+ #define IMX6SL_CLK_ENET			135
+-#define IMX6SL_CLK_END			136
++#define IMX6SL_CLK_LVDS1_SEL		136
++#define IMX6SL_CLK_LVDS1_OUT		137
++#define IMX6SL_CLK_LVDS1_IN		138
++#define IMX6SL_CLK_ANACLK1		139
++#define IMX6SL_PLL1_BYPASS_SRC		140
++#define IMX6SL_PLL2_BYPASS_SRC		141
++#define IMX6SL_PLL3_BYPASS_SRC		142
++#define IMX6SL_PLL4_BYPASS_SRC		143
++#define IMX6SL_PLL5_BYPASS_SRC		144
++#define IMX6SL_PLL6_BYPASS_SRC		145
++#define IMX6SL_PLL7_BYPASS_SRC		146
++#define IMX6SL_CLK_PLL1			147
++#define IMX6SL_CLK_PLL2			148
++#define IMX6SL_CLK_PLL3			149
++#define IMX6SL_CLK_PLL4			150
++#define IMX6SL_CLK_PLL5			151
++#define IMX6SL_CLK_PLL6			152
++#define IMX6SL_CLK_PLL7			153
++#define IMX6SL_PLL1_BYPASS		154
++#define IMX6SL_PLL2_BYPASS		155
++#define IMX6SL_PLL3_BYPASS		156
++#define IMX6SL_PLL4_BYPASS		157
++#define IMX6SL_PLL5_BYPASS		158
++#define IMX6SL_PLL6_BYPASS		159
++#define IMX6SL_PLL7_BYPASS		160
++#define IMX6SL_CLK_END			161
+ 
+ #endif /* __DT_BINDINGS_CLOCK_IMX6SL_H */
 -- 
 1.9.1
