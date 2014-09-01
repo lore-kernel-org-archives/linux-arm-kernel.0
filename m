@@ -1,30 +1,48 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Mon, 1 Sep 2014 15:00:10 +0530
-Subject: [GIT PULL] DaVinci board file fixes for v3.18 (merge window)
-Message-ID: <54043CA2.1090301@ti.com>
+From: peter.maydell@linaro.org (Peter Maydell)
+Date: Mon, 1 Sep 2014 10:30:17 +0100
+Subject: [PATCH 06/16] KVM: Add KVM_EXIT_SYSTEM_EVENT to user space API
+ header
+In-Reply-To: <20140901092017.GC19836@cbox>
+References: <1401041942-23471-1-git-send-email-christoffer.dall@linaro.org>
+ <1401041942-23471-7-git-send-email-christoffer.dall@linaro.org>
+ <CAFEAcA-yWadPiE4v7f-C1-V71=QHYLB=fzC78xhNMnNkVSJAhg@mail.gmail.com>
+ <20140901092017.GC19836@cbox>
+Message-ID: <CAFEAcA_S9dHbYVDrkr7X+cTcg-TC0nRWd4zLaUTX2zBjr+TKGQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 7d1311b93e58ed55f3a31cc8f94c4b8fe988a2b9:
+On 1 September 2014 10:20, Christoffer Dall <christoffer.dall@linaro.org> wrote:
+> On Fri, Aug 29, 2014 at 06:39:09PM +0100, Peter Maydell wrote:
+>> Talking with Ard I realised that there's actually a hole in the
+>> specification of this new ABI. Did we intend these shutdown
+>> and reset exits to be:
+>>  (1) requests from the guest for the shutdown/reset to be
+>>    scheduled in the near future (and we'll continue to execute
+>>    the guest until the shutdown actually happens)
+>>  (2) requests for shutdown/reset right now, with no further
+>>    guest instructions to be executed
+>>
+>> ?
+>>
+>> As currently implemented in QEMU we get behaviour (1),
+>> but I think the kernel PSCI implementation assumes
+>> behaviour (2). Who's right?
+>>
+> For the arm/arm64 use of this API (currently the only one?) the host
+> would not break or anything like that if you keep executing the VM, but
+> the guest will expect that no other instructions are executed after this
+> call.
 
-  Linux 3.17-rc1 (2014-08-16 10:40:26 -0600)
+Well, if we do that then between QEMU and KVM we've
+violated the PSCI ABI we're supposed to provide, so somebody
+is wrong :-)
 
-are available in the git repository at:
+I guess that since the kernel already implements "assume
+userspace won't resume the guest vcpu" the path of least
+resistance is to make userspace follow that.
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/nsekhar/linux-davinci.git tags/davinci-for-v3.18/board
+What does kvmtool do here (if it implements PSCI shutdown
+and reset at all)?
 
-for you to fetch changes up to 9e9bc235580829e3a06ccd13aa10110478c2e093:
-
-  ARM: davinci: board-da850-evm: Add needed regulators for tlv320aic3106 codec (2014-08-26 15:43:51 +0530)
-
-----------------------------------------------------------------
-Some non-critcal fixes for DA850 EVM board file
-adding missing regulator information.
-
-----------------------------------------------------------------
-Peter Ujfalusi (2):
-      ARM: davinci: board-da850-evm: Mark dcdc2 of TPS65070 as always_on
-      ARM: davinci: board-da850-evm: Add needed regulators for tlv320aic3106 codec
-
- arch/arm/mach-davinci/board-da850-evm.c |   15 +++++++++++++++
- 1 file changed, 15 insertions(+)
+thanks
+-- PMM
