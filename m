@@ -1,77 +1,50 @@
-From: tixy@linaro.org (Jon Medhurst (Tixy))
-Date: Mon, 01 Sep 2014 16:26:30 +0100
-Subject: [PATCH] ARM: probes: return directly when emulate not set
-In-Reply-To: <1409116109-67330-1-git-send-email-wangnan0@huawei.com>
-References: <1409116109-67330-1-git-send-email-wangnan0@huawei.com>
-Message-ID: <1409585190.2948.45.camel@linaro1.home>
+From: broonie@kernel.org (Mark Brown)
+Date: Mon, 1 Sep 2014 16:26:44 +0100
+Subject: [RFC PATCH for Juno 2/2] tty: SBSA compatible UART
+In-Reply-To: <1409583961-7466-3-git-send-email-hanjun.guo@linaro.org>
+References: <1409583961-7466-1-git-send-email-hanjun.guo@linaro.org>
+ <1409583961-7466-3-git-send-email-hanjun.guo@linaro.org>
+Message-ID: <20140901152644.GC29327@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2014-08-27 at 13:08 +0800, Wang Nan wrote:
-> When kprobe decoding instruction, original code calls instruction
-> specific decoder if emulate is set to false.  However, instructions with
-> DECODE_TYPE_EMULATE are in fact don't have their decoder. What in the
-> action table are in fact handlers.  For example:
+On Mon, Sep 01, 2014 at 11:06:01PM +0800, Hanjun Guo wrote:
+> From: Graeme Gregory <graeme.gregory@linaro.org>
 > 
-> 	/* LDRD (immediate)	cccc 000x x1x0 xxxx xxxx xxxx 1101 xxxx */
-> 	/* STRD (immediate)	cccc 000x x1x0 xxxx xxxx xxxx 1111 xxxx */
-> 	DECODE_EMULATEX	(0x0e5000d0, 0x004000d0, PROBES_LDRSTRD,
-> 						 REGS(NOPCWB, NOPCX, 0, 0, 0)),
+> This is a subset of pl011 UART which does not supprt DMA or baud rate
+> changing.
 > 
-> 	and
-> 
-> const union decode_action kprobes_arm_actions[NUM_PROBES_ARM_ACTIONS] = {
-> 	...
-> 	[PROBES_LDRSTRD] = {.handler = emulate_ldrdstrd},
-> 	...
-> 
-> In this situation, original code calls 'emulate_ldrdstrd' as a decoder,
-> which is obviously incorrect.
+> It is specified in the Server Base System Architecture document from
+> ARM.
 
-Except that situation can't occur because when arm_probes_decode_insn()
-is called with kprobes_arm_actions then emulate is set to true (see
-arch_prepare_kprobe).
+Is there any reason not to consider submitting this as a TTY driver now
+- are there known problems other than the issues with ACPI in general
+(I've not reviewed the code at all)?  The ACPI binding in this case
+seems particularly safe since it's a purposely basic and unconfigurable
+IP.
 
-For the situation where emulate is false, i.e. when called from
-arch_uprobe_analyze_insn(), then this provides these actions...
-
-const union decode_action uprobes_probes_actions[] = {
-	...
-	[PROBES_LDRSTRD] = {.decoder = decode_pc_ro},
-	...
-
-and we do want that decode function called. Basically, the code is
-behaving as it was designed and when passed emulate=false it turns the
-behaviour of emulated instruction forms into into the 'custom' action. 
+I guess we may want to consider handoff to the full pl011 driver at some
+point but there's a bunch of stuff with clocks to worry about before
+then.
 
 > 
-> This patch makes it returns INSN_GOOD directly when 'emulate' is not
-> true.
-> 
-> Signed-off-by: Wang Nan <wangnan0@huawei.com>
-> Cc: "David A. Long" <dave.long@linaro.org>
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Cc: Jon Medhurst <tixy@linaro.org>
-> Cc: Taras Kondratiuk <taras.kondratiuk@linaro.org>
-> Cc: Ben Dooks <ben.dooks@codethink.co.uk>
+> Signed-off-by: Graeme Gregory <graeme.gregory@linaro.org>
 > ---
->  arch/arm/kernel/probes.c | 3 +--
->  1 file changed, 1 insertion(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm/kernel/probes.c b/arch/arm/kernel/probes.c
-> index a8ab540..1c77b8d 100644
-> --- a/arch/arm/kernel/probes.c
-> +++ b/arch/arm/kernel/probes.c
-> @@ -436,8 +436,7 @@ probes_decode_insn(probes_opcode_t insn, struct arch_probes_insn *asi,
->  			struct decode_emulate *d = (struct decode_emulate *)h;
->  
->  			if (!emulate)
-> -				return actions[d->handler.action].decoder(insn,
-> -					asi, h);
-> +				return INSN_GOOD;
->  
->  			asi->insn_handler = actions[d->handler.action].handler;
->  			set_emulated_insn(insn, asi, thumb);
 
--- 
-Tixy
+Missing signoff here.
+
+> +config SBSAUART_TTY
+> +	tristate "SBSA UART TTY Driver"
+> +	help
+> +	  Console and system TTY driver for the SBSA UART which is defined
+> +	  in the Server Base System Architecure document for ARM64 servers.
+> +
+
+depends on ARM || ARM64 || COMPILE_TEST?
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140901/be87e3d9/attachment.sig>
