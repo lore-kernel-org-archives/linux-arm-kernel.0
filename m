@@ -1,88 +1,90 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Mon, 1 Sep 2014 15:41:48 +0200
-Subject: [PATCHv1 4/7] ASoC: dts: kirkwood-t5325: To support simple card
- newest style.
-In-Reply-To: <1409545781-20530-5-git-send-email-Li.Xiubo@freescale.com>
-References: <1409545781-20530-1-git-send-email-Li.Xiubo@freescale.com>
- <1409545781-20530-5-git-send-email-Li.Xiubo@freescale.com>
-Message-ID: <20140901134148.GB11312@lunn.ch>
+From: c.tirumalesh@gmail.com (tirumalesh chalamarla)
+Date: Mon, 1 Sep 2014 06:49:58 -0700
+Subject: [PATCH] iommu/arm-smmu: Allow size of stage 1 output to max
+ possible value for sateg 2 bypass
+In-Reply-To: <20140901114238.GB24594@arm.com>
+References: <1409162541-3940-1-git-send-email-c.tirumalesh@gmail.com>
+ <20140901114238.GB24594@arm.com>
+Message-ID: <CALuQcNn-d3_fQaygtObzeZL7OxU8BsstKMmCmpQMHEOF31b1RA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 01, 2014 at 12:29:38PM +0800, Xiubo Li wrote:
-> This patch depends on the following simple card patch:
-> ===
-> ASoC: simple-card: Merge single and muti DAI link code.
-
-Saying what a patch depends on, is not the best of ChangeLog.
-
-Say something like:
-
-The simple-card binding has been changed, so that a dai-link subnode
-is now required, and the properties directly under the sound node are
-no longer allowed. Modify the DT to fit this new binding.
-
-   Andrew
+Hi Will,
 
 
-> 
-> This patch merge single DAI link and muti-DAI links code together,
-> and simply the simple-card driver code.
-> 
-> And also do some other improvement:
-> 
-> Since from the DAI format micro SND_SOC_DAIFMT_CBx_CFx, the 'CBx'
-> mean Codec's bit clock is as master/slave and the 'CFx' mean Codec's
-> frame clock is as master/slave.
-> 
-> So these same DAI formats should be informed to CPU and CODE DAIs at
-> the same time. For the Codec driver will set the bit clock and frame
-> clock as the DAI formats said, but for the CPU driver, if the the
-> bit clock or frame clock is as Codec master, so it should be set CPU
-> DAI device as bit clock or frame clock as slave, and vice versa.
-> 
-> The old code will cause confusion, and we should be clear that the
-> letter 'C' here mean to Codec.
-> ===
-> 
-> Signed-off-by: Xiubo Li <Li.Xiubo@freescale.com>
-> ---
->  arch/arm/boot/dts/kirkwood-t5325.dts | 15 ++++++++-------
->  1 file changed, 8 insertions(+), 7 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/kirkwood-t5325.dts b/arch/arm/boot/dts/kirkwood-t5325.dts
-> index 610ec0f..25d1223 100644
-> --- a/arch/arm/boot/dts/kirkwood-t5325.dts
-> +++ b/arch/arm/boot/dts/kirkwood-t5325.dts
-> @@ -189,7 +189,6 @@
->  
->  	sound {
->  		compatible = "simple-audio-card";
-> -		simple-audio-card,format = "i2s";
->  		simple-audio-card,routing =
->  			"Headphone Jack", "HPL",
->  			"Headphone Jack", "HPR",
-> @@ -204,12 +203,14 @@
->  
->  		simple-audio-card,mclk-fs = <256>;
->  
-> -		simple-audio-card,cpu {
-> -			sound-dai = <&audio>;
-> -		};
+On Mon, Sep 1, 2014 at 4:42 AM, Will Deacon <will.deacon@arm.com> wrote:
+> Hi Tirumalesh,
+>
+> On Wed, Aug 27, 2014 at 07:02:21PM +0100, c.tirumalesh at gmail.com wrote:
+>> From: Tirumalesh Chalamarla <tchalamarla@cavium.com>
+>>
+>> This patch modifes output_mask calculation logic for stage 1 and allow
+>> max possible value supported by SMMU implementaions for translations,
+>> where stage 2 is bypassed.
+>>
+>> Erlier it is not possible to access full supported PA address with stage 1,
+>> even if it is supported by SMMU and stage 2 is bypass.
+>
+> I'm trying to understand what you're getting at here. Essentially, you want
+> to use the full stage-1 output range for a stage-1 only MMU, right?
+>
+
+YES,  restrict stage 1 out put to VA_BITS only if stage 2 is needed
+(i.e for NESTED_TRANSLATIONS).
+
+> The code is currently structured to truncate that to the stage-2 input size
+> for nested translation. However, I think that's better solved by faking the
+> ID registers in the virtual SMMU instead of posing these restrictions on the
+> host as well.
+>
+
+This sounds good, the only problem is, it is too much bound to virtual
+SMMU. There is no harm in changing/checking the
+stage 1 output mask, if stage 2 present, in host also.
+
+
+> Assuming I understand the problem correctly, why not simply remove the
+> truncation from the existing code (untested patch below)? Does that not
+> work for you?
+>
+
+This will not restrict stage 1 out put to VA_BITS, even for two level
+translations. this results in non debuggable problems
+if we configure incorrectly.  there is no harm in checking the
+condition for nested translations, as i did in my patch.
+
+
+Regards,
+Tirumalesh.
+
+> Will
+>
+> --->8
+>
+> diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+> index 2b1271658bfa..a02d05793a73 100644
+> --- a/drivers/iommu/arm-smmu.c
+> +++ b/drivers/iommu/arm-smmu.c
+> @@ -1917,21 +1917,7 @@ static int arm_smmu_device_cfg_probe(struct arm_smmu_device *smmu)
+>         /* ID2 */
+>         id = readl_relaxed(gr0_base + ARM_SMMU_GR0_ID2);
+>         size = arm_smmu_id_size_to_bits((id >> ID2_IAS_SHIFT) & ID2_IAS_MASK);
 > -
-> -		simple-audio-card,codec {
-> -			sound-dai = <&alc5621>;
-> +		simple-audio-card,dai-link {
-> +			format = "i2s";
-> +			cpu {
-> +				sound-dai = <&audio>;
-> +			};
-> +			codec {
-> +				sound-dai = <&alc5621>;
-> +			};
->  		};
->  	};
->  };
-> -- 
-> 1.8.4
-> 
+> -       /*
+> -        * Stage-1 output limited by stage-2 input size due to pgd
+> -        * allocation (PTRS_PER_PGD).
+> -        */
+> -       if (smmu->features & ARM_SMMU_FEAT_TRANS_NESTED) {
+> -#ifdef CONFIG_64BIT
+> -               smmu->s1_output_size = min_t(unsigned long, VA_BITS, size);
+> -#else
+> -               smmu->s1_output_size = min(32UL, size);
+> -#endif
+> -       } else {
+> -               smmu->s1_output_size = min_t(unsigned long, PHYS_MASK_SHIFT,
+> -                                            size);
+> -       }
+> +       smmu->s1_output_size = min_t(unsigned long, PHYS_MASK_SHIFT, size);
+>
+>         /* The stage-2 output mask is also applied for bypass */
+>         size = arm_smmu_id_size_to_bits((id >> ID2_OAS_SHIFT) & ID2_OAS_MASK);
