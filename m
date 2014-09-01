@@ -1,68 +1,85 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 1 Sep 2014 11:19:52 +0100
-Subject: [SMP BUG?] the return value of is_smp() is bug?
-In-Reply-To: <1409571334-2814-1-git-send-email-long.wanglong@huawei.com>
-References: <1409571334-2814-1-git-send-email-long.wanglong@huawei.com>
-Message-ID: <20140901101952.GF30401@n2100.arm.linux.org.uk>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 1 Sep 2014 12:20:26 +0200
+Subject: [PATCH v2 03/12] clk: Add a function to retrieve phase
+In-Reply-To: <5402F5D6.4080100@redhat.com>
+References: <1409428991-2442-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1409428991-2442-4-git-send-email-maxime.ripard@free-electrons.com>
+ <5402F5D6.4080100@redhat.com>
+Message-ID: <20140901102026.GL15297@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Firstly, do not send multiple copies of your message to mailing lists,
-certainly not within the three hours that you sent your three copies.
-If one of the addresses you sent the message to bounces, then it is
-*only* that one recipient who doesn't get your message, everyone else
-receives a copy.  So, there's now three copies of your message in the
-list archives, and people could end up replying to different messages.
+Hi,
 
-On Mon, Sep 01, 2014 at 07:35:34PM +0800, Wang Long wrote:
-> Hi,all
+On Sun, Aug 31, 2014 at 12:15:50PM +0200, Hans de Goede wrote:
+> Hi,
 > 
-> In kernel 3.17-rc2, when i set CONFIG_HAVE_SMP = y and CONFIG_SMP_ON_UP = y 
-> in .config file. the secondary core can not boot.
+> On 08/30/2014 10:03 PM, Maxime Ripard wrote:
+> > The current phase API doesn't look into the actual hardware to get the phase
+> > value, but will rather get it from a variable only set by the set_phase
+> > function.
+> > 
+> > This will cause issue when the client driver will never call the set_phase
+> > function, where we can end up having a reported phase that will not match what
+> > the hardware has been programmed to by the bootloader or what phase is
+> > programmed out of reset.
+> > 
+> > Add a new get_phase function for the drivers to implement so that we can get
+> > this value.
+> > 
+> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> > ---
+> >  drivers/clk/clk.c            | 17 ++++++++++++++---
+> >  include/linux/clk-provider.h |  5 +++++
+> >  2 files changed, 19 insertions(+), 3 deletions(-)
+> > 
+> > diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+> > index d87661af0c72..7dbceca694f1 100644
+> > --- a/drivers/clk/clk.c
+> > +++ b/drivers/clk/clk.c
+> > @@ -1797,8 +1797,8 @@ out:
+> >   * clk_get_phase - return the phase shift of a clock signal
+> >   * @clk: clock signal source
+> >   *
+> > - * Returns the phase shift of a clock node in degrees, otherwise returns
+> > - * -EERROR.
+> > + * Returns the phase shift of a clock node in degrees. Any negative
+> > + * values are errors.
+> >   */
+> >  int clk_get_phase(struct clk *clk)
+> >  {
+> > @@ -1808,7 +1808,18 @@ int clk_get_phase(struct clk *clk)
+> >  		goto out;
+> >  
+> >  	clk_prepare_lock();
+> > -	ret = clk->phase;
+> > +
+> > +	if (clk->phase) {
+> > +		ret = clk->phase;
+> > +		goto out_unlock;
+> > +	}
 > 
-> when i set CONFIG_HAVE_SMP = y and CONFIG_SMP_ON_UP = n in .config file,
-> the secondary core can boot.
+> 0 is a valid phase, so this will cause the phase to
+> be read from the hardware each time if the phase is 0.
 > 
-> But this does not happen in kernel 3.10 lts kernel, Whether the 
-> CONFIG_SMP_ON_UP is set yes or no ,the secondary core can boot.
-> 
-> Does the meaning of CONFIG_SMP_ON_UP changed or this is a bug in kernel 3.17-rc2 ? 
+> Perhaps make clk->phase signed (if it is not already), init it
+> to -1, and check for it not being -1 ?
 
-I think the answer is neither, because when the kernel is run on /real/
-hardware:
+Yeah, I'm not really proud of this code either, but yours would expose
+this -1 into debugfs, so I'm not sure it's really better :) 
 
-http://www.arm.linux.org.uk/developer/build/result.php?type=boot&idx=2514
+(with -1 being a valid phase too)
 
-it boots fine, bringing up all four CPUs.
-
-> config:     set CONFIG_HAVE_SMP = y and CONFIG_SMP_ON_UP = y
-> command:    # qemu-system-arm -M vexpress-a9 -smp 2  -m 128M -kernel arch/arm/boot/zImage -nographic
-
-I've no idea how qemu works here, but if the CPU doesn't indicate that
-it's a SMP capable CPU, we will disable SMP extensions.
-
-> The output:
-> 
-> ..........
-> is_smp() return false;
-> CPU: Testing write buffer coherency: ok
-> missing device node for CPU 0
-> CPU0: thread -1, cpu 0, socket 0, mpidr 80000000
-> Setting up static identity map for 0x604643d8 - 0x60464430
-> Brought up 1 CPUs
-> SMP: Total of 1 processors activated.
-> CPU: All CPU(s) started in SVC mode.
-> ...........
-
-You have decided that you'll edit the kernel messages, removing at least
-some of the information that could be relevant to the issue.  Please,
-only cut kernel messages when you are absolutely certain that they are
-not relevant to the problem you're reporting.
-
-However, I don't think it would help much - I suspect that qemu doesn't
-provide emulation of the SCU base address register, and that's what your
-problem is.  qemu needs to be fixed in that regard.
+Maxime
 
 -- 
-FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
-according to speedtest.net.
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140901/c1ed9049/attachment-0001.sig>
