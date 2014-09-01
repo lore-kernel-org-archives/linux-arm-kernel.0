@@ -1,48 +1,52 @@
-From: boris.brezillon@free-electrons.com (Boris BREZILLON)
-Date: Mon, 1 Sep 2014 11:51:48 +0200
-Subject: [PATCH v2 20/26] irqchip: atmel-aic5: convert to handle_domain_irq
-In-Reply-To: <1409047421-27649-21-git-send-email-marc.zyngier@arm.com>
-References: <1409047421-27649-1-git-send-email-marc.zyngier@arm.com>
- <1409047421-27649-21-git-send-email-marc.zyngier@arm.com>
-Message-ID: <20140901115148.256bb4bb@bbrezillon>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Mon, 1 Sep 2014 11:56:29 +0200
+Subject: [PATCH 06/16] KVM: Add KVM_EXIT_SYSTEM_EVENT to user space API
+ header
+In-Reply-To: <CAFEAcA_S9dHbYVDrkr7X+cTcg-TC0nRWd4zLaUTX2zBjr+TKGQ@mail.gmail.com>
+References: <1401041942-23471-1-git-send-email-christoffer.dall@linaro.org>
+ <1401041942-23471-7-git-send-email-christoffer.dall@linaro.org>
+ <CAFEAcA-yWadPiE4v7f-C1-V71=QHYLB=fzC78xhNMnNkVSJAhg@mail.gmail.com>
+ <20140901092017.GC19836@cbox>
+ <CAFEAcA_S9dHbYVDrkr7X+cTcg-TC0nRWd4zLaUTX2zBjr+TKGQ@mail.gmail.com>
+Message-ID: <20140901095629.GF19836@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 26 Aug 2014 11:03:35 +0100
-Marc Zyngier <marc.zyngier@arm.com> wrote:
-
-> Use the new handle_domain_irq method to handle interrupts.
+On Mon, Sep 01, 2014 at 10:30:17AM +0100, Peter Maydell wrote:
+> On 1 September 2014 10:20, Christoffer Dall <christoffer.dall@linaro.org> wrote:
+> > On Fri, Aug 29, 2014 at 06:39:09PM +0100, Peter Maydell wrote:
+> >> Talking with Ard I realised that there's actually a hole in the
+> >> specification of this new ABI. Did we intend these shutdown
+> >> and reset exits to be:
+> >>  (1) requests from the guest for the shutdown/reset to be
+> >>    scheduled in the near future (and we'll continue to execute
+> >>    the guest until the shutdown actually happens)
+> >>  (2) requests for shutdown/reset right now, with no further
+> >>    guest instructions to be executed
+> >>
+> >> ?
+> >>
+> >> As currently implemented in QEMU we get behaviour (1),
+> >> but I think the kernel PSCI implementation assumes
+> >> behaviour (2). Who's right?
+> >>
+> > For the arm/arm64 use of this API (currently the only one?) the host
+> > would not break or anything like that if you keep executing the VM, but
+> > the guest will expect that no other instructions are executed after this
+> > call.
 > 
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-
-Acked-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-
-> ---
->  drivers/irqchip/irq-atmel-aic5.c | 4 +---
->  1 file changed, 1 insertion(+), 3 deletions(-)
+> Well, if we do that then between QEMU and KVM we've
+> violated the PSCI ABI we're supposed to provide, so somebody
+> is wrong :-)
 > 
-> diff --git a/drivers/irqchip/irq-atmel-aic5.c b/drivers/irqchip/irq-atmel-aic5.c
-> index edb2270..04fe2c1 100644
-> --- a/drivers/irqchip/irq-atmel-aic5.c
-> +++ b/drivers/irqchip/irq-atmel-aic5.c
-> @@ -78,12 +78,10 @@ aic5_handle(struct pt_regs *regs)
->  	irqnr = irq_reg_readl(gc->reg_base + AT91_AIC5_IVR);
->  	irqstat = irq_reg_readl(gc->reg_base + AT91_AIC5_ISR);
->  
-> -	irqnr = irq_find_mapping(aic5_domain, irqnr);
-> -
->  	if (!irqstat)
->  		irq_reg_writel(0, gc->reg_base + AT91_AIC5_EOICR);
->  	else
-> -		handle_IRQ(irqnr, regs);
-> +		handle_domain_irq(aic5_domain, irqnr, regs);
->  }
->  
->  static void aic5_mask(struct irq_data *d)
+> I guess that since the kernel already implements "assume
+> userspace won't resume the guest vcpu" the path of least
+> resistance is to make userspace follow that.
 
+The thing is that we're not exposing PSCI to user space, we're just
+exposing a system event, so it feels a bit weird to rely on user space's
+correct interpretation of a more generic API, to correctly implement
+PSCI in the kernel.  On the other hand, user space can always break the
+guest as it sees fit...
 
-
--- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+-Christoffer
