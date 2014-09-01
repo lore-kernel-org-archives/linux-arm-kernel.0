@@ -1,41 +1,57 @@
-From: kuninori.morimoto.gx@gmail.com (Kuninori Morimoto)
-Date: Mon, 01 Sep 2014 00:50:19 -0700 (PDT)
-Subject: [alsa-devel] [PATCHv1 1/7] ASoC: simple-card: Merge single and
- muti	DAI link code.
-In-Reply-To: <ac4db632b6c944dcb2179089076b7871@BY2PR0301MB0613.namprd03.prod.outlook.com>
-References: <1409545781-20530-1-git-send-email-Li.Xiubo@freescale.com>
- <1409545781-20530-2-git-send-email-Li.Xiubo@freescale.com>
- <87tx4rzszx.wl%kuninori.morimoto.gx@gmail.com>
- <ac4db632b6c944dcb2179089076b7871@BY2PR0301MB0613.namprd03.prod.outlook.com>
-Message-ID: <87sikbzsne.wl%kuninori.morimoto.gx@gmail.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Mon, 1 Sep 2014 09:52:19 +0200
+Subject: [RFC PATCH 1/7] iommu: provide early initialisation hook for
+ IOMMU drivers
+In-Reply-To: <1409327670-3495-2-git-send-email-will.deacon@arm.com>
+References: <1409327670-3495-1-git-send-email-will.deacon@arm.com>
+ <1409327670-3495-2-git-send-email-will.deacon@arm.com>
+Message-ID: <20140901075216.GA24430@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-Hi Xiubo
-
-> > These are using
-> > 
-> >       asoc_simple_card_sub_parse_of(np, &dai_props->cpu_dai, xxx)
-> >       asoc_simple_card_sub_parse_of(np, &dai_props->codec_dai, xxx)
-> > 
-> > I guess, asoc_simple_card_sub_parse_of() can update
-> > below inside function
-> > 
-> > 	dai_props->cpu_dai.fmt |= daifmt;
-> > 	dai_props->codec_dai.fmt |= daifmt;
-> > 
-> > 
+On Fri, Aug 29, 2014 at 04:54:24PM +0100, Will Deacon wrote:
+> IOMMU drivers must be initialised before any of their upstream devices,
+> otherwise the relevant iommu_ops won't be configured for the bus in
+> question. To solve this, a number of IOMMU drivers use initcalls to
+> initialise the driver before anything has a chance to be probed.
 > 
-> Yes, yes, that's very well.
+> Whilst this solves the immediate problem, it leaves the job of probing
+> the IOMMU completely separate from the iommu_ops to configure the IOMMU,
+> which are called on a per-bus basis and require the driver to figure out
+> exactly which instance of the IOMMU is being requested. In particular,
+> the add_device callback simply passes a struct device to the driver,
+> which then has to parse firmware tables or probe buses to identify the
+> relevant IOMMU instance.
 > 
-> Thanks very much for you advice.
+> This patch takes the first step in addressing this problem by adding an
+> early initialisation pass for IOMMU drivers, giving them the ability to
+> set some per-instance data on their of_node. This data can then be
+> passed back to a new add_device function (added in a later patch) to
+> identify the IOMMU instance in question.
 > 
-> For some reason I must resent this patch series, and then I will
-> fix this together.
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
+> ---
+>  drivers/iommu/of_iommu.c          | 14 ++++++++++++++
+>  include/asm-generic/vmlinux.lds.h |  2 ++
+>  include/linux/of_iommu.h          | 21 +++++++++++++++++++++
+>  3 files changed, 37 insertions(+)
 
-Thank you for your help
+I don't think this is the right direction. We've been preaching that
+using initcall ordering is a bad thing and people should be using
+deferred probe instead. Now we have a bunch of these OF tables that do
+the exact opposite. Note that these are nothing more than a variant of
+initcalls that get called at platform-specific points in time.
 
-Best regards
----
-Kuninori Morimoto
+There are also ongoing discussions about how to change the device probe
+order to use dependencies (such as phandles from device tree) to prevent
+excessive deferred probing. With that in place this would be solved in a
+much more generic way.
+
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140901/ce639ee4/attachment-0001.sig>
