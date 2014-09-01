@@ -1,7 +1,7 @@
 From: long.wanglong@huawei.com (Wang Long)
-Date: Mon, 1 Sep 2014 19:15:33 +0800
+Date: Mon, 1 Sep 2014 19:35:34 +0800
 Subject: [SMP BUG?] the return value of is_smp() is bug?
-Message-ID: <1409570133-2766-1-git-send-email-long.wanglong@huawei.com>
+Message-ID: <1409571334-2814-1-git-send-email-long.wanglong@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
