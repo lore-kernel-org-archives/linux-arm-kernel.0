@@ -1,28 +1,35 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 1 Sep 2014 16:12:34 +0100
-Subject: [PATCH] iommu/arm-smmu: Allow size of stage 1 output to max
- possible value for sateg 2 bypass
-In-Reply-To: <CALuQcNn-d3_fQaygtObzeZL7OxU8BsstKMmCmpQMHEOF31b1RA@mail.gmail.com>
-References: <1409162541-3940-1-git-send-email-c.tirumalesh@gmail.com>
- <20140901114238.GB24594@arm.com>
- <CALuQcNn-d3_fQaygtObzeZL7OxU8BsstKMmCmpQMHEOF31b1RA@mail.gmail.com>
-Message-ID: <20140901151234.GE24594@arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 01 Sep 2014 17:17:51 +0200
+Subject: [Linaro-acpi] [RFC PATCH for Juno 1/2] net: smsc911x add support
+ for probing from ACPI
+In-Reply-To: <1409583961-7466-2-git-send-email-hanjun.guo@linaro.org>
+References: <1409583961-7466-1-git-send-email-hanjun.guo@linaro.org>
+ <1409583961-7466-2-git-send-email-hanjun.guo@linaro.org>
+Message-ID: <2861461.8zNpLC3I2n@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 01, 2014 at 02:49:58PM +0100, tirumalesh chalamarla wrote:
-> On Mon, Sep 1, 2014 at 4:42 AM, Will Deacon <will.deacon@arm.com> wrote:
-> > Assuming I understand the problem correctly, why not simply remove the
-> > truncation from the existing code (untested patch below)? Does that not
-> > work for you?
-> >
+On Monday 01 September 2014 23:06:00 Hanjun Guo wrote:
+> +#ifdef CONFIG_ACPI
+> +/* Configure some sensible defaults for ACPI mode */
+> +static int smsc911x_probe_config_acpi(struct smsc911x_platform_config *config,
+> +                                   acpi_handle *ahandle)
+> +{
+> +       if (!ahandle)
+> +               return -ENOSYS;
+> +
+> +       config->phy_interface = PHY_INTERFACE_MODE_MII;
 > 
-> This will not restrict stage 1 out put to VA_BITS, even for two level
-> translations. this results in non debuggable problems
-> if we configure incorrectly.  there is no harm in checking the
-> condition for nested translations, as i did in my patch.
 
-Right, but restricting stage-1 output to VA_BITS doesn't make sense;
-remember it's not the same kernel writing the stage-1 and stage-2 tables.
+Please remove the #ifdef and use 
 
-Will
+	if (!IS_ENABLED(CONFIG_ACPI) || !ahandle)
+
+to check for ACPI support. This should result in the same object code
+in all cases, but give better compile-time coverage when ACPI is
+disabled.
+
+Also, -ENOSYS is probably the wrong return value. I think you mean
+-ENXIO.
+
+	Arnd
