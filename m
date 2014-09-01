@@ -1,80 +1,38 @@
-From: inki.dae@samsung.com (Inki Dae)
-Date: Mon, 01 Sep 2014 11:47:41 +0900
-Subject: [PATCH RFC v2 3/8] component: add support for component match
- array
-In-Reply-To: <20140830213349.GE30401@n2100.arm.linux.org.uk>
-References: <20140624192830.GC20555@n2100.arm.linux.org.uk>
- <E1WzWOy-0007zc-36@rmk-PC.arm.linux.org.uk>
- <CA+gwMcdO5P-Yu+-FeHHGxkKwObsATL-ThVDwmEm2_cZ3enUXPQ@mail.gmail.com>
- <20140626144601.GS32514@n2100.arm.linux.org.uk>
- <20140701142210.GS32514@n2100.arm.linux.org.uk>
- <CAAQKjZOf-UoONHFf=6W4j4rXuo0nSJrhK_QesxNR55CEF7XONw@mail.gmail.com>
- <20140830213349.GE30401@n2100.arm.linux.org.uk>
-Message-ID: <5403DE4D.3090509@samsung.com>
+From: leoy@marvell.com (Leo Yan)
+Date: Mon, 1 Sep 2014 11:09:51 +0800
+Subject: [PATCH v2] arm64: fix bug for reloading FPSIMD state after cpu power
+ off
+Message-ID: <1409540991-7573-1-git-send-email-leoy@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2014? 08? 31? 06:33, Russell King - ARM Linux wrote:
-> On Thu, Jul 03, 2014 at 12:26:39AM +0900, Inki Dae wrote:
->> 2014-07-01 23:22 GMT+09:00 Russell King - ARM Linux <linux@arm.linux.org.uk>:
->>> On Thu, Jun 26, 2014 at 03:46:01PM +0100, Russell King - ARM Linux wrote:
->>>> On Thu, Jun 26, 2014 at 02:34:17PM +0200, Philipp Zabel wrote:
->>>>> Hi Russell,
->>>>>
->>>>> On Tue, Jun 24, 2014 at 9:29 PM, Russell King
->>>>> <rmk+kernel@arm.linux.org.uk> wrote:
->>>>> [...]
->>>>>> +/*
->>>>>> + * Add a component to be matched.
->>>>>> + *
->>>>>> + * The match array is first created or extended if necessary.
->>>>>> + */
->>>>>> +void component_match_add(struct device *dev, struct component_match **matchptr,
->>>>>> +       int (*compare)(struct device *, void *), void *compare_data)
->>>>>> +{
->>>>>> +       struct component_match *match = *matchptr;
->>>>>> +
->>>>>> +       if (IS_ERR(match))
->>>>>> +               return;
->>>>>> +
->>>>>> +       if (!match || match->num == match->alloc) {
->>>>>> +               size_t new_size = match ? match->alloc + 16 : 15;
->>>>>> +
->>>>>> +               match = component_match_realloc(dev, match, new_size);
->>>>>> +
->>>>>> +               *matchptr = match;
->>>>>> +
->>>>>> +               if (IS_ERR(match))
->>>>>> +                       return;
->>>>>> +       }
->>>>>> +
->>>>>> +       match->compare[match->num].fn = compare;
->>>>>> +       match->compare[match->num].data = compare_data;
->>>>>> +       match->num++;
->>>>>> +}
->>>>>
->>>>> component_match_add should be exported.
->>>>
->>>> Fixed, thanks.
->>>
->>> As there's no further comments, and Inki Dae has not responded, I'm
->>
->> It's has been just a week. I will check and look into your patch
->> series. I think Exynos drm should also be considered for the use of
->> component match array.
-> 
-> It has now been almost two months.  What's happening on this?
-> 
-> Please note that I'm planning to push the rest of the component updates
-> during the next merge window, which will result in unconverted drivers
-> breaking.
-> 
+Now arm64 defers reloading FPSIMD state, but this optimization also
+introduces the bug after cpu resume back from low power mode.
 
-Sorry for this. I was busy with other works. I will update and post it
-until this week.
+The reason is after the cpu has been powered off, s/w need set the
+cpu's fpsimd_last_state to NULL so that it will force to reload
+FPSIMD state for the thread, otherwise there has the chance to meet
+the condition for both the task's fpsimd_state.cpu field contains the
+id of the current cpu, and the cpu's fpsimd_last_state per-cpu variable
+points to the task's fpsimd_state, so finally kernel will skip to reload
+the context during it return back to userland.
 
-Thanks,
-Inki Dae
+Signed-off-by: Leo Yan <leoy@marvell.com>
+---
+ arch/arm64/kernel/fpsimd.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-> Thanks.
-> 
+diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
+index ad8aebb..3dca156 100644
+--- a/arch/arm64/kernel/fpsimd.c
++++ b/arch/arm64/kernel/fpsimd.c
+@@ -270,6 +270,7 @@ static int fpsimd_cpu_pm_notifier(struct notifier_block *self,
+ 	case CPU_PM_ENTER:
+ 		if (current->mm && !test_thread_flag(TIF_FOREIGN_FPSTATE))
+ 			fpsimd_save_state(&current->thread.fpsimd_state);
++		this_cpu_write(fpsimd_last_state, NULL);
+ 		break;
+ 	case CPU_PM_EXIT:
+ 		if (current->mm)
+-- 
+1.9.1
