@@ -1,25 +1,67 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 01 Sep 2014 16:18 +0200
-Subject: [PATCH] mfd: syscon: Decouple syscon interface from syscon devices
-In-Reply-To: <000c01cfc5d9$03866c30$0a934490$@samsung.com>
-References: <1408694991-21615-1-git-send-email-pankaj.dubey@samsung.com>
- <4121644.3haxjiIdIo@wuerfel> <000c01cfc5d9$03866c30$0a934490$@samsung.com>
-Message-ID: <6929512.Xet4VLKWdC@wuerfel>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Mon,  1 Sep 2014 15:21:37 +0100
+Subject: [PATCH v2] arm: use irq_set_affinity with force=false when migrating
+ irqs
+In-Reply-To: <1409571966-18343-1-git-send-email-sudeep.holla@arm.com>
+References: <1409571966-18343-1-git-send-email-sudeep.holla@arm.com>
+Message-ID: <1409581297-29216-1-git-send-email-sudeep.holla@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 01 September 2014 17:05:33 Pankaj Dubey wrote:
-> 
-> Please have a look at this thread [1], where we discussed the need of syscon
-> as platform device.
-> Looks like still there are users of syscon_regmap_lookup_by_pdevname
-> (clps711x.c).
-> So we can't make it completely independent of platform_device. 
-> 
-> [1]
-> https://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg35708.html
+From: Sudeep Holla <sudeep.holla@arm.com>
 
-I think the clps711x platform will soon stop using it, we already
-have patches for migrating to DT.
+Since commit 1dbfa187dad ("ARM: irq migration: force migration off CPU
+going down") the ARM interrupt migration code on cpu offline calls
+irqchip.irq_set_affinity() with the argument force=true. At the point
+of this change the argument had no effect because it was not used by
+any interrupt chip driver and there was no semantics defined.
 
-	Arnd
+This changed with commit 01f8fa4f01d8 ("genirq: Allow forcing cpu
+affinity of interrupts") which made the force argument useful to route
+interrupts to not yet online cpus without checking the target cpu
+against the cpu online mask. The following commit ffde1de64012
+("irqchip: gic: Support forced affinity setting") implemented this for
+the GIC interrupt controller.
+
+As a consequence the ARM cpu offline irq migration fails if CPU0 is
+offlined, because CPU0 is still set in the affinity mask and the
+validataion against cpu online mask is skipped to the force argument
+being true. The following first_cpu(mask) selection always selects
+CPU0 as the target.
+
+Solve the issue by calling irq_set_affinity() with force=false from
+the CPU offline irq migration code so the GIC driver validates the
+affinity mask against CPU online mask and therefore removes CPU0 from
+the possible target candidates.
+
+Tested on TC2 hotpluging CPU0 in and out. Without this patch the system
+locks up as the IRQs are not migrated away from CPU0.
+
+Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+Acked-by: Thomas Gleixner <tglx@linutronix.de>
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: <stable@vger.kernel.org> # 3.10.x
+---
+ arch/arm/kernel/irq.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+Change v1->v2:
+ - Updated the changelog to reflect the actual history behind
+   this change as suggested by tglx and added his ack
+
+diff --git a/arch/arm/kernel/irq.c b/arch/arm/kernel/irq.c
+index 2c4257604513..5c4d38e32a51 100644
+--- a/arch/arm/kernel/irq.c
++++ b/arch/arm/kernel/irq.c
+@@ -175,7 +175,7 @@ static bool migrate_one_irq(struct irq_desc *desc)
+ 	c = irq_data_get_irq_chip(d);
+ 	if (!c->irq_set_affinity)
+ 		pr_debug("IRQ%u: unable to set affinity\n", d->irq);
+-	else if (c->irq_set_affinity(d, affinity, true) == IRQ_SET_MASK_OK && ret)
++	else if (c->irq_set_affinity(d, affinity, false) == IRQ_SET_MASK_OK && ret)
+ 		cpumask_copy(d->affinity, affinity);
+ 
+ 	return ret;
+-- 
+1.8.3.2
