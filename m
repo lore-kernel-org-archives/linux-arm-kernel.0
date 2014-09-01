@@ -1,42 +1,48 @@
-From: pbonzini@redhat.com (Paolo Bonzini)
-Date: Mon, 01 Sep 2014 12:11:19 +0200
-Subject: [PATCH] KVM: EVENTFD: remove inclusion of irq.h
-In-Reply-To: <1409560568-6911-1-git-send-email-eric.auger@linaro.org>
-References: <1409560568-6911-1-git-send-email-eric.auger@linaro.org>
-Message-ID: <54044647.4030605@redhat.com>
+From: boris.brezillon@free-electrons.com (Boris BREZILLON)
+Date: Mon, 1 Sep 2014 12:16:26 +0200
+Subject: [PATCH v2 19/26] irqchip: atmel-aic: convert to handle_domain_irq
+In-Reply-To: <1409047421-27649-20-git-send-email-marc.zyngier@arm.com>
+References: <1409047421-27649-1-git-send-email-marc.zyngier@arm.com>
+ <1409047421-27649-20-git-send-email-marc.zyngier@arm.com>
+Message-ID: <20140901121626.7bd01dbe@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Il 01/09/2014 10:36, Eric Auger ha scritto:
-> No more needed. irq.h would be void on ARM.
+On Tue, 26 Aug 2014 11:03:34 +0100
+Marc Zyngier <marc.zyngier@arm.com> wrote:
+
+> Use the new handle_domain_irq method to handle interrupts.
 > 
-> Signed-off-by: Eric Auger <eric.auger@linaro.org>
-> 
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+
+Acked-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+
 > ---
+>  drivers/irqchip/irq-atmel-aic.c | 4 +---
+>  1 file changed, 1 insertion(+), 3 deletions(-)
 > 
-> I don't think irq.h is needed anymore since Paul Mackerras' work. However
-> I did not compile for all architectures.
-> ---
->  virt/kvm/eventfd.c | 1 -
->  1 file changed, 1 deletion(-)
-> 
-> diff --git a/virt/kvm/eventfd.c b/virt/kvm/eventfd.c
-> index 3c5981c..0c712a7 100644
-> --- a/virt/kvm/eventfd.c
-> +++ b/virt/kvm/eventfd.c
-> @@ -36,7 +36,6 @@
->  #include <linux/seqlock.h>
->  #include <trace/events/kvm.h>
+> diff --git a/drivers/irqchip/irq-atmel-aic.c b/drivers/irqchip/irq-atmel-aic.c
+> index a82869e..9a2cf3c 100644
+> --- a/drivers/irqchip/irq-atmel-aic.c
+> +++ b/drivers/irqchip/irq-atmel-aic.c
+> @@ -68,12 +68,10 @@ aic_handle(struct pt_regs *regs)
+>  	irqnr = irq_reg_readl(gc->reg_base + AT91_AIC_IVR);
+>  	irqstat = irq_reg_readl(gc->reg_base + AT91_AIC_ISR);
 >  
-> -#include "irq.h"
->  #include "iodev.h"
+> -	irqnr = irq_find_mapping(aic_domain, irqnr);
+> -
+>  	if (!irqstat)
+>  		irq_reg_writel(0, gc->reg_base + AT91_AIC_EOICR);
+>  	else
+> -		handle_IRQ(irqnr, regs);
+> +		handle_domain_irq(aic_domain, irqnr, regs);
+>  }
 >  
->  #ifdef CONFIG_HAVE_KVM_IRQFD
-> 
+>  static int aic_retrigger(struct irq_data *d)
 
-Acked-by: Paolo Bonzini <pbonzini@redhat.com>
 
-Christoffer, please include this via the ARM tree, together with ARM
-irqfd support.  Thanks,
 
-Paolo
+-- 
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
