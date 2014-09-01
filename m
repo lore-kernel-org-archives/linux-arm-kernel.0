@@ -1,90 +1,78 @@
 From: t-kristo@ti.com (Tero Kristo)
-Date: Mon, 1 Sep 2014 21:09:12 +0300
-Subject: [PATCH 23/26] ARM: OMAP3: PRM: make PRCM interrupt handler related
- functions static
+Date: Mon, 1 Sep 2014 21:09:09 +0300
+Subject: [PATCH 20/26] ARM: AM33xx: PRM: move global warm reset implementation
+ to driver
 In-Reply-To: <1409594955-1476-1-git-send-email-t-kristo@ti.com>
 References: <1409594955-1476-1-git-send-email-t-kristo@ti.com>
-Message-ID: <1409594955-1476-24-git-send-email-t-kristo@ti.com>
+Message-ID: <1409594955-1476-21-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-These are not needed outside the PRM driver, so make them static and
-remove the prototypes from the public header.
+Moved the implementation from am33xx-restart.c to the prm33xx.c file to
+isolate the PRM register accesses to be private for PRM driver.
 
 Signed-off-by: Tero Kristo <t-kristo@ti.com>
 ---
- arch/arm/mach-omap2/prm3xxx.c |   13 +++++++++----
- arch/arm/mach-omap2/prm3xxx.h |    6 ------
- 2 files changed, 9 insertions(+), 10 deletions(-)
+ arch/arm/mach-omap2/am33xx-restart.c |    9 +--------
+ arch/arm/mach-omap2/prm33xx.c        |   21 +++++++++++++++++++++
+ 2 files changed, 22 insertions(+), 8 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/prm3xxx.c b/arch/arm/mach-omap2/prm3xxx.c
-index 5c1bb25..f21fd76 100644
---- a/arch/arm/mach-omap2/prm3xxx.c
-+++ b/arch/arm/mach-omap2/prm3xxx.c
-@@ -30,6 +30,11 @@
- #include "cm3xxx.h"
- #include "cm-regbits-34xx.h"
+diff --git a/arch/arm/mach-omap2/am33xx-restart.c b/arch/arm/mach-omap2/am33xx-restart.c
+index c88d8df7..7286389 100644
+--- a/arch/arm/mach-omap2/am33xx-restart.c
++++ b/arch/arm/mach-omap2/am33xx-restart.c
+@@ -24,12 +24,5 @@ void am33xx_restart(enum reboot_mode mode, const char *cmd)
+ {
+ 	/* TODO: Handle mode and cmd if necessary */
  
-+static void omap3xxx_prm_read_pending_irqs(unsigned long *events);
-+static void omap3xxx_prm_ocp_barrier(void);
-+static void omap3xxx_prm_save_and_clear_irqen(u32 *saved_mask);
-+static void omap3xxx_prm_restore_irqen(u32 *saved_mask);
-+
- static const struct omap_prcm_irq omap3_prcm_irqs[] = {
- 	OMAP_PRCM_IRQ("wkup",	0,	0),
- 	OMAP_PRCM_IRQ("io",	9,	1),
-@@ -147,7 +152,7 @@ void omap3xxx_prm_dpll3_reset(void)
-  * MPU IRQs, and store the result into the u32 pointed to by @events.
-  * No return value.
-  */
--void omap3xxx_prm_read_pending_irqs(unsigned long *events)
-+static void omap3xxx_prm_read_pending_irqs(unsigned long *events)
- {
- 	u32 mask, st;
- 
-@@ -166,7 +171,7 @@ void omap3xxx_prm_read_pending_irqs(unsigned long *events)
-  * block, to avoid race conditions after acknowledging or clearing IRQ
-  * bits.  No return value.
-  */
--void omap3xxx_prm_ocp_barrier(void)
-+static void omap3xxx_prm_ocp_barrier(void)
- {
- 	omap2_prm_read_mod_reg(OCP_MOD, OMAP3_PRM_REVISION_OFFSET);
- }
-@@ -182,7 +187,7 @@ void omap3xxx_prm_ocp_barrier(void)
-  * returning; otherwise, spurious interrupts might occur.  No return
-  * value.
-  */
--void omap3xxx_prm_save_and_clear_irqen(u32 *saved_mask)
-+static void omap3xxx_prm_save_and_clear_irqen(u32 *saved_mask)
- {
- 	saved_mask[0] = omap2_prm_read_mod_reg(OCP_MOD,
- 					       OMAP3_PRM_IRQENABLE_MPU_OFFSET);
-@@ -202,7 +207,7 @@ void omap3xxx_prm_save_and_clear_irqen(u32 *saved_mask)
-  * barrier should be needed here; any pending PRM interrupts will fire
-  * once the writes reach the PRM.  No return value.
-  */
--void omap3xxx_prm_restore_irqen(u32 *saved_mask)
-+static void omap3xxx_prm_restore_irqen(u32 *saved_mask)
- {
- 	omap2_prm_write_mod_reg(saved_mask[0], OCP_MOD,
- 				OMAP3_PRM_IRQENABLE_MPU_OFFSET);
-diff --git a/arch/arm/mach-omap2/prm3xxx.h b/arch/arm/mach-omap2/prm3xxx.h
-index bc37d42..5d993d2 100644
---- a/arch/arm/mach-omap2/prm3xxx.h
-+++ b/arch/arm/mach-omap2/prm3xxx.h
-@@ -152,12 +152,6 @@ static inline void omap3xxx_prm_reconfigure_io_chain(void)
- }
- #endif
- 
--/* PRM interrupt-related functions */
--extern void omap3xxx_prm_read_pending_irqs(unsigned long *events);
--extern void omap3xxx_prm_ocp_barrier(void);
--extern void omap3xxx_prm_save_and_clear_irqen(u32 *saved_mask);
--extern void omap3xxx_prm_restore_irqen(u32 *saved_mask);
+-	am33xx_prm_rmw_reg_bits(AM33XX_RST_GLOBAL_WARM_SW_MASK,
+-				AM33XX_RST_GLOBAL_WARM_SW_MASK,
+-				AM33XX_PRM_DEVICE_MOD,
+-				AM33XX_PRM_RSTCTRL_OFFSET);
 -
- extern void omap3xxx_prm_dpll3_reset(void);
+-	/* OCP barrier */
+-	(void)am33xx_prm_read_reg(AM33XX_PRM_DEVICE_MOD,
+-				  AM33XX_PRM_RSTCTRL_OFFSET);
++	am33xx_prm_global_warm_sw_reset();
+ }
+diff --git a/arch/arm/mach-omap2/prm33xx.c b/arch/arm/mach-omap2/prm33xx.c
+index 3cbfb78..03960bc 100644
+--- a/arch/arm/mach-omap2/prm33xx.c
++++ b/arch/arm/mach-omap2/prm33xx.c
+@@ -23,6 +23,10 @@
+ #include "prm33xx.h"
+ #include "prm-regbits-33xx.h"
  
- extern int __init omap3xxx_prm_init(void);
++#define AM33XX_PRM_RSTCTRL_OFFSET		0x0000
++
++#define AM33XX_RST_GLOBAL_WARM_SW_MASK		(1 << 0)
++
+ /* Read a register in a PRM instance */
+ u32 am33xx_prm_read_reg(s16 inst, u16 idx)
+ {
+@@ -332,6 +336,23 @@ static int am33xx_check_vcvp(void)
+ 	return 0;
+ }
+ 
++/**
++ * am33xx_prm_global_warm_sw_reset - reboot the device via warm reset
++ *
++ * Immediately reboots the device through warm reset.
++ */
++void am33xx_prm_global_warm_sw_reset(void)
++{
++	am33xx_prm_rmw_reg_bits(AM33XX_RST_GLOBAL_WARM_SW_MASK,
++				AM33XX_RST_GLOBAL_WARM_SW_MASK,
++				AM33XX_PRM_DEVICE_MOD,
++				AM33XX_PRM_RSTCTRL_OFFSET);
++
++	/* OCP barrier */
++	(void)am33xx_prm_read_reg(AM33XX_PRM_DEVICE_MOD,
++				  AM33XX_PRM_RSTCTRL_OFFSET);
++}
++
+ struct pwrdm_ops am33xx_pwrdm_operations = {
+ 	.pwrdm_set_next_pwrst		= am33xx_pwrdm_set_next_pwrst,
+ 	.pwrdm_read_next_pwrst		= am33xx_pwrdm_read_next_pwrst,
 -- 
 1.7.9.5
