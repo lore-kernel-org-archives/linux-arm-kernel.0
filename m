@@ -1,82 +1,45 @@
-From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
-Date: Mon,  1 Sep 2014 17:34:35 +0200
-Subject: [PATCH v8 7/7] clk: Warn of unbalanced clk_prepare() calls
-In-Reply-To: <1409585675-26894-1-git-send-email-tomeu.vizoso@collabora.com>
-References: <1409585377-26091-1-git-send-email-tomeu.vizoso@collabora.com>
- <1409585675-26894-1-git-send-email-tomeu.vizoso@collabora.com>
-Message-ID: <1409585675-26894-4-git-send-email-tomeu.vizoso@collabora.com>
+From: lauraa@codeaurora.org (Laura Abbott)
+Date: Mon, 01 Sep 2014 08:42:20 -0700
+Subject: [PATCHv4 2/2] arm64: Add CONFIG_DEBUG_SET_MODULE_RONX support
+In-Reply-To: <20140826144023.GA22256@localhost>
+References: <1408477303-2640-1-git-send-email-lauraa@codeaurora.org>
+ <1408477303-2640-3-git-send-email-lauraa@codeaurora.org>
+ <20140826144023.GA22256@localhost>
+Message-ID: <540493DC.20909@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The warning will display the clock user that is trying to unprepare the clock,
-and the location of the last unprepare call.
+On 8/26/2014 7:40 AM, Catalin Marinas wrote:
+> On Tue, Aug 19, 2014 at 08:41:43PM +0100, Laura Abbott wrote:
+>> --- /dev/null
+>> +++ b/arch/arm64/mm/pageattr.c
+> [...]
+>> +static int change_memory_common(unsigned long addr, int numpages,
+>> +				pgprot_t set_mask, pgprot_t clear_mask)
+>> +{
+>> +	unsigned long start = addr;
+>> +	unsigned long size = PAGE_SIZE*numpages;
+>> +	unsigned long end = start + size;
+>> +	int ret;
+>> +	struct page_change_data data;
+>> +
+>> +	if (!IS_ALIGNED(addr, PAGE_SIZE)) {
+>> +		addr &= PAGE_MASK;
+>> +		WARN_ON_ONCE(1);
+>> +	}
+>> +
+>> +	if (!is_module_address(start) || !is_module_address(end))
+>> +		return -EINVAL;
+>
+> Minor thing, "end" is exclusive here. Do you still get the right check
+> with is_module_address(end)?
+>
 
-Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
+No, You are correct. I'll talk to Will to get that fixed up.
 
----
+Thanks,
+Laura
 
-v8: * Patch added
----
- drivers/clk/clk.c           | 22 ++++++++++++++++++++--
- include/linux/clk-private.h |  3 +++
- 2 files changed, 23 insertions(+), 2 deletions(-)
-
-diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-index 13ee3dd..a3d2372 100644
---- a/drivers/clk/clk.c
-+++ b/drivers/clk/clk.c
-@@ -834,7 +834,17 @@ void clk_unprepare(struct clk *clk_user)
- 	if (IS_ERR_OR_NULL(clk_user))
- 		return;
- 
--	clk_provider_unprepare(clk_to_clk_core(clk_user));
-+	clk_prepare_lock();
-+	if (!WARN(clk_user->prepare_count == 0,
-+		  "incorrect unprepare clk dev %s con %s last caller of unprepare %pF\n",
-+		  clk_user->dev_id, clk_user->con_id, clk_user->last_unprepare)) {
-+
-+		clk_user->last_unprepare = __builtin_return_address(0);
-+		clk_user->prepare_count--;
-+
-+		__clk_unprepare(clk_to_clk_core(clk_user));
-+	}
-+	clk_prepare_unlock();
- }
- EXPORT_SYMBOL_GPL(clk_unprepare);
- 
-@@ -890,10 +900,18 @@ EXPORT_SYMBOL_GPL(clk_provider_prepare);
-  */
- int clk_prepare(struct clk *clk_user)
- {
-+	int ret;
-+
- 	if (!clk_user)
- 		return 0;
- 
--	return clk_provider_prepare(clk_to_clk_core(clk_user));
-+	clk_prepare_lock();
-+	ret = __clk_prepare(clk_to_clk_core(clk_user));
-+	if (!ret)
-+		clk_user->prepare_count++;
-+	clk_prepare_unlock();
-+
-+	return ret;
- }
- EXPORT_SYMBOL_GPL(clk_prepare);
- 
-diff --git a/include/linux/clk-private.h b/include/linux/clk-private.h
-index 8126046..cf93bde 100644
---- a/include/linux/clk-private.h
-+++ b/include/linux/clk-private.h
-@@ -64,6 +64,9 @@ struct clk {
- 	unsigned int	enable_count;
- 	void		*last_disable;
- 
-+	unsigned int	prepare_count;
-+	void		*last_unprepare;
-+
- 	unsigned long	floor_constraint;
- 	unsigned long	ceiling_constraint;
- 	struct hlist_node child_node;
 -- 
-1.9.3
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
