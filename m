@@ -1,71 +1,46 @@
-From: Li.Xiubo@freescale.com (Xiubo Li)
-Date: Mon, 1 Sep 2014 12:29:40 +0800
-Subject: [PATCHv1 6/7] ASoC: dts: sh73a0-kzm9g-reference: To support simple
- card newest style.
-In-Reply-To: <1409545781-20530-1-git-send-email-Li.Xiubo@freescale.com>
-References: <1409545781-20530-1-git-send-email-Li.Xiubo@freescale.com>
-Message-ID: <1409545781-20530-7-git-send-email-Li.Xiubo@freescale.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Mon, 01 Sep 2014 07:22:32 +0200
+Subject: [PATCH 10/29] drivers: add DRIVER_HAS_OWN_IOMMU_MANAGER flag
+In-Reply-To: <1407235677-26324-11-git-send-email-m.szyprowski@samsung.com>
+References: <1407235677-26324-1-git-send-email-m.szyprowski@samsung.com>
+ <1407235677-26324-11-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <54040298.9020002@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch depends on the following simple card patch:
-===
-ASoC: simple-card: Merge single and muti DAI link code.
+Hi Greg,
 
-This patch merge single DAI link and muti-DAI links code together,
-and simply the simple-card driver code.
+On 2014-08-05 12:47, Marek Szyprowski wrote:
+> This patch adds a new flags for device drivers. This flag instructs
+> kernel that the device driver does it own management of IOMMU assisted
+> IO address space translations, so no default dma-mapping structures
+> should be initialized.
+>
+> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> ---
+>   include/linux/device.h | 2 ++
+>   1 file changed, 2 insertions(+)
+>
+> diff --git a/include/linux/device.h b/include/linux/device.h
+> index 5f4ff02..2e62371 100644
+> --- a/include/linux/device.h
+> +++ b/include/linux/device.h
+> @@ -253,6 +253,8 @@ struct device_driver {
+>   
+>   /* disables bind/unbind via sysfs */
+>   #define DRIVER_SUPPRESS_BIND_ATTRS	(1 << 0)
+> +/* driver uses own methods to manage IO address space */
+> +#define DRIVER_HAS_OWN_IOMMU_MANAGER	(1 << 1)
+>   
+>   extern int __must_check driver_register(struct device_driver *drv);
+>   extern void driver_unregister(struct device_driver *drv);
 
-And also do some other improvement:
+Could you comment if the approach of using flags in the struct driver
+could be accepted? I've converted suppress_bind_attrs entry to flags to
+avoid extending the structure, please see patch "[PATCH 05/29] drivers:
+convert suppress_bind_attrs parameter into flags".
 
-Since from the DAI format micro SND_SOC_DAIFMT_CBx_CFx, the 'CBx'
-mean Codec's bit clock is as master/slave and the 'CFx' mean Codec's
-frame clock is as master/slave.
-
-So these same DAI formats should be informed to CPU and CODE DAIs at
-the same time. For the Codec driver will set the bit clock and frame
-clock as the DAI formats said, but for the CPU driver, if the the
-bit clock or frame clock is as Codec master, so it should be set CPU
-DAI device as bit clock or frame clock as slave, and vice versa.
-
-The old code will cause confusion, and we should be clear that the
-letter 'C' here mean to Codec.
-===
-
-Signed-off-by: Xiubo Li <Li.Xiubo@freescale.com>
----
- arch/arm/boot/dts/sh73a0-kzm9g-reference.dts | 18 +++++++++++-------
- 1 file changed, 11 insertions(+), 7 deletions(-)
-
-diff --git a/arch/arm/boot/dts/sh73a0-kzm9g-reference.dts b/arch/arm/boot/dts/sh73a0-kzm9g-reference.dts
-index 18662ae..e689ae3 100644
---- a/arch/arm/boot/dts/sh73a0-kzm9g-reference.dts
-+++ b/arch/arm/boot/dts/sh73a0-kzm9g-reference.dts
-@@ -160,15 +160,19 @@
- 
- 	sound {
- 		compatible = "simple-audio-card";
--		simple-audio-card,format = "left_j";
--		simple-audio-card,cpu {
--			sound-dai = <&sh_fsi2 0>;
--		};
--		simple-audio-card,codec {
--			sound-dai = <&ak4648>;
-+
-+		simple-audio-card,dai-link {
-+			format = "left_j";
- 			bitclock-master;
- 			frame-master;
--			system-clock-frequency = <11289600>;
-+
-+			cpu {
-+				sound-dai = <&sh_fsi2 0>;
-+			};
-+			codec {
-+				sound-dai = <&ak4648>;
-+				system-clock-frequency = <11289600>;
-+			};
- 		};
- 	};
- };
+Best regards
 -- 
-1.8.4
+Marek Szyprowski, PhD
+Samsung R&D Institute Poland
