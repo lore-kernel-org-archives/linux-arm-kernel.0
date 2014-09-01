@@ -1,46 +1,27 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Mon, 01 Sep 2014 07:22:32 +0200
-Subject: [PATCH 10/29] drivers: add DRIVER_HAS_OWN_IOMMU_MANAGER flag
-In-Reply-To: <1407235677-26324-11-git-send-email-m.szyprowski@samsung.com>
-References: <1407235677-26324-1-git-send-email-m.szyprowski@samsung.com>
- <1407235677-26324-11-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <54040298.9020002@samsung.com>
+From: Li.Xiubo@freescale.com (Xiubo Li)
+Date: Mon, 1 Sep 2014 12:42:21 +0800
+Subject: [PATCH] ARM: Kconfig: Open force maximum zone order for all SoCs
+Message-ID: <1409546541-4129-1-git-send-email-Li.Xiubo@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Greg,
+Signed-off-by: Xiubo Li <Li.Xiubo@freescale.com>
+---
+ arch/arm/Kconfig | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-On 2014-08-05 12:47, Marek Szyprowski wrote:
-> This patch adds a new flags for device drivers. This flag instructs
-> kernel that the device driver does it own management of IOMMU assisted
-> IO address space translations, so no default dma-mapping structures
-> should be initialized.
->
-> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-> ---
->   include/linux/device.h | 2 ++
->   1 file changed, 2 insertions(+)
->
-> diff --git a/include/linux/device.h b/include/linux/device.h
-> index 5f4ff02..2e62371 100644
-> --- a/include/linux/device.h
-> +++ b/include/linux/device.h
-> @@ -253,6 +253,8 @@ struct device_driver {
->   
->   /* disables bind/unbind via sysfs */
->   #define DRIVER_SUPPRESS_BIND_ATTRS	(1 << 0)
-> +/* driver uses own methods to manage IO address space */
-> +#define DRIVER_HAS_OWN_IOMMU_MANAGER	(1 << 1)
->   
->   extern int __must_check driver_register(struct device_driver *drv);
->   extern void driver_unregister(struct device_driver *drv);
-
-Could you comment if the approach of using flags in the struct driver
-could be accepted? I've converted suppress_bind_attrs entry to flags to
-avoid extending the structure, please see patch "[PATCH 05/29] drivers:
-convert suppress_bind_attrs parameter into flags".
-
-Best regards
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index c49a775..bf8445c 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -1687,7 +1687,7 @@ config ARCH_WANT_GENERAL_HUGETLB
+ source "mm/Kconfig"
+ 
+ config FORCE_MAX_ZONEORDER
+-	int "Maximum zone order" if ARCH_SHMOBILE_LEGACY
++	int "Maximum zone order"
+ 	range 11 64 if ARCH_SHMOBILE_LEGACY
+ 	default "12" if SOC_AM33XX
+ 	default "9" if SA1111 || ARCH_EFM32
 -- 
-Marek Szyprowski, PhD
-Samsung R&D Institute Poland
+1.8.4
