@@ -1,83 +1,37 @@
 From: t-kristo@ti.com (Tero Kristo)
-Date: Mon, 1 Sep 2014 21:08:59 +0300
-Subject: [PATCH 10/26] ARM: OMAP2/3: CM: make cm_split_idlest_reg SoC calls
- static
+Date: Mon, 1 Sep 2014 21:09:01 +0300
+Subject: [PATCH 12/26] ARM: AM43xx: hwmod: use OMAP4 hardreset ops instead of
+ the AM33xx version
 In-Reply-To: <1409594955-1476-1-git-send-email-t-kristo@ti.com>
 References: <1409594955-1476-1-git-send-email-t-kristo@ti.com>
-Message-ID: <1409594955-1476-11-git-send-email-t-kristo@ti.com>
+Message-ID: <1409594955-1476-13-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-CM driver has a generic API which calls the SoC specific split function
-through cm_ll_data, so there is no need for the SoC specific functions to
-be publicly available.
+AM43xx is using OMAP4+ PRM driver, so it should be using the corresponding
+hardreset ops from the hwmod also.
 
 Signed-off-by: Tero Kristo <t-kristo@ti.com>
 ---
- arch/arm/mach-omap2/cm2xxx.c |    5 +++--
- arch/arm/mach-omap2/cm2xxx.h |    2 --
- arch/arm/mach-omap2/cm3xxx.c |    5 +++--
- arch/arm/mach-omap2/cm3xxx.h |    3 ---
- 4 files changed, 6 insertions(+), 9 deletions(-)
+ arch/arm/mach-omap2/omap_hwmod.c |    6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/cm2xxx.c b/arch/arm/mach-omap2/cm2xxx.c
-index 365df9e..a96d901 100644
---- a/arch/arm/mach-omap2/cm2xxx.c
-+++ b/arch/arm/mach-omap2/cm2xxx.c
-@@ -204,8 +204,9 @@ void omap2xxx_cm_apll96_disable(void)
-  * XXX This function is only needed until absolute register addresses are
-  * removed from the OMAP struct clk records.
-  */
--int omap2xxx_cm_split_idlest_reg(void __iomem *idlest_reg, s16 *prcm_inst,
--				 u8 *idlest_reg_id)
-+static int omap2xxx_cm_split_idlest_reg(void __iomem *idlest_reg,
-+					s16 *prcm_inst,
-+					u8 *idlest_reg_id)
- {
- 	unsigned long offs;
- 	u8 idlest_offs;
-diff --git a/arch/arm/mach-omap2/cm2xxx.h b/arch/arm/mach-omap2/cm2xxx.h
-index a14094b..c89502b 100644
---- a/arch/arm/mach-omap2/cm2xxx.h
-+++ b/arch/arm/mach-omap2/cm2xxx.h
-@@ -56,8 +56,6 @@ extern void omap2xxx_cm_set_apll96_auto_low_power_stop(void);
- 
- int omap2xxx_cm_wait_module_ready(u8 part, s16 prcm_mod, u16 idlest_id,
- 				  u8 idlest_shift);
--extern int omap2xxx_cm_split_idlest_reg(void __iomem *idlest_reg,
--					s16 *prcm_inst, u8 *idlest_reg_id);
- extern int omap2xxx_cm_fclks_active(void);
- extern int omap2xxx_cm_mpu_retention_allowed(void);
- extern u32 omap2xxx_cm_get_core_clk_src(void);
-diff --git a/arch/arm/mach-omap2/cm3xxx.c b/arch/arm/mach-omap2/cm3xxx.c
-index a29c2bf..c6622b7 100644
---- a/arch/arm/mach-omap2/cm3xxx.c
-+++ b/arch/arm/mach-omap2/cm3xxx.c
-@@ -118,8 +118,9 @@ static int omap3xxx_cm_wait_module_ready(u8 part, s16 prcm_mod, u16 idlest_id,
-  * XXX This function is only needed until absolute register addresses are
-  * removed from the OMAP struct clk records.
-  */
--int omap3xxx_cm_split_idlest_reg(void __iomem *idlest_reg, s16 *prcm_inst,
--				 u8 *idlest_reg_id)
-+static int omap3xxx_cm_split_idlest_reg(void __iomem *idlest_reg,
-+					s16 *prcm_inst,
-+					u8 *idlest_reg_id)
- {
- 	unsigned long offs;
- 	u8 idlest_offs;
-diff --git a/arch/arm/mach-omap2/cm3xxx.h b/arch/arm/mach-omap2/cm3xxx.h
-index 33491c7..734a858 100644
---- a/arch/arm/mach-omap2/cm3xxx.h
-+++ b/arch/arm/mach-omap2/cm3xxx.h
-@@ -68,9 +68,6 @@
- 
- #ifndef __ASSEMBLER__
- 
--extern int omap3xxx_cm_split_idlest_reg(void __iomem *idlest_reg,
--					s16 *prcm_inst, u8 *idlest_reg_id);
--
- extern void omap3_cm_save_context(void);
- extern void omap3_cm_restore_context(void);
- extern void omap3_cm_save_scratchpad_contents(u32 *ptr);
+diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
+index 0267af5..c52dc4c 100644
+--- a/arch/arm/mach-omap2/omap_hwmod.c
++++ b/arch/arm/mach-omap2/omap_hwmod.c
+@@ -4115,9 +4115,9 @@ void __init omap_hwmod_init(void)
+ 		soc_ops.enable_module = _omap4_enable_module;
+ 		soc_ops.disable_module = _omap4_disable_module;
+ 		soc_ops.wait_target_ready = _omap4_wait_target_ready;
+-		soc_ops.assert_hardreset = _am33xx_assert_hardreset;
+-		soc_ops.deassert_hardreset = _am33xx_deassert_hardreset;
+-		soc_ops.is_hardreset_asserted = _am33xx_is_hardreset_asserted;
++		soc_ops.assert_hardreset = _omap4_assert_hardreset;
++		soc_ops.deassert_hardreset = _omap4_deassert_hardreset;
++		soc_ops.is_hardreset_asserted = _omap4_is_hardreset_asserted;
+ 		soc_ops.init_clkdm = _init_clkdm;
+ 	} else if (soc_is_am33xx()) {
+ 		soc_ops.enable_module = _omap4_enable_module;
 -- 
 1.7.9.5
