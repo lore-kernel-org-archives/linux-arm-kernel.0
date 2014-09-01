@@ -1,90 +1,141 @@
 From: t-kristo@ti.com (Tero Kristo)
-Date: Mon, 1 Sep 2014 21:08:52 +0300
-Subject: [PATCH 03/26] ARM: OMAP2/3: hwmod: merge wait_target_ready functions
- for omap2/3
+Date: Mon, 1 Sep 2014 21:08:54 +0300
+Subject: [PATCH 05/26] ARM: OMAP4/AM33xx: add cm_init / cm_exit calls for
+ AM33xx and OMAP4+
 In-Reply-To: <1409594955-1476-1-git-send-email-t-kristo@ti.com>
 References: <1409594955-1476-1-git-send-email-t-kristo@ti.com>
-Message-ID: <1409594955-1476-4-git-send-email-t-kristo@ti.com>
+Message-ID: <1409594955-1476-6-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The implementation on these is identical, so no need to have them separate.
+This is needed for expanding the generic CM driver API to include
+AM33xx and OMAP4 also.
 
 Signed-off-by: Tero Kristo <t-kristo@ti.com>
 ---
- arch/arm/mach-omap2/omap_hwmod.c |   35 ++++-------------------------------
- 1 file changed, 4 insertions(+), 31 deletions(-)
+ arch/arm/mach-omap2/cm33xx.c     |   13 +++++++++++++
+ arch/arm/mach-omap2/cm33xx.h     |    1 +
+ arch/arm/mach-omap2/cminst44xx.c |   13 +++++++++++++
+ arch/arm/mach-omap2/cminst44xx.h |    1 +
+ arch/arm/mach-omap2/io.c         |    6 ++++++
+ 5 files changed, 34 insertions(+)
 
-diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
-index 6c074f3..1bb6d07 100644
---- a/arch/arm/mach-omap2/omap_hwmod.c
-+++ b/arch/arm/mach-omap2/omap_hwmod.c
-@@ -2923,7 +2923,7 @@ static int __init _alloc_linkspace(struct omap_hwmod_ocp_if **ois)
- /* Static functions intended only for use in soc_ops field function pointers */
+diff --git a/arch/arm/mach-omap2/cm33xx.c b/arch/arm/mach-omap2/cm33xx.c
+index ef9e9018..e02988f 100644
+--- a/arch/arm/mach-omap2/cm33xx.c
++++ b/arch/arm/mach-omap2/cm33xx.c
+@@ -358,3 +358,16 @@ struct clkdm_ops am33xx_clkdm_operations = {
+ 	.clkdm_clk_enable	= am33xx_clkdm_clk_enable,
+ 	.clkdm_clk_disable	= am33xx_clkdm_clk_disable,
+ };
++
++static struct cm_ll_data am33xx_cm_ll_data;
++
++int __init am33xx_cm_init(void)
++{
++	return cm_register(&am33xx_cm_ll_data);
++}
++
++static void __exit am33xx_cm_exit(void)
++{
++	cm_unregister(&am33xx_cm_ll_data);
++}
++__exitcall(am33xx_cm_exit);
+diff --git a/arch/arm/mach-omap2/cm33xx.h b/arch/arm/mach-omap2/cm33xx.h
+index 1771fc1..1d3cde7 100644
+--- a/arch/arm/mach-omap2/cm33xx.h
++++ b/arch/arm/mach-omap2/cm33xx.h
+@@ -379,6 +379,7 @@ void am33xx_cm_clkdm_enable_hwsup(u16 inst, u16 cdoffs);
+ void am33xx_cm_clkdm_disable_hwsup(u16 inst, u16 cdoffs);
+ void am33xx_cm_clkdm_force_sleep(u16 inst, u16 cdoffs);
+ void am33xx_cm_clkdm_force_wakeup(u16 inst, u16 cdoffs);
++int am33xx_cm_init(void);
  
- /**
-- * _omap2xxx_wait_target_ready - wait for a module to leave slave idle
-+ * _omap2xxx_3xxx_wait_target_ready - wait for a module to leave slave idle
-  * @oh: struct omap_hwmod *
-  *
-  * Wait for a module @oh to leave slave idle.  Returns 0 if the module
-@@ -2931,7 +2931,7 @@ static int __init _alloc_linkspace(struct omap_hwmod_ocp_if **ois)
-  * slave idle; otherwise, pass along the return value of the
-  * appropriate *_cm*_wait_module_ready() function.
-  */
--static int _omap2xxx_wait_target_ready(struct omap_hwmod *oh)
-+static int _omap2xxx_3xxx_wait_target_ready(struct omap_hwmod *oh)
- {
- 	if (!oh)
- 		return -EINVAL;
-@@ -2950,33 +2950,6 @@ static int _omap2xxx_wait_target_ready(struct omap_hwmod *oh)
- }
+ #if defined(CONFIG_SOC_AM33XX) || defined(CONFIG_SOC_AM43XX)
+ int am33xx_cm_wait_module_idle(u16 inst, u16 clkctrl_offs);
+diff --git a/arch/arm/mach-omap2/cminst44xx.c b/arch/arm/mach-omap2/cminst44xx.c
+index 7e6970a..695e71e 100644
+--- a/arch/arm/mach-omap2/cminst44xx.c
++++ b/arch/arm/mach-omap2/cminst44xx.c
+@@ -505,3 +505,16 @@ struct clkdm_ops am43xx_clkdm_operations = {
+ 	.clkdm_clk_enable	= omap4_clkdm_clk_enable,
+ 	.clkdm_clk_disable	= omap4_clkdm_clk_disable,
+ };
++
++static struct cm_ll_data omap4xxx_cm_ll_data;
++
++int __init omap4_cm_init(void)
++{
++	return cm_register(&omap4xxx_cm_ll_data);
++}
++
++static void __exit omap4_cm_exit(void)
++{
++	cm_unregister(&omap4xxx_cm_ll_data);
++}
++__exitcall(omap4_cm_exit);
+diff --git a/arch/arm/mach-omap2/cminst44xx.h b/arch/arm/mach-omap2/cminst44xx.h
+index 67a05f9..cc3c913 100644
+--- a/arch/arm/mach-omap2/cminst44xx.h
++++ b/arch/arm/mach-omap2/cminst44xx.h
+@@ -38,5 +38,6 @@ extern u32 omap4_cminst_read_inst_reg_bits(u8 part, u16 inst, s16 idx,
+ 					   u32 mask);
  
- /**
-- * _omap3xxx_wait_target_ready - wait for a module to leave slave idle
-- * @oh: struct omap_hwmod *
-- *
-- * Wait for a module @oh to leave slave idle.  Returns 0 if the module
-- * does not have an IDLEST bit or if the module successfully leaves
-- * slave idle; otherwise, pass along the return value of the
-- * appropriate *_cm*_wait_module_ready() function.
-- */
--static int _omap3xxx_wait_target_ready(struct omap_hwmod *oh)
--{
--	if (!oh)
--		return -EINVAL;
--
--	if (oh->flags & HWMOD_NO_IDLEST)
--		return 0;
--
--	if (!_find_mpu_rt_port(oh))
--		return 0;
--
--	/* XXX check module SIDLEMODE, hardreset status, enabled clocks */
--
--	return omap3xxx_cm_wait_module_ready(oh->prcm.omap2.module_offs,
--					     oh->prcm.omap2.idlest_reg_id,
--					     oh->prcm.omap2.idlest_idle_bit);
--}
--
--/**
-  * _omap4_wait_target_ready - wait for a module to leave slave idle
-  * @oh: struct omap_hwmod *
-  *
-@@ -4227,12 +4200,12 @@ int omap_hwmod_pad_route_irq(struct omap_hwmod *oh, int pad_idx, int irq_idx)
- void __init omap_hwmod_init(void)
- {
- 	if (cpu_is_omap24xx()) {
--		soc_ops.wait_target_ready = _omap2xxx_wait_target_ready;
-+		soc_ops.wait_target_ready = _omap2xxx_3xxx_wait_target_ready;
- 		soc_ops.assert_hardreset = _omap2_assert_hardreset;
- 		soc_ops.deassert_hardreset = _omap2_deassert_hardreset;
- 		soc_ops.is_hardreset_asserted = _omap2_is_hardreset_asserted;
- 	} else if (cpu_is_omap34xx()) {
--		soc_ops.wait_target_ready = _omap3xxx_wait_target_ready;
-+		soc_ops.wait_target_ready = _omap2xxx_3xxx_wait_target_ready;
- 		soc_ops.assert_hardreset = _omap2_assert_hardreset;
- 		soc_ops.deassert_hardreset = _omap2_deassert_hardreset;
- 		soc_ops.is_hardreset_asserted = _omap2_is_hardreset_asserted;
+ extern void omap_cm_base_init(void);
++int omap4_cm_init(void);
+ 
+ #endif
+diff --git a/arch/arm/mach-omap2/io.c b/arch/arm/mach-omap2/io.c
+index 5c2c71a..26055d9 100644
+--- a/arch/arm/mach-omap2/io.c
++++ b/arch/arm/mach-omap2/io.c
+@@ -45,6 +45,7 @@
+ #include "sram.h"
+ #include "cm2xxx.h"
+ #include "cm3xxx.h"
++#include "cm33xx.h"
+ #include "prm.h"
+ #include "cm.h"
+ #include "prcm_mpu44xx.h"
+@@ -582,6 +583,7 @@ void __init am33xx_init_early(void)
+ 	omap2_set_globals_cm(AM33XX_L4_WK_IO_ADDRESS(AM33XX_PRCM_BASE), NULL);
+ 	omap3xxx_check_revision();
+ 	am33xx_check_features();
++	am33xx_cm_init();
+ 	am33xx_powerdomains_init();
+ 	am33xx_clockdomains_init();
+ 	am33xx_hwmod_init();
+@@ -609,6 +611,7 @@ void __init am43xx_init_early(void)
+ 	omap3xxx_check_revision();
+ 	am33xx_check_features();
+ 	omap44xx_prm_init();
++	omap4_cm_init();
+ 	am43xx_powerdomains_init();
+ 	am43xx_clockdomains_init();
+ 	am43xx_hwmod_init();
+@@ -638,6 +641,7 @@ void __init omap4430_init_early(void)
+ 	omap_cm_base_init();
+ 	omap4xxx_check_revision();
+ 	omap4xxx_check_features();
++	omap4_cm_init();
+ 	omap4_pm_init_early();
+ 	omap44xx_prm_init();
+ 	omap44xx_voltagedomains_init();
+@@ -672,6 +676,7 @@ void __init omap5_init_early(void)
+ 	omap_cm_base_init();
+ 	omap44xx_prm_init();
+ 	omap5xxx_check_revision();
++	omap4_cm_init();
+ 	omap54xx_voltagedomains_init();
+ 	omap54xx_powerdomains_init();
+ 	omap54xx_clockdomains_init();
+@@ -700,6 +705,7 @@ void __init dra7xx_init_early(void)
+ 	omap_cm_base_init();
+ 	omap44xx_prm_init();
+ 	dra7xxx_check_revision();
++	omap4_cm_init();
+ 	dra7xx_powerdomains_init();
+ 	dra7xx_clockdomains_init();
+ 	dra7xx_hwmod_init();
 -- 
 1.7.9.5
