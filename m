@@ -1,90 +1,61 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Mon, 01 Sep 2014 12:47:08 +0200
-Subject: [PATCH 10/29] drivers: add DRIVER_HAS_OWN_IOMMU_MANAGER flag
-In-Reply-To: <4621634.jlJLccozTJ@wuerfel>
-References: <1407235677-26324-1-git-send-email-m.szyprowski@samsung.com>
- <20140901070748.GA24226@ulmo.nvidia.com> <540425F9.7080307@samsung.com>
- <4621634.jlJLccozTJ@wuerfel>
-Message-ID: <54044EAC.6010701@samsung.com>
+From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
+Date: Mon, 01 Sep 2014 12:47:38 +0200
+Subject: [PATCH 1/2] ARM: multi_v7_defconfig: Enable shmobile platforms
+In-Reply-To: <0a6f01cfc432$507900f0$f16b02d0$@samsung.com>
+References: <1409234429-1916-1-git-send-email-geert+renesas@glider.be>
+ <3598124.ze8sbSR9ui@wuerfel> <0a6f01cfc432$507900f0$f16b02d0$@samsung.com>
+Message-ID: <3021375.opancsXhz0@amdc1032>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
 
-On 2014-09-01 11:38, Arnd Bergmann wrote:
-> On Monday 01 September 2014 09:53:29 Marek Szyprowski wrote:
->> On 2014-09-01 09:07, Thierry Reding wrote:
->>> On Mon, Sep 01, 2014 at 07:22:32AM +0200, Marek Szyprowski wrote:
->>>> Hi Greg,
->>>>
->>>> On 2014-08-05 12:47, Marek Szyprowski wrote:
->>>>> This patch adds a new flags for device drivers. This flag instructs
->>>>> kernel that the device driver does it own management of IOMMU assisted
->>>>> IO address space translations, so no default dma-mapping structures
->>>>> should be initialized.
->>>>>
->>>>> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
->>>>> ---
->>>>>     include/linux/device.h | 2 ++
->>>>>     1 file changed, 2 insertions(+)
->>>>>
->>>>> diff --git a/include/linux/device.h b/include/linux/device.h
->>>>> index 5f4ff02..2e62371 100644
->>>>> --- a/include/linux/device.h
->>>>> +++ b/include/linux/device.h
->>>>> @@ -253,6 +253,8 @@ struct device_driver {
->>>>>     
->>>>>     /* disables bind/unbind via sysfs */
->>>>>     #define DRIVER_SUPPRESS_BIND_ATTRS       (1 << 0)
->>>>> +/* driver uses own methods to manage IO address space */
->>>>> +#define DRIVER_HAS_OWN_IOMMU_MANAGER       (1 << 1)
->>>>>     
->>>>>     extern int __must_check driver_register(struct device_driver *drv);
->>>>>     extern void driver_unregister(struct device_driver *drv);
->>>> Could you comment if the approach of using flags in the struct driver
->>>> could be accepted? I've converted suppress_bind_attrs entry to flags to
->>>> avoid extending the structure, please see patch "[PATCH 05/29] drivers:
->>>> convert suppress_bind_attrs parameter into flags".
->>> Is this really necessary? What I did as part of an RFC series for Tegra
->>> IOMMU support is keep this knowledge within the IOMMU driver rather than
->>> export it to the driver core.i
->> The problem with embedding the list of drivers that you would need to update
->> it everytime when you modify or extend iommu support in the other drivers.
->> I've tried also other approach, like adding respective notifiers to
->> individual
->> drivers to initialize custom iommu support (or disable default iommu
->> mapping)
->> before iommu driver gets initialized, but such solution is in my opinion too
->> complex and hard to understand if one is not familiar will all this stuff.
->>
->> All in all it turned out that the simplest and most generic way is to simply
->> add the flag to the driver core. Flags might be also used in the future
->> to model other kinds of dependencies between device drivers and/or driver
->> core.
-> I don't get it yet. I would expect that a driver doing its own management
-> of the iommu gets to use the linux/iommu.h interfaces, while a driver
-> using the default iommu setup uses linux/dma-mapping.h.
+Hi,
 
-You are right.
+On Saturday, August 30, 2014 06:10:59 PM Kukjin Kim wrote:
+> Arnd Bergmann wrote:
+> > 
+> Hi,
+> 
+> > On Friday 29 August 2014 20:05:49 Bartlomiej Zolnierkiewicz wrote:
+> > > I've been looking lately into making it possible to easily go
+> > > from multi_v7_defconfig config to a single platform one (in my
+> > > case Exynos one) and removing the need to keep the latter (i.e.
+> > > exynos_defconfig) in the kernel tree in the long-term.
+> > >
+> Why? I don't have any idea why we should use only multi_v7_defconfig for each
+> hardware platform. In my understanding, multi_v7_defconfig can be used for one
+> kernel image can support all of the platforms but it doesn't mean it should be
 
-> Who do you think needs to set this flag, and who needs to read it?
+In my long-term "plan" both configs should be available but one should
+be generated from the other.  Either way should be okay for me: multi ->
+single platform or single platforms(s) -> multi.
 
-In the proposed solution Exynos IOMMU driver creates a separate IO 
-address space
-for every client device in a system and binds it to the default 
-dma-mapping space
-for the given device. When drivers are doing its own management of IO 
-address
-space, instead of relying on what is available by default with dma-mapping
-interface, this will require releasing of the previously created default
-structures and resources. So this flag is set by the driver doing its own
-management of io address space. The flags is then checked by Exynos 
-IOMMU driver
-to avoid creating the default dma-mapping address space for devices 
-which driver
-does its own management.
+[ Please note that if you take multi_v7_defconfig and disable support
+  for all archs besides Exynos (trivial operation even when done by
+  hand) you end up with platform specific kernel config. ]
 
-Best regards
--- 
-Marek Szyprowski, PhD
+Pros:
+- less code in kernel
+- concentrated testing efforts
+- configs don't go out-of-sync with each other
+- less maintainance burden
+
+Cons:
+- fewer config options may be covered than with two independent configs
+
+> used for each platform. And I think, if we cannot maintain each platform's
+> defconfig in mainline, it will be kept in each SoC vendor and it is not a good
+
+It seems that currently in case of our internal kernel trees the custom
+kernel configs are always used instead of either exynos_defconfig or
+multi_v7_defconfig.  I think that there is a big room for improvement
+here.
+
+> way. I mean both defconfigs has each value in mainline, exynos_defconfig should
+> be updated though ;)
+
+Best regards,
+--
+Bartlomiej Zolnierkiewicz
 Samsung R&D Institute Poland
+Samsung Electronics
