@@ -1,67 +1,69 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Mon,  1 Sep 2014 15:21:37 +0100
-Subject: [PATCH v2] arm: use irq_set_affinity with force=false when migrating
- irqs
-In-Reply-To: <1409571966-18343-1-git-send-email-sudeep.holla@arm.com>
-References: <1409571966-18343-1-git-send-email-sudeep.holla@arm.com>
-Message-ID: <1409581297-29216-1-git-send-email-sudeep.holla@arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 01 Sep 2014 16:24:27 +0200
+Subject: [PATCH] mfd: syscon: Decouple syscon interface from syscon devices
+In-Reply-To: <20140901112549.GM7374@lee--X1>
+References: <1408694991-21615-1-git-send-email-pankaj.dubey@samsung.com>
+ <4121644.3haxjiIdIo@wuerfel> <20140901112549.GM7374@lee--X1>
+Message-ID: <12348292.z1qJl96tVA@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sudeep Holla <sudeep.holla@arm.com>
+On Monday 01 September 2014 12:25:49 Lee Jones wrote:
+> On Mon, 01 Sep 2014, Arnd Bergmann wrote:
+> > On Monday 01 September 2014 08:49:18 Lee Jones wrote:
+> > > On Fri, 22 Aug 2014, Pankaj Dubey wrote:
+> > > 
+> > > > From: Tomasz Figa <t.figa@samsung.com>
+> > > > 
+> > > > Currently a syscon entity can be only registered directly through a
+> > > > platform device that binds to a dedicated driver. However in certain use
+> > > > cases it is desirable to make a device used with another driver a syscon
+> > > > interface provider. For example, certain SoCs (e.g. Exynos) contain
+> > > > system controller blocks which perform various functions such as power
+> > > > domain control, CPU power management, low power mode control, but in
+> > > > addition contain certain IP integration glue, such as various signal
+> > > > masks, coprocessor power control, etc. In such case, there is a need to
+> > > > have a dedicated driver for such system controller but also share
+> > > > registers with other drivers. The latter is where the syscon interface
+> > > > is helpful.
+> > > > 
+> > > > This patch decouples syscon object from syscon driver, so that it can be
+> > > > registered from any driver in addition to the original "syscon" platform
+> > > > driver.
+> > > > 
+> > > > Signed-off-by: Tomasz Figa <t.figa@samsung.com>
+> > > > Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
+> > > > ---
+> > > > 
+> > > > RFC patch [1] was posted by Tomasz Figa. This patch addresses some of
+> > > > comments given by Arnd to RFC patch, and further decouples syscon from
+> > > > device model. It also gives flexibility of registering with syscon at
+> > > > early stage using device_node object.
+> > > 
+> > > It would be helpful if Arnd gave this revision his blessing (Ack).
+> > 
+> > I never saw a reason why we don't take this all the way as discussed
+> > a few times: Completely remove the dependency of syscon on having
+> > a platform driver for it, and make it possible to just call
+> > syscon_regmap_lookup_by_phandle() without having to register
+> > it first.
+> 
+> I think this sounds like a good end-state.  Migrating over by
+> supporting both methods in this way does sound like the correct thing
+> to do though.  Doing so is likely to dramatically reduce the effect on
+> current users.
 
-Since commit 1dbfa187dad ("ARM: irq migration: force migration off CPU
-going down") the ARM interrupt migration code on cpu offline calls
-irqchip.irq_set_affinity() with the argument force=true. At the point
-of this change the argument had no effect because it was not used by
-any interrupt chip driver and there was no semantics defined.
+Maybe I'm misreading the patch, but I don't see how it creates a
+migration path. What I want to end up with is infrastructure that
+lets anybody call syscon_regmap_lookup_by_pdevname or
+syscon_regmap_lookup_by_compatible (if they really need to)
+without needing the platform_driver for syscon. That should not
+require any form of compatibility layer because to the driver
+using it there is no API change.
 
-This changed with commit 01f8fa4f01d8 ("genirq: Allow forcing cpu
-affinity of interrupts") which made the force argument useful to route
-interrupts to not yet online cpus without checking the target cpu
-against the cpu online mask. The following commit ffde1de64012
-("irqchip: gic: Support forced affinity setting") implemented this for
-the GIC interrupt controller.
+In contrast, this patch introduces a new of_syscon_{un,}register()
+interface that would get removed after the the above has
+been implemented, causing extra churn for any driver that also
+wants to provide a regmap-like interface.
 
-As a consequence the ARM cpu offline irq migration fails if CPU0 is
-offlined, because CPU0 is still set in the affinity mask and the
-validataion against cpu online mask is skipped to the force argument
-being true. The following first_cpu(mask) selection always selects
-CPU0 as the target.
-
-Solve the issue by calling irq_set_affinity() with force=false from
-the CPU offline irq migration code so the GIC driver validates the
-affinity mask against CPU online mask and therefore removes CPU0 from
-the possible target candidates.
-
-Tested on TC2 hotpluging CPU0 in and out. Without this patch the system
-locks up as the IRQs are not migrated away from CPU0.
-
-Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
-Acked-by: Thomas Gleixner <tglx@linutronix.de>
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: <stable@vger.kernel.org> # 3.10.x
----
- arch/arm/kernel/irq.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-Change v1->v2:
- - Updated the changelog to reflect the actual history behind
-   this change as suggested by tglx and added his ack
-
-diff --git a/arch/arm/kernel/irq.c b/arch/arm/kernel/irq.c
-index 2c4257604513..5c4d38e32a51 100644
---- a/arch/arm/kernel/irq.c
-+++ b/arch/arm/kernel/irq.c
-@@ -175,7 +175,7 @@ static bool migrate_one_irq(struct irq_desc *desc)
- 	c = irq_data_get_irq_chip(d);
- 	if (!c->irq_set_affinity)
- 		pr_debug("IRQ%u: unable to set affinity\n", d->irq);
--	else if (c->irq_set_affinity(d, affinity, true) == IRQ_SET_MASK_OK && ret)
-+	else if (c->irq_set_affinity(d, affinity, false) == IRQ_SET_MASK_OK && ret)
- 		cpumask_copy(d->affinity, affinity);
- 
- 	return ret;
--- 
-1.8.3.2
+	Arnd
