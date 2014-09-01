@@ -1,65 +1,66 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 1 Sep 2014 12:42:38 +0100
-Subject: [PATCH] iommu/arm-smmu: Allow size of stage 1 output to max
- possible value for sateg 2 bypass
-In-Reply-To: <1409162541-3940-1-git-send-email-c.tirumalesh@gmail.com>
-References: <1409162541-3940-1-git-send-email-c.tirumalesh@gmail.com>
-Message-ID: <20140901114238.GB24594@arm.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Mon,  1 Sep 2014 12:46:06 +0100
+Subject: [PATCH] arm: use irq_set_affinity with force=false when migrating irqs
+Message-ID: <1409571966-18343-1-git-send-email-sudeep.holla@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tirumalesh,
+From: Sudeep Holla <sudeep.holla@arm.com>
 
-On Wed, Aug 27, 2014 at 07:02:21PM +0100, c.tirumalesh at gmail.com wrote:
-> From: Tirumalesh Chalamarla <tchalamarla@cavium.com>
-> 
-> This patch modifes output_mask calculation logic for stage 1 and allow
-> max possible value supported by SMMU implementaions for translations,
-> where stage 2 is bypassed.
-> 
-> Erlier it is not possible to access full supported PA address with stage 1,
-> even if it is supported by SMMU and stage 2 is bypass.
+Commit 01f8fa4f01d8("genirq: Allow forcing cpu affinity of interrupts")
+enabled the forced irq_set_affinity which previously refused to route an
+interrupt to an offline cpu.
 
-I'm trying to understand what you're getting at here. Essentially, you want
-to use the full stage-1 output range for a stage-1 only MMU, right?
+Commit ffde1de64012("irqchip: Gic: Support forced affinity setting")
+implements this force logic and disables the cpu online check for GIC
+interrupt controller.
 
-The code is currently structured to truncate that to the stage-2 input size
-for nested translation. However, I think that's better solved by faking the
-ID registers in the virtual SMMU instead of posing these restrictions on the
-host as well.
+When __cpu_disable calls migrate_irqs, it disables the current cpu in
+cpu_online_mask and uses forced irq_set_affinity to migrate the IRQs
+away from the cpu but passes affinity mask with the cpu being offlined
+also included in it.
 
-Assuming I understand the problem correctly, why not simply remove the
-truncation from the existing code (untested patch below)? Does that not
-work for you?
+If irq_set_affinity is called with force=true in a cpu hotplug path,
+the caller must ensure that the cpu being offlined is not present in the
+affinity mask or it may be selected as the target CPU, leading to the
+interrupt not being migrated.
 
-Will
+This patch fixes the issue by calling irq_set_affinity with force=false
+so that cpu_online_mask is checked while setting the affinity in the
+cpu hotplug path.
 
---->8
+Tested on TC2 hotpluging CPU0 in and out. Without this patch the system
+locks up as the IRQs are not migrated away from CPU0.
 
-diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
-index 2b1271658bfa..a02d05793a73 100644
---- a/drivers/iommu/arm-smmu.c
-+++ b/drivers/iommu/arm-smmu.c
-@@ -1917,21 +1917,7 @@ static int arm_smmu_device_cfg_probe(struct arm_smmu_device *smmu)
-        /* ID2 */
-        id = readl_relaxed(gr0_base + ARM_SMMU_GR0_ID2);
-        size = arm_smmu_id_size_to_bits((id >> ID2_IAS_SHIFT) & ID2_IAS_MASK);
--
--       /*
--        * Stage-1 output limited by stage-2 input size due to pgd
--        * allocation (PTRS_PER_PGD).
--        */
--       if (smmu->features & ARM_SMMU_FEAT_TRANS_NESTED) {
--#ifdef CONFIG_64BIT
--               smmu->s1_output_size = min_t(unsigned long, VA_BITS, size);
--#else
--               smmu->s1_output_size = min(32UL, size);
--#endif
--       } else {
--               smmu->s1_output_size = min_t(unsigned long, PHYS_MASK_SHIFT,
--                                            size);
--       }
-+       smmu->s1_output_size = min_t(unsigned long, PHYS_MASK_SHIFT, size);
+Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: Thomas Gleixner <tglx@linutronix.de>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: <stable@vger.kernel.org> # 3.10.x
+---
+ arch/arm/kernel/irq.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+Hi Russell,
+
+If you or tglx has no objections to this patch, I will put it
+in your patch tracker.
+
+Regards,
+Sudeep
+
+diff --git a/arch/arm/kernel/irq.c b/arch/arm/kernel/irq.c
+index 2c4257604513..5c4d38e32a51 100644
+--- a/arch/arm/kernel/irq.c
++++ b/arch/arm/kernel/irq.c
+@@ -175,7 +175,7 @@ static bool migrate_one_irq(struct irq_desc *desc)
+ 	c = irq_data_get_irq_chip(d);
+ 	if (!c->irq_set_affinity)
+ 		pr_debug("IRQ%u: unable to set affinity\n", d->irq);
+-	else if (c->irq_set_affinity(d, affinity, true) == IRQ_SET_MASK_OK && ret)
++	else if (c->irq_set_affinity(d, affinity, false) == IRQ_SET_MASK_OK && ret)
+ 		cpumask_copy(d->affinity, affinity);
  
-        /* The stage-2 output mask is also applied for bypass */
-        size = arm_smmu_id_size_to_bits((id >> ID2_OAS_SHIFT) & ID2_OAS_MASK);
+ 	return ret;
+-- 
+1.8.3.2
