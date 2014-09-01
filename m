@@ -1,39 +1,42 @@
-From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
-Date: Mon,  1 Sep 2014 17:29:37 +0200
-Subject: [PATCH v8 2/7] ASoC: mxs-saif: fix mixed use of public and provider
- clk API
-In-Reply-To: <1409585377-26091-1-git-send-email-tomeu.vizoso@collabora.com>
-References: <1409585377-26091-1-git-send-email-tomeu.vizoso@collabora.com>
-Message-ID: <1409585377-26091-3-git-send-email-tomeu.vizoso@collabora.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 01 Sep 2014 17:32 +0200
+Subject: [Linaro-acpi] [RFC PATCH for Juno 1/2] net: smsc911x add support
+ for probing from ACPI
+In-Reply-To: <20140901152854.GJ2953@xora-haswell.xora.org.uk>
+References: <1409583961-7466-1-git-send-email-hanjun.guo@linaro.org>
+ <2861461.8zNpLC3I2n@wuerfel> <20140901152854.GJ2953@xora-haswell.xora.org.uk>
+Message-ID: <40491090.z7F1jbVZzH@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In preparation to changing the clk provider API to use struct clk_core instead
-of struct clk.
+On Monday 01 September 2014 16:28:54 Graeme Gregory wrote:
+> On Mon, Sep 01, 2014 at 05:17:51PM +0200, Arnd Bergmann wrote:
+> > On Monday 01 September 2014 23:06:00 Hanjun Guo wrote:
+> > > +#ifdef CONFIG_ACPI
+> > > +/* Configure some sensible defaults for ACPI mode */
+> > > +static int smsc911x_probe_config_acpi(struct smsc911x_platform_config *config,
+> > > +                                   acpi_handle *ahandle)
+> > > +{
+> > > +       if (!ahandle)
+> > > +               return -ENOSYS;
+> > > +
+> > > +       config->phy_interface = PHY_INTERFACE_MODE_MII;
+> > > 
+> > 
+> > Please remove the #ifdef and use 
+> > 
+> >       if (!IS_ENABLED(CONFIG_ACPI) || !ahandle)
+> > 
+> > to check for ACPI support. This should result in the same object code
+> > in all cases, but give better compile-time coverage when ACPI is
+> > disabled.
+> > 
+> struct acpi_handle does not exist in the case !CONFIG_ACPI
 
-Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
-Acked-by: Mark Brown <broonie@linaro.org>
----
- sound/soc/mxs/mxs-saif.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+That should be easy to fix, and a good idea in general, independent
+of this patch.
+We generally make function declarations and type definitions visible
+(possibly empty) for disabled subsystems so the code using them
+silently goes away when that subsystem is disabled.
 
-diff --git a/sound/soc/mxs/mxs-saif.c b/sound/soc/mxs/mxs-saif.c
-index 231d7e7..a24367d 100644
---- a/sound/soc/mxs/mxs-saif.c
-+++ b/sound/soc/mxs/mxs-saif.c
-@@ -682,11 +682,11 @@ static int mxs_saif_mclk_init(struct platform_device *pdev)
- {
- 	struct mxs_saif *saif = platform_get_drvdata(pdev);
- 	struct device_node *np = pdev->dev.of_node;
--	struct clk *clk;
-+	struct clk_core *clk;
- 	int ret;
- 
- 	clk = clk_register_divider(&pdev->dev, "mxs_saif_mclk",
--				   __clk_get_name(saif->clk), 0,
-+				   clk_get_name(saif->clk), 0,
- 				   saif->base + SAIF_CTRL,
- 				   BP_SAIF_CTRL_BITCLK_MULT_RATE, 3,
- 				   0, NULL);
--- 
-1.9.3
+	Arnd
