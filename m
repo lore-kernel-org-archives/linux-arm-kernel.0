@@ -1,102 +1,81 @@
 From: eric.auger@linaro.org (Eric Auger)
-Date: Mon,  1 Sep 2014 14:52:46 +0200
-Subject: [RFC v2 7/9] KVM: KVM-VFIO: add new VFIO external API hooks
+Date: Mon,  1 Sep 2014 14:52:45 +0200
+Subject: [RFC v2 6/9] VFIO: Extend external user API
 In-Reply-To: <1409575968-5329-1-git-send-email-eric.auger@linaro.org>
 References: <1409575968-5329-1-git-send-email-eric.auger@linaro.org>
-Message-ID: <1409575968-5329-8-git-send-email-eric.auger@linaro.org>
+Message-ID: <1409575968-5329-7-git-send-email-eric.auger@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-add functions that implement the gateway to the extended
-external VFIO API:
-- kvm_vfio_device_get_external_user
-- kvm_vfio_device_put_external_user
-- kvm_vfio_external_base_device
+New functions are added to be called from ARM KVM-VFIO device.
+
+- vfio_device_get_external_user enables to get a vfio device from
+  its fd
+- vfio_device_put_external_user puts the vfio device
+- vfio_external_base_device returns the struct device*,
+  useful to access the platform_device
 
 Signed-off-by: Eric Auger <eric.auger@linaro.org>
 
 ---
 
 v1 -> v2:
-- kvm_vfio_external_get_base_device renamed into
-  kvm_vfio_external_base_device
-- kvm_vfio_external_get_type removed
----
- arch/arm/include/asm/kvm_host.h |  5 +++++
- virt/kvm/vfio.c                 | 45 +++++++++++++++++++++++++++++++++++++++++
- 2 files changed, 50 insertions(+)
 
-diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
-index 6dfb404..1aee6bb 100644
---- a/arch/arm/include/asm/kvm_host.h
-+++ b/arch/arm/include/asm/kvm_host.h
-@@ -171,6 +171,11 @@ void kvm_set_spte_hva(struct kvm *kvm, unsigned long hva, pte_t pte);
- unsigned long kvm_arm_num_regs(struct kvm_vcpu *vcpu);
- int kvm_arm_copy_reg_indices(struct kvm_vcpu *vcpu, u64 __user *indices);
- 
-+struct vfio_device;
-+struct vfio_device *kvm_vfio_device_get_external_user(struct file *filep);
-+void kvm_vfio_device_put_external_user(struct vfio_device *vdev);
-+struct device *kvm_vfio_external_base_device(struct vfio_device *vdev);
-+
- /* We do not have shadow page tables, hence the empty hooks */
- static inline int kvm_age_hva(struct kvm *kvm, unsigned long hva)
- {
-diff --git a/virt/kvm/vfio.c b/virt/kvm/vfio.c
-index ba1a93f..76dc7a1 100644
---- a/virt/kvm/vfio.c
-+++ b/virt/kvm/vfio.c
-@@ -59,6 +59,51 @@ static void kvm_vfio_group_put_external_user(struct vfio_group *vfio_group)
- 	symbol_put(vfio_group_put_external_user);
+- vfio_external_get_base_device renamed into vfio_external_base_device
+- vfio_external_get_type removed
+---
+ drivers/vfio/vfio.c  | 24 ++++++++++++++++++++++++
+ include/linux/vfio.h |  3 +++
+ 2 files changed, 27 insertions(+)
+
+diff --git a/drivers/vfio/vfio.c b/drivers/vfio/vfio.c
+index 8e84471..282814e 100644
+--- a/drivers/vfio/vfio.c
++++ b/drivers/vfio/vfio.c
+@@ -1401,6 +1401,30 @@ void vfio_group_put_external_user(struct vfio_group *group)
  }
+ EXPORT_SYMBOL_GPL(vfio_group_put_external_user);
  
-+struct vfio_device *kvm_vfio_device_get_external_user(struct file *filep)
++struct vfio_device *vfio_device_get_external_user(struct file *filep)
 +{
-+	struct vfio_device *vdev;
-+	struct vfio_device *(*fn)(struct file *);
++	struct vfio_device *vdev = filep->private_data;
 +
-+	fn = symbol_get(vfio_device_get_external_user);
-+	if (!fn)
++	if (filep->f_op != &vfio_device_fops)
 +		return ERR_PTR(-EINVAL);
 +
-+	vdev = fn(filep);
-+
-+	symbol_put(vfio_device_get_external_user);
-+
++	vfio_device_get(vdev);
 +	return vdev;
 +}
++EXPORT_SYMBOL_GPL(vfio_device_get_external_user);
 +
-+void kvm_vfio_device_put_external_user(struct vfio_device *vdev)
++void vfio_device_put_external_user(struct vfio_device *vdev)
 +{
-+	void (*fn)(struct vfio_device *);
-+
-+	fn = symbol_get(vfio_device_put_external_user);
-+	if (!fn)
-+		return;
-+
-+	fn(vdev);
-+
-+	symbol_put(vfio_device_put_external_user);
++	vfio_device_put(vdev);
 +}
++EXPORT_SYMBOL_GPL(vfio_device_put_external_user);
 +
-+struct device *kvm_vfio_external_base_device(struct vfio_device *vdev)
++struct device *vfio_external_base_device(struct vfio_device *vdev)
 +{
-+	struct device *(*fn)(struct vfio_device *);
-+	struct device *dev;
-+
-+	fn = symbol_get(vfio_external_base_device);
-+	if (!fn)
-+		return NULL;
-+
-+	dev = fn(vdev);
-+
-+	symbol_put(vfio_external_base_device);
-+
-+	return dev;
++	return vdev->dev;
 +}
++EXPORT_SYMBOL_GPL(vfio_external_base_device);
 +
- static bool kvm_vfio_group_is_coherent(struct vfio_group *vfio_group)
+ int vfio_external_user_iommu_id(struct vfio_group *group)
  {
- 	long (*fn)(struct vfio_group *, unsigned long);
+ 	return iommu_group_id(group->iommu_group);
+diff --git a/include/linux/vfio.h b/include/linux/vfio.h
+index ffe04ed..bd4b6cb 100644
+--- a/include/linux/vfio.h
++++ b/include/linux/vfio.h
+@@ -99,6 +99,9 @@ extern void vfio_group_put_external_user(struct vfio_group *group);
+ extern int vfio_external_user_iommu_id(struct vfio_group *group);
+ extern long vfio_external_check_extension(struct vfio_group *group,
+ 					  unsigned long arg);
++extern struct vfio_device *vfio_device_get_external_user(struct file *filep);
++extern void vfio_device_put_external_user(struct vfio_device *vdev);
++extern struct device *vfio_external_base_device(struct vfio_device *vdev);
+ 
+ struct pci_dev;
+ #ifdef CONFIG_EEH
 -- 
 1.9.1
