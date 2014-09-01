@@ -1,99 +1,30 @@
-From: richard.genoud@gmail.com (Richard Genoud)
-Date: Mon, 1 Sep 2014 11:26:59 +0200
-Subject: [PATCH RESEND 5/5] tty/serial: at91: add interrupts for modem
- control lines
-In-Reply-To: <53E7C8F8.1080507@hurleysoftware.com>
-References: <1400005245-11943-1-git-send-email-richard.genoud@gmail.com>
- <1400005245-11943-6-git-send-email-richard.genoud@gmail.com>
- <53E7C8F8.1080507@hurleysoftware.com>
-Message-ID: <CACQ1gAguMJM3iBSh9RN9Sbq8c-DfQUhzFPOXav2CASVHA6Rxdw@mail.gmail.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Mon, 1 Sep 2014 15:00:10 +0530
+Subject: [GIT PULL] DaVinci board file fixes for v3.18 (merge window)
+Message-ID: <54043CA2.1090301@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2014-08-10 21:33 GMT+02:00 Peter Hurley <peter@hurleysoftware.com>:
-> Hi Richard,
+The following changes since commit 7d1311b93e58ed55f3a31cc8f94c4b8fe988a2b9:
 
-Hi !
-Sorry for the delay !
+  Linux 3.17-rc1 (2014-08-16 10:40:26 -0600)
 
-> On 05/13/2014 02:20 PM, Richard Genoud wrote:
->> Handle CTS/DSR/RI/DCD GPIO interrupts in atmel_serial.
->>
->> Signed-off-by: Richard Genoud <richard.genoud@gmail.com>
->> Acked-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
->> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
->> ---
->>  drivers/tty/serial/atmel_serial.c |  125 ++++++++++++++++++++++++++++++++++++-
->>  1 file changed, 122 insertions(+), 3 deletions(-)
->>
->> diff --git a/drivers/tty/serial/atmel_serial.c b/drivers/tty/serial/atmel_serial.c
->> index 43ca659..3fceae0 100644
->> --- a/drivers/tty/serial/atmel_serial.c
->> +++ b/drivers/tty/serial/atmel_serial.c
->> @@ -45,6 +45,7 @@
->>  #include <linux/gpio.h>
->>  #include <linux/gpio/consumer.h>
->>  #include <linux/err.h>
->> +#include <linux/irq.h>
->>
->>  #include <asm/io.h>
->>  #include <asm/ioctls.h>
->> @@ -167,7 +168,9 @@ struct atmel_uart_port {
->>
->>       struct serial_rs485     rs485;          /* rs485 settings */
->>       struct mctrl_gpios      *gpios;
->> +     int                     gpio_irq[UART_GPIO_MAX];
->>       unsigned int            tx_done_mask;
->> +     bool                    ms_irq_enabled;
->>       bool                    is_usart;       /* usart or uart */
->>       struct timer_list       uart_timer;     /* uart timer */
->>       int (*prepare_rx)(struct uart_port *port);
->> @@ -489,8 +492,38 @@ static void atmel_stop_rx(struct uart_port *port)
->>   */
->>  static void atmel_enable_ms(struct uart_port *port)
->>  {
->> -     UART_PUT_IER(port, ATMEL_US_RIIC | ATMEL_US_DSRIC
->> -                     | ATMEL_US_DCDIC | ATMEL_US_CTSIC);
->> +     struct atmel_uart_port *atmel_port = to_atmel_uart_port(port);
->> +     uint32_t ier = 0;
->> +
->> +     /*
->> +      * Interrupt should not be enabled twice
->> +      */
->> +     if (atmel_port->ms_irq_enabled)
->> +             return;
->> +
->> +     atmel_port->ms_irq_enabled = true;
->> +
->> +     if (atmel_port->gpio_irq[UART_GPIO_CTS] >= 0)
->> +             enable_irq(atmel_port->gpio_irq[UART_GPIO_CTS]);
->> +     else
->> +             ier |= ATMEL_US_CTSIC;
->> +
->> +     if (atmel_port->gpio_irq[UART_GPIO_DSR] >= 0)
->> +             enable_irq(atmel_port->gpio_irq[UART_GPIO_DSR]);
->> +     else
->> +             ier |= ATMEL_US_DSRIC;
->> +
->> +     if (atmel_port->gpio_irq[UART_GPIO_RI] >= 0)
->> +             enable_irq(atmel_port->gpio_irq[UART_GPIO_RI]);
->> +     else
->> +             ier |= ATMEL_US_RIIC;
->> +
->> +     if (atmel_port->gpio_irq[UART_GPIO_DCD] >= 0)
->> +             enable_irq(atmel_port->gpio_irq[UART_GPIO_DCD]);
->> +     else
->> +             ier |= ATMEL_US_DCDIC;
->
-> Where are these gpio irqs disabled if !UART_ENABLE_MS()?
-They are disabled in atmel_shutdown()/atmel_free_gpio_irq().
-Like the doc says in Documentation/serial/driver
-  enable_ms(port)
-    Enable the modem status interrupts.
+are available in the git repository at:
 
-    This method may be called multiple times.  Modem status
-    interrupts should be disabled when the shutdown method is
-    called.
+  git://git.kernel.org/pub/scm/linux/kernel/git/nsekhar/linux-davinci.git tags/davinci-for-v3.18/board
 
-Regards,
-Richard.
+for you to fetch changes up to 9e9bc235580829e3a06ccd13aa10110478c2e093:
+
+  ARM: davinci: board-da850-evm: Add needed regulators for tlv320aic3106 codec (2014-08-26 15:43:51 +0530)
+
+----------------------------------------------------------------
+Some non-critcal fixes for DA850 EVM board file
+adding missing regulator information.
+
+----------------------------------------------------------------
+Peter Ujfalusi (2):
+      ARM: davinci: board-da850-evm: Mark dcdc2 of TPS65070 as always_on
+      ARM: davinci: board-da850-evm: Add needed regulators for tlv320aic3106 codec
+
+ arch/arm/mach-davinci/board-da850-evm.c |   15 +++++++++++++++
+ 1 file changed, 15 insertions(+)
