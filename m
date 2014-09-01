@@ -1,55 +1,71 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 1 Sep 2014 09:22:43 +0100
-Subject: [PATCH] drivers: mfd: exynos-pmu: Add support for Exynos7
-In-Reply-To: <1409544769-2695-1-git-send-email-a.kesavan@samsung.com>
-References: <1409544769-2695-1-git-send-email-a.kesavan@samsung.com>
-Message-ID: <20140901082243.GC6226@lee--X1>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Mon, 1 Sep 2014 16:24:14 +0800
+Subject: [PATCH v3] apf27dev: add max1027 in the dts
+In-Reply-To: <1409517629-5918-1-git-send-email-tremyfr@gmail.com>
+References: <1409517629-5918-1-git-send-email-tremyfr@gmail.com>
+Message-ID: <20140901082413.GE3135@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 01 Sep 2014, Abhilash Kesavan wrote:
-
-> Add intial PMU settings for exynos7. This is required for
-> future suspend-to-ram and cpuidle support.
+On Sun, Aug 31, 2014 at 10:40:29PM +0200, Philippe Reynes wrote:
 > 
-> Signed-off-by: Eunseok Choi <es10.choi@samsung.com>
-> Signed-off-by: Abhilash Kesavan <a.kesavan@samsung.com>
+> Signed-off-by: Philippe Reynes <tremyfr@gmail.com>
 > ---
-> This patch has been tested on an Exynos7 espresso board and is based
-> on Kgene's tree (for-next branch).
+>  arch/arm/boot/dts/imx27-apf27dev.dts |   17 +++++++++++++++++
+>  1 files changed, 17 insertions(+), 0 deletions(-)
 > 
-> Following are the dependencies:
-> 1) Support 64bit Cortex A57 based Exynos7 SoC
-> http://www.spinics.net/lists/arm-kernel/msg357380.html
-> 2) mfd: syscon: Decouple syscon interface from syscon devices
-> http://www.spinics.net/lists/linux-samsung-soc/msg35906.html
-> 3) ARM: EXYNOS: Add platform driver support for Exynos PMU
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2014-July/275675.html
-> 4) ARM: EXYNOS: Move PMU specific definitions from common.h
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2014-July/270655.html
-> 5) ARM: EXYNOS: Move pmu specific header files under "linux/mfd/samsung"
-> https://lkml.org/lkml/2014/4/28/217
-> 6) drivers: mfd: Add support for Exynos PMU driver
-> https://lkml.org/lkml/2014/4/28/332
+> Changelog:
+> v3: (thanks Alexander Shiyan for the feedback)
+> - add datasheet pin name as comment
 > 
-> NOTE: The above dependencies are not final yet, especially the
-> movement of exynos pmu driver to the mfd directory. I will re-work
-> this patch when the final location for exynos PMU driver is decided.
+> v2: (thanks Alexander Shiyan for the feedback)
+> - spi mode 0 is the default so no need to explicitly define it
+> 
+> diff --git a/arch/arm/boot/dts/imx27-apf27dev.dts b/arch/arm/boot/dts/imx27-apf27dev.dts
+> index b982309..0c08fbb 100644
+> --- a/arch/arm/boot/dts/imx27-apf27dev.dts
+> +++ b/arch/arm/boot/dts/imx27-apf27dev.dts
+> @@ -82,6 +82,16 @@
+>  	pinctrl-names = "default";
+>  	pinctrl-0 = <&pinctrl_cspi1 &pinctrl_cspi1_cs>;
+>  	status = "okay";
+> +
+> +	adc at 0 {
+> +		compatible = "maxim,max1027";
+> +		reg = <0>;
+> +		interrupt-parent = <&gpio5>;
+> +		interrupts = <15 IRQ_TYPE_EDGE_FALLING>;
+> +		pinctrl-names = "default";
+> +		pinctrl-0 = <&pinctrl_max1027>;
+> +		spi-max-frequency = <10000000>;
+> +	};
+>  };
+>  
+>  &cspi2 {
+> @@ -230,6 +240,13 @@
+>  		pinctrl_sdhc2_cd: sdhc2cdgrp {
+>  			fsl,pins = <MX27_PAD_TOUT__GPIO3_14 0x0>;
+>  		};
+> +
+> +		pinctrl_max1027: max1027 {
 
-Let me know when this patch is ready to go in and I'll review.
+The pinctrl entries are alphabetically sorted in there.  Can you also do
+that for your addition?
 
->  .../devicetree/bindings/arm/samsung/pmu.txt        |    1 +
->  arch/arm64/boot/dts/exynos7.dtsi                   |    5 +
->  drivers/mfd/exynos-pmu.c                           |  285 ++++++++++++++++++++
->  include/linux/mfd/samsung/exynos-regs-pmu.h        |  212 +++++++++++++++
->  4 files changed, 503 insertions(+)
+> +			 fsl,pins = <
+> +				 MX27_PAD_UART1_CTS__GPIO5_14 0 /* CNVST */
+> +				 MX27_PAD_UART1_RTS__GPIO5_15 0 /* EOC */
 
-This all needs to be broken up into seperate patches.
+Can you follow the convention to use hex value for the config cell,
+i.e. s/0/0x0?
 
-Also, see: Documentation/devicetree/bindings/submitting-patches.txt.
+Shawn
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+> +			>;
+> +		};
+>  	};
+>  };
+>  
+> -- 
+> 1.7.4.4
+> 
