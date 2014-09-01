@@ -1,293 +1,93 @@
-From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Fri, 01 Aug 2014 14:49:27 +0800
-Subject: [PATCH 10/19] ARM64 / ACPI: Get the enable method for SMP
- initialization in ACPI way
-In-Reply-To: <1406832724.8971.29.camel@smoke>
-References: <1406206825-15590-1-git-send-email-hanjun.guo@linaro.org>	
- <1406206825-15590-11-git-send-email-hanjun.guo@linaro.org>
- <1406832724.8971.29.camel@smoke>
-Message-ID: <53DB3877.3010909@linaro.org>
+From: long.wanglong@huawei.com (Wang Long)
+Date: Mon, 1 Sep 2014 19:15:33 +0800
+Subject: [SMP BUG?] the return value of is_smp() is bug?
+Message-ID: <1409570133-2766-1-git-send-email-long.wanglong@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2014-8-1 2:52, Geoff Levand wrote:
-> Hi Hanjun,
 
-Hi Geoff,
+Hi,all
 
-> 
-> On Thu, 2014-07-24 at 21:00 +0800, Hanjun Guo wrote:
->> ACPI 5.1 only has two explicit methods to boot up SMP,
->> PSCI and Parking protocol, but the Parking protocol is
->> only suitable for ARMv7 now, so make PSCI as the only way
->> for the SMP boot protocol before some updates for the
->> ACPI spec or the Parking protocol spec.
->>
->> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
->> Signed-off-by: Tomasz Nowicki <tomasz.nowicki@linaro.org>
->> ---
->>  arch/arm64/include/asm/acpi.h    |   21 +++++++++++++++
->>  arch/arm64/include/asm/cpu_ops.h |    9 ++++++-
->>  arch/arm64/include/asm/smp.h     |    2 +-
->>  arch/arm64/kernel/acpi.c         |    9 +++++++
->>  arch/arm64/kernel/cpu_ops.c      |   52 ++++++++++++++++++++++++++++++++++----
->>  arch/arm64/kernel/smp.c          |   29 +++++++++++++++++++--
->>  6 files changed, 113 insertions(+), 9 deletions(-)
->>
->> diff --git a/arch/arm64/include/asm/acpi.h b/arch/arm64/include/asm/acpi.h
->> index 5ce85f8..6240327 100644
->> --- a/arch/arm64/include/asm/acpi.h
->> +++ b/arch/arm64/include/asm/acpi.h
->> @@ -14,6 +14,27 @@
->>  
->>  /* Basic configuration for ACPI */
->>  #ifdef	CONFIG_ACPI
-> 
-> ^^ This seems to be a tab (\t) character here, which is a strange thing
-> for me to see...
+In kernel 3.17-rc2, when i set CONFIG_HAVE_SMP = y and CONFIG_SMP_ON_UP = y 
+in .config file. the secondary core can not boot.
 
-Yes, seems to be a tab but actually not :)
+when i set CONFIG_HAVE_SMP = y and CONFIG_SMP_ON_UP = n in .config file,
+the secondary core can boot.
 
-> 
->> +/*
->> + * ACPI 5.1 only has two explicit methods to
->> + * boot up SMP, PSCI and Parking protocol,
->> + * but the Parking protocol is only defined
->> + * for ARMv7 now, so make PSCI as the only
->> + * way for the SMP boot protocol before some
->> + * updates for the ACPI spec or the Parking
->> + * protocol spec.
->> + *
->> + * This enum is intend to make the boot method
->> + * scalable when above updates are happended,
->> + * which NOT means to support all of them.
->> + */
-> 
-> This comment will become out of date soon (I hope), and it is often the
-> case that these short term comments are not removed, so I think it
-> better to put this kind of note into the commit message, not the code.
+But this does not happen in kernel 3.10 lts kernel, Whether the 
+CONFIG_SMP_ON_UP is set yes or no ,the secondary core can boot.
 
-This will need some time, the spec is not ready and we still need more time
-for people to implement Parking protocol, I think we can keep this comments
-until Parking protocol driver is ready, and update them at that time.
+Does the meaning of CONFIG_SMP_ON_UP changed or this is a bug in kernel 3.17-rc2 ? 
 
-> 
->> +enum acpi_smp_boot_protocol {
->> +	ACPI_SMP_BOOT_PSCI,
->> +	ACPI_SMP_BOOT_PARKING_PROTOCOL,
->> +	ACPI_SMP_BOOT_PROTOCOL_MAX
->> +};
->> +
->> +enum acpi_smp_boot_protocol smp_boot_protocol(void);
->> +
->>  extern int acpi_disabled;
->>  extern int acpi_noirq;
->>  extern int acpi_pci_disabled;
->> diff --git a/arch/arm64/include/asm/cpu_ops.h b/arch/arm64/include/asm/cpu_ops.h
->> index d7b4b38..2a7c6fd 100644
->> --- a/arch/arm64/include/asm/cpu_ops.h
->> +++ b/arch/arm64/include/asm/cpu_ops.h
->> @@ -61,7 +61,14 @@ struct cpu_operations {
->>  };
->>  
->>  extern const struct cpu_operations *cpu_ops[NR_CPUS];
->> -extern int __init cpu_read_ops(struct device_node *dn, int cpu);
->> +extern int __init cpu_of_read_ops(struct device_node *dn, int cpu);
->> +
->> +#ifdef CONFIG_ACPI
->> +extern int __init cpu_acpi_read_ops(int cpu);
->> +#else
->> +static inline int __init cpu_acpi_read_ops(int cpu) { return -ENODEV; }
->> +#endif
-> 
-> This looks messy and not scalable for new enable methods.  It
-> seems a better way is to retain cpu_read_ops() and its functionality,
-> which is to return the proper enable method for that cpu in a generic
-> way.
-> 
-> Is there some reason you can't integrate acpi into the existing
-> cpu_ops and need to make this completely parallel method?
-> 
->>  extern void __init cpu_read_bootcpu_ops(void);
->>  
->>  #endif /* ifndef __ASM_CPU_OPS_H */
->> diff --git a/arch/arm64/include/asm/smp.h b/arch/arm64/include/asm/smp.h
->> index a498f2c..a5cea56 100644
->> --- a/arch/arm64/include/asm/smp.h
->> +++ b/arch/arm64/include/asm/smp.h
->> @@ -39,7 +39,7 @@ extern void show_ipi_list(struct seq_file *p, int prec);
->>  extern void handle_IPI(int ipinr, struct pt_regs *regs);
->>  
->>  /*
->> - * Setup the set of possible CPUs (via set_cpu_possible)
->> + * Platform specific SMP operations
->>   */
->>  extern void smp_init_cpus(void);
->>  
->> diff --git a/arch/arm64/kernel/acpi.c b/arch/arm64/kernel/acpi.c
->> index ff0f6a0..2af6662 100644
->> --- a/arch/arm64/kernel/acpi.c
->> +++ b/arch/arm64/kernel/acpi.c
->> @@ -184,6 +184,15 @@ static int __init acpi_parse_madt_gic_cpu_interface_entries(void)
->>  	return 0;
->>  }
->>  
->> +/* Protocol to bring up secondary CPUs */
->> +enum acpi_smp_boot_protocol smp_boot_protocol(void)
->> +{
->> +	if (acpi_psci_present)
->> +		return ACPI_SMP_BOOT_PSCI;
->> +	else
->> +		return ACPI_SMP_BOOT_PARKING_PROTOCOL;
->> +}
->> +
->>  static int __init acpi_parse_fadt(struct acpi_table_header *table)
->>  {
->>  	struct acpi_table_fadt *fadt = (struct acpi_table_fadt *)table;
->> diff --git a/arch/arm64/kernel/cpu_ops.c b/arch/arm64/kernel/cpu_ops.c
->> index d62d12f..4d9b3cf 100644
->> --- a/arch/arm64/kernel/cpu_ops.c
->> +++ b/arch/arm64/kernel/cpu_ops.c
->> @@ -16,11 +16,13 @@
->>   * along with this program.  If not, see <http://www.gnu.org/licenses/>.
->>   */
->>  
->> -#include <asm/cpu_ops.h>
->> -#include <asm/smp_plat.h>
->>  #include <linux/errno.h>
->>  #include <linux/of.h>
->>  #include <linux/string.h>
->> +#include <linux/acpi.h>
->> +
->> +#include <asm/cpu_ops.h>
->> +#include <asm/smp_plat.h>
->>  
->>  extern const struct cpu_operations smp_spin_table_ops;
->>  extern const struct cpu_operations cpu_psci_ops;
->> @@ -52,7 +54,7 @@ static const struct cpu_operations * __init cpu_get_ops(const char *name)
->>  /*
->>   * Read a cpu's enable method from the device tree and record it in cpu_ops.
->>   */
->> -int __init cpu_read_ops(struct device_node *dn, int cpu)
->> +int __init cpu_of_read_ops(struct device_node *dn, int cpu)
->>  {
->>  	const char *enable_method = of_get_property(dn, "enable-method", NULL);
->>  	if (!enable_method) {
->> @@ -76,12 +78,52 @@ int __init cpu_read_ops(struct device_node *dn, int cpu)
->>  	return 0;
->>  }
->>  
->> +#ifdef CONFIG_ACPI
->> +/*
->> + * Read a cpu's enable method in the ACPI way and record it in cpu_ops.
->> + */
->> +int __init cpu_acpi_read_ops(int cpu)
->> +{
->> +	/*
->> +	 * For ACPI 5.1, only two kind of methods are provided,
->> +	 * Parking protocol and PSCI, but Parking protocol is
->> +	 * used on ARMv7 only, so make PSCI as the only method
->> +	 * for SMP initialization before the ACPI spec or Parking
->> +	 * protocol spec is updated.
->> +	 */
-> 
-> Again, this comment will get old fast (I hope).
-> 
->> +	switch (smp_boot_protocol()) {
->> +	case ACPI_SMP_BOOT_PSCI:
->> +		cpu_ops[cpu] = cpu_get_ops("psci");
->> +		break;
->> +	case ACPI_SMP_BOOT_PARKING_PROTOCOL:
->> +	default:
->> +		cpu_ops[cpu] = NULL;
->> +		break;
->> +	}
->> +
->> +	if (!cpu_ops[cpu]) {
->> +		pr_warn("CPU %d: unsupported enable-method, only PSCI is supported\n",
->> +			cpu);
->> +		return -EOPNOTSUPP;
->> +	}
->> +
->> +	return 0;
->> +}
->> +#endif
->> +
->>  void __init cpu_read_bootcpu_ops(void)
->>  {
->> -	struct device_node *dn = of_get_cpu_node(0, NULL);
->> +	struct device_node *dn;
->> +
->> +	if (!acpi_disabled) {
->> +		cpu_acpi_read_ops(0);
->> +		return;
->> +	}
->> +
->> +	dn = of_get_cpu_node(0, NULL);
->>  	if (!dn) {
->>  		pr_err("Failed to find device node for boot cpu\n");
->>  		return;
->>  	}
->> -	cpu_read_ops(dn, 0);
->> +	cpu_of_read_ops(dn, 0);
->>  }
->> diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
->> index 8f1d37c..cb71662 100644
->> --- a/arch/arm64/kernel/smp.c
->> +++ b/arch/arm64/kernel/smp.c
->> @@ -315,7 +315,7 @@ static void (*smp_cross_call)(const struct cpumask *, unsigned int);
->>   * cpu logical map array containing MPIDR values related to logical
->>   * cpus. Assumes that cpu_logical_map(0) has already been initialized.
->>   */
->> -void __init smp_init_cpus(void)
->> +static void __init of_smp_init_cpus(void)
->>  {
->>  	struct device_node *dn = NULL;
->>  	unsigned int i, cpu = 1;
->> @@ -387,7 +387,7 @@ void __init smp_init_cpus(void)
->>  		if (cpu >= NR_CPUS)
->>  			goto next;
->>  
->> -		if (cpu_read_ops(dn, cpu) != 0)
->> +		if (cpu_of_read_ops(dn, cpu) != 0)
->>  			goto next;
->>  
->>  		if (cpu_ops[cpu]->cpu_init(dn, cpu))
->> @@ -418,6 +418,31 @@ next:
->>  			set_cpu_possible(i, true);
->>  }
->>  
->> +/*
->> + * In ACPI mode, the cpu possible map was enumerated before SMP
->> + * initialization when MADT table was parsed, so we can get the
->> + * possible map here to initialize CPUs.
->> + */
->> +static void __init acpi_smp_init_cpus(void)
->> +{
->> +	int cpu;
->> +
->> +	for_each_possible_cpu(cpu) {
->> +		if (cpu_acpi_read_ops(cpu) != 0)
->> +			continue;
->> +
->> +		cpu_ops[cpu]->cpu_init(NULL, cpu);
->> +	}
->> +}
->> +
->> +void __init smp_init_cpus(void)
->> +{
->> +	if (acpi_disabled)
->> +		of_smp_init_cpus();
->> +	else
->> +		acpi_smp_init_cpus();
->> +}
-> 
-> This is the same as cpu_ops, is acpi so special we need a completely
-> parallel method of initializing secondary cpus?
 
-Good point, Olof suggested the same here, I'm working on it and try to
-implement the code as you suggested, if I can't I will comment on it for
-the reasons that why I can't make it.
+I write the following patch to test the return value of is_smp().
 
-Thanks
-Hanjun
+----------------------------------------
+
+Signed-off-by: Wang Long <long.wanglong@huawei.com>
+---
+ arch/arm/kernel/setup.c |    5 +++++
+ 1 file changed, 5 insertions(+)
+
+diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+index 84db893d..fbeb67f 100644
+--- a/arch/arm/kernel/setup.c
++++ b/arch/arm/kernel/setup.c
+@@ -925,6 +925,11 @@ void __init setup_arch(char **cmdline_p)
+ 	arm_dt_init_cpu_maps();
+ 	psci_init();
+ #ifdef CONFIG_SMP
++	
++	if (is_smp() == 1)
++		printk("is_smp() return true;\n");
++	else if (is_smp() == 0)
++		printk("is_smp() return false;\n");
+ 	if (is_smp()) {
+ 		if (!mdesc->smp_init || !mdesc->smp_init()) {
+ 			if (psci_smp_available())
+
+kernel version: 3.17-rc2
+
+config:     set CONFIG_HAVE_SMP = y and CONFIG_SMP_ON_UP = y
+command:    # qemu-system-arm -M vexpress-a9 -smp 2  -m 128M -kernel arch/arm/boot/zImage -nographic
+The output:
+
+..........
+is_smp() return false;
+CPU: Testing write buffer coherency: ok
+missing device node for CPU 0
+CPU0: thread -1, cpu 0, socket 0, mpidr 80000000
+Setting up static identity map for 0x604643d8 - 0x60464430
+Brought up 1 CPUs
+SMP: Total of 1 processors activated.
+CPU: All CPU(s) started in SVC mode.
+...........
+
+config:     set CONFIG_HAVE_SMP = y and not set CONFIG_SMP_ON_UP 
+command:    # qemu-system-arm -M vexpress-a9 -smp 2  -m 128M -kernel arch/arm/boot/zImage -nographic
+The output:
+
+.....
+ Memory policy: Data cache writealloc
+is_smp() return true;
+sched_clock: 32 bits at 24MHz, resolution 41ns, wraps every 178956969942ns
+......
+......
+CPU: Testing write buffer coherency: ok
+missing device node for CPU 0
+missing device node for CPU 1
+CPU0: thread -1, cpu 0, socket 0, mpidr 80000000
+Setting up static identity map for 0x60463ef8 - 0x60463f50
+CPU1: Booted secondary processor
+CPU1: thread -1, cpu 1, socket 0, mpidr 80000001
+Brought up 2 CPUs
+SMP: Total of 2 processors activated.
+CPU: All CPU(s) started in SVC mode.
+devtmpfs: initialized
+.......
+
+Any ideas?
+
+
+-- 
+1.7.9.5
