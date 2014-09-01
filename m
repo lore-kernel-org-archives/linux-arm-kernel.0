@@ -1,52 +1,103 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Mon, 1 Sep 2014 11:56:29 +0200
-Subject: [PATCH 06/16] KVM: Add KVM_EXIT_SYSTEM_EVENT to user space API
- header
-In-Reply-To: <CAFEAcA_S9dHbYVDrkr7X+cTcg-TC0nRWd4zLaUTX2zBjr+TKGQ@mail.gmail.com>
-References: <1401041942-23471-1-git-send-email-christoffer.dall@linaro.org>
- <1401041942-23471-7-git-send-email-christoffer.dall@linaro.org>
- <CAFEAcA-yWadPiE4v7f-C1-V71=QHYLB=fzC78xhNMnNkVSJAhg@mail.gmail.com>
- <20140901092017.GC19836@cbox>
- <CAFEAcA_S9dHbYVDrkr7X+cTcg-TC0nRWd4zLaUTX2zBjr+TKGQ@mail.gmail.com>
-Message-ID: <20140901095629.GF19836@cbox>
+From: long.wanglong@huawei.com (long.wanglong)
+Date: Mon, 1 Sep 2014 18:00:58 +0800
+Subject: [SMP BUG?] the return value of is_smp() is bug?
+In-Reply-To: <1409550563-92081-1-git-send-email-long.wanglong@huawei.com>
+References: <1409550563-92081-1-git-send-email-long.wanglong@huawei.com>
+Message-ID: <540443DA.7030502@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 01, 2014 at 10:30:17AM +0100, Peter Maydell wrote:
-> On 1 September 2014 10:20, Christoffer Dall <christoffer.dall@linaro.org> wrote:
-> > On Fri, Aug 29, 2014 at 06:39:09PM +0100, Peter Maydell wrote:
-> >> Talking with Ard I realised that there's actually a hole in the
-> >> specification of this new ABI. Did we intend these shutdown
-> >> and reset exits to be:
-> >>  (1) requests from the guest for the shutdown/reset to be
-> >>    scheduled in the near future (and we'll continue to execute
-> >>    the guest until the shutdown actually happens)
-> >>  (2) requests for shutdown/reset right now, with no further
-> >>    guest instructions to be executed
-> >>
-> >> ?
-> >>
-> >> As currently implemented in QEMU we get behaviour (1),
-> >> but I think the kernel PSCI implementation assumes
-> >> behaviour (2). Who's right?
-> >>
-> > For the arm/arm64 use of this API (currently the only one?) the host
-> > would not break or anything like that if you keep executing the VM, but
-> > the guest will expect that no other instructions are executed after this
-> > call.
+On 2014/9/1 13:49, Wang Long wrote:
 > 
-> Well, if we do that then between QEMU and KVM we've
-> violated the PSCI ABI we're supposed to provide, so somebody
-> is wrong :-)
+> Hi,all
 > 
-> I guess that since the kernel already implements "assume
-> userspace won't resume the guest vcpu" the path of least
-> resistance is to make userspace follow that.
+> In kernel 3.17-rc2, when i set CONFIG_HAVE_SMP = y and CONFIG_SMP_ON_UP = y 
+> in .config file. the secondary core can not boot.
+> 
+> when i set CONFIG_HAVE_SMP = y and CONFIG_SMP_ON_UP = n in .config file,
+> the secondary core can boot.
+> 
+> But this does not happen in kernel 3.10 lts kernel, Whether the 
+> CONFIG_SMP_ON_UP is set yes or no ,the secondary core can boot.
+> 
+> Does the meaning of CONFIG_SMP_ON_UP changed or this is a bug in kernel 3.17-rc2 ? 
+> 
+> 
 
-The thing is that we're not exposing PSCI to user space, we're just
-exposing a system event, so it feels a bit weird to rely on user space's
-correct interpretation of a more generic API, to correctly implement
-PSCI in the kernel.  On the other hand, user space can always break the
-guest as it sees fit...
+hi Arnd
 
--Christoffer
+In above two cases, i also set  CONFIG_SMP = y. in addtion,
+the CONFIG_SMP_ON_UP depends on CONFIG_SMP. when set
+CONFIG_SMP_ON_UP = y, the value of CONFIG_SMP must be y.
+
+
+
+> I write the following patch to test the return value of is_smp().
+> 
+> ----------------------------------------
+> 
+> Signed-off-by: Wang Long <long.wanglong@huawei.com>
+> ---
+>  arch/arm/kernel/setup.c |    5 +++++
+>  1 file changed, 5 insertions(+)
+> 
+> diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+> index 84db893d..fbeb67f 100644
+> --- a/arch/arm/kernel/setup.c
+> +++ b/arch/arm/kernel/setup.c
+> @@ -925,6 +925,11 @@ void __init setup_arch(char **cmdline_p)
+>  	arm_dt_init_cpu_maps();
+>  	psci_init();
+>  #ifdef CONFIG_SMP
+> +	
+> +	if (is_smp() == 1)
+> +		printk("is_smp() return true;\n");
+> +	else if (is_smp() == 0)
+> +		printk("is_smp() return false;\n");
+>  	if (is_smp()) {
+>  		if (!mdesc->smp_init || !mdesc->smp_init()) {
+>  			if (psci_smp_available())
+> 
+> kernel version: 3.17-rc2
+> 
+> config:     set CONFIG_HAVE_SMP = y and CONFIG_SMP_ON_UP = y
+> command:    # qemu-system-arm -M vexpress-a9 -smp 2  -m 128M -kernel arch/arm/boot/zImage -nographic
+> The output:
+> 
+> ..........
+> is_smp() return false;
+> CPU: Testing write buffer coherency: ok
+> missing device node for CPU 0
+> CPU0: thread -1, cpu 0, socket 0, mpidr 80000000
+> Setting up static identity map for 0x604643d8 - 0x60464430
+> Brought up 1 CPUs
+> SMP: Total of 1 processors activated.
+> CPU: All CPU(s) started in SVC mode.
+> ...........
+> 
+> config:     set CONFIG_HAVE_SMP = y and not set CONFIG_SMP_ON_UP 
+> command:    # qemu-system-arm -M vexpress-a9 -smp 2  -m 128M -kernel arch/arm/boot/zImage -nographic
+> The output:
+> 
+> .....
+>  Memory policy: Data cache writealloc
+> is_smp() return true;
+> sched_clock: 32 bits at 24MHz, resolution 41ns, wraps every 178956969942ns
+> ......
+> ......
+> CPU: Testing write buffer coherency: ok
+> missing device node for CPU 0
+> missing device node for CPU 1
+> CPU0: thread -1, cpu 0, socket 0, mpidr 80000000
+> Setting up static identity map for 0x60463ef8 - 0x60463f50
+> CPU1: Booted secondary processor
+> CPU1: thread -1, cpu 1, socket 0, mpidr 80000001
+> Brought up 2 CPUs
+> SMP: Total of 2 processors activated.
+> CPU: All CPU(s) started in SVC mode.
+> devtmpfs: initialized
+> .......
+> 
+> Any ideas?
+> 
+> 
