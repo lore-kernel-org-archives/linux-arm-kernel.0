@@ -1,603 +1,143 @@
 From: eric.auger@linaro.org (Eric Auger)
-Date: Mon,  1 Sep 2014 14:52:47 +0200
-Subject: [RFC v2 8/9] KVM: KVM-VFIO: generic KVM_DEV_VFIO_DEVICE command and
- IRQ forwarding control
+Date: Mon,  1 Sep 2014 14:52:48 +0200
+Subject: [RFC v2 9/9] KVM: KVM-VFIO: ARM forwarding control
 In-Reply-To: <1409575968-5329-1-git-send-email-eric.auger@linaro.org>
 References: <1409575968-5329-1-git-send-email-eric.auger@linaro.org>
-Message-ID: <1409575968-5329-9-git-send-email-eric.auger@linaro.org>
+Message-ID: <1409575968-5329-10-git-send-email-eric.auger@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch introduces a new KVM_DEV_VFIO_DEVICE attribute.
-
-This is a new control channel which enables KVM to cooperate with
-viable VFIO devices.
-
-The kvm-vfio device now holds a list of devices (kvm_vfio_device)
-in addition to a list of groups (kvm_vfio_group). The new
-infrastructure enables to check the validity of the VFIO device
-file descriptor, get and hold a reference to it.
-
-The first concrete implemented command is IRQ forward control:
-KVM_DEV_VFIO_DEVICE_FORWARD_IRQ, KVM_DEV_VFIO_DEVICE_UNFORWARD_IRQ.
-
-It consists in programing the VFIO driver and KVM in a consistent manner
-so that an optimized IRQ injection/completion is set up. Each
-kvm_vfio_device holds a list of forwarded IRQ. When putting a
-kvm_vfio_device, the implementation makes sure the forwarded IRQs
-are set again in the normal handling state (non forwarded).
-
-The forwarding programmming is architecture specific, embodied by the
-kvm_arch_set_fwd_state function. Its implementation is given in a
-separate patch file.
-
-The forwarding control modality is enabled by the
-__KVM_HAVE_ARCH_KVM_VFIO_FORWARD define.
+Enables forwarding control for ARM. By defining
+__KVM_HAVE_ARCH_KVM_VFIO_FORWARD the patch enables
+KVM_DEV_VFIO_DEVICE_FORWARD/UNFORWARD_IRQ command on ARM. As a
+result it brings an optimized injection/completion handling for
+forwarded IRQ. The ARM specific part is implemented in a new module,
+kvm_vfio_arm.c
 
 Signed-off-by: Eric Auger <eric.auger@linaro.org>
-
 ---
+ arch/arm/include/asm/kvm_host.h |  2 +
+ arch/arm/kvm/Makefile           |  2 +-
+ arch/arm/kvm/kvm_vfio_arm.c     | 85 +++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 88 insertions(+), 1 deletion(-)
+ create mode 100644 arch/arm/kvm/kvm_vfio_arm.c
 
-v1 -> v2:
-- __KVM_HAVE_ARCH_KVM_VFIO renamed into __KVM_HAVE_ARCH_KVM_VFIO_FORWARD
-- original patch file separated into 2 parts: generic part moved in vfio.c
-  and ARM specific part(kvm_arch_set_fwd_state)
----
- include/linux/kvm_host.h |  27 +++
- virt/kvm/vfio.c          | 452 ++++++++++++++++++++++++++++++++++++++++++++++-
- 2 files changed, 477 insertions(+), 2 deletions(-)
-
-diff --git a/include/linux/kvm_host.h b/include/linux/kvm_host.h
-index a4c33b3..24350dc 100644
---- a/include/linux/kvm_host.h
-+++ b/include/linux/kvm_host.h
-@@ -1065,6 +1065,21 @@ struct kvm_device_ops {
- 		      unsigned long arg);
- };
+diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
+index 1aee6bb..dfd3b05 100644
+--- a/arch/arm/include/asm/kvm_host.h
++++ b/arch/arm/include/asm/kvm_host.h
+@@ -25,6 +25,8 @@
+ #include <asm/fpstate.h>
+ #include <kvm/arm_arch_timer.h>
  
-+enum kvm_fwd_irq_action {
-+	KVM_VFIO_IRQ_SET_FORWARD,
-+	KVM_VFIO_IRQ_SET_NORMAL,
-+	KVM_VFIO_IRQ_CLEANUP,
-+};
++#define __KVM_HAVE_ARCH_KVM_VFIO_FORWARD
 +
-+/* internal structure describing a forwarded IRQ */
-+struct kvm_fwd_irq {
-+	struct list_head link;
-+	__u32 index; /* platform device irq index */
-+	__u32 hwirq; /*physical IRQ */
-+	__u32 gsi; /* virtual IRQ */
-+	struct kvm_vcpu *vcpu; /* vcpu to inject into*/
-+};
-+
- void kvm_device_get(struct kvm_device *dev);
- void kvm_device_put(struct kvm_device *dev);
- struct kvm_device *kvm_device_from_filp(struct file *filp);
-@@ -1075,6 +1090,18 @@ extern struct kvm_device_ops kvm_vfio_ops;
- extern struct kvm_device_ops kvm_arm_vgic_v2_ops;
- extern struct kvm_device_ops kvm_flic_ops;
+ #if defined(CONFIG_KVM_ARM_MAX_VCPUS)
+ #define KVM_MAX_VCPUS CONFIG_KVM_ARM_MAX_VCPUS
+ #else
+diff --git a/arch/arm/kvm/Makefile b/arch/arm/kvm/Makefile
+index ea1fa76..26a5a42 100644
+--- a/arch/arm/kvm/Makefile
++++ b/arch/arm/kvm/Makefile
+@@ -19,7 +19,7 @@ kvm-arm-y = $(KVM)/kvm_main.o $(KVM)/coalesced_mmio.o $(KVM)/eventfd.o $(KVM)/vf
  
-+#ifdef __KVM_HAVE_ARCH_KVM_VFIO_FORWARD
-+int kvm_arch_set_fwd_state(struct kvm_fwd_irq *pfwd,
-+			   enum kvm_fwd_irq_action action);
+ obj-y += kvm-arm.o init.o interrupts.o
+ obj-y += arm.o handle_exit.o guest.o mmu.o emulate.o reset.o
+-obj-y += coproc.o coproc_a15.o coproc_a7.o mmio.o psci.o perf.o
++obj-y += coproc.o coproc_a15.o coproc_a7.o mmio.o psci.o perf.o kvm_vfio_arm.o
+ obj-$(CONFIG_KVM_ARM_VGIC) += $(KVM)/arm/vgic.o
+ obj-$(CONFIG_KVM_ARM_VGIC) += $(KVM)/arm/vgic-v2.o
+ obj-$(CONFIG_KVM_ARM_TIMER) += $(KVM)/arm/arch_timer.o
+diff --git a/arch/arm/kvm/kvm_vfio_arm.c b/arch/arm/kvm/kvm_vfio_arm.c
+new file mode 100644
+index 0000000..0d316b1
+--- /dev/null
++++ b/arch/arm/kvm/kvm_vfio_arm.c
+@@ -0,0 +1,85 @@
++/*
++ * Copyright (C) 2014 Linaro Ltd.
++ * Authors: Eric Auger <eric.auger@linaro.org>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License, version 2, as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ */
 +
-+#else
-+static inline int kvm_arch_set_fwd_state(struct kvm_fwd_irq *pfwd,
-+					 enum kvm_fwd_irq_action action)
-+{
-+	return 0;
-+}
-+#endif
-+
- #ifdef CONFIG_HAVE_KVM_CPU_RELAX_INTERCEPT
- 
- static inline void kvm_vcpu_set_in_spin_loop(struct kvm_vcpu *vcpu, bool val)
-diff --git a/virt/kvm/vfio.c b/virt/kvm/vfio.c
-index 76dc7a1..e4a81c4 100644
---- a/virt/kvm/vfio.c
-+++ b/virt/kvm/vfio.c
-@@ -18,14 +18,24 @@
- #include <linux/slab.h>
- #include <linux/uaccess.h>
- #include <linux/vfio.h>
++#include <linux/errno.h>
++#include <linux/file.h>
++#include <linux/kvm_host.h>
++#include <linux/list.h>
++#include <linux/mutex.h>
++#include <linux/vfio.h>
++#include <linux/irq.h>
++#include <asm/kvm_host.h>
++#include <asm/kvm.h>
++#include <linux/irq.h>
 +#include <linux/platform_device.h>
- 
- struct kvm_vfio_group {
- 	struct list_head node;
- 	struct vfio_group *vfio_group;
- };
- 
-+struct kvm_vfio_device {
-+	struct list_head node;
-+	struct vfio_device *vfio_device;
-+	/* list of forwarded IRQs for that VFIO device */
-+	struct list_head fwd_irq_list;
-+	int fd;
-+};
-+
- struct kvm_vfio {
- 	struct list_head group_list;
-+	struct list_head device_list;
- 	struct mutex lock;
- 	bool noncoherent;
- };
-@@ -246,12 +256,441 @@ static int kvm_vfio_set_group(struct kvm_device *dev, long attr, u64 arg)
- 	return -ENXIO;
- }
- 
-+/**
-+ * get_vfio_device - returns the vfio-device corresponding to this fd
-+ * @fd:fd of the vfio platform device
-+ *
-+ * checks it is a vfio device
-+ * increment its ref counter
-+ */
-+static struct vfio_device *kvm_vfio_get_vfio_device(int fd)
-+{
-+	struct fd f;
-+	struct vfio_device *vdev;
-+
-+	f = fdget(fd);
-+	if (!f.file)
-+		return NULL;
-+	vdev = kvm_vfio_device_get_external_user(f.file);
-+	fdput(f);
-+	return vdev;
-+}
++#include <linux/interrupt.h>
 +
 +/**
-+ * put_vfio_device: put the vfio platform device
-+ * @vdev: vfio_device to put
++ * kvm_arch_set_fwd_state - change the forwarded state of an IRQ
++ * @pfwd: the forwarded irq struct
++ * @action: action to perform (set forward, set back normal, cleanup)
 + *
-+ * decrement the ref counter
++ * programs the GIC and VGIC
++ * returns the VGIC map/unmap return status
++ * It is the responsability of the caller to make sure the physical IRQ
++ * is not active. there is a critical section between the start of the
++ * VFIO IRQ handler and LR programming.
 + */
-+static void kvm_vfio_put_vfio_device(struct vfio_device *vdev)
-+{
-+	kvm_vfio_device_put_external_user(vdev);
-+}
-+
-+/**
-+ * kvm_vfio_find_device - look for the device in the assigned
-+ * device list
-+ * @kv: the kvm-vfio device
-+ * @vdev: the vfio_device to look for
-+ *
-+ * returns the associated kvm_vfio_device if the device is known,
-+ * meaning at least 1 IRQ is forwarded for this device.
-+ * in the device is not registered, returns NULL.
-+ */
-+struct kvm_vfio_device *kvm_vfio_find_device(struct kvm_vfio *kv,
-+					     struct vfio_device *vdev)
-+{
-+	struct kvm_vfio_device *kvm_vdev_iter;
-+
-+	list_for_each_entry(kvm_vdev_iter, &kv->device_list, node) {
-+		if (kvm_vdev_iter->vfio_device == vdev)
-+			return kvm_vdev_iter;
-+	}
-+	return NULL;
-+}
-+
-+/**
-+ * kvm_vfio_find_irq - look for a an irq in the device IRQ list
-+ * @kvm_vdev: the kvm_vfio_device
-+ * @irq_index: irq index
-+ *
-+ * returns the forwarded irq struct if it exists, NULL in the negative
-+ */
-+struct kvm_fwd_irq *kvm_vfio_find_irq(struct kvm_vfio_device *kvm_vdev,
-+				      int irq_index)
-+{
-+	struct kvm_fwd_irq *fwd_irq_iter;
-+
-+	list_for_each_entry(fwd_irq_iter, &kvm_vdev->fwd_irq_list, link) {
-+		if (fwd_irq_iter->index == irq_index)
-+			return fwd_irq_iter;
-+	}
-+	return NULL;
-+}
-+
-+/**
-+ * validate_forward - checks whether forwarding a given IRQ is meaningful
-+ * @vdev:  vfio_device the IRQ belongs to
-+ * @fwd_irq: user struct containing the irq_index to forward
-+ * @kvm_vdev: if a forwarded IRQ already exists for that VFIO device,
-+ * kvm_vfio_device that holds it
-+ * @hwirq: irq numberthe irq index corresponds to
-+ *
-+ * checks the vfio-device is a platform vfio device
-+ * checks the irq_index corresponds to an actual hwirq and
-+ * checks this hwirq is not already forwarded
-+ * returns < 0 on following errors:
-+ * not a platform device, bad irq index, already forwarded
-+ */
-+static int kvm_vfio_validate_forward(struct kvm_vfio *kv,
-+			    struct vfio_device *vdev,
-+			    struct kvm_arch_forwarded_irq *fwd_irq,
-+			    struct kvm_vfio_device **kvm_vdev,
-+			    int *hwirq)
-+{
-+	struct device *dev = kvm_vfio_external_base_device(vdev);
-+	struct platform_device *platdev;
-+
-+	*hwirq = -1;
-+	*kvm_vdev = NULL;
-+	if (strcmp(dev->bus->name, "platform") == 0) {
-+		platdev = to_platform_device(dev);
-+		*hwirq = platform_get_irq(platdev, fwd_irq->index);
-+		if (*hwirq < 0) {
-+			kvm_err("%s incorrect index\n", __func__);
-+			return -EINVAL;
-+		}
-+	} else {
-+		kvm_err("%s not a platform device\n", __func__);
-+		return -EINVAL;
-+	}
-+	/* is a ref to this device already owned by the KVM-VFIO device? */
-+	*kvm_vdev = kvm_vfio_find_device(kv, vdev);
-+	if (*kvm_vdev) {
-+		if (kvm_vfio_find_irq(*kvm_vdev, fwd_irq->index)) {
-+			kvm_err("%s irq %d already forwarded\n",
-+				__func__, *hwirq);
-+			return -EINVAL;
-+		}
-+	}
-+	return 0;
-+}
-+
-+/**
-+ * validate_unforward: check a deassignment is meaningful
-+ * @kv: the kvm_vfio device
-+ * @vdev: the vfio_device whose irq to deassign belongs to
-+ * @fwd_irq: the user struct that contains the fd and irq_index of the irq
-+ * @kvm_vdev: the kvm_vfio_device the forwarded irq belongs to, if
-+ * it exists
-+ *
-+ * returns 0 if the provided irq effectively is forwarded
-+ * (a ref to this vfio_device is hold and this irq belongs to
-+ * the forwarded irq of this device)
-+ * returns -EINVAL in the negative
-+ */
-+static int kvm_vfio_validate_unforward(struct kvm_vfio *kv,
-+			      struct vfio_device *vdev,
-+			      struct kvm_arch_forwarded_irq *fwd_irq,
-+			      struct kvm_vfio_device **kvm_vdev)
-+{
-+	struct kvm_fwd_irq *pfwd;
-+
-+	*kvm_vdev = kvm_vfio_find_device(kv, vdev);
-+	if (!kvm_vdev) {
-+		kvm_err("%s no forwarded irq for this device\n", __func__);
-+		return -EINVAL;
-+	}
-+	pfwd = kvm_vfio_find_irq(*kvm_vdev, fwd_irq->index);
-+	if (!pfwd) {
-+		kvm_err("%s irq %d is not forwarded\n", __func__, fwd_irq->fd);
-+		return -EINVAL;
-+	}
-+	return 0;
-+}
-+
-+/**
-+ * kvm_vfio_forward - set a forwarded IRQ
-+ * @kdev: the kvm device
-+ * @vdev: the vfio device the IRQ belongs to
-+ * @fwd_irq: the user struct containing the irq_index and guest irq
-+ * @must_put: tells the caller whether the vfio_device must be put after
-+ * the call (ref must be released in case a ref onto this device was
-+ * already hold or in case of new device and failure)
-+ *
-+ * validate the injection, activate forward and store the information
-+ * about which irq and which device is concerned so that on deassign or
-+ * kvm-vfio destruction everuthing can be cleaned up.
-+ */
-+static int kvm_vfio_forward(struct kvm_device *kdev,
-+			    struct vfio_device *vdev,
-+			    struct kvm_arch_forwarded_irq *fwd_irq,
-+			    bool *must_put)
++int kvm_arch_set_fwd_state(struct kvm_fwd_irq *pfwd,
++			   enum kvm_fwd_irq_action action)
 +{
 +	int ret;
-+	struct kvm_fwd_irq *pfwd = NULL;
-+	struct kvm_vfio_device *kvm_vdev = NULL;
-+	struct kvm_vfio *kv = kdev->private;
-+	int hwirq;
++	struct irq_desc *desc = irq_to_desc(pfwd->hwirq);
++	struct irq_data *d = &desc->irq_data;
++	struct irq_chip *chip = desc->irq_data.chip;
 +
-+	*must_put = true;
-+	ret = kvm_vfio_validate_forward(kv, vdev, fwd_irq,
-+					&kvm_vdev, &hwirq);
-+	if (ret < 0)
-+		return -EINVAL;
-+
-+	pfwd = kzalloc(sizeof(*pfwd), GFP_KERNEL);
-+	if (!pfwd)
-+		return -ENOMEM;
-+	pfwd->index = fwd_irq->index;
-+	pfwd->gsi = fwd_irq->gsi;
-+	pfwd->hwirq = hwirq;
-+	pfwd->vcpu = kvm_get_vcpu(kdev->kvm, 0);
-+	ret = kvm_arch_set_fwd_state(pfwd, KVM_VFIO_IRQ_SET_FORWARD);
-+	if (ret < 0) {
-+		kvm_arch_set_fwd_state(pfwd, KVM_VFIO_IRQ_CLEANUP);
-+		kfree(pfwd);
-+		return ret;
++	disable_irq(pfwd->hwirq);
++	/* no fwd state change can happen if the IRQ is in progress */
++	if (irqd_irq_inprogress(d)) {
++		kvm_err("%s cannot change fwd state (IRQ %d in progress\n",
++			__func__, pfwd->hwirq);
++		enable_irq(pfwd->hwirq);
++		return -1;
 +	}
 +
-+	if (!kvm_vdev) {
-+		/* create & insert the new device and keep the ref */
-+		kvm_vdev = kzalloc(sizeof(*kvm_vdev), GFP_KERNEL);
-+		if (!kvm_vdev) {
-+			kvm_arch_set_fwd_state(pfwd, false);
-+			kfree(pfwd);
-+			return -ENOMEM;
-+		}
-+
-+		kvm_vdev->vfio_device = vdev;
-+		kvm_vdev->fd = fwd_irq->fd;
-+		INIT_LIST_HEAD(&kvm_vdev->fwd_irq_list);
-+		list_add(&kvm_vdev->node, &kv->device_list);
++	if (action == KVM_VFIO_IRQ_SET_FORWARD) {
++		irqd_set_irq_forwarded(d);
++		ret = vgic_map_phys_irq(pfwd->vcpu,
++					pfwd->gsi + VGIC_NR_PRIVATE_IRQS,
++					pfwd->hwirq);
++	} else if (action == KVM_VFIO_IRQ_SET_NORMAL) {
++		irqd_clr_irq_forwarded(d);
++		ret = vgic_unmap_phys_irq(pfwd->vcpu,
++					  pfwd->gsi +
++						VGIC_NR_PRIVATE_IRQS,
++					  pfwd->hwirq);
++	} else if (action == KVM_VFIO_IRQ_CLEANUP) {
++		irqd_clr_irq_forwarded(d);
 +		/*
-+		 * the only case where we keep the ref:
-+		 * new device and forward setting successful
++		 * in case the guest did not complete the
++		 * virtual IRQ, let's do it for him.
++		 * when cleanup is called, VCPU have already
++		 * been freed, do not manipulate VGIC
 +		 */
-+		*must_put = false;
++		chip->irq_eoi(d);
++		ret = 0;
++	} else {
++		enable_irq(pfwd->hwirq);
++		ret = -EINVAL;
 +	}
 +
-+	list_add(&pfwd->link, &kvm_vdev->fwd_irq_list);
-+
-+	kvm_debug("forwarding set for fd=%d, hwirq=%d, gsi=%d\n",
-+	fwd_irq->fd, hwirq, fwd_irq->gsi);
-+
-+	return 0;
-+}
-+
-+/**
-+ * remove_assigned_device - put a given device from the list
-+ * @kv: the kvm-vfio device
-+ * @vdev: the vfio-device to remove
-+ *
-+ * change the state of all forwarded IRQs, free the forwarded IRQ list,
-+ * remove the corresponding kvm_vfio_device from the assigned device
-+ * list.
-+ * returns true if the device could be removed, false in the negative
-+ */
-+bool remove_assigned_device(struct kvm_vfio *kv,
-+			    struct vfio_device *vdev)
-+{
-+	struct kvm_vfio_device *kvm_vdev_iter, *tmp_vdev;
-+	struct kvm_fwd_irq *fwd_irq_iter, *tmp_irq;
-+	bool removed = false;
-+	int ret;
-+
-+	list_for_each_entry_safe(kvm_vdev_iter, tmp_vdev,
-+				 &kv->device_list, node) {
-+		if (kvm_vdev_iter->vfio_device == vdev) {
-+			/* loop on all its forwarded IRQ */
-+			list_for_each_entry_safe(fwd_irq_iter, tmp_irq,
-+						 &kvm_vdev_iter->fwd_irq_list,
-+						 link) {
-+				ret = kvm_arch_set_fwd_state(fwd_irq_iter,
-+						KVM_VFIO_IRQ_SET_NORMAL);
-+				if (ret < 0)
-+					return ret;
-+				list_del(&fwd_irq_iter->link);
-+				kfree(fwd_irq_iter);
-+			}
-+			/* all IRQs could be deassigned */
-+			list_del(&kvm_vdev_iter->node);
-+			kvm_vfio_device_put_external_user(
-+				kvm_vdev_iter->vfio_device);
-+			kfree(kvm_vdev_iter);
-+			removed = true;
-+			break;
-+		}
-+	}
-+	return removed;
-+}
-+
-+
-+/**
-+ * remove_fwd_irq - remove a forwarded irq
-+ *
-+ * @kv: kvm-vfio device
-+ * kvm_vdev: the kvm_vfio_device the IRQ belongs to
-+ * irq_index: the index of the IRQ
-+ *
-+ * change the forwarded state of the IRQ, remove the IRQ from
-+ * the device forwarded IRQ list. In case it is the last one,
-+ * put the device
-+ */
-+int remove_fwd_irq(struct kvm_vfio *kv,
-+		   struct kvm_vfio_device *kvm_vdev,
-+		   int irq_index)
-+{
-+	struct kvm_fwd_irq *fwd_irq_iter, *tmp_irq;
-+	int ret = -1;
-+
-+	list_for_each_entry_safe(fwd_irq_iter, tmp_irq,
-+				 &kvm_vdev->fwd_irq_list, link) {
-+		if (fwd_irq_iter->index == irq_index) {
-+			ret = kvm_arch_set_fwd_state(fwd_irq_iter,
-+						KVM_VFIO_IRQ_SET_NORMAL);
-+			if (ret < 0)
-+				break;
-+			list_del(&fwd_irq_iter->link);
-+			kfree(fwd_irq_iter);
-+			ret = 0;
-+			break;
-+		}
-+	}
-+	if (list_empty(&kvm_vdev->fwd_irq_list))
-+		remove_assigned_device(kv, kvm_vdev->vfio_device);
-+
++	enable_irq(pfwd->hwirq);
 +	return ret;
 +}
-+
-+/**
-+ * kvm_vfio_unforward - remove a forwarded IRQ
-+ * @kdev: the kvm device
-+ * @vdev: the vfio_device
-+ * @fwd_irq: user struct
-+ * after checking this IRQ effectively is forwarded, change its state,
-+ * remove it from the corresponding kvm_vfio_device list
-+ */
-+static int kvm_vfio_unforward(struct kvm_device *kdev,
-+				     struct vfio_device *vdev,
-+				     struct kvm_arch_forwarded_irq *fwd_irq)
-+{
-+	struct kvm_vfio *kv = kdev->private;
-+	struct kvm_vfio_device *kvm_vdev;
-+	int ret;
-+
-+	ret = kvm_vfio_validate_unforward(kv, vdev, fwd_irq, &kvm_vdev);
-+	if (ret < 0)
-+		return -EINVAL;
-+
-+	ret = remove_fwd_irq(kv, kvm_vdev, fwd_irq->index);
-+	if (ret < 0)
-+		kvm_err("%s fail unforwarding (fd=%d, index=%d)\n",
-+			__func__, fwd_irq->fd, fwd_irq->index);
-+	else
-+		kvm_debug("%s unforwarding IRQ (fd=%d, index=%d)\n",
-+			  __func__, fwd_irq->fd, fwd_irq->index);
-+	return ret;
-+}
-+
-+
-+
-+
-+/**
-+ * kvm_vfio_set_device - the top function for interracting with a vfio
-+ * device
-+ */
-+static int kvm_vfio_set_device(struct kvm_device *kdev, long attr, u64 arg)
-+{
-+	struct kvm_vfio *kv = kdev->private;
-+	struct vfio_device *vdev;
-+	struct kvm_arch_forwarded_irq fwd_irq; /* user struct */
-+	int32_t __user *argp = (int32_t __user *)(unsigned long)arg;
-+
-+	switch (attr) {
-+#ifdef __KVM_HAVE_ARCH_KVM_VFIO_FORWARD
-+	case KVM_DEV_VFIO_DEVICE_FORWARD_IRQ:{
-+		bool must_put;
-+		int ret;
-+
-+		if (copy_from_user(&fwd_irq, argp, sizeof(fwd_irq)))
-+			return -EFAULT;
-+		vdev = kvm_vfio_get_vfio_device(fwd_irq.fd);
-+		if (IS_ERR(vdev))
-+			return PTR_ERR(vdev);
-+		mutex_lock(&kv->lock);
-+		ret = kvm_vfio_forward(kdev, vdev, &fwd_irq, &must_put);
-+		if (must_put)
-+			kvm_vfio_put_vfio_device(vdev);
-+		mutex_unlock(&kv->lock);
-+		return ret;
-+		}
-+	case KVM_DEV_VFIO_DEVICE_UNFORWARD_IRQ: {
-+		int ret;
-+
-+		if (copy_from_user(&fwd_irq, argp, sizeof(fwd_irq)))
-+			return -EFAULT;
-+		vdev = kvm_vfio_get_vfio_device(fwd_irq.fd);
-+		if (IS_ERR(vdev))
-+			return PTR_ERR(vdev);
-+
-+		kvm_vfio_device_put_external_user(vdev);
-+		mutex_lock(&kv->lock);
-+		ret = kvm_vfio_unforward(kdev, vdev, &fwd_irq);
-+		mutex_unlock(&kv->lock);
-+		return ret;
-+	}
-+#endif
-+	default:
-+		return -ENXIO;
-+	}
-+}
-+
-+/**
-+ * kvm_vfio_put_all_devices - cancel forwarded IRQs and put all devices
-+ * @kv: kvm-vfio device
-+ *
-+ * loop on all got devices and their associated forwarded IRQs
-+ * restore the non forwarded state, remove IRQs and their devices from
-+ * the respective list, put the vfio platform devices
-+ *
-+ * When this function is called, the vcpu already are destroyed. No
-+ * vgic manipulation can happen hence the KVM_VFIO_IRQ_CLEANUP
-+ * kvm_arch_set_fwd_state action
-+ */
-+int kvm_vfio_put_all_devices(struct kvm_vfio *kv)
-+{
-+	struct kvm_fwd_irq *fwd_irq_iter, *tmp_irq;
-+	struct kvm_vfio_device *kvm_vdev_iter, *tmp_vdev;
-+
-+	/* loop on all the assigned devices */
-+	list_for_each_entry_safe(kvm_vdev_iter, tmp_vdev,
-+				 &kv->device_list, node) {
-+
-+		/* loop on all its forwarded IRQ */
-+		list_for_each_entry_safe(fwd_irq_iter, tmp_irq,
-+					 &kvm_vdev_iter->fwd_irq_list, link) {
-+			kvm_arch_set_fwd_state(fwd_irq_iter,
-+						KVM_VFIO_IRQ_CLEANUP);
-+			list_del(&fwd_irq_iter->link);
-+			kfree(fwd_irq_iter);
-+		}
-+		list_del(&kvm_vdev_iter->node);
-+		kvm_vfio_device_put_external_user(kvm_vdev_iter->vfio_device);
-+		kfree(kvm_vdev_iter);
-+	}
-+	return 0;
-+}
-+
-+
- static int kvm_vfio_set_attr(struct kvm_device *dev,
- 			     struct kvm_device_attr *attr)
- {
- 	switch (attr->group) {
- 	case KVM_DEV_VFIO_GROUP:
- 		return kvm_vfio_set_group(dev, attr->attr, attr->addr);
-+	case KVM_DEV_VFIO_DEVICE:
-+		return kvm_vfio_set_device(dev, attr->attr, attr->addr);
- 	}
- 
- 	return -ENXIO;
-@@ -267,10 +706,17 @@ static int kvm_vfio_has_attr(struct kvm_device *dev,
- 		case KVM_DEV_VFIO_GROUP_DEL:
- 			return 0;
- 		}
--
- 		break;
-+#ifdef __KVM_HAVE_ARCH_KVM_VFIO_FORWARD
-+	case KVM_DEV_VFIO_DEVICE:
-+		switch (attr->attr) {
-+		case KVM_DEV_VFIO_DEVICE_FORWARD_IRQ:
-+		case KVM_DEV_VFIO_DEVICE_UNFORWARD_IRQ:
-+			return 0;
-+		}
-+		break;
-+#endif
- 	}
--
- 	return -ENXIO;
- }
- 
-@@ -284,6 +730,7 @@ static void kvm_vfio_destroy(struct kvm_device *dev)
- 		list_del(&kvg->node);
- 		kfree(kvg);
- 	}
-+	kvm_vfio_put_all_devices(kv);
- 
- 	kvm_vfio_update_coherency(dev);
- 
-@@ -306,6 +753,7 @@ static int kvm_vfio_create(struct kvm_device *dev, u32 type)
- 		return -ENOMEM;
- 
- 	INIT_LIST_HEAD(&kv->group_list);
-+	INIT_LIST_HEAD(&kv->device_list);
- 	mutex_init(&kv->lock);
- 
- 	dev->private = kv;
 -- 
 1.9.1
