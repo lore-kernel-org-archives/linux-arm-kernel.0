@@ -1,78 +1,165 @@
 From: t-kristo@ti.com (Tero Kristo)
-Date: Mon, 1 Sep 2014 21:09:09 +0300
-Subject: [PATCH 20/26] ARM: AM33xx: PRM: move global warm reset implementation
- to driver
+Date: Mon, 1 Sep 2014 21:09:14 +0300
+Subject: [PATCH 25/26] ARM: OMAP3+: PRM: add generic API for reconfiguring I/O
+ chain
 In-Reply-To: <1409594955-1476-1-git-send-email-t-kristo@ti.com>
 References: <1409594955-1476-1-git-send-email-t-kristo@ti.com>
-Message-ID: <1409594955-1476-21-git-send-email-t-kristo@ti.com>
+Message-ID: <1409594955-1476-26-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Moved the implementation from am33xx-restart.c to the prm33xx.c file to
-isolate the PRM register accesses to be private for PRM driver.
+This adds a generic API for reconfiguring the I/O chain. The implementation
+will call the SoC specific function registered during init time. The SoC
+specific reconfigure functions are also made static, as they don't need
+to be accessed outside the PRM driver itself.
 
 Signed-off-by: Tero Kristo <t-kristo@ti.com>
 ---
- arch/arm/mach-omap2/am33xx-restart.c |    9 +--------
- arch/arm/mach-omap2/prm33xx.c        |   21 +++++++++++++++++++++
- 2 files changed, 22 insertions(+), 8 deletions(-)
+ arch/arm/mach-omap2/omap_hwmod.c   |    5 +----
+ arch/arm/mach-omap2/prm.h          |    2 ++
+ arch/arm/mach-omap2/prm3xxx.c      |    3 ++-
+ arch/arm/mach-omap2/prm3xxx.h      |    8 --------
+ arch/arm/mach-omap2/prm44xx.c      |    3 ++-
+ arch/arm/mach-omap2/prm44xx_54xx.h |    9 ---------
+ arch/arm/mach-omap2/prm_common.c   |   16 ++++++++++++++++
+ 7 files changed, 23 insertions(+), 23 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/am33xx-restart.c b/arch/arm/mach-omap2/am33xx-restart.c
-index c88d8df7..7286389 100644
---- a/arch/arm/mach-omap2/am33xx-restart.c
-+++ b/arch/arm/mach-omap2/am33xx-restart.c
-@@ -24,12 +24,5 @@ void am33xx_restart(enum reboot_mode mode, const char *cmd)
- {
- 	/* TODO: Handle mode and cmd if necessary */
+diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
+index 1de87a7..1bfc504 100644
+--- a/arch/arm/mach-omap2/omap_hwmod.c
++++ b/arch/arm/mach-omap2/omap_hwmod.c
+@@ -1983,10 +1983,7 @@ static void _reconfigure_io_chain(void)
  
--	am33xx_prm_rmw_reg_bits(AM33XX_RST_GLOBAL_WARM_SW_MASK,
--				AM33XX_RST_GLOBAL_WARM_SW_MASK,
--				AM33XX_PRM_DEVICE_MOD,
--				AM33XX_PRM_RSTCTRL_OFFSET);
+ 	spin_lock_irqsave(&io_chain_lock, flags);
+ 
+-	if (cpu_is_omap34xx() && omap3_has_io_chain_ctrl())
+-		omap3xxx_prm_reconfigure_io_chain();
+-	else if (cpu_is_omap44xx())
+-		omap44xx_prm_reconfigure_io_chain();
++	prm_reconfigure_io_chain();
+ 
+ 	spin_unlock_irqrestore(&io_chain_lock, flags);
+ }
+diff --git a/arch/arm/mach-omap2/prm.h b/arch/arm/mach-omap2/prm.h
+index 0dd8d83..7efe14c 100644
+--- a/arch/arm/mach-omap2/prm.h
++++ b/arch/arm/mach-omap2/prm.h
+@@ -157,6 +157,8 @@ extern u32 prm_read_reset_sources(void);
+ extern bool prm_was_any_context_lost_old(u8 part, s16 inst, u16 idx);
+ extern void prm_clear_context_loss_flags_old(u8 part, s16 inst, u16 idx);
+ 
++void prm_reconfigure_io_chain(void);
++
+ #endif
+ 
+ 
+diff --git a/arch/arm/mach-omap2/prm3xxx.c b/arch/arm/mach-omap2/prm3xxx.c
+index f21fd76..1a739de 100644
+--- a/arch/arm/mach-omap2/prm3xxx.c
++++ b/arch/arm/mach-omap2/prm3xxx.c
+@@ -34,6 +34,7 @@ static void omap3xxx_prm_read_pending_irqs(unsigned long *events);
+ static void omap3xxx_prm_ocp_barrier(void);
+ static void omap3xxx_prm_save_and_clear_irqen(u32 *saved_mask);
+ static void omap3xxx_prm_restore_irqen(u32 *saved_mask);
++static void omap3xxx_prm_reconfigure_io_chain(void);
+ 
+ static const struct omap_prcm_irq omap3_prcm_irqs[] = {
+ 	OMAP_PRCM_IRQ("wkup",	0,	0),
+@@ -383,7 +384,7 @@ void __init omap3_prm_init_pm(bool has_uart4, bool has_iva)
+  * deasserting WUCLKIN and clearing the ST_IO_CHAIN WKST bit.  No
+  * return value.
+  */
+-void omap3xxx_prm_reconfigure_io_chain(void)
++static void omap3xxx_prm_reconfigure_io_chain(void)
+ {
+ 	int i = 0;
+ 
+diff --git a/arch/arm/mach-omap2/prm3xxx.h b/arch/arm/mach-omap2/prm3xxx.h
+index 5d993d2..321568b 100644
+--- a/arch/arm/mach-omap2/prm3xxx.h
++++ b/arch/arm/mach-omap2/prm3xxx.h
+@@ -144,14 +144,6 @@ extern u32 omap3_prm_vcvp_read(u8 offset);
+ extern void omap3_prm_vcvp_write(u32 val, u8 offset);
+ extern u32 omap3_prm_vcvp_rmw(u32 mask, u32 bits, u8 offset);
+ 
+-#ifdef CONFIG_ARCH_OMAP3
+-void omap3xxx_prm_reconfigure_io_chain(void);
+-#else
+-static inline void omap3xxx_prm_reconfigure_io_chain(void)
+-{
+-}
+-#endif
 -
--	/* OCP barrier */
--	(void)am33xx_prm_read_reg(AM33XX_PRM_DEVICE_MOD,
--				  AM33XX_PRM_RSTCTRL_OFFSET);
-+	am33xx_prm_global_warm_sw_reset();
- }
-diff --git a/arch/arm/mach-omap2/prm33xx.c b/arch/arm/mach-omap2/prm33xx.c
-index 3cbfb78..03960bc 100644
---- a/arch/arm/mach-omap2/prm33xx.c
-+++ b/arch/arm/mach-omap2/prm33xx.c
-@@ -23,6 +23,10 @@
- #include "prm33xx.h"
- #include "prm-regbits-33xx.h"
+ extern void omap3xxx_prm_dpll3_reset(void);
  
-+#define AM33XX_PRM_RSTCTRL_OFFSET		0x0000
-+
-+#define AM33XX_RST_GLOBAL_WARM_SW_MASK		(1 << 0)
-+
- /* Read a register in a PRM instance */
- u32 am33xx_prm_read_reg(s16 inst, u16 idx)
+ extern int __init omap3xxx_prm_init(void);
+diff --git a/arch/arm/mach-omap2/prm44xx.c b/arch/arm/mach-omap2/prm44xx.c
+index bfcc356..e7ac7e2 100644
+--- a/arch/arm/mach-omap2/prm44xx.c
++++ b/arch/arm/mach-omap2/prm44xx.c
+@@ -36,6 +36,7 @@ static void omap44xx_prm_read_pending_irqs(unsigned long *events);
+ static void omap44xx_prm_ocp_barrier(void);
+ static void omap44xx_prm_save_and_clear_irqen(u32 *saved_mask);
+ static void omap44xx_prm_restore_irqen(u32 *saved_mask);
++static void omap44xx_prm_reconfigure_io_chain(void);
+ 
+ static const struct omap_prcm_irq omap4_prcm_irqs[] = {
+ 	OMAP_PRCM_IRQ("io",     9,      1),
+@@ -292,7 +293,7 @@ static void omap44xx_prm_restore_irqen(u32 *saved_mask)
+  * deasserting WUCLKIN and waiting for WUCLKOUT to be deasserted.
+  * No return value. XXX Are the final two steps necessary?
+  */
+-void omap44xx_prm_reconfigure_io_chain(void)
++static void omap44xx_prm_reconfigure_io_chain(void)
  {
-@@ -332,6 +336,23 @@ static int am33xx_check_vcvp(void)
- 	return 0;
+ 	int i = 0;
+ 	s32 inst = omap4_prmst_get_prm_dev_inst();
+diff --git a/arch/arm/mach-omap2/prm44xx_54xx.h b/arch/arm/mach-omap2/prm44xx_54xx.h
+index faa7411..f751251 100644
+--- a/arch/arm/mach-omap2/prm44xx_54xx.h
++++ b/arch/arm/mach-omap2/prm44xx_54xx.h
+@@ -38,15 +38,6 @@ extern u32 omap4_prm_vcvp_read(u8 offset);
+ extern void omap4_prm_vcvp_write(u32 val, u8 offset);
+ extern u32 omap4_prm_vcvp_rmw(u32 mask, u32 bits, u8 offset);
+ 
+-#if defined(CONFIG_ARCH_OMAP4) || defined(CONFIG_SOC_OMAP5) || \
+-	defined(CONFIG_SOC_DRA7XX) || defined(CONFIG_SOC_AM43XX)
+-void omap44xx_prm_reconfigure_io_chain(void);
+-#else
+-static inline void omap44xx_prm_reconfigure_io_chain(void)
+-{
+-}
+-#endif
+-
+ extern int __init omap44xx_prm_init(void);
+ extern u32 omap44xx_prm_get_reset_sources(void);
+ 
+diff --git a/arch/arm/mach-omap2/prm_common.c b/arch/arm/mach-omap2/prm_common.c
+index f246bb4..582ed6a 100644
+--- a/arch/arm/mach-omap2/prm_common.c
++++ b/arch/arm/mach-omap2/prm_common.c
+@@ -487,6 +487,22 @@ int prm_is_hardreset_asserted(u8 shift, u8 part, s16 prm_mod, u16 offset)
  }
  
-+/**
-+ * am33xx_prm_global_warm_sw_reset - reboot the device via warm reset
+ /**
++ * prm_reconfigure_io_chain - clear latches and reconfigure I/O chain
 + *
-+ * Immediately reboots the device through warm reset.
++ * Clear any previously-latched I/O wakeup events and ensure that the
++ * I/O wakeup gaes are aligned with the current mux settings.
++ * Calls SoC specific I/O chain reconfigure function if available,
++ * otherwise does nothing.
 + */
-+void am33xx_prm_global_warm_sw_reset(void)
++void prm_reconfigure_io_chain(void)
 +{
-+	am33xx_prm_rmw_reg_bits(AM33XX_RST_GLOBAL_WARM_SW_MASK,
-+				AM33XX_RST_GLOBAL_WARM_SW_MASK,
-+				AM33XX_PRM_DEVICE_MOD,
-+				AM33XX_PRM_RSTCTRL_OFFSET);
++	if (!prcm_irq_setup || !prcm_irq_setup->reconfigure_io_chain)
++		return;
 +
-+	/* OCP barrier */
-+	(void)am33xx_prm_read_reg(AM33XX_PRM_DEVICE_MOD,
-+				  AM33XX_PRM_RSTCTRL_OFFSET);
++	prcm_irq_setup->reconfigure_io_chain();
 +}
 +
- struct pwrdm_ops am33xx_pwrdm_operations = {
- 	.pwrdm_set_next_pwrst		= am33xx_pwrdm_set_next_pwrst,
- 	.pwrdm_read_next_pwrst		= am33xx_pwrdm_read_next_pwrst,
++/**
+  * prm_register - register per-SoC low-level data with the PRM
+  * @pld: low-level per-SoC OMAP PRM data & function pointers to register
+  *
 -- 
 1.7.9.5
