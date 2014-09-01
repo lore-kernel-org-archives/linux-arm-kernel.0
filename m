@@ -1,37 +1,79 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Mon, 01 Sep 2014 18:08:49 +0100
-Subject: [Linaro-acpi] [RFC PATCH for Juno 1/2] net: smsc911x add support
- for probing from ACPI
-In-Reply-To: <20140901165853.GJ29327@sirena.org.uk>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 01 Sep 2014 19:11:44 +0200
+Subject: [RFC PATCH for Juno 1/2] net: smsc911x add support for probing
+ from ACPI
+In-Reply-To: <20140901170447.GF608@arm.com>
 References: <1409583961-7466-1-git-send-email-hanjun.guo@linaro.org>
  <1409583961-7466-2-git-send-email-hanjun.guo@linaro.org>
- <2861461.8zNpLC3I2n@wuerfel> <20140901152854.GJ2953@xora-haswell.xora.org.uk>
- <20140901165333.GE608@arm.com> <20140901165853.GJ29327@sirena.org.uk>
-Message-ID: <5404A821.5020207@arm.com>
+ <20140901170447.GF608@arm.com>
+Message-ID: <21764799.KDNDm9XRax@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+On Monday 01 September 2014 18:04:47 Catalin Marinas wrote:
+> On Mon, Sep 01, 2014 at 04:06:00PM +0100, Hanjun Guo wrote:
+> > +#ifdef CONFIG_ACPI
+> > +/* Configure some sensible defaults for ACPI mode */
+> > +static int smsc911x_probe_config_acpi(struct smsc911x_platform_config *config,
+> > +                                 acpi_handle *ahandle)
+> > +{
+> > +     if (!ahandle)
+> > +             return -ENOSYS;
+> > +
+> > +     config->phy_interface = PHY_INTERFACE_MODE_MII;
+> > +
+> > +     config->flags |= SMSC911X_USE_32BIT;
+> > +
+> > +     config->irq_polarity = SMSC911X_IRQ_POLARITY_ACTIVE_HIGH;
+> > +
+> > +     config->irq_type = SMSC911X_IRQ_TYPE_PUSH_PULL;
+> > +
+> > +     return 0;
+> > +}
+> > +#else
+> 
+> I don't like this and it shows issues we have with ACPI on certain ARM
+> platforms. You hard-code these values to match the Juno platform. What
+> if we get another SoC which has different configuration here? For DT, we
+> have the smsc911x_probe_config_dt() which reads the relevant information
+> from DT. I think this kind of configuration would be more suitable as
+> _DSD properties and sharing the similar names with DT (but we go back to
+> the question about who's in charge of the _DSD properties).
 
-On 01/09/14 17:58, Mark Brown wrote:
-> On Mon, Sep 01, 2014 at 05:53:33PM +0100, Catalin Marinas wrote:
->
->> Confused. Then how come smsc911x_drv_probe() has this line:
->
->> 	acpi_handle *ahandle = ACPI_HANDLE(&pdev->dev);
->
->> without any #ifdef's.
->
-> There's a stub smsc911x_probe_config_acpi() provided in the non-ACPI
-> case, Arnd's suggestion is basically to remove the stub.
->
+Good point, I totally missed that.
 
-I think Catalin is referring to ACPI_HANDLE used without any #ifdefs
+There is of course the possibility to set those values based on the
+acpi_device_id, but that is exactly the part that _DSD is trying to
+avoid.
 
-Catalin, few macros like ACPI_HANDLE and ACPI_PTR are defined in
-include/linux/acpi.h even when CONFIG_ACPI is not set mainly to
-avoid #ifdef's around simple assignments like the above one and one
-in platform_driver.acpi_match_table
+> >  static int smsc911x_drv_probe(struct platform_device *pdev)
+> >  {
+> >       struct device_node *np = pdev->dev.of_node;
+> > +     acpi_handle *ahandle = ACPI_HANDLE(&pdev->dev);
+> >       struct net_device *dev;
+> >       struct smsc911x_data *pdata;
+> >       struct smsc911x_platform_config *config = dev_get_platdata(&pdev->dev);
+> > @@ -2436,6 +2464,9 @@ static int smsc911x_drv_probe(struct platform_device *pdev)
+> >       }
+> >  
+> >       retval = smsc911x_probe_config_dt(&pdata->config, np);
+> > +     if (retval)
+> > +             retval = smsc911x_probe_config_acpi(&pdata->config, ahandle);
+> > +
+> 
+> In most of the ACPI patches so far we check for ACPI first with DT as a
+> fall-back if ACPI is not enabled. This changes here.
 
-Regards,
-Sudeep
+Does this really make a difference?
+
+> I would prefer
+> something which probes only ACPI if the ACPI is enabled (run-time, not
+> config) otherwise DT only. E.g.
+
+(example missing?)
+
+I think we should have the equivalent of of_have_populated_dt(), to
+check whether acpi is being used to boot, and have that new function
+be hardcoded to zero in case of !IS_ENABLED(CONFIG_ACPI).
+
+	Arnd
