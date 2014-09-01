@@ -1,56 +1,42 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 1 Sep 2014 12:37:55 +0100
-Subject: [PATCH v6 2/6] arm64: ptrace: allow tracer to skip a system call
-In-Reply-To: <53FD72E2.4020103@linaro.org>
-References: <1408611405-8943-1-git-send-email-takahiro.akashi@linaro.org>
- <1408611405-8943-3-git-send-email-takahiro.akashi@linaro.org>
- <CAGXu5jJCyqpXkdvNDCu+eMr0qnqwbqUUo4u+2p_7DvFMzfKoEw@mail.gmail.com>
- <53F69045.7010301@linaro.org> <20140826175128.GD23445@arm.com>
- <53FD72E2.4020103@linaro.org>
-Message-ID: <20140901113755.GA24594@arm.com>
+From: steve.capper@linaro.org (Steve Capper)
+Date: Mon, 1 Sep 2014 12:43:06 +0100
+Subject: [PATCH V3 0/6] RCU get_user_pages_fast and __get_user_pages_fast
+In-Reply-To: <20140828152320.GN22580@arm.com>
+References: <1409237107-24228-1-git-send-email-steve.capper@linaro.org>
+ <20140828152320.GN22580@arm.com>
+Message-ID: <CAPvkgC0YVhPEBqbWSDnGyZBUn3+8Kv7-yx1-_n0Jx+giKzOqmw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 27, 2014 at 06:55:46AM +0100, AKASHI Takahiro wrote:
-> On 08/27/2014 02:51 AM, Will Deacon wrote:
-> > On Fri, Aug 22, 2014 at 01:35:17AM +0100, AKASHI Takahiro wrote:
-> >> Oops, you're absolutely right. I didn't think of this case.
-> >> syscall_trace_enter() should not return a syscallno directly, but always
-> >> return -1 if syscallno < 0. (except when secure_computing() returns with -1)
-> >> This also implies that tracehook_report_syscall() should also have a return value.
-> >>
-> >> Will, is this fine with you?
-> >
-> > Well, the first thing that jumps out at me is why this is being done
-> > completely differently for arm64 and arm. I thought adding the new ptrace
-> > requests would reconcile the differences?
-> 
-> I'm not sure what portion of my code you mentioned as "completely different", but
-> 
-> 1)
-> setting x0 to -ENOSYS is necessary because, otherwise, user-issued syscall(-1) will
-> return a bogus value when audit tracing is on.
-> 
-> Please note that, on arm,
->                   not traced      traced
->                   ------          ------
-> syscall(-1)      aborted         OOPs(BUG_ON)
-> syscall(-3000)   aborted         aborted
-> syscall(1000)    ENOSYS          ENOSYS
-> 
-> So, anyhow, its a bit difficult and meaningless to mimic these invalid cases.
+On 28 August 2014 16:23, Will Deacon <will.deacon@arm.com> wrote:
+> On Thu, Aug 28, 2014 at 03:45:01PM +0100, Steve Capper wrote:
+>> I would like to get this series into 3.18 as it fixes quite a big problem
+>> with THP on arm and arm64. This series is split into a core mm part, an
+>> arm part and an arm64 part.
+>>
+>> Could somebody please take patch #1 (if it looks okay)?
+>> Russell, would you be happy with patches #2, #3, #4? (if we get #1 merged)
+>> Catalin, would you be happy taking patches #5, #6? (if we get #1 merged)
+>
+> Pretty sure we're happy to take the arm64 bits once you've got the core
+> changes sorted out. Failing that, Catalin's acked them so they could go via
+> an mm tree if it's easier.
+>
 
-I'm not suggesting we make ourselves bug-compatible with ARM. Instead, I'd
-rather see a series of patches getting the ARM code working correctly,
-before we go off doing something different for arm64.
+Hello,
 
-> 2)
-> branching a new label, syscall_trace_return_skip (see entry.S), after syscall_trace_enter()
-> is necessary in order to avoid OOPS in audit_syscall_enter() as we discussed.
-> 
-> Did I make it clear?
+Are any mm maintainers willing to take the first patch from this
+series into their tree for merging into 3.18?
+  mm: Introduce a general RCU get_user_pages_fast.
 
-Sure. So let's fix ARM, then look at the arm64 port after that. I really
-want to avoid divergence in this area.
+(or please let me know if there are any issues with the patch that
+need addressing).
 
-Will
+As Will has stated, Catalin's already acked the arm64 patches, and
+these can also go in via an mm tree if that makes things easier:
+  arm64: mm: Enable HAVE_RCU_TABLE_FREE logic
+  arm64: mm: Enable RCU fast_gup
+
+Thanks,
+--
+Steve
