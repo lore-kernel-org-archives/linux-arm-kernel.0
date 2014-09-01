@@ -1,71 +1,37 @@
-From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Mon, 01 Sep 2014 18:07:38 +0100
-Subject: [PATCH 2/2] imx-drm: imx-ldb: fix NULL pointer in imx_ldb_unbind()
-In-Reply-To: <20140901170712.GJ30401@n2100.arm.linux.org.uk>
-References: <20140901170712.GJ30401@n2100.arm.linux.org.uk>
-Message-ID: <E1XOV4s-0004ff-Fz@rmk-PC.arm.linux.org.uk>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Mon, 01 Sep 2014 18:08:49 +0100
+Subject: [Linaro-acpi] [RFC PATCH for Juno 1/2] net: smsc911x add support
+ for probing from ACPI
+In-Reply-To: <20140901165853.GJ29327@sirena.org.uk>
+References: <1409583961-7466-1-git-send-email-hanjun.guo@linaro.org>
+ <1409583961-7466-2-git-send-email-hanjun.guo@linaro.org>
+ <2861461.8zNpLC3I2n@wuerfel> <20140901152854.GJ2953@xora-haswell.xora.org.uk>
+ <20140901165333.GE608@arm.com> <20140901165853.GJ29327@sirena.org.uk>
+Message-ID: <5404A821.5020207@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When trying to unbind imx-drm, the following oops was observed from
-the imx-ldb driver:
+Hi Mark,
 
-Unable to handle kernel NULL pointer dereference at virtual address 0000001c
-pgd = de954000
-[0000001c] *pgd=2e92c831, *pte=00000000, *ppte=00000000
-Internal error: Oops: 17 [#1] SMP ARM
-Modules linked in: bnep rfcomm bluetooth nfsd exportfs hid_cypress brcmfmac brcmutil snd_soc_fsl_ssi snd_soc_fsl_spdif imx_pcm_fiq imx_pcm_dma imx_ldb(C) imx_thermal imx_sdma imx2_wdt snd_soc_sgtl5000 snd_soc_imx_sgtl5000 snd_soc_imx_spdif snd_soc_imx_audmux
-CPU: 1 PID: 1228 Comm: bash Tainted: G         C    3.16.0-rc2+ #1229
-task: ea378d80 ti: de948000 task.ti: de948000
-PC is at imx_ldb_unbind+0x1c/0x58 [imx_ldb]
-LR is at component_unbind+0x38/0x70
-pc : [<bf025068>]    lr : [<c0353108>]    psr: 200f0013
-sp : de949da8  ip : de949dc0  fp : de949dbc
-r10: e9a44b0c  r9 : 00000000  r8 : de949f78
-r7 : 00000012  r6 : e9b3f400  r5 : e9b133b8  r4 : e9b13010
-r3 : 00000000  r2 : e9b3f400  r1 : ea9a0210  r0 : e9b13020
-Flags: nzCv  IRQs on  FIQs on  Mode SVC_32  ISA ARM  Segment user
-Control: 10c53c7d  Table: 2e95404a  DAC: 00000015
-Process bash (pid: 1228, stack limit = 0xde948240)
-Stack: (0xde949da8 to 0xde94a000)
-...
-Backtrace:
-[<bf02504c>] (imx_ldb_unbind [imx_ldb]) from [<c0353108>] (component_unbind+0x38/0x70)
-[<c03530d0>] (component_unbind) from [<c03531d4>] (component_unbind_all+0x94/0xc8)
-[<c0353140>] (component_unbind_all) from [<c04bc224>] (imx_drm_driver_unload+0x34/0x4c)
-[<c04bc1f0>] (imx_drm_driver_unload) from [<c03394a4>] (drm_dev_unregister+0x2c/0xa0)
-[<c0339478>] (drm_dev_unregister) from [<c0339f8c>] (drm_put_dev+0x30/0x6c)
-[<c0339f5c>] (drm_put_dev) from [<c04bc1cc>] (imx_drm_unbind+0x14/0x18)
-[<c04bc1b8>] (imx_drm_unbind) from [<c03530b4>] (component_master_del+0xbc/0xd8)
-...
-Code: e5904058 e2840010 e2845fea e59430a0 (e593301c)
----[ end trace 4f211c6dbbcd4963 ]---
+On 01/09/14 17:58, Mark Brown wrote:
+> On Mon, Sep 01, 2014 at 05:53:33PM +0100, Catalin Marinas wrote:
+>
+>> Confused. Then how come smsc911x_drv_probe() has this line:
+>
+>> 	acpi_handle *ahandle = ACPI_HANDLE(&pdev->dev);
+>
+>> without any #ifdef's.
+>
+> There's a stub smsc911x_probe_config_acpi() provided in the non-ACPI
+> case, Arnd's suggestion is basically to remove the stub.
+>
 
-This is caused by only having one channel out of the pair configured in
-DT; the second channel remains uninitialised, but upon unbind, the
-driver attempts to clean up both, thereby dereferencing a NULL pointer.
-Avoid this by checking that the second channel is initialised.
+I think Catalin is referring to ACPI_HANDLE used without any #ifdefs
 
-Fixes: 1b3f76756633 ("imx-drm: initialise drm components directly")
-Cc: <stable@vger.kernel.org>
-Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
----
- drivers/staging/imx-drm/imx-ldb.c | 3 +++
- 1 file changed, 3 insertions(+)
+Catalin, few macros like ACPI_HANDLE and ACPI_PTR are defined in
+include/linux/acpi.h even when CONFIG_ACPI is not set mainly to
+avoid #ifdef's around simple assignments like the above one and one
+in platform_driver.acpi_match_table
 
-diff --git a/drivers/staging/imx-drm/imx-ldb.c b/drivers/staging/imx-drm/imx-ldb.c
-index 7e3f019d7e72..4662e00b456a 100644
---- a/drivers/staging/imx-drm/imx-ldb.c
-+++ b/drivers/staging/imx-drm/imx-ldb.c
-@@ -574,6 +574,9 @@ static void imx_ldb_unbind(struct device *dev, struct device *master,
- 	for (i = 0; i < 2; i++) {
- 		struct imx_ldb_channel *channel = &imx_ldb->channel[i];
- 
-+		if (!channel->connector.funcs)
-+			continue;
-+
- 		channel->connector.funcs->destroy(&channel->connector);
- 		channel->encoder.funcs->destroy(&channel->encoder);
- 	}
--- 
-1.8.3.1
+Regards,
+Sudeep
