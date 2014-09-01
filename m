@@ -1,46 +1,52 @@
 From: eric.auger@linaro.org (Eric Auger)
-Date: Mon,  1 Sep 2014 14:52:42 +0200
-Subject: [RFC v2 3/9] ARM: KVM: Enable the KVM-VFIO device
+Date: Mon,  1 Sep 2014 14:52:43 +0200
+Subject: [RFC v2 4/9] VFIO: platform: handler tests whether the IRQ is
+ forwarded
 In-Reply-To: <1409575968-5329-1-git-send-email-eric.auger@linaro.org>
 References: <1409575968-5329-1-git-send-email-eric.auger@linaro.org>
-Message-ID: <1409575968-5329-4-git-send-email-eric.auger@linaro.org>
+Message-ID: <1409575968-5329-5-git-send-email-eric.auger@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Kim Phillips <kim.phillips@linaro.org>
+In case the IRQ is forwarded, the VFIO platform IRQ handler does not
+need to disable the IRQ anymore. In that mode, when the handler completes
+the IRQ is not deactivated but only its priority is lowered.
 
-Used by KVM-enabled VFIO-based device passthrough support in QEMU.
+Some other actor (typically a guest) is supposed to deactivate the IRQ,
+allowing at that time a new physical IRQ to hit.
 
-Signed-off-by: Kim Phillips <kim.phillips@linaro.org>
+In virtualization use case, the physical IRQ is automatically completed
+by the interrupt controller when the guest completes the corresponding
+virtual IRQ.
+
+Signed-off-by: Eric Auger <eric.auger@linaro.org>
 ---
- arch/arm/kvm/Kconfig  | 1 +
- arch/arm/kvm/Makefile | 2 +-
- 2 files changed, 2 insertions(+), 1 deletion(-)
+ drivers/vfio/platform/vfio_platform_irq.c | 7 ++++++-
+ 1 file changed, 6 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/kvm/Kconfig b/arch/arm/kvm/Kconfig
-index e519a40..aace254 100644
---- a/arch/arm/kvm/Kconfig
-+++ b/arch/arm/kvm/Kconfig
-@@ -24,6 +24,7 @@ config KVM
- 	select KVM_MMIO
- 	select KVM_ARM_HOST
- 	depends on ARM_VIRT_EXT && ARM_LPAE
-+	select KVM_VFIO
- 	select HAVE_KVM_EVENTFD
- 	---help---
- 	  Support hosting virtualized guest machines. You will also
-diff --git a/arch/arm/kvm/Makefile b/arch/arm/kvm/Makefile
-index 859db09..ea1fa76 100644
---- a/arch/arm/kvm/Makefile
-+++ b/arch/arm/kvm/Makefile
-@@ -15,7 +15,7 @@ AFLAGS_init.o := -Wa,-march=armv7-a$(plus_virt)
- AFLAGS_interrupts.o := -Wa,-march=armv7-a$(plus_virt)
+diff --git a/drivers/vfio/platform/vfio_platform_irq.c b/drivers/vfio/platform/vfio_platform_irq.c
+index 6768508..1f851b2 100644
+--- a/drivers/vfio/platform/vfio_platform_irq.c
++++ b/drivers/vfio/platform/vfio_platform_irq.c
+@@ -88,13 +88,18 @@ static irqreturn_t vfio_irq_handler(int irq, void *dev_id)
+ 	struct vfio_platform_irq *irq_ctx = dev_id;
+ 	unsigned long flags;
+ 	int ret = IRQ_NONE;
++	struct irq_data *d;
++	bool is_forwarded;
  
- KVM := ../../../virt/kvm
--kvm-arm-y = $(KVM)/kvm_main.o $(KVM)/coalesced_mmio.o $(KVM)/eventfd.o
-+kvm-arm-y = $(KVM)/kvm_main.o $(KVM)/coalesced_mmio.o $(KVM)/eventfd.o $(KVM)/vfio.o
+ 	spin_lock_irqsave(&irq_ctx->lock, flags);
  
- obj-y += kvm-arm.o init.o interrupts.o
- obj-y += arm.o handle_exit.o guest.o mmu.o emulate.o reset.o
+ 	if (!irq_ctx->masked) {
+ 		ret = IRQ_HANDLED;
++		d = irq_get_irq_data(irq_ctx->hwirq);
++		is_forwarded = irqd_irq_forwarded(d);
+ 
+-		if (irq_ctx->flags & VFIO_IRQ_INFO_AUTOMASKED) {
++		if (irq_ctx->flags & VFIO_IRQ_INFO_AUTOMASKED &&
++						!is_forwarded) {
+ 			disable_irq_nosync(irq_ctx->hwirq);
+ 			irq_ctx->masked = true;
+ 		}
 -- 
 1.9.1
