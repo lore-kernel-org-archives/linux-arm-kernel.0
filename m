@@ -1,51 +1,27 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 01 Sep 2014 10:24:17 +0200
-Subject: [PATCH 1/2] ARM: multi_v7_defconfig: Enable shmobile platforms
-In-Reply-To: <CAMuHMdXXUrq3tsiaEym_uuoiYXNt66c5sm+1mSAfX6cHgMbEOQ@mail.gmail.com>
-References: <1409234429-1916-1-git-send-email-geert+renesas@glider.be>
- <3598124.ze8sbSR9ui@wuerfel>
- <CAMuHMdXXUrq3tsiaEym_uuoiYXNt66c5sm+1mSAfX6cHgMbEOQ@mail.gmail.com>
-Message-ID: <3848521.UcIm3L3emN@wuerfel>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 1 Sep 2014 10:27:22 +0200
+Subject: [PATCH v2 1/3] pinctrl: at91: add drive strength configuration
+In-Reply-To: <1408849926-9603-1-git-send-email-mark.roszko@gmail.com>
+References: <1408849926-9603-1-git-send-email-mark.roszko@gmail.com>
+Message-ID: <CACRpkdazv59T6xOSAxJQ7t5KDb7wyG4HwFTM+q4KC67ZFrZ26g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 30 August 2014 11:32:30 Geert Uytterhoeven wrote:
-> Hi Arnd,
-> 
-> On Fri, Aug 29, 2014 at 10:11 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> > A related problem that I think is more significant is that
-> > some platforms 'select' a particular driver and when you
-> > disable the platform, that driver is suddenly removed from the
-> > defconfig for all other platforms as well. This has bitten
-> > us a few times in the past, and I'd really like to fix those
-> > cases first.
-> 
-> Indeed. "select" is evil, and has a devastating effect on minimal
-> defconfigs (lots of churn and nasty surprises like the one you mentioned).
-> 
-> So it actually makes more sense to derive multi_v7_defconfig
-> from the individual platform's defconfigs.
-> I also have a script for that, which I wrote to create m68k's multi_defconfig
-> a long time ago:
-> https://github.com/geertu/linux-scripts/blob/master/linux-config-merge
+On Sun, Aug 24, 2014 at 5:12 AM, Marek Roszko <mark.roszko@gmail.com> wrote:
 
-This looks like a very interesting method, and is similar to the "Kconfig
-fragments" that a lot of people are using.
+> The SAMA5 and SAM9x5 series both have drive strength options for the PIOs. This
+> patch adds the ability to set one of three hardware options for drive strengths of low,
+> medium or high for the each pin. The actual current output of the chip based on the setting
+> is defined in the datasheets and varies per pins separate from banks and with supply voltage.
+>
+> This patch adds three new dt-bindings that allow setting the strength when configuring
+> pins. By default, no change will be made to the drive strength of a pin from its reset value.
+> Due to the difference between the register addresses of the SAMA5 and SAM9x5 series, a new
+> sama5d3-pinctrl id was added.
+>
+> Signed-off-by: Marek Roszko <mark.roszko@gmail.com>
 
-However I'm not sure we can replace the multi_v7_defconfig with it, the
-main problem I see with that is that it can get unpredictable when
-changes are done to one of the inputs. I'd rather keep the multi_v7_defconfig
-in some form (possibly extend it to v6) and use fragments for some specialized
-variation (v6-smp, v7, v7-lpae, ...).
- 
-> In the long run, I think creating defconfigs from DTS is the way to go.
-> Extracting dependencies from the build system (both Makefile and
-> the myriad of complex dependencies in Kconfig) are the biggest hurdles to
-> solve.
+Waiting for feedback from AT91 maintainers...
 
-Yes, this looks like very interesting work. We won't be able to use it
-for all cases, in particular for distro kernels that are meant to run
-on a large number of machines that don't all have dts files in the kernel,
-but it should simplify the workflow for a lot of embedded use cases.
-
-	Arnd
+Yours,
+Linus Walleij
