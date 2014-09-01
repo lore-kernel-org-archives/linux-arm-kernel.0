@@ -1,48 +1,114 @@
-From: peter.maydell@linaro.org (Peter Maydell)
-Date: Mon, 1 Sep 2014 10:30:17 +0100
-Subject: [PATCH 06/16] KVM: Add KVM_EXIT_SYSTEM_EVENT to user space API
- header
-In-Reply-To: <20140901092017.GC19836@cbox>
-References: <1401041942-23471-1-git-send-email-christoffer.dall@linaro.org>
- <1401041942-23471-7-git-send-email-christoffer.dall@linaro.org>
- <CAFEAcA-yWadPiE4v7f-C1-V71=QHYLB=fzC78xhNMnNkVSJAhg@mail.gmail.com>
- <20140901092017.GC19836@cbox>
-Message-ID: <CAFEAcA_S9dHbYVDrkr7X+cTcg-TC0nRWd4zLaUTX2zBjr+TKGQ@mail.gmail.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Mon, 1 Sep 2014 10:32:06 +0100
+Subject: [PATCH] mfd: palmas: Add support for optional wakeup
+In-Reply-To: <54007515.5080506@ti.com>
+References: <1408457197-30487-1-git-send-email-nm@ti.com>
+ <20140829105619.GH24579@lee--X1> <54007515.5080506@ti.com>
+Message-ID: <20140901093206.GJ7374@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 1 September 2014 10:20, Christoffer Dall <christoffer.dall@linaro.org> wrote:
-> On Fri, Aug 29, 2014 at 06:39:09PM +0100, Peter Maydell wrote:
->> Talking with Ard I realised that there's actually a hole in the
->> specification of this new ABI. Did we intend these shutdown
->> and reset exits to be:
->>  (1) requests from the guest for the shutdown/reset to be
->>    scheduled in the near future (and we'll continue to execute
->>    the guest until the shutdown actually happens)
->>  (2) requests for shutdown/reset right now, with no further
->>    guest instructions to be executed
->>
->> ?
->>
->> As currently implemented in QEMU we get behaviour (1),
->> but I think the kernel PSCI implementation assumes
->> behaviour (2). Who's right?
->>
-> For the arm/arm64 use of this API (currently the only one?) the host
-> would not break or anything like that if you keep executing the VM, but
-> the guest will expect that no other instructions are executed after this
-> call.
+On Fri, 29 Aug 2014, Nishanth Menon wrote:
+> On 08/29/2014 05:56 AM, Lee Jones wrote:
+> > On Tue, 19 Aug 2014, Nishanth Menon wrote:
+> > 
+> >> With the recent pinctrl-single changes, omaps can treat wake-up events
+> >> from deeper idle states as interrupts.
+> >>
+> >> Let's add support for the optional second interrupt for wake-up
+> >> events. And then SoC can wakeup and handle the event using it's
+> >> regular handler.
+> >>
+> >> Finally, to pass the wake-up interrupt in the dts file,
+> >> interrupts-extended property needs to be passed.
+> >>
+> >> This is similar in approach to commit 2a0b965cfb6e ("serial: omap: Add
+> >> support for optional wake-up")
+> >>
+> >> Signed-off-by: Nishanth Menon <nm@ti.com>
+> >> ---
+> >>  Documentation/devicetree/bindings/mfd/palmas.txt |   20 ++++++++
+> > 
+> > DT Ack please.
 
-Well, if we do that then between QEMU and KVM we've
-violated the PSCI ABI we're supposed to provide, so somebody
-is wrong :-)
+Please read Documentation/devicetree/bindings/submittingpatches.txt
 
-I guess that since the kernel already implements "assume
-userspace won't resume the guest vcpu" the path of least
-resistance is to make userspace follow that.
+> >>  drivers/mfd/palmas.c                             |   59 ++++++++++++++++++++++
+> >>  include/linux/mfd/palmas.h                       |    2 +
+> >>  3 files changed, 81 insertions(+)
+> >>
+> >> diff --git a/Documentation/devicetree/bindings/mfd/palmas.txt b/Documentation/devicetree/bindings/mfd/palmas.txt
+> >> index eda8989..2627842 100644
+> >> --- a/Documentation/devicetree/bindings/mfd/palmas.txt
+> >> +++ b/Documentation/devicetree/bindings/mfd/palmas.txt
+> >> @@ -51,3 +51,23 @@ palmas {
+> >>  		....
+> >>  	};
+> >>  }
+> >> +
+> >> +Example: with interrupts extended
+> >> + See Documentation/devicetree/bindings/interrupt-controller/interrupts.txt
+> >> + Use pinmux 0x418 as wakeup interrupt and gpio1_0 as interrupt source
+> >> +
+> >> +palmas {
+> > 
+> > Should this be 'palmas at 40 {'?
+> 
+> I might have preferred that as well.. I kept the existing style in the
+> documentation. Would you like me to change existing doc style too?
 
-What does kvmtool do here (if it implements PSCI shutdown
-and reset at all)?
+Yes please.  Although you can do this subseqently.
 
-thanks
--- PMM
+[...]
+
+> >> +static irqreturn_t palmas_wake_irq(int irq, void *_palmas)
+> >> +{
+> >> +	/*
+> >> +	 * Return Not handled so that interrupt is disabled.
+> >> +	 * Level event ensures that the event is eventually handled
+> >> +	 * by the appropriate chip handler already registered
+> >> +	 */
+> > 
+> > This looks okay to me, but could do with a second opinion from someone
+> > who is a little more familier with this kind of h/w.
+> > 
+> > How does this differ from threading IRQs?
+> 
+> I could try with an example:
+> consider a GPIO block 7 gpio 4 connected to a pinctrl pin 234 as the
+> interrupt source for palmas.
+> 
+> When the system is active, the GPIO block 7, gpio 4 happily functions
+> as the interrupt source. However, the SoC might not capable of
+> achieving SoC wide deepsleep when GPIO block 7 is active, So we have
+> to power off GPIO block 7. However on achieving low power, the system
+> needs to be capable of waking backup, for this, SoC uses the hardware
+> at the pin itself(TI calls it control module, others have other names,
+> lets for the discussion, call it pinctrl), on going to sleep the
+> action of enabling the pinctrl irq - enables the wakeup capability of
+> the pin, and disabling it disabled the wakeup capability. when the
+> wakeup event does take place, in some cases, it might be a edge event,
+> where by the time we have recofigured GPIO block, the interrupt event
+> is long gone - to support this, pinctrl invokes the driver interrupt
+> handler to ensure this functions. in our case(palmas), we are level
+> event and can depend on GPIO block to handle it when it is configured.
+> 
+> Basically two interrupt sources when SoC is in deep sleep(1 to exit
+> from deepsleep, and other from the module handling the actual event) -
+> Example: powerbutton press OR palmas RTC wakeup OR Palmas GPIO
+> generated wakeup.
+> 
+> However, this is not the same as threading IRQ as the wakeup event is
+> involved only during suspend path.
+> 
+> commit 2a0b965cfb6e ("serial: omap: Add support for optional wake-up")
+> 
+> is a good reference from serial port handling perspective.
+
+Thanks for the explanation.  This makes sense now.
+
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
