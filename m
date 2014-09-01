@@ -1,75 +1,58 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 1 Sep 2014 09:54:13 +0200
-Subject: [GIT PULL] Allwinner DT additions for 3.17, take 2
-In-Reply-To: <20140823042022.GB11268@localhost>
-References: <20140731095158.GA14197@lukather>
- <CAGb2v677G33AC2C8sV2tBthVfF=WdG7673g9PggCoUuJ1xtXuw@mail.gmail.com>
- <20140821211500.GU15297@lukather>
- <20140823042022.GB11268@localhost>
-Message-ID: <20140901075413.GK15297@lukather>
+From: gautam.vivek@samsung.com (Vivek Gautam)
+Date: Mon, 1 Sep 2014 13:27:38 +0530
+Subject: [PATCH 3/5] phy: exynos5-usbdrd: Add facility for VBUS-BOOST-5V
+ supply
+In-Reply-To: <20140828191625.GQ16689@saruman.home>
+References: <1409212920-28526-1-git-send-email-gautam.vivek@samsung.com>
+ <1409212920-28526-4-git-send-email-gautam.vivek@samsung.com>
+ <20140828191625.GQ16689@saruman.home>
+Message-ID: <CAFp+6iFrx6RJJjkuLpy+2RGsscpf2PXUATABJq8oPL+XhE_+vQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof,
+Hi Felipe,
 
-On Fri, Aug 22, 2014 at 09:20:22PM -0700, Olof Johansson wrote:
-> On Thu, Aug 21, 2014 at 11:15:00PM +0200, Maxime Ripard wrote:
-> > On Mon, Aug 18, 2014 at 02:19:07PM +0800, Chen-Yu Tsai wrote:
-> > > Hi,
-> > > 
-> > > On Thu, Jul 31, 2014 at 5:51 PM, Maxime Ripard
-> > > <maxime.ripard@free-electrons.com> wrote:
-> > > > Hi Arnd, Kevin, Olof,
-> > > >
-> > > > Here are a rather small (and late) pull request for the Allwinner DTs
-> > > > that comes on top of the previous one.
-> > > >
-> > > > It's basically just a fix, so there's no real need to merge it by
-> > > > -rc1, it can definitely be postponed to a later 3.17-rc.
-> > > >
-> > > > Thanks,
-> > > > Maxime
-> > > >
-> > > > The following changes since commit c220aec2bb793bf5a1fb451fd3e4db87654c5ba5:
-> > > >
-> > > >   ARM: dts: sun6i: Add Merrii A31 Hummingbird support (2014-07-18 22:40:37 +0200)
-> > > >
-> > > > are available in the git repository at:
-> > > >
-> > > >   git://git.kernel.org/pub/scm/linux/kernel/git/mripard/linux.git tags/sunxi-dt-for-3.17-2
-> > > >
-> > > > for you to fetch changes up to 495bccf3917b04c6727d720b56620e265c693ace:
-> > > >
-> > > >   ARM: dt: sun6i: Add #address-cells and #size-cells to i2c controller nodes (2014-07-28 11:34:39 +0200)
-> > > >
-> > > > ----------------------------------------------------------------
-> > > > Allwinner DT changes, take 2
-> > > >
-> > > > Only a single patch in here that fixes a DTC warning.
-> > > >
-> > > > ----------------------------------------------------------------
-> > > > Chen-Yu Tsai (1):
-> > > >       ARM: dt: sun6i: Add #address-cells and #size-cells to i2c controller nodes
-> > > 
-> > > It seems this patch didn't make it into v3.17-rc1.
-> > 
-> > Indeed. Arnd, Olof, Kevin, any news on this pull request?
-> 
-> Missed it. Will pull it for fixes.
 
-I didn't see it in your latest pull request to Linus, is this normal?
+On Fri, Aug 29, 2014 at 12:46 AM, Felipe Balbi <balbi@ti.com> wrote:
+> hi,
+>
+> On Thu, Aug 28, 2014 at 01:31:58PM +0530, Vivek Gautam wrote:
+>> @@ -457,11 +458,19 @@ static int exynos5_usbdrd_phy_power_on(struct phy *phy)
+>>       clk_prepare_enable(phy_drd->ref_clk);
+>>
+>>       /* Enable VBUS supply */
+>> +     if (phy_drd->vbus_boost) {
+>> +             ret = regulator_enable(phy_drd->vbus_boost);
+>> +             if (ret) {
+>> +                     dev_err(phy_drd->dev,
+>> +                             "Failed to enable VBUS boost supply\n");
+>> +                     goto fail_vbus;
+>> +             }
+>> +     }
+>
+> really this is nitpicking, but can you add a blank line here just make
+> my inner child happy ? :-)
 
-Thanks,
-Maxime
+Sure will add an extra line here and similar instances of this change.
+
+>
+>> @@ -470,6 +479,9 @@ static int exynos5_usbdrd_phy_power_on(struct phy *phy)
+>>
+>>       return 0;
+>>
+>> +fail_vbus_boost:
+>> +     if (phy_drd->vbus_boost)
+>> +             regulator_disable(phy_drd->vbus_boost);
+>
+> same here
+>
+> --
+> balbi
+
+
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140901/17f2dc30/attachment.sig>
+Best Regards
+Vivek Gautam
+Samsung R&D Institute, Bangalore
+India
