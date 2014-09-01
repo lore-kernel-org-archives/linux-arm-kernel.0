@@ -1,10 +1,10 @@
 From: Li.Xiubo@freescale.com (Xiubo Li)
-Date: Mon, 1 Sep 2014 12:29:37 +0800
-Subject: [PATCHv1 3/7] ASoC: dts: vf610-twr: To support simple card newest
- style.
+Date: Mon, 1 Sep 2014 12:29:38 +0800
+Subject: [PATCHv1 4/7] ASoC: dts: kirkwood-t5325: To support simple card
+ newest style.
 In-Reply-To: <1409545781-20530-1-git-send-email-Li.Xiubo@freescale.com>
 References: <1409545781-20530-1-git-send-email-Li.Xiubo@freescale.com>
-Message-ID: <1409545781-20530-4-git-send-email-Li.Xiubo@freescale.com>
+Message-ID: <1409545781-20530-5-git-send-email-Li.Xiubo@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -33,43 +33,38 @@ letter 'C' here mean to Codec.
 
 Signed-off-by: Xiubo Li <Li.Xiubo@freescale.com>
 ---
- arch/arm/boot/dts/vf610-twr.dts | 17 ++++++++---------
- 1 file changed, 8 insertions(+), 9 deletions(-)
+ arch/arm/boot/dts/kirkwood-t5325.dts | 15 ++++++++-------
+ 1 file changed, 8 insertions(+), 7 deletions(-)
 
-diff --git a/arch/arm/boot/dts/vf610-twr.dts b/arch/arm/boot/dts/vf610-twr.dts
-index b8a5e8c..841a45a 100644
---- a/arch/arm/boot/dts/vf610-twr.dts
-+++ b/arch/arm/boot/dts/vf610-twr.dts
-@@ -61,7 +61,6 @@
+diff --git a/arch/arm/boot/dts/kirkwood-t5325.dts b/arch/arm/boot/dts/kirkwood-t5325.dts
+index 610ec0f..25d1223 100644
+--- a/arch/arm/boot/dts/kirkwood-t5325.dts
++++ b/arch/arm/boot/dts/kirkwood-t5325.dts
+@@ -189,7 +189,6 @@
  
  	sound {
  		compatible = "simple-audio-card";
 -		simple-audio-card,format = "i2s";
- 		simple-audio-card,widgets =
- 			"Microphone", "Microphone Jack",
- 			"Headphone", "Headphone Jack",
-@@ -74,17 +73,17 @@
- 			"Headphone Jack", "HP_OUT",
- 			"Speaker Ext", "LINE_OUT";
+ 		simple-audio-card,routing =
+ 			"Headphone Jack", "HPL",
+ 			"Headphone Jack", "HPR",
+@@ -204,12 +203,14 @@
+ 
+ 		simple-audio-card,mclk-fs = <256>;
  
 -		simple-audio-card,cpu {
--			sound-dai = <&sai2>;
--			master-clkdir-out;
+-			sound-dai = <&audio>;
+-		};
+-
+-		simple-audio-card,codec {
+-			sound-dai = <&alc5621>;
 +		simple-audio-card,dai-link {
 +			format = "i2s";
- 			frame-master;
- 			bitclock-master;
--		};
- 
--		simple-audio-card,codec {
--			sound-dai = <&codec>;
--			frame-master;
--			bitclock-master;
 +			cpu {
-+				sound-dai = <&sai2>;
++				sound-dai = <&audio>;
 +			};
 +			codec {
-+				sound-dai = <&codec>;
++				sound-dai = <&alc5621>;
 +			};
  		};
  	};
