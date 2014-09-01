@@ -1,37 +1,74 @@
 From: t-kristo@ti.com (Tero Kristo)
-Date: Mon, 1 Sep 2014 21:09:01 +0300
-Subject: [PATCH 12/26] ARM: AM43xx: hwmod: use OMAP4 hardreset ops instead of
- the AM33xx version
+Date: Mon, 1 Sep 2014 21:09:02 +0300
+Subject: [PATCH 13/26] ARM: AM33xx: PRM: add support for prm_init
 In-Reply-To: <1409594955-1476-1-git-send-email-t-kristo@ti.com>
 References: <1409594955-1476-1-git-send-email-t-kristo@ti.com>
-Message-ID: <1409594955-1476-13-git-send-email-t-kristo@ti.com>
+Message-ID: <1409594955-1476-14-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-AM43xx is using OMAP4+ PRM driver, so it should be using the corresponding
-hardreset ops from the hwmod also.
+Added support for prm_init for AM33xx SoC. This is needed to register
+SoC specific prm_ll_data for these devices.
 
 Signed-off-by: Tero Kristo <t-kristo@ti.com>
 ---
- arch/arm/mach-omap2/omap_hwmod.c |    6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+ arch/arm/mach-omap2/io.c      |    2 ++
+ arch/arm/mach-omap2/prm33xx.c |   13 +++++++++++++
+ arch/arm/mach-omap2/prm33xx.h |    2 ++
+ 3 files changed, 17 insertions(+)
 
-diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
-index 0267af5..c52dc4c 100644
---- a/arch/arm/mach-omap2/omap_hwmod.c
-+++ b/arch/arm/mach-omap2/omap_hwmod.c
-@@ -4115,9 +4115,9 @@ void __init omap_hwmod_init(void)
- 		soc_ops.enable_module = _omap4_enable_module;
- 		soc_ops.disable_module = _omap4_disable_module;
- 		soc_ops.wait_target_ready = _omap4_wait_target_ready;
--		soc_ops.assert_hardreset = _am33xx_assert_hardreset;
--		soc_ops.deassert_hardreset = _am33xx_deassert_hardreset;
--		soc_ops.is_hardreset_asserted = _am33xx_is_hardreset_asserted;
-+		soc_ops.assert_hardreset = _omap4_assert_hardreset;
-+		soc_ops.deassert_hardreset = _omap4_deassert_hardreset;
-+		soc_ops.is_hardreset_asserted = _omap4_is_hardreset_asserted;
- 		soc_ops.init_clkdm = _init_clkdm;
- 	} else if (soc_is_am33xx()) {
- 		soc_ops.enable_module = _omap4_enable_module;
+diff --git a/arch/arm/mach-omap2/io.c b/arch/arm/mach-omap2/io.c
+index 26055d9..f1db801 100644
+--- a/arch/arm/mach-omap2/io.c
++++ b/arch/arm/mach-omap2/io.c
+@@ -53,6 +53,7 @@
+ #include "cminst44xx.h"
+ #include "prm2xxx.h"
+ #include "prm3xxx.h"
++#include "prm33xx.h"
+ #include "prm44xx.h"
+ #include "opp2xxx.h"
+ 
+@@ -583,6 +584,7 @@ void __init am33xx_init_early(void)
+ 	omap2_set_globals_cm(AM33XX_L4_WK_IO_ADDRESS(AM33XX_PRCM_BASE), NULL);
+ 	omap3xxx_check_revision();
+ 	am33xx_check_features();
++	am33xx_prm_init();
+ 	am33xx_cm_init();
+ 	am33xx_powerdomains_init();
+ 	am33xx_clockdomains_init();
+diff --git a/arch/arm/mach-omap2/prm33xx.c b/arch/arm/mach-omap2/prm33xx.c
+index 62709cd..f149e7c 100644
+--- a/arch/arm/mach-omap2/prm33xx.c
++++ b/arch/arm/mach-omap2/prm33xx.c
+@@ -342,3 +342,16 @@ struct pwrdm_ops am33xx_pwrdm_operations = {
+ 	.pwrdm_wait_transition		= am33xx_pwrdm_wait_transition,
+ 	.pwrdm_has_voltdm		= am33xx_check_vcvp,
+ };
++
++static struct prm_ll_data am33xx_prm_ll_data;
++
++int __init am33xx_prm_init(void)
++{
++	return prm_register(&am33xx_prm_ll_data);
++}
++
++static void __exit am33xx_prm_exit(void)
++{
++	prm_unregister(&am33xx_prm_ll_data);
++}
++__exitcall(am33xx_prm_exit);
+diff --git a/arch/arm/mach-omap2/prm33xx.h b/arch/arm/mach-omap2/prm33xx.h
+index 9b9918d..5cdfdc0 100644
+--- a/arch/arm/mach-omap2/prm33xx.h
++++ b/arch/arm/mach-omap2/prm33xx.h
+@@ -127,5 +127,7 @@ extern int am33xx_prm_is_hardreset_asserted(u8 shift, s16 inst,
+ extern int am33xx_prm_assert_hardreset(u8 shift, s16 inst, u16 rstctrl_offs);
+ extern int am33xx_prm_deassert_hardreset(u8 shift, u8 st_shift, s16 inst,
+ 		u16 rstctrl_offs, u16 rstst_offs);
++int am33xx_prm_init(void);
++
+ #endif /* ASSEMBLER */
+ #endif
 -- 
 1.7.9.5
