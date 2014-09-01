@@ -1,143 +1,287 @@
-From: fabio.estevam@freescale.com (Fabio Estevam)
-Date: Mon, 1 Sep 2014 14:50:03 -0300
-Subject: [PATCH 2/2] ARM: dts: imx6x-sdb: Add LCD support
-In-Reply-To: <1409593803-12368-1-git-send-email-fabio.estevam@freescale.com>
-References: <1409593803-12368-1-git-send-email-fabio.estevam@freescale.com>
-Message-ID: <1409593803-12368-2-git-send-email-fabio.estevam@freescale.com>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Mon, 1 Sep 2014 21:08:53 +0300
+Subject: [PATCH 04/26] ARM: AM33xx/OMAP4+: CM: remove cdoffs parameter from
+ wait_module_idle/ready
+In-Reply-To: <1409594955-1476-1-git-send-email-t-kristo@ti.com>
+References: <1409594955-1476-1-git-send-email-t-kristo@ti.com>
+Message-ID: <1409594955-1476-5-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for the "MX28LCD Seiko 4.3' WVGA" panel.
+This is not needed for anything. This also eases the consolidation of
+the wait_module_ready / wait_module_idle calls behind a generic CM
+driver API by reducing the number of needed parameters.
 
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+Signed-off-by: Tero Kristo <t-kristo@ti.com>
 ---
- arch/arm/boot/dts/imx6sx-sdb.dts | 93 ++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 93 insertions(+)
+ arch/arm/mach-omap2/cm33xx.c     |   18 +++++++-----------
+ arch/arm/mach-omap2/cm33xx.h     |   13 +++++--------
+ arch/arm/mach-omap2/cminst44xx.c |   19 +++++++------------
+ arch/arm/mach-omap2/cminst44xx.h |    5 ++---
+ arch/arm/mach-omap2/omap_hwmod.c |    4 ----
+ 5 files changed, 21 insertions(+), 38 deletions(-)
 
-diff --git a/arch/arm/boot/dts/imx6sx-sdb.dts b/arch/arm/boot/dts/imx6sx-sdb.dts
-index a3980d9..e2c244d 100644
---- a/arch/arm/boot/dts/imx6sx-sdb.dts
-+++ b/arch/arm/boot/dts/imx6sx-sdb.dts
-@@ -24,6 +24,13 @@
- 		reg = <0x80000000 0x40000000>;
- 	};
+diff --git a/arch/arm/mach-omap2/cm33xx.c b/arch/arm/mach-omap2/cm33xx.c
+index b3f99e9..ef9e9018 100644
+--- a/arch/arm/mach-omap2/cm33xx.c
++++ b/arch/arm/mach-omap2/cm33xx.c
+@@ -96,13 +96,12 @@ static inline u32 am33xx_cm_read_reg_bits(u16 inst, s16 idx, u32 mask)
+ /**
+  * _clkctrl_idlest - read a CM_*_CLKCTRL register; mask & shift IDLEST bitfield
+  * @inst: CM instance register offset (*_INST macro)
+- * @cdoffs: Clockdomain register offset (*_CDOFFS macro)
+  * @clkctrl_offs: Module clock control register offset (*_CLKCTRL macro)
+  *
+  * Return the IDLEST bitfield of a CM_*_CLKCTRL register, shifted down to
+  * bit 0.
+  */
+-static u32 _clkctrl_idlest(u16 inst, s16 cdoffs, u16 clkctrl_offs)
++static u32 _clkctrl_idlest(u16 inst, u16 clkctrl_offs)
+ {
+ 	u32 v = am33xx_cm_read_reg(inst, clkctrl_offs);
+ 	v &= AM33XX_IDLEST_MASK;
+@@ -113,17 +112,16 @@ static u32 _clkctrl_idlest(u16 inst, s16 cdoffs, u16 clkctrl_offs)
+ /**
+  * _is_module_ready - can module registers be accessed without causing an abort?
+  * @inst: CM instance register offset (*_INST macro)
+- * @cdoffs: Clockdomain register offset (*_CDOFFS macro)
+  * @clkctrl_offs: Module clock control register offset (*_CLKCTRL macro)
+  *
+  * Returns true if the module's CM_*_CLKCTRL.IDLEST bitfield is either
+  * *FUNCTIONAL or *INTERFACE_IDLE; false otherwise.
+  */
+-static bool _is_module_ready(u16 inst, s16 cdoffs, u16 clkctrl_offs)
++static bool _is_module_ready(u16 inst, u16 clkctrl_offs)
+ {
+ 	u32 v;
  
-+	backlight {
-+		compatible = "pwm-backlight";
-+		pwms = <&pwm3 0 5000000>;
-+		brightness-levels = <0 4 8 16 32 64 128 255>;
-+		default-brightness-level = <6>;
-+	};
-+
- 	gpio-keys {
- 		compatible = "gpio-keys";
- 		pinctrl-names = "default";
-@@ -90,6 +97,14 @@
- 			regulator-min-microvolt = <5000000>;
- 			regulator-max-microvolt = <5000000>;
- 		};
-+
-+		reg_lcd_3v3: regulator at 4 {
-+			compatible = "regulator-fixed";
-+			reg = <4>;
-+			regulator-name = "lcd-3v3";
-+			gpio = <&gpio3 27 0>;
-+			enable-active-high;
-+		};
- 	};
+-	v = _clkctrl_idlest(inst, cdoffs, clkctrl_offs);
++	v = _clkctrl_idlest(inst, clkctrl_offs);
  
- 	sound {
-@@ -251,6 +266,44 @@
- 	};
- };
+ 	return (v == CLKCTRL_IDLEST_FUNCTIONAL ||
+ 		v == CLKCTRL_IDLEST_INTERFACE_IDLE) ? true : false;
+@@ -229,7 +227,6 @@ void am33xx_cm_clkdm_force_wakeup(u16 inst, u16 cdoffs)
+ /**
+  * am33xx_cm_wait_module_ready - wait for a module to be in 'func' state
+  * @inst: CM instance register offset (*_INST macro)
+- * @cdoffs: Clockdomain register offset (*_CDOFFS macro)
+  * @clkctrl_offs: Module clock control register offset (*_CLKCTRL macro)
+  *
+  * Wait for the module IDLEST to be functional. If the idle state is in any
+@@ -237,11 +234,11 @@ void am33xx_cm_clkdm_force_wakeup(u16 inst, u16 cdoffs)
+  * sysconfig cannot be accessed and will probably lead to an "imprecise
+  * external abort"
+  */
+-int am33xx_cm_wait_module_ready(u16 inst, s16 cdoffs, u16 clkctrl_offs)
++int am33xx_cm_wait_module_ready(u16 inst, u16 clkctrl_offs)
+ {
+ 	int i = 0;
  
-+&lcdif1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_lcd>;
-+	lcd-supply = <&reg_lcd_3v3>;
-+	display = <&display0>;
-+	status = "okay";
-+
-+	display0: display {
-+		bits-per-pixel = <16>;
-+		bus-width = <24>;
-+
-+		display-timings {
-+			native-mode = <&timing0>;
-+			timing0: timing0 {
-+				clock-frequency = <33500000>;
-+				hactive = <800>;
-+				vactive = <480>;
-+				hback-porch = <89>;
-+				hfront-porch = <164>;
-+				vback-porch = <23>;
-+				vfront-porch = <10>;
-+				hsync-len = <10>;
-+				vsync-len = <10>;
-+				hsync-active = <0>;
-+				vsync-active = <0>;
-+				de-active = <1>;
-+				pixelclk-active = <0>;
-+			};
-+		};
-+	};
-+};
-+
-+&pwm3 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_pwm3>;
-+	status = "okay";
-+};
-+
- &ssi2 {
- 	status = "okay";
- };
-@@ -365,6 +418,46 @@
- 			>;
- 		};
+-	omap_test_timeout(_is_module_ready(inst, cdoffs, clkctrl_offs),
++	omap_test_timeout(_is_module_ready(inst, clkctrl_offs),
+ 			  MAX_MODULE_READY_TIME, i);
  
-+		pinctrl_lcd: lcdgrp {
-+			fsl,pins = <
-+				MX6SX_PAD_LCD1_DATA00__LCDIF1_DATA_0 0x4001b0b0
-+				MX6SX_PAD_LCD1_DATA01__LCDIF1_DATA_1 0x4001b0b0
-+				MX6SX_PAD_LCD1_DATA02__LCDIF1_DATA_2 0x4001b0b0
-+				MX6SX_PAD_LCD1_DATA03__LCDIF1_DATA_3 0x4001b0b0
-+				MX6SX_PAD_LCD1_DATA04__LCDIF1_DATA_4 0x4001b0b0
-+				MX6SX_PAD_LCD1_DATA05__LCDIF1_DATA_5 0x4001b0b0
-+				MX6SX_PAD_LCD1_DATA06__LCDIF1_DATA_6 0x4001b0b0
-+				MX6SX_PAD_LCD1_DATA07__LCDIF1_DATA_7 0x4001b0b0
-+				MX6SX_PAD_LCD1_DATA08__LCDIF1_DATA_8 0x4001b0b0
-+				MX6SX_PAD_LCD1_DATA09__LCDIF1_DATA_9 0x4001b0b0
-+				MX6SX_PAD_LCD1_DATA10__LCDIF1_DATA_10 0x4001b0b0
-+				MX6SX_PAD_LCD1_DATA11__LCDIF1_DATA_11 0x4001b0b0
-+				MX6SX_PAD_LCD1_DATA12__LCDIF1_DATA_12 0x4001b0b0
-+				MX6SX_PAD_LCD1_DATA13__LCDIF1_DATA_13 0x4001b0b0
-+				MX6SX_PAD_LCD1_DATA14__LCDIF1_DATA_14 0x4001b0b0
-+				MX6SX_PAD_LCD1_DATA15__LCDIF1_DATA_15 0x4001b0b0
-+				MX6SX_PAD_LCD1_DATA16__LCDIF1_DATA_16 0x4001b0b0
-+				MX6SX_PAD_LCD1_DATA17__LCDIF1_DATA_17 0x4001b0b0
-+				MX6SX_PAD_LCD1_DATA18__LCDIF1_DATA_18 0x4001b0b0
-+				MX6SX_PAD_LCD1_DATA19__LCDIF1_DATA_19 0x4001b0b0
-+				MX6SX_PAD_LCD1_DATA20__LCDIF1_DATA_20 0x4001b0b0
-+				MX6SX_PAD_LCD1_DATA21__LCDIF1_DATA_21 0x4001b0b0
-+				MX6SX_PAD_LCD1_DATA22__LCDIF1_DATA_22 0x4001b0b0
-+				MX6SX_PAD_LCD1_DATA23__LCDIF1_DATA_23 0x4001b0b0
-+				MX6SX_PAD_LCD1_CLK__LCDIF1_CLK	0x4001b0b0
-+				MX6SX_PAD_LCD1_ENABLE__LCDIF1_ENABLE 0x4001b0b0
-+				MX6SX_PAD_LCD1_VSYNC__LCDIF1_VSYNC 0x4001b0b0
-+				MX6SX_PAD_LCD1_HSYNC__LCDIF1_HSYNC 0x4001b0b0
-+				MX6SX_PAD_LCD1_RESET__GPIO3_IO_27 0x4001b0b0
-+			>;
-+		};
+ 	return (i < MAX_MODULE_READY_TIME) ? 0 : -EBUSY;
+@@ -251,21 +248,20 @@ int am33xx_cm_wait_module_ready(u16 inst, s16 cdoffs, u16 clkctrl_offs)
+  * am33xx_cm_wait_module_idle - wait for a module to be in 'disabled'
+  * state
+  * @inst: CM instance register offset (*_INST macro)
+- * @cdoffs: Clockdomain register offset (*_CDOFFS macro)
+  * @clkctrl_offs: Module clock control register offset (*_CLKCTRL macro)
+  *
+  * Wait for the module IDLEST to be disabled. Some PRCM transition,
+  * like reset assertion or parent clock de-activation must wait the
+  * module to be fully disabled.
+  */
+-int am33xx_cm_wait_module_idle(u16 inst, s16 cdoffs, u16 clkctrl_offs)
++int am33xx_cm_wait_module_idle(u16 inst, u16 clkctrl_offs)
+ {
+ 	int i = 0;
+ 
+ 	if (!clkctrl_offs)
+ 		return 0;
+ 
+-	omap_test_timeout((_clkctrl_idlest(inst, cdoffs, clkctrl_offs) ==
++	omap_test_timeout((_clkctrl_idlest(inst, clkctrl_offs) ==
+ 				CLKCTRL_IDLEST_DISABLED),
+ 				MAX_MODULE_READY_TIME, i);
+ 
+diff --git a/arch/arm/mach-omap2/cm33xx.h b/arch/arm/mach-omap2/cm33xx.h
+index bd24417..1771fc1 100644
+--- a/arch/arm/mach-omap2/cm33xx.h
++++ b/arch/arm/mach-omap2/cm33xx.h
+@@ -381,17 +381,14 @@ void am33xx_cm_clkdm_force_sleep(u16 inst, u16 cdoffs);
+ void am33xx_cm_clkdm_force_wakeup(u16 inst, u16 cdoffs);
+ 
+ #if defined(CONFIG_SOC_AM33XX) || defined(CONFIG_SOC_AM43XX)
+-extern int am33xx_cm_wait_module_idle(u16 inst, s16 cdoffs,
+-					u16 clkctrl_offs);
++int am33xx_cm_wait_module_idle(u16 inst, u16 clkctrl_offs);
+ extern void am33xx_cm_module_enable(u8 mode, u16 inst, s16 cdoffs,
+ 					u16 clkctrl_offs);
+ extern void am33xx_cm_module_disable(u16 inst, s16 cdoffs,
+ 					u16 clkctrl_offs);
+-extern int am33xx_cm_wait_module_ready(u16 inst, s16 cdoffs,
+-					u16 clkctrl_offs);
++int am33xx_cm_wait_module_ready(u16 inst, u16 clkctrl_offs);
+ #else
+-static inline int am33xx_cm_wait_module_idle(u16 inst, s16 cdoffs,
+-					u16 clkctrl_offs)
++static inline int am33xx_cm_wait_module_idle(u16 inst, u16 clkctrl_offs)
+ {
+ 	return 0;
+ }
+@@ -403,8 +400,8 @@ static inline void am33xx_cm_module_disable(u16 inst, s16 cdoffs,
+ 					u16 clkctrl_offs)
+ {
+ }
+-static inline int am33xx_cm_wait_module_ready(u16 inst, s16 cdoffs,
+-					u16 clkctrl_offs)
 +
-+		pinctrl_pwm3: pwm3grp-1 {
-+			fsl,pins = <
-+				MX6SX_PAD_SD1_DATA2__PWM3_OUT 0x110b0
-+			>;
-+		};
-+
- 		pinctrl_vcc_sd3: vccsd3grp {
- 			fsl,pins = <
- 				MX6SX_PAD_KEY_COL1__GPIO2_IO_11		0x17059
++static inline int am33xx_cm_wait_module_ready(u16 inst, u16 clkctrl_offs)
+ {
+ 	return 0;
+ }
+diff --git a/arch/arm/mach-omap2/cminst44xx.c b/arch/arm/mach-omap2/cminst44xx.c
+index 12aca56..7e6970a 100644
+--- a/arch/arm/mach-omap2/cminst44xx.c
++++ b/arch/arm/mach-omap2/cminst44xx.c
+@@ -78,13 +78,12 @@ void omap_cm_base_init(void)
+  * _clkctrl_idlest - read a CM_*_CLKCTRL register; mask & shift IDLEST bitfield
+  * @part: PRCM partition ID that the CM_CLKCTRL register exists in
+  * @inst: CM instance register offset (*_INST macro)
+- * @cdoffs: Clockdomain register offset (*_CDOFFS macro)
+  * @clkctrl_offs: Module clock control register offset (*_CLKCTRL macro)
+  *
+  * Return the IDLEST bitfield of a CM_*_CLKCTRL register, shifted down to
+  * bit 0.
+  */
+-static u32 _clkctrl_idlest(u8 part, u16 inst, s16 cdoffs, u16 clkctrl_offs)
++static u32 _clkctrl_idlest(u8 part, u16 inst, u16 clkctrl_offs)
+ {
+ 	u32 v = omap4_cminst_read_inst_reg(part, inst, clkctrl_offs);
+ 	v &= OMAP4430_IDLEST_MASK;
+@@ -96,17 +95,16 @@ static u32 _clkctrl_idlest(u8 part, u16 inst, s16 cdoffs, u16 clkctrl_offs)
+  * _is_module_ready - can module registers be accessed without causing an abort?
+  * @part: PRCM partition ID that the CM_CLKCTRL register exists in
+  * @inst: CM instance register offset (*_INST macro)
+- * @cdoffs: Clockdomain register offset (*_CDOFFS macro)
+  * @clkctrl_offs: Module clock control register offset (*_CLKCTRL macro)
+  *
+  * Returns true if the module's CM_*_CLKCTRL.IDLEST bitfield is either
+  * *FUNCTIONAL or *INTERFACE_IDLE; false otherwise.
+  */
+-static bool _is_module_ready(u8 part, u16 inst, s16 cdoffs, u16 clkctrl_offs)
++static bool _is_module_ready(u8 part, u16 inst, u16 clkctrl_offs)
+ {
+ 	u32 v;
+ 
+-	v = _clkctrl_idlest(part, inst, cdoffs, clkctrl_offs);
++	v = _clkctrl_idlest(part, inst, clkctrl_offs);
+ 
+ 	return (v == CLKCTRL_IDLEST_FUNCTIONAL ||
+ 		v == CLKCTRL_IDLEST_INTERFACE_IDLE) ? true : false;
+@@ -267,7 +265,6 @@ void omap4_cminst_clkdm_force_sleep(u8 part, u16 inst, u16 cdoffs)
+  * omap4_cminst_wait_module_ready - wait for a module to be in 'func' state
+  * @part: PRCM partition ID that the CM_CLKCTRL register exists in
+  * @inst: CM instance register offset (*_INST macro)
+- * @cdoffs: Clockdomain register offset (*_CDOFFS macro)
+  * @clkctrl_offs: Module clock control register offset (*_CLKCTRL macro)
+  *
+  * Wait for the module IDLEST to be functional. If the idle state is in any
+@@ -275,15 +272,14 @@ void omap4_cminst_clkdm_force_sleep(u8 part, u16 inst, u16 cdoffs)
+  * sysconfig cannot be accessed and will probably lead to an "imprecise
+  * external abort"
+  */
+-int omap4_cminst_wait_module_ready(u8 part, u16 inst, s16 cdoffs,
+-				   u16 clkctrl_offs)
++int omap4_cminst_wait_module_ready(u8 part, u16 inst, u16 clkctrl_offs)
+ {
+ 	int i = 0;
+ 
+ 	if (!clkctrl_offs)
+ 		return 0;
+ 
+-	omap_test_timeout(_is_module_ready(part, inst, cdoffs, clkctrl_offs),
++	omap_test_timeout(_is_module_ready(part, inst, clkctrl_offs),
+ 			  MAX_MODULE_READY_TIME, i);
+ 
+ 	return (i < MAX_MODULE_READY_TIME) ? 0 : -EBUSY;
+@@ -294,21 +290,20 @@ int omap4_cminst_wait_module_ready(u8 part, u16 inst, s16 cdoffs,
+  * state
+  * @part: PRCM partition ID that the CM_CLKCTRL register exists in
+  * @inst: CM instance register offset (*_INST macro)
+- * @cdoffs: Clockdomain register offset (*_CDOFFS macro)
+  * @clkctrl_offs: Module clock control register offset (*_CLKCTRL macro)
+  *
+  * Wait for the module IDLEST to be disabled. Some PRCM transition,
+  * like reset assertion or parent clock de-activation must wait the
+  * module to be fully disabled.
+  */
+-int omap4_cminst_wait_module_idle(u8 part, u16 inst, s16 cdoffs, u16 clkctrl_offs)
++int omap4_cminst_wait_module_idle(u8 part, u16 inst, u16 clkctrl_offs)
+ {
+ 	int i = 0;
+ 
+ 	if (!clkctrl_offs)
+ 		return 0;
+ 
+-	omap_test_timeout((_clkctrl_idlest(part, inst, cdoffs, clkctrl_offs) ==
++	omap_test_timeout((_clkctrl_idlest(part, inst, clkctrl_offs) ==
+ 			   CLKCTRL_IDLEST_DISABLED),
+ 			  MAX_MODULE_DISABLE_TIME, i);
+ 
+diff --git a/arch/arm/mach-omap2/cminst44xx.h b/arch/arm/mach-omap2/cminst44xx.h
+index 7f56ea4..67a05f9 100644
+--- a/arch/arm/mach-omap2/cminst44xx.h
++++ b/arch/arm/mach-omap2/cminst44xx.h
+@@ -16,9 +16,8 @@ void omap4_cminst_clkdm_enable_hwsup(u8 part, u16 inst, u16 cdoffs);
+ void omap4_cminst_clkdm_disable_hwsup(u8 part, u16 inst, u16 cdoffs);
+ void omap4_cminst_clkdm_force_sleep(u8 part, u16 inst, u16 cdoffs);
+ void omap4_cminst_clkdm_force_wakeup(u8 part, u16 inst, u16 cdoffs);
+-extern int omap4_cminst_wait_module_ready(u8 part, u16 inst, s16 cdoffs, u16 clkctrl_offs);
+-extern int omap4_cminst_wait_module_idle(u8 part, u16 inst, s16 cdoffs,
+-					 u16 clkctrl_offs);
++int omap4_cminst_wait_module_ready(u8 part, u16 inst, u16 clkctrl_offs);
++int omap4_cminst_wait_module_idle(u8 part, u16 inst, u16 clkctrl_offs);
+ extern void omap4_cminst_module_enable(u8 mode, u8 part, u16 inst, s16 cdoffs,
+ 				       u16 clkctrl_offs);
+ extern void omap4_cminst_module_disable(u8 part, u16 inst, s16 cdoffs,
+diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
+index 1bb6d07..b531be8 100644
+--- a/arch/arm/mach-omap2/omap_hwmod.c
++++ b/arch/arm/mach-omap2/omap_hwmod.c
+@@ -1028,7 +1028,6 @@ static int _omap4_wait_target_disable(struct omap_hwmod *oh)
+ 
+ 	return omap4_cminst_wait_module_idle(oh->clkdm->prcm_partition,
+ 					     oh->clkdm->cm_inst,
+-					     oh->clkdm->clkdm_offs,
+ 					     oh->prcm.omap4.clkctrl_offs);
+ }
+ 
+@@ -1053,7 +1052,6 @@ static int _am33xx_wait_target_disable(struct omap_hwmod *oh)
+ 		return 0;
+ 
+ 	return am33xx_cm_wait_module_idle(oh->clkdm->cm_inst,
+-					     oh->clkdm->clkdm_offs,
+ 					     oh->prcm.omap4.clkctrl_offs);
+ }
+ 
+@@ -2973,7 +2971,6 @@ static int _omap4_wait_target_ready(struct omap_hwmod *oh)
+ 
+ 	return omap4_cminst_wait_module_ready(oh->clkdm->prcm_partition,
+ 					      oh->clkdm->cm_inst,
+-					      oh->clkdm->clkdm_offs,
+ 					      oh->prcm.omap4.clkctrl_offs);
+ }
+ 
+@@ -3000,7 +2997,6 @@ static int _am33xx_wait_target_ready(struct omap_hwmod *oh)
+ 	/* XXX check module SIDLEMODE, hardreset status */
+ 
+ 	return am33xx_cm_wait_module_ready(oh->clkdm->cm_inst,
+-					      oh->clkdm->clkdm_offs,
+ 					      oh->prcm.omap4.clkctrl_offs);
+ }
+ 
 -- 
-1.9.1
+1.7.9.5
