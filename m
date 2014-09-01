@@ -1,62 +1,47 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 1 Sep 2014 18:04:47 +0100
-Subject: [RFC PATCH for Juno 1/2] net: smsc911x add support for probing
- from ACPI
-In-Reply-To: <1409583961-7466-2-git-send-email-hanjun.guo@linaro.org>
-References: <1409583961-7466-1-git-send-email-hanjun.guo@linaro.org>
- <1409583961-7466-2-git-send-email-hanjun.guo@linaro.org>
-Message-ID: <20140901170447.GF608@arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 01 Sep 2014 19:05:51 +0200
+Subject: [PATCH] mfd: syscon: Decouple syscon interface from syscon devices
+In-Reply-To: <20140901160426.GJ8796@lee--X1>
+References: <1408694991-21615-1-git-send-email-pankaj.dubey@samsung.com>
+ <12348292.z1qJl96tVA@wuerfel> <20140901160426.GJ8796@lee--X1>
+Message-ID: <3343901.7HpqcTBEp1@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 01, 2014 at 04:06:00PM +0100, Hanjun Guo wrote:
-> +#ifdef CONFIG_ACPI
-> +/* Configure some sensible defaults for ACPI mode */
-> +static int smsc911x_probe_config_acpi(struct smsc911x_platform_config *config,
-> +				    acpi_handle *ahandle)
-> +{
-> +	if (!ahandle)
-> +		return -ENOSYS;
-> +
-> +	config->phy_interface = PHY_INTERFACE_MODE_MII;
-> +
-> +	config->flags |= SMSC911X_USE_32BIT;
-> +
-> +	config->irq_polarity = SMSC911X_IRQ_POLARITY_ACTIVE_HIGH;
-> +
-> +	config->irq_type = SMSC911X_IRQ_TYPE_PUSH_PULL;
-> +
-> +	return 0;
-> +}
-> +#else
+On Monday 01 September 2014 17:04:26 Lee Jones wrote:
+> On Mon, 01 Sep 2014, Arnd Bergmann wrote:
+> > Maybe I'm misreading the patch, but I don't see how it creates a
+> > migration path. What I want to end up with is infrastructure that
+> > lets anybody call syscon_regmap_lookup_by_pdevname or
+> > syscon_regmap_lookup_by_compatible (if they really need to)
+> > without needing the platform_driver for syscon. That should not
+> > require any form of compatibility layer because to the driver
+> > using it there is no API change.
+> 
+> Somehow I think the likelyhood is that I am misreading the patch.
+> 
+> I thought that before this patch drivers we had to register a syscon
+> device to bind to this driver, which was fine for the first use-cases
+> of syscon as it wasn't required too early during boot.  However, now
+> there are use-cases where systems require access to syscon registers
+> eariler in boot we require a means to obtain access prior to device
+> probing.  I thought this patch not only provides that possibilty, but
+> also leaves in the ability to register direct from DT.
 
-I don't like this and it shows issues we have with ACPI on certain ARM
-platforms. You hard-code these values to match the Juno platform. What
-if we get another SoC which has different configuration here? For DT, we
-have the smsc911x_probe_config_dt() which reads the relevant information
-from DT. I think this kind of configuration would be more suitable as
-_DSD properties and sharing the similar names with DT (but we go back to
-the question about who's in charge of the _DSD properties).
+Right, it does provide the ability to have syscon before devices
+are registered, I missed that part.
 
->  static int smsc911x_drv_probe(struct platform_device *pdev)
->  {
->  	struct device_node *np = pdev->dev.of_node;
-> +	acpi_handle *ahandle = ACPI_HANDLE(&pdev->dev);
->  	struct net_device *dev;
->  	struct smsc911x_data *pdata;
->  	struct smsc911x_platform_config *config = dev_get_platdata(&pdev->dev);
-> @@ -2436,6 +2464,9 @@ static int smsc911x_drv_probe(struct platform_device *pdev)
->  	}
->  
->  	retval = smsc911x_probe_config_dt(&pdata->config, np);
-> +	if (retval)
-> +		retval = smsc911x_probe_config_acpi(&pdata->config, ahandle);
-> +
+> > In contrast, this patch introduces a new of_syscon_{un,}register()
+> > interface that would get removed after the the above has
+> > been implemented, causing extra churn for any driver that also
+> > wants to provide a regmap-like interface.
+> 
+> When will we ever not have to register syscon?
 
-In most of the ACPI patches so far we check for ACPI first with DT as a
-fall-back if ACPI is not enabled. This changes here. I would prefer
-something which probes only ACPI if the ACPI is enabled (run-time, not
-config) otherwise DT only. E.g.
+The idea is that we implicitly register the syscon block when someone
+calls syscon_regmap_lookup_by_compatible or syscon_regmap_lookup_by_phandle
+and then return a reference to that new syscon. When another driver
+looks up the same device node, we just pass a reference to the existing
+syscon.
 
--- 
-Catalin
+	Arnd
