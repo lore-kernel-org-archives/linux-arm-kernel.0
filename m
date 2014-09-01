@@ -1,107 +1,55 @@
-From: guodong.xu@linaro.org (Guodong Xu)
-Date: Mon, 01 Sep 2014 16:17:10 +0800
-Subject: [PATCH 2/3] mfd: Add hi6421 PMIC core driver
-In-Reply-To: <20140827141127.GA24579@lee--X1>
-References: <1408973982-2072-1-git-send-email-guodong.xu@linaro.org>
- <1408973982-2072-3-git-send-email-guodong.xu@linaro.org>
- <20140827141127.GA24579@lee--X1>
-Message-ID: <54042B86.4060008@linaro.org>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Mon, 1 Sep 2014 09:22:43 +0100
+Subject: [PATCH] drivers: mfd: exynos-pmu: Add support for Exynos7
+In-Reply-To: <1409544769-2695-1-git-send-email-a.kesavan@samsung.com>
+References: <1409544769-2695-1-git-send-email-a.kesavan@samsung.com>
+Message-ID: <20140901082243.GC6226@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Mon, 01 Sep 2014, Abhilash Kesavan wrote:
 
-
-On 08/27/2014 10:11 PM, Lee Jones wrote:
->> This adds driver to support HiSilicon Hi6421 PMIC. Hi6421 includes multi-
->> functions, such as regulators, codec, ADCs, Coulomb counter, etc.
->> This driver includes core APIs _only_.
->>
->> Drivers for individul components, like voltage regulators, are
->> implemented in corresponding driver directories and files.
->>
->> Registers in Hi6421 are memory mapped, so using regmap-mmio API.
->>
->> Signed-off-by: Guodong Xu <guodong.xu@linaro.org>
->> ---
+> Add intial PMU settings for exynos7. This is required for
+> future suspend-to-ram and cpuidle support.
 > 
-> The patch is missing version information normally indicated to in the
-> ?SUBJECT line with a full description added here.  This looks like a
-> first submission, but we both know that it's not. 
+> Signed-off-by: Eunseok Choi <es10.choi@samsung.com>
+> Signed-off-by: Abhilash Kesavan <a.kesavan@samsung.com>
+> ---
+> This patch has been tested on an Exynos7 espresso board and is based
+> on Kgene's tree (for-next branch).
 > 
-
-Ok. I will add it back, continuing the versions. Actually I purposely
-restarted version number in this submission because the Hi6421 regulator
-driver part has been accepted in v5, so this patchset is not inheriting
-'exactly' to the previous ones. But seems I am thinking in a wrong way.
-
-I will take this as my v7. And next patchset I send will be v8.
-
-Thanks.
-
->>  drivers/mfd/Kconfig             |  13 +++++
->>  drivers/mfd/Makefile            |   1 +
->>  drivers/mfd/hi6421-pmic-core.c  | 112 ++++++++++++++++++++++++++++++++++++++++
->>  include/linux/mfd/hi6421-pmic.h |  42 +++++++++++++++
->>  4 files changed, 168 insertions(+)
->>  create mode 100644 drivers/mfd/hi6421-pmic-core.c
->>  create mode 100644 include/linux/mfd/hi6421-pmic.h
+> Following are the dependencies:
+> 1) Support 64bit Cortex A57 based Exynos7 SoC
+> http://www.spinics.net/lists/arm-kernel/msg357380.html
+> 2) mfd: syscon: Decouple syscon interface from syscon devices
+> http://www.spinics.net/lists/linux-samsung-soc/msg35906.html
+> 3) ARM: EXYNOS: Add platform driver support for Exynos PMU
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2014-July/275675.html
+> 4) ARM: EXYNOS: Move PMU specific definitions from common.h
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2014-July/270655.html
+> 5) ARM: EXYNOS: Move pmu specific header files under "linux/mfd/samsung"
+> https://lkml.org/lkml/2014/4/28/217
+> 6) drivers: mfd: Add support for Exynos PMU driver
+> https://lkml.org/lkml/2014/4/28/332
 > 
-> [...]
-> 
->> diff --git a/drivers/mfd/hi6421-pmic-core.c b/drivers/mfd/hi6421-pmic-core.c
->> new file mode 100644
->> index 0000000..c6cba8f
->> --- /dev/null
->> +++ b/drivers/mfd/hi6421-pmic-core.c
->> @@ -0,0 +1,112 @@
-> 
-> [...]
-> 
->> +#include <linux/device.h>
->> +#include <linux/err.h>
->> +#include <linux/mfd/core.h>
->> +#include <linux/module.h>
->> +#include <linux/of.h>
->> +#include <linux/platform_device.h>
->> +#include <linux/regmap.h>
->> +#include <linux/mfd/hi6421-pmic.h>
->> +
->> +static struct of_device_id of_hi6421_pmic_match_tbl[] = {
->> +	{ .compatible = "hisilicon,hi6421-pmic", },
->> +	{ },
->> +};
-> 
-> Unless you're going to use this to of_match() on in future, this
-> should be down by the definition of 'struct platform_driver'.
-> 
+> NOTE: The above dependencies are not final yet, especially the
+> movement of exynos pmu driver to the mfd directory. I will re-work
+> this patch when the final location for exynos PMU driver is decided.
 
-Ok, Will do.
+Let me know when this patch is ready to go in and I'll review.
 
->> +static int hi6421_pmic_probe(struct platform_device *pdev)
->> +{
-> 
-> [...]
-> 
->> +	/* set over-current protection debounce 8ms */
->> +	regmap_update_bits(pmic->regmap, HI6421_OCP_DEB_CTRL_REG,
->> +		(HI6421_OCP_DEB_SEL_MASK | HI6421_OCP_EN_DEBOUNCE_MASK |
->> +		 HI6421_OCP_AUTO_STOP_MASK),
->> +		(HI6421_OCP_DEB_SEL_8MS | HI6421_OCP_EN_DEBOUNCE_ENABLE));
-> 
-> These might read a little better stacked and aligned.
->
+>  .../devicetree/bindings/arm/samsung/pmu.txt        |    1 +
+>  arch/arm64/boot/dts/exynos7.dtsi                   |    5 +
+>  drivers/mfd/exynos-pmu.c                           |  285 ++++++++++++++++++++
+>  include/linux/mfd/samsung/exynos-regs-pmu.h        |  212 +++++++++++++++
+>  4 files changed, 503 insertions(+)
 
-Will do.
+This all needs to be broken up into seperate patches.
 
->
->> +	pmic->dev = &pdev->dev;
->
-> Can't you retrieve this via dev->parent?
->
+Also, see: Documentation/devicetree/bindings/submitting-patches.txt.
 
-It is not used. I will remove dev from 'struct hi6421_pmic'.
-
-Thanks.
-
-Best regards,
-Guodong Xu
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
