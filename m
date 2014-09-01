@@ -1,65 +1,69 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 1 Sep 2014 13:17:00 +0100
-Subject: [PATCH 6/6 v4] ARM: realview: basic device tree implementation
-In-Reply-To: <CACRpkdaugAmVt5CF194xd+eVyz=Yfir6Jz0k9h4VSvSWLkKPRQ@mail.gmail.com>
-References: <1406294628-16079-1-git-send-email-linus.walleij@linaro.org>
- <1406294628-16079-7-git-send-email-linus.walleij@linaro.org>
- <20140725152401.GA21830@leverpostej>
- <CACRpkdaugAmVt5CF194xd+eVyz=Yfir6Jz0k9h4VSvSWLkKPRQ@mail.gmail.com>
-Message-ID: <20140901121700.GC6617@leverpostej>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Mon, 01 Sep 2014 13:18:49 +0100
+Subject: [PATCH] arm: use irq_set_affinity with force=false when migrating
+ irqs
+In-Reply-To: <20140901115057.GH30401@n2100.arm.linux.org.uk>
+References: <1409571966-18343-1-git-send-email-sudeep.holla@arm.com>
+ <20140901115057.GH30401@n2100.arm.linux.org.uk>
+Message-ID: <54046429.5060902@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
 
-On Mon, Sep 01, 2014 at 12:52:49PM +0100, Linus Walleij wrote:
-> Some ARM1176JZF confusion in as separate thread...
-> 
-> On Fri, Jul 25, 2014 at 5:24 PM, Mark Rutland <mark.rutland@arm.com> wrote:
-> > On Fri, Jul 25, 2014 at 02:23:48PM +0100, Linus Walleij wrote:
-> 
-> >> +               /* Primary DevChip GIC synthesized with the CPU */
-> >> +               intc_dc1176: interrupt-controller at 10120000 {
-> >> +                       compatible = "arm,arm1176jzf-gic";
-> >
-> > As far as I am aware, the JZF flags haven nothing to do with the GIC
-> > implementation. I think they can be dropped from this string (following
-> > the example of "arm,arm1176-pmu").
-> 
-> FWIW I changed the string to "arm,arm1176-gic"
 
-Ok.
+On 01/09/14 12:50, Russell King - ARM Linux wrote:
+> On Mon, Sep 01, 2014 at 12:46:06PM +0100, Sudeep Holla wrote:
+>> From: Sudeep Holla <sudeep.holla@arm.com>
+>>
+>> Commit 01f8fa4f01d8("genirq: Allow forcing cpu affinity of interrupts")
+>> enabled the forced irq_set_affinity which previously refused to route an
+>> interrupt to an offline cpu.
+>>
+>> Commit ffde1de64012("irqchip: Gic: Support forced affinity setting")
+>> implements this force logic and disables the cpu online check for GIC
+>> interrupt controller.
+>>
+>> When __cpu_disable calls migrate_irqs, it disables the current cpu in
+>> cpu_online_mask and uses forced irq_set_affinity to migrate the IRQs
+>> away from the cpu but passes affinity mask with the cpu being offlined
+>> also included in it.
+>>
+>> If irq_set_affinity is called with force=true in a cpu hotplug path,
+>> the caller must ensure that the cpu being offlined is not present in the
+>> affinity mask or it may be selected as the target CPU, leading to the
+>> interrupt not being migrated.
+>>
+>> This patch fixes the issue by calling irq_set_affinity with force=false
+>> so that cpu_online_mask is checked while setting the affinity in the
+>> cpu hotplug path.
+>>
+>> Tested on TC2 hotpluging CPU0 in and out. Without this patch the system
+>> locks up as the IRQs are not migrated away from CPU0.
+>>
+>> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+>> Cc: Russell King <linux@arm.linux.org.uk>
+>> Cc: Thomas Gleixner <tglx@linutronix.de>
+>> Cc: Mark Rutland <mark.rutland@arm.com>
+>> Cc: <stable@vger.kernel.org> # 3.10.x
+>> ---
+>>   arch/arm/kernel/irq.c | 2 +-
+>>   1 file changed, 1 insertion(+), 1 deletion(-)
+>>
+>> Hi Russell,
+>>
+>> If you or tglx has no objections to this patch, I will put it
+>> in your patch tracker.
+>
+> Post discussion, I have no objections - except to the above comment.  Let
+> me rewrite it in a programming language, and maybe you can spot what's
+> wrong:
+>
+> 	if (russell_has_no_objection(patch) || tglx_has_no_objection(patch))
+> 		submit_patch_to_tracker(patch);
+>
+> Personally, I'd like to see tglx's ack on this first.
 
-> But this isn't about the CPU actually. It is the ARM1176JZF development
-> chip. See:
-> http://infocenter.arm.com/help/topic/com.arm.doc.ddi0375a/DDI0375A_arm1176jzf_dev_chip_r0p0_trm.pdf
-> 
-> I know it is confusingly named as a name of a SoC that has this
-> CPU inside it but what can I do ... some guys named ARM came
-> up with this.
+Understood, I will wait for ack from tglx.
 
-Ah, I see. Sorry for the confusion there.
-
-> Should use the string "arm,arm1176jzf-devchip-gic"?
-
-That sounds fine to me.
-
-The document you've linked to says the GIC is derived from the MPCore
-GIC, so I'd place "arm,arm11mp-gic" as a fallback entry in the
-compatible list. Until we need to distinguish the two the driver
-shouldn't need to be updated.
-
-> 
-> >> +               /* This GIC on the board is cascaded off the DevChip GIC */
-> >> +               intc_pb1176: interrupt-controller at 10040000 {
-> >> +                       compatible = "arm,arm1176jzf-gic";
-> >
-> > And this isn't part of the CPU, so that string doesn't look right. I'd
-> > at least like to see an additional string earlier in the list
-> 
-> This seems to be a follow-on to the above confusion.
-
-Yup.
-
-Thanks,
-Mark.
+Regards,
+Sudeep
