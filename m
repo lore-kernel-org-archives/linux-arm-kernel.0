@@ -1,16 +1,60 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Mon, 1 Sep 2014 16:39:44 +0800
-Subject: [PATCH 1/2] ARM: i.MX: Remove i.MX1 ADS board support
-In-Reply-To: <1409486055-21541-1-git-send-email-shc_work@mail.ru>
-References: <1409486055-21541-1-git-send-email-shc_work@mail.ru>
-Message-ID: <20140901083943.GF3135@dragon>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Mon, 01 Sep 2014 10:39:14 +0200
+Subject: [PATCH RESEND] ARM: EXYNOS: Do not calculate boot address twice
+In-Reply-To: <032901cf9763$b7733150$265993f0$@samsung.com>
+References: <1403783163-28638-1-git-send-email-k.kozlowski@samsung.com>
+ <032901cf9763$b7733150$265993f0$@samsung.com>
+Message-ID: <1409560754.26751.2.camel@AMDC1943>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Aug 31, 2014 at 03:54:14PM +0400, Alexander Shiyan wrote:
-> mx1ads.c can be replaced with devicetree equivalent: imx1-ads.dts,
-> so remove the board file.
+On pi?, 2014-07-04 at 17:41 +0900, Kukjin Kim wrote:
+> Krzysztof Kozlowski wrote:
+> > 
+> > Commit b3205dea8fbf ("ARM: EXYNOS: Map SYSRAM through generic DT
+> > bindings") introduced local variable boot_reg where boot address from
+> > cpu_boot_reg() call is stored. Re-use it instead calling cpu_boot_reg()
+> > again.
+> > 
+> > Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> > ---
+> >  arch/arm/mach-exynos/platsmp.c | 4 ++--
+> >  1 file changed, 2 insertions(+), 2 deletions(-)
+> > 
+> > diff --git a/arch/arm/mach-exynos/platsmp.c b/arch/arm/mach-exynos/platsmp.c
+> > index 1c8d31e39520..55ed2e6729c5 100644
+> > --- a/arch/arm/mach-exynos/platsmp.c
+> > +++ b/arch/arm/mach-exynos/platsmp.c
+> > @@ -155,7 +155,7 @@ static int exynos_boot_secondary(unsigned int cpu, struct task_struct *idle)
+> >  				ret = PTR_ERR(boot_reg);
+> >  				goto fail;
+> >  			}
+> > -			__raw_writel(boot_addr, cpu_boot_reg(phys_cpu));
+> > +			__raw_writel(boot_addr, boot_reg);
+> >  		}
+> > 
+> >  		call_firmware_op(cpu_boot, phys_cpu);
+> > @@ -242,7 +242,7 @@ static void __init exynos_smp_prepare_cpus(unsigned int max_cpus)
+> > 
+> >  			if (IS_ERR(boot_reg))
+> >  				break;
+> > -			__raw_writel(boot_addr, cpu_boot_reg(phys_cpu));
+> > +			__raw_writel(boot_addr, boot_reg);
+> >  		}
+> >  	}
+> >  }
+> > --
+> > 1.9.1
 > 
-> Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
+> Oh, good catch. will apply :-)
 
-Applied both, thanks.
+Hi Kukjin,
+
+I cannot find this patch in your tree or in next. Did you applied this? 
+
+Best regards,
+Krzysztof
+
+
+> Thanks,
+> Kukjin
