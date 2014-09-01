@@ -1,31 +1,37 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Mon, 1 Sep 2014 10:13:59 +0530
-Subject: [PATCH] ARM: configs: Enable cpufreq-cpu0 for multi_v7_defconfig
-In-Reply-To: <1409486979-26869-1-git-send-email-broonie@kernel.org>
-References: <1409486979-26869-1-git-send-email-broonie@kernel.org>
-Message-ID: <CAKohpo=amz9+7Q2bF_hqKKw+RixLngi-xwR8GU9L1pi6kvYnqA@mail.gmail.com>
+From: Li.Xiubo@freescale.com (Xiubo Li)
+Date: Mon, 1 Sep 2014 12:29:34 +0800
+Subject: [PATCHv1 0/7] simple-card: simplify the code.
+Message-ID: <1409545781-20530-1-git-send-email-Li.Xiubo@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 31 August 2014 17:39, Mark Brown <broonie@kernel.org> wrote:
-> Many boards share the cpufreq-cpu0 driver meaning that if we enable it in
-> multi_v7_defconfig we can get a reasonable amount of functional utility for
-> systems and test coverage for a fairly small increase in kernel size.
->
-> Signed-off-by: Mark Brown <broonie@kernel.org>
-> ---
->  arch/arm/configs/multi_v7_defconfig | 2 ++
->  1 file changed, 2 insertions(+)
->
-> diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-> index 05c0e7c789df..9799e9d2e222 100644
-> --- a/arch/arm/configs/multi_v7_defconfig
-> +++ b/arch/arm/configs/multi_v7_defconfig
-> @@ -414,3 +414,5 @@ CONFIG_DEBUG_FS=y
->  CONFIG_MAGIC_SYSRQ=y
->  CONFIG_LOCKUP_DETECTOR=y
->  CONFIG_CRYPTO_DEV_TEGRA_AES=y
-> +CONFIG_CPU_FREQ=y
-> +CONFIG_GENERIC_CPUFREQ_CPU0=y
 
-Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
+Change in v1:
+- Add simple-card dts node patches.
+- Fix format parsing bug from Jean-Francois's comment.
+- Rebase to Kuninori-san's newest changes in next branch.
+
+
+Xiubo Li (7):
+  ASoC: simple-card: Merge single and muti DAI link code.
+  ASoC: simple-card: Adjust the comments of simple card.
+  ASoC: dts: vf610-twr: To support simple card newest style.
+  ASoC: dts: kirkwood-t5325: To support simple card newest style.
+  ASoC: dts: r8a7740-armadillo800eva-reference: To support simple card
+    newest style.
+  ASoC: dts: sh73a0-kzm9g-reference: To support simple card newest
+    style.
+  ASoC: dts: kirkwood-openrd-client: To support simple card newest
+    style.
+
+ .../devicetree/bindings/sound/simple-card.txt      | 101 ++++++------
+ arch/arm/boot/dts/kirkwood-openrd-client.dts       |  15 +-
+ arch/arm/boot/dts/kirkwood-t5325.dts               |  15 +-
+ .../boot/dts/r8a7740-armadillo800eva-reference.dts |  21 +--
+ arch/arm/boot/dts/sh73a0-kzm9g-reference.dts       |  18 ++-
+ arch/arm/boot/dts/vf610-twr.dts                    |  17 +-
+ sound/soc/generic/simple-card.c                    | 176 ++++++++-------------
+ 7 files changed, 160 insertions(+), 203 deletions(-)
+
+-- 
+1.8.4
