@@ -1,52 +1,49 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 01 Sep 2014 12:26 +0200
-Subject: [SMP BUG?] the return value of is_smp() is bug?
-In-Reply-To: <540443DA.7030502@huawei.com>
-References: <1409550563-92081-1-git-send-email-long.wanglong@huawei.com>
- <540443DA.7030502@huawei.com>
-Message-ID: <25226905.0IHWyHSRxb@wuerfel>
+Date: Mon, 01 Sep 2014 12:37:10 +0200
+Subject: [PATCH] mfd: syscon: Decouple syscon interface from syscon devices
+In-Reply-To: <20140901074918.GB6226@lee--X1>
+References: <1408694991-21615-1-git-send-email-pankaj.dubey@samsung.com>
+ <20140901074918.GB6226@lee--X1>
+Message-ID: <4121644.3haxjiIdIo@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 01 September 2014 18:00:58 long.wanglong wrote:
-> On 2014/9/1 13:49, Wang Long wrote:
-> > 
-> > Hi,all
-> > 
-> > In kernel 3.17-rc2, when i set CONFIG_HAVE_SMP = y and CONFIG_SMP_ON_UP = y 
-> > in .config file. the secondary core can not boot.
-> > 
-> > when i set CONFIG_HAVE_SMP = y and CONFIG_SMP_ON_UP = n in .config file,
-> > the secondary core can boot.
-> > 
-> > But this does not happen in kernel 3.10 lts kernel, Whether the 
-> > CONFIG_SMP_ON_UP is set yes or no ,the secondary core can boot.
-> > 
-> > Does the meaning of CONFIG_SMP_ON_UP changed or this is a bug in kernel 3.17-rc2 ? 
-> > 
-> > 
+On Monday 01 September 2014 08:49:18 Lee Jones wrote:
+> On Fri, 22 Aug 2014, Pankaj Dubey wrote:
 > 
-> hi Arnd
-> 
-> In above two cases, i also set  CONFIG_SMP = y. in addtion,
-> the CONFIG_SMP_ON_UP depends on CONFIG_SMP. when set
-> CONFIG_SMP_ON_UP = y, the value of CONFIG_SMP must be y.
-
-I see.
-
-I'm looking at the code more closely now:
-
-> > config:     set CONFIG_HAVE_SMP = y and CONFIG_SMP_ON_UP = y
-> > command:    # qemu-system-arm -M vexpress-a9 -smp 2  -m 128M -kernel arch/arm/boot/zImage -nographic
-> > The output:
+> > From: Tomasz Figa <t.figa@samsung.com>
 > > 
-> > ..........
-> > is_smp() return false;
+> > Currently a syscon entity can be only registered directly through a
+> > platform device that binds to a dedicated driver. However in certain use
+> > cases it is desirable to make a device used with another driver a syscon
+> > interface provider. For example, certain SoCs (e.g. Exynos) contain
+> > system controller blocks which perform various functions such as power
+> > domain control, CPU power management, low power mode control, but in
+> > addition contain certain IP integration glue, such as various signal
+> > masks, coprocessor power control, etc. In such case, there is a need to
+> > have a dedicated driver for such system controller but also share
+> > registers with other drivers. The latter is where the syscon interface
+> > is helpful.
+> > 
+> > This patch decouples syscon object from syscon driver, so that it can be
+> > registered from any driver in addition to the original "syscon" platform
+> > driver.
+> > 
+> > Signed-off-by: Tomasz Figa <t.figa@samsung.com>
+> > Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
+> > ---
+> > 
+> > RFC patch [1] was posted by Tomasz Figa. This patch addresses some of
+> > comments given by Arnd to RFC patch, and further decouples syscon from
+> > device model. It also gives flexibility of registering with syscon at
+> > early stage using device_node object.
+> 
+> It would be helpful if Arnd gave this revision his blessing (Ack).
 
-This test basically checks whether the __fixup_smp_on_up code was
-run or not. This has changed in bc41b8724f24 "ARM: 7846/1: Update
-SMP_ON_UP code to detect A9MPCore with 1 CPU devices", in order
-to support a quirk in the Aegis platform. Can you try reverting
-that commit?
+I never saw a reason why we don't take this all the way as discussed
+a few times: Completely remove the dependency of syscon on having
+a platform driver for it, and make it possible to just call
+syscon_regmap_lookup_by_phandle() without having to register
+it first.
 
 	Arnd
