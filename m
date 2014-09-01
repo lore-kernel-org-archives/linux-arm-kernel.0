@@ -1,30 +1,68 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon, 1 Sep 2014 11:18:54 +0100
-Subject: [PATCH] ARM: configs: Enable cpufreq-cpu0 for multi_v7_defconfig
-In-Reply-To: <3122457.yORdifPoE7@wuerfel>
-References: <1409486979-26869-1-git-send-email-broonie@kernel.org>
- <3122457.yORdifPoE7@wuerfel>
-Message-ID: <20140901101854.GL29327@sirena.org.uk>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 1 Sep 2014 11:19:52 +0100
+Subject: [SMP BUG?] the return value of is_smp() is bug?
+In-Reply-To: <1409571334-2814-1-git-send-email-long.wanglong@huawei.com>
+References: <1409571334-2814-1-git-send-email-long.wanglong@huawei.com>
+Message-ID: <20140901101952.GF30401@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 01, 2014 at 11:41:01AM +0200, Arnd Bergmann wrote:
-> On Sunday 31 August 2014 13:09:39 Mark Brown wrote:
-> > Many boards share the cpufreq-cpu0 driver meaning that if we enable it in
-> > multi_v7_defconfig we can get a reasonable amount of functional utility for
-> > systems and test coverage for a fairly small increase in kernel size.
+Firstly, do not send multiple copies of your message to mailing lists,
+certainly not within the three hours that you sent your three copies.
+If one of the addresses you sent the message to bounces, then it is
+*only* that one recipient who doesn't get your message, everyone else
+receives a copy.  So, there's now three copies of your message in the
+list archives, and people could end up replying to different messages.
 
-> > Signed-off-by: Mark Brown <broonie@kernel.org>
+On Mon, Sep 01, 2014 at 07:35:34PM +0800, Wang Long wrote:
+> Hi,all
+> 
+> In kernel 3.17-rc2, when i set CONFIG_HAVE_SMP = y and CONFIG_SMP_ON_UP = y 
+> in .config file. the secondary core can not boot.
+> 
+> when i set CONFIG_HAVE_SMP = y and CONFIG_SMP_ON_UP = n in .config file,
+> the secondary core can boot.
+> 
+> But this does not happen in kernel 3.10 lts kernel, Whether the 
+> CONFIG_SMP_ON_UP is set yes or no ,the secondary core can boot.
+> 
+> Does the meaning of CONFIG_SMP_ON_UP changed or this is a bug in kernel 3.17-rc2 ? 
 
-> Do we need this in 3.17, or should it go in during the merge window?
+I think the answer is neither, because when the kernel is run on /real/
+hardware:
 
-It's not a bug fix; it'd be nice to have it there from the point of view
-of some testing I'm doing on the defconfig and it should be safe but
-it's not a regression or anything.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140901/437d53ce/attachment.sig>
+http://www.arm.linux.org.uk/developer/build/result.php?type=boot&idx=2514
+
+it boots fine, bringing up all four CPUs.
+
+> config:     set CONFIG_HAVE_SMP = y and CONFIG_SMP_ON_UP = y
+> command:    # qemu-system-arm -M vexpress-a9 -smp 2  -m 128M -kernel arch/arm/boot/zImage -nographic
+
+I've no idea how qemu works here, but if the CPU doesn't indicate that
+it's a SMP capable CPU, we will disable SMP extensions.
+
+> The output:
+> 
+> ..........
+> is_smp() return false;
+> CPU: Testing write buffer coherency: ok
+> missing device node for CPU 0
+> CPU0: thread -1, cpu 0, socket 0, mpidr 80000000
+> Setting up static identity map for 0x604643d8 - 0x60464430
+> Brought up 1 CPUs
+> SMP: Total of 1 processors activated.
+> CPU: All CPU(s) started in SVC mode.
+> ...........
+
+You have decided that you'll edit the kernel messages, removing at least
+some of the information that could be relevant to the issue.  Please,
+only cut kernel messages when you are absolutely certain that they are
+not relevant to the problem you're reporting.
+
+However, I don't think it would help much - I suspect that qemu doesn't
+provide emulation of the SCU base address register, and that's what your
+problem is.  qemu needs to be fixed in that regard.
+
+-- 
+FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
+according to speedtest.net.
