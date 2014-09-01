@@ -1,44 +1,65 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 01 Sep 2014 14:11:12 +0200
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 1 Sep 2014 13:17:00 +0100
 Subject: [PATCH 6/6 v4] ARM: realview: basic device tree implementation
-In-Reply-To: <20140901120313.GI30401@n2100.arm.linux.org.uk>
+In-Reply-To: <CACRpkdaugAmVt5CF194xd+eVyz=Yfir6Jz0k9h4VSvSWLkKPRQ@mail.gmail.com>
 References: <1406294628-16079-1-git-send-email-linus.walleij@linaro.org>
- <9626823.572BIYcQL9@wuerfel> <20140901120313.GI30401@n2100.arm.linux.org.uk>
-Message-ID: <5409848.tU8vLO6RTd@wuerfel>
+ <1406294628-16079-7-git-send-email-linus.walleij@linaro.org>
+ <20140725152401.GA21830@leverpostej>
+ <CACRpkdaugAmVt5CF194xd+eVyz=Yfir6Jz0k9h4VSvSWLkKPRQ@mail.gmail.com>
+Message-ID: <20140901121700.GC6617@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 01 September 2014 13:03:13 Russell King - ARM Linux wrote:
-> On Fri, Jul 25, 2014 at 05:58:24PM +0200, Arnd Bergmann wrote:
-> > On Friday 25 July 2014 16:50:10 Russell King - ARM Linux wrote:
-> > > 
-> > > I toyed with the idea of adding the standard cache size specifications
-> > > to the L2C code, it sounds like there's a reason to do that now.
-> > > 
-> > > Let's not mess around with adding stuff like the above to work around
-> > > the L2 code not parsing the appropriate specs from DT, let's do the
-> > > right thing and add bindings to allow DT to provide the cache geometry.
-> > 
-> > Yes, please!
-> > 
-> > That would actually reduce the realview to just the dma_zone_size
-> > definition, and I think someone also posted a patch to get that from
-> > DT recently. Having realview booting with an empty board file would
-> > be ideal.
-> 
-> I did have a patch in my L2C cleanup series to provide these properties,
-> but it got discarded - even though we have existing platforms which
-> provide these values.
-> 
-> The reason for that was because requiring new properties causes a DT
-> breakage - previous versions of the DT suddenly stop working because
-> the values necessary to setup the L2C have been removed from the
-> kernel, and the older DT files do not contain the neccessary values
-> either.
+Hi Linus,
 
-But in case of realview or any other platform that does not have
-mainline DT support, nothing would break. There is no need to remove
-the settings from the kernel, I would just prefer not to add any
-other ones.
+On Mon, Sep 01, 2014 at 12:52:49PM +0100, Linus Walleij wrote:
+> Some ARM1176JZF confusion in as separate thread...
+> 
+> On Fri, Jul 25, 2014 at 5:24 PM, Mark Rutland <mark.rutland@arm.com> wrote:
+> > On Fri, Jul 25, 2014 at 02:23:48PM +0100, Linus Walleij wrote:
+> 
+> >> +               /* Primary DevChip GIC synthesized with the CPU */
+> >> +               intc_dc1176: interrupt-controller at 10120000 {
+> >> +                       compatible = "arm,arm1176jzf-gic";
+> >
+> > As far as I am aware, the JZF flags haven nothing to do with the GIC
+> > implementation. I think they can be dropped from this string (following
+> > the example of "arm,arm1176-pmu").
+> 
+> FWIW I changed the string to "arm,arm1176-gic"
 
-	Arnd
+Ok.
+
+> But this isn't about the CPU actually. It is the ARM1176JZF development
+> chip. See:
+> http://infocenter.arm.com/help/topic/com.arm.doc.ddi0375a/DDI0375A_arm1176jzf_dev_chip_r0p0_trm.pdf
+> 
+> I know it is confusingly named as a name of a SoC that has this
+> CPU inside it but what can I do ... some guys named ARM came
+> up with this.
+
+Ah, I see. Sorry for the confusion there.
+
+> Should use the string "arm,arm1176jzf-devchip-gic"?
+
+That sounds fine to me.
+
+The document you've linked to says the GIC is derived from the MPCore
+GIC, so I'd place "arm,arm11mp-gic" as a fallback entry in the
+compatible list. Until we need to distinguish the two the driver
+shouldn't need to be updated.
+
+> 
+> >> +               /* This GIC on the board is cascaded off the DevChip GIC */
+> >> +               intc_pb1176: interrupt-controller at 10040000 {
+> >> +                       compatible = "arm,arm1176jzf-gic";
+> >
+> > And this isn't part of the CPU, so that string doesn't look right. I'd
+> > at least like to see an additional string earlier in the list
+> 
+> This seems to be a follow-on to the above confusion.
+
+Yup.
+
+Thanks,
+Mark.
