@@ -1,107 +1,40 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Mon, 01 Sep 2014 12:00:54 -0700
-Subject: [PATCH v2 03/12] clk: Add a function to retrieve phase
-In-Reply-To: <1409428991-2442-4-git-send-email-maxime.ripard@free-electrons.com>
-References: <1409428991-2442-1-git-send-email-maxime.ripard@free-electrons.com>
- <1409428991-2442-4-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <20140901190054.5251.56409@quantum>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 01 Sep 2014 22:18:26 +0200
+Subject: [RFC PATCH 4/7] iommu: provide helper function to configure an
+ IOMMU for an of master
+In-Reply-To: <20140901164000.GM24594@arm.com>
+References: <1409327670-3495-1-git-send-email-will.deacon@arm.com>
+ <3729116.F0gWrQGFZl@wuerfel> <20140901164000.GM24594@arm.com>
+Message-ID: <4335091.FB685Z52eG@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Maxime Ripard (2014-08-30 13:03:02)
-> The current phase API doesn't look into the actual hardware to get the phase
-> value, but will rather get it from a variable only set by the set_phase
-> function.
+On Monday 01 September 2014 17:40:00 Will Deacon wrote:
+> On Mon, Sep 01, 2014 at 03:46:18PM +0100, Arnd Bergmann wrote:
+> > On Monday 01 September 2014 10:29:40 Thierry Reding wrote:
+> > > 
+> > > I think this could use a bit more formalization. As I said in another
+> > > reply earlier, there's very little standardization in the IOMMU API.
+> > > That certainly gives us a lot of flexibility but it also has the
+> > > downside that it's difficult to handle these abstractions in the core,
+> > > which is really what the core is all about, isn't it?
+> > > 
+> > > One method that worked really well for this in the past for other
+> > > subsystems is to allow drivers to specify an .of_xlate() function that
+> > > takes the controller device and a struct of_phandle_args. It is that
+> > > function's responsibility to take the information in an of_phandle_args
+> > > structure and use that to create some subsystem specific handle that
+> > > represents this information in a way that it can readily be used.
+> > 
+> > Yes, good idea.
 > 
-> This will cause issue when the client driver will never call the set_phase
-> function, where we can end up having a reported phase that will not match what
-> the hardware has been programmed to by the bootloader or what phase is
-> programmed out of reset.
-> 
-> Add a new get_phase function for the drivers to implement so that we can get
-> this value.
-> 
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> ---
->  drivers/clk/clk.c            | 17 ++++++++++++++---
->  include/linux/clk-provider.h |  5 +++++
->  2 files changed, 19 insertions(+), 3 deletions(-)
-> 
-> diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-> index d87661af0c72..7dbceca694f1 100644
-> --- a/drivers/clk/clk.c
-> +++ b/drivers/clk/clk.c
-> @@ -1797,8 +1797,8 @@ out:
->   * clk_get_phase - return the phase shift of a clock signal
->   * @clk: clock signal source
->   *
-> - * Returns the phase shift of a clock node in degrees, otherwise returns
-> - * -EERROR.
-> + * Returns the phase shift of a clock node in degrees. Any negative
-> + * values are errors.
->   */
->  int clk_get_phase(struct clk *clk)
->  {
-> @@ -1808,7 +1808,18 @@ int clk_get_phase(struct clk *clk)
->                 goto out;
->  
->         clk_prepare_lock();
-> -       ret = clk->phase;
-> +
-> +       if (clk->phase) {
+> Hmm, how does this work for PCI devices? The current RFC takes care to
+> ensure that the core changes work just as well for OF devices as PCI
+> devices, and the of-specific functions and data structures are not part of
+> it.
 
-So if a phase is zero, then we fall through and query the hardware?
-Seems like this case might be hit a lot for clocks that implement
-.get_phase but never have their phase shifted, and accesses to the
-registers may be much slower than to memory.
+I don't mind handling PCI devices separately. They are different in a number
+of ways already, in particular the way that they don't normally have an
+of_node attached to them but actually have a PCI bus/dev/function number.
 
-Do you expect the phase to be changed behind our backs? E.g. firmware
-changes it, or coming in and out of idle state, etc. If not then we can
-store the phase at clock registration time and use a cached value.
-
-See how the CLK_GET_RATE_NOCACHE and CLK_GET_ACCURACY_NOCACHE flags are
-used for details on how we can handle the case where the phase might
-change behind our back.
-
-Regards,
-Mike
-
-> +               ret = clk->phase;
-> +               goto out_unlock;
-> +       }
-> +
-> +       if (!clk->ops->get_phase)
-> +               goto out_unlock;
-> +
-> +       ret = clk->ops->get_phase(clk->hw);
-> +
-> +out_unlock:
->         clk_prepare_unlock();
->  
->  out:
-> diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
-> index 69b20d4c1e1a..abec961092a7 100644
-> --- a/include/linux/clk-provider.h
-> +++ b/include/linux/clk-provider.h
-> @@ -130,6 +130,10 @@ struct dentry;
->   *             set then clock accuracy will be initialized to parent accuracy
->   *             or 0 (perfect clock) if clock has no parent.
->   *
-> + * @get_phase: Queries the hardware to get the current phase of a clock.
-> + *             Returned values are 0-359 degrees on success, negative
-> + *             error codes on failure.
-> + *
->   * @set_phase: Shift the phase this clock signal in degrees specified
->   *             by the second argument. Valid values for degrees are
->   *             0-359. Return 0 on success, otherwise -EERROR.
-> @@ -182,6 +186,7 @@ struct clk_ops {
->                                     unsigned long parent_rate, u8 index);
->         unsigned long   (*recalc_accuracy)(struct clk_hw *hw,
->                                            unsigned long parent_accuracy);
-> +       int             (*get_phase)(struct clk_hw *hw);
->         int             (*set_phase)(struct clk_hw *hw, int degrees);
->         void            (*init)(struct clk_hw *hw);
->         int             (*debug_init)(struct clk_hw *hw, struct dentry *dentry);
-> -- 
-> 2.0.2
-> 
+	Arnd
