@@ -1,141 +1,38 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Mon,  1 Sep 2014 22:04:08 +0800
-Subject: [PATCH] ARM: sun5i: Add DT for HSG H702 tablet board
-Message-ID: <1409580248-15346-1-git-send-email-wens@csie.org>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Mon, 1 Sep 2014 16:03:20 +0200
+Subject: [Patch v3] 0/7] Remove mach-kirkwood
+In-Reply-To: <1997148.5Fa3W8ZmXx@vostro.rjw.lan>
+References: <1409417172-6846-1-git-send-email-andrew@lunn.ch>
+ <1997148.5Fa3W8ZmXx@vostro.rjw.lan>
+Message-ID: <20140901140320.GE11312@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is a Q8 format 7 inch tablet with an Allwinner A13 SoC.
-It has 512MB DRAM, 4GB NAND flash, an accelerometer, camera,
-RTL8188-based WiFi, and micro SD slot for external storage.
+On Mon, Sep 01, 2014 at 03:56:43PM +0200, Rafael J. Wysocki wrote:
+> On Saturday, August 30, 2014 06:46:05 PM Andrew Lunn wrote:
+> > This is mostly a resend of these patches, removing mach-kirkwood.  Not
+> > all maintainers picked up there patches, which has resulted in some
+> > dead kernel configuration in v3.17-rcX.
+> > 
+> > The patch set has been rebased on v3.17-rc2, and it is intended that
+> > Jason Cooper will submit them for inclusion in an RC. Subsystem
+> > maintainers do not need to do anything.
+> > 
+> > The last patch "cpufreq: Remove ARCH_KIRKWOOD dependency" is new,
+> > since what it is removing was added during v3.16-rcX. It follows the
+> > pattern of all the other patches.
+> > 
+> > Andrew Lunn (7):
+> >   cpuidle: kirkwood: Remove ARCH_KIRKWOOD dependency
+> >   ata: Remove ARCH_KIRKWOOD dependency
+> >   thermal: Remove ARCH_KIRKWOOD dependency
+> >   leds: Remove ARCH_KIRKWOOD dependency
+> >   rtc: Remove ARCH_KIRKWOOD dependency
+> >   watchdog: Remove ARCH_KIRKWOOD dependency
+> >   cpufreq: Remove ARCH_KIRKWOOD dependency
+> 
+> I have no problems with these changes, but what exactly am I supposed to do?
 
-It is likely made by a subsidiary of Hanns.G (Hannstar).
+Jason will submit the whole series. So an Acked-by: would be nice.
 
-Signed-off-by: Chen-Yu Tsai <wens@csie.org>
----
- arch/arm/boot/dts/Makefile               |   1 +
- arch/arm/boot/dts/sun5i-a13-hsg-h702.dts | 101 +++++++++++++++++++++++++++++++
- 2 files changed, 102 insertions(+)
- create mode 100644 arch/arm/boot/dts/sun5i-a13-hsg-h702.dts
-
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index b8c5cd3..94e61a6 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -406,6 +406,7 @@ dtb-$(CONFIG_MACH_SUN4I) += \
- dtb-$(CONFIG_MACH_SUN5I) += \
- 	sun5i-a10s-olinuxino-micro.dtb \
- 	sun5i-a10s-r7-tv-dongle.dtb \
-+	sun5i-a13-hsg-h702.dtb \
- 	sun5i-a13-olinuxino.dtb \
- 	sun5i-a13-olinuxino-micro.dtb
- dtb-$(CONFIG_MACH_SUN6I) += \
-diff --git a/arch/arm/boot/dts/sun5i-a13-hsg-h702.dts b/arch/arm/boot/dts/sun5i-a13-hsg-h702.dts
-new file mode 100644
-index 0000000..29fc7d1
---- /dev/null
-+++ b/arch/arm/boot/dts/sun5i-a13-hsg-h702.dts
-@@ -0,0 +1,101 @@
-+/*
-+ * Copyright 2014 Chen-Yu Tsai <wens at csie.org
-+ *
-+ * The code contained herein is licensed under the GNU General Public
-+ * License. You may obtain a copy of the GNU General Public License
-+ * Version 2 or later at the following locations:
-+ *
-+ * http://www.opensource.org/licenses/gpl-license.html
-+ * http://www.gnu.org/copyleft/gpl.html
-+ */
-+
-+/dts-v1/;
-+/include/ "sun5i-a13.dtsi"
-+/include/ "sunxi-common-regulators.dtsi"
-+
-+/ {
-+	model = "HSG H702";
-+	compatible = "hsg,h702", "allwinner,sun5i-a13";
-+
-+	soc at 01c00000 {
-+		mmc0: mmc@01c0f000 {
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin_h702>;
-+			vmmc-supply = <&reg_vcc3v3>;
-+			bus-width = <4>;
-+			cd-gpios = <&pio 6 0 0>; /* PG0 */
-+			cd-inverted;
-+			status = "okay";
-+		};
-+
-+		usbphy: phy at 01c13400 {
-+			usb1_vbus-supply = <&reg_usb1_vbus>;
-+			status = "okay";
-+		};
-+
-+		ehci0: usb at 01c14000 {
-+			status = "okay";
-+		};
-+
-+		ohci0: usb at 01c14400 {
-+			status = "okay";
-+		};
-+
-+		pinctrl at 01c20800 {
-+			mmc0_cd_pin_h702: mmc0_cd_pin at 0 {
-+				allwinner,pins = "PG0";
-+				allwinner,function = "gpio_in";
-+				allwinner,drive = <0>;
-+				allwinner,pull = <1>;
-+			};
-+		};
-+
-+		uart1: serial at 01c28400 {
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&uart1_pins_b>;
-+			status = "okay";
-+		};
-+
-+		i2c0: i2c at 01c2ac00 {
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&i2c0_pins_a>;
-+			status = "okay";
-+
-+			axp209: pmic at 34 {
-+				compatible = "x-powers,axp209";
-+				reg = <0x34>;
-+				interrupts = <0>;
-+				interrupt-controller;
-+				#interrupt-cells = <1>;
-+			};
-+		};
-+
-+		i2c1: i2c at 01c2b000 {
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&i2c1_pins_a>;
-+			status = "okay";
-+
-+			pcf8563: rtc at 51 {
-+				compatible = "nxp,pcf8563";
-+				reg = <0x51>;
-+			};
-+		};
-+
-+		i2c2: i2c at 01c2b400 {
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&i2c2_pins_a>;
-+			status = "okay";
-+		};
-+	};
-+
-+	reg_usb1_vbus: usb1-vbus {
-+		/*
-+		 * There doesn't seem to be a GPIO for controlling
-+		 * vbus, despite the fex file saying otherwise.
-+		 * Override the original settings with empty ones.
-+		 */
-+		pinctrl-0 = <>;
-+		gpio = <>;
-+		status = "okay";
-+	};
-+};
--- 
-2.1.0
+      Andrew
