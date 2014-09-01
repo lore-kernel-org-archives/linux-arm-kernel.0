@@ -1,36 +1,49 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 01 Sep 2014 16:31:28 +0200
-Subject: [RFC PATCH 1/7] iommu: provide early initialisation hook for
- IOMMU drivers
-In-Reply-To: <20140901075216.GA24430@ulmo>
-References: <1409327670-3495-1-git-send-email-will.deacon@arm.com>
- <1409327670-3495-2-git-send-email-will.deacon@arm.com>
- <20140901075216.GA24430@ulmo>
-Message-ID: <4386980.goxm0OjCmJ@wuerfel>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Mon, 1 Sep 2014 22:35:18 +0800
+Subject: [GIT PULL] MFD: ARM (IMX & R8): Immutable branch for Dialog
+ Semiconductor - vendor prefix consolidation
+In-Reply-To: <20140901133854.GA8796@lee--X1>
+References: <201408221446.s7MEkNVF001775@swsrvapps-01.diasemi.com>
+ <20140829091359.GF24579@lee--X1> <20140901132736.GG3135@dragon>
+ <20140901133854.GA8796@lee--X1>
+Message-ID: <20140901143517.GH3135@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 01 September 2014 09:52:19 Thierry Reding wrote:
-> I don't think this is the right direction. We've been preaching that
-> using initcall ordering is a bad thing and people should be using
-> deferred probe instead. Now we have a bunch of these OF tables that do
-> the exact opposite. Note that these are nothing more than a variant of
-> initcalls that get called at platform-specific points in time.
+On Mon, Sep 01, 2014 at 02:38:54PM +0100, Lee Jones wrote:
+> On Mon, 01 Sep 2014, Shawn Guo wrote:
+> > On Fri, Aug 29, 2014 at 10:13:59AM +0100, Lee Jones wrote:
+> > > IMX and R8 sub-arch Maintainers,
+> > > 
+> > > The following changes since commit 52addcf9d6669fa439387610bc65c92fa0980cef:
+> > > 
+> > >   Linux 3.17-rc2 (2014-08-25 15:36:20 -0700)
+> > > 
+> > > are available in the git repository at:
+> > > 
+> > >   git://git.kernel.org/pub/scm/linux/kernel/git/lee/mfd.git tags/ib-mfd-arm-v3.18
+> > > 
+> > > for you to fetch changes up to bd597f47ca4bf7a522a0298a95c7f9b2f0a75b9e:
+> > > 
+> > >   devicetree: Dialog Semiconductor consolidate existing vendor prefixes to standardise on 'dlg' (2014-08-29 09:26:29 +0100)
+> > > 
+> > > ----------------------------------------------------------------
+> > > Immutable branch between MFD and some ARM sub-arch maintainers.
+> > 
+> > I assume that I need to pull it into my tree only when it turns out
+> > there are merge conflicts, but otherwise it can just go through your
+> > tree, right?
 > 
-> There are also ongoing discussions about how to change the device probe
-> order to use dependencies (such as phandles from device tree) to prevent
-> excessive deferred probing. With that in place this would be solved in a
-> much more generic way.
+> If someone realises there's a conflict the chances are we've already
+> hacked someone off.  If the first person to realise is Linus during
+> the merge-window, you'd have to go to the effort of re-spinning your
+> pull-request.  Something else you'd probably like to avoid.
 
-We are not creating an ABI here, so it can always be changed later.
-For now, I think iommus are clearly in the same category as irqchips,
-timers, clock controllers and smp operations: we really want them
-to be available before we set up any other devices.
+I think if there is a conflict, linux-next will firstly report.  But,
+yes, pulling it in is the safest.
+> 
+> I would suggest for each affected Maintainer to pull this in.
 
-I don't mind finding a more generic solution in the long run, but for
-now, this gets the problem out of the way, and I can't think of any
-realistic corner cases that would prevent it from working. Do you
-think that an IOMMU driver may have a dependency on another device
-driver that is probed later? Do you have an example of such hardware?
+Pulled it into imx/dt branch, thanks.
 
-	Arnd
+Shawn
