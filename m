@@ -1,69 +1,64 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 01 Sep 2014 16:24:27 +0200
-Subject: [PATCH] mfd: syscon: Decouple syscon interface from syscon devices
-In-Reply-To: <20140901112549.GM7374@lee--X1>
-References: <1408694991-21615-1-git-send-email-pankaj.dubey@samsung.com>
- <4121644.3haxjiIdIo@wuerfel> <20140901112549.GM7374@lee--X1>
-Message-ID: <12348292.z1qJl96tVA@wuerfel>
+Date: Mon, 01 Sep 2014 16:27:30 +0200
+Subject: [RFC PATCH 2/7] dma-mapping: replace set_arch_dma_coherent_ops
+ with arch_setup_dma_ops
+In-Reply-To: <1409327670-3495-3-git-send-email-will.deacon@arm.com>
+References: <1409327670-3495-1-git-send-email-will.deacon@arm.com>
+ <1409327670-3495-3-git-send-email-will.deacon@arm.com>
+Message-ID: <3185781.KdfsMO5OZS@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 01 September 2014 12:25:49 Lee Jones wrote:
-> On Mon, 01 Sep 2014, Arnd Bergmann wrote:
-> > On Monday 01 September 2014 08:49:18 Lee Jones wrote:
-> > > On Fri, 22 Aug 2014, Pankaj Dubey wrote:
-> > > 
-> > > > From: Tomasz Figa <t.figa@samsung.com>
-> > > > 
-> > > > Currently a syscon entity can be only registered directly through a
-> > > > platform device that binds to a dedicated driver. However in certain use
-> > > > cases it is desirable to make a device used with another driver a syscon
-> > > > interface provider. For example, certain SoCs (e.g. Exynos) contain
-> > > > system controller blocks which perform various functions such as power
-> > > > domain control, CPU power management, low power mode control, but in
-> > > > addition contain certain IP integration glue, such as various signal
-> > > > masks, coprocessor power control, etc. In such case, there is a need to
-> > > > have a dedicated driver for such system controller but also share
-> > > > registers with other drivers. The latter is where the syscon interface
-> > > > is helpful.
-> > > > 
-> > > > This patch decouples syscon object from syscon driver, so that it can be
-> > > > registered from any driver in addition to the original "syscon" platform
-> > > > driver.
-> > > > 
-> > > > Signed-off-by: Tomasz Figa <t.figa@samsung.com>
-> > > > Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
-> > > > ---
-> > > > 
-> > > > RFC patch [1] was posted by Tomasz Figa. This patch addresses some of
-> > > > comments given by Arnd to RFC patch, and further decouples syscon from
-> > > > device model. It also gives flexibility of registering with syscon at
-> > > > early stage using device_node object.
-> > > 
-> > > It would be helpful if Arnd gave this revision his blessing (Ack).
-> > 
-> > I never saw a reason why we don't take this all the way as discussed
-> > a few times: Completely remove the dependency of syscon on having
-> > a platform driver for it, and make it possible to just call
-> > syscon_regmap_lookup_by_phandle() without having to register
-> > it first.
+On Friday 29 August 2014 16:54:25 Will Deacon wrote:
+> set_arch_dma_coherent_ops is called from of_dma_configure in order to
+> swizzle the architectural dma-mapping functions over to a cache-coherent
+> implementation. This is currently implemented only for ARM.
 > 
-> I think this sounds like a good end-state.  Migrating over by
-> supporting both methods in this way does sound like the correct thing
-> to do though.  Doing so is likely to dramatically reduce the effect on
-> current users.
+> In anticipation of re-using this mechanism for IOMMU-backed dma-mapping
+> ops too, this patch replaces the function with a broader
+> arch_setup_dma_ops callback which is also responsible for setting the
+> DMA mask and offset as well as selecting the correct mapping functions.
+> 
+> A further advantage of this split is that it nicely isolates the
+> of-specific code from the dma-mapping code, allowing potential reuse by
+> other buses (e.g. PCI) in the future.
+> 
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
 
-Maybe I'm misreading the patch, but I don't see how it creates a
-migration path. What I want to end up with is infrastructure that
-lets anybody call syscon_regmap_lookup_by_pdevname or
-syscon_regmap_lookup_by_compatible (if they really need to)
-without needing the platform_driver for syscon. That should not
-require any form of compatibility layer because to the driver
-using it there is no API change.
+Looks good, just one tiny comment
 
-In contrast, this patch introduces a new of_syscon_{un,}register()
-interface that would get removed after the the above has
-been implemented, causing extra churn for any driver that also
-wants to provide a regmap-like interface.
+> ---
+>  arch/arm/include/asm/dma-mapping.h | 20 ++++++++++++++----
+>  drivers/of/platform.c              | 42 ++++++++++----------------------------
+>  include/linux/dma-mapping.h        |  8 +++-----
+>  3 files changed, 30 insertions(+), 40 deletions(-)
+> 
+> diff --git a/arch/arm/include/asm/dma-mapping.h b/arch/arm/include/asm/dma-mapping.h
+> index c45b61a4b4a5..936125ef3f3f 100644
+> --- a/arch/arm/include/asm/dma-mapping.h
+> +++ b/arch/arm/include/asm/dma-mapping.h
+> @@ -121,12 +121,24 @@ static inline unsigned long dma_max_pfn(struct device *dev)
+>  }
+>  #define dma_max_pfn(dev) dma_max_pfn(dev)
+>  
+> -static inline int set_arch_dma_coherent_ops(struct device *dev)
+> +static inline void arch_setup_dma_ops(struct device *dev, u64 mask,
+> +                                     unsigned long offset, bool coherent)
+>  {
+> -       set_dma_ops(dev, &arm_coherent_dma_ops);
+> -       return 0;
+> +       dev->coherent_dma_mask = mask;
+> +
+> +       /*
+> +        * Set dma_mask to coherent_dma_mask by default if the architecture
+> +        * code has not set it.
+> +        */
+> +       if (!dev->dma_mask)
+> +               dev->dma_mask = &dev->coherent_dma_mask;
+> +
+
+We are in architecture specific code here, and we know that this
+architecture has not set up the dev->dma_mask pointer, so we can
+remove the 'if (!dev->dma_mask)'
 
 	Arnd
