@@ -1,71 +1,51 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Mon, 1 Sep 2014 16:24:14 +0800
-Subject: [PATCH v3] apf27dev: add max1027 in the dts
-In-Reply-To: <1409517629-5918-1-git-send-email-tremyfr@gmail.com>
-References: <1409517629-5918-1-git-send-email-tremyfr@gmail.com>
-Message-ID: <20140901082413.GE3135@dragon>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 01 Sep 2014 10:24:17 +0200
+Subject: [PATCH 1/2] ARM: multi_v7_defconfig: Enable shmobile platforms
+In-Reply-To: <CAMuHMdXXUrq3tsiaEym_uuoiYXNt66c5sm+1mSAfX6cHgMbEOQ@mail.gmail.com>
+References: <1409234429-1916-1-git-send-email-geert+renesas@glider.be>
+ <3598124.ze8sbSR9ui@wuerfel>
+ <CAMuHMdXXUrq3tsiaEym_uuoiYXNt66c5sm+1mSAfX6cHgMbEOQ@mail.gmail.com>
+Message-ID: <3848521.UcIm3L3emN@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Aug 31, 2014 at 10:40:29PM +0200, Philippe Reynes wrote:
+On Saturday 30 August 2014 11:32:30 Geert Uytterhoeven wrote:
+> Hi Arnd,
 > 
-> Signed-off-by: Philippe Reynes <tremyfr@gmail.com>
-> ---
->  arch/arm/boot/dts/imx27-apf27dev.dts |   17 +++++++++++++++++
->  1 files changed, 17 insertions(+), 0 deletions(-)
+> On Fri, Aug 29, 2014 at 10:11 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> > A related problem that I think is more significant is that
+> > some platforms 'select' a particular driver and when you
+> > disable the platform, that driver is suddenly removed from the
+> > defconfig for all other platforms as well. This has bitten
+> > us a few times in the past, and I'd really like to fix those
+> > cases first.
 > 
-> Changelog:
-> v3: (thanks Alexander Shiyan for the feedback)
-> - add datasheet pin name as comment
+> Indeed. "select" is evil, and has a devastating effect on minimal
+> defconfigs (lots of churn and nasty surprises like the one you mentioned).
 > 
-> v2: (thanks Alexander Shiyan for the feedback)
-> - spi mode 0 is the default so no need to explicitly define it
-> 
-> diff --git a/arch/arm/boot/dts/imx27-apf27dev.dts b/arch/arm/boot/dts/imx27-apf27dev.dts
-> index b982309..0c08fbb 100644
-> --- a/arch/arm/boot/dts/imx27-apf27dev.dts
-> +++ b/arch/arm/boot/dts/imx27-apf27dev.dts
-> @@ -82,6 +82,16 @@
->  	pinctrl-names = "default";
->  	pinctrl-0 = <&pinctrl_cspi1 &pinctrl_cspi1_cs>;
->  	status = "okay";
-> +
-> +	adc at 0 {
-> +		compatible = "maxim,max1027";
-> +		reg = <0>;
-> +		interrupt-parent = <&gpio5>;
-> +		interrupts = <15 IRQ_TYPE_EDGE_FALLING>;
-> +		pinctrl-names = "default";
-> +		pinctrl-0 = <&pinctrl_max1027>;
-> +		spi-max-frequency = <10000000>;
-> +	};
->  };
->  
->  &cspi2 {
-> @@ -230,6 +240,13 @@
->  		pinctrl_sdhc2_cd: sdhc2cdgrp {
->  			fsl,pins = <MX27_PAD_TOUT__GPIO3_14 0x0>;
->  		};
-> +
-> +		pinctrl_max1027: max1027 {
+> So it actually makes more sense to derive multi_v7_defconfig
+> from the individual platform's defconfigs.
+> I also have a script for that, which I wrote to create m68k's multi_defconfig
+> a long time ago:
+> https://github.com/geertu/linux-scripts/blob/master/linux-config-merge
 
-The pinctrl entries are alphabetically sorted in there.  Can you also do
-that for your addition?
+This looks like a very interesting method, and is similar to the "Kconfig
+fragments" that a lot of people are using.
 
-> +			 fsl,pins = <
-> +				 MX27_PAD_UART1_CTS__GPIO5_14 0 /* CNVST */
-> +				 MX27_PAD_UART1_RTS__GPIO5_15 0 /* EOC */
+However I'm not sure we can replace the multi_v7_defconfig with it, the
+main problem I see with that is that it can get unpredictable when
+changes are done to one of the inputs. I'd rather keep the multi_v7_defconfig
+in some form (possibly extend it to v6) and use fragments for some specialized
+variation (v6-smp, v7, v7-lpae, ...).
+ 
+> In the long run, I think creating defconfigs from DTS is the way to go.
+> Extracting dependencies from the build system (both Makefile and
+> the myriad of complex dependencies in Kconfig) are the biggest hurdles to
+> solve.
 
-Can you follow the convention to use hex value for the config cell,
-i.e. s/0/0x0?
+Yes, this looks like very interesting work. We won't be able to use it
+for all cases, in particular for distro kernels that are meant to run
+on a large number of machines that don't all have dts files in the kernel,
+but it should simplify the workflow for a lot of embedded use cases.
 
-Shawn
-
-> +			>;
-> +		};
->  	};
->  };
->  
-> -- 
-> 1.7.4.4
-> 
+	Arnd
