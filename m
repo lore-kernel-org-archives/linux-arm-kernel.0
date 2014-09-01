@@ -1,43 +1,24 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Mon, 1 Sep 2014 11:42:36 +0200
-Subject: [PATCH] dtb: at91: sam9n12ek: ohci: add port and vbus property
-In-Reply-To: <1409133169-26741-1-git-send-email-voice.shen@atmel.com>
-References: <1409133169-26741-1-git-send-email-voice.shen@atmel.com>
-Message-ID: <54043F8C.8070307@atmel.com>
+From: poggi.raph@gmail.com (=?UTF-8?Q?Rapha=C3=ABl_Poggi?=)
+Date: Mon, 1 Sep 2014 11:44:08 +0200
+Subject: arm: at91: sama5d3 suspend in ram
+Message-ID: <CACqcpZCQ52p70SckWU-43ue6v-3Uekq4xC=kg=jYuc0dcyze9w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27/08/2014 11:52, Bo Shen :
-> Add the port number and vbus property for ohci port, or else if
-> bootloader won't configure the vbus pin, the 5v supply is not
-> power on, so can not work with usb devices.
-> 
-> Signed-off-by: Bo Shen <voice.shen@atmel.com>
+Hi,
 
-Ok, thanks:
+I have some trouble using the suspend in ram with the sama5d3.
 
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+When the cpu execute code from pm_slowclock.S, the cpu "crash", I mean
+when I connect the JTAG, the program counter has an invalid/nonsense
+value.
 
-> ---
-> 
->  arch/arm/boot/dts/at91sam9n12ek.dts | 2 ++
->  1 file changed, 2 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/at91sam9n12ek.dts b/arch/arm/boot/dts/at91sam9n12ek.dts
-> index 83d7237..13bb24e 100644
-> --- a/arch/arm/boot/dts/at91sam9n12ek.dts
-> +++ b/arch/arm/boot/dts/at91sam9n12ek.dts
-> @@ -136,6 +136,8 @@
->  		};
->  
->  		usb0: ohci at 00500000 {
-> +			num-ports = <1>;
-> +			atmel,vbus-gpio = <&pioB 7 GPIO_ACTIVE_LOW>;
->  			status = "okay";
->  		};
->  	};
-> 
+I have tried with the patch series from Wenyou Yang :
+[PATCH 0/3] ARM: at91: add enter standby mode for ARMv7
+but this doesn't change anything.
 
+The code in pm_slowclock.S doesn't seem to have been test on the sama5d3
 
--- 
-Nicolas Ferre
+Is there anybody who succeeded to use the slowclock with the sama5d3 ?
+
+I'm using the linux 3.10 from github.com/linux4sam.
