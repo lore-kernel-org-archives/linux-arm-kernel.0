@@ -1,91 +1,61 @@
-From: inki.dae@samsung.com (Inki Dae)
-Date: Mon, 01 Sep 2014 22:37:44 +0900
-Subject: [PATCH 12/29] DRM: Exynos: fix window clear code
-In-Reply-To: <1407235677-26324-13-git-send-email-m.szyprowski@samsung.com>
-References: <1407235677-26324-1-git-send-email-m.szyprowski@samsung.com>
- <1407235677-26324-13-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <540476A8.8030502@samsung.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Mon, 1 Sep 2014 14:38:54 +0100
+Subject: [GIT PULL] MFD: ARM (IMX & R8): Immutable branch for Dialog
+ Semiconductor - vendor prefix consolidation
+In-Reply-To: <20140901132736.GG3135@dragon>
+References: <201408221446.s7MEkNVF001775@swsrvapps-01.diasemi.com>
+ <20140829091359.GF24579@lee--X1> <20140901132736.GG3135@dragon>
+Message-ID: <20140901133854.GA8796@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marek,
-
-On 2014? 08? 05? 19:47, Marek Szyprowski wrote:
-> To correctly disable hardware window during driver init, both enable bits
-> (WINCONx_ENWIN in WINCON and SHADOWCON_CHx_ENABLE in SHADOWCON) must be
-> cleared, otherwise hardware fails to re-enable such window later.
+On Mon, 01 Sep 2014, Shawn Guo wrote:
+> On Fri, Aug 29, 2014 at 10:13:59AM +0100, Lee Jones wrote:
+> > IMX and R8 sub-arch Maintainers,
+> > 
+> > The following changes since commit 52addcf9d6669fa439387610bc65c92fa0980cef:
+> > 
+> >   Linux 3.17-rc2 (2014-08-25 15:36:20 -0700)
+> > 
+> > are available in the git repository at:
+> > 
+> >   git://git.kernel.org/pub/scm/linux/kernel/git/lee/mfd.git tags/ib-mfd-arm-v3.18
+> > 
+> > for you to fetch changes up to bd597f47ca4bf7a522a0298a95c7f9b2f0a75b9e:
+> > 
+> >   devicetree: Dialog Semiconductor consolidate existing vendor prefixes to standardise on 'dlg' (2014-08-29 09:26:29 +0100)
+> > 
+> > ----------------------------------------------------------------
+> > Immutable branch between MFD and some ARM sub-arch maintainers.
 > 
-> While touching this function, also temporarily disable ctx->suspended flag
-> to let fimd_wait_for_vblank function really to do its job.
-> 
-> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-> ---
->  drivers/gpu/drm/exynos/exynos_drm_fimd.c | 25 ++++++++++++++++++-------
->  1 file changed, 18 insertions(+), 7 deletions(-)
-> 
-> diff --git a/drivers/gpu/drm/exynos/exynos_drm_fimd.c b/drivers/gpu/drm/exynos/exynos_drm_fimd.c
-> index 41904df..7a363d2 100644
-> --- a/drivers/gpu/drm/exynos/exynos_drm_fimd.c
-> +++ b/drivers/gpu/drm/exynos/exynos_drm_fimd.c
-> @@ -165,27 +165,38 @@ static void fimd_wait_for_vblank(struct exynos_drm_manager *mgr)
->  		DRM_DEBUG_KMS("vblank wait timed out.\n");
->  }
->  
-> -
->  static void fimd_clear_channel(struct exynos_drm_manager *mgr)
->  {
->  	struct fimd_context *ctx = mgr->ctx;
-> -	int win, ch_enabled = 0;
-> +	int state, win, ch_enabled = 0;
+> I assume that I need to pull it into my tree only when it turns out
+> there are merge conflicts, but otherwise it can just go through your
+> tree, right?
 
-It doesn't need to declare state variable here because this variable is
-used only when ch_enabled is 1.
+If someone realises there's a conflict the chances are we've already
+hacked someone off.  If the first person to realise is Linus during
+the merge-window, you'd have to go to the effort of re-spinning your
+pull-request.  Something else you'd probably like to avoid.
 
->  
->  	DRM_DEBUG_KMS("%s\n", __FILE__);
->  
->  	/* Check if any channel is enabled. */
->  	for (win = 0; win < WINDOWS_NR; win++) {
-> -		u32 val = readl(ctx->regs + SHADOWCON);
-> -		if (val & SHADOWCON_CHx_ENABLE(win)) {
-> -			val &= ~SHADOWCON_CHx_ENABLE(win);
-> -			writel(val, ctx->regs + SHADOWCON);
-> +		u32 val = readl(ctx->regs + WINCON(win));
+I would suggest for each affected Maintainer to pull this in.
 
-WARNING: Missing a blank line after declarations
+> > ----------------------------------------------------------------
+> > Steve Twiss (1):
+> >       devicetree: Dialog Semiconductor consolidate existing vendor prefixes to standardise on 'dlg'
+> > 
+> >  .../devicetree/bindings/i2c/trivial-devices.txt    |  2 +-
+> >  .../devicetree/bindings/regulator/da9210.txt       |  4 ++--
+> >  .../devicetree/bindings/vendor-prefixes.txt        |  1 +
+> >  arch/arm/boot/dts/imx53-smd.dts                    |  2 +-
+> >  arch/arm/boot/dts/imx6qdl-phytec-pfla02.dtsi       |  2 +-
+> >  arch/arm/boot/dts/r8a7790-lager.dts                |  2 +-
+> >  arch/arm/boot/dts/r8a7791-koelsch.dts              |  2 +-
+> >  drivers/mfd/da9055-core.c                          | 26 +++++++++++-----------
+> >  8 files changed, 21 insertions(+), 20 deletions(-)
+> > 
 
-> +		if (val & WINCONx_ENWIN) {
-> +			/* wincon */
-> +			val &= ~WINCONx_ENWIN;
-> +			writel(val, ctx->regs + WINCON(win));
-> +
-> +			/* unprotect windows */
-> +			if (ctx->driver_data->has_shadowcon) {
-> +				val = readl(ctx->regs + SHADOWCON);
-> +				val &= ~SHADOWCON_CHx_ENABLE(win);
-> +				writel(val, ctx->regs + SHADOWCON);
-> +			}
->  			ch_enabled = 1;
->  		}
->  	}
->  
->  	/* Wait for vsync, as disable channel takes effect at next vsync */
-> -	if (ch_enabled)
-> +	if (ch_enabled) {
-> +		state = ctx->suspended;
-
-int state = ctx->suspended;
-
-> +		ctx->suspended = 0;
->  		fimd_wait_for_vblank(mgr);
-> +		ctx->suspended = state;
-> +	}
->  }
->  
->  static int fimd_mgr_initialize(struct exynos_drm_manager *mgr,
-> 
-
-Above is trivial so I fixed them. Picked it up.
-
-Thanks,
-Inki Dae
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
