@@ -1,60 +1,62 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 01 Sep 2014 16:53:34 +0200
-Subject: [RFC PATCH 5/7] dma-mapping: detect and configure IOMMU in
- of_dma_configure
-In-Reply-To: <1409327670-3495-6-git-send-email-will.deacon@arm.com>
-References: <1409327670-3495-1-git-send-email-will.deacon@arm.com>
- <1409327670-3495-6-git-send-email-will.deacon@arm.com>
-Message-ID: <24828990.FUj2gbXJJY@wuerfel>
+From: grygorii.strashko@ti.com (Grygorii Strashko)
+Date: Mon, 1 Sep 2014 17:55:21 +0300
+Subject: [PATCH 1/4] gpio: syscon: add soc specific callback to assign
+ output value
+In-Reply-To: <CACRpkdaq2=f92yEEZgGHOtixDk35O9tmN2PZkSPKrGwGVDS_mQ@mail.gmail.com>
+References: <1407946582-20927-1-git-send-email-grygorii.strashko@ti.com>	<1407946582-20927-2-git-send-email-grygorii.strashko@ti.com>
+ <CACRpkdaq2=f92yEEZgGHOtixDk35O9tmN2PZkSPKrGwGVDS_mQ@mail.gmail.com>
+Message-ID: <540488D9.3040602@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 29 August 2014 16:54:28 Will Deacon wrote:
->  static void of_dma_configure(struct platform_device *pdev)
->  {
-> -       u64 dma_addr, paddr, size;
-> +       u64 dma_addr, paddr, size, mask;
->         int ret;
-> -       bool coherent;
-> +       bool coherent, iommu;
->         unsigned long offset;
->         struct device *dev = &pdev->dev;
->  
-> +       /*
-> +        * Set default dma-mask to 32 bit. Drivers are expected to setup
-> +        * the correct supported dma_mask.
-> +        */
-> +       mask = DMA_BIT_MASK(32);
-> +
->         ret = of_dma_get_range(dev->of_node, &dma_addr, &paddr, &size);
-> -       offset = ret < 0 ? 0 : PFN_DOWN(paddr - dma_addr);
-> -       dev_dbg(dev, "dma_pfn_offset(%#08lx)\n", dev->dma_pfn_offset);
-> +       if (ret < 0) {
-> +               dma_addr = offset = 0;
-> +               size = mask;
-> +       } else {
-> +               offset = PFN_DOWN(paddr - dma_addr);
-> +               dev_dbg(dev, "dma_pfn_offset(%#08lx)\n", dev->dma_pfn_offset);
-> +       }
->  
->         coherent = of_dma_is_coherent(dev->of_node);
->         dev_dbg(dev, "device is%sdma coherent\n",
->                 coherent ? " " : " not ");
->  
-> -       /*
-> -        * Set default dma-mask to 32 bit. Drivers are expected to setup
-> -        * the correct supported dma_mask.
-> -        */
-> -       arch_setup_dma_ops(dev, DMA_BIT_MASK(32), offset, coherent);
-> +       iommu = !of_iommu_configure(dev);
-> +       dev_dbg(dev, "device is%sbehind an iommu\n",
-> +               iommu ? " " : " not ");
-> +
-> +       arch_setup_dma_ops(dev, mask, dma_addr, size, offset, coherent, iommu);
->  }
+Hi Linus,
 
-Hmm, I was actually expecting of_iommu_configure() to be called from inside
-arch_setup_dma_ops(), leaving the choice for how it's set up to the
-architecture for now. It's probably not a big difference either way.
+On 08/29/2014 09:19 AM, Linus Walleij wrote:
+> On Wed, Aug 13, 2014 at 6:16 PM, Grygorii Strashko
+> <grygorii.strashko@ti.com> wrote:
+> 
+>> Some SoCs (like Keystone) may require to perform special
+>> sequence of operations to assign output GPIO value, so default
+>> implementation of .set() callback from gpio-syscon driver
+>> can't be used.
+>>
+>> Hence, add optional, SoC specific callback to assign output
+>> gpio value.
+>>
+>> Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
+> 
+> Hm :-/
+> 
+> I didn't realize this wasn't a quite so straight-forward a
+> syscon GPIO driver.
 
-	Arnd
+Yep. At first glance, everything seemed more simple.
+
+> 
+> Now I start to think that it looks kludgy to bolt this onto
+> the other driver and think we may need to go back to the
+> other version which puts it as a separate driver. I guess
+> that is what you refer to as v1?
+> 
+> I have a hard time to make my mind up about these
+> syscon things, sorry :-(
+> 
+> Now I have to ask you: which way do you prefer to do it,
+> if you can choose freely? The initial driver or augmenting
+> the syscon driver (patch v1)?
+
+Honestly, I think, It is better to keep Keystone 2 functionality in 
+standalone file [1], as it allows to simply manage this code using
+build system, avoid ugly #ifdefs in code (as you note on patch 3)
+and keep commits history more clear and HW specific (very helpful in 
+case of any issues). 
+
+But, as you agree now to take this syscon-based patches, I'll update & re-send them,
+applying comments from Alexander to the patch 1 and your comments to the patch 3 :)
+
+Thanks for your comments.
+
+[1] https://lkml.org/lkml/2014/7/23/352
+
+Best regards,
+-grygorii
