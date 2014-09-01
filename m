@@ -1,31 +1,28 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon, 1 Sep 2014 16:13:56 +0100
-Subject: [PATCHv1 1/7] ASoC: simple-card: Merge single and muti DAI link
- code.
-In-Reply-To: <20140901133412.GA11312@lunn.ch>
-References: <1409545781-20530-1-git-send-email-Li.Xiubo@freescale.com>
- <1409545781-20530-2-git-send-email-Li.Xiubo@freescale.com>
- <20140901133412.GA11312@lunn.ch>
-Message-ID: <20140901151356.GB29327@sirena.org.uk>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 1 Sep 2014 16:12:34 +0100
+Subject: [PATCH] iommu/arm-smmu: Allow size of stage 1 output to max
+ possible value for sateg 2 bypass
+In-Reply-To: <CALuQcNn-d3_fQaygtObzeZL7OxU8BsstKMmCmpQMHEOF31b1RA@mail.gmail.com>
+References: <1409162541-3940-1-git-send-email-c.tirumalesh@gmail.com>
+ <20140901114238.GB24594@arm.com>
+ <CALuQcNn-d3_fQaygtObzeZL7OxU8BsstKMmCmpQMHEOF31b1RA@mail.gmail.com>
+Message-ID: <20140901151234.GE24594@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 01, 2014 at 03:34:12PM +0200, Andrew Lunn wrote:
-> On Mon, Sep 01, 2014 at 12:29:35PM +0800, Xiubo Li wrote:
-> > This patch merge single DAI link and muti-DAI links code together,
-> > and simply the simple-card driver code.
+On Mon, Sep 01, 2014 at 02:49:58PM +0100, tirumalesh chalamarla wrote:
+> On Mon, Sep 1, 2014 at 4:42 AM, Will Deacon <will.deacon@arm.com> wrote:
+> > Assuming I understand the problem correctly, why not simply remove the
+> > truncation from the existing code (untested patch below)? Does that not
+> > work for you?
+> >
+> 
+> This will not restrict stage 1 out put to VA_BITS, even for two level
+> translations. this results in non debuggable problems
+> if we configure incorrectly.  there is no harm in checking the
+> condition for nested translations, as i did in my patch.
 
-> It would be good to note that this breaks the Binary API with DT
-> blobs. Old blobs will not work with this new C code.
+Right, but restricting stage-1 output to VA_BITS doesn't make sense;
+remember it's not the same kernel writing the stage-1 and stage-2 tables.
 
-That's not on, we need to maintian compatibility with the old DTs unless
-there's a very strong reason not to.  Revising the binding is one option
-for doing this, keeping the old binding in place and making a v2 binding
-with the new functionality.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140901/4648ac55/attachment-0001.sig>
+Will
