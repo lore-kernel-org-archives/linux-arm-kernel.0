@@ -1,40 +1,29 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 01 Sep 2014 22:18:26 +0200
-Subject: [RFC PATCH 4/7] iommu: provide helper function to configure an
- IOMMU for an of master
-In-Reply-To: <20140901164000.GM24594@arm.com>
-References: <1409327670-3495-1-git-send-email-will.deacon@arm.com>
- <3729116.F0gWrQGFZl@wuerfel> <20140901164000.GM24594@arm.com>
-Message-ID: <4335091.FB685Z52eG@wuerfel>
+From: gael.portay@gmail.com (=?UTF-8?q?Ga=C3=ABl=20PORTAY?=)
+Date: Mon,  1 Sep 2014 23:29:46 +0200
+Subject: [PATCH] ARM: at91/dt: sam9g20: set at91sam9g20 pllb driver
+Message-ID: <1409606986-32455-1-git-send-email-gael.portay@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 01 September 2014 17:40:00 Will Deacon wrote:
-> On Mon, Sep 01, 2014 at 03:46:18PM +0100, Arnd Bergmann wrote:
-> > On Monday 01 September 2014 10:29:40 Thierry Reding wrote:
-> > > 
-> > > I think this could use a bit more formalization. As I said in another
-> > > reply earlier, there's very little standardization in the IOMMU API.
-> > > That certainly gives us a lot of flexibility but it also has the
-> > > downside that it's difficult to handle these abstractions in the core,
-> > > which is really what the core is all about, isn't it?
-> > > 
-> > > One method that worked really well for this in the past for other
-> > > subsystems is to allow drivers to specify an .of_xlate() function that
-> > > takes the controller device and a struct of_phandle_args. It is that
-> > > function's responsibility to take the information in an of_phandle_args
-> > > structure and use that to create some subsystem specific handle that
-> > > represents this information in a way that it can readily be used.
-> > 
-> > Yes, good idea.
-> 
-> Hmm, how does this work for PCI devices? The current RFC takes care to
-> ensure that the core changes work just as well for OF devices as PCI
-> devices, and the of-specific functions and data structures are not part of
-> it.
+The at91sam9g20 SOC uses its own pllb implementation which is different
+from the one inherited from at91sam9260 SOC.
 
-I don't mind handling PCI devices separately. They are different in a number
-of ways already, in particular the way that they don't normally have an
-of_node attached to them but actually have a PCI bus/dev/function number.
+Signed-off-by: Ga?l PORTAY <gael.portay@gmail.com>
+---
+ arch/arm/boot/dts/at91sam9g20.dtsi | 1 +
+ 1 file changed, 1 insertion(+)
 
-	Arnd
+diff --git a/arch/arm/boot/dts/at91sam9g20.dtsi b/arch/arm/boot/dts/at91sam9g20.dtsi
+index 31f7652..4e0abbd 100644
+--- a/arch/arm/boot/dts/at91sam9g20.dtsi
++++ b/arch/arm/boot/dts/at91sam9g20.dtsi
+@@ -40,6 +40,7 @@
+ 				};
+ 
+ 				pllb: pllbck {
++					compatible = "atmel,at91sam9g20-clk-pllb";
+ 					atmel,clk-input-range = <2000000 32000000>;
+ 					atmel,pll-clk-output-ranges = <30000000 100000000 0 0>;
+ 				};
+-- 
+1.9.3
