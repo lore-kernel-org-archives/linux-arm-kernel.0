@@ -1,70 +1,51 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 1 Sep 2014 17:20:46 +0100
-Subject: [RFC PATCH 2/7] dma-mapping: replace set_arch_dma_coherent_ops
- with arch_setup_dma_ops
-In-Reply-To: <3185781.KdfsMO5OZS@wuerfel>
+Date: Mon, 1 Sep 2014 17:34:00 +0100
+Subject: [RFC PATCH 3/7] iommu: add new iommu_ops callback for adding a
+ device with a set of IDs
+In-Reply-To: <2811939.9L5BJIvoiz@wuerfel>
 References: <1409327670-3495-1-git-send-email-will.deacon@arm.com>
- <1409327670-3495-3-git-send-email-will.deacon@arm.com>
- <3185781.KdfsMO5OZS@wuerfel>
-Message-ID: <20140901162046.GJ24594@arm.com>
+ <1409327670-3495-4-git-send-email-will.deacon@arm.com>
+ <20140901081320.GB24430@ulmo> <2811939.9L5BJIvoiz@wuerfel>
+Message-ID: <20140901163400.GK24594@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 01, 2014 at 03:27:30PM +0100, Arnd Bergmann wrote:
-> On Friday 29 August 2014 16:54:25 Will Deacon wrote:
-> > set_arch_dma_coherent_ops is called from of_dma_configure in order to
-> > swizzle the architectural dma-mapping functions over to a cache-coherent
-> > implementation. This is currently implemented only for ARM.
+On Mon, Sep 01, 2014 at 03:39:16PM +0100, Arnd Bergmann wrote:
+> On Monday 01 September 2014 10:13:22 Thierry Reding wrote:
+> > On Fri, Aug 29, 2014 at 04:54:26PM +0100, Will Deacon wrote:
+> > > diff --git a/include/linux/iommu.h b/include/linux/iommu.h
+> > > index 20f9a527922a..3dd1b99c4542 100644
+> > > --- a/include/linux/iommu.h
+> > > +++ b/include/linux/iommu.h
+> > > @@ -114,6 +114,8 @@ struct iommu_ops {
+> > >       int (*domain_has_cap)(struct iommu_domain *domain,
+> > >                             unsigned long cap);
+> > >       int (*add_device)(struct device *dev);
+> > > +     int (*add_device_master_ids)(struct device *dev, int count, u32 *ids,
+> > > +                                  void *data);
 > > 
-> > In anticipation of re-using this mechanism for IOMMU-backed dma-mapping
-> > ops too, this patch replaces the function with a broader
-> > arch_setup_dma_ops callback which is also responsible for setting the
-> > DMA mask and offset as well as selecting the correct mapping functions.
-> > 
-> > A further advantage of this split is that it nicely isolates the
-> > of-specific code from the dma-mapping code, allowing potential reuse by
-> > other buses (e.g. PCI) in the future.
-> > 
-> > Signed-off-by: Will Deacon <will.deacon@arm.com>
+> > If we want to pass around IOMMU instances I think we should make them
+> > proper objects rather than some loosely specified void *.
 > 
-> Looks good, just one tiny comment
-> 
-> > ---
-> >  arch/arm/include/asm/dma-mapping.h | 20 ++++++++++++++----
-> >  drivers/of/platform.c              | 42 ++++++++++----------------------------
-> >  include/linux/dma-mapping.h        |  8 +++-----
-> >  3 files changed, 30 insertions(+), 40 deletions(-)
-> > 
-> > diff --git a/arch/arm/include/asm/dma-mapping.h b/arch/arm/include/asm/dma-mapping.h
-> > index c45b61a4b4a5..936125ef3f3f 100644
-> > --- a/arch/arm/include/asm/dma-mapping.h
-> > +++ b/arch/arm/include/asm/dma-mapping.h
-> > @@ -121,12 +121,24 @@ static inline unsigned long dma_max_pfn(struct device *dev)
-> >  }
-> >  #define dma_max_pfn(dev) dma_max_pfn(dev)
-> >  
-> > -static inline int set_arch_dma_coherent_ops(struct device *dev)
-> > +static inline void arch_setup_dma_ops(struct device *dev, u64 mask,
-> > +                                     unsigned long offset, bool coherent)
-> >  {
-> > -       set_dma_ops(dev, &arm_coherent_dma_ops);
-> > -       return 0;
-> > +       dev->coherent_dma_mask = mask;
-> > +
-> > +       /*
-> > +        * Set dma_mask to coherent_dma_mask by default if the architecture
-> > +        * code has not set it.
-> > +        */
-> > +       if (!dev->dma_mask)
-> > +               dev->dma_mask = &dev->coherent_dma_mask;
-> > +
-> 
-> We are in architecture specific code here, and we know that this
-> architecture has not set up the dev->dma_mask pointer, so we can
-> remove the 'if (!dev->dma_mask)'
+> Agreed.
 
-Good point; I'll fix it.
+For OF, this data argument is the data field of the device_node for the
+IOMMU. That's private to the corresponding IOMMU driver and I don't see
+what we gain by making that a generic structure. It's likely going to
+represent some internal driver data structures anyway, so that the IDs can
+be recorded in the relevant place and for the relevant group etc.
 
-Thanks,
+In other words, I have no idea what a generic data structure would look
+like for this.
+
+> > Also the generic IOMMU binding doesn't require the IOMMU specifier to
+> > contain master IDs. So this seems to be a callback that would only be
+> > used by a restricted set of IOMMUs.
+> 
+> No, it should be used by all of them, but we might be passing empty
+> arguments.
+
+Yup; I'd hope to remove/replace the add_device callback in the future,
+but that's a lot of work right now.
 
 Will
