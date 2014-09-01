@@ -1,36 +1,57 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon, 1 Sep 2014 19:11:52 +0100
-Subject: [RFC PATCH for Juno 1/2] net: smsc911x add support for probing
- from ACPI
-In-Reply-To: <20140901173245.GM2953@xora-haswell.xora.org.uk>
-References: <1409583961-7466-1-git-send-email-hanjun.guo@linaro.org>
- <1409583961-7466-2-git-send-email-hanjun.guo@linaro.org>
- <20140901170447.GF608@arm.com> <21764799.KDNDm9XRax@wuerfel>
- <20140901173245.GM2953@xora-haswell.xora.org.uk>
-Message-ID: <20140901181152.GL29327@sirena.org.uk>
+From: nm@ti.com (Nishanth Menon)
+Date: Mon, 01 Sep 2014 13:30:09 -0500
+Subject: [PATCH] mfd: palmas: Add support for optional wakeup
+In-Reply-To: <20140901093206.GJ7374@lee--X1>
+References: <1408457197-30487-1-git-send-email-nm@ti.com>
+ <20140829105619.GH24579@lee--X1> <54007515.5080506@ti.com>
+ <20140901093206.GJ7374@lee--X1>
+Message-ID: <5404BB31.3060001@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 01, 2014 at 06:32:45PM +0100, Graeme Gregory wrote:
+On 09/01/2014 04:32 AM, Lee Jones wrote:
+> On Fri, 29 Aug 2014, Nishanth Menon wrote:
+>> On 08/29/2014 05:56 AM, Lee Jones wrote:
+>>> On Tue, 19 Aug 2014, Nishanth Menon wrote:
+>>>
+>>>> With the recent pinctrl-single changes, omaps can treat wake-up events
+>>>> from deeper idle states as interrupts.
+>>>>
+>>>> Let's add support for the optional second interrupt for wake-up
+>>>> events. And then SoC can wakeup and handle the event using it's
+>>>> regular handler.
+>>>>
+>>>> Finally, to pass the wake-up interrupt in the dts file,
+>>>> interrupts-extended property needs to be passed.
+>>>>
+>>>> This is similar in approach to commit 2a0b965cfb6e ("serial: omap: Add
+>>>> support for optional wake-up")
+>>>>
+>>>> Signed-off-by: Nishanth Menon <nm@ti.com>
+>>>> ---
+>>>>   Documentation/devicetree/bindings/mfd/palmas.txt |   20 ++++++++
+>>>
+>>> DT Ack please.
+>
+> Please read Documentation/devicetree/bindings/submittingpatches.txt
 
-> This will of course most likely be replaced by _DSD values. I just
-> hardcoded for now as _DSD is not yet in the kernel and issues around
-> maintenance of bindings are not solved (unless this happened at KS where
-> I was not present).
+I assume you wanted me to note the following:
+"
+The Documentation/ portion of the patch should be a separate patch.
+"
 
-Not really.  AIUI the official thing is still some combination of
-getting a DT binding defined and then use that verbatim (as the x86
-embedded people want to though I'm still not clear that the Windows
-people are on board with this) and the UEFI processes.  It's possible I
-misunderstood though.
+Many maintainers prefer that when the bindings for the device is new, 
+and when additional properties are added, they prefer it part of same 
+patch.. Anyways.. if the above is what you prefer, I can follow that.
 
-Realistically if something is usable on x86 embedded it's going to be
-supported on ARMv8 servers too unless we jump through hoops, and even
-there real implementations in the wild will probably win out.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140901/ff5aaa8e/attachment.sig>
+In short, I assume you'd like three patches:
+a) fix up style of current documentation - palmas to palmas at 40
+b) Split documentation for interrupt-extended from the current patch 
+into it's own patch.
+c) remainder of this patch as is..
+
+Does that sound right?
+
+---
+Regards,
+Nishanth Menon
