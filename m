@@ -1,19 +1,34 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 1 Sep 2014 16:34:38 +0800
-Subject: [PATCH] ARM: dts: vf610-twr: remove useless property for sound
- card.
-In-Reply-To: <1409278941-16975-1-git-send-email-Li.Xiubo@freescale.com>
-References: <1409278941-16975-1-git-send-email-Li.Xiubo@freescale.com>
-Message-ID: <20140901083435.GA22559@dragon>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Mon, 1 Sep 2014 16:28:13 +0800
+Subject: [PATCH v2 1/3] pinctrl: at91: add drive strength configuration
+In-Reply-To: <CACRpkdazv59T6xOSAxJQ7t5KDb7wyG4HwFTM+q4KC67ZFrZ26g@mail.gmail.com>
+References: <1408849926-9603-1-git-send-email-mark.roszko@gmail.com>
+ <CACRpkdazv59T6xOSAxJQ7t5KDb7wyG4HwFTM+q4KC67ZFrZ26g@mail.gmail.com>
+Message-ID: <D13A6FB7-7CAE-43D7-ADC8-C5DACBCC79B9@jcrosoft.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 29, 2014 at 10:22:21AM +0800, Xiubo Li wrote:
-> This was added by:
-> Commit 8128c4f36 ("ARM: dts: vf610-twr: Add simple-card support.")
-> 
-> This useless property may cause some confusions for users.
-> 
-> Signed-off-by: Xiubo Li <Li.Xiubo@freescale.com>
 
-Applied, thanks.
+On Sep 1, 2014, at 4:27 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
+
+> 
+> On Sun, Aug 24, 2014 at 5:12 AM, Marek Roszko <mark.roszko@gmail.com> wrote:
+> 
+>> The SAMA5 and SAM9x5 series both have drive strength options for the PIOs. This
+>> patch adds the ability to set one of three hardware options for drive strengths of low,
+>> medium or high for the each pin. The actual current output of the chip based on the setting
+>> is defined in the datasheets and varies per pins separate from banks and with supply voltage.
+>> 
+>> This patch adds three new dt-bindings that allow setting the strength when configuring
+>> pins. By default, no change will be made to the drive strength of a pin from its reset value.
+>> Due to the difference between the register addresses of the SAMA5 and SAM9x5 series, a new
+>> sama5d3-pinctrl id was added.
+>> 
+>> Signed-off-by: Marek Roszko <mark.roszko@gmail.com>
+> 
+> Waiting for feedback from AT91 maintainers?
+
+I?ll check tomorrow
+> 
+> Yours,
+> Linus Walleij
