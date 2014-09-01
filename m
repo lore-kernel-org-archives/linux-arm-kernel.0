@@ -1,267 +1,45 @@
-From: eric.auger@linaro.org (Eric Auger)
-Date: Mon,  1 Sep 2014 10:53:04 +0200
-Subject: [PATCH v3] ARM: KVM: add irqfd support
-Message-ID: <1409561584-8050-1-git-send-email-eric.auger@linaro.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 01 Sep 2014 10:58:19 +0200
+Subject: [PATCH 1/2] ARM: multi_v7_defconfig: Enable shmobile platforms
+In-Reply-To: <0a6f01cfc432$507900f0$f16b02d0$@samsung.com>
+References: <1409234429-1916-1-git-send-email-geert+renesas@glider.be>
+ <3598124.ze8sbSR9ui@wuerfel> <0a6f01cfc432$507900f0$f16b02d0$@samsung.com>
+Message-ID: <7714045.KMII2MK3EF@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch enables irqfd on ARM.
+On Saturday 30 August 2014 18:10:59 Kukjin Kim wrote:
+> Arnd Bergmann wrote:
+> > On Friday 29 August 2014 20:05:49 Bartlomiej Zolnierkiewicz wrote:
+> > > I've been looking lately into making it possible to easily go
+> > > from multi_v7_defconfig config to a single platform one (in my
+> > > case Exynos one) and removing the need to keep the latter (i.e.
+> > > exynos_defconfig) in the kernel tree in the long-term.
+> > >
+> Why? I don't have any idea why we should use only multi_v7_defconfig for each
+> hardware platform. In my understanding, multi_v7_defconfig can be used for one
+> kernel image can support all of the platforms but it doesn't mean it should be
+> used for each platform. And I think, if we cannot maintain each platform's
+> defconfig in mainline, it will be kept in each SoC vendor and it is not a good
+> way. I mean both defconfigs has each value in mainline, exynos_defconfig should
+> be updated though ;)
 
-irqfd framework enables to inject a virtual IRQ into a guest upon an
-eventfd trigger. User-side uses KVM_IRQFD VM ioctl to provide KVM with
-a kvm_irqfd struct that associates a VM, an eventfd, a virtual IRQ number
-(aka. the gsi). When an actor signals the eventfd (typically a VFIO
-platform driver), the kvm irqfd subsystem injects the provided virtual
-IRQ into the guest.
+It's not clear how we are going to do this in the long run. We definitely
+have far more defconfig files in the kernel than we want to have, it's
+a burden for testers. In theory, running multi_v7_defconfig should have
+no downsides other than the obvious space overhead of the unused platform
+code and there should be no difference between disabling unused file systems
+and PCI drivers to disabling unused platforms.
 
-Resamplefd also is supported for level sensitive interrupts, ie. the
-user can provide another eventfd that is triggered when the completion
-of the virtual IRQ (gsi) is detected by the GIC.
+Another argument is that even an exynos_defconfig contains much more
+code than you really want, and for an embedded system you would turn off
+all the drivers that a particular exynos machine does not have. So there
+is no fundamental difference between turning off part of exynos_defconfig
+and turning off parts of multi_v7_defconfig, the difference is mainly
+how many options you'd turn off.
 
-The gsi must correspond to a shared peripheral interrupt (SPI), ie the
-GIC interrupt ID is gsi+32.
+Then again, I also don't see a reason to remove exynos_defconfig any time
+soon. So far the rule is that each platform can have its own defconfig
+because that's the way it has been done for a long time.
 
-this patch enables CONFIG_HAVE_KVM_EVENTFD and CONFIG_HAVE_KVM_IRQFD.
-CONFIG_HAVE_KVM_IRQCHIP is removed. No IRQ routing table is used
-(irqchip.c and irqcomm.c are not used).
-
-Both KVM_CAP_IRQFD & KVM_CAP_IRQFD_RESAMPLE capabilities are exposed
-
-Signed-off-by: Eric Auger <eric.auger@linaro.org>
-
----
-
-This patch serie deprecates the previous serie featuring GSI routing
-(https://patches.linaro.org/32261/)
-
-The patch serie has the following dependencies:
-- arm/arm64: KVM: Various VGIC cleanups and improvements
-  https://lists.cs.columbia.edu/pipermail/kvmarm/2014-June/009979.html
-- "KVM: EVENTFD: remove inclusion of irq.h"
-
-All pieces can be found on git://git.linaro.org/people/eric.auger/linux.git
-branch irqfd_norouting_integ_v3
-
-This work was tested with Calxeda Midway xgmac main interrupt with
-qemu-system-arm and QEMU VFIO platform device.
-
-v2 -> v3:
-- removal of irq.h from eventfd.c put in a separate patch to increase
-  visibility
-- properly expose KVM_CAP_IRQFD capability in arm.c
-- remove CONFIG_HAVE_KVM_IRQCHIP meaningfull only if irq_comm.c is used
-
-v1 -> v2:
-- rebase on 3.17rc1
-- move of the dist unlock in process_maintenance
-- remove of dist lock in __kvm_vgic_sync_hwstate
-- rewording of the commit message (add resamplefd reference)
-- remove irq.h
----
- Documentation/virtual/kvm/api.txt |  5 +++-
- arch/arm/include/uapi/asm/kvm.h   |  3 +++
- arch/arm/kvm/Kconfig              |  4 +--
- arch/arm/kvm/Makefile             |  2 +-
- arch/arm/kvm/arm.c                |  3 +++
- virt/kvm/arm/vgic.c               | 56 ++++++++++++++++++++++++++++++++++++---
- 6 files changed, 65 insertions(+), 8 deletions(-)
-
-diff --git a/Documentation/virtual/kvm/api.txt b/Documentation/virtual/kvm/api.txt
-index beae3fd..8118b12 100644
---- a/Documentation/virtual/kvm/api.txt
-+++ b/Documentation/virtual/kvm/api.txt
-@@ -2204,7 +2204,7 @@ into the hash PTE second double word).
- 4.75 KVM_IRQFD
- 
- Capability: KVM_CAP_IRQFD
--Architectures: x86 s390
-+Architectures: x86 s390 arm
- Type: vm ioctl
- Parameters: struct kvm_irqfd (in)
- Returns: 0 on success, -1 on error
-@@ -2230,6 +2230,9 @@ Note that closing the resamplefd is not sufficient to disable the
- irqfd.  The KVM_IRQFD_FLAG_RESAMPLE is only necessary on assignment
- and need not be specified with KVM_IRQFD_FLAG_DEASSIGN.
- 
-+On ARM/arm64 the injected must be a shared peripheral interrupt (SPI).
-+This means the programmed GIC interrupt ID is gsi+32.
-+
- 4.76 KVM_PPC_ALLOCATE_HTAB
- 
- Capability: KVM_CAP_PPC_ALLOC_HTAB
-diff --git a/arch/arm/include/uapi/asm/kvm.h b/arch/arm/include/uapi/asm/kvm.h
-index e6ebdd3..3034c66 100644
---- a/arch/arm/include/uapi/asm/kvm.h
-+++ b/arch/arm/include/uapi/asm/kvm.h
-@@ -194,6 +194,9 @@ struct kvm_arch_memory_slot {
- /* Highest supported SPI, from VGIC_NR_IRQS */
- #define KVM_ARM_IRQ_GIC_MAX		127
- 
-+/* One single KVM irqchip, ie. the VGIC */
-+#define KVM_NR_IRQCHIPS          1
-+
- /* PSCI interface */
- #define KVM_PSCI_FN_BASE		0x95c1ba5e
- #define KVM_PSCI_FN(n)			(KVM_PSCI_FN_BASE + (n))
-diff --git a/arch/arm/kvm/Kconfig b/arch/arm/kvm/Kconfig
-index 466bd29..e519a40 100644
---- a/arch/arm/kvm/Kconfig
-+++ b/arch/arm/kvm/Kconfig
-@@ -24,6 +24,7 @@ config KVM
- 	select KVM_MMIO
- 	select KVM_ARM_HOST
- 	depends on ARM_VIRT_EXT && ARM_LPAE
-+	select HAVE_KVM_EVENTFD
- 	---help---
- 	  Support hosting virtualized guest machines. You will also
- 	  need to select one or more of the processor modules below.
-@@ -55,7 +56,7 @@ config KVM_ARM_MAX_VCPUS
- config KVM_ARM_VGIC
- 	bool "KVM support for Virtual GIC"
- 	depends on KVM_ARM_HOST && OF
--	select HAVE_KVM_IRQCHIP
-+	select HAVE_KVM_IRQFD
- 	default y
- 	---help---
- 	  Adds support for a hardware assisted, in-kernel GIC emulation.
-@@ -63,7 +64,6 @@ config KVM_ARM_VGIC
- config KVM_ARM_TIMER
- 	bool "KVM support for Architected Timers"
- 	depends on KVM_ARM_VGIC && ARM_ARCH_TIMER
--	select HAVE_KVM_IRQCHIP
- 	default y
- 	---help---
- 	  Adds support for the Architected Timers in virtual machines
-diff --git a/arch/arm/kvm/Makefile b/arch/arm/kvm/Makefile
-index f7057ed..859db09 100644
---- a/arch/arm/kvm/Makefile
-+++ b/arch/arm/kvm/Makefile
-@@ -15,7 +15,7 @@ AFLAGS_init.o := -Wa,-march=armv7-a$(plus_virt)
- AFLAGS_interrupts.o := -Wa,-march=armv7-a$(plus_virt)
- 
- KVM := ../../../virt/kvm
--kvm-arm-y = $(KVM)/kvm_main.o $(KVM)/coalesced_mmio.o
-+kvm-arm-y = $(KVM)/kvm_main.o $(KVM)/coalesced_mmio.o $(KVM)/eventfd.o
- 
- obj-y += kvm-arm.o init.o interrupts.o
- obj-y += arm.o handle_exit.o guest.o mmu.o emulate.o reset.o
-diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
-index a99e0cd..6ba454a 100644
---- a/arch/arm/kvm/arm.c
-+++ b/arch/arm/kvm/arm.c
-@@ -181,6 +181,9 @@ int kvm_vm_ioctl_check_extension(struct kvm *kvm, long ext)
- 	case KVM_CAP_IRQCHIP:
- 		r = vgic_present;
- 		break;
-+#ifdef CONFIG_HAVE_KVM_IRQFD
-+	case KVM_CAP_IRQFD:
-+#endif
- 	case KVM_CAP_DEVICE_CTRL:
- 	case KVM_CAP_USER_MEMORY:
- 	case KVM_CAP_SYNC_MMU:
-diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
-index 7164d2e..586bd11 100644
---- a/virt/kvm/arm/vgic.c
-+++ b/virt/kvm/arm/vgic.c
-@@ -1334,7 +1334,10 @@ epilog:
- static bool vgic_process_maintenance(struct kvm_vcpu *vcpu)
- {
- 	u32 status = vgic_get_interrupt_status(vcpu);
-+	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
- 	bool level_pending = false;
-+	struct kvm *kvm = vcpu->kvm;
-+	int is_assigned_irq;
- 
- 	kvm_debug("STATUS = %08x\n", status);
- 
-@@ -1351,6 +1354,7 @@ static bool vgic_process_maintenance(struct kvm_vcpu *vcpu)
- 			struct vgic_lr vlr = vgic_get_lr(vcpu, lr);
- 			BUG_ON(vgic_irq_is_edge(vcpu, vlr.irq));
- 
-+			spin_lock(&dist->lock);
- 			vgic_irq_clear_queued(vcpu, vlr.irq);
- 			WARN_ON(vlr.state & LR_STATE_MASK);
- 			vlr.state = 0;
-@@ -1363,6 +1367,18 @@ static bool vgic_process_maintenance(struct kvm_vcpu *vcpu)
- 			 * interrupt.
- 			 */
- 			vgic_dist_irq_clear_soft_pend(vcpu, vlr.irq);
-+			spin_unlock(&dist->lock);
-+
-+			is_assigned_irq = kvm_irq_has_notifier(kvm, 0,
-+						vlr.irq - VGIC_NR_PRIVATE_IRQS);
-+
-+			if (is_assigned_irq) {
-+				kvm_debug("EOI irqchip routed vIRQ %d\n",
-+					  vlr.irq);
-+				kvm_notify_acked_irq(kvm, 0,
-+					vlr.irq - VGIC_NR_PRIVATE_IRQS);
-+			}
-+			spin_lock(&dist->lock);
- 
- 			/* Any additional pending interrupt? */
- 			if (vgic_dist_irq_get_level(vcpu, vlr.irq)) {
-@@ -1377,6 +1393,8 @@ static bool vgic_process_maintenance(struct kvm_vcpu *vcpu)
- 				vgic_cpu_irq_clear(vcpu, vlr.irq);
- 			}
- 
-+			spin_unlock(&dist->lock);
-+
- 			/*
- 			 * Despite being EOIed, the LR may not have
- 			 * been marked as empty.
-@@ -1441,14 +1459,10 @@ void kvm_vgic_flush_hwstate(struct kvm_vcpu *vcpu)
- 
- void kvm_vgic_sync_hwstate(struct kvm_vcpu *vcpu)
- {
--	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
--
- 	if (!irqchip_in_kernel(vcpu->kvm))
- 		return;
- 
--	spin_lock(&dist->lock);
- 	__kvm_vgic_sync_hwstate(vcpu);
--	spin_unlock(&dist->lock);
- }
- 
- int kvm_vgic_vcpu_pending_irq(struct kvm_vcpu *vcpu)
-@@ -2183,3 +2197,37 @@ struct kvm_device_ops kvm_arm_vgic_v2_ops = {
- 	.get_attr = vgic_get_attr,
- 	.has_attr = vgic_has_attr,
- };
-+
-+int kvm_irq_map_gsi(struct kvm *kvm,
-+		    struct kvm_kernel_irq_routing_entry *entries,
-+		    int gsi)
-+{
-+	return gsi;
-+}
-+
-+int kvm_irq_map_chip_pin(struct kvm *kvm, unsigned irqchip, unsigned pin)
-+{
-+	return pin;
-+}
-+
-+int kvm_set_irq(struct kvm *kvm, int irq_source_id,
-+		u32 irq, int level, bool line_status)
-+{
-+	int r = -EINVAL;
-+	unsigned int spi = irq + VGIC_NR_PRIVATE_IRQS;
-+
-+	if (spi > KVM_ARM_IRQ_GIC_MAX)
-+		return r;
-+
-+	kvm_debug("Inject irqchip routed vIRQ %d\n", irq);
-+	r = kvm_vgic_inject_irq(kvm, 0, spi, level);
-+	return r;
-+}
-+
-+/* MSI not implemented yet */
-+int kvm_set_msi(struct kvm_kernel_irq_routing_entry *e,
-+		struct kvm *kvm, int irq_source_id,
-+		int level, bool line_status)
-+{
-+	return 0;
-+}
--- 
-1.9.1
+	Arnd
