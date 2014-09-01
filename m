@@ -1,93 +1,42 @@
-From: long.wanglong@huawei.com (Wang Long)
-Date: Mon, 1 Sep 2014 13:49:23 +0800
-Subject: [SMP BUG?] the return value of is_smp() is bug?
-Message-ID: <1409550563-92081-1-git-send-email-long.wanglong@huawei.com>
+From: info@lategoodbye.de (Stefan Wahren)
+Date: Mon, 01 Sep 2014 08:31:05 +0200
+Subject: ARM: mx28: cpufreq-cpu0 support?
+In-Reply-To: <CAOMZO5CnuWJ9EaLUW8DYFU1Dzeh=92tux0zoUBKoW-L=VWZhhg@mail.gmail.com>
+References: <53F9B4BF.2050802@lategoodbye.de>	<20140825080123.GA12289@dragon>	<53FB1041.5010208@lategoodbye.de>	<CAOMZO5CG7mw5W4D3fRPE3TGxQ6-3pTtDJrsNnieN8XKE9dGofQ@mail.gmail.com>
+ <CAOMZO5CnuWJ9EaLUW8DYFU1Dzeh=92tux0zoUBKoW-L=VWZhhg@mail.gmail.com>
+Message-ID: <540412A9.4090806@lategoodbye.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Fabio,
 
-Hi,all
+Am 30.08.2014 19:07, schrieb Fabio Estevam:
+> On Sat, Aug 30, 2014 at 2:05 PM, Fabio Estevam <festevam@gmail.com> wrote:
+>> Hi Stefan,
+>>
+>> On Mon, Aug 25, 2014 at 7:30 AM, Stefan Wahren <info@lategoodbye.de> wrote:
+>>
+>>> As far as i know, the old Freescale BSP (2.6.35) contains a cpufreq driver
+>>> for mxs, which never goes to mainline. So i'm not sure what would be the
+>>> best way: porting the old driver or using cpufreq-cpu0.
+>>
+>> First step would be to port the PMU driver into mainline.
+>
+> I mean this regulator driver:
+> http://git.freescale.com/git/cgit.cgi/imx/linux-2.6-imx.git/tree/drivers/regulator/mxs-regulator.c?h=imx_2.6.35_maintain
+>
+> ,so that you can do the voltage scaling.
+>
 
-In kernel 3.17-rc2, when i set CONFIG_HAVE_SMP = y and CONFIG_SMP_ON_UP = y 
-in .config file. the secondary core can not boot.
+thanks. Okay, that leads to more questions:
 
-when i set CONFIG_HAVE_SMP = y and CONFIG_SMP_ON_UP = n in .config file,
-the secondary core can boot.
+How can i test a ported mxs-regulator driver, that it's really working? 
+Is there any userspace interface?
 
-But this does not happen in kernel 3.10 lts kernel, Whether the 
-CONFIG_SMP_ON_UP is set yes or no ,the secondary core can boot.
+Is there a good DT implementation of a similiar regulator driver, so i 
+can orientate on?
 
-Does the meaning of CONFIG_SMP_ON_UP changed or this is a bug in kernel 3.17-rc2 ? 
+What are the recommend mailing lists for this porting (linux-pm and 
+linux-arm-kernel)?
 
-
-I write the following patch to test the return value of is_smp().
-
-----------------------------------------
-
-Signed-off-by: Wang Long <long.wanglong@huawei.com>
----
- arch/arm/kernel/setup.c |    5 +++++
- 1 file changed, 5 insertions(+)
-
-diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
-index 84db893d..fbeb67f 100644
---- a/arch/arm/kernel/setup.c
-+++ b/arch/arm/kernel/setup.c
-@@ -925,6 +925,11 @@ void __init setup_arch(char **cmdline_p)
- 	arm_dt_init_cpu_maps();
- 	psci_init();
- #ifdef CONFIG_SMP
-+	
-+	if (is_smp() == 1)
-+		printk("is_smp() return true;\n");
-+	else if (is_smp() == 0)
-+		printk("is_smp() return false;\n");
- 	if (is_smp()) {
- 		if (!mdesc->smp_init || !mdesc->smp_init()) {
- 			if (psci_smp_available())
-
-kernel version: 3.17-rc2
-
-config:     set CONFIG_HAVE_SMP = y and CONFIG_SMP_ON_UP = y
-command:    # qemu-system-arm -M vexpress-a9 -smp 2  -m 128M -kernel arch/arm/boot/zImage -nographic
-The output:
-
-..........
-is_smp() return false;
-CPU: Testing write buffer coherency: ok
-missing device node for CPU 0
-CPU0: thread -1, cpu 0, socket 0, mpidr 80000000
-Setting up static identity map for 0x604643d8 - 0x60464430
-Brought up 1 CPUs
-SMP: Total of 1 processors activated.
-CPU: All CPU(s) started in SVC mode.
-...........
-
-config:     set CONFIG_HAVE_SMP = y and not set CONFIG_SMP_ON_UP 
-command:    # qemu-system-arm -M vexpress-a9 -smp 2  -m 128M -kernel arch/arm/boot/zImage -nographic
-The output:
-
-.....
- Memory policy: Data cache writealloc
-is_smp() return true;
-sched_clock: 32 bits at 24MHz, resolution 41ns, wraps every 178956969942ns
-......
-......
-CPU: Testing write buffer coherency: ok
-missing device node for CPU 0
-missing device node for CPU 1
-CPU0: thread -1, cpu 0, socket 0, mpidr 80000000
-Setting up static identity map for 0x60463ef8 - 0x60463f50
-CPU1: Booted secondary processor
-CPU1: thread -1, cpu 1, socket 0, mpidr 80000001
-Brought up 2 CPUs
-SMP: Total of 2 processors activated.
-CPU: All CPU(s) started in SVC mode.
-devtmpfs: initialized
-.......
-
-Any ideas?
-
-
--- 
-1.7.9.5
+BR Stefan
