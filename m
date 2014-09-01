@@ -1,62 +1,121 @@
-From: grygorii.strashko@ti.com (Grygorii Strashko)
-Date: Mon, 1 Sep 2014 17:55:21 +0300
-Subject: [PATCH 1/4] gpio: syscon: add soc specific callback to assign
- output value
-In-Reply-To: <CACRpkdaq2=f92yEEZgGHOtixDk35O9tmN2PZkSPKrGwGVDS_mQ@mail.gmail.com>
-References: <1407946582-20927-1-git-send-email-grygorii.strashko@ti.com>	<1407946582-20927-2-git-send-email-grygorii.strashko@ti.com>
- <CACRpkdaq2=f92yEEZgGHOtixDk35O9tmN2PZkSPKrGwGVDS_mQ@mail.gmail.com>
-Message-ID: <540488D9.3040602@ti.com>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Mon,  1 Sep 2014 22:57:38 +0800
+Subject: [PATCH v3 00/17] Introduce ACPI for ARM64 based on ACPI 5.1
+Message-ID: <1409583475-6978-1-git-send-email-hanjun.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+ACPI 5.1 has been released and now be freely available for
+download [1]. It fixed some major gaps to run ACPI on ARM,
+this patch just follow the ACPI 5.1 spec and prepare the
+code to run ACPI on ARM64.
 
-On 08/29/2014 09:19 AM, Linus Walleij wrote:
-> On Wed, Aug 13, 2014 at 6:16 PM, Grygorii Strashko
-> <grygorii.strashko@ti.com> wrote:
-> 
->> Some SoCs (like Keystone) may require to perform special
->> sequence of operations to assign output GPIO value, so default
->> implementation of .set() callback from gpio-syscon driver
->> can't be used.
->>
->> Hence, add optional, SoC specific callback to assign output
->> gpio value.
->>
->> Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
-> 
-> Hm :-/
-> 
-> I didn't realize this wasn't a quite so straight-forward a
-> syscon GPIO driver.
+ACPI 5.1 has some major changes for the following tables and
+method which are essential for ARM platforms:
+1) MADT table updates.
+2) FADT updates for PSCI
+3) GTDT
 
-Yep. At first glance, everything seemed more simple.
+This patch set is the ARM64 ACPI core patches covered MADT, FADT
+and GTDT, platform board specific drivers are not covered by this
+patch set, but we provide drivers for Juno to boot with ACPI only
+in the follwing patch set for review purpose.
 
-> 
-> Now I start to think that it looks kludgy to bolt this onto
-> the other driver and think we may need to go back to the
-> other version which puts it as a separate driver. I guess
-> that is what you refer to as v1?
-> 
-> I have a hard time to make my mind up about these
-> syscon things, sorry :-(
-> 
-> Now I have to ask you: which way do you prefer to do it,
-> if you can choose freely? The initial driver or augmenting
-> the syscon driver (patch v1)?
+We first introduce acpi.c and its related head file which are needed
+by ACPI core, and then get RSDP to extract all the ACPI boot-time tables.
+When all the boot-time tables (FADT, MADT, GTDT) are ready, then
+parse them to init the sytem when booted. Specifically, 
+a) we use FADT to init PSCI and use PSCI to boot SMP;
+b) Use MADT for GIC init and SMP init;
+c) GTDT for arch timer init.
 
-Honestly, I think, It is better to keep Keystone 2 functionality in 
-standalone file [1], as it allows to simply manage this code using
-build system, avoid ugly #ifdefs in code (as you note on patch 3)
-and keep commits history more clear and HW specific (very helpful in 
-case of any issues). 
+This patch set is based on 3.17-rc2 and was tested by Graeme on Juno
+and FVP base model boot with ACPI only OK, if you want to test them,
+you can pull from acpi-5.1-v3 branch in leg/acpi repo:
+git://git.linaro.org/leg/acpi/acpi.git
 
-But, as you agree now to take this syscon-based patches, I'll update & re-send them,
-applying comments from Alexander to the patch 1 and your comments to the patch 3 :)
+Updates since v2:
+ - Refactor the code to make SMP/PSCI init with less sperated init
+   path by Tomasz
+ - make ACPI depend on EXPERT
+ - Address lots of comments from Catalin, Sudeep, Geoff
+ - Add Juno device ACPI driver patches for review
 
-Thanks for your comments.
+Updates since v1:
+ - Set ACPI default off on ARM64 suggested by Olof;
+ - Rebase the patch set on top of linux-next branch/linux-pm tree which
+   includes the ACPICA for full ACPI 5.1 support.
+ - Update the document as suggested;
+ - Adress lots of comments from Mark, Sudeep, Randy, Naresh, Olof, Geoff
+   and more...
 
-[1] https://lkml.org/lkml/2014/7/23/352
+[1]: http://www.uefi.org/sites/default/files/resources/ACPI_5_1release.pdf
 
-Best regards,
--grygorii
+Al Stone (3):
+  ARM64 / ACPI: Get RSDP and ACPI boot-time tables
+  ARM64 / ACPI: Introduce early_param for "acpi"
+  ARM64 / ACPI: Select ACPI_REDUCED_HARDWARE_ONLY if ACPI is enabled on
+    ARM64
+
+Ashwin Chaugule (1):
+  ACPI / table: Add new function to get table entries
+
+Graeme Gregory (4):
+  ARM64 / ACPI: Introduce lowlevel suspend function
+  ARM64 / ACPI: If we chose to boot from acpi then disable FDT
+  ARM64 / ACPI: Enable ARM64 in Kconfig
+  Documentation: ACPI for ARM64
+
+Hanjun Guo (8):
+  ARM64: Move the init of cpu_logical_map(0) before
+    unflatten_device_tree()
+  ARM64 / ACPI: Make PCI optional for ACPI on ARM64
+  ARM64 / ACPI: Parse FADT table to get PSCI flags for PSCI init
+  ACPI / table: Print GIC information when MADT is parsed
+  ARM64 / ACPI: Parse MADT for SMP initialization
+  ACPI / processor: Make it possible to get CPU hardware ID via GICC
+  ARM64 / ACPI: Introduce ACPI_IRQ_MODEL_GIC and register device's gsi
+  ARM64 / ACPI: Parse GTDT to initialize arch timer
+
+Tomasz Nowicki (1):
+  ARM64 / ACPI: Add GICv2 specific ACPI boot support
+
+ Documentation/arm64/arm-acpi.txt     |  218 +++++++++++++++++++++
+ Documentation/kernel-parameters.txt  |    3 +-
+ arch/arm64/Kconfig                   |    3 +
+ arch/arm64/include/asm/acenv.h       |   18 ++
+ arch/arm64/include/asm/acpi.h        |  108 ++++++++++
+ arch/arm64/include/asm/cpu_ops.h     |    1 +
+ arch/arm64/include/asm/pci.h         |   11 ++
+ arch/arm64/include/asm/psci.h        |    3 +-
+ arch/arm64/include/asm/smp.h         |    5 +-
+ arch/arm64/kernel/Makefile           |    1 +
+ arch/arm64/kernel/acpi.c             |  359 ++++++++++++++++++++++++++++++++++
+ arch/arm64/kernel/cpu_ops.c          |    4 +-
+ arch/arm64/kernel/irq.c              |    5 +
+ arch/arm64/kernel/psci.c             |   78 +++++---
+ arch/arm64/kernel/setup.c            |   23 ++-
+ arch/arm64/kernel/smp.c              |    2 +-
+ arch/arm64/kernel/time.c             |    7 +
+ drivers/acpi/Kconfig                 |    6 +-
+ drivers/acpi/Makefile                |    2 +-
+ drivers/acpi/bus.c                   |    3 +
+ drivers/acpi/internal.h              |    5 +
+ drivers/acpi/processor_core.c        |   37 ++++
+ drivers/acpi/tables.c                |  113 +++++++++--
+ drivers/clocksource/arm_arch_timer.c |  117 +++++++++--
+ drivers/irqchip/irq-gic.c            |  114 +++++++++++
+ include/linux/acpi.h                 |    5 +
+ include/linux/clocksource.h          |    6 +
+ include/linux/irqchip/arm-gic-acpi.h |   33 ++++
+ include/linux/pci.h                  |   37 +++-
+ 29 files changed, 1237 insertions(+), 90 deletions(-)
+ create mode 100644 Documentation/arm64/arm-acpi.txt
+ create mode 100644 arch/arm64/include/asm/acenv.h
+ create mode 100644 arch/arm64/include/asm/acpi.h
+ create mode 100644 arch/arm64/include/asm/pci.h
+ create mode 100644 arch/arm64/kernel/acpi.c
+ create mode 100644 include/linux/irqchip/arm-gic-acpi.h
+
+-- 
+1.7.9.5
