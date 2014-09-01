@@ -1,36 +1,88 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Mon, 1 Sep 2014 21:47:38 +0800
-Subject: [linux-sunxi] [PATCH v2 0/4] input: Add new sun4i-lradc-keys
- driver
-In-Reply-To: <1388656707-16181-1-git-send-email-hdegoede@redhat.com>
-References: <1388656707-16181-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <CAGb2v66VZqpHyghs5xn=RdDUVU=2PxFw5BJ-R5Xpsk-nfoDM0Q@mail.gmail.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Mon, 1 Sep 2014 15:41:48 +0200
+Subject: [PATCHv1 4/7] ASoC: dts: kirkwood-t5325: To support simple card
+ newest style.
+In-Reply-To: <1409545781-20530-5-git-send-email-Li.Xiubo@freescale.com>
+References: <1409545781-20530-1-git-send-email-Li.Xiubo@freescale.com>
+ <1409545781-20530-5-git-send-email-Li.Xiubo@freescale.com>
+Message-ID: <20140901134148.GB11312@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Hans,
+On Mon, Sep 01, 2014 at 12:29:38PM +0800, Xiubo Li wrote:
+> This patch depends on the following simple card patch:
+> ===
+> ASoC: simple-card: Merge single and muti DAI link code.
 
-It seems this series didn't get any attention. Care to respin on top
-of the latest tree?
+Saying what a patch depends on, is not the best of ChangeLog.
 
-FYI, I have the series rebased on top of sunxi-next:
-https://github.com/wens/linux/commits/others/sunxi-lradc-input-v2
+Say something like:
 
-ChenYu
+The simple-card binding has been changed, so that a dai-link subnode
+is now required, and the properties directly under the sound node are
+no longer allowed. Modify the DT to fit this new binding.
 
-On Thu, Jan 2, 2014 at 5:58 PM, Hans de Goede <hdegoede@redhat.com> wrote:
-> Hi Dimitri et al,
->
-> Here is v2 of the sun4i-lradc-keys driver, changes since v1:
->
-> - Use include/dt-bindings/input/input.h
-> - Rename the keycodes property to linux,chan0-keycodes
->
-> Regards,
->
-> Hans
->
-> --
-> You received this message because you are subscribed to the Google Groups "linux-sunxi" group.
-> To unsubscribe from this group and stop receiving emails from it, send an email to linux-sunxi+unsubscribe at googlegroups.com.
-> For more options, visit https://groups.google.com/groups/opt_out.
+   Andrew
+
+
+> 
+> This patch merge single DAI link and muti-DAI links code together,
+> and simply the simple-card driver code.
+> 
+> And also do some other improvement:
+> 
+> Since from the DAI format micro SND_SOC_DAIFMT_CBx_CFx, the 'CBx'
+> mean Codec's bit clock is as master/slave and the 'CFx' mean Codec's
+> frame clock is as master/slave.
+> 
+> So these same DAI formats should be informed to CPU and CODE DAIs at
+> the same time. For the Codec driver will set the bit clock and frame
+> clock as the DAI formats said, but for the CPU driver, if the the
+> bit clock or frame clock is as Codec master, so it should be set CPU
+> DAI device as bit clock or frame clock as slave, and vice versa.
+> 
+> The old code will cause confusion, and we should be clear that the
+> letter 'C' here mean to Codec.
+> ===
+> 
+> Signed-off-by: Xiubo Li <Li.Xiubo@freescale.com>
+> ---
+>  arch/arm/boot/dts/kirkwood-t5325.dts | 15 ++++++++-------
+>  1 file changed, 8 insertions(+), 7 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/kirkwood-t5325.dts b/arch/arm/boot/dts/kirkwood-t5325.dts
+> index 610ec0f..25d1223 100644
+> --- a/arch/arm/boot/dts/kirkwood-t5325.dts
+> +++ b/arch/arm/boot/dts/kirkwood-t5325.dts
+> @@ -189,7 +189,6 @@
+>  
+>  	sound {
+>  		compatible = "simple-audio-card";
+> -		simple-audio-card,format = "i2s";
+>  		simple-audio-card,routing =
+>  			"Headphone Jack", "HPL",
+>  			"Headphone Jack", "HPR",
+> @@ -204,12 +203,14 @@
+>  
+>  		simple-audio-card,mclk-fs = <256>;
+>  
+> -		simple-audio-card,cpu {
+> -			sound-dai = <&audio>;
+> -		};
+> -
+> -		simple-audio-card,codec {
+> -			sound-dai = <&alc5621>;
+> +		simple-audio-card,dai-link {
+> +			format = "i2s";
+> +			cpu {
+> +				sound-dai = <&audio>;
+> +			};
+> +			codec {
+> +				sound-dai = <&alc5621>;
+> +			};
+>  		};
+>  	};
+>  };
+> -- 
+> 1.8.4
+> 
