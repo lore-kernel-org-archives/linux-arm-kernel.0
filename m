@@ -1,26 +1,31 @@
-From: cmetcalf@tilera.com (Chris Metcalf)
-Date: Mon, 1 Sep 2014 09:53:01 -0400
-Subject: [PATCH 2/5] char: tile-srom: Remove reference to platform_bus
-In-Reply-To: <1409574460.4343.7.camel@hornet>
-References: <1406298233-27876-1-git-send-email-pawel.moll@arm.com>	
- <1406298233-27876-2-git-send-email-pawel.moll@arm.com>	
- <53DAA605.2030500@tilera.com> <1406913678.22529.46.camel@hornet>	
- <53E139C8.9000502@tilera.com> <1407515691.31897.26.camel@hornet>	
- <5400C9C1.4060904@tilera.com> <1409574460.4343.7.camel@hornet>
-Message-ID: <54047A3D.3090702@tilera.com>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Mon, 01 Sep 2014 15:53:53 +0200
+Subject: [linux-sunxi] [PATCH v2 0/4] input: Add new sun4i-lradc-keys
+ driver
+In-Reply-To: <CAGb2v66VZqpHyghs5xn=RdDUVU=2PxFw5BJ-R5Xpsk-nfoDM0Q@mail.gmail.com>
+References: <1388656707-16181-1-git-send-email-hdegoede@redhat.com>
+ <CAGb2v66VZqpHyghs5xn=RdDUVU=2PxFw5BJ-R5Xpsk-nfoDM0Q@mail.gmail.com>
+Message-ID: <54047A71.3070207@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 9/1/2014 8:27 AM, Pawel Moll wrote:
-> On Fri, 2014-08-29 at 19:43 +0100, Chris Metcalf wrote:
->> If the
->> consensus is that this is the way to go, I can certainly take this change
->> into the Tile tree.
-> That would be cool, and left us only with the scsi/DMA as the last user
-> of platform_bus. But this is a completely different story ;-)
+Hi,
 
-OK, sounds good.  It's in the tile tree at linux-next now.
+On 09/01/2014 03:47 PM, Chen-Yu Tsai wrote:
+> Hi Hans,
+> 
+> It seems this series didn't get any attention. Care to respin on top
+> of the latest tree?
+> 
+> FYI, I have the series rebased on top of sunxi-next:
+> https://github.com/wens/linux/commits/others/sunxi-lradc-input-v2
 
--- 
-Chris Metcalf, Tilera Corp.
-http://www.tilera.com
+The problem is not it not getting attention, the problem is people were
+unhappy with the dt-bindings for this. I've a pretty good idea of how
+to fix up the bindings, but -ENOTIME so far. If you've a board you can
+test this on and want to take a shot at fixing it up, I can get into
+a little bit more detail.
+
+Regards,
+
+Hans
