@@ -1,73 +1,55 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Mon, 01 Sep 2014 18:36:50 +0530
-Subject: [PATCH RESEND v2 3/7] usb: phy: mxs: Add VF610 USB PHY support
-In-Reply-To: <acb7c055ded38c74291d0f0d8d2fdca54a8b95f8.1408391385.git.stefan@agner.ch>
-References: <cover.1408391385.git.stefan@agner.ch>
- <acb7c055ded38c74291d0f0d8d2fdca54a8b95f8.1408391385.git.stefan@agner.ch>
-Message-ID: <147749d74a57dcf72ed9bd81249d0ca5@agner.ch>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 01 Sep 2014 15:14:45 +0200
+Subject: [Linaro-mm-sig] [PATCH 10/29] drivers: add
+ DRIVER_HAS_OWN_IOMMU_MANAGER flag
+In-Reply-To: <54046186.5030407@samsung.com>
+References: <1407235677-26324-1-git-send-email-m.szyprowski@samsung.com>
+ <5493968.dbuSPSqts4@wuerfel> <54046186.5030407@samsung.com>
+Message-ID: <2864762.XVyAv0xVzJ@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I think I still miss a Signed-Off-By Felipe Balbi here...
+On Monday 01 September 2014 14:07:34 Marek Szyprowski wrote:
+> On 2014-09-01 13:56, Arnd Bergmann wrote:
+> > On Monday 01 September 2014 12:47:08 Marek Szyprowski wrote:
+> >>> Who do you think needs to set this flag, and who needs to read it?
+> >> In the proposed solution Exynos IOMMU driver creates a separate IO
+> >> address space
+> >> for every client device in a system and binds it to the default
+> >> dma-mapping space
+> >> for the given device. When drivers are doing its own management of IO
+> >> address
+> >> space, instead of relying on what is available by default with dma-mapping
+> >> interface, this will require releasing of the previously created default
+> >> structures and resources. So this flag is set by the driver doing its own
+> >> management of io address space. The flags is then checked by Exynos
+> >> IOMMU driver
+> >> to avoid creating the default dma-mapping address space for devices
+> >> which driver
+> >> does its own management.
+> > I don't completely understand it yet. I would assume the device
+> > to be added to the default domain at device creation time
+> > (of_platform_populate), way before we know which device driver
+> > is going to be used. How can this prevent the iommu driver
+> > from doing the association with the domain?
+> 
+> of_platform_populate() is too early to do the association, because that 
+> time the
+> exynos iommu driver is even not yet probed.
 
-All the rest should make it into 3.18, but USB without PHY is no fun to
-use ;-)
+Please have a look at the "Introduce automatic DMA configuration for IOMMU
+masters" series that Will Deacon sent out the other day. The idea is that
+we are changing the probe order so that the iommu gets initialized early
+enough for all IOMMU association to be done there.
 
-Am 2014-08-19 01:37, schrieb Stefan Agner:
-> This adds support for the USB PHY in Vybrid VF610. We assume that
-> the disconnection without VBUS is also needed for Vybrid.
-> 
-> Tests showed, without MXS_PHY_NEED_IP_FIX, enumeration of devices
-> behind a USB Hub fails with errors:
-> 
-> [  215.163507] usb usb1-port1: cannot reset (err = -32)
-> [  215.170498] usb usb1-port1: cannot reset (err = -32)
-> [  215.185120] usb usb1-port1: cannot reset (err = -32)
-> [  215.191345] usb usb1-port1: cannot reset (err = -32)
-> [  215.202487] usb usb1-port1: cannot reset (err = -32)
-> [  215.207718] usb usb1-port1: Cannot enable. Maybe the USB cable is bad?
-> [  215.219317] usb usb1-port1: unable to enumerate USB device
-> 
-> Hence we also enable the MXS_PHY_NEED_IP_FIX flag.
-> 
-> Acked-by: Peter Chen <peter.chen@freescale.com>
-> Signed-off-by: Stefan Agner <stefan@agner.ch>
-> ---
->  Documentation/devicetree/bindings/usb/mxs-phy.txt | 1 +
->  drivers/usb/phy/phy-mxs-usb.c                     | 6 ++++++
->  2 files changed, 7 insertions(+)
-> 
-> diff --git a/Documentation/devicetree/bindings/usb/mxs-phy.txt
-> b/Documentation/devicetree/bindings/usb/mxs-phy.txt
-> index cef181a..fe3eed8 100644
-> --- a/Documentation/devicetree/bindings/usb/mxs-phy.txt
-> +++ b/Documentation/devicetree/bindings/usb/mxs-phy.txt
-> @@ -5,6 +5,7 @@ Required properties:
->  	* "fsl,imx23-usbphy" for imx23 and imx28
->  	* "fsl,imx6q-usbphy" for imx6dq and imx6dl
->  	* "fsl,imx6sl-usbphy" for imx6sl
-> +	* "fsl,vf610-usbphy" for Vybrid vf610
->    "fsl,imx23-usbphy" is still a fallback for other strings
->  - reg: Should contain registers location and length
->  - interrupts: Should contain phy interrupt
-> diff --git a/drivers/usb/phy/phy-mxs-usb.c b/drivers/usb/phy/phy-mxs-usb.c
-> index c42bdf0..8c2f23b 100644
-> --- a/drivers/usb/phy/phy-mxs-usb.c
-> +++ b/drivers/usb/phy/phy-mxs-usb.c
-> @@ -125,10 +125,16 @@ static const struct mxs_phy_data imx6sl_phy_data = {
->  		MXS_PHY_NEED_IP_FIX,
->  };
->  
-> +static const struct mxs_phy_data vf610_phy_data = {
-> +	.flags = MXS_PHY_DISCONNECT_LINE_WITHOUT_VBUS |
-> +		MXS_PHY_NEED_IP_FIX,
-> +};
-> +
->  static const struct of_device_id mxs_phy_dt_ids[] = {
->  	{ .compatible = "fsl,imx6sl-usbphy", .data = &imx6sl_phy_data, },
->  	{ .compatible = "fsl,imx6q-usbphy", .data = &imx6q_phy_data, },
->  	{ .compatible = "fsl,imx23-usbphy", .data = &imx23_phy_data, },
-> +	{ .compatible = "fsl,vf610-usbphy", .data = &vf610_phy_data, },
->  	{ /* sentinel */ }
->  };
->  MODULE_DEVICE_TABLE(of, mxs_phy_dt_ids);
+> The association with default dma-mapping domain is done in
+> IOMMU_GROUP_NOTIFY_BIND_DRIVER notifier, just before binding the driver 
+> to the
+> given device. This way iommu driver can check dev->driver->flags and 
+> skip creating
+> default dma-mapping domain if driver announces that it wants to handle it by
+> itself.
+
+I really want to kill off those notifiers.
+
+	Arnd
