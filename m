@@ -1,103 +1,81 @@
-From: ta.omasab@gmail.com (Thomas Abraham)
-Date: Mon, 1 Sep 2014 14:17:20 +0530
-Subject: [PATCH v9 4/6] ARM: Exynos: switch to using generic cpufreq
- driver for Exynos4210/5250/5420
-In-Reply-To: <CAMAWPa-8h5PNhgT+ApBhA8p=i+4oFOnYnQsQ4mK1JKwwAhpvpQ@mail.gmail.com>
-References: <1406707663-16656-1-git-send-email-thomas.ab@samsung.com>
- <1406707663-16656-5-git-send-email-thomas.ab@samsung.com>
- <53DA8BB9.6020702@samsung.com> <53DA8D85.3050106@gmail.com>
- <7hbnrc6px3.fsf@paris.lan> <53F7DA13.6090305@gmail.com>
- <CADWw7OgAS-z-UOrJU-hL2fzuefJmLtCTg57jYk2Df7f5KfLJmA@mail.gmail.com>
- <7h8umc60we.fsf@paris.lan>
- <CADWw7OgW+o3tB=ptnsy-PsmXmNv8oXzt_WfK6NswQiEWWwAzNA@mail.gmail.com>
- <CAGa+x85-Anb+HsSUQRaaeex19-HK+yZDW0UpFBwAtsQ8Sf2Aqg@mail.gmail.com>
- <CAGa+x86jU8MR=r_xuaiorbNNyqrezb0b6Ozy-MPg9HvsARESOw@mail.gmail.com>
- <CAJuA9ajtsrY7zSDMs=c6BZ0AqERoBgvq++dTF4Dn673zGMfcgQ@mail.gmail.com>
- <CAMAWPa-8h5PNhgT+ApBhA8p=i+4oFOnYnQsQ4mK1JKwwAhpvpQ@mail.gmail.com>
-Message-ID: <CAJuA9ah5M_pXRMXPB6o7JLhgVUHM7kYo9HOV6Yxv4Z=hKMdG=w@mail.gmail.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Mon, 1 Sep 2014 10:47:31 +0200
+Subject: [PATCH v4 3/5] ARM: tegra: Initialize interrupt controller from DT
+In-Reply-To: <3113165.EcqFA5vr07@wuerfel>
+References: <1409239879-12376-1-git-send-email-thierry.reding@gmail.com>
+ <20140829142408.GA31264@ulmo> <20140829150422.GA11035@ulmo>
+ <3113165.EcqFA5vr07@wuerfel>
+Message-ID: <20140901084729.GD24430@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kevin,
+On Fri, Aug 29, 2014 at 09:53:42PM +0200, Arnd Bergmann wrote:
+> On Friday 29 August 2014 17:04:28 Thierry Reding wrote:
+> >         static struct irq_chip *extn;
+> > 
+> >         void gic_arch_register(const struct irqchip *chip)
+> >         {
+> >                 if (WARN(extn != NULL))
+> >                         return;
+> > 
+> >                 gic_chip.flags |= chip->flags;
+> >                 extn = chip;
+> >         }
+> > 
+> > Any preferences, or other ideas? Adding Thomas and Jason, perhaps they
+> > can provide more input on how to solve this.
+> 
+> I think the entire gic_arch_extn method is done in a rather odd way
+> and we should try to come up with a replacement.
+> 
+> These are the users at the moment:
+> 
+> arch/arm/mach-exynos/pm.c:      gic_arch_extn.irq_set_wake = exynos_irq_set_wake;
+> arch/arm/mach-imx/gpc.c:        gic_arch_extn.irq_mask = imx_gpc_irq_mask;
+> arch/arm/mach-imx/gpc.c:        gic_arch_extn.irq_unmask = imx_gpc_irq_unmask;
+> arch/arm/mach-imx/gpc.c:        gic_arch_extn.irq_set_wake = imx_gpc_irq_set_wake;
+> arch/arm/mach-omap2/omap-wakeupgen.c:   gic_arch_extn.irq_mask = wakeupgen_mask;
+> arch/arm/mach-omap2/omap-wakeupgen.c:   gic_arch_extn.irq_unmask = wakeupgen_unmask;
+> arch/arm/mach-omap2/omap-wakeupgen.c:   gic_arch_extn.flags = IRQCHIP_MASK_ON_SUSPEND | IRQCHIP_SKIP_SET_W
+> arch/arm/mach-shmobile/intc-sh73a0.c:   gic_arch_extn.irq_set_wake = sh73a0_set_wake;
+> arch/arm/mach-shmobile/setup-r8a7779.c: gic_arch_extn.irq_set_wake = r8a7779_set_wake;
+> arch/arm/mach-tegra/irq.c:      gic_arch_extn.irq_ack = tegra_ack;
+> arch/arm/mach-tegra/irq.c:      gic_arch_extn.irq_eoi = tegra_eoi;
+> arch/arm/mach-tegra/irq.c:      gic_arch_extn.irq_mask = tegra_mask;
+> arch/arm/mach-tegra/irq.c:      gic_arch_extn.irq_unmask = tegra_unmask;
+> arch/arm/mach-tegra/irq.c:      gic_arch_extn.irq_retrigger = tegra_retrigger;
+> arch/arm/mach-tegra/irq.c:      gic_arch_extn.irq_set_wake = tegra_set_wake;
+> arch/arm/mach-tegra/irq.c:      gic_arch_extn.flags = IRQCHIP_MASK_ON_SUSPEND;
+> arch/arm/mach-ux500/cpu.c:      gic_arch_extn.flags = IRQCHIP_SKIP_SET_WAKE | IRQCHIP_MASK_ON_SUSPEND;
+> arch/arm/mach-zynq/common.c:    gic_arch_extn.flags = IRQCHIP_SKIP_SET_WAKE | IRQCHIP_MASK_ON_SUSPEND;
+> 
+> I have to admit I don't really understand how these work, but what
+> I'd expect to work better is a way to turn the gic code into more
+> of a library that can be used by specialized drivers. In that
+> case you would register a driver for the tegra gic using IRQCHIP_DECLARE
+> and that driver would call a variation of gic_of_init() or gic_init_bases()
+> with the extra stuff as arguments.
+> 
+> We'd have to hack around the fact that all these platforms currently
+> don't list a specialized compatible string, but at least for the future
+> we should be able to do this without special hacks.
 
+Besides the issue with the missing compatible values, the hardware
+blocks that provide the additional functionality are separate from the
+GIC. So they would have to look up the GIC node explicitly.
 
-On Fri, Aug 29, 2014 at 8:33 PM, Kevin Hilman <khilman@kernel.org> wrote:
-> Hi Thomas,
->
-> On Fri, Aug 29, 2014 at 5:52 AM, Thomas Abraham <ta.omasab@gmail.com> wrote:
->> Hi Kevin,
->>
->> On Wed, Aug 27, 2014 at 3:55 AM, Kevin Hilman <khilman@linaro.org> wrote:
->>> On Tue, Aug 26, 2014 at 8:15 AM, Kevin Hilman <khilman@linaro.org> wrote:
->>>> On Mon, Aug 25, 2014 at 10:25 PM, Chander Kashyap <k.chander@samsung.com> wrote:
->>>
->>> [...]
->>>
->>>>>>
->>>>>> Can you clarify how you're setting the voltages to ensure stability?
->>>>>
->>>>> below is the diff :  wip/exynos/integ
->>>>
->>>> Thanks.
->>>>
->>>> I've applied your patch, and bootup shows vdd_arm and vdd_kfc at
->>>> 1500mV, but still when booting with cpuidle enabled (bL switcher
->>>> disabled), I'm seeing lockups with no kernel output.  With CPUidle
->>>> disabled, things are pretty stable.
->>>>
->>>> What tree are you using to test this out on 5420?  I'm using mainline
->>>> v3.17-rc1 + DT patch for CPUidle and this cpufreq series.  See my
->>>> wip/exynos/integ branch at
->>>> git://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux.git.
->>>
->>> I mis-stated this.  Actually my tree is based on the v3.17-rc1 branch
->>> of the exynos-reference tree[1] + the above mentioned patches for
->>> cpuidle and cpufreq.
->>>
->>> Also, I've narrowed down the instability a bit, and it's not related
->>> to CPUidle.  I can now trigger a boot hang even without CPUidle
->>> enabled.  Here's a quick way to cause a boot lockup. With the switcher
->>> disabled, I enable CPUfreq and set the default governor to
->>> performance.  As soon as cpufreq driver loads, it tries to use the top
->>> frequences for both clusters, and it hangs.
->>>
->>> Selectively disabling frequencies, I narrowed it down to the 1.3GHz
->>> and 1.2GHz frequencies of the little cluster.  With these commented
->>> out in the DT, it will fully boot with the performance governor
->>> enabled.
->>>
->>> So that leads to the question.  Are all of the operating points in
->>> exynos5420.dtsi valid for exynos5800, and have they been validated?
->>
->> I tried to recreate the boot lockup issue using the same steps you
->> listed above for the Exynos5800 peach-pi platform (Chromebook2), but I
->> do not see any issues. I can see both clusters with max clock speed
->> after boot (1.8GHz and 1.3GHz).
->>
->> I am using v3.17-rc2 + CPUFreq Patches + max77802 regulator support
->> patches for Chromebook2 + temp hack to set A15 voltage to 1.35V and A7
->> voltage to 1.3V.
->
-> Can you share your branch and temp hack(s) as well as your defconfig?
->
-> I'm using the v3.17-rc1 branch from the exynos tree (which includes
-> the max77802 series) but also has a bunch of other stuff which may be
-> causing the issue.
->
-> It would be good if I can reproduce your exact tree/branch and see if
-> I still have the same problem.
+I suppose that might actually be to our advantage, since these blocks
+will presumably have a specialized compatible string. So perhaps one
+solution would be to make the drivers for these separate IP blocks look
+up the GIC device tree node and call gic_of_init_ext() with a pointer to
+the IRQ chip implementation of this platform-specific glue to replace
+gic_arch_extn.
 
-The branch with the patches that have been used to test cpufreq on
-Exynos5800 is available at
-
-https://github.com/exynos-reference/kernel/tree/exynos5-v3.17-rc3-temp-cpufreq
-
-Please let me know if this works or if there are any issues.
-
-Thanks,
-Thomas.
-
->
-> Thanks for looking into this,
->
-> Kevin
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140901/3832df43/attachment.sig>
