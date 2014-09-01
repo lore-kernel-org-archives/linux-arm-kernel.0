@@ -1,65 +1,59 @@
-From: monstr@monstr.eu (Michal Simek)
-Date: Mon, 01 Sep 2014 13:08:40 +0200
-Subject: [PATCH v2] ARM: zynq: DT: Add LEDs to zc702 DT
-In-Reply-To: <1409323117-21711-1-git-send-email-soren.brinkmann@xilinx.com>
-References: <1409323117-21711-1-git-send-email-soren.brinkmann@xilinx.com>
-Message-ID: <540453B8.90403@monstr.eu>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Mon, 1 Sep 2014 12:25:49 +0100
+Subject: [PATCH] mfd: syscon: Decouple syscon interface from syscon devices
+In-Reply-To: <4121644.3haxjiIdIo@wuerfel>
+References: <1408694991-21615-1-git-send-email-pankaj.dubey@samsung.com>
+ <20140901074918.GB6226@lee--X1> <4121644.3haxjiIdIo@wuerfel>
+Message-ID: <20140901112549.GM7374@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/29/2014 04:38 PM, Soren Brinkmann wrote:
-> From: Ezra Savard <ezra.savard@xilinx.com>
+On Mon, 01 Sep 2014, Arnd Bergmann wrote:
+> On Monday 01 September 2014 08:49:18 Lee Jones wrote:
+> > On Fri, 22 Aug 2014, Pankaj Dubey wrote:
+> > 
+> > > From: Tomasz Figa <t.figa@samsung.com>
+> > > 
+> > > Currently a syscon entity can be only registered directly through a
+> > > platform device that binds to a dedicated driver. However in certain use
+> > > cases it is desirable to make a device used with another driver a syscon
+> > > interface provider. For example, certain SoCs (e.g. Exynos) contain
+> > > system controller blocks which perform various functions such as power
+> > > domain control, CPU power management, low power mode control, but in
+> > > addition contain certain IP integration glue, such as various signal
+> > > masks, coprocessor power control, etc. In such case, there is a need to
+> > > have a dedicated driver for such system controller but also share
+> > > registers with other drivers. The latter is where the syscon interface
+> > > is helpful.
+> > > 
+> > > This patch decouples syscon object from syscon driver, so that it can be
+> > > registered from any driver in addition to the original "syscon" platform
+> > > driver.
+> > > 
+> > > Signed-off-by: Tomasz Figa <t.figa@samsung.com>
+> > > Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
+> > > ---
+> > > 
+> > > RFC patch [1] was posted by Tomasz Figa. This patch addresses some of
+> > > comments given by Arnd to RFC patch, and further decouples syscon from
+> > > device model. It also gives flexibility of registering with syscon at
+> > > early stage using device_node object.
+> > 
+> > It would be helpful if Arnd gave this revision his blessing (Ack).
 > 
-> Adds LEDs to the zc702 devicetree for use with the leds-gpio driver.
-> 
-> Signed-off-by: Ezra Savard <ezra.savard@xilinx.com>
-> Reviewed-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
-> ---
-> v2:
->  - fix node names
-> ---
->  arch/arm/boot/dts/zynq-zc702.dts | 9 +++++++++
->  1 file changed, 9 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/zynq-zc702.dts b/arch/arm/boot/dts/zynq-zc702.dts
-> index 835c3089c61c..b29e0f97e764 100644
-> --- a/arch/arm/boot/dts/zynq-zc702.dts
-> +++ b/arch/arm/boot/dts/zynq-zc702.dts
-> @@ -27,6 +27,15 @@
->  		bootargs = "console=ttyPS0,115200 earlyprintk";
->  	};
->  
-> +	leds {
-> +		compatible = "gpio-leds";
-> +
-> +		ds23 {
-> +			label = "ds23";
-> +			gpios = <&gpio0 10 0>;
-> +			linux,default-trigger = "heartbeat";
-> +		};
-> +	};
->  };
->  
->  &can0 {
-> 
+> I never saw a reason why we don't take this all the way as discussed
+> a few times: Completely remove the dependency of syscon on having
+> a platform driver for it, and make it possible to just call
+> syscon_regmap_lookup_by_phandle() without having to register
+> it first.
 
-Applied.
-
-Thanks,
-Michal
+I think this sounds like a good end-state.  Migrating over by
+supporting both methods in this way does sound like the correct thing
+to do though.  Doing so is likely to dramatically reduce the effect on
+current users.
 
 -- 
-Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
-w: www.monstr.eu p: +42-0-721842854
-Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
-Maintainer of Linux kernel - Xilinx Zynq ARM architecture
-Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
-
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140901/754de40f/attachment.sig>
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
