@@ -1,39 +1,51 @@
-From: boris.brezillon@free-electrons.com (Boris BREZILLON)
-Date: Tue,  2 Sep 2014 09:50:18 +0200
-Subject: [PATCH 5/5] clk: at91: fix div by zero in USB clock driver
-In-Reply-To: <1409644218-13677-1-git-send-email-boris.brezillon@free-electrons.com>
-References: <1409644218-13677-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1409644218-13677-6-git-send-email-boris.brezillon@free-electrons.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 2 Sep 2014 09:52:34 +0200
+Subject: [PATCH v2 10/12] clk: sunxi: mod0: Introduce MMC proper phase
+ handling
+In-Reply-To: <20140901213945.5251.37105@quantum>
+References: <1409428991-2442-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1409428991-2442-11-git-send-email-maxime.ripard@free-electrons.com>
+ <20140901213945.5251.37105@quantum>
+Message-ID: <20140902075234.GO15297@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Test rate value before calculating the div value to avoid div by zero.
+Hi,
 
-Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
-Reported-by: Ga?l PORTAY <gael.portay@gmail.com>
----
- drivers/clk/at91/clk-usb.c | 7 +++++--
- 1 file changed, 5 insertions(+), 2 deletions(-)
+On Mon, Sep 01, 2014 at 02:39:45PM -0700, Mike Turquette wrote:
+> Quoting Maxime Ripard (2014-08-30 13:03:09)
+> > The MMC clock we thought we had until now are actually not one but three
+> > different clocks.
+> > 
+> > The main one is unchanged, and will have three outputs:
+> >   - The clock fed into the MMC
+> >   - a sample and output clocks, to deal with when should we output/sample data
+> >     to/from the MMC bus
+> > 
+> > The phase control we had are actually controlling the two latter clocks, but
+> > the main MMC one is unchanged.
+> > 
+> > We can adjust the phase with a 3 bits value, from 0 to 7, 0 meaning a 180 phase
+> > shift, and the other values being the number of periods from the MMC parent
+> > clock to outphase the clock of.
+> > 
+> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> 
+> Looks good. Thanks a lot for revisiting this after talking to your
+> hardware team!
 
-diff --git a/drivers/clk/at91/clk-usb.c b/drivers/clk/at91/clk-usb.c
-index 1838777..24b5b02 100644
---- a/drivers/clk/at91/clk-usb.c
-+++ b/drivers/clk/at91/clk-usb.c
-@@ -279,10 +279,13 @@ static int at91rm9200_clk_usb_set_rate(struct clk_hw *hw, unsigned long rate,
- 	int i;
- 	struct at91rm9200_clk_usb *usb = to_at91rm9200_clk_usb(hw);
- 	struct at91_pmc *pmc = usb->pmc;
--	unsigned long div = parent_rate / rate;
-+	unsigned long div;
- 
--	if (parent_rate % rate)
-+	if (!rate || parent_rate % rate)
- 		return -EINVAL;
-+
-+	div = parent_rate / rate;
-+
- 	for (i = 0; i < RM9200_USB_DIV_TAB_SIZE; i++) {
- 		if (usb->divisors[i] == div) {
- 			tmp = pmc_read(pmc, AT91_CKGR_PLLBR) &
+It's not *our* hardware team, but I'll let them know :)
+
+Maxime
+
 -- 
-1.9.1
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140902/3984ede1/attachment-0001.sig>
