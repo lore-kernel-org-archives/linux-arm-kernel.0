@@ -1,9 +1,9 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Tue,  2 Sep 2014 10:50:03 +0200
-Subject: [PATCH 7/7] ARM: at91: sama5: update defconfig
+Date: Tue,  2 Sep 2014 10:50:01 +0200
+Subject: [PATCH 5/7] ARM: at91: at91sam9g45: update defconfig
 In-Reply-To: <1409647803-8054-1-git-send-email-alexandre.belloni@free-electrons.com>
 References: <1409647803-8054-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <1409647803-8054-8-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <1409647803-8054-6-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -11,44 +11,42 @@ Update defconfig, adding:
  - PWM support using the generic framework
  - generic PWM leds
  - Power/reset
+ - Watchdog
 
 and removing deprecated config options.
 
 Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 ---
- arch/arm/configs/sama5_defconfig | 12 ++++++------
- 1 file changed, 6 insertions(+), 6 deletions(-)
+ arch/arm/configs/at91sam9g45_defconfig | 19 +++++++++++--------
+ 1 file changed, 11 insertions(+), 8 deletions(-)
 
-diff --git a/arch/arm/configs/sama5_defconfig b/arch/arm/configs/sama5_defconfig
-index 4414990521d3..eaff1292d09f 100644
---- a/arch/arm/configs/sama5_defconfig
-+++ b/arch/arm/configs/sama5_defconfig
-@@ -21,7 +21,6 @@ CONFIG_SOC_SAM_V7=y
- CONFIG_SOC_SAMA5D3=y
- CONFIG_MACH_SAMA5_DT=y
+diff --git a/arch/arm/configs/at91sam9g45_defconfig b/arch/arm/configs/at91sam9g45_defconfig
+index c6661a60025d..f66d1a1b64bf 100644
+--- a/arch/arm/configs/at91sam9g45_defconfig
++++ b/arch/arm/configs/at91sam9g45_defconfig
+@@ -20,7 +20,6 @@ CONFIG_MACH_AT91SAM9M10G45EK=y
+ CONFIG_MACH_AT91SAM9_DT=y
+ CONFIG_AT91_SLOW_CLOCK=y
  CONFIG_AEABI=y
 -# CONFIG_OABI_COMPAT is not set
  CONFIG_UACCESS_WITH_MEMCPY=y
  CONFIG_ZBOOT_ROM_TEXT=0x0
  CONFIG_ZBOOT_ROM_BSS=0x0
-@@ -65,7 +64,6 @@ CONFIG_DEVTMPFS_MOUNT=y
+@@ -51,7 +50,6 @@ CONFIG_DEVTMPFS_MOUNT=y
  # CONFIG_PREVENT_FIRMWARE_BUILD is not set
  CONFIG_MTD=y
  CONFIG_MTD_CMDLINE_PARTS=y
 -CONFIG_MTD_CHAR=y
  CONFIG_MTD_BLOCK=y
- CONFIG_MTD_CFI=y
- CONFIG_MTD_M25P80=y
-@@ -73,7 +71,6 @@ CONFIG_MTD_NAND=y
- CONFIG_MTD_NAND_ATMEL=y
- CONFIG_MTD_UBI=y
- CONFIG_MTD_UBI_GLUEBI=y
--CONFIG_PROC_DEVICETREE=y
- CONFIG_BLK_DEV_LOOP=y
+ CONFIG_MTD_DATAFLASH=y
+ CONFIG_MTD_NAND=y
+@@ -62,15 +60,12 @@ CONFIG_BLK_DEV_LOOP=y
  CONFIG_BLK_DEV_RAM=y
  CONFIG_BLK_DEV_RAM_COUNT=4
-@@ -83,10 +80,8 @@ CONFIG_ATMEL_SSC=y
- CONFIG_EEPROM_AT24=y
+ CONFIG_BLK_DEV_RAM_SIZE=8192
+-CONFIG_ATMEL_PWM=y
+ CONFIG_ATMEL_TCLIB=y
+ CONFIG_ATMEL_SSC=y
  CONFIG_SCSI=y
  CONFIG_BLK_DEV_SD=y
 -CONFIG_SCSI_MULTI_LUN=y
@@ -56,26 +54,42 @@ index 4414990521d3..eaff1292d09f 100644
  CONFIG_NETDEVICES=y
 -CONFIG_MII=y
  CONFIG_MACB=y
- # CONFIG_NET_VENDOR_BROADCOM is not set
- # CONFIG_NET_VENDOR_CIRRUS is not set
-@@ -135,6 +130,8 @@ CONFIG_SPI=y
+ CONFIG_DAVICOM_PHY=y
+ # CONFIG_INPUT_MOUSEDEV is not set
+@@ -93,18 +88,22 @@ CONFIG_I2C_CHARDEV=y
+ CONFIG_I2C_GPIO=y
+ CONFIG_SPI=y
  CONFIG_SPI_ATMEL=y
- CONFIG_SPI_GPIO=y
- CONFIG_GPIO_SYSFS=y
 +CONFIG_POWER_SUPPLY=y
 +CONFIG_POWER_RESET=y
  # CONFIG_HWMON is not set
- CONFIG_SSB=m
- CONFIG_REGULATOR=y
-@@ -165,6 +162,7 @@ CONFIG_MMC_ATMELMCI=y
++CONFIG_WATCHDOG=y
++CONFIG_WATCHDOG_NOWAYOUT=y
++CONFIG_AT91SAM9X_WATCHDOG=y
+ CONFIG_FB=y
+ CONFIG_FB_ATMEL=y
+ CONFIG_BACKLIGHT_LCD_SUPPORT=y
+ CONFIG_LCD_CLASS_DEVICE=y
+ CONFIG_BACKLIGHT_CLASS_DEVICE=y
+ CONFIG_BACKLIGHT_ATMEL_LCDC=y
+-CONFIG_BACKLIGHT_ATMEL_PWM=y
+ # CONFIG_BACKLIGHT_GENERIC is not set
++CONFIG_BACKLIGHT_PWM=y
+ CONFIG_FRAMEBUFFER_CONSOLE=y
+ CONFIG_FRAMEBUFFER_CONSOLE_DETECT_PRIMARY=y
+-CONFIG_FONTS=y
+ CONFIG_LOGO=y
+ CONFIG_SOUND=y
+ CONFIG_SND=y
+@@ -135,6 +134,7 @@ CONFIG_MMC_ATMELMCI=y
  CONFIG_NEW_LEDS=y
  CONFIG_LEDS_CLASS=y
  CONFIG_LEDS_GPIO=y
 +CONFIG_LEDS_PWM=y
+ CONFIG_LEDS_TRIGGERS=y
  CONFIG_LEDS_TRIGGER_TIMER=y
  CONFIG_LEDS_TRIGGER_HEARTBEAT=y
- CONFIG_LEDS_TRIGGER_GPIO=y
-@@ -174,6 +172,8 @@ CONFIG_DMADEVICES=y
+@@ -147,6 +147,8 @@ CONFIG_DMATEST=m
  # CONFIG_IOMMU_SUPPORT is not set
  CONFIG_IIO=y
  CONFIG_AT91_ADC=y
@@ -84,15 +98,20 @@ index 4414990521d3..eaff1292d09f 100644
  CONFIG_EXT4_FS=y
  CONFIG_FANOTIFY=y
  CONFIG_VFAT_FS=y
-@@ -188,8 +188,8 @@ CONFIG_NLS_ISO8859_1=y
- CONFIG_NLS_UTF8=y
+@@ -159,8 +161,8 @@ CONFIG_NLS_CODEPAGE_437=y
+ CONFIG_NLS_CODEPAGE_850=y
+ CONFIG_NLS_ISO8859_1=y
  CONFIG_STRIP_ASM_SYMS=y
- CONFIG_DEBUG_FS=y
 -# CONFIG_SCHED_DEBUG is not set
  CONFIG_DEBUG_MEMORY_INIT=y
 +# CONFIG_SCHED_DEBUG is not set
  # CONFIG_FTRACE is not set
  CONFIG_DEBUG_USER=y
  CONFIG_DEBUG_LL=y
+@@ -170,3 +172,4 @@ CONFIG_CRYPTO_ECB=y
+ CONFIG_CRYPTO_USER_API_HASH=m
+ CONFIG_CRYPTO_USER_API_SKCIPHER=m
+ # CONFIG_CRYPTO_HW is not set
++CONFIG_FONTS=y
 -- 
 1.9.1
