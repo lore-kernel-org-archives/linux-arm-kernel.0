@@ -1,104 +1,60 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 2 Sep 2014 11:25:08 +0200
-Subject: [linux-sunxi] Re: [PATCH 4/4] simplefb: add clock handling code
-In-Reply-To: <20140829143812.GC31264@ulmo>
-References: <53FCE704.4030103@redhat.com> <20140827093121.GA23186@ulmo>
- <53FDB46C.5010609@redhat.com> <20140827125613.GF23186@ulmo>
- <53FDE0CE.5030807@redhat.com> <20140827141632.GB32243@ulmo>
- <53FF1D6C.6090205@redhat.com> <20140829070116.GC13106@ulmo>
- <20140829141244.GH15297@lukather> <20140829143812.GC31264@ulmo>
-Message-ID: <20140902092508.GR15297@lukather>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 2 Sep 2014 10:31:22 +0100
+Subject: [PATCH v6 2/6] arm64: ptrace: allow tracer to skip a system call
+In-Reply-To: <20140902091622.GK30401@n2100.arm.linux.org.uk>
+References: <1408611405-8943-1-git-send-email-takahiro.akashi@linaro.org>
+ <1408611405-8943-3-git-send-email-takahiro.akashi@linaro.org>
+ <CAGXu5jJCyqpXkdvNDCu+eMr0qnqwbqUUo4u+2p_7DvFMzfKoEw@mail.gmail.com>
+ <53F69045.7010301@linaro.org> <20140826175128.GD23445@arm.com>
+ <53FD72E2.4020103@linaro.org> <20140901114751.GG30401@n2100.arm.linux.org.uk>
+ <54058421.5070506@linaro.org> <20140902091622.GK30401@n2100.arm.linux.org.uk>
+Message-ID: <20140902093121.GL30401@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 29, 2014 at 04:38:14PM +0200, Thierry Reding wrote:
-> On Fri, Aug 29, 2014 at 04:12:44PM +0200, Maxime Ripard wrote:
-> > On Fri, Aug 29, 2014 at 09:01:17AM +0200, Thierry Reding wrote:
-> > > I would think the memory should still be reserved anyway to make sure
-> > > nothing else is writing over it. And it's in the device tree anyway
-> > > because the driver needs to know where to put framebuffer content. So
-> > > the point I was trying to make is that we can't treat the memory in the
-> > > same way as clocks because it needs to be explicitly managed. Whereas
-> > > clocks don't. The driver is simply too generic to know what to do with
-> > > the clocks.
-> > 
-> > You agreed on the fact that the only thing we need to do with the
-> > clocks is claim them. Really, I don't find what's complicated there
-> > (or not generic).
+On Tue, Sep 02, 2014 at 10:16:22AM +0100, Russell King - ARM Linux wrote:
+> On Tue, Sep 02, 2014 at 05:47:29PM +0900, AKASHI Takahiro wrote:
+> > On 09/01/2014 08:47 PM, Russell King - ARM Linux wrote:
+> >> On Wed, Aug 27, 2014 at 02:55:46PM +0900, AKASHI Takahiro wrote:
+> >>> 1)
+> >>> setting x0 to -ENOSYS is necessary because, otherwise, user-issued syscall(-1) will
+> >>> return a bogus value when audit tracing is on.
+> >>>
+> >>> Please note that, on arm,
+> >>>                   not traced      traced
+> >>>                   ------          ------
+> >>> syscall(-1)      aborted         OOPs(BUG_ON)
+> >>> syscall(-3000)   aborted         aborted
+> >>> syscall(1000)    ENOSYS          ENOSYS
+> >>
+> >> Two points here:
+> >>
+> >> 1. You've found a case which causes a BUG_ON().  Where is the bug report
+> >>     for this, so the problem can be investigated and resolved?
+> >
+> > I think that I mentioned it could also happen on arm somewhere in a talk
+> > with Will, but don't remember exactly when.
 > 
-> That's not what I agreed on. What I said is that the only thing we need
-> to do with the clocks is nothing. They are already in the state that
-> they need to be.
+> Sorry, not good enough.  Please report this bug so it can be investigated
+> and fixed.
 
-Claim was probably a poor choice of words, but still. We have to keep
-the clock running, and both the solution you've been giving and this
-patch do so in a generic way.
+I'm going to go further than this, and tell you that you have been
+downright irresponsible here, and I'm disgusted by your behaviour over
+this.
 
-> > > It doesn't know what frequency they should be running at
-> > 
-> > We don't care about that. Just like we don't care about which
-> > frequency is the memory bus running at. It will just run at whatever
-> > frequency is appropriate.
-> 
-> Exactly. And you shouldn't have to care about them at all. Firmware has
-> already configured the clocks to run at the correct frequencies, and it
-> has made sure that they are enabled.
-> 
-> > > or what they're used for
-> > 
-> > And we don't care about that either. You're not interested in what
-> > output the framebuffer is setup to use, which is pretty much the same
-> > here, this is the same thing here.
-> 
-> That's precisely what I've been saying. The only thing that simplefb
-> cares about is the memory it should be using and the format of the
-> pixels (and how many of them) it writes into that memory. Everything
-> else is assumed to have been set up.
-> 
-> Including clocks.
+You have revealed a potential security problem publically, effectively
+giving details about how to cause it, but without having first reported
+it to people who can fix it, nor providing a fix for it.
 
-We're really discussing in circles here.
+Why is it a security problem?  Although it can't be used to gain
+information, it can be used potentially to deny service.  Any user can
+trace a task which they own, and then set the task's syscall to -1,
+which according to you results in a kernel oops.
 
-Mike?
-
-Your opinion would be very valuable.
-
-> > > so by any definition of what DT should describe they're useless for
-> > > this virtual device.
-> > >
-> > > Furthermore it's fairly likely that as your kernel support progresses
-> > > you'll find that the driver all of a sudden needs to manage some other
-> > > type of resource that you just haven't needed until now because it may
-> > > default to being always on. Then you'll have a hard time keeping
-> > > backwards-compatibility and will have to resort to the kinds of hacks
-> > > that you don't want to see in the kernel.
-> > 
-> > Not such a hard time. An older DT wouldn't define the new requirements
-> > anyway, so they wouldn't be used, and we would end up in pretty much
-> > the current case.
-> 
-> Except that you have firmware in the wild that sets up an incomplete
-> simplefb node and if you don't want to break compatibility you need to
-> provide fallbacks for the resources that aren't listed in the DT node.
-> And given that those fallbacks are all very board specific you'll need
-> to find ways to keep them enabled if you want to keep existing setups
-> working.
-
-How would an *optional* property break those users?
-
-If you don't need any clock to be kept running (or are hiding them
-under the carpet), of course you don't need such a property.
-
-Maxime
+If the kernel oops happens while holding any locks, that part of the
+system becomes non-functional and can result in all userland stopping
+dead.
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140902/6a77288d/attachment.sig>
+FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
+according to speedtest.net.
