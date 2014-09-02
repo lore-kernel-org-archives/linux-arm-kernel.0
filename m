@@ -1,46 +1,77 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Tue, 2 Sep 2014 12:39:59 +0200
-Subject: [PATCH v2] i2c: mv64xxx: continue probe when clock-frequency is
- missing
-In-Reply-To: <1409581693-15943-1-git-send-email-wens@csie.org>
-References: <1409581693-15943-1-git-send-email-wens@csie.org>
-Message-ID: <20140902103959.GC1266@katana>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 2 Sep 2014 11:40:02 +0100
+Subject: Formal license ambiguity in arch/arm/boot/dts/sun?i-a*.dts
+In-Reply-To: <20140902102206.GU15297@lukather>
+References: <20140731192016.GA6869@excalibur.cnev.de>
+ <20140803130430.GY3952@lukather> <201408031959.27607.arnd@arndb.de>
+ <20140804192510.GF3952@lukather>
+ <20140804212317.GL30282@n2100.arm.linux.org.uk>
+ <20140807132023.GG15297@lukather> <20140902102206.GU15297@lukather>
+Message-ID: <20140902104002.GN30401@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 01, 2014 at 10:28:13PM +0800, Chen-Yu Tsai wrote:
-> The "clock-frequency" DT property is listed as optional, However,
-> the current code stores the return value of of_property_read_u32 in
-> the return code of mv64xxx_of_config, but then forgets to clear it
-> after setting the default value of "clock-frequency". It is then
-> passed out to the main probe function, resulting in a probe failure
-> when "clock-frequency" is missing.
+On Tue, Sep 02, 2014 at 12:22:06PM +0200, Maxime Ripard wrote:
+> On Thu, Aug 07, 2014 at 03:20:23PM +0200, Maxime Ripard wrote:
+> > Hi Russell,
+> > 
+> > On Mon, Aug 04, 2014 at 10:23:17PM +0100, Russell King - ARM Linux wrote:
+> > > On Mon, Aug 04, 2014 at 09:25:10PM +0200, Maxime Ripard wrote:
+> > > > On Sun, Aug 03, 2014 at 07:59:27PM +0200, Arnd Bergmann wrote:
+> > > > > I would actually prefer if we could migrate a lot of these files to BSD license,
+> > > > > provided the original authors agree. We want the dtb blobs to be embeddable into
+> > > > > boot loaders of any license.
+> > > > 
+> > > > Even though I'd be open to having my contributions to DTBs under the
+> > > > BSD, is this really a thing?
+> > > > 
+> > > > I mean, for all I know, an OS/Bootloader would just parse a documented
+> > > > binary file, and I don't see any derivative work there.
+> > > 
+> > > How does the OS/Bootloader end up with that binary file?
+> > > 
+> > > For the sake of argument, let's say that the BSDs want to move to DT on
+> > > ARM.  Great, they convert over to parsing our DT blobs.
+> > > 
+> > > However, they can't distribute the binary DT blobs to their users without
+> > > coming up against the problems of the GPL wrt binary distribution.
+> > > 
+> > > They could distribute the source files, but remember that many of those
+> > > are currently GPL licensed, so they'd probably end up having to package
+> > > them entirely separately, if they're willing to do that at all.
+> > > 
+> > > Or they could decide to ignore us altogether, and do their own DT stuff,
+> > > maybe partially implementing our properties, or maybe coming up with
+> > > different and/or incompatible properties - which would be bad because
+> > > we now end up with two ways to describe the same hardware in active use.
+> > > 
+> > > I suspect the final option is the one they'd choose, and it's in our
+> > > interest that _that_ doesn't happen.
+> > 
+> > Ah, yes, it's not really about a fear of a GPL-spread, but rather a
+> > concern about the source distribution. Makes sense.
+> > 
+> > How should we deal with such relicensing?
 > 
-> This patch checks and then throws away the return value of
-> of_property_read_u32, instead of storing it and having to clear it
-> afterwards.
+> Ping?
 > 
-> This issue was discovered after the property was removed from all
-> sunxi DTs.
+> Are we doing this on a per platform basis? Should we enforce this dual
+> licensing for the future DTS patches? If so, starting from when?
 
-Hmm, I don't like that removal. Probably I should take care that this
-property is not "optional" but "recommended". The default value is
-depending on the driver, mostly because of historic reasons. It is
-definately better to explicitly state it. Despite all that...
+I have no answers to your questions - I put the question a number of
+times to Grant directly, and have been totally ignored.
 
-> 
-> Fixes: 4c730a06c19bb ("i2c: mv64xxx: Set bus frequency to 100kHz if clock-frequency is not provided")
-> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
-> Cc: stable at vger.kernel.org
-> Acked-by: Andrew Lunn <andrew@lunn.ch>
-> Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+So, I think we just do whatever we think is the correct approach.
 
-Applied to for-current, thanks!
+Remember, when you change the licensing on something which has had
+multiple contributors, you need to seek the permission from everyone
+how contributed to it - so it will have to be done on a per platform
+and per-SoC basis.
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140902/3867506c/attachment-0001.sig>
+I would also strongly suggest that future DTS files should be dual
+licensed from the start, and that we require contributions for the
+DTS files to be under both licenses.
+
+-- 
+FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
+according to speedtest.net.
