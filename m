@@ -1,60 +1,91 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 2 Sep 2014 10:31:22 +0100
-Subject: [PATCH v6 2/6] arm64: ptrace: allow tracer to skip a system call
-In-Reply-To: <20140902091622.GK30401@n2100.arm.linux.org.uk>
-References: <1408611405-8943-1-git-send-email-takahiro.akashi@linaro.org>
- <1408611405-8943-3-git-send-email-takahiro.akashi@linaro.org>
- <CAGXu5jJCyqpXkdvNDCu+eMr0qnqwbqUUo4u+2p_7DvFMzfKoEw@mail.gmail.com>
- <53F69045.7010301@linaro.org> <20140826175128.GD23445@arm.com>
- <53FD72E2.4020103@linaro.org> <20140901114751.GG30401@n2100.arm.linux.org.uk>
- <54058421.5070506@linaro.org> <20140902091622.GK30401@n2100.arm.linux.org.uk>
-Message-ID: <20140902093121.GL30401@n2100.arm.linux.org.uk>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 2 Sep 2014 11:34:28 +0200
+Subject: [PATCH v2 03/12] clk: Add a function to retrieve phase
+In-Reply-To: <20140901190054.5251.56409@quantum>
+References: <1409428991-2442-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1409428991-2442-4-git-send-email-maxime.ripard@free-electrons.com>
+ <20140901190054.5251.56409@quantum>
+Message-ID: <20140902093428.GS15297@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 02, 2014 at 10:16:22AM +0100, Russell King - ARM Linux wrote:
-> On Tue, Sep 02, 2014 at 05:47:29PM +0900, AKASHI Takahiro wrote:
-> > On 09/01/2014 08:47 PM, Russell King - ARM Linux wrote:
-> >> On Wed, Aug 27, 2014 at 02:55:46PM +0900, AKASHI Takahiro wrote:
-> >>> 1)
-> >>> setting x0 to -ENOSYS is necessary because, otherwise, user-issued syscall(-1) will
-> >>> return a bogus value when audit tracing is on.
-> >>>
-> >>> Please note that, on arm,
-> >>>                   not traced      traced
-> >>>                   ------          ------
-> >>> syscall(-1)      aborted         OOPs(BUG_ON)
-> >>> syscall(-3000)   aborted         aborted
-> >>> syscall(1000)    ENOSYS          ENOSYS
-> >>
-> >> Two points here:
-> >>
-> >> 1. You've found a case which causes a BUG_ON().  Where is the bug report
-> >>     for this, so the problem can be investigated and resolved?
-> >
-> > I think that I mentioned it could also happen on arm somewhere in a talk
-> > with Will, but don't remember exactly when.
+Hi,
+
+On Mon, Sep 01, 2014 at 12:00:54PM -0700, Mike Turquette wrote:
+> Quoting Maxime Ripard (2014-08-30 13:03:02)
+> > The current phase API doesn't look into the actual hardware to get the phase
+> > value, but will rather get it from a variable only set by the set_phase
+> > function.
+> > 
+> > This will cause issue when the client driver will never call the set_phase
+> > function, where we can end up having a reported phase that will not match what
+> > the hardware has been programmed to by the bootloader or what phase is
+> > programmed out of reset.
+> > 
+> > Add a new get_phase function for the drivers to implement so that we can get
+> > this value.
+> > 
+> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> > ---
+> >  drivers/clk/clk.c            | 17 ++++++++++++++---
+> >  include/linux/clk-provider.h |  5 +++++
+> >  2 files changed, 19 insertions(+), 3 deletions(-)
+> > 
+> > diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+> > index d87661af0c72..7dbceca694f1 100644
+> > --- a/drivers/clk/clk.c
+> > +++ b/drivers/clk/clk.c
+> > @@ -1797,8 +1797,8 @@ out:
+> >   * clk_get_phase - return the phase shift of a clock signal
+> >   * @clk: clock signal source
+> >   *
+> > - * Returns the phase shift of a clock node in degrees, otherwise returns
+> > - * -EERROR.
+> > + * Returns the phase shift of a clock node in degrees. Any negative
+> > + * values are errors.
+> >   */
+> >  int clk_get_phase(struct clk *clk)
+> >  {
+> > @@ -1808,7 +1808,18 @@ int clk_get_phase(struct clk *clk)
+> >                 goto out;
+> >  
+> >         clk_prepare_lock();
+> > -       ret = clk->phase;
+> > +
+> > +       if (clk->phase) {
 > 
-> Sorry, not good enough.  Please report this bug so it can be investigated
-> and fixed.
+> So if a phase is zero, then we fall through and query the hardware?
+> Seems like this case might be hit a lot for clocks that implement
+> .get_phase but never have their phase shifted, and accesses to the
+> registers may be much slower than to memory.
 
-I'm going to go further than this, and tell you that you have been
-downright irresponsible here, and I'm disgusted by your behaviour over
-this.
+Yep, which is exactly why I'm not that proud of it :)
 
-You have revealed a potential security problem publically, effectively
-giving details about how to cause it, but without having first reported
-it to people who can fix it, nor providing a fix for it.
+> Do you expect the phase to be changed behind our backs? E.g. firmware
+> changes it, or coming in and out of idle state, etc. If not then we can
+> store the phase at clock registration time and use a cached value.
 
-Why is it a security problem?  Although it can't be used to gain
-information, it can be used potentially to deny service.  Any user can
-trace a task which they own, and then set the task's syscall to -1,
-which according to you results in a kernel oops.
+This is exactly what happens in our case. Since in order to use the
+MMC, you have to change the phase of the output and sample clocks,
+every time the firmware will have to use the MMC, it will change these
+clocks phase. Which happens pretty much all the time.
 
-If the kernel oops happens while holding any locks, that part of the
-system becomes non-functional and can result in all userland stopping
-dead.
+> See how the CLK_GET_RATE_NOCACHE and CLK_GET_ACCURACY_NOCACHE flags are
+> used for details on how we can handle the case where the phase might
+> change behind our back.
+
+Ah, yes, of course. Thanks!
+
+Maxime
 
 -- 
-FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
-according to speedtest.net.
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140902/a528d5ca/attachment.sig>
