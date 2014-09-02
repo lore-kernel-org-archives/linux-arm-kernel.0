@@ -1,71 +1,56 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Tue,  2 Sep 2014 10:31:54 +0900
-Subject: [PATCH] ARM: shmobile: Enable Armadillo 800 EVA board in
- multiplatform defconfig
-In-Reply-To: <cover.1409621323.git.horms+renesas@verge.net.au>
-References: <cover.1409621323.git.horms+renesas@verge.net.au>
-Message-ID: <de46e95cdb8671e2b0728923b8113654779c3ba8.1409621323.git.horms+renesas@verge.net.au>
+From: sre@kernel.org (Sebastian Reichel)
+Date: Tue, 2 Sep 2014 05:05:46 +0200
+Subject: [PATCH 15/15] tty: serial: 8250: omap: add dma support
+In-Reply-To: <5404B149.6010400@linutronix.de>
+References: <20140821184416.GF10066@atomide.com>
+ <53FE3779.5090908@linutronix.de>
+ <20140827202313.GF16006@atomide.com>
+ <20140828082348.GA5413@linutronix.de>
+ <20140828164645.GG16006@atomide.com>
+ <53FF84DF.7080406@linutronix.de>
+ <20140828225454.GM16006@atomide.com>
+ <540048B4.7010807@linutronix.de>
+ <20140829161221.GO16006@atomide.com>
+ <5404B149.6010400@linutronix.de>
+Message-ID: <20140902030546.GB6724@earth.universe>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Geert Uytterhoeven <geert+renesas@glider.be>
+Hi,
 
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/configs/shmobile_defconfig | 12 ++++++++++++
- 1 file changed, 12 insertions(+)
+On Mon, Sep 01, 2014 at 07:47:53PM +0200, Sebastian Andrzej Siewior wrote:
+> On 08/29/2014 06:12 PM, Tony Lindgren wrote:
+> > Looks like the paste bug is there for sure, doing off idle and pasting
+> > 240 characters to the console can hang the UART RX after few attempts,
+> > and pasting 16 charactes won't show up at all if the system is idling.
+> > So you may want to play with that too a bit :)
+> 
+> One character wakes it up. After that you can send 16, 64 and you see
+> them. Right away. No delay.
+> 
+> If you send "a lot" data in one-go it takes approx 152 characters until
+> the first one is displayed properly at 115200,8N1. That is approx 13ms.
+> Could it take that long to get up and be ready?
 
-diff --git a/arch/arm/configs/shmobile_defconfig b/arch/arm/configs/shmobile_defconfig
-index b7ebf1e..522275a 100644
---- a/arch/arm/configs/shmobile_defconfig
-+++ b/arch/arm/configs/shmobile_defconfig
-@@ -12,6 +12,7 @@ CONFIG_SLAB=y
- CONFIG_ARCH_SHMOBILE_MULTI=y
- CONFIG_ARCH_EMEV2=y
- CONFIG_ARCH_R7S72100=y
-+CONFIG_ARCH_R8A7740=y
- CONFIG_ARCH_R8A7779=y
- CONFIG_ARCH_R8A7790=y
- CONFIG_ARCH_R8A7791=y
-@@ -75,6 +76,8 @@ CONFIG_SMSC_PHY=y
- # CONFIG_INPUT_MOUSEDEV_PSAUX is not set
- CONFIG_KEYBOARD_GPIO=y
- # CONFIG_INPUT_MOUSE is not set
-+CONFIG_INPUT_TOUCHSCREEN=y
-+CONFIG_TOUCHSCREEN_ST1232=y
- # CONFIG_LEGACY_PTYS is not set
- CONFIG_SERIAL_8250=y
- CONFIG_SERIAL_8250_CONSOLE=y
-@@ -113,10 +116,16 @@ CONFIG_VIDEO_RENESAS_VSP1=y
- CONFIG_VIDEO_ADV7180=y
- CONFIG_DRM=y
- CONFIG_DRM_RCAR_DU=y
-+CONFIG_BACKLIGHT_LCD_SUPPORT=y
-+# CONFIG_LCD_CLASS_DEVICE is not set
-+# CONFIG_BACKLIGHT_GENERIC is not set
-+CONFIG_BACKLIGHT_PWM=y
- CONFIG_SOUND=y
- CONFIG_SND=y
- CONFIG_SND_SOC=y
-+CONFIG_SND_SOC_SH4_FSI=y
- CONFIG_SND_SOC_RCAR=y
-+CONFIG_SND_SOC_WM8978=y
- CONFIG_USB=y
- CONFIG_USB_EHCI_HCD=y
- CONFIG_USB_OHCI_HCD=y
-@@ -133,9 +142,12 @@ CONFIG_NEW_LEDS=y
- CONFIG_LEDS_CLASS=y
- CONFIG_LEDS_GPIO=y
- CONFIG_RTC_CLASS=y
-+CONFIG_RTC_DRV_S35390A=y
- CONFIG_DMADEVICES=y
- CONFIG_SH_DMAE=y
- # CONFIG_IOMMU_SUPPORT is not set
-+CONFIG_PWM=y
-+CONFIG_PWM_RENESAS_TPU=y
- # CONFIG_DNOTIFY is not set
- CONFIG_MSDOS_FS=y
- CONFIG_VFAT_FS=y
--- 
-2.0.1
+I noticed the same behaviour when I tested the runtime PM stuff on
+my N900 with the existing serial-omap driver and I also assumed,
+that the chip needs that long to get up.
+
+> Comparing it with serial-omap I see the same thing: I takes approx the
+> same amount of data until the first one is displayed. After a lot of
+> "long" writes which wake the chip up from idle I manage to freeze both,
+> the serial-omap driver and mine driver.
+> 
+> One thing that is probably a dumb idea is that printk in
+> omap_8250_mdr1_errataset().
+> Would it be possible that when I hit a printk in the resume path that I
+> may deadlock and box will freeze?
+
+-- Sebastian
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140902/60396c65/attachment.sig>
