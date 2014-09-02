@@ -1,46 +1,37 @@
-From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Tue, 2 Sep 2014 11:08:02 +0800
-Subject: [PATCH] MAINTAINERS: update ARM pxa maintainers
-In-Reply-To: <1409342875-31720-1-git-send-email-robert.jarzmik@free.fr>
-References: <1409342875-31720-1-git-send-email-robert.jarzmik@free.fr>
-Message-ID: <CAN1soZxxdEb6UVH4J8skc_PPgmY2KCY=LBj3Hp0R9rRxtZoGgA@mail.gmail.com>
+From: Li.Xiubo@freescale.com (Li.Xiubo at freescale.com)
+Date: Tue, 2 Sep 2014 03:22:24 +0000
+Subject: [PATCHv1 1/7] ASoC: simple-card: Merge single and muti DAI link
+ code.
+In-Reply-To: <20140901151356.GB29327@sirena.org.uk>
+References: <1409545781-20530-1-git-send-email-Li.Xiubo@freescale.com>
+ <1409545781-20530-2-git-send-email-Li.Xiubo@freescale.com>
+ <20140901133412.GA11312@lunn.ch> <20140901151356.GB29327@sirena.org.uk>
+Message-ID: <1b29c16ac3944bb19940da886bf7da3a@BY2PR0301MB0613.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Aug 30, 2014 at 4:07 AM, Robert Jarzmik <robert.jarzmik@free.fr> wrote:
-> Change pxa active maintainers, and remove more busy people.
-> Remove Eric's tree as it is not accessible anymore.
->
-> Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
-> ---
->  MAINTAINERS | 6 +++---
->  1 file changed, 3 insertions(+), 3 deletions(-)
->
-> diff --git a/MAINTAINERS b/MAINTAINERS
-> index 217dc54..76ee718 100644
-> --- a/MAINTAINERS
-> +++ b/MAINTAINERS
-> @@ -7291,12 +7291,12 @@ F:      drivers/video/backlight/pwm_bl.c
->  F:     include/linux/pwm_backlight.h
->
->  PXA2xx/PXA3xx SUPPORT
-> -M:     Eric Miao <eric.y.miao@gmail.com>
-> -M:     Russell King <linux@arm.linux.org.uk>
->  M:     Haojian Zhuang <haojian.zhuang@gmail.com>
-> +M:     Robert Jarzmik <robert.jarzmik@free.fr>
-> +M:     Daniel Mack <daniel@zonque.org>
->  L:     linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
->  T:     git git://github.com/hzhuang1/linux.git
-> -T:     git git://git.linaro.org/people/ycmiao/pxa-linux.git
-> +T:     git git://github.com/rjarzmik/linux.git
->  S:     Maintained
->  F:     arch/arm/mach-pxa/
->  F:     drivers/pcmcia/pxa2xx*
-> --
-> 2.0.0.rc2
->
+> 
+> On Mon, Sep 01, 2014 at 03:34:12PM +0200, Andrew Lunn wrote:
+> > On Mon, Sep 01, 2014 at 12:29:35PM +0800, Xiubo Li wrote:
+> > > This patch merge single DAI link and muti-DAI links code together,
+> > > and simply the simple-card driver code.
+> 
+> > It would be good to note that this breaks the Binary API with DT
+> > blobs. Old blobs will not work with this new C code.
+> 
+> That's not on, we need to maintian compatibility with the old DTs unless
+> there's a very strong reason not to.  Revising the binding is one option
+> for doing this, keeping the old binding in place and making a v2 binding
+> with the new functionality.
 
-Acked
+Yes, agree.
 
-Regards
-Haojian
+Actually, the current code is a bit more complicated that we should keep in mind
+of two styles of single DAI link and muti-DAI links. And the binding document and
+code are a little unreadable.
+
+For others must read the simple card code carefully to add one DT node.
+
+Thanks,
+
+BRs
