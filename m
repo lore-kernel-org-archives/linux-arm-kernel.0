@@ -1,117 +1,88 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Tue, 2 Sep 2014 23:52:32 +0000 (UTC)
-Subject: OMAP baseline test results for v3.17-rc3
-Message-ID: <alpine.DEB.2.02.1409022346440.1546@utopia.booyaka.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Tue,  2 Sep 2014 16:58:28 -0700
+Subject: [PATCH] mmc: sdhci-msm: Make tuning block table endian agnostic
+Message-ID: <1409702308-3023-1-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+If we're tuning on a big-endian CPU we'll never determine we properly
+tuned the device because we compare the data we received from the
+controller with a table that assumes the CPU is little-endian.
+Change the table to be an array of bytes instead of 32-bit words
+so we can use memcmp() without needing to byte-swap every word
+depending on the endianess of the CPU.
 
-Here are some basic OMAP test results for Linux v3.17-rc3.
-Logs and other details at:
+Cc: Asutosh Das <asutoshd@codeaurora.org>
+Cc: Venkat Gopalakrishnan <venkatg@codeaurora.org>
+Cc: Georgi Djakov <gdjakov@mm-sol.com>
+Fixes: 415b5a75da43 "mmc: sdhci-msm: Add platform_execute_tuning implementation"
+Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+---
+ drivers/mmc/host/sdhci-msm.c | 42 +++++++++++++++++++++++++++---------------
+ 1 file changed, 27 insertions(+), 15 deletions(-)
 
-    http://www.pwsan.com/omap/testlogs/test_v3.17-rc3/20140902165525/
-
-
-Test summary
-------------
-
-Build: zImage:
-    Pass (16/16): multi_v7_defconfig, omap2plus_defconfig,
-		  omap2plus_defconfig_am33xx_only,
-		  omap2plus_defconfig_am43xx_only,
-		  omap2plus_defconfig_2430sdp_only,
-		  omap2plus_defconfig_cpupm, omap2plus_defconfig_no_pm,
-		  omap2plus_defconfig_n800_only_a,
-		  omap2plus_defconfig_n800_multi_omap2xxx,
-		  omap2plus_defconfig_omap2_4_only,
-		  omap2plus_defconfig_omap3_4_only,
-		  omap2plus_defconfig_dra7xx_only,
-		  rmk_omap3430_ldp_allnoconfig,
-		  rmk_omap3430_ldp_oldconfig,
-		  rmk_omap4430_sdp_allnoconfig,
-		  rmk_omap4430_sdp_oldconfig
-
-Build: uImage+dtb:
-    Pass (10/10): omap2plus_defconfig_am33xx_only/am335x-bone,
-		  omap2plus_defconfig/omap4-panda,
-		  omap2plus_defconfig/omap4-panda-es,
-		  omap2plus_defconfig/am3517-evm,
-		  omap2plus_defconfig/omap2430-sdp,
-		  omap2plus_defconfig/omap3-beagle,
-		  omap2plus_defconfig/omap3-beagle-xm,
-		  omap2plus_defconfig/omap3-evm-37xx,
-		  omap2plus_defconfig/omap4-var-som,
-		  omap2plus_defconfig/omap5-uevm
-
-Build: uImage:
-    Pass ( 3/ 3): omap1_defconfig, omap1_defconfig_1510innovator_only,
-		  omap1_defconfig_5912osk_only
-
-Boot to userspace:
-    FAIL ( 2/15): 2430sdp, 5430es2sbct54
-    skip ( 1/15): 5912osk
-    Pass (12/15): 2420n800, 3517evm, 3530es3beagle, 3730beaglexm,
-		  37xxevm, 4430es2panda, 4460pandaes, am335xbone,
-		  am335xbonelt, cmt3517, 4460varsomom, 5430es2uevm
-
-PM: chip retention via suspend:
-    FAIL ( 3/ 7): 2430sdp, 4430es2panda, 4460varsomom
-    Pass ( 4/ 7): 3530es3beagle, 3730beaglexm, 37xxevm, 4460pandaes
-
-PM: chip retention via dynamic idle:
-    FAIL ( 5/ 7): 2430sdp, 3530es3beagle, 4430es2panda, 4460pandaes,
-		  4460varsomom
-    Pass ( 2/ 7): 3730beaglexm, 37xxevm
-
-PM: chip off except CORE via suspend:
-    Pass ( 1/ 1): 3730beaglexm
-
-PM: chip off except CORE via dynamic idle:
-    Pass ( 1/ 1): 3730beaglexm
-
-PM: chip off via suspend:
-    FAIL ( 4/ 5): 3530es3beagle, 4430es2panda, 4460pandaes,
-		  4460varsomom
-    Pass ( 1/ 5): 37xxevm
-
-PM: chip off via dynamic idle:
-    FAIL ( 4/ 5): 3530es3beagle, 4430es2panda, 4460pandaes,
-		  4460varsomom
-    Pass ( 1/ 5): 37xxevm
-
-
-vmlinux object size
-(delta in bytes from test_v3.17-rc2 (52addcf9d6669fa439387610bc65c92fa0980cef)):
-   text     data      bss    total  kernel
-   +120      +32        0     +152  omap1_defconfig
-    +88      +64        0     +152  omap1_defconfig_1510innovator_only
-    +88      +32      +32     +152  omap1_defconfig_5912osk_only
-  -4992      -24        0    -5016  multi_v7_defconfig
-  -4376        0      +64    -4312  omap2plus_defconfig
-  -3896      +32        0    -3864  omap2plus_defconfig_2430sdp_only
-  -4448       -8        0    -4456  omap2plus_defconfig_am33xx_only
-  -4448       -8        0    -4456  omap2plus_defconfig_am43xx_only
-  -4376      +64      +64    -4248  omap2plus_defconfig_cpupm
-  -4320      +64        0    -4256  omap2plus_defconfig_dra7xx_only
- -15337     -552        0   -15889  omap2plus_defconfig_n800_multi_omap2xxx
- -11241     -504        0   -11745  omap2plus_defconfig_n800_only_a
-   +640      +96        0     +736  omap2plus_defconfig_no_pm
-  -4448      +80        0    -4368  omap2plus_defconfig_omap2_4_only
-  -4384       -8        0    -4392  omap2plus_defconfig_omap3_4_only
-  -4384      +80        0    -4304  omap2plus_defconfig_omap5_only
-   +108      -16      +24     +116  rmk_omap3430_ldp_allnoconfig
-   +172      -16        0     +156  rmk_omap3430_ldp_oldconfig
-    +76      -12      +56     +120  rmk_omap4430_sdp_allnoconfig
-   +140      +16        0     +156  rmk_omap4430_sdp_oldconfig
-
-Boot-time memory difference
-(delta in bytes from test_v3.17-rc2 (52addcf9d6669fa439387610bc65c92fa0980cef))
-  avail  rsrvd   high  freed  board          kconfig
-     8k    -8k      .      .  2420n800       omap2plus_defconfig_n800_only_a
-     8k    -8k      .      .  am335xbone     omap2plus_defconfig_am33xx_only
-
-
-A Compulab SBC-T54 (OMAP5432) has been added to the testbed, graciously 
-donated by Compulab and Igor Grinberg.  It currently isn't booting to 
-userspace in the current mainline kernel, but if the 'ldo8' regulator is 
-modified to be always-on in the omap5-sbc-t54.dts file, it will.
+diff --git a/drivers/mmc/host/sdhci-msm.c b/drivers/mmc/host/sdhci-msm.c
+index 40573a58486a..5aabffc15ae8 100644
+--- a/drivers/mmc/host/sdhci-msm.c
++++ b/drivers/mmc/host/sdhci-msm.c
+@@ -47,22 +47,34 @@
+ #define CMUX_SHIFT_PHASE_SHIFT	24
+ #define CMUX_SHIFT_PHASE_MASK	(7 << CMUX_SHIFT_PHASE_SHIFT)
+ 
+-static const u32 tuning_block_64[] = {
+-	0x00ff0fff, 0xccc3ccff, 0xffcc3cc3, 0xeffefffe,
+-	0xddffdfff, 0xfbfffbff, 0xff7fffbf, 0xefbdf777,
+-	0xf0fff0ff, 0x3cccfc0f, 0xcfcc33cc, 0xeeffefff,
+-	0xfdfffdff, 0xffbfffdf, 0xfff7ffbb, 0xde7b7ff7
++static const u8 tuning_block_64[] = {
++	0xff, 0x0f, 0xff, 0x00, 0xff, 0xcc, 0xc3, 0xcc,
++	0xc3, 0x3c, 0xcc, 0xff, 0xfe, 0xff, 0xfe, 0xef,
++	0xff, 0xdf, 0xff, 0xdd, 0xff, 0xfb, 0xff, 0xfb,
++	0xbf, 0xff, 0x7f, 0xff, 0x77, 0xf7, 0xbd, 0xef,
++	0xff, 0xf0, 0xff, 0xf0, 0x0f, 0xfc, 0xcc, 0x3c,
++	0xcc, 0x33, 0xcc, 0xcf, 0xff, 0xef, 0xff, 0xee,
++	0xff, 0xfd, 0xff, 0xfd, 0xdf, 0xff, 0xbf, 0xff,
++	0xbb, 0xff, 0xf7, 0xff, 0xf7, 0x7f, 0x7b, 0xde,
+ };
+ 
+-static const u32 tuning_block_128[] = {
+-	0xff00ffff, 0x0000ffff, 0xccccffff, 0xcccc33cc,
+-	0xcc3333cc, 0xffffcccc, 0xffffeeff, 0xffeeeeff,
+-	0xffddffff, 0xddddffff, 0xbbffffff, 0xbbffffff,
+-	0xffffffbb, 0xffffff77, 0x77ff7777, 0xffeeddbb,
+-	0x00ffffff, 0x00ffffff, 0xccffff00, 0xcc33cccc,
+-	0x3333cccc, 0xffcccccc, 0xffeeffff, 0xeeeeffff,
+-	0xddffffff, 0xddffffff, 0xffffffdd, 0xffffffbb,
+-	0xffffbbbb, 0xffff77ff, 0xff7777ff, 0xeeddbb77
++static const u8 tuning_block_128[] = {
++	0xff, 0xff, 0x00, 0xff, 0xff, 0xff, 0x00, 0x00,
++	0xff, 0xff, 0xcc, 0xcc, 0xcc, 0x33, 0xcc, 0xcc,
++	0xcc, 0x33, 0x33, 0xcc, 0xcc, 0xcc, 0xff, 0xff,
++	0xff, 0xee, 0xff, 0xff, 0xff, 0xee, 0xee, 0xff,
++	0xff, 0xff, 0xdd, 0xff, 0xff, 0xff, 0xdd, 0xdd,
++	0xff, 0xff, 0xff, 0xbb, 0xff, 0xff, 0xff, 0xbb,
++	0xbb, 0xff, 0xff, 0xff, 0x77, 0xff, 0xff, 0xff,
++	0x77, 0x77, 0xff, 0x77, 0xbb, 0xdd, 0xee, 0xff,
++	0xff, 0xff, 0xff, 0x00, 0xff, 0xff, 0xff, 0x00,
++	0x00, 0xff, 0xff, 0xcc, 0xcc, 0xcc, 0x33, 0xcc,
++	0xcc, 0xcc, 0x33, 0x33, 0xcc, 0xcc, 0xcc, 0xff,
++	0xff, 0xff, 0xee, 0xff, 0xff, 0xff, 0xee, 0xee,
++	0xff, 0xff, 0xff, 0xdd, 0xff, 0xff, 0xff, 0xdd,
++	0xdd, 0xff, 0xff, 0xff, 0xbb, 0xff, 0xff, 0xff,
++	0xbb, 0xbb, 0xff, 0xff, 0xff, 0x77, 0xff, 0xff,
++	0xff, 0x77, 0x77, 0xff, 0x77, 0xbb, 0xdd, 0xee,
+ };
+ 
+ struct sdhci_msm_host {
+@@ -359,7 +371,7 @@ static int sdhci_msm_execute_tuning(struct sdhci_host *host, u32 opcode)
+ {
+ 	int tuning_seq_cnt = 3;
+ 	u8 phase, *data_buf, tuned_phases[16], tuned_phase_cnt = 0;
+-	const u32 *tuning_block_pattern = tuning_block_64;
++	const u8 *tuning_block_pattern = tuning_block_64;
+ 	int size = sizeof(tuning_block_64);	/* Pattern size in bytes */
+ 	int rc;
+ 	struct mmc_host *mmc = host->mmc;
+-- 
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
