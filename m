@@ -1,64 +1,50 @@
-From: info@lategoodbye.de (Stefan Wahren)
-Date: Tue, 02 Sep 2014 07:09:42 +0200
-Subject: ARM: mx28: cpufreq-cpu0 support?
-In-Reply-To: <CAOMZO5A7-66LJtv4O2TghN3gVzme4N6JFMYd8TV7zXhUhsXedQ@mail.gmail.com>
-References: <53F9B4BF.2050802@lategoodbye.de>	<20140825080123.GA12289@dragon>	<53FB1041.5010208@lategoodbye.de>	<CAOMZO5CG7mw5W4D3fRPE3TGxQ6-3pTtDJrsNnieN8XKE9dGofQ@mail.gmail.com>	<CAOMZO5CnuWJ9EaLUW8DYFU1Dzeh=92tux0zoUBKoW-L=VWZhhg@mail.gmail.com>	<540412A9.4090806@lategoodbye.de>
- <CAOMZO5A7-66LJtv4O2TghN3gVzme4N6JFMYd8TV7zXhUhsXedQ@mail.gmail.com>
-Message-ID: <54055116.4030608@lategoodbye.de>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Tue, 02 Sep 2014 08:26:01 +0200
+Subject: [RFC PATCH 0/7] Introduce automatic DMA configuration for IOMMU
+ masters
+In-Reply-To: <1409327670-3495-1-git-send-email-will.deacon@arm.com>
+References: <1409327670-3495-1-git-send-email-will.deacon@arm.com>
+Message-ID: <540562F9.2030508@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Fabio,
+Hi Will,
 
-Am 01.09.2014 15:33, schrieb Fabio Estevam:
-> Hi Stefan,
+On 2014-08-29 17:54, Will Deacon wrote:
+> This patch series is an RFC to implement IOMMU master configuration into
+> of_dma_configure. I haven't yet ported any IOMMU drivers to it, so it
+> remains untested, but I wanted to get some early feedback to ensure that
+> this doesn't end up going in the wrong direction.
 >
-> On Mon, Sep 1, 2014 at 3:31 AM, Stefan Wahren <info@lategoodbye.de> wrote:
+> The idea comes out of my understanding following discussions with Arnd
+> and David at Kernel Summit / LinuxCon in Chicago. Essentially:
 >
->> thanks. Okay, that leads to more questions:
->>
->> How can i test a ported mxs-regulator driver, that it's really working? Is
->> there any userspace interface?
+>    - Allow IOMMUs to be probed early and set up per-instance data on their
+>      of_node
 >
-> After you ported the mxs regulator you can check whether it probed
-> correctly and if the reported voltages in the kernel log match the
-> register settings. You can also check if the voltages are really in
-> the correct reported value with a scope.
+>    - Add a new callback to the iommu_ops structure for adding a device
+>      with a set of opaque IDs (e.g. Stream IDs or Requester IDs)
 >
-> On mx6q we have the following:
+>    - Add an of_iommu_configure function, called from of_dma_configure,
+>      which registers the master IDs with the correspond IOMMU before
+>      probing the master itself
 >
-> [    0.070554] vdd1p1: 800 <--> 1375 mV at 1100 mV
-> [    0.071521] vdd3p0: 2800 <--> 3150 mV at 3000 mV
-> [    0.072397] vdd2p5: 2000 <--> 2750 mV at 2400 mV
-> [    0.073369] vddarm: 725 <--> 1450 mV at 1150 mV
-> [    0.074282] vddpu: 725 <--> 1450 mV at 1150 mV
-> [    0.075247] vddsoc: 725 <--> 1450 mV at 1200 mV
+>    - Where applicable, create an IOMMU domain per device and swizzle the
+>      DMA ops for that device to use the IOMMU variants.
 >
-> and you should get something like that in your kernel log after you
-> ported the mxs regulator driver.
->
->> Is there a good DT implementation of a similiar regulator driver, so i can
->> orientate on?
->
-> You could take a look at the drivers/regulator/anatop-regulator.c
-> driver, which handles the internal regulators on mx6.
->
-> The dts is arch/arm/boot/dts/imx6qdl.dtsi . Search for "anatop-regulator"
->
+> I haven't bothered doing anything clever with the DMA masks yet, so I
+> wouldn't be surprised if we end up chewing through tonnes of memory
+> allocating IOMMU domains that are far too big at the moment. Again, this
+> is just an RFC and I'd welcome comments on the general direction of the
+> series.
 
-thanks again. Now i unterstand much more, but otherwise the portation 
-won't be straight forward. The old source in 
-drivers/regulator/mxs-regulator.c needs a low level part located in 
-arch/arm/plat-mx28/power.c . As far as i know, the low level part needs 
-to move into the devicetree binding and into the mxs-regulator.c . Am i 
-right?
+Thanks for your patches, I wasn't aware the fact that you are working on
+this. When do you plan to send a second version? I would like to rebase
+my Exynos IOMMU patches (https://lkml.org/lkml/2014/8/5/183) on top of
+your work, but I wonder if I should select this version as a base or wait
+a bit for an update.
 
-Yesterday i had looked into the mx28 reference manual and into the low 
-level part of the mxs regulator. The reference manual defines four 
-voltage regulators: vddd, vdda, vddio and vddmem plus a overall current 
-regulator. But the low level part make use of vddd, vdda, vddio, 
-vddio_bo and the overall current.
-
-Do i need the brown out regulator (vddio_bo) and the vddmem?
-
-Stefan
+Best regards
+-- 
+Marek Szyprowski, PhD
+Samsung R&D Institute Poland
