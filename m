@@ -1,34 +1,40 @@
-From: peter.griffin@linaro.org (Peter Griffin)
-Date: Tue,  2 Sep 2014 18:08:49 +0100
-Subject: [PATCH v5 3/3] MAINTAINERS: Add dwc3-st.c file to ARCH/STI
- architecture
-In-Reply-To: <1409677729-6922-1-git-send-email-peter.griffin@linaro.org>
-References: <1409677729-6922-1-git-send-email-peter.griffin@linaro.org>
-Message-ID: <1409677729-6922-4-git-send-email-peter.griffin@linaro.org>
+From: robherring2@gmail.com (Rob Herring)
+Date: Tue, 2 Sep 2014 12:38:23 -0500
+Subject: [RFC PATCH 1/1] drivers: introduce ARM SBSA generic UART driver
+In-Reply-To: <3749748.k4a1nSHDdj@wuerfel>
+References: <1409328803-1953-1-git-send-email-andre.przywara@arm.com>
+ <540596A6.8000608@arm.com>
+ <CAL_Jsq+Rs5MXC7s7EeWAEAPxxqaShAVGt=cdQxud5Us+-Zp6jw@mail.gmail.com>
+ <3749748.k4a1nSHDdj@wuerfel>
+Message-ID: <CAL_JsqKGbSd5BymnFhT8KBjbBCPO8wsrHhG9Qn20c7mrrxTDDA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the new dwc3-st.c glue driver found on
-STMicroelectronics stih407 consumer electronics SoC's into the STI
-arch section of the maintainers file.
+On Tue, Sep 2, 2014 at 8:48 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Tuesday 02 September 2014 08:20:53 Rob Herring wrote:
+>> >>
+>> >> This alone is not okay. There is no such implementation of hardware.
+>> >
+>> > But the SBSA explicitly allows this. I don't know of any vendor who just
+>> > implements the subset, but I've been told that this has been asked for.
+>>
+>> To use baudrate as an example, that must be configurable somehow
+>> either with pl011 registers or in a vendor specific way. I suppose you
+>> could do an actual implementation with all those things hardcoded in
+>> the design, but that seems unlikely.
+>
+> Why does the baudrate need to be configurable? I think it's completely
+> reasonable to specify a console port that has a fixed (as in the
+> OS must not care) rate, and that can be implemented either as a UART
+> with a programmable rate or as a set of registers that directly talks
+> to a remote system management device over whatever hardware protocol
+> they choose.
 
-Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
-Acked-by: Lee Jones <lee.jones@linaro.org>
----
- MAINTAINERS | 1 +
- 1 file changed, 1 insertion(+)
+Sure. It is also completely reasonable that baudrate is configurable
+and vendors can implement it however they choose since the SBSA does
+not specify it. IIRC, the enabling and disabling bits are not
+specified either.
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index cf24bb5..55381955 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -1398,6 +1398,7 @@ F:	drivers/media/rc/st_rc.c
- F:	drivers/i2c/busses/i2c-st.c
- F:	drivers/tty/serial/st-asc.c
- F:	drivers/mmc/host/sdhci-st.c
-+F:	drivers/usb/dwc3/dwc3-st.c
- 
- ARM/TECHNOLOGIC SYSTEMS TS7250 MACHINE SUPPORT
- M:	Lennert Buytenhek <kernel@wantstofly.org>
--- 
-1.9.1
+Not having configurability is simply one variation on possible implementations.
+
+Rob
