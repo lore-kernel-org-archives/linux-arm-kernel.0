@@ -1,77 +1,69 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 2 Sep 2014 14:10:36 +0100
-Subject: [GIT PULL] arm64: second wave of arm64 fixes for 3.17
-Message-ID: <20140902131036.GL25379@arm.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Tue, 02 Sep 2014 15:11:23 +0200
+Subject: [RFC PATCH 0/7] Introduce automatic DMA configuration for IOMMU
+ masters
+In-Reply-To: <4561708.C5IqxBT0S9@wuerfel>
+References: <1409327670-3495-1-git-send-email-will.deacon@arm.com>
+ <3261702.HRSZJsEv5z@wuerfel> <5405B86C.9010704@samsung.com>
+ <4561708.C5IqxBT0S9@wuerfel>
+Message-ID: <5405C1FB.6090009@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Linus,
 
-Please can you pull these fixes for arm64? They address some issues found
-by running smatch on the arch code (ignoring the false positives) and also
-stop 32-bit Android from losing track of its stack.
+On 2014-09-02 14:46, Arnd Bergmann wrote:
+> On Tuesday 02 September 2014 14:30:36 Marek Szyprowski wrote:
+>>>>>> However we also need to figure out how to let drivers to make their own
+>>>>>> configuration, like it is required by Exynos DRM subsystem, which consist
+>>>>>> of several devices, each having its own IOMMU controller, but for
+>>>>>> convenience those drivers assume that they all have been bound to the same,
+>>>>>> single domain.
+>>>>> IIRC with the way we ended up putting the mask into the iommu descriptor of
+>>>>> the ARM SMMU, you can put multiple devices into the same iommu group, and
+>>>>> have them automatically share a domain.
+>>>>>
+>>>>> I don't know if the same would work for the Samsung implementation.
+>>>> The question is how to transfer such information from the device
+>>>> drivers, that
+>>>> need/benefit from such configuration to iommu driver, which does all the
+>>>> setup?
+>>>> This is something completely internal to particular drivers and should
+>>>> not be
+>>>> exported to device tree or userspace. Thierry suggested to hardcode this
+>>>> information in the iommu driver, but I'm looking for other approaches.
+>>>> Maybe simply releasing device from the default dma-mapping domain before
+>>>> attaching to custom one will be the easiest solution.
+>>> For the ARM SMMU, the problem is that there is not necessarily a good way
+>>> to partition the masters into IOMMU groups automatically, therefore we
+>>> want to provide some hints in DT. On a machine that can have more domains
+>>> than it has masters, this is not a problem and we can always use an
+>>> all-ones mask, but for a machine on which this is not the case, the
+>>> problem is simplified a lot of we hardcode the masks in a way that can
+>>> always work, putting multiple devices into an iommu group if necessary.
+>> Well, I was talking about the Exynos IOMMU case, where there are no hw
+>> restrictions and grouping is done just to make things easier for the Exynos
+>> DRM drivers (a buffer gets the same DMA address for all devices, which
+>> are a part of virtual Exynos DRM device).
+> Does that mean you don't actually need to use multiple contexts here and
+> could actually just use the normal dma-mapping interface if there is
+> a way to ensure the mappings are always shared across these masters?
 
-There's one additional irq migration fix in the pipeline, but it came in
-after I'd tagged and tested this set.
+Well, a default, shared single domain for dma-mapping interface will work
+with Exynos DRM and its multiple masters, although I never thought about
+such configuration.
 
-Thanks,
+> Or do you need this in addition to being able to use multiple masters
+> so you can have multiple rendering contexts in user space?
 
-Will
+Such advanced IO space management is not yet implemented.
 
---->8
+However there are also devices (like multimedia codec - exynos mfc and 
+camera
+capture subsystem exynos isp), which have limited DMA/IO window (256MiB in
+case of video codec), so they will still need to use their own separate 
+domain.
 
-The following changes since commit 52addcf9d6669fa439387610bc65c92fa0980cef:
-
-  Linux 3.17-rc2 (2014-08-25 15:36:20 -0700)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux.git tags/arm64-fixes
-
-for you to fetch changes up to 5e39977edf6500fd12f169e6c458d33b0ef62feb:
-
-  Revert "arm64: cpuinfo: print info for all CPUs" (2014-09-01 15:55:22 +0100)
-
-----------------------------------------------------------------
-arm64 fixes for -rc4
-
-Another handful of arm64 fixes here:
-
-  - A few fixes for real issues found by smatch (after Dan's talk at KS)
-  - Revert the /proc/cpuinfo changes merged during the merge window.
-    We've opened a can of worms here, so we need to find out where we
-    stand before we change this interface.
-  - Implement KSTK_ESP for compat tasks, otherwise 32-bit Android gets
-    confused wondering where its [stack] has gone
-  - Misc fixes (fpsimd context handling, crypto, ...)
-
-----------------------------------------------------------------
-Catalin Marinas (1):
-      arm64: Add brackets around user_stack_pointer()
-
-Colin Ian King (1):
-      arm64/crypto: remove redundant update of data
-
-Geoff Levand (1):
-      arm64: Remove unused variable in head.S
-
-Leo Yan (1):
-      arm64: fix bug for reloading FPSIMD state after cpu power off
-
-Will Deacon (5):
-      arm64: ptrace: fix compat hardware watchpoint reporting
-      arm64: ptrace: fix compat reg getter/setter return values
-      arm64: perf: don't rely on layout of pt_regs when grabbing sp or pc
-      arm64: report correct stack pointer in KSTK_ESP for compat tasks
-      Revert "arm64: cpuinfo: print info for all CPUs"
-
- arch/arm64/crypto/sha2-ce-glue.c       |  1 -
- arch/arm64/include/asm/hw_breakpoint.h |  1 -
- arch/arm64/include/asm/processor.h     |  2 +-
- arch/arm64/include/asm/ptrace.h        |  2 +-
- arch/arm64/kernel/fpsimd.c             |  1 +
- arch/arm64/kernel/head.S               |  4 ----
- arch/arm64/kernel/perf_regs.c          |  6 +++++
- arch/arm64/kernel/ptrace.c             | 13 +++++++----
- arch/arm64/kernel/setup.c              | 40 +++++++++++++++++++---------------
- 9 files changed, 40 insertions(+), 30 deletions(-)
+Best regards
+-- 
+Marek Szyprowski, PhD
+Samsung R&D Institute Poland
