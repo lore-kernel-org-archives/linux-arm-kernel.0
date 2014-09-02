@@ -1,39 +1,27 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Tue, 2 Sep 2014 13:56:21 -0400
-Subject: [PATCH] irqchip: exynos-combiner: Fix compilation error on ARM64
-In-Reply-To: <1409671492-7725-1-git-send-email-ch.naveen@samsung.com>
-References: <1409671492-7725-1-git-send-email-ch.naveen@samsung.com>
-Message-ID: <20140902175621.GG30467@titan.lakedaemon.net>
+From: bhelgaas@google.com (Bjorn Helgaas)
+Date: Tue, 2 Sep 2014 11:58:46 -0600
+Subject: SPEAr PCIe driver build failures in ARM allmodconfig
+In-Reply-To: <20140901232208.GN29327@sirena.org.uk>
+References: <E1XOXLn-0004fl-2V@cassiel.sirena.org.uk>
+ <20140901232208.GN29327@sirena.org.uk>
+Message-ID: <CAErSpo76Jz+jH6Znwuq5F-SW2pv+LNbqUiwpjc7w1b5rccWf1w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Naveen,
+On Mon, Sep 1, 2014 at 5:22 PM, Mark Brown <broonie@kernel.org> wrote:
+> ARM allmodconfig has started failing to build in Linus' tree in the past
+> few days with undefined dependencies in the SPEAr PCIe driver:
+>
+>>       arm-allmodconfig
+>> ERROR: "dw_pcie_host_init" [drivers/pci/host/pcie-spear13xx.ko] undefined!
+>> ERROR: "dw_handle_msi_irq" [drivers/pci/host/pcie-spear13xx.ko] undefined!
+>> ERROR: "dw_pcie_msi_init" [drivers/pci/host/pcie-spear13xx.ko] undefined!
+>> ERROR: "dw_pcie_cfg_write" [drivers/pci/host/pcie-spear13xx.ko] undefined!
+>> ERROR: "dw_pcie_cfg_read" [drivers/pci/host/pcie-spear13xx.ko] undefined!
+>> ERROR: "dw_pcie_setup_rc" [drivers/pci/host/pcie-spear13xx.ko] undefined!
+>> ERROR: "dw_pcie_link_up" [drivers/pci/host/pcie-spear13xx.ko] undefined!
+>
+> This has been fixed in -next with commit 8d7004a6904cf0 (PCI: spear:
+> Remove module option), can that be sent to Linus too please?
 
-On Tue, Sep 02, 2014 at 08:54:52PM +0530, Naveen Krishna Chatradhi wrote:
-> The following compilation error occurs on 64-bit Exynos7 SoC:
-> 
-> drivers/irqchip/exynos-combiner.c: In function ?combiner_irq_domain_map?:
-> drivers/irqchip/exynos-combiner.c:162:2: error: implicit declaration of function ?set_irq_flags? [-Werror=implicit-function-declaration]
->   set_irq_flags(irq, IRQF_VALID | IRQF_PROBE);
->   ^
-> drivers/irqchip/exynos-combiner.c:162:21: error: ?IRQF_VALID? undeclared (first use in this function)
->   set_irq_flags(irq, IRQF_VALID | IRQF_PROBE);
->                      ^
-> drivers/irqchip/exynos-combiner.c:162:21: note: each undeclared identifier is reported only once for each function it appears in
-> drivers/irqchip/exynos-combiner.c:162:34: error: ?IRQF_PROBE? undeclared (first use in this function)
->   set_irq_flags(irq, IRQF_VALID | IRQF_PROBE);
-> 
-> Fix the build error by including asm/hardirq.h.
-> 
-> Signed-off-by: Naveen Krishna Chatradhi <ch.naveen@samsung.com>
-> Cc: Thomas Gleixner <tglx@linutronix.de>
-> ---
->  drivers/irqchip/exynos-combiner.c |    2 ++
->  1 file changed, 2 insertions(+)
-
-Please include me in the Cc on future irqchip fixes, I almost missed
-this one.
-
-thx,
-
-Jason.
+Done, thanks for the reminder.
