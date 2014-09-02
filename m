@@ -1,86 +1,95 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Tue,  2 Sep 2014 10:49:58 +0200
-Subject: [PATCH 2/7] ARM: at91: at91sam9260_9g20: update defconfig
+Date: Tue,  2 Sep 2014 10:50:00 +0200
+Subject: [PATCH 4/7] ARM: at91: at91sam9263: update defconfig
 In-Reply-To: <1409647803-8054-1-git-send-email-alexandre.belloni@free-electrons.com>
 References: <1409647803-8054-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <1409647803-8054-3-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <1409647803-8054-5-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Update defconfig, adding:
- - ADC/touchscreen
+ - PWM support using the generic framework
+ - generic PWM leds
  - Power/reset
 
 and removing deprecated config options.
 
 Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 ---
- arch/arm/configs/at91sam9260_9g20_defconfig | 13 +++++--------
- 1 file changed, 5 insertions(+), 8 deletions(-)
+ arch/arm/configs/at91sam9263_defconfig | 13 ++++++-------
+ 1 file changed, 6 insertions(+), 7 deletions(-)
 
-diff --git a/arch/arm/configs/at91sam9260_9g20_defconfig b/arch/arm/configs/at91sam9260_9g20_defconfig
-index c4c160fc8791..3ada05d639ad 100644
---- a/arch/arm/configs/at91sam9260_9g20_defconfig
-+++ b/arch/arm/configs/at91sam9260_9g20_defconfig
-@@ -54,7 +54,6 @@ CONFIG_DEVTMPFS=y
+diff --git a/arch/arm/configs/at91sam9263_defconfig b/arch/arm/configs/at91sam9263_defconfig
+index e40026364e57..8b671c977b81 100644
+--- a/arch/arm/configs/at91sam9263_defconfig
++++ b/arch/arm/configs/at91sam9263_defconfig
+@@ -18,7 +18,6 @@ CONFIG_MACH_AT91SAM9263EK=y
+ CONFIG_MTD_AT91_DATAFLASH_CARD=y
+ # CONFIG_ARM_THUMB is not set
+ CONFIG_AEABI=y
+-# CONFIG_OABI_COMPAT is not set
+ CONFIG_ZBOOT_ROM_TEXT=0x0
+ CONFIG_ZBOOT_ROM_BSS=0x0
+ CONFIG_CMDLINE="mem=64M console=ttyS0,115200 initrd=0x21100000,3145728 root=/dev/ram0 rw"
+@@ -51,7 +50,6 @@ CONFIG_DEVTMPFS=y
  CONFIG_DEVTMPFS_MOUNT=y
  CONFIG_MTD=y
  CONFIG_MTD_CMDLINE_PARTS=y
--CONFIG_MTD_OF_PARTS=y
+-CONFIG_MTD_CHAR=y
  CONFIG_MTD_BLOCK=y
- CONFIG_MTD_DATAFLASH=y
- CONFIG_MTD_NAND=y
-@@ -66,13 +65,10 @@ CONFIG_BLK_DEV_RAM_SIZE=8192
- CONFIG_EEPROM_AT25=y
+ CONFIG_NFTL=y
+ CONFIG_NFTL_RW=y
+@@ -64,13 +62,10 @@ CONFIG_MTD_UBI_GLUEBI=y
+ CONFIG_BLK_DEV_LOOP=y
+ CONFIG_BLK_DEV_RAM=y
+ CONFIG_BLK_DEV_RAM_SIZE=8192
+-CONFIG_ATMEL_PWM=y
+ CONFIG_ATMEL_TCLIB=y
  CONFIG_SCSI=y
  CONFIG_BLK_DEV_SD=y
 -CONFIG_SCSI_MULTI_LUN=y
- # CONFIG_SCSI_LOWLEVEL is not set
  CONFIG_NETDEVICES=y
 -CONFIG_MII=y
  CONFIG_MACB=y
- # CONFIG_NET_VENDOR_BROADCOM is not set
--# CONFIG_NET_VENDOR_CHELSIO is not set
- # CONFIG_NET_VENDOR_FARADAY is not set
- # CONFIG_NET_VENDOR_INTEL is not set
- # CONFIG_NET_VENDOR_MARVELL is not set
-@@ -86,7 +82,6 @@ CONFIG_SMSC_PHY=y
- # CONFIG_INPUT_MOUSEDEV_PSAUX is not set
- CONFIG_KEYBOARD_GPIO=y
- # CONFIG_INPUT_MOUSE is not set
--# CONFIG_SERIO is not set
- CONFIG_SERIAL_ATMEL=y
- CONFIG_SERIAL_ATMEL_CONSOLE=y
- CONFIG_HW_RANDOM=y
-@@ -97,6 +92,8 @@ CONFIG_SPI=y
+ CONFIG_SMSC_PHY=y
+ # CONFIG_WLAN is not set
+@@ -92,6 +87,8 @@ CONFIG_I2C_GPIO=y
+ CONFIG_SPI=y
  CONFIG_SPI_ATMEL=y
- CONFIG_SPI_SPIDEV=y
  CONFIG_GPIO_SYSFS=y
 +CONFIG_POWER_SUPPLY=y
 +CONFIG_POWER_RESET=y
  # CONFIG_HWMON is not set
  CONFIG_WATCHDOG=y
  CONFIG_WATCHDOG_NOWAYOUT=y
-@@ -127,6 +124,8 @@ CONFIG_LEDS_TRIGGER_HEARTBEAT=y
+@@ -103,7 +100,6 @@ CONFIG_LCD_CLASS_DEVICE=y
+ CONFIG_BACKLIGHT_CLASS_DEVICE=y
+ CONFIG_FRAMEBUFFER_CONSOLE=y
+ CONFIG_FRAMEBUFFER_CONSOLE_DETECT_PRIMARY=y
+-CONFIG_FONTS=y
+ CONFIG_LOGO=y
+ CONFIG_SOUND=y
+ CONFIG_SND=y
+@@ -129,12 +125,14 @@ CONFIG_SDIO_UART=m
+ CONFIG_MMC_ATMELMCI=m
+ CONFIG_NEW_LEDS=y
+ CONFIG_LEDS_CLASS=y
+-CONFIG_LEDS_ATMEL_PWM=y
+ CONFIG_LEDS_GPIO=y
++CONFIG_LEDS_PWM=y
+ CONFIG_LEDS_TRIGGERS=y
+ CONFIG_LEDS_TRIGGER_HEARTBEAT=y
  CONFIG_RTC_CLASS=y
- CONFIG_RTC_DRV_RV3029C2=y
  CONFIG_RTC_DRV_AT91SAM9=y
-+CONFIG_IIO=y
-+CONFIG_AT91_ADC=y
++CONFIG_PWM=y
++CONFIG_PWM_ATMEL=y
  CONFIG_EXT4_FS=y
  CONFIG_VFAT_FS=y
  CONFIG_TMPFS=y
-@@ -139,10 +138,8 @@ CONFIG_NLS_CODEPAGE_850=y
- CONFIG_NLS_ISO8859_1=y
- CONFIG_NLS_ISO8859_15=y
+@@ -150,3 +148,4 @@ CONFIG_NLS_ISO8859_1=y
  CONFIG_NLS_UTF8=y
--# CONFIG_ENABLE_WARN_DEPRECATED is not set
--CONFIG_DEBUG_KERNEL=y
- CONFIG_DEBUG_INFO=y
-+# CONFIG_ENABLE_WARN_DEPRECATED is not set
- # CONFIG_FTRACE is not set
- CONFIG_DEBUG_LL=y
--CONFIG_AT91_DEBUG_LL_DBGU0=y
- CONFIG_EARLY_PRINTK=y
+ CONFIG_DEBUG_USER=y
+ CONFIG_XZ_DEC=y
++CONFIG_FONTS=y
 -- 
 1.9.1
