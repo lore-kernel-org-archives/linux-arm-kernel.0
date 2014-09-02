@@ -1,48 +1,36 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 02 Sep 2014 15:42:53 +0200
-Subject: [Linaro-acpi] [RFC PATCH for Juno 1/2] net: smsc911x add support
- for probing from ACPI
-In-Reply-To: <20140902132651.GF27056@arm.com>
-References: <1409583961-7466-1-git-send-email-hanjun.guo@linaro.org>
- <20140901173245.GM2953@xora-haswell.xora.org.uk>
- <20140902132651.GF27056@arm.com>
-Message-ID: <4816592.tj3on6vUaC@wuerfel>
+From: nick.dyer@itdev.co.uk (Nick Dyer)
+Date: Tue, 02 Sep 2014 14:46:55 +0100
+Subject: [PATCH v2 1/3] ARM: dts: Add Peach Pit dts entry for Atmel
+ touchpad
+In-Reply-To: <53FDE9B2.4040001@collabora.co.uk>
+References: <1409066937-3574-1-git-send-email-javier.martinez@collabora.co.uk>
+ <1409066937-3574-2-git-send-email-javier.martinez@collabora.co.uk>
+ <53FD1001.30701@suse.de> <53FD8528.7090504@collabora.co.uk>
+ <53FDD914.5090208@suse.de> <53FDE9B2.4040001@collabora.co.uk>
+Message-ID: <5405CA4F.10507@itdev.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 02 September 2014 14:26:52 Catalin Marinas wrote:
-> 
-> Not much at the KS, I think it will need to be followed up on lkml
-> (https://lkml.org/lkml/2014/8/17/10 is the last I'm aware of, not sure
-> about any updates in the meantime).
-> 
-> While the above gets sorted, what's the position from an ARM
-> perspective (and covered by Documentation/arm64/arm-acpi.txt)? I think
-> the "Device Enumeration" section in this document is fine, it's just the
-> kernel infrastructure missing.
-> 
-> Alternatively, you can say _DSD is not allowed (yet?) but I don't
-> particularly like basing the configuration on acpi_device_id like in
-> this patch. Which would leave us with ignoring any SoC containing
-> devices that require such specific configuration.
+On 27/08/14 15:22, Javier Martinez Canillas wrote:
+>>> If there was a BTN_NONE or KEY_UNUSED it would had been better but I think
+>>> that making a distinction between these two cases (reserved pin vs GPIO
+>>> available but not used) is useful.
+>>
+>> Maybe Nick can comment here.
 
-The way I recall the discussion, most people were on one extreme
-side of the discussion or the other:
+Yes, this is probably useful to document. However, I fear that it's not
+going to be obvious what the distinction is to someone who doesn't have the
+Atmel docs. Perhaps it would be clearer to just do something like:
 
-a) We should use _DSD for ARM64 servers to maximize code reuse with
-DT-enabled drivers, work around the slow UEFI standardization process,
-remain in control of the actual bindings, and avoid the need for
-endless per-ID platform-data definitions in drivers.
+		linux,gpio-keymap = <KEY_RESERVED
+		                     KEY_RESERVED
+		                     KEY_RESERVED /* GPIO0 */
+	        	             KEY_RESERVED /* GPIO1 */
+		                     KEY_RESERVED /* GPIO2 */
+		                     BTN_LEFT>;   /* GPIO3 */
 
-b) We should never use _DSD at all, since doing that would have no
-advantage over using DT directly, and we should force every device
-manufacturer to specify their bindings in an official ACPI document
-to prevent random incompatible bindings from being established.
-Any device that shows up in servers should not need arbitrary detailed
-properties anyway, as the details are supposed to be hidden in AML.
+If you omit any trailing KEY_RESERVED values it doesn't affect anything.
 
-I can understand the reasons for both approaches, and I find it hard
-to say either one is invalid. However, the worst possible outcome in
-my opinion would be having to support a mix of the two.
-
-	Arnd
+I was also going to suggest that you put something like "/* Atmel mXT224SL
+*/" in your .dts file so it's clear what version of the maXTouch device you
+are configuring.
