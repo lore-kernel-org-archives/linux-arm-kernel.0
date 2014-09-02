@@ -1,48 +1,55 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Tue, 2 Sep 2014 22:11:48 +0800
-Subject: [PATCH 2/2] ARM: dts: imx6x-sdb: Add LCD support
-In-Reply-To: <CAOMZO5Ct0PiRViQkrQ24ZUCHmaC+UgY1rktmOH+4BY0s99yB-g@mail.gmail.com>
-References: <1409593803-12368-1-git-send-email-fabio.estevam@freescale.com>
- <1409593803-12368-2-git-send-email-fabio.estevam@freescale.com>
- <20140902135036.GJ3135@dragon>
- <CAOMZO5Ct0PiRViQkrQ24ZUCHmaC+UgY1rktmOH+4BY0s99yB-g@mail.gmail.com>
-Message-ID: <20140902141147.GL3135@dragon>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Tue, 2 Sep 2014 16:22:59 +0200
+Subject: [PATCH 2/8 v2] leds: add device tree bindings for register bit
+ LEDs
+In-Reply-To: <1409659354-23553-3-git-send-email-linus.walleij@linaro.org>
+References: <1409659354-23553-1-git-send-email-linus.walleij@linaro.org>
+ <1409659354-23553-3-git-send-email-linus.walleij@linaro.org>
+Message-ID: <CAMuHMdXB_6vJpTeDgr4iiA=T_3bK7nQ3anF-HSdnEz=2QqYzaw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 02, 2014 at 11:01:06AM -0300, Fabio Estevam wrote:
-> On Tue, Sep 2, 2014 at 10:50 AM, Shawn Guo <shawn.guo@freescale.com> wrote:
-> 
-> >> +&lcdif1 {
-> >> +     pinctrl-names = "default";
-> >> +     pinctrl-0 = <&pinctrl_lcd>;
-> >> +     lcd-supply = <&reg_lcd_3v3>;
-> >> +     display = <&display0>;
-> >> +     status = "okay";
-> >> +
-> >> +     display0: display {
-> >
-> > Shouldn't the node be named more specific, so that we do not run into
-> > the kernel warning complaining duplicated property name?
-> 
-> I do not see any warning here.
+Hi Linus,
 
-I'm not sure why you do not see it, but I do.
+On Tue, Sep 2, 2014 at 2:02 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
+> +LED sub-node properties:
+> +
+> +Required properties:
+> +- compatible : must be "register-bit-led"
+> +- offset : register offset to the register controlling this LED
+> +- mask : bit mask for the bit controlling this LED in the register
 
-[    0.037835] device-tree: Duplicate name in lcdif at 02220000, renamed to "display#1"
+Why don't you use a "reg" property with "#address-cells = <2>" and
+"#size-cells = <1>", so you can store offset and mask there?
 
-> 
-> It was on mx28 that I got the warning as it has "display: display".
+> +syscon: syscon at 10000000 {
+> +       compatible = "arm,realview-pb1176-syscon", "syscon";
+> +       reg = <0x10000000 0x1000>;
+> +
+> +       led at 08.0 {
+> +               compatible = "register-bit-led";
+> +               offset = <0x08>;
+> +               mask = <0x01>;
+> +               label = "versatile:0";
+> +               linux,default-trigger = "heartbeat";
+> +               default-state = "on";
+> +       };
 
-I do not think the warning comes because of "display: display" but the
-fact that lcdif node has a property named "display" and a child node
-named "display" at the same time.
+ePAPR v1.1 says:
 
-Shawn
+"The unit-address must match the first address specified in the reg property
+ of the node. If the node has no reg property, the @ and unit-address must
+ be omitted ..."
 
-> 
-> Last time on mx28 you asked me to look at mx6qdl-sabresd.dtsi for a
-> reference, but display nodes there are inside the ldb node and do not
-> have the "display: display", so not sure how to proceed.
-> 
-> What do you suggest here?
+So you cannot have the "@8.0" without a "reg" property.
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
