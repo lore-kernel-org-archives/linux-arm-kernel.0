@@ -1,86 +1,48 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 02 Sep 2014 16:01:32 +0200
-Subject: [RFC PATCH 4/7] iommu: provide helper function to configure an
- IOMMU for an of master
-In-Reply-To: <20140902130508.GK25379@arm.com>
-References: <1409327670-3495-1-git-send-email-will.deacon@arm.com>
- <3424322.yoZKhlAsy0@wuerfel> <20140902130508.GK25379@arm.com>
-Message-ID: <5897964.3ztXLVfPDF@wuerfel>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Tue, 2 Sep 2014 22:11:48 +0800
+Subject: [PATCH 2/2] ARM: dts: imx6x-sdb: Add LCD support
+In-Reply-To: <CAOMZO5Ct0PiRViQkrQ24ZUCHmaC+UgY1rktmOH+4BY0s99yB-g@mail.gmail.com>
+References: <1409593803-12368-1-git-send-email-fabio.estevam@freescale.com>
+ <1409593803-12368-2-git-send-email-fabio.estevam@freescale.com>
+ <20140902135036.GJ3135@dragon>
+ <CAOMZO5Ct0PiRViQkrQ24ZUCHmaC+UgY1rktmOH+4BY0s99yB-g@mail.gmail.com>
+Message-ID: <20140902141147.GL3135@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 02 September 2014 14:05:08 Will Deacon wrote:
-> On Tue, Sep 02, 2014 at 01:15:06PM +0100, Arnd Bergmann wrote:
-
-> > > Anyway, I'll try to hack something together shortly. I think the proposal
-> > > is:
-> > > 
-> > >   - Make add_device_master_ids take a generic structure (struct iommu)
-> > >   - Add an of_xlate callback into iommu_ops which returns a populated
-> > >     struct iommu based on the of_node
-> > 
-> > We may have been talking past one another. What I meant with 'struct iommu'
-> > is something that identifies the iommu instance, not the connection to
-> > a particular master. What you describe here would work, but then I think
-> > the structure should have a different name. However, it seems easier to
-> > not have the add_device_master_ids at and just do the association in the
-> > xlate callback instead.
+On Tue, Sep 02, 2014 at 11:01:06AM -0300, Fabio Estevam wrote:
+> On Tue, Sep 2, 2014 at 10:50 AM, Shawn Guo <shawn.guo@freescale.com> wrote:
 > 
-> Yes, I think we were talking about two different things. If we move all
-> of the master handling into the xlate callback, then we can just use
-> of_phandle_args as the generic master representation (using the PCI host
-> controller node for PCI devices, as you mentioned). However, xlate is a
-> bit of a misnomer then, as it's not actually translating anything; the
-> handle used for DMA masters is still struct device, and we have that
-> already in of_dma_configure.
+> >> +&lcdif1 {
+> >> +     pinctrl-names = "default";
+> >> +     pinctrl-0 = <&pinctrl_lcd>;
+> >> +     lcd-supply = <&reg_lcd_3v3>;
+> >> +     display = <&display0>;
+> >> +     status = "okay";
+> >> +
+> >> +     display0: display {
+> >
+> > Shouldn't the node be named more specific, so that we do not run into
+> > the kernel warning complaining duplicated property name?
 > 
-> I'm still unsure about what to put inside struct iommu other than a private
-> data pointer. You previously suggested:
+> I do not see any warning here.
+
+I'm not sure why you do not see it, but I do.
+
+[    0.037835] device-tree: Duplicate name in lcdif at 02220000, renamed to "display#1"
+
 > 
-> 	struct iommu {
-> 		struct device *dev;
-> 		const struct iommu_ops *ops;
-> 		struct list_head domains;
-> 		void *private;
-> 	};
+> It was on mx28 that I got the warning as it has "display: display".
+
+I do not think the warning comes because of "display: display" but the
+fact that lcdif node has a property named "display" and a child node
+named "display" at the same time.
+
+Shawn
+
 > 
-> but that has the following problems:
+> Last time on mx28 you asked me to look at mx6qdl-sabresd.dtsi for a
+> reference, but display nodes there are inside the ldb node and do not
+> have the "display: display", so not sure how to proceed.
 > 
->   - We don't have a struct device * for the IOMMU until it's been probed
->     via the standard driver probing mechanisms, which may well be after
->     we've started registering masters
-
-Right, this may have to be the device_node pointer. I also realized that if
-we have this structure, we can stop using the device_node->data field
-and instead walk a list of iommu structures.
-
->   - The ops are still registered on a per-bus basis, and each domain has
->     a pointer to them anyway
-
-I think that has to change in the long run: we may well require distinct
-IOMMU operations if we have multiple IOMMUs used on the same bus_type.
- 
->   - The IOMMU driver really doesn't care about the domains, as the domain
->     in question is always passed back to the functions that need it (e.g.
->     attach, map, ...).
-
-This is an artifact of the API being single-instance at the moment.
-We might not in fact need it, I was just trying to think of things
-that naturally fit in there and that are probably already linked
-together in the individual iommu drivers.
-
-> The only useful field I can think of is something like a tree of masters,
-> but then we have to define a generic wrapper around struct device, which
-> is at odds with the rest of the IOMMU API.
-
-Maybe a list of the groups instead? I don't think you should need
-a list of every single master here.
-
-> One alternative is having the xlate call populate device->archdata.iommu,
-> but that's arch-specific and is essentially another opaque pointer.
-
-I think every architecture that supports IOMMUs needs to have this
-archdata pointer though, so that is still a good place to put private
-stuff.
-
-	Arnd
+> What do you suggest here?
