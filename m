@@ -1,69 +1,43 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Tue, 02 Sep 2014 15:11:23 +0200
-Subject: [RFC PATCH 0/7] Introduce automatic DMA configuration for IOMMU
- masters
-In-Reply-To: <4561708.C5IqxBT0S9@wuerfel>
-References: <1409327670-3495-1-git-send-email-will.deacon@arm.com>
- <3261702.HRSZJsEv5z@wuerfel> <5405B86C.9010704@samsung.com>
- <4561708.C5IqxBT0S9@wuerfel>
-Message-ID: <5405C1FB.6090009@samsung.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Tue, 2 Sep 2014 10:13:01 -0300
+Subject: ARM: mx28: cpufreq-cpu0 support?
+In-Reply-To: <54055116.4030608@lategoodbye.de>
+References: <53F9B4BF.2050802@lategoodbye.de> <20140825080123.GA12289@dragon>
+ <53FB1041.5010208@lategoodbye.de>
+ <CAOMZO5CG7mw5W4D3fRPE3TGxQ6-3pTtDJrsNnieN8XKE9dGofQ@mail.gmail.com>
+ <CAOMZO5CnuWJ9EaLUW8DYFU1Dzeh=92tux0zoUBKoW-L=VWZhhg@mail.gmail.com>
+ <540412A9.4090806@lategoodbye.de>
+ <CAOMZO5A7-66LJtv4O2TghN3gVzme4N6JFMYd8TV7zXhUhsXedQ@mail.gmail.com>
+ <54055116.4030608@lategoodbye.de>
+Message-ID: <CAOMZO5A3n6HV_A+U5pjzbHQMhcpmq7gw0e0aT87GGTyTZKeZ9A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tue, Sep 2, 2014 at 2:09 AM, Stefan Wahren <info@lategoodbye.de> wrote:
 
-On 2014-09-02 14:46, Arnd Bergmann wrote:
-> On Tuesday 02 September 2014 14:30:36 Marek Szyprowski wrote:
->>>>>> However we also need to figure out how to let drivers to make their own
->>>>>> configuration, like it is required by Exynos DRM subsystem, which consist
->>>>>> of several devices, each having its own IOMMU controller, but for
->>>>>> convenience those drivers assume that they all have been bound to the same,
->>>>>> single domain.
->>>>> IIRC with the way we ended up putting the mask into the iommu descriptor of
->>>>> the ARM SMMU, you can put multiple devices into the same iommu group, and
->>>>> have them automatically share a domain.
->>>>>
->>>>> I don't know if the same would work for the Samsung implementation.
->>>> The question is how to transfer such information from the device
->>>> drivers, that
->>>> need/benefit from such configuration to iommu driver, which does all the
->>>> setup?
->>>> This is something completely internal to particular drivers and should
->>>> not be
->>>> exported to device tree or userspace. Thierry suggested to hardcode this
->>>> information in the iommu driver, but I'm looking for other approaches.
->>>> Maybe simply releasing device from the default dma-mapping domain before
->>>> attaching to custom one will be the easiest solution.
->>> For the ARM SMMU, the problem is that there is not necessarily a good way
->>> to partition the masters into IOMMU groups automatically, therefore we
->>> want to provide some hints in DT. On a machine that can have more domains
->>> than it has masters, this is not a problem and we can always use an
->>> all-ones mask, but for a machine on which this is not the case, the
->>> problem is simplified a lot of we hardcode the masks in a way that can
->>> always work, putting multiple devices into an iommu group if necessary.
->> Well, I was talking about the Exynos IOMMU case, where there are no hw
->> restrictions and grouping is done just to make things easier for the Exynos
->> DRM drivers (a buffer gets the same DMA address for all devices, which
->> are a part of virtual Exynos DRM device).
-> Does that mean you don't actually need to use multiple contexts here and
-> could actually just use the normal dma-mapping interface if there is
-> a way to ensure the mappings are always shared across these masters?
+> thanks again. Now i unterstand much more, but otherwise the portation won't
+> be straight forward. The old source in drivers/regulator/mxs-regulator.c
+> needs a low level part located in arch/arm/plat-mx28/power.c . As far as i
+> know, the low level part needs to move into the devicetree binding and into
+> the mxs-regulator.c . Am i right?
 
-Well, a default, shared single domain for dma-mapping interface will work
-with Exynos DRM and its multiple masters, although I never thought about
-such configuration.
+Yes, I think you are right.
 
-> Or do you need this in addition to being able to use multiple masters
-> so you can have multiple rendering contexts in user space?
+> Yesterday i had looked into the mx28 reference manual and into the low level
+> part of the mxs regulator. The reference manual defines four voltage
+> regulators: vddd, vdda, vddio and vddmem plus a overall current regulator.
+> But the low level part make use of vddd, vdda, vddio, vddio_bo and the
+> overall current.
+>
+> Do i need the brown out regulator (vddio_bo) and the vddmem?
 
-Such advanced IO space management is not yet implemented.
+As far as I understand vddmem is not used on mx28evk. From the mx28
+reference manual;
 
-However there are also devices (like multimedia codec - exynos mfc and 
-camera
-capture subsystem exynos isp), which have limited DMA/IO window (256MiB in
-case of video codec), so they will still need to use their own separate 
-domain.
-
-Best regards
--- 
-Marek Szyprowski, PhD
-Samsung R&D Institute Poland
+"11.12.8 VDDMEM Supply Targets Control Register
+(HW_POWER_VDDMEMCTRL)
+This register controls the voltage target for a memory supply
+generated from VDDA. This
+supply is intended for use with external memories such as LV-DDR that
+have unique voltage
+requirements not compatible with VDDIO, VDDA , or VDDD."
