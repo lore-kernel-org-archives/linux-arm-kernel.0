@@ -1,49 +1,115 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 2 Sep 2014 12:36:55 +0100
-Subject: [PATCH v10 03/19] arm: fiq: Replace default FIQ handler
-In-Reply-To: <5405A3EF.60908@linaro.org>
-References: <1408369264-14242-1-git-send-email-daniel.thompson@linaro.org>
- <1408466769-20004-1-git-send-email-daniel.thompson@linaro.org>
- <1408466769-20004-4-git-send-email-daniel.thompson@linaro.org>
- <20140819173742.GG30401@n2100.arm.linux.org.uk> <53F39377.1070308@linaro.org>
- <20140828150112.GD30401@n2100.arm.linux.org.uk> <53FF50B1.20009@linaro.org>
- <20140828161551.GC5001@linux.vnet.ibm.com> <5405A3EF.60908@linaro.org>
-Message-ID: <20140902113655.GO30401@n2100.arm.linux.org.uk>
+From: peter@hurleysoftware.com (Peter Hurley)
+Date: Tue, 02 Sep 2014 07:40:18 -0400
+Subject: [PATCH RESEND 5/5] tty/serial: at91: add interrupts for modem
+ control lines
+In-Reply-To: <CACQ1gAguMJM3iBSh9RN9Sbq8c-DfQUhzFPOXav2CASVHA6Rxdw@mail.gmail.com>
+References: <1400005245-11943-1-git-send-email-richard.genoud@gmail.com>
+ <1400005245-11943-6-git-send-email-richard.genoud@gmail.com>
+ <53E7C8F8.1080507@hurleysoftware.com>
+ <CACQ1gAguMJM3iBSh9RN9Sbq8c-DfQUhzFPOXav2CASVHA6Rxdw@mail.gmail.com>
+Message-ID: <5405ACA2.5010308@hurleysoftware.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 02, 2014 at 12:03:11PM +0100, Daniel Thompson wrote:
-> On 28/08/14 17:15, Paul E. McKenney wrote:
-> > On Thu, Aug 28, 2014 at 04:54:25PM +0100, Daniel Thompson wrote:
-> >> On 28/08/14 16:01, Russell King - ARM Linux wrote:
-> >>> There's concerns with whether either printk() in check_flags() could
-> >>> be reached too (flags there should always indicate that IRQs were
-> >>> disabled, so that reduces down to a question about just the first
-> >>> printk() there.)
-> >>>
-> >>> There's also the very_verbose() stuff for RCU lockdep classes which
-> >>> Paul says must not be enabled.
-> >>>
-> >>> Lastly, Paul isn't a lockdep expert, but he sees nothing that prevents
-> >>> lockdep doing the deadlock checking as a result of the above call.
-> >>>
-> >>> So... this coupled with my feeling that notifiers make it too easy for
-> >>> unreviewed code to be hooked into this path, I'm fairly sure that we
-> >>> don't want to be calling atomic notifier chains from FIQ context.
+On 09/01/2014 05:26 AM, Richard Genoud wrote:
+> 2014-08-10 21:33 GMT+02:00 Peter Hurley <peter@hurleysoftware.com>:
+>> Hi Richard,
 > 
-> Having esablished (above) that RCU usage is safe from FIQ I have been
-> working on the assumption that your feeling regarding unreviewed code
-> is sufficient on its own to avoid using notifiers (and also to avoid
-> a list of function pointers like on x86).
+> Hi !
+> Sorry for the delay !
+> 
+>> On 05/13/2014 02:20 PM, Richard Genoud wrote:
+>>> Handle CTS/DSR/RI/DCD GPIO interrupts in atmel_serial.
+>>>
+>>> Signed-off-by: Richard Genoud <richard.genoud@gmail.com>
+>>> Acked-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+>>> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+>>> ---
+>>>  drivers/tty/serial/atmel_serial.c |  125 ++++++++++++++++++++++++++++++++++++-
+>>>  1 file changed, 122 insertions(+), 3 deletions(-)
+>>>
+>>> diff --git a/drivers/tty/serial/atmel_serial.c b/drivers/tty/serial/atmel_serial.c
+>>> index 43ca659..3fceae0 100644
+>>> --- a/drivers/tty/serial/atmel_serial.c
+>>> +++ b/drivers/tty/serial/atmel_serial.c
+>>> @@ -45,6 +45,7 @@
+>>>  #include <linux/gpio.h>
+>>>  #include <linux/gpio/consumer.h>
+>>>  #include <linux/err.h>
+>>> +#include <linux/irq.h>
+>>>
+>>>  #include <asm/io.h>
+>>>  #include <asm/ioctls.h>
+>>> @@ -167,7 +168,9 @@ struct atmel_uart_port {
+>>>
+>>>       struct serial_rs485     rs485;          /* rs485 settings */
+>>>       struct mctrl_gpios      *gpios;
+>>> +     int                     gpio_irq[UART_GPIO_MAX];
+>>>       unsigned int            tx_done_mask;
+>>> +     bool                    ms_irq_enabled;
+>>>       bool                    is_usart;       /* usart or uart */
+>>>       struct timer_list       uart_timer;     /* uart timer */
+>>>       int (*prepare_rx)(struct uart_port *port);
+>>> @@ -489,8 +492,38 @@ static void atmel_stop_rx(struct uart_port *port)
+>>>   */
+>>>  static void atmel_enable_ms(struct uart_port *port)
+>>>  {
+>>> -     UART_PUT_IER(port, ATMEL_US_RIIC | ATMEL_US_DSRIC
+>>> -                     | ATMEL_US_DCDIC | ATMEL_US_CTSIC);
+>>> +     struct atmel_uart_port *atmel_port = to_atmel_uart_port(port);
+>>> +     uint32_t ier = 0;
+>>> +
+>>> +     /*
+>>> +      * Interrupt should not be enabled twice
+>>> +      */
+>>> +     if (atmel_port->ms_irq_enabled)
+>>> +             return;
+>>> +
+>>> +     atmel_port->ms_irq_enabled = true;
+>>> +
+>>> +     if (atmel_port->gpio_irq[UART_GPIO_CTS] >= 0)
+>>> +             enable_irq(atmel_port->gpio_irq[UART_GPIO_CTS]);
+>>> +     else
+>>> +             ier |= ATMEL_US_CTSIC;
+>>> +
+>>> +     if (atmel_port->gpio_irq[UART_GPIO_DSR] >= 0)
+>>> +             enable_irq(atmel_port->gpio_irq[UART_GPIO_DSR]);
+>>> +     else
+>>> +             ier |= ATMEL_US_DSRIC;
+>>> +
+>>> +     if (atmel_port->gpio_irq[UART_GPIO_RI] >= 0)
+>>> +             enable_irq(atmel_port->gpio_irq[UART_GPIO_RI]);
+>>> +     else
+>>> +             ier |= ATMEL_US_RIIC;
+>>> +
+>>> +     if (atmel_port->gpio_irq[UART_GPIO_DCD] >= 0)
+>>> +             enable_irq(atmel_port->gpio_irq[UART_GPIO_DCD]);
+>>> +     else
+>>> +             ier |= ATMEL_US_DCDIC;
+>>
+>> Where are these gpio irqs disabled if !UART_ENABLE_MS()?
+> They are disabled in atmel_shutdown()/atmel_free_gpio_irq().
+> Like the doc says in Documentation/serial/driver
+>   enable_ms(port)
+>     Enable the modem status interrupts.
+> 
+>     This method may be called multiple times.  Modem status
+>     interrupts should be disabled when the shutdown method is
+>     called.
 
-I'm assuming that "your" above refers to Paul here, since you addressed
-your message To: Paul and only copied me for information purposes.
+Thanks for replying.
 
-If not, please address your message more appropriately so as to avoid
-confusion.
+The point of the UART_ENABLE_MS() macro is to allow the UART driver
+to determine if modem status interrupts need to be enabled when
+handling the .set_termios() method.
 
-Thanks.
+When handling set_termios(), if UART_ENABLE_MS is false (ie., the
+serial core does not require modem status interrupts), the UART
+driver can and should turn modem status interrupts off.
 
--- 
-FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
-according to speedtest.net.
+It is _also_ true that "modem status interrupts should be disabled
+when the shutdown method is called"; in fact, _all_ UART-sourced
+interrupts should be disabled when the shutdown method is called.
+
+Regards,
+Peter Hurley
