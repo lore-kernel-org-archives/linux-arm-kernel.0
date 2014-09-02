@@ -1,35 +1,125 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Tue, 2 Sep 2014 10:20:04 -0300
-Subject: mx28 battery charger support
-In-Reply-To: <20140902103913.GA9417@piout.net>
-References: <20140902103913.GA9417@piout.net>
-Message-ID: <CAOMZO5BNNBzJA0Q-Ls-c7ch-LXEhkuYxFwxJk72d7ZAL5mwJOQ@mail.gmail.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Tue, 2 Sep 2014 08:20:53 -0500
+Subject: [RFC PATCH 1/1] drivers: introduce ARM SBSA generic UART driver
+In-Reply-To: <540596A6.8000608@arm.com>
+References: <1409328803-1953-1-git-send-email-andre.przywara@arm.com>
+ <1409328803-1953-2-git-send-email-andre.przywara@arm.com>
+ <CAL_JsqJbAWRhduzMwdQMh8sDdVqTWVK2Ej9LQjx4gp2ifwxe6Q@mail.gmail.com>
+ <540596A6.8000608@arm.com>
+Message-ID: <CAL_Jsq+Rs5MXC7s7EeWAEAPxxqaShAVGt=cdQxud5Us+-Zp6jw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Alexandre,
-
-On Tue, Sep 2, 2014 at 7:39 AM, Alexandre Belloni
-<alexandre.belloni@free-electrons.com> wrote:
-> Hi,
+On Tue, Sep 2, 2014 at 5:06 AM, Andre Przywara <andre.przywara@arm.com> wrote:
+> Hi Rob,
 >
-> I'm having a look at the battery charger on i.mx28. Is there any
-> mainline driver or any attempt at mainlining a driver? The IP is not
-> documented in the i.MX28 Applications Processor Reference Manual but
-> there is an existing driver in the Linux 2.6.35 sources from Freescale [1].
+> thanks for looking at this.
 >
-> I would love not being stuck with such an old version ;)
+> On 02/09/14 04:06, Rob Herring wrote:
+>> On Fri, Aug 29, 2014 at 11:13 AM, Andre Przywara <andre.przywara@arm.com> wrote:
+>>> The ARM Server Base System Architecture (SBSA) describes a generic
+>>> UART which all compliant level 1 systems should implement. This is
+>>> actually a PL011 subset, so a full PL011 implementation will satisfy
+>>> this requirement.
+>>> However if a system does not have a PL011, a very stripped down
+>>> implementation complying to the SBSA defined specification will
+>>> suffice. The Linux PL011 driver is not guaranteed to drive this
+>>> limited device (and indeed the fast model implentation hangs the
+>>> kernel if driven by the PL011 driver).
+>>> So introduce a new driver just implementing the part specified by the
+>>> SBSA (which lacks DMA, the modem control signals and many of the
+>>> registers including baud rate control). This driver has been derived
+>>> by the actual PL011 one, removing all unnecessary code.
+>>>
+>>> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+>>> ---
+>>>  .../devicetree/bindings/serial/arm_sbsa_uart.txt   |    6 +
+>>>  drivers/tty/serial/Kconfig                         |   28 +
+>>>  drivers/tty/serial/Makefile                        |    1 +
+>>>  drivers/tty/serial/sbsa_uart.c                     |  793 ++++++++++++++++++++
+>>>  include/uapi/linux/serial_core.h                   |    1 +
+>>
+>> Sorry, but I think this is all wrong. We've now just duplicated some
+>> subset of the pl011 driver leaving out the parts like setting baudrate
+>> which can never be added since those things could be different for
+>> every vendor.
+>>
+>> The original intent of the SBSA uart was to provide a common early
+>> debug uart. It was not to have a full fledged driver. I think the SBSA
+>> has failed in this area and created the potential to create a mess of
+>> serial drivers different for every vendor. Reality will hopefully not
+>> be that extreme and most vendors will just use the pl011 and create
+>> their value add somewhere besides the uart. For the purpose of debug
+>> output, we already support that as the pl011 earlycon only touches
+>> SBSA compatible registers.
 >
-> [1] http://git.freescale.com/git/cgit.cgi/imx/linux-2.6-imx.git/tree/drivers/power/mxs?h=imx_2.6.35_maintain
+> I see your point (and was actually looking for those kind of comments
+> when posting this).
+> I agree to that debug aspect and understand that earlycon already does
+> this, but I think we need some support beyond earlycon, to be able to
+> login and use it as a console (which is not possible with earlycon,
+> right?) This is probably still for debugging or emergency access to the
+> system only, but maybe also for logging - actually quite similar to how
+> UARTs are used on today's x86 servers.
+> So after having written three incarnations of this driver (goldfish
+> based, PL010 based, PL011 based) I wonder if supporting the SBSA subset
+> in the real PL011 driver is an option. Either this would be enabled by a
+> new explicit DT property or preferably by a clever compatible string.
+> Ideally we would just provide a different set of "struct uart_ops"
+> members, with some pointing to generic PL011 routines, some to SBSA UART
+> specific ones.
+> Maybe we make the full featured PL011 support a config option
+> (defaulting to y), allowing people to only use the SBSA subset in their
+> kernel?
 
-I haven't seen any patches for upstreaming the battery charger on mxs yet..
+I think your choices are add the option into pl011 driver or move the
+common parts of pl011 driver into a common lib.
 
-In this discussion Robert Schwebel reports to be using a mainline
-kernel with the battery charger driver on mx23:
-https://community.freescale.com/thread/312468
+>
+> Does that make more sense? (for a general SBSA h/w rationale see below)
+>
+>>>  5 files changed, 829 insertions(+)
+>>>  create mode 100644 Documentation/devicetree/bindings/serial/arm_sbsa_uart.txt
+>>>  create mode 100644 drivers/tty/serial/sbsa_uart.c
+>>>
+>>> diff --git a/Documentation/devicetree/bindings/serial/arm_sbsa_uart.txt b/Documentation/devicetree/bindings/serial/arm_sbsa_uart.txt
+>>> new file mode 100644
+>>> index 0000000..8e2c5d6
+>>> --- /dev/null
+>>> +++ b/Documentation/devicetree/bindings/serial/arm_sbsa_uart.txt
+>>> @@ -0,0 +1,6 @@
+>>> +* ARM SBSA defined generic UART
+>>> +
+>>> +Required properties:
+>>> +- compatible: must be "arm,sbsa-uart"
+>>
+>> This alone is not okay. There is no such implementation of hardware.
+>
+> But the SBSA explicitly allows this. I don't know of any vendor who just
+> implements the subset, but I've been told that this has been asked for.
 
-Adding Robert in case he could comment on this.
+To use baudrate as an example, that must be configurable somehow
+either with pl011 registers or in a vendor specific way. I suppose you
+could do an actual implementation with all those things hardcoded in
+the design, but that seems unlikely.
 
-Regards,
+Regardless of config registers, if you have 10 different implementers
+of a spec, you need 10 different compatible strings because you will
+have 10 different sets of quirks. See the 8250 driver if you need
+proof of that.
 
-Fabio Estevam
+>> The DT must specify the implementation such as pl011.
+>
+> If it is a full featured PL011: sure. Then we don't need this driver at
+> all and just use the SBSA UART spec as a guideline for our earlycon
+> implementation.
+> I will try to learn if there is someone actually implementing only the
+> subset.
+
+I would have assumed you knew someone is. Otherwise, I don't really
+think anything should be implemented at this point. Perhaps adding
+SBSA uart as an explicit earlycon option would be worthwhile. Also, we
+should consider using ttySx instead of ttyAMAx for SBSA compliant
+systems (including ones with pl011).
+
+Rob
