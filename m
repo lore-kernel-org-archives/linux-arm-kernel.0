@@ -1,58 +1,56 @@
-From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
-Date: Tue, 02 Sep 2014 20:39:22 +0200
-Subject: [PATCH 15/15] tty: serial: 8250: omap: add dma support
-In-Reply-To: <5404B149.6010400@linutronix.de>
-References: <20140815210211.GD9239@atomide.com>
- <53F5AF0D.5060409@linutronix.de> <20140821184416.GF10066@atomide.com>
- <53FE3779.5090908@linutronix.de> <20140827202313.GF16006@atomide.com>
- <20140828082348.GA5413@linutronix.de> <20140828164645.GG16006@atomide.com>
- <53FF84DF.7080406@linutronix.de> <20140828225454.GM16006@atomide.com>
- <540048B4.7010807@linutronix.de> <20140829161221.GO16006@atomide.com>
- <5404B149.6010400@linutronix.de>
-Message-ID: <54060EDA.6060204@linutronix.de>
+From: lina.iyer@linaro.org (Lina Iyer)
+Date: Tue, 2 Sep 2014 12:43:05 -0600
+Subject: [PATCH v3 3/4] irq: Allow multiple clients to register for irq
+ affinity notification
+In-Reply-To: <alpine.DEB.2.10.1408272239190.3323@nanos>
+References: <1409170479-29955-1-git-send-email-lina.iyer@linaro.org>
+ <1409170479-29955-4-git-send-email-lina.iyer@linaro.org>
+ <alpine.DEB.2.10.1408272239190.3323@nanos>
+Message-ID: <20140902184305.GB91995@ilina-mac.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/01/2014 07:47 PM, Sebastian Andrzej Siewior wrote:
-> Comparing it with serial-omap I see the same thing: I takes approx the
-> same amount of data until the first one is displayed. After a lot of
-> "long" writes which wake the chip up from idle I manage to freeze both,
-> the serial-omap driver and mine driver.
+On Wed, Aug 27 2014 at 14:56 -0600, Thomas Gleixner wrote:
+>On Wed, 27 Aug 2014, Lina Iyer wrote:
+>
+>> PM QoS and other idle frameworks can do a better job of addressing power
+>> and performance requirements for a cpu, knowing the IRQs that are
+>> affine to that cpu. If a performance request is placed against serving
+>> the IRQ faster and if the IRQ is affine to a set of cpus, then setting
+>> the performance requirements only on those cpus help save power on the
+>> rest of the cpus. PM QoS framework is one such framework interested in
+>> knowing the smp_affinity of an IRQ and the change notificiation in this
+>> regard. QoS requests for the CPU_DMA_LATENCY constraint currently apply
+>> to all cpus, but when attached to an IRQ, can be applied only to the set
+>> of cpus that IRQ's smp_affinity is set to. This allows other cpus to
+>> enter deeper sleep states to save power. More than one framework/driver
+>> can be interested in such information.
+>
+>All you are describing is the fact, that there is only a single
+>notifier possible right now, but you completely miss to describe WHY
+>you need multiple ones.
+>
+>The existing notifier was introduced to tell the driver that the irq
+>affinity has changed, so it can move its buffers to the proper NUMA
+>node. So if that driver gets this information then it can tell the PM
+>QoS code that its affinity changed so that stuff can react
+>accordingly, right?
+>
+With the new PM QoS changes, multiple drivers would now be interested in
+knowing the smp_affinity changes of the same IRQ. PM QoS abstracts the
+notifier in the framework, so individual drivers dont have to register
+for notification themselves and handle affinity notifications. But PM
+QoS needs to coexist with NUMA and other arch drivers that need to
+modify based on their arch specific needs upon affinity change
+notifications.
+Modifying the IRQ notifications to list, benefits having a simpler
+mechanism to notify all arch drivers and frameworks like PM QoS.
 
-So after some testing:
-- it happens with omap-serial as well. Especially after disabling the
-  LED trigger for both LEDs.
 
-- it seemed that disabling the MDR1 check whether or not we lost
-  context made the problem appear less often but it was a trick. Even
-  with restoring the context each time I see the same problem.
-
-- it seems to be easier to trigger with the LED trigger switched off.
-  However sometimes it works for 10 minutes, sometimes it triggers
-  after one.
-
-- I see to face two kind of "deaths":
-  - the LED still goes on and off and the uart just does not respond
-    even if I tell the button print something on the screen (the button
-    also changes the frequency of the LED so I know that the button is
-    doing something).
-    Also from dumping the content of /proc/interrupts it seems that a
-    wake up is made, the uart should have restored the registers.
-
-  - one where the system is dead and the LED does not blink anymore.
-    Also my button is dead.
-
-- disabling DMA makes the problem not go away.
-
-- mdelay(25) in omap8250_lost_context() is long enough to drop the 403
-  bytes I send in my testcase. That means I see only "good" characters.
-  With this the box remained alive for 2h. However the uart died anyway.
-
->>
->> Regards,
->>
->> Tony
->>
-> 
-
-Sebastian
+>This is going nowhere unless you provide a proper usecase and
+>arguments why this is necessary. Handwaving and I want a pony
+>arguments are not sufficient.
+>
+>Thanks,
+>
+>	tglx
