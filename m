@@ -1,59 +1,104 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 2 Sep 2014 11:05:31 +0100
-Subject: [PATCH V2 4/6] arm64: Add DTS support for FSL's LS2085A SoC
-In-Reply-To: <78eaae039fd04eb58e1dac715968dd72@BN1PR03MB220.namprd03.prod.outlook.com>
-References: <1409219706-14843-1-git-send-email-bhupesh.sharma@freescale.com>
- <1409219706-14843-5-git-send-email-bhupesh.sharma@freescale.com>
- <20140828145635.GL14650@leverpostej>
- <18f8ee091e8847c0bcfba1ef04907a71@BN1PR03MB220.namprd03.prod.outlook.com>
- <20140829174757.GD18555@leverpostej>
- <78eaae039fd04eb58e1dac715968dd72@BN1PR03MB220.namprd03.prod.outlook.com>
-Message-ID: <20140902100531.GB25092@arm.com>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Tue, 02 Sep 2014 11:06:30 +0100
+Subject: [RFC PATCH 1/1] drivers: introduce ARM SBSA generic UART driver
+In-Reply-To: <CAL_JsqJbAWRhduzMwdQMh8sDdVqTWVK2Ej9LQjx4gp2ifwxe6Q@mail.gmail.com>
+References: <1409328803-1953-1-git-send-email-andre.przywara@arm.com>
+ <1409328803-1953-2-git-send-email-andre.przywara@arm.com>
+ <CAL_JsqJbAWRhduzMwdQMh8sDdVqTWVK2Ej9LQjx4gp2ifwxe6Q@mail.gmail.com>
+Message-ID: <540596A6.8000608@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 29, 2014 at 07:07:40PM +0100, bhupesh.sharma at freescale.com wrote:
-> > > > > +	memory at 80000000 {
-> > > > > +		device_type = "memory";
-> > > > > +		reg = <0x00000000 0x80000000 0 0x80000000>;
-> > > > > +		      /* DRAM space 1 - 2 GB DRAM */
-> > > > > +	};
-> > > >
-> > > > Does that mean:
-> > > >
-> > > >  - This is "DRAM space 1", populated with 2GB?
-> > > >
-> > > > Or:
-> > > >
-> > > >  - The DRAM space can be populated with 1 to 2 GB?
-> > > >
-> > > > If the former, s/ - /: / for clarity.
-> > > >
-> > > > If the latter, it might make sense to move that into board-specific
-> > > > dts files. If this can be dynamically populated ideally the
-> > > > firmware/loader would fix this up (assuming it can probe the memory).
-> > >
-> > > If the former. I will fix it up in v3.
-> > 
-> > Ok. Out of curiosity, are there other DRAM spaces that might be
-> > populated?
+Hi Rob,
+
+thanks for looking at this.
+
+On 02/09/14 04:06, Rob Herring wrote:
+> On Fri, Aug 29, 2014 at 11:13 AM, Andre Przywara <andre.przywara@arm.com> wrote:
+>> The ARM Server Base System Architecture (SBSA) describes a generic
+>> UART which all compliant level 1 systems should implement. This is
+>> actually a PL011 subset, so a full PL011 implementation will satisfy
+>> this requirement.
+>> However if a system does not have a PL011, a very stripped down
+>> implementation complying to the SBSA defined specification will
+>> suffice. The Linux PL011 driver is not guaranteed to drive this
+>> limited device (and indeed the fast model implentation hangs the
+>> kernel if driven by the PL011 driver).
+>> So introduce a new driver just implementing the part specified by the
+>> SBSA (which lacks DMA, the modem control signals and many of the
+>> registers including baud rate control). This driver has been derived
+>> by the actual PL011 one, removing all unnecessary code.
+>>
+>> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+>> ---
+>>  .../devicetree/bindings/serial/arm_sbsa_uart.txt   |    6 +
+>>  drivers/tty/serial/Kconfig                         |   28 +
+>>  drivers/tty/serial/Makefile                        |    1 +
+>>  drivers/tty/serial/sbsa_uart.c                     |  793 ++++++++++++++++++++
+>>  include/uapi/linux/serial_core.h                   |    1 +
 > 
-> Yes there is another DRAM space. The 1st one is accessible within 32 bits and
-> the 2nd one is accessible from 40-bit and above. However, I was waiting
-> for the 4-level ARM64 page table patches (from Catalin) to get absorbed, as w/o the
-> same we can access only a 39-bit PA and hence can have only 3-level page table limited
-> to the 1st DRAM region (which is accessible via first 32 bits).
+> Sorry, but I think this is all wrong. We've now just duplicated some
+> subset of the pl011 driver leaving out the parts like setting baudrate
+> which can never be added since those things could be different for
+> every vendor.
 > 
-> Any idea, about the latest state of Catalin's patch ([1])? Has it made to linux-next?
+> The original intent of the SBSA uart was to provide a common early
+> debug uart. It was not to have a full fledged driver. I think the SBSA
+> has failed in this area and created the potential to create a mess of
+> serial drivers different for every vendor. Reality will hopefully not
+> be that extreme and most vendors will just use the pl011 and create
+> their value add somewhere besides the uart. For the purpose of debug
+> output, we already support that as the pl011 earlycon only touches
+> SBSA compatible registers.
 
-The 48-bit VA support is in mainline but you wouldn't be able to enable
-it because KVM is still broken. Hopefully it will make it to 3.18-rc1.
+I see your point (and was actually looking for those kind of comments
+when posting this).
+I agree to that debug aspect and understand that earlycon already does
+this, but I think we need some support beyond earlycon, to be able to
+login and use it as a console (which is not possible with earlycon,
+right?) This is probably still for debugging or emergency access to the
+system only, but maybe also for logging - actually quite similar to how
+UARTs are used on today's x86 servers.
+So after having written three incarnations of this driver (goldfish
+based, PL010 based, PL011 based) I wonder if supporting the SBSA subset
+in the real PL011 driver is an option. Either this would be enabled by a
+new explicit DT property or preferably by a clever compatible string.
+Ideally we would just provide a different set of "struct uart_ops"
+members, with some pointing to generic PL011 routines, some to SBSA UART
+specific ones.
+Maybe we make the full featured PL011 support a config option
+(defaulting to y), allowing people to only use the SBSA subset in their
+kernel?
 
-But here we are talking about 40-bit PA range which should be fine with
-3 levels of page tables. The only problem is if you want to idmap the
-memory beyond 40-bit (I don't know whether UEFI requires this but for
-kernel booting you wouldn't need it since the kernel image is in the
-lower part).
+Does that make more sense? (for a general SBSA h/w rationale see below)
 
--- 
-Catalin
+>>  5 files changed, 829 insertions(+)
+>>  create mode 100644 Documentation/devicetree/bindings/serial/arm_sbsa_uart.txt
+>>  create mode 100644 drivers/tty/serial/sbsa_uart.c
+>>
+>> diff --git a/Documentation/devicetree/bindings/serial/arm_sbsa_uart.txt b/Documentation/devicetree/bindings/serial/arm_sbsa_uart.txt
+>> new file mode 100644
+>> index 0000000..8e2c5d6
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/serial/arm_sbsa_uart.txt
+>> @@ -0,0 +1,6 @@
+>> +* ARM SBSA defined generic UART
+>> +
+>> +Required properties:
+>> +- compatible: must be "arm,sbsa-uart"
+> 
+> This alone is not okay. There is no such implementation of hardware.
+
+But the SBSA explicitly allows this. I don't know of any vendor who just
+implements the subset, but I've been told that this has been asked for.
+
+> The DT must specify the implementation such as pl011.
+
+If it is a full featured PL011: sure. Then we don't need this driver at
+all and just use the SBSA UART spec as a guideline for our earlycon
+implementation.
+I will try to learn if there is someone actually implementing only the
+subset.
+
+Cheers,
+Andre.
