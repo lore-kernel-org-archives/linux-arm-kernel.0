@@ -1,83 +1,38 @@
-From: vincent.guittot@linaro.org (Vincent Guittot)
-Date: Wed, 3 Sep 2014 14:49:32 +0200
-Subject: [PATCH v5 08/12] sched: move cfs task on a CPU with higher
- capacity
-In-Reply-To: <540708DC.9060901@linux.vnet.ibm.com>
-References: <1409051215-16788-1-git-send-email-vincent.guittot@linaro.org>
- <1409051215-16788-9-git-send-email-vincent.guittot@linaro.org>
- <54020F00.2030807@linux.vnet.ibm.com>
- <CAKfTPtBq89SX=7=bXu2za7oXi1Lid_5ara-WputrtE8kCqcZcw@mail.gmail.com>
- <5406DB43.1030506@linux.vnet.ibm.com>
- <CAKfTPtCXBYSbXVgdeyMtvuK8aZaRBzhs9S3=+V2jvXnoCJFqBQ@mail.gmail.com>
- <540708DC.9060901@linux.vnet.ibm.com>
-Message-ID: <CAKfTPtDH5-7cW8=x-wooSn9Vui28h-KP6ACX1CefxHZHf=XHHQ@mail.gmail.com>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Tue, 02 Sep 2014 16:52:49 -0700
+Subject: [PATCH] clk: qcom: Fix sdc 144kHz frequency entry
+In-Reply-To: <54063E2B.6090403@codeaurora.org>
+References: <1409341766-24366-1-git-send-email-sboyd@codeaurora.org>
+ <20140902214402.5251.75274@quantum> <54063E2B.6090403@codeaurora.org>
+Message-ID: <20140902235249.5251.32238@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 3 September 2014 14:26, Preeti U Murthy <preeti@linux.vnet.ibm.com> wrote:
-> On 09/03/2014 05:14 PM, Vincent Guittot wrote:
->> On 3 September 2014 11:11, Preeti U Murthy <preeti@linux.vnet.ibm.com> wrote:
->>> On 09/01/2014 02:15 PM, Vincent Guittot wrote:
+Quoting Stephen Boyd (2014-09-02 15:01:15)
+> On 09/02/14 14:44, Mike Turquette wrote:
+> > Quoting Stephen Boyd (2014-08-29 12:49:26)
+> >> The pre-divider for the sdc clocks only has 2 bits in it, so we
+> >> can't possibly divide by anything larger than 4 here.
+> >> Furthermore, we program the value of ~(n - m) and the n value is
+> >> larger than 8 bits (max of 256). Replace this entry with 200kHz
+> >> which is close enough to 144kHz to be usable.
+> >>
+> >> Cc: Kumar Gala <galak@codeaurora.org>
+> >> Cc: Andy Gross <agross@codeaurora.org>
+> >> Fixes: 24d8fba44af3 "clk: qcom: Add support for IPQ8064's global clock controller (GCC)"
+> >> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+> > Do you need this pulled into a 3.17-rc?
+> >
+> 
+> Yes that would be helpful since this fixes a driver introduced into 3.17.
 
-[snip]
+Applied to clk-fixes.
 
->>>
->>> Ok I understand your explanation above. But I was wondering if you would
->>> need to add this check around rq->cfs.h_nr_running >= 1 in the above two
->>> cases as well.
->>
->> yes you're right for the test if (rq->nr_running >= 2).
->>
->> It's not so straight forward for nr_busy_cpus which reflects how many
->> CPUs have not stopped their tick. The scheduler assumes that the
->> latter are busy with cfs tasks
->>
->>>
->>> I have actually raised this concern over whether we should be using
->>> rq->nr_running or cfs_rq->nr_running while we do load balancing in reply
->>> to your patch3. While all our load measurements are about the cfs_rq
->>
->> I have just replied to your comments on patch 3. Sorry for the delay
->>
->>> load, we use rq->nr_running, which may include tasks from other sched
->>> classes as well. We divide them to get average load per task during load
->>> balancing which is wrong, isn't it? Similarly during nohz_kick_needed(),
->>> we trigger load balancing based on rq->nr_running again.
->>>
->>> In this patch too, even if you know that the cpu is being dominated by
->>> tasks that do not belong to cfs class, you would be triggering a futile
->>> load balance if there are no fair tasks to move.
->> This patch adds one additional condition that is based on
->> rq->cfs.h_nr_running so it should not trigger any futile load balance.
->> Then, I have also take advantage of this patch to clean up
->> nohz_kick_needed as proposed by Peter but the conditions are the same
->> than previously (except the one with rq->cfs.h_nr_running)
->>
->> I can prepare another patchset that will solve the concerns that you
->> raised for nohz_kick_needed and in patch 3 but i would prefer not
->> include them in this patchset which is large enough and which subject
->> is a bit different.
->> Does it seem ok for you ?
->
-> Sure Vincent, thanks! I have in fact sent out a mail raising my concern
-> over rq->nr_running. If others agree on the issue to be existing, maybe
-> we can work on this next patchset that can clean this up in all places
-> necessary and not just in nohz_kick_needed().
+Thanks,
+Mike
 
-Ok, let continue this discussion on the other thread
-
-Regards,
-Vincent
-
->
-> Regards
-> Preeti U Murthy
->>
->> Regards,
->> Vincent
->>>
->>> Regards
->>> Preeti U Murthy
->>>
->>
->
+> 
+> -- 
+> Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+> hosted by The Linux Foundation
+> 
