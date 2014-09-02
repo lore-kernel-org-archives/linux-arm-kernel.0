@@ -1,87 +1,61 @@
-From: pankaj.dubey@samsung.com (Pankaj Dubey)
-Date: Tue, 02 Sep 2014 14:02:48 +0530
-Subject: [PATCH] mfd: syscon: Decouple syscon interface from syscon devices
-In-Reply-To: <3109076.4UMHArqVbl@wuerfel>
-References: <1408694991-21615-1-git-send-email-pankaj.dubey@samsung.com>
- <3343901.7HpqcTBEp1@wuerfel> <20140902080516.GE17117@lee--X1>
- <3109076.4UMHArqVbl@wuerfel>
-Message-ID: <001401cfc688$85c07bf0$914173d0$@samsung.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 2 Sep 2014 09:31:39 +0100
+Subject: [RFC PATCH 0/7] Introduce automatic DMA configuration for IOMMU
+ masters
+In-Reply-To: <540562F9.2030508@samsung.com>
+References: <1409327670-3495-1-git-send-email-will.deacon@arm.com>
+ <540562F9.2030508@samsung.com>
+Message-ID: <20140902083138.GA25379@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tue, Sep 02, 2014 at 07:26:01AM +0100, Marek Szyprowski wrote:
+> Hi Will,
 
+Hi Marek,
 
-> -----Original Message-----
-> From: Arnd Bergmann [mailto:arnd at arndb.de]
-> Sent: Tuesday, September 02, 2014 1:45 PM
-> To: linux-arm-kernel at lists.infradead.org
-> Cc: Lee Jones; kgene.kim at samsung.com; linux at arm.linux.org.uk;
-> naushad at samsung.com; Pankaj Dubey; Tomasz Figa;
-linux-kernel at vger.kernel.org;
-> joshi at samsung.com; vikas.sajjan at samsung.com; linux-samsung-
-> soc at vger.kernel.org; broonie at kernel.org; thomas.ab at samsung.com;
-> chow.kim at samsung.com
-> Subject: Re: [PATCH] mfd: syscon: Decouple syscon interface from syscon
-devices
-> 
-> On Tuesday 02 September 2014 09:05:16 Lee Jones wrote:
-> > On Mon, 01 Sep 2014, Arnd Bergmann wrote:
+> On 2014-08-29 17:54, Will Deacon wrote:
+> > This patch series is an RFC to implement IOMMU master configuration into
+> > of_dma_configure. I haven't yet ported any IOMMU drivers to it, so it
+> > remains untested, but I wanted to get some early feedback to ensure that
+> > this doesn't end up going in the wrong direction.
 > >
-> > > On Monday 01 September 2014 17:04:26 Lee Jones wrote:
-> > > > On Mon, 01 Sep 2014, Arnd Bergmann wrote:
-> > > > > Maybe I'm misreading the patch, but I don't see how it creates a
-> > > > > migration path. What I want to end up with is infrastructure
-> > > > > that lets anybody call syscon_regmap_lookup_by_pdevname or
-> > > > > syscon_regmap_lookup_by_compatible (if they really need to)
-> > > > > without needing the platform_driver for syscon. That should not
-> > > > > require any form of compatibility layer because to the driver
-> > > > > using it there is no API change.
-> > > >
-> > > > Somehow I think the likelyhood is that I am misreading the patch.
-> > > >
-> > > > I thought that before this patch drivers we had to register a
-> > > > syscon device to bind to this driver, which was fine for the first
-> > > > use-cases of syscon as it wasn't required too early during boot.
-> > > > However, now there are use-cases where systems require access to
-> > > > syscon registers eariler in boot we require a means to obtain
-> > > > access prior to device probing.  I thought this patch not only
-> > > > provides that possibilty, but also leaves in the ability to register
-direct from
-> DT.
-> > >
-> > > Right, it does provide the ability to have syscon before devices are
-> > > registered, I missed that part.
-> > >
-> > > > > In contrast, this patch introduces a new
-> > > > > of_syscon_{un,}register() interface that would get removed after
-> > > > > the the above has been implemented, causing extra churn for any
-> > > > > driver that also wants to provide a regmap-like interface.
-> > > >
-> > > > When will we ever not have to register syscon?
-> > >
-> > > The idea is that we implicitly register the syscon block when
-> > > someone calls syscon_regmap_lookup_by_compatible or
-> > > syscon_regmap_lookup_by_phandle and then return a reference to that
-> > > new syscon. When another driver looks up the same device node, we
-> > > just pass a reference to the existing syscon.
+> > The idea comes out of my understanding following discussions with Arnd
+> > and David at Kernel Summit / LinuxCon in Chicago. Essentially:
 > >
-> > Doesn't sound too unreasonable.  So how about instead of exporting
-> > these new of_syscon_{un,}register() calls, we make them static and
-> > call them from syscon_regmap_lookup_by_{phandle,compatible}?
+> >    - Allow IOMMUs to be probed early and set up per-instance data on their
+> >      of_node
+> >
+> >    - Add a new callback to the iommu_ops structure for adding a device
+> >      with a set of opaque IDs (e.g. Stream IDs or Requester IDs)
+> >
+> >    - Add an of_iommu_configure function, called from of_dma_configure,
+> >      which registers the master IDs with the correspond IOMMU before
+> >      probing the master itself
+> >
+> >    - Where applicable, create an IOMMU domain per device and swizzle the
+> >      DMA ops for that device to use the IOMMU variants.
+> >
+> > I haven't bothered doing anything clever with the DMA masks yet, so I
+> > wouldn't be surprised if we end up chewing through tonnes of memory
+> > allocating IOMMU domains that are far too big at the moment. Again, this
+> > is just an RFC and I'd welcome comments on the general direction of the
+> > series.
 > 
-> Yes, that would be a good start. We should think about whether we want to
-remove
-> the existing DT probing at the same time, since it becomes unused, and we
-might
-> want to move the code to drivers/base/regmap_*.c at some point.
-> 
+> Thanks for your patches, I wasn't aware the fact that you are working on
+> this. When do you plan to send a second version? I would like to rebase
+> my Exynos IOMMU patches (https://lkml.org/lkml/2014/8/5/183) on top of
+> your work, but I wonder if I should select this version as a base or wait
+> a bit for an update.
 
+I'll try and get something out today/tomorrow depending on how easily the
+review comments fall out. It would be really great if you get an IOMMU
+working with this (I was going to look at the ARM SMMU once this stops
+moving) -- I have concerns that allocating one domain per master might be
+too much, but it's hard to tell without an IOMMU driver ported over.
 
-OK, I am working on these two parts. Once code is in proper form and tested
-on
-our setup I will post here.
+I'll CC you on v2.
 
-Thanks,
-Pankaj
+Cheers,
 
-> 	Arnd
+Will
