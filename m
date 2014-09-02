@@ -1,41 +1,30 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Wed, 03 Sep 2014 00:50:26 +0300
-Subject: [RFC PATCH 0/7] Introduce automatic DMA configuration for IOMMU
- masters
-In-Reply-To: <3133975.8bg0CLVMMz@wuerfel>
-References: <1409327670-3495-1-git-send-email-will.deacon@arm.com>
- <5405B6F2.1060105@samsung.com> <3133975.8bg0CLVMMz@wuerfel>
-Message-ID: <1804700.tdyjJcKU9T@avalon>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Tue, 02 Sep 2014 15:01:15 -0700
+Subject: [PATCH] clk: qcom: Fix sdc 144kHz frequency entry
+In-Reply-To: <20140902214402.5251.75274@quantum>
+References: <1409341766-24366-1-git-send-email-sboyd@codeaurora.org>
+ <20140902214402.5251.75274@quantum>
+Message-ID: <54063E2B.6090403@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 02 September 2014 14:43:18 Arnd Bergmann wrote:
-> On Tuesday 02 September 2014 14:24:18 Marek Szyprowski wrote:
-> > >>> For isolation purposes, it can only help to have more domains, but
-> > >>> I would guess that there is some space overhead in maintaining lots
-> > >>> of page tables.
-> > >> 
-> > >> I'm okay with both approaches (separate domain for each device vs.
-> > >> single common domain for all devices). Maybe this can be some kind of
-> > >> Kconfig option added to DMA debugging? Separation might be really
-> > >> helpful when debugging strange device behavior.
-> > > 
-> > > One potential problem with a single domain is when you have multiple
-> > > instances of a given IOMMU, each with different hardware restrictions.
-> > > Then you can end up with multiple sets of page tables for the domain
-> > > which, although not impossible to work with, is a bit of a mess.
-> > 
-> > Maybe the default dma-mapping domain should be one per a given IOMMU
-> > instance? This will simplify a lot of things in such case.
-> 
-> Yes, that sounds like a good idea.
+On 09/02/14 14:44, Mike Turquette wrote:
+> Quoting Stephen Boyd (2014-08-29 12:49:26)
+>> The pre-divider for the sdc clocks only has 2 bits in it, so we
+>> can't possibly divide by anything larger than 4 here.
+>> Furthermore, we program the value of ~(n - m) and the n value is
+>> larger than 8 bits (max of 256). Replace this entry with 200kHz
+>> which is close enough to 144kHz to be usable.
+>>
+>> Cc: Kumar Gala <galak@codeaurora.org>
+>> Cc: Andy Gross <agross@codeaurora.org>
+>> Fixes: 24d8fba44af3 "clk: qcom: Add support for IPQ8064's global clock controller (GCC)"
+>> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+> Do you need this pulled into a 3.17-rc?
+>
 
-That would work as a default configuration for the Renesas IPMMU IOMMU, which 
-supports four TLBs to be shared between more than four bus masters. Ideally 
-I'd like to make the bus master to TLB association somehow configurable, but 
-associating all bus masters with a single TLB as a first step is fine.
+Yes that would be helpful since this fixes a driver introduced into 3.17.
 
 -- 
-Regards,
-
-Laurent Pinchart
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
