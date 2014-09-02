@@ -1,30 +1,25 @@
-From: bjorn.andersson@sonymobile.com (Bjorn Andersson)
-Date: Tue, 2 Sep 2014 10:06:16 -0700
-Subject: [PATCH v3 4/4] pinctrl: qcom: Add support for reset for apq8064
-In-Reply-To: <CACRpkdbnkgb2YOKAPTFSaDhj7OMbfF+14_PeDch5mFLwjOANEw@mail.gmail.com>
-References: <1409322659-17693-1-git-send-email-pramod.gurav@smartplayin.com>
- <1409322659-17693-5-git-send-email-pramod.gurav@smartplayin.com>
- <CACRpkdbnkgb2YOKAPTFSaDhj7OMbfF+14_PeDch5mFLwjOANEw@mail.gmail.com>
-Message-ID: <20140902170615.GO12494@sonymobile.com>
+From: ijc@hellion.org.uk (Ian Campbell)
+Date: Tue, 02 Sep 2014 18:06:44 +0100
+Subject: Autoloading of SPI/nor driver on kirkwood (qnap devices)
+In-Reply-To: <1409673299.14324.43.camel@dagon.hellion.org.uk>
+References: <1409673299.14324.43.camel@dagon.hellion.org.uk>
+Message-ID: <1409677604.14324.49.camel@dagon.hellion.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue 02 Sep 05:36 PDT 2014, Linus Walleij wrote:
+On Tue, 2014-09-02 at 16:54 +0100, Ian Campbell wrote:
+> I could set these things to =m for the Debian kirkwood flavour, but
+> since this is supposed to be a distro-style kernel.
 
-> A bit dirty to have this in this driver, but who cares.
-> 
+(Oops, I somehow failed to insert "I would prefer not to" somewhere in
+that sentence.)
 
-Indeed, but we figured the taint was small enough to justify not creating
-cross-references to a separate driver.
+But, looking at the Debian config a bit closer it seems like all this
+stuff was previously =y for the kirkwood config and it's just that
+things were refactored to add MTD_SPI_NOR. So I went with =y for that
+too.
 
-> Does the APQ8064 accompanying PMIC also have the ability to
-> completely shut the system down?
-> 
+Still, it would be nice (tm) if these things would autoload when
+modular.
 
-Upon flipping pshold the PMIC will perform either a reset or a shutdown of the
-system. Per Stephen's suggestion we can hook the control of this up with a
-reboot_notifier in a pmic driver, hence saving ourselves of a reference to (or
-from) the PMIC here.
-
-Regards,
-Bjorn
+Ian.
