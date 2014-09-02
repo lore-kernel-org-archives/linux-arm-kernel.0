@@ -1,63 +1,109 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Tue, 02 Sep 2014 12:42:13 +0200
-Subject: [RFC PATCH 0/7] Introduce automatic DMA configuration for IOMMU
- masters
-In-Reply-To: <33373396.gPTVFGBBxa@wuerfel>
-References: <1409327670-3495-1-git-send-email-will.deacon@arm.com>
- <20140902083138.GA25379@arm.com> <54058442.2070204@samsung.com>
- <33373396.gPTVFGBBxa@wuerfel>
-Message-ID: <54059F05.2090901@samsung.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 2 Sep 2014 11:46:55 +0100
+Subject: [RFC PATCH 1/1] drivers: introduce ARM SBSA generic UART driver
+In-Reply-To: <540596A6.8000608@arm.com>
+References: <1409328803-1953-1-git-send-email-andre.przywara@arm.com>
+ <1409328803-1953-2-git-send-email-andre.przywara@arm.com>
+ <CAL_JsqJbAWRhduzMwdQMh8sDdVqTWVK2Ej9LQjx4gp2ifwxe6Q@mail.gmail.com>
+ <540596A6.8000608@arm.com>
+Message-ID: <20140902104654.GB6725@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+On Tue, Sep 02, 2014 at 11:06:30AM +0100, Andre Przywara wrote:
+> Hi Rob,
+> 
+> thanks for looking at this.
+> 
+> On 02/09/14 04:06, Rob Herring wrote:
+> > On Fri, Aug 29, 2014 at 11:13 AM, Andre Przywara <andre.przywara@arm.com> wrote:
+> >> The ARM Server Base System Architecture (SBSA) describes a generic
+> >> UART which all compliant level 1 systems should implement. This is
+> >> actually a PL011 subset, so a full PL011 implementation will satisfy
+> >> this requirement.
+> >> However if a system does not have a PL011, a very stripped down
+> >> implementation complying to the SBSA defined specification will
+> >> suffice. The Linux PL011 driver is not guaranteed to drive this
+> >> limited device (and indeed the fast model implentation hangs the
+> >> kernel if driven by the PL011 driver).
+> >> So introduce a new driver just implementing the part specified by the
+> >> SBSA (which lacks DMA, the modem control signals and many of the
+> >> registers including baud rate control). This driver has been derived
+> >> by the actual PL011 one, removing all unnecessary code.
+> >>
+> >> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+> >> ---
+> >>  .../devicetree/bindings/serial/arm_sbsa_uart.txt   |    6 +
+> >>  drivers/tty/serial/Kconfig                         |   28 +
+> >>  drivers/tty/serial/Makefile                        |    1 +
+> >>  drivers/tty/serial/sbsa_uart.c                     |  793 ++++++++++++++++++++
+> >>  include/uapi/linux/serial_core.h                   |    1 +
+> > 
+> > Sorry, but I think this is all wrong. We've now just duplicated some
+> > subset of the pl011 driver leaving out the parts like setting baudrate
+> > which can never be added since those things could be different for
+> > every vendor.
+> > 
+> > The original intent of the SBSA uart was to provide a common early
+> > debug uart. It was not to have a full fledged driver. I think the SBSA
+> > has failed in this area and created the potential to create a mess of
+> > serial drivers different for every vendor. Reality will hopefully not
+> > be that extreme and most vendors will just use the pl011 and create
+> > their value add somewhere besides the uart. For the purpose of debug
+> > output, we already support that as the pl011 earlycon only touches
+> > SBSA compatible registers.
 
-On 2014-09-02 10:56, Arnd Bergmann wrote:
-> On Tuesday 02 September 2014 10:48:02 Marek Szyprowski wrote:
->>>    -- I have concerns that allocating one domain per master might be
->>> too much, but it's hard to tell without an IOMMU driver ported over.
->> One domain per master is IMHO a sane default configuration. The only default
->> alternative I see is to have only one domain (related with dma-mapping
->> subsystem) and bind all devices to it. However I really don't see any
->> disadvantage of having separate domain per each master and such
->> configuration
->> gives devices better separation.
-> I was expecting that the dma-mapping implementation would by default use
-> one domain for all devices, since that is what the simpler IOMMUs without
-> domain support have to do anyway.
->
-> For isolation purposes, it can only help to have more domains, but
-> I would guess that there is some space overhead in maintaining lots
-> of page tables.
+I agree that we don't want a proliferation of not-quite-pl011 devices
+that we end up having to drive differently.
 
-I'm okay with both approaches (separate domain for each device vs. single
-common domain for all devices). Maybe this can be some kind of Kconfig
-option added to DMA debugging? Separation might be really helpful when
-debugging strange device behavior.
+If we do have such devices I wouldn't want to call them a pl011s for the
+sake of earlycon if they aren't actually pl011s.
 
->> However we also need to figure out how to let drivers to make their own
->> configuration, like it is required by Exynos DRM subsystem, which consist
->> of several devices, each having its own IOMMU controller, but for
->> convenience those drivers assume that they all have been bound to the same,
->> single domain.
-> IIRC with the way we ended up putting the mask into the iommu descriptor of
-> the ARM SMMU, you can put multiple devices into the same iommu group, and
-> have them automatically share a domain.
->
-> I don't know if the same would work for the Samsung implementation.
+> I see your point (and was actually looking for those kind of comments
+> when posting this).
+> I agree to that debug aspect and understand that earlycon already does
+> this, but I think we need some support beyond earlycon, to be able to
+> login and use it as a console (which is not possible with earlycon,
+> right?) This is probably still for debugging or emergency access to the
+> system only, but maybe also for logging - actually quite similar to how
+> UARTs are used on today's x86 servers.
+> So after having written three incarnations of this driver (goldfish
+> based, PL010 based, PL011 based) I wonder if supporting the SBSA subset
+> in the real PL011 driver is an option. Either this would be enabled by a
+> new explicit DT property or preferably by a clever compatible string.
+> Ideally we would just provide a different set of "struct uart_ops"
+> members, with some pointing to generic PL011 routines, some to SBSA UART
+> specific ones.
+> Maybe we make the full featured PL011 support a config option
+> (defaulting to y), allowing people to only use the SBSA subset in their
+> kernel?
+> 
+> Does that make more sense? (for a general SBSA h/w rationale see below)
+> 
+> >>  5 files changed, 829 insertions(+)
+> >>  create mode 100644 Documentation/devicetree/bindings/serial/arm_sbsa_uart.txt
+> >>  create mode 100644 drivers/tty/serial/sbsa_uart.c
+> >>
+> >> diff --git a/Documentation/devicetree/bindings/serial/arm_sbsa_uart.txt b/Documentation/devicetree/bindings/serial/arm_sbsa_uart.txt
+> >> new file mode 100644
+> >> index 0000000..8e2c5d6
+> >> --- /dev/null
+> >> +++ b/Documentation/devicetree/bindings/serial/arm_sbsa_uart.txt
+> >> @@ -0,0 +1,6 @@
+> >> +* ARM SBSA defined generic UART
+> >> +
+> >> +Required properties:
+> >> +- compatible: must be "arm,sbsa-uart"
+> > 
+> > This alone is not okay. There is no such implementation of hardware.
 
-The question is how to transfer such information from the device 
-drivers, that
-need/benefit from such configuration to iommu driver, which does all the 
-setup?
-This is something completely internal to particular drivers and should 
-not be
-exported to device tree or userspace. Thierry suggested to hardcode this
-information in the iommu driver, but I'm looking for other approaches.
-Maybe simply releasing device from the default dma-mapping domain before
-attaching to custom one will be the easiest solution.
+Do you want something like:
 
-Best regards
--- 
-Marek Szyprowski, PhD
-Samsung R&D Institute Poland
+- compatible: must contain an "arm,sbsa-uart" following a more specific
+  entry from the following list:
+
+  * "arm,pl011"
+
+Or do we need to restructure the pl011 docs entirely?
+
+Mark.
