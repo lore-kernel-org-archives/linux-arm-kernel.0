@@ -1,49 +1,141 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Tue, 02 Sep 2014 16:50:05 +0200
-Subject: [PATCH v2] mfd: syscon: Decouple syscon interface from platform
- devices
-In-Reply-To: <1409668935-10667-1-git-send-email-pankaj.dubey@samsung.com>
-References: <1409668935-10667-1-git-send-email-pankaj.dubey@samsung.com>
-Message-ID: <5405D91D.7020108@gmail.com>
+From: Varun.Sethi@freescale.com (Varun Sethi)
+Date: Tue, 2 Sep 2014 14:55:57 +0000
+Subject: [RFC PATCH 4/7] iommu: provide helper function to configure an
+ IOMMU for an of master
+In-Reply-To: <1409327670-3495-5-git-send-email-will.deacon@arm.com>
+References: <1409327670-3495-1-git-send-email-will.deacon@arm.com>
+ <1409327670-3495-5-git-send-email-will.deacon@arm.com>
+Message-ID: <c34cea0c3e924d23998ad8e5a4039db1@BL2PR03MB468.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02.09.2014 16:42, Pankaj Dubey wrote:
-> Currently a syscon entity can only be registered directly through a
-> platform device that binds to a dedicated syscon driver. However in
-> certain cases it is required to bind a device with it's dedicated
-> driver rather than binding with syscon driver.
+Hi Will,
+I am not clear on the functionality we want to achieve with this new API. Is this a way to link devices to a particular IOMMU? Would this be used to filter out add_device invocations i.e. iommu group creations just  for the devices attached to a particular IOMMU?
+
+What is the purpose of the data pointer, that is being passed to this API? Also, how would this be relevant to PCIe devices (also other hot plug devices).
+
+Regards
+Varun
+
+> -----Original Message-----
+> From: Will Deacon [mailto:will.deacon at arm.com]
+> Sent: Friday, August 29, 2014 9:24 PM
+> To: linux-arm-kernel at lists.infradead.org; iommu at lists.linux-foundation.org
+> Cc: arnd at arndb.de; dwmw2 at infradead.org; jroedel at suse.de;
+> hdoyu at nvidia.com; Sethi Varun-B16395; thierry.reding at gmail.com;
+> laurent.pinchart at ideasonboard.com; Will Deacon
+> Subject: [RFC PATCH 4/7] iommu: provide helper function to configure an
+> IOMMU for an of master
 > 
-> For example, certain SoCs (e.g. Exynos) contain system controller
-> blocks which perform various functions such as power domain control,
-> CPU power management, low power mode control, but in addition contain
-> certain IP integration glue, such as various signal masks,
-> coprocessor power control, etc. In such case, there is a need to have
-> a dedicated driver for such system controller but also share registers
-> with other drivers. The latter is where the syscon interface is helpful.
+> The generic IOMMU device-tree bindings can be used to add arbitrary OF
+> masters to an IOMMU with a compliant binding.
 > 
-> This patch decouples syscon object from syscon platform driver, and
-> allows to create syscon objects first time when it is required by
-> calling of syscon_regmap_lookup_by APIs and keeps a list of such syscon
-> objects along with syscon provider device_nodes and regmap handles.
+> This patch introduces of_iommu_configure, which does exactly that.
 > 
-> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
-> Signed-off-by: Tomasz Figa <t.figa@samsung.com>
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
 > ---
-> V1 of this patchset [1] and related discussion can be found here [1].
->  
-> Changes since v1:
->  - Removed of_syscon_unregister function.
->  - Modified of_syscon_register function and it will be used by syscon.c 
->    to create syscon objects whenever required. 
->  - Removed platform device support from syscon.
->  - Removed syscon_regmap_lookup_by_pdevname API support.
->  - As there are significant changes w.r.t patchset v1, I am taking over
->    author for this patchset from Tomasz Figa.
-
-I guess you should also drop my Signed-off-by too. I think the best
-thing would replacing it with my Suggested-by and adding Arnd's
-Suggested-by too.
-
-Best regards,
-Tomasz
+>  drivers/iommu/Kconfig    |  2 +-
+>  drivers/iommu/of_iommu.c | 36
+> ++++++++++++++++++++++++++++++++++++
+>  include/linux/of_iommu.h |  6 ++++++
+>  3 files changed, 43 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/iommu/Kconfig b/drivers/iommu/Kconfig index
+> dd5112265cc9..6d13f962f156 100644
+> --- a/drivers/iommu/Kconfig
+> +++ b/drivers/iommu/Kconfig
+> @@ -15,7 +15,7 @@ if IOMMU_SUPPORT
+> 
+>  config OF_IOMMU
+>         def_bool y
+> -       depends on OF
+> +       depends on OF && IOMMU_API
+> 
+>  config FSL_PAMU
+>  	bool "Freescale IOMMU support"
+> diff --git a/drivers/iommu/of_iommu.c b/drivers/iommu/of_iommu.c index
+> f9209666157c..a7d3b3a13b83 100644
+> --- a/drivers/iommu/of_iommu.c
+> +++ b/drivers/iommu/of_iommu.c
+> @@ -19,6 +19,7 @@
+> 
+>  #include <linux/export.h>
+>  #include <linux/limits.h>
+> +#include <linux/iommu.h>
+>  #include <linux/of.h>
+>  #include <linux/of_iommu.h>
+> 
+> @@ -90,6 +91,41 @@ int of_get_dma_window(struct device_node *dn, const
+> char *prefix, int index,  }  EXPORT_SYMBOL_GPL(of_get_dma_window);
+> 
+> +int of_iommu_configure(struct device *dev) {
+> +	struct of_phandle_args iommu_spec;
+> +	struct bus_type *bus = dev->bus;
+> +	const struct iommu_ops *ops = bus->iommu_ops;
+> +	int ret = -EINVAL, idx = 0;
+> +
+> +	if (!iommu_present(bus))
+> +		return -ENODEV;
+> +
+> +	/*
+> +	 * We don't currently walk up the tree looking for a parent IOMMU.
+> +	 * See the `Notes:' section of
+> +	 * Documentation/devicetree/bindings/iommu/iommu.txt
+> +	 */
+> +	while (!of_parse_phandle_with_args(dev->of_node, "iommus",
+> +					   "#iommu-cells", idx,
+> +					   &iommu_spec)) {
+> +		void *data = of_iommu_get_data(iommu_spec.np);
+> +
+> +		of_node_put(iommu_spec.np);
+> +		if (!ops->add_device_master_ids)
+> +			return -ENODEV;
+> +
+> +		ret = ops->add_device_master_ids(dev,
+> iommu_spec.args_count,
+> +						 iommu_spec.args, data);
+> +		if (ret)
+> +			break;
+> +
+> +		idx++;
+> +	}
+> +
+> +	return ret;
+> +}
+> +
+>  void __init of_iommu_init(void)
+>  {
+>  	struct device_node *np;
+> diff --git a/include/linux/of_iommu.h b/include/linux/of_iommu.h index
+> 29f2f3f88d6a..85c6d1152624 100644
+> --- a/include/linux/of_iommu.h
+> +++ b/include/linux/of_iommu.h
+> @@ -1,6 +1,7 @@
+>  #ifndef __OF_IOMMU_H
+>  #define __OF_IOMMU_H
+> 
+> +#include <linux/device.h>
+>  #include <linux/of.h>
+> 
+>  #ifdef CONFIG_OF_IOMMU
+> @@ -10,6 +11,7 @@ extern int of_get_dma_window(struct device_node *dn,
+> const char *prefix,
+>  			     size_t *size);
+> 
+>  extern void of_iommu_init(void);
+> +extern int of_iommu_configure(struct device *dev);
+> 
+>  #else
+> 
+> @@ -21,6 +23,10 @@ static inline int of_get_dma_window(struct device_node
+> *dn, const char *prefix,  }
+> 
+>  static inline void of_iommu_init(void) { }
+> +static inline int of_iommu_configure(struct device *dev) {
+> +	return -ENODEV;
+> +}
+> 
+>  #endif	/* CONFIG_OF_IOMMU */
+> 
+> --
+> 2.1.0
