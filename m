@@ -1,68 +1,57 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 2 Sep 2014 09:34:00 +0100
-Subject: [PATCH] mfd: syscon: Decouple syscon interface from syscon devices
-In-Reply-To: <3109076.4UMHArqVbl@wuerfel>
-References: <1408694991-21615-1-git-send-email-pankaj.dubey@samsung.com>
- <3343901.7HpqcTBEp1@wuerfel> <20140902080516.GE17117@lee--X1>
- <3109076.4UMHArqVbl@wuerfel>
-Message-ID: <20140902083400.GF17117@lee--X1>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Tue, 2 Sep 2014 10:36:59 +0200
+Subject: [PATCH v2 06/12] ARM: at91: add MTD_SPI_NOR (new dependency for
+ M25P80)
+In-Reply-To: <1398925607-7482-7-git-send-email-computersforpeace@gmail.com>
+References: <1398925607-7482-1-git-send-email-computersforpeace@gmail.com>
+ <1398925607-7482-7-git-send-email-computersforpeace@gmail.com>
+Message-ID: <540581AB.6020101@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 02 Sep 2014, Arnd Bergmann wrote:
-
-> On Tuesday 02 September 2014 09:05:16 Lee Jones wrote:
-> > On Mon, 01 Sep 2014, Arnd Bergmann wrote:
-> > 
-> > > On Monday 01 September 2014 17:04:26 Lee Jones wrote:
-> > > > On Mon, 01 Sep 2014, Arnd Bergmann wrote:
-> > > > > Maybe I'm misreading the patch, but I don't see how it creates a
-> > > > > migration path. What I want to end up with is infrastructure that
-> > > > > lets anybody call syscon_regmap_lookup_by_pdevname or
-> > > > > syscon_regmap_lookup_by_compatible (if they really need to)
-> > > > > without needing the platform_driver for syscon. That should not
-> > > > > require any form of compatibility layer because to the driver
-> > > > > using it there is no API change.
-> > > > 
-> > > > Somehow I think the likelyhood is that I am misreading the patch.
-> > > > 
-> > > > I thought that before this patch drivers we had to register a syscon
-> > > > device to bind to this driver, which was fine for the first use-cases
-> > > > of syscon as it wasn't required too early during boot.  However, now
-> > > > there are use-cases where systems require access to syscon registers
-> > > > eariler in boot we require a means to obtain access prior to device
-> > > > probing.  I thought this patch not only provides that possibilty, but
-> > > > also leaves in the ability to register direct from DT.
-> > > 
-> > > Right, it does provide the ability to have syscon before devices
-> > > are registered, I missed that part.
-> > > 
-> > > > > In contrast, this patch introduces a new of_syscon_{un,}register()
-> > > > > interface that would get removed after the the above has
-> > > > > been implemented, causing extra churn for any driver that also
-> > > > > wants to provide a regmap-like interface.
-> > > > 
-> > > > When will we ever not have to register syscon?
-> > > 
-> > > The idea is that we implicitly register the syscon block when someone
-> > > calls syscon_regmap_lookup_by_compatible or syscon_regmap_lookup_by_phandle
-> > > and then return a reference to that new syscon. When another driver
-> > > looks up the same device node, we just pass a reference to the existing
-> > > syscon.
-> > 
-> > Doesn't sound too unreasonable.  So how about instead of exporting
-> > these new of_syscon_{un,}register() calls, we make them static and
-> > call them from syscon_regmap_lookup_by_{phandle,compatible}?
+On 01/05/2014 08:26, Brian Norris :
+> This defconfig contains the CONFIG_M25P80 symbol, which is now
+> dependent on the MTD_SPI_NOR symbol. Add CONFIG_MTD_SPI_NOR to satisfy
+> the new dependency.
 > 
-> Yes, that would be a good start. We should think about whether we want
-> to remove the existing DT probing at the same time, since it becomes
-> unused, and we might want to move the code to drivers/base/regmap_*.c
-> at some point
+> At the same time, drop the now-nonexistent CONFIG_MTD_CHAR symbol.
+> 
+> Signed-off-by: Brian Norris <computersforpeace@gmail.com>
+> Cc: Andrew Victor <linux@maxim.org.za>
+> Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
 
-I'd support that move - and can even draft the patch if required.
+Okay, now taken in at91-3.18-defconfig, thanks:
+
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+
+
+> Cc: Jean-Christophe Plagniol-Villard <plagnioj@jcrosoft.com>
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: linux-kernel at vger.kernel.org
+> ---
+>  arch/arm/configs/sama5_defconfig | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/configs/sama5_defconfig b/arch/arm/configs/sama5_defconfig
+> index dc3881e07630..8282ebab6e52 100644
+> --- a/arch/arm/configs/sama5_defconfig
+> +++ b/arch/arm/configs/sama5_defconfig
+> @@ -65,12 +65,12 @@ CONFIG_DEVTMPFS_MOUNT=y
+>  # CONFIG_PREVENT_FIRMWARE_BUILD is not set
+>  CONFIG_MTD=y
+>  CONFIG_MTD_CMDLINE_PARTS=y
+> -CONFIG_MTD_CHAR=y
+>  CONFIG_MTD_BLOCK=y
+>  CONFIG_MTD_CFI=y
+>  CONFIG_MTD_M25P80=y
+>  CONFIG_MTD_NAND=y
+>  CONFIG_MTD_NAND_ATMEL=y
+> +CONFIG_MTD_SPI_NOR=y
+>  CONFIG_MTD_UBI=y
+>  CONFIG_MTD_UBI_GLUEBI=y
+>  CONFIG_PROC_DEVICETREE=y
+> 
+
 
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Nicolas Ferre
