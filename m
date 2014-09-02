@@ -1,271 +1,315 @@
-From: paulmck@linux.vnet.ibm.com (Paul E. McKenney)
-Date: Tue, 2 Sep 2014 07:23:14 -0700
-Subject: [PATCH v10 03/19] arm: fiq: Replace default FIQ handler
-In-Reply-To: <5405AEBC.9020904@linaro.org>
-References: <1408369264-14242-1-git-send-email-daniel.thompson@linaro.org>
- <1408466769-20004-1-git-send-email-daniel.thompson@linaro.org>
- <1408466769-20004-4-git-send-email-daniel.thompson@linaro.org>
- <20140819173742.GG30401@n2100.arm.linux.org.uk>
- <53F39377.1070308@linaro.org>
- <20140828150112.GD30401@n2100.arm.linux.org.uk>
- <5405AEBC.9020904@linaro.org>
-Message-ID: <20140902142314.GX5001@linux.vnet.ibm.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Tue, 2 Sep 2014 09:34:38 -0500
+Subject: [PATCH v6 4/4] phy: exynos5-usbdrd: Calibrate LOS levels for
+ exynos5420/5800
+In-Reply-To: <1409656338-20337-5-git-send-email-gautam.vivek@samsung.com>
+References: <1409656338-20337-1-git-send-email-gautam.vivek@samsung.com>
+ <1409656338-20337-5-git-send-email-gautam.vivek@samsung.com>
+Message-ID: <20140902143438.GB16872@saruman.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 02, 2014 at 12:49:16PM +0100, Daniel Thompson wrote:
-> On 28/08/14 16:01, Russell King - ARM Linux wrote:
-> > On Tue, Aug 19, 2014 at 07:12:07PM +0100, Daniel Thompson wrote:
-> >> On 19/08/14 18:37, Russell King - ARM Linux wrote:
-> >>> On Tue, Aug 19, 2014 at 05:45:53PM +0100, Daniel Thompson wrote:
-> >>>> +int register_fiq_nmi_notifier(struct notifier_block *nb)
-> >>>> +{
-> >>>> +	return atomic_notifier_chain_register(&fiq_nmi_chain, nb);
-> >>>> +}
-> >>>> +
-> >>>> +asmlinkage void __exception_irq_entry fiq_nmi_handler(struct pt_regs *regs)
-> >>>> +{
-> >>>> +	struct pt_regs *old_regs = set_irq_regs(regs);
-> >>>> +
-> >>>> +	nmi_enter();
-> >>>> +	atomic_notifier_call_chain(&fiq_nmi_chain, (unsigned long)regs, NULL);
-> >>>> +	nmi_exit();
-> >>>> +	set_irq_regs(old_regs);
-> >>>> +}
-> >>>
-> >>> Really not happy with this.  What happens if a FIQ occurs while we're
-> >>> inside register_fiq_nmi_notifier() - more specifically inside
-> >>> atomic_notifier_chain_register() ?
-> >>
-> >> Should depend on which side of the rcu update we're on.
-> > 
-> > I just asked Paul McKenney, our RCU expert... essentially, yes, RCU
-> > stuff itself is safe in this context.  However, RCU stuff can call into
-> > lockdep if lockdep is configured, and there are questions over lockdep.
-> > 
-> > There's some things which can be done to reduce the lockdep exposure
-> > to it, such as ensuring that rcu_read_lock() is first called outside
-> > of FIQ context.
-> > 
-> > There's concerns with whether either printk() in check_flags() could
-> > be reached too (flags there should always indicate that IRQs were
-> > disabled, so that reduces down to a question about just the first
-> > printk() there.)
-> > 
-> > There's also the very_verbose() stuff for RCU lockdep classes which
-> > Paul says must not be enabled.
-> > 
-> > Lastly, Paul isn't a lockdep expert, but he sees nothing that prevents
-> > lockdep doing the deadlock checking as a result of the above call.
-> > 
-> > So... this coupled with my feeling that notifiers make it too easy for
-> > unreviewed code to be hooked into this path, I'm fairly sure that we
-> > don't want to be calling atomic notifier chains from FIQ context.
-> 
-> Having esablished (elsewhere in the thread) that RCU usage is safe
-> from FIQ I have been working on the assumption that your feeling
-> regarding unreviewed code is sufficient on its own to avoid using
-> notifiers (and also to avoid a list of function pointers like on x86).
+Hi,
 
-There was a later clarification from a lockdep expert showing that the
-code was in fact safe, so the notifier approach should be just fine.
-
-							Thanx, Paul
-
-> Therefore I have made the changes requested and produced a
-> before/after patch to show the impact of this. I will merge this
-> into the FIQ patchset shortly (I need to run a few more build tests
-> first).
+On Tue, Sep 02, 2014 at 04:42:18PM +0530, Vivek Gautam wrote:
+> Adding phy calibrate callback, which facilitates setting certain
+> PHY settings post initialization of the PHY controller.
+> Exynos5420 and Exynos5800 have 28nm USB 3.0 DRD PHY for which
+> the Loss-of-Signal (LOS) Detector Threshold Level as well as
+> Tx-Vboost-Level should be controlled for Super-Speed operations.
 > 
-> Personally I still favour using notifiers and think the coupling below is
-> excessive. Nevertheless I've run a couple of basic tests on the code
-> below and it works fine.
+> Additionally set proper time to wait for RxDetect measurement,
+> for desired PHY reference clock, so as to solve issue with enumeration
+> of few USB 3.0 devices, like Samsung SUM-TSB16S 3.0 USB drive
+> on the controller.
+> We are using CR_port for this purpose to send required data
+> to override the LOS values.
 > 
+> On testing with USB 3.0 devices on USB 3.0 port present on
+> SMDK5420, and peach-pit boards should see following message:
+> usb 2-1: new SuperSpeed USB device number 2 using xhci-hcd
 > 
-> diff --git a/arch/arm/include/asm/fiq.h b/arch/arm/include/asm/fiq.h
-> index 175bfed..a25c952 100644
-> --- a/arch/arm/include/asm/fiq.h
-> +++ b/arch/arm/include/asm/fiq.h
-> @@ -54,7 +54,6 @@ extern void disable_fiq(int fiq);
->  extern int ack_fiq(int fiq);
->  extern void eoi_fiq(int fiq);
->  extern bool has_fiq(int fiq);
-> -extern int register_fiq_nmi_notifier(struct notifier_block *nb);
->  extern void fiq_register_mapping(int irq, struct fiq_chip *chip);
+> and without this patch, should see below shown message:
+> usb 1-1: new high-speed USB device number 2 using xhci-hcd
 > 
->  /* helpers defined in fiqasm.S: */
-> diff --git a/arch/arm/include/asm/kgdb.h b/arch/arm/include/asm/kgdb.h
-> index 6563da0..cb5ccd6 100644
-> --- a/arch/arm/include/asm/kgdb.h
-> +++ b/arch/arm/include/asm/kgdb.h
-> @@ -51,6 +51,7 @@ extern void kgdb_handle_bus_error(void);
->  extern int kgdb_fault_expected;
+> [Also removed unnecessary extra lines in the register macro definitions]
 > 
->  extern int kgdb_register_fiq(unsigned int fiq);
-> +extern void kgdb_handle_fiq(struct pt_regs *regs);
+> Signed-off-by: Vivek Gautam <gautam.vivek@samsung.com>
+> ---
+>  drivers/phy/phy-exynos5-usbdrd.c |  185 ++++++++++++++++++++++++++++++++++----
+>  1 file changed, 170 insertions(+), 15 deletions(-)
 > 
->  #endif /* !__ASSEMBLY__ */
-> 
-> diff --git a/arch/arm/kernel/fiq.c b/arch/arm/kernel/fiq.c
-> index b2bd1c7..7422b58 100644
-> --- a/arch/arm/kernel/fiq.c
-> +++ b/arch/arm/kernel/fiq.c
-> @@ -43,12 +43,14 @@
->  #include <linux/irq.h>
->  #include <linux/radix-tree.h>
->  #include <linux/slab.h>
-> +#include <linux/irqchip/arm-gic.h>
-> 
->  #include <asm/cacheflush.h>
->  #include <asm/cp15.h>
->  #include <asm/exception.h>
->  #include <asm/fiq.h>
->  #include <asm/irq.h>
-> +#include <asm/kgdb.h>
->  #include <asm/traps.h>
-> 
->  #define FIQ_OFFSET ({					\
-> @@ -65,7 +67,6 @@ static unsigned long no_fiq_insn;
->  static int fiq_start = -1;
->  static RADIX_TREE(fiq_data_tree, GFP_KERNEL);
->  static DEFINE_MUTEX(fiq_data_mutex);
-> -static ATOMIC_NOTIFIER_HEAD(fiq_nmi_chain);
-> 
->  /* Default reacquire function
->   * - we always relinquish FIQ control
-> @@ -218,17 +219,23 @@ bool has_fiq(int fiq)
->  }
->  EXPORT_SYMBOL(has_fiq);
-> 
-> -int register_fiq_nmi_notifier(struct notifier_block *nb)
-> -{
-> -	return atomic_notifier_chain_register(&fiq_nmi_chain, nb);
-> -}
+> diff --git a/drivers/phy/phy-exynos5-usbdrd.c b/drivers/phy/phy-exynos5-usbdrd.c
+> index 47f47fe..85742b0 100644
+> --- a/drivers/phy/phy-exynos5-usbdrd.c
+> +++ b/drivers/phy/phy-exynos5-usbdrd.c
+> @@ -37,13 +37,11 @@
+>  
+>  /* EXYNOS5: USB 3.0 DRD PHY registers */
+>  #define EXYNOS5_DRD_LINKSYSTEM			0x04
 > -
->  asmlinkage void __exception_irq_entry fiq_nmi_handler(struct pt_regs *regs)
->  {
->  	struct pt_regs *old_regs = set_irq_regs(regs);
-> 
->  	nmi_enter();
-> -	atomic_notifier_call_chain(&fiq_nmi_chain, (unsigned long)regs, NULL);
+>  #define LINKSYSTEM_FLADJ_MASK			(0x3f << 1)
+>  #define LINKSYSTEM_FLADJ(_x)			((_x) << 1)
+>  #define LINKSYSTEM_XHCI_VERSION_CONTROL		BIT(27)
+>  
+>  #define EXYNOS5_DRD_PHYUTMI			0x08
+> -
+>  #define PHYUTMI_OTGDISABLE			BIT(6)
+>  #define PHYUTMI_FORCESUSPEND			BIT(1)
+>  #define PHYUTMI_FORCESLEEP			BIT(0)
+> @@ -51,26 +49,20 @@
+>  #define EXYNOS5_DRD_PHYPIPE			0x0c
+>  
+>  #define EXYNOS5_DRD_PHYCLKRST			0x10
+> -
+>  #define PHYCLKRST_EN_UTMISUSPEND		BIT(31)
+> -
+>  #define PHYCLKRST_SSC_REFCLKSEL_MASK		(0xff << 23)
+>  #define PHYCLKRST_SSC_REFCLKSEL(_x)		((_x) << 23)
+> -
+>  #define PHYCLKRST_SSC_RANGE_MASK		(0x03 << 21)
+>  #define PHYCLKRST_SSC_RANGE(_x)			((_x) << 21)
+> -
+>  #define PHYCLKRST_SSC_EN			BIT(20)
+>  #define PHYCLKRST_REF_SSP_EN			BIT(19)
+>  #define PHYCLKRST_REF_CLKDIV2			BIT(18)
+> -
+>  #define PHYCLKRST_MPLL_MULTIPLIER_MASK		(0x7f << 11)
+>  #define PHYCLKRST_MPLL_MULTIPLIER_100MHZ_REF	(0x19 << 11)
+>  #define PHYCLKRST_MPLL_MULTIPLIER_50M_REF	(0x32 << 11)
+>  #define PHYCLKRST_MPLL_MULTIPLIER_24MHZ_REF	(0x68 << 11)
+>  #define PHYCLKRST_MPLL_MULTIPLIER_20MHZ_REF	(0x7d << 11)
+>  #define PHYCLKRST_MPLL_MULTIPLIER_19200KHZ_REF	(0x02 << 11)
+> -
+>  #define PHYCLKRST_FSEL_UTMI_MASK		(0x7 << 5)
+>  #define PHYCLKRST_FSEL_PIPE_MASK		(0x7 << 8)
+>  #define PHYCLKRST_FSEL(_x)			((_x) << 5)
+> @@ -78,46 +70,68 @@
+>  #define PHYCLKRST_FSEL_PAD_24MHZ		(0x2a << 5)
+>  #define PHYCLKRST_FSEL_PAD_20MHZ		(0x31 << 5)
+>  #define PHYCLKRST_FSEL_PAD_19_2MHZ		(0x38 << 5)
+> -
+>  #define PHYCLKRST_RETENABLEN			BIT(4)
+> -
+>  #define PHYCLKRST_REFCLKSEL_MASK		(0x03 << 2)
+>  #define PHYCLKRST_REFCLKSEL_PAD_REFCLK		(0x2 << 2)
+>  #define PHYCLKRST_REFCLKSEL_EXT_REFCLK		(0x3 << 2)
+> -
+>  #define PHYCLKRST_PORTRESET			BIT(1)
+>  #define PHYCLKRST_COMMONONN			BIT(0)
+>  
+>  #define EXYNOS5_DRD_PHYREG0			0x14
+> +#define PHYREG0_SSC_REF_CLK_SEL			BIT(21)
+> +#define PHYREG0_SSC_RANGE			BIT(20)
+> +#define PHYREG0_CR_WRITE			BIT(19)
+> +#define PHYREG0_CR_READ				BIT(18)
+> +#define PHYREG0_CR_DATA_IN(_x)			((_x) << 2)
+> +#define PHYREG0_CR_CAP_DATA			BIT(1)
+> +#define PHYREG0_CR_CAP_ADDR			BIT(0)
 > +
-> +	/* these callbacks deliberately avoid using a notifier chain in
-> +	 * order to ensure code review happens (drivers cannot "secretly"
-> +	 * employ FIQ without modifying this chain of calls).
-> +	 */
-> +#ifdef CONFIG_KGDB_FIQ
-> +	kgdb_handle_fiq(regs);
-> +#endif
-> +#ifdef CONFIG_ARM_GIC
-> +	gic_handle_fiq_ipi();
-> +#endif
+>  #define EXYNOS5_DRD_PHYREG1			0x18
+> +#define PHYREG1_CR_DATA_OUT(_x)			((_x) << 1)
+> +#define PHYREG1_CR_ACK				BIT(0)
+>  
+>  #define EXYNOS5_DRD_PHYPARAM0			0x1c
+> -
+>  #define PHYPARAM0_REF_USE_PAD			BIT(31)
+>  #define PHYPARAM0_REF_LOSLEVEL_MASK		(0x1f << 26)
+>  #define PHYPARAM0_REF_LOSLEVEL			(0x9 << 26)
+>  
+>  #define EXYNOS5_DRD_PHYPARAM1			0x20
+> -
+>  #define PHYPARAM1_PCS_TXDEEMPH_MASK		(0x1f << 0)
+>  #define PHYPARAM1_PCS_TXDEEMPH			(0x1c)
+>  
+>  #define EXYNOS5_DRD_PHYTERM			0x24
+>  
+>  #define EXYNOS5_DRD_PHYTEST			0x28
+> -
+>  #define PHYTEST_POWERDOWN_SSP			BIT(3)
+>  #define PHYTEST_POWERDOWN_HSP			BIT(2)
+>  
+>  #define EXYNOS5_DRD_PHYADP			0x2c
+>  
+>  #define EXYNOS5_DRD_PHYUTMICLKSEL		0x30
+> -
+
+this and all above are unrelated to $subject.
+
+>  #define PHYUTMICLKSEL_UTMI_CLKSEL		BIT(2)
+>  
+>  #define EXYNOS5_DRD_PHYRESUME			0x34
+>  #define EXYNOS5_DRD_LINKPORT			0x44
+>  
+> +/* USB 3.0 DRD PHY SS Function Control Reg; accessed by CR_PORT */
+> +#define EXYNOS5_DRD_PHYSS_LOSLEVEL_OVRD_IN		(0x15)
+> +#define LOSLEVEL_OVRD_IN_LOS_BIAS_5420			(0x5 << 13)
+> +#define LOSLEVEL_OVRD_IN_LOS_BIAS_DEFAULT		(0x0 << 13)
+> +#define LOSLEVEL_OVRD_IN_EN				(0x1 << 10)
+> +#define LOSLEVEL_OVRD_IN_LOS_LEVEL_DEFAULT		(0x9 << 0)
 > +
->  	nmi_exit();
->  	set_irq_regs(old_regs);
->  }
-> diff --git a/arch/arm/kernel/kgdb.c b/arch/arm/kernel/kgdb.c
-> index b77b885..630a3ef 100644
-> --- a/arch/arm/kernel/kgdb.c
-> +++ b/arch/arm/kernel/kgdb.c
-> @@ -312,12 +312,13 @@ struct kgdb_arch arch_kgdb_ops = {
+> +#define EXYNOS5_DRD_PHYSS_TX_VBOOSTLEVEL_OVRD_IN	(0x12)
+> +#define TX_VBOOSTLEVEL_OVRD_IN_VBOOST_5420		(0x5 << 13)
+> +#define TX_VBOOSTLEVEL_OVRD_IN_VBOOST_DEFAULT		(0x4 << 13)
+> +
+> +#define EXYNOS5_DRD_PHYSS_LANE0_TX_DEBUG		(0x1010)
+> +#define LANE0_TX_DEBUG_RXDET_MEAS_TIME_19M2_20M		(0x4 << 4)
+> +#define LANE0_TX_DEBUG_RXDET_MEAS_TIME_24M		(0x8 << 4)
+> +#define LANE0_TX_DEBUG_RXDET_MEAS_TIME_25M_26M		(0x8 << 4)
+> +#define LANE0_TX_DEBUG_RXDET_MEAS_TIME_48M_50M_52M	(0x20 << 4)
+> +#define LANE0_TX_DEBUG_RXDET_MEAS_TIME_62M5		(0x20 << 4)
+> +#define LANE0_TX_DEBUG_RXDET_MEAS_TIME_96M_100M		(0x40 << 4)
+> +
+>  #define KHZ	1000
+>  #define MHZ	(KHZ * KHZ)
+>  
+> @@ -135,12 +149,14 @@ struct exynos5_usbdrd_phy_config {
+>  	void (*phy_isol)(struct phy_usb_instance *inst, u32 on);
+>  	void (*phy_init)(struct exynos5_usbdrd_phy *phy_drd);
+>  	unsigned int (*set_refclk)(struct phy_usb_instance *inst);
+> +	int (*phy_calibrate)(struct phy_usb_instance *inst);
 >  };
-> 
->  #ifdef CONFIG_KGDB_FIQ
-> -static int kgdb_handle_fiq(struct notifier_block *nb, unsigned long arg,
-> -			   void *data)
-> +void kgdb_handle_fiq(struct pt_regs *regs)
->  {
-> -	struct pt_regs *regs = (void *) arg;
->  	int actual;
-> 
-> +	if (!kgdb_fiq)
-> +		return;
-> +
->  	if (!kgdb_nmicallback(raw_smp_processor_id(), regs))
->  		return NOTIFY_OK;
-> 
-> @@ -333,11 +334,6 @@ static int kgdb_handle_fiq(struct notifier_block *nb, unsigned long arg,
->  	return NOTIFY_OK;
->  }
-> 
-> -static struct notifier_block kgdb_fiq_notifier = {
-> -	.notifier_call = kgdb_handle_fiq,
-> -	.priority = 100,
-> -};
-> -
->  int kgdb_register_fiq(unsigned int fiq)
->  {
->  	static struct fiq_handler kgdb_fiq_desc = { .name = "kgdb", };
-> @@ -357,7 +353,6 @@ int kgdb_register_fiq(unsigned int fiq)
->  	}
-> 
->  	kgdb_fiq = fiq;
-> -	register_fiq_nmi_notifier(&kgdb_fiq_notifier);
-> 
+>  
+>  struct exynos5_usbdrd_phy_drvdata {
+>  	const struct exynos5_usbdrd_phy_config *phy_cfg;
+>  	u32 pmu_offset_usbdrd0_phy;
+>  	u32 pmu_offset_usbdrd1_phy;
+> +	void (*phy_exynos_calibrate)(struct exynos5_usbdrd_phy *phy_drd);
+>  };
+>  
+>  /**
+> @@ -487,6 +503,142 @@ static int exynos5_usbdrd_phy_power_off(struct phy *phy)
 >  	return 0;
 >  }
-> diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
-> index bda5a91..8821160 100644
-> --- a/drivers/irqchip/irq-gic.c
-> +++ b/drivers/irqchip/irq-gic.c
-> @@ -502,13 +502,17 @@ static void __init gic_init_fiq(struct gic_chip_data *gic,
->  /*
->   * Fully acknowledge (both ack and eoi) a FIQ-based IPI
->   */
-> -static int gic_handle_fiq_ipi(struct notifier_block *nb, unsigned long regs,
-> -			   void *data)
-> +void gic_handle_fiq_ipi(void)
->  {
->  	struct gic_chip_data *gic = &gic_data[0];
-> -	void __iomem *cpu_base = gic_data_cpu_base(gic);
-> +	void __iomem *cpu_base;
->  	unsigned long irqstat, irqnr;
-> 
-> +	if (!gic || !gic->fiq_enable)
-> +		return;
+>  
+> +static void crport_handshake(struct exynos5_usbdrd_phy *phy_drd,
+> +						u32 val, u32 cmd)
+> +{
+> +	u32 usec = 100;
+> +	u32 result;
 > +
-> +	cpu_base = gic_data_cpu_base(gic);
+> +	writel(val | cmd, phy_drd->reg_phy + EXYNOS5_DRD_PHYREG0);
 > +
->  	if (WARN_ON(!in_nmi()))
->  		return NOTIFY_BAD;
-> 
-> @@ -525,13 +529,6 @@ static int gic_handle_fiq_ipi(struct notifier_block *nb, unsigned long regs,
-> 
->  	return NOTIFY_OK;
->  }
-> -
-> -/*
-> - * Notifier to ensure IPI FIQ is acknowledged correctly.
-> - */
-> -static struct notifier_block gic_fiq_ipi_notifier = {
-> -	.notifier_call = gic_handle_fiq_ipi,
-> -};
->  #else /* CONFIG_FIQ */
->  static inline void gic_set_group_irq(void __iomem *base, unsigned int hwirq,
->  				     int group) {}
-> @@ -1250,10 +1247,6 @@ void __init gic_init_bases(unsigned int gic_nr, int irq_start,
->  #ifdef CONFIG_SMP
->  		set_smp_cross_call(gic_raise_softirq);
->  		register_cpu_notifier(&gic_cpu_notifier);
-> -#ifdef CONFIG_FIQ
-> -		if (gic_data_fiq_enable(gic))
-> -			register_fiq_nmi_notifier(&gic_fiq_ipi_notifier);
-> -#endif
->  #endif
->  		set_handle_irq(gic_handle_irq);
->  	}
-> diff --git a/include/linux/irqchip/arm-gic.h b/include/linux/irqchip/arm-gic.h
-> index 45e2d8c..52a5676 100644
-> --- a/include/linux/irqchip/arm-gic.h
-> +++ b/include/linux/irqchip/arm-gic.h
-> @@ -101,5 +101,8 @@ static inline void __init register_routable_domain_ops
->  {
->  	gic_routable_irq_domain_ops = ops;
->  }
+> +	do {
+> +		result = readl(phy_drd->reg_phy + EXYNOS5_DRD_PHYREG1);
+> +		if (result & PHYREG1_CR_ACK)
+> +			break;
 > +
-> +void gic_handle_fiq_ipi(void);
+> +		udelay(1);
+> +	} while (usec-- > 0);
 > +
->  #endif /* __ASSEMBLY */
->  #endif
-> 
-> 
+> +	if (!usec)
+> +		dev_err(phy_drd->dev,
+> +			"CRPORT handshake timeout1 (0x%08x)\n", val);
+
+if handshake timed out, shouldn't you error out here ? IOW, make this
+function return an int and return an error code from this point ? Why
+would you even continue to the next step ?
+
+> +
+> +	usec = 100;
+> +
+> +	writel(val, phy_drd->reg_phy + EXYNOS5_DRD_PHYREG0);
+> +
+> +	do {
+> +		result = readl(phy_drd->reg_phy + EXYNOS5_DRD_PHYREG1);
+> +		if (!(result & PHYREG1_CR_ACK))
+> +			break;
+> +
+> +		udelay(1);
+> +	} while (usec-- > 0);
+> +
+> +	if (!usec)
+> +		dev_err(phy_drd->dev,
+> +			"CRPORT handshake timeout2 (0x%08x)\n", val);
+
+return an error ?
+
+> +}
+> +
+> +static void crport_ctrl_write(struct exynos5_usbdrd_phy *phy_drd,
+> +						u32 addr, u32 data)
+> +{
+> +	/* Write Address */
+> +	writel(PHYREG0_CR_DATA_IN(addr),
+> +			phy_drd->reg_phy + EXYNOS5_DRD_PHYREG0);
+> +	crport_handshake(phy_drd, PHYREG0_CR_DATA_IN(addr),
+> +			 PHYREG0_CR_CAP_ADDR);
+> +
+> +	/* Write Data */
+> +	writel(PHYREG0_CR_DATA_IN(data),
+> +			phy_drd->reg_phy + EXYNOS5_DRD_PHYREG0);
+> +	crport_handshake(phy_drd, PHYREG0_CR_DATA_IN(data),
+> +			 PHYREG0_CR_CAP_DATA);
+> +	crport_handshake(phy_drd, PHYREG0_CR_DATA_IN(data),
+> +			 PHYREG0_CR_WRITE);
+> +}
+> +
+> +/*
+> + * Override PHY paramaeters using CR_PORT register to calibrate settings
+> + * to meet meet SuperSpeed requirements, on Exynos5420 and Exynos5800 systems,
+> + * which have 28nm USB 3.0 DRD PHY.
+> + */
+> +static void exynos5420_usbdrd_phy_calibrate(struct exynos5_usbdrd_phy *phy_drd)
+> +{
+> +	u32 temp;
+> +
+> +	/*
+> +	 * Change los_bias to (0x5) for 28nm PHY from a
+> +	 * default value (0x0); los_level is set as default
+> +	 * (0x9) as also reflected in los_level[30:26] bits
+> +	 * of PHYPARAM0 register.
+> +	 */
+> +	temp = LOSLEVEL_OVRD_IN_LOS_BIAS_5420 |
+> +		LOSLEVEL_OVRD_IN_EN |
+> +		LOSLEVEL_OVRD_IN_LOS_LEVEL_DEFAULT;
+> +	crport_ctrl_write(phy_drd,
+> +			  EXYNOS5_DRD_PHYSS_LOSLEVEL_OVRD_IN,
+> +			  temp);
+> +
+> +	/*
+> +	 * Set tx_vboost_lvl to (0x5) for 28nm PHY Tuning,
+> +	 * to raise Tx signal level from its default value of (0x4)
+> +	 */
+> +	temp = TX_VBOOSTLEVEL_OVRD_IN_VBOOST_5420;
+> +	crport_ctrl_write(phy_drd,
+> +			  EXYNOS5_DRD_PHYSS_TX_VBOOSTLEVEL_OVRD_IN,
+> +			  temp);
+> +
+> +	/*
+> +	 * Set proper time to wait for RxDetect measurement, for
+> +	 * desired reference clock of PHY, by tuning the CRPORT
+> +	 * register LANE0.TX_DEBUG which is internal to PHY.
+> +	 * This fixes issue with few USB 3.0 devices, which are
+> +	 * not detected (not even generate interrupts on the bus
+> +	 * on insertion) without this change.
+> +	 * e.g. Samsung SUM-TSB16S 3.0 USB drive.
+> +	 */
+> +	switch (phy_drd->extrefclk) {
+> +	case EXYNOS5_FSEL_50MHZ:
+> +		temp = LANE0_TX_DEBUG_RXDET_MEAS_TIME_48M_50M_52M;
+> +		break;
+> +	case EXYNOS5_FSEL_20MHZ:
+> +	case EXYNOS5_FSEL_19MHZ2:
+> +		temp = LANE0_TX_DEBUG_RXDET_MEAS_TIME_19M2_20M;
+> +		break;
+> +	case EXYNOS5_FSEL_24MHZ:
+
+why can't this be done during probe() ? Are you going to change external
+reference clock frequency during runtime ? And even if you do,
+wouldn't it be easier to subscribe to clock rate change notifiers
+instead of adding this ->calibrate() ?
+
+It still looks, to me, that this ->calibrate() thing is unnecessary. We
+have a single user for it and this user could very well get this sorted
+out during probe() or by subscribing to clock rate notifiers.
+
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140902/f0df3ec5/attachment.sig>
