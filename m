@@ -1,123 +1,88 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Tue, 02 Sep 2014 21:06:25 +0200
-Subject: [PATCH v2 1/4] clk: rockchip: protect critical clocks from
- getting disabled
-In-Reply-To: <1758693.xu8myGIhjQ@diego>
-References: <3132019.Q6dzkQ3ylK@diego> <1758693.xu8myGIhjQ@diego>
-Message-ID: <2295814.bdy3ybS178@diego>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Tue, 02 Sep 2014 22:08:58 +0300
+Subject: [RFC PATCH 4/7] iommu: provide helper function to configure an
+ IOMMU for an of master
+In-Reply-To: <20140902110340.GI25379@arm.com>
+References: <1409327670-3495-1-git-send-email-will.deacon@arm.com>
+ <1485866.XbpZvVaUr8@avalon> <20140902110340.GI25379@arm.com>
+Message-ID: <1706598.u5HumTdOPu@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mike,
+Hi Will,
 
-Am Donnerstag, 14. August 2014, 23:00:26 schrieb Heiko St?bner:
-> The clock-tree contains clocks that should never get disabled automatically.
-> One example are the base ACLKs, the base supplies for all peripherals.
-> 
-> Therefore add a structure similar to the sunxi clock-tree to protect these
-> special clocks from being disabled.
-> 
-> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
-> Tested-by: Doug Anderson <dianders@chromium.org>
-> Tested-by: Kever Yang <kever.yang@rock-chips.com>
-> ---
+On Tuesday 02 September 2014 12:03:40 Will Deacon wrote:
+> On Tue, Sep 02, 2014 at 11:51:54AM +0100, Laurent Pinchart wrote:
+> > On Friday 29 August 2014 16:54:27 Will Deacon wrote:
 
-from the discussions in v1 I remember there were no showstoppers for this 
-change, so could take a look into applying this one patch, so we can 
-sucessfully enable the dma controllers :-)
+[snip]
 
+> > > diff --git a/drivers/iommu/of_iommu.c b/drivers/iommu/of_iommu.c
+> > > index f9209666157c..a7d3b3a13b83 100644
+> > > --- a/drivers/iommu/of_iommu.c
+> > > +++ b/drivers/iommu/of_iommu.c
 
-Thanks
-Heiko
+[snip]
 
+> > > @@ -90,6 +91,41 @@ int of_get_dma_window(struct device_node *dn, const
+> > > char
+> > > *prefix, int index, }
+> > > 
+> > >  EXPORT_SYMBOL_GPL(of_get_dma_window);
+> > > 
+> > > +int of_iommu_configure(struct device *dev)
+> > > +{
+> > > +	struct of_phandle_args iommu_spec;
+> > > +	struct bus_type *bus = dev->bus;
+> > > +	const struct iommu_ops *ops = bus->iommu_ops;
+> > > +	int ret = -EINVAL, idx = 0;
+> > > +
+> > > +	if (!iommu_present(bus))
+> > > +		return -ENODEV;
+> > > +
+> > > +	/*
+> > > +	 * We don't currently walk up the tree looking for a parent IOMMU.
+> > > +	 * See the `Notes:' section of
+> > > +	 * Documentation/devicetree/bindings/iommu/iommu.txt
+> > > +	 */
+> > > +	while (!of_parse_phandle_with_args(dev->of_node, "iommus",
+> > > +					   "#iommu-cells", idx,
+> > > +					   &iommu_spec)) {
+> > > +		void *data = of_iommu_get_data(iommu_spec.np);
+> > > +
+> > > +		of_node_put(iommu_spec.np);
+> > > +		if (!ops->add_device_master_ids)
+> > > +			return -ENODEV;
+> > 
+> > Can't you move this outside of the loop ?
+> 
+> Yup, done.
+> 
+> > > +
+> > > +		ret = ops->add_device_master_ids(dev, iommu_spec.args_count,
+> > > +						 iommu_spec.args, data);
+> > 
+> > I'm curious, how do you envision support for devices connected to multiple
+> > IOMMUs ? IOMMU drivers usually allocate a per-device archdata structure in
+> > the add_device operation and store it in the dev->archdata.iommu field.
+> > How would that work with multiple invocations of add_device or
+> > add_device_master_ids ?
+>
+> Even devices with a single IOMMU could have multiple callbacks, since the
+> IOMMU gets called back once per ID in reality. That means the IOMMU drivers
+> will need to be tolerant of adding a master they already know about (by
+> looking up the device and adding the additional IDs).
 
-> no change since v1
-> 
->  drivers/clk/rockchip/clk-rk3188.c |  7 +++++++
->  drivers/clk/rockchip/clk-rk3288.c |  7 +++++++
->  drivers/clk/rockchip/clk.c        | 13 +++++++++++++
->  drivers/clk/rockchip/clk.h        |  1 +
->  4 files changed, 28 insertions(+)
-> 
-> diff --git a/drivers/clk/rockchip/clk-rk3188.c
-> b/drivers/clk/rockchip/clk-rk3188.c index a83a6d8..732118e 100644
-> --- a/drivers/clk/rockchip/clk-rk3188.c
-> +++ b/drivers/clk/rockchip/clk-rk3188.c
-> @@ -599,6 +599,11 @@ static struct rockchip_clk_branch rk3188_clk_branches[]
-> __initdata = { GATE(ACLK_GPS, "aclk_gps", "aclk_peri", 0,
-> RK2928_CLKGATE_CON(8), 13, GFLAGS), };
-> 
-> +static const char *rk3188_critical_clocks[] __initconst = {
-> +	"aclk_cpu",
-> +	"aclk_peri",
-> +};
-> +
->  static void __init rk3188_common_clk_init(struct device_node *np)
->  {
->  	void __iomem *reg_base;
-> @@ -628,6 +633,8 @@ static void __init rk3188_common_clk_init(struct
-> device_node *np) RK3188_GRF_SOC_STATUS);
->  	rockchip_clk_register_branches(common_clk_branches,
->  				  ARRAY_SIZE(common_clk_branches));
-> +	rockchip_clk_protect_critical(rk3188_critical_clocks,
-> +				      ARRAY_SIZE(rk3188_critical_clocks));
-> 
->  	rockchip_register_softrst(np, 9, reg_base + RK2928_SOFTRST_CON(0),
->  				  ROCKCHIP_SOFTRST_HIWORD_MASK);
-> diff --git a/drivers/clk/rockchip/clk-rk3288.c
-> b/drivers/clk/rockchip/clk-rk3288.c index 0d8c6c5..038b1aa 100644
-> --- a/drivers/clk/rockchip/clk-rk3288.c
-> +++ b/drivers/clk/rockchip/clk-rk3288.c
-> @@ -680,6 +680,11 @@ static struct rockchip_clk_branch rk3288_clk_branches[]
-> __initdata = { GATE(0, "pclk_isp_in", "ext_isp", 0, RK3288_CLKGATE_CON(16),
-> 3, GFLAGS), };
-> 
-> +static const char *rk3288_critical_clocks[] __initconst = {
-> +	"aclk_cpu",
-> +	"aclk_peri",
-> +};
-> +
->  static void __init rk3288_clk_init(struct device_node *np)
->  {
->  	void __iomem *reg_base;
-> @@ -710,6 +715,8 @@ static void __init rk3288_clk_init(struct device_node
-> *np) RK3288_GRF_SOC_STATUS);
->  	rockchip_clk_register_branches(rk3288_clk_branches,
->  				  ARRAY_SIZE(rk3288_clk_branches));
-> +	rockchip_clk_protect_critical(rk3288_critical_clocks,
-> +				      ARRAY_SIZE(rk3288_critical_clocks));
-> 
->  	rockchip_register_softrst(np, 9, reg_base + RK3288_SOFTRST_CON(0),
->  				  ROCKCHIP_SOFTRST_HIWORD_MASK);
-> diff --git a/drivers/clk/rockchip/clk.c b/drivers/clk/rockchip/clk.c
-> index 278cf9d..9189f1b 100644
-> --- a/drivers/clk/rockchip/clk.c
-> +++ b/drivers/clk/rockchip/clk.c
-> @@ -242,3 +242,16 @@ void __init rockchip_clk_register_branches(
->  		rockchip_clk_add_lookup(clk, list->id);
->  	}
->  }
-> +
-> +void __init rockchip_clk_protect_critical(const char *clocks[], int
-> nclocks) +{
-> +	int i;
-> +
-> +	/* Protect the clocks that needs to stay on */
-> +	for (i = 0; i < nclocks; i++) {
-> +		struct clk *clk = __clk_lookup(clocks[i]);
-> +
-> +		if (clk)
-> +			clk_prepare_enable(clk);
-> +	}
-> +}
-> diff --git a/drivers/clk/rockchip/clk.h b/drivers/clk/rockchip/clk.h
-> index 887cbde..2b0bca1 100644
-> --- a/drivers/clk/rockchip/clk.h
-> +++ b/drivers/clk/rockchip/clk.h
-> @@ -329,6 +329,7 @@ void rockchip_clk_register_branches(struct
-> rockchip_clk_branch *clk_list, unsigned int nr_clk);
->  void rockchip_clk_register_plls(struct rockchip_pll_clock *pll_list,
->  				unsigned int nr_pll, int grf_lock_offset);
-> +void rockchip_clk_protect_critical(const char *clocks[], int nclocks);
-> 
->  #define ROCKCHIP_SOFTRST_HIWORD_MASK	BIT(0)
+That wouldn't be too difficult to implement in IOMMU drivers, but I have a 
+feeling we would duplicate the same logic in several drivers. Adding fields to 
+struct iommu (possibly with a couple of helper functions) as mentioned below 
+might help. Another option would be to call the add_device_master_ids a single 
+time with a list of all ids, but the core code might become pretty ugly.
+
+> Once I've reworked the data argument to be a struct iommu, we can add fields
+> there if they're generally useful.
+
+-- 
+Regards,
+
+Laurent Pinchart
