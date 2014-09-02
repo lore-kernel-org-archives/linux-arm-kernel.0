@@ -1,30 +1,38 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Tue, 02 Sep 2014 15:01:15 -0700
-Subject: [PATCH] clk: qcom: Fix sdc 144kHz frequency entry
-In-Reply-To: <20140902214402.5251.75274@quantum>
-References: <1409341766-24366-1-git-send-email-sboyd@codeaurora.org>
- <20140902214402.5251.75274@quantum>
-Message-ID: <54063E2B.6090403@codeaurora.org>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Wed, 03 Sep 2014 00:06:53 +0200
+Subject: [GIT PULL] rockchip dma support
+Message-ID: <1573460.mA2d3uShjW@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/02/14 14:44, Mike Turquette wrote:
-> Quoting Stephen Boyd (2014-08-29 12:49:26)
->> The pre-divider for the sdc clocks only has 2 bits in it, so we
->> can't possibly divide by anything larger than 4 here.
->> Furthermore, we program the value of ~(n - m) and the n value is
->> larger than 8 bits (max of 256). Replace this entry with 200kHz
->> which is close enough to 144kHz to be usable.
->>
->> Cc: Kumar Gala <galak@codeaurora.org>
->> Cc: Andy Gross <agross@codeaurora.org>
->> Fixes: 24d8fba44af3 "clk: qcom: Add support for IPQ8064's global clock controller (GCC)"
->> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
-> Do you need this pulled into a 3.17-rc?
->
+Hi Arnd, Olof,
 
-Yes that would be helpful since this fixes a driver introduced into 3.17.
+this adds support for the pl330 dma controllers found on all Rockchip SoCs
+currently supported (rk3066, rk3188 and rk3288), so please pull
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+
+The following changes since commit 7d1311b93e58ed55f3a31cc8f94c4b8fe988a2b9:
+
+  Linux 3.17-rc1 (2014-08-16 10:40:26 -0600)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/mmind/linux-rockchip.git tags/v3.18-rockchip-dma
+
+for you to fetch changes up to ac42f481b75b98076b47fac60796657508f80abe:
+
+  ARM: dts: rockchip: add rk3066 and rk3188 dma controllers (2014-09-02 22:28:32 +0200)
+
+----------------------------------------------------------------
+Enable the AMBA bus and add necessary dma-controller dts nodes
+
+----------------------------------------------------------------
+Heiko St?bner (3):
+      ARM: rockchip: enable the AMBA bus
+      ARM: dts: rockchip: add rk3288 dma controllers
+      ARM: dts: rockchip: add rk3066 and rk3188 dma controllers
+
+ arch/arm/boot/dts/rk3288.dtsi  | 38 ++++++++++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/rk3xxx.dtsi  | 38 ++++++++++++++++++++++++++++++++++++++
+ arch/arm/mach-rockchip/Kconfig |  1 +
+ 3 files changed, 77 insertions(+)
