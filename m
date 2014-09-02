@@ -1,21 +1,24 @@
-From: bjorn.andersson@sonymobile.com (Bjorn Andersson)
-Date: Tue, 2 Sep 2014 09:30:49 -0700
-Subject: [PATCH v3 1/4] pinctrl: qcom: Add APQ8084 pinctrl support
-In-Reply-To: <1409663625-3185-2-git-send-email-gdjakov@mm-sol.com>
-References: <1409663625-3185-1-git-send-email-gdjakov@mm-sol.com>
- <1409663625-3185-2-git-send-email-gdjakov@mm-sol.com>
-Message-ID: <20140902163047.GL12494@sonymobile.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 2 Sep 2014 17:31:05 +0100
+Subject: [PATCH 2/2] dt-bindings: Add input supplies to rk808 bindings
+In-Reply-To: <1409674469-12123-3-git-send-email-dianders@chromium.org>
+References: <1409674469-12123-1-git-send-email-dianders@chromium.org>
+ <1409674469-12123-3-git-send-email-dianders@chromium.org>
+Message-ID: <20140902163105.GY29327@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue 02 Sep 06:13 PDT 2014, Georgi Djakov wrote:
+On Tue, Sep 02, 2014 at 09:14:29AM -0700, Doug Anderson wrote:
+> The original bindings for rk808 didn't include input supplies.  Add
+> them.
 
-> This patchset adds pinctrl support for the Qualcomm APQ8084 platform.
-> 
-> Reviewed-by: Andy Gross <agross@codeaurora.org>
-> Signed-off-by: Georgi Djakov <gdjakov@mm-sol.com>
+Acked-by: Mark Brown <broonie@linaro.org>
 
-I was expecting patch 4 to come before this, so that this commit would be
-"complete". But I'm fine with this.
-
-Acked-by: Bjorn Andersson <bjorn.andersson@sonymobile.com>
+You probably want to send this to Lee...
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140902/c4c95151/attachment.sig>
