@@ -1,72 +1,86 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 2 Sep 2014 12:22:06 +0200
-Subject: Formal license ambiguity in arch/arm/boot/dts/sun?i-a*.dts
-In-Reply-To: <20140807132023.GG15297@lukather>
-References: <20140731192016.GA6869@excalibur.cnev.de>
- <20140803130430.GY3952@lukather> <201408031959.27607.arnd@arndb.de>
- <20140804192510.GF3952@lukather>
- <20140804212317.GL30282@n2100.arm.linux.org.uk>
- <20140807132023.GG15297@lukather>
-Message-ID: <20140902102206.GU15297@lukather>
+From: bhupesh.sharma@freescale.com (bhupesh.sharma at freescale.com)
+Date: Tue, 2 Sep 2014 10:27:49 +0000
+Subject: [PATCH V2 4/6] arm64: Add DTS support for FSL's LS2085A SoC
+In-Reply-To: <20140902101438.GC25092@arm.com>
+References: <1409219706-14843-1-git-send-email-bhupesh.sharma@freescale.com>
+ <1409219706-14843-5-git-send-email-bhupesh.sharma@freescale.com>
+ <20140828145635.GL14650@leverpostej>
+ <18f8ee091e8847c0bcfba1ef04907a71@BN1PR03MB220.namprd03.prod.outlook.com>
+ <20140829174757.GD18555@leverpostej>
+ <78eaae039fd04eb58e1dac715968dd72@BN1PR03MB220.namprd03.prod.outlook.com>
+ <20140902100531.GB25092@arm.com> <20140902101438.GC25092@arm.com>
+Message-ID: <10117779d53642feb9f1e7deb2b8e928@BN1PR03MB220.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 07, 2014 at 03:20:23PM +0200, Maxime Ripard wrote:
-> Hi Russell,
+> -----Original Message-----
+> From: Catalin Marinas [mailto:catalin.marinas at arm.com]
+> Sent: Tuesday, September 02, 2014 3:45 PM
+> To: Sharma Bhupesh-B45370
+> Cc: Mark Rutland; Will Deacon; arnd at arndb.de; grant.likely at secretlab.ca;
+> Marc Zyngier; rob.herring at linaro.org; linux-arm-
+> kernel at lists.infradead.org; Yoder Stuart-B08248; Basu Arnab-B45036
+> Subject: Re: [PATCH V2 4/6] arm64: Add DTS support for FSL's LS2085A SoC
 > 
-> On Mon, Aug 04, 2014 at 10:23:17PM +0100, Russell King - ARM Linux wrote:
-> > On Mon, Aug 04, 2014 at 09:25:10PM +0200, Maxime Ripard wrote:
-> > > On Sun, Aug 03, 2014 at 07:59:27PM +0200, Arnd Bergmann wrote:
-> > > > I would actually prefer if we could migrate a lot of these files to BSD license,
-> > > > provided the original authors agree. We want the dtb blobs to be embeddable into
-> > > > boot loaders of any license.
-> > > 
-> > > Even though I'd be open to having my contributions to DTBs under the
-> > > BSD, is this really a thing?
-> > > 
-> > > I mean, for all I know, an OS/Bootloader would just parse a documented
-> > > binary file, and I don't see any derivative work there.
-> > 
-> > How does the OS/Bootloader end up with that binary file?
-> > 
-> > For the sake of argument, let's say that the BSDs want to move to DT on
-> > ARM.  Great, they convert over to parsing our DT blobs.
-> > 
-> > However, they can't distribute the binary DT blobs to their users without
-> > coming up against the problems of the GPL wrt binary distribution.
-> > 
-> > They could distribute the source files, but remember that many of those
-> > are currently GPL licensed, so they'd probably end up having to package
-> > them entirely separately, if they're willing to do that at all.
-> > 
-> > Or they could decide to ignore us altogether, and do their own DT stuff,
-> > maybe partially implementing our properties, or maybe coming up with
-> > different and/or incompatible properties - which would be bad because
-> > we now end up with two ways to describe the same hardware in active use.
-> > 
-> > I suspect the final option is the one they'd choose, and it's in our
-> > interest that _that_ doesn't happen.
+> On Tue, Sep 02, 2014 at 11:05:31AM +0100, Catalin Marinas wrote:
+> > On Fri, Aug 29, 2014 at 07:07:40PM +0100, bhupesh.sharma at freescale.com
+> wrote:
+> > > > > > > +	memory at 80000000 {
+> > > > > > > +		device_type = "memory";
+> > > > > > > +		reg = <0x00000000 0x80000000 0 0x80000000>;
+> > > > > > > +		      /* DRAM space 1 - 2 GB DRAM */
+> > > > > > > +	};
+> > > > > >
+> > > > > > Does that mean:
+> > > > > >
+> > > > > >  - This is "DRAM space 1", populated with 2GB?
+> > > > > >
+> > > > > > Or:
+> > > > > >
+> > > > > >  - The DRAM space can be populated with 1 to 2 GB?
+> > > > > >
+> > > > > > If the former, s/ - /: / for clarity.
+> > > > > >
+> > > > > > If the latter, it might make sense to move that into
+> > > > > > board-specific dts files. If this can be dynamically populated
+> > > > > > ideally the firmware/loader would fix this up (assuming it can
+> probe the memory).
+> > > > >
+> > > > > If the former. I will fix it up in v3.
+> > > >
+> > > > Ok. Out of curiosity, are there other DRAM spaces that might be
+> > > > populated?
+> > >
+> > > Yes there is another DRAM space. The 1st one is accessible within 32
+> > > bits and the 2nd one is accessible from 40-bit and above. However, I
+> > > was waiting for the 4-level ARM64 page table patches (from Catalin)
+> > > to get absorbed, as w/o the same we can access only a 39-bit PA and
+> > > hence can have only 3-level page table limited to the 1st DRAM region
+> (which is accessible via first 32 bits).
+> > >
+> > > Any idea, about the latest state of Catalin's patch ([1])? Has it
+> made to linux-next?
+> >
+> > The 48-bit VA support is in mainline but you wouldn't be able to
+> > enable it because KVM is still broken. Hopefully it will make it to
+> 3.18-rc1.
+> >
+> > But here we are talking about 40-bit PA range which should be fine
+> > with
+> > 3 levels of page tables. The only problem is if you want to idmap the
+> > memory beyond 40-bit (I don't know whether UEFI requires this but for
+> > kernel booting you wouldn't need it since the kernel image is in the
+> > lower part).
 > 
-> Ah, yes, it's not really about a fear of a GPL-spread, but rather a
-> concern about the source distribution. Makes sense.
+> Ah, I confused my self (and thanks to Mark Rutland for telling me). If
+> your PA range spans 40-bit, the kernel linear mapping would have to span
+> 40-bit as well unless we either implement highmem or compress the
+> phys_to_virt(). None of these are desirable on arm64, so it leaves us
+> with 48-bit VA (which will be enabled by default in defconfig once KVM is
+> sorted).
 > 
-> How should we deal with such relicensing?
 
-Ping?
+Right. Thanks for the useful information, Catalin.
 
-Are we doing this on a per platform basis? Should we enforce this dual
-licensing for the future DTS patches? If so, starting from when?
-
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140902/f664a267/attachment.sig>
+Regards,
+Bhupesh
