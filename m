@@ -1,54 +1,53 @@
-From: computersforpeace@gmail.com (Brian Norris)
-Date: Tue, 2 Sep 2014 15:44:00 -0700
-Subject: [PATCH v8 03/11] ARM: brcmstb: add debug UART for earlyprintk
- support
-In-Reply-To: <54064323.3090406@gmail.com>
-References: <1405976886-27807-1-git-send-email-computersforpeace@gmail.com>
- <1405976886-27807-4-git-send-email-computersforpeace@gmail.com>
- <20140802083040.GY30282@n2100.arm.linux.org.uk>
- <20140804165627.GT3711@ld-irv-0074>
- <CAN8TOE8w5bUT5byHiJrYr8AzaZ+EADzE+aoH6f2x2tFc1+1eQw@mail.gmail.com>
- <CAOesGMh5wX5eaCmPvXQs4fmNQsD+370P=O8PSdH2oMHKL_neDQ@mail.gmail.com>
- <54064323.3090406@gmail.com>
-Message-ID: <20140902224400.GY18411@ld-irv-0074>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Wed, 3 Sep 2014 01:02:53 +0200 (CEST)
+Subject: [PATCH v11 00/19] arm: KGDB NMI/FIQ support
+In-Reply-To: <1409662853-29313-1-git-send-email-daniel.thompson@linaro.org>
+References: <1408466769-20004-1-git-send-email-daniel.thompson@linaro.org>
+ <1409662853-29313-1-git-send-email-daniel.thompson@linaro.org>
+Message-ID: <alpine.DEB.2.10.1409030032010.3333@nanos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 02, 2014 at 03:22:27PM -0700, Florian Fainelli wrote:
-> On 08/13/2014 03:16 PM, Olof Johansson wrote:
+On Tue, 2 Sep 2014, Daniel Thompson wrote:
+
+> This patchset makes it possible to use kgdb's NMI infrastructure on ARM
+> platforms.
 > 
-> [snip]
+> The patches are seperated into three distinct groups:
 > 
-> >>>> I noticed that you sent this to the patch system.  I asked Olof last
-> >>>> night whether he had anything in arm-soc touching Kconfig.debug, and
-> >>>> he does (a number of other platforms have updated it.)  This means
-> >>>> that if I apply it to my tree, it may conflict, so I'm reluctant to
-> >>>> take it.
-> >>>
-> >>> OK... Matt told me that such patches go through you. So which is it?
-> >>> Should all Kconfig.debug patches go through the arm-soc route?
-> >>
-> >> How should this get in? Should I rebase/resend through Matt and
-> >> arm-soc? Or can you pick this up as-is?
-> > 
-> > Kconfig.debug is something that we usually merge new platforms for
-> > through arm-soc. The main exception has been release cycles when
-> > Russell has been doing major surgery on the file (one of those was a
-> > few releases ago), where we've backed off to avoid conflicts.
-> > 
-> > That's been the assumed arrangement from our side at least, we haven't
-> > had anything more formal than that.
-> > 
-> > So, go ahead and send it through us -- if we end up having a cycle
-> > where we can't apply it we can send it over to Russell for you.
+> 1. arm specific changes; these provide multi-platform support for FIQ
+>    (including raising an IPI using FIQ to ensure effective SMP support)
+>    and extend ARM KGDB support to use the features provided.
 > 
-> It looks like somehow, this patch got lost somewhere in the submission
-> process. Is it too late to accept it for 3.17 if we were to re-submit it?
+> 2. irqchip changes; updates to the gic and vic drivers to provide
+>    support for routing certain interrupt sources to FIQ.
+> 
+> 3. serial changes; driver support to allow the UART interrupt to be
+>    routed to FIQ. The already mainlined kgdb NMI infrastructure (mostly
+>    found in drivers/tty/serial/kgdb_nmi.c) will re-route the kgdb
+>    console UART's interrupt signal from IRQ to FIQ. Naturally the UART
+>    will no longer function normally and will instead be managed by kgdb
+>    using the polled I/O functions. Any character delivered to the UART
+>    causes the kgdb handler function to be called.
 
-I already resubmitted this weeks ago:
+To be honest, what you are doing is just ass backwards.
 
-  http://article.gmane.org/gmane.linux.ports.arm.kernel/348468
+The use case you are looking for is the most irrelevant of all. Just
+because KGDB is on some managerial "must have items" checklist does
+not make it useful.
 
-No comment / action so far.
+The only relevant use cases of FIQs are the same as those of NMIs on
+x86:
 
-Brian
+  - Watchdog to detect stuck cpus and issue stack traces
+
+  - Performace monitoring
+
+KGDB falls into place once you solved the above.
+
+That said for the general approach, I'll have a look at the irq
+related patches in a minute.
+
+Thanks,
+
+	tglx
