@@ -1,47 +1,56 @@
 From: mturquette@linaro.org (Mike Turquette)
-Date: Tue, 02 Sep 2014 14:44:02 -0700
-Subject: [PATCH] clk: qcom: Fix sdc 144kHz frequency entry
-In-Reply-To: <1409341766-24366-1-git-send-email-sboyd@codeaurora.org>
-References: <1409341766-24366-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <20140902214402.5251.75274@quantum>
+Date: Tue, 02 Sep 2014 14:45:06 -0700
+Subject: [PATCH] clk: at91: fix num_parents test in at91sam9260 slow clk
+ implementation
+In-Reply-To: <1409671671-13544-1-git-send-email-boris.brezillon@free-electrons.com>
+References: <1409671671-13544-1-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <20140902214506.5251.1412@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Stephen Boyd (2014-08-29 12:49:26)
-> The pre-divider for the sdc clocks only has 2 bits in it, so we
-> can't possibly divide by anything larger than 4 here.
-> Furthermore, we program the value of ~(n - m) and the n value is
-> larger than 8 bits (max of 256). Replace this entry with 200kHz
-> which is close enough to 144kHz to be usable.
+Quoting Boris BREZILLON (2014-09-02 08:27:51)
+> The slow clk block provided by at91sam9260 and derived SoCs should always
+> have 2 parents.
 > 
-> Cc: Kumar Gala <galak@codeaurora.org>
-> Cc: Andy Gross <agross@codeaurora.org>
-> Fixes: 24d8fba44af3 "clk: qcom: Add support for IPQ8064's global clock controller (GCC)"
-> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+> Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
+> ---
+> 
+> Hello Mike,
+> 
+> Could you take this fix for the next 3.17 rc ?
+> Without this fix you won't be able to use programmable clks (the slow
+> clk is one of the parents of prog clks), and these prog clks are used,
+> among other things, to provide clks to external audio chips.
+> 
+> No need to backport this fix to previous stable releases, as CCF support
+> for at91sam9260 (and derived) SoCs only appeared in 3.17.
 
-Do you need this pulled into a 3.17-rc?
+Pulled into clk-fixes.
 
 Regards,
 Mike
 
-> ---
->  drivers/clk/qcom/gcc-ipq806x.c | 2 +-
+> 
+> Best Regards,
+> 
+> Boris
+> 
+>  drivers/clk/at91/clk-slow.c | 2 +-
 >  1 file changed, 1 insertion(+), 1 deletion(-)
 > 
-> diff --git a/drivers/clk/qcom/gcc-ipq806x.c b/drivers/clk/qcom/gcc-ipq806x.c
-> index 4032e510d9aa..3b83b7dd78c7 100644
-> --- a/drivers/clk/qcom/gcc-ipq806x.c
-> +++ b/drivers/clk/qcom/gcc-ipq806x.c
-> @@ -1095,7 +1095,7 @@ static struct clk_branch prng_clk = {
->  };
+> diff --git a/drivers/clk/at91/clk-slow.c b/drivers/clk/at91/clk-slow.c
+> index 0300c46..32f7c1b 100644
+> --- a/drivers/clk/at91/clk-slow.c
+> +++ b/drivers/clk/at91/clk-slow.c
+> @@ -447,7 +447,7 @@ void __init of_at91sam9260_clk_slow_setup(struct device_node *np,
+>         int i;
 >  
->  static const struct freq_tbl clk_tbl_sdc[] = {
-> -       {    144000, P_PXO,   5, 18,625 },
-> +       {    200000, P_PXO,   2, 2, 125 },
->         {    400000, P_PLL8,  4, 1, 240 },
->         {  16000000, P_PLL8,  4, 1,   6 },
->         {  17070000, P_PLL8,  1, 2,  45 },
+>         num_parents = of_count_phandle_with_args(np, "clocks", "#clock-cells");
+> -       if (num_parents <= 0 || num_parents > 1)
+> +       if (num_parents != 2)
+>                 return;
+>  
+>         for (i = 0; i < num_parents; ++i) {
 > -- 
-> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-> hosted by The Linux Foundation
+> 1.9.1
 > 
