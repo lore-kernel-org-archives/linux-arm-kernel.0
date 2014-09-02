@@ -1,47 +1,46 @@
-From: evanluijk@interact.nl (Erik van Luijk)
-Date: Tue,  2 Sep 2014 12:52:12 +0200
-Subject: [PATCH] ARM: at91/dt: at91sam9m10g45ek add rtc node
-Message-ID: <1409655132-17735-1-git-send-email-evanluijk@interact.nl>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 2 Sep 2014 11:57:30 +0100
+Subject: [RFC PATCH 0/7] Introduce automatic DMA configuration for IOMMU
+ masters
+In-Reply-To: <54059F05.2090901@samsung.com>
+References: <1409327670-3495-1-git-send-email-will.deacon@arm.com>
+ <20140902083138.GA25379@arm.com> <54058442.2070204@samsung.com>
+ <33373396.gPTVFGBBxa@wuerfel> <54059F05.2090901@samsung.com>
+Message-ID: <20140902105730.GH25379@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Erik van Luijk <evanluijk@interact.nl>
----
- arch/arm/boot/dts/at91sam9g45.dtsi     | 7 +++++++
- arch/arm/boot/dts/at91sam9m10g45ek.dts | 3 +++
- 2 files changed, 10 insertions(+)
+On Tue, Sep 02, 2014 at 11:42:13AM +0100, Marek Szyprowski wrote:
+> On 2014-09-02 10:56, Arnd Bergmann wrote:
+> > On Tuesday 02 September 2014 10:48:02 Marek Szyprowski wrote:
+> >>>    -- I have concerns that allocating one domain per master might be
+> >>> too much, but it's hard to tell without an IOMMU driver ported over.
+> >> One domain per master is IMHO a sane default configuration. The only default
+> >> alternative I see is to have only one domain (related with dma-mapping
+> >> subsystem) and bind all devices to it. However I really don't see any
+> >> disadvantage of having separate domain per each master and such
+> >> configuration
+> >> gives devices better separation.
+> > I was expecting that the dma-mapping implementation would by default use
+> > one domain for all devices, since that is what the simpler IOMMUs without
+> > domain support have to do anyway.
+> >
+> > For isolation purposes, it can only help to have more domains, but
+> > I would guess that there is some space overhead in maintaining lots
+> > of page tables.
+> 
+> I'm okay with both approaches (separate domain for each device vs. single
+> common domain for all devices). Maybe this can be some kind of Kconfig
+> option added to DMA debugging? Separation might be really helpful when
+> debugging strange device behavior.
 
-diff --git a/arch/arm/boot/dts/at91sam9g45.dtsi b/arch/arm/boot/dts/at91sam9g45.dtsi
-index 932a669..bf62c18 100644
---- a/arch/arm/boot/dts/at91sam9g45.dtsi
-+++ b/arch/arm/boot/dts/at91sam9g45.dtsi
-@@ -1070,6 +1070,13 @@
- 				status = "disabled";
- 			};
- 
-+			rtc at fffffdb0 {
-+				compatible = "atmel,at91rm9200-rtc";
-+				reg = <0xfffffdb0 0x30>;
-+				interrupts = <1 IRQ_TYPE_LEVEL_HIGH 7>;
-+				status = "disabled";
-+			};
-+
- 			spi0: spi at fffa4000 {
- 				#address-cells = <1>;
- 				#size-cells = <0>;
-diff --git a/arch/arm/boot/dts/at91sam9m10g45ek.dts b/arch/arm/boot/dts/at91sam9m10g45ek.dts
-index 96ccc7d..2dd2347 100644
---- a/arch/arm/boot/dts/at91sam9m10g45ek.dts
-+++ b/arch/arm/boot/dts/at91sam9m10g45ek.dts
-@@ -70,6 +70,9 @@
- 
- 			watchdog at fffffd40 {
- 				status = "okay";
-+
-+			rtc at fffffdb0 {
-+				status = "okay";
- 			};
- 
- 			mmc0: mmc at fff80000 {
--- 
-1.9.1
+One potential problem with a single domain is when you have multiple
+instances of a given IOMMU, each with different hardware restrictions.
+Then you can end up with multiple sets of page tables for the domain
+which, although not impossible to work with, is a bit of a mess.
+
+I think having one domain per IOMMU instance would make the most sense,
+but then you have to teach more of the stack about the IOMMU topology. I
+think we'll get there in the end, but that's a little way off right now.
+
+Will
