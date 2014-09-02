@@ -1,37 +1,32 @@
-From: Li.Xiubo@freescale.com (Li.Xiubo at freescale.com)
-Date: Tue, 2 Sep 2014 03:22:24 +0000
-Subject: [PATCHv1 1/7] ASoC: simple-card: Merge single and muti DAI link
- code.
-In-Reply-To: <20140901151356.GB29327@sirena.org.uk>
-References: <1409545781-20530-1-git-send-email-Li.Xiubo@freescale.com>
- <1409545781-20530-2-git-send-email-Li.Xiubo@freescale.com>
- <20140901133412.GA11312@lunn.ch> <20140901151356.GB29327@sirena.org.uk>
-Message-ID: <1b29c16ac3944bb19940da886bf7da3a@BY2PR0301MB0613.namprd03.prod.outlook.com>
+From: davem@davemloft.net (David Miller)
+Date: Mon, 01 Sep 2014 20:26:32 -0700 (PDT)
+Subject: [PATCH 1/5] net: mvberlin_eth: add an Ethernet driver for
+ Marvell Berlin
+In-Reply-To: <1409320263-10295-2-git-send-email-antoine.tenart@free-electrons.com>
+References: <1409320263-10295-1-git-send-email-antoine.tenart@free-electrons.com>
+ <1409320263-10295-2-git-send-email-antoine.tenart@free-electrons.com>
+Message-ID: <20140901.202632.1784070145688270115.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> 
-> On Mon, Sep 01, 2014 at 03:34:12PM +0200, Andrew Lunn wrote:
-> > On Mon, Sep 01, 2014 at 12:29:35PM +0800, Xiubo Li wrote:
-> > > This patch merge single DAI link and muti-DAI links code together,
-> > > and simply the simple-card driver code.
-> 
-> > It would be good to note that this breaks the Binary API with DT
-> > blobs. Old blobs will not work with this new C code.
-> 
-> That's not on, we need to maintian compatibility with the old DTs unless
-> there's a very strong reason not to.  Revising the binding is one option
-> for doing this, keeping the old binding in place and making a v2 binding
-> with the new functionality.
+From: Antoine Tenart <antoine.tenart@free-electrons.com>
+Date: Fri, 29 Aug 2014 15:50:59 +0200
 
-Yes, agree.
+> +struct rx_desc {
+> +	u16 buf_size;		/* Buffer size				*/
+> +	u16 byte_cnt;		/* Descriptor buffer byte count		*/
+ ...
+> +	u16 byte_cnt;		/* buffer byte count			*/
+> +	u16 l4i_chk;		/* CPU provided TCP checksum		*/
 
-Actually, the current code is a bit more complicated that we should keep in mind
-of two styles of single DAI link and muti-DAI links. And the binding document and
-code are a little unreadable.
+I'm really suspcious that you're ordering these two members differently
+than that used by the mv643xx_eth driver.
 
-For others must read the simple card code carefully to add one DT node.
+Looking at a diff of the two drivers, most of the transmit and recieve paths
+are largely the same.
 
-Thanks,
+WRT. register differences, adding indirection to handle that is a no-brainer
+because the cost of the register access itself will absolutely dwarf whatever
+it costs to do an indirect call or whatever to implement the register access.
 
-BRs
+I really think you should look into sharing code more seriously.
