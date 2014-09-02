@@ -1,50 +1,52 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Tue, 02 Sep 2014 15:38:46 -0700
-Subject: [PATCH 0/5] clk: at91: fix USB clk support on at91rm9200/sam9 SoCs
-In-Reply-To: <1409644218-13677-1-git-send-email-boris.brezillon@free-electrons.com>
-References: <1409644218-13677-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <20140902223846.5251.86384@quantum>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Wed, 03 Sep 2014 01:00:23 +0200
+Subject: [Linaro-acpi] [RFC PATCH for Juno 1/2] net: smsc911x add support
+ for probing from ACPI
+In-Reply-To: <20140902162606.GX29327@sirena.org.uk>
+References: <1409583961-7466-1-git-send-email-hanjun.guo@linaro.org>
+ <4816592.tj3on6vUaC@wuerfel> <20140902162606.GX29327@sirena.org.uk>
+Message-ID: <2913007.3xRNb2X4ts@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Boris BREZILLON (2014-09-02 00:50:13)
-> Hi,
+On Tuesday, September 02, 2014 05:26:06 PM Mark Brown wrote:
 > 
-> This patch series fixes several bugs in the PLL driver preventing a proper
-> set_rate on the PLL clk.
-> It also enables propagation of set_rate request on the USB clk in order to
-> configure the PLL rate according to the USB block requirement (48 MHz).
+> --s3puAW9DMBtS2ARW
+> Content-Type: text/plain; charset=us-ascii
+> Content-Disposition: inline
 > 
-> Note that existing kernels, relying on the PLL configuration made by the
-> the bootloader should not be impacted by this bug, but others (those
-> directly booting from at91bootstrap or not enabling USB support in the
-> bootloader) will be.
+> On Tue, Sep 02, 2014 at 03:42:53PM +0200, Arnd Bergmann wrote:
 > 
-> This bug was reported by Ga?l, who's directly booting the kernel from the
-> bootstrap.
+> > The way I recall the discussion, most people were on one extreme
+> > side of the discussion or the other:
+> 
+> > a) We should use _DSD for ARM64 servers to maximize code reuse with
+> > DT-enabled drivers, work around the slow UEFI standardization process,
+> > remain in control of the actual bindings, and avoid the need for
+> > endless per-ID platform-data definitions in drivers.
+> 
+> > b) We should never use _DSD at all, since doing that would have no
+> > advantage over using DT directly, and we should force every device
+> > manufacturer to specify their bindings in an official ACPI document
+> > to prevent random incompatible bindings from being established.
+> > Any device that shows up in servers should not need arbitrary detailed
+> > properties anyway, as the details are supposed to be hidden in AML.
+> 
+> > I can understand the reasons for both approaches, and I find it hard
+> > to say either one is invalid. However, the worst possible outcome in
+> > my opinion would be having to support a mix of the two.
+> 
+> Right, and the x86 embedded folks are going full steam ahead with _DSD
+> regardless so it seems there will be some systems out there using it
+> even if they're not ARM servers.
 
-Applied to clk-next.
+Our intention is specifically not to use "random incompatible bindings"
+in that.  We'd rather have a common venue and process for establishing
+new bindings for both DT and _DSD in a compatible way.
 
-Regards,
-Mike
+Rafael
 
-> 
-> Best Regards,
-> 
-> Boris
-> 
-> Boris BREZILLON (5):
->   clk: at91: fix PLL_MAX_COUNT macro definition
->   clk: at91: rework PLL rate calculation
->   clk: at91: fix recalc_rate implementation of PLL driver
->   clk: at91: rework rm9200 USB clock to propagate set_rate to the parent
->     clk
->   clk: at91: fix div by zero in USB clock driver
-> 
->  drivers/clk/at91/clk-pll.c | 160 +++++++++++++++++++++++----------------------
->  drivers/clk/at91/clk-usb.c |  20 ++++--
->  2 files changed, 96 insertions(+), 84 deletions(-)
-> 
-> -- 
-> 1.9.1
-> 
+
+-- 
+I speak only for myself.
+Rafael J. Wysocki, Intel Open Source Technology Center.
