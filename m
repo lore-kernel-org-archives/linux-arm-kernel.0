@@ -1,27 +1,34 @@
-From: ijc@hellion.org.uk (Ian Campbell)
-Date: Tue, 02 Sep 2014 16:54:59 +0100
-Subject: Autoloading of SPI/nor driver on kirkwood (qnap devices)
-Message-ID: <1409673299.14324.43.camel@dagon.hellion.org.uk>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Tue, 02 Sep 2014 17:00:08 +0100
+Subject: [PATCH] irqchip: exynos-combiner: Fix compilation error on ARM64
+In-Reply-To: <1409671492-7725-1-git-send-email-ch.naveen@samsung.com>
+References: <1409671492-7725-1-git-send-email-ch.naveen@samsung.com>
+Message-ID: <5405E988.7050707@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
 
-I recently tried to switch to using the DT based kirkwood stuff with
-v3.16.1 on a QNAP TS-419 for the Debian kernel. Most things seemed ok
-except that the flash driver was not autoloaded -- as well as spi-nor.ko
-I had to manually modprobe m25p80.ko. Once I loaded both the flash was
-detected.
 
-I noticed that many platforms declare the flash chip as compatible =
-"st,m25pXXX" whereas the ts219.dtsi just said m25p128 but I tried
-changing that and it didn't help. In any case without spi-nor.ko being
-autoloaded I don't support m25p80.ko ever would be.
+On 02/09/14 16:24, Naveen Krishna Chatradhi wrote:
+> The following compilation error occurs on 64-bit Exynos7 SoC:
+>
+> drivers/irqchip/exynos-combiner.c: In function ?combiner_irq_domain_map?:
+> drivers/irqchip/exynos-combiner.c:162:2: error: implicit declaration of function ?set_irq_flags? [-Werror=implicit-function-declaration]
+>    set_irq_flags(irq, IRQF_VALID | IRQF_PROBE);
+>    ^
+> drivers/irqchip/exynos-combiner.c:162:21: error: ?IRQF_VALID? undeclared (first use in this function)
+>    set_irq_flags(irq, IRQF_VALID | IRQF_PROBE);
+>                       ^
+> drivers/irqchip/exynos-combiner.c:162:21: note: each undeclared identifier is reported only once for each function it appears in
+> drivers/irqchip/exynos-combiner.c:162:34: error: ?IRQF_PROBE? undeclared (first use in this function)
+>    set_irq_flags(irq, IRQF_VALID | IRQF_PROBE);
+>
+> Fix the build error by including asm/hardirq.h.
+>
 
-I could set these things to =m for the Debian kirkwood flavour, but
-since this is supposed to be a distro-style kernel.
+You should avoid using asm headers whenever possible esp. in driver
+code. linux/hardirq.h or much better linux/interrupt.h should fix this
+error.
 
-I'm not entirely sure how module loading of this SPI stuff is supposed
-to fit together -- anyone got any hints?
-
-Ian.
+Regards,
+Sudeep
