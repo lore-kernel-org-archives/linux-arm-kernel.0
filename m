@@ -1,87 +1,56 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 2 Sep 2014 14:05:08 +0100
-Subject: [RFC PATCH 4/7] iommu: provide helper function to configure an
- IOMMU for an of master
-In-Reply-To: <3424322.yoZKhlAsy0@wuerfel>
-References: <1409327670-3495-1-git-send-email-will.deacon@arm.com>
- <4335091.FB685Z52eG@wuerfel> <20140902100342.GG25379@arm.com>
- <3424322.yoZKhlAsy0@wuerfel>
-Message-ID: <20140902130508.GK25379@arm.com>
+From: daniel.thompson@linaro.org (Daniel Thompson)
+Date: Tue,  2 Sep 2014 14:00:46 +0100
+Subject: [PATCH v11 12/19] serial: kgdb_nmi: No CON_ENABLED by default
+In-Reply-To: <1409662853-29313-1-git-send-email-daniel.thompson@linaro.org>
+References: <1408466769-20004-1-git-send-email-daniel.thompson@linaro.org>
+ <1409662853-29313-1-git-send-email-daniel.thompson@linaro.org>
+Message-ID: <1409662853-29313-13-git-send-email-daniel.thompson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 02, 2014 at 01:15:06PM +0100, Arnd Bergmann wrote:
-> On Tuesday 02 September 2014 11:03:42 Will Deacon wrote:
-> > On Mon, Sep 01, 2014 at 09:18:26PM +0100, Arnd Bergmann wrote:
-> > > I don't mind handling PCI devices separately. They are different in a number
-> > > of ways already, in particular the way that they don't normally have an
-> > > of_node attached to them but actually have a PCI bus/dev/function number.
-> > 
-> > Sure, but at the point when we call back into the iommu_ops structure we
-> > really don't want bus specific functions. That's why I avoided any OF
-> > data structures being passed to add_device_master_ids.
-> 
-> Well, we clearly need some format that the caller and the callee agree
-> on. It can't be a completely opaque pointer because it's something
-> that has to be filled out by someone who knows the format.
-> 
-> Using the DT format has the advantage that the caller does not have
-> to know anything about the underlying driver except for #size-cells,
-> and it just passes the data it gets from DT into the driver. This is
-> how we do the association in a lot of other subsystems.
+At present this console is selectively enabled/disabled by NULL checking
+arch_kgdb_ops.enable_nmi. In practice this requires the architecture
+dependant code to implement some kind of control (e.g. module arguments)
+to enable/disable the feature.
 
-Ok. More below.
+The kernel already provide the perfectly adequade console= argument to
+do this. Let's us that instead, if nothing else, it makes any
+documentation architecture neutral.
 
-> > Anyway, I'll try to hack something together shortly. I think the proposal
-> > is:
-> > 
-> >   - Make add_device_master_ids take a generic structure (struct iommu)
-> >   - Add an of_xlate callback into iommu_ops which returns a populated
-> >     struct iommu based on the of_node
-> 
-> We may have been talking past one another. What I meant with 'struct iommu'
-> is something that identifies the iommu instance, not the connection to
-> a particular master. What you describe here would work, but then I think
-> the structure should have a different name. However, it seems easier to
-> not have the add_device_master_ids at and just do the association in the
-> xlate callback instead.
+Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
+---
+ drivers/tty/serial/kgdb_nmi.c | 5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
 
-Yes, I think we were talking about two different things. If we move all
-of the master handling into the xlate callback, then we can just use
-of_phandle_args as the generic master representation (using the PCI host
-controller node for PCI devices, as you mentioned). However, xlate is a
-bit of a misnomer then, as it's not actually translating anything; the
-handle used for DMA masters is still struct device, and we have that
-already in of_dma_configure.
-
-I'm still unsure about what to put inside struct iommu other than a private
-data pointer. You previously suggested:
-
-	struct iommu {
-		struct device *dev;
-		const struct iommu_ops *ops;
-		struct list_head domains;
-		void *private;
-	};
-
-but that has the following problems:
-
-  - We don't have a struct device * for the IOMMU until it's been probed
-    via the standard driver probing mechanisms, which may well be after
-    we've started registering masters
-
-  - The ops are still registered on a per-bus basis, and each domain has
-    a pointer to them anyway
-
-  - The IOMMU driver really doesn't care about the domains, as the domain
-    in question is always passed back to the functions that need it (e.g.
-    attach, map, ...).
-
-The only useful field I can think of is something like a tree of masters,
-but then we have to define a generic wrapper around struct device, which
-is at odds with the rest of the IOMMU API.
-
-One alternative is having the xlate call populate device->archdata.iommu,
-but that's arch-specific and is essentially another opaque pointer.
-
-Will
+diff --git a/drivers/tty/serial/kgdb_nmi.c b/drivers/tty/serial/kgdb_nmi.c
+index 6ec7501..129dc5b 100644
+--- a/drivers/tty/serial/kgdb_nmi.c
++++ b/drivers/tty/serial/kgdb_nmi.c
+@@ -46,6 +46,8 @@ static atomic_t kgdb_nmi_num_readers = ATOMIC_INIT(0);
+ 
+ static int kgdb_nmi_console_setup(struct console *co, char *options)
+ {
++	arch_kgdb_ops.enable_nmi(1);
++
+ 	/* The NMI console uses the dbg_io_ops to issue console messages. To
+ 	 * avoid duplicate messages during kdb sessions we must inform kdb's
+ 	 * I/O utilities that messages sent to the console will automatically
+@@ -77,7 +79,7 @@ static struct console kgdb_nmi_console = {
+ 	.setup  = kgdb_nmi_console_setup,
+ 	.write	= kgdb_nmi_console_write,
+ 	.device	= kgdb_nmi_console_device,
+-	.flags	= CON_PRINTBUFFER | CON_ANYTIME | CON_ENABLED,
++	.flags	= CON_PRINTBUFFER | CON_ANYTIME,
+ 	.index	= -1,
+ };
+ 
+@@ -354,7 +356,6 @@ int kgdb_register_nmi_console(void)
+ 	}
+ 
+ 	register_console(&kgdb_nmi_console);
+-	arch_kgdb_ops.enable_nmi(1);
+ 
+ 	return 0;
+ err_drv_reg:
+-- 
+1.9.3
