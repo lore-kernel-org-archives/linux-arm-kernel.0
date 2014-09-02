@@ -1,74 +1,86 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Tue, 02 Sep 2014 10:48:02 +0200
-Subject: [RFC PATCH 0/7] Introduce automatic DMA configuration for IOMMU
- masters
-In-Reply-To: <20140902083138.GA25379@arm.com>
-References: <1409327670-3495-1-git-send-email-will.deacon@arm.com>
- <540562F9.2030508@samsung.com> <20140902083138.GA25379@arm.com>
-Message-ID: <54058442.2070204@samsung.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Tue,  2 Sep 2014 10:49:58 +0200
+Subject: [PATCH 2/7] ARM: at91: at91sam9260_9g20: update defconfig
+In-Reply-To: <1409647803-8054-1-git-send-email-alexandre.belloni@free-electrons.com>
+References: <1409647803-8054-1-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <1409647803-8054-3-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will,
+Update defconfig, adding:
+ - ADC/touchscreen
+ - Power/reset
 
-On 2014-09-02 10:31, Will Deacon wrote:
-> On Tue, Sep 02, 2014 at 07:26:01AM +0100, Marek Szyprowski wrote:
->> On 2014-08-29 17:54, Will Deacon wrote:
->>> This patch series is an RFC to implement IOMMU master configuration into
->>> of_dma_configure. I haven't yet ported any IOMMU drivers to it, so it
->>> remains untested, but I wanted to get some early feedback to ensure that
->>> this doesn't end up going in the wrong direction.
->>>
->>> The idea comes out of my understanding following discussions with Arnd
->>> and David at Kernel Summit / LinuxCon in Chicago. Essentially:
->>>
->>>     - Allow IOMMUs to be probed early and set up per-instance data on their
->>>       of_node
->>>
->>>     - Add a new callback to the iommu_ops structure for adding a device
->>>       with a set of opaque IDs (e.g. Stream IDs or Requester IDs)
->>>
->>>     - Add an of_iommu_configure function, called from of_dma_configure,
->>>       which registers the master IDs with the correspond IOMMU before
->>>       probing the master itself
->>>
->>>     - Where applicable, create an IOMMU domain per device and swizzle the
->>>       DMA ops for that device to use the IOMMU variants.
->>>
->>> I haven't bothered doing anything clever with the DMA masks yet, so I
->>> wouldn't be surprised if we end up chewing through tonnes of memory
->>> allocating IOMMU domains that are far too big at the moment. Again, this
->>> is just an RFC and I'd welcome comments on the general direction of the
->>> series.
->> Thanks for your patches, I wasn't aware the fact that you are working on
->> this. When do you plan to send a second version? I would like to rebase
->> my Exynos IOMMU patches (https://lkml.org/lkml/2014/8/5/183) on top of
->> your work, but I wonder if I should select this version as a base or wait
->> a bit for an update.
-> I'll try and get something out today/tomorrow depending on how easily the
-> review comments fall out. It would be really great if you get an IOMMU
-> working with this (I was going to look at the ARM SMMU once this stops
-> moving)
+and removing deprecated config options.
 
-Great, I will wait then for v2.
+Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+---
+ arch/arm/configs/at91sam9260_9g20_defconfig | 13 +++++--------
+ 1 file changed, 5 insertions(+), 8 deletions(-)
 
->   -- I have concerns that allocating one domain per master might be
-> too much, but it's hard to tell without an IOMMU driver ported over.
-
-One domain per master is IMHO a sane default configuration. The only default
-alternative I see is to have only one domain (related with dma-mapping
-subsystem) and bind all devices to it. However I really don't see any
-disadvantage of having separate domain per each master and such 
-configuration
-gives devices better separation.
-
-However we also need to figure out how to let drivers to make their own
-configuration, like it is required by Exynos DRM subsystem, which consist
-of several devices, each having its own IOMMU controller, but for
-convenience those drivers assume that they all have been bound to the same,
-single domain.
-
-Best regards
+diff --git a/arch/arm/configs/at91sam9260_9g20_defconfig b/arch/arm/configs/at91sam9260_9g20_defconfig
+index c4c160fc8791..3ada05d639ad 100644
+--- a/arch/arm/configs/at91sam9260_9g20_defconfig
++++ b/arch/arm/configs/at91sam9260_9g20_defconfig
+@@ -54,7 +54,6 @@ CONFIG_DEVTMPFS=y
+ CONFIG_DEVTMPFS_MOUNT=y
+ CONFIG_MTD=y
+ CONFIG_MTD_CMDLINE_PARTS=y
+-CONFIG_MTD_OF_PARTS=y
+ CONFIG_MTD_BLOCK=y
+ CONFIG_MTD_DATAFLASH=y
+ CONFIG_MTD_NAND=y
+@@ -66,13 +65,10 @@ CONFIG_BLK_DEV_RAM_SIZE=8192
+ CONFIG_EEPROM_AT25=y
+ CONFIG_SCSI=y
+ CONFIG_BLK_DEV_SD=y
+-CONFIG_SCSI_MULTI_LUN=y
+ # CONFIG_SCSI_LOWLEVEL is not set
+ CONFIG_NETDEVICES=y
+-CONFIG_MII=y
+ CONFIG_MACB=y
+ # CONFIG_NET_VENDOR_BROADCOM is not set
+-# CONFIG_NET_VENDOR_CHELSIO is not set
+ # CONFIG_NET_VENDOR_FARADAY is not set
+ # CONFIG_NET_VENDOR_INTEL is not set
+ # CONFIG_NET_VENDOR_MARVELL is not set
+@@ -86,7 +82,6 @@ CONFIG_SMSC_PHY=y
+ # CONFIG_INPUT_MOUSEDEV_PSAUX is not set
+ CONFIG_KEYBOARD_GPIO=y
+ # CONFIG_INPUT_MOUSE is not set
+-# CONFIG_SERIO is not set
+ CONFIG_SERIAL_ATMEL=y
+ CONFIG_SERIAL_ATMEL_CONSOLE=y
+ CONFIG_HW_RANDOM=y
+@@ -97,6 +92,8 @@ CONFIG_SPI=y
+ CONFIG_SPI_ATMEL=y
+ CONFIG_SPI_SPIDEV=y
+ CONFIG_GPIO_SYSFS=y
++CONFIG_POWER_SUPPLY=y
++CONFIG_POWER_RESET=y
+ # CONFIG_HWMON is not set
+ CONFIG_WATCHDOG=y
+ CONFIG_WATCHDOG_NOWAYOUT=y
+@@ -127,6 +124,8 @@ CONFIG_LEDS_TRIGGER_HEARTBEAT=y
+ CONFIG_RTC_CLASS=y
+ CONFIG_RTC_DRV_RV3029C2=y
+ CONFIG_RTC_DRV_AT91SAM9=y
++CONFIG_IIO=y
++CONFIG_AT91_ADC=y
+ CONFIG_EXT4_FS=y
+ CONFIG_VFAT_FS=y
+ CONFIG_TMPFS=y
+@@ -139,10 +138,8 @@ CONFIG_NLS_CODEPAGE_850=y
+ CONFIG_NLS_ISO8859_1=y
+ CONFIG_NLS_ISO8859_15=y
+ CONFIG_NLS_UTF8=y
+-# CONFIG_ENABLE_WARN_DEPRECATED is not set
+-CONFIG_DEBUG_KERNEL=y
+ CONFIG_DEBUG_INFO=y
++# CONFIG_ENABLE_WARN_DEPRECATED is not set
+ # CONFIG_FTRACE is not set
+ CONFIG_DEBUG_LL=y
+-CONFIG_AT91_DEBUG_LL_DBGU0=y
+ CONFIG_EARLY_PRINTK=y
 -- 
-Marek Szyprowski, PhD
-Samsung R&D Institute Poland
+1.9.1
