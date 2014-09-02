@@ -1,41 +1,32 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Tue,  2 Sep 2014 09:14:29 -0700
-Subject: [PATCH 2/2] dt-bindings: Add input supplies to rk808 bindings
-In-Reply-To: <1409674469-12123-1-git-send-email-dianders@chromium.org>
-References: <1409674469-12123-1-git-send-email-dianders@chromium.org>
-Message-ID: <1409674469-12123-3-git-send-email-dianders@chromium.org>
+From: geoff@infradead.org (Geoff Levand)
+Date: Tue, 02 Sep 2014 09:18:34 -0700
+Subject: [RFC PATCH v1] Arm64: introduce __hyp_func_call
+In-Reply-To: <1409668765-25567-1-git-send-email-achandran@mvista.com>
+References: <1409668765-25567-1-git-send-email-achandran@mvista.com>
+Message-ID: <1409674714.21254.115.camel@smoke>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The original bindings for rk808 didn't include input supplies.  Add
-them.
+Hi Arun,
 
-Signed-off-by: Doug Anderson <dianders@chromium.org>
----
- Documentation/devicetree/bindings/mfd/rk808.txt | 11 +++++++++++
- 1 file changed, 11 insertions(+)
+On Tue, 2014-09-02 at 20:09 +0530, Arun Chandran wrote:
+> This adds a mechanism to __hyp_stub_vectors to allow a hypercall to
+> call a function at EL2. It is needed for users who want to
+> run a part of code with EL2 permissions. The current usecase is for
+> KVM and kexec.
+> 
+> For kexec we need to move the final CPU up to the mode it started
+> in before we branch to the new kernel. If we don't do that
 
-diff --git a/Documentation/devicetree/bindings/mfd/rk808.txt b/Documentation/devicetree/bindings/mfd/rk808.txt
-index f8932ac..283a906 100644
---- a/Documentation/devicetree/bindings/mfd/rk808.txt
-+++ b/Documentation/devicetree/bindings/mfd/rk808.txt
-@@ -13,6 +13,17 @@ Optional properties:
-   default output clock name
- - rockchip,system-power-controller: Telling whether or not this pmic is controlling
-   the system power.
-+- vcc1-supply:  The input supply for DCDC_REG1
-+- vcc2-supply:  The input supply for DCDC_REG2
-+- vcc3-supply:  The input supply for DCDC_REG3
-+- vcc4-supply:  The input supply for DCDC_REG4
-+- vcc6-supply:  The input supply for LDO_REG1 and LDO_REG2
-+- vcc7-supply:  The input supply for LDO_REG3 and LDO_REG7
-+- vcc8-supply:  The input supply for SWITCH_REG1
-+- vcc9-supply:  The input supply for LDO_REG4 and LDO_REG5
-+- vcc10-supply: The input supply for LDO_REG6
-+- vcc11-supply: The input supply for LDO_REG8
-+- vcc12-supply: The input supply for SWITCH_REG2
- 
- Regulators: All the regulators of RK808 to be instantiated shall be
- listed in a child node named 'regulators'. Each regulator is represented
--- 
-2.1.0.rc2.206.gedb03e5
+I certainly appreciate you trying to help with the kexec work, but I
+already have a patch that does something similar to this in my kexec
+series [1].
+
+Also, I think we need to consider this change in the context of the
+entire solution around how we handle exception level and kexec + KVM.
+I'm now working through the details of that, and when I have something I
+think is acceptable I'll post the kexec series for review.
+
+[1] https://git.linaro.org/people/geoff.levand/linux-kexec.git
+
+-Geoff
