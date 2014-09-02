@@ -1,54 +1,74 @@
-From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Tue, 02 Sep 2014 17:47:29 +0900
-Subject: [PATCH v6 2/6] arm64: ptrace: allow tracer to skip a system call
-In-Reply-To: <20140901114751.GG30401@n2100.arm.linux.org.uk>
-References: <1408611405-8943-1-git-send-email-takahiro.akashi@linaro.org>
- <1408611405-8943-3-git-send-email-takahiro.akashi@linaro.org>
- <CAGXu5jJCyqpXkdvNDCu+eMr0qnqwbqUUo4u+2p_7DvFMzfKoEw@mail.gmail.com>
- <53F69045.7010301@linaro.org> <20140826175128.GD23445@arm.com>
- <53FD72E2.4020103@linaro.org> <20140901114751.GG30401@n2100.arm.linux.org.uk>
-Message-ID: <54058421.5070506@linaro.org>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Tue, 02 Sep 2014 10:48:02 +0200
+Subject: [RFC PATCH 0/7] Introduce automatic DMA configuration for IOMMU
+ masters
+In-Reply-To: <20140902083138.GA25379@arm.com>
+References: <1409327670-3495-1-git-send-email-will.deacon@arm.com>
+ <540562F9.2030508@samsung.com> <20140902083138.GA25379@arm.com>
+Message-ID: <54058442.2070204@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/01/2014 08:47 PM, Russell King - ARM Linux wrote:
-> On Wed, Aug 27, 2014 at 02:55:46PM +0900, AKASHI Takahiro wrote:
->> 1)
->> setting x0 to -ENOSYS is necessary because, otherwise, user-issued syscall(-1) will
->> return a bogus value when audit tracing is on.
->>
->> Please note that, on arm,
->>                   not traced      traced
->>                   ------          ------
->> syscall(-1)      aborted         OOPs(BUG_ON)
->> syscall(-3000)   aborted         aborted
->> syscall(1000)    ENOSYS          ENOSYS
->
-> Two points here:
->
-> 1. You've found a case which causes a BUG_ON().  Where is the bug report
->     for this, so the problem can be investigated and resolved?
+Hi Will,
 
-I think that I mentioned it could also happen on arm somewhere in a talk with Will,
-but don't remember exactly when.
+On 2014-09-02 10:31, Will Deacon wrote:
+> On Tue, Sep 02, 2014 at 07:26:01AM +0100, Marek Szyprowski wrote:
+>> On 2014-08-29 17:54, Will Deacon wrote:
+>>> This patch series is an RFC to implement IOMMU master configuration into
+>>> of_dma_configure. I haven't yet ported any IOMMU drivers to it, so it
+>>> remains untested, but I wanted to get some early feedback to ensure that
+>>> this doesn't end up going in the wrong direction.
+>>>
+>>> The idea comes out of my understanding following discussions with Arnd
+>>> and David at Kernel Summit / LinuxCon in Chicago. Essentially:
+>>>
+>>>     - Allow IOMMUs to be probed early and set up per-instance data on their
+>>>       of_node
+>>>
+>>>     - Add a new callback to the iommu_ops structure for adding a device
+>>>       with a set of opaque IDs (e.g. Stream IDs or Requester IDs)
+>>>
+>>>     - Add an of_iommu_configure function, called from of_dma_configure,
+>>>       which registers the master IDs with the correspond IOMMU before
+>>>       probing the master itself
+>>>
+>>>     - Where applicable, create an IOMMU domain per device and swizzle the
+>>>       DMA ops for that device to use the IOMMU variants.
+>>>
+>>> I haven't bothered doing anything clever with the DMA masks yet, so I
+>>> wouldn't be surprised if we end up chewing through tonnes of memory
+>>> allocating IOMMU domains that are far too big at the moment. Again, this
+>>> is just an RFC and I'd welcome comments on the general direction of the
+>>> series.
+>> Thanks for your patches, I wasn't aware the fact that you are working on
+>> this. When do you plan to send a second version? I would like to rebase
+>> my Exynos IOMMU patches (https://lkml.org/lkml/2014/8/5/183) on top of
+>> your work, but I wonder if I should select this version as a base or wait
+>> a bit for an update.
+> I'll try and get something out today/tomorrow depending on how easily the
+> review comments fall out. It would be really great if you get an IOMMU
+> working with this (I was going to look at the ARM SMMU once this stops
+> moving)
 
-> 2. What do you mean by "aborted" ?
+Great, I will wait then for v2.
 
-I mean that the process will receive SIGILL and get aborted.
-A system call number, like -1 and -3000, won't be trapped by *switch* statement
-in asm_syscall() and end up with being signaled.
+>   -- I have concerns that allocating one domain per master might be
+> too much, but it's hard to tell without an IOMMU driver ported over.
 
-> Please, if you find a problem with 32-bit ARM, report it.  Don't hide it,
-> because hiding it can be a security issue or in the case of BUG_ON(), it
-> could be a denial of service issue.
->
-> As you're part of Linaro, I would have thought you'd be more responsible
-> in this regard - after all, Linaro is supposed to be about improving the
-> ARM kernel...  Maybe I got that wrong, and Linaro is actually about
-> ensuring that the ARM kernel is stuffed full of broken features?
+One domain per master is IMHO a sane default configuration. The only default
+alternative I see is to have only one domain (related with dma-mapping
+subsystem) and bind all devices to it. However I really don't see any
+disadvantage of having separate domain per each master and such 
+configuration
+gives devices better separation.
 
-I thought my first priority was on arm64 (and then arm), but now that you and Will
-seem to want to see the fix first on arm, okey, I will start with arm issue.
+However we also need to figure out how to let drivers to make their own
+configuration, like it is required by Exynos DRM subsystem, which consist
+of several devices, each having its own IOMMU controller, but for
+convenience those drivers assume that they all have been bound to the same,
+single domain.
 
-Thanks,
--Takahiro AKASHI
+Best regards
+-- 
+Marek Szyprowski, PhD
+Samsung R&D Institute Poland
