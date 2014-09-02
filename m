@@ -1,109 +1,142 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 2 Sep 2014 11:46:55 +0100
-Subject: [RFC PATCH 1/1] drivers: introduce ARM SBSA generic UART driver
-In-Reply-To: <540596A6.8000608@arm.com>
-References: <1409328803-1953-1-git-send-email-andre.przywara@arm.com>
- <1409328803-1953-2-git-send-email-andre.przywara@arm.com>
- <CAL_JsqJbAWRhduzMwdQMh8sDdVqTWVK2Ej9LQjx4gp2ifwxe6Q@mail.gmail.com>
- <540596A6.8000608@arm.com>
-Message-ID: <20140902104654.GB6725@leverpostej>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Tue, 02 Sep 2014 13:51:54 +0300
+Subject: [RFC PATCH 4/7] iommu: provide helper function to configure an
+ IOMMU for an of master
+In-Reply-To: <1409327670-3495-5-git-send-email-will.deacon@arm.com>
+References: <1409327670-3495-1-git-send-email-will.deacon@arm.com>
+ <1409327670-3495-5-git-send-email-will.deacon@arm.com>
+Message-ID: <1485866.XbpZvVaUr8@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 02, 2014 at 11:06:30AM +0100, Andre Przywara wrote:
-> Hi Rob,
+Hi Will,
+
+Thank you for the patch.
+
+On Friday 29 August 2014 16:54:27 Will Deacon wrote:
+> The generic IOMMU device-tree bindings can be used to add arbitrary OF
+> masters to an IOMMU with a compliant binding.
 > 
-> thanks for looking at this.
+> This patch introduces of_iommu_configure, which does exactly that.
 > 
-> On 02/09/14 04:06, Rob Herring wrote:
-> > On Fri, Aug 29, 2014 at 11:13 AM, Andre Przywara <andre.przywara@arm.com> wrote:
-> >> The ARM Server Base System Architecture (SBSA) describes a generic
-> >> UART which all compliant level 1 systems should implement. This is
-> >> actually a PL011 subset, so a full PL011 implementation will satisfy
-> >> this requirement.
-> >> However if a system does not have a PL011, a very stripped down
-> >> implementation complying to the SBSA defined specification will
-> >> suffice. The Linux PL011 driver is not guaranteed to drive this
-> >> limited device (and indeed the fast model implentation hangs the
-> >> kernel if driven by the PL011 driver).
-> >> So introduce a new driver just implementing the part specified by the
-> >> SBSA (which lacks DMA, the modem control signals and many of the
-> >> registers including baud rate control). This driver has been derived
-> >> by the actual PL011 one, removing all unnecessary code.
-> >>
-> >> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
-> >> ---
-> >>  .../devicetree/bindings/serial/arm_sbsa_uart.txt   |    6 +
-> >>  drivers/tty/serial/Kconfig                         |   28 +
-> >>  drivers/tty/serial/Makefile                        |    1 +
-> >>  drivers/tty/serial/sbsa_uart.c                     |  793 ++++++++++++++++++++
-> >>  include/uapi/linux/serial_core.h                   |    1 +
-> > 
-> > Sorry, but I think this is all wrong. We've now just duplicated some
-> > subset of the pl011 driver leaving out the parts like setting baudrate
-> > which can never be added since those things could be different for
-> > every vendor.
-> > 
-> > The original intent of the SBSA uart was to provide a common early
-> > debug uart. It was not to have a full fledged driver. I think the SBSA
-> > has failed in this area and created the potential to create a mess of
-> > serial drivers different for every vendor. Reality will hopefully not
-> > be that extreme and most vendors will just use the pl011 and create
-> > their value add somewhere besides the uart. For the purpose of debug
-> > output, we already support that as the pl011 earlycon only touches
-> > SBSA compatible registers.
-
-I agree that we don't want a proliferation of not-quite-pl011 devices
-that we end up having to drive differently.
-
-If we do have such devices I wouldn't want to call them a pl011s for the
-sake of earlycon if they aren't actually pl011s.
-
-> I see your point (and was actually looking for those kind of comments
-> when posting this).
-> I agree to that debug aspect and understand that earlycon already does
-> this, but I think we need some support beyond earlycon, to be able to
-> login and use it as a console (which is not possible with earlycon,
-> right?) This is probably still for debugging or emergency access to the
-> system only, but maybe also for logging - actually quite similar to how
-> UARTs are used on today's x86 servers.
-> So after having written three incarnations of this driver (goldfish
-> based, PL010 based, PL011 based) I wonder if supporting the SBSA subset
-> in the real PL011 driver is an option. Either this would be enabled by a
-> new explicit DT property or preferably by a clever compatible string.
-> Ideally we would just provide a different set of "struct uart_ops"
-> members, with some pointing to generic PL011 routines, some to SBSA UART
-> specific ones.
-> Maybe we make the full featured PL011 support a config option
-> (defaulting to y), allowing people to only use the SBSA subset in their
-> kernel?
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
+> ---
+>  drivers/iommu/Kconfig    |  2 +-
+>  drivers/iommu/of_iommu.c | 36 ++++++++++++++++++++++++++++++++++++
+>  include/linux/of_iommu.h |  6 ++++++
+>  3 files changed, 43 insertions(+), 1 deletion(-)
 > 
-> Does that make more sense? (for a general SBSA h/w rationale see below)
+> diff --git a/drivers/iommu/Kconfig b/drivers/iommu/Kconfig
+> index dd5112265cc9..6d13f962f156 100644
+> --- a/drivers/iommu/Kconfig
+> +++ b/drivers/iommu/Kconfig
+> @@ -15,7 +15,7 @@ if IOMMU_SUPPORT
 > 
-> >>  5 files changed, 829 insertions(+)
-> >>  create mode 100644 Documentation/devicetree/bindings/serial/arm_sbsa_uart.txt
-> >>  create mode 100644 drivers/tty/serial/sbsa_uart.c
-> >>
-> >> diff --git a/Documentation/devicetree/bindings/serial/arm_sbsa_uart.txt b/Documentation/devicetree/bindings/serial/arm_sbsa_uart.txt
-> >> new file mode 100644
-> >> index 0000000..8e2c5d6
-> >> --- /dev/null
-> >> +++ b/Documentation/devicetree/bindings/serial/arm_sbsa_uart.txt
-> >> @@ -0,0 +1,6 @@
-> >> +* ARM SBSA defined generic UART
-> >> +
-> >> +Required properties:
-> >> +- compatible: must be "arm,sbsa-uart"
-> > 
-> > This alone is not okay. There is no such implementation of hardware.
+>  config OF_IOMMU
+>         def_bool y
+> -       depends on OF
+> +       depends on OF && IOMMU_API
+> 
+>  config FSL_PAMU
+>  	bool "Freescale IOMMU support"
+> diff --git a/drivers/iommu/of_iommu.c b/drivers/iommu/of_iommu.c
+> index f9209666157c..a7d3b3a13b83 100644
+> --- a/drivers/iommu/of_iommu.c
+> +++ b/drivers/iommu/of_iommu.c
+> @@ -19,6 +19,7 @@
+> 
+>  #include <linux/export.h>
+>  #include <linux/limits.h>
+> +#include <linux/iommu.h>
 
-Do you want something like:
+Pet peeve of mine, how about keeping the headers alphabetically sorted ?
 
-- compatible: must contain an "arm,sbsa-uart" following a more specific
-  entry from the following list:
+>  #include <linux/of.h>
+>  #include <linux/of_iommu.h>
+> 
+> @@ -90,6 +91,41 @@ int of_get_dma_window(struct device_node *dn, const char
+> *prefix, int index, }
+>  EXPORT_SYMBOL_GPL(of_get_dma_window);
+> 
+> +int of_iommu_configure(struct device *dev)
+> +{
+> +	struct of_phandle_args iommu_spec;
+> +	struct bus_type *bus = dev->bus;
+> +	const struct iommu_ops *ops = bus->iommu_ops;
+> +	int ret = -EINVAL, idx = 0;
+> +
+> +	if (!iommu_present(bus))
+> +		return -ENODEV;
+> +
+> +	/*
+> +	 * We don't currently walk up the tree looking for a parent IOMMU.
+> +	 * See the `Notes:' section of
+> +	 * Documentation/devicetree/bindings/iommu/iommu.txt
+> +	 */
+> +	while (!of_parse_phandle_with_args(dev->of_node, "iommus",
+> +					   "#iommu-cells", idx,
+> +					   &iommu_spec)) {
+> +		void *data = of_iommu_get_data(iommu_spec.np);
+> +
+> +		of_node_put(iommu_spec.np);
+> +		if (!ops->add_device_master_ids)
+> +			return -ENODEV;
 
-  * "arm,pl011"
+Can't you move this outside of the loop ?
 
-Or do we need to restructure the pl011 docs entirely?
+> +
+> +		ret = ops->add_device_master_ids(dev, iommu_spec.args_count,
+> +						 iommu_spec.args, data);
 
-Mark.
+I'm curious, how do you envision support for devices connected to multiple 
+IOMMUs ? IOMMU drivers usually allocate a per-device archdata structure in the 
+add_device operation and store it in the dev->archdata.iommu field. How would 
+that work with multiple invocations of add_device or add_device_master_ids ?
+
+> +		if (ret)
+> +			break;
+> +
+> +		idx++;
+> +	}
+> +
+> +	return ret;
+> +}
+> +
+>  void __init of_iommu_init(void)
+>  {
+>  	struct device_node *np;
+> diff --git a/include/linux/of_iommu.h b/include/linux/of_iommu.h
+> index 29f2f3f88d6a..85c6d1152624 100644
+> --- a/include/linux/of_iommu.h
+> +++ b/include/linux/of_iommu.h
+> @@ -1,6 +1,7 @@
+>  #ifndef __OF_IOMMU_H
+>  #define __OF_IOMMU_H
+> 
+> +#include <linux/device.h>
+>  #include <linux/of.h>
+> 
+>  #ifdef CONFIG_OF_IOMMU
+> @@ -10,6 +11,7 @@ extern int of_get_dma_window(struct device_node *dn, const
+> char *prefix, size_t *size);
+> 
+>  extern void of_iommu_init(void);
+> +extern int of_iommu_configure(struct device *dev);
+> 
+>  #else
+> 
+> @@ -21,6 +23,10 @@ static inline int of_get_dma_window(struct device_node
+> *dn, const char *prefix, }
+> 
+>  static inline void of_iommu_init(void) { }
+> +static inline int of_iommu_configure(struct device *dev)
+> +{
+> +	return -ENODEV;
+> +}
+> 
+>  #endif	/* CONFIG_OF_IOMMU */
+
+-- 
+Regards,
+
+Laurent Pinchart
