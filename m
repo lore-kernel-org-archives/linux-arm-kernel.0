@@ -1,46 +1,66 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 2 Sep 2014 11:57:30 +0100
-Subject: [RFC PATCH 0/7] Introduce automatic DMA configuration for IOMMU
- masters
-In-Reply-To: <54059F05.2090901@samsung.com>
-References: <1409327670-3495-1-git-send-email-will.deacon@arm.com>
- <20140902083138.GA25379@arm.com> <54058442.2070204@samsung.com>
- <33373396.gPTVFGBBxa@wuerfel> <54059F05.2090901@samsung.com>
-Message-ID: <20140902105730.GH25379@arm.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 2 Sep 2014 12:01:02 +0100
+Subject: [PATCH 1/5] usb: dwc3: exynos: Add support for SCLK present on
+ Exynos7
+In-Reply-To: <CAFp+6iHLSaUjHqaKXXX0QLiRd3h+O67DRSQdExag-KUH0dnpag@mail.gmail.com>
+References: <1409212920-28526-1-git-send-email-gautam.vivek@samsung.com>
+ <1409212920-28526-2-git-send-email-gautam.vivek@samsung.com>
+ <20140828184847.GA18464@leverpostej>
+ <CAFp+6iHLSaUjHqaKXXX0QLiRd3h+O67DRSQdExag-KUH0dnpag@mail.gmail.com>
+Message-ID: <20140902110102.GC6725@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 02, 2014 at 11:42:13AM +0100, Marek Szyprowski wrote:
-> On 2014-09-02 10:56, Arnd Bergmann wrote:
-> > On Tuesday 02 September 2014 10:48:02 Marek Szyprowski wrote:
-> >>>    -- I have concerns that allocating one domain per master might be
-> >>> too much, but it's hard to tell without an IOMMU driver ported over.
-> >> One domain per master is IMHO a sane default configuration. The only default
-> >> alternative I see is to have only one domain (related with dma-mapping
-> >> subsystem) and bind all devices to it. However I really don't see any
-> >> disadvantage of having separate domain per each master and such
-> >> configuration
-> >> gives devices better separation.
-> > I was expecting that the dma-mapping implementation would by default use
-> > one domain for all devices, since that is what the simpler IOMMUs without
-> > domain support have to do anyway.
-> >
-> > For isolation purposes, it can only help to have more domains, but
-> > I would guess that there is some space overhead in maintaining lots
-> > of page tables.
+On Tue, Sep 02, 2014 at 11:39:08AM +0100, Vivek Gautam wrote:
+> Hi,
 > 
-> I'm okay with both approaches (separate domain for each device vs. single
-> common domain for all devices). Maybe this can be some kind of Kconfig
-> option added to DMA debugging? Separation might be really helpful when
-> debugging strange device behavior.
+> 
+> On Fri, Aug 29, 2014 at 12:18 AM, Mark Rutland <mark.rutland@arm.com> wrote:
+> > On Thu, Aug 28, 2014 at 09:01:56AM +0100, Vivek Gautam wrote:
+> >> Exynos7 also has a separate special gate clock going to the IP
+> >> apart from the usual AHB clock. So add support for the same.
+> >>
+> >> Signed-off-by: Vivek Gautam <gautam.vivek@samsung.com>
+> >> ---
+> >>  drivers/usb/dwc3/dwc3-exynos.c |   16 ++++++++++++++++
+> >>  1 file changed, 16 insertions(+)
+> >>
+> >> diff --git a/drivers/usb/dwc3/dwc3-exynos.c b/drivers/usb/dwc3/dwc3-exynos.c
+> >> index f9fb8ad..bab6395 100644
+> >> --- a/drivers/usb/dwc3/dwc3-exynos.c
+> >> +++ b/drivers/usb/dwc3/dwc3-exynos.c
+> >> @@ -35,6 +35,7 @@ struct dwc3_exynos {
+> >>       struct device           *dev;
+> >>
+> >>       struct clk              *clk;
+> >> +     struct clk              *sclk;
+> >>       struct regulator        *vdd33;
+> >>       struct regulator        *vdd10;
+> >>  };
+> >> @@ -141,10 +142,17 @@ static int dwc3_exynos_probe(struct platform_device *pdev)
+> >>               return -EINVAL;
+> >>       }
+> >>
+> >> +     /* Exynos7 has a special gate clock going to this IP */
+> >> +     exynos->sclk = devm_clk_get(dev, "usbdrd30_sclk");
+> >> +     if (IS_ERR(exynos->sclk))
+> >> +             dev_warn(dev, "couldn't get sclk\n");
+> >
+> > Doesn't this introduce a pointless warning for Exynos SoCs other than
+> > Exynos7?
+> 
+> True, it will introduce an unnecessary warning for non-Exynos7 systems.
+> I initially thought of introducing a compatible check for Exynos7-dwc3, but that
+> way we may end up adding such checks for future SoCs which have similar
+> controller but have some clock difference or some other small change, no ?
 
-One potential problem with a single domain is when you have multiple
-instances of a given IOMMU, each with different hardware restrictions.
-Then you can end up with multiple sets of page tables for the domain
-which, although not impossible to work with, is a bit of a mess.
+Perhaps. I don't know what your future hardware will look like.
 
-I think having one domain per IOMMU instance would make the most sense,
-but then you have to teach more of the stack about the IOMMU topology. I
-think we'll get there in the end, but that's a little way off right now.
+Is the usbdrd30_sclk input unique to Exynos7, or was it previously there
+but just without an input?
 
-Will
+If the latter you could just reduce this to:
+
+dev_info(dev, "no sclk specified");
+
+Mark.
