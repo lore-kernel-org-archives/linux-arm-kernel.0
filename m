@@ -1,26 +1,35 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 2 Sep 2014 17:52:21 +0100
-Subject: Formal license ambiguity in arch/arm/boot/dts/sun?i-a*.dts
-In-Reply-To: <20140902133713.GR30401@n2100.arm.linux.org.uk>
-References: <201408031959.27607.arnd@arndb.de> <20140804192510.GF3952@lukather>
- <20140804212317.GL30282@n2100.arm.linux.org.uk>
- <20140807132023.GG15297@lukather> <20140902102206.GU15297@lukather>
- <20140902104002.GN30401@n2100.arm.linux.org.uk>
- <20140902122716.GV15297@lukather> <5405B986.2080407@redhat.com>
- <20140902125116.GW15297@lukather>
- <20140902133713.GR30401@n2100.arm.linux.org.uk>
-Message-ID: <20140902165221.GU30401@n2100.arm.linux.org.uk>
+From: dianders@chromium.org (Doug Anderson)
+Date: Tue, 2 Sep 2014 09:53:00 -0700
+Subject: [PATCH 2/2] dt-bindings: Add input supplies to rk808 bindings
+In-Reply-To: <20140902163105.GY29327@sirena.org.uk>
+References: <1409674469-12123-1-git-send-email-dianders@chromium.org>
+ <1409674469-12123-3-git-send-email-dianders@chromium.org>
+ <20140902163105.GY29327@sirena.org.uk>
+Message-ID: <CAD=FV=Xnpqhqo4zQPJPUj3=BipeuD0+L4mxN_0zfJheTMnwjLA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 02, 2014 at 02:37:13PM +0100, Russell King - ARM Linux wrote:
-> I'll also drop Linus an email to see whether he has any concerns with
-> this.
+Mark,
 
-Okay, we (a few others on this thread and myself) have an answer from
-Linus, which is agreement with this approach.  Linus (like me, and I
-hope everyone else) would only have objection with BSD 4-clause.
+On Tue, Sep 2, 2014 at 9:31 AM, Mark Brown <broonie@kernel.org> wrote:
+> On Tue, Sep 02, 2014 at 09:14:29AM -0700, Doug Anderson wrote:
+>> The original bindings for rk808 didn't include input supplies.  Add
+>> them.
+>
+> Acked-by: Mark Brown <broonie@linaro.org>
+>
+> You probably want to send this to Lee...
 
--- 
-FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
-according to speedtest.net.
+Good point.  I think it might actually be better for Chris to just
+squash my bindings patch into his bindings patch since he still has to
+send out another version.  If you haven't applied the regulator patch
+by the time he sends his next version he can include my patch in his
+series (with your Ack).
+
+Chris did get an Ack for the MFD patch from Lee but I requested some
+changes to the regulator patch.  When things look good Chris will add
+you back to the CC list for the regulator part of his series.
+
+Thanks!
+
+-Doug
