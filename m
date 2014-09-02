@@ -1,51 +1,64 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 2 Sep 2014 09:52:34 +0200
-Subject: [PATCH v2 10/12] clk: sunxi: mod0: Introduce MMC proper phase
- handling
-In-Reply-To: <20140901213945.5251.37105@quantum>
-References: <1409428991-2442-1-git-send-email-maxime.ripard@free-electrons.com>
- <1409428991-2442-11-git-send-email-maxime.ripard@free-electrons.com>
- <20140901213945.5251.37105@quantum>
-Message-ID: <20140902075234.GO15297@lukather>
+From: takahiro.akashi@linaro.org (AKASHI Takahiro)
+Date: Tue, 02 Sep 2014 16:58:38 +0900
+Subject: [PATCH v6 2/6] arm64: ptrace: allow tracer to skip a system call
+In-Reply-To: <20140901113755.GA24594@arm.com>
+References: <1408611405-8943-1-git-send-email-takahiro.akashi@linaro.org>
+ <1408611405-8943-3-git-send-email-takahiro.akashi@linaro.org>
+ <CAGXu5jJCyqpXkdvNDCu+eMr0qnqwbqUUo4u+2p_7DvFMzfKoEw@mail.gmail.com>
+ <53F69045.7010301@linaro.org> <20140826175128.GD23445@arm.com>
+ <53FD72E2.4020103@linaro.org> <20140901113755.GA24594@arm.com>
+Message-ID: <540578AE.8090000@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 09/01/2014 08:37 PM, Will Deacon wrote:
+> On Wed, Aug 27, 2014 at 06:55:46AM +0100, AKASHI Takahiro wrote:
+>> On 08/27/2014 02:51 AM, Will Deacon wrote:
+>>> On Fri, Aug 22, 2014 at 01:35:17AM +0100, AKASHI Takahiro wrote:
+>>>> Oops, you're absolutely right. I didn't think of this case.
+>>>> syscall_trace_enter() should not return a syscallno directly, but always
+>>>> return -1 if syscallno < 0. (except when secure_computing() returns with -1)
+>>>> This also implies that tracehook_report_syscall() should also have a return value.
+>>>>
+>>>> Will, is this fine with you?
+>>>
+>>> Well, the first thing that jumps out at me is why this is being done
+>>> completely differently for arm64 and arm. I thought adding the new ptrace
+>>> requests would reconcile the differences?
+>>
+>> I'm not sure what portion of my code you mentioned as "completely different", but
+>>
+>> 1)
+>> setting x0 to -ENOSYS is necessary because, otherwise, user-issued syscall(-1) will
+>> return a bogus value when audit tracing is on.
+>>
+>> Please note that, on arm,
+>>                    not traced      traced
+>>                    ------          ------
+>> syscall(-1)      aborted         OOPs(BUG_ON)
+>> syscall(-3000)   aborted         aborted
+>> syscall(1000)    ENOSYS          ENOSYS
+>>
+>> So, anyhow, its a bit difficult and meaningless to mimic these invalid cases.
+>
+> I'm not suggesting we make ourselves bug-compatible with ARM. Instead, I'd
+> rather see a series of patches getting the ARM code working correctly,
+> before we go off doing something different for arm64.
 
-On Mon, Sep 01, 2014 at 02:39:45PM -0700, Mike Turquette wrote:
-> Quoting Maxime Ripard (2014-08-30 13:03:09)
-> > The MMC clock we thought we had until now are actually not one but three
-> > different clocks.
-> > 
-> > The main one is unchanged, and will have three outputs:
-> >   - The clock fed into the MMC
-> >   - a sample and output clocks, to deal with when should we output/sample data
-> >     to/from the MMC bus
-> > 
-> > The phase control we had are actually controlling the two latter clocks, but
-> > the main MMC one is unchanged.
-> > 
-> > We can adjust the phase with a 3 bits value, from 0 to 7, 0 meaning a 180 phase
-> > shift, and the other values being the number of periods from the MMC parent
-> > clock to outphase the clock of.
-> > 
-> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> 
-> Looks good. Thanks a lot for revisiting this after talking to your
-> hardware team!
+I see.
 
-It's not *our* hardware team, but I'll let them know :)
+>> 2)
+>> branching a new label, syscall_trace_return_skip (see entry.S), after syscall_trace_enter()
+>> is necessary in order to avoid OOPS in audit_syscall_enter() as we discussed.
+>>
+>> Did I make it clear?
+>
+> Sure. So let's fix ARM, then look at the arm64 port after that. I really
+> want to avoid divergence in this area.
 
-Maxime
+Okey, I will start with fixing the issue on arm.
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140902/3984ede1/attachment-0001.sig>
+-Takahiro AKASHI
+
+> Will
+>
