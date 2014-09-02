@@ -1,46 +1,43 @@
-From: boris.brezillon@free-electrons.com (Boris BREZILLON)
-Date: Tue,  2 Sep 2014 17:27:51 +0200
-Subject: [PATCH] clk: at91: fix num_parents test in at91sam9260 slow clk
- implementation
-Message-ID: <1409671671-13544-1-git-send-email-boris.brezillon@free-electrons.com>
+From: ch.naveen@samsung.com (Naveen Krishna Chatradhi)
+Date: Tue, 02 Sep 2014 20:54:52 +0530
+Subject: [PATCH] irqchip: exynos-combiner: Fix compilation error on ARM64
+Message-ID: <1409671492-7725-1-git-send-email-ch.naveen@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The slow clk block provided by at91sam9260 and derived SoCs should always
-have 2 parents.
+The following compilation error occurs on 64-bit Exynos7 SoC:
 
-Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
+drivers/irqchip/exynos-combiner.c: In function ?combiner_irq_domain_map?:
+drivers/irqchip/exynos-combiner.c:162:2: error: implicit declaration of function ?set_irq_flags? [-Werror=implicit-function-declaration]
+  set_irq_flags(irq, IRQF_VALID | IRQF_PROBE);
+  ^
+drivers/irqchip/exynos-combiner.c:162:21: error: ?IRQF_VALID? undeclared (first use in this function)
+  set_irq_flags(irq, IRQF_VALID | IRQF_PROBE);
+                     ^
+drivers/irqchip/exynos-combiner.c:162:21: note: each undeclared identifier is reported only once for each function it appears in
+drivers/irqchip/exynos-combiner.c:162:34: error: ?IRQF_PROBE? undeclared (first use in this function)
+  set_irq_flags(irq, IRQF_VALID | IRQF_PROBE);
+
+Fix the build error by including asm/hardirq.h.
+
+Signed-off-by: Naveen Krishna Chatradhi <ch.naveen@samsung.com>
+Cc: Thomas Gleixner <tglx@linutronix.de>
 ---
+ drivers/irqchip/exynos-combiner.c |    2 ++
+ 1 file changed, 2 insertions(+)
 
-Hello Mike,
-
-Could you take this fix for the next 3.17 rc ?
-Without this fix you won't be able to use programmable clks (the slow
-clk is one of the parents of prog clks), and these prog clks are used,
-among other things, to provide clks to external audio chips.
-
-No need to backport this fix to previous stable releases, as CCF support
-for at91sam9260 (and derived) SoCs only appeared in 3.17.
-
-Best Regards,
-
-Boris
-
- drivers/clk/at91/clk-slow.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/drivers/clk/at91/clk-slow.c b/drivers/clk/at91/clk-slow.c
-index 0300c46..32f7c1b 100644
---- a/drivers/clk/at91/clk-slow.c
-+++ b/drivers/clk/at91/clk-slow.c
-@@ -447,7 +447,7 @@ void __init of_at91sam9260_clk_slow_setup(struct device_node *np,
- 	int i;
+diff --git a/drivers/irqchip/exynos-combiner.c b/drivers/irqchip/exynos-combiner.c
+index f8636a6..7fbedcc 100644
+--- a/drivers/irqchip/exynos-combiner.c
++++ b/drivers/irqchip/exynos-combiner.c
+@@ -18,6 +18,8 @@
+ #include <linux/of_address.h>
+ #include <linux/of_irq.h>
  
- 	num_parents = of_count_phandle_with_args(np, "clocks", "#clock-cells");
--	if (num_parents <= 0 || num_parents > 1)
-+	if (num_parents != 2)
- 		return;
++#include <asm/hardirq.h>
++
+ #include "irqchip.h"
  
- 	for (i = 0; i < num_parents; ++i) {
+ #define COMBINER_ENABLE_SET	0x0
 -- 
-1.9.1
+1.7.9.5
