@@ -1,50 +1,69 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Tue, 02 Sep 2014 08:26:01 +0200
-Subject: [RFC PATCH 0/7] Introduce automatic DMA configuration for IOMMU
- masters
-In-Reply-To: <1409327670-3495-1-git-send-email-will.deacon@arm.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Tue, 02 Sep 2014 09:56:12 +0300
+Subject: [RFC PATCH 1/7] iommu: provide early initialisation hook for
+ IOMMU drivers
+In-Reply-To: <20140901075216.GA24430@ulmo>
 References: <1409327670-3495-1-git-send-email-will.deacon@arm.com>
-Message-ID: <540562F9.2030508@samsung.com>
+ <1409327670-3495-2-git-send-email-will.deacon@arm.com>
+ <20140901075216.GA24430@ulmo>
+Message-ID: <5261873.R44Dyo67Nf@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will,
+On Monday 01 September 2014 09:52:19 Thierry Reding wrote:
+> On Fri, Aug 29, 2014 at 04:54:24PM +0100, Will Deacon wrote:
+> > IOMMU drivers must be initialised before any of their upstream devices,
+> > otherwise the relevant iommu_ops won't be configured for the bus in
+> > question. To solve this, a number of IOMMU drivers use initcalls to
+> > initialise the driver before anything has a chance to be probed.
+> > 
+> > Whilst this solves the immediate problem, it leaves the job of probing
+> > the IOMMU completely separate from the iommu_ops to configure the IOMMU,
+> > which are called on a per-bus basis and require the driver to figure out
+> > exactly which instance of the IOMMU is being requested. In particular,
+> > the add_device callback simply passes a struct device to the driver,
+> > which then has to parse firmware tables or probe buses to identify the
+> > relevant IOMMU instance.
+> > 
+> > This patch takes the first step in addressing this problem by adding an
+> > early initialisation pass for IOMMU drivers, giving them the ability to
+> > set some per-instance data on their of_node. This data can then be
+> > passed back to a new add_device function (added in a later patch) to
+> > identify the IOMMU instance in question.
+> > 
+> > Signed-off-by: Will Deacon <will.deacon@arm.com>
+> > ---
+> > 
+> >  drivers/iommu/of_iommu.c          | 14 ++++++++++++++
+> >  include/asm-generic/vmlinux.lds.h |  2 ++
+> >  include/linux/of_iommu.h          | 21 +++++++++++++++++++++
+> >  3 files changed, 37 insertions(+)
+> 
+> I don't think this is the right direction. We've been preaching that
+> using initcall ordering is a bad thing and people should be using
+> deferred probe instead. Now we have a bunch of these OF tables that do
+> the exact opposite. Note that these are nothing more than a variant of
+> initcalls that get called at platform-specific points in time.
 
-On 2014-08-29 17:54, Will Deacon wrote:
-> This patch series is an RFC to implement IOMMU master configuration into
-> of_dma_configure. I haven't yet ported any IOMMU drivers to it, so it
-> remains untested, but I wanted to get some early feedback to ensure that
-> this doesn't end up going in the wrong direction.
->
-> The idea comes out of my understanding following discussions with Arnd
-> and David at Kernel Summit / LinuxCon in Chicago. Essentially:
->
->    - Allow IOMMUs to be probed early and set up per-instance data on their
->      of_node
->
->    - Add a new callback to the iommu_ops structure for adding a device
->      with a set of opaque IDs (e.g. Stream IDs or Requester IDs)
->
->    - Add an of_iommu_configure function, called from of_dma_configure,
->      which registers the master IDs with the correspond IOMMU before
->      probing the master itself
->
->    - Where applicable, create an IOMMU domain per device and swizzle the
->      DMA ops for that device to use the IOMMU variants.
->
-> I haven't bothered doing anything clever with the DMA masks yet, so I
-> wouldn't be surprised if we end up chewing through tonnes of memory
-> allocating IOMMU domains that are far too big at the moment. Again, this
-> is just an RFC and I'd welcome comments on the general direction of the
-> series.
+My idea to solve this problem was to defer probing of the bus master device 
+from the add_device IOMMU operation. This obviously won't work with add_device 
+called from the BUS_NOTIFY_ADD_DEVICE notifier, which led me to naively wonder 
+whether we couldn't call the add_device operation from the 
+BUS_NOTIFY_BIND_DRIVER notifier instead.
 
-Thanks for your patches, I wasn't aware the fact that you are working on
-this. When do you plan to send a second version? I would like to rebase
-my Exynos IOMMU patches (https://lkml.org/lkml/2014/8/5/183) on top of
-your work, but I wonder if I should select this version as a base or wait
-a bit for an update.
+> There are also ongoing discussions about how to change the device probe
+> order to use dependencies (such as phandles from device tree) to prevent
+> excessive deferred probing. With that in place this would be solved in a
+> much more generic way.
 
-Best regards
 -- 
-Marek Szyprowski, PhD
-Samsung R&D Institute Poland
+Regards,
+
+Laurent Pinchart
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: This is a digitally signed message part.
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140902/74614f63/attachment.sig>
