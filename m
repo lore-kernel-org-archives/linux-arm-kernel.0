@@ -1,33 +1,40 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Tue, 02 Sep 2014 14:41:14 +0200
-Subject: [PATCH 05/14] pinctrl: exynos: Add driver data for Exynos7
-In-Reply-To: <CACRpkdZc=d+pr1ofEEp+1MoZUah8T7_LOfwM8bT-TsT+VoDgwQ@mail.gmail.com>
-References: <1409132889-2080-1-git-send-email-ch.naveen@samsung.com>	<1409132889-2080-5-git-send-email-ch.naveen@samsung.com>
- <CACRpkdZc=d+pr1ofEEp+1MoZUah8T7_LOfwM8bT-TsT+VoDgwQ@mail.gmail.com>
-Message-ID: <5405BAEA.9030100@gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue,  2 Sep 2014 14:41:21 +0200
+Subject: [PATCH] ARM: ux500: disable msp2 node on Snowball
+Message-ID: <1409661681-31490-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+Analogous to commit 8858d88a25142544843869f0cd3e6654aa7b4aec
+that fixed commit 70b41abc151f9
+"ARM: ux500: move MSP pin control to the device tree"
+accidentally activated MSP2, giving rise to a boot scroll
+scream as the kernel attempts to probe a driver for it and
+fails to obtain DMA channel 14.
 
-On 02.09.2014 14:38, Linus Walleij wrote:
-> On Wed, Aug 27, 2014 at 11:48 AM, Naveen Krishna Chatradhi
-> <ch.naveen@samsung.com> wrote:
-> 
->> This patch adds driver data for Exynos7
->> to pinctrl-exynos driver. Exynos7 includes 229 multi-functional
->> input/output ports. There are 40 general port groups.
->>
->> Signed-off-by: Naveen Krishna Chatradhi <ch.naveen@samsung.com>
->> Cc: Tomasz Figa <t.figa@samsung.com>
->> Cc: linus.walleij at linaro.org
->> Cc: Thomas Abraham <thomas.ab@samsung.com>
-> 
-> Tomasz can you have a look at this (from your private mail...)?
+For some reason I forgot to fix this on the Snowball. Fix
+this up by marking the node disabled again.
 
-Sure. In fact I already took a look last week, and this patch in
-particular looks good. However I'm waiting for replies to my other
-comments in this thread, as some of them affect also this patch.
+Cc: Lee Jones <lee.jones@linaro.org>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ARM SoC folks: please apply this patch directly to fixes for
+v3.17, I have no other pending Ux500 fixes.
+---
+ arch/arm/boot/dts/ste-snowball.dts | 1 -
+ 1 file changed, 1 deletion(-)
 
-Best regards,
-Tomasz
+diff --git a/arch/arm/boot/dts/ste-snowball.dts b/arch/arm/boot/dts/ste-snowball.dts
+index 4a2000c620ad..3e97a669f15e 100644
+--- a/arch/arm/boot/dts/ste-snowball.dts
++++ b/arch/arm/boot/dts/ste-snowball.dts
+@@ -116,7 +116,6 @@
+ 		msp2: msp at 80117000 {
+ 			pinctrl-names = "default";
+ 			pinctrl-0 = <&msp2_default_mode>;
+-			status = "okay";
+ 		};
+ 
+ 		msp3: msp at 80125000 {
+-- 
+1.9.3
