@@ -1,71 +1,72 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Tue, 02 Sep 2014 13:23:43 +0300
-Subject: [RFC PATCH 4/7] iommu: provide helper function to configure an
- IOMMU for an of master
-In-Reply-To: <3729116.F0gWrQGFZl@wuerfel>
-References: <1409327670-3495-1-git-send-email-will.deacon@arm.com>
- <20140901082939.GC24430@ulmo> <3729116.F0gWrQGFZl@wuerfel>
-Message-ID: <2453590.E42S9qWAZh@avalon>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 2 Sep 2014 12:22:06 +0200
+Subject: Formal license ambiguity in arch/arm/boot/dts/sun?i-a*.dts
+In-Reply-To: <20140807132023.GG15297@lukather>
+References: <20140731192016.GA6869@excalibur.cnev.de>
+ <20140803130430.GY3952@lukather> <201408031959.27607.arnd@arndb.de>
+ <20140804192510.GF3952@lukather>
+ <20140804212317.GL30282@n2100.arm.linux.org.uk>
+ <20140807132023.GG15297@lukather>
+Message-ID: <20140902102206.GU15297@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 01 September 2014 16:46:18 Arnd Bergmann wrote:
-> On Monday 01 September 2014 10:29:40 Thierry Reding wrote:
-> > I think this could use a bit more formalization. As I said in another
-> > reply earlier, there's very little standardization in the IOMMU API.
-> > That certainly gives us a lot of flexibility but it also has the
-> > downside that it's difficult to handle these abstractions in the core,
-> > which is really what the core is all about, isn't it?
+On Thu, Aug 07, 2014 at 03:20:23PM +0200, Maxime Ripard wrote:
+> Hi Russell,
+> 
+> On Mon, Aug 04, 2014 at 10:23:17PM +0100, Russell King - ARM Linux wrote:
+> > On Mon, Aug 04, 2014 at 09:25:10PM +0200, Maxime Ripard wrote:
+> > > On Sun, Aug 03, 2014 at 07:59:27PM +0200, Arnd Bergmann wrote:
+> > > > I would actually prefer if we could migrate a lot of these files to BSD license,
+> > > > provided the original authors agree. We want the dtb blobs to be embeddable into
+> > > > boot loaders of any license.
+> > > 
+> > > Even though I'd be open to having my contributions to DTBs under the
+> > > BSD, is this really a thing?
+> > > 
+> > > I mean, for all I know, an OS/Bootloader would just parse a documented
+> > > binary file, and I don't see any derivative work there.
 > > 
-> > One method that worked really well for this in the past for other
-> > subsystems is to allow drivers to specify an .of_xlate() function that
-> > takes the controller device and a struct of_phandle_args. It is that
-> > function's responsibility to take the information in an of_phandle_args
-> > structure and use that to create some subsystem specific handle that
-> > represents this information in a way that it can readily be used.
+> > How does the OS/Bootloader end up with that binary file?
+> > 
+> > For the sake of argument, let's say that the BSDs want to move to DT on
+> > ARM.  Great, they convert over to parsing our DT blobs.
+> > 
+> > However, they can't distribute the binary DT blobs to their users without
+> > coming up against the problems of the GPL wrt binary distribution.
+> > 
+> > They could distribute the source files, but remember that many of those
+> > are currently GPL licensed, so they'd probably end up having to package
+> > them entirely separately, if they're willing to do that at all.
+> > 
+> > Or they could decide to ignore us altogether, and do their own DT stuff,
+> > maybe partially implementing our properties, or maybe coming up with
+> > different and/or incompatible properties - which would be bad because
+> > we now end up with two ways to describe the same hardware in active use.
+> > 
+> > I suspect the final option is the one they'd choose, and it's in our
+> > interest that _that_ doesn't happen.
 > 
-> Yes, good idea.
+> Ah, yes, it's not really about a fear of a GPL-spread, but rather a
+> concern about the source distribution. Makes sense.
 > 
-> > So I think it would really be helpful if IOMMU gained support for
-> > something similar. We could create a struct iommu to represent an
-> > instance of an IOMMU. IOMMU drivers can embed this structure and add
-> > device-specific fields that they need. That way we can easily pass
-> > around instances and upcast in the driver in a type-safe way.
-> 
-> Right.
-> 
-> > At the same time, a struct iommu_master could provide the basis to
-> > represent a single master interface on an IOMMU. Drivers can again embed
-> > that in driver-specific structures with additional fields required for
-> > the particular IOMMU implementation. .of_xlate() could return such an
-> > IOMMU master for the core to use.
-> 
-> I'm not convinced it's necessary. Could this just be a 'struct device'
-> instead of 'struct iommu_master'?
+> How should we deal with such relicensing?
 
-As master drivers should in general be unaware of the IOMMU that serves them, 
-embedding a struct iommu_master inside driver-specific structures is a no-go.
+Ping?
 
-Let's also not forget that a device can be connected to multiple IOMMU ports. 
-The only cases I've seen had multiple connections between a bus master device 
-and a single IOMMU, all of them potentially sharing a TLB, so a simple 
-implementation was possible.
+Are we doing this on a per platform basis? Should we enforce this dual
+licensing for the future DTS patches? If so, starting from when?
 
-I'm not sure how we could handle connections from one device to different 
-IOMMUs, or to multiple ports of the same IOMMU with different TLBs. Splitting 
-the device in multiple children struct device might be required.
-
-> > With such structures in place we should be able to eliminate many of the
-> > loops in IOMMU drivers that serve no other purpose than to find the
-> > master context from a struct device * and some parameters. It will also
-> > allow us to keep a central registry of IOMMUs and masters rather than
-> > duplicating that in every driver.
-> 
-> Yes, we should be able to identify an iommu context in a generic way,
-> but why do you want to break it down to individual masters within
-> one context?
+Maxime
 
 -- 
-Regards,
-
-Laurent Pinchart
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140902/f664a267/attachment.sig>
