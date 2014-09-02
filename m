@@ -1,9 +1,9 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue,  2 Sep 2014 20:21:07 +0200
-Subject: [PATCH 3/5] ARM: sun6i: Relicense the A31 DTSI under GPLv2/X11
+Date: Tue,  2 Sep 2014 20:21:08 +0200
+Subject: [PATCH 4/5] ARM: sun7i: Relicense the A20 DTSI under GPLv2/X11
 In-Reply-To: <1409682069-7164-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1409682069-7164-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1409682069-7164-3-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1409682069-7164-4-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -14,18 +14,23 @@ In order to make it easier for them to reuse our device trees, relicense our
 DTSI first under a GPL/X11 dual-license. Hopefully, the DTS will follow soon.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-Cc: Boris BREZILLON <boris.brezillon@free-electrons.com>
+Cc: Alexander Bersenev <bay@hackerdom.ru>
+Cc: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 Cc: Carlo Caione <carlo@caione.org>
 Cc: Chen-Yu Tsai <wens@csie.org>
+Cc: Emilio L?pez <emilio@elopez.com.ar>
 Cc: Hans de Goede <hdegoede@redhat.com>
+Cc: Marc Zyngier <marc.zyngier@arm.com>
+Cc: Oliver Schinagl <oliver@schinagl.nl>
+Cc: Roman Byshko <rbyshko@gmail.com>
 ---
- arch/arm/boot/dts/sun6i-a31.dtsi | 46 +++++++++++++++++++++++++++++++++++-----
+ arch/arm/boot/dts/sun7i-a20.dtsi | 46 +++++++++++++++++++++++++++++++++++-----
  1 file changed, 41 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm/boot/dts/sun6i-a31.dtsi b/arch/arm/boot/dts/sun6i-a31.dtsi
-index 1c2ec913e650..eb686e78f225 100644
---- a/arch/arm/boot/dts/sun6i-a31.dtsi
-+++ b/arch/arm/boot/dts/sun6i-a31.dtsi
+diff --git a/arch/arm/boot/dts/sun7i-a20.dtsi b/arch/arm/boot/dts/sun7i-a20.dtsi
+index c658e343ce11..198eb9a486f2 100644
+--- a/arch/arm/boot/dts/sun7i-a20.dtsi
++++ b/arch/arm/boot/dts/sun7i-a20.dtsi
 @@ -3,12 +3,48 @@
   *
   * Maxime Ripard <maxime.ripard@free-electrons.com>
