@@ -1,43 +1,54 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Tue, 2 Sep 2014 10:13:01 -0300
-Subject: ARM: mx28: cpufreq-cpu0 support?
-In-Reply-To: <54055116.4030608@lategoodbye.de>
-References: <53F9B4BF.2050802@lategoodbye.de> <20140825080123.GA12289@dragon>
- <53FB1041.5010208@lategoodbye.de>
- <CAOMZO5CG7mw5W4D3fRPE3TGxQ6-3pTtDJrsNnieN8XKE9dGofQ@mail.gmail.com>
- <CAOMZO5CnuWJ9EaLUW8DYFU1Dzeh=92tux0zoUBKoW-L=VWZhhg@mail.gmail.com>
- <540412A9.4090806@lategoodbye.de>
- <CAOMZO5A7-66LJtv4O2TghN3gVzme4N6JFMYd8TV7zXhUhsXedQ@mail.gmail.com>
- <54055116.4030608@lategoodbye.de>
-Message-ID: <CAOMZO5A3n6HV_A+U5pjzbHQMhcpmq7gw0e0aT87GGTyTZKeZ9A@mail.gmail.com>
+From: gdjakov@mm-sol.com (Georgi Djakov)
+Date: Tue,  2 Sep 2014 16:13:41 +0300
+Subject: [PATCH v3 0/4] pinctrl: qcom: Add APQ8084 pinctrl support
+Message-ID: <1409663625-3185-1-git-send-email-gdjakov@mm-sol.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 2, 2014 at 2:09 AM, Stefan Wahren <info@lategoodbye.de> wrote:
+This set of patches adds pinctrl support for the Qualcomm APQ8084 platform.
+The first patch adds the pin definitions. The second patch contains the
+devicetree binding documentation. The third patch adds the DT node.
+The last patch makes the INTR_TARGET_PROC_APPS value configurable and
+defines it for each existing SoC.
 
-> thanks again. Now i unterstand much more, but otherwise the portation won't
-> be straight forward. The old source in drivers/regulator/mxs-regulator.c
-> needs a low level part located in arch/arm/plat-mx28/power.c . As far as i
-> know, the low level part needs to move into the devicetree binding and into
-> the mxs-regulator.c . Am i right?
+Tested on IFC6540 board.
 
-Yes, I think you are right.
+Changes since v2:
+ - Fixed some incorrect bits and offsets. (suggested by Bjorn Andersson)
+ - Updated binding documentation to follow the format of msm8960.
+   (suggested by Bjorn Andersson)
+ - Added fourth patch, which removes the hardcoded INTR_TARGET_PROC_APPS
+   value and makes it configurable. Also we keep the current value for
+   existing SoCs. (suggested by Bjorn Andersson)
 
-> Yesterday i had looked into the mx28 reference manual and into the low level
-> part of the mxs regulator. The reference manual defines four voltage
-> regulators: vddd, vdda, vddio and vddmem plus a overall current regulator.
-> But the low level part make use of vddd, vdda, vddio, vddio_bo and the
-> overall current.
->
-> Do i need the brown out regulator (vddio_bo) and the vddmem?
+Changes since v1:
+ - Updated the total number of pins (suggested by Bjorn Andersson)
+ - Added the missing pin info (provided by Andy Gross)
+ - Updated groups and functions to be consistent with other pinctrls.
+   (suggested by Andy Gross)
+ - Removed unused functions, qdss and test pins. (suggested by Andy Gross)
+ - Updated the documentation with the possible functions.
 
-As far as I understand vddmem is not used on mx28evk. From the mx28
-reference manual;
+Georgi Djakov (4):
+  pinctrl: qcom: Add APQ8084 pinctrl support
+  dt: Document Qualcomm APQ8084 pinctrl binding
+  ARM: dts: qcom: Add TLMM DT node for APQ8084
+  pinctrl: qcom: Make the target processor value configurable
 
-"11.12.8 VDDMEM Supply Targets Control Register
-(HW_POWER_VDDMEMCTRL)
-This register controls the voltage target for a memory supply
-generated from VDDA. This
-supply is intended for use with external memories such as LV-DDR that
-have unique voltage
-requirements not compatible with VDDIO, VDDA , or VDDD."
+ .../bindings/pinctrl/qcom,apq8084-pinctrl.txt      |  179 +++
+ arch/arm/boot/dts/qcom-apq8084.dtsi                |   10 +
+ drivers/pinctrl/qcom/Kconfig                       |    8 +
+ drivers/pinctrl/qcom/Makefile                      |    1 +
+ drivers/pinctrl/qcom/pinctrl-apq8064.c             |    2 +
+ drivers/pinctrl/qcom/pinctrl-apq8084.c             | 1245 ++++++++++++++++++++
+ drivers/pinctrl/qcom/pinctrl-ipq8064.c             |    2 +
+ drivers/pinctrl/qcom/pinctrl-msm.c                 |    4 +-
+ drivers/pinctrl/qcom/pinctrl-msm.h                 |    3 +
+ drivers/pinctrl/qcom/pinctrl-msm8960.c             |    2 +
+ drivers/pinctrl/qcom/pinctrl-msm8x74.c             |    2 +
+ 11 files changed, 1455 insertions(+), 3 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/pinctrl/qcom,apq8084-pinctrl.txt
+ create mode 100644 drivers/pinctrl/qcom/pinctrl-apq8084.c
+
+-- 
+1.7.9.5
