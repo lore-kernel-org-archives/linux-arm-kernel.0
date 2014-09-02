@@ -1,84 +1,60 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue, 2 Sep 2014 19:54:43 +0800
-Subject: Formal license ambiguity in arch/arm/boot/dts/sun?i-a*.dts
-In-Reply-To: <20140902104002.GN30401@n2100.arm.linux.org.uk>
-References: <20140731192016.GA6869@excalibur.cnev.de>
- <20140803130430.GY3952@lukather>
- <201408031959.27607.arnd@arndb.de> <20140804192510.GF3952@lukather>
- <20140804212317.GL30282@n2100.arm.linux.org.uk>
- <20140807132023.GG15297@lukather> <20140902102206.GU15297@lukather>
- <20140902104002.GN30401@n2100.arm.linux.org.uk>
-Message-ID: <CAGb2v65oOWF_gf4EQAx+4NYWCQYpPHaZ5ng=p780OFeDba0QKA@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue,  2 Sep 2014 14:02:26 +0200
+Subject: [PATCH 0/8] ARM RealView DeviceTree support v5
+Message-ID: <1409659354-23553-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 2, 2014 at 6:40 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Tue, Sep 02, 2014 at 12:22:06PM +0200, Maxime Ripard wrote:
->> On Thu, Aug 07, 2014 at 03:20:23PM +0200, Maxime Ripard wrote:
->> > Hi Russell,
->> >
->> > On Mon, Aug 04, 2014 at 10:23:17PM +0100, Russell King - ARM Linux wrote:
->> > > On Mon, Aug 04, 2014 at 09:25:10PM +0200, Maxime Ripard wrote:
->> > > > On Sun, Aug 03, 2014 at 07:59:27PM +0200, Arnd Bergmann wrote:
->> > > > > I would actually prefer if we could migrate a lot of these files to BSD license,
->> > > > > provided the original authors agree. We want the dtb blobs to be embeddable into
->> > > > > boot loaders of any license.
->> > > >
->> > > > Even though I'd be open to having my contributions to DTBs under the
->> > > > BSD, is this really a thing?
->> > > >
->> > > > I mean, for all I know, an OS/Bootloader would just parse a documented
->> > > > binary file, and I don't see any derivative work there.
->> > >
->> > > How does the OS/Bootloader end up with that binary file?
->> > >
->> > > For the sake of argument, let's say that the BSDs want to move to DT on
->> > > ARM.  Great, they convert over to parsing our DT blobs.
->> > >
->> > > However, they can't distribute the binary DT blobs to their users without
->> > > coming up against the problems of the GPL wrt binary distribution.
->> > >
->> > > They could distribute the source files, but remember that many of those
->> > > are currently GPL licensed, so they'd probably end up having to package
->> > > them entirely separately, if they're willing to do that at all.
->> > >
->> > > Or they could decide to ignore us altogether, and do their own DT stuff,
->> > > maybe partially implementing our properties, or maybe coming up with
->> > > different and/or incompatible properties - which would be bad because
->> > > we now end up with two ways to describe the same hardware in active use.
->> > >
->> > > I suspect the final option is the one they'd choose, and it's in our
->> > > interest that _that_ doesn't happen.
->> >
->> > Ah, yes, it's not really about a fear of a GPL-spread, but rather a
->> > concern about the source distribution. Makes sense.
->> >
->> > How should we deal with such relicensing?
->>
->> Ping?
->>
->> Are we doing this on a per platform basis? Should we enforce this dual
->> licensing for the future DTS patches? If so, starting from when?
->
-> I have no answers to your questions - I put the question a number of
-> times to Grant directly, and have been totally ignored.
->
-> So, I think we just do whatever we think is the correct approach.
->
-> Remember, when you change the licensing on something which has had
-> multiple contributors, you need to seek the permission from everyone
-> how contributed to it - so it will have to be done on a per platform
-> and per-SoC basis.
+I've updated the RealView DeviceTree patch.
 
-Is there any particular order for any platform or SoC?
-Maybe we have to do the dependencies (dtsi) first?
+Main changes:
+- Push l2x0 setup into the device tree
+- Abstractify syscon LEDs
+- Abstractify syscon reboot
 
-It seems skeleton.dtsi and skeleton64.dtsi don't have explicit license
-headers. Do these 2 need to be addressed as well?
+Florian Fainelli (1):
+  ARM: l2c: parse 'cache-size' and 'cache-sets' properties
 
-ChenYu
+Linus Walleij (7):
+  leds: add a driver for syscon-based LEDs
+  leds: add device tree bindings for register bit LEDs
+  power: reset: driver for the Versatile syscon reboot
+  soc: add driver for the ARM RealView
+  ARM: l2x0: move DT parsing for cache props
+  ARM: l2x0: support associativity from DT
+  ARM: realview: basic device tree implementation
 
-> I would also strongly suggest that future DTS files should be dual
-> licensed from the start, and that we require contributions for the
-> DTS files to be under both licenses.
+ Documentation/devicetree/bindings/arm/arm-boards   |  65 ++++++
+ Documentation/devicetree/bindings/arm/gic.txt      |   1 +
+ Documentation/devicetree/bindings/arm/l2cc.txt     |   3 +
+ .../devicetree/bindings/leds/register-bit-led.txt  |  99 +++++++++
+ arch/arm/boot/dts/Makefile                         |   1 +
+ arch/arm/boot/dts/arm-realview-pb1176.dts          | 246 +++++++++++++++++++++
+ arch/arm/mach-realview/Kconfig                     |  13 ++
+ arch/arm/mach-realview/Makefile                    |   1 +
+ arch/arm/mach-realview/realview-dt.c               |  47 ++++
+ arch/arm/mm/cache-l2x0.c                           |  82 ++++++-
+ drivers/irqchip/irq-gic.c                          |   2 +
+ drivers/leds/Kconfig                               |  10 +
+ drivers/leds/Makefile                              |   1 +
+ drivers/leds/leds-syscon.c                         | 165 ++++++++++++++
+ drivers/power/reset/Kconfig                        |   9 +
+ drivers/power/reset/Makefile                       |   1 +
+ drivers/power/reset/arm-versatile-reboot.c         | 111 ++++++++++
+ drivers/soc/Kconfig                                |   1 +
+ drivers/soc/Makefile                               |   1 +
+ drivers/soc/versatile/Kconfig                      |  10 +
+ drivers/soc/versatile/Makefile                     |   1 +
+ drivers/soc/versatile/soc-realview.c               | 144 ++++++++++++
+ 22 files changed, 1009 insertions(+), 5 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/leds/register-bit-led.txt
+ create mode 100644 arch/arm/boot/dts/arm-realview-pb1176.dts
+ create mode 100644 arch/arm/mach-realview/realview-dt.c
+ create mode 100644 drivers/leds/leds-syscon.c
+ create mode 100644 drivers/power/reset/arm-versatile-reboot.c
+ create mode 100644 drivers/soc/versatile/Kconfig
+ create mode 100644 drivers/soc/versatile/Makefile
+ create mode 100644 drivers/soc/versatile/soc-realview.c
+
+-- 
+1.9.3
