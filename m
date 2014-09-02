@@ -1,45 +1,44 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Tue, 2 Sep 2014 14:47:42 +0200
-Subject: [PATCH 0/7] ARM: at91: update defconfigs
-In-Reply-To: <1409647803-8054-1-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1409647803-8054-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <5405BC6E.7010803@atmel.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 2 Sep 2014 14:51:16 +0200
+Subject: Formal license ambiguity in arch/arm/boot/dts/sun?i-a*.dts
+In-Reply-To: <5405B986.2080407@redhat.com>
+References: <20140731192016.GA6869@excalibur.cnev.de>
+ <20140803130430.GY3952@lukather> <201408031959.27607.arnd@arndb.de>
+ <20140804192510.GF3952@lukather>
+ <20140804212317.GL30282@n2100.arm.linux.org.uk>
+ <20140807132023.GG15297@lukather> <20140902102206.GU15297@lukather>
+ <20140902104002.GN30401@n2100.arm.linux.org.uk>
+ <20140902122716.GV15297@lukather> <5405B986.2080407@redhat.com>
+Message-ID: <20140902125116.GW15297@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/09/2014 10:49, Alexandre Belloni :
-> Following recent work on the AT91 platforms, update the defconfigs to include
-> the new power and reset driver, the ADC and touchscreen driver, the new PWM
-> driver using the generic PWM framework.
+On Tue, Sep 02, 2014 at 02:35:18PM +0200, Hans de Goede wrote:
+> > So I guess like Chen-Yu suggested that we should change the license of
+> > the DTSI first, and then the DTS. Otherwise, it wouldn't work very
+> > well, I guess you can't really relicense a GPL-only file.
 > 
-> Also remove deprecated options like CONFIG_PROC_DEVICETREE,
-> CONFIG_SCSI_MULTI_LUN, CONFIG_MII, CONFIG_MTD_CHAR.
+> IANAL, but mixing MIT (which I suggest use as the other license) and GPL
+> files in one binary (the generated dtb file) is fine AFAIK, this happens
+> all the time. The resulting binary is simple GPL licensed. So it would
+> make sense to start with dual licensing new boards right away even before
+> the dtsi has been relicensed. It won't make any practical difference
+> until the dtsi is relicensed, but it means less work later on.
 
-Nice: to the whole series:
+So you're allowed to licence derivative work of a GPL-licenced file
+under both the GPL and another licence?
 
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-
-Thanks.
-
-> Alexandre Belloni (7):
->   ARM: at91: at91_dt: update defconfig
->   ARM: at91: at91sam9260_9g20: update defconfig
->   ARM: at91: at91sam9261_9g10: update defconfig
->   ARM: at91: at91sam9263: update defconfig
->   ARM: at91: at91sam9g45: update defconfig
->   ARM: at91: at91sam9rl: update defconfig
->   ARM: at91: sama5: update defconfig
-> 
->  arch/arm/configs/at91_dt_defconfig          | 25 +++++++++++++------------
->  arch/arm/configs/at91sam9260_9g20_defconfig | 13 +++++--------
->  arch/arm/configs/at91sam9261_9g10_defconfig |  5 ++---
->  arch/arm/configs/at91sam9263_defconfig      | 13 ++++++-------
->  arch/arm/configs/at91sam9g45_defconfig      | 19 +++++++++++--------
->  arch/arm/configs/at91sam9rl_defconfig       | 19 ++++++++++++++-----
->  arch/arm/configs/sama5_defconfig            | 12 ++++++------
->  7 files changed, 57 insertions(+), 49 deletions(-)
-> 
-
+And as far as MIT vs BSD is concerned, I don't really have an
+opinion. Arnd? Russell?
 
 -- 
-Nicolas Ferre
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140902/b995c0b1/attachment.sig>
