@@ -1,96 +1,97 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 2 Sep 2014 14:27:16 +0200
-Subject: Formal license ambiguity in arch/arm/boot/dts/sun?i-a*.dts
-In-Reply-To: <20140902104002.GN30401@n2100.arm.linux.org.uk>
-References: <20140731192016.GA6869@excalibur.cnev.de>
- <20140803130430.GY3952@lukather> <201408031959.27607.arnd@arndb.de>
- <20140804192510.GF3952@lukather>
- <20140804212317.GL30282@n2100.arm.linux.org.uk>
- <20140807132023.GG15297@lukather> <20140902102206.GU15297@lukather>
- <20140902104002.GN30401@n2100.arm.linux.org.uk>
-Message-ID: <20140902122716.GV15297@lukather>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Tue, 02 Sep 2014 14:30:36 +0200
+Subject: [RFC PATCH 0/7] Introduce automatic DMA configuration for IOMMU
+ masters
+In-Reply-To: <3261702.HRSZJsEv5z@wuerfel>
+References: <1409327670-3495-1-git-send-email-will.deacon@arm.com>
+ <33373396.gPTVFGBBxa@wuerfel> <54059F05.2090901@samsung.com>
+ <3261702.HRSZJsEv5z@wuerfel>
+Message-ID: <5405B86C.9010704@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 02, 2014 at 11:40:02AM +0100, Russell King - ARM Linux wrote:
-> On Tue, Sep 02, 2014 at 12:22:06PM +0200, Maxime Ripard wrote:
-> > On Thu, Aug 07, 2014 at 03:20:23PM +0200, Maxime Ripard wrote:
-> > > Hi Russell,
-> > > 
-> > > On Mon, Aug 04, 2014 at 10:23:17PM +0100, Russell King - ARM Linux wrote:
-> > > > On Mon, Aug 04, 2014 at 09:25:10PM +0200, Maxime Ripard wrote:
-> > > > > On Sun, Aug 03, 2014 at 07:59:27PM +0200, Arnd Bergmann wrote:
-> > > > > > I would actually prefer if we could migrate a lot of these files to BSD license,
-> > > > > > provided the original authors agree. We want the dtb blobs to be embeddable into
-> > > > > > boot loaders of any license.
-> > > > > 
-> > > > > Even though I'd be open to having my contributions to DTBs under the
-> > > > > BSD, is this really a thing?
-> > > > > 
-> > > > > I mean, for all I know, an OS/Bootloader would just parse a documented
-> > > > > binary file, and I don't see any derivative work there.
-> > > > 
-> > > > How does the OS/Bootloader end up with that binary file?
-> > > > 
-> > > > For the sake of argument, let's say that the BSDs want to move to DT on
-> > > > ARM.  Great, they convert over to parsing our DT blobs.
-> > > > 
-> > > > However, they can't distribute the binary DT blobs to their users without
-> > > > coming up against the problems of the GPL wrt binary distribution.
-> > > > 
-> > > > They could distribute the source files, but remember that many of those
-> > > > are currently GPL licensed, so they'd probably end up having to package
-> > > > them entirely separately, if they're willing to do that at all.
-> > > > 
-> > > > Or they could decide to ignore us altogether, and do their own DT stuff,
-> > > > maybe partially implementing our properties, or maybe coming up with
-> > > > different and/or incompatible properties - which would be bad because
-> > > > we now end up with two ways to describe the same hardware in active use.
-> > > > 
-> > > > I suspect the final option is the one they'd choose, and it's in our
-> > > > interest that _that_ doesn't happen.
-> > > 
-> > > Ah, yes, it's not really about a fear of a GPL-spread, but rather a
-> > > concern about the source distribution. Makes sense.
-> > > 
-> > > How should we deal with such relicensing?
-> > 
-> > Ping?
-> > 
-> > Are we doing this on a per platform basis? Should we enforce this dual
-> > licensing for the future DTS patches? If so, starting from when?
-> 
-> I have no answers to your questions - I put the question a number of
-> times to Grant directly, and have been totally ignored.
-> 
-> So, I think we just do whatever we think is the correct approach.
-> 
-> Remember, when you change the licensing on something which has had
-> multiple contributors, you need to seek the permission from everyone
-> how contributed to it - so it will have to be done on a per platform
-> and per-SoC basis.
+Hi Arnd,
 
-Ack.
+On 2014-09-02 14:22, Arnd Bergmann wrote:
+> On Tuesday 02 September 2014 12:42:13 Marek Szyprowski wrote:
+>> On 2014-09-02 10:56, Arnd Bergmann wrote:
+>>> On Tuesday 02 September 2014 10:48:02 Marek Szyprowski wrote:
+>>>>>     -- I have concerns that allocating one domain per master might be
+>>>>> too much, but it's hard to tell without an IOMMU driver ported over.
+>>>> One domain per master is IMHO a sane default configuration. The only default
+>>>> alternative I see is to have only one domain (related with dma-mapping
+>>>> subsystem) and bind all devices to it. However I really don't see any
+>>>> disadvantage of having separate domain per each master and such
+>>>> configuration
+>>>> gives devices better separation.
+>>> I was expecting that the dma-mapping implementation would by default use
+>>> one domain for all devices, since that is what the simpler IOMMUs without
+>>> domain support have to do anyway.
+>>>
+>>> For isolation purposes, it can only help to have more domains, but
+>>> I would guess that there is some space overhead in maintaining lots
+>>> of page tables.
+>> I'm okay with both approaches (separate domain for each device vs. single
+>> common domain for all devices). Maybe this can be some kind of Kconfig
+>> option added to DMA debugging? Separation might be really helpful when
+>> debugging strange device behavior.
+> We should probably support the iommu=strict command line option that some
+> other architectures have. This is mainly meant to ensure that IOTLBs
+> are shot down as soon as the driver unmaps some memory, which you often
+> want to avoid for performance reasons.
+>
+> The iommu driver itself can then decide to also use separate domains
+> for iommu=strict but a shared domain otherwise.
+>
+> For hardware on which the shared domain is hard to do, the driver might
+> always use separate domains.
 
-> I would also strongly suggest that future DTS files should be dual
-> licensed from the start, and that we require contributions for the
-> DTS files to be under both licenses.
+Just to let you know, lazy unmapping is not yet implemented in ARM 
+dma-mapping
+implementation based on IOMMU.
 
-So I guess like Chen-Yu suggested that we should change the license of
-the DTSI first, and then the DTS. Otherwise, it wouldn't work very
-well, I guess you can't really relicense a GPL-only file.
+>>>> However we also need to figure out how to let drivers to make their own
+>>>> configuration, like it is required by Exynos DRM subsystem, which consist
+>>>> of several devices, each having its own IOMMU controller, but for
+>>>> convenience those drivers assume that they all have been bound to the same,
+>>>> single domain.
+>>> IIRC with the way we ended up putting the mask into the iommu descriptor of
+>>> the ARM SMMU, you can put multiple devices into the same iommu group, and
+>>> have them automatically share a domain.
+>>>
+>>> I don't know if the same would work for the Samsung implementation.
+>> The question is how to transfer such information from the device
+>> drivers, that
+>> need/benefit from such configuration to iommu driver, which does all the
+>> setup?
+>> This is something completely internal to particular drivers and should
+>> not be
+>> exported to device tree or userspace. Thierry suggested to hardcode this
+>> information in the iommu driver, but I'm looking for other approaches.
+>> Maybe simply releasing device from the default dma-mapping domain before
+>> attaching to custom one will be the easiest solution.
+> For the ARM SMMU, the problem is that there is not necessarily a good way
+> to partition the masters into IOMMU groups automatically, therefore we
+> want to provide some hints in DT. On a machine that can have more domains
+> than it has masters, this is not a problem and we can always use an
+> all-ones mask, but for a machine on which this is not the case, the
+> problem is simplified a lot of we hardcode the masks in a way that can
+> always work, putting multiple devices into an iommu group if necessary.
 
-Thanks!
-Maxime
+Well, I was talking about the Exynos IOMMU case, where there are no hw
+restrictions and grouping is done just to make things easier for the Exynos
+DRM drivers (a buffer gets the same DMA address for all devices, which
+are a part of virtual Exynos DRM device).
 
+> This is similar to how we do things for pinctrl, where you might have
+> a theoretically endless space of options to set stuff up, but we
+> can simplify it by defining the useful configurations.
+
+Right, if hardware is limited, a sane working configuration is something 
+that
+should be encoded in device tree.
+
+Best regards
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140902/f6243ff1/attachment-0001.sig>
+Marek Szyprowski, PhD
+Samsung R&D Institute Poland
