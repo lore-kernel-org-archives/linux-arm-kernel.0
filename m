@@ -1,103 +1,115 @@
-From: Barry.Song@csr.com (Barry Song)
-Date: Tue, 2 Sep 2014 17:02:37 +0800
-Subject: [PATCH 8/8] spi: sirf: make DMA transfer mode optional
-In-Reply-To: <1409648557-5470-1-git-send-email-Barry.Song@csr.com>
-References: <1409648557-5470-1-git-send-email-Barry.Song@csr.com>
-Message-ID: <1409648557-5470-4-git-send-email-Barry.Song@csr.com>
+From: Li.Xiubo@freescale.com (Li.Xiubo at freescale.com)
+Date: Tue, 2 Sep 2014 09:08:05 +0000
+Subject: [PATCHv1 4/7] ASoC: dts: kirkwood-t5325: To support simple card
+ newest style.
+In-Reply-To: <20140901134148.GB11312@lunn.ch>
+References: <1409545781-20530-1-git-send-email-Li.Xiubo@freescale.com>
+ <1409545781-20530-5-git-send-email-Li.Xiubo@freescale.com>
+ <20140901134148.GB11312@lunn.ch>
+Message-ID: <e58337783d164e8da966938b27825cda@BY2PR0301MB0613.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Qipan Li <Qipan.Li@csr.com>
+Hi Andrew,
 
-some customers want a pure PIO transfer mode even though DMA mode is
-supported. here we give them a Kconfig option, but still keep the DMA
-enabled in default.
+Thanks very much for you comment and advice.
 
-Signed-off-by: Qipan Li <Qipan.Li@csr.com>
-Signed-off-by: Barry Song <Baohua.Song@csr.com>
----
- drivers/spi/Kconfig    | 10 ++++++++++
- drivers/spi/spi-sirf.c | 11 ++++++++++-
- 2 files changed, 20 insertions(+), 1 deletion(-)
+I will resend this patch series to compatibility with the old DTs, and it will
+Up to the owners to update the DTs to support the new style of DTs.
 
-diff --git a/drivers/spi/Kconfig b/drivers/spi/Kconfig
-index 62e2242..0f84bd8 100644
---- a/drivers/spi/Kconfig
-+++ b/drivers/spi/Kconfig
-@@ -477,6 +477,16 @@ config SPI_SIRF
- 	help
- 	  SPI driver for CSR SiRFprimaII SoCs
- 
-+config SPI_SIRF_DMA
-+	bool "CSR SiRFprimaII/AtlasVI SPI DMA mode support"
-+	depends on SPI_SIRF
-+	default y
-+	help
-+	  CSR SPI driver support DMA and PIO mode, select it let SPI driver support DMA mode
-+	  deselect it let SPI controller in PIO mode.
-+	  In CSR SPI driver distinguish the config to decide what transfer mode use.
-+	  Default configure value is y, if want pure PIO mode deselect it will be OK.
-+
- config SPI_SUN4I
- 	tristate "Allwinner A10 SoCs SPI controller"
- 	depends on ARCH_SUNXI || COMPILE_TEST
-diff --git a/drivers/spi/spi-sirf.c b/drivers/spi/spi-sirf.c
-index 67d07b2..f934159 100644
---- a/drivers/spi/spi-sirf.c
-+++ b/drivers/spi/spi-sirf.c
-@@ -333,6 +333,7 @@ static void spi_sirfsoc_cmd_transfer(struct spi_device *spi,
- 	sspi->left_rx_word -= t->len;
- }
- 
-+#ifdef CONFIG_SPI_SIRF_DMA
- static void spi_sirfsoc_dma_transfer(struct spi_device *spi,
- 	struct spi_transfer *t)
- {
-@@ -407,6 +408,7 @@ static void spi_sirfsoc_dma_transfer(struct spi_device *spi,
- 	if (sspi->left_tx_word >= SIRFSOC_SPI_DAT_FRM_LEN_MAX)
- 		writel(0, sspi->base + SIRFSOC_SPI_TX_RX_EN);
- }
-+#endif
- 
- static void spi_sirfsoc_pio_transfer(struct spi_device *spi,
- 		struct spi_transfer *t)
-@@ -474,8 +476,10 @@ static int spi_sirfsoc_transfer(struct spi_device *spi, struct spi_transfer *t)
- 	 */
- 	if (sspi->tx_by_cmd)
- 		spi_sirfsoc_cmd_transfer(spi, t);
-+#ifdef CONFIG_SPI_SIRF_DMA
- 	else if (IS_DMA_VALID(t))
- 		spi_sirfsoc_dma_transfer(spi, t);
-+#endif
- 	else
- 		spi_sirfsoc_pio_transfer(spi, t);
- 
-@@ -526,6 +530,11 @@ spi_sirfsoc_setup_transfer(struct spi_device *spi, struct spi_transfer *t)
- 	u32 regval;
- 	u32 txfifo_ctrl, rxfifo_ctrl;
- 	u32 fifo_size = SIRFSOC_SPI_FIFO_SIZE / 4;
-+#ifdef CONFIG_SPI_SIRF_DMA
-+	int spi_use_dma = 1;
-+#else
-+	int spi_use_dma = 0;
-+#endif
- 
- 	sspi = spi_master_get_devdata(spi->master);
- 
-@@ -610,7 +619,7 @@ spi_sirfsoc_setup_transfer(struct spi_device *spi, struct spi_transfer *t)
- 	regval |= SIRFSOC_SPI_CS_IO_MODE;
- 	writel(regval, sspi->base + SIRFSOC_SPI_CTRL);
- 
--	if (IS_DMA_VALID(t)) {
-+	if (spi_use_dma && IS_DMA_VALID(t)) {
- 		/* Enable DMA mode for RX, TX */
- 		writel(0, sspi->base + SIRFSOC_SPI_TX_DMA_IO_CTRL);
- 		writel(SIRFSOC_SPI_RX_DMA_FLUSH,
--- 
-2.1.0
+BRs
+Xiubo
 
 
 
-Member of the CSR plc group of companies. CSR plc registered in England and Wales, registered number 4187346, registered office Churchill House, Cambridge Business Park, Cowley Road, Cambridge, CB4 0WZ, United Kingdom
-More information can be found at www.csr.com. Keep up to date with CSR on our technical blog, www.csr.com/blog, CSR people blog, www.csr.com/people, YouTube, www.youtube.com/user/CSRplc, Facebook, www.facebook.com/pages/CSR/191038434253534, or follow us on Twitter at www.twitter.com/CSR_plc.
-New for 2014, you can now access the wide range of products powered by aptX at www.aptx.com.
+
+> -----Original Message-----
+> From: Andrew Lunn [mailto:andrew at lunn.ch]
+> Sent: Monday, September 01, 2014 9:42 PM
+> To: Xiubo Li-B47053
+> Cc: broonie at kernel.org; lgirdwood at gmail.com; perex at perex.cz; tiwai at suse.de;
+> kuninori.morimoto.gx at renesas.com; moinejf at free.fr; andrew at lunn.ch;
+> jsarha at ti.com; devicetree at vger.kernel.org; linux-arm-
+> kernel at lists.infradead.org; linux-sh at vger.kernel.org; alsa-devel at alsa-
+> project.org; Guo Shawn-R65073; linux-kernel at vger.kernel.org; Jason Cooper
+> Subject: Re: [PATCHv1 4/7] ASoC: dts: kirkwood-t5325: To support simple card
+> newest style.
+> 
+> On Mon, Sep 01, 2014 at 12:29:38PM +0800, Xiubo Li wrote:
+> > This patch depends on the following simple card patch:
+> > ===
+> > ASoC: simple-card: Merge single and muti DAI link code.
+> 
+> Saying what a patch depends on, is not the best of ChangeLog.
+> 
+> Say something like:
+> 
+> The simple-card binding has been changed, so that a dai-link subnode
+> is now required, and the properties directly under the sound node are
+> no longer allowed. Modify the DT to fit this new binding.
+> 
+>    Andrew
+> 
+> 
+> >
+> > This patch merge single DAI link and muti-DAI links code together,
+> > and simply the simple-card driver code.
+> >
+> > And also do some other improvement:
+> >
+> > Since from the DAI format micro SND_SOC_DAIFMT_CBx_CFx, the 'CBx'
+> > mean Codec's bit clock is as master/slave and the 'CFx' mean Codec's
+> > frame clock is as master/slave.
+> >
+> > So these same DAI formats should be informed to CPU and CODE DAIs at
+> > the same time. For the Codec driver will set the bit clock and frame
+> > clock as the DAI formats said, but for the CPU driver, if the the
+> > bit clock or frame clock is as Codec master, so it should be set CPU
+> > DAI device as bit clock or frame clock as slave, and vice versa.
+> >
+> > The old code will cause confusion, and we should be clear that the
+> > letter 'C' here mean to Codec.
+> > ===
+> >
+> > Signed-off-by: Xiubo Li <Li.Xiubo@freescale.com>
+> > ---
+> >  arch/arm/boot/dts/kirkwood-t5325.dts | 15 ++++++++-------
+> >  1 file changed, 8 insertions(+), 7 deletions(-)
+> >
+> > diff --git a/arch/arm/boot/dts/kirkwood-t5325.dts
+> b/arch/arm/boot/dts/kirkwood-t5325.dts
+> > index 610ec0f..25d1223 100644
+> > --- a/arch/arm/boot/dts/kirkwood-t5325.dts
+> > +++ b/arch/arm/boot/dts/kirkwood-t5325.dts
+> > @@ -189,7 +189,6 @@
+> >
+> >  	sound {
+> >  		compatible = "simple-audio-card";
+> > -		simple-audio-card,format = "i2s";
+> >  		simple-audio-card,routing =
+> >  			"Headphone Jack", "HPL",
+> >  			"Headphone Jack", "HPR",
+> > @@ -204,12 +203,14 @@
+> >
+> >  		simple-audio-card,mclk-fs = <256>;
+> >
+> > -		simple-audio-card,cpu {
+> > -			sound-dai = <&audio>;
+> > -		};
+> > -
+> > -		simple-audio-card,codec {
+> > -			sound-dai = <&alc5621>;
+> > +		simple-audio-card,dai-link {
+> > +			format = "i2s";
+> > +			cpu {
+> > +				sound-dai = <&audio>;
+> > +			};
+> > +			codec {
+> > +				sound-dai = <&alc5621>;
+> > +			};
+> >  		};
+> >  	};
+> >  };
+> > --
+> > 1.8.4
+> >
