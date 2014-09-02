@@ -1,27 +1,32 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 02 Sep 2014 20:14:24 +0200
-Subject: [RFC PATCH v2 7/7] arm: dma-mapping: plumb our iommu mapping ops
- into arch_setup_dma_ops
-In-Reply-To: <1409680587-29818-8-git-send-email-will.deacon@arm.com>
+Date: Tue, 02 Sep 2014 20:13:46 +0200
+Subject: [RFC PATCH v2 6/7] arm: call iommu_init before
+ of_platform_populate
+In-Reply-To: <1409680587-29818-7-git-send-email-will.deacon@arm.com>
 References: <1409680587-29818-1-git-send-email-will.deacon@arm.com>
- <1409680587-29818-8-git-send-email-will.deacon@arm.com>
-Message-ID: <6595943.s3o5K6pyp9@wuerfel>
+ <1409680587-29818-7-git-send-email-will.deacon@arm.com>
+Message-ID: <6406734.5D2q2gd403@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 02 September 2014 18:56:27 Will Deacon wrote:
-> This patch plumbs the existing ARM IOMMU DMA infrastructure (which isn't
-> actually called outside of a few drivers) into arch_setup_dma_ops, so
-> that we can use IOMMUs for DMA transfers in a more generic fashion.
-> 
-> Since this significantly complicates the arch_setup_dma_ops function,
-> it is moved out of line into dma-mapping.c. If CONFIG_ARM_DMA_USE_IOMMU
-> is not set, the iommu paramater is ignored and the normal ops are used
-> instead.
-> 
-> Signed-off-by: Will Deacon <will.deacon@arm.com>
-> 
+On Tuesday 02 September 2014 18:56:26 Will Deacon wrote:
+> @@ -803,9 +804,11 @@ static int __init customize_machine(void)
+>         if (machine_desc->init_machine)
+>                 machine_desc->init_machine();
+>  #ifdef CONFIG_OF
+> -       else
+> +       else {
+> +               of_iommu_init();
+>                 of_platform_populate(NULL, of_default_bus_match_table,
+>                                         NULL, NULL);
+> +       }
+>  #endif
+>         return 0;
+>  }
 
-Looks great to me.
+I think it would be better to not have this depend on the presence
+of an init_machine callback. Why not move of_iommu_init() in front
+of the if()? It shouldn't do anything unless we have an iommu
+driver that we should be using.
 
 	Arnd
