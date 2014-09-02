@@ -1,58 +1,99 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Tue, 02 Sep 2014 11:49:55 +0200
-Subject: [GIT PULL] first bunch of dts changes for 3.18
-Message-ID: <1937322.lt3suVLyIs@diego>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 2 Sep 2014 11:50:08 +0200
+Subject: [PATCH v2 03/12] clk: Add a function to retrieve phase
+In-Reply-To: <54045820.7080102@redhat.com>
+References: <1409428991-2442-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1409428991-2442-4-git-send-email-maxime.ripard@free-electrons.com>
+ <5402F5D6.4080100@redhat.com> <20140901102026.GL15297@lukather>
+ <54045820.7080102@redhat.com>
+Message-ID: <20140902095008.GT15297@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Olof
+On Mon, Sep 01, 2014 at 01:27:28PM +0200, Hans de Goede wrote:
+> Hi,
+> 
+> On 09/01/2014 12:20 PM, Maxime Ripard wrote:
+> > Hi,
+> > 
+> > On Sun, Aug 31, 2014 at 12:15:50PM +0200, Hans de Goede wrote:
+> >> Hi,
+> >>
+> >> On 08/30/2014 10:03 PM, Maxime Ripard wrote:
+> >>> The current phase API doesn't look into the actual hardware to get the phase
+> >>> value, but will rather get it from a variable only set by the set_phase
+> >>> function.
+> >>>
+> >>> This will cause issue when the client driver will never call the set_phase
+> >>> function, where we can end up having a reported phase that will not match what
+> >>> the hardware has been programmed to by the bootloader or what phase is
+> >>> programmed out of reset.
+> >>>
+> >>> Add a new get_phase function for the drivers to implement so that we can get
+> >>> this value.
+> >>>
+> >>> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> >>> ---
+> >>>  drivers/clk/clk.c            | 17 ++++++++++++++---
+> >>>  include/linux/clk-provider.h |  5 +++++
+> >>>  2 files changed, 19 insertions(+), 3 deletions(-)
+> >>>
+> >>> diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+> >>> index d87661af0c72..7dbceca694f1 100644
+> >>> --- a/drivers/clk/clk.c
+> >>> +++ b/drivers/clk/clk.c
+> >>> @@ -1797,8 +1797,8 @@ out:
+> >>>   * clk_get_phase - return the phase shift of a clock signal
+> >>>   * @clk: clock signal source
+> >>>   *
+> >>> - * Returns the phase shift of a clock node in degrees, otherwise returns
+> >>> - * -EERROR.
+> >>> + * Returns the phase shift of a clock node in degrees. Any negative
+> >>> + * values are errors.
+> >>>   */
+> >>>  int clk_get_phase(struct clk *clk)
+> >>>  {
+> >>> @@ -1808,7 +1808,18 @@ int clk_get_phase(struct clk *clk)
+> >>>  		goto out;
+> >>>  
+> >>>  	clk_prepare_lock();
+> >>> -	ret = clk->phase;
+> >>> +
+> >>> +	if (clk->phase) {
+> >>> +		ret = clk->phase;
+> >>> +		goto out_unlock;
+> >>> +	}
+> >>
+> >> 0 is a valid phase, so this will cause the phase to
+> >> be read from the hardware each time if the phase is 0.
+> >>
+> >> Perhaps make clk->phase signed (if it is not already), init it
+> >> to -1, and check for it not being -1 ?
+> > 
+> > Yeah, I'm not really proud of this code either, but yours would expose
+> > this -1 into debugfs, so I'm not sure it's really better :) 
+> > 
+> > (with -1 being a valid phase too)
+> 
+> According to the comments in the patch adding the original phase functions
+> valid values are 0 - 359. And you could use clk_get_phase from the debugfs
+> code.
 
-here is a first bunch of dts changes for 3.18. A lot of material for
-the rk3288 and some other smaller adaptions for changes happening
-in other trees (dw_mmc conversion, accepted saradc driver in the iio tree).
+Yep, except that if I see a value -1 as a phase, I would assume that
+it's 359, but maybe it's just me :)
 
-So please pull
+Mike's solution seem great, I'll go for that.
 
+Maxime
 
-The following changes since commit 7d1311b93e58ed55f3a31cc8f94c4b8fe988a2b9:
-
-  Linux 3.17-rc1 (2014-08-16 10:40:26 -0600)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/mmind/linux-rockchip.git tags/v3.18-rockchip-dts1
-
-for you to fetch changes up to f23a6179d45e9d144bf2eb2bd82b2f1270f85fcf:
-
-  ARM: dts: rockchip: add saradc nodes (2014-08-27 23:43:01 +0200)
-
-----------------------------------------------------------------
-First hunk of Rockchip dts changes for 3.18
-- dw_mmc conversion from Jaehoon Chung
-- mmc support for rk3288
-- pwm + backlight for rk3288
-- rtc for Radxa Rock
-- saradc base nodes
-
-----------------------------------------------------------------
-Doug Anderson (5):
-      ARM: dts: Add emmc and sdmmc to the rk3288 device tree
-      ARM: dts: Enable emmc and sdmmc on the rk3288-evb boards
-      ARM: dts: Move the PMIC interrupt pinctrl line to rk3288-evb common
-      ARM: dts: Add main PWM info to rk3288
-      ARM: dts: Enable PWM backlight on rk3288-evb
-
-Heiko St?bner (2):
-      ARM: dts: rockchip: add hym8563 rtc to Radxa Rock board
-      ARM: dts: rockchip: add saradc nodes
-
-Jaehoon Chung (1):
-      ARM: dts: rockchip: unuse the slot-node and deprecate the supports-highspeed for dw-mmc
-
- arch/arm/boot/dts/rk3066a-bqcurie2.dts   | 15 ++---
- arch/arm/boot/dts/rk3188-radxarock.dts   | 24 ++++++--
- arch/arm/boot/dts/rk3288-evb-act8846.dts | 10 +---
- arch/arm/boot/dts/rk3288-evb.dtsi        | 83 +++++++++++++++++++++++++++
- arch/arm/boot/dts/rk3288.dtsi            | 98 ++++++++++++++++++++++++++++++++
- arch/arm/boot/dts/rk3xxx.dtsi            | 10 ++++
- 6 files changed, 215 insertions(+), 25 deletions(-)
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140902/9d927a97/attachment-0001.sig>
