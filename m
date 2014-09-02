@@ -1,44 +1,50 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Tue, 02 Sep 2014 15:22:27 -0700
-Subject: [PATCH v8 03/11] ARM: brcmstb: add debug UART for earlyprintk
- support
-In-Reply-To: <CAOesGMh5wX5eaCmPvXQs4fmNQsD+370P=O8PSdH2oMHKL_neDQ@mail.gmail.com>
-References: <1405976886-27807-1-git-send-email-computersforpeace@gmail.com>	<1405976886-27807-4-git-send-email-computersforpeace@gmail.com>	<20140802083040.GY30282@n2100.arm.linux.org.uk>	<20140804165627.GT3711@ld-irv-0074>	<CAN8TOE8w5bUT5byHiJrYr8AzaZ+EADzE+aoH6f2x2tFc1+1eQw@mail.gmail.com>
- <CAOesGMh5wX5eaCmPvXQs4fmNQsD+370P=O8PSdH2oMHKL_neDQ@mail.gmail.com>
-Message-ID: <54064323.3090406@gmail.com>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Tue, 02 Sep 2014 15:38:46 -0700
+Subject: [PATCH 0/5] clk: at91: fix USB clk support on at91rm9200/sam9 SoCs
+In-Reply-To: <1409644218-13677-1-git-send-email-boris.brezillon@free-electrons.com>
+References: <1409644218-13677-1-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <20140902223846.5251.86384@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/13/2014 03:16 PM, Olof Johansson wrote:
-
-[snip]
-
->>>> I noticed that you sent this to the patch system.  I asked Olof last
->>>> night whether he had anything in arm-soc touching Kconfig.debug, and
->>>> he does (a number of other platforms have updated it.)  This means
->>>> that if I apply it to my tree, it may conflict, so I'm reluctant to
->>>> take it.
->>>
->>> OK... Matt told me that such patches go through you. So which is it?
->>> Should all Kconfig.debug patches go through the arm-soc route?
->>
->> How should this get in? Should I rebase/resend through Matt and
->> arm-soc? Or can you pick this up as-is?
+Quoting Boris BREZILLON (2014-09-02 00:50:13)
+> Hi,
 > 
-> Kconfig.debug is something that we usually merge new platforms for
-> through arm-soc. The main exception has been release cycles when
-> Russell has been doing major surgery on the file (one of those was a
-> few releases ago), where we've backed off to avoid conflicts.
+> This patch series fixes several bugs in the PLL driver preventing a proper
+> set_rate on the PLL clk.
+> It also enables propagation of set_rate request on the USB clk in order to
+> configure the PLL rate according to the USB block requirement (48 MHz).
 > 
-> That's been the assumed arrangement from our side at least, we haven't
-> had anything more formal than that.
+> Note that existing kernels, relying on the PLL configuration made by the
+> the bootloader should not be impacted by this bug, but others (those
+> directly booting from at91bootstrap or not enabling USB support in the
+> bootloader) will be.
 > 
-> So, go ahead and send it through us -- if we end up having a cycle
-> where we can't apply it we can send it over to Russell for you.
+> This bug was reported by Ga?l, who's directly booting the kernel from the
+> bootstrap.
 
-It looks like somehow, this patch got lost somewhere in the submission
-process. Is it too late to accept it for 3.17 if we were to re-submit it?
+Applied to clk-next.
 
-Thanks
---
-Florian
+Regards,
+Mike
+
+> 
+> Best Regards,
+> 
+> Boris
+> 
+> Boris BREZILLON (5):
+>   clk: at91: fix PLL_MAX_COUNT macro definition
+>   clk: at91: rework PLL rate calculation
+>   clk: at91: fix recalc_rate implementation of PLL driver
+>   clk: at91: rework rm9200 USB clock to propagate set_rate to the parent
+>     clk
+>   clk: at91: fix div by zero in USB clock driver
+> 
+>  drivers/clk/at91/clk-pll.c | 160 +++++++++++++++++++++++----------------------
+>  drivers/clk/at91/clk-usb.c |  20 ++++--
+>  2 files changed, 96 insertions(+), 84 deletions(-)
+> 
+> -- 
+> 1.9.1
+> 
