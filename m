@@ -1,64 +1,58 @@
-From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Tue, 02 Sep 2014 16:58:38 +0900
-Subject: [PATCH v6 2/6] arm64: ptrace: allow tracer to skip a system call
-In-Reply-To: <20140901113755.GA24594@arm.com>
-References: <1408611405-8943-1-git-send-email-takahiro.akashi@linaro.org>
- <1408611405-8943-3-git-send-email-takahiro.akashi@linaro.org>
- <CAGXu5jJCyqpXkdvNDCu+eMr0qnqwbqUUo4u+2p_7DvFMzfKoEw@mail.gmail.com>
- <53F69045.7010301@linaro.org> <20140826175128.GD23445@arm.com>
- <53FD72E2.4020103@linaro.org> <20140901113755.GA24594@arm.com>
-Message-ID: <540578AE.8090000@linaro.org>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 2 Sep 2014 09:05:16 +0100
+Subject: [PATCH] mfd: syscon: Decouple syscon interface from syscon devices
+In-Reply-To: <3343901.7HpqcTBEp1@wuerfel>
+References: <1408694991-21615-1-git-send-email-pankaj.dubey@samsung.com>
+ <12348292.z1qJl96tVA@wuerfel> <20140901160426.GJ8796@lee--X1>
+ <3343901.7HpqcTBEp1@wuerfel>
+Message-ID: <20140902080516.GE17117@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/01/2014 08:37 PM, Will Deacon wrote:
-> On Wed, Aug 27, 2014 at 06:55:46AM +0100, AKASHI Takahiro wrote:
->> On 08/27/2014 02:51 AM, Will Deacon wrote:
->>> On Fri, Aug 22, 2014 at 01:35:17AM +0100, AKASHI Takahiro wrote:
->>>> Oops, you're absolutely right. I didn't think of this case.
->>>> syscall_trace_enter() should not return a syscallno directly, but always
->>>> return -1 if syscallno < 0. (except when secure_computing() returns with -1)
->>>> This also implies that tracehook_report_syscall() should also have a return value.
->>>>
->>>> Will, is this fine with you?
->>>
->>> Well, the first thing that jumps out at me is why this is being done
->>> completely differently for arm64 and arm. I thought adding the new ptrace
->>> requests would reconcile the differences?
->>
->> I'm not sure what portion of my code you mentioned as "completely different", but
->>
->> 1)
->> setting x0 to -ENOSYS is necessary because, otherwise, user-issued syscall(-1) will
->> return a bogus value when audit tracing is on.
->>
->> Please note that, on arm,
->>                    not traced      traced
->>                    ------          ------
->> syscall(-1)      aborted         OOPs(BUG_ON)
->> syscall(-3000)   aborted         aborted
->> syscall(1000)    ENOSYS          ENOSYS
->>
->> So, anyhow, its a bit difficult and meaningless to mimic these invalid cases.
->
-> I'm not suggesting we make ourselves bug-compatible with ARM. Instead, I'd
-> rather see a series of patches getting the ARM code working correctly,
-> before we go off doing something different for arm64.
+On Mon, 01 Sep 2014, Arnd Bergmann wrote:
 
-I see.
+> On Monday 01 September 2014 17:04:26 Lee Jones wrote:
+> > On Mon, 01 Sep 2014, Arnd Bergmann wrote:
+> > > Maybe I'm misreading the patch, but I don't see how it creates a
+> > > migration path. What I want to end up with is infrastructure that
+> > > lets anybody call syscon_regmap_lookup_by_pdevname or
+> > > syscon_regmap_lookup_by_compatible (if they really need to)
+> > > without needing the platform_driver for syscon. That should not
+> > > require any form of compatibility layer because to the driver
+> > > using it there is no API change.
+> > 
+> > Somehow I think the likelyhood is that I am misreading the patch.
+> > 
+> > I thought that before this patch drivers we had to register a syscon
+> > device to bind to this driver, which was fine for the first use-cases
+> > of syscon as it wasn't required too early during boot.  However, now
+> > there are use-cases where systems require access to syscon registers
+> > eariler in boot we require a means to obtain access prior to device
+> > probing.  I thought this patch not only provides that possibilty, but
+> > also leaves in the ability to register direct from DT.
+> 
+> Right, it does provide the ability to have syscon before devices
+> are registered, I missed that part.
+> 
+> > > In contrast, this patch introduces a new of_syscon_{un,}register()
+> > > interface that would get removed after the the above has
+> > > been implemented, causing extra churn for any driver that also
+> > > wants to provide a regmap-like interface.
+> > 
+> > When will we ever not have to register syscon?
+> 
+> The idea is that we implicitly register the syscon block when someone
+> calls syscon_regmap_lookup_by_compatible or syscon_regmap_lookup_by_phandle
+> and then return a reference to that new syscon. When another driver
+> looks up the same device node, we just pass a reference to the existing
+> syscon.
 
->> 2)
->> branching a new label, syscall_trace_return_skip (see entry.S), after syscall_trace_enter()
->> is necessary in order to avoid OOPS in audit_syscall_enter() as we discussed.
->>
->> Did I make it clear?
->
-> Sure. So let's fix ARM, then look at the arm64 port after that. I really
-> want to avoid divergence in this area.
+Doesn't sound too unreasonable.  So how about instead of exporting
+these new of_syscon_{un,}register() calls, we make them static and
+call them from syscon_regmap_lookup_by_{phandle,compatible}?
 
-Okey, I will start with fixing the issue on arm.
-
--Takahiro AKASHI
-
-> Will
->
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
