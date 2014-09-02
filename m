@@ -1,56 +1,66 @@
-From: sre@kernel.org (Sebastian Reichel)
-Date: Tue, 2 Sep 2014 05:05:46 +0200
-Subject: [PATCH 15/15] tty: serial: 8250: omap: add dma support
-In-Reply-To: <5404B149.6010400@linutronix.de>
-References: <20140821184416.GF10066@atomide.com>
- <53FE3779.5090908@linutronix.de>
- <20140827202313.GF16006@atomide.com>
- <20140828082348.GA5413@linutronix.de>
- <20140828164645.GG16006@atomide.com>
- <53FF84DF.7080406@linutronix.de>
- <20140828225454.GM16006@atomide.com>
- <540048B4.7010807@linutronix.de>
- <20140829161221.GO16006@atomide.com>
- <5404B149.6010400@linutronix.de>
-Message-ID: <20140902030546.GB6724@earth.universe>
+From: robherring2@gmail.com (Rob Herring)
+Date: Mon, 1 Sep 2014 22:06:24 -0500
+Subject: [RFC PATCH 1/1] drivers: introduce ARM SBSA generic UART driver
+In-Reply-To: <1409328803-1953-2-git-send-email-andre.przywara@arm.com>
+References: <1409328803-1953-1-git-send-email-andre.przywara@arm.com>
+ <1409328803-1953-2-git-send-email-andre.przywara@arm.com>
+Message-ID: <CAL_JsqJbAWRhduzMwdQMh8sDdVqTWVK2Ej9LQjx4gp2ifwxe6Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Fri, Aug 29, 2014 at 11:13 AM, Andre Przywara <andre.przywara@arm.com> wrote:
+> The ARM Server Base System Architecture (SBSA) describes a generic
+> UART which all compliant level 1 systems should implement. This is
+> actually a PL011 subset, so a full PL011 implementation will satisfy
+> this requirement.
+> However if a system does not have a PL011, a very stripped down
+> implementation complying to the SBSA defined specification will
+> suffice. The Linux PL011 driver is not guaranteed to drive this
+> limited device (and indeed the fast model implentation hangs the
+> kernel if driven by the PL011 driver).
+> So introduce a new driver just implementing the part specified by the
+> SBSA (which lacks DMA, the modem control signals and many of the
+> registers including baud rate control). This driver has been derived
+> by the actual PL011 one, removing all unnecessary code.
+>
+> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+> ---
+>  .../devicetree/bindings/serial/arm_sbsa_uart.txt   |    6 +
+>  drivers/tty/serial/Kconfig                         |   28 +
+>  drivers/tty/serial/Makefile                        |    1 +
+>  drivers/tty/serial/sbsa_uart.c                     |  793 ++++++++++++++++++++
+>  include/uapi/linux/serial_core.h                   |    1 +
 
-On Mon, Sep 01, 2014 at 07:47:53PM +0200, Sebastian Andrzej Siewior wrote:
-> On 08/29/2014 06:12 PM, Tony Lindgren wrote:
-> > Looks like the paste bug is there for sure, doing off idle and pasting
-> > 240 characters to the console can hang the UART RX after few attempts,
-> > and pasting 16 charactes won't show up at all if the system is idling.
-> > So you may want to play with that too a bit :)
-> 
-> One character wakes it up. After that you can send 16, 64 and you see
-> them. Right away. No delay.
-> 
-> If you send "a lot" data in one-go it takes approx 152 characters until
-> the first one is displayed properly at 115200,8N1. That is approx 13ms.
-> Could it take that long to get up and be ready?
+Sorry, but I think this is all wrong. We've now just duplicated some
+subset of the pl011 driver leaving out the parts like setting baudrate
+which can never be added since those things could be different for
+every vendor.
 
-I noticed the same behaviour when I tested the runtime PM stuff on
-my N900 with the existing serial-omap driver and I also assumed,
-that the chip needs that long to get up.
+The original intent of the SBSA uart was to provide a common early
+debug uart. It was not to have a full fledged driver. I think the SBSA
+has failed in this area and created the potential to create a mess of
+serial drivers different for every vendor. Reality will hopefully not
+be that extreme and most vendors will just use the pl011 and create
+their value add somewhere besides the uart. For the purpose of debug
+output, we already support that as the pl011 earlycon only touches
+SBSA compatible registers.
 
-> Comparing it with serial-omap I see the same thing: I takes approx the
-> same amount of data until the first one is displayed. After a lot of
-> "long" writes which wake the chip up from idle I manage to freeze both,
-> the serial-omap driver and mine driver.
-> 
-> One thing that is probably a dumb idea is that printk in
-> omap_8250_mdr1_errataset().
-> Would it be possible that when I hit a printk in the resume path that I
-> may deadlock and box will freeze?
+>  5 files changed, 829 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/serial/arm_sbsa_uart.txt
+>  create mode 100644 drivers/tty/serial/sbsa_uart.c
+>
+> diff --git a/Documentation/devicetree/bindings/serial/arm_sbsa_uart.txt b/Documentation/devicetree/bindings/serial/arm_sbsa_uart.txt
+> new file mode 100644
+> index 0000000..8e2c5d6
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/serial/arm_sbsa_uart.txt
+> @@ -0,0 +1,6 @@
+> +* ARM SBSA defined generic UART
+> +
+> +Required properties:
+> +- compatible: must be "arm,sbsa-uart"
 
--- Sebastian
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140902/60396c65/attachment.sig>
+This alone is not okay. There is no such implementation of hardware.
+The DT must specify the implementation such as pl011.
+
+Rob
