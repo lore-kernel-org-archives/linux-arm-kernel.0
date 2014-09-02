@@ -1,50 +1,72 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 02 Sep 2014 15:48:06 +0200
-Subject: [RFC PATCH 1/1] drivers: introduce ARM SBSA generic UART driver
-In-Reply-To: <CAL_Jsq+Rs5MXC7s7EeWAEAPxxqaShAVGt=cdQxud5Us+-Zp6jw@mail.gmail.com>
-References: <1409328803-1953-1-git-send-email-andre.przywara@arm.com>
- <540596A6.8000608@arm.com>
- <CAL_Jsq+Rs5MXC7s7EeWAEAPxxqaShAVGt=cdQxud5Us+-Zp6jw@mail.gmail.com>
-Message-ID: <3749748.k4a1nSHDdj@wuerfel>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Tue, 2 Sep 2014 15:49:08 +0200
+Subject: [GIT PULL 4/4] at91: dt for 3.18 #2
+In-Reply-To: <1409593127-24049-4-git-send-email-nicolas.ferre@atmel.com>
+References: <1409593127-24049-1-git-send-email-nicolas.ferre@atmel.com>
+ <1409593127-24049-4-git-send-email-nicolas.ferre@atmel.com>
+Message-ID: <5405CAD4.4090502@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 02 September 2014 08:20:53 Rob Herring wrote:
-> >>
-> >> This alone is not okay. There is no such implementation of hardware.
-> >
-> > But the SBSA explicitly allows this. I don't know of any vendor who just
-> > implements the subset, but I've been told that this has been asked for.
+On 01/09/2014 19:38, Nicolas Ferre :
+> Arnd, Olof, Kevin,
 > 
-> To use baudrate as an example, that must be configurable somehow
-> either with pl011 registers or in a vendor specific way. I suppose you
-> could do an actual implementation with all those things hardcoded in
-> the design, but that seems unlikely.
-
-Why does the baudrate need to be configurable? I think it's completely
-reasonable to specify a console port that has a fixed (as in the
-OS must not care) rate, and that can be implemented either as a UART
-with a programmable rate or as a set of registers that directly talks
-to a remote system management device over whatever hardware protocol
-they choose.
-
-> >> The DT must specify the implementation such as pl011.
-> >
-> > If it is a full featured PL011: sure. Then we don't need this driver at
-> > all and just use the SBSA UART spec as a guideline for our earlycon
-> > implementation.
-> > I will try to learn if there is someone actually implementing only the
-> > subset.
+> A little bit more material for the DT branch. I didn't want to the one I've
+> just sent you because this material is not related to the big cleanup addressed
+> by previous 3 pull-requests.
+> It is very basic and simple DT updates and a use of phy fixup infrastructure
+> that is now present in phy subsystem.
 > 
-> I would have assumed you knew someone is. Otherwise, I don't really
-> think anything should be implemented at this point. Perhaps adding
-> SBSA uart as an explicit earlycon option would be worthwhile. Also, we
-> should consider using ttySx instead of ttyAMAx for SBSA compliant
-> systems (including ones with pl011).
+> Thanks, best regards,
+> 
+> The following changes since commit 464d6e18639c4347dafd8dbcee270674dd3d8fba:
+> 
+>   Merge tag 'at91-dt-for-3.17' of git://git.kernel.org/pub/scm/linux/kernel/git/mripard/linux (2014-08-19 16:04:10 -0500)
+> 
+> are available in the git repository at:
+> 
+> 
+>   git://github.com/at91linux/linux-at91.git tags/at91-dt2
 
-What about systems that have both a SBSA debug port and a 8250
-compatible UART? That sounds like a very realistic hardware design
-choice for someone coming from an older x86/powerpc/mips/... chip
-that has 8250 and adds the extra port for SBSA compliance.
+FYI, I've just pushed a branch to show the conflict resolution while
+merging this tag with the tree previous pull-requests:
 
-	Arnd
+https://github.com/at91linux/linux-at91/commits/at91-3.18-resolved
+
+or:
+
+git://github.com/at91linux/linux-at91.git at91-3.18-resolved
+
+Best regards,
+
+> for you to fetch changes up to 5f8157309624929e05ece846d3ca8a3a64988378:
+> 
+>   ARM: at91: remove phy fixup for sama5d3xek boards (2014-09-01 19:30:44 +0200)
+> 
+> ----------------------------------------------------------------
+> Second batch of AT91 DT patches for 3.18:
+> - 2 little fixes for at91sam9x5 and at91sam9n12ek
+> - removal of a board specific hook for sama5d3xek about phy fixup
+>   replaced with proper DT property definition.
+> 
+> ----------------------------------------------------------------
+> Alexandre Belloni (1):
+>       ARM: at91/dt: sam9x5: fix ADC compatible string
+> 
+> Bo Shen (1):
+>       ARM: at91/dt: sam9n12ek: ohci: add port and vbus property
+> 
+> Boris BREZILLON (2):
+>       ARM: at91/dt: describe rgmii ethernet phy connected to sama5d3xek boards
+>       ARM: at91: remove phy fixup for sama5d3xek boards
+> 
+>  arch/arm/boot/dts/at91sam9n12ek.dts |  2 ++
+>  arch/arm/boot/dts/at91sam9x5.dtsi   |  2 +-
+>  arch/arm/boot/dts/sama5d3xcm.dtsi   | 30 ++++++++++++++++++++++++++++++
+>  arch/arm/mach-at91/board-dt-sama5.c | 22 ----------------------
+>  4 files changed, 33 insertions(+), 23 deletions(-)
+> 
+
+
+-- 
+Nicolas Ferre
