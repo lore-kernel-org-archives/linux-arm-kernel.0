@@ -1,159 +1,73 @@
 From: soren.brinkmann@xilinx.com (Soren Brinkmann)
-Date: Tue,  2 Sep 2014 14:19:09 -0700
-Subject: [PATCH v2 4/9] ARM: zynq: PM: Enable DDR clock stop
+Date: Tue,  2 Sep 2014 14:19:10 -0700
+Subject: [PATCH v2 5/9] ARM: zynq: Remove invalidate cache for cpu die
 In-Reply-To: <1409692754-13437-1-git-send-email-soren.brinkmann@xilinx.com>
 References: <1409692754-13437-1-git-send-email-soren.brinkmann@xilinx.com>
-Message-ID: <1409692754-13437-5-git-send-email-soren.brinkmann@xilinx.com>
+Message-ID: <1409692754-13437-6-git-send-email-soren.brinkmann@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The DDR controller can detect idle periods and leverage low power
-features clock stop. When new requests occur, the DDRC resumes
-normal operation.
+From: Daniel Lezcano <daniel.lezcano@linaro.org>
 
-Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
----
-v2:
- - properly document return value for zynq_pm_ioremap
- - change zynq_pm_late_init signature to return void
- - add kernel doc to late_init()
- - fix kernel doc
- - only enable clock-stop during boot and leave out self-refresh. The
-   self-refresh penalty is apparently not-negligible
----
- arch/arm/mach-zynq/Makefile |  2 +-
- arch/arm/mach-zynq/common.c |  1 +
- arch/arm/mach-zynq/common.h |  2 ++
- arch/arm/mach-zynq/pm.c     | 83 +++++++++++++++++++++++++++++++++++++++++++++
- 4 files changed, 87 insertions(+), 1 deletion(-)
- create mode 100644 arch/arm/mach-zynq/pm.c
+As there is no Power management unit on this board, it is not possible to power
+down a core, just WFI is allowed. There is no point to invalidate the cache and
+exit coherency.
 
-diff --git a/arch/arm/mach-zynq/Makefile b/arch/arm/mach-zynq/Makefile
-index 1b25d92ebf22..820dff6e1eba 100644
---- a/arch/arm/mach-zynq/Makefile
-+++ b/arch/arm/mach-zynq/Makefile
-@@ -3,7 +3,7 @@
- #
+Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+Reviewed-and-tested-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
+---
+ arch/arm/mach-zynq/hotplug.c | 32 +-------------------------------
+ 1 file changed, 1 insertion(+), 31 deletions(-)
+
+diff --git a/arch/arm/mach-zynq/hotplug.c b/arch/arm/mach-zynq/hotplug.c
+index 5052c70326e4..366f46c91365 100644
+--- a/arch/arm/mach-zynq/hotplug.c
++++ b/arch/arm/mach-zynq/hotplug.c
+@@ -10,35 +10,7 @@
+  * it under the terms of the GNU General Public License version 2 as
+  * published by the Free Software Foundation.
+  */
+-#include <linux/kernel.h>
+-#include <linux/errno.h>
+-#include <linux/smp.h>
+-
+-#include <asm/cacheflush.h>
+-#include <asm/cp15.h>
+-#include "common.h"
+-
+-static inline void zynq_cpu_enter_lowpower(void)
+-{
+-	unsigned int v;
+-
+-	flush_cache_all();
+-	asm volatile(
+-	"	mcr	p15, 0, %1, c7, c5, 0\n"
+-	"	dsb\n"
+-	/*
+-	 * Turn off coherency
+-	 */
+-	"	mrc	p15, 0, %0, c1, c0, 1\n"
+-	"	bic	%0, %0, #0x40\n"
+-	"	mcr	p15, 0, %0, c1, c0, 1\n"
+-	"	mrc	p15, 0, %0, c1, c0, 0\n"
+-	"	bic	%0, %0, %2\n"
+-	"	mcr	p15, 0, %0, c1, c0, 0\n"
+-	  : "=&r" (v)
+-	  : "r" (0), "Ir" (CR_C)
+-	  : "cc");
+-}
++#include <asm/proc-fns.h>
  
- # Common support
--obj-y				:= common.o slcr.o
-+obj-y				:= common.o slcr.o pm.o
- CFLAGS_REMOVE_hotplug.o		=-march=armv6k
- CFLAGS_hotplug.o 		=-Wa,-march=armv7-a -mcpu=cortex-a9
- obj-$(CONFIG_HOTPLUG_CPU)	+= hotplug.o
-diff --git a/arch/arm/mach-zynq/common.c b/arch/arm/mach-zynq/common.c
-index 3cb7c198615a..6bd13e5ce6b7 100644
---- a/arch/arm/mach-zynq/common.c
-+++ b/arch/arm/mach-zynq/common.c
-@@ -101,6 +101,7 @@ static int __init zynq_get_revision(void)
- static void __init zynq_init_late(void)
+ /*
+  * platform-specific code to shutdown a CPU
+@@ -47,8 +19,6 @@ static inline void zynq_cpu_enter_lowpower(void)
+  */
+ void zynq_platform_cpu_die(unsigned int cpu)
  {
- 	zynq_core_pm_init();
-+	zynq_pm_late_init();
- }
- 
- /**
-diff --git a/arch/arm/mach-zynq/common.h b/arch/arm/mach-zynq/common.h
-index 596ef0b5067c..0edbb6997b1c 100644
---- a/arch/arm/mach-zynq/common.h
-+++ b/arch/arm/mach-zynq/common.h
-@@ -40,6 +40,8 @@ extern void __iomem *zynq_scu_base;
- /* Hotplug */
- extern void zynq_platform_cpu_die(unsigned int cpu);
- 
-+void zynq_pm_late_init(void);
-+
- static inline void zynq_core_pm_init(void)
- {
- 	/* A9 clock gating */
-diff --git a/arch/arm/mach-zynq/pm.c b/arch/arm/mach-zynq/pm.c
-new file mode 100644
-index 000000000000..911fcf865be8
---- /dev/null
-+++ b/arch/arm/mach-zynq/pm.c
-@@ -0,0 +1,83 @@
-+/*
-+ * Zynq power management
-+ *
-+ *  Copyright (C) 2012 - 2014 Xilinx
-+ *
-+ *  S?ren Brinkmann <soren.brinkmann@xilinx.com>
-+ *
-+ * This program is free software: you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation, either version 2 of the License, or
-+ * (at your option) any later version.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-+ */
-+
-+#include <linux/io.h>
-+#include <linux/of_address.h>
-+#include <linux/of_device.h>
-+#include "common.h"
-+
-+/* register offsets */
-+#define DDRC_CTRL_REG1_OFFS		0x60
-+#define DDRC_DRAM_PARAM_REG3_OFFS	0x20
-+
-+/* bitfields */
-+#define DDRC_CLOCKSTOP_MASK	BIT(23)
-+#define DDRC_SELFREFRESH_MASK	BIT(12)
-+
-+static void __iomem *ddrc_base;
-+
-+/**
-+ * zynq_pm_ioremap() - Create IO mappings
-+ * @comp:	DT compatible string
-+ * Return: Pointer to the mapped memory or NULL.
-+ *
-+ * Remap the memory region for a compatible DT node.
-+ */
-+static void __iomem *zynq_pm_ioremap(const char *comp)
-+{
-+	struct device_node *np;
-+	void __iomem *base = NULL;
-+
-+	np = of_find_compatible_node(NULL, NULL, comp);
-+	if (np) {
-+		base = of_iomap(np, 0);
-+		of_node_put(np);
-+	} else {
-+		pr_warn("%s: no compatible node found for '%s'\n", __func__,
-+				comp);
-+	}
-+
-+	return base;
-+}
-+
-+/**
-+ * zynq_pm_late_init() - Power management init
-+ *
-+ * Initialization of power management related featurs and infrastructure.
-+ */
-+void __init zynq_pm_late_init(void)
-+{
-+	u32 reg;
-+
-+	ddrc_base = zynq_pm_ioremap("xlnx,zynq-ddrc-a05");
-+	if (!ddrc_base) {
-+		pr_warn("%s: Unable to map DDRC IO memory.\n", __func__);
-+	} else {
-+		/*
-+		 * Enable DDRC clock stop feature. The HW takes care of
-+		 * entering/exiting the correct mode depending
-+		 * on activity state.
-+		 */
-+		reg = readl(ddrc_base + DDRC_DRAM_PARAM_REG3_OFFS);
-+		reg |= DDRC_CLOCKSTOP_MASK;
-+		writel(reg, ddrc_base + DDRC_DRAM_PARAM_REG3_OFFS);
-+	}
-+}
+-	zynq_cpu_enter_lowpower();
+-
+ 	/*
+ 	 * there is no power-control hardware on this platform, so all
+ 	 * we can do is put the core into WFI; this is safe as the calling
 -- 
 2.1.0.1.g27b9230
