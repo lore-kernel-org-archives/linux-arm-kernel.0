@@ -1,54 +1,103 @@
-From: soren.brinkmann@xilinx.com (Soren Brinkmann)
-Date: Tue,  2 Sep 2014 14:19:14 -0700
-Subject: [PATCH v2 9/9] ARM: zynq: Rename 'zynq_platform_cpu_die'
-In-Reply-To: <1409692754-13437-1-git-send-email-soren.brinkmann@xilinx.com>
-References: <1409692754-13437-1-git-send-email-soren.brinkmann@xilinx.com>
-Message-ID: <1409692754-13437-10-git-send-email-soren.brinkmann@xilinx.com>
+From: abrestic@chromium.org (Andrew Bresticker)
+Date: Tue,  2 Sep 2014 14:34:52 -0700
+Subject: [PATCH v3 0/9] Tegra xHCI support
+Message-ID: <1409693701-16520-1-git-send-email-abrestic@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Match the naming pattern of all other SMP ops and rename
-zynq_platform_cpu_die --> zynq_cpu_die.
+This series adds support for xHCI on NVIDIA Tegra SoCs.  This includes:
+ - patches 1 and 2: adding a driver for the mailbox used to communicate
+   with the xHCI controller's firmware,
+ - patches 3 and 4: extending the XUSB pad controller driver to support
+   the USB PHY types (UTMI, HSIC, and USB3),
+ - patches 5 and 6: adding a xHCI host-controller driver, and
+ - patches 7, 8, and 9: updating the relevant DT files.
 
-Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
----
-v2:
- - make comments comply to kernel-doc format
----
- arch/arm/mach-zynq/platsmp.c | 12 +++++++-----
- 1 file changed, 7 insertions(+), 5 deletions(-)
+The PHY and host drivers have compile-time dependencies on the mailbox
+driver, and the host driver has compile-time dependencies on the PHY
+driver.  It is probably best if these all get merged through the Tegra
+tree.
 
-diff --git a/arch/arm/mach-zynq/platsmp.c b/arch/arm/mach-zynq/platsmp.c
-index f722b5a83a45..52d768ff7857 100644
---- a/arch/arm/mach-zynq/platsmp.c
-+++ b/arch/arm/mach-zynq/platsmp.c
-@@ -137,12 +137,14 @@ static int zynq_cpu_kill(unsigned cpu)
- 	return 1;
- }
- 
--/*
-- * platform-specific code to shutdown a CPU
-+/**
-+ * zynq_cpu_die - Let a CPU core die
-+ * @cpu:	Dying CPU
-  *
-- * Called with IRQs disabled
-+ * Platform-specific code to shutdown a CPU.
-+ * Called with IRQs disabled on the dying CPU.
-  */
--static void zynq_platform_cpu_die(unsigned int cpu)
-+static void zynq_cpu_die(unsigned int cpu)
- {
- 	zynq_slcr_cpu_state_write(cpu, true);
- 
-@@ -162,7 +164,7 @@ struct smp_operations zynq_smp_ops __initdata = {
- 	.smp_boot_secondary	= zynq_boot_secondary,
- 	.smp_secondary_init	= zynq_secondary_init,
- #ifdef CONFIG_HOTPLUG_CPU
--	.cpu_die		= zynq_platform_cpu_die,
-+	.cpu_die		= zynq_cpu_die,
- 	.cpu_kill		= zynq_cpu_kill,
- #endif
- };
+Based on 3.17-rc3, Jassi Brar's common mailbox framework [0], and my
+xHCI modules series [1].
+
+Tested on Venice2, Jetson TK1, and Big with a variety of USB2.0 and
+USB3.0 memory sticks and ethernet dongles using controller firmware
+recently posted by Andrew Chew [2].
+
+Notes:
+ - HSIC support is mostly untested and I think there are still some issues
+   to work out there.  I do have a Tegra124 board with a HSIC hub so I'll
+   try to sort those out later.
+ - The XUSB padctl driver doesn't play nice with the existing Tegra USB2.0
+   PHY driver, so all ports should be assigned to the XHCI controller.
+
+Based on work by:
+  a lot of people, but from what I can tell from the L4T tree [3], the
+  original authors of the Tegra xHCI driver are:
+    Ajay Gupta <ajayg@nvidia.com>
+    Bharath Yadav <byadav@nvidia.com>
+
+Chagnes from v2:
+ - Dropped mailbox channel specifier.  The mailbox driver allocates virtual
+   channels backed by the single physical channel.
+ - Added support for HS_CURR_LEVEL adjustment pinconfig property, which
+   will be required for the Blaze board.
+ - Addressed Stephen's review comments.
+
+Changes from v1:
+ - Converted mailbox driver to use the common mailbox framework.
+ - Fixed up host driver so that it can now be built and used as a module.
+ - Addressed Stephen's review comments.
+ - Misc. cleanups.
+
+Changes from RFC:
+ - Dropped Tegra114 support.
+ - Split out mailbox into separate driver.
+ - Stopped using child xhci-plat device in xHCI host-controller driver.
+ - Added PHY support to Thierry's XUSB padctl driver instead of in a separate
+   USB PHY driver.
+ - Added Jetson TK1 support.
+ - Misc. cleanups.
+
+[0] https://lkml.org/lkml/2014/8/1/200
+[1] https://lkml.org/lkml/2014/8/18/504
+[2] https://patchwork.ozlabs.org/patch/384013/
+[3] git://nv-tegra.nvidia.com/linux-3.10.git
+
+Andrew Bresticker (9):
+  of: Add NVIDIA Tegra XUSB mailbox binding
+  mailbox: Add NVIDIA Tegra XUSB mailbox driver
+  of: Update Tegra XUSB pad controller binding for USB
+  pinctrl: tegra-xusb: Add USB PHY support
+  of: Add NVIDIA Tegra xHCI controller binding
+  usb: xhci: Add NVIDIA Tegra xHCI host-controller driver
+  ARM: tegra: Add Tegra124 XUSB mailbox and xHCI controller
+  ARM: tegra: jetson-tk1: Add xHCI support
+  ARM: tegra: venice2: Add xHCI support
+
+ .../bindings/mailbox/nvidia,tegra124-xusb-mbox.txt |   32 +
+ .../pinctrl/nvidia,tegra124-xusb-padctl.txt        |   56 +-
+ .../bindings/usb/nvidia,tegra124-xhci.txt          |  104 ++
+ arch/arm/boot/dts/tegra124-jetson-tk1.dts          |   48 +-
+ arch/arm/boot/dts/tegra124-venice2.dts             |   79 +-
+ arch/arm/boot/dts/tegra124.dtsi                    |   41 +
+ drivers/mailbox/Kconfig                            |    3 +
+ drivers/mailbox/Makefile                           |    2 +
+ drivers/mailbox/tegra-xusb-mailbox.c               |  290 +++++
+ drivers/pinctrl/Kconfig                            |    1 +
+ drivers/pinctrl/pinctrl-tegra-xusb.c               | 1233 +++++++++++++++++++-
+ drivers/usb/host/Kconfig                           |    9 +
+ drivers/usb/host/Makefile                          |    1 +
+ drivers/usb/host/xhci-tegra.c                      |  905 ++++++++++++++
+ include/dt-bindings/pinctrl/pinctrl-tegra-xusb.h   |   20 +
+ include/soc/tegra/xusb.h                           |   53 +
+ 16 files changed, 2796 insertions(+), 81 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/mailbox/nvidia,tegra124-xusb-mbox.txt
+ create mode 100644 Documentation/devicetree/bindings/usb/nvidia,tegra124-xhci.txt
+ create mode 100644 drivers/mailbox/tegra-xusb-mailbox.c
+ create mode 100644 drivers/usb/host/xhci-tegra.c
+ create mode 100644 include/soc/tegra/xusb.h
+
 -- 
-2.1.0.1.g27b9230
+2.1.0.rc2.206.gedb03e5
