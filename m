@@ -1,56 +1,41 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Tue, 02 Sep 2014 14:45:06 -0700
-Subject: [PATCH] clk: at91: fix num_parents test in at91sam9260 slow clk
- implementation
-In-Reply-To: <1409671671-13544-1-git-send-email-boris.brezillon@free-electrons.com>
-References: <1409671671-13544-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <20140902214506.5251.1412@quantum>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Wed, 03 Sep 2014 00:50:26 +0300
+Subject: [RFC PATCH 0/7] Introduce automatic DMA configuration for IOMMU
+ masters
+In-Reply-To: <3133975.8bg0CLVMMz@wuerfel>
+References: <1409327670-3495-1-git-send-email-will.deacon@arm.com>
+ <5405B6F2.1060105@samsung.com> <3133975.8bg0CLVMMz@wuerfel>
+Message-ID: <1804700.tdyjJcKU9T@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Boris BREZILLON (2014-09-02 08:27:51)
-> The slow clk block provided by at91sam9260 and derived SoCs should always
-> have 2 parents.
+On Tuesday 02 September 2014 14:43:18 Arnd Bergmann wrote:
+> On Tuesday 02 September 2014 14:24:18 Marek Szyprowski wrote:
+> > >>> For isolation purposes, it can only help to have more domains, but
+> > >>> I would guess that there is some space overhead in maintaining lots
+> > >>> of page tables.
+> > >> 
+> > >> I'm okay with both approaches (separate domain for each device vs.
+> > >> single common domain for all devices). Maybe this can be some kind of
+> > >> Kconfig option added to DMA debugging? Separation might be really
+> > >> helpful when debugging strange device behavior.
+> > > 
+> > > One potential problem with a single domain is when you have multiple
+> > > instances of a given IOMMU, each with different hardware restrictions.
+> > > Then you can end up with multiple sets of page tables for the domain
+> > > which, although not impossible to work with, is a bit of a mess.
+> > 
+> > Maybe the default dma-mapping domain should be one per a given IOMMU
+> > instance? This will simplify a lot of things in such case.
 > 
-> Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
-> ---
-> 
-> Hello Mike,
-> 
-> Could you take this fix for the next 3.17 rc ?
-> Without this fix you won't be able to use programmable clks (the slow
-> clk is one of the parents of prog clks), and these prog clks are used,
-> among other things, to provide clks to external audio chips.
-> 
-> No need to backport this fix to previous stable releases, as CCF support
-> for at91sam9260 (and derived) SoCs only appeared in 3.17.
+> Yes, that sounds like a good idea.
 
-Pulled into clk-fixes.
+That would work as a default configuration for the Renesas IPMMU IOMMU, which 
+supports four TLBs to be shared between more than four bus masters. Ideally 
+I'd like to make the bus master to TLB association somehow configurable, but 
+associating all bus masters with a single TLB as a first step is fine.
 
+-- 
 Regards,
-Mike
 
-> 
-> Best Regards,
-> 
-> Boris
-> 
->  drivers/clk/at91/clk-slow.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/drivers/clk/at91/clk-slow.c b/drivers/clk/at91/clk-slow.c
-> index 0300c46..32f7c1b 100644
-> --- a/drivers/clk/at91/clk-slow.c
-> +++ b/drivers/clk/at91/clk-slow.c
-> @@ -447,7 +447,7 @@ void __init of_at91sam9260_clk_slow_setup(struct device_node *np,
->         int i;
->  
->         num_parents = of_count_phandle_with_args(np, "clocks", "#clock-cells");
-> -       if (num_parents <= 0 || num_parents > 1)
-> +       if (num_parents != 2)
->                 return;
->  
->         for (i = 0; i < num_parents; ++i) {
-> -- 
-> 1.9.1
-> 
+Laurent Pinchart
