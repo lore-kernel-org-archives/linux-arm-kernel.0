@@ -1,154 +1,77 @@
-From: daniel.thompson@linaro.org (Daniel Thompson)
-Date: Tue,  2 Sep 2014 14:00:53 +0100
-Subject: [PATCH v11 19/19] serial: imx: Add support for KGDB's FIQ/NMI mode
-In-Reply-To: <1409662853-29313-1-git-send-email-daniel.thompson@linaro.org>
-References: <1408466769-20004-1-git-send-email-daniel.thompson@linaro.org>
- <1409662853-29313-1-git-send-email-daniel.thompson@linaro.org>
-Message-ID: <1409662853-29313-20-git-send-email-daniel.thompson@linaro.org>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 2 Sep 2014 14:10:36 +0100
+Subject: [GIT PULL] arm64: second wave of arm64 fixes for 3.17
+Message-ID: <20140902131036.GL25379@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch makes it possible to use the imx uart with KGDB's FIQ/NMI
-mode.
+Hello Linus,
 
-Main changes are:
+Please can you pull these fixes for arm64? They address some issues found
+by running smatch on the arch code (ignoring the false positives) and also
+stop 32-bit Android from losing track of its stack.
 
-.poll_init() will, if KGDB+FIQ are enabled, perform deeper hardware
-initialization to ensure the serial port is always active (required
-otherwise FIQ is not triggered by UART activity). This has an impact on
-power usage so it is conservatively enabled.
+There's one additional irq migration fix in the pipeline, but it came in
+after I'd tagged and tested this set.
 
-imx_put_poll_char() has been simplified to remove the code to disable
-interrupts. The present code can corrupt register state when re-entered
-from FIQ handler.
+Thanks,
 
-Both imx_put_poll_char() and imx_get_poll_char() adopt _relaxed()
-MMIO functions (which are safe for polled I/O and needed to avoid taking
-spin locks).
+Will
 
-Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
-Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-Cc: Jiri Slaby <jslaby@suse.cz>
-Cc: linux-serial at vger.kernel.org
-Acked-by: Dirk Behme <dirk.behme@de.bosch.com>
----
- drivers/tty/serial/imx.c | 71 +++++++++++++++++++++++++++++++++++-------------
- 1 file changed, 52 insertions(+), 19 deletions(-)
+--->8
 
-diff --git a/drivers/tty/serial/imx.c b/drivers/tty/serial/imx.c
-index 983668a..a201c61 100644
---- a/drivers/tty/serial/imx.c
-+++ b/drivers/tty/serial/imx.c
-@@ -49,6 +49,7 @@
- #include <linux/of_device.h>
- #include <linux/io.h>
- #include <linux/dma-mapping.h>
-+#include <linux/kgdb.h>
- 
- #include <asm/irq.h>
- #include <linux/platform_data/serial-imx.h>
-@@ -1505,44 +1506,73 @@ imx_verify_port(struct uart_port *port, struct serial_struct *ser)
- }
- 
- #if defined(CONFIG_CONSOLE_POLL)
-+
-+#if defined(CONFIG_KGDB_FIQ)
-+/*
-+ * Prepare the UART to be used from kgdb's NMI support.
-+ */
-+static int imx_poll_init(struct uart_port *port)
-+{
-+	struct imx_port *sport = (struct imx_port *)port;
-+	unsigned long flags;
-+	unsigned long temp;
-+	int retval;
-+
-+	retval = clk_prepare_enable(sport->clk_ipg);
-+	if (retval)
-+		return retval;
-+	retval = clk_prepare_enable(sport->clk_per);
-+	if (retval)
-+		clk_disable_unprepare(sport->clk_ipg);
-+
-+	imx_setup_ufcr(sport, 0);
-+
-+	spin_lock_irqsave(&sport->port.lock, flags);
-+
-+	temp = readl(sport->port.membase + UCR1);
-+	if (is_imx1_uart(sport))
-+		temp |= IMX1_UCR1_UARTCLKEN;
-+	temp |= UCR1_UARTEN | UCR1_RRDYEN;
-+	temp &= ~(UCR1_TXMPTYEN | UCR1_RTSDEN);
-+	writel(temp, sport->port.membase + UCR1);
-+
-+	temp = readl(sport->port.membase + UCR2);
-+	temp |= UCR2_RXEN;
-+	writel(temp, sport->port.membase + UCR2);
-+
-+	spin_unlock_irqrestore(&sport->port.lock, flags);
-+
-+	/* register the FIQ with kgdb */
-+	kgdb_register_fiq(sport->port.irq);
-+
-+	return 0;
-+}
-+#endif /* CONFIG_KGDB_FIQ */
-+
- static int imx_poll_get_char(struct uart_port *port)
- {
--	if (!(readl(port->membase + USR2) & USR2_RDR))
-+	if (!(readl_relaxed(port->membase + USR2) & USR2_RDR))
- 		return NO_POLL_CHAR;
- 
--	return readl(port->membase + URXD0) & URXD_RX_DATA;
-+	return readl_relaxed(port->membase + URXD0) & URXD_RX_DATA;
- }
- 
- static void imx_poll_put_char(struct uart_port *port, unsigned char c)
- {
--	struct imx_port_ucrs old_ucr;
- 	unsigned int status;
- 
--	/* save control registers */
--	imx_port_ucrs_save(port, &old_ucr);
--
--	/* disable interrupts */
--	writel(UCR1_UARTEN, port->membase + UCR1);
--	writel(old_ucr.ucr2 & ~(UCR2_ATEN | UCR2_RTSEN | UCR2_ESCI),
--	       port->membase + UCR2);
--	writel(old_ucr.ucr3 & ~(UCR3_DCD | UCR3_RI | UCR3_DTREN),
--	       port->membase + UCR3);
--
- 	/* drain */
- 	do {
--		status = readl(port->membase + USR1);
-+		status = readl_relaxed(port->membase + USR1);
- 	} while (~status & USR1_TRDY);
- 
- 	/* write */
--	writel(c, port->membase + URTX0);
-+	writel_relaxed(c, port->membase + URTX0);
- 
- 	/* flush */
- 	do {
--		status = readl(port->membase + USR2);
-+		status = readl_relaxed(port->membase + USR2);
- 	} while (~status & USR2_TXDC);
--
--	/* restore control registers */
--	imx_port_ucrs_restore(port, &old_ucr);
- }
- #endif
- 
-@@ -1563,6 +1593,9 @@ static struct uart_ops imx_pops = {
- 	.config_port	= imx_config_port,
- 	.verify_port	= imx_verify_port,
- #if defined(CONFIG_CONSOLE_POLL)
-+#if defined(CONFIG_KGDB_FIQ)
-+	.poll_init      = imx_poll_init,
-+#endif
- 	.poll_get_char  = imx_poll_get_char,
- 	.poll_put_char  = imx_poll_put_char,
- #endif
--- 
-1.9.3
+The following changes since commit 52addcf9d6669fa439387610bc65c92fa0980cef:
+
+  Linux 3.17-rc2 (2014-08-25 15:36:20 -0700)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux.git tags/arm64-fixes
+
+for you to fetch changes up to 5e39977edf6500fd12f169e6c458d33b0ef62feb:
+
+  Revert "arm64: cpuinfo: print info for all CPUs" (2014-09-01 15:55:22 +0100)
+
+----------------------------------------------------------------
+arm64 fixes for -rc4
+
+Another handful of arm64 fixes here:
+
+  - A few fixes for real issues found by smatch (after Dan's talk at KS)
+  - Revert the /proc/cpuinfo changes merged during the merge window.
+    We've opened a can of worms here, so we need to find out where we
+    stand before we change this interface.
+  - Implement KSTK_ESP for compat tasks, otherwise 32-bit Android gets
+    confused wondering where its [stack] has gone
+  - Misc fixes (fpsimd context handling, crypto, ...)
+
+----------------------------------------------------------------
+Catalin Marinas (1):
+      arm64: Add brackets around user_stack_pointer()
+
+Colin Ian King (1):
+      arm64/crypto: remove redundant update of data
+
+Geoff Levand (1):
+      arm64: Remove unused variable in head.S
+
+Leo Yan (1):
+      arm64: fix bug for reloading FPSIMD state after cpu power off
+
+Will Deacon (5):
+      arm64: ptrace: fix compat hardware watchpoint reporting
+      arm64: ptrace: fix compat reg getter/setter return values
+      arm64: perf: don't rely on layout of pt_regs when grabbing sp or pc
+      arm64: report correct stack pointer in KSTK_ESP for compat tasks
+      Revert "arm64: cpuinfo: print info for all CPUs"
+
+ arch/arm64/crypto/sha2-ce-glue.c       |  1 -
+ arch/arm64/include/asm/hw_breakpoint.h |  1 -
+ arch/arm64/include/asm/processor.h     |  2 +-
+ arch/arm64/include/asm/ptrace.h        |  2 +-
+ arch/arm64/kernel/fpsimd.c             |  1 +
+ arch/arm64/kernel/head.S               |  4 ----
+ arch/arm64/kernel/perf_regs.c          |  6 +++++
+ arch/arm64/kernel/ptrace.c             | 13 +++++++----
+ arch/arm64/kernel/setup.c              | 40 +++++++++++++++++++---------------
+ 9 files changed, 40 insertions(+), 30 deletions(-)
