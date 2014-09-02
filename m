@@ -1,66 +1,46 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Mon, 1 Sep 2014 22:06:24 -0500
-Subject: [RFC PATCH 1/1] drivers: introduce ARM SBSA generic UART driver
-In-Reply-To: <1409328803-1953-2-git-send-email-andre.przywara@arm.com>
-References: <1409328803-1953-1-git-send-email-andre.przywara@arm.com>
- <1409328803-1953-2-git-send-email-andre.przywara@arm.com>
-Message-ID: <CAL_JsqJbAWRhduzMwdQMh8sDdVqTWVK2Ej9LQjx4gp2ifwxe6Q@mail.gmail.com>
+From: haojian.zhuang@gmail.com (Haojian Zhuang)
+Date: Tue, 2 Sep 2014 11:08:02 +0800
+Subject: [PATCH] MAINTAINERS: update ARM pxa maintainers
+In-Reply-To: <1409342875-31720-1-git-send-email-robert.jarzmik@free.fr>
+References: <1409342875-31720-1-git-send-email-robert.jarzmik@free.fr>
+Message-ID: <CAN1soZxxdEb6UVH4J8skc_PPgmY2KCY=LBj3Hp0R9rRxtZoGgA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 29, 2014 at 11:13 AM, Andre Przywara <andre.przywara@arm.com> wrote:
-> The ARM Server Base System Architecture (SBSA) describes a generic
-> UART which all compliant level 1 systems should implement. This is
-> actually a PL011 subset, so a full PL011 implementation will satisfy
-> this requirement.
-> However if a system does not have a PL011, a very stripped down
-> implementation complying to the SBSA defined specification will
-> suffice. The Linux PL011 driver is not guaranteed to drive this
-> limited device (and indeed the fast model implentation hangs the
-> kernel if driven by the PL011 driver).
-> So introduce a new driver just implementing the part specified by the
-> SBSA (which lacks DMA, the modem control signals and many of the
-> registers including baud rate control). This driver has been derived
-> by the actual PL011 one, removing all unnecessary code.
+On Sat, Aug 30, 2014 at 4:07 AM, Robert Jarzmik <robert.jarzmik@free.fr> wrote:
+> Change pxa active maintainers, and remove more busy people.
+> Remove Eric's tree as it is not accessible anymore.
 >
-> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+> Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
 > ---
->  .../devicetree/bindings/serial/arm_sbsa_uart.txt   |    6 +
->  drivers/tty/serial/Kconfig                         |   28 +
->  drivers/tty/serial/Makefile                        |    1 +
->  drivers/tty/serial/sbsa_uart.c                     |  793 ++++++++++++++++++++
->  include/uapi/linux/serial_core.h                   |    1 +
-
-Sorry, but I think this is all wrong. We've now just duplicated some
-subset of the pl011 driver leaving out the parts like setting baudrate
-which can never be added since those things could be different for
-every vendor.
-
-The original intent of the SBSA uart was to provide a common early
-debug uart. It was not to have a full fledged driver. I think the SBSA
-has failed in this area and created the potential to create a mess of
-serial drivers different for every vendor. Reality will hopefully not
-be that extreme and most vendors will just use the pl011 and create
-their value add somewhere besides the uart. For the purpose of debug
-output, we already support that as the pl011 earlycon only touches
-SBSA compatible registers.
-
->  5 files changed, 829 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/serial/arm_sbsa_uart.txt
->  create mode 100644 drivers/tty/serial/sbsa_uart.c
+>  MAINTAINERS | 6 +++---
+>  1 file changed, 3 insertions(+), 3 deletions(-)
 >
-> diff --git a/Documentation/devicetree/bindings/serial/arm_sbsa_uart.txt b/Documentation/devicetree/bindings/serial/arm_sbsa_uart.txt
-> new file mode 100644
-> index 0000000..8e2c5d6
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/serial/arm_sbsa_uart.txt
-> @@ -0,0 +1,6 @@
-> +* ARM SBSA defined generic UART
-> +
-> +Required properties:
-> +- compatible: must be "arm,sbsa-uart"
+> diff --git a/MAINTAINERS b/MAINTAINERS
+> index 217dc54..76ee718 100644
+> --- a/MAINTAINERS
+> +++ b/MAINTAINERS
+> @@ -7291,12 +7291,12 @@ F:      drivers/video/backlight/pwm_bl.c
+>  F:     include/linux/pwm_backlight.h
+>
+>  PXA2xx/PXA3xx SUPPORT
+> -M:     Eric Miao <eric.y.miao@gmail.com>
+> -M:     Russell King <linux@arm.linux.org.uk>
+>  M:     Haojian Zhuang <haojian.zhuang@gmail.com>
+> +M:     Robert Jarzmik <robert.jarzmik@free.fr>
+> +M:     Daniel Mack <daniel@zonque.org>
+>  L:     linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+>  T:     git git://github.com/hzhuang1/linux.git
+> -T:     git git://git.linaro.org/people/ycmiao/pxa-linux.git
+> +T:     git git://github.com/rjarzmik/linux.git
+>  S:     Maintained
+>  F:     arch/arm/mach-pxa/
+>  F:     drivers/pcmcia/pxa2xx*
+> --
+> 2.0.0.rc2
+>
 
-This alone is not okay. There is no such implementation of hardware.
-The DT must specify the implementation such as pl011.
+Acked
 
-Rob
+Regards
+Haojian
