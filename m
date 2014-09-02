@@ -1,24 +1,46 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Tue, 2 Sep 2014 12:39:13 +0200
-Subject: mx28 battery charger support
-Message-ID: <20140902103913.GA9417@piout.net>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Tue, 2 Sep 2014 12:39:59 +0200
+Subject: [PATCH v2] i2c: mv64xxx: continue probe when clock-frequency is
+ missing
+In-Reply-To: <1409581693-15943-1-git-send-email-wens@csie.org>
+References: <1409581693-15943-1-git-send-email-wens@csie.org>
+Message-ID: <20140902103959.GC1266@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Mon, Sep 01, 2014 at 10:28:13PM +0800, Chen-Yu Tsai wrote:
+> The "clock-frequency" DT property is listed as optional, However,
+> the current code stores the return value of of_property_read_u32 in
+> the return code of mv64xxx_of_config, but then forgets to clear it
+> after setting the default value of "clock-frequency". It is then
+> passed out to the main probe function, resulting in a probe failure
+> when "clock-frequency" is missing.
+> 
+> This patch checks and then throws away the return value of
+> of_property_read_u32, instead of storing it and having to clear it
+> afterwards.
+> 
+> This issue was discovered after the property was removed from all
+> sunxi DTs.
 
-I'm having a look at the battery charger on i.mx28. Is there any
-mainline driver or any attempt at mainlining a driver? The IP is not
-documented in the i.MX28 Applications Processor Reference Manual but
-there is an existing driver in the Linux 2.6.35 sources from Freescale [1].
+Hmm, I don't like that removal. Probably I should take care that this
+property is not "optional" but "recommended". The default value is
+depending on the driver, mostly because of historic reasons. It is
+definately better to explicitly state it. Despite all that...
 
-I would love not being stuck with such an old version ;)
+> 
+> Fixes: 4c730a06c19bb ("i2c: mv64xxx: Set bus frequency to 100kHz if clock-frequency is not provided")
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+> Cc: stable at vger.kernel.org
+> Acked-by: Andrew Lunn <andrew@lunn.ch>
+> Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 
-[1] http://git.freescale.com/git/cgit.cgi/imx/linux-2.6-imx.git/tree/drivers/power/mxs?h=imx_2.6.35_maintain
+Applied to for-current, thanks!
 
-Regards,
-
--- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140902/3867506c/attachment-0001.sig>
