@@ -1,56 +1,117 @@
-From: computersforpeace@gmail.com (Brian Norris)
-Date: Tue, 2 Sep 2014 16:49:24 -0700
-Subject: [PATCH] ARM: drop ISAR0 workaround for B15
-In-Reply-To: <20140813194047.GA18411@ld-irv-0074>
-References: <1407797053-12544-1-git-send-email-gregory.0xf0@gmail.com>
- <20140813194047.GA18411@ld-irv-0074>
-Message-ID: <20140902234924.GZ18411@ld-irv-0074>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Tue, 2 Sep 2014 23:52:32 +0000 (UTC)
+Subject: OMAP baseline test results for v3.17-rc3
+Message-ID: <alpine.DEB.2.02.1409022346440.1546@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ping.
 
-Is this worthy of 3.17-rc? Or should it just be queued for 3.18, as it's
-only removing redundant info?
+Here are some basic OMAP test results for Linux v3.17-rc3.
+Logs and other details at:
 
-On Wed, Aug 13, 2014 at 12:40:47PM -0700, Brian Norris wrote:
-> The Brahma-B15's ISAR0 correcty advertises UDIV/SDIV support in both ARM
-> and Thumb2 modes (CPUID_EXT_ISAR0=02101110), so we don't need to
-> manually apply this hwcap.
-> 
-> The code in question actually predates the following commit, which made
-> our hwcaps unnecessary:
-> 
->     commit 8164f7af88d9ad3a757bd14f634b23997ee77f6b
->     Author: Stephen Boyd <sboyd@codeaurora.org>
->     Date:   Mon Mar 18 19:44:15 2013 +0100
-> 
->         ARM: 7680/1: Detect support for SDIV/UDIV from ISAR0 register
-> 
-> Signed-off-by: Brian Norris <computersforpeace@gmail.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> ---
-> Supersedes Gregory's previous patch.
-> 
-> This addresses some very old review comments from Mark and Will:
-> 
->   http://lists.infradead.org/pipermail/linux-arm-kernel/2014-January/225895.html
->   http://lists.infradead.org/pipermail/linux-arm-kernel/2014-January/227916.html
-> 
->  arch/arm/mm/proc-v7.S | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
-> index b5d67db20897..b3a947863ac7 100644
-> --- a/arch/arm/mm/proc-v7.S
-> +++ b/arch/arm/mm/proc-v7.S
-> @@ -570,7 +570,7 @@ __v7_ca15mp_proc_info:
->  __v7_b15mp_proc_info:
->  	.long	0x420f00f0
->  	.long	0xff0ffff0
-> -	__v7_proc __v7_b15mp_setup, hwcaps = HWCAP_IDIV
-> +	__v7_proc __v7_b15mp_setup
->  	.size	__v7_b15mp_proc_info, . - __v7_b15mp_proc_info
->  
->  	/*
+    http://www.pwsan.com/omap/testlogs/test_v3.17-rc3/20140902165525/
+
+
+Test summary
+------------
+
+Build: zImage:
+    Pass (16/16): multi_v7_defconfig, omap2plus_defconfig,
+		  omap2plus_defconfig_am33xx_only,
+		  omap2plus_defconfig_am43xx_only,
+		  omap2plus_defconfig_2430sdp_only,
+		  omap2plus_defconfig_cpupm, omap2plus_defconfig_no_pm,
+		  omap2plus_defconfig_n800_only_a,
+		  omap2plus_defconfig_n800_multi_omap2xxx,
+		  omap2plus_defconfig_omap2_4_only,
+		  omap2plus_defconfig_omap3_4_only,
+		  omap2plus_defconfig_dra7xx_only,
+		  rmk_omap3430_ldp_allnoconfig,
+		  rmk_omap3430_ldp_oldconfig,
+		  rmk_omap4430_sdp_allnoconfig,
+		  rmk_omap4430_sdp_oldconfig
+
+Build: uImage+dtb:
+    Pass (10/10): omap2plus_defconfig_am33xx_only/am335x-bone,
+		  omap2plus_defconfig/omap4-panda,
+		  omap2plus_defconfig/omap4-panda-es,
+		  omap2plus_defconfig/am3517-evm,
+		  omap2plus_defconfig/omap2430-sdp,
+		  omap2plus_defconfig/omap3-beagle,
+		  omap2plus_defconfig/omap3-beagle-xm,
+		  omap2plus_defconfig/omap3-evm-37xx,
+		  omap2plus_defconfig/omap4-var-som,
+		  omap2plus_defconfig/omap5-uevm
+
+Build: uImage:
+    Pass ( 3/ 3): omap1_defconfig, omap1_defconfig_1510innovator_only,
+		  omap1_defconfig_5912osk_only
+
+Boot to userspace:
+    FAIL ( 2/15): 2430sdp, 5430es2sbct54
+    skip ( 1/15): 5912osk
+    Pass (12/15): 2420n800, 3517evm, 3530es3beagle, 3730beaglexm,
+		  37xxevm, 4430es2panda, 4460pandaes, am335xbone,
+		  am335xbonelt, cmt3517, 4460varsomom, 5430es2uevm
+
+PM: chip retention via suspend:
+    FAIL ( 3/ 7): 2430sdp, 4430es2panda, 4460varsomom
+    Pass ( 4/ 7): 3530es3beagle, 3730beaglexm, 37xxevm, 4460pandaes
+
+PM: chip retention via dynamic idle:
+    FAIL ( 5/ 7): 2430sdp, 3530es3beagle, 4430es2panda, 4460pandaes,
+		  4460varsomom
+    Pass ( 2/ 7): 3730beaglexm, 37xxevm
+
+PM: chip off except CORE via suspend:
+    Pass ( 1/ 1): 3730beaglexm
+
+PM: chip off except CORE via dynamic idle:
+    Pass ( 1/ 1): 3730beaglexm
+
+PM: chip off via suspend:
+    FAIL ( 4/ 5): 3530es3beagle, 4430es2panda, 4460pandaes,
+		  4460varsomom
+    Pass ( 1/ 5): 37xxevm
+
+PM: chip off via dynamic idle:
+    FAIL ( 4/ 5): 3530es3beagle, 4430es2panda, 4460pandaes,
+		  4460varsomom
+    Pass ( 1/ 5): 37xxevm
+
+
+vmlinux object size
+(delta in bytes from test_v3.17-rc2 (52addcf9d6669fa439387610bc65c92fa0980cef)):
+   text     data      bss    total  kernel
+   +120      +32        0     +152  omap1_defconfig
+    +88      +64        0     +152  omap1_defconfig_1510innovator_only
+    +88      +32      +32     +152  omap1_defconfig_5912osk_only
+  -4992      -24        0    -5016  multi_v7_defconfig
+  -4376        0      +64    -4312  omap2plus_defconfig
+  -3896      +32        0    -3864  omap2plus_defconfig_2430sdp_only
+  -4448       -8        0    -4456  omap2plus_defconfig_am33xx_only
+  -4448       -8        0    -4456  omap2plus_defconfig_am43xx_only
+  -4376      +64      +64    -4248  omap2plus_defconfig_cpupm
+  -4320      +64        0    -4256  omap2plus_defconfig_dra7xx_only
+ -15337     -552        0   -15889  omap2plus_defconfig_n800_multi_omap2xxx
+ -11241     -504        0   -11745  omap2plus_defconfig_n800_only_a
+   +640      +96        0     +736  omap2plus_defconfig_no_pm
+  -4448      +80        0    -4368  omap2plus_defconfig_omap2_4_only
+  -4384       -8        0    -4392  omap2plus_defconfig_omap3_4_only
+  -4384      +80        0    -4304  omap2plus_defconfig_omap5_only
+   +108      -16      +24     +116  rmk_omap3430_ldp_allnoconfig
+   +172      -16        0     +156  rmk_omap3430_ldp_oldconfig
+    +76      -12      +56     +120  rmk_omap4430_sdp_allnoconfig
+   +140      +16        0     +156  rmk_omap4430_sdp_oldconfig
+
+Boot-time memory difference
+(delta in bytes from test_v3.17-rc2 (52addcf9d6669fa439387610bc65c92fa0980cef))
+  avail  rsrvd   high  freed  board          kconfig
+     8k    -8k      .      .  2420n800       omap2plus_defconfig_n800_only_a
+     8k    -8k      .      .  am335xbone     omap2plus_defconfig_am33xx_only
+
+
+A Compulab SBC-T54 (OMAP5432) has been added to the testbed, graciously 
+donated by Compulab and Igor Grinberg.  It currently isn't booting to 
+userspace in the current mainline kernel, but if the 'ldo8' regulator is 
+modified to be always-on in the omap5-sbc-t54.dts file, it will.
