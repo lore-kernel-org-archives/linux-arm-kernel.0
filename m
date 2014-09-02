@@ -1,94 +1,77 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Tue,  2 Sep 2014 11:35:24 +0100
-Subject: [PATCH] arm64: use irq_set_affinity with force=false when migrating
- irqs
-Message-ID: <1409654124-7358-1-git-send-email-sudeep.holla@arm.com>
+From: gautam.vivek@samsung.com (Vivek Gautam)
+Date: Tue, 2 Sep 2014 16:09:08 +0530
+Subject: [PATCH 1/5] usb: dwc3: exynos: Add support for SCLK present on
+ Exynos7
+In-Reply-To: <20140828184847.GA18464@leverpostej>
+References: <1409212920-28526-1-git-send-email-gautam.vivek@samsung.com>
+ <1409212920-28526-2-git-send-email-gautam.vivek@samsung.com>
+ <20140828184847.GA18464@leverpostej>
+Message-ID: <CAFp+6iHLSaUjHqaKXXX0QLiRd3h+O67DRSQdExag-KUH0dnpag@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sudeep Holla <sudeep.holla@arm.com>
+Hi,
 
-The arm64 interrupt migration code on cpu offline calls
-irqchip.irq_set_affinity() with the argument force=true. Originally
-this argument had no effect because it was not used by any interrupt
-chip driver and there was no semantics defined.
 
-This changed with commit 01f8fa4f01d8 ("genirq: Allow forcing cpu
-affinity of interrupts") which made the force argument useful to route
-interrupts to not yet online cpus without checking the target cpu
-against the cpu online mask. The following commit ffde1de64012
-("irqchip: gic: Support forced affinity setting") implemented this for
-the GIC interrupt controller.
+On Fri, Aug 29, 2014 at 12:18 AM, Mark Rutland <mark.rutland@arm.com> wrote:
+> On Thu, Aug 28, 2014 at 09:01:56AM +0100, Vivek Gautam wrote:
+>> Exynos7 also has a separate special gate clock going to the IP
+>> apart from the usual AHB clock. So add support for the same.
+>>
+>> Signed-off-by: Vivek Gautam <gautam.vivek@samsung.com>
+>> ---
+>>  drivers/usb/dwc3/dwc3-exynos.c |   16 ++++++++++++++++
+>>  1 file changed, 16 insertions(+)
+>>
+>> diff --git a/drivers/usb/dwc3/dwc3-exynos.c b/drivers/usb/dwc3/dwc3-exynos.c
+>> index f9fb8ad..bab6395 100644
+>> --- a/drivers/usb/dwc3/dwc3-exynos.c
+>> +++ b/drivers/usb/dwc3/dwc3-exynos.c
+>> @@ -35,6 +35,7 @@ struct dwc3_exynos {
+>>       struct device           *dev;
+>>
+>>       struct clk              *clk;
+>> +     struct clk              *sclk;
+>>       struct regulator        *vdd33;
+>>       struct regulator        *vdd10;
+>>  };
+>> @@ -141,10 +142,17 @@ static int dwc3_exynos_probe(struct platform_device *pdev)
+>>               return -EINVAL;
+>>       }
+>>
+>> +     /* Exynos7 has a special gate clock going to this IP */
+>> +     exynos->sclk = devm_clk_get(dev, "usbdrd30_sclk");
+>> +     if (IS_ERR(exynos->sclk))
+>> +             dev_warn(dev, "couldn't get sclk\n");
+>
+> Doesn't this introduce a pointless warning for Exynos SoCs other than
+> Exynos7?
 
-As a consequence the cpu offline irq migration fails if CPU0 is
-offlined, because CPU0 is still set in the affinity mask and the
-validation against cpu online mask is skipped to the force argument
-being true. The following first_cpu(mask) selection always selects
-CPU0 as the target.
+True, it will introduce an unnecessary warning for non-Exynos7 systems.
+I initially thought of introducing a compatible check for Exynos7-dwc3, but that
+way we may end up adding such checks for future SoCs which have similar
+controller but have some clock difference or some other small change, no ?
 
-Commit 601c942176d8("arm64: use cpu_online_mask when using forced
-irq_set_affinity") intended to fix the above mentioned issue but
-introduced another issue where affinity can be migrated to a wrong
-CPU due to unconditional copy of cpu_online_mask.
+>
+>> +
+>>       exynos->dev     = dev;
+>>       exynos->clk     = clk;
+>>
+>>       clk_prepare_enable(exynos->clk);
+>> +     if (!IS_ERR(exynos->sclk))
+>> +             clk_prepare_enable(exynos->sclk);
+>
+> If you replaced the returned err value with NULL you could avoid these
+> IS_ERR cases.
 
-As with for arm, solve the issue by calling irq_set_affinity() with
-force=false from the CPU offline irq migration code so the GIC driver
-validates the affinity mask against CPU online mask and therefore
-removes CPU0 from the possible target candidates. Also revert the
-changes done in the commit 601c942176d8 as it's no longer needed.
+Right, point taken.
 
-Tested on Juno platform.
+[snip]
 
-Fixes: 601c942176d8("arm64: use cpu_online_mask when using forced
-	irq_set_affinity")
-Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
-Acked-by: Mark Rutland <mark.rutland@arm.com>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: <stable@vger.kernel.org> # 3.10.x
----
- arch/arm64/kernel/irq.c | 12 ++++--------
- 1 file changed, 4 insertions(+), 8 deletions(-)
 
-Hi Will,
 
-After both Russell and Thomas agreed on the fix for ARM[0][1], I have
-similar fix for ARM64 with change log giving background as suggested
-by Thomas. It would be good if you can take this for next -rc fix.
-
-Regards,
-Sudeep
-
-[0] http://www.spinics.net/lists/arm-kernel/msg358336.html
-[1] http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=8133/1
-
-diff --git a/arch/arm64/kernel/irq.c b/arch/arm64/kernel/irq.c
-index 0f08dfd69ebc..dfa6e3e74fdd 100644
---- a/arch/arm64/kernel/irq.c
-+++ b/arch/arm64/kernel/irq.c
-@@ -97,19 +97,15 @@ static bool migrate_one_irq(struct irq_desc *desc)
- 	if (irqd_is_per_cpu(d) || !cpumask_test_cpu(smp_processor_id(), affinity))
- 		return false;
- 
--	if (cpumask_any_and(affinity, cpu_online_mask) >= nr_cpu_ids)
-+	if (cpumask_any_and(affinity, cpu_online_mask) >= nr_cpu_ids) {
-+		affinity = cpu_online_mask;
- 		ret = true;
-+	}
- 
--	/*
--	 * when using forced irq_set_affinity we must ensure that the cpu
--	 * being offlined is not present in the affinity mask, it may be
--	 * selected as the target CPU otherwise
--	 */
--	affinity = cpu_online_mask;
- 	c = irq_data_get_irq_chip(d);
- 	if (!c->irq_set_affinity)
- 		pr_debug("IRQ%u: unable to set affinity\n", d->irq);
--	else if (c->irq_set_affinity(d, affinity, true) == IRQ_SET_MASK_OK && ret)
-+	else if (c->irq_set_affinity(d, affinity, false) == IRQ_SET_MASK_OK && ret)
- 		cpumask_copy(d->affinity, affinity);
- 
- 	return ret;
 -- 
-1.8.3.2
+Best Regards
+Vivek Gautam
+Samsung R&D Institute, Bangalore
+India
