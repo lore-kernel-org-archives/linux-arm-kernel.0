@@ -1,68 +1,51 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 2 Sep 2014 20:40:47 +0100
-Subject: [PATCH v11 11/19] irqchip: vic: Add support for FIQ management
-In-Reply-To: <1409662853-29313-12-git-send-email-daniel.thompson@linaro.org>
-References: <1408466769-20004-1-git-send-email-daniel.thompson@linaro.org>
- <1409662853-29313-1-git-send-email-daniel.thompson@linaro.org>
- <1409662853-29313-12-git-send-email-daniel.thompson@linaro.org>
-Message-ID: <20140902194047.GY30401@n2100.arm.linux.org.uk>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Tue, 02 Sep 2014 21:48:14 +0200
+Subject: [PATCH 0/2] Add input supplies to rk808 regulator
+In-Reply-To: <1409674469-12123-1-git-send-email-dianders@chromium.org>
+References: <1409674469-12123-1-git-send-email-dianders@chromium.org>
+Message-ID: <13302580.b33ghgBegF@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 02, 2014 at 02:00:45PM +0100, Daniel Thompson wrote:
-> diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
-> index bda5a91..8821160 100644
-> --- a/drivers/irqchip/irq-gic.c
-> +++ b/drivers/irqchip/irq-gic.c
-> @@ -502,13 +502,17 @@ static void __init gic_init_fiq(struct gic_chip_data *gic,
->  /*
->   * Fully acknowledge (both ack and eoi) a FIQ-based IPI
->   */
-> -static int gic_handle_fiq_ipi(struct notifier_block *nb, unsigned long regs,
-> -			   void *data)
-> +void gic_handle_fiq_ipi(void)
->  {
->  	struct gic_chip_data *gic = &gic_data[0];
-> -	void __iomem *cpu_base = gic_data_cpu_base(gic);
-> +	void __iomem *cpu_base;
->  	unsigned long irqstat, irqnr;
->  
-> +	if (!gic || !gic->fiq_enable)
-> +		return;
-> +
-> +	cpu_base = gic_data_cpu_base(gic);
-> +
->  	if (WARN_ON(!in_nmi()))
->  		return NOTIFY_BAD;
->  
-> @@ -525,13 +529,6 @@ static int gic_handle_fiq_ipi(struct notifier_block *nb, unsigned long regs,
->  
->  	return NOTIFY_OK;
->  }
-> -
-> -/*
-> - * Notifier to ensure IPI FIQ is acknowledged correctly.
-> - */
-> -static struct notifier_block gic_fiq_ipi_notifier = {
-> -	.notifier_call = gic_handle_fiq_ipi,
-> -};
->  #else /* CONFIG_FIQ */
->  static inline void gic_set_group_irq(void __iomem *base, unsigned int hwirq,
->  				     int group) {}
-> @@ -1250,10 +1247,6 @@ void __init gic_init_bases(unsigned int gic_nr, int irq_start,
->  #ifdef CONFIG_SMP
->  		set_smp_cross_call(gic_raise_softirq);
->  		register_cpu_notifier(&gic_cpu_notifier);
-> -#ifdef CONFIG_FIQ
-> -		if (gic_data_fiq_enable(gic))
-> -			register_fiq_nmi_notifier(&gic_fiq_ipi_notifier);
-> -#endif
->  #endif
->  		set_handle_irq(gic_handle_irq);
->  	}
+Am Dienstag, 2. September 2014, 09:14:27 schrieb Doug Anderson:
+> We want to specify the input supplies to the rk808 regulator.  This
+> patch series adds them to the driver.  Note that the bindings are
+> based atop Chris's most recent version at
+> <https://patchwork.kernel.org/patch/4817931/>.  If the regulator patch
+> is applied before Chris sends out his next version then I think Chris
+> could squash my bindings change (patch 2) into his next version.
+> 
+> 
+> Doug Anderson (2):
+>   regulator: RK808: Add proper input supplies for rk808
 
-Shouldn't this be merged into some other patch?
+Patch 1 didn't apply, as it didn't take the recent pdata removal Chris
+posted. After fixing this [0], it sucessfully solved the missing supplies
+I've seen on the weekend, so
 
--- 
-FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
-according to speedtest.net.
+Tested-by: Heiko Stuebner <heiko@sntech.de>
+
+
+>   dt-bindings: Add input supplies to rk808 bindings
+> 
+>  Documentation/devicetree/bindings/mfd/rk808.txt | 11 +++++++++++
+>  drivers/regulator/rk808-regulator.c             | 15 ++++++++++++++-
+>  2 files changed, 25 insertions(+), 1 deletion(-)
+
+
+
+[0]
+--- "[PATCH 1_2] regulator_RK808_Add proper input supplies for rk808.mbox.orig"	2014-09-02 20:49:12.000000000 +0200
++++ "[PATCH 1_2] regulator_RK808_Add proper input supplies for rk808.mbox"	2014-09-02 21:22:57.052197875 +0200
+@@ -203,7 +203,7 @@
+  		.type = REGULATOR_VOLTAGE,
+ @@ -364,7 +378,6 @@ static int rk808_regulator_probe(struct platform_device *pdev)
+  		if (client->dev.of_node)
+- 			config.of_node = pdata->of_node[i];
++ 			config.of_node = rk808_regulator->of_node[i];
+  
+ -		reg_data->supply_regulator = rk808_reg[i].name;
+  		config.init_data = reg_data;
+
+As Chris is supposed to merge these changes into his series, this doesn't
+really matter though.
