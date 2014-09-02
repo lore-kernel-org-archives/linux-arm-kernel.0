@@ -1,45 +1,83 @@
 From: gdjakov@mm-sol.com (Georgi Djakov)
-Date: Tue,  2 Sep 2014 18:40:41 +0300
-Subject: [PATCH v2 1/3] ARM: dts: qcom: Add initial IFC6540 board device tree
+Date: Tue,  2 Sep 2014 18:40:43 +0300
+Subject: [PATCH v2 3/3] ARM: dts: qcom: Add SDHC nodes for APQ8084 platform
 In-Reply-To: <1409672443-4289-1-git-send-email-gdjakov@mm-sol.com>
 References: <1409672443-4289-1-git-send-email-gdjakov@mm-sol.com>
-Message-ID: <1409672443-4289-2-git-send-email-gdjakov@mm-sol.com>
+Message-ID: <1409672443-4289-4-git-send-email-gdjakov@mm-sol.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add initial device tree for the IFC6540 Snapdragon 805 pico-itx
-single-board computer.
+Enable support for the two SD host controllers on the APQ8084 platform
+by adding the required nodes to the DT files.
+On the IFC6540 board, the first controller is connected to the onboard
+eMMC and the second is connected to a micro-SD card slot.
 
 Signed-off-by: Georgi Djakov <gdjakov@mm-sol.com>
 ---
- arch/arm/boot/dts/Makefile                 |    1 +
- arch/arm/boot/dts/qcom-apq8084-ifc6540.dts |    6 ++++++
- 2 files changed, 7 insertions(+)
- create mode 100644 arch/arm/boot/dts/qcom-apq8084-ifc6540.dts
+ arch/arm/boot/dts/qcom-apq8084-ifc6540.dts |   11 +++++++++++
+ arch/arm/boot/dts/qcom-apq8084.dtsi        |   23 +++++++++++++++++++++++
+ 2 files changed, 34 insertions(+)
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index b022972..df8453a 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -345,6 +345,7 @@ dtb-$(CONFIG_ARCH_PRIMA2) += prima2-evb.dtb
- dtb-$(CONFIG_ARCH_QCOM) += \
- 	qcom-apq8064-ifc6410.dtb \
- 	qcom-apq8074-dragonboard.dtb \
-+	qcom-apq8084-ifc6540.dtb \
- 	qcom-apq8084-mtp.dtb \
- 	qcom-msm8660-surf.dtb \
- 	qcom-msm8960-cdp.dtb
 diff --git a/arch/arm/boot/dts/qcom-apq8084-ifc6540.dts b/arch/arm/boot/dts/qcom-apq8084-ifc6540.dts
-new file mode 100644
-index 0000000..4603e91
---- /dev/null
+index e41cb8a..c9ff108 100644
+--- a/arch/arm/boot/dts/qcom-apq8084-ifc6540.dts
 +++ b/arch/arm/boot/dts/qcom-apq8084-ifc6540.dts
-@@ -0,0 +1,6 @@
-+#include "qcom-apq8084.dtsi"
+@@ -8,5 +8,16 @@
+ 		serial at f995e000 {
+ 			status = "okay";
+ 		};
 +
-+/ {
-+	model = "Qualcomm APQ8084/IFC6540";
-+	compatible = "qcom,apq8084-ifc6540", "qcom,apq8084";
-+};
++		sdhci at f9824900 {
++			bus-width = <8>;
++			non-removable;
++			status = "okay";
++		};
++
++		sdhci at f98a4900 {
++			cd-gpios = <&tlmm 122 GPIO_ACTIVE_LOW>;
++			bus-width = <4>;
++		};
+ 	};
+ };
+diff --git a/arch/arm/boot/dts/qcom-apq8084.dtsi b/arch/arm/boot/dts/qcom-apq8084.dtsi
+index 21d01e5..1f130bc 100644
+--- a/arch/arm/boot/dts/qcom-apq8084.dtsi
++++ b/arch/arm/boot/dts/qcom-apq8084.dtsi
+@@ -3,6 +3,7 @@
+ #include "skeleton.dtsi"
+ 
+ #include <dt-bindings/clock/qcom,gcc-apq8084.h>
++#include <dt-bindings/gpio/gpio.h>
+ 
+ / {
+ 	model = "Qualcomm APQ 8084";
+@@ -203,5 +204,27 @@
+ 			clock-names = "core", "iface";
+ 			status = "disabled";
+ 		};
++
++		sdhci at f9824900 {
++			compatible = "qcom,sdhci-msm-v4";
++			reg = <0xf9824900 0x11c>, <0xf9824000 0x800>;
++			reg-names = "hc_mem", "core_mem";
++			interrupts = <0 123 0>, <0 138 0>;
++			interrupt-names = "hc_irq", "pwr_irq";
++			clocks = <&gcc GCC_SDCC1_APPS_CLK>, <&gcc GCC_SDCC1_AHB_CLK>;
++			clock-names = "core", "iface";
++			status = "disabled";
++		};
++
++		sdhci at f98a4900 {
++			compatible = "qcom,sdhci-msm-v4";
++			reg = <0xf98a4900 0x11c>, <0xf98a4000 0x800>;
++			reg-names = "hc_mem", "core_mem";
++			interrupts = <0 125 0>, <0 221 0>;
++			interrupt-names = "hc_irq", "pwr_irq";
++			clocks = <&gcc GCC_SDCC2_APPS_CLK>, <&gcc GCC_SDCC2_AHB_CLK>;
++			clock-names = "core", "iface";
++			status = "disabled";
++		};
+ 	};
+ };
 -- 
 1.7.9.5
