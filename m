@@ -1,55 +1,59 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 2 Sep 2014 11:03:42 +0100
-Subject: [RFC PATCH 4/7] iommu: provide helper function to configure an
- IOMMU for an of master
-In-Reply-To: <4335091.FB685Z52eG@wuerfel>
-References: <1409327670-3495-1-git-send-email-will.deacon@arm.com>
- <3729116.F0gWrQGFZl@wuerfel> <20140901164000.GM24594@arm.com>
- <4335091.FB685Z52eG@wuerfel>
-Message-ID: <20140902100342.GG25379@arm.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 2 Sep 2014 11:05:31 +0100
+Subject: [PATCH V2 4/6] arm64: Add DTS support for FSL's LS2085A SoC
+In-Reply-To: <78eaae039fd04eb58e1dac715968dd72@BN1PR03MB220.namprd03.prod.outlook.com>
+References: <1409219706-14843-1-git-send-email-bhupesh.sharma@freescale.com>
+ <1409219706-14843-5-git-send-email-bhupesh.sharma@freescale.com>
+ <20140828145635.GL14650@leverpostej>
+ <18f8ee091e8847c0bcfba1ef04907a71@BN1PR03MB220.namprd03.prod.outlook.com>
+ <20140829174757.GD18555@leverpostej>
+ <78eaae039fd04eb58e1dac715968dd72@BN1PR03MB220.namprd03.prod.outlook.com>
+Message-ID: <20140902100531.GB25092@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 01, 2014 at 09:18:26PM +0100, Arnd Bergmann wrote:
-> On Monday 01 September 2014 17:40:00 Will Deacon wrote:
-> > On Mon, Sep 01, 2014 at 03:46:18PM +0100, Arnd Bergmann wrote:
-> > > On Monday 01 September 2014 10:29:40 Thierry Reding wrote:
-> > > > 
-> > > > I think this could use a bit more formalization. As I said in another
-> > > > reply earlier, there's very little standardization in the IOMMU API.
-> > > > That certainly gives us a lot of flexibility but it also has the
-> > > > downside that it's difficult to handle these abstractions in the core,
-> > > > which is really what the core is all about, isn't it?
-> > > > 
-> > > > One method that worked really well for this in the past for other
-> > > > subsystems is to allow drivers to specify an .of_xlate() function that
-> > > > takes the controller device and a struct of_phandle_args. It is that
-> > > > function's responsibility to take the information in an of_phandle_args
-> > > > structure and use that to create some subsystem specific handle that
-> > > > represents this information in a way that it can readily be used.
-> > > 
-> > > Yes, good idea.
+On Fri, Aug 29, 2014 at 07:07:40PM +0100, bhupesh.sharma at freescale.com wrote:
+> > > > > +	memory at 80000000 {
+> > > > > +		device_type = "memory";
+> > > > > +		reg = <0x00000000 0x80000000 0 0x80000000>;
+> > > > > +		      /* DRAM space 1 - 2 GB DRAM */
+> > > > > +	};
+> > > >
+> > > > Does that mean:
+> > > >
+> > > >  - This is "DRAM space 1", populated with 2GB?
+> > > >
+> > > > Or:
+> > > >
+> > > >  - The DRAM space can be populated with 1 to 2 GB?
+> > > >
+> > > > If the former, s/ - /: / for clarity.
+> > > >
+> > > > If the latter, it might make sense to move that into board-specific
+> > > > dts files. If this can be dynamically populated ideally the
+> > > > firmware/loader would fix this up (assuming it can probe the memory).
+> > >
+> > > If the former. I will fix it up in v3.
 > > 
-> > Hmm, how does this work for PCI devices? The current RFC takes care to
-> > ensure that the core changes work just as well for OF devices as PCI
-> > devices, and the of-specific functions and data structures are not part of
-> > it.
+> > Ok. Out of curiosity, are there other DRAM spaces that might be
+> > populated?
 > 
-> I don't mind handling PCI devices separately. They are different in a number
-> of ways already, in particular the way that they don't normally have an
-> of_node attached to them but actually have a PCI bus/dev/function number.
+> Yes there is another DRAM space. The 1st one is accessible within 32 bits and
+> the 2nd one is accessible from 40-bit and above. However, I was waiting
+> for the 4-level ARM64 page table patches (from Catalin) to get absorbed, as w/o the
+> same we can access only a 39-bit PA and hence can have only 3-level page table limited
+> to the 1st DRAM region (which is accessible via first 32 bits).
+> 
+> Any idea, about the latest state of Catalin's patch ([1])? Has it made to linux-next?
 
-Sure, but at the point when we call back into the iommu_ops structure we
-really don't want bus specific functions. That's why I avoided any OF
-data structures being passed to add_device_master_ids.
+The 48-bit VA support is in mainline but you wouldn't be able to enable
+it because KVM is still broken. Hopefully it will make it to 3.18-rc1.
 
-Anyway, I'll try to hack something together shortly. I think the proposal
-is:
+But here we are talking about 40-bit PA range which should be fine with
+3 levels of page tables. The only problem is if you want to idmap the
+memory beyond 40-bit (I don't know whether UEFI requires this but for
+kernel booting you wouldn't need it since the kernel image is in the
+lower part).
 
-  - Make add_device_master_ids take a generic structure (struct iommu)
-  - Add an of_xlate callback into iommu_ops which returns a populated
-    struct iommu based on the of_node
-
-Sound about right?
-
-Will
+-- 
+Catalin
