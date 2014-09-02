@@ -1,32 +1,106 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 2 Sep 2014 16:22:28 +0100
-Subject: [PATCH] ARM: configs: Remove REGULATOR_VIRTUAL_CONSUMER from
- defconfigs
-In-Reply-To: <5405DD72.30603@wwwdotorg.org>
-References: <1409486590-23645-1-git-send-email-broonie@kernel.org>
- <5405DD72.30603@wwwdotorg.org>
-Message-ID: <20140902152228.GW29327@sirena.org.uk>
+From: pawel.moll@arm.com (Pawel Moll)
+Date: Tue,  2 Sep 2014 16:26:11 +0100
+Subject: [PATCH] bus: arm-ccn: Move event cleanup routine
+Message-ID: <1409671571-4606-1-git-send-email-pawel.moll@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 02, 2014 at 09:08:34AM -0600, Stephen Warren wrote:
-> On 08/31/2014 06:03 AM, Mark Brown wrote:
+From: Pawel Moll <mail@pawelmoll.com>
 
-> >The virtual consumer is a test device intended to be used while developing
-> >regulator drivers, it should never be used in production. Remove it from
-> >all defconfigs to avoid confusion among users.
+The function cleaning up an initialized event
+was called from the "event_del" handler, instead
+of being used as the "destroy" callback. In case of
+events group allocation this caused NULL pointer
+dereference (as events are added and deleted
+multiple times then). Fixed now.
 
-> tegra_defconfig isn't a distro configuration, and has plenty of other
-> debug/test options turned on. I'm not sure that removing this option really
-> has much benefit. Still, this likely isn't going to cause any issue, so I
-> guess it's fine. People can always add the option locally if they want.
+Signed-off-by: Pawel Moll <mail@pawelmoll.com>
+---
+ drivers/bus/arm-ccn.c | 51 +++++++++++++++++++++++++--------------------------
+ 1 file changed, 25 insertions(+), 26 deletions(-)
 
-In order to instantiate it you're going to have to generate a custom DT
-anyway so I don't think the burden is excessive.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140902/5e47a30d/attachment-0001.sig>
+diff --git a/drivers/bus/arm-ccn.c b/drivers/bus/arm-ccn.c
+index 6f550d9..a60f264 100644
+--- a/drivers/bus/arm-ccn.c
++++ b/drivers/bus/arm-ccn.c
+@@ -586,6 +586,30 @@ static int arm_ccn_pmu_type_eq(u32 a, u32 b)
+ 	return 0;
+ }
+ 
++static void arm_ccn_pmu_event_destroy(struct perf_event *event)
++{
++	struct arm_ccn *ccn = pmu_to_arm_ccn(event->pmu);
++	struct hw_perf_event *hw = &event->hw;
++
++	if (hw->idx == CCN_IDX_PMU_CYCLE_COUNTER) {
++		clear_bit(CCN_IDX_PMU_CYCLE_COUNTER, ccn->dt.pmu_counters_mask);
++	} else {
++		struct arm_ccn_component *source =
++				ccn->dt.pmu_counters[hw->idx].source;
++
++		if (CCN_CONFIG_TYPE(event->attr.config) == CCN_TYPE_XP &&
++				CCN_CONFIG_EVENT(event->attr.config) ==
++				CCN_EVENT_WATCHPOINT)
++			clear_bit(hw->config_base, source->xp.dt_cmp_mask);
++		else
++			clear_bit(hw->config_base, source->pmu_events_mask);
++		clear_bit(hw->idx, ccn->dt.pmu_counters_mask);
++	}
++
++	ccn->dt.pmu_counters[hw->idx].source = NULL;
++	ccn->dt.pmu_counters[hw->idx].event = NULL;
++}
++
+ static int arm_ccn_pmu_event_init(struct perf_event *event)
+ {
+ 	struct arm_ccn *ccn;
+@@ -599,6 +623,7 @@ static int arm_ccn_pmu_event_init(struct perf_event *event)
+ 		return -ENOENT;
+ 
+ 	ccn = pmu_to_arm_ccn(event->pmu);
++	event->destroy = arm_ccn_pmu_event_destroy;
+ 
+ 	if (hw->sample_period) {
+ 		dev_warn(ccn->dev, "Sampling not supported!\n");
+@@ -731,30 +756,6 @@ static int arm_ccn_pmu_event_init(struct perf_event *event)
+ 	return 0;
+ }
+ 
+-static void arm_ccn_pmu_event_free(struct perf_event *event)
+-{
+-	struct arm_ccn *ccn = pmu_to_arm_ccn(event->pmu);
+-	struct hw_perf_event *hw = &event->hw;
+-
+-	if (hw->idx == CCN_IDX_PMU_CYCLE_COUNTER) {
+-		clear_bit(CCN_IDX_PMU_CYCLE_COUNTER, ccn->dt.pmu_counters_mask);
+-	} else {
+-		struct arm_ccn_component *source =
+-				ccn->dt.pmu_counters[hw->idx].source;
+-
+-		if (CCN_CONFIG_TYPE(event->attr.config) == CCN_TYPE_XP &&
+-				CCN_CONFIG_EVENT(event->attr.config) ==
+-				CCN_EVENT_WATCHPOINT)
+-			clear_bit(hw->config_base, source->xp.dt_cmp_mask);
+-		else
+-			clear_bit(hw->config_base, source->pmu_events_mask);
+-		clear_bit(hw->idx, ccn->dt.pmu_counters_mask);
+-	}
+-
+-	ccn->dt.pmu_counters[hw->idx].source = NULL;
+-	ccn->dt.pmu_counters[hw->idx].event = NULL;
+-}
+-
+ static u64 arm_ccn_pmu_read_counter(struct arm_ccn *ccn, int idx)
+ {
+ 	u64 res;
+@@ -1027,8 +1028,6 @@ static int arm_ccn_pmu_event_add(struct perf_event *event, int flags)
+ static void arm_ccn_pmu_event_del(struct perf_event *event, int flags)
+ {
+ 	arm_ccn_pmu_event_stop(event, PERF_EF_UPDATE);
+-
+-	arm_ccn_pmu_event_free(event);
+ }
+ 
+ static void arm_ccn_pmu_event_read(struct perf_event *event)
+-- 
+1.9.1
