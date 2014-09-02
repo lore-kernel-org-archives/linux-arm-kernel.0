@@ -1,36 +1,56 @@
-From: a.spyridakis@virtualopensystems.com (Alexander Spyridakis)
-Date: Tue, 2 Sep 2014 10:28:00 +0200
-Subject: [Linaro-acpi] [PATCH v3 13/17] ARM64 / ACPI: Add GICv2 specific
- ACPI boot support
-In-Reply-To: <5404AE56.80801@arm.com>
-References: <1409583475-6978-1-git-send-email-hanjun.guo@linaro.org>
- <1409583475-6978-14-git-send-email-hanjun.guo@linaro.org>
- <5404AE56.80801@arm.com>
-Message-ID: <CAJRNFKKziDydj_HFPam6e+FSZr6D3XPUQ+-iuH0a1Bbh3+Kz3A@mail.gmail.com>
+From: sebastian@breakpoint.cc (Sebastian Andrzej Siewior)
+Date: Tue, 2 Sep 2014 10:29:31 +0200
+Subject: [PATCH] mfd: twl4030-power: Fix PM idle pin configuration to not
+ conflict with regulators
+In-Reply-To: <20140819152405.GA12002@atomide.com>
+References: <20140819152405.GA12002@atomide.com>
+Message-ID: <20140902082931.GA32460@breakpoint.cc>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 1 September 2014 19:35, Marc Zyngier <marc.zyngier@arm.com> wrote:
->
-> On 01/09/14 15:57, Hanjun Guo wrote:
-> > From: Tomasz Nowicki <tomasz.nowicki@linaro.org>
-> >
-> > ACPI kernel uses MADT table for proper GIC initialization. It needs to
-> > parse GIC related subtables, collect CPU interface and distributor
-> > addresses and call driver initialization function (which is hardware
-> > abstraction agnostic). In a similar way, FDT initialize GICv1/2.
-> >
-> > NOTE: This commit allow to initialize GICv1/2 only.
->
-> I cannot help but notice that there is no support for KVM here. It'd be
-> good to add a note to that effect, so that people do not expect
-> virtualization support to be working when booting with ACPI.
+On 2014-08-19 08:24:05 [-0700], Tony Lindgren wrote:
+> 
+> This allows us to enable the PMIC configuration for n900.
+> 
+> Fixes: 43fef47f94a1 (mfd: twl4030-power: Add a configuration to turn off oscillator during off-idle)
 
-Just a heads up for this, I run up to this problem too while testing
-and by forcing some values for vgic and arch_timers I could boot a
-QEMU guest without problems.
+My beaglebone-ab does not like this. With this patch applied I end up
+with:
+[    2.437316] Waiting for root device /dev/mmcblk0p2...
+[    4.428192] mmc0: card never left busy state
+[    4.432647] mmc0: error -110 whilst initialising SD card
 
-I'll try and see if it will be easy to handle this more properly
-instead of hardcoded values.
+I noticed this after I disabled lock debugging and tracing (syscall tracing
+was enabled). Enabling both again makes the error go away.
+With debugging + tracing disabled (so the error pops up) and git bisect
+I get this commit (daebabd57) reported.
+A diff between a good/bad bootlog (with lock-debug + tracing switched
+off):
 
-Regards.
+| smartreflex smartreflex.0: omap_sr_probe: SmartReflex driver initialized
+| smartreflex smartreflex.1: omap_sr_probe: SmartReflex driver initialized
+| hsusb2_vbus: disabling
+| VPLL2: disabling
+| VUSB3V1: disabling
+|+VDAC: disabling
+|+VAUX3: disabling
+| Waiting for root device /dev/mmcblk0p2...
+|-mmc0: host does not support reading read-only switch. assuming write-enable.
+|-mmc0: new high speed SDHC card at address 1234
+|-mmcblk0: mmc0:1234 SA04G 3.63 GiB 
+|- mmcblk0: p1 p2 p3
+|-BTRFS: device fsid 2e050bbb-1520-425e-a215-1e5bf865c7dc devid 1 transid 496 /dev/root
+|-BTRFS info (device mmcblk0p2): disk space caching is enabled
+|-BTRFS: detected SSD devices, enabling SSD mode
+|-VFS: Mounted root (btrfs filesystem) readonly on device 0:13.
+|-devtmpfs: mounted
+|-Freeing unused kernel memory: 216K (c051a000 - c0550000)
+|-BTRFS info (device mmcblk0p2): disk space caching is enabled
+|-
+|-Please press Enter to activate this console. 
+|+mmc0: card never left busy state
+|+mmc0: error -110 whilst initialising SD card
+
+reverting this commit on top of -rc3 makes mmc0 work again.
+
+Sebastian
