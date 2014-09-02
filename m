@@ -1,32 +1,33 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 02 Sep 2014 20:13:46 +0200
-Subject: [RFC PATCH v2 6/7] arm: call iommu_init before
- of_platform_populate
-In-Reply-To: <1409680587-29818-7-git-send-email-will.deacon@arm.com>
-References: <1409680587-29818-1-git-send-email-will.deacon@arm.com>
- <1409680587-29818-7-git-send-email-will.deacon@arm.com>
-Message-ID: <6406734.5D2q2gd403@wuerfel>
+From: khilman@kernel.org (Kevin Hilman)
+Date: Tue, 02 Sep 2014 11:18:34 -0700
+Subject: [PATCH] ARM: ux500: disable msp2 node on Snowball
+In-Reply-To: <1409661681-31490-1-git-send-email-linus.walleij@linaro.org>
+ (Linus Walleij's message of "Tue, 2 Sep 2014 14:41:21 +0200")
+References: <1409661681-31490-1-git-send-email-linus.walleij@linaro.org>
+Message-ID: <7h8um17uo5.fsf@paris.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 02 September 2014 18:56:26 Will Deacon wrote:
-> @@ -803,9 +804,11 @@ static int __init customize_machine(void)
->         if (machine_desc->init_machine)
->                 machine_desc->init_machine();
->  #ifdef CONFIG_OF
-> -       else
-> +       else {
-> +               of_iommu_init();
->                 of_platform_populate(NULL, of_default_bus_match_table,
->                                         NULL, NULL);
-> +       }
->  #endif
->         return 0;
->  }
+Linus Walleij <linus.walleij@linaro.org> writes:
 
-I think it would be better to not have this depend on the presence
-of an init_machine callback. Why not move of_iommu_init() in front
-of the if()? It shouldn't do anything unless we have an iommu
-driver that we should be using.
+> Analogous to commit 8858d88a25142544843869f0cd3e6654aa7b4aec
+> that fixed commit 70b41abc151f9
+> "ARM: ux500: move MSP pin control to the device tree"
+> accidentally activated MSP2, giving rise to a boot scroll
+> scream as the kernel attempts to probe a driver for it and
+> fails to obtain DMA channel 14.
+>
+> For some reason I forgot to fix this on the Snowball. Fix
+> this up by marking the node disabled again.
+>
+> Cc: Lee Jones <lee.jones@linaro.org>
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> ---
+> ARM SoC folks: please apply this patch directly to fixes for
+> v3.17, I have no other pending Ux500 fixes.
 
-	Arnd
+Tested on snowball, and applied to fixes.
+
+Thanks,
+
+Kevin
