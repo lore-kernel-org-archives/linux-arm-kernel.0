@@ -1,9 +1,9 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue,  2 Sep 2014 20:21:09 +0200
-Subject: [PATCH 5/5] ARM: sun8i: Relicense the A23 DTSI under GPLv2/X11
+Date: Tue,  2 Sep 2014 20:21:07 +0200
+Subject: [PATCH 3/5] ARM: sun6i: Relicense the A31 DTSI under GPLv2/X11
 In-Reply-To: <1409682069-7164-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1409682069-7164-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1409682069-7164-5-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1409682069-7164-3-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -14,18 +14,21 @@ In order to make it easier for them to reuse our device trees, relicense our
 DTSI first under a GPL/X11 dual-license. Hopefully, the DTS will follow soon.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+Cc: Boris BREZILLON <boris.brezillon@free-electrons.com>
+Cc: Carlo Caione <carlo@caione.org>
 Cc: Chen-Yu Tsai <wens@csie.org>
+Cc: Hans de Goede <hdegoede@redhat.com>
 ---
- arch/arm/boot/dts/sun8i-a23.dtsi | 46 +++++++++++++++++++++++++++++++++++-----
+ arch/arm/boot/dts/sun6i-a31.dtsi | 46 +++++++++++++++++++++++++++++++++++-----
  1 file changed, 41 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm/boot/dts/sun8i-a23.dtsi b/arch/arm/boot/dts/sun8i-a23.dtsi
-index 2ec86d3614ad..a35039224cb5 100644
---- a/arch/arm/boot/dts/sun8i-a23.dtsi
-+++ b/arch/arm/boot/dts/sun8i-a23.dtsi
+diff --git a/arch/arm/boot/dts/sun6i-a31.dtsi b/arch/arm/boot/dts/sun6i-a31.dtsi
+index 1c2ec913e650..eb686e78f225 100644
+--- a/arch/arm/boot/dts/sun6i-a31.dtsi
++++ b/arch/arm/boot/dts/sun6i-a31.dtsi
 @@ -3,12 +3,48 @@
   *
-  * Chen-Yu Tsai <wens@csie.org>
+  * Maxime Ripard <maxime.ripard@free-electrons.com>
   *
 - * The code contained herein is licensed under the GNU General Public
 - * License. You may obtain a copy of the GNU General Public License
