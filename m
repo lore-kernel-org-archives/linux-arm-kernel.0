@@ -1,117 +1,44 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Tue,  2 Sep 2014 10:50:01 +0200
-Subject: [PATCH 5/7] ARM: at91: at91sam9g45: update defconfig
-In-Reply-To: <1409647803-8054-1-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1409647803-8054-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <1409647803-8054-6-git-send-email-alexandre.belloni@free-electrons.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 02 Sep 2014 10:56:36 +0200
+Subject: [RFC PATCH 0/7] Introduce automatic DMA configuration for IOMMU
+ masters
+In-Reply-To: <54058442.2070204@samsung.com>
+References: <1409327670-3495-1-git-send-email-will.deacon@arm.com>
+ <20140902083138.GA25379@arm.com> <54058442.2070204@samsung.com>
+Message-ID: <33373396.gPTVFGBBxa@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Update defconfig, adding:
- - PWM support using the generic framework
- - generic PWM leds
- - Power/reset
- - Watchdog
+On Tuesday 02 September 2014 10:48:02 Marek Szyprowski wrote:
+> 
+> >   -- I have concerns that allocating one domain per master might be
+> > too much, but it's hard to tell without an IOMMU driver ported over.
+> 
+> One domain per master is IMHO a sane default configuration. The only default
+> alternative I see is to have only one domain (related with dma-mapping
+> subsystem) and bind all devices to it. However I really don't see any
+> disadvantage of having separate domain per each master and such 
+> configuration
+> gives devices better separation.
 
-and removing deprecated config options.
+I was expecting that the dma-mapping implementation would by default use
+one domain for all devices, since that is what the simpler IOMMUs without
+domain support have to do anyway.
 
-Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
----
- arch/arm/configs/at91sam9g45_defconfig | 19 +++++++++++--------
- 1 file changed, 11 insertions(+), 8 deletions(-)
+For isolation purposes, it can only help to have more domains, but
+I would guess that there is some space overhead in maintaining lots
+of page tables.
 
-diff --git a/arch/arm/configs/at91sam9g45_defconfig b/arch/arm/configs/at91sam9g45_defconfig
-index c6661a60025d..f66d1a1b64bf 100644
---- a/arch/arm/configs/at91sam9g45_defconfig
-+++ b/arch/arm/configs/at91sam9g45_defconfig
-@@ -20,7 +20,6 @@ CONFIG_MACH_AT91SAM9M10G45EK=y
- CONFIG_MACH_AT91SAM9_DT=y
- CONFIG_AT91_SLOW_CLOCK=y
- CONFIG_AEABI=y
--# CONFIG_OABI_COMPAT is not set
- CONFIG_UACCESS_WITH_MEMCPY=y
- CONFIG_ZBOOT_ROM_TEXT=0x0
- CONFIG_ZBOOT_ROM_BSS=0x0
-@@ -51,7 +50,6 @@ CONFIG_DEVTMPFS_MOUNT=y
- # CONFIG_PREVENT_FIRMWARE_BUILD is not set
- CONFIG_MTD=y
- CONFIG_MTD_CMDLINE_PARTS=y
--CONFIG_MTD_CHAR=y
- CONFIG_MTD_BLOCK=y
- CONFIG_MTD_DATAFLASH=y
- CONFIG_MTD_NAND=y
-@@ -62,15 +60,12 @@ CONFIG_BLK_DEV_LOOP=y
- CONFIG_BLK_DEV_RAM=y
- CONFIG_BLK_DEV_RAM_COUNT=4
- CONFIG_BLK_DEV_RAM_SIZE=8192
--CONFIG_ATMEL_PWM=y
- CONFIG_ATMEL_TCLIB=y
- CONFIG_ATMEL_SSC=y
- CONFIG_SCSI=y
- CONFIG_BLK_DEV_SD=y
--CONFIG_SCSI_MULTI_LUN=y
- # CONFIG_SCSI_LOWLEVEL is not set
- CONFIG_NETDEVICES=y
--CONFIG_MII=y
- CONFIG_MACB=y
- CONFIG_DAVICOM_PHY=y
- # CONFIG_INPUT_MOUSEDEV is not set
-@@ -93,18 +88,22 @@ CONFIG_I2C_CHARDEV=y
- CONFIG_I2C_GPIO=y
- CONFIG_SPI=y
- CONFIG_SPI_ATMEL=y
-+CONFIG_POWER_SUPPLY=y
-+CONFIG_POWER_RESET=y
- # CONFIG_HWMON is not set
-+CONFIG_WATCHDOG=y
-+CONFIG_WATCHDOG_NOWAYOUT=y
-+CONFIG_AT91SAM9X_WATCHDOG=y
- CONFIG_FB=y
- CONFIG_FB_ATMEL=y
- CONFIG_BACKLIGHT_LCD_SUPPORT=y
- CONFIG_LCD_CLASS_DEVICE=y
- CONFIG_BACKLIGHT_CLASS_DEVICE=y
- CONFIG_BACKLIGHT_ATMEL_LCDC=y
--CONFIG_BACKLIGHT_ATMEL_PWM=y
- # CONFIG_BACKLIGHT_GENERIC is not set
-+CONFIG_BACKLIGHT_PWM=y
- CONFIG_FRAMEBUFFER_CONSOLE=y
- CONFIG_FRAMEBUFFER_CONSOLE_DETECT_PRIMARY=y
--CONFIG_FONTS=y
- CONFIG_LOGO=y
- CONFIG_SOUND=y
- CONFIG_SND=y
-@@ -135,6 +134,7 @@ CONFIG_MMC_ATMELMCI=y
- CONFIG_NEW_LEDS=y
- CONFIG_LEDS_CLASS=y
- CONFIG_LEDS_GPIO=y
-+CONFIG_LEDS_PWM=y
- CONFIG_LEDS_TRIGGERS=y
- CONFIG_LEDS_TRIGGER_TIMER=y
- CONFIG_LEDS_TRIGGER_HEARTBEAT=y
-@@ -147,6 +147,8 @@ CONFIG_DMATEST=m
- # CONFIG_IOMMU_SUPPORT is not set
- CONFIG_IIO=y
- CONFIG_AT91_ADC=y
-+CONFIG_PWM=y
-+CONFIG_PWM_ATMEL=y
- CONFIG_EXT4_FS=y
- CONFIG_FANOTIFY=y
- CONFIG_VFAT_FS=y
-@@ -159,8 +161,8 @@ CONFIG_NLS_CODEPAGE_437=y
- CONFIG_NLS_CODEPAGE_850=y
- CONFIG_NLS_ISO8859_1=y
- CONFIG_STRIP_ASM_SYMS=y
--# CONFIG_SCHED_DEBUG is not set
- CONFIG_DEBUG_MEMORY_INIT=y
-+# CONFIG_SCHED_DEBUG is not set
- # CONFIG_FTRACE is not set
- CONFIG_DEBUG_USER=y
- CONFIG_DEBUG_LL=y
-@@ -170,3 +172,4 @@ CONFIG_CRYPTO_ECB=y
- CONFIG_CRYPTO_USER_API_HASH=m
- CONFIG_CRYPTO_USER_API_SKCIPHER=m
- # CONFIG_CRYPTO_HW is not set
-+CONFIG_FONTS=y
--- 
-1.9.1
+> However we also need to figure out how to let drivers to make their own
+> configuration, like it is required by Exynos DRM subsystem, which consist
+> of several devices, each having its own IOMMU controller, but for
+> convenience those drivers assume that they all have been bound to the same,
+> single domain.
+
+IIRC with the way we ended up putting the mask into the iommu descriptor of
+the ARM SMMU, you can put multiple devices into the same iommu group, and
+have them automatically share a domain.
+
+I don't know if the same would work for the Samsung implementation.
+
+	Arnd
