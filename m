@@ -1,36 +1,50 @@
-From: nick.dyer@itdev.co.uk (Nick Dyer)
-Date: Tue, 02 Sep 2014 14:46:55 +0100
-Subject: [PATCH v2 1/3] ARM: dts: Add Peach Pit dts entry for Atmel
- touchpad
-In-Reply-To: <53FDE9B2.4040001@collabora.co.uk>
-References: <1409066937-3574-1-git-send-email-javier.martinez@collabora.co.uk>
- <1409066937-3574-2-git-send-email-javier.martinez@collabora.co.uk>
- <53FD1001.30701@suse.de> <53FD8528.7090504@collabora.co.uk>
- <53FDD914.5090208@suse.de> <53FDE9B2.4040001@collabora.co.uk>
-Message-ID: <5405CA4F.10507@itdev.co.uk>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 02 Sep 2014 15:48:06 +0200
+Subject: [RFC PATCH 1/1] drivers: introduce ARM SBSA generic UART driver
+In-Reply-To: <CAL_Jsq+Rs5MXC7s7EeWAEAPxxqaShAVGt=cdQxud5Us+-Zp6jw@mail.gmail.com>
+References: <1409328803-1953-1-git-send-email-andre.przywara@arm.com>
+ <540596A6.8000608@arm.com>
+ <CAL_Jsq+Rs5MXC7s7EeWAEAPxxqaShAVGt=cdQxud5Us+-Zp6jw@mail.gmail.com>
+Message-ID: <3749748.k4a1nSHDdj@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27/08/14 15:22, Javier Martinez Canillas wrote:
->>> If there was a BTN_NONE or KEY_UNUSED it would had been better but I think
->>> that making a distinction between these two cases (reserved pin vs GPIO
->>> available but not used) is useful.
->>
->> Maybe Nick can comment here.
+On Tuesday 02 September 2014 08:20:53 Rob Herring wrote:
+> >>
+> >> This alone is not okay. There is no such implementation of hardware.
+> >
+> > But the SBSA explicitly allows this. I don't know of any vendor who just
+> > implements the subset, but I've been told that this has been asked for.
+> 
+> To use baudrate as an example, that must be configurable somehow
+> either with pl011 registers or in a vendor specific way. I suppose you
+> could do an actual implementation with all those things hardcoded in
+> the design, but that seems unlikely.
 
-Yes, this is probably useful to document. However, I fear that it's not
-going to be obvious what the distinction is to someone who doesn't have the
-Atmel docs. Perhaps it would be clearer to just do something like:
+Why does the baudrate need to be configurable? I think it's completely
+reasonable to specify a console port that has a fixed (as in the
+OS must not care) rate, and that can be implemented either as a UART
+with a programmable rate or as a set of registers that directly talks
+to a remote system management device over whatever hardware protocol
+they choose.
 
-		linux,gpio-keymap = <KEY_RESERVED
-		                     KEY_RESERVED
-		                     KEY_RESERVED /* GPIO0 */
-	        	             KEY_RESERVED /* GPIO1 */
-		                     KEY_RESERVED /* GPIO2 */
-		                     BTN_LEFT>;   /* GPIO3 */
+> >> The DT must specify the implementation such as pl011.
+> >
+> > If it is a full featured PL011: sure. Then we don't need this driver at
+> > all and just use the SBSA UART spec as a guideline for our earlycon
+> > implementation.
+> > I will try to learn if there is someone actually implementing only the
+> > subset.
+> 
+> I would have assumed you knew someone is. Otherwise, I don't really
+> think anything should be implemented at this point. Perhaps adding
+> SBSA uart as an explicit earlycon option would be worthwhile. Also, we
+> should consider using ttySx instead of ttyAMAx for SBSA compliant
+> systems (including ones with pl011).
 
-If you omit any trailing KEY_RESERVED values it doesn't affect anything.
+What about systems that have both a SBSA debug port and a 8250
+compatible UART? That sounds like a very realistic hardware design
+choice for someone coming from an older x86/powerpc/mips/... chip
+that has 8250 and adds the extra port for SBSA compliance.
 
-I was also going to suggest that you put something like "/* Atmel mXT224SL
-*/" in your .dts file so it's clear what version of the maXTouch device you
-are configuring.
+	Arnd
