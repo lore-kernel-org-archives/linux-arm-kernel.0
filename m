@@ -1,26 +1,40 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Tue, 2 Sep 2014 15:00:26 -0300
-Subject: [PATCH 2/2] ARM: dts: imx6x-sdb: Add LCD support
-In-Reply-To: <20140902141147.GL3135@dragon>
-References: <1409593803-12368-1-git-send-email-fabio.estevam@freescale.com>
- <1409593803-12368-2-git-send-email-fabio.estevam@freescale.com>
- <20140902135036.GJ3135@dragon>
- <CAOMZO5Ct0PiRViQkrQ24ZUCHmaC+UgY1rktmOH+4BY0s99yB-g@mail.gmail.com>
- <20140902141147.GL3135@dragon>
-Message-ID: <CAOMZO5CBNAxapXsVpqi_+G_K+JA1fU7E06A7Fc-xbM3Tp=3f-Q@mail.gmail.com>
+From: fabio.estevam@freescale.com (Fabio Estevam)
+Date: Tue, 2 Sep 2014 15:00:43 -0300
+Subject: [PATCH v2 1/2] ARM: dts: imx6sx: Add LCDIF compatible strings
+Message-ID: <1409680844-24747-1-git-send-email-fabio.estevam@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 2, 2014 at 11:11 AM, Shawn Guo <shawn.guo@freescale.com> wrote:
+imx6sx has the same LCDIF controller IP as in mx28, so add the proper
+compatible strings.
 
-> I'm not sure why you do not see it, but I do.
->
-> [    0.037835] device-tree: Duplicate name in lcdif at 02220000, renamed to "display#1"
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+---
+Changes since v1:
+- None
 
-I was not grepping correctly, sorry. I can see it now.
+ arch/arm/boot/dts/imx6sx.dtsi | 2 ++
+ 1 file changed, 2 insertions(+)
 
-> I do not think the warning comes because of "display: display" but the
-> fact that lcdif node has a property named "display" and a child node
-> named "display" at the same time.
-
-Ok, sent a v2 without the duplicate warning message. Thanks
+diff --git a/arch/arm/boot/dts/imx6sx.dtsi b/arch/arm/boot/dts/imx6sx.dtsi
+index 63d9d82..d137caca 100644
+--- a/arch/arm/boot/dts/imx6sx.dtsi
++++ b/arch/arm/boot/dts/imx6sx.dtsi
+@@ -1065,6 +1065,7 @@
+ 				};
+ 
+ 				lcdif1: lcdif at 02220000 {
++					compatible = "fsl,imx6sx-lcdif", "fsl,imx28-lcdif";
+ 					reg = <0x02220000 0x4000>;
+ 					interrupts = <GIC_SPI 5 IRQ_TYPE_LEVEL_HIGH>;
+ 					clocks = <&clks IMX6SX_CLK_LCDIF1_PIX>,
+@@ -1075,6 +1076,7 @@
+ 				};
+ 
+ 				lcdif2: lcdif at 02224000 {
++					compatible = "fsl,imx6sx-lcdif", "fsl,imx28-lcdif";
+ 					reg = <0x02224000 0x4000>;
+ 					interrupts = <GIC_SPI 6 IRQ_TYPE_LEVEL_HIGH>;
+ 					clocks = <&clks IMX6SX_CLK_LCDIF2_PIX>,
+-- 
+1.9.1
