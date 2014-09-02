@@ -1,37 +1,53 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 2 Sep 2014 14:17:29 +0100
-Subject: [PATCH 7/8] ARM: l2x0: support associativity from DT
-In-Reply-To: <1409659354-23553-8-git-send-email-linus.walleij@linaro.org>
-References: <1409659354-23553-1-git-send-email-linus.walleij@linaro.org>
- <1409659354-23553-8-git-send-email-linus.walleij@linaro.org>
-Message-ID: <20140902131729.GQ30401@n2100.arm.linux.org.uk>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 2 Sep 2014 14:19:53 +0100
+Subject: [PATCH] ARM: ux500: disable msp2 node on Snowball
+In-Reply-To: <1409661681-31490-1-git-send-email-linus.walleij@linaro.org>
+References: <1409661681-31490-1-git-send-email-linus.walleij@linaro.org>
+Message-ID: <20140902131953.GB870@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 02, 2014 at 02:02:33PM +0200, Linus Walleij wrote:
-> The ARM RealView platforms comes with boot loaders that fail
-> to set up cache size, ways and associativity correctly. This
-> complements Florian's patch to set up cache size and sets from
-> the device tree with the possibility to set up associativity
-> on the L2C-220 cache variant.
+On Tue, 02 Sep 2014, Linus Walleij wrote:
 
-Do we need this?
+> Analogous to commit 8858d88a25142544843869f0cd3e6654aa7b4aec
+> that fixed commit 70b41abc151f9
+> "ARM: ux500: move MSP pin control to the device tree"
+> accidentally activated MSP2, giving rise to a boot scroll
+> scream as the kernel attempts to probe a driver for it and
+> fails to obtain DMA channel 14.
+> 
+> For some reason I forgot to fix this on the Snowball. Fix
+> this up by marking the node disabled again.
+> 
+> Cc: Lee Jones <lee.jones@linaro.org>
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> ---
+> ARM SoC folks: please apply this patch directly to fixes for
+> v3.17, I have no other pending Ux500 fixes.
+> ---
+>  arch/arm/boot/dts/ste-snowball.dts | 1 -
+>  1 file changed, 1 deletion(-)
 
-If we have the cache size, the number of sets, and the cache block size
-(cache line size) which are all ePAPR specified properties for a cache,
-then:
+Ah I see.  You fixed the HREF back in Feb, but I guess Snowball didn't
+benefit from it.
 
-	number of cache blocks = cache size / cache block size
-	ways of associativity = number of cache blocks / number of sets
-	way size = cache block size * number of sets
-
-It's a tad annoying to have to convert between the two representations,
-but ePAPR decided on size, sets and block size rather than size and
-ways.
-
-See arch/powerpc/kernel/cacheinfo.c line 260 for the powerpc
-associativity calculations from these values.
+Acked-by: Lee Jones <lee.jones@linaro.org>
+ 
+> diff --git a/arch/arm/boot/dts/ste-snowball.dts b/arch/arm/boot/dts/ste-snowball.dts
+> index 4a2000c620ad..3e97a669f15e 100644
+> --- a/arch/arm/boot/dts/ste-snowball.dts
+> +++ b/arch/arm/boot/dts/ste-snowball.dts
+> @@ -116,7 +116,6 @@
+>  		msp2: msp at 80117000 {
+>  			pinctrl-names = "default";
+>  			pinctrl-0 = <&msp2_default_mode>;
+> -			status = "okay";
+>  		};
+>  
+>  		msp3: msp at 80125000 {
 
 -- 
-FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
-according to speedtest.net.
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
