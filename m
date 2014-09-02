@@ -1,35 +1,31 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 2 Sep 2014 13:43:26 +0100
-Subject: [PATCH 5/8] ARM: l2x0: move DT parsing for cache props
-In-Reply-To: <1409659354-23553-6-git-send-email-linus.walleij@linaro.org>
-References: <1409659354-23553-1-git-send-email-linus.walleij@linaro.org>
- <1409659354-23553-6-git-send-email-linus.walleij@linaro.org>
-Message-ID: <20140902124326.GP30401@n2100.arm.linux.org.uk>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 02 Sep 2014 14:43:18 +0200
+Subject: [RFC PATCH 0/7] Introduce automatic DMA configuration for IOMMU
+ masters
+In-Reply-To: <5405B6F2.1060105@samsung.com>
+References: <1409327670-3495-1-git-send-email-will.deacon@arm.com>
+ <20140902105730.GH25379@arm.com> <5405B6F2.1060105@samsung.com>
+Message-ID: <3133975.8bg0CLVMMz@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 02, 2014 at 02:02:31PM +0200, Linus Walleij wrote:
-> The current diagnostic prints in the l2x0 driver will print
-> warnings like this if the AUX register i modified by the
-> mask and set words passed to the l2x0_init() function:
+On Tuesday 02 September 2014 14:24:18 Marek Szyprowski wrote:
+> >>> For isolation purposes, it can only help to have more domains, but
+> >>> I would guess that there is some space overhead in maintaining lots
+> >>> of page tables.
+> >> I'm okay with both approaches (separate domain for each device vs. single
+> >> common domain for all devices). Maybe this can be some kind of Kconfig
+> >> option added to DMA debugging? Separation might be really helpful when
+> >> debugging strange device behavior.
+> > One potential problem with a single domain is when you have multiple
+> > instances of a given IOMMU, each with different hardware restrictions.
+> > Then you can end up with multiple sets of page tables for the domain
+> > which, although not impossible to work with, is a bit of a mess.
 > 
-> L2C: platform modifies aux control register: 0x02020fff -> 0x02730fff
-> L2C: DT/platform modifies aux control register: 0x02020fff -> 0x02730fff
+> Maybe the default dma-mapping domain should be one per a given IOMMU 
+> instance?
+> This will simplify a lot of things in such case.
 
-Notice that there are two here.
+Yes, that sounds like a good idea.
 
-The first means that the platform passed values which resulted in an
-actual modification to the control register.  This happens in
-l2x0_of_init() to identify values of aux_mask/aux_val which result
-in manipulation of the control register by hard-coded platform values.
-
-The second means that the platform _or_ the DT resulted in an actual
-modification of the control register.  This happens in __l2c_init(),
-after the DT has been parsed, or after the non-DT code paths to identify
-any remaining modifications.
-
-I don't see any point to this patch.
-
--- 
-FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
-according to speedtest.net.
+	Arnd
