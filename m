@@ -1,145 +1,39 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue,  2 Sep 2014 18:56:21 +0100
-Subject: [RFC PATCH v2 1/7] iommu: provide early initialisation hook for IOMMU
- drivers
-In-Reply-To: <1409680587-29818-1-git-send-email-will.deacon@arm.com>
-References: <1409680587-29818-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1409680587-29818-2-git-send-email-will.deacon@arm.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Tue, 2 Sep 2014 13:56:21 -0400
+Subject: [PATCH] irqchip: exynos-combiner: Fix compilation error on ARM64
+In-Reply-To: <1409671492-7725-1-git-send-email-ch.naveen@samsung.com>
+References: <1409671492-7725-1-git-send-email-ch.naveen@samsung.com>
+Message-ID: <20140902175621.GG30467@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-IOMMU drivers must be initialised before any of their upstream devices,
-otherwise the relevant iommu_ops won't be configured for the bus in
-question. To solve this, a number of IOMMU drivers use initcalls to
-initialise the driver before anything has a chance to be probed.
+Naveen,
 
-Whilst this solves the immediate problem, it leaves the job of probing
-the IOMMU completely separate from the iommu_ops to configure the IOMMU,
-which are called on a per-bus basis and require the driver to figure out
-exactly which instance of the IOMMU is being requested. In particular,
-the add_device callback simply passes a struct device to the driver,
-which then has to parse firmware tables or probe buses to identify the
-relevant IOMMU instance.
+On Tue, Sep 02, 2014 at 08:54:52PM +0530, Naveen Krishna Chatradhi wrote:
+> The following compilation error occurs on 64-bit Exynos7 SoC:
+> 
+> drivers/irqchip/exynos-combiner.c: In function ?combiner_irq_domain_map?:
+> drivers/irqchip/exynos-combiner.c:162:2: error: implicit declaration of function ?set_irq_flags? [-Werror=implicit-function-declaration]
+>   set_irq_flags(irq, IRQF_VALID | IRQF_PROBE);
+>   ^
+> drivers/irqchip/exynos-combiner.c:162:21: error: ?IRQF_VALID? undeclared (first use in this function)
+>   set_irq_flags(irq, IRQF_VALID | IRQF_PROBE);
+>                      ^
+> drivers/irqchip/exynos-combiner.c:162:21: note: each undeclared identifier is reported only once for each function it appears in
+> drivers/irqchip/exynos-combiner.c:162:34: error: ?IRQF_PROBE? undeclared (first use in this function)
+>   set_irq_flags(irq, IRQF_VALID | IRQF_PROBE);
+> 
+> Fix the build error by including asm/hardirq.h.
+> 
+> Signed-off-by: Naveen Krishna Chatradhi <ch.naveen@samsung.com>
+> Cc: Thomas Gleixner <tglx@linutronix.de>
+> ---
+>  drivers/irqchip/exynos-combiner.c |    2 ++
+>  1 file changed, 2 insertions(+)
 
-This patch takes the first step in addressing this problem by adding an
-early initialisation pass for IOMMU drivers, giving them the ability to
-set some per-instance data on their of_node in the form of a new
-iommu_data structure. This can later be used when parsing OF masters to
-identify the IOMMU instance in question.
+Please include me in the Cc on future irqchip fixes, I almost missed
+this one.
 
-Signed-off-by: Will Deacon <will.deacon@arm.com>
----
- drivers/iommu/of_iommu.c          | 14 ++++++++++++++
- include/asm-generic/vmlinux.lds.h |  2 ++
- include/linux/iommu.h             |  6 ++++++
- include/linux/of_iommu.h          | 23 +++++++++++++++++++++++
- 4 files changed, 45 insertions(+)
+thx,
 
-diff --git a/drivers/iommu/of_iommu.c b/drivers/iommu/of_iommu.c
-index e550ccb7634e..f9209666157c 100644
---- a/drivers/iommu/of_iommu.c
-+++ b/drivers/iommu/of_iommu.c
-@@ -89,3 +89,17 @@ int of_get_dma_window(struct device_node *dn, const char *prefix, int index,
- 	return 0;
- }
- EXPORT_SYMBOL_GPL(of_get_dma_window);
-+
-+void __init of_iommu_init(void)
-+{
-+	struct device_node *np;
-+	const struct of_device_id *match, *matches = &__iommu_of_table;
-+
-+	for_each_matching_node_and_match(np, matches, &match) {
-+		const int (*init_fn)(struct device_node *) = match->data;
-+
-+		if (init_fn(np))
-+			pr_err("Failed to initialise IOMMU %s\n",
-+				of_node_full_name(np));
-+	}
-+}
-diff --git a/include/asm-generic/vmlinux.lds.h b/include/asm-generic/vmlinux.lds.h
-index 5ba0360663a7..b75ede8f99ae 100644
---- a/include/asm-generic/vmlinux.lds.h
-+++ b/include/asm-generic/vmlinux.lds.h
-@@ -162,6 +162,7 @@
- #define CLKSRC_OF_TABLES()	OF_TABLE(CONFIG_CLKSRC_OF, clksrc)
- #define IRQCHIP_OF_MATCH_TABLE() OF_TABLE(CONFIG_IRQCHIP, irqchip)
- #define CLK_OF_TABLES()		OF_TABLE(CONFIG_COMMON_CLK, clk)
-+#define IOMMU_OF_TABLES()	OF_TABLE(CONFIG_OF_IOMMU, iommu)
- #define RESERVEDMEM_OF_TABLES()	OF_TABLE(CONFIG_OF_RESERVED_MEM, reservedmem)
- #define CPU_METHOD_OF_TABLES()	OF_TABLE(CONFIG_SMP, cpu_method)
- #define EARLYCON_OF_TABLES()	OF_TABLE(CONFIG_SERIAL_EARLYCON, earlycon)
-@@ -495,6 +496,7 @@
- 	CLK_OF_TABLES()							\
- 	RESERVEDMEM_OF_TABLES()						\
- 	CLKSRC_OF_TABLES()						\
-+	IOMMU_OF_TABLES()						\
- 	CPU_METHOD_OF_TABLES()						\
- 	KERNEL_DTB()							\
- 	IRQCHIP_OF_MATCH_TABLE()					\
-diff --git a/include/linux/iommu.h b/include/linux/iommu.h
-index 20f9a527922a..fdddb14cd8f5 100644
---- a/include/linux/iommu.h
-+++ b/include/linux/iommu.h
-@@ -57,6 +57,12 @@ struct iommu_domain {
- 	struct iommu_domain_geometry geometry;
- };
- 
-+struct iommu_data {
-+	struct iommu_domain *domain;
-+	struct iova_domain *iovad;
-+	void *priv;
-+};
-+
- #define IOMMU_CAP_CACHE_COHERENCY	0x1
- #define IOMMU_CAP_INTR_REMAP		0x2	/* isolates device intrs */
- 
-diff --git a/include/linux/of_iommu.h b/include/linux/of_iommu.h
-index 51a560f34bca..a39e2d78f735 100644
---- a/include/linux/of_iommu.h
-+++ b/include/linux/of_iommu.h
-@@ -1,12 +1,17 @@
- #ifndef __OF_IOMMU_H
- #define __OF_IOMMU_H
- 
-+#include <linux/iommu.h>
-+#include <linux/of.h>
-+
- #ifdef CONFIG_OF_IOMMU
- 
- extern int of_get_dma_window(struct device_node *dn, const char *prefix,
- 			     int index, unsigned long *busno, dma_addr_t *addr,
- 			     size_t *size);
- 
-+extern void of_iommu_init(void);
-+
- #else
- 
- static inline int of_get_dma_window(struct device_node *dn, const char *prefix,
-@@ -16,6 +21,24 @@ static inline int of_get_dma_window(struct device_node *dn, const char *prefix,
- 	return -EINVAL;
- }
- 
-+static inline void of_iommu_init(void) { }
-+
- #endif	/* CONFIG_OF_IOMMU */
- 
-+static inline void of_iommu_set_data(struct device_node *np,
-+				     struct iommu_data *data)
-+{
-+	np->data = data;
-+}
-+
-+static inline struct iommu_data *of_iommu_get_data(struct device_node *np)
-+{
-+	return np->data;
-+}
-+
-+extern struct of_device_id __iommu_of_table;
-+
-+#define IOMMU_OF_DECLARE(name, compat, fn) \
-+	OF_DECLARE_1(iommu, name, compat, fn)
-+
- #endif /* __OF_IOMMU_H */
--- 
-2.1.0
+Jason.
