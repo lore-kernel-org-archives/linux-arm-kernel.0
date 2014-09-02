@@ -1,46 +1,46 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Tue,  2 Sep 2014 18:56:26 +0100
-Subject: [RFC PATCH v2 6/7] arm: call iommu_init before of_platform_populate
+Date: Tue,  2 Sep 2014 18:56:23 +0100
+Subject: [RFC PATCH v2 3/7] iommu: add new iommu_ops callback for adding an OF
+ device
 In-Reply-To: <1409680587-29818-1-git-send-email-will.deacon@arm.com>
 References: <1409680587-29818-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1409680587-29818-7-git-send-email-will.deacon@arm.com>
+Message-ID: <1409680587-29818-4-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We need to ensure that the IOMMUs in the system have a chance to perform
-some basic initialisation before we start adding masters to them.
-
-This patch adds a call to of_iommu_init before of_platform_populate.
+This patch adds a new function to the iommu_ops structure to allow an
+OF device to be added to a specific IOMMU instance using the recently
+merged generic devicetree binding for IOMMUs. The callback (of_xlate)
+takes a struct device representing the master and an of_phandle_args
+representing the IOMMU and the correspondong IDs for the new master.
 
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm/kernel/setup.c | 5 ++++-
- 1 file changed, 4 insertions(+), 1 deletion(-)
+ include/linux/iommu.h | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
-index 84db893dedc2..38a0203523af 100644
---- a/arch/arm/kernel/setup.c
-+++ b/arch/arm/kernel/setup.c
-@@ -18,6 +18,7 @@
- #include <linux/bootmem.h>
- #include <linux/seq_file.h>
- #include <linux/screen_info.h>
-+#include <linux/of_iommu.h>
- #include <linux/of_platform.h>
- #include <linux/init.h>
- #include <linux/kexec.h>
-@@ -803,9 +804,11 @@ static int __init customize_machine(void)
- 	if (machine_desc->init_machine)
- 		machine_desc->init_machine();
- #ifdef CONFIG_OF
--	else
-+	else {
-+		of_iommu_init();
- 		of_platform_populate(NULL, of_default_bus_match_table,
- 					NULL, NULL);
-+	}
- #endif
- 	return 0;
- }
+diff --git a/include/linux/iommu.h b/include/linux/iommu.h
+index fdddb14cd8f5..3e766b85daa3 100644
+--- a/include/linux/iommu.h
++++ b/include/linux/iommu.h
+@@ -21,6 +21,7 @@
+ 
+ #include <linux/errno.h>
+ #include <linux/err.h>
++#include <linux/of.h>
+ #include <linux/types.h>
+ #include <trace/events/iommu.h>
+ 
+@@ -136,6 +137,10 @@ struct iommu_ops {
+ 	/* Get the numer of window per domain */
+ 	u32 (*domain_get_windows)(struct iommu_domain *domain);
+ 
++#ifdef CONFIG_OF_IOMMU
++	int (*of_xlate)(struct device *dev, struct of_phandle_args *args);
++#endif
++
+ 	unsigned long pgsize_bitmap;
+ };
+ 
 -- 
 2.1.0
