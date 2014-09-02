@@ -1,33 +1,58 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 02 Sep 2014 19:35:21 +0100
-Subject: [PATCH 4/5] ARM: sun7i: Relicense the A20 DTSI under GPLv2/X11
-In-Reply-To: <1409682069-7164-4-git-send-email-maxime.ripard@free-electrons.com>
-References: <1409682069-7164-1-git-send-email-maxime.ripard@free-electrons.com>
- <1409682069-7164-4-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <54060DE9.3040308@arm.com>
+From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
+Date: Tue, 02 Sep 2014 20:39:22 +0200
+Subject: [PATCH 15/15] tty: serial: 8250: omap: add dma support
+In-Reply-To: <5404B149.6010400@linutronix.de>
+References: <20140815210211.GD9239@atomide.com>
+ <53F5AF0D.5060409@linutronix.de> <20140821184416.GF10066@atomide.com>
+ <53FE3779.5090908@linutronix.de> <20140827202313.GF16006@atomide.com>
+ <20140828082348.GA5413@linutronix.de> <20140828164645.GG16006@atomide.com>
+ <53FF84DF.7080406@linutronix.de> <20140828225454.GM16006@atomide.com>
+ <540048B4.7010807@linutronix.de> <20140829161221.GO16006@atomide.com>
+ <5404B149.6010400@linutronix.de>
+Message-ID: <54060EDA.6060204@linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/09/14 19:21, Maxime Ripard wrote:
-> The current GPL only licensing on the DTSI makes it very impractical for other
-> software components licensed under another license.
-> 
-> In order to make it easier for them to reuse our device trees, relicense our
-> DTSI first under a GPL/X11 dual-license. Hopefully, the DTS will follow soon.
-> 
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> Cc: Alexander Bersenev <bay@hackerdom.ru>
-> Cc: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-> Cc: Carlo Caione <carlo@caione.org>
-> Cc: Chen-Yu Tsai <wens@csie.org>
-> Cc: Emilio L?pez <emilio@elopez.com.ar>
-> Cc: Hans de Goede <hdegoede@redhat.com>
-> Cc: Marc Zyngier <marc.zyngier@arm.com>
-> Cc: Oliver Schinagl <oliver@schinagl.nl>
-> Cc: Roman Byshko <rbyshko@gmail.com>
+On 09/01/2014 07:47 PM, Sebastian Andrzej Siewior wrote:
+> Comparing it with serial-omap I see the same thing: I takes approx the
+> same amount of data until the first one is displayed. After a lot of
+> "long" writes which wake the chip up from idle I manage to freeze both,
+> the serial-omap driver and mine driver.
 
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+So after some testing:
+- it happens with omap-serial as well. Especially after disabling the
+  LED trigger for both LEDs.
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+- it seemed that disabling the MDR1 check whether or not we lost
+  context made the problem appear less often but it was a trick. Even
+  with restoring the context each time I see the same problem.
+
+- it seems to be easier to trigger with the LED trigger switched off.
+  However sometimes it works for 10 minutes, sometimes it triggers
+  after one.
+
+- I see to face two kind of "deaths":
+  - the LED still goes on and off and the uart just does not respond
+    even if I tell the button print something on the screen (the button
+    also changes the frequency of the LED so I know that the button is
+    doing something).
+    Also from dumping the content of /proc/interrupts it seems that a
+    wake up is made, the uart should have restored the registers.
+
+  - one where the system is dead and the LED does not blink anymore.
+    Also my button is dead.
+
+- disabling DMA makes the problem not go away.
+
+- mdelay(25) in omap8250_lost_context() is long enough to drop the 403
+  bytes I send in my testcase. That means I see only "good" characters.
+  With this the box remained alive for 2h. However the uart died anyway.
+
+>>
+>> Regards,
+>>
+>> Tony
+>>
+> 
+
+Sebastian
