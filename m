@@ -1,69 +1,58 @@
-From: Barry.Song@csr.com (Barry Song)
-Date: Tue, 2 Sep 2014 17:46:48 +0800
-Subject: [PATCH 2/2] ARM: dts: prima2: add I2S 2ch, 6ch, nodin, mclk groups
-In-Reply-To: <1409651208-5820-1-git-send-email-Barry.Song@csr.com>
-References: <1409651208-5820-1-git-send-email-Barry.Song@csr.com>
-Message-ID: <1409651208-5820-2-git-send-email-Barry.Song@csr.com>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Tue, 02 Sep 2014 11:49:55 +0200
+Subject: [GIT PULL] first bunch of dts changes for 3.18
+Message-ID: <1937322.lt3suVLyIs@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Rongjun Ying <rongjun.ying@csr.com>
+Hi Arnd, Olof
 
-we have done that for atlas6 in commit ed36c1a, 086b8904 etc. here we
-do same things for prima2.
+here is a first bunch of dts changes for 3.18. A lot of material for
+the rk3288 and some other smaller adaptions for changes happening
+in other trees (dw_mmc conversion, accepted saradc driver in the iio tree).
 
-Signed-off-by: Rongjun Ying <rongjun.ying@csr.com>
-Signed-off-by: Barry Song <Baohua.Song@csr.com>
----
- arch/arm/boot/dts/prima2.dtsi | 24 ++++++++++++++++++++++++
- 1 file changed, 24 insertions(+)
-
-diff --git a/arch/arm/boot/dts/prima2.dtsi b/arch/arm/boot/dts/prima2.dtsi
-index 963b7e5..bc6e611 100644
---- a/arch/arm/boot/dts/prima2.dtsi
-+++ b/arch/arm/boot/dts/prima2.dtsi
-@@ -524,12 +524,36 @@
-                                                 sirf,function = "sdmmc5";
-                                         };
-                                 };
-+				i2s_mclk_pins_a: i2s_mclk at 0 {
-+                                        i2s_mclk {
-+                                                sirf,pins = "i2smclkgrp";
-+                                                sirf,function = "i2s_mclk";
-+                                        };
-+                                };
-+				i2s_ext_clk_input_pins_a: i2s_ext_clk_input at 0 {
-+                                        i2s_ext_clk_input {
-+                                                sirf,pins = "i2s_ext_clk_inputgrp";
-+                                                sirf,function = "i2s_ext_clk_input";
-+                                        };
-+                                };
-                                 i2s_pins_a: i2s at 0 {
-                                         i2s {
-                                                 sirf,pins = "i2sgrp";
-                                                 sirf,function = "i2s";
-                                         };
-                                 };
-+				i2s_no_din_pins_a: i2s_no_din at 0 {
-+                                        i2s_no_din {
-+                                                sirf,pins = "i2s_no_dingrp";
-+                                                sirf,function = "i2s_no_din";
-+                                        };
-+                                };
-+				i2s_6chn_pins_a: i2s_6chn at 0 {
-+                                        i2s_6chn {
-+                                                sirf,pins = "i2s_6chngrp";
-+                                                sirf,function = "i2s_6chn";
-+                                        };
-+                                };
-                                 ac97_pins_a: ac97 at 0 {
-                                         ac97 {
-                                                 sirf,pins = "ac97grp";
--- 
-2.1.0
+So please pull
 
 
+The following changes since commit 7d1311b93e58ed55f3a31cc8f94c4b8fe988a2b9:
 
-Member of the CSR plc group of companies. CSR plc registered in England and Wales, registered number 4187346, registered office Churchill House, Cambridge Business Park, Cowley Road, Cambridge, CB4 0WZ, United Kingdom
-More information can be found at www.csr.com. Keep up to date with CSR on our technical blog, www.csr.com/blog, CSR people blog, www.csr.com/people, YouTube, www.youtube.com/user/CSRplc, Facebook, www.facebook.com/pages/CSR/191038434253534, or follow us on Twitter at www.twitter.com/CSR_plc.
-New for 2014, you can now access the wide range of products powered by aptX at www.aptx.com.
+  Linux 3.17-rc1 (2014-08-16 10:40:26 -0600)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/mmind/linux-rockchip.git tags/v3.18-rockchip-dts1
+
+for you to fetch changes up to f23a6179d45e9d144bf2eb2bd82b2f1270f85fcf:
+
+  ARM: dts: rockchip: add saradc nodes (2014-08-27 23:43:01 +0200)
+
+----------------------------------------------------------------
+First hunk of Rockchip dts changes for 3.18
+- dw_mmc conversion from Jaehoon Chung
+- mmc support for rk3288
+- pwm + backlight for rk3288
+- rtc for Radxa Rock
+- saradc base nodes
+
+----------------------------------------------------------------
+Doug Anderson (5):
+      ARM: dts: Add emmc and sdmmc to the rk3288 device tree
+      ARM: dts: Enable emmc and sdmmc on the rk3288-evb boards
+      ARM: dts: Move the PMIC interrupt pinctrl line to rk3288-evb common
+      ARM: dts: Add main PWM info to rk3288
+      ARM: dts: Enable PWM backlight on rk3288-evb
+
+Heiko St?bner (2):
+      ARM: dts: rockchip: add hym8563 rtc to Radxa Rock board
+      ARM: dts: rockchip: add saradc nodes
+
+Jaehoon Chung (1):
+      ARM: dts: rockchip: unuse the slot-node and deprecate the supports-highspeed for dw-mmc
+
+ arch/arm/boot/dts/rk3066a-bqcurie2.dts   | 15 ++---
+ arch/arm/boot/dts/rk3188-radxarock.dts   | 24 ++++++--
+ arch/arm/boot/dts/rk3288-evb-act8846.dts | 10 +---
+ arch/arm/boot/dts/rk3288-evb.dtsi        | 83 +++++++++++++++++++++++++++
+ arch/arm/boot/dts/rk3288.dtsi            | 98 ++++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/rk3xxx.dtsi            | 10 ++++
+ 6 files changed, 215 insertions(+), 25 deletions(-)
