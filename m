@@ -1,123 +1,155 @@
-From: khilman@kernel.org (Kevin Hilman)
-Date: Tue, 02 Sep 2014 12:32:22 -0700
-Subject: [PATCH v9 4/6] ARM: Exynos: switch to using generic cpufreq
- driver for Exynos4210/5250/5420
-In-Reply-To: <CAJuA9ah5M_pXRMXPB6o7JLhgVUHM7kYo9HOV6Yxv4Z=hKMdG=w@mail.gmail.com>
- (Thomas Abraham's message of "Mon, 1 Sep 2014 14:17:20 +0530")
-References: <1406707663-16656-1-git-send-email-thomas.ab@samsung.com>
- <1406707663-16656-5-git-send-email-thomas.ab@samsung.com>
- <53DA8BB9.6020702@samsung.com> <53DA8D85.3050106@gmail.com>
- <7hbnrc6px3.fsf@paris.lan> <53F7DA13.6090305@gmail.com>
- <CADWw7OgAS-z-UOrJU-hL2fzuefJmLtCTg57jYk2Df7f5KfLJmA@mail.gmail.com>
- <7h8umc60we.fsf@paris.lan>
- <CADWw7OgW+o3tB=ptnsy-PsmXmNv8oXzt_WfK6NswQiEWWwAzNA@mail.gmail.com>
- <CAGa+x85-Anb+HsSUQRaaeex19-HK+yZDW0UpFBwAtsQ8Sf2Aqg@mail.gmail.com>
- <CAGa+x86jU8MR=r_xuaiorbNNyqrezb0b6Ozy-MPg9HvsARESOw@mail.gmail.com>
- <CAJuA9ajtsrY7zSDMs=c6BZ0AqERoBgvq++dTF4Dn673zGMfcgQ@mail.gmail.com>
- <CAMAWPa-8h5PNhgT+ApBhA8p=i+4oFOnYnQsQ4mK1JKwwAhpvpQ@mail.gmail.com>
- <CAJuA9ah5M_pXRMXPB6o7JLhgVUHM7kYo9HOV6Yxv4Z=hKMdG=w@mail.gmail.com>
-Message-ID: <7hmwah6cop.fsf@paris.lan>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 2 Sep 2014 20:33:55 +0100
+Subject: [PATCH v11 06/19] irqchip: gic: Provide support for interrupt
+ grouping
+In-Reply-To: <1409662853-29313-7-git-send-email-daniel.thompson@linaro.org>
+References: <1408466769-20004-1-git-send-email-daniel.thompson@linaro.org>
+ <1409662853-29313-1-git-send-email-daniel.thompson@linaro.org>
+ <1409662853-29313-7-git-send-email-daniel.thompson@linaro.org>
+Message-ID: <20140902193355.GW30401@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-HI Thomas,
+On Tue, Sep 02, 2014 at 02:00:40PM +0100, Daniel Thompson wrote:
+> diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
+> index 4b959e6..423707c 100644
+> --- a/drivers/irqchip/irq-gic.c
+> +++ b/drivers/irqchip/irq-gic.c
+> @@ -41,6 +41,9 @@
+>  #include <linux/irqchip/arm-gic.h>
+>  
+>  #include <asm/cputype.h>
+> +#ifdef CONFIG_FIQ
+> +#include <asm/fiq.h>
+> +#endif
 
-Thomas Abraham <ta.omasab@gmail.com> writes:
+Is there much advantage to this ifdef over providing a dummy asm/fiq.h
+in ARM64?
 
-> On Fri, Aug 29, 2014 at 8:33 PM, Kevin Hilman <khilman@kernel.org> wrote:
->> Hi Thomas,
->>
->> On Fri, Aug 29, 2014 at 5:52 AM, Thomas Abraham <ta.omasab@gmail.com> wrote:
->>> Hi Kevin,
->>>
->>> On Wed, Aug 27, 2014 at 3:55 AM, Kevin Hilman <khilman@linaro.org> wrote:
->>>> On Tue, Aug 26, 2014 at 8:15 AM, Kevin Hilman <khilman@linaro.org> wrote:
->>>>> On Mon, Aug 25, 2014 at 10:25 PM, Chander Kashyap <k.chander@samsung.com> wrote:
->>>>
->>>> [...]
->>>>
->>>>>>>
->>>>>>> Can you clarify how you're setting the voltages to ensure stability?
->>>>>>
->>>>>> below is the diff :  wip/exynos/integ
->>>>>
->>>>> Thanks.
->>>>>
->>>>> I've applied your patch, and bootup shows vdd_arm and vdd_kfc at
->>>>> 1500mV, but still when booting with cpuidle enabled (bL switcher
->>>>> disabled), I'm seeing lockups with no kernel output.  With CPUidle
->>>>> disabled, things are pretty stable.
->>>>>
->>>>> What tree are you using to test this out on 5420?  I'm using mainline
->>>>> v3.17-rc1 + DT patch for CPUidle and this cpufreq series.  See my
->>>>> wip/exynos/integ branch at
->>>>> git://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux.git.
->>>>
->>>> I mis-stated this.  Actually my tree is based on the v3.17-rc1 branch
->>>> of the exynos-reference tree[1] + the above mentioned patches for
->>>> cpuidle and cpufreq.
->>>>
->>>> Also, I've narrowed down the instability a bit, and it's not related
->>>> to CPUidle.  I can now trigger a boot hang even without CPUidle
->>>> enabled.  Here's a quick way to cause a boot lockup. With the switcher
->>>> disabled, I enable CPUfreq and set the default governor to
->>>> performance.  As soon as cpufreq driver loads, it tries to use the top
->>>> frequences for both clusters, and it hangs.
->>>>
->>>> Selectively disabling frequencies, I narrowed it down to the 1.3GHz
->>>> and 1.2GHz frequencies of the little cluster.  With these commented
->>>> out in the DT, it will fully boot with the performance governor
->>>> enabled.
->>>>
->>>> So that leads to the question.  Are all of the operating points in
->>>> exynos5420.dtsi valid for exynos5800, and have they been validated?
->>>
->>> I tried to recreate the boot lockup issue using the same steps you
->>> listed above for the Exynos5800 peach-pi platform (Chromebook2), but I
->>> do not see any issues. I can see both clusters with max clock speed
->>> after boot (1.8GHz and 1.3GHz).
->>>
->>> I am using v3.17-rc2 + CPUFreq Patches + max77802 regulator support
->>> patches for Chromebook2 + temp hack to set A15 voltage to 1.35V and A7
->>> voltage to 1.3V.
->>
->> Can you share your branch and temp hack(s) as well as your defconfig?
->>
->> I'm using the v3.17-rc1 branch from the exynos tree (which includes
->> the max77802 series) but also has a bunch of other stuff which may be
->> causing the issue.
->>
->> It would be good if I can reproduce your exact tree/branch and see if
->> I still have the same problem.
->
-> The branch with the patches that have been used to test cpufreq on
-> Exynos5800 is available at
->
-> https://github.com/exynos-reference/kernel/tree/exynos5-v3.17-rc3-temp-cpufreq
->
-> Please let me know if this works or if there are any issues.
+>  #include <asm/irq.h>
+>  #include <asm/exception.h>
+>  #include <asm/smp_plat.h>
+> @@ -68,6 +71,9 @@ struct gic_chip_data {
+>  #ifdef CONFIG_GIC_NON_BANKED
+>  	void __iomem *(*get_base)(union gic_base *);
+>  #endif
+> +#ifdef CONFIG_FIQ
+> +	bool fiq_enable;
+> +#endif
+>  };
+>  
+>  static DEFINE_RAW_SPINLOCK(irq_controller_lock);
+> @@ -131,6 +137,16 @@ static inline void gic_set_base_accessor(struct gic_chip_data *data,
+>  #define gic_set_base_accessor(d, f)
+>  #endif
+>  
+> +#ifdef CONFIG_FIQ
+> +static inline bool gic_data_fiq_enable(struct gic_chip_data *data)
+> +{
+> +	return data->fiq_enable;
+> +}
+> +#else
+> +static inline bool gic_data_fiq_enable(
+> +		struct gic_chip_data *data) { return false; }
 
-Yes, your branch works fine, but it's because of the last (unposted)
-patch on your branch[1]: 
-ARM: dts: remove all supplies sourced from tps65090 PMIC
+I really hate this style.  Just lay it out as a normal function.
 
-That patch had not been posted, so I hadn't seen it before, but based on
-the changelog, it's pretty clear you had the same problems that I had
-without it, so I'm not sure why it wasn't mentioned earlier in this
-thread.
+> +	/*
+> +	 * If grouping is not available (not implemented or prohibited by
+> +	 * security mode) these registers a read-as-zero/write-ignored.
+> +	 * However as a precaution we restore the reset default regardless of
+> +	 * the result of the test.
+> +	 */
 
-I also noticed that the "force vdd_arm and vdd_kfc to max voltage" patch
-is not actually using the max voltage, which appears to be 1.5V from the
-DT, but actually using 1.35 V, however the changelog has no explanation
-for this.
+Have we found that this additional complexity is actually necessary?
+If not, we're over-engineering the code, making it more complex (and
+hence more likely to be buggy) for very little reason.
 
-One other thing, your temp-cpufreq branch has conflicts with max77802
-stuff in the v3.17-rc1 branch of the exynos-reference tree (which I'm
-using for CPUidle dependencies, on the PMU series IIRC.)
+Last night, I booted an unconditional version of this on OMAP3430, and
+OMAP4430.  It's also been booted on the range of iMX6 CPUs.  Nothing
+here has shown any signs of problems to having these registers written.
 
-Are there any plans to update the main referece branch and include
-cpufreq?
+> +	/*
+> +	 * Set EnableGrp1/EnableGrp0 (bit 1 and 0) or EnableGrp (bit 0 only,
+> +	 * bit 1 ignored)
+> +	 */
+> +	if (gic_data_fiq_enable(gic))
+> +		writel_relaxed(3, base + GIC_DIST_CTRL);
+> +	else
+> +		writel_relaxed(1, base + GIC_DIST_CTRL);
 
-Kevin
+If we are going to do this conditionally, and the only thing which
+is variable is the value to be written, I much prefer the conditional
+bit to be on the value and not the write.  The compiler doesn't always
+optimise these things very well.  So:
 
-[1] https://github.com/exynos-reference/kernel/commit/f08be7e4296a3452ee5d1aae31e3de5bbff2cf1a
+	writel_relaxed(gic_data_fiq_enable(gic) ? 3 : 1, base + GIC_DIST_CTRL);
+
+works well enough for me.  If you feel better by using a temporary
+local, that works for me too.
+
+> +	if (gic_data_fiq_enable(gic))
+> +		writel_relaxed(0x1f, base + GIC_CPU_CTRL);
+> +	else
+> +		writel_relaxed(1, base + GIC_CPU_CTRL);
+
+Same here.
+
+> @@ -485,7 +564,10 @@ static void gic_dist_restore(unsigned int gic_nr)
+>  		writel_relaxed(gic_data[gic_nr].saved_spi_enable[i],
+>  			dist_base + GIC_DIST_ENABLE_SET + i * 4);
+>  
+> -	writel_relaxed(1, dist_base + GIC_DIST_CTRL);
+> +	if (gic_data_fiq_enable(&gic_data[gic_nr]))
+> +		writel_relaxed(3, dist_base + GIC_DIST_CTRL);
+> +	else
+> +		writel_relaxed(1, dist_base + GIC_DIST_CTRL);
+
+And here.
+
+> @@ -542,7 +624,7 @@ static void gic_cpu_restore(unsigned int gic_nr)
+>  		writel_relaxed(0xa0a0a0a0, dist_base + GIC_DIST_PRI + i * 4);
+>  
+>  	writel_relaxed(0xf0, cpu_base + GIC_CPU_PRIMASK);
+> -	writel_relaxed(1, cpu_base + GIC_CPU_CTRL);
+> +	writel_relaxed(0x1f, cpu_base + GIC_CPU_CTRL);
+
+Interestingly, here you write 0x1f unconditionally.
+>  }
+>  
+>  static int gic_notifier(struct notifier_block *self, unsigned long cmd,	void *v)
+> @@ -604,6 +686,7 @@ static void gic_raise_softirq(const struct cpumask *mask, unsigned int irq)
+>  {
+>  	int cpu;
+>  	unsigned long flags, map = 0;
+> +	unsigned long softint;
+>  
+>  	raw_spin_lock_irqsave(&irq_controller_lock, flags);
+>  
+> @@ -618,7 +701,11 @@ static void gic_raise_softirq(const struct cpumask *mask, unsigned int irq)
+>  	dmb(ishst);
+>  
+>  	/* this always happens on GIC0 */
+> -	writel_relaxed(map << 16 | irq, gic_data_dist_base(&gic_data[0]) + GIC_DIST_SOFTINT);
+> +	softint = map << 16 | irq;
+> +	if (gic_data_fiq_enable(&gic_data[0]))
+> +		softint |= 0x8000;
+
+I guess that this always has to be done conditionally.  I'd prefer this
+test to be done slightly differently (and we might as well wrap in a bit
+of patch 9 here):
+
+	if (sgi_is_nonsecure(irq, &gic_data[0]))
+		softint |= 0x8000;
+
+which follows the true purpose of that bit.  This bit only has effect if
+we are running in secure mode, where it must match the status of the
+target interrupt (as programmed into GIC_DIST_IGROUP).
+
+We probably should do this based on a bitmask of SGIs in the
+gic_chip_data, which is initialised according to how we've been able
+to setup the GIC_DIST_IGROUP register(s).
+
+-- 
+FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
+according to speedtest.net.
