@@ -1,56 +1,87 @@
-From: sebastian@breakpoint.cc (Sebastian Andrzej Siewior)
-Date: Tue, 2 Sep 2014 10:29:31 +0200
-Subject: [PATCH] mfd: twl4030-power: Fix PM idle pin configuration to not
- conflict with regulators
-In-Reply-To: <20140819152405.GA12002@atomide.com>
-References: <20140819152405.GA12002@atomide.com>
-Message-ID: <20140902082931.GA32460@breakpoint.cc>
+From: pankaj.dubey@samsung.com (Pankaj Dubey)
+Date: Tue, 02 Sep 2014 14:02:48 +0530
+Subject: [PATCH] mfd: syscon: Decouple syscon interface from syscon devices
+In-Reply-To: <3109076.4UMHArqVbl@wuerfel>
+References: <1408694991-21615-1-git-send-email-pankaj.dubey@samsung.com>
+ <3343901.7HpqcTBEp1@wuerfel> <20140902080516.GE17117@lee--X1>
+ <3109076.4UMHArqVbl@wuerfel>
+Message-ID: <001401cfc688$85c07bf0$914173d0$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2014-08-19 08:24:05 [-0700], Tony Lindgren wrote:
+
+
+> -----Original Message-----
+> From: Arnd Bergmann [mailto:arnd at arndb.de]
+> Sent: Tuesday, September 02, 2014 1:45 PM
+> To: linux-arm-kernel at lists.infradead.org
+> Cc: Lee Jones; kgene.kim at samsung.com; linux at arm.linux.org.uk;
+> naushad at samsung.com; Pankaj Dubey; Tomasz Figa;
+linux-kernel at vger.kernel.org;
+> joshi at samsung.com; vikas.sajjan at samsung.com; linux-samsung-
+> soc at vger.kernel.org; broonie at kernel.org; thomas.ab at samsung.com;
+> chow.kim at samsung.com
+> Subject: Re: [PATCH] mfd: syscon: Decouple syscon interface from syscon
+devices
 > 
-> This allows us to enable the PMIC configuration for n900.
+> On Tuesday 02 September 2014 09:05:16 Lee Jones wrote:
+> > On Mon, 01 Sep 2014, Arnd Bergmann wrote:
+> >
+> > > On Monday 01 September 2014 17:04:26 Lee Jones wrote:
+> > > > On Mon, 01 Sep 2014, Arnd Bergmann wrote:
+> > > > > Maybe I'm misreading the patch, but I don't see how it creates a
+> > > > > migration path. What I want to end up with is infrastructure
+> > > > > that lets anybody call syscon_regmap_lookup_by_pdevname or
+> > > > > syscon_regmap_lookup_by_compatible (if they really need to)
+> > > > > without needing the platform_driver for syscon. That should not
+> > > > > require any form of compatibility layer because to the driver
+> > > > > using it there is no API change.
+> > > >
+> > > > Somehow I think the likelyhood is that I am misreading the patch.
+> > > >
+> > > > I thought that before this patch drivers we had to register a
+> > > > syscon device to bind to this driver, which was fine for the first
+> > > > use-cases of syscon as it wasn't required too early during boot.
+> > > > However, now there are use-cases where systems require access to
+> > > > syscon registers eariler in boot we require a means to obtain
+> > > > access prior to device probing.  I thought this patch not only
+> > > > provides that possibilty, but also leaves in the ability to register
+direct from
+> DT.
+> > >
+> > > Right, it does provide the ability to have syscon before devices are
+> > > registered, I missed that part.
+> > >
+> > > > > In contrast, this patch introduces a new
+> > > > > of_syscon_{un,}register() interface that would get removed after
+> > > > > the the above has been implemented, causing extra churn for any
+> > > > > driver that also wants to provide a regmap-like interface.
+> > > >
+> > > > When will we ever not have to register syscon?
+> > >
+> > > The idea is that we implicitly register the syscon block when
+> > > someone calls syscon_regmap_lookup_by_compatible or
+> > > syscon_regmap_lookup_by_phandle and then return a reference to that
+> > > new syscon. When another driver looks up the same device node, we
+> > > just pass a reference to the existing syscon.
+> >
+> > Doesn't sound too unreasonable.  So how about instead of exporting
+> > these new of_syscon_{un,}register() calls, we make them static and
+> > call them from syscon_regmap_lookup_by_{phandle,compatible}?
 > 
-> Fixes: 43fef47f94a1 (mfd: twl4030-power: Add a configuration to turn off oscillator during off-idle)
+> Yes, that would be a good start. We should think about whether we want to
+remove
+> the existing DT probing at the same time, since it becomes unused, and we
+might
+> want to move the code to drivers/base/regmap_*.c at some point.
+> 
 
-My beaglebone-ab does not like this. With this patch applied I end up
-with:
-[    2.437316] Waiting for root device /dev/mmcblk0p2...
-[    4.428192] mmc0: card never left busy state
-[    4.432647] mmc0: error -110 whilst initialising SD card
 
-I noticed this after I disabled lock debugging and tracing (syscall tracing
-was enabled). Enabling both again makes the error go away.
-With debugging + tracing disabled (so the error pops up) and git bisect
-I get this commit (daebabd57) reported.
-A diff between a good/bad bootlog (with lock-debug + tracing switched
-off):
+OK, I am working on these two parts. Once code is in proper form and tested
+on
+our setup I will post here.
 
-| smartreflex smartreflex.0: omap_sr_probe: SmartReflex driver initialized
-| smartreflex smartreflex.1: omap_sr_probe: SmartReflex driver initialized
-| hsusb2_vbus: disabling
-| VPLL2: disabling
-| VUSB3V1: disabling
-|+VDAC: disabling
-|+VAUX3: disabling
-| Waiting for root device /dev/mmcblk0p2...
-|-mmc0: host does not support reading read-only switch. assuming write-enable.
-|-mmc0: new high speed SDHC card at address 1234
-|-mmcblk0: mmc0:1234 SA04G 3.63 GiB 
-|- mmcblk0: p1 p2 p3
-|-BTRFS: device fsid 2e050bbb-1520-425e-a215-1e5bf865c7dc devid 1 transid 496 /dev/root
-|-BTRFS info (device mmcblk0p2): disk space caching is enabled
-|-BTRFS: detected SSD devices, enabling SSD mode
-|-VFS: Mounted root (btrfs filesystem) readonly on device 0:13.
-|-devtmpfs: mounted
-|-Freeing unused kernel memory: 216K (c051a000 - c0550000)
-|-BTRFS info (device mmcblk0p2): disk space caching is enabled
-|-
-|-Please press Enter to activate this console. 
-|+mmc0: card never left busy state
-|+mmc0: error -110 whilst initialising SD card
+Thanks,
+Pankaj
 
-reverting this commit on top of -rc3 makes mmc0 work again.
-
-Sebastian
+> 	Arnd
