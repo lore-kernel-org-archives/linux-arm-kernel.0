@@ -1,57 +1,29 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Tue, 2 Sep 2014 10:36:59 +0200
-Subject: [PATCH v2 06/12] ARM: at91: add MTD_SPI_NOR (new dependency for
- M25P80)
-In-Reply-To: <1398925607-7482-7-git-send-email-computersforpeace@gmail.com>
-References: <1398925607-7482-1-git-send-email-computersforpeace@gmail.com>
- <1398925607-7482-7-git-send-email-computersforpeace@gmail.com>
-Message-ID: <540581AB.6020101@atmel.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 2 Sep 2014 09:42:14 +0100
+Subject: [RESEND PATCH] arm64: dts: add <dt-bindings/> symlink
+In-Reply-To: <1409629756-14304-1-git-send-email-pankaj.dubey@samsung.com>
+References: <1409629756-14304-1-git-send-email-pankaj.dubey@samsung.com>
+Message-ID: <20140902084214.GE25379@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/05/2014 08:26, Brian Norris :
-> This defconfig contains the CONFIG_M25P80 symbol, which is now
-> dependent on the MTD_SPI_NOR symbol. Add CONFIG_MTD_SPI_NOR to satisfy
-> the new dependency.
+On Tue, Sep 02, 2014 at 04:49:16AM +0100, Pankaj Dubey wrote:
+> Add symlink to include/dt-bindings from arch/arm64/boot/dts/include/ to
+> match the ones in ARM architectures so that preprocessed device
+> tree files can include various useful constant definitions.
 > 
-> At the same time, drop the now-nonexistent CONFIG_MTD_CHAR symbol.
+> See commit c58299aa8754 ("kbuild: create an "include chroot" for DT bindings")
+> merged in v3.10-rc1 for details.
 > 
-> Signed-off-by: Brian Norris <computersforpeace@gmail.com>
-> Cc: Andrew Victor <linux@maxim.org.za>
-> Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
-
-Okay, now taken in at91-3.18-defconfig, thanks:
-
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-
-
-> Cc: Jean-Christophe Plagniol-Villard <plagnioj@jcrosoft.com>
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: linux-kernel at vger.kernel.org
+> CC: Catalin Marinas <catalin.marinas@arm.com>
+> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
 > ---
->  arch/arm/configs/sama5_defconfig | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
 > 
-> diff --git a/arch/arm/configs/sama5_defconfig b/arch/arm/configs/sama5_defconfig
-> index dc3881e07630..8282ebab6e52 100644
-> --- a/arch/arm/configs/sama5_defconfig
-> +++ b/arch/arm/configs/sama5_defconfig
-> @@ -65,12 +65,12 @@ CONFIG_DEVTMPFS_MOUNT=y
->  # CONFIG_PREVENT_FIRMWARE_BUILD is not set
->  CONFIG_MTD=y
->  CONFIG_MTD_CMDLINE_PARTS=y
-> -CONFIG_MTD_CHAR=y
->  CONFIG_MTD_BLOCK=y
->  CONFIG_MTD_CFI=y
->  CONFIG_MTD_M25P80=y
->  CONFIG_MTD_NAND=y
->  CONFIG_MTD_NAND_ATMEL=y
-> +CONFIG_MTD_SPI_NOR=y
->  CONFIG_MTD_UBI=y
->  CONFIG_MTD_UBI_GLUEBI=y
->  CONFIG_PROC_DEVICETREE=y
-> 
+> Resubmitting this change as now it will be required for Samsung ARM64
+> based SoC.
 
+Just include this change in the series adding a .dts that needs it -- it
+doesn't really make sense in isolation (unless somebody desperately wants
+this in?).
 
--- 
-Nicolas Ferre
+Will
