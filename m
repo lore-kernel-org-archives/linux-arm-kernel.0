@@ -1,60 +1,41 @@
 From: balbi@ti.com (Felipe Balbi)
-Date: Tue, 2 Sep 2014 09:35:39 -0500
-Subject: [PATCH 1/5] usb: dwc3: exynos: Add support for SCLK present on
+Date: Tue, 2 Sep 2014 09:37:11 -0500
+Subject: [PATCH 5/5] phy: exynos5-usbdrd: Adding Kconfig dependency for
  Exynos7
-In-Reply-To: <CAFp+6iHLSaUjHqaKXXX0QLiRd3h+O67DRSQdExag-KUH0dnpag@mail.gmail.com>
+In-Reply-To: <CAFp+6iHsfg6Ru0LBN=JviV=-mSdmuSo9Te3EXYF+X8jssD_BYQ@mail.gmail.com>
 References: <1409212920-28526-1-git-send-email-gautam.vivek@samsung.com>
- <1409212920-28526-2-git-send-email-gautam.vivek@samsung.com>
- <20140828184847.GA18464@leverpostej>
- <CAFp+6iHLSaUjHqaKXXX0QLiRd3h+O67DRSQdExag-KUH0dnpag@mail.gmail.com>
-Message-ID: <20140902143539.GC16872@saruman.home>
+ <1409212920-28526-6-git-send-email-gautam.vivek@samsung.com>
+ <CAN_we7MQAqEsRaQc_pkRE_KXx9zZNLDBR2aHUrazM30Nv3udmQ@mail.gmail.com>
+ <CAFp+6iHsfg6Ru0LBN=JviV=-mSdmuSo9Te3EXYF+X8jssD_BYQ@mail.gmail.com>
+Message-ID: <20140902143711.GD16872@saruman.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 02, 2014 at 04:09:08PM +0530, Vivek Gautam wrote:
-> Hi,
-> 
-> 
-> On Fri, Aug 29, 2014 at 12:18 AM, Mark Rutland <mark.rutland@arm.com> wrote:
-> > On Thu, Aug 28, 2014 at 09:01:56AM +0100, Vivek Gautam wrote:
-> >> Exynos7 also has a separate special gate clock going to the IP
-> >> apart from the usual AHB clock. So add support for the same.
-> >>
-> >> Signed-off-by: Vivek Gautam <gautam.vivek@samsung.com>
-> >> ---
-> >>  drivers/usb/dwc3/dwc3-exynos.c |   16 ++++++++++++++++
-> >>  1 file changed, 16 insertions(+)
-> >>
-> >> diff --git a/drivers/usb/dwc3/dwc3-exynos.c b/drivers/usb/dwc3/dwc3-exynos.c
-> >> index f9fb8ad..bab6395 100644
-> >> --- a/drivers/usb/dwc3/dwc3-exynos.c
-> >> +++ b/drivers/usb/dwc3/dwc3-exynos.c
-> >> @@ -35,6 +35,7 @@ struct dwc3_exynos {
-> >>       struct device           *dev;
-> >>
-> >>       struct clk              *clk;
-> >> +     struct clk              *sclk;
-> >>       struct regulator        *vdd33;
-> >>       struct regulator        *vdd10;
-> >>  };
-> >> @@ -141,10 +142,17 @@ static int dwc3_exynos_probe(struct platform_device *pdev)
-> >>               return -EINVAL;
-> >>       }
-> >>
-> >> +     /* Exynos7 has a special gate clock going to this IP */
-> >> +     exynos->sclk = devm_clk_get(dev, "usbdrd30_sclk");
-> >> +     if (IS_ERR(exynos->sclk))
-> >> +             dev_warn(dev, "couldn't get sclk\n");
+On Mon, Sep 01, 2014 at 01:30:21PM +0530, Vivek Gautam wrote:
+> On Thu, Aug 28, 2014 at 8:36 PM, Daniele Forsi <dforsi@gmail.com> wrote:
+> > 2014-08-28 10:02 GMT+02:00 Vivek Gautam:
 > >
-> > Doesn't this introduce a pointless warning for Exynos SoCs other than
-> > Exynos7?
+> >> This USB 3.0 PHY controller is also present on Exynos7
+> >> platform, so adding the dependency on ARCH_EXYNOS7 for this driver.
+> >
+> >> +++ b/drivers/phy/Kconfig
+> >> @@ -186,7 +186,7 @@ config PHY_EXYNOS5250_USB2
+> >>
+> >>  config PHY_EXYNOS5_USBDRD
+> >>         tristate "Exynos5 SoC series USB DRD PHY driver"
+> >> -       depends on ARCH_EXYNOS5 && OF
+> >> +       depends on (ARCH_EXYNOS5 || ARCH_EXYNOS7) && OF
+> >
+> > shouldn't that prompt and its help text be updated to mention also Exynos7?
 > 
-> True, it will introduce an unnecessary warning for non-Exynos7 systems.
-> I initially thought of introducing a compatible check for Exynos7-dwc3, but that
-> way we may end up adding such checks for future SoCs which have similar
-> controller but have some clock difference or some other small change, no ?
+> Right, even that has to be updated accordingly. Will update the same in next
+> version of the patch. Thanks for pointing this.
 
-maybe dev_dbg() is what you want ? :-)
+I would rather change that to ARCH_EXYNOS, unless Kishon doesn't like
+that idea. The thing is that this will likely need to be patches for
+exynos8, 9, 10, 11...
+
+cheers
 
 -- 
 balbi
@@ -64,4 +45,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 819 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140902/0dde8948/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140902/26413d4c/attachment.sig>
