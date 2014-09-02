@@ -1,382 +1,261 @@
-From: tomasz.nowicki@linaro.org (Tomasz Nowicki)
-Date: Tue, 02 Sep 2014 13:48:37 +0200
-Subject: [PATCH v3 13/17] ARM64 / ACPI: Add GICv2 specific ACPI boot
- support
-In-Reply-To: <5404AE56.80801@arm.com>
-References: <1409583475-6978-1-git-send-email-hanjun.guo@linaro.org>
- <1409583475-6978-14-git-send-email-hanjun.guo@linaro.org>
- <5404AE56.80801@arm.com>
-Message-ID: <5405AE95.1020201@linaro.org>
+From: daniel.thompson@linaro.org (Daniel Thompson)
+Date: Tue, 02 Sep 2014 12:49:16 +0100
+Subject: [PATCH v10 03/19] arm: fiq: Replace default FIQ handler
+In-Reply-To: <20140828150112.GD30401@n2100.arm.linux.org.uk>
+References: <1408369264-14242-1-git-send-email-daniel.thompson@linaro.org>
+ <1408466769-20004-1-git-send-email-daniel.thompson@linaro.org>
+ <1408466769-20004-4-git-send-email-daniel.thompson@linaro.org>
+ <20140819173742.GG30401@n2100.arm.linux.org.uk> <53F39377.1070308@linaro.org>
+ <20140828150112.GD30401@n2100.arm.linux.org.uk>
+Message-ID: <5405AEBC.9020904@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01.09.2014 19:35, Marc Zyngier wrote:
-> On 01/09/14 15:57, Hanjun Guo wrote:
->> From: Tomasz Nowicki <tomasz.nowicki@linaro.org>
+On 28/08/14 16:01, Russell King - ARM Linux wrote:
+> On Tue, Aug 19, 2014 at 07:12:07PM +0100, Daniel Thompson wrote:
+>> On 19/08/14 18:37, Russell King - ARM Linux wrote:
+>>> On Tue, Aug 19, 2014 at 05:45:53PM +0100, Daniel Thompson wrote:
+>>>> +int register_fiq_nmi_notifier(struct notifier_block *nb)
+>>>> +{
+>>>> +	return atomic_notifier_chain_register(&fiq_nmi_chain, nb);
+>>>> +}
+>>>> +
+>>>> +asmlinkage void __exception_irq_entry fiq_nmi_handler(struct pt_regs *regs)
+>>>> +{
+>>>> +	struct pt_regs *old_regs = set_irq_regs(regs);
+>>>> +
+>>>> +	nmi_enter();
+>>>> +	atomic_notifier_call_chain(&fiq_nmi_chain, (unsigned long)regs, NULL);
+>>>> +	nmi_exit();
+>>>> +	set_irq_regs(old_regs);
+>>>> +}
+>>>
+>>> Really not happy with this.  What happens if a FIQ occurs while we're
+>>> inside register_fiq_nmi_notifier() - more specifically inside
+>>> atomic_notifier_chain_register() ?
 >>
->> ACPI kernel uses MADT table for proper GIC initialization. It needs to
->> parse GIC related subtables, collect CPU interface and distributor
->> addresses and call driver initialization function (which is hardware
->> abstraction agnostic). In a similar way, FDT initialize GICv1/2.
->>
->> NOTE: This commit allow to initialize GICv1/2 only.
->
-> I cannot help but notice that there is no support for KVM here. It'd be
-> good to add a note to that effect, so that people do not expect
-> virtualization support to be working when booting with ACPI.
+>> Should depend on which side of the rcu update we're on.
+> 
+> I just asked Paul McKenney, our RCU expert... essentially, yes, RCU
+> stuff itself is safe in this context.  However, RCU stuff can call into
+> lockdep if lockdep is configured, and there are questions over lockdep.
+> 
+> There's some things which can be done to reduce the lockdep exposure
+> to it, such as ensuring that rcu_read_lock() is first called outside
+> of FIQ context.
+> 
+> There's concerns with whether either printk() in check_flags() could
+> be reached too (flags there should always indicate that IRQs were
+> disabled, so that reduces down to a question about just the first
+> printk() there.)
+> 
+> There's also the very_verbose() stuff for RCU lockdep classes which
+> Paul says must not be enabled.
+> 
+> Lastly, Paul isn't a lockdep expert, but he sees nothing that prevents
+> lockdep doing the deadlock checking as a result of the above call.
+> 
+> So... this coupled with my feeling that notifiers make it too easy for
+> unreviewed code to be hooked into this path, I'm fairly sure that we
+> don't want to be calling atomic notifier chains from FIQ context.
 
-yes, it is worth mentioning!
+Having esablished (elsewhere in the thread) that RCU usage is safe
+from FIQ I have been working on the assumption that your feeling
+regarding unreviewed code is sufficient on its own to avoid using
+notifiers (and also to avoid a list of function pointers like on x86).
 
->
->> Signed-off-by: Tomasz Nowicki <tomasz.nowicki@linaro.org>
->> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
->> ---
->>   arch/arm64/include/asm/acpi.h        |    2 -
->>   arch/arm64/kernel/acpi.c             |   23 +++++++
->>   arch/arm64/kernel/irq.c              |    5 ++
->>   drivers/irqchip/irq-gic.c            |  114 ++++++++++++++++++++++++++++++++++
->>   include/linux/irqchip/arm-gic-acpi.h |   33 ++++++++++
->>   5 files changed, 175 insertions(+), 2 deletions(-)
->>   create mode 100644 include/linux/irqchip/arm-gic-acpi.h
->>
->> diff --git a/arch/arm64/include/asm/acpi.h b/arch/arm64/include/asm/acpi.h
->> index a867467..5d2ab63 100644
->> --- a/arch/arm64/include/asm/acpi.h
->> +++ b/arch/arm64/include/asm/acpi.h
->> @@ -97,8 +97,6 @@ void __init acpi_smp_init_cpus(void);
->>   extern int (*acpi_suspend_lowlevel)(void);
->>   #define acpi_wakeup_address 0
->>
->> -#define ACPI_MAX_GIC_CPU_INTERFACE_ENTRIES 65535
->> -
->>   #else
->>
->>   static inline bool acpi_psci_present(void) { return false; }
->> diff --git a/arch/arm64/kernel/acpi.c b/arch/arm64/kernel/acpi.c
->> index 354b912..b3b82b0 100644
->> --- a/arch/arm64/kernel/acpi.c
->> +++ b/arch/arm64/kernel/acpi.c
->> @@ -23,6 +23,7 @@
->>   #include <linux/irqdomain.h>
->>   #include <linux/bootmem.h>
->>   #include <linux/smp.h>
->> +#include <linux/irqchip/arm-gic-acpi.h>
->>
->>   #include <asm/cputype.h>
->>   #include <asm/cpu_ops.h>
->> @@ -313,6 +314,28 @@ void __init acpi_boot_table_init(void)
->>   		pr_err("Can't find FADT or error happened during parsing FADT\n");
->>   }
->>
->> +void __init acpi_gic_init(void)
->> +{
->> +	struct acpi_table_header *table;
->> +	acpi_status status;
->> +	acpi_size tbl_size;
->> +	int err;
->> +
->> +	status = acpi_get_table_with_size(ACPI_SIG_MADT, 0, &table, &tbl_size);
->> +	if (ACPI_FAILURE(status)) {
->> +		const char *msg = acpi_format_exception(status);
->> +
->> +		pr_err("Failed to get MADT table, %s\n", msg);
->> +		return;
->> +	}
->> +
->> +	err = gic_v2_acpi_init(table);
->> +	if (err)
->> +		pr_err("Failed to initialize GIC IRQ controller");
->
-> What will happen when you get to implement GICv3 support? Another entry
-> like this? Why isn't this entirely contained in the GIC driver? Do I
-> sound like a stuck record?
+Therefore I have made the changes requested and produced a
+before/after patch to show the impact of this. I will merge this
+into the FIQ patchset shortly (I need to run a few more build tests
+first).
 
-There will be another call to GICv3 init:
-[...]
-	err = gic_v3_acpi_init(table);
-	if (err)
-		err = gic_v2_acpi_init(table);
-	if (err)
-		pr_err("Failed to initialize GIC IRQ controller");
-[...]
-This is the main reason I put common code here.
+Personally I still favour using notifiers and think the coupling below is
+excessive. Nevertheless I've run a couple of basic tests on the code
+below and it works fine.
 
->
->> +
->> +	early_acpi_os_unmap_memory((char *)table, tbl_size);
->> +}
->> +
->>   /*
->>    * acpi_suspend_lowlevel() - save kernel state and suspend.
->>    *
->> diff --git a/arch/arm64/kernel/irq.c b/arch/arm64/kernel/irq.c
->> index 0f08dfd..c074d60 100644
->> --- a/arch/arm64/kernel/irq.c
->> +++ b/arch/arm64/kernel/irq.c
->> @@ -28,6 +28,7 @@
->>   #include <linux/irqchip.h>
->>   #include <linux/seq_file.h>
->>   #include <linux/ratelimit.h>
->> +#include <linux/irqchip/arm-gic-acpi.h>
->>
->>   unsigned long irq_err_count;
->>
->> @@ -78,6 +79,10 @@ void __init set_handle_irq(void (*handle_irq)(struct pt_regs *))
->>   void __init init_IRQ(void)
->>   {
->>   	irqchip_init();
->> +
->> +	if (!handle_arch_irq)
->> +		acpi_gic_init();
->> +
->
-> Why isn't this called from irqchip_init? It would seem like the logical
-> spot to probe an interrupt controller.
 
-irqchip.c is OF dependent, I want to decouple these from the very 
-beginning.
-
->
->>   	if (!handle_arch_irq)
->>   		panic("No interrupt controller found.");
->>   }
->> diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
->> index 4b959e6..85cbf43 100644
->> --- a/drivers/irqchip/irq-gic.c
->> +++ b/drivers/irqchip/irq-gic.c
->> @@ -33,12 +33,14 @@
->>   #include <linux/of.h>
->>   #include <linux/of_address.h>
->>   #include <linux/of_irq.h>
->> +#include <linux/acpi.h>
->>   #include <linux/irqdomain.h>
->>   #include <linux/interrupt.h>
->>   #include <linux/percpu.h>
->>   #include <linux/slab.h>
->>   #include <linux/irqchip/chained_irq.h>
->>   #include <linux/irqchip/arm-gic.h>
->> +#include <linux/irqchip/arm-gic-acpi.h>
->>
->>   #include <asm/cputype.h>
->>   #include <asm/irq.h>
->> @@ -1029,3 +1031,115 @@ IRQCHIP_DECLARE(msm_8660_qgic, "qcom,msm-8660-qgic", gic_of_init);
->>   IRQCHIP_DECLARE(msm_qgic2, "qcom,msm-qgic2", gic_of_init);
->>
->>   #endif
->> +
->> +#ifdef CONFIG_ACPI
->> +static u64 dist_phy_base, cpu_phy_base = ULONG_MAX;
->
-> Please use phys_addr_t for physical addresses. The use of ULONG_MAX
-> looks dodgy. Please have a proper symbol to flag the fact that it hasn't
-> been assigned yet.
-Sure, will do.
-
->
->> +
->> +static int __init
->> +gic_acpi_parse_madt_cpu(struct acpi_subtable_header *header,
->> +			const unsigned long end)
->> +{
->> +	struct acpi_madt_generic_interrupt *processor;
->> +	u64 gic_cpu_base;
->
-> phys_addr_t
->
->> +	processor = (struct acpi_madt_generic_interrupt *)header;
->> +
->> +	if (BAD_MADT_ENTRY(processor, end))
->> +		return -EINVAL;
->> +
->> +	gic_cpu_base = processor->base_address;
->> +	if (!gic_cpu_base)
->> +		return -EFAULT;
->
-> Is zero an invalid address?
-Yeah, good point.
->
->> +
->> +	/*
->> +	 * There is no support for non-banked GICv1/2 register in ACPI spec.
->> +	 * All CPU interface addresses have to be the same.
->> +	 */
->> +	if (cpu_phy_base != ULONG_MAX && gic_cpu_base != cpu_phy_base)
->> +		return -EFAULT;
->> +
->> +	cpu_phy_base = gic_cpu_base;
->> +	return 0;
->> +}
->> +
->> +static int __init
->> +gic_acpi_parse_madt_distributor(struct acpi_subtable_header *header,
->> +				const unsigned long end)
->> +{
->> +	struct acpi_madt_generic_distributor *dist;
->> +
->> +	dist = (struct acpi_madt_generic_distributor *)header;
->> +
->> +	if (BAD_MADT_ENTRY(dist, end))
->> +		return -EINVAL;
->> +
->> +	dist_phy_base = dist->base_address;
->> +	if (!dist_phy_base)
->> +		return -EFAULT;
->
-> Same question about zero.
->
->> +
->> +	return 0;
->> +}
->> +
->> +int __init
->> +gic_v2_acpi_init(struct acpi_table_header *table)
->> +{
->> +	void __iomem *cpu_base, *dist_base;
->> +	int count;
->> +
->> +	/* Collect CPU base addresses */
->> +	count = acpi_parse_entries(sizeof(struct acpi_table_madt),
->> +				   gic_acpi_parse_madt_cpu, table,
->> +				   ACPI_MADT_TYPE_GENERIC_INTERRUPT,
->> +				   ACPI_MAX_GIC_CPU_INTERFACE_ENTRIES);
->> +	if (count < 0) {
->> +		pr_err("Error during GICC entries parsing\n");
->> +		return -EFAULT;
->> +	} else if (!count) {
->> +		/* No GICC entries provided, use address from MADT header */
->> +		struct acpi_table_madt *madt = (struct acpi_table_madt *)table;
->> +
->> +		if (!madt->address)
->> +			return -EFAULT;
->> +
->> +		cpu_phy_base = (u64)madt->address;
->> +	}
->> +
->> +	/*
->> +	 * Find distributor base address. We expect one distributor entry since
->> +	 * ACPI 5.1 spec neither support multi-GIC instances nor GIC cascade.
->> +	 */
->> +	count = acpi_parse_entries(sizeof(struct acpi_table_madt),
->> +				   gic_acpi_parse_madt_distributor, table,
->> +				   ACPI_MADT_TYPE_GENERIC_DISTRIBUTOR,
->> +				   ACPI_MAX_GIC_DISTRIBUTOR_ENTRIES);
->> +	if (count <= 0) {
->> +		pr_err("Error during GICD entries parsing\n");
->> +		return -EFAULT;
->> +	} else if (count > 1) {
->> +		pr_err("More than one GICD entry detected\n");
->> +		return -EINVAL;
->> +	}
->> +
->> +	cpu_base = ioremap(cpu_phy_base, ACPI_GIC_CPU_IF_MEM_SIZE);
->> +	if (!cpu_base) {
->> +		pr_err("Unable to map GICC registers\n");
->> +		return -ENOMEM;
->> +	}
->> +
->> +	dist_base = ioremap(dist_phy_base, ACPI_GIC_DIST_MEM_SIZE);
->> +	if (!dist_base) {
->> +		pr_err("Unable to map GICD registers\n");
->> +		iounmap(cpu_base);
->> +		return -ENOMEM;
->> +	}
->> +
->> +	/*
->> +	 * Initialize zero GIC instance (no multi-GIC support). Also, set GIC
->> +	 * as default IRQ domain to allow for GSI registration and GSI to IRQ
->> +	 * number translation (see acpi_register_gsi() and acpi_gsi_to_irq()).
->> +	 */
->> +	gic_init_bases(0, -1, dist_base, cpu_base, 0, NULL);
->> +	irq_set_default_host(gic_data[0].domain);
->> +	return 0;
->> +}
->> +#endif
->> diff --git a/include/linux/irqchip/arm-gic-acpi.h b/include/linux/irqchip/arm-gic-acpi.h
->> new file mode 100644
->> index 0000000..ce2ae1a8
->> --- /dev/null
->> +++ b/include/linux/irqchip/arm-gic-acpi.h
->> @@ -0,0 +1,33 @@
->> +/*
->> + * Copyright (C) 2014, Linaro Ltd.
->> + *	Author: Tomasz Nowicki <tomasz.nowicki@linaro.org>
->> + *
->> + * This program is free software; you can redistribute it and/or modify
->> + * it under the terms of the GNU General Public License version 2 as
->> + * published by the Free Software Foundation.
->> + */
->> +
->> +#ifndef ARM_GIC_ACPI_H_
->> +#define ARM_GIC_ACPI_H_
->> +
->> +#include <linux/acpi.h>
->
-> Do we need linux/acpi.h here? You could have a separate forward
-> declaration of struct acpi_table_header, specially in the light of my
-> last remark below.
-Indeed, we can do forward declaration instead of #include 
-<linux/acpi.h>. Thanks!
-
->
->> +
->> +#ifdef CONFIG_ACPI
->> +#define ACPI_MAX_GIC_CPU_INTERFACE_ENTRIES	65535
->
-> With GICv2? I doubt it.
-I will create macro for each GIC driver:
-#define ACPI_MAX_GICV2_CPU_INTERFACE_ENTRIES	8
-#define ACPI_MAX_GICV3_CPU_INTERFACE_ENTRIES	65535
-
->
->> +#define ACPI_MAX_GIC_DISTRIBUTOR_ENTRIES	1
->> +
->> +/*
->> + * Hard code here, we can not get memory size from MADT (but FDT does),
->> + * Actually no need to do that, because this size can be inferred
->> + * from GIC spec.
->> + */
->> +#define ACPI_GIC_DIST_MEM_SIZE		(SZ_64K)
->
-> I don't know which version of the spec you're looking at, but my version
-> of the GICv2 spec has a 4kB distributor. Also, it would be good to make
-> obvious which GIC version this define is about.
-OK
-
->
->> +#define ACPI_GIC_CPU_IF_MEM_SIZE	(SZ_8K)
->> +
->> +void acpi_gic_init(void);
->> +int gic_v2_acpi_init(struct acpi_table_header *table);
->> +#else
->> +static inline void acpi_gic_init(void) { }
->> +#endif
->> +
->> +#endif /* ARM_GIC_ACPI_H_ */
->>
->
-> In the end, why do we need a separate file for this? I cannot see
-> anything that prevents it from being merged with arm-gic.h.
->
-> Thanks,
->
-> 	M.
->
-Having only GICv2, it would work. Considering we would do the same for 
-GICv3 (arm-gic-v3.h) there will be register name conflicts for both 
-headers inclusion:
-
-[...]
-#include <linux/irqchip/arm-gic.h>
-#include <linux/irqchip/arm-gic-v3.h>
-[...]
-	err = gic_v3_acpi_init(table);
-	if (err)
-		err = gic_v2_acpi_init(table);
-	if (err)
-		pr_err("Failed to initialize GIC IRQ controller");
-[...]
-So instead of changing register names prefix, I choose new header will 
-be less painfully.
-
-Regards,
-Tomasz
+diff --git a/arch/arm/include/asm/fiq.h b/arch/arm/include/asm/fiq.h
+index 175bfed..a25c952 100644
+--- a/arch/arm/include/asm/fiq.h
++++ b/arch/arm/include/asm/fiq.h
+@@ -54,7 +54,6 @@ extern void disable_fiq(int fiq);
+ extern int ack_fiq(int fiq);
+ extern void eoi_fiq(int fiq);
+ extern bool has_fiq(int fiq);
+-extern int register_fiq_nmi_notifier(struct notifier_block *nb);
+ extern void fiq_register_mapping(int irq, struct fiq_chip *chip);
+ 
+ /* helpers defined in fiqasm.S: */
+diff --git a/arch/arm/include/asm/kgdb.h b/arch/arm/include/asm/kgdb.h
+index 6563da0..cb5ccd6 100644
+--- a/arch/arm/include/asm/kgdb.h
++++ b/arch/arm/include/asm/kgdb.h
+@@ -51,6 +51,7 @@ extern void kgdb_handle_bus_error(void);
+ extern int kgdb_fault_expected;
+ 
+ extern int kgdb_register_fiq(unsigned int fiq);
++extern void kgdb_handle_fiq(struct pt_regs *regs);
+ 
+ #endif /* !__ASSEMBLY__ */
+ 
+diff --git a/arch/arm/kernel/fiq.c b/arch/arm/kernel/fiq.c
+index b2bd1c7..7422b58 100644
+--- a/arch/arm/kernel/fiq.c
++++ b/arch/arm/kernel/fiq.c
+@@ -43,12 +43,14 @@
+ #include <linux/irq.h>
+ #include <linux/radix-tree.h>
+ #include <linux/slab.h>
++#include <linux/irqchip/arm-gic.h>
+ 
+ #include <asm/cacheflush.h>
+ #include <asm/cp15.h>
+ #include <asm/exception.h>
+ #include <asm/fiq.h>
+ #include <asm/irq.h>
++#include <asm/kgdb.h>
+ #include <asm/traps.h>
+ 
+ #define FIQ_OFFSET ({					\
+@@ -65,7 +67,6 @@ static unsigned long no_fiq_insn;
+ static int fiq_start = -1;
+ static RADIX_TREE(fiq_data_tree, GFP_KERNEL);
+ static DEFINE_MUTEX(fiq_data_mutex);
+-static ATOMIC_NOTIFIER_HEAD(fiq_nmi_chain);
+ 
+ /* Default reacquire function
+  * - we always relinquish FIQ control
+@@ -218,17 +219,23 @@ bool has_fiq(int fiq)
+ }
+ EXPORT_SYMBOL(has_fiq);
+ 
+-int register_fiq_nmi_notifier(struct notifier_block *nb)
+-{
+-	return atomic_notifier_chain_register(&fiq_nmi_chain, nb);
+-}
+-
+ asmlinkage void __exception_irq_entry fiq_nmi_handler(struct pt_regs *regs)
+ {
+ 	struct pt_regs *old_regs = set_irq_regs(regs);
+ 
+ 	nmi_enter();
+-	atomic_notifier_call_chain(&fiq_nmi_chain, (unsigned long)regs, NULL);
++
++	/* these callbacks deliberately avoid using a notifier chain in
++	 * order to ensure code review happens (drivers cannot "secretly"
++	 * employ FIQ without modifying this chain of calls).
++	 */
++#ifdef CONFIG_KGDB_FIQ
++	kgdb_handle_fiq(regs);
++#endif
++#ifdef CONFIG_ARM_GIC
++	gic_handle_fiq_ipi();
++#endif
++
+ 	nmi_exit();
+ 	set_irq_regs(old_regs);
+ }
+diff --git a/arch/arm/kernel/kgdb.c b/arch/arm/kernel/kgdb.c
+index b77b885..630a3ef 100644
+--- a/arch/arm/kernel/kgdb.c
++++ b/arch/arm/kernel/kgdb.c
+@@ -312,12 +312,13 @@ struct kgdb_arch arch_kgdb_ops = {
+ };
+ 
+ #ifdef CONFIG_KGDB_FIQ
+-static int kgdb_handle_fiq(struct notifier_block *nb, unsigned long arg,
+-			   void *data)
++void kgdb_handle_fiq(struct pt_regs *regs)
+ {
+-	struct pt_regs *regs = (void *) arg;
+ 	int actual;
+ 
++	if (!kgdb_fiq)
++		return;
++
+ 	if (!kgdb_nmicallback(raw_smp_processor_id(), regs))
+ 		return NOTIFY_OK;
+ 
+@@ -333,11 +334,6 @@ static int kgdb_handle_fiq(struct notifier_block *nb, unsigned long arg,
+ 	return NOTIFY_OK;
+ }
+ 
+-static struct notifier_block kgdb_fiq_notifier = {
+-	.notifier_call = kgdb_handle_fiq,
+-	.priority = 100,
+-};
+-
+ int kgdb_register_fiq(unsigned int fiq)
+ {
+ 	static struct fiq_handler kgdb_fiq_desc = { .name = "kgdb", };
+@@ -357,7 +353,6 @@ int kgdb_register_fiq(unsigned int fiq)
+ 	}
+ 
+ 	kgdb_fiq = fiq;
+-	register_fiq_nmi_notifier(&kgdb_fiq_notifier);
+ 
+ 	return 0;
+ }
+diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
+index bda5a91..8821160 100644
+--- a/drivers/irqchip/irq-gic.c
++++ b/drivers/irqchip/irq-gic.c
+@@ -502,13 +502,17 @@ static void __init gic_init_fiq(struct gic_chip_data *gic,
+ /*
+  * Fully acknowledge (both ack and eoi) a FIQ-based IPI
+  */
+-static int gic_handle_fiq_ipi(struct notifier_block *nb, unsigned long regs,
+-			   void *data)
++void gic_handle_fiq_ipi(void)
+ {
+ 	struct gic_chip_data *gic = &gic_data[0];
+-	void __iomem *cpu_base = gic_data_cpu_base(gic);
++	void __iomem *cpu_base;
+ 	unsigned long irqstat, irqnr;
+ 
++	if (!gic || !gic->fiq_enable)
++		return;
++
++	cpu_base = gic_data_cpu_base(gic);
++
+ 	if (WARN_ON(!in_nmi()))
+ 		return NOTIFY_BAD;
+ 
+@@ -525,13 +529,6 @@ static int gic_handle_fiq_ipi(struct notifier_block *nb, unsigned long regs,
+ 
+ 	return NOTIFY_OK;
+ }
+-
+-/*
+- * Notifier to ensure IPI FIQ is acknowledged correctly.
+- */
+-static struct notifier_block gic_fiq_ipi_notifier = {
+-	.notifier_call = gic_handle_fiq_ipi,
+-};
+ #else /* CONFIG_FIQ */
+ static inline void gic_set_group_irq(void __iomem *base, unsigned int hwirq,
+ 				     int group) {}
+@@ -1250,10 +1247,6 @@ void __init gic_init_bases(unsigned int gic_nr, int irq_start,
+ #ifdef CONFIG_SMP
+ 		set_smp_cross_call(gic_raise_softirq);
+ 		register_cpu_notifier(&gic_cpu_notifier);
+-#ifdef CONFIG_FIQ
+-		if (gic_data_fiq_enable(gic))
+-			register_fiq_nmi_notifier(&gic_fiq_ipi_notifier);
+-#endif
+ #endif
+ 		set_handle_irq(gic_handle_irq);
+ 	}
+diff --git a/include/linux/irqchip/arm-gic.h b/include/linux/irqchip/arm-gic.h
+index 45e2d8c..52a5676 100644
+--- a/include/linux/irqchip/arm-gic.h
++++ b/include/linux/irqchip/arm-gic.h
+@@ -101,5 +101,8 @@ static inline void __init register_routable_domain_ops
+ {
+ 	gic_routable_irq_domain_ops = ops;
+ }
++
++void gic_handle_fiq_ipi(void);
++
+ #endif /* __ASSEMBLY */
+ #endif
