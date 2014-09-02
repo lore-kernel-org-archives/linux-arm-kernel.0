@@ -1,55 +1,271 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Tue, 2 Sep 2014 16:22:59 +0200
-Subject: [PATCH 2/8 v2] leds: add device tree bindings for register bit
- LEDs
-In-Reply-To: <1409659354-23553-3-git-send-email-linus.walleij@linaro.org>
-References: <1409659354-23553-1-git-send-email-linus.walleij@linaro.org>
- <1409659354-23553-3-git-send-email-linus.walleij@linaro.org>
-Message-ID: <CAMuHMdXB_6vJpTeDgr4iiA=T_3bK7nQ3anF-HSdnEz=2QqYzaw@mail.gmail.com>
+From: paulmck@linux.vnet.ibm.com (Paul E. McKenney)
+Date: Tue, 2 Sep 2014 07:23:14 -0700
+Subject: [PATCH v10 03/19] arm: fiq: Replace default FIQ handler
+In-Reply-To: <5405AEBC.9020904@linaro.org>
+References: <1408369264-14242-1-git-send-email-daniel.thompson@linaro.org>
+ <1408466769-20004-1-git-send-email-daniel.thompson@linaro.org>
+ <1408466769-20004-4-git-send-email-daniel.thompson@linaro.org>
+ <20140819173742.GG30401@n2100.arm.linux.org.uk>
+ <53F39377.1070308@linaro.org>
+ <20140828150112.GD30401@n2100.arm.linux.org.uk>
+ <5405AEBC.9020904@linaro.org>
+Message-ID: <20140902142314.GX5001@linux.vnet.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+On Tue, Sep 02, 2014 at 12:49:16PM +0100, Daniel Thompson wrote:
+> On 28/08/14 16:01, Russell King - ARM Linux wrote:
+> > On Tue, Aug 19, 2014 at 07:12:07PM +0100, Daniel Thompson wrote:
+> >> On 19/08/14 18:37, Russell King - ARM Linux wrote:
+> >>> On Tue, Aug 19, 2014 at 05:45:53PM +0100, Daniel Thompson wrote:
+> >>>> +int register_fiq_nmi_notifier(struct notifier_block *nb)
+> >>>> +{
+> >>>> +	return atomic_notifier_chain_register(&fiq_nmi_chain, nb);
+> >>>> +}
+> >>>> +
+> >>>> +asmlinkage void __exception_irq_entry fiq_nmi_handler(struct pt_regs *regs)
+> >>>> +{
+> >>>> +	struct pt_regs *old_regs = set_irq_regs(regs);
+> >>>> +
+> >>>> +	nmi_enter();
+> >>>> +	atomic_notifier_call_chain(&fiq_nmi_chain, (unsigned long)regs, NULL);
+> >>>> +	nmi_exit();
+> >>>> +	set_irq_regs(old_regs);
+> >>>> +}
+> >>>
+> >>> Really not happy with this.  What happens if a FIQ occurs while we're
+> >>> inside register_fiq_nmi_notifier() - more specifically inside
+> >>> atomic_notifier_chain_register() ?
+> >>
+> >> Should depend on which side of the rcu update we're on.
+> > 
+> > I just asked Paul McKenney, our RCU expert... essentially, yes, RCU
+> > stuff itself is safe in this context.  However, RCU stuff can call into
+> > lockdep if lockdep is configured, and there are questions over lockdep.
+> > 
+> > There's some things which can be done to reduce the lockdep exposure
+> > to it, such as ensuring that rcu_read_lock() is first called outside
+> > of FIQ context.
+> > 
+> > There's concerns with whether either printk() in check_flags() could
+> > be reached too (flags there should always indicate that IRQs were
+> > disabled, so that reduces down to a question about just the first
+> > printk() there.)
+> > 
+> > There's also the very_verbose() stuff for RCU lockdep classes which
+> > Paul says must not be enabled.
+> > 
+> > Lastly, Paul isn't a lockdep expert, but he sees nothing that prevents
+> > lockdep doing the deadlock checking as a result of the above call.
+> > 
+> > So... this coupled with my feeling that notifiers make it too easy for
+> > unreviewed code to be hooked into this path, I'm fairly sure that we
+> > don't want to be calling atomic notifier chains from FIQ context.
+> 
+> Having esablished (elsewhere in the thread) that RCU usage is safe
+> from FIQ I have been working on the assumption that your feeling
+> regarding unreviewed code is sufficient on its own to avoid using
+> notifiers (and also to avoid a list of function pointers like on x86).
 
-On Tue, Sep 2, 2014 at 2:02 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
-> +LED sub-node properties:
+There was a later clarification from a lockdep expert showing that the
+code was in fact safe, so the notifier approach should be just fine.
+
+							Thanx, Paul
+
+> Therefore I have made the changes requested and produced a
+> before/after patch to show the impact of this. I will merge this
+> into the FIQ patchset shortly (I need to run a few more build tests
+> first).
+> 
+> Personally I still favour using notifiers and think the coupling below is
+> excessive. Nevertheless I've run a couple of basic tests on the code
+> below and it works fine.
+> 
+> 
+> diff --git a/arch/arm/include/asm/fiq.h b/arch/arm/include/asm/fiq.h
+> index 175bfed..a25c952 100644
+> --- a/arch/arm/include/asm/fiq.h
+> +++ b/arch/arm/include/asm/fiq.h
+> @@ -54,7 +54,6 @@ extern void disable_fiq(int fiq);
+>  extern int ack_fiq(int fiq);
+>  extern void eoi_fiq(int fiq);
+>  extern bool has_fiq(int fiq);
+> -extern int register_fiq_nmi_notifier(struct notifier_block *nb);
+>  extern void fiq_register_mapping(int irq, struct fiq_chip *chip);
+> 
+>  /* helpers defined in fiqasm.S: */
+> diff --git a/arch/arm/include/asm/kgdb.h b/arch/arm/include/asm/kgdb.h
+> index 6563da0..cb5ccd6 100644
+> --- a/arch/arm/include/asm/kgdb.h
+> +++ b/arch/arm/include/asm/kgdb.h
+> @@ -51,6 +51,7 @@ extern void kgdb_handle_bus_error(void);
+>  extern int kgdb_fault_expected;
+> 
+>  extern int kgdb_register_fiq(unsigned int fiq);
+> +extern void kgdb_handle_fiq(struct pt_regs *regs);
+> 
+>  #endif /* !__ASSEMBLY__ */
+> 
+> diff --git a/arch/arm/kernel/fiq.c b/arch/arm/kernel/fiq.c
+> index b2bd1c7..7422b58 100644
+> --- a/arch/arm/kernel/fiq.c
+> +++ b/arch/arm/kernel/fiq.c
+> @@ -43,12 +43,14 @@
+>  #include <linux/irq.h>
+>  #include <linux/radix-tree.h>
+>  #include <linux/slab.h>
+> +#include <linux/irqchip/arm-gic.h>
+> 
+>  #include <asm/cacheflush.h>
+>  #include <asm/cp15.h>
+>  #include <asm/exception.h>
+>  #include <asm/fiq.h>
+>  #include <asm/irq.h>
+> +#include <asm/kgdb.h>
+>  #include <asm/traps.h>
+> 
+>  #define FIQ_OFFSET ({					\
+> @@ -65,7 +67,6 @@ static unsigned long no_fiq_insn;
+>  static int fiq_start = -1;
+>  static RADIX_TREE(fiq_data_tree, GFP_KERNEL);
+>  static DEFINE_MUTEX(fiq_data_mutex);
+> -static ATOMIC_NOTIFIER_HEAD(fiq_nmi_chain);
+> 
+>  /* Default reacquire function
+>   * - we always relinquish FIQ control
+> @@ -218,17 +219,23 @@ bool has_fiq(int fiq)
+>  }
+>  EXPORT_SYMBOL(has_fiq);
+> 
+> -int register_fiq_nmi_notifier(struct notifier_block *nb)
+> -{
+> -	return atomic_notifier_chain_register(&fiq_nmi_chain, nb);
+> -}
+> -
+>  asmlinkage void __exception_irq_entry fiq_nmi_handler(struct pt_regs *regs)
+>  {
+>  	struct pt_regs *old_regs = set_irq_regs(regs);
+> 
+>  	nmi_enter();
+> -	atomic_notifier_call_chain(&fiq_nmi_chain, (unsigned long)regs, NULL);
 > +
-> +Required properties:
-> +- compatible : must be "register-bit-led"
-> +- offset : register offset to the register controlling this LED
-> +- mask : bit mask for the bit controlling this LED in the register
-
-Why don't you use a "reg" property with "#address-cells = <2>" and
-"#size-cells = <1>", so you can store offset and mask there?
-
-> +syscon: syscon at 10000000 {
-> +       compatible = "arm,realview-pb1176-syscon", "syscon";
-> +       reg = <0x10000000 0x1000>;
+> +	/* these callbacks deliberately avoid using a notifier chain in
+> +	 * order to ensure code review happens (drivers cannot "secretly"
+> +	 * employ FIQ without modifying this chain of calls).
+> +	 */
+> +#ifdef CONFIG_KGDB_FIQ
+> +	kgdb_handle_fiq(regs);
+> +#endif
+> +#ifdef CONFIG_ARM_GIC
+> +	gic_handle_fiq_ipi();
+> +#endif
 > +
-> +       led at 08.0 {
-> +               compatible = "register-bit-led";
-> +               offset = <0x08>;
-> +               mask = <0x01>;
-> +               label = "versatile:0";
-> +               linux,default-trigger = "heartbeat";
-> +               default-state = "on";
-> +       };
-
-ePAPR v1.1 says:
-
-"The unit-address must match the first address specified in the reg property
- of the node. If the node has no reg property, the @ and unit-address must
- be omitted ..."
-
-So you cannot have the "@8.0" without a "reg" property.
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+>  	nmi_exit();
+>  	set_irq_regs(old_regs);
+>  }
+> diff --git a/arch/arm/kernel/kgdb.c b/arch/arm/kernel/kgdb.c
+> index b77b885..630a3ef 100644
+> --- a/arch/arm/kernel/kgdb.c
+> +++ b/arch/arm/kernel/kgdb.c
+> @@ -312,12 +312,13 @@ struct kgdb_arch arch_kgdb_ops = {
+>  };
+> 
+>  #ifdef CONFIG_KGDB_FIQ
+> -static int kgdb_handle_fiq(struct notifier_block *nb, unsigned long arg,
+> -			   void *data)
+> +void kgdb_handle_fiq(struct pt_regs *regs)
+>  {
+> -	struct pt_regs *regs = (void *) arg;
+>  	int actual;
+> 
+> +	if (!kgdb_fiq)
+> +		return;
+> +
+>  	if (!kgdb_nmicallback(raw_smp_processor_id(), regs))
+>  		return NOTIFY_OK;
+> 
+> @@ -333,11 +334,6 @@ static int kgdb_handle_fiq(struct notifier_block *nb, unsigned long arg,
+>  	return NOTIFY_OK;
+>  }
+> 
+> -static struct notifier_block kgdb_fiq_notifier = {
+> -	.notifier_call = kgdb_handle_fiq,
+> -	.priority = 100,
+> -};
+> -
+>  int kgdb_register_fiq(unsigned int fiq)
+>  {
+>  	static struct fiq_handler kgdb_fiq_desc = { .name = "kgdb", };
+> @@ -357,7 +353,6 @@ int kgdb_register_fiq(unsigned int fiq)
+>  	}
+> 
+>  	kgdb_fiq = fiq;
+> -	register_fiq_nmi_notifier(&kgdb_fiq_notifier);
+> 
+>  	return 0;
+>  }
+> diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
+> index bda5a91..8821160 100644
+> --- a/drivers/irqchip/irq-gic.c
+> +++ b/drivers/irqchip/irq-gic.c
+> @@ -502,13 +502,17 @@ static void __init gic_init_fiq(struct gic_chip_data *gic,
+>  /*
+>   * Fully acknowledge (both ack and eoi) a FIQ-based IPI
+>   */
+> -static int gic_handle_fiq_ipi(struct notifier_block *nb, unsigned long regs,
+> -			   void *data)
+> +void gic_handle_fiq_ipi(void)
+>  {
+>  	struct gic_chip_data *gic = &gic_data[0];
+> -	void __iomem *cpu_base = gic_data_cpu_base(gic);
+> +	void __iomem *cpu_base;
+>  	unsigned long irqstat, irqnr;
+> 
+> +	if (!gic || !gic->fiq_enable)
+> +		return;
+> +
+> +	cpu_base = gic_data_cpu_base(gic);
+> +
+>  	if (WARN_ON(!in_nmi()))
+>  		return NOTIFY_BAD;
+> 
+> @@ -525,13 +529,6 @@ static int gic_handle_fiq_ipi(struct notifier_block *nb, unsigned long regs,
+> 
+>  	return NOTIFY_OK;
+>  }
+> -
+> -/*
+> - * Notifier to ensure IPI FIQ is acknowledged correctly.
+> - */
+> -static struct notifier_block gic_fiq_ipi_notifier = {
+> -	.notifier_call = gic_handle_fiq_ipi,
+> -};
+>  #else /* CONFIG_FIQ */
+>  static inline void gic_set_group_irq(void __iomem *base, unsigned int hwirq,
+>  				     int group) {}
+> @@ -1250,10 +1247,6 @@ void __init gic_init_bases(unsigned int gic_nr, int irq_start,
+>  #ifdef CONFIG_SMP
+>  		set_smp_cross_call(gic_raise_softirq);
+>  		register_cpu_notifier(&gic_cpu_notifier);
+> -#ifdef CONFIG_FIQ
+> -		if (gic_data_fiq_enable(gic))
+> -			register_fiq_nmi_notifier(&gic_fiq_ipi_notifier);
+> -#endif
+>  #endif
+>  		set_handle_irq(gic_handle_irq);
+>  	}
+> diff --git a/include/linux/irqchip/arm-gic.h b/include/linux/irqchip/arm-gic.h
+> index 45e2d8c..52a5676 100644
+> --- a/include/linux/irqchip/arm-gic.h
+> +++ b/include/linux/irqchip/arm-gic.h
+> @@ -101,5 +101,8 @@ static inline void __init register_routable_domain_ops
+>  {
+>  	gic_routable_irq_domain_ops = ops;
+>  }
+> +
+> +void gic_handle_fiq_ipi(void);
+> +
+>  #endif /* __ASSEMBLY */
+>  #endif
+> 
+> 
