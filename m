@@ -1,53 +1,84 @@
-From: edubezval@gmail.com (edubezval at gmail.com)
-Date: Tue, 2 Sep 2014 07:53:14 -0400
-Subject: [Patch v3] 3/7] thermal: Remove ARCH_KIRKWOOD dependency
-In-Reply-To: <1409417172-6846-4-git-send-email-andrew@lunn.ch>
-References: <1409417172-6846-1-git-send-email-andrew@lunn.ch>
- <1409417172-6846-4-git-send-email-andrew@lunn.ch>
-Message-ID: <CAC-25o8UaK0gdysSk399Y29OAcQikDerc0b8xbzLiPjT44p0ew@mail.gmail.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Tue, 2 Sep 2014 19:54:43 +0800
+Subject: Formal license ambiguity in arch/arm/boot/dts/sun?i-a*.dts
+In-Reply-To: <20140902104002.GN30401@n2100.arm.linux.org.uk>
+References: <20140731192016.GA6869@excalibur.cnev.de>
+ <20140803130430.GY3952@lukather>
+ <201408031959.27607.arnd@arndb.de> <20140804192510.GF3952@lukather>
+ <20140804212317.GL30282@n2100.arm.linux.org.uk>
+ <20140807132023.GG15297@lukather> <20140902102206.GU15297@lukather>
+ <20140902104002.GN30401@n2100.arm.linux.org.uk>
+Message-ID: <CAGb2v65oOWF_gf4EQAx+4NYWCQYpPHaZ5ng=p780OFeDba0QKA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Andrew,
-
-On Sat, Aug 30, 2014 at 12:46 PM, Andrew Lunn <andrew@lunn.ch> wrote:
-> mach-kirkwood has been removed, now that kirkwood lives in mach-mvebu.
-> Depend on MACH_KIRKWOOD, which will be set when kirkwood is built as
-> part of ARCH_MVEBU.
+On Tue, Sep 2, 2014 at 6:40 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Tue, Sep 02, 2014 at 12:22:06PM +0200, Maxime Ripard wrote:
+>> On Thu, Aug 07, 2014 at 03:20:23PM +0200, Maxime Ripard wrote:
+>> > Hi Russell,
+>> >
+>> > On Mon, Aug 04, 2014 at 10:23:17PM +0100, Russell King - ARM Linux wrote:
+>> > > On Mon, Aug 04, 2014 at 09:25:10PM +0200, Maxime Ripard wrote:
+>> > > > On Sun, Aug 03, 2014 at 07:59:27PM +0200, Arnd Bergmann wrote:
+>> > > > > I would actually prefer if we could migrate a lot of these files to BSD license,
+>> > > > > provided the original authors agree. We want the dtb blobs to be embeddable into
+>> > > > > boot loaders of any license.
+>> > > >
+>> > > > Even though I'd be open to having my contributions to DTBs under the
+>> > > > BSD, is this really a thing?
+>> > > >
+>> > > > I mean, for all I know, an OS/Bootloader would just parse a documented
+>> > > > binary file, and I don't see any derivative work there.
+>> > >
+>> > > How does the OS/Bootloader end up with that binary file?
+>> > >
+>> > > For the sake of argument, let's say that the BSDs want to move to DT on
+>> > > ARM.  Great, they convert over to parsing our DT blobs.
+>> > >
+>> > > However, they can't distribute the binary DT blobs to their users without
+>> > > coming up against the problems of the GPL wrt binary distribution.
+>> > >
+>> > > They could distribute the source files, but remember that many of those
+>> > > are currently GPL licensed, so they'd probably end up having to package
+>> > > them entirely separately, if they're willing to do that at all.
+>> > >
+>> > > Or they could decide to ignore us altogether, and do their own DT stuff,
+>> > > maybe partially implementing our properties, or maybe coming up with
+>> > > different and/or incompatible properties - which would be bad because
+>> > > we now end up with two ways to describe the same hardware in active use.
+>> > >
+>> > > I suspect the final option is the one they'd choose, and it's in our
+>> > > interest that _that_ doesn't happen.
+>> >
+>> > Ah, yes, it's not really about a fear of a GPL-spread, but rather a
+>> > concern about the source distribution. Makes sense.
+>> >
+>> > How should we deal with such relicensing?
+>>
+>> Ping?
+>>
+>> Are we doing this on a per platform basis? Should we enforce this dual
+>> licensing for the future DTS patches? If so, starting from when?
 >
-> Signed-off-by: Andrew Lunn <andrew@lunn.ch>
-> Cc: Zhang Rui <rui.zhang@intel.com>
-> Cc: linux-pm at vger.kernel.org
-> ---
->  drivers/thermal/Kconfig | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+> I have no answers to your questions - I put the question a number of
+> times to Grant directly, and have been totally ignored.
 >
-> diff --git a/drivers/thermal/Kconfig b/drivers/thermal/Kconfig
-> index 693208eb9047..ef5587fe2c69 100644
-> --- a/drivers/thermal/Kconfig
-> +++ b/drivers/thermal/Kconfig
-> @@ -143,7 +143,7 @@ config RCAR_THERMAL
+> So, I think we just do whatever we think is the correct approach.
 >
->  config KIRKWOOD_THERMAL
->         tristate "Temperature sensor on Marvell Kirkwood SoCs"
-> -       depends on ARCH_KIRKWOOD || MACH_KIRKWOOD
-> +       depends on MACH_KIRKWOOD
+> Remember, when you change the licensing on something which has had
+> multiple contributors, you need to seek the permission from everyone
+> how contributed to it - so it will have to be done on a per platform
+> and per-SoC basis.
 
-I have no objections with this change. So, wrt thermal:
-Acked-by: Eduardo Valentin <edubezval@gmail.com>
+Is there any particular order for any platform or SoC?
+Maybe we have to do the dependencies (dtsi) first?
 
->         depends on OF
->         help
->           Support for the Kirkwood thermal sensor driver into the Linux thermal
-> --
-> 2.1.0
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-pm" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+It seems skeleton.dtsi and skeleton64.dtsi don't have explicit license
+headers. Do these 2 need to be addressed as well?
 
+ChenYu
 
-
--- 
-Eduardo Bezerra Valentin
+> I would also strongly suggest that future DTS files should be dual
+> licensed from the start, and that we require contributions for the
+> DTS files to be under both licenses.
