@@ -1,52 +1,54 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Wed, 03 Sep 2014 01:00:23 +0200
-Subject: [Linaro-acpi] [RFC PATCH for Juno 1/2] net: smsc911x add support
- for probing from ACPI
-In-Reply-To: <20140902162606.GX29327@sirena.org.uk>
-References: <1409583961-7466-1-git-send-email-hanjun.guo@linaro.org>
- <4816592.tj3on6vUaC@wuerfel> <20140902162606.GX29327@sirena.org.uk>
-Message-ID: <2913007.3xRNb2X4ts@vostro.rjw.lan>
+From: computersforpeace@gmail.com (Brian Norris)
+Date: Tue, 2 Sep 2014 15:44:00 -0700
+Subject: [PATCH v8 03/11] ARM: brcmstb: add debug UART for earlyprintk
+ support
+In-Reply-To: <54064323.3090406@gmail.com>
+References: <1405976886-27807-1-git-send-email-computersforpeace@gmail.com>
+ <1405976886-27807-4-git-send-email-computersforpeace@gmail.com>
+ <20140802083040.GY30282@n2100.arm.linux.org.uk>
+ <20140804165627.GT3711@ld-irv-0074>
+ <CAN8TOE8w5bUT5byHiJrYr8AzaZ+EADzE+aoH6f2x2tFc1+1eQw@mail.gmail.com>
+ <CAOesGMh5wX5eaCmPvXQs4fmNQsD+370P=O8PSdH2oMHKL_neDQ@mail.gmail.com>
+ <54064323.3090406@gmail.com>
+Message-ID: <20140902224400.GY18411@ld-irv-0074>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, September 02, 2014 05:26:06 PM Mark Brown wrote:
+On Tue, Sep 02, 2014 at 03:22:27PM -0700, Florian Fainelli wrote:
+> On 08/13/2014 03:16 PM, Olof Johansson wrote:
 > 
-> --s3puAW9DMBtS2ARW
-> Content-Type: text/plain; charset=us-ascii
-> Content-Disposition: inline
+> [snip]
 > 
-> On Tue, Sep 02, 2014 at 03:42:53PM +0200, Arnd Bergmann wrote:
+> >>>> I noticed that you sent this to the patch system.  I asked Olof last
+> >>>> night whether he had anything in arm-soc touching Kconfig.debug, and
+> >>>> he does (a number of other platforms have updated it.)  This means
+> >>>> that if I apply it to my tree, it may conflict, so I'm reluctant to
+> >>>> take it.
+> >>>
+> >>> OK... Matt told me that such patches go through you. So which is it?
+> >>> Should all Kconfig.debug patches go through the arm-soc route?
+> >>
+> >> How should this get in? Should I rebase/resend through Matt and
+> >> arm-soc? Or can you pick this up as-is?
+> > 
+> > Kconfig.debug is something that we usually merge new platforms for
+> > through arm-soc. The main exception has been release cycles when
+> > Russell has been doing major surgery on the file (one of those was a
+> > few releases ago), where we've backed off to avoid conflicts.
+> > 
+> > That's been the assumed arrangement from our side at least, we haven't
+> > had anything more formal than that.
+> > 
+> > So, go ahead and send it through us -- if we end up having a cycle
+> > where we can't apply it we can send it over to Russell for you.
 > 
-> > The way I recall the discussion, most people were on one extreme
-> > side of the discussion or the other:
-> 
-> > a) We should use _DSD for ARM64 servers to maximize code reuse with
-> > DT-enabled drivers, work around the slow UEFI standardization process,
-> > remain in control of the actual bindings, and avoid the need for
-> > endless per-ID platform-data definitions in drivers.
-> 
-> > b) We should never use _DSD at all, since doing that would have no
-> > advantage over using DT directly, and we should force every device
-> > manufacturer to specify their bindings in an official ACPI document
-> > to prevent random incompatible bindings from being established.
-> > Any device that shows up in servers should not need arbitrary detailed
-> > properties anyway, as the details are supposed to be hidden in AML.
-> 
-> > I can understand the reasons for both approaches, and I find it hard
-> > to say either one is invalid. However, the worst possible outcome in
-> > my opinion would be having to support a mix of the two.
-> 
-> Right, and the x86 embedded folks are going full steam ahead with _DSD
-> regardless so it seems there will be some systems out there using it
-> even if they're not ARM servers.
+> It looks like somehow, this patch got lost somewhere in the submission
+> process. Is it too late to accept it for 3.17 if we were to re-submit it?
 
-Our intention is specifically not to use "random incompatible bindings"
-in that.  We'd rather have a common venue and process for establishing
-new bindings for both DT and _DSD in a compatible way.
+I already resubmitted this weeks ago:
 
-Rafael
+  http://article.gmane.org/gmane.linux.ports.arm.kernel/348468
 
+No comment / action so far.
 
--- 
-I speak only for myself.
-Rafael J. Wysocki, Intel Open Source Technology Center.
+Brian
