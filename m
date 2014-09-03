@@ -1,213 +1,96 @@
-From: vincent.guittot@linaro.org (Vincent Guittot)
-Date: Wed, 3 Sep 2014 13:44:58 +0200
-Subject: [PATCH v5 08/12] sched: move cfs task on a CPU with higher
- capacity
-In-Reply-To: <5406DB43.1030506@linux.vnet.ibm.com>
-References: <1409051215-16788-1-git-send-email-vincent.guittot@linaro.org>
- <1409051215-16788-9-git-send-email-vincent.guittot@linaro.org>
- <54020F00.2030807@linux.vnet.ibm.com>
- <CAKfTPtBq89SX=7=bXu2za7oXi1Lid_5ara-WputrtE8kCqcZcw@mail.gmail.com>
- <5406DB43.1030506@linux.vnet.ibm.com>
-Message-ID: <CAKfTPtCXBYSbXVgdeyMtvuK8aZaRBzhs9S3=+V2jvXnoCJFqBQ@mail.gmail.com>
+From: boris.brezillon@free-electrons.com (Boris BREZILLON)
+Date: Wed, 3 Sep 2014 13:46:52 +0200
+Subject: [PATCH 3/5] ARM: sun6i: Relicense the A31 DTSI under GPLv2/X11
+In-Reply-To: <1409682069-7164-3-git-send-email-maxime.ripard@free-electrons.com>
+References: <1409682069-7164-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1409682069-7164-3-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <20140903134652.79e4e07f@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 3 September 2014 11:11, Preeti U Murthy <preeti@linux.vnet.ibm.com> wrote:
-> On 09/01/2014 02:15 PM, Vincent Guittot wrote:
->> On 30 August 2014 19:50, Preeti U Murthy <preeti@linux.vnet.ibm.com> wrote:
->>> Hi Vincent,
->>>> index 18db43e..60ae1ce 100644
->>>> --- a/kernel/sched/fair.c
->>>> +++ b/kernel/sched/fair.c
->>>> @@ -6049,6 +6049,14 @@ static bool update_sd_pick_busiest(struct lb_env *env,
->>>>                       return true;
->>>>       }
->>>>
->>>> +     /*
->>>> +      * The group capacity is reduced probably because of activity from other
->>>> +      * sched class or interrupts which use part of the available capacity
->>>> +      */
->>>> +     if ((sg->sgc->capacity_orig * 100) > (sgs->group_capacity *
->>>> +                             env->sd->imbalance_pct))
->>>
->>> Wouldn't the check on avg_load let us know if we are packing more tasks
->>> in this group than its capacity ? Isn't that the metric we are more
->>> interested in?
->>
->> With  this patch, we don't want to pack but we prefer to spread the
->> task on another CPU than the one which handles the interruption if
->> latter uses a significant part of the CPU capacity.
->>
->>>
->>>> +             return true;
->>>> +
->>>>       return false;
->>>>  }
->>>>
->>>> @@ -6534,13 +6542,23 @@ static int need_active_balance(struct lb_env *env)
->>>>       struct sched_domain *sd = env->sd;
->>>>
->>>>       if (env->idle == CPU_NEWLY_IDLE) {
->>>> +             int src_cpu = env->src_cpu;
->>>>
->>>>               /*
->>>>                * ASYM_PACKING needs to force migrate tasks from busy but
->>>>                * higher numbered CPUs in order to pack all tasks in the
->>>>                * lowest numbered CPUs.
->>>>                */
->>>> -             if ((sd->flags & SD_ASYM_PACKING) && env->src_cpu > env->dst_cpu)
->>>> +             if ((sd->flags & SD_ASYM_PACKING) && src_cpu > env->dst_cpu)
->>>> +                     return 1;
->>>> +
->>>> +             /*
->>>> +              * If the CPUs share their cache and the src_cpu's capacity is
->>>> +              * reduced because of other sched_class or IRQs, we trig an
->>>> +              * active balance to move the task
->>>> +              */
->>>> +             if ((capacity_orig_of(src_cpu) * 100) > (capacity_of(src_cpu) *
->>>> +                             sd->imbalance_pct))
->>>>                       return 1;
->>>>       }
->>>>
->>>> @@ -6643,6 +6661,8 @@ static int load_balance(int this_cpu, struct rq *this_rq,
->>>>
->>>>       schedstat_add(sd, lb_imbalance[idle], env.imbalance);
->>>>
->>>> +     env.src_cpu = busiest->cpu;
->>>> +
->>>>       ld_moved = 0;
->>>>       if (busiest->nr_running > 1) {
->>>>               /*
->>>> @@ -6652,7 +6672,6 @@ static int load_balance(int this_cpu, struct rq *this_rq,
->>>>                * correctly treated as an imbalance.
->>>>                */
->>>>               env.flags |= LBF_ALL_PINNED;
->>>> -             env.src_cpu   = busiest->cpu;
->>>>               env.src_rq    = busiest;
->>>>               env.loop_max  = min(sysctl_sched_nr_migrate, busiest->nr_running);
->>>>
->>>> @@ -7359,10 +7378,12 @@ static void nohz_idle_balance(struct rq *this_rq, enum cpu_idle_type idle)
->>>>
->>>>  /*
->>>>   * Current heuristic for kicking the idle load balancer in the presence
->>>> - * of an idle cpu is the system.
->>>> + * of an idle cpu in the system.
->>>>   *   - This rq has more than one task.
->>>> - *   - At any scheduler domain level, this cpu's scheduler group has multiple
->>>> - *     busy cpu's exceeding the group's capacity.
->>>> + *   - This rq has at least one CFS task and the capacity of the CPU is
->>>> + *     significantly reduced because of RT tasks or IRQs.
->>>> + *   - At parent of LLC scheduler domain level, this cpu's scheduler group has
->>>> + *     multiple busy cpu.
->>>>   *   - For SD_ASYM_PACKING, if the lower numbered cpu's in the scheduler
->>>>   *     domain span are idle.
->>>>   */
->>>> @@ -7372,9 +7393,10 @@ static inline int nohz_kick_needed(struct rq *rq)
->>>>       struct sched_domain *sd;
->>>>       struct sched_group_capacity *sgc;
->>>>       int nr_busy, cpu = rq->cpu;
->>>> +     bool kick = false;
->>>>
->>>>       if (unlikely(rq->idle_balance))
->>>> -             return 0;
->>>> +             return false;
->>>>
->>>>         /*
->>>>       * We may be recently in ticked or tickless idle mode. At the first
->>>> @@ -7388,38 +7410,45 @@ static inline int nohz_kick_needed(struct rq *rq)
->>>>        * balancing.
->>>>        */
->>>>       if (likely(!atomic_read(&nohz.nr_cpus)))
->>>> -             return 0;
->>>> +             return false;
->>>>
->>>>       if (time_before(now, nohz.next_balance))
->>>> -             return 0;
->>>> +             return false;
->>>>
->>>>       if (rq->nr_running >= 2)
->>>
->>> Will this check ^^ not catch those cases which this patch is targeting?
->>
->> This patch is not about how many tasks are running but if the capacity
->> of the CPU is reduced because of side activity like interruptions
->> which are only visible in the capacity value (with IRQ_TIME_ACCOUNTING
->> config) but not in nr_running.
->> Even if the capacity is reduced because of RT tasks, nothing ensures
->> that the RT task will be running when the tick fires
->>
->> Regards,
->> Vincent
->>>
->>> Regards
->>> Preeti U Murthy
->>>
->>>> -             goto need_kick;
->>>> +             return true;
->>>>
->>>>       rcu_read_lock();
->>>>       sd = rcu_dereference(per_cpu(sd_busy, cpu));
->>>> -
->>>>       if (sd) {
->>>>               sgc = sd->groups->sgc;
->>>>               nr_busy = atomic_read(&sgc->nr_busy_cpus);
->>>>
->>>> -             if (nr_busy > 1)
->>>> -                     goto need_kick_unlock;
->>>> +             if (nr_busy > 1) {
->>>> +                     kick = true;
->>>> +                     goto unlock;
->>>> +             }
->>>> +
->>>>       }
->>>>
->>>> -     sd = rcu_dereference(per_cpu(sd_asym, cpu));
->>>> +     sd = rcu_dereference(rq->sd);
->>>> +     if (sd) {
->>>> +             if ((rq->cfs.h_nr_running >= 1) &&
->>>> +                             ((rq->cpu_capacity * sd->imbalance_pct) <
->>>> +                             (rq->cpu_capacity_orig * 100))) {
->
-> Ok I understand your explanation above. But I was wondering if you would
-> need to add this check around rq->cfs.h_nr_running >= 1 in the above two
-> cases as well.
+On Tue,  2 Sep 2014 20:21:07 +0200
+Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
 
-yes you're right for the test if (rq->nr_running >= 2).
+> The current GPL only licensing on the DTSI makes it very impractical for other
+> software components licensed under another license.
+> 
+> In order to make it easier for them to reuse our device trees, relicense our
+> DTSI first under a GPL/X11 dual-license. Hopefully, the DTS will follow soon.
+> 
 
-It's not so straight forward for nr_busy_cpus which reflects how many
-CPUs have not stopped their tick. The scheduler assumes that the
-latter are busy with cfs tasks
+Acked-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 
->
-> I have actually raised this concern over whether we should be using
-> rq->nr_running or cfs_rq->nr_running while we do load balancing in reply
-> to your patch3. While all our load measurements are about the cfs_rq
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> Cc: Boris BREZILLON <boris.brezillon@free-electrons.com>
+> Cc: Carlo Caione <carlo@caione.org>
+> Cc: Chen-Yu Tsai <wens@csie.org>
+> Cc: Hans de Goede <hdegoede@redhat.com>
+> ---
+>  arch/arm/boot/dts/sun6i-a31.dtsi | 46 +++++++++++++++++++++++++++++++++++-----
+>  1 file changed, 41 insertions(+), 5 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/sun6i-a31.dtsi b/arch/arm/boot/dts/sun6i-a31.dtsi
+> index 1c2ec913e650..eb686e78f225 100644
+> --- a/arch/arm/boot/dts/sun6i-a31.dtsi
+> +++ b/arch/arm/boot/dts/sun6i-a31.dtsi
+> @@ -3,12 +3,48 @@
+>   *
+>   * Maxime Ripard <maxime.ripard@free-electrons.com>
+>   *
+> - * The code contained herein is licensed under the GNU General Public
+> - * License. You may obtain a copy of the GNU General Public License
+> - * Version 2 or later at the following locations:
+> + * This file is dual-licensed: you can use it either under the terms
+> + * of the GPL or the X11 license, at your option. Note that this dual
+> + * licensing only applies to this file, and not this project as a
+> + * whole.
+>   *
+> - * http://www.opensource.org/licenses/gpl-license.html
+> - * http://www.gnu.org/copyleft/gpl.html
+> + *  a) This library is free software; you can redistribute it and/or
+> + *     modify it under the terms of the GNU General Public License as
+> + *     published by the Free Software Foundation; either version 2 of the
+> + *     License, or (at your option) any later version.
+> + *
+> + *     This library is distributed in the hope that it will be useful,
+> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + *     GNU General Public License for more details.
+> + *
+> + *     You should have received a copy of the GNU General Public
+> + *     License along with this library; if not, write to the Free
+> + *     Software Foundation, Inc., 51 Franklin St, Fifth Floor, Boston,
+> + *     MA 02110-1301 USA
+> + *
+> + * Or, alternatively,
+> + *
+> + *  b) Permission is hereby granted, free of charge, to any person
+> + *     obtaining a copy of this software and associated documentation
+> + *     files (the "Software"), to deal in the Software without
+> + *     restriction, including without limitation the rights to use,
+> + *     copy, modify, merge, publish, distribute, sublicense, and/or
+> + *     sell copies of the Software, and to permit persons to whom the
+> + *     Software is furnished to do so, subject to the following
+> + *     conditions:
+> + *
+> + *     The above copyright notice and this permission notice shall be
+> + *     included in all copies or substantial portions of the Software.
+> + *
+> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+> + *     OTHER DEALINGS IN THE SOFTWARE.
+>   */
+>  
+>  /include/ "skeleton.dtsi"
 
-I have just replied to your comments on patch 3. Sorry for the delay
 
-> load, we use rq->nr_running, which may include tasks from other sched
-> classes as well. We divide them to get average load per task during load
-> balancing which is wrong, isn't it? Similarly during nohz_kick_needed(),
-> we trigger load balancing based on rq->nr_running again.
->
-> In this patch too, even if you know that the cpu is being dominated by
-> tasks that do not belong to cfs class, you would be triggering a futile
-> load balance if there are no fair tasks to move.
-This patch adds one additional condition that is based on
-rq->cfs.h_nr_running so it should not trigger any futile load balance.
-Then, I have also take advantage of this patch to clean up
-nohz_kick_needed as proposed by Peter but the conditions are the same
-than previously (except the one with rq->cfs.h_nr_running)
 
-I can prepare another patchset that will solve the concerns that you
-raised for nohz_kick_needed and in patch 3 but i would prefer not
-include them in this patchset which is large enough and which subject
-is a bit different.
-Does it seem ok for you ?
-
-Regards,
-Vincent
->
-> Regards
-> Preeti U Murthy
->
+-- 
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
