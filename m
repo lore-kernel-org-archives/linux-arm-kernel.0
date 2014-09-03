@@ -1,56 +1,35 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 3 Sep 2014 16:48:22 +0100
-Subject: [GIT PULL] iommu/arm-smmu: fixes for 3.17
-Message-ID: <20140903154822.GG32378@arm.com>
+From: gang.chen.5i5j@gmail.com (Chen Gang)
+Date: Wed, 03 Sep 2014 23:50:31 +0800
+Subject: [PATCH] drivers/usb/host/ehci-xilinx-of.c: Include "linux/of_irq.h"
+ to avoid compiling error
+Message-ID: <540738C7.5000106@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Joerg,
+Need include it for irq_of_parse_and_map(), the related error with
+allmodconfig under microblaze:
 
-Please can you pull the following arm-smmu fixes for 3.17? They address
-a variety of issues found by running the driver on more hardware and
-also by the vSMMU work I've been doing.
+  drivers/usb/host/ehci-xilinx-of.c: In function ?ehci_hcd_xilinx_of_probe?:
+  drivers/usb/host/ehci-xilinx-of.c:156:2: error: implicit declaration of function ?irq_of_parse_and_map? [-Werror=implicit-function-declaration]
+    irq = irq_of_parse_and_map(dn, 0);
+    ^
 
-The only change from the series I posted to the list [1] is that I've
-re-ordered the patches to put the stable candidates first.
+Signed-off-by: Chen Gang <gang.chen.5i5j@gmail.com>
+---
+ drivers/usb/host/ehci-xilinx-of.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-Cheers,
-
-Will
-
-[1] http://lists.linuxfoundation.org/pipermail/iommu/2014-August/009644.html
-
---->8
-
-The following changes since commit 69e273c0b0a3c337a521d083374c918dc52c666f:
-
-  Linux 3.17-rc3 (2014-08-31 18:23:04 -0700)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/will/linux.git for-joerg/arm-smmu/fixes
-
-for you to fetch changes up to 4d09d99d543ec28b2280a1f62382697f47ea6366:
-
-  iommu/arm-smmu: fix corner cases in address size calculations (2014-09-02 10:04:43 +0100)
-
-----------------------------------------------------------------
-Hans Wennborg (1):
-      iommu/arm-smmu: fix decimal printf format specifiers prefixed with 0x
-
-Mitchel Humpherys (1):
-      iommu/arm-smmu: avoid calling request_irq in atomic context
-
-Olav Haugan (2):
-      iommu/arm-smmu: fix programming of SMMU_CBn_TCR for stage 1
-      iommu/arm-smmu: Do not access non-existing S2CR registers
-
-Vladimir Murzin (1):
-      iommu/arm-smmu: remove pgtable_page_{c,d}tor()
-
-Will Deacon (2):
-      iommu/arm-smmu: fix s2cr and smr teardown on device detach from domain
-      iommu/arm-smmu: fix corner cases in address size calculations
-
- drivers/iommu/arm-smmu.c | 127 +++++++++++++++++++++++++++--------------------
- 1 file changed, 73 insertions(+), 54 deletions(-)
+diff --git a/drivers/usb/host/ehci-xilinx-of.c b/drivers/usb/host/ehci-xilinx-of.c
+index fe57710..a232836 100644
+--- a/drivers/usb/host/ehci-xilinx-of.c
++++ b/drivers/usb/host/ehci-xilinx-of.c
+@@ -31,6 +31,7 @@
+ #include <linux/of.h>
+ #include <linux/of_platform.h>
+ #include <linux/of_address.h>
++#include <linux/of_irq.h>
+ 
+ /**
+  * ehci_xilinx_port_handed_over - hand the port out if failed to enable it
+-- 
+1.9.3
