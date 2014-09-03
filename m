@@ -1,64 +1,52 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Thu, 04 Sep 2014 01:31:21 +0900
-Subject: [PATCH v2 5/7] arm64: dts: Add initial device tree support for
- EXYNOS7
-In-Reply-To: <3382034.5ADO0F7naY@wuerfel>
-References: <1409672143-8574-1-git-send-email-ch.naveen@samsung.com>
- <1409672143-8574-6-git-send-email-ch.naveen@samsung.com>
- <036a01cfc792$422271e0$c66755a0$@samsung.com> <3382034.5ADO0F7naY@wuerfel>
-Message-ID: <043401cfc794$7f228650$7d6792f0$@samsung.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 3 Sep 2014 17:31:30 +0100
+Subject: [PATCH V3 0/6] ARM64: Add support for FSL's LS2085A SoC
+In-Reply-To: <2843702.jP4KCB2Kid@wuerfel>
+References: <1409757194-28155-1-git-send-email-bhupesh.sharma@freescale.com>
+ <2961958.2caI26WGbt@wuerfel> <20140903160936.GL3127@leverpostej>
+ <2843702.jP4KCB2Kid@wuerfel>
+Message-ID: <20140903163130.GM3127@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd Bergmann wrote:
+On Wed, Sep 03, 2014 at 05:18:42PM +0100, Arnd Bergmann wrote:
+> On Wednesday 03 September 2014 17:09:36 Mark Rutland wrote:
+> > On Wed, Sep 03, 2014 at 05:05:51PM +0100, Arnd Bergmann wrote:
+> > > On Wednesday 03 September 2014 16:56:55 Mark Rutland wrote:
+> > > > Personally I'd like to see such things patched by the firmware/loader
+> > > > where possible (ideally with some way of switching said patching off if
+> > > > we really know better). We already expect the loader to patch memory
+> > > > nodes where memory can be dynamically populated. 
+> > > > 
+> > > > I don't see why we should tie the in-kernel dts to a particular firmware
+> > > > revision. Having such properties in the in-kernel dts is only going to
+> > > > mislead. The arm64 boot-wrapper patches dts for PSCI, but for
+> > > > compatibility with old wrappers the in-kernel dts must forever say
+> > > > spin-table is used to bring up secondaries.
+> > > 
+> > > But the kernel has never supported this platform with a non-PSCI
+> > > enable method, why should we provide compatibility for something
+> > > we never had upstream?
+> > 
+> > I'm not arguing we should.
+> > 
+> > What I'm suggesting is there wouldn't be an enable-method at all (so we
+> > won't bring up secondaries at all unless that's patched).
 > 
-Hi, Arnd
+> Ok, I see the appeal in forcing boot loaders to put some patch
+> up the dtbs with whatever software interfaces they provide.
+> What I'm interested in however is making it harder for the boot
+> loader to use something other than psci.
 
-> On Thursday 04 September 2014 01:15:20 Kukjin Kim wrote:
-> > Naveen Krishna Chatradhi wrote:
-> >
-> > > diff --git a/arch/arm64/boot/dts/exynos/exynos7-espresso.dts b/arch/arm64/boot/dts/exynos/exynos7-
-> > > espresso.dts
-> > > new file mode 100644
-> > > index 0000000..f6a8879
-> > > --- /dev/null
-> > > +++ b/arch/arm64/boot/dts/exynos/exynos7-espresso.dts
-> > > @@ -0,0 +1,31 @@
-> > > +/*
-> > > + * SAMSUNG Exynos7 Espresso board device tree source
-> > > + *
-> > > + * Copyright (c) 2014 Samsung Electronics Co., Ltd.
-> > > + *		http://www.samsung.com
-> > > + *
-> > > + * This program is free software; you can redistribute it and/or modify
-> > > + * it under the terms of the GNU General Public License version 2 as
-> > > + * published by the Free Software Foundation.
-> > > +*/
-> > > +
-> > > +/dts-v1/;
-> > > +#include "exynos7.dtsi"
-> > > +
-> > > +/ {
-> > > +	model = "Samsung Exynos7 Espresso board based on EXYNOS7";
-> > > +	compatible = "samsung,exynos7-espresso", "samsung,exynos7";
-> > > +
-> > > +	chosen {
-> > > +		linux,stdout-path = &serial_2;
-> >
-> > Well...
-> >
-> > > +	};
-> > > +
-> > > +	memory at 40000000 {
-> > > +		device_type = "memory";
-> > > +		reg = <0x0 0x40000000 0x0 0xC0000000>;
-> >
-> > The base address of system memory is depending on each board, actually some of
-> > them are 0x20000000.
-> 
-> This is the board specific file, so it seems ok.
-> 
-I mean there are many espresso boards are having different exynos7 SoC. I mean
-exynos7-espresso cannot represent all of espresso boards.
+I see.
 
-- Kukjin
+I agree that we presently want systems to implement PSCI (0.2+), and we
+certainly do not want anything that's platform-specific.
+
+However, I'm not sure I follow the reasoning for making this
+significantly harder, and even ignoring that I don't think this does
+make things significantly harder. Especially so if we have a PSCI node
+but not an enable method -- in that case its trivial to patch in an
+unrelated enable-method anyhow.
+
+Mark.
