@@ -1,66 +1,61 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Wed, 03 Sep 2014 14:20:50 +0200
-Subject: [PATCH v4 1/4] ethernet: arc: Add support for Rockchip SoC layer
- device tree bindings
-In-Reply-To: <3774938.44qiV4hEoE@wuerfel>
-References: <1409740036-8117-1-git-send-email-romain.perier@gmail.com>
- <3774938.44qiV4hEoE@wuerfel>
-Message-ID: <12261801.xhz3LcucGs@diego>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 03 Sep 2014 13:21:07 +0100
+Subject: [PATCH v2 00/26] genirq: fix use of irq_find_mapping outside
+ of legal RCU context
+In-Reply-To: <alpine.DEB.2.10.1409031409160.3333@nanos>
+References: <1409047421-27649-1-git-send-email-marc.zyngier@arm.com>
+ <alpine.DEB.2.10.1408262333420.3323@nanos>
+ <87y4uap98n.fsf@approximate.cambridge.arm.com>
+ <20140903120406.GK30467@titan.lakedaemon.net>
+ <alpine.DEB.2.10.1409031409160.3333@nanos>
+Message-ID: <540707B3.4050305@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Mittwoch, 3. September 2014, 13:14:54 schrieb Arnd Bergmann:
-> On Wednesday 03 September 2014 10:27:13 Romain Perier wrote:
-> > +static const struct emac_rockchip_soc_data emac_rockchip_dt_data[] = {
-> > +       { .grf_offset = 0x154 }, /* rk3066 */
-> > +       { .grf_offset = 0x0a4 }, /* rk3188 */
-> > +};
-> > +
-> > +static const struct of_device_id emac_rockchip_dt_ids[] = {
-> > +       { .compatible = "rockchip,rk3066-emac", .data =
-> > &emac_rockchip_dt_data[0] }, +       { .compatible =
-> > "rockchip,rk3188-emac", .data = &emac_rockchip_dt_data[1] }, +       { /*
-> > Sentinel */ }
-> > +};
-> > +
+[Dropping linux at openrisc.net from the CC list]
+
+On 03/09/14 13:09, Thomas Gleixner wrote:
+> On Wed, 3 Sep 2014, Jason Cooper wrote:
 > 
-> One last question: is this the location given as .grf_offset the
-> only thing in grf that is potentially of concern to this driver?
+>> On Wed, Aug 27, 2014 at 10:33:44AM +0100, Marc Zyngier wrote:
+>>> Hi Thomas,
+>>>
+>>> On Tue, Aug 26 2014 at 10:34:51 pm BST, Thomas Gleixner <tglx@linutronix.de> wrote:
+>>>> On Tue, 26 Aug 2014, Marc Zyngier wrote:
+>>>>
+>>>>> A number of irqchip drivers are directly calling irq_find_mapping,
+>>>>> which may use a rcu_read_lock call when walking the radix tree.
+>>>>>
+>>>>> Turns out that if you hit that point with CONFIG_PROVE_RCU enabled,
+>>>>> the kernel will shout at you, as using RCU in this context may be
+>>>>> illegal (specially if coming from the idle state, where RCU would be
+>>>>> in a quiescent state).
+>>>>>
+>>>>> A possible fix would be to wrap calls to irq_find_mapping into a
+>>>>> RCU_NONIDLE macro, but that really looks ugly.
+>>>>>
+>>>>> This patch series introduce another generic IRQ entry point
+>>>>> (handle_domain_irq), which has the exact same behaviour as handle_IRQ
+>>>>> (as defined on arm, arm64 and openrisc), except that it also takes a
+>>>>> irq_domain pointer. This allows the logical IRQ lookup to be done
+>>>>> inside the irq_{enter,exit} section, which contains a
+>>>>> rcu_irq_{enter,exit}, making it safe.
+>>>>
+>>>> Looks good. Should this be routed to the genirq tree?
+>>>
+>>> I'm happy for you to take this series, provided the architecture
+>>> maintainers agree on it (I'm still to hear from the openrisc guys, and
+>>> their mailing-list seems to positively hate my guts).
+>>
+>> I think everyone's had a chance to look over it by now.  Thomas, shall I
+>> take the series?
 > 
-> If it is, you can change the binding to include the register number
-> in the syscon reference, like
-> 
-> 	rockchip,grf = <&grf 0x154>;
-> 
-> and then read it from there, to simplify the code needed to get the
-> number from the device id.
+> Yes please.
 
-I would disagree here :-)
+Do you want a pull request? Or are you picking up the patches from the ML?
 
-Specific to the emac, there also exists a second register in the grf (0xa8 for 
-the rk3188) that contains a field 
+Thanks,
 
-----
-emac_newrcv_en - the selection of RMII receive selection
-0: don't support the data package without header
-1: support the data package without header
-----
-
-which we don't handle currently but somebody might want to in the future.
-[There also is no documentation of this at all]
-
-
-The dt maintainers also generally suggest to define compatibles for the 
-individual socs anyway, even if only one is matched, so I don't see the 
-necessity to encode this 2 times
-	compatible = "rockchip,rk3188-emac", "rockchip,rk3066-emac";
-	rockchip,grf = <&grf 0xa4>;
-
-instead of the more flexible
-	compatible = "rockchip,rk3188-emac";
-	rockchip,grf = <&grf>;
-
-which other rockchip drivers already use in this form.
-
-
-Heiko
+	M.
+-- 
+Jazz is not dead. It just smells funny...
