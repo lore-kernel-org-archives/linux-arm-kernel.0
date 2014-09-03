@@ -1,112 +1,116 @@
-From: boris.brezillon@free-electrons.com (Boris BREZILLON)
-Date: Wed, 3 Sep 2014 09:09:16 +0200
-Subject: [PATCH] ARM: at91/dt: at91sam9m10g45ek add rtc node
-In-Reply-To: <5406B098.6020500@interact.nl>
-References: <1409655132-17735-1-git-send-email-evanluijk@interact.nl>
- <20140902183356.7bcfdf84@bbrezillon> <5406B098.6020500@interact.nl>
-Message-ID: <20140903090916.4a624739@bbrezillon>
+From: wangyijing@huawei.com (Yijing Wang)
+Date: Wed, 3 Sep 2014 15:15:11 +0800
+Subject: [RFC PATCH 00/11] Refactor MSI to support Non-PCI device
+In-Reply-To: <c3b2bd89ef3d462cb302f6ede56a0d44@BLUPR03MB566.namprd03.prod.outlook.com>
+References: <1406344128-27055-1-git-send-email-wangyijing@huawei.com>
+ <c6d34fe1bbe9457ea8cff7dcd97902b8@DM2PR03MB317.namprd03.prod.outlook.com>
+ <53DEF80C.1010608@huawei.com>
+ <8a2b4e237f2d4c7e95ef72867658b53a@BLUPR03MB566.namprd03.prod.outlook.com>
+ <53F44022.6030706@huawei.com>
+ <c3b2bd89ef3d462cb302f6ede56a0d44@BLUPR03MB566.namprd03.prod.outlook.com>
+Message-ID: <5406BFFF.9000505@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 03 Sep 2014 08:09:28 +0200
-Erik van Luijk <evanluijk@interact.nl> wrote:
+>> Provide the private MSI setup functions in bus-driver layer can't apply to all
+>> Non-PCI MSI devices, because we can not guarantee Non-PCI MSI devices are always
+>> on a bus. The existing HPET, DMAR device both have no bus bind.
+> 
+> Yes, that's why I was not sure of bus-driver or device-driver model.
+> 
+>> I'm working on a
+>> new MSI setup framework, as you mentioned before, in device-driver model.
+>>
+>> I abstracted a new virtual device (called struct msi_dev), this msi_dev will
+>> manage all MSI info,
+> 
+> Will this "struct msi_dev" will be part of "struct device"?
+> 
+>> and a new bus named msi_bus, also introduced a new driver
+>> msi_driver, msi_bus is responsible for binding msi_dev and msi_driver.
+>> All MSI devices will be classified into different MSI device types, like
+>> MSI_TYPE_PCI, MSI_TYPE_HPET, MSI_TYPE_DMAR, etc..
+>>
+>> Each MSI type device should provide a private struct msi_driver. msi_driver
+>> should contain the type specific MSI ops functions to help setup and enable MSI
+>> device, request MSI irq.
+>>
+>> I almost finish the first draft, and will post out next week in plan :)
+> 
+> Will be looking forward to next version.
+
+Hi Bharat, I'm sorry I had to delay to send out the new version :(. I found some risks in the
+new MSI framework, i.e. DMAR MSI initialized the MSI before the linux device-driver tree be built.
+And we also found some problems during test. So I think I need more time to review and test.
+
+Thanks!
+Yijing.
 
 > 
-> Hi Boris, Nicolas,
+> Thanks
+> -Bharat
 > 
-> Boris BREZILLON schreef op 2-9-2014 om 18:33:
-> > Hi Erik,
->  >
->  > On Tue,  2 Sep 2014 12:52:12 +0200
->  > Erik van Luijk <evanluijk@interact.nl> wrote:
->  >
->  >> Signed-off-by: Erik van Luijk <evanluijk@interact.nl>
->  >
->  > Except for the nitpicks you'll find below, you have my
->  >
->  > Acked-by: Boris Brezillon <boris.brezillon@free-electrons.com>
->  >
->  >> ---
->  >>  arch/arm/boot/dts/at91sam9g45.dtsi     | 7 +++++++
->  >>  arch/arm/boot/dts/at91sam9m10g45ek.dts | 3 +++
->  >>  2 files changed, 10 insertions(+)
->  >>
->  >> diff --git a/arch/arm/boot/dts/at91sam9g45.dtsi 
-> b/arch/arm/boot/dts/at91sam9g45.dtsi
->  >> index 932a669..bf62c18 100644
->  >> --- a/arch/arm/boot/dts/at91sam9g45.dtsi
->  >> +++ b/arch/arm/boot/dts/at91sam9g45.dtsi
->  >> @@ -1070,6 +1070,13 @@
->  >>                  status = "disabled";
->  >>              };
->  >>
->  >> +            rtc at fffffdb0 {
->  >> +                compatible = "atmel,at91rm9200-rtc";
->  >> +                reg = <0xfffffdb0 0x30>;
->  >
->  > The RTC registers goes from 0xfffffdb0 to 0xfffffdc0, which means the
->  > size is 0x10 and not 0x30. This is not important here, because the
->  > following region is marked as reserved, but we prefer to keep the DT
->  > consistent with the datasheet.
+>>
+>>
+>> Thanks!
+>> Yijing.
+>>
+>>>
+>>> Thanks
+>>> -Bharat
+>>>
+>>>>
+>>>> My patchset is just a RFC draft, I will update it later, all we want
+>>>> to do is make kernel support Non-PCI MSI devices.
+>>>>
+>>>> Thanks!
+>>>> Yijing.
+>>>>
+>>>>
+>>>>>
+>>>>> Thanks
+>>>>> Arnab
+>>>>> --
+>>>>> To unsubscribe from this list: send the line "unsubscribe
+>>>>> linux-kernel" in the body of a message to majordomo at vger.kernel.org
+>>>>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>>>>> Please read the FAQ at  http://www.tux.org/lkml/
+>>>>>
+>>>>> .
+>>>>>
+>>>>
+>>>>
+>>>> --
+>>>> Thanks!
+>>>> Yijing
+>>>>
+>>>> --
+>>>> To unsubscribe from this list: send the line "unsubscribe linux-pci"
+>>>> in the body of a message to majordomo at vger.kernel.org More majordomo
+>>>> info at http://vger.kernel.org/majordomo-info.html
+>>>
+>>> .
+>>>
+>>
+>>
+>> --
+>> Thanks!
+>> Yijing
+>>
+>> --
+>> To unsubscribe from this list: send the line "unsubscribe linux-pci" in the body
+>> of a message to majordomo at vger.kernel.org More majordomo info at
+>> http://vger.kernel.org/majordomo-info.html
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
 > 
-> This is an inconsistency in the datasheet of the AT91SAM9G45 (and at 
-> least also
-> AT91SAM9G15, AT91SAM9G25, AT91SAM9G35 and AT91SAM9M10).
-> In the memory map (fig. 5-1) there is room for 16 bytes.
-> But in the 'Real-time Clock (RTC) User Interface' (table 15-1) there is 
-> room for
-> 48 bytes (0x30) excluding the Reserved Registers (which don't belong to 
-> the RTC
-> on the AT91SAM9M10). Perhaps Nicolas can draw some attention to this at 
-> Atmel.
-
-Indeed, I only had a look at the memory map.
-Given this input, you should keep your definition ;-).
-
+> .
 > 
-> >
->  >> +                interrupts = <1 IRQ_TYPE_LEVEL_HIGH 7>;
->  >> +                status = "disabled";
->  >> +            };
->  >> +
->  >>              spi0: spi at fffa4000 {
->  >>                  #address-cells = <1>;
->  >>                  #size-cells = <0>;
->  >> diff --git a/arch/arm/boot/dts/at91sam9m10g45ek.dts 
-> b/arch/arm/boot/dts/at91sam9m10g45ek.dts
->  >> index 96ccc7d..2dd2347 100644
->  >> --- a/arch/arm/boot/dts/at91sam9m10g45ek.dts
->  >> +++ b/arch/arm/boot/dts/at91sam9m10g45ek.dts
->  >> @@ -70,6 +70,9 @@
->  >>
->  >>              watchdog at fffffd40 {
->  >>                  status = "okay";
->  >> +
->  >> +            rtc at fffffdb0 {
->  >> +                status = "okay";
->  >
->  > Try to keep SoC and board changes in distinct commits.
-> 
-> Understood.
-> 
-> >
->  >>              };
->  >>
->  >>              mmc0: mmc at fff80000 {
->  >
->  >
->  > Best Regards,
->  >
->  > Boris
->  >
-> 
-> Regards,
-> 
-> Erik
-
 
 
 -- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+Thanks!
+Yijing
