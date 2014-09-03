@@ -1,51 +1,133 @@
-From: boris.brezillon@free-electrons.com (Boris BREZILLON)
-Date: Wed, 3 Sep 2014 11:31:57 +0200
-Subject: [PATCH 0/5] rtc: at91sam9: add DT support
-In-Reply-To: <1409733934-14465-1-git-send-email-boris.brezillon@free-electrons.com>
-References: <1409733934-14465-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <20140903113157.45822fbb@bbrezillon>
+From: jingchang.lu@freescale.com (Jingchang Lu)
+Date: Wed, 3 Sep 2014 16:44:13 +0800
+Subject: [PATCHv3] clk: ppc-corenet: rename to ppc-qoriq and add
+ CLK_OF_DECLARE support
+Message-ID: <1409733853-19727-1-git-send-email-jingchang.lu@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed,  3 Sep 2014 10:45:29 +0200
-Boris BREZILLON <boris.brezillon@free-electrons.com> wrote:
+The IP is shared on PPC and ARM, this rename it to qoriq for better
+represention, and this also add the CLK_OF_DECLARE support for being
+initialized by of_clk_init() on ARM.
 
-> Hello,
-> 
-> This patch series adds DT support to the atmel at91sam9 RTC driver.
-> 
-> It also removes any machine specific inclusions to prepare the migration
-> to multi platform kernel support, and retain the slow clock to prevent
-> the CCF from disabling it at the end of boot.
+Signed-off-by: Jingchang Lu <jingchang.lu@freescale.com>
+---
+changes in v3:
+ generate the patch with -M -C option
 
-Oops, just noticed there already was a proposal adding DT support to
-this driver [1].
-Adding Johan and Douglas in Cc.
+changes in v2:
+ rename the driver name to ppc-qoriq.c for shared on PPC and ARM.
 
-[1]http://lists.infradead.org/pipermail/linux-arm-kernel/2013-April/160453.html
+ drivers/clk/Kconfig                            |  9 +++++----
+ drivers/clk/Makefile                           |  2 +-
+ drivers/clk/{clk-ppc-corenet.c => clk-qoriq.c} | 27 +++++++++++++++-----------
+ 3 files changed, 22 insertions(+), 16 deletions(-)
+ rename drivers/clk/{clk-ppc-corenet.c => clk-qoriq.c} (88%)
 
-> 
-> Best Regards,
-> 
-> Boris
-> 
-> Boris BREZILLON (5):
->   rtc: at91sam9: remove references to mach specific headers
->   rtc: at91sam9: use standard readl/writel functions instead of raw
->     versions
->   rtc: at91sam9: add DT support
->   rtc: at91sam9: retain slow clock and check its rate
->   rtc: at91sam9: add DT bindings documentation
-> 
->  .../devicetree/bindings/rtc/atmel,at91sam9-rtc.txt | 20 +++++++
->  drivers/rtc/rtc-at91sam9.c                         | 63 +++++++++++++++++++---
->  2 files changed, 75 insertions(+), 8 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/rtc/atmel,at91sam9-rtc.txt
-> 
-
-
-
+diff --git a/drivers/clk/Kconfig b/drivers/clk/Kconfig
+index cfd3af7..d7892b9 100644
+--- a/drivers/clk/Kconfig
++++ b/drivers/clk/Kconfig
+@@ -81,12 +81,13 @@ config COMMON_CLK_AXI_CLKGEN
+ 	  Support for the Analog Devices axi-clkgen pcore clock generator for Xilinx
+ 	  FPGAs. It is commonly used in Analog Devices' reference designs.
+ 
+-config CLK_PPC_CORENET
+-	bool "Clock driver for PowerPC corenet platforms"
+-	depends on PPC_E500MC && OF
++config CLK_QORIQ
++	bool "Clock driver for PowerPC corenet and compatible ARM-based platforms"
++	depends on (PPC_E500MC || ARM) && OF
+ 	---help---
+ 	  This adds the clock driver support for Freescale PowerPC corenet
+-	  platforms using common clock framework.
++	  platforms and compatible Freescale ARM based platforms using common
++	  clock framework.
+ 
+ config COMMON_CLK_XGENE
+ 	bool "Clock driver for APM XGene SoC"
+diff --git a/drivers/clk/Makefile b/drivers/clk/Makefile
+index f537a0b..5ca4b72 100644
+--- a/drivers/clk/Makefile
++++ b/drivers/clk/Makefile
+@@ -27,7 +27,7 @@ obj-$(CONFIG_ARCH_MOXART)		+= clk-moxart.o
+ obj-$(CONFIG_ARCH_NOMADIK)		+= clk-nomadik.o
+ obj-$(CONFIG_ARCH_NSPIRE)		+= clk-nspire.o
+ obj-$(CONFIG_COMMON_CLK_PALMAS)		+= clk-palmas.o
+-obj-$(CONFIG_CLK_PPC_CORENET)		+= clk-ppc-corenet.o
++obj-$(CONFIG_CLK_QORIQ)			+= clk-qoriq.o
+ obj-$(CONFIG_COMMON_CLK_S2MPS11)	+= clk-s2mps11.o
+ obj-$(CONFIG_COMMON_CLK_SI5351)		+= clk-si5351.o
+ obj-$(CONFIG_COMMON_CLK_SI570)		+= clk-si570.o
+diff --git a/drivers/clk/clk-ppc-corenet.c b/drivers/clk/clk-qoriq.c
+similarity index 88%
+rename from drivers/clk/clk-ppc-corenet.c
+rename to drivers/clk/clk-qoriq.c
+index 8e58edf..5053f46 100644
+--- a/drivers/clk/clk-ppc-corenet.c
++++ b/drivers/clk/clk-qoriq.c
+@@ -155,7 +155,7 @@ static void __init core_pll_init(struct device_node *np)
+ 
+ 	base = of_iomap(np, 0);
+ 	if (!base) {
+-		pr_err("clk-ppc: iomap error\n");
++		pr_err("clk-qoriq: iomap error\n");
+ 		return;
+ 	}
+ 
+@@ -252,7 +252,7 @@ static void __init sysclk_init(struct device_node *node)
+ 	u32 rate;
+ 
+ 	if (!np) {
+-		pr_err("ppc-clk: could not get parent node\n");
++		pr_err("qoriq-clk: could not get parent node\n");
+ 		return;
+ 	}
+ 
+@@ -278,30 +278,35 @@ static const struct of_device_id clk_match[] __initconst = {
+ 	{}
+ };
+ 
+-static int __init ppc_corenet_clk_probe(struct platform_device *pdev)
++static int __init qoriq_corenet_clk_probe(struct platform_device *pdev)
+ {
+ 	of_clk_init(clk_match);
+ 
+ 	return 0;
+ }
+ 
+-static const struct of_device_id ppc_clk_ids[] __initconst = {
++static const struct of_device_id qoriq_clk_ids[] __initconst = {
+ 	{ .compatible = "fsl,qoriq-clockgen-1.0", },
+ 	{ .compatible = "fsl,qoriq-clockgen-2.0", },
+ 	{}
+ };
+ 
+-static struct platform_driver ppc_corenet_clk_driver __initdata = {
++static struct platform_driver qoriq_corenet_clk_driver __initdata = {
+ 	.driver = {
+-		.name = "ppc_corenet_clock",
++		.name = "qoriq_corenet_clock",
+ 		.owner = THIS_MODULE,
+-		.of_match_table = ppc_clk_ids,
++		.of_match_table = qoriq_clk_ids,
+ 	},
+-	.probe = ppc_corenet_clk_probe,
++	.probe = qoriq_corenet_clk_probe,
+ };
+ 
+-static int __init ppc_corenet_clk_init(void)
++static int __init qoriq_corenet_clk_init(void)
+ {
+-	return platform_driver_register(&ppc_corenet_clk_driver);
++	return platform_driver_register(&qoriq_corenet_clk_driver);
+ }
+-subsys_initcall(ppc_corenet_clk_init);
++subsys_initcall(qoriq_corenet_clk_init);
++
++CLK_OF_DECLARE(qoriq_core_pll_v1, "fsl,qoriq-core-pll-1.0", core_pll_init);
++CLK_OF_DECLARE(qoriq_core_pll_v2, "fsl,qoriq-core-pll-2.0", core_pll_init);
++CLK_OF_DECLARE(qoriq_core_mux_v1, "fsl,qoriq-core-mux-1.0", core_mux_init);
++CLK_OF_DECLARE(qoriq_core_mux_v2, "fsl,qoriq-core-mux-2.0", core_mux_init);
 -- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+1.8.0
