@@ -1,115 +1,179 @@
 From: apinski@cavium.com (Andrew Pinski)
-Date: Wed,  3 Sep 2014 14:19:15 -0700
-Subject: [PATCH 21/24] ARM64:ILP32: Use a seperate syscall table as a few
- syscalls need to be using the compat syscalls
+Date: Wed,  3 Sep 2014 14:19:12 -0700
+Subject: [PATCH 18/24] ARM64: Add vdso for ILP32 and use it for the signal
+ return
 In-Reply-To: <1409779158-30963-1-git-send-email-apinski@cavium.com>
 References: <1409779158-30963-1-git-send-email-apinski@cavium.com>
-Message-ID: <1409779158-30963-22-git-send-email-apinski@cavium.com>
+Message-ID: <1409779158-30963-19-git-send-email-apinski@cavium.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some syscalls are still need to use the compat versions.
-So we need to have a seperate syscall table for ILP32.
-This patch adds them including documentation on why we need to use each one.
+This patch adds the VDSO for ILP32. We need to use a different
+VDSO than LP64 since ILP32 uses ELF32 while LP64 uses ELF64.
 
-This list is based on the list from https://lkml.org/lkml/2013/9/11/478.
+After this patch, signal handling works mostly.  In that signals
+go through their action and then returned correctly.
 
 Signed-off-by: Andrew Pinski <apinski@cavium.com>
 ---
- arch/arm64/include/asm/syscalls.h |    4 +
- arch/arm64/include/asm/unistd.h   |    4 +
- arch/arm64/kernel/Makefile        |    1 +
- arch/arm64/kernel/entry.S         |   13 +++-
- arch/arm64/kernel/sys_ilp32.c     |  195 +++++++++++++++++++++++++++++++++++++
- 5 files changed, 216 insertions(+), 1 deletions(-)
- create mode 100644 arch/arm64/kernel/sys_ilp32.c
+ arch/arm64/include/asm/vdso.h                 |    4 +
+ arch/arm64/kernel/Makefile                    |    5 +
+ arch/arm64/kernel/signal.c                    |    4 +
+ arch/arm64/kernel/vdso-ilp32/.gitignore       |    2 +
+ arch/arm64/kernel/vdso-ilp32/Makefile         |   72 ++++++++++++++++++
+ arch/arm64/kernel/vdso-ilp32/vdso-ilp32.S     |   33 ++++++++
+ arch/arm64/kernel/vdso-ilp32/vdso-ilp32.lds.S |   98 +++++++++++++++++++++++++
+ arch/arm64/kernel/vdso.c                      |   69 ++++++++++++++---
+ 8 files changed, 274 insertions(+), 13 deletions(-)
+ create mode 100644 arch/arm64/kernel/vdso-ilp32/.gitignore
+ create mode 100644 arch/arm64/kernel/vdso-ilp32/Makefile
+ create mode 100644 arch/arm64/kernel/vdso-ilp32/vdso-ilp32.S
+ create mode 100644 arch/arm64/kernel/vdso-ilp32/vdso-ilp32.lds.S
 
-diff --git a/arch/arm64/include/asm/syscalls.h b/arch/arm64/include/asm/syscalls.h
-index 48fe7c6..b58dad7 100644
---- a/arch/arm64/include/asm/syscalls.h
-+++ b/arch/arm64/include/asm/syscalls.h
-@@ -25,6 +25,10 @@
-  */
- asmlinkage long sys_rt_sigreturn_wrapper(void);
+diff --git a/arch/arm64/include/asm/vdso.h b/arch/arm64/include/asm/vdso.h
+index 839ce00..84050c6 100644
+--- a/arch/arm64/include/asm/vdso.h
++++ b/arch/arm64/include/asm/vdso.h
+@@ -29,6 +29,10 @@
+ 
+ #include <generated/vdso-offsets.h>
  
 +#ifdef CONFIG_ARM64_ILP32
-+long ilp32_sys_sigaltstack(const stack_t __user *, stack_t __user *);
++#include <generated/vdso-ilp32-offsets.h>
 +#endif
 +
- #include <asm-generic/syscalls.h>
- 
- #endif	/* __ASM_SYSCALLS_H */
-diff --git a/arch/arm64/include/asm/unistd.h b/arch/arm64/include/asm/unistd.h
-index 70e5559..c99815a 100644
---- a/arch/arm64/include/asm/unistd.h
-+++ b/arch/arm64/include/asm/unistd.h
-@@ -13,6 +13,10 @@
-  * You should have received a copy of the GNU General Public License
-  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-  */
-+#ifdef CONFIG_ARM64_ILP32
-+#define __ARCH_WANT_COMPAT_SYS_PREADV64
-+#define __ARCH_WANT_COMPAT_SYS_PWRITEV64
-+#endif
- #ifdef CONFIG_AARCH32_EL0
- #define __ARCH_WANT_COMPAT_SYS_GETDENTS64
- #define __ARCH_WANT_COMPAT_STAT64
+ #define VDSO_SYMBOL(base, name)						   \
+ ({									   \
+ 	(void *)(vdso_offset_##name - VDSO_LBASE + (unsigned long)(base)); \
 diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
-index dcb9033..8a531fb 100644
+index 6de85f5..dcb9033 100644
 --- a/arch/arm64/kernel/Makefile
 +++ b/arch/arm64/kernel/Makefile
-@@ -19,6 +19,7 @@ arm64-obj-y		:= cputable.o debug-monitors.o entry.o irq.o fpsimd.o	\
+@@ -31,6 +31,7 @@ arm64-obj-$(CONFIG_KGDB)		+= kgdb.o
+ arm64-obj-$(CONFIG_EFI)			+= efi.o efi-stub.o efi-entry.o
  
- arm64-obj-$(CONFIG_AARCH32_EL0)		+= sys32.o kuser32.o signal32.o 	\
- 					   sys_compat.o
-+arm64-obj-$(CONFIG_ARM64_ILP32)		+= sys_ilp32.o
- arm64-obj-$(CONFIG_FUNCTION_TRACER)	+= ftrace.o entry-ftrace.o
- arm64-obj-$(CONFIG_MODULES)		+= arm64ksyms.o module.o
- arm64-obj-$(CONFIG_SMP)			+= smp.o smp_spin_table.o topology.o
-diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
-index 9314352..dbedecf 100644
---- a/arch/arm64/kernel/entry.S
-+++ b/arch/arm64/kernel/entry.S
-@@ -643,9 +643,14 @@ ENDPROC(ret_from_fork)
-  */
- 	.align	6
- el0_svc:
--	adrp	stbl, sys_call_table		// load syscall table pointer
- 	uxtw	scno, w8			// syscall number in w8
- 	mov	sc_nr, #__NR_syscalls
-+#ifdef CONFIG_ARM64_ILP32
-+	get_thread_info tsk
-+	ldr	x16, [tsk, #TI_FLAGS]
-+	tbnz	x16, #TIF_32BIT, el0_ilp32_svc	// We are using ILP32
-+#endif
-+	adrp	stbl, sys_call_table		// load syscall table pointer
- el0_svc_naked:					// compat entry point
- 	stp	x0, scno, [sp, #S_ORIG_X0]	// save the original x0 and syscall number
- 	enable_dbg_and_irq
-@@ -664,6 +669,12 @@ ni_sys:
- 	b	do_ni_syscall
- ENDPROC(el0_svc)
- 
-+#ifdef CONFIG_ARM64_ILP32
-+el0_ilp32_svc:
-+	adrp	stbl, sys_call_ilp32_table // load syscall table pointer
-+	b el0_svc_naked
-+#endif
+ obj-y					+= $(arm64-obj-y) vdso/
++obj-$(CONFIG_ARM64_ILP32)		+= vdso-ilp32/
+ obj-m					+= $(arm64-obj-m)
+ head-y					:= head.o
+ extra-y					:= $(head-y) vmlinux.lds
+@@ -38,3 +39,7 @@ extra-y					:= $(head-y) vmlinux.lds
+ # vDSO - this must be built first to generate the symbol offsets
+ $(call objectify,$(arm64-obj-y)): $(obj)/vdso/vdso-offsets.h
+ $(obj)/vdso/vdso-offsets.h: $(obj)/vdso
 +
- 	/*
- 	 * This is the really slow path.  We're going to be doing context
- 	 * switches, and waiting for our parent to respond.
-diff --git a/arch/arm64/kernel/sys_ilp32.c b/arch/arm64/kernel/sys_ilp32.c
++# vDSO - this must be built first to generate the symbol offsets
++$(call objectify,$(arm64-obj-y)): $(obj)/vdso-ilp32/vdso-ilp32-offsets.h
++$(obj)/vdso-ilp32/vdso-ilp32-offsets.h: $(obj)/vdso-ilp32
+diff --git a/arch/arm64/kernel/signal.c b/arch/arm64/kernel/signal.c
+index f47c064..5311147 100644
+--- a/arch/arm64/kernel/signal.c
++++ b/arch/arm64/kernel/signal.c
+@@ -242,6 +242,10 @@ static void setup_return(struct pt_regs *regs, struct k_sigaction *ka,
+ 
+ 	if (ka->sa.sa_flags & SA_RESTORER)
+ 		sigtramp = ka->sa.sa_restorer;
++#ifdef CONFIG_ARM64_ILP32
++	else if (is_ilp32_compat_task())
++		sigtramp = VDSO_SYMBOL(current->mm->context.vdso, sigtramp_ilp32);
++#endif
+ 	else
+ 		sigtramp = VDSO_SYMBOL(current->mm->context.vdso, sigtramp);
+ 
+diff --git a/arch/arm64/kernel/vdso-ilp32/.gitignore b/arch/arm64/kernel/vdso-ilp32/.gitignore
 new file mode 100644
-index 0000000..8c68d28
+index 0000000..61806c3
 --- /dev/null
-+++ b/arch/arm64/kernel/sys_ilp32.c
-@@ -0,0 +1,195 @@
++++ b/arch/arm64/kernel/vdso-ilp32/.gitignore
+@@ -0,0 +1,2 @@
++vdso-ilp32.lds
++vdso-ilp32-offsets.h
+diff --git a/arch/arm64/kernel/vdso-ilp32/Makefile b/arch/arm64/kernel/vdso-ilp32/Makefile
+new file mode 100644
+index 0000000..c8f5472
+--- /dev/null
++++ b/arch/arm64/kernel/vdso-ilp32/Makefile
+@@ -0,0 +1,72 @@
++#
++# Building a vDSO image for AArch64.
++#
++# Author: Will Deacon <will.deacon@arm.com>
++# Heavily based on the vDSO Makefiles for other archs.
++#
++
++obj-ilp32-vdso := gettimeofday-ilp32.o note-ilp32.o sigreturn-ilp32.o
++
++# Build rules
++targets := $(obj-ilp32-vdso) vdso-ilp32.so vdso-ilp32.so.dbg
++obj-ilp32-vdso := $(addprefix $(obj)/, $(obj-ilp32-vdso))
++
++ccflags-y := -shared -fno-common -fno-builtin
++ccflags-y += -nostdlib -Wl,-soname=linux-ilp32-vdso.so.1 \
++		$(call cc-ldoption, -Wl$(comma)--hash-style=sysv)
++
++obj-y += vdso-ilp32.o
++extra-y += vdso-ilp32.lds vdso-ilp32-offsets.h
++CPPFLAGS_vdso-ilp32.lds += -P -C -U$(ARCH) -mabi=ilp32
++
++# Force dependency (incbin is bad)
++$(obj)/vdso-ilp32.o : $(obj)/vdso-ilp32.so
++
++# Link rule for the .so file, .lds has to be first
++$(obj)/vdso-ilp32.so.dbg: $(src)/vdso-ilp32.lds $(obj-ilp32-vdso)
++	$(call if_changed,vdso-ilp32ld)
++
++# Strip rule for the .so file
++$(obj)/%.so: OBJCOPYFLAGS := -S
++$(obj)/%.so: $(obj)/%.so.dbg FORCE
++	$(call if_changed,objcopy)
++
++# Generate VDSO offsets using helper script
++gen-vdsosym := $(srctree)/$(src)/../vdso/gen_vdso_offsets.sh
++quiet_cmd_vdsosym = VDSOSYM $@
++define cmd_vdsosym
++	$(NM) $< | $(gen-vdsosym) | LC_ALL=C sort > $@ && \
++	cp $@ include/generated/
++endef
++
++$(obj)/vdso-ilp32-offsets.h: $(obj)/vdso-ilp32.so.dbg FORCE
++	$(call if_changed,vdsosym)
++
++# Assembly rules for the .S files
++#$(obj-ilp32-vdso): %.o: $(src)/../vdso/$(subst -ilp32,,%.S)
++#	$(call if_changed_dep,vdso-ilp32as)
++
++$(obj)/gettimeofday-ilp32.o: $(src)/../vdso/gettimeofday.S
++	$(call if_changed_dep,vdso-ilp32as)
++
++$(obj)/note-ilp32.o: $(src)/../vdso/note.S
++	$(call if_changed_dep,vdso-ilp32as)
++
++$(obj)/sigreturn-ilp32.o: $(src)/../vdso/sigreturn.S
++	$(call if_changed_dep,vdso-ilp32as)
++
++# Actual build commands
++quiet_cmd_vdso-ilp32ld = VDSOILP32L $@
++      cmd_vdso-ilp32ld = $(CC) $(c_flags) -mabi=ilp32  -Wl,-n -Wl,-T $^ -o $@
++quiet_cmd_vdso-ilp32as = VDSOILP32A $@
++      cmd_vdso-ilp32as = $(CC) $(a_flags) -mabi=ilp32 -c -o $@ $<
++
++# Install commands for the unstripped file
++quiet_cmd_vdso_install = INSTALL $@
++      cmd_vdso_install = cp $(obj)/$@.dbg $(MODLIB)/vdso/$@
++
++vdso-ilp32.so: $(obj)/vdso-ilp32.so.dbg
++	@mkdir -p $(MODLIB)/vdso
++	$(call cmd,vdso_install)
++
++vdso_install: vdso-ilp32.so
+diff --git a/arch/arm64/kernel/vdso-ilp32/vdso-ilp32.S b/arch/arm64/kernel/vdso-ilp32/vdso-ilp32.S
+new file mode 100644
+index 0000000..46ac072
+--- /dev/null
++++ b/arch/arm64/kernel/vdso-ilp32/vdso-ilp32.S
+@@ -0,0 +1,33 @@
 +/*
-+ * AArch64- ILP32 specific system calls implementation
-+ *
-+ * Copyright (C) 2013 Cavium Inc.
-+ * Author: Andrew Pinski <apinski@cavium.com>
++ * Copyright (C) 2012 ARM Limited
 + *
 + * This program is free software; you can redistribute it and/or modify
 + * it under the terms of the GNU General Public License version 2 as
@@ -122,183 +186,270 @@ index 0000000..8c68d28
 + *
 + * You should have received a copy of the GNU General Public License
 + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
++ *
++ * Author: Will Deacon <will.deacon@arm.com>
 + */
 +
-+#include <linux/compiler.h>
-+#include <linux/errno.h>
-+#include <linux/fs.h>
-+#include <linux/mm.h>
-+#include <linux/export.h>
-+#include <linux/sched.h>
-+#include <linux/slab.h>
-+#include <linux/syscalls.h>
-+#include <linux/compat.h>
++#include <linux/init.h>
++#include <linux/linkage.h>
++#include <linux/const.h>
++#include <asm/page.h>
 +
++	__PAGE_ALIGNED_DATA
++
++	.globl vdso_ilp32_start, vdso_ilp32_end
++	.balign PAGE_SIZE
++vdso_ilp32_start:
++	.incbin "arch/arm64/kernel/vdso-ilp32/vdso-ilp32.so"
++	.balign PAGE_SIZE
++vdso_ilp32_end:
++
++	.previous
+diff --git a/arch/arm64/kernel/vdso-ilp32/vdso-ilp32.lds.S b/arch/arm64/kernel/vdso-ilp32/vdso-ilp32.lds.S
+new file mode 100644
+index 0000000..ac8029b
+--- /dev/null
++++ b/arch/arm64/kernel/vdso-ilp32/vdso-ilp32.lds.S
+@@ -0,0 +1,98 @@
 +/*
-+ * Wrappers to pass the pt_regs argument.
++ * GNU linker script for the VDSO library.
++ *
++ * Copyright (C) 2012 ARM Limited
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
++ *
++ * Author: Will Deacon <will.deacon@arm.com>
++ * Heavily based on the vDSO linker scripts for other archs.
 + */
-+#define sys_rt_sigreturn sys_rt_sigreturn_wrapper
 +
-+/*
-+ * Note places where mention unsigned long bitmaps, could
-+ * use the non compat version for little-endian but big-endian
-+ * has issues to do layout of the bits in the bitmaps.
-+ */
++#include <linux/const.h>
++#include <asm/page.h>
++#include <asm/vdso.h>
 +
-+/* Using Compat syscalls where necessary */
-+#define sys_ioctl		compat_sys_ioctl
-+/* iovec */
-+#define sys_readv		compat_sys_readv
-+#define sys_writev		compat_sys_writev
-+#define sys_preadv		compat_sys_preadv64
-+#define sys_pwritev		compat_sys_pwritev64
-+#define sys_vmsplice		compat_sys_vmsplice
-+/* robust_list_head */
-+#define sys_set_robust_list	compat_sys_set_robust_list
-+#define sys_get_robust_list	compat_sys_get_robust_list
-+
-+/* kexec_segment */
-+#define sys_kexec_load		compat_sys_kexec_load
-+
-+/* Ptrace has some structures which are different between ILP32 and LP64 */
-+#define sys_ptrace		compat_sys_ptrace
-+
-+/* struct msghdr */
-+#define sys_recvfrom		compat_sys_recvfrom
-+#define sys_recvmmsg		compat_sys_recvmmsg
-+#define sys_sendmmsg		compat_sys_sendmmsg
-+#define sys_sendmsg		compat_sys_sendmsg
-+#define sys_recvmsg		compat_sys_recvmsg
-+
-+/*
-+ * Note the timeval is taken care by COMPAT_USE_64BIT_TIME
-+ * being true.
-+ */
-+#define sys_setsockopt		compat_sys_setsockopt
-+#define sys_getsockopt		compat_sys_getsockopt
-+
-+/* Array of pointers */
-+#define sys_execve		compat_sys_execve
-+#define sys_move_pages		compat_sys_move_pages
-+
-+/* iovec */
-+#define sys_process_vm_readv	compat_sys_process_vm_readv
-+#define sys_process_vm_writev	compat_sys_process_vm_writev
-+
-+/*
-+ * The NFSv4 and ncpfs structures are depend on the long and
-+ * pointer sizes.
-+ */
-+#define sys_mount               compat_sys_mount
-+
-+/* NUMA */
-+/* unsigned long bitmaps */
-+#define sys_get_mempolicy       compat_sys_get_mempolicy
-+#define sys_set_mempolicy       compat_sys_set_mempolicy
-+#define sys_mbind               compat_sys_mbind
-+
-+/* array of pointers */
-+/* unsigned long bitmaps */
-+#define sys_migrate_pages       compat_sys_migrate_pages
-+
-+/* Scheduler */
-+/* unsigned long bitmaps */
-+#define sys_sched_setaffinity   compat_sys_sched_setaffinity
-+#define sys_sched_getaffinity   compat_sys_sched_getaffinity
-+
-+/* iov usage */
-+#define sys_keyctl              compat_sys_keyctl
-+
-+/* aio */
-+/* Array of pointers (iocb's) */
-+#define sys_io_submit           compat_sys_io_submit
-+
-+/* We need to make sure the pointer gets copied correctly. */
-+asmlinkage long ilp32_sys_mq_notify(mqd_t mqdes,
-+			const struct sigevent __user *u_notification)
++/*OUTPUT_FORMAT("elf32-littleaarch64", "elf32-bigaarch64", "elf32-littleaarch64")
++OUTPUT_ARCH(aarch64)
++*/
++SECTIONS
 +{
-+	struct sigevent __user *p = NULL;
++	PROVIDE(_vdso_data = . - PAGE_SIZE);
++	. = VDSO_LBASE + SIZEOF_HEADERS;
 +
-+	if (u_notification) {
-+		struct sigevent n;
++	.hash		: { *(.hash) }			:text
++	.gnu.hash	: { *(.gnu.hash) }
++	.dynsym		: { *(.dynsym) }
++	.dynstr		: { *(.dynstr) }
++	.gnu.version	: { *(.gnu.version) }
++	.gnu.version_d	: { *(.gnu.version_d) }
++	.gnu.version_r	: { *(.gnu.version_r) }
 +
-+		p = compat_alloc_user_space(sizeof(*p));
-+		if (copy_from_user(&n, u_notification, sizeof(*p)))
-+			return -EFAULT;
-+		if (n.sigev_notify == SIGEV_THREAD)
-+			n.sigev_value.sival_ptr = compat_ptr((uintptr_t)n.sigev_value.sival_ptr);
-+		if (copy_to_user(p, &n, sizeof(*p)))
-+			return -EFAULT;
++	.note		: { *(.note.*) }		:text	:note
++
++	. = ALIGN(16);
++
++	.text		: { *(.text*) }			:text	=0xd503201f
++	PROVIDE (__etext = .);
++	PROVIDE (_etext = .);
++	PROVIDE (etext = .);
++
++	.eh_frame_hdr	: { *(.eh_frame_hdr) }		:text	:eh_frame_hdr
++	.eh_frame	: { KEEP (*(.eh_frame)) }	:text
++
++	.dynamic	: { *(.dynamic) }		:text	:dynamic
++
++	.rodata		: { *(.rodata*) }		:text
++
++	_end = .;
++	PROVIDE(end = .);
++
++	/DISCARD/	: {
++		*(.note.GNU-stack)
++		*(.data .data.* .gnu.linkonce.d.* .sdata*)
++		*(.bss .sbss .dynbss .dynsbss)
 +	}
-+	return sys_mq_notify(mqdes, p);
 +}
 +
 +/*
-+ * sigevent contains sigval_t which is now 64bit always
-+ * but need special handling due to padding for SIGEV_THREAD.
++ * We must supply the ELF program headers explicitly to get just one
++ * PT_LOAD segment, and set the flags explicitly to make segments read-only.
 + */
-+#define sys_mq_notify		ilp32_sys_mq_notify
-+
-+
-+/*
-+ * sigaltstack needs some special handling as the
-+ * padding for stack_t might not be non-zero.
-+ */
-+long ilp32_sys_sigaltstack(const stack_t __user *uss_ptr,
-+			   stack_t __user *uoss_ptr)
++PHDRS
 +{
-+	stack_t uss, uoss;
-+	int ret;
-+	mm_segment_t seg;
-+
-+	if (uss_ptr) {
-+		if (!access_ok(VERIFY_READ, uss_ptr, sizeof(*uss_ptr)))
-+			return -EFAULT;
-+		if (__get_user(uss.ss_sp, &uss_ptr->ss_sp) |
-+			__get_user(uss.ss_flags, &uss_ptr->ss_flags) |
-+			__get_user(uss.ss_size, &uss_ptr->ss_size))
-+			return -EFAULT;
-+		/* Zero extend the sp address and the size. */
-+		uss.ss_sp = (void *)(uintptr_t)(unsigned int)(uintptr_t)uss.ss_sp;
-+		uss.ss_size = (size_t)(unsigned int)uss.ss_size;
-+	}
-+	seg = get_fs();
-+	set_fs(KERNEL_DS);
-+	/* 
-+	 * Note we need to use uoss as we have changed the segment to the
-+	 * kernel one so passing an user one around is wrong.
-+	 */
-+	ret = sys_sigaltstack((stack_t __force __user *) (uss_ptr ? &uss : NULL),
-+			      (stack_t __force __user *) &uoss);
-+	set_fs(seg);
-+	if (ret >= 0 && uoss_ptr)  {
-+		if (!access_ok(VERIFY_WRITE, uoss_ptr, sizeof(stack_t)) ||
-+		    __put_user(uoss.ss_sp, &uoss_ptr->ss_sp) ||
-+		    __put_user(uoss.ss_flags, &uoss_ptr->ss_flags) ||
-+		    __put_user(uoss.ss_size, &uoss_ptr->ss_size))
-+			ret = -EFAULT;
-+	}
-+	return ret;
++	text		PT_LOAD		FLAGS(5) FILEHDR PHDRS; /* PF_R|PF_X */
++	dynamic		PT_DYNAMIC	FLAGS(4);		/* PF_R */
++	note		PT_NOTE		FLAGS(4);		/* PF_R */
++	eh_frame_hdr	PT_GNU_EH_FRAME;
 +}
 +
 +/*
-+ * sigaltstack needs some special handling as the padding
-+ * for stack_t might not be non-zero.
++ * This controls what symbols we export from the DSO.
 + */
-+#define sys_sigaltstack		ilp32_sys_sigaltstack
-+
-+#include <asm/syscalls.h>
-+
-+#undef __SYSCALL
-+#define __SYSCALL(nr, sym)	[nr] = sym,
++VERSION
++{
++	LINUX_2.6.39 {
++	global:
++		__kernel_rt_sigreturn;
++		__kernel_gettimeofday;
++		__kernel_clock_gettime;
++		__kernel_clock_getres;
++	local: *;
++	};
++}
 +
 +/*
-+ * The sys_call_ilp32_table array must be 4K aligned to be accessible from
-+ * kernel/entry.S.
++ * Make the sigreturn code visible to the kernel.
 + */
-+void *sys_call_ilp32_table[__NR_syscalls] __aligned(4096) = {
-+	[0 ... __NR_syscalls - 1] = sys_ni_syscall,
-+#include <asm/unistd.h>
-+};
++VDSO_sigtramp_ilp32		= __kernel_rt_sigreturn;
+diff --git a/arch/arm64/kernel/vdso.c b/arch/arm64/kernel/vdso.c
+index a777ac3..21b3726 100644
+--- a/arch/arm64/kernel/vdso.c
++++ b/arch/arm64/kernel/vdso.c
+@@ -41,6 +41,12 @@ extern char vdso_start, vdso_end;
+ static unsigned long vdso_pages;
+ static struct page **vdso_pagelist;
+ 
++#ifdef CONFIG_ARM64_ILP32
++extern char vdso_ilp32_start, vdso_ilp32_end;
++static unsigned long vdso_ilp32_pages;
++static struct page **vdso_ilp32_pagelist;
++#endif
++
+ /*
+  * The vDSO data page.
+  */
+@@ -110,24 +116,31 @@ int aarch32_setup_vectors_page(struct linux_binprm *bprm, int uses_interp)
+ }
+ #endif /* CONFIG_AARCH32_EL0 */
+ 
+-static struct vm_special_mapping vdso_spec[2];
++static struct vm_special_mapping vdso_spec[2][2];
+ 
+-static int __init vdso_init(void)
++static inline int __init vdso_init_common(char *vdso_start, char *vdso_end,
++					  unsigned long *vdso_pagesp,
++					  struct page ***vdso_pagelistp,
++					  bool ilp32)
+ {
+ 	int i;
++	unsigned long vdso_pages;
++	struct page **vdso_pagelist;
+ 
+-	if (memcmp(&vdso_start, "\177ELF", 4)) {
++	if (memcmp(vdso_start, "\177ELF", 4)) {
+ 		pr_err("vDSO is not a valid ELF object!\n");
+ 		return -EINVAL;
+ 	}
+ 
+-	vdso_pages = (&vdso_end - &vdso_start) >> PAGE_SHIFT;
++	vdso_pages = (vdso_end - vdso_start) >> PAGE_SHIFT;
++	*vdso_pagesp = vdso_pages;
+ 	pr_info("vdso: %ld pages (%ld code @ %p, %ld data @ %p)\n",
+-		vdso_pages + 1, vdso_pages, &vdso_start, 1L, vdso_data);
++		vdso_pages + 1, vdso_pages, vdso_start, 1L, vdso_data);
+ 
+ 	/* Allocate the vDSO pagelist, plus a page for the data. */
+ 	vdso_pagelist = kcalloc(vdso_pages + 1, sizeof(struct page *),
+ 				GFP_KERNEL);
++	*vdso_pagelistp = vdso_pagelist;
+ 	if (vdso_pagelist == NULL)
+ 		return -ENOMEM;
+ 
+@@ -136,33 +149,63 @@ static int __init vdso_init(void)
+ 
+ 	/* Grab the vDSO code pages. */
+ 	for (i = 0; i < vdso_pages; i++)
+-		vdso_pagelist[i + 1] = virt_to_page(&vdso_start + i * PAGE_SIZE);
++		vdso_pagelist[i + 1] = virt_to_page(vdso_start + i * PAGE_SIZE);
+ 
+ 	/* Populate the special mapping structures */
+-	vdso_spec[0] = (struct vm_special_mapping) {
++	vdso_spec[ilp32][0] = (struct vm_special_mapping) {
+ 		.name	= "[vvar]",
+ 		.pages	= vdso_pagelist,
+ 	};
+ 
+-	vdso_spec[1] = (struct vm_special_mapping) {
++	vdso_spec[ilp32][1] = (struct vm_special_mapping) {
+ 		.name	= "[vdso]",
+ 		.pages	= &vdso_pagelist[1],
+ 	};
+ 
+ 	return 0;
+ }
++
++static int __init vdso_init(void)
++{
++	return vdso_init_common(&vdso_start, &vdso_end,
++				&vdso_pages, &vdso_pagelist, 0);
++}
+ arch_initcall(vdso_init);
+ 
++#ifdef CONFIG_ARM64_ILP32
++static int __init vdso_ilp32_init(void)
++{
++	return vdso_init_common(&vdso_ilp32_start, &vdso_ilp32_end,
++				&vdso_ilp32_pages, &vdso_ilp32_pagelist, 1);
++}
++arch_initcall(vdso_ilp32_init);
++#endif
++
+ int arch_setup_additional_pages(struct linux_binprm *bprm,
+ 				int uses_interp)
+ {
+ 	struct mm_struct *mm = current->mm;
+ 	unsigned long vdso_base, vdso_text_len, vdso_mapping_len;
+ 	void *ret;
+-
+-	vdso_text_len = vdso_pages << PAGE_SHIFT;
++	struct page **pagelist;
++	unsigned long pages;
++	bool ilp32;
++
++#ifdef CONFIG_ARM64_ILP32
++	ilp32 = is_ilp32_compat_task();
++	if (is_ilp32_compat_task()) {
++		pages = vdso_ilp32_pages;
++		pagelist = vdso_ilp32_pagelist;
++	} else
++#endif
++	{
++		ilp32 = false;
++		pages = vdso_pages;
++		pagelist = vdso_pagelist;
++	}
++	vdso_text_len = pages << PAGE_SHIFT;
+ 	/* Be sure to map the data page */
+-	vdso_mapping_len = vdso_text_len + PAGE_SIZE;
++	vdso_mapping_len = (pages + 1) << PAGE_SHIFT;
+ 
+ 	down_write(&mm->mmap_sem);
+ 	vdso_base = get_unmapped_area(NULL, 0, vdso_mapping_len, 0, 0);
+@@ -172,7 +215,7 @@ int arch_setup_additional_pages(struct linux_binprm *bprm,
+ 	}
+ 	ret = _install_special_mapping(mm, vdso_base, PAGE_SIZE,
+ 				       VM_READ|VM_MAYREAD,
+-				       &vdso_spec[0]);
++				       &vdso_spec[ilp32][0]);
+ 	if (IS_ERR(ret))
+ 		goto up_fail;
+ 
+@@ -181,7 +224,7 @@ int arch_setup_additional_pages(struct linux_binprm *bprm,
+ 	ret = _install_special_mapping(mm, vdso_base, vdso_text_len,
+ 				       VM_READ|VM_EXEC|
+ 				       VM_MAYREAD|VM_MAYWRITE|VM_MAYEXEC,
+-				       &vdso_spec[1]);
++				       &vdso_spec[ilp32][1]);
+ 	if (IS_ERR(ret))
+ 		goto up_fail;
+ 
 -- 
 1.7.2.5
