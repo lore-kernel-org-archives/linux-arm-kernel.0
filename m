@@ -1,34 +1,73 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 03 Sep 2014 17:39:07 +0200
-Subject: [PATCH V3 0/6] ARM64: Add support for FSL's LS2085A SoC
-In-Reply-To: <d856a7c55a0949cd918411f3f834bbe3@BN1PR03MB220.namprd03.prod.outlook.com>
-References: <1409757194-28155-1-git-send-email-bhupesh.sharma@freescale.com>
- <11626142.L1WDF72bmp@wuerfel>
- <d856a7c55a0949cd918411f3f834bbe3@BN1PR03MB220.namprd03.prod.outlook.com>
-Message-ID: <9081864.6l1AHRQ5bg@wuerfel>
+From: gabriel.fernandez@st.com (Gabriel FERNANDEZ)
+Date: Wed,  3 Sep 2014 17:37:16 +0200
+Subject: [PATCH v2 7/8] phy: miphy28lp: Add SSC support for PCIE
+In-Reply-To: <1409758637-28654-1-git-send-email-gabriel.fernandez@linaro.org>
+References: <1409758637-28654-1-git-send-email-gabriel.fernandez@linaro.org>
+Message-ID: <1409758637-28654-8-git-send-email-gabriel.fernandez@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 03 September 2014 15:36:44 bhupesh.sharma at freescale.com wrote:
-> > On Wednesday 03 September 2014 20:43:08 Bhupesh Sharma wrote:
-> > >
-> > > In this version, the enable-method for the CPU nodes is left for the
-> > > bootloader (u-boot or UEFI) to patch-up. This DTS has been tested for
-> > > PSCI v0.2 CPU_ON method (and corresponding secondary boot) using the
-> > > following ARMv8 u-boot patches:
-> > 
-> > What would be a reason for using something other than PSCI?
-> > 
-> 
-> We had originally gone ahead and implemented spin-table release method in ARMv8 u-boot
-> (see [1]) (the v3 of that patchset is still in works), but we have since been pointed towards
-> PSCI by Mark and Catalin, so we have implemented PSCI in ARMv8 u-boot and the v2 and v3
-> of the DTS patchset have been tested with both the spin-table and PSCI approaches.
-> 
-> [1] http://lists.denx.de/pipermail/u-boot/2014-June/182759.html
-> 
+SSC is the technique of modulating the operating frequency of a signal
+slightly to spread its radiated emissions over a range of frequencies.
+This reduction in the maximum emission for a given frequency helps meet
+radiated emission requirements.
+These settings are applicable for PCIE with Internal clock.
 
-Would it be possible then to just mandate PSCI for the upstream-supported
-version?
+Signed-off-by: Harsh Gupta <harsh.gupta@st.com>
+Signed-off-by: Gabriel Fernandez <gabriel.fernandez@linaro.orgm>
+---
+ drivers/phy/phy-miphy28lp.c | 32 ++++++++++++++++++++++++++++++++
+ 1 file changed, 32 insertions(+)
 
-	Arnd
+diff --git a/drivers/phy/phy-miphy28lp.c b/drivers/phy/phy-miphy28lp.c
+index b36e737..976fdda 100644
+--- a/drivers/phy/phy-miphy28lp.c
++++ b/drivers/phy/phy-miphy28lp.c
+@@ -679,6 +679,36 @@ static int miphy28lp_init_sata(struct miphy28lp_phy *miphy_phy)
+ 	return miphy_is_ready(miphy_phy);
+ }
+ 
++static void miphy_pcie_tune_ssc(struct miphy28lp_phy *miphy_phy)
++{
++	u8 val;
++
++	/* Compensate Tx impedance to avoid out of range values */
++	if (miphy_phy->ssc) {
++		/*
++		 * Enable the SSC on PLL for all banks
++		 * SSC Modulation @ 31 KHz and 4000 ppm modulation amp
++		 */
++		val = readb_relaxed(miphy_phy->base + 0x0c);
++		val |= 0x04;
++		writeb_relaxed(val, miphy_phy->base + 0x0c);
++		val = readb_relaxed(miphy_phy->base + 0x0a);
++		val |= 0x10;
++		writeb_relaxed(val, miphy_phy->base + 0x0a);
++
++		for (val = 0; val < 2; val++) {
++			writeb_relaxed(val, miphy_phy->base + 0x0f);
++			writeb_relaxed(0x69, miphy_phy->base + 0xe5);
++			writeb_relaxed(0x21, miphy_phy->base + 0xe6);
++			writeb_relaxed(0x3c, miphy_phy->base + 0xe4);
++			writeb_relaxed(0x21, miphy_phy->base + 0xe6);
++			writeb_relaxed(0x00, miphy_phy->base + 0xe3);
++			writeb_relaxed(0x02, miphy_phy->base + 0xe3);
++			writeb_relaxed(0x00, miphy_phy->base + 0xe3);
++		}
++	}
++}
++
+ static int miphy28lp_init_pcie(struct miphy28lp_phy *miphy_phy)
+ {
+ 	struct miphy28lp_dev *miphy_dev = miphy_phy->phydev;
+@@ -710,6 +740,8 @@ static int miphy28lp_init_pcie(struct miphy28lp_phy *miphy_phy)
+ 	/* initialize miphy */
+ 	miphy28lp_configure_pcie(miphy_phy);
+ 
++	miphy_pcie_tune_ssc(miphy_phy);
++
+ 	/* Waiting for Compensation to complete */
+ 	do {
+ 		val = readb_relaxed(miphy_phy->base + MIPHY_COMP_FSM_6);
+-- 
+1.9.1
