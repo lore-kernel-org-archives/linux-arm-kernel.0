@@ -1,85 +1,45 @@
 From: apinski@cavium.com (Andrew Pinski)
-Date: Wed,  3 Sep 2014 14:19:13 -0700
-Subject: [PATCH 19/24] ptrace: Allow compat to use the native siginfo
+Date: Wed,  3 Sep 2014 14:19:17 -0700
+Subject: [PATCH 23/24] ARM64: Add ARM64_ILP32 to Kconfig
 In-Reply-To: <1409779158-30963-1-git-send-email-apinski@cavium.com>
 References: <1409779158-30963-1-git-send-email-apinski@cavium.com>
-Message-ID: <1409779158-30963-20-git-send-email-apinski@cavium.com>
+Message-ID: <1409779158-30963-24-git-send-email-apinski@cavium.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With ARM64 ILP32 ABI, we want to use the non-compat
-siginfo as we want to simplify signal handling for this new ABI.
-This patch just adds a new define COMPAT_USE_NATIVE_SIGINFO and
-if it is true then read/write in the compat case as it was the
-non-compat case.
+This patch adds the config option for ILP32.
 
 Signed-off-by: Andrew Pinski <apinski@cavium.com>
 ---
- include/linux/compat.h |    4 ++++
- kernel/ptrace.c        |   25 ++++++++++++++++++-------
- 2 files changed, 22 insertions(+), 7 deletions(-)
+ arch/arm64/Kconfig |    9 ++++++++-
+ 1 files changed, 8 insertions(+), 1 deletions(-)
 
-diff --git a/include/linux/compat.h b/include/linux/compat.h
-index e649426..2d8c535 100644
---- a/include/linux/compat.h
-+++ b/include/linux/compat.h
-@@ -24,6 +24,10 @@
- #define COMPAT_USE_64BIT_TIME 0
- #endif
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index 73c93dd..4ee4183 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -376,7 +376,7 @@ source "fs/Kconfig.binfmt"
  
-+#ifndef COMPAT_USE_NATIVE_SIGINFO
-+#define COMPAT_USE_NATIVE_SIGINFO 0
-+#endif
+ config COMPAT
+ 	def_bool y
+-	depends on AARCH32_EL0
++	depends on AARCH32_EL0 || ARM64_ILP32
+ 	select COMPAT_BINFMT_ELF
+ 
+ config AARCH32_EL0
+@@ -393,6 +393,13 @@ config AARCH32_EL0
+ 
+ 	  If you want to execute 32-bit userspace applications, say Y.
+ 
++config ARM64_ILP32
++	bool "Kernel support for ILP32"
++	help
++	  This option enables support for AArch64 ILP32 user space.  ILP32
++	  is an ABI where long and pointers are 32bits but it uses the AARCH64
++	  instruction set.
 +
- #ifndef __SC_DELOUSE
- #define __SC_DELOUSE(t,v) ((t)(unsigned long)(v))
- #endif
-diff --git a/kernel/ptrace.c b/kernel/ptrace.c
-index 54e7522..40ae023 100644
---- a/kernel/ptrace.c
-+++ b/kernel/ptrace.c
-@@ -657,7 +657,7 @@ static int ptrace_peek_siginfo(struct task_struct *child,
- 			break;
- 
- #ifdef CONFIG_COMPAT
--		if (unlikely(is_compat_task())) {
-+		if (unlikely(is_compat_task() && !COMPAT_USE_NATIVE_SIGINFO)) {
- 			compat_siginfo_t __user *uinfo = compat_ptr(data);
- 
- 			if (copy_siginfo_to_user32(uinfo, &info) ||
-@@ -1126,16 +1126,27 @@ int compat_ptrace_request(struct task_struct *child, compat_long_t request,
- 
- 	case PTRACE_GETSIGINFO:
- 		ret = ptrace_getsiginfo(child, &siginfo);
--		if (!ret)
--			ret = copy_siginfo_to_user32(
--				(struct compat_siginfo __user *) datap,
--				&siginfo);
-+		if (!ret) {
-+			if (COMPAT_USE_NATIVE_SIGINFO)
-+				ret = copy_siginfo_to_user(
-+					(struct siginfo __user *) datap,
-+					&siginfo);
-+			else
-+				ret = copy_siginfo_to_user32(
-+					(struct compat_siginfo __user *) datap,
-+					&siginfo);
-+		}
- 		break;
- 
- 	case PTRACE_SETSIGINFO:
- 		memset(&siginfo, 0, sizeof siginfo);
--		if (copy_siginfo_from_user32(
--			    &siginfo, (struct compat_siginfo __user *) datap))
-+		if (COMPAT_USE_NATIVE_SIGINFO)
-+			ret = copy_from_user(&siginfo, datap, sizeof(siginfo));
-+		else
-+			ret = copy_siginfo_from_user32(
-+				 &siginfo,
-+				 (struct compat_siginfo __user *) datap);
-+		if (ret)
- 			ret = -EFAULT;
- 		else
- 			ret = ptrace_setsiginfo(child, &siginfo);
+ config SYSVIPC_COMPAT
+ 	def_bool y
+ 	depends on AARCH32_EL0 && SYSVIPC
 -- 
 1.7.2.5
