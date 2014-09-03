@@ -1,39 +1,36 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 03 Sep 2014 20:42:44 +0200
-Subject: [PATCH v3 13/17] ARM64 / ACPI: Add GICv2 specific ACPI boot
- support
-In-Reply-To: <1409583475-6978-14-git-send-email-hanjun.guo@linaro.org>
-References: <1409583475-6978-1-git-send-email-hanjun.guo@linaro.org>
- <1409583475-6978-14-git-send-email-hanjun.guo@linaro.org>
-Message-ID: <2893693.4bZJXXENof@wuerfel>
+From: nm@ti.com (Nishanth Menon)
+Date: Wed, 3 Sep 2014 13:46:21 -0500
+Subject: [PATCH] ARM: dts: am437x-gp: switch i2c0 to 100KHz
+Message-ID: <1409769981-17669-1-git-send-email-nm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 01 September 2014 22:57:51 Hanjun Guo wrote:
-> +       /* Collect CPU base addresses */
-> +       count = acpi_parse_entries(sizeof(struct acpi_table_madt),
-> +                                  gic_acpi_parse_madt_cpu, table,
-> +                                  ACPI_MADT_TYPE_GENERIC_INTERRUPT,
-> +                                  ACPI_MAX_GIC_CPU_INTERFACE_ENTRIES);
-> +       if (count < 0) {
-> +               pr_err("Error during GICC entries parsing\n");
-> +               return -EFAULT;
-> +       } else if (!count) {
-> +               /* No GICC entries provided, use address from MADT header */
-> +               struct acpi_table_madt *madt = (struct acpi_table_madt *)table;
-> +
-> +               if (!madt->address)
-> +                       return -EFAULT;
-> +
-> +               cpu_phy_base = (u64)madt->address;
-> +       }
+On the GP EVM, the ambient light sensor is limited to 100KHz on the
+I2C bus.
 
-After I read through ACPI-5.1 section 5.2.12.14, I wonder if this is the
-best way to treat a missing ACPI_MADT_TYPE_GENERIC_INTERRUPT table.
+So use 100kHz for I2C on the GP EVM due to this limitation on the
+ambient light sensor.
 
-Do we expect to see those in practice? It seems like using the x86 local
-APIC address as a fallback for the GIC address is not something we
-should do unless we absolutely have to support a system that doesn't
-have the GIC table.
+Reported-by: Aparna Balasubramanian <aparnab@ti.com>
+Signed-off-by: Nishanth Menon <nm@ti.com>
+---
+based on v3.17-rc1
 
-	Arnd
+ arch/arm/boot/dts/am437x-gp-evm.dts |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm/boot/dts/am437x-gp-evm.dts b/arch/arm/boot/dts/am437x-gp-evm.dts
+index 646a6ea..9559c19 100644
+--- a/arch/arm/boot/dts/am437x-gp-evm.dts
++++ b/arch/arm/boot/dts/am437x-gp-evm.dts
+@@ -260,7 +260,7 @@
+ 	status = "okay";
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&i2c0_pins>;
+-	clock-frequency = <400000>;
++	clock-frequency = <100000>;
+ 
+ 	tps65218: tps65218 at 24 {
+ 		reg = <0x24>;
+-- 
+1.7.9.5
