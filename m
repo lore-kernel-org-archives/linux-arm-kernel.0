@@ -1,58 +1,52 @@
-From: khiem.nguyen.xt@renesas.com (Khiem Nguyen)
-Date: Wed, 03 Sep 2014 11:42:57 +0900
-Subject: [PATCH repost] ARM: shmobile: lager: correct memory map
-In-Reply-To: <20140903004901.GA3277@verge.net.au>
-References: <20140903004901.GA3277@verge.net.au>
-Message-ID: <54068031.5050806@renesas.com>
+From: cw00.choi@samsung.com (Chanwoo Choi)
+Date: Wed, 03 Sep 2014 12:09:01 +0900
+Subject: [PATCHv6 0/2] thermal: exynos: Add support for TRIMINFO feature of
+ Exynos3250
+Message-ID: <1409713743-6124-1-git-send-email-cw00.choi@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Simon-san, Shiiba-san,
+This patchset add the support of TRIMINFO_RELOAD feature for Exynos3250.
+But Exynos3250 has two TRIMINFO_CTRL register instead other Exynos has only one
+TRIMINFO_CTRL register. So, this patchset support the some Exynos SoC which
+has more than one TRIMINF_CTRL.
 
-Thanks for the patch.
+Also, this patchset fix wrong value of TRIMINFO_RELOAD_SHIFT and remove
+duplicate code when reading triminfo register of Exynos5440.
 
-On 9/3/2014 9:49 AM, Simon Horman wrote:
-> The base address of the second memory region on the lager
-> board is 0x140000000. Update the tag used in the dts file accordingly.
-> 
-> This is a documentation fix and should have no run-time affect.
-> 
-> This problem was introduced when the second memory region
-> was added to the lager dts file by 62bc32a2573c4219
-> ("ARM: shmobile: Include all 4 GiB of memory on Lager)"
-> in v3.14.
-> 
-> Reported-by: NAOYA SHIIBA <naoya.shiiba.nx@renesas.com>
-> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-> ---
->  arch/arm/boot/dts/r8a7790-lager.dts | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> I am reposting this as Olof originally requested a syntax change,
-> which I followed up on, however that change no longer seems appropriate.
-> This this patch seems to be correct.
-[...]
-> -	memory at 180000000 {
-> +	memory at 140000000 {
+Changes from v5:
+- Rebase this patchset on next branch of linux-soc-thermal.git
 
-Could you give more information about not using new syntax ?
+Changes from v4:
+- Remove un-necessary triminfo_ctrl_{shift, mask} field
+- Includes Bartlomiej's patch[1] that Exynos5260 / Exynos5420 should not use
+TRIM_RELOAD flag
+[2] https://lkml.org/lkml/2014/8/20/481
 
-I checked memblock information in both 2 ways 
-(i.e memory at 140000000 and memory at 1,40000000)
-and I got same result.
-root at lager:~# cat /sys/kernel/debug/memblock/memory
-   0: 0x0000000040000000..0x000000007fffffff
-   1: 0x0000000140000000..0x00000001ffffffff
+Changes from v3:
+- Add reviewed message of Amit Daniel Kachhap <amit.daniel@samsung.com>
+- Split RELOAD patch as two patch
+- Fix 'TRIMINFO_RELOAD_SHIFT' value
+- This series includes separate patch[1]
+[1] https://lkml.org/lkml/2014/8/20/5
+- Drop ACTIME bit setting because TRM includes not enough information of ACTIME bit.
 
-So, what does 'no longer seems appropriate" mean ?
+Changes from v2:
+- Fix build break because of missing 'or' operation.
 
->  		device_type = "memory";
->  		reg = <1 0x40000000 0 0xc0000000>;
->  	};
-> 
+Changes from v1:
+- Add missing 'TMU_SUPPORT_TRIM_RELOAD' features
 
-Thanks.
+Chanwoo Choi (2):
+  thermal: exynos: Add support for many TRIMINFO_CTRL registers
+  thermal: exynos: Add support for TRIM_RELOAD feature at Exynos3250
+
+ drivers/thermal/samsung/exynos_thermal_common.h |  1 +
+ drivers/thermal/samsung/exynos_tmu.c            | 15 ++++++++++++---
+ drivers/thermal/samsung/exynos_tmu.h            |  7 +++++--
+ drivers/thermal/samsung/exynos_tmu_data.c       | 11 +++++++++--
+ drivers/thermal/samsung/exynos_tmu_data.h       |  8 ++++++--
+ 5 files changed, 33 insertions(+), 9 deletions(-)
 
 -- 
-Best regards,
-KHIEM Nguyen
+1.8.0
