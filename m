@@ -1,45 +1,36 @@
-From: matt@console-pimps.org (Matt Fleming)
-Date: Wed, 3 Sep 2014 14:35:03 +0100
-Subject: [PATCH v2 0/5] beautify EFI memmap logs
-In-Reply-To: <1409743943-16934-1-git-send-email-lersek@redhat.com>
-References: <1409743943-16934-1-git-send-email-lersek@redhat.com>
-Message-ID: <20140903133503.GF3001@console-pimps.org>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Wed, 3 Sep 2014 06:37:42 -0700
+Subject: [PATCH] mmc: sdhci-msm: Make tuning block table endian agnostic
+In-Reply-To: <CAPDyKFoboJGTzF3aQ=YBpWyVT6opTMgz_6gpOo5BRX30+hfCBQ@mail.gmail.com>
+References: <1409702308-3023-1-git-send-email-sboyd@codeaurora.org>
+ <CAPDyKFoboJGTzF3aQ=YBpWyVT6opTMgz_6gpOo5BRX30+hfCBQ@mail.gmail.com>
+Message-ID: <20140903133742.GB28256@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 03 Sep, at 01:32:18PM, Laszlo Ersek wrote:
-> changes in v2:
-> - explain with examples how the log's appearance changes, in patches 3-5
->   [Ingo]
+On 09/03, Ulf Hansson wrote:
+> On 3 September 2014 01:58, Stephen Boyd <sboyd@codeaurora.org> wrote:
+> > If we're tuning on a big-endian CPU we'll never determine we properly
+> > tuned the device because we compare the data we received from the
+> > controller with a table that assumes the CPU is little-endian.
+> > Change the table to be an array of bytes instead of 32-bit words
+> > so we can use memcmp() without needing to byte-swap every word
+> > depending on the endianess of the CPU.
+> >
+> > Cc: Asutosh Das <asutoshd@codeaurora.org>
+> > Cc: Venkat Gopalakrishnan <venkatg@codeaurora.org>
+> > Cc: Georgi Djakov <gdjakov@mm-sol.com>
+> > Fixes: 415b5a75da43 "mmc: sdhci-msm: Add platform_execute_tuning implementation"
+> > Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 > 
-> v1 blurb:
+> Hi Stephen,
 > 
-> > It's a pain to analyze EFI memmap logs while debugging, especially to
-> > verify the memory types (an enum) and the memory attributes (a
-> > bitmap). This series renders those columns human-readable, and unifies
-> > their formatting between x86, ia64 and arm64.
+> If you want me to pick this up, please repost to linux-mmc as well.
+> Otherwise you have my ack for it!
 > 
-> Thanks
-> Laszlo
-> 
-> Laszlo Ersek (5):
->   efi: add macro for EFI_MEMORY_UCE memory attribute
->   efi: introduce efi_md_typeattr_format()
->   x86: efi: format EFI memory type & attrs with efi_md_typeattr_format()
->   ia64: efi: format EFI memory type & attrs with
->     efi_md_typeattr_format()
->   arm64: efi: format EFI memory type & attrs with
->     efi_md_typeattr_format()
-> 
->  include/linux/efi.h         |  8 +++++++
->  arch/arm64/kernel/efi.c     | 26 +++++----------------
->  arch/ia64/kernel/efi.c      |  6 +++--
->  arch/x86/platform/efi/efi.c |  7 ++++--
->  drivers/firmware/efi/efi.c  | 57 +++++++++++++++++++++++++++++++++++++++++++++
->  5 files changed, 80 insertions(+), 24 deletions(-)
 
-Thanks Laszlo, applied to the 'next' branch with Ard's Tested-by and
-Acked-by tags.
+Ok I'll repost it now.
 
 -- 
-Matt Fleming, Intel Open Source Technology Center
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
