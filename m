@@ -1,43 +1,88 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed, 03 Sep 2014 22:50:46 +0900
-Subject: [PATCH] ARM: dts: exynos4x12: Fix pull setting in sd4_width8 pin
- group
-In-Reply-To: <1409062405-15215-1-git-send-email-t.figa@samsung.com>
-References: <1409062405-15215-1-git-send-email-t.figa@samsung.com>
-Message-ID: <02ed01cfc77e$0fede790$2fc9b6b0$@samsung.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Wed,  3 Sep 2014 06:57:02 -0700
+Subject: [PATCH] mmc: sdhci-msm: Make tuning block table endian agnostic
+Message-ID: <1409752622-7564-1-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tomasz Figa wrote:
-> 
-> The group has the samsung,pin-pud property set to 4, which is not a
-> correct value. This patch fixes this by replacing it with 3, which is
-> the correct value for pull-up.
-> 
-Yes, I checked the value. You're right.
+If we're tuning on a big-endian CPU we'll never determine we properly
+tuned the device because we compare the data we received from the
+controller with a table that assumes the CPU is little-endian.
+Change the table to be an array of bytes instead of 32-bit words
+so we can use memcmp() without needing to byte-swap every word
+depending on the endianess of the CPU.
 
-Will apply into fixes.
+Cc: Asutosh Das <asutoshd@codeaurora.org>
+Cc: Venkat Gopalakrishnan <venkatg@codeaurora.org>
+Reviewed-by: Georgi Djakov <gdjakov@mm-sol.com>
+Fixes: 415b5a75da43 "mmc: sdhci-msm: Add platform_execute_tuning implementation"
+Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+---
+ drivers/mmc/host/sdhci-msm.c | 42 +++++++++++++++++++++++++++---------------
+ 1 file changed, 27 insertions(+), 15 deletions(-)
 
-Thanks,
-Kukjin
-
-> Signed-off-by: Tomasz Figa <t.figa@samsung.com>
-> ---
->  arch/arm/boot/dts/exynos4x12-pinctrl.dtsi | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/boot/dts/exynos4x12-pinctrl.dtsi b/arch/arm/boot/dts/exynos4x12-pinctrl.dtsi
-> index 927fec6..c141931 100644
-> --- a/arch/arm/boot/dts/exynos4x12-pinctrl.dtsi
-> +++ b/arch/arm/boot/dts/exynos4x12-pinctrl.dtsi
-> @@ -691,7 +691,7 @@
->  		sd4_bus8: sd4-bus-width8 {
->  			samsung,pins = "gpk1-3", "gpk1-4", "gpk1-5", "gpk1-6";
->  			samsung,pin-function = <4>;
-> -			samsung,pin-pud = <4>;
-> +			samsung,pin-pud = <3>;
->  			samsung,pin-drv = <3>;
->  		};
-> 
-> --
-> 2.0.4
+diff --git a/drivers/mmc/host/sdhci-msm.c b/drivers/mmc/host/sdhci-msm.c
+index 40573a58486a..5aabffc15ae8 100644
+--- a/drivers/mmc/host/sdhci-msm.c
++++ b/drivers/mmc/host/sdhci-msm.c
+@@ -47,22 +47,34 @@
+ #define CMUX_SHIFT_PHASE_SHIFT	24
+ #define CMUX_SHIFT_PHASE_MASK	(7 << CMUX_SHIFT_PHASE_SHIFT)
+ 
+-static const u32 tuning_block_64[] = {
+-	0x00ff0fff, 0xccc3ccff, 0xffcc3cc3, 0xeffefffe,
+-	0xddffdfff, 0xfbfffbff, 0xff7fffbf, 0xefbdf777,
+-	0xf0fff0ff, 0x3cccfc0f, 0xcfcc33cc, 0xeeffefff,
+-	0xfdfffdff, 0xffbfffdf, 0xfff7ffbb, 0xde7b7ff7
++static const u8 tuning_block_64[] = {
++	0xff, 0x0f, 0xff, 0x00, 0xff, 0xcc, 0xc3, 0xcc,
++	0xc3, 0x3c, 0xcc, 0xff, 0xfe, 0xff, 0xfe, 0xef,
++	0xff, 0xdf, 0xff, 0xdd, 0xff, 0xfb, 0xff, 0xfb,
++	0xbf, 0xff, 0x7f, 0xff, 0x77, 0xf7, 0xbd, 0xef,
++	0xff, 0xf0, 0xff, 0xf0, 0x0f, 0xfc, 0xcc, 0x3c,
++	0xcc, 0x33, 0xcc, 0xcf, 0xff, 0xef, 0xff, 0xee,
++	0xff, 0xfd, 0xff, 0xfd, 0xdf, 0xff, 0xbf, 0xff,
++	0xbb, 0xff, 0xf7, 0xff, 0xf7, 0x7f, 0x7b, 0xde,
+ };
+ 
+-static const u32 tuning_block_128[] = {
+-	0xff00ffff, 0x0000ffff, 0xccccffff, 0xcccc33cc,
+-	0xcc3333cc, 0xffffcccc, 0xffffeeff, 0xffeeeeff,
+-	0xffddffff, 0xddddffff, 0xbbffffff, 0xbbffffff,
+-	0xffffffbb, 0xffffff77, 0x77ff7777, 0xffeeddbb,
+-	0x00ffffff, 0x00ffffff, 0xccffff00, 0xcc33cccc,
+-	0x3333cccc, 0xffcccccc, 0xffeeffff, 0xeeeeffff,
+-	0xddffffff, 0xddffffff, 0xffffffdd, 0xffffffbb,
+-	0xffffbbbb, 0xffff77ff, 0xff7777ff, 0xeeddbb77
++static const u8 tuning_block_128[] = {
++	0xff, 0xff, 0x00, 0xff, 0xff, 0xff, 0x00, 0x00,
++	0xff, 0xff, 0xcc, 0xcc, 0xcc, 0x33, 0xcc, 0xcc,
++	0xcc, 0x33, 0x33, 0xcc, 0xcc, 0xcc, 0xff, 0xff,
++	0xff, 0xee, 0xff, 0xff, 0xff, 0xee, 0xee, 0xff,
++	0xff, 0xff, 0xdd, 0xff, 0xff, 0xff, 0xdd, 0xdd,
++	0xff, 0xff, 0xff, 0xbb, 0xff, 0xff, 0xff, 0xbb,
++	0xbb, 0xff, 0xff, 0xff, 0x77, 0xff, 0xff, 0xff,
++	0x77, 0x77, 0xff, 0x77, 0xbb, 0xdd, 0xee, 0xff,
++	0xff, 0xff, 0xff, 0x00, 0xff, 0xff, 0xff, 0x00,
++	0x00, 0xff, 0xff, 0xcc, 0xcc, 0xcc, 0x33, 0xcc,
++	0xcc, 0xcc, 0x33, 0x33, 0xcc, 0xcc, 0xcc, 0xff,
++	0xff, 0xff, 0xee, 0xff, 0xff, 0xff, 0xee, 0xee,
++	0xff, 0xff, 0xff, 0xdd, 0xff, 0xff, 0xff, 0xdd,
++	0xdd, 0xff, 0xff, 0xff, 0xbb, 0xff, 0xff, 0xff,
++	0xbb, 0xbb, 0xff, 0xff, 0xff, 0x77, 0xff, 0xff,
++	0xff, 0x77, 0x77, 0xff, 0x77, 0xbb, 0xdd, 0xee,
+ };
+ 
+ struct sdhci_msm_host {
+@@ -359,7 +371,7 @@ static int sdhci_msm_execute_tuning(struct sdhci_host *host, u32 opcode)
+ {
+ 	int tuning_seq_cnt = 3;
+ 	u8 phase, *data_buf, tuned_phases[16], tuned_phase_cnt = 0;
+-	const u32 *tuning_block_pattern = tuning_block_64;
++	const u8 *tuning_block_pattern = tuning_block_64;
+ 	int size = sizeof(tuning_block_64);	/* Pattern size in bytes */
+ 	int rc;
+ 	struct mmc_host *mmc = host->mmc;
+-- 
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
