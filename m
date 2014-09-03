@@ -1,7 +1,8 @@
 From: ludovic.desroches@atmel.com (Ludovic Desroches)
-Date: Wed, 3 Sep 2014 08:26:40 +0200
-Subject: [PATCH] iio: adc: at91: don't use the last converted data register
-Message-ID: <1409725600-12961-1-git-send-email-ludovic.desroches@atmel.com>
+Date: Wed, 3 Sep 2014 08:34:29 +0200
+Subject: [RESEND PATCH] iio: adc: at91: don't use the last converted data
+ register
+Message-ID: <1409726069-13054-1-git-send-email-ludovic.desroches@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -16,6 +17,9 @@ the channel data register.
 
 Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
 ---
+
+Sorry for the noise, there was a typo in the CC list.
+
  drivers/iio/adc/at91_adc.c |   14 +++++++++-----
  1 file changed, 9 insertions(+), 5 deletions(-)
 
