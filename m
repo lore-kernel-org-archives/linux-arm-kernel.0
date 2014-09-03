@@ -1,39 +1,36 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 03 Sep 2014 13:10:32 +0200
-Subject: [PATCH 00/15] PM / Domains: Cleanups and remove superfluous APIs
-In-Reply-To: <1409741551-16437-1-git-send-email-ulf.hansson@linaro.org>
-References: <1409741551-16437-1-git-send-email-ulf.hansson@linaro.org>
-Message-ID: <4774333.eJdjGCa2sL@wuerfel>
+Date: Wed, 03 Sep 2014 13:14:54 +0200
+Subject: [PATCH v4 1/4] ethernet: arc: Add support for Rockchip SoC layer
+ device tree bindings
+In-Reply-To: <1409740036-8117-1-git-send-email-romain.perier@gmail.com>
+References: <1409740036-8117-1-git-send-email-romain.perier@gmail.com>
+Message-ID: <3774938.44qiV4hEoE@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 03 September 2014 12:52:16 Ulf Hansson wrote:
-> 
->  arch/arm/mach-exynos/exynos.c         |   1 -
->  arch/arm/mach-s3c64xx/common.c        |   5 -
->  arch/arm/mach-s3c64xx/common.h        |   7 -
->  arch/arm/mach-s3c64xx/mach-anw6410.c  |   1 -
->  arch/arm/mach-s3c64xx/mach-crag6410.c |   1 -
->  arch/arm/mach-s3c64xx/mach-hmt.c      |   1 -
->  arch/arm/mach-s3c64xx/mach-mini6410.c |   1 -
->  arch/arm/mach-s3c64xx/mach-ncp.c      |   1 -
->  arch/arm/mach-s3c64xx/mach-real6410.c |   1 -
->  arch/arm/mach-s3c64xx/mach-smartq5.c  |   1 -
->  arch/arm/mach-s3c64xx/mach-smartq7.c  |   1 -
->  arch/arm/mach-s3c64xx/mach-smdk6400.c |   1 -
->  arch/arm/mach-s3c64xx/mach-smdk6410.c |   1 -
->  arch/arm/mach-s3c64xx/pm.c            |   7 -
->  arch/arm/mach-shmobile/pm-r8a7779.c   |   1 -
->  arch/arm/mach-shmobile/pm-rmobile.c   |   1 -
->  drivers/base/power/domain.c           | 322 ++++------------------------------
->  drivers/base/power/domain_governor.c  |   7 +-
->  drivers/sh/pm_runtime.c               |  11 --
->  include/linux/pm_domain.h             |  56 +-----
->  20 files changed, 40 insertions(+), 388 deletions(-)
+On Wednesday 03 September 2014 10:27:13 Romain Perier wrote:
+> +static const struct emac_rockchip_soc_data emac_rockchip_dt_data[] = {
+> +       { .grf_offset = 0x154 }, /* rk3066 */
+> +       { .grf_offset = 0x0a4 }, /* rk3188 */
+> +};
+> +
+> +static const struct of_device_id emac_rockchip_dt_ids[] = {
+> +       { .compatible = "rockchip,rk3066-emac", .data = &emac_rockchip_dt_data[0] },
+> +       { .compatible = "rockchip,rk3188-emac", .data = &emac_rockchip_dt_data[1] },
+> +       { /* Sentinel */ }
+> +};
+> +
 > 
 
-Wow, great diffstat!
+One last question: is this the location given as .grf_offset the
+only thing in grf that is potentially of concern to this driver?
 
-I have no idea what this series really does, but I love it ;-)
+If it is, you can change the binding to include the register number
+in the syscon reference, like
+
+	rockchip,grf = <&grf 0x154>;
+
+and then read it from there, to simplify the code needed to get the
+number from the device id.
 
 	Arnd
