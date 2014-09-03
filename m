@@ -1,71 +1,220 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Tue, 02 Sep 2014 17:13:46 -0700
-Subject: [PATCH v8 6/7] clk: Add floor and ceiling constraints to clock
- rates
-In-Reply-To: <1409585675-26894-3-git-send-email-tomeu.vizoso@collabora.com>
-References: <1409585377-26091-1-git-send-email-tomeu.vizoso@collabora.com>
- <1409585675-26894-1-git-send-email-tomeu.vizoso@collabora.com>
- <1409585675-26894-3-git-send-email-tomeu.vizoso@collabora.com>
-Message-ID: <20140903001346.5251.47709@quantum>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 2 Sep 2014 17:24:45 -0700
+Subject: [PATCH] mfd: twl4030-power: Fix PM idle pin configuration to not
+ conflict with regulators
+In-Reply-To: <20140902082931.GA32460@breakpoint.cc>
+References: <20140819152405.GA12002@atomide.com>
+ <20140902082931.GA32460@breakpoint.cc>
+Message-ID: <20140903002445.GD11766@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Tomeu Vizoso (2014-09-01 08:34:34)
-> @@ -1633,6 +1636,13 @@ int clk_provider_set_rate(struct clk_core *clk, unsigned long rate)
->         /* prevent racing with updates to the clock topology */
->         clk_prepare_lock();
->  
-> +       hlist_for_each_entry(clk_user, &clk->per_user_clks, child_node) {
-> +               rate = max(rate, clk_user->floor_constraint);
-> +
-> +               if (clk_user->ceiling_constraint > 0)
-> +                       rate = min(rate, clk_user->ceiling_constraint);
+* Sebastian Andrzej Siewior <sebastian@breakpoint.cc> [140902 01:29]:
+> On 2014-08-19 08:24:05 [-0700], Tony Lindgren wrote:
+> > 
+> > This allows us to enable the PMIC configuration for n900.
+> > 
+> > Fixes: 43fef47f94a1 (mfd: twl4030-power: Add a configuration to turn off oscillator during off-idle)
+> 
+> My beaglebone-ab does not like this. With this patch applied I end up
+> with:
+> [    2.437316] Waiting for root device /dev/mmcblk0p2...
+> [    4.428192] mmc0: card never left busy state
+> [    4.432647] mmc0: error -110 whilst initialising SD card
 
-A ceiling_constraint from consumer_A could be less than a
-floor_constraint from consumer_B. What should we do in this case?
+I assume you mean beagleboard-ab, not beaglebone-ab :)
+ 
+> I noticed this after I disabled lock debugging and tracing (syscall tracing
+> was enabled). Enabling both again makes the error go away.
+> With debugging + tracing disabled (so the error pops up) and git bisect
+> I get this commit (daebabd57) reported.
 
-In the code above the ceiling_constraint will always win. Is that by
-design? We should document that behavior in Documentation/clk.txt.
+OK. Sounds like we still have a race between the regulator code
+and twl4030-power.c for accessing some twl registers.
 
-This is the right place to check for the aforementioned corner case,
-since we not only care about a single consumer having sane constraints
-(e.g. min < max) but also mixing constraints across consumers.
+> A diff between a good/bad bootlog (with lock-debug + tracing switched
+> off):
+> 
+> | smartreflex smartreflex.0: omap_sr_probe: SmartReflex driver initialized
+> | smartreflex smartreflex.1: omap_sr_probe: SmartReflex driver initialized
+> | hsusb2_vbus: disabling
+> | VPLL2: disabling
+> | VUSB3V1: disabling
+> |+VDAC: disabling
+> |+VAUX3: disabling
 
-However ...
+This seems to be the reason. Seems you're on v3.17-rc3, but with
+commit daebabd57 we are not even touching the group registers that
+twl-regulator.c accesses for VDAC and VAUX3 as they are set to
+TWL4030_RESCONFIG_UNDEF. So I'm a bit baffled what's going on.
 
-> +       }
-> +
->         /* bail early if nothing to do */
->         if (rate == clk_provider_get_rate(clk))
->                 goto out;
-> @@ -1699,6 +1709,24 @@ int clk_set_rate(struct clk *clk_user, unsigned long rate)
->  }
->  EXPORT_SYMBOL_GPL(clk_set_rate);
->  
-> +int clk_set_floor_rate(struct clk *clk_user, unsigned long rate)
-> +{
-> +       struct clk_core *clk = clk_to_clk_core(clk_user);
-> +
-> +       clk_user->floor_constraint = rate;
-> +       return clk_provider_set_rate(clk, clk_provider_get_rate(clk));
-> +}
-> +EXPORT_SYMBOL_GPL(clk_set_floor_rate);
-> +
-> +int clk_set_ceiling_rate(struct clk *clk_user, unsigned long rate)
-> +{
-> +       struct clk_core *clk = clk_to_clk_core(clk_user);
-> +
-> +       clk_user->ceiling_constraint = rate;
-> +       return clk_provider_set_rate(clk, clk_provider_get_rate(clk));
-> +}
-> +EXPORT_SYMBOL_GPL(clk_set_ceiling_rate);
+> reverting this commit on top of -rc3 makes mmc0 work again.
 
-... we should probably sanity-check constraints here to make sure that
-ceiling_rates for a given consumer are higher than floor_constraints for
-that same consumer. It's a bit extra overhead but a WARN would probably
-be helpful in this case.
-
-Rest of the patch looks good.
+Again, I assume you're talking about reverting daebabd57,
+not 43fef47f94a1. Anyways, here's a debug hack I used earlier to
+dump out the twl configuration in late_initcall and via sysfs
+so maybe try that and see what the values are with working
+and non-working case?
 
 Regards,
-Mike
+
+Tony
+
+--- a/drivers/mfd/twl4030-power.c
++++ b/drivers/mfd/twl4030-power.c
+@@ -358,6 +358,146 @@ out:
+ 	return err;
+ }
+ 
++#ifdef CONFIG_DEBUG_FS
++#include <linux/debugfs.h>
++#include <linux/seq_file.h>
++
++static void twl4030_dump_resource(unsigned index, struct seq_file *s)
++{
++	int addr;
++	int err;
++	u8 type;
++	u8 grp;
++	u8 remap;
++
++	addr = res_config_addrs[index];
++
++	err = twl_i2c_read_u8(TWL_MODULE_PM_RECEIVER, &grp,
++			      addr + DEV_GRP_OFFSET);
++	if (err) {
++		pr_err("TWL4030 Resource group 0x%02x could not be read\n",
++			addr);
++		return;
++	}
++
++	err = twl_i2c_read_u8(TWL_MODULE_PM_RECEIVER, &type,
++				addr + TYPE_OFFSET);
++	if (err < 0) {
++		pr_err("TWL4030 Resource type 0x%02x could not be read\n",
++			addr);
++		return;
++	}
++
++	err = twl_i2c_read_u8(TWL_MODULE_PM_RECEIVER, &remap,
++			      addr + REMAP_OFFSET);
++	if (err < 0) {
++		pr_err("TWL4030 Resource 0x%02x remap could not be read\n",
++			addr);
++		return;
++	}
++
++	if (s)
++		seq_printf(s, "%i: addr: 0x%04x grp: 0x%04x type: 0x%04x remap: 0x%04x\n",
++			   index, addr, grp, type, remap);
++	else
++		printk("%i: addr: 0x%04x grp: 0x%04x type: 0x%04x remap: 0x%04x\n",
++		       index, addr, grp, type, remap);
++}
++
++static void twl4030_dump_resources(void)
++{
++	int i;
++
++	for (i = 1; i <= RES_MAIN_REF; i++)
++		twl4030_dump_resource(i, NULL);
++}
++
++static struct dentry *dbg_root;
++
++static int dbg_show(struct seq_file *s, void *unused)
++{
++	unsigned long offset = (unsigned long)s->private;
++
++	twl4030_dump_resource(offset, s);
++
++	return 0;
++}
++
++static ssize_t dbg_write(struct file *file,
++			 const char __user *user_buf,
++			 size_t count, loff_t *ppos)
++{
++	struct seq_file *seqf;
++	unsigned long offset;
++	u8 val;
++	int res;
++
++	res = kstrtou8_from_user(user_buf, count, 0x10, &val);
++        if (res < 0)
++                return res;
++
++	seqf = file->private_data;
++	offset = (unsigned long)seqf->private;
++	offset = res_config_addrs[offset];
++
++	res = twl_i2c_write_u8(TWL_MODULE_PM_RECEIVER,
++			       val, offset + DEV_GRP_OFFSET);
++	if (res < 0) {
++		pr_err("TWL4030 failed to program devgroup\n");
++		return res;
++	}
++
++	*ppos += count;
++
++	return count;
++}
++
++static int dbg_open(struct inode *inode, struct file *file)
++{
++        return single_open(file, dbg_show, inode->i_private);
++}
++
++static const struct file_operations dbg_fops = {
++        .open           = dbg_open,
++        .read           = seq_read,
++        .write          = dbg_write,
++        .llseek         = seq_lseek,
++        .release        = single_release,
++};
++
++static void __init dbg_init(struct twl4030_resconfig *rconfig)
++{
++	int i;
++
++	dbg_root = debugfs_create_dir("twl4030-power", NULL);
++	if (IS_ERR(dbg_root) || !dbg_root)
++		return;
++
++	for (i = 1; i <= RES_MAIN_REF; i++) {
++		u8 name[16];
++
++		sprintf(name, "0x%02x", res_config_addrs[i]);
++		(void)debugfs_create_file(name, S_IRUGO,
++					  dbg_root,
++					  (void *)i,
++					  &dbg_fops);
++	}
++}
++
++static int __init dbg_initcall(void)
++{
++	twl4030_dump_resources();
++
++	return 0;
++}
++late_initcall(dbg_initcall);
++
++#else
++static inline void dbg_init(struct twl4030_resconfig *rconfig)
++{
++}
++#endif
++
+ static int twl4030_configure_resource(struct twl4030_resconfig *rconfig)
+ {
+ 	int rconfig_addr;
+@@ -864,6 +1004,8 @@ relock:
+ 		return err2;
+ 	}
+ 
++	dbg_init(pdata->resource_config);
++
+ 	return err;
+ }
+ 
