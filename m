@@ -1,33 +1,46 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 03 Sep 2014 15:49:04 +0200
-Subject: [PATCH v2] mfd: syscon: Decouple syscon interface from platform
- devices
-In-Reply-To: <20140903151611.260a7218@bbrezillon>
-References: <1409668935-10667-1-git-send-email-pankaj.dubey@samsung.com>
- <6034841.GFrG3XCMdb@wuerfel> <20140903151611.260a7218@bbrezillon>
-Message-ID: <4224773.hl3QDeILqz@wuerfel>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Wed, 03 Sep 2014 15:49:47 +0200
+Subject: [PATCH v2 3/9] ARM: zynq: DT: Add DDRC node
+In-Reply-To: <1409692754-13437-4-git-send-email-soren.brinkmann@xilinx.com>
+References: <1409692754-13437-1-git-send-email-soren.brinkmann@xilinx.com>
+ <1409692754-13437-4-git-send-email-soren.brinkmann@xilinx.com>
+Message-ID: <54071C7B.4090805@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 03 September 2014 15:16:11 Boris BREZILLON wrote:
-> I checked that part, and it appears most of the code is already there
-> (see usage of regmap_attach_dev function here [1]).
-> 
-> The only problem I see is that errors are still printed with dev_err,
-> which, AFAIK, will trigger a kernel panic if dev is NULL.
+On 09/02/2014 11:19 PM, Soren Brinkmann wrote:
+> Add the DDR controller to the Zynq devicetree.
+>
+> Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
 
-Actually not:
+Acked-by: Daniel Lezcano <daniel.lezcano@linaro.org>
 
-static int __dev_printk(const char *level, const struct device *dev,
-                        struct va_format *vaf)
-{
-        if (!dev)
-                return printk("%s(NULL device *): %pV", level, vaf);
+> ---
+>   arch/arm/boot/dts/zynq-7000.dtsi | 5 +++++
+>   1 file changed, 5 insertions(+)
+>
+> diff --git a/arch/arm/boot/dts/zynq-7000.dtsi b/arch/arm/boot/dts/zynq-7000.dtsi
+> index 6cc83d4c6c76..587cadcf7001 100644
+> --- a/arch/arm/boot/dts/zynq-7000.dtsi
+> +++ b/arch/arm/boot/dts/zynq-7000.dtsi
+> @@ -146,6 +146,11 @@
+>   			cache-level = <2>;
+>   		};
+>
+> +		memory-controller at f8006000 {
+> +			compatible = "xlnx,zynq-ddrc-a05";
+> +			reg = <0xf8006000 0x1000>;
+> +		} ;
+> +
+>   		uart0: serial at e0000000 {
+>   			compatible = "xlnx,xuartps", "cdns,uart-r1p8";
+>   			status = "disabled";
+>
 
-        return dev_printk_emit(level[1] - '0', dev,
-                               "%s %s: %pV",
-                               dev_driver_string(dev), dev_name(dev), vaf);
-}
 
+-- 
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
 
-	Arnd
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
