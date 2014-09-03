@@ -1,43 +1,46 @@
 From: boris.brezillon@free-electrons.com (Boris BREZILLON)
-Date: Wed,  3 Sep 2014 11:07:49 +0200
-Subject: [PATCH 3/5] irqchip: atmel-aic: add specific irq fixup function for
- sam9g45 and sam9rl
-In-Reply-To: <1409735271-15353-1-git-send-email-boris.brezillon@free-electrons.com>
-References: <1409735271-15353-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1409735271-15353-4-git-send-email-boris.brezillon@free-electrons.com>
+Date: Wed,  3 Sep 2014 11:07:46 +0200
+Subject: [PATCH 0/5] irqchip: atmel-aic: add RTT irq fixup
+Message-ID: <1409735271-15353-1-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The at91sam9g45 and at91sam9rl SoCs embed one RTT (Real Time Timer) and one
-RTC block and thus need to call both rtt and rtc fixup functions.
+Hello,
 
-Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
----
- drivers/irqchip/irq-atmel-aic.c | 10 ++++++++--
- 1 file changed, 8 insertions(+), 2 deletions(-)
+This patch series add a new fixup function for the RTT (Real Time Timer)
+block and make use of it on SoCs integrating at least one RTT to prevent
+spurious interrupts on the first interrupt line.
 
-diff --git a/drivers/irqchip/irq-atmel-aic.c b/drivers/irqchip/irq-atmel-aic.c
-index c21c3d2..8e3b585 100644
---- a/drivers/irqchip/irq-atmel-aic.c
-+++ b/drivers/irqchip/irq-atmel-aic.c
-@@ -221,10 +221,16 @@ static void __init at91sam9260_aic_irq_fixup(struct device_node *root)
- 	aic_common_rtt_irq_fixup(root);
- }
- 
-+static void __init at91sam9g45_aic_irq_fixup(struct device_node *root)
-+{
-+	aic_common_rtc_irq_fixup(root);
-+	aic_common_rtt_irq_fixup(root);
-+}
-+
- static const struct of_device_id __initdata aic_irq_fixups[] = {
--	{ .compatible = "atmel,at91sam9g45", .data = at91sam9_aic_irq_fixup },
-+	{ .compatible = "atmel,at91sam9g45", .data = at91sam9g45_aic_irq_fixup },
- 	{ .compatible = "atmel,at91sam9n12", .data = at91sam9_aic_irq_fixup },
--	{ .compatible = "atmel,at91sam9rl", .data = at91sam9_aic_irq_fixup },
-+	{ .compatible = "atmel,at91sam9rl", .data = at91sam9g45_aic_irq_fixup },
- 	{ .compatible = "atmel,at91sam9x5", .data = at91sam9_aic_irq_fixup },
- 	{ .compatible = "atmel,at91sam9260", .data = at91sam9260_aic_irq_fixup },
- 	{ .compatible = "atmel,at91sam9261", .data = at91sam9260_aic_irq_fixup },
+This fixup function was previously implemented in
+arch/arm/mach-at91/sysirq_mask.c, but is now moved to the AIC driver so
+that we can remove SoC specific hooks in arch/arm/mach-at91/ when booting
+a DT kernel.
+
+This series also reworks the naming convention of the SoC specific fixup
+functions and add an entry for the at91rm9200.
+
+The series depends on the acceptation of the RTT DT bindings proposed here
+[1].
+
+Best Regards,
+
+Boris
+
+[1]https://lkml.org/lkml/2014/9/3/145
+
+Boris BREZILLON (5):
+  irqchip: atmel-aic: add irq fixup for RTT block
+  irqchip: atmel-aic: add irq fixups for at91sam926x SoCs
+  irqchip: atmel-aic: add specific irq fixup function for sam9g45 and
+    sam9rl
+  irqchip: atmel-aic: rename at91sam9_aic_irq_fixup for naming
+    consistency
+  irqchip: atmel-aic: add missing entry for rm9200 irq fixups
+
+ drivers/irqchip/irq-atmel-aic-common.c | 26 ++++++++++++++++++++++++++
+ drivers/irqchip/irq-atmel-aic-common.h |  2 ++
+ drivers/irqchip/irq-atmel-aic.c        | 26 +++++++++++++++++++++-----
+ 3 files changed, 49 insertions(+), 5 deletions(-)
+
 -- 
 1.9.1
