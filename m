@@ -1,37 +1,70 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 3 Sep 2014 10:45:47 +0100
-Subject: [RFC PATCH 4/7] iommu: provide helper function to configure an
- IOMMU for an of master
-In-Reply-To: <20140902205941.GA26123@suse.de>
-References: <1409327670-3495-1-git-send-email-will.deacon@arm.com>
- <3424322.yoZKhlAsy0@wuerfel> <20140902130508.GK25379@arm.com>
- <5897964.3ztXLVfPDF@wuerfel> <20140902205941.GA26123@suse.de>
-Message-ID: <20140903094547.GB32378@arm.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Wed, 03 Sep 2014 11:49:15 +0200
+Subject: [PATCHv2 4/4] clocksource: tcb_clksrc: unprepare clock in case
+ of failure
+In-Reply-To: <1409329003-17252-5-git-send-email-g.portay@overkiz.com>
+References: <1409329003-17252-1-git-send-email-g.portay@overkiz.com>
+ <1409329003-17252-5-git-send-email-g.portay@overkiz.com>
+Message-ID: <5406E41B.1040406@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 02, 2014 at 09:59:41PM +0100, jroedel at suse.de wrote:
-> On Tue, Sep 02, 2014 at 04:01:32PM +0200, Arnd Bergmann wrote:
-> > This is an artifact of the API being single-instance at the moment.
-> > We might not in fact need it, I was just trying to think of things
-> > that naturally fit in there and that are probably already linked
-> > together in the individual iommu drivers.
-> 
-> I am not sure what you mean by single-instance. Is it that currently the
-> API only supports one type of iommu_ops per bus? That should be fine as
-> long as there is only one type of IOMMU on the bus.
+On 08/29/2014 06:16 PM, Ga?l PORTAY wrote:
+> The clock is not unprepared in case of the request IRQ fails.
+>
+> Also update to request_irq.
+>
+> Signed-off-by: Ga?l PORTAY <g.portay@overkiz.com>
 
-The problem is really with the platform_bus, which is used as a catch-all
-for all the non-probable memory-mapped buses on an SoC. We really want to
-have different IOMMU types there.
+Acked-by: Daniel Lezcano <daniel.lezcano@linaro.org>
 
-> Besides that, it is a feature of the IOMMU-API to hide the details about
-> all the hardware IOMMUs in the system from its users.
+> ---
+>   drivers/clocksource/tcb_clksrc.c | 13 ++++---------
+>   1 file changed, 4 insertions(+), 9 deletions(-)
+>
+> diff --git a/drivers/clocksource/tcb_clksrc.c b/drivers/clocksource/tcb_clksrc.c
+> index f922e81..8bdbc45 100644
+> --- a/drivers/clocksource/tcb_clksrc.c
+> +++ b/drivers/clocksource/tcb_clksrc.c
+> @@ -178,12 +178,6 @@ static irqreturn_t ch2_irq(int irq, void *handle)
+>   	return IRQ_NONE;
+>   }
+>
+> -static struct irqaction tc_irqaction = {
+> -	.name		= "tc_clkevt",
+> -	.flags		= IRQF_TIMER,
+> -	.handler	= ch2_irq,
+> -};
+> -
+>   static int __init setup_clkevents(struct atmel_tc *tc, int clk32k_divisor_idx)
+>   {
+>   	int ret;
+> @@ -198,15 +192,16 @@ static int __init setup_clkevents(struct atmel_tc *tc, int clk32k_divisor_idx)
+>
+>   	clkevt.regs = tc->regs;
+>   	clkevt.clk = t2_clk;
+> -	tc_irqaction.dev_id = &clkevt;
+>
+>   	timer_clock = clk32k_divisor_idx;
+>
+>   	clkevt.clkevt.cpumask = cpumask_of(0);
+>
+> -	ret = setup_irq(irq, &tc_irqaction);
+> -	if (ret)
+> +	ret = request_irq(irq, ch2_irq, IRQF_TIMER, "tc_clkevt", &clkevt);
+> +	if (ret) {
+> +		clk_disable_unprepare(t2_clk);
+>   		return ret;
+> +	}
+>
+>   	clockevents_config_and_register(&clkevt.clkevt, 32768, 1, 0xffff);
+>
+>
 
-Sure, but even if we have multiple instances of the same IOMMU type, the
-complexity in dealing with that is currently pushed down into the drivers,
-with each one trying to construct its own notion of topology and master
-linkages. Moving some of this into generic code would ease the burden on
-IOMMU drivers.
 
-Will
+-- 
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
