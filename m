@@ -1,29 +1,78 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 03 Sep 2014 20:31:44 +0200
-Subject: [PATCH V3 0/6] ARM64: Add support for FSL's LS2085A SoC
-In-Reply-To: <20140903163130.GM3127@leverpostej>
-References: <1409757194-28155-1-git-send-email-bhupesh.sharma@freescale.com>
- <2843702.jP4KCB2Kid@wuerfel> <20140903163130.GM3127@leverpostej>
-Message-ID: <6499926.sQm3J8L764@wuerfel>
+From: keescook@chromium.org (Kees Cook)
+Date: Wed, 3 Sep 2014 11:34:41 -0700
+Subject: [PATCH v6 1/6] arm64: ptrace: add PTRACE_SET_SYSCALL
+In-Reply-To: <53FD6D7C.8030700@linaro.org>
+References: <1408611405-8943-1-git-send-email-takahiro.akashi@linaro.org>
+ <1408611405-8943-2-git-send-email-takahiro.akashi@linaro.org>
+ <CAGXu5jJrTEhdDZ8fipNeaVm1_wto7u2f=uq_KzyMcVHJMT57vw@mail.gmail.com>
+ <53F68C81.6020807@linaro.org> <20140826174637.GC23445@arm.com>
+ <53FD6D7C.8030700@linaro.org>
+Message-ID: <CAGXu5j+FNa36EdLeZ16TMeGNmgw7F7A06MZZMhFQSKFNfQWrhg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 03 September 2014 17:31:30 Mark Rutland wrote:
-> 
-> However, I'm not sure I follow the reasoning for making this
-> significantly harder, and even ignoring that I don't think this does
-> make things significantly harder. Especially so if we have a PSCI node
-> but not an enable method -- in that case its trivial to patch in an
-> unrelated enable-method anyhow.
+On Tue, Aug 26, 2014 at 10:32 PM, AKASHI Takahiro
+<takahiro.akashi@linaro.org> wrote:
+> Kees,
+>
+>
+> On 08/27/2014 02:46 AM, Will Deacon wrote:
+>>
+>> On Fri, Aug 22, 2014 at 01:19:13AM +0100, AKASHI Takahiro wrote:
+>>>
+>>> On 08/22/2014 01:47 AM, Kees Cook wrote:
+>>>>
+>>>> On Thu, Aug 21, 2014 at 3:56 AM, AKASHI Takahiro
+>>>> <takahiro.akashi@linaro.org> wrote:
+>>>>>
+>>>>> To allow tracer to be able to change/skip a system call by re-writing
+>>>>> a syscall number, there are several approaches:
+>>>>>
+>>>>> (1) modify x8 register with ptrace(PTRACE_SETREGSET), and handle this
+>>>>> case
+>>>>>       later on in syscall_trace_enter(), or
+>>>>> (2) support ptrace(PTRACE_SET_SYSCALL) as on arm
+>>>>>
+>>>>> Thinking of the fact that user_pt_regs doesn't expose 'syscallno' to
+>>>>> tracer as well as that secure_computing() expects a changed syscall
+>>>>> number
+>>>>> to be visible, especially case of -1, before this function returns in
+>>>>> syscall_trace_enter(), we'd better take (2).
+>>>>>
+>>>>> Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
+>>>>
+>>>>
+>>>> Thanks, I like having this on both arm and arm64.
+>>>
+>>>
+>>> Yeah, having this simplified the code of syscall_trace_enter() a bit, but
+>>> also imposes some restriction on arm64, too.
+>>>
+>>>   > I wonder if other archs should add this option too.
+>>>
+>>> Do you think so? I assumed that SET_SYSCALL is to be avoided if possible.
+>>>
+>>> I also think that SET_SYSCALL should take an extra argument for a return
+>>> value
+>>> just in case of -1 (or we have SKIP_SYSCALL?).
+>>
+>>
+>> I think we should propose this as a new request in the generic ptrace
+>> code.
+>> We can have an architecture-hook for actually setting the syscall, and
+>> allow
+>> architectures to define their own implementation of the request so they
+>> can
+>> be moved over one by one.
+>
+>
+> What do you think about this request?
 
-Right, it's not actually much harder. A better way to look at it is
-probably that we document what which parts we expect to stay constant
-and which parts are to be filled out by the boot loader. Independent
-of what PSCI implementation the boot loader provides, we would like
-to see enable-method="psci".
+That sounds fine -- it doesn't need to be part of this series. I was
+just noticing this was a common issue across multiple architectures.
 
-I just saw that Geoff had a related comment, and documenting this
-would make it clearer to other reviewers, as well as people that
-happen to look at this file as a base for new platforms.
+-Kees
 
-	Arnd
+-- 
+Kees Cook
+Chrome OS Security
