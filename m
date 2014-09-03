@@ -1,45 +1,42 @@
 From: apinski@cavium.com (Andrew Pinski)
-Date: Wed,  3 Sep 2014 14:19:17 -0700
-Subject: [PATCH 23/24] ARM64: Add ARM64_ILP32 to Kconfig
+Date: Wed,  3 Sep 2014 14:19:08 -0700
+Subject: [PATCH 14/24] ARM64:ILP32 use the standard start_thread for ILP32 so
+ the processor state is not AARCH32
 In-Reply-To: <1409779158-30963-1-git-send-email-apinski@cavium.com>
 References: <1409779158-30963-1-git-send-email-apinski@cavium.com>
-Message-ID: <1409779158-30963-24-git-send-email-apinski@cavium.com>
+Message-ID: <1409779158-30963-15-git-send-email-apinski@cavium.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the config option for ILP32.
+If we have both ILP32 and AARCH32 compiled in, we need use the non compat start
+thread for ILP32.
 
 Signed-off-by: Andrew Pinski <apinski@cavium.com>
 ---
- arch/arm64/Kconfig |    9 ++++++++-
- 1 files changed, 8 insertions(+), 1 deletions(-)
+ arch/arm64/include/asm/processor.h |   11 +++++++++++
+ 1 files changed, 11 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index 73c93dd..4ee4183 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -376,7 +376,7 @@ source "fs/Kconfig.binfmt"
- 
- config COMPAT
- 	def_bool y
--	depends on AARCH32_EL0
-+	depends on AARCH32_EL0 || ARM64_ILP32
- 	select COMPAT_BINFMT_ELF
- 
- config AARCH32_EL0
-@@ -393,6 +393,13 @@ config AARCH32_EL0
- 
- 	  If you want to execute 32-bit userspace applications, say Y.
- 
-+config ARM64_ILP32
-+	bool "Kernel support for ILP32"
-+	help
-+	  This option enables support for AArch64 ILP32 user space.  ILP32
-+	  is an ABI where long and pointers are 32bits but it uses the AARCH64
-+	  instruction set.
-+
- config SYSVIPC_COMPAT
- 	def_bool y
- 	depends on AARCH32_EL0 && SYSVIPC
+diff --git a/arch/arm64/include/asm/processor.h b/arch/arm64/include/asm/processor.h
+index 286b1be..7bd9f32 100644
+--- a/arch/arm64/include/asm/processor.h
++++ b/arch/arm64/include/asm/processor.h
+@@ -104,6 +104,17 @@ static inline void start_thread(struct pt_regs *regs, unsigned long pc,
+ static inline void compat_start_thread(struct pt_regs *regs, unsigned long pc,
+ 				       unsigned long sp)
+ {
++#ifdef CONFIG_ARM64_ILP32
++	/*
++	 * ILP32 thread are started the same way as LP64 threads.
++	 * Note we cannot use is_ilp32_compat_task here as that
++	 * would introduce a header depency issue.
++	 */
++	if (!test_thread_flag(TIF_AARCH32)) {
++		start_thread(regs, pc, sp);
++		return;
++	}
++#endif
+ 	start_thread_common(regs, pc);
+ 	regs->pstate = COMPAT_PSR_MODE_USR;
+ 	if (pc & 1)
 -- 
 1.7.2.5
