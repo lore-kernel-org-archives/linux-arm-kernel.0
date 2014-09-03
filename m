@@ -1,32 +1,25 @@
-From: b29396@freescale.com (Dong Aisheng)
-Date: Wed, 3 Sep 2014 20:19:33 +0800
-Subject: [PATCH 0/7] mmc: sdhci/imx: a few clean up and fixes
-In-Reply-To: <CAOMZO5D8GaMTCnGo4iO+eKYr6xXx3iyN-9pyNMUT-0f-dv1+FQ@mail.gmail.com>
-References: <1409745903-26550-1-git-send-email-b29396@freescale.com>
- <CAOMZO5D8GaMTCnGo4iO+eKYr6xXx3iyN-9pyNMUT-0f-dv1+FQ@mail.gmail.com>
-Message-ID: <20140903121929.GA31326@shlinux1.ap.freescale.net>
+From: matt@console-pimps.org (Matt Fleming)
+Date: Wed, 3 Sep 2014 13:46:13 +0100
+Subject: [PATCH 2/5] efi: introduce efi_md_typeattr_format()
+In-Reply-To: <1409532820-5027-3-git-send-email-lersek@redhat.com>
+References: <1409532820-5027-1-git-send-email-lersek@redhat.com>
+ <1409532820-5027-3-git-send-email-lersek@redhat.com>
+Message-ID: <20140903124613.GD3001@console-pimps.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 03, 2014 at 09:34:28AM -0300, Fabio Estevam wrote:
-> Hi Dong,
-> 
-> On Wed, Sep 3, 2014 at 9:04 AM, Dong Aisheng <b29396@freescale.com> wrote:
-> > A few clean up and fixes.
-> 
-> Usually it is a good idea to separate cleanup from fixes. Do any of
-> the fixes should go to 3.17-rc or stable?
-> 
+On Mon, 01 Sep, at 02:53:37AM, Laszlo Ersek wrote:
+> +char * __init efi_md_typeattr_format(char *buf, size_t size,
+> +				     const efi_memory_desc_t *md)
+> +{
+> +	char *pos;
+> +	int type_len;
+> +	register u64 attr;
 
-Thanks for reminder.
-Most are tiny fixes and clean up.
-If to be strictly, Patch 3 mmc: sdhci-esdhc-imx: add ADMA Length Mismatch errata fix
-could go to stable although the issue is very very hard to reproduce as stated
-in errata.
+You can delete the 'register' keyword, since the compiler is free to
+ignore it (and will do so).
 
-Regards
-Dong Aisheng
+Rest of the patch looks good.
 
-> Regards,
-> 
-> Fabio Estevam
+-- 
+Matt Fleming, Intel Open Source Technology Center
