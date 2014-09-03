@@ -1,243 +1,65 @@
 From: peter.griffin@linaro.org (Peter Griffin)
-Date: Wed,  3 Sep 2014 11:27:57 +0100
-Subject: [PATCH 1/3] phy: phy-stih407-usb: Add usb picoPHY driver found on
- stih407 SoC family
+Date: Wed,  3 Sep 2014 11:27:58 +0100
+Subject: [PATCH 2/3] phy: phy-stih407-usb: Add dt documentation for USB
+ picophy found on stih407 SoC family
 In-Reply-To: <1409740079-16554-1-git-send-email-peter.griffin@linaro.org>
 References: <1409740079-16554-1-git-send-email-peter.griffin@linaro.org>
-Message-ID: <1409740079-16554-2-git-send-email-peter.griffin@linaro.org>
+Message-ID: <1409740079-16554-3-git-send-email-peter.griffin@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is the generic phy driver for the picoPHY ports used by the
-USB2 and USB3 Host controllers available on STiH407 consumer electronic
-SoC families available from STMicroelectronics.
+This patch adds the dt documentation for the usb picophy found on stih407 SoC family
+available from STMicroelectronics.
 
 Signed-off-by: Giuseppe Cavallaro <peppe.cavallaro@st.com>
 Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
 ---
- drivers/phy/Kconfig           |   8 ++
- drivers/phy/Makefile          |   2 +
- drivers/phy/phy-stih407-usb.c | 185 ++++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 195 insertions(+)
- create mode 100644 drivers/phy/phy-stih407-usb.c
+ .../devicetree/bindings/phy/phy-stih407-usb.txt    | 37 ++++++++++++++++++++++
+ 1 file changed, 37 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/phy/phy-stih407-usb.txt
 
-diff --git a/drivers/phy/Kconfig b/drivers/phy/Kconfig
-index 0dd7427..58018f7 100644
---- a/drivers/phy/Kconfig
-+++ b/drivers/phy/Kconfig
-@@ -230,4 +230,12 @@ config PHY_XGENE
- 	help
- 	  This option enables support for APM X-Gene SoC multi-purpose PHY.
- 
-+config PHY_STIH407_USB
-+	tristate "STMicroelectronics USB2 picoPHY driver for STiH407 family"
-+	depends on ARCH_STI
-+	depends on GENERIC_PHY
-+	help
-+	  Enable this support to enable the picoPHY device used by USB2
-+	  and USB3 controllers on STMicroelectronics STiH407 SoC families.
-+
- endmenu
-diff --git a/drivers/phy/Makefile b/drivers/phy/Makefile
-index 95c69ed..c82ac59 100644
---- a/drivers/phy/Makefile
-+++ b/drivers/phy/Makefile
-@@ -28,3 +28,5 @@ obj-$(CONFIG_PHY_QCOM_IPQ806X_SATA)	+= phy-qcom-ipq806x-sata.o
- obj-$(CONFIG_PHY_ST_SPEAR1310_MIPHY)	+= phy-spear1310-miphy.o
- obj-$(CONFIG_PHY_ST_SPEAR1340_MIPHY)	+= phy-spear1340-miphy.o
- obj-$(CONFIG_PHY_XGENE)			+= phy-xgene.o
-+obj-$(CONFIG_PHY_STIH407_USB)		+= phy-stih407-usb.o
-+
-diff --git a/drivers/phy/phy-stih407-usb.c b/drivers/phy/phy-stih407-usb.c
+diff --git a/Documentation/devicetree/bindings/phy/phy-stih407-usb.txt b/Documentation/devicetree/bindings/phy/phy-stih407-usb.txt
 new file mode 100644
-index 0000000..8019e3b
+index 0000000..650d346
 --- /dev/null
-+++ b/drivers/phy/phy-stih407-usb.c
-@@ -0,0 +1,185 @@
-+/*
-+ * Copyright (C) 2014 STMicroelectronics
-+ *
-+ * STMicroelectronics Generic PHY driver for STiH407 USB2.
-+ *
-+ * Author: Giuseppe Cavallaro <peppe.cavallaro@st.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2, as
-+ * published by the Free Software Foundation.
-+ *
-+ */
-+#include <linux/platform_device.h>
-+#include <linux/io.h>
-+#include <linux/kernel.h>
-+#include <linux/module.h>
-+#include <linux/of.h>
-+#include <linux/of_platform.h>
-+#include <linux/clk.h>
-+#include <linux/regmap.h>
-+#include <linux/reset.h>
-+#include <linux/mfd/syscon.h>
-+#include <linux/phy/phy.h>
++++ b/Documentation/devicetree/bindings/phy/phy-stih407-usb.txt
+@@ -0,0 +1,37 @@
++ST STiH407 USB-PHY controller
 +
-+/* Default PHY_SEL and REFCLKSEL configuration */
-+#define STIH407_USB_PICOPHY_CTRL_PORT_CONF	0x6
-+#define STIH407_USB_PICOPHY_CTRL_PORT_MASK	0x1f
++This file documents the dt bindings for the picoPHY driver which is the PHY for both USB2 and USB3 host controllers
++controllers available on STiH407 SoC families.
 +
-+/* ports parameters overriding */
-+#define STIH407_USB_PICOPHY_PARAM_DEF		0x39a4dc
-+#define STIH407_USB_PICOPHY_PARAM_MASK		0xffffffff
++On STiH410, we have to use the DWC3 port#2 with a picoPHY to manage USB2
++devices. The USB2 Controller will use the ports #0 and #1.
 +
-+struct stih407_usb2_picophy {
-+	struct phy *phy;
-+	struct regmap *regmap;
-+	struct device *dev;
-+	struct reset_control *rstc;
-+	struct reset_control *rstport;
-+	int ctrl;
-+	int param;
++This is to document the DT parameters to be passed from the blob in that case.
++
++Required properties:
++- compatible		: should be "st,stih407-usb2-phy"
++- reg			: contain the offset and length of the system configuration registers
++			  used as glue logic to control & parameter phy
++- reg-names		: the names of the system configuration registers in "reg", should be "param" and "reg"
++- st,syscfg		: sysconfig register to manage phy parameter at driver level
++- resets		: list of phandle and reset specifier pairs. There should be two entries, one
++			  for the whole phy and one for the port
++- reset-names		: list of reset signal names. Should be "global" and "port"
++See: Documentation/devicetree/bindings/reset/st,sti-powerdown.txt
++See: Documentation/devicetree/bindings/reset/reset.txt
++
++Example:
++
++usb2_picophy0: usbpicophy at 0 {
++	compatible	= "st,stih407-usb2-phy";
++	reg		= <0xf8 0x04>,	/* syscfg 5062 */
++			  <0xf4 0x04>;	/* syscfg 5061 */
++	reg-names	= "param",
++			  "ctrl";
++			  #phy-cells = <0>;
++	st,syscfg	= <&syscfg_core>;
++	resets		= <&softreset STIH407_PICOPHY_SOFTRESET>,
++			  <&picophyreset STIH407_PICOPHY0_RESET>;
++	reset-names	= "global",
++			  "port";
 +};
-+
-+static int stih407_usb2_pico_ctrl(struct stih407_usb2_picophy *phy_dev)
-+{
-+	reset_control_deassert(phy_dev->rstc);
-+
-+	return regmap_update_bits(phy_dev->regmap, phy_dev->ctrl,
-+				  STIH407_USB_PICOPHY_CTRL_PORT_MASK,
-+				  STIH407_USB_PICOPHY_CTRL_PORT_CONF);
-+}
-+
-+static int stih407_usb2_init_port(struct phy *phy)
-+{
-+	int ret;
-+	struct stih407_usb2_picophy *phy_dev = phy_get_drvdata(phy);
-+
-+	stih407_usb2_pico_ctrl(phy_dev);
-+
-+	ret = regmap_update_bits(phy_dev->regmap,
-+				 phy_dev->param,
-+				 STIH407_USB_PICOPHY_PARAM_MASK,
-+				 STIH407_USB_PICOPHY_PARAM_DEF);
-+	if (ret)
-+		return ret;
-+
-+	return reset_control_deassert(phy_dev->rstport);
-+}
-+
-+static int stih407_usb2_exit_port(struct phy *phy)
-+{
-+	struct stih407_usb2_picophy *phy_dev = phy_get_drvdata(phy);
-+
-+	/*
-+	 * Only port reset is asserted, phy global reset is kept untouched
-+	 * as other ports may still be active. When all ports are in reset
-+	 * state, assumption is made that power will be cut off on the phy, in
-+	 * case of suspend for instance. Theoretically, asserting individual
-+	 * reset (like here) or global reset should be equivalent.
-+	 */
-+	return reset_control_assert(phy_dev->rstport);
-+}
-+
-+static const struct phy_ops stih407_usb2_picophy_data = {
-+	.init = stih407_usb2_init_port,
-+	.exit = stih407_usb2_exit_port,
-+	.owner = THIS_MODULE,
-+};
-+
-+static const struct of_device_id stih407_usb2_picophy_of_match[];
-+
-+static int stih407_usb2_picophy_probe(struct platform_device *pdev)
-+{
-+	const struct of_device_id *match;
-+	struct stih407_usb2_picophy *phy_dev;
-+	struct device *dev = &pdev->dev;
-+	struct device_node *np = dev->of_node;
-+	struct phy_provider *phy_provider;
-+	struct phy *phy;
-+	struct resource *res;
-+
-+	phy_dev = devm_kzalloc(dev, sizeof(*phy_dev), GFP_KERNEL);
-+	if (!phy_dev)
-+		return -ENOMEM;
-+
-+	match = of_match_device(stih407_usb2_picophy_of_match, dev);
-+	if (!match)
-+		return -ENODEV;
-+
-+	phy_dev->dev = dev;
-+	dev_set_drvdata(dev, phy_dev);
-+
-+	phy_dev->rstc = devm_reset_control_get(dev, "global");
-+	if (IS_ERR(phy_dev->rstc)) {
-+		dev_err(dev, "failed to ctrl picoPHY reset\n");
-+		return PTR_ERR(phy_dev->rstc);
-+	}
-+
-+	phy_dev->rstport = devm_reset_control_get(dev, "port");
-+	if (IS_ERR(phy_dev->rstport)) {
-+		dev_err(dev, "failed to ctrl picoPHY reset\n");
-+		return PTR_ERR(phy_dev->rstport);
-+	}
-+
-+	/* Reset port by default: only deassert it in phy init */
-+	reset_control_assert(phy_dev->rstport);
-+
-+	phy_dev->regmap = syscon_regmap_lookup_by_phandle(np, "st,syscfg");
-+	if (IS_ERR(phy_dev->regmap)) {
-+		dev_err(dev, "No syscfg phandle specified\n");
-+		return PTR_ERR(phy_dev->regmap);
-+	}
-+
-+	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "ctrl");
-+	if (!res) {
-+		dev_err(dev, "No ctrl reg found\n");
-+		return -ENXIO;
-+	}
-+	phy_dev->ctrl = res->start;
-+
-+	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "param");
-+	if (!res) {
-+		dev_err(dev, "No param reg found\n");
-+		return -ENXIO;
-+	}
-+	phy_dev->param = res->start;
-+
-+	phy = devm_phy_create(dev, NULL, match->data, NULL);
-+	if (IS_ERR(phy)) {
-+		dev_err(dev, "failed to create Display Port PHY\n");
-+		return PTR_ERR(phy);
-+	}
-+
-+	phy_dev->phy = phy;
-+	phy_set_drvdata(phy, phy_dev);
-+
-+	phy_provider = devm_of_phy_provider_register(dev, of_phy_simple_xlate);
-+	if (IS_ERR(phy_provider))
-+		return PTR_ERR(phy_provider);
-+
-+	dev_info(dev, "STiH407 USB Generic picoPHY driver probed!");
-+
-+	return 0;
-+}
-+
-+static const struct of_device_id stih407_usb2_picophy_of_match[] = {
-+	{ .compatible = "st,stih407-usb2-phy",
-+	  .data = &stih407_usb2_picophy_data },
-+	{ /*sentinel */ },
-+};
-+
-+MODULE_DEVICE_TABLE(of, stih407_usb2_picophy_of_match);
-+
-+static struct platform_driver stih407_usb2_picophy_driver = {
-+	.probe = stih407_usb2_picophy_probe,
-+	.driver = {
-+		   .name = "stih407-usb-genphy",
-+		   .of_match_table = stih407_usb2_picophy_of_match,
-+		   }
-+};
-+
-+module_platform_driver(stih407_usb2_picophy_driver);
-+
-+MODULE_AUTHOR("Giuseppe Cavallaro <peppe.cavallaro@st.com>");
-+MODULE_DESCRIPTION("STMicroelectronics Generic picoPHY driver for STiH407");
-+MODULE_LICENSE("GPL v2");
 -- 
 1.9.1
