@@ -1,28 +1,22 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 3 Sep 2014 14:45:59 -0700
-Subject: [PATCH] ARM: dts: am335x-bone*: Fix model name and update
- compatibility information
-In-Reply-To: <1409760190-17275-1-git-send-email-nm@ti.com>
-References: <1409760190-17275-1-git-send-email-nm@ti.com>
-Message-ID: <20140903214558.GN11766@atomide.com>
+Date: Wed, 3 Sep 2014 14:47:16 -0700
+Subject: [PATCH] ARM: dts: am437x-gp: switch i2c0 to 100KHz
+In-Reply-To: <1409769981-17669-1-git-send-email-nm@ti.com>
+References: <1409769981-17669-1-git-send-email-nm@ti.com>
+Message-ID: <20140903214715.GO11766@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Nishanth Menon <nm@ti.com> [140903 09:03]:
-> Beaglebone white and beaglebone black differ in tiny little aspects.
-> This is the reason why we maintain seperate dts for these platforms.
-> However, there is no real way to decode from dtb which platform it is
-> since compatible and model name are the same for both platforms.
+* Nishanth Menon <nm@ti.com> [140903 11:46]:
+> On the GP EVM, the ambient light sensor is limited to 100KHz on the
+> I2C bus.
 > 
-> Fix this so that beaglebone black and beaglebone are identifiable,
-> while maintaining compatibility for older zImages which might use old
-> beaglebone compatible flag for black as well.
+> So use 100kHz for I2C on the GP EVM due to this limitation on the
+> ambient light sensor.
 > 
-> Reported-by: Tom Rini <trini@ti.com>
+> Reported-by: Aparna Balasubramanian <aparnab@ti.com>
 > Signed-off-by: Nishanth Menon <nm@ti.com>
 
-Thanks applying into omap-for-v3.18/fixes-not-urgent.
-
-Regards,
+Thanks applying into omap-for-v3.7/fixes-v2.
 
 Tony
