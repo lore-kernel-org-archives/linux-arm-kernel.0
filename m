@@ -1,33 +1,88 @@
-From: Nathan_Lynch@mentor.com (Nathan Lynch)
-Date: Wed, 3 Sep 2014 09:09:06 -0500
-Subject: [PATCH 0/4] arm_arch_timer: VDSO preparation, code consolidation
-In-Reply-To: <1408743797-7648-1-git-send-email-nathan_lynch@mentor.com>
-References: <1408743797-7648-1-git-send-email-nathan_lynch@mentor.com>
-Message-ID: <54072102.1020605@mentor.com>
+From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
+Date: Wed, 03 Sep 2014 16:14:07 +0200
+Subject: [PATCH v8 6/7] clk: Add floor and ceiling constraints to clock
+ rates
+In-Reply-To: <20140903001346.5251.47709@quantum>
+References: <1409585377-26091-1-git-send-email-tomeu.vizoso@collabora.com>
+ <1409585675-26894-1-git-send-email-tomeu.vizoso@collabora.com>
+ <1409585675-26894-3-git-send-email-tomeu.vizoso@collabora.com>
+ <20140903001346.5251.47709@quantum>
+Message-ID: <5407222F.9040200@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/22/2014 04:43 PM, Nathan Lynch wrote:
-> This series contains the necessary changes to allow architected timer
-> access from user-space on 32-bit ARM.  This allows the VDSO to support
-> high resolution timestamps for clock_gettime and gettimeofday.  This
-> also merges substantially similar code from arm and arm64 into the
-> core arm_arch_timer driver.
-> 
-> These patches have been carried as part of the ARM VDSO patch set over
-> the last several months, but I am splitting them out here as I assume
-> they should go through the clocksource maintainer.
-> 
-> Nathan Lynch (4):
->   clocksource: arm_arch_timer: change clocksource name if CP15
->     unavailable
->   clocksource: arm_arch_timer: enable counter access for 32-bit ARM
->   ARM: arch_timer: remove unused functions
->   arm64: arch_timer: remove unused functions
-> 
->  arch/arm/include/asm/arch_timer.h    | 25 -------------------
->  arch/arm64/include/asm/arch_timer.h  | 31 -----------------------
->  drivers/clocksource/arm_arch_timer.c | 48 +++++++++++++++++++++++++++++++++---
->  3 files changed, 44 insertions(+), 60 deletions(-)
+On 09/03/2014 02:13 AM, Mike Turquette wrote:
+> Quoting Tomeu Vizoso (2014-09-01 08:34:34)
+>> @@ -1633,6 +1636,13 @@ int clk_provider_set_rate(struct clk_core *clk, unsigned long rate)
+>>          /* prevent racing with updates to the clock topology */
+>>          clk_prepare_lock();
+>>
+>> +       hlist_for_each_entry(clk_user, &clk->per_user_clks, child_node) {
+>> +               rate = max(rate, clk_user->floor_constraint);
+>> +
+>> +               if (clk_user->ceiling_constraint > 0)
+>> +                       rate = min(rate, clk_user->ceiling_constraint);
+>
+> A ceiling_constraint from consumer_A could be less than a
+> floor_constraint from consumer_B. What should we do in this case?
+>
+> In the code above the ceiling_constraint will always win. Is that by
+> design? We should document that behavior in Documentation/clk.txt.
+>
+> This is the right place to check for the aforementioned corner case,
+> since we not only care about a single consumer having sane constraints
+> (e.g. min < max) but also mixing constraints across consumers.
 
-Daniel, do you plan to take this series for 3.18?
+Yeah. I think I lean towards first applying all floors, then applying 
+all ceilings. Because hardware damage could happen if a ceiling from 
+thermal isn't applied because of a bug in some other driver.
+
+This also has the advantage of being deterministic, when with the 
+current approach the result depends on the order in which the per-user 
+clocks are iterated.
+
+> However ...
+>
+>> +       }
+>> +
+>>          /* bail early if nothing to do */
+>>          if (rate == clk_provider_get_rate(clk))
+>>                  goto out;
+>> @@ -1699,6 +1709,24 @@ int clk_set_rate(struct clk *clk_user, unsigned long rate)
+>>   }
+>>   EXPORT_SYMBOL_GPL(clk_set_rate);
+>>
+>> +int clk_set_floor_rate(struct clk *clk_user, unsigned long rate)
+>> +{
+>> +       struct clk_core *clk = clk_to_clk_core(clk_user);
+>> +
+>> +       clk_user->floor_constraint = rate;
+>> +       return clk_provider_set_rate(clk, clk_provider_get_rate(clk));
+>> +}
+>> +EXPORT_SYMBOL_GPL(clk_set_floor_rate);
+>> +
+>> +int clk_set_ceiling_rate(struct clk *clk_user, unsigned long rate)
+>> +{
+>> +       struct clk_core *clk = clk_to_clk_core(clk_user);
+>> +
+>> +       clk_user->ceiling_constraint = rate;
+>> +       return clk_provider_set_rate(clk, clk_provider_get_rate(clk));
+>> +}
+>> +EXPORT_SYMBOL_GPL(clk_set_ceiling_rate);
+>
+> ... we should probably sanity-check constraints here to make sure that
+> ceiling_rates for a given consumer are higher than floor_constraints for
+> that same consumer. It's a bit extra overhead but a WARN would probably
+> be helpful in this case.
+
+Sounds like a good idea to me, will do.
+
+Thanks,
+
+Tomeu
+
+> Rest of the patch looks good.
+>
+> Regards,
+> Mike
+>
