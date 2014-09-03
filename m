@@ -1,29 +1,57 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 3 Sep 2014 10:19:46 +0200
-Subject: [PATCH 06/11 v5] coresight-replicator: add CoreSight Replicator
- driver
-In-Reply-To: <1409159852-7249-7-git-send-email-mathieu.poirier@linaro.org>
-References: <1409159852-7249-1-git-send-email-mathieu.poirier@linaro.org>
- <1409159852-7249-7-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <CACRpkdb2PvkUOyVkhzk8WF457kZ5zqQVo5eFSMHk8u+mbNaZXQ@mail.gmail.com>
+From: naveenkrishna.ch@gmail.com (Naveen Krishna Ch)
+Date: Wed, 3 Sep 2014 13:51:56 +0530
+Subject: [PATCH] tty/serial: fix config dependencies for samsung serial
+In-Reply-To: <3749760.naNt3fHoTI@wuerfel>
+References: <1409671320-7604-1-git-send-email-ch.naveen@samsung.com>
+ <3749760.naNt3fHoTI@wuerfel>
+Message-ID: <CAHfPSqAn5gHjDA75Zf1W5=GH9_W+X6+4oc9rDK7CqeSoF3DURw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 27, 2014 at 7:17 PM,  <mathieu.poirier@linaro.org> wrote:
+Hi Arnd,
 
-> From: Pratik Patel <pratikp@codeaurora.org>
+On 2 September 2014 21:16, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Tuesday 02 September 2014 20:52:00 Naveen Krishna Chatradhi wrote:
+>> Make the config symbols SERIAL_SAMSUNG_UARTS_4 and
+>> SERIAL_SAMSUNG_UARTS depend on SERIAL_SAMSUNG rather than
+>> PLAT_SAMSUNG.
 >
-> This driver manages non-configurable CoreSight Replicator that
-> takes a single input trace data stream and replicates it to
-> produce two identical trace data output streams. Replicators
-> are typically used to route single interleaved trace data
-> stream to two or more sinks.
+> Please always describe why you are doing a change. This patch
+> seems really pointless.
+
+The SERIAL_SAMSUNG_UARTS_4 and SERIAL_SAMSUNG_UARTS config options are
+meaningful only if SERIAL_SAMSUNG is enabled. Hence the dependency
+rules were changed. I will repost this patch with better description.
+
 >
-> Signed-off-by: Pratik Patel <pratikp@codeaurora.org>
-> Signed-off-by: Panchaxari Prasannamurthy <panchaxari.prasannamurthy@linaro.org>
-> Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+>>  config SERIAL_SAMSUNG_UARTS_4
+>>         bool
+>> -       depends on PLAT_SAMSUNG
+>> +       depends on SERIAL_SAMSUNG
+>>         default y if !(CPU_S3C2410 || CPU_S3C2412 || CPU_S3C2440 || CPU_S3C2442)
+>>         help
+>>           Internal node for the common case of 4 Samsung compatible UARTs
+>>
+>>  config SERIAL_SAMSUNG_UARTS
+>>         int
+>> -       depends on PLAT_SAMSUNG
+>> +       depends on SERIAL_SAMSUNG
+>>         default 4 if SERIAL_SAMSUNG_UARTS_4 || CPU_S3C2416
+>>         default 3
+>>         help
+>>
+>
+> Have you checked that it still builds on all samsung platforms when
+> SERIAL_SAMSUNG is disabled? We have had build errors in this area
+> in the past.
 
-Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
+Yes, it builds for other Samsung platforms.
 
-Yours,
-Linus Walleij
+>
+>         Arnd
+
+Thanks.
+
+-- 
+Shine bright,
+(: Nav :)
