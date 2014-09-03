@@ -1,39 +1,41 @@
-From: preeti@linux.vnet.ibm.com (Preeti U Murthy)
-Date: Wed, 03 Sep 2014 14:11:14 +0530
-Subject: [PATCH v5 04/12] sched: Allow all archs to set the capacity_orig
-In-Reply-To: <CAKfTPtCNPYOi9OY37nbG9o71n4i5mxxvrRow0SgL_9pVK1LpMA@mail.gmail.com>
-References: <1409051215-16788-1-git-send-email-vincent.guittot@linaro.org>
- <1409051215-16788-5-git-send-email-vincent.guittot@linaro.org>
- <540204DC.5090204@linux.vnet.ibm.com>
- <CAKfTPtCNPYOi9OY37nbG9o71n4i5mxxvrRow0SgL_9pVK1LpMA@mail.gmail.com>
-Message-ID: <5406D42A.8090209@linux.vnet.ibm.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 3 Sep 2014 10:43:00 +0200
+Subject: [PATCH 08/11 v5] coresight: adding documentation for coresight
+In-Reply-To: <1409159852-7249-9-git-send-email-mathieu.poirier@linaro.org>
+References: <1409159852-7249-1-git-send-email-mathieu.poirier@linaro.org>
+ <1409159852-7249-9-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <CACRpkdbD3Ds=iPxwD57ERd=xPAyVvdVbMEfjqdtAvO-0YqT_EA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/01/2014 01:35 PM, Vincent Guittot wrote:
-> On 30 August 2014 19:07, Preeti U Murthy <preeti@linux.vnet.ibm.com> wrote:
->> Hi Vincent,
->>
->> On 08/26/2014 04:36 PM, Vincent Guittot wrote:
->>> capacity_orig is only changed for system with a SMT sched_domain level in order
->>
->> I think I had asked this before, but why only capacity_orig? The
->> capacity of a group is also being updated the same way. This patch fixes
->> the capacity of a group to reflect the capacity of the heterogeneous
->> CPUs in it, this capacity being both the full capacity of the group:
->> capacity_orig and the capacity available for the fair tasks. So I feel
->> in the subject as well as the changelog it would suffice to say 'capacity'.
-> 
-> IIRC, we discussed that point on a former version. The patch changes
-> only the behavior of capacity_orig but the behavior of capacity stays
-> unchanged as all archs can already set the capacity whereas the
-> capacity_orig was configurable only if the SD_SHARE_CPUCAPACITY was
-> set in the sched_domain. This is no more the case with this patch
-> which creates arch_scale_cpu_capacity for setting capacity_orig.
+On Wed, Aug 27, 2014 at 7:17 PM,  <mathieu.poirier@linaro.org> wrote:
 
-Yes, sorry I overlooked that.
+> From: Mathieu Poirier <mathieu.poirier@linaro.org>
+>
+> Documentation for the coresight framework and drivers.
+>
+> Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+(...)
+>  Documentation/trace/coresight.txt | 237 ++++++++++++++++++++++++++++++++++++++
 
-Reviewed-by: Preeti U. Murthy <preeti@linux.vnet.ibm.com>
+I guess you agreed on this location? If it's ARM-specific,
+Documentation/arm/coresight.txt
+is an alternative.
 
-Regards
-Preeti U Murthy
+> +The file cstrace.bin can be decompressed using "ptm2human", DS-5 or Trace32.
+
+Is ptm2human a candidate for the kernel tools/ directory?
+
+Maybe not now but later?
+
++root at linaro-developer:/sys/kernel/debug/coresight# ls
+
+Maybe reduce noise here:
+
+root:/sys/kernel/debug/coresight# ls
+
+The reader probably does not need to know the name of your
+development system.
+
+Yours,
+Linus Walleij
