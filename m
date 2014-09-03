@@ -1,47 +1,64 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 03 Sep 2014 14:50:22 +0200
-Subject: [PATCH v4 1/4] ethernet: arc: Add support for Rockchip SoC layer
- device tree bindings
-In-Reply-To: <12261801.xhz3LcucGs@diego>
-References: <1409740036-8117-1-git-send-email-romain.perier@gmail.com>
- <3774938.44qiV4hEoE@wuerfel> <12261801.xhz3LcucGs@diego>
-Message-ID: <3545574.7Z5WmaTlg0@wuerfel>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Wed, 3 Sep 2014 15:01:31 +0200
+Subject: [PATCH v2 0/5] beautify EFI memmap logs
+In-Reply-To: <1409743943-16934-1-git-send-email-lersek@redhat.com>
+References: <1409743943-16934-1-git-send-email-lersek@redhat.com>
+Message-ID: <CAKv+Gu_Yk-q0gf+EHc3EYQ=obLT2nj6Kj6qPTk678ASFEW+ZFQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 03 September 2014 14:20:50 Heiko St?bner wrote:
-> > 
-> > One last question: is this the location given as .grf_offset the
-> > only thing in grf that is potentially of concern to this driver?
-> > 
-> > If it is, you can change the binding to include the register number
-> > in the syscon reference, like
-> > 
-> >       rockchip,grf = <&grf 0x154>;
-> > 
-> > and then read it from there, to simplify the code needed to get the
-> > number from the device id.
-> 
-> I would disagree here 
-> 
-> Specific to the emac, there also exists a second register in the grf (0xa8 for 
-> the rk3188) that contains a field 
-> 
-> ----
-> emac_newrcv_en - the selection of RMII receive selection
-> 0: don't support the data package without header
-> 1: support the data package without header
-> ----
-> 
-> which we don't handle currently but somebody might want to in the future.
-> [There also is no documentation of this at all]
+On 3 September 2014 13:32, Laszlo Ersek <lersek@redhat.com> wrote:
+> changes in v2:
+> - explain with examples how the log's appearance changes, in patches 3-5
+>   [Ingo]
+>
+> v1 blurb:
+>
+>> It's a pain to analyze EFI memmap logs while debugging, especially to
+>> verify the memory types (an enum) and the memory attributes (a
+>> bitmap). This series renders those columns human-readable, and unifies
+>> their formatting between x86, ia64 and arm64.
+>
 
-Ok, fair enough. If there is a chance that there would be more of these
-fields that we may want to support in the future, the table approach
-seems reasonable.
+Tested-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+(on arm64 only)
 
-The main advantage of putting the register number into the syscon
-reference is to support future models without driver changes, but
-it's not clear if that's worth it.
++1 for aligning between architectures
++1 for cleaning up the output to make it more readable
 
-	Arnd
+The only thing I am not entirely convinced about is printing all those
+memory attributes: is it really so interesting to know that region X
+/can/ be configured as writeback, write through, write combining etc
+etc, as most regions seem to support most attributes, yet it tells you
+nothing about what the kernel ends up doing with that information. In
+the arm64 case, for instance, all MEMORY_WB ranges are mapped
+writeback cached, and everything else is mapped uncached.
+
+-- 
+Ard.
+
+
+> Laszlo Ersek (5):
+>   efi: add macro for EFI_MEMORY_UCE memory attribute
+>   efi: introduce efi_md_typeattr_format()
+>   x86: efi: format EFI memory type & attrs with efi_md_typeattr_format()
+>   ia64: efi: format EFI memory type & attrs with
+>     efi_md_typeattr_format()
+>   arm64: efi: format EFI memory type & attrs with
+>     efi_md_typeattr_format()
+>
+>  include/linux/efi.h         |  8 +++++++
+>  arch/arm64/kernel/efi.c     | 26 +++++----------------
+>  arch/ia64/kernel/efi.c      |  6 +++--
+>  arch/x86/platform/efi/efi.c |  7 ++++--
+>  drivers/firmware/efi/efi.c  | 57 +++++++++++++++++++++++++++++++++++++++++++++
+>  5 files changed, 80 insertions(+), 24 deletions(-)
+>
+> --
+> 1.8.3.1
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
