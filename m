@@ -1,75 +1,36 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Wed, 3 Sep 2014 14:48:46 +0900
-Subject: [PATCH repost] ARM: shmobile: lager: correct memory map
-In-Reply-To: <54068031.5050806@renesas.com>
-References: <20140903004901.GA3277@verge.net.au> <54068031.5050806@renesas.com>
-Message-ID: <20140903054843.GA29259@verge.net.au>
+From: sr@denx.de (Stefan Roese)
+Date: Wed, 03 Sep 2014 07:51:42 +0200
+Subject: [PATCH 1/5] ARM: sun4i: Relicense the A10 DTSI under GPLv2/X11
+In-Reply-To: <1409682069-7164-1-git-send-email-maxime.ripard@free-electrons.com>
+References: <1409682069-7164-1-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <5406AC6E.6070002@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Khiem-san,
+On 02.09.2014 20:21, Maxime Ripard wrote:
+> The current GPL only licensing on the DTSI makes it very impractical for other
+> software components licensed under another license.
+>
+> In order to make it easier for them to reuse our device trees, relicense our
+> DTSI first under a GPL/X11 dual-license. Hopefully, the DTS will follow soon.
+>
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> Cc: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+> Cc: Arnd Bergmann <arnd@arndb.de>
+> Cc: Carlo Caione <carlo.caione@gmail.com>
+> Cc: Chen-Yu Tsai <wens@csie.org>
+> Cc: David Lanzend?rfer <david.lanzendoerfer@o2s.ch>
+> Cc: Emilio L?pez <emilio@elopez.com.ar>
+> Cc: Hans de Goede <hdegoede@redhat.com>
+> Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> Cc: Oliver Schinagl <oliver@schinagl.nl>
+> Cc: Roman Byshko <rbyshko@gmail.com>
+> Cc: Stefan Roese <sr@denx.de>
+> ---
 
-On Wed, Sep 03, 2014 at 11:42:57AM +0900, Khiem Nguyen wrote:
-> Dear Simon-san, Shiiba-san,
-> 
-> Thanks for the patch.
-> 
-> On 9/3/2014 9:49 AM, Simon Horman wrote:
-> > The base address of the second memory region on the lager
-> > board is 0x140000000. Update the tag used in the dts file accordingly.
-> > 
-> > This is a documentation fix and should have no run-time affect.
-> > 
-> > This problem was introduced when the second memory region
-> > was added to the lager dts file by 62bc32a2573c4219
-> > ("ARM: shmobile: Include all 4 GiB of memory on Lager)"
-> > in v3.14.
-> > 
-> > Reported-by: NAOYA SHIIBA <naoya.shiiba.nx@renesas.com>
-> > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-> > ---
-> >  arch/arm/boot/dts/r8a7790-lager.dts | 2 +-
-> >  1 file changed, 1 insertion(+), 1 deletion(-)
-> > 
-> > I am reposting this as Olof originally requested a syntax change,
-> > which I followed up on, however that change no longer seems appropriate.
-> > This this patch seems to be correct.
-> [...]
-> > -	memory at 180000000 {
-> > +	memory at 140000000 {
-> 
-> Could you give more information about not using new syntax ?
-> 
-> I checked memblock information in both 2 ways 
-> (i.e memory at 140000000 and memory at 1,40000000)
-> and I got same result.
-> root at lager:~# cat /sys/kernel/debug/memblock/memory
->    0: 0x0000000040000000..0x000000007fffffff
->    1: 0x0000000140000000..0x00000001ffffffff
-> 
-> So, what does 'no longer seems appropriate" mean ?
+For the whole series:
 
-Sorry for being vague.
+Acked-by: Stefan Roese <sr@denx.de>
 
-I am specifically referring to the conversation in
-the thread "[PATCH 11/14] arm64: dts: Add initial device tree support for
-EXYNOS7" and in particular the following contribution to that discussion by
-Olof:
-
-	"Ok, I'm happily proven wrong here, also by confirming how this is
-	 done on "real" OF.
-
-	 According to benh:
-
-	 15:20 <benh> ojn: 0,0 is not quite right, it's supposed to be used
-	 when the two numbers are different things, like device,fn on PCI
-
-	 The same is true for >2^32 unit addresses, they just use the one
-	 integer instead of x,y.
-
-	 So, I take back all I've said on this in the last 72 hours. :) It
-	 looks like we might need to revisit some of the 32-bit DTs.  Simon,
-	 drop the series you had. :)"
-
-An archive of the message in question is available at:
-https://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg36123.html
+Thanks,
+Stefan
