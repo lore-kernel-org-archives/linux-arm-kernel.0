@@ -1,34 +1,37 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 3 Sep 2014 10:13:55 +0200
-Subject: [PATCH 02/11 v5] coresight-tmc: add CoreSight TMC driver
-In-Reply-To: <1409159852-7249-3-git-send-email-mathieu.poirier@linaro.org>
-References: <1409159852-7249-1-git-send-email-mathieu.poirier@linaro.org>
- <1409159852-7249-3-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <CACRpkdZ-nTCkPRg8iDCJM2G2ic1_3RnzmE_jkdnagSM73DyCkw@mail.gmail.com>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Wed, 3 Sep 2014 11:14:12 +0300
+Subject: [GIT PULL] clk: ti: dra7xx: fixes for early 3.17-rc
+Message-ID: <5406CDD4.8000103@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 27, 2014 at 7:17 PM,  <mathieu.poirier@linaro.org> wrote:
+Hi Mike,
 
-> From: Pratik Patel <pratikp@codeaurora.org>
->
-> This driver manages CoreSight TMC (Trace Memory Controller) which
-> can act as a link or a sink depending upon its configuration. It
-> can present itself as an ETF (Embedded Trace FIFO) or ETR
-> (Embedded Trace Router).
->
-> ETF when configured in circular buffer mode acts as a trace
-> collection sink. When configured in HW fifo mode it acts as link.
-> ETR always acts as a sink and can be used to route data to memory
-> allocated in RAM.
->
-> Signed-off-by: Pratik Patel <pratikp@codeaurora.org>
-> Signed-off-by: Panchaxari Prasannamurthy <panchaxari.prasannamurthy@linaro.org>
-> Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+The following changes since commit 7d1311b93e58ed55f3a31cc8f94c4b8fe988a2b9:
 
-This looks good to me now.
+   Linux 3.17-rc1 (2014-08-16 10:40:26 -0600)
 
-Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
+are available in the git repository at:
 
-Yours,
-Linus Walleij
+   git at github.com:t-kristo/linux-pm.git for-v3.17-rc/ti-clk-driver
+
+for you to fetch changes up to 20411dad75ece9a613af715df4489e60990c4017:
+
+   clk: ti: dra7-atl: Provide error check for incoming parameters in 
+set_rate (2014-08-21 18:04:16 +0300)
+
+----------------------------------------------------------------
+Just a couple of quick error check fixes for dra7 boards. Proper fix 
+would be required for the generic clock driver as well (see 
+https://www.mail-archive.com/linux-omap at vger.kernel.org/msg108454.html.)
+
+----------------------------------------------------------------
+Nishanth Menon (2):
+       clk: ti: divider: Provide error check for incoming parameters in 
+set_rate
+       clk: ti: dra7-atl: Provide error check for incoming parameters in 
+set_rate
+
+  drivers/clk/ti/clk-dra7-atl.c |    6 +++++-
+  drivers/clk/ti/divider.c      |    7 ++++++-
+  2 files changed, 11 insertions(+), 2 deletions(-)
