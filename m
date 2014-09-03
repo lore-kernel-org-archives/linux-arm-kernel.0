@@ -1,37 +1,19 @@
-From: naobsd@gmail.com (Naoki FUKAUMI)
-Date: Thu, 4 Sep 2014 00:29:28 +0900
-Subject: [PATCH 4/4] ARM: dts: Enable emac node on the rk3188-radxarock
- boards
-In-Reply-To: <1409740036-8117-4-git-send-email-romain.perier@gmail.com>
-References: <1409740036-8117-1-git-send-email-romain.perier@gmail.com>
- <1409740036-8117-4-git-send-email-romain.perier@gmail.com>
-Message-ID: <CAFnsNoSmHwN3nJ5ZJL5fc_-kaECCoLBvpdBYQxkyLcUzLx5MTw@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 03 Sep 2014 17:29:49 +0200
+Subject: [PATCH V3 0/6] ARM64: Add support for FSL's LS2085A SoC
+In-Reply-To: <1409757194-28155-1-git-send-email-bhupesh.sharma@freescale.com>
+References: <1409757194-28155-1-git-send-email-bhupesh.sharma@freescale.com>
+Message-ID: <11626142.L1WDF72bmp@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 3, 2014 at 7:27 PM, Romain Perier <romain.perier@gmail.com> wrote:
-> This enables EMAC Rockchip support on radxa rock boards.
->
-> Signed-off-by: Romain Perier <romain.perier@gmail.com>
-> ---
->  arch/arm/boot/dts/rk3188-radxarock.dts | 24 ++++++++++++++++++++++++
->  1 file changed, 24 insertions(+)
->
-> diff --git a/arch/arm/boot/dts/rk3188-radxarock.dts b/arch/arm/boot/dts/rk3188-radxarock.dts
-> index 5e4e3c23..e1358d3 100644
-> --- a/arch/arm/boot/dts/rk3188-radxarock.dts
-> +++ b/arch/arm/boot/dts/rk3188-radxarock.dts
-> @@ -76,6 +76,24 @@
->         };
->  };
->
-> +&emac {
-> +       status = "okay";
-> +       compatible = "rockchip,rk3188-emac";
-> +
-> +       pinctrl-names = "default";
-> +       pinctrl-0 = <&emac_xfer>, <&emac_mdio>, <&phy_int>;
-> +
-> +       mac-address = [ c6 ef 91 8e 60 4b ];
+On Wednesday 03 September 2014 20:43:08 Bhupesh Sharma wrote:
+> 
+> In this version, the enable-method for the CPU nodes is left for the
+> bootloader (u-boot or UEFI) to patch-up. This DTS has been tested for
+> PSCI v0.2 CPU_ON method (and corresponding secondary boot) using the
+> following ARMv8 u-boot patches:
 
-is "mac-address" required?
+What would be a reason for using something other than PSCI?
+
+	Arnd
