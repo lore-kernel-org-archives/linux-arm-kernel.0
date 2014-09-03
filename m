@@ -1,73 +1,75 @@
-From: Nathan_Lynch@mentor.com (Nathan Lynch)
-Date: Wed, 3 Sep 2014 00:41:47 -0500
-Subject: [PATCH v9 0/6] ARM: VDSO
-In-Reply-To: <53FE4448.9070708@codeaurora.org>
-References: <1408744351-7814-1-git-send-email-nathan_lynch@mentor.com>
- <53FE4448.9070708@codeaurora.org>
-Message-ID: <5406AA1B.3050506@mentor.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Wed, 3 Sep 2014 14:48:46 +0900
+Subject: [PATCH repost] ARM: shmobile: lager: correct memory map
+In-Reply-To: <54068031.5050806@renesas.com>
+References: <20140903004901.GA3277@verge.net.au> <54068031.5050806@renesas.com>
+Message-ID: <20140903054843.GA29259@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/27/2014 03:49 PM, Christopher Covington wrote:
+Hi Khiem-san,
+
+On Wed, Sep 03, 2014 at 11:42:57AM +0900, Khiem Nguyen wrote:
+> Dear Simon-san, Shiiba-san,
 > 
-> It appears to me that there is code in several architecture subdirectories
-> (I'm aware of x86, arm64, and with these patches arm[32] and I would be
-> surprised if there weren't more) doing largely the same setup of special
-> mappings at randomized offsets, checking ELF magic etc. Not that these patches
-> should necessarily do it, but is there a reasonable amount of consolidation
-> that could be done, or am I underestimating how much of this really does vary
-> per architecture?
+> Thanks for the patch.
+> 
+> On 9/3/2014 9:49 AM, Simon Horman wrote:
+> > The base address of the second memory region on the lager
+> > board is 0x140000000. Update the tag used in the dts file accordingly.
+> > 
+> > This is a documentation fix and should have no run-time affect.
+> > 
+> > This problem was introduced when the second memory region
+> > was added to the lager dts file by 62bc32a2573c4219
+> > ("ARM: shmobile: Include all 4 GiB of memory on Lager)"
+> > in v3.14.
+> > 
+> > Reported-by: NAOYA SHIIBA <naoya.shiiba.nx@renesas.com>
+> > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> > ---
+> >  arch/arm/boot/dts/r8a7790-lager.dts | 2 +-
+> >  1 file changed, 1 insertion(+), 1 deletion(-)
+> > 
+> > I am reposting this as Olof originally requested a syntax change,
+> > which I followed up on, however that change no longer seems appropriate.
+> > This this patch seems to be correct.
+> [...]
+> > -	memory at 180000000 {
+> > +	memory at 140000000 {
+> 
+> Could you give more information about not using new syntax ?
+> 
+> I checked memblock information in both 2 ways 
+> (i.e memory at 140000000 and memory at 1,40000000)
+> and I got same result.
+> root at lager:~# cat /sys/kernel/debug/memblock/memory
+>    0: 0x0000000040000000..0x000000007fffffff
+>    1: 0x0000000140000000..0x00000001ffffffff
+> 
+> So, what does 'no longer seems appropriate" mean ?
 
-Sorry to not respond to this promptly, was distracted by some other work.
+Sorry for being vague.
 
-As Andy said, the possibility for consolidating some aspects of VDSO support
-is there, but it would be a fair bit of work.
+I am specifically referring to the conversation in
+the thread "[PATCH 11/14] arm64: dts: Add initial device tree support for
+EXYNOS7" and in particular the following contribution to that discussion by
+Olof:
 
-For example, arch_setup_additional_pages tends to have the general form of:
+	"Ok, I'm happily proven wrong here, also by confirming how this is
+	 done on "real" OF.
 
-lock mmap_sem
-get_unmapped_area
-install_special_mapping (or _install_special_mapping, preferably)
-stash vdso address in mmu context
-release mmap_sem
+	 According to benh:
 
-But there are a lot of implementation details that differ:
+	 15:20 <benh> ojn: 0,0 is not quite right, it's supposed to be used
+	 when the two numbers are different things, like device,fn on PCI
 
-         +----------------------------------------------------------------
-         | Number of VMAs installed
-         |   +------------------------------------------------------------
-         |   | Considers uses_interp
-         |   |     +------------------------------------------------------
-         |   |     | Uses _install_special_mapping
-         |   |     |     +------------------------------------------------
-         |   |     |     | Performs additional work (e.g. remap_pfn_range)
-         |   |     |     |     +------------------------------------------
-         |   |     |     |     | Randomizes VDSO offset vs stack and libs
-         |   |     |     |     |     +------------------------------------
-         |   |     |     |     |     | Records VDSO address in mmu context
-         |   |     |     |     |     |     +------------------------------
-         |   |     |     |     |     |     | Supports compat VDSO
-         |   |     |     |     |     |     |     +------------------------
-         |   |     |     |     |     |     |     | Supports disabling VDSO
-         |   |     |     |     |     |     |     | at boot (e.g. vdso=off)
-         |   |     |     |     |     |     |     |     +------------------
-         |   |     |     |     |     |     |     |     | Can disable VDSO
- arch    |   |     |     |     |     |     |     |     | via Kconfig
----------+---+-----+-----+-----+-----+-----+-----+-----+------------------
- arm*    | 3 | no  | yes | no  | yes | yes | no  | no  | yes
- arm64   | 2 | no  | yes | no  | no  | yes | no  | no  | no
- hexagon | 1 | no  | no  | no  | no  | yes | no  | no  | no
- mips    | 1 | no  | no  | no  | no  | yes | no  | no  | no
- powerpc | 1 | no  | no  | no  | no  | yes | yes | no  | no
- s390    | 1 | yes | no  | no  | no  | yes | yes | yes | no
- sh      | 1 | no  | no  | no  | no  | yes | no  | yes | yes
- tile    | 1 | no  | no  | yes | no  | yes | no  | yes | no
- x86     | 2 | no  | yes | yes | yes | yes | yes | yes | no
+	 The same is true for >2^32 unit addresses, they just use the one
+	 integer instead of x,y.
 
-* With VDSO patches from this thread, of course.
+	 So, I take back all I've said on this in the last 72 hours. :) It
+	 looks like we might need to revisit some of the 32-bit DTs.  Simon,
+	 drop the series you had. :)"
 
-I think pushing the mmap_sem lock/unlock up into the ELF loader might be
-of some benefit (slightly reduced complexity in the arch code).  But
-any generic replacement for arch_setup_additional_pages will have to
-account for all the differences above, and probably a few more I've
-missed.
+An archive of the message in question is available at:
+https://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg36123.html
