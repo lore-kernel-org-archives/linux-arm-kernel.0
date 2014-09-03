@@ -1,130 +1,112 @@
-From: sthokal@xilinx.com (Srikanth Thokala)
-Date: Wed, 3 Sep 2014 12:17:43 +0530
-Subject: [PATCH v3 2/2] dma: Add Xilinx AXI Direct Memory Access Engine
- driver support
-In-Reply-To: <20140819170346.GS13288@intel.com>
-References: <1406549869-24422-1-git-send-email-sthokal@xilinx.com>
- <1406549869-24422-2-git-send-email-sthokal@xilinx.com>
- <20140819170346.GS13288@intel.com>
-Message-ID: <CA+mB=1L14Os=ZdJzj8_+XXa+oq4ZOS_kadQHpKQ2yws2tqGVSQ@mail.gmail.com>
+From: boris.brezillon@free-electrons.com (Boris BREZILLON)
+Date: Wed, 3 Sep 2014 09:09:16 +0200
+Subject: [PATCH] ARM: at91/dt: at91sam9m10g45ek add rtc node
+In-Reply-To: <5406B098.6020500@interact.nl>
+References: <1409655132-17735-1-git-send-email-evanluijk@interact.nl>
+ <20140902183356.7bcfdf84@bbrezillon> <5406B098.6020500@interact.nl>
+Message-ID: <20140903090916.4a624739@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Vinod,
+On Wed, 03 Sep 2014 08:09:28 +0200
+Erik van Luijk <evanluijk@interact.nl> wrote:
 
-Apologies for the delay.
+> 
+> Hi Boris, Nicolas,
+> 
+> Boris BREZILLON schreef op 2-9-2014 om 18:33:
+> > Hi Erik,
+>  >
+>  > On Tue,  2 Sep 2014 12:52:12 +0200
+>  > Erik van Luijk <evanluijk@interact.nl> wrote:
+>  >
+>  >> Signed-off-by: Erik van Luijk <evanluijk@interact.nl>
+>  >
+>  > Except for the nitpicks you'll find below, you have my
+>  >
+>  > Acked-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+>  >
+>  >> ---
+>  >>  arch/arm/boot/dts/at91sam9g45.dtsi     | 7 +++++++
+>  >>  arch/arm/boot/dts/at91sam9m10g45ek.dts | 3 +++
+>  >>  2 files changed, 10 insertions(+)
+>  >>
+>  >> diff --git a/arch/arm/boot/dts/at91sam9g45.dtsi 
+> b/arch/arm/boot/dts/at91sam9g45.dtsi
+>  >> index 932a669..bf62c18 100644
+>  >> --- a/arch/arm/boot/dts/at91sam9g45.dtsi
+>  >> +++ b/arch/arm/boot/dts/at91sam9g45.dtsi
+>  >> @@ -1070,6 +1070,13 @@
+>  >>                  status = "disabled";
+>  >>              };
+>  >>
+>  >> +            rtc at fffffdb0 {
+>  >> +                compatible = "atmel,at91rm9200-rtc";
+>  >> +                reg = <0xfffffdb0 0x30>;
+>  >
+>  > The RTC registers goes from 0xfffffdb0 to 0xfffffdc0, which means the
+>  > size is 0x10 and not 0x30. This is not important here, because the
+>  > following region is marked as reserved, but we prefer to keep the DT
+>  > consistent with the datasheet.
+> 
+> This is an inconsistency in the datasheet of the AT91SAM9G45 (and at 
+> least also
+> AT91SAM9G15, AT91SAM9G25, AT91SAM9G35 and AT91SAM9M10).
+> In the memory map (fig. 5-1) there is room for 16 bytes.
+> But in the 'Real-time Clock (RTC) User Interface' (table 15-1) there is 
+> room for
+> 48 bytes (0x30) excluding the Reserved Registers (which don't belong to 
+> the RTC
+> on the AT91SAM9M10). Perhaps Nicolas can draw some attention to this at 
+> Atmel.
 
-On Tue, Aug 19, 2014 at 10:33 PM, Vinod Koul <vinod.koul@intel.com> wrote:
-> On Mon, Jul 28, 2014 at 05:47:49PM +0530, Srikanth Thokala wrote:
->> +struct xilinx_dma_chan {
->> +     struct xilinx_dma_device *xdev;
->> +     u32 ctrl_offset;
->> +     spinlock_t lock;
->> +     struct list_head pending_list;
->> +     struct xilinx_dma_tx_descriptor *active_desc;
->> +     struct xilinx_dma_tx_descriptor *allocated_desc;
->> +     struct list_head done_list;
->> +     struct list_head free_seg_list;
->> +     struct dma_chan common;
->> +     struct xilinx_dma_tx_segment *seg_v;
->> +     dma_addr_t seg_p;
->> +     struct device *dev;
->> +     int irq;
->> +     int id;
->> +     enum dma_transfer_direction direction;
-> This looks suspect. Why should channel have direction, for a descriptor it
-> makes sense though.
+Indeed, I only had a look at the memory map.
+Given this input, you should keep your definition ;-).
 
-The channel only supports transfers in one direction. Either from memory to
-peripheral or from peripheral to memory, that's fixed and can't be changed
-at runtime.  So, the driver needs to know which direction the channel supports
-and hence it can reject transfers with the wrong direction.
+> 
+> >
+>  >> +                interrupts = <1 IRQ_TYPE_LEVEL_HIGH 7>;
+>  >> +                status = "disabled";
+>  >> +            };
+>  >> +
+>  >>              spi0: spi at fffa4000 {
+>  >>                  #address-cells = <1>;
+>  >>                  #size-cells = <0>;
+>  >> diff --git a/arch/arm/boot/dts/at91sam9m10g45ek.dts 
+> b/arch/arm/boot/dts/at91sam9m10g45ek.dts
+>  >> index 96ccc7d..2dd2347 100644
+>  >> --- a/arch/arm/boot/dts/at91sam9m10g45ek.dts
+>  >> +++ b/arch/arm/boot/dts/at91sam9m10g45ek.dts
+>  >> @@ -70,6 +70,9 @@
+>  >>
+>  >>              watchdog at fffffd40 {
+>  >>                  status = "okay";
+>  >> +
+>  >> +            rtc at fffffdb0 {
+>  >> +                status = "okay";
+>  >
+>  > Try to keep SoC and board changes in distinct commits.
+> 
+> Understood.
+> 
+> >
+>  >>              };
+>  >>
+>  >>              mmc0: mmc at fff80000 {
+>  >
+>  >
+>  > Best Regards,
+>  >
+>  > Boris
+>  >
+> 
+> Regards,
+> 
+> Erik
 
->
->> +static enum dma_status xilinx_dma_tx_status(struct dma_chan *dchan,
->> +                                         dma_cookie_t cookie,
->> +                                         struct dma_tx_state *txstate)
->> +{
->> +     struct xilinx_dma_chan *chan = to_xilinx_chan(dchan);
->> +     enum dma_status ret;
->> +     unsigned long flags;
->> +
->> +     ret = dma_cookie_status(dchan, cookie, txstate);
->> +     if (ret != DMA_COMPLETE) {
->> +             spin_lock_irqsave(&chan->lock, flags);
->> +             dma_set_residue(txstate, chan->residue);
->> +             spin_unlock_irqrestore(&chan->lock, flags);
->> +     }
-> No residue reporting?
 
-I will fix this, thanks.
 
->
->> +static int xilinx_dma_device_control(struct dma_chan *dchan,
->> +                                  enum dma_ctrl_cmd cmd, unsigned long arg)
->> +{
->> +     struct xilinx_dma_chan *chan = to_xilinx_chan(dchan);
->> +     unsigned long flags;
->> +
->> +     if (cmd != DMA_TERMINATE_ALL)
->> +             return -ENXIO;
->> +
->> +     /* Halt the DMA engine */
->> +     xilinx_dma_halt(chan);
->> +
->> +     spin_lock_irqsave(&chan->lock, flags);
->> +
->> +     /* Remove and free all of the descriptors in the lists */
->> +     xilinx_dma_free_desc_list(chan, &chan->pending_list);
->> +     xilinx_dma_free_desc_list(chan, &chan->done_list);
->
->> +
->> +     spin_unlock_irqrestore(&chan->lock, flags);
->> +
->> +     return 0;
->> +}
->> +
->> +/**
->> + * xilinx_dma_channel_set_config - Configure DMA channel
->> + * @dchan: DMA channel
->> + * @cfg: DMA device configuration pointer
->> + *
->> + * Return: '0' on success and failure value on error
->> + */
->> +int xilinx_dma_channel_set_config(struct dma_chan *dchan,
->> +                               struct xilinx_dma_config *cfg)
->> +{
->> +     struct xilinx_dma_chan *chan = to_xilinx_chan(dchan);
->> +     u32 reg = dma_ctrl_read(chan, XILINX_DMA_REG_CONTROL);
->> +
->> +     if (cfg->reset)
->> +             return xilinx_dma_reset(chan);
->> +
->> +     if (cfg->coalesc <= XILINX_DMA_CR_COALESCE_MAX)
->> +             reg |= cfg->coalesc << XILINX_DMA_CR_COALESCE_SHIFT;
->> +
->> +     if (cfg->delay <= XILINX_DMA_CR_DELAY_MAX)
->> +             reg |= cfg->delay << XILINX_DMA_CR_DELAY_SHIFT;
->> +
->> +     dma_ctrl_write(chan, XILINX_DMA_REG_CONTROL, reg);
-> You aren't checking if a transaction is already running on this channel.
-> Also don't you need other slave parameters, I see you have removed the
-> dma_slave_config entirely
-
-All the parameters that are required for this DMA engine are provided by
-SG list, so I don't see the need of dma_slave_config.  There are some
-specific IP parameters that are not part of dma_slave_config and these
-are being set by 'dma_channel_set_config' which is exported to slave
-drivers.
-
-Thanks for the reveiw,
-Srikanth
-
->
-> --
-> ~Vinod
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
+-- 
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
