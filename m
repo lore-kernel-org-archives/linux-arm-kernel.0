@@ -1,91 +1,48 @@
 From: antoine.tenart@free-electrons.com (Antoine Tenart)
-Date: Wed,  3 Sep 2014 09:48:19 +0200
-Subject: [PATCH v4 00/12] ARM: berlin: USB support
-Message-ID: <1409730511-16101-1-git-send-email-antoine.tenart@free-electrons.com>
+Date: Wed,  3 Sep 2014 09:48:27 +0200
+Subject: [PATCH v4 08/12] Documentation: bindings: add doc for the USB2
+ ChipIdea USB driver
+In-Reply-To: <1409730511-16101-1-git-send-email-antoine.tenart@free-electrons.com>
+References: <1409730511-16101-1-git-send-email-antoine.tenart@free-electrons.com>
+Message-ID: <1409730511-16101-9-git-send-email-antoine.tenart@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series adds the support for ChipIdea USB2 (ci13xxx) controllers,
-the USB PHYs of the Marvell Berlin SoCs and also adds a reset
-controller for these SoCs.
+Document the USB2 ChipIdea driver (ci13xxx) bindings.
 
-The reset controller is used by the PHY driver and shares the
-existing chip controller node with the clocks and one pin controller.
-
-The Marvell Berlin USB controllers are host only on the BG2Q and are
-compatible with USB ChipIdea. We here add a glue to use the available
-common functions for this kind of controllers, and add a generic USB2
-ChipIdea driver. A PHY driver is also added to control the USB PHY.
-
-This series applies on top of the generic PHY support in the USB
-framework[1].
-
-Changes since v3:
-        - removed the DMA mask property
-        - moved the clock handling in the common probe function
-        - fixed the documentation for the USB2 ChipIdea USB PHY binding
-        - made sure the reset bit is 0-31 in the reset driver
-
-Changes since v2:
-        - moved the PHY driver to the generic PHY framework
-        - changed the compatible to 'chipidea,usb2'
-        - added a property to set the DMA mask in the USB2 CI driver
-        - separated dt specific calls in the CI probing function
-        - rebased on top of the generic PHY support for CI[1]
-
-Changes since v1:
-        - made the Berlin CI USB driver a generic one
-        - added support to custom offset for the reset register
-        - added fixed regulators to support supply the VBUS
-        - modified the PHY driver to support the one one the BG2CD as
-          well
-        - documented the reset properties
-        - added bindings for the BG2CD
-        - cosmetic fixes
-
-[1] git://git.free-electrons.com:users/antoine-tenart/linux.git usb-phy
-    https://lkml.org/lkml/2014/9/3/78
-
-Antoine Tenart (10):
-  reset: add the Berlin reset controller driver
-  Documentation: bindings: add reset bindings docs for Marvell Berlin
-    SoCs
-  ARM: Berlin: select the reset controller
-  ARM: dts: berlin: add a required reset property in the chip controller
-    node
-  phy: add the Berlin USB PHY driver
-  Documentation: bindings: add doc for the Berlin USB PHY
-  usb: chipidea: add a usb2 driver for ci13xxx
-  Documentation: bindings: add doc for the USB2 ChipIdea USB driver
-  ARM: dts: berlin: add BG2Q nodes for USB support
-  ARM: dts: Berlin: enable USB on the BG2Q DMP
-
-Sebastian Hesselbarth (2):
-  ARM: dts: berlin: add BG2CD nodes for USB support
-  ARM: dts: berlin: enable USB on the Google Chromecast
-
- .../devicetree/bindings/arm/marvell,berlin.txt     |  10 +
- .../devicetree/bindings/phy/berlin-usb-phy.txt     |  16 ++
- .../devicetree/bindings/usb/ci-hdrc-usb2.txt       |  22 ++
- arch/arm/boot/dts/berlin2.dtsi                     |   1 +
- arch/arm/boot/dts/berlin2cd-google-chromecast.dts  |   4 +
- arch/arm/boot/dts/berlin2cd.dtsi                   |  35 ++++
- arch/arm/boot/dts/berlin2q-marvell-dmp.dts         |  53 +++++
- arch/arm/boot/dts/berlin2q.dtsi                    |  53 +++++
- arch/arm/mach-berlin/Kconfig                       |   2 +
- drivers/phy/Kconfig                                |   7 +
- drivers/phy/Makefile                               |   1 +
- drivers/phy/phy-berlin-usb.c                       | 224 +++++++++++++++++++++
- drivers/reset/Makefile                             |   1 +
- drivers/reset/reset-berlin.c                       | 131 ++++++++++++
- drivers/usb/chipidea/Makefile                      |   1 +
- drivers/usb/chipidea/ci_hdrc_usb2.c                | 137 +++++++++++++
- 16 files changed, 698 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/phy/berlin-usb-phy.txt
+Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
+---
+ .../devicetree/bindings/usb/ci-hdrc-usb2.txt       | 22 ++++++++++++++++++++++
+ 1 file changed, 22 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/usb/ci-hdrc-usb2.txt
- create mode 100644 drivers/phy/phy-berlin-usb.c
- create mode 100644 drivers/reset/reset-berlin.c
- create mode 100644 drivers/usb/chipidea/ci_hdrc_usb2.c
 
+diff --git a/Documentation/devicetree/bindings/usb/ci-hdrc-usb2.txt b/Documentation/devicetree/bindings/usb/ci-hdrc-usb2.txt
+new file mode 100644
+index 000000000000..8dd6d8285dab
+--- /dev/null
++++ b/Documentation/devicetree/bindings/usb/ci-hdrc-usb2.txt
+@@ -0,0 +1,22 @@
++* USB2 ChipIdea USB controller for ci13xxx
++
++Required properties:
++- compatible: should be "chipidea,usb2"
++- reg: base address and length of the registers
++- interrupts: interrupt for the USB controller
++
++Optional properties:
++- clocks: reference to the USB clock
++- phys: reference to the USB PHY
++- vbus-supply: reference to the VBUS regulator
++
++Example:
++
++	usb at f7ed0000 {
++		compatible = "chipidea,usb2";
++		reg = <0xf7ed0000 0x10000>;
++		interrupts = <GIC_SPI 11 IRQ_TYPE_LEVEL_HIGH>;
++		clocks = <&chip CLKID_USB0>;
++		phys = <&usb_phy0>;
++		vbus-supply = <&reg_usb0_vbus>;
++	};
 -- 
 1.9.1
