@@ -1,34 +1,16 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed,  3 Sep 2014 09:56:26 +0900
-Subject: [PATCH v2] MAINTAINERS: Add dts and dtsi files to Calxeda Highbank
- ARM platform
-Message-ID: <1409705786-6568-1-git-send-email-horms+renesas@verge.net.au>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Wed, 3 Sep 2014 09:00:44 +0800
+Subject: [PATCH v2 1/2] ARM: dts: imx6sx: Add LCDIF compatible strings
+In-Reply-To: <1409680844-24747-1-git-send-email-fabio.estevam@freescale.com>
+References: <1409680844-24747-1-git-send-email-fabio.estevam@freescale.com>
+Message-ID: <20140903010043.GM3135@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+On Tue, Sep 02, 2014 at 03:00:43PM -0300, Fabio Estevam wrote:
+> imx6sx has the same LCDIF controller IP as in mx28, so add the proper
+> compatible strings.
+> 
+> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
 
----
-v2
-* Added highbank.dts
-* Sorted entries alphabetically
----
- MAINTAINERS | 3 +++
- 1 file changed, 3 insertions(+)
-
-diff --git a/MAINTAINERS b/MAINTAINERS
-index aefa948..d73eaef 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -858,6 +858,9 @@ ARM/CALXEDA HIGHBANK ARCHITECTURE
- M:	Rob Herring <robh@kernel.org>
- L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
- S:	Maintained
-+F:	arch/arm/boot/dts/ecx-2000.dts
-+F:	arch/arm/boot/dts/ecx-common.dtsi
-+F:	arch/arm/boot/dts/highbank.dts
- F:	arch/arm/mach-highbank/
- 
- ARM/CAVIUM NETWORKS CNS3XXX MACHINE SUPPORT
--- 
-2.0.1
+Applied both, thanks.
