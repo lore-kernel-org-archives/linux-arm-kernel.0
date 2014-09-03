@@ -1,73 +1,127 @@
 From: keescook@chromium.org (Kees Cook)
-Date: Wed,  3 Sep 2014 14:57:01 -0700
-Subject: [PATCH v5 0/8] arm: support CONFIG_RODATA
-Message-ID: <1409781429-27593-1-git-send-email-keescook@chromium.org>
+Date: Wed,  3 Sep 2014 14:57:03 -0700
+Subject: [PATCH v5 2/8] ARM: expand fixmap region to 3MB
+In-Reply-To: <1409781429-27593-1-git-send-email-keescook@chromium.org>
+References: <1409781429-27593-1-git-send-email-keescook@chromium.org>
+Message-ID: <1409781429-27593-3-git-send-email-keescook@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is a series of patches to support CONFIG_RODATA on ARM, so that
-the kernel text is RO, and non-text sections default to NX. To support
-on-the-fly kernel text patching (via ftrace, kprobes, etc), fixmap
-support has been finalized based on several versions of various patches
-that are floating around on the mailing list. This series attempts to
-include the least intrusive version, so that others can build on it for
-future fixmap work.
+From: Rob Herring <robh@kernel.org>
 
-The series has been heavily tested, and appears to be working correctly:
+With commit a05e54c103b0 ("ARM: 8031/2: change fixmap mapping region to
+support 32 CPUs"), the fixmap region was expanded to 2MB, but it
+precluded any other uses of the fixmap region. In order to support other
+uses the fixmap region needs to be expanded beyond 2MB. Fortunately, the
+adjacent 1MB range 0xffe00000-0xfff00000 is availabe.
 
-With CONFIG_ARM_PTDUMP, expected page table permissions are seen in
-/sys/kernel/debug/kernel_page_tables.
+Remove fixmap_page_table ptr and lookup the page table via the virtual
+address so that the fixmap region can span more that one pmd. The 2nd
+pmd is already created since it is shared with the vector page.
 
-Using CONFIG_LKDTM, the kernel now correctly detects bad accesses for
-for the following lkdtm tests via /sys/kernel/debug/provoke-crash/DIRECT:
-        EXEC_DATA
-        WRITE_RO
-        WRITE_KERN
+Signed-off-by: Rob Herring <robh@kernel.org>
+[kees: fixed CONFIG_DEBUG_HIGHMEM get_fixmap() calls]
+[kees: moved pte allocation outside of CONFIG_HIGHMEM]
+Signed-off-by: Kees Cook <keescook@chromium.org>
+Acked-by: Nicolas Pitre <nico@linaro.org>
+---
+ Documentation/arm/memory.txt  |  2 +-
+ arch/arm/include/asm/fixmap.h |  2 +-
+ arch/arm/mm/highmem.c         | 15 ++++++++-------
+ arch/arm/mm/mmu.c             |  6 +++---
+ 4 files changed, 13 insertions(+), 12 deletions(-)
 
-ftrace works:
-        CONFIG_FTRACE_STARTUP_TEST passes
-        Enabling tracing works:
-                echo function > /sys/kernel/debug/tracing/current_tracer
-
-kprobes works:
-        CONFIG_ARM_KPROBES_TEST passes
-
-kexec works:
-        kexec will load and start a new kernel
-
-Built with and without CONFIG_HIGHMEM, CONFIG_HIGHMEM_DEBUG, and
-CONFIG_NR_CPUS=32.
-
-Thanks to everyone who has been testing this series and working on its
-various pieces!
-
-Unless there are other concerns, I'd like to send a pull request to
-rmk soon.
-
-Thanks!
-
--Kees
-
-v5:
-- clean up #includes in mmu.c (will.deacon)
-- optimize get_cr() test (will.deacon)
-- created free_tcmmem to avoid excessive #ifdefs (will.deacon)
-- explicitly test irqs_disabled in set_fixmap (will.deacon)
-
-v4:
-- expanded fixmap to 3MB to support 32 CPUs (robh)
-- corrected pmd-finding via vaddr instead of FIXMAP_START (robh)
-- switched structure size test to BUILD_BUG_ON (sboyd)
-- added locking annotations to keep sparse happy (sboyd)
-- adding missing "static" declarations noticed by sparse
-- reorganized fixmap portion of patches
-
-v3:
-- more cleanups in switch to generic fixmap (lauraa, robh)
-- fixed kexec merge hunk glitch (will.deacon)
-- added tested-by tags where appropriate from v2 testing
-
-v2:
-- fix typo in kexec merge (buildbot)
-- flip index order for highmem pte access (lauraa)
-- added kgdb updates (dianders)
+diff --git a/Documentation/arm/memory.txt b/Documentation/arm/memory.txt
+index 38dc06d0a791..4178ebda6e66 100644
+--- a/Documentation/arm/memory.txt
++++ b/Documentation/arm/memory.txt
+@@ -41,7 +41,7 @@ fffe8000	fffeffff	DTCM mapping area for platforms with
+ fffe0000	fffe7fff	ITCM mapping area for platforms with
+ 				ITCM mounted inside the CPU.
+ 
+-ffc00000	ffdfffff	Fixmap mapping region.  Addresses provided
++ffc00000	ffefffff	Fixmap mapping region.  Addresses provided
+ 				by fix_to_virt() will be located here.
+ 
+ fee00000	feffffff	Mapping of PCI I/O space. This is a static
+diff --git a/arch/arm/include/asm/fixmap.h b/arch/arm/include/asm/fixmap.h
+index a7add6f9315d..d984ca69ce19 100644
+--- a/arch/arm/include/asm/fixmap.h
++++ b/arch/arm/include/asm/fixmap.h
+@@ -2,7 +2,7 @@
+ #define _ASM_FIXMAP_H
+ 
+ #define FIXADDR_START		0xffc00000UL
+-#define FIXADDR_END		0xffe00000UL
++#define FIXADDR_END		0xfff00000UL
+ #define FIXADDR_TOP		(FIXADDR_END - PAGE_SIZE)
+ 
+ #include <asm/kmap_types.h>
+diff --git a/arch/arm/mm/highmem.c b/arch/arm/mm/highmem.c
+index 45aeaaca9052..81061987ac45 100644
+--- a/arch/arm/mm/highmem.c
++++ b/arch/arm/mm/highmem.c
+@@ -18,19 +18,20 @@
+ #include <asm/tlbflush.h>
+ #include "mm.h"
+ 
+-pte_t *fixmap_page_table;
+-
+ static inline void set_fixmap_pte(int idx, pte_t pte)
+ {
+ 	unsigned long vaddr = __fix_to_virt(idx);
+-	set_pte_ext(fixmap_page_table + idx, pte, 0);
++	pte_t *ptep = pte_offset_kernel(pmd_off_k(vaddr), vaddr);
++
++	set_pte_ext(ptep, pte, 0);
+ 	local_flush_tlb_kernel_page(vaddr);
+ }
+ 
+ static inline pte_t get_fixmap_pte(unsigned long vaddr)
+ {
+-	unsigned long idx = __virt_to_fix(vaddr);
+-	return *(fixmap_page_table + idx);
++	pte_t *ptep = pte_offset_kernel(pmd_off_k(vaddr), vaddr);
++
++	return *ptep;
+ }
+ 
+ void *kmap(struct page *page)
+@@ -84,7 +85,7 @@ void *kmap_atomic(struct page *page)
+ 	 * With debugging enabled, kunmap_atomic forces that entry to 0.
+ 	 * Make sure it was indeed properly unmapped.
+ 	 */
+-	BUG_ON(!pte_none(*(fixmap_page_table + idx)));
++	BUG_ON(!pte_none(get_fixmap_pte(vaddr)));
+ #endif
+ 	/*
+ 	 * When debugging is off, kunmap_atomic leaves the previous mapping
+@@ -134,7 +135,7 @@ void *kmap_atomic_pfn(unsigned long pfn)
+ 	idx = type + KM_TYPE_NR * smp_processor_id();
+ 	vaddr = __fix_to_virt(idx);
+ #ifdef CONFIG_DEBUG_HIGHMEM
+-	BUG_ON(!pte_none(*(fixmap_page_table + idx)));
++	BUG_ON(!pte_none(get_fixmap_pte(vaddr)));
+ #endif
+ 	set_fixmap_pte(idx, pfn_pte(pfn, kmap_prot));
+ 
+diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
+index 8348ed6b2efe..7fa0966cd15f 100644
+--- a/arch/arm/mm/mmu.c
++++ b/arch/arm/mm/mmu.c
+@@ -1326,10 +1326,10 @@ static void __init kmap_init(void)
+ #ifdef CONFIG_HIGHMEM
+ 	pkmap_page_table = early_pte_alloc(pmd_off_k(PKMAP_BASE),
+ 		PKMAP_BASE, _PAGE_KERNEL_TABLE);
+-
+-	fixmap_page_table = early_pte_alloc(pmd_off_k(FIXADDR_START),
+-		FIXADDR_START, _PAGE_KERNEL_TABLE);
+ #endif
++
++	early_pte_alloc(pmd_off_k(FIXADDR_START), FIXADDR_START,
++			_PAGE_KERNEL_TABLE);
+ }
+ 
+ static void __init map_lowmem(void)
+-- 
+1.9.1
