@@ -1,86 +1,65 @@
-From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Wed, 03 Sep 2014 12:09:03 +0900
-Subject: [PATCHv6 2/2] thermal: exynos: Add support for TRIM_RELOAD feature at
- Exynos3250
-In-Reply-To: <1409713743-6124-1-git-send-email-cw00.choi@samsung.com>
-References: <1409713743-6124-1-git-send-email-cw00.choi@samsung.com>
-Message-ID: <1409713743-6124-3-git-send-email-cw00.choi@samsung.com>
+From: gautam.vivek@samsung.com (Vivek Gautam)
+Date: Wed, 3 Sep 2014 09:14:04 +0530
+Subject: [PATCH v2] mfd: syscon: Decouple syscon interface from platform
+ devices
+In-Reply-To: <1409668935-10667-1-git-send-email-pankaj.dubey@samsung.com>
+References: <1409668935-10667-1-git-send-email-pankaj.dubey@samsung.com>
+Message-ID: <CAFp+6iEzux2WgV5DcexQB6=gb8tt-FSM9jW7aBM_o6+U4JWwFg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch add support for TRIM_RELOAD feature at Exynos3250. The TMu of
-Exynos3250 has two TRIMINFO_CON register and must need to set RELOAD bit
-before reading TRIMINFO register.
+On Tue, Sep 2, 2014 at 8:12 PM, Pankaj Dubey <pankaj.dubey@samsung.com> wrote:
+> Currently a syscon entity can only be registered directly through a
+> platform device that binds to a dedicated syscon driver. However in
+> certain cases it is required to bind a device with it's dedicated
+> driver rather than binding with syscon driver.
+>
+> For example, certain SoCs (e.g. Exynos) contain system controller
+> blocks which perform various functions such as power domain control,
+> CPU power management, low power mode control, but in addition contain
+> certain IP integration glue, such as various signal masks,
+> coprocessor power control, etc. In such case, there is a need to have
+> a dedicated driver for such system controller but also share registers
+> with other drivers. The latter is where the syscon interface is helpful.
+>
+> This patch decouples syscon object from syscon platform driver, and
+> allows to create syscon objects first time when it is required by
+> calling of syscon_regmap_lookup_by APIs and keeps a list of such syscon
+> objects along with syscon provider device_nodes and regmap handles.
+>
+> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
+> Signed-off-by: Tomasz Figa <t.figa@samsung.com>
+> ---
+> V1 of this patchset [1] and related discussion can be found here [1].
+>
+> Changes since v1:
+>  - Removed of_syscon_unregister function.
+>  - Modified of_syscon_register function and it will be used by syscon.c
+>    to create syscon objects whenever required.
+>  - Removed platform device support from syscon.
+>  - Removed syscon_regmap_lookup_by_pdevname API support.
+>  - As there are significant changes w.r.t patchset v1, I am taking over
+>    author for this patchset from Tomasz Figa.
+>
+> Note: Current kernel has clps711x user of syscon_regmap_lookup_by_pdevname and
+> will be broken after this patch. As per discussion over here [1], patches
+> for making these drivers DT based are ready and once that is done they can use
+> syscon_regmap_lookup_by_phandle or syscon_regmap_lookup_by_compatible.
+>
+> [1]: https://lkml.org/lkml/2014/8/22/81
 
-Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
-Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
-Cc: Zhang Rui <rui.zhang@intel.com>
-Cc: Eduardo Valentin <edubezval@gmail.com>
-Cc: Amit Daniel Kachhap <amit.daniel@samsung.com>
-Reviewed-by: Amit Daniel Kachhap <amit.daniel@samsung.com>
----
- drivers/thermal/samsung/exynos_tmu_data.c | 9 +++++++--
- drivers/thermal/samsung/exynos_tmu_data.h | 7 +++++--
- 2 files changed, 12 insertions(+), 4 deletions(-)
+[snip]
 
-diff --git a/drivers/thermal/samsung/exynos_tmu_data.c b/drivers/thermal/samsung/exynos_tmu_data.c
-index 362a1e1..8bae170 100644
---- a/drivers/thermal/samsung/exynos_tmu_data.c
-+++ b/drivers/thermal/samsung/exynos_tmu_data.c
-@@ -87,6 +87,9 @@ struct exynos_tmu_init_data const exynos4210_default_tmu_data = {
- #if defined(CONFIG_SOC_EXYNOS3250)
- static const struct exynos_tmu_registers exynos3250_tmu_registers = {
- 	.triminfo_data = EXYNOS_TMU_REG_TRIMINFO,
-+	.triminfo_ctrl[0] = EXYNOS_TMU_TRIMINFO_CON1,
-+	.triminfo_ctrl[1] = EXYNOS_TMU_TRIMINFO_CON2,
-+	.triminfo_ctrl_count = 2,
- 	.tmu_ctrl = EXYNOS_TMU_REG_CONTROL,
- 	.test_mux_addr_shift = EXYNOS4412_MUX_ADDR_SHIFT,
- 	.therm_trip_mode_shift = EXYNOS_TMU_TRIP_MODE_SHIFT,
-@@ -147,8 +150,10 @@ static const struct exynos_tmu_registers exynos3250_tmu_registers = {
- 		.temp_level = 95, \
- 	}, \
- 	.freq_tab_count = 2, \
-+	.triminfo_reload[0] = EXYNOS_TRIMINFO_RELOAD_ENABLE, \
-+	.triminfo_reload[1] = EXYNOS_TRIMINFO_RELOAD_ENABLE, \
- 	.registers = &exynos3250_tmu_registers, \
--	.features = (TMU_SUPPORT_EMULATION | \
-+	.features = (TMU_SUPPORT_EMULATION | TMU_SUPPORT_TRIM_RELOAD | \
- 			TMU_SUPPORT_FALLING_TRIP | TMU_SUPPORT_READY_STATUS | \
- 			TMU_SUPPORT_EMUL_TIME)
- #endif
-@@ -169,7 +174,7 @@ struct exynos_tmu_init_data const exynos3250_default_tmu_data = {
- #if defined(CONFIG_SOC_EXYNOS4412) || defined(CONFIG_SOC_EXYNOS5250)
- static const struct exynos_tmu_registers exynos4412_tmu_registers = {
- 	.triminfo_data = EXYNOS_TMU_REG_TRIMINFO,
--	.triminfo_ctrl[0] = EXYNOS_TMU_TRIMINFO_CON,
-+	.triminfo_ctrl[0] = EXYNOS_TMU_TRIMINFO_CON2,
- 	.triminfo_ctrl_count = 1,
- 	.tmu_ctrl = EXYNOS_TMU_REG_CONTROL,
- 	.test_mux_addr_shift = EXYNOS4412_MUX_ADDR_SHIFT,
-diff --git a/drivers/thermal/samsung/exynos_tmu_data.h b/drivers/thermal/samsung/exynos_tmu_data.h
-index 6b47a17..4b8f33c 100644
---- a/drivers/thermal/samsung/exynos_tmu_data.h
-+++ b/drivers/thermal/samsung/exynos_tmu_data.h
-@@ -39,14 +39,17 @@
- #define EXYNOS_TMU_BUF_SLOPE_SEL_SHIFT	8
- #define EXYNOS_TMU_CORE_EN_SHIFT	0
- 
-+/* Exynos3250 specific registers */
-+#define EXYNOS_TMU_TRIMINFO_CON1	0x10
-+
- /* Exynos4210 specific registers */
- #define EXYNOS4210_TMU_REG_THRESHOLD_TEMP	0x44
- #define EXYNOS4210_TMU_REG_TRIG_LEVEL0	0x50
- 
- #define EXYNOS4210_TMU_TRIG_LEVEL_MASK	0x1111
- 
--/* Exynos5250 and Exynos4412 specific registers */
--#define EXYNOS_TMU_TRIMINFO_CON	0x14
-+/* Exynos5250, Exynos4412, Exynos3250 specific registers */
-+#define EXYNOS_TMU_TRIMINFO_CON2	0x14
- #define EXYNOS_THD_TEMP_RISE		0x50
- #define EXYNOS_THD_TEMP_FALL		0x54
- #define EXYNOS_EMUL_CON		0x80
+Tested on smdk5250 board with 3.17-rc3 for USB 2.0 and USB 3.0, since USB takes
+syscon phandle for handling some of the pmu registers.
+Things work fine with all the dt side changes in this patch.
+
+Tested-by: Vivek Gautam <gautam.vivek@samsung.com>
+
+
+
 -- 
-1.8.0
+Best Regards
+Vivek Gautam
+Samsung R&D Institute, Bangalore
+India
