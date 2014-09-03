@@ -1,44 +1,70 @@
-From: naveenkrishna.ch@gmail.com (Naveen Krishna Ch)
-Date: Wed, 3 Sep 2014 13:11:43 +0530
-Subject: [PATCH 06/14] pinctrl: samsung: use CONFIG_PINCTRL_SAMSUNG symbol
- in makefile
-In-Reply-To: <CACRpkda=LCT_P7czZ6mNX_7eS9nyKwxZrzXO2AAQ8W5RrehCcw@mail.gmail.com>
-References: <1409132889-2080-1-git-send-email-ch.naveen@samsung.com>
- <1409132889-2080-6-git-send-email-ch.naveen@samsung.com>
- <CACRpkda=LCT_P7czZ6mNX_7eS9nyKwxZrzXO2AAQ8W5RrehCcw@mail.gmail.com>
-Message-ID: <CAHfPSqCND6QsuxiJjy7+jUb2PV3AVb=OtsGE=FL_mN5jJm6q0Q@mail.gmail.com>
+From: boris.brezillon@free-electrons.com (Boris BREZILLON)
+Date: Wed, 3 Sep 2014 09:42:50 +0200
+Subject: [PATCH] clk: at91: fix num_parents test in at91sam9260 slow clk
+ implementation
+In-Reply-To: <20140902214506.5251.1412@quantum>
+References: <1409671671-13544-1-git-send-email-boris.brezillon@free-electrons.com>
+ <20140902214506.5251.1412@quantum>
+Message-ID: <20140903094250.0a5b5154@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29 August 2014 18:07, Linus Walleij <linus.walleij@linaro.org> wrote:
-> On Wed, Aug 27, 2014 at 11:48 AM, Naveen Krishna Chatradhi
-> <ch.naveen@samsung.com> wrote:
->
->> Samsung Exynos7 is a ARM64bit processor. Which does not select
->> the CONFIG_PLAT_SAMSUNG symbol. CONFIG_PINCTRL_SAMSUNG is being
->> selected for both PLAT_SAMSUNG and ARCH_EXYNOS7 symbols.
->>
->> This patch modifes the pinctrl/Makefile to use
->> CONFIG_PINCTRL_SAMSUNG symbol to compile the pinctrl/samsung/*.c
->>
->> Signed-off-by: Naveen Krishna Chatradhi <ch.naveen@samsung.com>
->> Cc: Tomasz Figa <t.figa@samsung.com>
->> Cc: linus.walleij at linaro.org
->> Cc: Thomas Abraham <thomas.ab@samsung.com>
->
-> Excellent catch, thanks, patch applied!
+On Tue, 02 Sep 2014 14:45:06 -0700
+Mike Turquette <mturquette@linaro.org> wrote:
 
-Thanks Linus.
+> Quoting Boris BREZILLON (2014-09-02 08:27:51)
+> > The slow clk block provided by at91sam9260 and derived SoCs should always
+> > have 2 parents.
+> > 
+> > Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
+> > ---
+> > 
+> > Hello Mike,
+> > 
+> > Could you take this fix for the next 3.17 rc ?
+> > Without this fix you won't be able to use programmable clks (the slow
+> > clk is one of the parents of prog clks), and these prog clks are used,
+> > among other things, to provide clks to external audio chips.
+> > 
+> > No need to backport this fix to previous stable releases, as CCF support
+> > for at91sam9260 (and derived) SoCs only appeared in 3.17.
+> 
+> Pulled into clk-fixes.
 
->
-> I should use this pattern on more places in the Makefile,
-> I was confused by logically thinking that Kconfig symbols
-> used in Makefile cannot be from a Kconfig one level below.
->
-> Yours,
-> Linus Walleij
+Thanks!
+
+> 
+> Regards,
+> Mike
+> 
+> > 
+> > Best Regards,
+> > 
+> > Boris
+> > 
+> >  drivers/clk/at91/clk-slow.c | 2 +-
+> >  1 file changed, 1 insertion(+), 1 deletion(-)
+> > 
+> > diff --git a/drivers/clk/at91/clk-slow.c b/drivers/clk/at91/clk-slow.c
+> > index 0300c46..32f7c1b 100644
+> > --- a/drivers/clk/at91/clk-slow.c
+> > +++ b/drivers/clk/at91/clk-slow.c
+> > @@ -447,7 +447,7 @@ void __init of_at91sam9260_clk_slow_setup(struct device_node *np,
+> >         int i;
+> >  
+> >         num_parents = of_count_phandle_with_args(np, "clocks", "#clock-cells");
+> > -       if (num_parents <= 0 || num_parents > 1)
+> > +       if (num_parents != 2)
+> >                 return;
+> >  
+> >         for (i = 0; i < num_parents; ++i) {
+> > -- 
+> > 1.9.1
+> > 
+
 
 
 -- 
-Shine bright,
-(: Nav :)
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
