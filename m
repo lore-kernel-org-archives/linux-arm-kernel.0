@@ -1,40 +1,59 @@
 From: b29396@freescale.com (Dong Aisheng)
-Date: Wed, 3 Sep 2014 20:05:00 +0800
-Subject: [PATCH 4/7] mmc: sdhci: do not enable card detect interrupt for gpio
- cd type
+Date: Wed, 3 Sep 2014 20:05:03 +0800
+Subject: [PATCH 7/7] mmc: sdhci-esdhc-imx: add quirk SDHCI_QUIRK2_BROKEN_HS200
+ for imx6qdl
 In-Reply-To: <1409745903-26550-1-git-send-email-b29396@freescale.com>
 References: <1409745903-26550-1-git-send-email-b29396@freescale.com>
-Message-ID: <1409745903-26550-5-git-send-email-b29396@freescale.com>
+Message-ID: <1409745903-26550-8-git-send-email-b29396@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Except SDHCI_QUIRK_BROKEN_CARD_DETECTION and MMC_CAP_NONREMOVABLE,
-we also do not need to handle controller native card detect interrupt
-for gpio as card detect case.
-If we wrong enabled the card detect interrupt for gpio case,
-it will cause a lot of unexpected card detect interrupts during data transfer
-which should not happen.
+The iMX6Q/DL can not support HS200 mode while iMX6SL and iMX6SX can,
+so introduce a new flag to distinguish them.
 
 Signed-off-by: Dong Aisheng <b29396@freescale.com>
 ---
- drivers/mmc/host/sdhci.c |    3 ++-
- 1 files changed, 2 insertions(+), 1 deletions(-)
+ drivers/mmc/host/sdhci-esdhc-imx.c |   10 ++++++++--
+ 1 files changed, 8 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/mmc/host/sdhci.c b/drivers/mmc/host/sdhci.c
-index f6a683b..4d0b7b5 100644
---- a/drivers/mmc/host/sdhci.c
-+++ b/drivers/mmc/host/sdhci.c
-@@ -136,9 +136,10 @@ static void sdhci_dumpregs(struct sdhci_host *host)
- static void sdhci_set_card_detection(struct sdhci_host *host, bool enable)
- {
- 	u32 present;
-+	int gpio_cd = mmc_gpio_get_cd(host->mmc);
+diff --git a/drivers/mmc/host/sdhci-esdhc-imx.c b/drivers/mmc/host/sdhci-esdhc-imx.c
+index 87179c4..16eff00 100644
+--- a/drivers/mmc/host/sdhci-esdhc-imx.c
++++ b/drivers/mmc/host/sdhci-esdhc-imx.c
+@@ -120,6 +120,8 @@
+  * when reading data from the card
+  */
+ #define ESDHC_FLAG_ERR004536		BIT(7)
++/* The IP supports HS200 mode */
++#define ESDHC_FLAG_HS200		BIT(8)
  
- 	if ((host->quirks & SDHCI_QUIRK_BROKEN_CARD_DETECTION) ||
--	    (host->mmc->caps & MMC_CAP_NONREMOVABLE))
-+	    (host->mmc->caps & MMC_CAP_NONREMOVABLE) || !IS_ERR_VALUE(gpio_cd))
- 		return;
+ struct esdhc_soc_data {
+ 	u32 flags;
+@@ -147,12 +149,13 @@ static struct esdhc_soc_data usdhc_imx6q_data = {
  
- 	if (enable) {
+ static struct esdhc_soc_data usdhc_imx6sl_data = {
+ 	.flags = ESDHC_FLAG_USDHC | ESDHC_FLAG_STD_TUNING
+-			| ESDHC_FLAG_HAVE_CAP1 | ESDHC_FLAG_ERR004536,
++			| ESDHC_FLAG_HAVE_CAP1 | ESDHC_FLAG_ERR004536
++			| ESDHC_FLAG_HS200,
+ };
+ 
+ static struct esdhc_soc_data usdhc_imx6sx_data = {
+ 	.flags = ESDHC_FLAG_USDHC | ESDHC_FLAG_STD_TUNING
+-			| ESDHC_FLAG_HAVE_CAP1,
++			| ESDHC_FLAG_HAVE_CAP1 | ESDHC_FLAG_HS200,
+ };
+ 
+ struct pltfm_imx_data {
+@@ -1063,6 +1066,9 @@ static int sdhci_esdhc_imx_probe(struct platform_device *pdev)
+ 		host->quirks2 |= SDHCI_QUIRK2_PRESET_VALUE_BROKEN;
+ 		host->mmc->caps |= MMC_CAP_1_8V_DDR;
+ 
++		if (!(imx_data->socdata->flags & ESDHC_FLAG_HS200))
++			host->quirks2 |= SDHCI_QUIRK2_BROKEN_HS200;
++
+ 		/*
+ 		 * errata ESDHC_FLAG_ERR004536 fix for MX6Q TO1.2 and MX6DL
+ 		 * TO1.1, it's harmless for MX6SL
 -- 
 1.7.8
