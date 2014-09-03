@@ -1,42 +1,157 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 03 Sep 2014 15:27:30 +0200
-Subject: [PATCH] ARM: cns3xxx: fix allmodconfig panic in pci driver
-In-Reply-To: <1409750292-24105-1-git-send-email-kaixu.xia@linaro.org>
-References: <kaixu.xia@linaro.org>
- <1409750292-24105-1-git-send-email-kaixu.xia@linaro.org>
-Message-ID: <2886818.zPBP0DOepO@wuerfel>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Wed, 03 Sep 2014 15:29:01 +0200
+Subject: [PATCH v8 7/8] drivers: cpuidle: initialize big.LITTLE driver
+ through DT
+In-Reply-To: <1409585324-3678-8-git-send-email-lorenzo.pieralisi@arm.com>
+References: <1409585324-3678-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <1409585324-3678-8-git-send-email-lorenzo.pieralisi@arm.com>
+Message-ID: <5407179D.6040909@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 03 September 2014 21:18:12 Xia Kaixu wrote:
-> From: Xia Kaixu <kaixu.xia@linaro.org>
-> 
-> The kernel panic occurs when running an allmodconfig kernel on 
-> OMAP4460. The inicall "cns3xxx_pcie_init" does not check which
-> hardware it's running on and just tries to access to its specific 
-> registers. Now call it from .init_late callback from the two
-> machine descriptors.
-> 
-> Signed-off-by: Xia Kaixu <kaixu.xia@linaro.org>
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Cc: Anton Vorontsov <anton@enomsg.org>
-> Cc: Felix Fietkau <nbd@openwrt.org>
-> Cc: Imre Kaloz <kaloz@openwrt.org>
-> Cc: linaro-kernel at lists.linaro.org
-> Cc: linux-arm-kernel at lists.infradead.org
+On 09/01/2014 05:28 PM, Lorenzo Pieralisi wrote:
+> With the introduction of DT based idle states, CPUidle drivers for ARM
+> can now initialize idle states data through properties in the device tree.
+>
+> This patch adds code to the big.LITTLE CPUidle driver to dynamically
+> initialize idle states data through the updated device tree source file.
+>
+> Cc: Chander Kashyap <k.chander@samsung.com>
+> Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 
-Hi Kaixu,
+Acked-by: Daniel Lezcano <daniel.lezcano@linaro.org>
 
-it seems this time all the Cc's worked. One thing I just noticed is that
-you confused the 'Signed-off-by' lines. I did look at the patch earlier
-before you sent it out but unfortunately missed that.
+> ---
+>   arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts | 23 +++++++++++++++++++++++
+>   drivers/cpuidle/Kconfig.arm                |  1 +
+>   drivers/cpuidle/cpuidle-big_little.c       | 19 +++++++++++++++++++
+>   3 files changed, 43 insertions(+)
+>
+> diff --git a/arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts b/arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts
+> index a25c262..322fd15 100644
+> --- a/arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts
+> +++ b/arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts
+> @@ -38,6 +38,7 @@
+>   			compatible = "arm,cortex-a15";
+>   			reg = <0>;
+>   			cci-control-port = <&cci_control1>;
+> +			cpu-idle-states = <&CLUSTER_SLEEP_BIG>;
+>   		};
+>
+>   		cpu1: cpu at 1 {
+> @@ -45,6 +46,7 @@
+>   			compatible = "arm,cortex-a15";
+>   			reg = <1>;
+>   			cci-control-port = <&cci_control1>;
+> +			cpu-idle-states = <&CLUSTER_SLEEP_BIG>;
+>   		};
+>
+>   		cpu2: cpu at 2 {
+> @@ -52,6 +54,7 @@
+>   			compatible = "arm,cortex-a7";
+>   			reg = <0x100>;
+>   			cci-control-port = <&cci_control2>;
+> +			cpu-idle-states = <&CLUSTER_SLEEP_LITTLE>;
+>   		};
+>
+>   		cpu3: cpu at 3 {
+> @@ -59,6 +62,7 @@
+>   			compatible = "arm,cortex-a7";
+>   			reg = <0x101>;
+>   			cci-control-port = <&cci_control2>;
+> +			cpu-idle-states = <&CLUSTER_SLEEP_LITTLE>;
+>   		};
+>
+>   		cpu4: cpu at 4 {
+> @@ -66,6 +70,25 @@
+>   			compatible = "arm,cortex-a7";
+>   			reg = <0x102>;
+>   			cci-control-port = <&cci_control2>;
+> +			cpu-idle-states = <&CLUSTER_SLEEP_LITTLE>;
+> +		};
+> +
+> +		idle-states {
+> +			CLUSTER_SLEEP_BIG: cluster-sleep-big {
+> +				compatible = "arm,idle-state";
+> +				local-timer-stop;
+> +				entry-latency-us = <1000>;
+> +				exit-latency-us = <700>;
+> +				min-residency-us = <2000>;
+> +			};
+> +
+> +			CLUSTER_SLEEP_LITTLE: cluster-sleep-little {
+> +				compatible = "arm,idle-state";
+> +				local-timer-stop;
+> +				entry-latency-us = <1000>;
+> +				exit-latency-us = <500>;
+> +				min-residency-us = <2500>;
+> +			};
+>   		};
+>   	};
+>
+> diff --git a/drivers/cpuidle/Kconfig.arm b/drivers/cpuidle/Kconfig.arm
+> index 38cff69..e339c7f 100644
+> --- a/drivers/cpuidle/Kconfig.arm
+> +++ b/drivers/cpuidle/Kconfig.arm
+> @@ -7,6 +7,7 @@ config ARM_BIG_LITTLE_CPUIDLE
+>   	depends on MCPM
+>   	select ARM_CPU_SUSPEND
+>   	select CPU_IDLE_MULTIPLE_DRIVERS
+> +	select DT_IDLE_STATES
+>   	help
+>   	  Select this option to enable CPU idle driver for big.LITTLE based
+>   	  ARM systems. Driver manages CPUs coordination through MCPM and
+> diff --git a/drivers/cpuidle/cpuidle-big_little.c b/drivers/cpuidle/cpuidle-big_little.c
+> index ef94c3b..85d09bc 100644
+> --- a/drivers/cpuidle/cpuidle-big_little.c
+> +++ b/drivers/cpuidle/cpuidle-big_little.c
+> @@ -24,6 +24,8 @@
+>   #include <asm/smp_plat.h>
+>   #include <asm/suspend.h>
+>
+> +#include "dt_idle_states.h"
+> +
+>   static int bl_enter_powerdown(struct cpuidle_device *dev,
+>   			      struct cpuidle_driver *drv, int idx);
+>
+> @@ -73,6 +75,12 @@ static struct cpuidle_driver bl_idle_little_driver = {
+>   	.state_count = 2,
+>   };
+>
+> +static const struct of_device_id bl_idle_state_match[] __initconst = {
+> +	{ .compatible = "arm,idle-state",
+> +	  .data = bl_enter_powerdown },
+> +	{ },
+> +};
+> +
+>   static struct cpuidle_driver bl_idle_big_driver = {
+>   	.name = "big_idle",
+>   	.owner = THIS_MODULE,
+> @@ -190,6 +198,17 @@ static int __init bl_idle_init(void)
+>   	if (ret)
+>   		goto out_uninit_little;
+>
+> +	/* Start at index 1, index 0 standard WFI */
+> +	ret = dt_init_idle_driver(&bl_idle_big_driver, bl_idle_state_match, 1);
+> +	if (ret < 0)
+> +		goto out_uninit_big;
+> +
+> +	/* Start at index 1, index 0 standard WFI */
+> +	ret = dt_init_idle_driver(&bl_idle_little_driver,
+> +				  bl_idle_state_match, 1);
+> +	if (ret < 0)
+> +		goto out_uninit_big;
+> +
+>   	ret = cpuidle_register(&bl_idle_little_driver, NULL);
+>   	if (ret)
+>   		goto out_uninit_big;
+>
 
-You can read again in Documentation/SubmittingPatches about how
-they work, but the short version is that you must never put someone
-else's name in Signed-off-by under a patch you write yourself.
-When we apply the patch, I (or whoever else does) will put that
-line below yours to document who handled the patch.
 
-Otherwise, the patch looks good to me, thanks a lot for doing it.
+-- 
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
 
-	Arnd
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
