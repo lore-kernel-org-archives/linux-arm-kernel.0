@@ -1,65 +1,67 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Wed, 3 Sep 2014 10:01:14 +0200
-Subject: [GIT PULL] at91: defconfig for 3.18 #1
-Message-ID: <1409731274-23483-1-git-send-email-nicolas.ferre@atmel.com>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Wed, 03 Sep 2014 10:07:15 +0200
+Subject: [PATCH v4 2/4] dt-bindings: document Rockchip thermal
+In-Reply-To: <1409710239-19941-3-git-send-email-caesar.wang@rock-chips.com>
+References: <1409710239-19941-1-git-send-email-caesar.wang@rock-chips.com>
+ <1409710239-19941-3-git-send-email-caesar.wang@rock-chips.com>
+Message-ID: <11280986.L6lv82O8Qv@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd, Olof, Kevin,
+Am Mittwoch, 3. September 2014, 10:10:37 schrieb Caesar Wang:
+> This add the necessary binding documentation for the thermal
+> found on Rockchip SoCs
+> 
+> Signed-off-by: zhaoyifeng <zyf@rock-chips.com>
+> Signed-off-by: Caesar Wang <caesar.wang@rock-chips.com>
+> ---
+>  .../devicetree/bindings/thermal/rockchip-thermal.txt | 20
+> ++++++++++++++++++++ 1 file changed, 20 insertions(+)
+>  create mode 100644
+> Documentation/devicetree/bindings/thermal/rockchip-thermal.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/thermal/rockchip-thermal.txt
+> b/Documentation/devicetree/bindings/thermal/rockchip-thermal.txt new file
+> mode 100644
+> index 0000000..1ed4d4c
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/thermal/rockchip-thermal.txt
+> @@ -0,0 +1,20 @@
+> +* Temperature Sensor ADC (TSADC) on rockchip SoCs
+> +
+> +Required properties:
+> +- compatible: "rockchip,rk3288-tsadc"
+> +- reg: physical base address of the controller and length of memory mapped
+> +       region.
+> +- interrupts: The interrupt number to the cpu. The interrupt specifier
+> format +	      depends on the interrupt controller.
+> +- clocks: Must contain an entry for each entry in clock-names.
+> +- clock-names: Shall be "tsadc" for the converter-clock, and "apb_pclk" for
+> +	       the peripheral clock.
 
-Some defconfig updates for AT91. May be included after my 4 previous
-pull-requests but it is certainly not a hard dependency as it won't break
-compilation anyway.
+You're using the passive-temp, critical-temp and force-shut-temp properties in 
+your driver without declaring them here.
 
-Thanks, best regards,
+But more importantly, please use the generic trip-points for this. I guess it 
+shouldn't be a problem to introduce a "forced-shutdown" trippoint [0] for the 
+additional trip-point you have - thermal maintainers, please shout if I'm 
+wrong :-)
 
-The following changes since commit 7d1311b93e58ed55f3a31cc8f94c4b8fe988a2b9:
 
-  Linux 3.17-rc1 (2014-08-16 10:40:26 -0600)
+Heiko
 
-are available in the git repository at:
 
-  git://github.com/at91linux/linux-at91.git tags/at91-defconfig
+[0] in a separate patch, changing
+- thermal_trip_type enum in include/linux/thermal.h
+- trip_types mapping in drivers/thermal/of-thermal.c
+- Documentation/devicetree/bindings/thermal/thermal.txt
 
-for you to fetch changes up to 7cc5f270ee6e271df466f9d3c1c4522593002ac4:
-
-  ARM: at91: sama5: update defconfig (2014-09-02 15:06:11 +0200)
-
-----------------------------------------------------------------
-First batch of AT91 defconfig update for 3.18:
-- a dependency needed for SPI flash
-- enable sound on DT platforms
-- cleanup of current defconfigs:
-  - addition of new PWM subsystem and related drivers
-  - addition of ADC/touchscreen, watchdog or USB depending on the SoC
-  - addition of power/reset drivers activated during this development cycle
-  - removal of obsolete config options
-
-----------------------------------------------------------------
-Alexandre Belloni (7):
-      ARM: at91: at91_dt: update defconfig
-      ARM: at91: at91sam9260_9g20: update defconfig
-      ARM: at91: at91sam9261_9g10: update defconfig
-      ARM: at91: at91sam9263: update defconfig
-      ARM: at91: at91sam9g45: update defconfig
-      ARM: at91: at91sam9rl: update defconfig
-      ARM: at91: sama5: update defconfig
-
-Bo Shen (2):
-      ARM: at91/at91_dt_defconfig: enable sound support
-      ARM: at91/sama5_defconfig: enable sound support
-
-Brian Norris (1):
-      ARM: at91: add MTD_SPI_NOR (new dependency for M25P80)
-
- arch/arm/configs/at91_dt_defconfig          | 35 +++++++++++++++++++----------
- arch/arm/configs/at91sam9260_9g20_defconfig | 13 +++++------
- arch/arm/configs/at91sam9261_9g10_defconfig |  5 ++---
- arch/arm/configs/at91sam9263_defconfig      | 13 +++++------
- arch/arm/configs/at91sam9g45_defconfig      | 19 +++++++++-------
- arch/arm/configs/at91sam9rl_defconfig       | 19 +++++++++++-----
- arch/arm/configs/sama5_defconfig            | 18 ++++++++++-----
- 7 files changed, 73 insertions(+), 49 deletions(-)
-
--- 
-Nicolas Ferre
+> +
+> +Example:
+> +tsadc: tsadc at ff280000 {
+> +	compatible = "rockchip,rk3288-tsadc";
+> +	reg = <0xff280000 0x100>;
+> +	interrupts = <GIC_SPI 37 IRQ_TYPE_LEVEL_HIGH>;
+> +	clocks = <&cru SCLK_TSADC>, <&cru PCLK_TSADC>;
+> +	clock-names = "tsadc", "apb_pclk";
+> +};
