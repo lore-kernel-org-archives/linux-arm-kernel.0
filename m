@@ -1,127 +1,80 @@
 From: keescook@chromium.org (Kees Cook)
-Date: Wed,  3 Sep 2014 14:57:03 -0700
-Subject: [PATCH v5 2/8] ARM: expand fixmap region to 3MB
+Date: Wed,  3 Sep 2014 14:57:04 -0700
+Subject: [PATCH v5 3/8] arm: fixmap: implement __set_fixmap()
 In-Reply-To: <1409781429-27593-1-git-send-email-keescook@chromium.org>
 References: <1409781429-27593-1-git-send-email-keescook@chromium.org>
-Message-ID: <1409781429-27593-3-git-send-email-keescook@chromium.org>
+Message-ID: <1409781429-27593-4-git-send-email-keescook@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Rob Herring <robh@kernel.org>
+This is used from set_fixmap() and clear_fixmap() via asm-generic/fixmap.h.
+Also makes sure that the fixmap allocation fits into the expected range.
 
-With commit a05e54c103b0 ("ARM: 8031/2: change fixmap mapping region to
-support 32 CPUs"), the fixmap region was expanded to 2MB, but it
-precluded any other uses of the fixmap region. In order to support other
-uses the fixmap region needs to be expanded beyond 2MB. Fortunately, the
-adjacent 1MB range 0xffe00000-0xfff00000 is availabe.
+Based on patch by Rabin Vincent.
 
-Remove fixmap_page_table ptr and lookup the page table via the virtual
-address so that the fixmap region can span more that one pmd. The 2nd
-pmd is already created since it is shared with the vector page.
-
-Signed-off-by: Rob Herring <robh@kernel.org>
-[kees: fixed CONFIG_DEBUG_HIGHMEM get_fixmap() calls]
-[kees: moved pte allocation outside of CONFIG_HIGHMEM]
 Signed-off-by: Kees Cook <keescook@chromium.org>
+Cc: Rabin Vincent <rabin@rab.in>
 Acked-by: Nicolas Pitre <nico@linaro.org>
 ---
- Documentation/arm/memory.txt  |  2 +-
- arch/arm/include/asm/fixmap.h |  2 +-
- arch/arm/mm/highmem.c         | 15 ++++++++-------
- arch/arm/mm/mmu.c             |  6 +++---
- 4 files changed, 13 insertions(+), 12 deletions(-)
+ arch/arm/include/asm/fixmap.h |  2 ++
+ arch/arm/mm/mmu.c             | 25 +++++++++++++++++++++++++
+ 2 files changed, 27 insertions(+)
 
-diff --git a/Documentation/arm/memory.txt b/Documentation/arm/memory.txt
-index 38dc06d0a791..4178ebda6e66 100644
---- a/Documentation/arm/memory.txt
-+++ b/Documentation/arm/memory.txt
-@@ -41,7 +41,7 @@ fffe8000	fffeffff	DTCM mapping area for platforms with
- fffe0000	fffe7fff	ITCM mapping area for platforms with
- 				ITCM mounted inside the CPU.
- 
--ffc00000	ffdfffff	Fixmap mapping region.  Addresses provided
-+ffc00000	ffefffff	Fixmap mapping region.  Addresses provided
- 				by fix_to_virt() will be located here.
- 
- fee00000	feffffff	Mapping of PCI I/O space. This is a static
 diff --git a/arch/arm/include/asm/fixmap.h b/arch/arm/include/asm/fixmap.h
-index a7add6f9315d..d984ca69ce19 100644
+index d984ca69ce19..714606f70425 100644
 --- a/arch/arm/include/asm/fixmap.h
 +++ b/arch/arm/include/asm/fixmap.h
-@@ -2,7 +2,7 @@
- #define _ASM_FIXMAP_H
+@@ -14,6 +14,8 @@ enum fixed_addresses {
+ 	__end_of_fixed_addresses
+ };
  
- #define FIXADDR_START		0xffc00000UL
--#define FIXADDR_END		0xffe00000UL
-+#define FIXADDR_END		0xfff00000UL
- #define FIXADDR_TOP		(FIXADDR_END - PAGE_SIZE)
- 
- #include <asm/kmap_types.h>
-diff --git a/arch/arm/mm/highmem.c b/arch/arm/mm/highmem.c
-index 45aeaaca9052..81061987ac45 100644
---- a/arch/arm/mm/highmem.c
-+++ b/arch/arm/mm/highmem.c
-@@ -18,19 +18,20 @@
- #include <asm/tlbflush.h>
- #include "mm.h"
- 
--pte_t *fixmap_page_table;
--
- static inline void set_fixmap_pte(int idx, pte_t pte)
- {
- 	unsigned long vaddr = __fix_to_virt(idx);
--	set_pte_ext(fixmap_page_table + idx, pte, 0);
-+	pte_t *ptep = pte_offset_kernel(pmd_off_k(vaddr), vaddr);
++void __set_fixmap(enum fixed_addresses idx, phys_addr_t phys, pgprot_t prot);
 +
-+	set_pte_ext(ptep, pte, 0);
- 	local_flush_tlb_kernel_page(vaddr);
- }
+ #include <asm-generic/fixmap.h>
  
- static inline pte_t get_fixmap_pte(unsigned long vaddr)
- {
--	unsigned long idx = __virt_to_fix(vaddr);
--	return *(fixmap_page_table + idx);
-+	pte_t *ptep = pte_offset_kernel(pmd_off_k(vaddr), vaddr);
-+
-+	return *ptep;
- }
- 
- void *kmap(struct page *page)
-@@ -84,7 +85,7 @@ void *kmap_atomic(struct page *page)
- 	 * With debugging enabled, kunmap_atomic forces that entry to 0.
- 	 * Make sure it was indeed properly unmapped.
- 	 */
--	BUG_ON(!pte_none(*(fixmap_page_table + idx)));
-+	BUG_ON(!pte_none(get_fixmap_pte(vaddr)));
  #endif
- 	/*
- 	 * When debugging is off, kunmap_atomic leaves the previous mapping
-@@ -134,7 +135,7 @@ void *kmap_atomic_pfn(unsigned long pfn)
- 	idx = type + KM_TYPE_NR * smp_processor_id();
- 	vaddr = __fix_to_virt(idx);
- #ifdef CONFIG_DEBUG_HIGHMEM
--	BUG_ON(!pte_none(*(fixmap_page_table + idx)));
-+	BUG_ON(!pte_none(get_fixmap_pte(vaddr)));
- #endif
- 	set_fixmap_pte(idx, pfn_pte(pfn, kmap_prot));
- 
 diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
-index 8348ed6b2efe..7fa0966cd15f 100644
+index 7fa0966cd15f..fa3a667852cb 100644
 --- a/arch/arm/mm/mmu.c
 +++ b/arch/arm/mm/mmu.c
-@@ -1326,10 +1326,10 @@ static void __init kmap_init(void)
- #ifdef CONFIG_HIGHMEM
- 	pkmap_page_table = early_pte_alloc(pmd_off_k(PKMAP_BASE),
- 		PKMAP_BASE, _PAGE_KERNEL_TABLE);
--
--	fixmap_page_table = early_pte_alloc(pmd_off_k(FIXADDR_START),
--		FIXADDR_START, _PAGE_KERNEL_TABLE);
- #endif
-+
-+	early_pte_alloc(pmd_off_k(FIXADDR_START), FIXADDR_START,
-+			_PAGE_KERNEL_TABLE);
- }
+@@ -22,6 +22,7 @@
+ #include <asm/cputype.h>
+ #include <asm/sections.h>
+ #include <asm/cachetype.h>
++#include <asm/fixmap.h>
+ #include <asm/sections.h>
+ #include <asm/setup.h>
+ #include <asm/smp_plat.h>
+@@ -392,6 +393,30 @@ SET_MEMORY_FN(rw, pte_set_rw)
+ SET_MEMORY_FN(x, pte_set_x)
+ SET_MEMORY_FN(nx, pte_set_nx)
  
- static void __init map_lowmem(void)
++void __set_fixmap(enum fixed_addresses idx, phys_addr_t phys, pgprot_t prot)
++{
++	unsigned long vaddr = __fix_to_virt(idx);
++	pte_t *pte = pte_offset_kernel(pmd_off_k(vaddr), vaddr);
++
++	/* Make sure fixmap region does not exceed available allocation. */
++	BUILD_BUG_ON(FIXADDR_START + (__end_of_fixed_addresses * PAGE_SIZE) >
++		     FIXADDR_END);
++	BUG_ON(idx >= __end_of_fixed_addresses);
++
++	if (pgprot_val(prot))
++		set_pte_at(NULL, vaddr, pte,
++			pfn_pte(phys >> PAGE_SHIFT, prot));
++	else
++		pte_clear(NULL, vaddr, pte);
++
++	/*
++	 * Given the potential a15 tlbi errata, we can only do tlb flushes
++	 * with interrupts disabled. Callers must have taken care of this.
++	 */
++	WARN_ON_ONCE(!irqs_disabled());
++	flush_tlb_kernel_range(vaddr, vaddr + PAGE_SIZE);
++}
++
+ /*
+  * Adjust the PMD section entries according to the CPU in use.
+  */
 -- 
 1.9.1
