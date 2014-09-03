@@ -1,82 +1,85 @@
 From: apinski@cavium.com (Andrew Pinski)
-Date: Wed,  3 Sep 2014 14:19:18 -0700
-Subject: [PATCH 24/24] Add documentation about ARM64 ILP32 ABI
+Date: Wed,  3 Sep 2014 14:19:13 -0700
+Subject: [PATCH 19/24] ptrace: Allow compat to use the native siginfo
 In-Reply-To: <1409779158-30963-1-git-send-email-apinski@cavium.com>
 References: <1409779158-30963-1-git-send-email-apinski@cavium.com>
-Message-ID: <1409779158-30963-25-git-send-email-apinski@cavium.com>
+Message-ID: <1409779158-30963-20-git-send-email-apinski@cavium.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds the documentation about the ILP32 ABI and what is difference between it and the normal generic 32bit ABI.
+With ARM64 ILP32 ABI, we want to use the non-compat
+siginfo as we want to simplify signal handling for this new ABI.
+This patch just adds a new define COMPAT_USE_NATIVE_SIGINFO and
+if it is true then read/write in the compat case as it was the
+non-compat case.
 
 Signed-off-by: Andrew Pinski <apinski@cavium.com>
 ---
- Documentation/arm64/ilp32.txt |   57 +++++++++++++++++++++++++++++++++++++++++
- 1 files changed, 57 insertions(+), 0 deletions(-)
- create mode 100644 Documentation/arm64/ilp32.txt
+ include/linux/compat.h |    4 ++++
+ kernel/ptrace.c        |   25 ++++++++++++++++++-------
+ 2 files changed, 22 insertions(+), 7 deletions(-)
 
-diff --git a/Documentation/arm64/ilp32.txt b/Documentation/arm64/ilp32.txt
-new file mode 100644
-index 0000000..0863aa4
---- /dev/null
-+++ b/Documentation/arm64/ilp32.txt
-@@ -0,0 +1,57 @@
-+			ILP32 AARCH64 SYSCALL ABI
-+			=====================
+diff --git a/include/linux/compat.h b/include/linux/compat.h
+index e649426..2d8c535 100644
+--- a/include/linux/compat.h
++++ b/include/linux/compat.h
+@@ -24,6 +24,10 @@
+ #define COMPAT_USE_64BIT_TIME 0
+ #endif
+ 
++#ifndef COMPAT_USE_NATIVE_SIGINFO
++#define COMPAT_USE_NATIVE_SIGINFO 0
++#endif
 +
-+Author: Andrew Pinski  <apinski@cavium.com>
-+Date: May 23, 2014
-+
-+This document describes the ILP32 syscall ABI and where it differs
-+from the generic linux syscall interface.
-+ILP32 sets __kernel_long_t and __kernel_ulong_t both to 64bit
-+(long long).  This effects the following types:
-+* time_t: unsigned long long
-+* clock_t: unsigned long long
-+* fsword_t: long long
-+* suseconds_t: long long
-+* swblk_t: long long
-+* fd_mask_t: long long
-+
-+Some structures are changed to reduce the difference in the code path
-+for both ILP32 and LP64 ABIs for signal handling.
-+
-+The following structures have been changed so the layout of the structures are the same between ILP32 and LP64 ABIs.
-+* timespec: Uses time_t and suseconds_t
-+* timeval: Uses time_t and suseconds_t
-+* stat: Uses timespec/time_t.
-+* semid64_ds: Uses time_t.
-+* msqid64_ds: Uses time_t.
-+* shmid64_ds: Uses time_t.
-+* rt_sigframe: Uses siginfo and ucontext.
-+* siginfo_t: Uses clock_t and sigval_t
-+* ucontext: Uses stack_t and sigset_t
-+* stack_t: NOTE special handling inside the kernel is done to make sure
-+  the pointers are zero extended
-+* sigval_t: Contains pointers
-+* sigevent: Uses sigval_t which causes it to be the same.  Special
-+  handing is needed for reading; in the mq_notify syscall
-+* sigaction: NOTE the userland structure inside glibc does
-+  not match the kernel structure here (this causes issues with LTP).
-+  Uses sigset_t.
-+* fd_set: This is done to avoid endian issues between ILP32 and LP64
-+  Also the syscall which uses fd_set uses timespec
-+
-+
-+Also the syscalls which normally would pass 64bit values as two
-+arguments; now pass the 64bit value as one argument.  Also they have
-+been renamed (removing the 64 from the name) to avoid confusion.
-+The list of these syscalls:
-+* fcntl
-+* statfs
-+* fstatfs
-+* truncate
-+* ftruncate
-+* lseek
-+* sendfile
-+* newfstatat
-+* fstat
-+* mmap
-+* fadvise64
+ #ifndef __SC_DELOUSE
+ #define __SC_DELOUSE(t,v) ((t)(unsigned long)(v))
+ #endif
+diff --git a/kernel/ptrace.c b/kernel/ptrace.c
+index 54e7522..40ae023 100644
+--- a/kernel/ptrace.c
++++ b/kernel/ptrace.c
+@@ -657,7 +657,7 @@ static int ptrace_peek_siginfo(struct task_struct *child,
+ 			break;
+ 
+ #ifdef CONFIG_COMPAT
+-		if (unlikely(is_compat_task())) {
++		if (unlikely(is_compat_task() && !COMPAT_USE_NATIVE_SIGINFO)) {
+ 			compat_siginfo_t __user *uinfo = compat_ptr(data);
+ 
+ 			if (copy_siginfo_to_user32(uinfo, &info) ||
+@@ -1126,16 +1126,27 @@ int compat_ptrace_request(struct task_struct *child, compat_long_t request,
+ 
+ 	case PTRACE_GETSIGINFO:
+ 		ret = ptrace_getsiginfo(child, &siginfo);
+-		if (!ret)
+-			ret = copy_siginfo_to_user32(
+-				(struct compat_siginfo __user *) datap,
+-				&siginfo);
++		if (!ret) {
++			if (COMPAT_USE_NATIVE_SIGINFO)
++				ret = copy_siginfo_to_user(
++					(struct siginfo __user *) datap,
++					&siginfo);
++			else
++				ret = copy_siginfo_to_user32(
++					(struct compat_siginfo __user *) datap,
++					&siginfo);
++		}
+ 		break;
+ 
+ 	case PTRACE_SETSIGINFO:
+ 		memset(&siginfo, 0, sizeof siginfo);
+-		if (copy_siginfo_from_user32(
+-			    &siginfo, (struct compat_siginfo __user *) datap))
++		if (COMPAT_USE_NATIVE_SIGINFO)
++			ret = copy_from_user(&siginfo, datap, sizeof(siginfo));
++		else
++			ret = copy_siginfo_from_user32(
++				 &siginfo,
++				 (struct compat_siginfo __user *) datap);
++		if (ret)
+ 			ret = -EFAULT;
+ 		else
+ 			ret = ptrace_setsiginfo(child, &siginfo);
 -- 
 1.7.2.5
