@@ -1,41 +1,55 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Wed,  3 Sep 2014 12:52:31 +0200
-Subject: [PATCH 15/15] PM / Domains: Keep declaration of dev_power_governors
- together
-In-Reply-To: <1409741551-16437-1-git-send-email-ulf.hansson@linaro.org>
-References: <1409741551-16437-1-git-send-email-ulf.hansson@linaro.org>
-Message-ID: <1409741551-16437-16-git-send-email-ulf.hansson@linaro.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 03 Sep 2014 12:56:02 +0200
+Subject: [PATCH] tty/serial: fix config dependencies for samsung serial
+In-Reply-To: <CAHfPSqAn5gHjDA75Zf1W5=GH9_W+X6+4oc9rDK7CqeSoF3DURw@mail.gmail.com>
+References: <1409671320-7604-1-git-send-email-ch.naveen@samsung.com>
+ <3749760.naNt3fHoTI@wuerfel>
+ <CAHfPSqAn5gHjDA75Zf1W5=GH9_W+X6+4oc9rDK7CqeSoF3DURw@mail.gmail.com>
+Message-ID: <10202237.9vbtDF9MIQ@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is a pure code cleanup in the header file for the PM domain. No
-functional change.
+On Wednesday 03 September 2014 13:51:56 Naveen Krishna Ch wrote:
+> On 2 September 2014 21:16, Arnd Bergmann <arnd@arndb.de> wrote:
+> > On Tuesday 02 September 2014 20:52:00 Naveen Krishna Chatradhi wrote:
+> >> Make the config symbols SERIAL_SAMSUNG_UARTS_4 and
+> >> SERIAL_SAMSUNG_UARTS depend on SERIAL_SAMSUNG rather than
+> >> PLAT_SAMSUNG.
+> >
+> > Please always describe why you are doing a change. This patch
+> > seems really pointless.
+> 
+> The SERIAL_SAMSUNG_UARTS_4 and SERIAL_SAMSUNG_UARTS config options are
+> meaningful only if SERIAL_SAMSUNG is enabled. Hence the dependency
+> rules were changed. I will repost this patch with better description.
 
-Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
----
- include/linux/pm_domain.h | 3 +--
- 1 file changed, 1 insertion(+), 2 deletions(-)
+My point is that the options are used by both the uart driver and
+the platform code, e.g. for the purpose of PM debugging which can
+be enabled even when the serial-samsung driver is turned off.
 
-diff --git a/include/linux/pm_domain.h b/include/linux/pm_domain.h
-index ebf52ae..324b927 100644
---- a/include/linux/pm_domain.h
-+++ b/include/linux/pm_domain.h
-@@ -117,8 +117,6 @@ static inline struct generic_pm_domain_data *dev_gpd_data(struct device *dev)
- 	return to_gpd_data(dev->power.subsys_data->domain_data);
- }
- 
--extern struct dev_power_governor simple_qos_governor;
--
- extern struct generic_pm_domain *dev_to_genpd(struct device *dev);
- extern int __pm_genpd_add_device(struct generic_pm_domain *genpd,
- 				 struct device *dev,
-@@ -151,6 +149,7 @@ extern void pm_genpd_init(struct generic_pm_domain *genpd,
- extern int pm_genpd_poweron(struct generic_pm_domain *genpd);
- extern int pm_genpd_name_poweron(const char *domain_name);
- 
-+extern struct dev_power_governor simple_qos_governor;
- extern struct dev_power_governor pm_domain_always_on_gov;
- #else
- 
--- 
-1.9.1
+> >>  config SERIAL_SAMSUNG_UARTS_4
+> >>         bool
+> >> -       depends on PLAT_SAMSUNG
+> >> +       depends on SERIAL_SAMSUNG
+> >>         default y if !(CPU_S3C2410 || CPU_S3C2412 || CPU_S3C2440 || CPU_S3C2442)
+> >>         help
+> >>           Internal node for the common case of 4 Samsung compatible UARTs
+> >>
+> >>  config SERIAL_SAMSUNG_UARTS
+> >>         int
+> >> -       depends on PLAT_SAMSUNG
+> >> +       depends on SERIAL_SAMSUNG
+> >>         default 4 if SERIAL_SAMSUNG_UARTS_4 || CPU_S3C2416
+> >>         default 3
+> >>         help
+> >>
+> >
+> > Have you checked that it still builds on all samsung platforms when
+> > SERIAL_SAMSUNG is disabled? We have had build errors in this area
+> > in the past.
+> 
+> Yes, it builds for other Samsung platforms.
+
+Ok.
+
+	Arnd
