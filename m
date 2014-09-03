@@ -1,70 +1,53 @@
-From: boris.brezillon@free-electrons.com (Boris BREZILLON)
-Date: Wed, 3 Sep 2014 09:42:50 +0200
-Subject: [PATCH] clk: at91: fix num_parents test in at91sam9260 slow clk
- implementation
-In-Reply-To: <20140902214506.5251.1412@quantum>
-References: <1409671671-13544-1-git-send-email-boris.brezillon@free-electrons.com>
- <20140902214506.5251.1412@quantum>
-Message-ID: <20140903094250.0a5b5154@bbrezillon>
+From: naveenkrishna.ch@gmail.com (Naveen Krishna Ch)
+Date: Wed, 3 Sep 2014 13:13:21 +0530
+Subject: [PATCH 08/14] i2c: exynos5: Add Kconfig dependencies
+In-Reply-To: <20140828040311.GD4972@localhost>
+References: <1409132740-1954-1-git-send-email-ch.naveen@samsung.com>
+ <1409132740-1954-2-git-send-email-ch.naveen@samsung.com>
+ <20140828040311.GD4972@localhost>
+Message-ID: <CAHfPSqBTskQxC_HktLyPF=4cmmzZvVZO2u_Y4tXkftA1qtsR4g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 02 Sep 2014 14:45:06 -0700
-Mike Turquette <mturquette@linaro.org> wrote:
+Hi Olof,
 
-> Quoting Boris BREZILLON (2014-09-02 08:27:51)
-> > The slow clk block provided by at91sam9260 and derived SoCs should always
-> > have 2 parents.
-> > 
-> > Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
-> > ---
-> > 
-> > Hello Mike,
-> > 
-> > Could you take this fix for the next 3.17 rc ?
-> > Without this fix you won't be able to use programmable clks (the slow
-> > clk is one of the parents of prog clks), and these prog clks are used,
-> > among other things, to provide clks to external audio chips.
-> > 
-> > No need to backport this fix to previous stable releases, as CCF support
-> > for at91sam9260 (and derived) SoCs only appeared in 3.17.
-> 
-> Pulled into clk-fixes.
+On 28 August 2014 09:33, Olof Johansson <olof@lixom.net> wrote:
+> On Wed, Aug 27, 2014 at 03:15:40PM +0530, Naveen Krishna Chatradhi wrote:
+>> The i2c-exynos5.c driver can be reused for the HSI2C controller
+>> on Exynos7 SoCs from Samsung.
+>>
+>> This patch adds the Kconfig dependency to choose i2c-exynos5.c
+>> for CONFIG_ARCH_EXYNOS7.
+>>
+>> Signed-off-by: Naveen Krishna Chatradhi <ch.naveen@samsung.com>
+>> To: linux-i2c at vger.kernel.org
+>> Cc: Wolfram Sang <wsa@the-dreams.de>
+>> ---
+>>  drivers/i2c/busses/Kconfig |    2 +-
+>>  1 file changed, 1 insertion(+), 1 deletion(-)
+>>
+>> diff --git a/drivers/i2c/busses/Kconfig b/drivers/i2c/busses/Kconfig
+>> index 2ac87fa..bd18fa6 100644
+>> --- a/drivers/i2c/busses/Kconfig
+>> +++ b/drivers/i2c/busses/Kconfig
+>> @@ -465,7 +465,7 @@ config I2C_EG20T
+>>
+>>  config I2C_EXYNOS5
+>>       tristate "Exynos5 high-speed I2C driver"
+>> -     depends on ARCH_EXYNOS5 && OF
+>> +     depends on (ARCH_EXYNOS5 || ARCH_EXYNOS7) && OF
+>
+> Ick, this will keep growing. Please use ARCH_EXYNOS instead. Yes,
+> this means you need to add it to the arm64 Kconfig and select it from
+> ARCH_EXYNOS7.
 
-Thanks!
+Ok, will repost with ARCH_EXYNOS. Thanks.
 
-> 
-> Regards,
-> Mike
-> 
-> > 
-> > Best Regards,
-> > 
-> > Boris
-> > 
-> >  drivers/clk/at91/clk-slow.c | 2 +-
-> >  1 file changed, 1 insertion(+), 1 deletion(-)
-> > 
-> > diff --git a/drivers/clk/at91/clk-slow.c b/drivers/clk/at91/clk-slow.c
-> > index 0300c46..32f7c1b 100644
-> > --- a/drivers/clk/at91/clk-slow.c
-> > +++ b/drivers/clk/at91/clk-slow.c
-> > @@ -447,7 +447,7 @@ void __init of_at91sam9260_clk_slow_setup(struct device_node *np,
-> >         int i;
-> >  
-> >         num_parents = of_count_phandle_with_args(np, "clocks", "#clock-cells");
-> > -       if (num_parents <= 0 || num_parents > 1)
-> > +       if (num_parents != 2)
-> >                 return;
-> >  
-> >         for (i = 0; i < num_parents; ++i) {
-> > -- 
-> > 1.9.1
-> > 
-
-
+>
+>
+>
+> -Olof
 
 -- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+Shine bright,
+(: Nav :)
