@@ -1,198 +1,32 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Wed,  3 Sep 2014 14:57:05 -0700
-Subject: [PATCH v5 4/8] arm: use fixmap for text patching when text is RO
-In-Reply-To: <1409781429-27593-1-git-send-email-keescook@chromium.org>
-References: <1409781429-27593-1-git-send-email-keescook@chromium.org>
-Message-ID: <1409781429-27593-5-git-send-email-keescook@chromium.org>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 3 Sep 2014 15:04:39 -0700
+Subject: [PATCHv2] ARM: debug: uncompress debug support for omap2plus
+In-Reply-To: <20140826075831.GU30401@n2100.arm.linux.org.uk>
+References: <1409038140-7433-1-git-send-email-kpark3469@gmail.com>
+ <20140826075831.GU30401@n2100.arm.linux.org.uk>
+Message-ID: <20140903220433.GQ11766@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Rabin Vincent <rabin@rab.in>
+* Russell King - ARM Linux <linux@arm.linux.org.uk> [140826 00:58]:
+> On Tue, Aug 26, 2014 at 04:28:59PM +0900, kpark3469 at gmail.com wrote:
+> > From: Sahara <keun-o.park@windriver.com>
+> > 
+> > Since OMAP low-level debug code places data in the .data section,
+> > The symbol DEBUG_UNCOMPRESS was defined with !DEBUG_OMAP2PLUS_UART.
+> > This patch removes the part using data section in debug/omap2plus.S,
+> > so DEBUG_UNCOMPRESS is now available on OMAP system.
+> > 
+> > Signed-off-by: Sahara <keun-o.park@windriver.com>
+> > Tested-by: Afzal Mohammed <afzal.mohd.ma@gmail.com> (on am335x beagle
+> > bone white)
+> 
+> You need to consider whom you are sending this to.  It would be well
+> worth including the OMAP maintainer, Tony Lindgren.
 
-Use fixmaps for text patching when the kernel text is read-only,
-inspired by x86.  This makes jump labels and kprobes work with the
-currently available CONFIG_DEBUG_SET_MODULE_RONX and the upcoming
-CONFIG_DEBUG_RODATA options.
+Thanks saw it and replied yesterday that we should just rip out
+the SoC detection and use standard 8250 debug_ll code.
 
-Signed-off-by: Rabin Vincent <rabin@rab.in>
-[kees: fixed up for merge with "arm: use generic fixmap.h"]
-[kees: added parse acquire/release annotations to pass C=1 builds]
-Signed-off-by: Kees Cook <keescook@chromium.org>
-Acked-by: Nicolas Pitre <nico@linaro.org>
----
- arch/arm/include/asm/fixmap.h |  4 +++
- arch/arm/kernel/jump_label.c  |  2 +-
- arch/arm/kernel/patch.c       | 79 +++++++++++++++++++++++++++++++++++++++----
- arch/arm/kernel/patch.h       | 12 ++++++-
- 4 files changed, 88 insertions(+), 9 deletions(-)
+Regards,
 
-diff --git a/arch/arm/include/asm/fixmap.h b/arch/arm/include/asm/fixmap.h
-index 714606f70425..0415eae1df27 100644
---- a/arch/arm/include/asm/fixmap.h
-+++ b/arch/arm/include/asm/fixmap.h
-@@ -11,6 +11,10 @@ enum fixed_addresses {
- 	FIX_KMAP_BEGIN,
- 	FIX_KMAP_END = FIX_KMAP_BEGIN + (KM_TYPE_NR * NR_CPUS) - 1,
- 
-+	/* Support writing RO kernel text via kprobes, jump labels, etc. */
-+	FIX_TEXT_POKE0,
-+	FIX_TEXT_POKE1,
-+
- 	__end_of_fixed_addresses
- };
- 
-diff --git a/arch/arm/kernel/jump_label.c b/arch/arm/kernel/jump_label.c
-index 4ce4f789446d..afeeb9ea6f43 100644
---- a/arch/arm/kernel/jump_label.c
-+++ b/arch/arm/kernel/jump_label.c
-@@ -19,7 +19,7 @@ static void __arch_jump_label_transform(struct jump_entry *entry,
- 		insn = arm_gen_nop();
- 
- 	if (is_static)
--		__patch_text(addr, insn);
-+		__patch_text_early(addr, insn);
- 	else
- 		patch_text(addr, insn);
- }
-diff --git a/arch/arm/kernel/patch.c b/arch/arm/kernel/patch.c
-index 07314af47733..a1dce690446a 100644
---- a/arch/arm/kernel/patch.c
-+++ b/arch/arm/kernel/patch.c
-@@ -1,8 +1,11 @@
- #include <linux/kernel.h>
-+#include <linux/spinlock.h>
- #include <linux/kprobes.h>
-+#include <linux/mm.h>
- #include <linux/stop_machine.h>
- 
- #include <asm/cacheflush.h>
-+#include <asm/fixmap.h>
- #include <asm/smp_plat.h>
- #include <asm/opcodes.h>
- 
-@@ -13,21 +16,77 @@ struct patch {
- 	unsigned int insn;
- };
- 
--void __kprobes __patch_text(void *addr, unsigned int insn)
-+static DEFINE_SPINLOCK(patch_lock);
-+
-+static void __kprobes *patch_map(void *addr, int fixmap, unsigned long *flags)
-+	__acquires(&patch_lock)
-+{
-+	unsigned int uintaddr = (uintptr_t) addr;
-+	bool module = !core_kernel_text(uintaddr);
-+	struct page *page;
-+
-+	if (module && IS_ENABLED(CONFIG_DEBUG_SET_MODULE_RONX))
-+		page = vmalloc_to_page(addr);
-+	else if (!module && IS_ENABLED(CONFIG_DEBUG_RODATA))
-+		page = virt_to_page(addr);
-+	else
-+		return addr;
-+
-+	if (flags)
-+		spin_lock_irqsave(&patch_lock, *flags);
-+	else
-+		__acquire(&patch_lock);
-+
-+	set_fixmap(fixmap, page_to_phys(page));
-+
-+	return (void *) (__fix_to_virt(fixmap) + (uintaddr & ~PAGE_MASK));
-+}
-+
-+static void __kprobes patch_unmap(int fixmap, unsigned long *flags)
-+	__releases(&patch_lock)
-+{
-+	clear_fixmap(fixmap);
-+
-+	if (flags)
-+		spin_unlock_irqrestore(&patch_lock, *flags);
-+	else
-+		__release(&patch_lock);
-+}
-+
-+void __kprobes __patch_text_real(void *addr, unsigned int insn, bool remap)
- {
- 	bool thumb2 = IS_ENABLED(CONFIG_THUMB2_KERNEL);
-+	unsigned int uintaddr = (uintptr_t) addr;
-+	bool twopage = false;
-+	unsigned long flags;
-+	void *waddr = addr;
- 	int size;
- 
-+	if (remap)
-+		waddr = patch_map(addr, FIX_TEXT_POKE0, &flags);
-+	else
-+		__acquire(&patch_lock);
-+
- 	if (thumb2 && __opcode_is_thumb16(insn)) {
--		*(u16 *)addr = __opcode_to_mem_thumb16(insn);
-+		*(u16 *)waddr = __opcode_to_mem_thumb16(insn);
- 		size = sizeof(u16);
--	} else if (thumb2 && ((uintptr_t)addr & 2)) {
-+	} else if (thumb2 && (uintaddr & 2)) {
- 		u16 first = __opcode_thumb32_first(insn);
- 		u16 second = __opcode_thumb32_second(insn);
--		u16 *addrh = addr;
-+		u16 *addrh0 = waddr;
-+		u16 *addrh1 = waddr + 2;
-+
-+		twopage = (uintaddr & ~PAGE_MASK) == PAGE_SIZE - 2;
-+		if (twopage && remap)
-+			addrh1 = patch_map(addr + 2, FIX_TEXT_POKE1, NULL);
- 
--		addrh[0] = __opcode_to_mem_thumb16(first);
--		addrh[1] = __opcode_to_mem_thumb16(second);
-+		*addrh0 = __opcode_to_mem_thumb16(first);
-+		*addrh1 = __opcode_to_mem_thumb16(second);
-+
-+		if (twopage && addrh1 != addr + 2) {
-+			flush_kernel_vmap_range(addrh1, 2);
-+			patch_unmap(FIX_TEXT_POKE1, NULL);
-+		}
- 
- 		size = sizeof(u32);
- 	} else {
-@@ -36,10 +95,16 @@ void __kprobes __patch_text(void *addr, unsigned int insn)
- 		else
- 			insn = __opcode_to_mem_arm(insn);
- 
--		*(u32 *)addr = insn;
-+		*(u32 *)waddr = insn;
- 		size = sizeof(u32);
- 	}
- 
-+	if (waddr != addr) {
-+		flush_kernel_vmap_range(waddr, twopage ? size / 2 : size);
-+		patch_unmap(FIX_TEXT_POKE0, &flags);
-+	} else
-+		__release(&patch_lock);
-+
- 	flush_icache_range((uintptr_t)(addr),
- 			   (uintptr_t)(addr) + size);
- }
-diff --git a/arch/arm/kernel/patch.h b/arch/arm/kernel/patch.h
-index b4731f2dac38..77e054c2f6cd 100644
---- a/arch/arm/kernel/patch.h
-+++ b/arch/arm/kernel/patch.h
-@@ -2,6 +2,16 @@
- #define _ARM_KERNEL_PATCH_H
- 
- void patch_text(void *addr, unsigned int insn);
--void __patch_text(void *addr, unsigned int insn);
-+void __patch_text_real(void *addr, unsigned int insn, bool remap);
-+
-+static inline void __patch_text(void *addr, unsigned int insn)
-+{
-+	__patch_text_real(addr, insn, true);
-+}
-+
-+static inline void __patch_text_early(void *addr, unsigned int insn)
-+{
-+	__patch_text_real(addr, insn, false);
-+}
- 
- #endif
--- 
-1.9.1
+Tony
