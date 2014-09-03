@@ -1,13 +1,37 @@
-From: lznuaa@gmail.com (Zhi Li)
-Date: Wed, 3 Sep 2014 16:02:14 -0500
-Subject: [Patch net-next 00/11] net: fec: imx6sx multiqueue support
-In-Reply-To: <5407807e.c26c460a.65d3.71b9SMTPIN_ADDED_BROKEN@mx.google.com>
-References: <5407807e.c26c460a.65d3.71b9SMTPIN_ADDED_BROKEN@mx.google.com>
-Message-ID: <CAHrpEqSKBGGyeKPoM702=NqK0qAr8w2Tq84zktEbZ-PKDiKA9g@mail.gmail.com>
+From: b.galvani@gmail.com (Beniamino Galvani)
+Date: Wed, 3 Sep 2014 23:12:20 +0200
+Subject: [PATCH v5 1/4] ethernet: arc: Add support for Rockchip SoC layer
+ device tree bindings
+In-Reply-To: <1409763165-16461-1-git-send-email-romain.perier@gmail.com>
+References: <1409763165-16461-1-git-send-email-romain.perier@gmail.com>
+Message-ID: <20140903211220.GA16962@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 3, 2014 at 3:34 PM,  <y@shlinux1.ap.freescale.net> wrote:
->
->
-Sorry! Sent out with wrong sender email address.
+On Wed, Sep 03, 2014 at 04:52:42PM +0000, Romain Perier wrote:
+> This patch defines a platform glue layer for Rockchip SoCs which
+> support arc-emac driver. It ensures that regulator for the rmii is on
+> before trying to connect to the ethernet controller. It applies right
+> speed and mode changes to the grf when ethernet settings change.
+
+Hi Romain,
+
+on a Radxa Rock when I try to remove the emac_rockchip module the
+board locks up when calling clk_disable_unprepare(priv->refclk). The
+tree is a net-next + your series, I don't know if I need some other
+patches.
+
+There is also the following build warning due to the emac dependency
+on REGULATOR which in principle seems correct, but looking at other
+drivers I wonder why they use the regulator APIs but don't have the
+same dependency.
+
+drivers/regulator/Kconfig:1:error: recursive dependency detected!
+drivers/regulator/Kconfig:1:       symbol REGULATOR is selected by MDIO_SUN4I
+drivers/net/phy/Kconfig:159:       symbol MDIO_SUN4I depends on PHYLIB
+drivers/net/phy/Kconfig:5:         symbol PHYLIB is selected by ARC_EMAC_CORE
+drivers/net/ethernet/arc/Kconfig:20:      symbol ARC_EMAC_CORE is selected by EMAC_ROCKCHIP
+drivers/net/ethernet/arc/Kconfig:35:      symbol EMAC_ROCKCHIP depends on REGULATOR
+
+Regards,
+Beniamino
