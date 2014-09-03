@@ -1,34 +1,41 @@
 From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Wed,  3 Sep 2014 12:52:20 +0200
-Subject: [PATCH 04/15] ARM: shmobile: Drop dev_irq_safe from r8a7779 genpd
- config
+Date: Wed,  3 Sep 2014 12:52:23 +0200
+Subject: [PATCH 07/15] PM / Domains: Remove redundant check for CONFIG_PM
 In-Reply-To: <1409741551-16437-1-git-send-email-ulf.hansson@linaro.org>
 References: <1409741551-16437-1-git-send-email-ulf.hansson@linaro.org>
-Message-ID: <1409741551-16437-5-git-send-email-ulf.hansson@linaro.org>
+Message-ID: <1409741551-16437-8-git-send-email-ulf.hansson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The dev_irq_safe configuration is redundant, genpd don't have any
-special treatmeant for handling it. Let's remove it.
+CONFIG_PM_GENERIC_DOMAINS depends on CONFIG_PM, thus there are no need
+to check explicity for it.
 
-Cc: Simon Horman <horms@verge.net.au>
-Cc: Magnus Damm <magnus.damm@gmail.com>
 Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
 ---
- arch/arm/mach-shmobile/pm-r8a7779.c | 1 -
- 1 file changed, 1 deletion(-)
+ drivers/base/power/domain.c | 4 ----
+ 1 file changed, 4 deletions(-)
 
-diff --git a/arch/arm/mach-shmobile/pm-r8a7779.c b/arch/arm/mach-shmobile/pm-r8a7779.c
-index 69f70b7..82fe3d7 100644
---- a/arch/arm/mach-shmobile/pm-r8a7779.c
-+++ b/arch/arm/mach-shmobile/pm-r8a7779.c
-@@ -87,7 +87,6 @@ static void r8a7779_init_pm_domain(struct r8a7779_pm_domain *r8a7779_pd)
- 	genpd->dev_ops.stop = pm_clk_suspend;
- 	genpd->dev_ops.start = pm_clk_resume;
- 	genpd->dev_ops.active_wakeup = pd_active_wakeup;
--	genpd->dev_irq_safe = true;
- 	genpd->power_off = pd_power_down;
- 	genpd->power_on = pd_power_up;
+diff --git a/drivers/base/power/domain.c b/drivers/base/power/domain.c
+index 4298a2b..b910d0f 100644
+--- a/drivers/base/power/domain.c
++++ b/drivers/base/power/domain.c
+@@ -66,8 +66,6 @@ static struct generic_pm_domain *pm_genpd_lookup_name(const char *domain_name)
+ 	return genpd;
+ }
  
+-#ifdef CONFIG_PM
+-
+ struct generic_pm_domain *dev_to_genpd(struct device *dev)
+ {
+ 	if (IS_ERR_OR_NULL(dev->pm_domain))
+@@ -281,8 +279,6 @@ int pm_genpd_name_poweron(const char *domain_name)
+ 	return genpd ? pm_genpd_poweron(genpd) : -EINVAL;
+ }
+ 
+-#endif /* CONFIG_PM */
+-
+ #ifdef CONFIG_PM_RUNTIME
+ 
+ static int genpd_start_dev_no_timing(struct generic_pm_domain *genpd,
 -- 
 1.9.1
