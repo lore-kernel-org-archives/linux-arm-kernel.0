@@ -1,54 +1,120 @@
-From: khilman@kernel.org (Kevin Hilman)
-Date: Wed, 03 Sep 2014 16:15:21 -0700
-Subject: [PATCH v9 4/6] ARM: Exynos: switch to using generic cpufreq
- driver for Exynos4210/5250/5420
-In-Reply-To: <CAJuA9ag2pybyLDUyW43wMQu4PA1cB4V9c1bc7WB3xjqzhqNGTw@mail.gmail.com>
- (Thomas Abraham's message of "Wed, 3 Sep 2014 18:48:35 +0530")
-References: <1406707663-16656-1-git-send-email-thomas.ab@samsung.com>
- <1406707663-16656-5-git-send-email-thomas.ab@samsung.com>
- <53DA8BB9.6020702@samsung.com> <53DA8D85.3050106@gmail.com>
- <7hbnrc6px3.fsf@paris.lan> <53F7DA13.6090305@gmail.com>
- <CADWw7OgAS-z-UOrJU-hL2fzuefJmLtCTg57jYk2Df7f5KfLJmA@mail.gmail.com>
- <7h8umc60we.fsf@paris.lan>
- <CADWw7OgW+o3tB=ptnsy-PsmXmNv8oXzt_WfK6NswQiEWWwAzNA@mail.gmail.com>
- <CAGa+x85-Anb+HsSUQRaaeex19-HK+yZDW0UpFBwAtsQ8Sf2Aqg@mail.gmail.com>
- <CAGa+x86jU8MR=r_xuaiorbNNyqrezb0b6Ozy-MPg9HvsARESOw@mail.gmail.com>
- <CAJuA9ajtsrY7zSDMs=c6BZ0AqERoBgvq++dTF4Dn673zGMfcgQ@mail.gmail.com>
- <CAMAWPa-8h5PNhgT+ApBhA8p=i+4oFOnYnQsQ4mK1JKwwAhpvpQ@mail.gmail.com>
- <CAJuA9ah5M_pXRMXPB6o7JLhgVUHM7kYo9HOV6Yxv4Z=hKMdG=w@mail.gmail.com>
- <7hmwah6cop.fsf@paris.lan>
- <CAJuA9ahe=9gdTaGcRb69syvRfwkkGMgDiiNfOMA9TBo42cWVZw@mail.gmail.com>
- <CAJuA9ag2pybyLDUyW43wMQu4PA1cB4V9c1bc7WB3xjqzhqNGTw@mail.gmail.com>
-Message-ID: <7hsik847p2.fsf@paris.lan>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Wed, 03 Sep 2014 16:39:37 -0700
+Subject: [PATCH v9 5/6] clk: Add floor and ceiling constraints to clock
+ rates
+In-Reply-To: <1409758434-20810-3-git-send-email-tomeu.vizoso@collabora.com>
+References: <1409758148-20104-1-git-send-email-tomeu.vizoso@collabora.com>
+ <1409758434-20810-1-git-send-email-tomeu.vizoso@collabora.com>
+ <1409758434-20810-3-git-send-email-tomeu.vizoso@collabora.com>
+Message-ID: <5407A6B9.1080606@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas,
+On 09/03/14 08:33, Tomeu Vizoso wrote:
+> Adds a way for clock consumers to set maximum and minimum rates. This can be
+> used for thermal drivers to set ceiling rates, or by misc. drivers to set
+> floor rates to assure a minimum performance level.
+>
+> Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
+> Tested-by: Heiko Stuebner <heiko@sntech.de>
+>
+> ---
+>
+> v9: * Apply first all the floor constraints, then the ceiling constraints.
+>     * WARN on ceiling constraints below the current floor, for a given user clk
+>
+> v5: * Move the storage of constraints to the per-user clk struct, as suggested
+>       by Stephen Warren.
+> ---
+>  drivers/clk/clk.c           | 43 +++++++++++++++++++++++++++++++++++++++++++
+>  drivers/clk/clk.h           |  1 +
+>  drivers/clk/clkdev.c        |  2 +-
+>  include/linux/clk-private.h |  5 +++++
+>  include/linux/clk.h         | 18 ++++++++++++++++++
+>  5 files changed, 68 insertions(+), 1 deletion(-)
+>
+> diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+> index 61a3492..3a961c6 100644
+> --- a/drivers/clk/clk.c
+> +++ b/drivers/clk/clk.c
+> @@ -560,6 +560,8 @@ struct clk *__clk_create_clk(struct clk_core *clk_core, const char *dev,
+>  	clk->dev_id = dev;
+>  	clk->con_id = con;
+>  
+> +	hlist_add_head(&clk->child_node, &clk_core->per_user_clks);
+> +
 
-Thomas Abraham <ta.omasab@gmail.com> writes:
+How is this safe with another thread that may be traversing the list? Or
+even two threads calling clk_get_parent() at the same time?
 
-[...]
+>  	return clk;
+>  }
+>  
+> @@ -1625,6 +1627,7 @@ static void clk_change_rate(struct clk_core *clk)
+>  int clk_provider_set_rate(struct clk_core *clk, unsigned long rate)
+>  {
+>  	struct clk_core *top, *fail_clk;
+> +	struct clk *clk_user;
+>  	int ret = 0;
+>  
+>  	if (!clk)
+> @@ -1633,6 +1636,15 @@ int clk_provider_set_rate(struct clk_core *clk, unsigned long rate)
+>  	/* prevent racing with updates to the clock topology */
+>  	clk_prepare_lock();
+>  
+> +	hlist_for_each_entry(clk_user, &clk->per_user_clks, child_node) {
+> +		rate = max(rate, clk_user->floor_constraint);
+> +	}
+> +
+> +	hlist_for_each_entry(clk_user, &clk->per_user_clks, child_node) {
+> +		if (clk_user->ceiling_constraint > 0)
+> +			rate = min(rate, clk_user->ceiling_constraint);
+> +	}
+> +
+>  	/* bail early if nothing to do */
+>  	if (rate == clk_provider_get_rate(clk))
+>  		goto out;
+> @@ -1699,6 +1711,29 @@ int clk_set_rate(struct clk *clk_user, unsigned long rate)
+>  }
+>  EXPORT_SYMBOL_GPL(clk_set_rate);
+>  
+> +int clk_set_floor_rate(struct clk *clk_user, unsigned long rate)
+> +{
+> +	struct clk_core *clk = clk_to_clk_core(clk_user);
+> +
+> +	clk_user->floor_constraint = rate;
+> +	return clk_provider_set_rate(clk, clk_provider_get_rate(clk));
 
-> A new branch [1] has been created using commits from exynos5-v3.17-rc1
-> branch + cpufreq + regulator + temp fixes. I have tested this branch
-> on Exynos5800 Chromebook2 and cpufreq works fine with both ondemand
-> and performance governors. Please let me know if there are any issues
-> with this new branch. It is based on v3.17-rc3.
+It would be nice if this was also locked around so that the
+floor_constraint or ceiling_constraint doesn't change while another
+thread is iterating the list. I guess we'll get by though because
+eventually things will settle and either this thread here will set the
+"final" rate, or the other thread in clk_provider_set_rate() will have
+already set the final rate. It just seems wrong to not hold the lock
+while updating what is supposed to be protected by the prepare lock.
 
-Excellent!  Thank you.
+> +}
+> +EXPORT_SYMBOL_GPL(clk_set_floor_rate);
+> +
+> +int clk_set_ceiling_rate(struct clk *clk_user, unsigned long rate)
+> +{
+> +	struct clk_core *clk = clk_to_clk_core(clk_user);
+> +
+> +	WARN(rate > 0 && rate < clk_user->floor_constraint,
+> +	     "clk %s dev %s con %s: new ceiling %lu lower than existing floor %lu\n",
+> +	     __clk_get_name(clk), clk_user->dev_id, clk_user->con_id, rate,
+> +	     clk_user->floor_constraint);
+> +
+> +	clk_user->ceiling_constraint = rate;
+> +	return clk_provider_set_rate(clk, clk_provider_get_rate(clk));
+> +}
+> +EXPORT_SYMBOL_GPL(clk_set_ceiling_rate);
 
-The only thing missing now is the CPUidle support for 5800, and all
-that's needed for that is the compatible string patch[1] which Daniel
-has queued up.
+Maybe I'm late to this patch series given that Mike applied it, but I
+wonder why we wouldn't just have one API that takes a min and a max,
+i.e. clk_set_rate_range(clk, min, max)? Then clk_set_rate() is a small
+wrapper on top that just sets min and max to the same value.
 
-With that patch, display + CPUidle + CPUfreq are working pretty well on
-my exynos5800/chromebook2 with the big.LITTLE switcher disabled.  If I
-turn on the switcher, it boots OK, but as soon as I try to run powertop
-(upstream v2.6.1) it gets stuck.  Have you tried this branch with the
-switcher enabled?
-
-Thanks again for your work on this, we're getting close!  
-
-Kevin
-
-[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2014-August/279028.html
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
