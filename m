@@ -1,60 +1,19 @@
-From: list-09_linux_arm@tqsc.de (Markus Niebel)
-Date: Wed, 03 Sep 2014 18:35:37 +0200
-Subject: [BUG] staging: imx-drm: clock reparent fails for LDB channel 1 on
- i.MX53
-Message-ID: <54074359.5090500@tqsc.de>
+From: joro@8bytes.org (Joerg Roedel)
+Date: Wed, 3 Sep 2014 18:24:49 +0200
+Subject: [GIT PULL] iommu/arm-smmu: fixes for 3.17
+In-Reply-To: <20140903154822.GG32378@arm.com>
+References: <20140903154822.GG32378@arm.com>
+Message-ID: <20140903162449.GL28786@8bytes.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Wed, Sep 03, 2014 at 04:48:22PM +0100, Will Deacon wrote:
+> The following changes since commit 69e273c0b0a3c337a521d083374c918dc52c666f:
+> 
+>   Linux 3.17-rc3 (2014-08-31 18:23:04 -0700)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/will/linux.git for-joerg/arm-smmu/fixes
 
-playing with LVDS channel 1 on a TQMa53 with MBa53 mainboard we see error
-
-imx-ldb 53fa8008.ldb: unable to set di0 parent clock to ldb_di1
-
-this comes from imx_ldb_set_clock with mux = 0. If setting mux parameter hard to "1"
-LVDS on channel 1 works just fine. The value of the mux param comes from device tree
-port settings. 
-
-The following device tree change fixes the issue, but im not sure if this is the
-correct way. 
-
-diff --git a/arch/arm/boot/dts/imx53.dtsi b/arch/arm/boot/dts/imx53.dtsi
-index 6456a00..acdfabf 100644
---- a/arch/arm/boot/dts/imx53.dtsi
-+++ b/arch/arm/boot/dts/imx53.dtsi
-@@ -419,10 +419,14 @@
-                                status = "disabled";
- 
-                                lvds-channel at 0 {
-+                                       #address-cells = <1>;
-+                                       #size-cells = <0>;
-                                        reg = <0>;
-                                        status = "disabled";
- 
-                                        port {
-+                                               reg = <0>;
-+
-                                                lvds0_in: endpoint {
-                                                        remote-endpoint = <&ipu_di0_lvds0>;
-                                                };
-@@ -430,10 +434,14 @@
-                                };
- 
-                                lvds-channel at 1 {
-+                                       #address-cells = <1>;
-+                                       #size-cells = <0>;
-                                        reg = <1>;
-                                        status = "disabled";
- 
-                                        port {
-+                                               reg = <1>;
-+
-                                                lvds1_in: endpoint {
-                                                        remote-endpoint = <&ipu_di1_lvds1>;
-                                                };
- 
-In my understanding the i.MX53 has no multiplexer for the input, so
-DI1 -> LVDS1 in case of single channel or separate channels 
-
-Markus Niebel
+Pulled into iommu/fixes, thanks Will.
