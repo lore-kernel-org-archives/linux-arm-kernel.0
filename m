@@ -1,57 +1,24 @@
-From: m.chehab@samsung.com (Mauro Carvalho Chehab)
-Date: Wed,  3 Sep 2014 17:33:05 -0300
-Subject: [PATCH 33/46] [media] s5p-tv: Simplify the return logic
-In-Reply-To: <cover.1409775488.git.m.chehab@samsung.com>
-References: <cover.1409775488.git.m.chehab@samsung.com>
-Message-ID: <600cea39e9bd3c211ab8836ad6079f238c816499.1409775488.git.m.chehab@samsung.com>
+From: dianders@chromium.org (Doug Anderson)
+Date: Wed,  3 Sep 2014 13:44:24 -0700
+Subject: [PATCH 0/3] SPI Fixes for spi-rockchip
+Message-ID: <1409777067-17422-1-git-send-email-dianders@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Make sure pm_runtime_* calls does not use unnecessary
-IS_ERR_VALUE().
+These three patches are random SPI fixes for spi-rockchip.  They are
+unrelated and can be applied / NAKed separately.  They've been tested
+in PIO mode on an rk3288 board (since SPI DMA isn't currently working
+for some unknown reason).
 
-Reported by scripts/coccinelle/api/pm_runtime.cocci script.
 
-Signed-off-by: Mauro Carvalho Chehab <m.chehab@samsung.com>
+Doug Anderson (3):
+  spi/rockchip: Fix the wait_for_idle() timeout
+  spi/rockchip: Don't warn if SPI is busy but disabled
+  dt-bindings: spi/rockchip: Mark DMA as optional
 
-diff --git a/drivers/media/platform/s5p-tv/hdmi_drv.c b/drivers/media/platform/s5p-tv/hdmi_drv.c
-index 754740f4b671..37c8bd694c5f 100644
---- a/drivers/media/platform/s5p-tv/hdmi_drv.c
-+++ b/drivers/media/platform/s5p-tv/hdmi_drv.c
-@@ -615,7 +615,7 @@ static int hdmi_s_power(struct v4l2_subdev *sd, int on)
- 	else
- 		ret = pm_runtime_put_sync(hdev->dev);
- 	/* only values < 0 indicate errors */
--	return IS_ERR_VALUE(ret) ? ret : 0;
-+	return ret < 0 ? ret : 0;
- }
- 
- static int hdmi_s_dv_timings(struct v4l2_subdev *sd,
-diff --git a/drivers/media/platform/s5p-tv/sdo_drv.c b/drivers/media/platform/s5p-tv/sdo_drv.c
-index 5a7c3796f22e..72cf892dd008 100644
---- a/drivers/media/platform/s5p-tv/sdo_drv.c
-+++ b/drivers/media/platform/s5p-tv/sdo_drv.c
-@@ -190,7 +190,7 @@ static int sdo_s_power(struct v4l2_subdev *sd, int on)
- 		ret = pm_runtime_put_sync(dev);
- 
- 	/* only values < 0 indicate errors */
--	return IS_ERR_VALUE(ret) ? ret : 0;
-+	return ret < 0 ? ret : 0;
- }
- 
- static int sdo_streamon(struct sdo_device *sdev)
-diff --git a/drivers/media/platform/s5p-tv/sii9234_drv.c b/drivers/media/platform/s5p-tv/sii9234_drv.c
-index 3dd762e5b67e..db8c17bb4aaa 100644
---- a/drivers/media/platform/s5p-tv/sii9234_drv.c
-+++ b/drivers/media/platform/s5p-tv/sii9234_drv.c
-@@ -289,7 +289,7 @@ static int sii9234_s_power(struct v4l2_subdev *sd, int on)
- 	else
- 		ret = pm_runtime_put(&ctx->client->dev);
- 	/* only values < 0 indicate errors */
--	return IS_ERR_VALUE(ret) ? ret : 0;
-+	return ret < 0 ? ret : 0;
- }
- 
- static int sii9234_s_stream(struct v4l2_subdev *sd, int enable)
+ Documentation/devicetree/bindings/spi/spi-rockchip.txt | 8 ++++++--
+ drivers/spi/spi-rockchip.c                             | 5 +++--
+ 2 files changed, 9 insertions(+), 4 deletions(-)
+
 -- 
-1.9.3
+2.1.0.rc2.206.gedb03e5
