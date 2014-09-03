@@ -1,96 +1,108 @@
-From: boris.brezillon@free-electrons.com (Boris BREZILLON)
-Date: Wed, 3 Sep 2014 13:46:52 +0200
-Subject: [PATCH 3/5] ARM: sun6i: Relicense the A31 DTSI under GPLv2/X11
-In-Reply-To: <1409682069-7164-3-git-send-email-maxime.ripard@free-electrons.com>
-References: <1409682069-7164-1-git-send-email-maxime.ripard@free-electrons.com>
- <1409682069-7164-3-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <20140903134652.79e4e07f@bbrezillon>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed,  3 Sep 2014 13:51:52 +0200
+Subject: [PATCH] pinctrl: sh-pfc: rename confusing pinmux ops variable
+Message-ID: <1409745112-13652-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue,  2 Sep 2014 20:21:07 +0200
-Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
+The vtable named *pinmux_ops in the affected files are not really
+about pin multiplexing, but a struct related to some PFC-specific
+operations, inclusing pin config (bias setting). Rename the variable
+so as to avoid confusions.
 
-> The current GPL only licensing on the DTSI makes it very impractical for other
-> software components licensed under another license.
-> 
-> In order to make it easier for them to reuse our device trees, relicense our
-> DTSI first under a GPL/X11 dual-license. Hopefully, the DTS will follow soon.
-> 
+Cc: Laurent Pinchart <Laurent.pinchart@ideasonboard.com>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ drivers/pinctrl/sh-pfc/pfc-r8a73a4.c | 4 ++--
+ drivers/pinctrl/sh-pfc/pfc-r8a7740.c | 4 ++--
+ drivers/pinctrl/sh-pfc/pfc-sh7372.c  | 4 ++--
+ drivers/pinctrl/sh-pfc/pfc-sh73a0.c  | 4 ++--
+ 4 files changed, 8 insertions(+), 8 deletions(-)
 
-Acked-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> Cc: Boris BREZILLON <boris.brezillon@free-electrons.com>
-> Cc: Carlo Caione <carlo@caione.org>
-> Cc: Chen-Yu Tsai <wens@csie.org>
-> Cc: Hans de Goede <hdegoede@redhat.com>
-> ---
->  arch/arm/boot/dts/sun6i-a31.dtsi | 46 +++++++++++++++++++++++++++++++++++-----
->  1 file changed, 41 insertions(+), 5 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/sun6i-a31.dtsi b/arch/arm/boot/dts/sun6i-a31.dtsi
-> index 1c2ec913e650..eb686e78f225 100644
-> --- a/arch/arm/boot/dts/sun6i-a31.dtsi
-> +++ b/arch/arm/boot/dts/sun6i-a31.dtsi
-> @@ -3,12 +3,48 @@
->   *
->   * Maxime Ripard <maxime.ripard@free-electrons.com>
->   *
-> - * The code contained herein is licensed under the GNU General Public
-> - * License. You may obtain a copy of the GNU General Public License
-> - * Version 2 or later at the following locations:
-> + * This file is dual-licensed: you can use it either under the terms
-> + * of the GPL or the X11 license, at your option. Note that this dual
-> + * licensing only applies to this file, and not this project as a
-> + * whole.
->   *
-> - * http://www.opensource.org/licenses/gpl-license.html
-> - * http://www.gnu.org/copyleft/gpl.html
-> + *  a) This library is free software; you can redistribute it and/or
-> + *     modify it under the terms of the GNU General Public License as
-> + *     published by the Free Software Foundation; either version 2 of the
-> + *     License, or (at your option) any later version.
-> + *
-> + *     This library is distributed in the hope that it will be useful,
-> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + *     GNU General Public License for more details.
-> + *
-> + *     You should have received a copy of the GNU General Public
-> + *     License along with this library; if not, write to the Free
-> + *     Software Foundation, Inc., 51 Franklin St, Fifth Floor, Boston,
-> + *     MA 02110-1301 USA
-> + *
-> + * Or, alternatively,
-> + *
-> + *  b) Permission is hereby granted, free of charge, to any person
-> + *     obtaining a copy of this software and associated documentation
-> + *     files (the "Software"), to deal in the Software without
-> + *     restriction, including without limitation the rights to use,
-> + *     copy, modify, merge, publish, distribute, sublicense, and/or
-> + *     sell copies of the Software, and to permit persons to whom the
-> + *     Software is furnished to do so, subject to the following
-> + *     conditions:
-> + *
-> + *     The above copyright notice and this permission notice shall be
-> + *     included in all copies or substantial portions of the Software.
-> + *
-> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-> + *     OTHER DEALINGS IN THE SOFTWARE.
->   */
->  
->  /include/ "skeleton.dtsi"
-
-
-
+diff --git a/drivers/pinctrl/sh-pfc/pfc-r8a73a4.c b/drivers/pinctrl/sh-pfc/pfc-r8a73a4.c
+index ce9fb7aa8ba3..280a56f97786 100644
+--- a/drivers/pinctrl/sh-pfc/pfc-r8a73a4.c
++++ b/drivers/pinctrl/sh-pfc/pfc-r8a73a4.c
+@@ -2717,14 +2717,14 @@ static void r8a73a4_pinmux_set_bias(struct sh_pfc *pfc, unsigned int pin,
+ 	iowrite8(value, addr);
+ }
+ 
+-static const struct sh_pfc_soc_operations r8a73a4_pinmux_ops = {
++static const struct sh_pfc_soc_operations r8a73a4_pfc_ops = {
+ 	.get_bias = r8a73a4_pinmux_get_bias,
+ 	.set_bias = r8a73a4_pinmux_set_bias,
+ };
+ 
+ const struct sh_pfc_soc_info r8a73a4_pinmux_info = {
+ 	.name		= "r8a73a4_pfc",
+-	.ops		= &r8a73a4_pinmux_ops,
++	.ops		= &r8a73a4_pfc_ops,
+ 
+ 	.input = { PINMUX_INPUT_BEGIN, PINMUX_INPUT_END },
+ 	.output = { PINMUX_OUTPUT_BEGIN, PINMUX_OUTPUT_END },
+diff --git a/drivers/pinctrl/sh-pfc/pfc-r8a7740.c b/drivers/pinctrl/sh-pfc/pfc-r8a7740.c
+index e4c1ef477053..b486e9d20cc2 100644
+--- a/drivers/pinctrl/sh-pfc/pfc-r8a7740.c
++++ b/drivers/pinctrl/sh-pfc/pfc-r8a7740.c
+@@ -3752,14 +3752,14 @@ static void r8a7740_pinmux_set_bias(struct sh_pfc *pfc, unsigned int pin,
+ 	iowrite8(value, addr);
+ }
+ 
+-static const struct sh_pfc_soc_operations r8a7740_pinmux_ops = {
++static const struct sh_pfc_soc_operations r8a7740_pfc_ops = {
+ 	.get_bias = r8a7740_pinmux_get_bias,
+ 	.set_bias = r8a7740_pinmux_set_bias,
+ };
+ 
+ const struct sh_pfc_soc_info r8a7740_pinmux_info = {
+ 	.name		= "r8a7740_pfc",
+-	.ops		= &r8a7740_pinmux_ops,
++	.ops		= &r8a7740_pfc_ops,
+ 
+ 	.input		= { PINMUX_INPUT_BEGIN,
+ 			    PINMUX_INPUT_END },
+diff --git a/drivers/pinctrl/sh-pfc/pfc-sh7372.c b/drivers/pinctrl/sh-pfc/pfc-sh7372.c
+index d9158b3b2919..8211f66a2f68 100644
+--- a/drivers/pinctrl/sh-pfc/pfc-sh7372.c
++++ b/drivers/pinctrl/sh-pfc/pfc-sh7372.c
+@@ -2614,14 +2614,14 @@ static void sh7372_pinmux_set_bias(struct sh_pfc *pfc, unsigned int pin,
+ 	iowrite8(value, addr);
+ }
+ 
+-static const struct sh_pfc_soc_operations sh7372_pinmux_ops = {
++static const struct sh_pfc_soc_operations sh7372_pfc_ops = {
+ 	.get_bias = sh7372_pinmux_get_bias,
+ 	.set_bias = sh7372_pinmux_set_bias,
+ };
+ 
+ const struct sh_pfc_soc_info sh7372_pinmux_info = {
+ 	.name = "sh7372_pfc",
+-	.ops = &sh7372_pinmux_ops,
++	.ops = &sh7372_pfc_ops,
+ 
+ 	.input = { PINMUX_INPUT_BEGIN, PINMUX_INPUT_END },
+ 	.output = { PINMUX_OUTPUT_BEGIN, PINMUX_OUTPUT_END },
+diff --git a/drivers/pinctrl/sh-pfc/pfc-sh73a0.c b/drivers/pinctrl/sh-pfc/pfc-sh73a0.c
+index 0bd8f4401b42..2dd8fd524a80 100644
+--- a/drivers/pinctrl/sh-pfc/pfc-sh73a0.c
++++ b/drivers/pinctrl/sh-pfc/pfc-sh73a0.c
+@@ -3856,7 +3856,7 @@ static int sh73a0_pinmux_soc_init(struct sh_pfc *pfc)
+ 	return 0;
+ }
+ 
+-static const struct sh_pfc_soc_operations sh73a0_pinmux_ops = {
++static const struct sh_pfc_soc_operations sh73a0_pfc_ops = {
+ 	.init = sh73a0_pinmux_soc_init,
+ 	.get_bias = sh73a0_pinmux_get_bias,
+ 	.set_bias = sh73a0_pinmux_set_bias,
+@@ -3864,7 +3864,7 @@ static const struct sh_pfc_soc_operations sh73a0_pinmux_ops = {
+ 
+ const struct sh_pfc_soc_info sh73a0_pinmux_info = {
+ 	.name = "sh73a0_pfc",
+-	.ops = &sh73a0_pinmux_ops,
++	.ops = &sh73a0_pfc_ops,
+ 
+ 	.input = { PINMUX_INPUT_BEGIN, PINMUX_INPUT_END },
+ 	.output = { PINMUX_OUTPUT_BEGIN, PINMUX_OUTPUT_END },
 -- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+1.9.3
