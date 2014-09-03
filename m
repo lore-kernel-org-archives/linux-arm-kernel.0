@@ -1,57 +1,32 @@
 From: mturquette@linaro.org (Mike Turquette)
-Date: Wed, 03 Sep 2014 10:55:37 -0700
-Subject: [PATCH 06/12] clk: mmp: add mmp private gate clock
-In-Reply-To: <1409027904-21859-7-git-send-email-chao.xie@marvell.com>
+Date: Wed, 03 Sep 2014 11:04:24 -0700
+Subject: [PATCH 02/12] clk: mmp: add spin lock for clk-frac
+In-Reply-To: <1409027904-21859-3-git-send-email-chao.xie@marvell.com>
 References: <1409027904-21859-1-git-send-email-chao.xie@marvell.com>
- <1409027904-21859-7-git-send-email-chao.xie@marvell.com>
-Message-ID: <20140903175537.11368.98589@quantum>
+ <1409027904-21859-3-git-send-email-chao.xie@marvell.com>
+Message-ID: <20140903180424.11368.36053@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Chao Xie (2014-08-25 21:38:18)
+Quoting Chao Xie (2014-08-25 21:38:14)
 > From: Chao Xie <chao.xie@marvell.com>
 > 
-> Some SOCes have this kind of the gate clock
-> 1. There are some bits to control the gate not only one bit.
-> 2. Some clocks has operations of "out of reset" and "enable".
->    To enable clock, we need do "out of reset" and "enable".
->    To disable clock, we may not need "set to reset". It depends
->    on the SOCes' design.
+> The register used by clk-frac may be shared with
+> other clocks.
+> So it needs to use spin lock to protect the register
+> access.
+> 
+> Signed-off-by: Chao Xie <chao.xie@marvell.com>
 
-Are there any other IP blocks affected by the "out of reset" and "set to
-reset" states? I wonder if you might benefit from the reset controller
-framework?  For example see,
+This patch will break against the latest clk-next due to api changes.
+You can see more here[0] and use this script to update your code if you
+like[1].
 
-drivers/clk/qcom/gcc-apq8084.c
+Basically the calls to clk_set_rate need to be changed to
+clk_provider_set_rate.
 
-<snip>
-
-> +static int mmp_clk_gate_enable(struct clk_hw *hw)
-> +{
-> +       struct mmp_clk_gate *gate = to_clk_mmp_gate(hw);
-> +       struct clk *clk = hw->clk;
-> +       unsigned long flags = 0;
-> +       unsigned long rate;
-> +       u32 tmp;
-> +
-> +       if (gate->lock)
-> +               spin_lock_irqsave(gate->lock, flags);
-> +
-> +       tmp = readl(gate->reg);
-> +       tmp &= ~gate->mask;
-> +       tmp |= gate->val_enable;
-> +       writel(tmp, gate->reg);
-> +
-> +       if (gate->lock)
-> +               spin_unlock_irqrestore(gate->lock, flags);
-> +
-> +       if (gate->flags & MMP_CLK_GATE_NEED_DELAY) {
-> +               rate = __clk_get_rate(clk);
-> +               /* Need delay 2 cycles. */
-> +               udelay(2000000/rate);
-
-How long are these delays? Long enough to warrant using clk_prepare
-instead of clk_enable? Are these clocks enabled from interrupt context?
+[0] http://lkml.kernel.org/r/<1409758148-20104-1-git-send-email-tomeu.vizoso@collabora.com>
+[1] http://cgit.collabora.com/git/user/tomeu/linux.git/commit/?h=clk-refactoring-9&id=ea48c0d655346cce26329523cf24574f9ea8feee
 
 Regards,
 Mike
