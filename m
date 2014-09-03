@@ -1,36 +1,42 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Wed, 3 Sep 2014 13:46:21 -0500
-Subject: [PATCH] ARM: dts: am437x-gp: switch i2c0 to 100KHz
-Message-ID: <1409769981-17669-1-git-send-email-nm@ti.com>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Wed, 03 Sep 2014 11:49:56 -0700
+Subject: [PATCH v3 0/6] Migrate PXA27x platforms to clock framework
+In-Reply-To: <201408241408.19861.arnd@arndb.de>
+References: <1406753464-15000-1-git-send-email-robert.jarzmik@free.fr>
+ <1465795.XsPpj3dZHX@wuerfel> <87d2bq43pc.fsf@free.fr>
+ <201408241408.19861.arnd@arndb.de>
+Message-ID: <20140903184956.11368.47800@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On the GP EVM, the ambient light sensor is limited to 100KHz on the
-I2C bus.
+Quoting Arnd Bergmann (2014-08-24 05:08:19)
+> On Sunday 24 August 2014, Robert Jarzmik wrote:
+> > > By default, I'd expect Haojian to pick up the patches and send
+> > > us a pull request. He sent an Ack, but also didn't make it clear
+> > > that we should pick them up.
+> > I was thinking that they would go through the clk maintainers, hence Haojian's
+> > ack. If they should go through arm-soc, they would need Mike's ack.
 
-So use 100kHz for I2C on the GP EVM due to this limitation on the
-ambient light sensor.
+Robert,
 
-Reported-by: Aparna Balasubramanian <aparnab@ti.com>
-Signed-off-by: Nishanth Menon <nm@ti.com>
----
-based on v3.17-rc1
+I'm happy to take the patches but they will need to be rebased onto
+clk-next and refactored to take into account Tomeu's api split[0].
 
- arch/arm/boot/dts/am437x-gp-evm.dts |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> Right, makes sense. We have in the past done it either way for other
+> platforms. When merging the patches through the clk subsystem, it still
+> makes sense to let us know of those plans and ask for an Ack from
+> the arm-soc maintainers, to be sure we can plan ahead in case there
+> are other (conflicting) patch sets that are sent through arm-soc.
 
-diff --git a/arch/arm/boot/dts/am437x-gp-evm.dts b/arch/arm/boot/dts/am437x-gp-evm.dts
-index 646a6ea..9559c19 100644
---- a/arch/arm/boot/dts/am437x-gp-evm.dts
-+++ b/arch/arm/boot/dts/am437x-gp-evm.dts
-@@ -260,7 +260,7 @@
- 	status = "okay";
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&i2c0_pins>;
--	clock-frequency = <400000>;
-+	clock-frequency = <100000>;
- 
- 	tps65218: tps65218 at 24 {
- 		reg = <0x24>;
--- 
-1.7.9.5
+Arnd,
+
+Do I have your Ack for the arch/arm patches?
+
+[0] https://lkml.kernel.org/r/<1409758148-20104-1-git-send-email-tomeu.vizoso@collabora.com>
+
+Thanks,
+Mike
+
+> 
+>         Arnd
