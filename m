@@ -1,37 +1,90 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Wed, 3 Sep 2014 11:14:12 +0300
-Subject: [GIT PULL] clk: ti: dra7xx: fixes for early 3.17-rc
-Message-ID: <5406CDD4.8000103@ti.com>
+From: naveenkrishna.ch@gmail.com (Naveen Krishna Ch)
+Date: Wed, 3 Sep 2014 13:44:11 +0530
+Subject: [PATCH 13/14] arm64: exynos7: Enable ARMv8 based Exynos7 (SoC)
+ support
+In-Reply-To: <20140827110927.GC7773@leverpostej>
+References: <1409132660-1898-1-git-send-email-ch.naveen@samsung.com>
+ <1409132660-1898-5-git-send-email-ch.naveen@samsung.com>
+ <20140827110927.GC7773@leverpostej>
+Message-ID: <CAHfPSqBDJwOtZhoS7OC1N72Sa=YgdZKcnw+mczCEmVTrYvUF4A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mike,
+Hi Mark,
 
-The following changes since commit 7d1311b93e58ed55f3a31cc8f94c4b8fe988a2b9:
+On 27 August 2014 16:39, Mark Rutland <mark.rutland@arm.com> wrote:
+> Hi,
+>
+> On Wed, Aug 27, 2014 at 10:44:20AM +0100, Naveen Krishna Chatradhi wrote:
+>> From: Alim Akhtar <alim.akhtar@samsung.com>
+>>
+>> This patch adds the necessary Kconfig entries to enable
+>> support for the ARMv8 based Exynos7 SoC.
+>>
+>> Signed-off-by: Alim Akhtar <alim.akhtar@samsung.com>
+>> Signed-off-by: Naveen Krishna Chatradhi <ch.naveen@samsung.com>
+>> Cc: Rob Herring <robh@kernel.org>
+>> Cc: Catalin Marinas <catalin.marinas@arm.com>
+>> ---
+>>  arch/arm64/Kconfig |   17 +++++++++++++++++
+>>  1 file changed, 17 insertions(+)
+>>
+>> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+>> index fd4e81a..d555558 100644
+>> --- a/arch/arm64/Kconfig
+>> +++ b/arch/arm64/Kconfig
+>> @@ -134,6 +134,23 @@ source "kernel/Kconfig.freezer"
+>>
+>>  menu "Platform selection"
+>>
+>> +config ARCH_EXYNOS7
+>> +     bool "ARMv8 based SAMSUNG EXYNOS7"
+>> +     select HAVE_S3C2410_WATCHDOG if WATCHDOG
+>> +     select CLKSRC_OF
+>
+> This seems to be implied by ARM_ARCH_TIMER in the core arm64 Kconfig, so
+> I'm not sure this is necessary.
 
-   Linux 3.17-rc1 (2014-08-16 10:40:26 -0600)
+Ok.
 
-are available in the git repository at:
+>
+>> +     select COMMON_CLK_SAMSUNG
+>> +     select GPIOLIB
+>
+> You select ARCH_REQUIRE_GPIOLIB below, so is this necessary?
 
-   git at github.com:t-kristo/linux-pm.git for-v3.17-rc/ti-clk-driver
+Yes, this is not required. Will remove.
 
-for you to fetch changes up to 20411dad75ece9a613af715df4489e60990c4017:
+>
+>> +     select PINCTRL
+>> +     select PINCTRL_EXYNOS
+>> +     select RTC_CLASS
+>> +     select HAVE_S3C_RTC
+>> +     select GENERIC_GPIO
+>> +     select ARCH_REQUIRE_GPIOLIB
+>> +     select HAVE_CLK
+>
+> Isn't this selected already through the core arm64 Kconfig?
+>
+> It looks like we have COMMON_CLK, which selects CLKDEV_LOOKUP, which
+> selects HAVE_CLK.
 
-   clk: ti: dra7-atl: Provide error check for incoming parameters in 
-set_rate (2014-08-21 18:04:16 +0300)
+Ok.
 
-----------------------------------------------------------------
-Just a couple of quick error check fixes for dra7 boards. Proper fix 
-would be required for the generic clock driver as well (see 
-https://www.mail-archive.com/linux-omap at vger.kernel.org/msg108454.html.)
+>
+>> +     select HAVE_SMP
+>
+> I may have missed something, but I didn't see any SMP support in this
+> series.
 
-----------------------------------------------------------------
-Nishanth Menon (2):
-       clk: ti: divider: Provide error check for incoming parameters in 
-set_rate
-       clk: ti: dra7-atl: Provide error check for incoming parameters in 
-set_rate
+As Catalin suggested, will remove this.
 
-  drivers/clk/ti/clk-dra7-atl.c |    6 +++++-
-  drivers/clk/ti/divider.c      |    7 ++++++-
-  2 files changed, 11 insertions(+), 2 deletions(-)
+>
+> Thanks,
+> Mark.
+
+Thanks for your comments.
+
+-- 
+Shine bright,
+(: Nav :)
