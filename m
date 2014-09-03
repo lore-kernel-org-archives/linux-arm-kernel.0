@@ -1,22 +1,44 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 3 Sep 2014 14:47:16 -0700
-Subject: [PATCH] ARM: dts: am437x-gp: switch i2c0 to 100KHz
-In-Reply-To: <1409769981-17669-1-git-send-email-nm@ti.com>
-References: <1409769981-17669-1-git-send-email-nm@ti.com>
-Message-ID: <20140903214715.GO11766@atomide.com>
+Date: Wed, 3 Sep 2014 14:51:13 -0700
+Subject: [PATCH] arm: boot: dts: am4372: fix USB regs size
+In-Reply-To: <1409779344-27823-1-git-send-email-balbi@ti.com>
+References: <1409779344-27823-1-git-send-email-balbi@ti.com>
+Message-ID: <20140903215112.GP11766@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Nishanth Menon <nm@ti.com> [140903 11:46]:
-> On the GP EVM, the ambient light sensor is limited to 100KHz on the
-> I2C bus.
+* Felipe Balbi <balbi@ti.com> [140903 14:28]:
+> Size should be 64KiB instead of 92KiB.
 > 
-> So use 100kHz for I2C on the GP EVM due to this limitation on the
-> ambient light sensor.
+> Signed-off-by: Felipe Balbi <balbi@ti.com>
+> ---
+>  arch/arm/boot/dts/am4372.dtsi | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
 > 
-> Reported-by: Aparna Balasubramanian <aparnab@ti.com>
-> Signed-off-by: Nishanth Menon <nm@ti.com>
+> diff --git a/arch/arm/boot/dts/am4372.dtsi b/arch/arm/boot/dts/am4372.dtsi
+> index 9b3d2ba..8689949 100644
+> --- a/arch/arm/boot/dts/am4372.dtsi
+> +++ b/arch/arm/boot/dts/am4372.dtsi
+> @@ -804,7 +804,7 @@
+>  
+>  			usb1: usb at 48390000 {
+>  				compatible = "synopsys,dwc3";
+> -				reg = <0x48390000 0x17000>;
+> +				reg = <0x48390000 0x10000>;
+>  				interrupts = <GIC_SPI 168 IRQ_TYPE_LEVEL_HIGH>;
+>  				phys = <&usb2_phy1>;
+>  				phy-names = "usb2-phy";
+> @@ -826,7 +826,7 @@
+>  
+>  			usb2: usb at 483d0000 {
+>  				compatible = "synopsys,dwc3";
+> -				reg = <0x483d0000 0x17000>;
+> +				reg = <0x483d0000 0x10000>;
+>  				interrupts = <GIC_SPI 174 IRQ_TYPE_LEVEL_HIGH>;
+>  				phys = <&usb2_phy2>;
+>  				phy-names = "usb2-phy";
+> -- 
 
-Thanks applying into omap-for-v3.7/fixes-v2.
+Applying into omap-for-v3.17/fixes-v2 thanks.
 
 Tony
