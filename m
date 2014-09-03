@@ -1,67 +1,231 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Wed, 03 Sep 2014 10:07:15 +0200
-Subject: [PATCH v4 2/4] dt-bindings: document Rockchip thermal
-In-Reply-To: <1409710239-19941-3-git-send-email-caesar.wang@rock-chips.com>
-References: <1409710239-19941-1-git-send-email-caesar.wang@rock-chips.com>
- <1409710239-19941-3-git-send-email-caesar.wang@rock-chips.com>
-Message-ID: <11280986.L6lv82O8Qv@diego>
+From: naveenkrishna.ch@gmail.com (Naveen Krishna Ch)
+Date: Wed, 3 Sep 2014 13:35:46 +0530
+Subject: [PATCH 11/14] arm64: dts: Add initial device tree support for
+ EXYNOS7
+In-Reply-To: <20140828035639.GB4972@localhost>
+References: <1409132660-1898-1-git-send-email-ch.naveen@samsung.com>
+ <1409132660-1898-3-git-send-email-ch.naveen@samsung.com>
+ <20140828035639.GB4972@localhost>
+Message-ID: <CAHfPSqDHoawng0xH6ibYRyzn2uqODhW9W9ZCUNa=bN-d20aRtg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Mittwoch, 3. September 2014, 10:10:37 schrieb Caesar Wang:
-> This add the necessary binding documentation for the thermal
-> found on Rockchip SoCs
-> 
-> Signed-off-by: zhaoyifeng <zyf@rock-chips.com>
-> Signed-off-by: Caesar Wang <caesar.wang@rock-chips.com>
-> ---
->  .../devicetree/bindings/thermal/rockchip-thermal.txt | 20
-> ++++++++++++++++++++ 1 file changed, 20 insertions(+)
->  create mode 100644
-> Documentation/devicetree/bindings/thermal/rockchip-thermal.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/thermal/rockchip-thermal.txt
-> b/Documentation/devicetree/bindings/thermal/rockchip-thermal.txt new file
-> mode 100644
-> index 0000000..1ed4d4c
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/thermal/rockchip-thermal.txt
-> @@ -0,0 +1,20 @@
-> +* Temperature Sensor ADC (TSADC) on rockchip SoCs
-> +
-> +Required properties:
-> +- compatible: "rockchip,rk3288-tsadc"
-> +- reg: physical base address of the controller and length of memory mapped
-> +       region.
-> +- interrupts: The interrupt number to the cpu. The interrupt specifier
-> format +	      depends on the interrupt controller.
-> +- clocks: Must contain an entry for each entry in clock-names.
-> +- clock-names: Shall be "tsadc" for the converter-clock, and "apb_pclk" for
-> +	       the peripheral clock.
+Hi Olof,
 
-You're using the passive-temp, critical-temp and force-shut-temp properties in 
-your driver without declaring them here.
+On 28 August 2014 09:26, Olof Johansson <olof@lixom.net> wrote:
+> Hi,
+>
+> On Wed, Aug 27, 2014 at 03:14:18PM +0530, Naveen Krishna Chatradhi wrote:
+>> Add initial device tree nodes for EXYNOS7 SoC.
+>> Also, includes the dt-binding definitions for clock ids.
+>
+> Uh, no -- it just adds the dtsi.
 
-But more importantly, please use the generic trip-points for this. I guess it 
-shouldn't be a problem to introduce a "forced-shutdown" trippoint [0] for the 
-additional trip-point you have - thermal maintainers, please shout if I'm 
-wrong :-)
+Ok. Will fix.
+
+>
+>> Signed-off-by: Naveen Krishna Chatradhi <ch.naveen@samsung.com>
+>> Cc: Thomas Abraham <thomas.ab@samsung.com>
+>> Cc: Rob Herring <robh@kernel.org>
+>> Cc: Catalin Marinas <catalin.marinas@arm.com>
+>> ---
+>>  arch/arm64/boot/dts/exynos7.dtsi |  553 ++++++++++++++++++++++++++++++++++++++
+>>  1 file changed, 553 insertions(+)
+>>  create mode 100644 arch/arm64/boot/dts/exynos7.dtsi
+>>
+>> diff --git a/arch/arm64/boot/dts/exynos7.dtsi b/arch/arm64/boot/dts/exynos7.dtsi
+>> new file mode 100644
+>> index 0000000..6b9eaf4
+>> --- /dev/null
+>> +++ b/arch/arm64/boot/dts/exynos7.dtsi
+>
+> Let's not make the same mistake as on 32-bit, and go with a directory
+> hierarchy here from day one.
+>
+> So, please create a exynos subdirectory for this file. You also need
+> a Makefile when you add a board dts.
+
+Ok. Will fix.
+
+>
+>> @@ -0,0 +1,553 @@
+>> +/*
+>> + * SAMSUNG EXYNOS7 SoC device tree source
+>> + *
+>> + * Copyright (c) 2014 Samsung Electronics Co., Ltd.
+>> + *           http://www.samsung.com
+>> + *
+>> + * SAMSUNG EXYNOS7 SoC device nodes are listed in this file.
+>> + * EXYNOS7 based board files can include this file and provide
+>> + * values for board specfic bindings.
+>> + *
+>> + * This program is free software; you can redistribute it and/or modify
+>> + * it under the terms of the GNU General Public License version 2 as
+>> + * published by the Free Software Foundation.
+>> + */
+>> +
+>> +#include <dt-bindings/clock/exynos7-clk.h>
+>> +
+>> +/ {
+>> +     compatible = "samsung,exynos7";
+>> +     interrupt-parent = <&gic>;
+>> +     #address-cells = <1>;
+>> +     #size-cells = <1>;
+>
+> You should probably use address-cells/size-cells 2/2 on a 64-bit platform.
+
+Ok.
+
+>
+>> +     aliases {
+>> +             pinctrl0 = &pinctrl_0;
+>> +             pinctrl1 = &pinctrl_1;
+>> +             pinctrl2 = &pinctrl_2;
+>> +             pinctrl3 = &pinctrl_3;
+>> +             pinctrl4 = &pinctrl_4;
+>> +             pinctrl5 = &pinctrl_5;
+>> +             pinctrl6 = &pinctrl_6;
+>> +             pinctrl7 = &pinctrl_7;
+>> +             pinctrl8 = &pinctrl_8;
+>> +             pinctrl9 = &pinctrl_9;
+>> +             mshc0 = &mmc_0;
+>> +             mshc2 = &mmc_2;
+>> +     };
+>> +
+>> +     chipid at 10000000 {
+>> +             compatible = "samsung,exynos4210-chipid";
+>> +             reg = <0x10000000 0x100>;
+>> +     };
+>> +
+>> +     cpus {
+>> +             #address-cells = <2>;
+>> +             #size-cells = <0>;
+>
+> Why size-cells=2? Can you not fit a cpuid in 32 bits?
+>
+>> +             cpu at 0 {
+>> +                     device_type = "cpu";
+>> +                     compatible = "arm,cortex-a57", "arm,armv8";
+>> +                     reg = <0x0 0x0>;
+>> +             };
+>> +     };
+>> +
+>> +     fin_pll: xxti {
+>> +             compatible = "fixed-clock";
+>> +             clock-frequency = <24000000>;
+>> +             clock-output-names = "fin_pll";
+>> +             #clock-cells = <0>;
+>> +     };
+>> +
+>> +     gic: interrupt-controller at 11001000 {
+>> +             compatible = "arm,gic-400";
+>> +             #interrupt-cells = <3>;
+>> +             #address-cells = <0>;
+>> +             interrupt-controller;
+>> +             reg =   <0x11001000 0x1000>,
+>> +                     <0x11002000 0x1000>,
+>> +                     <0x11004000 0x2000>,
+>> +                     <0x11006000 0x2000>;
+>> +     };
+>> +
+>> +     hsi2c_0: hsi2c at 13640000 {
+>> +             compatible = "samsung,exynos7-hsi2c";
+>
+> Is the i2c controller here completely new?
+
+It is almost the same as in Exynos5 but few register bits have been
+changed. So we have added a new compatible string.
+
+>
+> Also, please use 'i2c' for node name on these nodes.
+
+Ok.
+
+>
+>> +             reg = <0x13640000 0x1000>;
+>> +             interrupts = <0 441 0>;
+>> +             #address-cells = <1>;
+>> +             #size-cells = <0>;
+>> +             pinctrl-names = "default";
+>> +             pinctrl-0 = <&hs_i2c0_bus>;
+>> +             clocks = <&clock_peric0 PCLK_HSI2C0>;
+>> +             clock-names = "hsi2c";
+>> +             status = "disabled";
+>> +     };
+>> +
+>> +     hsi2c_1: hsi2c at 13650000 {
+>> +             compatible = "samsung,exynos7-hsi2c";
+>> +             reg = <0x13650000 0x1000>;
+>> +             interrupts = <0 442 0>;
+>> +             #address-cells = <1>;
+>> +             #size-cells = <0>;
+>> +             pinctrl-names = "default";
+>> +             pinctrl-0 = <&hs_i2c1_bus>;
+>> +             clocks = <&clock_peric0 PCLK_HSI2C1>;
+>> +             clock-names = "hsi2c";
+>> +             status = "disabled";
+>> +     };
+>> +
+>> +     hsi2c_2: hsi2c at 14E60000 {
+>
+> I much prefer lowercase hex in unit addresses (and reg entries) below. I
+> know 32-bit uses uppercase, but let's switch going forward here.
+
+Ok. Will fix.
+
+>
+>> +     mct at 101C0000 {
+>> +             compatible = "samsung,exynos4210-mct";
+>
+> Please just do away with MCT here, and use architected timers going
+> forward. There really shouldn't be a need to keep supporting MCT any
+> more -- it's a construct from before arch timers on Cortex-A9.
+
+Ok.
+
+>
+>> +     mmc_0: mmc at 15740000 {
+>> +             compatible = "samsung,exynos7-dw-mshc-smu";
+>
+> Is this controller backwards compatible with exynos5 ones?
+
+The dwmmc controller in Exynos7 is not fully backward compatible with
+Exynos5. Specifically, it requires 64-bit related changes for IDMAC
+and handling the changes in register offsets.
+
+>
+>> +     /* The Clock nodes are ordered as per the usermanual. */
+>
+> "The clock"
+>
+> "user manual"
+
+Ok.
+
+>
+>> +     timer {
+>> +             compatible = "arm,armv8-timer";
+>> +             interrupts = <1 13 0xff01>,
+>> +                          <1 14 0xff01>,
+>> +                          <1 11 0xff01>,
+>> +                          <1 10 0xff01>;
+>> +             clock-frequency = <24000000>;
+>> +             use-clocksource-only;
+>> +             use-physical-timer;
+>
+> These two properties are not standard, and I would expect any 64-bit
+> platform to come with PSCI such that you have a way to initialize the
+> virtual timers.
+
+Ok.
+
+>
+>
+> -Olof
 
 
-Heiko
+Thanks for your comments.
 
-
-[0] in a separate patch, changing
-- thermal_trip_type enum in include/linux/thermal.h
-- trip_types mapping in drivers/thermal/of-thermal.c
-- Documentation/devicetree/bindings/thermal/thermal.txt
-
-> +
-> +Example:
-> +tsadc: tsadc at ff280000 {
-> +	compatible = "rockchip,rk3288-tsadc";
-> +	reg = <0xff280000 0x100>;
-> +	interrupts = <GIC_SPI 37 IRQ_TYPE_LEVEL_HIGH>;
-> +	clocks = <&cru SCLK_TSADC>, <&cru PCLK_TSADC>;
-> +	clock-names = "tsadc", "apb_pclk";
-> +};
+-- 
+Shine bright,
+(: Nav :)
