@@ -1,10 +1,10 @@
 From: lersek@redhat.com (Laszlo Ersek)
-Date: Wed,  3 Sep 2014 13:32:21 +0200
-Subject: [PATCH v2 3/5] x86: efi: format EFI memory type & attrs with
+Date: Wed,  3 Sep 2014 13:32:23 +0200
+Subject: [PATCH v2 5/5] arm64: efi: format EFI memory type & attrs with
  efi_md_typeattr_format()
 In-Reply-To: <1409743943-16934-1-git-send-email-lersek@redhat.com>
 References: <1409743943-16934-1-git-send-email-lersek@redhat.com>
-Message-ID: <1409743943-16934-4-git-send-email-lersek@redhat.com>
+Message-ID: <1409743943-16934-6-git-send-email-lersek@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,106 +12,135 @@ An example log excerpt demonstrating the change:
 
 Before the patch:
 
-> efi: mem00: type=7, attr=0xf, range=[0x0000000000000000-0x000000000009f000) (0MB)
-> efi: mem01: type=2, attr=0xf, range=[0x000000000009f000-0x00000000000a0000) (0MB)
-> efi: mem02: type=7, attr=0xf, range=[0x0000000000100000-0x0000000000400000) (3MB)
-> efi: mem03: type=2, attr=0xf, range=[0x0000000000400000-0x0000000000800000) (4MB)
-> efi: mem04: type=10, attr=0xf, range=[0x0000000000800000-0x0000000000808000) (0MB)
-> efi: mem05: type=7, attr=0xf, range=[0x0000000000808000-0x0000000000810000) (0MB)
-> efi: mem06: type=10, attr=0xf, range=[0x0000000000810000-0x0000000000900000) (0MB)
-> efi: mem07: type=4, attr=0xf, range=[0x0000000000900000-0x0000000001100000) (8MB)
-> efi: mem08: type=7, attr=0xf, range=[0x0000000001100000-0x0000000001400000) (3MB)
-> efi: mem09: type=2, attr=0xf, range=[0x0000000001400000-0x0000000002613000) (18MB)
-> efi: mem10: type=7, attr=0xf, range=[0x0000000002613000-0x0000000004000000) (25MB)
-> efi: mem11: type=4, attr=0xf, range=[0x0000000004000000-0x0000000004020000) (0MB)
-> efi: mem12: type=7, attr=0xf, range=[0x0000000004020000-0x00000000068ea000) (40MB)
-> efi: mem13: type=2, attr=0xf, range=[0x00000000068ea000-0x00000000068f0000) (0MB)
-> efi: mem14: type=3, attr=0xf, range=[0x00000000068f0000-0x0000000006c7b000) (3MB)
-> efi: mem15: type=6, attr=0x800000000000000f, range=[0x0000000006c7b000-0x0000000006c7d000) (0MB)
-> efi: mem16: type=5, attr=0x800000000000000f, range=[0x0000000006c7d000-0x0000000006c85000) (0MB)
-> efi: mem17: type=6, attr=0x800000000000000f, range=[0x0000000006c85000-0x0000000006c87000) (0MB)
-> efi: mem18: type=3, attr=0xf, range=[0x0000000006c87000-0x0000000006ca3000) (0MB)
-> efi: mem19: type=6, attr=0x800000000000000f, range=[0x0000000006ca3000-0x0000000006ca6000) (0MB)
-> efi: mem20: type=10, attr=0xf, range=[0x0000000006ca6000-0x0000000006cc6000) (0MB)
-> efi: mem21: type=6, attr=0x800000000000000f, range=[0x0000000006cc6000-0x0000000006d95000) (0MB)
-> efi: mem22: type=5, attr=0x800000000000000f, range=[0x0000000006d95000-0x0000000006e22000) (0MB)
-> efi: mem23: type=7, attr=0xf, range=[0x0000000006e22000-0x0000000007165000) (3MB)
-> efi: mem24: type=4, attr=0xf, range=[0x0000000007165000-0x0000000007d22000) (11MB)
-> efi: mem25: type=7, attr=0xf, range=[0x0000000007d22000-0x0000000007d25000) (0MB)
-> efi: mem26: type=3, attr=0xf, range=[0x0000000007d25000-0x0000000007ea2000) (1MB)
-> efi: mem27: type=5, attr=0x800000000000000f, range=[0x0000000007ea2000-0x0000000007ed2000) (0MB)
-> efi: mem28: type=6, attr=0x800000000000000f, range=[0x0000000007ed2000-0x0000000007ef6000) (0MB)
-> efi: mem29: type=7, attr=0xf, range=[0x0000000007ef6000-0x0000000007f00000) (0MB)
-> efi: mem30: type=9, attr=0xf, range=[0x0000000007f00000-0x0000000007f02000) (0MB)
-> efi: mem31: type=10, attr=0xf, range=[0x0000000007f02000-0x0000000007f06000) (0MB)
-> efi: mem32: type=4, attr=0xf, range=[0x0000000007f06000-0x0000000007fd0000) (0MB)
-> efi: mem33: type=6, attr=0x800000000000000f, range=[0x0000000007fd0000-0x0000000007ff0000) (0MB)
-> efi: mem34: type=7, attr=0xf, range=[0x0000000007ff0000-0x0000000008000000) (0MB)
+> Processing EFI memory map:
+>   0x000040000000-0x000040000fff [Loader Data]
+>   0x000040001000-0x00004007ffff [Conventional Memory]
+>   0x000040080000-0x00004072afff [Loader Data]
+>   0x00004072b000-0x00005fdfffff [Conventional Memory]
+>   0x00005fe00000-0x00005fe0ffff [Loader Data]
+>   0x00005fe10000-0x0000964e8fff [Conventional Memory]
+>   0x0000964e9000-0x0000964e9fff [Loader Data]
+>   0x0000964ea000-0x000096c52fff [Loader Code]
+>   0x000096c53000-0x00009709dfff [Boot Code]*
+>   0x00009709e000-0x0000970b3fff [Runtime Code]*
+>   0x0000970b4000-0x0000970f4fff [Runtime Data]*
+>   0x0000970f5000-0x000097117fff [Runtime Code]*
+>   0x000097118000-0x000097199fff [Runtime Data]*
+>   0x00009719a000-0x0000971dffff [Runtime Code]*
+>   0x0000971e0000-0x0000997f8fff [Conventional Memory]
+>   0x0000997f9000-0x0000998f1fff [Boot Data]*
+>   0x0000998f2000-0x0000999eafff [Conventional Memory]
+>   0x0000999eb000-0x00009af09fff [Boot Data]*
+>   0x00009af0a000-0x00009af21fff [Conventional Memory]
+>   0x00009af22000-0x00009af46fff [Boot Data]*
+>   0x00009af47000-0x00009af5bfff [Conventional Memory]
+>   0x00009af5c000-0x00009afe1fff [Boot Data]*
+>   0x00009afe2000-0x00009afe2fff [Conventional Memory]
+>   0x00009afe3000-0x00009c01ffff [Boot Data]*
+>   0x00009c020000-0x00009efbffff [Conventional Memory]
+>   0x00009efc0000-0x00009f14efff [Boot Code]*
+>   0x00009f14f000-0x00009f162fff [Runtime Code]*
+>   0x00009f163000-0x00009f194fff [Runtime Data]*
+>   0x00009f195000-0x00009f197fff [Boot Data]*
+>   0x00009f198000-0x00009f198fff [Runtime Data]*
+>   0x00009f199000-0x00009f1acfff [Conventional Memory]
+>   0x00009f1ad000-0x00009f1affff [Boot Data]*
+>   0x00009f1b0000-0x00009f1b0fff [Runtime Data]*
+>   0x00009f1b1000-0x00009fffffff [Boot Data]*
+>   0x000004000000-0x000007ffffff [Memory Mapped I/O]
+>   0x000009010000-0x000009010fff [Memory Mapped I/O]
 
 After the patch:
 
-> efi: mem00: [Conventional Memory|   |  |  |  |   |WB|WT|WC|UC] range=[0x0000000000000000-0x000000000009f000) (0MB)
-> efi: mem01: [Loader Data        |   |  |  |  |   |WB|WT|WC|UC] range=[0x000000000009f000-0x00000000000a0000) (0MB)
-> efi: mem02: [Conventional Memory|   |  |  |  |   |WB|WT|WC|UC] range=[0x0000000000100000-0x0000000000400000) (3MB)
-> efi: mem03: [Loader Data        |   |  |  |  |   |WB|WT|WC|UC] range=[0x0000000000400000-0x0000000000800000) (4MB)
-> efi: mem04: [ACPI Memory NVS    |   |  |  |  |   |WB|WT|WC|UC] range=[0x0000000000800000-0x0000000000808000) (0MB)
-> efi: mem05: [Conventional Memory|   |  |  |  |   |WB|WT|WC|UC] range=[0x0000000000808000-0x0000000000810000) (0MB)
-> efi: mem06: [ACPI Memory NVS    |   |  |  |  |   |WB|WT|WC|UC] range=[0x0000000000810000-0x0000000000900000) (0MB)
-> efi: mem07: [Boot Data          |   |  |  |  |   |WB|WT|WC|UC] range=[0x0000000000900000-0x0000000001100000) (8MB)
-> efi: mem08: [Conventional Memory|   |  |  |  |   |WB|WT|WC|UC] range=[0x0000000001100000-0x0000000001400000) (3MB)
-> efi: mem09: [Loader Data        |   |  |  |  |   |WB|WT|WC|UC] range=[0x0000000001400000-0x0000000002613000) (18MB)
-> efi: mem10: [Conventional Memory|   |  |  |  |   |WB|WT|WC|UC] range=[0x0000000002613000-0x0000000004000000) (25MB)
-> efi: mem11: [Boot Data          |   |  |  |  |   |WB|WT|WC|UC] range=[0x0000000004000000-0x0000000004020000) (0MB)
-> efi: mem12: [Conventional Memory|   |  |  |  |   |WB|WT|WC|UC] range=[0x0000000004020000-0x00000000068ea000) (40MB)
-> efi: mem13: [Loader Data        |   |  |  |  |   |WB|WT|WC|UC] range=[0x00000000068ea000-0x00000000068f0000) (0MB)
-> efi: mem14: [Boot Code          |   |  |  |  |   |WB|WT|WC|UC] range=[0x00000000068f0000-0x0000000006c7b000) (3MB)
-> efi: mem15: [Runtime Data       |RUN|  |  |  |   |WB|WT|WC|UC] range=[0x0000000006c7b000-0x0000000006c7d000) (0MB)
-> efi: mem16: [Runtime Code       |RUN|  |  |  |   |WB|WT|WC|UC] range=[0x0000000006c7d000-0x0000000006c85000) (0MB)
-> efi: mem17: [Runtime Data       |RUN|  |  |  |   |WB|WT|WC|UC] range=[0x0000000006c85000-0x0000000006c87000) (0MB)
-> efi: mem18: [Boot Code          |   |  |  |  |   |WB|WT|WC|UC] range=[0x0000000006c87000-0x0000000006ca3000) (0MB)
-> efi: mem19: [Runtime Data       |RUN|  |  |  |   |WB|WT|WC|UC] range=[0x0000000006ca3000-0x0000000006ca6000) (0MB)
-> efi: mem20: [ACPI Memory NVS    |   |  |  |  |   |WB|WT|WC|UC] range=[0x0000000006ca6000-0x0000000006cc6000) (0MB)
-> efi: mem21: [Runtime Data       |RUN|  |  |  |   |WB|WT|WC|UC] range=[0x0000000006cc6000-0x0000000006d95000) (0MB)
-> efi: mem22: [Runtime Code       |RUN|  |  |  |   |WB|WT|WC|UC] range=[0x0000000006d95000-0x0000000006e22000) (0MB)
-> efi: mem23: [Conventional Memory|   |  |  |  |   |WB|WT|WC|UC] range=[0x0000000006e22000-0x0000000007165000) (3MB)
-> efi: mem24: [Boot Data          |   |  |  |  |   |WB|WT|WC|UC] range=[0x0000000007165000-0x0000000007d22000) (11MB)
-> efi: mem25: [Conventional Memory|   |  |  |  |   |WB|WT|WC|UC] range=[0x0000000007d22000-0x0000000007d25000) (0MB)
-> efi: mem26: [Boot Code          |   |  |  |  |   |WB|WT|WC|UC] range=[0x0000000007d25000-0x0000000007ea2000) (1MB)
-> efi: mem27: [Runtime Code       |RUN|  |  |  |   |WB|WT|WC|UC] range=[0x0000000007ea2000-0x0000000007ed2000) (0MB)
-> efi: mem28: [Runtime Data       |RUN|  |  |  |   |WB|WT|WC|UC] range=[0x0000000007ed2000-0x0000000007ef6000) (0MB)
-> efi: mem29: [Conventional Memory|   |  |  |  |   |WB|WT|WC|UC] range=[0x0000000007ef6000-0x0000000007f00000) (0MB)
-> efi: mem30: [ACPI Reclaim Memory|   |  |  |  |   |WB|WT|WC|UC] range=[0x0000000007f00000-0x0000000007f02000) (0MB)
-> efi: mem31: [ACPI Memory NVS    |   |  |  |  |   |WB|WT|WC|UC] range=[0x0000000007f02000-0x0000000007f06000) (0MB)
-> efi: mem32: [Boot Data          |   |  |  |  |   |WB|WT|WC|UC] range=[0x0000000007f06000-0x0000000007fd0000) (0MB)
-> efi: mem33: [Runtime Data       |RUN|  |  |  |   |WB|WT|WC|UC] range=[0x0000000007fd0000-0x0000000007ff0000) (0MB)
-> efi: mem34: [Conventional Memory|   |  |  |  |   |WB|WT|WC|UC] range=[0x0000000007ff0000-0x0000000008000000) (0MB)
+> Processing EFI memory map:
+>   0x000040000000-0x000040000fff [Loader Data        |   |  |  |  |   |WB|WT|WC|UC]
+>   0x000040001000-0x00004007ffff [Conventional Memory|   |  |  |  |   |WB|WT|WC|UC]
+>   0x000040080000-0x00004072afff [Loader Data        |   |  |  |  |   |WB|WT|WC|UC]
+>   0x00004072b000-0x00005fdfffff [Conventional Memory|   |  |  |  |   |WB|WT|WC|UC]
+>   0x00005fe00000-0x00005fe0ffff [Loader Data        |   |  |  |  |   |WB|WT|WC|UC]
+>   0x00005fe10000-0x0000964e8fff [Conventional Memory|   |  |  |  |   |WB|WT|WC|UC]
+>   0x0000964e9000-0x0000964e9fff [Loader Data        |   |  |  |  |   |WB|WT|WC|UC]
+>   0x0000964ea000-0x000096c52fff [Loader Code        |   |  |  |  |   |WB|WT|WC|UC]
+>   0x000096c53000-0x00009709dfff [Boot Code          |   |  |  |  |   |WB|WT|WC|UC]*
+>   0x00009709e000-0x0000970b3fff [Runtime Code       |RUN|  |  |  |   |WB|WT|WC|UC]*
+>   0x0000970b4000-0x0000970f4fff [Runtime Data       |RUN|  |  |  |   |WB|WT|WC|UC]*
+>   0x0000970f5000-0x000097117fff [Runtime Code       |RUN|  |  |  |   |WB|WT|WC|UC]*
+>   0x000097118000-0x000097199fff [Runtime Data       |RUN|  |  |  |   |WB|WT|WC|UC]*
+>   0x00009719a000-0x0000971dffff [Runtime Code       |RUN|  |  |  |   |WB|WT|WC|UC]*
+>   0x0000971e0000-0x0000997f8fff [Conventional Memory|   |  |  |  |   |WB|WT|WC|UC]
+>   0x0000997f9000-0x0000998f1fff [Boot Data          |   |  |  |  |   |WB|WT|WC|UC]*
+>   0x0000998f2000-0x0000999eafff [Conventional Memory|   |  |  |  |   |WB|WT|WC|UC]
+>   0x0000999eb000-0x00009af09fff [Boot Data          |   |  |  |  |   |WB|WT|WC|UC]*
+>   0x00009af0a000-0x00009af21fff [Conventional Memory|   |  |  |  |   |WB|WT|WC|UC]
+>   0x00009af22000-0x00009af46fff [Boot Data          |   |  |  |  |   |WB|WT|WC|UC]*
+>   0x00009af47000-0x00009af5bfff [Conventional Memory|   |  |  |  |   |WB|WT|WC|UC]
+>   0x00009af5c000-0x00009afe1fff [Boot Data          |   |  |  |  |   |WB|WT|WC|UC]*
+>   0x00009afe2000-0x00009afe2fff [Conventional Memory|   |  |  |  |   |WB|WT|WC|UC]
+>   0x00009afe3000-0x00009c01ffff [Boot Data          |   |  |  |  |   |WB|WT|WC|UC]*
+>   0x00009c020000-0x00009efbffff [Conventional Memory|   |  |  |  |   |WB|WT|WC|UC]
+>   0x00009efc0000-0x00009f14efff [Boot Code          |   |  |  |  |   |WB|WT|WC|UC]*
+>   0x00009f14f000-0x00009f162fff [Runtime Code       |RUN|  |  |  |   |WB|WT|WC|UC]*
+>   0x00009f163000-0x00009f194fff [Runtime Data       |RUN|  |  |  |   |WB|WT|WC|UC]*
+>   0x00009f195000-0x00009f197fff [Boot Data          |   |  |  |  |   |WB|WT|WC|UC]*
+>   0x00009f198000-0x00009f198fff [Runtime Data       |RUN|  |  |  |   |WB|WT|WC|UC]*
+>   0x00009f199000-0x00009f1acfff [Conventional Memory|   |  |  |  |   |WB|WT|WC|UC]
+>   0x00009f1ad000-0x00009f1affff [Boot Data          |   |  |  |  |   |WB|WT|WC|UC]*
+>   0x00009f1b0000-0x00009f1b0fff [Runtime Data       |RUN|  |  |  |   |WB|WT|WC|UC]*
+>   0x00009f1b1000-0x00009fffffff [Boot Data          |   |  |  |  |   |WB|WT|WC|UC]*
+>   0x000004000000-0x000007ffffff [Memory Mapped I/O  |RUN|  |  |  |   |  |  |  |UC]
+>   0x000009010000-0x000009010fff [Memory Mapped I/O  |RUN|  |  |  |   |  |  |  |UC]
 
-Both the type enum and the attribute bitmap are decoded, with the
-additional benefit that the memory ranges line up as well.
+The attribute bitmap is now displayed, in decoded form.
 
 Signed-off-by: Laszlo Ersek <lersek@redhat.com>
 ---
- arch/x86/platform/efi/efi.c | 7 +++++--
- 1 file changed, 5 insertions(+), 2 deletions(-)
+ arch/arm64/kernel/efi.c | 26 ++++++--------------------
+ 1 file changed, 6 insertions(+), 20 deletions(-)
 
-diff --git a/arch/x86/platform/efi/efi.c b/arch/x86/platform/efi/efi.c
-index 850da94..ae2573a 100644
---- a/arch/x86/platform/efi/efi.c
-+++ b/arch/x86/platform/efi/efi.c
-@@ -210,9 +210,12 @@ static void __init print_efi_memmap(void)
- 	for (p = memmap.map, i = 0;
- 	     p < memmap.map_end;
- 	     p += memmap.desc_size, i++) {
-+		char buf[64];
+diff --git a/arch/arm64/kernel/efi.c b/arch/arm64/kernel/efi.c
+index 03aaa99..3b1f23c 100644
+--- a/arch/arm64/kernel/efi.c
++++ b/arch/arm64/kernel/efi.c
+@@ -119,23 +119,6 @@ static int __init uefi_init(void)
+ 	return retval;
+ }
+ 
+-static __initdata char memory_type_name[][32] = {
+-	{"Reserved"},
+-	{"Loader Code"},
+-	{"Loader Data"},
+-	{"Boot Code"},
+-	{"Boot Data"},
+-	{"Runtime Code"},
+-	{"Runtime Data"},
+-	{"Conventional Memory"},
+-	{"Unusable Memory"},
+-	{"ACPI Reclaim Memory"},
+-	{"ACPI Memory NVS"},
+-	{"Memory Mapped I/O"},
+-	{"MMIO Port Space"},
+-	{"PAL Code"},
+-};
+-
+ /*
+  * Return true for RAM regions we want to permanently reserve.
+  */
+@@ -166,10 +149,13 @@ static __init void reserve_regions(void)
+ 		paddr = md->phys_addr;
+ 		npages = md->num_pages;
+ 
+-		if (uefi_debug)
+-			pr_info("  0x%012llx-0x%012llx [%s]",
++		if (uefi_debug) {
++			char buf[64];
 +
- 		md = p;
--		pr_info("mem%02u: type=%u, attr=0x%llx, range=[0x%016llx-0x%016llx) (%lluMB)\n",
--			i, md->type, md->attribute, md->phys_addr,
-+		pr_info("mem%02u: %s range=[0x%016llx-0x%016llx) (%lluMB)\n",
-+			i, efi_md_typeattr_format(buf, sizeof(buf), md),
-+			md->phys_addr,
- 			md->phys_addr + (md->num_pages << EFI_PAGE_SHIFT),
- 			(md->num_pages >> (20 - EFI_PAGE_SHIFT)));
- 	}
++			pr_info("  0x%012llx-0x%012llx %s",
+ 				paddr, paddr + (npages << EFI_PAGE_SHIFT) - 1,
+-				memory_type_name[md->type]);
++				efi_md_typeattr_format(buf, sizeof(buf), md));
++		}
+ 
+ 		memrange_efi_to_native(&paddr, &npages);
+ 		size = npages << PAGE_SHIFT;
 -- 
 1.8.3.1
