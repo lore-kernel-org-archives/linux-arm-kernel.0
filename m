@@ -1,36 +1,67 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 3 Sep 2014 06:37:42 -0700
-Subject: [PATCH] mmc: sdhci-msm: Make tuning block table endian agnostic
-In-Reply-To: <CAPDyKFoboJGTzF3aQ=YBpWyVT6opTMgz_6gpOo5BRX30+hfCBQ@mail.gmail.com>
-References: <1409702308-3023-1-git-send-email-sboyd@codeaurora.org>
- <CAPDyKFoboJGTzF3aQ=YBpWyVT6opTMgz_6gpOo5BRX30+hfCBQ@mail.gmail.com>
-Message-ID: <20140903133742.GB28256@codeaurora.org>
+From: nm@ti.com (Nishanth Menon)
+Date: Wed, 3 Sep 2014 08:39:08 -0500
+Subject: [PATCH] ARM: dts: DRA7: Add PMU nodes
+In-Reply-To: <1408456440-30171-1-git-send-email-nm@ti.com>
+References: <1408456440-30171-1-git-send-email-nm@ti.com>
+Message-ID: <540719FC.5070803@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/03, Ulf Hansson wrote:
-> On 3 September 2014 01:58, Stephen Boyd <sboyd@codeaurora.org> wrote:
-> > If we're tuning on a big-endian CPU we'll never determine we properly
-> > tuned the device because we compare the data we received from the
-> > controller with a table that assumes the CPU is little-endian.
-> > Change the table to be an array of bytes instead of 32-bit words
-> > so we can use memcmp() without needing to byte-swap every word
-> > depending on the endianess of the CPU.
-> >
-> > Cc: Asutosh Das <asutoshd@codeaurora.org>
-> > Cc: Venkat Gopalakrishnan <venkatg@codeaurora.org>
-> > Cc: Georgi Djakov <gdjakov@mm-sol.com>
-> > Fixes: 415b5a75da43 "mmc: sdhci-msm: Add platform_execute_tuning implementation"
-> > Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+On 08/19/2014 08:54 AM, Nishanth Menon wrote:
+> From: Lucas Weaver <l-weaver@ti.com>
 > 
-> Hi Stephen,
+> DRA74x and DRA72x family of processors vary slightly in the number
+> of CPUs. So, add different instances of PMU for each of these processor
+> groups. Further, since the interrupts bypass crossbar and are directly
+> connected to GIC, mark the dts nodes with relevant information.
 > 
-> If you want me to pick this up, please repost to linux-mmc as well.
-> Otherwise you have my ack for it!
+> Tested with perf utility.
+> 
+> Reviewed-by: Felipe Balbi <balbi@ti.com>
+> Signed-off-by: Lucas Weaver <l-weaver@ti.com>
+> Signed-off-by: Nishanth Menon <nm@ti.com>
+> ---
+Hi,
+Gentle ping..
+
+Regards,
+Nishanth Menon
+>  arch/arm/boot/dts/dra72x.dtsi |    5 +++++
+>  arch/arm/boot/dts/dra74x.dtsi |    6 ++++++
+>  2 files changed, 11 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/dra72x.dtsi b/arch/arm/boot/dts/dra72x.dtsi
+> index f1ec22f..e5a3d23 100644
+> --- a/arch/arm/boot/dts/dra72x.dtsi
+> +++ b/arch/arm/boot/dts/dra72x.dtsi
+> @@ -22,4 +22,9 @@
+>  			reg = <0>;
+>  		};
+>  	};
+> +
+> +	pmu {
+> +		compatible = "arm,cortex-a15-pmu";
+> +		interrupts = <GIC_SPI DIRECT_IRQ(131) IRQ_TYPE_LEVEL_HIGH>;
+> +	};
+>  };
+> diff --git a/arch/arm/boot/dts/dra74x.dtsi b/arch/arm/boot/dts/dra74x.dtsi
+> index a4e8bb9..3be544c 100644
+> --- a/arch/arm/boot/dts/dra74x.dtsi
+> +++ b/arch/arm/boot/dts/dra74x.dtsi
+> @@ -38,4 +38,10 @@
+>  			reg = <1>;
+>  		};
+>  	};
+> +
+> +	pmu {
+> +		compatible = "arm,cortex-a15-pmu";
+> +		interrupts = <GIC_SPI DIRECT_IRQ(131) IRQ_TYPE_LEVEL_HIGH>,
+> +			     <GIC_SPI DIRECT_IRQ(132) IRQ_TYPE_LEVEL_HIGH>;
+> +	};
+>  };
 > 
 
-Ok I'll repost it now.
 
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+Regards,
+Nishanth Menon
