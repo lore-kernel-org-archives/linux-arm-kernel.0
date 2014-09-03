@@ -1,70 +1,42 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 3 Sep 2014 15:27:28 +0200
-Subject: [PATCH v2 0/5] beautify EFI memmap logs
-In-Reply-To: <540716A1.7040905@redhat.com>
-References: <1409743943-16934-1-git-send-email-lersek@redhat.com>
- <CAKv+Gu_Yk-q0gf+EHc3EYQ=obLT2nj6Kj6qPTk678ASFEW+ZFQ@mail.gmail.com>
- <540716A1.7040905@redhat.com>
-Message-ID: <CAKv+Gu-dTApubxij8U3P93BnWot+x7Vy+QNE+xBMdU5xoOSBgA@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 03 Sep 2014 15:27:30 +0200
+Subject: [PATCH] ARM: cns3xxx: fix allmodconfig panic in pci driver
+In-Reply-To: <1409750292-24105-1-git-send-email-kaixu.xia@linaro.org>
+References: <kaixu.xia@linaro.org>
+ <1409750292-24105-1-git-send-email-kaixu.xia@linaro.org>
+Message-ID: <2886818.zPBP0DOepO@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 3 September 2014 15:24, Laszlo Ersek <lersek@redhat.com> wrote:
-> On 09/03/14 15:01, Ard Biesheuvel wrote:
->> On 3 September 2014 13:32, Laszlo Ersek <lersek@redhat.com> wrote:
->>> changes in v2:
->>> - explain with examples how the log's appearance changes, in patches 3-5
->>>   [Ingo]
->>>
->>> v1 blurb:
->>>
->>>> It's a pain to analyze EFI memmap logs while debugging, especially to
->>>> verify the memory types (an enum) and the memory attributes (a
->>>> bitmap). This series renders those columns human-readable, and unifies
->>>> their formatting between x86, ia64 and arm64.
->>>
->>
->> Tested-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->> (on arm64 only)
->>
->> +1 for aligning between architectures
->> +1 for cleaning up the output to make it more readable
->>
->> The only thing I am not entirely convinced about is printing all those
->> memory attributes: is it really so interesting to know that region X
->> /can/ be configured as writeback, write through, write combining etc
->> etc, as most regions seem to support most attributes, yet it tells you
->> nothing about what the kernel ends up doing with that information. In
->> the arm64 case, for instance, all MEMORY_WB ranges are mapped
->> writeback cached, and everything else is mapped uncached.
->
-> You don't need these attributes spelled out when you're not debugging.
-> In that case, either build without CONFIG_EFI_DEBUG (on x86 and ia64),
-> or don't pass uefi_debug=1 (on arm64).
->
-> When you're debugging however, you need every bit of info you can get.
-> For example, assume a tricky bug in exactly that part of the arm64 code
-> that you just described above. You'll be flip-flopping between the
-> kernel source and the original, pristine memory map dump. It's much
-> easier to ignore a few words / columns in the log (even: cut it out with
-> a script or interactively) than to read bitmaps in hex (or to decode
-> them in a script). I know because I grew to hate these hex-encoded
-> attributes and dec-encoded enum constants when I was developing S3 for
-> OVMF, and fighting the memmap.
->
-> A good analogue is ACPI debugging in the kernel. The ACPI subsystem
-> comes with a very elaborate heap of switches, facility bitmaps, log
-> levels, and so on. The end result is that it is faster to add printks to
-> your suspect location(s) in ACPI, rebuild, retest, repeat, than to learn
-> to use the acpi debug flags. (And I did the former when I was recently
-> fixing a bug in the RHEL-6 kernel, in the intersection of ACPI and EFI.)
->
-> So yes, I think that this detailed format is preferable.
->
+On Wednesday 03 September 2014 21:18:12 Xia Kaixu wrote:
+> From: Xia Kaixu <kaixu.xia@linaro.org>
+> 
+> The kernel panic occurs when running an allmodconfig kernel on 
+> OMAP4460. The inicall "cns3xxx_pcie_init" does not check which
+> hardware it's running on and just tries to access to its specific 
+> registers. Now call it from .init_late callback from the two
+> machine descriptors.
+> 
+> Signed-off-by: Xia Kaixu <kaixu.xia@linaro.org>
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Cc: Anton Vorontsov <anton@enomsg.org>
+> Cc: Felix Fietkau <nbd@openwrt.org>
+> Cc: Imre Kaloz <kaloz@openwrt.org>
+> Cc: linaro-kernel at lists.linaro.org
+> Cc: linux-arm-kernel at lists.infradead.org
 
-OK, you've convinced me :-)
+Hi Kaixu,
 
-Acked-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+it seems this time all the Cc's worked. One thing I just noticed is that
+you confused the 'Signed-off-by' lines. I did look at the patch earlier
+before you sent it out but unfortunately missed that.
 
-Cheers,
-Ard.
+You can read again in Documentation/SubmittingPatches about how
+they work, but the short version is that you must never put someone
+else's name in Signed-off-by under a patch you write yourself.
+When we apply the patch, I (or whoever else does) will put that
+line below yours to document who handled the patch.
+
+Otherwise, the patch looks good to me, thanks a lot for doing it.
+
+	Arnd
