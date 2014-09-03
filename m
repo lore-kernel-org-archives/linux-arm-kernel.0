@@ -1,121 +1,100 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Wed, 3 Sep 2014 09:50:56 +0800
-Subject: [PATCH 1/5] ARM: sun4i: Relicense the A10 DTSI under GPLv2/X11
-In-Reply-To: <540624C8.80508@schinagl.nl>
-References: <1409682069-7164-1-git-send-email-maxime.ripard@free-electrons.com>
- <54062362.2040602@redhat.com> <540624C8.80508@schinagl.nl>
-Message-ID: <CAGb2v65NdMUpJ3Q_zTYxAdFqncE0Huxo-z-OPAQJPH8sCXco4w@mail.gmail.com>
+From: cw00.choi@samsung.com (Chanwoo Choi)
+Date: Wed, 03 Sep 2014 11:08:43 +0900
+Subject: [PATCHv5 4/4] thermal: exynos: Remove duplicate code when reading
+ triminfo register of Exynos5440
+In-Reply-To: <20140829192818.GB23645@developer>
+References: <1409016665-3824-1-git-send-email-cw00.choi@samsung.com>
+ <1409016665-3824-5-git-send-email-cw00.choi@samsung.com>
+ <53FEAF2A.1080400@samsung.com> <20140828145310.GC18194@developer>
+ <53FFC051.7040907@samsung.com> <20140829192818.GB23645@developer>
+Message-ID: <5406782B.9000408@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 3, 2014 at 4:12 AM, Olliver Schinagl <oliver@schinagl.nl> wrote:
-> Hey all,
->
->
->
-> On 09/02/2014 10:06 PM, Hans de Goede wrote:
->>
->> Hi,
->>
->>
->>
->> On 09/02/2014 08:21 PM, Maxime Ripard wrote:
->>>
->>> The current GPL only licensing on the DTSI makes it very impractical for
->>> other
->>> software components licensed under another license.
->>>
->>> In order to make it easier for them to reuse our device trees, relicense
->>> our
->>> DTSI first under a GPL/X11 dual-license. Hopefully, the DTS will follow
->>> soon.
->>>
->>> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
->>> Cc: Alexandre Belloni <alexandre.belloni@free-electrons.com>
->>> Cc: Arnd Bergmann <arnd@arndb.de>
->>> Cc: Carlo Caione <carlo.caione@gmail.com>
->>> Cc: Chen-Yu Tsai <wens@csie.org>
->>> Cc: David Lanzend?rfer <david.lanzendoerfer@o2s.ch>
->>> Cc: Emilio L?pez <emilio@elopez.com.ar>
->>> Cc: Hans de Goede <hdegoede@redhat.com>
->>> Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
->>> Cc: Oliver Schinagl <oliver@schinagl.nl>
->>> Cc: Roman Byshko <rbyshko@gmail.com>
->>> Cc: Stefan Roese <sr@denx.de>
->>
->> Series is:
->>
->> Acked-by: Hans de Goede <hdegoede@redhat.com>
->
-> and
-> Acked-by: Olliver Schinagl <oliver@schinagl.nl>
+Dear Eduardo,
 
-Acked-by: Chen-Yu Tsai <wens@csie.org>
+On 08/30/2014 04:28 AM, Eduardo Valentin wrote:
+> Chanwoo,
+> 
+> On Fri, Aug 29, 2014 at 08:50:41AM +0900, Chanwoo Choi wrote:
+>> Dear Eduardo,
+>>
+>> On 08/28/2014 11:53 PM, Eduardo Valentin wrote:
+>>> On Thu, Aug 28, 2014 at 01:25:14PM +0900, Chanwoo Choi wrote:
+>>>> Dear Eduardo,
+>>>>
+>>>> This patch is wrong. It is my mistake.
+>>>>
+>>>> Please ignore only this patch because
+>>>> the offset calculation of 'case 0' is different from 'case 2'.
+>>>
+>>>
+>>> Do patches 1 - 3 are still correct? Patch 1, from Barlomiej, seams to be
+>>> a common agreement. 
+> 
+>>
+>> Yes, patches 1 - 3 are correct.
+>>
+> 
+> OK. I pulled patch 01 into my next branch.
+> 
+> Can you please update patches 02 and 03 based on my next brach? They are
+> conflicting with the massive cleanups done by Bartlomiej (Thanks
+> Bartlomiej). So, please, resend patches 02 and 03 only, refreshed onto
+> my next branch.
 
->>> ---
->>>    arch/arm/boot/dts/sun4i-a10.dtsi | 46
->>> +++++++++++++++++++++++++++++++++++-----
->>>    1 file changed, 41 insertions(+), 5 deletions(-)
+OK, I'll send new patchset after rebase it.
+
+Best Regards,
+Chanwoo Choi
+
+> 
+> Cheers.
+> 
+>> Best Regards,
+>> Chanwoo Choi
+>>
 >>>
->>> diff --git a/arch/arm/boot/dts/sun4i-a10.dtsi
->>> b/arch/arm/boot/dts/sun4i-a10.dtsi
->>> index 380f914b226d..d12d36c470bc 100644
->>> --- a/arch/arm/boot/dts/sun4i-a10.dtsi
->>> +++ b/arch/arm/boot/dts/sun4i-a10.dtsi
->>> @@ -2,12 +2,48 @@
->>>     * Copyright 2012 Stefan Roese
->>>     * Stefan Roese <sr@denx.de>
->>>     *
->>> - * The code contained herein is licensed under the GNU General Public
->>> - * License. You may obtain a copy of the GNU General Public License
->>> - * Version 2 or later at the following locations:
->>> + * This file is dual-licensed: you can use it either under the terms
->>> + * of the GPL or the X11 license, at your option. Note that this dual
->>> + * licensing only applies to this file, and not this project as a
->>> + * whole.
->>>     *
->>> - * http://www.opensource.org/licenses/gpl-license.html
->>> - * http://www.gnu.org/copyleft/gpl.html
->>> + *  a) This library is free software; you can redistribute it and/or
->>> + *     modify it under the terms of the GNU General Public License as
->>> + *     published by the Free Software Foundation; either version 2 of
->>> the
->>> + *     License, or (at your option) any later version.
->>> + *
->>> + *     This library is distributed in the hope that it will be useful,
->>> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
->>> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
->>> + *     GNU General Public License for more details.
->>> + *
->>> + *     You should have received a copy of the GNU General Public
->>> + *     License along with this library; if not, write to the Free
->>> + *     Software Foundation, Inc., 51 Franklin St, Fifth Floor, Boston,
->>> + *     MA 02110-1301 USA
->>> + *
->>> + * Or, alternatively,
->>> + *
->>> + *  b) Permission is hereby granted, free of charge, to any person
->>> + *     obtaining a copy of this software and associated documentation
->>> + *     files (the "Software"), to deal in the Software without
->>> + *     restriction, including without limitation the rights to use,
->>> + *     copy, modify, merge, publish, distribute, sublicense, and/or
->>> + *     sell copies of the Software, and to permit persons to whom the
->>> + *     Software is furnished to do so, subject to the following
->>> + *     conditions:
->>> + *
->>> + *     The above copyright notice and this permission notice shall be
->>> + *     included in all copies or substantial portions of the Software.
->>> + *
->>> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
->>> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
->>> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
->>> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
->>> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
->>> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
->>> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
->>> + *     OTHER DEALINGS IN THE SOFTWARE.
->>>     */
+>>>>
+>>>> Best Regards,
+>>>> Chanwoo Choi
+>>>>
+>>>> On 08/26/2014 10:31 AM, Chanwoo Choi wrote:
+>>>>> This patch remove simply duplicate code when reading triminfo register of Exynos5440.
+>>>>>
+>>>>> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
+>>>>> Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
+>>>>> Cc: Zhang Rui <rui.zhang@intel.com>
+>>>>> Cc: Eduardo Valentin <edubezval@gmail.com>
+>>>>> Cc: Amit Daniel Kachhap <amit.daniel@samsung.com>
+>>>>> Reviewed-by: Amit Daniel Kachhap <amit.daniel@samsung.com>
+>>>>> ---
+>>>>>  drivers/thermal/samsung/exynos_tmu.c | 4 +---
+>>>>>  1 file changed, 1 insertion(+), 3 deletions(-)
+>>>>>
+>>>>> diff --git a/drivers/thermal/samsung/exynos_tmu.c b/drivers/thermal/samsung/exynos_tmu.c
+>>>>> index 64c702a..5888467 100644
+>>>>> --- a/drivers/thermal/samsung/exynos_tmu.c
+>>>>> +++ b/drivers/thermal/samsung/exynos_tmu.c
+>>>>> @@ -187,15 +187,13 @@ static int exynos_tmu_initialize(struct platform_device *pdev)
+>>>>>  		 */
+>>>>>  		switch (data->id) {
+>>>>>  		case 0:
+>>>>> +		case 2:
+>>>>>  			trim_info = readl(data->base +
+>>>>>  			EXYNOS5440_EFUSE_SWAP_OFFSET + reg->triminfo_data);
+>>>>>  			break;
+>>>>>  		case 1:
+>>>>>  			trim_info = readl(data->base + reg->triminfo_data);
+>>>>>  			break;
+>>>>> -		case 2:
+>>>>> -			trim_info = readl(data->base -
+>>>>> -			EXYNOS5440_EFUSE_SWAP_OFFSET + reg->triminfo_data);
+>>>>>  		}
+>>>>>  	} else {
+>>>>>  		/* On exynos5420 the triminfo register is in the shared space */
+>>>>>
+>>>>
 >>>
->>>    /include/ "skeleton.dtsi"
->>>
->
+>>
+> 
