@@ -1,45 +1,36 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Wed,  3 Sep 2014 13:44:27 -0700
-Subject: [PATCH 3/3] dt-bindings: spi/rockchip: Mark DMA as optional
-In-Reply-To: <1409777067-17422-1-git-send-email-dianders@chromium.org>
-References: <1409777067-17422-1-git-send-email-dianders@chromium.org>
-Message-ID: <1409777067-17422-4-git-send-email-dianders@chromium.org>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Wed, 03 Sep 2014 23:01:15 +0200
+Subject: [PATCH v4 01/12] reset: add the Berlin reset controller driver
+In-Reply-To: <1409730511-16101-2-git-send-email-antoine.tenart@free-electrons.com>
+References: <1409730511-16101-1-git-send-email-antoine.tenart@free-electrons.com>
+ <1409730511-16101-2-git-send-email-antoine.tenart@free-electrons.com>
+Message-ID: <5407819B.2060605@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Rockchip SPI controller works fine without DMA (aside from a few
-warnings).  The DMA property even implies this, saying:
+On 09/03/2014 09:48 AM, Antoine Tenart wrote:
+> Add a reset controller for Marvell Berlin SoCs which is used by the
+> USB PHYs drivers (for now).
+> 
+> Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
+> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+> Acked-by: Philipp Zabel <p.zabel@pengutronix.de>
+> ---
+>  drivers/reset/Makefile       |   1 +
+>  drivers/reset/reset-berlin.c | 131 +++++++++++++++++++++++++++++++++++++++++++
+>  2 files changed, 132 insertions(+)
+>  create mode 100644 drivers/reset/reset-berlin.c
 
-  DMA request names should include "tx" and "rx" if present.
+I guess the reset stuff is quite independent from usb-phy and can
+be picked up now.
 
-Officially mark the properties as optional.
+Applied
+01/12 and 03/12 to berlin/soc and
+02/12 and 04/12 to berlin/dt.
 
-Signed-off-by: Doug Anderson <dianders@chromium.org>
----
- Documentation/devicetree/bindings/spi/spi-rockchip.txt | 8 ++++++--
- 1 file changed, 6 insertions(+), 2 deletions(-)
+Thanks!
 
-diff --git a/Documentation/devicetree/bindings/spi/spi-rockchip.txt b/Documentation/devicetree/bindings/spi/spi-rockchip.txt
-index 7bab355..467dec4 100644
---- a/Documentation/devicetree/bindings/spi/spi-rockchip.txt
-+++ b/Documentation/devicetree/bindings/spi/spi-rockchip.txt
-@@ -16,11 +16,15 @@ Required Properties:
- - clocks: Must contain an entry for each entry in clock-names.
- - clock-names: Shall be "spiclk" for the transfer-clock, and "apb_pclk" for
- 			   the peripheral clock.
-+- #address-cells: should be 1.
-+- #size-cells: should be 0.
-+
-+Optional Properties:
-+
- - dmas: DMA specifiers for tx and rx dma. See the DMA client binding,
- 		Documentation/devicetree/bindings/dma/dma.txt
- - dma-names: DMA request names should include "tx" and "rx" if present.
--- #address-cells: should be 1.
--- #size-cells: should be 0.
-+
- 
- Example:
- 
--- 
-2.1.0.rc2.206.gedb03e5
+For the usb-phy dts patches, I'll wait for the corresponding genphy
+patches.
+
+Sebastian
