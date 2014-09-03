@@ -1,65 +1,107 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 3 Sep 2014 20:34:53 +0100
-Subject: [PATCH v10 03/19] arm: fiq: Replace default FIQ handler
-In-Reply-To: <5406EBAA.9040206@linaro.org>
-References: <1408369264-14242-1-git-send-email-daniel.thompson@linaro.org>
- <1408466769-20004-1-git-send-email-daniel.thompson@linaro.org>
- <1408466769-20004-4-git-send-email-daniel.thompson@linaro.org>
- <20140819173742.GG30401@n2100.arm.linux.org.uk> <53F39377.1070308@linaro.org>
- <20140828150112.GD30401@n2100.arm.linux.org.uk> <5405AEBC.9020904@linaro.org>
- <20140902164204.GT30401@n2100.arm.linux.org.uk> <5406EBAA.9040206@linaro.org>
-Message-ID: <20140903193453.GA30401@n2100.arm.linux.org.uk>
+From: Nathan_Lynch@mentor.com (Nathan Lynch)
+Date: Wed, 3 Sep 2014 15:03:06 -0500
+Subject: [PATCH v9 0/6] ARM: VDSO
+In-Reply-To: <CALCETrX7Q34nyU7YZfQYnYFPVSaquJ5WzO-AVPnW5PJUCNqopQ@mail.gmail.com>
+References: <1408744351-7814-1-git-send-email-nathan_lynch@mentor.com>
+ <53FE4448.9070708@codeaurora.org> <5406AA1B.3050506@mentor.com>
+ <CALCETrX7Q34nyU7YZfQYnYFPVSaquJ5WzO-AVPnW5PJUCNqopQ@mail.gmail.com>
+Message-ID: <540773FA.5020108@mentor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 03, 2014 at 11:21:30AM +0100, Daniel Thompson wrote:
-> On 02/09/14 17:42, Russell King - ARM Linux wrote:
-> > Yes, it does, because unlike the x86 community, we have a wide range
-> > of platforms, and platform code does not go through the same path or
-> > get the same review as core ARM code.
-> > 
-> > As I already pointed out, with a notifier, it's very easy to sneak
-> > something into the FIQ path by submitting a patch for platform code
-> > which calls the registration function.  That's going to be pretty
-> > difficult to spot amongst the 3000+ messages on the linux-arm-kernel
-> > list each month in order to give it the review that it would need.
-> > That's especially true as I now ignore almost all most platform
-> > code patches as we have Arnd and Olof to look at that.
-> > 
-> > So, unless you can come up with a proposal which ensures that there
-> > is sufficient review triggered when someone decides to call the
-> > notifier registration function...
+On 09/03/2014 11:59 AM, Andy Lutomirski wrote:
+> On Sep 2, 2014 10:44 PM, "Nathan Lynch" <Nathan_Lynch@mentor.com> wrote:
+>>
+>> On 08/27/2014 03:49 PM, Christopher Covington wrote:
+>>>
+>>> It appears to me that there is code in several architecture subdirectories
+>>> (I'm aware of x86, arm64, and with these patches arm[32] and I would be
+>>> surprised if there weren't more) doing largely the same setup of special
+>>> mappings at randomized offsets, checking ELF magic etc. Not that these patches
+>>> should necessarily do it, but is there a reasonable amount of consolidation
+>>> that could be done, or am I underestimating how much of this really does vary
+>>> per architecture?
+>>
+>> Sorry to not respond to this promptly, was distracted by some other work.
+>>
+>> As Andy said, the possibility for consolidating some aspects of VDSO support
+>> is there, but it would be a fair bit of work.
+>>
+>> For example, arch_setup_additional_pages tends to have the general form of:
+>>
+>> lock mmap_sem
+>> get_unmapped_area
+>> install_special_mapping (or _install_special_mapping, preferably)
+>> stash vdso address in mmu context
+>> release mmap_sem
+>>
+>> But there are a lot of implementation details that differ:
+>>
+>>          +----------------------------------------------------------------
+>>          | Number of VMAs installed
+>>          |   +------------------------------------------------------------
+>>          |   | Considers uses_interp
+>>          |   |     +------------------------------------------------------
+>>          |   |     | Uses _install_special_mapping
+>>          |   |     |     +------------------------------------------------
+>>          |   |     |     | Performs additional work (e.g. remap_pfn_range)
+>>          |   |     |     |     +------------------------------------------
+>>          |   |     |     |     | Randomizes VDSO offset vs stack and libs
+>>          |   |     |     |     |     +------------------------------------
+>>          |   |     |     |     |     | Records VDSO address in mmu context
+>>          |   |     |     |     |     |     +------------------------------
+>>          |   |     |     |     |     |     | Supports compat VDSO
+>>          |   |     |     |     |     |     |     +------------------------
+>>          |   |     |     |     |     |     |     | Supports disabling VDSO
+>>          |   |     |     |     |     |     |     | at boot (e.g. vdso=off)
+>>          |   |     |     |     |     |     |     |     +------------------
+>>          |   |     |     |     |     |     |     |     | Can disable VDSO
+>>  arch    |   |     |     |     |     |     |     |     | via Kconfig
+>> ---------+---+-----+-----+-----+-----+-----+-----+-----+------------------
+>>  arm*    | 3 | no  | yes | no  | yes | yes | no  | no  | yes
+>>  arm64   | 2 | no  | yes | no  | no  | yes | no  | no  | no
+>>  hexagon | 1 | no  | no  | no  | no  | yes | no  | no  | no
+>>  mips    | 1 | no  | no  | no  | no  | yes | no  | no  | no
+>>  powerpc | 1 | no  | no  | no  | no  | yes | yes | no  | no
+>>  s390    | 1 | yes | no  | no  | no  | yes | yes | yes | no
+>>  sh      | 1 | no  | no  | no  | no  | yes | no  | yes | yes
+>>  tile    | 1 | no  | no  | yes | no  | yes | no  | yes | no
+>>  x86     | 2 | no  | yes | yes | yes | yes | yes | yes | no
+>>
+>> * With VDSO patches from this thread, of course.
+>>
+>> I think pushing the mmap_sem lock/unlock up into the ELF loader might be
+>> of some benefit (slightly reduced complexity in the arch code).  But
+>> any generic replacement for arch_setup_additional_pages will have to
+>> account for all the differences above, and probably a few more I've
+>> missed.
+>>
 > 
-> Reflecting upon this and upon Thomas' comments about only using FIQ for
-> watchdog, backtrace and performance monitoring...
+> Wow, nice table!  I think that we should eventually get rid of most of
+> these differences.
+
+Thanks, and agreed.
+
+
+> Christopher, since you seem to be interested in CRIU, one thing to
+> note is that any architecture that shoves a pointer to the vdso into
+> the mmu context is likely to fail if the vdso is mremapped.  CRIU
+> needs to mremap the vdso, so this is a problem.
 > 
-> The short version is, "I was wrong and should have done what you said in
-> the first place".
-> 
-> The long version adds, "because the coupling concerns were spurious; the
-> only proposed users of the default FIQ handler outside of core ARM code,
-> are ARM-centric irqchip drivers."
+> x86_64 is an exception: it doesn't use that pointer for anything.
 
-I would say that the ARM specific changes to entry-armv.S and setup.c
-are correct.  All that you're doing there is to replace the existing
-default no-op FIQ handler with some additional code which gets us into
-SVC mode and back out, but itself is also a no-op.  In other words, no
-real change.
+Hmm, I would expect architectures that implement arch_vma_name like so
+to experience problems with CRIU:
 
-That's a good first patch, and one which I would actually like to have
-in my tree sooner rather than later, so that I can split that out from
-my prototype code.
+const char *arch_vma_name(struct vm_area_struct *vma)
+{
+	if (vma->vm_mm && vma->vm_start == vma->vm_mm->context.vdso_base)
+		return "[vdso]";
+	return NULL;
+}
 
-I can also split out from it the ARM generic changes for implementing
-the FIQ dumping too, which gives us a second patch.  With a bit of
-additional work, much of that should actually be generic code, not
-ARM or x86 specific code.  That's going to annoy x86 people a little
-because some of that is being reworked...
+Is this what you're referring to?
 
-That will leave the problem of how to deal with the IRQ controller
-specifics, and how to properly wire it together with the IRQ controller
-in the loop - that is where Thomas' concerns are focused.
-
--- 
-FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
-according to speedtest.net.
+Looking at 3.17-rc3, every arch uses mm_context_t->vdso_base or
+similar to provide a value for AT_SYSINFO_EHDR at exec time.
+Is this also problematic?
