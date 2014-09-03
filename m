@@ -1,58 +1,33 @@
 From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Wed,  3 Sep 2014 12:52:25 +0200
-Subject: [PATCH 09/15] PM / Domains: Remove genpd_queue_power_off_work() API
+Date: Wed,  3 Sep 2014 12:52:27 +0200
+Subject: [PATCH 11/15] ARM: exynos: Leave disabling of unused PM domains to
+ genpd
 In-Reply-To: <1409741551-16437-1-git-send-email-ulf.hansson@linaro.org>
 References: <1409741551-16437-1-git-send-email-ulf.hansson@linaro.org>
-Message-ID: <1409741551-16437-10-git-send-email-ulf.hansson@linaro.org>
+Message-ID: <1409741551-16437-12-git-send-email-ulf.hansson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There are no active users of this API. Let's remove it and if future
-needs shows up we could consider to have a get/put API instead.
+Since genpd at late init, will try to disable unused PM domains we
+don't need to do it from here as well.
 
+Cc: Kukjin Kim <kgene.kim@samsung.com>
 Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
 ---
- drivers/base/power/domain.c | 5 ++++-
- include/linux/pm_domain.h   | 2 --
- 2 files changed, 4 insertions(+), 3 deletions(-)
+ arch/arm/mach-exynos/exynos.c | 1 -
+ 1 file changed, 1 deletion(-)
 
-diff --git a/drivers/base/power/domain.c b/drivers/base/power/domain.c
-index 601e35b..d71d045 100644
---- a/drivers/base/power/domain.c
-+++ b/drivers/base/power/domain.c
-@@ -422,7 +422,7 @@ static bool genpd_abort_poweroff(struct generic_pm_domain *genpd)
-  * Queue up the execution of pm_genpd_poweroff() unless it's already been done
-  * before.
-  */
--void genpd_queue_power_off_work(struct generic_pm_domain *genpd)
-+static void genpd_queue_power_off_work(struct generic_pm_domain *genpd)
- {
- 	queue_work(pm_wq, &genpd->power_off_work);
- }
-@@ -729,6 +729,9 @@ static inline int genpd_dev_pm_qos_notifier(struct notifier_block *nb,
- 	return NOTIFY_DONE;
- }
+diff --git a/arch/arm/mach-exynos/exynos.c b/arch/arm/mach-exynos/exynos.c
+index 6a24e11..b89e5f3 100644
+--- a/arch/arm/mach-exynos/exynos.c
++++ b/arch/arm/mach-exynos/exynos.c
+@@ -193,7 +193,6 @@ static void __init exynos_init_late(void)
+ 		/* to be supported later */
+ 		return;
  
-+static inline void
-+genpd_queue_power_off_work(struct generic_pm_domain *genpd) {}
-+
- static inline void genpd_power_off_work_fn(struct work_struct *work) {}
- 
- #define pm_genpd_runtime_suspend	NULL
-diff --git a/include/linux/pm_domain.h b/include/linux/pm_domain.h
-index eeba1a4..abeb5dc 100644
---- a/include/linux/pm_domain.h
-+++ b/include/linux/pm_domain.h
-@@ -258,10 +258,8 @@ static inline int pm_genpd_name_add_device(const char *domain_name,
+-	pm_genpd_poweroff_unused();
+ 	exynos_pm_init();
  }
- 
- #ifdef CONFIG_PM_GENERIC_DOMAINS_RUNTIME
--extern void genpd_queue_power_off_work(struct generic_pm_domain *genpd);
- extern void pm_genpd_poweroff_unused(void);
- #else
--static inline void genpd_queue_power_off_work(struct generic_pm_domain *gpd) {}
- static inline void pm_genpd_poweroff_unused(void) {}
- #endif
  
 -- 
 1.9.1
