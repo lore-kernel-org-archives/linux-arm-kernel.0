@@ -1,101 +1,192 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Wed, 3 Sep 2014 10:36:34 +0200
-Subject: [PATCH] mmc: sdhci-msm: Make tuning block table endian agnostic
-In-Reply-To: <1409702308-3023-1-git-send-email-sboyd@codeaurora.org>
-References: <1409702308-3023-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <CAPDyKFoboJGTzF3aQ=YBpWyVT6opTMgz_6gpOo5BRX30+hfCBQ@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 3 Sep 2014 10:37:22 +0200
+Subject: [PATCH 07/11 v5] coresight-etm: add CoreSight ETM/PTM driver
+In-Reply-To: <1409159852-7249-8-git-send-email-mathieu.poirier@linaro.org>
+References: <1409159852-7249-1-git-send-email-mathieu.poirier@linaro.org>
+ <1409159852-7249-8-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <CACRpkdZO7Mo_JaecjypR_kXKwaatgU+4oLLKheQ22OcNMG_-nQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 3 September 2014 01:58, Stephen Boyd <sboyd@codeaurora.org> wrote:
-> If we're tuning on a big-endian CPU we'll never determine we properly
-> tuned the device because we compare the data we received from the
-> controller with a table that assumes the CPU is little-endian.
-> Change the table to be an array of bytes instead of 32-bit words
-> so we can use memcmp() without needing to byte-swap every word
-> depending on the endianess of the CPU.
->
-> Cc: Asutosh Das <asutoshd@codeaurora.org>
-> Cc: Venkat Gopalakrishnan <venkatg@codeaurora.org>
-> Cc: Georgi Djakov <gdjakov@mm-sol.com>
-> Fixes: 415b5a75da43 "mmc: sdhci-msm: Add platform_execute_tuning implementation"
-> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+On Wed, Aug 27, 2014 at 7:17 PM,  <mathieu.poirier@linaro.org> wrote:
 
-Hi Stephen,
+> From: Pratik Patel <pratikp@codeaurora.org>
+>
+> This driver manages CoreSight ETM (Embedded Trace Macrocell) that
+> supports processor tracing. Currently supported version are ARM
+> ETMv3.x and PTM1.x.
+>
+> Signed-off-by: Pratik Patel <pratikp@codeaurora.org>
+> Signed-off-by: Panchaxari Prasannamurthy <panchaxari.prasannamurthy@linaro.org>
+> Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
 
-If you want me to pick this up, please repost to linux-mmc as well.
-Otherwise you have my ack for it!
+(...)
+> +/* Accessors for CP14 registers */
+> +#define dbg_read(reg)                  RCP14_##reg()
+> +#define dbg_write(val, reg)            WCP14_##reg(val)
+> +#define etm_read(reg)                  RCP14_##reg()
+> +#define etm_write(val, reg)            WCP14_##reg(val)
+> +
+> +/* MRC14 and MCR14 */
+> +#define MRC14(op1, crn, crm, op2)                                      \
+> +({                                                                     \
+> +u32 val;                                                               \
+> +asm volatile("mrc p14, "#op1", %0, "#crn", "#crm", "#op2 : "=r" (val));        \
+> +val;                                                                   \
+> +})
+> +
+> +#define MCR14(val, op1, crn, crm, op2)                                 \
+> +({                                                                     \
+> +asm volatile("mcr p14, "#op1", %0, "#crn", "#crm", "#op2 : : "r" (val));\
+> +})
 
-Kind regards
-Uffe
+OK... some ARMish funny assembly...
 
-> ---
->  drivers/mmc/host/sdhci-msm.c | 42 +++++++++++++++++++++++++++---------------
->  1 file changed, 27 insertions(+), 15 deletions(-)
->
-> diff --git a/drivers/mmc/host/sdhci-msm.c b/drivers/mmc/host/sdhci-msm.c
-> index 40573a58486a..5aabffc15ae8 100644
-> --- a/drivers/mmc/host/sdhci-msm.c
-> +++ b/drivers/mmc/host/sdhci-msm.c
-> @@ -47,22 +47,34 @@
->  #define CMUX_SHIFT_PHASE_SHIFT 24
->  #define CMUX_SHIFT_PHASE_MASK  (7 << CMUX_SHIFT_PHASE_SHIFT)
->
-> -static const u32 tuning_block_64[] = {
-> -       0x00ff0fff, 0xccc3ccff, 0xffcc3cc3, 0xeffefffe,
-> -       0xddffdfff, 0xfbfffbff, 0xff7fffbf, 0xefbdf777,
-> -       0xf0fff0ff, 0x3cccfc0f, 0xcfcc33cc, 0xeeffefff,
-> -       0xfdfffdff, 0xffbfffdf, 0xfff7ffbb, 0xde7b7ff7
-> +static const u8 tuning_block_64[] = {
-> +       0xff, 0x0f, 0xff, 0x00, 0xff, 0xcc, 0xc3, 0xcc,
-> +       0xc3, 0x3c, 0xcc, 0xff, 0xfe, 0xff, 0xfe, 0xef,
-> +       0xff, 0xdf, 0xff, 0xdd, 0xff, 0xfb, 0xff, 0xfb,
-> +       0xbf, 0xff, 0x7f, 0xff, 0x77, 0xf7, 0xbd, 0xef,
-> +       0xff, 0xf0, 0xff, 0xf0, 0x0f, 0xfc, 0xcc, 0x3c,
-> +       0xcc, 0x33, 0xcc, 0xcf, 0xff, 0xef, 0xff, 0xee,
-> +       0xff, 0xfd, 0xff, 0xfd, 0xdf, 0xff, 0xbf, 0xff,
-> +       0xbb, 0xff, 0xf7, 0xff, 0xf7, 0x7f, 0x7b, 0xde,
->  };
->
-> -static const u32 tuning_block_128[] = {
-> -       0xff00ffff, 0x0000ffff, 0xccccffff, 0xcccc33cc,
-> -       0xcc3333cc, 0xffffcccc, 0xffffeeff, 0xffeeeeff,
-> -       0xffddffff, 0xddddffff, 0xbbffffff, 0xbbffffff,
-> -       0xffffffbb, 0xffffff77, 0x77ff7777, 0xffeeddbb,
-> -       0x00ffffff, 0x00ffffff, 0xccffff00, 0xcc33cccc,
-> -       0x3333cccc, 0xffcccccc, 0xffeeffff, 0xeeeeffff,
-> -       0xddffffff, 0xddffffff, 0xffffffdd, 0xffffffbb,
-> -       0xffffbbbb, 0xffff77ff, 0xff7777ff, 0xeeddbb77
-> +static const u8 tuning_block_128[] = {
-> +       0xff, 0xff, 0x00, 0xff, 0xff, 0xff, 0x00, 0x00,
-> +       0xff, 0xff, 0xcc, 0xcc, 0xcc, 0x33, 0xcc, 0xcc,
-> +       0xcc, 0x33, 0x33, 0xcc, 0xcc, 0xcc, 0xff, 0xff,
-> +       0xff, 0xee, 0xff, 0xff, 0xff, 0xee, 0xee, 0xff,
-> +       0xff, 0xff, 0xdd, 0xff, 0xff, 0xff, 0xdd, 0xdd,
-> +       0xff, 0xff, 0xff, 0xbb, 0xff, 0xff, 0xff, 0xbb,
-> +       0xbb, 0xff, 0xff, 0xff, 0x77, 0xff, 0xff, 0xff,
-> +       0x77, 0x77, 0xff, 0x77, 0xbb, 0xdd, 0xee, 0xff,
-> +       0xff, 0xff, 0xff, 0x00, 0xff, 0xff, 0xff, 0x00,
-> +       0x00, 0xff, 0xff, 0xcc, 0xcc, 0xcc, 0x33, 0xcc,
-> +       0xcc, 0xcc, 0x33, 0x33, 0xcc, 0xcc, 0xcc, 0xff,
-> +       0xff, 0xff, 0xee, 0xff, 0xff, 0xff, 0xee, 0xee,
-> +       0xff, 0xff, 0xff, 0xdd, 0xff, 0xff, 0xff, 0xdd,
-> +       0xdd, 0xff, 0xff, 0xff, 0xbb, 0xff, 0xff, 0xff,
-> +       0xbb, 0xbb, 0xff, 0xff, 0xff, 0x77, 0xff, 0xff,
-> +       0xff, 0x77, 0x77, 0xff, 0x77, 0xbb, 0xdd, 0xee,
->  };
->
->  struct sdhci_msm_host {
-> @@ -359,7 +371,7 @@ static int sdhci_msm_execute_tuning(struct sdhci_host *host, u32 opcode)
->  {
->         int tuning_seq_cnt = 3;
->         u8 phase, *data_buf, tuned_phases[16], tuned_phase_cnt = 0;
-> -       const u32 *tuning_block_pattern = tuning_block_64;
-> +       const u8 *tuning_block_pattern = tuning_block_64;
->         int size = sizeof(tuning_block_64);     /* Pattern size in bytes */
->         int rc;
->         struct mmc_host *mmc = host->mmc;
-> --
-> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-> hosted by The Linux Foundation
->
+(...)
+
+But this:
+
+> +static unsigned int etm_read_reg(u32 reg)
+> +{
+> +       switch (reg) {
+> +       case ETMCR:
+> +               return etm_read(ETMCR);
+> +       case ETMCCR:
+> +               return etm_read(ETMCCR);
+(...)
+
+And this:
+
+> +static void etm_write_reg(u32 val, u32 reg)
+> +{
+> +       switch (reg) {
+> +       case ETMCR:
+> +               etm_write(val, ETMCR);
+> +               return;
+> +       case ETMTRIGGER:
+> +               etm_write(val, ETMTRIGGER);
+> +               return;
+
+And then this:
+
+> +unsigned int etm_readl_cp14(u32 off)
+> +{
+> +       return etm_read_reg(off);
+> +}
+> +
+> +void etm_writel_cp14(u32 val, u32 off)
+> +{
+> +       etm_write_reg(val, off);
+> +}
+
+And then this:
+
++static inline void etm_writel(struct etm_drvdata *drvdata,
++                             u32 val, u32 off)
++{
++       if (drvdata->use_cp14)
++               etm_writel_cp14(val, off);
++       else
++               writel_relaxed(val, drvdata->base + off);
++}
++
++static inline unsigned int etm_readl(struct etm_drvdata *drvdata, u32 off)
++{
++       u32 val;
++
++       if (drvdata->use_cp14)
++               val = etm_readl_cp14(off);
++       else
++               val = readl_relaxed(drvdata->base + off);
++       return val;
++}
+
+Just looks like an extra layer or two or three of indirection of
+absolutely no use or value. It seems to be done because someone
+doesn't know how to get parameters to assembly inlines and
+added all the switch statements for get #defined enumerators
+from variables.
+
+The code actually using these layered accessors look like this:
+
+etmcr = etm_readl(drvdata, ETMCR);
+
+I would rewrite the last function like this:
+
+static inline unsigned int etm_readl(struct etm_drvdata *drvdata, u32 off)
+{
+       u32 val;
+
+       if (drvdata->use_cp14)
+               asm_volatile()...
+       else
+               val = readl_relaxed(drvdata->base + off);
+       return val;
+}
+
+The asm_volatile() and parametrizing it is the trick. Just figure it out ;)
+http://www.ethernut.de/en/documents/arm-inline-asm.html
+
+> diff --git a/drivers/coresight/coresight-etm.h b/drivers/coresight/coresight-etm.h
+(...)
+> +struct etm_drvdata {
+> +       void __iomem                    *base;
+> +       struct device                   *dev;
+> +       struct coresight_device         *csdev;
+> +       struct clk                      *clk;
+> +       spinlock_t                      spinlock;
+> +       int                             cpu;
+> +       int                             port_size;
+> +       u8                              arch;
+> +       bool                            use_cp14;
+> +       bool                            enable;
+> +       bool                            sticky_enable;
+> +       bool                            boot_enable;
+> +       bool                            os_unlock;
+> +       u8                              nr_addr_cmp;
+> +       u8                              nr_cntr;
+> +       u8                              nr_ext_inp;
+> +       u8                              nr_ext_out;
+> +       u8                              nr_ctxid_cmp;
+> +       u8                              reset;
+> +       u32                             etmccr;
+> +       u32                             etmccer;
+> +       u32                             traceid;
+> +       u32                             mode;
+> +       u32                             ctrl;
+> +       u32                             trigger_event;
+> +       u32                             startstop_ctrl;
+> +       u32                             enable_event;
+> +       u32                             enable_ctrl1;
+> +       u32                             fifofull_level;
+> +       u8                              addr_idx;
+> +       u32                             addr_val[ETM_MAX_ADDR_CMP];
+> +       u32                             addr_acctype[ETM_MAX_ADDR_CMP];
+> +       u32                             addr_type[ETM_MAX_ADDR_CMP];
+> +       u8                              cntr_idx;
+> +       u32                             cntr_rld_val[ETM_MAX_CNTR];
+> +       u32                             cntr_event[ETM_MAX_CNTR];
+> +       u32                             cntr_rld_event[ETM_MAX_CNTR];
+> +       u32                             cntr_val[ETM_MAX_CNTR];
+> +       u32                             seq_12_event;
+> +       u32                             seq_21_event;
+> +       u32                             seq_23_event;
+> +       u32                             seq_31_event;
+> +       u32                             seq_32_event;
+> +       u32                             seq_13_event;
+> +       u32                             seq_curr_state;
+> +       u8                              ctxid_idx;
+> +       u32                             ctxid_val[ETM_MAX_CTXID_CMP];
+> +       u32                             ctxid_mask;
+> +       u32                             sync_freq;
+> +       u32                             timestamp_event;
+> +};
+
+Unless all of this is self-evident I would kerneldoc it. If I don't
+understand something of this, and if you don't, who's going to
+understand it in a few years...
+
+Apart from this it looks OK. Albeit big. But that may be unavoidable.
+
+Yours,
+Linus Walleij
