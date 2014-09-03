@@ -1,148 +1,112 @@
-From: daniel.thompson@linaro.org (Daniel Thompson)
-Date: Wed, 03 Sep 2014 09:27:01 +0100
-Subject: [PATCH v11 01/19] arm: fiq: Add callbacks to manage FIQ routings
-In-Reply-To: <alpine.DEB.2.10.1409030103090.3333@nanos>
-References: <1408466769-20004-1-git-send-email-daniel.thompson@linaro.org>
- <1409662853-29313-1-git-send-email-daniel.thompson@linaro.org>
- <1409662853-29313-2-git-send-email-daniel.thompson@linaro.org>
- <alpine.DEB.2.10.1409030103090.3333@nanos>
-Message-ID: <5406D0D5.1050909@linaro.org>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Wed, 3 Sep 2014 10:35:06 +0200
+Subject: [RESEND PATCH] iio: adc: at91: don't use the last converted data
+ register
+In-Reply-To: <1409726069-13054-1-git-send-email-ludovic.desroches@atmel.com>
+References: <1409726069-13054-1-git-send-email-ludovic.desroches@atmel.com>
+Message-ID: <20140903083506.GF10093@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/09/14 01:03, Thomas Gleixner wrote:
-> On Tue, 2 Sep 2014, Daniel Thompson wrote:
+On 03/09/2014 at 08:34:29 +0200, Ludovic Desroches wrote :
+> If touchscreen mode is enabled and a conversion is requested on another
+> channel, the result in the last converted data register can be a
+> touchscreen relative value. Starting a conversion involves to do a
+> conversion for all active channel. It starts with ADC channels and ends
+> with touchscreen channels. Then if ADC_LCD register is not read quickly,
+> its content may be a touchscreen conversion.
+> To remove this temporal constraint, the conversion value is taken from
+> the channel data register.
 > 
->> Currently enable_fiq/disable_fiq use a simple offset to convert an IRQ
->> virq into a FIQ virq. This is too inflexible for multi-platform kernels
->> and makes runtime error checking impossible.
+> Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+
+I wondering whether we should get rid of drdy in the trigger path too.
+Maybe this can be done in a follow-up patch. Else,
+
+Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+
+> ---
 > 
-> You are missing to explain WHY it is too inflexible ....
+> Sorry for the noise, there was a typo in the CC list.
+> 
+>  drivers/iio/adc/at91_adc.c |   14 +++++++++-----
+>  1 file changed, 9 insertions(+), 5 deletions(-)
+> 
+> diff --git a/drivers/iio/adc/at91_adc.c b/drivers/iio/adc/at91_adc.c
+> index 3b5bacd..dde22cb 100644
+> --- a/drivers/iio/adc/at91_adc.c
+> +++ b/drivers/iio/adc/at91_adc.c
+> @@ -196,6 +196,7 @@ struct at91_adc_state {
+>  	bool			done;
+>  	int			irq;
+>  	u16			last_value;
+> +	int			chnb;
+>  	struct mutex		lock;
+>  	u8			num_channels;
+>  	void __iomem		*reg_base;
+> @@ -274,7 +275,7 @@ void handle_adc_eoc_trigger(int irq, struct iio_dev *idev)
+>  		disable_irq_nosync(irq);
+>  		iio_trigger_poll(idev->trig, iio_get_time_ns());
+>  	} else {
+> -		st->last_value = at91_adc_readl(st, AT91_ADC_LCDR);
+> +		st->last_value = at91_adc_readl(st, AT91_ADC_CHAN(st, st->chnb));
+>  		st->done = true;
+>  		wake_up_interruptible(&st->wq_data_avail);
+>  	}
+> @@ -348,10 +349,11 @@ static irqreturn_t at91_adc_rl_interrupt(int irq, void *private)
+>  	struct iio_dev *idev = private;
+>  	struct at91_adc_state *st = iio_priv(idev);
+>  	u32 status = at91_adc_readl(st, st->registers->status_register);
+> +	const u32 eoc_mask = (1 << st->num_channels) - 1;
+>  	unsigned int reg;
 >  
->> We solve this by introducing a flexible mapping that allows interrupt
+>  	status &= at91_adc_readl(st, AT91_ADC_IMR);
+> -	if (status & st->registers->drdy_mask)
+> +	if (status & eoc_mask)
+>  		handle_adc_eoc_trigger(irq, idev);
+>  
+>  	if (status & AT91RL_ADC_IER_PEN) {
+> @@ -413,12 +415,13 @@ static irqreturn_t at91_adc_9x5_interrupt(int irq, void *private)
+>  	struct iio_dev *idev = private;
+>  	struct at91_adc_state *st = iio_priv(idev);
+>  	u32 status = at91_adc_readl(st, st->registers->status_register);
+> +	const u32 eoc_mask = (1 << st->num_channels) - 1;
+>  	const uint32_t ts_data_irq_mask =
+>  		AT91_ADC_IER_XRDY |
+>  		AT91_ADC_IER_YRDY |
+>  		AT91_ADC_IER_PRDY;
+>  
+> -	if (status & st->registers->drdy_mask)
+> +	if (status & eoc_mask)
+>  		handle_adc_eoc_trigger(irq, idev);
+>  
+>  	if (status & AT91_ADC_IER_PEN) {
+> @@ -689,9 +692,10 @@ static int at91_adc_read_raw(struct iio_dev *idev,
+>  	case IIO_CHAN_INFO_RAW:
+>  		mutex_lock(&st->lock);
+>  
+> +		st->chnb = chan->channel;
+>  		at91_adc_writel(st, AT91_ADC_CHER,
+>  				AT91_ADC_CH(chan->channel));
+> -		at91_adc_writel(st, AT91_ADC_IER, st->registers->drdy_mask);
+> +		at91_adc_writel(st, AT91_ADC_IER, 1 << chan->channel);
+>  		at91_adc_writel(st, AT91_ADC_CR, AT91_ADC_START);
+>  
+>  		ret = wait_event_interruptible_timeout(st->wq_data_avail,
+> @@ -708,7 +712,7 @@ static int at91_adc_read_raw(struct iio_dev *idev,
+>  
+>  		at91_adc_writel(st, AT91_ADC_CHDR,
+>  				AT91_ADC_CH(chan->channel));
+> -		at91_adc_writel(st, AT91_ADC_IDR, st->registers->drdy_mask);
+> +		at91_adc_writel(st, AT91_ADC_IDR, 1 << chan->channel);
+>  
+>  		st->last_value = 0;
+>  		st->done = false;
+> -- 
+> 1.7.9.5
 > 
-> Flexible in that context reads like random semantics. And that's
-> definitely nothing we want to see in the context of interrupts/fiqs
-> 
->> controllers that support FIQ to register those mappings. This, in turn,
->> makes it much possible for drivers in DT kernels to install FIQ handlers
->> without knowing anything about the interrupt controller.
-> 
->> +#include <linux/irq.h>
->>  #include <asm/ptrace.h>
->>  
->> +struct fiq_chip {
->> +	void (*fiq_enable)(struct irq_data *data);
->> +	void (*fiq_disable)(struct irq_data *data);
->> +};
-> 
-> So you define an ARM specific extension to the irq infrastructure
-> which is completely ignoring that there might be other architectures
-> which have the same issue?
-> 
-> Aside of that you define that structure w/o documenting in any way
-> what the semantics of the callbacks are and how struct irq_data is
-> supposed to be (ab)used there.
-> 
->> +struct fiq_data {
->> +	struct fiq_chip *fiq_chip;
->> +	struct irq_data *irq_data;
->> +};
-> 
-> Nice. Another completely undocumented data structure.
-> 
->>  static unsigned long no_fiq_insn;
->> +static int fiq_start = -1;
->> +static RADIX_TREE(fiq_data_tree, GFP_KERNEL);
-> 
-> Along with a radix tree, which again lacks any form of documentation.
-> 
->> -static int fiq_start;
->> +static struct fiq_data *lookup_fiq_data(int fiq)
->> +{
->> +	struct fiq_data *data;
->> +
->> +	rcu_read_lock();
->> +	data = radix_tree_lookup(&fiq_data_tree, fiq);
->> +	rcu_read_unlock();
->> +
->> +	return data;
-> 
-> That makes a lot of sense. NOT!
-> 
-> What kind of protection is that rcu_read_lock/unlock pair providing
-> for the return value? Just that it has been valid at lookup time?
-> 
-> What protects against concurrent calls to the various usage sites
-> which shine by the lack of serialization ...
 
-The locking here ought to safe because there is no means to unregister
-fiq data (the two irqchip drivers I looked at has no need for that) so
-once looked up the data will be valid.
-
-Thus it's only purpose was to prevent incorrect traversals of the radix
-tree.
-
-That said, this doesn't make it right.
-
-
->>  void enable_fiq(int fiq)
->>  {
->> +	struct fiq_data *data = lookup_fiq_data(fiq);
->> +
->> +	if (data) {
->> +		if (data->fiq_chip->fiq_enable)
->> +			data->fiq_chip->fiq_enable(data->irq_data);
->> +		enable_irq(fiq);
-> 
-> This is ass backwards, really.
-> 
-> The FIQ target is a property of the interrupt line right?
-> 
-> So why the heck do you need a separate chip/data representation
-> including a radix tree and whatever? Just because you can?
-> 
-> What is wrong to tell the irq core code via a flag that a particular
-> interrupt should be targeted at FIQ instead of a regular interrupt?
-> 
-> Nothing as far as I can tell. And that would even allow to retarget an
-> already enabled interrupt to FIQ or vice versa.
-> 
-> So all your patch does is trying to (ab)use an existing interface
-> which was created in the last millenium for totally different reasons
-> and in a totally different context.
-> 
-> But you fail completely to understand what that interface is doing:
-> 
->     It merily maps the Linux virq to a FIQ via an offset.
-> 
-> While I understand that this is not workable on multiplatform kernels,
-> I really cannot understand your attempt to change this by adding
-> complex functionality to a primitive offset mapping function.
-> 
-> You just add some randomly defined new chip/data combination which
-> abuses the irq_data structure under the hood instead of properly
-> integrating that irq chip property into irqchip/irqdata itself.
-> 
-> So instead of thinking about the properties of the hardware and
-> questioning the existing mechanism, you just bolt some crap onto it
-> and inflict a gazillion of pointless modifications to the irq chip
-> drivers without any value.
-> 
-> So all it needs is
-> 
->  1) Adding a property flag to the irq chip which signals that it
->     supports FIQ/NMI targets
-> 
->  2) Adding a interface which allows to flag a particular interrupt
->     line targeted to either the regular or the FIQ/NMI which consults
->     the flag added by #1
-> 
->  3) Let the chip driver deal with the target flag at a minimal
->     intrusive level w/o registering racy callbacks designed in hell
->     and imposing arch specific data structures, storage etc. for no
->     value
-
-Thanks for the comments.
-
-I'll get working along these lines.
+-- 
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
