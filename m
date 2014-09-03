@@ -1,64 +1,86 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 3 Sep 2014 15:01:31 +0200
-Subject: [PATCH v2 0/5] beautify EFI memmap logs
-In-Reply-To: <1409743943-16934-1-git-send-email-lersek@redhat.com>
-References: <1409743943-16934-1-git-send-email-lersek@redhat.com>
-Message-ID: <CAKv+Gu_Yk-q0gf+EHc3EYQ=obLT2nj6Kj6qPTk678ASFEW+ZFQ@mail.gmail.com>
+From: cov@codeaurora.org (Christopher Covington)
+Date: Wed, 03 Sep 2014 09:13:24 -0400
+Subject: [PATCH v9 0/6] ARM: VDSO
+In-Reply-To: <5406AA1B.3050506@mentor.com>
+References: <1408744351-7814-1-git-send-email-nathan_lynch@mentor.com>
+ <53FE4448.9070708@codeaurora.org> <5406AA1B.3050506@mentor.com>
+Message-ID: <540713F4.5020201@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 3 September 2014 13:32, Laszlo Ersek <lersek@redhat.com> wrote:
-> changes in v2:
-> - explain with examples how the log's appearance changes, in patches 3-5
->   [Ingo]
->
-> v1 blurb:
->
->> It's a pain to analyze EFI memmap logs while debugging, especially to
->> verify the memory types (an enum) and the memory attributes (a
->> bitmap). This series renders those columns human-readable, and unifies
->> their formatting between x86, ia64 and arm64.
->
+Hi Nathan,
 
-Tested-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-(on arm64 only)
+On 09/03/2014 01:41 AM, Nathan Lynch wrote:
+> On 08/27/2014 03:49 PM, Christopher Covington wrote:
+>>
+>> It appears to me that there is code in several architecture subdirectories
+>> (I'm aware of x86, arm64, and with these patches arm[32] and I would be
+>> surprised if there weren't more) doing largely the same setup of special
+>> mappings at randomized offsets, checking ELF magic etc. Not that these patches
+>> should necessarily do it, but is there a reasonable amount of consolidation
+>> that could be done, or am I underestimating how much of this really does vary
+>> per architecture?
+> 
+> Sorry to not respond to this promptly, was distracted by some other work.
+> 
+> As Andy said, the possibility for consolidating some aspects of VDSO support
+> is there, but it would be a fair bit of work.
+> 
+> For example, arch_setup_additional_pages tends to have the general form of:
+> 
+> lock mmap_sem
+> get_unmapped_area
+> install_special_mapping (or _install_special_mapping, preferably)
+> stash vdso address in mmu context
+> release mmap_sem
+> 
+> But there are a lot of implementation details that differ:
+> 
+>          +----------------------------------------------------------------
+>          | Number of VMAs installed
+>          |   +------------------------------------------------------------
+>          |   | Considers uses_interp
+>          |   |     +------------------------------------------------------
+>          |   |     | Uses _install_special_mapping
+>          |   |     |     +------------------------------------------------
+>          |   |     |     | Performs additional work (e.g. remap_pfn_range)
+>          |   |     |     |     +------------------------------------------
+>          |   |     |     |     | Randomizes VDSO offset vs stack and libs
+>          |   |     |     |     |     +------------------------------------
+>          |   |     |     |     |     | Records VDSO address in mmu context
+>          |   |     |     |     |     |     +------------------------------
+>          |   |     |     |     |     |     | Supports compat VDSO
+>          |   |     |     |     |     |     |     +------------------------
+>          |   |     |     |     |     |     |     | Supports disabling VDSO
+>          |   |     |     |     |     |     |     | at boot (e.g. vdso=off)
+>          |   |     |     |     |     |     |     |     +------------------
+>          |   |     |     |     |     |     |     |     | Can disable VDSO
+>  arch    |   |     |     |     |     |     |     |     | via Kconfig
+> ---------+---+-----+-----+-----+-----+-----+-----+-----+------------------
+>  arm*    | 3 | no  | yes | no  | yes | yes | no  | no  | yes
+>  arm64   | 2 | no  | yes | no  | no  | yes | no  | no  | no
+>  hexagon | 1 | no  | no  | no  | no  | yes | no  | no  | no
+>  mips    | 1 | no  | no  | no  | no  | yes | no  | no  | no
+>  powerpc | 1 | no  | no  | no  | no  | yes | yes | no  | no
+>  s390    | 1 | yes | no  | no  | no  | yes | yes | yes | no
+>  sh      | 1 | no  | no  | no  | no  | yes | no  | yes | yes
+>  tile    | 1 | no  | no  | yes | no  | yes | no  | yes | no
+>  x86     | 2 | no  | yes | yes | yes | yes | yes | yes | no
+> 
+> * With VDSO patches from this thread, of course.
+> 
+> I think pushing the mmap_sem lock/unlock up into the ELF loader might be
+> of some benefit (slightly reduced complexity in the arch code).  But
+> any generic replacement for arch_setup_additional_pages will have to
+> account for all the differences above, and probably a few more I've
+> missed.
 
-+1 for aligning between architectures
-+1 for cleaning up the output to make it more readable
+I really appreciate the detailed response. I'll try to find time to explore
+this further, hopefully using QEMU to run kernels for most of those architectures.
 
-The only thing I am not entirely convinced about is printing all those
-memory attributes: is it really so interesting to know that region X
-/can/ be configured as writeback, write through, write combining etc
-etc, as most regions seem to support most attributes, yet it tells you
-nothing about what the kernel ends up doing with that information. In
-the arm64 case, for instance, all MEMORY_WB ranges are mapped
-writeback cached, and everything else is mapped uncached.
+Christopher
 
 -- 
-Ard.
-
-
-> Laszlo Ersek (5):
->   efi: add macro for EFI_MEMORY_UCE memory attribute
->   efi: introduce efi_md_typeattr_format()
->   x86: efi: format EFI memory type & attrs with efi_md_typeattr_format()
->   ia64: efi: format EFI memory type & attrs with
->     efi_md_typeattr_format()
->   arm64: efi: format EFI memory type & attrs with
->     efi_md_typeattr_format()
->
->  include/linux/efi.h         |  8 +++++++
->  arch/arm64/kernel/efi.c     | 26 +++++----------------
->  arch/ia64/kernel/efi.c      |  6 +++--
->  arch/x86/platform/efi/efi.c |  7 ++++--
->  drivers/firmware/efi/efi.c  | 57 +++++++++++++++++++++++++++++++++++++++++++++
->  5 files changed, 80 insertions(+), 24 deletions(-)
->
-> --
-> 1.8.3.1
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Employee of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by the Linux Foundation.
