@@ -1,413 +1,183 @@
-From: tomasz.nowicki@linaro.org (Tomasz Nowicki)
-Date: Wed, 03 Sep 2014 11:26:14 +0200
-Subject: [PATCH v3 13/17] ARM64 / ACPI: Add GICv2 specific ACPI boot
- support
-In-Reply-To: <5405BFE7.5060005@arm.com>
-References: <1409583475-6978-1-git-send-email-hanjun.guo@linaro.org>
- <1409583475-6978-14-git-send-email-hanjun.guo@linaro.org>
- <5404AE56.80801@arm.com> <5405AE95.1020201@linaro.org>
- <5405BFE7.5060005@arm.com>
-Message-ID: <5406DEB6.1060705@linaro.org>
+From: daniel.thompson@linaro.org (Daniel Thompson)
+Date: Wed, 03 Sep 2014 10:28:28 +0100
+Subject: [PATCH v11 06/19] irqchip: gic: Provide support for interrupt
+ grouping
+In-Reply-To: <20140902193355.GW30401@n2100.arm.linux.org.uk>
+References: <1408466769-20004-1-git-send-email-daniel.thompson@linaro.org>
+ <1409662853-29313-1-git-send-email-daniel.thompson@linaro.org>
+ <1409662853-29313-7-git-send-email-daniel.thompson@linaro.org>
+ <20140902193355.GW30401@n2100.arm.linux.org.uk>
+Message-ID: <5406DF3C.9060503@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02.09.2014 15:02, Marc Zyngier wrote:
-> On 02/09/14 12:48, Tomasz Nowicki wrote:
->> On 01.09.2014 19:35, Marc Zyngier wrote:
->>> On 01/09/14 15:57, Hanjun Guo wrote:
->>>> From: Tomasz Nowicki <tomasz.nowicki@linaro.org>
->>>>
->>>> ACPI kernel uses MADT table for proper GIC initialization. It needs to
->>>> parse GIC related subtables, collect CPU interface and distributor
->>>> addresses and call driver initialization function (which is hardware
->>>> abstraction agnostic). In a similar way, FDT initialize GICv1/2.
->>>>
->>>> NOTE: This commit allow to initialize GICv1/2 only.
->>>
->>> I cannot help but notice that there is no support for KVM here. It'd be
->>> good to add a note to that effect, so that people do not expect
->>> virtualization support to be working when booting with ACPI.
->>
->> yes, it is worth mentioning!
->>
->>>
->>>> Signed-off-by: Tomasz Nowicki <tomasz.nowicki@linaro.org>
->>>> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
->>>> ---
->>>>    arch/arm64/include/asm/acpi.h        |    2 -
->>>>    arch/arm64/kernel/acpi.c             |   23 +++++++
->>>>    arch/arm64/kernel/irq.c              |    5 ++
->>>>    drivers/irqchip/irq-gic.c            |  114 ++++++++++++++++++++++++++++++++++
->>>>    include/linux/irqchip/arm-gic-acpi.h |   33 ++++++++++
->>>>    5 files changed, 175 insertions(+), 2 deletions(-)
->>>>    create mode 100644 include/linux/irqchip/arm-gic-acpi.h
->>>>
->>>> diff --git a/arch/arm64/include/asm/acpi.h b/arch/arm64/include/asm/acpi.h
->>>> index a867467..5d2ab63 100644
->>>> --- a/arch/arm64/include/asm/acpi.h
->>>> +++ b/arch/arm64/include/asm/acpi.h
->>>> @@ -97,8 +97,6 @@ void __init acpi_smp_init_cpus(void);
->>>>    extern int (*acpi_suspend_lowlevel)(void);
->>>>    #define acpi_wakeup_address 0
->>>>
->>>> -#define ACPI_MAX_GIC_CPU_INTERFACE_ENTRIES 65535
->>>> -
->>>>    #else
->>>>
->>>>    static inline bool acpi_psci_present(void) { return false; }
->>>> diff --git a/arch/arm64/kernel/acpi.c b/arch/arm64/kernel/acpi.c
->>>> index 354b912..b3b82b0 100644
->>>> --- a/arch/arm64/kernel/acpi.c
->>>> +++ b/arch/arm64/kernel/acpi.c
->>>> @@ -23,6 +23,7 @@
->>>>    #include <linux/irqdomain.h>
->>>>    #include <linux/bootmem.h>
->>>>    #include <linux/smp.h>
->>>> +#include <linux/irqchip/arm-gic-acpi.h>
->>>>
->>>>    #include <asm/cputype.h>
->>>>    #include <asm/cpu_ops.h>
->>>> @@ -313,6 +314,28 @@ void __init acpi_boot_table_init(void)
->>>>               pr_err("Can't find FADT or error happened during parsing FADT\n");
->>>>    }
->>>>
->>>> +void __init acpi_gic_init(void)
->>>> +{
->>>> +    struct acpi_table_header *table;
->>>> +    acpi_status status;
->>>> +    acpi_size tbl_size;
->>>> +    int err;
->>>> +
->>>> +    status = acpi_get_table_with_size(ACPI_SIG_MADT, 0, &table, &tbl_size);
->>>> +    if (ACPI_FAILURE(status)) {
->>>> +            const char *msg = acpi_format_exception(status);
->>>> +
->>>> +            pr_err("Failed to get MADT table, %s\n", msg);
->>>> +            return;
->>>> +    }
->>>> +
->>>> +    err = gic_v2_acpi_init(table);
->>>> +    if (err)
->>>> +            pr_err("Failed to initialize GIC IRQ controller");
->>>
->>> What will happen when you get to implement GICv3 support? Another entry
->>> like this? Why isn't this entirely contained in the GIC driver? Do I
->>> sound like a stuck record?
->>
->> There will be another call to GICv3 init:
->> [...]
->>          err = gic_v3_acpi_init(table);
->>          if (err)
->>                  err = gic_v2_acpi_init(table);
->>          if (err)
->>                  pr_err("Failed to initialize GIC IRQ controller");
->> [...]
->> This is the main reason I put common code here.
->>
->>>
->>>> +
->>>> +    early_acpi_os_unmap_memory((char *)table, tbl_size);
->>>> +}
->>>> +
->>>>    /*
->>>>     * acpi_suspend_lowlevel() - save kernel state and suspend.
->>>>     *
->>>> diff --git a/arch/arm64/kernel/irq.c b/arch/arm64/kernel/irq.c
->>>> index 0f08dfd..c074d60 100644
->>>> --- a/arch/arm64/kernel/irq.c
->>>> +++ b/arch/arm64/kernel/irq.c
->>>> @@ -28,6 +28,7 @@
->>>>    #include <linux/irqchip.h>
->>>>    #include <linux/seq_file.h>
->>>>    #include <linux/ratelimit.h>
->>>> +#include <linux/irqchip/arm-gic-acpi.h>
->>>>
->>>>    unsigned long irq_err_count;
->>>>
->>>> @@ -78,6 +79,10 @@ void __init set_handle_irq(void (*handle_irq)(struct pt_regs *))
->>>>    void __init init_IRQ(void)
->>>>    {
->>>>       irqchip_init();
->>>> +
->>>> +    if (!handle_arch_irq)
->>>> +            acpi_gic_init();
->>>> +
->>>
->>> Why isn't this called from irqchip_init? It would seem like the logical
->>> spot to probe an interrupt controller.
->>
->> irqchip.c is OF dependent, I want to decouple these from the very
->> beginning.
->
-> No. irqchip.c is not OF dependent, it is just that DT is the only thing
-> we support so far. I don't think duplicating the kernel infrastructure
-> "because we're different" is the right way.
->
-> There is no reason for your probing structure to be artificially
-> different (you're parsing the same information, at the same time). Just
-> put in place a similar probing mechanism, and this will look a lot better.
->
->>>
->>>>       if (!handle_arch_irq)
->>>>               panic("No interrupt controller found.");
->>>>    }
->>>> diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
->>>> index 4b959e6..85cbf43 100644
->>>> --- a/drivers/irqchip/irq-gic.c
->>>> +++ b/drivers/irqchip/irq-gic.c
->>>> @@ -33,12 +33,14 @@
->>>>    #include <linux/of.h>
->>>>    #include <linux/of_address.h>
->>>>    #include <linux/of_irq.h>
->>>> +#include <linux/acpi.h>
->>>>    #include <linux/irqdomain.h>
->>>>    #include <linux/interrupt.h>
->>>>    #include <linux/percpu.h>
->>>>    #include <linux/slab.h>
->>>>    #include <linux/irqchip/chained_irq.h>
->>>>    #include <linux/irqchip/arm-gic.h>
->>>> +#include <linux/irqchip/arm-gic-acpi.h>
->>>>
->>>>    #include <asm/cputype.h>
->>>>    #include <asm/irq.h>
->>>> @@ -1029,3 +1031,115 @@ IRQCHIP_DECLARE(msm_8660_qgic, "qcom,msm-8660-qgic", gic_of_init);
->>>>    IRQCHIP_DECLARE(msm_qgic2, "qcom,msm-qgic2", gic_of_init);
->>>>
->>>>    #endif
->>>> +
->>>> +#ifdef CONFIG_ACPI
->>>> +static u64 dist_phy_base, cpu_phy_base = ULONG_MAX;
->>>
->>> Please use phys_addr_t for physical addresses. The use of ULONG_MAX
->>> looks dodgy. Please have a proper symbol to flag the fact that it hasn't
->>> been assigned yet.
->> Sure, will do.
->>
->>>
->>>> +
->>>> +static int __init
->>>> +gic_acpi_parse_madt_cpu(struct acpi_subtable_header *header,
->>>> +                    const unsigned long end)
->>>> +{
->>>> +    struct acpi_madt_generic_interrupt *processor;
->>>> +    u64 gic_cpu_base;
->>>
->>> phys_addr_t
->>>
->>>> +    processor = (struct acpi_madt_generic_interrupt *)header;
->>>> +
->>>> +    if (BAD_MADT_ENTRY(processor, end))
->>>> +            return -EINVAL;
->>>> +
->>>> +    gic_cpu_base = processor->base_address;
->>>> +    if (!gic_cpu_base)
->>>> +            return -EFAULT;
->>>
->>> Is zero an invalid address?
->> Yeah, good point.
->>>
->>>> +
->>>> +    /*
->>>> +     * There is no support for non-banked GICv1/2 register in ACPI spec.
->>>> +     * All CPU interface addresses have to be the same.
->>>> +     */
->>>> +    if (cpu_phy_base != ULONG_MAX && gic_cpu_base != cpu_phy_base)
->>>> +            return -EFAULT;
->>>> +
->>>> +    cpu_phy_base = gic_cpu_base;
->>>> +    return 0;
->>>> +}
->>>> +
->>>> +static int __init
->>>> +gic_acpi_parse_madt_distributor(struct acpi_subtable_header *header,
->>>> +                            const unsigned long end)
->>>> +{
->>>> +    struct acpi_madt_generic_distributor *dist;
->>>> +
->>>> +    dist = (struct acpi_madt_generic_distributor *)header;
->>>> +
->>>> +    if (BAD_MADT_ENTRY(dist, end))
->>>> +            return -EINVAL;
->>>> +
->>>> +    dist_phy_base = dist->base_address;
->>>> +    if (!dist_phy_base)
->>>> +            return -EFAULT;
->>>
->>> Same question about zero.
->>>
->>>> +
->>>> +    return 0;
->>>> +}
->>>> +
->>>> +int __init
->>>> +gic_v2_acpi_init(struct acpi_table_header *table)
->>>> +{
->>>> +    void __iomem *cpu_base, *dist_base;
->>>> +    int count;
->>>> +
->>>> +    /* Collect CPU base addresses */
->>>> +    count = acpi_parse_entries(sizeof(struct acpi_table_madt),
->>>> +                               gic_acpi_parse_madt_cpu, table,
->>>> +                               ACPI_MADT_TYPE_GENERIC_INTERRUPT,
->>>> +                               ACPI_MAX_GIC_CPU_INTERFACE_ENTRIES);
->>>> +    if (count < 0) {
->>>> +            pr_err("Error during GICC entries parsing\n");
->>>> +            return -EFAULT;
->>>> +    } else if (!count) {
->>>> +            /* No GICC entries provided, use address from MADT header */
->>>> +            struct acpi_table_madt *madt = (struct acpi_table_madt *)table;
->>>> +
->>>> +            if (!madt->address)
->>>> +                    return -EFAULT;
->>>> +
->>>> +            cpu_phy_base = (u64)madt->address;
->>>> +    }
->>>> +
->>>> +    /*
->>>> +     * Find distributor base address. We expect one distributor entry since
->>>> +     * ACPI 5.1 spec neither support multi-GIC instances nor GIC cascade.
->>>> +     */
->>>> +    count = acpi_parse_entries(sizeof(struct acpi_table_madt),
->>>> +                               gic_acpi_parse_madt_distributor, table,
->>>> +                               ACPI_MADT_TYPE_GENERIC_DISTRIBUTOR,
->>>> +                               ACPI_MAX_GIC_DISTRIBUTOR_ENTRIES);
->>>> +    if (count <= 0) {
->>>> +            pr_err("Error during GICD entries parsing\n");
->>>> +            return -EFAULT;
->>>> +    } else if (count > 1) {
->>>> +            pr_err("More than one GICD entry detected\n");
->>>> +            return -EINVAL;
->>>> +    }
->>>> +
->>>> +    cpu_base = ioremap(cpu_phy_base, ACPI_GIC_CPU_IF_MEM_SIZE);
->>>> +    if (!cpu_base) {
->>>> +            pr_err("Unable to map GICC registers\n");
->>>> +            return -ENOMEM;
->>>> +    }
->>>> +
->>>> +    dist_base = ioremap(dist_phy_base, ACPI_GIC_DIST_MEM_SIZE);
->>>> +    if (!dist_base) {
->>>> +            pr_err("Unable to map GICD registers\n");
->>>> +            iounmap(cpu_base);
->>>> +            return -ENOMEM;
->>>> +    }
->>>> +
->>>> +    /*
->>>> +     * Initialize zero GIC instance (no multi-GIC support). Also, set GIC
->>>> +     * as default IRQ domain to allow for GSI registration and GSI to IRQ
->>>> +     * number translation (see acpi_register_gsi() and acpi_gsi_to_irq()).
->>>> +     */
->>>> +    gic_init_bases(0, -1, dist_base, cpu_base, 0, NULL);
->>>> +    irq_set_default_host(gic_data[0].domain);
->>>> +    return 0;
->>>> +}
->>>> +#endif
->>>> diff --git a/include/linux/irqchip/arm-gic-acpi.h b/include/linux/irqchip/arm-gic-acpi.h
->>>> new file mode 100644
->>>> index 0000000..ce2ae1a8
->>>> --- /dev/null
->>>> +++ b/include/linux/irqchip/arm-gic-acpi.h
->>>> @@ -0,0 +1,33 @@
->>>> +/*
->>>> + * Copyright (C) 2014, Linaro Ltd.
->>>> + *  Author: Tomasz Nowicki <tomasz.nowicki@linaro.org>
->>>> + *
->>>> + * This program is free software; you can redistribute it and/or modify
->>>> + * it under the terms of the GNU General Public License version 2 as
->>>> + * published by the Free Software Foundation.
->>>> + */
->>>> +
->>>> +#ifndef ARM_GIC_ACPI_H_
->>>> +#define ARM_GIC_ACPI_H_
->>>> +
->>>> +#include <linux/acpi.h>
->>>
->>> Do we need linux/acpi.h here? You could have a separate forward
->>> declaration of struct acpi_table_header, specially in the light of my
->>> last remark below.
->> Indeed, we can do forward declaration instead of #include
->> <linux/acpi.h>. Thanks!
->>
->>>
->>>> +
->>>> +#ifdef CONFIG_ACPI
->>>> +#define ACPI_MAX_GIC_CPU_INTERFACE_ENTRIES  65535
->>>
->>> With GICv2? I doubt it.
->> I will create macro for each GIC driver:
->> #define ACPI_MAX_GICV2_CPU_INTERFACE_ENTRIES    8
->> #define ACPI_MAX_GICV3_CPU_INTERFACE_ENTRIES    65535
->
-> Where do you get this value (ACPI_MAX_GICV3_CPU_INTERFACE_ENTRIES) from?
->
->>>
->>>> +#define ACPI_MAX_GIC_DISTRIBUTOR_ENTRIES    1
->>>> +
->>>> +/*
->>>> + * Hard code here, we can not get memory size from MADT (but FDT does),
->>>> + * Actually no need to do that, because this size can be inferred
->>>> + * from GIC spec.
->>>> + */
->>>> +#define ACPI_GIC_DIST_MEM_SIZE              (SZ_64K)
->>>
->>> I don't know which version of the spec you're looking at, but my version
->>> of the GICv2 spec has a 4kB distributor. Also, it would be good to make
->>> obvious which GIC version this define is about.
->> OK
->>
->>>
->>>> +#define ACPI_GIC_CPU_IF_MEM_SIZE    (SZ_8K)
->>>> +
->>>> +void acpi_gic_init(void);
->>>> +int gic_v2_acpi_init(struct acpi_table_header *table);
->>>> +#else
->>>> +static inline void acpi_gic_init(void) { }
->>>> +#endif
->>>> +
->>>> +#endif /* ARM_GIC_ACPI_H_ */
->>>>
->>>
->>> In the end, why do we need a separate file for this? I cannot see
->>> anything that prevents it from being merged with arm-gic.h.
->>>
->>> Thanks,
->>>
->>>        M.
->>>
->> Having only GICv2, it would work. Considering we would do the same for
->> GICv3 (arm-gic-v3.h) there will be register name conflicts for both
->> headers inclusion:
->>
->> [...]
->> #include <linux/irqchip/arm-gic.h>
->> #include <linux/irqchip/arm-gic-v3.h>
->> [...]
->>          err = gic_v3_acpi_init(table);
->>          if (err)
->>                  err = gic_v2_acpi_init(table);
->>          if (err)
->>                  pr_err("Failed to initialize GIC IRQ controller");
->> [...]
->> So instead of changing register names prefix, I choose new header will
->> be less painfully.
->
-> Yes, and this is exactly why I pushed back on that last time. I'll
-> continue saying that interrupt controllers should be self-probing, with
-> ACPI as they are with DT.
->
-> Even with the restrictions of ACPI and SBSA, we end-up with at least 2
-> main families of interrupt controllers (GICv2 and GICv3), both with a
-> number of "interesting" variations (GICv2m and GICv4, to only mention
-> those I'm directly involved with).
->
-> I can safely predict that the above will become a tangled mess within 18
-> months, and the idea of littering the arch code with a bunch of
-> hardcoded "if (blah())" doesn't fill me with joy and confidence.
->
-> In summary: we have the infrastructure already, just use it.
+On 02/09/14 20:33, Russell King - ARM Linux wrote:
+> On Tue, Sep 02, 2014 at 02:00:40PM +0100, Daniel Thompson wrote:
+>> diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
+>> index 4b959e6..423707c 100644
+>> --- a/drivers/irqchip/irq-gic.c
+>> +++ b/drivers/irqchip/irq-gic.c
+>> @@ -41,6 +41,9 @@
+>>  #include <linux/irqchip/arm-gic.h>
+>>  
+>>  #include <asm/cputype.h>
+>> +#ifdef CONFIG_FIQ
+>> +#include <asm/fiq.h>
+>> +#endif
+> 
+> Is there much advantage to this ifdef over providing a dummy asm/fiq.h
+> in ARM64?
+> 
+>>  #include <asm/irq.h>
+>>  #include <asm/exception.h>
+>>  #include <asm/smp_plat.h>
+>> @@ -68,6 +71,9 @@ struct gic_chip_data {
+>>  #ifdef CONFIG_GIC_NON_BANKED
+>>  	void __iomem *(*get_base)(union gic_base *);
+>>  #endif
+>> +#ifdef CONFIG_FIQ
+>> +	bool fiq_enable;
+>> +#endif
+>>  };
+>>  
+>>  static DEFINE_RAW_SPINLOCK(irq_controller_lock);
+>> @@ -131,6 +137,16 @@ static inline void gic_set_base_accessor(struct gic_chip_data *data,
+>>  #define gic_set_base_accessor(d, f)
+>>  #endif
+>>  
+>> +#ifdef CONFIG_FIQ
+>> +static inline bool gic_data_fiq_enable(struct gic_chip_data *data)
+>> +{
+>> +	return data->fiq_enable;
+>> +}
+>> +#else
+>> +static inline bool gic_data_fiq_enable(
+>> +		struct gic_chip_data *data) { return false; }
+> 
+> I really hate this style.  Just lay it out as a normal function.
 
-We had that discussion but I see we still don't have consensus here. It 
-would be good to know our direction before we prepare next patch 
-version. Arnd any comments on this from you side?
+Will do.
 
-Tomasz
+
+>> +	/*
+>> +	 * If grouping is not available (not implemented or prohibited by
+>> +	 * security mode) these registers a read-as-zero/write-ignored.
+>> +	 * However as a precaution we restore the reset default regardless of
+>> +	 * the result of the test.
+>> +	 */
+> 
+> Have we found that this additional complexity is actually necessary?
+> If not, we're over-engineering the code, making it more complex (and
+> hence more likely to be buggy) for very little reason.
+>
+> Last night, I booted an unconditional version of this on OMAP3430, and
+> OMAP4430.  It's also been booted on the range of iMX6 CPUs.  Nothing
+> here has shown any signs of problems to having these registers written.
+
+No, I haven't proven that most of the conditional code based on
+gic_data_fiq_enable() is required.
+
+I should certainly be safe to remove the conditional code from registers
+specified was RAZ/WI.
+
+I suspect we could also remove it from registers with bits that are
+reserved (although spec. doesn't not state this explicitly).
+
+I could aggressively remove the conditionals and keep the current code
+on a branch to make it quicker to support any reported regressions.
+
+
+>> +	/*
+>> +	 * Set EnableGrp1/EnableGrp0 (bit 1 and 0) or EnableGrp (bit 0 only,
+>> +	 * bit 1 ignored)
+>> +	 */
+>> +	if (gic_data_fiq_enable(gic))
+>> +		writel_relaxed(3, base + GIC_DIST_CTRL);
+>> +	else
+>> +		writel_relaxed(1, base + GIC_DIST_CTRL);
+> 
+> If we are going to do this conditionally, and the only thing which
+> is variable is the value to be written, I much prefer the conditional
+> bit to be on the value and not the write.  The compiler doesn't always
+> optimise these things very well.  So:
+> 
+> 	writel_relaxed(gic_data_fiq_enable(gic) ? 3 : 1, base + GIC_DIST_CTRL);
+> 
+> works well enough for me.  If you feel better by using a temporary
+> local, that works for me too.
+
+Ternary is fine by me although I'm inclined to be more aggressive with
+removal of conditional code.
+
+> 
+>> +	if (gic_data_fiq_enable(gic))
+>> +		writel_relaxed(0x1f, base + GIC_CPU_CTRL);
+>> +	else
+>> +		writel_relaxed(1, base + GIC_CPU_CTRL);
+> 
+> Same here.
+
+Ok.
+
+>> @@ -485,7 +564,10 @@ static void gic_dist_restore(unsigned int gic_nr)
+>>  		writel_relaxed(gic_data[gic_nr].saved_spi_enable[i],
+>>  			dist_base + GIC_DIST_ENABLE_SET + i * 4);
+>>  
+>> -	writel_relaxed(1, dist_base + GIC_DIST_CTRL);
+>> +	if (gic_data_fiq_enable(&gic_data[gic_nr]))
+>> +		writel_relaxed(3, dist_base + GIC_DIST_CTRL);
+>> +	else
+>> +		writel_relaxed(1, dist_base + GIC_DIST_CTRL);
+> 
+> And here.
+
+Ok.
+
+>> @@ -542,7 +624,7 @@ static void gic_cpu_restore(unsigned int gic_nr)
+>>  		writel_relaxed(0xa0a0a0a0, dist_base + GIC_DIST_PRI + i * 4);
+>>  
+>>  	writel_relaxed(0xf0, cpu_base + GIC_CPU_PRIMASK);
+>> -	writel_relaxed(1, cpu_base + GIC_CPU_CTRL);
+>> +	writel_relaxed(0x1f, cpu_base + GIC_CPU_CTRL);
+> 
+> Interestingly, here you write 0x1f unconditionally.
+
+Oops. Can I pretend this was was a premonition?
+
+
+>>  }
+>>  
+>>  static int gic_notifier(struct notifier_block *self, unsigned long cmd,	void *v)
+>> @@ -604,6 +686,7 @@ static void gic_raise_softirq(const struct cpumask *mask, unsigned int irq)
+>>  {
+>>  	int cpu;
+>>  	unsigned long flags, map = 0;
+>> +	unsigned long softint;
+>>  
+>>  	raw_spin_lock_irqsave(&irq_controller_lock, flags);
+>>  
+>> @@ -618,7 +701,11 @@ static void gic_raise_softirq(const struct cpumask *mask, unsigned int irq)
+>>  	dmb(ishst);
+>>  
+>>  	/* this always happens on GIC0 */
+>> -	writel_relaxed(map << 16 | irq, gic_data_dist_base(&gic_data[0]) + GIC_DIST_SOFTINT);
+>> +	softint = map << 16 | irq;
+>> +	if (gic_data_fiq_enable(&gic_data[0]))
+>> +		softint |= 0x8000;
+> 
+> I guess that this always has to be done conditionally.  I'd prefer this
+> test to be done slightly differently (and we might as well wrap in a bit
+> of patch 9 here):
+> 
+> 	if (sgi_is_nonsecure(irq, &gic_data[0]))
+> 		softint |= 0x8000;
+> 
+> which follows the true purpose of that bit.  This bit only has effect if
+> we are running in secure mode, where it must match the status of the
+> target interrupt (as programmed into GIC_DIST_IGROUP).
+> 
+> We probably should do this based on a bitmask of SGIs in the
+> gic_chip_data, which is initialised according to how we've been able
+> to setup the GIC_DIST_IGROUP register(s).
+
+Will do.
