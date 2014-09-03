@@ -1,38 +1,47 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Tue, 02 Sep 2014 16:52:49 -0700
-Subject: [PATCH] clk: qcom: Fix sdc 144kHz frequency entry
-In-Reply-To: <54063E2B.6090403@codeaurora.org>
-References: <1409341766-24366-1-git-send-email-sboyd@codeaurora.org>
- <20140902214402.5251.75274@quantum> <54063E2B.6090403@codeaurora.org>
-Message-ID: <20140902235249.5251.32238@quantum>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 03 Sep 2014 14:50:22 +0200
+Subject: [PATCH v4 1/4] ethernet: arc: Add support for Rockchip SoC layer
+ device tree bindings
+In-Reply-To: <12261801.xhz3LcucGs@diego>
+References: <1409740036-8117-1-git-send-email-romain.perier@gmail.com>
+ <3774938.44qiV4hEoE@wuerfel> <12261801.xhz3LcucGs@diego>
+Message-ID: <3545574.7Z5WmaTlg0@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Stephen Boyd (2014-09-02 15:01:15)
-> On 09/02/14 14:44, Mike Turquette wrote:
-> > Quoting Stephen Boyd (2014-08-29 12:49:26)
-> >> The pre-divider for the sdc clocks only has 2 bits in it, so we
-> >> can't possibly divide by anything larger than 4 here.
-> >> Furthermore, we program the value of ~(n - m) and the n value is
-> >> larger than 8 bits (max of 256). Replace this entry with 200kHz
-> >> which is close enough to 144kHz to be usable.
-> >>
-> >> Cc: Kumar Gala <galak@codeaurora.org>
-> >> Cc: Andy Gross <agross@codeaurora.org>
-> >> Fixes: 24d8fba44af3 "clk: qcom: Add support for IPQ8064's global clock controller (GCC)"
-> >> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
-> > Do you need this pulled into a 3.17-rc?
-> >
+On Wednesday 03 September 2014 14:20:50 Heiko St?bner wrote:
+> > 
+> > One last question: is this the location given as .grf_offset the
+> > only thing in grf that is potentially of concern to this driver?
+> > 
+> > If it is, you can change the binding to include the register number
+> > in the syscon reference, like
+> > 
+> >       rockchip,grf = <&grf 0x154>;
+> > 
+> > and then read it from there, to simplify the code needed to get the
+> > number from the device id.
 > 
-> Yes that would be helpful since this fixes a driver introduced into 3.17.
-
-Applied to clk-fixes.
-
-Thanks,
-Mike
-
+> I would disagree here 
 > 
-> -- 
-> Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-> hosted by The Linux Foundation
+> Specific to the emac, there also exists a second register in the grf (0xa8 for 
+> the rk3188) that contains a field 
 > 
+> ----
+> emac_newrcv_en - the selection of RMII receive selection
+> 0: don't support the data package without header
+> 1: support the data package without header
+> ----
+> 
+> which we don't handle currently but somebody might want to in the future.
+> [There also is no documentation of this at all]
+
+Ok, fair enough. If there is a chance that there would be more of these
+fields that we may want to support in the future, the table approach
+seems reasonable.
+
+The main advantage of putting the register number into the syscon
+reference is to support future models without driver changes, but
+it's not clear if that's worth it.
+
+	Arnd
