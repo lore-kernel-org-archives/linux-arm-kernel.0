@@ -1,41 +1,33 @@
 From: b29396@freescale.com (Dong Aisheng)
-Date: Wed, 3 Sep 2014 20:05:01 +0800
-Subject: [PATCH 5/7] mmc: sdhci: do not enable card cd wakeup for gpio case
+Date: Wed, 3 Sep 2014 20:04:58 +0800
+Subject: [PATCH 2/7] mmc: sdhci-esdhc-imx: usdhc does not have missing card
+ interrupt issue
 In-Reply-To: <1409745903-26550-1-git-send-email-b29396@freescale.com>
 References: <1409745903-26550-1-git-send-email-b29396@freescale.com>
-Message-ID: <1409745903-26550-6-git-send-email-b29396@freescale.com>
+Message-ID: <1409745903-26550-3-git-send-email-b29396@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Do not need to enable the controller card cd interrupt wakeup
-if using GPIO as card detect since it's meaningless.
+The usdhc does not have missing card interrupt issue, so execute the
+workaround conditionally.
 
 Signed-off-by: Dong Aisheng <b29396@freescale.com>
 ---
- drivers/mmc/host/sdhci.c |    5 ++++-
- 1 files changed, 4 insertions(+), 1 deletions(-)
+ drivers/mmc/host/sdhci-esdhc-imx.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-diff --git a/drivers/mmc/host/sdhci.c b/drivers/mmc/host/sdhci.c
-index 4d0b7b5..7aa98b9 100644
---- a/drivers/mmc/host/sdhci.c
-+++ b/drivers/mmc/host/sdhci.c
-@@ -2548,13 +2548,16 @@ static irqreturn_t sdhci_thread_irq(int irq, void *dev_id)
- void sdhci_enable_irq_wakeups(struct sdhci_host *host)
- {
- 	u8 val;
-+	int gpio_cd = mmc_gpio_get_cd(host->mmc);
-+
- 	u8 mask = SDHCI_WAKE_ON_INSERT | SDHCI_WAKE_ON_REMOVE
- 			| SDHCI_WAKE_ON_INT;
+diff --git a/drivers/mmc/host/sdhci-esdhc-imx.c b/drivers/mmc/host/sdhci-esdhc-imx.c
+index 256c901..9594bf8 100644
+--- a/drivers/mmc/host/sdhci-esdhc-imx.c
++++ b/drivers/mmc/host/sdhci-esdhc-imx.c
+@@ -300,7 +300,7 @@ static void esdhc_writel_le(struct sdhci_host *host, u32 val, int reg)
+ 	u32 data;
  
- 	val = sdhci_readb(host, SDHCI_WAKE_UP_CONTROL);
- 	val |= mask ;
- 	/* Avoid fake wake up */
--	if (host->quirks & SDHCI_QUIRK_BROKEN_CARD_DETECTION)
-+	if (host->quirks & SDHCI_QUIRK_BROKEN_CARD_DETECTION ||
-+	    !IS_ERR_VALUE(gpio_cd))
- 		val &= ~(SDHCI_WAKE_ON_INSERT | SDHCI_WAKE_ON_REMOVE);
- 	sdhci_writeb(host, val, SDHCI_WAKE_UP_CONTROL);
- }
+ 	if (unlikely(reg == SDHCI_INT_ENABLE || reg == SDHCI_SIGNAL_ENABLE)) {
+-		if (val & SDHCI_INT_CARD_INT) {
++		if ((val & SDHCI_INT_CARD_INT) && !esdhc_is_usdhc(imx_data)) {
+ 			/*
+ 			 * Clear and then set D3CD bit to avoid missing the
+ 			 * card interrupt.  This is a eSDHC controller problem
 -- 
 1.7.8
