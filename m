@@ -1,47 +1,101 @@
-From: romain.perier@gmail.com (PERIER Romain)
-Date: Wed, 3 Sep 2014 18:37:16 +0200
-Subject: [PATCH 4/4] ARM: dts: Enable emac node on the rk3188-radxarock
- boards
-In-Reply-To: <CAFnsNoSmHwN3nJ5ZJL5fc_-kaECCoLBvpdBYQxkyLcUzLx5MTw@mail.gmail.com>
-References: <1409740036-8117-1-git-send-email-romain.perier@gmail.com>
- <1409740036-8117-4-git-send-email-romain.perier@gmail.com>
- <CAFnsNoSmHwN3nJ5ZJL5fc_-kaECCoLBvpdBYQxkyLcUzLx5MTw@mail.gmail.com>
-Message-ID: <CABgxDoJOJ9bM2CgXyXjPvsv2DN_QO+HPAzCwfjdyKFDpUAOtOw@mail.gmail.com>
+From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
+Date: Wed, 03 Sep 2014 18:46:04 +0200
+Subject: [PATCH 15/15] tty: serial: 8250: omap: add dma support
+In-Reply-To: <20140902201536.GC11766@atomide.com>
+References: <53FE3779.5090908@linutronix.de>
+ <20140827202313.GF16006@atomide.com> <20140828082348.GA5413@linutronix.de>
+ <20140828164645.GG16006@atomide.com> <53FF84DF.7080406@linutronix.de>
+ <20140828225454.GM16006@atomide.com> <540048B4.7010807@linutronix.de>
+ <20140829161221.GO16006@atomide.com> <5404B149.6010400@linutronix.de>
+ <54060EDA.6060204@linutronix.de> <20140902201536.GC11766@atomide.com>
+Message-ID: <540745CC.2090901@linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It is an optional property used by arc-emac (the core driver), if it
-is not present the core driver generates one for you.
-Problem being that with this property two radxa rock boards connected
-on the same local network might have the same mac address.
+On 09/02/2014 10:15 PM, Tony Lindgren wrote:
+>> - I see to face two kind of "deaths":
+>>   - the LED still goes on and off and the uart just does not respond
+>>     even if I tell the button print something on the screen (the button
+>>     also changes the frequency of the LED so I know that the button is
+>>     doing something).
+>>     Also from dumping the content of /proc/interrupts it seems that a
+>>     wake up is made, the uart should have restored the registers.
+> 
+> OK yeah this is the case I was seeing too. So do you just set the
+> LED triggers to none in sysfs to make it easier to reproduce?
 
-In this case it would be probably better to remove this property. What
-do you think ?
+Yes.
 
-2014-09-03 17:29 GMT+02:00 Naoki FUKAUMI <naobsd@gmail.com>:
-> On Wed, Sep 3, 2014 at 7:27 PM, Romain Perier <romain.perier@gmail.com> wrote:
->> This enables EMAC Rockchip support on radxa rock boards.
->>
->> Signed-off-by: Romain Perier <romain.perier@gmail.com>
->> ---
->>  arch/arm/boot/dts/rk3188-radxarock.dts | 24 ++++++++++++++++++++++++
->>  1 file changed, 24 insertions(+)
->>
->> diff --git a/arch/arm/boot/dts/rk3188-radxarock.dts b/arch/arm/boot/dts/rk3188-radxarock.dts
->> index 5e4e3c23..e1358d3 100644
->> --- a/arch/arm/boot/dts/rk3188-radxarock.dts
->> +++ b/arch/arm/boot/dts/rk3188-radxarock.dts
->> @@ -76,6 +76,24 @@
->>         };
->>  };
->>
->> +&emac {
->> +       status = "okay";
->> +       compatible = "rockchip,rk3188-emac";
->> +
->> +       pinctrl-names = "default";
->> +       pinctrl-0 = <&emac_xfer>, <&emac_mdio>, <&phy_int>;
->> +
->> +       mac-address = [ c6 ef 91 8e 60 4b ];
->
-> is "mac-address" required?
+>>   - one where the system is dead and the LED does not blink anymore.
+>>     Also my button is dead.
+> 
+> This I don't think I've seen. This could also be the errata issue on
+> your earlier rev beagleboard-xm with off-idle.
+
+might be.
+
+Your pstore hint gave me something. I tried that earlier but somehow
+assumed that dram content was killed on init. But the content is even
+there are pressing the reset button :)
+
+However, I was able to capture the case where the LED was not blinking:
+The IIR register says 0xc6 (=> line status error). That is okay. At the
+same time LSR register says 0xe0. This is not okay. It means that there
+is some kind of error and at least one error bit is set in this
+register which is not the case. Also those bits are cleared on read
+which does not happen here. And we loop forever so the LED does blink
+anymore.
+
+The RX-count register says that it is empty which sense because bit 0
+is not set (in LSR). However I can read multiple times from the RX FIFO
+until I get the "unhandled bus access" error which usually happens
+right away if the empty FIFO is read on omap3 HW. In the last test I
+mange to read 91 times before the crash. I hoped that this FIFO read
+would make the interrupt go away but it did not.
+
+The HW seems to be in a strange state. It might be either the errata
+or something else. I even took the resume routine from omap-serial in
+case I did something wrong. In my last test it worked for 10minues
+before the interrupt storm came.
+
+This is probably the same thing I see on the omap-serial driver where I
+got from pstore:
+
+[   32.659271] random: nonblocking pool is initialized
+[  212.170623] NMI watchdog: BUG: soft lockup - CPU#0 stuck for 22s!
+[swapper:0]
+
+So I *guess* the interrupt routine is looping. This is problem one, no
+idea what is going on (the register status captured on 8250-omap makes
+no sense).
+
+Problem two, where the UART does not wakeup:
+What I observed is that sometimes the UART does not wake up properly
+i.e. it does not write anything on the console, even where it should. I
+can't tell if the read is working properly, the write does not.
+>From my capture I see that the resume routine was running and the
+register should have been written. That means the UART should be up and
+running but nothing happens.
+It often works again after the system comes out of resume again (i.e.
+RPM suspens and resumes the UART). So it is okay on the next wakeup. Or
+the wakeup after next.
+>From the script:
+
+| while ((1))
+| do
+|
+|         echo -n 409-chars >/dev/ttyUSB0
+|
+|         sleep 1
+|         a=$(date)
+|         echo -e "\n#$a" >/dev/ttyUSB0
+|         echo $a
+|         sleep 13;
+| done
+
+I see that sometimes one or two sequential timestamps are missing. And
+the it continues like nothing happened.
+
+> Tony
+
+Sebastian
