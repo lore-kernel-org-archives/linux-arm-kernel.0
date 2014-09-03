@@ -1,110 +1,36 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 3 Sep 2014 11:39:02 -0700
-Subject: [PATCH] mfd: twl4030-power: Fix PM idle pin configuration to not
- conflict with regulators
-In-Reply-To: <5406D388.5050104@linutronix.de>
-References: <20140819152405.GA12002@atomide.com>
- <20140902082931.GA32460@breakpoint.cc>
- <20140903002445.GD11766@atomide.com>
- <5406D388.5050104@linutronix.de>
-Message-ID: <20140903183901.GF11766@atomide.com>
+From: carlo.caione@gmail.com (Carlo Caione)
+Date: Wed, 3 Sep 2014 20:42:50 +0200
+Subject: [PATCH 1/5] ARM: sun4i: Relicense the A10 DTSI under GPLv2/X11
+In-Reply-To: <1409682069-7164-1-git-send-email-maxime.ripard@free-electrons.com>
+References: <1409682069-7164-1-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <20140903184250.GA8163@nuc>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Sebastian Andrzej Siewior <bigeasy@linutronix.de> [140903 01:39]:
-> On 09/03/2014 02:24 AM, Tony Lindgren wrote:
+On Tue, Sep 02, 2014 at 08:21:05PM +0200, Maxime Ripard wrote:
+> The current GPL only licensing on the DTSI makes it very impractical for other
+> software components licensed under another license.
 > 
-> > dump out the twl configuration in late_initcall and via sysfs
-> > so maybe try that and see what the values are with working
-> > and non-working case?
+> In order to make it easier for them to reuse our device trees, relicense our
+> DTSI first under a GPL/X11 dual-license. Hopefully, the DTS will follow soon.
 > 
-> good.txt and bad.txt are from the late_initcall.
-> 
->  $ diff -u good.txt bad.txt
-> --- good.txt    2014-09-03 10:29:58.920317368 +0200
-> +++ bad.txt     2014-09-03 10:28:57.064313222 +0200
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> Cc: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+> Cc: Arnd Bergmann <arnd@arndb.de>
+> Cc: Carlo Caione <carlo.caione@gmail.com>
+> Cc: Chen-Yu Tsai <wens@csie.org>
+> Cc: David Lanzend?rfer <david.lanzendoerfer@o2s.ch>
+> Cc: Emilio L?pez <emilio@elopez.com.ar>
+> Cc: Hans de Goede <hdegoede@redhat.com>
+> Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> Cc: Oliver Schinagl <oliver@schinagl.nl>
+> Cc: Roman Byshko <rbyshko@gmail.com>
+> Cc: Stefan Roese <sr@denx.de>
+> ---
+>  arch/arm/boot/dts/sun4i-a10.dtsi | 46 +++++++++++++++++++++++++++++++++++-----
+>  1 file changed, 41 insertions(+), 5 deletions(-)
 
-Hmm can you check that you have good.txt and bad.txt the
-right way? I'd assume you need VAUX2 or VAUX3 enabled
-not disabled for the MMC to work?
+Acked-by: Carlo Caione <carlo@caione.org> 
 
-> @@ -1,13 +1,13 @@
->   1: addr: 0x0017 grp: 0x0000 type: 0x0000 remap: 0x0008
-> - 2: addr: 0x001b grp: 0x0000 type: 0x0000 remap: 0x0008
-> - 3: addr: 0x001f grp: 0x0000 type: 0x0000 remap: 0x0008
-> + 2: addr: 0x001b grp: 0x002e type: 0x0000 remap: 0x0008
-> + 3: addr: 0x001f grp: 0x002e type: 0x0000 remap: 0x0008
-
-OK so looking at res_config_addrs[], we have RES_VAUX2 at
-0x1b and RES_VAUX3 at 0x1f. The value for the group register
-0x2e means that bit5 is set and it's used by the p1 device
-group. So when the group register is 0x2e, the resource is
-enabled. Those got most likely enabled by twl-regulator.c
-as twl4030-power.c has TWL4030_RESCONFIG_UNDEF for VAUX2 and
-VAUX3.
-
->   4: addr: 0x0023 grp: 0x0000 type: 0x0000 remap: 0x0008
->   5: addr: 0x0027 grp: 0x002e type: 0x0000 remap: 0x0008
->   6: addr: 0x002b grp: 0x0000 type: 0x0000 remap: 0x0008
->   7: addr: 0x002f grp: 0x002e type: 0x000b remap: 0x0000
->   8: addr: 0x0033 grp: 0x002e type: 0x0000 remap: 0x0008
->   9: addr: 0x0037 grp: 0x002e type: 0x0000 remap: 0x0008
-> -10: addr: 0x003b grp: 0x0000 type: 0x0000 remap: 0x0008
-> +10: addr: 0x003b grp: 0x002e type: 0x0000 remap: 0x0008
-
-And that's RES_VDAC at 0x3b with the same story, it's also
-marked TWL4030_RESCONFIG_UNDEF and only modified by the
-twl4030-power.c.
-
-I think the use on beaglboard for these are:
-
-VAUX2	USB_1V8
-VAUX3	CAM_CORE
-VDAC	VDAC_1V8
-
-Not quite seeing the connection.. But I'm assuming you have
-good.txt and bad.txt the wrong way around, and you need
-VAUX2, VAUX3 or VDAC _enabled_ to get MMC working :)
-
-So this seems to hint we have issue in one of these:
-
-1. We are not claiming VAUX2, VAUX3 or VDAC for beagleboard,
-   and there's now a timing issue where the regulator
-   framework disables the unused regulators before MMC.
-
-2. We may have a bug that causes register access to
-   DEV_GRP_OFFSET in twl4030-power.c even with those
-   resources marked as TWL4030_RESCONFIG_UNDEF.
-
-3. There's a I2C race somewhere accessing twl registers.
-
-Guessing #1 above, maybe give the following patch a try
-and see if that helps? If that works, try commenting out
-vaux3 or vdac and see which one is needed. I'm guessing
-it's the vdac.
-
-Regards,
-
-Tony
-
---- a/arch/arm/boot/dts/omap3-beagle-xm.dts
-+++ b/arch/arm/boot/dts/omap3-beagle-xm.dts
-@@ -331,6 +331,18 @@
- 	regulator-always-on;
- };
- 
-+&vaux3 {
-+	regulator-name = "cam_core";
-+	regulator-min-microvolt = <1800000>;
-+	regulator-max-microvolt = <1800000>;
-+	regulator-always-on;
-+};
-+
-+&vdac {
-+	regulator-name = "vdac_1v8";
-+	regulator-always-on;
-+};
-+
- &mcbsp2 {
- 	status = "okay";
- };
+-- 
+Carlo Caione
