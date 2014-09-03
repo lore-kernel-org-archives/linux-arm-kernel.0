@@ -1,31 +1,188 @@
 From: bhupesh.sharma@freescale.com (Bhupesh Sharma)
-Date: Wed, 3 Sep 2014 20:43:13 +0530
-Subject: [PATCH V3 5/6] arm64: dts/Makefile: Add support for FSL's LS2085A
- simulator model
+Date: Wed, 3 Sep 2014 20:43:12 +0530
+Subject: [PATCH V3 4/6] arm64: Add DTS support for FSL's LS2085A SoC
 In-Reply-To: <1409757194-28155-1-git-send-email-bhupesh.sharma@freescale.com>
 References: <1409757194-28155-1-git-send-email-bhupesh.sharma@freescale.com>
-Message-ID: <1409757194-28155-6-git-send-email-bhupesh.sharma@freescale.com>
+Message-ID: <1409757194-28155-5-git-send-email-bhupesh.sharma@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds build support for FSL's LS2085A simulator model
-in arm64 dts Makefile.
+This patch adds the device tree support for FSL LS2085A SoC
+based on ARMv8 architecture.
+
+Following levels of DTSI/DTS files have been created for the
+LS2085A SoC family:
+
+- fsl-ls2085a.dtsi:
+DTS-Include file for FSL LS2085A SoC.
+
+- fsl-ls2085a-simu.dts:
+DTS file for FSL LS2085a software simulator model.
 
 Signed-off-by: Bhupesh Sharma <bhupesh.sharma@freescale.com>
+Signed-off-by: Arnab Basu <arnab.basu@freescale.com>
+Signed-off-by: Stuart Yoder <stuart.yoder@freescale.com>
 ---
- arch/arm64/boot/dts/Makefile |    1 +
- 1 file changed, 1 insertion(+)
+ arch/arm64/boot/dts/fsl-ls2085a-simu.dts |   26 +++++++
+ arch/arm64/boot/dts/fsl-ls2085a.dtsi     |  117 ++++++++++++++++++++++++++++++
+ 2 files changed, 143 insertions(+)
+ create mode 100644 arch/arm64/boot/dts/fsl-ls2085a-simu.dts
+ create mode 100644 arch/arm64/boot/dts/fsl-ls2085a.dtsi
 
-diff --git a/arch/arm64/boot/dts/Makefile b/arch/arm64/boot/dts/Makefile
-index c52bdb0..c6ed88662 100644
---- a/arch/arm64/boot/dts/Makefile
-+++ b/arch/arm64/boot/dts/Makefile
-@@ -1,5 +1,6 @@
- dtb-$(CONFIG_ARCH_VEXPRESS) += rtsm_ve-aemv8a.dtb foundation-v8.dtb
- dtb-$(CONFIG_ARCH_XGENE) += apm-mustang.dtb
-+dtb-$(CONFIG_ARCH_FSL_LS2085A) += fsl-ls2085a-simu.dtb
- 
- targets += dtbs
- targets += $(dtb-y)
+diff --git a/arch/arm64/boot/dts/fsl-ls2085a-simu.dts b/arch/arm64/boot/dts/fsl-ls2085a-simu.dts
+new file mode 100644
+index 0000000..3c0f953
+--- /dev/null
++++ b/arch/arm64/boot/dts/fsl-ls2085a-simu.dts
+@@ -0,0 +1,26 @@
++/*
++ * Device Tree file for Freescale LS2085a software Simulator model
++ *
++ * Copyright (C) 2014, Freescale Semiconductor
++ *
++ * Bhupesh Sharma <bhupesh.sharma@freescale.com>
++ *
++ * This file is licensed under the terms of the GNU General Public
++ * License version 2.  This program is licensed "as is" without any
++ * warranty of any kind, whether express or implied.
++ */
++
++/dts-v1/;
++
++/include/ "fsl-ls2085a.dtsi"
++
++/ {
++	model = "Freescale Layerscape 2085a software Simulator model";
++	compatible = "fsl,ls2085a-simu", "fsl,ls2085a";
++
++	ethernet at 2210000 {
++		compatible = "smsc,lan91c111";
++		reg = <0x0 0x2210000 0x0 0x100>;
++		interrupts = <0 58 0x1>;
++	};
++};
+diff --git a/arch/arm64/boot/dts/fsl-ls2085a.dtsi b/arch/arm64/boot/dts/fsl-ls2085a.dtsi
+new file mode 100644
+index 0000000..0f9170d
+--- /dev/null
++++ b/arch/arm64/boot/dts/fsl-ls2085a.dtsi
+@@ -0,0 +1,117 @@
++/*
++ * Device Tree Include file for Freescale Layerscape-2085A family SoC.
++ *
++ * Copyright (C) 2014, Freescale Semiconductor
++ *
++ * Bhupesh Sharma <bhupesh.sharma@freescale.com>
++ *
++ * This file is licensed under the terms of the GNU General Public
++ * License version 2.  This program is licensed "as is" without any
++ * warranty of any kind, whether express or implied.
++ */
++
++/ {
++	compatible = "fsl,ls2085a";
++	interrupt-parent = <&gic>;
++	#address-cells = <2>;
++	#size-cells = <2>;
++
++	cpus {
++		#address-cells = <2>;
++		#size-cells = <0>;
++
++		/* We have 4 clusters having 2 Cortex-A57 cores each */
++		cpu at 0 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a57";
++			reg = <0x0 0x0>;
++		};
++
++		cpu at 1 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a57";
++			reg = <0x0 0x1>;
++		};
++
++		cpu at 100 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a57";
++			reg = <0x0 0x100>;
++		};
++
++		cpu at 101 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a57";
++			reg = <0x0 0x101>;
++		};
++
++		cpu at 200 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a57";
++			reg = <0x0 0x200>;
++		};
++
++		cpu at 201 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a57";
++			reg = <0x0 0x201>;
++		};
++
++		cpu at 300 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a57";
++			reg = <0x0 0x300>;
++		};
++
++		cpu at 301 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a57";
++			reg = <0x0 0x301>;
++		};
++	};
++
++	memory at 80000000 {
++		device_type = "memory";
++		reg = <0x00000000 0x80000000 0 0x80000000>;
++		      /* DRAM space - 1, size : 2 GB DRAM */
++	};
++
++	gic: interrupt-controller at 6000000 {
++		compatible = "arm,gic-v3";
++		reg = <0x0 0x06000000 0 0x10000>, /* GIC Dist */
++		      <0x0 0x06100000 0 0x100000>; /* GICR (RD_base + SGI_base) */
++		#interrupt-cells = <3>;
++		interrupt-controller;
++		interrupts = <1 9 0x4>;
++	};
++
++	timer {
++		compatible = "arm,armv8-timer";
++		interrupts = <1 13 0x1>, /* Physical Secure PPI, edge triggered */
++			     <1 14 0x1>, /* Physical Non-Secure PPI, edge triggered */
++			     <1 11 0x1>, /* Virtual PPI, edge triggered */
++			     <1 10 0x1>; /* Hypervisor PPI, edge triggered */
++	};
++
++	serial0: serial at 21c0500 {
++		device_type = "serial";
++		compatible = "fsl,ns16550", "ns16550a";
++		reg = <0x0 0x21c0500 0x0 0x100>;
++		clock-frequency = <0>;	/* Updated by bootloader */
++		interrupts = <0 32 0x1>; /* edge triggered */
++	};
++
++	serial1: serial at 21c0600 {
++		device_type = "serial";
++		compatible = "fsl,ns16550", "ns16550a";
++		reg = <0x0 0x21c0600 0x0 0x100>;
++		clock-frequency = <0>; 	/* Updated by bootloader */
++		interrupts = <0 32 0x1>; /* edge triggered */
++	};
++
++	fsl_mc: fsl-mc at 80c000000 {
++		compatible = "fsl,qoriq-mc";
++		reg = <0x00000008 0x0c000000 0 0x40>,	 /* MC portal base */
++		      <0x00000000 0x08340000 0 0x40000>; /* MC control reg */
++	};
++};
 -- 
 1.7.9.5
