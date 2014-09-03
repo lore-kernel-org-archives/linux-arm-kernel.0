@@ -1,113 +1,317 @@
-From: daniel.thompson@linaro.org (Daniel Thompson)
-Date: Wed, 03 Sep 2014 11:21:30 +0100
-Subject: [PATCH v10 03/19] arm: fiq: Replace default FIQ handler
-In-Reply-To: <20140902164204.GT30401@n2100.arm.linux.org.uk>
-References: <1408369264-14242-1-git-send-email-daniel.thompson@linaro.org>
- <1408466769-20004-1-git-send-email-daniel.thompson@linaro.org>
- <1408466769-20004-4-git-send-email-daniel.thompson@linaro.org>
- <20140819173742.GG30401@n2100.arm.linux.org.uk> <53F39377.1070308@linaro.org>
- <20140828150112.GD30401@n2100.arm.linux.org.uk> <5405AEBC.9020904@linaro.org>
- <20140902164204.GT30401@n2100.arm.linux.org.uk>
-Message-ID: <5406EBAA.9040206@linaro.org>
+From: romain.perier@gmail.com (Romain Perier)
+Date: Wed,  3 Sep 2014 10:27:13 +0000
+Subject: [PATCH v4 1/4] ethernet: arc: Add support for Rockchip SoC layer
+ device tree bindings
+Message-ID: <1409740036-8117-1-git-send-email-romain.perier@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/09/14 17:42, Russell King - ARM Linux wrote:
-> On Tue, Sep 02, 2014 at 12:49:16PM +0100, Daniel Thompson wrote:
->> On 28/08/14 16:01, Russell King - ARM Linux wrote:
->>> I just asked Paul McKenney, our RCU expert... essentially, yes, RCU
->>> stuff itself is safe in this context.  However, RCU stuff can call into
->>> lockdep if lockdep is configured, and there are questions over lockdep.
->>>
->>> There's some things which can be done to reduce the lockdep exposure
->>> to it, such as ensuring that rcu_read_lock() is first called outside
->>> of FIQ context.
->>>
->>> There's concerns with whether either printk() in check_flags() could
->>> be reached too (flags there should always indicate that IRQs were
->>> disabled, so that reduces down to a question about just the first
->>> printk() there.)
->>>
->>> There's also the very_verbose() stuff for RCU lockdep classes which
->>> Paul says must not be enabled.
->>>
->>> Lastly, Paul isn't a lockdep expert, but he sees nothing that prevents
->>> lockdep doing the deadlock checking as a result of the above call.
->>>
->>> So... this coupled with my feeling that notifiers make it too easy for
->>> unreviewed code to be hooked into this path, I'm fairly sure that we
->>> don't want to be calling atomic notifier chains from FIQ context.
->>
->> Having esablished (elsewhere in the thread) that RCU usage is safe
->> from FIQ I have been working on the assumption that your feeling
->> regarding unreviewed code is sufficient on its own to avoid using
->> notifiers (and also to avoid a list of function pointers like on x86).
-> 
-> Yes, it does, because unlike the x86 community, we have a wide range
-> of platforms, and platform code does not go through the same path or
-> get the same review as core ARM code.
-> 
-> As I already pointed out, with a notifier, it's very easy to sneak
-> something into the FIQ path by submitting a patch for platform code
-> which calls the registration function.  That's going to be pretty
-> difficult to spot amongst the 3000+ messages on the linux-arm-kernel
-> list each month in order to give it the review that it would need.
-> That's especially true as I now ignore almost all most platform
-> code patches as we have Arnd and Olof to look at that.
-> 
-> So, unless you can come up with a proposal which ensures that there
-> is sufficient review triggered when someone decides to call the
-> notifier registration function...
+This patch defines a platform glue layer for Rockchip SoCs which
+support arc-emac driver. It ensures that regulator for the rmii is on
+before trying to connect to the ethernet controller. It applies right
+speed and mode changes to the grf when ethernet settings change.
 
-Reflecting upon this and upon Thomas' comments about only using FIQ for
-watchdog, backtrace and performance monitoring...
+Signed-off-by: Romain Perier <romain.perier@gmail.com>
+---
+ drivers/net/ethernet/arc/Kconfig         |  10 ++
+ drivers/net/ethernet/arc/Makefile        |   1 +
+ drivers/net/ethernet/arc/emac.h          |   4 +-
+ drivers/net/ethernet/arc/emac_main.c     |   2 +
+ drivers/net/ethernet/arc/emac_rockchip.c | 228 +++++++++++++++++++++++++++++++
+ 5 files changed, 244 insertions(+), 1 deletion(-)
+ create mode 100644 drivers/net/ethernet/arc/emac_rockchip.c
 
-The short version is, "I was wrong and should have done what you said in
-the first place".
-
-The long version adds, "because the coupling concerns were spurious; the
-only proposed users of the default FIQ handler outside of core ARM code,
-are ARM-centric irqchip drivers."
-
-
-> How about something like:
-> 
-> static const char *allowable_callers[] = {
-> 	...
-> };
-> 
-> 	snprintf(caller, sizeof(caller), "%pf", __builtin_return_address(0));
-> 
-> 	for (i = 0; i < ARRAY_SIZE(allowable_callers); i++)
-> 		if (!strcmp(caller, allowable_callers[i]))
-> 			break;
-> 
-> 	if (i == ARRAY_SIZE(allowable_callers)) {
-> 		printk(KERN_ERR "%s is not permitted to register a FIQ notifer\n",
-> 			caller);
-> 		return;
-> 	}
-> 
-> This gives us the advantage of using the notifier, but also gives us the
-> requirement that the file has to be modified to permit new registrations,
-> thereby triggering the closer review.
-
-Cool trick. However since I'm wrong...
-
-
-> The other question I have is that if we permit kgdb and nmi tracing with
-> this mechanism, how do the hooked callers distinguish between these
-> different purposes?  I don't see how that works with your notifier
-> setup.
-
-The notifier as found in the existing patchs allowed the sharing only of
-IPI FIQ (for example between stack dump code and kgdb).
-
-This worked due to the way IPIs can be automatically EOIed and, because
-they are software generated, software can use flags. In fact the kgdb
-handler already uses this to discriminate between IPI FIQ and UART
-interrupts (although the flag is set kgdb core logic rather than in the
-ARM code).
-
-For SPIs it's safety depended upon drivers using claim_fiq() to
-arbitrate. There was no enforcement mechanism to prevent abuse.
+diff --git a/drivers/net/ethernet/arc/Kconfig b/drivers/net/ethernet/arc/Kconfig
+index 89e04fd..8e262e2 100644
+--- a/drivers/net/ethernet/arc/Kconfig
++++ b/drivers/net/ethernet/arc/Kconfig
+@@ -32,4 +32,14 @@ config ARC_EMAC
+ 	  non-standard on-chip ethernet device ARC EMAC 10/100 is used.
+ 	  Say Y here if you have such a board.  If unsure, say N.
+ 
++config EMAC_ROCKCHIP
++	tristate "Rockchip EMAC support"
++	select ARC_EMAC_CORE
++	depends on OF_IRQ && OF_NET && REGULATOR
++	---help---
++	  Support for Rockchip RK3066/RK3188 EMAC ethernet controllers.
++	  This selects Rockchip SoC glue layer support for the
++	  emac device driver. This driver is used for RK3066/RK3188
++	  EMAC ethernet controller.
++
+ endif # NET_VENDOR_ARC
+diff --git a/drivers/net/ethernet/arc/Makefile b/drivers/net/ethernet/arc/Makefile
+index 241bb80..79108af 100644
+--- a/drivers/net/ethernet/arc/Makefile
++++ b/drivers/net/ethernet/arc/Makefile
+@@ -5,3 +5,4 @@
+ arc_emac-objs := emac_main.o emac_mdio.o
+ obj-$(CONFIG_ARC_EMAC_CORE) += arc_emac.o
+ obj-$(CONFIG_ARC_EMAC) += emac_arc.o
++obj-$(CONFIG_EMAC_ROCKCHIP) += emac_rockchip.o
+diff --git a/drivers/net/ethernet/arc/emac.h b/drivers/net/ethernet/arc/emac.h
+index eb2ba67..dae1ac3 100644
+--- a/drivers/net/ethernet/arc/emac.h
++++ b/drivers/net/ethernet/arc/emac.h
+@@ -123,9 +123,11 @@ struct buffer_state {
+  * @speed:	PHY's last set speed.
+  */
+ struct arc_emac_priv {
+-	/* Devices */
+ 	const char *drv_name;
+ 	const char *drv_version;
++	void (*set_mac_speed)(void *priv, unsigned int speed);
++
++	/* Devices */
+ 	struct device *dev;
+ 	struct phy_device *phy_dev;
+ 	struct mii_bus *bus;
+diff --git a/drivers/net/ethernet/arc/emac_main.c b/drivers/net/ethernet/arc/emac_main.c
+index b35c69e..a08f343 100644
+--- a/drivers/net/ethernet/arc/emac_main.c
++++ b/drivers/net/ethernet/arc/emac_main.c
+@@ -48,6 +48,8 @@ static void arc_emac_adjust_link(struct net_device *ndev)
+ 	if (priv->speed != phy_dev->speed) {
+ 		priv->speed = phy_dev->speed;
+ 		state_changed = 1;
++		if (priv->set_mac_speed)
++			priv->set_mac_speed(priv, priv->speed);
+ 	}
+ 
+ 	if (priv->duplex != phy_dev->duplex) {
+diff --git a/drivers/net/ethernet/arc/emac_rockchip.c b/drivers/net/ethernet/arc/emac_rockchip.c
+new file mode 100644
+index 0000000..97dffbc
+--- /dev/null
++++ b/drivers/net/ethernet/arc/emac_rockchip.c
+@@ -0,0 +1,228 @@
++/**
++ * emac-rockchip.c - Rockchip EMAC specific glue layer
++ *
++ * Copyright (C) 2014 Romain Perier <romain.perier@gmail.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
++#include <linux/etherdevice.h>
++#include <linux/mfd/syscon.h>
++#include <linux/module.h>
++#include <linux/of_net.h>
++#include <linux/platform_device.h>
++#include <linux/regmap.h>
++#include <linux/regulator/consumer.h>
++
++#include "emac.h"
++
++#define DRV_NAME        "rockchip_emac"
++#define DRV_VERSION     "1.0"
++
++#define GRF_MODE_MII		(1UL << 0)
++#define GRF_MODE_RMII		(0UL << 0)
++#define GRF_SPEED_10M		(0UL << 1)
++#define GRF_SPEED_100M		(1UL << 1)
++#define GRF_SPEED_ENABLE_BIT	(1UL << 17)
++#define GRF_MODE_ENABLE_BIT	(1UL << 16)
++
++struct emac_rockchip_soc_data {
++	int grf_offset;
++};
++
++struct rockchip_priv_data {
++	struct arc_emac_priv emac;
++	struct regmap *grf;
++	const struct emac_rockchip_soc_data *soc_data;
++	struct regulator *regulator;
++	struct clk *refclk;
++};
++
++static const struct emac_rockchip_soc_data emac_rockchip_dt_data[] = {
++	{ .grf_offset = 0x154 }, /* rk3066 */
++	{ .grf_offset = 0x0a4 }, /* rk3188 */
++};
++
++static const struct of_device_id emac_rockchip_dt_ids[] = {
++	{ .compatible = "rockchip,rk3066-emac", .data = &emac_rockchip_dt_data[0] },
++	{ .compatible = "rockchip,rk3188-emac", .data = &emac_rockchip_dt_data[1] },
++	{ /* Sentinel */ }
++};
++
++static void emac_rockchip_set_mac_speed(void *priv, unsigned int speed)
++{
++	struct rockchip_priv_data *emac = priv;
++	u32 data;
++	int err = 0;
++
++	/* write-enable bits */
++	data = GRF_SPEED_ENABLE_BIT;
++
++	switch(speed) {
++	case 10:
++		data |= GRF_SPEED_10M;
++		break;
++	case 100:
++		data |= GRF_SPEED_100M;
++		break;
++	default:
++		pr_err("speed %u not supported\n", speed);
++		return;
++	}
++
++	err = regmap_write(emac->grf, emac->soc_data->grf_offset, data);
++	if (err)
++		pr_err("unable to apply speed %u to grf (%d)\n", speed, err);
++}
++
++static int emac_rockchip_probe(struct platform_device *pdev)
++{
++	struct device *dev = &pdev->dev;
++	struct net_device *ndev;
++	struct rockchip_priv_data *priv;
++	const struct of_device_id *match;
++	u32 data;
++	int err, interface;
++
++	if (!pdev->dev.of_node)
++		return -ENODEV;
++
++	ndev = alloc_etherdev(sizeof(struct rockchip_priv_data));
++	if (!ndev)
++		return -ENOMEM;
++	platform_set_drvdata(pdev, ndev);
++	SET_NETDEV_DEV(ndev, dev);
++
++	priv = netdev_priv(ndev);
++	priv->emac.drv_name = DRV_NAME;
++	priv->emac.drv_version = DRV_VERSION;
++	priv->emac.set_mac_speed = emac_rockchip_set_mac_speed;
++
++	interface = of_get_phy_mode(dev->of_node);
++
++	/* RK3066 and RK3188 SoCs only support RMII */
++	if (interface != PHY_INTERFACE_MODE_RMII) {
++		dev_err(dev, "unsupported phy interface mode %d\n", interface);
++		err = -ENOTSUPP;
++		goto out_netdev;
++	}
++
++	priv->grf = syscon_regmap_lookup_by_phandle(dev->of_node, "rockchip,grf");
++	if (IS_ERR(priv->grf)) {
++		dev_err(dev, "failed to retrieve global register file from the device tree (%ld)\n", PTR_ERR(priv->grf));
++		err = PTR_ERR(priv->grf);
++		goto out_netdev;
++	}
++
++	match = of_match_node(emac_rockchip_dt_ids, dev->of_node);
++	priv->soc_data = match->data;
++
++	priv->emac.clk = devm_clk_get(dev, "hclk");
++	if (IS_ERR(priv->emac.clk)) {
++		dev_err(dev, "failed to retrieve host clock from device tree (%ld)\n", PTR_ERR(priv->emac.clk));
++		err = PTR_ERR(priv->emac.clk);
++		goto out_netdev;
++	}
++
++	priv->refclk = devm_clk_get(dev, "macref");
++	if (IS_ERR(priv->refclk)) {
++		dev_err(dev, "failed to retrieve reference clock from device tree (%ld)\n", PTR_ERR(priv->refclk));
++		err = PTR_ERR(priv->refclk);
++		goto out_netdev;
++	}
++
++	err = clk_prepare_enable(priv->refclk);
++	if (err) {
++		dev_err(dev, "failed to enable reference clock (%d)\n", err);
++		goto out_netdev;
++	}
++
++	/* Optional regulator for PHY */
++	priv->regulator = devm_regulator_get_optional(dev, "phy");
++	if (IS_ERR(priv->regulator)) {
++		if (PTR_ERR(priv->regulator) == -EPROBE_DEFER)
++			return -EPROBE_DEFER;
++		dev_err(dev, "no regulator found\n");
++		priv->regulator = NULL;
++	}
++
++	if (priv->regulator) {
++		err = regulator_enable(priv->regulator);
++		if (err) {
++			dev_err(dev, "failed to enable phy-supply (%d)\n", err);
++			goto out_clk_disable;
++		}
++	}
++
++	err = arc_emac_probe(ndev, interface);
++	if (err)
++		goto out_regulator_disable;
++
++	/* write-enable bits */
++	data = GRF_MODE_ENABLE_BIT | GRF_SPEED_ENABLE_BIT;
++
++	data |= GRF_SPEED_100M;
++	data |= GRF_MODE_RMII;
++
++	err = regmap_write(priv->grf, priv->soc_data->grf_offset, data);
++	if (err) {
++		dev_err(dev, "unable to apply initial settings to grf (%d)\n", err);
++		goto out_regulator_disable;
++	}
++
++	/* RMII interface needs always a rate of 50MHz */
++	err = clk_set_rate(priv->refclk, 50000000);
++	if (err)
++		dev_err(dev, "failed to change reference clock rate (%d)\n", err);
++	return 0;
++
++out_regulator_disable:
++	if (priv->regulator)
++		regulator_disable(priv->regulator);
++out_clk_disable:
++	clk_unprepare_disable(priv->refclk);
++out_netdev:
++	free_netdev(ndev);
++	return err;
++}
++
++static int emac_rockchip_remove(struct platform_device *pdev)
++{
++	struct net_device *ndev = platform_get_drvdata(pdev);
++	struct rockchip_priv_data *priv = netdev_priv(ndev);
++	int err;
++
++	clk_disable_unprepare(priv->refclk);
++
++	if (priv->regulator)
++		regulator_disable(priv->regulator);
++
++	err = arc_emac_remove(ndev);
++	free_netdev(ndev);
++	return err;
++}
++
++MODULE_DEVICE_TABLE(of, emac_rockchip_dt_ids);
++
++static struct platform_driver emac_rockchip_driver = {
++	.probe = emac_rockchip_probe,
++	.remove = emac_rockchip_remove,
++	.driver = {
++		.name = DRV_NAME,
++		.of_match_table  = emac_rockchip_dt_ids,
++	},
++};
++
++module_platform_driver(emac_rockchip_driver);
++
++MODULE_AUTHOR("Romain Perier <romain.perier@gmail.com>");
++MODULE_DESCRIPTION("Rockchip EMAC platform driver");
++MODULE_LICENSE("GPL");
+-- 
+1.9.1
