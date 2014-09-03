@@ -1,49 +1,36 @@
-From: boris.brezillon@free-electrons.com (Boris BREZILLON)
-Date: Wed, 3 Sep 2014 16:15:28 +0200
-Subject: [PATCH v2] mfd: syscon: Decouple syscon interface from platform
- devices
-In-Reply-To: <4224773.hl3QDeILqz@wuerfel>
-References: <1409668935-10667-1-git-send-email-pankaj.dubey@samsung.com>
- <6034841.GFrG3XCMdb@wuerfel> <20140903151611.260a7218@bbrezillon>
- <4224773.hl3QDeILqz@wuerfel>
-Message-ID: <20140903161528.05f566e1@bbrezillon>
+From: leigh@solinno.co.uk (Leigh Brown)
+Date: Wed, 03 Sep 2014 15:40:56 +0100
+Subject: [PATCH V2 0/4] clk: mvebu: Improve clock drift
+In-Reply-To: <1409645719-20003-1-git-send-email-gregory.clement@free-electrons.com>
+References: <1409645719-20003-1-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <902cee907da9c532822dcf5db722b47c@doppler.thel33t.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 03 Sep 2014 15:49:04 +0200
-Arnd Bergmann <arnd@arndb.de> wrote:
-
-> On Wednesday 03 September 2014 15:16:11 Boris BREZILLON wrote:
-> > I checked that part, and it appears most of the code is already there
-> > (see usage of regmap_attach_dev function here [1]).
-> > 
-> > The only problem I see is that errors are still printed with dev_err,
-> > which, AFAIK, will trigger a kernel panic if dev is NULL.
+On 2014-09-02 09:15, Gregory CLEMENT wrote:
+> Few users reported a timer drift on the Armada 370 based board such as
+> the mirabox or the Netgear ReadyNAS 102. This is the second series
+> with few improvements after the review of the 1st version.
 > 
-> Actually not:
+> The reason is that when the SSCG (Spread Spectrum Clock Generator) is
+> enabled, it shifts the frequency of the clock. The percentage is no
+> more than 1% but when the clock is used for a timer it leads to a
+> clock drift.
 > 
-> static int __dev_printk(const char *level, const struct device *dev,
->                         struct va_format *vaf)
-> {
->         if (!dev)
->                 return printk("%s(NULL device *): %pV", level, vaf);
+> This series allows to correct the affected clock when the SSCG is
+> enabled. This drift can happen on all the mvebu SoC on the cpu clock
+> block (ie cpu, ddr and l2 cache). Currently the only notable effect is
+> for the Armada 370 because this SoC use the l2cache clock as source
+> for the timer. That's why even if the series allow any of the mvebu
+> SoC to benefit to this correction, Armada 370 is the only user of it.
 > 
->         return dev_printk_emit(level[1] - '0', dev,
->                                "%s %s: %pV",
->                                dev_driver_string(dev), dev_name(dev), vaf);
-> }
+> The first 2 patches should go through the clk subsystem, whereas the
+> third one should go to the arm-soc through the mvebu tree.
 > 
+> The last one is just to fix a typo I found while I was reading the clk
+> code.
 
-My bad then (I don't know where I looked at to think NULL dev was not
-gracefully handled :-)). Thanks for pointing this out.
-Given that, I think it should work fine even with a NULL dev.
-I'll give it a try on at91 ;-).
+This is working superbly for me on my Mirabox, and ntpd is now 
+completely stable.
 
-Best Regards,
-
-Boris
-
--- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+Tested-by: Leigh Brown <leigh@solinno.co.uk>
