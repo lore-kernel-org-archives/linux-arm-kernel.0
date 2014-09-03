@@ -1,37 +1,126 @@
-From: b.galvani@gmail.com (Beniamino Galvani)
-Date: Wed, 3 Sep 2014 23:12:20 +0200
-Subject: [PATCH v5 1/4] ethernet: arc: Add support for Rockchip SoC layer
- device tree bindings
-In-Reply-To: <1409763165-16461-1-git-send-email-romain.perier@gmail.com>
-References: <1409763165-16461-1-git-send-email-romain.perier@gmail.com>
-Message-ID: <20140903211220.GA16962@gmail.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Thu, 04 Sep 2014 00:14:49 +0300
+Subject: [PATCH] pinctrl: sh-pfc: rename confusing pinmux ops variable
+In-Reply-To: <1409745112-13652-1-git-send-email-linus.walleij@linaro.org>
+References: <1409745112-13652-1-git-send-email-linus.walleij@linaro.org>
+Message-ID: <1591463.JEteqGINz8@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 03, 2014 at 04:52:42PM +0000, Romain Perier wrote:
-> This patch defines a platform glue layer for Rockchip SoCs which
-> support arc-emac driver. It ensures that regulator for the rmii is on
-> before trying to connect to the ethernet controller. It applies right
-> speed and mode changes to the grf when ethernet settings change.
+Hi Linus,
 
-Hi Romain,
+Thank you for the patch.
 
-on a Radxa Rock when I try to remove the emac_rockchip module the
-board locks up when calling clk_disable_unprepare(priv->refclk). The
-tree is a net-next + your series, I don't know if I need some other
-patches.
+On Wednesday 03 September 2014 13:51:52 Linus Walleij wrote:
+> The vtable named *pinmux_ops in the affected files are not really
+> about pin multiplexing, but a struct related to some PFC-specific
+> operations, inclusing pin config (bias setting). Rename the variable
+> so as to avoid confusions.
+> 
+> Cc: Laurent Pinchart <Laurent.pinchart@ideasonboard.com>
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 
-There is also the following build warning due to the emac dependency
-on REGULATOR which in principle seems correct, but looking at other
-drivers I wonder why they use the regulator APIs but don't have the
-same dependency.
+Acked-by: Laurent Pinchart <Laurent.pinchart@ideasonboard.com>
 
-drivers/regulator/Kconfig:1:error: recursive dependency detected!
-drivers/regulator/Kconfig:1:       symbol REGULATOR is selected by MDIO_SUN4I
-drivers/net/phy/Kconfig:159:       symbol MDIO_SUN4I depends on PHYLIB
-drivers/net/phy/Kconfig:5:         symbol PHYLIB is selected by ARC_EMAC_CORE
-drivers/net/ethernet/arc/Kconfig:20:      symbol ARC_EMAC_CORE is selected by EMAC_ROCKCHIP
-drivers/net/ethernet/arc/Kconfig:35:      symbol EMAC_ROCKCHIP depends on REGULATOR
+> ---
+>  drivers/pinctrl/sh-pfc/pfc-r8a73a4.c | 4 ++--
+>  drivers/pinctrl/sh-pfc/pfc-r8a7740.c | 4 ++--
+>  drivers/pinctrl/sh-pfc/pfc-sh7372.c  | 4 ++--
+>  drivers/pinctrl/sh-pfc/pfc-sh73a0.c  | 4 ++--
+>  4 files changed, 8 insertions(+), 8 deletions(-)
+> 
+> diff --git a/drivers/pinctrl/sh-pfc/pfc-r8a73a4.c
+> b/drivers/pinctrl/sh-pfc/pfc-r8a73a4.c index ce9fb7aa8ba3..280a56f97786
+> 100644
+> --- a/drivers/pinctrl/sh-pfc/pfc-r8a73a4.c
+> +++ b/drivers/pinctrl/sh-pfc/pfc-r8a73a4.c
+> @@ -2717,14 +2717,14 @@ static void r8a73a4_pinmux_set_bias(struct sh_pfc
+> *pfc, unsigned int pin, iowrite8(value, addr);
+>  }
+> 
+> -static const struct sh_pfc_soc_operations r8a73a4_pinmux_ops = {
+> +static const struct sh_pfc_soc_operations r8a73a4_pfc_ops = {
+>  	.get_bias = r8a73a4_pinmux_get_bias,
+>  	.set_bias = r8a73a4_pinmux_set_bias,
+>  };
+> 
+>  const struct sh_pfc_soc_info r8a73a4_pinmux_info = {
+>  	.name		= "r8a73a4_pfc",
+> -	.ops		= &r8a73a4_pinmux_ops,
+> +	.ops		= &r8a73a4_pfc_ops,
+> 
+>  	.input = { PINMUX_INPUT_BEGIN, PINMUX_INPUT_END },
+>  	.output = { PINMUX_OUTPUT_BEGIN, PINMUX_OUTPUT_END },
+> diff --git a/drivers/pinctrl/sh-pfc/pfc-r8a7740.c
+> b/drivers/pinctrl/sh-pfc/pfc-r8a7740.c index e4c1ef477053..b486e9d20cc2
+> 100644
+> --- a/drivers/pinctrl/sh-pfc/pfc-r8a7740.c
+> +++ b/drivers/pinctrl/sh-pfc/pfc-r8a7740.c
+> @@ -3752,14 +3752,14 @@ static void r8a7740_pinmux_set_bias(struct sh_pfc
+> *pfc, unsigned int pin, iowrite8(value, addr);
+>  }
+> 
+> -static const struct sh_pfc_soc_operations r8a7740_pinmux_ops = {
+> +static const struct sh_pfc_soc_operations r8a7740_pfc_ops = {
+>  	.get_bias = r8a7740_pinmux_get_bias,
+>  	.set_bias = r8a7740_pinmux_set_bias,
+>  };
+> 
+>  const struct sh_pfc_soc_info r8a7740_pinmux_info = {
+>  	.name		= "r8a7740_pfc",
+> -	.ops		= &r8a7740_pinmux_ops,
+> +	.ops		= &r8a7740_pfc_ops,
+> 
+>  	.input		= { PINMUX_INPUT_BEGIN,
+>  			    PINMUX_INPUT_END },
+> diff --git a/drivers/pinctrl/sh-pfc/pfc-sh7372.c
+> b/drivers/pinctrl/sh-pfc/pfc-sh7372.c index d9158b3b2919..8211f66a2f68
+> 100644
+> --- a/drivers/pinctrl/sh-pfc/pfc-sh7372.c
+> +++ b/drivers/pinctrl/sh-pfc/pfc-sh7372.c
+> @@ -2614,14 +2614,14 @@ static void sh7372_pinmux_set_bias(struct sh_pfc
+> *pfc, unsigned int pin, iowrite8(value, addr);
+>  }
+> 
+> -static const struct sh_pfc_soc_operations sh7372_pinmux_ops = {
+> +static const struct sh_pfc_soc_operations sh7372_pfc_ops = {
+>  	.get_bias = sh7372_pinmux_get_bias,
+>  	.set_bias = sh7372_pinmux_set_bias,
+>  };
+> 
+>  const struct sh_pfc_soc_info sh7372_pinmux_info = {
+>  	.name = "sh7372_pfc",
+> -	.ops = &sh7372_pinmux_ops,
+> +	.ops = &sh7372_pfc_ops,
+> 
+>  	.input = { PINMUX_INPUT_BEGIN, PINMUX_INPUT_END },
+>  	.output = { PINMUX_OUTPUT_BEGIN, PINMUX_OUTPUT_END },
+> diff --git a/drivers/pinctrl/sh-pfc/pfc-sh73a0.c
+> b/drivers/pinctrl/sh-pfc/pfc-sh73a0.c index 0bd8f4401b42..2dd8fd524a80
+> 100644
+> --- a/drivers/pinctrl/sh-pfc/pfc-sh73a0.c
+> +++ b/drivers/pinctrl/sh-pfc/pfc-sh73a0.c
+> @@ -3856,7 +3856,7 @@ static int sh73a0_pinmux_soc_init(struct sh_pfc *pfc)
+>  	return 0;
+>  }
+> 
+> -static const struct sh_pfc_soc_operations sh73a0_pinmux_ops = {
+> +static const struct sh_pfc_soc_operations sh73a0_pfc_ops = {
+>  	.init = sh73a0_pinmux_soc_init,
+>  	.get_bias = sh73a0_pinmux_get_bias,
+>  	.set_bias = sh73a0_pinmux_set_bias,
+> @@ -3864,7 +3864,7 @@ static const struct sh_pfc_soc_operations
+> sh73a0_pinmux_ops = {
+> 
+>  const struct sh_pfc_soc_info sh73a0_pinmux_info = {
+>  	.name = "sh73a0_pfc",
+> -	.ops = &sh73a0_pinmux_ops,
+> +	.ops = &sh73a0_pfc_ops,
+> 
+>  	.input = { PINMUX_INPUT_BEGIN, PINMUX_INPUT_END },
+>  	.output = { PINMUX_OUTPUT_BEGIN, PINMUX_OUTPUT_END },
 
+-- 
 Regards,
-Beniamino
+
+Laurent Pinchart
