@@ -1,46 +1,50 @@
 From: b20788@freescale.com (Anson Huang)
-Date: Wed, 3 Sep 2014 15:36:43 +0800
-Subject: [PATCH 1/3] ARM: imx: add gpt_3m clk for i.mx6qdl
+Date: Wed, 3 Sep 2014 15:36:44 +0800
+Subject: [PATCH 2/3] ARM: dts: imx6: change gpt per clk to gpt_3m on i.mx6qdl
+ and i.mx6sx
 In-Reply-To: <1409729805-9741-1-git-send-email-b20788@freescale.com>
 References: <1409729805-9741-1-git-send-email-b20788@freescale.com>
-Message-ID: <1409729805-9741-2-git-send-email-b20788@freescale.com>
+Message-ID: <1409729805-9741-3-git-send-email-b20788@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add gpt_3m clock for i.mx6qdl, as gpt can source clock
-from OSC, some i.MX6 series SOCs has fixed divider of
-8 for gpt clock, so here add a fix clk of gpt_3m.
+Original gpt per clk parent is from ipg_per clk which
+may be scaled when system enter low bus mode, as ipg
+clk will be lower in low bus mode, to keep system clk
+NOT drift, select gpt per clk parent from OSC which
+is at fixed freq always.
 
 Signed-off-by: Anson Huang <b20788@freescale.com>
 ---
- arch/arm/mach-imx/clk-imx6q.c             |    1 +
- include/dt-bindings/clock/imx6qdl-clock.h |    3 ++-
- 2 files changed, 3 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/imx6qdl.dtsi |    2 +-
+ arch/arm/boot/dts/imx6sx.dtsi  |    2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-imx/clk-imx6q.c b/arch/arm/mach-imx/clk-imx6q.c
-index 2edcebf..7e6b3dd 100644
---- a/arch/arm/mach-imx/clk-imx6q.c
-+++ b/arch/arm/mach-imx/clk-imx6q.c
-@@ -194,6 +194,7 @@ static void __init imx6q_clocks_init(struct device_node *ccm_node)
- 	clk[IMX6QDL_CLK_PLL3_80M]  = imx_clk_fixed_factor("pll3_80m",  "pll3_usb_otg",   1, 6);
- 	clk[IMX6QDL_CLK_PLL3_60M]  = imx_clk_fixed_factor("pll3_60m",  "pll3_usb_otg",   1, 8);
- 	clk[IMX6QDL_CLK_TWD]       = imx_clk_fixed_factor("twd",       "arm",            1, 2);
-+	clk[IMX6QDL_CLK_GPT_3M]    = imx_clk_fixed_factor("gpt_3m",    "osc",            1, 8);
- 	if (cpu_is_imx6dl()) {
- 		clk[IMX6QDL_CLK_GPU2D_AXI] = imx_clk_fixed_factor("gpu2d_axi", "mmdc_ch0_axi_podf", 1, 1);
- 		clk[IMX6QDL_CLK_GPU3D_AXI] = imx_clk_fixed_factor("gpu3d_axi", "mmdc_ch0_axi_podf", 1, 1);
-diff --git a/include/dt-bindings/clock/imx6qdl-clock.h b/include/dt-bindings/clock/imx6qdl-clock.h
-index 323e865..9bc2e07 100644
---- a/include/dt-bindings/clock/imx6qdl-clock.h
-+++ b/include/dt-bindings/clock/imx6qdl-clock.h
-@@ -220,6 +220,7 @@
- #define IMX6QDL_CLK_LVDS2_GATE			207
- #define IMX6QDL_CLK_ESAI_IPG			208
- #define IMX6QDL_CLK_ESAI_MEM			209
--#define IMX6QDL_CLK_END				210
-+#define IMX6QDL_CLK_GPT_3M			210
-+#define IMX6QDL_CLK_END				211
+diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
+index 70d7207..ccd6c1b 100644
+--- a/arch/arm/boot/dts/imx6qdl.dtsi
++++ b/arch/arm/boot/dts/imx6qdl.dtsi
+@@ -401,7 +401,7 @@
+ 				reg = <0x02098000 0x4000>;
+ 				interrupts = <0 55 IRQ_TYPE_LEVEL_HIGH>;
+ 				clocks = <&clks IMX6QDL_CLK_GPT_IPG>,
+-					 <&clks IMX6QDL_CLK_GPT_IPG_PER>;
++					 <&clks IMX6QDL_CLK_GPT_3M>;
+ 				clock-names = "ipg", "per";
+ 			};
  
- #endif /* __DT_BINDINGS_CLOCK_IMX6QDL_H */
+diff --git a/arch/arm/boot/dts/imx6sx.dtsi b/arch/arm/boot/dts/imx6sx.dtsi
+index 63d9d82..b5d8252 100644
+--- a/arch/arm/boot/dts/imx6sx.dtsi
++++ b/arch/arm/boot/dts/imx6sx.dtsi
+@@ -421,7 +421,7 @@
+ 				reg = <0x02098000 0x4000>;
+ 				interrupts = <GIC_SPI 55 IRQ_TYPE_LEVEL_HIGH>;
+ 				clocks = <&clks IMX6SX_CLK_GPT_BUS>,
+-					 <&clks IMX6SX_CLK_GPT_SERIAL>;
++					 <&clks IMX6SX_CLK_GPT_3M>;
+ 				clock-names = "ipg", "per";
+ 			};
+ 
 -- 
 1.7.9.5
