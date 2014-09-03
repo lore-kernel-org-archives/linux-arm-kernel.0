@@ -1,93 +1,37 @@
-From: dinguyen@opensource.altera.com (Dinh Nguyen)
-Date: Tue, 2 Sep 2014 21:30:00 -0500
-Subject: [PATCHv10 2/2] arm: dts: Add Altera SDRAM EDAC bindings &
- devicetree entries.
-In-Reply-To: <1407770293-27190-3-git-send-email-tthayer@opensource.altera.com>
-References: <1407770293-27190-1-git-send-email-tthayer@opensource.altera.com>
- <1407770293-27190-3-git-send-email-tthayer@opensource.altera.com>
-Message-ID: <54067D28.20408@opensource.altera.com>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Tue, 02 Sep 2014 19:38:44 -0700
+Subject: [PATCH 0/3] clk: zynq: Clean up
+In-Reply-To: <1409698929-30143-1-git-send-email-soren.brinkmann@xilinx.com>
+References: <1409698929-30143-1-git-send-email-soren.brinkmann@xilinx.com>
+Message-ID: <20140903023844.5251.5476@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi DTS maintainers,
+Quoting Soren Brinkmann (2014-09-02 16:02:06)
+> Hi,
+> 
+> triggered by that discussion whether checkpatch should be used to check
+> files, I ran checkpatch on Zynq's clock code. A few of the reported
+> issues I found worth fixing.
 
-If possible, can I please get an Acked-by for this patch?
+Applied to clk-next.
 
-Many thanks...
+Regards,
+Mike
 
-Dinh
-
-On 8/11/14, 10:18 AM, tthayer at opensource.altera.com wrote:
-> From: Thor Thayer <tthayer@opensource.altera.com>
 > 
-> Add the Altera SDRAM EDAC bindings and device tree changes to the Altera SoC project.
+>         Thanks,
+>         S?ren
 > 
-> Signed-off-by: Thor Thayer <tthayer@opensource.altera.com>
-> ---
-> v2: Changes to SoC SDRAM EDAC code.
+> Soren Brinkmann (3):
+>   clk: zynq: Remove unnecessary OOM message
+>   clk: zynq: Remove pointless return at end of void function
+>   clk: zynq: Move const initdata into correct code section
 > 
-> v3: Implement code suggestions for SDRAM EDAC code.
+>  drivers/clk/zynq/clkc.c | 30 ++++++++++++++----------------
+>  drivers/clk/zynq/pll.c  |  4 +---
+>  2 files changed, 15 insertions(+), 19 deletions(-)
 > 
-> v4: Remove syscon from SDRAM controller bindings.
-> 
-> v5: No Change, bump version for consistency.
-> 
-> v6: Only map the ctrlcfg register as syscon.
-> 
-> v7: No change. Bump for consistency.
-> 
-> v8: No change. Bump for consistency.
-> 
-> v9: Changes to support a MFD SDRAM controller with nested EDAC.
-> 
-> v10: Revert to using syscon based on feedback.
-> ---
->  .../bindings/arm/altera/socfpga-sdram-edac.txt     |   15 +++++++++++++++
->  arch/arm/boot/dts/socfpga.dtsi                     |   11 +++++++++++
->  2 files changed, 26 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/arm/altera/socfpga-sdram-edac.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/arm/altera/socfpga-sdram-edac.txt b/Documentation/devicetree/bindings/arm/altera/socfpga-sdram-edac.txt
-> new file mode 100644
-> index 0000000..d0ce01d
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/arm/altera/socfpga-sdram-edac.txt
-> @@ -0,0 +1,15 @@
-> +Altera SOCFPGA SDRAM Error Detection & Correction [EDAC]
-> +The EDAC accesses a range of registers in the SDRAM controller.
-> +
-> +Required properties:
-> +- compatible : should contain "altr,sdram-edac";
-> +- altr,sdr-syscon : phandle of the sdr module
-> +- interrupts : Should contain the SDRAM ECC IRQ in the
-> +	appropriate format for the IRQ controller.
-> +
-> +Example:
-> +	sdramedac {
-> +		compatible = "altr,sdram-edac";
-> +		altr,sdr-syscon = <&sdr>;
-> +		interrupts = <0 39 4>;
-> +	};
-> diff --git a/arch/arm/boot/dts/socfpga.dtsi b/arch/arm/boot/dts/socfpga.dtsi
-> index 4676f25..45b361e 100644
-> --- a/arch/arm/boot/dts/socfpga.dtsi
-> +++ b/arch/arm/boot/dts/socfpga.dtsi
-> @@ -603,6 +603,17 @@
->  			};
->  		};
->  
-> +		sdr: sdr at ffc25000 {
-> +			compatible = "syscon";
-> +			reg = <0xffc25000 0x1000>;
-> +		};
-> +
-> +		sdramedac {
-> +			compatible = "altr,sdram-edac";
-> +			altr,sdr-syscon = <&sdr>;
-> +			interrupts = <0 39 4>;
-> +		};
-> +
->  		L2: l2-cache at fffef000 {
->  			compatible = "arm,pl310-cache";
->  			reg = <0xfffef000 0x1000>;
+> -- 
+> 2.1.0.1.g27b9230
 > 
