@@ -1,109 +1,88 @@
-From: gdjakov@mm-sol.com (Georgi Djakov)
-Date: Wed,  3 Sep 2014 19:50:31 +0300
-Subject: [PATCH v3] ARM: dts: qcom: Add initial IFC6540 board device tree
-Message-ID: <1409763031-16873-1-git-send-email-gdjakov@mm-sol.com>
+From: luto@amacapital.net (Andy Lutomirski)
+Date: Wed, 3 Sep 2014 09:59:34 -0700
+Subject: [PATCH v9 0/6] ARM: VDSO
+In-Reply-To: <5406AA1B.3050506@mentor.com>
+References: <1408744351-7814-1-git-send-email-nathan_lynch@mentor.com>
+ <53FE4448.9070708@codeaurora.org> <5406AA1B.3050506@mentor.com>
+Message-ID: <CALCETrX7Q34nyU7YZfQYnYFPVSaquJ5WzO-AVPnW5PJUCNqopQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add basic support for the IFC6540 single-board computer boards, that are
-based on the APQ8084 SoC. This patch adds the initial device tree and the
-neccessary nodes required for enabling the serial port and eMMC.
+On Sep 2, 2014 10:44 PM, "Nathan Lynch" <Nathan_Lynch@mentor.com> wrote:
+>
+> On 08/27/2014 03:49 PM, Christopher Covington wrote:
+> >
+> > It appears to me that there is code in several architecture subdirectories
+> > (I'm aware of x86, arm64, and with these patches arm[32] and I would be
+> > surprised if there weren't more) doing largely the same setup of special
+> > mappings at randomized offsets, checking ELF magic etc. Not that these patches
+> > should necessarily do it, but is there a reasonable amount of consolidation
+> > that could be done, or am I underestimating how much of this really does vary
+> > per architecture?
+>
+> Sorry to not respond to this promptly, was distracted by some other work.
+>
+> As Andy said, the possibility for consolidating some aspects of VDSO support
+> is there, but it would be a fair bit of work.
+>
+> For example, arch_setup_additional_pages tends to have the general form of:
+>
+> lock mmap_sem
+> get_unmapped_area
+> install_special_mapping (or _install_special_mapping, preferably)
+> stash vdso address in mmu context
+> release mmap_sem
+>
+> But there are a lot of implementation details that differ:
+>
+>          +----------------------------------------------------------------
+>          | Number of VMAs installed
+>          |   +------------------------------------------------------------
+>          |   | Considers uses_interp
+>          |   |     +------------------------------------------------------
+>          |   |     | Uses _install_special_mapping
+>          |   |     |     +------------------------------------------------
+>          |   |     |     | Performs additional work (e.g. remap_pfn_range)
+>          |   |     |     |     +------------------------------------------
+>          |   |     |     |     | Randomizes VDSO offset vs stack and libs
+>          |   |     |     |     |     +------------------------------------
+>          |   |     |     |     |     | Records VDSO address in mmu context
+>          |   |     |     |     |     |     +------------------------------
+>          |   |     |     |     |     |     | Supports compat VDSO
+>          |   |     |     |     |     |     |     +------------------------
+>          |   |     |     |     |     |     |     | Supports disabling VDSO
+>          |   |     |     |     |     |     |     | at boot (e.g. vdso=off)
+>          |   |     |     |     |     |     |     |     +------------------
+>          |   |     |     |     |     |     |     |     | Can disable VDSO
+>  arch    |   |     |     |     |     |     |     |     | via Kconfig
+> ---------+---+-----+-----+-----+-----+-----+-----+-----+------------------
+>  arm*    | 3 | no  | yes | no  | yes | yes | no  | no  | yes
+>  arm64   | 2 | no  | yes | no  | no  | yes | no  | no  | no
+>  hexagon | 1 | no  | no  | no  | no  | yes | no  | no  | no
+>  mips    | 1 | no  | no  | no  | no  | yes | no  | no  | no
+>  powerpc | 1 | no  | no  | no  | no  | yes | yes | no  | no
+>  s390    | 1 | yes | no  | no  | no  | yes | yes | yes | no
+>  sh      | 1 | no  | no  | no  | no  | yes | no  | yes | yes
+>  tile    | 1 | no  | no  | yes | no  | yes | no  | yes | no
+>  x86     | 2 | no  | yes | yes | yes | yes | yes | yes | no
+>
+> * With VDSO patches from this thread, of course.
+>
+> I think pushing the mmap_sem lock/unlock up into the ELF loader might be
+> of some benefit (slightly reduced complexity in the arch code).  But
+> any generic replacement for arch_setup_additional_pages will have to
+> account for all the differences above, and probably a few more I've
+> missed.
+>
 
-Signed-off-by: Georgi Djakov <gdjakov@mm-sol.com>
----
-Changes since v2:
- - Squashed all patches into one. (suggested by Kumar Gala)
+Wow, nice table!  I think that we should eventually get rid of most of
+these differences.
 
-Changes since v1:
- - This time add linux-arm-msm list to the CC.
- - Include a third patch for enabling the eMMC.
+Christopher, since you seem to be interested in CRIU, one thing to
+note is that any architecture that shoves a pointer to the vdso into
+the mmu context is likely to fail if the vdso is mremapped.  CRIU
+needs to mremap the vdso, so this is a problem.
 
- arch/arm/boot/dts/Makefile                 |    1 +
- arch/arm/boot/dts/qcom-apq8084-ifc6540.dts |   23 +++++++++++++++++++++++
- arch/arm/boot/dts/qcom-apq8084.dtsi        |   23 +++++++++++++++++++++++
- 3 files changed, 47 insertions(+)
- create mode 100644 arch/arm/boot/dts/qcom-apq8084-ifc6540.dts
+x86_64 is an exception: it doesn't use that pointer for anything.
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index b022972..df8453a 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -345,6 +345,7 @@ dtb-$(CONFIG_ARCH_PRIMA2) += prima2-evb.dtb
- dtb-$(CONFIG_ARCH_QCOM) += \
- 	qcom-apq8064-ifc6410.dtb \
- 	qcom-apq8074-dragonboard.dtb \
-+	qcom-apq8084-ifc6540.dtb \
- 	qcom-apq8084-mtp.dtb \
- 	qcom-msm8660-surf.dtb \
- 	qcom-msm8960-cdp.dtb
-diff --git a/arch/arm/boot/dts/qcom-apq8084-ifc6540.dts b/arch/arm/boot/dts/qcom-apq8084-ifc6540.dts
-new file mode 100644
-index 0000000..c9ff108
---- /dev/null
-+++ b/arch/arm/boot/dts/qcom-apq8084-ifc6540.dts
-@@ -0,0 +1,23 @@
-+#include "qcom-apq8084.dtsi"
-+
-+/ {
-+	model = "Qualcomm APQ8084/IFC6540";
-+	compatible = "qcom,apq8084-ifc6540", "qcom,apq8084";
-+
-+	soc {
-+		serial at f995e000 {
-+			status = "okay";
-+		};
-+
-+		sdhci at f9824900 {
-+			bus-width = <8>;
-+			non-removable;
-+			status = "okay";
-+		};
-+
-+		sdhci at f98a4900 {
-+			cd-gpios = <&tlmm 122 GPIO_ACTIVE_LOW>;
-+			bus-width = <4>;
-+		};
-+	};
-+};
-diff --git a/arch/arm/boot/dts/qcom-apq8084.dtsi b/arch/arm/boot/dts/qcom-apq8084.dtsi
-index 21d01e5..1f130bc 100644
---- a/arch/arm/boot/dts/qcom-apq8084.dtsi
-+++ b/arch/arm/boot/dts/qcom-apq8084.dtsi
-@@ -3,6 +3,7 @@
- #include "skeleton.dtsi"
- 
- #include <dt-bindings/clock/qcom,gcc-apq8084.h>
-+#include <dt-bindings/gpio/gpio.h>
- 
- / {
- 	model = "Qualcomm APQ 8084";
-@@ -203,5 +204,27 @@
- 			clock-names = "core", "iface";
- 			status = "disabled";
- 		};
-+
-+		sdhci at f9824900 {
-+			compatible = "qcom,sdhci-msm-v4";
-+			reg = <0xf9824900 0x11c>, <0xf9824000 0x800>;
-+			reg-names = "hc_mem", "core_mem";
-+			interrupts = <0 123 0>, <0 138 0>;
-+			interrupt-names = "hc_irq", "pwr_irq";
-+			clocks = <&gcc GCC_SDCC1_APPS_CLK>, <&gcc GCC_SDCC1_AHB_CLK>;
-+			clock-names = "core", "iface";
-+			status = "disabled";
-+		};
-+
-+		sdhci at f98a4900 {
-+			compatible = "qcom,sdhci-msm-v4";
-+			reg = <0xf98a4900 0x11c>, <0xf98a4000 0x800>;
-+			reg-names = "hc_mem", "core_mem";
-+			interrupts = <0 125 0>, <0 221 0>;
-+			interrupt-names = "hc_irq", "pwr_irq";
-+			clocks = <&gcc GCC_SDCC2_APPS_CLK>, <&gcc GCC_SDCC2_AHB_CLK>;
-+			clock-names = "core", "iface";
-+			status = "disabled";
-+		};
- 	};
- };
--- 
-1.7.9.5
+--Andy
