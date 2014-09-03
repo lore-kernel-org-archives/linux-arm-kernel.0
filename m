@@ -1,25 +1,49 @@
 From: b29396@freescale.com (Dong Aisheng)
-Date: Wed, 3 Sep 2014 20:04:56 +0800
-Subject: [PATCH 0/7] mmc: sdhci/imx: a few clean up and fixes
-Message-ID: <1409745903-26550-1-git-send-email-b29396@freescale.com>
+Date: Wed, 3 Sep 2014 20:04:57 +0800
+Subject: [PATCH 1/7] mmc: sdhci-esdhc-imx: remove duplicated lines
+In-Reply-To: <1409745903-26550-1-git-send-email-b29396@freescale.com>
+References: <1409745903-26550-1-git-send-email-b29396@freescale.com>
+Message-ID: <1409745903-26550-2-git-send-email-b29396@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A few clean up and fixes.
+There is already the same register check above, no need the later one.
+Move them into one place and delete the later one.
 
-Dong Aisheng (7):
-  mmc: sdhci-esdhc-imx: remove duplicated lines
-  mmc: sdhci-esdhc-imx: usdhc does not have missing card interrupt
-    issue
-  mmc: sdhci-esdhc-imx: add ADMA Length Mismatch errata fix
-  mmc: sdhci: do not enable card detect interrupt for gpio cd type
-  mmc: sdhci: do not enable card cd wakeup for gpio case
-  mmc: sdhci-esdhc-imx: add imx6sx support
-  mmc: sdhci-esdhc-imx: add quirk SDHCI_QUIRK2_BROKEN_HS200 for imx6qdl
+Signed-off-by: Dong Aisheng <b29396@freescale.com>
+---
+ drivers/mmc/host/sdhci-esdhc-imx.c |   12 +++++-------
+ 1 files changed, 5 insertions(+), 7 deletions(-)
 
- drivers/mmc/host/sdhci-esdhc-imx.c |   44 ++++++++++++++++++++++++++++-------
- drivers/mmc/host/sdhci.c           |    8 +++++-
- 2 files changed, 41 insertions(+), 11 deletions(-)
-
+diff --git a/drivers/mmc/host/sdhci-esdhc-imx.c b/drivers/mmc/host/sdhci-esdhc-imx.c
+index 587ee0e..256c901 100644
+--- a/drivers/mmc/host/sdhci-esdhc-imx.c
++++ b/drivers/mmc/host/sdhci-esdhc-imx.c
+@@ -315,6 +315,11 @@ static void esdhc_writel_le(struct sdhci_host *host, u32 val, int reg)
+ 			data |= ESDHC_CTRL_D3CD;
+ 			writel(data, host->ioaddr + SDHCI_HOST_CONTROL);
+ 		}
++
++		if (val & SDHCI_INT_ADMA_ERROR) {
++			val &= ~SDHCI_INT_ADMA_ERROR;
++			val |= ESDHC_INT_VENDOR_SPEC_DMA_ERR;
++		}
+ 	}
+ 
+ 	if (unlikely((imx_data->socdata->flags & ESDHC_FLAG_MULTIBLK_NO_INT)
+@@ -335,13 +340,6 @@ static void esdhc_writel_le(struct sdhci_host *host, u32 val, int reg)
+ 			}
+ 	}
+ 
+-	if (unlikely(reg == SDHCI_INT_ENABLE || reg == SDHCI_SIGNAL_ENABLE)) {
+-		if (val & SDHCI_INT_ADMA_ERROR) {
+-			val &= ~SDHCI_INT_ADMA_ERROR;
+-			val |= ESDHC_INT_VENDOR_SPEC_DMA_ERR;
+-		}
+-	}
+-
+ 	writel(val, host->ioaddr + reg);
+ }
+ 
 -- 
 1.7.8
