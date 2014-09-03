@@ -1,30 +1,34 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 3 Sep 2014 10:45:16 +0200
-Subject: [PATCH 11/11 v5] ARM: removing support for etb/etm in
- "arch/arm/kernel/"
-In-Reply-To: <1409159852-7249-12-git-send-email-mathieu.poirier@linaro.org>
-References: <1409159852-7249-1-git-send-email-mathieu.poirier@linaro.org>
- <1409159852-7249-12-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <CACRpkdZerhSgrGimebPY-iY3aV40wRyf-DjsSS+iMOgOj1k_Pw@mail.gmail.com>
+From: boris.brezillon@free-electrons.com (Boris BREZILLON)
+Date: Wed,  3 Sep 2014 10:45:29 +0200
+Subject: [PATCH 0/5] rtc: at91sam9: add DT support
+Message-ID: <1409733934-14465-1-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 27, 2014 at 7:17 PM,  <mathieu.poirier@linaro.org> wrote:
+Hello,
 
-> From: Mathieu Poirier <mathieu.poirier@linaro.org>
->
-> Removing minimal support for etb/etm to favour an implentation
-> that is more flexible, extensible and capable of handling more
-> platforms.
->
-> Also removing the only client of the old driver.  That code can
-> easily be replaced by entries for etb/etm in the device tree.
->
-> Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+This patch series adds DT support to the atmel at91sam9 RTC driver.
 
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
+It also removes any machine specific inclusions to prepare the migration
+to multi platform kernel support, and retain the slow clock to prevent
+the CCF from disabling it at the end of boot.
 
-The new driver is clearly better.
+Best Regards,
 
-Yours,
-Linus Walleij
+Boris
+
+Boris BREZILLON (5):
+  rtc: at91sam9: remove references to mach specific headers
+  rtc: at91sam9: use standard readl/writel functions instead of raw
+    versions
+  rtc: at91sam9: add DT support
+  rtc: at91sam9: retain slow clock and check its rate
+  rtc: at91sam9: add DT bindings documentation
+
+ .../devicetree/bindings/rtc/atmel,at91sam9-rtc.txt | 20 +++++++
+ drivers/rtc/rtc-at91sam9.c                         | 63 +++++++++++++++++++---
+ 2 files changed, 75 insertions(+), 8 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/rtc/atmel,at91sam9-rtc.txt
+
+-- 
+1.9.1
