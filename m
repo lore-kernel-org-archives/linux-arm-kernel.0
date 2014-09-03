@@ -1,72 +1,36 @@
 From: bhupesh.sharma@freescale.com (Bhupesh Sharma)
-Date: Wed, 3 Sep 2014 20:43:11 +0530
-Subject: [PATCH V3 3/6] Documentation: DT: Add entry for FSL Management Complex
+Date: Wed, 3 Sep 2014 20:43:10 +0530
+Subject: [PATCH V3 2/6] Documentation: DT: Add entry for FSL LS2085A SoC and
+ Simulator model
 In-Reply-To: <1409757194-28155-1-git-send-email-bhupesh.sharma@freescale.com>
 References: <1409757194-28155-1-git-send-email-bhupesh.sharma@freescale.com>
-Message-ID: <1409757194-28155-4-git-send-email-bhupesh.sharma@freescale.com>
+Message-ID: <1409757194-28155-3-git-send-email-bhupesh.sharma@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 This patch adds a devicetree binding documentation for FSL's
-Management Complex.
-
-Management Complex is a hardware resource manager that manages
-specialized hardware objects used in network-oriented packet
-processing applications
+LS2085A SoC and Simulator model.
 
 Signed-off-by: Bhupesh Sharma <bhupesh.sharma@freescale.com>
-Signed-off-by: Stuart Yoder <stuart.yoder@freescale.com>
-Signed-off-by: J. German Rivera <German.Rivera@freescale.com>
 ---
- .../devicetree/bindings/misc/fsl,qoriq-mc.txt      |   40 ++++++++++++++++++++
- 1 file changed, 40 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/misc/fsl,qoriq-mc.txt
+ Documentation/devicetree/bindings/arm/fsl.txt |    8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/misc/fsl,qoriq-mc.txt b/Documentation/devicetree/bindings/misc/fsl,qoriq-mc.txt
-new file mode 100644
-index 0000000..c7a26ca
---- /dev/null
-+++ b/Documentation/devicetree/bindings/misc/fsl,qoriq-mc.txt
-@@ -0,0 +1,40 @@
-+* Freescale Management Complex
+diff --git a/Documentation/devicetree/bindings/arm/fsl.txt b/Documentation/devicetree/bindings/arm/fsl.txt
+index e935d7d..3b28c4d 100644
+--- a/Documentation/devicetree/bindings/arm/fsl.txt
++++ b/Documentation/devicetree/bindings/arm/fsl.txt
+@@ -74,3 +74,11 @@ Required root node properties:
+ i.MX6q generic board
+ Required root node properties:
+     - compatible = "fsl,imx6q";
 +
-+The Freescale Management Complex (fsl-mc) is a hardware resource
-+manager that manages specialized hardware objects used in
-+network-oriented packet processing applications. After the fsl-mc
-+block is enabled, pools of hardware resources are available, such as
-+queues, buffer pools, I/O interfaces. These resources are building
-+blocks that can be used to create functional hardware objects/devices
-+such as network interfaces, crypto accelerator instances, L2 switches,
-+etc.
++Freescale LS2085A SoC Device Tree Bindings
++------------------------------------------
 +
-+Required properties:
-+
-+    - compatible
-+        Value type: <string>
-+        Definition: Must be "fsl,qoriq-mc".  A Freescale Management Complex
-+                    compatible with this binding must have Block Revision
-+                    Registers BRR1 and BRR2 at offset 0x0BF8 and 0x0BFC in
-+                    the MC control register region.
-+
-+    - reg
-+        Value type: <prop-encoded-array>
-+        Definition: A standard property.  Specifies one or two regions
-+                    defining the MC's registers:
-+
-+                       -the first region is the command portal for the
-+                        this machine and must always be present
-+
-+                       -the second region is the MC control registers. This
-+                        region may not be present in some scenarios, such
-+                        as in the device tree presented to a virtual machine.
-+
-+Example:
-+
-+        fsl_mc: fsl-mc at 80c000000 {
-+                compatible = "fsl,qoriq-mc";
-+                reg = <0x00000008 0x0c000000 0 0x40>,    /* MC portal base */
-+                      <0x00000000 0x08340000 0 0x40000>; /* MC control reg */
-+        };
++LS2085A ARMv8 based Simulator model
++Required root node properties:
++    - compatible = "fsl,ls2085a-simu", "fsl,ls2085a";
 +
 -- 
 1.7.9.5
