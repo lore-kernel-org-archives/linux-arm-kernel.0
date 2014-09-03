@@ -1,52 +1,148 @@
 From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Wed, 03 Sep 2014 12:09:01 +0900
-Subject: [PATCHv6 0/2] thermal: exynos: Add support for TRIMINFO feature of
- Exynos3250
-Message-ID: <1409713743-6124-1-git-send-email-cw00.choi@samsung.com>
+Date: Wed, 03 Sep 2014 12:09:02 +0900
+Subject: [PATCHv6 1/2] thermal: exynos: Add support for many TRIMINFO_CTRL
+ registers
+In-Reply-To: <1409713743-6124-1-git-send-email-cw00.choi@samsung.com>
+References: <1409713743-6124-1-git-send-email-cw00.choi@samsung.com>
+Message-ID: <1409713743-6124-2-git-send-email-cw00.choi@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patchset add the support of TRIMINFO_RELOAD feature for Exynos3250.
-But Exynos3250 has two TRIMINFO_CTRL register instead other Exynos has only one
-TRIMINFO_CTRL register. So, this patchset support the some Exynos SoC which
-has more than one TRIMINF_CTRL.
+This patch support many TRIMINFO_CTRL registers if specific Exynos SoC
+has one more TRIMINFO_CTRL registers. Also this patch uses proper 'RELOAD'
+shift/mask bit operation to set RELOAD feature instead of static value.
 
-Also, this patchset fix wrong value of TRIMINFO_RELOAD_SHIFT and remove
-duplicate code when reading triminfo register of Exynos5440.
-
-Changes from v5:
-- Rebase this patchset on next branch of linux-soc-thermal.git
-
-Changes from v4:
-- Remove un-necessary triminfo_ctrl_{shift, mask} field
-- Includes Bartlomiej's patch[1] that Exynos5260 / Exynos5420 should not use
-TRIM_RELOAD flag
-[2] https://lkml.org/lkml/2014/8/20/481
-
-Changes from v3:
-- Add reviewed message of Amit Daniel Kachhap <amit.daniel@samsung.com>
-- Split RELOAD patch as two patch
-- Fix 'TRIMINFO_RELOAD_SHIFT' value
-- This series includes separate patch[1]
-[1] https://lkml.org/lkml/2014/8/20/5
-- Drop ACTIME bit setting because TRM includes not enough information of ACTIME bit.
-
-Changes from v2:
-- Fix build break because of missing 'or' operation.
-
-Changes from v1:
-- Add missing 'TMU_SUPPORT_TRIM_RELOAD' features
-
-Chanwoo Choi (2):
-  thermal: exynos: Add support for many TRIMINFO_CTRL registers
-  thermal: exynos: Add support for TRIM_RELOAD feature at Exynos3250
-
+Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
+Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
+Cc: Zhang Rui <rui.zhang@intel.com>
+Cc: Eduardo Valentin <edubezval@gmail.com>
+Cc: Amit Daniel Kachhap <amit.daniel@samsung.com>
+Reviewed-by: Amit Daniel Kachhap <amit.daniel@samsung.com>
+---
  drivers/thermal/samsung/exynos_thermal_common.h |  1 +
  drivers/thermal/samsung/exynos_tmu.c            | 15 ++++++++++++---
  drivers/thermal/samsung/exynos_tmu.h            |  7 +++++--
- drivers/thermal/samsung/exynos_tmu_data.c       | 11 +++++++++--
- drivers/thermal/samsung/exynos_tmu_data.h       |  8 ++++++--
- 5 files changed, 33 insertions(+), 9 deletions(-)
+ drivers/thermal/samsung/exynos_tmu_data.c       |  4 +++-
+ drivers/thermal/samsung/exynos_tmu_data.h       |  1 +
+ 5 files changed, 22 insertions(+), 6 deletions(-)
 
+diff --git a/drivers/thermal/samsung/exynos_thermal_common.h b/drivers/thermal/samsung/exynos_thermal_common.h
+index cd44719..158f5aa 100644
+--- a/drivers/thermal/samsung/exynos_thermal_common.h
++++ b/drivers/thermal/samsung/exynos_thermal_common.h
+@@ -27,6 +27,7 @@
+ #define SENSOR_NAME_LEN	16
+ #define MAX_TRIP_COUNT	8
+ #define MAX_COOLING_DEVICE 4
++#define MAX_TRIMINFO_CTRL_REG	2
+ 
+ #define ACTIVE_INTERVAL 500
+ #define IDLE_INTERVAL 10000
+diff --git a/drivers/thermal/samsung/exynos_tmu.c b/drivers/thermal/samsung/exynos_tmu.c
+index 35437df..092ab69 100644
+--- a/drivers/thermal/samsung/exynos_tmu.c
++++ b/drivers/thermal/samsung/exynos_tmu.c
+@@ -127,7 +127,7 @@ static int exynos_tmu_initialize(struct platform_device *pdev)
+ 	struct exynos_tmu_data *data = platform_get_drvdata(pdev);
+ 	struct exynos_tmu_platform_data *pdata = data->pdata;
+ 	const struct exynos_tmu_registers *reg = pdata->registers;
+-	unsigned int status, trim_info = 0, con;
++	unsigned int status, trim_info = 0, con, ctrl;
+ 	unsigned int rising_threshold = 0, falling_threshold = 0;
+ 	int ret = 0, threshold_code, i;
+ 
+@@ -144,8 +144,17 @@ static int exynos_tmu_initialize(struct platform_device *pdev)
+ 		}
+ 	}
+ 
+-	if (TMU_SUPPORTS(pdata, TRIM_RELOAD))
+-		__raw_writel(1, data->base + reg->triminfo_ctrl);
++	if (TMU_SUPPORTS(pdata, TRIM_RELOAD)) {
++		for (i = 0; i < reg->triminfo_ctrl_count; i++) {
++			if (pdata->triminfo_reload[i]) {
++				ctrl = readl(data->base +
++						reg->triminfo_ctrl[i]);
++				ctrl |= pdata->triminfo_reload[i];
++				writel(ctrl, data->base +
++						reg->triminfo_ctrl[i]);
++			}
++		}
++	}
+ 
+ 	/* Save trimming info in order to perform calibration */
+ 	if (data->soc == SOC_ARCH_EXYNOS5440) {
+diff --git a/drivers/thermal/samsung/exynos_tmu.h b/drivers/thermal/samsung/exynos_tmu.h
+index d503f35..f67203b 100644
+--- a/drivers/thermal/samsung/exynos_tmu.h
++++ b/drivers/thermal/samsung/exynos_tmu.h
+@@ -78,6 +78,7 @@ enum soc_type {
+  * slightly across different exynos SOC's.
+  * @triminfo_data: register containing 2 pont trimming data
+  * @triminfo_ctrl: trim info controller register.
++ * @triminfo_ctrl_count: the number of trim info controller register.
+  * @tmu_ctrl: TMU main controller register.
+  * @test_mux_addr_shift: shift bits of test mux address.
+  * @therm_trip_mode_shift: shift bits of tripping mode in tmu_ctrl register.
+@@ -112,8 +113,8 @@ enum soc_type {
+ struct exynos_tmu_registers {
+ 	u32	triminfo_data;
+ 
+-	u32	triminfo_ctrl;
+-	u32	triminfo_ctrl1;
++	u32	triminfo_ctrl[MAX_TRIMINFO_CTRL_REG];
++	u32	triminfo_ctrl_count;
+ 
+ 	u32	tmu_ctrl;
+ 	u32     test_mux_addr_shift;
+@@ -200,6 +201,7 @@ struct exynos_tmu_registers {
+  * @second_point_trim: temp value of the second point trimming
+  * @default_temp_offset: default temperature offset in case of no trimming
+  * @test_mux; information if SoC supports test MUX
++ * @triminfo_reload: reload value to read TRIMINFO register
+  * @cal_type: calibration type for temperature
+  * @freq_clip_table: Table representing frequency reduction percentage.
+  * @freq_tab_count: Count of the above table as frequency reduction may
+@@ -230,6 +232,7 @@ struct exynos_tmu_platform_data {
+ 	u8 second_point_trim;
+ 	u8 default_temp_offset;
+ 	u8 test_mux;
++	u8 triminfo_reload[MAX_TRIMINFO_CTRL_REG];
+ 
+ 	enum calibration_type cal_type;
+ 	enum soc_type type;
+diff --git a/drivers/thermal/samsung/exynos_tmu_data.c b/drivers/thermal/samsung/exynos_tmu_data.c
+index 177ada5..362a1e1 100644
+--- a/drivers/thermal/samsung/exynos_tmu_data.c
++++ b/drivers/thermal/samsung/exynos_tmu_data.c
+@@ -169,7 +169,8 @@ struct exynos_tmu_init_data const exynos3250_default_tmu_data = {
+ #if defined(CONFIG_SOC_EXYNOS4412) || defined(CONFIG_SOC_EXYNOS5250)
+ static const struct exynos_tmu_registers exynos4412_tmu_registers = {
+ 	.triminfo_data = EXYNOS_TMU_REG_TRIMINFO,
+-	.triminfo_ctrl = EXYNOS_TMU_TRIMINFO_CON,
++	.triminfo_ctrl[0] = EXYNOS_TMU_TRIMINFO_CON,
++	.triminfo_ctrl_count = 1,
+ 	.tmu_ctrl = EXYNOS_TMU_REG_CONTROL,
+ 	.test_mux_addr_shift = EXYNOS4412_MUX_ADDR_SHIFT,
+ 	.therm_trip_mode_shift = EXYNOS_TMU_TRIP_MODE_SHIFT,
+@@ -231,6 +232,7 @@ static const struct exynos_tmu_registers exynos4412_tmu_registers = {
+ 		.temp_level = 95, \
+ 	}, \
+ 	.freq_tab_count = 2, \
++	.triminfo_reload[0] = EXYNOS_TRIMINFO_RELOAD_ENABLE, \
+ 	.registers = &exynos4412_tmu_registers, \
+ 	.features = (TMU_SUPPORT_EMULATION | TMU_SUPPORT_TRIM_RELOAD | \
+ 			TMU_SUPPORT_FALLING_TRIP | TMU_SUPPORT_READY_STATUS | \
+diff --git a/drivers/thermal/samsung/exynos_tmu_data.h b/drivers/thermal/samsung/exynos_tmu_data.h
+index ac03b76..6b47a17 100644
+--- a/drivers/thermal/samsung/exynos_tmu_data.h
++++ b/drivers/thermal/samsung/exynos_tmu_data.h
+@@ -51,6 +51,7 @@
+ #define EXYNOS_THD_TEMP_FALL		0x54
+ #define EXYNOS_EMUL_CON		0x80
+ 
++#define EXYNOS_TRIMINFO_RELOAD_ENABLE	1
+ #define EXYNOS_TRIMINFO_25_SHIFT	0
+ #define EXYNOS_TRIMINFO_85_SHIFT	8
+ #define EXYNOS_TMU_RISE_INT_MASK	0x111
 -- 
 1.8.0
