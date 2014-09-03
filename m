@@ -1,86 +1,93 @@
-From: khiem.nguyen.xt@renesas.com (Khiem Nguyen)
-Date: Wed, 03 Sep 2014 15:22:14 +0900
-Subject: [PATCH repost] ARM: shmobile: lager: correct memory map
-In-Reply-To: <20140903054843.GA29259@verge.net.au>
-References: <20140903004901.GA3277@verge.net.au>
- <54068031.5050806@renesas.com> <20140903054843.GA29259@verge.net.au>
-Message-ID: <5406B396.30907@renesas.com>
+From: ludovic.desroches@atmel.com (Ludovic Desroches)
+Date: Wed, 3 Sep 2014 08:26:40 +0200
+Subject: [PATCH] iio: adc: at91: don't use the last converted data register
+Message-ID: <1409725600-12961-1-git-send-email-ludovic.desroches@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Simon-san,
+If touchscreen mode is enabled and a conversion is requested on another
+channel, the result in the last converted data register can be a
+touchscreen relative value. Starting a conversion involves to do a
+conversion for all active channel. It starts with ADC channels and ends
+with touchscreen channels. Then if ADC_LCD register is not read quickly,
+its content may be a touchscreen conversion.
+To remove this temporal constraint, the conversion value is taken from
+the channel data register.
 
-On 9/3/2014 2:48 PM, Simon Horman wrote:
-> Hi Khiem-san,
-> 
-> On Wed, Sep 03, 2014 at 11:42:57AM +0900, Khiem Nguyen wrote:
->> Dear Simon-san, Shiiba-san,
->>
->> Thanks for the patch.
->>
->> On 9/3/2014 9:49 AM, Simon Horman wrote:
->>> The base address of the second memory region on the lager
->>> board is 0x140000000. Update the tag used in the dts file accordingly.
->>>
->>> This is a documentation fix and should have no run-time affect.
->>>
->>> This problem was introduced when the second memory region
->>> was added to the lager dts file by 62bc32a2573c4219
->>> ("ARM: shmobile: Include all 4 GiB of memory on Lager)"
->>> in v3.14.
->>>
->>> Reported-by: NAOYA SHIIBA <naoya.shiiba.nx@renesas.com>
->>> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
->>> ---
->>>  arch/arm/boot/dts/r8a7790-lager.dts | 2 +-
->>>  1 file changed, 1 insertion(+), 1 deletion(-)
->>>
->>> I am reposting this as Olof originally requested a syntax change,
->>> which I followed up on, however that change no longer seems appropriate.
->>> This this patch seems to be correct.
->> [...]
->>> -	memory at 180000000 {
->>> +	memory at 140000000 {
->>
->> Could you give more information about not using new syntax ?
->>
->> I checked memblock information in both 2 ways 
->> (i.e memory at 140000000 and memory at 1,40000000)
->> and I got same result.
->> root at lager:~# cat /sys/kernel/debug/memblock/memory
->>    0: 0x0000000040000000..0x000000007fffffff
->>    1: 0x0000000140000000..0x00000001ffffffff
->>
->> So, what does 'no longer seems appropriate" mean ?
-> 
-> Sorry for being vague.
-> 
-> I am specifically referring to the conversation in
-> the thread "[PATCH 11/14] arm64: dts: Add initial device tree support for
-> EXYNOS7" and in particular the following contribution to that discussion by
-> Olof:
-> 
-> 	"Ok, I'm happily proven wrong here, also by confirming how this is
-> 	 done on "real" OF.
-> 
-> 	 According to benh:
-> 
-> 	 15:20 <benh> ojn: 0,0 is not quite right, it's supposed to be used
-> 	 when the two numbers are different things, like device,fn on PCI
-> 
-> 	 The same is true for >2^32 unit addresses, they just use the one
-> 	 integer instead of x,y.
-> 
-> 	 So, I take back all I've said on this in the last 72 hours. :) It
-> 	 looks like we might need to revisit some of the 32-bit DTs.  Simon,
-> 	 drop the series you had. :)"
-> 
-> An archive of the message in question is available at:
-> https://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg36123.html
+Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+---
+ drivers/iio/adc/at91_adc.c |   14 +++++++++-----
+ 1 file changed, 9 insertions(+), 5 deletions(-)
 
-OK. I understood.
-Let's follow the right way. :)
-
+diff --git a/drivers/iio/adc/at91_adc.c b/drivers/iio/adc/at91_adc.c
+index 3b5bacd..dde22cb 100644
+--- a/drivers/iio/adc/at91_adc.c
++++ b/drivers/iio/adc/at91_adc.c
+@@ -196,6 +196,7 @@ struct at91_adc_state {
+ 	bool			done;
+ 	int			irq;
+ 	u16			last_value;
++	int			chnb;
+ 	struct mutex		lock;
+ 	u8			num_channels;
+ 	void __iomem		*reg_base;
+@@ -274,7 +275,7 @@ void handle_adc_eoc_trigger(int irq, struct iio_dev *idev)
+ 		disable_irq_nosync(irq);
+ 		iio_trigger_poll(idev->trig, iio_get_time_ns());
+ 	} else {
+-		st->last_value = at91_adc_readl(st, AT91_ADC_LCDR);
++		st->last_value = at91_adc_readl(st, AT91_ADC_CHAN(st, st->chnb));
+ 		st->done = true;
+ 		wake_up_interruptible(&st->wq_data_avail);
+ 	}
+@@ -348,10 +349,11 @@ static irqreturn_t at91_adc_rl_interrupt(int irq, void *private)
+ 	struct iio_dev *idev = private;
+ 	struct at91_adc_state *st = iio_priv(idev);
+ 	u32 status = at91_adc_readl(st, st->registers->status_register);
++	const u32 eoc_mask = (1 << st->num_channels) - 1;
+ 	unsigned int reg;
+ 
+ 	status &= at91_adc_readl(st, AT91_ADC_IMR);
+-	if (status & st->registers->drdy_mask)
++	if (status & eoc_mask)
+ 		handle_adc_eoc_trigger(irq, idev);
+ 
+ 	if (status & AT91RL_ADC_IER_PEN) {
+@@ -413,12 +415,13 @@ static irqreturn_t at91_adc_9x5_interrupt(int irq, void *private)
+ 	struct iio_dev *idev = private;
+ 	struct at91_adc_state *st = iio_priv(idev);
+ 	u32 status = at91_adc_readl(st, st->registers->status_register);
++	const u32 eoc_mask = (1 << st->num_channels) - 1;
+ 	const uint32_t ts_data_irq_mask =
+ 		AT91_ADC_IER_XRDY |
+ 		AT91_ADC_IER_YRDY |
+ 		AT91_ADC_IER_PRDY;
+ 
+-	if (status & st->registers->drdy_mask)
++	if (status & eoc_mask)
+ 		handle_adc_eoc_trigger(irq, idev);
+ 
+ 	if (status & AT91_ADC_IER_PEN) {
+@@ -689,9 +692,10 @@ static int at91_adc_read_raw(struct iio_dev *idev,
+ 	case IIO_CHAN_INFO_RAW:
+ 		mutex_lock(&st->lock);
+ 
++		st->chnb = chan->channel;
+ 		at91_adc_writel(st, AT91_ADC_CHER,
+ 				AT91_ADC_CH(chan->channel));
+-		at91_adc_writel(st, AT91_ADC_IER, st->registers->drdy_mask);
++		at91_adc_writel(st, AT91_ADC_IER, 1 << chan->channel);
+ 		at91_adc_writel(st, AT91_ADC_CR, AT91_ADC_START);
+ 
+ 		ret = wait_event_interruptible_timeout(st->wq_data_avail,
+@@ -708,7 +712,7 @@ static int at91_adc_read_raw(struct iio_dev *idev,
+ 
+ 		at91_adc_writel(st, AT91_ADC_CHDR,
+ 				AT91_ADC_CH(chan->channel));
+-		at91_adc_writel(st, AT91_ADC_IDR, st->registers->drdy_mask);
++		at91_adc_writel(st, AT91_ADC_IDR, 1 << chan->channel);
+ 
+ 		st->last_value = 0;
+ 		st->done = false;
 -- 
-Best regards,
-KHIEM Nguyen
+1.7.9.5
