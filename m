@@ -1,69 +1,52 @@
 From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Wed,  3 Sep 2014 12:52:30 +0200
-Subject: [PATCH 14/15] PM / Domains: Remove default_stop_ok() API
+Date: Wed,  3 Sep 2014 12:52:29 +0200
+Subject: [PATCH 13/15] drivers: sh: Leave disabling of unused PM domains to
+ genpd
 In-Reply-To: <1409741551-16437-1-git-send-email-ulf.hansson@linaro.org>
 References: <1409741551-16437-1-git-send-email-ulf.hansson@linaro.org>
-Message-ID: <1409741551-16437-15-git-send-email-ulf.hansson@linaro.org>
+Message-ID: <1409741551-16437-14-git-send-email-ulf.hansson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There are currently no need to export default_stop_ok() as an API,
-instead let's keep it local to the PM domain governor.
+Since genpd at late init, will try to disable unused PM domains we
+don't need to do it from here as well.
 
+Cc: Simon Horman <horms@verge.net.au>
+Cc: Magnus Damm <magnus.damm@gmail.com>
 Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
 ---
- drivers/base/power/domain_governor.c | 7 ++-----
- include/linux/pm_domain.h            | 6 ------
- 2 files changed, 2 insertions(+), 11 deletions(-)
+ drivers/sh/pm_runtime.c | 11 -----------
+ 1 file changed, 11 deletions(-)
 
-diff --git a/drivers/base/power/domain_governor.c b/drivers/base/power/domain_governor.c
-index a089e3b..d88a62e 100644
---- a/drivers/base/power/domain_governor.c
-+++ b/drivers/base/power/domain_governor.c
-@@ -42,7 +42,7 @@ static int dev_update_qos_constraint(struct device *dev, void *data)
-  * default_stop_ok - Default PM domain governor routine for stopping devices.
-  * @dev: Device to check.
-  */
--bool default_stop_ok(struct device *dev)
-+static bool default_stop_ok(struct device *dev)
- {
- 	struct gpd_timing_data *td = &dev_gpd_data(dev)->td;
- 	unsigned long flags;
-@@ -229,10 +229,7 @@ static bool always_on_power_down_ok(struct dev_pm_domain *domain)
+diff --git a/drivers/sh/pm_runtime.c b/drivers/sh/pm_runtime.c
+index 72f6381..fe2c2d5 100644
+--- a/drivers/sh/pm_runtime.c
++++ b/drivers/sh/pm_runtime.c
+@@ -75,8 +75,6 @@ static struct pm_clk_notifier_block platform_bus_notifier = {
+ 	.con_ids = { NULL, },
+ };
  
- #else /* !CONFIG_PM_RUNTIME */
- 
--bool default_stop_ok(struct device *dev)
--{
--	return false;
--}
-+static inline bool default_stop_ok(struct device *dev) { return false; }
- 
- #define default_power_down_ok	NULL
- #define always_on_power_down_ok	NULL
-diff --git a/include/linux/pm_domain.h b/include/linux/pm_domain.h
-index abeb5dc..ebf52ae 100644
---- a/include/linux/pm_domain.h
-+++ b/include/linux/pm_domain.h
-@@ -151,8 +151,6 @@ extern void pm_genpd_init(struct generic_pm_domain *genpd,
- extern int pm_genpd_poweron(struct generic_pm_domain *genpd);
- extern int pm_genpd_name_poweron(const char *domain_name);
- 
--extern bool default_stop_ok(struct device *dev);
+-static bool default_pm_on;
 -
- extern struct dev_power_governor pm_domain_always_on_gov;
- #else
- 
-@@ -231,10 +229,6 @@ static inline int pm_genpd_name_poweron(const char *domain_name)
+ static int __init sh_pm_runtime_init(void)
  {
- 	return -ENOSYS;
+ 	if (IS_ENABLED(CONFIG_ARCH_SHMOBILE_MULTI)) {
+@@ -96,16 +94,7 @@ static int __init sh_pm_runtime_init(void)
+ 			return 0;
+ 	}
+ 
+-	default_pm_on = true;
+ 	pm_clk_add_notifier(&platform_bus_type, &platform_bus_notifier);
+ 	return 0;
  }
--static inline bool default_stop_ok(struct device *dev)
+ core_initcall(sh_pm_runtime_init);
+-
+-static int __init sh_pm_runtime_late_init(void)
 -{
--	return false;
+-	if (default_pm_on)
+-		pm_genpd_poweroff_unused();
+-	return 0;
 -}
- #define simple_qos_governor NULL
- #define pm_domain_always_on_gov NULL
- #endif
+-late_initcall(sh_pm_runtime_late_init);
 -- 
 1.9.1
