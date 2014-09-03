@@ -1,87 +1,198 @@
 From: keescook@chromium.org (Kees Cook)
-Date: Wed,  3 Sep 2014 14:57:07 -0700
-Subject: [PATCH v5 6/8] arm: kgdb: Handle read-only text / modules
+Date: Wed,  3 Sep 2014 14:57:05 -0700
+Subject: [PATCH v5 4/8] arm: use fixmap for text patching when text is RO
 In-Reply-To: <1409781429-27593-1-git-send-email-keescook@chromium.org>
 References: <1409781429-27593-1-git-send-email-keescook@chromium.org>
-Message-ID: <1409781429-27593-7-git-send-email-keescook@chromium.org>
+Message-ID: <1409781429-27593-5-git-send-email-keescook@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Doug Anderson <dianders@chromium.org>
+From: Rabin Vincent <rabin@rab.in>
 
-Handle the case where someone has set the text segment of the kernel
-as read-only by using the newly introduced "patch" mechanism.
+Use fixmaps for text patching when the kernel text is read-only,
+inspired by x86.  This makes jump labels and kprobes work with the
+currently available CONFIG_DEBUG_SET_MODULE_RONX and the upcoming
+CONFIG_DEBUG_RODATA options.
 
-Signed-off-by: Doug Anderson <dianders@chromium.org>
-[kees: switched structure size check to BUILD_BUG_ON (sboyd)]
+Signed-off-by: Rabin Vincent <rabin@rab.in>
+[kees: fixed up for merge with "arm: use generic fixmap.h"]
+[kees: added parse acquire/release annotations to pass C=1 builds]
 Signed-off-by: Kees Cook <keescook@chromium.org>
 Acked-by: Nicolas Pitre <nico@linaro.org>
 ---
- arch/arm/kernel/Makefile |  2 +-
- arch/arm/kernel/kgdb.c   | 29 +++++++++++++++++++++++++++++
- 2 files changed, 30 insertions(+), 1 deletion(-)
+ arch/arm/include/asm/fixmap.h |  4 +++
+ arch/arm/kernel/jump_label.c  |  2 +-
+ arch/arm/kernel/patch.c       | 79 +++++++++++++++++++++++++++++++++++++++----
+ arch/arm/kernel/patch.h       | 12 ++++++-
+ 4 files changed, 88 insertions(+), 9 deletions(-)
 
-diff --git a/arch/arm/kernel/Makefile b/arch/arm/kernel/Makefile
-index 38ddd9f83d0e..70b730766330 100644
---- a/arch/arm/kernel/Makefile
-+++ b/arch/arm/kernel/Makefile
-@@ -67,7 +67,7 @@ test-kprobes-objs		+= kprobes-test-arm.o
- endif
- obj-$(CONFIG_OABI_COMPAT)	+= sys_oabi-compat.o
- obj-$(CONFIG_ARM_THUMBEE)	+= thumbee.o
--obj-$(CONFIG_KGDB)		+= kgdb.o
-+obj-$(CONFIG_KGDB)		+= kgdb.o patch.o
- obj-$(CONFIG_ARM_UNWIND)	+= unwind.o
- obj-$(CONFIG_HAVE_TCM)		+= tcm.o
- obj-$(CONFIG_OF)		+= devtree.o
-diff --git a/arch/arm/kernel/kgdb.c b/arch/arm/kernel/kgdb.c
-index a74b53c1b7df..07db2f8a1b45 100644
---- a/arch/arm/kernel/kgdb.c
-+++ b/arch/arm/kernel/kgdb.c
-@@ -12,8 +12,12 @@
- #include <linux/irq.h>
- #include <linux/kdebug.h>
- #include <linux/kgdb.h>
-+#include <linux/uaccess.h>
-+
- #include <asm/traps.h>
+diff --git a/arch/arm/include/asm/fixmap.h b/arch/arm/include/asm/fixmap.h
+index 714606f70425..0415eae1df27 100644
+--- a/arch/arm/include/asm/fixmap.h
++++ b/arch/arm/include/asm/fixmap.h
+@@ -11,6 +11,10 @@ enum fixed_addresses {
+ 	FIX_KMAP_BEGIN,
+ 	FIX_KMAP_END = FIX_KMAP_BEGIN + (KM_TYPE_NR * NR_CPUS) - 1,
  
-+#include "patch.h"
++	/* Support writing RO kernel text via kprobes, jump labels, etc. */
++	FIX_TEXT_POKE0,
++	FIX_TEXT_POKE1,
 +
- struct dbg_reg_def_t dbg_reg_def[DBG_MAX_REG_NUM] =
- {
- 	{ "r0", 4, offsetof(struct pt_regs, ARM_r0)},
-@@ -244,6 +248,31 @@ void kgdb_arch_exit(void)
- 	unregister_die_notifier(&kgdb_notifier);
+ 	__end_of_fixed_addresses
+ };
+ 
+diff --git a/arch/arm/kernel/jump_label.c b/arch/arm/kernel/jump_label.c
+index 4ce4f789446d..afeeb9ea6f43 100644
+--- a/arch/arm/kernel/jump_label.c
++++ b/arch/arm/kernel/jump_label.c
+@@ -19,7 +19,7 @@ static void __arch_jump_label_transform(struct jump_entry *entry,
+ 		insn = arm_gen_nop();
+ 
+ 	if (is_static)
+-		__patch_text(addr, insn);
++		__patch_text_early(addr, insn);
+ 	else
+ 		patch_text(addr, insn);
  }
+diff --git a/arch/arm/kernel/patch.c b/arch/arm/kernel/patch.c
+index 07314af47733..a1dce690446a 100644
+--- a/arch/arm/kernel/patch.c
++++ b/arch/arm/kernel/patch.c
+@@ -1,8 +1,11 @@
+ #include <linux/kernel.h>
++#include <linux/spinlock.h>
+ #include <linux/kprobes.h>
++#include <linux/mm.h>
+ #include <linux/stop_machine.h>
  
-+int kgdb_arch_set_breakpoint(struct kgdb_bkpt *bpt)
+ #include <asm/cacheflush.h>
++#include <asm/fixmap.h>
+ #include <asm/smp_plat.h>
+ #include <asm/opcodes.h>
+ 
+@@ -13,21 +16,77 @@ struct patch {
+ 	unsigned int insn;
+ };
+ 
+-void __kprobes __patch_text(void *addr, unsigned int insn)
++static DEFINE_SPINLOCK(patch_lock);
++
++static void __kprobes *patch_map(void *addr, int fixmap, unsigned long *flags)
++	__acquires(&patch_lock)
 +{
-+	int err;
++	unsigned int uintaddr = (uintptr_t) addr;
++	bool module = !core_kernel_text(uintaddr);
++	struct page *page;
 +
-+	/* patch_text() only supports int-sized breakpoints */
-+	BUILD_BUG_ON(sizeof(int) != BREAK_INSTR_SIZE);
++	if (module && IS_ENABLED(CONFIG_DEBUG_SET_MODULE_RONX))
++		page = vmalloc_to_page(addr);
++	else if (!module && IS_ENABLED(CONFIG_DEBUG_RODATA))
++		page = virt_to_page(addr);
++	else
++		return addr;
 +
-+	err = probe_kernel_read(bpt->saved_instr, (char *)bpt->bpt_addr,
-+				BREAK_INSTR_SIZE);
-+	if (err)
-+		return err;
++	if (flags)
++		spin_lock_irqsave(&patch_lock, *flags);
++	else
++		__acquire(&patch_lock);
 +
-+	patch_text((void *)bpt->bpt_addr,
-+		   *(unsigned int *)arch_kgdb_ops.gdb_bpt_instr);
++	set_fixmap(fixmap, page_to_phys(page));
 +
-+	return err;
++	return (void *) (__fix_to_virt(fixmap) + (uintaddr & ~PAGE_MASK));
 +}
 +
-+int kgdb_arch_remove_breakpoint(struct kgdb_bkpt *bpt)
++static void __kprobes patch_unmap(int fixmap, unsigned long *flags)
++	__releases(&patch_lock)
 +{
-+	patch_text((void *)bpt->bpt_addr, *(unsigned int *)bpt->saved_instr);
++	clear_fixmap(fixmap);
 +
-+	return 0;
++	if (flags)
++		spin_unlock_irqrestore(&patch_lock, *flags);
++	else
++		__release(&patch_lock);
 +}
 +
- /*
-  * Register our undef instruction hooks with ARM undef core.
-  * We regsiter a hook specifically looking for the KGB break inst
++void __kprobes __patch_text_real(void *addr, unsigned int insn, bool remap)
+ {
+ 	bool thumb2 = IS_ENABLED(CONFIG_THUMB2_KERNEL);
++	unsigned int uintaddr = (uintptr_t) addr;
++	bool twopage = false;
++	unsigned long flags;
++	void *waddr = addr;
+ 	int size;
+ 
++	if (remap)
++		waddr = patch_map(addr, FIX_TEXT_POKE0, &flags);
++	else
++		__acquire(&patch_lock);
++
+ 	if (thumb2 && __opcode_is_thumb16(insn)) {
+-		*(u16 *)addr = __opcode_to_mem_thumb16(insn);
++		*(u16 *)waddr = __opcode_to_mem_thumb16(insn);
+ 		size = sizeof(u16);
+-	} else if (thumb2 && ((uintptr_t)addr & 2)) {
++	} else if (thumb2 && (uintaddr & 2)) {
+ 		u16 first = __opcode_thumb32_first(insn);
+ 		u16 second = __opcode_thumb32_second(insn);
+-		u16 *addrh = addr;
++		u16 *addrh0 = waddr;
++		u16 *addrh1 = waddr + 2;
++
++		twopage = (uintaddr & ~PAGE_MASK) == PAGE_SIZE - 2;
++		if (twopage && remap)
++			addrh1 = patch_map(addr + 2, FIX_TEXT_POKE1, NULL);
+ 
+-		addrh[0] = __opcode_to_mem_thumb16(first);
+-		addrh[1] = __opcode_to_mem_thumb16(second);
++		*addrh0 = __opcode_to_mem_thumb16(first);
++		*addrh1 = __opcode_to_mem_thumb16(second);
++
++		if (twopage && addrh1 != addr + 2) {
++			flush_kernel_vmap_range(addrh1, 2);
++			patch_unmap(FIX_TEXT_POKE1, NULL);
++		}
+ 
+ 		size = sizeof(u32);
+ 	} else {
+@@ -36,10 +95,16 @@ void __kprobes __patch_text(void *addr, unsigned int insn)
+ 		else
+ 			insn = __opcode_to_mem_arm(insn);
+ 
+-		*(u32 *)addr = insn;
++		*(u32 *)waddr = insn;
+ 		size = sizeof(u32);
+ 	}
+ 
++	if (waddr != addr) {
++		flush_kernel_vmap_range(waddr, twopage ? size / 2 : size);
++		patch_unmap(FIX_TEXT_POKE0, &flags);
++	} else
++		__release(&patch_lock);
++
+ 	flush_icache_range((uintptr_t)(addr),
+ 			   (uintptr_t)(addr) + size);
+ }
+diff --git a/arch/arm/kernel/patch.h b/arch/arm/kernel/patch.h
+index b4731f2dac38..77e054c2f6cd 100644
+--- a/arch/arm/kernel/patch.h
++++ b/arch/arm/kernel/patch.h
+@@ -2,6 +2,16 @@
+ #define _ARM_KERNEL_PATCH_H
+ 
+ void patch_text(void *addr, unsigned int insn);
+-void __patch_text(void *addr, unsigned int insn);
++void __patch_text_real(void *addr, unsigned int insn, bool remap);
++
++static inline void __patch_text(void *addr, unsigned int insn)
++{
++	__patch_text_real(addr, insn, true);
++}
++
++static inline void __patch_text_early(void *addr, unsigned int insn)
++{
++	__patch_text_real(addr, insn, false);
++}
+ 
+ #endif
 -- 
 1.9.1
