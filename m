@@ -1,52 +1,47 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 3 Sep 2014 17:31:30 +0100
-Subject: [PATCH V3 0/6] ARM64: Add support for FSL's LS2085A SoC
-In-Reply-To: <2843702.jP4KCB2Kid@wuerfel>
-References: <1409757194-28155-1-git-send-email-bhupesh.sharma@freescale.com>
- <2961958.2caI26WGbt@wuerfel> <20140903160936.GL3127@leverpostej>
- <2843702.jP4KCB2Kid@wuerfel>
-Message-ID: <20140903163130.GM3127@leverpostej>
+From: romain.perier@gmail.com (PERIER Romain)
+Date: Wed, 3 Sep 2014 18:37:16 +0200
+Subject: [PATCH 4/4] ARM: dts: Enable emac node on the rk3188-radxarock
+ boards
+In-Reply-To: <CAFnsNoSmHwN3nJ5ZJL5fc_-kaECCoLBvpdBYQxkyLcUzLx5MTw@mail.gmail.com>
+References: <1409740036-8117-1-git-send-email-romain.perier@gmail.com>
+ <1409740036-8117-4-git-send-email-romain.perier@gmail.com>
+ <CAFnsNoSmHwN3nJ5ZJL5fc_-kaECCoLBvpdBYQxkyLcUzLx5MTw@mail.gmail.com>
+Message-ID: <CABgxDoJOJ9bM2CgXyXjPvsv2DN_QO+HPAzCwfjdyKFDpUAOtOw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 03, 2014 at 05:18:42PM +0100, Arnd Bergmann wrote:
-> On Wednesday 03 September 2014 17:09:36 Mark Rutland wrote:
-> > On Wed, Sep 03, 2014 at 05:05:51PM +0100, Arnd Bergmann wrote:
-> > > On Wednesday 03 September 2014 16:56:55 Mark Rutland wrote:
-> > > > Personally I'd like to see such things patched by the firmware/loader
-> > > > where possible (ideally with some way of switching said patching off if
-> > > > we really know better). We already expect the loader to patch memory
-> > > > nodes where memory can be dynamically populated. 
-> > > > 
-> > > > I don't see why we should tie the in-kernel dts to a particular firmware
-> > > > revision. Having such properties in the in-kernel dts is only going to
-> > > > mislead. The arm64 boot-wrapper patches dts for PSCI, but for
-> > > > compatibility with old wrappers the in-kernel dts must forever say
-> > > > spin-table is used to bring up secondaries.
-> > > 
-> > > But the kernel has never supported this platform with a non-PSCI
-> > > enable method, why should we provide compatibility for something
-> > > we never had upstream?
-> > 
-> > I'm not arguing we should.
-> > 
-> > What I'm suggesting is there wouldn't be an enable-method at all (so we
-> > won't bring up secondaries at all unless that's patched).
-> 
-> Ok, I see the appeal in forcing boot loaders to put some patch
-> up the dtbs with whatever software interfaces they provide.
-> What I'm interested in however is making it harder for the boot
-> loader to use something other than psci.
+It is an optional property used by arc-emac (the core driver), if it
+is not present the core driver generates one for you.
+Problem being that with this property two radxa rock boards connected
+on the same local network might have the same mac address.
 
-I see.
+In this case it would be probably better to remove this property. What
+do you think ?
 
-I agree that we presently want systems to implement PSCI (0.2+), and we
-certainly do not want anything that's platform-specific.
-
-However, I'm not sure I follow the reasoning for making this
-significantly harder, and even ignoring that I don't think this does
-make things significantly harder. Especially so if we have a PSCI node
-but not an enable method -- in that case its trivial to patch in an
-unrelated enable-method anyhow.
-
-Mark.
+2014-09-03 17:29 GMT+02:00 Naoki FUKAUMI <naobsd@gmail.com>:
+> On Wed, Sep 3, 2014 at 7:27 PM, Romain Perier <romain.perier@gmail.com> wrote:
+>> This enables EMAC Rockchip support on radxa rock boards.
+>>
+>> Signed-off-by: Romain Perier <romain.perier@gmail.com>
+>> ---
+>>  arch/arm/boot/dts/rk3188-radxarock.dts | 24 ++++++++++++++++++++++++
+>>  1 file changed, 24 insertions(+)
+>>
+>> diff --git a/arch/arm/boot/dts/rk3188-radxarock.dts b/arch/arm/boot/dts/rk3188-radxarock.dts
+>> index 5e4e3c23..e1358d3 100644
+>> --- a/arch/arm/boot/dts/rk3188-radxarock.dts
+>> +++ b/arch/arm/boot/dts/rk3188-radxarock.dts
+>> @@ -76,6 +76,24 @@
+>>         };
+>>  };
+>>
+>> +&emac {
+>> +       status = "okay";
+>> +       compatible = "rockchip,rk3188-emac";
+>> +
+>> +       pinctrl-names = "default";
+>> +       pinctrl-0 = <&emac_xfer>, <&emac_mdio>, <&phy_int>;
+>> +
+>> +       mac-address = [ c6 ef 91 8e 60 4b ];
+>
+> is "mac-address" required?
