@@ -1,36 +1,43 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 03 Sep 2014 13:14:54 +0200
-Subject: [PATCH v4 1/4] ethernet: arc: Add support for Rockchip SoC layer
- device tree bindings
-In-Reply-To: <1409740036-8117-1-git-send-email-romain.perier@gmail.com>
-References: <1409740036-8117-1-git-send-email-romain.perier@gmail.com>
-Message-ID: <3774938.44qiV4hEoE@wuerfel>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Wed, 03 Sep 2014 19:17:16 +0800
+Subject: [PATCH v3 13/17] ARM64 / ACPI: Add GICv2 specific ACPI boot
+ support
+In-Reply-To: <5406EDDC.3020208@arm.com>
+References: <1409583475-6978-1-git-send-email-hanjun.guo@linaro.org>
+ <1409583475-6978-14-git-send-email-hanjun.guo@linaro.org>
+ <5404AE56.80801@arm.com> <5405AE95.1020201@linaro.org>
+ <5405BFE7.5060005@arm.com> <5405E626.4090306@linaro.org>
+ <5406EDDC.3020208@arm.com>
+Message-ID: <5406F8BC.7000503@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 03 September 2014 10:27:13 Romain Perier wrote:
-> +static const struct emac_rockchip_soc_data emac_rockchip_dt_data[] = {
-> +       { .grf_offset = 0x154 }, /* rk3066 */
-> +       { .grf_offset = 0x0a4 }, /* rk3188 */
-> +};
-> +
-> +static const struct of_device_id emac_rockchip_dt_ids[] = {
-> +       { .compatible = "rockchip,rk3066-emac", .data = &emac_rockchip_dt_data[0] },
-> +       { .compatible = "rockchip,rk3188-emac", .data = &emac_rockchip_dt_data[1] },
-> +       { /* Sentinel */ }
-> +};
-> +
-> 
 
-One last question: is this the location given as .grf_offset the
-only thing in grf that is potentially of concern to this driver?
+>>>>>> +
+>>>>>> +#ifdef CONFIG_ACPI
+>>>>>> +#define ACPI_MAX_GIC_CPU_INTERFACE_ENTRIES  65535
+>>>>> With GICv2? I doubt it.
+>>>> I will create macro for each GIC driver:
+>>>> #define ACPI_MAX_GICV2_CPU_INTERFACE_ENTRIES    8
+>>>> #define ACPI_MAX_GICV3_CPU_INTERFACE_ENTRIES    65535
+>>> Where do you get this value (ACPI_MAX_GICV3_CPU_INTERFACE_ENTRIES) from?
+>> This value is for max processors entries in MADT, and we will use it to scan MADT
+>> for SMP/GIC Init, I just make it big enough for GICv3/4. since ACPI core will stop
+>> scan MADT if the real numbers of processors entries are reached no matter
+>> how big ACPI_MAX_GICV3_CPU_INTERFACE_ENTRIES is, I think we can just
+>> define a number big enough then it will work (x86 and ia64 did the same thing).
+> Also, with GICv3++, there is no such thing as a memory-mapped CPU
+> interface anymore. What you get is a bunch of redistributors (one per
+> CPU). I assume what you have here actually describe the redistributors,
+> and its name should reflect that.
 
-If it is, you can change the binding to include the register number
-in the syscon reference, like
+As Sudeep said, it is not to link to GIC architecture, so I think we can keep
+it stick with ACPI spec, in ACPI spec, it called "GICC structure" (section 5.2.12.14
+in ACPI 5.1), so we can name it as ACPI_MAX_GICC_STRUCTURE_ENTRIES no matter
+GICv2 or GICv3/4 (with GICv2, it may have more than 8 entries with some disabled
+ones, will no more than 8 enabled entries).
 
-	rockchip,grf = <&grf 0x154>;
+What do you think?
 
-and then read it from there, to simplify the code needed to get the
-number from the device id.
-
-	Arnd
+Thanks
+Hanjun
