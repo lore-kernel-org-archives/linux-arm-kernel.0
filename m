@@ -1,50 +1,37 @@
-From: bhupesh.sharma@freescale.com (Bhupesh Sharma)
-Date: Wed, 3 Sep 2014 20:43:14 +0530
-Subject: [PATCH V3 6/6] arm64: Add support for FSL's LS2085A SoC in Kconfig
- and defconfig
-In-Reply-To: <1409757194-28155-1-git-send-email-bhupesh.sharma@freescale.com>
-References: <1409757194-28155-1-git-send-email-bhupesh.sharma@freescale.com>
-Message-ID: <1409757194-28155-7-git-send-email-bhupesh.sharma@freescale.com>
+From: naobsd@gmail.com (Naoki FUKAUMI)
+Date: Thu, 4 Sep 2014 00:29:28 +0900
+Subject: [PATCH 4/4] ARM: dts: Enable emac node on the rk3188-radxarock
+ boards
+In-Reply-To: <1409740036-8117-4-git-send-email-romain.perier@gmail.com>
+References: <1409740036-8117-1-git-send-email-romain.perier@gmail.com>
+ <1409740036-8117-4-git-send-email-romain.perier@gmail.com>
+Message-ID: <CAFnsNoSmHwN3nJ5ZJL5fc_-kaECCoLBvpdBYQxkyLcUzLx5MTw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds support for FSL's LS2085A SoC in the arm64 Kconfig
-and defconfig files.
+On Wed, Sep 3, 2014 at 7:27 PM, Romain Perier <romain.perier@gmail.com> wrote:
+> This enables EMAC Rockchip support on radxa rock boards.
+>
+> Signed-off-by: Romain Perier <romain.perier@gmail.com>
+> ---
+>  arch/arm/boot/dts/rk3188-radxarock.dts | 24 ++++++++++++++++++++++++
+>  1 file changed, 24 insertions(+)
+>
+> diff --git a/arch/arm/boot/dts/rk3188-radxarock.dts b/arch/arm/boot/dts/rk3188-radxarock.dts
+> index 5e4e3c23..e1358d3 100644
+> --- a/arch/arm/boot/dts/rk3188-radxarock.dts
+> +++ b/arch/arm/boot/dts/rk3188-radxarock.dts
+> @@ -76,6 +76,24 @@
+>         };
+>  };
+>
+> +&emac {
+> +       status = "okay";
+> +       compatible = "rockchip,rk3188-emac";
+> +
+> +       pinctrl-names = "default";
+> +       pinctrl-0 = <&emac_xfer>, <&emac_mdio>, <&phy_int>;
+> +
+> +       mac-address = [ c6 ef 91 8e 60 4b ];
 
-Signed-off-by: Bhupesh Sharma <bhupesh.sharma@freescale.com>
-Signed-off-by: Arnab Basu <arnab.basu@freescale.com>
----
- arch/arm64/Kconfig           |    5 +++++
- arch/arm64/configs/defconfig |    1 +
- 2 files changed, 6 insertions(+)
-
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index fd4e81a..1114df0 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -149,6 +149,11 @@ config ARCH_XGENE
- 	help
- 	  This enables support for AppliedMicro X-Gene SOC Family
- 
-+config ARCH_FSL_LS2085A
-+	bool "Freescale LS2085A SOC"
-+	help
-+	  This enables support for Freescale LS2085A SOC.
-+
- endmenu
- 
- menu "Bus support"
-diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
-index d92ef3c..f2fb45d 100644
---- a/arch/arm64/configs/defconfig
-+++ b/arch/arm64/configs/defconfig
-@@ -34,6 +34,7 @@ CONFIG_MODULE_UNLOAD=y
- # CONFIG_IOSCHED_DEADLINE is not set
- CONFIG_ARCH_VEXPRESS=y
- CONFIG_ARCH_XGENE=y
-+CONFIG_ARCH_FSL_LS2085A=y
- CONFIG_SMP=y
- CONFIG_PREEMPT=y
- CONFIG_KSM=y
--- 
-1.7.9.5
+is "mac-address" required?
