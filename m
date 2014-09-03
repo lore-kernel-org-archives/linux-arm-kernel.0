@@ -1,36 +1,39 @@
-From: carlo.caione@gmail.com (Carlo Caione)
-Date: Wed, 3 Sep 2014 20:42:50 +0200
-Subject: [PATCH 1/5] ARM: sun4i: Relicense the A10 DTSI under GPLv2/X11
-In-Reply-To: <1409682069-7164-1-git-send-email-maxime.ripard@free-electrons.com>
-References: <1409682069-7164-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <20140903184250.GA8163@nuc>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 03 Sep 2014 20:42:44 +0200
+Subject: [PATCH v3 13/17] ARM64 / ACPI: Add GICv2 specific ACPI boot
+ support
+In-Reply-To: <1409583475-6978-14-git-send-email-hanjun.guo@linaro.org>
+References: <1409583475-6978-1-git-send-email-hanjun.guo@linaro.org>
+ <1409583475-6978-14-git-send-email-hanjun.guo@linaro.org>
+Message-ID: <2893693.4bZJXXENof@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 02, 2014 at 08:21:05PM +0200, Maxime Ripard wrote:
-> The current GPL only licensing on the DTSI makes it very impractical for other
-> software components licensed under another license.
-> 
-> In order to make it easier for them to reuse our device trees, relicense our
-> DTSI first under a GPL/X11 dual-license. Hopefully, the DTS will follow soon.
-> 
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> Cc: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-> Cc: Arnd Bergmann <arnd@arndb.de>
-> Cc: Carlo Caione <carlo.caione@gmail.com>
-> Cc: Chen-Yu Tsai <wens@csie.org>
-> Cc: David Lanzend?rfer <david.lanzendoerfer@o2s.ch>
-> Cc: Emilio L?pez <emilio@elopez.com.ar>
-> Cc: Hans de Goede <hdegoede@redhat.com>
-> Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> Cc: Oliver Schinagl <oliver@schinagl.nl>
-> Cc: Roman Byshko <rbyshko@gmail.com>
-> Cc: Stefan Roese <sr@denx.de>
-> ---
->  arch/arm/boot/dts/sun4i-a10.dtsi | 46 +++++++++++++++++++++++++++++++++++-----
->  1 file changed, 41 insertions(+), 5 deletions(-)
+On Monday 01 September 2014 22:57:51 Hanjun Guo wrote:
+> +       /* Collect CPU base addresses */
+> +       count = acpi_parse_entries(sizeof(struct acpi_table_madt),
+> +                                  gic_acpi_parse_madt_cpu, table,
+> +                                  ACPI_MADT_TYPE_GENERIC_INTERRUPT,
+> +                                  ACPI_MAX_GIC_CPU_INTERFACE_ENTRIES);
+> +       if (count < 0) {
+> +               pr_err("Error during GICC entries parsing\n");
+> +               return -EFAULT;
+> +       } else if (!count) {
+> +               /* No GICC entries provided, use address from MADT header */
+> +               struct acpi_table_madt *madt = (struct acpi_table_madt *)table;
+> +
+> +               if (!madt->address)
+> +                       return -EFAULT;
+> +
+> +               cpu_phy_base = (u64)madt->address;
+> +       }
 
-Acked-by: Carlo Caione <carlo@caione.org> 
+After I read through ACPI-5.1 section 5.2.12.14, I wonder if this is the
+best way to treat a missing ACPI_MADT_TYPE_GENERIC_INTERRUPT table.
 
--- 
-Carlo Caione
+Do we expect to see those in practice? It seems like using the x86 local
+APIC address as a fallback for the GIC address is not something we
+should do unless we absolutely have to support a system that doesn't
+have the GIC table.
+
+	Arnd
