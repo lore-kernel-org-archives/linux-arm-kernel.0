@@ -1,39 +1,34 @@
 From: lersek@redhat.com (Laszlo Ersek)
-Date: Wed,  3 Sep 2014 13:32:18 +0200
-Subject: [PATCH v2 0/5] beautify EFI memmap logs
-Message-ID: <1409743943-16934-1-git-send-email-lersek@redhat.com>
+Date: Wed,  3 Sep 2014 13:32:19 +0200
+Subject: [PATCH v2 1/5] efi: add macro for EFI_MEMORY_UCE memory attribute
+In-Reply-To: <1409743943-16934-1-git-send-email-lersek@redhat.com>
+References: <1409743943-16934-1-git-send-email-lersek@redhat.com>
+Message-ID: <1409743943-16934-2-git-send-email-lersek@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-changes in v2:
-- explain with examples how the log's appearance changes, in patches 3-5
-  [Ingo]
+Add the following macro from the UEFI spec, for completeness:
 
-v1 blurb:
+  EFI_MEMORY_UCE  Memory cacheability attribute: The memory region
+                  supports being configured as not cacheable, exported,
+                  and supports the "fetch and add" semaphore mechanism.
 
-> It's a pain to analyze EFI memmap logs while debugging, especially to
-> verify the memory types (an enum) and the memory attributes (a
-> bitmap). This series renders those columns human-readable, and unifies
-> their formatting between x86, ia64 and arm64.
+Signed-off-by: Laszlo Ersek <lersek@redhat.com>
+---
+ include/linux/efi.h | 1 +
+ 1 file changed, 1 insertion(+)
 
-Thanks
-Laszlo
-
-Laszlo Ersek (5):
-  efi: add macro for EFI_MEMORY_UCE memory attribute
-  efi: introduce efi_md_typeattr_format()
-  x86: efi: format EFI memory type & attrs with efi_md_typeattr_format()
-  ia64: efi: format EFI memory type & attrs with
-    efi_md_typeattr_format()
-  arm64: efi: format EFI memory type & attrs with
-    efi_md_typeattr_format()
-
- include/linux/efi.h         |  8 +++++++
- arch/arm64/kernel/efi.c     | 26 +++++----------------
- arch/ia64/kernel/efi.c      |  6 +++--
- arch/x86/platform/efi/efi.c |  7 ++++--
- drivers/firmware/efi/efi.c  | 57 +++++++++++++++++++++++++++++++++++++++++++++
- 5 files changed, 80 insertions(+), 24 deletions(-)
-
+diff --git a/include/linux/efi.h b/include/linux/efi.h
+index 45cb4ff..b4b1d8d 100644
+--- a/include/linux/efi.h
++++ b/include/linux/efi.h
+@@ -92,6 +92,7 @@ typedef	struct {
+ #define EFI_MEMORY_WC		((u64)0x0000000000000002ULL)	/* write-coalescing */
+ #define EFI_MEMORY_WT		((u64)0x0000000000000004ULL)	/* write-through */
+ #define EFI_MEMORY_WB		((u64)0x0000000000000008ULL)	/* write-back */
++#define EFI_MEMORY_UCE		((u64)0x0000000000000010ULL)	/* uncached, exported */
+ #define EFI_MEMORY_WP		((u64)0x0000000000001000ULL)	/* write-protect */
+ #define EFI_MEMORY_RP		((u64)0x0000000000002000ULL)	/* read-protect */
+ #define EFI_MEMORY_XP		((u64)0x0000000000004000ULL)	/* execute-protect */
 -- 
 1.8.3.1
