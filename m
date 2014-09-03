@@ -1,22 +1,43 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 3 Sep 2014 10:03:01 +0100
-Subject: [PATCH] ARM: drop ISAR0 workaround for B15
-In-Reply-To: <20140902234924.GZ18411@ld-irv-0074>
-References: <1407797053-12544-1-git-send-email-gregory.0xf0@gmail.com>
- <20140813194047.GA18411@ld-irv-0074>
- <20140902234924.GZ18411@ld-irv-0074>
-Message-ID: <20140903090301.GA32378@arm.com>
+From: boris.brezillon@free-electrons.com (Boris BREZILLON)
+Date: Wed,  3 Sep 2014 11:07:49 +0200
+Subject: [PATCH 3/5] irqchip: atmel-aic: add specific irq fixup function for
+ sam9g45 and sam9rl
+In-Reply-To: <1409735271-15353-1-git-send-email-boris.brezillon@free-electrons.com>
+References: <1409735271-15353-1-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1409735271-15353-4-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 03, 2014 at 12:49:24AM +0100, Brian Norris wrote:
-> Ping.
-> 
-> Is this worthy of 3.17-rc? Or should it just be queued for 3.18, as it's
-> only removing redundant info?
+The at91sam9g45 and at91sam9rl SoCs embed one RTT (Real Time Timer) and one
+RTC block and thus need to call both rtt and rtc fixup functions.
 
-Since it's not actually fixing anything, I don't think it qualifies as a
-fix. You can still put it into rmk's patch system though, as I don't see
-this conflicting with anything in the pipeline.
+Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
+---
+ drivers/irqchip/irq-atmel-aic.c | 10 ++++++++--
+ 1 file changed, 8 insertions(+), 2 deletions(-)
 
-Will
+diff --git a/drivers/irqchip/irq-atmel-aic.c b/drivers/irqchip/irq-atmel-aic.c
+index c21c3d2..8e3b585 100644
+--- a/drivers/irqchip/irq-atmel-aic.c
++++ b/drivers/irqchip/irq-atmel-aic.c
+@@ -221,10 +221,16 @@ static void __init at91sam9260_aic_irq_fixup(struct device_node *root)
+ 	aic_common_rtt_irq_fixup(root);
+ }
+ 
++static void __init at91sam9g45_aic_irq_fixup(struct device_node *root)
++{
++	aic_common_rtc_irq_fixup(root);
++	aic_common_rtt_irq_fixup(root);
++}
++
+ static const struct of_device_id __initdata aic_irq_fixups[] = {
+-	{ .compatible = "atmel,at91sam9g45", .data = at91sam9_aic_irq_fixup },
++	{ .compatible = "atmel,at91sam9g45", .data = at91sam9g45_aic_irq_fixup },
+ 	{ .compatible = "atmel,at91sam9n12", .data = at91sam9_aic_irq_fixup },
+-	{ .compatible = "atmel,at91sam9rl", .data = at91sam9_aic_irq_fixup },
++	{ .compatible = "atmel,at91sam9rl", .data = at91sam9g45_aic_irq_fixup },
+ 	{ .compatible = "atmel,at91sam9x5", .data = at91sam9_aic_irq_fixup },
+ 	{ .compatible = "atmel,at91sam9260", .data = at91sam9260_aic_irq_fixup },
+ 	{ .compatible = "atmel,at91sam9261", .data = at91sam9260_aic_irq_fixup },
+-- 
+1.9.1
