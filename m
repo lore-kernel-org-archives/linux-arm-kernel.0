@@ -1,268 +1,116 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Wed, 03 Sep 2014 12:13:48 +0200
-Subject: [PATCH] iio: adc: rockchip_saradc: add support for rk3066-tsadc
- variant
-In-Reply-To: <540642CA.9080007@gmx.de>
-References: <1999284.oRCTeZRSv1@diego> <540642CA.9080007@gmx.de>
-Message-ID: <38104193.mr2XbIjNkb@diego>
+From: masami.hiramatsu.pt@hitachi.com (Masami Hiramatsu)
+Date: Wed, 03 Sep 2014 19:18:04 +0900
+Subject: [PATCH v5 3/3] kprobes: arm: enable OPTPROBES for ARM 32
+In-Reply-To: <1409665784.2873.49.camel@linaro1.home>
+References: <1409144552-12751-1-git-send-email-wangnan0@huawei.com>
+ <1409144552-12751-4-git-send-email-wangnan0@huawei.com>
+ <1409665784.2873.49.camel@linaro1.home>
+Message-ID: <5406EADC.8080009@hitachi.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Mittwoch, 3. September 2014, 00:20:58 schrieb Hartmut Knaack:
-> Heiko St?bner schrieb:
-> > Older Rockchip SoCs, at least the rk3066, used a slightly modified saradc
-> > for temperature measurements. This so called tsadc does not contain any
-> > active parts like temperature interrupts and only supports polling the
-> > current temperature. The returned voltage can then be converted by a
-> > suitable thermal driver to and actual temperature and used for thermal
-> > handling.
-> > 
-> > Signed-off-by: Heiko Stuebner <heiko@sntech.de>
-> > ---
+(2014/09/02 22:49), Jon Medhurst (Tixy) wrote:
+> I gave the patches a quick test and in doing so found a bug which stops
+> any probes actually being optimised, and the same bug should affect X86,
+> see comment below...
 > 
-> Looks mostly good to me, just some minor style issues inline.
+> On Wed, 2014-08-27 at 21:02 +0800, Wang Nan wrote:
+> [...]
+>> +int arch_prepare_optimized_kprobe(struct optimized_kprobe *op)
+>> +{
+>> +	u8 *buf;
+>> +	unsigned long rel_chk;
+>> +	unsigned long val;
+>> +
+>> +	if (!can_optimize(op))
+>> +		return -EILSEQ;
+>> +
+>> +	op->optinsn.insn = get_optinsn_slot();
+>> +	if (!op->optinsn.insn)
+>> +		return -ENOMEM;
+>> +
+>> +	/*
+>> +	 * Verify if the address gap is in 32MiB range, because this uses
+>> +	 * a relative jump.
+>> +	 *
+>> +	 * kprobe opt use a 'b' instruction to branch to optinsn.insn.
+>> +	 * According to ARM manual, branch instruction is:
+>> +	 *
+>> +	 *   31  28 27           24 23             0
+>> +	 *  +------+---+---+---+---+----------------+
+>> +	 *  | cond | 1 | 0 | 1 | 0 |      imm24     |
+>> +	 *  +------+---+---+---+---+----------------+
+>> +	 *
+>> +	 * imm24 is a signed 24 bits integer. The real branch offset is computed
+>> +	 * by: imm32 = SignExtend(imm24:'00', 32);
+>> +	 *
+>> +	 * So the maximum forward branch should be:
+>> +	 *   (0x007fffff << 2) = 0x01fffffc =  0x1fffffc
+>> +	 * The maximum backword branch should be:
+>> +	 *   (0xff800000 << 2) = 0xfe000000 = -0x2000000
+>> +	 *
+>> +	 * We can simply check (rel & 0xfe000003):
+>> +	 *  if rel is positive, (rel & 0xfe000000) shoule be 0
+>> +	 *  if rel is negitive, (rel & 0xfe000000) should be 0xfe000000
+>> +	 *  the last '3' is used for alignment checking.
+>> +	 */
+>> +	rel_chk = (unsigned long)((long)op->optinsn.insn -
+>> +			(long)op->kp.addr + 8) & 0xfe000003;
 > 
-> > This is a different IP than the rk3288-tsadc Ceasar provided a driver for.
-> > As the commit messages states, the one used on the rk3066 is just a
-> > saradc,
-> > while the new tsadc in the rk3288 contains active components for thermal
-> > handling.
-> > 
-> > A working example using the pending iio-thermal driver can found on
-> > https://github.com/mmind/linux-rockchip/commit/c07e02f069d9677d489f2541766
-> > 19fae36f2aad0> 
-> >  .../bindings/iio/adc/rockchip-saradc.txt           |  2 +-
-> >  drivers/iio/adc/rockchip_saradc.c                  | 62
-> >  +++++++++++++++++----- 2 files changed, 50 insertions(+), 14
-> >  deletions(-)
-> > 
-> > diff --git a/Documentation/devicetree/bindings/iio/adc/rockchip-saradc.txt
-> > b/Documentation/devicetree/bindings/iio/adc/rockchip-saradc.txt index
-> > 5d3ec1d..a9a5fe1 100644
-> > --- a/Documentation/devicetree/bindings/iio/adc/rockchip-saradc.txt
-> > +++ b/Documentation/devicetree/bindings/iio/adc/rockchip-saradc.txt
-> > @@ -1,7 +1,7 @@
-> > 
-> >  Rockchip Successive Approximation Register (SAR) A/D Converter bindings
-> > 
-> >  Required properties:
-> > -- compatible: Should be "rockchip,saradc"
-> > +- compatible: Should be "rockchip,saradc" or "rockchip,rk3066-tsadc"
-> > 
-> >  - reg: physical base address of the controller and length of memory
-> >  mapped
-> >  
-> >         region.
-> >  
-> >  - interrupts: The interrupt number to the cpu. The interrupt specifier
-> >  format> 
-> > diff --git a/drivers/iio/adc/rockchip_saradc.c
-> > b/drivers/iio/adc/rockchip_saradc.c index e074a0b..7effada 100644
-> > --- a/drivers/iio/adc/rockchip_saradc.c
-> > +++ b/drivers/iio/adc/rockchip_saradc.c
-> > @@ -18,13 +18,13 @@
-> > 
-> >  #include <linux/interrupt.h>
-> >  #include <linux/io.h>
-> >  #include <linux/of.h>
-> > 
-> > +#include <linux/of_device.h>
-> > 
-> >  #include <linux/clk.h>
-> >  #include <linux/completion.h>
-> >  #include <linux/regulator/consumer.h>
-> >  #include <linux/iio/iio.h>
-> >  
-> >  #define SARADC_DATA			0x00
-> > 
-> > -#define SARADC_DATA_MASK		0x3ff
-> > 
-> >  #define SARADC_STAS			0x04
-> >  #define SARADC_STAS_BUSY		BIT(0)
-> > 
-> > @@ -38,15 +38,22 @@
-> > 
-> >  #define SARADC_DLY_PU_SOC		0x0c
-> >  #define SARADC_DLY_PU_SOC_MASK		0x3f
-> > 
-> > -#define SARADC_BITS			10
-> > 
-> >  #define SARADC_TIMEOUT			msecs_to_jiffies(100)
-> > 
-> > +struct rockchip_saradc_data {
-> > +	int				num_bits;
-> > +	const struct iio_chan_spec	*channels;
-> > +	int				num_channels;
-> > +	unsigned long			clk_rate;
-> > +};
-> > +
-> > 
-> >  struct rockchip_saradc {
-> >  
-> >  	void __iomem		*regs;
-> >  	struct clk		*pclk;
-> >  	struct clk		*clk;
-> >  	struct completion	completion;
-> >  	struct regulator	*vref;
-> > 
-> > +	const struct rockchip_saradc_data *data;
-> > 
-> >  	u16			last_val;
-> >  
-> >  };
+> This check always fails because op->kp.addr is zero. Debugging this I
+> found that this function is called from alloc_aggr_kprobe() and that
+> copies the real kprobe into op->kp using copy_kprobe(), which doesn't
+> actually copy the 'addr' value...
+
+Right, I've already pointed that :)
+
+https://lkml.org/lkml/2014/8/28/114
+
 > 
-> The alignment of the whole block should be adjusted to fit with the new
-> element.
-
-Hmm, I'm not sure if this should be in this patch, as changing the indentation 
-is more or less an unrelated change which makes recognizing the actual change 
-of adding the data field harder to see. 
-
-It could be a second patch on top to adapt the formating, but this also sounds 
-a bit like overkill.
-
-In any case I guess I'll wait for Jonathan to decide how he likes this to be 
-approached.
-
-
-> > @@ -90,7 +97,7 @@ static int rockchip_saradc_read_raw(struct iio_dev
-> > *indio_dev,> 
-> >  		}
-> >  		
-> >  		*val = ret / 1000;
-> > 
-> > -		*val2 = SARADC_BITS;
-> > +		*val2 = info->data->num_bits;
-> > 
-> >  		return IIO_VAL_FRACTIONAL_LOG2;
-> >  	
-> >  	default:
-> >  		return -EINVAL;
-> > 
-> > @@ -103,7 +110,7 @@ static irqreturn_t rockchip_saradc_isr(int irq, void
-> > *dev_id)> 
-> >  	/* Read value */
-> >  	info->last_val = readl_relaxed(info->regs + SARADC_DATA);
-> > 
-> > -	info->last_val &= SARADC_DATA_MASK;
-> > +	info->last_val &= BIT(info->data->num_bits) - 1;
+>         static inline void copy_kprobe(struct kprobe *ap, struct kprobe *p)
+>         {
+>         	memcpy(&p->opcode, &ap->opcode, sizeof(kprobe_opcode_t));
+>         	memcpy(&p->ainsn, &ap->ainsn, sizeof(struct arch_specific_insn));
+>         }
 > 
-> I think using GENMASK would reflect the intention better, that you want to
-> mask out your data.
+> Thing is, the new ARM code is a close copy of the existing X86 version
+> so that would also suffer the same problem of kp.addr always being zero.
+> So either I've miss understood something or this is fundamental bug no
+> one has noticed before.
+> 
+> Throwing in 'p->addr = ap->addr' into the copy_kprobe function fixed the
+> behaviour arch_prepare_optimized_kprobe.
+> 
+> I was testing this by running the kprobes tests
+> (CONFIG_ARM_KPROBES_TEST=y) and putting a few printk's in strategic
+> places in kprobes-opt.c to check to see what code paths got executed,
+> which is how I discovered the problem.
+> 
+> Two things to note when running kprobes tests...
+> 
+> 1. On SMP systems it's very slow because of kprobe's use of stop_machine
+> for applying and removing probes, this forces the system to idle and
+> wait for the next scheduler tick for each probe change.
 
-I didn't know GENMASK before, so thanks for the pointer .. this looks quite 
-cool :-)
+Hmm, agreed. It seems that arm32 limitation of self-modifying code on SMP.
+I'm not sure how we can handle it, but I guess;
+ - for some processors which have better coherent cache for SMP, we can
+   atomically replace the breakpoint code with original code.
+ - Even if we get an "undefined instruction" exception, its handler can
+   ask kprobes if the address is under modifying or not. And if it is,
+   we can just return from the exception to retry the execution.
+
+Thank you,
+
+> 2. It's a good idea to enable VERBOSE in kprobes-test.h to get output
+> for each test case instruction, this reassures you things are
+> progressing and if things explode lets you know what instruction type
+> triggered it.
+> 
 
 
-> >  	/* Clear irq & power down adc */
-> >  	writel_relaxed(0, info->regs + SARADC_CTRL);
-> > 
-> > @@ -133,12 +140,44 @@ static const struct iio_chan_spec
-> > rockchip_saradc_iio_channels[] = {> 
-> >  	ADC_CHANNEL(2, "adc2"),
-> >  
-> >  };
-> > 
-> > +static const struct rockchip_saradc_data saradc_data = {
-> > +	.num_bits = 10,
-> > +	.channels = rockchip_saradc_iio_channels,
-> > +	.num_channels = ARRAY_SIZE(rockchip_saradc_iio_channels),
-> > +	.clk_rate = 1000000,
-> > +};
-> > +
-> > +static const struct iio_chan_spec rockchip_rk3066_tsadc_iio_channels[] =
-> > {
-> > +	ADC_CHANNEL(0, "adc0"),
-> > +	ADC_CHANNEL(1, "adc1"),
-> > +};
-> > +
-> > +static const struct rockchip_saradc_data rk3066_tsadc_data = {
-> > +	.num_bits = 12,
-> > +	.channels = rockchip_rk3066_tsadc_iio_channels,
-> > +	.num_channels = ARRAY_SIZE(rockchip_rk3066_tsadc_iio_channels),
-> > +	.clk_rate = 50000,
-> > +};
-> > +
-> > +static const struct of_device_id rockchip_saradc_match[] = {
-> > +	{
-> > +		.compatible = "rockchip,saradc",
-> > +		.data = &saradc_data,
-> > +	}, {
-> > +		.compatible = "rockchip,rk3066-tsadc",
-> > +		.data = &rk3066_tsadc_data,
-> > +	},
-> > +	{},
-> > +};
-> > +MODULE_DEVICE_TABLE(of, rockchip_saradc_match);
-> > +
-> > 
-> >  static int rockchip_saradc_probe(struct platform_device *pdev)
-> >  {
-> >  
-> >  	struct rockchip_saradc *info = NULL;
-> >  	struct device_node *np = pdev->dev.of_node;
-> >  	struct iio_dev *indio_dev = NULL;
-> >  	struct resource	*mem;
-> > 
-> > +	const struct of_device_id *match;
-> > 
-> >  	int ret;
-> >  	int irq;
-> > 
-> > @@ -152,6 +191,9 @@ static int rockchip_saradc_probe(struct
-> > platform_device *pdev)> 
-> >  	}
-> >  	info = iio_priv(indio_dev);
-> > 
-> > +	match = of_match_device(rockchip_saradc_match, &pdev->dev);
-> > +	info->data = match->data;
-> > +
-> > 
-> >  	mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> >  	info->regs = devm_ioremap_resource(&pdev->dev, mem);
-> >  	if (IS_ERR(info->regs))
-> > 
-> > @@ -195,7 +237,7 @@ static int rockchip_saradc_probe(struct
-> > platform_device *pdev)> 
-> >  	 * Use a default of 1MHz for the converter clock.
-> >  	 * This may become user-configurable in the future.
-> >  	 */
-> > 
-> > -	ret = clk_set_rate(info->clk, 1000000);
-> > +	ret = clk_set_rate(info->clk, info->data->clk_rate);
-> > 
-> >  	if (ret < 0) {
-> >  	
-> >  		dev_err(&pdev->dev, "failed to set adc clk rate, %d\n", ret);
-> >  		return ret;
-> > 
-> > @@ -227,8 +269,8 @@ static int rockchip_saradc_probe(struct
-> > platform_device *pdev)> 
-> >  	indio_dev->info = &rockchip_saradc_iio_info;
-> >  	indio_dev->modes = INDIO_DIRECT_MODE;
-> > 
-> > -	indio_dev->channels = rockchip_saradc_iio_channels;
-> > -	indio_dev->num_channels = ARRAY_SIZE(rockchip_saradc_iio_channels);
-> > +	indio_dev->channels = info->data->channels;
-> > +	indio_dev->num_channels = info->data->num_channels;
-> > 
-> >  	ret = iio_device_register(indio_dev);
-> >  	if (ret)
-> > 
-> > @@ -296,12 +338,6 @@ static int rockchip_saradc_resume(struct device *dev)
-> > 
-> >  static SIMPLE_DEV_PM_OPS(rockchip_saradc_pm_ops,
-> >  
-> >  			 rockchip_saradc_suspend, rockchip_saradc_resume);
-> > 
-> > -static const struct of_device_id rockchip_saradc_match[] = {
-> > -	{ .compatible = "rockchip,saradc" },
-> > -	{},
-> > -};
-> > -MODULE_DEVICE_TABLE(of, rockchip_saradc_match);
-> > -
-> > 
-> >  static struct platform_driver rockchip_saradc_driver = {
-> >  
-> >  	.probe		= rockchip_saradc_probe,
-> >  	.remove		= rockchip_saradc_remove,
+-- 
+Masami HIRAMATSU
+Software Platform Research Dept. Linux Technology Research Center
+Hitachi, Ltd., Yokohama Research Laboratory
+E-mail: masami.hiramatsu.pt at hitachi.com
