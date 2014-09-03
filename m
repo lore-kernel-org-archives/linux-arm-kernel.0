@@ -1,46 +1,43 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Wed, 03 Sep 2014 15:49:47 +0200
-Subject: [PATCH v2 3/9] ARM: zynq: DT: Add DDRC node
-In-Reply-To: <1409692754-13437-4-git-send-email-soren.brinkmann@xilinx.com>
-References: <1409692754-13437-1-git-send-email-soren.brinkmann@xilinx.com>
- <1409692754-13437-4-git-send-email-soren.brinkmann@xilinx.com>
-Message-ID: <54071C7B.4090805@linaro.org>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Wed, 03 Sep 2014 22:50:46 +0900
+Subject: [PATCH] ARM: dts: exynos4x12: Fix pull setting in sd4_width8 pin
+ group
+In-Reply-To: <1409062405-15215-1-git-send-email-t.figa@samsung.com>
+References: <1409062405-15215-1-git-send-email-t.figa@samsung.com>
+Message-ID: <02ed01cfc77e$0fede790$2fc9b6b0$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/02/2014 11:19 PM, Soren Brinkmann wrote:
-> Add the DDR controller to the Zynq devicetree.
->
-> Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
+Tomasz Figa wrote:
+> 
+> The group has the samsung,pin-pud property set to 4, which is not a
+> correct value. This patch fixes this by replacing it with 3, which is
+> the correct value for pull-up.
+> 
+Yes, I checked the value. You're right.
 
-Acked-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+Will apply into fixes.
 
+Thanks,
+Kukjin
+
+> Signed-off-by: Tomasz Figa <t.figa@samsung.com>
 > ---
->   arch/arm/boot/dts/zynq-7000.dtsi | 5 +++++
->   1 file changed, 5 insertions(+)
->
-> diff --git a/arch/arm/boot/dts/zynq-7000.dtsi b/arch/arm/boot/dts/zynq-7000.dtsi
-> index 6cc83d4c6c76..587cadcf7001 100644
-> --- a/arch/arm/boot/dts/zynq-7000.dtsi
-> +++ b/arch/arm/boot/dts/zynq-7000.dtsi
-> @@ -146,6 +146,11 @@
->   			cache-level = <2>;
->   		};
->
-> +		memory-controller at f8006000 {
-> +			compatible = "xlnx,zynq-ddrc-a05";
-> +			reg = <0xf8006000 0x1000>;
-> +		} ;
-> +
->   		uart0: serial at e0000000 {
->   			compatible = "xlnx,xuartps", "cdns,uart-r1p8";
->   			status = "disabled";
->
-
-
--- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+>  arch/arm/boot/dts/exynos4x12-pinctrl.dtsi | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/boot/dts/exynos4x12-pinctrl.dtsi b/arch/arm/boot/dts/exynos4x12-pinctrl.dtsi
+> index 927fec6..c141931 100644
+> --- a/arch/arm/boot/dts/exynos4x12-pinctrl.dtsi
+> +++ b/arch/arm/boot/dts/exynos4x12-pinctrl.dtsi
+> @@ -691,7 +691,7 @@
+>  		sd4_bus8: sd4-bus-width8 {
+>  			samsung,pins = "gpk1-3", "gpk1-4", "gpk1-5", "gpk1-6";
+>  			samsung,pin-function = <4>;
+> -			samsung,pin-pud = <4>;
+> +			samsung,pin-pud = <3>;
+>  			samsung,pin-drv = <3>;
+>  		};
+> 
+> --
+> 2.0.4
