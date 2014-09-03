@@ -1,182 +1,34 @@
 From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Wed,  3 Sep 2014 12:52:17 +0200
-Subject: [PATCH 01/15] PM / Domains: Remove the pm_genpd_add|remove_callbacks
- APIs
+Date: Wed,  3 Sep 2014 12:52:21 +0200
+Subject: [PATCH 05/15] ARM: shmobile: Drop dev_irq_safe from R-mobile genpd
+ config
 In-Reply-To: <1409741551-16437-1-git-send-email-ulf.hansson@linaro.org>
 References: <1409741551-16437-1-git-send-email-ulf.hansson@linaro.org>
-Message-ID: <1409741551-16437-2-git-send-email-ulf.hansson@linaro.org>
+Message-ID: <1409741551-16437-6-git-send-email-ulf.hansson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There are no users of these APIs. To simplify the generic power domain
-let's remove them.
+The dev_irq_safe configuration is redundant, genpd don't have any
+special treatmeant for handling it. Let's remove it.
 
+Cc: Simon Horman <horms@verge.net.au>
+Cc: Magnus Damm <magnus.damm@gmail.com>
 Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
 ---
- drivers/base/power/domain.c | 106 --------------------------------------------
- include/linux/pm_domain.h   |  19 --------
- 2 files changed, 125 deletions(-)
+ arch/arm/mach-shmobile/pm-rmobile.c | 1 -
+ 1 file changed, 1 deletion(-)
 
-diff --git a/drivers/base/power/domain.c b/drivers/base/power/domain.c
-index eee55c1..e613e3c 100644
---- a/drivers/base/power/domain.c
-+++ b/drivers/base/power/domain.c
-@@ -1744,112 +1744,6 @@ int pm_genpd_remove_subdomain(struct generic_pm_domain *genpd,
- }
- 
- /**
-- * pm_genpd_add_callbacks - Add PM domain callbacks to a given device.
-- * @dev: Device to add the callbacks to.
-- * @ops: Set of callbacks to add.
-- * @td: Timing data to add to the device along with the callbacks (optional).
-- *
-- * Every call to this routine should be balanced with a call to
-- * __pm_genpd_remove_callbacks() and they must not be nested.
-- */
--int pm_genpd_add_callbacks(struct device *dev, struct gpd_dev_ops *ops,
--			   struct gpd_timing_data *td)
--{
--	struct generic_pm_domain_data *gpd_data_new, *gpd_data = NULL;
--	int ret = 0;
--
--	if (!(dev && ops))
--		return -EINVAL;
--
--	gpd_data_new = __pm_genpd_alloc_dev_data(dev);
--	if (!gpd_data_new)
--		return -ENOMEM;
--
--	pm_runtime_disable(dev);
--	device_pm_lock();
--
--	ret = dev_pm_get_subsys_data(dev);
--	if (ret)
--		goto out;
--
--	spin_lock_irq(&dev->power.lock);
--
--	if (dev->power.subsys_data->domain_data) {
--		gpd_data = to_gpd_data(dev->power.subsys_data->domain_data);
--	} else {
--		gpd_data = gpd_data_new;
--		dev->power.subsys_data->domain_data = &gpd_data->base;
--	}
--	gpd_data->refcount++;
--	gpd_data->ops = *ops;
--	if (td)
--		gpd_data->td = *td;
--
--	spin_unlock_irq(&dev->power.lock);
--
-- out:
--	device_pm_unlock();
--	pm_runtime_enable(dev);
--
--	if (gpd_data != gpd_data_new)
--		__pm_genpd_free_dev_data(dev, gpd_data_new);
--
--	return ret;
--}
--EXPORT_SYMBOL_GPL(pm_genpd_add_callbacks);
--
--/**
-- * __pm_genpd_remove_callbacks - Remove PM domain callbacks from a given device.
-- * @dev: Device to remove the callbacks from.
-- * @clear_td: If set, clear the device's timing data too.
-- *
-- * This routine can only be called after pm_genpd_add_callbacks().
-- */
--int __pm_genpd_remove_callbacks(struct device *dev, bool clear_td)
--{
--	struct generic_pm_domain_data *gpd_data = NULL;
--	bool remove = false;
--	int ret = 0;
--
--	if (!(dev && dev->power.subsys_data))
--		return -EINVAL;
--
--	pm_runtime_disable(dev);
--	device_pm_lock();
--
--	spin_lock_irq(&dev->power.lock);
--
--	if (dev->power.subsys_data->domain_data) {
--		gpd_data = to_gpd_data(dev->power.subsys_data->domain_data);
--		gpd_data->ops = (struct gpd_dev_ops){ NULL };
--		if (clear_td)
--			gpd_data->td = (struct gpd_timing_data){ 0 };
--
--		if (--gpd_data->refcount == 0) {
--			dev->power.subsys_data->domain_data = NULL;
--			remove = true;
--		}
--	} else {
--		ret = -EINVAL;
--	}
--
--	spin_unlock_irq(&dev->power.lock);
--
--	device_pm_unlock();
--	pm_runtime_enable(dev);
--
--	if (ret)
--		return ret;
--
--	dev_pm_put_subsys_data(dev);
--	if (remove)
--		__pm_genpd_free_dev_data(dev, gpd_data);
--
--	return 0;
--}
--EXPORT_SYMBOL_GPL(__pm_genpd_remove_callbacks);
--
--/**
-  * pm_genpd_attach_cpuidle - Connect the given PM domain with cpuidle.
-  * @genpd: PM domain to be connected with cpuidle.
-  * @state: cpuidle state this domain can disable/enable.
-diff --git a/include/linux/pm_domain.h b/include/linux/pm_domain.h
-index 7c1d252..0aa9ad9 100644
---- a/include/linux/pm_domain.h
-+++ b/include/linux/pm_domain.h
-@@ -151,10 +151,6 @@ extern int pm_genpd_add_subdomain_names(const char *master_name,
- 					const char *subdomain_name);
- extern int pm_genpd_remove_subdomain(struct generic_pm_domain *genpd,
- 				     struct generic_pm_domain *target);
--extern int pm_genpd_add_callbacks(struct device *dev,
--				  struct gpd_dev_ops *ops,
--				  struct gpd_timing_data *td);
--extern int __pm_genpd_remove_callbacks(struct device *dev, bool clear_td);
- extern int pm_genpd_attach_cpuidle(struct generic_pm_domain *genpd, int state);
- extern int pm_genpd_name_attach_cpuidle(const char *name, int state);
- extern int pm_genpd_detach_cpuidle(struct generic_pm_domain *genpd);
-@@ -217,16 +213,6 @@ static inline int pm_genpd_remove_subdomain(struct generic_pm_domain *genpd,
- {
- 	return -ENOSYS;
- }
--static inline int pm_genpd_add_callbacks(struct device *dev,
--					 struct gpd_dev_ops *ops,
--					 struct gpd_timing_data *td)
--{
--	return -ENOSYS;
--}
--static inline int __pm_genpd_remove_callbacks(struct device *dev, bool clear_td)
--{
--	return -ENOSYS;
--}
- static inline int pm_genpd_attach_cpuidle(struct generic_pm_domain *genpd, int st)
- {
- 	return -ENOSYS;
-@@ -281,11 +267,6 @@ static inline int pm_genpd_name_add_device(const char *domain_name,
- 	return __pm_genpd_name_add_device(domain_name, dev, NULL);
- }
- 
--static inline int pm_genpd_remove_callbacks(struct device *dev)
--{
--	return __pm_genpd_remove_callbacks(dev, true);
--}
--
- #ifdef CONFIG_PM_GENERIC_DOMAINS_RUNTIME
- extern void genpd_queue_power_off_work(struct generic_pm_domain *genpd);
- extern void pm_genpd_poweroff_unused(void);
+diff --git a/arch/arm/mach-shmobile/pm-rmobile.c b/arch/arm/mach-shmobile/pm-rmobile.c
+index ebdd16e..818de2f 100644
+--- a/arch/arm/mach-shmobile/pm-rmobile.c
++++ b/arch/arm/mach-shmobile/pm-rmobile.c
+@@ -111,7 +111,6 @@ static void rmobile_init_pm_domain(struct rmobile_pm_domain *rmobile_pd)
+ 	genpd->dev_ops.stop		= pm_clk_suspend;
+ 	genpd->dev_ops.start		= pm_clk_resume;
+ 	genpd->dev_ops.active_wakeup	= rmobile_pd_active_wakeup;
+-	genpd->dev_irq_safe		= true;
+ 	genpd->power_off		= rmobile_pd_power_down;
+ 	genpd->power_on			= rmobile_pd_power_up;
+ 	__rmobile_pd_power_up(rmobile_pd, false);
 -- 
 1.9.1
