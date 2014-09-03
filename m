@@ -1,47 +1,35 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Wed, 03 Sep 2014 14:27:21 -0700
-Subject: [Patch net-next 04/11] net:fec: add multiqueue support
-In-Reply-To: <1409776697-1536-5-git-send-email-Frank.Li@freescale.com>
-References: <1409776697-1536-1-git-send-email-Frank.Li@freescale.com>
- <1409776697-1536-5-git-send-email-Frank.Li@freescale.com>
-Message-ID: <540787B9.8090504@gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 3 Sep 2014 14:38:36 -0700
+Subject: [GIT PULL] ARM: OMAP3: quick clock dts fix for 3.17-rc
+In-Reply-To: <5406CEC3.5000601@ti.com>
+References: <5406CEC3.5000601@ti.com>
+Message-ID: <20140903213835.GJ11766@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/03/2014 01:38 PM, Frank Li wrote:
-> From: Fugang Duan <B38611@freescale.com>
+* Tero Kristo <t-kristo@ti.com> [140903 01:18]:
+> Hi Tony,
 > 
-> Add multiqueue support, which is compatible with previous single queue
-> driver for FEC/ENET IPs.
+> The following changes since commit 7d1311b93e58ed55f3a31cc8f94c4b8fe988a2b9:
 > 
-> By default, the tx/rx queue number is 1, user can config the queue number
-> at DTS file like this:
-> 	fsl,num_tx_queues=<3>;
-> 	fsl,num_rx_queues=<3>;
+>   Linux 3.17-rc1 (2014-08-16 10:40:26 -0600)
 > 
-> Ethernet multiqueue mechanism can improve performance in SMP system.
-> For single hw queue, multiqueue can balance cpu loading.
-> For multi hw queues, multiple cores can process network packets in parallel,
-> and refer the article for the detail advantage for multiqueue:
-> http://vger.kernel.org/~davem/davem_nyc09.pdf
+> are available in the git repository at:
+> 
+>   git at github.com:t-kristo/linux-pm.git for-v3.17-rc/ti-clk-dt
+> 
+> for you to fetch changes up to adf5b4dcc0cf50715f74f49f3c7af0c80467f55f:
+> 
+>   ARM: dts: set 'ti,set-rate-parent' for dpll4_m5x2 clock (2014-08-21
+> 18:01:35 +0300)
+> 
+> ----------------------------------------------------------------
+> Stefan Herbrechtsmeier (1):
+>       ARM: dts: set 'ti,set-rate-parent' for dpll4_m5x2 clock
+> 
+>  arch/arm/boot/dts/omap3xxx-clocks.dtsi |    1 +
+>  1 file changed, 1 insertion(+)
 
-You should probably split that patch in a minimum of two, or more
-different parts.
+Thanks applying into omap-for-v3.17/fixes-v2.
 
-Two parts:
-
-- add TX multiqueue support
-- add RX multiqueue support
-
-More parts:
-
-- prepare for TX multiqueue (introduce queue structure, definitions)
-- transition TX path to use queue 0
-- add support for the two other TX queues
-- prepare for RX multiqueue (introduce queue structure, definitions)
-- prepare for multiqueue, hardcode RX path to use queue 0
-- add support for the two other RX queues
-
-The number of changes are extremely hard to review...
---
-Florian
+Tony 
