@@ -1,98 +1,86 @@
-From: evanluijk@interact.nl (Erik van Luijk)
-Date: Wed, 03 Sep 2014 08:09:28 +0200
-Subject: [PATCH] ARM: at91/dt: at91sam9m10g45ek add rtc node
-In-Reply-To: <20140902183356.7bcfdf84@bbrezillon>
-References: <1409655132-17735-1-git-send-email-evanluijk@interact.nl>
- <20140902183356.7bcfdf84@bbrezillon>
-Message-ID: <5406B098.6020500@interact.nl>
+From: khiem.nguyen.xt@renesas.com (Khiem Nguyen)
+Date: Wed, 03 Sep 2014 15:22:14 +0900
+Subject: [PATCH repost] ARM: shmobile: lager: correct memory map
+In-Reply-To: <20140903054843.GA29259@verge.net.au>
+References: <20140903004901.GA3277@verge.net.au>
+ <54068031.5050806@renesas.com> <20140903054843.GA29259@verge.net.au>
+Message-ID: <5406B396.30907@renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Dear Simon-san,
 
-Hi Boris, Nicolas,
+On 9/3/2014 2:48 PM, Simon Horman wrote:
+> Hi Khiem-san,
+> 
+> On Wed, Sep 03, 2014 at 11:42:57AM +0900, Khiem Nguyen wrote:
+>> Dear Simon-san, Shiiba-san,
+>>
+>> Thanks for the patch.
+>>
+>> On 9/3/2014 9:49 AM, Simon Horman wrote:
+>>> The base address of the second memory region on the lager
+>>> board is 0x140000000. Update the tag used in the dts file accordingly.
+>>>
+>>> This is a documentation fix and should have no run-time affect.
+>>>
+>>> This problem was introduced when the second memory region
+>>> was added to the lager dts file by 62bc32a2573c4219
+>>> ("ARM: shmobile: Include all 4 GiB of memory on Lager)"
+>>> in v3.14.
+>>>
+>>> Reported-by: NAOYA SHIIBA <naoya.shiiba.nx@renesas.com>
+>>> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+>>> ---
+>>>  arch/arm/boot/dts/r8a7790-lager.dts | 2 +-
+>>>  1 file changed, 1 insertion(+), 1 deletion(-)
+>>>
+>>> I am reposting this as Olof originally requested a syntax change,
+>>> which I followed up on, however that change no longer seems appropriate.
+>>> This this patch seems to be correct.
+>> [...]
+>>> -	memory at 180000000 {
+>>> +	memory at 140000000 {
+>>
+>> Could you give more information about not using new syntax ?
+>>
+>> I checked memblock information in both 2 ways 
+>> (i.e memory at 140000000 and memory at 1,40000000)
+>> and I got same result.
+>> root at lager:~# cat /sys/kernel/debug/memblock/memory
+>>    0: 0x0000000040000000..0x000000007fffffff
+>>    1: 0x0000000140000000..0x00000001ffffffff
+>>
+>> So, what does 'no longer seems appropriate" mean ?
+> 
+> Sorry for being vague.
+> 
+> I am specifically referring to the conversation in
+> the thread "[PATCH 11/14] arm64: dts: Add initial device tree support for
+> EXYNOS7" and in particular the following contribution to that discussion by
+> Olof:
+> 
+> 	"Ok, I'm happily proven wrong here, also by confirming how this is
+> 	 done on "real" OF.
+> 
+> 	 According to benh:
+> 
+> 	 15:20 <benh> ojn: 0,0 is not quite right, it's supposed to be used
+> 	 when the two numbers are different things, like device,fn on PCI
+> 
+> 	 The same is true for >2^32 unit addresses, they just use the one
+> 	 integer instead of x,y.
+> 
+> 	 So, I take back all I've said on this in the last 72 hours. :) It
+> 	 looks like we might need to revisit some of the 32-bit DTs.  Simon,
+> 	 drop the series you had. :)"
+> 
+> An archive of the message in question is available at:
+> https://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg36123.html
 
-Boris BREZILLON schreef op 2-9-2014 om 18:33:
-> Hi Erik,
- >
- > On Tue,  2 Sep 2014 12:52:12 +0200
- > Erik van Luijk <evanluijk@interact.nl> wrote:
- >
- >> Signed-off-by: Erik van Luijk <evanluijk@interact.nl>
- >
- > Except for the nitpicks you'll find below, you have my
- >
- > Acked-by: Boris Brezillon <boris.brezillon@free-electrons.com>
- >
- >> ---
- >>  arch/arm/boot/dts/at91sam9g45.dtsi     | 7 +++++++
- >>  arch/arm/boot/dts/at91sam9m10g45ek.dts | 3 +++
- >>  2 files changed, 10 insertions(+)
- >>
- >> diff --git a/arch/arm/boot/dts/at91sam9g45.dtsi 
-b/arch/arm/boot/dts/at91sam9g45.dtsi
- >> index 932a669..bf62c18 100644
- >> --- a/arch/arm/boot/dts/at91sam9g45.dtsi
- >> +++ b/arch/arm/boot/dts/at91sam9g45.dtsi
- >> @@ -1070,6 +1070,13 @@
- >>                  status = "disabled";
- >>              };
- >>
- >> +            rtc at fffffdb0 {
- >> +                compatible = "atmel,at91rm9200-rtc";
- >> +                reg = <0xfffffdb0 0x30>;
- >
- > The RTC registers goes from 0xfffffdb0 to 0xfffffdc0, which means the
- > size is 0x10 and not 0x30. This is not important here, because the
- > following region is marked as reserved, but we prefer to keep the DT
- > consistent with the datasheet.
+OK. I understood.
+Let's follow the right way. :)
 
-This is an inconsistency in the datasheet of the AT91SAM9G45 (and at 
-least also
-AT91SAM9G15, AT91SAM9G25, AT91SAM9G35 and AT91SAM9M10).
-In the memory map (fig. 5-1) there is room for 16 bytes.
-But in the 'Real-time Clock (RTC) User Interface' (table 15-1) there is 
-room for
-48 bytes (0x30) excluding the Reserved Registers (which don't belong to 
-the RTC
-on the AT91SAM9M10). Perhaps Nicolas can draw some attention to this at 
-Atmel.
-
->
- >> +                interrupts = <1 IRQ_TYPE_LEVEL_HIGH 7>;
- >> +                status = "disabled";
- >> +            };
- >> +
- >>              spi0: spi at fffa4000 {
- >>                  #address-cells = <1>;
- >>                  #size-cells = <0>;
- >> diff --git a/arch/arm/boot/dts/at91sam9m10g45ek.dts 
-b/arch/arm/boot/dts/at91sam9m10g45ek.dts
- >> index 96ccc7d..2dd2347 100644
- >> --- a/arch/arm/boot/dts/at91sam9m10g45ek.dts
- >> +++ b/arch/arm/boot/dts/at91sam9m10g45ek.dts
- >> @@ -70,6 +70,9 @@
- >>
- >>              watchdog at fffffd40 {
- >>                  status = "okay";
- >> +
- >> +            rtc at fffffdb0 {
- >> +                status = "okay";
- >
- > Try to keep SoC and board changes in distinct commits.
-
-Understood.
-
->
- >>              };
- >>
- >>              mmc0: mmc at fff80000 {
- >
- >
- > Best Regards,
- >
- > Boris
- >
-
-Regards,
-
-Erik
+-- 
+Best regards,
+KHIEM Nguyen
