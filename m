@@ -1,75 +1,42 @@
 From: antoine.tenart@free-electrons.com (Antoine Tenart)
-Date: Wed,  3 Sep 2014 09:48:30 +0200
-Subject: [PATCH v4 11/12] ARM: dts: berlin: add BG2CD nodes for USB support
+Date: Wed,  3 Sep 2014 09:48:25 +0200
+Subject: [PATCH v4 06/12] Documentation: bindings: add doc for the Berlin USB
+ PHY
 In-Reply-To: <1409730511-16101-1-git-send-email-antoine.tenart@free-electrons.com>
 References: <1409730511-16101-1-git-send-email-antoine.tenart@free-electrons.com>
-Message-ID: <1409730511-16101-12-git-send-email-antoine.tenart@free-electrons.com>
+Message-ID: <1409730511-16101-7-git-send-email-antoine.tenart@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+Document the bindings of the Marvell Berlin USB PHY driver.
 
-Adds nodes describing the Marvell Berlin BG2CD USB PHY and USB. The BG2CD
-SoC has 2 USB ChipIdea controllers, with usb0 host-only and usb1 dual-role
-capable.
-
-Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
 ---
- arch/arm/boot/dts/berlin2cd.dtsi | 34 ++++++++++++++++++++++++++++++++++
- 1 file changed, 34 insertions(+)
+ Documentation/devicetree/bindings/phy/berlin-usb-phy.txt | 16 ++++++++++++++++
+ 1 file changed, 16 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/phy/berlin-usb-phy.txt
 
-diff --git a/arch/arm/boot/dts/berlin2cd.dtsi b/arch/arm/boot/dts/berlin2cd.dtsi
-index 68f7032b4686..5c6950531327 100644
---- a/arch/arm/boot/dts/berlin2cd.dtsi
-+++ b/arch/arm/boot/dts/berlin2cd.dtsi
-@@ -66,6 +66,22 @@
- 			clocks = <&chip CLKID_TWD>;
- 		};
- 
-+		usb_phy0: usb-phy at b74000 {
-+			compatible = "marvell,berlin2cd-usb-phy";
-+			reg = <0xb74000 0x128>;
-+			#phy-cells = <0>;
-+			resets = <&chip 0x178 23>;
-+			status = "disabled";
-+		};
+diff --git a/Documentation/devicetree/bindings/phy/berlin-usb-phy.txt b/Documentation/devicetree/bindings/phy/berlin-usb-phy.txt
+new file mode 100644
+index 000000000000..be33780f668e
+--- /dev/null
++++ b/Documentation/devicetree/bindings/phy/berlin-usb-phy.txt
+@@ -0,0 +1,16 @@
++* Marvell Berlin USB PHY
 +
-+		usb_phy1: usb-phy at b78000 {
-+			compatible = "marvell,berlin2cd-usb-phy";
-+			reg = <0xb78000 0x128>;
-+			#phy-cells = <0>;
-+			resets = <&chip 0x178 24>;
-+			status = "disabled";
-+		};
++Required properties:
++- compatible: "marvell,berlin2-usb-phy" or "marvell,berlin2cd-usb-phy"
++- reg: base address and length of the registers
++- #phys-cells: should be 0
++- resets: reference to the reset controller
 +
- 		apb at e80000 {
- 			compatible = "simple-bus";
- 			#address-cells = <1>;
-@@ -242,6 +258,24 @@
- 			};
- 		};
- 
-+		usb0: usb at ed0000 {
-+			compatible = "chipidea,usb2";
-+			reg = <0xed0000 0x200>;
-+			interrupts = <GIC_SPI 11 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&chip CLKID_USB0>;
-+			usb-phy = <&usb_phy0>;
-+			status = "disabled";
-+		};
++Example:
 +
-+		usb1: usb at ee0000 {
-+			compatible = "chipidea,usb2";
-+			reg = <0xee0000 0x200>;
-+			interrupts = <GIC_SPI 12 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&chip CLKID_USB1>;
-+			usb-phy = <&usb_phy1>;
-+			status = "disabled";
-+		};
-+
- 		apb at fc0000 {
- 			compatible = "simple-bus";
- 			#address-cells = <1>;
++	usb-phy at f774000 {
++		compatible = "marvell,berlin2-usb-phy";
++		reg = <0xf774000 0x128>;
++		#phy-cells = <0>;
++		resets = <&chip 0x104 14>;
++	};
 -- 
 1.9.1
