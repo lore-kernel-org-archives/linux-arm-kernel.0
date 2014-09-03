@@ -1,55 +1,57 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 3 Sep 2014 18:53:40 +0100
-Subject: [PATCH V2 4/6] arm64: Add DTS support for FSL's LS2085A SoC
-In-Reply-To: <1409764991.21254.139.camel@smoke>
-References: <1409219706-14843-1-git-send-email-bhupesh.sharma@freescale.com>
- <1409219706-14843-5-git-send-email-bhupesh.sharma@freescale.com>
- <1409764991.21254.139.camel@smoke>
-Message-ID: <20140903175340.GN3127@leverpostej>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Wed, 03 Sep 2014 10:55:37 -0700
+Subject: [PATCH 06/12] clk: mmp: add mmp private gate clock
+In-Reply-To: <1409027904-21859-7-git-send-email-chao.xie@marvell.com>
+References: <1409027904-21859-1-git-send-email-chao.xie@marvell.com>
+ <1409027904-21859-7-git-send-email-chao.xie@marvell.com>
+Message-ID: <20140903175537.11368.98589@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Geoff,
-
-On Wed, Sep 03, 2014 at 06:23:11PM +0100, Geoff Levand wrote:
-> Hi Bhupesh,
+Quoting Chao Xie (2014-08-25 21:38:18)
+> From: Chao Xie <chao.xie@marvell.com>
 > 
-> On Thu, 2014-08-28 at 15:25 +0530, Bhupesh Sharma wrote:
-> > This patch adds the device tree support for FSL LS2085A SoC
-> > based on ARMv8 architecture.
-> > +	cpus {
-> > +		#address-cells = <2>;
-> > +		#size-cells = <0>;
-> > +
-> > +		/* We have 4 clusters having 2 Cortex-A57 cores each */
-> > +		cpu at 0 {
-> > +			device_type = "cpu";
-> > +			compatible = "arm,cortex-a57";
-> > +			reg = <0x0 0x0>;
-> > +		};
-> 
-> arm64 needs a cpu enable-method property.  Is your boot loader adding
-> that?
+> Some SOCes have this kind of the gate clock
+> 1. There are some bits to control the gate not only one bit.
+> 2. Some clocks has operations of "out of reset" and "enable".
+>    To enable clock, we need do "out of reset" and "enable".
+>    To disable clock, we may not need "set to reset". It depends
+>    on the SOCes' design.
 
-That's the plan. If you take a look on the U-Boot mailing list you'll
-see there are patches under review which do just that, along with the
-basis of a PSCI 0.2 implementation.
+Are there any other IP blocks affected by the "out of reset" and "set to
+reset" states? I wonder if you might benefit from the reset controller
+framework?  For example see,
 
-Note that whether or not the in-kernel dts should have an enable-method
-is under discussion in a subsequent (v3) posting [1,2] of this series.
+drivers/clk/qcom/gcc-apq8084.c
 
-> Be aware that if you have set it up this way, users will not be able to
-> use this file with kexec's --dtb=FILE to specify a 2nd stage DT file.
-> kexec will use a copy of the DT from the 1st stage in this case.
+<snip>
 
-Surely the latter is the default and the former is the "trust me I know
-what I'm doing" case?
+> +static int mmp_clk_gate_enable(struct clk_hw *hw)
+> +{
+> +       struct mmp_clk_gate *gate = to_clk_mmp_gate(hw);
+> +       struct clk *clk = hw->clk;
+> +       unsigned long flags = 0;
+> +       unsigned long rate;
+> +       u32 tmp;
+> +
+> +       if (gate->lock)
+> +               spin_lock_irqsave(gate->lock, flags);
+> +
+> +       tmp = readl(gate->reg);
+> +       tmp &= ~gate->mask;
+> +       tmp |= gate->val_enable;
+> +       writel(tmp, gate->reg);
+> +
+> +       if (gate->lock)
+> +               spin_unlock_irqrestore(gate->lock, flags);
+> +
+> +       if (gate->flags & MMP_CLK_GATE_NEED_DELAY) {
+> +               rate = __clk_get_rate(clk);
+> +               /* Need delay 2 cycles. */
+> +               udelay(2000000/rate);
 
-In general there are other things you might need to fill in anyhow (like
-dynamically populated memory), so I don't see that as a big isssue
-(though admittedly painful if you're testing things in that area).
+How long are these delays? Long enough to warrant using clk_prepare
+instead of clk_enable? Are these clocks enabled from interrupt context?
 
-Mark.
-
-[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2014-September/284076.html
-[2] http://lists.infradead.org/pipermail/linux-arm-kernel/2014-September/284106.html
+Regards,
+Mike
