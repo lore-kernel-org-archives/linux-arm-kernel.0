@@ -1,115 +1,39 @@
-From: naveenkrishna.ch@gmail.com (Naveen Krishna Ch)
-Date: Wed, 3 Sep 2014 13:07:15 +0530
-Subject: [PATCH 01/14] clk: samsung: add support for 145xx and 1460x PLLs
-In-Reply-To: <53FDCAA5.1080302@samsung.com>
-References: <1409132889-2080-1-git-send-email-ch.naveen@samsung.com>
- <53FDCAA5.1080302@samsung.com>
-Message-ID: <CAHfPSqCkzO5dgHTc73cDEAqAQCUJRxbeLPwp6h2s_QQ408kJZA@mail.gmail.com>
+From: b20788@freescale.com (Anson Huang)
+Date: Wed, 3 Sep 2014 15:36:42 +0800
+Subject: [PATCH 0/3] move gpt per clk parent for ipg_per to OSC
+Message-ID: <1409729805-9741-1-git-send-email-b20788@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tomasz,
+Currently, gpt timer's clock is from ipg_per, and ipg_per clock is from ipg
+on most of i.MX6 series SOCs, but ipg's rate may be scaled when system enters
+low bus mode for saving power, then gpt timer's clock rate will be scaled as
+well, as system timer should be kept stable and NOT drift, better to keep gpt
+timer's clk at fixed rate, on i.MX6Q TO > 1.0, i.MX6DL and i.MX6SX, there is
+OSC clk available for gpt timer, we should enable this feature, the hardware
+design is as below:
 
-On 27 August 2014 17:40, Tomasz Figa <t.figa@samsung.com> wrote:
-> On 27.08.2014 11:48, Naveen Krishna Chatradhi wrote:
->> By registers bits and offsets the 145xx PLL is similar to
->> pll_type "pll_35xx". Also, 1460x PLL is similar to pll_type
->> "pll_46xx".
->>
->> Hence, reusing the functions defined for pll_35xx and pll_46xx
->> to support 145xx and 1460x PLLs respectively.
->
-> [snip]
->
->> @@ -139,6 +140,7 @@ static const struct clk_ops samsung_pll3000_clk_ops = {
->>  #define PLL35XX_PDIV_SHIFT      (8)
->>  #define PLL35XX_SDIV_SHIFT      (0)
->>  #define PLL35XX_LOCK_STAT_SHIFT      (29)
->> +#define PLL145XX_ENABLE              BIT(31)
->
-> The same bit is also present in PLL35XX.
->
->>
->>  static unsigned long samsung_pll35xx_recalc_rate(struct clk_hw *hw,
->>                               unsigned long parent_rate)
->> @@ -186,6 +188,10 @@ static int samsung_pll35xx_set_rate(struct clk_hw *hw, unsigned long drate,
->>
->>       tmp = __raw_readl(pll->con_reg);
->>
->> +     /* Enable PLL */
->> +     if (pll->type == (pll_1450x || pll_1451x || pll_1452x))
->> +             tmp |= PLL145XX_ENABLE;
->
-> I believe that the need to enable the PLL is not really specific to
-> pll_145xx. Any PLL which is initially disabled, should be enabled before
-> trying to wait until it stabilizes.
+i.MX6Q TO > 1.0: GPT_CR_CLKSRC, 3b'101 selects fix clock
+    of OSC / 8 for gpt per clk;
+i.MX6DL and i.MX6SX: GPT_CR_CLKSRC, 3b'101 selects OSC
+    for gpt per clk, and we must enable GPT_CR_24MEM to
+    enable OSC clk source for gpt per, GPT_PR_PRESCALER24M
+    is for pre-scaling of this OSC clk, here set it to 8
+    to make gpt per clk is 3MHz;
+i.MX6SL: ipg_per can be from OSC directly, so no need to
+    implement this new clk source for gpt per.
 
-Yes, all other PLL types would also need this. Since I was adding
-support specifically for 145xx PLL, I put this in here. The 'if' check
-can be removed and used for 45xx PLL as well.
+Anson Huang (3):
+  ARM: imx: add gpt_3m clk for i.mx6qdl
+  ARM: dts: imx6: change gpt per clk to gpt_3m on i.mx6qdl and i.mx6sx
+  ARM: imx: source gpt per clk from OSC for system timer
 
->
->> +
->>       if (!(samsung_pll35xx_mp_change(rate, tmp))) {
->>               /* If only s change, change just s value only*/
->>               tmp &= ~(PLL35XX_SDIV_MASK << PLL35XX_SDIV_SHIFT);
->> @@ -196,8 +202,12 @@ static int samsung_pll35xx_set_rate(struct clk_hw *hw, unsigned long drate,
->>       }
->>
->>       /* Set PLL lock time. */
->> -     __raw_writel(rate->pdiv * PLL35XX_LOCK_FACTOR,
->> -                     pll->lock_reg);
->> +     if (pll->type == (pll_1450x || pll_1451x || pll_1452x))
->> +             __raw_writel(rate->pdiv * PLL145XX_LOCK_FACTOR,
->> +                             pll->lock_reg);
->
-> If we already have lock_reg in pll, then maybe lock_factor could be
-> added there too and this code simply parametrized?
-
-Ok.
-
->
->> +     else
->> +             __raw_writel(rate->pdiv * PLL35XX_LOCK_FACTOR,
->> +                             pll->lock_reg);
->>
->>       /* Change PLL PMS values */
->>       tmp &= ~((PLL35XX_MDIV_MASK << PLL35XX_MDIV_SHIFT) |
->> @@ -356,7 +366,6 @@ static const struct clk_ops samsung_pll36xx_clk_min_ops = {
->>
->>  #define PLL45XX_ENABLE               BIT(31)
->>  #define PLL45XX_LOCKED               BIT(29)
->> -
->
-> Stray change?
-
-Yes. Fixed.
-
->
->>  static unsigned long samsung_pll45xx_recalc_rate(struct clk_hw *hw,
->>                               unsigned long parent_rate)
->>  {
->
-> [snip]
->
->> @@ -573,14 +588,23 @@ static int samsung_pll46xx_set_rate(struct clk_hw *hw, unsigned long drate,
->>               lock = 0xffff;
->>
->>       /* Set PLL PMS and VSEL values. */
->> -     con0 &= ~((PLL46XX_MDIV_MASK << PLL46XX_MDIV_SHIFT) |
->> +     if (pll->type == pll_1460x) {
->> +             con0 &= ~((PLL46XX_MDIV_MASK << PLL46XX_MDIV_SHIFT) |
->
-> Shouldn't PLL1460X_MDIV_MASK be used here instead?
-
-Ok. Fixed.
-
-Thanks.
-
->
-> Best regards,
-> Tomasz
+ arch/arm/boot/dts/imx6qdl.dtsi            |    2 +-
+ arch/arm/boot/dts/imx6sx.dtsi             |    2 +-
+ arch/arm/mach-imx/clk-imx6q.c             |    1 +
+ arch/arm/mach-imx/time.c                  |   29 ++++++++++++++++++++++++-----
+ include/dt-bindings/clock/imx6qdl-clock.h |    3 ++-
+ 5 files changed, 29 insertions(+), 8 deletions(-)
 
 -- 
-Shine bright,
-(: Nav )
+1.7.9.5
