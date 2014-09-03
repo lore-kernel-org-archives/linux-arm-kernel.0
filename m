@@ -1,85 +1,46 @@
-From: grygorii.strashko@ti.com (Grygorii Strashko)
-Date: Wed, 3 Sep 2014 20:05:35 +0300
-Subject: [PATCH v3 4/4] ARM: dts: keystone-k2hk: add dsp gpio controllers nodes
-In-Reply-To: <1409763935-5713-1-git-send-email-grygorii.strashko@ti.com>
-References: <1409763935-5713-1-git-send-email-grygorii.strashko@ti.com>
-Message-ID: <1409763935-5713-5-git-send-email-grygorii.strashko@ti.com>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Wed, 03 Sep 2014 10:08:31 -0700
+Subject: [GIT PULL] clk: ti: dra7xx: fixes for early 3.17-rc
+In-Reply-To: <5406CDD4.8000103@ti.com>
+References: <5406CDD4.8000103@ti.com>
+Message-ID: <20140903170831.11368.8180@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add Keystone 2 DSP GPIO nodes.
-DSP GPIO banks 0-7 correspond to DSP0-DSP7
+Quoting Tero Kristo (2014-09-03 01:14:12)
+> Hi Mike,
+> 
+> The following changes since commit 7d1311b93e58ed55f3a31cc8f94c4b8fe988a2b9:
+> 
+>    Linux 3.17-rc1 (2014-08-16 10:40:26 -0600)
+> 
+> are available in the git repository at:
+> 
+>    git at github.com:t-kristo/linux-pm.git for-v3.17-rc/ti-clk-driver
+> 
+> for you to fetch changes up to 20411dad75ece9a613af715df4489e60990c4017:
+> 
+>    clk: ti: dra7-atl: Provide error check for incoming parameters in 
+> set_rate (2014-08-21 18:04:16 +0300)
 
-Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
----
- arch/arm/boot/dts/k2hk.dtsi | 56 +++++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 56 insertions(+)
+Pulled into clk-fixes.
 
-diff --git a/arch/arm/boot/dts/k2hk.dtsi b/arch/arm/boot/dts/k2hk.dtsi
-index 321ba2f..3287455 100644
---- a/arch/arm/boot/dts/k2hk.dtsi
-+++ b/arch/arm/boot/dts/k2hk.dtsi
-@@ -50,5 +50,61 @@
- 			#interrupt-cells = <1>;
- 			ti,syscon-dev = <&devctrl 0x2a0>;
- 		};
-+
-+		dspgpio0: keystone_dsp_gpio at 02620240 {
-+			compatible = "ti,keystone-dsp-gpio";
-+			gpio-controller;
-+			#gpio-cells = <2>;
-+			gpio,syscon-dev = <&devctrl 0x240>;
-+		};
-+
-+		dspgpio1: keystone_dsp_gpio at 2620244 {
-+			compatible = "ti,keystone-dsp-gpio";
-+			gpio-controller;
-+			#gpio-cells = <2>;
-+			gpio,syscon-dev = <&devctrl 0x244>;
-+		};
-+
-+		dspgpio2: keystone_dsp_gpio at 2620248 {
-+			compatible = "ti,keystone-dsp-gpio";
-+			gpio-controller;
-+			#gpio-cells = <2>;
-+			gpio,syscon-dev = <&devctrl 0x248>;
-+		};
-+
-+		dspgpio3: keystone_dsp_gpio at 262024c {
-+			compatible = "ti,keystone-dsp-gpio";
-+			gpio-controller;
-+			#gpio-cells = <2>;
-+			gpio,syscon-dev = <&devctrl 0x24c>;
-+		};
-+
-+		dspgpio4: keystone_dsp_gpio at 2620250 {
-+			compatible = "ti,keystone-dsp-gpio";
-+			gpio-controller;
-+			#gpio-cells = <2>;
-+			gpio,syscon-dev = <&devctrl 0x250>;
-+		};
-+
-+		dspgpio5: keystone_dsp_gpio at 2620254 {
-+			compatible = "ti,keystone-dsp-gpio";
-+			gpio-controller;
-+			#gpio-cells = <2>;
-+			gpio,syscon-dev = <&devctrl 0x254>;
-+		};
-+
-+		dspgpio6: keystone_dsp_gpio at 2620258 {
-+			compatible = "ti,keystone-dsp-gpio";
-+			gpio-controller;
-+			#gpio-cells = <2>;
-+			gpio,syscon-dev = <&devctrl 0x258>;
-+		};
-+
-+		dspgpio7: keystone_dsp_gpio at 262025c {
-+			compatible = "ti,keystone-dsp-gpio";
-+			gpio-controller;
-+			#gpio-cells = <2>;
-+			gpio,syscon-dev = <&devctrl 0x25c>;
-+		};
- 	};
- };
--- 
-1.9.1
+Thanks,
+Mike
+
+> 
+> ----------------------------------------------------------------
+> Just a couple of quick error check fixes for dra7 boards. Proper fix 
+> would be required for the generic clock driver as well (see 
+> https://www.mail-archive.com/linux-omap at vger.kernel.org/msg108454.html.)
+> 
+> ----------------------------------------------------------------
+> Nishanth Menon (2):
+>        clk: ti: divider: Provide error check for incoming parameters in 
+> set_rate
+>        clk: ti: dra7-atl: Provide error check for incoming parameters in 
+> set_rate
+> 
+>   drivers/clk/ti/clk-dra7-atl.c |    6 +++++-
+>   drivers/clk/ti/divider.c      |    7 ++++++-
+>   2 files changed, 11 insertions(+), 2 deletions(-)
