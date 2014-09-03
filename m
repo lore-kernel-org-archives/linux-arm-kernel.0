@@ -1,192 +1,71 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 3 Sep 2014 10:37:22 +0200
-Subject: [PATCH 07/11 v5] coresight-etm: add CoreSight ETM/PTM driver
-In-Reply-To: <1409159852-7249-8-git-send-email-mathieu.poirier@linaro.org>
-References: <1409159852-7249-1-git-send-email-mathieu.poirier@linaro.org>
- <1409159852-7249-8-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <CACRpkdZO7Mo_JaecjypR_kXKwaatgU+4oLLKheQ22OcNMG_-nQ@mail.gmail.com>
+From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
+Date: Wed, 03 Sep 2014 10:38:32 +0200
+Subject: [PATCH] mfd: twl4030-power: Fix PM idle pin configuration to
+ not conflict with regulators
+In-Reply-To: <20140903002445.GD11766@atomide.com>
+References: <20140819152405.GA12002@atomide.com>
+ <20140902082931.GA32460@breakpoint.cc> <20140903002445.GD11766@atomide.com>
+Message-ID: <5406D388.5050104@linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 27, 2014 at 7:17 PM,  <mathieu.poirier@linaro.org> wrote:
+On 09/03/2014 02:24 AM, Tony Lindgren wrote:
+> I assume you mean beagleboard-ab, not beaglebone-ab :)
 
-> From: Pratik Patel <pratikp@codeaurora.org>
->
-> This driver manages CoreSight ETM (Embedded Trace Macrocell) that
-> supports processor tracing. Currently supported version are ARM
-> ETMv3.x and PTM1.x.
->
-> Signed-off-by: Pratik Patel <pratikp@codeaurora.org>
-> Signed-off-by: Panchaxari Prasannamurthy <panchaxari.prasannamurthy@linaro.org>
-> Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+you assume correct.
 
-(...)
-> +/* Accessors for CP14 registers */
-> +#define dbg_read(reg)                  RCP14_##reg()
-> +#define dbg_write(val, reg)            WCP14_##reg(val)
-> +#define etm_read(reg)                  RCP14_##reg()
-> +#define etm_write(val, reg)            WCP14_##reg(val)
-> +
-> +/* MRC14 and MCR14 */
-> +#define MRC14(op1, crn, crm, op2)                                      \
-> +({                                                                     \
-> +u32 val;                                                               \
-> +asm volatile("mrc p14, "#op1", %0, "#crn", "#crm", "#op2 : "=r" (val));        \
-> +val;                                                                   \
-> +})
-> +
-> +#define MCR14(val, op1, crn, crm, op2)                                 \
-> +({                                                                     \
-> +asm volatile("mcr p14, "#op1", %0, "#crn", "#crm", "#op2 : : "r" (val));\
-> +})
+>> reverting this commit on top of -rc3 makes mmc0 work again.
+> 
+> Again, I assume you're talking about reverting daebabd57,
+> not 43fef47f94a1. Anyways, here's a debug hack I used earlier to
 
-OK... some ARMish funny assembly...
+Yes, I reverted daebabd57 which was pointed to me by git bisect.
 
-(...)
+> dump out the twl configuration in late_initcall and via sysfs
+> so maybe try that and see what the values are with working
+> and non-working case?
 
-But this:
+good.txt and bad.txt are from the late_initcall.
 
-> +static unsigned int etm_read_reg(u32 reg)
-> +{
-> +       switch (reg) {
-> +       case ETMCR:
-> +               return etm_read(ETMCR);
-> +       case ETMCCR:
-> +               return etm_read(ETMCCR);
-(...)
+ $ diff -u good.txt bad.txt
+--- good.txt    2014-09-03 10:29:58.920317368 +0200
++++ bad.txt     2014-09-03 10:28:57.064313222 +0200
+@@ -1,13 +1,13 @@
+  1: addr: 0x0017 grp: 0x0000 type: 0x0000 remap: 0x0008
+- 2: addr: 0x001b grp: 0x0000 type: 0x0000 remap: 0x0008
+- 3: addr: 0x001f grp: 0x0000 type: 0x0000 remap: 0x0008
++ 2: addr: 0x001b grp: 0x002e type: 0x0000 remap: 0x0008
++ 3: addr: 0x001f grp: 0x002e type: 0x0000 remap: 0x0008
+  4: addr: 0x0023 grp: 0x0000 type: 0x0000 remap: 0x0008
+  5: addr: 0x0027 grp: 0x002e type: 0x0000 remap: 0x0008
+  6: addr: 0x002b grp: 0x0000 type: 0x0000 remap: 0x0008
+  7: addr: 0x002f grp: 0x002e type: 0x000b remap: 0x0000
+  8: addr: 0x0033 grp: 0x002e type: 0x0000 remap: 0x0008
+  9: addr: 0x0037 grp: 0x002e type: 0x0000 remap: 0x0008
+-10: addr: 0x003b grp: 0x0000 type: 0x0000 remap: 0x0008
++10: addr: 0x003b grp: 0x002e type: 0x0000 remap: 0x0008
+ 11: addr: 0x003f grp: 0x00ef type: 0x0011 remap: 0x0008
+ 12: addr: 0x0043 grp: 0x00ef type: 0x0010 remap: 0x0008
+ 13: addr: 0x0047 grp: 0x00ef type: 0x0011 remap: 0x0008
+@@ -17,12 +17,8 @@
+ 17: addr: 0x0071 grp: 0x0000 type: 0x0000 remap: 0x0008
+ 18: addr: 0x0074 grp: 0x0000 type: 0x0000 remap: 0x0008
+ 19: addr: 0x0077 grp: 0x00ef type: 0x0000 remap: 0x0008
+-mmc0: host does not support reading read-only switch. assuming
+write-enable.
+ 20: addr: 0x007a grp: 0x0000 type: 0x0000 remap: 0x0000
+-mmc0: new high speed SDHC card at address 1234
+-mmcblk0: mmc0:1234 SA04G 3.63 GiB
+ 21: addr: 0x007f grp: 0x00ef type: 0x000a remap: 0x0008
+- mmcblk0: p1 p2 p3
+ 22: addr: 0x0082 grp: 0x00ee type: 0x0008 remap: 0x0008
+ 23: addr: 0x0085 grp: 0x00af type: 0x0013 remap: 0x0000
+ 24: addr: 0x0088 grp: 0x00ef type: 0x000e remap: 0x0008
 
-And this:
 
-> +static void etm_write_reg(u32 val, u32 reg)
-> +{
-> +       switch (reg) {
-> +       case ETMCR:
-> +               etm_write(val, ETMCR);
-> +               return;
-> +       case ETMTRIGGER:
-> +               etm_write(val, ETMTRIGGER);
-> +               return;
+> 
+> Regards,
+> 
+> Tony
 
-And then this:
-
-> +unsigned int etm_readl_cp14(u32 off)
-> +{
-> +       return etm_read_reg(off);
-> +}
-> +
-> +void etm_writel_cp14(u32 val, u32 off)
-> +{
-> +       etm_write_reg(val, off);
-> +}
-
-And then this:
-
-+static inline void etm_writel(struct etm_drvdata *drvdata,
-+                             u32 val, u32 off)
-+{
-+       if (drvdata->use_cp14)
-+               etm_writel_cp14(val, off);
-+       else
-+               writel_relaxed(val, drvdata->base + off);
-+}
-+
-+static inline unsigned int etm_readl(struct etm_drvdata *drvdata, u32 off)
-+{
-+       u32 val;
-+
-+       if (drvdata->use_cp14)
-+               val = etm_readl_cp14(off);
-+       else
-+               val = readl_relaxed(drvdata->base + off);
-+       return val;
-+}
-
-Just looks like an extra layer or two or three of indirection of
-absolutely no use or value. It seems to be done because someone
-doesn't know how to get parameters to assembly inlines and
-added all the switch statements for get #defined enumerators
-from variables.
-
-The code actually using these layered accessors look like this:
-
-etmcr = etm_readl(drvdata, ETMCR);
-
-I would rewrite the last function like this:
-
-static inline unsigned int etm_readl(struct etm_drvdata *drvdata, u32 off)
-{
-       u32 val;
-
-       if (drvdata->use_cp14)
-               asm_volatile()...
-       else
-               val = readl_relaxed(drvdata->base + off);
-       return val;
-}
-
-The asm_volatile() and parametrizing it is the trick. Just figure it out ;)
-http://www.ethernut.de/en/documents/arm-inline-asm.html
-
-> diff --git a/drivers/coresight/coresight-etm.h b/drivers/coresight/coresight-etm.h
-(...)
-> +struct etm_drvdata {
-> +       void __iomem                    *base;
-> +       struct device                   *dev;
-> +       struct coresight_device         *csdev;
-> +       struct clk                      *clk;
-> +       spinlock_t                      spinlock;
-> +       int                             cpu;
-> +       int                             port_size;
-> +       u8                              arch;
-> +       bool                            use_cp14;
-> +       bool                            enable;
-> +       bool                            sticky_enable;
-> +       bool                            boot_enable;
-> +       bool                            os_unlock;
-> +       u8                              nr_addr_cmp;
-> +       u8                              nr_cntr;
-> +       u8                              nr_ext_inp;
-> +       u8                              nr_ext_out;
-> +       u8                              nr_ctxid_cmp;
-> +       u8                              reset;
-> +       u32                             etmccr;
-> +       u32                             etmccer;
-> +       u32                             traceid;
-> +       u32                             mode;
-> +       u32                             ctrl;
-> +       u32                             trigger_event;
-> +       u32                             startstop_ctrl;
-> +       u32                             enable_event;
-> +       u32                             enable_ctrl1;
-> +       u32                             fifofull_level;
-> +       u8                              addr_idx;
-> +       u32                             addr_val[ETM_MAX_ADDR_CMP];
-> +       u32                             addr_acctype[ETM_MAX_ADDR_CMP];
-> +       u32                             addr_type[ETM_MAX_ADDR_CMP];
-> +       u8                              cntr_idx;
-> +       u32                             cntr_rld_val[ETM_MAX_CNTR];
-> +       u32                             cntr_event[ETM_MAX_CNTR];
-> +       u32                             cntr_rld_event[ETM_MAX_CNTR];
-> +       u32                             cntr_val[ETM_MAX_CNTR];
-> +       u32                             seq_12_event;
-> +       u32                             seq_21_event;
-> +       u32                             seq_23_event;
-> +       u32                             seq_31_event;
-> +       u32                             seq_32_event;
-> +       u32                             seq_13_event;
-> +       u32                             seq_curr_state;
-> +       u8                              ctxid_idx;
-> +       u32                             ctxid_val[ETM_MAX_CTXID_CMP];
-> +       u32                             ctxid_mask;
-> +       u32                             sync_freq;
-> +       u32                             timestamp_event;
-> +};
-
-Unless all of this is self-evident I would kerneldoc it. If I don't
-understand something of this, and if you don't, who's going to
-understand it in a few years...
-
-Apart from this it looks OK. Albeit big. But that may be unavoidable.
-
-Yours,
-Linus Walleij
+Sebastian
