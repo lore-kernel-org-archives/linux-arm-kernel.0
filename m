@@ -1,36 +1,96 @@
-From: leigh@solinno.co.uk (Leigh Brown)
-Date: Wed, 03 Sep 2014 15:40:56 +0100
-Subject: [PATCH V2 0/4] clk: mvebu: Improve clock drift
-In-Reply-To: <1409645719-20003-1-git-send-email-gregory.clement@free-electrons.com>
-References: <1409645719-20003-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <902cee907da9c532822dcf5db722b47c@doppler.thel33t.co.uk>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Wed, 03 Sep 2014 16:26:48 +0200
+Subject: [PATCH 2/4] dt-bindings: Document EMAC Rockchip
+In-Reply-To: <1409740036-8117-2-git-send-email-romain.perier@gmail.com>
+References: <1409740036-8117-1-git-send-email-romain.perier@gmail.com>
+ <1409740036-8117-2-git-send-email-romain.perier@gmail.com>
+Message-ID: <10602790.aE60xYj4zP@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2014-09-02 09:15, Gregory CLEMENT wrote:
-> Few users reported a timer drift on the Armada 370 based board such as
-> the mirabox or the Netgear ReadyNAS 102. This is the second series
-> with few improvements after the review of the 1st version.
+Am Mittwoch, 3. September 2014, 10:27:14 schrieb Romain Perier:
+> This adds the necessary binding documentation for the EMAC Rockchip platform
+> driver found in RK3066 and RK3188 SoCs.
 > 
-> The reason is that when the SSCG (Spread Spectrum Clock Generator) is
-> enabled, it shifts the frequency of the clock. The percentage is no
-> more than 1% but when the clock is used for a timer it leads to a
-> clock drift.
+> Signed-off-by: Romain Perier <romain.perier@gmail.com>
+> ---
+>  .../devicetree/bindings/net/emac_rockchip.txt      | 53
+> ++++++++++++++++++++++ 1 file changed, 53 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/net/emac_rockchip.txt
 > 
-> This series allows to correct the affected clock when the SSCG is
-> enabled. This drift can happen on all the mvebu SoC on the cpu clock
-> block (ie cpu, ddr and l2 cache). Currently the only notable effect is
-> for the Armada 370 because this SoC use the l2cache clock as source
-> for the timer. That's why even if the series allow any of the mvebu
-> SoC to benefit to this correction, Armada 370 is the only user of it.
-> 
-> The first 2 patches should go through the clk subsystem, whereas the
-> third one should go to the arm-soc through the mvebu tree.
-> 
-> The last one is just to fix a typo I found while I was reading the clk
-> code.
+> diff --git a/Documentation/devicetree/bindings/net/emac_rockchip.txt
+> b/Documentation/devicetree/bindings/net/emac_rockchip.txt new file mode
+> 100644
+> index 0000000..d3242e4
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/net/emac_rockchip.txt
+> @@ -0,0 +1,53 @@
+> +* ARC EMAC 10/100 Ethernet platform driver for Rockchip Rk3066/RK3188 SoCs
+> +
+> +Required properties:
+> +- compatible: Should be "rockchip,rk3066-emac" or "rockchip,rk3188-emac"
+> +  according to the target SoC.
+> +- reg: Address and length of the register set for the device
+> +- interrupts: Should contain the EMAC interrupts
+> +- pinctrl-names: pin control state name ("default").
+> +- pinctrl-0: pin control group list of phandle. It must contain
+> +  pin control groups for communication with the phy and for the mii bus.
 
-This is working superbly for me on my Mirabox, and ntpd is now 
-completely stable.
+pinctrl is normally not supposed to be part of the binding doc, as it is a 
+property of the board and not the controller IP itself
 
-Tested-by: Leigh Brown <leigh@solinno.co.uk>
+
+> +- rockchip,grf: phandle to the syscon grf used to control speed and mode
+> +  for emac.
+> +- phy: see ethernet.txt file in the same directory.
+> +- phy-mode: see ethernet.txt file in the same directory.
+> +
+> +Optional properties:
+> +- phy-supply: phandle to a regulator if the PHY needs one
+> +
+> +Clock handling:
+> +- The host clock is needed to calculate and set polling period of EMAC.
+> +  It must be provided by the clock "hclk".
+> +- The reference clock is needed to get/set data from phy at the right
+> frequency,
+> +  according to its "phy-mode". It must be provided by the clock
+> "macref".
+
+I think a more often used scheme is something like
+
+- clocks: Must contain an entry for each entry in clock-names.
+- clock-names: Shall be "hclk" for the host clock needed to calculate and
+			set polling period of EMAC and "macref" for the reference
+			clock needed to transfer data to and from the phy.
+
+
+> +
+> +Child nodes of the driver are the individual PHY devices connected to the
+> +MDIO bus. They must have a "reg" property given the PHY address on the MDIO
+> bus. +
+> +Examples:
+> +
+> +ethernet at 10204000 {
+> +	compatible = "rockchip,rk3188-emac";
+> +	reg = <0xc0fc2000 0x3c>;
+> +	interrupts = <6>;
+> +	mac-address = [ 00 11 22 33 44 55 ];
+> +
+> +	clocks = <&cru HCLK_EMAC>, <&cru SCLK_MAC>;
+> +	clock-names = "hclk", "macref";
+> +
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&emac_xfer>, <&emac_mdio>, <&phy_int>;
+> +
+> +	rockchip,grf = <&grf>;
+> +
+> +	phy = <&phy0>;
+> +	phy-mode = "rmii";
+> +	phy-supply = <&vcc_rmii>;
+> +
+> +	#address-cells = <1>;
+> +	#size-cells = <0>;
+> +	phy0: ethernet-phy at 0 {
+> +	      reg = <1>;
+> +	};
+> +};
