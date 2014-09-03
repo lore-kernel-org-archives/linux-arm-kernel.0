@@ -1,52 +1,47 @@
 From: apinski@cavium.com (Andrew Pinski)
-Date: Wed,  3 Sep 2014 14:19:05 -0700
-Subject: [PATCH 11/24] ARM64: Add is_ilp32_compat_task and
- is_ilp32_compat_thread
+Date: Wed,  3 Sep 2014 14:18:56 -0700
+Subject: [PATCH 02/24] ARM64: Rename COMPAT to AARCH32_EL0 in Kconfig
 In-Reply-To: <1409779158-30963-1-git-send-email-apinski@cavium.com>
 References: <1409779158-30963-1-git-send-email-apinski@cavium.com>
-Message-ID: <1409779158-30963-12-git-send-email-apinski@cavium.com>
+Message-ID: <1409779158-30963-3-git-send-email-apinski@cavium.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the functions which returns if the current task is an
-ILP32 task and one returns if the thread is an ILP32 thread.
+We want to split CONFIG_COMPAT so we can use the COMPAT interface in some cases including
+for compat binfmt.
 
 Signed-off-by: Andrew Pinski <apinski@cavium.com>
 ---
- arch/arm64/include/asm/compat.h |   22 ++++++++++++++++++++++
- 1 files changed, 22 insertions(+), 0 deletions(-)
+ arch/arm64/Kconfig |    8 ++++++--
+ 1 files changed, 6 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm64/include/asm/compat.h b/arch/arm64/include/asm/compat.h
-index 8fcfb29..9082b27 100644
---- a/arch/arm64/include/asm/compat.h
-+++ b/arch/arm64/include/asm/compat.h
-@@ -332,5 +332,27 @@ static inline int is_a32_compat_thread(struct thread_info *thread)
- }
- #endif
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index fd4e81a..73c93dd 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -375,9 +375,13 @@ menu "Userspace binary formats"
+ source "fs/Kconfig.binfmt"
  
-+#ifdef CONFIG_ARM64_ILP32
-+static inline int is_ilp32_compat_task(void)
-+{
-+	return test_thread_flag(TIF_32BIT) && !is_a32_compat_task();
-+}
-+static inline int is_ilp32_compat_thread(struct thread_info *thread)
-+{
-+	return test_ti_thread_flag(thread, TIF_32BIT) &&
-+	       !is_a32_compat_thread(thread);
-+}
-+#else
-+static inline int is_ilp32_compat_task(void)
-+{
-+	return 0;
-+}
-+static inline int is_ilp32_compat_thread(struct thread_info *thread)
-+{
-+	return 0;
-+}
-+#endif
+ config COMPAT
++	def_bool y
++	depends on AARCH32_EL0
++	select COMPAT_BINFMT_ELF
 +
-+
- #endif /* __KERNEL__ */
- #endif /* __ASM_COMPAT_H */
++config AARCH32_EL0
+ 	bool "Kernel support for 32-bit EL0"
+ 	depends on !ARM64_64K_PAGES
+-	select COMPAT_BINFMT_ELF
+ 	select HAVE_UID16
+ 	select OLD_SIGSUSPEND3
+ 	select COMPAT_OLD_SIGACTION
+@@ -391,7 +395,7 @@ config COMPAT
+ 
+ config SYSVIPC_COMPAT
+ 	def_bool y
+-	depends on COMPAT && SYSVIPC
++	depends on AARCH32_EL0 && SYSVIPC
+ 
+ endmenu
+ 
 -- 
 1.7.2.5
