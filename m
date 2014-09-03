@@ -1,37 +1,58 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Tue, 02 Sep 2014 19:38:44 -0700
-Subject: [PATCH 0/3] clk: zynq: Clean up
-In-Reply-To: <1409698929-30143-1-git-send-email-soren.brinkmann@xilinx.com>
-References: <1409698929-30143-1-git-send-email-soren.brinkmann@xilinx.com>
-Message-ID: <20140903023844.5251.5476@quantum>
+From: khiem.nguyen.xt@renesas.com (Khiem Nguyen)
+Date: Wed, 03 Sep 2014 11:42:57 +0900
+Subject: [PATCH repost] ARM: shmobile: lager: correct memory map
+In-Reply-To: <20140903004901.GA3277@verge.net.au>
+References: <20140903004901.GA3277@verge.net.au>
+Message-ID: <54068031.5050806@renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Soren Brinkmann (2014-09-02 16:02:06)
-> Hi,
-> 
-> triggered by that discussion whether checkpatch should be used to check
-> files, I ran checkpatch on Zynq's clock code. A few of the reported
-> issues I found worth fixing.
+Dear Simon-san, Shiiba-san,
 
-Applied to clk-next.
+Thanks for the patch.
 
-Regards,
-Mike
+On 9/3/2014 9:49 AM, Simon Horman wrote:
+> The base address of the second memory region on the lager
+> board is 0x140000000. Update the tag used in the dts file accordingly.
+> 
+> This is a documentation fix and should have no run-time affect.
+> 
+> This problem was introduced when the second memory region
+> was added to the lager dts file by 62bc32a2573c4219
+> ("ARM: shmobile: Include all 4 GiB of memory on Lager)"
+> in v3.14.
+> 
+> Reported-by: NAOYA SHIIBA <naoya.shiiba.nx@renesas.com>
+> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> ---
+>  arch/arm/boot/dts/r8a7790-lager.dts | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> I am reposting this as Olof originally requested a syntax change,
+> which I followed up on, however that change no longer seems appropriate.
+> This this patch seems to be correct.
+[...]
+> -	memory at 180000000 {
+> +	memory at 140000000 {
 
+Could you give more information about not using new syntax ?
+
+I checked memblock information in both 2 ways 
+(i.e memory at 140000000 and memory at 1,40000000)
+and I got same result.
+root at lager:~# cat /sys/kernel/debug/memblock/memory
+   0: 0x0000000040000000..0x000000007fffffff
+   1: 0x0000000140000000..0x00000001ffffffff
+
+So, what does 'no longer seems appropriate" mean ?
+
+>  		device_type = "memory";
+>  		reg = <1 0x40000000 0 0xc0000000>;
+>  	};
 > 
->         Thanks,
->         S?ren
-> 
-> Soren Brinkmann (3):
->   clk: zynq: Remove unnecessary OOM message
->   clk: zynq: Remove pointless return at end of void function
->   clk: zynq: Move const initdata into correct code section
-> 
->  drivers/clk/zynq/clkc.c | 30 ++++++++++++++----------------
->  drivers/clk/zynq/pll.c  |  4 +---
->  2 files changed, 15 insertions(+), 19 deletions(-)
-> 
-> -- 
-> 2.1.0.1.g27b9230
-> 
+
+Thanks.
+
+-- 
+Best regards,
+KHIEM Nguyen
