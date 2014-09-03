@@ -1,71 +1,39 @@
-From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
-Date: Wed, 03 Sep 2014 10:38:32 +0200
-Subject: [PATCH] mfd: twl4030-power: Fix PM idle pin configuration to
- not conflict with regulators
-In-Reply-To: <20140903002445.GD11766@atomide.com>
-References: <20140819152405.GA12002@atomide.com>
- <20140902082931.GA32460@breakpoint.cc> <20140903002445.GD11766@atomide.com>
-Message-ID: <5406D388.5050104@linutronix.de>
+From: preeti@linux.vnet.ibm.com (Preeti U Murthy)
+Date: Wed, 03 Sep 2014 14:11:14 +0530
+Subject: [PATCH v5 04/12] sched: Allow all archs to set the capacity_orig
+In-Reply-To: <CAKfTPtCNPYOi9OY37nbG9o71n4i5mxxvrRow0SgL_9pVK1LpMA@mail.gmail.com>
+References: <1409051215-16788-1-git-send-email-vincent.guittot@linaro.org>
+ <1409051215-16788-5-git-send-email-vincent.guittot@linaro.org>
+ <540204DC.5090204@linux.vnet.ibm.com>
+ <CAKfTPtCNPYOi9OY37nbG9o71n4i5mxxvrRow0SgL_9pVK1LpMA@mail.gmail.com>
+Message-ID: <5406D42A.8090209@linux.vnet.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/03/2014 02:24 AM, Tony Lindgren wrote:
-> I assume you mean beagleboard-ab, not beaglebone-ab :)
-
-you assume correct.
-
->> reverting this commit on top of -rc3 makes mmc0 work again.
+On 09/01/2014 01:35 PM, Vincent Guittot wrote:
+> On 30 August 2014 19:07, Preeti U Murthy <preeti@linux.vnet.ibm.com> wrote:
+>> Hi Vincent,
+>>
+>> On 08/26/2014 04:36 PM, Vincent Guittot wrote:
+>>> capacity_orig is only changed for system with a SMT sched_domain level in order
+>>
+>> I think I had asked this before, but why only capacity_orig? The
+>> capacity of a group is also being updated the same way. This patch fixes
+>> the capacity of a group to reflect the capacity of the heterogeneous
+>> CPUs in it, this capacity being both the full capacity of the group:
+>> capacity_orig and the capacity available for the fair tasks. So I feel
+>> in the subject as well as the changelog it would suffice to say 'capacity'.
 > 
-> Again, I assume you're talking about reverting daebabd57,
-> not 43fef47f94a1. Anyways, here's a debug hack I used earlier to
+> IIRC, we discussed that point on a former version. The patch changes
+> only the behavior of capacity_orig but the behavior of capacity stays
+> unchanged as all archs can already set the capacity whereas the
+> capacity_orig was configurable only if the SD_SHARE_CPUCAPACITY was
+> set in the sched_domain. This is no more the case with this patch
+> which creates arch_scale_cpu_capacity for setting capacity_orig.
 
-Yes, I reverted daebabd57 which was pointed to me by git bisect.
+Yes, sorry I overlooked that.
 
-> dump out the twl configuration in late_initcall and via sysfs
-> so maybe try that and see what the values are with working
-> and non-working case?
+Reviewed-by: Preeti U. Murthy <preeti@linux.vnet.ibm.com>
 
-good.txt and bad.txt are from the late_initcall.
-
- $ diff -u good.txt bad.txt
---- good.txt    2014-09-03 10:29:58.920317368 +0200
-+++ bad.txt     2014-09-03 10:28:57.064313222 +0200
-@@ -1,13 +1,13 @@
-  1: addr: 0x0017 grp: 0x0000 type: 0x0000 remap: 0x0008
-- 2: addr: 0x001b grp: 0x0000 type: 0x0000 remap: 0x0008
-- 3: addr: 0x001f grp: 0x0000 type: 0x0000 remap: 0x0008
-+ 2: addr: 0x001b grp: 0x002e type: 0x0000 remap: 0x0008
-+ 3: addr: 0x001f grp: 0x002e type: 0x0000 remap: 0x0008
-  4: addr: 0x0023 grp: 0x0000 type: 0x0000 remap: 0x0008
-  5: addr: 0x0027 grp: 0x002e type: 0x0000 remap: 0x0008
-  6: addr: 0x002b grp: 0x0000 type: 0x0000 remap: 0x0008
-  7: addr: 0x002f grp: 0x002e type: 0x000b remap: 0x0000
-  8: addr: 0x0033 grp: 0x002e type: 0x0000 remap: 0x0008
-  9: addr: 0x0037 grp: 0x002e type: 0x0000 remap: 0x0008
--10: addr: 0x003b grp: 0x0000 type: 0x0000 remap: 0x0008
-+10: addr: 0x003b grp: 0x002e type: 0x0000 remap: 0x0008
- 11: addr: 0x003f grp: 0x00ef type: 0x0011 remap: 0x0008
- 12: addr: 0x0043 grp: 0x00ef type: 0x0010 remap: 0x0008
- 13: addr: 0x0047 grp: 0x00ef type: 0x0011 remap: 0x0008
-@@ -17,12 +17,8 @@
- 17: addr: 0x0071 grp: 0x0000 type: 0x0000 remap: 0x0008
- 18: addr: 0x0074 grp: 0x0000 type: 0x0000 remap: 0x0008
- 19: addr: 0x0077 grp: 0x00ef type: 0x0000 remap: 0x0008
--mmc0: host does not support reading read-only switch. assuming
-write-enable.
- 20: addr: 0x007a grp: 0x0000 type: 0x0000 remap: 0x0000
--mmc0: new high speed SDHC card at address 1234
--mmcblk0: mmc0:1234 SA04G 3.63 GiB
- 21: addr: 0x007f grp: 0x00ef type: 0x000a remap: 0x0008
-- mmcblk0: p1 p2 p3
- 22: addr: 0x0082 grp: 0x00ee type: 0x0008 remap: 0x0008
- 23: addr: 0x0085 grp: 0x00af type: 0x0013 remap: 0x0000
- 24: addr: 0x0088 grp: 0x00ef type: 0x000e remap: 0x0008
-
-
-> 
-> Regards,
-> 
-> Tony
-
-Sebastian
+Regards
+Preeti U Murthy
