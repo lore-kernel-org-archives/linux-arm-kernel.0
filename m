@@ -1,39 +1,33 @@
 From: apinski@cavium.com (Andrew Pinski)
-Date: Wed,  3 Sep 2014 14:19:02 -0700
-Subject: [PATCH 08/24] Allow a 32bit ABI to use the naming of the 64bit ABI
- syscalls to avoid confusion of not splitting the registers
+Date: Wed,  3 Sep 2014 14:19:03 -0700
+Subject: [PATCH 09/24] ARM64:ILP32: Use the same syscall names as LP64
 In-Reply-To: <1409779158-30963-1-git-send-email-apinski@cavium.com>
 References: <1409779158-30963-1-git-send-email-apinski@cavium.com>
-Message-ID: <1409779158-30963-9-git-send-email-apinski@cavium.com>
+Message-ID: <1409779158-30963-10-git-send-email-apinski@cavium.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In the ARM64 ILP32 case, we want to say the syscalls that normally would pass
-64bit as two arguments are now passing as one so want to use the 64bit
-naming scheme.
+Define __SYSCALL_NONCOMPAT so we use the 64bit naming scheme for ILP32.
 
 Signed-off-by: Andrew Pinski <apinski@cavium.com>
 ---
- include/uapi/asm-generic/unistd.h |    6 +++++-
- 1 files changed, 5 insertions(+), 1 deletions(-)
+ arch/arm64/include/uapi/asm/unistd.h |    6 ++++++
+ 1 files changed, 6 insertions(+), 0 deletions(-)
 
-diff --git a/include/uapi/asm-generic/unistd.h b/include/uapi/asm-generic/unistd.h
-index 11d11bc..a7984a0 100644
---- a/include/uapi/asm-generic/unistd.h
-+++ b/include/uapi/asm-generic/unistd.h
-@@ -881,8 +881,12 @@ __SYSCALL(__NR_fork, sys_ni_syscall)
-  * they take different names.
-  * Here we map the numbers so that both versions
-  * use the same syscall table layout.
-+ * For 32bit abis where 64bit can be passed via one
-+ * register, use the same naming as the 64bit ones
-+ * as they will only have a 64 bit off_t.
+diff --git a/arch/arm64/include/uapi/asm/unistd.h b/arch/arm64/include/uapi/asm/unistd.h
+index 1caadc2..13cbf8d 100644
+--- a/arch/arm64/include/uapi/asm/unistd.h
++++ b/arch/arm64/include/uapi/asm/unistd.h
+@@ -13,4 +13,10 @@
+  * You should have received a copy of the GNU General Public License
+  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
   */
--#if __BITS_PER_LONG == 64 && !defined(__SYSCALL_COMPAT)
-+#if (__BITS_PER_LONG == 64 && !defined(__SYSCALL_COMPAT)) || \
-+	defined(__ARCH_WANT_64BIT_SYSCALLS)
- #define __NR_fcntl __NR3264_fcntl
- #define __NR_statfs __NR3264_statfs
- #define __NR_fstatfs __NR3264_fstatfs
++
++/* For ILP32, we want to use the non compat names. */
++#if defined(__ILP32__)
++#define __ARCH_WANT_64BIT_SYSCALLS
++#endif
++
+ #include <asm-generic/unistd.h>
 -- 
 1.7.2.5
