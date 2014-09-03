@@ -1,53 +1,59 @@
-From: naveenkrishna.ch@gmail.com (Naveen Krishna Ch)
-Date: Wed, 3 Sep 2014 13:13:21 +0530
-Subject: [PATCH 08/14] i2c: exynos5: Add Kconfig dependencies
-In-Reply-To: <20140828040311.GD4972@localhost>
-References: <1409132740-1954-1-git-send-email-ch.naveen@samsung.com>
- <1409132740-1954-2-git-send-email-ch.naveen@samsung.com>
- <20140828040311.GD4972@localhost>
-Message-ID: <CAHfPSqBTskQxC_HktLyPF=4cmmzZvVZO2u_Y4tXkftA1qtsR4g@mail.gmail.com>
+From: antoine.tenart@free-electrons.com (Antoine Tenart)
+Date: Wed,  3 Sep 2014 09:48:23 +0200
+Subject: [PATCH v4 04/12] ARM: dts: berlin: add a required reset property in
+ the chip controller node
+In-Reply-To: <1409730511-16101-1-git-send-email-antoine.tenart@free-electrons.com>
+References: <1409730511-16101-1-git-send-email-antoine.tenart@free-electrons.com>
+Message-ID: <1409730511-16101-5-git-send-email-antoine.tenart@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof,
+The chip controller node now also describes the Marvell Berlin reset
+controller. Add the required 'reset-cells' property.
 
-On 28 August 2014 09:33, Olof Johansson <olof@lixom.net> wrote:
-> On Wed, Aug 27, 2014 at 03:15:40PM +0530, Naveen Krishna Chatradhi wrote:
->> The i2c-exynos5.c driver can be reused for the HSI2C controller
->> on Exynos7 SoCs from Samsung.
->>
->> This patch adds the Kconfig dependency to choose i2c-exynos5.c
->> for CONFIG_ARCH_EXYNOS7.
->>
->> Signed-off-by: Naveen Krishna Chatradhi <ch.naveen@samsung.com>
->> To: linux-i2c at vger.kernel.org
->> Cc: Wolfram Sang <wsa@the-dreams.de>
->> ---
->>  drivers/i2c/busses/Kconfig |    2 +-
->>  1 file changed, 1 insertion(+), 1 deletion(-)
->>
->> diff --git a/drivers/i2c/busses/Kconfig b/drivers/i2c/busses/Kconfig
->> index 2ac87fa..bd18fa6 100644
->> --- a/drivers/i2c/busses/Kconfig
->> +++ b/drivers/i2c/busses/Kconfig
->> @@ -465,7 +465,7 @@ config I2C_EG20T
->>
->>  config I2C_EXYNOS5
->>       tristate "Exynos5 high-speed I2C driver"
->> -     depends on ARCH_EXYNOS5 && OF
->> +     depends on (ARCH_EXYNOS5 || ARCH_EXYNOS7) && OF
->
-> Ick, this will keep growing. Please use ARCH_EXYNOS instead. Yes,
-> this means you need to add it to the arm64 Kconfig and select it from
-> ARCH_EXYNOS7.
+Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
+Acked-by: Philipp Zabel <p.zabel@pengutronix.de>
+---
+ arch/arm/boot/dts/berlin2.dtsi   | 1 +
+ arch/arm/boot/dts/berlin2cd.dtsi | 1 +
+ arch/arm/boot/dts/berlin2q.dtsi  | 1 +
+ 3 files changed, 3 insertions(+)
 
-Ok, will repost with ARCH_EXYNOS. Thanks.
-
->
->
->
-> -Olof
-
+diff --git a/arch/arm/boot/dts/berlin2.dtsi b/arch/arm/boot/dts/berlin2.dtsi
+index 9d7c810ebd0b..d7e81e124de0 100644
+--- a/arch/arm/boot/dts/berlin2.dtsi
++++ b/arch/arm/boot/dts/berlin2.dtsi
+@@ -249,6 +249,7 @@
+ 		chip: chip-control at ea0000 {
+ 			compatible = "marvell,berlin2-chip-ctrl";
+ 			#clock-cells = <1>;
++			#reset-cells = <2>;
+ 			reg = <0xea0000 0x400>;
+ 			clocks = <&refclk>;
+ 			clock-names = "refclk";
+diff --git a/arch/arm/boot/dts/berlin2cd.dtsi b/arch/arm/boot/dts/berlin2cd.dtsi
+index cc1df65da504..68f7032b4686 100644
+--- a/arch/arm/boot/dts/berlin2cd.dtsi
++++ b/arch/arm/boot/dts/berlin2cd.dtsi
+@@ -231,6 +231,7 @@
+ 		chip: chip-control at ea0000 {
+ 			compatible = "marvell,berlin2cd-chip-ctrl";
+ 			#clock-cells = <1>;
++			#reset-cells = <2>;
+ 			reg = <0xea0000 0x400>;
+ 			clocks = <&refclk>;
+ 			clock-names = "refclk";
+diff --git a/arch/arm/boot/dts/berlin2q.dtsi b/arch/arm/boot/dts/berlin2q.dtsi
+index 400c40fceccc..ffba5c3bdab8 100644
+--- a/arch/arm/boot/dts/berlin2q.dtsi
++++ b/arch/arm/boot/dts/berlin2q.dtsi
+@@ -332,6 +332,7 @@
+ 		chip: chip-control at ea0000 {
+ 			compatible = "marvell,berlin2q-chip-ctrl";
+ 			#clock-cells = <1>;
++			#reset-cells = <2>;
+ 			reg = <0xea0000 0x400>, <0xdd0170 0x10>;
+ 			clocks = <&refclk>;
+ 			clock-names = "refclk";
 -- 
-Shine bright,
-(: Nav :)
+1.9.1
