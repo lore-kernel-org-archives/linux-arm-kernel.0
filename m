@@ -1,1175 +1,344 @@
-From: sthokal@xilinx.com (Srikanth Thokala)
-Date: Wed, 3 Sep 2014 12:52:05 +0530
-Subject: [PATCH v7] pcie: Add Xilinx PCIe Host Bridge IP driver
-In-Reply-To: <1408551962-2249-1-git-send-email-sthokal@xilinx.com>
-References: <1408551962-2249-1-git-send-email-sthokal@xilinx.com>
-Message-ID: <CA+mB=1JXUEsQSWyncERShmSyXBDh+6xvOaxQ2C5VYrjnANmWqQ@mail.gmail.com>
+From: gautam.vivek@samsung.com (Vivek Gautam)
+Date: Wed, 3 Sep 2014 12:59:27 +0530
+Subject: [PATCH v6 4/4] phy: exynos5-usbdrd: Calibrate LOS levels for
+ exynos5420/5800
+In-Reply-To: <20140902143438.GB16872@saruman.home>
+References: <1409656338-20337-1-git-send-email-gautam.vivek@samsung.com>
+ <1409656338-20337-5-git-send-email-gautam.vivek@samsung.com>
+ <20140902143438.GB16872@saruman.home>
+Message-ID: <CAFp+6iEyqmbwMLFrBKD7NVLDAC=b+h1hPKFS=BG4k9D69hn_dg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Bjorn,
+Hi Felipe,
 
-I fixed the mentioned issues with build-bot in v7.  Could you please
-take this patch?
 
-Thanks
-Srikanth
+On Tue, Sep 2, 2014 at 8:04 PM, Felipe Balbi <balbi@ti.com> wrote:
+> Hi,
+>
+> On Tue, Sep 02, 2014 at 04:42:18PM +0530, Vivek Gautam wrote:
+>> Adding phy calibrate callback, which facilitates setting certain
+>> PHY settings post initialization of the PHY controller.
+>> Exynos5420 and Exynos5800 have 28nm USB 3.0 DRD PHY for which
+>> the Loss-of-Signal (LOS) Detector Threshold Level as well as
+>> Tx-Vboost-Level should be controlled for Super-Speed operations.
+>>
+>> Additionally set proper time to wait for RxDetect measurement,
+>> for desired PHY reference clock, so as to solve issue with enumeration
+>> of few USB 3.0 devices, like Samsung SUM-TSB16S 3.0 USB drive
+>> on the controller.
+>> We are using CR_port for this purpose to send required data
+>> to override the LOS values.
+>>
+>> On testing with USB 3.0 devices on USB 3.0 port present on
+>> SMDK5420, and peach-pit boards should see following message:
+>> usb 2-1: new SuperSpeed USB device number 2 using xhci-hcd
+>>
+>> and without this patch, should see below shown message:
+>> usb 1-1: new high-speed USB device number 2 using xhci-hcd
+>>
+>> [Also removed unnecessary extra lines in the register macro definitions]
+>>
+>> Signed-off-by: Vivek Gautam <gautam.vivek@samsung.com>
+>> ---
+>>  drivers/phy/phy-exynos5-usbdrd.c |  185 ++++++++++++++++++++++++++++++++++----
+>>  1 file changed, 170 insertions(+), 15 deletions(-)
+>>
+>> diff --git a/drivers/phy/phy-exynos5-usbdrd.c b/drivers/phy/phy-exynos5-usbdrd.c
+>> index 47f47fe..85742b0 100644
+>> --- a/drivers/phy/phy-exynos5-usbdrd.c
+>> +++ b/drivers/phy/phy-exynos5-usbdrd.c
+>> @@ -37,13 +37,11 @@
+>>
+>>  /* EXYNOS5: USB 3.0 DRD PHY registers */
+>>  #define EXYNOS5_DRD_LINKSYSTEM                       0x04
+>> -
+>>  #define LINKSYSTEM_FLADJ_MASK                        (0x3f << 1)
+>>  #define LINKSYSTEM_FLADJ(_x)                 ((_x) << 1)
+>>  #define LINKSYSTEM_XHCI_VERSION_CONTROL              BIT(27)
+>>
+>>  #define EXYNOS5_DRD_PHYUTMI                  0x08
+>> -
+>>  #define PHYUTMI_OTGDISABLE                   BIT(6)
+>>  #define PHYUTMI_FORCESUSPEND                 BIT(1)
+>>  #define PHYUTMI_FORCESLEEP                   BIT(0)
+>> @@ -51,26 +49,20 @@
+>>  #define EXYNOS5_DRD_PHYPIPE                  0x0c
+>>
+>>  #define EXYNOS5_DRD_PHYCLKRST                        0x10
+>> -
+>>  #define PHYCLKRST_EN_UTMISUSPEND             BIT(31)
+>> -
+>>  #define PHYCLKRST_SSC_REFCLKSEL_MASK         (0xff << 23)
+>>  #define PHYCLKRST_SSC_REFCLKSEL(_x)          ((_x) << 23)
+>> -
+>>  #define PHYCLKRST_SSC_RANGE_MASK             (0x03 << 21)
+>>  #define PHYCLKRST_SSC_RANGE(_x)                      ((_x) << 21)
+>> -
+>>  #define PHYCLKRST_SSC_EN                     BIT(20)
+>>  #define PHYCLKRST_REF_SSP_EN                 BIT(19)
+>>  #define PHYCLKRST_REF_CLKDIV2                        BIT(18)
+>> -
+>>  #define PHYCLKRST_MPLL_MULTIPLIER_MASK               (0x7f << 11)
+>>  #define PHYCLKRST_MPLL_MULTIPLIER_100MHZ_REF (0x19 << 11)
+>>  #define PHYCLKRST_MPLL_MULTIPLIER_50M_REF    (0x32 << 11)
+>>  #define PHYCLKRST_MPLL_MULTIPLIER_24MHZ_REF  (0x68 << 11)
+>>  #define PHYCLKRST_MPLL_MULTIPLIER_20MHZ_REF  (0x7d << 11)
+>>  #define PHYCLKRST_MPLL_MULTIPLIER_19200KHZ_REF       (0x02 << 11)
+>> -
+>>  #define PHYCLKRST_FSEL_UTMI_MASK             (0x7 << 5)
+>>  #define PHYCLKRST_FSEL_PIPE_MASK             (0x7 << 8)
+>>  #define PHYCLKRST_FSEL(_x)                   ((_x) << 5)
+>> @@ -78,46 +70,68 @@
+>>  #define PHYCLKRST_FSEL_PAD_24MHZ             (0x2a << 5)
+>>  #define PHYCLKRST_FSEL_PAD_20MHZ             (0x31 << 5)
+>>  #define PHYCLKRST_FSEL_PAD_19_2MHZ           (0x38 << 5)
+>> -
+>>  #define PHYCLKRST_RETENABLEN                 BIT(4)
+>> -
+>>  #define PHYCLKRST_REFCLKSEL_MASK             (0x03 << 2)
+>>  #define PHYCLKRST_REFCLKSEL_PAD_REFCLK               (0x2 << 2)
+>>  #define PHYCLKRST_REFCLKSEL_EXT_REFCLK               (0x3 << 2)
+>> -
+>>  #define PHYCLKRST_PORTRESET                  BIT(1)
+>>  #define PHYCLKRST_COMMONONN                  BIT(0)
+>>
+>>  #define EXYNOS5_DRD_PHYREG0                  0x14
+>> +#define PHYREG0_SSC_REF_CLK_SEL                      BIT(21)
+>> +#define PHYREG0_SSC_RANGE                    BIT(20)
+>> +#define PHYREG0_CR_WRITE                     BIT(19)
+>> +#define PHYREG0_CR_READ                              BIT(18)
+>> +#define PHYREG0_CR_DATA_IN(_x)                       ((_x) << 2)
+>> +#define PHYREG0_CR_CAP_DATA                  BIT(1)
+>> +#define PHYREG0_CR_CAP_ADDR                  BIT(0)
+>> +
+>>  #define EXYNOS5_DRD_PHYREG1                  0x18
+>> +#define PHYREG1_CR_DATA_OUT(_x)                      ((_x) << 1)
+>> +#define PHYREG1_CR_ACK                               BIT(0)
+>>
+>>  #define EXYNOS5_DRD_PHYPARAM0                        0x1c
+>> -
+>>  #define PHYPARAM0_REF_USE_PAD                        BIT(31)
+>>  #define PHYPARAM0_REF_LOSLEVEL_MASK          (0x1f << 26)
+>>  #define PHYPARAM0_REF_LOSLEVEL                       (0x9 << 26)
+>>
+>>  #define EXYNOS5_DRD_PHYPARAM1                        0x20
+>> -
+>>  #define PHYPARAM1_PCS_TXDEEMPH_MASK          (0x1f << 0)
+>>  #define PHYPARAM1_PCS_TXDEEMPH                       (0x1c)
+>>
+>>  #define EXYNOS5_DRD_PHYTERM                  0x24
+>>
+>>  #define EXYNOS5_DRD_PHYTEST                  0x28
+>> -
+>>  #define PHYTEST_POWERDOWN_SSP                        BIT(3)
+>>  #define PHYTEST_POWERDOWN_HSP                        BIT(2)
+>>
+>>  #define EXYNOS5_DRD_PHYADP                   0x2c
+>>
+>>  #define EXYNOS5_DRD_PHYUTMICLKSEL            0x30
+>> -
+>
+> this and all above are unrelated to $subject.
 
-On Wed, Aug 20, 2014 at 9:56 PM, Srikanth Thokala <sthokal@xilinx.com> wrote:
-> This is the driver for Xilinx AXI PCIe Host Bridge Soft IP
+True, but i have mentioned about this change in the commit message.
+It looked so trivial to me that i included it here in this patch.
+
+Will separate it out in a separate patch if you like that. :-)
+
 >
-> Signed-off-by: Srikanth Thokala <sthokal@xilinx.com>
-> Acked-by: Arnd Bergmann <arnd@arndb.de>
-> ---
-> Changes in v7:
-> - Removed errors reported from build-bot.  The errors are
->   mainly due to same CONFIG_PCI_XILINX flag being used for
->   Zynq and Microblaze platforms.  So, renamed the driver
->   config flag name to CONFIG_PCIE_XILINX.
-> - Also, renamed the driver file to pcie-xilinx.c to be in
->   sync with CONFIG option.
-> - Fixed the annotation of xilinx_pcie_scan_bus() function
->   to remove build-bot warnings.
+>>  #define PHYUTMICLKSEL_UTMI_CLKSEL            BIT(2)
+>>
+>>  #define EXYNOS5_DRD_PHYRESUME                        0x34
+>>  #define EXYNOS5_DRD_LINKPORT                 0x44
+>>
+>> +/* USB 3.0 DRD PHY SS Function Control Reg; accessed by CR_PORT */
+>> +#define EXYNOS5_DRD_PHYSS_LOSLEVEL_OVRD_IN           (0x15)
+>> +#define LOSLEVEL_OVRD_IN_LOS_BIAS_5420                       (0x5 << 13)
+>> +#define LOSLEVEL_OVRD_IN_LOS_BIAS_DEFAULT            (0x0 << 13)
+>> +#define LOSLEVEL_OVRD_IN_EN                          (0x1 << 10)
+>> +#define LOSLEVEL_OVRD_IN_LOS_LEVEL_DEFAULT           (0x9 << 0)
+>> +
+>> +#define EXYNOS5_DRD_PHYSS_TX_VBOOSTLEVEL_OVRD_IN     (0x12)
+>> +#define TX_VBOOSTLEVEL_OVRD_IN_VBOOST_5420           (0x5 << 13)
+>> +#define TX_VBOOSTLEVEL_OVRD_IN_VBOOST_DEFAULT                (0x4 << 13)
+>> +
+>> +#define EXYNOS5_DRD_PHYSS_LANE0_TX_DEBUG             (0x1010)
+>> +#define LANE0_TX_DEBUG_RXDET_MEAS_TIME_19M2_20M              (0x4 << 4)
+>> +#define LANE0_TX_DEBUG_RXDET_MEAS_TIME_24M           (0x8 << 4)
+>> +#define LANE0_TX_DEBUG_RXDET_MEAS_TIME_25M_26M               (0x8 << 4)
+>> +#define LANE0_TX_DEBUG_RXDET_MEAS_TIME_48M_50M_52M   (0x20 << 4)
+>> +#define LANE0_TX_DEBUG_RXDET_MEAS_TIME_62M5          (0x20 << 4)
+>> +#define LANE0_TX_DEBUG_RXDET_MEAS_TIME_96M_100M              (0x40 << 4)
+>> +
+>>  #define KHZ  1000
+>>  #define MHZ  (KHZ * KHZ)
+>>
+>> @@ -135,12 +149,14 @@ struct exynos5_usbdrd_phy_config {
+>>       void (*phy_isol)(struct phy_usb_instance *inst, u32 on);
+>>       void (*phy_init)(struct exynos5_usbdrd_phy *phy_drd);
+>>       unsigned int (*set_refclk)(struct phy_usb_instance *inst);
+>> +     int (*phy_calibrate)(struct phy_usb_instance *inst);
+>>  };
+>>
+>>  struct exynos5_usbdrd_phy_drvdata {
+>>       const struct exynos5_usbdrd_phy_config *phy_cfg;
+>>       u32 pmu_offset_usbdrd0_phy;
+>>       u32 pmu_offset_usbdrd1_phy;
+>> +     void (*phy_exynos_calibrate)(struct exynos5_usbdrd_phy *phy_drd);
+>>  };
+>>
+>>  /**
+>> @@ -487,6 +503,142 @@ static int exynos5_usbdrd_phy_power_off(struct phy *phy)
+>>       return 0;
+>>  }
+>>
+>> +static void crport_handshake(struct exynos5_usbdrd_phy *phy_drd,
+>> +                                             u32 val, u32 cmd)
+>> +{
+>> +     u32 usec = 100;
+>> +     u32 result;
+>> +
+>> +     writel(val | cmd, phy_drd->reg_phy + EXYNOS5_DRD_PHYREG0);
+>> +
+>> +     do {
+>> +             result = readl(phy_drd->reg_phy + EXYNOS5_DRD_PHYREG1);
+>> +             if (result & PHYREG1_CR_ACK)
+>> +                     break;
+>> +
+>> +             udelay(1);
+>> +     } while (usec-- > 0);
+>> +
+>> +     if (!usec)
+>> +             dev_err(phy_drd->dev,
+>> +                     "CRPORT handshake timeout1 (0x%08x)\n", val);
 >
-> Changes in v6:
-> - Added Ack from Arnd. Thanks Arnd.
-> - Rebased on 3.16-rc7.
+> if handshake timed out, shouldn't you error out here ? IOW, make this
+> function return an int and return an error code from this point ? Why
+> would you even continue to the next step ?
+
+Point taken, we should have error'ed out here once timeout occured.
+Will update it accordingly.
+
 >
-> Changes in v5:
-> - Removed unnecessary checking of port structure.
-> - Changed the return type of verify_config from int to bool.
-> - Renamed following functions,
->   xilinx_pcie_is_link_up() -> xilinx_pcie_link_is_up()
->   xilinx_pcie_verify_config() -> xilinx_pcie_valid_device()
->   xilinx_pcie_get_config_base() -> xilinx_pcie_config_base()
-> - Removed link_up bool flag from port structure, as it is not
->   being used.
-> - Removed unused constants.
-> - Rebased on 3.16-rc6.
-> - Fixed some minor comments.
-> - Thanks Bjorn for the review.
+>> +
+>> +     usec = 100;
+>> +
+>> +     writel(val, phy_drd->reg_phy + EXYNOS5_DRD_PHYREG0);
+>> +
+>> +     do {
+>> +             result = readl(phy_drd->reg_phy + EXYNOS5_DRD_PHYREG1);
+>> +             if (!(result & PHYREG1_CR_ACK))
+>> +                     break;
+>> +
+>> +             udelay(1);
+>> +     } while (usec-- > 0);
+>> +
+>> +     if (!usec)
+>> +             dev_err(phy_drd->dev,
+>> +                     "CRPORT handshake timeout2 (0x%08x)\n", val);
 >
-> Changes in v4:
-> - Regarding the comments to separate ECAM functionality,
->   I have sent a separate patch and it is decided to implement
->   it later. The patch is here,
->   https://lkml.org/lkml/2014/5/18/54
-> - Fixed issue with adding configuration bus resource.
-> - Moved the logic for setting up bus resources to probe() from
->   pcie_setup().
-> - Instead of mapping all the MSI interrupts in the probe, changed
->   to map only when a MSI is requested.
-> - Earlier, the implementation of legacy and MSI interrupts init-
->   is mutually exclusive, now changed to have the legacy interrupts
->   init always and MSI interrupt init based on CONFIG_PCI_MSI flag.
-> - Regarding the MSI generic implementation comment, I will plan to
->   do on top of this driver patch.
-> - Rebased on 3.16-rc2.
-> - Fixed other minor comments.
-> - Thanks Arnd and Bjorn for the review.
+> return an error ?
+sure
+
 >
-> Changes in v3:
-> - Rebased on v3.15.0-rc1
-> - Added support for interrupt-map DT functionality.
-> - Removed map_irq() wrapper, instead using of_irq_parse_and_map_pci().
-> - Modified resource mapping logic as per the series
->   "PCI: ARM: add support for generic PCI host controller"
-> - Modified devicetree binding documentation to update with interrupt-
->   map properties.
-> - Use devm calls wherever applicable.
-> - Fixed minor comments from Jason
-> - Thanks Jason for the review and suggestions.
+>> +}
+>> +
+>> +static void crport_ctrl_write(struct exynos5_usbdrd_phy *phy_drd,
+>> +                                             u32 addr, u32 data)
+>> +{
+>> +     /* Write Address */
+>> +     writel(PHYREG0_CR_DATA_IN(addr),
+>> +                     phy_drd->reg_phy + EXYNOS5_DRD_PHYREG0);
+>> +     crport_handshake(phy_drd, PHYREG0_CR_DATA_IN(addr),
+>> +                      PHYREG0_CR_CAP_ADDR);
+>> +
+>> +     /* Write Data */
+>> +     writel(PHYREG0_CR_DATA_IN(data),
+>> +                     phy_drd->reg_phy + EXYNOS5_DRD_PHYREG0);
+>> +     crport_handshake(phy_drd, PHYREG0_CR_DATA_IN(data),
+>> +                      PHYREG0_CR_CAP_DATA);
+>> +     crport_handshake(phy_drd, PHYREG0_CR_DATA_IN(data),
+>> +                      PHYREG0_CR_WRITE);
+>> +}
+>> +
+>> +/*
+>> + * Override PHY paramaeters using CR_PORT register to calibrate settings
+>> + * to meet meet SuperSpeed requirements, on Exynos5420 and Exynos5800 systems,
+>> + * which have 28nm USB 3.0 DRD PHY.
+>> + */
+>> +static void exynos5420_usbdrd_phy_calibrate(struct exynos5_usbdrd_phy *phy_drd)
+>> +{
+>> +     u32 temp;
+>> +
+>> +     /*
+>> +      * Change los_bias to (0x5) for 28nm PHY from a
+>> +      * default value (0x0); los_level is set as default
+>> +      * (0x9) as also reflected in los_level[30:26] bits
+>> +      * of PHYPARAM0 register.
+>> +      */
+>> +     temp = LOSLEVEL_OVRD_IN_LOS_BIAS_5420 |
+>> +             LOSLEVEL_OVRD_IN_EN |
+>> +             LOSLEVEL_OVRD_IN_LOS_LEVEL_DEFAULT;
+>> +     crport_ctrl_write(phy_drd,
+>> +                       EXYNOS5_DRD_PHYSS_LOSLEVEL_OVRD_IN,
+>> +                       temp);
+>> +
+>> +     /*
+>> +      * Set tx_vboost_lvl to (0x5) for 28nm PHY Tuning,
+>> +      * to raise Tx signal level from its default value of (0x4)
+>> +      */
+>> +     temp = TX_VBOOSTLEVEL_OVRD_IN_VBOOST_5420;
+>> +     crport_ctrl_write(phy_drd,
+>> +                       EXYNOS5_DRD_PHYSS_TX_VBOOSTLEVEL_OVRD_IN,
+>> +                       temp);
+>> +
+>> +     /*
+>> +      * Set proper time to wait for RxDetect measurement, for
+>> +      * desired reference clock of PHY, by tuning the CRPORT
+>> +      * register LANE0.TX_DEBUG which is internal to PHY.
+>> +      * This fixes issue with few USB 3.0 devices, which are
+>> +      * not detected (not even generate interrupts on the bus
+>> +      * on insertion) without this change.
+>> +      * e.g. Samsung SUM-TSB16S 3.0 USB drive.
+>> +      */
+>> +     switch (phy_drd->extrefclk) {
+>> +     case EXYNOS5_FSEL_50MHZ:
+>> +             temp = LANE0_TX_DEBUG_RXDET_MEAS_TIME_48M_50M_52M;
+>> +             break;
+>> +     case EXYNOS5_FSEL_20MHZ:
+>> +     case EXYNOS5_FSEL_19MHZ2:
+>> +             temp = LANE0_TX_DEBUG_RXDET_MEAS_TIME_19M2_20M;
+>> +             break;
+>> +     case EXYNOS5_FSEL_24MHZ:
 >
-> Changes in v2:
-> - Rebased on v3.14.0-rc8
-> - Removed IP specific DT properties like include-rc, axibar-num etc.,
->   as suggested by Jason and Bjorn, Thanks
-> ---
->  .../devicetree/bindings/pci/xilinx-pcie.txt        |   62 ++
->  drivers/pci/host/Kconfig                           |    7 +
->  drivers/pci/host/Makefile                          |    1 +
->  drivers/pci/host/pcie-xilinx.c                     |  978 ++++++++++++++++++++
->  4 files changed, 1048 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/pci/xilinx-pcie.txt
->  create mode 100644 drivers/pci/host/pcie-xilinx.c
+> why can't this be done during probe() ? Are you going to change external
+> reference clock frequency during runtime ? And even if you do,
+> wouldn't it be easier to subscribe to clock rate change notifiers
+> instead of adding this ->calibrate() ?
+
+Wait, did this patch give an impression that we are changing the reference
+clock settings ?
+
+We are actually trying to override some of the PHY parameters, which is
+possible only after the controller has been reset.
+These PHY parameter overriding (on PHY registers which are not exposed outside)
+is done post initialization, only through EXYNOS5_DRD_PHYREG0.
+
 >
-> diff --git a/Documentation/devicetree/bindings/pci/xilinx-pcie.txt b/Documentation/devicetree/bindings/pci/xilinx-pcie.txt
-> new file mode 100644
-> index 0000000..3e2c88d
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/pci/xilinx-pcie.txt
-> @@ -0,0 +1,62 @@
-> +* Xilinx AXI PCIe Root Port Bridge DT description
-> +
-> +Required properties:
-> +- #address-cells: Address representation for root ports, set to <3>
-> +- #size-cells: Size representation for root ports, set to <2>
-> +- #interrupt-cells: specifies the number of cells needed to encode an
-> +       interrupt source. The value must be 1.
-> +- compatible: Should contain "xlnx,axi-pcie-host-1.00.a"
-> +- reg: Should contain AXI PCIe registers location and length
-> +- device_type: must be "pci"
-> +- interrupts: Should contain AXI PCIe interrupt
-> +- interrupt-map-mask,
-> +  interrupt-map: standard PCI properties to define the mapping of the
-> +       PCI interface to interrupt numbers.
-> +- ranges: ranges for the PCI memory regions (I/O space region is not
-> +       supported by hardware)
-> +       Please refer to the standard PCI bus binding document for a more
-> +       detailed explanation
-> +
-> +Optional properties:
-> +- bus-range: PCI bus numbers covered
-> +
-> +Interrupt controller child node
-> ++++++++++++++++++++++++++++++++
-> +Required properties:
-> +- interrupt-controller: identifies the node as an interrupt controller
-> +- #address-cells: specifies the number of cells needed to encode an
-> +       address. The value must be 0.
-> +- #interrupt-cells: specifies the number of cells needed to encode an
-> +       interrupt source. The value must be 1.
-> +
-> +NOTE:
-> +The core provides a single interrupt for both INTx/MSI messages. So,
-> +created a interrupt controller node to support 'interrupt-map' DT
-> +functionality.  The driver will create an IRQ domain for this map, decode
-> +the four INTx interrupts in ISR and route them to this domain.
-> +
-> +
-> +Example:
-> +++++++++
-> +
-> +       pci_express: axi-pcie at 50000000 {
-> +               #address-cells = <3>;
-> +               #size-cells = <2>;
-> +               #interrupt-cells = <1>;
-> +               compatible = "xlnx,axi-pcie-host-1.00.a";
-> +               reg = < 0x50000000 0x10000000 >;
-> +               device_type = "pci";
-> +               interrupts = < 0 52 4 >;
-> +               interrupt-map-mask = <0 0 0 7>;
-> +               interrupt-map = <0 0 0 1 &pcie_intc 1>,
-> +                               <0 0 0 2 &pcie_intc 2>,
-> +                               <0 0 0 3 &pcie_intc 3>,
-> +                               <0 0 0 4 &pcie_intc 4>;
-> +               ranges = < 0x02000000 0 0x60000000 0x60000000 0 0x10000000 >;
-> +
-> +               pcie_intc: interrupt-controller {
-> +                       interrupt-controller;
-> +                       #address-cells = <0>;
-> +                       #interrupt-cells = <1>;
-> +               }
-> +       };
-> diff --git a/drivers/pci/host/Kconfig b/drivers/pci/host/Kconfig
-> index 21df477..255a9fa 100644
-> --- a/drivers/pci/host/Kconfig
-> +++ b/drivers/pci/host/Kconfig
-> @@ -46,4 +46,11 @@ config PCI_HOST_GENERIC
->           Say Y here if you want to support a simple generic PCI host
->           controller, such as the one emulated by kvmtool.
->
-> +config PCIE_XILINX
-> +       bool "Xilinx AXI PCIe host bridge support"
-> +       depends on ARCH_ZYNQ
-> +       help
-> +         Say 'Y' here if you want kernel to support the Xilinx AXI PCIe
-> +         Host Bridge driver.
-> +
->  endmenu
-> diff --git a/drivers/pci/host/Makefile b/drivers/pci/host/Makefile
-> index 611ba4b..339595c 100644
-> --- a/drivers/pci/host/Makefile
-> +++ b/drivers/pci/host/Makefile
-> @@ -6,3 +6,4 @@ obj-$(CONFIG_PCI_TEGRA) += pci-tegra.o
->  obj-$(CONFIG_PCI_RCAR_GEN2) += pci-rcar-gen2.o
->  obj-$(CONFIG_PCI_RCAR_GEN2_PCIE) += pcie-rcar.o
->  obj-$(CONFIG_PCI_HOST_GENERIC) += pci-host-generic.o
-> +obj-$(CONFIG_PCIE_XILINX) += pcie-xilinx.o
-> diff --git a/drivers/pci/host/pcie-xilinx.c b/drivers/pci/host/pcie-xilinx.c
-> new file mode 100644
-> index 0000000..32c5ded
-> --- /dev/null
-> +++ b/drivers/pci/host/pcie-xilinx.c
-> @@ -0,0 +1,978 @@
-> +/*
-> + * PCIe host controller driver for Xilinx AXI PCIe Bridge
-> + *
-> + * Copyright (c) 2012 - 2014 Xilinx, Inc.
-> + *
-> + * Based on the Tegra PCIe driver
-> + *
-> + * Bits taken from Synopsys Designware Host controller driver and
-> + * ARM PCI Host generic driver.
-> + *
-> + * This program is free software: you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License as published by
-> + * the Free Software Foundation, either version 2 of the License, or
-> + * (at your option) any later version.
-> + */
-> +
-> +#include <linux/interrupt.h>
-> +#include <linux/irq.h>
-> +#include <linux/irqdomain.h>
-> +#include <linux/kernel.h>
-> +#include <linux/module.h>
-> +#include <linux/msi.h>
-> +#include <linux/of_address.h>
-> +#include <linux/of_pci.h>
-> +#include <linux/of_platform.h>
-> +#include <linux/of_irq.h>
-> +#include <linux/pci.h>
-> +#include <linux/platform_device.h>
-> +
-> +/* Register definitions */
-> +#define XILINX_PCIE_REG_BIR            0x00000130
-> +#define XILINX_PCIE_REG_IDR            0x00000138
-> +#define XILINX_PCIE_REG_IMR            0x0000013c
-> +#define XILINX_PCIE_REG_PSCR           0x00000144
-> +#define XILINX_PCIE_REG_RPSC           0x00000148
-> +#define XILINX_PCIE_REG_MSIBASE1       0x0000014c
-> +#define XILINX_PCIE_REG_MSIBASE2       0x00000150
-> +#define XILINX_PCIE_REG_RPEFR          0x00000154
-> +#define XILINX_PCIE_REG_RPIFR1         0x00000158
-> +#define XILINX_PCIE_REG_RPIFR2         0x0000015c
-> +
-> +/* Interrupt registers definitions */
-> +#define XILINX_PCIE_INTR_LINK_DOWN     BIT(0)
-> +#define XILINX_PCIE_INTR_ECRC_ERR      BIT(1)
-> +#define XILINX_PCIE_INTR_STR_ERR       BIT(2)
-> +#define XILINX_PCIE_INTR_HOT_RESET     BIT(3)
-> +#define XILINX_PCIE_INTR_CFG_TIMEOUT   BIT(8)
-> +#define XILINX_PCIE_INTR_CORRECTABLE   BIT(9)
-> +#define XILINX_PCIE_INTR_NONFATAL      BIT(10)
-> +#define XILINX_PCIE_INTR_FATAL         BIT(11)
-> +#define XILINX_PCIE_INTR_INTX          BIT(16)
-> +#define XILINX_PCIE_INTR_MSI           BIT(17)
-> +#define XILINX_PCIE_INTR_SLV_UNSUPP    BIT(20)
-> +#define XILINX_PCIE_INTR_SLV_UNEXP     BIT(21)
-> +#define XILINX_PCIE_INTR_SLV_COMPL     BIT(22)
-> +#define XILINX_PCIE_INTR_SLV_ERRP      BIT(23)
-> +#define XILINX_PCIE_INTR_SLV_CMPABT    BIT(24)
-> +#define XILINX_PCIE_INTR_SLV_ILLBUR    BIT(25)
-> +#define XILINX_PCIE_INTR_MST_DECERR    BIT(26)
-> +#define XILINX_PCIE_INTR_MST_SLVERR    BIT(27)
-> +#define XILINX_PCIE_INTR_MST_ERRP      BIT(28)
-> +#define XILINX_PCIE_IMR_ALL_MASK       0x1FF30FED
-> +#define XILINX_PCIE_IDR_ALL_MASK       0xFFFFFFFF
-> +
-> +/* Root Port Error FIFO Read Register definitions */
-> +#define XILINX_PCIE_RPEFR_ERR_VALID    BIT(18)
-> +#define XILINX_PCIE_RPEFR_REQ_ID       GENMASK(15, 0)
-> +#define XILINX_PCIE_RPEFR_ALL_MASK     0xFFFFFFFF
-> +
-> +/* Root Port Interrupt FIFO Read Register 1 definitions */
-> +#define XILINX_PCIE_RPIFR1_INTR_VALID  BIT(31)
-> +#define XILINX_PCIE_RPIFR1_MSI_INTR    BIT(30)
-> +#define XILINX_PCIE_RPIFR1_INTR_MASK   GENMASK(28, 27)
-> +#define XILINX_PCIE_RPIFR1_ALL_MASK    0xFFFFFFFF
-> +#define XILINX_PCIE_RPIFR1_INTR_SHIFT          27
-> +
-> +/* Bridge Info Register definitions */
-> +#define XILINX_PCIE_BIR_ECAM_SZ_MASK   GENMASK(18, 16)
-> +#define XILINX_PCIE_BIR_ECAM_SZ_SHIFT  16
-> +
-> +/* Root Port Interrupt FIFO Read Register 2 definitions */
-> +#define XILINX_PCIE_RPIFR2_MSG_DATA    GENMASK(15, 0)
-> +
-> +/* Root Port Status/control Register definitions */
-> +#define XILINX_PCIE_REG_RPSC_BEN       BIT(0)
-> +
-> +/* Phy Status/Control Register definitions */
-> +#define XILINX_PCIE_REG_PSCR_LNKUP     BIT(11)
-> +
-> +/* ECAM definitions */
-> +#define ECAM_BUS_NUM_SHIFT             20
-> +#define ECAM_DEV_NUM_SHIFT             12
-> +
-> +/* Number of MSI IRQs */
-> +#define XILINX_NUM_MSI_IRQS            128
-> +
-> +/* Number of Memory Resources */
-> +#define XILINX_MAX_NUM_RESOURCES       3
-> +
-> +/**
-> + * struct xilinx_pcie_port - PCIe port information
-> + * @reg_base: IO Mapped Register Base
-> + * @irq: Interrupt number
-> + * @msi_pages: MSI pages
-> + * @root_busno: Root Bus number
-> + * @dev: Device pointer
-> + * @irq_domain: IRQ domain pointer
-> + * @bus_range: Bus range
-> + * @resources: Bus Resources
-> + */
-> +struct xilinx_pcie_port {
-> +       void __iomem *reg_base;
-> +       u32 irq;
-> +       unsigned long msi_pages;
-> +       u8 root_busno;
-> +       struct device *dev;
-> +       struct irq_domain *irq_domain;
-> +       struct resource bus_range;
-> +       struct list_head resources;
-> +};
-> +
-> +static DECLARE_BITMAP(msi_irq_in_use, XILINX_NUM_MSI_IRQS);
-> +
-> +static inline struct xilinx_pcie_port *sys_to_pcie(struct pci_sys_data *sys)
-> +{
-> +       return sys->private_data;
-> +}
-> +
-> +static inline u32 pcie_read(struct xilinx_pcie_port *port, u32 reg)
-> +{
-> +       return readl(port->reg_base + reg);
-> +}
-> +
-> +static inline void pcie_write(struct xilinx_pcie_port *port,
-> +                             u32 val, u32 reg)
-> +{
-> +       writel(val, port->reg_base + reg);
-> +}
-> +
-> +static inline bool xilinx_pcie_link_is_up(struct xilinx_pcie_port *port)
-> +{
-> +       return (pcie_read(port, XILINX_PCIE_REG_PSCR) &
-> +               XILINX_PCIE_REG_PSCR_LNKUP) ? 1 : 0;
-> +}
-> +
-> +/**
-> + * xilinx_pcie_clear_err_interrupts - Clear Error Interrupts
-> + * @port: PCIe port information
-> + */
-> +static void xilinx_pcie_clear_err_interrupts(struct xilinx_pcie_port *port)
-> +{
-> +       u32 val = pcie_read(port, XILINX_PCIE_REG_RPEFR);
-> +
-> +       if (val & XILINX_PCIE_RPEFR_ERR_VALID) {
-> +               dev_dbg(port->dev, "Requester ID %d\n",
-> +                       val & XILINX_PCIE_RPEFR_REQ_ID);
-> +               pcie_write(port, XILINX_PCIE_RPEFR_ALL_MASK,
-> +                          XILINX_PCIE_REG_RPEFR);
-> +       }
-> +}
-> +
-> +/**
-> + * xilinx_pcie_valid_device - Check if a valid device is present on bus
-> + * @bus: PCI Bus structure
-> + * @devfn: device/function
-> + *
-> + * Return: 'true' on success and 'false' if invalid device is found
-> + */
-> +static bool xilinx_pcie_valid_device(struct pci_bus *bus,
-> +                                    unsigned int devfn)
-> +{
-> +       struct xilinx_pcie_port *port = sys_to_pcie(bus->sysdata);
-> +
-> +       /* Check if link is up when trying to access downstream ports */
-> +       if (bus->number != port->root_busno)
-> +               if (!xilinx_pcie_link_is_up(port))
-> +                       return false;
-> +
-> +       /* Only one device down on each root port */
-> +       if (bus->number == port->root_busno && devfn > 0)
-> +               return false;
-> +
-> +       /*
-> +        * Do not read more than one device on the bus directly attached
-> +        * to RC.
-> +        */
-> +       if (bus->primary == port->root_busno && devfn > 0)
-> +               return false;
-> +
-> +       return true;
-> +}
-> +
-> +/**
-> + * xilinx_pcie_config_base - Get configuration base
-> + * @bus: PCI Bus structure
-> + * @devfn: Device/function
-> + * @where: Offset from base
-> + *
-> + * Return: Base address of the configuration space needed to be
-> + *        accessed.
-> + */
-> +static void __iomem *xilinx_pcie_config_base(struct pci_bus *bus,
-> +                                                unsigned int devfn,
-> +                                                int where)
-> +{
-> +       struct xilinx_pcie_port *port = sys_to_pcie(bus->sysdata);
-> +       int relbus;
-> +
-> +       relbus = (bus->number << ECAM_BUS_NUM_SHIFT) |
-> +                (devfn << ECAM_DEV_NUM_SHIFT);
-> +
-> +       return port->reg_base + relbus + where;
-> +}
-> +
-> +/**
-> + * xilinx_pcie_read_config - Read configuration space
-> + * @bus: PCI Bus structure
-> + * @devfn: Device/function
-> + * @where: Offset from base
-> + * @size: Byte/word/dword
-> + * @val: Value to be read
-> + *
-> + * Return: PCIBIOS_SUCCESSFUL on success
-> + *        EINVAL/PCIBIOS_DEVICE_NOT_FOUND/PCIBIOS_BAD_REGISTER_NUMBER
-> + *        on failure.
-> + */
-> +static int xilinx_pcie_read_config(struct pci_bus *bus,
-> +                                  unsigned int devfn, int where,
-> +                                  int size, u32 *val)
-> +{
-> +       void __iomem *addr;
-> +
-> +       if (!xilinx_pcie_valid_device(bus, devfn)) {
-> +               *val = 0xFFFFFFFF;
-> +               return PCIBIOS_DEVICE_NOT_FOUND;
-> +       }
-> +
-> +       addr = xilinx_pcie_config_base(bus, devfn, where);
-> +
-> +       switch (size) {
-> +       case 1:
-> +               *val = readb(addr);
-> +               break;
-> +       case 2:
-> +               *val = readw(addr);
-> +               break;
-> +       default:
-> +               *val = readl(addr);
-> +               break;
-> +       }
-> +
-> +       return PCIBIOS_SUCCESSFUL;
-> +}
-> +
-> +/**
-> + * xilinx_pcie_write_config - Write configuration space
-> + * @bus: PCI Bus structure
-> + * @devfn: Device/function
-> + * @where: Offset from base
-> + * @size: Byte/word/dword
-> + * @val: Value to be written to device
-> + *
-> + * Return: PCIBIOS_SUCCESSFUL on success,
-> + *        EINVAL/PCIBIOS_DEVICE_NOT_FOUND/PCIBIOS_BAD_REGISTER_NUMBER
-> + *        on failure.
-> + */
-> +static int xilinx_pcie_write_config(struct pci_bus *bus,
-> +                                   unsigned int devfn, int where,
-> +                                   int size, u32 val)
-> +{
-> +       void __iomem *addr;
-> +
-> +       if (!xilinx_pcie_valid_device(bus, devfn))
-> +               return PCIBIOS_DEVICE_NOT_FOUND;
-> +
-> +       addr = xilinx_pcie_config_base(bus, devfn, where);
-> +
-> +       switch (size) {
-> +       case 1:
-> +               writeb(val, addr);
-> +               break;
-> +       case 2:
-> +               writew(val, addr);
-> +               break;
-> +       default:
-> +               writel(val, addr);
-> +               break;
-> +       }
-> +
-> +       return PCIBIOS_SUCCESSFUL;
-> +}
-> +
-> +/* PCIe operations */
-> +static struct pci_ops xilinx_pcie_ops = {
-> +       .read  = xilinx_pcie_read_config,
-> +       .write = xilinx_pcie_write_config,
-> +};
-> +
-> +/* MSI functions */
-> +
-> +/**
-> + * xilinx_pcie_destroy_msi - Free MSI number
-> + * @irq: IRQ to be freed
-> + */
-> +static void xilinx_pcie_destroy_msi(unsigned int irq)
-> +{
-> +       struct irq_desc *desc;
-> +       struct msi_desc *msi;
-> +       struct xilinx_pcie_port *port;
-> +
-> +       desc = irq_to_desc(irq);
-> +       msi = irq_desc_get_msi_desc(desc);
-> +       port = sys_to_pcie(msi->dev->bus->sysdata);
-> +
-> +       if (!test_bit(irq, msi_irq_in_use))
-> +               dev_err(port->dev, "Trying to free unused MSI#%d\n", irq);
-> +       else
-> +               clear_bit(irq, msi_irq_in_use);
-> +}
-> +
-> +/**
-> + * xilinx_pcie_assign_msi - Allocate MSI number
-> + * @port: PCIe port structure
-> + *
-> + * Return: A valid IRQ on success and error value on failure.
-> + */
-> +static int xilinx_pcie_assign_msi(struct xilinx_pcie_port *port)
-> +{
-> +       int pos;
-> +
-> +       pos = find_first_zero_bit(msi_irq_in_use, XILINX_NUM_MSI_IRQS);
-> +       if (pos < XILINX_NUM_MSI_IRQS)
-> +               set_bit(pos, msi_irq_in_use);
-> +       else
-> +               return -ENOSPC;
-> +
-> +       return pos;
-> +}
-> +
-> +/**
-> + * xilinx_msi_teardown_irq - Destroy the MSI
-> + * @chip: MSI Chip descriptor
-> + * @irq: MSI IRQ to destroy
-> + */
-> +static void xilinx_msi_teardown_irq(struct msi_chip *chip, unsigned int irq)
-> +{
-> +       xilinx_pcie_destroy_msi(irq);
-> +}
-> +
-> +/**
-> + * xilinx_pcie_msi_setup_irq - Setup MSI request
-> + * @chip: MSI chip pointer
-> + * @pdev: PCIe device pointer
-> + * @desc: MSI descriptor pointer
-> + *
-> + * Return: '0' on success and error value on failure
-> + */
-> +static int xilinx_pcie_msi_setup_irq(struct msi_chip *chip,
-> +                                    struct pci_dev *pdev,
-> +                                    struct msi_desc *desc)
-> +{
-> +       struct xilinx_pcie_port *port = sys_to_pcie(pdev->bus->sysdata);
-> +       unsigned int irq;
-> +       int hwirq;
-> +       struct msi_msg msg;
-> +       phys_addr_t msg_addr;
-> +
-> +       hwirq = xilinx_pcie_assign_msi(port);
-> +       if (irq < 0)
-> +               return irq;
-> +
-> +       irq = irq_create_mapping(port->irq_domain, hwirq);
-> +       if (!irq)
-> +               return -EINVAL;
-> +
-> +       irq_set_msi_desc(irq, desc);
-> +
-> +       msg_addr = virt_to_phys((void *)port->msi_pages);
-> +
-> +       msg.address_hi = 0;
-> +       msg.address_lo = msg_addr;
-> +       msg.data = irq;
-> +
-> +       write_msi_msg(irq, &msg);
-> +
-> +       return 0;
-> +}
-> +
-> +/* MSI Chip Descriptor */
-> +static struct msi_chip xilinx_pcie_msi_chip = {
-> +       .setup_irq = xilinx_pcie_msi_setup_irq,
-> +       .teardown_irq = xilinx_msi_teardown_irq,
-> +};
-> +
-> +/* HW Interrupt Chip Descriptor */
-> +static struct irq_chip xilinx_msi_irq_chip = {
-> +       .name = "Xilinx PCIe MSI",
-> +       .irq_enable = unmask_msi_irq,
-> +       .irq_disable = mask_msi_irq,
-> +       .irq_mask = mask_msi_irq,
-> +       .irq_unmask = unmask_msi_irq,
-> +};
-> +
-> +/**
-> + * xilinx_pcie_msi_map - Set the handler for the MSI and mark IRQ as valid
-> + * @domain: IRQ domain
-> + * @irq: Virtual IRQ number
-> + * @hwirq: HW interrupt number
-> + *
-> + * Return: Always returns 0.
-> + */
-> +static int xilinx_pcie_msi_map(struct irq_domain *domain, unsigned int irq,
-> +                              irq_hw_number_t hwirq)
-> +{
-> +       irq_set_chip_and_handler(irq, &xilinx_msi_irq_chip, handle_simple_irq);
-> +       irq_set_chip_data(irq, domain->host_data);
-> +       set_irq_flags(irq, IRQF_VALID);
-> +
-> +       return 0;
-> +}
-> +
-> +/* IRQ Domain operations */
-> +static const struct irq_domain_ops msi_domain_ops = {
-> +       .map = xilinx_pcie_msi_map,
-> +};
-> +
-> +/**
-> + * xilinx_pcie_enable_msi - Enable MSI support
-> + * @port: PCIe port information
-> + */
-> +static void xilinx_pcie_enable_msi(struct xilinx_pcie_port *port)
-> +{
-> +       phys_addr_t msg_addr;
-> +
-> +       port->msi_pages = __get_free_pages(GFP_KERNEL, 0);
-> +       msg_addr = virt_to_phys((void *)port->msi_pages);
-> +       pcie_write(port, 0x0, XILINX_PCIE_REG_MSIBASE1);
-> +       pcie_write(port, msg_addr, XILINX_PCIE_REG_MSIBASE2);
-> +}
-> +
-> +/**
-> + * xilinx_pcie_add_bus - Add MSI chip info to PCIe bus
-> + * @bus: PCIe bus
-> + */
-> +static void xilinx_pcie_add_bus(struct pci_bus *bus)
-> +{
-> +       if (IS_ENABLED(CONFIG_PCI_MSI)) {
-> +               struct xilinx_pcie_port *port = sys_to_pcie(bus->sysdata);
-> +
-> +               xilinx_pcie_msi_chip.dev = port->dev;
-> +               bus->msi = &xilinx_pcie_msi_chip;
-> +       }
-> +}
-> +
-> +/* INTx Functions */
-> +
-> +/**
-> + * xilinx_pcie_intx_map - Set the handler for the INTx and mark IRQ as valid
-> + * @domain: IRQ domain
-> + * @irq: Virtual IRQ number
-> + * @hwirq: HW interrupt number
-> + *
-> + * Return: Always returns 0.
-> + */
-> +static int xilinx_pcie_intx_map(struct irq_domain *domain, unsigned int irq,
-> +                               irq_hw_number_t hwirq)
-> +{
-> +       irq_set_chip_and_handler(irq, &dummy_irq_chip, handle_simple_irq);
-> +       irq_set_chip_data(irq, domain->host_data);
-> +       set_irq_flags(irq, IRQF_VALID);
-> +
-> +       return 0;
-> +}
-> +
-> +/* INTx IRQ Domain operations */
-> +static const struct irq_domain_ops intx_domain_ops = {
-> +       .map = xilinx_pcie_intx_map,
-> +};
-> +
-> +/* PCIe HW Functions */
-> +
-> +/**
-> + * xilinx_pcie_intr_handler - Interrupt Service Handler
-> + * @irq: IRQ number
-> + * @data: PCIe port information
-> + *
-> + * Return: IRQ_HANDLED on success and IRQ_NONE on failure
-> + */
-> +static irqreturn_t xilinx_pcie_intr_handler(int irq, void *data)
-> +{
-> +       struct xilinx_pcie_port *port = (struct xilinx_pcie_port *)data;
-> +       u32 val, mask, status, msi_data;
-> +
-> +       /* Read interrupt decode and mask registers */
-> +       val = pcie_read(port, XILINX_PCIE_REG_IDR);
-> +       mask = pcie_read(port, XILINX_PCIE_REG_IMR);
-> +
-> +       status = val & mask;
-> +       if (!status)
-> +               return IRQ_NONE;
-> +
-> +       if (status & XILINX_PCIE_INTR_LINK_DOWN)
-> +               dev_warn(port->dev, "Link Down\n");
-> +
-> +       if (status & XILINX_PCIE_INTR_ECRC_ERR)
-> +               dev_warn(port->dev, "ECRC failed\n");
-> +
-> +       if (status & XILINX_PCIE_INTR_STR_ERR)
-> +               dev_warn(port->dev, "Streaming error\n");
-> +
-> +       if (status & XILINX_PCIE_INTR_HOT_RESET)
-> +               dev_info(port->dev, "Hot reset\n");
-> +
-> +       if (status & XILINX_PCIE_INTR_CFG_TIMEOUT)
-> +               dev_warn(port->dev, "ECAM access timeout\n");
-> +
-> +       if (status & XILINX_PCIE_INTR_CORRECTABLE) {
-> +               dev_warn(port->dev, "Correctable error message\n");
-> +               xilinx_pcie_clear_err_interrupts(port);
-> +       }
-> +
-> +       if (status & XILINX_PCIE_INTR_NONFATAL) {
-> +               dev_warn(port->dev, "Non fatal error message\n");
-> +               xilinx_pcie_clear_err_interrupts(port);
-> +       }
-> +
-> +       if (status & XILINX_PCIE_INTR_FATAL) {
-> +               dev_warn(port->dev, "Fatal error message\n");
-> +               xilinx_pcie_clear_err_interrupts(port);
-> +       }
-> +
-> +       if (status & XILINX_PCIE_INTR_INTX) {
-> +               /* INTx interrupt received */
-> +               val = pcie_read(port, XILINX_PCIE_REG_RPIFR1);
-> +
-> +               /* Check whether interrupt valid */
-> +               if (!(val & XILINX_PCIE_RPIFR1_INTR_VALID)) {
-> +                       dev_warn(port->dev, "RP Intr FIFO1 read error\n");
-> +                       return IRQ_HANDLED;
-> +               }
-> +
-> +               /* Clear interrupt FIFO register 1 */
-> +               pcie_write(port, XILINX_PCIE_RPIFR1_ALL_MASK,
-> +                          XILINX_PCIE_REG_RPIFR1);
-> +
-> +               /* Handle INTx Interrupt */
-> +               val = ((val & XILINX_PCIE_RPIFR1_INTR_MASK) >>
-> +                       XILINX_PCIE_RPIFR1_INTR_SHIFT) + 1;
-> +               generic_handle_irq(irq_find_mapping(port->irq_domain, val));
-> +       }
-> +
-> +       if (status & XILINX_PCIE_INTR_MSI) {
-> +               /* MSI Interrupt */
-> +               val = pcie_read(port, XILINX_PCIE_REG_RPIFR1);
-> +
-> +               if (!(val & XILINX_PCIE_RPIFR1_INTR_VALID)) {
-> +                       dev_warn(port->dev, "RP Intr FIFO1 read error\n");
-> +                       return IRQ_HANDLED;
-> +               }
-> +
-> +               if (val & XILINX_PCIE_RPIFR1_MSI_INTR) {
-> +                       msi_data = pcie_read(port, XILINX_PCIE_REG_RPIFR2) &
-> +                                  XILINX_PCIE_RPIFR2_MSG_DATA;
-> +
-> +                       /* Clear interrupt FIFO register 1 */
-> +                       pcie_write(port, XILINX_PCIE_RPIFR1_ALL_MASK,
-> +                                  XILINX_PCIE_REG_RPIFR1);
-> +
-> +                       if (IS_ENABLED(CONFIG_PCI_MSI)) {
-> +                               /* Handle MSI Interrupt */
-> +                               generic_handle_irq(msi_data);
-> +                       }
-> +               }
-> +       }
-> +
-> +       if (status & XILINX_PCIE_INTR_SLV_UNSUPP)
-> +               dev_warn(port->dev, "Slave unsupported request\n");
-> +
-> +       if (status & XILINX_PCIE_INTR_SLV_UNEXP)
-> +               dev_warn(port->dev, "Slave unexpected completion\n");
-> +
-> +       if (status & XILINX_PCIE_INTR_SLV_COMPL)
-> +               dev_warn(port->dev, "Slave completion timeout\n");
-> +
-> +       if (status & XILINX_PCIE_INTR_SLV_ERRP)
-> +               dev_warn(port->dev, "Slave Error Poison\n");
-> +
-> +       if (status & XILINX_PCIE_INTR_SLV_CMPABT)
-> +               dev_warn(port->dev, "Slave Completer Abort\n");
-> +
-> +       if (status & XILINX_PCIE_INTR_SLV_ILLBUR)
-> +               dev_warn(port->dev, "Slave Illegal Burst\n");
-> +
-> +       if (status & XILINX_PCIE_INTR_MST_DECERR)
-> +               dev_warn(port->dev, "Master decode error\n");
-> +
-> +       if (status & XILINX_PCIE_INTR_MST_SLVERR)
-> +               dev_warn(port->dev, "Master slave error\n");
-> +
-> +       if (status & XILINX_PCIE_INTR_MST_ERRP)
-> +               dev_warn(port->dev, "Master error poison\n");
-> +
-> +       /* Clear the Interrupt Decode register */
-> +       pcie_write(port, status, XILINX_PCIE_REG_IDR);
-> +
-> +       return IRQ_HANDLED;
-> +}
-> +
-> +/**
-> + * xilinx_pcie_free_irq_domain - Free IRQ domain
-> + * @port: PCIe port information
-> + */
-> +static void xilinx_pcie_free_irq_domain(struct xilinx_pcie_port *port)
-> +{
-> +       int i;
-> +       u32 irq, num_irqs;
-> +
-> +       /* Free IRQ Domain */
-> +       if (IS_ENABLED(CONFIG_PCI_MSI)) {
-> +
-> +               free_pages(port->msi_pages, 0);
-> +
-> +               num_irqs = XILINX_NUM_MSI_IRQS;
-> +       } else {
-> +               /* INTx */
-> +               num_irqs = 4;
-> +       }
-> +
-> +       for (i = 0; i < num_irqs; i++) {
-> +               irq = irq_find_mapping(port->irq_domain, i);
-> +               if (irq > 0)
-> +                       irq_dispose_mapping(irq);
-> +       }
-> +
-> +       irq_domain_remove(port->irq_domain);
-> +}
-> +
-> +/**
-> + * xilinx_pcie_init_irq_domain - Initialize IRQ domain
-> + * @port: PCIe port information
-> + *
-> + * Return: '0' on success and error value on failure
-> + */
-> +static int xilinx_pcie_init_irq_domain(struct xilinx_pcie_port *port)
-> +{
-> +       struct device *dev = port->dev;
-> +       struct device_node *node = dev->of_node;
-> +       struct device_node *pcie_intc_node;
-> +
-> +       /* Setup INTx */
-> +       pcie_intc_node = of_get_next_child(node, NULL);
-> +       if (!pcie_intc_node) {
-> +               dev_err(dev, "No PCIe Intc node found\n");
-> +               return PTR_ERR(pcie_intc_node);
-> +       }
-> +
-> +       port->irq_domain = irq_domain_add_linear(pcie_intc_node, 4,
-> +                                                &intx_domain_ops,
-> +                                                port);
-> +       if (!port->irq_domain) {
-> +               dev_err(dev, "Failed to get a INTx IRQ domain\n");
-> +               return PTR_ERR(port->irq_domain);
-> +       }
-> +
-> +       /* Setup MSI */
-> +       if (IS_ENABLED(CONFIG_PCI_MSI)) {
-> +               port->irq_domain = irq_domain_add_linear(node,
-> +                                                        XILINX_NUM_MSI_IRQS,
-> +                                                        &msi_domain_ops,
-> +                                                        &xilinx_pcie_msi_chip);
-> +               if (!port->irq_domain) {
-> +                       dev_err(dev, "Failed to get a MSI IRQ domain\n");
-> +                       return PTR_ERR(port->irq_domain);
-> +               }
-> +
-> +               xilinx_pcie_enable_msi(port);
-> +       }
-> +
-> +       return 0;
-> +}
-> +
-> +/**
-> + * xilinx_pcie_init_port - Initialize hardware
-> + * @port: PCIe port information
-> + */
-> +static void xilinx_pcie_init_port(struct xilinx_pcie_port *port)
-> +{
-> +       if (xilinx_pcie_link_is_up(port))
-> +               dev_info(port->dev, "PCIe Link is UP\n");
-> +       else
-> +               dev_info(port->dev, "PCIe Link is DOWN\n");
-> +
-> +       /* Disable all interrupts */
-> +       pcie_write(port, ~XILINX_PCIE_IDR_ALL_MASK,
-> +                  XILINX_PCIE_REG_IMR);
-> +
-> +       /* Clear pending interrupts */
-> +       pcie_write(port, pcie_read(port, XILINX_PCIE_REG_IDR) &
-> +                        XILINX_PCIE_IMR_ALL_MASK,
-> +                  XILINX_PCIE_REG_IDR);
-> +
-> +       /* Enable all interrupts */
-> +       pcie_write(port, XILINX_PCIE_IMR_ALL_MASK, XILINX_PCIE_REG_IMR);
-> +
-> +       /* Enable the Bridge enable bit */
-> +       pcie_write(port, pcie_read(port, XILINX_PCIE_REG_RPSC) |
-> +                        XILINX_PCIE_REG_RPSC_BEN,
-> +                  XILINX_PCIE_REG_RPSC);
-> +}
-> +
-> +/**
-> + * xilinx_pcie_setup - Setup memory resources
-> + * @nr: Bus number
-> + * @sys: Per controller structure
-> + *
-> + * Return: '1' on success and error value on failure
-> + */
-> +static int xilinx_pcie_setup(int nr, struct pci_sys_data *sys)
-> +{
-> +       struct xilinx_pcie_port *port = sys_to_pcie(sys);
-> +
-> +       list_splice_init(&port->resources, &sys->resources);
-> +
-> +       return 1;
-> +}
-> +
-> +/**
-> + * xilinx_pcie_scan_bus - Scan PCIe bus for devices
-> + * @nr: Bus number
-> + * @sys: Per controller structure
-> + *
-> + * Return: Valid Bus pointer on success and NULL on failure
-> + */
-> +static struct pci_bus *xilinx_pcie_scan_bus(int nr,
-> +                                                  struct pci_sys_data *sys)
-> +{
-> +       struct xilinx_pcie_port *port = sys_to_pcie(sys);
-> +       struct pci_bus *bus;
-> +
-> +       port->root_busno = sys->busnr;
-> +       bus = pci_scan_root_bus(port->dev, sys->busnr, &xilinx_pcie_ops,
-> +                               sys, &sys->resources);
-> +
-> +       return bus;
-> +}
-> +
-> +/**
-> + * xilinx_pcie_parse_and_add_res - Add resources by parsing ranges
-> + * @port: PCIe port information
-> + *
-> + * Return: '0' on success and error value on failure
-> + */
-> +static int xilinx_pcie_parse_and_add_res(struct xilinx_pcie_port *port)
-> +{
-> +       struct device *dev = port->dev;
-> +       struct device_node *node = dev->of_node;
-> +       struct resource *mem;
-> +       resource_size_t offset;
-> +       struct of_pci_range_parser parser;
-> +       struct of_pci_range range;
-> +       struct pci_host_bridge_window *win;
-> +       int err = 0, mem_resno = 0;
-> +
-> +       /* Get the ranges */
-> +       if (of_pci_range_parser_init(&parser, node)) {
-> +               dev_err(dev, "missing \"ranges\" property\n");
-> +               return -EINVAL;
-> +       }
-> +
-> +       /* Parse the ranges and add the resources found to the list */
-> +       for_each_of_pci_range(&parser, &range) {
-> +
-> +               if (mem_resno >= XILINX_MAX_NUM_RESOURCES) {
-> +                       dev_err(dev, "Maximum memory resources exceeded\n");
-> +                       return -EINVAL;
-> +               }
-> +
-> +               mem = devm_kmalloc(dev, sizeof(*mem), GFP_KERNEL);
-> +               if (!mem) {
-> +                       err = -ENOMEM;
-> +                       goto free_resources;
-> +               }
-> +
-> +               of_pci_range_to_resource(&range, node, mem);
-> +
-> +               switch (mem->flags & IORESOURCE_TYPE_BITS) {
-> +               case IORESOURCE_MEM:
-> +                       offset = range.cpu_addr - range.pci_addr;
-> +                       mem_resno++;
-> +                       break;
-> +               default:
-> +                       err = -EINVAL;
-> +                       break;
-> +               }
-> +
-> +               if (err < 0) {
-> +                       dev_warn(dev, "Invalid resource found %pR\n", mem);
-> +                       continue;
-> +               }
-> +
-> +               err = request_resource(&iomem_resource, mem);
-> +               if (err)
-> +                       goto free_resources;
-> +
-> +               pci_add_resource_offset(&port->resources, mem, offset);
-> +       }
-> +
-> +       /* Get the bus range */
-> +       if (of_pci_parse_bus_range(node, &port->bus_range)) {
-> +               u32 val = pcie_read(port, XILINX_PCIE_REG_BIR);
-> +               u8 last;
-> +
-> +               last = (val & XILINX_PCIE_BIR_ECAM_SZ_MASK) >>
-> +                       XILINX_PCIE_BIR_ECAM_SZ_SHIFT;
-> +
-> +               port->bus_range = (struct resource) {
-> +                       .name   = node->name,
-> +                       .start  = 0,
-> +                       .end    = last,
-> +                       .flags  = IORESOURCE_BUS,
-> +               };
-> +       }
-> +
-> +       /* Register bus resource */
-> +       pci_add_resource(&port->resources, &port->bus_range);
-> +
-> +       return 0;
-> +
-> +free_resources:
-> +       release_child_resources(&iomem_resource);
-> +       list_for_each_entry(win, &port->resources, list)
-> +               devm_kfree(dev, win->res);
-> +       pci_free_resource_list(&port->resources);
-> +
-> +       return err;
-> +}
-> +
-> +/**
-> + * xilinx_pcie_parse_dt - Parse Device tree
-> + * @port: PCIe port information
-> + *
-> + * Return: '0' on success and error value on failure
-> + */
-> +static int xilinx_pcie_parse_dt(struct xilinx_pcie_port *port)
-> +{
-> +       struct device *dev = port->dev;
-> +       struct device_node *node = dev->of_node;
-> +       struct resource regs;
-> +       const char *type;
-> +       int err;
-> +
-> +       type = of_get_property(node, "device_type", NULL);
-> +       if (!type || strcmp(type, "pci")) {
-> +               dev_err(dev, "invalid \"device_type\" %s\n", type);
-> +               return -EINVAL;
-> +       }
-> +
-> +       err = of_address_to_resource(node, 0, &regs);
-> +       if (err) {
-> +               dev_err(dev, "missing \"reg\" property\n");
-> +               return err;
-> +       }
-> +
-> +       port->reg_base = devm_ioremap_resource(dev, &regs);
-> +       if (IS_ERR(port->reg_base))
-> +               return PTR_ERR(port->reg_base);
-> +
-> +       port->irq = irq_of_parse_and_map(node, 0);
-> +       err = devm_request_irq(dev, port->irq, xilinx_pcie_intr_handler,
-> +                              IRQF_SHARED, "xilinx-pcie", port);
-> +       if (err) {
-> +               dev_err(dev, "unable to request irq %d\n", port->irq);
-> +               return err;
-> +       }
-> +
-> +       return 0;
-> +}
-> +
-> +/**
-> + * xilinx_pcie_probe - Probe function
-> + * @pdev: Platform device pointer
-> + *
-> + * Return: '0' on success and error value on failure
-> + */
-> +static int xilinx_pcie_probe(struct platform_device *pdev)
-> +{
-> +       struct xilinx_pcie_port *port;
-> +       struct hw_pci hw;
-> +       struct device *dev = &pdev->dev;
-> +       int err;
-> +
-> +       if (!dev->of_node)
-> +               return -ENODEV;
-> +
-> +       port = devm_kzalloc(dev, sizeof(*port), GFP_KERNEL);
-> +       if (!port)
-> +               return -ENOMEM;
-> +
-> +       port->dev = dev;
-> +
-> +       err = xilinx_pcie_parse_dt(port);
-> +       if (err) {
-> +               dev_err(dev, "Parsing DT failed\n");
-> +               return err;
-> +       }
-> +
-> +       xilinx_pcie_init_port(port);
-> +
-> +       err = xilinx_pcie_init_irq_domain(port);
-> +       if (err) {
-> +               dev_err(dev, "Failed creating IRQ Domain\n");
-> +               return err;
-> +       }
-> +
-> +       /*
-> +        * Parse PCI ranges, configuration bus range and
-> +        * request their resources
-> +        */
-> +       INIT_LIST_HEAD(&port->resources);
-> +       err = xilinx_pcie_parse_and_add_res(port);
-> +       if (err) {
-> +               dev_err(dev, "Failed adding resources\n");
-> +               return err;
-> +       }
-> +
-> +       platform_set_drvdata(pdev, port);
-> +
-> +       /* Register the device */
-> +       memset(&hw, 0, sizeof(hw));
-> +       hw = (struct hw_pci) {
-> +               .nr_controllers = 1,
-> +               .private_data   = (void **)&port,
-> +               .setup          = xilinx_pcie_setup,
-> +               .map_irq        = of_irq_parse_and_map_pci,
-> +               .add_bus        = xilinx_pcie_add_bus,
-> +               .scan           = xilinx_pcie_scan_bus,
-> +               .ops            = &xilinx_pcie_ops,
-> +       };
-> +       pci_common_init_dev(dev, &hw);
-> +
-> +       return 0;
-> +}
-> +
-> +/**
-> + * xilinx_pcie_remove - Remove function
-> + * @pdev: Platform device pointer
-> + *
-> + * Return: '0' always
-> + */
-> +static int xilinx_pcie_remove(struct platform_device *pdev)
-> +{
-> +       struct xilinx_pcie_port *port = platform_get_drvdata(pdev);
-> +
-> +       xilinx_pcie_free_irq_domain(port);
-> +
-> +       return 0;
-> +}
-> +
-> +static struct of_device_id xilinx_pcie_of_match[] = {
-> +       { .compatible = "xlnx,axi-pcie-host-1.00.a", },
-> +       {}
-> +};
-> +
-> +static struct platform_driver xilinx_pcie_driver = {
-> +       .driver = {
-> +               .name = "xilinx-pcie",
-> +               .owner = THIS_MODULE,
-> +               .of_match_table = xilinx_pcie_of_match,
-> +               .suppress_bind_attrs = true,
-> +       },
-> +       .probe = xilinx_pcie_probe,
-> +       .remove = xilinx_pcie_remove,
-> +};
-> +module_platform_driver(xilinx_pcie_driver);
-> +
-> +MODULE_AUTHOR("Xilinx Inc");
-> +MODULE_DESCRIPTION("Xilinx AXI PCIe driver");
-> +MODULE_LICENSE("GPL v2");
-> --
-> 1.7.9.5
->
+> It still looks, to me, that this ->calibrate() thing is unnecessary. We
+> have a single user for it and this user could very well get this sorted
+> out during probe() or by subscribing to clock rate notifiers.
+
+We can't program these parameters during PHY probe(), since they reset to
+their default value after the controller reset.
+So we needed a way to do this post initialization, once the controller has been
+reset.
+
+
+
+-- 
+Best Regards
+Vivek Gautam
+Samsung R&D Institute, Bangalore
+India
