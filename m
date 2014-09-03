@@ -1,37 +1,36 @@
 From: apinski@cavium.com (Andrew Pinski)
-Date: Wed,  3 Sep 2014 14:18:58 -0700
-Subject: [PATCH 04/24] ARM64:ILP32: Set kernel_long to long long so we can
- reuse most of the same syscalls as LP64
+Date: Wed,  3 Sep 2014 14:19:06 -0700
+Subject: [PATCH 12/24] ARM64:ILP32: COMPAT_USE_64BIT_TIME is true for ILP32
+ tasks
 In-Reply-To: <1409779158-30963-1-git-send-email-apinski@cavium.com>
 References: <1409779158-30963-1-git-send-email-apinski@cavium.com>
-Message-ID: <1409779158-30963-5-git-send-email-apinski@cavium.com>
+Message-ID: <1409779158-30963-13-git-send-email-apinski@cavium.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since we want time_t and some other userland types to be the same between ILP32 and LP64, we define __kernel_long_t to be long long.
+Since __kernel_long_t (time_t) is long long, we need to tell the rest of
+kernel that we use 64bit time_t for compat when the task is not an
+AARCH32 task.  The reason why we check AARCH32 rather than ILP32 here is
+because if we don't have AARCH32 compiled in (which is going to be the common case due to AARCH32 requiring 4k pages).
 
 Signed-off-by: Andrew Pinski <apinski@cavium.com>
 ---
- arch/arm64/include/uapi/asm/posix_types.h |    8 +++++++-
- 1 files changed, 7 insertions(+), 1 deletions(-)
+ arch/arm64/include/asm/compat.h |    3 +++
+ 1 files changed, 3 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm64/include/uapi/asm/posix_types.h b/arch/arm64/include/uapi/asm/posix_types.h
-index 7985ff6..0961945 100644
---- a/arch/arm64/include/uapi/asm/posix_types.h
-+++ b/arch/arm64/include/uapi/asm/posix_types.h
-@@ -5,6 +5,12 @@ typedef unsigned short __kernel_old_uid_t;
- typedef unsigned short __kernel_old_gid_t;
- #define __kernel_old_uid_t __kernel_old_uid_t
+diff --git a/arch/arm64/include/asm/compat.h b/arch/arm64/include/asm/compat.h
+index 9082b27..eca6eec 100644
+--- a/arch/arm64/include/asm/compat.h
++++ b/arch/arm64/include/asm/compat.h
+@@ -76,6 +76,9 @@ struct compat_timeval {
+ 	s32		tv_usec;
+ };
  
-+#ifdef __ILP32__
-+typedef long long __kernel_long_t;
-+typedef unsigned long long __kernel_ulong_t;
-+#define __kernel_long_t __kernel_long_t
-+#endif
++/* ILP32 uses 64bit time_t and not the above compat structures */
++#define COMPAT_USE_64BIT_TIME (!is_a32_compat_task())
 +
- #include <asm-generic/posix_types.h>
- 
--#endif /*  __ASM_POSIX_TYPES_H */
-+#endif /* __ASM_POSIX_TYPES_H */
+ struct compat_stat {
+ #ifdef __AARCH64EB__
+ 	short		st_dev;
 -- 
 1.7.2.5
