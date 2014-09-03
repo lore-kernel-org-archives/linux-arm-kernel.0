@@ -1,101 +1,109 @@
-From: gabriel.fernandez@st.com (Gabriel FERNANDEZ)
-Date: Wed,  3 Sep 2014 17:37:15 +0200
-Subject: [PATCH v2 6/8] phy: miphy28lp: Add SSC support for SATA
-In-Reply-To: <1409758637-28654-1-git-send-email-gabriel.fernandez@linaro.org>
-References: <1409758637-28654-1-git-send-email-gabriel.fernandez@linaro.org>
-Message-ID: <1409758637-28654-7-git-send-email-gabriel.fernandez@linaro.org>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Wed,  3 Sep 2014 09:42:06 -0600
+Subject: [PATCH] ARM: tegra: rely on bootloader pinmux programming on Tegra124
+Message-ID: <1409758926-22966-1-git-send-email-swarren@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch to tune on/off the ssc on miphy sata setup.
-User can now enable ssc via dt blob, it is useful to reduce
-effects of EMI.
+From: Stephen Warren <swarren@nvidia.com>
 
-Signed-off-by: Giuseppe Condorelli <giuseppe.condorelli@st.com>
-Signed-off-by: Gabriel Fernandez <gabriel.fernandez@linaro.org>
+The defined mechanism for programming the Tegra pinmux is to perform all
+of the following at once in order, before using any I/O controller that
+is affected by the pinmux:
+
+- Set the CLAMP_INPUTS_WHEN_TRISTATED PMC register bit.
+- Set up any GPIO pins to their "initial" state.
+- Program all pinmux settings in one go.
+
+Other methods such as:
+
+- Not setting CLAMP_INPUTS_WHEN_TRISTATED.
+- Not setting GPIOs to their "initial" state before programming the
+  pinmux settings of the related pin, in particular the mux function.
+- Not programming the entire pinmux at once, in order to avoid
+  possible conflicting settings.
+
+... are not qualified or supported by NVIDIA ASIC/syseng. They could
+cause glitches or undesired output levels on some pins, or controller
+malfunction.
+
+While we've been getting away with doing something different on many
+Tegra boards without issue, I believe we've just been getting lucky.
+I'd like to switch all Tegra124 systems to the correct scheme now so
+they provide the right example to follow, and require that any new
+boards we support upstream work in the same fashion.
+
+While it would be nice to update boards containing older SoCs for
+consistency, I don't anticipate doing so. It's too much churn to change
+at this time. At least with all Tegra124 boards converted, the most
+recent boards provide the correct example.
+
+Since the bootloader needs to reprogram the pinmux to access certain
+peripherals, it must program the entire pinmux due to the supported
+rules above. As such, there is no need to program any part of the pinmux
+from the kernel, unless dynamic pinmuxing is used. Given this, we couuld
+simply remove the pinmux "default" state from the DT entirely. However,
+some bootloaders parse the DT to perform their initial pinmux setup, so
+it's useful to keep the pinmux data in DT. To allow this while avoiding
+redundant work in the kernel, rename the "default" state to "boot". The
+kernel won't apply this, but bootloaders can still look for this state
+name and apply it. Note however that the DT provides zero information
+about the required initial GPIO setup, so bootloaders using this approach
+are not likely to operate correctly without an additional GPIO
+initialization table somewhere. Previous discussions on the DT mailing
+list have rejected adding such a table to DT...
+
+The following U-Boot commits fully initialize the pinmux:
+
+Jetson TK1: 4ff213b8e478 ARM: tegra: clamp inputs on Jetson TK1
+Venice2: 3365479ce78a ARM: tegra: Venice2 pinmux spreadsheet updates
+Both are part of U-Boot v2014.07 and later.
+
+Without those commits, the only fallout I see from this change is that
+HDMI on Venice2 no longer works. Given the very small user-base of this
+platform, I feel that requiring a bootloader update is reasonable.
+
+Signed-off-by: Stephen Warren <swarren@nvidia.com>
 ---
- .../devicetree/bindings/phy/phy-miphy28lp.txt      |  1 +
- drivers/phy/phy-miphy28lp.c                        | 35 ++++++++++++++++++++++
- 2 files changed, 36 insertions(+)
+ arch/arm/boot/dts/tegra124-jetson-tk1.dts | 6 +++---
+ arch/arm/boot/dts/tegra124-venice2.dts    | 6 +++---
+ 2 files changed, 6 insertions(+), 6 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/phy/phy-miphy28lp.txt b/Documentation/devicetree/bindings/phy/phy-miphy28lp.txt
-index 5e307af..49bb7bb 100644
---- a/Documentation/devicetree/bindings/phy/phy-miphy28lp.txt
-+++ b/Documentation/devicetree/bindings/phy/phy-miphy28lp.txt
-@@ -39,6 +39,7 @@ Optional properties (port (child) node):
- 			  register.
- - st,px_rx_pol_inv	: to invert polarity of RXn/RXp (respectively negative line and positive
- 			  line).
-+- st,scc-on		: enable ssc to reduce effects of EMI (only for sata or PCIe).
+diff --git a/arch/arm/boot/dts/tegra124-jetson-tk1.dts b/arch/arm/boot/dts/tegra124-jetson-tk1.dts
+index 3ea41534334d..64828c265414 100644
+--- a/arch/arm/boot/dts/tegra124-jetson-tk1.dts
++++ b/arch/arm/boot/dts/tegra124-jetson-tk1.dts
+@@ -31,10 +31,10 @@
+ 	};
  
- example:
+ 	pinmux: pinmux at 0,70000868 {
+-		pinctrl-names = "default";
+-		pinctrl-0 = <&state_default>;
++		pinctrl-names = "boot";
++		pinctrl-0 = <&state_boot>;
  
-diff --git a/drivers/phy/phy-miphy28lp.c b/drivers/phy/phy-miphy28lp.c
-index aa36cea..b36e737 100644
---- a/drivers/phy/phy-miphy28lp.c
-+++ b/drivers/phy/phy-miphy28lp.c
-@@ -140,6 +140,7 @@ struct miphy28lp_phy {
- 	bool osc_force_ext;
- 	bool osc_rdy;
- 	bool px_rx_pol_inv;
-+	bool ssc;
+-		state_default: pinmux {
++		state_boot: pinmux {
+ 			clk_32k_out_pa0 {
+ 				nvidia,pins = "clk_32k_out_pa0";
+ 				nvidia,function = "soc";
+diff --git a/arch/arm/boot/dts/tegra124-venice2.dts b/arch/arm/boot/dts/tegra124-venice2.dts
+index dcbe5858faf1..b95891b7c9b9 100644
+--- a/arch/arm/boot/dts/tegra124-venice2.dts
++++ b/arch/arm/boot/dts/tegra124-venice2.dts
+@@ -43,10 +43,10 @@
+ 	};
  
- 	struct reset_control *miphy_rst;
+ 	pinmux: pinmux at 0,70000868 {
+-		pinctrl-names = "default";
+-		pinctrl-0 = <&pinmux_default>;
++		pinctrl-names = "boot";
++		pinctrl-0 = <&pinmux_boot>;
  
-@@ -604,6 +605,36 @@ static int miphy28lp_setup(struct miphy28lp_phy *miphy_phy, u32 miphy_val)
- 	return miphy_osc_is_ready(miphy_phy);
- }
- 
-+static void miphy_sata_tune_ssc(struct miphy28lp_phy *miphy_phy)
-+{
-+	u8 val;
-+
-+	/* Compensate Tx impedance to avoid out of range values */
-+	if (miphy_phy->ssc) {
-+		/*
-+		 * Enable the SSC on PLL for all banks
-+		 * SSC Modulation @ 31 KHz and 4000 ppm modulation amp
-+		 */
-+
-+		val = readb_relaxed(miphy_phy->base + 0x0c);
-+		val |= 0x04;
-+		writeb_relaxed(val, miphy_phy->base + 0x0c);
-+		val = readb_relaxed(miphy_phy->base + 0x0a);
-+		val |= 0x10;
-+		writeb_relaxed(val, miphy_phy->base + 0x0a);
-+
-+		for (val = 0; val < 3; val++) {
-+			writeb_relaxed(val, miphy_phy->base + 0x0f);
-+			writeb_relaxed(0x3c, miphy_phy->base + 0xe4);
-+			writeb_relaxed(0x6c, miphy_phy->base + 0xe5);
-+			writeb_relaxed(0x81, miphy_phy->base + 0xe6);
-+			writeb_relaxed(0x00, miphy_phy->base + 0xe3);
-+			writeb_relaxed(0x02, miphy_phy->base + 0xe3);
-+			writeb_relaxed(0x00, miphy_phy->base + 0xe3);
-+		}
-+	}
-+}
-+
- static int miphy28lp_init_sata(struct miphy28lp_phy *miphy_phy)
- {
- 	struct miphy28lp_dev *miphy_dev = miphy_phy->phydev;
-@@ -643,6 +674,8 @@ static int miphy28lp_init_sata(struct miphy28lp_phy *miphy_phy)
- 		writeb_relaxed(val, miphy_phy->base + MIPHY_CONTROL);
- 	}
- 
-+	miphy_sata_tune_ssc(miphy_phy);
-+
- 	return miphy_is_ready(miphy_phy);
- }
- 
-@@ -872,6 +905,8 @@ static int miphy28lp_of_probe(struct device_node *np,
- 	miphy_phy->px_rx_pol_inv =
- 		of_property_read_bool(np, "st,px_rx_pol_inv");
- 
-+	miphy_phy->ssc = of_property_read_bool(np, "st,ssc-on");
-+
- 	of_property_read_u32(np, "st,sata-gen", &miphy_phy->sata_gen);
- 	if (!miphy_phy->sata_gen)
- 		miphy_phy->sata_gen = SATA_GEN1;
+-		pinmux_default: common {
++		pinmux_boot: common {
+ 			dap_mclk1_pw4 {
+ 				nvidia,pins = "dap_mclk1_pw4";
+ 				nvidia,function = "extperiph1";
 -- 
 1.9.1
