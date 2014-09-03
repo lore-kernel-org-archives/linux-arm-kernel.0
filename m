@@ -1,151 +1,148 @@
 From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Wed, 03 Sep 2014 15:29:01 +0200
-Subject: [PATCH v8 7/8] drivers: cpuidle: initialize big.LITTLE driver
- through DT
-In-Reply-To: <1409585324-3678-8-git-send-email-lorenzo.pieralisi@arm.com>
+Date: Wed, 03 Sep 2014 15:32:14 +0200
+Subject: [PATCH v8 8/8] drivers: cpuidle: initialize Exynos driver through
+ DT
+In-Reply-To: <1409585324-3678-9-git-send-email-lorenzo.pieralisi@arm.com>
 References: <1409585324-3678-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1409585324-3678-8-git-send-email-lorenzo.pieralisi@arm.com>
-Message-ID: <5407179D.6040909@linaro.org>
+ <1409585324-3678-9-git-send-email-lorenzo.pieralisi@arm.com>
+Message-ID: <5407185E.6030308@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 09/01/2014 05:28 PM, Lorenzo Pieralisi wrote:
-> With the introduction of DT based idle states, CPUidle drivers for ARM
-> can now initialize idle states data through properties in the device tree.
+> With the introduction of DT based idle states, CPUidle drivers for
+> ARM can now initialize idle states data through properties in the device
+> tree.
 >
-> This patch adds code to the big.LITTLE CPUidle driver to dynamically
-> initialize idle states data through the updated device tree source file.
+> This patch adds code to the Exynos CPUidle driver to dynamically
+> initialize idle states data through the updated device tree source
+> files.
 >
 > Cc: Chander Kashyap <k.chander@samsung.com>
+> Cc: Kukjin Kim <kgene.kim@samsung.com>
+> Cc: Tomasz Figa <t.figa@samsung.com>
 > Acked-by: Catalin Marinas <catalin.marinas@arm.com>
 > Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 
 Acked-by: Daniel Lezcano <daniel.lezcano@linaro.org>
 
 > ---
->   arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts | 23 +++++++++++++++++++++++
->   drivers/cpuidle/Kconfig.arm                |  1 +
->   drivers/cpuidle/cpuidle-big_little.c       | 19 +++++++++++++++++++
->   3 files changed, 43 insertions(+)
+>   arch/arm/boot/dts/exynos4210.dtsi | 11 +++++++++++
+>   arch/arm/boot/dts/exynos5250.dtsi | 11 +++++++++++
+>   drivers/cpuidle/Kconfig.arm       |  1 +
+>   drivers/cpuidle/cpuidle-exynos.c  | 18 +++++++++++++++++-
+>   4 files changed, 40 insertions(+), 1 deletion(-)
 >
-> diff --git a/arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts b/arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts
-> index a25c262..322fd15 100644
-> --- a/arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts
-> +++ b/arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts
-> @@ -38,6 +38,7 @@
->   			compatible = "arm,cortex-a15";
->   			reg = <0>;
->   			cci-control-port = <&cci_control1>;
-> +			cpu-idle-states = <&CLUSTER_SLEEP_BIG>;
+> diff --git a/arch/arm/boot/dts/exynos4210.dtsi b/arch/arm/boot/dts/exynos4210.dtsi
+> index eab7c7b..69fd1a0 100644
+> --- a/arch/arm/boot/dts/exynos4210.dtsi
+> +++ b/arch/arm/boot/dts/exynos4210.dtsi
+> @@ -48,12 +48,23 @@
+>   			device_type = "cpu";
+>   			compatible = "arm,cortex-a9";
+>   			reg = <0x900>;
+> +			cpu-idle-states = <&CLUSTER_SLEEP_0>;
 >   		};
 >
->   		cpu1: cpu at 1 {
-> @@ -45,6 +46,7 @@
->   			compatible = "arm,cortex-a15";
->   			reg = <1>;
->   			cci-control-port = <&cci_control1>;
-> +			cpu-idle-states = <&CLUSTER_SLEEP_BIG>;
->   		};
->
->   		cpu2: cpu at 2 {
-> @@ -52,6 +54,7 @@
->   			compatible = "arm,cortex-a7";
->   			reg = <0x100>;
->   			cci-control-port = <&cci_control2>;
-> +			cpu-idle-states = <&CLUSTER_SLEEP_LITTLE>;
->   		};
->
->   		cpu3: cpu at 3 {
-> @@ -59,6 +62,7 @@
->   			compatible = "arm,cortex-a7";
->   			reg = <0x101>;
->   			cci-control-port = <&cci_control2>;
-> +			cpu-idle-states = <&CLUSTER_SLEEP_LITTLE>;
->   		};
->
->   		cpu4: cpu at 4 {
-> @@ -66,6 +70,25 @@
->   			compatible = "arm,cortex-a7";
->   			reg = <0x102>;
->   			cci-control-port = <&cci_control2>;
-> +			cpu-idle-states = <&CLUSTER_SLEEP_LITTLE>;
+>   		cpu at 901 {
+>   			device_type = "cpu";
+>   			compatible = "arm,cortex-a9";
+>   			reg = <0x901>;
+> +			cpu-idle-states = <&CLUSTER_SLEEP_0>;
 > +		};
 > +
 > +		idle-states {
-> +			CLUSTER_SLEEP_BIG: cluster-sleep-big {
+> +			CLUSTER_SLEEP_0: cluster-sleep-0 {
 > +				compatible = "arm,idle-state";
-> +				local-timer-stop;
 > +				entry-latency-us = <1000>;
-> +				exit-latency-us = <700>;
-> +				min-residency-us = <2000>;
+> +				exit-latency-us = <300>;
+> +				min-residency-us = <100000>;
 > +			};
+>   		};
+>   	};
+>
+> diff --git a/arch/arm/boot/dts/exynos5250.dtsi b/arch/arm/boot/dts/exynos5250.dtsi
+> index 492e1ef..3a758ff 100644
+> --- a/arch/arm/boot/dts/exynos5250.dtsi
+> +++ b/arch/arm/boot/dts/exynos5250.dtsi
+> @@ -63,12 +63,23 @@
+>   			compatible = "arm,cortex-a15";
+>   			reg = <0>;
+>   			clock-frequency = <1700000000>;
+> +			cpu-idle-states = <&CLUSTER_SLEEP_0>;
+>   		};
+>   		cpu at 1 {
+>   			device_type = "cpu";
+>   			compatible = "arm,cortex-a15";
+>   			reg = <1>;
+>   			clock-frequency = <1700000000>;
+> +			cpu-idle-states = <&CLUSTER_SLEEP_0>;
+> +		};
 > +
-> +			CLUSTER_SLEEP_LITTLE: cluster-sleep-little {
+> +		idle-states {
+> +			CLUSTER_SLEEP_0: cluster-sleep-0 {
 > +				compatible = "arm,idle-state";
-> +				local-timer-stop;
 > +				entry-latency-us = <1000>;
-> +				exit-latency-us = <500>;
-> +				min-residency-us = <2500>;
+> +				exit-latency-us = <300>;
+> +				min-residency-us = <100000>;
 > +			};
 >   		};
 >   	};
 >
 > diff --git a/drivers/cpuidle/Kconfig.arm b/drivers/cpuidle/Kconfig.arm
-> index 38cff69..e339c7f 100644
+> index e339c7f..04cc229 100644
 > --- a/drivers/cpuidle/Kconfig.arm
 > +++ b/drivers/cpuidle/Kconfig.arm
-> @@ -7,6 +7,7 @@ config ARM_BIG_LITTLE_CPUIDLE
->   	depends on MCPM
->   	select ARM_CPU_SUSPEND
->   	select CPU_IDLE_MULTIPLE_DRIVERS
+> @@ -55,6 +55,7 @@ config ARM_AT91_CPUIDLE
+>   config ARM_EXYNOS_CPUIDLE
+>   	bool "Cpu Idle Driver for the Exynos processors"
+>   	depends on ARCH_EXYNOS
 > +	select DT_IDLE_STATES
 >   	help
->   	  Select this option to enable CPU idle driver for big.LITTLE based
->   	  ARM systems. Driver manages CPUs coordination through MCPM and
-> diff --git a/drivers/cpuidle/cpuidle-big_little.c b/drivers/cpuidle/cpuidle-big_little.c
-> index ef94c3b..85d09bc 100644
-> --- a/drivers/cpuidle/cpuidle-big_little.c
-> +++ b/drivers/cpuidle/cpuidle-big_little.c
-> @@ -24,6 +24,8 @@
->   #include <asm/smp_plat.h>
+>   	  Select this to enable cpuidle for Exynos processors
+>
+> diff --git a/drivers/cpuidle/cpuidle-exynos.c b/drivers/cpuidle/cpuidle-exynos.c
+> index ba9b34b..e66a426 100644
+> --- a/drivers/cpuidle/cpuidle-exynos.c
+> +++ b/drivers/cpuidle/cpuidle-exynos.c
+> @@ -18,6 +18,8 @@
 >   #include <asm/suspend.h>
+>   #include <asm/cpuidle.h>
 >
 > +#include "dt_idle_states.h"
 > +
->   static int bl_enter_powerdown(struct cpuidle_device *dev,
->   			      struct cpuidle_driver *drv, int idx);
+>   static void (*exynos_enter_aftr)(void);
 >
-> @@ -73,6 +75,12 @@ static struct cpuidle_driver bl_idle_little_driver = {
->   	.state_count = 2,
+>   static int exynos_enter_lowpower(struct cpuidle_device *dev,
+> @@ -56,13 +58,27 @@ static struct cpuidle_driver exynos_idle_driver = {
+>   	.safe_state_index = 0,
 >   };
 >
-> +static const struct of_device_id bl_idle_state_match[] __initconst = {
+> +static const struct of_device_id exynos_idle_state_match[] __initconst = {
 > +	{ .compatible = "arm,idle-state",
-> +	  .data = bl_enter_powerdown },
+> +	  .data = exynos_enter_lowpower },
 > +	{ },
 > +};
 > +
->   static struct cpuidle_driver bl_idle_big_driver = {
->   	.name = "big_idle",
->   	.owner = THIS_MODULE,
-> @@ -190,6 +198,17 @@ static int __init bl_idle_init(void)
->   	if (ret)
->   		goto out_uninit_little;
+>   static int exynos_cpuidle_probe(struct platform_device *pdev)
+>   {
+>   	int ret;
+> +	struct cpuidle_driver *drv = &exynos_idle_driver;
 >
+>   	exynos_enter_aftr = (void *)(pdev->dev.platform_data);
+>
+> -	ret = cpuidle_register(&exynos_idle_driver, NULL);
 > +	/* Start at index 1, index 0 standard WFI */
-> +	ret = dt_init_idle_driver(&bl_idle_big_driver, bl_idle_state_match, 1);
-> +	if (ret < 0)
-> +		goto out_uninit_big;
+> +	ret = dt_init_idle_driver(drv, exynos_idle_state_match, 1);
+> +	if (ret < 0) {
+> +		dev_err(&pdev->dev, "failed to initialize idle states\n");
+> +		return ret;
+> +	}
 > +
-> +	/* Start at index 1, index 0 standard WFI */
-> +	ret = dt_init_idle_driver(&bl_idle_little_driver,
-> +				  bl_idle_state_match, 1);
-> +	if (ret < 0)
-> +		goto out_uninit_big;
-> +
->   	ret = cpuidle_register(&bl_idle_little_driver, NULL);
->   	if (ret)
->   		goto out_uninit_big;
+> +	ret = cpuidle_register(drv, NULL);
+>   	if (ret) {
+>   		dev_err(&pdev->dev, "failed to register cpuidle driver\n");
+>   		return ret;
 >
 
 
