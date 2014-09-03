@@ -1,36 +1,13 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Wed, 03 Sep 2014 23:01:15 +0200
-Subject: [PATCH v4 01/12] reset: add the Berlin reset controller driver
-In-Reply-To: <1409730511-16101-2-git-send-email-antoine.tenart@free-electrons.com>
-References: <1409730511-16101-1-git-send-email-antoine.tenart@free-electrons.com>
- <1409730511-16101-2-git-send-email-antoine.tenart@free-electrons.com>
-Message-ID: <5407819B.2060605@gmail.com>
+From: lznuaa@gmail.com (Zhi Li)
+Date: Wed, 3 Sep 2014 16:02:14 -0500
+Subject: [Patch net-next 00/11] net: fec: imx6sx multiqueue support
+In-Reply-To: <5407807e.c26c460a.65d3.71b9SMTPIN_ADDED_BROKEN@mx.google.com>
+References: <5407807e.c26c460a.65d3.71b9SMTPIN_ADDED_BROKEN@mx.google.com>
+Message-ID: <CAHrpEqSKBGGyeKPoM702=NqK0qAr8w2Tq84zktEbZ-PKDiKA9g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/03/2014 09:48 AM, Antoine Tenart wrote:
-> Add a reset controller for Marvell Berlin SoCs which is used by the
-> USB PHYs drivers (for now).
-> 
-> Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
-> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-> Acked-by: Philipp Zabel <p.zabel@pengutronix.de>
-> ---
->  drivers/reset/Makefile       |   1 +
->  drivers/reset/reset-berlin.c | 131 +++++++++++++++++++++++++++++++++++++++++++
->  2 files changed, 132 insertions(+)
->  create mode 100644 drivers/reset/reset-berlin.c
-
-I guess the reset stuff is quite independent from usb-phy and can
-be picked up now.
-
-Applied
-01/12 and 03/12 to berlin/soc and
-02/12 and 04/12 to berlin/dt.
-
-Thanks!
-
-For the usb-phy dts patches, I'll wait for the corresponding genphy
-patches.
-
-Sebastian
+On Wed, Sep 3, 2014 at 3:34 PM,  <y@shlinux1.ap.freescale.net> wrote:
+>
+>
+Sorry! Sent out with wrong sender email address.
