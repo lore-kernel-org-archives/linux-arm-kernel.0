@@ -1,101 +1,65 @@
-From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
-Date: Wed, 03 Sep 2014 18:46:04 +0200
-Subject: [PATCH 15/15] tty: serial: 8250: omap: add dma support
-In-Reply-To: <20140902201536.GC11766@atomide.com>
-References: <53FE3779.5090908@linutronix.de>
- <20140827202313.GF16006@atomide.com> <20140828082348.GA5413@linutronix.de>
- <20140828164645.GG16006@atomide.com> <53FF84DF.7080406@linutronix.de>
- <20140828225454.GM16006@atomide.com> <540048B4.7010807@linutronix.de>
- <20140829161221.GO16006@atomide.com> <5404B149.6010400@linutronix.de>
- <54060EDA.6060204@linutronix.de> <20140902201536.GC11766@atomide.com>
-Message-ID: <540745CC.2090901@linutronix.de>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Wed, 3 Sep 2014 13:48:07 -0300
+Subject: [BUG] staging: imx-drm: clock reparent fails for LDB channel 1 on
+ i.MX53
+In-Reply-To: <54074359.5090500@tqsc.de>
+References: <54074359.5090500@tqsc.de>
+Message-ID: <CAOMZO5AEKmFg-eM=b6WWYG4qy-1PRcsSHfoKG2aZFMmQBgw5Hw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/02/2014 10:15 PM, Tony Lindgren wrote:
->> - I see to face two kind of "deaths":
->>   - the LED still goes on and off and the uart just does not respond
->>     even if I tell the button print something on the screen (the button
->>     also changes the frequency of the LED so I know that the button is
->>     doing something).
->>     Also from dumping the content of /proc/interrupts it seems that a
->>     wake up is made, the uart should have restored the registers.
-> 
-> OK yeah this is the case I was seeing too. So do you just set the
-> LED triggers to none in sysfs to make it easier to reproduce?
+On Wed, Sep 3, 2014 at 1:35 PM, Markus Niebel <list-09_linux_arm@tqsc.de> wrote:
+> Hello,
+>
+> playing with LVDS channel 1 on a TQMa53 with MBa53 mainboard we see error
+>
+> imx-ldb 53fa8008.ldb: unable to set di0 parent clock to ldb_di1
+>
+> this comes from imx_ldb_set_clock with mux = 0. If setting mux parameter hard to "1"
+> LVDS on channel 1 works just fine. The value of the mux param comes from device tree
+> port settings.
+>
+> The following device tree change fixes the issue, but im not sure if this is the
+> correct way.
+>
+> diff --git a/arch/arm/boot/dts/imx53.dtsi b/arch/arm/boot/dts/imx53.dtsi
+> index 6456a00..acdfabf 100644
+> --- a/arch/arm/boot/dts/imx53.dtsi
+> +++ b/arch/arm/boot/dts/imx53.dtsi
+> @@ -419,10 +419,14 @@
+>                                 status = "disabled";
+>
+>                                 lvds-channel at 0 {
+> +                                       #address-cells = <1>;
+> +                                       #size-cells = <0>;
+>                                         reg = <0>;
+>                                         status = "disabled";
+>
+>                                         port {
+> +                                               reg = <0>;
+> +
+>                                                 lvds0_in: endpoint {
+>                                                         remote-endpoint = <&ipu_di0_lvds0>;
+>                                                 };
+> @@ -430,10 +434,14 @@
+>                                 };
+>
+>                                 lvds-channel at 1 {
+> +                                       #address-cells = <1>;
+> +                                       #size-cells = <0>;
+>                                         reg = <1>;
+>                                         status = "disabled";
+>
+>                                         port {
+> +                                               reg = <1>;
+> +
+>                                                 lvds1_in: endpoint {
+>                                                         remote-endpoint = <&ipu_di1_lvds1>;
+>                                                 };
+>
+> In my understanding the i.MX53 has no multiplexer for the input, so
+> DI1 -> LVDS1 in case of single channel or separate channels
 
-Yes.
+Your change looks good. Adding Philipp and Shawn on Cc.
 
->>   - one where the system is dead and the LED does not blink anymore.
->>     Also my button is dead.
-> 
-> This I don't think I've seen. This could also be the errata issue on
-> your earlier rev beagleboard-xm with off-idle.
-
-might be.
-
-Your pstore hint gave me something. I tried that earlier but somehow
-assumed that dram content was killed on init. But the content is even
-there are pressing the reset button :)
-
-However, I was able to capture the case where the LED was not blinking:
-The IIR register says 0xc6 (=> line status error). That is okay. At the
-same time LSR register says 0xe0. This is not okay. It means that there
-is some kind of error and at least one error bit is set in this
-register which is not the case. Also those bits are cleared on read
-which does not happen here. And we loop forever so the LED does blink
-anymore.
-
-The RX-count register says that it is empty which sense because bit 0
-is not set (in LSR). However I can read multiple times from the RX FIFO
-until I get the "unhandled bus access" error which usually happens
-right away if the empty FIFO is read on omap3 HW. In the last test I
-mange to read 91 times before the crash. I hoped that this FIFO read
-would make the interrupt go away but it did not.
-
-The HW seems to be in a strange state. It might be either the errata
-or something else. I even took the resume routine from omap-serial in
-case I did something wrong. In my last test it worked for 10minues
-before the interrupt storm came.
-
-This is probably the same thing I see on the omap-serial driver where I
-got from pstore:
-
-[   32.659271] random: nonblocking pool is initialized
-[  212.170623] NMI watchdog: BUG: soft lockup - CPU#0 stuck for 22s!
-[swapper:0]
-
-So I *guess* the interrupt routine is looping. This is problem one, no
-idea what is going on (the register status captured on 8250-omap makes
-no sense).
-
-Problem two, where the UART does not wakeup:
-What I observed is that sometimes the UART does not wake up properly
-i.e. it does not write anything on the console, even where it should. I
-can't tell if the read is working properly, the write does not.
->From my capture I see that the resume routine was running and the
-register should have been written. That means the UART should be up and
-running but nothing happens.
-It often works again after the system comes out of resume again (i.e.
-RPM suspens and resumes the UART). So it is okay on the next wakeup. Or
-the wakeup after next.
->From the script:
-
-| while ((1))
-| do
-|
-|         echo -n 409-chars >/dev/ttyUSB0
-|
-|         sleep 1
-|         a=$(date)
-|         echo -e "\n#$a" >/dev/ttyUSB0
-|         echo $a
-|         sleep 13;
-| done
-
-I see that sometimes one or two sequential timestamps are missing. And
-the it continues like nothing happened.
-
-> Tony
-
-Sebastian
+Thanks
