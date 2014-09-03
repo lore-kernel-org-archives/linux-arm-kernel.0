@@ -1,366 +1,172 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Wed, 03 Sep 2014 10:26:07 -0700
-Subject: [PATCH v9 0/6] Per-user clock constraints
-In-Reply-To: <1409758148-20104-1-git-send-email-tomeu.vizoso@collabora.com>
-References: <1409758148-20104-1-git-send-email-tomeu.vizoso@collabora.com>
-Message-ID: <20140903172607.11368.1601@quantum>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Wed, 3 Sep 2014 18:29:34 +0100
+Subject: [PATCH v8 8/8] drivers: cpuidle: initialize Exynos driver
+ through DT
+In-Reply-To: <5407185E.6030308@linaro.org>
+References: <1409585324-3678-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <1409585324-3678-9-git-send-email-lorenzo.pieralisi@arm.com>
+ <5407185E.6030308@linaro.org>
+Message-ID: <20140903172934.GH1824@e102568-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Tomeu Vizoso (2014-09-03 08:29:07)
-> Hi,
+On Wed, Sep 03, 2014 at 02:32:14PM +0100, Daniel Lezcano wrote:
+> On 09/01/2014 05:28 PM, Lorenzo Pieralisi wrote:
+> > With the introduction of DT based idle states, CPUidle drivers for
+> > ARM can now initialize idle states data through properties in the device
+> > tree.
+> >
+> > This patch adds code to the Exynos CPUidle driver to dynamically
+> > initialize idle states data through the updated device tree source
+> > files.
+> >
+> > Cc: Chander Kashyap <k.chander@samsung.com>
+> > Cc: Kukjin Kim <kgene.kim@samsung.com>
+> > Cc: Tomasz Figa <t.figa@samsung.com>
+> > Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+> > Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 > 
-> I'm sending this v9 in order to fix a few build errors found by Intel's 0day build farm. Notable changes are:
-> 
-> * Changes to mxs-saif.c have been folded into 2/6, in order for bisectability to be preserved.
-> 
-> * All floor constraints are applied first, then all ceiling constraints. This is to keep the behavior deterministic and to prevent any situation in which floor constraints could trump over ceiling constraints.
-> 
-> * A WARN has been added to flag inconsistent ranges of constraints.
-> 
-> * Redundant includes of linux/clk.h have been removed.
-> 
-> These series depend on Mike's patches at [0] and is rebased on top of today's clk-next.
+> Acked-by: Daniel Lezcano <daniel.lezcano@linaro.org>
 
-Applied to clk-next! Thanks much for your hard work on this series. It
-has turned out pretty nice. And thanks to Rabin for the original
-proposal and to Andrew Lunn for helping to resolve the Kirkwood issues.
+Thanks Daniel !
 
-I would not be surprised if we have to fix some stuff up leading up to
-the next merge window. The split between struct clk and struct clk_core
-will likely cause some of the pending patches on the list to break and I
-might ask for your help with the Coccinelle script ;-)
+This patch has a dependency:
 
-I guess we'll know soon if things start to explode once this hits
-linux-next...
+http://lists.infradead.org/pipermail/linux-arm-kernel/2014-July/274179.html
 
-Thanks again,
-Mike
+Bartolomiej do you plan to merge the patch above ?
+
+This patch needs also testing, I do not have Exynos boards so I only
+compile tested it.
+
+Lorenzo
 
 > 
-> Follows the original cover letter blurb:
+> > ---
+> >   arch/arm/boot/dts/exynos4210.dtsi | 11 +++++++++++
+> >   arch/arm/boot/dts/exynos5250.dtsi | 11 +++++++++++
+> >   drivers/cpuidle/Kconfig.arm       |  1 +
+> >   drivers/cpuidle/cpuidle-exynos.c  | 18 +++++++++++++++++-
+> >   4 files changed, 40 insertions(+), 1 deletion(-)
+> >
+> > diff --git a/arch/arm/boot/dts/exynos4210.dtsi b/arch/arm/boot/dts/exynos4210.dtsi
+> > index eab7c7b..69fd1a0 100644
+> > --- a/arch/arm/boot/dts/exynos4210.dtsi
+> > +++ b/arch/arm/boot/dts/exynos4210.dtsi
+> > @@ -48,12 +48,23 @@
+> >   			device_type = "cpu";
+> >   			compatible = "arm,cortex-a9";
+> >   			reg = <0x900>;
+> > +			cpu-idle-states = <&CLUSTER_SLEEP_0>;
+> >   		};
+> >
+> >   		cpu at 901 {
+> >   			device_type = "cpu";
+> >   			compatible = "arm,cortex-a9";
+> >   			reg = <0x901>;
+> > +			cpu-idle-states = <&CLUSTER_SLEEP_0>;
+> > +		};
+> > +
+> > +		idle-states {
+> > +			CLUSTER_SLEEP_0: cluster-sleep-0 {
+> > +				compatible = "arm,idle-state";
+> > +				entry-latency-us = <1000>;
+> > +				exit-latency-us = <300>;
+> > +				min-residency-us = <100000>;
+> > +			};
+> >   		};
+> >   	};
+> >
+> > diff --git a/arch/arm/boot/dts/exynos5250.dtsi b/arch/arm/boot/dts/exynos5250.dtsi
+> > index 492e1ef..3a758ff 100644
+> > --- a/arch/arm/boot/dts/exynos5250.dtsi
+> > +++ b/arch/arm/boot/dts/exynos5250.dtsi
+> > @@ -63,12 +63,23 @@
+> >   			compatible = "arm,cortex-a15";
+> >   			reg = <0>;
+> >   			clock-frequency = <1700000000>;
+> > +			cpu-idle-states = <&CLUSTER_SLEEP_0>;
+> >   		};
+> >   		cpu at 1 {
+> >   			device_type = "cpu";
+> >   			compatible = "arm,cortex-a15";
+> >   			reg = <1>;
+> >   			clock-frequency = <1700000000>;
+> > +			cpu-idle-states = <&CLUSTER_SLEEP_0>;
+> > +		};
+> > +
+> > +		idle-states {
+> > +			CLUSTER_SLEEP_0: cluster-sleep-0 {
+> > +				compatible = "arm,idle-state";
+> > +				entry-latency-us = <1000>;
+> > +				exit-latency-us = <300>;
+> > +				min-residency-us = <100000>;
+> > +			};
+> >   		};
+> >   	};
+> >
+> > diff --git a/drivers/cpuidle/Kconfig.arm b/drivers/cpuidle/Kconfig.arm
+> > index e339c7f..04cc229 100644
+> > --- a/drivers/cpuidle/Kconfig.arm
+> > +++ b/drivers/cpuidle/Kconfig.arm
+> > @@ -55,6 +55,7 @@ config ARM_AT91_CPUIDLE
+> >   config ARM_EXYNOS_CPUIDLE
+> >   	bool "Cpu Idle Driver for the Exynos processors"
+> >   	depends on ARCH_EXYNOS
+> > +	select DT_IDLE_STATES
+> >   	help
+> >   	  Select this to enable cpuidle for Exynos processors
+> >
+> > diff --git a/drivers/cpuidle/cpuidle-exynos.c b/drivers/cpuidle/cpuidle-exynos.c
+> > index ba9b34b..e66a426 100644
+> > --- a/drivers/cpuidle/cpuidle-exynos.c
+> > +++ b/drivers/cpuidle/cpuidle-exynos.c
+> > @@ -18,6 +18,8 @@
+> >   #include <asm/suspend.h>
+> >   #include <asm/cpuidle.h>
+> >
+> > +#include "dt_idle_states.h"
+> > +
+> >   static void (*exynos_enter_aftr)(void);
+> >
+> >   static int exynos_enter_lowpower(struct cpuidle_device *dev,
+> > @@ -56,13 +58,27 @@ static struct cpuidle_driver exynos_idle_driver = {
+> >   	.safe_state_index = 0,
+> >   };
+> >
+> > +static const struct of_device_id exynos_idle_state_match[] __initconst = {
+> > +	{ .compatible = "arm,idle-state",
+> > +	  .data = exynos_enter_lowpower },
+> > +	{ },
+> > +};
+> > +
+> >   static int exynos_cpuidle_probe(struct platform_device *pdev)
+> >   {
+> >   	int ret;
+> > +	struct cpuidle_driver *drv = &exynos_idle_driver;
+> >
+> >   	exynos_enter_aftr = (void *)(pdev->dev.platform_data);
+> >
+> > -	ret = cpuidle_register(&exynos_idle_driver, NULL);
+> > +	/* Start at index 1, index 0 standard WFI */
+> > +	ret = dt_init_idle_driver(drv, exynos_idle_state_match, 1);
+> > +	if (ret < 0) {
+> > +		dev_err(&pdev->dev, "failed to initialize idle states\n");
+> > +		return ret;
+> > +	}
+> > +
+> > +	ret = cpuidle_register(drv, NULL);
+> >   	if (ret) {
+> >   		dev_err(&pdev->dev, "failed to register cpuidle driver\n");
+> >   		return ret;
+> >
 > 
-> I'm retaking Rabin's patches [1] for splitting the clk API in two: one API for
-> clk consumers and another for providers. The consumer API uses a clk structure
-> that just keeps track of the consumer and has a reference to the actual
-> clk_core struct, which is used internally.
-> 
-> I have kept a patch from Rabin that aims to aid in debugging nested
-> enable/disable calls, though my personal aim is to allow more than one consumer
-> to influence the final, effective frequency rate. For now this is limited to
-> setting floor and ceiling constraints, with the short-term aim of allowing
-> devfreq and thermal drivers to set floor and ceiling frequencies on the memory
-> clock, respectively.
-> 
-> For those functions in the consumer clk API that were called from providers, I
-> have added variants to clk-provider.h that are the same only that accept a
-> clk_core instead. These functions are prefixed with clk_provider_.
-> 
-> Patch 1/7 just adds a bunch of defines with the goal of having all the renames
-> in their own commit while preserving git-bisectability, with patch 3/7
-> containing the rename itself as generated by the Coccinelle script in [2].
-> Patch 2/7 is needed because sound/soc/mxs/mxs-saif.c calls both the consumer
-> and the provider API. The actual implementation of the API split comes in patch
-> 4/7. I will be happy to organize the refactoring differently if anybody has a
-> better idea.
-> 
-> Patch 5/7 warns when there's an unbalanced usage of the enable and disable
-> APIs, and patch 6/7 adds the API for setting floor and ceiling frequencies, per
-> consumer. Patch 7/7 will warn when prepare/unprepare are used unbalanced,
-> printing the code location of the last call to unprepare.
-> 
-> [0] http://thread.gmane.org/gmane.linux.kernel/1778132
-> [1] http://thread.gmane.org/gmane.linux.kernel/1402006
-> [2] http://cgit.collabora.com/git/user/tomeu/linux.git/log/?h=clk-refactoring-9
-> 
-> Thanks,
-> 
-> Tomeu
-> 
-> Tomeu Vizoso (6):
->   clk: Add temporary mapping to the existing API
->   clk: Move all drivers to use internal API
->   clk: use struct clk only for external API
->   clk: per-user clock accounting for debug
->   clk: Add floor and ceiling constraints to clock rates
->   clk: Warn of unbalanced clk_prepare() calls
-> 
->  arch/arm/mach-dove/common.c                   |  10 +-
->  arch/arm/mach-imx/clk-busy.c                  |   9 +-
->  arch/arm/mach-imx/clk-fixup-div.c             |   4 +-
->  arch/arm/mach-imx/clk-fixup-mux.c             |   4 +-
->  arch/arm/mach-imx/clk-gate2.c                 |   4 +-
->  arch/arm/mach-imx/clk-imx1.c                  |   3 +-
->  arch/arm/mach-imx/clk-imx21.c                 |   3 +-
->  arch/arm/mach-imx/clk-imx25.c                 |   9 +-
->  arch/arm/mach-imx/clk-imx27.c                 |   5 +-
->  arch/arm/mach-imx/clk-imx31.c                 |  11 +-
->  arch/arm/mach-imx/clk-imx35.c                 |  23 +-
->  arch/arm/mach-imx/clk-imx51-imx53.c           |  78 +--
->  arch/arm/mach-imx/clk-imx6q.c                 |  54 +-
->  arch/arm/mach-imx/clk-imx6sl.c                |  14 +-
->  arch/arm/mach-imx/clk-imx6sx.c                |  98 ++--
->  arch/arm/mach-imx/clk-pfd.c                   |   5 +-
->  arch/arm/mach-imx/clk-pllv1.c                 |   5 +-
->  arch/arm/mach-imx/clk-pllv2.c                 |   5 +-
->  arch/arm/mach-imx/clk-pllv3.c                 |   5 +-
->  arch/arm/mach-imx/clk-vf610.c                 |  43 +-
->  arch/arm/mach-imx/clk.c                       |  11 +-
->  arch/arm/mach-imx/clk.h                       |  42 +-
->  arch/arm/mach-msm/clock-pcom.c                |   2 +-
->  arch/arm/mach-msm/clock.c                     |   2 +-
->  arch/arm/mach-mv78xx0/common.c                |   2 +-
->  arch/arm/mach-omap2/board-cm-t35.c            |   2 +-
->  arch/arm/mach-omap2/cclock3xxx_data.c         | 371 +++++++------
->  arch/arm/mach-omap2/clkt2xxx_dpll.c           |   5 +-
->  arch/arm/mach-omap2/clkt2xxx_dpllcore.c       |   5 +-
->  arch/arm/mach-omap2/clkt2xxx_virt_prcm_set.c  |  11 +-
->  arch/arm/mach-omap2/clkt34xx_dpll3m2.c        |   3 +-
->  arch/arm/mach-omap2/clkt_clksel.c             |  46 +-
->  arch/arm/mach-omap2/clkt_dpll.c               |   8 +-
->  arch/arm/mach-omap2/clock.c                   |  52 +-
->  arch/arm/mach-omap2/clock.h                   |  18 +-
->  arch/arm/mach-omap2/clock3xxx.c               |  23 +-
->  arch/arm/mach-omap2/clock3xxx.h               |   4 +-
->  arch/arm/mach-omap2/clock_common_data.c       |   2 +-
->  arch/arm/mach-omap2/clockdomain.c             |   9 +-
->  arch/arm/mach-omap2/clockdomain.h             |   4 +-
->  arch/arm/mach-omap2/display.c                 |   6 +-
->  arch/arm/mach-omap2/dpll3xxx.c                |  29 +-
->  arch/arm/mach-omap2/dpll44xx.c                |   5 +-
->  arch/arm/mach-omap2/mcbsp.c                   |   5 +-
->  arch/arm/mach-omap2/omap_device.c             |  10 +-
->  arch/arm/mach-omap2/omap_hwmod.c              |  42 +-
->  arch/arm/mach-omap2/omap_hwmod.h              |  12 +-
->  arch/arm/mach-omap2/pm24xx.c                  |  12 +-
->  arch/arm/mach-orion5x/common.c                |   2 +-
->  arch/arm/mach-shmobile/clock.c                |  10 +-
->  arch/arm/mach-vexpress/spc.c                  |   4 +-
->  arch/arm/plat-orion/common.c                  |  22 +-
->  arch/arm/plat-orion/include/plat/common.h     |  12 +-
->  arch/powerpc/platforms/512x/clock-commonclk.c |  48 +-
->  drivers/clk/at91/clk-main.c                   |  24 +-
->  drivers/clk/at91/clk-master.c                 |   6 +-
->  drivers/clk/at91/clk-peripheral.c             |  12 +-
->  drivers/clk/at91/clk-pll.c                    |   6 +-
->  drivers/clk/at91/clk-plldiv.c                 |   6 +-
->  drivers/clk/at91/clk-programmable.c           |  10 +-
->  drivers/clk/at91/clk-slow.c                   |  24 +-
->  drivers/clk/at91/clk-smd.c                    |   6 +-
->  drivers/clk/at91/clk-system.c                 |   6 +-
->  drivers/clk/at91/clk-usb.c                    |  20 +-
->  drivers/clk/at91/clk-utmi.c                   |   6 +-
->  drivers/clk/bcm/clk-kona-setup.c              |   6 +-
->  drivers/clk/bcm/clk-kona.c                    |  12 +-
->  drivers/clk/bcm/clk-kona.h                    |   2 +-
->  drivers/clk/berlin/berlin2-avpll.c            |   4 +-
->  drivers/clk/berlin/berlin2-avpll.h            |   4 +-
->  drivers/clk/berlin/berlin2-div.c              |   2 +-
->  drivers/clk/berlin/berlin2-div.h              |   2 +-
->  drivers/clk/berlin/berlin2-pll.c              |   2 +-
->  drivers/clk/berlin/berlin2-pll.h              |   2 +-
->  drivers/clk/berlin/bg2.c                      |  14 +-
->  drivers/clk/berlin/bg2q.c                     |  10 +-
->  drivers/clk/clk-axi-clkgen.c                  |   3 +-
->  drivers/clk/clk-axm5516.c                     |   4 +-
->  drivers/clk/clk-bcm2835.c                     |   2 +-
->  drivers/clk/clk-composite.c                   |  11 +-
->  drivers/clk/clk-conf.c                        |  18 +-
->  drivers/clk/clk-devres.c                      |  31 ++
->  drivers/clk/clk-divider.c                     |   8 +-
->  drivers/clk/clk-efm32gg.c                     |   3 +-
->  drivers/clk/clk-fixed-factor.c                |   6 +-
->  drivers/clk/clk-fixed-rate.c                  |   8 +-
->  drivers/clk/clk-fractional-divider.c          |   4 +-
->  drivers/clk/clk-gate.c                        |   4 +-
->  drivers/clk/clk-highbank.c                    |   8 +-
->  drivers/clk/clk-ls1x.c                        |  16 +-
->  drivers/clk/clk-max77686.c                    |  10 +-
->  drivers/clk/clk-moxart.c                      |   8 +-
->  drivers/clk/clk-mux.c                         |   7 +-
->  drivers/clk/clk-nomadik.c                     |  15 +-
->  drivers/clk/clk-nspire.c                      |   4 +-
->  drivers/clk/clk-palmas.c                      |   7 +-
->  drivers/clk/clk-ppc-corenet.c                 |   8 +-
->  drivers/clk/clk-s2mps11.c                     |   6 +-
->  drivers/clk/clk-si5351.c                      |  17 +-
->  drivers/clk/clk-si570.c                       |   4 +-
->  drivers/clk/clk-twl6040.c                     |   3 +-
->  drivers/clk/clk-u300.c                        |  13 +-
->  drivers/clk/clk-vt8500.c                      |   4 +-
->  drivers/clk/clk-wm831x.c                      |   7 +-
->  drivers/clk/clk-xgene.c                       |  12 +-
->  drivers/clk/clk.c                             | 724 +++++++++++++++++---------
->  drivers/clk/clk.h                             |  12 +-
->  drivers/clk/clkdev.c                          | 130 ++++-
->  drivers/clk/hisilicon/clk-hi3620.c            |   9 +-
->  drivers/clk/hisilicon/clk-hip04.c             |   1 -
->  drivers/clk/hisilicon/clk.c                   |  17 +-
->  drivers/clk/hisilicon/clk.h                   |   2 +-
->  drivers/clk/hisilicon/clkgate-separated.c     |   5 +-
->  drivers/clk/keystone/gate.c                   |   7 +-
->  drivers/clk/keystone/pll.c                    |  11 +-
->  drivers/clk/mmp/clk-apbc.c                    |   5 +-
->  drivers/clk/mmp/clk-apmu.c                    |   5 +-
->  drivers/clk/mmp/clk-frac.c                    |   4 +-
->  drivers/clk/mmp/clk-mmp2.c                    |  14 +-
->  drivers/clk/mmp/clk-pxa168.c                  |  12 +-
->  drivers/clk/mmp/clk-pxa910.c                  |  12 +-
->  drivers/clk/mmp/clk.h                         |   8 +-
->  drivers/clk/mvebu/clk-corediv.c               |   4 +-
->  drivers/clk/mvebu/clk-cpu.c                   |   8 +-
->  drivers/clk/mvebu/common.c                    |  15 +-
->  drivers/clk/mvebu/kirkwood.c                  |   6 +-
->  drivers/clk/mxs/clk-div.c                     |   5 +-
->  drivers/clk/mxs/clk-frac.c                    |   5 +-
->  drivers/clk/mxs/clk-imx23.c                   |   5 +-
->  drivers/clk/mxs/clk-imx28.c                   |   5 +-
->  drivers/clk/mxs/clk-pll.c                     |   5 +-
->  drivers/clk/mxs/clk-ref.c                     |   5 +-
->  drivers/clk/mxs/clk.h                         |  17 +-
->  drivers/clk/qcom/clk-rcg.c                    |   8 +-
->  drivers/clk/qcom/clk-rcg2.c                   |  14 +-
->  drivers/clk/qcom/clk-regmap.c                 |   2 +-
->  drivers/clk/qcom/clk-regmap.h                 |   2 +-
->  drivers/clk/qcom/common.c                     |   6 +-
->  drivers/clk/qcom/gcc-apq8084.c                |   2 +-
->  drivers/clk/qcom/gcc-ipq806x.c                |   2 +-
->  drivers/clk/qcom/gcc-msm8660.c                |   2 +-
->  drivers/clk/qcom/gcc-msm8960.c                |   2 +-
->  drivers/clk/qcom/gcc-msm8974.c                |   2 +-
->  drivers/clk/qcom/mmcc-msm8960.c               |   6 +-
->  drivers/clk/rockchip/clk-pll.c                |   9 +-
->  drivers/clk/rockchip/clk-rk3188.c             |   2 +-
->  drivers/clk/rockchip/clk-rk3288.c             |   2 +-
->  drivers/clk/rockchip/clk-rockchip.c           |   2 +-
->  drivers/clk/rockchip/clk.c                    |  23 +-
->  drivers/clk/rockchip/clk.h                    |   5 +-
->  drivers/clk/samsung/clk-exynos-audss.c        |  16 +-
->  drivers/clk/samsung/clk-exynos-clkout.c       |   9 +-
->  drivers/clk/samsung/clk-exynos3250.c          |   1 -
->  drivers/clk/samsung/clk-exynos4.c             |   7 +-
->  drivers/clk/samsung/clk-exynos5250.c          |   1 -
->  drivers/clk/samsung/clk-exynos5260.c          |   1 -
->  drivers/clk/samsung/clk-exynos5410.c          |   1 -
->  drivers/clk/samsung/clk-exynos5420.c          |   1 -
->  drivers/clk/samsung/clk-exynos5440.c          |   1 -
->  drivers/clk/samsung/clk-pll.c                 |   6 +-
->  drivers/clk/samsung/clk-pll.h                 |   2 +-
->  drivers/clk/samsung/clk-s3c2410-dclk.c        |  30 +-
->  drivers/clk/samsung/clk-s3c2410.c             |   1 -
->  drivers/clk/samsung/clk-s3c2412.c             |   1 -
->  drivers/clk/samsung/clk-s3c2443.c             |   1 -
->  drivers/clk/samsung/clk-s3c64xx.c             |   1 -
->  drivers/clk/samsung/clk-s5pv210-audss.c       |  16 +-
->  drivers/clk/samsung/clk.c                     |  22 +-
->  drivers/clk/samsung/clk.h                     |   3 +-
->  drivers/clk/shmobile/clk-div6.c               |   2 +-
->  drivers/clk/shmobile/clk-emev2.c              |   4 +-
->  drivers/clk/shmobile/clk-mstp.c               |   6 +-
->  drivers/clk/shmobile/clk-r8a7740.c            |   6 +-
->  drivers/clk/shmobile/clk-r8a7779.c            |   6 +-
->  drivers/clk/shmobile/clk-rcar-gen2.c          |  10 +-
->  drivers/clk/shmobile/clk-rz.c                 |   6 +-
->  drivers/clk/sirf/clk-atlas6.c                 |   3 +-
->  drivers/clk/sirf/clk-common.c                 |  30 +-
->  drivers/clk/sirf/clk-prima2.c                 |   3 +-
->  drivers/clk/socfpga/clk-gate.c                |   3 +-
->  drivers/clk/socfpga/clk-periph.c              |   3 +-
->  drivers/clk/socfpga/clk-pll.c                 |   5 +-
->  drivers/clk/spear/clk-aux-synth.c             |   8 +-
->  drivers/clk/spear/clk-frac-synth.c            |   4 +-
->  drivers/clk/spear/clk-gpt-synth.c             |   4 +-
->  drivers/clk/spear/clk-vco-pll.c               |   8 +-
->  drivers/clk/spear/clk.h                       |  14 +-
->  drivers/clk/spear/spear1310_clock.c           |   3 +-
->  drivers/clk/spear/spear1340_clock.c           |   3 +-
->  drivers/clk/spear/spear3xx_clock.c            |  17 +-
->  drivers/clk/spear/spear6xx_clock.c            |   3 +-
->  drivers/clk/st/clk-flexgen.c                  |  12 +-
->  drivers/clk/st/clkgen-fsyn.c                  |  22 +-
->  drivers/clk/st/clkgen-mux.c                   |  32 +-
->  drivers/clk/st/clkgen-pll.c                   |  34 +-
->  drivers/clk/sunxi/clk-a10-hosc.c              |   2 +-
->  drivers/clk/sunxi/clk-a20-gmac.c              |   2 +-
->  drivers/clk/sunxi/clk-factors.c               |   4 +-
->  drivers/clk/sunxi/clk-sun6i-apb0-gates.c      |   2 +-
->  drivers/clk/sunxi/clk-sun6i-apb0.c            |   2 +-
->  drivers/clk/sunxi/clk-sun6i-ar100.c           |   6 +-
->  drivers/clk/sunxi/clk-sun8i-apb0.c            |   2 +-
->  drivers/clk/sunxi/clk-sunxi.c                 |  18 +-
->  drivers/clk/tegra/clk-audio-sync.c            |   4 +-
->  drivers/clk/tegra/clk-divider.c               |   5 +-
->  drivers/clk/tegra/clk-periph-gate.c           |   5 +-
->  drivers/clk/tegra/clk-periph.c                |   9 +-
->  drivers/clk/tegra/clk-pll-out.c               |   5 +-
->  drivers/clk/tegra/clk-pll.c                   |  41 +-
->  drivers/clk/tegra/clk-super.c                 |   5 +-
->  drivers/clk/tegra/clk-tegra-audio.c           |   5 +-
->  drivers/clk/tegra/clk-tegra-fixed.c           |   9 +-
->  drivers/clk/tegra/clk-tegra-periph.c          |  13 +-
->  drivers/clk/tegra/clk-tegra-pmc.c             |   5 +-
->  drivers/clk/tegra/clk-tegra-super-gen4.c      |   9 +-
->  drivers/clk/tegra/clk-tegra114.c              |  11 +-
->  drivers/clk/tegra/clk-tegra124.c              |   7 +-
->  drivers/clk/tegra/clk-tegra20.c               |  13 +-
->  drivers/clk/tegra/clk-tegra30.c               |   9 +-
->  drivers/clk/tegra/clk.c                       |  25 +-
->  drivers/clk/tegra/clk.h                       |  38 +-
->  drivers/clk/ti/apll.c                         |   8 +-
->  drivers/clk/ti/clk-2xxx.c                     |   8 +-
->  drivers/clk/ti/clk-33xx.c                     |  18 +-
->  drivers/clk/ti/clk-3xxx.c                     |   8 +-
->  drivers/clk/ti/clk-43xx.c                     |   8 +-
->  drivers/clk/ti/clk-44xx.c                     |  16 +-
->  drivers/clk/ti/clk-54xx.c                     |  25 +-
->  drivers/clk/ti/clk-7xx.c                      |  28 +-
->  drivers/clk/ti/clk-dra7-atl.c                 |   6 +-
->  drivers/clk/ti/clk.c                          |   2 +-
->  drivers/clk/ti/clockdomain.c                  |   4 +-
->  drivers/clk/ti/composite.c                    |   2 +-
->  drivers/clk/ti/divider.c                      |   6 +-
->  drivers/clk/ti/dpll.c                         |   8 +-
->  drivers/clk/ti/fixed-factor.c                 |   2 +-
->  drivers/clk/ti/gate.c                         |   2 +-
->  drivers/clk/ti/interface.c                    |   2 +-
->  drivers/clk/ti/mux.c                          |   6 +-
->  drivers/clk/ux500/abx500-clk.c                |   3 +-
->  drivers/clk/ux500/clk-prcc.c                  |   8 +-
->  drivers/clk/ux500/clk-prcmu.c                 |  16 +-
->  drivers/clk/ux500/clk-sysctrl.c               |  10 +-
->  drivers/clk/ux500/clk.h                       |  23 +-
->  drivers/clk/ux500/u8500_clk.c                 |   3 +-
->  drivers/clk/ux500/u8500_of_clk.c              |  13 +-
->  drivers/clk/ux500/u8540_clk.c                 |   3 +-
->  drivers/clk/ux500/u9540_clk.c                 |   1 -
->  drivers/clk/versatile/clk-icst.c              |   5 +-
->  drivers/clk/versatile/clk-icst.h              |   2 +-
->  drivers/clk/versatile/clk-impd1.c             |  19 +-
->  drivers/clk/versatile/clk-realview.c          |   3 +-
->  drivers/clk/versatile/clk-sp810.c             |  30 +-
->  drivers/clk/versatile/clk-versatile.c         |   3 +-
->  drivers/clk/versatile/clk-vexpress-osc.c      |   2 +-
->  drivers/clk/versatile/clk-vexpress.c          |   6 +-
->  drivers/clk/x86/clk-lpt.c                     |   3 +-
->  drivers/clk/zynq/clkc.c                       |  22 +-
->  drivers/clk/zynq/pll.c                        |   4 +-
->  drivers/gpu/drm/msm/hdmi/hdmi_phy_8960.c      |   3 +-
->  drivers/media/platform/exynos4-is/media-dev.c |  18 +-
->  drivers/media/platform/exynos4-is/media-dev.h |   7 +-
->  drivers/media/platform/omap3isp/isp.h         |   2 +-
->  drivers/rtc/rtc-hym8563.c                     |   4 +-
->  drivers/staging/imx-drm/imx-tve.c             |  27 +-
->  include/asm-generic/clkdev.h                  |   6 +-
->  include/linux/clk-private.h                   |  51 +-
->  include/linux/clk-provider.h                  | 137 +++--
->  include/linux/clk.h                           |  50 +-
->  include/linux/clk/ti.h                        |  10 +-
->  include/linux/clk/zynq.h                      |   3 +-
->  include/linux/clkdev.h                        |  24 +-
->  include/linux/platform_data/si5351.h          |   4 +-
->  sound/soc/mxs/mxs-saif.c                      |   4 +-
->  274 files changed, 2276 insertions(+), 1859 deletions(-)
 > 
 > -- 
-> 1.9.3
+>   <http://www.linaro.org/> Linaro.org | Open source software for ARM SoCs
+> 
+> Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+> <http://twitter.com/#!/linaroorg> Twitter |
+> <http://www.linaro.org/linaro-blog/> Blog
+> 
 > 
