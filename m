@@ -1,42 +1,49 @@
 From: apinski@cavium.com (Andrew Pinski)
-Date: Wed,  3 Sep 2014 14:19:08 -0700
-Subject: [PATCH 14/24] ARM64:ILP32 use the standard start_thread for ILP32 so
- the processor state is not AARCH32
+Date: Wed,  3 Sep 2014 14:19:09 -0700
+Subject: [PATCH 15/24] compat_binfmt_elf: coredump: Allow some core dump
+ macros be overridden for compat.
 In-Reply-To: <1409779158-30963-1-git-send-email-apinski@cavium.com>
 References: <1409779158-30963-1-git-send-email-apinski@cavium.com>
-Message-ID: <1409779158-30963-15-git-send-email-apinski@cavium.com>
+Message-ID: <1409779158-30963-16-git-send-email-apinski@cavium.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If we have both ILP32 and AARCH32 compiled in, we need use the non compat start
-thread for ILP32.
+On some targets (x86 [32bit and x32] and arm64 [aarch32 and ilp32]), there are
+two compat elf abis.  This adds a few more "#define * COMPAT_*" for compat
+targets to define if needed.
 
 Signed-off-by: Andrew Pinski <apinski@cavium.com>
 ---
- arch/arm64/include/asm/processor.h |   11 +++++++++++
- 1 files changed, 11 insertions(+), 0 deletions(-)
+ fs/compat_binfmt_elf.c |   17 +++++++++++++++++
+ 1 files changed, 17 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm64/include/asm/processor.h b/arch/arm64/include/asm/processor.h
-index 286b1be..7bd9f32 100644
---- a/arch/arm64/include/asm/processor.h
-+++ b/arch/arm64/include/asm/processor.h
-@@ -104,6 +104,17 @@ static inline void start_thread(struct pt_regs *regs, unsigned long pc,
- static inline void compat_start_thread(struct pt_regs *regs, unsigned long pc,
- 				       unsigned long sp)
- {
-+#ifdef CONFIG_ARM64_ILP32
-+	/*
-+	 * ILP32 thread are started the same way as LP64 threads.
-+	 * Note we cannot use is_ilp32_compat_task here as that
-+	 * would introduce a header depency issue.
-+	 */
-+	if (!test_thread_flag(TIF_AARCH32)) {
-+		start_thread(regs, pc, sp);
-+		return;
-+	}
+diff --git a/fs/compat_binfmt_elf.c b/fs/compat_binfmt_elf.c
+index 4d24d17..8307927 100644
+--- a/fs/compat_binfmt_elf.c
++++ b/fs/compat_binfmt_elf.c
+@@ -130,6 +130,23 @@ static void cputime_to_compat_timeval(const cputime_t cputime,
+ #define	arch_setup_additional_pages compat_arch_setup_additional_pages
+ #endif
+ 
++
++#ifdef COMPAT_PR_REG_SIZE
++#define PR_REG_SIZE COMPAT_PR_REG_SIZE
 +#endif
- 	start_thread_common(regs, pc);
- 	regs->pstate = COMPAT_PSR_MODE_USR;
- 	if (pc & 1)
++
++#ifdef COMPAT_PRSTATUS_SIZE
++#define PRSTATUS_SIZE COMPAT_PRSTATUS_SIZE
++#endif
++
++#ifdef COMPAT_PR_REG_PTR
++#define PR_REG_PTR COMPAT_PR_REG_PTR
++#endif
++
++#ifdef COMPAT_SET_PR_FPVALID
++#define SET_PR_FPVALID COMPAT_SET_PR_FPVALID
++#endif
++
+ /*
+  * Rename a few of the symbols that binfmt_elf.c will define.
+  * These are all local so the names don't really matter, but it
 -- 
 1.7.2.5
