@@ -1,7 +1,9 @@
 From: festevam@gmail.com (Fabio Estevam)
-Date: Tue,  2 Sep 2014 22:45:12 -0300
-Subject: [PATCH v2 1/3] ARM: dts: imx28-evk: Fix display duplicate name warning
-Message-ID: <1409708714-15136-1-git-send-email-festevam@gmail.com>
+Date: Tue,  2 Sep 2014 22:45:13 -0300
+Subject: [PATCH 2/3] ARM: dts: imx23-evk: Fix display duplicate name warning
+In-Reply-To: <1409708714-15136-1-git-send-email-festevam@gmail.com>
+References: <1409708714-15136-1-git-send-email-festevam@gmail.com>
+Message-ID: <1409708714-15136-2-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -17,18 +19,18 @@ Rename the child node name in order to avoid the warning.
 Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
 ---
 Changes since v1:
-- Rename the child node
+- None. Newly introduced in this version
 
- arch/arm/boot/dts/imx28-evk.dts | 4 ++--
+ arch/arm/boot/dts/imx23-evk.dts | 4 ++--
  1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/boot/dts/imx28-evk.dts b/arch/arm/boot/dts/imx28-evk.dts
-index e4cc44c..09664fc 100644
---- a/arch/arm/boot/dts/imx28-evk.dts
-+++ b/arch/arm/boot/dts/imx28-evk.dts
-@@ -124,10 +124,10 @@
- 				pinctrl-0 = <&lcdif_24bit_pins_a
- 					     &lcdif_pins_evk>;
+diff --git a/arch/arm/boot/dts/imx23-evk.dts b/arch/arm/boot/dts/imx23-evk.dts
+index a33f66c..57e2997 100644
+--- a/arch/arm/boot/dts/imx23-evk.dts
++++ b/arch/arm/boot/dts/imx23-evk.dts
+@@ -60,10 +60,10 @@
+ 				pinctrl-names = "default";
+ 				pinctrl-0 = <&lcdif_24bit_pins_a>;
  				lcd-supply = <&reg_lcd_3v3>;
 -				display = <&display>;
 +				display = <&display0>;
