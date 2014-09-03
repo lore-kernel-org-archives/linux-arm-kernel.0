@@ -1,67 +1,56 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Wed, 3 Sep 2014 08:39:08 -0500
-Subject: [PATCH] ARM: dts: DRA7: Add PMU nodes
-In-Reply-To: <1408456440-30171-1-git-send-email-nm@ti.com>
-References: <1408456440-30171-1-git-send-email-nm@ti.com>
-Message-ID: <540719FC.5070803@ti.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Wed, 03 Sep 2014 22:40:07 +0900
+Subject: [RESEND PATCH v4 2/2] ARM: EXYNOS: Refactor the pm code to use DT
+ based lookup
+In-Reply-To: <CAGm_ybhDsGpoHg8XVBOPEv7oHc0YdSZBW_JXB0hZk-y6Bac00g@mail.gmail.com>
+References: <1408431167-14134-1-git-send-email-vikas.sajjan@samsung.com>
+ <1408431167-14134-3-git-send-email-vikas.sajjan@samsung.com>
+ <CAGm_ybjx4t7kGg0mJHjrox39jP-DNgc-0rkLNn2rcOLS6JjAHQ@mail.gmail.com>
+ <2186657.jhIisq7Fok@amdc1032>
+ <CAGm_ybhDsGpoHg8XVBOPEv7oHc0YdSZBW_JXB0hZk-y6Bac00g@mail.gmail.com>
+Message-ID: <02aa01cfc77c$94865f20$bd931d60$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/19/2014 08:54 AM, Nishanth Menon wrote:
-> From: Lucas Weaver <l-weaver@ti.com>
+Vikas Sajjan wrote:
 > 
-> DRA74x and DRA72x family of processors vary slightly in the number
-> of CPUs. So, add different instances of PMU for each of these processor
-> groups. Further, since the interrupts bypass crossbar and are directly
-> connected to GIC, mark the dts nodes with relevant information.
+> Hi,
 > 
-> Tested with perf utility.
-> 
-> Reviewed-by: Felipe Balbi <balbi@ti.com>
-> Signed-off-by: Lucas Weaver <l-weaver@ti.com>
-> Signed-off-by: Nishanth Menon <nm@ti.com>
-> ---
 Hi,
-Gentle ping..
 
-Regards,
-Nishanth Menon
->  arch/arm/boot/dts/dra72x.dtsi |    5 +++++
->  arch/arm/boot/dts/dra74x.dtsi |    6 ++++++
->  2 files changed, 11 insertions(+)
+Sorry for late response...
+
+> On Tue, Aug 19, 2014 at 3:05 PM, Bartlomiej Zolnierkiewicz
+> <b.zolnierkie@samsung.com> wrote:
+> >
+> > Hi,
+> >
+> > On Tuesday, August 19, 2014 01:26:49 PM Vikas Sajjan wrote:
+> >> Hi Kukjin,
+> >>
+> >> On Tue, Aug 19, 2014 at 12:22 PM, Vikas Sajjan <vikas.sajjan@samsung.com> wrote:
+> >> > Refactoring the pm.c to avoid using "soc_is_exynos" checks,
+> >> > instead use the DT based lookup.
+> >> >
+> >> > While at it, consolidate the common code across SoCs
+> >> > and create static helper functions.
+> >> >
+> >> > Signed-off-by: Vikas Sajjan <vikas.sajjan@samsung.com>
+> >> > Reviewed-by: Tomasz Figa <t.figa@samsung.com>
+> >>
+> >> Can you pick this series...
+> >
+> > I think that my PM_SLEEP=n build fixes should go in before this cleanup
+> > series:
 > 
-> diff --git a/arch/arm/boot/dts/dra72x.dtsi b/arch/arm/boot/dts/dra72x.dtsi
-> index f1ec22f..e5a3d23 100644
-> --- a/arch/arm/boot/dts/dra72x.dtsi
-> +++ b/arch/arm/boot/dts/dra72x.dtsi
-> @@ -22,4 +22,9 @@
->  			reg = <0>;
->  		};
->  	};
-> +
-> +	pmu {
-> +		compatible = "arm,cortex-a15-pmu";
-> +		interrupts = <GIC_SPI DIRECT_IRQ(131) IRQ_TYPE_LEVEL_HIGH>;
-> +	};
->  };
-> diff --git a/arch/arm/boot/dts/dra74x.dtsi b/arch/arm/boot/dts/dra74x.dtsi
-> index a4e8bb9..3be544c 100644
-> --- a/arch/arm/boot/dts/dra74x.dtsi
-> +++ b/arch/arm/boot/dts/dra74x.dtsi
-> @@ -38,4 +38,10 @@
->  			reg = <1>;
->  		};
->  	};
-> +
-> +	pmu {
-> +		compatible = "arm,cortex-a15-pmu";
-> +		interrupts = <GIC_SPI DIRECT_IRQ(131) IRQ_TYPE_LEVEL_HIGH>,
-> +			     <GIC_SPI DIRECT_IRQ(132) IRQ_TYPE_LEVEL_HIGH>;
-> +	};
->  };
+> Its better for Kukjin to decide which series he wants to pick first.
 > 
+Hmm...I need to have a look at the Bart's fix then I'll let you know. Maybe
+tomorrow morning ;)
 
+> 
+> >
+> >   http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg35430.html
+> >
 
--- 
-Regards,
-Nishanth Menon
+- Kukjin
