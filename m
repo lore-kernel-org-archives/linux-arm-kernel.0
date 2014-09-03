@@ -1,174 +1,64 @@
-From: gdjakov@mm-sol.com (Georgi Djakov)
-Date: Wed,  3 Sep 2014 19:28:16 +0300
-Subject: [PATCH v4 4/4] pinctrl: qcom: Make the target processor value
- configurable
-In-Reply-To: <1409761696-15435-1-git-send-email-gdjakov@mm-sol.com>
-References: <1409761696-15435-1-git-send-email-gdjakov@mm-sol.com>
-Message-ID: <1409761696-15435-5-git-send-email-gdjakov@mm-sol.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Thu, 04 Sep 2014 01:31:21 +0900
+Subject: [PATCH v2 5/7] arm64: dts: Add initial device tree support for
+ EXYNOS7
+In-Reply-To: <3382034.5ADO0F7naY@wuerfel>
+References: <1409672143-8574-1-git-send-email-ch.naveen@samsung.com>
+ <1409672143-8574-6-git-send-email-ch.naveen@samsung.com>
+ <036a01cfc792$422271e0$c66755a0$@samsung.com> <3382034.5ADO0F7naY@wuerfel>
+Message-ID: <043401cfc794$7f228650$7d6792f0$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently the value used to specify that interrupts from the gpio should
-be routed to the application processor is hardcoded for all Qualcomm SoCs.
-But the new APQ8084 SoC uses a different value. To resolve this, we make
-this value configurable for each SoC. For all existing SoCs we continue
-to use the current value, and only for APQ8084 we use the new value.
+Arnd Bergmann wrote:
+> 
+Hi, Arnd
 
-Suggested-by: Bjorn Andersson <bjorn.andersson@sonymobile.com>
-Acked-by: Bjorn Andersson <bjorn.andersson@sonymobile.com>
-Signed-off-by: Georgi Djakov <gdjakov@mm-sol.com>
----
- drivers/pinctrl/qcom/pinctrl-apq8064.c |    2 ++
- drivers/pinctrl/qcom/pinctrl-apq8084.c |    2 ++
- drivers/pinctrl/qcom/pinctrl-ipq8064.c |    2 ++
- drivers/pinctrl/qcom/pinctrl-msm.c     |    4 +---
- drivers/pinctrl/qcom/pinctrl-msm.h     |    3 +++
- drivers/pinctrl/qcom/pinctrl-msm8960.c |    2 ++
- drivers/pinctrl/qcom/pinctrl-msm8x74.c |    2 ++
- 7 files changed, 14 insertions(+), 3 deletions(-)
+> On Thursday 04 September 2014 01:15:20 Kukjin Kim wrote:
+> > Naveen Krishna Chatradhi wrote:
+> >
+> > > diff --git a/arch/arm64/boot/dts/exynos/exynos7-espresso.dts b/arch/arm64/boot/dts/exynos/exynos7-
+> > > espresso.dts
+> > > new file mode 100644
+> > > index 0000000..f6a8879
+> > > --- /dev/null
+> > > +++ b/arch/arm64/boot/dts/exynos/exynos7-espresso.dts
+> > > @@ -0,0 +1,31 @@
+> > > +/*
+> > > + * SAMSUNG Exynos7 Espresso board device tree source
+> > > + *
+> > > + * Copyright (c) 2014 Samsung Electronics Co., Ltd.
+> > > + *		http://www.samsung.com
+> > > + *
+> > > + * This program is free software; you can redistribute it and/or modify
+> > > + * it under the terms of the GNU General Public License version 2 as
+> > > + * published by the Free Software Foundation.
+> > > +*/
+> > > +
+> > > +/dts-v1/;
+> > > +#include "exynos7.dtsi"
+> > > +
+> > > +/ {
+> > > +	model = "Samsung Exynos7 Espresso board based on EXYNOS7";
+> > > +	compatible = "samsung,exynos7-espresso", "samsung,exynos7";
+> > > +
+> > > +	chosen {
+> > > +		linux,stdout-path = &serial_2;
+> >
+> > Well...
+> >
+> > > +	};
+> > > +
+> > > +	memory at 40000000 {
+> > > +		device_type = "memory";
+> > > +		reg = <0x0 0x40000000 0x0 0xC0000000>;
+> >
+> > The base address of system memory is depending on each board, actually some of
+> > them are 0x20000000.
+> 
+> This is the board specific file, so it seems ok.
+> 
+I mean there are many espresso boards are having different exynos7 SoC. I mean
+exynos7-espresso cannot represent all of espresso boards.
 
-diff --git a/drivers/pinctrl/qcom/pinctrl-apq8064.c b/drivers/pinctrl/qcom/pinctrl-apq8064.c
-index feb6f15..f877aed 100644
---- a/drivers/pinctrl/qcom/pinctrl-apq8064.c
-+++ b/drivers/pinctrl/qcom/pinctrl-apq8064.c
-@@ -258,6 +258,7 @@ static const unsigned int sdc3_data_pins[] = { 95 };
- 		.intr_status_bit = 0,			\
- 		.intr_ack_high = 1,			\
- 		.intr_target_bit = 0,			\
-+		.intr_target_kpss_val = 4,		\
- 		.intr_raw_status_bit = 3,		\
- 		.intr_polarity_bit = 1,			\
- 		.intr_detection_bit = 2,		\
-@@ -283,6 +284,7 @@ static const unsigned int sdc3_data_pins[] = { 95 };
- 		.intr_enable_bit = -1,			\
- 		.intr_status_bit = -1,			\
- 		.intr_target_bit = -1,			\
-+		.intr_target_kpss_val = -1,		\
- 		.intr_raw_status_bit = -1,		\
- 		.intr_polarity_bit = -1,		\
- 		.intr_detection_bit = -1,		\
-diff --git a/drivers/pinctrl/qcom/pinctrl-apq8084.c b/drivers/pinctrl/qcom/pinctrl-apq8084.c
-index 5362959..138cbf6 100644
---- a/drivers/pinctrl/qcom/pinctrl-apq8084.c
-+++ b/drivers/pinctrl/qcom/pinctrl-apq8084.c
-@@ -371,6 +371,7 @@ static const unsigned int sdc2_data_pins[] = { 152 };
- 		.intr_status_bit = 0,			\
- 		.intr_ack_high = 0,			\
- 		.intr_target_bit = 5,			\
-+		.intr_target_kpss_val = 3,		\
- 		.intr_raw_status_bit = 4,		\
- 		.intr_polarity_bit = 1,			\
- 		.intr_detection_bit = 2,		\
-@@ -396,6 +397,7 @@ static const unsigned int sdc2_data_pins[] = { 152 };
- 		.intr_enable_bit = -1,                  \
- 		.intr_status_bit = -1,                  \
- 		.intr_target_bit = -1,                  \
-+		.intr_target_kpss_val = -1,		\
- 		.intr_raw_status_bit = -1,              \
- 		.intr_polarity_bit = -1,                \
- 		.intr_detection_bit = -1,               \
-diff --git a/drivers/pinctrl/qcom/pinctrl-ipq8064.c b/drivers/pinctrl/qcom/pinctrl-ipq8064.c
-index 767cf11..81f49a9 100644
---- a/drivers/pinctrl/qcom/pinctrl-ipq8064.c
-+++ b/drivers/pinctrl/qcom/pinctrl-ipq8064.c
-@@ -211,6 +211,7 @@ static const unsigned int sdc3_data_pins[] = { 71 };
- 		.intr_status_bit = 0,			\
- 		.intr_ack_high = 1,			\
- 		.intr_target_bit = 0,			\
-+		.intr_target_kpss_val = 4,		\
- 		.intr_raw_status_bit = 3,		\
- 		.intr_polarity_bit = 1,			\
- 		.intr_detection_bit = 2,		\
-@@ -236,6 +237,7 @@ static const unsigned int sdc3_data_pins[] = { 71 };
- 		.intr_enable_bit = -1,                  \
- 		.intr_status_bit = -1,                  \
- 		.intr_target_bit = -1,                  \
-+		.intr_target_kpss_val = -1,		\
- 		.intr_raw_status_bit = -1,              \
- 		.intr_polarity_bit = -1,                \
- 		.intr_detection_bit = -1,               \
-diff --git a/drivers/pinctrl/qcom/pinctrl-msm.c b/drivers/pinctrl/qcom/pinctrl-msm.c
-index 2738108..592c6fc 100644
---- a/drivers/pinctrl/qcom/pinctrl-msm.c
-+++ b/drivers/pinctrl/qcom/pinctrl-msm.c
-@@ -649,8 +649,6 @@ static void msm_gpio_irq_ack(struct irq_data *d)
- 	spin_unlock_irqrestore(&pctrl->lock, flags);
- }
- 
--#define INTR_TARGET_PROC_APPS    4
--
- static int msm_gpio_irq_set_type(struct irq_data *d, unsigned int type)
- {
- 	struct gpio_chip *gc = irq_data_get_irq_chip_data(d);
-@@ -674,7 +672,7 @@ static int msm_gpio_irq_set_type(struct irq_data *d, unsigned int type)
- 	/* Route interrupts to application cpu */
- 	val = readl(pctrl->regs + g->intr_target_reg);
- 	val &= ~(7 << g->intr_target_bit);
--	val |= INTR_TARGET_PROC_APPS << g->intr_target_bit;
-+	val |= g->intr_target_kpss_val << g->intr_target_bit;
- 	writel(val, pctrl->regs + g->intr_target_reg);
- 
- 	/* Update configuration for gpio.
-diff --git a/drivers/pinctrl/qcom/pinctrl-msm.h b/drivers/pinctrl/qcom/pinctrl-msm.h
-index 7b2a227..b952c4b 100644
---- a/drivers/pinctrl/qcom/pinctrl-msm.h
-+++ b/drivers/pinctrl/qcom/pinctrl-msm.h
-@@ -53,6 +53,8 @@ struct msm_function {
-  * @intr_status_bit:      Offset in @intr_status_reg for reading and acking the interrupt
-  *                        status.
-  * @intr_target_bit:      Offset in @intr_target_reg for configuring the interrupt routing.
-+ * @intr_target_kpss_val: Value in @intr_target_bit for specifying that the interrupt from
-+ *                        this gpio should get routed to the KPSS processor.
-  * @intr_raw_status_bit:  Offset in @intr_cfg_reg for the raw status bit.
-  * @intr_polarity_bit:    Offset in @intr_cfg_reg for specifying polarity of the interrupt.
-  * @intr_detection_bit:   Offset in @intr_cfg_reg for specifying interrupt type.
-@@ -88,6 +90,7 @@ struct msm_pingroup {
- 	unsigned intr_ack_high:1;
- 
- 	unsigned intr_target_bit:5;
-+	unsigned intr_target_kpss_val:5;
- 	unsigned intr_raw_status_bit:5;
- 	unsigned intr_polarity_bit:5;
- 	unsigned intr_detection_bit:5;
-diff --git a/drivers/pinctrl/qcom/pinctrl-msm8960.c b/drivers/pinctrl/qcom/pinctrl-msm8960.c
-index 3504703..2ab21ce 100644
---- a/drivers/pinctrl/qcom/pinctrl-msm8960.c
-+++ b/drivers/pinctrl/qcom/pinctrl-msm8960.c
-@@ -384,6 +384,7 @@ static const unsigned int sdc3_data_pins[] = { 157 };
- 		.intr_status_bit = 0,			\
- 		.intr_ack_high = 1,			\
- 		.intr_target_bit = 0,			\
-+		.intr_target_kpss_val = 4,		\
- 		.intr_raw_status_bit = 3,		\
- 		.intr_polarity_bit = 1,			\
- 		.intr_detection_bit = 2,		\
-@@ -409,6 +410,7 @@ static const unsigned int sdc3_data_pins[] = { 157 };
- 		.intr_enable_bit = -1,			\
- 		.intr_status_bit = -1,			\
- 		.intr_target_bit = -1,			\
-+		.intr_target_kpss_val = -1,		\
- 		.intr_raw_status_bit = -1,		\
- 		.intr_polarity_bit = -1,		\
- 		.intr_detection_bit = -1,		\
-diff --git a/drivers/pinctrl/qcom/pinctrl-msm8x74.c b/drivers/pinctrl/qcom/pinctrl-msm8x74.c
-index 8c97201..3c85838 100644
---- a/drivers/pinctrl/qcom/pinctrl-msm8x74.c
-+++ b/drivers/pinctrl/qcom/pinctrl-msm8x74.c
-@@ -366,6 +366,7 @@ static const unsigned int sdc2_data_pins[] = { 151 };
- 		.intr_enable_bit = 0,			\
- 		.intr_status_bit = 0,			\
- 		.intr_target_bit = 5,			\
-+		.intr_target_kpss_val = 4,		\
- 		.intr_raw_status_bit = 4,		\
- 		.intr_polarity_bit = 1,			\
- 		.intr_detection_bit = 2,		\
-@@ -391,6 +392,7 @@ static const unsigned int sdc2_data_pins[] = { 151 };
- 		.intr_enable_bit = -1,			\
- 		.intr_status_bit = -1,			\
- 		.intr_target_bit = -1,			\
-+		.intr_target_kpss_val = -1,		\
- 		.intr_raw_status_bit = -1,		\
- 		.intr_polarity_bit = -1,		\
- 		.intr_detection_bit = -1,		\
--- 
-1.7.9.5
+- Kukjin
