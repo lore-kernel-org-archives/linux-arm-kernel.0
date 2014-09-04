@@ -1,38 +1,50 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 4 Sep 2014 18:02:36 +0200
-Subject: [PATCH 11/19] ARM: S5PV210: Remove support for board files
-In-Reply-To: <1409825105.5546.91.camel@x220>
-References: <1404496099-26708-1-git-send-email-t.figa@samsung.com>
- <53C675E4.4020502@samsung.com> <1409825105.5546.91.camel@x220>
-Message-ID: <201409041802.36466.arnd@arndb.de>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 4 Sep 2014 17:03:20 +0100
+Subject: [PATCH v8 6/8] drivers: cpuidle: CPU idle ARM64 driver
+In-Reply-To: <20140903173740.GJ1824@e102568-lin.cambridge.arm.com>
+References: <1409585324-3678-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <1409585324-3678-7-git-send-email-lorenzo.pieralisi@arm.com>
+ <20140903173740.GJ1824@e102568-lin.cambridge.arm.com>
+Message-ID: <20140904160320.GB22354@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 04 September 2014, Paul Bolle wrote:
+On Wed, Sep 03, 2014 at 06:37:40PM +0100, Lorenzo Pieralisi wrote:
+> On Mon, Sep 01, 2014 at 04:28:42PM +0100, Lorenzo Pieralisi wrote:
+> > This patch implements a generic CPU idle driver for ARM64 machines.
+> > 
+> > It relies on the DT idle states infrastructure to initialize idle
+> > states count and respective parameters. Current code assumes the driver
+> > is managing idle states on all possible CPUs but can be easily
+> > generalized to support heterogenous systems and build cpumasks at
+> > runtime using MIDRs or DT cpu nodes compatible properties.
+> > 
+> > The driver relies on the arm64 CPU operations to call the idle
+> > initialization hook used to parse and save suspend back-end specific
+> > idle states information upon probing.
+> > 
+> > Idle state index 0 is always initialized as a simple wfi state, ie always
+> > considered present and functional on all ARM64 platforms.
+> > 
+> > Idle state indices higher than 0 trigger idle state entry by calling
+> > the cpu_suspend function, that triggers the suspend operation through
+> > the CPU operations suspend back-end hook. cpu_suspend passes the idle
+> > state index as a parameter so that the CPU operations suspend back-end
+> > can retrieve the required idle state data by using the idle state
+> > index to execute a look-up on its internal data structures.
+> > 
+> > Reviewed-by: Ashwin Chaugule <ashwin.chaugule@linaro.org>
+> > Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
+> > Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 > 
-> On Wed, 2014-07-16 at 14:53 +0200, Tomasz Figa wrote:
-> > I believe that both sound card drivers for Goni and Aquilla could be
-> > replaced with simple cards in DT, so I'll send a follow-up patch for this.
-> 
-> References to MACH_GONI and MACH_AQUILA can still be seen in v3.17-rc3
-> and next-20140903. Note that as consequence SND_SOC_GONI_AQUILA_WM8994
-> can not be set anymore.
-> 
-> > Most likely the same is the case for SMDK boards, but they don't seem to
-> > have any active users (see cover letter for more details), which means
-> > that probably they could be simply dropped from
-> > sound/soc/samsung/Kconfig in another follow-up patch.
-> 
-> Ditto for MACH_SMDKC100, MACH_SMDKC110, and MACH_SMDKV210. Note that
-> here SND_SOC_SMDK_WM8580_PCM can not be set anymore.
-> 
-> (This is intended to be a gentile reminder. I hope it actually comes
-> across like that.)
+> This patch should be ready to go too, is it ok if I split the series
+> in arm64 arch specific patches (will ask Catalin to pull) and CPUidle ones
+> (inclusive of DT bindings and !!this patch!!) and send two separate pull
+> requests ?
 
-At least I find those reminders useful. We clearly have a bug here
-that was recently introduced, and we should fix that.
+If Daniel/Rafael don't have any objection, I can take the whole series
+through the arm64 tree (it seems that patches have been already acked by
+Daniel).
 
-I think it would be nice if you could submit a patch to remove the
-drivers from ASoC, then we can see if anybody complains.
-
-	Arnd
+-- 
+Catalin
