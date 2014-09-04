@@ -1,48 +1,83 @@
 From: daniel.thompson@linaro.org (Daniel Thompson)
-Date: Thu,  4 Sep 2014 17:03:37 +0100
-Subject: [PATCH v1 3/6] arm64: Introduce dummy version of asm/fiq.h
+Date: Thu,  4 Sep 2014 17:03:36 +0100
+Subject: [PATCH v1 2/6] arm: smp: Introduce a non-maskable IPI
 In-Reply-To: <1409846620-14542-1-git-send-email-daniel.thompson@linaro.org>
 References: <1409662853-29313-1-git-send-email-daniel.thompson@linaro.org>
  <1409846620-14542-1-git-send-email-daniel.thompson@linaro.org>
-Message-ID: <1409846620-14542-4-git-send-email-daniel.thompson@linaro.org>
+Message-ID: <1409846620-14542-3-git-send-email-daniel.thompson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Drivers that are shared between arm and arm64 and which employ
-FIQ on arm cannot include asm/fiq.h without #ifdef'ing. This patch
-introduces a dummy version of asm/fiq.h to arm64 to avoid this.
+This patch introduces a new IPI intended to be routed to FIQ rather
+than IRQ. An IPI based upon FIQ can be used to implement debug
+features that require non-maskable interrupts.
 
 Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
+Cc: Russell King <linux@arm.linux.org.uk>
 ---
- arch/arm64/include/asm/fiq.h | 18 ++++++++++++++++++
- 1 file changed, 18 insertions(+)
- create mode 100644 arch/arm64/include/asm/fiq.h
+ arch/arm/include/asm/hardirq.h | 2 +-
+ arch/arm/include/asm/smp.h     | 3 +++
+ arch/arm/kernel/smp.c          | 7 +++++++
+ 3 files changed, 11 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm64/include/asm/fiq.h b/arch/arm64/include/asm/fiq.h
-new file mode 100644
-index 0000000..909ec54
---- /dev/null
-+++ b/arch/arm64/include/asm/fiq.h
-@@ -0,0 +1,18 @@
-+/*
-+ * arch/arm64/include/asm/fiq.h
-+ *
-+ * Placeholder to reduce #ifdef'ing in shared arm/arm64 drivers.
-+ */
+diff --git a/arch/arm/include/asm/hardirq.h b/arch/arm/include/asm/hardirq.h
+index fe3ea77..5df33e3 100644
+--- a/arch/arm/include/asm/hardirq.h
++++ b/arch/arm/include/asm/hardirq.h
+@@ -5,7 +5,7 @@
+ #include <linux/threads.h>
+ #include <asm/irq.h>
+ 
+-#define NR_IPI	8
++#define NR_IPI	9
+ 
+ typedef struct {
+ 	unsigned int __softirq_pending;
+diff --git a/arch/arm/include/asm/smp.h b/arch/arm/include/asm/smp.h
+index 2ec765c..0e23384 100644
+--- a/arch/arm/include/asm/smp.h
++++ b/arch/arm/include/asm/smp.h
+@@ -20,6 +20,9 @@
+ 
+ #define raw_smp_processor_id() (current_thread_info()->cpu)
+ 
++/* bitmap of IPIs that must be signalled using FIQ */
++#define SMP_IPI_FIQ_MASK 0x0100
 +
-+#ifndef __ASM_FIQ_H
-+#define __ASM_FIQ_H
+ struct seq_file;
+ 
+ /*
+diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
+index 9388a3d..b2404d0 100644
+--- a/arch/arm/kernel/smp.c
++++ b/arch/arm/kernel/smp.c
+@@ -72,6 +72,7 @@ enum ipi_msg_type {
+ 	IPI_CPU_STOP,
+ 	IPI_IRQ_WORK,
+ 	IPI_COMPLETION,
++	IPI_FIQ,
+ };
+ 
+ static DECLARE_COMPLETION(cpu_running);
+@@ -451,6 +452,7 @@ static const char *ipi_types[NR_IPI] __tracepoint_string = {
+ 	S(IPI_CPU_STOP, "CPU stop interrupts"),
+ 	S(IPI_IRQ_WORK, "IRQ work interrupts"),
+ 	S(IPI_COMPLETION, "completion interrupts"),
++	S(IPI_FIQ, "FIQ interrupts"),
+ };
+ 
+ static void smp_cross_call(const struct cpumask *target, unsigned int ipinr)
+@@ -618,6 +620,11 @@ void handle_IPI(int ipinr, struct pt_regs *regs)
+ 		irq_exit();
+ 		break;
+ 
++	case IPI_FIQ:
++		BUILD_BUG_ON(SMP_IPI_FIQ_MASK != BIT(IPI_FIQ));
++		pr_warn("CPU%u: IPI FIQ delivered via IRQ vector\n", cpu);
++		break;
 +
-+/*
-+ * This placeholder allows code of the following form to be simplified:
-+ *
-+ * #ifdef CONFIG_FIQ
-+ * #include <asm/fiq.h>
-+ * #endif
-+ */
-+
-+#endif
+ 	default:
+ 		printk(KERN_CRIT "CPU%u: Unknown IPI message 0x%x\n",
+ 		       cpu, ipinr);
 -- 
 1.9.3
