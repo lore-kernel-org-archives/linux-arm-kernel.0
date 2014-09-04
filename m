@@ -1,95 +1,60 @@
-From: stuart.yoder@freescale.com (Stuart Yoder)
-Date: Thu, 4 Sep 2014 16:32:28 +0000
-Subject: [PATCH V3 0/6] ARM64: Add support for FSL's LS2085A SoC
-In-Reply-To: <3563146.jh46O3eIbG@wuerfel>
-References: <1409757194-28155-1-git-send-email-bhupesh.sharma@freescale.com>
- <6499926.sQm3J8L764@wuerfel> <20140904091319.GA32228@leverpostej>
- <3563146.jh46O3eIbG@wuerfel>
-Message-ID: <363ee62e362d46a2b02415a124b78cef@CY1PR0301MB0748.namprd03.prod.outlook.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 4 Sep 2014 09:39:01 -0700
+Subject: [PATCH] mfd: twl4030-power: Fix PM idle pin configuration to not
+ conflict with regulators
+In-Reply-To: <5408269F.7030400@linutronix.de>
+References: <20140819152405.GA12002@atomide.com>
+ <20140902082931.GA32460@breakpoint.cc>
+ <20140903002445.GD11766@atomide.com>
+ <5406D388.5050104@linutronix.de>
+ <20140903183901.GF11766@atomide.com>
+ <5408269F.7030400@linutronix.de>
+Message-ID: <20140904163900.GT11766@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-> -----Original Message-----
-> From: Arnd Bergmann [mailto:arnd at arndb.de]
-> Sent: Thursday, September 04, 2014 4:39 AM
-> To: Mark Rutland
-> Cc: linux-arm-kernel at lists.infradead.org; rob.herring at linaro.org; Sharma Bhupesh-B45370; Catalin Marinas;
-> Will Deacon; Yoder Stuart-B08248; grant.likely at secretlab.ca; Marc Zyngier; Basu Arnab-B45036; Geoff Levand
-> Subject: Re: [PATCH V3 0/6] ARM64: Add support for FSL's LS2085A SoC
+* Sebastian Andrzej Siewior <bigeasy@linutronix.de> [140904 01:46]:
+> On 09/03/2014 08:39 PM, Tony Lindgren wrote:
+> >> good.txt and bad.txt are from the late_initcall.
+> >>
+> >>  $ diff -u good.txt bad.txt
+> >> --- good.txt    2014-09-03 10:29:58.920317368 +0200
+> >> +++ bad.txt     2014-09-03 10:28:57.064313222 +0200
+> > 
+> > Hmm can you check that you have good.txt and bad.txt the
+> > right way? I'd assume you need VAUX2 or VAUX3 enabled
+> > not disabled for the MMC to work?
 > 
-> On Thursday 04 September 2014 10:13:19 Mark Rutland wrote:
-> > On Wed, Sep 03, 2014 at 07:31:44PM +0100, Arnd Bergmann wrote:
-> > > On Wednesday 03 September 2014 17:31:30 Mark Rutland wrote:
-> > > >
-> > > > However, I'm not sure I follow the reasoning for making this
-> > > > significantly harder, and even ignoring that I don't think this does
-> > > > make things significantly harder. Especially so if we have a PSCI node
-> > > > but not an enable method -- in that case its trivial to patch in an
-> > > > unrelated enable-method anyhow.
-> > >
-> > > Right, it's not actually much harder. A better way to look at it is
-> > > probably that we document what which parts we expect to stay constant
-> > > and which parts are to be filled out by the boot loader. Independent
-> > > of what PSCI implementation the boot loader provides, we would like
-> > > to see enable-method="psci".
-> >
-> > So in the /cpus node, have a comment like:
-> >
-> > /*
-> >  * We expect the enable-method to be "psci", but this is dependent on
-> >  * the FW, which will fill this in.
-> >  */
-> 
-> I was thinking of leaving the enable-method in the cpus node, but having
-> an empty psci node with a similar comment.
-> 
-> > Or, should we put together a soc-guidance.txt with that, ensuring things
-> > are initialised correctly (CNTVOFF, CNTFREQ), etc?
-> 
-> I would very much welcome documentation like that!
+> No, it was correct. If you look at the complete file you will notice
+> the - which removes the mmc detect/mount in the bad case and + which
+> adds the -110 error
+...
+ 
+> With that patch it seems it is a little harder to trigger. It is
+> usually every other boot that fails. Here a diff between two that
+> worked (say good-v1 vs good-v2):
+...
+ 
+> It took mmc a little longer to detect but it worked. And the content of
+> the three registers seem not to matter _or_ it was dumped before MMC
+> got active.
+...
+ 
+> I didn't change a thing, I just pressed reset. As you see the content
+> of the TWL registers don't seem to be that important since it was the
+> same at the time of the dump. And the mmc didn't came back.
 
-If any documentation updates are to be made I think they belong in
-Documentation/arm64/booting.txt.
+OK. I guess that means that it's most likely some timing related issue,
+or an issue with some regulator not being ready by the time the MMC
+probes. Or it's a bug somewhere that I'm not figuring out.
 
-There is currently the following:
+Looking at the twl-regulator.c, twl4030reg_enable just sets the group
+bit and we're not checking any status and don't have startup-delay-us
+for them.
 
-[cut]
-- CPUs with a "spin-table" enable-method must have a 'cpu-release-addr'
-  property in their cpu node.  This property identifies a
-  naturally-aligned 64-bit zero-initalised memory location.
+At least phy-twl4030-usb.c has twl4030_i2c_write_u8_verify(), I wonder
+if adding a read back of the register to twl-regulator.c would help?
 
-  These CPUs should spin outside of the kernel in a reserved area of
-  memory (communicated to the kernel by a /memreserve/ region in the
-  device tree) polling their cpu-release-addr location, which must be
-  contained in the reserved region.  A wfe instruction may be inserted
-  to reduce the overhead of the busy-loop and a sev will be issued by
-  the primary CPU.  When a read of the location pointed to by the
-  cpu-release-addr returns a non-zero value, the CPU must jump to this
-  value.  The value will be written as a single 64-bit little-endian
-  value, so CPUs must convert the read value to their native endianness
-  before jumping to it.
+Regards,
 
-- CPUs with a "psci" enable method should remain outside of
-  the kernel (i.e. outside of the regions of memory described to the
-  kernel in the memory node, or in a reserved area of memory described
-  to the kernel by a /memreserve/ region in the device tree).  The
-  kernel will issue CPU_ON calls as described in ARM document number ARM
-  DEN 0022A ("Power State Coordination Interface System Software on ARM
-  processors") to bring CPUs into the kernel.
-
-  The device tree should contain a 'psci' node, as described in
-  Documentation/devicetree/bindings/arm/psci.txt.
-[cut]
-
-Whatever the requirements are-- enable-method present, psci node
-(empty or otherwise), plus anything about other initialization
-like CNTVOFF/CNTFREQ.  Having all boot time requirements in one
-place would be good.
-
-Also, if psci 2.0 is a requirement that should be specified in 
-there as well.
-
-Thanks,
-Stuart
+Tony
