@@ -1,57 +1,53 @@
-From: David.Laight@ACULAB.COM (David Laight)
-Date: Thu, 4 Sep 2014 08:50:40 +0000
-Subject: [Patch net-next 08/11] net:fec: change FEC alignment to 64
- bytes for ARM platform
-In-Reply-To: <1409776697-1536-9-git-send-email-Frank.Li@freescale.com>
-References: <1409776697-1536-1-git-send-email-Frank.Li@freescale.com>
- <1409776697-1536-9-git-send-email-Frank.Li@freescale.com>
-Message-ID: <063D6719AE5E284EB5DD2968C1650D6D17487196@AcuExch.aculab.com>
+From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
+Date: Thu, 04 Sep 2014 10:53:05 +0200
+Subject: [PATCH v9 5/6] clk: Add floor and ceiling constraints to clock
+ rates
+In-Reply-To: <20140904005305.11368.16931@quantum>
+References: <1409758148-20104-1-git-send-email-tomeu.vizoso@collabora.com>
+ <1409758434-20810-1-git-send-email-tomeu.vizoso@collabora.com>
+ <1409758434-20810-3-git-send-email-tomeu.vizoso@collabora.com>
+ <5407A6B9.1080606@codeaurora.org> <20140904005305.11368.16931@quantum>
+Message-ID: <54082871.8080808@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Frank Li
-> From: Fugang Duan <B38611@freescale.com>
+On 09/04/2014 02:53 AM, Mike Turquette wrote:
+> Quoting Stephen Boyd (2014-09-03 16:39:37)
+>> On 09/03/14 08:33, Tomeu Vizoso wrote:
+>>> +int clk_set_ceiling_rate(struct clk *clk_user, unsigned long rate)
+>>> +{
+>>> +     struct clk_core *clk = clk_to_clk_core(clk_user);
+>>> +
+>>> +     WARN(rate > 0 && rate < clk_user->floor_constraint,
+>>> +          "clk %s dev %s con %s: new ceiling %lu lower than existing floor %lu\n",
+>>> +          __clk_get_name(clk), clk_user->dev_id, clk_user->con_id, rate,
+>>> +          clk_user->floor_constraint);
+>>> +
+>>> +     clk_user->ceiling_constraint = rate;
+>>> +     return clk_provider_set_rate(clk, clk_provider_get_rate(clk));
+>>> +}
+>>> +EXPORT_SYMBOL_GPL(clk_set_ceiling_rate);
+>>
+>> Maybe I'm late to this patch series given that Mike applied it, but I
+>> wonder why we wouldn't just have one API that takes a min and a max,
+>> i.e. clk_set_rate_range(clk, min, max)? Then clk_set_rate() is a small
+>> wrapper on top that just sets min and max to the same value.
 > 
-> Since enet-avb has 64 bytes alignment limitation for rx DMA transfer.
-> The previous enet IP for ARM platform has 16 bytes alignment for tx
-> DMA transfer.
+> We certainly can have that. But being able to easily adjust a floor or
+> ceiling value seems like a good thing to me, and that is what these
+> functions do.
+> 
+> If we decide to have a clk_set_rate_range (where we perhaps pass zero in
+> for a value that we do not wish to constrain) then I imagine that
+> clk_set_ceiling_rate and clk_set_floor_rate will simply become a wrapper
+> for that function. No harm having it both ways. If one way of doing
+> things falls out of favor we can always cull it and update all the
+> users.
 
-Do you mean rx or tx here? or both??
+I opted for separate functions because in the specific use cases I
+thought of, any user will be interested in setting either a floor or a
+ceiling constraint, but not both.
 
-And can we beat up the hardware designers to stop these restrictions
-on rx (in particular) ethernet buffer alignments?
-A device isn't suitable for ethernet unless is can write the destination
-mac address to a 4n+2 boundary.
+Regards,
 
-	David
-
-> 64 is the an integral number of 16, so change alignment
-> to 64 bytes for all ARM platform, which don't impact the performance
-> of previous platform.
-> 
-> Signed-off-by: Fugang Duan <B38611@freescale.com>
-> Signed-off-by: Frank Li <Frank.Li@freescale.com>
-> ---
->  drivers/net/ethernet/freescale/fec_main.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/drivers/net/ethernet/freescale/fec_main.c b/drivers/net/ethernet/freescale/fec_main.c
-> index a232245..b388e29f 100644
-> --- a/drivers/net/ethernet/freescale/fec_main.c
-> +++ b/drivers/net/ethernet/freescale/fec_main.c
-> @@ -65,7 +65,7 @@
->  static void set_multicast_list(struct net_device *ndev);
-> 
->  #if defined(CONFIG_ARM)
-> -#define FEC_ALIGNMENT	0xf
-> +#define FEC_ALIGNMENT	0x3f
->  #else
->  #define FEC_ALIGNMENT	0x3
->  #endif
-> --
-> 1.9.1
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe netdev" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+Tomeu
