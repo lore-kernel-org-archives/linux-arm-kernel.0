@@ -1,49 +1,90 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Thu, 4 Sep 2014 18:48:40 +0100
-Subject: [PATCH] clocksource: arch_timer: Fix code to use physical timers
- when requested
-In-Reply-To: <CAPz6YkVv1nbEumt9Q8gHAWddmECOm7DL=WLWfZKxBmzTfLQ00A@mail.gmail.com>
-References: <CAPz6YkWAPtuy4sAuAK9GtpDgfGsccxeS+pqqe_t_R818Jt01qA@mail.gmail.com>
- <53FE5B09.2020403@codeaurora.org>
- <CAOesGMhTivDzJFuxONggcJ6N5UvZopKa=+tv9PoPX593cpnm0A@mail.gmail.com>
- <53FE7E3B.1010500@codeaurora.org>
- <CAOesGMgXnsqttHwAxEW4a7-Rx-nmSwpJd_Dt1iCcFOvzDwbzdA@mail.gmail.com>
- <CAD=FV=VjN6Xam-nRRcxvOoN-gokU6DbGVjoPXN_fkTJssH1RWA@mail.gmail.com>
- <20140828093505.GC14650@leverpostej>
- <CAPz6YkUZkqgEBsPtX0uGpU+OzF5qdv1hGMXLo4iThUv-7B-Jbw@mail.gmail.com>
- <20140829100414.GA19424@leverpostej>
- <CAPz6YkVv1nbEumt9Q8gHAWddmECOm7DL=WLWfZKxBmzTfLQ00A@mail.gmail.com>
-Message-ID: <20140904174840.GB14822@e102568-lin.cambridge.arm.com>
+From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
+Date: Thu, 04 Sep 2014 19:08:12 +0100
+Subject: [PATCH] pinctrl: st: Add remove function and remove gpio_chip
+ on failure
+In-Reply-To: <1409409935-8775-1-git-send-email-pramod.gurav@smartplayin.com>
+References: <1409409935-8775-1-git-send-email-pramod.gurav@smartplayin.com>
+Message-ID: <5408AA8C.7040100@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 04, 2014 at 06:01:27PM +0100, Sonny Rao wrote:
+Pramod,
+sorry for delay in reply as I was travelling, still in Jet lag.
+> Signed-off-by: Pramod Gurav <pramod.gurav@smartplayin.com>
+> ---
+>   drivers/pinctrl/pinctrl-st.c |   25 +++++++++++++++++++++++++
+>   1 files changed, 25 insertions(+), 0 deletions(-)
+>
+> diff --git a/drivers/pinctrl/pinctrl-st.c b/drivers/pinctrl/pinctrl-st.c
+> index 5475374..9296845 100644
+> --- a/drivers/pinctrl/pinctrl-st.c
+> +++ b/drivers/pinctrl/pinctrl-st.c
+> @@ -1517,6 +1517,7 @@ static int st_gpiolib_register_bank(struct st_pinctrl *info,
+>   					   0, handle_simple_irq,
+>   					   IRQ_TYPE_LEVEL_LOW);
+>   		if (err) {
+> +			gpiochip_remove(&bank->gpio_chip);
+This change-set looks good.
+IMO, you can send a patch for this change set.
 
-[...]
+>   			dev_info(dev, "could not add irqchip\n");
+>   			return err;
+>   		}
+> @@ -1685,6 +1686,29 @@ static int st_pctl_probe(struct platform_device *pdev)
+>   	return 0;
+>   }
+>
 
-> > If an OS is booted at PL2 it can access the physical counters, and
-> > should do so in case something like KVM will be used later. The OS can
-> > write to CNTVOFF at PL2, and if it sets CNTVOFF to zero the physical and
-> > virtual counters are equivalent. Thus it can use the virtual counters
-> > and doesn't need to have additional code in several places (including
-> > the VDSO) where it needs to choose to read which counters to read.
-> >
-> > The problem only exists where PL2 exists and the firmware/bootloader
-> > skipped PL2 without initialising the necessary PL2 state. This is in
-> > general a stupid thing to do; it introduces a problem that need not
-> > exist and throws away the option of using the features PL2 provides.
-> > This is a firmware/bootloader bug.
-> 
-> Well it's not quite that simple, this is actually an issue with the
-> hardware that the CNTVOFF comes up with different values on different
-> cores.  This happens not only at boot, but any time the core is
-> powered on, which could include deep sleep or CPU hotplug and suspend
-> to ram.  The firmware may not be involved in all these cases, so we
-> cannot rely on it to fix this problem.
+> +static int st_pctl_remove(struct platform_device *pdev)
+> +{
+Ideally this driver will not be removed, as other drivers depend on 
+this, even the serial.
 
-And why isn't firmware involved in those cases if it _is_ involved in
-cold boot ? Resuming from low-power means resuming the machine/core as it
-was when it was running before power down, anything that deviates from that
-behaviour is a programming bug.
+so I see no big achievement in adding the remove functionality, as this 
+is going to be a dead code and would never be tested.
 
-Lorenzo
+> +	struct st_pinctrl *info = platform_get_drvdata(pdev);
+> +	struct device_node *np = pdev->dev.of_node;
+> +	struct device_node *child;
+> +	struct gpio_chip gpio_chip;
+> +	int bank = 0;
+> +
+
+> +	if (info->nbanks) {
+> +		for_each_child_of_node(np, child) {
+> +			if (of_property_read_bool(child, "gpio-controller")) {
+We should not re-parse the DT nodes once we are done with it in the probe.
+
+> +				gpio_chip = info->banks[bank].gpio_chip;
+> +				gpiochip_remove(&gpio_chip);
+> +				bank++;
+> +			}
+> +		}
+> +	}
+> +
+
+I think the logic is very simple:
+
+	while (nbanks--)
+		gpiochip_remove(&info->banks[bank++].gpio_chip))
+
+
+thanks,
+srini
+> +	pinctrl_unregister(info->pctl);
+> +
+> +	return 0;
+> +}
+> +
+>   static struct platform_driver st_pctl_driver = {
+>   	.driver = {
+>   		.name = "st-pinctrl",
+> @@ -1692,6 +1716,7 @@ static struct platform_driver st_pctl_driver = {
+>   		.of_match_table = st_pctl_of_match,
+>   	},
+>   	.probe = st_pctl_probe,
+> +	.remove = st_pctl_remove,
+>   };
+>
+>   static int __init st_pctl_init(void)
+>
