@@ -1,29 +1,39 @@
-From: peter.maydell@linaro.org (Peter Maydell)
-Date: Thu, 4 Sep 2014 09:33:43 +0100
-Subject: [SMP BUG?] the return value of is_smp() is bug?
-In-Reply-To: <5407BCAE.7030606@huawei.com>
-References: <1409550563-92081-1-git-send-email-long.wanglong@huawei.com>
- <540443DA.7030502@huawei.com> <25226905.0IHWyHSRxb@wuerfel>
- <5407BCAE.7030606@huawei.com>
-Message-ID: <CAFEAcA82zX-yodXYB+4vVrjq7tVe=wV4v3iCQ7O1a1HLFX_B1w@mail.gmail.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Thu, 4 Sep 2014 10:40:11 +0200
+Subject: [PATCH 00/15] PM / Domains: Cleanups and remove superfluous APIs
+In-Reply-To: <1409741551-16437-1-git-send-email-ulf.hansson@linaro.org>
+References: <1409741551-16437-1-git-send-email-ulf.hansson@linaro.org>
+Message-ID: <CAMuHMdXmfG_bpzX3HrtZPB5nV2n7UPwxGJqdpjJBqWNSnBe-Pw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4 September 2014 02:13, long.wanglong <long.wanglong@huawei.com> wrote:
-> When i revert the commit bc41b8724f24, the secondary core can boot.
-> The problem is that qemu doesn't provide emulation of the SCU base
-> address register. When reading the SCU base, qemu just return 0.
+Hi Ulf,
 
-You need to upgrade your QEMU -- we improved the emulation
-of all our Cortex-A9 boards to make sure they set valid values
-for the base address register, in order to fix exactly this regression.
-QEMU 2.0 or later should work.
+On Wed, Sep 3, 2014 at 12:52 PM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
+> This patchset has a bit of a history and some parts of it has been posted
+> earlier.
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2014-June/262725.html
+>
+> The intent is to simplify code for the generic power domain and also some of
+> the machine specific code that uses the generic power domain.
+>
+> Do note, there are dependencies through this patchset, especially related to
+> the ARM SoC changes, thus they all need to be kept together.
 
-(As an aside, I think the Aegis quirk test is pretty ugly:
-"base address happens to be set to zero" is not exactly
-a very reliable way to identify a particular SoC. However
-in this case QEMU was emulating real h/w insufficiently
-accurately, so we fixed it.)
+Thanks for your patch series!
 
-thanks
--- PMM
+I gave this series (on top of "[PATCH v2 0/9] PM / Domains: Generic OF-based
+support", with one minor conflict) a quick run on r8a7791/koelsch-reference,
+r8a7740/armadillo-legacy, and r8a7740/armadillo-multiplatform.
+Everything looks fine.
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
