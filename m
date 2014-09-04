@@ -1,116 +1,234 @@
-From: marex@denx.de (Marek Vasut)
-Date: Thu, 4 Sep 2014 16:38:45 +0200
-Subject: [PATCH v7 1/2] i2c: imx: add DMA support for freescale i2c driver
-In-Reply-To: <1407923215-3749-2-git-send-email-yao.yuan@freescale.com>
-References: <1407923215-3749-1-git-send-email-yao.yuan@freescale.com>
- <1407923215-3749-2-git-send-email-yao.yuan@freescale.com>
-Message-ID: <201409041638.45537.marex@denx.de>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Thu, 04 Sep 2014 23:29:15 +0800
+Subject: [PATCH v3 09/17] ARM64 / ACPI: Parse MADT for SMP initialization
+In-Reply-To: <20140903172138.GG1824@e102568-lin.cambridge.arm.com>
+References: <1409583475-6978-1-git-send-email-hanjun.guo@linaro.org>
+ <1409583475-6978-10-git-send-email-hanjun.guo@linaro.org>
+ <20140903172138.GG1824@e102568-lin.cambridge.arm.com>
+Message-ID: <5408854B.9010703@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, August 13, 2014 at 11:46:54 AM, Yuan Yao wrote:
-> Add dma support for i2c. This function depend on DMA driver.
-> You can turn on it by write both the dmas and dma-name properties in dts
-> node. DMA is optional, even DMA request unsuccessfully, i2c can also work
-> well.
-> 
-> Signed-off-by: Yuan Yao <yao.yuan@freescale.com>
+Hi Lorenzo,
 
+On 2014?09?04? 01:21, Lorenzo Pieralisi wrote:
+> On Mon, Sep 01, 2014 at 03:57:47PM +0100, Hanjun Guo wrote:
+>> MADT contains the information for MPIDR which is essential for
+>> SMP initialization, parse the GIC cpu interface structures to
+>> get the MPIDR value and map it to cpu_logical_map(), and add
+>> enabled cpu with valid MPIDR into cpu_possible_map.
+>>
+>> ACPI 5.1 only has two explicit methods to boot up SMP, PSCI and
+>> Parking protocol, but the Parking protocol is only specified for
+>> ARMv7 now, so make PSCI as the only way for the SMP boot protocol
+>> before some updates for the ACPI spec or the Parking protocol spec.
 [...]
+>>  int acpi_noirq;			/* skip ACPI IRQ initialization */
+>>  int acpi_disabled;
+>>  EXPORT_SYMBOL(acpi_disabled);
+>> @@ -31,6 +35,8 @@ EXPORT_SYMBOL(acpi_disabled);
+>>  int acpi_pci_disabled;		/* skip ACPI PCI scan and IRQ initialization */
+>>  EXPORT_SYMBOL(acpi_pci_disabled);
+>>  
+>> +static int enabled_cpus;	/* Processors (GICC) with enabled flag in MADT */
+> Will this be ever different from (num_possible_cpus() - 1) ?
 
-> +/* Enable DMA if transfer byte size is bigger than this threshold.
-> + * As the hardware request, it must bigger than 4.
+Yes, num_possible_cpus() will much more than enabled cpus
+in MADT, when ACPI based CPU hot plug is introduced, you can refer
+to the code in x86.
 
-The comment is unclear, just by reading it, I have no clue what are the units 
-for this value. I can guess those would be bytes, but it would be a good idea
-to be explicit.
+>
+>> +
+>>  /*
+>>   * __acpi_map_table() will be called before page_init(), so early_ioremap()
+>>   * or early_memremap() should be called here to for ACPI table mapping.
+>> @@ -51,6 +57,144 @@ void __init __acpi_unmap_table(char *map, unsigned long size)
+>>  	early_memunmap(map, size);
+>>  }
+>>  
+>> +/**
+>> + * acpi_map_gic_cpu_interface - generates a logical cpu number
+>> + * and map to MPIDR represented by GICC structure
+>> + * @mpidr: CPU's hardware id to register, MPIDR represented in MADT
+>> + * @enabled: this cpu is enabled or not
+>> + *
+>> + * Returns the logical cpu number which maps to MPIDR
+>> + */
+>> +static int acpi_map_gic_cpu_interface(u64 mpidr, u8 enabled)
+>> +{
+>> +	int cpu;
+>> +
+>> +	if (mpidr == INVALID_HWID) {
+>> +		pr_info("Skip invalid cpu hardware ID\n");
+>> +		return -EINVAL;
+>> +	}
+>> +
+>> +	total_cpus++;
+> What's this used for ?
 
-Also, wasn't kernel comment style starting with leading /* , with the text 
-starting only on the next line ?
+It is for all the CPU entries in MADT table, it is used to let
+people know how many CPUs in MADT (enabled and disabled).
 
-> + */
-> +#define IMX_I2C_DMA_THRESHOLD	16
-> +#define IMX_I2C_DMA_TIMEOUT	1000
-> +
+>
+>> +	if (!enabled)
+>> +		return -EINVAL;
+>> +
+>> +	if (enabled_cpus >=  NR_CPUS) {
+>> +		pr_warn("NR_CPUS limit of %d reached, Processor %d/0x%llx ignored.\n",
+>> +			NR_CPUS, total_cpus, mpidr);
+>> +		return -EINVAL;
+>> +	}
+>> +
+>> +	/* No need to check duplicate MPIDRs for the first CPU */
+>> +	if (enabled_cpus) {
+>> +		/*
+>> +		 * Duplicate MPIDRs are a recipe for disaster. Scan
+>> +		 * all initialized entries and check for
+>> +		 * duplicates. If any is found just ignore the CPU.
+>> +		 */
+>> +		for_each_possible_cpu(cpu) {
+>> +			if (cpu_logical_map(cpu) == mpidr) {
+>> +				pr_err("Firmware bug, duplicate CPU MPIDR: 0x%llx in MADT\n",
+>> +				mpidr);
+>> +				return -EINVAL;
+>> +			}
+>> +		}
+>> +	} else {
+>> +		/* Fist GICC entry must be BSP as ACPI spec said */
+> s/Fist/First/
+>
+>> +		if  (cpu_logical_map(0) != mpidr) {
+>> +			pr_err("First GICC entry is not BSP for MPIDR 0x%llx\n",
+>> +			       mpidr);
+>> +			return -EINVAL;
+>> +		}
+> Interesting, this means that if I want to change the boot CPU I have to
+> recompile the ACPI tables. Is that really true ?
 
-[...]
+No, you needn't. there is a logic problem here, we just need to print
+some message here and continue, OS will still ok with that.
 
-> +static int i2c_imx_dma_write(struct imx_i2c_struct *i2c_imx,
-> +					struct i2c_msg *msgs)
-> +{
-> +	int result;
-> +	unsigned int temp = 0;
-> +	unsigned long orig_jiffies = jiffies;
-> +	struct imx_i2c_dma *dma = i2c_imx->dma;
-> +	struct device *dev = &i2c_imx->adapter.dev;
-> +
-> +	dev_dbg(dev, "<%s> write slave address: addr=0x%x\n",
-> +		__func__, msgs->addr << 1);
-> +
-> +	reinit_completion(&i2c_imx->dma->cmd_complete);
-> +	dma->chan_using = dma->chan_tx;
-> +	dma->dma_transfer_dir = DMA_MEM_TO_DEV;
-> +	dma->dma_data_dir = DMA_TO_DEVICE;
-> +	dma->dma_len = msgs->len - 1;
-> +	result = i2c_imx_dma_xfer(i2c_imx, msgs);
-> +	if (result)
-> +		return result;
-> +
-> +	temp = imx_i2c_read_reg(i2c_imx, IMX_I2C_I2CR);
-> +	temp |= I2CR_DMAEN;
-> +	imx_i2c_write_reg(temp, i2c_imx, IMX_I2C_I2CR);
-> +
-> +	/*
-> +	 * Write slave address.
-> +	 * The first byte muse be transmitted by the CPU.
-> +	 */
-> +	imx_i2c_write_reg(msgs->addr << 1, i2c_imx, IMX_I2C_I2DR);
-> +	result = wait_for_completion_interruptible_timeout(
-> +				&i2c_imx->dma->cmd_complete,
-> +				msecs_to_jiffies(IMX_I2C_DMA_TIMEOUT));
-> +	if (result <= 0) {
-> +		dmaengine_terminate_all(dma->chan_using);
-> +		if (result)
-> +			return result;
-> +		else
-> +			return -ETIMEDOUT;
+>
+>> +	}
+>> +
+>> +	/* allocate a logical cpu id for the new comer */
+>> +	if (cpu_logical_map(0) == mpidr) {
+>> +		/*
+>> +		 * boot_cpu_init() already hold bit 0 in cpu_present_mask
+>> +		 * for BSP, no need to allocate again.
+>> +		 */
+>> +		cpu = 0;
+>> +	} else {
+>> +		cpu = cpumask_next_zero(-1, cpu_possible_mask);
+>> +	}
+> You may use a ternary operator, more compact and clearer.
+>
+> BTW you seem to be contradicting yourself. On one hand you keep a
+> counter for enabled_cpus, and then use cpu_possible_mask to allocate
+> a logical cpu id. Make a decision, either you use a counter or you
+> use cpu_possible_mask and its bitweight.
 
-Shouldn't you force-disable the DMA here somehow (like unsetting I2CR_DMAEN 
-bit), if it failed or timed out?
+ok.
 
-> +	}
-> +
-> +	/* Waiting for Transfer complete. */
-> +	while (1) {
-> +		temp = imx_i2c_read_reg(i2c_imx, IMX_I2C_I2SR);
-> +		if (temp & I2SR_ICF)
-> +			break;
-> +		if (time_after(jiffies, orig_jiffies +
-> +				msecs_to_jiffies(IMX_I2C_DMA_TIMEOUT))) {
-> +			dev_dbg(&i2c_imx->adapter.dev, "<%s> Timeout\n",
-> +				__func__);
-> +			return -ETIMEDOUT;
-> +		}
-> +		schedule();
-> +	}
-> +
-> +	temp = imx_i2c_read_reg(i2c_imx, IMX_I2C_I2CR);
-> +	temp &= ~I2CR_DMAEN;
-> +	imx_i2c_write_reg(temp, i2c_imx, IMX_I2C_I2CR);
-> +
-> +	/* The last data byte must be transferred by the CPU. */
-> +	imx_i2c_write_reg(msgs->buf[msgs->len-1],
-> +				i2c_imx, IMX_I2C_I2DR);
-> +	result = i2c_imx_trx_complete(i2c_imx);
-> +	if (result)
-> +		return result;
-> +
-> +	result = i2c_imx_acked(i2c_imx);
-> +	if (result)
-> +		return result;
-> +
-> +	return 0;
-> +}
-[...]
+>
+>> +	/*
+>> +	 * ACPI 5.1 only has two explicit methods to boot up SMP,
+>> +	 * PSCI and Parking protocol, but the Parking protocol is
+>> +	 * only specified for ARMv7 now, so make PSCI as the only
+>> +	 * way for the SMP boot protocol before some updates for
+>> +	 * the ACPI spec or the Parking protocol spec.
+>> +	 */
+>> +	if (!acpi_psci_present()) {
+>> +		pr_warn("CPU %d has no PSCI support, will not boot\n", cpu);
+>> +		return -EOPNOTSUPP;
+>> +	}
+> This check really does not belong here. You do not even start parsing the gic
+> cpu interfaces if psci is missing or I am missing something myself. Anyway,
+> this check must not be in this function.
 
-Thanks!
+I agree with you, i will update the patch.
+
+>
+>> +
+>> +	/* Get cpu_ops include the boot CPU */
+>> +	cpu_ops[cpu] = cpu_get_ops("psci");
+>> +	if (!cpu_ops[cpu])
+>> +		return -EINVAL;
+>> +
+>> +	/* CPU 0 was already initialized */
+>> +	if (cpu) {
+>> +		if (cpu_ops[cpu]->cpu_init(NULL, cpu))
+>> +			return -EOPNOTSUPP;
+>> +
+>> +		/* map the logical cpu id to cpu MPIDR */
+>> +		cpu_logical_map(cpu) = mpidr;
+>> +
+>> +		set_cpu_possible(cpu, true);
+>> +	}
+>> +
+>> +	enabled_cpus++;
+> See above to me enabled_cpus and (num_possible_cpus() - 1)  are identical.
+
+I think I need to remove all the CPU hotplug related code and make this function
+as simple as possible and introduce them when needed.
+
+>
+>> +	return cpu;
+>> +}
+>> +
+>> +static int __init
+>> +acpi_parse_gic_cpu_interface(struct acpi_subtable_header *header,
+>> +				const unsigned long end)
+>> +{
+>> +	struct acpi_madt_generic_interrupt *processor;
+>> +
+>> +	processor = (struct acpi_madt_generic_interrupt *)header;
+>> +
+>> +	if (BAD_MADT_ENTRY(processor, end))
+>> +		return -EINVAL;
+>> +
+>> +	acpi_table_print_madt_entry(header);
+>> +
+>> +	acpi_map_gic_cpu_interface(processor->arm_mpidr,
+>> +		processor->flags & ACPI_MADT_ENABLED);
+> Ehm. You must check the return value here right (and return an error if
+> that's an error, otherwise the count value below can be botched ?!).
+>
+> Or you do not consider a parsing error as an error and want to keep
+> parsing remaining GIC CPU IF entries ?
+
+yes, this is my intension. we can skip the error ones and boot
+other CPUs which have no errors.
+
+>
+>> +
+>> +	return 0;
+>> +}
+>> +
+>> +/* Parse GIC cpu interface entries in MADT for SMP init */
+>> +void __init acpi_smp_init_cpus(void)
+>> +{
+>> +	int count;
+>> +
+>> +	/*
+>> +	 * do a partial walk of MADT to determine how many CPUs
+>> +	 * we have including disabled CPUs, and get information
+>> +	 * we need for SMP init
+>> +	 */
+>> +	count = acpi_table_parse_madt(ACPI_MADT_TYPE_GENERIC_INTERRUPT,
+>> +			acpi_parse_gic_cpu_interface,
+>> +			ACPI_MAX_GIC_CPU_INTERFACE_ENTRIES);
+>> +
+>> +	if (!count) {
+>> +		pr_err("No GIC CPU interface entries present\n");
+>> +		return;
+>> +	} else if (count < 0) {
+>> +		pr_err("Error parsing GIC CPU interface entry\n");
+>> +		return;
+>> +	}
+> What would you consider an error ? A single GIC CPU IF entry error ?
+
+could you please explain it in detail? I can't catch up with you, my apologizes.
+
+Thanks
+Hanjun
