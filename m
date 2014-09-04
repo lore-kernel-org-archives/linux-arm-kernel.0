@@ -1,59 +1,52 @@
-From: lznuaa@gmail.com (Zhi Li)
-Date: Wed, 3 Sep 2014 22:41:37 -0500
-Subject: [Patch net-next 04/11] net:fec: add multiqueue support
-In-Reply-To: <540787B9.8090504@gmail.com>
-References: <1409776697-1536-1-git-send-email-Frank.Li@freescale.com>
- <1409776697-1536-5-git-send-email-Frank.Li@freescale.com>
- <540787B9.8090504@gmail.com>
-Message-ID: <CAHrpEqRSGg9=B8nk-PFkayP1kN8eQ5UnBvjikR5svub-wD-d6w@mail.gmail.com>
+From: xiakaixu@huawei.com (xiakaixu)
+Date: Thu, 4 Sep 2014 11:46:30 +0800
+Subject: [PATCH] ARM: cns3xxx: fix allmodconfig panic in pci driver
+In-Reply-To: <2886818.zPBP0DOepO@wuerfel>
+References: <kaixu.xia@linaro.org>
+ <1409750292-24105-1-git-send-email-kaixu.xia@linaro.org>
+ <2886818.zPBP0DOepO@wuerfel>
+Message-ID: <5407E096.5000005@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 3, 2014 at 4:27 PM, Florian Fainelli <f.fainelli@gmail.com> wrote:
-> On 09/03/2014 01:38 PM, Frank Li wrote:
->> From: Fugang Duan <B38611@freescale.com>
+? 2014/9/3 21:27, Arnd Bergmann ??:
+> On Wednesday 03 September 2014 21:18:12 Xia Kaixu wrote:
+>> From: Xia Kaixu <kaixu.xia@linaro.org>
 >>
->> Add multiqueue support, which is compatible with previous single queue
->> driver for FEC/ENET IPs.
+>> The kernel panic occurs when running an allmodconfig kernel on 
+>> OMAP4460. The inicall "cns3xxx_pcie_init" does not check which
+>> hardware it's running on and just tries to access to its specific 
+>> registers. Now call it from .init_late callback from the two
+>> machine descriptors.
 >>
->> By default, the tx/rx queue number is 1, user can config the queue number
->> at DTS file like this:
->>       fsl,num_tx_queues=<3>;
->>       fsl,num_rx_queues=<3>;
->>
->> Ethernet multiqueue mechanism can improve performance in SMP system.
->> For single hw queue, multiqueue can balance cpu loading.
->> For multi hw queues, multiple cores can process network packets in parallel,
->> and refer the article for the detail advantage for multiqueue:
->> http://vger.kernel.org/~davem/davem_nyc09.pdf
->
-> You should probably split that patch in a minimum of two, or more
-> different parts.
->
-> Two parts:
->
-> - add TX multiqueue support
-> - add RX multiqueue support
->
+>> Signed-off-by: Xia Kaixu <kaixu.xia@linaro.org>
+>> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+>> Cc: Anton Vorontsov <anton@enomsg.org>
+>> Cc: Felix Fietkau <nbd@openwrt.org>
+>> Cc: Imre Kaloz <kaloz@openwrt.org>
+>> Cc: linaro-kernel at lists.linaro.org
+>> Cc: linux-arm-kernel at lists.infradead.org
+> 
+> Hi Kaixu,
+> 
+> it seems this time all the Cc's worked. One thing I just noticed is that
+> you confused the 'Signed-off-by' lines. I did look at the patch earlier
+> before you sent it out but unfortunately missed that.
+> 
+> You can read again in Documentation/SubmittingPatches about how
+> they work, but the short version is that you must never put someone
+> else's name in Signed-off-by under a patch you write yourself.
+> When we apply the patch, I (or whoever else does) will put that
+> line below yours to document who handled the patch.
 
-I understood your concern.
-We also need consider logical integration.
-
-Separate this patch just reduce changed lines in a patch.
-Most of this patch change is from fep-> to txq-> or rxq->
-
-best regards
-Frank Li
-
-> More parts:
->
-> - prepare for TX multiqueue (introduce queue structure, definitions)
-> - transition TX path to use queue 0
-> - add support for the two other TX queues
-> - prepare for RX multiqueue (introduce queue structure, definitions)
-> - prepare for multiqueue, hardcode RX path to use queue 0
-> - add support for the two other RX queues
->
-> The number of changes are extremely hard to review...
-> --
-> Florian
+  Sure, you are right. Thanks for the reminder!
+> 
+> Otherwise, the patch looks good to me, thanks a lot for doing it.
+> 
+> 	Arnd
+> 
+> _______________________________________________
+> linaro-kernel mailing list
+> linaro-kernel at lists.linaro.org
+> http://lists.linaro.org/mailman/listinfo/linaro-kernel
+> 
