@@ -1,70 +1,55 @@
-From: kiran.padwal@smartplayin.com (kiran.padwal at smartplayin.com)
-Date: Thu, 4 Sep 2014 06:11:30 -0400 (EDT)
-Subject: =?utf-8?Q?RE=3A_=5BPATCH_v2_4=2F4=5D_clk=3A_Use_ww=5Fmutexes_for_clk=5Fpr?=
- =?utf-8?Q?epare=5F=7Block=2Funlock=7D?=
-In-Reply-To: <1409792466-5092-5-git-send-email-sboyd@codeaurora.org>
-References: <1409792466-5092-1-git-send-email-sboyd@codeaurora.org>
- <1409792466-5092-5-git-send-email-sboyd@codeaurora.org>
-Message-ID: <1409825490.812215098@apps.rackspace.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 04 Sep 2014 12:14:58 +0200
+Subject: [PATCH v3 13/17] ARM64 / ACPI: Add GICv2 specific ACPI boot
+ support
+In-Reply-To: <54083A94.2040105@linaro.org>
+References: <1409583475-6978-1-git-send-email-hanjun.guo@linaro.org>
+ <2893693.4bZJXXENof@wuerfel> <54083A94.2040105@linaro.org>
+Message-ID: <3046890.jAXAYeBPWQ@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stephen,
+On Thursday 04 September 2014 12:10:28 Tomasz Nowicki wrote:
+> On 03.09.2014 20:42, Arnd Bergmann wrote:
+> > On Monday 01 September 2014 22:57:51 Hanjun Guo wrote:
+> >> +       /* Collect CPU base addresses */
+> >> +       count = acpi_parse_entries(sizeof(struct acpi_table_madt),
+> >> +                                  gic_acpi_parse_madt_cpu, table,
+> >> +                                  ACPI_MADT_TYPE_GENERIC_INTERRUPT,
+> >> +                                  ACPI_MAX_GIC_CPU_INTERFACE_ENTRIES);
+> >> +       if (count < 0) {
+> >> +               pr_err("Error during GICC entries parsing\n");
+> >> +               return -EFAULT;
+> >> +       } else if (!count) {
+> >> +               /* No GICC entries provided, use address from MADT header */
+> >> +               struct acpi_table_madt *madt = (struct acpi_table_madt *)table;
+> >> +
+> >> +               if (!madt->address)
+> >> +                       return -EFAULT;
+> >> +
+> >> +               cpu_phy_base = (u64)madt->address;
+> >> +       }
+> >
+> > After I read through ACPI-5.1 section 5.2.12.14, I wonder if this is the
+> > best way to treat a missing ACPI_MADT_TYPE_GENERIC_INTERRUPT table.
+> >
+> > Do we expect to see those in practice? It seems like using the x86 local
+> > APIC address as a fallback for the GIC address is not something we
+> > should do unless we absolutely have to support a system that doesn't
+> > have the GIC table.
+> 
+> No, we do not expect and hopefully there will be no such 
+> 
+> But, we are trying to be as much as possible inline with 5.1 spec, 
+> 5.2.12.14 says:
+> [...]
+> If provided here (CPU physical base address), the "Local Interrupt 
+> Controller Address" field in the MADT must be ignored by the OSPM.
+> [...]
+> 
 
-On Wednesday, September 3, 2014 9:01pm, "Stephen Boyd" <sboyd@codeaurora.org> said:
+Yes, that's what I saw. So ignoring it all the time is fine, right?
+Presumably the madt->address field is only referenced here because
+some pre-5.1 implementations used to do that.
 
-> Changing the rate of a "slow" clock can take 10s of milliseconds
-> while changing the rate of a "fast" clock can be done in a few
-
-<snip>
-
-> -static void clk_prepare_lock(void)
-> +static void __clk_unlock(struct list_head *list)
-> +{
-> +	struct clk *entry, *temp;
-> +
-> +	list_for_each_entry_safe (entry, temp, list, ww_list) {
-
-Checkpatch warning for above line,
-WARNING: space prohibited between function name and open parenthesis '('
-
-> +		list_del_init(&entry->ww_list);
-> +		ww_mutex_unlock(&entry->lock);
-> +	}
-> +}
-> +
-> +static void clk_unlock(struct list_head *list, struct ww_acquire_ctx *ctx)
-> +{
-
-<snip>
-
-> +	ww_acquire_init(ctx, &prepare_ww_class);
-> +	do {
-> +		ret = __clk_prepare_lock(clk, list, ctx);
-> +	} while (ret == -EDEADLK);
-> +	ww_acquire_done(ctx);
-> +}
-> +
-> +static int __clk_unprepare_lock(struct clk *clk, struct list_head *list,
-> +			         struct ww_acquire_ctx *ctx)
-
-Checkpatch error for above line,
-ERROR: code indent should use tabs where possible
-
-Best Regards,
-Kiran Padwal
-
-> +{
-> +	int ret;
-> +
-> +	do {
-> +		ret = clk_lock_one(clk, list, ctx);
-> +		if (ret == -EDEADLK)
-> +			return ret;
-> +
-> +		if (clk->prepare_count > 1)
-> +			break;
-> +	} while ((clk = clk->parent));
-> +
-> +	return 0;
-> +}
+	Arnd
