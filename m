@@ -1,99 +1,49 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 04 Sep 2014 16:05:53 +0200
-Subject: [PATCH] drivers: pci: convert generic host controller to DT host
- bridge creation API
-In-Reply-To: <20140904133956.GA12351@e102568-lin.cambridge.arm.com>
-References: <1407861695-25549-1-git-send-email-Liviu.Dudau@arm.com>
- <20140819120553.GA23128@arm.com>
- <20140904133956.GA12351@e102568-lin.cambridge.arm.com>
-Message-ID: <6930538.Get2YiuMvJ@wuerfel>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 4 Sep 2014 15:06:19 +0100
+Subject: [PATCH v4 4/8] arm: use fixmap for text patching when text is RO
+In-Reply-To: <CAGXu5jJJyLkw38VyZ6fuKf5k5EcQNf+Ke0G0=qZ+pc+CptvXmA@mail.gmail.com>
+References: <1407949593-16121-1-git-send-email-keescook@chromium.org>
+ <1407949593-16121-5-git-send-email-keescook@chromium.org>
+ <20140819122933.GI23128@arm.com>
+ <CAGXu5jLxqyfJtg8rR9nzOrSBSsRC6y34rG6mZ8bb=AoxbSHkWQ@mail.gmail.com>
+ <CAGXu5jJ890ruLO8Nit2exMSWigSM71kfZOkLoF0DcY1viFiX_A@mail.gmail.com>
+ <20140904092720.GA7156@arm.com>
+ <CAGXu5jJJyLkw38VyZ6fuKf5k5EcQNf+Ke0G0=qZ+pc+CptvXmA@mail.gmail.com>
+Message-ID: <20140904140619.GH7156@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 04 September 2014 14:39:56 Lorenzo Pieralisi wrote:
-> > > +   if (!res_valid) {
-> > > +           dev_err(dev, "non-prefetchable memory resource required\n");
-> > > +           return -EINVAL;
-> > > +   }
-> > > +
-> > > +   if (iores) {
-> > > +           if (!PAGE_ALIGNED(io_cpuaddr))
-> > > +                   return -EINVAL;
-> > 
-> > Why is this alignment check not in the core code? Probably a question for
-> > somebody like Arnd, but do we need to deal with multiple IO resources?
-> > Currently we'll just silently take the last one that we found, which doesn't
-> > sound ideal.
+On Thu, Sep 04, 2014 at 03:00:31PM +0100, Kees Cook wrote:
+> On Thu, Sep 4, 2014 at 2:27 AM, Will Deacon <will.deacon@arm.com> wrote:
+> > On Wed, Sep 03, 2014 at 10:43:58PM +0100, Kees Cook wrote:
+> >> On Wed, Aug 20, 2014 at 5:28 AM, Kees Cook <keescook@chromium.org> wrote:
+> >> > On Tue, Aug 19, 2014 at 7:29 AM, Will Deacon <will.deacon@arm.com> wrote:
+> >> >> On Wed, Aug 13, 2014 at 06:06:29PM +0100, Kees Cook wrote:
+> >> >>> +     set_fixmap(fixmap, page_to_phys(page));
+> >> >>
+> >> >> set_fixmap does TLB invalidation, right? I think that means it can block on
+> >> >> 11MPCore and A15 w/ the TLBI erratum, so it's not safe to call this with
+> >> >> interrupts disabled anyway.
+> >> >
+> >> > Oh right. Hrm.
+> >> >
+> >> > In an earlier version of this series set_fixmap did not perform TLB
+> >> > invalidation. I wonder if this is not needed at all? (Wouldn't that be
+> >> > nice...)
+> >>
+> >> As suspected, my tests fail spectacularly without the TLB flush.
+> >> Adding WARN_ON(!irqs_disabled()) doesn't warn, so I think we're safe
+> >> here. Should I leave the WARN_ON in place for clarity, or some other
+> >> comments?
+> >
+> > I thought there was a potential call to spin_lock_irqsave right before
+> > this TLB flush?
 > 
-> (1) Yes, the alignment check should be made in core code
+> I'm not sure I understand what you mean. Should I change something
+> here? It looks like irqs are disabled, so isn't this a safe code path?
 
-Makes sense. In theory we could support unaligned addresses (as long as
-the offset in the page is the same for virtual and physical), but I don't
-see why we should implement that unless some implementation absolutely
-requires it.
+My point was that it's not safe to call set_fixmap when interrupts are
+disabled, because it will try to flush the TLB, and this can lock-up on
+some CPUs where it needs to do something like smp_call_function.
 
-> (2) I could take the first IO resource and warn on multiple IO resources if
->     they are detected. Thoughts ?
-
-I think we should either warn, or be reasonably sure that it will work.
-Again, in theory this should work, but no sane hardware implementation
-would do it like that.
-
-> > > +           if (err)
-> > > +                   return err;
-> > > +   }
-> > > +
-> > > +   /* Parse and map our Configuration Space windows */
-> > > +   err = gen_pci_parse_map_cfg_windows(host);
-> > > +   if (err)
-> > > +           return err;
-> > > +
-> > > +   pci_add_flags(PCI_ENABLE_PROC_DOMAINS);
-> > > +   pci_add_flags(PCI_REASSIGN_ALL_BUS | PCI_REASSIGN_ALL_RSRC);
-> > 
-> > Why does this belong in the host controller driver and how does it interact
-> > with the probe-only property?
-> 
-> That's a very good question and it is one that confuses me too.
-> 
-> Current code in pci_common_init_dev() sets PCI_REASSIGN_ALL_RSRC behind
-> our backs silently. That flag has a side effect only if the probing code
-> detects PCI bridges in the list of devices, since PCI core probing code
-> will try to reassign the bus numbers upon PCI bridge detection IIUC. I do
-> not think that PCI_REASSIGN_ALL_BUS has any side effect on ARM (by grepping
-> around I noticed that PCI_REASSIGN_ALL_RSRC is used in
-> 
-> pcibios_assign_all_busses()
-> 
-> which in turn is triggered only if PCI bridges are detected, still grokking
-> the code though).
-
-Interesting point: the generic implementation should probably not default
-to reassigning all buses at all. We could have a (host controller specific,
-but with standardized name) DT property for it, but it would be best if
-firmware already probes it to not have to do it again.
-
-> Apart from the PCI_ENABLE_PROC_DOMAINS flag which I think it is safe to
-> set by default (but let me check that too),
-
-I think it should be enabled here, as no legacy machine will use this
-driver.
-
-> I *think* that setting of
-> 
-> PCI_REASSIGN_ALL_BUS and PCI_REASSIGN_ALL_RSRC
-> 
-> should be set by DT, as the probe-only flag is. At the moment this is not a
-> problem (well...) since:
-> 
-> (a) PCI_REASSIGN_ALL_RSRC is forced by pcibios on ARM
-> (b) it has no implications on the generic host controller since it is
->     run on kvmtools with no PCI bridge devices
-> 
-> If Bjorn or Arnd can help me understand the complete reasoning behind
-> those flags I would be very grateful and update code according to
-> Liviu's v10.
-
-I suspect they were just copied over to preserve the existing behavior.
-
-	Arnd
+Will
