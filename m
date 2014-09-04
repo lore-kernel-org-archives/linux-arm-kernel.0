@@ -1,87 +1,83 @@
-From: khilman@kernel.org (Kevin Hilman)
-Date: Thu, 04 Sep 2014 06:30:13 -0700
-Subject: [PATCH v9 4/6] ARM: Exynos: switch to using generic cpufreq
- driver for Exynos4210/5250/5420
-In-Reply-To: <CAJuA9aiXwgxrS_AYw5tt5GryhrtoOpK2RhhLcjxShNqswiCmqA@mail.gmail.com>
- (Thomas Abraham's message of "Thu, 4 Sep 2014 15:52:38 +0530")
-References: <1406707663-16656-1-git-send-email-thomas.ab@samsung.com>
- <1406707663-16656-5-git-send-email-thomas.ab@samsung.com>
- <53DA8BB9.6020702@samsung.com> <53DA8D85.3050106@gmail.com>
- <7hbnrc6px3.fsf@paris.lan> <53F7DA13.6090305@gmail.com>
- <CADWw7OgAS-z-UOrJU-hL2fzuefJmLtCTg57jYk2Df7f5KfLJmA@mail.gmail.com>
- <7h8umc60we.fsf@paris.lan>
- <CADWw7OgW+o3tB=ptnsy-PsmXmNv8oXzt_WfK6NswQiEWWwAzNA@mail.gmail.com>
- <CAGa+x85-Anb+HsSUQRaaeex19-HK+yZDW0UpFBwAtsQ8Sf2Aqg@mail.gmail.com>
- <CAGa+x86jU8MR=r_xuaiorbNNyqrezb0b6Ozy-MPg9HvsARESOw@mail.gmail.com>
- <CAJuA9ajtsrY7zSDMs=c6BZ0AqERoBgvq++dTF4Dn673zGMfcgQ@mail.gmail.com>
- <CAMAWPa-8h5PNhgT+ApBhA8p=i+4oFOnYnQsQ4mK1JKwwAhpvpQ@mail.gmail.com>
- <CAJuA9ah5M_pXRMXPB6o7JLhgVUHM7kYo9HOV6Yxv4Z=hKMdG=w@mail.gmail.com>
- <7hmwah6cop.fsf@paris.lan>
- <CAJuA9ahe=9gdTaGcRb69syvRfwkkGMgDiiNfOMA9TBo42cWVZw@mail.gmail.com>
- <CAJuA9ag2pybyLDUyW43wMQu4PA1cB4V9c1bc7WB3xjqzhqNGTw@mail.gmail.com>
- <7hsik847p2.fsf@paris.lan>
- <CAJuA9aiXwgxrS_AYw5tt5GryhrtoOpK2RhhLcjxShNqswiCmqA@mail.gmail.com>
-Message-ID: <7hfvg74ioq.fsf@paris.lan>
+From: nm@ti.com (Nishanth Menon)
+Date: Thu, 4 Sep 2014 08:33:37 -0500
+Subject: [PATCH 1/2] ARM: dts: dra7-evm: Fix spi1 mux documentation
+In-Reply-To: <1409837008-32144-2-git-send-email-nm@ti.com>
+References: <1409837008-32144-1-git-send-email-nm@ti.com>
+ <1409837008-32144-2-git-send-email-nm@ti.com>
+Message-ID: <20140904133337.GA4215@kahuna>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thomas Abraham <ta.omasab@gmail.com> writes:
+On 08:23-20140904, Nishanth Menon wrote:
+> While auditing the various pin ctrl configurations using the following
+> command:
+> grep PIN_ arch/arm/boot/dts/dra7-evm.dts|(while read line;
+> do
+> 	v=`echo "$line" | sed -e "s/\s\s*/|/g" | cut -d '|' -f1 |
+> 		cut -d 'x' -f2|tr [a-z] [A-Z]`;
+> 	HEX=`echo "obase=16;ibase=16;4A003400+$v"| bc`;
+> 	echo "$HEX ===> $line";
+> done)
+> against DRA75x/74x NDA TRM revision S(SPRUHI2S August 2014),
+> documentation errors were found for spi1 pinctrl. Fix the same.
+> 
+> Fixes: 6e58b8f1daaf1af340fb9309907e5ffa473c7aff ("ARM: dts: DRA7: Add
+> the dts files for dra7 SoC and dra7-evm board")
+^^^ uggh... apologies.. checkpatch slipped this one.. updated rev below
+(wont repost unless requested), Apologies on the spam..
+----8<----
+>From db595b941663f634f5f5106cf0092c7c8e998bb4 Mon Sep 17 00:00:00 2001
+From: Nishanth Menon <nm@ti.com>
+Date: Thu, 4 Sep 2014 08:06:27 -0500
+Subject: [PATCH V2 1/2] ARM: dts: dra7-evm: Fix spi1 mux documentation
 
-> On Thu, Sep 4, 2014 at 4:45 AM, Kevin Hilman <khilman@kernel.org> wrote:
->> Hi Thomas,
->>
->> Thomas Abraham <ta.omasab@gmail.com> writes:
->>
->> [...]
->>
->>> A new branch [1] has been created using commits from exynos5-v3.17-rc1
->>> branch + cpufreq + regulator + temp fixes. I have tested this branch
->>> on Exynos5800 Chromebook2 and cpufreq works fine with both ondemand
->>> and performance governors. Please let me know if there are any issues
->>> with this new branch. It is based on v3.17-rc3.
->>
->> Excellent!  Thank you.
->>
->> The only thing missing now is the CPUidle support for 5800, and all
->> that's needed for that is the compatible string patch[1] which Daniel
->> has queued up.
->>
->> With that patch, display + CPUidle + CPUfreq are working pretty well on
->> my exynos5800/chromebook2 with the big.LITTLE switcher disabled.  If I
->> turn on the switcher, it boots OK, but as soon as I try to run powertop
->> (upstream v2.6.1) it gets stuck.  Have you tried this branch with the
->> switcher enabled?
->
-> Yes, I have tested switcher + cpufreq + cpuidle with this branch and
-> there are no issues found. I haven't tested with powertop yet. I will
-> try and do that and let you know the result.
->
-> You mentioned that when you run powertop, it gets stuck. When that
-> happens, is there any log on the console or does system just turn
-> unresponsive?
+While auditing the various pin ctrl configurations using the following
+command:
+grep PIN_ arch/arm/boot/dts/dra7-evm.dts|(while read line;
+do
+	v=`echo "$line" | sed -e "s/\s\s*/|/g" | cut -d '|' -f1 |
+		cut -d 'x' -f2|tr [a-z] [A-Z]`;
+	HEX=`echo "obase=16;ibase=16;4A003400+$v"| bc`;
+	echo "$HEX ===> $line";
+done)
+against DRA75x/74x NDA TRM revision S(SPRUHI2S August 2014),
+documentation errors were found for spi1 pinctrl. Fix the same.
 
-The console is not responsive, but kernel seems busy because I see
-periodic timeout messages from the samsung clock driver.
+Fixes: 6e58b8f1daaf1af ("ARM: dts: DRA7: Add the dts files for dra7 SoC and dra7-evm board")
+Signed-off-by: Nishanth Menon <nm@ti.com>
+---
+ arch/arm/boot/dts/dra7-evm.dts |   14 +++++++-------
+ 1 file changed, 7 insertions(+), 7 deletions(-)
 
-Note that I see these messages when things are functioning normally
-also.
+diff --git a/arch/arm/boot/dts/dra7-evm.dts b/arch/arm/boot/dts/dra7-evm.dts
+index 50f8022..e120fca 100644
+--- a/arch/arm/boot/dts/dra7-evm.dts
++++ b/arch/arm/boot/dts/dra7-evm.dts
+@@ -50,13 +50,13 @@
+ 
+ 	mcspi1_pins: pinmux_mcspi1_pins {
+ 		pinctrl-single,pins = <
+-			0x3a4 (PIN_INPUT | MUX_MODE0) /* spi2_clk */
+-			0x3a8 (PIN_INPUT | MUX_MODE0) /* spi2_d1 */
+-			0x3ac (PIN_INPUT | MUX_MODE0) /* spi2_d0 */
+-			0x3b0 (PIN_INPUT_SLEW | MUX_MODE0) /* spi2_cs0 */
+-			0x3b4 (PIN_INPUT_SLEW | MUX_MODE0) /* spi2_cs1 */
+-			0x3b8 (PIN_INPUT_SLEW | MUX_MODE6) /* spi2_cs2 */
+-			0x3bc (PIN_INPUT_SLEW | MUX_MODE6) /* spi2_cs3 */
++			0x3a4 (PIN_INPUT | MUX_MODE0) /* spi1_sclk */
++			0x3a8 (PIN_INPUT | MUX_MODE0) /* spi1_d1 */
++			0x3ac (PIN_INPUT | MUX_MODE0) /* spi1_d0 */
++			0x3b0 (PIN_INPUT_SLEW | MUX_MODE0) /* spi1_cs0 */
++			0x3b4 (PIN_INPUT_SLEW | MUX_MODE0) /* spi1_cs1 */
++			0x3b8 (PIN_INPUT_SLEW | MUX_MODE6) /* spi1_cs2.hdmi1_hpd */
++			0x3bc (PIN_INPUT_SLEW | MUX_MODE6) /* spi1_cs3.hdmi1_cec */
+ 		>;
+ 	};
+ 
+-- 
+1.7.9.5
 
-Kevin
 
-
-[1]
-[  337.832031] wait_until_divider_stable: timeout in divider stablization
-[  337.847024] wait_until_divider_stable: timeout in divider stablization
-[  337.862024] wait_until_divider_stable: timeout in divider stablization
-[  337.957028] wait_until_divider_stable: timeout in divider stablization
-[  337.972024] wait_until_divider_stable: timeout in divider stablization
-[  337.987024] wait_until_divider_stable: timeout in divider stablization
-[  340.082029] wait_until_divider_stable: timeout in divider stablization
-[  340.097024] wait_until_divider_stable: timeout in divider stablization
-[  340.112024] wait_until_divider_stable: timeout in divider stablization
-[  346.242030] wait_until_divider_stable: timeout in divider stablization
-[  346.257024] wait_until_divider_stable: timeout in divider stablization
-[  346.272024] wait_until_divider_stable: timeout in divider stablization
-[  348.322029] wait_until_divider_stable: timeout in divider stablization
-[  348.337025] wait_until_divider_stable: timeout in divider stablization
-[  348.352024] wait_until_divider_stable: timeout in divider stablization
+-- 
+Regards,
+Nishanth Menon
