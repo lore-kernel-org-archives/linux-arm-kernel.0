@@ -1,90 +1,49 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Thu, 4 Sep 2014 08:23:28 -0500
-Subject: [PATCH 2/2] ARM: dts: dra7-evm: Add vtt regulator support
-In-Reply-To: <1409837008-32144-1-git-send-email-nm@ti.com>
-References: <1409837008-32144-1-git-send-email-nm@ti.com>
-Message-ID: <1409837008-32144-3-git-send-email-nm@ti.com>
+From: bhelgaas@google.com (Bjorn Helgaas)
+Date: Thu, 4 Sep 2014 07:24:34 -0600
+Subject: [PATCH 2/2] PCI: Layerscape: Add Layerscape PCIe driver
+In-Reply-To: <1409856338-1730-2-git-send-email-Minghuan.Lian@freescale.com>
+References: <1409856338-1730-1-git-send-email-Minghuan.Lian@freescale.com>
+ <1409856338-1730-2-git-send-email-Minghuan.Lian@freescale.com>
+Message-ID: <CAErSpo5kFkF-JoUj-Ean7VXa4gxYW+q-X89+7ahyEymWpxxQ2w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Lokesh Vutla <lokeshvutla@ti.com>
+On Thu, Sep 4, 2014 at 12:45 PM, Minghuan Lian
+<Minghuan.Lian@freescale.com> wrote:
+> Add support for Freescale Layerscape PCIe controller. This driver
+> re-uses the designware core code.
+>
+> Signed-off-by: Minghuan Lian <Minghuan.Lian@freescale.com>
+> ---
+>  .../devicetree/bindings/pci/fsl,ls-pcie.txt        |  41 +++
+>  drivers/pci/host/Kconfig                           |   7 +
+>  drivers/pci/host/Makefile                          |   1 +
+>  drivers/pci/host/pci-layerscape.c                  | 315 +++++++++++++++++++++
+>  include/linux/pci_ids.h                            |   1 +
+>  5 files changed, 365 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/pci/fsl,ls-pcie.txt
+>  create mode 100644 drivers/pci/host/pci-layerscape.c
 
-DRA7 evm REV G and later boards uses a vtt regulator for DDR3
-termination and this is controlled by gpio7_11. This gpio is
-configured in boot loader. gpio7_11, which is only available only on
-Pad A22, in previous boards, is connected only to an unused pad on
-expansion connector EXP_P3 and is safe to be muxed as GPIO on all
-DRA7-evm versions (without a need to spin off another dts file).
+> diff --git a/include/linux/pci_ids.h b/include/linux/pci_ids.h
+> index 6ed0bb7..26d4c30 100644
+> --- a/include/linux/pci_ids.h
+> +++ b/include/linux/pci_ids.h
+> @@ -2442,6 +2442,7 @@
+>  #define PCI_DEVICE_ID_P5020            0x0421
+>  #define PCI_DEVICE_ID_P5010E           0x0428
+>  #define PCI_DEVICE_ID_P5010            0x0429
+> +#define PCI_DEVICE_ID_LS1021A          0x0e0b
 
-Since gpio7_11 is used to control VTT and should not be reset or kept
-in idle state during boot up else VTT will be disconnected and DDR
-gets corrupted. So, as part of this change, mark gpio7 as no-reset and
-no-idle on init.
+This is only used in one file and should not be in pci_ids.h (per the
+comment at the top of pci_ids.h).
 
-Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
-Signed-off-by: Nishanth Menon <nm@ti.com>
----
- arch/arm/boot/dts/dra7-evm.dts |   27 ++++++++++++++++++++++++++-
- 1 file changed, 26 insertions(+), 1 deletion(-)
-
-diff --git a/arch/arm/boot/dts/dra7-evm.dts b/arch/arm/boot/dts/dra7-evm.dts
-index e120fca..71f0f10 100644
---- a/arch/arm/boot/dts/dra7-evm.dts
-+++ b/arch/arm/boot/dts/dra7-evm.dts
-@@ -8,6 +8,7 @@
- /dts-v1/;
- 
- #include "dra74x.dtsi"
-+#include <dt-bindings/gpio/gpio.h>
- 
- / {
- 	model = "TI DRA742";
-@@ -24,9 +25,29 @@
- 		regulator-min-microvolt = <3300000>;
- 		regulator-max-microvolt = <3300000>;
- 	};
-+
-+	vtt_fixed: fixedregulator-vtt {
-+		compatible = "regulator-fixed";
-+		regulator-name = "vtt_fixed";
-+		regulator-min-microvolt = <1350000>;
-+		regulator-max-microvolt = <1350000>;
-+		regulator-always-on;
-+		regulator-boot-on;
-+		enable-active-high;
-+		gpio = <&gpio7 11 GPIO_ACTIVE_HIGH>;
-+	};
- };
- 
- &dra7_pmx_core {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&vtt_pin>;
-+
-+	vtt_pin: pinmux_vtt_pin {
-+		pinctrl-single,pins = <
-+			0x3b4 (PIN_OUTPUT | MUX_MODE14) /* spi1_cs1.gpio7_11 */
-+		>;
-+	};
-+
- 	i2c1_pins: pinmux_i2c1_pins {
- 		pinctrl-single,pins = <
- 			0x400 (PIN_INPUT | MUX_MODE0) /* i2c1_sda */
-@@ -54,7 +75,6 @@
- 			0x3a8 (PIN_INPUT | MUX_MODE0) /* spi1_d1 */
- 			0x3ac (PIN_INPUT | MUX_MODE0) /* spi1_d0 */
- 			0x3b0 (PIN_INPUT_SLEW | MUX_MODE0) /* spi1_cs0 */
--			0x3b4 (PIN_INPUT_SLEW | MUX_MODE0) /* spi1_cs1 */
- 			0x3b8 (PIN_INPUT_SLEW | MUX_MODE6) /* spi1_cs2.hdmi1_hpd */
- 			0x3bc (PIN_INPUT_SLEW | MUX_MODE6) /* spi1_cs3.hdmi1_cec */
- 		>;
-@@ -504,3 +524,8 @@
- &usb2_phy2 {
- 	phy-supply = <&ldousb_reg>;
- };
-+
-+&gpio7 {
-+	ti,no-reset-on-init;
-+	ti,no-idle-on-init;
-+};
--- 
-1.7.9.5
+>  #define PCI_DEVICE_ID_MPC8641          0x7010
+>  #define PCI_DEVICE_ID_MPC8641D         0x7011
+>  #define PCI_DEVICE_ID_MPC8610          0x7018
+> --
+> 1.9.1
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
