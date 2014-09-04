@@ -1,14 +1,13 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Thu,  4 Sep 2014 15:39:50 +0100
+Date: Thu,  4 Sep 2014 15:39:51 +0100
 Subject: [PATCH 3/4] watchdog: st_wdt: Provide binding documentation for ST's
  LPC Watchdog driver
 In-Reply-To: <1409841592-18890-1-git-send-email-lee.jones@linaro.org>
 References: <1409841592-18890-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1409841592-18890-4-git-send-email-lee.jones@linaro.org>
+Message-ID: <1409841592-18890-5-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Cc: devicetree at vger.kernel.org
 Signed-off-by: David Paris <david.paris@st.com>
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
