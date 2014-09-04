@@ -1,24 +1,101 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 4 Sep 2014 13:09:19 +0800
-Subject: [PATCH v2] pinctrl: imx/mxs: move freescale drivers to subdir
-In-Reply-To: <1409746436-23094-1-git-send-email-linus.walleij@linaro.org>
-References: <1409746436-23094-1-git-send-email-linus.walleij@linaro.org>
-Message-ID: <20140904050917.GB18688@dragon>
+From: jh80.chung@samsung.com (Jaehoon Chung)
+Date: Thu, 04 Sep 2014 14:21:53 +0900
+Subject: [PATCH] mmc: dw_mmc: Don't enable interrupts until we're ready
+In-Reply-To: <1409701034-28526-1-git-send-email-dianders@chromium.org>
+References: <1409701034-28526-1-git-send-email-dianders@chromium.org>
+Message-ID: <5407F6F1.60900@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 03, 2014 at 02:13:56PM +0200, Linus Walleij wrote:
-> This moves all the Freescale-related drivers (i.MX and MXS) to
-> its own subdirectory to clear the view.
-> 
-> Cc: Alexander Shiyan <shc_work@mail.ru>
-> Cc: Shawn Guo <shawn.guo@linaro.org>
-> Cc: Anson Huang <b20788@freescale.com>
-> Cc: Fabio Estevam <fabio.estevam@freescale.com>
-> Cc: Denis Carikli <denis@eukrea.com>
-> Cc: Markus Pargmann <mpa@pengutronix.de>
-> Cc: Greg Ungerer <gerg@uclinux.org>
-> Cc: Sascha Hauer <s.hauer@pengutronix.de>
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+Hi Doug
 
-Acked-by: Shawn Guo <shawn.guo@linaro.org> 
+On 09/03/2014 08:37 AM, Doug Anderson wrote:
+> On dw_mmc there's a small race if you happen to get a card detect
+> interrupt at just the wrong time during probe.  You may have enabled
+> the interrupt but host->slot[0] may be NULL.
+> 
+> Fix the race by enabling interrupts all the way at the end of the
+> probe.  We can also use free_irq() instead of dw_mmc specific masking
+> to mask the IRQ at removal time.  Note that since we're now managing
+> freeing of the irq ourselves, there's no need to use devm.
+> 
+> FYI, the crash would look like:
+>   dwmmc_rockchip ff0c0000.dwmmc: DW MMC controller at irq 64, 32 bit host data width, 256 deep fifo
+>   Unable to handle kernel NULL pointer dereference at virtual address 00000000
+>   pgd = c0004000
+>   [00000000] *pgd=00000000
+>   ...
+>   ...
+>   [<c0499380>] (dw_mci_work_routine_card) from [<c0134b94>] (process_one_work+0x260/0x3c4)
+>   [<c0134b94>] (process_one_work) from [<c0135b10>] (worker_thread+0x240/0x3a8)
+>   [<c0135b10>] (worker_thread) from [<c013b64c>] (kthread+0x100/0x118)
+>   [<c013b64c>] (kthread) from [<c0106418>] (ret_from_fork+0x14/0x20)
+> 
+> Signed-off-by: Doug Anderson <dianders@chromium.org>
+> ---
+> FYI: making dw_mmc into a module and trying module removal was not
+> tested.  I'd appreciate any testing that folks can do there.  This
+> code should be the equivalent and makes the error case of probe match
+> the removal case more closely now.
+> 
+>  drivers/mmc/host/dw_mmc.c | 17 +++++++++++------
+>  1 file changed, 11 insertions(+), 6 deletions(-)
+> 
+> diff --git a/drivers/mmc/host/dw_mmc.c b/drivers/mmc/host/dw_mmc.c
+> index 7f227e9..540ba3c 100644
+> --- a/drivers/mmc/host/dw_mmc.c
+> +++ b/drivers/mmc/host/dw_mmc.c
+> @@ -2577,10 +2577,6 @@ int dw_mci_probe(struct dw_mci *host)
+>  		goto err_dmaunmap;
+>  	}
+>  	INIT_WORK(&host->card_work, dw_mci_work_routine_card);
+> -	ret = devm_request_irq(host->dev, host->irq, dw_mci_interrupt,
+> -			       host->irq_flags, "dw-mci", host);
+> -	if (ret)
+> -		goto err_workqueue;
+>  
+>  	if (host->pdata->num_slots)
+>  		host->num_slots = host->pdata->num_slots;
+> @@ -2619,11 +2615,21 @@ int dw_mci_probe(struct dw_mci *host)
+>  		goto err_workqueue;
+>  	}
+>  
+> +	ret = request_irq(host->irq, dw_mci_interrupt, host->irq_flags,
+> +			  "dw-mci", host);
+> +	if (ret)
+> +		goto err_initted;
+
+I didn't test and consider race condition yet.
+But if located "request_irq" at here, we can be confused something,
+since there is "dev_info(host->dev, "%d slots initialized\n", init_slots)" message at above.
+
+I think you can relocate this.
+
+Best Regards,
+Jaehoon Chung
+
+> +
+>  	if (host->quirks & DW_MCI_QUIRK_IDMAC_DTO)
+>  		dev_info(host->dev, "Internal DMAC interrupt fix enabled.\n");
+>  
+>  	return 0;
+>  
+> +err_initted:
+> +	for (i = 0; i < host->num_slots; i++)
+> +		if (host->slot[i])
+> +			dw_mci_cleanup_slot(host->slot[i], i);
+> +
+>  err_workqueue:
+>  	destroy_workqueue(host->card_workqueue);
+>  
+> @@ -2649,8 +2655,7 @@ void dw_mci_remove(struct dw_mci *host)
+>  {
+>  	int i;
+>  
+> -	mci_writel(host, RINTSTS, 0xFFFFFFFF);
+> -	mci_writel(host, INTMASK, 0); /* disable all mmc interrupt first */
+> +	free_irq(host->irq, host);
+>  
+>  	for (i = 0; i < host->num_slots; i++) {
+>  		dev_dbg(host->dev, "remove slot %d\n", i);
+> 
