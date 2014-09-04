@@ -1,72 +1,85 @@
-From: long.wanglong@huawei.com (long.wanglong)
-Date: Thu, 4 Sep 2014 09:01:41 +0800
-Subject: [SMP BUG?] the return value of is_smp() is bug?
-In-Reply-To: <20140901101952.GF30401@n2100.arm.linux.org.uk>
-References: <1409571334-2814-1-git-send-email-long.wanglong@huawei.com>
- <20140901101952.GF30401@n2100.arm.linux.org.uk>
-Message-ID: <5407B9F5.2090000@huawei.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Thu, 4 Sep 2014 10:10:38 +0900
+Subject: [PATCH repost] ARM: shmobile: lager: correct memory map
+In-Reply-To: <5406B396.30907@renesas.com>
+References: <20140903004901.GA3277@verge.net.au> <54068031.5050806@renesas.com>
+ <20140903054843.GA29259@verge.net.au> <5406B396.30907@renesas.com>
+Message-ID: <20140904011038.GA433@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2014/9/1 18:19, Russell King - ARM Linux wrote:
-> Firstly, do not send multiple copies of your message to mailing lists,
-> certainly not within the three hours that you sent your three copies.
-> If one of the addresses you sent the message to bounces, then it is
-> *only* that one recipient who doesn't get your message, everyone else
-> receives a copy.  So, there's now three copies of your message in the
-> list archives, and people could end up replying to different messages.
+On Wed, Sep 03, 2014 at 03:22:14PM +0900, Khiem Nguyen wrote:
+> Dear Simon-san,
 > 
-> On Mon, Sep 01, 2014 at 07:35:34PM +0800, Wang Long wrote:
->> Hi,all
->>
->> In kernel 3.17-rc2, when i set CONFIG_HAVE_SMP = y and CONFIG_SMP_ON_UP = y 
->> in .config file. the secondary core can not boot.
->>
->> when i set CONFIG_HAVE_SMP = y and CONFIG_SMP_ON_UP = n in .config file,
->> the secondary core can boot.
->>
->> But this does not happen in kernel 3.10 lts kernel, Whether the 
->> CONFIG_SMP_ON_UP is set yes or no ,the secondary core can boot.
->>
->> Does the meaning of CONFIG_SMP_ON_UP changed or this is a bug in kernel 3.17-rc2 ? 
+> On 9/3/2014 2:48 PM, Simon Horman wrote:
+> > Hi Khiem-san,
+> > 
+> > On Wed, Sep 03, 2014 at 11:42:57AM +0900, Khiem Nguyen wrote:
+> >> Dear Simon-san, Shiiba-san,
+> >>
+> >> Thanks for the patch.
+> >>
+> >> On 9/3/2014 9:49 AM, Simon Horman wrote:
+> >>> The base address of the second memory region on the lager
+> >>> board is 0x140000000. Update the tag used in the dts file accordingly.
+> >>>
+> >>> This is a documentation fix and should have no run-time affect.
+> >>>
+> >>> This problem was introduced when the second memory region
+> >>> was added to the lager dts file by 62bc32a2573c4219
+> >>> ("ARM: shmobile: Include all 4 GiB of memory on Lager)"
+> >>> in v3.14.
+> >>>
+> >>> Reported-by: NAOYA SHIIBA <naoya.shiiba.nx@renesas.com>
+> >>> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> >>> ---
+> >>>  arch/arm/boot/dts/r8a7790-lager.dts | 2 +-
+> >>>  1 file changed, 1 insertion(+), 1 deletion(-)
+> >>>
+> >>> I am reposting this as Olof originally requested a syntax change,
+> >>> which I followed up on, however that change no longer seems appropriate.
+> >>> This this patch seems to be correct.
+> >> [...]
+> >>> -	memory at 180000000 {
+> >>> +	memory at 140000000 {
+> >>
+> >> Could you give more information about not using new syntax ?
+> >>
+> >> I checked memblock information in both 2 ways 
+> >> (i.e memory at 140000000 and memory at 1,40000000)
+> >> and I got same result.
+> >> root at lager:~# cat /sys/kernel/debug/memblock/memory
+> >>    0: 0x0000000040000000..0x000000007fffffff
+> >>    1: 0x0000000140000000..0x00000001ffffffff
+> >>
+> >> So, what does 'no longer seems appropriate" mean ?
+> > 
+> > Sorry for being vague.
+> > 
+> > I am specifically referring to the conversation in
+> > the thread "[PATCH 11/14] arm64: dts: Add initial device tree support for
+> > EXYNOS7" and in particular the following contribution to that discussion by
+> > Olof:
+> > 
+> > 	"Ok, I'm happily proven wrong here, also by confirming how this is
+> > 	 done on "real" OF.
+> > 
+> > 	 According to benh:
+> > 
+> > 	 15:20 <benh> ojn: 0,0 is not quite right, it's supposed to be used
+> > 	 when the two numbers are different things, like device,fn on PCI
+> > 
+> > 	 The same is true for >2^32 unit addresses, they just use the one
+> > 	 integer instead of x,y.
+> > 
+> > 	 So, I take back all I've said on this in the last 72 hours. :) It
+> > 	 looks like we might need to revisit some of the 32-bit DTs.  Simon,
+> > 	 drop the series you had. :)"
+> > 
+> > An archive of the message in question is available at:
+> > https://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg36123.html
 > 
-> I think the answer is neither, because when the kernel is run on /real/
-> hardware:
-> 
-> http://www.arm.linux.org.uk/developer/build/result.php?type=boot&idx=2514
-> 
-> it boots fine, bringing up all four CPUs.
-> 
->> config:     set CONFIG_HAVE_SMP = y and CONFIG_SMP_ON_UP = y
->> command:    # qemu-system-arm -M vexpress-a9 -smp 2  -m 128M -kernel arch/arm/boot/zImage -nographic
-> 
-> I've no idea how qemu works here, but if the CPU doesn't indicate that
-> it's a SMP capable CPU, we will disable SMP extensions.
-> 
->> The output:
->>
->> ..........
->> is_smp() return false;
->> CPU: Testing write buffer coherency: ok
->> missing device node for CPU 0
->> CPU0: thread -1, cpu 0, socket 0, mpidr 80000000
->> Setting up static identity map for 0x604643d8 - 0x60464430
->> Brought up 1 CPUs
->> SMP: Total of 1 processors activated.
->> CPU: All CPU(s) started in SVC mode.
->> ...........
-> 
-> You have decided that you'll edit the kernel messages, removing at least
-> some of the information that could be relevant to the issue.  Please,
-> only cut kernel messages when you are absolutely certain that they are
-> not relevant to the problem you're reporting.
-> 
-> However, I don't think it would help much - I suspect that qemu doesn't
-> provide emulation of the SCU base address register, and that's what your
-> problem is.  qemu needs to be fixed in that regard.
-> 
+> OK. I understood.
+> Let's follow the right way. :)
 
-Hi,Russell King
-
-Thank you for your reply. I will not send multiple copies of message to mailing lists.
-The problem is that qemu doesn't provide emulation of the SCU base address register.
+Thanks. I have queued up this patch.
