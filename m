@@ -1,48 +1,31 @@
-From: shengjiu.wang@freescale.com (Shengjiu Wang)
-Date: Thu, 4 Sep 2014 17:48:59 +0800
-Subject: [PATCH V1 2/2] ARM: clk-imx6q: refine clock tree for SSI
-In-Reply-To: <98d2985de76fa84525e9958522bd371a34ff84f0.1409824001.git.shengjiu.wang@freescale.com>
-References: <98d2985de76fa84525e9958522bd371a34ff84f0.1409824001.git.shengjiu.wang@freescale.com>
-Message-ID: <1f6481989f10f7777b56574f240895a5fb4ac189.1409824001.git.shengjiu.wang@freescale.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 04 Sep 2014 12:01:52 +0200
+Subject: [PATCH 24/24] Add documentation about ARM64 ILP32 ABI
+In-Reply-To: <1409779158-30963-25-git-send-email-apinski@cavium.com>
+References: <1409779158-30963-1-git-send-email-apinski@cavium.com>
+ <1409779158-30963-25-git-send-email-apinski@cavium.com>
+Message-ID: <4031586.MjMM3BtNgn@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Each SSI has "ssi", "ssi_ipg" clocks, and they share same gate bits.
+On Wednesday 03 September 2014 14:19:18 Andrew Pinski wrote:
+> +This document describes the ILP32 syscall ABI and where it differs
+> +from the generic linux syscall interface.
+> +ILP32 sets __kernel_long_t and __kernel_ulong_t both to 64bit
+> +(long long).  This effects the following types:
+> +* time_t: unsigned long long
+> +* clock_t: unsigned long long
+> +* fsword_t: long long
+> +* suseconds_t: long long
+> +* swblk_t: long long
+> +* fd_mask_t: long long
 
-Signed-off-by: Shengjiu Wang <shengjiu.wang@freescale.com>
----
- arch/arm/mach-imx/clk-imx6q.c |   12 +++++++++---
- 1 file changed, 9 insertions(+), 3 deletions(-)
+What about data structures derived from these? I'm worried that
+some of them (in particular time_t) leak into ioctl interfaces
+when they are getting included in some other data structure that
+is used as an ioctl argument.
 
-diff --git a/arch/arm/mach-imx/clk-imx6q.c b/arch/arm/mach-imx/clk-imx6q.c
-index d5bf1e2..013d3cd 100644
---- a/arch/arm/mach-imx/clk-imx6q.c
-+++ b/arch/arm/mach-imx/clk-imx6q.c
-@@ -108,6 +108,9 @@ static struct clk_div_table video_div_table[] = {
- 
- static unsigned int share_count_esai;
- static unsigned int share_count_asrc;
-+static unsigned int share_count_ssi1;
-+static unsigned int share_count_ssi2;
-+static unsigned int share_count_ssi3;
- 
- static void __init imx6q_clocks_init(struct device_node *ccm_node)
- {
-@@ -392,9 +395,12 @@ static void __init imx6q_clocks_init(struct device_node *ccm_node)
- 	clk[IMX6QDL_CLK_SDMA]         = imx_clk_gate2("sdma",          "ahb",               base + 0x7c, 6);
- 	clk[IMX6QDL_CLK_SPBA]         = imx_clk_gate2("spba",          "ipg",               base + 0x7c, 12);
- 	clk[IMX6QDL_CLK_SPDIF]        = imx_clk_gate2("spdif",         "spdif_podf",        base + 0x7c, 14);
--	clk[IMX6QDL_CLK_SSI1_IPG]     = imx_clk_gate2("ssi1_ipg",      "ipg",               base + 0x7c, 18);
--	clk[IMX6QDL_CLK_SSI2_IPG]     = imx_clk_gate2("ssi2_ipg",      "ipg",               base + 0x7c, 20);
--	clk[IMX6QDL_CLK_SSI3_IPG]     = imx_clk_gate2("ssi3_ipg",      "ipg",               base + 0x7c, 22);
-+	clk[IMX6QDL_CLK_SSI1_IPG]     = imx_clk_gate2_shared("ssi1_ipg",      "ipg",        base + 0x7c, 18, &share_count_ssi1);
-+	clk[IMX6QDL_CLK_SSI2_IPG]     = imx_clk_gate2_shared("ssi2_ipg",      "ipg",        base + 0x7c, 20, &share_count_ssi2);
-+	clk[IMX6QDL_CLK_SSI3_IPG]     = imx_clk_gate2_shared("ssi3_ipg",      "ipg",        base + 0x7c, 22, &share_count_ssi3);
-+	clk[IMX6QDL_CLK_SSI1]         = imx_clk_gate2_shared("ssi1",          "ssi1_podf",  base + 0x7c, 18, &share_count_ssi1);
-+	clk[IMX6QDL_CLK_SSI2]         = imx_clk_gate2_shared("ssi2",          "ssi2_podf",  base + 0x7c, 20, &share_count_ssi2);
-+	clk[IMX6QDL_CLK_SSI3]         = imx_clk_gate2_shared("ssi3",          "ssi3_podf",  base + 0x7c, 22, &share_count_ssi3);
- 	clk[IMX6QDL_CLK_UART_IPG]     = imx_clk_gate2("uart_ipg",      "ipg",               base + 0x7c, 24);
- 	clk[IMX6QDL_CLK_UART_SERIAL]  = imx_clk_gate2("uart_serial",   "uart_serial_podf",  base + 0x7c, 26);
- 	clk[IMX6QDL_CLK_USBOH3]       = imx_clk_gate2("usboh3",        "ipg",               base + 0x80, 0);
--- 
-1.7.9.5
+Do you have a list of which data structures change based on the
+scalar type changes?
+
+	Arnd
