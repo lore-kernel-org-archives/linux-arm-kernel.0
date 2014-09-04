@@ -1,92 +1,40 @@
-From: vincent.guittot@linaro.org (Vincent Guittot)
-Date: Thu, 4 Sep 2014 09:17:47 +0200
-Subject: [PATCH v5 03/12] sched: fix avg_load computation
-In-Reply-To: <1409787800.31585.26.camel@schen9-desk2.jf.intel.com>
-References: <1409051215-16788-1-git-send-email-vincent.guittot@linaro.org>
- <1409051215-16788-4-git-send-email-vincent.guittot@linaro.org>
- <5401BCDF.3040503@linux.vnet.ibm.com>
- <CAKfTPtAt_X99p4KHNmZtVAnMdYm8_QLZ796WO+McqGf5RyM+iQ@mail.gmail.com>
- <1409787800.31585.26.camel@schen9-desk2.jf.intel.com>
-Message-ID: <CAKfTPtCd02JLyd335WUpU5RRUYmS=Ni9S0U_U1uDsYjs59oQ1A@mail.gmail.com>
+From: carlo.caione@gmail.com (Carlo Caione)
+Date: Thu, 4 Sep 2014 09:21:15 +0200
+Subject: [PATCH 1/5] ARM: sun4i: Relicense the A10 DTSI under GPLv2/X11
+In-Reply-To: <20140903184250.GA8163@nuc>
+References: <1409682069-7164-1-git-send-email-maxime.ripard@free-electrons.com>
+ <20140903184250.GA8163@nuc>
+Message-ID: <20140904072115.GA7877@carlo-MacBookPro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4 September 2014 01:43, Tim Chen <tim.c.chen@linux.intel.com> wrote:
-> On Wed, 2014-09-03 at 13:09 +0200, Vincent Guittot wrote:
->> On 30 August 2014 14:00, Preeti U Murthy <preeti@linux.vnet.ibm.com> wrote:
->> > Hi Vincent,
->> >
->> > On 08/26/2014 04:36 PM, Vincent Guittot wrote:
->> >> The computation of avg_load and avg_load_per_task should only takes into
->> >> account the number of cfs tasks. The non cfs task are already taken into
->> >> account by decreasing the cpu's capacity and they will be tracked in the
->> >> CPU's utilization (group_utilization) of the next patches
->> >>
->> >> Signed-off-by: Vincent Guittot <vincent.guittot@linaro.org>
->> >> ---
->> >>  kernel/sched/fair.c | 4 ++--
->> >>  1 file changed, 2 insertions(+), 2 deletions(-)
->> >>
->> >> diff --git a/kernel/sched/fair.c b/kernel/sched/fair.c
->> >> index 87b9dc7..b85e9f7 100644
->> >> --- a/kernel/sched/fair.c
->> >> +++ b/kernel/sched/fair.c
->> >> @@ -4092,7 +4092,7 @@ static unsigned long capacity_of(int cpu)
->> >>  static unsigned long cpu_avg_load_per_task(int cpu)
->> >>  {
->> >>       struct rq *rq = cpu_rq(cpu);
->> >> -     unsigned long nr_running = ACCESS_ONCE(rq->nr_running);
->> >> +     unsigned long nr_running = ACCESS_ONCE(rq->cfs.h_nr_running);
->> >>       unsigned long load_avg = rq->cfs.runnable_load_avg;
->> >>
->> >>       if (nr_running)
->> >> @@ -5985,7 +5985,7 @@ static inline void update_sg_lb_stats(struct lb_env *env,
->> >>                       load = source_load(i, load_idx);
->> >>
->> >>               sgs->group_load += load;
->> >> -             sgs->sum_nr_running += rq->nr_running;
->> >> +             sgs->sum_nr_running += rq->cfs.h_nr_running;
->> >>
->> >>               if (rq->nr_running > 1)
->> >>                       *overload = true;
->> >>
->> >
->> > Why do we probe rq->nr_running while we do load balancing? Should not we
->> > be probing cfs_rq->nr_running instead? We are interested after all in
->> > load balancing fair tasks right? The reason I ask this is, I was
->> > wondering if we need to make the above similar change in more places in
->> > load balancing.
->>
->> Hi Preeti,
->>
->> Yes, we should probably the test   rq->cfs.h_nr_running > 0 before
->> setting overload.
->>
->
-> The overload indicator is used for knowing when we can totally avoid
-> load balancing to a cpu that is about to go idle.
-> We can avoid load balancing when no cpu has more than 1 task.  So if you
-> have say just one fair task and multiple deadline tasks on a cpu,
-> and another cpu about to go idle, you should turn on normal load
-> balancing in the idle path by setting overload to true.
+On Wed, Sep 03, 2014 at 08:42:50PM +0200, Carlo Caione wrote:
+> On Tue, Sep 02, 2014 at 08:21:05PM +0200, Maxime Ripard wrote:
+> > The current GPL only licensing on the DTSI makes it very impractical for other
+> > software components licensed under another license.
+> > 
+> > In order to make it easier for them to reuse our device trees, relicense our
+> > DTSI first under a GPL/X11 dual-license. Hopefully, the DTS will follow soon.
+> > 
+> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> > Cc: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+> > Cc: Arnd Bergmann <arnd@arndb.de>
+> > Cc: Carlo Caione <carlo.caione@gmail.com>
+> > Cc: Chen-Yu Tsai <wens@csie.org>
+> > Cc: David Lanzend?rfer <david.lanzendoerfer@o2s.ch>
+> > Cc: Emilio L?pez <emilio@elopez.com.ar>
+> > Cc: Hans de Goede <hdegoede@redhat.com>
+> > Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> > Cc: Oliver Schinagl <oliver@schinagl.nl>
+> > Cc: Roman Byshko <rbyshko@gmail.com>
+> > Cc: Stefan Roese <sr@denx.de>
+> > ---
+> >  arch/arm/boot/dts/sun4i-a10.dtsi | 46 +++++++++++++++++++++++++++++++++++-----
+> >  1 file changed, 41 insertions(+), 5 deletions(-)
+> 
+> Acked-by: Carlo Caione <carlo@caione.org> 
 
-The newly idle load balancing can only affect CFS tasks so triggering
-a load_balance because a cpu is overloaded by rt tasks only, will not
-change anything.
+The ACK is intended for the whole series :)
 
->
-> So setting overload should be set based on rq->nr_running and not on
-> rq->cfs.h_nr_running.
-
-We should probably use both values like below
-
-if ((rq->nr_running > 1) && ( rq->cfs.h_nr_running > 0))
-
-Regards,
-Vincent
->
-> Thanks.
->
-> Tim
->
->
+-- 
+Carlo Caione
