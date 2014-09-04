@@ -1,38 +1,37 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Thu, 04 Sep 2014 12:29:43 -0700
-Subject: [PATCH v3 0/6] Migrate PXA27x platforms to clock framework
-In-Reply-To: <3966110.RPrxdc8FBm@wuerfel>
-References: <1406753464-15000-1-git-send-email-robert.jarzmik@free.fr>
- <201408241408.19861.arnd@arndb.de> <20140903184956.11368.47800@quantum>
- <3966110.RPrxdc8FBm@wuerfel>
-Message-ID: <20140904192943.11368.83896@quantum>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Thu, 04 Sep 2014 21:49:29 +0200
+Subject: [PATCH 14/15] PM / Domains: Remove default_stop_ok() API
+In-Reply-To: <CAMuHMdUEfAdpUgEtOQfdG1gbZjVo3bfAAmhm0-miFGbQ8ckHgA@mail.gmail.com>
+References: <1409741551-16437-1-git-send-email-ulf.hansson@linaro.org>
+ <1409741551-16437-15-git-send-email-ulf.hansson@linaro.org>
+ <CAMuHMdUEfAdpUgEtOQfdG1gbZjVo3bfAAmhm0-miFGbQ8ckHgA@mail.gmail.com>
+Message-ID: <6302495.FUvz9FPcau@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Arnd Bergmann (2014-09-03 12:33:31)
-> On Wednesday 03 September 2014 11:49:56 Mike Turquette wrote:
-> > > Right, makes sense. We have in the past done it either way for other
-> > > platforms. When merging the patches through the clk subsystem, it still
-> > > makes sense to let us know of those plans and ask for an Ack from
-> > > the arm-soc maintainers, to be sure we can plan ahead in case there
-> > > are other (conflicting) patch sets that are sent through arm-soc.
-> > 
-> > Do I have your Ack for the arch/arm patches?
-> > 
-> > [0] https://lkml.kernel.org/r/<1409758148-20104-1-git-send-email-tomeu.vizoso@collabora.com>
+On Wednesday, September 03, 2014 03:15:59 PM Geert Uytterhoeven wrote:
+> Hi Ulf,
 > 
-> I have no objection to the change, but we might need to be careful in
-> case we get a lot of conflicts.
+> On Wed, Sep 3, 2014 at 12:52 PM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
+> > --- a/drivers/base/power/domain_governor.c
+> > +++ b/drivers/base/power/domain_governor.c
 > 
-> How about making it a shared branch that you plan to send upstream
-> but that we can also include in arm-soc to avoid conflicts if necessary?
-
-Sounds good. I'll probably need to perform a bit of surgery on my tree
-and rebase it in order to have the minimum set of patches that get
-pulled into arm-soc.
-
-Regards,
-Mike
-
+> > @@ -229,10 +229,7 @@ static bool always_on_power_down_ok(struct dev_pm_domain *domain)
+> >
+> >  #else /* !CONFIG_PM_RUNTIME */
+> >
+> > -bool default_stop_ok(struct device *dev)
+> > -{
+> > -       return false;
+> > -}
+> > +static inline bool default_stop_ok(struct device *dev) { return false; }
 > 
->         Arnd
+> The "inline" doesn't make much sense here.
+
+But then it doesn't hurt either I suppose?
+
+Anyway, Ulf, are you going to update this patch?
+
+-- 
+I speak only for myself.
+Rafael J. Wysocki, Intel Open Source Technology Center.
