@@ -1,55 +1,38 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 04 Sep 2014 12:14:58 +0200
-Subject: [PATCH v3 13/17] ARM64 / ACPI: Add GICv2 specific ACPI boot
- support
-In-Reply-To: <54083A94.2040105@linaro.org>
-References: <1409583475-6978-1-git-send-email-hanjun.guo@linaro.org>
- <2893693.4bZJXXENof@wuerfel> <54083A94.2040105@linaro.org>
-Message-ID: <3046890.jAXAYeBPWQ@wuerfel>
+From: pebolle@tiscali.nl (Paul Bolle)
+Date: Thu, 04 Sep 2014 12:16:57 +0200
+Subject: [PATCH 18/19] ARM: SAMSUNG: Remove remaining legacy code
+In-Reply-To: <53C676DB.6070002@samsung.com>
+References: <1404496099-26708-1-git-send-email-t.figa@samsung.com>
+ <1404496099-26708-19-git-send-email-t.figa@samsung.com>
+ <1405505756.4408.24.camel@x220> <53C676DB.6070002@samsung.com>
+Message-ID: <1409825817.5546.99.camel@x220>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 04 September 2014 12:10:28 Tomasz Nowicki wrote:
-> On 03.09.2014 20:42, Arnd Bergmann wrote:
-> > On Monday 01 September 2014 22:57:51 Hanjun Guo wrote:
-> >> +       /* Collect CPU base addresses */
-> >> +       count = acpi_parse_entries(sizeof(struct acpi_table_madt),
-> >> +                                  gic_acpi_parse_madt_cpu, table,
-> >> +                                  ACPI_MADT_TYPE_GENERIC_INTERRUPT,
-> >> +                                  ACPI_MAX_GIC_CPU_INTERFACE_ENTRIES);
-> >> +       if (count < 0) {
-> >> +               pr_err("Error during GICC entries parsing\n");
-> >> +               return -EFAULT;
-> >> +       } else if (!count) {
-> >> +               /* No GICC entries provided, use address from MADT header */
-> >> +               struct acpi_table_madt *madt = (struct acpi_table_madt *)table;
-> >> +
-> >> +               if (!madt->address)
-> >> +                       return -EFAULT;
-> >> +
-> >> +               cpu_phy_base = (u64)madt->address;
-> >> +       }
-> >
-> > After I read through ACPI-5.1 section 5.2.12.14, I wonder if this is the
-> > best way to treat a missing ACPI_MADT_TYPE_GENERIC_INTERRUPT table.
-> >
-> > Do we expect to see those in practice? It seems like using the x86 local
-> > APIC address as a fallback for the GIC address is not something we
-> > should do unless we absolutely have to support a system that doesn't
-> > have the GIC table.
+On Wed, 2014-07-16 at 14:58 +0200, Tomasz Figa wrote:
+> On 16.07.2014 12:15, Paul Bolle wrote:
+> > After this patch that symbol is still referenced in:
+> > drivers/media/platform/Kconfig:159:     depends on VIDEO_DEV && VIDEO_V4L2 && (PLAT_S5P || ARCH_EXYNOS)
+> > drivers/media/platform/Kconfig:169:     depends on VIDEO_DEV && VIDEO_V4L2 && (PLAT_S5P || ARCH_EXYNOS)
+> > drivers/media/platform/Kconfig:177:     depends on VIDEO_DEV && VIDEO_V4L2 && (PLAT_S5P || ARCH_EXYNOS)
+> > drivers/media/platform/exynos4-is/Kconfig:5:    depends on (PLAT_S5P || ARCH_EXYNOS)
+> > drivers/media/platform/s5p-tv/Kconfig:11:       depends on (PLAT_S5P || ARCH_EXYNOS) && PM_RUNTIME
+> > drivers/usb/host/Kconfig:223:       depends on PLAT_S5P || ARCH_EXYNOS
+> > drivers/usb/host/Kconfig:530:   depends on PLAT_S5P || ARCH_EXYNOS
+> > 
+> > Again, I assume patches to remove these references are pending. But is
+> > that correct?
 > 
-> No, we do not expect and hopefully there will be no such 
-> 
-> But, we are trying to be as much as possible inline with 5.1 spec, 
-> 5.2.12.14 says:
-> [...]
-> If provided here (CPU physical base address), the "Local Interrupt 
-> Controller Address" field in the MADT must be ignored by the OSPM.
-> [...]
-> 
+> I had two patches fixing those, but apparently this was lost in action.
+> The correct solution is s/PLAT_S5P/ARCH_S5PV210/. I will include this in
+> a follow-up series if nobody objects.
 
-Yes, that's what I saw. So ignoring it all the time is fine, right?
-Presumably the madt->address field is only referenced here because
-some pre-5.1 implementations used to do that.
+No one objected, as far as I know.
 
-	Arnd
+Exactly the same references are still to be found in v3.17-rc3 and
+next-20140903. Perhaps someone actually familiar with this matter (ie,
+not me) could submit one or more patches that implement Tomasz'
+proposal.
+
+
+Paul Bolle
