@@ -1,103 +1,64 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu,  4 Sep 2014 10:12:39 +0900
-Subject: [PATCH 8/9] ARM: shmobile: Consolidate Legacy SH_CLK_CPG Kconfig
-In-Reply-To: <cover.1409792454.git.horms+renesas@verge.net.au>
-References: <cover.1409792454.git.horms+renesas@verge.net.au>
-Message-ID: <0cdc23df6e4014a6dafe351da436dcc453f203b1.1409792454.git.horms+renesas@verge.net.au>
+Date: Thu,  4 Sep 2014 10:12:50 +0900
+Subject: [GIT PULL] Renesas ARM Based SoC r8a7740 Multiplatform Updates for
+ v3.18
+Message-ID: <cover.1409792648.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Magnus Damm <damm+renesas@opensource.se>
+Hi Olof, Hi Kevin, Hi Arnd,
 
-Consolidate SH_CLK_CPG under ARCH_SHMOBILE_LEGACY so it can
-be shared by the legacy ARM mach-shmobile support code.
+Please consider these Renesas ARM based SoC r8a7740 multiplatform updates
+for v3.18.
 
-Signed-off-by: Magnus Damm <damm+renesas@opensource.se>
-Acked-by: Geert Uytterhoeven <geert@linux-m68k.org>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/Kconfig               | 1 +
- arch/arm/mach-shmobile/Kconfig | 8 --------
- 2 files changed, 1 insertion(+), 8 deletions(-)
+This pull request is based on
+"Renesas ARM Based SoC R8a7740 CCF and Timers Updates for v3.18"
+tagged as renesas-r8a7740-ccf-and-timers-for-v3.18,
+which I have previously sent a pull request for.
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 93efc9a..bd8beae 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -661,6 +661,7 @@ config ARCH_SHMOBILE_LEGACY
- 	select NO_IOPORT_MAP
- 	select PINCTRL
- 	select PM_GENERIC_DOMAINS if PM
-+	select SH_CLK_CPG
- 	select SPARSE_IRQ
- 	help
- 	  Support for Renesas ARM SoC platforms using a non-multiplatform
-diff --git a/arch/arm/mach-shmobile/Kconfig b/arch/arm/mach-shmobile/Kconfig
-index d4cf8bf..6283ff2 100644
---- a/arch/arm/mach-shmobile/Kconfig
-+++ b/arch/arm/mach-shmobile/Kconfig
-@@ -95,7 +95,6 @@ config ARCH_SH7372
- 	select ARCH_RMOBILE
- 	select ARCH_WANT_OPTIONAL_GPIOLIB
- 	select ARM_CPU_SUSPEND if PM || CPU_IDLE
--	select SH_CLK_CPG
- 	select SH_INTC
- 
- config ARCH_SH73A0
-@@ -104,7 +103,6 @@ config ARCH_SH73A0
- 	select ARCH_WANT_OPTIONAL_GPIOLIB
- 	select ARM_GIC
- 	select I2C
--	select SH_CLK_CPG
- 	select SH_INTC
- 	select RENESAS_INTC_IRQPIN
- 
-@@ -113,7 +111,6 @@ config ARCH_R8A73A4
- 	select ARCH_RMOBILE
- 	select ARCH_WANT_OPTIONAL_GPIOLIB
- 	select ARM_GIC
--	select SH_CLK_CPG
- 	select RENESAS_IRQC
- 
- config ARCH_R8A7740
-@@ -121,14 +118,12 @@ config ARCH_R8A7740
- 	select ARCH_RMOBILE
- 	select ARCH_WANT_OPTIONAL_GPIOLIB
- 	select ARM_GIC
--	select SH_CLK_CPG
- 	select RENESAS_INTC_IRQPIN
- 
- config ARCH_R8A7778
- 	bool "R-Car M1A (R8A77781)"
- 	select ARCH_RCAR_GEN1
- 	select ARCH_WANT_OPTIONAL_GPIOLIB
--	select SH_CLK_CPG
- 	select ARM_GIC
- 
- config ARCH_R8A7779
-@@ -136,7 +131,6 @@ config ARCH_R8A7779
- 	select ARCH_RCAR_GEN1
- 	select ARCH_WANT_OPTIONAL_GPIOLIB
- 	select ARM_GIC
--	select SH_CLK_CPG
- 
- config ARCH_R8A7790
- 	bool "R-Car H2 (R8A77900)"
-@@ -144,7 +138,6 @@ config ARCH_R8A7790
- 	select ARCH_WANT_OPTIONAL_GPIOLIB
- 	select ARM_GIC
- 	select MIGHT_HAVE_PCI
--	select SH_CLK_CPG
- 	select ARCH_DMA_ADDR_T_64BIT if ARM_LPAE
- 
- config ARCH_R8A7791
-@@ -153,7 +146,6 @@ config ARCH_R8A7791
- 	select ARCH_WANT_OPTIONAL_GPIOLIB
- 	select ARM_GIC
- 	select MIGHT_HAVE_PCI
--	select SH_CLK_CPG
- 	select ARCH_DMA_ADDR_T_64BIT if ARM_LPAE
- 
- config ARCH_R7S72100
--- 
-2.0.1
+
+The following changes since commit 433306747791845677ba662435a9bbbafaa21df3:
+
+  ARM: shmobile: r8a7740: Remove r8a7740_add_standard_devices_dt (2014-08-23 19:58:57 +0900)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-r8a7740-multiplatform-for-v3.18
+
+for you to fetch changes up to 118a04358b7efa884aeedf80ddecc87174d7f3c2:
+
+  ARM: shmobile: armadillo800eva reference: Remove DTS (2014-09-02 10:04:32 +0900)
+
+----------------------------------------------------------------
+Renesas ARM Based SoC r8a7740 Multiplatform Updates for v3.18
+
+* Enable multiplatform support for r8a7740 SoC and remove
+  its DT-reference C board DTS files.
+
+118a043 ARM: shmobile: armadillo800eva reference: Remove DTS
+f2d4c4a ARM: shmobile: armadillo800eva reference: Remove C board code
+1174c71 ARM: shmobile: r8a7740: Add restart callback
+cc9517d ARM: shmobile: armadillo800eva: Build DTS for multiplatform
+25aa7ba ARM: shmobile: armadillo800eva: Sync DTS
+c41215b ARM: shmobile: r8a7740: Multiplatform support
+
+----------------------------------------------------------------
+Magnus Damm (6):
+      ARM: shmobile: r8a7740: Multiplatform support
+      ARM: shmobile: armadillo800eva: Sync DTS
+      ARM: shmobile: armadillo800eva: Build DTS for multiplatform
+      ARM: shmobile: r8a7740: Add restart callback
+      ARM: shmobile: armadillo800eva reference: Remove C board code
+      ARM: shmobile: armadillo800eva reference: Remove DTS
+
+ arch/arm/boot/dts/Makefile                         |   2 +-
+ .../boot/dts/r8a7740-armadillo800eva-reference.dts | 300 ---------------------
+ arch/arm/boot/dts/r8a7740-armadillo800eva.dts      | 276 ++++++++++++++++++-
+ arch/arm/mach-shmobile/Kconfig                     |   5 +
+ .../board-armadillo800eva-reference.c              | 199 --------------
+ arch/arm/mach-shmobile/pm-r8a7740.c                |   5 +-
+ arch/arm/mach-shmobile/r8a7740.h                   |   4 +-
+ arch/arm/mach-shmobile/setup-r8a7740.c             |  16 +-
+ 8 files changed, 300 insertions(+), 507 deletions(-)
+ delete mode 100644 arch/arm/boot/dts/r8a7740-armadillo800eva-reference.dts
+ delete mode 100644 arch/arm/mach-shmobile/board-armadillo800eva-reference.c
