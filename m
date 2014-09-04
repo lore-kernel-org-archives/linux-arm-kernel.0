@@ -1,38 +1,68 @@
-From: pebolle@tiscali.nl (Paul Bolle)
-Date: Thu, 04 Sep 2014 12:16:57 +0200
-Subject: [PATCH 18/19] ARM: SAMSUNG: Remove remaining legacy code
-In-Reply-To: <53C676DB.6070002@samsung.com>
-References: <1404496099-26708-1-git-send-email-t.figa@samsung.com>
- <1404496099-26708-19-git-send-email-t.figa@samsung.com>
- <1405505756.4408.24.camel@x220> <53C676DB.6070002@samsung.com>
-Message-ID: <1409825817.5546.99.camel@x220>
+From: ta.omasab@gmail.com (Thomas Abraham)
+Date: Thu, 4 Sep 2014 15:52:38 +0530
+Subject: [PATCH v9 4/6] ARM: Exynos: switch to using generic cpufreq
+ driver for Exynos4210/5250/5420
+In-Reply-To: <7hsik847p2.fsf@paris.lan>
+References: <1406707663-16656-1-git-send-email-thomas.ab@samsung.com>
+ <1406707663-16656-5-git-send-email-thomas.ab@samsung.com>
+ <53DA8BB9.6020702@samsung.com> <53DA8D85.3050106@gmail.com>
+ <7hbnrc6px3.fsf@paris.lan> <53F7DA13.6090305@gmail.com>
+ <CADWw7OgAS-z-UOrJU-hL2fzuefJmLtCTg57jYk2Df7f5KfLJmA@mail.gmail.com>
+ <7h8umc60we.fsf@paris.lan>
+ <CADWw7OgW+o3tB=ptnsy-PsmXmNv8oXzt_WfK6NswQiEWWwAzNA@mail.gmail.com>
+ <CAGa+x85-Anb+HsSUQRaaeex19-HK+yZDW0UpFBwAtsQ8Sf2Aqg@mail.gmail.com>
+ <CAGa+x86jU8MR=r_xuaiorbNNyqrezb0b6Ozy-MPg9HvsARESOw@mail.gmail.com>
+ <CAJuA9ajtsrY7zSDMs=c6BZ0AqERoBgvq++dTF4Dn673zGMfcgQ@mail.gmail.com>
+ <CAMAWPa-8h5PNhgT+ApBhA8p=i+4oFOnYnQsQ4mK1JKwwAhpvpQ@mail.gmail.com>
+ <CAJuA9ah5M_pXRMXPB6o7JLhgVUHM7kYo9HOV6Yxv4Z=hKMdG=w@mail.gmail.com>
+ <7hmwah6cop.fsf@paris.lan>
+ <CAJuA9ahe=9gdTaGcRb69syvRfwkkGMgDiiNfOMA9TBo42cWVZw@mail.gmail.com>
+ <CAJuA9ag2pybyLDUyW43wMQu4PA1cB4V9c1bc7WB3xjqzhqNGTw@mail.gmail.com>
+ <7hsik847p2.fsf@paris.lan>
+Message-ID: <CAJuA9aiXwgxrS_AYw5tt5GryhrtoOpK2RhhLcjxShNqswiCmqA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2014-07-16 at 14:58 +0200, Tomasz Figa wrote:
-> On 16.07.2014 12:15, Paul Bolle wrote:
-> > After this patch that symbol is still referenced in:
-> > drivers/media/platform/Kconfig:159:     depends on VIDEO_DEV && VIDEO_V4L2 && (PLAT_S5P || ARCH_EXYNOS)
-> > drivers/media/platform/Kconfig:169:     depends on VIDEO_DEV && VIDEO_V4L2 && (PLAT_S5P || ARCH_EXYNOS)
-> > drivers/media/platform/Kconfig:177:     depends on VIDEO_DEV && VIDEO_V4L2 && (PLAT_S5P || ARCH_EXYNOS)
-> > drivers/media/platform/exynos4-is/Kconfig:5:    depends on (PLAT_S5P || ARCH_EXYNOS)
-> > drivers/media/platform/s5p-tv/Kconfig:11:       depends on (PLAT_S5P || ARCH_EXYNOS) && PM_RUNTIME
-> > drivers/usb/host/Kconfig:223:       depends on PLAT_S5P || ARCH_EXYNOS
-> > drivers/usb/host/Kconfig:530:   depends on PLAT_S5P || ARCH_EXYNOS
-> > 
-> > Again, I assume patches to remove these references are pending. But is
-> > that correct?
-> 
-> I had two patches fixing those, but apparently this was lost in action.
-> The correct solution is s/PLAT_S5P/ARCH_S5PV210/. I will include this in
-> a follow-up series if nobody objects.
+On Thu, Sep 4, 2014 at 4:45 AM, Kevin Hilman <khilman@kernel.org> wrote:
+> Hi Thomas,
+>
+> Thomas Abraham <ta.omasab@gmail.com> writes:
+>
+> [...]
+>
+>> A new branch [1] has been created using commits from exynos5-v3.17-rc1
+>> branch + cpufreq + regulator + temp fixes. I have tested this branch
+>> on Exynos5800 Chromebook2 and cpufreq works fine with both ondemand
+>> and performance governors. Please let me know if there are any issues
+>> with this new branch. It is based on v3.17-rc3.
+>
+> Excellent!  Thank you.
+>
+> The only thing missing now is the CPUidle support for 5800, and all
+> that's needed for that is the compatible string patch[1] which Daniel
+> has queued up.
+>
+> With that patch, display + CPUidle + CPUfreq are working pretty well on
+> my exynos5800/chromebook2 with the big.LITTLE switcher disabled.  If I
+> turn on the switcher, it boots OK, but as soon as I try to run powertop
+> (upstream v2.6.1) it gets stuck.  Have you tried this branch with the
+> switcher enabled?
 
-No one objected, as far as I know.
+Yes, I have tested switcher + cpufreq + cpuidle with this branch and
+there are no issues found. I haven't tested with powertop yet. I will
+try and do that and let you know the result.
 
-Exactly the same references are still to be found in v3.17-rc3 and
-next-20140903. Perhaps someone actually familiar with this matter (ie,
-not me) could submit one or more patches that implement Tomasz'
-proposal.
+You mentioned that when you run powertop, it gets stuck. When that
+happens, is there any log on the console or does system just turn
+unresponsive?
 
+Thanks,
+Thomas.
 
-Paul Bolle
+>
+> Thanks again for your work on this, we're getting close!
+>
+> Kevin
+>
+> [1] http://lists.infradead.org/pipermail/linux-arm-kernel/2014-August/279028.html
+>
