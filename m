@@ -1,43 +1,28 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 4 Sep 2014 19:31:02 +0200
-Subject: [PATCH 07/11 v5] coresight-etm: add CoreSight ETM/PTM driver
-In-Reply-To: <CANLsYkzAE1a8SmbEtGz5f14NfHX0R51RBAUkZZv==OkZBJzTFw@mail.gmail.com>
-References: <1409159852-7249-1-git-send-email-mathieu.poirier@linaro.org>
- <1409159852-7249-8-git-send-email-mathieu.poirier@linaro.org>
- <CACRpkdZO7Mo_JaecjypR_kXKwaatgU+4oLLKheQ22OcNMG_-nQ@mail.gmail.com>
- <CANLsYkzAE1a8SmbEtGz5f14NfHX0R51RBAUkZZv==OkZBJzTFw@mail.gmail.com>
-Message-ID: <CACRpkda6Rj0ZJ4NfKtqV=0p_OVEpjmSLNsUM7Z0MC3UMn43HGg@mail.gmail.com>
+Date: Thu, 4 Sep 2014 19:32:31 +0200
+Subject: [PATCH 1/2] gpio: Add driver for AXM55xx SSP chip selects
+In-Reply-To: <20140904170630.GL29327@sirena.org.uk>
+References: <1409576021-24828-1-git-send-email-anders.berg@avagotech.com>
+ <1409576021-24828-2-git-send-email-anders.berg@avagotech.com>
+ <CACRpkdby4H-fivNn_kG2uL0EjsCGAc+t6OyFi0+VcNGf2Z9NQA@mail.gmail.com>
+ <20140904170630.GL29327@sirena.org.uk>
+Message-ID: <CACRpkdZEoBan=Lqr1T-iY41U9NfMA_MCLX3LA=juw7X4pmRvSQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 4, 2014 at 7:19 PM, Mathieu Poirier
-<mathieu.poirier@linaro.org> wrote:
-> [Me]:
->> I would rewrite the last function like this:
+On Thu, Sep 4, 2014 at 7:06 PM, Mark Brown <broonie@kernel.org> wrote:
+> On Thu, Sep 04, 2014 at 07:04:44PM +0200, Linus Walleij wrote:
+>> I need an ACK from Mark Brown on this before I apply.
+>> The driver seems to do what it should, but I need Mark to
+>> be OK with exporting the CS signals from an SSP/SPI block
+>> to be exposed to Linux as GPIOs.
 >>
->> static inline unsigned int etm_readl(struct etm_drvdata *drvdata, u32 off)
->> {
->>        u32 val;
->>
->>        if (drvdata->use_cp14)
->>                asm_volatile()...
->>        else
->>                val = readl_relaxed(drvdata->base + off);
->>        return val;
->> }
+>> (Top-posting and quoting patch verbatim so Mark gets it.)
 >
-> That unfortunately won't work.  "u32 off" is a numerical value and it
-> works well in the case were CP14 accesses aren't needed.  On the flip
-> side that numerical value isn't sufficient to deduce all 3 arguments
-> (crn, crm, op2) required by instructions mcr/mrc for the right access
-> to happen - there is simply no correlation between the offset of an
-> APB bus memory mapped address and the corresponding CP14 access.
+> I don't see any sort of reasoning for this?
 
-You're right, I oversimplified it in my head grossly...
-
-Jens Wiklander pointed me to the macros used in OP-TEE for CP15
-access with the same unpredictable patterns:
-https://github.com/OP-TEE/optee_os/tree/master/core/arch/arm32/include
+Maybe there was some earlier, but this is an excellent opportunity
+to repeat it... So Anders: why do you want to do this?
 
 Yours,
 Linus Walleij
