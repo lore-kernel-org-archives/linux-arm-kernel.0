@@ -1,65 +1,47 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 4 Sep 2014 16:07:37 -0700
-Subject: [GIT PULL] omap fixes against v3.17-rc3
-Message-ID: <20140904230737.GA7319@atomide.com>
+From: Anson.Huang@freescale.com (Anson.Huang at freescale.com)
+Date: Thu, 4 Sep 2014 23:37:21 +0000
+Subject: [PATCH 0/3] move gpt per clk parent for ipg_per to OSC
+In-Reply-To: <CAOMZO5BOfsvrH3ijxKwyGemEW-B60n-+4wpDZ5xfC98efM469w@mail.gmail.com>
+References: <1409729805-9741-1-git-send-email-b20788@freescale.com>,
+ <CAOMZO5BOfsvrH3ijxKwyGemEW-B60n-+4wpDZ5xfC98efM469w@mail.gmail.com>
+Message-ID: <9B0C19C6-6C3B-47DC-9DC4-5BD42CE294A4@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 69e273c0b0a3c337a521d083374c918dc52c666f:
+Hi, Fabio
+        can I know why you want to run the new kernel with old dtb?
 
-  Linux 3.17-rc3 (2014-08-31 18:23:04 -0700)
+Sent from Anson's iPhone
 
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-fixes-against-v3.17-rc3
-
-for you to fetch changes up to c7cc9ba11f8c09a4d12af0fc4aa9f9b026cdd354:
-
-  ARM: dts: dra7-evm: Add vtt regulator support (2014-09-04 12:49:22 -0700)
-
-----------------------------------------------------------------
-Few fixes for omaps mostly for various devices to get them working
-properly on the new am437x and dra7 hardware for several devices
-such as I2C, NAND, DDR3 and USB. There's also a clock fix for omap3.
-
-And also included are two minor cosmetic fixes that are not
-stictly fixes for the new hardware support added recently to
-downgrade a GPMC warning into a debug statement, and fix the
-confusing comments for dra7-evm spi1 mux.
-
-Note that these are all .dts changes except for a GPMC change.
-
-----------------------------------------------------------------
-Felipe Balbi (1):
-      ARM: dts: am4372: fix USB regs size
-
-Lokesh Vutla (1):
-      ARM: dts: dra7-evm: Add vtt regulator support
-
-Nishanth Menon (2):
-      ARM: dts: am437x-gp: switch i2c0 to 100KHz
-      ARM: dts: dra7-evm: Fix spi1 mux documentation
-
-Roger Quadros (8):
-      ARM: dts: dra7-evm: Fix i2c3 pinmux and frequency
-      ARM: dts: dra7-evm: Fix 8th NAND partition's name
-      ARM: dts: am43x-epos-evm: Use BCH16 ECC scheme instead of BCH8
-      ARM: dts: am437x-gp-evm: Use BCH16 ECC scheme instead of BCH8
-      ARM: dts: am437x-gp-evm: Don't use read/write wait monitoring
-      ARM: dts: am43xx-epos-evm: Don't use read/write wait monitoring
-      ARM: OMAP2+: gpmc: Don't complain if wait pin is used without r/w monitoring
-      ARM: dts: am43x-epos-evm: Disable QSPI to prevent conflict with GPMC-NAND
-
-Stefan Herbrechtsmeier (1):
-      ARM: dts: set 'ti,set-rate-parent' for dpll4_m5x2 clock
-
-Tony Lindgren (1):
-      Merge branch 'for-v3.17-rc/ti-clk-dt' of github.com:t-kristo/linux-pm into fixes-rc3
-
- arch/arm/boot/dts/am4372.dtsi          |  4 +--
- arch/arm/boot/dts/am437x-gp-evm.dts    |  6 ++---
- arch/arm/boot/dts/am43x-epos-evm.dts   |  9 +++----
- arch/arm/boot/dts/dra7-evm.dts         | 47 ++++++++++++++++++++++++++--------
- arch/arm/boot/dts/omap3xxx-clocks.dtsi |  1 +
- arch/arm/mach-omap2/gpmc.c             |  7 +++--
- 6 files changed, 48 insertions(+), 26 deletions(-)
+> ? 2014?9?5??6:50?"Fabio Estevam" <festevam@gmail.com> ???
+> 
+>> On Wed, Sep 3, 2014 at 4:36 AM, Anson Huang <b20788@freescale.com> wrote:
+>> Currently, gpt timer's clock is from ipg_per, and ipg_per clock is from ipg
+>> on most of i.MX6 series SOCs, but ipg's rate may be scaled when system enters
+>> low bus mode for saving power, then gpt timer's clock rate will be scaled as
+>> well, as system timer should be kept stable and NOT drift, better to keep gpt
+>> timer's clk at fixed rate, on i.MX6Q TO > 1.0, i.MX6DL and i.MX6SX, there is
+>> OSC clk available for gpt timer, we should enable this feature, the hardware
+>> design is as below:
+>> 
+>> i.MX6Q TO > 1.0: GPT_CR_CLKSRC, 3b'101 selects fix clock
+>>    of OSC / 8 for gpt per clk;
+>> i.MX6DL and i.MX6SX: GPT_CR_CLKSRC, 3b'101 selects OSC
+>>    for gpt per clk, and we must enable GPT_CR_24MEM to
+>>    enable OSC clk source for gpt per, GPT_PR_PRESCALER24M
+>>    is for pre-scaling of this OSC clk, here set it to 8
+>>    to make gpt per clk is 3MHz;
+>> i.MX6SL: ipg_per can be from OSC directly, so no need to
+>>    implement this new clk source for gpt per.
+>> 
+>> Anson Huang (3):
+>>  ARM: imx: add gpt_3m clk for i.mx6qdl
+>>  ARM: dts: imx6: change gpt per clk to gpt_3m on i.mx6qdl and i.mx6sx
+>>  ARM: imx: source gpt per clk from OSC for system timer
+> 
+> This patch series works fine if we use the new dtb and new kernel.
+> 
+> However, booting a kernel with these series applied and using an old
+> dtb we get a system with broken timer.
+> 
+> 'sleep 1' takes something like 20 seconds in this case.
