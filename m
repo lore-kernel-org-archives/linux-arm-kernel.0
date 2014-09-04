@@ -1,51 +1,68 @@
-From: David.Laight@ACULAB.COM (David Laight)
-Date: Thu, 4 Sep 2014 09:18:25 +0000
-Subject: [Patch net-next 08/11] net:fec: change FEC alignment to 64
- bytes for ARM platform
-In-Reply-To: <e50c6383dc184566846e190026d1186a@BLUPR03MB373.namprd03.prod.outlook.com>
-References: <1409776697-1536-1-git-send-email-Frank.Li@freescale.com>
- <1409776697-1536-9-git-send-email-Frank.Li@freescale.com>
- <063D6719AE5E284EB5DD2968C1650D6D17487196@AcuExch.aculab.com>
- <e50c6383dc184566846e190026d1186a@BLUPR03MB373.namprd03.prod.outlook.com>
-Message-ID: <063D6719AE5E284EB5DD2968C1650D6D174872BE@AcuExch.aculab.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 4 Sep 2014 10:27:21 +0100
+Subject: [PATCH v4 4/8] arm: use fixmap for text patching when text is RO
+In-Reply-To: <CAGXu5jJ890ruLO8Nit2exMSWigSM71kfZOkLoF0DcY1viFiX_A@mail.gmail.com>
+References: <1407949593-16121-1-git-send-email-keescook@chromium.org>
+ <1407949593-16121-5-git-send-email-keescook@chromium.org>
+ <20140819122933.GI23128@arm.com>
+ <CAGXu5jLxqyfJtg8rR9nzOrSBSsRC6y34rG6mZ8bb=AoxbSHkWQ@mail.gmail.com>
+ <CAGXu5jJ890ruLO8Nit2exMSWigSM71kfZOkLoF0DcY1viFiX_A@mail.gmail.com>
+Message-ID: <20140904092720.GA7156@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: fugang.duan@freescale.com
-> >From: Frank Li
-> >> From: Fugang Duan <B38611@freescale.com>
+On Wed, Sep 03, 2014 at 10:43:58PM +0100, Kees Cook wrote:
+> On Wed, Aug 20, 2014 at 5:28 AM, Kees Cook <keescook@chromium.org> wrote:
+> > On Tue, Aug 19, 2014 at 7:29 AM, Will Deacon <will.deacon@arm.com> wrote:
+> >> On Wed, Aug 13, 2014 at 06:06:29PM +0100, Kees Cook wrote:
+> >>> +static void __kprobes *patch_map(void *addr, int fixmap, unsigned long *flags)
+> >>> +     __acquires(&patch_lock)
+> >>> +{
+> >>> +     unsigned int uintaddr = (uintptr_t) addr;
+> >>> +     bool module = !core_kernel_text(uintaddr);
+> >>> +     struct page *page;
+> >>> +
+> >>> +     if (module && IS_ENABLED(CONFIG_DEBUG_SET_MODULE_RONX))
+> >>> +             page = vmalloc_to_page(addr);
+> >>> +     else if (!module && IS_ENABLED(CONFIG_DEBUG_RODATA))
+> >>> +             page = virt_to_page(addr);
+> >>> +     else
+> >>> +             return addr;
+> >>> +
+> >>> +     if (flags)
+> >>> +             spin_lock_irqsave(&patch_lock, *flags);
+> >>> +     else
+> >>> +             __acquire(&patch_lock);
 > >>
-> >> Since enet-avb has 64 bytes alignment limitation for rx DMA transfer.
-> >> The previous enet IP for ARM platform has 16 bytes alignment for tx
-> >> DMA transfer.
+> >> I don't understand the locking here. Why is it conditional, why do we need
+> >> to disable interrupts, and are you just racing against yourself?
 > >
-> >Do you mean rx or tx here? or both??
+> > AIUI, the locking is here to avoid multiple users of the text poking
+> > fixmaps. It's conditional because there are two fixmaps
+> > (FIX_TEXT_POKE0 and FIX_TEXT_POKE1). Locking happens around 0 so
+> > locking around 1 is not needed since it is only ever used when 0 is in
+> > use. (__patch_text_real locks patch_lock before setting 0 when it uses
+> > remapping, and if it also needs 1, it doesn't have to lock since the
+> > lock is already held.)
 > >
-> >And can we beat up the hardware designers to stop these restrictions on rx
-> >(in particular) ethernet buffer alignments?
-> >A device isn't suitable for ethernet unless is can write the destination
-> >mac address to a 4n+2 boundary.
+> >>> +     set_fixmap(fixmap, page_to_phys(page));
+> >>
+> >> set_fixmap does TLB invalidation, right? I think that means it can block on
+> >> 11MPCore and A15 w/ the TLBI erratum, so it's not safe to call this with
+> >> interrupts disabled anyway.
 > >
-> >	David
+> > Oh right. Hrm.
 > >
-> Hi, David,
+> > In an earlier version of this series set_fixmap did not perform TLB
+> > invalidation. I wonder if this is not needed at all? (Wouldn't that be
+> > nice...)
 > 
-> For previous enet IP there has 16 bytes data buffer alignment limitation for tx & rx DMA transfer.
-> For imx6sx enet-avb IP, there has 64 bytes data buffer alignment limitation for rx DMA transfer, byte
-> alignment for tx data
-> Buffer for DMA transfer.
-> 
-> I think rx data buffer alignment limitation don't introduce performance drop, is not complex for sw
-> implemention. Anyway,
-> We can request IC designer to remove the limitation for future chips.
+> As suspected, my tests fail spectacularly without the TLB flush.
+> Adding WARN_ON(!irqs_disabled()) doesn't warn, so I think we're safe
+> here. Should I leave the WARN_ON in place for clarity, or some other
+> comments?
 
-The 'problem' is that you need the IP header to be 32bit aligned.
-If the dma buffer has to be aligned then the code either has to do an expensive
-misaligned copy of the entire frame (at some point the entire frame is almost
-certainly all copied into an aligned buffer), or take the hit of misaligned
-memory accesses (which might have to be emulated with byte transfers).
+I thought there was a potential call to spin_lock_irqsave right before
+this TLB flush?
 
-The rx buffer can be aligned provided the hardware skips (or writes junk to)
-the first two bytes.
-
-	David
+Will
