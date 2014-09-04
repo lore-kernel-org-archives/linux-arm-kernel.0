@@ -1,71 +1,54 @@
-From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Thu, 4 Sep 2014 07:20:19 -0600
-Subject: [PATCH 1/2] PCI: designware: change MSI-related pcie_host_ops
-In-Reply-To: <1409856338-1730-1-git-send-email-Minghuan.Lian@freescale.com>
-References: <1409856338-1730-1-git-send-email-Minghuan.Lian@freescale.com>
-Message-ID: <CAErSpo5kEVSKmZn9CxZ=G=PbnKcAaso=ZwCwp=aEvJsnS_AKyQ@mail.gmail.com>
+From: dmurphy@ti.com (Murphy, Dan)
+Date: Thu, 4 Sep 2014 13:21:48 +0000
+Subject: [PATCH v2 1/2] doc: dt/bindings: input: introduce TI DRV2667
+ haptic driver description
+References: <1408980413-8763-1-git-send-email-dmurphy@ti.com>
+Message-ID: <00FC9A978A94B7418C33AFAE8A35ED49E385C5@DFLE09.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 4, 2014 at 12:45 PM, Minghuan Lian
-<Minghuan.Lian@freescale.com> wrote:
-> 1. Change original get_msi_data() to get_msi_addr(), since this
-> function returns MSI message address.
-> 2. Add a new function get_msi_data() to return MSI message data.
+Bumping x2
 
-This looks like two patches: one that merely renames a function, with
-no functional change at all, and a second that adds a new function.
-Please split them.
-
-> Signed-off-by: Minghuan Lian <Minghuan.Lian@freescale.com>
+On 08/25/2014 10:26 AM, Murphy, Dan wrote:
+> DRV2667 is a haptic/vibrator driver for Linear Resonant Actuators.
+> Adding dt binding for this part
+> 
+> Signed-off-by: Dan Murphy <dmurphy@ti.com>
 > ---
->  drivers/pci/host/pcie-designware.c | 11 ++++++++---
->  drivers/pci/host/pcie-designware.h |  3 ++-
->  2 files changed, 10 insertions(+), 4 deletions(-)
->
-> diff --git a/drivers/pci/host/pcie-designware.c b/drivers/pci/host/pcie-designware.c
-> index 52bd3a1..c84913e 100644
-> --- a/drivers/pci/host/pcie-designware.c
-> +++ b/drivers/pci/host/pcie-designware.c
-> @@ -373,12 +373,17 @@ static int dw_msi_setup_irq(struct msi_chip *chip, struct pci_dev *pdev,
->          */
->         desc->msi_attrib.multiple = msgvec;
->
-> -       if (pp->ops->get_msi_data)
-> -               msg.address_lo = pp->ops->get_msi_data(pp);
-> +       if (pp->ops->get_msi_addr)
-> +               msg.address_lo = pp->ops->get_msi_addr(pp);
->         else
->                 msg.address_lo = virt_to_phys((void *)pp->msi_data);
->         msg.address_hi = 0x0;
-> -       msg.data = pos;
+> 
+> v2 - Removed extra tabs, changed node to function not device
+> added vbat-supply, and removed confusing description - https://patchwork.kernel.org/patch/4759381/
+> 
+>  .../devicetree/bindings/input/ti,drv2667.txt       |   17 +++++++++++++++++
+>  1 file changed, 17 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/input/ti,drv2667.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/input/ti,drv2667.txt b/Documentation/devicetree/bindings/input/ti,drv2667.txt
+> new file mode 100644
+> index 0000000..996382c
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/input/ti,drv2667.txt
+> @@ -0,0 +1,17 @@
+> +* Texas Instruments - drv2667 Haptics driver
 > +
-> +       if (pp->ops->get_msi_data)
-> +               msg.data = pp->ops->get_msi_data(pp, pos);
-> +       else
-> +               msg.data = pos;
+> +Required properties:
+> +	- compatible - "ti,drv2667" - DRV2667
+> +	- reg -  I2C slave address
+> +	- vbat-supply - Required supply regulator
 > +
->         write_msi_msg(irq, &msg);
->
->         return 0;
-> diff --git a/drivers/pci/host/pcie-designware.h b/drivers/pci/host/pcie-designware.h
-> index daf81f9..7f08807 100644
-> --- a/drivers/pci/host/pcie-designware.h
-> +++ b/drivers/pci/host/pcie-designware.h
-> @@ -73,7 +73,8 @@ struct pcie_host_ops {
->         void (*host_init)(struct pcie_port *pp);
->         void (*msi_set_irq)(struct pcie_port *pp, int irq);
->         void (*msi_clear_irq)(struct pcie_port *pp, int irq);
-> -       u32 (*get_msi_data)(struct pcie_port *pp);
-> +       u32 (*get_msi_addr)(struct pcie_port *pp);
-> +       u32 (*get_msi_data)(struct pcie_port *pp, int pos);
->  };
->
->  int dw_pcie_cfg_read(void __iomem *addr, int where, int size, u32 *val);
-> --
-> 1.9.1
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> +Example:
+> +
+> +haptics: haptics at 59 {
+> +	compatible = "ti,drv2667";
+> +	reg = <0x59>;
+> +	vbat-supply = <&vbat>;
+> +};
+> +
+> +For more product information please see the link below:
+> +http://www.ti.com/product/drv2667
+> 
+
+
+-- 
+------------------
+Dan Murphy
