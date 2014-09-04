@@ -1,68 +1,45 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 4 Sep 2014 10:27:21 +0100
-Subject: [PATCH v4 4/8] arm: use fixmap for text patching when text is RO
-In-Reply-To: <CAGXu5jJ890ruLO8Nit2exMSWigSM71kfZOkLoF0DcY1viFiX_A@mail.gmail.com>
-References: <1407949593-16121-1-git-send-email-keescook@chromium.org>
- <1407949593-16121-5-git-send-email-keescook@chromium.org>
- <20140819122933.GI23128@arm.com>
- <CAGXu5jLxqyfJtg8rR9nzOrSBSsRC6y34rG6mZ8bb=AoxbSHkWQ@mail.gmail.com>
- <CAGXu5jJ890ruLO8Nit2exMSWigSM71kfZOkLoF0DcY1viFiX_A@mail.gmail.com>
-Message-ID: <20140904092720.GA7156@arm.com>
+From: chen.fang@freescale.com (Fancy Fang)
+Date: Thu, 4 Sep 2014 16:28:55 +0800
+Subject: [PATCH] ARM: clk-imx6sl: correct the pxp and epdc axi clock selections
+Message-ID: <1409819335-29094-1-git-send-email-chen.fang@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 03, 2014 at 10:43:58PM +0100, Kees Cook wrote:
-> On Wed, Aug 20, 2014 at 5:28 AM, Kees Cook <keescook@chromium.org> wrote:
-> > On Tue, Aug 19, 2014 at 7:29 AM, Will Deacon <will.deacon@arm.com> wrote:
-> >> On Wed, Aug 13, 2014 at 06:06:29PM +0100, Kees Cook wrote:
-> >>> +static void __kprobes *patch_map(void *addr, int fixmap, unsigned long *flags)
-> >>> +     __acquires(&patch_lock)
-> >>> +{
-> >>> +     unsigned int uintaddr = (uintptr_t) addr;
-> >>> +     bool module = !core_kernel_text(uintaddr);
-> >>> +     struct page *page;
-> >>> +
-> >>> +     if (module && IS_ENABLED(CONFIG_DEBUG_SET_MODULE_RONX))
-> >>> +             page = vmalloc_to_page(addr);
-> >>> +     else if (!module && IS_ENABLED(CONFIG_DEBUG_RODATA))
-> >>> +             page = virt_to_page(addr);
-> >>> +     else
-> >>> +             return addr;
-> >>> +
-> >>> +     if (flags)
-> >>> +             spin_lock_irqsave(&patch_lock, *flags);
-> >>> +     else
-> >>> +             __acquire(&patch_lock);
-> >>
-> >> I don't understand the locking here. Why is it conditional, why do we need
-> >> to disable interrupts, and are you just racing against yourself?
-> >
-> > AIUI, the locking is here to avoid multiple users of the text poking
-> > fixmaps. It's conditional because there are two fixmaps
-> > (FIX_TEXT_POKE0 and FIX_TEXT_POKE1). Locking happens around 0 so
-> > locking around 1 is not needed since it is only ever used when 0 is in
-> > use. (__patch_text_real locks patch_lock before setting 0 when it uses
-> > remapping, and if it also needs 1, it doesn't have to lock since the
-> > lock is already held.)
-> >
-> >>> +     set_fixmap(fixmap, page_to_phys(page));
-> >>
-> >> set_fixmap does TLB invalidation, right? I think that means it can block on
-> >> 11MPCore and A15 w/ the TLBI erratum, so it's not safe to call this with
-> >> interrupts disabled anyway.
-> >
-> > Oh right. Hrm.
-> >
-> > In an earlier version of this series set_fixmap did not perform TLB
-> > invalidation. I wonder if this is not needed at all? (Wouldn't that be
-> > nice...)
-> 
-> As suspected, my tests fail spectacularly without the TLB flush.
-> Adding WARN_ON(!irqs_disabled()) doesn't warn, so I think we're safe
-> here. Should I leave the WARN_ON in place for clarity, or some other
-> comments?
+The parent clocks of IMX6SL_CLK_PXP_AXI_SEL and IMX6SL_CLK_EPDC_AXI_SEL
+clocks are not the same. So split the epdc_pxp_sels into two different
+clock selections 'pxp_axi_sels' and 'epdc_axi_sels'.
 
-I thought there was a potential call to spin_lock_irqsave right before
-this TLB flush?
+Signed-off-by: Fancy Fang <chen.fang@freescale.com>
+Signed-off-by: Robby Cai <R63905@freescale.com>
+Acked-by: Shawn Guo <shawn.guo@freescale.com>
+---
+ arch/arm/mach-imx/clk-imx6sl.c | 7 ++++---
+ 1 file changed, 4 insertions(+), 3 deletions(-)
 
-Will
+diff --git a/arch/arm/mach-imx/clk-imx6sl.c b/arch/arm/mach-imx/clk-imx6sl.c
+index 43261ea..d730dfa 100644
+--- a/arch/arm/mach-imx/clk-imx6sl.c
++++ b/arch/arm/mach-imx/clk-imx6sl.c
+@@ -47,7 +47,8 @@ static const char *csi_lcdif_sels[]	= { "mmdc", "pll2_pfd2", "pll3_120m", "pll3_
+ static const char *usdhc_sels[]		= { "pll2_pfd2", "pll2_pfd0", };
+ static const char *ssi_sels[]		= { "pll3_pfd2", "pll3_pfd3", "pll4_audio_div", "dummy", };
+ static const char *perclk_sels[]	= { "ipg", "osc", };
+-static const char *epdc_pxp_sels[]	= { "mmdc", "pll3_usb_otg", "pll5_video_div", "pll2_pfd0", "pll2_pfd2", "pll3_pfd1", };
++static const char *pxp_axi_sels[]	= { "pll2_bus", "pll3_usb_otg", "pll5_video_div", "pll2_pfd0", "pll2_pfd2", "pll3_pfd3", };
++static const char *epdc_axi_sels[]	= { "pll2_bus", "pll3_usb_otg", "pll5_video_div", "pll2_pfd0", "pll2_pfd2", "pll3_pfd2", };
+ static const char *gpu2d_ovg_sels[]	= { "pll3_pfd1", "pll3_usb_otg", "pll2_bus", "pll2_pfd2", };
+ static const char *gpu2d_sels[]		= { "pll2_pfd2", "pll3_usb_otg", "pll3_pfd1", "pll2_bus", };
+ static const char *lcdif_pix_sels[]	= { "pll2_bus", "pll3_usb_otg", "pll5_video_div", "pll2_pfd0", "pll3_pfd0", "pll3_pfd1", };
+@@ -251,8 +252,8 @@ static void __init imx6sl_clocks_init(struct device_node *ccm_node)
+ 	clks[IMX6SL_CLK_SSI2_SEL]         = imx_clk_fixup_mux("ssi2_sel",   base + 0x1c, 12, 2, ssi_sels,          ARRAY_SIZE(ssi_sels),    imx_cscmr1_fixup);
+ 	clks[IMX6SL_CLK_SSI3_SEL]         = imx_clk_fixup_mux("ssi3_sel",   base + 0x1c, 14, 2, ssi_sels,          ARRAY_SIZE(ssi_sels),    imx_cscmr1_fixup);
+ 	clks[IMX6SL_CLK_PERCLK_SEL]       = imx_clk_fixup_mux("perclk_sel", base + 0x1c, 6,  1, perclk_sels,       ARRAY_SIZE(perclk_sels), imx_cscmr1_fixup);
+-	clks[IMX6SL_CLK_PXP_AXI_SEL]      = imx_clk_mux("pxp_axi_sel",      base + 0x34, 6,  3, epdc_pxp_sels,     ARRAY_SIZE(epdc_pxp_sels));
+-	clks[IMX6SL_CLK_EPDC_AXI_SEL]     = imx_clk_mux("epdc_axi_sel",     base + 0x34, 15, 3, epdc_pxp_sels,     ARRAY_SIZE(epdc_pxp_sels));
++	clks[IMX6SL_CLK_PXP_AXI_SEL]      = imx_clk_mux("pxp_axi_sel",      base + 0x34, 6,  3, pxp_axi_sels,      ARRAY_SIZE(pxp_axi_sels));
++	clks[IMX6SL_CLK_EPDC_AXI_SEL]     = imx_clk_mux("epdc_axi_sel",     base + 0x34, 15, 3, epdc_axi_sels,     ARRAY_SIZE(epdc_axi_sels));
+ 	clks[IMX6SL_CLK_GPU2D_OVG_SEL]    = imx_clk_mux("gpu2d_ovg_sel",    base + 0x18, 4,  2, gpu2d_ovg_sels,    ARRAY_SIZE(gpu2d_ovg_sels));
+ 	clks[IMX6SL_CLK_GPU2D_SEL]        = imx_clk_mux("gpu2d_sel",        base + 0x18, 8,  2, gpu2d_sels,        ARRAY_SIZE(gpu2d_sels));
+ 	clks[IMX6SL_CLK_LCDIF_PIX_SEL]    = imx_clk_mux("lcdif_pix_sel",    base + 0x38, 6,  3, lcdif_pix_sels,    ARRAY_SIZE(lcdif_pix_sels));
+-- 
+1.9.1
