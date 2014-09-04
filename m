@@ -1,61 +1,60 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 4 Sep 2014 18:27:48 +0100
-Subject: [PATCH v5 3/8] arm: fixmap: implement __set_fixmap()
-In-Reply-To: <CAGXu5jKimGaupwyUwt0Zwa3OtjeoED8-uBeMX0MwXjBYP6ssAg@mail.gmail.com>
-References: <1409781429-27593-1-git-send-email-keescook@chromium.org>
- <1409781429-27593-4-git-send-email-keescook@chromium.org>
- <20140904170349.GL7156@arm.com>
- <CAGXu5jKimGaupwyUwt0Zwa3OtjeoED8-uBeMX0MwXjBYP6ssAg@mail.gmail.com>
-Message-ID: <20140904172748.GO7156@arm.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Thu, 4 Sep 2014 18:29:10 +0100
+Subject: [PATCH v8 6/8] drivers: cpuidle: CPU idle ARM64 driver
+In-Reply-To: <20140904160320.GB22354@arm.com>
+References: <1409585324-3678-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <1409585324-3678-7-git-send-email-lorenzo.pieralisi@arm.com>
+ <20140903173740.GJ1824@e102568-lin.cambridge.arm.com>
+ <20140904160320.GB22354@arm.com>
+Message-ID: <20140904172909.GA14822@e102568-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 04, 2014 at 06:23:42PM +0100, Kees Cook wrote:
-> On Thu, Sep 4, 2014 at 10:03 AM, Will Deacon <will.deacon@arm.com> wrote:
-> > Hi Kees,
-> >
-> > On Wed, Sep 03, 2014 at 10:57:04PM +0100, Kees Cook wrote:
-> >> This is used from set_fixmap() and clear_fixmap() via asm-generic/fixmap.h.
-> >> Also makes sure that the fixmap allocation fits into the expected range.
-> >>
-> >> Based on patch by Rabin Vincent.
-> >
-> > [...]
-> >
-> >> +void __set_fixmap(enum fixed_addresses idx, phys_addr_t phys, pgprot_t prot)
-> >> +{
-> >> +     unsigned long vaddr = __fix_to_virt(idx);
-> >> +     pte_t *pte = pte_offset_kernel(pmd_off_k(vaddr), vaddr);
-> >> +
-> >> +     /* Make sure fixmap region does not exceed available allocation. */
-> >> +     BUILD_BUG_ON(FIXADDR_START + (__end_of_fixed_addresses * PAGE_SIZE) >
-> >> +                  FIXADDR_END);
-> >> +     BUG_ON(idx >= __end_of_fixed_addresses);
-> >> +
-> >> +     if (pgprot_val(prot))
-> >> +             set_pte_at(NULL, vaddr, pte,
-> >> +                     pfn_pte(phys >> PAGE_SHIFT, prot));
-> >> +     else
-> >> +             pte_clear(NULL, vaddr, pte);
-> >> +
-> >> +     /*
-> >> +      * Given the potential a15 tlbi errata, we can only do tlb flushes
-> >> +      * with interrupts disabled. Callers must have taken care of this.
-> >> +      */
-> >> +     WARN_ON_ONCE(!irqs_disabled());
-> >> +     flush_tlb_kernel_range(vaddr, vaddr + PAGE_SIZE);
-> >
-> > Aha, this explains why we were confusing each other! The issue is that
-> > interrupts must be *enabled*, so this code does the exact opposite of
-> > what we need.
-> >
-> > I think this got lost in a sea of double negatives during the last round
-> > of review.
+On Thu, Sep 04, 2014 at 05:03:20PM +0100, Catalin Marinas wrote:
+> On Wed, Sep 03, 2014 at 06:37:40PM +0100, Lorenzo Pieralisi wrote:
+> > On Mon, Sep 01, 2014 at 04:28:42PM +0100, Lorenzo Pieralisi wrote:
+> > > This patch implements a generic CPU idle driver for ARM64 machines.
+> > > 
+> > > It relies on the DT idle states infrastructure to initialize idle
+> > > states count and respective parameters. Current code assumes the driver
+> > > is managing idle states on all possible CPUs but can be easily
+> > > generalized to support heterogenous systems and build cpumasks at
+> > > runtime using MIDRs or DT cpu nodes compatible properties.
+> > > 
+> > > The driver relies on the arm64 CPU operations to call the idle
+> > > initialization hook used to parse and save suspend back-end specific
+> > > idle states information upon probing.
+> > > 
+> > > Idle state index 0 is always initialized as a simple wfi state, ie always
+> > > considered present and functional on all ARM64 platforms.
+> > > 
+> > > Idle state indices higher than 0 trigger idle state entry by calling
+> > > the cpu_suspend function, that triggers the suspend operation through
+> > > the CPU operations suspend back-end hook. cpu_suspend passes the idle
+> > > state index as a parameter so that the CPU operations suspend back-end
+> > > can retrieve the required idle state data by using the idle state
+> > > index to execute a look-up on its internal data structures.
+> > > 
+> > > Reviewed-by: Ashwin Chaugule <ashwin.chaugule@linaro.org>
+> > > Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
+> > > Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> > 
+> > This patch should be ready to go too, is it ok if I split the series
+> > in arm64 arch specific patches (will ask Catalin to pull) and CPUidle ones
+> > (inclusive of DT bindings and !!this patch!!) and send two separate pull
+> > requests ?
 > 
-> Ah! If this is the case, perhaps we can get away with
-> local_flush_tlb_kernel_range() then?
+> If Daniel/Rafael don't have any objection, I can take the whole series
+> through the arm64 tree (it seems that patches have been already acked by
+> Daniel).
 
-That's a bit tricky, since you need to ensure that preemption is disabled
-until the mapping is put back like it was.
+Thanks a lot Catalin. Since this one is a brand new CPUidle driver and it
+follows a different pattern from arm legacy drivers I would like to get
+Daniel's ack on this patch too before pushing it. For the records I have
+just added two pr_err to signal driver probing error, ultraminor changes
+that do not justify a repost.
 
-Will
+If Samsung guys do not manifest themselves I would drop patch 8 from
+the series till it gets tested and its patch dependency queued too.
+
+Lorenzo
