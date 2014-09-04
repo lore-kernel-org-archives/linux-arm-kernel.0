@@ -1,29 +1,28 @@
 From: srv_yingjoe.chen@mediatek.com (Joe.C)
-Date: Fri, 5 Sep 2014 07:50:56 +0800
-Subject: [PATCH 1/5] arm: MTK: Add basic support for mt8127
+Date: Fri, 5 Sep 2014 07:50:57 +0800
+Subject: [PATCH 2/5] arm: mediatek: add dts for 8127 Moose board
 In-Reply-To: <1409874660-8710-1-git-send-email-srv_yingjoe.chen@mediatek.com>
 References: <1409874660-8710-1-git-send-email-srv_yingjoe.chen@mediatek.com>
-Message-ID: <1409874660-8710-2-git-send-email-srv_yingjoe.chen@mediatek.com>
+Message-ID: <1409874660-8710-3-git-send-email-srv_yingjoe.chen@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: "Joe.C" <yingjoe.chen@mediatek.com>
 
-This adds a basic dtsi for MT8127 SoC.
+Moose is a tablet evalutation board based on MT8127 SoC.
 
 Signed-off-by: Joe.C <yingjoe.chen@mediatek.com>
 ---
- arch/arm/boot/dts/mt8127.dtsi     | 93 +++++++++++++++++++++++++++++++++++++++
- arch/arm/mach-mediatek/mediatek.c |  1 +
- 2 files changed, 94 insertions(+)
- create mode 100644 arch/arm/boot/dts/mt8127.dtsi
+ arch/arm/boot/dts/mt8127-moose.dts | 24 ++++++++++++++++++++++++
+ 1 file changed, 24 insertions(+)
+ create mode 100644 arch/arm/boot/dts/mt8127-moose.dts
 
-diff --git a/arch/arm/boot/dts/mt8127.dtsi b/arch/arm/boot/dts/mt8127.dtsi
+diff --git a/arch/arm/boot/dts/mt8127-moose.dts b/arch/arm/boot/dts/mt8127-moose.dts
 new file mode 100644
-index 0000000..261213c
+index 0000000..715e23c
 --- /dev/null
-+++ b/arch/arm/boot/dts/mt8127.dtsi
-@@ -0,0 +1,93 @@
++++ b/arch/arm/boot/dts/mt8127-moose.dts
+@@ -0,0 +1,24 @@
 +/*
 + * Copyright (c) 2014 MediaTek Inc.
 + * Author: Joe.C <yingjoe.chen@mediatek.com>
@@ -38,96 +37,15 @@ index 0000000..261213c
 + * GNU General Public License for more details.
 + */
 +
-+#include <dt-bindings/interrupt-controller/irq.h>
-+#include <dt-bindings/interrupt-controller/arm-gic.h>
-+#include "skeleton64.dtsi"
++/dts-v1/;
++#include "mt8127.dtsi"
 +
 +/ {
-+	compatible = "mediatek,mt8127";
-+	interrupt-parent = <&gic>;
++	model = "mt8127-moose";
 +
-+	cpus {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		cpu at 0 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a7";
-+			reg = <0x0>;
-+		};
-+		cpu at 1 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a7";
-+			reg = <0x1>;
-+		};
-+		cpu at 2 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a7";
-+			reg = <0x2>;
-+		};
-+		cpu at 3 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a7";
-+			reg = <0x3>;
-+		};
-+
-+	};
-+
-+	clocks {
-+		#address-cells = <2>;
-+		#size-cells = <2>;
-+		compatible = "simple-bus";
-+		ranges;
-+
-+		system_clk: dummy13m {
-+			compatible = "fixed-clock";
-+			clock-frequency = <13000000>;
-+			#clock-cells = <0>;
-+		};
-+
-+		rtc_clk: dummy32k {
-+			compatible = "fixed-clock";
-+			clock-frequency = <32000>;
-+			#clock-cells = <0>;
-+		};
-+	};
-+
-+	soc {
-+		#address-cells = <2>;
-+		#size-cells = <2>;
-+		compatible = "simple-bus";
-+		ranges;
-+
-+		timer: timer at 10008000 {
-+			compatible = "mediatek,mt6577-timer";
-+			reg = <0 0x10008000 0 0x80>;
-+			interrupts = <GIC_SPI 112 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&system_clk>, <&rtc_clk>;
-+			clock-names = "system-clk", "rtc-clk";
-+		};
-+
-+		gic: interrupt-controller at 10211000 {
-+			compatible = "arm,cortex-a7-gic";
-+			interrupt-controller;
-+			#interrupt-cells = <3>;
-+			reg = <0 0x10211000 0 0x1000>,
-+			      <0 0x10212000 0 0x1000>,
-+			      <0 0x10214000 0 0x2000>,
-+			      <0 0x10216000 0 0x2000>;
-+		};
++	memory {
++		reg = <0 0x80000000 0 0x40000000>;
 +	};
 +};
-diff --git a/arch/arm/mach-mediatek/mediatek.c b/arch/arm/mach-mediatek/mediatek.c
-index f2acf07..7f478ce 100644
---- a/arch/arm/mach-mediatek/mediatek.c
-+++ b/arch/arm/mach-mediatek/mediatek.c
-@@ -19,6 +19,7 @@
- 
- static const char * const mediatek_board_dt_compat[] = {
- 	"mediatek,mt6589",
-+	"mediatek,mt8127",
- 	NULL,
- };
- 
 -- 
 1.8.1.1.dirty
