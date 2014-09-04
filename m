@@ -1,25 +1,46 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Thu, 04 Sep 2014 14:22:36 -0700
-Subject: [PATCH] mmc: sdhci-msm: Make tuning block table endian agnostic
-In-Reply-To: <CAPDyKFp0LwK=DABHaP-Ke=QZFP8bY5MO9RnYmUBqeEdDKp63BA@mail.gmail.com>
-References: <1409752622-7564-1-git-send-email-sboyd@codeaurora.org>	<5407F364.9030303@samsung.com>
- <CAPDyKFp0LwK=DABHaP-Ke=QZFP8bY5MO9RnYmUBqeEdDKp63BA@mail.gmail.com>
-Message-ID: <5408D81C.7070602@codeaurora.org>
+From: b.galvani@gmail.com (Beniamino Galvani)
+Date: Thu, 4 Sep 2014 23:38:21 +0200
+Subject: [PATCH v5 1/4] ethernet: arc: Add support for Rockchip SoC layer
+ device tree bindings
+In-Reply-To: <3809311.80Auz8fbHu@wuerfel>
+References: <1409763165-16461-1-git-send-email-romain.perier@gmail.com>
+ <20140903211220.GA16962@gmail.com> <3809311.80Auz8fbHu@wuerfel>
+Message-ID: <20140904213821.GA13511@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/04/14 03:53, Ulf Hansson wrote:
-> On 4 September 2014 07:06, Jaehoon Chung <jh80.chung@samsung.com> wrote:
->>
->> In dw-mmc.c, tuning_block values are same.
->> So I think we can move these value into generic header. how about?
-> Actually, I believe these values comes from the eMMC specification?
-> Shouldn't they be moved to the mmc core instead?
+On Thu, Sep 04, 2014 at 11:33:38AM +0200, Arnd Bergmann wrote:
+> This is a recurring problem: 
+> 
+> driver a depends on x and selects y
+> driver b depends on y and selects x
+> 
+> Maybe we should teach Kconfig to not worry about it when x and y are
+> both user-selectable as well.
+> 
+> However, a nicer solution would be if we could agree for each symbol
+> on who is supposed to 'select' or 'depends on' it. In particular,
+> we are inconsistent about CONFIG_REGULATOR:
+> 
+> MDIO_SUN4I probably should not 'select' it but instead 'depends on'
+> this symbol if anything. It would be nice if someone could submit
+> a patch to that effect. EMAC_ROCKCHIP could also drop the dependency
+> on REGULATOR: you can still build the driver without that subsystem
+> being enabled, but then all the regulators have to be set up by
+> the boot loader.
 
-That sounds like good consolidation, but can we do that in a follow-up
-patch? This fixes the driver for me and I was hoping to make something
-minimal to go back to stable trees.
+Thanks, things are clearer now. 
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+If I understand correctly the dependency of MDIO_SUN4I on REGULATOR
+can be dropped as well for the same reason; I will send a patch for
+that.
+
+Beniamino
+
+> 
+> There isn't much we can do about the PHYLIB dependency, unless we
+> turn it into a silent symbol that gets selected by all phy drivers,
+> or we change all network drivers that currently 'select' it to
+> 'depends on'. I don't really want to get involved in that discussion ;-)
+> 
+> 	Arnd
