@@ -1,43 +1,23 @@
-From: dinguyen@opensource.altera.com (dinguyen at opensource.altera.com)
-Date: Thu, 4 Sep 2014 11:11:45 -0500
-Subject: [GIT PULL 2/2] SOCFPGA driver updates for 3.18
-In-Reply-To: <1409847105-27241-1-git-send-email-dinguyen@opensource.altera.com>
-References: <1409847105-27241-1-git-send-email-dinguyen@opensource.altera.com>
-Message-ID: <1409847105-27241-2-git-send-email-dinguyen@opensource.altera.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 4 Sep 2014 18:16:40 +0200
+Subject: [PATCH v4 1/4] pinctrl: qcom: Add APQ8084 pinctrl support
+In-Reply-To: <1409761696-15435-2-git-send-email-gdjakov@mm-sol.com>
+References: <1409761696-15435-1-git-send-email-gdjakov@mm-sol.com>
+ <1409761696-15435-2-git-send-email-gdjakov@mm-sol.com>
+Message-ID: <CACRpkdZE=Torp_s9M+NrVEwYXU3XVzWDzGO6u84ZqtxW4HUJGg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Kevin and Olof,
+On Wed, Sep 3, 2014 at 6:28 PM, Georgi Djakov <gdjakov@mm-sol.com> wrote:
 
-Please consider pulling this patch for v3.18. Boris had given me permission to
-take this patch together with it's DTS component. The DTS portion was in the
-previous pull request.
+> This patchset adds pinctrl support for the Qualcomm APQ8084 platform.
+>
+> Reviewed-by: Andy Gross <agross@codeaurora.org>
+> Acked-by: Bjorn Andersson <bjorn.andersson@sonymobile.com>
+> Signed-off-by: Georgi Djakov <gdjakov@mm-sol.com>
 
-Thanks,
-Dinh
+Patch applied, after taking the liberty to copy the changelog into
+the commit message.
 
-The following changes since commit 52addcf9d6669fa439387610bc65c92fa0980cef:
-
-  Linux 3.17-rc2 (2014-08-25 15:36:20 -0700)
-
-are available in the git repository at:
-
-  git://git.rocketboards.org/linux-socfpga-next.git tags/socfpga_driver_for_v3.18
-
-for you to fetch changes up to 0730c4a52ef777a3098e00363e56858f14d6d323:
-
-  edac: altera: Add Altera SDRAM EDAC support (2014-09-04 11:05:23 -0500)
-
-----------------------------------------------------------------
-SOCFPGA driver update for v3.18
-
-----------------------------------------------------------------
-Thor Thayer (1):
-      edac: altera: Add Altera SDRAM EDAC support
-
- MAINTAINERS                |   5 +
- drivers/edac/Kconfig       |   9 +
- drivers/edac/Makefile      |   2 +
- drivers/edac/altera_edac.c | 410 +++++++++++++++++++++++++++++++++++++++++++++
- 4 files changed, 426 insertions(+)
- create mode 100644 drivers/edac/altera_edac.c
+Yours,
+Linus Walleij
