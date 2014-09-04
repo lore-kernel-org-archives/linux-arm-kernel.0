@@ -1,48 +1,86 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed,  3 Sep 2014 18:01:05 -0700
-Subject: [PATCH v2 3/4] clk: Use lockless functions for debug printing
+Date: Wed,  3 Sep 2014 18:01:03 -0700
+Subject: [PATCH v2 1/4] clk: Recalc rate and accuracy in underscore functions
+ if not caching
 In-Reply-To: <1409792466-5092-1-git-send-email-sboyd@codeaurora.org>
 References: <1409792466-5092-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <1409792466-5092-4-git-send-email-sboyd@codeaurora.org>
+Message-ID: <1409792466-5092-2-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In the near future we're going to move the prepare lock to a
-per-clock ww_mutex. Use the lockless functions here for printing
-the rate and accuracy so that we don't run into AA deadlocks in
-the future.
+When we move this code to use ww_mutex we'll need to call
+__clk_get_rate() and __clk_get_accuracy(), instead of their
+non-underscore counterparts, while holding the clock's prepare
+mutex. Move the recalculation of these values into the underscore
+functions so that we can call __clk_get_rate() and
+__clk_get_accuracy() while holding locks.
 
 Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 ---
- drivers/clk/clk.c | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
+ drivers/clk/clk.c | 17 ++++++++++-------
+ 1 file changed, 10 insertions(+), 7 deletions(-)
 
 diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-index 248a8612a12d..d2da11674f0b 100644
+index b76fa69b44cb..1feaf708aa49 100644
 --- a/drivers/clk/clk.c
 +++ b/drivers/clk/clk.c
-@@ -122,8 +122,8 @@ static void clk_summary_show_one(struct seq_file *s, struct clk *c, int level)
- 	seq_printf(s, "%*s%-*s %11d %12d %11lu %10lu\n",
- 		   level * 3 + 1, "",
- 		   30 - level * 3, c->name,
--		   c->enable_count, c->prepare_count, clk_get_rate(c),
--		   clk_get_accuracy(c));
-+		   c->enable_count, c->prepare_count, __clk_get_rate(c),
-+		   __clk_get_accuracy(c));
+@@ -591,6 +591,8 @@ unsigned int __clk_get_prepare_count(struct clk *clk)
+ 	return !clk ? 0 : clk->prepare_count;
  }
  
- static void clk_summary_show_subtree(struct seq_file *s, struct clk *c,
-@@ -180,8 +180,8 @@ static void clk_dump_one(struct seq_file *s, struct clk *c, int level)
- 	seq_printf(s, "\"%s\": { ", c->name);
- 	seq_printf(s, "\"enable_count\": %d,", c->enable_count);
- 	seq_printf(s, "\"prepare_count\": %d,", c->prepare_count);
--	seq_printf(s, "\"rate\": %lu", clk_get_rate(c));
--	seq_printf(s, "\"accuracy\": %lu", clk_get_accuracy(c));
-+	seq_printf(s, "\"rate\": %lu", __clk_get_rate(c));
-+	seq_printf(s, "\"accuracy\": %lu", __clk_get_accuracy(c));
++static void __clk_recalc_rates(struct clk *clk, unsigned long msg);
++
+ unsigned long __clk_get_rate(struct clk *clk)
+ {
+ 	unsigned long ret;
+@@ -600,6 +602,9 @@ unsigned long __clk_get_rate(struct clk *clk)
+ 		goto out;
+ 	}
+ 
++	if (clk->flags & CLK_GET_RATE_NOCACHE)
++		__clk_recalc_rates(clk, 0);
++
+ 	ret = clk->rate;
+ 
+ 	if (clk->flags & CLK_IS_ROOT)
+@@ -613,11 +618,16 @@ out:
+ }
+ EXPORT_SYMBOL_GPL(__clk_get_rate);
+ 
++static void __clk_recalc_accuracies(struct clk *clk);
++
+ unsigned long __clk_get_accuracy(struct clk *clk)
+ {
+ 	if (!clk)
+ 		return 0;
+ 
++	if (clk->flags & CLK_GET_ACCURACY_NOCACHE)
++		__clk_recalc_accuracies(clk);
++
+ 	return clk->accuracy;
  }
  
- static void clk_dump_subtree(struct seq_file *s, struct clk *c, int level)
+@@ -1083,9 +1093,6 @@ long clk_get_accuracy(struct clk *clk)
+ 	unsigned long accuracy;
+ 
+ 	clk_prepare_lock();
+-	if (clk && (clk->flags & CLK_GET_ACCURACY_NOCACHE))
+-		__clk_recalc_accuracies(clk);
+-
+ 	accuracy = __clk_get_accuracy(clk);
+ 	clk_prepare_unlock();
+ 
+@@ -1151,10 +1158,6 @@ unsigned long clk_get_rate(struct clk *clk)
+ 	unsigned long rate;
+ 
+ 	clk_prepare_lock();
+-
+-	if (clk && (clk->flags & CLK_GET_RATE_NOCACHE))
+-		__clk_recalc_rates(clk, 0);
+-
+ 	rate = __clk_get_rate(clk);
+ 	clk_prepare_unlock();
+ 
 -- 
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
 hosted by The Linux Foundation
