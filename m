@@ -1,112 +1,780 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Thu, 4 Sep 2014 16:23:25 +0900
-Subject: [PATCH v2 1/3] clocksource: sh_cmt: Document SoC specific bindings
-In-Reply-To: <5552768.CVrm7BiFam@avalon>
-References: <1409792121-28912-1-git-send-email-horms+renesas@verge.net.au>
- <1409792121-28912-2-git-send-email-horms+renesas@verge.net.au>
- <5552768.CVrm7BiFam@avalon>
-Message-ID: <20140904072324.GF9999@verge.net.au>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Thu, 4 Sep 2014 15:31:38 +0800
+Subject: [PATCH v2 09/12] ARM: sunxi: dt: Add sample and output mmc clocks
+In-Reply-To: <1409428991-2442-10-git-send-email-maxime.ripard@free-electrons.com>
+References: <1409428991-2442-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1409428991-2442-10-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <CAGb2v65PM_RzbB=9co+Q7_gEi+6biT-HKTM7XG8q-SqgzoAmRA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 04, 2014 at 09:51:27AM +0300, Laurent Pinchart wrote:
-> Hi Simon,
-> 
-> Thank you for the patch.
-> 
-> On Thursday 04 September 2014 09:55:19 Simon Horman wrote:
-> > In general Renesas hardware is not documented to the extent
-> > where the relationship between IP blocks on different SoCs can be assumed
-> > although they may appear to operate the same way. Furthermore the
-> > documentation typically does not specify a version for individual
-> > IP blocks. For these reasons a convention of using the SoC name in place
-> > of a version and providing SoC-specific compat strings has been adopted.
-> > 
-> > Although not universally liked this convention is used in the bindings for
-> > a number of drivers for Renesas hardware. The purpose of this patch is to
-> > update the Renesas R-Car Compare Match Timer (CMT) driver to follow this
-> > convention.
-> > 
-> > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-> > Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
-> > Acked-by: Mark Rutland <mark.rutland@arm.com>
-> > 
-> > ---
-> > * I plan to follow up with patches to use these new bindings in the
-> >   dtsi files for the affected SoCs.
-> > 
-> > v2
-> > * Reorder compat entries so more-specific entries and their fallbacks
-> >   are grouped with the fallback entry coming last.
-> > * Explicitly document fallback
-> > ---
-> >  .../devicetree/bindings/timer/renesas,cmt.txt      | 44 ++++++++++++++++---
-> >  1 file changed, 38 insertions(+), 6 deletions(-)
-> > 
-> > diff --git a/Documentation/devicetree/bindings/timer/renesas,cmt.txt
-> > b/Documentation/devicetree/bindings/timer/renesas,cmt.txt index
-> > a17418b..7b44f4b 100644
-> > --- a/Documentation/devicetree/bindings/timer/renesas,cmt.txt
-> > +++ b/Documentation/devicetree/bindings/timer/renesas,cmt.txt
-> > @@ -11,15 +11,47 @@ datasheets.
-> > 
-> >  Required Properties:
-> > 
-> > -  - compatible: must contain one of the following.
-> > -    - "renesas,cmt-32" for the 32-bit CMT
-> > +  - compatible: must contain one or more of the following:
-> > +    - "renesas,cmt-32-r8a7740" for the R8a7740 32-bit CMT
-> > +		(CMT0)
-> > +    - "renesas,cmt-32-sh7372" for the SH7372 32-bit CMT
-> > +		(CMT0)
-> > +    - "renesas,cmt-32-sh73a0" for the SH73a0 32-bit CMT
-> > +		(CMT0)
-> > +    - "renesas,cmt-32" for all 32-bit CMT without fast clock support
-> >  		(CMT0 on sh7372, sh73a0 and r8a7740)
-> > -    - "renesas,cmt-32-fast" for the 32-bit CMT with fast clock support
-> > +		This is a fallback for the above renesas,cmt-32-* entries.
-> > +
-> > +    - "renesas,cmt-32-fast-r8a7740" for the R8A7740 32-bit CMT with fast
-> > +		clock support (CMT[234])
-> > +    - "renesas,cmt-32-fast-sh7372" for the SH7372 32-bit CMT with fast
-> > +		clock support (CMT[234])
-> > +    - "renesas,cmt-32-fast-sh73a0" for the SH73A0 32-bit CMT with fast
-> > +		clock support (CMT[234])
-> > +    - "renesas,cmt-32-fast" for all 32-bit CMT with fast clock support
-> >  		(CMT[234] on sh7372, sh73a0 and r8a7740)
-> > -    - "renesas,cmt-48" for the 48-bit CMT
-> > +		This is a fallback for the above renesas,cmt-32-fast-* entries.
-> > +
-> > +    - "renesas,cmt-48-sh7372" for the SH7372 48-bit CMT
-> > +		(CMT1)
-> > +    - "renesas,cmt-48-sh73a0" for the SH73A0 48-bit CMT
-> > +		(CMT1)
-> > +    - "renesas,cmt-48-r8a7740" for the R8A7740 48-bit CMT
-> > +		(CMT1)
-> > +    - "renesas,cmt-48" for all non-second generation 48-bit CMT
-> >  		(CMT1 on sh7372, sh73a0 and r8a7740)
-> > -    - "renesas,cmt-48-gen2" for the second generation 48-bit CMT
-> > +		This is a fallback for the above renesas,cmt-48-* entries.
-> > +
-> > +    - "renesas,cmt-48-r8a73a4" for the R8A73A4 48-bit CMT
-> > +		(CMT[01])
-> > +    - "renesas,cmt-48-r8a7790" for the R8A7790 48-bit CMT
-> > +		(CMT[01])
-> > +    - "renesas,cmt-48-r8a7791" for the R8A7791 48-bit CMT
-> > +		(CMT[01])
-> > +    - "renesas,cmt-48-gen2" for all second generation 48-bit CMT
-> >  		(CMT[01] on r8a73a4, r8a7790 and r8a7791)
-> > +		This is a fallback for the renesas,cmt-48-r8a73a4,
-> > +		renesas,cmt-48-r8a7790 and renesas,cmt-48-gen2 entries.
-> 
-> If renesas,cmt-48-gen2 is a fallback for renesas,cmt-48-gen2, we'll have an 
-> infinite loop :-) I suppose you meant
-> 
-> 		This is a fallback for the renesas,cmt-48-r8a73a4,
-> 		renesas,cmt-48-r8a7790 and renesas,cmt-48-r8a7791 entries.
+Hi,
 
-Yes, indeed. Thanks :)
+On Sun, Aug 31, 2014 at 4:03 AM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> Add the sample and output clocks for the MMC phase support.
+>
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> ---
+>  arch/arm/boot/dts/sun4i-a10.dtsi  | 104 +++++++++++++++++++++++++++++++++++---
+>  arch/arm/boot/dts/sun5i-a10s.dtsi |  79 ++++++++++++++++++++++++++---
+>  arch/arm/boot/dts/sun5i-a13.dtsi  |  80 +++++++++++++++++++++++++----
+>  arch/arm/boot/dts/sun6i-a31.dtsi  | 104 +++++++++++++++++++++++++++++++++++---
+>  arch/arm/boot/dts/sun7i-a20.dtsi  | 104 +++++++++++++++++++++++++++++++++++---
+>  5 files changed, 430 insertions(+), 41 deletions(-)
+>
+> diff --git a/arch/arm/boot/dts/sun4i-a10.dtsi b/arch/arm/boot/dts/sun4i-a10.dtsi
+> index 380f914b226d..3183436528e1 100644
+> --- a/arch/arm/boot/dts/sun4i-a10.dtsi
+> +++ b/arch/arm/boot/dts/sun4i-a10.dtsi
+> @@ -227,6 +227,22 @@
+>                         clock-output-names = "mmc0";
+>                 };
+>
+> +               mmc0_output_clk: clk_mmc_output at 01c20088 {
 
-> With that change,
-> 
-> Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+Nitpick, but could we have the node name use "clk" as a suffix,
+like the label? And also change the node name of the original
+mmc clks to "mmc_clk" to differentiate.
+
+> +                       #clock-cells = <0>;
+> +                       compatible = "allwinner,sun4i-a10-mmc-output-clk";
+> +                       reg = <0x01c20088 0x4>;
+> +                       clocks = <&mmc0_clk>;
+> +                       clock-output-names = "mmc0_output";
+> +               };
+> +
+> +               mmc0_sample_clk: clk_mmc_sample at 01c20088 {
+> +                       #clock-cells = <0>;
+> +                       compatible = "allwinner,sun4i-a10-mmc-sample-clk";
+> +                       reg = <0x01c20088 0x4>;
+> +                       clocks = <&mmc0_clk>;
+> +                       clock-output-names = "mmc0_sample";
+> +               };
+> +
+>                 mmc1_clk: clk at 01c2008c {
+>                         #clock-cells = <0>;
+>                         compatible = "allwinner,sun4i-a10-mod0-clk";
+> @@ -235,6 +251,22 @@
+>                         clock-output-names = "mmc1";
+>                 };
+>
+> +               mmc1_output_clk: clk_mmc_output at 01c2008c {
+> +                       #clock-cells = <0>;
+> +                       compatible = "allwinner,sun4i-a10-mmc-output-clk";
+> +                       reg = <0x01c2008c 0x4>;
+> +                       clocks = <&mmc1_clk>;
+> +                       clock-output-names = "mmc1_output";
+> +               };
+> +
+> +               mmc1_sample_clk: clk_mmc_sample at 01c2008c {
+> +                       #clock-cells = <0>;
+> +                       compatible = "allwinner,sun4i-a10-mmc-sample-clk";
+> +                       reg = <0x01c2008c 0x4>;
+> +                       clocks = <&mmc1_clk>;
+> +                       clock-output-names = "mmc1_sample";
+> +               };
+> +
+>                 mmc2_clk: clk at 01c20090 {
+>                         #clock-cells = <0>;
+>                         compatible = "allwinner,sun4i-a10-mod0-clk";
+> @@ -243,6 +275,22 @@
+>                         clock-output-names = "mmc2";
+>                 };
+>
+> +               mmc2_output_clk: clk_mmc_output at 01c20090 {
+> +                       #clock-cells = <0>;
+> +                       compatible = "allwinner,sun4i-a10-mmc-output-clk";
+> +                       reg = <0x01c20090 0x4>;
+> +                       clocks = <&mmc2_clk>;
+> +                       clock-output-names = "mmc2_output";
+> +               };
+> +
+> +               mmc2_sample_clk: clk_mmc_sample at 01c20090 {
+> +                       #clock-cells = <0>;
+> +                       compatible = "allwinner,sun4i-a10-mmc-sample-clk";
+> +                       reg = <0x01c20090 0x4>;
+> +                       clocks = <&mmc2_clk>;
+> +                       clock-output-names = "mmc2_sample";
+> +               };
+> +
+>                 mmc3_clk: clk at 01c20094 {
+>                         #clock-cells = <0>;
+>                         compatible = "allwinner,sun4i-a10-mod0-clk";
+> @@ -251,6 +299,22 @@
+>                         clock-output-names = "mmc3";
+>                 };
+>
+> +               mmc3_output_clk: clk_mmc_output at 01c20094 {
+> +                       #clock-cells = <0>;
+> +                       compatible = "allwinner,sun4i-a10-mmc-output-clk";
+> +                       reg = <0x01c20094 0x4>;
+> +                       clocks = <&mmc3_clk>;
+> +                       clock-output-names = "mmc3_output";
+> +               };
+> +
+> +               mmc3_sample_clk: clk_mmc_sample at 01c20094 {
+> +                       #clock-cells = <0>;
+> +                       compatible = "allwinner,sun4i-a10-mmc-sample-clk";
+> +                       reg = <0x01c20094 0x4>;
+> +                       clocks = <&mmc3_clk>;
+> +                       clock-output-names = "mmc3_sample";
+> +               };
+> +
+>                 ts_clk: clk at 01c20098 {
+>                         #clock-cells = <0>;
+>                         compatible = "allwinner,sun4i-a10-mod0-clk";
+> @@ -392,8 +456,14 @@
+>                 mmc0: mmc at 01c0f000 {
+>                         compatible = "allwinner,sun4i-a10-mmc";
+>                         reg = <0x01c0f000 0x1000>;
+> -                       clocks = <&ahb_gates 8>, <&mmc0_clk>;
+> -                       clock-names = "ahb", "mmc";
+> +                       clocks = <&ahb_gates 8>,
+> +                                <&mmc0_clk>,
+> +                                <&mmc0_sample_clk>,
+> +                                <&mmc0_output_clk>;
+> +                       clock-names = "ahb",
+> +                                     "mmc",
+> +                                     "sample",
+> +                                     "output";
+>                         interrupts = <32>;
+>                         status = "disabled";
+>                 };
+> @@ -401,8 +471,14 @@
+>                 mmc1: mmc at 01c10000 {
+>                         compatible = "allwinner,sun4i-a10-mmc";
+>                         reg = <0x01c10000 0x1000>;
+> -                       clocks = <&ahb_gates 9>, <&mmc1_clk>;
+> -                       clock-names = "ahb", "mmc";
+> +                       clocks = <&ahb_gates 9>,
+> +                                <&mmc1_clk>,
+> +                                <&mmc1_sample_clk>,
+> +                                <&mmc1_output_clk>;
+> +                       clock-names = "ahb",
+> +                                     "mmc",
+> +                                     "sample",
+> +                                     "output";
+>                         interrupts = <33>;
+>                         status = "disabled";
+>                 };
+> @@ -410,8 +486,14 @@
+>                 mmc2: mmc at 01c11000 {
+>                         compatible = "allwinner,sun4i-a10-mmc";
+>                         reg = <0x01c11000 0x1000>;
+> -                       clocks = <&ahb_gates 10>, <&mmc2_clk>;
+> -                       clock-names = "ahb", "mmc";
+> +                       clocks = <&ahb_gates 10>,
+> +                                <&mmc2_clk>,
+> +                                <&mmc2_sample_clk>,
+> +                                <&mmc2_output_clk>;
+> +                       clock-names = "ahb",
+> +                                     "mmc",
+> +                                     "sample",
+> +                                     "output";
+>                         interrupts = <34>;
+>                         status = "disabled";
+>                 };
+> @@ -419,8 +501,14 @@
+>                 mmc3: mmc at 01c12000 {
+>                         compatible = "allwinner,sun4i-a10-mmc";
+>                         reg = <0x01c12000 0x1000>;
+> -                       clocks = <&ahb_gates 11>, <&mmc3_clk>;
+> -                       clock-names = "ahb", "mmc";
+> +                       clocks = <&ahb_gates 11>,
+> +                                <&mmc3_clk>,
+> +                                <&mmc3_sample_clk>,
+> +                                <&mmc3_output_clk>;
+> +                       clock-names = "ahb",
+> +                                     "mmc",
+> +                                     "sample",
+> +                                     "output";
+>                         interrupts = <35>;
+>                         status = "disabled";
+>                 };
+> diff --git a/arch/arm/boot/dts/sun5i-a10s.dtsi b/arch/arm/boot/dts/sun5i-a10s.dtsi
+> index 531272c0e526..4f5eb763e05a 100644
+> --- a/arch/arm/boot/dts/sun5i-a10s.dtsi
+> +++ b/arch/arm/boot/dts/sun5i-a10s.dtsi
+> @@ -212,6 +212,22 @@
+>                         clock-output-names = "mmc0";
+>                 };
+>
+> +               mmc0_output_clk: clk_mmc_output at 01c20088 {
+> +                       #clock-cells = <0>;
+> +                       compatible = "allwinner,sun4i-a10-mmc-output-clk";
+> +                       reg = <0x01c20088 0x4>;
+> +                       clocks = <&mmc0_clk>;
+> +                       clock-output-names = "mmc0_output";
+> +               };
+> +
+> +               mmc0_sample_clk: clk_mmc_sample at 01c20088 {
+> +                       #clock-cells = <0>;
+> +                       compatible = "allwinner,sun4i-a10-mmc-sample-clk";
+> +                       reg = <0x01c20088 0x4>;
+> +                       clocks = <&mmc0_clk>;
+> +                       clock-output-names = "mmc0_sample";
+> +               };
+> +
+>                 mmc1_clk: clk at 01c2008c {
+>                         #clock-cells = <0>;
+>                         compatible = "allwinner,sun4i-a10-mod0-clk";
+> @@ -220,6 +236,22 @@
+>                         clock-output-names = "mmc1";
+>                 };
+>
+> +               mmc1_output_clk: clk_mmc_output at 01c2008c {
+> +                       #clock-cells = <0>;
+> +                       compatible = "allwinner,sun4i-a10-mmc-output-clk";
+> +                       reg = <0x01c2008c 0x4>;
+> +                       clocks = <&mmc1_clk>;
+> +                       clock-output-names = "mmc1_output";
+> +               };
+> +
+> +               mmc1_sample_clk: clk_mmc_sample at 01c2008c {
+> +                       #clock-cells = <0>;
+> +                       compatible = "allwinner,sun4i-a10-mmc-sample-clk";
+> +                       reg = <0x01c2008c 0x4>;
+> +                       clocks = <&mmc1_clk>;
+> +                       clock-output-names = "mmc1_sample";
+> +               };
+> +
+>                 mmc2_clk: clk at 01c20090 {
+>                         #clock-cells = <0>;
+>                         compatible = "allwinner,sun4i-a10-mod0-clk";
+> @@ -228,6 +260,22 @@
+>                         clock-output-names = "mmc2";
+>                 };
+>
+> +               mmc2_output_clk: clk_mmc_output at 01c20090 {
+> +                       #clock-cells = <0>;
+> +                       compatible = "allwinner,sun4i-a10-mmc-output-clk";
+> +                       reg = <0x01c20090 0x4>;
+> +                       clocks = <&mmc2_clk>;
+> +                       clock-output-names = "mmc2_output";
+> +               };
+> +
+> +               mmc2_sample_clk: clk_mmc_sample at 01c20090 {
+> +                       #clock-cells = <0>;
+> +                       compatible = "allwinner,sun4i-a10-mmc-sample-clk";
+> +                       reg = <0x01c20090 0x4>;
+> +                       clocks = <&mmc2_clk>;
+> +                       clock-output-names = "mmc2_sample";
+> +               };
+> +
+>                 ts_clk: clk at 01c20098 {
+>                         #clock-cells = <0>;
+>                         compatible = "allwinner,sun4i-a10-mod0-clk";
+> @@ -353,8 +401,14 @@
+>                 mmc0: mmc at 01c0f000 {
+>                         compatible = "allwinner,sun5i-a13-mmc";
+>                         reg = <0x01c0f000 0x1000>;
+> -                       clocks = <&ahb_gates 8>, <&mmc0_clk>;
+> -                       clock-names = "ahb", "mmc";
+> +                       clocks = <&ahb_gates 8>,
+> +                                <&mmc0_clk>,
+> +                                <&mmc0_sample_clk>,
+> +                                <&mmc0_output_clk>;
+> +                       clock-names = "ahb",
+> +                                     "mmc",
+> +                                     "sample",
+> +                                     "output";
+>                         interrupts = <32>;
+>                         status = "disabled";
+>                 };
+> @@ -362,8 +416,14 @@
+>                 mmc1: mmc at 01c10000 {
+>                         compatible = "allwinner,sun5i-a13-mmc";
+>                         reg = <0x01c10000 0x1000>;
+> -                       clocks = <&ahb_gates 9>, <&mmc1_clk>;
+> -                       clock-names = "ahb", "mmc";
+> +                       clocks = <&ahb_gates 9>,
+> +                                <&mmc1_clk>,
+> +                                <&mmc1_sample_clk>,
+> +                                <&mmc1_output_clk>;
+> +                       clock-names = "ahb",
+> +                                     "mmc",
+> +                                     "sample",
+> +                                     "output";
+>                         interrupts = <33>;
+>                         status = "disabled";
+>                 };
+> @@ -371,12 +431,17 @@
+>                 mmc2: mmc at 01c11000 {
+>                         compatible = "allwinner,sun5i-a13-mmc";
+>                         reg = <0x01c11000 0x1000>;
+> -                       clocks = <&ahb_gates 10>, <&mmc2_clk>;
+> -                       clock-names = "ahb", "mmc";
+> +                       clocks = <&ahb_gates 10>,
+> +                                <&mmc2_clk>,
+> +                                <&mmc2_sample_clk>,
+> +                                <&mmc2_output_clk>;
+> +                       clock-names = "ahb",
+> +                                     "mmc",
+> +                                     "sample",
+> +                                     "output";
+>                         interrupts = <34>;
+>                         status = "disabled";
+>                 };
+> -
+>                 usbphy: phy at 01c13400 {
+>                         #phy-cells = <1>;
+>                         compatible = "allwinner,sun5i-a13-usb-phy";
+> diff --git a/arch/arm/boot/dts/sun5i-a13.dtsi b/arch/arm/boot/dts/sun5i-a13.dtsi
+> index b131068f4f35..73f99ff6ac6f 100644
+> --- a/arch/arm/boot/dts/sun5i-a13.dtsi
+> +++ b/arch/arm/boot/dts/sun5i-a13.dtsi
+> @@ -202,30 +202,78 @@
+>                         clock-output-names = "ms";
+>                 };
+>
+> -               mmc0_clk: clk at 01c20088 {
+> +               mmc0_clk: clk_mmc at 01c20088 {
+>                         #clock-cells = <0>;
+> -                       compatible = "allwinner,sun4i-a10-mod0-clk";
+> +                       compatible = "allwinner,sun4i-a10-mmc-clk";
+>                         reg = <0x01c20088 0x4>;
+>                         clocks = <&osc24M>, <&pll6 1>, <&pll5 1>;
+>                         clock-output-names = "mmc0";
+>                 };
+>
+> -               mmc1_clk: clk at 01c2008c {
+> +               mmc0_output_clk: clk_mmc_output at 01c20088 {
+>                         #clock-cells = <0>;
+> -                       compatible = "allwinner,sun4i-a10-mod0-clk";
+> +                       compatible = "allwinner,sun4i-a10-mmc-output-clk";
+> +                       reg = <0x01c20088 0x4>;
+> +                       clocks = <&mmc0_clk>;
+> +                       clock-output-names = "mmc0_output";
+> +               };
+> +
+> +               mmc0_sample_clk: clk_mmc_sample at 01c20088 {
+> +                       #clock-cells = <0>;
+> +                       compatible = "allwinner,sun4i-a10-mmc-sample-clk";
+> +                       reg = <0x01c20088 0x4>;
+> +                       clocks = <&mmc0_clk>;
+> +                       clock-output-names = "mmc0_sample";
+> +               };
+> +
+> +               mmc1_clk: clk_mmc at 01c2008c {
+> +                       #clock-cells = <0>;
+> +                       compatible = "allwinner,sun4i-a10-mmc-clk";
+>                         reg = <0x01c2008c 0x4>;
+>                         clocks = <&osc24M>, <&pll6 1>, <&pll5 1>;
+>                         clock-output-names = "mmc1";
+>                 };
+>
+> -               mmc2_clk: clk at 01c20090 {
+> +               mmc1_output_clk: clk_mmc_output at 01c2008c {
+>                         #clock-cells = <0>;
+> -                       compatible = "allwinner,sun4i-a10-mod0-clk";
+> +                       compatible = "allwinner,sun4i-a10-mmc-output-clk";
+> +                       reg = <0x01c2008c 0x4>;
+> +                       clocks = <&mmc1_clk>;
+> +                       clock-output-names = "mmc1_output";
+> +               };
+> +
+> +               mmc1_sample_clk: clk_mmc_sample at 01c2008c {
+> +                       #clock-cells = <0>;
+> +                       compatible = "allwinner,sun4i-a10-mmc-sample-clk";
+> +                       reg = <0x01c2008c 0x4>;
+> +                       clocks = <&mmc1_clk>;
+> +                       clock-output-names = "mmc1_sample";
+> +               };
+> +
+> +               mmc2_clk: clk_mmc at 01c20090 {
+> +                       #clock-cells = <0>;
+> +                       compatible = "allwinner,sun4i-a10-mmc-clk";
+>                         reg = <0x01c20090 0x4>;
+>                         clocks = <&osc24M>, <&pll6 1>, <&pll5 1>;
+>                         clock-output-names = "mmc2";
+>                 };
+>
+> +               mmc2_output_clk: clk_mmc_output at 01c20090 {
+> +                       #clock-cells = <0>;
+> +                       compatible = "allwinner,sun4i-a10-mmc-output-clk";
+> +                       reg = <0x01c20090 0x4>;
+> +                       clocks = <&mmc2_clk>;
+> +                       clock-output-names = "mmc2_output";
+> +               };
+> +
+> +               mmc2_sample_clk: clk_mmc_sample at 01c20090 {
+> +                       #clock-cells = <0>;
+> +                       compatible = "allwinner,sun4i-a10-mmc-sample-clk";
+> +                       reg = <0x01c20090 0x4>;
+> +                       clocks = <&mmc2_clk>;
+> +                       clock-output-names = "mmc2_sample";
+> +               };
+> +
+>                 ts_clk: clk at 01c20098 {
+>                         #clock-cells = <0>;
+>                         compatible = "allwinner,sun4i-a10-mod0-clk";
+> @@ -335,8 +383,14 @@
+>                 mmc0: mmc at 01c0f000 {
+>                         compatible = "allwinner,sun5i-a13-mmc";
+>                         reg = <0x01c0f000 0x1000>;
+> -                       clocks = <&ahb_gates 8>, <&mmc0_clk>;
+> -                       clock-names = "ahb", "mmc";
+> +                       clocks = <&ahb_gates 8>,
+> +                                <&mmc0_clk>,
+> +                                <&mmc0_sample_clk>,
+> +                                <&mmc0_output_clk>;
+> +                       clock-names = "ahb",
+> +                                     "mmc",
+> +                                     "sample",
+> +                                     "output";
+>                         interrupts = <32>;
+>                         status = "disabled";
+>                 };
+> @@ -344,8 +398,14 @@
+>                 mmc2: mmc at 01c11000 {
+>                         compatible = "allwinner,sun5i-a13-mmc";
+>                         reg = <0x01c11000 0x1000>;
+> -                       clocks = <&ahb_gates 10>, <&mmc2_clk>;
+> -                       clock-names = "ahb", "mmc";
+> +                       clocks = <&ahb_gates 10>,
+> +                                <&mmc2_clk>,
+> +                                <&mmc2_sample_clk>,
+> +                                <&mmc2_output_clk>;
+> +                       clock-names = "ahb",
+> +                                     "mmc",
+> +                                     "sample",
+> +                                     "output";
+>                         interrupts = <34>;
+>                         status = "disabled";
+>                 };
+> diff --git a/arch/arm/boot/dts/sun6i-a31.dtsi b/arch/arm/boot/dts/sun6i-a31.dtsi
+> index 1c2ec913e650..574e6f19a0f6 100644
+> --- a/arch/arm/boot/dts/sun6i-a31.dtsi
+> +++ b/arch/arm/boot/dts/sun6i-a31.dtsi
+> @@ -216,6 +216,22 @@
+>                         clock-output-names = "mmc0";
+>                 };
+>
+> +               mmc0_output_clk: clk_mmc_output at 01c20088 {
+> +                       #clock-cells = <0>;
+> +                       compatible = "allwinner,sun4i-a10-mmc-output-clk";
+> +                       reg = <0x01c20088 0x4>;
+> +                       clocks = <&mmc0_clk>;
+> +                       clock-output-names = "mmc0_output";
+> +               };
+> +
+> +               mmc0_sample_clk: clk_mmc_sample at 01c20088 {
+> +                       #clock-cells = <0>;
+> +                       compatible = "allwinner,sun4i-a10-mmc-sample-clk";
+> +                       reg = <0x01c20088 0x4>;
+> +                       clocks = <&mmc0_clk>;
+> +                       clock-output-names = "mmc0_sample";
+> +               };
+> +
+>                 mmc1_clk: clk at 01c2008c {
+>                         #clock-cells = <0>;
+>                         compatible = "allwinner,sun4i-a10-mod0-clk";
+> @@ -224,6 +240,22 @@
+>                         clock-output-names = "mmc1";
+>                 };
+>
+> +               mmc1_output_clk: clk_mmc_output at 01c2008c {
+> +                       #clock-cells = <0>;
+> +                       compatible = "allwinner,sun4i-a10-mmc-output-clk";
+> +                       reg = <0x01c2008c 0x4>;
+> +                       clocks = <&mmc1_clk>;
+> +                       clock-output-names = "mmc1_output";
+> +               };
+> +
+> +               mmc1_sample_clk: clk_mmc_sample at 01c2008c {
+> +                       #clock-cells = <0>;
+> +                       compatible = "allwinner,sun4i-a10-mmc-sample-clk";
+> +                       reg = <0x01c2008c 0x4>;
+> +                       clocks = <&mmc1_clk>;
+> +                       clock-output-names = "mmc1_sample";
+> +               };
+> +
+>                 mmc2_clk: clk at 01c20090 {
+>                         #clock-cells = <0>;
+>                         compatible = "allwinner,sun4i-a10-mod0-clk";
+> @@ -232,6 +264,22 @@
+>                         clock-output-names = "mmc2";
+>                 };
+>
+> +               mmc2_output_clk: clk_mmc_output at 01c20090 {
+> +                       #clock-cells = <0>;
+> +                       compatible = "allwinner,sun4i-a10-mmc-output-clk";
+> +                       reg = <0x01c20090 0x4>;
+> +                       clocks = <&mmc2_clk>;
+> +                       clock-output-names = "mmc2_output";
+> +               };
+> +
+> +               mmc2_sample_clk: clk_mmc_sample at 01c20090 {
+> +                       #clock-cells = <0>;
+> +                       compatible = "allwinner,sun4i-a10-mmc-sample-clk";
+> +                       reg = <0x01c20090 0x4>;
+> +                       clocks = <&mmc2_clk>;
+> +                       clock-output-names = "mmc2_sample";
+> +               };
+> +
+>                 mmc3_clk: clk at 01c20094 {
+>                         #clock-cells = <0>;
+>                         compatible = "allwinner,sun4i-a10-mod0-clk";
+> @@ -240,6 +288,22 @@
+>                         clock-output-names = "mmc3";
+>                 };
+>
+> +               mmc3_output_clk: clk_mmc_output at 01c20094 {
+> +                       #clock-cells = <0>;
+> +                       compatible = "allwinner,sun4i-a10-mmc-output-clk";
+> +                       reg = <0x01c20094 0x4>;
+> +                       clocks = <&mmc3_clk>;
+> +                       clock-output-names = "mmc3_output";
+> +               };
+> +
+> +               mmc3_sample_clk: clk_mmc_sample at 01c20094 {
+> +                       #clock-cells = <0>;
+> +                       compatible = "allwinner,sun4i-a10-mmc-sample-clk";
+> +                       reg = <0x01c20094 0x4>;
+> +                       clocks = <&mmc3_clk>;
+> +                       clock-output-names = "mmc3_sample";
+> +               };
+> +
+>                 spi0_clk: clk at 01c200a0 {
+>                         #clock-cells = <0>;
+>                         compatible = "allwinner,sun4i-a10-mod0-clk";
+> @@ -330,8 +394,14 @@
+>                 mmc0: mmc at 01c0f000 {
+>                         compatible = "allwinner,sun5i-a13-mmc";
+>                         reg = <0x01c0f000 0x1000>;
+> -                       clocks = <&ahb1_gates 8>, <&mmc0_clk>;
+> -                       clock-names = "ahb", "mmc";
+> +                       clocks = <&ahb1_gates 8>,
+> +                                <&mmc0_clk>,
+> +                                <&mmc0_sample_clk>,
+> +                                <&mmc0_output_clk>;
+> +                       clock-names = "ahb",
+> +                                     "mmc",
+> +                                     "sample",
+> +                                     "output";
+>                         resets = <&ahb1_rst 8>;
+>                         reset-names = "ahb";
+>                         interrupts = <0 60 4>;
+> @@ -341,8 +411,14 @@
+>                 mmc1: mmc at 01c10000 {
+>                         compatible = "allwinner,sun5i-a13-mmc";
+>                         reg = <0x01c10000 0x1000>;
+> -                       clocks = <&ahb1_gates 9>, <&mmc1_clk>;
+> -                       clock-names = "ahb", "mmc";
+> +                       clocks = <&ahb1_gates 9>,
+> +                                <&mmc1_clk>,
+> +                                <&mmc1_sample_clk>,
+> +                                <&mmc1_output_clk>;
+> +                       clock-names = "ahb",
+> +                                     "mmc",
+> +                                     "sample",
+> +                                     "output";
+>                         resets = <&ahb1_rst 9>;
+>                         reset-names = "ahb";
+>                         interrupts = <0 61 4>;
+> @@ -352,8 +428,14 @@
+>                 mmc2: mmc at 01c11000 {
+>                         compatible = "allwinner,sun5i-a13-mmc";
+>                         reg = <0x01c11000 0x1000>;
+> -                       clocks = <&ahb1_gates 10>, <&mmc2_clk>;
+> -                       clock-names = "ahb", "mmc";
+> +                       clocks = <&ahb1_gates 10>,
+> +                                <&mmc2_clk>,
+> +                                <&mmc2_sample_clk>,
+> +                                <&mmc2_output_clk>;
+> +                       clock-names = "ahb",
+> +                                     "mmc",
+> +                                     "sample",
+> +                                     "output";
+>                         resets = <&ahb1_rst 10>;
+>                         reset-names = "ahb";
+>                         interrupts = <0 62 4>;
+> @@ -363,8 +445,14 @@
+>                 mmc3: mmc at 01c12000 {
+>                         compatible = "allwinner,sun5i-a13-mmc";
+>                         reg = <0x01c12000 0x1000>;
+> -                       clocks = <&ahb1_gates 11>, <&mmc3_clk>;
+> -                       clock-names = "ahb", "mmc";
+> +                       clocks = <&ahb1_gates 11>,
+> +                                <&mmc3_clk>,
+> +                                <&mmc3_sample_clk>,
+> +                                <&mmc3_output_clk>;
+> +                       clock-names = "ahb",
+> +                                     "mmc",
+> +                                     "sample",
+> +                                     "output";
+>                         resets = <&ahb1_rst 11>;
+>                         reset-names = "ahb";
+>                         interrupts = <0 63 4>;
+> diff --git a/arch/arm/boot/dts/sun7i-a20.dtsi b/arch/arm/boot/dts/sun7i-a20.dtsi
+> index ec5603da595e..fc0a90d54d63 100644
+> --- a/arch/arm/boot/dts/sun7i-a20.dtsi
+> +++ b/arch/arm/boot/dts/sun7i-a20.dtsi
+> @@ -239,6 +239,22 @@
+>                         clock-output-names = "mmc0";
+>                 };
+>
+> +               mmc0_output_clk: clk_mmc_output at 01c20088 {
+> +                       #clock-cells = <0>;
+> +                       compatible = "allwinner,sun4i-a10-mmc-output-clk";
+> +                       reg = <0x01c20088 0x4>;
+> +                       clocks = <&mmc0_clk>;
+> +                       clock-output-names = "mmc0_output";
+> +               };
+> +
+> +               mmc0_sample_clk: clk_mmc_sample at 01c20088 {
+> +                       #clock-cells = <0>;
+> +                       compatible = "allwinner,sun4i-a10-mmc-sample-clk";
+> +                       reg = <0x01c20088 0x4>;
+> +                       clocks = <&mmc0_clk>;
+> +                       clock-output-names = "mmc0_sample";
+> +               };
+> +
+>                 mmc1_clk: clk at 01c2008c {
+>                         #clock-cells = <0>;
+>                         compatible = "allwinner,sun4i-a10-mod0-clk";
+> @@ -247,6 +263,22 @@
+>                         clock-output-names = "mmc1";
+>                 };
+>
+> +               mmc1_output_clk: clk_mmc_output at 01c2008c {
+> +                       #clock-cells = <0>;
+> +                       compatible = "allwinner,sun4i-a10-mmc-output-clk";
+> +                       reg = <0x01c2008c 0x4>;
+> +                       clocks = <&mmc1_clk>;
+> +                       clock-output-names = "mmc1_output";
+> +               };
+> +
+> +               mmc1_sample_clk: clk_mmc_sample at 01c2008c {
+> +                       #clock-cells = <0>;
+> +                       compatible = "allwinner,sun4i-a10-mmc-sample-clk";
+> +                       reg = <0x01c2008c 0x4>;
+> +                       clocks = <&mmc1_clk>;
+> +                       clock-output-names = "mmc1_sample";
+> +               };
+> +
+>                 mmc2_clk: clk at 01c20090 {
+>                         #clock-cells = <0>;
+>                         compatible = "allwinner,sun4i-a10-mod0-clk";
+> @@ -255,6 +287,22 @@
+>                         clock-output-names = "mmc2";
+>                 };
+>
+> +               mmc2_output_clk: clk_mmc_output at 01c20090 {
+> +                       #clock-cells = <0>;
+> +                       compatible = "allwinner,sun4i-a10-mmc-output-clk";
+> +                       reg = <0x01c20090 0x4>;
+> +                       clocks = <&mmc2_clk>;
+> +                       clock-output-names = "mmc2_output";
+> +               };
+> +
+> +               mmc2_sample_clk: clk_mmc_sample at 01c20090 {
+> +                       #clock-cells = <0>;
+> +                       compatible = "allwinner,sun4i-a10-mmc-sample-clk";
+> +                       reg = <0x01c20090 0x4>;
+> +                       clocks = <&mmc2_clk>;
+> +                       clock-output-names = "mmc2_sample";
+> +               };
+> +
+>                 mmc3_clk: clk at 01c20094 {
+>                         #clock-cells = <0>;
+>                         compatible = "allwinner,sun4i-a10-mod0-clk";
+> @@ -263,6 +311,22 @@
+>                         clock-output-names = "mmc3";
+>                 };
+>
+> +               mmc3_output_clk: clk_mmc_output at 01c20094 {
+> +                       #clock-cells = <0>;
+> +                       compatible = "allwinner,sun4i-a10-mmc-output-clk";
+> +                       reg = <0x01c20094 0x4>;
+> +                       clocks = <&mmc3_clk>;
+> +                       clock-output-names = "mmc3_output";
+> +               };
+> +
+> +               mmc3_sample_clk: clk_mmc_sample at 01c20094 {
+> +                       #clock-cells = <0>;
+> +                       compatible = "allwinner,sun4i-a10-mmc-sample-clk";
+> +                       reg = <0x01c20094 0x4>;
+> +                       clocks = <&mmc3_clk>;
+> +                       clock-output-names = "mmc3_sample";
+> +               };
+> +
+>                 ts_clk: clk at 01c20098 {
+>                         #clock-cells = <0>;
+>                         compatible = "allwinner,sun4i-a10-mod0-clk";
+> @@ -476,8 +540,14 @@
+>                 mmc0: mmc at 01c0f000 {
+>                         compatible = "allwinner,sun5i-a13-mmc";
+>                         reg = <0x01c0f000 0x1000>;
+> -                       clocks = <&ahb_gates 8>, <&mmc0_clk>;
+> -                       clock-names = "ahb", "mmc";
+> +                       clocks = <&ahb_gates 8>,
+> +                                <&mmc0_clk>,
+> +                                <&mmc0_sample_clk>,
+> +                                <&mmc0_output_clk>;
+> +                       clock-names = "ahb",
+> +                                     "mmc",
+> +                                     "sample",
+> +                                     "output";
+>                         interrupts = <0 32 4>;
+>                         status = "disabled";
+>                 };
+> @@ -485,8 +555,14 @@
+>                 mmc1: mmc at 01c10000 {
+>                         compatible = "allwinner,sun5i-a13-mmc";
+>                         reg = <0x01c10000 0x1000>;
+> -                       clocks = <&ahb_gates 9>, <&mmc1_clk>;
+> -                       clock-names = "ahb", "mmc";
+> +                       clocks = <&ahb_gates 9>,
+> +                                <&mmc1_clk>,
+> +                                <&mmc1_sample_clk>,
+> +                                <&mmc1_output_clk>;
+> +                       clock-names = "ahb",
+> +                                     "mmc",
+> +                                     "sample",
+> +                                     "output";
+>                         interrupts = <0 33 4>;
+>                         status = "disabled";
+>                 };
+> @@ -494,8 +570,14 @@
+>                 mmc2: mmc at 01c11000 {
+>                         compatible = "allwinner,sun5i-a13-mmc";
+>                         reg = <0x01c11000 0x1000>;
+> -                       clocks = <&ahb_gates 10>, <&mmc2_clk>;
+> -                       clock-names = "ahb", "mmc";
+> +                       clocks = <&ahb_gates 10>,
+> +                                <&mmc2_clk>,
+> +                                <&mmc2_sample_clk>,
+> +                                <&mmc2_output_clk>;
+> +                       clock-names = "ahb",
+> +                                     "mmc",
+> +                                     "sample",
+> +                                     "output";
+>                         interrupts = <0 34 4>;
+>                         status = "disabled";
+>                 };
+> @@ -503,8 +585,14 @@
+>                 mmc3: mmc at 01c12000 {
+>                         compatible = "allwinner,sun5i-a13-mmc";
+>                         reg = <0x01c12000 0x1000>;
+> -                       clocks = <&ahb_gates 11>, <&mmc3_clk>;
+> -                       clock-names = "ahb", "mmc";
+> +                       clocks = <&ahb_gates 11>,
+> +                                <&mmc3_clk>,
+> +                                <&mmc3_sample_clk>,
+> +                                <&mmc3_output_clk>;
+> +                       clock-names = "ahb",
+> +                                     "mmc",
+> +                                     "sample",
+> +                                     "output";
+>                         interrupts = <0 35 4>;
+>                         status = "disabled";
+>                 };
+
+Also sun8i is missing from this patch. I can add that later.
+
+Thanks
+
+
+ChenYu
