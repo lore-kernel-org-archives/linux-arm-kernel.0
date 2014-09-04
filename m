@@ -1,60 +1,48 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 4 Sep 2014 09:39:01 -0700
-Subject: [PATCH] mfd: twl4030-power: Fix PM idle pin configuration to not
- conflict with regulators
-In-Reply-To: <5408269F.7030400@linutronix.de>
-References: <20140819152405.GA12002@atomide.com>
- <20140902082931.GA32460@breakpoint.cc>
- <20140903002445.GD11766@atomide.com>
- <5406D388.5050104@linutronix.de>
- <20140903183901.GF11766@atomide.com>
- <5408269F.7030400@linutronix.de>
-Message-ID: <20140904163900.GT11766@atomide.com>
+From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
+Date: Thu, 4 Sep 2014 09:45:36 -0700
+Subject: [PATCH 2/3] gpio: zynq: Fixed broken wakeup implementation
+In-Reply-To: <CACRpkdbb0oeA0b5SSLtR6U7jv8asCeEJdHEsDAg7_tH+GHc5RQ@mail.gmail.com>
+References: <1409335127-26712-1-git-send-email-soren.brinkmann@xilinx.com>
+ <1409335127-26712-3-git-send-email-soren.brinkmann@xilinx.com>
+ <CACRpkdbb0oeA0b5SSLtR6U7jv8asCeEJdHEsDAg7_tH+GHc5RQ@mail.gmail.com>
+Message-ID: <00af0950-9750-4c5c-97ee-76893823c29d@BN1BFFO11FD020.protection.gbl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Sebastian Andrzej Siewior <bigeasy@linutronix.de> [140904 01:46]:
-> On 09/03/2014 08:39 PM, Tony Lindgren wrote:
-> >> good.txt and bad.txt are from the late_initcall.
-> >>
-> >>  $ diff -u good.txt bad.txt
-> >> --- good.txt    2014-09-03 10:29:58.920317368 +0200
-> >> +++ bad.txt     2014-09-03 10:28:57.064313222 +0200
-> > 
-> > Hmm can you check that you have good.txt and bad.txt the
-> > right way? I'd assume you need VAUX2 or VAUX3 enabled
-> > not disabled for the MMC to work?
+On Thu, 2014-09-04 at 06:27PM +0200, Linus Walleij wrote:
+> On Fri, Aug 29, 2014 at 7:58 PM, Soren Brinkmann
+> <soren.brinkmann@xilinx.com> wrote:
 > 
-> No, it was correct. If you look at the complete file you will notice
-> the - which removes the mmc detect/mount in the bad case and + which
-> adds the -110 error
-...
- 
-> With that patch it seems it is a little harder to trigger. It is
-> usually every other boot that fails. Here a diff between two that
-> worked (say good-v1 vs good-v2):
-...
- 
-> It took mmc a little longer to detect but it worked. And the content of
-> the three registers seem not to matter _or_ it was dumped before MMC
-> got active.
-...
- 
-> I didn't change a thing, I just pressed reset. As you see the content
-> of the TWL registers don't seem to be that important since it was the
-> same at the time of the dump. And the mmc didn't came back.
+> > From: Ezra Savard <ezra.savard@xilinx.com>
+> >
+> > Use of unmask/mask in set_wake was an incorrect implementation. The new
+> > implementation correctly sets wakeup for the gpio chip's IRQ so the gpio chip
+> > will not sleep while wakeup-enabled gpio are in use.
+> >
+> > Signed-off-by: Ezra Savard <ezra.savard@xilinx.com>
+> > Reviewed-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
+> 
+> Patch applied.
+> 
+> However the problems seems quite generic.
+> 
+> Do you see this kind of error in other GPIO drivers?
+> 
+> IRQchip semantics always make me nervous.
 
-OK. I guess that means that it's most likely some timing related issue,
-or an issue with some regulator not being ready by the time the MMC
-probes. Or it's a bug somewhere that I'm not figuring out.
+Our implementation was just completely flawed. It did work with our
+limited tests using the sysfs interface. But once we started with the
+gpio_keys things fell apart. The set_wake did mask/unmask IRQs, which
+is clearly the job of the respective mask/unmask function of a gpiochip.
+After we found that, we looked at a few other drivers and designed this
+following gpio-mxs.
+So, the core part was to do the right thing in set_wake. Once that was
+done, the runtime PM callbacks needed some realignment to determine
+whether GPIO is a wakeup device or not.
 
-Looking at the twl-regulator.c, twl4030reg_enable just sets the group
-bit and we're not checking any status and don't have startup-delay-us
-for them.
+So, this was really just a gpio-zynq problem, not really generic.
 
-At least phy-twl4030-usb.c has twl4030_i2c_write_u8_verify(), I wonder
-if adding a read back of the register to twl-regulator.c would help?
+Thanks for applying. I'll post the gpiolib-sysfs patch on its own in a
+separate submission.
 
-Regards,
-
-Tony
+	S?ren
