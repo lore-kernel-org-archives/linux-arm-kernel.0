@@ -1,50 +1,97 @@
-From: pankaj.dubey@samsung.com (Pankaj Dubey)
-Date: Thu, 04 Sep 2014 10:35:28 +0530
-Subject: [RESEND PATCH] arm64: dts: add <dt-bindings/> symlink
-In-Reply-To: <20140902084214.GE25379@arm.com>
-References: <1409629756-14304-1-git-send-email-pankaj.dubey@samsung.com>
- <20140902084214.GE25379@arm.com>
-Message-ID: <002801cfc7fd$d9c5b5a0$8d5120e0$@samsung.com>
+From: jh80.chung@samsung.com (Jaehoon Chung)
+Date: Thu, 04 Sep 2014 14:06:44 +0900
+Subject: [PATCH] mmc: sdhci-msm: Make tuning block table endian agnostic
+In-Reply-To: <1409752622-7564-1-git-send-email-sboyd@codeaurora.org>
+References: <1409752622-7564-1-git-send-email-sboyd@codeaurora.org>
+Message-ID: <5407F364.9030303@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi, Stephen.
 
-
-> -----Original Message-----
-> From: Will Deacon [mailto:will.deacon at arm.com]
-> Sent: Tuesday, September 02, 2014 2:12 PM
-> To: Pankaj Dubey
-> Cc: linux-arm-kernel at lists.infradead.org; linux-kernel at vger.kernel.org;
-> devicetree at vger.kernel.org; naushad at samsung.com; Catalin Marinas;
-> robh+dt at kernel.org; thomas.ab at samsung.com
-> Subject: Re: [RESEND PATCH] arm64: dts: add <dt-bindings/> symlink
+On 09/03/2014 10:57 PM, Stephen Boyd wrote:
+> If we're tuning on a big-endian CPU we'll never determine we properly
+> tuned the device because we compare the data we received from the
+> controller with a table that assumes the CPU is little-endian.
+> Change the table to be an array of bytes instead of 32-bit words
+> so we can use memcmp() without needing to byte-swap every word
+> depending on the endianess of the CPU.
 > 
-> On Tue, Sep 02, 2014 at 04:49:16AM +0100, Pankaj Dubey wrote:
-> > Add symlink to include/dt-bindings from arch/arm64/boot/dts/include/
-> > to match the ones in ARM architectures so that preprocessed device
-> > tree files can include various useful constant definitions.
-> >
-> > See commit c58299aa8754 ("kbuild: create an "include chroot" for DT
-> > bindings") merged in v3.10-rc1 for details.
-> >
-> > CC: Catalin Marinas <catalin.marinas@arm.com>
-> > Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
-> > ---
-> >
-> > Resubmitting this change as now it will be required for Samsung ARM64
-> > based SoC.
+> Cc: Asutosh Das <asutoshd@codeaurora.org>
+> Cc: Venkat Gopalakrishnan <venkatg@codeaurora.org>
+> Reviewed-by: Georgi Djakov <gdjakov@mm-sol.com>
+> Fixes: 415b5a75da43 "mmc: sdhci-msm: Add platform_execute_tuning implementation"
+> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+> ---
+>  drivers/mmc/host/sdhci-msm.c | 42 +++++++++++++++++++++++++++---------------
+>  1 file changed, 27 insertions(+), 15 deletions(-)
 > 
-> Just include this change in the series adding a .dts that needs it -- it
-doesn't really
-> make sense in isolation (unless somebody desperately wants this in?).
+> diff --git a/drivers/mmc/host/sdhci-msm.c b/drivers/mmc/host/sdhci-msm.c
+> index 40573a58486a..5aabffc15ae8 100644
+> --- a/drivers/mmc/host/sdhci-msm.c
+> +++ b/drivers/mmc/host/sdhci-msm.c
+> @@ -47,22 +47,34 @@
+>  #define CMUX_SHIFT_PHASE_SHIFT	24
+>  #define CMUX_SHIFT_PHASE_MASK	(7 << CMUX_SHIFT_PHASE_SHIFT)
+>  
+> -static const u32 tuning_block_64[] = {
+> -	0x00ff0fff, 0xccc3ccff, 0xffcc3cc3, 0xeffefffe,
+> -	0xddffdfff, 0xfbfffbff, 0xff7fffbf, 0xefbdf777,
+> -	0xf0fff0ff, 0x3cccfc0f, 0xcfcc33cc, 0xeeffefff,
+> -	0xfdfffdff, 0xffbfffdf, 0xfff7ffbb, 0xde7b7ff7
+> +static const u8 tuning_block_64[] = {
+> +	0xff, 0x0f, 0xff, 0x00, 0xff, 0xcc, 0xc3, 0xcc,
+> +	0xc3, 0x3c, 0xcc, 0xff, 0xfe, 0xff, 0xfe, 0xef,
+> +	0xff, 0xdf, 0xff, 0xdd, 0xff, 0xfb, 0xff, 0xfb,
+> +	0xbf, 0xff, 0x7f, 0xff, 0x77, 0xf7, 0xbd, 0xef,
+> +	0xff, 0xf0, 0xff, 0xf0, 0x0f, 0xfc, 0xcc, 0x3c,
+> +	0xcc, 0x33, 0xcc, 0xcf, 0xff, 0xef, 0xff, 0xee,
+> +	0xff, 0xfd, 0xff, 0xfd, 0xdf, 0xff, 0xbf, 0xff,
+> +	0xbb, 0xff, 0xf7, 0xff, 0xf7, 0x7f, 0x7b, 0xde,
+>  };
+>  
+> -static const u32 tuning_block_128[] = {
+> -	0xff00ffff, 0x0000ffff, 0xccccffff, 0xcccc33cc,
+> -	0xcc3333cc, 0xffffcccc, 0xffffeeff, 0xffeeeeff,
+> -	0xffddffff, 0xddddffff, 0xbbffffff, 0xbbffffff,
+> -	0xffffffbb, 0xffffff77, 0x77ff7777, 0xffeeddbb,
+> -	0x00ffffff, 0x00ffffff, 0xccffff00, 0xcc33cccc,
+> -	0x3333cccc, 0xffcccccc, 0xffeeffff, 0xeeeeffff,
+> -	0xddffffff, 0xddffffff, 0xffffffdd, 0xffffffbb,
+> -	0xffffbbbb, 0xffff77ff, 0xff7777ff, 0xeeddbb77
+> +static const u8 tuning_block_128[] = {
+> +	0xff, 0xff, 0x00, 0xff, 0xff, 0xff, 0x00, 0x00,
+> +	0xff, 0xff, 0xcc, 0xcc, 0xcc, 0x33, 0xcc, 0xcc,
+> +	0xcc, 0x33, 0x33, 0xcc, 0xcc, 0xcc, 0xff, 0xff,
+> +	0xff, 0xee, 0xff, 0xff, 0xff, 0xee, 0xee, 0xff,
+> +	0xff, 0xff, 0xdd, 0xff, 0xff, 0xff, 0xdd, 0xdd,
+> +	0xff, 0xff, 0xff, 0xbb, 0xff, 0xff, 0xff, 0xbb,
+> +	0xbb, 0xff, 0xff, 0xff, 0x77, 0xff, 0xff, 0xff,
+> +	0x77, 0x77, 0xff, 0x77, 0xbb, 0xdd, 0xee, 0xff,
+> +	0xff, 0xff, 0xff, 0x00, 0xff, 0xff, 0xff, 0x00,
+> +	0x00, 0xff, 0xff, 0xcc, 0xcc, 0xcc, 0x33, 0xcc,
+> +	0xcc, 0xcc, 0x33, 0x33, 0xcc, 0xcc, 0xcc, 0xff,
+> +	0xff, 0xff, 0xee, 0xff, 0xff, 0xff, 0xee, 0xee,
+> +	0xff, 0xff, 0xff, 0xdd, 0xff, 0xff, 0xff, 0xdd,
+> +	0xdd, 0xff, 0xff, 0xff, 0xbb, 0xff, 0xff, 0xff,
+> +	0xbb, 0xbb, 0xff, 0xff, 0xff, 0x77, 0xff, 0xff,
+> +	0xff, 0x77, 0x77, 0xff, 0x77, 0xbb, 0xdd, 0xee,
+>  };
+In dw-mmc.c, tuning_block values are same.
+So I think we can move these value into generic header. how about?
+
+Best Regards,
+Jaehoon Chung
+
+>  
+>  struct sdhci_msm_host {
+> @@ -359,7 +371,7 @@ static int sdhci_msm_execute_tuning(struct sdhci_host *host, u32 opcode)
+>  {
+>  	int tuning_seq_cnt = 3;
+>  	u8 phase, *data_buf, tuned_phases[16], tuned_phase_cnt = 0;
+> -	const u32 *tuning_block_pattern = tuning_block_64;
+> +	const u8 *tuning_block_pattern = tuning_block_64;
+>  	int size = sizeof(tuning_block_64);	/* Pattern size in bytes */
+>  	int rc;
+>  	struct mmc_host *mmc = host->mmc;
 > 
-
-OK, we will include this patch in series adding a .dts that needs it in next
-respin.
-
-@Naveen: Please include this patch whenever you are respinning Exynos7 dts
-patches.
-
-Thanks,
-Pankaj Dubey
-> Will
