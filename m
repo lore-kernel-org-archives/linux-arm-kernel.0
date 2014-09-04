@@ -1,64 +1,92 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Thu, 4 Sep 2014 09:02:04 +0200
-Subject: Autoloading of SPI/nor driver on kirkwood (qnap devices)
-In-Reply-To: <1409796689.27524.34.camel@decadent.org.uk>
-References: <1409673299.14324.43.camel@dagon.hellion.org.uk>
- <1409796689.27524.34.camel@decadent.org.uk>
-Message-ID: <CAMuHMdWBr=B0_Xivti9K5ReryHHEunQj2P26FjhmzhO-L9t+9g@mail.gmail.com>
+From: vincent.guittot@linaro.org (Vincent Guittot)
+Date: Thu, 4 Sep 2014 09:17:47 +0200
+Subject: [PATCH v5 03/12] sched: fix avg_load computation
+In-Reply-To: <1409787800.31585.26.camel@schen9-desk2.jf.intel.com>
+References: <1409051215-16788-1-git-send-email-vincent.guittot@linaro.org>
+ <1409051215-16788-4-git-send-email-vincent.guittot@linaro.org>
+ <5401BCDF.3040503@linux.vnet.ibm.com>
+ <CAKfTPtAt_X99p4KHNmZtVAnMdYm8_QLZ796WO+McqGf5RyM+iQ@mail.gmail.com>
+ <1409787800.31585.26.camel@schen9-desk2.jf.intel.com>
+Message-ID: <CAKfTPtCd02JLyd335WUpU5RRUYmS=Ni9S0U_U1uDsYjs59oQ1A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ben,
-
-On Thu, Sep 4, 2014 at 4:11 AM, Ben Hutchings <ben@decadent.org.uk> wrote:
->> I noticed that many platforms declare the flash chip as compatible =
->> "st,m25pXXX" whereas the ts219.dtsi just said m25p128 but I tried
->> changing that and it didn't help. In any case without spi-nor.ko being
->> autoloaded I don't support m25p80.ko ever would be.
+On 4 September 2014 01:43, Tim Chen <tim.c.chen@linux.intel.com> wrote:
+> On Wed, 2014-09-03 at 13:09 +0200, Vincent Guittot wrote:
+>> On 30 August 2014 14:00, Preeti U Murthy <preeti@linux.vnet.ibm.com> wrote:
+>> > Hi Vincent,
+>> >
+>> > On 08/26/2014 04:36 PM, Vincent Guittot wrote:
+>> >> The computation of avg_load and avg_load_per_task should only takes into
+>> >> account the number of cfs tasks. The non cfs task are already taken into
+>> >> account by decreasing the cpu's capacity and they will be tracked in the
+>> >> CPU's utilization (group_utilization) of the next patches
+>> >>
+>> >> Signed-off-by: Vincent Guittot <vincent.guittot@linaro.org>
+>> >> ---
+>> >>  kernel/sched/fair.c | 4 ++--
+>> >>  1 file changed, 2 insertions(+), 2 deletions(-)
+>> >>
+>> >> diff --git a/kernel/sched/fair.c b/kernel/sched/fair.c
+>> >> index 87b9dc7..b85e9f7 100644
+>> >> --- a/kernel/sched/fair.c
+>> >> +++ b/kernel/sched/fair.c
+>> >> @@ -4092,7 +4092,7 @@ static unsigned long capacity_of(int cpu)
+>> >>  static unsigned long cpu_avg_load_per_task(int cpu)
+>> >>  {
+>> >>       struct rq *rq = cpu_rq(cpu);
+>> >> -     unsigned long nr_running = ACCESS_ONCE(rq->nr_running);
+>> >> +     unsigned long nr_running = ACCESS_ONCE(rq->cfs.h_nr_running);
+>> >>       unsigned long load_avg = rq->cfs.runnable_load_avg;
+>> >>
+>> >>       if (nr_running)
+>> >> @@ -5985,7 +5985,7 @@ static inline void update_sg_lb_stats(struct lb_env *env,
+>> >>                       load = source_load(i, load_idx);
+>> >>
+>> >>               sgs->group_load += load;
+>> >> -             sgs->sum_nr_running += rq->nr_running;
+>> >> +             sgs->sum_nr_running += rq->cfs.h_nr_running;
+>> >>
+>> >>               if (rq->nr_running > 1)
+>> >>                       *overload = true;
+>> >>
+>> >
+>> > Why do we probe rq->nr_running while we do load balancing? Should not we
+>> > be probing cfs_rq->nr_running instead? We are interested after all in
+>> > load balancing fair tasks right? The reason I ask this is, I was
+>> > wondering if we need to make the above similar change in more places in
+>> > load balancing.
+>>
+>> Hi Preeti,
+>>
+>> Yes, we should probably the test   rq->cfs.h_nr_running > 0 before
+>> setting overload.
+>>
 >
-> m25p80.c has:
+> The overload indicator is used for knowing when we can totally avoid
+> load balancing to a cpu that is about to go idle.
+> We can avoid load balancing when no cpu has more than 1 task.  So if you
+> have say just one fair task and multiple deadline tasks on a cpu,
+> and another cpu about to go idle, you should turn on normal load
+> balancing in the idle path by setting overload to true.
+
+The newly idle load balancing can only affect CFS tasks so triggering
+a load_balance because a cpu is overloaded by rt tasks only, will not
+change anything.
+
 >
-> static struct spi_driver m25p80_driver = {
->         ...
->         .id_table       = spi_nor_ids,
->         ...
-> };
+> So setting overload should be set based on rq->nr_running and not on
+> rq->cfs.h_nr_running.
+
+We should probably use both values like below
+
+if ((rq->nr_running > 1) && ( rq->cfs.h_nr_running > 0))
+
+Regards,
+Vincent
 >
-> while spi_nor_ids is defined in spi-nor.c.  Since they end up as two
-> separate modules, modpost can't read the ID table and add the device ID
-> aliases to m25p80.ko.
-
-Woops. This indeed doesn't work.
-Note that the MODULE_DEVICE_TABLE() is also gone from m25p80.c
-
-So m25p80.c needs to contain the IDs, while spi-nor.c also needs the IDs
-because it's a framework/library.
-
-A quick solution would be to move the ID table to a header file, and include
-that by both, and re-add the lost MODULE_DEVICE_TABLE() to m25p80.c.
-That duplicates the data, though.
-
-Hmm, for the built-in case, we can avoid the duplication by letting m25p80.c
-refer to the table in spi-nor.c if !MODULE.
-Does anyone see a better solution?
-
-> It looks like m25p80 has been split up in order that the new fsl-qspi
-> driver can share its code (bypassing the SPI core and its device
-> model!).  Why doesn't fsl-qspi implement an SPI controller device?  I
-> think it is totally unacceptable to regress m25p80 in this way for the
-> sake of a new driver.
-
-Fsl-qspi is not a generic SPI driver, but a dedicated SPI NOR driver.
-It's programmed using high-level SPI NOR commands, instead of low-level
-SPI commands.
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+> Thanks.
+>
+> Tim
+>
+>
