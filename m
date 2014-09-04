@@ -1,121 +1,95 @@
-From: list-09_linux_arm@tqsc.de (Markus Niebel)
-Date: Thu,  4 Sep 2014 18:43:05 +0200
-Subject: [PATCH] ARM: DT: imx53: fix lvds channel 1 port
-Message-ID: <1409848985-16140-1-git-send-email-list-09_linux_arm@tqsc.de>
+From: stuart.yoder@freescale.com (Stuart Yoder)
+Date: Thu, 4 Sep 2014 16:32:28 +0000
+Subject: [PATCH V3 0/6] ARM64: Add support for FSL's LS2085A SoC
+In-Reply-To: <3563146.jh46O3eIbG@wuerfel>
+References: <1409757194-28155-1-git-send-email-bhupesh.sharma@freescale.com>
+ <6499926.sQm3J8L764@wuerfel> <20140904091319.GA32228@leverpostej>
+ <3563146.jh46O3eIbG@wuerfel>
+Message-ID: <363ee62e362d46a2b02415a124b78cef@CY1PR0301MB0748.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Markus Niebel <Markus.Niebel@tq-group.com>
 
-using LVDS channel 1 on an i.MX53 leads to following error:
 
-imx-ldb 53fa8008.ldb: unable to set di0 parent clock to ldb_di1
+> -----Original Message-----
+> From: Arnd Bergmann [mailto:arnd at arndb.de]
+> Sent: Thursday, September 04, 2014 4:39 AM
+> To: Mark Rutland
+> Cc: linux-arm-kernel at lists.infradead.org; rob.herring at linaro.org; Sharma Bhupesh-B45370; Catalin Marinas;
+> Will Deacon; Yoder Stuart-B08248; grant.likely at secretlab.ca; Marc Zyngier; Basu Arnab-B45036; Geoff Levand
+> Subject: Re: [PATCH V3 0/6] ARM64: Add support for FSL's LS2085A SoC
+> 
+> On Thursday 04 September 2014 10:13:19 Mark Rutland wrote:
+> > On Wed, Sep 03, 2014 at 07:31:44PM +0100, Arnd Bergmann wrote:
+> > > On Wednesday 03 September 2014 17:31:30 Mark Rutland wrote:
+> > > >
+> > > > However, I'm not sure I follow the reasoning for making this
+> > > > significantly harder, and even ignoring that I don't think this does
+> > > > make things significantly harder. Especially so if we have a PSCI node
+> > > > but not an enable method -- in that case its trivial to patch in an
+> > > > unrelated enable-method anyhow.
+> > >
+> > > Right, it's not actually much harder. A better way to look at it is
+> > > probably that we document what which parts we expect to stay constant
+> > > and which parts are to be filled out by the boot loader. Independent
+> > > of what PSCI implementation the boot loader provides, we would like
+> > > to see enable-method="psci".
+> >
+> > So in the /cpus node, have a comment like:
+> >
+> > /*
+> >  * We expect the enable-method to be "psci", but this is dependent on
+> >  * the FW, which will fill this in.
+> >  */
+> 
+> I was thinking of leaving the enable-method in the cpus node, but having
+> an empty psci node with a similar comment.
+> 
+> > Or, should we put together a soc-guidance.txt with that, ensuring things
+> > are initialised correctly (CNTVOFF, CNTFREQ), etc?
+> 
+> I would very much welcome documentation like that!
 
-This comes from imx_ldb_set_clock with mux = 0. Mux parameter must be "1" for
-reparenting di1 clock to ldb_di1. The value of the mux param comes from device
-tree port settings.
+If any documentation updates are to be made I think they belong in
+Documentation/arm64/booting.txt.
 
-On i.MX5, the internal two-input-multiplexer is used. Due to hardware limitations,
-only one port (port@[0,1]) can be used for each channel (lvds-channel@[0,1],
-respectively)
+There is currently the following:
 
-Documentation update suggested by Philipp Zabel <p.zabel@pengutronix.de>
+[cut]
+- CPUs with a "spin-table" enable-method must have a 'cpu-release-addr'
+  property in their cpu node.  This property identifies a
+  naturally-aligned 64-bit zero-initalised memory location.
 
-Signed-off-by: Markus Niebel <Markus.Niebel@tq-group.com>
----
- Documentation/devicetree/bindings/staging/imx-drm/ldb.txt | 15 +++++++++++++--
- arch/arm/boot/dts/imx53.dtsi                              | 12 ++++++++++--
- 2 files changed, 23 insertions(+), 4 deletions(-)
+  These CPUs should spin outside of the kernel in a reserved area of
+  memory (communicated to the kernel by a /memreserve/ region in the
+  device tree) polling their cpu-release-addr location, which must be
+  contained in the reserved region.  A wfe instruction may be inserted
+  to reduce the overhead of the busy-loop and a sev will be issued by
+  the primary CPU.  When a read of the location pointed to by the
+  cpu-release-addr returns a non-zero value, the CPU must jump to this
+  value.  The value will be written as a single 64-bit little-endian
+  value, so CPUs must convert the read value to their native endianness
+  before jumping to it.
 
-diff --git a/Documentation/devicetree/bindings/staging/imx-drm/ldb.txt b/Documentation/devicetree/bindings/staging/imx-drm/ldb.txt
-index 578a1fc..443bcb6 100644
---- a/Documentation/devicetree/bindings/staging/imx-drm/ldb.txt
-+++ b/Documentation/devicetree/bindings/staging/imx-drm/ldb.txt
-@@ -56,6 +56,9 @@ Required properties:
-  - fsl,data-width : should be <18> or <24>
-  - port: A port node with endpoint definitions as defined in
-    Documentation/devicetree/bindings/media/video-interfaces.txt.
-+   On i.MX5, the internal two-input-multiplexer is used.
-+   Due to hardware limitations, only one port (port@[0,1])
-+   can be used for each channel (lvds-channel@[0,1], respectively)
-    On i.MX6, there should be four ports (port@[0-3]) that correspond
-    to the four LVDS multiplexer inputs.
- 
-@@ -78,6 +81,8 @@ ldb: ldb at 53fa8008 {
- 		      "di0", "di1";
- 
- 	lvds-channel at 0 {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
- 		reg = <0>;
- 		fsl,data-mapping = "spwg";
- 		fsl,data-width = <24>;
-@@ -86,7 +91,9 @@ ldb: ldb at 53fa8008 {
- 			/* ... */
- 		};
- 
--		port {
-+		port at 0 {
-+			reg = <0>;
-+
- 			lvds0_in: endpoint {
- 				remote-endpoint = <&ipu_di0_lvds0>;
- 			};
-@@ -94,6 +101,8 @@ ldb: ldb at 53fa8008 {
- 	};
- 
- 	lvds-channel at 1 {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
- 		reg = <1>;
- 		fsl,data-mapping = "spwg";
- 		fsl,data-width = <24>;
-@@ -102,7 +111,9 @@ ldb: ldb at 53fa8008 {
- 			/* ... */
- 		};
- 
--		port {
-+		port at 1 {
-+			reg = <1>;
-+
- 			lvds1_in: endpoint {
- 				remote-endpoint = <&ipu_di1_lvds1>;
- 			};
-diff --git a/arch/arm/boot/dts/imx53.dtsi b/arch/arm/boot/dts/imx53.dtsi
-index 6456a00..1a2202d 100644
---- a/arch/arm/boot/dts/imx53.dtsi
-+++ b/arch/arm/boot/dts/imx53.dtsi
-@@ -419,10 +419,14 @@
- 				status = "disabled";
- 
- 				lvds-channel at 0 {
-+					#address-cells = <1>;
-+					#size-cells = <0>;
- 					reg = <0>;
- 					status = "disabled";
- 
--					port {
-+					port at 0 {
-+						reg = <0>;
-+
- 						lvds0_in: endpoint {
- 							remote-endpoint = <&ipu_di0_lvds0>;
- 						};
-@@ -430,10 +434,14 @@
- 				};
- 
- 				lvds-channel at 1 {
-+					#address-cells = <1>;
-+					#size-cells = <0>;
- 					reg = <1>;
- 					status = "disabled";
- 
--					port {
-+					port at 1 {
-+						reg = <1>;
-+
- 						lvds1_in: endpoint {
- 							remote-endpoint = <&ipu_di1_lvds1>;
- 						};
--- 
-2.1.0
+- CPUs with a "psci" enable method should remain outside of
+  the kernel (i.e. outside of the regions of memory described to the
+  kernel in the memory node, or in a reserved area of memory described
+  to the kernel by a /memreserve/ region in the device tree).  The
+  kernel will issue CPU_ON calls as described in ARM document number ARM
+  DEN 0022A ("Power State Coordination Interface System Software on ARM
+  processors") to bring CPUs into the kernel.
+
+  The device tree should contain a 'psci' node, as described in
+  Documentation/devicetree/bindings/arm/psci.txt.
+[cut]
+
+Whatever the requirements are-- enable-method present, psci node
+(empty or otherwise), plus anything about other initialization
+like CNTVOFF/CNTFREQ.  Having all boot time requirements in one
+place would be good.
+
+Also, if psci 2.0 is a requirement that should be specified in 
+there as well.
+
+Thanks,
+Stuart
