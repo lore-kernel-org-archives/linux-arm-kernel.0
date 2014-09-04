@@ -1,33 +1,121 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 4 Sep 2014 18:29:32 +0200
-Subject: [PATCH 3/3] gpio: lib-sysfs: Add 'wakeup' attribute
-In-Reply-To: <1409335127-26712-4-git-send-email-soren.brinkmann@xilinx.com>
-References: <1409335127-26712-1-git-send-email-soren.brinkmann@xilinx.com>
- <1409335127-26712-4-git-send-email-soren.brinkmann@xilinx.com>
-Message-ID: <CACRpkda14yOtM=sfsiy2vajd-u-+YbkXZAADQLVNurM4TdCDeQ@mail.gmail.com>
+From: list-09_linux_arm@tqsc.de (Markus Niebel)
+Date: Thu,  4 Sep 2014 18:43:05 +0200
+Subject: [PATCH] ARM: DT: imx53: fix lvds channel 1 port
+Message-ID: <1409848985-16140-1-git-send-email-list-09_linux_arm@tqsc.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 29, 2014 at 7:58 PM, Soren Brinkmann
-<soren.brinkmann@xilinx.com> wrote:
+From: Markus Niebel <Markus.Niebel@tq-group.com>
 
-> Add an attribute 'wakeup' to the GPIO sysfs interface which allows
-> marking/unmarking a GPIO as wake IRQ.
-> The file 'wakeup' is created in each exported GPIOs directory, if an IRQ
-> is associated with that GPIO and the irqchip implements set_wake().
-> Writing 'enabled' to that file will enable wake for that GPIO, while
-> writing 'disabled' will disable wake.
-> Reading that file will return either 'disabled' or 'enabled' depening on
-> the currently set flag for the GPIO's IRQ.
->
-> Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
+using LVDS channel 1 on an i.MX53 leads to following error:
 
-While I do see the utility of this patch, any kind of interrupt and
-related handling in userspace makes me super-stressed and
-nervous.
+imx-ldb 53fa8008.ldb: unable to set di0 parent clock to ldb_di1
 
-I need wide consent for this and please post this patch separately
-from the zynq-related patches.
+This comes from imx_ldb_set_clock with mux = 0. Mux parameter must be "1" for
+reparenting di1 clock to ldb_di1. The value of the mux param comes from device
+tree port settings.
 
-Yours,
-Linus Walleij
+On i.MX5, the internal two-input-multiplexer is used. Due to hardware limitations,
+only one port (port@[0,1]) can be used for each channel (lvds-channel@[0,1],
+respectively)
+
+Documentation update suggested by Philipp Zabel <p.zabel@pengutronix.de>
+
+Signed-off-by: Markus Niebel <Markus.Niebel@tq-group.com>
+---
+ Documentation/devicetree/bindings/staging/imx-drm/ldb.txt | 15 +++++++++++++--
+ arch/arm/boot/dts/imx53.dtsi                              | 12 ++++++++++--
+ 2 files changed, 23 insertions(+), 4 deletions(-)
+
+diff --git a/Documentation/devicetree/bindings/staging/imx-drm/ldb.txt b/Documentation/devicetree/bindings/staging/imx-drm/ldb.txt
+index 578a1fc..443bcb6 100644
+--- a/Documentation/devicetree/bindings/staging/imx-drm/ldb.txt
++++ b/Documentation/devicetree/bindings/staging/imx-drm/ldb.txt
+@@ -56,6 +56,9 @@ Required properties:
+  - fsl,data-width : should be <18> or <24>
+  - port: A port node with endpoint definitions as defined in
+    Documentation/devicetree/bindings/media/video-interfaces.txt.
++   On i.MX5, the internal two-input-multiplexer is used.
++   Due to hardware limitations, only one port (port@[0,1])
++   can be used for each channel (lvds-channel@[0,1], respectively)
+    On i.MX6, there should be four ports (port@[0-3]) that correspond
+    to the four LVDS multiplexer inputs.
+ 
+@@ -78,6 +81,8 @@ ldb: ldb at 53fa8008 {
+ 		      "di0", "di1";
+ 
+ 	lvds-channel at 0 {
++		#address-cells = <1>;
++		#size-cells = <0>;
+ 		reg = <0>;
+ 		fsl,data-mapping = "spwg";
+ 		fsl,data-width = <24>;
+@@ -86,7 +91,9 @@ ldb: ldb at 53fa8008 {
+ 			/* ... */
+ 		};
+ 
+-		port {
++		port at 0 {
++			reg = <0>;
++
+ 			lvds0_in: endpoint {
+ 				remote-endpoint = <&ipu_di0_lvds0>;
+ 			};
+@@ -94,6 +101,8 @@ ldb: ldb at 53fa8008 {
+ 	};
+ 
+ 	lvds-channel at 1 {
++		#address-cells = <1>;
++		#size-cells = <0>;
+ 		reg = <1>;
+ 		fsl,data-mapping = "spwg";
+ 		fsl,data-width = <24>;
+@@ -102,7 +111,9 @@ ldb: ldb at 53fa8008 {
+ 			/* ... */
+ 		};
+ 
+-		port {
++		port at 1 {
++			reg = <1>;
++
+ 			lvds1_in: endpoint {
+ 				remote-endpoint = <&ipu_di1_lvds1>;
+ 			};
+diff --git a/arch/arm/boot/dts/imx53.dtsi b/arch/arm/boot/dts/imx53.dtsi
+index 6456a00..1a2202d 100644
+--- a/arch/arm/boot/dts/imx53.dtsi
++++ b/arch/arm/boot/dts/imx53.dtsi
+@@ -419,10 +419,14 @@
+ 				status = "disabled";
+ 
+ 				lvds-channel at 0 {
++					#address-cells = <1>;
++					#size-cells = <0>;
+ 					reg = <0>;
+ 					status = "disabled";
+ 
+-					port {
++					port at 0 {
++						reg = <0>;
++
+ 						lvds0_in: endpoint {
+ 							remote-endpoint = <&ipu_di0_lvds0>;
+ 						};
+@@ -430,10 +434,14 @@
+ 				};
+ 
+ 				lvds-channel at 1 {
++					#address-cells = <1>;
++					#size-cells = <0>;
+ 					reg = <1>;
+ 					status = "disabled";
+ 
+-					port {
++					port at 1 {
++						reg = <1>;
++
+ 						lvds1_in: endpoint {
+ 							remote-endpoint = <&ipu_di1_lvds1>;
+ 						};
+-- 
+2.1.0
