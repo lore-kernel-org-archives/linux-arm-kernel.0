@@ -1,102 +1,38 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Thu, 4 Sep 2014 17:02:17 +0100
-Subject: [PATCH] drivers: pci: convert generic host controller to DT host
- bridge creation API
-In-Reply-To: <6930538.Get2YiuMvJ@wuerfel>
-References: <1407861695-25549-1-git-send-email-Liviu.Dudau@arm.com>
- <20140819120553.GA23128@arm.com>
- <20140904133956.GA12351@e102568-lin.cambridge.arm.com>
- <6930538.Get2YiuMvJ@wuerfel>
-Message-ID: <20140904160217.GC12351@e102568-lin.cambridge.arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 4 Sep 2014 18:02:36 +0200
+Subject: [PATCH 11/19] ARM: S5PV210: Remove support for board files
+In-Reply-To: <1409825105.5546.91.camel@x220>
+References: <1404496099-26708-1-git-send-email-t.figa@samsung.com>
+ <53C675E4.4020502@samsung.com> <1409825105.5546.91.camel@x220>
+Message-ID: <201409041802.36466.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
-
-thanks for having a look.
-
-On Thu, Sep 04, 2014 at 03:05:53PM +0100, Arnd Bergmann wrote:
-> On Thursday 04 September 2014 14:39:56 Lorenzo Pieralisi wrote:
-> > > > +   if (!res_valid) {
-> > > > +           dev_err(dev, "non-prefetchable memory resource required\n");
-> > > > +           return -EINVAL;
-> > > > +   }
-> > > > +
-> > > > +   if (iores) {
-> > > > +           if (!PAGE_ALIGNED(io_cpuaddr))
-> > > > +                   return -EINVAL;
-> > > 
-> > > Why is this alignment check not in the core code? Probably a question for
-> > > somebody like Arnd, but do we need to deal with multiple IO resources?
-> > > Currently we'll just silently take the last one that we found, which doesn't
-> > > sound ideal.
-> > 
-> > (1) Yes, the alignment check should be made in core code
+On Thursday 04 September 2014, Paul Bolle wrote:
 > 
-> Makes sense. In theory we could support unaligned addresses (as long as
-> the offset in the page is the same for virtual and physical), but I don't
-> see why we should implement that unless some implementation absolutely
-> requires it.
+> On Wed, 2014-07-16 at 14:53 +0200, Tomasz Figa wrote:
+> > I believe that both sound card drivers for Goni and Aquilla could be
+> > replaced with simple cards in DT, so I'll send a follow-up patch for this.
 > 
-> > (2) I could take the first IO resource and warn on multiple IO resources if
-> >     they are detected. Thoughts ?
+> References to MACH_GONI and MACH_AQUILA can still be seen in v3.17-rc3
+> and next-20140903. Note that as consequence SND_SOC_GONI_AQUILA_WM8994
+> can not be set anymore.
 > 
-> I think we should either warn, or be reasonably sure that it will work.
-> Again, in theory this should work, but no sane hardware implementation
-> would do it like that.
-
-Ok, I will refactor the IO resources mapping code on top of Livius's v10.
-
-> > > > +           if (err)
-> > > > +                   return err;
-> > > > +   }
-> > > > +
-> > > > +   /* Parse and map our Configuration Space windows */
-> > > > +   err = gen_pci_parse_map_cfg_windows(host);
-> > > > +   if (err)
-> > > > +           return err;
-> > > > +
-> > > > +   pci_add_flags(PCI_ENABLE_PROC_DOMAINS);
-> > > > +   pci_add_flags(PCI_REASSIGN_ALL_BUS | PCI_REASSIGN_ALL_RSRC);
-> > > 
-> > > Why does this belong in the host controller driver and how does it interact
-> > > with the probe-only property?
-> > 
-> > That's a very good question and it is one that confuses me too.
-> > 
-> > Current code in pci_common_init_dev() sets PCI_REASSIGN_ALL_RSRC behind
-> > our backs silently. That flag has a side effect only if the probing code
-> > detects PCI bridges in the list of devices, since PCI core probing code
-> > will try to reassign the bus numbers upon PCI bridge detection IIUC. I do
-> > not think that PCI_REASSIGN_ALL_BUS has any side effect on ARM (by grepping
-> > around I noticed that PCI_REASSIGN_ALL_RSRC is used in
-> > 
-> > pcibios_assign_all_busses()
-> > 
-> > which in turn is triggered only if PCI bridges are detected, still grokking
-> > the code though).
+> > Most likely the same is the case for SMDK boards, but they don't seem to
+> > have any active users (see cover letter for more details), which means
+> > that probably they could be simply dropped from
+> > sound/soc/samsung/Kconfig in another follow-up patch.
 > 
-> Interesting point: the generic implementation should probably not default
-> to reassigning all buses at all. We could have a (host controller specific,
-> but with standardized name) DT property for it, but it would be best if
-> firmware already probes it to not have to do it again.
-
-I think that makes sense, let me point out though that this is
-*not* how the code works today, since the pcibios code sets:
-
-PCI_REASSIGN_ALL_RSRC (pci_common_init_dev() in arch/arm/kernel/bios32.c)
-
-by default. I won't set the PCI_REASSIGN_ALL_RSRC and PCI_REASSIGN_ALL_BUS
-flags.
-
-> > Apart from the PCI_ENABLE_PROC_DOMAINS flag which I think it is safe to
-> > set by default (but let me check that too),
+> Ditto for MACH_SMDKC100, MACH_SMDKC110, and MACH_SMDKV210. Note that
+> here SND_SOC_SMDK_WM8580_PCM can not be set anymore.
 > 
-> I think it should be enabled here, as no legacy machine will use this
-> driver.
+> (This is intended to be a gentile reminder. I hope it actually comes
+> across like that.)
 
-+1
+At least I find those reminders useful. We clearly have a bug here
+that was recently introduced, and we should fix that.
 
-I will wait for Liviu's v10 and repost accordingly.
+I think it would be nice if you could submit a patch to remove the
+drivers from ASoC, then we can see if anybody complains.
 
-Lorenzo
+	Arnd
