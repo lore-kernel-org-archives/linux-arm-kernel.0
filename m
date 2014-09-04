@@ -1,45 +1,49 @@
-From: chen.fang@freescale.com (Fancy Fang)
-Date: Thu, 4 Sep 2014 16:28:55 +0800
-Subject: [PATCH] ARM: clk-imx6sl: correct the pxp and epdc axi clock selections
-Message-ID: <1409819335-29094-1-git-send-email-chen.fang@freescale.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 04 Sep 2014 11:33:38 +0200
+Subject: [PATCH v5 1/4] ethernet: arc: Add support for Rockchip SoC layer
+ device tree bindings
+In-Reply-To: <20140903211220.GA16962@gmail.com>
+References: <1409763165-16461-1-git-send-email-romain.perier@gmail.com>
+ <20140903211220.GA16962@gmail.com>
+Message-ID: <3809311.80Auz8fbHu@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The parent clocks of IMX6SL_CLK_PXP_AXI_SEL and IMX6SL_CLK_EPDC_AXI_SEL
-clocks are not the same. So split the epdc_pxp_sels into two different
-clock selections 'pxp_axi_sels' and 'epdc_axi_sels'.
+On Wednesday 03 September 2014 23:12:20 Beniamino Galvani wrote:
+> There is also the following build warning due to the emac dependency
+> on REGULATOR which in principle seems correct, but looking at other
+> drivers I wonder why they use the regulator APIs but don't have the
+> same dependency.
+> 
+> drivers/regulator/Kconfig:1:error: recursive dependency detected!
+> drivers/regulator/Kconfig:1:       symbol REGULATOR is selected by MDIO_SUN4I
+> drivers/net/phy/Kconfig:159:       symbol MDIO_SUN4I depends on PHYLIB
+> drivers/net/phy/Kconfig:5:         symbol PHYLIB is selected by ARC_EMAC_CORE
+> drivers/net/ethernet/arc/Kconfig:20:      symbol ARC_EMAC_CORE is selected by EMAC_ROCKCHIP
+> drivers/net/ethernet/arc/Kconfig:35:      symbol EMAC_ROCKCHIP depends on REGULATOR
 
-Signed-off-by: Fancy Fang <chen.fang@freescale.com>
-Signed-off-by: Robby Cai <R63905@freescale.com>
-Acked-by: Shawn Guo <shawn.guo@freescale.com>
----
- arch/arm/mach-imx/clk-imx6sl.c | 7 ++++---
- 1 file changed, 4 insertions(+), 3 deletions(-)
+This is a recurring problem: 
 
-diff --git a/arch/arm/mach-imx/clk-imx6sl.c b/arch/arm/mach-imx/clk-imx6sl.c
-index 43261ea..d730dfa 100644
---- a/arch/arm/mach-imx/clk-imx6sl.c
-+++ b/arch/arm/mach-imx/clk-imx6sl.c
-@@ -47,7 +47,8 @@ static const char *csi_lcdif_sels[]	= { "mmdc", "pll2_pfd2", "pll3_120m", "pll3_
- static const char *usdhc_sels[]		= { "pll2_pfd2", "pll2_pfd0", };
- static const char *ssi_sels[]		= { "pll3_pfd2", "pll3_pfd3", "pll4_audio_div", "dummy", };
- static const char *perclk_sels[]	= { "ipg", "osc", };
--static const char *epdc_pxp_sels[]	= { "mmdc", "pll3_usb_otg", "pll5_video_div", "pll2_pfd0", "pll2_pfd2", "pll3_pfd1", };
-+static const char *pxp_axi_sels[]	= { "pll2_bus", "pll3_usb_otg", "pll5_video_div", "pll2_pfd0", "pll2_pfd2", "pll3_pfd3", };
-+static const char *epdc_axi_sels[]	= { "pll2_bus", "pll3_usb_otg", "pll5_video_div", "pll2_pfd0", "pll2_pfd2", "pll3_pfd2", };
- static const char *gpu2d_ovg_sels[]	= { "pll3_pfd1", "pll3_usb_otg", "pll2_bus", "pll2_pfd2", };
- static const char *gpu2d_sels[]		= { "pll2_pfd2", "pll3_usb_otg", "pll3_pfd1", "pll2_bus", };
- static const char *lcdif_pix_sels[]	= { "pll2_bus", "pll3_usb_otg", "pll5_video_div", "pll2_pfd0", "pll3_pfd0", "pll3_pfd1", };
-@@ -251,8 +252,8 @@ static void __init imx6sl_clocks_init(struct device_node *ccm_node)
- 	clks[IMX6SL_CLK_SSI2_SEL]         = imx_clk_fixup_mux("ssi2_sel",   base + 0x1c, 12, 2, ssi_sels,          ARRAY_SIZE(ssi_sels),    imx_cscmr1_fixup);
- 	clks[IMX6SL_CLK_SSI3_SEL]         = imx_clk_fixup_mux("ssi3_sel",   base + 0x1c, 14, 2, ssi_sels,          ARRAY_SIZE(ssi_sels),    imx_cscmr1_fixup);
- 	clks[IMX6SL_CLK_PERCLK_SEL]       = imx_clk_fixup_mux("perclk_sel", base + 0x1c, 6,  1, perclk_sels,       ARRAY_SIZE(perclk_sels), imx_cscmr1_fixup);
--	clks[IMX6SL_CLK_PXP_AXI_SEL]      = imx_clk_mux("pxp_axi_sel",      base + 0x34, 6,  3, epdc_pxp_sels,     ARRAY_SIZE(epdc_pxp_sels));
--	clks[IMX6SL_CLK_EPDC_AXI_SEL]     = imx_clk_mux("epdc_axi_sel",     base + 0x34, 15, 3, epdc_pxp_sels,     ARRAY_SIZE(epdc_pxp_sels));
-+	clks[IMX6SL_CLK_PXP_AXI_SEL]      = imx_clk_mux("pxp_axi_sel",      base + 0x34, 6,  3, pxp_axi_sels,      ARRAY_SIZE(pxp_axi_sels));
-+	clks[IMX6SL_CLK_EPDC_AXI_SEL]     = imx_clk_mux("epdc_axi_sel",     base + 0x34, 15, 3, epdc_axi_sels,     ARRAY_SIZE(epdc_axi_sels));
- 	clks[IMX6SL_CLK_GPU2D_OVG_SEL]    = imx_clk_mux("gpu2d_ovg_sel",    base + 0x18, 4,  2, gpu2d_ovg_sels,    ARRAY_SIZE(gpu2d_ovg_sels));
- 	clks[IMX6SL_CLK_GPU2D_SEL]        = imx_clk_mux("gpu2d_sel",        base + 0x18, 8,  2, gpu2d_sels,        ARRAY_SIZE(gpu2d_sels));
- 	clks[IMX6SL_CLK_LCDIF_PIX_SEL]    = imx_clk_mux("lcdif_pix_sel",    base + 0x38, 6,  3, lcdif_pix_sels,    ARRAY_SIZE(lcdif_pix_sels));
--- 
-1.9.1
+driver a depends on x and selects y
+driver b depends on y and selects x
+
+Maybe we should teach Kconfig to not worry about it when x and y are
+both user-selectable as well.
+
+However, a nicer solution would be if we could agree for each symbol
+on who is supposed to 'select' or 'depends on' it. In particular,
+we are inconsistent about CONFIG_REGULATOR:
+
+MDIO_SUN4I probably should not 'select' it but instead 'depends on'
+this symbol if anything. It would be nice if someone could submit
+a patch to that effect. EMAC_ROCKCHIP could also drop the dependency
+on REGULATOR: you can still build the driver without that subsystem
+being enabled, but then all the regulators have to be set up by
+the boot loader.
+
+There isn't much we can do about the PHYLIB dependency, unless we
+turn it into a silent symbol that gets selected by all phy drivers,
+or we change all network drivers that currently 'select' it to
+'depends on'. I don't really want to get involved in that discussion ;-)
+
+	Arnd
