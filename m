@@ -1,89 +1,111 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Thu, 04 Sep 2014 13:00:37 +0200
-Subject: [BUG] staging: imx-drm: clock reparent fails for LDB channel 1
- on i.MX53
-In-Reply-To: <CAOMZO5AEKmFg-eM=b6WWYG4qy-1PRcsSHfoKG2aZFMmQBgw5Hw@mail.gmail.com>
-References: <54074359.5090500@tqsc.de>
- <CAOMZO5AEKmFg-eM=b6WWYG4qy-1PRcsSHfoKG2aZFMmQBgw5Hw@mail.gmail.com>
-Message-ID: <1409828437.3931.19.camel@paszta.hi.pengutronix.de>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 4 Sep 2014 12:26:25 +0100
+Subject: [RFC PATCH v2 4/7] iommu: provide helper function to configure
+ an IOMMU for an of master
+In-Reply-To: <5768908.PeRFksrdyQ@wuerfel>
+References: <1409680587-29818-1-git-send-email-will.deacon@arm.com>
+ <1409680587-29818-5-git-send-email-will.deacon@arm.com>
+ <5768908.PeRFksrdyQ@wuerfel>
+Message-ID: <20140904112625.GE7156@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Arnd,
 
-Am Mittwoch, den 03.09.2014, 13:48 -0300 schrieb Fabio Estevam:
-> On Wed, Sep 3, 2014 at 1:35 PM, Markus Niebel <list-09_linux_arm@tqsc.de> wrote:
-> > Hello,
-> >
-> > playing with LVDS channel 1 on a TQMa53 with MBa53 mainboard we see error
-> >
-> > imx-ldb 53fa8008.ldb: unable to set di0 parent clock to ldb_di1
-> >
-> > this comes from imx_ldb_set_clock with mux = 0. If setting mux parameter hard to "1"
-> > LVDS on channel 1 works just fine. The value of the mux param comes from device tree
-> > port settings.
-> >
-> > The following device tree change fixes the issue, but im not sure if this is the
-> > correct way.
-> >
-> > diff --git a/arch/arm/boot/dts/imx53.dtsi b/arch/arm/boot/dts/imx53.dtsi
-> > index 6456a00..acdfabf 100644
-> > --- a/arch/arm/boot/dts/imx53.dtsi
-> > +++ b/arch/arm/boot/dts/imx53.dtsi
-> > @@ -419,10 +419,14 @@
-> >                                 status = "disabled";
-> >
-> >                                 lvds-channel at 0 {
-> > +                                       #address-cells = <1>;
-> > +                                       #size-cells = <0>;
-> >                                         reg = <0>;
-> >                                         status = "disabled";
-> >
-> >                                         port {
+Thanks for the review.
 
-This should be port at 0.
-
-> > +                                               reg = <0>;
-> > +
-> >                                                 lvds0_in: endpoint {
-> >                                                         remote-endpoint = <&ipu_di0_lvds0>;
-> >                                                 };
-> > @@ -430,10 +434,14 @@
-> >                                 };
-> >
-> >                                 lvds-channel at 1 {
-> > +                                       #address-cells = <1>;
-> > +                                       #size-cells = <0>;
-> >                                         reg = <1>;
-> >                                         status = "disabled";
-> >
-> >                                         port {
-
-port at 1
-
-> > +                                               reg = <1>;
-> > +
-> >                                                 lvds1_in: endpoint {
-> >                                                         remote-endpoint = <&ipu_di1_lvds1>;
-> >                                                 };
->
-> > In my understanding the i.MX53 has no multiplexer for the input, so
-> > DI1 -> LVDS1 in case of single channel or separate channels
+On Tue, Sep 02, 2014 at 08:10:10PM +0100, Arnd Bergmann wrote:
+> On Tuesday 02 September 2014 18:56:24 Will Deacon wrote:
+> > +struct iommu_dma_mapping *of_iommu_configure(struct device *dev)
+> > +{
+> > +       struct of_phandle_args iommu_spec;
+> > +       struct iommu_dma_mapping *mapping;
+> > +       struct bus_type *bus = dev->bus;
+> > +       const struct iommu_ops *ops = bus->iommu_ops;
 > 
-> Your change looks good. Adding Philipp and Shawn on Cc.
+> I think it would be best to not even introduce the tight coupling
+> between bus_type and iommu_ops here, one of the main reasons we
+> are doing this is to break that connection.
+> 
+> Better put the iommu_ops into the iommu_data pointer that gets looked
+> up per iommu device.
 
-Apart from the comments, this looks good to me, too.
-In Documentation/devicetree/bindings/staging/imx-drm/ldb.txt the example
-should be updated with the above changes, and an explanation should be
-added to the port documentation in there:
+Yes, I'll add that. It's a bit weird, because those same ops will later
+be duplicated in iommu_data->domain->ops, but that's an artifact of how
+the domain is currently constructed by iommu_domain_alloc.
 
-"On i.MX5, the internal two-input-multiplexer is used.
- Due to hardware limitations, only one port (port@[0,1])
- can be used for each channel (lvds-channel@[0,1], respectively)"
+> > +       struct iommu_data *iommu = NULL;
+> > +       int idx = 0;
+> > +
+> > +       if (!iommu_present(bus) || !ops->of_xlate)
+> > +               return NULL;
+> > +
+> > +       /*
+> > +        * We don't currently walk up the tree looking for a parent IOMMU.
+> > +        * See the `Notes:' section of
+> > +        * Documentation/devicetree/bindings/iommu/iommu.txt
+> > +        */
+> > +        */
+> > +       while (!of_parse_phandle_with_args(dev->of_node, "iommus",
+> > +                                          "#iommu-cells", idx,
+> > +                                          &iommu_spec)) {
+> > +               struct device_node *np = iommu_spec.np;
+> > +               struct iommu_data *data = of_iommu_get_data(np);
+> > +
+> > +               if (!iommu) {
+> > +                       if (!ops->of_xlate(dev, &iommu_spec))
+> > +                               iommu = data;
+> 
+> I would make the first argument of the of_xlate function the iommu_data,
+> so the code can find the right instance.
 
-Is this clear enough? In principle each channel could have two input
-ports on i.MX5, but there is no way to properly route the ldb di clock
-to the other display interface.
+Oops, that's what I intended. Well spotted.
 
-regards
-Philipp
+> Maybe also add an extra argument at the end that can be used by the
+> PCI code and potentially other drivers with multiple master IDs
+> behind one "iommus" property to pass some value identifying which of
+> the masters is meant.
+> 
+> The format of that is unfortunately bus specific and our platform_bus
+> really covers a number of different hardware buses (AXI, AHB, OPB, ...)
+> but the caller should be able to provide the data in the right form
+> that the iommu understands. I would try using a single u64 argument
+> as a start, hoping that this covers all the buses we need. At least
+> it's enough for PCI (bus/device/function) and for AXI (requester-id?).
+
+Yeah, I think that will work. It's kind of like a device `index' for a
+device that sits behind a bridge (trying to avoid yet another ID parameter
+:).
+
+> 
+> > +               } else if (iommu != data) {
+> > +                       pr_warn("Rejecting device %s with multiple IOMMU instances\n",
+> > +                               dev_name(dev));
+> > +                       iommu = NULL;
+> > +               }
+> > +
+> > +               of_node_put(np);
+> > +
+> > +               if (!iommu)
+> > +                       break;
+> > +
+> > +               idx++;
+> > +       }
+> > +
+> > +       if (!iommu)
+> > +               return NULL;
+> > +
+> > +       mapping = devm_kzalloc(dev, sizeof(*mapping), GFP_KERNEL);
+> > +       if (!mapping)
+> > +               return NULL;
+> > 
+> 
+> I don't think it's safe to use devm_* functions here: this is during
+> device discovery, and this data will be freed if probe() fails or
+> the device gets removed from a driver.
+
+So I can make this a standard kzalloc, but I have no idea where the
+corresponding kfree should live. Is there something equivalent to
+of_dma_unconfigure, or is this data that is expected to persist?
+
+Will
