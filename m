@@ -1,24 +1,30 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 4 Sep 2014 21:41:45 +0200
-Subject: [PATCH 0/3] clps711x for 3.18
-In-Reply-To: <1408451506-8001-1-git-send-email-shc_work@mail.ru>
-References: <1408451506-8001-1-git-send-email-shc_work@mail.ru>
-Message-ID: <201409042141.45745.arnd@arndb.de>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 4 Sep 2014 12:49:52 -0700
+Subject: [PATCH 0/2] ARM: dts: dra7-evm: fixes for mux and VTT control
+In-Reply-To: <1409837008-32144-1-git-send-email-nm@ti.com>
+References: <1409837008-32144-1-git-send-email-nm@ti.com>
+Message-ID: <20140904194951.GB14698@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 19 August 2014, Alexander Shiyan wrote:
-> Here is a CLPS711X patchset for 3.18. Please apply this to arm-soc tree.
+* Nishanth Menon <nm@ti.com> [140904 06:24]:
+> Hi,
 > 
-> Alexander Shiyan (3):
->   ARM: clps711x: Switch CLPS711X subarch to use clk and clocksource
->     driver
->   ARM: clps711x: edb7211: Use new PWM driver for backlight
->   ARM: clps711x: Add SOC BUS support
+> The following series was inspired in part by http://marc.info/?l=linux-omap&m=140974309205295&w=2
+> causing me to try and do an audit of pinctrl configurations on the platform.
+> 
+> Further, failures on latest board updates in the automated farm also
+> caused identification of a fix which was yet to be send to upstream
+> from product kernel. Slightly unrelated patches in this series.
+> 
+> So here they are..
+> based on v3.17-rc1:
+> before-dra7xx-evm:  Boot FAIL: http://paste.ubuntu.org.cn/1477597
+> (fails can be at different times though.. random crashes without VTT is usual)..
+> after-dra7xx-evm:  Boot PASS: http://paste.ubuntu.org.cn/1477596
 
+Thanks applying both into omap-for-v3.17/fixes-v2.
 
-Applied the first patch to next/cleanup, and the other two to next/soc.
+Regards,
 
-Thanks for the reminder.
-
-	Arnd
+Tony
