@@ -1,48 +1,41 @@
-From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
-Date: Thu, 4 Sep 2014 09:45:36 -0700
-Subject: [PATCH 2/3] gpio: zynq: Fixed broken wakeup implementation
-In-Reply-To: <CACRpkdbb0oeA0b5SSLtR6U7jv8asCeEJdHEsDAg7_tH+GHc5RQ@mail.gmail.com>
-References: <1409335127-26712-1-git-send-email-soren.brinkmann@xilinx.com>
- <1409335127-26712-3-git-send-email-soren.brinkmann@xilinx.com>
- <CACRpkdbb0oeA0b5SSLtR6U7jv8asCeEJdHEsDAg7_tH+GHc5RQ@mail.gmail.com>
-Message-ID: <00af0950-9750-4c5c-97ee-76893823c29d@BN1BFFO11FD020.protection.gbl>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu,  4 Sep 2014 17:49:58 +0100
+Subject: [PATCH 0/7] iommu/arm-smmu: misc. driver updates targetting 3.18
+Message-ID: <1409849405-17347-1-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2014-09-04 at 06:27PM +0200, Linus Walleij wrote:
-> On Fri, Aug 29, 2014 at 7:58 PM, Soren Brinkmann
-> <soren.brinkmann@xilinx.com> wrote:
-> 
-> > From: Ezra Savard <ezra.savard@xilinx.com>
-> >
-> > Use of unmask/mask in set_wake was an incorrect implementation. The new
-> > implementation correctly sets wakeup for the gpio chip's IRQ so the gpio chip
-> > will not sleep while wakeup-enabled gpio are in use.
-> >
-> > Signed-off-by: Ezra Savard <ezra.savard@xilinx.com>
-> > Reviewed-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
-> 
-> Patch applied.
-> 
-> However the problems seems quite generic.
-> 
-> Do you see this kind of error in other GPIO drivers?
-> 
-> IRQchip semantics always make me nervous.
+Hi all,
 
-Our implementation was just completely flawed. It did work with our
-limited tests using the sysfs interface. But once we started with the
-gpio_keys things fell apart. The set_wake did mask/unmask IRQs, which
-is clearly the job of the respective mask/unmask function of a gpiochip.
-After we found that, we looked at a few other drivers and designed this
-following gpio-mxs.
-So, the core part was to do the right thing in set_wake. Once that was
-done, the runtime PM callbacks needed some realignment to determine
-whether GPIO is a wakeup device or not.
+This series is a collection of ARM SMMU updates I have in my tree that
+I'd like to get merged for 3.18. This has mostly come out of the vSMMU
+work (which is still some way off, as proper testing is proving to be
+difficult), but Robin has also added minimal support for MMU-401.
 
-So, this was really just a gpio-zynq problem, not really generic.
+There are a couple of other things on my radar (fixing our reporting of
+IOMMU_CAP_CACHE_COHERENCY and wiring up iommu_group_get_for_dev), but
+they needn't block sending this series out for review.
 
-Thanks for applying. I'll post the gpiolib-sysfs patch on its own in a
-separate submission.
+Feedback welcome,
 
-	S?ren
+Will
+
+--->8
+
+Robin Murphy (2):
+  iommu/arm-smmu: fix architecture version detection
+  iommu/arm-smmu: support MMU-401
+
+Will Deacon (5):
+  iommu/arm-smmu: allow translation stage to be forced on the cmdline
+  iommu/arm-smmu: add support for multi-master iommu groups
+  iommu/arm-smmu: put iommu_domain pointer in dev->archdata.iommu
+  iommu/arm-smmu: use page shift instead of page size to avoid division
+  iommu/arm-smmu: don't bother truncating the s1 output size to VA_BITS
+
+ .../devicetree/bindings/iommu/arm,smmu.txt         |   1 +
+ drivers/iommu/arm-smmu.c                           | 197 ++++++++++++---------
+ 2 files changed, 115 insertions(+), 83 deletions(-)
+
+-- 
+2.1.0
