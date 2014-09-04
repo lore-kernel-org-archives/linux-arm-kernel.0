@@ -1,140 +1,51 @@
-From: sonnyrao@chromium.org (Sonny Rao)
-Date: Thu, 4 Sep 2014 10:01:27 -0700
-Subject: [PATCH] clocksource: arch_timer: Fix code to use physical timers
- when requested
-In-Reply-To: <20140829100414.GA19424@leverpostej>
-References: <1409173419-13076-1-git-send-email-sonnyrao@chromium.org>
- <CAOesGMjK65Rc-K0fyFUUJLw6huLT82E-nqJwZO4PqhgopF96Ow@mail.gmail.com>
- <CAPz6YkWAPtuy4sAuAK9GtpDgfGsccxeS+pqqe_t_R818Jt01qA@mail.gmail.com>
- <53FE5B09.2020403@codeaurora.org>
- <CAOesGMhTivDzJFuxONggcJ6N5UvZopKa=+tv9PoPX593cpnm0A@mail.gmail.com>
- <53FE7E3B.1010500@codeaurora.org>
- <CAOesGMgXnsqttHwAxEW4a7-Rx-nmSwpJd_Dt1iCcFOvzDwbzdA@mail.gmail.com>
- <CAD=FV=VjN6Xam-nRRcxvOoN-gokU6DbGVjoPXN_fkTJssH1RWA@mail.gmail.com>
- <20140828093505.GC14650@leverpostej>
- <CAPz6YkUZkqgEBsPtX0uGpU+OzF5qdv1hGMXLo4iThUv-7B-Jbw@mail.gmail.com>
- <20140829100414.GA19424@leverpostej>
-Message-ID: <CAPz6YkVv1nbEumt9Q8gHAWddmECOm7DL=WLWfZKxBmzTfLQ00A@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 4 Sep 2014 18:03:49 +0100
+Subject: [PATCH v5 3/8] arm: fixmap: implement __set_fixmap()
+In-Reply-To: <1409781429-27593-4-git-send-email-keescook@chromium.org>
+References: <1409781429-27593-1-git-send-email-keescook@chromium.org>
+ <1409781429-27593-4-git-send-email-keescook@chromium.org>
+Message-ID: <20140904170349.GL7156@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 29, 2014 at 3:04 AM, Mark Rutland <mark.rutland@arm.com> wrote:
-> On Fri, Aug 29, 2014 at 01:10:49AM +0100, Sonny Rao wrote:
->> On Thu, Aug 28, 2014 at 2:35 AM, Mark Rutland <mark.rutland@arm.com> wrote:
->> > On Thu, Aug 28, 2014 at 04:33:31AM +0100, Doug Anderson wrote:
->> >> Hi,
->> >>
->> >> On Wed, Aug 27, 2014 at 7:58 PM, Olof Johansson <olof@lixom.net> wrote:
->> >> > On Wed, Aug 27, 2014 at 5:56 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
->> >> >> On 08/27/14 15:33, Olof Johansson wrote:
->> >> >>> On Wed, Aug 27, 2014 at 3:26 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
->> >> >>>
->> >> >>>> Is there any reason why the virtual counter can't be read? Maybe we're
->> >> >>>> the hyp and we need to make sure we don't use the virtual timer so that
->> >> >>>> the guest can use it, but that doesn't have any effect on the usage of
->> >> >>>> the virtual counter for the clocksource.
->> >> >>> There are several cases where virtual is unusable -- in particular it
->> >> >>> might not have been configured properly (i.e. the phys/virt offset is
->> >> >>> at a bad value).
->> >> >>>
->> >> >>
->> >> >> Any specifics? It would be nice to say so in the commit text so that
->> >> >> others using such devices know they need this patch. I'm guessing the
->> >> >> firmware can't be fixed?
->> >>
->> >> Even if we could change things to use a virtual timer in some cases,
->> >> Sonny's patch still fixes a bug.  The code as written right now makes
->> >> pretenses about supporting the physical timer, but it doesn't work.
->> >> That should be fixed.
->> >
->> > The code does support the physical timer. It does not support the
->> > physical counter (and makes no pretenses that it does).
->> >
->>
->> Is there some reason that it should not support it?  It seems like the
->> two things are highly related.
->
-> While the two are related, in sane systems the use of the physical
-> counters is rendered unnecessary by the ability to write to CNTVOFF at
-> PL2.
+Hi Kees,
 
-By sane, do you mean a system which starts the kernel in PL2?  Or one
-that has CNTVOFF initialized to the same value on all CPUs?
+On Wed, Sep 03, 2014 at 10:57:04PM +0100, Kees Cook wrote:
+> This is used from set_fixmap() and clear_fixmap() via asm-generic/fixmap.h.
+> Also makes sure that the fixmap allocation fits into the expected range.
+> 
+> Based on patch by Rabin Vincent.
 
->
-> If an OS is booted at PL1 the physical timers aren't guaranteed to be
-> accessible, so the OS must use the virtual timers. As the OS could be
-> virtualized it must use the virtual counters.
+[...]
 
-I was curious to learn more about these modes and looked at the spec.
-The spec I have seems to say that in a VMSA implementation without
-virtualization, then CNTPCT is always available, but if it has
-virtualization then a bit needs to be set, which I think is what
-you're referring to.  I think the spec also says that virtualization
-extensions are optional.  How do you deal with the case that they are
-not implemented?  Or maybe that simply isn't supported?
+> +void __set_fixmap(enum fixed_addresses idx, phys_addr_t phys, pgprot_t prot)
+> +{
+> +	unsigned long vaddr = __fix_to_virt(idx);
+> +	pte_t *pte = pte_offset_kernel(pmd_off_k(vaddr), vaddr);
+> +
+> +	/* Make sure fixmap region does not exceed available allocation. */
+> +	BUILD_BUG_ON(FIXADDR_START + (__end_of_fixed_addresses * PAGE_SIZE) >
+> +		     FIXADDR_END);
+> +	BUG_ON(idx >= __end_of_fixed_addresses);
+> +
+> +	if (pgprot_val(prot))
+> +		set_pte_at(NULL, vaddr, pte,
+> +			pfn_pte(phys >> PAGE_SHIFT, prot));
+> +	else
+> +		pte_clear(NULL, vaddr, pte);
+> +
+> +	/*
+> +	 * Given the potential a15 tlbi errata, we can only do tlb flushes
+> +	 * with interrupts disabled. Callers must have taken care of this.
+> +	 */
+> +	WARN_ON_ONCE(!irqs_disabled());
+> +	flush_tlb_kernel_range(vaddr, vaddr + PAGE_SIZE);
 
-> If an OS is booted at PL2 it can access the physical counters, and
-> should do so in case something like KVM will be used later. The OS can
-> write to CNTVOFF at PL2, and if it sets CNTVOFF to zero the physical and
-> virtual counters are equivalent. Thus it can use the virtual counters
-> and doesn't need to have additional code in several places (including
-> the VDSO) where it needs to choose to read which counters to read.
->
-> The problem only exists where PL2 exists and the firmware/bootloader
-> skipped PL2 without initialising the necessary PL2 state. This is in
-> general a stupid thing to do; it introduces a problem that need not
-> exist and throws away the option of using the features PL2 provides.
-> This is a firmware/bootloader bug.
+Aha, this explains why we were confusing each other! The issue is that
+interrupts must be *enabled*, so this code does the exact opposite of
+what we need.
 
-Well it's not quite that simple, this is actually an issue with the
-hardware that the CNTVOFF comes up with different values on different
-cores.  This happens not only at boot, but any time the core is
-powered on, which could include deep sleep or CPU hotplug and suspend
-to ram.  The firmware may not be involved in all these cases, so we
-cannot rely on it to fix this problem.
+I think this got lost in a sea of double negatives during the last round
+of review.
 
->
->> > I had hoped we wouldn't encounter cases where CNTVOFF was hopelessly
->> > ill-configured on a platform, but evidently we have. So we need some
->> > workaround for that.
->> >
->> >> > Yeah, there are a few. The big.LITTLE on the Chromebook 2 models have
->> >> > this issue, due to the A7 cluster having an incorrect offset
->> >> > programmed. However, arch timers aren't supported on that SoC in the
->> >> > first place, so it's not a problem in reality.
->> >> >
->> >> > The other known platform is rk3288. It has products out in the wild
->> >> > where firmware updates are unlikely.
->> >>
->> >> One other reason is that (I'm told) that the virtual offset is lost in
->> >> certain power down conditions (powering down a core, going into S3,
->> >> etc).  When we power back up the offset is effectively reset to a
->> >> random value.  That means we need something to reprogram the virtual
->> >> timer offset whenever we power things back up.
->> >>
->> >> If we've got a hypervisor then the hypervisor will definitely be
->> >> involved in powering things back up and it can reset the virtual
->> >> offset.  ...but forcing systems to implement a hypervisor (or somehow
->> >> adding an interface for the kernel to call back into firmware) is a
->> >> huge effort and it means more hard-to-update code sitting in firmware.
->> >
->> > Not if you boot Linux at hyp, as we've recommended for this precise
->> > reason. That doesn't fix other things like CNTFRQ if the secure
->> > initialisation doesn't poke that, however.
->>
->> That's interesting, we could look into that.
->
-> I would strongly recommend that you do. :)
->
-> Linux has supported booting at Hyp for quite a while now, so I would
-> hope the only issues would be the organisation of the firmware and/or
-> bootloader.
-
-I'm still investigating this for our firmware (but cannot guarantee
-that anyone else will do this), but like I mentioned above, it
-probably won't solve the problem for suspend to RAM or deep
-sleep/power gating of cpu cores.
-
-> Thanks,
-> Mark.
+Will
