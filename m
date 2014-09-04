@@ -1,182 +1,54 @@
-From: daniel.thompson@linaro.org (Daniel Thompson)
-Date: Thu,  4 Sep 2014 17:03:40 +0100
-Subject: [PATCH v1 6/6] arm: Implement arch_trigger_all_cpu_backtrace
-In-Reply-To: <1409846620-14542-1-git-send-email-daniel.thompson@linaro.org>
-References: <1409662853-29313-1-git-send-email-daniel.thompson@linaro.org>
- <1409846620-14542-1-git-send-email-daniel.thompson@linaro.org>
-Message-ID: <1409846620-14542-7-git-send-email-daniel.thompson@linaro.org>
+From: dinguyen@opensource.altera.com (dinguyen at opensource.altera.com)
+Date: Thu, 4 Sep 2014 11:11:44 -0500
+Subject: [GIT PULL 1/2] SOCFPGA updates for 3.18
+Message-ID: <1409847105-27241-1-git-send-email-dinguyen@opensource.altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Russell King <linux@arm.linux.org.uk>
+Hi Arnd, Kevin and Olof,
 
-Currently arm does not implement arch_trigger_all_cpu_backtrace because,
-on SMP systems, there has never before been a means to route a
-non-maskable interrupt to the other CPUs in the system. With the
-introduction of IPI FIQ this is no longer the case. This patch
-provides an implementation of arch_trigger_all_cpu_backtrace and
-the associated KConfig machinary to enable it.
+Please consider pulling in these patches for v3.18. 5 of the 6 patches are
+DTS updates and the 1 patch is updating the MAINTAINERS entry with my new
+email address.
 
-This is mostly Russell's code but since it was shared as an example rather
-than a fully fledged patch currently this code is currently
-Not-yet-signed-off-by: Russell King <linux@arm.linux.org.uk>
+Thanks,
+Dinh
 
-[Fill in headers and Kconfig, checkpatch.pl substitutions: CONFIG_NR_CPUS
-for NR_CPUS and pr_warn() for printk(KERN_WARNING, )]
-Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
----
- arch/arm/Kconfig.debug     | 14 +++++++++++
- arch/arm/include/asm/irq.h |  5 ++++
- arch/arm/include/asm/smp.h |  4 ++++
- arch/arm/kernel/smp.c      | 60 ++++++++++++++++++++++++++++++++++++++++++++++
- arch/arm/kernel/traps.c    |  3 +++
- 5 files changed, 86 insertions(+)
+The following changes since commit 52addcf9d6669fa439387610bc65c92fa0980cef:
 
-diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
-index b11ad54..2fa932d 100644
---- a/arch/arm/Kconfig.debug
-+++ b/arch/arm/Kconfig.debug
-@@ -1281,4 +1281,18 @@ config DEBUG_SET_MODULE_RONX
- 	  against certain classes of kernel exploits.
- 	  If in doubt, say "N".
- 
-+config ARM_BACKTRACE_TRIGGERING
-+	bool "Support non-maskable backtrace triggering"
-+	depends on SMP
-+	select FIQ
-+	help
-+	  Say Y here if you want to provide support for non-maskable
-+	  backtrace triggering. This is used to generate a backtrace
-+	  from all CPUs in a non-responsive system. Backtrace requests
-+	  can be issued by lockup and hung task detectors, spin lock
-+	  debugging or magic sysrq.
-+
-+	  This option is only effective when the kernel is run on a
-+	  platform capable of generating FIQs.
-+
- endmenu
-diff --git a/arch/arm/include/asm/irq.h b/arch/arm/include/asm/irq.h
-index 53c15de..a5cc2ed 100644
---- a/arch/arm/include/asm/irq.h
-+++ b/arch/arm/include/asm/irq.h
-@@ -35,6 +35,11 @@ extern void (*handle_arch_irq)(struct pt_regs *);
- extern void set_handle_irq(void (*handle_irq)(struct pt_regs *));
- #endif
- 
-+#ifdef CONFIG_ARM_BACKTRACE_TRIGGERING
-+void arch_trigger_all_cpu_backtrace(bool);
-+#define arch_trigger_all_cpu_backtrace arch_trigger_all_cpu_backtrace
-+#endif
-+
- #endif
- 
- #endif
-diff --git a/arch/arm/include/asm/smp.h b/arch/arm/include/asm/smp.h
-index 0e23384..d20bd95 100644
---- a/arch/arm/include/asm/smp.h
-+++ b/arch/arm/include/asm/smp.h
-@@ -90,6 +90,10 @@ extern void arch_send_wakeup_ipi_mask(const struct cpumask *mask);
- 
- extern int register_ipi_completion(struct completion *completion, int cpu);
- 
-+#ifdef CONFIG_ARM_BACKTRACE_TRIGGERING
-+extern void ipi_cpu_backtrace(struct pt_regs *regs);
-+#endif
-+
- struct smp_operations {
- #ifdef CONFIG_SMP
- 	/*
-diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
-index b2404d0..d1765a6 100644
---- a/arch/arm/kernel/smp.c
-+++ b/arch/arm/kernel/smp.c
-@@ -554,6 +554,63 @@ static void ipi_complete(unsigned int cpu)
- 	complete(per_cpu(cpu_completion, cpu));
- }
- 
-+#ifdef CONFIG_ARM_BACKTRACE_TRIGGERING
-+/* For reliability, we're prepared to waste bits here. */
-+static DECLARE_BITMAP(backtrace_mask, CONFIG_NR_CPUS) __read_mostly;
-+
-+void ipi_cpu_backtrace(struct pt_regs *regs)
-+{
-+	int cpu = smp_processor_id();
-+
-+	if (cpumask_test_cpu(cpu, to_cpumask(backtrace_mask))) {
-+		static arch_spinlock_t lock = __ARCH_SPIN_LOCK_UNLOCKED;
-+
-+		arch_spin_lock(&lock);
-+		pr_warn("FIQ backtrace for cpu %d\n", cpu);
-+		show_regs(regs);
-+		arch_spin_unlock(&lock);
-+		cpumask_clear_cpu(cpu, to_cpumask(backtrace_mask));
-+	}
-+}
-+
-+void arch_trigger_all_cpu_backtrace(bool include_self)
-+{
-+	static unsigned long backtrace_flag;
-+	int i, cpu = get_cpu();
-+
-+	if (test_and_set_bit(0, &backtrace_flag)) {
-+		/*
-+		 * If there is already a trigger_all_cpu_backtrace() in progress
-+		 * (backtrace_flag == 1), don't output double cpu dump infos.
-+		 */
-+		put_cpu();
-+		return;
-+	}
-+
-+	cpumask_copy(to_cpumask(backtrace_mask), cpu_online_mask);
-+	if (!include_self)
-+		cpumask_clear_cpu(cpu, to_cpumask(backtrace_mask));
-+
-+	if (!cpumask_empty(to_cpumask(backtrace_mask))) {
-+		pr_info("Sending FIQ to %s CPUs:\n",
-+			(include_self ? "all" : "other"));
-+		smp_cross_call(to_cpumask(backtrace_mask), IPI_FIQ);
-+	}
-+
-+	/* Wait for up to 10 seconds for all CPUs to do the backtrace */
-+	for (i = 0; i < 10 * 1000; i++) {
-+		if (cpumask_empty(to_cpumask(backtrace_mask)))
-+			break;
-+
-+		mdelay(1);
-+	}
-+
-+	clear_bit(0, &backtrace_flag);
-+	smp_mb__after_atomic();
-+	put_cpu();
-+}
-+#endif
-+
- /*
-  * Main handler for inter-processor interrupts
-  */
-@@ -623,6 +680,9 @@ void handle_IPI(int ipinr, struct pt_regs *regs)
- 	case IPI_FIQ:
- 		BUILD_BUG_ON(SMP_IPI_FIQ_MASK != BIT(IPI_FIQ));
- 		pr_warn("CPU%u: IPI FIQ delivered via IRQ vector\n", cpu);
-+#ifdef CONFIG_ARM_BACKTRACE_TRIGGERING
-+		ipi_cpu_backtrace(regs);
-+#endif
- 		break;
- 
- 	default:
-diff --git a/arch/arm/kernel/traps.c b/arch/arm/kernel/traps.c
-index 2c219c7..b7e1e85 100644
---- a/arch/arm/kernel/traps.c
-+++ b/arch/arm/kernel/traps.c
-@@ -484,6 +484,9 @@ asmlinkage void __exception_irq_entry handle_fiq_as_nmi(struct pt_regs *regs)
- #ifdef CONFIG_ARM_GIC
- 	gic_handle_fiq_ipi();
- #endif
-+#ifdef CONFIG_ARM_BACKTRACE_TRIGGERING
-+	ipi_cpu_backtrace(regs);
-+#endif
- 
- 	nmi_exit();
- 
--- 
-1.9.3
+  Linux 3.17-rc2 (2014-08-25 15:36:20 -0700)
+
+are available in the git repository at:
+
+  git://git.rocketboards.org/linux-socfpga-next.git tags/socfpga_update_for_v3.18
+
+for you to fetch changes up to 75a41826e2c5dc1dc0fd5195fc29b031c97337af:
+
+  arm: dts: Add Altera SDRAM EDAC bindings & devicetree entries. (2014-09-04 10:15:52 -0500)
+
+----------------------------------------------------------------
+arm: dts: Add Altera SDRAM EDAC bindings & devicetree entries.
+
+----------------------------------------------------------------
+Dinh Nguyen (4):
+      MAINTAINERS: update entries for ARM/SOCFPGA platform
+      ARM: dts: socfpga: remove extra alias in the ArriaV devkit
+      ARM: dts: socfpga: Add SD card detect
+      ARM: dts: socfpga: memreserve first 4KB for future system use
+
+Jaehoon Chung (1):
+      ARM: dts: socfpga: unuse the slot-node and deprecate the supports-highspeed for dw-mmc
+
+Thor Thayer (1):
+      arm: dts: Add Altera SDRAM EDAC bindings & devicetree entries.
+
+ .../devicetree/bindings/arm/altera/socfpga-sdram-edac.txt | 15 +++++++++++++++
+ MAINTAINERS                                               |  7 +++++--
+ arch/arm/boot/dts/socfpga.dtsi                            | 11 +++++++++++
+ arch/arm/boot/dts/socfpga_arria5.dtsi                     | 11 +++++------
+ arch/arm/boot/dts/socfpga_arria5_socdk.dts                |  7 -------
+ arch/arm/boot/dts/socfpga_cyclone5.dtsi                   | 13 ++++++-------
+ arch/arm/boot/dts/socfpga_cyclone5_socdk.dts              |  4 ++++
+ arch/arm/boot/dts/socfpga_vt.dts                          |  9 +++------
+ 8 files changed, 49 insertions(+), 28 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/altera/socfpga-sdram-edac.txt
