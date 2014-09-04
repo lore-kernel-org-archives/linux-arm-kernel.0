@@ -1,89 +1,47 @@
-From: boris.brezillon@free-electrons.com (Boris BREZILLON)
-Date: Thu, 4 Sep 2014 08:03:59 +0200
-Subject: [PATCH v2] mfd: syscon: Decouple syscon interface from platform
- devices
-In-Reply-To: <002701cfc7fb$110a7350$331f59f0$@samsung.com>
-References: <1409668935-10667-1-git-send-email-pankaj.dubey@samsung.com>
- <6034841.GFrG3XCMdb@wuerfel> <20140903151611.260a7218@bbrezillon>
- <4224773.hl3QDeILqz@wuerfel> <20140903161528.05f566e1@bbrezillon>
- <002701cfc7fb$110a7350$331f59f0$@samsung.com>
-Message-ID: <20140904080359.6b15cce5@bbrezillon>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Thu, 4 Sep 2014 09:28:32 +0300
+Subject: [PATCH] ARM: dts: omap5.dtsi: add DSS RFBI node
+Message-ID: <1409812112-19194-1-git-send-email-tomi.valkeinen@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Pankaj
+The RFBI node for OMAP DSS was left out when adding the rest of the DSS
+nodes, because it was not clear how to set up the clocks for the RFBI.
 
-On Thu, 04 Sep 2014 10:15:27 +0530
-Pankaj Dubey <pankaj.dubey@samsung.com> wrote:
+However, it seems that if there is a HWMOD for a device, we also need a
+DT node for it. Otherwise, at boot, we get:
 
-> Hi Boris,
-> 
-> On Wednesday, September 03, 2014 Boris BREZILLON wrote,
-> > To: Arnd Bergmann
-> > Cc: Pankaj Dubey; kgene.kim at samsung.com; linux at arm.linux.org.uk; Alexander
-> > Shiyan; naushad at samsung.com; Tomasz Figa; linux-kernel at vger.kernel.org;
-> > joshi at samsung.com; linux-samsung-soc at vger.kernel.org;
-> thomas.ab at samsung.com;
-> > tomasz.figa at gmail.com; vikas.sajjan at samsung.com; chow.kim at samsung.com;
-> > lee.jones at linaro.org; Michal Simek; linux-arm-kernel at lists.infradead.org;
-> Mark
-> > Brown
-> > Subject: Re: [PATCH v2] mfd: syscon: Decouple syscon interface from
-> platform
-> > devices
-> > 
-> > On Wed, 03 Sep 2014 15:49:04 +0200
-> > Arnd Bergmann <arnd@arndb.de> wrote:
-> > 
-> > > On Wednesday 03 September 2014 15:16:11 Boris BREZILLON wrote:
-> > > > I checked that part, and it appears most of the code is already
-> > > > there (see usage of regmap_attach_dev function here [1]).
-> > > >
-> > > > The only problem I see is that errors are still printed with
-> > > > dev_err, which, AFAIK, will trigger a kernel panic if dev is NULL.
-> > >
-> > > Actually not:
-> > >
-> > > static int __dev_printk(const char *level, const struct device *dev,
-> > >                         struct va_format *vaf) {
-> > >         if (!dev)
-> > >                 return printk("%s(NULL device *): %pV", level, vaf);
-> > >
-> > >         return dev_printk_emit(level[1] - '0', dev,
-> > >                                "%s %s: %pV",
-> > >                                dev_driver_string(dev), dev_name(dev),
-> > > vaf); }
-> > >
-> > 
-> > My bad then (I don't know where I looked at to think NULL dev was not
-> gracefully
-> > handled :-)). Thanks for pointing this out.
-> > Given that, I think it should work fine even with a NULL dev.
-> > I'll give it a try on at91 ;-).
-> > 
-> 
-> We have tested this patch, on Exynos board and found working well.
-> In our use case DT based drivers such as USB Phy, SATA Phy, Watchdog are
-> calling 
-> syscon_regmap_lookup_by APIs to get regmap handle to Exynos PMU and it
-> worked 
-> well for these drivers. 
+WARNING: CPU: 0 PID: 1 at arch/arm/mach-omap2/omap_hwmod.c:2542 _init+0x464/0x4e0()
+omap_hwmod: dss_rfbi: doesn't have mpu register target base
 
-Great!
+Now that v3.17-rc3 contains a fix
+(8fd46439e1f5a7f86d76a08733459b74debd9468) for the L3 ICLK required by
+the RFBI, let's add the RFBI node to get rid of the warning.
 
-> 
-> It would be great if after testing you share result here or give a
-> Tested-By.
+Signed-off-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
+---
+ arch/arm/boot/dts/omap5.dtsi | 9 +++++++++
+ 1 file changed, 9 insertions(+)
 
-Yep, that's the idea.
-Let me some time to rework the PMC drivers (drivers/clk/at91/pmc.c) and
-test it, and I'll add my Tested-by ;-).
-
-Best Regards,
-
-Boris
-
+diff --git a/arch/arm/boot/dts/omap5.dtsi b/arch/arm/boot/dts/omap5.dtsi
+index fc8df1739f39..1e6ff61a7f12 100644
+--- a/arch/arm/boot/dts/omap5.dtsi
++++ b/arch/arm/boot/dts/omap5.dtsi
+@@ -945,6 +945,15 @@
+ 				clock-names = "fck";
+ 			};
+ 
++			rfbi: encoder at 58002000  {
++				compatible = "ti,omap5-rfbi";
++				reg = <0x58002000 0x100>;
++				status = "disabled";
++				ti,hwmods = "dss_rfbi";
++				clocks = <&dss_dss_clk>, <&l3_iclk_div>;
++				clock-names = "fck", "ick";
++			};
++
+ 			dsi1: encoder at 58004000 {
+ 				compatible = "ti,omap5-dsi";
+ 				reg = <0x58004000 0x200>,
 -- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+1.9.1
