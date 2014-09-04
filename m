@@ -1,45 +1,40 @@
-From: chen.fang@freescale.com (Fancy Fang)
-Date: Thu, 4 Sep 2014 16:33:12 +0800
-Subject: [PATCH] ARM: clk-imx6sl: correct the pxp and epdc axi clock selections
-Message-ID: <1409819592-31462-1-git-send-email-chen.fang@freescale.com>
+From: pebolle@tiscali.nl (Paul Bolle)
+Date: Thu, 04 Sep 2014 11:39:27 +0200
+Subject: [PATCH 04/19] serial: samsung: Remove support for legacy clock
+ code
+In-Reply-To: <53C68FAB.9070102@samsung.com>
+References: <1404496099-26708-1-git-send-email-t.figa@samsung.com>
+ <1404496099-26708-5-git-send-email-t.figa@samsung.com>
+ <1405502840.4408.2.camel@x220> <53C67386.5070401@samsung.com>
+ <1405520767.4408.39.camel@x220> <1405521324.4408.44.camel@x220>
+ <53C68FAB.9070102@samsung.com>
+Message-ID: <1409823567.5546.80.camel@x220>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The parent clocks of IMX6SL_CLK_PXP_AXI_SEL and IMX6SL_CLK_EPDC_AXI_SEL
-clocks are not the same. So split the epdc_pxp_sels into two different
-clock selections 'pxp_axi_sels' and 'epdc_axi_sels'.
+On Wed, 2014-07-16 at 16:43 +0200, Tomasz Figa wrote:
+> On 16.07.2014 16:35, Paul Bolle wrote:
+> > On Wed, 2014-07-16 at 16:26 +0200, Paul Bolle wrote:
+> >> On Wed, 2014-07-16 at 14:43 +0200, Tomasz Figa wrote:
+> >>> That's right. Apparently I missed them. I guess that's not critical,
+> >>> though, and could be done in separate patch, right?
+> >>
+> >> This is not critical at all, so that's fine with me. 
+> > 
+> > Actually, that's only correct if the solution here is to just remove the
+> > (currently) dead code hidden behind CONFIG_SAMSUNG_CLOCK. But if the
+> > solution requires something less trivial, that might be quite wrong.
+> > 
+> > So please disregard my comment!
+> 
+> The code between those ifdefs is no longer used, because all Samsung
+> platforms use the Common Clock Framework after this series. So I believe
+> we can safely remove this dead code.
 
-Signed-off-by: Fancy Fang <chen.fang@freescale.com>
-Signed-off-by: Robby Cai <R63905@freescale.com>
-Acked-by: Shawn Guo <shawn.guo@freescale.com>
----
- arch/arm/mach-imx/clk-imx6sl.c | 7 ++++---
- 1 file changed, 4 insertions(+), 3 deletions(-)
+The three checks for CONFIG_SAMSUNG_CLOCK can still be seen in v3.17-rc3
+and next-20140903. Should I perhaps submit the trivial patch to remove
+them (and the code they hide) or did things turn out to be more
+complicated?
 
-diff --git a/arch/arm/mach-imx/clk-imx6sl.c b/arch/arm/mach-imx/clk-imx6sl.c
-index 43261ea..d730dfa 100644
---- a/arch/arm/mach-imx/clk-imx6sl.c
-+++ b/arch/arm/mach-imx/clk-imx6sl.c
-@@ -47,7 +47,8 @@ static const char *csi_lcdif_sels[]	= { "mmdc", "pll2_pfd2", "pll3_120m", "pll3_
- static const char *usdhc_sels[]		= { "pll2_pfd2", "pll2_pfd0", };
- static const char *ssi_sels[]		= { "pll3_pfd2", "pll3_pfd3", "pll4_audio_div", "dummy", };
- static const char *perclk_sels[]	= { "ipg", "osc", };
--static const char *epdc_pxp_sels[]	= { "mmdc", "pll3_usb_otg", "pll5_video_div", "pll2_pfd0", "pll2_pfd2", "pll3_pfd1", };
-+static const char *pxp_axi_sels[]	= { "pll2_bus", "pll3_usb_otg", "pll5_video_div", "pll2_pfd0", "pll2_pfd2", "pll3_pfd3", };
-+static const char *epdc_axi_sels[]	= { "pll2_bus", "pll3_usb_otg", "pll5_video_div", "pll2_pfd0", "pll2_pfd2", "pll3_pfd2", };
- static const char *gpu2d_ovg_sels[]	= { "pll3_pfd1", "pll3_usb_otg", "pll2_bus", "pll2_pfd2", };
- static const char *gpu2d_sels[]		= { "pll2_pfd2", "pll3_usb_otg", "pll3_pfd1", "pll2_bus", };
- static const char *lcdif_pix_sels[]	= { "pll2_bus", "pll3_usb_otg", "pll5_video_div", "pll2_pfd0", "pll3_pfd0", "pll3_pfd1", };
-@@ -251,8 +252,8 @@ static void __init imx6sl_clocks_init(struct device_node *ccm_node)
- 	clks[IMX6SL_CLK_SSI2_SEL]         = imx_clk_fixup_mux("ssi2_sel",   base + 0x1c, 12, 2, ssi_sels,          ARRAY_SIZE(ssi_sels),    imx_cscmr1_fixup);
- 	clks[IMX6SL_CLK_SSI3_SEL]         = imx_clk_fixup_mux("ssi3_sel",   base + 0x1c, 14, 2, ssi_sels,          ARRAY_SIZE(ssi_sels),    imx_cscmr1_fixup);
- 	clks[IMX6SL_CLK_PERCLK_SEL]       = imx_clk_fixup_mux("perclk_sel", base + 0x1c, 6,  1, perclk_sels,       ARRAY_SIZE(perclk_sels), imx_cscmr1_fixup);
--	clks[IMX6SL_CLK_PXP_AXI_SEL]      = imx_clk_mux("pxp_axi_sel",      base + 0x34, 6,  3, epdc_pxp_sels,     ARRAY_SIZE(epdc_pxp_sels));
--	clks[IMX6SL_CLK_EPDC_AXI_SEL]     = imx_clk_mux("epdc_axi_sel",     base + 0x34, 15, 3, epdc_pxp_sels,     ARRAY_SIZE(epdc_pxp_sels));
-+	clks[IMX6SL_CLK_PXP_AXI_SEL]      = imx_clk_mux("pxp_axi_sel",      base + 0x34, 6,  3, pxp_axi_sels,      ARRAY_SIZE(pxp_axi_sels));
-+	clks[IMX6SL_CLK_EPDC_AXI_SEL]     = imx_clk_mux("epdc_axi_sel",     base + 0x34, 15, 3, epdc_axi_sels,     ARRAY_SIZE(epdc_axi_sels));
- 	clks[IMX6SL_CLK_GPU2D_OVG_SEL]    = imx_clk_mux("gpu2d_ovg_sel",    base + 0x18, 4,  2, gpu2d_ovg_sels,    ARRAY_SIZE(gpu2d_ovg_sels));
- 	clks[IMX6SL_CLK_GPU2D_SEL]        = imx_clk_mux("gpu2d_sel",        base + 0x18, 8,  2, gpu2d_sels,        ARRAY_SIZE(gpu2d_sels));
- 	clks[IMX6SL_CLK_LCDIF_PIX_SEL]    = imx_clk_mux("lcdif_pix_sel",    base + 0x38, 6,  3, lcdif_pix_sels,    ARRAY_SIZE(lcdif_pix_sels));
--- 
-1.9.1
+
+Paul Bolle
