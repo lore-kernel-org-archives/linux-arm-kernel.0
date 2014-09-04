@@ -1,46 +1,56 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu,  4 Sep 2014 10:12:28 +0900
-Subject: [PATCH 5/5] ARM: shmobile: kzm9g-reference dts: Use tabs for
- indentation
-In-Reply-To: <cover.1409792871.git.horms+renesas@verge.net.au>
-References: <cover.1409792871.git.horms+renesas@verge.net.au>
-Message-ID: <40c488df84f9fbf4b84b4baed6e2cec4a2d946ed.1409792871.git.horms+renesas@verge.net.au>
+Date: Thu,  4 Sep 2014 10:12:38 +0900
+Subject: [GIT PULL] Renesas ARM Based SoC Kconfig Cleanups for v3.18
+Message-ID: <cover.1409792454.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Geert Uytterhoeven <geert+renesas@glider.be>
+Hi Olof, Hi Kevin, Hi Arnd,
 
-Checkpatch says:
+Please consider these Renesas ARM based SoC kconfig cleanups for v3.18.
 
-ERROR: code indent should use tabs where possible
+This pull request is based on v3.17-rc2.
+This is to avoid a conflict between v3.17-rc2 and this series.
 
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/boot/dts/sh73a0-kzm9g-reference.dts | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/boot/dts/sh73a0-kzm9g-reference.dts b/arch/arm/boot/dts/sh73a0-kzm9g-reference.dts
-index 18662ae..477f815 100644
---- a/arch/arm/boot/dts/sh73a0-kzm9g-reference.dts
-+++ b/arch/arm/boot/dts/sh73a0-kzm9g-reference.dts
-@@ -66,7 +66,7 @@
- 	};
- 
- 	vmmc_sdhi0: regulator at 2 {
--	        compatible = "regulator-fixed";
-+		compatible = "regulator-fixed";
- 		regulator-name = "SDHI0 Vcc";
- 		regulator-min-microvolt = <3300000>;
- 		regulator-max-microvolt = <3300000>;
-@@ -75,7 +75,7 @@
- 	};
- 
- 	vmmc_sdhi2: regulator at 3 {
--	        compatible = "regulator-fixed";
-+		compatible = "regulator-fixed";
- 		regulator-name = "SDHI2 Vcc";
- 		regulator-min-microvolt = <3300000>;
- 		regulator-max-microvolt = <3300000>;
--- 
-2.0.1
+The following changes since commit 52addcf9d6669fa439387610bc65c92fa0980cef:
+
+  Linux 3.17-rc2 (2014-08-25 15:36:20 -0700)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-kconfig-cleanups-for-v3.18
+
+for you to fetch changes up to 13298fbbdb3f6a0ef55419dc048e064c7a7b0ef8:
+
+  ARM: shmobile: r8a7791 is now called "R-Car M2-W" (2014-09-02 09:32:08 +0900)
+
+----------------------------------------------------------------
+Renesas ARM Based SoC Kconfig Cleanups for v3.18
+
+* Update name of "R-Car M2-W" SoC (previously there was no "-W")
+* Consolidate Legacy SH_CLK_CPG and CPU_V7 Kconfig
+* Only select PM_RMOBILE for legacy case
+* Cleanup pm-rcar.o and pm-rmobile.o build using Kconfig
+
+----------------------------------------------------------------
+Geert Uytterhoeven (1):
+      ARM: shmobile: r8a7791 is now called "R-Car M2-W"
+
+Magnus Damm (8):
+      ARM: shmobile: Introduce a Kconfig entry for R-Mobile
+      ARM: shmobile: Introduce a Kconfig entry for R-Car Gen1
+      ARM: shmobile: Introduce a Kconfig entry for R-Car Gen2
+      ARM: shmobile: Cleanup pm-rcar.o build using Kconfig
+      ARM: shmobile: Cleanup pm-rmobile.o build using Kconfig
+      ARM: shmobile: Only select PM_RMOBILE for legacy case
+      ARM: shmobile: Consolidate Legacy CPU_V7 Kconfig
+      ARM: shmobile: Consolidate Legacy SH_CLK_CPG Kconfig
+
+ arch/arm/Kconfig                    |  2 +
+ arch/arm/mach-shmobile/Kconfig      | 77 ++++++++++++++++++-------------------
+ arch/arm/mach-shmobile/Makefile     | 30 +++++++--------
+ arch/arm/mach-shmobile/pm-rcar.c    |  4 --
+ arch/arm/mach-shmobile/pm-rmobile.c |  2 -
+ arch/arm/mach-shmobile/pm-rmobile.h |  4 +-
+ 6 files changed, 54 insertions(+), 65 deletions(-)
