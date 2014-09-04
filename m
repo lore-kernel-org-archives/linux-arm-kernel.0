@@ -1,104 +1,44 @@
-From: gabriel.fernandez@st.com (Gabriel FERNANDEZ)
-Date: Thu,  4 Sep 2014 14:59:39 +0200
-Subject: [PATCH] ARM: STi: DT: STiH407: Add all defines for STiH407 DT clocks
-In-Reply-To: <1409835579-23541-1-git-send-email-gabriel.fernandez@linaro.org>
-References: <1409835579-23541-1-git-send-email-gabriel.fernandez@linaro.org>
-Message-ID: <1409835579-23541-2-git-send-email-gabriel.fernandez@linaro.org>
+From: lifshitz@compulab.co.il (Dmitry Lifshitz)
+Date: Thu,  4 Sep 2014 16:02:52 +0300
+Subject: [PATCH 1/2] ARM: dts: cm-t54: fix serial console power supply.
+In-Reply-To: <1409835773-22782-1-git-send-email-lifshitz@compulab.co.il>
+References: <1409835773-22782-1-git-send-email-lifshitz@compulab.co.il>
+Message-ID: <1409835773-22782-2-git-send-email-lifshitz@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds all clock defines for clockgen C0,D0,D2 and D3
+LDO8 regulator is used for act led and serial cosole power supply.
 
-Signed-off-by: Gabriel Fernandez <gabriel.fernandez@linaro.org>
+Its DT status is declared as "disabled", however the serial console was
+functional until Commit 318dbb02b ("regulator: palmas: Fix SMPS
+enable/disable/is_enabled") wich properly turns off LDO8 on boot.
+
+Fix serial cosole power supply (and act led) on boot by turning LDO8 on.
+
+Signed-off-by: Dmitry Lifshitz <lifshitz@compulab.co.il>
 ---
- include/dt-bindings/clock/stih407-clks.h | 75 ++++++++++++++++++++++++++++++++
- 1 file changed, 75 insertions(+)
+ arch/arm/boot/dts/omap5-cm-t54.dts |    5 ++---
+ 1 files changed, 2 insertions(+), 3 deletions(-)
 
-diff --git a/include/dt-bindings/clock/stih407-clks.h b/include/dt-bindings/clock/stih407-clks.h
-index 1f9bfe0..7af2b71 100644
---- a/include/dt-bindings/clock/stih407-clks.h
-+++ b/include/dt-bindings/clock/stih407-clks.h
-@@ -6,6 +6,81 @@
- #define _DT_BINDINGS_CLK_STIH407
+diff --git a/arch/arm/boot/dts/omap5-cm-t54.dts b/arch/arm/boot/dts/omap5-cm-t54.dts
+index b8698ca..429471a 100644
+--- a/arch/arm/boot/dts/omap5-cm-t54.dts
++++ b/arch/arm/boot/dts/omap5-cm-t54.dts
+@@ -353,13 +353,12 @@
+ 				};
  
- /* CLOCKGEN C0 */
-+#define CLK_ICN_GPU		0
-+#define CLK_FDMA		1
-+#define CLK_NAND		2
-+#define CLK_HVA			3
-+#define CLK_PROC_STFE		4
-+#define CLK_PROC_TP		5
-+#define CLK_RX_ICN_DMU		6
-+#define CLK_RX_ICN_DISP_0	6
-+#define CLK_RX_ICN_DISP_1	6
-+#define CLK_RX_ICN_HVA		7
-+#define CLK_RX_ICN_TS		7
-+#define CLK_ICN_CPU		8
-+#define CLK_TX_ICN_DMU		9
-+#define CLK_TX_ICN_HVA		9
-+#define CLK_TX_ICN_TS		9
-+#define CLK_ICN_COMPO		9
-+#define CLK_MMC_0		10
-+#define CLK_MMC_1		11
-+#define CLK_JPEGDEC		12
-+#define CLK_ICN_REG		13
-+#define CLK_TRACE_A9		13
-+#define CLK_PTI_STM		13
- #define CLK_EXT2F_A9		13
-+#define CLK_IC_BDISP_0		14
-+#define CLK_IC_BDISP_1		15
-+#define CLK_PP_DMU		16
-+#define CLK_VID_DMU		17
-+#define CLK_DSS_LPC		18
-+#define CLK_ST231_AUD_0		19
-+#define CLK_ST231_GP_0		19
-+#define CLK_ST231_GP_1		20
-+#define CLK_ST231_DMU		21
-+#define CLK_ICN_LMI		22
-+#define CLK_TX_ICN_DISP_0	23
-+#define CLK_TX_ICN_DISP_1	23
-+#define CLK_ICN_SBC		24
-+#define CLK_STFE_FRC2		25
-+#define CLK_ETH_PHY		26
-+#define CLK_ETH_REF_PHYCLK	27
-+#define CLK_FLASH_PROMIP	28
-+#define CLK_MAIN_DISP		29
-+#define CLK_AUX_DISP		30
-+#define CLK_COMPO_DVP		31
+ 				ldo8_reg: ldo8 {
+-					/* VDD_3v0: Does not go anywhere */
++					/* VDD_3V_GP: act led/serial console */
+ 					regulator-name = "ldo8";
+ 					regulator-min-microvolt = <3000000>;
+ 					regulator-max-microvolt = <3000000>;
++					regulator-always-on;
+ 					regulator-boot-on;
+-					/* Unused */
+-					status = "disabled";
+ 				};
  
-+/* CLOCKGEN D0 */
-+#define CLK_PCM_0		0
-+#define CLK_PCM_1		1
-+#define CLK_PCM_2		2
-+#define CLK_SPDIFF		3
-+
-+/* CLOCKGEN D2 */
-+#define CLK_PIX_MAIN_DISP	0
-+#define CLK_PIX_PIP		1
-+#define CLK_PIX_GDP1		2
-+#define CLK_PIX_GDP2		3
-+#define CLK_PIX_GDP3		4
-+#define CLK_PIX_GDP4		5
-+#define CLK_PIX_AUX_DISP	6
-+#define CLK_DENC		7
-+#define CLK_PIX_HDDAC		8
-+#define CLK_HDDAC		9
-+#define CLK_SDDAC		10
-+#define CLK_PIX_DVO		11
-+#define CLK_DVO			12
-+#define CLK_PIX_HDMI		13
-+#define CLK_TMDS_HDMI		14
-+#define CLK_REF_HDMIPHY		15
-+
-+/* CLOCKGEN D3 */
-+#define CLK_STFE_FRC1		0
-+#define CLK_TSOUT_0		1
-+#define CLK_TSOUT_1		2
-+#define CLK_MCHI		3
-+#define CLK_VSENS_COMPO		4
-+#define CLK_FRC1_REMOTE		5
-+#define CLK_LPC_0		6
-+#define CLK_LPC_1		7
- #endif
+ 				ldo9_reg: ldo9 {
 -- 
-1.9.1
+1.7.5.4
