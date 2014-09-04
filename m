@@ -1,25 +1,101 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 04 Sep 2014 15:51:22 +0200
-Subject: [PATCH 2/2] PCI: Layerscape: Add Layerscape PCIe driver
-In-Reply-To: <2799937.bNtU9KXR6t@wuerfel>
-References: <1409856338-1730-1-git-send-email-Minghuan.Lian@freescale.com>
- <1409856338-1730-2-git-send-email-Minghuan.Lian@freescale.com>
- <2799937.bNtU9KXR6t@wuerfel>
-Message-ID: <3055252.byHHPbPjpA@wuerfel>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Thu,  4 Sep 2014 15:52:27 +0200
+Subject: [PATCH v3 0/9] PM / Domains: Generic OF-based support
+Message-ID: <1409838756-31963-1-git-send-email-ulf.hansson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 04 September 2014 14:14:48 Arnd Bergmann wrote:
-> 
-> My impression is that you have two distinct MSI controller
-> implementations, one for LS1021A and the other one for everything
-> else. How about using separate pcie_host_ops for them, possibly
-> also moving them into separate files?
-> 
+Changes in v3:
+	- Aligned on terminology, now using "PM domain" in comments and commit
+	- messages/headers.
+	- Improved English and grammar in comments and commit messages/headers.
+	- Adopted proposal from Geert, to have compile-time-check wrapper
+	  functions for the API that adds xlate_simple and xlate_onecell
+	  providers.
+ 	- Renamed "domain_num" to "num_domains", in genpd_onecell_data struct.
+	- Handle non-contiguous arrays for onecell PM domain providers.
+	- Rebased the Exynos patch to follow the new genpd API changes.
 
-One more thing: you should really use the msi-parent property to
-find the MSI controller: Sooner or later this PCI block is likely
-to end up in a real product that has GICv2m or GICv3 support, so
-you will have to pick which of the two MSI controllers to use.
 
-	Arnd
+Changes in v2:
+	- Fix the ACPI patch, it didn't even compile for CONFIG_ACPI.
+	- Updated some comments in code and in commit messages.
+	- Fixed the dev_pm_domain_attach API to handle EPROBE_DEFER properly.
+	- Rebased the ARM Exynos patch.
+	- Added some Tested-by tags.
+
+
+This patchset has a bit of a history and some parts of it has been posted
+earlier.
+
+http://lists.infradead.org/pipermail/linux-arm-kernel/2014-June/262725.html
+
+In the first revision I intentially didn't increase version number of the
+patches, since I think it would have cause more confusion than clarity.
+
+A summary of changes in V1 and since the last patchset, from the link above:
+	- Instead of letting driver core handling the device to power domain
+	binding/unbinding, follow the behavior of how the ACPI power domain
+	is handled.
+
+
+This is a summary of what these patches are intended to do:
+
+1)
+Add generic power domain OF-based support which also includes APIs to handle
+attach/detach of generic power domains to devices.
+
+2)
+Adding a common API to attach/detach power domains and include support for the
+ACPI and the generic power domain in there.
+
+3)
+>From subsystem level code, at probe/remove, convert from invoking the ACPI
+specific power domain attach/detach functions to the new common attach/detach
+APIs.
+
+4)
+Add support for the AMBA bus to attach/detach power domains, using the new
+common APIs.
+
+5)
+Convert Exynos to use the new generic power domain OF support.
+
+Obviously, there are dependencies througout this patchset, which means if they
+get accepted the all need to go together. It might also be convenient to share
+them through an immutable branch.
+
+
+Tomasz Figa (2):
+  PM / Domains: Add generic OF-based PM domain look-up
+  ARM: exynos: Move to generic PM domain DT bindings
+
+Ulf Hansson (7):
+  ACPI / PM: Let acpi_dev_pm_detach() return an error code
+  PM / Domains: Add APIs to attach/detach a PM domain for a device
+  drivercore / platform: Convert to dev_pm_domain_attach|detach()
+  i2c: core: Convert to dev_pm_domain_attach|detach()
+  mmc: sdio: Convert to dev_pm_domain_attach|detach()
+  spi: core: Convert to dev_pm_domain_attach|detach()
+  amba: Add support for attach/detach of PM domains
+
+ .../bindings/arm/exynos/power_domain.txt           |  13 +-
+ .../devicetree/bindings/power/power_domain.txt     |  49 ++++
+ arch/arm/mach-exynos/pm_domains.c                  |  78 +-----
+ drivers/acpi/device_pm.c                           |   8 +-
+ drivers/amba/bus.c                                 |  10 +-
+ drivers/base/platform.c                            |  15 +-
+ drivers/base/power/common.c                        |  56 ++++
+ drivers/base/power/domain.c                        | 291 +++++++++++++++++++++
+ drivers/i2c/i2c-core.c                             |  13 +-
+ drivers/mmc/core/sdio_bus.c                        |   4 +-
+ drivers/spi/spi.c                                  |  12 +-
+ include/linux/acpi.h                               |   7 +-
+ include/linux/pm.h                                 |  14 +
+ include/linux/pm_domain.h                          |  57 ++++
+ kernel/power/Kconfig                               |   4 +
+ 15 files changed, 524 insertions(+), 107 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/power/power_domain.txt
+
+-- 
+1.9.1
