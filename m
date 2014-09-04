@@ -1,111 +1,89 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Thu, 4 Sep 2014 12:53:45 +0200
-Subject: [PATCH] mmc: sdhci-msm: Make tuning block table endian agnostic
-In-Reply-To: <5407F364.9030303@samsung.com>
-References: <1409752622-7564-1-git-send-email-sboyd@codeaurora.org>
- <5407F364.9030303@samsung.com>
-Message-ID: <CAPDyKFp0LwK=DABHaP-Ke=QZFP8bY5MO9RnYmUBqeEdDKp63BA@mail.gmail.com>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Thu, 04 Sep 2014 13:00:37 +0200
+Subject: [BUG] staging: imx-drm: clock reparent fails for LDB channel 1
+ on i.MX53
+In-Reply-To: <CAOMZO5AEKmFg-eM=b6WWYG4qy-1PRcsSHfoKG2aZFMmQBgw5Hw@mail.gmail.com>
+References: <54074359.5090500@tqsc.de>
+ <CAOMZO5AEKmFg-eM=b6WWYG4qy-1PRcsSHfoKG2aZFMmQBgw5Hw@mail.gmail.com>
+Message-ID: <1409828437.3931.19.camel@paszta.hi.pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4 September 2014 07:06, Jaehoon Chung <jh80.chung@samsung.com> wrote:
-> Hi, Stephen.
->
-> On 09/03/2014 10:57 PM, Stephen Boyd wrote:
->> If we're tuning on a big-endian CPU we'll never determine we properly
->> tuned the device because we compare the data we received from the
->> controller with a table that assumes the CPU is little-endian.
->> Change the table to be an array of bytes instead of 32-bit words
->> so we can use memcmp() without needing to byte-swap every word
->> depending on the endianess of the CPU.
->>
->> Cc: Asutosh Das <asutoshd@codeaurora.org>
->> Cc: Venkat Gopalakrishnan <venkatg@codeaurora.org>
->> Reviewed-by: Georgi Djakov <gdjakov@mm-sol.com>
->> Fixes: 415b5a75da43 "mmc: sdhci-msm: Add platform_execute_tuning implementation"
->> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
->> ---
->>  drivers/mmc/host/sdhci-msm.c | 42 +++++++++++++++++++++++++++---------------
->>  1 file changed, 27 insertions(+), 15 deletions(-)
->>
->> diff --git a/drivers/mmc/host/sdhci-msm.c b/drivers/mmc/host/sdhci-msm.c
->> index 40573a58486a..5aabffc15ae8 100644
->> --- a/drivers/mmc/host/sdhci-msm.c
->> +++ b/drivers/mmc/host/sdhci-msm.c
->> @@ -47,22 +47,34 @@
->>  #define CMUX_SHIFT_PHASE_SHIFT       24
->>  #define CMUX_SHIFT_PHASE_MASK        (7 << CMUX_SHIFT_PHASE_SHIFT)
->>
->> -static const u32 tuning_block_64[] = {
->> -     0x00ff0fff, 0xccc3ccff, 0xffcc3cc3, 0xeffefffe,
->> -     0xddffdfff, 0xfbfffbff, 0xff7fffbf, 0xefbdf777,
->> -     0xf0fff0ff, 0x3cccfc0f, 0xcfcc33cc, 0xeeffefff,
->> -     0xfdfffdff, 0xffbfffdf, 0xfff7ffbb, 0xde7b7ff7
->> +static const u8 tuning_block_64[] = {
->> +     0xff, 0x0f, 0xff, 0x00, 0xff, 0xcc, 0xc3, 0xcc,
->> +     0xc3, 0x3c, 0xcc, 0xff, 0xfe, 0xff, 0xfe, 0xef,
->> +     0xff, 0xdf, 0xff, 0xdd, 0xff, 0xfb, 0xff, 0xfb,
->> +     0xbf, 0xff, 0x7f, 0xff, 0x77, 0xf7, 0xbd, 0xef,
->> +     0xff, 0xf0, 0xff, 0xf0, 0x0f, 0xfc, 0xcc, 0x3c,
->> +     0xcc, 0x33, 0xcc, 0xcf, 0xff, 0xef, 0xff, 0xee,
->> +     0xff, 0xfd, 0xff, 0xfd, 0xdf, 0xff, 0xbf, 0xff,
->> +     0xbb, 0xff, 0xf7, 0xff, 0xf7, 0x7f, 0x7b, 0xde,
->>  };
->>
->> -static const u32 tuning_block_128[] = {
->> -     0xff00ffff, 0x0000ffff, 0xccccffff, 0xcccc33cc,
->> -     0xcc3333cc, 0xffffcccc, 0xffffeeff, 0xffeeeeff,
->> -     0xffddffff, 0xddddffff, 0xbbffffff, 0xbbffffff,
->> -     0xffffffbb, 0xffffff77, 0x77ff7777, 0xffeeddbb,
->> -     0x00ffffff, 0x00ffffff, 0xccffff00, 0xcc33cccc,
->> -     0x3333cccc, 0xffcccccc, 0xffeeffff, 0xeeeeffff,
->> -     0xddffffff, 0xddffffff, 0xffffffdd, 0xffffffbb,
->> -     0xffffbbbb, 0xffff77ff, 0xff7777ff, 0xeeddbb77
->> +static const u8 tuning_block_128[] = {
->> +     0xff, 0xff, 0x00, 0xff, 0xff, 0xff, 0x00, 0x00,
->> +     0xff, 0xff, 0xcc, 0xcc, 0xcc, 0x33, 0xcc, 0xcc,
->> +     0xcc, 0x33, 0x33, 0xcc, 0xcc, 0xcc, 0xff, 0xff,
->> +     0xff, 0xee, 0xff, 0xff, 0xff, 0xee, 0xee, 0xff,
->> +     0xff, 0xff, 0xdd, 0xff, 0xff, 0xff, 0xdd, 0xdd,
->> +     0xff, 0xff, 0xff, 0xbb, 0xff, 0xff, 0xff, 0xbb,
->> +     0xbb, 0xff, 0xff, 0xff, 0x77, 0xff, 0xff, 0xff,
->> +     0x77, 0x77, 0xff, 0x77, 0xbb, 0xdd, 0xee, 0xff,
->> +     0xff, 0xff, 0xff, 0x00, 0xff, 0xff, 0xff, 0x00,
->> +     0x00, 0xff, 0xff, 0xcc, 0xcc, 0xcc, 0x33, 0xcc,
->> +     0xcc, 0xcc, 0x33, 0x33, 0xcc, 0xcc, 0xcc, 0xff,
->> +     0xff, 0xff, 0xee, 0xff, 0xff, 0xff, 0xee, 0xee,
->> +     0xff, 0xff, 0xff, 0xdd, 0xff, 0xff, 0xff, 0xdd,
->> +     0xdd, 0xff, 0xff, 0xff, 0xbb, 0xff, 0xff, 0xff,
->> +     0xbb, 0xbb, 0xff, 0xff, 0xff, 0x77, 0xff, 0xff,
->> +     0xff, 0x77, 0x77, 0xff, 0x77, 0xbb, 0xdd, 0xee,
->>  };
-> In dw-mmc.c, tuning_block values are same.
-> So I think we can move these value into generic header. how about?
+Hi,
 
-Actually, I believe these values comes from the eMMC specification?
-Shouldn't they be moved to the mmc core instead?
+Am Mittwoch, den 03.09.2014, 13:48 -0300 schrieb Fabio Estevam:
+> On Wed, Sep 3, 2014 at 1:35 PM, Markus Niebel <list-09_linux_arm@tqsc.de> wrote:
+> > Hello,
+> >
+> > playing with LVDS channel 1 on a TQMa53 with MBa53 mainboard we see error
+> >
+> > imx-ldb 53fa8008.ldb: unable to set di0 parent clock to ldb_di1
+> >
+> > this comes from imx_ldb_set_clock with mux = 0. If setting mux parameter hard to "1"
+> > LVDS on channel 1 works just fine. The value of the mux param comes from device tree
+> > port settings.
+> >
+> > The following device tree change fixes the issue, but im not sure if this is the
+> > correct way.
+> >
+> > diff --git a/arch/arm/boot/dts/imx53.dtsi b/arch/arm/boot/dts/imx53.dtsi
+> > index 6456a00..acdfabf 100644
+> > --- a/arch/arm/boot/dts/imx53.dtsi
+> > +++ b/arch/arm/boot/dts/imx53.dtsi
+> > @@ -419,10 +419,14 @@
+> >                                 status = "disabled";
+> >
+> >                                 lvds-channel at 0 {
+> > +                                       #address-cells = <1>;
+> > +                                       #size-cells = <0>;
+> >                                         reg = <0>;
+> >                                         status = "disabled";
+> >
+> >                                         port {
 
-Kind regards
-Uffe
+This should be port at 0.
 
+> > +                                               reg = <0>;
+> > +
+> >                                                 lvds0_in: endpoint {
+> >                                                         remote-endpoint = <&ipu_di0_lvds0>;
+> >                                                 };
+> > @@ -430,10 +434,14 @@
+> >                                 };
+> >
+> >                                 lvds-channel at 1 {
+> > +                                       #address-cells = <1>;
+> > +                                       #size-cells = <0>;
+> >                                         reg = <1>;
+> >                                         status = "disabled";
+> >
+> >                                         port {
+
+port at 1
+
+> > +                                               reg = <1>;
+> > +
+> >                                                 lvds1_in: endpoint {
+> >                                                         remote-endpoint = <&ipu_di1_lvds1>;
+> >                                                 };
 >
-> Best Regards,
-> Jaehoon Chung
->
->>
->>  struct sdhci_msm_host {
->> @@ -359,7 +371,7 @@ static int sdhci_msm_execute_tuning(struct sdhci_host *host, u32 opcode)
->>  {
->>       int tuning_seq_cnt = 3;
->>       u8 phase, *data_buf, tuned_phases[16], tuned_phase_cnt = 0;
->> -     const u32 *tuning_block_pattern = tuning_block_64;
->> +     const u8 *tuning_block_pattern = tuning_block_64;
->>       int size = sizeof(tuning_block_64);     /* Pattern size in bytes */
->>       int rc;
->>       struct mmc_host *mmc = host->mmc;
->>
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-mmc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> > In my understanding the i.MX53 has no multiplexer for the input, so
+> > DI1 -> LVDS1 in case of single channel or separate channels
+> 
+> Your change looks good. Adding Philipp and Shawn on Cc.
+
+Apart from the comments, this looks good to me, too.
+In Documentation/devicetree/bindings/staging/imx-drm/ldb.txt the example
+should be updated with the above changes, and an explanation should be
+added to the port documentation in there:
+
+"On i.MX5, the internal two-input-multiplexer is used.
+ Due to hardware limitations, only one port (port@[0,1])
+ can be used for each channel (lvds-channel@[0,1], respectively)"
+
+Is this clear enough? In principle each channel could have two input
+ports on i.MX5, but there is no way to properly route the ldb di clock
+to the other display interface.
+
+regards
+Philipp
