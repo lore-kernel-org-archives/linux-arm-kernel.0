@@ -1,53 +1,44 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 4 Sep 2014 13:28:24 +0100
-Subject: [RFC PATCH v2 4/7] iommu: provide helper function to configure
- an IOMMU for an of master
-In-Reply-To: <30707436.FH2aSkoH5H@wuerfel>
-References: <1409680587-29818-1-git-send-email-will.deacon@arm.com>
- <5768908.PeRFksrdyQ@wuerfel> <20140904112625.GE7156@arm.com>
- <30707436.FH2aSkoH5H@wuerfel>
-Message-ID: <20140904122824.GF7156@arm.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Thu, 04 Sep 2014 16:55:05 +0400
+Subject: [Patch net-next 10/11] ARM: Documentation: Update fec dts binding
+ doc
+In-Reply-To: <54078488.68c1420a.3020.7c0dSMTPIN_ADDED_BROKEN@mx.google.com>
+References: <1409776486-1403-1-git-send-email-y>
+ <54078488.68c1420a.3020.7c0dSMTPIN_ADDED_BROKEN@mx.google.com>
+Message-ID: <54086129.9050508@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 04, 2014 at 12:59:50PM +0100, Arnd Bergmann wrote:
-> On Thursday 04 September 2014 12:26:25 Will Deacon wrote:
-> > > 
-> > > > +               } else if (iommu != data) {
-> > > > +                       pr_warn("Rejecting device %s with multiple IOMMU instances\n",
-> > > > +                               dev_name(dev));
-> > > > +                       iommu = NULL;
-> > > > +               }
-> > > > +
-> > > > +               of_node_put(np);
-> > > > +
-> > > > +               if (!iommu)
-> > > > +                       break;
-> > > > +
-> > > > +               idx++;
-> > > > +       }
-> > > > +
-> > > > +       if (!iommu)
-> > > > +               return NULL;
-> > > > +
-> > > > +       mapping = devm_kzalloc(dev, sizeof(*mapping), GFP_KERNEL);
-> > > > +       if (!mapping)
-> > > > +               return NULL;
-> > > > 
-> > > 
-> > > I don't think it's safe to use devm_* functions here: this is during
-> > > device discovery, and this data will be freed if probe() fails or
-> > > the device gets removed from a driver.
-> > 
-> > So I can make this a standard kzalloc, but I have no idea where the
-> > corresponding kfree should live. Is there something equivalent to
-> > of_dma_unconfigure, or is this data that is expected to persist?
-> > 
-> 
-> Can this be a simple kfree in of_platform_device_create_pdata?
+Hello.
 
-We could certainly hook into the error path there (when of_device_add
-fails), yes, but I was also thinking about device removal and whether we
-need to care about that. I guess not for the OF case.
+On 9/4/2014 12:34 AM, y at shlinux1.ap.freescale.net wrote:
 
-Will
+> From: Frank Li <Frank.Li@freescale.com>
+
+>      This patch update fec devicetree binding doc that add Optional
+>      properties "fsl,num_tx_queues" and "fsl,num_rx_queues".
+
+> Signed-off-by: Fugang Duan <B38611@freescale.com>
+> Signed-off-by: Frank Li <Frank.Li@freescale.com>
+> ---
+>   Documentation/devicetree/bindings/net/fsl-fec.txt | 6 ++++++
+>   1 file changed, 6 insertions(+)
+
+> diff --git a/Documentation/devicetree/bindings/net/fsl-fec.txt b/Documentation/devicetree/bindings/net/fsl-fec.txt
+> index 8a2c7b5..4da148d 100644
+> --- a/Documentation/devicetree/bindings/net/fsl-fec.txt
+> +++ b/Documentation/devicetree/bindings/net/fsl-fec.txt
+> @@ -16,6 +16,12 @@ Optional properties:
+>   - phy-handle : phandle to the PHY device connected to this device.
+>   - fixed-link : Assume a fixed link. See fixed-link.txt in the same directory.
+>     Use instead of phy-handle.
+> +- fsl,num_tx_queues : The property is valid for enet-avb IP, which supports
+> +  hw multi queues. Should specify the tx queue number, otherwise set tx queue
+> +  number to 1.
+> +- fsl,num_rx_queues : The property is valid for enet-avb IP, which supports
+> +  hw multi queues. Should specify the rx queue number, otherwise set rx queue
+> +  number to 1.
+
+    Hyphens are preferred to underscores in the prop names.
+
+WBR, Sergei
