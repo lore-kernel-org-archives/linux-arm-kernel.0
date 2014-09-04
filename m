@@ -1,140 +1,56 @@
-From: wanghaibin.wang@huawei.com (wanghaibin)
-Date: Thu, 4 Sep 2014 15:52:32 +0800
-Subject: [PATCH v2 03/15] arm/arm64: KVM: refactor vgic_handle_mmio()
- function
-In-Reply-To: <1408626416-11326-4-git-send-email-andre.przywara@arm.com>
-References: <1408626416-11326-1-git-send-email-andre.przywara@arm.com>
- <1408626416-11326-4-git-send-email-andre.przywara@arm.com>
-Message-ID: <54081A40.9030009@huawei.com>
+From: bhupesh.sharma@freescale.com (bhupesh.sharma at freescale.com)
+Date: Thu, 4 Sep 2014 07:55:09 +0000
+Subject: [PATCH V3 4/6] arm64: Add DTS support for FSL's LS2085A SoC
+In-Reply-To: <3908508.RbGYaA1nXT@wuerfel>
+References: <1409757194-28155-1-git-send-email-bhupesh.sharma@freescale.com>
+ <1409757194-28155-5-git-send-email-bhupesh.sharma@freescale.com>
+ <3908508.RbGYaA1nXT@wuerfel>
+Message-ID: <5dcffbb315b14465ae1ba569c553b522@BN1PR03MB220.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2014/8/21 21:06, Andre Przywara wrote:
+Hi Arnd,
 
-> Currently we only need to deal with one MMIO region for the GIC
-> emulation, but we soon need to extend this. Refactor the existing
-> code to allow easier addition of different ranges without code
-> duplication.
+> -----Original Message-----
+> From: Arnd Bergmann [mailto:arnd at arndb.de]
+> Sent: Thursday, September 04, 2014 12:05 AM
+> To: linux-arm-kernel at lists.infradead.org
+> Cc: Sharma Bhupesh-B45370; Catalin.Marinas at arm.com; mark.rutland at arm.com;
+> rob.herring at linaro.org; marc.zyngier at arm.com; Will.Deacon at arm.com; Yoder
+> Stuart-B08248; grant.likely at secretlab.ca; Basu Arnab-B45036
+> Subject: Re: [PATCH V3 4/6] arm64: Add DTS support for FSL's LS2085A SoC
 > 
-> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
-> ---
->  virt/kvm/arm/vgic.c |   72 ++++++++++++++++++++++++++++++++++++---------------
->  1 file changed, 51 insertions(+), 21 deletions(-)
+> On Wednesday 03 September 2014 20:43:12 Bhupesh Sharma wrote:
+> > diff --git a/arch/arm64/boot/dts/fsl-ls2085a-simu.dts
+> > b/arch/arm64/boot/dts/fsl-ls2085a-simu.dts
+> > new file mode 100644
+> > index 0000000..3c0f953
+> > --- /dev/null
+> > +++ b/arch/arm64/boot/dts/fsl-ls2085a-simu.dts
+> > @@ -0,0 +1,26 @@
+> > +/*
+> > + * Device Tree file for Freescale LS2085a software Simulator model
+> > + *
+> > + * Copyright (C) 2014, Freescale Semiconductor
+> > + *
+> > + * Bhupesh Sharma <bhupesh.sharma@freescale.com>
+> > + *
+> > + * This file is licensed under the terms of the GNU General Public
+> > + * License version 2.  This program is licensed "as is" without any
+> > + * warranty of any kind, whether express or implied.
+> > + */
+> >
 > 
-> diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
-> index bba8692..3b6f78d 100644
-> --- a/virt/kvm/arm/vgic.c
-> +++ b/virt/kvm/arm/vgic.c
-> @@ -925,37 +925,28 @@ static bool vgic_validate_access(const struct vgic_dist *dist,
->  	return true;
->  }
->  
-> -/**
-> - * vgic_handle_mmio - handle an in-kernel MMIO access
-> +/*
-> + * vgic_handle_mmio_range - handle an in-kernel MMIO access
->   * @vcpu:	pointer to the vcpu performing the access
->   * @run:	pointer to the kvm_run structure
->   * @mmio:	pointer to the data describing the access
-> + * @ranges:	pointer to the register defining structure
-> + * @mmio_base:	base address for this mapping
->   *
-> - * returns true if the MMIO access has been performed in kernel space,
-> - * and false if it needs to be emulated in user space.
-> + * returns true if the MMIO access could be performed
->   */
-> -bool vgic_handle_mmio(struct kvm_vcpu *vcpu, struct kvm_run *run,
-> -		      struct kvm_exit_mmio *mmio)
-> +static bool vgic_handle_mmio_range(struct kvm_vcpu *vcpu, struct kvm_run *run,
-> +			    struct kvm_exit_mmio *mmio,
-> +			    const struct mmio_range *ranges,
-> +			    unsigned long mmio_base)
->  {
->  	const struct mmio_range *range;
->  	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
-> -	unsigned long base = dist->vgic_dist_base;
->  	bool updated_state;
->  	unsigned long offset;
->  
-> -	if (!irqchip_in_kernel(vcpu->kvm) ||
-> -	    mmio->phys_addr < base ||
-> -	    (mmio->phys_addr + mmio->len) > (base + KVM_VGIC_V2_DIST_SIZE))
-> -		return false;
-> -
-> -	/* We don't support ldrd / strd or ldm / stm to the emulated vgic */
-> -	if (mmio->len > 4) {
-> -		kvm_inject_dabt(vcpu, mmio->phys_addr);
-> -		return true;
-> -	}
-> -
-> -	offset = mmio->phys_addr - base;
-> -	range = find_matching_range(vgic_dist_ranges, mmio, offset);
-> +	offset = mmio->phys_addr - mmio_base;
-> +	range = find_matching_range(ranges, mmio, offset);
->  	if (unlikely(!range || !range->handle_mmio)) {
->  		pr_warn("Unhandled access %d %08llx %d\n",
->  			mmio->is_write, mmio->phys_addr, mmio->len);
-> @@ -963,7 +954,7 @@ bool vgic_handle_mmio(struct kvm_vcpu *vcpu, struct kvm_run *run,
->  	}
->  
->  	spin_lock(&vcpu->kvm->arch.vgic.lock);
-> -	offset = mmio->phys_addr - range->base - base;
-> +	offset -= range->base;
->  	if (vgic_validate_access(dist, range, offset)) {
->  		updated_state = range->handle_mmio(vcpu, mmio, offset);
->  	} else {
-> @@ -981,6 +972,45 @@ bool vgic_handle_mmio(struct kvm_vcpu *vcpu, struct kvm_run *run,
->  	return true;
->  }
->  
+> One more thing, same comment as for the respective Exynos7 patch:
+> can this please be a permissive license, like GPLv2+MIT dual license?
+> 
 
+Yes. I saw Russell's email in which he mentions that Linus is ok with using the MIT
+X11 licenses ([1]). However, I am not sure I understand the GPLv2+MIT dual license.
+Is it listed separately on [2], or is it a sum of the X11 + GPLv2 clauses mentioned in [2].
 
-Andre, Is the IS_IN_RANGE definition wrong?
+[1] http://www.spinics.net/lists/arm-kernel/msg358782.html
+[2] http://www.gnu.org/licenses/license-list.html
 
-Compare with Marc's old code, here should lack a  "=".
-
-#define IS_IN_RANGE(addr, alen, base, len) \
-	(((addr) >= (base)) && (((addr) + (alen)) <= ((base) + (len))))
-
-> +#define IS_IN_RANGE(addr, alen, base, len) \
-> +	(((addr) >= (base)) && (((addr) + (alen)) < ((base) + (len))))
-> +
-> +static bool vgic_v2_handle_mmio(struct kvm_vcpu *vcpu, struct kvm_run *run,
-> +				struct kvm_exit_mmio *mmio)
-> +{
-> +	unsigned long base = vcpu->kvm->arch.vgic.vgic_dist_base;
-> +
-> +	if (!IS_IN_RANGE(mmio->phys_addr, mmio->len, base,
-> +			 KVM_VGIC_V2_DIST_SIZE))
-> +		return false;
-> +
-> +	/* GICv2 does not support accesses wider than 32 bits */
-> +	if (mmio->len > 4) {
-> +		kvm_inject_dabt(vcpu, mmio->phys_addr);
-> +		return true;
-> +	}
-> +
-> +	return vgic_handle_mmio_range(vcpu, run, mmio, vgic_dist_ranges, base);
-> +}
-> +
-> +/**
-> + * vgic_handle_mmio - handle an in-kernel MMIO access for the GIC emulation
-> + * @vcpu:      pointer to the vcpu performing the access
-> + * @run:       pointer to the kvm_run structure
-> + * @mmio:      pointer to the data describing the access
-> + *
-> + * returns true if the MMIO access has been performed in kernel space,
-> + * and false if it needs to be emulated in user space.
-> + */
-> +bool vgic_handle_mmio(struct kvm_vcpu *vcpu, struct kvm_run *run,
-> +		      struct kvm_exit_mmio *mmio)
-> +{
-> +	if (!irqchip_in_kernel(vcpu->kvm))
-> +		return false;
-> +
-> +	return vgic_v2_handle_mmio(vcpu, run, mmio);
-> +}
-> +
->  static u8 *vgic_get_sgi_sources(struct vgic_dist *dist, int vcpu_id, int sgi)
->  {
->  	return dist->irq_sgi_sources + vcpu_id * VGIC_NR_SGIS + sgi;
+Regards,
+Bhupesh
