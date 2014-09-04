@@ -1,64 +1,47 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Thu, 4 Sep 2014 09:33:51 +0900
-Subject: [PATCH 13/15] drivers: sh: Leave disabling of unused PM domains
- to genpd
-In-Reply-To: <1409741551-16437-14-git-send-email-ulf.hansson@linaro.org>
-References: <1409741551-16437-1-git-send-email-ulf.hansson@linaro.org>
- <1409741551-16437-14-git-send-email-ulf.hansson@linaro.org>
-Message-ID: <20140904003351.GB13821@verge.net.au>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Wed, 03 Sep 2014 17:53:05 -0700
+Subject: [PATCH v9 5/6] clk: Add floor and ceiling constraints to clock
+ rates
+In-Reply-To: <5407A6B9.1080606@codeaurora.org>
+References: <1409758148-20104-1-git-send-email-tomeu.vizoso@collabora.com>
+ <1409758434-20810-1-git-send-email-tomeu.vizoso@collabora.com>
+ <1409758434-20810-3-git-send-email-tomeu.vizoso@collabora.com>
+ <5407A6B9.1080606@codeaurora.org>
+Message-ID: <20140904005305.11368.16931@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 03, 2014 at 12:52:29PM +0200, Ulf Hansson wrote:
-> Since genpd at late init, will try to disable unused PM domains we
-> don't need to do it from here as well.
+Quoting Stephen Boyd (2014-09-03 16:39:37)
+> On 09/03/14 08:33, Tomeu Vizoso wrote:
+> > +int clk_set_ceiling_rate(struct clk *clk_user, unsigned long rate)
+> > +{
+> > +     struct clk_core *clk = clk_to_clk_core(clk_user);
+> > +
+> > +     WARN(rate > 0 && rate < clk_user->floor_constraint,
+> > +          "clk %s dev %s con %s: new ceiling %lu lower than existing floor %lu\n",
+> > +          __clk_get_name(clk), clk_user->dev_id, clk_user->con_id, rate,
+> > +          clk_user->floor_constraint);
+> > +
+> > +     clk_user->ceiling_constraint = rate;
+> > +     return clk_provider_set_rate(clk, clk_provider_get_rate(clk));
+> > +}
+> > +EXPORT_SYMBOL_GPL(clk_set_ceiling_rate);
 > 
-> Cc: Simon Horman <horms@verge.net.au>
-> Cc: Magnus Damm <magnus.damm@gmail.com>
-> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+> Maybe I'm late to this patch series given that Mike applied it, but I
+> wonder why we wouldn't just have one API that takes a min and a max,
+> i.e. clk_set_rate_range(clk, min, max)? Then clk_set_rate() is a small
+> wrapper on top that just sets min and max to the same value.
 
+We certainly can have that. But being able to easily adjust a floor or
+ceiling value seems like a good thing to me, and that is what these
+functions do.
 
-Acked-by: Simon Horman <horms+renesas@verge.net.au>
+If we decide to have a clk_set_rate_range (where we perhaps pass zero in
+for a value that we do not wish to constrain) then I imagine that
+clk_set_ceiling_rate and clk_set_floor_rate will simply become a wrapper
+for that function. No harm having it both ways. If one way of doing
+things falls out of favor we can always cull it and update all the
+users.
 
-> ---
->  drivers/sh/pm_runtime.c | 11 -----------
->  1 file changed, 11 deletions(-)
-> 
-> diff --git a/drivers/sh/pm_runtime.c b/drivers/sh/pm_runtime.c
-> index 72f6381..fe2c2d5 100644
-> --- a/drivers/sh/pm_runtime.c
-> +++ b/drivers/sh/pm_runtime.c
-> @@ -75,8 +75,6 @@ static struct pm_clk_notifier_block platform_bus_notifier = {
->  	.con_ids = { NULL, },
->  };
->  
-> -static bool default_pm_on;
-> -
->  static int __init sh_pm_runtime_init(void)
->  {
->  	if (IS_ENABLED(CONFIG_ARCH_SHMOBILE_MULTI)) {
-> @@ -96,16 +94,7 @@ static int __init sh_pm_runtime_init(void)
->  			return 0;
->  	}
->  
-> -	default_pm_on = true;
->  	pm_clk_add_notifier(&platform_bus_type, &platform_bus_notifier);
->  	return 0;
->  }
->  core_initcall(sh_pm_runtime_init);
-> -
-> -static int __init sh_pm_runtime_late_init(void)
-> -{
-> -	if (default_pm_on)
-> -		pm_genpd_poweroff_unused();
-> -	return 0;
-> -}
-> -late_initcall(sh_pm_runtime_late_init);
-> -- 
-> 1.9.1
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-sh" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+Regards,
+Mike
