@@ -1,88 +1,79 @@
-From: daniel.thompson@linaro.org (Daniel Thompson)
-Date: Thu, 04 Sep 2014 10:09:20 +0100
-Subject: [PATCH v10 03/19] arm: fiq: Replace default FIQ handler
-In-Reply-To: <20140903193453.GA30401@n2100.arm.linux.org.uk>
-References: <1408369264-14242-1-git-send-email-daniel.thompson@linaro.org>
- <1408466769-20004-1-git-send-email-daniel.thompson@linaro.org>
- <1408466769-20004-4-git-send-email-daniel.thompson@linaro.org>
- <20140819173742.GG30401@n2100.arm.linux.org.uk> <53F39377.1070308@linaro.org>
- <20140828150112.GD30401@n2100.arm.linux.org.uk> <5405AEBC.9020904@linaro.org>
- <20140902164204.GT30401@n2100.arm.linux.org.uk> <5406EBAA.9040206@linaro.org>
- <20140903193453.GA30401@n2100.arm.linux.org.uk>
-Message-ID: <54082C40.2000107@linaro.org>
+From: fugang.duan@freescale.com (fugang.duan at freescale.com)
+Date: Thu, 4 Sep 2014 09:11:10 +0000
+Subject: [Patch net-next 08/11] net:fec: change FEC alignment to 64 bytes
+ for ARM platform
+In-Reply-To: <063D6719AE5E284EB5DD2968C1650D6D17487196@AcuExch.aculab.com>
+References: <1409776697-1536-1-git-send-email-Frank.Li@freescale.com>
+ <1409776697-1536-9-git-send-email-Frank.Li@freescale.com>
+ <063D6719AE5E284EB5DD2968C1650D6D17487196@AcuExch.aculab.com>
+Message-ID: <e50c6383dc184566846e190026d1186a@BLUPR03MB373.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/09/14 20:34, Russell King - ARM Linux wrote:
-> On Wed, Sep 03, 2014 at 11:21:30AM +0100, Daniel Thompson wrote:
->> On 02/09/14 17:42, Russell King - ARM Linux wrote:
->>> Yes, it does, because unlike the x86 community, we have a wide range
->>> of platforms, and platform code does not go through the same path or
->>> get the same review as core ARM code.
->>>
->>> As I already pointed out, with a notifier, it's very easy to sneak
->>> something into the FIQ path by submitting a patch for platform code
->>> which calls the registration function.  That's going to be pretty
->>> difficult to spot amongst the 3000+ messages on the linux-arm-kernel
->>> list each month in order to give it the review that it would need.
->>> That's especially true as I now ignore almost all most platform
->>> code patches as we have Arnd and Olof to look at that.
->>>
->>> So, unless you can come up with a proposal which ensures that there
->>> is sufficient review triggered when someone decides to call the
->>> notifier registration function...
+From: David Laight <David.Laight@ACULAB.COM> Sent: Thursday, September 04, 2014 4:51 PM
+>To: Li Frank-B20596; Duan Fugang-B38611; davem at davemloft.net;
+>netdev at vger.kernel.org; lznuaa at gmail.com
+>Cc: shawn.guo at linaro.org; linux-arm-kernel at lists.infradead.org;
+>devicetree at vger.kernel.org; Duan Fugang-B38611
+>Subject: RE: [Patch net-next 08/11] net:fec: change FEC alignment to 64
+>bytes for ARM platform
+>
+>From: Frank Li
+>> From: Fugang Duan <B38611@freescale.com>
 >>
->> Reflecting upon this and upon Thomas' comments about only using FIQ for
->> watchdog, backtrace and performance monitoring...
+>> Since enet-avb has 64 bytes alignment limitation for rx DMA transfer.
+>> The previous enet IP for ARM platform has 16 bytes alignment for tx
+>> DMA transfer.
+>
+>Do you mean rx or tx here? or both??
+>
+>And can we beat up the hardware designers to stop these restrictions on rx
+>(in particular) ethernet buffer alignments?
+>A device isn't suitable for ethernet unless is can write the destination
+>mac address to a 4n+2 boundary.
+>
+>	David
+>
+Hi, David,
+
+For previous enet IP there has 16 bytes data buffer alignment limitation for tx & rx DMA transfer.
+For imx6sx enet-avb IP, there has 64 bytes data buffer alignment limitation for rx DMA transfer, byte alignment for tx data
+Buffer for DMA transfer.
+
+I think rx data buffer alignment limitation don't introduce performance drop, is not complex for sw implemention. Anyway,
+We can request IC designer to remove the limitation for future chips.
+
+Thanks,
+Andy
+
+>> 64 is the an integral number of 16, so change alignment to 64 bytes
+>> for all ARM platform, which don't impact the performance of previous
+>> platform.
 >>
->> The short version is, "I was wrong and should have done what you said in
->> the first place".
+>> Signed-off-by: Fugang Duan <B38611@freescale.com>
+>> Signed-off-by: Frank Li <Frank.Li@freescale.com>
+>> ---
+>>  drivers/net/ethernet/freescale/fec_main.c | 2 +-
+>>  1 file changed, 1 insertion(+), 1 deletion(-)
 >>
->> The long version adds, "because the coupling concerns were spurious; the
->> only proposed users of the default FIQ handler outside of core ARM code,
->> are ARM-centric irqchip drivers."
-> 
-> I would say that the ARM specific changes to entry-armv.S and setup.c
-> are correct.  All that you're doing there is to replace the existing
-> default no-op FIQ handler with some additional code which gets us into
-> SVC mode and back out, but itself is also a no-op.  In other words, no
-> real change.
-> 
-> That's a good first patch, and one which I would actually like to have
-> in my tree sooner rather than later, so that I can split that out from
-> my prototype code.
-
-So would I!
-
-I did some rebasing yesterday to put anything to do with kgdb right at
-the back of the queue. This "good first patch" is now actually the first
-patch; where the nofifier used to be it currently calls do_unexp_fiq()
-making it very close to "no real change".
-
-BTW do_unexp_fiq() calls printk() but
-
-> I can also split out from it the ARM generic changes for implementing
-> the FIQ dumping too, which gives us a second patch.  With a bit of
-> additional work, much of that should actually be generic code, not
-> ARM or x86 specific code.  That's going to annoy x86 people a little
-> because some of that is being reworked...
-
-So far I have been testing the action after patch review using the big
-kgdb patches on top of it.
-
-Today I plan to remove the kgdb stuff, drop in your version of
-arch_trigger_all_cpu_backtrace() and test the results. I was going to
-use the code you shared on 13 August meaning all the cpu mask bit
-manipulation is in the arm-only code.
-
-If you want me to work with something more recent then feel free to
-point me at it...
-
-
-> That will leave the problem of how to deal with the IRQ controller
-> specifics, and how to properly wire it together with the IRQ controller
-> in the loop - that is where Thomas' concerns are focused.
-
-I'm working on those and its looking pretty good so far. This is mostly
-because SGIs don't need to allocate virqs so the controversial bits of
-my last patchset disappear completely.
+>> diff --git a/drivers/net/ethernet/freescale/fec_main.c
+>> b/drivers/net/ethernet/freescale/fec_main.c
+>> index a232245..b388e29f 100644
+>> --- a/drivers/net/ethernet/freescale/fec_main.c
+>> +++ b/drivers/net/ethernet/freescale/fec_main.c
+>> @@ -65,7 +65,7 @@
+>>  static void set_multicast_list(struct net_device *ndev);
+>>
+>>  #if defined(CONFIG_ARM)
+>> -#define FEC_ALIGNMENT	0xf
+>> +#define FEC_ALIGNMENT	0x3f
+>>  #else
+>>  #define FEC_ALIGNMENT	0x3
+>>  #endif
+>> --
+>> 1.9.1
+>>
+>> --
+>> To unsubscribe from this list: send the line "unsubscribe netdev" in
+>> the body of a message to majordomo at vger.kernel.org More majordomo info
+>> at  http://vger.kernel.org/majordomo-info.html
