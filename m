@@ -1,50 +1,66 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 4 Sep 2014 17:03:20 +0100
-Subject: [PATCH v8 6/8] drivers: cpuidle: CPU idle ARM64 driver
-In-Reply-To: <20140903173740.GJ1824@e102568-lin.cambridge.arm.com>
-References: <1409585324-3678-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1409585324-3678-7-git-send-email-lorenzo.pieralisi@arm.com>
- <20140903173740.GJ1824@e102568-lin.cambridge.arm.com>
-Message-ID: <20140904160320.GB22354@arm.com>
+From: daniel.thompson@linaro.org (Daniel Thompson)
+Date: Thu,  4 Sep 2014 17:03:34 +0100
+Subject: [PATCH v1 0/6] arm: Implement arch_trigger_all_cpu_backtrace
+In-Reply-To: <1409662853-29313-1-git-send-email-daniel.thompson@linaro.org>
+References: <1409662853-29313-1-git-send-email-daniel.thompson@linaro.org>
+Message-ID: <1409846620-14542-1-git-send-email-daniel.thompson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 03, 2014 at 06:37:40PM +0100, Lorenzo Pieralisi wrote:
-> On Mon, Sep 01, 2014 at 04:28:42PM +0100, Lorenzo Pieralisi wrote:
-> > This patch implements a generic CPU idle driver for ARM64 machines.
-> > 
-> > It relies on the DT idle states infrastructure to initialize idle
-> > states count and respective parameters. Current code assumes the driver
-> > is managing idle states on all possible CPUs but can be easily
-> > generalized to support heterogenous systems and build cpumasks at
-> > runtime using MIDRs or DT cpu nodes compatible properties.
-> > 
-> > The driver relies on the arm64 CPU operations to call the idle
-> > initialization hook used to parse and save suspend back-end specific
-> > idle states information upon probing.
-> > 
-> > Idle state index 0 is always initialized as a simple wfi state, ie always
-> > considered present and functional on all ARM64 platforms.
-> > 
-> > Idle state indices higher than 0 trigger idle state entry by calling
-> > the cpu_suspend function, that triggers the suspend operation through
-> > the CPU operations suspend back-end hook. cpu_suspend passes the idle
-> > state index as a parameter so that the CPU operations suspend back-end
-> > can retrieve the required idle state data by using the idle state
-> > index to execute a look-up on its internal data structures.
-> > 
-> > Reviewed-by: Ashwin Chaugule <ashwin.chaugule@linaro.org>
-> > Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
-> > Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> 
-> This patch should be ready to go too, is it ok if I split the series
-> in arm64 arch specific patches (will ask Catalin to pull) and CPUidle ones
-> (inclusive of DT bindings and !!this patch!!) and send two separate pull
-> requests ?
+This patchset implements arch_trigger_all_cpu_backtrace for arm.
 
-If Daniel/Rafael don't have any objection, I can take the whole series
-through the arm64 tree (it seems that patches have been already acked by
-Daniel).
+Non-maskable signalling relies on the kernel being able to access FIQ
+and therefore, for devices that implement TrustZone, it will work only on
+systems that boot the kernel in secure mode.
 
--- 
-Catalin
+Tested on Freescale iMX.6 (both via SysRq-l and by deliberately locking
+up the kernel with CONFIG_DEBUG_SPINLOCK=y).
+
+Changes *before* v1:
+
+- This patchset is a hugely cut-down successor to "[PATCH v11 00/19]
+  arm: KGDB NMI/FIQ support". Thanks to Thomas Gleixner for suggesting
+  the new structure. For historic details see:
+        https://lkml.org/lkml/2014/9/2/227
+
+- Fix bug in __fiq_abt (no longer passes a bad struct pt_regs value).
+  In fixing this we also remove the useless indirection previously
+  found in the fiq_handler macro.
+
+- Make default fiq handler "always on" by migrating from fiq.c to
+  traps.c and replace do_unexp_fiq with the new handler (Russell
+  King).
+
+- Add arm64 version of fiq.h (Russell King)
+
+- Removed conditional branching and code from irq-gic.c, this is
+  replaced by much simpler code that relies on the GIC specification's
+  heavy use of read-as-zero/write-ignored (Russell King)
+
+
+Daniel Thompson (5):
+  arm: fiq: Replace default FIQ handler
+  arm: smp: Introduce a non-maskable IPI
+  arm64: Introduce dummy version of asm/fiq.h
+  irqchip: gic: Add support for IPI FIQ
+  irqchip: gic: Group 0 workaround.
+
+Russell King (1):
+  arm: Implement arch_trigger_all_cpu_backtrace
+
+ arch/arm/Kconfig.debug          |  14 +++
+ arch/arm/include/asm/hardirq.h  |   2 +-
+ arch/arm/include/asm/irq.h      |   5 +
+ arch/arm/include/asm/smp.h      |   7 ++
+ arch/arm/kernel/entry-armv.S    | 110 ++++++++++++++++++--
+ arch/arm/kernel/setup.c         |   8 +-
+ arch/arm/kernel/smp.c           |  67 ++++++++++++
+ arch/arm/kernel/traps.c         |  34 +++++-
+ arch/arm64/include/asm/fiq.h    |  18 ++++
+ drivers/irqchip/irq-gic.c       | 223 +++++++++++++++++++++++++++++++++++++---
+ include/linux/irqchip/arm-gic.h |   3 +
+ 11 files changed, 464 insertions(+), 27 deletions(-)
+ create mode 100644 arch/arm64/include/asm/fiq.h
+
+--
+1.9.3
