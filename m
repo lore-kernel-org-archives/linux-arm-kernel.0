@@ -1,50 +1,55 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 4 Sep 2014 10:45:21 +0100
-Subject: [PATCH v10 03/19] arm: fiq: Replace default FIQ handler
-In-Reply-To: <54082C40.2000107@linaro.org>
-References: <1408466769-20004-1-git-send-email-daniel.thompson@linaro.org>
- <1408466769-20004-4-git-send-email-daniel.thompson@linaro.org>
- <20140819173742.GG30401@n2100.arm.linux.org.uk> <53F39377.1070308@linaro.org>
- <20140828150112.GD30401@n2100.arm.linux.org.uk> <5405AEBC.9020904@linaro.org>
- <20140902164204.GT30401@n2100.arm.linux.org.uk> <5406EBAA.9040206@linaro.org>
- <20140903193453.GA30401@n2100.arm.linux.org.uk> <54082C40.2000107@linaro.org>
-Message-ID: <20140904094521.GB30401@n2100.arm.linux.org.uk>
+From: shengjiu.wang@freescale.com (Shengjiu Wang)
+Date: Thu, 4 Sep 2014 17:48:58 +0800
+Subject: [PATCH V1 1/2] ARM: clk-imx6q: refine clock tree for ASRC
+Message-ID: <98d2985de76fa84525e9958522bd371a34ff84f0.1409824001.git.shengjiu.wang@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 04, 2014 at 10:09:20AM +0100, Daniel Thompson wrote:
-> On 03/09/14 20:34, Russell King - ARM Linux wrote:
-> > I would say that the ARM specific changes to entry-armv.S and setup.c
-> > are correct.  All that you're doing there is to replace the existing
-> > default no-op FIQ handler with some additional code which gets us into
-> > SVC mode and back out, but itself is also a no-op.  In other words, no
-> > real change.
-> > 
-> > That's a good first patch, and one which I would actually like to have
-> > in my tree sooner rather than later, so that I can split that out from
-> > my prototype code.
-> 
-> So would I!
-> 
-> I did some rebasing yesterday to put anything to do with kgdb right at
-> the back of the queue. This "good first patch" is now actually the first
-> patch; where the nofifier used to be it currently calls do_unexp_fiq()
-> making it very close to "no real change".
-> 
-> BTW do_unexp_fiq() calls printk() but
+ASRC has "asrc", "asrc_ipg", "asrc_mem" clocks, and they share
+the same gate bits.
 
-You're making the assumption that something called do_unexp_fiq() before
-your patches.  It seems that that function is dead code, and now that
-you've pointed that out, I will kill this function.
+Signed-off-by: Shengjiu Wang <shengjiu.wang@freescale.com>
+---
+ arch/arm/mach-imx/clk-imx6q.c             |    5 ++++-
+ include/dt-bindings/clock/imx6qdl-clock.h |    4 +++-
+ 2 files changed, 7 insertions(+), 2 deletions(-)
 
-The current situation is that if the CPU receives a FIQ, it enters the
-FIQ vector, which contains an immediate return instruction.
-
-> If you want me to work with something more recent then feel free to
-> point me at it...
-
-I'll post some of that stuff later today, probably this evening.
-
+diff --git a/arch/arm/mach-imx/clk-imx6q.c b/arch/arm/mach-imx/clk-imx6q.c
+index 2edcebf..d5bf1e2 100644
+--- a/arch/arm/mach-imx/clk-imx6q.c
++++ b/arch/arm/mach-imx/clk-imx6q.c
+@@ -107,6 +107,7 @@ static struct clk_div_table video_div_table[] = {
+ };
+ 
+ static unsigned int share_count_esai;
++static unsigned int share_count_asrc;
+ 
+ static void __init imx6q_clocks_init(struct device_node *ccm_node)
+ {
+@@ -317,7 +318,9 @@ static void __init imx6q_clocks_init(struct device_node *ccm_node)
+ 
+ 	/*                                            name             parent_name          reg         shift */
+ 	clk[IMX6QDL_CLK_APBH_DMA]     = imx_clk_gate2("apbh_dma",      "usdhc3",            base + 0x68, 4);
+-	clk[IMX6QDL_CLK_ASRC]         = imx_clk_gate2("asrc",          "asrc_podf",         base + 0x68, 6);
++	clk[IMX6QDL_CLK_ASRC]         = imx_clk_gate2_shared("asrc",         "asrc_podf",   base + 0x68, 6, &share_count_asrc);
++	clk[IMX6QDL_CLK_ASRC_IPG]     = imx_clk_gate2_shared("asrc_ipg",     "ahb",         base + 0x68, 6, &share_count_asrc);
++	clk[IMX6QDL_CLK_ASRC_MEM]     = imx_clk_gate2_shared("asrc_mem",     "ahb",         base + 0x68, 6, &share_count_asrc);
+ 	clk[IMX6QDL_CLK_CAN1_IPG]     = imx_clk_gate2("can1_ipg",      "ipg",               base + 0x68, 14);
+ 	clk[IMX6QDL_CLK_CAN1_SERIAL]  = imx_clk_gate2("can1_serial",   "can_root",          base + 0x68, 16);
+ 	clk[IMX6QDL_CLK_CAN2_IPG]     = imx_clk_gate2("can2_ipg",      "ipg",               base + 0x68, 18);
+diff --git a/include/dt-bindings/clock/imx6qdl-clock.h b/include/dt-bindings/clock/imx6qdl-clock.h
+index 323e865..1e99613 100644
+--- a/include/dt-bindings/clock/imx6qdl-clock.h
++++ b/include/dt-bindings/clock/imx6qdl-clock.h
+@@ -220,6 +220,8 @@
+ #define IMX6QDL_CLK_LVDS2_GATE			207
+ #define IMX6QDL_CLK_ESAI_IPG			208
+ #define IMX6QDL_CLK_ESAI_MEM			209
+-#define IMX6QDL_CLK_END				210
++#define IMX6QDL_CLK_ASRC_IPG			210
++#define IMX6QDL_CLK_ASRC_MEM			211
++#define IMX6QDL_CLK_END				212
+ 
+ #endif /* __DT_BINDINGS_CLOCK_IMX6QDL_H */
 -- 
-FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
-according to speedtest.net.
+1.7.9.5
