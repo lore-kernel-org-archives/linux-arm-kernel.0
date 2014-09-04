@@ -1,322 +1,143 @@
 From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Thu, 04 Sep 2014 14:05:33 +0200
-Subject: [PATCH v5 1/4] ethernet: arc: Add support for Rockchip SoC layer
- device tree bindings
-In-Reply-To: <1409763165-16461-1-git-send-email-romain.perier@gmail.com>
+Date: Thu, 04 Sep 2014 14:11:51 +0200
+Subject: [PATCH 3/4] ARM: dts: Add emac nodes to the rk3188 device tree
+In-Reply-To: <1409763165-16461-3-git-send-email-romain.perier@gmail.com>
 References: <1409763165-16461-1-git-send-email-romain.perier@gmail.com>
-Message-ID: <13303426.CnNG9VQfuK@diego>
+ <1409763165-16461-3-git-send-email-romain.perier@gmail.com>
+Message-ID: <2772929.YUnUK3Vc00@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Mittwoch, 3. September 2014, 16:52:42 schrieb Romain Perier:
-> This patch defines a platform glue layer for Rockchip SoCs which
-> support arc-emac driver. It ensures that regulator for the rmii is on
-> before trying to connect to the ethernet controller. It applies right
-> speed and mode changes to the grf when ethernet settings change.
+Am Mittwoch, 3. September 2014, 16:52:44 schrieb Romain Perier:
+> This adds support for EMAC Rockchip driver on RK3188 SoCs.
 > 
 > Signed-off-by: Romain Perier <romain.perier@gmail.com>
 
-Reviewed-by: Heiko Stuebner <heiko@sntech.de>
+could you think about changing patches 3 and 4 with the diff below?
+
+For one the comment style is not really following the coding style.
+I guess either remove the comments completely or switch to a /* ... */
+form.
+
+More importantly, I think the compatible is a property of the SoC and does
+not need to be replicated into every board, so it should live in a small
+&emac node in the rk3188.dtsi to adapt the property.
+
+
+Heiko
+
+
+diff --git a/arch/arm/boot/dts/rk3188-radxarock.dts b/arch/arm/boot/dts/rk3188-radxarock.dts
+index 9f37c6f..a5c90e1 100644
+--- a/arch/arm/boot/dts/rk3188-radxarock.dts
++++ b/arch/arm/boot/dts/rk3188-radxarock.dts
+@@ -100,7 +100,6 @@
+ 
+ &emac {
+ 	status = "okay";
+-	compatible = "rockchip,rk3188-emac";
+ 
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&emac_xfer>, <&emac_mdio>, <&phy_int>;
+diff --git a/arch/arm/boot/dts/rk3188.dtsi b/arch/arm/boot/dts/rk3188.dtsi
+index 1261358..fd7511e 100644
+--- a/arch/arm/boot/dts/rk3188.dtsi
++++ b/arch/arm/boot/dts/rk3188.dtsi
+@@ -193,14 +193,14 @@
+ 
+ 		emac {
+ 			emac_xfer: emac-xfer {
+-				rockchip,pins = <RK_GPIO3 16 RK_FUNC_2 &pcfg_pull_none>, //tx_en
+-						<RK_GPIO3 17 RK_FUNC_2 &pcfg_pull_none>, //txd1
+-						<RK_GPIO3 18 RK_FUNC_2 &pcfg_pull_none>, //txd0
+-						<RK_GPIO3 19 RK_FUNC_2 &pcfg_pull_none>, //rxd0
+-						<RK_GPIO3 20 RK_FUNC_2 &pcfg_pull_none>, //rxd1
+-						<RK_GPIO3 21 RK_FUNC_2 &pcfg_pull_none>, //mac_clk
+-						<RK_GPIO3 22 RK_FUNC_2 &pcfg_pull_none>, //rx_err
+-						<RK_GPIO3 23 RK_FUNC_2 &pcfg_pull_none>; //crs_dvalid
++				rockchip,pins = <RK_GPIO3 16 RK_FUNC_2 &pcfg_pull_none>, /* tx_en */
++						<RK_GPIO3 17 RK_FUNC_2 &pcfg_pull_none>, /* txd1 */
++						<RK_GPIO3 18 RK_FUNC_2 &pcfg_pull_none>, /* txd0 */
++						<RK_GPIO3 19 RK_FUNC_2 &pcfg_pull_none>, /* rxd0 */
++						<RK_GPIO3 20 RK_FUNC_2 &pcfg_pull_none>, /* rxd1 */
++						<RK_GPIO3 21 RK_FUNC_2 &pcfg_pull_none>, /* mac_clk */
++						<RK_GPIO3 22 RK_FUNC_2 &pcfg_pull_none>, /* rx_err */
++						<RK_GPIO3 23 RK_FUNC_2 &pcfg_pull_none>; /* crs_dvalid */
+ 			};
+ 
+ 			emac_mdio: emac-mdio {
+@@ -385,6 +385,10 @@
+ 	};
+ };
+ 
++&emac {
++	compatible = "rockchip,rk3188-emac";
++};
++
+ &global_timer {
+ 	interrupts = <GIC_PPI 11 0xf04>;
+ };
+
 
 > ---
->  drivers/net/ethernet/arc/Kconfig         |  10 ++
->  drivers/net/ethernet/arc/Makefile        |   1 +
->  drivers/net/ethernet/arc/emac.h          |   4 +-
->  drivers/net/ethernet/arc/emac_main.c     |   2 +
->  drivers/net/ethernet/arc/emac_rockchip.c | 228
-> +++++++++++++++++++++++++++++++ 5 files changed, 244 insertions(+), 1
-> deletion(-)
->  create mode 100644 drivers/net/ethernet/arc/emac_rockchip.c
+>  arch/arm/boot/dts/rk3188.dtsi | 18 ++++++++++++++++++
+>  arch/arm/boot/dts/rk3xxx.dtsi | 17 +++++++++++++++++
+>  2 files changed, 35 insertions(+)
 > 
-> diff --git a/drivers/net/ethernet/arc/Kconfig
-> b/drivers/net/ethernet/arc/Kconfig index 89e04fd..8e262e2 100644
-> --- a/drivers/net/ethernet/arc/Kconfig
-> +++ b/drivers/net/ethernet/arc/Kconfig
-> @@ -32,4 +32,14 @@ config ARC_EMAC
->  	  non-standard on-chip ethernet device ARC EMAC 10/100 is used.
->  	  Say Y here if you have such a board.  If unsure, say N.
+> diff --git a/arch/arm/boot/dts/rk3188.dtsi b/arch/arm/boot/dts/rk3188.dtsi
+> index ee801a9..a182713 100644
+> --- a/arch/arm/boot/dts/rk3188.dtsi
+> +++ b/arch/arm/boot/dts/rk3188.dtsi
+> @@ -147,6 +147,24 @@
+>  			bias-disable;
+>  		};
 > 
-> +config EMAC_ROCKCHIP
-> +	tristate "Rockchip EMAC support"
-> +	select ARC_EMAC_CORE
-> +	depends on OF_IRQ && OF_NET && REGULATOR
-> +	---help---
-> +	  Support for Rockchip RK3066/RK3188 EMAC ethernet controllers.
-> +	  This selects Rockchip SoC glue layer support for the
-> +	  emac device driver. This driver is used for RK3066/RK3188
-> +	  EMAC ethernet controller.
+> +		emac {
+> +			emac_xfer: emac-xfer {
+> +				rockchip,pins = <RK_GPIO3 16 RK_FUNC_2 &pcfg_pull_none>, //tx_en
+> +						<RK_GPIO3 17 RK_FUNC_2 &pcfg_pull_none>, //txd1
+> +						<RK_GPIO3 18 RK_FUNC_2 &pcfg_pull_none>, //txd0
+> +						<RK_GPIO3 19 RK_FUNC_2 &pcfg_pull_none>, //rxd0
+> +						<RK_GPIO3 20 RK_FUNC_2 &pcfg_pull_none>, //rxd1
+> +						<RK_GPIO3 21 RK_FUNC_2 &pcfg_pull_none>, //mac_clk
+> +						<RK_GPIO3 22 RK_FUNC_2 &pcfg_pull_none>, //rx_err
+> +						<RK_GPIO3 23 RK_FUNC_2 &pcfg_pull_none>; //crs_dvalid
+> +			};
 > +
->  endif # NET_VENDOR_ARC
-> diff --git a/drivers/net/ethernet/arc/Makefile
-> b/drivers/net/ethernet/arc/Makefile index 241bb80..79108af 100644
-> --- a/drivers/net/ethernet/arc/Makefile
-> +++ b/drivers/net/ethernet/arc/Makefile
-> @@ -5,3 +5,4 @@
->  arc_emac-objs := emac_main.o emac_mdio.o
->  obj-$(CONFIG_ARC_EMAC_CORE) += arc_emac.o
->  obj-$(CONFIG_ARC_EMAC) += emac_arc.o
-> +obj-$(CONFIG_EMAC_ROCKCHIP) += emac_rockchip.o
-> diff --git a/drivers/net/ethernet/arc/emac.h
-> b/drivers/net/ethernet/arc/emac.h index eb2ba67..dae1ac3 100644
-> --- a/drivers/net/ethernet/arc/emac.h
-> +++ b/drivers/net/ethernet/arc/emac.h
-> @@ -123,9 +123,11 @@ struct buffer_state {
->   * @speed:	PHY's last set speed.
->   */
->  struct arc_emac_priv {
-> -	/* Devices */
->  	const char *drv_name;
->  	const char *drv_version;
-> +	void (*set_mac_speed)(void *priv, unsigned int speed);
+> +			emac_mdio: emac-mdio {
+> +				rockchip,pins = <RK_GPIO3 24 RK_FUNC_2 &pcfg_pull_none>,
+> +						<RK_GPIO3 25 RK_FUNC_2 &pcfg_pull_none>;
+> +			};
+> +		};
 > +
-> +	/* Devices */
->  	struct device *dev;
->  	struct phy_device *phy_dev;
->  	struct mii_bus *bus;
-> diff --git a/drivers/net/ethernet/arc/emac_main.c
-> b/drivers/net/ethernet/arc/emac_main.c index b35c69e..a08f343 100644
-> --- a/drivers/net/ethernet/arc/emac_main.c
-> +++ b/drivers/net/ethernet/arc/emac_main.c
-> @@ -48,6 +48,8 @@ static void arc_emac_adjust_link(struct net_device *ndev)
->  	if (priv->speed != phy_dev->speed) {
->  		priv->speed = phy_dev->speed;
->  		state_changed = 1;
-> +		if (priv->set_mac_speed)
-> +			priv->set_mac_speed(priv, priv->speed);
->  	}
+>  		i2c0 {
+>  			i2c0_xfer: i2c0-xfer {
+>  				rockchip,pins = <RK_GPIO1 24 RK_FUNC_1 &pcfg_pull_none>,
+> diff --git a/arch/arm/boot/dts/rk3xxx.dtsi b/arch/arm/boot/dts/rk3xxx.dtsi
+> index 8caf85d..208b1df 100644
+> --- a/arch/arm/boot/dts/rk3xxx.dtsi
+> +++ b/arch/arm/boot/dts/rk3xxx.dtsi
+> @@ -91,6 +91,23 @@
+>  		status = "disabled";
+>  	};
 > 
->  	if (priv->duplex != phy_dev->duplex) {
-> diff --git a/drivers/net/ethernet/arc/emac_rockchip.c
-> b/drivers/net/ethernet/arc/emac_rockchip.c new file mode 100644
-> index 0000000..51d0585
-> --- /dev/null
-> +++ b/drivers/net/ethernet/arc/emac_rockchip.c
-> @@ -0,0 +1,228 @@
-> +/**
-> + * emac-rockchip.c - Rockchip EMAC specific glue layer
-> + *
-> + * Copyright (C) 2014 Romain Perier <romain.perier@gmail.com>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License as published by
-> + * the Free Software Foundation; either version 2 of the License, or
-> + * (at your option) any later version.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + */
+> +	emac: ethernet at 10204000 {
+> +		compatible = "snps,arc-emac";
+> +		reg = <0x10204000 0x3c>;
+> +		interrupts = <GIC_SPI 19 IRQ_TYPE_LEVEL_HIGH>;
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
 > +
-> +#include <linux/etherdevice.h>
-> +#include <linux/mfd/syscon.h>
-> +#include <linux/module.h>
-> +#include <linux/of_net.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/regmap.h>
-> +#include <linux/regulator/consumer.h>
+> +		rockchip,grf = <&grf>;
 > +
-> +#include "emac.h"
+> +		clocks = <&cru HCLK_EMAC>, <&cru SCLK_MAC>;
+> +		clock-names = "hclk", "macref";
+> +		max-speed = <100>;
+> +		phy-mode = "rmii";
 > +
-> +#define DRV_NAME        "rockchip_emac"
-> +#define DRV_VERSION     "1.0"
+> +		status = "disabled";
+> +	};
 > +
-> +#define GRF_MODE_MII		(1UL << 0)
-> +#define GRF_MODE_RMII		(0UL << 0)
-> +#define GRF_SPEED_10M		(0UL << 1)
-> +#define GRF_SPEED_100M		(1UL << 1)
-> +#define GRF_SPEED_ENABLE_BIT	(1UL << 17)
-> +#define GRF_MODE_ENABLE_BIT	(1UL << 16)
-> +
-> +struct emac_rockchip_soc_data {
-> +	int grf_offset;
-> +};
-> +
-> +struct rockchip_priv_data {
-> +	struct arc_emac_priv emac;
-> +	struct regmap *grf;
-> +	const struct emac_rockchip_soc_data *soc_data;
-> +	struct regulator *regulator;
-> +	struct clk *refclk;
-> +};
-> +
-> +static void emac_rockchip_set_mac_speed(void *priv, unsigned int speed)
-> +{
-> +	struct rockchip_priv_data *emac = priv;
-> +	u32 data;
-> +	int err = 0;
-> +
-> +	/* write-enable bits */
-> +	data = GRF_SPEED_ENABLE_BIT;
-> +
-> +	switch(speed) {
-> +	case 10:
-> +		data |= GRF_SPEED_10M;
-> +		break;
-> +	case 100:
-> +		data |= GRF_SPEED_100M;
-> +		break;
-> +	default:
-> +		pr_err("speed %u not supported\n", speed);
-> +		return;
-> +	}
-> +
-> +	err = regmap_write(emac->grf, emac->soc_data->grf_offset, data);
-> +	if (err)
-> +		pr_err("unable to apply speed %u to grf (%d)\n", speed, err);
-> +}
-> +
-> +static const struct emac_rockchip_soc_data emac_rockchip_dt_data[] = {
-> +	{ .grf_offset = 0x154 }, /* rk3066 */
-> +	{ .grf_offset = 0x0a4 }, /* rk3188 */
-> +};
-> +
-> +static const struct of_device_id emac_rockchip_dt_ids[] = {
-> +	{ .compatible = "rockchip,rk3066-emac", .data = &emac_rockchip_dt_data[0]
-> }, +	{ .compatible = "rockchip,rk3188-emac", .data =
-> &emac_rockchip_dt_data[1] }, +	{ /* Sentinel */ }
-> +};
-> +
-> +MODULE_DEVICE_TABLE(of, emac_rockchip_dt_ids);
-> +
-> +static int emac_rockchip_probe(struct platform_device *pdev)
-> +{
-> +	struct device *dev = &pdev->dev;
-> +	struct net_device *ndev;
-> +	struct rockchip_priv_data *priv;
-> +	const struct of_device_id *match;
-> +	u32 data;
-> +	int err, interface;
-> +
-> +	if (!pdev->dev.of_node)
-> +		return -ENODEV;
-> +
-> +	ndev = alloc_etherdev(sizeof(struct rockchip_priv_data));
-> +	if (!ndev)
-> +		return -ENOMEM;
-> +	platform_set_drvdata(pdev, ndev);
-> +	SET_NETDEV_DEV(ndev, dev);
-> +
-> +	priv = netdev_priv(ndev);
-> +	priv->emac.drv_name = DRV_NAME;
-> +	priv->emac.drv_version = DRV_VERSION;
-> +	priv->emac.set_mac_speed = emac_rockchip_set_mac_speed;
-> +
-> +	interface = of_get_phy_mode(dev->of_node);
-> +
-> +	/* RK3066 and RK3188 SoCs only support RMII */
-> +	if (interface != PHY_INTERFACE_MODE_RMII) {
-> +		dev_err(dev, "unsupported phy interface mode %d\n", interface);
-> +		err = -ENOTSUPP;
-> +		goto out_netdev;
-> +	}
-> +
-> +	priv->grf = syscon_regmap_lookup_by_phandle(dev->of_node, "rockchip,grf");
-> +	if (IS_ERR(priv->grf)) {
-> +		dev_err(dev, "failed to retrieve global register file (%ld)\n",
-> PTR_ERR(priv->grf)); +		err = PTR_ERR(priv->grf);
-> +		goto out_netdev;
-> +	}
-> +
-> +	match = of_match_node(emac_rockchip_dt_ids, dev->of_node);
-> +	priv->soc_data = match->data;
-> +
-> +	priv->emac.clk = devm_clk_get(dev, "hclk");
-> +	if (IS_ERR(priv->emac.clk)) {
-> +		dev_err(dev, "failed to retrieve host clock (%ld)\n",
-> PTR_ERR(priv->emac.clk)); +		err = PTR_ERR(priv->emac.clk);
-> +		goto out_netdev;
-> +	}
-> +
-> +	priv->refclk = devm_clk_get(dev, "macref");
-> +	if (IS_ERR(priv->refclk)) {
-> +		dev_err(dev, "failed to retrieve reference clock (%ld)\n",
-> PTR_ERR(priv->refclk)); +		err = PTR_ERR(priv->refclk);
-> +		goto out_netdev;
-> +	}
-> +
-> +	err = clk_prepare_enable(priv->refclk);
-> +	if (err) {
-> +		dev_err(dev, "failed to enable reference clock (%d)\n", err);
-> +		goto out_netdev;
-> +	}
-> +
-> +	/* Optional regulator for PHY */
-> +	priv->regulator = devm_regulator_get_optional(dev, "phy");
-> +	if (IS_ERR(priv->regulator)) {
-> +		if (PTR_ERR(priv->regulator) == -EPROBE_DEFER)
-> +			return -EPROBE_DEFER;
-> +		dev_err(dev, "no regulator found\n");
-> +		priv->regulator = NULL;
-> +	}
-> +
-> +	if (priv->regulator) {
-> +		err = regulator_enable(priv->regulator);
-> +		if (err) {
-> +			dev_err(dev, "failed to enable phy-supply (%d)\n", err);
-> +			goto out_clk_disable;
-> +		}
-> +	}
-> +
-> +	err = arc_emac_probe(ndev, interface);
-> +	if (err)
-> +		goto out_regulator_disable;
-> +
-> +	/* write-enable bits */
-> +	data = GRF_MODE_ENABLE_BIT | GRF_SPEED_ENABLE_BIT;
-> +
-> +	data |= GRF_SPEED_100M;
-> +	data |= GRF_MODE_RMII;
-> +
-> +	err = regmap_write(priv->grf, priv->soc_data->grf_offset, data);
-> +	if (err) {
-> +		dev_err(dev, "unable to apply initial settings to grf (%d)\n", err);
-> +		goto out_regulator_disable;
-> +	}
-> +
-> +	/* RMII interface needs always a rate of 50MHz */
-> +	err = clk_set_rate(priv->refclk, 50000000);
-> +	if (err)
-> +		dev_err(dev, "failed to change reference clock rate (%d)\n", err);
-> +	return 0;
-> +
-> +out_regulator_disable:
-> +	if (priv->regulator)
-> +		regulator_disable(priv->regulator);
-> +out_clk_disable:
-> +	clk_disable_unprepare(priv->refclk);
-> +out_netdev:
-> +	free_netdev(ndev);
-> +	return err;
-> +}
-> +
-> +static int emac_rockchip_remove(struct platform_device *pdev)
-> +{
-> +	struct net_device *ndev = platform_get_drvdata(pdev);
-> +	struct rockchip_priv_data *priv = netdev_priv(ndev);
-> +	int err;
-> +
-> +	clk_disable_unprepare(priv->refclk);
-> +
-> +	if (priv->regulator)
-> +		regulator_disable(priv->regulator);
-> +
-> +	err = arc_emac_remove(ndev);
-> +	free_netdev(ndev);
-> +	return err;
-> +}
-> +
-> +static struct platform_driver emac_rockchip_driver = {
-> +	.probe = emac_rockchip_probe,
-> +	.remove = emac_rockchip_remove,
-> +	.driver = {
-> +		.name = DRV_NAME,
-> +		.of_match_table  = emac_rockchip_dt_ids,
-> +	},
-> +};
-> +
-> +module_platform_driver(emac_rockchip_driver);
-> +
-> +MODULE_AUTHOR("Romain Perier <romain.perier@gmail.com>");
-> +MODULE_DESCRIPTION("Rockchip EMAC platform driver");
-> +MODULE_LICENSE("GPL");
+>  	mmc0: dwmmc at 10214000 {
+>  		compatible = "rockchip,rk2928-dw-mshc";
+>  		reg = <0x10214000 0x1000>;
