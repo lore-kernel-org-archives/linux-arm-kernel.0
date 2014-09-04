@@ -1,11 +1,13 @@
 From: ben@decadent.org.uk (Ben Hutchings)
-Date: Thu, 04 Sep 2014 03:11:29 +0100
+Date: Thu, 04 Sep 2014 03:21:58 +0100
 Subject: Autoloading of SPI/nor driver on kirkwood (qnap devices)
 In-Reply-To: <1409673299.14324.43.camel@dagon.hellion.org.uk>
 References: <1409673299.14324.43.camel@dagon.hellion.org.uk>
-Message-ID: <1409796689.27524.34.camel@decadent.org.uk>
+Message-ID: <1409797318.27524.37.camel@decadent.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
+
+[Re-sending with more recent address for Huang Shijie.]
 
 On Tue, 2014-09-02 at 16:54 +0100, Ian Campbell wrote:
 > Hello,
@@ -59,4 +61,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 811 bytes
 Desc: This is a digitally signed message part
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140904/f6059f39/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140904/0c02a5b2/attachment.sig>
