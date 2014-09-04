@@ -1,90 +1,34 @@
-From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Thu, 04 Sep 2014 19:08:12 +0100
-Subject: [PATCH] pinctrl: st: Add remove function and remove gpio_chip
- on failure
-In-Reply-To: <1409409935-8775-1-git-send-email-pramod.gurav@smartplayin.com>
-References: <1409409935-8775-1-git-send-email-pramod.gurav@smartplayin.com>
-Message-ID: <5408AA8C.7040100@linaro.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 04 Sep 2014 20:56:01 +0200
+Subject: [PATCH] drivers: pci: convert generic host controller to DT host
+ bridge creation API
+In-Reply-To: <20140904160217.GC12351@e102568-lin.cambridge.arm.com>
+References: <1407861695-25549-1-git-send-email-Liviu.Dudau@arm.com>
+ <6930538.Get2YiuMvJ@wuerfel>
+ <20140904160217.GC12351@e102568-lin.cambridge.arm.com>
+Message-ID: <6051177.6dmYKHoDhl@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Pramod,
-sorry for delay in reply as I was travelling, still in Jet lag.
-> Signed-off-by: Pramod Gurav <pramod.gurav@smartplayin.com>
-> ---
->   drivers/pinctrl/pinctrl-st.c |   25 +++++++++++++++++++++++++
->   1 files changed, 25 insertions(+), 0 deletions(-)
->
-> diff --git a/drivers/pinctrl/pinctrl-st.c b/drivers/pinctrl/pinctrl-st.c
-> index 5475374..9296845 100644
-> --- a/drivers/pinctrl/pinctrl-st.c
-> +++ b/drivers/pinctrl/pinctrl-st.c
-> @@ -1517,6 +1517,7 @@ static int st_gpiolib_register_bank(struct st_pinctrl *info,
->   					   0, handle_simple_irq,
->   					   IRQ_TYPE_LEVEL_LOW);
->   		if (err) {
-> +			gpiochip_remove(&bank->gpio_chip);
-This change-set looks good.
-IMO, you can send a patch for this change set.
+On Thursday 04 September 2014 17:02:17 Lorenzo Pieralisi wrote:
+> On Thu, Sep 04, 2014 at 03:05:53PM +0100, Arnd Bergmann wrote:
 
->   			dev_info(dev, "could not add irqchip\n");
->   			return err;
->   		}
-> @@ -1685,6 +1686,29 @@ static int st_pctl_probe(struct platform_device *pdev)
->   	return 0;
->   }
->
+> > Interesting point: the generic implementation should probably not default
+> > to reassigning all buses at all. We could have a (host controller specific,
+> > but with standardized name) DT property for it, but it would be best if
+> > firmware already probes it to not have to do it again.
+> 
+> I think that makes sense, let me point out though that this is
+> *not* how the code works today, since the pcibios code sets:
+> 
+> PCI_REASSIGN_ALL_RSRC (pci_common_init_dev() in arch/arm/kernel/bios32.c)
+> 
+> by default. I won't set the PCI_REASSIGN_ALL_RSRC and PCI_REASSIGN_ALL_BUS
+> flags.
 
-> +static int st_pctl_remove(struct platform_device *pdev)
-> +{
-Ideally this driver will not be removed, as other drivers depend on 
-this, even the serial.
+Yes, I know it's not what the ARM32 code does at the moment. The main
+reason for that is that there is normally no firmware at all. Since
+the new code should be shared with ARM64 and we typically have firmware
+there, we should reconsider the defaults.
 
-so I see no big achievement in adding the remove functionality, as this 
-is going to be a dead code and would never be tested.
-
-> +	struct st_pinctrl *info = platform_get_drvdata(pdev);
-> +	struct device_node *np = pdev->dev.of_node;
-> +	struct device_node *child;
-> +	struct gpio_chip gpio_chip;
-> +	int bank = 0;
-> +
-
-> +	if (info->nbanks) {
-> +		for_each_child_of_node(np, child) {
-> +			if (of_property_read_bool(child, "gpio-controller")) {
-We should not re-parse the DT nodes once we are done with it in the probe.
-
-> +				gpio_chip = info->banks[bank].gpio_chip;
-> +				gpiochip_remove(&gpio_chip);
-> +				bank++;
-> +			}
-> +		}
-> +	}
-> +
-
-I think the logic is very simple:
-
-	while (nbanks--)
-		gpiochip_remove(&info->banks[bank++].gpio_chip))
-
-
-thanks,
-srini
-> +	pinctrl_unregister(info->pctl);
-> +
-> +	return 0;
-> +}
-> +
->   static struct platform_driver st_pctl_driver = {
->   	.driver = {
->   		.name = "st-pinctrl",
-> @@ -1692,6 +1716,7 @@ static struct platform_driver st_pctl_driver = {
->   		.of_match_table = st_pctl_of_match,
->   	},
->   	.probe = st_pctl_probe,
-> +	.remove = st_pctl_remove,
->   };
->
->   static int __init st_pctl_init(void)
->
+	Arnd
