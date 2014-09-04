@@ -1,168 +1,78 @@
 From: pankaj.dubey@samsung.com (Pankaj Dubey)
-Date: Thu, 04 Sep 2014 10:09:19 +0530
+Date: Thu, 04 Sep 2014 10:15:27 +0530
 Subject: [PATCH v2] mfd: syscon: Decouple syscon interface from platform
  devices
-In-Reply-To: <6034841.GFrG3XCMdb@wuerfel>
+In-Reply-To: <20140903161528.05f566e1@bbrezillon>
 References: <1409668935-10667-1-git-send-email-pankaj.dubey@samsung.com>
- <6034841.GFrG3XCMdb@wuerfel>
-Message-ID: <002601cfc7fa$39413580$abc3a080$@samsung.com>
+ <6034841.GFrG3XCMdb@wuerfel> <20140903151611.260a7218@bbrezillon>
+ <4224773.hl3QDeILqz@wuerfel> <20140903161528.05f566e1@bbrezillon>
+Message-ID: <002701cfc7fb$110a7350$331f59f0$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+Hi Boris,
 
-On Tuesday, September 02, 2014 Arnd Bergmann wrote,
-> To: Pankaj Dubey
-> Cc: linux-arm-kernel at lists.infradead.org;
-linux-samsung-soc at vger.kernel.org; linux-
-> kernel at vger.kernel.org; lee.jones at linaro.org; kgene.kim at samsung.com;
-> linux at arm.linux.org.uk; vikas.sajjan at samsung.com; joshi at samsung.com;
-> naushad at samsung.com; thomas.ab at samsung.com; chow.kim at samsung.com;
-> tomasz.figa at gmail.com; Tomasz Figa; Alexander Shiyan; Michal Simek
+On Wednesday, September 03, 2014 Boris BREZILLON wrote,
+> To: Arnd Bergmann
+> Cc: Pankaj Dubey; kgene.kim at samsung.com; linux at arm.linux.org.uk; Alexander
+> Shiyan; naushad at samsung.com; Tomasz Figa; linux-kernel at vger.kernel.org;
+> joshi at samsung.com; linux-samsung-soc at vger.kernel.org;
+thomas.ab at samsung.com;
+> tomasz.figa at gmail.com; vikas.sajjan at samsung.com; chow.kim at samsung.com;
+> lee.jones at linaro.org; Michal Simek; linux-arm-kernel at lists.infradead.org;
+Mark
+> Brown
 > Subject: Re: [PATCH v2] mfd: syscon: Decouple syscon interface from
 platform
 > devices
 > 
-> On Tuesday 02 September 2014 20:12:15 Pankaj Dubey wrote:
-> > Currently a syscon entity can only be registered directly through a
-> > platform device that binds to a dedicated syscon driver. However in
-> > certain cases it is required to bind a device with it's dedicated
-> > driver rather than binding with syscon driver.
+> On Wed, 03 Sep 2014 15:49:04 +0200
+> Arnd Bergmann <arnd@arndb.de> wrote:
+> 
+> > On Wednesday 03 September 2014 15:16:11 Boris BREZILLON wrote:
+> > > I checked that part, and it appears most of the code is already
+> > > there (see usage of regmap_attach_dev function here [1]).
+> > >
+> > > The only problem I see is that errors are still printed with
+> > > dev_err, which, AFAIK, will trigger a kernel panic if dev is NULL.
 > >
-> > For example, certain SoCs (e.g. Exynos) contain system controller
-> > blocks which perform various functions such as power domain control,
-> > CPU power management, low power mode control, but in addition contain
-> > certain IP integration glue, such as various signal masks, coprocessor
-> > power control, etc. In such case, there is a need to have a dedicated
-> > driver for such system controller but also share registers with other
-> > drivers. The latter is where the syscon interface is helpful.
+> > Actually not:
 > >
-> > This patch decouples syscon object from syscon platform driver, and
-> > allows to create syscon objects first time when it is required by
-> > calling of syscon_regmap_lookup_by APIs and keeps a list of such
-> > syscon objects along with syscon provider device_nodes and regmap
-handles.
+> > static int __dev_printk(const char *level, const struct device *dev,
+> >                         struct va_format *vaf) {
+> >         if (!dev)
+> >                 return printk("%s(NULL device *): %pV", level, vaf);
 > >
-> > Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
-> > Signed-off-by: Tomasz Figa <t.figa@samsung.com>
-> > ---
-> > V1 of this patchset [1] and related discussion can be found here [1].
+> >         return dev_printk_emit(level[1] - '0', dev,
+> >                                "%s %s: %pV",
+> >                                dev_driver_string(dev), dev_name(dev),
+> > vaf); }
 > >
-> > Changes since v1:
-> >  - Removed of_syscon_unregister function.
-> >  - Modified of_syscon_register function and it will be used by syscon.c
-> >    to create syscon objects whenever required.
-> >  - Removed platform device support from syscon.
-> >  - Removed syscon_regmap_lookup_by_pdevname API support.
-> >  - As there are significant changes w.r.t patchset v1, I am taking over
-> >    author for this patchset from Tomasz Figa.
 > 
-> Note that you got the Signed-off-by: list wrong, you should never have any
-people
-> listed as Signed-off-by after your own name, and they should be listed
-before your
-> name only when you are forwarding their patches.
+> My bad then (I don't know where I looked at to think NULL dev was not
+gracefully
+> handled :-)). Thanks for pointing this out.
+> Given that, I think it should work fine even with a NULL dev.
+> I'll give it a try on at91 ;-).
 > 
 
-Sorry, I was not aware of this. I will take care in future.
+We have tested this patch, on Exynos board and found working well.
+In our use case DT based drivers such as USB Phy, SATA Phy, Watchdog are
+calling 
+syscon_regmap_lookup_by APIs to get regmap handle to Exynos PMU and it
+worked 
+well for these drivers. 
 
-> > Note: Current kernel has clps711x user of
-> > syscon_regmap_lookup_by_pdevname and will be broken after this patch.
-> > As per discussion over here [1], patches for making these drivers DT
-> > based are ready and once that is done they can use
-> syscon_regmap_lookup_by_phandle or syscon_regmap_lookup_by_compatible.
-> >
-> > [1]: https://lkml.org/lkml/2014/8/22/81
-> 
-> Adding Alexander Shiyan to Cc here, so we can make sure this is well
-coordinated.
-> 
-> I'm also adding Michal Simek, since here was involved in earlier
-discussions about
-> doing this.
-> 
+It would be great if after testing you share result here or give a
+Tested-By.
 
-Thanks.
-
-> >  drivers/mfd/syscon.c       |  143
-+++++++++++++-------------------------------
-> >  include/linux/mfd/syscon.h |    1 +
-> >  2 files changed, 44 insertions(+), 100 deletions(-)
+Thanks,
+Pankaj Dubey 
+> Best Regards,
 > 
-> I certainly like the diffstat ;-)
+> Boris
 > 
-> >  struct syscon {
-> > +	struct device_node *np;
-> >  	struct regmap *regmap;
-> > +	struct list_head list;
-> >  };
-> 
-> Right
-> 
-> > @@ -68,27 +72,6 @@ struct regmap
-> > *syscon_regmap_lookup_by_compatible(const char *s)  }
-> > EXPORT_SYMBOL_GPL(syscon_regmap_lookup_by_compatible);
-> >
-> > -static int syscon_match_pdevname(struct device *dev, void *data) -{
-> > -	return !strcmp(dev_name(dev), (const char *)data);
-> > -}
-> > -
-> > -struct regmap *syscon_regmap_lookup_by_pdevname(const char *s) -{
-> > -	struct device *dev;
-> > -	struct syscon *syscon;
-> > -
-> > -	dev = driver_find_device(&syscon_driver.driver, NULL, (void *)s,
-> > -				 syscon_match_pdevname);
-> > -	if (!dev)
-> > -		return ERR_PTR(-EPROBE_DEFER);
-> > -
-> > -	syscon = dev_get_drvdata(dev);
-> > -
-> > -	return syscon->regmap;
-> > -}
-> > -EXPORT_SYMBOL_GPL(syscon_regmap_lookup_by_pdevname);
-> 
-> I think this can actually be left intact if that helps with clps71xx.
-> It could be done in a hacky way using bus_find_device_by_name() to keep it
-simple,
-> or in a somewhat nicer way by keeping the syscon platform_driver around
-for the
-> non-DT case.
-> 
-
-Ok as per our last discussion you mentioned that clps71xx will be soon
-migrating to DT.
-So if that is not going to happen sooner, I would also prefer better keep
-syscon_regmap_lookup_by_pdevname and syscon platform_driver for non-DT case,
-so that this issue should not block this patch.
-
-So please let's make final call to keep syscon platform_driver for non-DT
-case which eventually
-can be dropped once clps71xx driver migrates to DT based. So that I can
-prepare next patchset
-keeping syscon platform_driver support  and syscon_regmap_lookup_by_pdevname
-API support
-for non-DT case and send across for review. 
-
-
-> 
-> > +	regmap = regmap_init_mmio(NULL, base, &syscon_regmap_config);
-> > +	if (IS_ERR(regmap)) {
-> > +		pr_err("regmap init failed\n");
-> > +		return ERR_CAST(regmap);
-> > +	}
-> 
-> The last time I looked over this code, I think it was not safe to
-> call regmap_init_mmio() with a NULL device pointer, and we decided
-> that should be fixed. Have you checked whether it is ok now?
-> 
-
-At least we could not see any issues with this. We have tested it one
-Exynos5250 board
-where syscon object is getting created first time when other drivers (USB,
-SATA Phy, Watchdog)
-are calling helper function syscon_regmap_lookup_by_phandle and able to
-access regmap handle
-and able to use regmap_read/write APIs.
-
-> 	Arnd
+> --
+> Boris Brezillon, Free Electrons
+> Embedded Linux and Kernel engineering
+> http://free-electrons.com
