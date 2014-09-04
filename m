@@ -1,88 +1,64 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Thu, 04 Sep 2014 10:00:03 +0300
-Subject: [PATCH v2 3/3] clocksource: sh_tmu: Document r8a7779 binding
-In-Reply-To: <1409792121-28912-4-git-send-email-horms+renesas@verge.net.au>
-References: <1409792121-28912-1-git-send-email-horms+renesas@verge.net.au>
- <1409792121-28912-4-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <7501332.2iGyNsREJQ@avalon>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Thu, 4 Sep 2014 09:02:04 +0200
+Subject: Autoloading of SPI/nor driver on kirkwood (qnap devices)
+In-Reply-To: <1409796689.27524.34.camel@decadent.org.uk>
+References: <1409673299.14324.43.camel@dagon.hellion.org.uk>
+ <1409796689.27524.34.camel@decadent.org.uk>
+Message-ID: <CAMuHMdWBr=B0_Xivti9K5ReryHHEunQj2P26FjhmzhO-L9t+9g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Simon,
+Hi Ben,
 
-Thank you for the patch.
+On Thu, Sep 4, 2014 at 4:11 AM, Ben Hutchings <ben@decadent.org.uk> wrote:
+>> I noticed that many platforms declare the flash chip as compatible =
+>> "st,m25pXXX" whereas the ts219.dtsi just said m25p128 but I tried
+>> changing that and it didn't help. In any case without spi-nor.ko being
+>> autoloaded I don't support m25p80.ko ever would be.
+>
+> m25p80.c has:
+>
+> static struct spi_driver m25p80_driver = {
+>         ...
+>         .id_table       = spi_nor_ids,
+>         ...
+> };
+>
+> while spi_nor_ids is defined in spi-nor.c.  Since they end up as two
+> separate modules, modpost can't read the ID table and add the device ID
+> aliases to m25p80.ko.
 
-On Thursday 04 September 2014 09:55:21 Simon Horman wrote:
-> In general Renesas hardware is not documented to the extent
-> where the relationship between IP blocks on different SoCs can be assumed
-> although they may appear to operate the same way. Furthermore the
-> documentation typically does not specify a version for individual
-> IP blocks. For these reasons a convention of using the SoC name in place
-> of a version and providing SoC-specific compat strings has been adopted.
-> 
-> Although not universally liked this convention is used in the bindings
-> for a number of drivers for Renesas hardware. The purpose of this patch is
-> to update the Renesas R-Car Timer Unit (TMU) driver to follow this
-> convention.
-> 
-> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-> Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
-> 
-> ---
-> * I plan to follow up with a patch patch to use the new binding in the
->   dtsi files for the r8a7779 SoC.
-> commit 471269b790aec03385dc4fb127ed7094ff83c16d
-> 
-> v2
-> * Suggestions by Mark Rutland and Sergei Shtylyov
->   - Compatible strings should be "one or more" not "one" of those listed
->   - Describe the generic binding as covering any MTU2 device
->   - Re-order compat strings from most to least specific
-> ---
->  Documentation/devicetree/bindings/timer/renesas,tmu.txt | 6 ++++--
->  1 file changed, 4 insertions(+), 2 deletions(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/timer/renesas,tmu.txt
-> b/Documentation/devicetree/bindings/timer/renesas,tmu.txt index
-> 425d0c5..f9a9545 100644
-> --- a/Documentation/devicetree/bindings/timer/renesas,tmu.txt
-> +++ b/Documentation/devicetree/bindings/timer/renesas,tmu.txt
-> @@ -8,7 +8,9 @@ are independent. The TMU hardware supports up to three
-> channels.
-> 
->  Required Properties:
-> 
-> -  - compatible: must contain "renesas,tmu"
-> +  - compatible: must contain one or more of the following:
-> +    - "renesas,tmu-r8a7779" R8A7779 TMU
-> +    - "renesas,tmu" any TMU
+Woops. This indeed doesn't work.
+Note that the MODULE_DEVICE_TABLE() is also gone from m25p80.c
 
-How about matching the wording of patch 1/3 with
+So m25p80.c needs to contain the IDs, while spi-nor.c also needs the IDs
+because it's a framework/library.
 
-    - "renesas,tmu-r8a7779" for the R8A7779 TMU
-    - "renesas,tmu" for any TMU.
-      This is a fallback for the above renesas,tmu-* entries
+A quick solution would be to move the ID table to a header file, and include
+that by both, and re-add the lost MODULE_DEVICE_TABLE() to m25p80.c.
+That duplicates the data, though.
 
-Same comment for patch 2/3.
+Hmm, for the built-in case, we can avoid the duplication by letting m25p80.c
+refer to the table in spi-nor.c if !MODULE.
+Does anyone see a better solution?
 
-With this change,
+> It looks like m25p80 has been split up in order that the new fsl-qspi
+> driver can share its code (bypassing the SPI core and its device
+> model!).  Why doesn't fsl-qspi implement an SPI controller device?  I
+> think it is totally unacceptable to regress m25p80 in this way for the
+> sake of a new driver.
 
-Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+Fsl-qspi is not a generic SPI driver, but a dedicated SPI NOR driver.
+It's programmed using high-level SPI NOR commands, instead of low-level
+SPI commands.
 
->    - reg: base address and length of the registers block for the timer
-> module.
-> 
-> @@ -27,7 +29,7 @@ Optional Properties:
->  Example: R8A7779 (R-Car H1) TMU0 node
-> 
->  	tmu0: timer at ffd80000 {
-> -		compatible = "renesas,tmu";
-> +		compatible = "renesas,tmu-r8a7779", "renesas,tmu";
->  		reg = <0xffd80000 0x30>;
->  		interrupts = <0 32 IRQ_TYPE_LEVEL_HIGH>,
->  			     <0 33 IRQ_TYPE_LEVEL_HIGH>,
+Gr{oetje,eeting}s,
 
--- 
-Regards,
+                        Geert
 
-Laurent Pinchart
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
