@@ -1,77 +1,28 @@
-From: b.galvani@gmail.com (Beniamino Galvani)
-Date: Thu, 4 Sep 2014 21:30:33 +0200
-Subject: [PATCH v5 1/4] ethernet: arc: Add support for Rockchip SoC layer
- device tree bindings
-In-Reply-To: <CABgxDoLWqqwGUUt9hWuJdHT_VF0c6-7xeAwgfeH7TwJmu1BN9w@mail.gmail.com>
-References: <1409763165-16461-1-git-send-email-romain.perier@gmail.com>
- <20140903211220.GA16962@gmail.com>
- <CABgxDoLWqqwGUUt9hWuJdHT_VF0c6-7xeAwgfeH7TwJmu1BN9w@mail.gmail.com>
-Message-ID: <20140904192934.GB14583@gmail.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Thu, 04 Sep 2014 13:37:27 -0600
+Subject: [PATCH] ARM: tegra: Move AHB Kconfig to drivers/amba
+In-Reply-To: <53FB7288.9050002@wwwdotorg.org>
+References: <1406643934-16301-1-git-send-email-thierry.reding@gmail.com>
+ <53D7C9EE.60503@wwwdotorg.org> <53FB7288.9050002@wwwdotorg.org>
+Message-ID: <5408BF77.1020007@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 04, 2014 at 10:45:35AM +0200, PERIER Romain wrote:
-> Hi Beniamino,
-> 
-> I will investigate. Could you please :
-> 
-> - Load the module
-> - Show me the output of lsmod
-> - Use your ethernet a bit
-> - Try to unload the module
-> - If your board did not freeze or if your kernel did not panic , show
-> me your dmesg (if it is impossible show me the dmesg before unloading
-> the module)
-> 
-> Perhaps, we could continue this discussion in private (by email or
-> IRC). What do you think ?
-> 
-> I will investigate this evening and tomorrow. Thanks for your feedbacks .
+On 08/25/2014 11:29 AM, Stephen Warren wrote:
+> On 07/29/2014 10:21 AM, Stephen Warren wrote:
+>> On 07/29/2014 08:25 AM, Thierry Reding wrote:
+>>> From: Thierry Reding <treding@nvidia.com>
+>>>
+>>> This will allow the Kconfig option to be shared among 32-bit and 64-bit
+>>> ARM.
+>>
+>> This seems fine to me. I'd expect to apply it for 3.18, provided I get
+>> an ack from Russell as drivers/amba maintainer (hence CCing him without
+>> trimming the quote).
+>
+> Russell,
+>
+> Are you OK with this patch? If so, if you could ack it so I can apply
+> it, that would be great.
 
-Hi Romain,
-
-the freeze happens in clk_disable_unprepare(), which disables the
-macref clock parents up to the dpll, needed by the DDR.
-
-As suggested by Heiko on IRC, the patch "clk: rockchip: protect
-critical clocks from getting disabled" [1], modified to include ddrphy
-in the list of critical clocks, solves the problem.
-
-During the module unload, if you move the call to arc_emac_remove()
-before clk_disable_unprepare() you can avoid a delay of 4-5 seconds
-caused by the timeout of the function phy_disconnect(). In any case:
-
-Tested-by: Beniamino Galvani <b.galvani@gmail.com>
-
-[1] https://git.linaro.org/people/mike.turquette/linux.git/commit/fe94f974e9c8b820640a5873d81589ab67380516
-
-> 
-> 
-> 2014-09-03 23:12 GMT+02:00 Beniamino Galvani <b.galvani@gmail.com>:
-> > On Wed, Sep 03, 2014 at 04:52:42PM +0000, Romain Perier wrote:
-> >> This patch defines a platform glue layer for Rockchip SoCs which
-> >> support arc-emac driver. It ensures that regulator for the rmii is on
-> >> before trying to connect to the ethernet controller. It applies right
-> >> speed and mode changes to the grf when ethernet settings change.
-> >
-> > Hi Romain,
-> >
-> > on a Radxa Rock when I try to remove the emac_rockchip module the
-> > board locks up when calling clk_disable_unprepare(priv->refclk). The
-> > tree is a net-next + your series, I don't know if I need some other
-> > patches.
-> >
-> > There is also the following build warning due to the emac dependency
-> > on REGULATOR which in principle seems correct, but looking at other
-> > drivers I wonder why they use the regulator APIs but don't have the
-> > same dependency.
-> >
-> > drivers/regulator/Kconfig:1:error: recursive dependency detected!
-> > drivers/regulator/Kconfig:1:       symbol REGULATOR is selected by MDIO_SUN4I
-> > drivers/net/phy/Kconfig:159:       symbol MDIO_SUN4I depends on PHYLIB
-> > drivers/net/phy/Kconfig:5:         symbol PHYLIB is selected by ARC_EMAC_CORE
-> > drivers/net/ethernet/arc/Kconfig:20:      symbol ARC_EMAC_CORE is selected by EMAC_ROCKCHIP
-> > drivers/net/ethernet/arc/Kconfig:35:      symbol EMAC_ROCKCHIP depends on REGULATOR
-> >
-> > Regards,
-> > Beniamino
+Russell?
