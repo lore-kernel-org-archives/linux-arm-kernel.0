@@ -1,77 +1,86 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Wed, 3 Sep 2014 21:09:38 -0700
-Subject: [Patch net-next 04/11] net:fec: add multiqueue support
-In-Reply-To: <CAHrpEqRSGg9=B8nk-PFkayP1kN8eQ5UnBvjikR5svub-wD-d6w@mail.gmail.com>
-References: <1409776697-1536-1-git-send-email-Frank.Li@freescale.com>
- <1409776697-1536-5-git-send-email-Frank.Li@freescale.com>
- <540787B9.8090504@gmail.com>
- <CAHrpEqRSGg9=B8nk-PFkayP1kN8eQ5UnBvjikR5svub-wD-d6w@mail.gmail.com>
-Message-ID: <CAGVrzcaB=7qkXzZ46-86-obMJBTOZQ01N7PROdi9RrkiDnE2zQ@mail.gmail.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Thu, 4 Sep 2014 12:16:09 +0800
+Subject: [PATCH 06/12] clk: mmp: add mmp private gate clock
+In-Reply-To: <479e7ccf.16dee.1483ed3a882.Coremail.xiechao_mail@163.com>
+References: <1409027904-21859-1-git-send-email-chao.xie@marvell.com>
+ <1409027904-21859-7-git-send-email-chao.xie@marvell.com>
+ <20140903175537.11368.98589@quantum>
+ <479e7ccf.16dee.1483ed3a882.Coremail.xiechao_mail@163.com>
+Message-ID: <CAGb2v65NbK+WT0dVsr6sMkFG0wwPXeFanyp17PdvqG0AGJ1DPg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2014-09-03 20:41 GMT-07:00 Zhi Li <lznuaa@gmail.com>:
-> On Wed, Sep 3, 2014 at 4:27 PM, Florian Fainelli <f.fainelli@gmail.com> wrote:
->> On 09/03/2014 01:38 PM, Frank Li wrote:
->>> From: Fugang Duan <B38611@freescale.com>
+On Thu, Sep 4, 2014 at 12:02 PM, Chao Xie <xiechao_mail@163.com> wrote:
+>
+>
+> At 2014-09-04 01:55:37, "Mike Turquette" <mturquette@linaro.org> wrote:
+>>Quoting Chao Xie (2014-08-25 21:38:18)
+>>> From: Chao Xie <chao.xie@marvell.com>
 >>>
->>> Add multiqueue support, which is compatible with previous single queue
->>> driver for FEC/ENET IPs.
->>>
->>> By default, the tx/rx queue number is 1, user can config the queue number
->>> at DTS file like this:
->>>       fsl,num_tx_queues=<3>;
->>>       fsl,num_rx_queues=<3>;
->>>
->>> Ethernet multiqueue mechanism can improve performance in SMP system.
->>> For single hw queue, multiqueue can balance cpu loading.
->>> For multi hw queues, multiple cores can process network packets in parallel,
->>> and refer the article for the detail advantage for multiqueue:
->>> http://vger.kernel.org/~davem/davem_nyc09.pdf
+>>> Some SOCes have this kind of the gate clock
+>>> 1. There are some bits to control the gate not only one bit.
+>>> 2. Some clocks has operations of "out of reset" and "enable".
+>>>    To enable clock, we need do "out of reset" and "enable".
+>>>    To disable clock, we may not need "set to reset". It depends
+>>>    on the SOCes' design.
 >>
->> You should probably split that patch in a minimum of two, or more
->> different parts.
+>>Are there any other IP blocks affected by the "out of reset" and "set to
+>>reset" states? I wonder if you might benefit from the reset controller
+>>framework?  For example see,
 >>
->> Two parts:
+>>drivers/clk/qcom/gcc-apq8084.c
 >>
->> - add TX multiqueue support
->> - add RX multiqueue support
->>
+>><snip>
 >
-> I understood your concern.
-> We also need consider logical integration.
-
-Sure, hence the reason why I suggest you make it happen in different
-parts, what you can do is make sure that you parse "fsl,num_tx_queues"
-and "fsl,num_rx_queues" as one of the last patches in this patch
-series. That way, we achieve a logical breakdown of the changes and
-only support and enable multiqueue when the driver is ready.
-
->
-> Separate this patch just reduce changed lines in a patch.
-
-That is exactly my point, right now there is too much churn to make a
-reviewer able to spot potential problems.
-
-> Most of this patch change is from fep-> to txq-> or rxq->
->
-> best regards
-> Frank Li
->
->> More parts:
 >>
->> - prepare for TX multiqueue (introduce queue structure, definitions)
->> - transition TX path to use queue 0
->> - add support for the two other TX queues
->> - prepare for RX multiqueue (introduce queue structure, definitions)
->> - prepare for multiqueue, hardcode RX path to use queue 0
->> - add support for the two other RX queues
+> Thanks to point it out.
+> To use the reset framework, there are some problem.
+> 1. the reset bit is combined with the clocks disable/enable bits in same register. Seperating setting them means spinlock
+> protection and 2 operations for read-update the bits.
+>
+>
+> except that, i think reset framework can bring some benefits.
+
+Check out the sunxi gates clk
+(drivers/clk/sunxi/clk-sunxi.c:sunxi_gates_clk_setup())
+In particular, the usb gate clk, which has gates and reset controls
+in the same register. The driver registers separate clk gates and reset
+controls for each bit, but uses the same spinlock for all bits.
+
+
+ChenYu
+
+> Even without the reset bit, we still need the gate clocks.
+> The enable/disable is not a bit operation, and it is bits operation for some devices.
+> In fact i want to use it to replace the old clk-apbc and clk-apmu clocks.
+>
+>>> +static int mmp_clk_gate_enable(struct clk_hw *hw)
+>>> +{
+>>> +       struct mmp_clk_gate *gate = to_clk_mmp_gate(hw);
+>>> +       struct clk *clk = hw->clk;
+>>> +       unsigned long flags = 0;
+>>> +       unsigned long rate;
+>>> +       u32 tmp;
+>>> +
+>>> +       if (gate->lock)
+>>> +               spin_lock_irqsave(gate->lock, flags);
+>>> +
+>>> +       tmp = readl(gate->reg);
+>>> +       tmp &= ~gate->mask;
+>>> +       tmp |= gate->val_enable;
+>>> +       writel(tmp, gate->reg);
+>>> +
+>>> +       if (gate->lock)
+>>> +               spin_unlock_irqrestore(gate->lock, flags);
+>>> +
+>>> +       if (gate->flags & MMP_CLK_GATE_NEED_DELAY) {
+>>> +               rate = __clk_get_rate(clk);
+>>> +               /* Need delay 2 cycles. */
+>>> +               udelay(2000000/rate);
 >>
->> The number of changes are extremely hard to review...
->> --
->> Florian
-
-
-
--- 
-Florian
+>>How long are these delays? Long enough to warrant using clk_prepare
+>>instead of clk_enable? Are these clocks enabled from interrupt context?
+>
+>>
+> For power optimization, some clocks need to be enabled/disable in interrupt context.
+> The worst delay is rate=32KHZ, so the delay is 62.5us.
