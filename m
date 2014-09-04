@@ -1,74 +1,79 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Thu, 4 Sep 2014 13:01:50 +0900
-Subject: [GIT PULL] Renesas ARM Based SoC r8a7740 Multiplatform Updates
- for v3.18
-In-Reply-To: <cover.1409792648.git.horms+renesas@verge.net.au>
-References: <cover.1409792648.git.horms+renesas@verge.net.au>
-Message-ID: <20140904040149.GA21197@verge.net.au>
+From: xiechao_mail@163.com (Chao Xie)
+Date: Thu, 4 Sep 2014 12:02:11 +0800 (CST)
+Subject: [PATCH 06/12] clk: mmp: add mmp private gate clock
+In-Reply-To: <20140903175537.11368.98589@quantum>
+References: <1409027904-21859-1-git-send-email-chao.xie@marvell.com>
+ <1409027904-21859-7-git-send-email-chao.xie@marvell.com>
+ <20140903175537.11368.98589@quantum>
+Message-ID: <479e7ccf.16dee.1483ed3a882.Coremail.xiechao_mail@163.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 04, 2014 at 10:12:50AM +0900, Simon Horman wrote:
-> Hi Olof, Hi Kevin, Hi Arnd,
-> 
-> Please consider these Renesas ARM based SoC r8a7740 multiplatform updates
-> for v3.18.
-> 
-> This pull request is based on
-> "Renesas ARM Based SoC R8a7740 CCF and Timers Updates for v3.18"
-> tagged as renesas-r8a7740-ccf-and-timers-for-v3.18,
-> which I have previously sent a pull request for.
-> 
-> 
-> The following changes since commit 433306747791845677ba662435a9bbbafaa21df3:
-> 
->   ARM: shmobile: r8a7740: Remove r8a7740_add_standard_devices_dt (2014-08-23 19:58:57 +0900)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-r8a7740-multiplatform-for-v3.18
-> 
-> for you to fetch changes up to 118a04358b7efa884aeedf80ddecc87174d7f3c2:
-> 
->   ARM: shmobile: armadillo800eva reference: Remove DTS (2014-09-02 10:04:32 +0900)
-> 
-> ----------------------------------------------------------------
-> Renesas ARM Based SoC r8a7740 Multiplatform Updates for v3.18
-> 
-> * Enable multiplatform support for r8a7740 SoC and remove
->   its DT-reference C board DTS files.
-> 
-> 118a043 ARM: shmobile: armadillo800eva reference: Remove DTS
-> f2d4c4a ARM: shmobile: armadillo800eva reference: Remove C board code
 
-Unfortunately a portion of this patch got lost somewhere.
 
-I would like to withdraw this series accordingly.
-I plan repost it in the not to distant future.
+At 2014-09-04 01:55:37, "Mike Turquette" <mturquette@linaro.org> wrote:
+>Quoting Chao Xie (2014-08-25 21:38:18)
+>> From: Chao Xie <chao.xie@marvell.com>
+>> 
+>> Some SOCes have this kind of the gate clock
+>> 1. There are some bits to control the gate not only one bit.
+>> 2. Some clocks has operations of "out of reset" and "enable".
+>>    To enable clock, we need do "out of reset" and "enable".
+>>    To disable clock, we may not need "set to reset". It depends
+>>    on the SOCes' design.
+>
+>Are there any other IP blocks affected by the "out of reset" and "set to
+>reset" states? I wonder if you might benefit from the reset controller
+>framework?  For example see,
+>
+>drivers/clk/qcom/gcc-apq8084.c
+>
+><snip>
 
-> 1174c71 ARM: shmobile: r8a7740: Add restart callback
-> cc9517d ARM: shmobile: armadillo800eva: Build DTS for multiplatform
-> 25aa7ba ARM: shmobile: armadillo800eva: Sync DTS
-> c41215b ARM: shmobile: r8a7740: Multiplatform support
-> 
-> ----------------------------------------------------------------
-> Magnus Damm (6):
->       ARM: shmobile: r8a7740: Multiplatform support
->       ARM: shmobile: armadillo800eva: Sync DTS
->       ARM: shmobile: armadillo800eva: Build DTS for multiplatform
->       ARM: shmobile: r8a7740: Add restart callback
->       ARM: shmobile: armadillo800eva reference: Remove C board code
->       ARM: shmobile: armadillo800eva reference: Remove DTS
-> 
->  arch/arm/boot/dts/Makefile                         |   2 +-
->  .../boot/dts/r8a7740-armadillo800eva-reference.dts | 300 ---------------------
->  arch/arm/boot/dts/r8a7740-armadillo800eva.dts      | 276 ++++++++++++++++++-
->  arch/arm/mach-shmobile/Kconfig                     |   5 +
->  .../board-armadillo800eva-reference.c              | 199 --------------
->  arch/arm/mach-shmobile/pm-r8a7740.c                |   5 +-
->  arch/arm/mach-shmobile/r8a7740.h                   |   4 +-
->  arch/arm/mach-shmobile/setup-r8a7740.c             |  16 +-
->  8 files changed, 300 insertions(+), 507 deletions(-)
->  delete mode 100644 arch/arm/boot/dts/r8a7740-armadillo800eva-reference.dts
->  delete mode 100644 arch/arm/mach-shmobile/board-armadillo800eva-reference.c
-> 
+>
+Thanks to point it out.
+To use the reset framework, there are some problem.
+1. the reset bit is combined with the clocks disable/enable bits in same register. Seperating setting them means spinlock
+protection and 2 operations for read-update the bits.
+
+
+except that, i think reset framework can bring some benefits.
+
+
+Even without the reset bit, we still need the gate clocks.
+The enable/disable is not a bit operation, and it is bits operation for some devices.
+In fact i want to use it to replace the old clk-apbc and clk-apmu clocks. 
+
+>> +static int mmp_clk_gate_enable(struct clk_hw *hw)
+>> +{
+>> +       struct mmp_clk_gate *gate = to_clk_mmp_gate(hw);
+>> +       struct clk *clk = hw->clk;
+>> +       unsigned long flags = 0;
+>> +       unsigned long rate;
+>> +       u32 tmp;
+>> +
+>> +       if (gate->lock)
+>> +               spin_lock_irqsave(gate->lock, flags);
+>> +
+>> +       tmp = readl(gate->reg);
+>> +       tmp &= ~gate->mask;
+>> +       tmp |= gate->val_enable;
+>> +       writel(tmp, gate->reg);
+>> +
+>> +       if (gate->lock)
+>> +               spin_unlock_irqrestore(gate->lock, flags);
+>> +
+>> +       if (gate->flags & MMP_CLK_GATE_NEED_DELAY) {
+>> +               rate = __clk_get_rate(clk);
+>> +               /* Need delay 2 cycles. */
+>> +               udelay(2000000/rate);
+>
+>How long are these delays? Long enough to warrant using clk_prepare
+>instead of clk_enable? Are these clocks enabled from interrupt context?
+
+>
+For power optimization, some clocks need to be enabled/disable in interrupt context.
+The worst delay is rate=32KHZ, so the delay is 62.5us.
+
+>Regards,
+>Mike
