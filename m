@@ -1,82 +1,190 @@
-From: dgreid@chromium.org (Dylan Reid)
-Date: Thu, 4 Sep 2014 14:08:09 -0700
-Subject: [PATCH v2] ARM: tegra: add Acer Chromebook 13 device tree
-In-Reply-To: <5408D3F7.5080200@wwwdotorg.org>
-References: <1407957267-3258-1-git-send-email-dgreid@chromium.org>
- <5408C023.8060403@wwwdotorg.org>
- <CAEUnVG5xdbGZS5pFef0mkCB15pCCFR=vW5rELwU--KTBCT_feQ@mail.gmail.com>
- <5408D3F7.5080200@wwwdotorg.org>
-Message-ID: <CAEUnVG5PG=+ZsEXrOXib4hNjxTDj6dY9bosCEAW6XhkLK9zFdA@mail.gmail.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Thu,  4 Sep 2014 14:11:34 -0700
+Subject: [PATCH] clk: qcom: Consolidate frequency finding logic
+Message-ID: <1409865094-20762-1-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 4, 2014 at 2:04 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
-> On 09/04/2014 02:33 PM, Dylan Reid wrote:
->>
->> On Thu, Sep 4, 2014 at 12:40 PM, Stephen Warren <swarren@wwwdotorg.org>
->> wrote:
->>>
->>> On 08/13/2014 01:14 PM, Dylan Reid wrote:
->>>>
->>>>
->>>> The Acer Chromebook 13, codenamed Big, contains an NVIDIA tegra124
->>>> processor and is similar to the Venice2 reference platform.
->>>>
->>>> The keyboard, USB 2, audio, HDMI, sdcard, and emmc have been tested
->>>> and work on the 1266x768 models.  The HD models haven't yet been
->>>> tested.
->>>>
->>>> WiFi does not work yet, it needs at least some PMIC changes to enable
->>>> the 32k clock.
->>>>
->>>> The elan trackpad is not yet functional but hopefully will be soon as
->>>> there are patches under review.
->>>>
->>>> There is also an issue on reboot because the TPM isn't reset.  It will
->>>> cause the stock firmware to enter recovery mode.  This can be worked
->>>> around by an EC-reset, press the refresh and power keys at the same
->>>> time.
->>>
->>>
->>>
->>> BTW, I'm only waiting on a few minor fixes for issues pointed out by
->>> Andreas
->>> before applying this patch:
->>
->>
->> Thanks Stephen,
->>
->> Sorry I've been MIA, things have been a little crazy here.
->>
->>> * Resolution typo in the commit message.
->>> * Sort order of the Makefile addition.
->>> * pwm: label move.
->>
->>
->> If I move the pwm label, should I move the others as well?  Do we want
->> to use the same method that has been used for exynos5250?  Exynos has
->> a label on most things that are overridden and the .dts files that
->> override them, like exynos5250-snow.dts, access them with &label
->> syntax.  It's easy for me to do, but it will involve converting
->> venice2 and jetson as well to avoid label re-defines.
->
->
-> I think anything that's first defined in tegra124.dtsi should have the label
-> defined in tegra124.dtsi, provided the label makes sens across all boards.
-> From v2 of the patch, that looks like: dpaux, pwm. It looks like the pinmux
-> label isn't used, so I'd suggest dropping that. The label name hdmi_ddc
-> feels board-specific (since different boards could at least theoretically
-> use different I2C controllers for DDC), so I'd leave that in the board dts
-> file myself.
->
-> The &label { ... } syntax wouldn't be consistent with any of the other Tegra
-> files at the moment, so I'd suggest sticking to the overall DT structure you
-> already have in patch v2. I admit it's unfortunate that Exynos and Tegra use
-> different node reference styles, but consistency between all the Tegra DT
-> files feels most important to me right now:-)
+There are two find_freq() functions in clk-rcg.c and clk-rcg2.c
+that are almost exactly the same. Consolidate them into one
+function to save on some code space.
 
-Sounds good.  I'll do that, run a few tests and send the patches out by EOD.
+Cc: Mike Turquette <mturquette@linaro.org>
+Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+---
 
-Thanks,
+I'll queue this for v3.18 if there are no objections.
 
-Dylan
+ drivers/clk/qcom/clk-rcg.c  | 20 ++++----------------
+ drivers/clk/qcom/clk-rcg2.c | 19 +++----------------
+ drivers/clk/qcom/common.c   | 16 ++++++++++++++++
+ drivers/clk/qcom/common.h   |  4 ++++
+ 4 files changed, 27 insertions(+), 32 deletions(-)
+
+diff --git a/drivers/clk/qcom/clk-rcg.c b/drivers/clk/qcom/clk-rcg.c
+index 59f118cc4c8b..710a869fc24c 100644
+--- a/drivers/clk/qcom/clk-rcg.c
++++ b/drivers/clk/qcom/clk-rcg.c
+@@ -21,6 +21,7 @@
+ #include <asm/div64.h>
+ 
+ #include "clk-rcg.h"
++#include "common.h"
+ 
+ static u32 ns_to_src(struct src_sel *s, u32 ns)
+ {
+@@ -360,26 +361,13 @@ clk_dyn_rcg_recalc_rate(struct clk_hw *hw, unsigned long parent_rate)
+ 	}
+ }
+ 
+-static const
+-struct freq_tbl *find_freq(const struct freq_tbl *f, unsigned long rate)
+-{
+-	if (!f)
+-		return NULL;
+-
+-	for (; f->freq; f++)
+-		if (rate <= f->freq)
+-			return f;
+-
+-	return NULL;
+-}
+-
+ static long _freq_tbl_determine_rate(struct clk_hw *hw,
+ 		const struct freq_tbl *f, unsigned long rate,
+ 		unsigned long *p_rate, struct clk_core **p)
+ {
+ 	unsigned long clk_flags;
+ 
+-	f = find_freq(f, rate);
++	f = qcom_find_freq(f, rate);
+ 	if (!f)
+ 		return -EINVAL;
+ 
+@@ -477,7 +465,7 @@ static int clk_rcg_set_rate(struct clk_hw *hw, unsigned long rate,
+ 	struct clk_rcg *rcg = to_clk_rcg(hw);
+ 	const struct freq_tbl *f;
+ 
+-	f = find_freq(rcg->freq_tbl, rate);
++	f = qcom_find_freq(rcg->freq_tbl, rate);
+ 	if (!f)
+ 		return -EINVAL;
+ 
+@@ -497,7 +485,7 @@ static int __clk_dyn_rcg_set_rate(struct clk_hw *hw, unsigned long rate)
+ 	struct clk_dyn_rcg *rcg = to_clk_dyn_rcg(hw);
+ 	const struct freq_tbl *f;
+ 
+-	f = find_freq(rcg->freq_tbl, rate);
++	f = qcom_find_freq(rcg->freq_tbl, rate);
+ 	if (!f)
+ 		return -EINVAL;
+ 
+diff --git a/drivers/clk/qcom/clk-rcg2.c b/drivers/clk/qcom/clk-rcg2.c
+index 6aac1ec0777c..0d2759b814ff 100644
+--- a/drivers/clk/qcom/clk-rcg2.c
++++ b/drivers/clk/qcom/clk-rcg2.c
+@@ -24,6 +24,7 @@
+ #include <asm/div64.h>
+ 
+ #include "clk-rcg.h"
++#include "common.h"
+ 
+ #define CMD_REG			0x0
+ #define CMD_UPDATE		BIT(0)
+@@ -172,27 +173,13 @@ clk_rcg2_recalc_rate(struct clk_hw *hw, unsigned long parent_rate)
+ 	return calc_rate(parent_rate, m, n, mode, hid_div);
+ }
+ 
+-static const
+-struct freq_tbl *find_freq(const struct freq_tbl *f, unsigned long rate)
+-{
+-	if (!f)
+-		return NULL;
+-
+-	for (; f->freq; f++)
+-		if (rate <= f->freq)
+-			return f;
+-
+-	/* Default to our fastest rate */
+-	return f - 1;
+-}
+-
+ static long _freq_tbl_determine_rate(struct clk_hw *hw,
+ 		const struct freq_tbl *f, unsigned long rate,
+ 		unsigned long *p_rate, struct clk_core **p)
+ {
+ 	unsigned long clk_flags;
+ 
+-	f = find_freq(f, rate);
++	f = qcom_find_freq(f, rate);
+ 	if (!f)
+ 		return -EINVAL;
+ 
+@@ -268,7 +255,7 @@ static int __clk_rcg2_set_rate(struct clk_hw *hw, unsigned long rate)
+ 	struct clk_rcg2 *rcg = to_clk_rcg2(hw);
+ 	const struct freq_tbl *f;
+ 
+-	f = find_freq(rcg->freq_tbl, rate);
++	f = qcom_find_freq(rcg->freq_tbl, rate);
+ 	if (!f)
+ 		return -EINVAL;
+ 
+diff --git a/drivers/clk/qcom/common.c b/drivers/clk/qcom/common.c
+index afd40ea50887..dd8335b8522b 100644
+--- a/drivers/clk/qcom/common.c
++++ b/drivers/clk/qcom/common.c
+@@ -18,6 +18,7 @@
+ #include <linux/reset-controller.h>
+ 
+ #include "common.h"
++#include "clk-rcg.h"
+ #include "clk-regmap.h"
+ #include "reset.h"
+ 
+@@ -27,6 +28,21 @@ struct qcom_cc {
+ 	struct clk_core *clks[];
+ };
+ 
++const
++struct freq_tbl *qcom_find_freq(const struct freq_tbl *f, unsigned long rate)
++{
++	if (!f)
++		return NULL;
++
++	for (; f->freq; f++)
++		if (rate <= f->freq)
++			return f;
++
++	/* Default to our fastest rate */
++	return f - 1;
++}
++EXPORT_SYMBOL_GPL(qcom_find_freq);
++
+ struct regmap *
+ qcom_cc_map(struct platform_device *pdev, const struct qcom_cc_desc *desc)
+ {
+diff --git a/drivers/clk/qcom/common.h b/drivers/clk/qcom/common.h
+index 2765e9d3da97..f519322acdf3 100644
+--- a/drivers/clk/qcom/common.h
++++ b/drivers/clk/qcom/common.h
+@@ -18,6 +18,7 @@ struct regmap_config;
+ struct clk_regmap;
+ struct qcom_reset_map;
+ struct regmap;
++struct freq_tbl;
+ 
+ struct qcom_cc_desc {
+ 	const struct regmap_config *config;
+@@ -27,6 +28,9 @@ struct qcom_cc_desc {
+ 	size_t num_resets;
+ };
+ 
++extern const struct freq_tbl *qcom_find_freq(const struct freq_tbl *f,
++					     unsigned long rate);
++
+ extern struct regmap *qcom_cc_map(struct platform_device *pdev,
+ 				  const struct qcom_cc_desc *desc);
+ extern int qcom_cc_really_probe(struct platform_device *pdev,
+-- 
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
