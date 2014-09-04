@@ -1,114 +1,62 @@
-From: leoy@marvell.com (Leo Yan)
-Date: Thu, 4 Sep 2014 09:25:33 +0800
-Subject: [RFC PATCH v2] clockevents: re-calculate event when cpu enter idle
-Message-ID: <1409793933-29938-1-git-send-email-leoy@marvell.com>
+From: ben@decadent.org.uk (Ben Hutchings)
+Date: Thu, 04 Sep 2014 03:11:29 +0100
+Subject: Autoloading of SPI/nor driver on kirkwood (qnap devices)
+In-Reply-To: <1409673299.14324.43.camel@dagon.hellion.org.uk>
+References: <1409673299.14324.43.camel@dagon.hellion.org.uk>
+Message-ID: <1409796689.27524.34.camel@decadent.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Below flow will have the redundant interrupts for broadcast timer:
+On Tue, 2014-09-02 at 16:54 +0100, Ian Campbell wrote:
+> Hello,
+> 
+> I recently tried to switch to using the DT based kirkwood stuff with
+> v3.16.1 on a QNAP TS-419 for the Debian kernel. Most things seemed ok
+> except that the flash driver was not autoloaded -- as well as spi-nor.ko
+> I had to manually modprobe m25p80.ko. Once I loaded both the flash was
+> detected.
+> 
+> I noticed that many platforms declare the flash chip as compatible =
+> "st,m25pXXX" whereas the ts219.dtsi just said m25p128 but I tried
+> changing that and it didn't help. In any case without spi-nor.ko being
+> autoloaded I don't support m25p80.ko ever would be.
 
-1. Process A starts a hrtimer with 100ms timeout, then Process A will
-   wait on the waitqueue to sleep;
-2. The CPU which Process A runs on will enter idle and call notify
-   CLOCK_EVT_NOTIFY_BROADCAST_ENTER, so the CPU will shutdown its local
-   and set broadcast timer's next event with delta for 100ms timeout;
-3. After 70ms later, the CPU is waken up by other peripheral's interrupt
-   and Process A will be waken up as well; Process A will cancel the hrtimer
-   at this point, kernel will remove the timer event from the event queue
-   but it will not really disable broadcast timer;
-4. So after 30ms later, the broadcast timer interrupt will be triggered
-   even though the timer has been cancelled by s/w in step 3.
+m25p80.c has:
 
-To fix this issue, in theory cpu can check this situation when the cpu
-enter and exit idle; So it can iterate the related idle cpus to calculate
-the correct broadcast event value.
+static struct spi_driver m25p80_driver = {
+	...
+	.id_table	= spi_nor_ids,
+	...
+};
 
-But with upper method, it has the side effect. Due the cpu enter and exit
-idle state very frequently in short time, so can optimize to only calculate
-the correct state only when the cpu join into broadcast timer and set the
-next event after calculate a different event compare to previous time.
+while spi_nor_ids is defined in spi-nor.c.  Since they end up as two
+separate modules, modpost can't read the ID table and add the device ID
+aliases to m25p80.ko.
 
-Signed-off-by: Leo Yan <leoy@marvell.com>
----
- kernel/time/tick-broadcast.c | 56 +++++++++++++++++++++++++++++++++++++-------
- 1 file changed, 48 insertions(+), 8 deletions(-)
+It looks like m25p80 has been split up in order that the new fsl-qspi
+driver can share its code (bypassing the SPI core and its device
+model!).  Why doesn't fsl-qspi implement an SPI controller device?  I
+think it is totally unacceptable to regress m25p80 in this way for the
+sake of a new driver.
 
-diff --git a/kernel/time/tick-broadcast.c b/kernel/time/tick-broadcast.c
-index 64c5990..52f8879 100644
---- a/kernel/time/tick-broadcast.c
-+++ b/kernel/time/tick-broadcast.c
-@@ -324,6 +324,31 @@ unlock:
- 	raw_spin_unlock(&tick_broadcast_lock);
- }
- 
-+static void tick_broadcast_oneshot_get_earlier_event(void)
-+{
-+	struct clock_event_device *bc;
-+	struct tick_device *td;
-+	ktime_t next_event;
-+	int cpu, next_cpu = 0;
-+
-+	next_event.tv64 = KTIME_MAX;
-+
-+	/* iterate all expired events */
-+	for_each_cpu(cpu, tick_broadcast_oneshot_mask) {
-+
-+		td = &per_cpu(tick_cpu_device, cpu);
-+		if (td->evtdev->next_event.tv64 < next_event.tv64) {
-+			next_event.tv64 = td->evtdev->next_event.tv64;
-+			next_cpu = cpu;
-+		}
-+	}
-+
-+	bc = tick_broadcast_device.evtdev;
-+	if (next_event.tv64 != KTIME_MAX &&
-+	    next_event.tv64 != bc->next_event.tv64)
-+		tick_broadcast_set_event(bc, next_cpu, next_event, 0);
-+}
-+
- /*
-  * Powerstate information: The system enters/leaves a state, where
-  * affected devices might stop
-@@ -717,17 +742,32 @@ int tick_broadcast_oneshot_control(unsigned long reason)
- 		if (!cpumask_test_and_set_cpu(cpu, tick_broadcast_oneshot_mask)) {
- 			WARN_ON_ONCE(cpumask_test_cpu(cpu, tick_broadcast_pending_mask));
- 			broadcast_shutdown_local(bc, dev);
-+
-+			/*
-+			 * We only reprogram the broadcast timer if we did not
-+			 * mark ourself in the force mask; If the current CPU
-+			 * is in the force mask, then we are going to be woken
-+			 * by the IPI right away.
-+			 */
-+			if (cpumask_test_cpu(cpu, tick_broadcast_force_mask))
-+				goto out;
-+
- 			/*
--			 * We only reprogram the broadcast timer if we
--			 * did not mark ourself in the force mask and
--			 * if the cpu local event is earlier than the
--			 * broadcast event. If the current CPU is in
--			 * the force mask, then we are going to be
--			 * woken by the IPI right away.
-+			 * Reprogram the broadcast timer if the cpu local event
-+			 * is earlier than the broadcast event;
- 			 */
--			if (!cpumask_test_cpu(cpu, tick_broadcast_force_mask) &&
--			    dev->next_event.tv64 < bc->next_event.tv64)
-+			if (dev->next_event.tv64 < bc->next_event.tv64) {
- 				tick_broadcast_set_event(bc, cpu, dev->next_event, 1);
-+				goto out;
-+			}
-+
-+			/*
-+			 * It's possible the cpu has cancelled the timer which
-+			 * has set the broadcast event at last time, so
-+			 * re-calculate the broadcast timer according to all
-+			 * related cpus' expire events.
-+			 */
-+			tick_broadcast_oneshot_get_earlier_event();
- 		}
- 		/*
- 		 * If the current CPU owns the hrtimer broadcast
+> I could set these things to =m for the Debian kirkwood flavour, but
+> since this is supposed to be a distro-style kernel.
+> 
+> I'm not entirely sure how module loading of this SPI stuff is supposed
+> to fit together -- anyone got any hints?
+
+Same as for any bus driver.
+
+Ben.
+
 -- 
-1.9.1
+Ben Hutchings
+Experience is directly proportional to the value of equipment destroyed.
+                                                         - Carolyn Scheppner
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 811 bytes
+Desc: This is a digitally signed message part
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140904/f6059f39/attachment.sig>
