@@ -1,38 +1,43 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 4 Sep 2014 10:39:44 +0100
-Subject: [PATCH v6 2/3] mfd: qcom-rpm: Driver for the Qualcomm RPM
-In-Reply-To: <1409029109-28769-3-git-send-email-bjorn.andersson@sonymobile.com>
-References: <1409029109-28769-1-git-send-email-bjorn.andersson@sonymobile.com>
- <1409029109-28769-3-git-send-email-bjorn.andersson@sonymobile.com>
-Message-ID: <20140904093944.GC1397@lee--X1>
+From: pebolle@tiscali.nl (Paul Bolle)
+Date: Thu, 04 Sep 2014 11:42:21 +0200
+Subject: [PATCH 04/19] serial: samsung: Remove support for legacy clock
+ code
+In-Reply-To: <1409823567.5546.80.camel@x220>
+References: <1404496099-26708-1-git-send-email-t.figa@samsung.com>
+ <1404496099-26708-5-git-send-email-t.figa@samsung.com>
+ <1405502840.4408.2.camel@x220> <53C67386.5070401@samsung.com>
+ <1405520767.4408.39.camel@x220> <1405521324.4408.44.camel@x220>
+ <53C68FAB.9070102@samsung.com> <1409823567.5546.80.camel@x220>
+Message-ID: <1409823741.5546.82.camel@x220>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 25 Aug 2014, Bjorn Andersson wrote:
+[Use Tomasz's new address and add Sylwester.]
 
-> Driver for the Resource Power Manager (RPM) found in Qualcomm 8660, 8960
-> and 8064 based devices. The driver exposes resources that child drivers
-> can operate on; to implementing regulator, clock and bus frequency
-> drivers.
+On Thu, 2014-09-04 at 11:39 +0200, Paul Bolle wrote:
+> On Wed, 2014-07-16 at 16:43 +0200, Tomasz Figa wrote:
+> > On 16.07.2014 16:35, Paul Bolle wrote:
+> > > On Wed, 2014-07-16 at 16:26 +0200, Paul Bolle wrote:
+> > >> On Wed, 2014-07-16 at 14:43 +0200, Tomasz Figa wrote:
+> > >>> That's right. Apparently I missed them. I guess that's not critical,
+> > >>> though, and could be done in separate patch, right?
+> > >>
+> > >> This is not critical at all, so that's fine with me. 
+> > > 
+> > > Actually, that's only correct if the solution here is to just remove the
+> > > (currently) dead code hidden behind CONFIG_SAMSUNG_CLOCK. But if the
+> > > solution requires something less trivial, that might be quite wrong.
+> > > 
+> > > So please disregard my comment!
+> > 
+> > The code between those ifdefs is no longer used, because all Samsung
+> > platforms use the Common Clock Framework after this series. So I believe
+> > we can safely remove this dead code.
 > 
-> Signed-off-by: Bjorn Andersson <bjorn.andersson@sonymobile.com>
-> ---
->  drivers/mfd/Kconfig          |   14 +
->  drivers/mfd/Makefile         |    1 +
->  drivers/mfd/qcom_rpm.c       |  580 ++++++++++++++++++++++++++++++++++++++++++
->  include/linux/mfd/qcom_rpm.h |   10 +
->  4 files changed, 605 insertions(+)
->  create mode 100644 drivers/mfd/qcom_rpm.c
->  create mode 100644 include/linux/mfd/qcom_rpm.h
-
-I'd like to take this in with the other MFD patch.
-
-Is the regulator one okay to go in on it's own?
-
-Acked-by: Lee Jones <lee.jones@linaro.org>
-
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+> The three checks for CONFIG_SAMSUNG_CLOCK can still be seen in v3.17-rc3
+> and next-20140903. Should I perhaps submit the trivial patch to remove
+> them (and the code they hide) or did things turn out to be more
+> complicated?
+> 
+> 
+> Paul Bolle
