@@ -1,25 +1,23 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 4 Sep 2014 18:20:01 +0200
-Subject: [PATCH v4 4/4] pinctrl: qcom: Make the target processor value
- configurable
-In-Reply-To: <1409761696-15435-5-git-send-email-gdjakov@mm-sol.com>
-References: <1409761696-15435-1-git-send-email-gdjakov@mm-sol.com>
- <1409761696-15435-5-git-send-email-gdjakov@mm-sol.com>
-Message-ID: <CACRpkdZQouNk0z1AQHbjULJXdRK07-kZDXLcnx0Xayew0fnocA@mail.gmail.com>
+Date: Thu, 4 Sep 2014 18:22:50 +0200
+Subject: [PATCH 1/3] gpio: zynq: Mask non-wakeup GPIO interrupts on suspend
+In-Reply-To: <1409335127-26712-2-git-send-email-soren.brinkmann@xilinx.com>
+References: <1409335127-26712-1-git-send-email-soren.brinkmann@xilinx.com>
+ <1409335127-26712-2-git-send-email-soren.brinkmann@xilinx.com>
+Message-ID: <CACRpkdbn9XiBXcTr+znxu9MxLdUT5XpSoTdnPKRcfDJyG5cwuQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 3, 2014 at 6:28 PM, Georgi Djakov <gdjakov@mm-sol.com> wrote:
+On Fri, Aug 29, 2014 at 7:58 PM, Soren Brinkmann
+<soren.brinkmann@xilinx.com> wrote:
 
-> Currently the value used to specify that interrupts from the gpio should
-> be routed to the application processor is hardcoded for all Qualcomm SoCs.
-> But the new APQ8084 SoC uses a different value. To resolve this, we make
-> this value configurable for each SoC. For all existing SoCs we continue
-> to use the current value, and only for APQ8084 we use the new value.
+> From: Ezra Savard <ezra.savard@xilinx.com>
 >
-> Suggested-by: Bjorn Andersson <bjorn.andersson@sonymobile.com>
-> Acked-by: Bjorn Andersson <bjorn.andersson@sonymobile.com>
-> Signed-off-by: Georgi Djakov <gdjakov@mm-sol.com>
+> Added flag to the GPIO chip so that IRQ from non-wakeup GPIO will
+> not wake the system.
+>
+> Signed-off-by: Ezra Savard <ezra.savard@xilinx.com>
+> Reviewed-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
 
 Patch applied.
 
