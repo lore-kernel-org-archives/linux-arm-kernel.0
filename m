@@ -1,80 +1,103 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Thu, 04 Sep 2014 14:13:04 +0200
-Subject: [PATCH v2 2/4] dt-bindings: Document EMAC Rockchip
-In-Reply-To: <1409763165-16461-2-git-send-email-romain.perier@gmail.com>
-References: <1409763165-16461-1-git-send-email-romain.perier@gmail.com>
- <1409763165-16461-2-git-send-email-romain.perier@gmail.com>
-Message-ID: <1605203.17D53P54cu@diego>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 04 Sep 2014 14:14:48 +0200
+Subject: [PATCH 2/2] PCI: Layerscape: Add Layerscape PCIe driver
+In-Reply-To: <1409856338-1730-2-git-send-email-Minghuan.Lian@freescale.com>
+References: <1409856338-1730-1-git-send-email-Minghuan.Lian@freescale.com>
+ <1409856338-1730-2-git-send-email-Minghuan.Lian@freescale.com>
+Message-ID: <2799937.bNtU9KXR6t@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Mittwoch, 3. September 2014, 16:52:43 schrieb Romain Perier:
-> This adds the necessary binding documentation for the EMAC Rockchip platform
-> driver found in RK3066 and RK3188 SoCs.
-> 
-> Signed-off-by: Romain Perier <romain.perier@gmail.com>
+On Thursday 04 September 2014 18:45:38 Minghuan Lian wrote:
 
-Reviewed-by: Heiko Stuebner <heiko@sntech.de>
+> +
+> +#define PCIE_LS1021A_BASE	0x3400000
+> +#define PCIE_LS1021A_REG_SIZE	0x0100000
 
-> ---
->  .../devicetree/bindings/net/emac_rockchip.txt      | 50
-> ++++++++++++++++++++++ 1 file changed, 50 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/net/emac_rockchip.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/net/emac_rockchip.txt
-> b/Documentation/devicetree/bindings/net/emac_rockchip.txt new file mode
-> 100644
-> index 0000000..8dc1c79
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/net/emac_rockchip.txt
-> @@ -0,0 +1,50 @@
-> +* ARC EMAC 10/100 Ethernet platform driver for Rockchip Rk3066/RK3188 SoCs
-> +
-> +Required properties:
-> +- compatible: Should be "rockchip,rk3066-emac" or "rockchip,rk3188-emac"
-> +  according to the target SoC.
-> +- reg: Address and length of the register set for the device
-> +- interrupts: Should contain the EMAC interrupts
-> +- rockchip,grf: phandle to the syscon grf used to control speed and mode
-> +  for emac.
-> +- phy: see ethernet.txt file in the same directory.
-> +- phy-mode: see ethernet.txt file in the same directory.
-> +
-> +Optional properties:
-> +- phy-supply: phandle to a regulator if the PHY needs one
-> +
-> +Clock handling:
-> +- clocks: Must contain an entry for each entry in clock-names.
-> +- clock-names: Shall be "hclk" for the host clock needed to calculate and
-> set +  polling period of EMAC and "macref" for the reference clock needed
-> to transfer +  data to and from the phy.
-> +
-> +Child nodes of the driver are the individual PHY devices connected to the
-> +MDIO bus. They must have a "reg" property given the PHY address on the MDIO
-> bus. +
-> +Examples:
-> +
-> +ethernet at 10204000 {
-> +	compatible = "rockchip,rk3188-emac";
-> +	reg = <0xc0fc2000 0x3c>;
-> +	interrupts = <6>;
-> +	mac-address = [ 00 11 22 33 44 55 ];
-> +
-> +	clocks = <&cru HCLK_EMAC>, <&cru SCLK_MAC>;
-> +	clock-names = "hclk", "macref";
-> +
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&emac_xfer>, <&emac_mdio>, <&phy_int>;
-> +
-> +	rockchip,grf = <&grf>;
-> +
-> +	phy = <&phy0>;
-> +	phy-mode = "rmii";
-> +	phy-supply = <&vcc_rmii>;
-> +
-> +	#address-cells = <1>;
-> +	#size-cells = <0>;
-> +	phy0: ethernet-phy at 0 {
-> +	      reg = <1>;
-> +	};
+This does not belong here. All addresses must come from DT,
+and you should not do the calculation below based on the address.
+
+> +struct ls_pcie {
+> +	struct list_head node;
+> +	struct device *dev;
+> +	struct pci_bus *bus;
+> +	void __iomem *dbi;
+> +	void __iomem *scfg;
+> +	struct pcie_port pp;
+> +	int id;
+> +	int index;
+> +	int irq;
+> +	int msi_irq;
+> +	int pme_irq;
 > +};
+
+irq and pme_irq seem to be completely unused, so better
+not add them until they are actually used.
+
+The scfg registers seem to belong to another device that
+is responsible for multiple instances. Unfortunately,
+this "fsl,ls1021a-scfg" device is not documented anywhere
+that I can see.
+
+Is this some sort of syscon node, or is it specific to the
+pcie controller(s)?
+
+> +static LIST_HEAD(ls_pcie_list);
+
+Don't maintain your own lists please.
+
+> +static int ls_pcie_link_up(struct pcie_port *pp)
+> +{
+> +	u32 rc, tmp;
+> +	struct ls_pcie *pcie = to_ls_pcie(pp);
+> +
+> +	tmp = ioread32(pcie->scfg + SCFG_SCFGREVCR_OFF);
+> +	iowrite32(SCFG_NO_BIT_REVERSE, pcie->scfg + SCFG_SCFGREVCR_OFF);
+> +
+> +	rc = (ioread32(pcie->scfg + PEXMSCPORTSR(pcie->index)) >>
+> +	     LTSSM_STATE_SHIFT) & LTSSM_STATE_MASK;
+> +
+> +	iowrite32(tmp, pcie->scfg + SCFG_SCFGREVCR_OFF);
+> +
+> +	if (rc < LTSSM_PCIE_L0)
+> +		return 0;
+> +
+> +	return 1;
+> +}
+
+This looks like it is really a phy driver, although a pretty minimal
+one.
+
+> +static u32 ls_pcie_get_msi_addr(struct pcie_port *pp)
+> +{
+> +	return SCFG_SPIMSICR_ADDR;
+> +}
+> +
+> +static u32 ls_pcie_get_msi_data(struct pcie_port *pp, int pos)
+> +{
+> +	struct ls_pcie *pcie = to_ls_pcie(pp);
+> +
+> +	if (pcie->id == PCI_DEVICE_ID_LS1021A)
+> +		return MSI_LS1021A_DATA(pcie->index);
+> +
+> +	return pos;
+> +}
+
+My impression is that you have two distinct MSI controller
+implementations, one for LS1021A and the other one for everything
+else. How about using separate pcie_host_ops for them, possibly
+also moving them into separate files?
+
+A good way to deal with this is to put the pointers to the two
+pcie_host_ops into the data fields of the ls_pcie_of_match table.
+
+> +/* Freescale PCIe driver does not allow module unload */
+> +static int __init ls_pcie_init(void)
+> +{
+> +	return platform_driver_probe(&ls_pcie_driver, ls_pcie_probe);
+> +}
+> +subsys_initcall(ls_pcie_init);
+
+Better change to platform_driver_register, so you can use deferred probing.
+
+	Arnd
