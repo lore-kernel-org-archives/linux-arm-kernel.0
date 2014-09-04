@@ -1,49 +1,87 @@
-From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Thu, 4 Sep 2014 07:24:34 -0600
-Subject: [PATCH 2/2] PCI: Layerscape: Add Layerscape PCIe driver
-In-Reply-To: <1409856338-1730-2-git-send-email-Minghuan.Lian@freescale.com>
-References: <1409856338-1730-1-git-send-email-Minghuan.Lian@freescale.com>
- <1409856338-1730-2-git-send-email-Minghuan.Lian@freescale.com>
-Message-ID: <CAErSpo5kFkF-JoUj-Ean7VXa4gxYW+q-X89+7ahyEymWpxxQ2w@mail.gmail.com>
+From: khilman@kernel.org (Kevin Hilman)
+Date: Thu, 04 Sep 2014 06:30:13 -0700
+Subject: [PATCH v9 4/6] ARM: Exynos: switch to using generic cpufreq
+ driver for Exynos4210/5250/5420
+In-Reply-To: <CAJuA9aiXwgxrS_AYw5tt5GryhrtoOpK2RhhLcjxShNqswiCmqA@mail.gmail.com>
+ (Thomas Abraham's message of "Thu, 4 Sep 2014 15:52:38 +0530")
+References: <1406707663-16656-1-git-send-email-thomas.ab@samsung.com>
+ <1406707663-16656-5-git-send-email-thomas.ab@samsung.com>
+ <53DA8BB9.6020702@samsung.com> <53DA8D85.3050106@gmail.com>
+ <7hbnrc6px3.fsf@paris.lan> <53F7DA13.6090305@gmail.com>
+ <CADWw7OgAS-z-UOrJU-hL2fzuefJmLtCTg57jYk2Df7f5KfLJmA@mail.gmail.com>
+ <7h8umc60we.fsf@paris.lan>
+ <CADWw7OgW+o3tB=ptnsy-PsmXmNv8oXzt_WfK6NswQiEWWwAzNA@mail.gmail.com>
+ <CAGa+x85-Anb+HsSUQRaaeex19-HK+yZDW0UpFBwAtsQ8Sf2Aqg@mail.gmail.com>
+ <CAGa+x86jU8MR=r_xuaiorbNNyqrezb0b6Ozy-MPg9HvsARESOw@mail.gmail.com>
+ <CAJuA9ajtsrY7zSDMs=c6BZ0AqERoBgvq++dTF4Dn673zGMfcgQ@mail.gmail.com>
+ <CAMAWPa-8h5PNhgT+ApBhA8p=i+4oFOnYnQsQ4mK1JKwwAhpvpQ@mail.gmail.com>
+ <CAJuA9ah5M_pXRMXPB6o7JLhgVUHM7kYo9HOV6Yxv4Z=hKMdG=w@mail.gmail.com>
+ <7hmwah6cop.fsf@paris.lan>
+ <CAJuA9ahe=9gdTaGcRb69syvRfwkkGMgDiiNfOMA9TBo42cWVZw@mail.gmail.com>
+ <CAJuA9ag2pybyLDUyW43wMQu4PA1cB4V9c1bc7WB3xjqzhqNGTw@mail.gmail.com>
+ <7hsik847p2.fsf@paris.lan>
+ <CAJuA9aiXwgxrS_AYw5tt5GryhrtoOpK2RhhLcjxShNqswiCmqA@mail.gmail.com>
+Message-ID: <7hfvg74ioq.fsf@paris.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 4, 2014 at 12:45 PM, Minghuan Lian
-<Minghuan.Lian@freescale.com> wrote:
-> Add support for Freescale Layerscape PCIe controller. This driver
-> re-uses the designware core code.
+Thomas Abraham <ta.omasab@gmail.com> writes:
+
+> On Thu, Sep 4, 2014 at 4:45 AM, Kevin Hilman <khilman@kernel.org> wrote:
+>> Hi Thomas,
+>>
+>> Thomas Abraham <ta.omasab@gmail.com> writes:
+>>
+>> [...]
+>>
+>>> A new branch [1] has been created using commits from exynos5-v3.17-rc1
+>>> branch + cpufreq + regulator + temp fixes. I have tested this branch
+>>> on Exynos5800 Chromebook2 and cpufreq works fine with both ondemand
+>>> and performance governors. Please let me know if there are any issues
+>>> with this new branch. It is based on v3.17-rc3.
+>>
+>> Excellent!  Thank you.
+>>
+>> The only thing missing now is the CPUidle support for 5800, and all
+>> that's needed for that is the compatible string patch[1] which Daniel
+>> has queued up.
+>>
+>> With that patch, display + CPUidle + CPUfreq are working pretty well on
+>> my exynos5800/chromebook2 with the big.LITTLE switcher disabled.  If I
+>> turn on the switcher, it boots OK, but as soon as I try to run powertop
+>> (upstream v2.6.1) it gets stuck.  Have you tried this branch with the
+>> switcher enabled?
 >
-> Signed-off-by: Minghuan Lian <Minghuan.Lian@freescale.com>
-> ---
->  .../devicetree/bindings/pci/fsl,ls-pcie.txt        |  41 +++
->  drivers/pci/host/Kconfig                           |   7 +
->  drivers/pci/host/Makefile                          |   1 +
->  drivers/pci/host/pci-layerscape.c                  | 315 +++++++++++++++++++++
->  include/linux/pci_ids.h                            |   1 +
->  5 files changed, 365 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/pci/fsl,ls-pcie.txt
->  create mode 100644 drivers/pci/host/pci-layerscape.c
-
-> diff --git a/include/linux/pci_ids.h b/include/linux/pci_ids.h
-> index 6ed0bb7..26d4c30 100644
-> --- a/include/linux/pci_ids.h
-> +++ b/include/linux/pci_ids.h
-> @@ -2442,6 +2442,7 @@
->  #define PCI_DEVICE_ID_P5020            0x0421
->  #define PCI_DEVICE_ID_P5010E           0x0428
->  #define PCI_DEVICE_ID_P5010            0x0429
-> +#define PCI_DEVICE_ID_LS1021A          0x0e0b
-
-This is only used in one file and should not be in pci_ids.h (per the
-comment at the top of pci_ids.h).
-
->  #define PCI_DEVICE_ID_MPC8641          0x7010
->  #define PCI_DEVICE_ID_MPC8641D         0x7011
->  #define PCI_DEVICE_ID_MPC8610          0x7018
-> --
-> 1.9.1
+> Yes, I have tested switcher + cpufreq + cpuidle with this branch and
+> there are no issues found. I haven't tested with powertop yet. I will
+> try and do that and let you know the result.
 >
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> You mentioned that when you run powertop, it gets stuck. When that
+> happens, is there any log on the console or does system just turn
+> unresponsive?
+
+The console is not responsive, but kernel seems busy because I see
+periodic timeout messages from the samsung clock driver.
+
+Note that I see these messages when things are functioning normally
+also.
+
+Kevin
+
+
+[1]
+[  337.832031] wait_until_divider_stable: timeout in divider stablization
+[  337.847024] wait_until_divider_stable: timeout in divider stablization
+[  337.862024] wait_until_divider_stable: timeout in divider stablization
+[  337.957028] wait_until_divider_stable: timeout in divider stablization
+[  337.972024] wait_until_divider_stable: timeout in divider stablization
+[  337.987024] wait_until_divider_stable: timeout in divider stablization
+[  340.082029] wait_until_divider_stable: timeout in divider stablization
+[  340.097024] wait_until_divider_stable: timeout in divider stablization
+[  340.112024] wait_until_divider_stable: timeout in divider stablization
+[  346.242030] wait_until_divider_stable: timeout in divider stablization
+[  346.257024] wait_until_divider_stable: timeout in divider stablization
+[  346.272024] wait_until_divider_stable: timeout in divider stablization
+[  348.322029] wait_until_divider_stable: timeout in divider stablization
+[  348.337025] wait_until_divider_stable: timeout in divider stablization
+[  348.352024] wait_until_divider_stable: timeout in divider stablization
