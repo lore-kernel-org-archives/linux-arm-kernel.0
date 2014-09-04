@@ -1,40 +1,112 @@
-From: carlo.caione@gmail.com (Carlo Caione)
-Date: Thu, 4 Sep 2014 09:21:15 +0200
-Subject: [PATCH 1/5] ARM: sun4i: Relicense the A10 DTSI under GPLv2/X11
-In-Reply-To: <20140903184250.GA8163@nuc>
-References: <1409682069-7164-1-git-send-email-maxime.ripard@free-electrons.com>
- <20140903184250.GA8163@nuc>
-Message-ID: <20140904072115.GA7877@carlo-MacBookPro>
+From: horms@verge.net.au (Simon Horman)
+Date: Thu, 4 Sep 2014 16:23:25 +0900
+Subject: [PATCH v2 1/3] clocksource: sh_cmt: Document SoC specific bindings
+In-Reply-To: <5552768.CVrm7BiFam@avalon>
+References: <1409792121-28912-1-git-send-email-horms+renesas@verge.net.au>
+ <1409792121-28912-2-git-send-email-horms+renesas@verge.net.au>
+ <5552768.CVrm7BiFam@avalon>
+Message-ID: <20140904072324.GF9999@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 03, 2014 at 08:42:50PM +0200, Carlo Caione wrote:
-> On Tue, Sep 02, 2014 at 08:21:05PM +0200, Maxime Ripard wrote:
-> > The current GPL only licensing on the DTSI makes it very impractical for other
-> > software components licensed under another license.
-> > 
-> > In order to make it easier for them to reuse our device trees, relicense our
-> > DTSI first under a GPL/X11 dual-license. Hopefully, the DTS will follow soon.
-> > 
-> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> > Cc: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-> > Cc: Arnd Bergmann <arnd@arndb.de>
-> > Cc: Carlo Caione <carlo.caione@gmail.com>
-> > Cc: Chen-Yu Tsai <wens@csie.org>
-> > Cc: David Lanzend?rfer <david.lanzendoerfer@o2s.ch>
-> > Cc: Emilio L?pez <emilio@elopez.com.ar>
-> > Cc: Hans de Goede <hdegoede@redhat.com>
-> > Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> > Cc: Oliver Schinagl <oliver@schinagl.nl>
-> > Cc: Roman Byshko <rbyshko@gmail.com>
-> > Cc: Stefan Roese <sr@denx.de>
-> > ---
-> >  arch/arm/boot/dts/sun4i-a10.dtsi | 46 +++++++++++++++++++++++++++++++++++-----
-> >  1 file changed, 41 insertions(+), 5 deletions(-)
+On Thu, Sep 04, 2014 at 09:51:27AM +0300, Laurent Pinchart wrote:
+> Hi Simon,
 > 
-> Acked-by: Carlo Caione <carlo@caione.org> 
+> Thank you for the patch.
+> 
+> On Thursday 04 September 2014 09:55:19 Simon Horman wrote:
+> > In general Renesas hardware is not documented to the extent
+> > where the relationship between IP blocks on different SoCs can be assumed
+> > although they may appear to operate the same way. Furthermore the
+> > documentation typically does not specify a version for individual
+> > IP blocks. For these reasons a convention of using the SoC name in place
+> > of a version and providing SoC-specific compat strings has been adopted.
+> > 
+> > Although not universally liked this convention is used in the bindings for
+> > a number of drivers for Renesas hardware. The purpose of this patch is to
+> > update the Renesas R-Car Compare Match Timer (CMT) driver to follow this
+> > convention.
+> > 
+> > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> > Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> > Acked-by: Mark Rutland <mark.rutland@arm.com>
+> > 
+> > ---
+> > * I plan to follow up with patches to use these new bindings in the
+> >   dtsi files for the affected SoCs.
+> > 
+> > v2
+> > * Reorder compat entries so more-specific entries and their fallbacks
+> >   are grouped with the fallback entry coming last.
+> > * Explicitly document fallback
+> > ---
+> >  .../devicetree/bindings/timer/renesas,cmt.txt      | 44 ++++++++++++++++---
+> >  1 file changed, 38 insertions(+), 6 deletions(-)
+> > 
+> > diff --git a/Documentation/devicetree/bindings/timer/renesas,cmt.txt
+> > b/Documentation/devicetree/bindings/timer/renesas,cmt.txt index
+> > a17418b..7b44f4b 100644
+> > --- a/Documentation/devicetree/bindings/timer/renesas,cmt.txt
+> > +++ b/Documentation/devicetree/bindings/timer/renesas,cmt.txt
+> > @@ -11,15 +11,47 @@ datasheets.
+> > 
+> >  Required Properties:
+> > 
+> > -  - compatible: must contain one of the following.
+> > -    - "renesas,cmt-32" for the 32-bit CMT
+> > +  - compatible: must contain one or more of the following:
+> > +    - "renesas,cmt-32-r8a7740" for the R8a7740 32-bit CMT
+> > +		(CMT0)
+> > +    - "renesas,cmt-32-sh7372" for the SH7372 32-bit CMT
+> > +		(CMT0)
+> > +    - "renesas,cmt-32-sh73a0" for the SH73a0 32-bit CMT
+> > +		(CMT0)
+> > +    - "renesas,cmt-32" for all 32-bit CMT without fast clock support
+> >  		(CMT0 on sh7372, sh73a0 and r8a7740)
+> > -    - "renesas,cmt-32-fast" for the 32-bit CMT with fast clock support
+> > +		This is a fallback for the above renesas,cmt-32-* entries.
+> > +
+> > +    - "renesas,cmt-32-fast-r8a7740" for the R8A7740 32-bit CMT with fast
+> > +		clock support (CMT[234])
+> > +    - "renesas,cmt-32-fast-sh7372" for the SH7372 32-bit CMT with fast
+> > +		clock support (CMT[234])
+> > +    - "renesas,cmt-32-fast-sh73a0" for the SH73A0 32-bit CMT with fast
+> > +		clock support (CMT[234])
+> > +    - "renesas,cmt-32-fast" for all 32-bit CMT with fast clock support
+> >  		(CMT[234] on sh7372, sh73a0 and r8a7740)
+> > -    - "renesas,cmt-48" for the 48-bit CMT
+> > +		This is a fallback for the above renesas,cmt-32-fast-* entries.
+> > +
+> > +    - "renesas,cmt-48-sh7372" for the SH7372 48-bit CMT
+> > +		(CMT1)
+> > +    - "renesas,cmt-48-sh73a0" for the SH73A0 48-bit CMT
+> > +		(CMT1)
+> > +    - "renesas,cmt-48-r8a7740" for the R8A7740 48-bit CMT
+> > +		(CMT1)
+> > +    - "renesas,cmt-48" for all non-second generation 48-bit CMT
+> >  		(CMT1 on sh7372, sh73a0 and r8a7740)
+> > -    - "renesas,cmt-48-gen2" for the second generation 48-bit CMT
+> > +		This is a fallback for the above renesas,cmt-48-* entries.
+> > +
+> > +    - "renesas,cmt-48-r8a73a4" for the R8A73A4 48-bit CMT
+> > +		(CMT[01])
+> > +    - "renesas,cmt-48-r8a7790" for the R8A7790 48-bit CMT
+> > +		(CMT[01])
+> > +    - "renesas,cmt-48-r8a7791" for the R8A7791 48-bit CMT
+> > +		(CMT[01])
+> > +    - "renesas,cmt-48-gen2" for all second generation 48-bit CMT
+> >  		(CMT[01] on r8a73a4, r8a7790 and r8a7791)
+> > +		This is a fallback for the renesas,cmt-48-r8a73a4,
+> > +		renesas,cmt-48-r8a7790 and renesas,cmt-48-gen2 entries.
+> 
+> If renesas,cmt-48-gen2 is a fallback for renesas,cmt-48-gen2, we'll have an 
+> infinite loop :-) I suppose you meant
+> 
+> 		This is a fallback for the renesas,cmt-48-r8a73a4,
+> 		renesas,cmt-48-r8a7790 and renesas,cmt-48-r8a7791 entries.
 
-The ACK is intended for the whole series :)
+Yes, indeed. Thanks :)
 
--- 
-Carlo Caione
+> With that change,
+> 
+> Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
