@@ -1,68 +1,65 @@
-From: ta.omasab@gmail.com (Thomas Abraham)
-Date: Thu, 4 Sep 2014 15:52:38 +0530
-Subject: [PATCH v9 4/6] ARM: Exynos: switch to using generic cpufreq
- driver for Exynos4210/5250/5420
-In-Reply-To: <7hsik847p2.fsf@paris.lan>
-References: <1406707663-16656-1-git-send-email-thomas.ab@samsung.com>
- <1406707663-16656-5-git-send-email-thomas.ab@samsung.com>
- <53DA8BB9.6020702@samsung.com> <53DA8D85.3050106@gmail.com>
- <7hbnrc6px3.fsf@paris.lan> <53F7DA13.6090305@gmail.com>
- <CADWw7OgAS-z-UOrJU-hL2fzuefJmLtCTg57jYk2Df7f5KfLJmA@mail.gmail.com>
- <7h8umc60we.fsf@paris.lan>
- <CADWw7OgW+o3tB=ptnsy-PsmXmNv8oXzt_WfK6NswQiEWWwAzNA@mail.gmail.com>
- <CAGa+x85-Anb+HsSUQRaaeex19-HK+yZDW0UpFBwAtsQ8Sf2Aqg@mail.gmail.com>
- <CAGa+x86jU8MR=r_xuaiorbNNyqrezb0b6Ozy-MPg9HvsARESOw@mail.gmail.com>
- <CAJuA9ajtsrY7zSDMs=c6BZ0AqERoBgvq++dTF4Dn673zGMfcgQ@mail.gmail.com>
- <CAMAWPa-8h5PNhgT+ApBhA8p=i+4oFOnYnQsQ4mK1JKwwAhpvpQ@mail.gmail.com>
- <CAJuA9ah5M_pXRMXPB6o7JLhgVUHM7kYo9HOV6Yxv4Z=hKMdG=w@mail.gmail.com>
- <7hmwah6cop.fsf@paris.lan>
- <CAJuA9ahe=9gdTaGcRb69syvRfwkkGMgDiiNfOMA9TBo42cWVZw@mail.gmail.com>
- <CAJuA9ag2pybyLDUyW43wMQu4PA1cB4V9c1bc7WB3xjqzhqNGTw@mail.gmail.com>
- <7hsik847p2.fsf@paris.lan>
-Message-ID: <CAJuA9aiXwgxrS_AYw5tt5GryhrtoOpK2RhhLcjxShNqswiCmqA@mail.gmail.com>
+From: tomasz.nowicki@linaro.org (Tomasz Nowicki)
+Date: Thu, 04 Sep 2014 12:39:45 +0200
+Subject: [PATCH v3 13/17] ARM64 / ACPI: Add GICv2 specific ACPI boot
+ support
+In-Reply-To: <3046890.jAXAYeBPWQ@wuerfel>
+References: <1409583475-6978-1-git-send-email-hanjun.guo@linaro.org>
+ <2893693.4bZJXXENof@wuerfel> <54083A94.2040105@linaro.org>
+ <3046890.jAXAYeBPWQ@wuerfel>
+Message-ID: <54084171.6050305@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 4, 2014 at 4:45 AM, Kevin Hilman <khilman@kernel.org> wrote:
-> Hi Thomas,
+On 04.09.2014 12:14, Arnd Bergmann wrote:
+> On Thursday 04 September 2014 12:10:28 Tomasz Nowicki wrote:
+>> On 03.09.2014 20:42, Arnd Bergmann wrote:
+>>> On Monday 01 September 2014 22:57:51 Hanjun Guo wrote:
+>>>> +       /* Collect CPU base addresses */
+>>>> +       count = acpi_parse_entries(sizeof(struct acpi_table_madt),
+>>>> +                                  gic_acpi_parse_madt_cpu, table,
+>>>> +                                  ACPI_MADT_TYPE_GENERIC_INTERRUPT,
+>>>> +                                  ACPI_MAX_GIC_CPU_INTERFACE_ENTRIES);
+>>>> +       if (count < 0) {
+>>>> +               pr_err("Error during GICC entries parsing\n");
+>>>> +               return -EFAULT;
+>>>> +       } else if (!count) {
+>>>> +               /* No GICC entries provided, use address from MADT header */
+>>>> +               struct acpi_table_madt *madt = (struct acpi_table_madt *)table;
+>>>> +
+>>>> +               if (!madt->address)
+>>>> +                       return -EFAULT;
+>>>> +
+>>>> +               cpu_phy_base = (u64)madt->address;
+>>>> +       }
+>>>
+>>> After I read through ACPI-5.1 section 5.2.12.14, I wonder if this is the
+>>> best way to treat a missing ACPI_MADT_TYPE_GENERIC_INTERRUPT table.
+>>>
+>>> Do we expect to see those in practice? It seems like using the x86 local
+>>> APIC address as a fallback for the GIC address is not something we
+>>> should do unless we absolutely have to support a system that doesn't
+>>> have the GIC table.
+>>
+>> No, we do not expect and hopefully there will be no such
+>>
+>> But, we are trying to be as much as possible inline with 5.1 spec,
+>> 5.2.12.14 says:
+>> [...]
+>> If provided here (CPU physical base address), the "Local Interrupt
+>> Controller Address" field in the MADT must be ignored by the OSPM.
+>> [...]
+>>
 >
-> Thomas Abraham <ta.omasab@gmail.com> writes:
->
-> [...]
->
->> A new branch [1] has been created using commits from exynos5-v3.17-rc1
->> branch + cpufreq + regulator + temp fixes. I have tested this branch
->> on Exynos5800 Chromebook2 and cpufreq works fine with both ondemand
->> and performance governors. Please let me know if there are any issues
->> with this new branch. It is based on v3.17-rc3.
->
-> Excellent!  Thank you.
->
-> The only thing missing now is the CPUidle support for 5800, and all
-> that's needed for that is the compatible string patch[1] which Daniel
-> has queued up.
->
-> With that patch, display + CPUidle + CPUfreq are working pretty well on
-> my exynos5800/chromebook2 with the big.LITTLE switcher disabled.  If I
-> turn on the switcher, it boots OK, but as soon as I try to run powertop
-> (upstream v2.6.1) it gets stuck.  Have you tried this branch with the
-> switcher enabled?
+> Yes, that's what I saw. So ignoring it all the time is fine, right?
+> Presumably the madt->address field is only referenced here because
+> some pre-5.1 implementations used to do that.
 
-Yes, I have tested switcher + cpufreq + cpuidle with this branch and
-there are no issues found. I haven't tested with powertop yet. I will
-try and do that and let you know the result.
-
-You mentioned that when you run powertop, it gets stuck. When that
-happens, is there any log on the console or does system just turn
-unresponsive?
+So this is very vague statement. On the one hand it would make sense to 
+take madt->address if we have no GICC entries. On the other hand we do 
+not support non-banked GIC cpu registers. So all of then need to have 
+the same cpu_base_address. What if one has null address? Should the rest 
+take madt->address? I think you are right, I will remove madt->address 
+fallback and simplify the code.
 
 Thanks,
-Thomas.
-
->
-> Thanks again for your work on this, we're getting close!
->
-> Kevin
->
-> [1] http://lists.infradead.org/pipermail/linux-arm-kernel/2014-August/279028.html
->
+Tomasz
