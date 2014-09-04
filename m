@@ -1,65 +1,114 @@
-From: long.wanglong@huawei.com (long.wanglong)
-Date: Thu, 4 Sep 2014 09:13:18 +0800
-Subject: [SMP BUG?] the return value of is_smp() is bug?
-In-Reply-To: <25226905.0IHWyHSRxb@wuerfel>
-References: <1409550563-92081-1-git-send-email-long.wanglong@huawei.com>
- <540443DA.7030502@huawei.com> <25226905.0IHWyHSRxb@wuerfel>
-Message-ID: <5407BCAE.7030606@huawei.com>
+From: leoy@marvell.com (Leo Yan)
+Date: Thu, 4 Sep 2014 09:25:33 +0800
+Subject: [RFC PATCH v2] clockevents: re-calculate event when cpu enter idle
+Message-ID: <1409793933-29938-1-git-send-email-leoy@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2014/9/1 18:26, Arnd Bergmann wrote:
-> On Monday 01 September 2014 18:00:58 long.wanglong wrote:
->> On 2014/9/1 13:49, Wang Long wrote:
->>>
->>> Hi,all
->>>
->>> In kernel 3.17-rc2, when i set CONFIG_HAVE_SMP = y and CONFIG_SMP_ON_UP = y 
->>> in .config file. the secondary core can not boot.
->>>
->>> when i set CONFIG_HAVE_SMP = y and CONFIG_SMP_ON_UP = n in .config file,
->>> the secondary core can boot.
->>>
->>> But this does not happen in kernel 3.10 lts kernel, Whether the 
->>> CONFIG_SMP_ON_UP is set yes or no ,the secondary core can boot.
->>>
->>> Does the meaning of CONFIG_SMP_ON_UP changed or this is a bug in kernel 3.17-rc2 ? 
->>>
->>>
->>
->> hi Arnd
->>
->> In above two cases, i also set  CONFIG_SMP = y. in addtion,
->> the CONFIG_SMP_ON_UP depends on CONFIG_SMP. when set
->> CONFIG_SMP_ON_UP = y, the value of CONFIG_SMP must be y.
-> 
-> I see.
-> 
-> I'm looking at the code more closely now:
-> 
->>> config:     set CONFIG_HAVE_SMP = y and CONFIG_SMP_ON_UP = y
->>> command:    # qemu-system-arm -M vexpress-a9 -smp 2  -m 128M -kernel arch/arm/boot/zImage -nographic
->>> The output:
->>>
->>> ..........
->>> is_smp() return false;
-> 
-> This test basically checks whether the __fixup_smp_on_up code was
-> run or not. This has changed in bc41b8724f24 "ARM: 7846/1: Update
-> SMP_ON_UP code to detect A9MPCore with 1 CPU devices", in order
-> to support a quirk in the Aegis platform. Can you try reverting
-> that commit?
-> 
-> 	Arnd
-> 
-> .
-> 
+Below flow will have the redundant interrupts for broadcast timer:
 
+1. Process A starts a hrtimer with 100ms timeout, then Process A will
+   wait on the waitqueue to sleep;
+2. The CPU which Process A runs on will enter idle and call notify
+   CLOCK_EVT_NOTIFY_BROADCAST_ENTER, so the CPU will shutdown its local
+   and set broadcast timer's next event with delta for 100ms timeout;
+3. After 70ms later, the CPU is waken up by other peripheral's interrupt
+   and Process A will be waken up as well; Process A will cancel the hrtimer
+   at this point, kernel will remove the timer event from the event queue
+   but it will not really disable broadcast timer;
+4. So after 30ms later, the broadcast timer interrupt will be triggered
+   even though the timer has been cancelled by s/w in step 3.
 
-Hi Arnd
+To fix this issue, in theory cpu can check this situation when the cpu
+enter and exit idle; So it can iterate the related idle cpus to calculate
+the correct broadcast event value.
 
-When i revert the commit bc41b8724f24, the secondary core can boot.
-The problem is that qemu doesn't provide emulation of the SCU base
-address register. When reading the SCU base, qemu just return 0.
+But with upper method, it has the side effect. Due the cpu enter and exit
+idle state very frequently in short time, so can optimize to only calculate
+the correct state only when the cpu join into broadcast timer and set the
+next event after calculate a different event compare to previous time.
 
-In the real hardware, there is no this problem.
+Signed-off-by: Leo Yan <leoy@marvell.com>
+---
+ kernel/time/tick-broadcast.c | 56 +++++++++++++++++++++++++++++++++++++-------
+ 1 file changed, 48 insertions(+), 8 deletions(-)
+
+diff --git a/kernel/time/tick-broadcast.c b/kernel/time/tick-broadcast.c
+index 64c5990..52f8879 100644
+--- a/kernel/time/tick-broadcast.c
++++ b/kernel/time/tick-broadcast.c
+@@ -324,6 +324,31 @@ unlock:
+ 	raw_spin_unlock(&tick_broadcast_lock);
+ }
+ 
++static void tick_broadcast_oneshot_get_earlier_event(void)
++{
++	struct clock_event_device *bc;
++	struct tick_device *td;
++	ktime_t next_event;
++	int cpu, next_cpu = 0;
++
++	next_event.tv64 = KTIME_MAX;
++
++	/* iterate all expired events */
++	for_each_cpu(cpu, tick_broadcast_oneshot_mask) {
++
++		td = &per_cpu(tick_cpu_device, cpu);
++		if (td->evtdev->next_event.tv64 < next_event.tv64) {
++			next_event.tv64 = td->evtdev->next_event.tv64;
++			next_cpu = cpu;
++		}
++	}
++
++	bc = tick_broadcast_device.evtdev;
++	if (next_event.tv64 != KTIME_MAX &&
++	    next_event.tv64 != bc->next_event.tv64)
++		tick_broadcast_set_event(bc, next_cpu, next_event, 0);
++}
++
+ /*
+  * Powerstate information: The system enters/leaves a state, where
+  * affected devices might stop
+@@ -717,17 +742,32 @@ int tick_broadcast_oneshot_control(unsigned long reason)
+ 		if (!cpumask_test_and_set_cpu(cpu, tick_broadcast_oneshot_mask)) {
+ 			WARN_ON_ONCE(cpumask_test_cpu(cpu, tick_broadcast_pending_mask));
+ 			broadcast_shutdown_local(bc, dev);
++
++			/*
++			 * We only reprogram the broadcast timer if we did not
++			 * mark ourself in the force mask; If the current CPU
++			 * is in the force mask, then we are going to be woken
++			 * by the IPI right away.
++			 */
++			if (cpumask_test_cpu(cpu, tick_broadcast_force_mask))
++				goto out;
++
+ 			/*
+-			 * We only reprogram the broadcast timer if we
+-			 * did not mark ourself in the force mask and
+-			 * if the cpu local event is earlier than the
+-			 * broadcast event. If the current CPU is in
+-			 * the force mask, then we are going to be
+-			 * woken by the IPI right away.
++			 * Reprogram the broadcast timer if the cpu local event
++			 * is earlier than the broadcast event;
+ 			 */
+-			if (!cpumask_test_cpu(cpu, tick_broadcast_force_mask) &&
+-			    dev->next_event.tv64 < bc->next_event.tv64)
++			if (dev->next_event.tv64 < bc->next_event.tv64) {
+ 				tick_broadcast_set_event(bc, cpu, dev->next_event, 1);
++				goto out;
++			}
++
++			/*
++			 * It's possible the cpu has cancelled the timer which
++			 * has set the broadcast event at last time, so
++			 * re-calculate the broadcast timer according to all
++			 * related cpus' expire events.
++			 */
++			tick_broadcast_oneshot_get_earlier_event();
+ 		}
+ 		/*
+ 		 * If the current CPU owns the hrtimer broadcast
+-- 
+1.9.1
