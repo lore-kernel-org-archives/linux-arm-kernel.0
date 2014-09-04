@@ -1,196 +1,80 @@
 From: lina.iyer@linaro.org (Lina Iyer)
-Date: Thu,  4 Sep 2014 16:35:30 -0600
-Subject: [PATCH v5 5/7] qcom: msm-pm: Add cpu low power mode functions
+Date: Thu,  4 Sep 2014 16:35:32 -0600
+Subject: [PATCH v5 7/7] arm: dts: qcom: Add idle states device nodes for 8974
 In-Reply-To: <1409870132-16929-1-git-send-email-lina.iyer@linaro.org>
 References: <1409870132-16929-1-git-send-email-lina.iyer@linaro.org>
-Message-ID: <1409870132-16929-6-git-send-email-lina.iyer@linaro.org>
+Message-ID: <1409870132-16929-8-git-send-email-lina.iyer@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Based on work by many authors, available at codeaurora.org
-
-Add interface layer to abstract and handle hardware specific
-functionality for executing various cpu low power modes in QCOM
-chipsets.
-
-QCOM cpus support multiple low power modes. The C-States are defined as -
-
-    * WFI (clock gating)
-    * Retention (clock gating at lower power)
-    * Standalone Power Collapse (Standalone PC or SPC) - The power to
-    	the cpu is lost and the cpu warmboots.
-    * Power Collapse (PC) - Same as SPC, but is a cognizant of the fact
-    	that the SoC may do deeper sleep modes.
+Add allowable C-States for each cpu using the cpu-idle-states node.
+ARM spec dictates WFI as the default idle state at 0. Support standalone
+power collapse (power down that does not affect any SoC idle states) for
+each cpu.
 
 Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
-[lina: simplify the driver for an initial submission, add commit text
-description of idle states]
 ---
- drivers/soc/qcom/Makefile |   2 +-
- drivers/soc/qcom/msm-pm.c | 106 ++++++++++++++++++++++++++++++++++++++++++++++
- include/soc/qcom/pm.h     |  31 ++++++++++++++
- 3 files changed, 138 insertions(+), 1 deletion(-)
- create mode 100644 drivers/soc/qcom/msm-pm.c
- create mode 100644 include/soc/qcom/pm.h
+ arch/arm/boot/dts/qcom-msm8974.dtsi | 20 ++++++++++++++++++++
+ 1 file changed, 20 insertions(+)
 
-diff --git a/drivers/soc/qcom/Makefile b/drivers/soc/qcom/Makefile
-index 9457b2a..acdd6fa 100644
---- a/drivers/soc/qcom/Makefile
-+++ b/drivers/soc/qcom/Makefile
-@@ -1,4 +1,4 @@
- obj-$(CONFIG_QCOM_GSBI)	+=	qcom_gsbi.o
--obj-$(CONFIG_QCOM_PM)	+=	spm.o spm-devices.o
-+obj-$(CONFIG_QCOM_PM)	+=	spm.o spm-devices.o msm-pm.o
- CFLAGS_scm.o :=$(call as-instr,.arch_extension sec,-DREQUIRES_SEC=1)
- obj-$(CONFIG_QCOM_SCM) += scm.o scm-boot.o
-diff --git a/drivers/soc/qcom/msm-pm.c b/drivers/soc/qcom/msm-pm.c
-new file mode 100644
-index 0000000..8926c71
---- /dev/null
-+++ b/drivers/soc/qcom/msm-pm.c
-@@ -0,0 +1,106 @@
-+/* Copyright (c) 2010-2014, The Linux Foundation. All rights reserved.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 and
-+ * only version 2 as published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ */
+diff --git a/arch/arm/boot/dts/qcom-msm8974.dtsi b/arch/arm/boot/dts/qcom-msm8974.dtsi
+index 0580bc2..041c8b6 100644
+--- a/arch/arm/boot/dts/qcom-msm8974.dtsi
++++ b/arch/arm/boot/dts/qcom-msm8974.dtsi
+@@ -21,6 +21,7 @@
+ 			reg = <0>;
+ 			next-level-cache = <&L2>;
+ 			qcom,acc = <&acc0>;
++			cpu-idle-states = <&CPU_WFI &CPU_SPC>;
+ 		};
+ 
+ 		CPU1: cpu at 1 {
+@@ -30,6 +31,7 @@
+ 			reg = <1>;
+ 			next-level-cache = <&L2>;
+ 			qcom,acc = <&acc1>;
++			cpu-idle-states = <&CPU_WFI &CPU_SPC>;
+ 		};
+ 
+ 		CPU2: cpu at 2 {
+@@ -39,6 +41,7 @@
+ 			reg = <2>;
+ 			next-level-cache = <&L2>;
+ 			qcom,acc = <&acc2>;
++			cpu-idle-states = <&CPU_WFI &CPU_SPC>;
+ 		};
+ 
+ 		CPU3: cpu at 3 {
+@@ -48,6 +51,7 @@
+ 			reg = <3>;
+ 			next-level-cache = <&L2>;
+ 			qcom,acc = <&acc3>;
++			cpu-idle-states = <&CPU_WFI &CPU_SPC>;
+ 		};
+ 
+ 		L2: l2-cache {
+@@ -55,6 +59,22 @@
+ 			cache-level = <2>;
+ 			qcom,saw = <&saw_l2>;
+ 		};
 +
-+#include <linux/kernel.h>
-+#include <linux/init.h>
-+#include <linux/platform_device.h>
++		idle-states {
++			CPU_WFI: cpu-idle-state-0 {
++				compatible = "qcom,idle-state-wfi", "arm,idle-state";
++				entry-latency-us = <1>;
++				exit-latency-us = <1>;
++				min-residency-us = <2>;
++			};
 +
-+#include <asm/proc-fns.h>
-+#include <asm/suspend.h>
-+
-+#include <soc/qcom/pm.h>
-+#include <soc/qcom/scm.h>
-+#include <soc/qcom/scm-boot.h>
-+#include <soc/qcom/spm.h>
-+
-+#define SCM_CMD_TERMINATE_PC	(0x2)
-+#define SCM_FLUSH_FLAG_MASK	(0x3)
-+
-+static int set_up_boot_address(void *entry, int cpu)
-+{
-+	static int flags[NR_CPUS] = {
-+		SCM_FLAG_WARMBOOT_CPU0,
-+		SCM_FLAG_WARMBOOT_CPU1,
-+		SCM_FLAG_WARMBOOT_CPU2,
-+		SCM_FLAG_WARMBOOT_CPU3,
-+	};
-+	static DEFINE_PER_CPU(void *, last_known_entry);
-+
-+	if (entry == per_cpu(last_known_entry, cpu))
-+		return 0;
-+
-+	per_cpu(last_known_entry, cpu) = entry;
-+	return scm_set_boot_addr(virt_to_phys(entry), flags[cpu]);
-+}
-+
-+static int msm_pm_collapse(unsigned long int unused)
-+{
-+	int ret;
-+	enum msm_pm_l2_scm_flag flag;
-+
-+	ret = set_up_boot_address(cpu_resume, raw_smp_processor_id());
-+	if (ret) {
-+		pr_err("Failed to set warm boot address for cpu %d\n",
-+				raw_smp_processor_id());
-+		return ret;
-+	}
-+
-+	flag = MSM_SCM_L2_ON & SCM_FLUSH_FLAG_MASK;
-+	scm_call_atomic1(SCM_SVC_BOOT, SCM_CMD_TERMINATE_PC, flag);
-+
-+	return 0;
-+}
-+
-+/**
-+ * msm_cpu_pm_enter_sleep(): Enter a low power mode on current cpu
-+ *
-+ * @mode - sleep mode to enter
-+ *
-+ * The code should be called with interrupts disabled and on the core on
-+ * which the low power mode is to be executed.
-+ *
-+ */
-+static int msm_cpu_pm_enter_sleep(enum msm_pm_sleep_mode mode)
-+{
-+	int ret;
-+
-+	switch (mode) {
-+	case MSM_PM_SLEEP_MODE_SPC:
-+		msm_spm_set_low_power_mode(MSM_SPM_MODE_POWER_COLLAPSE);
-+		ret = cpu_suspend(0, msm_pm_collapse);
-+		break;
-+	default:
-+	case MSM_PM_SLEEP_MODE_WFI:
-+		msm_spm_set_low_power_mode(MSM_SPM_MODE_CLOCK_GATING);
-+		ret = cpu_do_idle();
-+		break;
-+	}
-+
-+	local_irq_enable();
-+
-+	return ret;
-+}
-+
-+static struct platform_device qcom_cpuidle_device = {
-+	.name              = "qcom_cpuidle",
-+	.id                = -1,
-+	.dev.platform_data = msm_cpu_pm_enter_sleep,
-+};
-+
-+static int __init msm_pm_device_init(void)
-+{
-+	platform_device_register(&qcom_cpuidle_device);
-+
-+	return 0;
-+}
-+device_initcall(msm_pm_device_init);
-diff --git a/include/soc/qcom/pm.h b/include/soc/qcom/pm.h
-new file mode 100644
-index 0000000..c2f006b
---- /dev/null
-+++ b/include/soc/qcom/pm.h
-@@ -0,0 +1,31 @@
-+/*
-+ * Copyright (c) 2009-2014, The Linux Foundation. All rights reserved.
-+ *
-+ * This software is licensed under the terms of the GNU General Public
-+ * License version 2, as published by the Free Software Foundation, and
-+ * may be copied, distributed, and modified under those terms.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ */
-+
-+#ifndef __QCOM_PM_H
-+#define __QCOM_PM_H
-+
-+enum msm_pm_sleep_mode {
-+	MSM_PM_SLEEP_MODE_WFI,
-+	MSM_PM_SLEEP_MODE_RET,
-+	MSM_PM_SLEEP_MODE_SPC,
-+	MSM_PM_SLEEP_MODE_PC,
-+	MSM_PM_SLEEP_MODE_NR,
-+};
-+
-+enum msm_pm_l2_scm_flag {
-+	MSM_SCM_L2_ON = 0,
-+	MSM_SCM_L2_OFF = 1
-+};
-+
-+#endif  /* __QCOM_PM_H */
++			CPU_SPC: cpu-idle-state-1 {
++				compatible = "qcom,idle-state-spc", "arm,idle-state";
++				entry-latency-us = <150>;
++				exit-latency-us = <200>;
++				min-residency-us = <2000>;
++			};
++		};
+ 	};
+ 
+ 	cpu-pmu {
 -- 
 1.9.1
