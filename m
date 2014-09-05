@@ -1,45 +1,54 @@
-From: Minghuan.Lian@freescale.com (Minghuan.Lian at freescale.com)
-Date: Fri, 5 Sep 2014 07:40:39 +0000
-Subject: =?gb2312?B?tPC4tDogW1BBVENIIDIvMl0gUENJOiBMYXllcnNjYXBlOiBBZGQgTGF5ZXJz?=
- =?gb2312?Q?cape_PCIe_driver?=
-In-Reply-To: <CAOMZO5BtOO42sde_Eco2=p06WQsJn3+1J44k6i+Dg7qxOK8qdw@mail.gmail.com>
-References: <1409856338-1730-1-git-send-email-Minghuan.Lian@freescale.com>
- <1409856338-1730-2-git-send-email-Minghuan.Lian@freescale.com>,
- <CAOMZO5BtOO42sde_Eco2=p06WQsJn3+1J44k6i+Dg7qxOK8qdw@mail.gmail.com>
-Message-ID: <1409931678166.54274@freescale.com>
+From: rric@kernel.org (Robert Richter)
+Date: Fri,  5 Sep 2014 09:46:41 +0200
+Subject: [PATCH v2 0/4] arm64, thunder: Enable Cavium Thunder SoC Family
+Message-ID: <1409903205-2762-1-git-send-email-rric@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Fabio,
+From: Robert Richter <rrichter@cavium.com>
 
-There are no same parts between Layerscape and imx6 except the same PCIe IP.
-I think it is better Layerscape uses a separate file. 
+This initial patches enable Cavium Thunder SoC Family. The patches add
+Kconfig and devicetree support and then add Thunder to the defconfig.
 
-Yes, I retrieve base and size from dtsi file, and then use them and defined PCIE_LS1021A_BASE to calculate controller index. Our SoC contains two PCI controllers.
-I can remove  PCIE_LS1021A_BASE, but I must find a way to get controller index.
-Because SCFG(The supplemental configuration unit, provides SoC specific configuration and status
-registers for the device.) includes several separate register for PEX1 and PEX2. 
-and I do not want to add several 'reg' entry to describe the SCFG PEX registers.
+The Thunder system needs more enablement patches for subsystems and
+devices, this includes network, ahci, gicv3/gicv3-its, pci, smmu, kvm.
+We will send separate patch sets for these. All of them base on this
+initial patches.
 
-Thanks,
-Minghaun 
-________________________________________
-???: Fabio Estevam <festevam@gmail.com>
-????: 2014?9?5? 4:21
-???: Lian Minghuan-B31939
-??: linux-pci at vger.kernel.org; linux-arm-kernel at lists.infradead.org; Zang Roy-R61911; Hu Mingkai-B21284; Wood Scott-B07421
-??: Re: [PATCH 2/2] PCI: Layerscape: Add Layerscape PCIe driver
+I sent a separate patch set independently that introduces support for
+dts vendor subdirs. After both patch sets have been applied I will
+send a patch in addition that moves the dts file into a subdirectory.
 
-On Thu, Sep 4, 2014 at 3:45 PM, Minghuan Lian
-<Minghuan.Lian@freescale.com> wrote:
-> Add support for Freescale Layerscape PCIe controller. This driver
-> re-uses the designware core code.
+Patches are available here:
 
-It seems that this is the same IP as on mx6, right?
+ git://git.kernel.org/pub/scm/linux/kernel/git/rric/linux.git thunder/init
 
-Is it possible to adapt drivers/pci/host/pci-imx6.c to work on Layerscape?
+v2 changes:
+* rebased to 3.17
+* placed commas between 32-bit portions of 64 bit addresses
+* removed #address-cells and size-cells in gic node
+* get rid of the clocks node
+* changed to gpl/x11 dual license
+* removed memreserve
+* moved gic to bus node
 
-> +#define PCIE_LS1021A_BASE      0x3400000
-> +#define PCIE_LS1021A_REG_SIZE  0x0100000
+Radha Mohan Chintakuntla (3):
+  arm64, thunder: Add Kconfig option for Cavium Thunder SoC Family
+  arm64, thunder: Add initial dts for Cavium Thunder SoC
+  arm64, thunder: Document devicetree bindings for Cavium Thunder SoC
 
-You should retrieve base and reg size from the dtsi file.
+Robert Richter (1):
+  arm64, defconfig: Enable Cavium Thunder SoC in defconfig
+
+ .../devicetree/bindings/arm/cavium-thunder.txt     |  10 +
+ Documentation/devicetree/bindings/arm/cpus.txt     |   1 +
+ arch/arm64/Kconfig                                 |   6 +
+ arch/arm64/boot/dts/Makefile                       |   1 +
+ arch/arm64/boot/dts/thunder-88xx.dts               | 414 +++++++++++++++++++++
+ arch/arm64/configs/defconfig                       |   1 +
+ 6 files changed, 433 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/arm/cavium-thunder.txt
+ create mode 100644 arch/arm64/boot/dts/thunder-88xx.dts
+
+-- 
+2.0.1
