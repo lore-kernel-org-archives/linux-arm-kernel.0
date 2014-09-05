@@ -1,58 +1,32 @@
-From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
-Date: Fri,  5 Sep 2014 21:02:49 +0200
-Subject: [PATCH 14/18] tty: serial: 8250_dma: handle the when UART response
- while DMA remains idle
-In-Reply-To: <1409943773-7874-1-git-send-email-bigeasy@linutronix.de>
-References: <1409943773-7874-1-git-send-email-bigeasy@linutronix.de>
-Message-ID: <1409943773-7874-15-git-send-email-bigeasy@linutronix.de>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 05 Sep 2014 21:36:38 +0200
+Subject: arm: Add basic support for MediaTek MT8127 & MT8135 SoCs
+In-Reply-To: <1409874660-8710-1-git-send-email-srv_yingjoe.chen@mediatek.com>
+References: <1409874660-8710-1-git-send-email-srv_yingjoe.chen@mediatek.com>
+Message-ID: <15158935.ieDDcCvpAL@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sometimes the OMAP UART does not signal the DMA engine to unload the FIFO.
-Usually this happens when we have >threshold bytes in the FIFO
-and start the DMA transfer. It seems that in those cases the UART won't
-trigger the transfer once the requested threshold is reached. In some
-rare cases the UART does not trigger the DMA transfer even if programmed
-while the FIFO was empty.
-In those cases the UART drops an RDI event and we have to empty the FIFO
-manually. If we ignore it because the DMA transfer is programmed then we
-will enter the function a few times until we receive the RX_TIMEOUT
-event. At that point the FIFO is usually full and we risk to overflow
-the FIFO.
+Hello Joe,
 
-Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
----
- drivers/tty/serial/8250/8250_dma.c | 18 ++++++++++++++++++
- 1 file changed, 18 insertions(+)
+On Friday 05 September 2014 07:50:55 Joe. C wrote:
+> This series add basic device tree support MT8127 & MT8135.
+> This series is based on v3.17-rc3.
+>
+> We are planning to upstream drivers for MT8127 & MT8135 SoCs.
+> MT8135 is a tablet soc featuring 2 CA7 + 2 CA15. MT8127 is a
+> tablet soc with 4 CA7. They share many similar IP components
+> with MT65xx series.
 
-diff --git a/drivers/tty/serial/8250/8250_dma.c b/drivers/tty/serial/8250/8250_dma.c
-index 6cd8a4db609a..f0fce8236279 100644
---- a/drivers/tty/serial/8250/8250_dma.c
-+++ b/drivers/tty/serial/8250/8250_dma.c
-@@ -182,6 +182,24 @@ int serial8250_rx_dma(struct uart_8250_port *p, unsigned int iir)
- 			__dma_rx_do_complete(p, true);
- 		}
- 		return -ETIMEDOUT;
-+	case UART_IIR_RDI:
-+		if (p->bugs & UART_BUG_DMA_RX)
-+			break;
-+		/*
-+		 * The OMAP UART is a special BEAST. If we receive RDI we _have_
-+		 * a DMA transfer programmed but it didn't worked. One reason is
-+		 * that we were too slow and there were too many bytes in the
-+		 * FIFO, the UART counted wrong and never kicked the DMA engine
-+		 * to do anything. That means once we receive RDI on OMAP than
-+		 * the DMA won't do anything soon so we have to cancel the DMA
-+		 * transfer and purge the FIFO manually.
-+		 */
-+		if (dma->rx_running) {
-+			dmaengine_pause(dma->rxchan);
-+			__dma_rx_do_complete(p, true);
-+		}
-+		return -ETIMEDOUT;
-+
- 	default:
- 		break;
- 	}
--- 
-2.1.0
+The patches look very nice to me, I'm glad to hear you have
+plans to upstream more.
+ 
+> Please note this one is not base on intpol [1] patches I sent
+> last month. Base on the discussion on intpol, I think it might
+> take some more time. I'd like to have this merge first so we
+> can work on other stuff simultaneously.
+
+Yes, I agree. I'll wait for Matthias to pick up your patches
+and send a pull request for them.
+
+	Arnd
