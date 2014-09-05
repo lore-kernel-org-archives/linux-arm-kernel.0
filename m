@@ -1,53 +1,85 @@
-From: bhupesh.sharma@freescale.com (bhupesh.sharma at freescale.com)
-Date: Fri, 5 Sep 2014 09:46:46 +0000
-Subject: [PATCH v2] ARM: spear: Remove references to PLAT_SPEAR_SINGLE
-In-Reply-To: <1409909940.5546.154.camel@x220>
-References: <1392153676.14317.8.camel@x220> <1397550407.1985.12.camel@x220>
- <534CFB45.9070704@st.com> <1402919387.30599.4.camel@x220>
- <1409909229.5546.146.camel@x220> <1409909940.5546.154.camel@x220>
-Message-ID: <67e78606ffe94782aa09439f42fef837@BN1PR03MB220.namprd03.prod.outlook.com>
+From: takahiro.akashi@linaro.org (AKASHI Takahiro)
+Date: Fri,  5 Sep 2014 18:46:33 +0900
+Subject: [PATCH] arm: prevent BUG_ON in audit_syscall_entry()
+Message-ID: <1409910393-30896-1-git-send-email-takahiro.akashi@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+BUG_ON() in audit_syscall_entry() will be hit if user issues syscall(-1)
+while syscall auditing is enabled (that is, by starting auditd).
+In fact, syscall(-1) just fails (not signaled despite the expectation,
+this is another minor bug), but the succeeding syscall hits BUG_ON.
 
-> -----Original Message-----
-> From: linux-arm-kernel [mailto:linux-arm-kernel-
-> bounces at lists.infradead.org] On Behalf Of Paul Bolle
-> Sent: Friday, September 05, 2014 3:09 PM
-> To: Viresh Kumar; Shiraz Hashim
-> Cc: Russell King; Richard Weinberger; Martin Walch; spear-
-> devel at list.st.com; linux-kernel at vger.kernel.org; linux-arm-
-> kernel at lists.infradead.org
-> Subject: Re: [PATCH v2] ARM: spear: Remove references to
-> PLAT_SPEAR_SINGLE
-> 
-> On Fri, 2014-09-05 at 11:27 +0200, Paul Bolle wrote:
-> > On Mon, 2014-06-16 at 13:49 +0200, Paul Bolle wrote:
-> > > On Tue, 2014-04-15 at 14:56 +0530, Rajeev kumar wrote:
-> > > > Reviewed-by: Rajeev Kumar <rajeev-dlh.kumar@st.com>
-> > >
-> > > Thanks!
-> > >
-> > > This can still be seen in v3.16-rc1 and in today's linux-next (ie,
-> > > next-20140616). Is this trivial patch queued somewhere?
-> >
-> > Ditto for v3.17-rc3 and next-20140904. Could someone please pix this
-> up?
-> 
-> And now Rajeev's address bounces. Has Rajeev left ST?
-> 
-> 
+When auditing syscall(-1), audit_syscall_entry() is called anyway, but
+audit_syscall_exit() is not called and then 'in_syscall' flag in thread's
+audit context is kept on. In this way, audit_syscall_entry() against
+the succeeding syscall will see BUG_ON(in_syscall).
 
-Copying Rajeev' new id.
+This patch fixes this bug by
+1) enforcing syscall exit tracing, including audit_syscall_exit(), to be
+   executed in all cases,
+2) handling user-issued syscall(-1) with arm_syscall().
 
+Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
+---
+ arch/arm/kernel/entry-common.S |    4 ++--
+ arch/arm/kernel/ptrace.c       |   10 +++++++++-
+ 2 files changed, 11 insertions(+), 3 deletions(-)
 
-Regards,
-Bhupesh
-
-> 
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+diff --git a/arch/arm/kernel/entry-common.S b/arch/arm/kernel/entry-common.S
+index e52fe5a..28d3931 100644
+--- a/arch/arm/kernel/entry-common.S
++++ b/arch/arm/kernel/entry-common.S
+@@ -426,7 +426,6 @@ ENTRY(vector_swi)
+ local_restart:
+ 	ldr	r10, [tsk, #TI_FLAGS]		@ check for syscall tracing
+ 	stmdb	sp!, {r4, r5}			@ push fifth and sixth args
+-
+ 	tst	r10, #_TIF_SYSCALL_WORK		@ are we tracing syscalls?
+ 	bne	__sys_trace
+ 
+@@ -476,10 +475,11 @@ __sys_trace:
+ 	cmp	scno, #-1			@ skip the syscall?
+ 	bne	2b
+ 	add	sp, sp, #S_OFF			@ restore stack
+-	b	ret_slow_syscall
++	b	__sys_trace_return_skipped
+ 
+ __sys_trace_return:
+ 	str	r0, [sp, #S_R0 + S_OFF]!	@ save returned r0
++__sys_trace_return_skipped:
+ 	mov	r0, sp
+ 	bl	syscall_trace_exit
+ 	b	ret_slow_syscall
+diff --git a/arch/arm/kernel/ptrace.c b/arch/arm/kernel/ptrace.c
+index 0c27ed6..f3339c8 100644
+--- a/arch/arm/kernel/ptrace.c
++++ b/arch/arm/kernel/ptrace.c
+@@ -928,9 +928,13 @@ static void tracehook_report_syscall(struct pt_regs *regs,
+ 	regs->ARM_ip = ip;
+ }
+ 
++extern int arm_syscall(int, struct pt_regs *);
++
+ asmlinkage int syscall_trace_enter(struct pt_regs *regs, int scno)
+ {
+-	current_thread_info()->syscall = scno;
++	int orig_scno;
++
++	current_thread_info()->syscall = orig_scno = scno;
+ 
+ 	/* Do the secure computing check first; failures should be fast. */
+ 	if (secure_computing(scno) == -1)
+@@ -947,6 +951,10 @@ asmlinkage int syscall_trace_enter(struct pt_regs *regs, int scno)
+ 	audit_syscall_entry(AUDIT_ARCH_ARM, scno, regs->ARM_r0, regs->ARM_r1,
+ 			    regs->ARM_r2, regs->ARM_r3);
+ 
++	/* user-issued syscall of -1 */
++	if (scno == -1 && orig_scno == -1)
++		arm_syscall(scno, regs);
++
+ 	return scno;
+ }
+ 
+-- 
+1.7.9.5
