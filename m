@@ -1,92 +1,54 @@
-From: pebolle@tiscali.nl (Paul Bolle)
-Date: Fri, 05 Sep 2014 11:27:09 +0200
-Subject: [PATCH v2] ARM: spear: Remove references to PLAT_SPEAR_SINGLE
-In-Reply-To: <1402919387.30599.4.camel@x220>
-References: <1392153676.14317.8.camel@x220> <1397550407.1985.12.camel@x220>
- <534CFB45.9070704@st.com> <1402919387.30599.4.camel@x220>
-Message-ID: <1409909229.5546.146.camel@x220>
+From: rric@kernel.org (Robert Richter)
+Date: Fri, 5 Sep 2014 11:32:22 +0200
+Subject: [PATCH v2 3/4] arm64, thunder: Document devicetree bindings for
+ Cavium Thunder SoC
+In-Reply-To: <20140905084200.GE13515@arm.com>
+References: <1409903205-2762-1-git-send-email-rric@kernel.org>
+ <1409903205-2762-4-git-send-email-rric@kernel.org>
+ <20140905084200.GE13515@arm.com>
+Message-ID: <20140905093222.GS4703@rric.localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2014-06-16 at 13:49 +0200, Paul Bolle wrote:
-> On Tue, 2014-04-15 at 14:56 +0530, Rajeev kumar wrote:
-> > On 4/15/2014 1:56 PM, Paul Bolle wrote:
-> > > The Kconfig symbol PLAT_SPEAR_SINGLE briefly appeared during the v3.10
-> > > development cycle. It was removed in a merge commit before v3.10. A few
-> > > references to it were left in the tree, probably because they didn't
-> > > generate merge conflicts. Whatever it was, they're useless now and can
-> > > safely be removed.
-> > >
-> > > Reported-by: Martin Walch <walch.martin@web.de>
-> > > Signed-off-by: Paul Bolle <pebolle@tiscali.nl>
-> > > ---
-> > > 0) First version was broken: it left config ARCH_SPEAR_AUTO without its
-> > > bool type. This version is done on top of v3.15-rc1.
-> > >
-> > > 1) Still untested.
-> > >
-> > >   arch/arm/mach-spear/Kconfig | 9 ++++-----
-> > >   1 file changed, 4 insertions(+), 5 deletions(-)
-> > >
-> > > diff --git a/arch/arm/mach-spear/Kconfig b/arch/arm/mach-spear/Kconfig
-> > > index 0786249b2832..bc8a11c53377 100644
-> > > --- a/arch/arm/mach-spear/Kconfig
-> > > +++ b/arch/arm/mach-spear/Kconfig
-> > > @@ -4,7 +4,6 @@
-> > >
-> > >   menuconfig PLAT_SPEAR
-> > >   	bool "ST SPEAr Family" if ARCH_MULTI_V7 || ARCH_MULTI_V5
-> > > -	default PLAT_SPEAR_SINGLE
-> > >   	select ARCH_REQUIRE_GPIOLIB
-> > >   	select ARM_AMBA
-> > >   	select CLKSRC_MMIO
-> > > @@ -13,7 +12,7 @@ if PLAT_SPEAR
-> > >
-> > >   config ARCH_SPEAR13XX
-> > >   	bool "ST SPEAr13xx"
-> > > -	depends on ARCH_MULTI_V7 || PLAT_SPEAR_SINGLE
-> > > +	depends on ARCH_MULTI_V7
-> > >   	select ARCH_HAS_CPUFREQ
-> > >   	select ARM_GIC
-> > >   	select GPIO_SPEAR_SPICS
-> > > @@ -41,7 +40,7 @@ endif #ARCH_SPEAR13XX
-> > >
-> > >   config ARCH_SPEAR3XX
-> > >   	bool "ST SPEAr3xx"
-> > > -	depends on ARCH_MULTI_V5 || PLAT_SPEAR_SINGLE
-> > > +	depends on ARCH_MULTI_V5
-> > >   	depends on !ARCH_SPEAR13XX
-> > >   	select ARM_VIC
-> > >   	select PINCTRL
-> > > @@ -72,7 +71,7 @@ endif
-> > >
-> > >   config ARCH_SPEAR6XX
-> > >   	bool "ST SPEAr6XX"
-> > > -	depends on ARCH_MULTI_V5 || PLAT_SPEAR_SINGLE
-> > > +	depends on ARCH_MULTI_V5
-> > >   	depends on !ARCH_SPEAR13XX
-> > >   	select ARM_VIC
-> > >   	help
-> > > @@ -85,7 +84,7 @@ config MACH_SPEAR600
-> > >   	  Supports ST SPEAr600 boards configured via the device-tree
-> > >
-> > >   config ARCH_SPEAR_AUTO
-> > > -	def_bool PLAT_SPEAR_SINGLE
-> > > +	bool
-> > >   	depends on !ARCH_SPEAR13XX && !ARCH_SPEAR6XX
-> > >   	select ARCH_SPEAR3XX
-> > >
-> > >
+On 05.09.14 09:42:00, Will Deacon wrote:
+> On Fri, Sep 05, 2014 at 08:46:44AM +0100, Robert Richter wrote:
+> > From: Radha Mohan Chintakuntla <rchintakuntla@cavium.com>
 > > 
+> > This patch adds documentation for the devicetree bindings used by the
+> > DT files of Cavium Thunder SoC platforms.
 > > 
-> > Reviewed-by: Rajeev Kumar <rajeev-dlh.kumar@st.com>
+> > Signed-off-by: Radha Mohan Chintakuntla <rchintakuntla@cavium.com>
+> > Signed-off-by: Robert Richter <rrichter@cavium.com>
+> > ---
+> >  Documentation/devicetree/bindings/arm/cavium-thunder.txt | 10 ++++++++++
+> >  Documentation/devicetree/bindings/arm/cpus.txt           |  1 +
+> >  2 files changed, 11 insertions(+)
+> >  create mode 100644 Documentation/devicetree/bindings/arm/cavium-thunder.txt
+> > 
+> > diff --git a/Documentation/devicetree/bindings/arm/cavium-thunder.txt b/Documentation/devicetree/bindings/arm/cavium-thunder.txt
+> > new file mode 100644
+> > index 000000000000..6f63a5866902
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/arm/cavium-thunder.txt
+> > @@ -0,0 +1,10 @@
+> > +Cavium Thunder platform device tree bindings
+> > +--------------------------------------------
+> > +
+> > +Boards with Cavium's Thunder SoC shall have following properties.
+> > +
+> > +Root Node
+> > +---------
+> > +Required root node properties:
+> > +
+> > +  - compatible = "cavium,thunder-88xx";
 > 
-> Thanks!
-> 
-> This can still be seen in v3.16-rc1 and in today's linux-next (ie,
-> next-20140616). Is this trivial patch queued somewhere?
+> Is this file necessary? We don't have one for xgene afaict.
 
-Ditto for v3.17-rc3 and next-20140904. Could someone please pix this up?
+Hmm, looking at Documentation/devicetree/bindings/arm/calxeda.txt
+there is something similar.
 
+I am fine with both, keeping or removing it.
 
-Paul Bolle
+Would leave this to the DT maintainers.
+
+-Robert
