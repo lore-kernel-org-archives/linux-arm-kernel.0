@@ -1,50 +1,57 @@
-From: LW@KARO-electronics.de (Lothar =?UTF-8?B?V2HDn21hbm4=?=)
-Date: Fri, 5 Sep 2014 16:23:30 +0200
-Subject: [PATCH] pinctrl: single: fix freudian slip
-In-Reply-To: <1409903739-25998-1-git-send-email-linus.walleij@linaro.org>
-References: <1409903739-25998-1-git-send-email-linus.walleij@linaro.org>
-Message-ID: <20140905162330.75247029@ipc1.ka-ro>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 5 Sep 2014 15:22:46 +0100
+Subject: [PATCH v2 1/4] arm64, thunder: Add Kconfig option for Cavium
+ Thunder SoC Family
+In-Reply-To: <7863371.EMkUuntQWU@wuerfel>
+References: <1409903205-2762-1-git-send-email-rric@kernel.org>
+ <20140905110552.GH30401@n2100.arm.linux.org.uk>
+ <20140905125147.GC20164@leverpostej> <7863371.EMkUuntQWU@wuerfel>
+Message-ID: <20140905142245.GG20164@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Arnd,
 
-Linus Walleij wrote:
-> commit 03e9f0cac5da6af85758276cb4624caf5911f2b9
-> "pinctrl: clean up after enable refactoring"
-> renamed the vtable callback .enable to .set_mux. The
-> renaming was done manually, and one of the alterations
-> contained a freudian slip. I confess, I am human.
+[...]
+
+> A common pattern these days is to do dependencies like
 > 
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-> ---
->  drivers/pinctrl/pinctrl-single.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+> arch/*/Kconfig:
+> 	config ARCH_FOO
+> 	bool "Enable support for Foo platform"
+> 	help
+> 	  ...
 > 
-> diff --git a/drivers/pinctrl/pinctrl-single.c b/drivers/pinctrl/pinctrl-single.c
-> index 9032422ad18f..fb94b772ad62 100644
-> --- a/drivers/pinctrl/pinctrl-single.c
-> +++ b/drivers/pinctrl/pinctrl-single.c
-> @@ -519,7 +519,7 @@ static const struct pinmux_ops pcs_pinmux_ops = {
->  	.get_functions_count = pcs_get_functions_count,
->  	.get_function_name = pcs_get_function_name,
->  	.get_function_groups = pcs_get_function_groups,
-> -	.set_mux = pcs_sex_mux,
-> +	.set_mux = pcs_set_mux,
->  	.gpio_request_enable = pcs_request_gpio,
->  };
->  
-Congrats, you passed the Turing test! ;)
+> 
+> drivers/*/Kconfig
+> 	config SUBSYS_FOO
+> 	bool "SUBSYS driver for Foo"
+> 	depends on ARCH_FOO || COMPILE_TEST
+> 	depends on OF && REGULATOR && GENERIC_PHY # or whatever
 
+Russell's comments w.r.t. Kconfig warnings when config names change
+still holds regardless of select vs depends on.
 
-Lothar Wa?mann
--- 
-___________________________________________________________
+> That way we can enable everything in the defconfig, but someone
+> who likes to build a more specialized kernel can disable the
+> other platforms and won't get the drivers that are specific to
+> those.
+> 
+> I personally think this is a bit more verbose than what we need, but
+> I don't strongly object doing it that way.
 
-Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
-Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
-Gesch?ftsf?hrer: Matthias Kaussen
-Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
+You'd still be able to do this without ARCH_FOO, though you would need
+to know which drivers are necessary for a particular SoC. That seems to
+be the way things are handled on x86; I don't recall having to select
+support for specific machines there, just the individual drivers.
 
-www.karo-electronics.de | info at karo-electronics.de
-___________________________________________________________
+> The code size really should not matter much on ARM64 though: it's
+> unlikely we will see a lot of systems with less than a few gigabytes
+> of memory, and I expect that a generic kernel would be e.g. 6 MB
+> instead of 4 MB for a platform specific kernel.
+
+Agreed. If there kernel size begins looking unwieldy we either need to
+be compiling more things as modules or a more drastic kernel weight loss
+program.
+
+Mark.
