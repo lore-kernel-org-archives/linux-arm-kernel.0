@@ -1,121 +1,123 @@
-From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Fri,  5 Sep 2014 18:47:43 +0900
-Subject: [RFC] arm64: kgdb: fix single stepping
-Message-ID: <1409910463-30936-1-git-send-email-takahiro.akashi@linaro.org>
+From: wangyijing@huawei.com (Yijing Wang)
+Date: Fri, 5 Sep 2014 18:09:55 +0800
+Subject: [PATCH v1 10/21] x86/MSI: Remove unused MSI weak arch functions
+In-Reply-To: <1409911806-10519-1-git-send-email-wangyijing@huawei.com>
+References: <1409911806-10519-1-git-send-email-wangyijing@huawei.com>
+Message-ID: <1409911806-10519-11-git-send-email-wangyijing@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I tried to verify kgdb in vanilla kernel on fast model, but it seems that
-the single stepping with kgdb doesn't work correctly since its first
-appearance at v3.15.
+Now we can clean up MSI weak arch functions in x86.
 
-On v3.15, 'stepi' command after breaking the kernel at some breakpoint
-steps forward to the next instruction, but the succeeding 'stepi' never
-goes beyond that.
-On v3.16, 'stepi' moves forward to the second instruction just after call of
-do_debug_execption() in el1_dbg, and never goes beyond that. This variance
-of behavior seems to come in with the following patch in v3.16:
-
-    commit 2a2830703a23 ("arm64: debug: avoid accessing mdscr_el1 on fault
-    paths where possible")
-
-I cannot deny the possibility that this migh be a bug of fast model, but
-this patch works for me better than vanilla, and hopefully will help you
-see what's happening behind this issue.
-
-Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
+Signed-off-by: Yijing Wang <wangyijing@huawei.com>
 ---
- arch/arm64/include/asm/assembler.h |    7 +++++++
- arch/arm64/kernel/entry.S          |    4 ++--
- arch/arm64/kernel/kgdb.c           |   15 ++++++---------
- 3 files changed, 15 insertions(+), 11 deletions(-)
+ arch/x86/include/asm/pci.h      |    3 ---
+ arch/x86/include/asm/x86_init.h |    4 ----
+ arch/x86/kernel/apic/io_apic.c  |    2 +-
+ arch/x86/kernel/x86_init.c      |   24 ------------------------
+ drivers/iommu/irq_remapping.c   |    1 -
+ 5 files changed, 1 insertions(+), 33 deletions(-)
 
-diff --git a/arch/arm64/include/asm/assembler.h b/arch/arm64/include/asm/assembler.h
-index 5901480..a345973 100644
---- a/arch/arm64/include/asm/assembler.h
-+++ b/arch/arm64/include/asm/assembler.h
-@@ -87,6 +87,13 @@
- 9990:
- 	.endm
- 
-+	.macro  enable_dbg_if_not_stepping, tmp
-+	mrs     \tmp, mdscr_el1
-+	tbnz    \tmp, #0, 9990f
-+	enable_dbg
-+9990:
-+	.endm
-+
- /*
-  * Enable both debug exceptions and interrupts. This is likely to be
-  * faster than two daifclr operations, since writes to this register
-diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
-index d5eb447..b882f5d 100644
---- a/arch/arm64/kernel/entry.S
-+++ b/arch/arm64/kernel/entry.S
-@@ -325,7 +325,7 @@ el1_dbg:
- 	mrs	x0, far_el1
- 	mov	x2, sp				// struct pt_regs
- 	bl	do_debug_exception
--	enable_dbg
-+	enable_dbg_if_not_stepping x2
- 	kernel_exit 1
- el1_inv:
- 	// TODO: add support for undefined instructions in kernel mode
-@@ -339,7 +339,7 @@ ENDPROC(el1_sync)
- 	.align	6
- el1_irq:
- 	kernel_entry 1
--	enable_dbg
-+	enable_dbg_if_not_stepping x2
- #ifdef CONFIG_TRACE_IRQFLAGS
- 	bl	trace_hardirqs_off
+diff --git a/arch/x86/include/asm/pci.h b/arch/x86/include/asm/pci.h
+index 878a06d..34f9676 100644
+--- a/arch/x86/include/asm/pci.h
++++ b/arch/x86/include/asm/pci.h
+@@ -96,14 +96,11 @@ extern void pci_iommu_alloc(void);
+ #ifdef CONFIG_PCI_MSI
+ /* implemented in arch/x86/kernel/apic/io_apic. */
+ struct msi_desc;
+-int native_setup_msi_irqs(struct pci_dev *dev, int nvec, int type);
+ void native_teardown_msi_irq(unsigned int irq);
+-void native_restore_msi_irqs(struct pci_dev *dev);
+ int setup_msi_irq(struct pci_dev *dev, struct msi_desc *msidesc,
+ 		  unsigned int irq_base, unsigned int irq_offset);
+ extern struct msi_chip *x86_msi_chip;
+ #else
+-#define native_setup_msi_irqs		NULL
+ #define native_teardown_msi_irq		NULL
  #endif
-diff --git a/arch/arm64/kernel/kgdb.c b/arch/arm64/kernel/kgdb.c
-index 75c9cf1..bbc085f 100644
---- a/arch/arm64/kernel/kgdb.c
-+++ b/arch/arm64/kernel/kgdb.c
-@@ -176,14 +176,6 @@ int kgdb_arch_handle_exception(int exception_vector, int signo,
- 		 * over and over again.
- 		 */
- 		kgdb_arch_update_addr(linux_regs, remcom_in_buffer);
--		atomic_set(&kgdb_cpu_doing_single_step, -1);
--		kgdb_single_step =  0;
--
--		/*
--		 * Received continue command, disable single step
--		 */
--		if (kernel_active_single_step())
--			kernel_disable_single_step();
  
- 		err = 0;
- 		break;
-@@ -198,13 +190,13 @@ int kgdb_arch_handle_exception(int exception_vector, int signo,
- 		 */
- 		kgdb_arch_update_addr(linux_regs, remcom_in_buffer);
- 		atomic_set(&kgdb_cpu_doing_single_step, raw_smp_processor_id());
--		kgdb_single_step =  1;
+diff --git a/arch/x86/include/asm/x86_init.h b/arch/x86/include/asm/x86_init.h
+index f58a9c7..2514f67 100644
+--- a/arch/x86/include/asm/x86_init.h
++++ b/arch/x86/include/asm/x86_init.h
+@@ -174,13 +174,9 @@ struct pci_dev;
+ struct msi_msg;
  
- 		/*
- 		 * Enable single step handling
- 		 */
- 		if (!kernel_active_single_step())
- 			kernel_enable_single_step(linux_regs);
-+
- 		err = 0;
- 		break;
- 	default:
-@@ -229,7 +221,12 @@ static int kgdb_compiled_brk_fn(struct pt_regs *regs, unsigned int esr)
+ struct x86_msi_ops {
+-	int (*setup_msi_irqs)(struct pci_dev *dev, int nvec, int type);
+ 	void (*compose_msi_msg)(struct pci_dev *dev, unsigned int irq,
+ 				unsigned int dest, struct msi_msg *msg,
+ 			       u8 hpet_id);
+-	void (*teardown_msi_irq)(unsigned int irq);
+-	void (*teardown_msi_irqs)(struct pci_dev *dev);
+-	void (*restore_msi_irqs)(struct pci_dev *dev);
+ 	int  (*setup_hpet_msi)(unsigned int irq, unsigned int id);
+ };
  
- static int kgdb_step_brk_fn(struct pt_regs *regs, unsigned int esr)
- {
-+	kernel_disable_single_step();
-+
- 	kgdb_handle_exception(1, SIGTRAP, 0, regs);
-+
-+	atomic_set(&kgdb_cpu_doing_single_step, -1);
-+
+diff --git a/arch/x86/kernel/apic/io_apic.c b/arch/x86/kernel/apic/io_apic.c
+index 882b95e..f998192 100644
+--- a/arch/x86/kernel/apic/io_apic.c
++++ b/arch/x86/kernel/apic/io_apic.c
+@@ -3200,7 +3200,7 @@ int setup_msi_irq(struct pci_dev *dev, struct msi_desc *msidesc,
  	return 0;
  }
  
+-int native_setup_msi_irqs(struct pci_dev *dev, int nvec, int type)
++static int native_setup_msi_irqs(struct pci_dev *dev, int nvec, int type)
+ {
+ 	struct msi_desc *msidesc;
+ 	unsigned int irq;
+diff --git a/arch/x86/kernel/x86_init.c b/arch/x86/kernel/x86_init.c
+index 234b072..cc32568 100644
+--- a/arch/x86/kernel/x86_init.c
++++ b/arch/x86/kernel/x86_init.c
+@@ -110,34 +110,10 @@ EXPORT_SYMBOL_GPL(x86_platform);
+ 
+ #if defined(CONFIG_PCI_MSI)
+ struct x86_msi_ops x86_msi = {
+-	.setup_msi_irqs		= native_setup_msi_irqs,
+ 	.compose_msi_msg	= native_compose_msi_msg,
+-	.teardown_msi_irq	= native_teardown_msi_irq,
+-	.teardown_msi_irqs	= default_teardown_msi_irqs,
+-	.restore_msi_irqs	= default_restore_msi_irqs,
+ 	.setup_hpet_msi		= default_setup_hpet_msi,
+ };
+ 
+-/* MSI arch specific hooks */
+-int arch_setup_msi_irqs(struct pci_dev *dev, int nvec, int type)
+-{
+-	return x86_msi.setup_msi_irqs(dev, nvec, type);
+-}
+-
+-void arch_teardown_msi_irqs(struct pci_dev *dev)
+-{
+-	x86_msi.teardown_msi_irqs(dev);
+-}
+-
+-void arch_teardown_msi_irq(unsigned int irq)
+-{
+-	x86_msi.teardown_msi_irq(irq);
+-}
+-
+-void arch_restore_msi_irqs(struct pci_dev *dev)
+-{
+-	x86_msi.restore_msi_irqs(dev);
+-}
+ #endif
+ 
+ struct x86_io_apic_ops x86_io_apic_ops = {
+diff --git a/drivers/iommu/irq_remapping.c b/drivers/iommu/irq_remapping.c
+index e75026e..99b1c0f 100644
+--- a/drivers/iommu/irq_remapping.c
++++ b/drivers/iommu/irq_remapping.c
+@@ -170,7 +170,6 @@ static void __init irq_remapping_modify_x86_ops(void)
+ 	x86_io_apic_ops.set_affinity	= set_remapped_irq_affinity;
+ 	x86_io_apic_ops.setup_entry	= setup_ioapic_remapped_entry;
+ 	x86_io_apic_ops.eoi_ioapic_pin	= eoi_ioapic_pin_remapped;
+-	x86_msi.setup_msi_irqs          = irq_remapping_setup_msi_irqs;
+ 	x86_msi.setup_hpet_msi		= setup_hpet_msi_remapped;
+ 	x86_msi.compose_msi_msg		= compose_remapped_msi_msg;
+ 	x86_msi_chip = &remap_msi_chip;
 -- 
-1.7.9.5
+1.7.1
