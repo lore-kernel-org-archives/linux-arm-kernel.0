@@ -1,41 +1,42 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Fri, 5 Sep 2014 13:14:13 -0500
-Subject: [PATCH v2 1/2] ARM: DRA7: Add support for soc_is_dra74x() and
- soc_is_dra72x() variants
-In-Reply-To: <alpine.DEB.2.02.1409051803190.9444@utopia.booyaka.com>
-References: <1406523237-6905-1-git-send-email-lokeshvutla@ti.com>
- <1406523237-6905-2-git-send-email-lokeshvutla@ti.com>
- <alpine.DEB.2.02.1407280529320.24161@utopia.booyaka.com>
- <53D5E0F4.3080607@ti.com>
- <CAGo_u6pZiyJ8574YUXvg_Pz_P=LDeot-kFh7NQJBUqgwsR+Fmw@mail.gmail.com>
- <alpine.DEB.2.02.1408280618480.21985@utopia.booyaka.com>
- <CAGo_u6qLJdrHw-FosDvhdvMQxQntf=ujZdRW+MrCdqbHZruU4A@mail.gmail.com>
- <alpine.DEB.2.02.1409051803190.9444@utopia.booyaka.com>
-Message-ID: <5409FD75.3090407@ti.com>
+From: peter.griffin@linaro.org (Peter Griffin)
+Date: Fri, 5 Sep 2014 19:16:36 +0100
+Subject: [PATCH RESEND v5 1/5] usb: host: ehci-st: Add EHCI support for
+ ST STB devices
+In-Reply-To: <202755915.brE74x99uQ@wuerfel>
+References: <1409937829-23708-1-git-send-email-peter.griffin@linaro.org>
+ <1409937829-23708-2-git-send-email-peter.griffin@linaro.org>
+ <202755915.brE74x99uQ@wuerfel>
+Message-ID: <20140905181636.GA1715@griffinp-ThinkPad-X1-Carbon-2nd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/05/2014 01:08 PM, Paul Walmsley wrote:
-[...]
->> In the meanwhile, we will try to provide test logs that you may desire 
->> for at least the platforms we have functioning and access to. please 
->> feel free to request specific test vectors if you feel our coverage is 
->> not good enough.
+Hi Arnd,
+
+On Fri, 05 Sep 2014, Arnd Bergmann wrote:
+
+> On Friday 05 September 2014 18:23:45 Peter Griffin wrote:
+> > +struct st_platform_priv {
+> > +       struct clk *clks[USB_MAX_CLKS];
+> > +       struct clk *clk48;
+> > +       struct reset_control *rst;
+> > +       struct reset_control *pwr;
+> > +       struct phy *phy;
+> > +};
 > 
-> Thanks.  You've been showing a lot of great leadership in proactively 
-> posting test logs.  What I'd suggest doing is to keep that up, and if 
-> possible, post one of the test reports for each patch series that's 
-> posted, if possible. 
+> Any reason why this is in a shared header file? It looks like
+> duplicating the structure under two different names would
+> actually be shorter and keep the drivers more readable as they'd
+> be self-contained, even when they have the exact same structure.
 
-I do have automated scripts verifying various defconfigs on a daily
-basis for linux-next and master tags..
-https://github.com/nmenon/kernel-test-logs/ (based on each tag).
+The only reason was it was a identical structure so I put it in a shared
+header file. I can unabstract it if you want?
 
-Every TI engineer does have access to these platforms as well as I do.
-Realistically, few platforms do go offline and online as time goes on.
-we will try to post test reports for each series as much as our TI
-policies let us.
+> 
+> Do both drivers use all fields?
 
--- 
-Regards,
-Nishanth Menon
+Yes they are. I thought the 48Mhz clock would only be used by ohci, but annoyingly it also
+clocks the reset logic of the ehci block as well.
+
+regards,
+
+Peter.
