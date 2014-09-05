@@ -1,100 +1,45 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Fri, 5 Sep 2014 11:15:26 +0200
-Subject: [PATCH] tty/serial: at91: BUG: disable interrupts when
- !UART_ENABLE_MS()
-In-Reply-To: <1409760567-13186-1-git-send-email-richard.genoud@gmail.com>
-References: <1409760567-13186-1-git-send-email-richard.genoud@gmail.com>
-Message-ID: <54097F2E.6090809@atmel.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 5 Sep 2014 10:21:20 +0100
+Subject: [PATCH v8 6/8] drivers: cpuidle: CPU idle ARM64 driver
+In-Reply-To: <20140904172909.GA14822@e102568-lin.cambridge.arm.com>
+References: <1409585324-3678-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <1409585324-3678-7-git-send-email-lorenzo.pieralisi@arm.com>
+ <20140903173740.GJ1824@e102568-lin.cambridge.arm.com>
+ <20140904160320.GB22354@arm.com>
+ <20140904172909.GA14822@e102568-lin.cambridge.arm.com>
+Message-ID: <20140905092120.GG13515@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/09/2014 18:09, Richard Genoud :
-> In set_termios(), interrupts where not disabled if UART_ENABLE_MS() was
-> false.
+On Thu, Sep 04, 2014 at 06:29:10PM +0100, Lorenzo Pieralisi wrote:
+> On Thu, Sep 04, 2014 at 05:03:20PM +0100, Catalin Marinas wrote:
+> > On Wed, Sep 03, 2014 at 06:37:40PM +0100, Lorenzo Pieralisi wrote:
+> > > This patch should be ready to go too, is it ok if I split the series
+> > > in arm64 arch specific patches (will ask Catalin to pull) and CPUidle ones
+> > > (inclusive of DT bindings and !!this patch!!) and send two separate pull
+> > > requests ?
+> > 
+> > If Daniel/Rafael don't have any objection, I can take the whole series
+> > through the arm64 tree (it seems that patches have been already acked by
+> > Daniel).
 > 
-> Tested on at91sam9g35.
+> Thanks a lot Catalin. Since this one is a brand new CPUidle driver and it
+> follows a different pattern from arm legacy drivers I would like to get
+> Daniel's ack on this patch too before pushing it. For the records I have
+> just added two pr_err to signal driver probing error, ultraminor changes
+> that do not justify a repost.
 > 
-> CC: stable at vger.kernel.org # >= 3.16
-> 
-> Signed-off-by: Richard Genoud <richard.genoud@gmail.com>
-> ---
->  drivers/tty/serial/atmel_serial.c | 43 ++++++++++++++++++++++++++++++++++++++-
->  1 file changed, 42 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/tty/serial/atmel_serial.c b/drivers/tty/serial/atmel_serial.c
-> index 7b63677475c1..d7d4584549a5 100644
-> --- a/drivers/tty/serial/atmel_serial.c
-> +++ b/drivers/tty/serial/atmel_serial.c
-> @@ -527,6 +527,45 @@ static void atmel_enable_ms(struct uart_port *port)
->  }
->  
->  /*
-> + * Disable modem status interrupts
-> + */
-> +static void atmel_disable_ms(struct uart_port *port)
-> +{
-> +	struct atmel_uart_port *atmel_port = to_atmel_uart_port(port);
-> +	uint32_t idr = 0;
-> +
-> +	/*
-> +	 * Interrupt should not be disabled twice
-> +	 */
-> +	if (!atmel_port->ms_irq_enabled)
-> +		return;
-> +
-> +	atmel_port->ms_irq_enabled = false;
-> +
-> +	if (atmel_port->gpio_irq[UART_GPIO_CTS] >= 0)
-> +		disable_irq(atmel_port->gpio_irq[UART_GPIO_CTS]);
-> +	else
-> +		idr |= ATMEL_US_CTSIC;
-> +
-> +	if (atmel_port->gpio_irq[UART_GPIO_DSR] >= 0)
-> +		disable_irq(atmel_port->gpio_irq[UART_GPIO_DSR]);
-> +	else
-> +		idr |= ATMEL_US_DSRIC;
-> +
-> +	if (atmel_port->gpio_irq[UART_GPIO_RI] >= 0)
-> +		disable_irq(atmel_port->gpio_irq[UART_GPIO_RI]);
-> +	else
-> +		idr |= ATMEL_US_RIIC;
-> +
-> +	if (atmel_port->gpio_irq[UART_GPIO_DCD] >= 0)
-> +		disable_irq(atmel_port->gpio_irq[UART_GPIO_DCD]);
-> +	else
-> +		idr |= ATMEL_US_DCDIC;
-> +
-> +	UART_PUT_IDR(port, idr);
-> +}
-> +
-> +/*
->   * Control the transmission of a break signal
->   */
->  static void atmel_break_ctl(struct uart_port *port, int break_state)
-> @@ -1993,7 +2032,9 @@ static void atmel_set_termios(struct uart_port *port, struct ktermios *termios,
->  
->  	/* CTS flow-control and modem-status interrupts */
->  	if (UART_ENABLE_MS(port, termios->c_cflag))
-> -		port->ops->enable_ms(port);
-> +		atmel_enable_ms(port);
-> +	else
-> +		atmel_disable_ms(port);
->  
->  	spin_unlock_irqrestore(&port->lock, flags);
->  }
+> If Samsung guys do not manifest themselves I would drop patch 8 from
+> the series till it gets tested and its patch dependency queued too.
 
-Richard,
+The last patch also has a dependency, as you mentioned to Daniel. I think
+we can certainly merge the arm64 parts, and if Daniel doesn't object, then
+we can take the driver stuff too but leaving the exynos bits out (i.e. drop
+the last patch).
 
-Indeed it seems needed:
+Anyway, if you could repost with the acks you've collected and rearrange it
+so the arm64 patches are first in the series, that would be great.
 
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+Cheers,
 
-
-But BTW, I see just below a call to the atmel_enable_ms() function in
-atmel_set_ldisc(). My question is, shouldn't we also add this
-atmel_disable_ms() in the alternative that disables the PPS in this
-ldisc function?
-
-Thanks, bye,
--- 
-Nicolas Ferre
+Will
