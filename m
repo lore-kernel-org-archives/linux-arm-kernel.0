@@ -1,62 +1,47 @@
 From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
-Date: Fri, 05 Sep 2014 15:51:27 +0200
-Subject: [PATCH v6 4/5] ARM: EXYNOS: PM: fix register setup for AFTR mode code
+Date: Fri, 05 Sep 2014 15:51:28 +0200
+Subject: [PATCH v6 5/5] ARM: EXYNOS: cpuidle: allow driver usage on Exynos4x12
+ SoCs
 In-Reply-To: <1409925088-4705-1-git-send-email-b.zolnierkie@samsung.com>
 References: <1409925088-4705-1-git-send-email-b.zolnierkie@samsung.com>
-Message-ID: <1409925088-4705-5-git-send-email-b.zolnierkie@samsung.com>
+Message-ID: <1409925088-4705-6-git-send-email-b.zolnierkie@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add S5P_CENTRAL_SEQ_OPTION register setup to cpuidle AFTR mode code
-by moving the relevant code from exynos_pm_suspend() (used only by
-suspend) to exynos_pm_central_suspend() (used by both suspend and
-AFTR).  Without this setup AFTR mode doesn't show any benefit over
-WFI one (at least on Exynos4412 SoC).  When this setup is applied
-AFTR mode reduces power consumption by ~12% (as measured on Trats2
-board).
+Register cpuidle platform device on Exynos4x12 SoCs allowing EXYNOS
+cpuidle driver usage on these SoCs.
 
-This change is a preparation for adding secure firmware support to
-EXYNOS cpuidle driver.
+AFTR mode reduces power consumption on Trats2 board (Exynos4412 SoC
+with secure firmware enabled) by ~12% when EXYNOS cpuidle driver is
+enabled (in both cases the default exynos_defconfig config is used
+and CPU1-3 are offlined).
+
+Currently Exynos4412 SoC support is limited to Trats2 board.
 
 Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
 Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
 ---
 v6:
-- no changes
+- limit Exynos4412 SoC support to Trats2 board for now
 
- arch/arm/mach-exynos/pm.c | 11 ++++-------
- 1 file changed, 4 insertions(+), 7 deletions(-)
+ arch/arm/mach-exynos/exynos.c | 5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-exynos/pm.c b/arch/arm/mach-exynos/pm.c
-index e0b6885..3cee123 100644
---- a/arch/arm/mach-exynos/pm.c
-+++ b/arch/arm/mach-exynos/pm.c
-@@ -169,6 +169,10 @@ static void exynos_pm_central_suspend(void)
- 	tmp = pmu_raw_readl(S5P_CENTRAL_SEQ_CONFIGURATION);
- 	tmp &= ~S5P_CENTRAL_LOWPWR_CFG;
- 	pmu_raw_writel(tmp, S5P_CENTRAL_SEQ_CONFIGURATION);
-+
-+	/* Setting SEQ_OPTION register */
-+	pmu_raw_writel(S5P_USE_STANDBY_WFI0 | S5P_USE_STANDBY_WFE0,
-+		       S5P_CENTRAL_SEQ_OPTION);
- }
+diff --git a/arch/arm/mach-exynos/exynos.c b/arch/arm/mach-exynos/exynos.c
+index 6a24e11..f5a78d7 100644
+--- a/arch/arm/mach-exynos/exynos.c
++++ b/arch/arm/mach-exynos/exynos.c
+@@ -317,7 +317,10 @@ static void __init exynos_dt_machine_init(void)
+ 		exynos_sysram_init();
  
- static int exynos_pm_central_resume(void)
-@@ -291,15 +295,8 @@ static void exynos_pm_prepare(void)
+ 	if (of_machine_is_compatible("samsung,exynos4210") ||
+-			of_machine_is_compatible("samsung,exynos5250"))
++	    of_machine_is_compatible("samsung,exynos4212") ||
++	    (of_machine_is_compatible("samsung,exynos4412") &&
++	     of_machine_is_compatible("samsung,trats2")) ||
++	    of_machine_is_compatible("samsung,exynos5250"))
+ 		platform_device_register(&exynos_cpuidle);
  
- static int exynos_pm_suspend(void)
- {
--	unsigned long tmp;
--
- 	exynos_pm_central_suspend();
- 
--	/* Setting SEQ_OPTION register */
--
--	tmp = (S5P_USE_STANDBY_WFI0 | S5P_USE_STANDBY_WFE0);
--	pmu_raw_writel(tmp, S5P_CENTRAL_SEQ_OPTION);
--
- 	if (read_cpuid_part() == ARM_CPU_PART_CORTEX_A9)
- 		exynos_cpu_save_register();
- 
+ 	platform_device_register_simple("exynos-cpufreq", -1, NULL, 0);
 -- 
 1.8.2.3
