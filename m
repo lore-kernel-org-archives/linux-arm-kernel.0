@@ -1,30 +1,37 @@
-From: hpa@zytor.com (H. Peter Anvin)
-Date: Fri, 05 Sep 2014 13:07:28 -0700
-Subject: Post-merge-window ping (Re: [PATCH v4 0/5] x86: two-phase syscall
- tracing and seccomp fastpath)
-In-Reply-To: <CALCETrUaZ8w92g96SmFEZDE0Jr+0Moeo+S24-TyW8crrK5reSg@mail.gmail.com>
-References: <CALCETrUaZ8w92g96SmFEZDE0Jr+0Moeo+S24-TyW8crrK5reSg@mail.gmail.com>
-Message-ID: <540A1800.3000005@zytor.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 5 Sep 2014 22:15:29 +0200
+Subject: [PATCH] ARM: sunxi: Remove sun4i reboot code from mach directory
+In-Reply-To: <7hoauuyuyl.fsf@paris.lan>
+References: <1409332787-23923-1-git-send-email-maxime.ripard@free-electrons.com>
+ <7hoauuyuyl.fsf@paris.lan>
+Message-ID: <201409052215.30171.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/26/2014 06:32 PM, Andy Lutomirski wrote:
-> On Mon, Jul 28, 2014 at 8:38 PM, Andy Lutomirski <luto@amacapital.net> wrote:
->> This applies to:
->> git://git.kernel.org/pub/scm/linux/kernel/git/kees/linux.git seccomp-fastpath
->>
->> Gitweb:
->> https://git.kernel.org/cgit/linux/kernel/git/kees/linux.git/log/?h=seccomp/fastpath
+On Friday 05 September 2014, Kevin Hilman wrote:
+> Maxime Ripard <maxime.ripard@free-electrons.com> writes:
 > 
-> Hi all-
+> > Now that the restart code has been merged in the watchdog driver, we don't need
+> > the restart code in the mach-sunxi directory anymore.
+> >
+> > Remove it entirely.
+> >
+> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> > ---
+> >
+> > Hi Arnd, Kevin, Olof,
+> >
+> > I don't know if this can be considered 3.17 material, but if so, it would be
+> > great if you could merge it directly.
 > 
-> AFAIK the only thing that's changed since I submitted it is that the
-> 3.17 merge window is closed.  Kees rebased the tree this applies to,
-> but I think the patches all still apply.  What, if anything, do I need
-> to do to help this along for 3.18?
+> I don't think it's v3.17 material at this point in the cycle because
+> it's not a regression fix.
 > 
+> Please add it to your queue for v3.18.
 
-Just put this stuff in a branch and running through my personal test
-battery now.
+I agree. I had actually put it into my apply-for-3.18 queue already, but
+it's better if this comes through the normal cleanups from Maxime, unless
+he has nothing else yet and prefers me to apply it to the next/cleanup
+branch now.
 
-	-hpa
+	Arnd
