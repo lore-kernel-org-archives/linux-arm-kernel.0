@@ -1,43 +1,57 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Fri, 5 Sep 2014 07:46:19 -0500
-Subject: [PATCH 5/6] dts, arm64: Move dts files to vendor subdirs
-In-Reply-To: <1409899692-1455-6-git-send-email-rric@kernel.org>
-References: <1409899692-1455-1-git-send-email-rric@kernel.org>
- <1409899692-1455-6-git-send-email-rric@kernel.org>
-Message-ID: <CAL_JsqLJ+zuqx9RELw3p2Pa13QuXsDR3Fv1Qcaeqk+R6HXy9uQ@mail.gmail.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Fri, 5 Sep 2014 14:48:00 +0200
+Subject: [PATCH] tty/serial: at91: BUG: disable interrupts when
+ !UART_ENABLE_MS()
+In-Reply-To: <54099926.6000302@hurleysoftware.com>
+References: <1409760567-13186-1-git-send-email-richard.genoud@gmail.com>
+ <54097F2E.6090809@atmel.com> <54099926.6000302@hurleysoftware.com>
+Message-ID: <5409B100.5080709@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 5, 2014 at 1:48 AM, Robert Richter <rric@kernel.org> wrote:
-> From: Robert Richter <rrichter@cavium.com>
->
-> Moving dts files to vendor subdirs.
->
-> Signed-off-by: Robert Richter <rrichter@cavium.com>
-> ---
->  arch/arm64/boot/dts/Makefile                     |   4 +-
->  arch/arm64/boot/dts/apm-mustang.dts              |  34 --
->  arch/arm64/boot/dts/apm-storm.dtsi               | 425 -----------------------
->  arch/arm64/boot/dts/apm/Makefile                 |   5 +
->  arch/arm64/boot/dts/apm/apm-mustang.dts          |  34 ++
->  arch/arm64/boot/dts/apm/apm-storm.dtsi           | 425 +++++++++++++++++++++++
->  arch/arm64/boot/dts/arm/Makefile                 |   6 +
->  arch/arm64/boot/dts/arm/foundation-v8.dts        | 232 +++++++++++++
->  arch/arm64/boot/dts/arm/rtsm_ve-aemv8a.dts       | 159 +++++++++
->  arch/arm64/boot/dts/arm/rtsm_ve-motherboard.dtsi | 240 +++++++++++++
->  arch/arm64/boot/dts/foundation-v8.dts            | 232 -------------
->  arch/arm64/boot/dts/rtsm_ve-aemv8a.dts           | 159 ---------
->  arch/arm64/boot/dts/rtsm_ve-motherboard.dtsi     | 240 -------------
->  13 files changed, 1103 insertions(+), 1092 deletions(-)
+On 05/09/2014 13:06, Peter Hurley :
+> Hi Nicolas,
+> 
+> On 09/05/2014 05:15 AM, Nicolas Ferre wrote:
+>> On 03/09/2014 18:09, Richard Genoud :
+>> Richard,
+>>
+>> Indeed it seems needed:
+>>
+>> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+>>
+>>
+>> But BTW, I see just below a call to the atmel_enable_ms() function in
+>> atmel_set_ldisc(). My question is, shouldn't we also add this
+>> atmel_disable_ms() in the alternative that disables the PPS in this
+>> ldisc function?
+> 
+> I have that change in another series but it has to wait for:
 
-This should be sent with renames enabled (-M option). You can enable
-it by default with this in your git config:
+Given the attractive enhancements that you describe below... I'll wait
+with pleasure ;-)
 
-[diff]
-        renames = true
+> 1. another series that fixes races setting and clearing the controlling tty
+>    (and reduces the footprint of tty_mutex)
+> 2. a series built on that which moves tty_lock() out from under tty_mutex
+>    when reopening ttys
+>    This allows the tty_lock to be held while closing the tty.
+> 3. a series which removes the ldisc flush from the serial core, among some
+>    other locking fixes in the serial core.
+>    This fixes a lock inversion between the termios_rwsem and the port mutex.
+> 
+> All of which enables the set_ldisc() notification to be safely passed
+> termios so it can use UART_ENABLE_MS() and also claim the port mutex
+> to change the UPF_HARDPPS_CD flag, which is currently non-atomic and
+> may corrupt the uart port flags field.
+> 
+> The series also claims the port lock around the *_enable_ms() in the
+> various set_ldisc() handlers to protect the hardware re-programming :)
+> 
+> Right now, all of this is temporarily stuck on the most recent patch
+> series, which hinges on whether the kernel should continue to support
+> non-atomic byte stores.
 
-Otherwise,
-
-Acked-by: Rob Herring <robh@kernel.org>
-
-Rob
+Thanks for sharing your plans. Bye,
+-- 
+Nicolas Ferre
