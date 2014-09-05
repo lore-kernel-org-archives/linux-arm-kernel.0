@@ -1,42 +1,92 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 5 Sep 2014 10:25:08 +0100
-Subject: [PATCH v2 1/4] arm64, thunder: Add Kconfig option for Cavium
- Thunder SoC Family
-In-Reply-To: <20140905092135.GR4703@rric.localhost>
-References: <1409903205-2762-1-git-send-email-rric@kernel.org>
- <1409903205-2762-2-git-send-email-rric@kernel.org>
- <20140905083932.GD13515@arm.com>
- <20140905092135.GR4703@rric.localhost>
-Message-ID: <20140905092507.GH13515@arm.com>
+From: pebolle@tiscali.nl (Paul Bolle)
+Date: Fri, 05 Sep 2014 11:27:09 +0200
+Subject: [PATCH v2] ARM: spear: Remove references to PLAT_SPEAR_SINGLE
+In-Reply-To: <1402919387.30599.4.camel@x220>
+References: <1392153676.14317.8.camel@x220> <1397550407.1985.12.camel@x220>
+ <534CFB45.9070704@st.com> <1402919387.30599.4.camel@x220>
+Message-ID: <1409909229.5546.146.camel@x220>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 05, 2014 at 10:21:35AM +0100, Robert Richter wrote:
-> On 05.09.14 09:39:32, Will Deacon wrote:
-> > On Fri, Sep 05, 2014 at 08:46:42AM +0100, Robert Richter wrote:
-> > > From: Radha Mohan Chintakuntla <rchintakuntla@cavium.com>
-> > > 
-> > > Increase maximum numbers of cpus to 32. This relates to current
-> > > maximal possible cpu number. Increasing this to 64 cpus will be a
-> > > separate patch not part of this enablement patches.
+On Mon, 2014-06-16 at 13:49 +0200, Paul Bolle wrote:
+> On Tue, 2014-04-15 at 14:56 +0530, Rajeev kumar wrote:
+> > On 4/15/2014 1:56 PM, Paul Bolle wrote:
+> > > The Kconfig symbol PLAT_SPEAR_SINGLE briefly appeared during the v3.10
+> > > development cycle. It was removed in a merge commit before v3.10. A few
+> > > references to it were left in the tree, probably because they didn't
+> > > generate merge conflicts. Whatever it was, they're useless now and can
+> > > safely be removed.
+> > >
+> > > Reported-by: Martin Walch <walch.martin@web.de>
+> > > Signed-off-by: Paul Bolle <pebolle@tiscali.nl>
+> > > ---
+> > > 0) First version was broken: it left config ARCH_SPEAR_AUTO without its
+> > > bool type. This version is done on top of v3.15-rc1.
+> > >
+> > > 1) Still untested.
+> > >
+> > >   arch/arm/mach-spear/Kconfig | 9 ++++-----
+> > >   1 file changed, 4 insertions(+), 5 deletions(-)
+> > >
+> > > diff --git a/arch/arm/mach-spear/Kconfig b/arch/arm/mach-spear/Kconfig
+> > > index 0786249b2832..bc8a11c53377 100644
+> > > --- a/arch/arm/mach-spear/Kconfig
+> > > +++ b/arch/arm/mach-spear/Kconfig
+> > > @@ -4,7 +4,6 @@
+> > >
+> > >   menuconfig PLAT_SPEAR
+> > >   	bool "ST SPEAr Family" if ARCH_MULTI_V7 || ARCH_MULTI_V5
+> > > -	default PLAT_SPEAR_SINGLE
+> > >   	select ARCH_REQUIRE_GPIOLIB
+> > >   	select ARM_AMBA
+> > >   	select CLKSRC_MMIO
+> > > @@ -13,7 +12,7 @@ if PLAT_SPEAR
+> > >
+> > >   config ARCH_SPEAR13XX
+> > >   	bool "ST SPEAr13xx"
+> > > -	depends on ARCH_MULTI_V7 || PLAT_SPEAR_SINGLE
+> > > +	depends on ARCH_MULTI_V7
+> > >   	select ARCH_HAS_CPUFREQ
+> > >   	select ARM_GIC
+> > >   	select GPIO_SPEAR_SPICS
+> > > @@ -41,7 +40,7 @@ endif #ARCH_SPEAR13XX
+> > >
+> > >   config ARCH_SPEAR3XX
+> > >   	bool "ST SPEAr3xx"
+> > > -	depends on ARCH_MULTI_V5 || PLAT_SPEAR_SINGLE
+> > > +	depends on ARCH_MULTI_V5
+> > >   	depends on !ARCH_SPEAR13XX
+> > >   	select ARM_VIC
+> > >   	select PINCTRL
+> > > @@ -72,7 +71,7 @@ endif
+> > >
+> > >   config ARCH_SPEAR6XX
+> > >   	bool "ST SPEAr6XX"
+> > > -	depends on ARCH_MULTI_V5 || PLAT_SPEAR_SINGLE
+> > > +	depends on ARCH_MULTI_V5
+> > >   	depends on !ARCH_SPEAR13XX
+> > >   	select ARM_VIC
+> > >   	help
+> > > @@ -85,7 +84,7 @@ config MACH_SPEAR600
+> > >   	  Supports ST SPEAr600 boards configured via the device-tree
+> > >
+> > >   config ARCH_SPEAR_AUTO
+> > > -	def_bool PLAT_SPEAR_SINGLE
+> > > +	bool
+> > >   	depends on !ARCH_SPEAR13XX && !ARCH_SPEAR6XX
+> > >   	select ARCH_SPEAR3XX
+> > >
+> > >
 > > 
-> > Just out of interest, does raising the current maximum limit actually break
-> > any existing code? If not, then doing this as two patches doesn't seem worth
-> > it.
+> > 
+> > Reviewed-by: Rajeev Kumar <rajeev-dlh.kumar@st.com>
 > 
-> Increasing to 64 should be fine from the perspective of cpu mask
-> implementation. Memory foot print should be the same already as this
-> uses long which is 64 bit. So this wouldn't hurt.
+> Thanks!
 > 
-> However, I felt a bit uncomfortable having a dependency here to
-> enabling 64 cpus and getting this patch set upstream. Support for more
-> than 32 cpus is not well tested yet and there still might be problems
-> with e.g. interrupt delivery or topology.
+> This can still be seen in v3.16-rc1 and in today's linux-next (ie,
+> next-20140616). Is this trivial patch queued somewhere?
 
-All I mean is, if the kernel doesn't explode on existing systems by changing
-the upper limit to 64, then we should do that. If you're not comfortable
-that the Thunder code can handle that, then leave the thunder default as 32,
-like you do in the current patch. It just seems odd not to change the
-maximum number, since it's an arbitrary limit from my perspective.
+Ditto for v3.17-rc3 and next-20140904. Could someone please pix this up?
 
-Will
+
+Paul Bolle
