@@ -1,27 +1,19 @@
 From: shawn.guo@freescale.com (Shawn Guo)
-Date: Fri, 5 Sep 2014 08:35:25 +0800
-Subject: [PATCH 0/3] move gpt per clk parent for ipg_per to OSC
-In-Reply-To: <CAOMZO5BOfsvrH3ijxKwyGemEW-B60n-+4wpDZ5xfC98efM469w@mail.gmail.com>
-References: <1409729805-9741-1-git-send-email-b20788@freescale.com>
- <CAOMZO5BOfsvrH3ijxKwyGemEW-B60n-+4wpDZ5xfC98efM469w@mail.gmail.com>
-Message-ID: <20140905003523.GD10809@dragon>
+Date: Fri, 5 Sep 2014 08:43:23 +0800
+Subject: [PATCH] ARM: clk-imx6sl: correct the pxp and epdc axi clock
+ selections
+In-Reply-To: <1409819592-31462-1-git-send-email-chen.fang@freescale.com>
+References: <1409819592-31462-1-git-send-email-chen.fang@freescale.com>
+Message-ID: <20140905004322.GE10809@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 04, 2014 at 07:50:35PM -0300, Fabio Estevam wrote:
-> This patch series works fine if we use the new dtb and new kernel.
+On Thu, Sep 04, 2014 at 04:33:12PM +0800, Fancy Fang wrote:
+> The parent clocks of IMX6SL_CLK_PXP_AXI_SEL and IMX6SL_CLK_EPDC_AXI_SEL
+> clocks are not the same. So split the epdc_pxp_sels into two different
+> clock selections 'pxp_axi_sels' and 'epdc_axi_sels'.
 > 
-> However, booting a kernel with these series applied and using an old
-> dtb we get a system with broken timer.
-> 
-> 'sleep 1' takes something like 20 seconds in this case.
+> Signed-off-by: Fancy Fang <chen.fang@freescale.com>
+> Signed-off-by: Robby Cai <R63905@freescale.com>
 
-Oh, yes.  It breaks the compatibility with existing DTB.  Dropped the
-patches for now.
-
-Anson,
-
-We may need to query the clock rate and then decide how to set up those
-register bits?
-
-Shawn
+Applied, thanks.
