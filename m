@@ -1,56 +1,47 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 5 Sep 2014 13:13:16 +0100
-Subject: [PATCH] ARM: /proc/cpuinfo: Use DT machine name when possible
-In-Reply-To: <201409051338.40988@pali>
-References: <1403110464-29646-1-git-send-email-pali.rohar@gmail.com>
- <201409051338.40988@pali>
-Message-ID: <20140905121316.GI30401@n2100.arm.linux.org.uk>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 5 Sep 2014 13:22:32 +0100
+Subject: Unable to boot mainline on snow chromebook since 3.15
+In-Reply-To: <20140905115704.GO13515@arm.com>
+References: <20140905115704.GO13515@arm.com>
+Message-ID: <20140905122232.GP13515@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 05, 2014 at 01:38:40PM +0200, Pali Roh?r wrote:
-> On Wednesday 18 June 2014 18:54:24 Pali Roh?r wrote:
-> > Machine name from board description is some generic name on DT
-> > kernel. DT provides machine name property which is specific
-> > for board, so use it instead generic one when possible.
-> > 
-> > Signed-off-by: Pali Roh?r <pali.rohar@gmail.com>
-> > ---
-> >  arch/arm/kernel/setup.c |    7 +++++--
-> >  1 file changed, 5 insertions(+), 2 deletions(-)
-> > 
-> > diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
-> > index 8a16ee5..fbc7b4f 100644
-> > --- a/arch/arm/kernel/setup.c
-> > +++ b/arch/arm/kernel/setup.c
-> > @@ -875,10 +875,13 @@ void __init setup_arch(char **cmdline_p)
-> > 
-> >  	setup_processor();
-> >  	mdesc = setup_machine_fdt(__atags_pointer);
-> > -	if (!mdesc)
-> > +	if (mdesc)
-> > +		machine_name = of_flat_dt_get_machine_name();
-> > +	else
-> >  		mdesc = setup_machine_tags(__atags_pointer,
-> > __machine_arch_type); machine_desc = mdesc;
-> > -	machine_name = mdesc->name;
-> > +	if (!machine_name)
-> > +		machine_name = mdesc->name;
-> > 
-> >  	if (mdesc->reboot_mode != REBOOT_HARD)
-> >  		reboot_mode = mdesc->reboot_mode;
+[Looks like it's not just Rutland that can't spell the address of the
+ mailing list today. Fixed here, so please use this post in any replies].
+
+On Fri, Sep 05, 2014 at 12:57:04PM +0100, Will Deacon wrote:
+> Hi all,
 > 
-> So, do you really want to break userspace which reading file 
-> /proc/cpuinfo (after migration from boardcode --> DT)?
+> I'm one of the few, foolish people to try running mainline on my 5250-based
+> Samsung Chromebook (snow). I can live without wireless, usb3 and video
+> acceleration, so actually it makes a reasonable development platform for
+> doing A15-based (micro)-architectural work.
 > 
-> I still do not see reason for that. And only this one file is 
-> problematic...
-
-Sorry, I just don't give a damn about your whinging about this.  I've
-made the situation perfectly clear.  Your patch will not be accepted.
-
-Thanks.
-
--- 
-FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
-according to speedtest.net.
+> However, since 3.15 I've not been able to boot *any* mainline kernels on
+> this board. I did mean to report this earlier, but I have other machines
+> that can run mainline so this has fallen by the wayside.
+> 
+> The problems started with 3.16, where simple-fb would fail to initialise
+> and I lost my display. Note that I don't have a serial console on this
+> machine (I looked at the PCB and there's no way I can solder one of those
+> myself :) I bisected the issue at the time, and I could get my display back
+> by removing some of the new regulator and hdmi properties from the DT. At
+> that point, I could boot, but DMA didn't initialise for the MMC controller
+> so I couldn't mount my root filesystem.
+> 
+> With 3.17-rc3, it seems a lot worse -- I don't get any output after nv-uboot
+> (i.e. the nv-uboot screen just remains on the display, with the last line
+> reading "Stashed 20 records").
+> 
+> I'd usually try to debug this a bit further, but without a console it's
+> really painful to get anywhere. I've been working with 3.15, but now I'm
+> having to backport patches when I want to test them, which is more effort
+> than I can be bothered with.
+> 
+> Is anybody else running mainline on this device and are these known/fixed
+> problems?
+> 
+> Cheers,
+> 
+> Will
