@@ -1,31 +1,72 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 5 Sep 2014 17:27:18 +0200
-Subject: [GIT PULL] Renesas ARM Based SoC Init Delay Updates For v3.18
-In-Reply-To: <cover.1408927601.git.horms+renesas@verge.net.au>
-References: <cover.1408927601.git.horms+renesas@verge.net.au>
-Message-ID: <201409051727.18845.arnd@arndb.de>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Fri, 5 Sep 2014 08:27:58 -0700
+Subject: [PATCH 3/4] watchdog: st_wdt: Provide binding documentation for
+ ST's LPC Watchdog driver
+In-Reply-To: <1409841592-18890-5-git-send-email-lee.jones@linaro.org>
+References: <1409841592-18890-1-git-send-email-lee.jones@linaro.org>
+ <1409841592-18890-5-git-send-email-lee.jones@linaro.org>
+Message-ID: <20140905152758.GA10670@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 25 August 2014, Simon Horman wrote:
-> Hi Olof, Hi Kevin, Hi Arnd,
+On Thu, Sep 04, 2014 at 03:39:51PM +0100, Lee Jones wrote:
+> Signed-off-by: David Paris <david.paris@st.com>
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+
+You might want to copy the devicetree mailing list for bindings approval.
+
+> ---
+>  .../devicetree/bindings/watchdog/st-lpc-wdt.txt    | 27 ++++++++++++++++++++++
+>  1 file changed, 27 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/watchdog/st-lpc-wdt.txt
 > 
-> Please consider these Renesas ARM based SoC init delay updates for v3.18.
-> 
+> diff --git a/Documentation/devicetree/bindings/watchdog/st-lpc-wdt.txt b/Documentation/devicetree/bindings/watchdog/st-lpc-wdt.txt
+> new file mode 100644
+> index 0000000..f0e57ba
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/watchdog/st-lpc-wdt.txt
+> @@ -0,0 +1,27 @@
+> +STMicroelectronics LPC Watchdog
+> +===============================
+> +
+> +Required properties
+> +
+> +- compatible 	: "st,<soc>-watchdog"
 
-While looking at your branches, I noticed that you go to great lengths
-to compute the correct lpj value and avoid the calibration.
+Is this acceptable ? I thought the supported bindings have to be listed
+explicitly.
 
-However, I believe the "modern" way to do this is to call
-register_current_timer_delay() in order to base the delay loop
-on the hardware timer instead of looping in the CPU. This is
-more accurate and more robust against CPU frequency scaling.
+> +- reg		: LPC registers base address + range
+> +- reg-names	: Register map "base" and "syscfg-en" are compulsory "type" is
 
-I'm applying the patches now, but it's something you may want
-to look at in the future. On a related topic, your clocksource
-drivers could be simplified for the DT-only case by using
-CLOCKSOURCE_OF_DECLARE() instead of early_platform_init(), but
-I don't know what the impact would be for the arch/sh and legacy
-mach-shmobile cases.
+'.' after compulsory ?
 
-	Arnd
+> +		  platform dependent and not required for the STiH407.
+> +- clock-names 	: Should be "lpc_wdt"
+> +- clocks	: Clock used by LPC device
+> +- timeout-sec	: Qatchdog timeout in seconds
+
+Watchdog
+
+> +- st,syscfg	: Syscfg node used to configure cpu reset type and mask
+> +- st,warm_reset	: If present, reset type will be 'warm'. If not, it will be cold
+
+s/cold/cold./ ?
+
+> +
+> +Example:
+> +	watchdog at fde05000 {
+> +		compatible	= "st,stih416-lpc-watchdog";
+> +		reg		= <0xfde05000 0x1000> <0x204 0x4>;
+> +		reg-names	= "base", "syscfg-en"
+> +		clock-names	= "lpc_wdt";
+> +		clocks 		= <&clk_s_d3_flexgen CLK_LPC_0>;
+> +		timeout-sec	= <600>;
+> +		st,syscfg	= <&syscfg_core>;
+> +		st,warm_reset;
+> +	};
+> +
+
+Empty line at the end results in a whitespace error when applying.
+
+Guenter
