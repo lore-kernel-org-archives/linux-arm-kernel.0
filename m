@@ -1,32 +1,40 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Fri, 5 Sep 2014 16:14:17 +0800
-Subject: [PATCH 8/8] spi: sirf: make DMA transfer mode optional
-In-Reply-To: <20140904224132.GW29327@sirena.org.uk>
-References: <1409648557-5470-1-git-send-email-Barry.Song@csr.com>
- <1409648557-5470-4-git-send-email-Barry.Song@csr.com>
- <20140904224132.GW29327@sirena.org.uk>
-Message-ID: <CAGsJ_4ysw0vy93N4evG_Aq2mMuymVXY6ig2U0EQBwQmz3uMyNA@mail.gmail.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Fri, 5 Sep 2014 10:16:27 +0200
+Subject: [PATCH 14/15] PM / Domains: Remove default_stop_ok() API
+In-Reply-To: <6302495.FUvz9FPcau@vostro.rjw.lan>
+References: <1409741551-16437-1-git-send-email-ulf.hansson@linaro.org>
+ <1409741551-16437-15-git-send-email-ulf.hansson@linaro.org>
+ <CAMuHMdUEfAdpUgEtOQfdG1gbZjVo3bfAAmhm0-miFGbQ8ckHgA@mail.gmail.com>
+ <6302495.FUvz9FPcau@vostro.rjw.lan>
+Message-ID: <CAPDyKFqbnmGXptn0y5=230HodvEGf94Ab71FjmPj6j9ZJGrgcQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2014-09-05 6:41 GMT+08:00 Mark Brown <broonie@kernel.org>:
-> On Tue, Sep 02, 2014 at 05:02:37PM +0800, Barry Song wrote:
->> From: Qipan Li <Qipan.Li@csr.com>
+On 4 September 2014 21:49, Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
+> On Wednesday, September 03, 2014 03:15:59 PM Geert Uytterhoeven wrote:
+>> Hi Ulf,
 >>
->> some customers want a pure PIO transfer mode even though DMA mode is
->> supported. here we give them a Kconfig option, but still keep the DMA
->> enabled in default.
+>> On Wed, Sep 3, 2014 at 12:52 PM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
+>> > --- a/drivers/base/power/domain_governor.c
+>> > +++ b/drivers/base/power/domain_governor.c
+>>
+>> > @@ -229,10 +229,7 @@ static bool always_on_power_down_ok(struct dev_pm_domain *domain)
+>> >
+>> >  #else /* !CONFIG_PM_RUNTIME */
+>> >
+>> > -bool default_stop_ok(struct device *dev)
+>> > -{
+>> > -       return false;
+>> > -}
+>> > +static inline bool default_stop_ok(struct device *dev) { return false; }
+>>
+>> The "inline" doesn't make much sense here.
 >
-> This doesn't feel like something for the standard kernel - can you
-> explain the benefit the customers think they're getting here?  It seems
-> like either this is something we should have as a more general option,
-> perhaps controllable at runtime or there's likely to be some bug or
-> other problem that's being worked around here.
+> But then it doesn't hurt either I suppose?
+>
+> Anyway, Ulf, are you going to update this patch?
 
-i have no strong technical reason for this as the benefit is not
-always technical. you know....the commit log has provided the reason
-for this patch.
-the difficulty for me is maintaining the difference between mainline
-and local codes, but if we have to maintain two copies,  we can.
+Unless there are other comments, I would prefer to not update. :-)
 
--barry
+Kind regards
+Uffe
