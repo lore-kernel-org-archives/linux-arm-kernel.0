@@ -1,52 +1,80 @@
 From: wangyijing@huawei.com (Yijing Wang)
-Date: Fri, 5 Sep 2014 18:10:05 +0800
-Subject: [PATCH v1 20/21] tile/MSI: Use MSI chip framework to configure
- MSI/MSI-X irq
+Date: Fri, 5 Sep 2014 18:09:51 +0800
+Subject: [PATCH v1 06/21] PCI/MSI: Refactor struct msi_chip to make it become
+ more common
 In-Reply-To: <1409911806-10519-1-git-send-email-wangyijing@huawei.com>
 References: <1409911806-10519-1-git-send-email-wangyijing@huawei.com>
-Message-ID: <1409911806-10519-21-git-send-email-wangyijing@huawei.com>
+Message-ID: <1409911806-10519-7-git-send-email-wangyijing@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use MSI chip framework instead of arch MSI functions to configure
-MSI/MSI-X irq. So we can manage MSI/MSI-X irq in a unified framework.
+Now there are a lot of __weak arch functions in MSI code.
+These functions make MSI driver complex. Thierry Reding Introduced
+a new MSI chip framework to configure MSI/MSI-X irq in ARM. Use
+the new MSI chip framework to refactor all other platform MSI
+arch code to eliminate weak arch MSI functions. This patch add
+.restore_irq() and .setup_irqs() to make it become more common.
 
 Signed-off-by: Yijing Wang <wangyijing@huawei.com>
 ---
- arch/tile/kernel/pci_gx.c |   14 ++++++++++++--
- 1 files changed, 12 insertions(+), 2 deletions(-)
+ drivers/pci/msi.c   |   15 +++++++++++++++
+ include/linux/msi.h |    3 +++
+ 2 files changed, 18 insertions(+), 0 deletions(-)
 
-diff --git a/arch/tile/kernel/pci_gx.c b/arch/tile/kernel/pci_gx.c
-index e39f9c5..4912b75 100644
---- a/arch/tile/kernel/pci_gx.c
-+++ b/arch/tile/kernel/pci_gx.c
-@@ -1485,7 +1485,7 @@ static struct irq_chip tilegx_msi_chip = {
- 	/* TBD: support set_affinity. */
+diff --git a/drivers/pci/msi.c b/drivers/pci/msi.c
+index 539c11d..d78d637 100644
+--- a/drivers/pci/msi.c
++++ b/drivers/pci/msi.c
+@@ -63,6 +63,11 @@ int __weak arch_setup_msi_irqs(struct pci_dev *dev, int nvec, int type)
+ {
+ 	struct msi_desc *entry;
+ 	int ret;
++	struct msi_chip *chip;
++
++	chip = arch_find_msi_chip(dev);
++	if (chip && chip->setup_irqs)
++		return chip->setup_irqs(dev, nvec, type);
+ 
+ 	/*
+ 	 * If an architecture wants to support multiple MSI, it needs to
+@@ -105,6 +110,11 @@ void default_teardown_msi_irqs(struct pci_dev *dev)
+ 
+ void __weak arch_teardown_msi_irqs(struct pci_dev *dev)
+ {
++	struct msi_chip *chip = arch_find_msi_chip(dev);
++
++	if (chip && chip->teardown_irqs)
++		return chip->teardown_irqs(dev);
++
+ 	return default_teardown_msi_irqs(dev);
+ }
+ 
+@@ -128,6 +138,11 @@ static void default_restore_msi_irq(struct pci_dev *dev, int irq)
+ 
+ void __weak arch_restore_msi_irqs(struct pci_dev *dev)
+ {
++	struct msi_chip *chip = arch_find_msi_chip(dev);
++
++	if (chip && chip->restore_irqs)
++		return chip->restore_irqs(dev);
++
+ 	return default_restore_msi_irqs(dev);
+ }
+ 
+diff --git a/include/linux/msi.h b/include/linux/msi.h
+index 5650848..92a51e7 100644
+--- a/include/linux/msi.h
++++ b/include/linux/msi.h
+@@ -72,7 +72,10 @@ struct msi_chip {
+ 	struct list_head list;
+ 
+ 	int (*setup_irq)(struct pci_dev *dev, struct msi_desc *desc);
++	int (*setup_irqs)(struct pci_dev *dev, int nvec, int type);
+ 	void (*teardown_irq)(unsigned int irq);
++	void (*teardown_irqs)(struct pci_dev *dev);
++	void (*restore_irqs)(struct pci_dev *dev);
  };
  
--int arch_setup_msi_irq(struct pci_dev *pdev, struct msi_desc *desc)
-+static int tile_setup_msi_irq(struct pci_dev *pdev, struct msi_desc *desc)
- {
- 	struct pci_controller *controller;
- 	gxio_trio_context_t *trio_context;
-@@ -1604,7 +1604,17 @@ is_64_failure:
- 	return ret;
- }
- 
--void arch_teardown_msi_irq(unsigned int irq)
-+void tile_teardown_msi_irq(unsigned int irq)
- {
- 	irq_free_hwirq(irq);
- }
-+
-+static struct msi_chip tile_msi_chip = {
-+	.setup_irq = tile_setup_msi_irq,
-+	.teardown_irq = tile_teardown_msi_irq,
-+};
-+
-+struct msi_chip *arch_find_msi_chip(struct pci_dev *dev)
-+{
-+	return &tile_msi_chip;
-+}
+ #endif /* LINUX_MSI_H */
 -- 
 1.7.1
