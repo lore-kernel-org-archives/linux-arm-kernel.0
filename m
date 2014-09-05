@@ -1,42 +1,37 @@
-From: peter.griffin@linaro.org (Peter Griffin)
-Date: Fri, 5 Sep 2014 19:16:36 +0100
-Subject: [PATCH RESEND v5 1/5] usb: host: ehci-st: Add EHCI support for
- ST STB devices
-In-Reply-To: <202755915.brE74x99uQ@wuerfel>
-References: <1409937829-23708-1-git-send-email-peter.griffin@linaro.org>
- <1409937829-23708-2-git-send-email-peter.griffin@linaro.org>
- <202755915.brE74x99uQ@wuerfel>
-Message-ID: <20140905181636.GA1715@griffinp-ThinkPad-X1-Carbon-2nd>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Fri, 5 Sep 2014 20:20:44 +0200
+Subject: [PATCH] PCI: mvebu: Fix uninitialized variable in
+ mvebu_get_tgt_attr()
+In-Reply-To: <20140905174122.GD8080@google.com>
+References: <1407512045-26969-1-git-send-email-geert+renesas@glider.be>
+ <20140905174122.GD8080@google.com>
+Message-ID: <20140905202044.4c166a43@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+Dear Bjorn Helgaas,
 
-On Fri, 05 Sep 2014, Arnd Bergmann wrote:
+On Fri, 5 Sep 2014 11:41:22 -0600, Bjorn Helgaas wrote:
 
-> On Friday 05 September 2014 18:23:45 Peter Griffin wrote:
-> > +struct st_platform_priv {
-> > +       struct clk *clks[USB_MAX_CLKS];
-> > +       struct clk *clk48;
-> > +       struct reset_control *rst;
-> > +       struct reset_control *pwr;
-> > +       struct phy *phy;
-> > +};
-> 
-> Any reason why this is in a shared header file? It looks like
-> duplicating the structure under two different names would
-> actually be shorter and keep the drivers more readable as they'd
-> be self-contained, even when they have the exact same structure.
+> This fix looks right to me.  I added a stable tag as follows.  Thomas
+> and/or Jason, and you ack this?
 
-The only reason was it was a identical structure so I put it in a shared
-header file. I can unabstract it if you want?
+Hum, I think I would actually prefer something like:
 
-> 
-> Do both drivers use all fields?
+                if (DT_FLAGS_TO_TYPE(flags) == DT_TYPE_IO)
+                        rtype = IORESOURCE_IO;
+                else if (DT_FLAGS_TO_TYPE(flags) == DT_TYPE_MEM32)
+                        rtype = IORESOURCE_MEM;
++		else
++			continue;
 
-Yes they are. I thought the 48Mhz clock would only be used by ohci, but annoyingly it also
-clocks the reset logic of the ehci block as well.
+So that we're explicit with the fact that we only care about I/O and
+MEM32 resource types.
 
-regards,
+Thanks,
 
-Peter.
+Thomas
+-- 
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
