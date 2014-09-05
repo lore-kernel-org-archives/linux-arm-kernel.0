@@ -1,45 +1,41 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 5 Sep 2014 10:21:20 +0100
-Subject: [PATCH v8 6/8] drivers: cpuidle: CPU idle ARM64 driver
-In-Reply-To: <20140904172909.GA14822@e102568-lin.cambridge.arm.com>
-References: <1409585324-3678-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1409585324-3678-7-git-send-email-lorenzo.pieralisi@arm.com>
- <20140903173740.GJ1824@e102568-lin.cambridge.arm.com>
- <20140904160320.GB22354@arm.com>
- <20140904172909.GA14822@e102568-lin.cambridge.arm.com>
-Message-ID: <20140905092120.GG13515@arm.com>
+From: rric@kernel.org (Robert Richter)
+Date: Fri, 5 Sep 2014 11:21:35 +0200
+Subject: [PATCH v2 1/4] arm64, thunder: Add Kconfig option for Cavium
+ Thunder SoC Family
+In-Reply-To: <20140905083932.GD13515@arm.com>
+References: <1409903205-2762-1-git-send-email-rric@kernel.org>
+ <1409903205-2762-2-git-send-email-rric@kernel.org>
+ <20140905083932.GD13515@arm.com>
+Message-ID: <20140905092135.GR4703@rric.localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 04, 2014 at 06:29:10PM +0100, Lorenzo Pieralisi wrote:
-> On Thu, Sep 04, 2014 at 05:03:20PM +0100, Catalin Marinas wrote:
-> > On Wed, Sep 03, 2014 at 06:37:40PM +0100, Lorenzo Pieralisi wrote:
-> > > This patch should be ready to go too, is it ok if I split the series
-> > > in arm64 arch specific patches (will ask Catalin to pull) and CPUidle ones
-> > > (inclusive of DT bindings and !!this patch!!) and send two separate pull
-> > > requests ?
+On 05.09.14 09:39:32, Will Deacon wrote:
+> On Fri, Sep 05, 2014 at 08:46:42AM +0100, Robert Richter wrote:
+> > From: Radha Mohan Chintakuntla <rchintakuntla@cavium.com>
 > > 
-> > If Daniel/Rafael don't have any objection, I can take the whole series
-> > through the arm64 tree (it seems that patches have been already acked by
-> > Daniel).
+> > Increase maximum numbers of cpus to 32. This relates to current
+> > maximal possible cpu number. Increasing this to 64 cpus will be a
+> > separate patch not part of this enablement patches.
 > 
-> Thanks a lot Catalin. Since this one is a brand new CPUidle driver and it
-> follows a different pattern from arm legacy drivers I would like to get
-> Daniel's ack on this patch too before pushing it. For the records I have
-> just added two pr_err to signal driver probing error, ultraminor changes
-> that do not justify a repost.
-> 
-> If Samsung guys do not manifest themselves I would drop patch 8 from
-> the series till it gets tested and its patch dependency queued too.
+> Just out of interest, does raising the current maximum limit actually break
+> any existing code? If not, then doing this as two patches doesn't seem worth
+> it.
 
-The last patch also has a dependency, as you mentioned to Daniel. I think
-we can certainly merge the arm64 parts, and if Daniel doesn't object, then
-we can take the driver stuff too but leaving the exynos bits out (i.e. drop
-the last patch).
+Increasing to 64 should be fine from the perspective of cpu mask
+implementation. Memory foot print should be the same already as this
+uses long which is 64 bit. So this wouldn't hurt.
 
-Anyway, if you could repost with the acks you've collected and rearrange it
-so the arm64 patches are first in the series, that would be great.
+However, I felt a bit uncomfortable having a dependency here to
+enabling 64 cpus and getting this patch set upstream. Support for more
+than 32 cpus is not well tested yet and there still might be problems
+with e.g. interrupt delivery or topology.
 
-Cheers,
+If increasing to 32 cpus as an intermediate step isn't the best
+approach here, we can live with the current defaults too. I would then
+just remove that change from the patch.
 
-Will
+For follow on driver patch sets it would be good to have ARCH_THUNDER
+upstream as this option will be shared between all drivers.
+
+-Robert
