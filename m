@@ -1,52 +1,21 @@
-From: peter@hurleysoftware.com (Peter Hurley)
-Date: Fri, 05 Sep 2014 07:06:14 -0400
-Subject: [PATCH] tty/serial: at91: BUG: disable interrupts when
- !UART_ENABLE_MS()
-In-Reply-To: <54097F2E.6090809@atmel.com>
-References: <1409760567-13186-1-git-send-email-richard.genoud@gmail.com>
- <54097F2E.6090809@atmel.com>
-Message-ID: <54099926.6000302@hurleysoftware.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 5 Sep 2014 13:10:29 +0200
+Subject: [PATCH 5/8] ARM: l2x0: move DT parsing for cache props
+In-Reply-To: <20140902124326.GP30401@n2100.arm.linux.org.uk>
+References: <1409659354-23553-1-git-send-email-linus.walleij@linaro.org>
+ <1409659354-23553-6-git-send-email-linus.walleij@linaro.org>
+ <20140902124326.GP30401@n2100.arm.linux.org.uk>
+Message-ID: <CACRpkdaWdDu+P56yNmVR=GbrSYhWEBB0D0+o+m=2rctzO=8yOg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Nicolas,
+On Tue, Sep 2, 2014 at 2:43 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
 
-On 09/05/2014 05:15 AM, Nicolas Ferre wrote:
-> On 03/09/2014 18:09, Richard Genoud :
-> Richard,
-> 
-> Indeed it seems needed:
-> 
-> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-> 
-> 
-> But BTW, I see just below a call to the atmel_enable_ms() function in
-> atmel_set_ldisc(). My question is, shouldn't we also add this
-> atmel_disable_ms() in the alternative that disables the PPS in this
-> ldisc function?
+> I don't see any point to this patch.
 
-I have that change in another series but it has to wait for:
+Neither do I after looking closer. Hm. I must have been confusing
+myself, I'm dropping this crap.
 
-1. another series that fixes races setting and clearing the controlling tty
-   (and reduces the footprint of tty_mutex)
-2. a series built on that which moves tty_lock() out from under tty_mutex
-   when reopening ttys
-   This allows the tty_lock to be held while closing the tty.
-3. a series which removes the ldisc flush from the serial core, among some
-   other locking fixes in the serial core.
-   This fixes a lock inversion between the termios_rwsem and the port mutex.
-
-All of which enables the set_ldisc() notification to be safely passed
-termios so it can use UART_ENABLE_MS() and also claim the port mutex
-to change the UPF_HARDPPS_CD flag, which is currently non-atomic and
-may corrupt the uart port flags field.
-
-The series also claims the port lock around the *_enable_ms() in the
-various set_ldisc() handlers to protect the hardware re-programming :)
-
-Right now, all of this is temporarily stuck on the most recent patch
-series, which hinges on whether the kernel should continue to support
-non-atomic byte stores.
-
-Regards,
-Peter Hurley
+Yours,
+Linus Walleij
