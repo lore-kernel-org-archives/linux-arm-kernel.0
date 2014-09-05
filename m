@@ -1,77 +1,40 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Fri, 5 Sep 2014 10:23:04 +0200
-Subject: [PATCH 13/15] drivers: sh: Leave disabling of unused PM domains
- to genpd
-In-Reply-To: <20140904003351.GB13821@verge.net.au>
-References: <1409741551-16437-1-git-send-email-ulf.hansson@linaro.org>
- <1409741551-16437-14-git-send-email-ulf.hansson@linaro.org>
- <20140904003351.GB13821@verge.net.au>
-Message-ID: <CAPDyKFr2MT9TRt_OXgeWMyoaK1-PrJrTYEFrwyDi4YELgjqe3w@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 5 Sep 2014 10:30:20 +0200
+Subject: [PATCH v3 3/4] gpio: syscon: reuse for keystone 2 socs
+In-Reply-To: <1409763935-5713-4-git-send-email-grygorii.strashko@ti.com>
+References: <1409763935-5713-1-git-send-email-grygorii.strashko@ti.com>
+ <1409763935-5713-4-git-send-email-grygorii.strashko@ti.com>
+Message-ID: <CACRpkdbz3zXjVSRXtyE1A5-QjJ3dTiuCO=r=sFY1UZe+VnORgw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4 September 2014 02:33, Simon Horman <horms@verge.net.au> wrote:
-> On Wed, Sep 03, 2014 at 12:52:29PM +0200, Ulf Hansson wrote:
->> Since genpd at late init, will try to disable unused PM domains we
->> don't need to do it from here as well.
->>
->> Cc: Simon Horman <horms@verge.net.au>
->> Cc: Magnus Damm <magnus.damm@gmail.com>
->> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+On Wed, Sep 3, 2014 at 7:05 PM, Grygorii Strashko
+<grygorii.strashko@ti.com> wrote:
+
+> On Keystone SOCs, ARM host can send interrupts to DSP cores using the
+> DSP GPIO controller IP. Each DSP GPIO controller provides 28 IRQ signals for
+> each DSP core. This is one of the component used by the IPC mechanism used
+> on Keystone SOCs.
 >
+> Keystone 2 DSP GPIO controller has specific features:
+> - each GPIO can be configured only as output pin;
+> - setting GPIO value to 1 causes IRQ generation on target DSP core;
+> - reading pin value returns 0 - if IRQ was handled or 1 - IRQ is still
+>   pending.
 >
-> Acked-by: Simon Horman <horms+renesas@verge.net.au>
+> This patch updates gpio-syscon driver to be reused by Keystone 2 SoCs,
+> because the Keystone 2 DSP GPIO controller is controlled through Syscon
+> devices and, as requested by Linus Walleij, such kind of GPIO controllers
+> should be integrated with drivers/gpio/gpio-syscon.c driver.
 >
+> Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
+> ---
+>  .../devicetree/bindings/gpio/gpio-dsp-keystone.txt | 39 ++++++++++++++++++++++
 
-Simon, thanks for your ack!
+Rob, can you look at these bindings?
 
-When you have time, would you please also have a look at the two patches below:
+I suspect they may fall under your category of "not a real device, but
+leaking Linux implementation internals".
 
-[PATCH 04/15] ARM: shmobile: Drop dev_irq_safe from r8a7779 genpd config
-[PATCH 05/15] ARM: shmobile: Drop dev_irq_safe from R-mobile genpd config
-
-Kind regards
-Uffe
-
->> ---
->>  drivers/sh/pm_runtime.c | 11 -----------
->>  1 file changed, 11 deletions(-)
->>
->> diff --git a/drivers/sh/pm_runtime.c b/drivers/sh/pm_runtime.c
->> index 72f6381..fe2c2d5 100644
->> --- a/drivers/sh/pm_runtime.c
->> +++ b/drivers/sh/pm_runtime.c
->> @@ -75,8 +75,6 @@ static struct pm_clk_notifier_block platform_bus_notifier = {
->>       .con_ids = { NULL, },
->>  };
->>
->> -static bool default_pm_on;
->> -
->>  static int __init sh_pm_runtime_init(void)
->>  {
->>       if (IS_ENABLED(CONFIG_ARCH_SHMOBILE_MULTI)) {
->> @@ -96,16 +94,7 @@ static int __init sh_pm_runtime_init(void)
->>                       return 0;
->>       }
->>
->> -     default_pm_on = true;
->>       pm_clk_add_notifier(&platform_bus_type, &platform_bus_notifier);
->>       return 0;
->>  }
->>  core_initcall(sh_pm_runtime_init);
->> -
->> -static int __init sh_pm_runtime_late_init(void)
->> -{
->> -     if (default_pm_on)
->> -             pm_genpd_poweroff_unused();
->> -     return 0;
->> -}
->> -late_initcall(sh_pm_runtime_late_init);
->> --
->> 1.9.1
->>
->> --
->> To unsubscribe from this list: send the line "unsubscribe linux-sh" in
->> the body of a message to majordomo at vger.kernel.org
->> More majordomo info at  http://vger.kernel.org/majordomo-info.html
->>
+Yours,
+Linus Walleij
