@@ -1,46 +1,46 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Fri, 05 Sep 2014 15:41:40 +0400
-Subject: [PATCH v1 15/21] Powerpc/MSI: Use MSI chip framework to configure
- MSI/MSI-X irq
-In-Reply-To: <43412AE0-85BB-4B4B-A4EA-2C6D3B8B85D7@gmail.com>
-References: <1409911806-10519-1-git-send-email-wangyijing@huawei.com>
- <1409911806-10519-16-git-send-email-wangyijing@huawei.com>
- <540994D4.6040500@cogentembedded.com>
- <43412AE0-85BB-4B4B-A4EA-2C6D3B8B85D7@gmail.com>
-Message-ID: <5409A174.3050205@cogentembedded.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Fri, 5 Sep 2014 13:47:08 +0200
+Subject: [PATCH v7 1/5] Documentation: Add device tree bindings for
+ Freescale i.MX GPC
+In-Reply-To: <1409060791-23167-2-git-send-email-p.zabel@pengutronix.de>
+References: <1409060791-23167-1-git-send-email-p.zabel@pengutronix.de>
+ <1409060791-23167-2-git-send-email-p.zabel@pengutronix.de>
+Message-ID: <CAMuHMdUqbk+OZiBMUsebQ_==7jCan+dHsfJLhi+CPUE=xc6yRA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 9/5/2014 3:33 PM, wangyijing wrote:
+Hi Philipp,
 
->>> Use MSI chip framework instead of arch MSI functions to configure
->>> MSI/MSI-X irq. So we can manage MSI/MSI-X irq in a unified framework.
+On Tue, Aug 26, 2014 at 3:46 PM, Philipp Zabel <p.zabel@pengutronix.de> wrote:
+> +++ b/Documentation/devicetree/bindings/power/fsl,imx-gpc.txt
+> @@ -0,0 +1,54 @@
 
->>> Signed-off-by: Yijing Wang <wangyijing@huawei.com>
->>> ---
->>>   arch/powerpc/kernel/msi.c |   14 ++++++++++++--
->>>   1 files changed, 12 insertions(+), 2 deletions(-)
+> +IP cores belonging to a power domain should contain a 'power-domain' property
 
->>> diff --git a/arch/powerpc/kernel/msi.c b/arch/powerpc/kernel/msi.c
->>> index 71bd161..01781a4 100644
->>> --- a/arch/powerpc/kernel/msi.c
->>> +++ b/arch/powerpc/kernel/msi.c
->> [...]
->>> @@ -27,7 +27,17 @@ int arch_setup_msi_irqs(struct pci_dev *dev, int nvec, int type)
->>>       return ppc_md.setup_msi_irqs(dev, nvec, type);
->>>   }
->>>
->>> -void arch_teardown_msi_irqs(struct pci_dev *dev)
->>> +static void ppc_teardown_msi_irqs(struct pci_dev *dev)
+power-domains
 
->>    Shouldn't this function take IRQ # instead?
+> +that is a phandle pointing to the gpc device node and a DOMAIN_INDEX specifying
+> +the power domain the device belongs to.
+> +
+> +Example of a device that is part of the PU power domain:
+> +
+> +       vpu: vpu at 02040000 {
+> +               reg = <0x02040000 0x3c000>;
+> +               /* ... */
+> +               power-domain = <&gpc 1>;
 
-> This function need to teardown all msi irqs of the pci dev, we should pass the pci dev as argument .
+power-domains
 
-    Ah, I've mixed up the teardown_irqs() method with teardown_irq()! Too 
-similar. :-)
+> +               /* ... */
+> +       };
 
-> Thanks!
-> Yijing.
+Gr{oetje,eeting}s,
 
-WBR, Sergei
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
