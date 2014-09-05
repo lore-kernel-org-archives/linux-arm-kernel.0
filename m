@@ -1,68 +1,101 @@
-From: wangyijing0307@gmail.com (wangyijing)
-Date: Fri, 5 Sep 2014 19:33:08 +0800
-Subject: [PATCH v1 15/21] Powerpc/MSI: Use MSI chip framework to configure
- MSI/MSI-X irq
-In-Reply-To: <540994D4.6040500@cogentembedded.com>
-References: <1409911806-10519-1-git-send-email-wangyijing@huawei.com>
- <1409911806-10519-16-git-send-email-wangyijing@huawei.com>
- <540994D4.6040500@cogentembedded.com>
-Message-ID: <43412AE0-85BB-4B4B-A4EA-2C6D3B8B85D7@gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 05 Sep 2014 13:38:23 +0200
+Subject: [PATCH v2] ARM: spear: Remove references to PLAT_SPEAR_SINGLE
+In-Reply-To: <CAKohpomS5TrG0eU51N-Pu2jE-ZVioNHz-U_7Y-mfFSUU+As-MQ@mail.gmail.com>
+References: <1392153676.14317.8.camel@x220> <1409910654.5546.161.camel@x220>
+ <CAKohpomS5TrG0eU51N-Pu2jE-ZVioNHz-U_7Y-mfFSUU+As-MQ@mail.gmail.com>
+Message-ID: <2863474.Iz36QDfM80@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Friday 05 September 2014 15:24:31 Viresh Kumar wrote:
+> On 5 September 2014 15:20, Paul Bolle <pebolle@tiscali.nl> wrote:
+> > On Fri, 2014-09-05 at 15:13 +0530, Viresh Kumar wrote:
+> >> On Fri, Sep 5, 2014 at 3:09 PM, Paul Bolle <pebolle@tiscali.nl> wrote:
+> >> >> Ditto for v3.17-rc3 and next-20140904. Could someone please pix this up?
+> >>
+> >> You need to send it to arm at kernel.org..
+> >
+> > Will do, no problem. But why actually? (Note that MAINTAINERS is silent
+> > on arm at kernel.org. Maybe that address is documented elsewhere.)
+> 
+> Don't know where it is documented.
+> 
+> @Arnd: ??
 
+We have avoided documenting it so far, to avoid getting spammed with trivial
+patches that should get picked up by the subarch maintainers instead.
 
-> ? 2014?9?5??18:47?Sergei Shtylyov <sergei.shtylyov@cogentembedded.com> ???
-> 
-> Hello.
-> 
->> On 9/5/2014 2:10 PM, Yijing Wang wrote:
->> 
->> Use MSI chip framework instead of arch MSI functions to configure
->> MSI/MSI-X irq. So we can manage MSI/MSI-X irq in a unified framework.
-> 
->> Signed-off-by: Yijing Wang <wangyijing@huawei.com>
->> ---
->>  arch/powerpc/kernel/msi.c |   14 ++++++++++++--
->>  1 files changed, 12 insertions(+), 2 deletions(-)
-> 
->> diff --git a/arch/powerpc/kernel/msi.c b/arch/powerpc/kernel/msi.c
->> index 71bd161..01781a4 100644
->> --- a/arch/powerpc/kernel/msi.c
->> +++ b/arch/powerpc/kernel/msi.c
-> [...]
->> @@ -27,7 +27,17 @@ int arch_setup_msi_irqs(struct pci_dev *dev, int nvec, int type)
->>      return ppc_md.setup_msi_irqs(dev, nvec, type);
->>  }
->> 
->> -void arch_teardown_msi_irqs(struct pci_dev *dev)
->> +static void ppc_teardown_msi_irqs(struct pci_dev *dev)
-> 
->   Shouldn't this function take IRQ # instead?
+I've applied this patch to the next/fixes-non-critical branch now, with minor
+fixup for a conflict that has come in. See below for the final version.
 
-This function need to teardown all msi irqs of the pci dev, we should pass the pci dev as argument .
+	Arnd
 
-Thanks!
-Yijing.
+---
+commit 3b0b8ec99aadea710f3dece74c95523463c0087a
+Author: Paul Bolle <pebolle@tiscali.nl>
+Date:   Tue Apr 15 10:26:47 2014 +0200
 
-> 
->>  {
->>      ppc_md.teardown_msi_irqs(dev);
->>  }
->> +
->> +static struct msi_chip ppc_msi_chip = {
->> +    .setup_irqs = ppc_setup_msi_irqs,
->> +    .teardown_irqs = ppc_teardown_msi_irqs,
->> +};
->> +
->> +struct msi_chip *arch_find_msi_chip(struct pci_dev *dev)
->> +{
->> +    return &ppc_msi_chip;
->> +}
-> 
-> WBR, Sergei
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+    ARM: spear: Remove references to PLAT_SPEAR_SINGLE
+    
+    The Kconfig symbol PLAT_SPEAR_SINGLE briefly appeared during the v3.10
+    development cycle. It was removed in a merge commit before v3.10. A few
+    references to it were left in the tree, probably because they didn't
+    generate merge conflicts. Whatever it was, they're useless now and can
+    safely be removed.
+    
+    Reported-by: Martin Walch <walch.martin@web.de>
+    Signed-off-by: Paul Bolle <pebolle@tiscali.nl>
+    Reviewed-by: Rajeev Kumar <rajeev-dlh.kumar@st.com>
+    Cc: Rajeev Kumar <rajeev_kumar@mentor.com>
+    Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
+    Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+
+diff --git a/arch/arm/mach-spear/Kconfig b/arch/arm/mach-spear/Kconfig
+index 6fd4dc88160b..b6f4bda273b3 100644
+--- a/arch/arm/mach-spear/Kconfig
++++ b/arch/arm/mach-spear/Kconfig
+@@ -4,7 +4,6 @@
+ 
+ menuconfig PLAT_SPEAR
+ 	bool "ST SPEAr Family" if ARCH_MULTI_V7 || ARCH_MULTI_V5
+-	default PLAT_SPEAR_SINGLE
+ 	select ARCH_REQUIRE_GPIOLIB
+ 	select ARM_AMBA
+ 	select CLKSRC_MMIO
+@@ -13,7 +12,7 @@ if PLAT_SPEAR
+ 
+ config ARCH_SPEAR13XX
+ 	bool "ST SPEAr13xx"
+-	depends on ARCH_MULTI_V7 || PLAT_SPEAR_SINGLE
++	depends on ARCH_MULTI_V7
+ 	select ARM_GIC
+ 	select GPIO_SPEAR_SPICS
+ 	select HAVE_ARM_SCU if SMP
+@@ -44,7 +43,7 @@ endif #ARCH_SPEAR13XX
+ 
+ config ARCH_SPEAR3XX
+ 	bool "ST SPEAr3xx"
+-	depends on ARCH_MULTI_V5 || PLAT_SPEAR_SINGLE
++	depends on ARCH_MULTI_V5
+ 	depends on !ARCH_SPEAR13XX
+ 	select ARM_VIC
+ 	select PINCTRL
+@@ -75,7 +74,7 @@ endif
+ 
+ config ARCH_SPEAR6XX
+ 	bool "ST SPEAr6XX"
+-	depends on ARCH_MULTI_V5 || PLAT_SPEAR_SINGLE
++	depends on ARCH_MULTI_V5
+ 	depends on !ARCH_SPEAR13XX
+ 	select ARM_VIC
+ 	help
+@@ -88,7 +87,7 @@ config MACH_SPEAR600
+ 	  Supports ST SPEAr600 boards configured via the device-tree
+ 
+ config ARCH_SPEAR_AUTO
+-	def_bool PLAT_SPEAR_SINGLE
++	bool
+ 	depends on !ARCH_SPEAR13XX && !ARCH_SPEAR6XX
+ 	select ARCH_SPEAR3XX
+ 
