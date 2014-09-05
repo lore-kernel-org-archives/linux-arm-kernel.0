@@ -1,33 +1,69 @@
-From: computersforpeace@gmail.com (Brian Norris)
-Date: Fri,  5 Sep 2014 16:25:37 -0700
-Subject: [PATCH] ARM: brcmstb: Kconfig: drop unneeded symbol selections
-Message-ID: <1409959537-14217-1-git-send-email-computersforpeace@gmail.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Fri, 05 Sep 2014 16:29:36 -0700
+Subject: [PATCH] RFC: add function for localbus address
+In-Reply-To: <1409672700-21697-1-git-send-email-svarbanov@mm-sol.com>
+References: <20140729234522.E9FF1C40738@trevor.secretlab.ca>
+ <1409672700-21697-1-git-send-email-svarbanov@mm-sol.com>
+Message-ID: <540A4760.8060105@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-These are either implied or not necessary.
+On 09/02/14 08:45, Stanimir Varbanov wrote:
+> Hi Grant,
+>
+> I came down to this. Could you review? Is that
+> implementation closer to the suggestion made by you.
 
-Signed-off-by: Brian Norris <computersforpeace@gmail.com>
----
-Based on some of Rob's comments from earlier review
+I like this patch (but I'm biased because I want it to exist). Feel free
+to add my Tested-by.
 
- arch/arm/mach-bcm/Kconfig | 3 ---
- 1 file changed, 3 deletions(-)
 
-diff --git a/arch/arm/mach-bcm/Kconfig b/arch/arm/mach-bcm/Kconfig
-index fc938005ad39..fa9e6134fa72 100644
---- a/arch/arm/mach-bcm/Kconfig
-+++ b/arch/arm/mach-bcm/Kconfig
-@@ -101,10 +101,7 @@ config ARCH_BCM_5301X
- 
- config ARCH_BRCMSTB
- 	bool "Broadcom BCM7XXX based boards" if ARCH_MULTI_V7
--	depends on MMU
- 	select ARM_GIC
--	select MIGHT_HAVE_PCI
--	select HAVE_SMP
- 	select HAVE_ARM_ARCH_TIMER
- 	select BRCMSTB_GISB_ARB
- 	select BRCMSTB_L2_IRQ
+> ---
+>  drivers/of/address.c       |   49 ++++++++++++++++++++++++++++++++++++++++++++
+>  drivers/of/platform.c      |   20 ++++++++++++++---
+>  include/linux/of_address.h |   19 +++++++++++++++++
+>  3 files changed, 84 insertions(+), 4 deletions(-)
+>
+> diff --git a/drivers/of/address.c b/drivers/of/address.c
+> index e371825..86c2166 100644
+> --- a/drivers/of/address.c
+> +++ b/drivers/of/address.c
+> @@ -601,6 +601,32 @@ const __be32 *of_get_address(struct device_node *dev, int index, u64 *size,
+>  }
+>  EXPORT_SYMBOL(of_get_address);
+>  
+> +const __be32 *of_get_localbus_address(struct device_node *np, int index,
+> +				      u64 *size)
+> +{
+> +	struct device_node *root, *parent;
+> +	const __be32 *ranges, *prop = NULL;
+> +
+> +	parent = of_get_parent(np);
+> +	if (!parent)
+> +		return NULL;
+> +
+> +	root = of_find_node_by_path("/");
+> +
+> +	if (parent == root) {
+> +		of_node_put(parent);
+> +		return NULL;
+> +	}
+
+I don't get this part though. Perhaps it needs a comment to say why we
+don't allow the node to live in the root.
+
+> +
+> +	ranges = of_get_property(parent, "ranges", NULL);
+> +	of_node_put(parent);
+> +
+> +	if (!ranges)
+> +		prop = of_get_address(np, index, size, NULL);
+> +
+> +	return prop;
+> +}
+> +
+>
+
 -- 
-1.9.1
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
