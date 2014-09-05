@@ -1,247 +1,121 @@
-From: wangyijing@huawei.com (Yijing Wang)
-Date: Fri, 5 Sep 2014 18:09:49 +0800
-Subject: [PATCH v1 04/21] x86/xen/MSI: Eliminate arch_msix_mask_irq() and
- arch_msi_mask_irq()
-In-Reply-To: <1409911806-10519-1-git-send-email-wangyijing@huawei.com>
-References: <1409911806-10519-1-git-send-email-wangyijing@huawei.com>
-Message-ID: <1409911806-10519-5-git-send-email-wangyijing@huawei.com>
+From: takahiro.akashi@linaro.org (AKASHI Takahiro)
+Date: Fri,  5 Sep 2014 18:47:43 +0900
+Subject: [RFC] arm64: kgdb: fix single stepping
+Message-ID: <1409910463-30936-1-git-send-email-takahiro.akashi@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 0e4ccb150 added two __weak arch functions arch_msix_mask_irq()
-and arch_msi_mask_irq() to fix a bug found when running xen in x86.
-Introduced these two funcntions make MSI code complex. And mask/unmask
-is the irq actions related to interrupt controller, should not use
-weak arch functions to override mask/unmask interfaces. This patch
-reverted commit 0e4ccb150 and export struct irq_chip msi_chip, modify
-msi_chip->irq_mask/irq_unmask() in xen init functions to fix this
-bug for simplicity. Also this is preparation for using struct
-msi_chip instead of weak arch MSI functions in all platforms.
+I tried to verify kgdb in vanilla kernel on fast model, but it seems that
+the single stepping with kgdb doesn't work correctly since its first
+appearance at v3.15.
 
-Signed-off-by: Yijing Wang <wangyijing@huawei.com>
-CC: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
+On v3.15, 'stepi' command after breaking the kernel at some breakpoint
+steps forward to the next instruction, but the succeeding 'stepi' never
+goes beyond that.
+On v3.16, 'stepi' moves forward to the second instruction just after call of
+do_debug_execption() in el1_dbg, and never goes beyond that. This variance
+of behavior seems to come in with the following patch in v3.16:
+
+    commit 2a2830703a23 ("arm64: debug: avoid accessing mdscr_el1 on fault
+    paths where possible")
+
+I cannot deny the possibility that this migh be a bug of fast model, but
+this patch works for me better than vanilla, and hopefully will help you
+see what's happening behind this issue.
+
+Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
 ---
- arch/x86/include/asm/apic.h     |    4 ++++
- arch/x86/include/asm/x86_init.h |    3 ---
- arch/x86/kernel/apic/io_apic.c  |    2 +-
- arch/x86/kernel/x86_init.c      |   10 ----------
- arch/x86/pci/xen.c              |   16 ++++++----------
- drivers/pci/msi.c               |   22 ++++++----------------
- include/linux/msi.h             |    4 ++--
- 7 files changed, 19 insertions(+), 42 deletions(-)
+ arch/arm64/include/asm/assembler.h |    7 +++++++
+ arch/arm64/kernel/entry.S          |    4 ++--
+ arch/arm64/kernel/kgdb.c           |   15 ++++++---------
+ 3 files changed, 15 insertions(+), 11 deletions(-)
 
-diff --git a/arch/x86/include/asm/apic.h b/arch/x86/include/asm/apic.h
-index 465b309..47a5f94 100644
---- a/arch/x86/include/asm/apic.h
-+++ b/arch/x86/include/asm/apic.h
-@@ -43,6 +43,10 @@ static inline void generic_apic_probe(void)
- }
- #endif
+diff --git a/arch/arm64/include/asm/assembler.h b/arch/arm64/include/asm/assembler.h
+index 5901480..a345973 100644
+--- a/arch/arm64/include/asm/assembler.h
++++ b/arch/arm64/include/asm/assembler.h
+@@ -87,6 +87,13 @@
+ 9990:
+ 	.endm
  
-+#ifdef CONFIG_PCI_MSI
-+extern struct irq_chip msi_chip;
-+#endif
++	.macro  enable_dbg_if_not_stepping, tmp
++	mrs     \tmp, mdscr_el1
++	tbnz    \tmp, #0, 9990f
++	enable_dbg
++9990:
++	.endm
 +
- #ifdef CONFIG_X86_LOCAL_APIC
- 
- extern unsigned int apic_verbosity;
-diff --git a/arch/x86/include/asm/x86_init.h b/arch/x86/include/asm/x86_init.h
-index e45e4da..f58a9c7 100644
---- a/arch/x86/include/asm/x86_init.h
-+++ b/arch/x86/include/asm/x86_init.h
-@@ -172,7 +172,6 @@ struct x86_platform_ops {
- 
- struct pci_dev;
- struct msi_msg;
--struct msi_desc;
- 
- struct x86_msi_ops {
- 	int (*setup_msi_irqs)(struct pci_dev *dev, int nvec, int type);
-@@ -183,8 +182,6 @@ struct x86_msi_ops {
- 	void (*teardown_msi_irqs)(struct pci_dev *dev);
- 	void (*restore_msi_irqs)(struct pci_dev *dev);
- 	int  (*setup_hpet_msi)(unsigned int irq, unsigned int id);
--	u32 (*msi_mask_irq)(struct msi_desc *desc, u32 mask, u32 flag);
--	u32 (*msix_mask_irq)(struct msi_desc *desc, u32 flag);
- };
- 
- struct IO_APIC_route_entry;
-diff --git a/arch/x86/kernel/apic/io_apic.c b/arch/x86/kernel/apic/io_apic.c
-index e877cfb..2a2ec28 100644
---- a/arch/x86/kernel/apic/io_apic.c
-+++ b/arch/x86/kernel/apic/io_apic.c
-@@ -3161,7 +3161,7 @@ msi_set_affinity(struct irq_data *data, const struct cpumask *mask, bool force)
-  * IRQ Chip for MSI PCI/PCI-X/PCI-Express Devices,
-  * which implement the MSI or MSI-X Capability Structure.
-  */
--static struct irq_chip msi_chip = {
-+struct irq_chip msi_chip = {
- 	.name			= "PCI-MSI",
- 	.irq_unmask		= unmask_msi_irq,
- 	.irq_mask		= mask_msi_irq,
-diff --git a/arch/x86/kernel/x86_init.c b/arch/x86/kernel/x86_init.c
-index e48b674..234b072 100644
---- a/arch/x86/kernel/x86_init.c
-+++ b/arch/x86/kernel/x86_init.c
-@@ -116,8 +116,6 @@ struct x86_msi_ops x86_msi = {
- 	.teardown_msi_irqs	= default_teardown_msi_irqs,
- 	.restore_msi_irqs	= default_restore_msi_irqs,
- 	.setup_hpet_msi		= default_setup_hpet_msi,
--	.msi_mask_irq		= default_msi_mask_irq,
--	.msix_mask_irq		= default_msix_mask_irq,
- };
- 
- /* MSI arch specific hooks */
-@@ -140,14 +138,6 @@ void arch_restore_msi_irqs(struct pci_dev *dev)
- {
- 	x86_msi.restore_msi_irqs(dev);
- }
--u32 arch_msi_mask_irq(struct msi_desc *desc, u32 mask, u32 flag)
--{
--	return x86_msi.msi_mask_irq(desc, mask, flag);
--}
--u32 arch_msix_mask_irq(struct msi_desc *desc, u32 flag)
--{
--	return x86_msi.msix_mask_irq(desc, flag);
--}
+ /*
+  * Enable both debug exceptions and interrupts. This is likely to be
+  * faster than two daifclr operations, since writes to this register
+diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
+index d5eb447..b882f5d 100644
+--- a/arch/arm64/kernel/entry.S
++++ b/arch/arm64/kernel/entry.S
+@@ -325,7 +325,7 @@ el1_dbg:
+ 	mrs	x0, far_el1
+ 	mov	x2, sp				// struct pt_regs
+ 	bl	do_debug_exception
+-	enable_dbg
++	enable_dbg_if_not_stepping x2
+ 	kernel_exit 1
+ el1_inv:
+ 	// TODO: add support for undefined instructions in kernel mode
+@@ -339,7 +339,7 @@ ENDPROC(el1_sync)
+ 	.align	6
+ el1_irq:
+ 	kernel_entry 1
+-	enable_dbg
++	enable_dbg_if_not_stepping x2
+ #ifdef CONFIG_TRACE_IRQFLAGS
+ 	bl	trace_hardirqs_off
  #endif
+diff --git a/arch/arm64/kernel/kgdb.c b/arch/arm64/kernel/kgdb.c
+index 75c9cf1..bbc085f 100644
+--- a/arch/arm64/kernel/kgdb.c
++++ b/arch/arm64/kernel/kgdb.c
+@@ -176,14 +176,6 @@ int kgdb_arch_handle_exception(int exception_vector, int signo,
+ 		 * over and over again.
+ 		 */
+ 		kgdb_arch_update_addr(linux_regs, remcom_in_buffer);
+-		atomic_set(&kgdb_cpu_doing_single_step, -1);
+-		kgdb_single_step =  0;
+-
+-		/*
+-		 * Received continue command, disable single step
+-		 */
+-		if (kernel_active_single_step())
+-			kernel_disable_single_step();
  
- struct x86_io_apic_ops x86_io_apic_ops = {
-diff --git a/arch/x86/pci/xen.c b/arch/x86/pci/xen.c
-index ad03739..84c2fce 100644
---- a/arch/x86/pci/xen.c
-+++ b/arch/x86/pci/xen.c
-@@ -394,13 +394,9 @@ static void xen_teardown_msi_irq(unsigned int irq)
- {
- 	xen_destroy_irq(irq);
- }
--static u32 xen_nop_msi_mask_irq(struct msi_desc *desc, u32 mask, u32 flag)
--{
--	return 0;
--}
--static u32 xen_nop_msix_mask_irq(struct msi_desc *desc, u32 flag)
+ 		err = 0;
+ 		break;
+@@ -198,13 +190,13 @@ int kgdb_arch_handle_exception(int exception_vector, int signo,
+ 		 */
+ 		kgdb_arch_update_addr(linux_regs, remcom_in_buffer);
+ 		atomic_set(&kgdb_cpu_doing_single_step, raw_smp_processor_id());
+-		kgdb_single_step =  1;
+ 
+ 		/*
+ 		 * Enable single step handling
+ 		 */
+ 		if (!kernel_active_single_step())
+ 			kernel_enable_single_step(linux_regs);
 +
-+void xen_nop_msi_mask(struct irq_data *data)
- {
--	return 0;
- }
- #endif
+ 		err = 0;
+ 		break;
+ 	default:
+@@ -229,7 +221,12 @@ static int kgdb_compiled_brk_fn(struct pt_regs *regs, unsigned int esr)
  
-@@ -425,8 +421,8 @@ int __init pci_xen_init(void)
- 	x86_msi.setup_msi_irqs = xen_setup_msi_irqs;
- 	x86_msi.teardown_msi_irq = xen_teardown_msi_irq;
- 	x86_msi.teardown_msi_irqs = xen_teardown_msi_irqs;
--	x86_msi.msi_mask_irq = xen_nop_msi_mask_irq;
--	x86_msi.msix_mask_irq = xen_nop_msix_mask_irq;
-+	msi_chip.irq_mask = xen_nop_msi_mask;
-+	msi_chip.irq_unmask = xen_nop_msi_mask;
- #endif
+ static int kgdb_step_brk_fn(struct pt_regs *regs, unsigned int esr)
+ {
++	kernel_disable_single_step();
++
+ 	kgdb_handle_exception(1, SIGTRAP, 0, regs);
++
++	atomic_set(&kgdb_cpu_doing_single_step, -1);
++
  	return 0;
  }
-@@ -506,8 +502,8 @@ int __init pci_xen_initial_domain(void)
- 	x86_msi.setup_msi_irqs = xen_initdom_setup_msi_irqs;
- 	x86_msi.teardown_msi_irq = xen_teardown_msi_irq;
- 	x86_msi.restore_msi_irqs = xen_initdom_restore_msi_irqs;
--	x86_msi.msi_mask_irq = xen_nop_msi_mask_irq;
--	x86_msi.msix_mask_irq = xen_nop_msix_mask_irq;
-+	msi_chip.irq_mask = xen_nop_msi_mask;
-+	msi_chip.irq_unmask = xen_nop_msi_mask;
- #endif
- 	xen_setup_acpi_sci();
- 	__acpi_register_gsi = acpi_register_gsi_xen;
-diff --git a/drivers/pci/msi.c b/drivers/pci/msi.c
-index d547f7f..a77e7f7 100644
---- a/drivers/pci/msi.c
-+++ b/drivers/pci/msi.c
-@@ -161,7 +161,7 @@ static inline __attribute_const__ u32 msi_mask(unsigned x)
-  * reliably as devices without an INTx disable bit will then generate a
-  * level IRQ which will never be cleared.
-  */
--u32 default_msi_mask_irq(struct msi_desc *desc, u32 mask, u32 flag)
-+u32 __msi_mask_irq(struct msi_desc *desc, u32 mask, u32 flag)
- {
- 	u32 mask_bits = desc->masked;
  
-@@ -175,14 +175,9 @@ u32 default_msi_mask_irq(struct msi_desc *desc, u32 mask, u32 flag)
- 	return mask_bits;
- }
- 
--__weak u32 arch_msi_mask_irq(struct msi_desc *desc, u32 mask, u32 flag)
--{
--	return default_msi_mask_irq(desc, mask, flag);
--}
--
- static void msi_mask_irq(struct msi_desc *desc, u32 mask, u32 flag)
- {
--	desc->masked = arch_msi_mask_irq(desc, mask, flag);
-+	desc->masked = __msi_mask_irq(desc, mask, flag);
- }
- 
- /*
-@@ -192,7 +187,7 @@ static void msi_mask_irq(struct msi_desc *desc, u32 mask, u32 flag)
-  * file.  This saves a few milliseconds when initialising devices with lots
-  * of MSI-X interrupts.
-  */
--u32 default_msix_mask_irq(struct msi_desc *desc, u32 flag)
-+u32 __msix_mask_irq(struct msi_desc *desc, u32 flag)
- {
- 	u32 mask_bits = desc->masked;
- 	unsigned offset = desc->msi_attrib.entry_nr * PCI_MSIX_ENTRY_SIZE +
-@@ -205,14 +200,9 @@ u32 default_msix_mask_irq(struct msi_desc *desc, u32 flag)
- 	return mask_bits;
- }
- 
--__weak u32 arch_msix_mask_irq(struct msi_desc *desc, u32 flag)
--{
--	return default_msix_mask_irq(desc, flag);
--}
--
- static void msix_mask_irq(struct msi_desc *desc, u32 flag)
- {
--	desc->masked = arch_msix_mask_irq(desc, flag);
-+	desc->masked = __msix_mask_irq(desc, flag);
- }
- 
- static void msi_set_mask_bit(struct irq_data *data, u32 flag)
-@@ -864,7 +854,7 @@ void pci_msi_shutdown(struct pci_dev *dev)
- 	/* Return the device with MSI unmasked as initial states */
- 	mask = msi_mask(desc->msi_attrib.multi_cap);
- 	/* Keep cached state to be restored */
--	arch_msi_mask_irq(desc, mask, ~mask);
-+	__msi_mask_irq(desc, mask, ~mask);
- 
- 	/* Restore dev->irq to its default pin-assertion irq */
- 	dev->irq = desc->msi_attrib.default_irq;
-@@ -964,7 +954,7 @@ void pci_msix_shutdown(struct pci_dev *dev)
- 	/* Return the device with MSI-X masked as initial states */
- 	list_for_each_entry(entry, &dev->msi_list, list) {
- 		/* Keep cached states to be restored */
--		arch_msix_mask_irq(entry, 1);
-+		__msix_mask_irq(entry, 1);
- 	}
- 
- 	msix_clear_and_set_ctrl(dev, PCI_MSIX_FLAGS_ENABLE, 0);
-diff --git a/include/linux/msi.h b/include/linux/msi.h
-index 762fe61..5650848 100644
---- a/include/linux/msi.h
-+++ b/include/linux/msi.h
-@@ -19,6 +19,8 @@ void read_msi_msg(struct msi_desc *entry, struct msi_msg *msg);
- void get_cached_msi_msg(struct msi_desc *entry, struct msi_msg *msg);
- void __write_msi_msg(struct msi_desc *entry, struct msi_msg *msg);
- void write_msi_msg(unsigned int irq, struct msi_msg *msg);
-+u32 __msix_mask_irq(struct msi_desc *desc, u32 flag);
-+u32 __msi_mask_irq(struct msi_desc *desc, u32 mask, u32 flag);
- 
- struct msi_desc {
- 	struct {
-@@ -62,8 +64,6 @@ void arch_restore_msi_irqs(struct pci_dev *dev);
- 
- void default_teardown_msi_irqs(struct pci_dev *dev);
- void default_restore_msi_irqs(struct pci_dev *dev);
--u32 default_msi_mask_irq(struct msi_desc *desc, u32 mask, u32 flag);
--u32 default_msix_mask_irq(struct msi_desc *desc, u32 flag);
- 
- struct msi_chip {
- 	struct module *owner;
 -- 
-1.7.1
+1.7.9.5
