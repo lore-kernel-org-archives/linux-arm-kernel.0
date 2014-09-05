@@ -1,45 +1,70 @@
 From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
-Date: Fri,  5 Sep 2014 21:02:41 +0200
-Subject: [PATCH 06/18] tty: serial: 8250_core: user the ->line argument as a
- hint in serial8250_find_match_or_unused()
+Date: Fri,  5 Sep 2014 21:02:36 +0200
+Subject: [PATCH 01/18] tty: serial: 8250_core: provide a function to export
+ uart_8250_port
 In-Reply-To: <1409943773-7874-1-git-send-email-bigeasy@linutronix.de>
 References: <1409943773-7874-1-git-send-email-bigeasy@linutronix.de>
-Message-ID: <1409943773-7874-7-git-send-email-bigeasy@linutronix.de>
+Message-ID: <1409943773-7874-2-git-send-email-bigeasy@linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tony noticed that the old omap-serial driver picked the uart "number"
-based on the hint given from device tree or platform device's id.
-The 8250 based omap driver doesn't do this because the core code does
-not honour the ->line argument which is passed by the driver.
+There is no way to access a struct uart_8250_port for a specific
+line. This is only required outside of the 8250/uart callbacks like for
+devices' suspend & remove callbacks. For those the 8250-core provides a
+wrapper like serial8250_unregister_port() which passes the struct
+to the proper function based on the line argument.
 
-This patch aims to keep the same behaviour as with omap-serial. The
-function will first try to use the line suggested ->line argument and
-then fallback to the old strategy in case the port is taken.
+For run time suspend I need access to this struct not only to make
+serial_out() work but also to properly restore up->ier and up->mcr.
 
-That means the the third uart will always be ttyS2 even if the previous
-two have not been enabled in DT.
-
+Acked-by: Alan Cox <alan@linux.intel.com>
 Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
 ---
- drivers/tty/serial/8250/8250_core.c | 5 +++++
- 1 file changed, 5 insertions(+)
+ drivers/tty/serial/8250/8250.h      |  2 ++
+ drivers/tty/serial/8250/8250_core.c | 18 ++++++++++++++++++
+ 2 files changed, 20 insertions(+)
 
+diff --git a/drivers/tty/serial/8250/8250.h b/drivers/tty/serial/8250/8250.h
+index 1b08c918cd51..85bfec58d77c 100644
+--- a/drivers/tty/serial/8250/8250.h
++++ b/drivers/tty/serial/8250/8250.h
+@@ -112,6 +112,8 @@ static inline void serial_dl_write(struct uart_8250_port *up, int value)
+ 	up->dl_write(up, value);
+ }
+ 
++struct uart_8250_port *serial8250_get_port(int line);
++
+ #if defined(__alpha__) && !defined(CONFIG_PCI)
+ /*
+  * Digital did something really horribly wrong with the OUT1 and OUT2
 diff --git a/drivers/tty/serial/8250/8250_core.c b/drivers/tty/serial/8250/8250_core.c
-index eaab8974a456..8f5fb81d5fad 100644
+index 1d42dba6121d..e2ad13a9aea4 100644
 --- a/drivers/tty/serial/8250/8250_core.c
 +++ b/drivers/tty/serial/8250/8250_core.c
-@@ -3479,6 +3479,11 @@ static struct uart_8250_port *serial8250_find_match_or_unused(struct uart_port *
- 		if (uart_match_port(&serial8250_ports[i].port, port))
- 			return &serial8250_ports[i];
+@@ -2880,6 +2880,24 @@ static struct uart_ops serial8250_pops = {
  
-+	/* try line number first if still available */
-+	i = port->line;
-+	if (i < nr_uarts && serial8250_ports[i].port.type == PORT_UNKNOWN &&
-+			serial8250_ports[i].port.iobase == 0)
-+		return &serial8250_ports[i];
- 	/*
- 	 * We didn't find a matching entry, so look for the first
- 	 * free entry.  We look for one which hasn't been previously
+ static struct uart_8250_port serial8250_ports[UART_NR];
+ 
++/**
++ * serial8250_get_port - retrieve struct uart_8250_port
++ * @line: serial line number
++ *
++ * This function retrieves struct uart_8250_port for the specific line.
++ * This struct *must* *not* be used to perform a 8250 or serial core operation
++ * which is not accessible otherwise. Its only purpose is to make the struct
++ * accessible to the runtime-pm callbacks for context suspend/restore.
++ * The lock assumption made here is none because runtime-pm suspend/resume
++ * callbacks should not be invoked if there is any operation performed on the
++ * port.
++ */
++struct uart_8250_port *serial8250_get_port(int line)
++{
++	return &serial8250_ports[line];
++}
++EXPORT_SYMBOL_GPL(serial8250_get_port);
++
+ static void (*serial8250_isa_config)(int port, struct uart_port *up,
+ 	unsigned short *capabilities);
+ 
 -- 
 2.1.0
