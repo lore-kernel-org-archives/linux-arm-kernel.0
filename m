@@ -1,150 +1,127 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 05 Sep 2014 10:44:10 +0200
-Subject: =?UTF-8?B?562U5aSNOg==?= [PATCH 2/2] PCI: Layerscape: Add
- Layerscape PCIe driver
-In-Reply-To: <1409930568256.17564@freescale.com>
-References: <1409856338-1730-1-git-send-email-Minghuan.Lian@freescale.com>
- <2799937.bNtU9KXR6t@wuerfel> <1409930568256.17564@freescale.com>
-Message-ID: <7284910.vZQKmpeMI1@wuerfel>
+From: tomasz.nowicki@linaro.org (Tomasz Nowicki)
+Date: Fri, 05 Sep 2014 10:52:19 +0200
+Subject: [PATCH v3 13/17] ARM64 / ACPI: Add GICv2 specific ACPI boot
+ support
+In-Reply-To: <4895927.Zp4WL2AZAF@wuerfel>
+References: <1409583475-6978-1-git-send-email-hanjun.guo@linaro.org>
+ <5405BFE7.5060005@arm.com> <5406DEB6.1060705@linaro.org>
+ <4895927.Zp4WL2AZAF@wuerfel>
+Message-ID: <540979C3.9020806@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 05 September 2014 07:22:08 Minghuan.Lian at freescale.com wrote:
-> Hi Arnd,
-> 
-> Please see my comments inline.
 
-Please use the usual reply style in the future, using '>' characters to
-properly give attribution. I'm fixing this up manually in my reply
-here, so others can follow the discussion.
 
-> > On Thursday 04 September 2014 18:45:38 Minghuan Lian wrote:
-> > > +
-> > > +#define PCIE_LS1021A_BASE    0x3400000
-> > > +#define PCIE_LS1021A_REG_SIZE        0x0100000
-> > 
-> > This does not belong here. All addresses must come from DT,
-> > and you should not do the calculation below based on the address.
-> [Minghuan] LS1021A contains two PCI controllers. I use them to 
-> calculation the PCI controller index.
-> There are several separate registers for PEX1 and PEX2 in SCFG
-> register space. It is hard to get them address from DTS. Could
-> you tell me a way to get PCI controller index?
+On 03.09.2014 16:57, Arnd Bergmann wrote:
+> On Wednesday 03 September 2014 11:26:14 Tomasz Nowicki wrote:
+>> On 02.09.2014 15:02, Marc Zyngier wrote:
+>>> On 02/09/14 12:48, Tomasz Nowicki wrote:
+>>>> On 01.09.2014 19:35, Marc Zyngier wrote:
+>>>>>> @@ -78,6 +79,10 @@ void __init set_handle_irq(void (*handle_irq)(struct pt_regs *))
+>>>>>>     void __init init_IRQ(void)
+>>>>>>     {
+>>>>>>        irqchip_init();
+>>>>>> +
+>>>>>> +    if (!handle_arch_irq)
+>>>>>> +            acpi_gic_init();
+>>>>>> +
+>>>>>
+>>>>> Why isn't this called from irqchip_init? It would seem like the logical
+>>>>> spot to probe an interrupt controller.
+>>>>
+>>>> irqchip.c is OF dependent, I want to decouple these from the very
+>>>> beginning.
+>>>
+>>> No. irqchip.c is not OF dependent, it is just that DT is the only thing
+>>> we support so far. I don't think duplicating the kernel infrastructure
+>>> "because we're different" is the right way.
+>>>
+>>> There is no reason for your probing structure to be artificially
+>>> different (you're parsing the same information, at the same time). Just
+>>> put in place a similar probing mechanism, and this will look a lot better.
+>
+>
+>>>> Having only GICv2, it would work. Considering we would do the same for
+>>>> GICv3 (arm-gic-v3.h) there will be register name conflicts for both
+>>>> headers inclusion:
+>>>>
+>>>> [...]
+>>>> #include <linux/irqchip/arm-gic.h>
+>>>> #include <linux/irqchip/arm-gic-v3.h>
+>>>> [...]
+>>>>           err = gic_v3_acpi_init(table);
+>>>>           if (err)
+>>>>                   err = gic_v2_acpi_init(table);
+>>>>           if (err)
+>>>>                   pr_err("Failed to initialize GIC IRQ controller");
+>>>> [...]
+>>>> So instead of changing register names prefix, I choose new header will
+>>>> be less painfully.
+>>>
+>>> Yes, and this is exactly why I pushed back on that last time. I'll
+>>> continue saying that interrupt controllers should be self-probing, with
+>>> ACPI as they are with DT.
+>>>
+>>> Even with the restrictions of ACPI and SBSA, we end-up with at least 2
+>>> main families of interrupt controllers (GICv2 and GICv3), both with a
+>>> number of "interesting" variations (GICv2m and GICv4, to only mention
+>>> those I'm directly involved with).
+>>>
+>>> I can safely predict that the above will become a tangled mess within 18
+>>> months, and the idea of littering the arch code with a bunch of
+>>> hardcoded "if (blah())" doesn't fill me with joy and confidence.
+>>>
+>>> In summary: we have the infrastructure already, just use it.
+>>
+>> We had that discussion but I see we still don't have consensus here. It
+>> would be good to know our direction before we prepare next patch
+>> version. Arnd any comments on this from you side?
+>
+> I still prefer being explicit here for the same reason I mentioned earlier:
+> I want it to be very clear that we don't support arbitrary irqchips other
+> than the ones in the APCI specification. The infrastructure exists on DT
+> because we have to support a large number of incompatible irqchips.
+>
+> In particular, the ACPI tables describing the irqchip have no way to
+> identify the GIC at all, if I read the spec correctly, you have to
+> parse the tables, ioremap the registers and then read the ID to know
+> if you have GICv1/v2/v2m/v3/v4. There doesn't seem to be any "device"
+> for the GIC that a hypothetical probe function would be based on.
+Yes, it is just one table with bunch of different subtables types. Since 
+GIC identification register is at different offset across GICv1/2 and 
+GICv3, the probe logic seems to be slightly different. IMO, we should 
+look into our MADT and try GICv3 fist and then GICv2, that means 
+presence of redistributor entries suggests GICv3/4. Its absence means we 
+need to look for GICC subtables and then call GICv2 init.
 
-The easiest way would be to put the index as a property in the
-device tree itself.
+>
+> It does seem wrong to parse the tables in the irq-gic.c file though:
+> that part can well be common across the various gic versions and then
+> call into either irq-gic.c or irq-gic-v3.c for the version specific
+> parts. Whether we put that common code into drivers/irqchip/irqchip.c,
+> drivers/irqchip/gic-common.c, drivers/irqchip/irq-acpi-gic.c or
+> drivers/acpi/irq-gic.c I don't care at all.
 
-> > +struct ls_pcie {
-> > +     struct list_head node;
-> > +     struct device *dev;
-> > +     struct pci_bus *bus;
-> > +     void __iomem *dbi;
-> > +     void __iomem *scfg;
-> > +     struct pcie_port pp;
-> > +     int id;
-> > +     int index;
-> > +     int irq;
-> > +     int msi_irq;
-> > +     int pme_irq;
-> > +};
-> 
-> irq and pme_irq seem to be completely unused, so better
-> not add them until they are actually used.
-> [Minghuan] Ok, I will remove them.
-> 
-> The scfg registers seem to belong to another device that
-> is responsible for multiple instances. Unfortunately,
-> this "fsl,ls1021a-scfg" device is not documented anywhere
-> that I can see.
-> 
-> Is this some sort of syscon node, or is it specific to the
-> pcie controller(s)?
-> 
-> [Minghaun] SCFG provides SoC specific configuration and status
-> registers for the device including PCI USB eTSEC SATA ...
-> The platform patches that contains SCFG code are being upstream.
+We already had tried making MADT parser common for all GICs in the 
+separate file (outside GIC driver), it did not end up well. In the light 
+of above comment, the logic will be complex and some GIC local strutures 
+need to be exported:
+1. Check redistributor entries.
+2. If none exist, as fallback, check GICC entries, there are 
+redistributor base address assigned to CPU. Unfortunately it has no 
+register set size so ioremap only two pages (RD + SGI) check if we 
+support VLPI and extend ioremap if true. We cannot operate on GIC 
+register outside GIC driver so that requires another exported GICv3 
+function.
+3. Jump to redistributor part if we are OK so far, if not, then we start 
+playing with GICC enries and look for cpu base addresses.
 
-This sounds like it should be a syscon node, and you should use
-syscon_regmap_lookup_by_phandle() to find the scfg node from each
-of those drivers, rather than scanning the DT yourself in each
-of the drivers using it.
+Honestly, apart from distributor parsing logic, there is no common code.
 
-This can also be a place to put the index, such as 
+As you can see, current gic_v2_acpi_init() logic is quite easy to 
+follow. And gic_v3_acpi_init() inside of GICv3 driver is easy too. I 
+might not see other solutions but I am open to other suggestions, so 
+please correct me in that case.
 
-	scfg = <&scfg 0>;
-
-for the first PCIe node. The probe function then extracts both
-the phandle for the syscon and the index from that property.
-
-> > +static int ls_pcie_link_up(struct pcie_port *pp)
-> > +{
-> > +     u32 rc, tmp;
-> > +     struct ls_pcie *pcie = to_ls_pcie(pp);
-> > +
-> > +     tmp = ioread32(pcie->scfg + SCFG_SCFGREVCR_OFF);
-> > +     iowrite32(SCFG_NO_BIT_REVERSE, pcie->scfg + SCFG_SCFGREVCR_OFF);
-> > +
-> > +     rc = (ioread32(pcie->scfg + PEXMSCPORTSR(pcie->index)) >>
-> > +          LTSSM_STATE_SHIFT) & LTSSM_STATE_MASK;
-> > +
-> > +     iowrite32(tmp, pcie->scfg + SCFG_SCFGREVCR_OFF);
-> > +
-> > +     if (rc < LTSSM_PCIE_L0)
-> > +             return 0;
-> > +
-> > +     return 1;
-> > +}
-> 
-> This looks like it is really a phy driver, although a pretty minimal
-> one.
-> 
-> [Minghuan] I read SCFG register. SCFG provides SoC specific configuration
-> and status registers for the device including PCI USB eTSEC SATA ...
-
-I'm guessing that a lot of that is phy related information though.
-A nicer way to deal with this, compared to using syscon directly is
-to have a phy driver for your chip, and have that deal with all
-the phy related setup. In this case you would have a reference in
-the client driver like
-
-	phys = <&scfgphy LS1021A_PHY_PCIE0>;
-	phy-names = "pcie";
-
-And in the pcie driver you just call devm_phy_get(dev, "pcie") to get a reference
-to that phy node, and then you can use the phy API to perform actions on
-it (init, power_on, power_off, exit).
-
-This keeps all knowledge about the phy registers inside of the scfg area
-in one place, and you only have to add a new phy driver for a future SoC
-that has the same PCIe core but different scfg.
-
-> > +static u32 ls_pcie_get_msi_addr(struct pcie_port *pp)
-> > +{
-> > +     return SCFG_SPIMSICR_ADDR;
-> > +}
-> > +
-> > +static u32 ls_pcie_get_msi_data(struct pcie_port *pp, int pos)
-> > +{
-> > +     struct ls_pcie *pcie = to_ls_pcie(pp);
-> > +
-> > +     if (pcie->id == PCI_DEVICE_ID_LS1021A)
-> > +             return MSI_LS1021A_DATA(pcie->index);
-> > +
-> > +     return pos;
-> > +}
-> 
-> My impression is that you have two distinct MSI controller
-> implementations, one for LS1021A and the other one for everything
-> else. How about using separate pcie_host_ops for them, possibly
-> also moving them into separate files?
-> 
-> A good way to deal with this is to put the pointers to the two
-> pcie_host_ops into the data fields of the ls_pcie_of_match table.
-> 
-> [Minghuan] LS1021 contains the same two PCI controllers PEX1 and PEX2.
-> both PEX1 and PEX use the same MSI address, but different MSI message data.
-
-I mean LS1021 is different from other chips here, since you compare
-the pcie->id value.
-
-	Arnd
+Regards,
+Tomasz
