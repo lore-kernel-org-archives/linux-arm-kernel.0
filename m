@@ -1,74 +1,34 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 5 Sep 2014 14:30:09 -0700
-Subject: [PATCH 07/10] ARM: OMAP5 / DRA7: Enable CPU RET on suspend
-In-Reply-To: <20140905211558.GA31011@kahuna>
-References: <1408716154-26101-1-git-send-email-nm@ti.com>
- <1408716154-26101-8-git-send-email-nm@ti.com>
- <7hbnr5dake.fsf@paris.lan> <53FE2BF2.3020006@ti.com>
- <20140827194156.GE16006@atomide.com> <53FE34D7.7040004@ti.com>
- <53FE3551.2080806@ti.com> <20140905211558.GA31011@kahuna>
-Message-ID: <20140905213009.GB3238@atomide.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Fri, 5 Sep 2014 22:36:00 +0100
+Subject: [PATCH v9 5/8] drivers: cpuidle: implement DT based idle states
+ infrastructure
+In-Reply-To: <20140905212908.GA28626@e102568-lin.cambridge.arm.com>
+References: <1409938498-17984-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <1409938498-17984-6-git-send-email-lorenzo.pieralisi@arm.com>
+ <7hlhpxygzv.fsf@paris.lan>
+ <20140905212908.GA28626@e102568-lin.cambridge.arm.com>
+Message-ID: <20140905213600.GJ29327@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Nishanth Menon <nm@ti.com> [140905 14:16]:
-> On 14:45-20140827, Nishanth Menon wrote:
-> > On 08/27/2014 02:43 PM, Santosh Shilimkar wrote:
-> > > On Wednesday 27 August 2014 03:41 PM, Tony Lindgren wrote:
-> > >> * Nishanth Menon <nm@ti.com> [140827 12:05]:
-> > >>> On 08/27/2014 01:58 PM, Kevin Hilman wrote:
-> > >>>> Nishanth Menon <nm@ti.com> writes:
-> > >>>>
-> > >>>>> From: Rajendra Nayak <rnayak@ti.com>
-> > >>>>>
-> > >>>>> On OMAP5 / DRA7, prevent a CPU powerdomain OFF and resulting MPU OSWR
-> > >>>>> and instead attempt a CPU RET and side effect, MPU RET in suspend.
-> > >>>>>
-> > >>>>> Signed-off-by: Rajendra Nayak <rnayak@ti.com>
-> > >>>>> [nm at ti.com: update to do save_state only on DRA7]
-> > >>>>> Signed-off-by: Nishanth Menon <nm@ti.com>
-> > >>>>> ---
-> > >>>>>  arch/arm/mach-omap2/omap-mpuss-lowpower.c |    4 ++++
-> > >>>>>  arch/arm/mach-omap2/omap-wakeupgen.c      |    2 +-
-> > >>>>>  arch/arm/mach-omap2/pm44xx.c              |    9 +++++++--
-> > >>>>>  3 files changed, 12 insertions(+), 3 deletions(-)
-> > >>>>>
-> > >>>>> diff --git a/arch/arm/mach-omap2/omap-mpuss-lowpower.c b/arch/arm/mach-omap2/omap-mpuss-lowpower.c
-> > >>>>> index 207fce2..0d640eb 100644
-> > >>>>> --- a/arch/arm/mach-omap2/omap-mpuss-lowpower.c
-> > >>>>> +++ b/arch/arm/mach-omap2/omap-mpuss-lowpower.c
-> > >>>>> @@ -242,6 +242,10 @@ int omap4_enter_lowpower(unsigned int cpu, unsigned int power_state)
-> > >>>>>  		save_state = 1;
-> > >>>>>  		break;
-> > >>>>>  	case PWRDM_POWER_RET:
-> > >>>>> +		if (soc_is_omap54xx() || soc_is_dra7xx()) {
-> > >>>>
-> > >>>> Aren't we trying to get away from these soc_* checks for anything other
-> > >>>> than init code?
-> > >>>
-> > >>> I would expect that to take place in stages as part of which the next
-> > >>> level of cleanup is to move PRM into drivers. Currently our wakeupgen,
-> > >>> prm code does have quiet a few needs of dealing with soc_is checks
-> > >>> primarily from having to re-architect code in two different directions
-> > >>> - we want to move into just one direction eventually - to prm drivers
-> > >>> and as less code in mach-omap2 which is already in the works.
-> > >>
-> > >> Why don't you just set some flag at init time based on the
-> > >> soc_is check and then test that here? That limits the use of
-> > >> soc_is to init code only which makes it easier to phase it
-> > >> out completely eventually.
-> > >>
-> > > Indeed. Infact the version of the code I tried posting last year was
-> > > using a flag which was initialised during init. Same can be
-> > > done her.
-> > 
-> > OK. will try something along that line in the next rev.
-> 
-> 
-> Hi,
-> 
-> Updated patch below:
+On Fri, Sep 05, 2014 at 10:29:08PM +0100, Lorenzo Pieralisi wrote:
+> On Fri, Sep 05, 2014 at 09:00:52PM +0100, Kevin Hilman wrote:
 
-Looks OK to me thanks.
+> (3) Add an optional property to the DT bindings to describe the state
 
-Tony
+> (3) I am not extremely keen at this stage to re-patch the DT bindings,
+> it has been an awful lot of work to make everyone agree so I would avoid
+> any changes, I hope you understand (and I am not even sure DT maintainers
+> would accept that, so even less keen on changing the DT bindings at this
+> stage).
+
+Just do it as an incremental patch if you're worried - we've got
+precendents for this like regulator-name which exists solely to make
+diagnostics more descriptive.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140905/94263623/attachment.sig>
