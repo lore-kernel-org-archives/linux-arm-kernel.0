@@ -1,156 +1,89 @@
-From: daniel.thompson@linaro.org (Daniel Thompson)
-Date: Fri, 05 Sep 2014 15:31:01 +0100
-Subject: [PATCH FYI 3/4] ARM: add basic support for on-demand backtrace
- of other CPUs
-In-Reply-To: <E1XPq1S-0000RP-FR@rmk-PC.arm.linux.org.uk>
-References: <20140905094056.GD30401@n2100.arm.linux.org.uk>
- <E1XPq1S-0000RP-FR@rmk-PC.arm.linux.org.uk>
-Message-ID: <5409C925.8020409@linaro.org>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Fri,  5 Sep 2014 11:34:23 -0300
+Subject: [PATCH] ARM: imx_v4_v5_defconfig: Select CONFIG_IMX_WEIM
+Message-ID: <1409927663-8871-1-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/09/14 10:41, Russell King wrote:
-> Add basic infrastructure for triggering a backtrace of other CPUs
-> via an IPI, preferably at FIQ level.  It is intended that this shall
-> be used for cases where we have detected that something has already
-> failed in the kernel.
-> 
-> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> ---
->  arch/arm/include/asm/irq.h |  5 ++++
->  arch/arm/kernel/smp.c      | 62 ++++++++++++++++++++++++++++++++++++++++++++++
->  2 files changed, 67 insertions(+)
-> 
-> diff --git a/arch/arm/include/asm/irq.h b/arch/arm/include/asm/irq.h
-> index 53c15dec7af6..be1d07d59ee9 100644
-> --- a/arch/arm/include/asm/irq.h
-> +++ b/arch/arm/include/asm/irq.h
-> @@ -35,6 +35,11 @@ extern void (*handle_arch_irq)(struct pt_regs *);
->  extern void set_handle_irq(void (*handle_irq)(struct pt_regs *));
->  #endif
->  
-> +#ifdef CONFIG_SMP
-> +extern void arch_trigger_all_cpu_backtrace(bool);
-> +#define arch_trigger_all_cpu_backtrace(x) arch_trigger_all_cpu_backtrace(x)
-> +#endif
-> +
->  #endif
->  
->  #endif
-> diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
-> index 9388a3d479e1..94959f977b82 100644
-> --- a/arch/arm/kernel/smp.c
-> +++ b/arch/arm/kernel/smp.c
-> @@ -72,8 +72,12 @@ enum ipi_msg_type {
->  	IPI_CPU_STOP,
->  	IPI_IRQ_WORK,
->  	IPI_COMPLETION,
-> +	IPI_CPU_BACKTRACE,
+From: Fabio Estevam <fabio.estevam@freescale.com>
 
-I'd prefer this to use a more generic name to allow the IPI to be used
-for debug/profiling purposes.
+The imx weim driver is used by some mx27/mx1 boards, so let's enable it by
+default.
 
-The backtrace_mask bitmap already makes it safe to call
-ipi_cpu_backtrace() without any additional demux.
+Generated this patch by doing:
 
+- make imx_v4_v5_defconfig
+- make menuconfig and manually select CONFIG_IMX_WEIM
+- make savedefconfig
+- cp defconfig arch/arm/configs/imx_v4_v5_defconfig
 
->  };
->  
-> +/* For reliability, we're prepared to waste bits here. */
-> +static DECLARE_BITMAP(backtrace_mask, NR_CPUS) __read_mostly;
-> +
+,which results in some additional cleanups.
 
-Both checkpatch and the comments in linux/thread.h imply using
-CONFIG_NR_CPUS is better here.
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+---
+ arch/arm/configs/imx_v4_v5_defconfig | 11 ++---------
+ 1 file changed, 2 insertions(+), 9 deletions(-)
 
-
->  static DECLARE_COMPLETION(cpu_running);
->  
->  static struct smp_operations smp_ops;
-> @@ -539,6 +543,21 @@ static void ipi_cpu_stop(unsigned int cpu)
->  		cpu_relax();
->  }
->  
-> +static void ipi_cpu_backtrace(struct pt_regs *regs)
-> +{
-> +	int cpu = smp_processor_id();
-> +
-> +	if (cpumask_test_cpu(cpu, to_cpumask(backtrace_mask))) {
-> +		static arch_spinlock_t lock = __ARCH_SPIN_LOCK_UNLOCKED;
-> +
-> +		arch_spin_lock(&lock);
-> +		printk(KERN_WARNING "FIQ backtrace for cpu %d\n", cpu);
-
-How about some indication showing degree of platform support currently
-available?
-
-printk(KERN_WARNING "%s backtrace for cpu %d\n",
-       in_nmi() ? "FIQ" : "Non-FIQ", cpu);
-
-
-Daniel.
-
-> +		show_regs(regs);
-> +		arch_spin_unlock(&lock);
-> +		cpumask_clear_cpu(cpu, to_cpumask(backtrace_mask));
-> +	}
-> +}
-> +
->  static DEFINE_PER_CPU(struct completion *, cpu_completion);
->  
->  int register_ipi_completion(struct completion *completion, int cpu)
-> @@ -618,6 +637,12 @@ void handle_IPI(int ipinr, struct pt_regs *regs)
->  		irq_exit();
->  		break;
->  
-> +	case IPI_CPU_BACKTRACE:
-> +		irq_enter();
-> +		ipi_cpu_backtrace(regs);
-> +		irq_exit();
-> +		break;
-> +
->  	default:
->  		printk(KERN_CRIT "CPU%u: Unknown IPI message 0x%x\n",
->  		       cpu, ipinr);
-> @@ -712,3 +737,40 @@ static int __init register_cpufreq_notifier(void)
->  core_initcall(register_cpufreq_notifier);
->  
->  #endif
-> +
-> +void arch_trigger_all_cpu_backtrace(bool include_self)
-> +{
-> +	static unsigned long backtrace_flag;
-> +	int i, cpu = get_cpu();
-> +
-> +	if (test_and_set_bit(0, &backtrace_flag)) {
-> +		/*
-> +		 * If there is already a trigger_all_cpu_backtrace() in progress
-> +		 * (backtrace_flag == 1), don't output double cpu dump infos.
-> +		 */
-> +		put_cpu();
-> +		return;
-> +	}
-> +
-> +	cpumask_copy(to_cpumask(backtrace_mask), cpu_online_mask);
-> +	if (!include_self)
-> +		cpumask_clear_cpu(cpu, to_cpumask(backtrace_mask));
-> +
-> +	if (!cpumask_empty(to_cpumask(backtrace_mask))) {
-> +		pr_info("Sending FIQ to %s CPUs:\n",
-> +			(include_self ? "all" : "other"));
-> +		smp_cross_call(to_cpumask(backtrace_mask), IPI_CPU_BACKTRACE);
-> +	}
-> +
-> +	/* Wait for up to 10 seconds for all CPUs to do the backtrace */
-> +	for (i = 0; i < 10 * 1000; i++) {
-> +		if (cpumask_empty(to_cpumask(backtrace_mask)))
-> +			break;
-> +
-> +		mdelay(1);
-> +	}
-> +
-> +	clear_bit(0, &backtrace_flag);
-> +	smp_mb__after_atomic();
-> +	put_cpu();
-> +}
-> 
+diff --git a/arch/arm/configs/imx_v4_v5_defconfig b/arch/arm/configs/imx_v4_v5_defconfig
+index a3fb866..e688741 100644
+--- a/arch/arm/configs/imx_v4_v5_defconfig
++++ b/arch/arm/configs/imx_v4_v5_defconfig
+@@ -21,7 +21,6 @@ CONFIG_ARCH_MULTI_V4T=y
+ CONFIG_ARCH_MULTI_V5=y
+ # CONFIG_ARCH_MULTI_V7 is not set
+ CONFIG_ARCH_MXC=y
+-CONFIG_MXC_IRQ_PRIOR=y
+ CONFIG_MACH_SCB9328=y
+ CONFIG_MACH_APF9328=y
+ CONFIG_MACH_MX21ADS=y
+@@ -38,8 +37,6 @@ CONFIG_PREEMPT=y
+ CONFIG_AEABI=y
+ CONFIG_ZBOOT_ROM_TEXT=0x0
+ CONFIG_ZBOOT_ROM_BSS=0x0
+-CONFIG_FPE_NWFPE=y
+-CONFIG_FPE_NWFPE_XP=y
+ CONFIG_PM_DEBUG=y
+ CONFIG_NET=y
+ CONFIG_PACKET=y
+@@ -58,6 +55,7 @@ CONFIG_NETFILTER=y
+ CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
+ CONFIG_DEVTMPFS=y
+ CONFIG_DEVTMPFS_MOUNT=y
++CONFIG_IMX_WEIM=y
+ CONFIG_MTD=y
+ CONFIG_MTD_CMDLINE_PARTS=y
+ CONFIG_MTD_BLOCK=y
+@@ -73,8 +71,8 @@ CONFIG_MTD_NAND_MXC=y
+ CONFIG_MTD_UBI=y
+ CONFIG_EEPROM_AT24=y
+ CONFIG_EEPROM_AT25=y
+-CONFIG_ATA=y
+ CONFIG_BLK_DEV_SD=y
++CONFIG_ATA=y
+ CONFIG_PATA_IMX=y
+ CONFIG_NETDEVICES=y
+ CONFIG_CS89x0=y
+@@ -97,10 +95,8 @@ CONFIG_SERIAL_8250=m
+ CONFIG_SERIAL_IMX=y
+ CONFIG_SERIAL_IMX_CONSOLE=y
+ # CONFIG_HW_RANDOM is not set
+-CONFIG_I2C=y
+ CONFIG_I2C_CHARDEV=y
+ CONFIG_I2C_IMX=y
+-CONFIG_SPI=y
+ CONFIG_SPI_IMX=y
+ CONFIG_SPI_SPIDEV=y
+ CONFIG_GPIO_SYSFS=y
+@@ -127,10 +123,7 @@ CONFIG_VIDEO_CODA=y
+ CONFIG_SOC_CAMERA_OV2640=y
+ CONFIG_FB=y
+ CONFIG_FB_IMX=y
+-CONFIG_BACKLIGHT_LCD_SUPPORT=y
+-CONFIG_LCD_CLASS_DEVICE=y
+ CONFIG_LCD_L4F00242T03=y
+-CONFIG_BACKLIGHT_CLASS_DEVICE=y
+ CONFIG_FRAMEBUFFER_CONSOLE=y
+ CONFIG_LOGO=y
+ CONFIG_SOUND=y
+-- 
+1.9.1
