@@ -1,82 +1,72 @@
 From: rric@kernel.org (Robert Richter)
-Date: Fri,  5 Sep 2014 08:48:06 +0200
-Subject: [PATCH 0/6] dts, kbuild: Implement support for dtb vendor subdirs
-Message-ID: <1409899692-1455-1-git-send-email-rric@kernel.org>
+Date: Fri,  5 Sep 2014 08:48:07 +0200
+Subject: [PATCH 1/6] dts, arm64: Add dtbs_install make target
+In-Reply-To: <1409899692-1455-1-git-send-email-rric@kernel.org>
+References: <1409899692-1455-1-git-send-email-rric@kernel.org>
+Message-ID: <1409899692-1455-2-git-send-email-rric@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Robert Richter <rrichter@cavium.com>
 
-For arm64 we want to put dts files into vendor's subdirectories from
-the beginning. This patch set implements this. As this is a generic
-kbuild implementation, vendor subdirs will be also available for
-arch/arm and other architectures. The subdirectory tree is also
-reflected in the install path.
+This adds the dtbs_install make target to arm64. The target has been
+introduced already to arch/arm with the following commit:
 
-A new makefile variable dts-dirs is introduced to point to dts
-subdirs. This variable is used by kbuild for building and installation
-of dtb files.
+ f4d4ffc03efc kbuild: dtbs_install: new make target
 
-A dts Makefile looks now as follows:
+Implementation for arm64 is the same as for arm.
 
-----
-dtb-$(CONFIG_...) += some_file_1.dtb
-dtb-$(CONFIG_...) += some_file_2.dtb
+With 'dtbs_install' all config enabled dtb files are installed to
+either the INSTALL_DTBS_PATH directory or the default location:
 
-dts-dirs          += dir_vendor_a
-dts-dirs          += dir_vendor_b
+ $INSTALL_PATH/dtbs/$KERNELRELEASE
 
-# come always afterwards:
-always         := $(dtb-y)
-subdir-y       := $(dts-dirs)
-clean-files    := *.dtb
-----
+Signed-off-by: Robert Richter <rrichter@cavium.com>
+---
+ arch/arm64/Makefile          | 6 ++++--
+ arch/arm64/boot/dts/Makefile | 4 +++-
+ 2 files changed, 7 insertions(+), 3 deletions(-)
 
-This patches also introduces the dtbs_install make target for
-arm64. Install rules are moved to Makefile.dtbinst using the same
-style and calling convention like for modinst and fwinst.
-
-Robert Richter (6):
-  dts, arm64: Add dtbs_install make target
-  dts, kbuild: Factor out dtbs install rules to Makefile.dtbinst
-  dts, arm/arm64: Remove dtbs build rules in sub-makes
-  dts, kbuild: Implement support for dtb vendor subdirs
-  dts, arm64: Move dts files to vendor subdirs
-  dts, arm: Remove $(MACHINE) variable from dtbs make recipes
-
- arch/arm/Makefile                                |   8 +-
- arch/arm/boot/dts/Makefile                       |  12 +-
- arch/arm64/Makefile                              |  10 +-
- arch/arm64/boot/dts/Makefile                     |  13 +-
- arch/arm64/boot/dts/apm-mustang.dts              |  34 --
- arch/arm64/boot/dts/apm-storm.dtsi               | 425 -----------------------
- arch/arm64/boot/dts/apm/Makefile                 |   5 +
- arch/arm64/boot/dts/apm/apm-mustang.dts          |  34 ++
- arch/arm64/boot/dts/apm/apm-storm.dtsi           | 425 +++++++++++++++++++++++
- arch/arm64/boot/dts/arm/Makefile                 |   6 +
- arch/arm64/boot/dts/arm/foundation-v8.dts        | 232 +++++++++++++
- arch/arm64/boot/dts/arm/rtsm_ve-aemv8a.dts       | 159 +++++++++
- arch/arm64/boot/dts/arm/rtsm_ve-motherboard.dtsi | 240 +++++++++++++
- arch/arm64/boot/dts/foundation-v8.dts            | 232 -------------
- arch/arm64/boot/dts/rtsm_ve-aemv8a.dts           | 159 ---------
- arch/arm64/boot/dts/rtsm_ve-motherboard.dtsi     | 240 -------------
- scripts/Kbuild.include                           |   6 +
- scripts/Makefile.dtbinst                         |  51 +++
- scripts/Makefile.lib                             |  12 -
- 19 files changed, 1179 insertions(+), 1124 deletions(-)
- delete mode 100644 arch/arm64/boot/dts/apm-mustang.dts
- delete mode 100644 arch/arm64/boot/dts/apm-storm.dtsi
- create mode 100644 arch/arm64/boot/dts/apm/Makefile
- create mode 100644 arch/arm64/boot/dts/apm/apm-mustang.dts
- create mode 100644 arch/arm64/boot/dts/apm/apm-storm.dtsi
- create mode 100644 arch/arm64/boot/dts/arm/Makefile
- create mode 100644 arch/arm64/boot/dts/arm/foundation-v8.dts
- create mode 100644 arch/arm64/boot/dts/arm/rtsm_ve-aemv8a.dts
- create mode 100644 arch/arm64/boot/dts/arm/rtsm_ve-motherboard.dtsi
- delete mode 100644 arch/arm64/boot/dts/foundation-v8.dts
- delete mode 100644 arch/arm64/boot/dts/rtsm_ve-aemv8a.dts
- delete mode 100644 arch/arm64/boot/dts/rtsm_ve-motherboard.dtsi
- create mode 100644 scripts/Makefile.dtbinst
-
+diff --git a/arch/arm64/Makefile b/arch/arm64/Makefile
+index 2df5e5daeebe..e0a8292bc832 100644
+--- a/arch/arm64/Makefile
++++ b/arch/arm64/Makefile
+@@ -71,8 +71,9 @@ zinstall install: vmlinux
+ %.dtb: scripts
+ 	$(Q)$(MAKE) $(build)=$(boot)/dts $(boot)/dts/$@
+ 
+-dtbs: scripts
+-	$(Q)$(MAKE) $(build)=$(boot)/dts dtbs
++PHONY += dtbs dtbs_install
++dtbs dtbs_install: prepare scripts
++	$(Q)$(MAKE) $(build)=$(boot)/dts $@
+ 
+ PHONY += vdso_install
+ vdso_install:
+@@ -86,6 +87,7 @@ define archhelp
+   echo  '* Image.gz      - Compressed kernel image (arch/$(ARCH)/boot/Image.gz)'
+   echo  '  Image         - Uncompressed kernel image (arch/$(ARCH)/boot/Image)'
+   echo  '* dtbs          - Build device tree blobs for enabled boards'
++  echo  '  dtbs_install  - Install dtbs to $(INSTALL_DTBS_PATH)'
+   echo  '  install       - Install uncompressed kernel'
+   echo  '  zinstall      - Install compressed kernel'
+   echo  '                  Install using (your) ~/bin/installkernel or'
+diff --git a/arch/arm64/boot/dts/Makefile b/arch/arm64/boot/dts/Makefile
+index c52bdb051f66..82e1c4cf8780 100644
+--- a/arch/arm64/boot/dts/Makefile
++++ b/arch/arm64/boot/dts/Makefile
+@@ -1,9 +1,11 @@
+ dtb-$(CONFIG_ARCH_VEXPRESS) += rtsm_ve-aemv8a.dtb foundation-v8.dtb
+ dtb-$(CONFIG_ARCH_XGENE) += apm-mustang.dtb
+ 
+-targets += dtbs
++targets += dtbs dtbs_install
+ targets += $(dtb-y)
+ 
+ dtbs: $(addprefix $(obj)/, $(dtb-y))
+ 
+ clean-files := *.dtb
++
++dtbs_install: $(addsuffix _dtbinst_, $(dtb-y))
 -- 
 2.0.1
