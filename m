@@ -1,42 +1,71 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Fri, 5 Sep 2014 15:24:31 +0530
-Subject: [PATCH v2] ARM: spear: Remove references to PLAT_SPEAR_SINGLE
-In-Reply-To: <1409910654.5546.161.camel@x220>
-References: <1392153676.14317.8.camel@x220> <1397550407.1985.12.camel@x220>
- <534CFB45.9070704@st.com> <1402919387.30599.4.camel@x220>
- <1409909229.5546.146.camel@x220> <1409909940.5546.154.camel@x220>
- <CAOh2x=koqY0SyOuP+Xk7Zd3Ue_7HPFAxUn+V3M4ehgCv-8i02A@mail.gmail.com>
- <1409910654.5546.161.camel@x220>
-Message-ID: <CAKohpomS5TrG0eU51N-Pu2jE-ZVioNHz-U_7Y-mfFSUU+As-MQ@mail.gmail.com>
+From: wangyijing@huawei.com (Yijing Wang)
+Date: Fri, 5 Sep 2014 18:10:01 +0800
+Subject: [PATCH v1 16/21] s390/MSI: Use MSI chip framework to configure
+ MSI/MSI-X irq
+In-Reply-To: <1409911806-10519-1-git-send-email-wangyijing@huawei.com>
+References: <1409911806-10519-1-git-send-email-wangyijing@huawei.com>
+Message-ID: <1409911806-10519-17-git-send-email-wangyijing@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 5 September 2014 15:20, Paul Bolle <pebolle@tiscali.nl> wrote:
-> On Fri, 2014-09-05 at 15:13 +0530, Viresh Kumar wrote:
->> On Fri, Sep 5, 2014 at 3:09 PM, Paul Bolle <pebolle@tiscali.nl> wrote:
->> >> Ditto for v3.17-rc3 and next-20140904. Could someone please pix this up?
->>
->> You need to send it to arm at kernel.org..
->
-> Will do, no problem. But why actually? (Note that MAINTAINERS is silent
-> on arm at kernel.org. Maybe that address is documented elsewhere.)
+Use MSI chip framework instead of arch MSI functions to configure
+MSI/MSI-X irq. So we can manage MSI/MSI-X irq in a unified framework.
 
-Don't know where it is documented.
+Signed-off-by: Yijing Wang <wangyijing@huawei.com>
+---
+ arch/s390/pci/pci.c |   18 ++++++++++++++----
+ 1 files changed, 14 insertions(+), 4 deletions(-)
 
-@Arnd: ??
-
->> > And now Rajeev's address bounces. Has Rajeev left ST?
->>
->> Yeah both Shiraz/Rajeev and myself have left ST :)
->
-> I see. Is there a current address for Rajeev.? I will not keep an
-> Acked-by on a bouncing address.
-
-rajivrec at gmail.com
-
->> You can add
->> Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
->
-> Thanks,
-
-Welcome !!
+diff --git a/arch/s390/pci/pci.c b/arch/s390/pci/pci.c
+index 2fa7b14..da5316e 100644
+--- a/arch/s390/pci/pci.c
++++ b/arch/s390/pci/pci.c
+@@ -358,7 +358,7 @@ static void zpci_irq_handler(struct airq_struct *airq)
+ 	}
+ }
+ 
+-int arch_setup_msi_irqs(struct pci_dev *pdev, int nvec, int type)
++int zpci_setup_msi_irqs(struct pci_dev *pdev, int nvec, int type)
+ {
+ 	struct zpci_dev *zdev = get_zdev(pdev);
+ 	unsigned int hwirq, msi_vecs;
+@@ -434,7 +434,7 @@ out:
+ 	return rc;
+ }
+ 
+-void arch_teardown_msi_irqs(struct pci_dev *pdev)
++static void zpci_teardown_msi_irqs(struct pci_dev *pdev)
+ {
+ 	struct zpci_dev *zdev = get_zdev(pdev);
+ 	struct msi_desc *msi;
+@@ -448,9 +448,9 @@ void arch_teardown_msi_irqs(struct pci_dev *pdev)
+ 	/* Release MSI interrupts */
+ 	list_for_each_entry(msi, &pdev->msi_list, list) {
+ 		if (msi->msi_attrib.is_msix)
+-			default_msix_mask_irq(msi, 1);
++			__msix_mask_irq(msi, 1);
+ 		else
+-			default_msi_mask_irq(msi, 1, 1);
++			__msi_mask_irq(msi, 1, 1);
+ 		irq_set_msi_desc(msi->irq, NULL);
+ 		irq_free_desc(msi->irq);
+ 		msi->msg.address_lo = 0;
+@@ -464,6 +464,16 @@ void arch_teardown_msi_irqs(struct pci_dev *pdev)
+ 	airq_iv_free_bit(zpci_aisb_iv, zdev->aisb);
+ }
+ 
++static struct msi_chip zpci_msi_chip = {
++	.setup_irqs = zpci_setup_msi_irqs,
++	.teardown_irqs = zpci_teardown_msi_irqs,
++};
++
++struct msi_chip *arch_find_msi_chip(struct pci_dev *dev)
++{
++	return &zpci_msi_chip;
++}
++
+ static void zpci_map_resources(struct zpci_dev *zdev)
+ {
+ 	struct pci_dev *pdev = zdev->pdev;
+-- 
+1.7.1
