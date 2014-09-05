@@ -1,98 +1,135 @@
-From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Fri, 5 Sep 2014 13:23:29 -0600
-Subject: [PATCH v2] PCI: keystone: add a pci quirk to limit mrrs
-In-Reply-To: <1407527132-3294-1-git-send-email-m-karicheri2@ti.com>
-References: <1407527132-3294-1-git-send-email-m-karicheri2@ti.com>
-Message-ID: <20140905192329.GE8080@google.com>
+From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
+Date: Fri,  5 Sep 2014 21:02:53 +0200
+Subject: [PATCH 18/18] tty: serial: 8250: omap: add dma support
+In-Reply-To: <1409943773-7874-1-git-send-email-bigeasy@linutronix.de>
+References: <1409943773-7874-1-git-send-email-bigeasy@linutronix.de>
+Message-ID: <1409943773-7874-19-git-send-email-bigeasy@linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 08, 2014 at 03:45:32PM -0400, Murali Karicheri wrote:
-> Keystone PCI controller has a limitation that memory read request
-> size must not exceed 256 bytes. This is a hardware limitation and
-> add a quirk to force this limit on all downstream devices by
-> updating mrrs.
-> 
-> Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
-> ---
->  -v2: made the quirk happens after tuning
->  -v1: changed printk to indicate PCI bdf
->  This applies on top of the Keystone PCI controller patch series
->  at http://thread.gmane.org/gmane.linux.kernel.pci/33523
->  drivers/pci/host/pci-keystone.c |   40 +++++++++++++++++++++++++++++++++++++++
->  1 file changed, 40 insertions(+)
-> 
-> diff --git a/drivers/pci/host/pci-keystone.c b/drivers/pci/host/pci-keystone.c
-> index c1cfaef..a132622 100644
-> --- a/drivers/pci/host/pci-keystone.c
-> +++ b/drivers/pci/host/pci-keystone.c
-> @@ -42,8 +42,48 @@
->  /* DEV_STAT_CTRL */
->  #define PCIE_CAP_BASE		0x70
->  
-> +/* PCIE controller device IDs */
-> +#define PCIE_RC_K2HK		0xb008
-> +#define PCIE_RC_K2E		0xb009
-> +#define PCIE_RC_K2L		0xb00a
+This patch adds the required pieces to 8250-OMAP UART driver for DMA
+support. The TX burst size is set to 1 so we can send an arbitrary
+amount of bytes.
 
-A Root Complex doesn't appear in config space as a PCI device, so I think
-these are actually Root Port devices, aren't they?
+The RX burst is currently set to 48 which means we receive an DMA
+interrupt every 48 bytes and have to reprogram everything. Less bytes in
+the RX-FIFO mean that no DMA transfer will happen and the UART will send a
+RX-timeout _or_ RDI event at which point the FIFO will be manually purged.
+There is a workaround for TX-DMA on AM33xx where we put the first byte
+into the FIFO to kick start the DMA process. Haven't seen this problem on
+AM375x (beagle bone) or DRA7xx.
 
-I suppose the spec would allow Root Complex Integrated Endpoints, on which
-MRRS could also be set, but I think your quirk ignores them because they
-would appear on the root bus.  Is ignoring them OK, or would you want to
-set MRRS for those as well?
+On AM375x there is "Usage Note 2.7: UART: Cannot Acknowledge Idle
+Requests in Smartidle Mode When Configured for DMA Operations" in the
+errata document. This problem persists even after disabling DMA in the
+UART and will be addressed in the HWMOD.
 
-> +
->  #define to_keystone_pcie(x)	container_of(x, struct keystone_pcie, pp)
->  
-> +static void quirk_limit_mrrs(struct pci_dev *dev)
-> +{
-> +	struct pci_bus *bus = dev->bus;
-> +	struct pci_dev *bridge = bus->self;
-> +
-> +	if (pci_is_root_bus(bus))
-> +		return;
-> +
-> +	/* look for the host bridge */
-> +	while (!pci_is_root_bus(bus)) {
-> +		bridge = bus->self;
-> +		bus = bus->parent;
-> +	}
-> +
-> +	if (bridge) {
-> +		u16 id;
-> +
-> +		/*
-> +		 * Keystone PCI controller has a h/w limitation of
-> +		 * 256 bytes maximum read request size. It can't handle
-> +		 * anything higher than this. So force this limit on
-> +		 * all downstream devices
-> +		 */
-> +		pci_read_config_word(bridge, PCI_DEVICE_ID, &id);
+Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
+---
+ drivers/tty/serial/8250/8250_omap.c | 49 +++++++++++++++++++++++++++++++++++++
+ 1 file changed, 49 insertions(+)
 
-I think you should check the Vendor ID here as well.  Otherwise, there's a
-possibility of applying this quirk to devices under a bridge with the same
-Device ID but different Vendor ID.
-
-And I think you should be able to use the bridge->vendor and bridge->device
-fields instead of reading them from config space.  Actually, this might be
-a good place to use pci_match_id().
-
-> +		if ((id == PCIE_RC_K2HK) || (id == PCIE_RC_K2E) ||
-> +		    (id == PCIE_RC_K2L)) {
-> +			if (pcie_get_readrq(dev) > 256) {
-> +				dev_info(&dev->dev, "limiting mrrs to 256\n");
-> +				pcie_set_readrq(dev, 256);
-> +			}
-> +		}
-> +	}
-> +}
-> +DECLARE_PCI_FIXUP_ENABLE(PCI_ANY_ID, PCI_ANY_ID, quirk_limit_mrrs);
-> +
->  static int ks_pcie_establish_link(struct keystone_pcie *ks_pcie)
->  {
->  	struct pcie_port *pp = &ks_pcie->pp;
-> -- 
-> 1.7.9.5
-> 
+diff --git a/drivers/tty/serial/8250/8250_omap.c b/drivers/tty/serial/8250/8250_omap.c
+index 4128bbc35089..7e98dd413203 100644
+--- a/drivers/tty/serial/8250/8250_omap.c
++++ b/drivers/tty/serial/8250/8250_omap.c
+@@ -360,6 +360,10 @@ static void omap_8250_set_termios(struct uart_port *port,
+ 	priv->scr = OMAP_UART_SCR_RX_TRIG_GRANU1_MASK | OMAP_UART_SCR_TX_EMPTY |
+ 		OMAP_UART_SCR_TX_TRIG_GRANU1_MASK;
+ 
++	if (up->dma)
++		priv->scr |= OMAP_UART_SCR_DMAMODE_1 |
++			OMAP_UART_SCR_DMAMODE_CTL;
++
+ 	priv->xon = termios->c_cc[VSTART];
+ 	priv->xoff = termios->c_cc[VSTOP];
+ 
+@@ -542,6 +546,11 @@ static int omap_8250_startup(struct uart_port *port)
+ 		priv->wer |= OMAP_UART_TX_WAKEUP_EN;
+ 	serial_out(up, UART_OMAP_WER, priv->wer);
+ 
++	if (up->dma) {
++		serial8250_rx_dma(up, 0);
++		priv->dma_active = true;
++	}
++
+ 	pm_runtime_mark_last_busy(port->dev);
+ 	pm_runtime_put_autosuspend(port->dev);
+ 	return 0;
+@@ -560,6 +569,10 @@ static void omap_8250_shutdown(struct uart_port *port)
+ 	struct omap8250_priv *priv = port->private_data;
+ 
+ 	flush_work(&priv->qos_work);
++	if (up->dma) {
++		serial8250_rx_dma(up, UART_IIR_RX_TIMEOUT);
++		priv->dma_active = false;
++	}
+ 
+ 	pm_runtime_get_sync(port->dev);
+ 
+@@ -607,6 +620,13 @@ static void omap_8250_unthrottle(struct uart_port *port)
+ 	pm_runtime_put_autosuspend(port->dev);
+ }
+ 
++#ifdef CONFIG_SERIAL_8250_DMA
++static bool the_no_dma_filter_fn(struct dma_chan *chan, void *param)
++{
++	return false;
++}
++#endif
++
+ static int omap8250_probe(struct platform_device *pdev)
+ {
+ 	struct resource *regs = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+@@ -706,6 +726,30 @@ static int omap8250_probe(struct platform_device *pdev)
+ 	pm_runtime_get_sync(&pdev->dev);
+ 
+ 	omap_serial_fill_features_erratas(&up, priv);
++#ifdef CONFIG_SERIAL_8250_DMA
++	if (pdev->dev.of_node) {
++		/*
++		 * Oh DMA support. If there are no DMA properties in the DT then
++		 * we will fall back to a generic DMA channel which does not
++		 * really work here. To ensure that we do not get a generic DMA
++		 * channel assigned, we have the the_no_dma_filter_fn() here.
++		 * To avoid "failed to request DMA" messages we check for DMA
++		 * properties in DT.
++		 */
++		ret = of_property_count_strings(pdev->dev.of_node, "dma-names");
++		if (ret == 2) {
++			up.dma = &priv->omap8250_dma;
++			priv->omap8250_dma.fn = the_no_dma_filter_fn;
++			priv->omap8250_dma.rx_size = RX_TRIGGER;
++			priv->omap8250_dma.rxconf.src_maxburst = RX_TRIGGER;
++			priv->omap8250_dma.txconf.dst_maxburst = TX_TRIGGER;
++
++			if (of_machine_is_compatible("ti,am33xx"))
++				up.bugs |= UART_BUG_DMA_TX;
++			up.bugs |= UART_BUG_DMA_RX;
++		}
++	}
++#endif
+ 	ret = serial8250_register_8250_port(&up);
+ 	if (ret < 0) {
+ 		dev_err(&pdev->dev, "unable to register 8250 port\n");
+@@ -842,6 +886,8 @@ static int omap8250_runtime_suspend(struct device *dev)
+ 	}
+ 
+ 	omap8250_enable_wakeup(priv, true);
++	if (priv->dma_active)
++		serial8250_rx_dma(up, UART_IIR_RX_TIMEOUT);
+ 
+ 	priv->latency = PM_QOS_CPU_DMA_LAT_DEFAULT_VALUE;
+ 	schedule_work(&priv->qos_work);
+@@ -866,6 +912,9 @@ static int omap8250_runtime_resume(struct device *dev)
+ 	if (loss_cntx)
+ 		omap8250_restore_regs(up);
+ 
++	if (priv->dma_active)
++		serial8250_rx_dma(up, 0);
++
+ 	priv->latency = priv->calc_latency;
+ 	schedule_work(&priv->qos_work);
+ 	return 0;
+-- 
+2.1.0
