@@ -1,109 +1,90 @@
 From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Fri, 05 Sep 2014 13:30:17 +0900
-Subject: [RFC PATCH 3/5] ARM: dts: Add PPMU dt node for Exynos3250
-In-Reply-To: <1409891419-28560-1-git-send-email-cw00.choi@samsung.com>
-References: <1409891419-28560-1-git-send-email-cw00.choi@samsung.com>
-Message-ID: <1409891419-28560-4-git-send-email-cw00.choi@samsung.com>
+Date: Fri, 05 Sep 2014 13:30:14 +0900
+Subject: [RFC PATCH 0/5] devfreq: Add devfreq-event class to provide raw data
+ for devfreq device
+Message-ID: <1409891419-28560-1-git-send-email-cw00.choi@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch add PPMU (Performance Profiling Monitoring Units) dt node
-to estimate the utilization of each IP in Exynos SoC throught DEVFREQ Event
-subsystem.
+This patchset add new devfreq_event class to provide raw data to determine
+current utilization of device  which is used for devfreq governor.
+But, This patchset is just initial version and must need more implementaion
+and updates.
 
-This patch adds following PPMU dt nodes:
-- PPMU_DMC0	0x106a0000
-- PPMU_DMC1	0x106b0000
-- PPMU_RIGHTBUS 0x112A0000
-- PPMU_LEFTBUS  0x116A0000
-- PPMU_CAMIF    0x11AC0000
-- PPMU_LCD0     0x11E40000
-- PPMU_3D       0x13220000
-- PPMU_MFC_L    0x13660000
-- PPMU_CPU	0x106c0000
+Although this patchset has not enough feature to support devfreq-event class,
+I send this RFC patchset to share current implementation. Please feel free to
+give comment and advice.
 
-Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
-Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
----
- arch/arm/boot/dts/exynos3250.dtsi | 66 +++++++++++++++++++++++++++++++++++++++
- 1 file changed, 66 insertions(+)
+[Description of devfreq-event class]
+This patchset add new devfreq_event class for devfreq_event device which provide
+raw data (e.g., memory bus utilization/GPU utilization). This raw data from
+devfreq_event data would be used for the governor of devfreq subsystem.
+- devfreq_event device : Provide raw data for governor of existing devfreq device
+- devfreq device       : Monitor device state and change frequency/voltage of device
+                         using the raw data from devfreq_event device
 
-diff --git a/arch/arm/boot/dts/exynos3250.dtsi b/arch/arm/boot/dts/exynos3250.dtsi
-index 1d52de6..20a4c59 100644
---- a/arch/arm/boot/dts/exynos3250.dtsi
-+++ b/arch/arm/boot/dts/exynos3250.dtsi
-@@ -465,6 +465,72 @@
- 			compatible = "arm,cortex-a7-pmu";
- 			interrupts = <0 18 0>, <0 19 0>;
- 		};
-+
-+		ppmu_dmc0: ppmu_dmc0 at 106a0000 {
-+			compatible = "samsung,exynos4210-ppmu";
-+			reg = <0x106a0000 0x2000>;
-+			status = "disabled";
-+		};
-+
-+		ppmu_dmc1: ppmu_dmc1 at 106b0000 {
-+			compatible = "samsung,exynos4210-ppmu";
-+			reg = <0x106b0000 0x2000>;
-+			status = "disabled";
-+		};
-+
-+		ppmu_cpu: ppmu_cpu at 106c0000 {
-+			compatible = "samsung,exynos4210-ppmu";
-+			reg = <0x106c0000 0x2000>;
-+			status = "disabled";
-+		};
-+
-+		ppmu_rightbus: ppmu_rightbus at 112a0000 {
-+			compatible = "samsung,exynos4210-ppmu";
-+			reg = <0x112a0000 0x2000>;
-+			clocks = <&cmu CLK_PPMURIGHT>;
-+			clock-names = "ppmu";
-+			status = "disabled";
-+		};
-+
-+		ppmu_leftbus: ppmu_leftbus0 at 116a0000 {
-+			compatible = "samsung,exynos4210-ppmu";
-+			reg = <0x116a0000 0x2000>;
-+			clocks = <&cmu CLK_PPMULEFT>;
-+			clock-names = "ppmu";
-+			status = "disabled";
-+		};
-+
-+		ppmu_camif: ppmu_camif at 11ac0000 {
-+			compatible = "samsung,exynos4210-ppmu";
-+			reg = <0x11ac0000 0x2000>;
-+			clocks = <&cmu CLK_PPMUCAMIF>;
-+			clock-names = "ppmu";
-+			status = "disabled";
-+		};
-+
-+		ppmu_lcd0: ppmu_lcd0 at 11e40000 {
-+			compatible = "samsung,exynos4210-ppmu";
-+			reg = <0x11e40000 0x2000>;
-+			clocks = <&cmu CLK_PPMULCD0>;
-+			clock-names = "ppmu";
-+			status = "disabled";
-+		};
-+
-+		ppmu_g3d: ppmu_g3d at 13220000 {
-+			compatible = "samsung,exynos4210-ppmu";
-+			reg = <0x13220000 0x2000>;
-+			clocks = <&cmu CLK_PPMUG3D>;
-+			clock-names = "ppmu";
-+			status = "disabled";
-+		};
-+
-+		ppmu_mfc_l: ppmu_mfc_l at 13660000 {
-+			compatible = "samsung,exynos4210-ppmu";
-+			reg = <0x13660000 0x2000>;
-+			clocks = <&cmu CLK_PPMUMFC_L>;
-+			clock-names = "ppmu";
-+			status = "disabled";
-+		};
- 	};
- };
- 
+The devfreq subsystem support generic DVFS(Dynamic Voltage/Frequency Scaling)
+for Non-CPU Devices. The devfreq device would dertermine current device state
+using various governor (e.g., ondemand, performance, powersave). After completed
+determination of system state, devfreq device would change the frequency/voltage
+of devfreq device according to the result of governor.
+
+But, devfreq governor must need basic data which indicates current device state.
+Existing devfreq subsystem only consider devfreq device which check current system
+state and determine proper system state using basic data. There is no subsystem
+for device providing basic data to devfreq device.
+
+The devfreq subsystem must need devfreq_event device(data-provider device) for
+existing devfreq device. So, this patch add new devfreq_event class for
+devfreq_event device which read various basic data(e.g, memory bus utilization,
+GPU utilization) and provide measured data to existing devfreq device through
+standard APIs of devfreq_event class.
+
+The following description explains the feature of two kind of devfreq class:
+- devfreq class (existing)
+ : devfreq consumer device use raw data from devfreq_event device for
+   determining proper current system state and change voltage/frequency
+   dynamically using various governors.
+- devfreq_event class (new)
+ : Provide measured raw data to devfreq device for governor
+
+[For example]
+If board dts includes PPMU_DMC0/DMC1/CPU event node,
+would show following sysfs entry. Also devfreq driver(e.g., exynos4_bus.c)
+can get the instance of devfreq-event device by using provided API and then
+get raw data which reflect the current utilization of device.
+
+-sh-3.2# pwd
+/sys/class/devfreq_event
+-sh-3.2# ls -al
+total 0
+drwxr-xr-x  2 root root 0 Jan  1 21:06 .
+drwxr-xr-x 45 root root 0 Jan  1 21:06 ..
+lrwxrwxrwx  1 root root 0 Jan  1 21:06 event.0 -> ../../devices/soc/106a0000.ppmu_dmc0/devfreq_event/event.0
+lrwxrwxrwx  1 root root 0 Jan  1 21:06 event.1 -> ../../devices/soc/106b0000.ppmu_dmc1/devfreq_event/event.1
+lrwxrwxrwx  1 root root 0 Jan  1 21:06 event.2 -> ../../devices/soc/106c0000.ppmu_cpu/devfreq_event/event.2
+
+Chanwoo Choi (5):
+  devfreq: Add new devfreq_event class to provide basic data for devfreq governor
+  devfreq: event: Add exynos-ppmu devfreq evnet driver
+  ARM: dts: Add PPMU dt node for Exynos3250
+  ARM: dts: Add PPMU dt node for Exynos4 SoC
+  ARM: dts: Add dt node fo PPMU_CPU/DMC0/DMC1 for exynos4412-trats2
+
+ arch/arm/boot/dts/exynos3250.dtsi       |  66 +++++
+ arch/arm/boot/dts/exynos4.dtsi          |  96 ++++++++
+ arch/arm/boot/dts/exynos4210.dtsi       |   8 +
+ arch/arm/boot/dts/exynos4412-trats2.dts |  29 +++
+ drivers/devfreq/Kconfig                 |  12 +
+ drivers/devfreq/Makefile                |   5 +-
+ drivers/devfreq/devfreq-event.c         | 251 +++++++++++++++++++
+ drivers/devfreq/event/Makefile          |   2 +
+ drivers/devfreq/event/exynos-ppmu.c     | 410 ++++++++++++++++++++++++++++++++
+ include/linux/devfreq.h                 |  97 ++++++++
+ 10 files changed, 975 insertions(+), 1 deletion(-)
+ create mode 100644 drivers/devfreq/devfreq-event.c
+ create mode 100644 drivers/devfreq/event/Makefile
+ create mode 100644 drivers/devfreq/event/exynos-ppmu.c
+
 -- 
 1.8.0
