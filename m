@@ -1,123 +1,184 @@
 From: wangyijing@huawei.com (Yijing Wang)
-Date: Fri, 5 Sep 2014 18:09:55 +0800
-Subject: [PATCH v1 10/21] x86/MSI: Remove unused MSI weak arch functions
+Date: Fri, 5 Sep 2014 18:09:46 +0800
+Subject: [PATCH v1 01/21] PCI/MSI: Clean up struct msi_chip argument
 In-Reply-To: <1409911806-10519-1-git-send-email-wangyijing@huawei.com>
 References: <1409911806-10519-1-git-send-email-wangyijing@huawei.com>
-Message-ID: <1409911806-10519-11-git-send-email-wangyijing@huawei.com>
+Message-ID: <1409911806-10519-2-git-send-email-wangyijing@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now we can clean up MSI weak arch functions in x86.
+Msi_chip functions setup_irq/teardown_irq rarely use msi_chip
+argument. We can look up msi_chip pointer by the device pointer
+or irq number, so clean up msi_chip argument.
 
 Signed-off-by: Yijing Wang <wangyijing@huawei.com>
+CC: Thierry Reding <thierry.reding@gmail.com>
+CC: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- arch/x86/include/asm/pci.h      |    3 ---
- arch/x86/include/asm/x86_init.h |    4 ----
- arch/x86/kernel/apic/io_apic.c  |    2 +-
- arch/x86/kernel/x86_init.c      |   24 ------------------------
- drivers/iommu/irq_remapping.c   |    1 -
- 5 files changed, 1 insertions(+), 33 deletions(-)
+ drivers/irqchip/irq-armada-370-xp.c |   12 +++++-------
+ drivers/pci/host/pci-tegra.c        |    8 +++++---
+ drivers/pci/host/pcie-designware.c  |    4 ++--
+ drivers/pci/host/pcie-rcar.c        |    8 +++++---
+ drivers/pci/msi.c                   |    4 ++--
+ include/linux/msi.h                 |    5 ++---
+ 6 files changed, 21 insertions(+), 20 deletions(-)
 
-diff --git a/arch/x86/include/asm/pci.h b/arch/x86/include/asm/pci.h
-index 878a06d..34f9676 100644
---- a/arch/x86/include/asm/pci.h
-+++ b/arch/x86/include/asm/pci.h
-@@ -96,14 +96,11 @@ extern void pci_iommu_alloc(void);
- #ifdef CONFIG_PCI_MSI
- /* implemented in arch/x86/kernel/apic/io_apic. */
- struct msi_desc;
--int native_setup_msi_irqs(struct pci_dev *dev, int nvec, int type);
- void native_teardown_msi_irq(unsigned int irq);
--void native_restore_msi_irqs(struct pci_dev *dev);
- int setup_msi_irq(struct pci_dev *dev, struct msi_desc *msidesc,
- 		  unsigned int irq_base, unsigned int irq_offset);
- extern struct msi_chip *x86_msi_chip;
- #else
--#define native_setup_msi_irqs		NULL
- #define native_teardown_msi_irq		NULL
- #endif
+diff --git a/drivers/irqchip/irq-armada-370-xp.c b/drivers/irqchip/irq-armada-370-xp.c
+index 574aba0..658990c 100644
+--- a/drivers/irqchip/irq-armada-370-xp.c
++++ b/drivers/irqchip/irq-armada-370-xp.c
+@@ -129,9 +129,8 @@ static void armada_370_xp_free_msi(int hwirq)
+ 	mutex_unlock(&msi_used_lock);
+ }
  
-diff --git a/arch/x86/include/asm/x86_init.h b/arch/x86/include/asm/x86_init.h
-index f58a9c7..2514f67 100644
---- a/arch/x86/include/asm/x86_init.h
-+++ b/arch/x86/include/asm/x86_init.h
-@@ -174,13 +174,9 @@ struct pci_dev;
- struct msi_msg;
- 
- struct x86_msi_ops {
--	int (*setup_msi_irqs)(struct pci_dev *dev, int nvec, int type);
- 	void (*compose_msi_msg)(struct pci_dev *dev, unsigned int irq,
- 				unsigned int dest, struct msi_msg *msg,
- 			       u8 hpet_id);
--	void (*teardown_msi_irq)(unsigned int irq);
--	void (*teardown_msi_irqs)(struct pci_dev *dev);
--	void (*restore_msi_irqs)(struct pci_dev *dev);
- 	int  (*setup_hpet_msi)(unsigned int irq, unsigned int id);
- };
- 
-diff --git a/arch/x86/kernel/apic/io_apic.c b/arch/x86/kernel/apic/io_apic.c
-index 882b95e..f998192 100644
---- a/arch/x86/kernel/apic/io_apic.c
-+++ b/arch/x86/kernel/apic/io_apic.c
-@@ -3200,7 +3200,7 @@ int setup_msi_irq(struct pci_dev *dev, struct msi_desc *msidesc,
+-static int armada_370_xp_setup_msi_irq(struct msi_chip *chip,
+-				       struct pci_dev *pdev,
+-				       struct msi_desc *desc)
++static int armada_370_xp_setup_msi_irq(struct pci_dev *pdev,
++		struct msi_desc *desc)
+ {
+ 	struct msi_msg msg;
+ 	int virq, hwirq;
+@@ -156,8 +155,7 @@ static int armada_370_xp_setup_msi_irq(struct msi_chip *chip,
  	return 0;
  }
  
--int native_setup_msi_irqs(struct pci_dev *dev, int nvec, int type)
-+static int native_setup_msi_irqs(struct pci_dev *dev, int nvec, int type)
+-static void armada_370_xp_teardown_msi_irq(struct msi_chip *chip,
+-					   unsigned int irq)
++static void armada_370_xp_teardown_msi_irq(unsigned int irq)
  {
- 	struct msi_desc *msidesc;
- 	unsigned int irq;
-diff --git a/arch/x86/kernel/x86_init.c b/arch/x86/kernel/x86_init.c
-index 234b072..cc32568 100644
---- a/arch/x86/kernel/x86_init.c
-+++ b/arch/x86/kernel/x86_init.c
-@@ -110,34 +110,10 @@ EXPORT_SYMBOL_GPL(x86_platform);
+ 	struct irq_data *d = irq_get_irq_data(irq);
+ 	unsigned long hwirq = d->hwirq;
+@@ -166,8 +164,8 @@ static void armada_370_xp_teardown_msi_irq(struct msi_chip *chip,
+ 	armada_370_xp_free_msi(hwirq);
+ }
  
- #if defined(CONFIG_PCI_MSI)
- struct x86_msi_ops x86_msi = {
--	.setup_msi_irqs		= native_setup_msi_irqs,
- 	.compose_msi_msg	= native_compose_msi_msg,
--	.teardown_msi_irq	= native_teardown_msi_irq,
--	.teardown_msi_irqs	= default_teardown_msi_irqs,
--	.restore_msi_irqs	= default_restore_msi_irqs,
- 	.setup_hpet_msi		= default_setup_hpet_msi,
+-static int armada_370_xp_check_msi_device(struct msi_chip *chip, struct pci_dev *dev,
+-					  int nvec, int type)
++static int armada_370_xp_check_msi_device(struct pci_dev *dev,
++		int nvec, int type)
+ {
+ 	/* We support MSI, but not MSI-X */
+ 	if (type == PCI_CAP_ID_MSI)
+diff --git a/drivers/pci/host/pci-tegra.c b/drivers/pci/host/pci-tegra.c
+index 0fb0fdb..edd4040 100644
+--- a/drivers/pci/host/pci-tegra.c
++++ b/drivers/pci/host/pci-tegra.c
+@@ -1157,9 +1157,10 @@ static irqreturn_t tegra_pcie_msi_irq(int irq, void *data)
+ 	return processed > 0 ? IRQ_HANDLED : IRQ_NONE;
+ }
+ 
+-static int tegra_msi_setup_irq(struct msi_chip *chip, struct pci_dev *pdev,
++static int tegra_msi_setup_irq(struct pci_dev *pdev,
+ 			       struct msi_desc *desc)
+ {
++	struct msi_chip *chip = pdev->bus->msi;
+ 	struct tegra_msi *msi = to_tegra_msi(chip);
+ 	struct msi_msg msg;
+ 	unsigned int irq;
+@@ -1185,10 +1186,11 @@ static int tegra_msi_setup_irq(struct msi_chip *chip, struct pci_dev *pdev,
+ 	return 0;
+ }
+ 
+-static void tegra_msi_teardown_irq(struct msi_chip *chip, unsigned int irq)
++static void tegra_msi_teardown_irq(unsigned int irq)
+ {
+-	struct tegra_msi *msi = to_tegra_msi(chip);
+ 	struct irq_data *d = irq_get_irq_data(irq);
++	struct msi_chip *chip = irq_get_chip_data(irq);
++	struct tegra_msi *msi = to_tegra_msi(chip);
+ 
+ 	tegra_msi_free(msi, d->hwirq);
+ }
+diff --git a/drivers/pci/host/pcie-designware.c b/drivers/pci/host/pcie-designware.c
+index 52bd3a1..2204456 100644
+--- a/drivers/pci/host/pcie-designware.c
++++ b/drivers/pci/host/pcie-designware.c
+@@ -342,7 +342,7 @@ static void clear_irq(unsigned int irq)
+ 	msi->msi_attrib.multiple = 0;
+ }
+ 
+-static int dw_msi_setup_irq(struct msi_chip *chip, struct pci_dev *pdev,
++static int dw_msi_setup_irq(struct pci_dev *pdev,
+ 			struct msi_desc *desc)
+ {
+ 	int irq, pos, msgvec;
+@@ -384,7 +384,7 @@ static int dw_msi_setup_irq(struct msi_chip *chip, struct pci_dev *pdev,
+ 	return 0;
+ }
+ 
+-static void dw_msi_teardown_irq(struct msi_chip *chip, unsigned int irq)
++static void dw_msi_teardown_irq(unsigned int irq)
+ {
+ 	clear_irq(irq);
+ }
+diff --git a/drivers/pci/host/pcie-rcar.c b/drivers/pci/host/pcie-rcar.c
+index 4884ee5..647bc9f 100644
+--- a/drivers/pci/host/pcie-rcar.c
++++ b/drivers/pci/host/pcie-rcar.c
+@@ -615,9 +615,10 @@ static irqreturn_t rcar_pcie_msi_irq(int irq, void *data)
+ 	return IRQ_HANDLED;
+ }
+ 
+-static int rcar_msi_setup_irq(struct msi_chip *chip, struct pci_dev *pdev,
++static int rcar_msi_setup_irq(struct pci_dev *pdev,
+ 			      struct msi_desc *desc)
+ {
++	struct msi_chip *chip = pdev->bus->msi;
+ 	struct rcar_msi *msi = to_rcar_msi(chip);
+ 	struct rcar_pcie *pcie = container_of(chip, struct rcar_pcie, msi.chip);
+ 	struct msi_msg msg;
+@@ -645,10 +646,11 @@ static int rcar_msi_setup_irq(struct msi_chip *chip, struct pci_dev *pdev,
+ 	return 0;
+ }
+ 
+-static void rcar_msi_teardown_irq(struct msi_chip *chip, unsigned int irq)
++static void rcar_msi_teardown_irq(unsigned int irq)
+ {
+-	struct rcar_msi *msi = to_rcar_msi(chip);
+ 	struct irq_data *d = irq_get_irq_data(irq);
++	struct msi_chip *chip = irq_get_chip_data(irq);
++	struct rcar_msi *msi = to_rcar_msi(chip);
+ 
+ 	rcar_msi_free(msi, d->hwirq);
+ }
+diff --git a/drivers/pci/msi.c b/drivers/pci/msi.c
+index 8fc9587..f6cb317 100644
+--- a/drivers/pci/msi.c
++++ b/drivers/pci/msi.c
+@@ -37,7 +37,7 @@ int __weak arch_setup_msi_irq(struct pci_dev *dev, struct msi_desc *desc)
+ 	if (!chip || !chip->setup_irq)
+ 		return -EINVAL;
+ 
+-	err = chip->setup_irq(chip, dev, desc);
++	err = chip->setup_irq(dev, desc);
+ 	if (err < 0)
+ 		return err;
+ 
+@@ -53,7 +53,7 @@ void __weak arch_teardown_msi_irq(unsigned int irq)
+ 	if (!chip || !chip->teardown_irq)
+ 		return;
+ 
+-	chip->teardown_irq(chip, irq);
++	chip->teardown_irq(irq);
+ }
+ 
+ int __weak arch_setup_msi_irqs(struct pci_dev *dev, int nvec, int type)
+diff --git a/include/linux/msi.h b/include/linux/msi.h
+index c3c70a6..762fe61 100644
+--- a/include/linux/msi.h
++++ b/include/linux/msi.h
+@@ -71,9 +71,8 @@ struct msi_chip {
+ 	struct device_node *of_node;
+ 	struct list_head list;
+ 
+-	int (*setup_irq)(struct msi_chip *chip, struct pci_dev *dev,
+-			 struct msi_desc *desc);
+-	void (*teardown_irq)(struct msi_chip *chip, unsigned int irq);
++	int (*setup_irq)(struct pci_dev *dev, struct msi_desc *desc);
++	void (*teardown_irq)(unsigned int irq);
  };
  
--/* MSI arch specific hooks */
--int arch_setup_msi_irqs(struct pci_dev *dev, int nvec, int type)
--{
--	return x86_msi.setup_msi_irqs(dev, nvec, type);
--}
--
--void arch_teardown_msi_irqs(struct pci_dev *dev)
--{
--	x86_msi.teardown_msi_irqs(dev);
--}
--
--void arch_teardown_msi_irq(unsigned int irq)
--{
--	x86_msi.teardown_msi_irq(irq);
--}
--
--void arch_restore_msi_irqs(struct pci_dev *dev)
--{
--	x86_msi.restore_msi_irqs(dev);
--}
- #endif
- 
- struct x86_io_apic_ops x86_io_apic_ops = {
-diff --git a/drivers/iommu/irq_remapping.c b/drivers/iommu/irq_remapping.c
-index e75026e..99b1c0f 100644
---- a/drivers/iommu/irq_remapping.c
-+++ b/drivers/iommu/irq_remapping.c
-@@ -170,7 +170,6 @@ static void __init irq_remapping_modify_x86_ops(void)
- 	x86_io_apic_ops.set_affinity	= set_remapped_irq_affinity;
- 	x86_io_apic_ops.setup_entry	= setup_ioapic_remapped_entry;
- 	x86_io_apic_ops.eoi_ioapic_pin	= eoi_ioapic_pin_remapped;
--	x86_msi.setup_msi_irqs          = irq_remapping_setup_msi_irqs;
- 	x86_msi.setup_hpet_msi		= setup_hpet_msi_remapped;
- 	x86_msi.compose_msi_msg		= compose_remapped_msi_msg;
- 	x86_msi_chip = &remap_msi_chip;
+ #endif /* LINUX_MSI_H */
 -- 
 1.7.1
