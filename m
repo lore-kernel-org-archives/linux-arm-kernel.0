@@ -1,32 +1,87 @@
-From: rric@kernel.org (Robert Richter)
-Date: Fri, 5 Sep 2014 12:51:35 +0200
-Subject: [PATCH v2 1/4] arm64, thunder: Add Kconfig option for Cavium
- Thunder SoC Family
-In-Reply-To: <20140905093647.GH2172@leverpostej>
-References: <1409903205-2762-1-git-send-email-rric@kernel.org>
- <1409903205-2762-2-git-send-email-rric@kernel.org>
- <20140905083932.GD13515@arm.com>
- <20140905092135.GR4703@rric.localhost>
- <20140905092507.GH13515@arm.com>
- <20140905093647.GH2172@leverpostej>
-Message-ID: <20140905105135.GU4703@rric.localhost>
+From: mikko.perttunen@kapsi.fi (Mikko Perttunen)
+Date: Fri, 05 Sep 2014 13:55:45 +0300
+Subject: [PATCH 0/8] Tegra124 EMC (external memory controller) support
+In-Reply-To: <CAAObsKABUa9xD+hntyv97ZQB7Bk05kN0h0-+H7Q9ks6RT0yV2Q@mail.gmail.com>
+References: <1405088313-20048-1-git-send-email-mperttunen@nvidia.com>
+ <53FB7511.9090205@wwwdotorg.org> <53FC3A5D.8030708@nvidia.com>
+ <CAAObsKABUa9xD+hntyv97ZQB7Bk05kN0h0-+H7Q9ks6RT0yV2Q@mail.gmail.com>
+Message-ID: <540996B1.4010300@kapsi.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05.09.14 10:36:47, Mark Rutland wrote:
-> On Fri, Sep 05, 2014 at 10:25:08AM +0100, Will Deacon wrote:
-> > All I mean is, if the kernel doesn't explode on existing systems by changing
-> > the upper limit to 64, then we should do that. If you're not comfortable
-> > that the Thunder code can handle that, then leave the thunder default as 32,
-> > like you do in the current patch. It just seems odd not to change the
-> > maximum number, since it's an arbitrary limit from my perspective.
-> 
-> FWIW my Juno happily boots with a NR_CPUS=64 kernel.
+FYI, the structure the EMC series currently takes (in my local branch) 
+is as follows:
+- clock implementation in CAR code. This just knows about allowed rates 
+and which parents should have them and handles reparenting when required.
+- memory/tegra124-emc: this contains the EMC rate change sequence and 
+exports an API which the clock driver uses.
+- memory/tegra124-mc: contains API to write registers in MC memory 
+space, used by memory/tegra124-emc.
 
-It looks like if it's fine to set the general default to NR_CPUS=64
-even if the kernel might not yet boot more than 32 cpus. Will make
-this change separately and drop it in this patch.
+(I decided that this is cleaner than having a huge EMC driver that uses 
+an API exported by CAR)
 
-See also my other reply to Russell in this thread.
+I'm not sure if adding the bandwidth management code to the clock or 
+memory/emc driver would be best. But we can decide that later.
 
--Robert
+I need to clean up the series after the big refactorings; I'll submit a 
+new version once that's done.
+
+Mikko
+
+(P.S. my internship ended so I'm using this address now)
+
+On 09/05/2014 01:22 PM, Tomeu Vizoso wrote:
+> On 26 August 2014 09:42, Mikko Perttunen <mperttunen@nvidia.com> wrote:
+>> On 25/08/14 20:40, Stephen Warren wrote:
+>>>
+>>> On 07/11/2014 08:18 AM, Mikko Perttunen wrote:
+>>>>
+>>>> Hi everyone,
+>>>>
+>>>> this series adds support for the EMC (external memory controller) clock
+>>>> in the Tegra124 system-on-chip. The series has been tested on Jetson TK1.
+>>>>
+>>>> The first two patches remove the old "emc_mux" and "emc" clocks from the
+>>>> clock tree and the device tree bindings. This is, of course, not
+>>>> backwards
+>>>> compatible, but as these clocks have never been useful for anything
+>>>> (apart from maybe reading the boot rate of the EMC clock). If this is
+>>>> still
+>>>> not acceptable, the second patch can be dropped.
+>>>
+>>> ...
+>>>
+>>> Mikko, this series had some comments, especially on the DT binding
+>>> (patch 5/8) and how the MC/EMC drivers interact. Is there an updated
+>>> version of the series? Or, is the series replaced by Tomeu Vizoso's work?
+>>
+>>
+>> Yes, I have a v2 with these comments addressed. One concern, though, is the
+>> part writing to CLK_SOURCE_EMC. If some other driver also wants to read this
+>> register (MC, likely), we might need to have an API for it in the CAR
+>> driver. On the other hand, maybe not, since it's only one register. Thierry?
+>>
+>> Another point is that v2 adds a new API to the MC driver, which also doesn't
+>> exist yet. The EMC driver can technically work without the MC driver (but
+>> with a header for MC added), but I'm not sure the result would be very
+>> useful.
+>>
+>> I believe the plan is that Tomeu's EMC code will be integrated into this EMC
+>> driver once both are ready.
+>
+> That's mostly right. My clk constraints series just allow consumers to
+> influence the effective rate of a clock, such as the EMC. And the
+> pm_qos series will allow to track the total memory bandwidth needs in
+> the system. I'm not sure yet where in the code this tracking will be
+> done. It could be done in an EMC driver in drivers/memory, but it's
+> probably too unrelated to be placed in the EMC clock driver.
+>
+> Regards,
+>
+> Tomeu
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-tegra" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>
