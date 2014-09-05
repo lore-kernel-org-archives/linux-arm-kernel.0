@@ -1,27 +1,65 @@
-From: pebolle@tiscali.nl (Paul Bolle)
-Date: Fri, 05 Sep 2014 11:39:00 +0200
-Subject: [PATCH v2] ARM: spear: Remove references to PLAT_SPEAR_SINGLE
-In-Reply-To: <1409909229.5546.146.camel@x220>
-References: <1392153676.14317.8.camel@x220> <1397550407.1985.12.camel@x220>
- <534CFB45.9070704@st.com> <1402919387.30599.4.camel@x220>
- <1409909229.5546.146.camel@x220>
-Message-ID: <1409909940.5546.154.camel@x220>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 5 Sep 2014 10:39:33 +0100
+Subject: [PATCH v2 3/4] arm64, thunder: Document devicetree bindings for
+ Cavium Thunder SoC
+In-Reply-To: <20140905093222.GS4703@rric.localhost>
+References: <1409903205-2762-1-git-send-email-rric@kernel.org>
+ <1409903205-2762-4-git-send-email-rric@kernel.org>
+ <20140905084200.GE13515@arm.com>
+ <20140905093222.GS4703@rric.localhost>
+Message-ID: <20140905093932.GI2172@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2014-09-05 at 11:27 +0200, Paul Bolle wrote:
-> On Mon, 2014-06-16 at 13:49 +0200, Paul Bolle wrote:
-> > On Tue, 2014-04-15 at 14:56 +0530, Rajeev kumar wrote:
-> > > Reviewed-by: Rajeev Kumar <rajeev-dlh.kumar@st.com>
+On Fri, Sep 05, 2014 at 10:32:22AM +0100, Robert Richter wrote:
+> On 05.09.14 09:42:00, Will Deacon wrote:
+> > On Fri, Sep 05, 2014 at 08:46:44AM +0100, Robert Richter wrote:
+> > > From: Radha Mohan Chintakuntla <rchintakuntla@cavium.com>
+> > > 
+> > > This patch adds documentation for the devicetree bindings used by the
+> > > DT files of Cavium Thunder SoC platforms.
+> > > 
+> > > Signed-off-by: Radha Mohan Chintakuntla <rchintakuntla@cavium.com>
+> > > Signed-off-by: Robert Richter <rrichter@cavium.com>
+> > > ---
+> > >  Documentation/devicetree/bindings/arm/cavium-thunder.txt | 10 ++++++++++
+> > >  Documentation/devicetree/bindings/arm/cpus.txt           |  1 +
+> > >  2 files changed, 11 insertions(+)
+> > >  create mode 100644 Documentation/devicetree/bindings/arm/cavium-thunder.txt
+> > > 
+> > > diff --git a/Documentation/devicetree/bindings/arm/cavium-thunder.txt b/Documentation/devicetree/bindings/arm/cavium-thunder.txt
+> > > new file mode 100644
+> > > index 000000000000..6f63a5866902
+> > > --- /dev/null
+> > > +++ b/Documentation/devicetree/bindings/arm/cavium-thunder.txt
+> > > @@ -0,0 +1,10 @@
+> > > +Cavium Thunder platform device tree bindings
+> > > +--------------------------------------------
+> > > +
+> > > +Boards with Cavium's Thunder SoC shall have following properties.
+> > > +
+> > > +Root Node
+> > > +---------
+> > > +Required root node properties:
+> > > +
+> > > +  - compatible = "cavium,thunder-88xx";
 > > 
-> > Thanks!
-> > 
-> > This can still be seen in v3.16-rc1 and in today's linux-next (ie,
-> > next-20140616). Is this trivial patch queued somewhere?
+> > Is this file necessary? We don't have one for xgene afaict.
 > 
-> Ditto for v3.17-rc3 and next-20140904. Could someone please pix this up?
+> Hmm, looking at Documentation/devicetree/bindings/arm/calxeda.txt
+> there is something similar.
+> 
+> I am fine with both, keeping or removing it.
+> 
+> Would leave this to the DT maintainers.
 
-And now Rajeev's address bounces. Has Rajeev left ST?
+Having a required root node compatible is fine, though I would only
+expect it to be necessary for errata workarounds if we have no other way
+of detecting things.
 
+That said, compatible strings shouldn't have wildcards, so
+"cavium,thunder-88xx" should be replaced with something more specific.
+Later boards can claim compatibility with that (but should have their
+own strings too).
 
-Paul Bolle
+Mark.
