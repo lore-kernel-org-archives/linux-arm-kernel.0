@@ -1,35 +1,23 @@
-From: wangyijing@huawei.com (Yijing Wang)
-Date: Fri, 5 Sep 2014 18:09:47 +0800
-Subject: [PATCH v1 02/21] PCI/MSI: Remove useless bus->msi assignment
-In-Reply-To: <1409911806-10519-1-git-send-email-wangyijing@huawei.com>
-References: <1409911806-10519-1-git-send-email-wangyijing@huawei.com>
-Message-ID: <1409911806-10519-3-git-send-email-wangyijing@huawei.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 5 Sep 2014 10:47:47 +0100
+Subject: [PATCH 1/2] gpio: Add driver for AXM55xx SSP chip selects
+In-Reply-To: <1409576021-24828-2-git-send-email-anders.berg@avagotech.com>
+References: <1409576021-24828-1-git-send-email-anders.berg@avagotech.com>
+ <1409576021-24828-2-git-send-email-anders.berg@avagotech.com>
+Message-ID: <20140905094747.GE30401@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently, PCI drivers will initialize bus->msi in
-pcibios_add_bus(). pcibios_add_bus() will be called
-in every pci bus initialization. So the bus->msi
-assignment in pci_alloc_child_bus() is useless.
+On Mon, Sep 01, 2014 at 02:53:40PM +0200, Anders Berg wrote:
+> The AXM55xx device has a ARM PL022 SSP controller with an extension that
+> enables the control of up to five chip select signals. This driver implements
+> the logic to control these signals and exports them as GPIOs.
+> 
+> Signed-off-by: Anders Berg <anders.berg@avagotech.com>
 
-Signed-off-by: Yijing Wang <wangyijing@huawei.com>
-CC: Thierry Reding <thierry.reding@avionic-design.de>
-CC: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
----
- drivers/pci/probe.c |    1 -
- 1 files changed, 0 insertions(+), 1 deletions(-)
+So, what happens if the GPIO driver binds first, followed by the SSP
+device?  Please test that scenario out before this patch gets merged.
 
-diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
-index e3cf8a2..8296576 100644
---- a/drivers/pci/probe.c
-+++ b/drivers/pci/probe.c
-@@ -677,7 +677,6 @@ static struct pci_bus *pci_alloc_child_bus(struct pci_bus *parent,
- 
- 	child->parent = parent;
- 	child->ops = parent->ops;
--	child->msi = parent->msi;
- 	child->sysdata = parent->sysdata;
- 	child->bus_flags = parent->bus_flags;
- 
 -- 
-1.7.1
+FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
+according to speedtest.net.
