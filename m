@@ -1,47 +1,58 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 5 Sep 2014 13:22:32 +0100
-Subject: Unable to boot mainline on snow chromebook since 3.15
-In-Reply-To: <20140905115704.GO13515@arm.com>
-References: <20140905115704.GO13515@arm.com>
-Message-ID: <20140905122232.GP13515@arm.com>
+From: vincent.guittot@linaro.org (Vincent Guittot)
+Date: Fri, 5 Sep 2014 14:24:04 +0200
+Subject: [PATCH v5 08/12] sched: move cfs task on a CPU with higher
+ capacity
+In-Reply-To: <5409A73B.4050402@linux.vnet.ibm.com>
+References: <1409051215-16788-1-git-send-email-vincent.guittot@linaro.org>
+ <1409051215-16788-9-git-send-email-vincent.guittot@linaro.org>
+ <5409A73B.4050402@linux.vnet.ibm.com>
+Message-ID: <CAKfTPtA=rfM5VWF9On1SJUcNcTvYOBg-XVMcL8bY8LD2BjceYg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[Looks like it's not just Rutland that can't spell the address of the
- mailing list today. Fixed here, so please use this post in any replies].
+On 5 September 2014 14:06, Preeti U Murthy <preeti@linux.vnet.ibm.com> wrote:
+> Hi Vincent,
+>
+> On 08/26/2014 04:36 PM, Vincent Guittot wrote:
+>> If the CPU is used for handling lot of IRQs, trig a load balance to check if
+>> it's worth moving its tasks on another CPU that has more capacity.
+>>
+>> As a sidenote, this will note generate more spurious ilb because we already
+>> trig an ilb if there is more than 1 busy cpu. If this cpu is the only one that
+>> has a task, we will trig the ilb once for migrating the task.
+>>
+>> The nohz_kick_needed function has been cleaned up a bit while adding the new
+>> test
+>>
+>> Signed-off-by: Vincent Guittot <vincent.guittot@linaro.org>
+>
+> So I see that there are added checks in your previous patches on if the
+> cpu capacity for CFS tasks is good enough to run tasks on the cpu. My
+> concern is although they appear sensible, would they trigger an increase
+> in the number of times we load balance to a large extent.
+>
+> Ebizzy would not test this aspect right? There are no real time
+> tasks/interrupts that get generated.
 
-On Fri, Sep 05, 2014 at 12:57:04PM +0100, Will Deacon wrote:
-> Hi all,
-> 
-> I'm one of the few, foolish people to try running mainline on my 5250-based
-> Samsung Chromebook (snow). I can live without wireless, usb3 and video
-> acceleration, so actually it makes a reasonable development platform for
-> doing A15-based (micro)-architectural work.
-> 
-> However, since 3.15 I've not been able to boot *any* mainline kernels on
-> this board. I did mean to report this earlier, but I have other machines
-> that can run mainline so this has fallen by the wayside.
-> 
-> The problems started with 3.16, where simple-fb would fail to initialise
-> and I lost my display. Note that I don't have a serial console on this
-> machine (I looked at the PCB and there's no way I can solder one of those
-> myself :) I bisected the issue at the time, and I could get my display back
-> by removing some of the new regulator and hdmi properties from the DT. At
-> that point, I could boot, but DMA didn't initialise for the MMC controller
-> so I couldn't mount my root filesystem.
-> 
-> With 3.17-rc3, it seems a lot worse -- I don't get any output after nv-uboot
-> (i.e. the nv-uboot screen just remains on the display, with the last line
-> reading "Stashed 20 records").
-> 
-> I'd usually try to debug this a bit further, but without a console it's
-> really painful to get anywhere. I've been working with 3.15, but now I'm
-> having to backport patches when I want to test them, which is more effort
-> than I can be bothered with.
-> 
-> Is anybody else running mainline on this device and are these known/fixed
-> problems?
-> 
-> Cheers,
-> 
-> Will
+yes, ebizzy doesn't test this part but check for non regression
+
+The scp test is the one that i use to check this patch and the
+previous one but a test with some cfs and rt tasks should also do the
+jobs.
+we can see an increase of 82% for the dual core when
+CONFIG_IRQ_TIME_ACCOUNTING is enable
+
+>
+> Besides, what is the column that says patchset+irq? What is the irq
+> accounting patchset that you refer to in your cover letter?
+
+it refers to CONFIG_IRQ_TIME_ACCOUNTING which includes the time spent
+under interrupt context to compute the scale_rt_capacity
+
+Regards,
+Vincent
+
+>
+> Regards
+> Preeti U Murthy
+>
