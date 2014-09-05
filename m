@@ -1,127 +1,95 @@
-From: yao.yuan@freescale.com (Yao Yuan)
-Date: Fri, 5 Sep 2014 10:32:40 +0000
-Subject: [PATCH v7 1/2] i2c: imx: add DMA support for freescale i2c driver
-In-Reply-To: <201409041638.45537.marex@denx.de>
-References: <1407923215-3749-1-git-send-email-yao.yuan@freescale.com>
- <1407923215-3749-2-git-send-email-yao.yuan@freescale.com>
- <201409041638.45537.marex@denx.de>
-Message-ID: <c10c1960255e4dbca2a281b995290c6d@BL2PR03MB338.namprd03.prod.outlook.com>
+From: tomasz.nowicki@linaro.org (Tomasz Nowicki)
+Date: Fri, 05 Sep 2014 12:36:08 +0200
+Subject: [Linaro-acpi] [PATCH v3 13/17] ARM64 / ACPI: Add GICv2 specific
+ ACPI boot support
+In-Reply-To: <3400229.hn32yHbVD2@wuerfel>
+References: <1409583475-6978-1-git-send-email-hanjun.guo@linaro.org>
+ <4895927.Zp4WL2AZAF@wuerfel> <540986B2.7000901@arm.com>
+ <3400229.hn32yHbVD2@wuerfel>
+Message-ID: <54099218.9030108@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, September 04, 2014 10:39 PM, Marek Vasut wrote:
-> On Wednesday, August 13, 2014 at 11:46:54 AM, Yuan Yao wrote:
-> > Add dma support for i2c. This function depend on DMA driver.
-> > You can turn on it by write both the dmas and dma-name properties in
-> > dts node. DMA is optional, even DMA request unsuccessfully, i2c can
-> > also work well.
-> >
-> > Signed-off-by: Yuan Yao <yao.yuan@freescale.com>
-> 
-> [...]
-> 
-> > +/* Enable DMA if transfer byte size is bigger than this threshold.
-> > + * As the hardware request, it must bigger than 4.
-> 
-> The comment is unclear, just by reading it, I have no clue what are the
-> units for this value. I can guess those would be bytes, but it would be a
-> good idea to be explicit.
-> 
-> Also, wasn't kernel comment style starting with leading /* , with the
-> text starting only on the next line ?
-> 
 
-[Yuan Yao] Thanks for your review. I will correct it in the next version.
 
-> > + */
-> > +#define IMX_I2C_DMA_THRESHOLD	16
-> > +#define IMX_I2C_DMA_TIMEOUT	1000
-> > +
-> 
-> [...]
-> 
-> > +static int i2c_imx_dma_write(struct imx_i2c_struct *i2c_imx,
-> > +					struct i2c_msg *msgs)
-> > +{
-> > +	int result;
-> > +	unsigned int temp = 0;
-> > +	unsigned long orig_jiffies = jiffies;
-> > +	struct imx_i2c_dma *dma = i2c_imx->dma;
-> > +	struct device *dev = &i2c_imx->adapter.dev;
-> > +
-> > +	dev_dbg(dev, "<%s> write slave address: addr=0x%x\n",
-> > +		__func__, msgs->addr << 1);
-> > +
-> > +	reinit_completion(&i2c_imx->dma->cmd_complete);
-> > +	dma->chan_using = dma->chan_tx;
-> > +	dma->dma_transfer_dir = DMA_MEM_TO_DEV;
-> > +	dma->dma_data_dir = DMA_TO_DEVICE;
-> > +	dma->dma_len = msgs->len - 1;
-> > +	result = i2c_imx_dma_xfer(i2c_imx, msgs);
-> > +	if (result)
-> > +		return result;
-> > +
-> > +	temp = imx_i2c_read_reg(i2c_imx, IMX_I2C_I2CR);
-> > +	temp |= I2CR_DMAEN;
-> > +	imx_i2c_write_reg(temp, i2c_imx, IMX_I2C_I2CR);
-> > +
-> > +	/*
-> > +	 * Write slave address.
-> > +	 * The first byte muse be transmitted by the CPU.
-> > +	 */
-> > +	imx_i2c_write_reg(msgs->addr << 1, i2c_imx, IMX_I2C_I2DR);
-> > +	result = wait_for_completion_interruptible_timeout(
-> > +				&i2c_imx->dma->cmd_complete,
-> > +				msecs_to_jiffies(IMX_I2C_DMA_TIMEOUT));
-> > +	if (result <= 0) {
-> > +		dmaengine_terminate_all(dma->chan_using);
-> > +		if (result)
-> > +			return result;
-> > +		else
-> > +			return -ETIMEDOUT;
-> 
-> Shouldn't you force-disable the DMA here somehow (like unsetting
-> I2CR_DMAEN bit), if it failed or timed out?
+On 05.09.2014 12:13, Arnd Bergmann wrote:
+> On Friday 05 September 2014 10:47:30 Marc Zyngier wrote:
+>>>
+>>> I still prefer being explicit here for the same reason I mentioned earlier:
+>>> I want it to be very clear that we don't support arbitrary irqchips other
+>>> than the ones in the APCI specification. The infrastructure exists on DT
+>>> because we have to support a large number of incompatible irqchips.
+>>
+>> I'm not suggesting that we should support more than the ACPI spec says.
+>> And that's certainly the whole point of a spec, isn't it? ACPI says what
+>> we support, and we're not going any further. I'm just saying that we
+>> shouldn't make the maintenance burden heavier, and the code nothing
+>> short of disgusting. Using our current infrastructure doesn't mean we're
+>> going to support GIcv2.37.
+>
+> Ok
+>
+>>> In particular, the ACPI tables describing the irqchip have no way to
+>>> identify the GIC at all, if I read the spec correctly, you have to
+>>> parse the tables, ioremap the registers and then read the ID to know
+>>> if you have GICv1/v2/v2m/v3/v4. There doesn't seem to be any "device"
+>>> for the GIC that a hypothetical probe function would be based on.
+>>
+>> This is not the way I read the spec. Table 5-46 (Interrupt Controller
+>> Structure) tells you if you have a CPU interface (GICv1/v2) or a
+>> redistributor (GICv3/v4). That's enough to know whether or not you
+>> should carry on probing a particular controller.
+>
+> Ah, good. I missed that.
+>
+>> The various GIC versions don't really have a unified memory map anyway
+>> (well, none that you can rely on), and you really have to rely on ACPI
+>> to tell you what you have.
+>
+> So we are back to needing to support two different irqchip drivers
+> (v1/v2/v2m and v3/v4), instead of five or more, right?
+>
+>>> It does seem wrong to parse the tables in the irq-gic.c file though:
+>>> that part can well be common across the various gic versions and then
+>>> call into either irq-gic.c or irq-gic-v3.c for the version specific
+>>> parts. Whether we put that common code into drivers/irqchip/irqchip.c,
+>>> drivers/irqchip/gic-common.c, drivers/irqchip/irq-acpi-gic.c or
+>>> drivers/acpi/irq-gic.c I don't care at all.
+>>
+>> I don't think so you can make that common code very easily. The
+>> information required by both drivers is organized differently.
+>> If it was, I'd have done that for the DT binding.
+>
+> I see, and that's also what Tomasz just explained. So can we just
+> have one an irqchip_init() function doing this:?
+>
+> if (dt)
+> 	of_irq_init(__irqchip_of_table);
+> else if (acpi) {
+> 	read cpu-interface and redistributor address from acpi tables
+> 	if (cpu-interface)
+> 		gic_v2_acpi_init(table);
+> 	else if(redistributor)
+> 		gic_v3_acpi_init(table)
+> }
+>
 
-[Yuan Yao] Yes, I put the code for force-disable DMA in i2c_imx_start().
-In order to make sure any DMA error will not effect the I2C.
-It seems almost the same as put the code here, how about your think?
+It is pretty much the same as:
+if (dt)
+	of_irq_init(__irqchip_of_table);
+else if (acpi) {
+	err = gic_v3_acpi_init(table) {
+		read redistributor address from acpi tables
+		[...]
+	}
+	if (err) {
+		err = gic_v2_acpi_init(table) {
+		read cpu-interface address from acpi tables
+		[...]
+		}
+	}
+}
+What basically is my current implementation (well, without GICv3 support 
+but that will be next step).
 
-Thanks!
-
-> > +	}
-> > +
-> > +	/* Waiting for Transfer complete. */
-> > +	while (1) {
-> > +		temp = imx_i2c_read_reg(i2c_imx, IMX_I2C_I2SR);
-> > +		if (temp & I2SR_ICF)
-> > +			break;
-> > +		if (time_after(jiffies, orig_jiffies +
-> > +				msecs_to_jiffies(IMX_I2C_DMA_TIMEOUT))) {
-> > +			dev_dbg(&i2c_imx->adapter.dev, "<%s> Timeout\n",
-> > +				__func__);
-> > +			return -ETIMEDOUT;
-> > +		}
-> > +		schedule();
-> > +	}
-> > +
-> > +	temp = imx_i2c_read_reg(i2c_imx, IMX_I2C_I2CR);
-> > +	temp &= ~I2CR_DMAEN;
-> > +	imx_i2c_write_reg(temp, i2c_imx, IMX_I2C_I2CR);
-> > +
-> > +	/* The last data byte must be transferred by the CPU. */
-> > +	imx_i2c_write_reg(msgs->buf[msgs->len-1],
-> > +				i2c_imx, IMX_I2C_I2DR);
-> > +	result = i2c_imx_trx_complete(i2c_imx);
-> > +	if (result)
-> > +		return result;
-> > +
-> > +	result = i2c_imx_acked(i2c_imx);
-> > +	if (result)
-> > +		return result;
-> > +
-> > +	return 0;
-> > +}
-> [...]
-> 
-> Thanks!
+Tomasz
