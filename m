@@ -1,72 +1,127 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 05 Sep 2014 15:12:50 +0100
-Subject: Unable to boot mainline on snow chromebook since 3.15
-In-Reply-To: <CAEC9eQOMd7ME5KiG2QHCf3TMJAwSxLUgGpmFrpw_HQT4me9YWg@mail.gmail.com>
-References: <20140905115704.GO13515@arm.com> <20140905122232.GP13515@arm.com>
- <CAEC9eQOMd7ME5KiG2QHCf3TMJAwSxLUgGpmFrpw_HQT4me9YWg@mail.gmail.com>
-Message-ID: <5409C4E2.20304@arm.com>
+From: gael.portay@gmail.com (=?UTF-8?q?Ga=C3=ABl=20PORTAY?=)
+Date: Fri,  5 Sep 2014 16:14:36 +0200
+Subject: [PATCHv3 0/4] ARM: at91/tclib: fix segmentation fault
+Message-ID: <1409926480-16367-1-git-send-email-gael.portay@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/09/14 14:46, Ajay kumar wrote:
-> Hi Will,
-> 
-> On Fri, Sep 5, 2014 at 5:52 PM, Will Deacon <will.deacon@arm.com> wrote:
->> [Looks like it's not just Rutland that can't spell the address of the
->>  mailing list today. Fixed here, so please use this post in any replies].
->>
->> On Fri, Sep 05, 2014 at 12:57:04PM +0100, Will Deacon wrote:
->>> Hi all,
->>>
->>> I'm one of the few, foolish people to try running mainline on my 5250-based
->>> Samsung Chromebook (snow). I can live without wireless, usb3 and video
->>> acceleration, so actually it makes a reasonable development platform for
->>> doing A15-based (micro)-architectural work.
->>>
->>> However, since 3.15 I've not been able to boot *any* mainline kernels on
->>> this board. I did mean to report this earlier, but I have other machines
->>> that can run mainline so this has fallen by the wayside.
->>>
->>> The problems started with 3.16, where simple-fb would fail to initialise
->>> and I lost my display. Note that I don't have a serial console on this
->>> machine (I looked at the PCB and there's no way I can solder one of those
->>> myself :) I bisected the issue at the time, and I could get my display back
->>> by removing some of the new regulator and hdmi properties from the DT. At
->>> that point, I could boot, but DMA didn't initialise for the MMC controller
->>> so I couldn't mount my root filesystem.
->>> http://www.spinics.net/lists/dri-devel/msg66740.html
->>> With 3.17-rc3, it seems a lot worse -- I don't get any output after nv-uboot
->>> (i.e. the nv-uboot screen just remains on the display, with the last line
->>> reading "Stashed 20 records").
->>>
->>> I'd usually try to debug this a bit further, but without a console it's
->>> really painful to get anywhere. I've been working with 3.15, but now I'm
->>> having to backport patches when I want to test them, which is more effort
->>> than I can be bothered with.
->>>
->>> Is anybody else running mainline on this device and are these known/fixed
->>> problems?
-> AFAIK, ARM chromebooks use DRM based display drivers and the required
-> patches are still not merged:
-> http://www.spinics.net/lists/dri-devel/msg66740.html
-> 
-> Corresponding DT patches are also still not merged:
-> http://www.spinics.net/lists/arm-kernel/msg358324.html
-> http://www.spinics.net/lists/arm-kernel/msg358325.html
-> 
-> There is a patch for configs as well:
-> https://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg35828.html
-> 
-> Try these patches(I hope they will apply directly on 3.17-rc3) and you should
-> be able to use display on snow.
+Hi every one,
 
-As Will said, it used to work with simplefb, and it doesn't anymore. It
-means someone broke mainline. So before even considering merging these
-DRM patches, I'd really like to see simplefb on Snow restored to working
-conditions *in mainline*.
+This set of patches fix a segmentation fault happening when kexec-ing
+kernel on an at91 platform (see backtrace below).
 
-Thanks,
+While the previous kernel shuts down, the tcb_clksrc driver leaves its
+interruptions unmasked. When the new kernel initiliazes any tclib making use of
+a TC block, an interruption may happen before the interrupt handler is set,
+causing a kernel segmentation fault.
 
-	M.
+To prevent from such cases from happening, the last patch sets up the shutdown
+callback which masks interruptions when the machine is shutdown. Furthermore,
+it also masks the interruptions at probe to make sure no interruption happens
+before the handler is set. This will prevent freshly kexec-ed kernel from
+crashing when launched from a kernel which does not properly mask interruptions
+at shutdown.
+
+Unable to handle kernel NULL pointer dereference at virtual address 00000000
+pgd = c0004000
+[00000000] *pgd=00000000
+Internal error: Oops: 80000005 [#1] ARM
+Modules linked in:
+CPU: 0 PID: 1 Comm: swapper Not tainted 3.16.0+ #144
+task: c1828aa0 ti: c182a000 task.ti: c182a000
+PC is at 0x0
+LR is at ch2_irq+0x28/0x30
+pc : [<00000000>]    lr : [<c01db904>]    psr: 000000d3
+sp : c182bd38  ip : c182bd48  fp : c182bd44
+r10: c0373390  r9 : c1825b00  r8 : 60000053
+r7 : 00000000  r6 : 00000000  r5 : 00000013  r4 : c036e800
+r3 : 00000000  r2 : 00002004  r1 : c036e760  r0 : c036e760
+Flags: nzcv  IRQs off  FIQs off  Mode SVC_32  ISA ARM  Segment kernel
+Control: 0005317f  Table: 20004000  DAC: 00000017
+Process swapper (pid: 1, stack limit = 0xc182a1c0)
+Stack: (0xc182bd38 to 0xc182c000)
+bd20:                                                       c182bd7c c182bd48
+bd40: c0045430 c01db8ec 00000000 c18c6f40 c182bd74 c1825b00 c035cec4 00000000
+bd60: c182be2c 60000053 c1825b34 00000000 c182bd94 c182bd80 c0045570 c0045408
+bd80: 00000000 c1825b00 c182bdac c182bd98 c0047f34 c0045550 00000013 c036619c
+bda0: c182bdc4 c182bdb0 c0044da4 c0047e98 0000007f 00000013 c182bde4 c182bdc8
+bdc0: c0009e34 c0044d8c fefff000 c0046728 60000053 ffffffff c182bdf4 c182bde8
+bde0: c00086a8 c0009ddc c182be74 c182bdf8 c000cb80 c0008674 00000000 00000013
+be00: 00000000 00014200 c1825b00 c036e800 00000013 c035ed98 60000053 c1825b34
+be20: 00000000 c182be74 c182be20 c182be40 c0047994 c0046728 60000053 ffffffff
+be40: 00000013 c036e800 c182be64 c1825b00 00000013 c036e800 c035ed98 c03874bc
+be60: 00000004 c036e700 c182be94 c182be78 c004689c c0046398 c036e760 c18c6080
+be80: 00000000 c035ed10 c182bedc c182be98 c0348b08 c004684c 0000000c c034dac8
+bea0: 004c4b3f c028c338 c036e760 00000013 c014ecc8 c18e67e0 c035b9c0 c0348884
+bec0: c035b9c0 c182a020 00000000 00000000 c182bf54 c182bee0 c00089fc c0348894
+bee0: c00da51c c1ffcc78 c182bf0c c182bef8 c002d100 c002d09c c1ffcc78 00000000
+bf00: c182bf54 c182bf10 c002d308 c0336570 c182bf3c c0334e44 00000003 00000003
+bf20: 00000030 c0334b44 c0044d74 00000003 00000003 c034dac8 c0350a94 c0373440
+bf40: c0373440 00000030 c182bf94 c182bf58 c0336d24 c000890c 00000003 00000003
+bf60: c0336560 c182bf64 c182bf64 6e616e0d 00000000 c0272fc8 00000000 00000000
+bf80: 00000000 00000000 c182bfac c182bf98 c0272fd8 c0336bd8 c182a000 00000000
+bfa0: 00000000 c182bfb0 c00095d0 c0272fd8 00000000 00000000 00000000 00000000
+bfc0: 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
+bfe0: 00000000 00000000 00000000 00000000 00000013 00000000 374d27cd 33cc33e4
+Backtrace:
+[<c01db8dc>] (ch2_irq) from [<c0045430>] (handle_irq_event_percpu+0x38/0x148)
+[<c00453f8>] (handle_irq_event_percpu) from [<c0045570>] (handle_irq_event+0x30/0x40)
+ r10:00000000 r9:c1825b34 r8:60000053 r7:c182be2c r6:00000000 r5:c035cec4
+ r4:c1825b00
+[<c0045540>] (handle_irq_event) from [<c0047f34>] (handle_fasteoi_irq+0xac/0x11c)
+ r4:c1825b00 r3:00000000
+[<c0047e88>] (handle_fasteoi_irq) from [<c0044da4>] (generic_handle_irq+0x28/0x38)
+ r5:c036619c r4:00000013
+[<c0044d7c>] (generic_handle_irq) from [<c0009e34>] (handle_IRQ+0x68/0x88)
+ r4:00000013 r3:0000007f
+[<c0009dcc>] (handle_IRQ) from [<c00086a8>] (at91_aic_handle_irq+0x44/0x4c)
+ r6:ffffffff r5:60000053 r4:c0046728 r3:fefff000
+[<c0008664>] (at91_aic_handle_irq) from [<c000cb80>] (__irq_svc+0x40/0x4c)
+Exception stack(0xc182bdf8 to 0xc182be40)
+bde0:                                                       00000000 00000013
+be00: 00000000 00014200 c1825b00 c036e800 00000013 c035ed98 60000053 c1825b34
+be20: 00000000 c182be74 c182be20 c182be40 c0047994 c0046728 60000053 ffffffff
+[<c0046388>] (__setup_irq) from [<c004689c>] (setup_irq+0x60/0x8c)
+ r10:c036e700 r9:00000004 r8:c03874bc r7:c035ed98 r6:c036e800 r5:00000013
+ r4:c1825b00
+[<c004683c>] (setup_irq) from [<c0348b08>] (tcb_clksrc_init+0x284/0x31c)
+ r6:c035ed10 r5:00000000 r4:c18c6080 r3:c036e760
+[<c0348884>] (tcb_clksrc_init) from [<c00089fc>] (do_one_initcall+0x100/0x1b4)
+ r10:00000000 r9:00000000 r8:c182a020 r7:c035b9c0 r6:c0348884 r5:c035b9c0
+ r4:c18e67e0
+[<c00088fc>] (do_one_initcall) from [<c0336d24>] (kernel_init_freeable+0x15c/0x224)
+ r9:00000030 r8:c0373440 r7:c0373440 r6:c0350a94 r5:c034dac8 r4:00000003
+[<c0336bc8>] (kernel_init_freeable) from [<c0272fd8>] (kernel_init+0x10/0xec)
+ r9:00000000 r8:00000000 r7:00000000 r6:00000000 r5:c0272fc8 r4:00000000
+[<c0272fc8>] (kernel_init) from [<c00095d0>] (ret_from_fork+0x14/0x24)
+ r4:00000000 r3:c182a000
+Code: bad PC value
+---[ end trace 5b30f0017e282e47 ]---
+Kernel panic - not syncing: Fatal exception in interrupt
+
+Your sincerly,
+Ga?l PORTAY
+
+Changes since v1:
+ - use writel instead of __raw_writel
+ - move to request_irq function
+ - disable clock if request irq fails
+Changes since v2:
+ - create dedicated macro to define all IRQs
+ - use new ATMEL_TC_ALL_IRQ macro to mask all IRQs (instead of 0xff)
+ - change the fourth patch commit message
+
+Ga?l PORTAY (4):
+  ARM: at91/tclib: prefer using of devm_* functions
+  ARM: at91/tclib: move initialization from alloc to probe
+  ARM: at91/tclib: mask interruptions at shutdown and probe
+  clocksource: tcb_clksrc: sanitize IRQ request
+
+ drivers/clocksource/tcb_clksrc.c |  15 ++----
+ drivers/misc/atmel_tclib.c       | 101 +++++++++++++++++----------------------
+ drivers/pwm/pwm-atmel-tcb.c      |   2 +-
+ include/linux/atmel_tc.h         |  13 +++--
+ 4 files changed, 60 insertions(+), 71 deletions(-)
+
 -- 
-Jazz is not dead. It just smells funny...
+1.9.3
