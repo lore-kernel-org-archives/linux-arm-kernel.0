@@ -1,35 +1,18 @@
-From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Fri, 5 Sep 2014 13:00:29 -0600
-Subject: [PATCH] PCI: mvebu: Fix uninitialized variable in
- mvebu_get_tgt_attr()
-In-Reply-To: <5898856.RmRf87KNto@wuerfel>
-References: <1407512045-26969-1-git-send-email-geert+renesas@glider.be>
- <20140905174122.GD8080@google.com>
- <20140905202044.4c166a43@free-electrons.com>
- <5898856.RmRf87KNto@wuerfel>
-Message-ID: <CAErSpo4sEQN6T9knuh4U2x9BCUODJheaAf3S8+W4U4oC-C7mMA@mail.gmail.com>
+From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
+Date: Fri,  5 Sep 2014 21:02:35 +0200
+Subject: [PATCH v8 00/18] 8250-core based serial driver for OMAP + DMA
+Message-ID: <1409943773-7874-1-git-send-email-bigeasy@linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 5, 2014 at 12:34 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Friday 05 September 2014 20:20:44 Thomas Petazzoni wrote:
->> Hum, I think I would actually prefer something like:
->>
->>                 if (DT_FLAGS_TO_TYPE(flags) == DT_TYPE_IO)
->>                         rtype = IORESOURCE_IO;
->>                 else if (DT_FLAGS_TO_TYPE(flags) == DT_TYPE_MEM32)
->>                         rtype = IORESOURCE_MEM;
->> +               else
->> +                       continue;
->>
->> So that we're explicit with the fact that we only care about I/O and
->> MEM32 resource types.
->
-> Agreed, that looks better than my patch as well.
+This is my complete queue fo the omap serial driver based on the 8250 core
+code. I played with it on beagle bone, am335x-evm and dra7xx including DMA.
+The runtime-pm pieces look now bug-compatible with the omap-serial driver.
+Besides the runtime-om improvement I also fixed a few corner cases for the
+TX-DMA problem. The DMA fixes (in edma and omap-dma) were dropped and the
+problem has been in 8250-dma via patch #13.
 
-I like it better, too, but we still need the "range += rangesz" part,
-so I don't think it will work.  I suppose that could be moved to the
-update expression of the "for" loop.  Or, since we don't use "i" in
-the loop at all, maybe we could do something like this:
+The whole queue is available at
+  git://git.breakpoint.cc/bigeasy/linux.git uart_v8
 
-    for (; range < rend; range += rangesz)
+Sebastian
