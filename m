@@ -1,93 +1,42 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 05 Sep 2014 13:21:48 +0200
-Subject: [PATCH v2 2/4] arm64,
- thunder: Add initial dts for Cavium Thunder SoC
-In-Reply-To: <1409903205-2762-3-git-send-email-rric@kernel.org>
-References: <1409903205-2762-1-git-send-email-rric@kernel.org>
- <1409903205-2762-3-git-send-email-rric@kernel.org>
-Message-ID: <5017180.kZRPNE71Sv@wuerfel>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri,  5 Sep 2014 12:22:17 +0100
+Subject: [PATCH 0/2] PSCI: don't call CPU_OFF when it might fail
+Message-ID: <1409916139-20127-1-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 05 September 2014 09:46:43 Robert Richter wrote:
-> diff --git a/arch/arm64/boot/dts/thunder-88xx.dts b/arch/arm64/boot/dts/thunder-88xx.dts
-> new file mode 100644
-> index 000000000000..4cc1d059d2d9
-> --- /dev/null
-> +++ b/arch/arm64/boot/dts/thunder-88xx.dts
+[Apologies to all who received this already, I typo'd the LAKML address]
 
-Most people end up having a soc.dtsi file and a board.dsi file including
-the former and adding the machine-specific properties.
+In certain conditions PSCI's CPU_OFF call may return DENIED (in the presence of
+a UP OS on the secure world), or might not exist (in early implementations
+prior to PSCI 0.2). Both the arm and arm64 callers fail to handle the former,
+and the arm caller doesn't handle the latter.
 
-It is likely that you will end up needing the same, so you might want to
-start that way.
+We can determine wether a CPU_OFF call will succeed by calling
+MIGRATE_INFO_TYPE. If we receive 2 (A.K.A. PSCI_0_2_TOS_MP) in response we know
+that CPU_OFF should succeed, and in other cases it is necessary to discover
+which CPU said OS lives on and attempt migration. As there don't seem to be any
+UP implementations out there so far, for now we can limit ourselves to only
+supporting CPU hotplug in the PSCI_0_2_TOS_MP case. Hotplug support on such
+systems will require additional work, but at least they won't blow up by
+default.
 
-> +/ {
-> +	model = "Cavium ThunderX CN88XX Family";
-> +	compatible = "cavium,thunder-88xx";
+These patches add the necessary checks to the arm and arm64 PSCI callers to
+prevent the issues described above. MIGRATE_INFO_TYPE is a mandatory part of
+PSCI 0.2, so no conforming implementation should be adversely affected. Both
+the ARM Trusted Firmware and KVM respond to MIGRATE_INFO_TYPE with
+PSCI_0_2_TOS_MP, so should see no loss of functionality (verified on Juno). 
 
-As mentioned by Mark already, you should not include 'xx' in the
-compatible string, but instead use the real soc ID.
+Thanks,
+Mark.
 
-Normally, each SoC has some slight differences anyway, so you would
-override these in the specialized dtsi file.
+Mark Rutland (2):
+  arm64: psci: respect MIGRATE_INFO_TYPE
+  arm: psci: don't call CPU_OFF blindly
 
-The "model" property should go into the board specific file.
+ arch/arm/kernel/psci_smp.c | 36 +++++++++++++++++++++++++++++-------
+ arch/arm64/kernel/psci.c   | 14 ++++++++++++++
+ 2 files changed, 43 insertions(+), 7 deletions(-)
 
-> +	interrupt-parent = <&gic0>;
-> +	#address-cells = <2>;
-> +	#size-cells = <2>;
-> +
-> +	aliases {
-> +		serial0 = &uaa0;
-> +		serial1 = &uaa1;
-> +	};
-> +
-> +	psci {
-> +		compatible = "arm,psci-0.2";
-> +		method = "smc";
-> +	};
-
-The aliases node should go into the board file as well, since it's
-possible that e.g. the first uart is not connected and you need
-something like
-
-	aliases {
-		serial0 = &uaa1;
-	};
-
-The psci node (according to a discussion we just had for the freescale
-dts files) should ideally get filled out by the boot loader that
-implements the psci code, to ensure the version matches.
-
-> +
-> +	memory at 00000000 {
-> +		device_type = "memory";
-> +		reg = <0x0 0x00000000 0x0 0x80000000>;
-> +	};
-
-memory should also go into the board specific file, or get filled by
-the boot loader if it is detected at boot time and user serviceable.
-
-I assume that your machines have NUMA properties, in that case it
-makes sense to split up the memory device nodes by topology. I think
-there are some standard properties to describe the topology further,
-but I don't remember how it's done at the moment.
-
-> +	soc {
-> +		compatible = "simple-bus";
-> +		#address-cells = <2>;
-> +		#size-cells = <2>;
-> +		ranges;
-> +
-> +		refclk50mhz: refclk50mhz {
-> +			compatible = "fixed-clock";
-> +			#clock-cells = <0>;
-> +			clock-frequency = <50000000>;
-> +			clock-output-names = "refclk50mhz";
-> +		};
-
-If the reference clock is generated outside of the SoC, I would put the device
-node for it on the top level.
-
-	Arnd
+-- 
+1.9.1
