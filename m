@@ -1,87 +1,92 @@
-From: mikko.perttunen@kapsi.fi (Mikko Perttunen)
-Date: Fri, 05 Sep 2014 13:55:45 +0300
-Subject: [PATCH 0/8] Tegra124 EMC (external memory controller) support
-In-Reply-To: <CAAObsKABUa9xD+hntyv97ZQB7Bk05kN0h0-+H7Q9ks6RT0yV2Q@mail.gmail.com>
-References: <1405088313-20048-1-git-send-email-mperttunen@nvidia.com>
- <53FB7511.9090205@wwwdotorg.org> <53FC3A5D.8030708@nvidia.com>
- <CAAObsKABUa9xD+hntyv97ZQB7Bk05kN0h0-+H7Q9ks6RT0yV2Q@mail.gmail.com>
-Message-ID: <540996B1.4010300@kapsi.fi>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 5 Sep 2014 12:05:52 +0100
+Subject: [PATCH v2 1/4] arm64, thunder: Add Kconfig option for Cavium
+ Thunder SoC Family
+In-Reply-To: <20140905104547.GT4703@rric.localhost>
+References: <1409903205-2762-1-git-send-email-rric@kernel.org>
+ <1409903205-2762-2-git-send-email-rric@kernel.org>
+ <20140905093239.GC30401@n2100.arm.linux.org.uk>
+ <20140905104547.GT4703@rric.localhost>
+Message-ID: <20140905110552.GH30401@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-FYI, the structure the EMC series currently takes (in my local branch) 
-is as follows:
-- clock implementation in CAR code. This just knows about allowed rates 
-and which parents should have them and handles reparenting when required.
-- memory/tegra124-emc: this contains the EMC rate change sequence and 
-exports an API which the clock driver uses.
-- memory/tegra124-mc: contains API to write registers in MC memory 
-space, used by memory/tegra124-emc.
+On Fri, Sep 05, 2014 at 12:45:47PM +0200, Robert Richter wrote:
+> On 05.09.14 10:32:40, Russell King - ARM Linux wrote:
+> > On Fri, Sep 05, 2014 at 09:46:42AM +0200, Robert Richter wrote:
+> > > From: Radha Mohan Chintakuntla <rchintakuntla@cavium.com>
+> > > 
+> > > Increase maximum numbers of cpus to 32. This relates to current
+> > > maximal possible cpu number. Increasing this to 64 cpus will be a
+> > > separate patch not part of this enablement patches.
+> > > 
+> > > Signed-off-by: Radha Mohan Chintakuntla <rchintakuntla@cavium.com>
+> > > Signed-off-by: Robert Richter <rrichter@cavium.com>
+> > > ---
+> > >  arch/arm64/Kconfig | 6 ++++++
+> > >  1 file changed, 6 insertions(+)
+> > > 
+> > > diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+> > > index fd4e81a4e1ce..77fb82b0f684 100644
+> > > --- a/arch/arm64/Kconfig
+> > > +++ b/arch/arm64/Kconfig
+> > > @@ -134,6 +134,11 @@ source "kernel/Kconfig.freezer"
+> > >  
+> > >  menu "Platform selection"
+> > >  
+> > > +config ARCH_THUNDER
+> > > +	bool "Cavium Inc. Thunder SoC Family"
+> > > +	help
+> > > +	  This enables support for Cavium's Thunder Family of SoCs.
+> > > +
+> > >  config ARCH_VEXPRESS
+> > >  	bool "ARMv8 software model (Versatile Express)"
+> > >  	select ARCH_REQUIRE_GPIOLIB
+> > > @@ -256,6 +261,7 @@ config NR_CPUS
+> > >  	range 2 32
+> > >  	depends on SMP
+> > >  	# These have to remain sorted largest to smallest
+> > > +	default "32" if ARCH_THUNDER
+> > >  	default "8"
+> > 
+> > Why do you need ARCH_THUNDER?  If it's just to change this default,
+> 
+> No, we need it just to enable all our drivers on the SoC. We want to
+> enable the SoC by using defconfig + ARCH_THUNDER. As said in my other
+> mail, I put it here to be able to base all other thunder driver patch
+> sets on this initial base patch set. Otherwise this particular patch
+> and also the dtb patch need to be shipped with all other driver patch
+> sets. This might lead to duplicate submissions of the same patch.
+> 
+> With doing defconfig + ARCH_THUNDER we also want to enable the max
+> number of cpus that is currently supported. I only enable 32 cpus
+> since booting more cpus is untested. There might be problems at the 32
+> cpu boundary. Just setting it to 64 does not mean a kernel will
+> actually boot more than 32 cpus. But if it will be ack'ed, I would be
+> fine to set NR_CPUS to 32 or 64 in general and independent from
+> ARCH_THUNDER.
+> 
+> For simplicity I better drop setting NR_CPUS in this patch.
 
-(I decided that this is cleaner than having a huge EMC driver that uses 
-an API exported by CAR)
+So, ARM64 will get a big long list of "config ARCH_foo" options just
+to stuff lots of broken select statements into the configuration.  Yes,
+this may have been the norm with ARM, but it's turned out to be more
+of a problem than a solution, especially as it keeps causing Kconfig
+warnings when things change in the rest of the kernel tree.
 
-I'm not sure if adding the bandwidth management code to the clock or 
-memory/emc driver would be best. But we can decide that later.
+The same is true with defconfigs - Linus threatened to delete all ARM
+defconfigs except one at one point.
 
-I need to clean up the series after the big refactorings; I'll submit a 
-new version once that's done.
+As I said below, this isn't how stuff is dealt with on x86.
 
-Mikko
+What I'm questioning here is the entire ethos of "have an ARCH_foo
+configuration which sets stuff up for platform foo".
 
-(P.S. my internship ended so I'm using this address now)
+> > please don't bother - we don't do this kind of thing on x86, so why
+> > should it be done here?  Just ensure that NR_CPUS is appropriately
+> > adjusted.  Alternatively, look at how x86 deals with this (with
+> > X86_BIGSMP / MAXSMP).
 
-On 09/05/2014 01:22 PM, Tomeu Vizoso wrote:
-> On 26 August 2014 09:42, Mikko Perttunen <mperttunen@nvidia.com> wrote:
->> On 25/08/14 20:40, Stephen Warren wrote:
->>>
->>> On 07/11/2014 08:18 AM, Mikko Perttunen wrote:
->>>>
->>>> Hi everyone,
->>>>
->>>> this series adds support for the EMC (external memory controller) clock
->>>> in the Tegra124 system-on-chip. The series has been tested on Jetson TK1.
->>>>
->>>> The first two patches remove the old "emc_mux" and "emc" clocks from the
->>>> clock tree and the device tree bindings. This is, of course, not
->>>> backwards
->>>> compatible, but as these clocks have never been useful for anything
->>>> (apart from maybe reading the boot rate of the EMC clock). If this is
->>>> still
->>>> not acceptable, the second patch can be dropped.
->>>
->>> ...
->>>
->>> Mikko, this series had some comments, especially on the DT binding
->>> (patch 5/8) and how the MC/EMC drivers interact. Is there an updated
->>> version of the series? Or, is the series replaced by Tomeu Vizoso's work?
->>
->>
->> Yes, I have a v2 with these comments addressed. One concern, though, is the
->> part writing to CLK_SOURCE_EMC. If some other driver also wants to read this
->> register (MC, likely), we might need to have an API for it in the CAR
->> driver. On the other hand, maybe not, since it's only one register. Thierry?
->>
->> Another point is that v2 adds a new API to the MC driver, which also doesn't
->> exist yet. The EMC driver can technically work without the MC driver (but
->> with a header for MC added), but I'm not sure the result would be very
->> useful.
->>
->> I believe the plan is that Tomeu's EMC code will be integrated into this EMC
->> driver once both are ready.
->
-> That's mostly right. My clk constraints series just allow consumers to
-> influence the effective rate of a clock, such as the EMC. And the
-> pm_qos series will allow to track the total memory bandwidth needs in
-> the system. I'm not sure yet where in the code this tracking will be
-> done. It could be done in an EMC driver in drivers/memory, but it's
-> probably too unrelated to be placed in the EMC clock driver.
->
-> Regards,
->
-> Tomeu
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-tegra" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
->
+-- 
+FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
+according to speedtest.net.
