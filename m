@@ -1,44 +1,46 @@
 From: b20788@freescale.com (Anson Huang)
-Date: Fri, 5 Sep 2014 11:26:43 +0800
-Subject: [PATCH V2 0/3] move gpt per clk parent from ipg_per to OSC
-Message-ID: <1409887606-22388-1-git-send-email-b20788@freescale.com>
+Date: Fri, 5 Sep 2014 11:26:44 +0800
+Subject: [PATCH V2 1/3] ARM: imx: add gpt_3m clk for i.mx6qdl
+In-Reply-To: <1409887606-22388-1-git-send-email-b20788@freescale.com>
+References: <1409887606-22388-1-git-send-email-b20788@freescale.com>
+Message-ID: <1409887606-22388-2-git-send-email-b20788@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently, gpt timer's clock is from ipg_per, and ipg_per clock is from ipg
-on most of i.MX6 series SOCs, but ipg's rate may be scaled when system enters
-low bus mode for saving power, then gpt timer's clock rate will be scaled as
-well, as system timer should be kept stable and NOT drift, better to keep gpt
-timer's clk at fixed rate, on i.MX6Q TO > 1.0, i.MX6DL and i.MX6SX, there is
-OSC clk available for gpt timer, we should enable this feature, the hardware
-design is as below:
+Add gpt_3m clock for i.mx6qdl, as gpt can source clock
+from OSC, some i.MX6 series SOCs has fixed divider of
+8 for gpt clock, so here add a fix clk of gpt_3m.
 
-i.MX6Q TO > 1.0: GPT_CR_CLKSRC, 3b'101 selects fix clock
-    of OSC / 8 for gpt per clk;
-i.MX6DL and i.MX6SX: GPT_CR_CLKSRC, 3b'101 selects OSC
-    for gpt per clk, and we must enable GPT_CR_24MEM to
-    enable OSC clk source for gpt per, GPT_PR_PRESCALER24M
-    is for pre-scaling of this OSC clk, here set it to 8
-    to make gpt per clk is 3MHz;
-i.MX6SL: ipg_per can be from OSC directly, so no need to
-    implement this new clk source for gpt per.
-
-As we still need to make it work on i.MX6Q TO1.0 which has no OSC clock source
-for gpt per, so we add a soc_per clock for i.MX6Q, other SoCs all have OSC
-clock source available for gpt per, so we can just replace the original gpt
-per clk with gpt_3m clock.
-
-Anson Huang (3):
-  ARM: imx: add gpt_3m clk for i.mx6qdl
-  ARM: dts: imx6: make gpt per clock can be from OSC
-  ARM: imx: source gpt per clk from OSC for system timer
-
- arch/arm/boot/dts/imx6qdl.dtsi            |    5 ++--
- arch/arm/boot/dts/imx6sx.dtsi             |    2 +-
+Signed-off-by: Anson Huang <b20788@freescale.com>
+---
  arch/arm/mach-imx/clk-imx6q.c             |    1 +
- arch/arm/mach-imx/time.c                  |   41 ++++++++++++++++++++++++-----
  include/dt-bindings/clock/imx6qdl-clock.h |    3 ++-
- 5 files changed, 42 insertions(+), 10 deletions(-)
+ 2 files changed, 3 insertions(+), 1 deletion(-)
 
+diff --git a/arch/arm/mach-imx/clk-imx6q.c b/arch/arm/mach-imx/clk-imx6q.c
+index 2edcebf..7e6b3dd 100644
+--- a/arch/arm/mach-imx/clk-imx6q.c
++++ b/arch/arm/mach-imx/clk-imx6q.c
+@@ -194,6 +194,7 @@ static void __init imx6q_clocks_init(struct device_node *ccm_node)
+ 	clk[IMX6QDL_CLK_PLL3_80M]  = imx_clk_fixed_factor("pll3_80m",  "pll3_usb_otg",   1, 6);
+ 	clk[IMX6QDL_CLK_PLL3_60M]  = imx_clk_fixed_factor("pll3_60m",  "pll3_usb_otg",   1, 8);
+ 	clk[IMX6QDL_CLK_TWD]       = imx_clk_fixed_factor("twd",       "arm",            1, 2);
++	clk[IMX6QDL_CLK_GPT_3M]    = imx_clk_fixed_factor("gpt_3m",    "osc",            1, 8);
+ 	if (cpu_is_imx6dl()) {
+ 		clk[IMX6QDL_CLK_GPU2D_AXI] = imx_clk_fixed_factor("gpu2d_axi", "mmdc_ch0_axi_podf", 1, 1);
+ 		clk[IMX6QDL_CLK_GPU3D_AXI] = imx_clk_fixed_factor("gpu3d_axi", "mmdc_ch0_axi_podf", 1, 1);
+diff --git a/include/dt-bindings/clock/imx6qdl-clock.h b/include/dt-bindings/clock/imx6qdl-clock.h
+index 323e865..9bc2e07 100644
+--- a/include/dt-bindings/clock/imx6qdl-clock.h
++++ b/include/dt-bindings/clock/imx6qdl-clock.h
+@@ -220,6 +220,7 @@
+ #define IMX6QDL_CLK_LVDS2_GATE			207
+ #define IMX6QDL_CLK_ESAI_IPG			208
+ #define IMX6QDL_CLK_ESAI_MEM			209
+-#define IMX6QDL_CLK_END				210
++#define IMX6QDL_CLK_GPT_3M			210
++#define IMX6QDL_CLK_END				211
+ 
+ #endif /* __DT_BINDINGS_CLOCK_IMX6QDL_H */
 -- 
 1.7.9.5
