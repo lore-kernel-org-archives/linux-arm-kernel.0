@@ -1,63 +1,31 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Fri, 05 Sep 2014 15:58:41 +0400
-Subject: [PATCH 1/2] arm64: psci: respect MIGRATE_INFO_TYPE
-In-Reply-To: <1409916139-20127-2-git-send-email-mark.rutland@arm.com>
-References: <1409916139-20127-1-git-send-email-mark.rutland@arm.com>
- <1409916139-20127-2-git-send-email-mark.rutland@arm.com>
-Message-ID: <5409A571.8060502@cogentembedded.com>
+From: pankaj.dubey@samsung.com (Pankaj Dubey)
+Date: Fri, 05 Sep 2014 17:24:41 +0530
+Subject: [PATCH] clk: samsung: exynos3250: fix width field of mout_mmc0/1
+Message-ID: <1409918081-2464-1-git-send-email-pankaj.dubey@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+As per Exynos3250 user manual mmc0/1 mux selection has 4 bit wide.
 
-On 9/5/2014 3:22 PM, Mark Rutland wrote:
+Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
+---
+ drivers/clk/samsung/clk-exynos3250.c |    4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-> Commit e71246a23acb (PSCI: Add initial support for PSCIv0.2 functions)
-> added hooks for MIGRATE_INFO_TYPE, but didn't call it anywhere. This
-> means that currently a UP Trusted OS can reject CPU_OFF calls, which
-> will cause things to blow up.
-
-> This patch ensures we test MIGRATE_INFO_TYPE before calling CPU_OFF. If
-> there's a UP trusted OS hotplug is rejected. Full support for PSCI in
-> the presence of a UP trusted OS will require the use of MIGRATE and will
-> have to come as a later patch.
-
-> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> Cc: Ashwin Chaugule <ashwin.chaugule@linaro.org>
-> Cc: Rob Herring <robh@kernel.org>
-> Cc: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-> Cc: Ian Campbell <ian.campbell@citrix.com>
-> Cc: Christoffer Dall <christoffer.dall@linaro.org>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> ---
->   arch/arm64/kernel/psci.c | 14 ++++++++++++++
->   1 file changed, 14 insertions(+)
-
-> diff --git a/arch/arm64/kernel/psci.c b/arch/arm64/kernel/psci.c
-> index 5539547..a5407af 100644
-> --- a/arch/arm64/kernel/psci.c
-> +++ b/arch/arm64/kernel/psci.c
-> @@ -386,6 +386,20 @@ static int cpu_psci_cpu_disable(unsigned int cpu)
->   	/* Fail early if we don't have CPU_OFF support */
->   	if (!psci_ops.cpu_off)
->   		return -EOPNOTSUPP;
-> +
-> +	/*
-> +	 * In the presence of a UP trusted OS, it might not be possible to
-> +	 * hotplug certain CPUs, and CPU_OFF may return (which would be bad).
-> +	 * Supporting a UP trusted OS requires careful use of
-> +	 * MIGRATE_INFO_UP_CPU and MIGRATE, so for now fail in the presence of
-> +	 * a UP Trusted OS.
-> +	 */
-> +	if (psci_ops.migrate_info_type &&
-> +		psci_ops.migrate_info_type() != PSCI_0_2_TOS_MP) {
-> +			pr_warn("Unable to handle UP trusted OS\n");
-> +			return -EPERM;
-
-    The above 2 lines are indented too much to the right.
-
-> +	}
-> +
-
-WNR, Sergei
+diff --git a/drivers/clk/samsung/clk-exynos3250.c b/drivers/clk/samsung/clk-exynos3250.c
+index 7a17bd4..e1cb464 100644
+--- a/drivers/clk/samsung/clk-exynos3250.c
++++ b/drivers/clk/samsung/clk-exynos3250.c
+@@ -335,8 +335,8 @@ static struct samsung_mux_clock mux_clks[] __initdata = {
+ 
+ 	/* SRC_FSYS */
+ 	MUX(CLK_MOUT_TSADC, "mout_tsadc", group_sclk_p, SRC_FSYS, 28, 4),
+-	MUX(CLK_MOUT_MMC1, "mout_mmc1", group_sclk_p, SRC_FSYS, 4, 3),
+-	MUX(CLK_MOUT_MMC0, "mout_mmc0", group_sclk_p, SRC_FSYS, 0, 3),
++	MUX(CLK_MOUT_MMC1, "mout_mmc1", group_sclk_p, SRC_FSYS, 4, 4),
++	MUX(CLK_MOUT_MMC0, "mout_mmc0", group_sclk_p, SRC_FSYS, 0, 4),
+ 
+ 	/* SRC_PERIL0 */
+ 	MUX(CLK_MOUT_UART1, "mout_uart1", group_sclk_p, SRC_PERIL0, 4, 4),
+-- 
+1.7.9.5
