@@ -1,30 +1,150 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 5 Sep 2014 09:42:54 +0100
-Subject: [PATCH v2 0/4] arm64, thunder: Enable Cavium Thunder SoC Family
-In-Reply-To: <1409903205-2762-1-git-send-email-rric@kernel.org>
-References: <1409903205-2762-1-git-send-email-rric@kernel.org>
-Message-ID: <20140905084254.GF13515@arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 05 Sep 2014 10:44:10 +0200
+Subject: =?UTF-8?B?562U5aSNOg==?= [PATCH 2/2] PCI: Layerscape: Add
+ Layerscape PCIe driver
+In-Reply-To: <1409930568256.17564@freescale.com>
+References: <1409856338-1730-1-git-send-email-Minghuan.Lian@freescale.com>
+ <2799937.bNtU9KXR6t@wuerfel> <1409930568256.17564@freescale.com>
+Message-ID: <7284910.vZQKmpeMI1@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 05, 2014 at 08:46:41AM +0100, Robert Richter wrote:
-> From: Robert Richter <rrichter@cavium.com>
+On Friday 05 September 2014 07:22:08 Minghuan.Lian at freescale.com wrote:
+> Hi Arnd,
 > 
-> This initial patches enable Cavium Thunder SoC Family. The patches add
-> Kconfig and devicetree support and then add Thunder to the defconfig.
-> 
-> The Thunder system needs more enablement patches for subsystems and
-> devices, this includes network, ahci, gicv3/gicv3-its, pci, smmu, kvm.
-> We will send separate patch sets for these. All of them base on this
-> initial patches.
-> 
-> I sent a separate patch set independently that introduces support for
-> dts vendor subdirs. After both patch sets have been applied I will
-> send a patch in addition that moves the dts file into a subdirectory.
-> 
-> Patches are available here:
+> Please see my comments inline.
 
-If you can get some acks for the DT bits, I'm happy to take this via the
-arm64 tree for 3.18.
+Please use the usual reply style in the future, using '>' characters to
+properly give attribution. I'm fixing this up manually in my reply
+here, so others can follow the discussion.
 
-Will
+> > On Thursday 04 September 2014 18:45:38 Minghuan Lian wrote:
+> > > +
+> > > +#define PCIE_LS1021A_BASE    0x3400000
+> > > +#define PCIE_LS1021A_REG_SIZE        0x0100000
+> > 
+> > This does not belong here. All addresses must come from DT,
+> > and you should not do the calculation below based on the address.
+> [Minghuan] LS1021A contains two PCI controllers. I use them to 
+> calculation the PCI controller index.
+> There are several separate registers for PEX1 and PEX2 in SCFG
+> register space. It is hard to get them address from DTS. Could
+> you tell me a way to get PCI controller index?
+
+The easiest way would be to put the index as a property in the
+device tree itself.
+
+> > +struct ls_pcie {
+> > +     struct list_head node;
+> > +     struct device *dev;
+> > +     struct pci_bus *bus;
+> > +     void __iomem *dbi;
+> > +     void __iomem *scfg;
+> > +     struct pcie_port pp;
+> > +     int id;
+> > +     int index;
+> > +     int irq;
+> > +     int msi_irq;
+> > +     int pme_irq;
+> > +};
+> 
+> irq and pme_irq seem to be completely unused, so better
+> not add them until they are actually used.
+> [Minghuan] Ok, I will remove them.
+> 
+> The scfg registers seem to belong to another device that
+> is responsible for multiple instances. Unfortunately,
+> this "fsl,ls1021a-scfg" device is not documented anywhere
+> that I can see.
+> 
+> Is this some sort of syscon node, or is it specific to the
+> pcie controller(s)?
+> 
+> [Minghaun] SCFG provides SoC specific configuration and status
+> registers for the device including PCI USB eTSEC SATA ...
+> The platform patches that contains SCFG code are being upstream.
+
+This sounds like it should be a syscon node, and you should use
+syscon_regmap_lookup_by_phandle() to find the scfg node from each
+of those drivers, rather than scanning the DT yourself in each
+of the drivers using it.
+
+This can also be a place to put the index, such as 
+
+	scfg = <&scfg 0>;
+
+for the first PCIe node. The probe function then extracts both
+the phandle for the syscon and the index from that property.
+
+> > +static int ls_pcie_link_up(struct pcie_port *pp)
+> > +{
+> > +     u32 rc, tmp;
+> > +     struct ls_pcie *pcie = to_ls_pcie(pp);
+> > +
+> > +     tmp = ioread32(pcie->scfg + SCFG_SCFGREVCR_OFF);
+> > +     iowrite32(SCFG_NO_BIT_REVERSE, pcie->scfg + SCFG_SCFGREVCR_OFF);
+> > +
+> > +     rc = (ioread32(pcie->scfg + PEXMSCPORTSR(pcie->index)) >>
+> > +          LTSSM_STATE_SHIFT) & LTSSM_STATE_MASK;
+> > +
+> > +     iowrite32(tmp, pcie->scfg + SCFG_SCFGREVCR_OFF);
+> > +
+> > +     if (rc < LTSSM_PCIE_L0)
+> > +             return 0;
+> > +
+> > +     return 1;
+> > +}
+> 
+> This looks like it is really a phy driver, although a pretty minimal
+> one.
+> 
+> [Minghuan] I read SCFG register. SCFG provides SoC specific configuration
+> and status registers for the device including PCI USB eTSEC SATA ...
+
+I'm guessing that a lot of that is phy related information though.
+A nicer way to deal with this, compared to using syscon directly is
+to have a phy driver for your chip, and have that deal with all
+the phy related setup. In this case you would have a reference in
+the client driver like
+
+	phys = <&scfgphy LS1021A_PHY_PCIE0>;
+	phy-names = "pcie";
+
+And in the pcie driver you just call devm_phy_get(dev, "pcie") to get a reference
+to that phy node, and then you can use the phy API to perform actions on
+it (init, power_on, power_off, exit).
+
+This keeps all knowledge about the phy registers inside of the scfg area
+in one place, and you only have to add a new phy driver for a future SoC
+that has the same PCIe core but different scfg.
+
+> > +static u32 ls_pcie_get_msi_addr(struct pcie_port *pp)
+> > +{
+> > +     return SCFG_SPIMSICR_ADDR;
+> > +}
+> > +
+> > +static u32 ls_pcie_get_msi_data(struct pcie_port *pp, int pos)
+> > +{
+> > +     struct ls_pcie *pcie = to_ls_pcie(pp);
+> > +
+> > +     if (pcie->id == PCI_DEVICE_ID_LS1021A)
+> > +             return MSI_LS1021A_DATA(pcie->index);
+> > +
+> > +     return pos;
+> > +}
+> 
+> My impression is that you have two distinct MSI controller
+> implementations, one for LS1021A and the other one for everything
+> else. How about using separate pcie_host_ops for them, possibly
+> also moving them into separate files?
+> 
+> A good way to deal with this is to put the pointers to the two
+> pcie_host_ops into the data fields of the ls_pcie_of_match table.
+> 
+> [Minghuan] LS1021 contains the same two PCI controllers PEX1 and PEX2.
+> both PEX1 and PEX use the same MSI address, but different MSI message data.
+
+I mean LS1021 is different from other chips here, since you compare
+the pcie->id value.
+
+	Arnd
