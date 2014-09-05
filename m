@@ -1,23 +1,59 @@
-From: khilman@kernel.org (Kevin Hilman)
-Date: Fri, 05 Sep 2014 08:35:56 -0700
-Subject: [PATCH 00/15] PM / Domains: Cleanups and remove superfluous APIs
-In-Reply-To: <1409741551-16437-1-git-send-email-ulf.hansson@linaro.org> (Ulf
- Hansson's message of "Wed, 3 Sep 2014 12:52:16 +0200")
-References: <1409741551-16437-1-git-send-email-ulf.hansson@linaro.org>
-Message-ID: <7ha96eyt9f.fsf@paris.lan>
+From: peter.griffin@linaro.org (Peter Griffin)
+Date: Fri,  5 Sep 2014 16:36:29 +0100
+Subject: [PATCH v6 0/3]  Add ST dwc3 glue layer driver
+Message-ID: <1409931392-22340-1-git-send-email-peter.griffin@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ulf Hansson <ulf.hansson@linaro.org> writes:
+This series adds support for the ST glue logic which wraps the DWC3 controller
+on STiH407 SoC family chipsets.
 
-> This patchset has a bit of a history and some parts of it has been posted
-> earlier.
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2014-June/262725.html
->
-> The intent is to simplify code for the generic power domain and also some of
-> the machine specific code that uses the generic power domain.
->
-> Do note, there are dependencies through this patchset, especially related to
-> the ARM SoC changes, thus they all need to be kept together.
+Changes since v5
+ - Use of_platform_depopulate
 
-Reviewed-by: Kevin Hilman <khilman@linaro.org>
+Changes since v4
+ - Fix bug with setting bits in usb control register
+ - Remove superflous '\n'
+ - Change default Kconfig to make default same as other platforms
+ - Update dt doc example so that both usb2 and usb3 phys are using generic drivers/phy instead of drivers/usb/phy
+ - Reconfigure ST glue logic regs in resume callback
+
+Changes since v3
+ - Various formating nits
+
+Changes since v2
+ - Use dr_mode for host/device static configuration
+ - Manage shared reset signal to usbss to avoid hang if probing before usb3 phy
+ - Remove DT checks and make driver depend on OF
+ - Change some #define to use BIT macro
+ - Make some comments clearer
+ - Use kerneldoc for struct documentation
+ - Remove udelay
+ - Let DT create platform_devices, and remove legacy alloc
+ - Change some logging levels to dev_dbg
+ - Various whitespace and formatting cleanup
+ - Use SIMPLE_DEV_PM_OPS()
+ - Add const to of_device struct
+ - Reorder header files alphabetically
+ - Use devm_ioremap_resource instead of devm_request_and_ioremap
+ - Remove of_match_ptr()
+
+Changes since v1
+ - Fix Kconfig mistake
+
+Peter Griffin (3):
+  usb: dwc3: add ST dwc3 glue layer to manage dwc3 HC
+  usb: dwc3: dwc3-st: Add st-dwc3 devicetree bindings documentation
+  MAINTAINERS: Add dwc3-st.c file to ARCH/STI architecture
+
+ Documentation/devicetree/bindings/usb/dwc3-st.txt |  68 ++++
+ MAINTAINERS                                       |   1 +
+ drivers/usb/dwc3/Kconfig                          |   9 +
+ drivers/usb/dwc3/Makefile                         |   1 +
+ drivers/usb/dwc3/dwc3-st.c                        | 377 ++++++++++++++++++++++
+ 5 files changed, 456 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/usb/dwc3-st.txt
+ create mode 100644 drivers/usb/dwc3/dwc3-st.c
+
+-- 
+1.9.1
