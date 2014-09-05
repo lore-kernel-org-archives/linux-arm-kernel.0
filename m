@@ -1,85 +1,120 @@
-From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Fri,  5 Sep 2014 18:46:33 +0900
-Subject: [PATCH] arm: prevent BUG_ON in audit_syscall_entry()
-Message-ID: <1409910393-30896-1-git-send-email-takahiro.akashi@linaro.org>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 05 Sep 2014 10:47:30 +0100
+Subject: [PATCH v3 13/17] ARM64 / ACPI: Add GICv2 specific ACPI boot
+ support
+In-Reply-To: <4895927.Zp4WL2AZAF@wuerfel>
+References: <1409583475-6978-1-git-send-email-hanjun.guo@linaro.org>
+ <5405BFE7.5060005@arm.com> <5406DEB6.1060705@linaro.org>
+ <4895927.Zp4WL2AZAF@wuerfel>
+Message-ID: <540986B2.7000901@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-BUG_ON() in audit_syscall_entry() will be hit if user issues syscall(-1)
-while syscall auditing is enabled (that is, by starting auditd).
-In fact, syscall(-1) just fails (not signaled despite the expectation,
-this is another minor bug), but the succeeding syscall hits BUG_ON.
+On 03/09/14 15:57, Arnd Bergmann wrote:
+> On Wednesday 03 September 2014 11:26:14 Tomasz Nowicki wrote:
+>> On 02.09.2014 15:02, Marc Zyngier wrote:
+>>> On 02/09/14 12:48, Tomasz Nowicki wrote:
+>>>> On 01.09.2014 19:35, Marc Zyngier wrote:
+>>>>>> @@ -78,6 +79,10 @@ void __init set_handle_irq(void (*handle_irq)(struct pt_regs *))
+>>>>>>    void __init init_IRQ(void)
+>>>>>>    {
+>>>>>>       irqchip_init();
+>>>>>> +
+>>>>>> +    if (!handle_arch_irq)
+>>>>>> +            acpi_gic_init();
+>>>>>> +
+>>>>>
+>>>>> Why isn't this called from irqchip_init? It would seem like the logical
+>>>>> spot to probe an interrupt controller.
+>>>>
+>>>> irqchip.c is OF dependent, I want to decouple these from the very
+>>>> beginning.
+>>>
+>>> No. irqchip.c is not OF dependent, it is just that DT is the only thing
+>>> we support so far. I don't think duplicating the kernel infrastructure
+>>> "because we're different" is the right way.
+>>>
+>>> There is no reason for your probing structure to be artificially
+>>> different (you're parsing the same information, at the same time). Just
+>>> put in place a similar probing mechanism, and this will look a lot better.
+> 
+> 
+>>>> Having only GICv2, it would work. Considering we would do the same for
+>>>> GICv3 (arm-gic-v3.h) there will be register name conflicts for both
+>>>> headers inclusion:
+>>>>
+>>>> [...]
+>>>> #include <linux/irqchip/arm-gic.h>
+>>>> #include <linux/irqchip/arm-gic-v3.h>
+>>>> [...]
+>>>>          err = gic_v3_acpi_init(table);
+>>>>          if (err)
+>>>>                  err = gic_v2_acpi_init(table);
+>>>>          if (err)
+>>>>                  pr_err("Failed to initialize GIC IRQ controller");
+>>>> [...]
+>>>> So instead of changing register names prefix, I choose new header will
+>>>> be less painfully.
+>>>
+>>> Yes, and this is exactly why I pushed back on that last time. I'll
+>>> continue saying that interrupt controllers should be self-probing, with
+>>> ACPI as they are with DT.
+>>>
+>>> Even with the restrictions of ACPI and SBSA, we end-up with at least 2
+>>> main families of interrupt controllers (GICv2 and GICv3), both with a
+>>> number of "interesting" variations (GICv2m and GICv4, to only mention
+>>> those I'm directly involved with).
+>>>
+>>> I can safely predict that the above will become a tangled mess within 18
+>>> months, and the idea of littering the arch code with a bunch of
+>>> hardcoded "if (blah())" doesn't fill me with joy and confidence.
+>>>
+>>> In summary: we have the infrastructure already, just use it.
+>>
+>> We had that discussion but I see we still don't have consensus here. It 
+>> would be good to know our direction before we prepare next patch 
+>> version. Arnd any comments on this from you side?
+> 
+> I still prefer being explicit here for the same reason I mentioned earlier:
+> I want it to be very clear that we don't support arbitrary irqchips other
+> than the ones in the APCI specification. The infrastructure exists on DT
+> because we have to support a large number of incompatible irqchips.
 
-When auditing syscall(-1), audit_syscall_entry() is called anyway, but
-audit_syscall_exit() is not called and then 'in_syscall' flag in thread's
-audit context is kept on. In this way, audit_syscall_entry() against
-the succeeding syscall will see BUG_ON(in_syscall).
+I'm not suggesting that we should support more than the ACPI spec says.
+And that's certainly the whole point of a spec, isn't it? ACPI says what
+we support, and we're not going any further. I'm just saying that we
+shouldn't make the maintenance burden heavier, and the code nothing
+short of disgusting. Using our current infrastructure doesn't mean we're
+going to support GIcv2.37.
 
-This patch fixes this bug by
-1) enforcing syscall exit tracing, including audit_syscall_exit(), to be
-   executed in all cases,
-2) handling user-issued syscall(-1) with arm_syscall().
+> In particular, the ACPI tables describing the irqchip have no way to
+> identify the GIC at all, if I read the spec correctly, you have to
+> parse the tables, ioremap the registers and then read the ID to know
+> if you have GICv1/v2/v2m/v3/v4. There doesn't seem to be any "device"
+> for the GIC that a hypothetical probe function would be based on.
 
-Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
----
- arch/arm/kernel/entry-common.S |    4 ++--
- arch/arm/kernel/ptrace.c       |   10 +++++++++-
- 2 files changed, 11 insertions(+), 3 deletions(-)
+This is not the way I read the spec. Table 5-46 (Interrupt Controller
+Structure) tells you if you have a CPU interface (GICv1/v2) or a
+redistributor (GICv3/v4). That's enough to know whether or not you
+should carry on probing a particular controller.
 
-diff --git a/arch/arm/kernel/entry-common.S b/arch/arm/kernel/entry-common.S
-index e52fe5a..28d3931 100644
---- a/arch/arm/kernel/entry-common.S
-+++ b/arch/arm/kernel/entry-common.S
-@@ -426,7 +426,6 @@ ENTRY(vector_swi)
- local_restart:
- 	ldr	r10, [tsk, #TI_FLAGS]		@ check for syscall tracing
- 	stmdb	sp!, {r4, r5}			@ push fifth and sixth args
--
- 	tst	r10, #_TIF_SYSCALL_WORK		@ are we tracing syscalls?
- 	bne	__sys_trace
- 
-@@ -476,10 +475,11 @@ __sys_trace:
- 	cmp	scno, #-1			@ skip the syscall?
- 	bne	2b
- 	add	sp, sp, #S_OFF			@ restore stack
--	b	ret_slow_syscall
-+	b	__sys_trace_return_skipped
- 
- __sys_trace_return:
- 	str	r0, [sp, #S_R0 + S_OFF]!	@ save returned r0
-+__sys_trace_return_skipped:
- 	mov	r0, sp
- 	bl	syscall_trace_exit
- 	b	ret_slow_syscall
-diff --git a/arch/arm/kernel/ptrace.c b/arch/arm/kernel/ptrace.c
-index 0c27ed6..f3339c8 100644
---- a/arch/arm/kernel/ptrace.c
-+++ b/arch/arm/kernel/ptrace.c
-@@ -928,9 +928,13 @@ static void tracehook_report_syscall(struct pt_regs *regs,
- 	regs->ARM_ip = ip;
- }
- 
-+extern int arm_syscall(int, struct pt_regs *);
-+
- asmlinkage int syscall_trace_enter(struct pt_regs *regs, int scno)
- {
--	current_thread_info()->syscall = scno;
-+	int orig_scno;
-+
-+	current_thread_info()->syscall = orig_scno = scno;
- 
- 	/* Do the secure computing check first; failures should be fast. */
- 	if (secure_computing(scno) == -1)
-@@ -947,6 +951,10 @@ asmlinkage int syscall_trace_enter(struct pt_regs *regs, int scno)
- 	audit_syscall_entry(AUDIT_ARCH_ARM, scno, regs->ARM_r0, regs->ARM_r1,
- 			    regs->ARM_r2, regs->ARM_r3);
- 
-+	/* user-issued syscall of -1 */
-+	if (scno == -1 && orig_scno == -1)
-+		arm_syscall(scno, regs);
-+
- 	return scno;
- }
- 
+The various GIC versions don't really have a unified memory map anyway
+(well, none that you can rely on), and you really have to rely on ACPI
+to tell you what you have.
+
+> It does seem wrong to parse the tables in the irq-gic.c file though:
+> that part can well be common across the various gic versions and then
+> call into either irq-gic.c or irq-gic-v3.c for the version specific
+> parts. Whether we put that common code into drivers/irqchip/irqchip.c,
+> drivers/irqchip/gic-common.c, drivers/irqchip/irq-acpi-gic.c or
+> drivers/acpi/irq-gic.c I don't care at all.
+
+I don't think so you can make that common code very easily. The
+information required by both drivers is organized differently.
+If it was, I'd have done that for the DT binding.
+
+Thanks,
+
+	M.
 -- 
-1.7.9.5
+Jazz is not dead. It just smells funny...
