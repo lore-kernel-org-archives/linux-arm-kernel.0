@@ -1,31 +1,22 @@
-From: pankaj.dubey@samsung.com (Pankaj Dubey)
-Date: Fri, 05 Sep 2014 17:24:41 +0530
-Subject: [PATCH] clk: samsung: exynos3250: fix width field of mout_mmc0/1
-Message-ID: <1409918081-2464-1-git-send-email-pankaj.dubey@samsung.com>
+From: pebolle@tiscali.nl (Paul Bolle)
+Date: Fri, 05 Sep 2014 14:04:18 +0200
+Subject: [PATCH 11/19] ARM: S5PV210: Remove support for board files
+In-Reply-To: <201409041802.36466.arnd@arndb.de>
+References: <1404496099-26708-1-git-send-email-t.figa@samsung.com>
+ <53C675E4.4020502@samsung.com> <1409825105.5546.91.camel@x220>
+ <201409041802.36466.arnd@arndb.de>
+Message-ID: <1409918658.7832.25.camel@x220>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As per Exynos3250 user manual mmc0/1 mux selection has 4 bit wide.
+Hi Arnd,
 
-Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
----
- drivers/clk/samsung/clk-exynos3250.c |    4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+On Thu, 2014-09-04 at 18:02 +0200, Arnd Bergmann wrote:
+> I think it would be nice if you could submit a patch to remove the
+> drivers from ASoC, then we can see if anybody complains.
 
-diff --git a/drivers/clk/samsung/clk-exynos3250.c b/drivers/clk/samsung/clk-exynos3250.c
-index 7a17bd4..e1cb464 100644
---- a/drivers/clk/samsung/clk-exynos3250.c
-+++ b/drivers/clk/samsung/clk-exynos3250.c
-@@ -335,8 +335,8 @@ static struct samsung_mux_clock mux_clks[] __initdata = {
- 
- 	/* SRC_FSYS */
- 	MUX(CLK_MOUT_TSADC, "mout_tsadc", group_sclk_p, SRC_FSYS, 28, 4),
--	MUX(CLK_MOUT_MMC1, "mout_mmc1", group_sclk_p, SRC_FSYS, 4, 3),
--	MUX(CLK_MOUT_MMC0, "mout_mmc0", group_sclk_p, SRC_FSYS, 0, 3),
-+	MUX(CLK_MOUT_MMC1, "mout_mmc1", group_sclk_p, SRC_FSYS, 4, 4),
-+	MUX(CLK_MOUT_MMC0, "mout_mmc0", group_sclk_p, SRC_FSYS, 0, 4),
- 
- 	/* SRC_PERIL0 */
- 	MUX(CLK_MOUT_UART1, "mout_uart1", group_sclk_p, SRC_PERIL0, 4, 4),
--- 
-1.7.9.5
+Just to know what I'm getting my self into: whom would you expect to
+send me agitated messages once those patches have landed?
+
+
+Paul Bolle
