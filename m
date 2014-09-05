@@ -1,61 +1,56 @@
-From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Fri, 05 Sep 2014 13:30:19 +0900
-Subject: [RFC PATCH 5/5] ARM: dts: Add dt node fo PPMU_CPU/DMC0/DMC1 for
- exynos4412-trats2
-In-Reply-To: <1409891419-28560-1-git-send-email-cw00.choi@samsung.com>
-References: <1409891419-28560-1-git-send-email-cw00.choi@samsung.com>
-Message-ID: <1409891419-28560-6-git-send-email-cw00.choi@samsung.com>
+From: dianders@chromium.org (Doug Anderson)
+Date: Thu, 4 Sep 2014 21:31:56 -0700
+Subject: [PATCH] i2c: rk3x: fix divisor calculation for SCL frequency
+In-Reply-To: <1409884333-3544-1-git-send-email-addy.ke@rock-chips.com>
+References: <1409884333-3544-1-git-send-email-addy.ke@rock-chips.com>
+Message-ID: <CAD=FV=W3JJM38v-X=pyLUjAzY3Ti88xUgWp9bMsX5dqp1gubpg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch add dt node for PPMU_CPU/DMC0/DMC1 for exynos4412-trats2 board.
-Each PPMU dt node includes one event of 'PPMU Count 3'
+Addy,
 
-Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
-Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
----
- arch/arm/boot/dts/exynos4412-trats2.dts | 29 +++++++++++++++++++++++++++++
- 1 file changed, 29 insertions(+)
+On Thu, Sep 4, 2014 at 7:32 PM, Addy Ke <addy.ke@rock-chips.com> wrote:
+> I2C_CLKDIV register descripted in the previous version of
+> RK3x chip manual is incorrect. Plus 1 is required.
+>
+> The correct formula:
+> - T(SCL_HIGH) = T(PCLK) * (CLKDIVH + 1) * 8
+> - T(SCL_LOW) = T(PCLK) * (CLKDIVL + 1) * 8
+> - (SCL Divsor) = 8 * ((CLKDIVL + 1) + (CLKDIVH + 1))
+> - SCL = PCLK / (CLK Divsor)
 
-diff --git a/arch/arm/boot/dts/exynos4412-trats2.dts b/arch/arm/boot/dts/exynos4412-trats2.dts
-index 11967f4..00dcb91 100644
---- a/arch/arm/boot/dts/exynos4412-trats2.dts
-+++ b/arch/arm/boot/dts/exynos4412-trats2.dts
-@@ -770,6 +770,35 @@
- 		status = "okay";
- 	};
- 
-+	ppmu_cpu: ppmu_cpu at 106c0000 {
-+		status = "okay";
-+
-+		events {
-+			ppmu_cpu_3: ppmu-cpu-pmcnt3 {
-+				event-name = "ppmu-cpu-pmcnt3";
-+			};
-+		};
-+	};
-+
-+	ppmu_dmc0: ppmu_dmc0 at 106a0000 {
-+		status = "okay";
-+
-+		events {
-+			ppmu_dmc0_3: ppmu-dmc0-pmcnt3 {
-+				event-name = "ppmu-dmc0-pmcnt3";
-+			};
-+		};
-+	};
-+
-+	ppmu_dmc1: ppmu_dmc1 at 106b0000 {
-+		status = "okay";
-+
-+		events {
-+			ppmu_dmc1_3: ppmu-dmc1-pmcnt3 {
-+				event-name = "ppmu-dmc1-pmcnt3";
-+		};
-+	};
-+
- 	thermistor-ap at 0 {
- 		compatible = "ntc,ncp15wb473";
- 		pullup-uv = <1800000>;	 /* VCC_1.8V_AP */
--- 
-1.8.0
+I'll trust that you tested this with a scope
+
+
+> It will be updated to the latest version of chip manual.
+>
+> Signed-off-by: Addy Ke <addy.ke@rock-chips.com>
+> ---
+>  drivers/i2c/busses/i2c-rk3x.c | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+>
+> diff --git a/drivers/i2c/busses/i2c-rk3x.c b/drivers/i2c/busses/i2c-rk3x.c
+> index e637c32..76b6604 100644
+> --- a/drivers/i2c/busses/i2c-rk3x.c
+> +++ b/drivers/i2c/busses/i2c-rk3x.c
+> @@ -433,8 +433,8 @@ static void rk3x_i2c_set_scl_rate(struct rk3x_i2c *i2c, unsigned long scl_rate)
+>         unsigned long i2c_rate = clk_get_rate(i2c->clk);
+>         unsigned int div;
+>
+> -       /* SCL rate = (clk rate) / (8 * DIV) */
+> -       div = DIV_ROUND_UP(i2c_rate, scl_rate * 8);
+> +       /* SCL rate = (clk rate) / (8 * (DIV + 2)) */
+> +       div = DIV_ROUND_UP(i2c_rate, scl_rate * 8) - 2;
+
+Given the bug I just fixed in the Rockchip SPI driver, I was a little
+worried about div becoming -1 (and thus being a really large positive
+number since div is unsigned).
+
+However, it seems that you get saved by the next statement:
+  div = DIV_ROUND_UP(div, 2);
+
+In the testing I did with the Linux macros, that magically transformed
+a div of 0xFFFFFFFF (-1) to 0, so it's not technically a bug.  ...but
+it's very non-obvious.  Can you do something a little cleaner?
+
+-Doug
