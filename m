@@ -1,92 +1,57 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Fri, 5 Sep 2014 18:36:09 +0200
-Subject: [GIT PULL] at91: drivers for 3.18 #2
-Message-ID: <1409934969-11584-1-git-send-email-nicolas.ferre@atmel.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 5 Sep 2014 17:50:33 +0100
+Subject: [PATCH v2 4/5] arm64: Introduce dummy version of asm/fiq.h
+In-Reply-To: <1409931198-22600-5-git-send-email-daniel.thompson@linaro.org>
+References: <1409846620-14542-1-git-send-email-daniel.thompson@linaro.org>
+ <1409931198-22600-1-git-send-email-daniel.thompson@linaro.org>
+ <1409931198-22600-5-git-send-email-daniel.thompson@linaro.org>
+Message-ID: <20140905165033.GD10976@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd, Olof, Kevin,
+On Fri, Sep 05, 2014 at 04:33:17PM +0100, Daniel Thompson wrote:
+> Drivers that are shared between arm and arm64 and which employ
+> FIQ on arm cannot include asm/fiq.h without #ifdef'ing. This patch
+> introduces a dummy version of asm/fiq.h to arm64 to avoid this.
+> 
+> Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> ---
+>  arch/arm64/include/asm/fiq.h | 18 ++++++++++++++++++
+>  1 file changed, 18 insertions(+)
+>  create mode 100644 arch/arm64/include/asm/fiq.h
+> 
+> diff --git a/arch/arm64/include/asm/fiq.h b/arch/arm64/include/asm/fiq.h
+> new file mode 100644
+> index 0000000..909ec54
+> --- /dev/null
+> +++ b/arch/arm64/include/asm/fiq.h
+> @@ -0,0 +1,18 @@
+> +/*
+> + * arch/arm64/include/asm/fiq.h
+> + *
+> + * Placeholder to reduce #ifdef'ing in shared arm/arm64 drivers.
+> + */
+> +
+> +#ifndef __ASM_FIQ_H
+> +#define __ASM_FIQ_H
+> +
+> +/*
+> + * This placeholder allows code of the following form to be simplified:
+> + *
+> + * #ifdef CONFIG_FIQ
+> + * #include <asm/fiq.h>
+> + * #endif
+> + */
+> +
+> +#endif
 
-This pull-request is focused on the work that Maxime did for migrating our timer
-(PIT) to the clocksource sub-system. A big cleanup happened which allows us to
-be even closer to the point when we have only the bare minimum in our formerly
-crowded mach-at91 directory.
+OK, we add a dummy file, but please keep it simple. Comments are fine
+but no need for header guards (nor the file name, on arm64 we try to get
+rid of them, though some still slip through).
 
-This pull-request goes on top of the "drivers" one already sent to you on Sept.
-01st.
-
-Thanks, best regards,
-
-The following changes since commit 405a72c5e78b5c560c8b2711d4000fa5eb063e1b:
-
-  power: reset: at91-poweroff: fix wakeup status register index (2014-09-01 18:40:44 +0200)
-
-are available in the git repository at:
-
-  git://github.com/at91linux/linux-at91.git tags/at91-drivers2
-
-for you to fetch changes up to 5c1406f573f0f13b85c738a21030aadc9bb36bdd:
-
-  ARM: at91: PIT: Move the driver to drivers/clocksource (2014-09-03 10:55:46 +0200)
-
-----------------------------------------------------------------
-Second drivers series for AT91/3.18:
-- move of the PIT (basic timer) from mach-at91 to its
-  proper location: drivers/clocksource
-- big cleanup of this driver along the way
-
-----------------------------------------------------------------
-Maxime Ripard (14):
-      ARM: at91: PIT: Follow the general coding rules
-      ARM: at91: generic.h: Add include safe guards
-      ARM: at91: PIT: Use DIV_ROUND_CLOSEST to compute the cycles
-      ARM: at91: PIT: Use of_have_populated_dt instead of CONFIG_OF
-      ARM: at91: PIT: Rework probe functions
-      ARM: at91: dt: Remove init_time definitions
-      ARM: at91: PIT: Use consistent exit path in probe
-      ARM: at91: PIT: Use pr_fmt
-      ARM: at91: PIT: use request_irq instead of setup_irq
-      ARM: at91: PIT: (Almost) remove the global variables
-      ARM: at91: soc: Add init_time callback
-      ARM: at91: Convert the boards to the init_time callback
-      ARM: at91: PIT: Convert to an early_platform_device
-      ARM: at91: PIT: Move the driver to drivers/clocksource
-
- arch/arm/mach-at91/Kconfig              |   5 -
- arch/arm/mach-at91/Makefile             |   1 -
- arch/arm/mach-at91/at91sam9260.c        |  34 +++-
- arch/arm/mach-at91/at91sam9261.c        |  34 +++-
- arch/arm/mach-at91/at91sam9263.c        |  34 +++-
- arch/arm/mach-at91/at91sam926x_time.c   | 294 ------------------------------
- arch/arm/mach-at91/at91sam9g45.c        |  34 +++-
- arch/arm/mach-at91/at91sam9rl.c         |  34 +++-
- arch/arm/mach-at91/board-afeb-9260v1.c  |   2 +-
- arch/arm/mach-at91/board-cam60.c        |   2 +-
- arch/arm/mach-at91/board-cpu9krea.c     |   2 +-
- arch/arm/mach-at91/board-dt-sam9.c      |  10 --
- arch/arm/mach-at91/board-dt-sama5.c     |   9 -
- arch/arm/mach-at91/board-flexibity.c    |   2 +-
- arch/arm/mach-at91/board-foxg20.c       |   2 +-
- arch/arm/mach-at91/board-gsia18s.c      |   2 +-
- arch/arm/mach-at91/board-pcontrol-g20.c |   2 +-
- arch/arm/mach-at91/board-sam9-l9260.c   |   2 +-
- arch/arm/mach-at91/board-sam9260ek.c    |   2 +-
- arch/arm/mach-at91/board-sam9261ek.c    |   4 +-
- arch/arm/mach-at91/board-sam9263ek.c    |   2 +-
- arch/arm/mach-at91/board-sam9g20ek.c    |   4 +-
- arch/arm/mach-at91/board-sam9m10g45ek.c |   2 +-
- arch/arm/mach-at91/board-sam9rlek.c     |   2 +-
- arch/arm/mach-at91/board-snapper9260.c  |   2 +-
- arch/arm/mach-at91/board-stamp9g20.c    |   4 +-
- arch/arm/mach-at91/generic.h            |   8 +-
- arch/arm/mach-at91/setup.c              |   5 +
- arch/arm/mach-at91/soc.h                |   1 +
- drivers/clocksource/Kconfig             |   4 +
- drivers/clocksource/Makefile            |   1 +
- drivers/clocksource/timer-atmel-pit.c   | 304 ++++++++++++++++++++++++++++++++
- 32 files changed, 505 insertions(+), 345 deletions(-)
- delete mode 100644 arch/arm/mach-at91/at91sam926x_time.c
- create mode 100644 drivers/clocksource/timer-atmel-pit.c
+Thanks.
 
 -- 
-Nicolas Ferre
+Catalin
