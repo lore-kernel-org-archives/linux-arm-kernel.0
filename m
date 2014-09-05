@@ -1,194 +1,61 @@
-From: ta.omasab@gmail.com (Thomas Abraham)
-Date: Fri, 5 Sep 2014 19:11:05 +0530
-Subject: [PATCH v9 4/6] ARM: Exynos: switch to using generic cpufreq
- driver for Exynos4210/5250/5420
-In-Reply-To: <7hfvg74ioq.fsf@paris.lan>
-References: <1406707663-16656-1-git-send-email-thomas.ab@samsung.com>
- <1406707663-16656-5-git-send-email-thomas.ab@samsung.com>
- <53DA8BB9.6020702@samsung.com> <53DA8D85.3050106@gmail.com>
- <7hbnrc6px3.fsf@paris.lan> <53F7DA13.6090305@gmail.com>
- <CADWw7OgAS-z-UOrJU-hL2fzuefJmLtCTg57jYk2Df7f5KfLJmA@mail.gmail.com>
- <7h8umc60we.fsf@paris.lan>
- <CADWw7OgW+o3tB=ptnsy-PsmXmNv8oXzt_WfK6NswQiEWWwAzNA@mail.gmail.com>
- <CAGa+x85-Anb+HsSUQRaaeex19-HK+yZDW0UpFBwAtsQ8Sf2Aqg@mail.gmail.com>
- <CAGa+x86jU8MR=r_xuaiorbNNyqrezb0b6Ozy-MPg9HvsARESOw@mail.gmail.com>
- <CAJuA9ajtsrY7zSDMs=c6BZ0AqERoBgvq++dTF4Dn673zGMfcgQ@mail.gmail.com>
- <CAMAWPa-8h5PNhgT+ApBhA8p=i+4oFOnYnQsQ4mK1JKwwAhpvpQ@mail.gmail.com>
- <CAJuA9ah5M_pXRMXPB6o7JLhgVUHM7kYo9HOV6Yxv4Z=hKMdG=w@mail.gmail.com>
- <7hmwah6cop.fsf@paris.lan>
- <CAJuA9ahe=9gdTaGcRb69syvRfwkkGMgDiiNfOMA9TBo42cWVZw@mail.gmail.com>
- <CAJuA9ag2pybyLDUyW43wMQu4PA1cB4V9c1bc7WB3xjqzhqNGTw@mail.gmail.com>
- <7hsik847p2.fsf@paris.lan>
- <CAJuA9aiXwgxrS_AYw5tt5GryhrtoOpK2RhhLcjxShNqswiCmqA@mail.gmail.com>
- <7hfvg74ioq.fsf@paris.lan>
-Message-ID: <CAJuA9ah7cxAySNObNjqEPdgwnTok3OiO81faex_8hJMNQtVU5g@mail.gmail.com>
+From: ajaynumb@gmail.com (Ajay kumar)
+Date: Fri, 5 Sep 2014 19:16:03 +0530
+Subject: Unable to boot mainline on snow chromebook since 3.15
+In-Reply-To: <20140905122232.GP13515@arm.com>
+References: <20140905115704.GO13515@arm.com> <20140905122232.GP13515@arm.com>
+Message-ID: <CAEC9eQOMd7ME5KiG2QHCf3TMJAwSxLUgGpmFrpw_HQT4me9YWg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 4, 2014 at 7:00 PM, Kevin Hilman <khilman@kernel.org> wrote:
-> Thomas Abraham <ta.omasab@gmail.com> writes:
+Hi Will,
+
+On Fri, Sep 5, 2014 at 5:52 PM, Will Deacon <will.deacon@arm.com> wrote:
+> [Looks like it's not just Rutland that can't spell the address of the
+>  mailing list today. Fixed here, so please use this post in any replies].
 >
->> On Thu, Sep 4, 2014 at 4:45 AM, Kevin Hilman <khilman@kernel.org> wrote:
->>> Hi Thomas,
->>>
->>> Thomas Abraham <ta.omasab@gmail.com> writes:
->>>
->>> [...]
->>>
->>>> A new branch [1] has been created using commits from exynos5-v3.17-rc1
->>>> branch + cpufreq + regulator + temp fixes. I have tested this branch
->>>> on Exynos5800 Chromebook2 and cpufreq works fine with both ondemand
->>>> and performance governors. Please let me know if there are any issues
->>>> with this new branch. It is based on v3.17-rc3.
->>>
->>> Excellent!  Thank you.
->>>
->>> The only thing missing now is the CPUidle support for 5800, and all
->>> that's needed for that is the compatible string patch[1] which Daniel
->>> has queued up.
->>>
->>> With that patch, display + CPUidle + CPUfreq are working pretty well on
->>> my exynos5800/chromebook2 with the big.LITTLE switcher disabled.  If I
->>> turn on the switcher, it boots OK, but as soon as I try to run powertop
->>> (upstream v2.6.1) it gets stuck.  Have you tried this branch with the
->>> switcher enabled?
+> On Fri, Sep 05, 2014 at 12:57:04PM +0100, Will Deacon wrote:
+>> Hi all,
 >>
->> Yes, I have tested switcher + cpufreq + cpuidle with this branch and
->> there are no issues found. I haven't tested with powertop yet. I will
->> try and do that and let you know the result.
+>> I'm one of the few, foolish people to try running mainline on my 5250-based
+>> Samsung Chromebook (snow). I can live without wireless, usb3 and video
+>> acceleration, so actually it makes a reasonable development platform for
+>> doing A15-based (micro)-architectural work.
 >>
->> You mentioned that when you run powertop, it gets stuck. When that
->> happens, is there any log on the console or does system just turn
->> unresponsive?
->
-> The console is not responsive, but kernel seems busy because I see
-> periodic timeout messages from the samsung clock driver.
+>> However, since 3.15 I've not been able to boot *any* mainline kernels on
+>> this board. I did mean to report this earlier, but I have other machines
+>> that can run mainline so this has fallen by the wayside.
+>>
+>> The problems started with 3.16, where simple-fb would fail to initialise
+>> and I lost my display. Note that I don't have a serial console on this
+>> machine (I looked at the PCB and there's no way I can solder one of those
+>> myself :) I bisected the issue at the time, and I could get my display back
+>> by removing some of the new regulator and hdmi properties from the DT. At
+>> that point, I could boot, but DMA didn't initialise for the MMC controller
+>> so I couldn't mount my root filesystem.
+>>http://www.spinics.net/lists/dri-devel/msg66740.html
+>> With 3.17-rc3, it seems a lot worse -- I don't get any output after nv-uboot
+>> (i.e. the nv-uboot screen just remains on the display, with the last line
+>> reading "Stashed 20 records").
+>>
+>> I'd usually try to debug this a bit further, but without a console it's
+>> really painful to get anywhere. I've been working with 3.15, but now I'm
+>> having to backport patches when I want to test them, which is more effort
+>> than I can be bothered with.
+>>
+>> Is anybody else running mainline on this device and are these known/fixed
+>> problems?
+AFAIK, ARM chromebooks use DRM based display drivers and the required
+patches are still not merged:
+http://www.spinics.net/lists/dri-devel/msg66740.html
 
-Ok, I haven't tried to recreate this issue. I will try and do that.
+Corresponding DT patches are also still not merged:
+http://www.spinics.net/lists/arm-kernel/msg358324.html
+http://www.spinics.net/lists/arm-kernel/msg358325.html
 
->
-> Note that I see these messages when things are functioning normally
-> also.
+There is a patch for configs as well:
+https://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg35828.html
 
-I did notice this a few times before but today I was able to reproduce
-this consistently with other test cases. This timeout is because the
-CPU clock blocks of the cluster that has been turned down are being
-reconfigured, which on Exynos will not work. The following is a
-temporary patch which solves this issue.
+Try these patches(I hope they will apply directly on 3.17-rc3) and you should
+be able to use display on snow.
 
-
->From b0c4057d428134fe12446431ede1d9a579fd1d05 Mon Sep 17 00:00:00 2001
-From: Thomas Abraham <thomas.ab@samsung.com>
-Date: Fri, 5 Sep 2014 17:11:10 +0530
-Subject: [PATCH] TEMP: cpufreq/bL: let the CPU switch complete before
-scaling frequency
-
-On Exynos5420/Exyons5800, the clock blocks that make up the CPU clock
-supply do no operate when the cluster in which they belong is powered off.
-The CPU clock supply path is PLL -> Mux/Dividers -> CPU_clock.
-
-In the arm_big_little CPUfreq driver, the frequency is scaled first and
-then the CPU is switched to the new cluster. In case the switch was for
-the first-man CPU in that new cluster, the frequency scaling step in
-arm_big_little CPUfreq driver would not work for Exynos since the
-in-bound cluster is powered off at that point. Note: On Exynos, the
-cluster is powered off when all the CPUs in that cluster are powered off
-which implies that the CPU clock blocks for that cluster do not operate
-anymore.
-
-So when using arm_big_little CPUfreq driver for Exynos, two changes are
-required. The first change is to let the CPU to switch to the new cluster
-before scaling the frequency. The second change is to ensure that the
-switch has been completed before scaling the frequency.
-
-With these changes, the message "wait_until_divider_stable: timeout in
-divider stabilization" is not seen anymore.
-
-Signed-off-by: Thomas Abraham <thomas.ab@samsung.com>
----
- arch/arm/include/asm/bL_switcher.h |   15 ++++++++++++++-
- drivers/cpufreq/arm_big_little.c   |    9 ++++++++-
- 2 files changed, 22 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm/include/asm/bL_switcher.h
-b/arch/arm/include/asm/bL_switcher.h
-index 1714800..d609b86 100644
---- a/arch/arm/include/asm/bL_switcher.h
-+++ b/arch/arm/include/asm/bL_switcher.h
-@@ -20,9 +20,22 @@ typedef void (*bL_switch_completion_handler)(void *cookie);
- int bL_switch_request_cb(unsigned int cpu, unsigned int new_cluster_id,
-                         bL_switch_completion_handler completer,
-                         void *completer_cookie);
-+
-+static void bL_switch_complete_cb(void *cookie)
-+{
-+        struct completion *switch_complete = (struct completion *) cookie;
-+        complete(switch_complete);
-+}
-+
- static inline int bL_switch_request(unsigned int cpu, unsigned int
-new_cluster_id)
- {
--       return bL_switch_request_cb(cpu, new_cluster_id, NULL, NULL);
-+       struct completion complete;
-+
-+       init_completion(&complete);
-+       bL_switch_request_cb(cpu, new_cluster_id, &bL_switch_complete_cb,
-+                                       &complete);
-+       wait_for_completion(&complete);
-+       return 0;
- }
-
- /*
-diff --git a/drivers/cpufreq/arm_big_little.c b/drivers/cpufreq/arm_big_little.c
-index a46c223..baeff47 100644
---- a/drivers/cpufreq/arm_big_little.c
-+++ b/drivers/cpufreq/arm_big_little.c
-@@ -129,6 +129,13 @@ bL_cpufreq_set_rate(u32 cpu, u32 old_cluster, u32
-new_cluster, u32 rate)
-        int ret;
-        bool bLs = is_bL_switching_enabled();
-
-+       /* Switch cluster */
-+       if (old_cluster != new_cluster) {
-+               pr_debug("%s: cpu: %d, old cluster: %d, new cluster: %d\n",
-+                               __func__, cpu, old_cluster, new_cluster);
-+               bL_switch_request(cpu, new_cluster);
-+       }
-+
-        mutex_lock(&cluster_lock[new_cluster]);
-
-        if (bLs) {
-@@ -167,7 +174,7 @@ bL_cpufreq_set_rate(u32 cpu, u32 old_cluster, u32
-new_cluster, u32 rate)
-                                __func__, cpu, old_cluster, new_cluster);
-
-                /* Switch cluster */
--               bL_switch_request(cpu, new_cluster);
-+               /*bL_switch_request(cpu, new_cluster);*/
-
-                mutex_lock(&cluster_lock[old_cluster]);
-
--- 
-1.6.6.rc2
-
->
-> Kevin
->
->
-> [1]
-> [  337.832031] wait_until_divider_stable: timeout in divider stablization
-> [  337.847024] wait_until_divider_stable: timeout in divider stablization
-> [  337.862024] wait_until_divider_stable: timeout in divider stablization
-> [  337.957028] wait_until_divider_stable: timeout in divider stablization
-> [  337.972024] wait_until_divider_stable: timeout in divider stablization
-> [  337.987024] wait_until_divider_stable: timeout in divider stablization
-> [  340.082029] wait_until_divider_stable: timeout in divider stablization
-> [  340.097024] wait_until_divider_stable: timeout in divider stablization
-> [  340.112024] wait_until_divider_stable: timeout in divider stablization
-> [  346.242030] wait_until_divider_stable: timeout in divider stablization
-> [  346.257024] wait_until_divider_stable: timeout in divider stablization
-> [  346.272024] wait_until_divider_stable: timeout in divider stablization
-> [  348.322029] wait_until_divider_stable: timeout in divider stablization
-> [  348.337025] wait_until_divider_stable: timeout in divider stablization
-> [  348.352024] wait_until_divider_stable: timeout in divider stablization
+Ajay
