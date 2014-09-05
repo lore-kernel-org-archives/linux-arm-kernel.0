@@ -1,77 +1,41 @@
 From: behanw@converseincode.com (behanw at converseincode.com)
-Date: Fri,  5 Sep 2014 16:18:41 -0700
-Subject: [PATCH] arm: LLVMLinux: Provide __aeabi_* symbols which are needed
- for clang
-Message-ID: <1409959121-12630-1-git-send-email-behanw@converseincode.com>
+Date: Fri,  5 Sep 2014 16:21:42 -0700
+Subject: [PATCH] arm64: LLVMLinux: Add missing abort() for AARCH64
+Message-ID: <1409959302-13976-1-git-send-email-behanw@converseincode.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Behan Webster <behanw@converseincode.com>
+From: Mark Charlebois <charlebm@gmail.com>
 
-These symbols are required when compiling the Linux kernel for arch ARM with
-clang.
+Add missing abort for arch aarch64.
 
-Author: Mark Charlebois <charlebm@gmail.com>
+This patch makes the aarch64 kernel able to compile with gcc or clang.
+
 Signed-off-by: Mark Charlebois <charlebm@gmail.com>
 Signed-off-by: Behan Webster <behanw@converseincode.com>
 ---
- arch/arm/lib/Makefile |  4 ++++
- arch/arm/lib/eabi.c   | 32 ++++++++++++++++++++++++++++++++
- 2 files changed, 36 insertions(+)
- create mode 100644 arch/arm/lib/eabi.c
+ arch/arm64/kernel/traps.c | 9 +++++++++
+ 1 file changed, 9 insertions(+)
 
-diff --git a/arch/arm/lib/Makefile b/arch/arm/lib/Makefile
-index 0573faa..b585fcf 100644
---- a/arch/arm/lib/Makefile
-+++ b/arch/arm/lib/Makefile
-@@ -15,6 +15,10 @@ lib-y		:= backtrace.o changebit.o csumipv6.o csumpartial.o   \
- 		   io-readsb.o io-writesb.o io-readsl.o io-writesl.o  \
- 		   call_with_stack.o bswapsdi2.o
+diff --git a/arch/arm64/kernel/traps.c b/arch/arm64/kernel/traps.c
+index 02cd3f0..123cd6e 100644
+--- a/arch/arm64/kernel/traps.c
++++ b/arch/arm64/kernel/traps.c
+@@ -349,6 +349,15 @@ void __pgd_error(const char *file, int line, unsigned long val)
+ 	pr_crit("%s:%d: bad pgd %016lx.\n", file, line, val);
+ }
  
-+ifeq ($(COMPILER),clang)
-+lib-y += eabi.o
-+endif
-+
- mmu-y	:= clear_user.o copy_page.o getuser.o putuser.o
- 
- # the code in uaccess.S is not preemption safe and
-diff --git a/arch/arm/lib/eabi.c b/arch/arm/lib/eabi.c
-new file mode 100644
-index 0000000..41b27b2
---- /dev/null
-+++ b/arch/arm/lib/eabi.c
-@@ -0,0 +1,32 @@
-+/*
-+ *  linux/lib/eabi.c
-+ *
-+ *  Copyright (C) 2012  Mark Charlebois
-+ */
-+
-+/*
-+ * EABI routines
-+ */
-+
-+#include <linux/types.h>
-+#include <linux/string.h>
-+#include <linux/ctype.h>
-+#include <linux/export.h>
-+
-+void __aeabi_memcpy(void *dest, const void *src, size_t n)
++void abort(void)
 +{
-+	(void)memcpy(dest, src, n);
-+}
-+EXPORT_SYMBOL(__aeabi_memcpy);
++	BUG();
 +
-+void __aeabi_memmove(void *dest, const void *src, size_t n)
-+{
-+	(void)memmove(dest, src, n);
++	/* if that doesn't kill us, halt */
++	panic("Oops failed to kill thread");
 +}
-+EXPORT_SYMBOL(__aeabi_memmove);
++EXPORT_SYMBOL(abort);
 +
-+void __aeabi_memset(void *s, size_t n, int c)
-+{
-+	(void)memset(s, c, n);
-+}
-+EXPORT_SYMBOL(__aeabi_memset);
+ void __init trap_init(void)
+ {
+ 	return;
 -- 
 1.9.1
