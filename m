@@ -1,155 +1,72 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 5 Sep 2014 11:10:17 +0100
-Subject: [PATCH FYI 3/4] ARM: add basic support for on-demand backtrace
- of other CPUs
-In-Reply-To: <E1XPq1S-0000RP-FR@rmk-PC.arm.linux.org.uk>
-References: <20140905094056.GD30401@n2100.arm.linux.org.uk>
- <E1XPq1S-0000RP-FR@rmk-PC.arm.linux.org.uk>
-Message-ID: <20140905101017.GG30401@n2100.arm.linux.org.uk>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 05 Sep 2014 12:13:22 +0200
+Subject: [Linaro-acpi] [PATCH v3 13/17] ARM64 / ACPI: Add GICv2 specific
+ ACPI boot support
+In-Reply-To: <540986B2.7000901@arm.com>
+References: <1409583475-6978-1-git-send-email-hanjun.guo@linaro.org>
+ <4895927.Zp4WL2AZAF@wuerfel> <540986B2.7000901@arm.com>
+Message-ID: <3400229.hn32yHbVD2@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 05, 2014 at 10:41:38AM +0100, Russell King wrote:
-> Add basic infrastructure for triggering a backtrace of other CPUs
-> via an IPI, preferably at FIQ level.  It is intended that this shall
-> be used for cases where we have detected that something has already
-> failed in the kernel.
+On Friday 05 September 2014 10:47:30 Marc Zyngier wrote:
+> > 
+> > I still prefer being explicit here for the same reason I mentioned earlier:
+> > I want it to be very clear that we don't support arbitrary irqchips other
+> > than the ones in the APCI specification. The infrastructure exists on DT
+> > because we have to support a large number of incompatible irqchips.
 > 
-> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> I'm not suggesting that we should support more than the ACPI spec says.
+> And that's certainly the whole point of a spec, isn't it? ACPI says what
+> we support, and we're not going any further. I'm just saying that we
+> shouldn't make the maintenance burden heavier, and the code nothing
+> short of disgusting. Using our current infrastructure doesn't mean we're
+> going to support GIcv2.37.
 
-As I've said previously, I believe that most of the code below should
-be generic code rather than arch code - I see nothing here which is
-arch specific apart from the "how do we send a NMI/FIQ", i.o.w. the
-smp_cross_call() call.
+Ok
 
-I'd propose changing linux/nmi.h such that arch_trigger_all_cpu_backtrace()
-becomes "bool trigger_cpu_backtrace(bool include_self)" and have the
-presence of the NMI/FIQ trigger function indicate whether we can do
-this - and moving the code below into lib/ or kernel/.
-
-> ---
->  arch/arm/include/asm/irq.h |  5 ++++
->  arch/arm/kernel/smp.c      | 62 ++++++++++++++++++++++++++++++++++++++++++++++
->  2 files changed, 67 insertions(+)
+> > In particular, the ACPI tables describing the irqchip have no way to
+> > identify the GIC at all, if I read the spec correctly, you have to
+> > parse the tables, ioremap the registers and then read the ID to know
+> > if you have GICv1/v2/v2m/v3/v4. There doesn't seem to be any "device"
+> > for the GIC that a hypothetical probe function would be based on.
 > 
-> diff --git a/arch/arm/include/asm/irq.h b/arch/arm/include/asm/irq.h
-> index 53c15dec7af6..be1d07d59ee9 100644
-> --- a/arch/arm/include/asm/irq.h
-> +++ b/arch/arm/include/asm/irq.h
-> @@ -35,6 +35,11 @@ extern void (*handle_arch_irq)(struct pt_regs *);
->  extern void set_handle_irq(void (*handle_irq)(struct pt_regs *));
->  #endif
->  
-> +#ifdef CONFIG_SMP
-> +extern void arch_trigger_all_cpu_backtrace(bool);
-> +#define arch_trigger_all_cpu_backtrace(x) arch_trigger_all_cpu_backtrace(x)
-> +#endif
-> +
->  #endif
->  
->  #endif
-> diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
-> index 9388a3d479e1..94959f977b82 100644
-> --- a/arch/arm/kernel/smp.c
-> +++ b/arch/arm/kernel/smp.c
-> @@ -72,8 +72,12 @@ enum ipi_msg_type {
->  	IPI_CPU_STOP,
->  	IPI_IRQ_WORK,
->  	IPI_COMPLETION,
-> +	IPI_CPU_BACKTRACE,
->  };
->  
-> +/* For reliability, we're prepared to waste bits here. */
-> +static DECLARE_BITMAP(backtrace_mask, NR_CPUS) __read_mostly;
-> +
->  static DECLARE_COMPLETION(cpu_running);
->  
->  static struct smp_operations smp_ops;
-> @@ -539,6 +543,21 @@ static void ipi_cpu_stop(unsigned int cpu)
->  		cpu_relax();
->  }
->  
-> +static void ipi_cpu_backtrace(struct pt_regs *regs)
-> +{
-> +	int cpu = smp_processor_id();
-> +
-> +	if (cpumask_test_cpu(cpu, to_cpumask(backtrace_mask))) {
-> +		static arch_spinlock_t lock = __ARCH_SPIN_LOCK_UNLOCKED;
-> +
-> +		arch_spin_lock(&lock);
-> +		printk(KERN_WARNING "FIQ backtrace for cpu %d\n", cpu);
-> +		show_regs(regs);
-> +		arch_spin_unlock(&lock);
-> +		cpumask_clear_cpu(cpu, to_cpumask(backtrace_mask));
-> +	}
-> +}
-> +
->  static DEFINE_PER_CPU(struct completion *, cpu_completion);
->  
->  int register_ipi_completion(struct completion *completion, int cpu)
-> @@ -618,6 +637,12 @@ void handle_IPI(int ipinr, struct pt_regs *regs)
->  		irq_exit();
->  		break;
->  
-> +	case IPI_CPU_BACKTRACE:
-> +		irq_enter();
-> +		ipi_cpu_backtrace(regs);
-> +		irq_exit();
-> +		break;
-> +
->  	default:
->  		printk(KERN_CRIT "CPU%u: Unknown IPI message 0x%x\n",
->  		       cpu, ipinr);
-> @@ -712,3 +737,40 @@ static int __init register_cpufreq_notifier(void)
->  core_initcall(register_cpufreq_notifier);
->  
->  #endif
-> +
-> +void arch_trigger_all_cpu_backtrace(bool include_self)
-> +{
-> +	static unsigned long backtrace_flag;
-> +	int i, cpu = get_cpu();
-> +
-> +	if (test_and_set_bit(0, &backtrace_flag)) {
-> +		/*
-> +		 * If there is already a trigger_all_cpu_backtrace() in progress
-> +		 * (backtrace_flag == 1), don't output double cpu dump infos.
-> +		 */
-> +		put_cpu();
-> +		return;
-> +	}
-> +
-> +	cpumask_copy(to_cpumask(backtrace_mask), cpu_online_mask);
-> +	if (!include_self)
-> +		cpumask_clear_cpu(cpu, to_cpumask(backtrace_mask));
-> +
-> +	if (!cpumask_empty(to_cpumask(backtrace_mask))) {
-> +		pr_info("Sending FIQ to %s CPUs:\n",
-> +			(include_self ? "all" : "other"));
-> +		smp_cross_call(to_cpumask(backtrace_mask), IPI_CPU_BACKTRACE);
-> +	}
-> +
-> +	/* Wait for up to 10 seconds for all CPUs to do the backtrace */
-> +	for (i = 0; i < 10 * 1000; i++) {
-> +		if (cpumask_empty(to_cpumask(backtrace_mask)))
-> +			break;
-> +
-> +		mdelay(1);
-> +	}
-> +
-> +	clear_bit(0, &backtrace_flag);
-> +	smp_mb__after_atomic();
-> +	put_cpu();
-> +}
-> -- 
-> 1.8.3.1
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> This is not the way I read the spec. Table 5-46 (Interrupt Controller
+> Structure) tells you if you have a CPU interface (GICv1/v2) or a
+> redistributor (GICv3/v4). That's enough to know whether or not you
+> should carry on probing a particular controller.
 
--- 
-FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
-according to speedtest.net.
+Ah, good. I missed that.
+
+> The various GIC versions don't really have a unified memory map anyway
+> (well, none that you can rely on), and you really have to rely on ACPI
+> to tell you what you have.
+
+So we are back to needing to support two different irqchip drivers
+(v1/v2/v2m and v3/v4), instead of five or more, right?
+
+> > It does seem wrong to parse the tables in the irq-gic.c file though:
+> > that part can well be common across the various gic versions and then
+> > call into either irq-gic.c or irq-gic-v3.c for the version specific
+> > parts. Whether we put that common code into drivers/irqchip/irqchip.c,
+> > drivers/irqchip/gic-common.c, drivers/irqchip/irq-acpi-gic.c or
+> > drivers/acpi/irq-gic.c I don't care at all.
+> 
+> I don't think so you can make that common code very easily. The
+> information required by both drivers is organized differently.
+> If it was, I'd have done that for the DT binding.
+
+I see, and that's also what Tomasz just explained. So can we just
+have one an irqchip_init() function doing this:?
+
+if (dt)
+	of_irq_init(__irqchip_of_table);
+else if (acpi) {
+	read cpu-interface and redistributor address from acpi tables
+	if (cpu-interface)
+		gic_v2_acpi_init(table);
+	else if(redistributor)
+		gic_v3_acpi_init(table)
+}
+
+	Arnd
