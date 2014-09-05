@@ -1,52 +1,30 @@
-From: xjq@rock-chips.com (jianqun)
-Date: Fri,  5 Sep 2014 13:49:26 +0800
-Subject: [PATCH] Rockchip: RK3288: CRU: swap value of bit for CORE clock pll
- source selection
-Message-ID: <1409896166-32732-1-git-send-email-xjq@rock-chips.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Thu, 4 Sep 2014 23:02:48 -0700
+Subject: [PATCH 1/2] clk: Make __clk_lookup() use a list instead of tree
+ search
+In-Reply-To: <1409880209-25094-1-git-send-email-sboyd@codeaurora.org>
+References: <CAF6AEGtk=KhW+m-jc6VzH=pHGgnE1Uzq0tYiqqnX0sPHV1rbPQ@mail.gmail.com>
+ <1409880209-25094-1-git-send-email-sboyd@codeaurora.org>
+Message-ID: <20140905060248.GA22593@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: xujianqun <xjq@rock-chips.com>
+On 09/04, Stephen Boyd wrote:
+> In the near future we're going to move the prepare lock to be a
+> per-clock ww_mutex. __clk_lookup() is called very deep in the
+> set-rate path and we would like to avoid having to take all the
+> locks in the clock tree to search for a clock (basically
+> defeating the purpose of introducing per-clock locks). Introduce
+> a new list that contains all clocks registered in the system and
+> walk this list until the clock is found.
+> 
+> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+> ---
 
-For RK3288, core clock pll source select APLL when bit value is 1, select GPLL
-when bit value is 0;
+Actually this won't work. We can't grab the list lock while the
+prepare lock is held. So we need to do the debugfs stuff with a
+different lock and do it outside of the prepare lock.
 
-CRU_CLKSEL0_CON [15]
-- core_clk_pll_sel
-- CORE clock pll source selection
--- 1'b1: select ARM PLL
--- 1'b0: select GENERAL PLL
-
-BUG=none
-TEST= "cat /sys/kernel/debug/clk/clk_summary |grep apll" check parent of core clock
-
-Change-Id: I44a528af256da1fad573b4ccf9d0a20ad4cf6d68
-Signed-off-by: xujianqun <xjq@rock-chips.com>
----
- drivers/clk/rockchip/clk-cpu.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
-
-diff --git a/drivers/clk/rockchip/clk-cpu.c b/drivers/clk/rockchip/clk-cpu.c
-index c5b14e9..1725ac7 100644
---- a/drivers/clk/rockchip/clk-cpu.c
-+++ b/drivers/clk/rockchip/clk-cpu.c
-@@ -136,7 +136,7 @@ static int rockchip_cpuclk_pre_rate_change(struct rockchip_cpuclk *cpuclk,
- 	}
- 
- 	/* select alternate parent */
--	writel(HIWORD_UPDATE(1, 1, reg_data->mux_core_shift),
-+	writel(HIWORD_UPDATE(0, 1, reg_data->mux_core_shift),
- 	       cpuclk->reg_base + reg_data->core_reg);
- 
- 	/* alternate parent is active now. set the dividers */
-@@ -163,7 +163,7 @@ static int rockchip_cpuclk_post_rate_change(struct rockchip_cpuclk *cpuclk,
- 	spin_lock(cpuclk->lock);
- 
- 	/* post-rate change event, re-mux back to primary parent */
--	writel(HIWORD_UPDATE(0, 1, reg_data->mux_core_shift),
-+	writel(HIWORD_UPDATE(1, 1, reg_data->mux_core_shift),
- 	       cpuclk->reg_base + RK2928_CLKSEL_CON(0));
- 
- 	/* remove any core dividers */
 -- 
-1.9.1
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
