@@ -1,64 +1,58 @@
-From: Minghuan.Lian@freescale.com (Minghuan.Lian at freescale.com)
-Date: Fri, 5 Sep 2014 07:24:45 +0000
-Subject: =?gb2312?B?tPC4tDogW1BBVENIIDIvMl0gUENJOiBMYXllcnNjYXBlOiBBZGQgTGF5ZXJz?=
- =?gb2312?Q?cape_PCIe_driver?=
-In-Reply-To: <CAErSpo5kFkF-JoUj-Ean7VXa4gxYW+q-X89+7ahyEymWpxxQ2w@mail.gmail.com>
-References: <1409856338-1730-1-git-send-email-Minghuan.Lian@freescale.com>
- <1409856338-1730-2-git-send-email-Minghuan.Lian@freescale.com>,
- <CAErSpo5kFkF-JoUj-Ean7VXa4gxYW+q-X89+7ahyEymWpxxQ2w@mail.gmail.com>
-Message-ID: <1409930725114.61690@freescale.com>
+From: maxime.coquelin@st.com (Maxime Coquelin)
+Date: Fri, 5 Sep 2014 09:27:35 +0200
+Subject: [PATCH] pinctrl: st: Add remove function and remove gpio_chip
+ on failure
+In-Reply-To: <5408AA8C.7040100@linaro.org>
+References: <1409409935-8775-1-git-send-email-pramod.gurav@smartplayin.com>
+ <5408AA8C.7040100@linaro.org>
+Message-ID: <540965E7.7040302@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Bjorn,
+Hi Pramod, Srini
 
-Thanks for your comments, I will fix it.
+On 09/04/2014 08:08 PM, Srinivas Kandagatla wrote:
+> Pramod,
+> sorry for delay in reply as I was travelling, still in Jet lag.
+>> Signed-off-by: Pramod Gurav <pramod.gurav@smartplayin.com>
+>> ---
+>>   drivers/pinctrl/pinctrl-st.c |   25 +++++++++++++++++++++++++
+>>   1 files changed, 25 insertions(+), 0 deletions(-)
+>>
+>> diff --git a/drivers/pinctrl/pinctrl-st.c b/drivers/pinctrl/pinctrl-st.c
+>> index 5475374..9296845 100644
+>> --- a/drivers/pinctrl/pinctrl-st.c
+>> +++ b/drivers/pinctrl/pinctrl-st.c
+>> @@ -1517,6 +1517,7 @@ static int st_gpiolib_register_bank(struct
+>> st_pinctrl *info,
+>>                          0, handle_simple_irq,
+>>                          IRQ_TYPE_LEVEL_LOW);
+>>           if (err) {
+>> +            gpiochip_remove(&bank->gpio_chip);
+> This change-set looks good.
+> IMO, you can send a patch for this change set.
+
+Removing the gpiochip here looks good to me too.
+
+>
+>>               dev_info(dev, "could not add irqchip\n");
+>>               return err;
+>>           }
+>> @@ -1685,6 +1686,29 @@ static int st_pctl_probe(struct platform_device
+>> *pdev)
+>>       return 0;
+>>   }
+>>
+>
+>> +static int st_pctl_remove(struct platform_device *pdev)
+>> +{
+> Ideally this driver will not be removed, as other drivers depend on
+> this, even the serial.
+>
+> so I see no big achievement in adding the remove functionality, as this
+> is going to be a dead code and would never be tested.
+
+Agree too.
 
 Thanks,
-Minghuan
-________________________________________
-???: Bjorn Helgaas <bhelgaas@google.com>
-????: 2014?9?4? 21:24
-???: Lian Minghuan-B31939
-??: linux-pci at vger.kernel.org; linux-arm; Zang Roy-R61911; Hu Mingkai-B21284
-??: Re: [PATCH 2/2] PCI: Layerscape: Add Layerscape PCIe driver
-
-On Thu, Sep 4, 2014 at 12:45 PM, Minghuan Lian
-<Minghuan.Lian@freescale.com> wrote:
-> Add support for Freescale Layerscape PCIe controller. This driver
-> re-uses the designware core code.
->
-> Signed-off-by: Minghuan Lian <Minghuan.Lian@freescale.com>
-> ---
->  .../devicetree/bindings/pci/fsl,ls-pcie.txt        |  41 +++
->  drivers/pci/host/Kconfig                           |   7 +
->  drivers/pci/host/Makefile                          |   1 +
->  drivers/pci/host/pci-layerscape.c                  | 315 +++++++++++++++++++++
->  include/linux/pci_ids.h                            |   1 +
->  5 files changed, 365 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/pci/fsl,ls-pcie.txt
->  create mode 100644 drivers/pci/host/pci-layerscape.c
-
-> diff --git a/include/linux/pci_ids.h b/include/linux/pci_ids.h
-> index 6ed0bb7..26d4c30 100644
-> --- a/include/linux/pci_ids.h
-> +++ b/include/linux/pci_ids.h
-> @@ -2442,6 +2442,7 @@
->  #define PCI_DEVICE_ID_P5020            0x0421
->  #define PCI_DEVICE_ID_P5010E           0x0428
->  #define PCI_DEVICE_ID_P5010            0x0429
-> +#define PCI_DEVICE_ID_LS1021A          0x0e0b
-
-This is only used in one file and should not be in pci_ids.h (per the
-comment at the top of pci_ids.h).
-
->  #define PCI_DEVICE_ID_MPC8641          0x7010
->  #define PCI_DEVICE_ID_MPC8641D         0x7011
->  #define PCI_DEVICE_ID_MPC8610          0x7018
-> --
-> 1.9.1
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+Maxime
