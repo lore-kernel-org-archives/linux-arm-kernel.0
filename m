@@ -1,47 +1,82 @@
-From: Minghuan.Lian@freescale.com (Minghuan.Lian at freescale.com)
-Date: Fri, 5 Sep 2014 06:43:44 +0000
-Subject: =?gb2312?B?tPC4tDogW1BBVENIIDIvMl0gUENJOiBMYXllcnNjYXBlOiBBZGQgTGF5ZXJz?=
- =?gb2312?Q?cape_PCIe_driver?=
-In-Reply-To: <4843064.4PPheKAzXq@wuerfel>
-References: <1409856338-1730-1-git-send-email-Minghuan.Lian@freescale.com>
- <1409856338-1730-2-git-send-email-Minghuan.Lian@freescale.com>
- <CAOMZO5BtOO42sde_Eco2=p06WQsJn3+1J44k6i+Dg7qxOK8qdw@mail.gmail.com>,
- <4843064.4PPheKAzXq@wuerfel>
-Message-ID: <1409928263985.66691@freescale.com>
+From: rric@kernel.org (Robert Richter)
+Date: Fri,  5 Sep 2014 08:48:06 +0200
+Subject: [PATCH 0/6] dts, kbuild: Implement support for dtb vendor subdirs
+Message-ID: <1409899692-1455-1-git-send-email-rric@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+From: Robert Richter <rrichter@cavium.com>
 
-Thanks for your comments.
+For arm64 we want to put dts files into vendor's subdirectories from
+the beginning. This patch set implements this. As this is a generic
+kbuild implementation, vendor subdirs will be also available for
+arch/arm and other architectures. The subdirectory tree is also
+reflected in the install path.
 
-There are no same parts between Layerscape and imx.
-I think we should use a new file to implement Layerscape PCI driver.
+A new makefile variable dts-dirs is introduced to point to dts
+subdirs. This variable is used by kbuild for building and installation
+of dtb files.
 
-Thanks,
-Minghuan
-________________________________________
-???: Arnd Bergmann <arnd@arndb.de>
-????: 2014?9?5? 5:12
-???: linux-arm-kernel at lists.infradead.org
-??: Fabio Estevam; Lian Minghuan-B31939; Wood Scott-B07421; linux-pci at vger.kernel.org; Hu Mingkai-B21284; Zang Roy-R61911
-??: Re: [PATCH 2/2] PCI: Layerscape: Add Layerscape PCIe driver
+A dts Makefile looks now as follows:
 
-On Thursday 04 September 2014 17:21:48 Fabio Estevam wrote:
-> On Thu, Sep 4, 2014 at 3:45 PM, Minghuan Lian
-> <Minghuan.Lian@freescale.com> wrote:
-> > Add support for Freescale Layerscape PCIe controller. This driver
-> > re-uses the designware core code.
->
-> It seems that this is the same IP as on mx6, right?
->
-> Is it possible to adapt drivers/pci/host/pci-imx6.c to work on Layerscape?
+----
+dtb-$(CONFIG_...) += some_file_1.dtb
+dtb-$(CONFIG_...) += some_file_2.dtb
 
-For all I can tell, the common parts are already shared in pcie-designware.c,
-while the new file contains only those parts that are specific to layerscape
-and different from imx.
+dts-dirs          += dir_vendor_a
+dts-dirs          += dir_vendor_b
 
-If there are parts in there that are the same between layerscape and imx,
-the implementation should also be moved to a shared file.
+# come always afterwards:
+always         := $(dtb-y)
+subdir-y       := $(dts-dirs)
+clean-files    := *.dtb
+----
 
-        Arnd
+This patches also introduces the dtbs_install make target for
+arm64. Install rules are moved to Makefile.dtbinst using the same
+style and calling convention like for modinst and fwinst.
+
+Robert Richter (6):
+  dts, arm64: Add dtbs_install make target
+  dts, kbuild: Factor out dtbs install rules to Makefile.dtbinst
+  dts, arm/arm64: Remove dtbs build rules in sub-makes
+  dts, kbuild: Implement support for dtb vendor subdirs
+  dts, arm64: Move dts files to vendor subdirs
+  dts, arm: Remove $(MACHINE) variable from dtbs make recipes
+
+ arch/arm/Makefile                                |   8 +-
+ arch/arm/boot/dts/Makefile                       |  12 +-
+ arch/arm64/Makefile                              |  10 +-
+ arch/arm64/boot/dts/Makefile                     |  13 +-
+ arch/arm64/boot/dts/apm-mustang.dts              |  34 --
+ arch/arm64/boot/dts/apm-storm.dtsi               | 425 -----------------------
+ arch/arm64/boot/dts/apm/Makefile                 |   5 +
+ arch/arm64/boot/dts/apm/apm-mustang.dts          |  34 ++
+ arch/arm64/boot/dts/apm/apm-storm.dtsi           | 425 +++++++++++++++++++++++
+ arch/arm64/boot/dts/arm/Makefile                 |   6 +
+ arch/arm64/boot/dts/arm/foundation-v8.dts        | 232 +++++++++++++
+ arch/arm64/boot/dts/arm/rtsm_ve-aemv8a.dts       | 159 +++++++++
+ arch/arm64/boot/dts/arm/rtsm_ve-motherboard.dtsi | 240 +++++++++++++
+ arch/arm64/boot/dts/foundation-v8.dts            | 232 -------------
+ arch/arm64/boot/dts/rtsm_ve-aemv8a.dts           | 159 ---------
+ arch/arm64/boot/dts/rtsm_ve-motherboard.dtsi     | 240 -------------
+ scripts/Kbuild.include                           |   6 +
+ scripts/Makefile.dtbinst                         |  51 +++
+ scripts/Makefile.lib                             |  12 -
+ 19 files changed, 1179 insertions(+), 1124 deletions(-)
+ delete mode 100644 arch/arm64/boot/dts/apm-mustang.dts
+ delete mode 100644 arch/arm64/boot/dts/apm-storm.dtsi
+ create mode 100644 arch/arm64/boot/dts/apm/Makefile
+ create mode 100644 arch/arm64/boot/dts/apm/apm-mustang.dts
+ create mode 100644 arch/arm64/boot/dts/apm/apm-storm.dtsi
+ create mode 100644 arch/arm64/boot/dts/arm/Makefile
+ create mode 100644 arch/arm64/boot/dts/arm/foundation-v8.dts
+ create mode 100644 arch/arm64/boot/dts/arm/rtsm_ve-aemv8a.dts
+ create mode 100644 arch/arm64/boot/dts/arm/rtsm_ve-motherboard.dtsi
+ delete mode 100644 arch/arm64/boot/dts/foundation-v8.dts
+ delete mode 100644 arch/arm64/boot/dts/rtsm_ve-aemv8a.dts
+ delete mode 100644 arch/arm64/boot/dts/rtsm_ve-motherboard.dtsi
+ create mode 100644 scripts/Makefile.dtbinst
+
+-- 
+2.0.1
