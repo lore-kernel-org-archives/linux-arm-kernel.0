@@ -1,69 +1,43 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Fri, 05 Sep 2014 16:29:36 -0700
-Subject: [PATCH] RFC: add function for localbus address
-In-Reply-To: <1409672700-21697-1-git-send-email-svarbanov@mm-sol.com>
-References: <20140729234522.E9FF1C40738@trevor.secretlab.ca>
- <1409672700-21697-1-git-send-email-svarbanov@mm-sol.com>
-Message-ID: <540A4760.8060105@codeaurora.org>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Sat,  6 Sep 2014 01:06:14 +0200
+Subject: [PATCH 11/11] ARM: rockchip: add a cpufreq-cpu0 device
+In-Reply-To: <1409958374-30937-1-git-send-email-heiko@sntech.de>
+References: <1409958374-30937-1-git-send-email-heiko@sntech.de>
+Message-ID: <1409958374-30937-12-git-send-email-heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/02/14 08:45, Stanimir Varbanov wrote:
-> Hi Grant,
->
-> I came down to this. Could you review? Is that
-> implementation closer to the suggestion made by you.
+Rockchip SoCs can sucessfully use the generic cpufreq-cpu0 driver to
+do frequency scaling. Therefore add a platform device in the machine
+init code.
 
-I like this patch (but I'm biased because I want it to exist). Feel free
-to add my Tested-by.
+Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+---
+ arch/arm/mach-rockchip/rockchip.c | 7 +++++++
+ 1 file changed, 7 insertions(+)
 
-
-> ---
->  drivers/of/address.c       |   49 ++++++++++++++++++++++++++++++++++++++++++++
->  drivers/of/platform.c      |   20 ++++++++++++++---
->  include/linux/of_address.h |   19 +++++++++++++++++
->  3 files changed, 84 insertions(+), 4 deletions(-)
->
-> diff --git a/drivers/of/address.c b/drivers/of/address.c
-> index e371825..86c2166 100644
-> --- a/drivers/of/address.c
-> +++ b/drivers/of/address.c
-> @@ -601,6 +601,32 @@ const __be32 *of_get_address(struct device_node *dev, int index, u64 *size,
->  }
->  EXPORT_SYMBOL(of_get_address);
->  
-> +const __be32 *of_get_localbus_address(struct device_node *np, int index,
-> +				      u64 *size)
-> +{
-> +	struct device_node *root, *parent;
-> +	const __be32 *ranges, *prop = NULL;
-> +
-> +	parent = of_get_parent(np);
-> +	if (!parent)
-> +		return NULL;
-> +
-> +	root = of_find_node_by_path("/");
-> +
-> +	if (parent == root) {
-> +		of_node_put(parent);
-> +		return NULL;
-> +	}
-
-I don't get this part though. Perhaps it needs a comment to say why we
-don't allow the node to live in the root.
-
-> +
-> +	ranges = of_get_property(parent, "ranges", NULL);
-> +	of_node_put(parent);
-> +
-> +	if (!ranges)
-> +		prop = of_get_address(np, index, size, NULL);
-> +
-> +	return prop;
-> +}
-> +
->
-
+diff --git a/arch/arm/mach-rockchip/rockchip.c b/arch/arm/mach-rockchip/rockchip.c
+index 8ab9e0e..eea1f06 100644
+--- a/arch/arm/mach-rockchip/rockchip.c
++++ b/arch/arm/mach-rockchip/rockchip.c
+@@ -24,6 +24,12 @@
+ #include <asm/hardware/cache-l2x0.h>
+ #include "core.h"
+ 
++static void __init rockchip_dt_init(void)
++{
++	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
++	platform_device_register_simple("cpufreq-cpu0", 0, NULL, 0);
++}
++
+ static const char * const rockchip_board_dt_compat[] = {
+ 	"rockchip,rk2928",
+ 	"rockchip,rk3066a",
+@@ -37,4 +43,5 @@ DT_MACHINE_START(ROCKCHIP_DT, "Rockchip Cortex-A9 (Device Tree)")
+ 	.l2c_aux_val	= 0,
+ 	.l2c_aux_mask	= ~0,
+ 	.dt_compat	= rockchip_board_dt_compat,
++	.init_machine	= rockchip_dt_init,
+ MACHINE_END
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+2.0.1
