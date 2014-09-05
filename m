@@ -1,37 +1,74 @@
-From: pebolle@tiscali.nl (Paul Bolle)
-Date: Fri, 05 Sep 2014 11:50:54 +0200
-Subject: [PATCH v2] ARM: spear: Remove references to PLAT_SPEAR_SINGLE
-In-Reply-To: <CAOh2x=koqY0SyOuP+Xk7Zd3Ue_7HPFAxUn+V3M4ehgCv-8i02A@mail.gmail.com>
-References: <1392153676.14317.8.camel@x220> <1397550407.1985.12.camel@x220>
- <534CFB45.9070704@st.com> <1402919387.30599.4.camel@x220>
- <1409909229.5546.146.camel@x220> <1409909940.5546.154.camel@x220>
- <CAOh2x=koqY0SyOuP+Xk7Zd3Ue_7HPFAxUn+V3M4ehgCv-8i02A@mail.gmail.com>
-Message-ID: <1409910654.5546.161.camel@x220>
+From: wangyijing@huawei.com (Yijing Wang)
+Date: Fri, 5 Sep 2014 18:09:45 +0800
+Subject: [PATCH v1 00/21] Use MSI chip to configure MSI/MSI-X in all platforms
+Message-ID: <1409911806-10519-1-git-send-email-wangyijing@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Viresh,
+This series is based Bjorn's pci-next branch + Alexander Gordeev's two patches
+"Remove arch_msi_check_device()" link: https://lkml.org/lkml/2014/7/12/41
 
-On Fri, 2014-09-05 at 15:13 +0530, Viresh Kumar wrote:
-> On Fri, Sep 5, 2014 at 3:09 PM, Paul Bolle <pebolle@tiscali.nl> wrote:
-> >> Ditto for v3.17-rc3 and next-20140904. Could someone please pix this up?
-> 
-> You need to send it to arm at kernel.org..
-
-Will do, no problem. But why actually? (Note that MAINTAINERS is silent
-on arm at kernel.org. Maybe that address is documented elsewhere.)
-
-> > And now Rajeev's address bounces. Has Rajeev left ST?
-> 
-> Yeah both Shiraz/Rajeev and myself have left ST :)
-
-I see. Is there a current address for Rajeev.? I will not keep an
-Acked-by on a bouncing address.
-
-> You can add
-> Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
-
-Thanks,
+Currently, there are a lot of weak arch functions in MSI code.
+Thierry Reding Introduced MSI chip framework to configure MSI/MSI-X in arm.
+This series use MSI chip framework to refactor MSI code across all platforms
+to eliminate weak arch functions. It has been tested fine in x86(with or without
+irq remap).
 
 
-Paul Bolle
+RFC->v1: Updated "[patch 4/21] x86/xen/MSI: Eliminate...", export msi_chip instead
+         of #ifdef to fix MSI bug in xen running in x86. 
+		 Rename arch_get_match_msi_chip() to arch_find_msi_chip().
+		 Drop use struct device as the msi_chip argument, we will do that
+		 later in another patchset.
+
+Yijing Wang (21):
+  PCI/MSI: Clean up struct msi_chip argument
+  PCI/MSI: Remove useless bus->msi assignment
+  MSI: Remove the redundant irq_set_chip_data()
+  x86/xen/MSI: Eliminate arch_msix_mask_irq() and arch_msi_mask_irq()
+  PCI/MSI: Introduce weak arch_find_msi_chip() to find MSI chip
+  PCI/MSI: Refactor struct msi_chip to make it become more common
+  x86/MSI: Use MSI chip framework to configure MSI/MSI-X irq
+  x86/xen/MSI: Use MSI chip framework to configure MSI/MSI-X irq
+  Irq_remapping/MSI: Use MSI chip framework to configure MSI/MSI-X irq
+  x86/MSI: Remove unused MSI weak arch functions
+  MIPS/Octeon/MSI: Use MSI chip framework to configure MSI/MSI-X irq
+  MIPS/Xlp: Remove the dead function destroy_irq() to fix build error
+  MIPS/Xlp/MSI: Use MSI chip framework to configure MSI/MSI-X irq
+  MIPS/Xlr/MSI: Use MSI chip framework to configure MSI/MSI-X irq
+  Powerpc/MSI: Use MSI chip framework to configure MSI/MSI-X irq
+  s390/MSI: Use MSI chip framework to configure MSI/MSI-X irq
+  arm/iop13xx/MSI: Use MSI chip framework to configure MSI/MSI-X irq
+  IA64/MSI: Use MSI chip framework to configure MSI/MSI-X irq
+  Sparc/MSI: Use MSI chip framework to configure MSI/MSI-X irq
+  tile/MSI: Use MSI chip framework to configure MSI/MSI-X irq
+  PCI/MSI: Clean up unused MSI arch functions
+
+ arch/arm/mach-iop13xx/include/mach/pci.h |    2 +
+ arch/arm/mach-iop13xx/iq81340mc.c        |    1 +
+ arch/arm/mach-iop13xx/iq81340sc.c        |    1 +
+ arch/arm/mach-iop13xx/msi.c              |    9 ++-
+ arch/arm/mach-iop13xx/pci.c              |    6 ++
+ arch/ia64/kernel/msi_ia64.c              |   18 ++++-
+ arch/mips/pci/msi-octeon.c               |   35 +++++---
+ arch/mips/pci/msi-xlp.c                  |   18 +++-
+ arch/mips/pci/pci-xlr.c                  |   15 +++-
+ arch/powerpc/kernel/msi.c                |   14 +++-
+ arch/s390/pci/pci.c                      |   18 ++++-
+ arch/sparc/kernel/pci.c                  |   14 +++-
+ arch/tile/kernel/pci_gx.c                |   14 +++-
+ arch/x86/include/asm/apic.h              |    4 +
+ arch/x86/include/asm/pci.h               |    4 +-
+ arch/x86/include/asm/x86_init.h          |    7 --
+ arch/x86/kernel/apic/io_apic.c           |   16 ++++-
+ arch/x86/kernel/x86_init.c               |   34 --------
+ arch/x86/pci/xen.c                       |   60 +++++++++------
+ drivers/iommu/irq_remapping.c            |    9 ++-
+ drivers/irqchip/irq-armada-370-xp.c      |   12 +--
+ drivers/pci/host/pci-tegra.c             |    8 +-
+ drivers/pci/host/pcie-designware.c       |    4 +-
+ drivers/pci/host/pcie-rcar.c             |    8 +-
+ drivers/pci/msi.c                        |  123 +++++++++++++-----------------
+ drivers/pci/probe.c                      |    1 -
+ include/linux/msi.h                      |   26 ++-----
+ 27 files changed, 268 insertions(+), 213 deletions(-)
