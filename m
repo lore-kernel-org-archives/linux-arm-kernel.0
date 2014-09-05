@@ -1,35 +1,40 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Fri, 5 Sep 2014 08:20:23 -0700
-Subject: [PATCH] i2c: rk3x: fix divisor calculation for SCL frequency
-In-Reply-To: <54098DA6.4090704@rock-chips.com>
-References: <1409884333-3544-1-git-send-email-addy.ke@rock-chips.com>
- <CAD=FV=W3JJM38v-X=pyLUjAzY3Ti88xUgWp9bMsX5dqp1gubpg@mail.gmail.com>
- <54098DA6.4090704@rock-chips.com>
-Message-ID: <CAD=FV=WwCTRh44jTvTZoeFFACmWKeGyu=zWb1=BeimGMuT9r2Q@mail.gmail.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Fri, 5 Sep 2014 17:21:28 +0200
+Subject: [PATCH] ARM: at91/dt: sam9g20: set at91sam9g20 pllb driver
+In-Reply-To: <1409606986-32455-1-git-send-email-gael.portay@gmail.com>
+References: <1409606986-32455-1-git-send-email-gael.portay@gmail.com>
+Message-ID: <5409D4F8.4090806@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Addy,
+On 01/09/2014 23:29, Ga?l PORTAY :
+> The at91sam9g20 SOC uses its own pllb implementation which is different
+> from the one inherited from at91sam9260 SOC.
+> 
+> Signed-off-by: Ga?l PORTAY <gael.portay@gmail.com>
 
-On Fri, Sep 5, 2014 at 3:17 AM, addy ke <addy.ke@rock-chips.com> wrote:
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 
-> The following modifications is reasonable?
->
-> static void rk3x_i2c_set_scl_rate(struct rk3x_i2c *i2c, unsigned long scl_rate)
-> {
->         unsigned long i2c_rate = clk_get_rate(i2c->clk);
->         unsigned int div;
->
->         /* set DIV = DIVH = DIVL
->          * SCL rate = (clk rate) / (8 * (DIVH + 1 + DIVL + 1))
->          *          = (clk rate) / (16 * (DIV + 1))
->          */
->         div = DIV_ROUND_UP(i2c_rate, scl_rate * 16) - 1;
->
->         i2c_writel(i2c, (div << 16) | (div & 0xffff), REG_CLKDIV);
-> }
+Stacked on at91-3.17-fixes. Thanks!
 
-Yes, that looks much cleaner and is a nice solution, thanks!  Can you
-send up a new patch version?
+> ---
+>  arch/arm/boot/dts/at91sam9g20.dtsi | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/arch/arm/boot/dts/at91sam9g20.dtsi b/arch/arm/boot/dts/at91sam9g20.dtsi
+> index 31f7652..4e0abbd 100644
+> --- a/arch/arm/boot/dts/at91sam9g20.dtsi
+> +++ b/arch/arm/boot/dts/at91sam9g20.dtsi
+> @@ -40,6 +40,7 @@
+>  				};
+>  
+>  				pllb: pllbck {
+> +					compatible = "atmel,at91sam9g20-clk-pllb";
+>  					atmel,clk-input-range = <2000000 32000000>;
+>  					atmel,pll-clk-output-ranges = <30000000 100000000 0 0>;
+>  				};
+> 
 
--Doug
+
+-- 
+Nicolas Ferre
