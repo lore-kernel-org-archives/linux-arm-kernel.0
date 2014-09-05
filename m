@@ -1,56 +1,46 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 5 Sep 2014 10:32:40 +0100
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 5 Sep 2014 10:36:47 +0100
 Subject: [PATCH v2 1/4] arm64, thunder: Add Kconfig option for Cavium
  Thunder SoC Family
-In-Reply-To: <1409903205-2762-2-git-send-email-rric@kernel.org>
+In-Reply-To: <20140905092507.GH13515@arm.com>
 References: <1409903205-2762-1-git-send-email-rric@kernel.org>
  <1409903205-2762-2-git-send-email-rric@kernel.org>
-Message-ID: <20140905093239.GC30401@n2100.arm.linux.org.uk>
+ <20140905083932.GD13515@arm.com>
+ <20140905092135.GR4703@rric.localhost>
+ <20140905092507.GH13515@arm.com>
+Message-ID: <20140905093647.GH2172@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 05, 2014 at 09:46:42AM +0200, Robert Richter wrote:
-> From: Radha Mohan Chintakuntla <rchintakuntla@cavium.com>
+On Fri, Sep 05, 2014 at 10:25:08AM +0100, Will Deacon wrote:
+> On Fri, Sep 05, 2014 at 10:21:35AM +0100, Robert Richter wrote:
+> > On 05.09.14 09:39:32, Will Deacon wrote:
+> > > On Fri, Sep 05, 2014 at 08:46:42AM +0100, Robert Richter wrote:
+> > > > From: Radha Mohan Chintakuntla <rchintakuntla@cavium.com>
+> > > > 
+> > > > Increase maximum numbers of cpus to 32. This relates to current
+> > > > maximal possible cpu number. Increasing this to 64 cpus will be a
+> > > > separate patch not part of this enablement patches.
+> > > 
+> > > Just out of interest, does raising the current maximum limit actually break
+> > > any existing code? If not, then doing this as two patches doesn't seem worth
+> > > it.
+> > 
+> > Increasing to 64 should be fine from the perspective of cpu mask
+> > implementation. Memory foot print should be the same already as this
+> > uses long which is 64 bit. So this wouldn't hurt.
+> > 
+> > However, I felt a bit uncomfortable having a dependency here to
+> > enabling 64 cpus and getting this patch set upstream. Support for more
+> > than 32 cpus is not well tested yet and there still might be problems
+> > with e.g. interrupt delivery or topology.
 > 
-> Increase maximum numbers of cpus to 32. This relates to current
-> maximal possible cpu number. Increasing this to 64 cpus will be a
-> separate patch not part of this enablement patches.
-> 
-> Signed-off-by: Radha Mohan Chintakuntla <rchintakuntla@cavium.com>
-> Signed-off-by: Robert Richter <rrichter@cavium.com>
-> ---
->  arch/arm64/Kconfig | 6 ++++++
->  1 file changed, 6 insertions(+)
-> 
-> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-> index fd4e81a4e1ce..77fb82b0f684 100644
-> --- a/arch/arm64/Kconfig
-> +++ b/arch/arm64/Kconfig
-> @@ -134,6 +134,11 @@ source "kernel/Kconfig.freezer"
->  
->  menu "Platform selection"
->  
-> +config ARCH_THUNDER
-> +	bool "Cavium Inc. Thunder SoC Family"
-> +	help
-> +	  This enables support for Cavium's Thunder Family of SoCs.
-> +
->  config ARCH_VEXPRESS
->  	bool "ARMv8 software model (Versatile Express)"
->  	select ARCH_REQUIRE_GPIOLIB
-> @@ -256,6 +261,7 @@ config NR_CPUS
->  	range 2 32
->  	depends on SMP
->  	# These have to remain sorted largest to smallest
-> +	default "32" if ARCH_THUNDER
->  	default "8"
+> All I mean is, if the kernel doesn't explode on existing systems by changing
+> the upper limit to 64, then we should do that. If you're not comfortable
+> that the Thunder code can handle that, then leave the thunder default as 32,
+> like you do in the current patch. It just seems odd not to change the
+> maximum number, since it's an arbitrary limit from my perspective.
 
-Why do you need ARCH_THUNDER?  If it's just to change this default,
-please don't bother - we don't do this kind of thing on x86, so why
-should it be done here?  Just ensure that NR_CPUS is appropriately
-adjusted.  Alternatively, look at how x86 deals with this (with
-X86_BIGSMP / MAXSMP).
+FWIW my Juno happily boots with a NR_CPUS=64 kernel.
 
--- 
-FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
-according to speedtest.net.
+Mark.
