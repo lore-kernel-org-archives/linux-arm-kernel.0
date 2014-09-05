@@ -1,111 +1,20 @@
-From: m-karicheri2@ti.com (Murali Karicheri)
-Date: Fri, 5 Sep 2014 16:30:12 -0400
-Subject: [PATCH v2] PCI: keystone: add a pci quirk to limit mrrs
-In-Reply-To: <20140905192329.GE8080@google.com>
-References: <1407527132-3294-1-git-send-email-m-karicheri2@ti.com>
- <20140905192329.GE8080@google.com>
-Message-ID: <540A1D54.9030103@ti.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 5 Sep 2014 22:36:21 +0200
+Subject: [GIT PULL] single Integrator patch for v3.18
+In-Reply-To: <CACRpkdaDH2pjD9q4U7n=E6irdGyN_xVjwBjOfxNO0MfWWK-tUA@mail.gmail.com>
+References: <CACRpkdaDH2pjD9q4U7n=E6irdGyN_xVjwBjOfxNO0MfWWK-tUA@mail.gmail.com>
+Message-ID: <201409052236.22004.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/05/2014 03:23 PM, Bjorn Helgaas wrote:
-> On Fri, Aug 08, 2014 at 03:45:32PM -0400, Murali Karicheri wrote:
->> Keystone PCI controller has a limitation that memory read request
->> size must not exceed 256 bytes. This is a hardware limitation and
->> add a quirk to force this limit on all downstream devices by
->> updating mrrs.
->>
->> Signed-off-by: Murali Karicheri<m-karicheri2@ti.com>
->> ---
->>   -v2: made the quirk happens after tuning
->>   -v1: changed printk to indicate PCI bdf
->>   This applies on top of the Keystone PCI controller patch series
->>   at http://thread.gmane.org/gmane.linux.kernel.pci/33523
->>   drivers/pci/host/pci-keystone.c |   40 +++++++++++++++++++++++++++++++++++++++
->>   1 file changed, 40 insertions(+)
->>
->> diff --git a/drivers/pci/host/pci-keystone.c b/drivers/pci/host/pci-keystone.c
->> index c1cfaef..a132622 100644
->> --- a/drivers/pci/host/pci-keystone.c
->> +++ b/drivers/pci/host/pci-keystone.c
->> @@ -42,8 +42,48 @@
->>   /* DEV_STAT_CTRL */
->>   #define PCIE_CAP_BASE		0x70
->>
->> +/* PCIE controller device IDs */
->> +#define PCIE_RC_K2HK		0xb008
->> +#define PCIE_RC_K2E		0xb009
->> +#define PCIE_RC_K2L		0xb00a
->
-> A Root Complex doesn't appear in config space as a PCI device, so I think
-> these are actually Root Port devices, aren't they?
+On Friday 05 September 2014, Linus Walleij wrote:
+> Hi ARM SoC folks,
+> 
+> here is a single IM-PD1 Integrator related patch for v3.18.
+> Please pull it in as a separate new feature.
+> 
 
-Yes.
 
->
-> I suppose the spec would allow Root Complex Integrated Endpoints, on which
-> MRRS could also be set, but I think your quirk ignores them because they
-> would appear on the root bus.  Is ignoring them OK, or would you want to
-> set MRRS for those as well?
+Pulled into next/soc, thanks!
 
-How does the Root Complex integrated endpoints are designed? Our PCI can 
-act as a RC or EP and not both at the same time. So I guess this is not 
-applicable.
-
->
->> +
->>   #define to_keystone_pcie(x)	container_of(x, struct keystone_pcie, pp)
->>
->> +static void quirk_limit_mrrs(struct pci_dev *dev)
->> +{
->> +	struct pci_bus *bus = dev->bus;
->> +	struct pci_dev *bridge = bus->self;
->> +
->> +	if (pci_is_root_bus(bus))
->> +		return;
->> +
->> +	/* look for the host bridge */
->> +	while (!pci_is_root_bus(bus)) {
->> +		bridge = bus->self;
->> +		bus = bus->parent;
->> +	}
->> +
->> +	if (bridge) {
->> +		u16 id;
->> +
->> +		/*
->> +		 * Keystone PCI controller has a h/w limitation of
->> +		 * 256 bytes maximum read request size. It can't handle
->> +		 * anything higher than this. So force this limit on
->> +		 * all downstream devices
->> +		 */
->> +		pci_read_config_word(bridge, PCI_DEVICE_ID,&id);
->
-> I think you should check the Vendor ID here as well.  Otherwise, there's a
-> possibility of applying this quirk to devices under a bridge with the same
-> Device ID but different Vendor ID.
->
-> And I think you should be able to use the bridge->vendor and bridge->device
-> fields instead of reading them from config space.  Actually, this might be
-> a good place to use pci_match_id().
-
-Ok.
-
->
->> +		if ((id == PCIE_RC_K2HK) || (id == PCIE_RC_K2E) ||
->> +		    (id == PCIE_RC_K2L)) {
->> +			if (pcie_get_readrq(dev)>  256) {
->> +				dev_info(&dev->dev, "limiting mrrs to 256\n");
->> +				pcie_set_readrq(dev, 256);
->> +			}
->> +		}
->> +	}
->> +}
->> +DECLARE_PCI_FIXUP_ENABLE(PCI_ANY_ID, PCI_ANY_ID, quirk_limit_mrrs);
->> +
->>   static int ks_pcie_establish_link(struct keystone_pcie *ks_pcie)
->>   {
->>   	struct pcie_port *pp =&ks_pcie->pp;
->> --
->> 1.7.9.5
->>
+	Arnd
