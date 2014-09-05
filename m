@@ -1,47 +1,19 @@
-From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
-Date: Fri, 05 Sep 2014 15:51:28 +0200
-Subject: [PATCH v6 5/5] ARM: EXYNOS: cpuidle: allow driver usage on Exynos4x12
- SoCs
-In-Reply-To: <1409925088-4705-1-git-send-email-b.zolnierkie@samsung.com>
-References: <1409925088-4705-1-git-send-email-b.zolnierkie@samsung.com>
-Message-ID: <1409925088-4705-6-git-send-email-b.zolnierkie@samsung.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Fri, 5 Sep 2014 10:58:34 -0300
+Subject: [PATCH] ARM: /proc/cpuinfo: Use DT machine name when possible
+In-Reply-To: <201409051552.05447@pali>
+References: <1403110464-29646-1-git-send-email-pali.rohar@gmail.com>
+ <201409051338.40988@pali> <20140905134542.GD20164@leverpostej>
+ <201409051552.05447@pali>
+Message-ID: <CAOMZO5BtUaYbQUhidgyPBFdARsFY=uYySYqXXmFEfPL8qTBbfQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Register cpuidle platform device on Exynos4x12 SoCs allowing EXYNOS
-cpuidle driver usage on these SoCs.
+On Fri, Sep 5, 2014 at 10:52 AM, Pali Roh?r <pali.rohar@gmail.com> wrote:
 
-AFTR mode reduces power consumption on Trats2 board (Exynos4412 SoC
-with secure firmware enabled) by ~12% when EXYNOS cpuidle driver is
-enabled (in both cases the default exynos_defconfig config is used
-and CPU1-3 are offlined).
+> So what is your suggestion for identifing board (name/type) which
+> will work with any kernel (and will not be broken again by kernel
+> later)?
 
-Currently Exynos4412 SoC support is limited to Trats2 board.
-
-Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
-Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
----
-v6:
-- limit Exynos4412 SoC support to Trats2 board for now
-
- arch/arm/mach-exynos/exynos.c | 5 ++++-
- 1 file changed, 4 insertions(+), 1 deletion(-)
-
-diff --git a/arch/arm/mach-exynos/exynos.c b/arch/arm/mach-exynos/exynos.c
-index 6a24e11..f5a78d7 100644
---- a/arch/arm/mach-exynos/exynos.c
-+++ b/arch/arm/mach-exynos/exynos.c
-@@ -317,7 +317,10 @@ static void __init exynos_dt_machine_init(void)
- 		exynos_sysram_init();
- 
- 	if (of_machine_is_compatible("samsung,exynos4210") ||
--			of_machine_is_compatible("samsung,exynos5250"))
-+	    of_machine_is_compatible("samsung,exynos4212") ||
-+	    (of_machine_is_compatible("samsung,exynos4412") &&
-+	     of_machine_is_compatible("samsung,trats2")) ||
-+	    of_machine_is_compatible("samsung,exynos5250"))
- 		platform_device_register(&exynos_cpuidle);
- 
- 	platform_device_register_simple("exynos-cpufreq", -1, NULL, 0);
--- 
-1.8.2.3
+$ cat /sys/bus/soc/devices/soc0/machine
+Freescale i.MX6 Quad SABRE Smart Device Board
