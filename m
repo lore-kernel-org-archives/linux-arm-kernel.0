@@ -1,23 +1,61 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 5 Sep 2014 10:47:47 +0100
-Subject: [PATCH 1/2] gpio: Add driver for AXM55xx SSP chip selects
-In-Reply-To: <1409576021-24828-2-git-send-email-anders.berg@avagotech.com>
-References: <1409576021-24828-1-git-send-email-anders.berg@avagotech.com>
- <1409576021-24828-2-git-send-email-anders.berg@avagotech.com>
-Message-ID: <20140905094747.GE30401@n2100.arm.linux.org.uk>
+From: wangyijing@huawei.com (Yijing Wang)
+Date: Fri, 5 Sep 2014 18:10:03 +0800
+Subject: [PATCH v1 18/21] IA64/MSI: Use MSI chip framework to configure
+ MSI/MSI-X irq
+In-Reply-To: <1409911806-10519-1-git-send-email-wangyijing@huawei.com>
+References: <1409911806-10519-1-git-send-email-wangyijing@huawei.com>
+Message-ID: <1409911806-10519-19-git-send-email-wangyijing@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 01, 2014 at 02:53:40PM +0200, Anders Berg wrote:
-> The AXM55xx device has a ARM PL022 SSP controller with an extension that
-> enables the control of up to five chip select signals. This driver implements
-> the logic to control these signals and exports them as GPIOs.
-> 
-> Signed-off-by: Anders Berg <anders.berg@avagotech.com>
+Use MSI chip framework instead of arch MSI functions to configure
+MSI/MSI-X irq. So we can manage MSI/MSI-X irq in a unified framework.
 
-So, what happens if the GPIO driver binds first, followed by the SSP
-device?  Please test that scenario out before this patch gets merged.
+Signed-off-by: Yijing Wang <wangyijing@huawei.com>
+---
+ arch/ia64/kernel/msi_ia64.c |   18 ++++++++++++++----
+ 1 files changed, 14 insertions(+), 4 deletions(-)
 
+diff --git a/arch/ia64/kernel/msi_ia64.c b/arch/ia64/kernel/msi_ia64.c
+index 4efe748..55ac859 100644
+--- a/arch/ia64/kernel/msi_ia64.c
++++ b/arch/ia64/kernel/msi_ia64.c
+@@ -112,15 +112,15 @@ static struct irq_chip ia64_msi_chip = {
+ };
+ 
+ 
+-int arch_setup_msi_irq(struct pci_dev *pdev, struct msi_desc *desc)
++static int arch_ia64_setup_msi_irq(struct pci_dev *dev, struct msi_desc *desc)
+ {
+ 	if (platform_setup_msi_irq)
+-		return platform_setup_msi_irq(pdev, desc);
++		return platform_setup_msi_irq(dev, desc);
+ 
+-	return ia64_setup_msi_irq(pdev, desc);
++	return ia64_setup_msi_irq(dev, desc);
+ }
+ 
+-void arch_teardown_msi_irq(unsigned int irq)
++static void arch_ia64_teardown_msi_irq(unsigned int irq)
+ {
+ 	if (platform_teardown_msi_irq)
+ 		return platform_teardown_msi_irq(irq);
+@@ -128,6 +128,16 @@ void arch_teardown_msi_irq(unsigned int irq)
+ 	return ia64_teardown_msi_irq(irq);
+ }
+ 
++static struct msi_chip chip = {
++	.setup_irq = arch_ia64_setup_msi_irq,
++	.teardown_irq = arch_ia64_teardown_msi_irq,
++};
++
++struct msi_chip *arch_find_msi_chip(struct pci_dev *dev)
++{
++	return &chip;
++}
++
+ #ifdef CONFIG_INTEL_IOMMU
+ #ifdef CONFIG_SMP
+ static int dmar_msi_set_affinity(struct irq_data *data,
 -- 
-FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
-according to speedtest.net.
+1.7.1
