@@ -1,36 +1,25 @@
-From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Fri, 05 Sep 2014 10:41:33 +0100
-Subject: [PATCH FYI 2/4] ARM: remove unused do_unexp_fiq() function
-In-Reply-To: <20140905094056.GD30401@n2100.arm.linux.org.uk>
-References: <20140905094056.GD30401@n2100.arm.linux.org.uk>
-Message-ID: <E1XPq1N-0000RK-Cn@rmk-PC.arm.linux.org.uk>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Fri, 5 Sep 2014 15:13:39 +0530
+Subject: [PATCH v2] ARM: spear: Remove references to PLAT_SPEAR_SINGLE
+In-Reply-To: <1409909940.5546.154.camel@x220>
+References: <1392153676.14317.8.camel@x220> <1397550407.1985.12.camel@x220>
+ <534CFB45.9070704@st.com> <1402919387.30599.4.camel@x220>
+ <1409909229.5546.146.camel@x220> <1409909940.5546.154.camel@x220>
+Message-ID: <CAOh2x=koqY0SyOuP+Xk7Zd3Ue_7HPFAxUn+V3M4ehgCv-8i02A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-do_unexp_fiq() has never been called by any code in the last 10 years,
-it's about time it was removed!
+On Fri, Sep 5, 2014 at 3:09 PM, Paul Bolle <pebolle@tiscali.nl> wrote:
+>> Ditto for v3.17-rc3 and next-20140904. Could someone please pix this up?
 
-Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
----
- arch/arm/kernel/traps.c | 6 ------
- 1 file changed, 6 deletions(-)
+You need to send it to arm at kernel.org..
 
-diff --git a/arch/arm/kernel/traps.c b/arch/arm/kernel/traps.c
-index c8e4bb714944..a447dcc4d2f7 100644
---- a/arch/arm/kernel/traps.c
-+++ b/arch/arm/kernel/traps.c
-@@ -460,12 +460,6 @@ asmlinkage void __exception do_undefinstr(struct pt_regs *regs)
- 	arm_notify_die("Oops - undefined instruction", regs, &info, 0, 6);
- }
- 
--asmlinkage void do_unexp_fiq (struct pt_regs *regs)
--{
--	printk("Hmm.  Unexpected FIQ received, but trying to continue\n");
--	printk("You may have a hardware problem...\n");
--}
--
- /*
-  * bad_mode handles the impossible case in the vectors.  If you see one of
-  * these, then it's extremely serious, and could mean you have buggy hardware.
--- 
-1.8.3.1
+> And now Rajeev's address bounces. Has Rajeev left ST?
+
+Yeah both Shiraz/Rajeev and myself have left ST :)
+
+You can add
+Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
+
+--
+viresh
