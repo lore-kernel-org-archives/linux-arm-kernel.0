@@ -1,88 +1,23 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Fri, 05 Sep 2014 14:28:04 +0200
-Subject: [PATCH v5 0/5] ARM: EXYNOS: cpuidle: fix AFTR mode on boards with
- secure firmware enabled
-In-Reply-To: <53E0F338.8080006@linaro.org>
-References: <1407245666-20016-1-git-send-email-b.zolnierkie@samsung.com>
- <53E0E420.8060207@linaro.org> <53E0E98F.5020706@samsung.com>
- <53E0F338.8080006@linaro.org>
-Message-ID: <1409920084.2811.4.camel@AMDC1943>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 05 Sep 2014 14:28:45 +0200
+Subject: [PATCH 11/19] ARM: S5PV210: Remove support for board files
+In-Reply-To: <1409918658.7832.25.camel@x220>
+References: <1404496099-26708-1-git-send-email-t.figa@samsung.com>
+ <201409041802.36466.arnd@arndb.de> <1409918658.7832.25.camel@x220>
+Message-ID: <16177201.Mk3a7oJAud@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On wto, 2014-08-05 at 17:07 +0200, Daniel Lezcano wrote:
-> On 08/05/2014 04:26 PM, Krzysztof Kozlowski wrote:
-> > On 05.08.2014 16:03, Daniel Lezcano wrote:
-> >> On 08/05/2014 03:34 PM, Bartlomiej Zolnierkiewicz wrote:
-> >>> Hi,
-> >>>
-> >>> This patch series adds support for AFTR idle mode on boards with
-> >>> secure firmware enabled and allows EXYNOS cpuidle driver usage on
-> >>> Exynos4x12 SoCs.
-> >>>
-> >>> It has been tested on Trats2 board (using Exynos4412 SoC with secure
-> >>> firmware enabled) on which AFTR mode reduces power consumption by ~12%
-> >>> when EXYNOS cpuidle driver is enabled (in both cases the default
-> >>> exynos_defconfig config is used and CPU1-3 are offlined).
-> >>
-> >> As a sidenote:
-> >>
-> >> On my odroid-U2:
-> >>   * 4 cpus online -> 130 mA
-> >>   * 3 cpus online -> 164 mA
-> >>   * 2 cpus online -> 160 mA
-> >>   * 1 cpu online  -> 157 mA
-> >>
-> >> So were are consuming more when there are unplugged cpu ... any ideas ?
-> >
-> > On which tree are you testing? Current next has ARMCLK down feature
-> > enabled. ARMCLK down may stop working after hotunplugging CPU:
-> > http://www.spinics.net/lists/arm-kernel/msg352890.html
-> >
-> > That was observed especially on Exynos4212 where ARMCLK down stops
-> > working permanently. On Trats2 (Exynos4412) the clock down stopped only
-> > a for short period after disabling CPU.
+On Friday 05 September 2014 14:04:18 Paul Bolle wrote:
 > 
-> Hi Krzysztof,
+> On Thu, 2014-09-04 at 18:02 +0200, Arnd Bergmann wrote:
+> > I think it would be nice if you could submit a patch to remove the
+> > drivers from ASoC, then we can see if anybody complains.
 > 
-> I tested the patches you mentioned above on top of this patchset.
-> 
-> You are right this is directly related to the ARMCLK but the behavior 
-> may be not as you expect I think.
-> 
-> When I boot:
-> 
-> 4 cpus online => 131 mA
-> 
-> Then I unplug one by one the cpus:
-> 
-> 3 cpus online => 127 mA
-> 2 cpus online => 123 mA
-> 1 cpu online  => 120 mA
-> 
-> This is consistent.
-> 
-> But now, I online the cpus:
-> 
-> 2 cpus online => 162 mA
-> 3 cpus online => 165 mA
-> 4 cpus online => 131 mA
-> 
-> 
-> -- side note --
-> 
-> Please note, I did not disable the cpuidle neither the AFTR state and 
-> the kernel did not hang but I don't see the noticeable power saving we 
-> should be observing when there is one cpu remaining entering the AFTR 
-> state (cpuidle stats show we enter AFTR). So there is definitively 
-> something wrong with this state.
+> Just to know what I'm getting my self into: whom would you expect to
+> send me agitated messages once those patches have landed?
 
-Strange things happen... on current next-20140904 I couldn't reproduce
-this inconsistent energy consumption after hotplug. At least on Trats2
-(Exynos4412) and Gear1 (Exynos4212) it behaves consistently (and
-properly with my patches).
+That would be somebody who is using their own patches on top of
+mainline and didn't notice that upstream broke under them ;-)
 
-Anyway I'll respin the patchset.
-
-Best regards,
-Krzysztof
+	Arnd
