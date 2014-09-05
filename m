@@ -1,89 +1,63 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Fri,  5 Sep 2014 11:34:23 -0300
-Subject: [PATCH] ARM: imx_v4_v5_defconfig: Select CONFIG_IMX_WEIM
-Message-ID: <1409927663-8871-1-git-send-email-festevam@gmail.com>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Fri, 05 Sep 2014 15:37:18 +0100
+Subject: [RFC PATCH 1/1] drivers: introduce ARM SBSA generic UART driver
+In-Reply-To: <CAL_JsqKGbSd5BymnFhT8KBjbBCPO8wsrHhG9Qn20c7mrrxTDDA@mail.gmail.com>
+References: <1409328803-1953-1-git-send-email-andre.przywara@arm.com>
+ <540596A6.8000608@arm.com>
+ <CAL_Jsq+Rs5MXC7s7EeWAEAPxxqaShAVGt=cdQxud5Us+-Zp6jw@mail.gmail.com>
+ <3749748.k4a1nSHDdj@wuerfel>
+ <CAL_JsqKGbSd5BymnFhT8KBjbBCPO8wsrHhG9Qn20c7mrrxTDDA@mail.gmail.com>
+Message-ID: <5409CA9E.2060807@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fabio Estevam <fabio.estevam@freescale.com>
+Hi Rob,
 
-The imx weim driver is used by some mx27/mx1 boards, so let's enable it by
-default.
+On 02/09/14 18:38, Rob Herring wrote:
+> On Tue, Sep 2, 2014 at 8:48 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+>> On Tuesday 02 September 2014 08:20:53 Rob Herring wrote:
+>>>>>
+>>>>> This alone is not okay. There is no such implementation of hardware.
+>>>>
+>>>> But the SBSA explicitly allows this. I don't know of any vendor who just
+>>>> implements the subset, but I've been told that this has been asked for.
+>>>
+>>> To use baudrate as an example, that must be configurable somehow
+>>> either with pl011 registers or in a vendor specific way. I suppose you
+>>> could do an actual implementation with all those things hardcoded in
+>>> the design, but that seems unlikely.
+>>
+>> Why does the baudrate need to be configurable? I think it's completely
+>> reasonable to specify a console port that has a fixed (as in the
+>> OS must not care) rate, and that can be implemented either as a UART
+>> with a programmable rate or as a set of registers that directly talks
+>> to a remote system management device over whatever hardware protocol
+>> they choose.
+> 
+> Sure. It is also completely reasonable that baudrate is configurable
+> and vendors can implement it however they choose since the SBSA does
+> not specify it.
 
-Generated this patch by doing:
+But this would be a different driver for a different hardware then and
+not covered by the SBSA version - so to some degree not our problem ;-)
+I don't see how we could really cover this problem for every possibly
+upcoming implementation.
 
-- make imx_v4_v5_defconfig
-- make menuconfig and manually select CONFIG_IMX_WEIM
-- make savedefconfig
-- cp defconfig arch/arm/configs/imx_v4_v5_defconfig
+If I got the spec correctly, then exposing the baudrate setting for SBSA
+hardware is not meaningful in the sense of the spec.
+If you want to go with a configurable UART complying to the spec, you'd
+probably use a full featured PL011.
 
-,which results in some additional cleanups.
+> IIRC, the enabling and disabling bits are not
+> specified either.
 
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
- arch/arm/configs/imx_v4_v5_defconfig | 11 ++---------
- 1 file changed, 2 insertions(+), 9 deletions(-)
+Correct, also the FIFO is always on and the word format is fixed to 8n1.
 
-diff --git a/arch/arm/configs/imx_v4_v5_defconfig b/arch/arm/configs/imx_v4_v5_defconfig
-index a3fb866..e688741 100644
---- a/arch/arm/configs/imx_v4_v5_defconfig
-+++ b/arch/arm/configs/imx_v4_v5_defconfig
-@@ -21,7 +21,6 @@ CONFIG_ARCH_MULTI_V4T=y
- CONFIG_ARCH_MULTI_V5=y
- # CONFIG_ARCH_MULTI_V7 is not set
- CONFIG_ARCH_MXC=y
--CONFIG_MXC_IRQ_PRIOR=y
- CONFIG_MACH_SCB9328=y
- CONFIG_MACH_APF9328=y
- CONFIG_MACH_MX21ADS=y
-@@ -38,8 +37,6 @@ CONFIG_PREEMPT=y
- CONFIG_AEABI=y
- CONFIG_ZBOOT_ROM_TEXT=0x0
- CONFIG_ZBOOT_ROM_BSS=0x0
--CONFIG_FPE_NWFPE=y
--CONFIG_FPE_NWFPE_XP=y
- CONFIG_PM_DEBUG=y
- CONFIG_NET=y
- CONFIG_PACKET=y
-@@ -58,6 +55,7 @@ CONFIG_NETFILTER=y
- CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
- CONFIG_DEVTMPFS=y
- CONFIG_DEVTMPFS_MOUNT=y
-+CONFIG_IMX_WEIM=y
- CONFIG_MTD=y
- CONFIG_MTD_CMDLINE_PARTS=y
- CONFIG_MTD_BLOCK=y
-@@ -73,8 +71,8 @@ CONFIG_MTD_NAND_MXC=y
- CONFIG_MTD_UBI=y
- CONFIG_EEPROM_AT24=y
- CONFIG_EEPROM_AT25=y
--CONFIG_ATA=y
- CONFIG_BLK_DEV_SD=y
-+CONFIG_ATA=y
- CONFIG_PATA_IMX=y
- CONFIG_NETDEVICES=y
- CONFIG_CS89x0=y
-@@ -97,10 +95,8 @@ CONFIG_SERIAL_8250=m
- CONFIG_SERIAL_IMX=y
- CONFIG_SERIAL_IMX_CONSOLE=y
- # CONFIG_HW_RANDOM is not set
--CONFIG_I2C=y
- CONFIG_I2C_CHARDEV=y
- CONFIG_I2C_IMX=y
--CONFIG_SPI=y
- CONFIG_SPI_IMX=y
- CONFIG_SPI_SPIDEV=y
- CONFIG_GPIO_SYSFS=y
-@@ -127,10 +123,7 @@ CONFIG_VIDEO_CODA=y
- CONFIG_SOC_CAMERA_OV2640=y
- CONFIG_FB=y
- CONFIG_FB_IMX=y
--CONFIG_BACKLIGHT_LCD_SUPPORT=y
--CONFIG_LCD_CLASS_DEVICE=y
- CONFIG_LCD_L4F00242T03=y
--CONFIG_BACKLIGHT_CLASS_DEVICE=y
- CONFIG_FRAMEBUFFER_CONSOLE=y
- CONFIG_LOGO=y
- CONFIG_SOUND=y
--- 
-1.9.1
+Regards,
+Andre.
+
+> 
+> Not having configurability is simply one variation on possible implementations.
+> 
+> Rob
+> 
