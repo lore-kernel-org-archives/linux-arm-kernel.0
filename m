@@ -1,72 +1,90 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 5 Sep 2014 18:40:49 +0100
-Subject: [PATCH FYI 3/4] ARM: add basic support for on-demand backtrace
- of other CPUs
-In-Reply-To: <5409C925.8020409@linaro.org>
-References: <20140905094056.GD30401@n2100.arm.linux.org.uk>
- <E1XPq1S-0000RP-FR@rmk-PC.arm.linux.org.uk> <5409C925.8020409@linaro.org>
-Message-ID: <20140905174049.GJ30401@n2100.arm.linux.org.uk>
+From: bhelgaas@google.com (Bjorn Helgaas)
+Date: Fri, 5 Sep 2014 11:41:22 -0600
+Subject: [PATCH] PCI: mvebu: Fix uninitialized variable in
+ mvebu_get_tgt_attr()
+In-Reply-To: <1407512045-26969-1-git-send-email-geert+renesas@glider.be>
+References: <1407512045-26969-1-git-send-email-geert+renesas@glider.be>
+Message-ID: <20140905174122.GD8080@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 05, 2014 at 03:31:01PM +0100, Daniel Thompson wrote:
-> On 05/09/14 10:41, Russell King wrote:
-> > diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
-> > index 9388a3d479e1..94959f977b82 100644
-> > --- a/arch/arm/kernel/smp.c
-> > +++ b/arch/arm/kernel/smp.c
-> > @@ -72,8 +72,12 @@ enum ipi_msg_type {
-> >  	IPI_CPU_STOP,
-> >  	IPI_IRQ_WORK,
-> >  	IPI_COMPLETION,
-> > +	IPI_CPU_BACKTRACE,
+On Fri, Aug 08, 2014 at 05:34:05PM +0200, Geert Uytterhoeven wrote:
+> drivers/pci/host/pci-mvebu.c: In function 'mvebu_get_tgt_attr':
+> drivers/pci/host/pci-mvebu.c:887:39: warning: 'rtype' may be used uninitialized in this function [-Wmaybe-uninitialized]
+>    if (slot == PCI_SLOT(devfn) && type == rtype) {
+>                                        ^
 > 
-> I'd prefer this to use a more generic name to allow the IPI to be used
-> for debug/profiling purposes.
-
-However, for profiling purposes, you want the profiling code to have
-as smaller impact as possible, so you wouldn't want to call lots of
-unnecessary functions based on:
-
-> The backtrace_mask bitmap already makes it safe to call
-> ipi_cpu_backtrace() without any additional demux.
-
-The reason is quite simple - if you spend longer in the profiling code,
-you perturb the timings of the code being profiled more, which can
-change the profiled code's behaviour.  Take a look at things like the
-network receive softirq (or any softirq) where there's a limited amount
-of work which is done on the tail-end of a normal interrupt, before
-bouncing it across to ksoftirqd.
-
-Let's say you're chasing a performance problem with networking, trying
-to work out what's going on, but running perf causes the performance
-problem to vanish, because the timings have changed soo much that the
-softirq stays scheduled on ksoftirqd.  What do you do then?
-
-We should always aim for profiling and debugging to hasve as low
-overhead as is possible.
-
-> >  };
-> >  
-> > +/* For reliability, we're prepared to waste bits here. */
-> > +static DECLARE_BITMAP(backtrace_mask, NR_CPUS) __read_mostly;
-> > +
+> If there's ever gonna be a configuration space or 64-bit memory space
+> entry in DT, rtype will be uninitialized, and the wrong entry may be
+> returned.
 > 
-> Both checkpatch and the comments in linux/thread.h imply using
-> CONFIG_NR_CPUS is better here.
-
-This comes from x86 code.  I don't wish to introduce an additional delta
-between x86 and ARM, especially as we should look towards moving the x86
-version out of arch/x86 into a generic location.
-
-> How about some indication showing degree of platform support currently
-> available?
+> Initialize rtype to 0 (which is an unused IORESOURCE_* type) to fix this.
 > 
-> printk(KERN_WARNING "%s backtrace for cpu %d\n",
->        in_nmi() ? "FIQ" : "Non-FIQ", cpu);
+> Introduced in commit 11be65472a427dcf7a11ab6e3e3628f1c6768b5b ("PCI:
+> mvebu: Adapt to the new device tree layout").
+> 
+> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> ---
+> Alternatively, should the "else if (DT_FLAGS_TO_TYPE(flags) ==
+> DT_TYPE_MEM32)" just be changed to "else", assuming there can never be
+> other entries than for I/O or 32-bit memory space?
+> ---
+>  drivers/pci/host/pci-mvebu.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/drivers/pci/host/pci-mvebu.c b/drivers/pci/host/pci-mvebu.c
+> index ce23e0f076b6..9515f0d13fd4 100644
+> --- a/drivers/pci/host/pci-mvebu.c
+> +++ b/drivers/pci/host/pci-mvebu.c
+> @@ -877,7 +877,7 @@ static int mvebu_get_tgt_attr(struct device_node *np, int devfn,
+>  		u32 flags = of_read_number(range, 1);
+>  		u32 slot = of_read_number(range + 1, 1);
+>  		u64 cpuaddr = of_read_number(range + na, pna);
+> -		unsigned long rtype;
+> +		unsigned long rtype = 0;
+>  
+>  		if (DT_FLAGS_TO_TYPE(flags) == DT_TYPE_IO)
+>  			rtype = IORESOURCE_IO;
+> -- 
+> 1.9.1
+> 
 
-We could do that.
+This fix looks right to me.  I added a stable tag as follows.  Thomas
+and/or Jason, and you ack this?
 
--- 
-FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
-according to speedtest.net.
+
+commit f96f4040d0d01b6eeacda212cf7db105d06a55ba
+Author: Geert Uytterhoeven <geert+renesas@glider.be>
+Date:   Fri Aug 8 17:34:05 2014 +0200
+
+    PCI: mvebu: Fix uninitialized "rtype" in mvebu_get_tgt_attr()
+    
+    drivers/pci/host/pci-mvebu.c: In function 'mvebu_get_tgt_attr':
+    drivers/pci/host/pci-mvebu.c:887:39: warning: 'rtype' may be used uninitialized in this function [-Wmaybe-uninitialized]
+       if (slot == PCI_SLOT(devfn) && type == rtype) {
+                                           ^
+    
+    If there's ever a DT entry other than DT_TYPE_IO or DT_TYPE_MEM32,
+    e.g., a configuration space or 64-bit memory space entry, rtype will
+    be uninitialized, and the wrong entry may be returned.
+    
+    Initialize rtype to 0 (which is an unused IORESOURCE_* type) to fix this.
+    
+    Fixes: 11be65472a42 ("PCI: mvebu: Adapt to the new device tree layout")
+    Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+    Signed-off-by: Bjorn Helgaas <bhelgaas@google.com>
+    CC: stable at vger.kernel.org	# v3.12+
+
+diff --git a/drivers/pci/host/pci-mvebu.c b/drivers/pci/host/pci-mvebu.c
+index a8c6f1a92e0f..081579c0971e 100644
+--- a/drivers/pci/host/pci-mvebu.c
++++ b/drivers/pci/host/pci-mvebu.c
+@@ -877,7 +877,7 @@ static int mvebu_get_tgt_attr(struct device_node *np, int devfn,
+ 		u32 flags = of_read_number(range, 1);
+ 		u32 slot = of_read_number(range + 1, 1);
+ 		u64 cpuaddr = of_read_number(range + na, pna);
+-		unsigned long rtype;
++		unsigned long rtype = 0;
+ 
+ 		if (DT_FLAGS_TO_TYPE(flags) == DT_TYPE_IO)
+ 			rtype = IORESOURCE_IO;
