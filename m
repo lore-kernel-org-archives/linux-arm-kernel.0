@@ -1,72 +1,135 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Fri, 5 Sep 2014 08:27:58 -0700
-Subject: [PATCH 3/4] watchdog: st_wdt: Provide binding documentation for
- ST's LPC Watchdog driver
-In-Reply-To: <1409841592-18890-5-git-send-email-lee.jones@linaro.org>
-References: <1409841592-18890-1-git-send-email-lee.jones@linaro.org>
- <1409841592-18890-5-git-send-email-lee.jones@linaro.org>
-Message-ID: <20140905152758.GA10670@roeck-us.net>
+From: daniel.thompson@linaro.org (Daniel Thompson)
+Date: Fri,  5 Sep 2014 16:33:15 +0100
+Subject: [PATCH v2 2/5] ARM: add basic support for on-demand backtrace of
+ other CPUs
+In-Reply-To: <1409931198-22600-1-git-send-email-daniel.thompson@linaro.org>
+References: <1409846620-14542-1-git-send-email-daniel.thompson@linaro.org>
+ <1409931198-22600-1-git-send-email-daniel.thompson@linaro.org>
+Message-ID: <1409931198-22600-3-git-send-email-daniel.thompson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 04, 2014 at 03:39:51PM +0100, Lee Jones wrote:
-> Signed-off-by: David Paris <david.paris@st.com>
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+From: Russell King <rmk+kernel@arm.linux.org.uk>
 
-You might want to copy the devicetree mailing list for bindings approval.
+Add basic infrastructure for triggering a backtrace of other CPUs
+via an IPI, preferably at FIQ level.  It is intended that this shall
+be used for cases where we have detected that something has already
+failed in the kernel.
 
-> ---
->  .../devicetree/bindings/watchdog/st-lpc-wdt.txt    | 27 ++++++++++++++++++++++
->  1 file changed, 27 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/watchdog/st-lpc-wdt.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/watchdog/st-lpc-wdt.txt b/Documentation/devicetree/bindings/watchdog/st-lpc-wdt.txt
-> new file mode 100644
-> index 0000000..f0e57ba
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/watchdog/st-lpc-wdt.txt
-> @@ -0,0 +1,27 @@
-> +STMicroelectronics LPC Watchdog
-> +===============================
-> +
-> +Required properties
-> +
-> +- compatible 	: "st,<soc>-watchdog"
+Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+---
+ arch/arm/include/asm/irq.h |  5 ++++
+ arch/arm/kernel/smp.c      | 62 ++++++++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 67 insertions(+)
 
-Is this acceptable ? I thought the supported bindings have to be listed
-explicitly.
-
-> +- reg		: LPC registers base address + range
-> +- reg-names	: Register map "base" and "syscfg-en" are compulsory "type" is
-
-'.' after compulsory ?
-
-> +		  platform dependent and not required for the STiH407.
-> +- clock-names 	: Should be "lpc_wdt"
-> +- clocks	: Clock used by LPC device
-> +- timeout-sec	: Qatchdog timeout in seconds
-
-Watchdog
-
-> +- st,syscfg	: Syscfg node used to configure cpu reset type and mask
-> +- st,warm_reset	: If present, reset type will be 'warm'. If not, it will be cold
-
-s/cold/cold./ ?
-
-> +
-> +Example:
-> +	watchdog at fde05000 {
-> +		compatible	= "st,stih416-lpc-watchdog";
-> +		reg		= <0xfde05000 0x1000> <0x204 0x4>;
-> +		reg-names	= "base", "syscfg-en"
-> +		clock-names	= "lpc_wdt";
-> +		clocks 		= <&clk_s_d3_flexgen CLK_LPC_0>;
-> +		timeout-sec	= <600>;
-> +		st,syscfg	= <&syscfg_core>;
-> +		st,warm_reset;
-> +	};
-> +
-
-Empty line at the end results in a whitespace error when applying.
-
-Guenter
+diff --git a/arch/arm/include/asm/irq.h b/arch/arm/include/asm/irq.h
+index 53c15de..be1d07d 100644
+--- a/arch/arm/include/asm/irq.h
++++ b/arch/arm/include/asm/irq.h
+@@ -35,6 +35,11 @@ extern void (*handle_arch_irq)(struct pt_regs *);
+ extern void set_handle_irq(void (*handle_irq)(struct pt_regs *));
+ #endif
+ 
++#ifdef CONFIG_SMP
++extern void arch_trigger_all_cpu_backtrace(bool);
++#define arch_trigger_all_cpu_backtrace(x) arch_trigger_all_cpu_backtrace(x)
++#endif
++
+ #endif
+ 
+ #endif
+diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
+index 9388a3d..94959f9 100644
+--- a/arch/arm/kernel/smp.c
++++ b/arch/arm/kernel/smp.c
+@@ -72,8 +72,12 @@ enum ipi_msg_type {
+ 	IPI_CPU_STOP,
+ 	IPI_IRQ_WORK,
+ 	IPI_COMPLETION,
++	IPI_CPU_BACKTRACE,
+ };
+ 
++/* For reliability, we're prepared to waste bits here. */
++static DECLARE_BITMAP(backtrace_mask, NR_CPUS) __read_mostly;
++
+ static DECLARE_COMPLETION(cpu_running);
+ 
+ static struct smp_operations smp_ops;
+@@ -539,6 +543,21 @@ static void ipi_cpu_stop(unsigned int cpu)
+ 		cpu_relax();
+ }
+ 
++static void ipi_cpu_backtrace(struct pt_regs *regs)
++{
++	int cpu = smp_processor_id();
++
++	if (cpumask_test_cpu(cpu, to_cpumask(backtrace_mask))) {
++		static arch_spinlock_t lock = __ARCH_SPIN_LOCK_UNLOCKED;
++
++		arch_spin_lock(&lock);
++		printk(KERN_WARNING "FIQ backtrace for cpu %d\n", cpu);
++		show_regs(regs);
++		arch_spin_unlock(&lock);
++		cpumask_clear_cpu(cpu, to_cpumask(backtrace_mask));
++	}
++}
++
+ static DEFINE_PER_CPU(struct completion *, cpu_completion);
+ 
+ int register_ipi_completion(struct completion *completion, int cpu)
+@@ -618,6 +637,12 @@ void handle_IPI(int ipinr, struct pt_regs *regs)
+ 		irq_exit();
+ 		break;
+ 
++	case IPI_CPU_BACKTRACE:
++		irq_enter();
++		ipi_cpu_backtrace(regs);
++		irq_exit();
++		break;
++
+ 	default:
+ 		printk(KERN_CRIT "CPU%u: Unknown IPI message 0x%x\n",
+ 		       cpu, ipinr);
+@@ -712,3 +737,40 @@ static int __init register_cpufreq_notifier(void)
+ core_initcall(register_cpufreq_notifier);
+ 
+ #endif
++
++void arch_trigger_all_cpu_backtrace(bool include_self)
++{
++	static unsigned long backtrace_flag;
++	int i, cpu = get_cpu();
++
++	if (test_and_set_bit(0, &backtrace_flag)) {
++		/*
++		 * If there is already a trigger_all_cpu_backtrace() in progress
++		 * (backtrace_flag == 1), don't output double cpu dump infos.
++		 */
++		put_cpu();
++		return;
++	}
++
++	cpumask_copy(to_cpumask(backtrace_mask), cpu_online_mask);
++	if (!include_self)
++		cpumask_clear_cpu(cpu, to_cpumask(backtrace_mask));
++
++	if (!cpumask_empty(to_cpumask(backtrace_mask))) {
++		pr_info("Sending FIQ to %s CPUs:\n",
++			(include_self ? "all" : "other"));
++		smp_cross_call(to_cpumask(backtrace_mask), IPI_CPU_BACKTRACE);
++	}
++
++	/* Wait for up to 10 seconds for all CPUs to do the backtrace */
++	for (i = 0; i < 10 * 1000; i++) {
++		if (cpumask_empty(to_cpumask(backtrace_mask)))
++			break;
++
++		mdelay(1);
++	}
++
++	clear_bit(0, &backtrace_flag);
++	smp_mb__after_atomic();
++	put_cpu();
++}
+-- 
+1.9.3
