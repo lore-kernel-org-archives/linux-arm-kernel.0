@@ -1,148 +1,151 @@
-From: daniel.thompson@linaro.org (Daniel Thompson)
-Date: Fri, 05 Sep 2014 16:15:36 +0100
-Subject: [PATCH FYI 3/4] ARM: add basic support for on-demand backtrace
- of other CPUs
-In-Reply-To: <E1XPq1S-0000RP-FR@rmk-PC.arm.linux.org.uk>
-References: <20140905094056.GD30401@n2100.arm.linux.org.uk>
- <E1XPq1S-0000RP-FR@rmk-PC.arm.linux.org.uk>
-Message-ID: <5409D398.5000705@linaro.org>
+From: galak@codeaurora.org (Kumar Gala)
+Date: Fri, 5 Sep 2014 10:20:18 -0500
+Subject: [PATCH v3] ARM: dts: qcom: Add initial IFC6540 board device tree
+In-Reply-To: <5409C803.8060007@suse.de>
+References: <1409763031-16873-1-git-send-email-gdjakov@mm-sol.com>
+ <5409C803.8060007@suse.de>
+Message-ID: <070D3E01-139E-4EC2-928F-31B8CA5E1BD7@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/09/14 10:41, Russell King wrote:
-> Add basic infrastructure for triggering a backtrace of other CPUs
-> via an IPI, preferably at FIQ level.  It is intended that this shall
-> be used for cases where we have detected that something has already
-> failed in the kernel.
+
+On Sep 5, 2014, at 9:26 AM, Andreas F?rber <afaerber@suse.de> wrote:
+
+> Hi,
 > 
-> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> ---
->  arch/arm/include/asm/irq.h |  5 ++++
->  arch/arm/kernel/smp.c      | 62 ++++++++++++++++++++++++++++++++++++++++++++++
->  2 files changed, 67 insertions(+)
+> Am 03.09.2014 18:50, schrieb Georgi Djakov:
+>> Add basic support for the IFC6540 single-board computer boards, that are
+>> based on the APQ8084 SoC. This patch adds the initial device tree and the
+>> neccessary nodes required for enabling the serial port and eMMC.
+>> 
+>> Signed-off-by: Georgi Djakov <gdjakov@mm-sol.com>
+>> ---
+>> Changes since v2:
+>> - Squashed all patches into one. (suggested by Kumar Gala)
+>> 
+>> Changes since v1:
+>> - This time add linux-arm-msm list to the CC.
+>> - Include a third patch for enabling the eMMC.
+>> 
+>> arch/arm/boot/dts/Makefile                 |    1 +
+>> arch/arm/boot/dts/qcom-apq8084-ifc6540.dts |   23 +++++++++++++++++++++++
+>> arch/arm/boot/dts/qcom-apq8084.dtsi        |   23 +++++++++++++++++++++++
+>> 3 files changed, 47 insertions(+)
+>> create mode 100644 arch/arm/boot/dts/qcom-apq8084-ifc6540.dts
+>> 
+>> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+>> index b022972..df8453a 100644
+>> --- a/arch/arm/boot/dts/Makefile
+>> +++ b/arch/arm/boot/dts/Makefile
+>> @@ -345,6 +345,7 @@ dtb-$(CONFIG_ARCH_PRIMA2) += prima2-evb.dtb
+>> dtb-$(CONFIG_ARCH_QCOM) += \
+>> 	qcom-apq8064-ifc6410.dtb \
+>> 	qcom-apq8074-dragonboard.dtb \
+>> +	qcom-apq8084-ifc6540.dtb \
+>> 	qcom-apq8084-mtp.dtb \
+>> 	qcom-msm8660-surf.dtb \
+>> 	qcom-msm8960-cdp.dtb
+>> diff --git a/arch/arm/boot/dts/qcom-apq8084-ifc6540.dts b/arch/arm/boot/dts/qcom-apq8084-ifc6540.dts
+>> new file mode 100644
+>> index 0000000..c9ff108
+>> --- /dev/null
+>> +++ b/arch/arm/boot/dts/qcom-apq8084-ifc6540.dts
+>> @@ -0,0 +1,23 @@
+>> +#include "qcom-apq8084.dtsi"
+>> +
+>> +/ {
+>> +	model = "Qualcomm APQ8084/IFC6540";
+>> +	compatible = "qcom,apq8084-ifc6540", "qcom,apq8084";
+>> +
+>> +	soc {
+>> +		serial at f995e000 {
+>> +			status = "okay";
+>> +		};
+>> +
+>> +		sdhci at f9824900 {
+>> +			bus-width = <8>;
+>> +			non-removable;
+>> +			status = "okay";
+>> +		};
+>> +
+>> +		sdhci at f98a4900 {
+>> +			cd-gpios = <&tlmm 122 GPIO_ACTIVE_LOW>;
+>> +			bus-width = <4>;
+>> +		};
+>> +	};
+>> +};
+>> diff --git a/arch/arm/boot/dts/qcom-apq8084.dtsi b/arch/arm/boot/dts/qcom-apq8084.dtsi
+>> index 21d01e5..1f130bc 100644
+>> --- a/arch/arm/boot/dts/qcom-apq8084.dtsi
+>> +++ b/arch/arm/boot/dts/qcom-apq8084.dtsi
+>> @@ -3,6 +3,7 @@
+>> #include "skeleton.dtsi"
+>> 
+>> #include <dt-bindings/clock/qcom,gcc-apq8084.h>
+>> +#include <dt-bindings/gpio/gpio.h>
+>> 
+>> / {
+>> 	model = "Qualcomm APQ 8084";
+>> @@ -203,5 +204,27 @@
+>> 			clock-names = "core", "iface";
+>> 			status = "disabled";
+>> 		};
+>> +
+>> +		sdhci at f9824900 {
+>> +			compatible = "qcom,sdhci-msm-v4";
+>> +			reg = <0xf9824900 0x11c>, <0xf9824000 0x800>;
+>> +			reg-names = "hc_mem", "core_mem";
+>> +			interrupts = <0 123 0>, <0 138 0>;
 > 
-> diff --git a/arch/arm/include/asm/irq.h b/arch/arm/include/asm/irq.h
-> index 53c15dec7af6..be1d07d59ee9 100644
-> --- a/arch/arm/include/asm/irq.h
-> +++ b/arch/arm/include/asm/irq.h
-> @@ -35,6 +35,11 @@ extern void (*handle_arch_irq)(struct pt_regs *);
->  extern void set_handle_irq(void (*handle_irq)(struct pt_regs *));
->  #endif
->  
-> +#ifdef CONFIG_SMP
-> +extern void arch_trigger_all_cpu_backtrace(bool);
-> +#define arch_trigger_all_cpu_backtrace(x) arch_trigger_all_cpu_backtrace(x)
-> +#endif
-> +
->  #endif
->  
->  #endif
-> diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
-> index 9388a3d479e1..94959f977b82 100644
-> --- a/arch/arm/kernel/smp.c
-> +++ b/arch/arm/kernel/smp.c
-> @@ -72,8 +72,12 @@ enum ipi_msg_type {
->  	IPI_CPU_STOP,
->  	IPI_IRQ_WORK,
->  	IPI_COMPLETION,
-> +	IPI_CPU_BACKTRACE,
->  };
->  
-> +/* For reliability, we're prepared to waste bits here. */
-> +static DECLARE_BITMAP(backtrace_mask, NR_CPUS) __read_mostly;
-> +
->  static DECLARE_COMPLETION(cpu_running);
->  
->  static struct smp_operations smp_ops;
-> @@ -539,6 +543,21 @@ static void ipi_cpu_stop(unsigned int cpu)
->  		cpu_relax();
->  }
->  
-> +static void ipi_cpu_backtrace(struct pt_regs *regs)
-> +{
-> +	int cpu = smp_processor_id();
-> +
-> +	if (cpumask_test_cpu(cpu, to_cpumask(backtrace_mask))) {
-> +		static arch_spinlock_t lock = __ARCH_SPIN_LOCK_UNLOCKED;
-> +
-> +		arch_spin_lock(&lock);
-> +		printk(KERN_WARNING "FIQ backtrace for cpu %d\n", cpu);
-> +		show_regs(regs);
-> +		arch_spin_unlock(&lock);
-> +		cpumask_clear_cpu(cpu, to_cpumask(backtrace_mask));
-> +	}
-> +}
-> +
->  static DEFINE_PER_CPU(struct completion *, cpu_completion);
->  
->  int register_ipi_completion(struct completion *completion, int cpu)
-> @@ -618,6 +637,12 @@ void handle_IPI(int ipinr, struct pt_regs *regs)
->  		irq_exit();
->  		break;
->  
-> +	case IPI_CPU_BACKTRACE:
-> +		irq_enter();
-> +		ipi_cpu_backtrace(regs);
-> +		irq_exit();
-> +		break;
-> +
->  	default:
->  		printk(KERN_CRIT "CPU%u: Unknown IPI message 0x%x\n",
->  		       cpu, ipinr);
-> @@ -712,3 +737,40 @@ static int __init register_cpufreq_notifier(void)
->  core_initcall(register_cpufreq_notifier);
->  
->  #endif
-> +
-> +void arch_trigger_all_cpu_backtrace(bool include_self)
-> +{
-> +	static unsigned long backtrace_flag;
-> +	int i, cpu = get_cpu();
-> +
-> +	if (test_and_set_bit(0, &backtrace_flag)) {
-> +		/*
-> +		 * If there is already a trigger_all_cpu_backtrace() in progress
-> +		 * (backtrace_flag == 1), don't output double cpu dump infos.
-> +		 */
-> +		put_cpu();
-> +		return;
-> +	}
-> +
-> +	cpumask_copy(to_cpumask(backtrace_mask), cpu_online_mask);
-> +	if (!include_self)
-> +		cpumask_clear_cpu(cpu, to_cpumask(backtrace_mask));
-> +
-> +	if (!cpumask_empty(to_cpumask(backtrace_mask))) {
-> +		pr_info("Sending FIQ to %s CPUs:\n",
-> +			(include_self ? "all" : "other"));
-> +		smp_cross_call(to_cpumask(backtrace_mask), IPI_CPU_BACKTRACE);
-> +	}
-> +
-> +	/* Wait for up to 10 seconds for all CPUs to do the backtrace */
-> +	for (i = 0; i < 10 * 1000; i++) {
-> +		if (cpumask_empty(to_cpumask(backtrace_mask)))
-> +			break;
-> +
-> +		mdelay(1);
-> +	}
-
-
-I am seeing timeout problems when I test using SysRq-l to call
-arch_trigger_all_cpu_backtrace() with FIQ support *disabled* (i.e. in
-secure mode).
-
-I've not investigated yet but it feels like interrupts are masked (which
-makes sense given the calling context will be the UART ISR). Basically
-the console locks up and the backtrace for CPU-0 is delayed for 10 seconds.
-
-Once the backtrace does come out things return to normal...
-
-
-Daniel.
-
-> +
-> +	clear_bit(0, &backtrace_flag);
-> +	smp_mb__after_atomic();
-> +	put_cpu();
-> +}
+> I see that you've used GPIO_ACTIVE_* above. Is the trailing zero here
+> possibly IRQ_TYPE_NONE?
 > 
+>> +			interrupt-names = "hc_irq", "pwr_irq";
+>> +			clocks = <&gcc GCC_SDCC1_APPS_CLK>, <&gcc GCC_SDCC1_AHB_CLK>;
+>> +			clock-names = "core", "iface";
+>> +			status = "disabled";
+>> +		};
+>> +
+>> +		sdhci at f98a4900 {
+>> +			compatible = "qcom,sdhci-msm-v4";
+>> +			reg = <0xf98a4900 0x11c>, <0xf98a4000 0x800>;
+>> +			reg-names = "hc_mem", "core_mem";
+>> +			interrupts = <0 125 0>, <0 221 0>;
+>> +			interrupt-names = "hc_irq", "pwr_irq";
+>> +			clocks = <&gcc GCC_SDCC2_APPS_CLK>, <&gcc GCC_SDCC2_AHB_CLK>;
+>> +			clock-names = "core", "iface";
+>> +			status = "disabled";
+>> +		};
+> 
+> If you assign labels to these two nodes, you can reference them in the
+> .dts as &labelname {...};. Same for the uart node. That avoids
+> duplicating the hierarchy, detects spelling mistakes at compile time and
+> reduces indentation. Cf. the recent ifc6410 patch.
+
+Got no issues with introducing the labels, but I?d like to keep the hierarchy in the .dts file.
+
+> Also, is sdhci the best node name here? Usually it's not supposed to
+> reflect the exact interface used (e.g., usb vs. ehci).
+
+probably just use sdhc
+
+> 
+>> 	};
+>> };
+> 
+> Otherwise looks good.
+> 
+> Regards,
+> Andreas
+> 
+> -- 
+> SUSE LINUX Products GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
+> GF: Jeff Hawn, Jennifer Guild, Felix Imend?rffer; HRB 16746 AG N?rnberg
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-arm-msm" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+
+-- 
+Employee of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
