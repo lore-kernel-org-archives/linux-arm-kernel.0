@@ -1,417 +1,408 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Fri,  5 Sep 2014 15:47:33 -0700
-Subject: [PATCH v2 13/15] clk: qcom: Add Krait clock controller driver
+Date: Fri,  5 Sep 2014 15:47:24 -0700
+Subject: [PATCH v2 04/15] clk: divider: Make generic for usage elsewhere
 In-Reply-To: <1409957256-23729-1-git-send-email-sboyd@codeaurora.org>
 References: <1409957256-23729-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <1409957256-23729-15-git-send-email-sboyd@codeaurora.org>
+Message-ID: <1409957256-23729-6-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Krait CPU clocks are made up of a primary mux and secondary
-mux for each CPU and the L2, controlled via cp15 accessors. For
-Kraits within KPSSv1 each secondary mux accepts a different aux
-source, but on KPSSv2 each secondary mux accepts the same aux
-source.
+Some devices don't use mmio to interact with dividers. Split out the
+logic from the register read/write parts so that we can reuse the
+division logic elsewhere.
 
 Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 ---
- drivers/clk/qcom/Kconfig    |   8 +
- drivers/clk/qcom/Makefile   |   1 +
- drivers/clk/qcom/krait-cc.c | 357 ++++++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 366 insertions(+)
- create mode 100644 drivers/clk/qcom/krait-cc.c
+ drivers/clk/clk-divider.c    | 197 ++++++++++++++++++++++++++-----------------
+ include/linux/clk-provider.h |  11 +++
+ 2 files changed, 132 insertions(+), 76 deletions(-)
 
-diff --git a/drivers/clk/qcom/Kconfig b/drivers/clk/qcom/Kconfig
-index 6bf73773f75a..63285d116013 100644
---- a/drivers/clk/qcom/Kconfig
-+++ b/drivers/clk/qcom/Kconfig
-@@ -87,6 +87,14 @@ config KPSS_XCC
- 	  if you want to support CPU frequency scaling on devices such
- 	  as MSM8960, APQ8064, etc.
+diff --git a/drivers/clk/clk-divider.c b/drivers/clk/clk-divider.c
+index 18a9de29df0e..78ecd8af8740 100644
+--- a/drivers/clk/clk-divider.c
++++ b/drivers/clk/clk-divider.c
+@@ -30,7 +30,7 @@
  
-+config KRAITCC
-+	tristate "Krait Clock Controller"
-+	depends on COMMON_CLK_QCOM && ARM
-+	select KRAIT_CLOCKS
-+	help
-+	  Support for the Krait CPU clocks on Qualcomm devices.
-+	  Say Y if you want to support CPU frequency scaling.
+ #define to_clk_divider(_hw) container_of(_hw, struct clk_divider, hw)
+ 
+-#define div_mask(d)	((1 << ((d)->width)) - 1)
++#define div_mask(width)	(BIT(width) - 1)
+ 
+ static unsigned int _get_table_maxdiv(const struct clk_div_table *table)
+ {
+@@ -54,15 +54,16 @@ static unsigned int _get_table_mindiv(const struct clk_div_table *table)
+ 	return mindiv;
+ }
+ 
+-static unsigned int _get_maxdiv(struct clk_divider *divider)
++static unsigned int _get_maxdiv(const struct clk_div_table *table, u8 width,
++				unsigned long flags)
+ {
+-	if (divider->flags & CLK_DIVIDER_ONE_BASED)
+-		return div_mask(divider);
+-	if (divider->flags & CLK_DIVIDER_POWER_OF_TWO)
+-		return 1 << div_mask(divider);
+-	if (divider->table)
+-		return _get_table_maxdiv(divider->table);
+-	return div_mask(divider) + 1;
++	if (flags & CLK_DIVIDER_ONE_BASED)
++		return div_mask(width);
++	if (flags & CLK_DIVIDER_POWER_OF_TWO)
++		return 1 << div_mask(width);
++	if (table)
++		return _get_table_maxdiv(table);
++	return div_mask(width) + 1;
+ }
+ 
+ static unsigned int _get_table_div(const struct clk_div_table *table,
+@@ -76,14 +77,15 @@ static unsigned int _get_table_div(const struct clk_div_table *table,
+ 	return 0;
+ }
+ 
+-static unsigned int _get_div(struct clk_divider *divider, unsigned int val)
++static unsigned int _get_div(const struct clk_div_table *table,
++			     unsigned int val, unsigned long flags)
+ {
+-	if (divider->flags & CLK_DIVIDER_ONE_BASED)
++	if (flags & CLK_DIVIDER_ONE_BASED)
+ 		return val;
+-	if (divider->flags & CLK_DIVIDER_POWER_OF_TWO)
++	if (flags & CLK_DIVIDER_POWER_OF_TWO)
+ 		return 1 << val;
+-	if (divider->table)
+-		return _get_table_div(divider->table, val);
++	if (table)
++		return _get_table_div(table, val);
+ 	return val + 1;
+ }
+ 
+@@ -98,29 +100,28 @@ static unsigned int _get_table_val(const struct clk_div_table *table,
+ 	return 0;
+ }
+ 
+-static unsigned int _get_val(struct clk_divider *divider, unsigned int div)
++static unsigned int _get_val(const struct clk_div_table *table,
++			     unsigned int div, unsigned long flags)
+ {
+-	if (divider->flags & CLK_DIVIDER_ONE_BASED)
++	if (flags & CLK_DIVIDER_ONE_BASED)
+ 		return div;
+-	if (divider->flags & CLK_DIVIDER_POWER_OF_TWO)
++	if (flags & CLK_DIVIDER_POWER_OF_TWO)
+ 		return __ffs(div);
+-	if (divider->table)
+-		return  _get_table_val(divider->table, div);
++	if (table)
++		return  _get_table_val(table, div);
+ 	return div - 1;
+ }
+ 
+-static unsigned long clk_divider_recalc_rate(struct clk_hw *hw,
+-		unsigned long parent_rate)
++unsigned long divider_recalc_rate(struct clk_hw *hw, unsigned long parent_rate,
++				  unsigned int val,
++				  const struct clk_div_table *table,
++				  unsigned long flags)
+ {
+-	struct clk_divider *divider = to_clk_divider(hw);
+-	unsigned int div, val;
+-
+-	val = clk_readl(divider->reg) >> divider->shift;
+-	val &= div_mask(divider);
++	unsigned int div;
+ 
+-	div = _get_div(divider, val);
++	div = _get_div(table, val, flags);
+ 	if (!div) {
+-		WARN(!(divider->flags & CLK_DIVIDER_ALLOW_ZERO),
++		WARN(!(flags & CLK_DIVIDER_ALLOW_ZERO),
+ 			"%s: Zero divisor and CLK_DIVIDER_ALLOW_ZERO not set\n",
+ 			__clk_get_name(hw->clk));
+ 		return parent_rate;
+@@ -128,6 +129,20 @@ static unsigned long clk_divider_recalc_rate(struct clk_hw *hw,
+ 
+ 	return DIV_ROUND_UP(parent_rate, div);
+ }
++EXPORT_SYMBOL_GPL(divider_recalc_rate);
 +
- config KRAIT_CLOCKS
- 	bool
- 	select KRAIT_L2_ACCESSORS
-diff --git a/drivers/clk/qcom/Makefile b/drivers/clk/qcom/Makefile
-index d85491bfc053..866f0fe600d9 100644
---- a/drivers/clk/qcom/Makefile
-+++ b/drivers/clk/qcom/Makefile
-@@ -20,3 +20,4 @@ obj-$(CONFIG_MSM_MMCC_8960) += mmcc-msm8960.o
- obj-$(CONFIG_MSM_MMCC_8974) += mmcc-msm8974.o
- obj-$(CONFIG_KPSS_XCC) += kpss-xcc.o
- obj-$(CONFIG_QCOM_HFPLL) += hfpll.o
-+obj-$(CONFIG_KRAITCC) += krait-cc.o
-diff --git a/drivers/clk/qcom/krait-cc.c b/drivers/clk/qcom/krait-cc.c
-new file mode 100644
-index 000000000000..8c5d24e2c6cb
---- /dev/null
-+++ b/drivers/clk/qcom/krait-cc.c
-@@ -0,0 +1,357 @@
-+/* Copyright (c) 2013-2014, The Linux Foundation. All rights reserved.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 and
-+ * only version 2 as published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+#include <linux/kernel.h>
-+#include <linux/init.h>
-+#include <linux/module.h>
-+#include <linux/platform_device.h>
-+#include <linux/err.h>
-+#include <linux/io.h>
-+#include <linux/of.h>
-+#include <linux/of_device.h>
-+#include <linux/clk.h>
-+#include <linux/clk-provider.h>
-+#include <linux/slab.h>
-+
-+#include <asm/smp_plat.h>
-+
-+#include "clk-krait.h"
-+
-+static unsigned int sec_mux_map[] = {
-+	2,
-+	0,
-+};
-+
-+static unsigned int pri_mux_map[] = {
-+	1,
-+	2,
-+	0,
-+};
-+
-+static int
-+krait_add_div(struct device *dev, int id, const char *s, unsigned offset)
++static unsigned long clk_divider_recalc_rate(struct clk_hw *hw,
++		unsigned long parent_rate)
 +{
-+	struct krait_div2_clk *div;
-+	struct clk_init_data init = {
-+		.num_parents = 1,
-+		.ops = &krait_div2_clk_ops,
-+		.flags = CLK_SET_RATE_PARENT,
-+	};
-+	const char *p_names[1];
-+	struct clk *clk;
++	struct clk_divider *divider = to_clk_divider(hw);
++	unsigned int val;
 +
-+	div = devm_kzalloc(dev, sizeof(*div), GFP_KERNEL);
-+	if (!div)
-+		return -ENOMEM;
++	val = clk_readl(divider->reg) >> divider->shift;
++	val &= div_mask(divider->width);
 +
-+	div->width = 2;
-+	div->shift = 6;
-+	div->lpl = id >= 0;
-+	div->offset = offset;
-+	div->hw.init = &init;
++	return divider_recalc_rate(hw, parent_rate, val, divider->table,
++				   divider->flags);
++}
+ 
+ /*
+  * The reverse of DIV_ROUND_UP: The maximum number which
+@@ -146,12 +161,13 @@ static bool _is_valid_table_div(const struct clk_div_table *table,
+ 	return false;
+ }
+ 
+-static bool _is_valid_div(struct clk_divider *divider, unsigned int div)
++static bool _is_valid_div(const struct clk_div_table *table, unsigned int div,
++			  unsigned long flags)
+ {
+-	if (divider->flags & CLK_DIVIDER_POWER_OF_TWO)
++	if (flags & CLK_DIVIDER_POWER_OF_TWO)
+ 		return is_power_of_2(div);
+-	if (divider->table)
+-		return _is_valid_table_div(divider->table, div);
++	if (table)
++		return _is_valid_table_div(table, div);
+ 	return true;
+ }
+ 
+@@ -191,71 +207,76 @@ static int _round_down_table(const struct clk_div_table *table, int div)
+ 	return down;
+ }
+ 
+-static int _div_round_up(struct clk_divider *divider,
+-		unsigned long parent_rate, unsigned long rate)
++static int _div_round_up(const struct clk_div_table *table,
++			 unsigned long parent_rate, unsigned long rate,
++			 unsigned long flags)
+ {
+ 	int div = DIV_ROUND_UP(parent_rate, rate);
+ 
+-	if (divider->flags & CLK_DIVIDER_POWER_OF_TWO)
++	if (flags & CLK_DIVIDER_POWER_OF_TWO)
+ 		div = __roundup_pow_of_two(div);
+-	if (divider->table)
+-		div = _round_up_table(divider->table, div);
++	if (table)
++		div = _round_up_table(table, div);
+ 
+ 	return div;
+ }
+ 
+-static int _div_round_closest(struct clk_divider *divider,
+-		unsigned long parent_rate, unsigned long rate)
++static int _div_round_closest(const struct clk_div_table *table,
++			      unsigned long parent_rate, unsigned long rate,
++			      unsigned long flags)
+ {
+ 	int up, down, div;
+ 
+ 	up = down = div = DIV_ROUND_CLOSEST(parent_rate, rate);
+ 
+-	if (divider->flags & CLK_DIVIDER_POWER_OF_TWO) {
++	if (flags & CLK_DIVIDER_POWER_OF_TWO) {
+ 		up = __roundup_pow_of_two(div);
+ 		down = __rounddown_pow_of_two(div);
+-	} else if (divider->table) {
+-		up = _round_up_table(divider->table, div);
+-		down = _round_down_table(divider->table, div);
++	} else if (table) {
++		up = _round_up_table(table, div);
++		down = _round_down_table(table, div);
+ 	}
+ 
+ 	return (up - div) <= (div - down) ? up : down;
+ }
+ 
+-static int _div_round(struct clk_divider *divider, unsigned long parent_rate,
+-		unsigned long rate)
++static int _div_round(const struct clk_div_table *table,
++		      unsigned long parent_rate, unsigned long rate,
++		      unsigned long flags)
+ {
+-	if (divider->flags & CLK_DIVIDER_ROUND_CLOSEST)
+-		return _div_round_closest(divider, parent_rate, rate);
++	if (flags & CLK_DIVIDER_ROUND_CLOSEST)
++		return _div_round_closest(table, parent_rate, rate, flags);
+ 
+-	return _div_round_up(divider, parent_rate, rate);
++	return _div_round_up(table, parent_rate, rate, flags);
+ }
+ 
+-static bool _is_best_div(struct clk_divider *divider,
+-		unsigned long rate, unsigned long now, unsigned long best)
++static bool _is_best_div(unsigned long rate, unsigned long now,
++			 unsigned long best, unsigned long flags)
+ {
+-	if (divider->flags & CLK_DIVIDER_ROUND_CLOSEST)
++	if (flags & CLK_DIVIDER_ROUND_CLOSEST)
+ 		return abs(rate - now) < abs(rate - best);
+ 
+ 	return now <= rate && now > best;
+ }
+ 
+-static int _next_div(struct clk_divider *divider, int div)
++static int _next_div(const struct clk_div_table *table, int div,
++		     unsigned long flags)
+ {
+ 	div++;
+ 
+-	if (divider->flags & CLK_DIVIDER_POWER_OF_TWO)
++	if (flags & CLK_DIVIDER_POWER_OF_TWO)
+ 		return __roundup_pow_of_two(div);
+-	if (divider->table)
+-		return _round_up_table(divider->table, div);
++	if (table)
++		return _round_up_table(table, div);
+ 
+ 	return div;
+ }
+ 
+ static int clk_divider_bestdiv(struct clk_hw *hw, unsigned long rate,
+-		unsigned long *best_parent_rate)
++			       unsigned long *best_parent_rate,
++			       const struct clk_div_table *table, u8 width,
++			       unsigned long flags)
+ {
+-	struct clk_divider *divider = to_clk_divider(hw);
+ 	int i, bestdiv = 0;
+ 	unsigned long parent_rate, best = 0, now, maxdiv;
+ 	unsigned long parent_rate_saved = *best_parent_rate;
+@@ -263,11 +284,11 @@ static int clk_divider_bestdiv(struct clk_hw *hw, unsigned long rate,
+ 	if (!rate)
+ 		rate = 1;
+ 
+-	maxdiv = _get_maxdiv(divider);
++	maxdiv = _get_maxdiv(table, width, flags);
+ 
+ 	if (!(__clk_get_flags(hw->clk) & CLK_SET_RATE_PARENT)) {
+ 		parent_rate = *best_parent_rate;
+-		bestdiv = _div_round(divider, parent_rate, rate);
++		bestdiv = _div_round(table, parent_rate, rate, flags);
+ 		bestdiv = bestdiv == 0 ? 1 : bestdiv;
+ 		bestdiv = bestdiv > maxdiv ? maxdiv : bestdiv;
+ 		return bestdiv;
+@@ -279,8 +300,8 @@ static int clk_divider_bestdiv(struct clk_hw *hw, unsigned long rate,
+ 	 */
+ 	maxdiv = min(ULONG_MAX / rate, maxdiv);
+ 
+-	for (i = 1; i <= maxdiv; i = _next_div(divider, i)) {
+-		if (!_is_valid_div(divider, i))
++	for (i = 1; i <= maxdiv; i = _next_div(table, i, flags)) {
++		if (!_is_valid_div(table, i, flags))
+ 			continue;
+ 		if (rate * i == parent_rate_saved) {
+ 			/*
+@@ -294,7 +315,7 @@ static int clk_divider_bestdiv(struct clk_hw *hw, unsigned long rate,
+ 		parent_rate = __clk_round_rate(__clk_get_parent(hw->clk),
+ 				MULT_ROUND_UP(rate, i));
+ 		now = DIV_ROUND_UP(parent_rate, i);
+-		if (_is_best_div(divider, rate, now, best)) {
++		if (_is_best_div(rate, now, best, flags)) {
+ 			bestdiv = i;
+ 			best = now;
+ 			*best_parent_rate = parent_rate;
+@@ -302,48 +323,72 @@ static int clk_divider_bestdiv(struct clk_hw *hw, unsigned long rate,
+ 	}
+ 
+ 	if (!bestdiv) {
+-		bestdiv = _get_maxdiv(divider);
++		bestdiv = _get_maxdiv(table, width, flags);
+ 		*best_parent_rate = __clk_round_rate(__clk_get_parent(hw->clk), 1);
+ 	}
+ 
+ 	return bestdiv;
+ }
+ 
+-static long clk_divider_round_rate(struct clk_hw *hw, unsigned long rate,
+-				unsigned long *prate)
++long divider_round_rate(struct clk_hw *hw, unsigned long rate,
++			unsigned long *prate, const struct clk_div_table *table,
++			u8 width, unsigned long flags)
+ {
+ 	int div;
+-	div = clk_divider_bestdiv(hw, rate, prate);
 +
-+	init.name = kasprintf(GFP_KERNEL, "hfpll%s_div", s);
-+	if (!init.name)
-+		return -ENOMEM;
++	div = clk_divider_bestdiv(hw, rate, prate, table, width, flags);
+ 
+ 	return DIV_ROUND_UP(*prate, div);
+ }
++EXPORT_SYMBOL_GPL(divider_round_rate);
+ 
+-static int clk_divider_set_rate(struct clk_hw *hw, unsigned long rate,
+-				unsigned long parent_rate)
++static long clk_divider_round_rate(struct clk_hw *hw, unsigned long rate,
++				unsigned long *prate)
+ {
+ 	struct clk_divider *divider = to_clk_divider(hw);
 +
-+	init.parent_names = p_names;
-+	p_names[0] = kasprintf(GFP_KERNEL, "hfpll%s", s);
-+	if (!p_names[0]) {
-+		kfree(init.name);
-+		return -ENOMEM;
-+	}
-+
-+	clk = devm_clk_register(dev, &div->hw);
-+	kfree(p_names[0]);
-+	kfree(init.name);
-+
-+	return PTR_ERR_OR_ZERO(clk);
++	return divider_round_rate(hw, rate, prate, divider->table,
++				  divider->width, divider->flags);
 +}
 +
-+static int
-+krait_add_sec_mux(struct device *dev, int id, const char *s, unsigned offset,
-+		  bool unique_aux)
++int divider_get_val(unsigned long rate, unsigned long parent_rate,
++		    const struct clk_div_table *table, u8 width,
++		    unsigned long flags)
 +{
-+	struct krait_mux_clk *mux;
-+	static const char *sec_mux_list[] = {
-+		"acpu_aux",
-+		"qsb",
-+	};
-+	struct clk_init_data init = {
-+		.parent_names = sec_mux_list,
-+		.num_parents = ARRAY_SIZE(sec_mux_list),
-+		.ops = &krait_mux_clk_ops,
-+		.flags = CLK_SET_RATE_PARENT,
-+	};
-+	struct clk *clk;
+ 	unsigned int div, value;
+-	unsigned long flags = 0;
+-	u32 val;
+ 
+ 	div = DIV_ROUND_UP(parent_rate, rate);
+ 
+-	if (!_is_valid_div(divider, div))
++	if (!_is_valid_div(table, div, flags))
+ 		return -EINVAL;
+ 
+-	value = _get_val(divider, div);
++	value = _get_val(table, div, flags);
 +
-+	mux = devm_kzalloc(dev, sizeof(*mux), GFP_KERNEL);
-+	if (!mux)
-+		return -ENOMEM;
-+
-+	mux->offset = offset;
-+	mux->lpl = id >= 0;
-+	mux->has_safe_parent = true;
-+	mux->safe_sel = 2;
-+	mux->mask = 0x3;
-+	mux->shift = 2;
-+	mux->parent_map = sec_mux_map;
-+	mux->hw.init = &init;
-+
-+	init.name = kasprintf(GFP_KERNEL, "krait%s_sec_mux", s);
-+	if (!init.name)
-+		return -ENOMEM;
-+
-+	if (unique_aux) {
-+		sec_mux_list[0] = kasprintf(GFP_KERNEL, "acpu%s_aux", s);
-+		if (!sec_mux_list[0]) {
-+			clk = ERR_PTR(-ENOMEM);
-+			goto err_aux;
-+		}
-+	}
-+
-+	clk = devm_clk_register(dev, &mux->hw);
-+
-+	if (unique_aux)
-+		kfree(sec_mux_list[0]);
-+err_aux:
-+	kfree(init.name);
-+	return PTR_ERR_OR_ZERO(clk);
-+}
-+
-+static struct clk *
-+krait_add_pri_mux(struct device *dev, int id, const char *s, unsigned offset)
-+{
-+	struct krait_mux_clk *mux;
-+	const char *p_names[3];
-+	struct clk_init_data init = {
-+		.parent_names = p_names,
-+		.num_parents = ARRAY_SIZE(p_names),
-+		.ops = &krait_mux_clk_ops,
-+		.flags = CLK_SET_RATE_PARENT,
-+	};
-+	struct clk *clk;
-+
-+	mux = devm_kzalloc(dev, sizeof(*mux), GFP_KERNEL);
-+	if (!mux)
-+		return ERR_PTR(-ENOMEM);
-+
-+	mux->has_safe_parent = true;
-+	mux->safe_sel = 0;
-+	mux->mask = 0x3;
-+	mux->shift = 0;
-+	mux->offset = offset;
-+	mux->lpl = id >= 0;
-+	mux->parent_map = pri_mux_map;
-+	mux->hw.init = &init;
-+
-+	init.name = kasprintf(GFP_KERNEL, "krait%s_pri_mux", s);
-+	if (!init.name)
-+		return ERR_PTR(-ENOMEM);
-+
-+	p_names[0] = kasprintf(GFP_KERNEL, "hfpll%s", s);
-+	if (!p_names[0]) {
-+		clk = ERR_PTR(-ENOMEM);
-+		goto err_p0;
-+	}
-+
-+	p_names[1] = kasprintf(GFP_KERNEL, "hfpll%s_div", s);
-+	if (!p_names[1]) {
-+		clk = ERR_PTR(-ENOMEM);
-+		goto err_p1;
-+	}
-+
-+	p_names[2] = kasprintf(GFP_KERNEL, "krait%s_sec_mux", s);
-+	if (!p_names[2]) {
-+		clk = ERR_PTR(-ENOMEM);
-+		goto err_p2;
-+	}
-+
-+	clk = devm_clk_register(dev, &mux->hw);
-+
-+	kfree(p_names[2]);
-+err_p2:
-+	kfree(p_names[1]);
-+err_p1:
-+	kfree(p_names[0]);
-+err_p0:
-+	kfree(init.name);
-+	return clk;
-+}
-+
-+/* id < 0 for L2, otherwise id == physical CPU number */
-+static struct clk *krait_add_clks(struct device *dev, int id, bool unique_aux)
-+{
-+	int ret;
-+	unsigned offset;
-+	void *p = NULL;
-+	const char *s;
-+	struct clk *clk;
-+
-+	if (id >= 0) {
-+		offset = 0x4501 + (0x1000 * id);
-+		s = p = kasprintf(GFP_KERNEL, "%d", id);
-+		if (!s)
-+			return ERR_PTR(-ENOMEM);
-+	} else {
-+		offset = 0x500;
-+		s = "_l2";
-+	}
-+
-+	ret = krait_add_div(dev, id, s, offset);
-+	if (ret) {
-+		clk = ERR_PTR(ret);
-+		goto err;
-+	}
-+
-+	ret = krait_add_sec_mux(dev, id, s, offset, unique_aux);
-+	if (ret) {
-+		clk = ERR_PTR(ret);
-+		goto err;
-+	}
-+
-+	clk = krait_add_pri_mux(dev, id, s, offset);
-+err:
-+	kfree(p);
-+	return clk;
-+}
-+
-+static struct clk *krait_of_get(struct of_phandle_args *clkspec, void *data)
-+{
-+	unsigned int idx = clkspec->args[0];
-+	struct clk **clks = data;
-+
-+	if (idx >= 5) {
-+		pr_err("%s: invalid clock index %d\n", __func__, idx);
-+		return ERR_PTR(-EINVAL);
-+	}
-+
-+	return clks[idx] ? : ERR_PTR(-ENODEV);
-+}
-+
-+static const struct of_device_id krait_cc_match_table[] = {
-+	{ .compatible = "qcom,krait-cc-v1", (void *)1UL },
-+	{ .compatible = "qcom,krait-cc-v2" },
-+	{}
-+};
-+MODULE_DEVICE_TABLE(of, krait_cc_match_table);
-+
-+static int krait_cc_probe(struct platform_device *pdev)
-+{
-+	struct device *dev = &pdev->dev;
-+	const struct of_device_id *id;
-+	unsigned long cur_rate, aux_rate;
-+	int i, cpu;
-+	struct clk *clk;
-+	struct clk **clks;
-+	struct clk *l2_pri_mux_clk;
-+
-+	id = of_match_device(krait_cc_match_table, &pdev->dev);
-+	if (!id)
-+		return -ENODEV;
-+
-+	/* Rate is 1 because 0 causes problems for __clk_mux_determine_rate */
-+	clk = clk_register_fixed_rate(dev, "qsb", NULL, CLK_IS_ROOT, 1);
-+	if (IS_ERR(clk))
-+		return PTR_ERR(clk);
-+
-+	if (!id->data) {
-+		clk = clk_register_fixed_factor(&pdev->dev, "acpu_aux",
-+						"gpll0_vote", 0, 1, 2);
-+		if (IS_ERR(clk))
-+			return PTR_ERR(clk);
-+	}
-+
-+	/* Krait configurations have at most 4 CPUs and one L2 */
-+	clks = devm_kcalloc(dev, 5, sizeof(*clks), GFP_KERNEL);
-+	if (!clks)
-+		return -ENOMEM;
-+
-+	for_each_possible_cpu(i) {
-+		cpu = cpu_logical_map(i);
-+		clk = krait_add_clks(dev, cpu, id->data);
-+		if (IS_ERR(clk))
-+			return PTR_ERR(clk);
-+		clks[cpu] = clk;
-+	}
-+
-+	l2_pri_mux_clk = krait_add_clks(dev, -1, id->data);
-+	if (IS_ERR(l2_pri_mux_clk))
-+		return PTR_ERR(l2_pri_mux_clk);
-+	clks[4] = l2_pri_mux_clk;
-+
-+	/*
-+	 * We don't want the CPU or L2 clocks to be turned off at late init
-+	 * if CPUFREQ or HOTPLUG configs are disabled. So, bump up the
-+	 * refcount of these clocks. Any cpufreq/hotplug manager can assume
-+	 * that the clocks have already been prepared and enabled by the time
-+	 * they take over.
-+	 */
-+	for_each_online_cpu(i) {
-+		cpu = cpu_logical_map(i);
-+		clk_prepare_enable(l2_pri_mux_clk);
-+		WARN(clk_prepare_enable(clks[cpu]),
-+			"Unable to turn on CPU%d clock", cpu);
-+	}
-+
-+	/*
-+	 * Force reinit of HFPLLs and muxes to overwrite any potential
-+	 * incorrect configuration of HFPLLs and muxes by the bootloader.
-+	 * While at it, also make sure the cores are running at known rates
-+	 * and print the current rate.
-+	 *
-+	 * The clocks are set to aux clock rate first to make sure the
-+	 * secondary mux is not sourcing off of QSB. The rate is then set to
-+	 * two different rates to force a HFPLL reinit under all
-+	 * circumstances.
-+	 */
-+	cur_rate = clk_get_rate(l2_pri_mux_clk);
-+	aux_rate = 384000000;
-+	if (cur_rate == 1) {
-+		pr_info("L2 @ QSB rate. Forcing new rate.\n");
-+		cur_rate = aux_rate;
-+	}
-+	clk_set_rate(l2_pri_mux_clk, aux_rate);
-+	clk_set_rate(l2_pri_mux_clk, 2);
-+	clk_set_rate(l2_pri_mux_clk, cur_rate);
-+	pr_info("L2 @ %lu KHz\n", clk_get_rate(l2_pri_mux_clk) / 1000);
-+	for_each_possible_cpu(i) {
-+		cpu = cpu_logical_map(i);
-+		clk = clks[cpu];
-+		cur_rate = clk_get_rate(clk);
-+		if (cur_rate == 1) {
-+			pr_info("CPU%d @ QSB rate. Forcing new rate.\n", i);
-+			cur_rate = aux_rate;
-+		}
-+		clk_set_rate(clk, aux_rate);
-+		clk_set_rate(clk, 2);
-+		clk_set_rate(clk, cur_rate);
-+		pr_info("CPU%d @ %lu KHz\n", i, clk_get_rate(clk) / 1000);
-+	}
-+
-+	of_clk_add_provider(dev->of_node, krait_of_get, clks);
++	min_t(unsigned int, value, div_mask(width));
 +
 +	return 0;
 +}
++EXPORT_SYMBOL_GPL(divider_get_val);
 +
-+static struct platform_driver krait_cc_driver = {
-+	.probe = krait_cc_probe,
-+	.driver = {
-+		.name = "clock-krait",
-+		.of_match_table = krait_cc_match_table,
-+		.owner = THIS_MODULE,
-+	},
-+};
-+module_platform_driver(krait_cc_driver);
++static int clk_divider_set_rate(struct clk_hw *hw, unsigned long rate,
++				unsigned long parent_rate)
++{
++	struct clk_divider *divider = to_clk_divider(hw);
++	unsigned int value;
++	unsigned long flags = 0;
++	u32 val;
+ 
+-	if (value > div_mask(divider))
+-		value = div_mask(divider);
++	value = divider_get_val(rate, parent_rate, divider->table,
++				divider->width, divider->flags);
+ 
+ 	if (divider->lock)
+ 		spin_lock_irqsave(divider->lock, flags);
+ 
+ 	if (divider->flags & CLK_DIVIDER_HIWORD_MASK) {
+-		val = div_mask(divider) << (divider->shift + 16);
++		val = div_mask(divider->width) << (divider->shift + 16);
+ 	} else {
+ 		val = clk_readl(divider->reg);
+-		val &= ~(div_mask(divider) << divider->shift);
++		val &= ~(div_mask(divider->width) << divider->shift);
+ 	}
+ 	val |= value << divider->shift;
+ 	clk_writel(val, divider->reg);
+diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
+index 92a00b61370a..5058fb98dbfb 100644
+--- a/include/linux/clk-provider.h
++++ b/include/linux/clk-provider.h
+@@ -342,6 +342,17 @@ struct clk_divider {
+ 
+ extern const struct clk_ops clk_divider_ops;
+ extern const struct clk_ops clk_divider_ro_ops;
 +
-+MODULE_DESCRIPTION("Krait CPU Clock Driver");
-+MODULE_LICENSE("GPL v2");
++unsigned long divider_recalc_rate(struct clk_hw *hw, unsigned long parent_rate,
++		unsigned int val, const struct clk_div_table *table,
++		unsigned long flags);
++long divider_round_rate(struct clk_hw *hw, unsigned long rate,
++		unsigned long *prate, const struct clk_div_table *table,
++		u8 width, unsigned long flags);
++int divider_get_val(unsigned long rate, unsigned long parent_rate,
++		const struct clk_div_table *table, u8 width,
++		unsigned long flags);
++
+ struct clk *clk_register_divider(struct device *dev, const char *name,
+ 		const char *parent_name, unsigned long flags,
+ 		void __iomem *reg, u8 shift, u8 width,
 -- 
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
 hosted by The Linux Foundation
