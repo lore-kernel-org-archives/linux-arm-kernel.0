@@ -1,53 +1,117 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Fri,  5 Sep 2014 14:44:35 -0700
-Subject: [GIT PULL 3.18] ARM: BCM: Broadcom BCM63138 support
-Message-ID: <1409953475-23130-1-git-send-email-f.fainelli@gmail.com>
+From: bhelgaas@google.com (Bjorn Helgaas)
+Date: Fri, 5 Sep 2014 16:08:20 -0600
+Subject: [PATCH v9 06/12] ARM: integrator: Correct usage of
+ of_pci_range_to_resource()
+In-Reply-To: <1407860725-25202-7-git-send-email-Liviu.Dudau@arm.com>
+References: <1407860725-25202-1-git-send-email-Liviu.Dudau@arm.com>
+ <1407860725-25202-7-git-send-email-Liviu.Dudau@arm.com>
+Message-ID: <20140905220820.GI8080@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd, Olof,
+[+cc Linus]
 
-This pull request contains the basic Broadcom BCM63138 DSL SoC support
-that has been posted a few weeks ago. Arnd has reviewed those changes, and
-I was expecting Matt to carry these changes for me, but I did not get an
-answer so far and I don't want these patches to be held much longer.
+On Tue, Aug 12, 2014 at 05:25:19PM +0100, Liviu Dudau wrote:
+> Previously, of_pci_range_to_resource() would return a resource
+> that contained physical addresses of the IO space even if the
+> IORESOURCE_IO flags mandate a logical port set of values. Now
+> that the function has been fixed we need to update the drivers
+> that were taking advantage of the old behaviour.
+> 
+> Cc: Linus Walleij <linus.walleij@linaro.org>
+> Cc: Arnd Bergmann <arnd@arndb.de>
+> Cc: Rob Herring <robh+dt@kernel.org>
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
 
-Thanks!
+Something's wrong with the CC: list.  You list Linus here in the changelog,
+but I don't see him in the CC: headers.
 
-The following changes since commit 244a68e90d0775d3e579020768ef3d5409473adc:
-
-  Merge fixes branch into for-next (2014-09-05 22:56:46 +0200)
-
-are available in the git repository at:
-
-
-  https://github.com/brcm/linux.git bcm63138-v3
-
-for you to fetch changes up to ad672f6d6aaf748488ee6a759c23d4f8528f1b6c:
-
-  MAINTAINERS: add entry for the Broadcom BCM63xx ARM SoCs (2014-09-05 14:30:56 -0700)
-
-----------------------------------------------------------------
-Florian Fainelli (5):
-      ARM: BCM63XX: add basic support for the Broadcom BCM63138 DSL SoC
-      ARM: BCM63XX: add low-level UART debug support
-      ARM: BCM63XX: add BCM63138 minimal Device Tree
-      ARM: BCM63XX: add BCM963138DVT Reference platform DTS
-      MAINTAINERS: add entry for the Broadcom BCM63xx ARM SoCs
-
- .../devicetree/bindings/arm/bcm/bcm63138.txt       |   9 ++
- MAINTAINERS                                        |   8 ++
- arch/arm/Kconfig.debug                             |  18 ++-
- arch/arm/boot/dts/Makefile                         |   1 +
- arch/arm/boot/dts/bcm63138.dtsi                    | 134 +++++++++++++++++++++
- arch/arm/boot/dts/bcm963138dvt.dts                 |  30 +++++
- arch/arm/include/debug/bcm63xx.S                   |  33 +++++
- arch/arm/mach-bcm/Kconfig                          |  17 +++
- arch/arm/mach-bcm/Makefile                         |   3 +
- arch/arm/mach-bcm/bcm63xx.c                        |  27 +++++
- 10 files changed, 278 insertions(+), 2 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/arm/bcm/bcm63138.txt
- create mode 100644 arch/arm/boot/dts/bcm63138.dtsi
- create mode 100644 arch/arm/boot/dts/bcm963138dvt.dts
- create mode 100644 arch/arm/include/debug/bcm63xx.S
- create mode 100644 arch/arm/mach-bcm/bcm63xx.c
+> ---
+>  arch/arm/mach-integrator/pci_v3.c | 24 +++++++++++++-----------
+>  1 file changed, 13 insertions(+), 11 deletions(-)
+> 
+> diff --git a/arch/arm/mach-integrator/pci_v3.c b/arch/arm/mach-integrator/pci_v3.c
+> index 05e1f73..193b7f8 100644
+> --- a/arch/arm/mach-integrator/pci_v3.c
+> +++ b/arch/arm/mach-integrator/pci_v3.c
+> @@ -660,6 +660,7 @@ static void __init pci_v3_preinit(void)
+>  {
+>  	unsigned long flags;
+>  	unsigned int temp;
+> +	phys_addr_t io_address = pci_pio_to_address(io_mem.start);
+>  
+>  	pcibios_min_mem = 0x00100000;
+>  
+> @@ -701,7 +702,7 @@ static void __init pci_v3_preinit(void)
+>  	/*
+>  	 * Setup window 2 - PCI IO
+>  	 */
+> -	v3_writel(V3_LB_BASE2, v3_addr_to_lb_base2(io_mem.start) |
+> +	v3_writel(V3_LB_BASE2, v3_addr_to_lb_base2(io_address) |
+>  			V3_LB_BASE_ENABLE);
+>  	v3_writew(V3_LB_MAP2, v3_addr_to_lb_map2(0));
+>  
+> @@ -742,6 +743,7 @@ static void __init pci_v3_preinit(void)
+>  static void __init pci_v3_postinit(void)
+>  {
+>  	unsigned int pci_cmd;
+> +	phys_addr_t io_address = pci_pio_to_address(io_mem.start);
+>  
+>  	pci_cmd = PCI_COMMAND_MEMORY |
+>  		  PCI_COMMAND_MASTER | PCI_COMMAND_INVALIDATE;
+> @@ -758,7 +760,7 @@ static void __init pci_v3_postinit(void)
+>  		       "interrupt: %d\n", ret);
+>  #endif
+>  
+> -	register_isa_ports(non_mem.start, io_mem.start, 0);
+> +	register_isa_ports(non_mem.start, io_address, 0);
+>  }
+>  
+>  /*
+> @@ -867,33 +869,33 @@ static int __init pci_v3_probe(struct platform_device *pdev)
+>  
+>  	for_each_of_pci_range(&parser, &range) {
+>  		if (!range.flags) {
+> -			of_pci_range_to_resource(&range, np, &conf_mem);
+> +			ret = of_pci_range_to_resource(&range, np, &conf_mem);
+>  			conf_mem.name = "PCIv3 config";
+>  		}
+>  		if (range.flags & IORESOURCE_IO) {
+> -			of_pci_range_to_resource(&range, np, &io_mem);
+> +			ret = of_pci_range_to_resource(&range, np, &io_mem);
+> +			dev_info(&pdev->dev, "IO PCI range converted\n");
+>  			io_mem.name = "PCIv3 I/O";
+>  		}
+>  		if ((range.flags & IORESOURCE_MEM) &&
+>  			!(range.flags & IORESOURCE_PREFETCH)) {
+>  			non_mem_pci = range.pci_addr;
+>  			non_mem_pci_sz = range.size;
+> -			of_pci_range_to_resource(&range, np, &non_mem);
+> +			ret = of_pci_range_to_resource(&range, np, &non_mem);
+>  			non_mem.name = "PCIv3 non-prefetched mem";
+>  		}
+>  		if ((range.flags & IORESOURCE_MEM) &&
+>  			(range.flags & IORESOURCE_PREFETCH)) {
+>  			pre_mem_pci = range.pci_addr;
+>  			pre_mem_pci_sz = range.size;
+> -			of_pci_range_to_resource(&range, np, &pre_mem);
+> +			ret = of_pci_range_to_resource(&range, np, &pre_mem);
+>  			pre_mem.name = "PCIv3 prefetched mem";
+>  		}
+> -	}
+>  
+> -	if (!conf_mem.start || !io_mem.start ||
+> -	    !non_mem.start || !pre_mem.start) {
+> -		dev_err(&pdev->dev, "missing ranges in device node\n");
+> -		return -EINVAL;
+> +		if (ret < 0) {
+> +			dev_err(&pdev->dev, "missing ranges in device node\n");
+> +			return -EINVAL;
+> +		}
+>  	}
+>  
+>  	pci_v3.map_irq = of_irq_parse_and_map_pci;
+> -- 
+> 2.0.4
+> 
