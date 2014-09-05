@@ -1,112 +1,74 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Fri, 5 Sep 2014 22:29:08 +0100
-Subject: [PATCH v9 5/8] drivers: cpuidle: implement DT based idle states
- infrastructure
-In-Reply-To: <7hlhpxygzv.fsf@paris.lan>
-References: <1409938498-17984-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1409938498-17984-6-git-send-email-lorenzo.pieralisi@arm.com>
- <7hlhpxygzv.fsf@paris.lan>
-Message-ID: <20140905212908.GA28626@e102568-lin.cambridge.arm.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 5 Sep 2014 14:30:09 -0700
+Subject: [PATCH 07/10] ARM: OMAP5 / DRA7: Enable CPU RET on suspend
+In-Reply-To: <20140905211558.GA31011@kahuna>
+References: <1408716154-26101-1-git-send-email-nm@ti.com>
+ <1408716154-26101-8-git-send-email-nm@ti.com>
+ <7hbnr5dake.fsf@paris.lan> <53FE2BF2.3020006@ti.com>
+ <20140827194156.GE16006@atomide.com> <53FE34D7.7040004@ti.com>
+ <53FE3551.2080806@ti.com> <20140905211558.GA31011@kahuna>
+Message-ID: <20140905213009.GB3238@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 05, 2014 at 09:00:52PM +0100, Kevin Hilman wrote:
-> Lorenzo Pieralisi <lorenzo.pieralisi@arm.com> writes:
+* Nishanth Menon <nm@ti.com> [140905 14:16]:
+> On 14:45-20140827, Nishanth Menon wrote:
+> > On 08/27/2014 02:43 PM, Santosh Shilimkar wrote:
+> > > On Wednesday 27 August 2014 03:41 PM, Tony Lindgren wrote:
+> > >> * Nishanth Menon <nm@ti.com> [140827 12:05]:
+> > >>> On 08/27/2014 01:58 PM, Kevin Hilman wrote:
+> > >>>> Nishanth Menon <nm@ti.com> writes:
+> > >>>>
+> > >>>>> From: Rajendra Nayak <rnayak@ti.com>
+> > >>>>>
+> > >>>>> On OMAP5 / DRA7, prevent a CPU powerdomain OFF and resulting MPU OSWR
+> > >>>>> and instead attempt a CPU RET and side effect, MPU RET in suspend.
+> > >>>>>
+> > >>>>> Signed-off-by: Rajendra Nayak <rnayak@ti.com>
+> > >>>>> [nm at ti.com: update to do save_state only on DRA7]
+> > >>>>> Signed-off-by: Nishanth Menon <nm@ti.com>
+> > >>>>> ---
+> > >>>>>  arch/arm/mach-omap2/omap-mpuss-lowpower.c |    4 ++++
+> > >>>>>  arch/arm/mach-omap2/omap-wakeupgen.c      |    2 +-
+> > >>>>>  arch/arm/mach-omap2/pm44xx.c              |    9 +++++++--
+> > >>>>>  3 files changed, 12 insertions(+), 3 deletions(-)
+> > >>>>>
+> > >>>>> diff --git a/arch/arm/mach-omap2/omap-mpuss-lowpower.c b/arch/arm/mach-omap2/omap-mpuss-lowpower.c
+> > >>>>> index 207fce2..0d640eb 100644
+> > >>>>> --- a/arch/arm/mach-omap2/omap-mpuss-lowpower.c
+> > >>>>> +++ b/arch/arm/mach-omap2/omap-mpuss-lowpower.c
+> > >>>>> @@ -242,6 +242,10 @@ int omap4_enter_lowpower(unsigned int cpu, unsigned int power_state)
+> > >>>>>  		save_state = 1;
+> > >>>>>  		break;
+> > >>>>>  	case PWRDM_POWER_RET:
+> > >>>>> +		if (soc_is_omap54xx() || soc_is_dra7xx()) {
+> > >>>>
+> > >>>> Aren't we trying to get away from these soc_* checks for anything other
+> > >>>> than init code?
+> > >>>
+> > >>> I would expect that to take place in stages as part of which the next
+> > >>> level of cleanup is to move PRM into drivers. Currently our wakeupgen,
+> > >>> prm code does have quiet a few needs of dealing with soc_is checks
+> > >>> primarily from having to re-architect code in two different directions
+> > >>> - we want to move into just one direction eventually - to prm drivers
+> > >>> and as less code in mach-omap2 which is already in the works.
+> > >>
+> > >> Why don't you just set some flag at init time based on the
+> > >> soc_is check and then test that here? That limits the use of
+> > >> soc_is to init code only which makes it easier to phase it
+> > >> out completely eventually.
+> > >>
+> > > Indeed. Infact the version of the code I tried posting last year was
+> > > using a flag which was initialised during init. Same can be
+> > > done her.
+> > 
+> > OK. will try something along that line in the next rev.
 > 
-> > On most common ARM systems, the low-power states a CPU can be put into are
-> > not discoverable in HW and require device tree bindings to describe
-> > power down suspend operations and idle states parameters.
-> >
-> > In order to enable DT based idle states and configure idle drivers, this
-> > patch implements the bulk infrastructure required to parse the device tree
-> > idle states bindings and initialize the corresponding CPUidle driver states
-> > data.
-> >
-> > The parsing API accepts a start index that defines the first idle state
-> > that should be initialized by the parsing code in order to give new and
-> > legacy driver flexibility over which states should be parsed using the
-> > new DT mechanism.
-> >
-> > The idle states node(s) is obtained from the phandle list of the first cpu
-> > in the driver cpumask;  the kernel checks that the idle state node phandle
-> > is the same for all CPUs in the driver cpumask before declaring the idle state
-> > as valid and start parsing its content.
-> >
-> > The idle state enter function pointer is initialized through DT match
-> > structures passed in by the CPUidle driver, so that ARM legacy code can
-> > cope with platform specific idle entry method based on compatible
-> > string matching and the code used to initialize the enter function pointer
-> > can be moved to the DT generic layer.
-> >
-> > Acked-by: Catalin Marinas <catalin.marinas@arm.com>
-> > Acked-by: Daniel Lezcano <daniel.lezcano@linaro.org>
-> > Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 > 
-> [...]
+> Hi,
 > 
-> > +	idle_state->flags = CPUIDLE_FLAG_TIME_VALID;
-> > +	if (of_property_read_bool(state_node, "local-timer-stop"))
-> > +		idle_state->flags |= CPUIDLE_FLAG_TIMER_STOP;
-> > +	/*
-> > +	 * TODO:
-> > +	 *	replace with kstrdup and pointer assignment when name
-> > +	 *	and desc become string pointers
-> > +	 */
-> > +	strncpy(idle_state->name, state_node->name, CPUIDLE_NAME_LEN - 1);
-> > +	strncpy(idle_state->desc, state_node->name, CPUIDLE_DESC_LEN - 1);
-> 
-> This is a very minor concern, and shouldn't hold back this series,
-> but...
-> 
-> I was playing with this series in order to test out the qcom cpuidle
-> driver from Lina, and noticed that the state name and descriptions were
-> not terribly helpful:
-> 
-> /sys/devices/system/cpu/cpu0/cpuidle # cat state?/name
-> cpu-idle-state-
-> cpu-idle-state-
-> /sys/devices/system/cpu/cpu0/cpuidle # cat state?/desc
-> cpu-idle-state-0
-> cpu-idle-state-1
-> 
-> Turns out these strings come from the node name itself, and truncated in
-> the case of state->name, but this can be fixed in the DTS itself (c.f.
-> reply to Lina's driver.)
-> 
-> However, seeing that the node name is used to populate both the
-> state->name and ->, made me wonder if there should better way to set the
-> state->desc field to a more useful string.  Tools like powertop actually
-> use that field and it can be quite useful.
+> Updated patch below:
 
-Well, the truncation problem will be solved when those strings will be
-kdup'ed, so for the name I think there is not a problem, copying the
-state node is fine waiting for those strings to become pointers.
+Looks OK to me thanks.
 
-For desc, there are four options:
-
-(1) enumerating idle states (but that's worse than copying the name into
-    desc since on ARM idle-state{1,2,3...} means nothing)
-(2) copying the idle state node compatible string into desc
-(3) Add an optional property to the DT bindings to describe the state
-(4) Leave code as it is
-
-(3) I am not extremely keen at this stage to re-patch the DT bindings,
-it has been an awful lot of work to make everyone agree so I would avoid
-any changes, I hope you understand (and I am not even sure DT maintainers
-would accept that, so even less keen on changing the DT bindings at this
-stage).
-
-(2) I am not sure it will clarify the description much.
-
-(1) I would rule it out. So either we accept that the name can be
-extended in length (that's going to be the case since we will
-dynamically allocate the string so there will be no truncation, to
-a reasonable extent) so (4) is fine, or we merge this code and I
-will take care of pushing for (3) in a separate patch and copy the resulting
-description into desc (if that change does not get NACK'ed).
-
-I would really want to see this code in the mailine asap since it is
-groundwork for all future CPUidle generalisation, I hope that what I am
-saying above is acceptable, please let me know what you think.
-
-Lorenzo
+Tony
