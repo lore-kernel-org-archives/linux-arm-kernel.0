@@ -1,159 +1,154 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Fri,  5 Sep 2014 15:47:25 -0700
-Subject: [PATCH v2 05/15] clk: Add safe switch hook
+Date: Fri,  5 Sep 2014 15:47:32 -0700
+Subject: [PATCH v2 12/15] clk: qcom: Add KPSS ACC/GCC driver
 In-Reply-To: <1409957256-23729-1-git-send-email-sboyd@codeaurora.org>
 References: <1409957256-23729-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <1409957256-23729-7-git-send-email-sboyd@codeaurora.org>
+Message-ID: <1409957256-23729-14-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sometimes clocks can't accept their parent source turning off
-while the source is reprogrammed to a different rate. Most
-notably some CPU clocks require a way to switch away from the
-current PLL they're running on, reprogram that PLL to a new rate,
-and then switch back to the PLL with the new rate once they're
-done.  Add a hook that drivers can implement allowing them to
-return a 'safe parent' that they can switch their parent to while
-the upstream source is reprogrammed.
+The ACC and GCC regions present in KPSSv1 contain registers to
+control clocks and power to each Krait CPU and L2. For CPUfreq
+purposes probe these devices and expose a mux clock that chooses
+between PXO and PLL8.
 
 Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 ---
- drivers/clk/clk.c            | 53 ++++++++++++++++++++++++++++++++++++++------
- include/linux/clk-private.h  |  2 ++
- include/linux/clk-provider.h |  1 +
- 3 files changed, 49 insertions(+), 7 deletions(-)
+ drivers/clk/qcom/Kconfig    |  8 ++++
+ drivers/clk/qcom/Makefile   |  1 +
+ drivers/clk/qcom/kpss-xcc.c | 94 +++++++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 103 insertions(+)
+ create mode 100644 drivers/clk/qcom/kpss-xcc.c
 
-diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-index 255ec8c92919..b23e2b9c9102 100644
---- a/drivers/clk/clk.c
-+++ b/drivers/clk/clk.c
-@@ -1368,6 +1368,7 @@ static void clk_calc_subtree(struct clk *clk, unsigned long new_rate,
- 			     struct clk *new_parent, u8 p_index)
- {
- 	struct clk *child;
-+	struct clk *parent;
+diff --git a/drivers/clk/qcom/Kconfig b/drivers/clk/qcom/Kconfig
+index 2fd07b17e10e..6bf73773f75a 100644
+--- a/drivers/clk/qcom/Kconfig
++++ b/drivers/clk/qcom/Kconfig
+@@ -79,6 +79,14 @@ config QCOM_HFPLL
+ 	  Say Y if you want to support CPU frequency scaling on devices
+ 	  such as MSM8974, APQ8084, etc.
  
- 	clk->new_rate = new_rate;
- 	clk->new_parent = new_parent;
-@@ -1377,6 +1378,17 @@ static void clk_calc_subtree(struct clk *clk, unsigned long new_rate,
- 	if (new_parent && new_parent != clk->parent)
- 		new_parent->new_child = clk;
- 
-+	if (clk->ops->get_safe_parent) {
-+		parent = clk->ops->get_safe_parent(clk->hw);
-+		if (parent) {
-+			p_index = clk_fetch_parent_index(clk, parent);
-+			clk->safe_parent_index = p_index;
-+			clk->safe_parent = parent;
-+		}
++config KPSS_XCC
++	tristate "KPSS Clock Controller"
++	depends on COMMON_CLK_QCOM
++	help
++	  Support for the Krait ACC and GCC clock controllers. Say Y
++	  if you want to support CPU frequency scaling on devices such
++	  as MSM8960, APQ8064, etc.
++
+ config KRAIT_CLOCKS
+ 	bool
+ 	select KRAIT_L2_ACCESSORS
+diff --git a/drivers/clk/qcom/Makefile b/drivers/clk/qcom/Makefile
+index c7fda5e9dcc7..d85491bfc053 100644
+--- a/drivers/clk/qcom/Makefile
++++ b/drivers/clk/qcom/Makefile
+@@ -18,4 +18,5 @@ obj-$(CONFIG_MSM_GCC_8960) += gcc-msm8960.o
+ obj-$(CONFIG_MSM_GCC_8974) += gcc-msm8974.o
+ obj-$(CONFIG_MSM_MMCC_8960) += mmcc-msm8960.o
+ obj-$(CONFIG_MSM_MMCC_8974) += mmcc-msm8974.o
++obj-$(CONFIG_KPSS_XCC) += kpss-xcc.o
+ obj-$(CONFIG_QCOM_HFPLL) += hfpll.o
+diff --git a/drivers/clk/qcom/kpss-xcc.c b/drivers/clk/qcom/kpss-xcc.c
+new file mode 100644
+index 000000000000..9c49496afa6a
+--- /dev/null
++++ b/drivers/clk/qcom/kpss-xcc.c
+@@ -0,0 +1,94 @@
++/* Copyright (c) 2014, The Linux Foundation. All rights reserved.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 and
++ * only version 2 as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
++#include <linux/kernel.h>
++#include <linux/init.h>
++#include <linux/module.h>
++#include <linux/platform_device.h>
++#include <linux/err.h>
++#include <linux/io.h>
++#include <linux/of.h>
++#include <linux/of_device.h>
++#include <linux/clk.h>
++#include <linux/clk-provider.h>
++
++static const char *aux_parents[] = {
++	"pll8_vote",
++	"pxo",
++};
++
++static unsigned int aux_parent_map[] = {
++	3,
++	0,
++};
++
++static const struct of_device_id kpss_xcc_match_table[] = {
++	{ .compatible = "qcom,kpss-acc-v1", .data = (void *)1UL },
++	{ .compatible = "qcom,kpss-gcc" },
++	{}
++};
++MODULE_DEVICE_TABLE(of, kpss_xcc_match_table);
++
++static int kpss_xcc_driver_probe(struct platform_device *pdev)
++{
++	const struct of_device_id *id;
++	struct clk *clk;
++	struct resource *res;
++	void __iomem *base;
++	const char *name;
++
++	id = of_match_device(kpss_xcc_match_table, &pdev->dev);
++	if (!id)
++		return -ENODEV;
++
++	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	base = devm_ioremap_resource(&pdev->dev, res);
++	if (IS_ERR(base))
++		return PTR_ERR(base);
++
++	if (id->data) {
++		if (of_property_read_string_index(pdev->dev.of_node,
++					"clock-output-names", 0, &name))
++			return -ENODEV;
++		base += 0x14;
 +	} else {
-+		clk->safe_parent = NULL;
++		name = "acpu_l2_aux";
++		base += 0x28;
 +	}
 +
- 	hlist_for_each_entry(child, &clk->children, child_node) {
- 		child->new_rate = clk_recalc(child, new_rate);
- 		clk_calc_subtree(child, child->new_rate, NULL, 0);
-@@ -1459,14 +1471,42 @@ out:
- static struct clk *clk_propagate_rate_change(struct clk *clk, unsigned long event)
- {
- 	struct clk *child, *tmp_clk, *fail_clk = NULL;
-+	struct clk *old_parent;
- 	int ret = NOTIFY_DONE;
- 
--	if (clk->rate == clk->new_rate)
-+	if (clk->rate == clk->new_rate && event != POST_RATE_CHANGE)
- 		return NULL;
- 
-+	switch (event) {
-+	case PRE_RATE_CHANGE:
-+		if (clk->safe_parent)
-+			clk->ops->set_parent(clk->hw, clk->safe_parent_index);
-+		break;
-+	case POST_RATE_CHANGE:
-+		if (clk->safe_parent) {
-+			old_parent = __clk_set_parent_before(clk,
-+							     clk->new_parent);
-+			if (clk->ops->set_rate_and_parent) {
-+				clk->ops->set_rate_and_parent(clk->hw,
-+						clk->new_rate,
-+						clk->new_parent ?
-+						clk->new_parent->rate : 0,
-+						clk->new_parent_index);
-+			} else if (clk->ops->set_parent) {
-+				clk->ops->set_parent(clk->hw,
-+						clk->new_parent_index);
-+			}
-+			__clk_set_parent_after(clk, clk->new_parent,
-+					       old_parent);
-+		}
-+		break;
-+	}
++	clk = clk_register_mux_table(&pdev->dev, name, aux_parents,
++				     ARRAY_SIZE(aux_parents), 0, base, 0, 0x3,
++				     0, aux_parent_map, NULL);
 +
- 	if (clk->notifier_count) {
--		ret = __clk_notify(clk, event, clk->rate, clk->new_rate);
--		if (ret & NOTIFY_STOP_MASK)
-+		if (event != POST_RATE_CHANGE)
-+			ret = __clk_notify(clk, event, clk->rate,
-+					   clk->new_rate);
-+		if (ret & NOTIFY_STOP_MASK && event != POST_RATE_CHANGE)
- 			fail_clk = clk;
- 	}
- 
-@@ -1508,7 +1548,8 @@ static void clk_change_rate(struct clk *clk)
- 	else if (clk->parent)
- 		best_parent_rate = clk->parent->rate;
- 
--	if (clk->new_parent && clk->new_parent != clk->parent) {
-+	if (clk->new_parent && clk->new_parent != clk->parent &&
-+			!clk->safe_parent) {
- 		old_parent = __clk_set_parent_before(clk, clk->new_parent);
- 
- 		if (clk->ops->set_rate_and_parent) {
-@@ -1528,9 +1569,6 @@ static void clk_change_rate(struct clk *clk)
- 
- 	clk->rate = clk_recalc(clk, best_parent_rate);
- 
--	if (clk->notifier_count && old_rate != clk->rate)
--		__clk_notify(clk, POST_RATE_CHANGE, old_rate, clk->rate);
--
- 	hlist_for_each_entry(child, &clk->children, child_node) {
- 		/* Skip children who will be reparented to another clock */
- 		if (child->new_parent && child->new_parent != clk)
-@@ -1604,6 +1642,7 @@ int clk_set_rate(struct clk *clk, unsigned long rate)
- 	/* change the rates */
- 	clk_change_rate(top);
- 
-+	clk_propagate_rate_change(top, POST_RATE_CHANGE);
- out:
- 	clk_prepare_unlock();
- 
-diff --git a/include/linux/clk-private.h b/include/linux/clk-private.h
-index efbf70b9fd84..f48684af4d8f 100644
---- a/include/linux/clk-private.h
-+++ b/include/linux/clk-private.h
-@@ -38,8 +38,10 @@ struct clk {
- 	struct clk		**parents;
- 	u8			num_parents;
- 	u8			new_parent_index;
-+	u8			safe_parent_index;
- 	unsigned long		rate;
- 	unsigned long		new_rate;
-+	struct clk		*safe_parent;
- 	struct clk		*new_parent;
- 	struct clk		*new_child;
- 	unsigned long		flags;
-diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
-index 32d39613d217..6dec0b306336 100644
---- a/include/linux/clk-provider.h
-+++ b/include/linux/clk-provider.h
-@@ -170,6 +170,7 @@ struct clk_ops {
- 					struct clk **best_parent_clk);
- 	int		(*set_parent)(struct clk_hw *hw, u8 index);
- 	u8		(*get_parent)(struct clk_hw *hw);
-+	struct clk	*(*get_safe_parent)(struct clk_hw *hw);
- 	int		(*set_rate)(struct clk_hw *hw, unsigned long rate,
- 				    unsigned long parent_rate);
- 	int		(*set_rate_and_parent)(struct clk_hw *hw,
++	platform_set_drvdata(pdev, clk);
++
++	return PTR_ERR_OR_ZERO(clk);
++}
++
++static int kpss_xcc_driver_remove(struct platform_device *pdev)
++{
++	clk_unregister_mux(platform_get_drvdata(pdev));
++	return 0;
++}
++
++static struct platform_driver kpss_xcc_driver = {
++	.probe = kpss_xcc_driver_probe,
++	.remove = kpss_xcc_driver_remove,
++	.driver = {
++		.name = "kpss-xcc",
++		.of_match_table = kpss_xcc_match_table,
++		.owner = THIS_MODULE,
++	},
++};
++module_platform_driver(kpss_xcc_driver);
++
++MODULE_LICENSE("GPL v2");
 -- 
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
 hosted by The Linux Foundation
