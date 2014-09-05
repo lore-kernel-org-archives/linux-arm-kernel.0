@@ -1,42 +1,58 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri,  5 Sep 2014 12:22:17 +0100
-Subject: [PATCH 0/2] PSCI: don't call CPU_OFF when it might fail
-Message-ID: <1409916139-20127-1-git-send-email-mark.rutland@arm.com>
+Date: Fri,  5 Sep 2014 12:22:18 +0100
+Subject: [PATCH 1/2] arm64: psci: respect MIGRATE_INFO_TYPE
+In-Reply-To: <1409916139-20127-1-git-send-email-mark.rutland@arm.com>
+References: <1409916139-20127-1-git-send-email-mark.rutland@arm.com>
+Message-ID: <1409916139-20127-2-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[Apologies to all who received this already, I typo'd the LAKML address]
+Commit e71246a23acb (PSCI: Add initial support for PSCIv0.2 functions)
+added hooks for MIGRATE_INFO_TYPE, but didn't call it anywhere. This
+means that currently a UP Trusted OS can reject CPU_OFF calls, which
+will cause things to blow up.
 
-In certain conditions PSCI's CPU_OFF call may return DENIED (in the presence of
-a UP OS on the secure world), or might not exist (in early implementations
-prior to PSCI 0.2). Both the arm and arm64 callers fail to handle the former,
-and the arm caller doesn't handle the latter.
+This patch ensures we test MIGRATE_INFO_TYPE before calling CPU_OFF. If
+there's a UP trusted OS hotplug is rejected. Full support for PSCI in
+the presence of a UP trusted OS will require the use of MIGRATE and will
+have to come as a later patch.
 
-We can determine wether a CPU_OFF call will succeed by calling
-MIGRATE_INFO_TYPE. If we receive 2 (A.K.A. PSCI_0_2_TOS_MP) in response we know
-that CPU_OFF should succeed, and in other cases it is necessary to discover
-which CPU said OS lives on and attempt migration. As there don't seem to be any
-UP implementations out there so far, for now we can limit ourselves to only
-supporting CPU hotplug in the PSCI_0_2_TOS_MP case. Hotplug support on such
-systems will require additional work, but at least they won't blow up by
-default.
+Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+Cc: Ashwin Chaugule <ashwin.chaugule@linaro.org>
+Cc: Rob Herring <robh@kernel.org>
+Cc: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+Cc: Ian Campbell <ian.campbell@citrix.com>
+Cc: Christoffer Dall <christoffer.dall@linaro.org>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+---
+ arch/arm64/kernel/psci.c | 14 ++++++++++++++
+ 1 file changed, 14 insertions(+)
 
-These patches add the necessary checks to the arm and arm64 PSCI callers to
-prevent the issues described above. MIGRATE_INFO_TYPE is a mandatory part of
-PSCI 0.2, so no conforming implementation should be adversely affected. Both
-the ARM Trusted Firmware and KVM respond to MIGRATE_INFO_TYPE with
-PSCI_0_2_TOS_MP, so should see no loss of functionality (verified on Juno). 
-
-Thanks,
-Mark.
-
-Mark Rutland (2):
-  arm64: psci: respect MIGRATE_INFO_TYPE
-  arm: psci: don't call CPU_OFF blindly
-
- arch/arm/kernel/psci_smp.c | 36 +++++++++++++++++++++++++++++-------
- arch/arm64/kernel/psci.c   | 14 ++++++++++++++
- 2 files changed, 43 insertions(+), 7 deletions(-)
-
+diff --git a/arch/arm64/kernel/psci.c b/arch/arm64/kernel/psci.c
+index 5539547..a5407af 100644
+--- a/arch/arm64/kernel/psci.c
++++ b/arch/arm64/kernel/psci.c
+@@ -386,6 +386,20 @@ static int cpu_psci_cpu_disable(unsigned int cpu)
+ 	/* Fail early if we don't have CPU_OFF support */
+ 	if (!psci_ops.cpu_off)
+ 		return -EOPNOTSUPP;
++
++	/*
++	 * In the presence of a UP trusted OS, it might not be possible to
++	 * hotplug certain CPUs, and CPU_OFF may return (which would be bad).
++	 * Supporting a UP trusted OS requires careful use of
++	 * MIGRATE_INFO_UP_CPU and MIGRATE, so for now fail in the presence of
++	 * a UP Trusted OS.
++	 */
++	if (psci_ops.migrate_info_type &&
++		psci_ops.migrate_info_type() != PSCI_0_2_TOS_MP) {
++			pr_warn("Unable to handle UP trusted OS\n");
++			return -EPERM;
++	}
++
+ 	return 0;
+ }
+ 
 -- 
 1.9.1
