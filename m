@@ -1,30 +1,31 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Fri,  5 Sep 2014 16:45:12 +0200
-Subject: [PATCH] ARM: at91/dt: rm9200: fix usb clock definition
-Message-ID: <1409928312-24235-1-git-send-email-alexandre.belloni@free-electrons.com>
+From: khilman@kernel.org (Kevin Hilman)
+Date: Fri, 05 Sep 2014 07:59:14 -0700
+Subject: [PATCH] ARM: sunxi: Remove sun4i reboot code from mach directory
+In-Reply-To: <1409332787-23923-1-git-send-email-maxime.ripard@free-electrons.com>
+ (Maxime Ripard's message of "Fri, 29 Aug 2014 19:19:47 +0200")
+References: <1409332787-23923-1-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <7hoauuyuyl.fsf@paris.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The atmel,clk-divisors property is taking 4 divisors, if less are
-provided, the clock registration will fail.
+Maxime Ripard <maxime.ripard@free-electrons.com> writes:
 
-Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
----
- arch/arm/boot/dts/at91rm9200.dtsi | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+> Now that the restart code has been merged in the watchdog driver, we don't need
+> the restart code in the mach-sunxi directory anymore.
+>
+> Remove it entirely.
+>
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> ---
+>
+> Hi Arnd, Kevin, Olof,
+>
+> I don't know if this can be considered 3.17 material, but if so, it would be
+> great if you could merge it directly.
 
-diff --git a/arch/arm/boot/dts/at91rm9200.dtsi b/arch/arm/boot/dts/at91rm9200.dtsi
-index 65ccf564b9a5..6c97d4af61ee 100644
---- a/arch/arm/boot/dts/at91rm9200.dtsi
-+++ b/arch/arm/boot/dts/at91rm9200.dtsi
-@@ -149,7 +149,7 @@
- 				usb: usbck {
- 					compatible = "atmel,at91rm9200-clk-usb";
- 					#clock-cells = <0>;
--					atmel,clk-divisors = <1 2>;
-+					atmel,clk-divisors = <1 2 0 0>;
- 					clocks = <&pllb>;
- 				};
- 
--- 
-1.9.1
+I don't think it's v3.17 material at this point in the cycle because
+it's not a regression fix.
+
+Please add it to your queue for v3.18.
+
+Kevin
