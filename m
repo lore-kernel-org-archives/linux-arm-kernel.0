@@ -1,89 +1,32 @@
-From: tomasz.nowicki@linaro.org (Tomasz Nowicki)
-Date: Fri, 05 Sep 2014 12:49:52 +0200
-Subject: [Linaro-acpi] [PATCH v3 13/17] ARM64 / ACPI: Add GICv2 specific
- ACPI boot support
-In-Reply-To: <540992EA.6020209@arm.com>
-References: <1409583475-6978-1-git-send-email-hanjun.guo@linaro.org>
- <4895927.Zp4WL2AZAF@wuerfel> <540986B2.7000901@arm.com>
- <3400229.hn32yHbVD2@wuerfel> <540992EA.6020209@arm.com>
-Message-ID: <54099550.5080902@linaro.org>
+From: rric@kernel.org (Robert Richter)
+Date: Fri, 5 Sep 2014 12:51:35 +0200
+Subject: [PATCH v2 1/4] arm64, thunder: Add Kconfig option for Cavium
+ Thunder SoC Family
+In-Reply-To: <20140905093647.GH2172@leverpostej>
+References: <1409903205-2762-1-git-send-email-rric@kernel.org>
+ <1409903205-2762-2-git-send-email-rric@kernel.org>
+ <20140905083932.GD13515@arm.com>
+ <20140905092135.GR4703@rric.localhost>
+ <20140905092507.GH13515@arm.com>
+ <20140905093647.GH2172@leverpostej>
+Message-ID: <20140905105135.GU4703@rric.localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 05.09.14 10:36:47, Mark Rutland wrote:
+> On Fri, Sep 05, 2014 at 10:25:08AM +0100, Will Deacon wrote:
+> > All I mean is, if the kernel doesn't explode on existing systems by changing
+> > the upper limit to 64, then we should do that. If you're not comfortable
+> > that the Thunder code can handle that, then leave the thunder default as 32,
+> > like you do in the current patch. It just seems odd not to change the
+> > maximum number, since it's an arbitrary limit from my perspective.
+> 
+> FWIW my Juno happily boots with a NR_CPUS=64 kernel.
 
+It looks like if it's fine to set the general default to NR_CPUS=64
+even if the kernel might not yet boot more than 32 cpus. Will make
+this change separately and drop it in this patch.
 
-On 05.09.2014 12:39, Marc Zyngier wrote:
-> On 05/09/14 11:13, Arnd Bergmann wrote:
->> On Friday 05 September 2014 10:47:30 Marc Zyngier wrote:
->>>>
->>>> I still prefer being explicit here for the same reason I mentioned earlier:
->>>> I want it to be very clear that we don't support arbitrary irqchips other
->>>> than the ones in the APCI specification. The infrastructure exists on DT
->>>> because we have to support a large number of incompatible irqchips.
->>>
->>> I'm not suggesting that we should support more than the ACPI spec says.
->>> And that's certainly the whole point of a spec, isn't it? ACPI says what
->>> we support, and we're not going any further. I'm just saying that we
->>> shouldn't make the maintenance burden heavier, and the code nothing
->>> short of disgusting. Using our current infrastructure doesn't mean we're
->>> going to support GIcv2.37.
->>
->> Ok
->>
->>>> In particular, the ACPI tables describing the irqchip have no way to
->>>> identify the GIC at all, if I read the spec correctly, you have to
->>>> parse the tables, ioremap the registers and then read the ID to know
->>>> if you have GICv1/v2/v2m/v3/v4. There doesn't seem to be any "device"
->>>> for the GIC that a hypothetical probe function would be based on.
->>>
->>> This is not the way I read the spec. Table 5-46 (Interrupt Controller
->>> Structure) tells you if you have a CPU interface (GICv1/v2) or a
->>> redistributor (GICv3/v4). That's enough to know whether or not you
->>> should carry on probing a particular controller.
->>
->> Ah, good. I missed that.
->>
->>> The various GIC versions don't really have a unified memory map anyway
->>> (well, none that you can rely on), and you really have to rely on ACPI
->>> to tell you what you have.
->>
->> So we are back to needing to support two different irqchip drivers
->> (v1/v2/v2m and v3/v4), instead of five or more, right?
->
-> As long as we make sure that the variants are directly probed from the
-> "canonical" driver (v2m from v2, ITS and v4 from v3), then we're OK.
-Yes, that is our intention.
+See also my other reply to Russell in this thread.
 
->
->>>> It does seem wrong to parse the tables in the irq-gic.c file though:
->>>> that part can well be common across the various gic versions and then
->>>> call into either irq-gic.c or irq-gic-v3.c for the version specific
->>>> parts. Whether we put that common code into drivers/irqchip/irqchip.c,
->>>> drivers/irqchip/gic-common.c, drivers/irqchip/irq-acpi-gic.c or
->>>> drivers/acpi/irq-gic.c I don't care at all.
->>>
->>> I don't think so you can make that common code very easily. The
->>> information required by both drivers is organized differently.
->>> If it was, I'd have done that for the DT binding.
->>
->> I see, and that's also what Tomasz just explained. So can we just
->> have one an irqchip_init() function doing this:?
->>
->> if (dt)
->> 	of_irq_init(__irqchip_of_table);
->> else if (acpi) {
->> 	read cpu-interface and redistributor address from acpi tables
->> 	if (cpu-interface)
->> 		gic_v2_acpi_init(table);
->> 	else if(redistributor)
->> 		gic_v3_acpi_init(table)
->> }
->
-> That'd be better, but that only considers the basic architecture. GICv2m
-> and GICv3's ITS bring additional complexity (and their own table
-> parsing). At that stage, I'm not sure how much commonality we're left with.
-
-Right, my local ACPI GICv3 support assumes to probe ITS from 
-gic_v3_acpi_init() body.
-
-Tomasz
+-Robert
