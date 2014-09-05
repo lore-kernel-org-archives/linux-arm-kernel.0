@@ -1,43 +1,31 @@
 From: heiko@sntech.de (Heiko Stuebner)
-Date: Sat,  6 Sep 2014 01:06:14 +0200
-Subject: [PATCH 11/11] ARM: rockchip: add a cpufreq-cpu0 device
+Date: Sat,  6 Sep 2014 01:06:13 +0200
+Subject: [PATCH 10/11] ARM: rockchip: enable cpufreq-related options
 In-Reply-To: <1409958374-30937-1-git-send-email-heiko@sntech.de>
 References: <1409958374-30937-1-git-send-email-heiko@sntech.de>
-Message-ID: <1409958374-30937-12-git-send-email-heiko@sntech.de>
+Message-ID: <1409958374-30937-11-git-send-email-heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Rockchip SoCs can sucessfully use the generic cpufreq-cpu0 driver to
-do frequency scaling. Therefore add a platform device in the machine
-init code.
+Enable ARCH_HAS_CPUFREQ and ARCH_HAS_OPP.
 
 Signed-off-by: Heiko Stuebner <heiko@sntech.de>
 ---
- arch/arm/mach-rockchip/rockchip.c | 7 +++++++
- 1 file changed, 7 insertions(+)
+ arch/arm/mach-rockchip/Kconfig | 2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/arch/arm/mach-rockchip/rockchip.c b/arch/arm/mach-rockchip/rockchip.c
-index 8ab9e0e..eea1f06 100644
---- a/arch/arm/mach-rockchip/rockchip.c
-+++ b/arch/arm/mach-rockchip/rockchip.c
-@@ -24,6 +24,12 @@
- #include <asm/hardware/cache-l2x0.h>
- #include "core.h"
- 
-+static void __init rockchip_dt_init(void)
-+{
-+	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
-+	platform_device_register_simple("cpufreq-cpu0", 0, NULL, 0);
-+}
-+
- static const char * const rockchip_board_dt_compat[] = {
- 	"rockchip,rk2928",
- 	"rockchip,rk3066a",
-@@ -37,4 +43,5 @@ DT_MACHINE_START(ROCKCHIP_DT, "Rockchip Cortex-A9 (Device Tree)")
- 	.l2c_aux_val	= 0,
- 	.l2c_aux_mask	= ~0,
- 	.dt_compat	= rockchip_board_dt_compat,
-+	.init_machine	= rockchip_dt_init,
- MACHINE_END
+diff --git a/arch/arm/mach-rockchip/Kconfig b/arch/arm/mach-rockchip/Kconfig
+index d168669..007e9dd 100644
+--- a/arch/arm/mach-rockchip/Kconfig
++++ b/arch/arm/mach-rockchip/Kconfig
+@@ -2,6 +2,8 @@ config ARCH_ROCKCHIP
+ 	bool "Rockchip RK2928 and RK3xxx SOCs" if ARCH_MULTI_V7
+ 	select PINCTRL
+ 	select PINCTRL_ROCKCHIP
++	select ARCH_HAS_CPUFREQ
++	select ARCH_HAS_OPP
+ 	select ARCH_HAS_RESET_CONTROLLER
+ 	select ARCH_REQUIRE_GPIOLIB
+ 	select ARM_GIC
 -- 
 2.0.1
