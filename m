@@ -1,83 +1,92 @@
-From: pali.rohar@gmail.com (Pali =?utf-8?q?Roh=C3=A1r?=)
-Date: Fri, 5 Sep 2014 15:52:05 +0200
-Subject: [PATCH] ARM: /proc/cpuinfo: Use DT machine name when possible
-In-Reply-To: <20140905134542.GD20164@leverpostej>
-References: <1403110464-29646-1-git-send-email-pali.rohar@gmail.com>
- <201409051338.40988@pali> <20140905134542.GD20164@leverpostej>
-Message-ID: <201409051552.05447@pali>
+From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
+Date: Fri, 05 Sep 2014 15:51:23 +0200
+Subject: [PATCH v6 0/5] ARM: EXYNOS: cpuidle: fix AFTR mode on boards with
+ secure firmware enabled
+Message-ID: <1409925088-4705-1-git-send-email-b.zolnierkie@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 05 September 2014 15:45:42 Mark Rutland wrote:
-> On Fri, Sep 05, 2014 at 12:38:40PM +0100, Pali Roh?r wrote:
-> > On Wednesday 18 June 2014 18:54:24 Pali Roh?r wrote:
-> > > Machine name from board description is some generic name
-> > > on DT kernel. DT provides machine name property which is
-> > > specific for board, so use it instead generic one when
-> > > possible.
-> > > 
-> > > Signed-off-by: Pali Roh?r <pali.rohar@gmail.com>
-> > > ---
-> > > 
-> > >  arch/arm/kernel/setup.c |    7 +++++--
-> > >  1 file changed, 5 insertions(+), 2 deletions(-)
-> > > 
-> > > diff --git a/arch/arm/kernel/setup.c
-> > > b/arch/arm/kernel/setup.c index 8a16ee5..fbc7b4f 100644
-> > > --- a/arch/arm/kernel/setup.c
-> > > +++ b/arch/arm/kernel/setup.c
-> > > @@ -875,10 +875,13 @@ void __init setup_arch(char
-> > > **cmdline_p)
-> > > 
-> > >  	setup_processor();
-> > >  	mdesc = setup_machine_fdt(__atags_pointer);
-> > > 
-> > > -	if (!mdesc)
-> > > +	if (mdesc)
-> > > +		machine_name = of_flat_dt_get_machine_name();
-> > > +	else
-> > > 
-> > >  		mdesc = setup_machine_tags(__atags_pointer,
-> > > 
-> > > __machine_arch_type); machine_desc = mdesc;
-> > > -	machine_name = mdesc->name;
-> > > +	if (!machine_name)
-> > > +		machine_name = mdesc->name;
-> > > 
-> > >  	if (mdesc->reboot_mode != REBOOT_HARD)
-> > >  	
-> > >  		reboot_mode = mdesc->reboot_mode;
-> > 
-> > So, do you really want to break userspace which reading file
-> > /proc/cpuinfo (after migration from boardcode --> DT)?
-> 
-> You have no guarantee model name in the DT == the name in a
-> board file anyhow, and trying to force that is wrong. So
-> further to Russell's reply, I must NAK this from a DT
-> perspective.
-> 
-> Realistically your userspace is already broken if relying on
-> such things. You built something that only ever worked for a
-> particular arbitrary string. So it was already broken for
-> every other board, and there was never any guarantee that new
-> boards where your userspace could have worked would share the
-> same name.
-> 
-> You're trying to fix the wrong side of the equation.
-> 
-> Mark.
+Hi,
 
-So what is your suggestion for identifing board (name/type) which 
-will work with any kernel (and will not be broken again by kernel 
-later)?
+This patch series adds support for AFTR idle mode on boards with
+secure firmware enabled and allows EXYNOS cpuidle driver usage on
+Exynos4x12 SoCs.
+
+It has been tested on Trats2 board (using Exynos4412 SoC with secure
+firmware enabled) on which AFTR mode reduces power consumption by ~12%
+when EXYNOS cpuidle driver is enabled (in both cases the default
+exynos_defconfig config is used and CPU1-3 are offlined).
+
+Currently Exynos4412 SoC support is limited to Trats2 board.
+
+Depends on:
+- next-20140904 branch of linux-next kernel tree
+- "irqchip: Properly fetch the per cpu offset" patch
+  (https://www.mail-archive.com/linux-kernel at vger.kernel.org/msg716674.html)
+- [PATCH v3 0/5] Firmware-assisted suspend/resume of Exynos SoCs
+  (https://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg35921.html)
+
+Changes since v5:
+- rebased on top of next-20140904 +
+  "irqchip: Properly fetch the per cpu offset" patch
+  (https://www.mail-archive.com/linux-kernel at vger.kernel.org/msg716674.html)
+  [PATCH v3 0/5] Firmware-assisted suspend/resume of Exynos SoCs
+  (https://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg35921.html)
+- limit Exynos4412 SoC support to Trats2 board for now
+
+Changes since v4:
+- rebased on top of next-20140804 +
+  [PATCH v5][next-20140804] ARM: EXYNOS: Fix suspend/resume sequences
+  (http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg35262.html)
+  [PATCH v2 0/2] Firmware-assisted suspend/resume of Exynos SoCs
+  (http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg34282.html)
+- call exynos_save_cp15() only on A9 type core (this is needed for the future
+  Exynos3250 SoC support)
+
+Changes since v3:
+- rebased on top of next-20140804 +
+  [PATCH v4][next-20140804] ARM: EXYNOS: Fix suspend/resume sequences
+  (http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg35192.html)
+  [PATCH v2 0/2] Firmware-assisted suspend/resume of Exynos SoCs
+  (http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg34282.html)
+- (re-)added patch fixing S5P_CENTRAL_SEQ_OPTION register setup
+
+Changes since v2:
+- rebased on top of next-20140708 +
+  [PATCH 5/6] ARM: EXYNOS: Fix suspend/resume sequencies
+  (http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg32809.html)
+  [with rejects fixed]
+  [PATCH 6/6] ARM: EXYNOS: Register cpuidle device only on Exynos4210 and 5250
+  (http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg32808.html)
+  [PATCH 0/2] Firmware-assisted suspend/resume of Exynos SoCs
+  (http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg32991.html)
+  [with rejects fixed in patch #2]
+- addressed review comments from Tomasz Figa and Daniel Lezcano
+
+Changes since v1:
+- synced against next-20140602
+- added missing Acked-by-s
+
+Best regards,
+--
+Bartlomiej Zolnierkiewicz
+Samsung R&D Institute Poland
+Samsung Electronics
+
+
+Bartlomiej Zolnierkiewicz (5):
+  ARM: EXYNOS: PM: replace EXYNOS_BOOT_VECTOR_* macros by static inlines
+  ARM: EXYNOS: add AFTR mode support to firmware do_idle method
+  ARM: EXYNOS: cpuidle: add secure firmware support to AFTR mode code
+  ARM: EXYNOS: PM: fix register setup for AFTR mode code
+  ARM: EXYNOS: cpuidle: allow driver usage on Exynos4x12 SoCs
+
+ arch/arm/include/asm/firmware.h |  2 +-
+ arch/arm/mach-exynos/common.h   |  5 ++++
+ arch/arm/mach-exynos/exynos.c   |  5 +++-
+ arch/arm/mach-exynos/firmware.c | 34 ++++++++++++++++-------
+ arch/arm/mach-exynos/pm.c       | 60 ++++++++++++++++++++++++-----------------
+ 5 files changed, 71 insertions(+), 35 deletions(-)
 
 -- 
-Pali Roh?r
-pali.rohar at gmail.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: This is a digitally signed message part.
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140905/6e3c7aea/attachment.sig>
+1.8.2.3
