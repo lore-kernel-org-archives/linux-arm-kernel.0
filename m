@@ -1,19 +1,16 @@
 From: shawn.guo@freescale.com (Shawn Guo)
-Date: Fri, 5 Sep 2014 08:43:23 +0800
-Subject: [PATCH] ARM: clk-imx6sl: correct the pxp and epdc axi clock
- selections
-In-Reply-To: <1409819592-31462-1-git-send-email-chen.fang@freescale.com>
-References: <1409819592-31462-1-git-send-email-chen.fang@freescale.com>
-Message-ID: <20140905004322.GE10809@dragon>
+Date: Fri, 5 Sep 2014 08:43:47 +0800
+Subject: [PATCH V1 1/2] ARM: clk-imx6q: refine clock tree for ASRC
+In-Reply-To: <98d2985de76fa84525e9958522bd371a34ff84f0.1409824001.git.shengjiu.wang@freescale.com>
+References: <98d2985de76fa84525e9958522bd371a34ff84f0.1409824001.git.shengjiu.wang@freescale.com>
+Message-ID: <20140905004346.GF10809@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 04, 2014 at 04:33:12PM +0800, Fancy Fang wrote:
-> The parent clocks of IMX6SL_CLK_PXP_AXI_SEL and IMX6SL_CLK_EPDC_AXI_SEL
-> clocks are not the same. So split the epdc_pxp_sels into two different
-> clock selections 'pxp_axi_sels' and 'epdc_axi_sels'.
+On Thu, Sep 04, 2014 at 05:48:58PM +0800, Shengjiu Wang wrote:
+> ASRC has "asrc", "asrc_ipg", "asrc_mem" clocks, and they share
+> the same gate bits.
 > 
-> Signed-off-by: Fancy Fang <chen.fang@freescale.com>
-> Signed-off-by: Robby Cai <R63905@freescale.com>
+> Signed-off-by: Shengjiu Wang <shengjiu.wang@freescale.com>
 
-Applied, thanks.
+Applied both, thanks.
