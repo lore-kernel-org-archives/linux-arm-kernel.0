@@ -1,33 +1,45 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Fri, 5 Sep 2014 15:51:49 -0500
-Subject: [PATCH V2 1/3] Documentation: dt-bindings: mfd: palmas: Fix example
- style of i2c peripheral
-In-Reply-To: <1409950311-25236-1-git-send-email-nm@ti.com>
-References: <1409950311-25236-1-git-send-email-nm@ti.com>
-Message-ID: <1409950311-25236-2-git-send-email-nm@ti.com>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Fri, 5 Sep 2014 21:53:05 +0100
+Subject: [PATCH 0/2] PSCI: don't call CPU_OFF when it might fail
+In-Reply-To: <1409916139-20127-1-git-send-email-mark.rutland@arm.com>
+References: <1409916139-20127-1-git-send-email-mark.rutland@arm.com>
+Message-ID: <alpine.DEB.2.02.1409052151450.2334@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use device at address as name for device nodes.
-
-Suggested-by: Lee Jones <lee.jones@linaro.org>
-Signed-off-by: Nishanth Menon <nm@ti.com>
----
- Documentation/devicetree/bindings/mfd/palmas.txt |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/Documentation/devicetree/bindings/mfd/palmas.txt b/Documentation/devicetree/bindings/mfd/palmas.txt
-index eda8989..d193859 100644
---- a/Documentation/devicetree/bindings/mfd/palmas.txt
-+++ b/Documentation/devicetree/bindings/mfd/palmas.txt
-@@ -33,7 +33,7 @@ Optional properties:
+On Fri, 5 Sep 2014, Mark Rutland wrote:
+> [Apologies to all who received this already, I typo'd the LAKML address]
+> 
+> In certain conditions PSCI's CPU_OFF call may return DENIED (in the presence of
+> a UP OS on the secure world), or might not exist (in early implementations
+> prior to PSCI 0.2). Both the arm and arm64 callers fail to handle the former,
+> and the arm caller doesn't handle the latter.
+> 
+> We can determine wether a CPU_OFF call will succeed by calling
+> MIGRATE_INFO_TYPE. If we receive 2 (A.K.A. PSCI_0_2_TOS_MP) in response we know
+> that CPU_OFF should succeed, and in other cases it is necessary to discover
+> which CPU said OS lives on and attempt migration. As there don't seem to be any
+> UP implementations out there so far, for now we can limit ourselves to only
+> supporting CPU hotplug in the PSCI_0_2_TOS_MP case. Hotplug support on such
+> systems will require additional work, but at least they won't blow up by
+> default.
+> 
+> These patches add the necessary checks to the arm and arm64 PSCI callers to
+> prevent the issues described above. MIGRATE_INFO_TYPE is a mandatory part of
+> PSCI 0.2, so no conforming implementation should be adversely affected. Both
+> the ARM Trusted Firmware and KVM respond to MIGRATE_INFO_TYPE with
+> PSCI_0_2_TOS_MP, so should see no loss of functionality (verified on Juno). 
+> 
+> Thanks,
+> Mark.
+> 
+> Mark Rutland (2):
+>   arm64: psci: respect MIGRATE_INFO_TYPE
+>   arm: psci: don't call CPU_OFF blindly
+> 
+>  arch/arm/kernel/psci_smp.c | 36 +++++++++++++++++++++++++++++-------
+>  arch/arm64/kernel/psci.c   | 14 ++++++++++++++
+>  2 files changed, 43 insertions(+), 7 deletions(-)
  
- Example:
- 
--palmas {
-+palmas at 48 {
- 	compatible = "ti,twl6035", "ti,palmas";
- 	reg = <0x48>
- 	interrupt-parent = <&intc>;
--- 
-1.7.9.5
+The patches look good to me and AFACT they would work fine on Xen 4.4
+and the soon to be release 4.5.
