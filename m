@@ -1,41 +1,60 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Fri,  5 Sep 2014 15:51:56 -0700
-Subject: [PATCH] ARM: debug: Update MSM and QCOM DEBUG_LL help
-Message-ID: <1409957516-25616-1-git-send-email-sboyd@codeaurora.org>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Sat,  6 Sep 2014 01:06:12 +0200
+Subject: [PATCH 09/11] ARM: dts: rockchip: add cpu supplies to boards
+In-Reply-To: <1409958374-30937-1-git-send-email-heiko@sntech.de>
+References: <1409958374-30937-1-git-send-email-heiko@sntech.de>
+Message-ID: <1409958374-30937-10-git-send-email-heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add another SoC address for apq8064 and use DEBUG_UART_VIRT
-instead of DEBUG_UART_BASE because the former actually exists.
+This adds the cpu-supplies to the curie2 and radxarock boards. The rk3288
+boards are currently still missing their cpu-regulator, so will get their
+supply later.
 
-Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+Signed-off-by: Heiko Stuebner <heiko@sntech.de>
 ---
- arch/arm/Kconfig.debug | 5 +++--
- 1 file changed, 3 insertions(+), 2 deletions(-)
+ arch/arm/boot/dts/rk3066a-bqcurie2.dts | 4 ++++
+ arch/arm/boot/dts/rk3188-radxarock.dts | 6 +++++-
+ 2 files changed, 9 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
-index 537dd04209bc..a71558ecf9da 100644
---- a/arch/arm/Kconfig.debug
-+++ b/arch/arm/Kconfig.debug
-@@ -378,7 +378,7 @@ choice
- 		  Say Y here if you want the debug print routines to direct
- 		  their output to the serial port on MSM devices.
+diff --git a/arch/arm/boot/dts/rk3066a-bqcurie2.dts b/arch/arm/boot/dts/rk3066a-bqcurie2.dts
+index 042f821d..b185738 100644
+--- a/arch/arm/boot/dts/rk3066a-bqcurie2.dts
++++ b/arch/arm/boot/dts/rk3066a-bqcurie2.dts
+@@ -60,6 +60,10 @@
+ 	};
+ };
  
--		  ARCH                DEBUG_UART_PHYS   DEBUG_UART_BASE   #
-+		  ARCH                DEBUG_UART_PHYS   DEBUG_UART_VIRT   #
- 		  MSM7X00A, QSD8X50   0xa9a00000        0xe1000000        UART1
- 		  MSM7X00A, QSD8X50   0xa9b00000        0xe1000000        UART2
- 		  MSM7X00A, QSD8X50   0xa9c00000        0xe1000000        UART3
-@@ -397,7 +397,8 @@ choice
- 		  Say Y here if you want the debug print routines to direct
- 		  their output to the serial port on Qualcomm devices.
++&cpu0 {
++	cpu0-supply = <&vdd_arm>;
++};
++
+ &i2c1 {
+ 	status = "okay";
+ 	clock-frequency = <400000>;
+diff --git a/arch/arm/boot/dts/rk3188-radxarock.dts b/arch/arm/boot/dts/rk3188-radxarock.dts
+index 171b610..f3656d4 100644
+--- a/arch/arm/boot/dts/rk3188-radxarock.dts
++++ b/arch/arm/boot/dts/rk3188-radxarock.dts
+@@ -76,6 +76,10 @@
+ 	};
+ };
  
--		  ARCH      DEBUG_UART_PHYS   DEBUG_UART_BASE
-+		  ARCH      DEBUG_UART_PHYS   DEBUG_UART_VIRT
-+		  APQ8064   0x16640000        0xf0040000
- 		  APQ8084   0xf995e000        0xfa75e000
- 		  MSM8X60   0x19c40000        0xf0040000
- 		  MSM8960   0x16440000        0xf0040000
++&cpu0 {
++	cpu0-supply = <&vdd_arm>;
++};
++
+ &i2c1 {
+ 	status = "okay";
+ 	clock-frequency = <400000>;
+@@ -106,7 +110,7 @@
+ 			vdd_arm: REG3 {
+ 				regulator-name = "VDD_ARM";
+ 				regulator-min-microvolt = <875000>;
+-				regulator-max-microvolt = <1300000>;
++				regulator-max-microvolt = <1350000>;
+ 				regulator-always-on;
+ 			};
+ 
 -- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by The Linux Foundation
+2.0.1
