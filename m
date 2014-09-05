@@ -1,28 +1,81 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 05 Sep 2014 19:57:28 +0200
-Subject: [PATCH RESEND v5 1/5] usb: host: ehci-st: Add EHCI support for ST
- STB devices
-In-Reply-To: <1409937829-23708-2-git-send-email-peter.griffin@linaro.org>
-References: <1409937829-23708-1-git-send-email-peter.griffin@linaro.org>
- <1409937829-23708-2-git-send-email-peter.griffin@linaro.org>
-Message-ID: <202755915.brE74x99uQ@wuerfel>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Fri, 5 Sep 2014 18:03:07 +0000 (UTC)
+Subject: [GIT PULL] ARM: OMAP2+: DRA72x/DRA74x basic support
+In-Reply-To: <CAOesGMiudDK71Pzo+k9iiKJAcJzobc5z4+cpcomeJyM1KzbvgQ@mail.gmail.com>
+References: <alpine.DEB.2.02.1408280617360.21985@utopia.booyaka.com>
+ <20140828170258.GH16006@atomide.com>
+ <CAOesGMiudDK71Pzo+k9iiKJAcJzobc5z4+cpcomeJyM1KzbvgQ@mail.gmail.com>
+Message-ID: <alpine.DEB.2.02.1409051759530.9444@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 05 September 2014 18:23:45 Peter Griffin wrote:
-> +struct st_platform_priv {
-> +       struct clk *clks[USB_MAX_CLKS];
-> +       struct clk *clk48;
-> +       struct reset_control *rst;
-> +       struct reset_control *pwr;
-> +       struct phy *phy;
-> +};
+Hello Olof,
 
-Any reason why this is in a shared header file? It looks like
-duplicating the structure under two different names would
-actually be shorter and keep the drivers more readable as they'd
-be self-contained, even when they have the exact same structure.
+Sorry for the confusion, and thanks for the clarification.  
 
-Do both drivers use all fields?
+TI folks: no new platform support will be accepted through me for any 
+future -rc series patchsets.
 
-	Arnd
+
+- Paul
+
+On Sun, 31 Aug 2014, Olof Johansson wrote:
+
+> This one clearly falls into the category of new platform support, not
+> bugfixes. But it's pretty small so I'll pick it up this time.
+> 
+> 
+> -Olof
+> 
+> On Thu, Aug 28, 2014 at 10:02 AM, Tony Lindgren <tony@atomide.com> wrote:
+> > Arnd & Olof,
+> >
+> > Can you please pick this one up for the -rc cycle so the TI guys
+> > can boot test dra7 with mainline properly?
+> >
+> > Regards,
+> >
+> > Tony
+> >
+> > * Paul Walmsley <paul@pwsan.com> [140827 23:18]:
+> >> Hi Tony,
+> >>
+> >> The following changes since commit 52addcf9d6669fa439387610bc65c92fa0980cef:
+> >>
+> >>   Linux 3.17-rc2 (2014-08-25 15:36:20 -0700)
+> >>
+> >> are available in the git repository at:
+> >>
+> >>   git://git.kernel.org/pub/scm/linux/kernel/git/pjw/omap-pending.git tags/for-v3.17-rc/omap-dra72x-d74x-support-a
+> >>
+> >> for you to fetch changes up to f7f7a29bf0cf25af23f37e5b5bf1368b85705286:
+> >>
+> >>   ARM: DRA7: hwmod: Add dra74x and dra72x specific ocp interface lists (2014-08-27 19:38:23 -0600)
+> >>
+> >> ----------------------------------------------------------------
+> >> Add basic subarchitecture support for the DRA72x and DRA74x.  These
+> >> are OMAP2+ derivative SoCs.  This should be low-risk to existing OMAP
+> >> platforms.
+> >>
+> >> Basic build, boot, and PM test logs are available here:
+> >>
+> >> http://www.pwsan.com/omap/testlogs/hwmod-a-early-v3.17-rc/20140827194314/
+> >>
+> >> ----------------------------------------------------------------
+> >> Rajendra Nayak (2):
+> >>       ARM: DRA7: Add support for soc_is_dra74x() and soc_is_dra72x() variants
+> >>       ARM: DRA7: hwmod: Add dra74x and dra72x specific ocp interface lists
+> >>
+> >>  arch/arm/mach-omap2/omap_hwmod.c          |  3 +++
+> >>  arch/arm/mach-omap2/omap_hwmod_7xx_data.c | 22 ++++++++++++++++++++--
+> >>  arch/arm/mach-omap2/soc.h                 |  6 ++++++
+> >>  3 files changed, 29 insertions(+), 2 deletions(-)
+> >>
+> > --
+> > To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+> > the body of a message to majordomo at vger.kernel.org
+> > More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
+
+
+- Paul
