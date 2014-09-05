@@ -1,52 +1,56 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Fri,  5 Sep 2014 16:15:33 +0200
-Subject: [PATCH] ARM: at91: rm9200: fix clock registration
-Message-ID: <1409926533-7853-1-git-send-email-alexandre.belloni@free-electrons.com>
+From: gael.portay@gmail.com (=?UTF-8?q?Ga=C3=ABl=20PORTAY?=)
+Date: Fri,  5 Sep 2014 16:14:37 +0200
+Subject: [PATCHv3 1/4] ARM: at91/tclib: prefer using of devm_* functions
+In-Reply-To: <1409926480-16367-1-git-send-email-gael.portay@gmail.com>
+References: <1409926480-16367-1-git-send-email-gael.portay@gmail.com>
+Message-ID: <1409926480-16367-2-git-send-email-gael.portay@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Actually register clocks from device tree when using the common clock
-framework.
-
-Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+Signed-off-by: Ga?l PORTAY <gael.portay@gmail.com>
+Acked-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 ---
- arch/arm/mach-at91/board-dt-rm9200.c | 11 ++++++++++-
- 1 file changed, 10 insertions(+), 1 deletion(-)
+ drivers/misc/atmel_tclib.c | 14 ++++++--------
+ 1 file changed, 6 insertions(+), 8 deletions(-)
 
-diff --git a/arch/arm/mach-at91/board-dt-rm9200.c b/arch/arm/mach-at91/board-dt-rm9200.c
-index 61ea21445664..a598481a3570 100644
---- a/arch/arm/mach-at91/board-dt-rm9200.c
-+++ b/arch/arm/mach-at91/board-dt-rm9200.c
-@@ -14,6 +14,7 @@
- #include <linux/gpio.h>
- #include <linux/of.h>
- #include <linux/of_irq.h>
-+#include <linux/clk-provider.h>
+diff --git a/drivers/misc/atmel_tclib.c b/drivers/misc/atmel_tclib.c
+index c8d8e38..b514a2d 100644
+--- a/drivers/misc/atmel_tclib.c
++++ b/drivers/misc/atmel_tclib.c
+@@ -150,17 +150,15 @@ static int __init tc_probe(struct platform_device *pdev)
+ 	if (irq < 0)
+ 		return -EINVAL;
  
- #include <asm/setup.h>
- #include <asm/irq.h>
-@@ -24,13 +25,21 @@
- #include "at91_aic.h"
- #include "generic.h"
+-	tc = kzalloc(sizeof(struct atmel_tc), GFP_KERNEL);
++	tc = devm_kzalloc(&pdev->dev, sizeof(struct atmel_tc), GFP_KERNEL);
+ 	if (!tc)
+ 		return -ENOMEM;
  
-+static void __init rm9200_dt_timer_init(void)
-+{
-+#if defined(CONFIG_COMMON_CLK)
-+	of_clk_init(NULL);
-+#endif
-+	at91rm9200_timer_init();
-+}
-+
- static const char *at91rm9200_dt_board_compat[] __initdata = {
- 	"atmel,at91rm9200",
- 	NULL
- };
+ 	tc->pdev = pdev;
  
- DT_MACHINE_START(at91rm9200_dt, "Atmel AT91RM9200 (Device Tree)")
--	.init_time      = at91rm9200_timer_init,
-+	.init_time      = rm9200_dt_timer_init,
- 	.map_io		= at91_map_io,
- 	.init_early	= at91rm9200_dt_initialize,
- 	.dt_compat	= at91rm9200_dt_board_compat,
+-	clk = clk_get(&pdev->dev, "t0_clk");
+-	if (IS_ERR(clk)) {
+-		kfree(tc);
+-		return -EINVAL;
+-	}
++	clk = devm_clk_get(&pdev->dev, "t0_clk");
++	if (IS_ERR(clk))
++		return PTR_ERR(clk);
+ 
+ 	/* Now take SoC information if available */
+ 	if (pdev->dev.of_node) {
+@@ -171,10 +169,10 @@ static int __init tc_probe(struct platform_device *pdev)
+ 	}
+ 
+ 	tc->clk[0] = clk;
+-	tc->clk[1] = clk_get(&pdev->dev, "t1_clk");
++	tc->clk[1] = devm_clk_get(&pdev->dev, "t1_clk");
+ 	if (IS_ERR(tc->clk[1]))
+ 		tc->clk[1] = clk;
+-	tc->clk[2] = clk_get(&pdev->dev, "t2_clk");
++	tc->clk[2] = devm_clk_get(&pdev->dev, "t2_clk");
+ 	if (IS_ERR(tc->clk[2]))
+ 		tc->clk[2] = clk;
+ 
 -- 
-1.9.1
+1.9.3
