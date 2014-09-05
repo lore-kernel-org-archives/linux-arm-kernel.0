@@ -1,56 +1,44 @@
 From: wangyijing@huawei.com (Yijing Wang)
-Date: Fri, 5 Sep 2014 18:09:59 +0800
-Subject: [PATCH v1 14/21] MIPS/Xlr/MSI: Use MSI chip framework to configure
- MSI/MSI-X irq
+Date: Fri, 5 Sep 2014 18:09:57 +0800
+Subject: [PATCH v1 12/21] MIPS/Xlp: Remove the dead function destroy_irq() to
+ fix build error
 In-Reply-To: <1409911806-10519-1-git-send-email-wangyijing@huawei.com>
 References: <1409911806-10519-1-git-send-email-wangyijing@huawei.com>
-Message-ID: <1409911806-10519-15-git-send-email-wangyijing@huawei.com>
+Message-ID: <1409911806-10519-13-git-send-email-wangyijing@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use MSI chip framework instead of arch MSI functions to configure
-MSI/MSI-X irq. So we can manage MSI/MSI-X irq in a unified framework.
+Commit 465665f78a7 ("mips: Kill pointless destroy_irq()") removed
+the destroy_irq(). So remove the leftover one in xlp_setup_msix()
+to fix build error.
 
-Signed-off-by: Yijing Wang <wangyijing@huawei.com>
+arch/mips/pci/msi-xlp.c: In function 'xlp_setup_msix':
+arch/mips/pci/msi-xlp.c:447:3: error: implicit declaration of function 'destroy_irq'..
+cc1: some warnings being treated as errors
+make[1]: *** [arch/mips/pci/msi-xlp.o] Error 1
+make: *** [arch/mips/pci/] Error 2
+
+Signed-off-by: Yijing Wang <wangyiijng@huawei.com>
+Cc: Thomas Gleixner <tglx@linutronix.de>
 ---
- arch/mips/pci/pci-xlr.c |   15 +++++++++++++--
- 1 files changed, 13 insertions(+), 2 deletions(-)
+ arch/mips/pci/msi-xlp.c |    4 +---
+ 1 files changed, 1 insertions(+), 3 deletions(-)
 
-diff --git a/arch/mips/pci/pci-xlr.c b/arch/mips/pci/pci-xlr.c
-index 0dde803..7bd91cc 100644
---- a/arch/mips/pci/pci-xlr.c
-+++ b/arch/mips/pci/pci-xlr.c
-@@ -214,11 +214,11 @@ static int get_irq_vector(const struct pci_dev *dev)
- }
+diff --git a/arch/mips/pci/msi-xlp.c b/arch/mips/pci/msi-xlp.c
+index fa374fe..e469dc7 100644
+--- a/arch/mips/pci/msi-xlp.c
++++ b/arch/mips/pci/msi-xlp.c
+@@ -443,10 +443,8 @@ static int xlp_setup_msix(uint64_t lnkbase, int node, int link,
+ 	msg.data = 0xc00 | msixvec;
  
- #ifdef CONFIG_PCI_MSI
--void arch_teardown_msi_irq(unsigned int irq)
-+void xlr_teardown_msi_irq(unsigned int irq)
- {
- }
+ 	ret = irq_set_msi_desc(xirq, desc);
+-	if (ret < 0) {
+-		destroy_irq(xirq);
++	if (ret < 0)
+ 		return ret;
+-	}
  
--int arch_setup_msi_irq(struct pci_dev *dev, struct msi_desc *desc)
-+int xlr_setup_msi_irq(struct pci_dev *dev, struct msi_desc *desc)
- {
- 	struct msi_msg msg;
- 	struct pci_dev *lnk;
-@@ -263,6 +263,17 @@ int arch_setup_msi_irq(struct pci_dev *dev, struct msi_desc *desc)
- 	write_msi_msg(irq, &msg);
+ 	write_msi_msg(xirq, &msg);
  	return 0;
- }
-+
-+static struct msi_chip xlr_msi_chip = {
-+	.setup_irq = xlr_setup_msi_irq,
-+	.teardown_irq = xlr_teardown_msi_irq,
-+};
-+
-+struct msi_chip *arch_find_msi_chip(struct pci_dev *dev)
-+{
-+	return &xlr_msi_chip;
-+}
-+
- #endif
- 
- /* Extra ACK needed for XLR on chip PCI controller */
 -- 
 1.7.1
