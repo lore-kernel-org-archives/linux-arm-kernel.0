@@ -1,56 +1,64 @@
-From: pali.rohar@gmail.com (Pali =?utf-8?q?Roh=C3=A1r?=)
-Date: Fri, 5 Sep 2014 13:38:40 +0200
-Subject: [PATCH] ARM: /proc/cpuinfo: Use DT machine name when possible
-In-Reply-To: <1403110464-29646-1-git-send-email-pali.rohar@gmail.com>
-References: <1403110464-29646-1-git-send-email-pali.rohar@gmail.com>
-Message-ID: <201409051338.40988@pali>
+From: marex@denx.de (Marek Vasut)
+Date: Fri, 5 Sep 2014 12:40:44 +0200
+Subject: [PATCH v7 1/2] i2c: imx: add DMA support for freescale i2c driver
+In-Reply-To: <c10c1960255e4dbca2a281b995290c6d@BL2PR03MB338.namprd03.prod.outlook.com>
+References: <1407923215-3749-1-git-send-email-yao.yuan@freescale.com>
+ <201409041638.45537.marex@denx.de>
+ <c10c1960255e4dbca2a281b995290c6d@BL2PR03MB338.namprd03.prod.outlook.com>
+Message-ID: <201409051240.44469.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 18 June 2014 18:54:24 Pali Roh?r wrote:
-> Machine name from board description is some generic name on DT
-> kernel. DT provides machine name property which is specific
-> for board, so use it instead generic one when possible.
+On Friday, September 05, 2014 at 12:32:40 PM, Yao Yuan wrote:
+[...]
+> > > +static int i2c_imx_dma_write(struct imx_i2c_struct *i2c_imx,
+> > > +					struct i2c_msg *msgs)
+> > > +{
+> > > +	int result;
+> > > +	unsigned int temp = 0;
+> > > +	unsigned long orig_jiffies = jiffies;
+> > > +	struct imx_i2c_dma *dma = i2c_imx->dma;
+> > > +	struct device *dev = &i2c_imx->adapter.dev;
+> > > +
+> > > +	dev_dbg(dev, "<%s> write slave address: addr=0x%x\n",
+> > > +		__func__, msgs->addr << 1);
+> > > +
+> > > +	reinit_completion(&i2c_imx->dma->cmd_complete);
+> > > +	dma->chan_using = dma->chan_tx;
+> > > +	dma->dma_transfer_dir = DMA_MEM_TO_DEV;
+> > > +	dma->dma_data_dir = DMA_TO_DEVICE;
+> > > +	dma->dma_len = msgs->len - 1;
+> > > +	result = i2c_imx_dma_xfer(i2c_imx, msgs);
+> > > +	if (result)
+> > > +		return result;
+> > > +
+> > > +	temp = imx_i2c_read_reg(i2c_imx, IMX_I2C_I2CR);
+> > > +	temp |= I2CR_DMAEN;
+> > > +	imx_i2c_write_reg(temp, i2c_imx, IMX_I2C_I2CR);
+> > > +
+> > > +	/*
+> > > +	 * Write slave address.
+> > > +	 * The first byte muse be transmitted by the CPU.
+> > > +	 */
+> > > +	imx_i2c_write_reg(msgs->addr << 1, i2c_imx, IMX_I2C_I2DR);
+> > > +	result = wait_for_completion_interruptible_timeout(
+> > > +				&i2c_imx->dma->cmd_complete,
+> > > +				msecs_to_jiffies(IMX_I2C_DMA_TIMEOUT));
+> > > +	if (result <= 0) {
+> > > +		dmaengine_terminate_all(dma->chan_using);
+> > > +		if (result)
+> > > +			return result;
+> > > +		else
+> > > +			return -ETIMEDOUT;
+> > 
+> > Shouldn't you force-disable the DMA here somehow (like unsetting
+> > I2CR_DMAEN bit), if it failed or timed out?
 > 
-> Signed-off-by: Pali Roh?r <pali.rohar@gmail.com>
-> ---
->  arch/arm/kernel/setup.c |    7 +++++--
->  1 file changed, 5 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
-> index 8a16ee5..fbc7b4f 100644
-> --- a/arch/arm/kernel/setup.c
-> +++ b/arch/arm/kernel/setup.c
-> @@ -875,10 +875,13 @@ void __init setup_arch(char **cmdline_p)
-> 
->  	setup_processor();
->  	mdesc = setup_machine_fdt(__atags_pointer);
-> -	if (!mdesc)
-> +	if (mdesc)
-> +		machine_name = of_flat_dt_get_machine_name();
-> +	else
->  		mdesc = setup_machine_tags(__atags_pointer,
-> __machine_arch_type); machine_desc = mdesc;
-> -	machine_name = mdesc->name;
-> +	if (!machine_name)
-> +		machine_name = mdesc->name;
-> 
->  	if (mdesc->reboot_mode != REBOOT_HARD)
->  		reboot_mode = mdesc->reboot_mode;
+> [Yuan Yao] Yes, I put the code for force-disable DMA in i2c_imx_start().
+> In order to make sure any DMA error will not effect the I2C.
+> It seems almost the same as put the code here, how about your think?
 
-So, do you really want to break userspace which reading file 
-/proc/cpuinfo (after migration from boardcode --> DT)?
+Would that mean that the "crashed" DMA would be running until the next 
+transmission is scheduled ?
 
-I still do not see reason for that. And only this one file is 
-problematic...
-
--- 
-Pali Roh?r
-pali.rohar at gmail.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: This is a digitally signed message part.
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140905/db8b702e/attachment.sig>
+[...]
