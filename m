@@ -1,71 +1,49 @@
 From: wangyijing@huawei.com (Yijing Wang)
-Date: Fri, 5 Sep 2014 18:10:01 +0800
-Subject: [PATCH v1 16/21] s390/MSI: Use MSI chip framework to configure
- MSI/MSI-X irq
+Date: Fri, 5 Sep 2014 18:09:50 +0800
+Subject: [PATCH v1 05/21] PCI/MSI: Introduce weak arch_find_msi_chip() to find
+ MSI chip
 In-Reply-To: <1409911806-10519-1-git-send-email-wangyijing@huawei.com>
 References: <1409911806-10519-1-git-send-email-wangyijing@huawei.com>
-Message-ID: <1409911806-10519-17-git-send-email-wangyijing@huawei.com>
+Message-ID: <1409911806-10519-6-git-send-email-wangyijing@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use MSI chip framework instead of arch MSI functions to configure
-MSI/MSI-X irq. So we can manage MSI/MSI-X irq in a unified framework.
+Introduce weak arch_find_msi_chip() to find the match msi_chip.
+Currently, MSI chip associates pci bus to msi_chip. Because in
+ARM platform, there may be more than one MSI controller in system.
+Associate pci bus to msi_chip help pci device to find the match
+msi_chip and setup MSI/MSI-X irq correctly. But in other platform,
+like in x86. we only need one MSI chip, because all device use
+the same MSI address/data and irq etc. So it's no need to associate
+pci bus to MSI chip, just use a arch function, arch_find_msi_chip()
+to return the MSI chip for simplicity. The default weak
+arch_find_msi_chip() used in ARM platform, find the MSI chip
+by pci bus.
 
 Signed-off-by: Yijing Wang <wangyijing@huawei.com>
 ---
- arch/s390/pci/pci.c |   18 ++++++++++++++----
- 1 files changed, 14 insertions(+), 4 deletions(-)
+ drivers/pci/msi.c |    7 ++++++-
+ 1 files changed, 6 insertions(+), 1 deletions(-)
 
-diff --git a/arch/s390/pci/pci.c b/arch/s390/pci/pci.c
-index 2fa7b14..da5316e 100644
---- a/arch/s390/pci/pci.c
-+++ b/arch/s390/pci/pci.c
-@@ -358,7 +358,7 @@ static void zpci_irq_handler(struct airq_struct *airq)
- 	}
- }
+diff --git a/drivers/pci/msi.c b/drivers/pci/msi.c
+index a77e7f7..539c11d 100644
+--- a/drivers/pci/msi.c
++++ b/drivers/pci/msi.c
+@@ -29,9 +29,14 @@ static int pci_msi_enable = 1;
  
--int arch_setup_msi_irqs(struct pci_dev *pdev, int nvec, int type)
-+int zpci_setup_msi_irqs(struct pci_dev *pdev, int nvec, int type)
- {
- 	struct zpci_dev *zdev = get_zdev(pdev);
- 	unsigned int hwirq, msi_vecs;
-@@ -434,7 +434,7 @@ out:
- 	return rc;
- }
+ /* Arch hooks */
  
--void arch_teardown_msi_irqs(struct pci_dev *pdev)
-+static void zpci_teardown_msi_irqs(struct pci_dev *pdev)
- {
- 	struct zpci_dev *zdev = get_zdev(pdev);
- 	struct msi_desc *msi;
-@@ -448,9 +448,9 @@ void arch_teardown_msi_irqs(struct pci_dev *pdev)
- 	/* Release MSI interrupts */
- 	list_for_each_entry(msi, &pdev->msi_list, list) {
- 		if (msi->msi_attrib.is_msix)
--			default_msix_mask_irq(msi, 1);
-+			__msix_mask_irq(msi, 1);
- 		else
--			default_msi_mask_irq(msi, 1, 1);
-+			__msi_mask_irq(msi, 1, 1);
- 		irq_set_msi_desc(msi->irq, NULL);
- 		irq_free_desc(msi->irq);
- 		msi->msg.address_lo = 0;
-@@ -464,6 +464,16 @@ void arch_teardown_msi_irqs(struct pci_dev *pdev)
- 	airq_iv_free_bit(zpci_aisb_iv, zdev->aisb);
- }
- 
-+static struct msi_chip zpci_msi_chip = {
-+	.setup_irqs = zpci_setup_msi_irqs,
-+	.teardown_irqs = zpci_teardown_msi_irqs,
-+};
-+
-+struct msi_chip *arch_find_msi_chip(struct pci_dev *dev)
++struct msi_chip * __weak arch_find_msi_chip(struct pci_dev *dev)
 +{
-+	return &zpci_msi_chip;
++	return dev->bus->msi;
 +}
 +
- static void zpci_map_resources(struct zpci_dev *zdev)
+ int __weak arch_setup_msi_irq(struct pci_dev *dev, struct msi_desc *desc)
  {
- 	struct pci_dev *pdev = zdev->pdev;
+-	struct msi_chip *chip = dev->bus->msi;
++	struct msi_chip *chip = arch_find_msi_chip(dev);
+ 	int err;
+ 
+ 	if (!chip || !chip->setup_irq)
 -- 
 1.7.1
