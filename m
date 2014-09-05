@@ -1,54 +1,82 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Fri, 5 Sep 2014 15:11:47 -0700
-Subject: [PATCH] clocksource: arch_timer: Fix code to use physical timers
- when requested
-In-Reply-To: <20140828093505.GC14650@leverpostej>
-References: <1409173419-13076-1-git-send-email-sonnyrao@chromium.org>
- <CAOesGMjK65Rc-K0fyFUUJLw6huLT82E-nqJwZO4PqhgopF96Ow@mail.gmail.com>
- <CAPz6YkWAPtuy4sAuAK9GtpDgfGsccxeS+pqqe_t_R818Jt01qA@mail.gmail.com>
- <53FE5B09.2020403@codeaurora.org>
- <CAOesGMhTivDzJFuxONggcJ6N5UvZopKa=+tv9PoPX593cpnm0A@mail.gmail.com>
- <53FE7E3B.1010500@codeaurora.org>
- <CAOesGMgXnsqttHwAxEW4a7-Rx-nmSwpJd_Dt1iCcFOvzDwbzdA@mail.gmail.com>
- <CAD=FV=VjN6Xam-nRRcxvOoN-gokU6DbGVjoPXN_fkTJssH1RWA@mail.gmail.com>
- <20140828093505.GC14650@leverpostej>
-Message-ID: <CAD=FV=UwfP0x-bswbtV_eUvpKeOSNnsVVLTE3VHguyhm_jiSug@mail.gmail.com>
+From: luto@amacapital.net (Andy Lutomirski)
+Date: Fri,  5 Sep 2014 15:13:51 -0700
+Subject: [PATCH v5 0/5] x86: two-phase syscall tracing and seccomp fastpath
+Message-ID: <cover.1409954077.git.luto@amacapital.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mark,
+This applies to:
+git://git.kernel.org/pub/scm/linux/kernel/git/kees/linux.git seccomp-fastpath
 
-On Thu, Aug 28, 2014 at 2:35 AM, Mark Rutland <mark.rutland@arm.com> wrote:
-> Not if you boot Linux at hyp, as we've recommended for this precise
-> reason. That doesn't fix other things like CNTFRQ if the secure
-> initialisation doesn't poke that, however.
+Gitweb:
+https://git.kernel.org/cgit/linux/kernel/git/kees/linux.git/log/?h=seccomp/fastpath
 
-I'll freely admit that I'm out of my league and out of my comfort zone
-here, but...
+This is both a cleanup and a speedup.  It reduces overhead due to
+installing a trivial seccomp filter by 87%.  The speedup comes from
+avoiding the full syscall tracing mechanism for filters that don't
+return SECCOMP_RET_TRACE.
 
-In the theory that firmware ought to be as minimal as possible
-(because it's hard to update and hard to keep in sync with kernel
-versions), it seems like firmware ought to start the kernel out in as
-permissive mode as it's willing to provide, right?
+This series depends on splitting the seccomp hooks into two phases.
+The first phase evaluates the filter; it can skip syscalls, allow
+them, kill the calling task, or pass a u32 to the second phase.  The
+second phase requires a full tracing context, and it sends ptrace
+events if necessary.  The seccomp core part is in Kees' seccomp/fastpath
+tree.
 
-If the kernel is started out as permissive as possible then it can do
-anything it needs to.  Future versions of the kernel can be
-implemented to do any way-cool things that they want to do without an
-update to firmware, right?  ...and current versions of the kernel can
-just shed permissions if they don't want them.
+These patches implement a similar split for the x86 syscall
+entry work.  The C callback is invoked in two phases: the first has
+only a partial frame, and it can request phase 2 processing with a
+full frame.
 
-...so if I understand correctly, "Secure SVC" mode is more permissive
-than "Non Secure HYP" mode, right?  It looks to me as if we currently
-start the kernel in "Secure SVC" mode.  What do you think about the
-kernel detecting Secure SVC and then dropping down permission levels
-(to Non Secure HYP).  Once it did this, it could update things like
-the virtual offset and then transition down further into non-secure
-SVC mode.
+Finally, I switch the 64-bit system_call code to use the new split
+entry work.  This is a net deletion of assembly code: it replaces
+all of the audit entry muck.
 
+In the process, I fixed some bugs.
 
-...or maybe this has been discussed millions of times already and I'm
-just clueless.  ...or maybe this is just too hard for the kernel to do
-in a generic way?
+If this is acceptable, someone can do the same tweak for the
+ia32entry and entry_32 code.
 
+This passes all seccomp tests that I know of.
 
--Doug
+Changes from v4:
+ - Rebased (which seems to have been a no-op)
+ - Fixed embarrassing bug that broke allnoconfig
+   (patch 3 was missing an ifdef).
+
+Changes from v3:
+ - Dropped the core seccomp changes from the email -- Kees has applied them.
+ - Add patch 2 (the TIF_NOHZ change).
+ - Fix TIF_NOHZ in the two-phase entry code (thanks, Oleg).
+
+Changes from v2:
+ - Fixed 32-bit x86 build (and the tests pass).
+ - Put the doc patch where it belongs.
+
+Changes from v1:
+ - Rebased on top of Kees' shiny new seccomp tree (no effect on the x86
+   part).
+ - Improved patch 6 vs patch 7 split (thanks Alexei!)
+ - Fixed bogus -ENOSYS in patch 5 (thanks Kees!)
+ - Improved changelog message in patch 6.
+
+Changes from RFC version:
+ - The first three patches are more or less the same
+ - The rest is more or less a rewrite
+
+Andy Lutomirski (5):
+  x86,x32,audit: Fix x32's AUDIT_ARCH wrt audit
+  x86,entry: Only call user_exit if TIF_NOHZ
+  x86: Split syscall_trace_enter into two phases
+  x86_64,entry: Treat regs->ax the same in fastpath and slowpath
+    syscalls
+  x86_64,entry: Use split-phase syscall_trace_enter for 64-bit syscalls
+
+ arch/x86/include/asm/calling.h |   6 +-
+ arch/x86/include/asm/ptrace.h  |   5 ++
+ arch/x86/kernel/entry_64.S     |  51 +++++--------
+ arch/x86/kernel/ptrace.c       | 165 +++++++++++++++++++++++++++++++++--------
+ 4 files changed, 164 insertions(+), 63 deletions(-)
+
+-- 
+1.9.3
