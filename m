@@ -1,59 +1,28 @@
-From: m-karicheri2@ti.com (Murali Karicheri)
-Date: Fri, 5 Sep 2014 14:33:54 -0400
-Subject: [PATCH] PCI: keystone: update to support multiple pci ports
-In-Reply-To: <7260053.FoBVhTXVfj@wuerfel>
-References: <1409938782-31460-1-git-send-email-m-karicheri2@ti.com>
- <7260053.FoBVhTXVfj@wuerfel>
-Message-ID: <540A0212.6060303@ti.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 05 Sep 2014 20:34:14 +0200
+Subject: [PATCH] PCI: mvebu: Fix uninitialized variable in
+ mvebu_get_tgt_attr()
+In-Reply-To: <20140905202044.4c166a43@free-electrons.com>
+References: <1407512045-26969-1-git-send-email-geert+renesas@glider.be>
+ <20140905174122.GD8080@google.com>
+ <20140905202044.4c166a43@free-electrons.com>
+Message-ID: <5898856.RmRf87KNto@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/05/2014 01:54 PM, Arnd Bergmann wrote:
-> On Friday 05 September 2014 13:39:42 Murali Karicheri wrote:
->> +
->>          /* enable RC mode in devcfg */
->>          val = readl(reg_p);
->> -       val&= ~PCIE_MODE_MASK;
->> -       val |= PCIE_RC_MODE;
->> +       port_id<<= 1;
->> +       val&= ~(PCIE_MODE_MASK<<  port_id);
->> +       val |= (PCIE_RC_MODE<<  port_id);
->>          writel(val, reg_p);
->> +       devm_iounmap(dev, reg_p);
->> +       devm_release_mem_region(dev, res->start, resource_size(res));
->
-> This looks like it's a shared register of some sort that doesn't
-> really belong into the registers of a particular port. Could it
-> be that it's actually for the PHY?
->
-> 	Arnd
-Arnd,
+On Friday 05 September 2014 20:20:44 Thomas Petazzoni wrote:
+> Hum, I think I would actually prefer something like:
+> 
+>                 if (DT_FLAGS_TO_TYPE(flags) == DT_TYPE_IO)
+>                         rtype = IORESOURCE_IO;
+>                 else if (DT_FLAGS_TO_TYPE(flags) == DT_TYPE_MEM32)
+>                         rtype = IORESOURCE_MEM;
+> +               else
+> +                       continue;
+> 
+> So that we're explicit with the fact that we only care about I/O and
+> MEM32 resource types.
 
-This a shared device configuration register between the two ports the 
-desciption states it is bootstrap configuration of the PCIe module as 
-Endpoint or Root complex and Not Phy. Hope below text will help.
+Agreed, that looks better than my patch as well.
 
-Table 3-23 Device Configuration Register (DEVCFG)
-
-
-PCIESSMODE[1:0] 00b PCIESSMODE is used to control the
-functionality of PCIESS module out of
-reset. This MMR output is connected to
-DEVTYPE input of PCIESS
-(Changes from
-Nysh) : Note that in Nysh this value came
-from a bootstrap pin.
-00 : Endpoint
-01 : Legacy Endpoint
-10 : Rootcomplex
-11 : Reserved
-PCIESS_1_MODE[1:0
-]
-00b PCIESSMODE is used to control the
-functionality of PCIE_1 module out of
-reset. This MMR output is connected to
-DEVTYPE input of PCIE_1
-00 : Endpoint
-01 : Legacy Endpoint
-10 : Rootcomplex
-11 : Reserv
+	Arnd
