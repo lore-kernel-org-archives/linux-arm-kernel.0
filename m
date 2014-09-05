@@ -1,80 +1,155 @@
-From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Fri, 05 Sep 2014 19:08:33 +0900
-Subject: [PATCH v6 2/6] arm64: ptrace: allow tracer to skip a system call
-In-Reply-To: <20140902091622.GK30401@n2100.arm.linux.org.uk>
-References: <1408611405-8943-1-git-send-email-takahiro.akashi@linaro.org>
- <1408611405-8943-3-git-send-email-takahiro.akashi@linaro.org>
- <CAGXu5jJCyqpXkdvNDCu+eMr0qnqwbqUUo4u+2p_7DvFMzfKoEw@mail.gmail.com>
- <53F69045.7010301@linaro.org> <20140826175128.GD23445@arm.com>
- <53FD72E2.4020103@linaro.org> <20140901114751.GG30401@n2100.arm.linux.org.uk>
- <54058421.5070506@linaro.org> <20140902091622.GK30401@n2100.arm.linux.org.uk>
-Message-ID: <54098BA1.3090508@linaro.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 5 Sep 2014 11:10:17 +0100
+Subject: [PATCH FYI 3/4] ARM: add basic support for on-demand backtrace
+ of other CPUs
+In-Reply-To: <E1XPq1S-0000RP-FR@rmk-PC.arm.linux.org.uk>
+References: <20140905094056.GD30401@n2100.arm.linux.org.uk>
+ <E1XPq1S-0000RP-FR@rmk-PC.arm.linux.org.uk>
+Message-ID: <20140905101017.GG30401@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/02/2014 06:16 PM, Russell King - ARM Linux wrote:
-> On Tue, Sep 02, 2014 at 05:47:29PM +0900, AKASHI Takahiro wrote:
->> On 09/01/2014 08:47 PM, Russell King - ARM Linux wrote:
->>> On Wed, Aug 27, 2014 at 02:55:46PM +0900, AKASHI Takahiro wrote:
->>>> 1)
->>>> setting x0 to -ENOSYS is necessary because, otherwise, user-issued syscall(-1) will
->>>> return a bogus value when audit tracing is on.
->>>>
->>>> Please note that, on arm,
->>>>                    not traced      traced
->>>>                    ------          ------
->>>> syscall(-1)      aborted         OOPs(BUG_ON)
->>>> syscall(-3000)   aborted         aborted
->>>> syscall(1000)    ENOSYS          ENOSYS
->>>
->>> Two points here:
->>>
->>> 1. You've found a case which causes a BUG_ON().  Where is the bug report
->>>      for this, so the problem can be investigated and resolved?
->>
->> I think that I mentioned it could also happen on arm somewhere in a talk
->> with Will, but don't remember exactly when.
->
-> Sorry, not good enough.  Please report this bug so it can be investigated
-> and fixed.
+On Fri, Sep 05, 2014 at 10:41:38AM +0100, Russell King wrote:
+> Add basic infrastructure for triggering a backtrace of other CPUs
+> via an IPI, preferably at FIQ level.  It is intended that this shall
+> be used for cases where we have detected that something has already
+> failed in the kernel.
+> 
+> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 
-Please review my patch as well as the commit message.
+As I've said previously, I believe that most of the code below should
+be generic code rather than arch code - I see nothing here which is
+arch specific apart from the "how do we send a NMI/FIQ", i.o.w. the
+smp_cross_call() call.
 
->>> 2. What do you mean by "aborted" ?
->>
->> I mean that the process will receive SIGILL and get aborted.
->> A system call number, like -1 and -3000, won't be trapped by *switch*
->> statement in asm_syscall() and end up with being signaled.
->
-> That is correct behaviour - because numbers greater than 0xf0000 (or
-> 0x9f0000 for OABI - the 0x900000 offset on the syscalls on OABI is to
-> distinguish them from syscalls used by RISC OS) are not intended to
-> be Linux syscalls per-se.
+I'd propose changing linux/nmi.h such that arch_trigger_all_cpu_backtrace()
+becomes "bool trigger_cpu_backtrace(bool include_self)" and have the
+presence of the NMI/FIQ trigger function indicate whether we can do
+this - and moving the code below into lib/ or kernel/.
 
-I tried to make such invalid/pseudo syscalls hehave in the same way
-whether or not a task is traced (by seccomp, ptrace or audit).
+> ---
+>  arch/arm/include/asm/irq.h |  5 ++++
+>  arch/arm/kernel/smp.c      | 62 ++++++++++++++++++++++++++++++++++++++++++++++
+>  2 files changed, 67 insertions(+)
+> 
+> diff --git a/arch/arm/include/asm/irq.h b/arch/arm/include/asm/irq.h
+> index 53c15dec7af6..be1d07d59ee9 100644
+> --- a/arch/arm/include/asm/irq.h
+> +++ b/arch/arm/include/asm/irq.h
+> @@ -35,6 +35,11 @@ extern void (*handle_arch_irq)(struct pt_regs *);
+>  extern void set_handle_irq(void (*handle_irq)(struct pt_regs *));
+>  #endif
+>  
+> +#ifdef CONFIG_SMP
+> +extern void arch_trigger_all_cpu_backtrace(bool);
+> +#define arch_trigger_all_cpu_backtrace(x) arch_trigger_all_cpu_backtrace(x)
+> +#endif
+> +
+>  #endif
+>  
+>  #endif
+> diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
+> index 9388a3d479e1..94959f977b82 100644
+> --- a/arch/arm/kernel/smp.c
+> +++ b/arch/arm/kernel/smp.c
+> @@ -72,8 +72,12 @@ enum ipi_msg_type {
+>  	IPI_CPU_STOP,
+>  	IPI_IRQ_WORK,
+>  	IPI_COMPLETION,
+> +	IPI_CPU_BACKTRACE,
+>  };
+>  
+> +/* For reliability, we're prepared to waste bits here. */
+> +static DECLARE_BITMAP(backtrace_mask, NR_CPUS) __read_mostly;
+> +
+>  static DECLARE_COMPLETION(cpu_running);
+>  
+>  static struct smp_operations smp_ops;
+> @@ -539,6 +543,21 @@ static void ipi_cpu_stop(unsigned int cpu)
+>  		cpu_relax();
+>  }
+>  
+> +static void ipi_cpu_backtrace(struct pt_regs *regs)
+> +{
+> +	int cpu = smp_processor_id();
+> +
+> +	if (cpumask_test_cpu(cpu, to_cpumask(backtrace_mask))) {
+> +		static arch_spinlock_t lock = __ARCH_SPIN_LOCK_UNLOCKED;
+> +
+> +		arch_spin_lock(&lock);
+> +		printk(KERN_WARNING "FIQ backtrace for cpu %d\n", cpu);
+> +		show_regs(regs);
+> +		arch_spin_unlock(&lock);
+> +		cpumask_clear_cpu(cpu, to_cpumask(backtrace_mask));
+> +	}
+> +}
+> +
+>  static DEFINE_PER_CPU(struct completion *, cpu_completion);
+>  
+>  int register_ipi_completion(struct completion *completion, int cpu)
+> @@ -618,6 +637,12 @@ void handle_IPI(int ipinr, struct pt_regs *regs)
+>  		irq_exit();
+>  		break;
+>  
+> +	case IPI_CPU_BACKTRACE:
+> +		irq_enter();
+> +		ipi_cpu_backtrace(regs);
+> +		irq_exit();
+> +		break;
+> +
+>  	default:
+>  		printk(KERN_CRIT "CPU%u: Unknown IPI message 0x%x\n",
+>  		       cpu, ipinr);
+> @@ -712,3 +737,40 @@ static int __init register_cpufreq_notifier(void)
+>  core_initcall(register_cpufreq_notifier);
+>  
+>  #endif
+> +
+> +void arch_trigger_all_cpu_backtrace(bool include_self)
+> +{
+> +	static unsigned long backtrace_flag;
+> +	int i, cpu = get_cpu();
+> +
+> +	if (test_and_set_bit(0, &backtrace_flag)) {
+> +		/*
+> +		 * If there is already a trigger_all_cpu_backtrace() in progress
+> +		 * (backtrace_flag == 1), don't output double cpu dump infos.
+> +		 */
+> +		put_cpu();
+> +		return;
+> +	}
+> +
+> +	cpumask_copy(to_cpumask(backtrace_mask), cpu_online_mask);
+> +	if (!include_self)
+> +		cpumask_clear_cpu(cpu, to_cpumask(backtrace_mask));
+> +
+> +	if (!cpumask_empty(to_cpumask(backtrace_mask))) {
+> +		pr_info("Sending FIQ to %s CPUs:\n",
+> +			(include_self ? "all" : "other"));
+> +		smp_cross_call(to_cpumask(backtrace_mask), IPI_CPU_BACKTRACE);
+> +	}
+> +
+> +	/* Wait for up to 10 seconds for all CPUs to do the backtrace */
+> +	for (i = 0; i < 10 * 1000; i++) {
+> +		if (cpumask_empty(to_cpumask(backtrace_mask)))
+> +			break;
+> +
+> +		mdelay(1);
+> +	}
+> +
+> +	clear_bit(0, &backtrace_flag);
+> +	smp_mb__after_atomic();
+> +	put_cpu();
+> +}
+> -- 
+> 1.8.3.1
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
->>> Please, if you find a problem with 32-bit ARM, report it.  Don't hide it,
->>> because hiding it can be a security issue or in the case of BUG_ON(), it
->>> could be a denial of service issue.
->>>
->>> As you're part of Linaro, I would have thought you'd be more responsible
->>> in this regard - after all, Linaro is supposed to be about improving the
->>> ARM kernel...  Maybe I got that wrong, and Linaro is actually about
->>> ensuring that the ARM kernel is stuffed full of broken features?
->>
->> I thought my first priority was on arm64 (and then arm), but now that
->> you and Will seem to want to see the fix first on arm, okey, I will
->> start with arm issue.
->
-> So what you're saying there is that if you find a bug in ARM code, which
-> everyone is currently using, you can ignore it until you've sorted out
-> ARM64 which almost no one is using.
->
-> This is absurd, and whoever has set your priorities is clearly on drugs.
-
-Thank you. I learned a new English word, absurd.
-
--Takahiro AKASHI
-
->
+-- 
+FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
+according to speedtest.net.
