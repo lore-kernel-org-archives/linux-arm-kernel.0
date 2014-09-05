@@ -1,72 +1,77 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 05 Sep 2014 12:13:22 +0200
-Subject: [Linaro-acpi] [PATCH v3 13/17] ARM64 / ACPI: Add GICv2 specific
- ACPI boot support
-In-Reply-To: <540986B2.7000901@arm.com>
-References: <1409583475-6978-1-git-send-email-hanjun.guo@linaro.org>
- <4895927.Zp4WL2AZAF@wuerfel> <540986B2.7000901@arm.com>
-Message-ID: <3400229.hn32yHbVD2@wuerfel>
+From: addy.ke@rock-chips.com (addy ke)
+Date: Fri, 05 Sep 2014 18:17:10 +0800
+Subject: [PATCH] i2c: rk3x: fix divisor calculation for SCL frequency
+In-Reply-To: <CAD=FV=W3JJM38v-X=pyLUjAzY3Ti88xUgWp9bMsX5dqp1gubpg@mail.gmail.com>
+References: <1409884333-3544-1-git-send-email-addy.ke@rock-chips.com>
+ <CAD=FV=W3JJM38v-X=pyLUjAzY3Ti88xUgWp9bMsX5dqp1gubpg@mail.gmail.com>
+Message-ID: <54098DA6.4090704@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 05 September 2014 10:47:30 Marc Zyngier wrote:
-> > 
-> > I still prefer being explicit here for the same reason I mentioned earlier:
-> > I want it to be very clear that we don't support arbitrary irqchips other
-> > than the ones in the APCI specification. The infrastructure exists on DT
-> > because we have to support a large number of incompatible irqchips.
+> Addy,
 > 
-> I'm not suggesting that we should support more than the ACPI spec says.
-> And that's certainly the whole point of a spec, isn't it? ACPI says what
-> we support, and we're not going any further. I'm just saying that we
-> shouldn't make the maintenance burden heavier, and the code nothing
-> short of disgusting. Using our current infrastructure doesn't mean we're
-> going to support GIcv2.37.
-
-Ok
-
-> > In particular, the ACPI tables describing the irqchip have no way to
-> > identify the GIC at all, if I read the spec correctly, you have to
-> > parse the tables, ioremap the registers and then read the ID to know
-> > if you have GICv1/v2/v2m/v3/v4. There doesn't seem to be any "device"
-> > for the GIC that a hypothetical probe function would be based on.
+> On Thu, Sep 4, 2014 at 7:32 PM, Addy Ke <addy.ke@rock-chips.com> wrote:
+>> I2C_CLKDIV register descripted in the previous version of
+>> RK3x chip manual is incorrect. Plus 1 is required.
+>>
+>> The correct formula:
+>> - T(SCL_HIGH) = T(PCLK) * (CLKDIVH + 1) * 8
+>> - T(SCL_LOW) = T(PCLK) * (CLKDIVL + 1) * 8
+>> - (SCL Divsor) = 8 * ((CLKDIVL + 1) + (CLKDIVH + 1))
+>> - SCL = PCLK / (CLK Divsor)
 > 
-> This is not the way I read the spec. Table 5-46 (Interrupt Controller
-> Structure) tells you if you have a CPU interface (GICv1/v2) or a
-> redistributor (GICv3/v4). That's enough to know whether or not you
-> should carry on probing a particular controller.
-
-Ah, good. I missed that.
-
-> The various GIC versions don't really have a unified memory map anyway
-> (well, none that you can rely on), and you really have to rely on ACPI
-> to tell you what you have.
-
-So we are back to needing to support two different irqchip drivers
-(v1/v2/v2m and v3/v4), instead of five or more, right?
-
-> > It does seem wrong to parse the tables in the irq-gic.c file though:
-> > that part can well be common across the various gic versions and then
-> > call into either irq-gic.c or irq-gic-v3.c for the version specific
-> > parts. Whether we put that common code into drivers/irqchip/irqchip.c,
-> > drivers/irqchip/gic-common.c, drivers/irqchip/irq-acpi-gic.c or
-> > drivers/acpi/irq-gic.c I don't care at all.
+> I'll trust that you tested this with a scope
 > 
-> I don't think so you can make that common code very easily. The
-> information required by both drivers is organized differently.
-> If it was, I'd have done that for the DT binding.
+Yes ,I have tested on RK3188 and RK3288, and confirmed by oscilloscope.
+> 
+>> It will be updated to the latest version of chip manual.
+>>
+>> Signed-off-by: Addy Ke <addy.ke@rock-chips.com>
+>> ---
+>>  drivers/i2c/busses/i2c-rk3x.c | 4 ++--
+>>  1 file changed, 2 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/drivers/i2c/busses/i2c-rk3x.c b/drivers/i2c/busses/i2c-rk3x.c
+>> index e637c32..76b6604 100644
+>> --- a/drivers/i2c/busses/i2c-rk3x.c
+>> +++ b/drivers/i2c/busses/i2c-rk3x.c
+>> @@ -433,8 +433,8 @@ static void rk3x_i2c_set_scl_rate(struct rk3x_i2c *i2c, unsigned long scl_rate)
+>>         unsigned long i2c_rate = clk_get_rate(i2c->clk);
+>>         unsigned int div;
+>>
+>> -       /* SCL rate = (clk rate) / (8 * DIV) */
+>> -       div = DIV_ROUND_UP(i2c_rate, scl_rate * 8);
+>> +       /* SCL rate = (clk rate) / (8 * (DIV + 2)) */
+>> +       div = DIV_ROUND_UP(i2c_rate, scl_rate * 8) - 2;
+> 
+> Given the bug I just fixed in the Rockchip SPI driver, I was a little
+> worried about div becoming -1 (and thus being a really large positive
+> number since div is unsigned).
+> 
+> However, it seems that you get saved by the next statement:
+>   div = DIV_ROUND_UP(div, 2);
+> 
+> In the testing I did with the Linux macros, that magically transformed
+> a div of 0xFFFFFFFF (-1) to 0, so it's not technically a bug.  ...but
+> it's very non-obvious.  Can you do something a little cleaner?
 
-I see, and that's also what Tomasz just explained. So can we just
-have one an irqchip_init() function doing this:?
+The following modifications is reasonable?
 
-if (dt)
-	of_irq_init(__irqchip_of_table);
-else if (acpi) {
-	read cpu-interface and redistributor address from acpi tables
-	if (cpu-interface)
-		gic_v2_acpi_init(table);
-	else if(redistributor)
-		gic_v3_acpi_init(table)
+static void rk3x_i2c_set_scl_rate(struct rk3x_i2c *i2c, unsigned long scl_rate)
+{
+        unsigned long i2c_rate = clk_get_rate(i2c->clk);
+        unsigned int div;
+
+        /* set DIV = DIVH = DIVL
+         * SCL rate = (clk rate) / (8 * (DIVH + 1 + DIVL + 1))
+         *          = (clk rate) / (16 * (DIV + 1))
+         */
+        div = DIV_ROUND_UP(i2c_rate, scl_rate * 16) - 1;
+
+        i2c_writel(i2c, (div << 16) | (div & 0xffff), REG_CLKDIV);
 }
-
-	Arnd
+> 
+> -Doug
+> 
+> 
+> 
