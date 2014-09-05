@@ -1,74 +1,52 @@
-From: robert.richter@caviumnetworks.com (Robert Richter)
-Date: Fri, 5 Sep 2014 12:45:47 +0200
-Subject: [PATCH v2 1/4] arm64, thunder: Add Kconfig option for Cavium
- Thunder SoC Family
-In-Reply-To: <20140905093239.GC30401@n2100.arm.linux.org.uk>
-References: <1409903205-2762-1-git-send-email-rric@kernel.org>
- <1409903205-2762-2-git-send-email-rric@kernel.org>
- <20140905093239.GC30401@n2100.arm.linux.org.uk>
-Message-ID: <20140905104547.GT4703@rric.localhost>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Fri, 05 Sep 2014 14:47:48 +0400
+Subject: [PATCH v1 15/21] Powerpc/MSI: Use MSI chip framework to configure
+ MSI/MSI-X irq
+In-Reply-To: <1409911806-10519-16-git-send-email-wangyijing@huawei.com>
+References: <1409911806-10519-1-git-send-email-wangyijing@huawei.com>
+ <1409911806-10519-16-git-send-email-wangyijing@huawei.com>
+Message-ID: <540994D4.6040500@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05.09.14 10:32:40, Russell King - ARM Linux wrote:
-> On Fri, Sep 05, 2014 at 09:46:42AM +0200, Robert Richter wrote:
-> > From: Radha Mohan Chintakuntla <rchintakuntla@cavium.com>
-> > 
-> > Increase maximum numbers of cpus to 32. This relates to current
-> > maximal possible cpu number. Increasing this to 64 cpus will be a
-> > separate patch not part of this enablement patches.
-> > 
-> > Signed-off-by: Radha Mohan Chintakuntla <rchintakuntla@cavium.com>
-> > Signed-off-by: Robert Richter <rrichter@cavium.com>
-> > ---
-> >  arch/arm64/Kconfig | 6 ++++++
-> >  1 file changed, 6 insertions(+)
-> > 
-> > diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-> > index fd4e81a4e1ce..77fb82b0f684 100644
-> > --- a/arch/arm64/Kconfig
-> > +++ b/arch/arm64/Kconfig
-> > @@ -134,6 +134,11 @@ source "kernel/Kconfig.freezer"
-> >  
-> >  menu "Platform selection"
-> >  
-> > +config ARCH_THUNDER
-> > +	bool "Cavium Inc. Thunder SoC Family"
-> > +	help
-> > +	  This enables support for Cavium's Thunder Family of SoCs.
-> > +
-> >  config ARCH_VEXPRESS
-> >  	bool "ARMv8 software model (Versatile Express)"
-> >  	select ARCH_REQUIRE_GPIOLIB
-> > @@ -256,6 +261,7 @@ config NR_CPUS
-> >  	range 2 32
-> >  	depends on SMP
-> >  	# These have to remain sorted largest to smallest
-> > +	default "32" if ARCH_THUNDER
-> >  	default "8"
-> 
-> Why do you need ARCH_THUNDER?  If it's just to change this default,
+Hello.
 
-No, we need it just to enable all our drivers on the SoC. We want to
-enable the SoC by using defconfig + ARCH_THUNDER. As said in my other
-mail, I put it here to be able to base all other thunder driver patch
-sets on this initial base patch set. Otherwise this particular patch
-and also the dtb patch need to be shipped with all other driver patch
-sets. This might lead to duplicate submissions of the same patch.
+On 9/5/2014 2:10 PM, Yijing Wang wrote:
 
-With doing defconfig + ARCH_THUNDER we also want to enable the max
-number of cpus that is currently supported. I only enable 32 cpus
-since booting more cpus is untested. There might be problems at the 32
-cpu boundary. Just setting it to 64 does not mean a kernel will
-actually boot more than 32 cpus. But if it will be ack'ed, I would be
-fine to set NR_CPUS to 32 or 64 in general and independent from
-ARCH_THUNDER.
+> Use MSI chip framework instead of arch MSI functions to configure
+> MSI/MSI-X irq. So we can manage MSI/MSI-X irq in a unified framework.
 
-For simplicity I better drop setting NR_CPUS in this patch.
+> Signed-off-by: Yijing Wang <wangyijing@huawei.com>
+> ---
+>   arch/powerpc/kernel/msi.c |   14 ++++++++++++--
+>   1 files changed, 12 insertions(+), 2 deletions(-)
 
--Robert
+> diff --git a/arch/powerpc/kernel/msi.c b/arch/powerpc/kernel/msi.c
+> index 71bd161..01781a4 100644
+> --- a/arch/powerpc/kernel/msi.c
+> +++ b/arch/powerpc/kernel/msi.c
+[...]
+> @@ -27,7 +27,17 @@ int arch_setup_msi_irqs(struct pci_dev *dev, int nvec, int type)
+>   	return ppc_md.setup_msi_irqs(dev, nvec, type);
+>   }
+>
+> -void arch_teardown_msi_irqs(struct pci_dev *dev)
+> +static void ppc_teardown_msi_irqs(struct pci_dev *dev)
 
-> please don't bother - we don't do this kind of thing on x86, so why
-> should it be done here?  Just ensure that NR_CPUS is appropriately
-> adjusted.  Alternatively, look at how x86 deals with this (with
-> X86_BIGSMP / MAXSMP).
+    Shouldn't this function take IRQ # instead?
+
+>   {
+>   	ppc_md.teardown_msi_irqs(dev);
+>   }
+> +
+> +static struct msi_chip ppc_msi_chip = {
+> +	.setup_irqs = ppc_setup_msi_irqs,
+> +	.teardown_irqs = ppc_teardown_msi_irqs,
+> +};
+> +
+> +struct msi_chip *arch_find_msi_chip(struct pci_dev *dev)
+> +{
+> +	return &ppc_msi_chip;
+> +}
+
+WBR, Sergei
