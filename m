@@ -1,92 +1,84 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 05 Sep 2014 16:04:06 +0200
-Subject: [PATCH v2 1/4] arm64,
- thunder: Add Kconfig option for Cavium Thunder SoC Family
-In-Reply-To: <20140905125147.GC20164@leverpostej>
-References: <1409903205-2762-1-git-send-email-rric@kernel.org>
- <20140905110552.GH30401@n2100.arm.linux.org.uk>
- <20140905125147.GC20164@leverpostej>
-Message-ID: <7863371.EMkUuntQWU@wuerfel>
+From: gautam.vivek@samsung.com (Vivek Gautam)
+Date: Fri, 5 Sep 2014 19:26:42 +0530
+Subject: Unable to boot mainline on snow chromebook since 3.15
+In-Reply-To: <CAEC9eQOMd7ME5KiG2QHCf3TMJAwSxLUgGpmFrpw_HQT4me9YWg@mail.gmail.com>
+References: <20140905115704.GO13515@arm.com> <20140905122232.GP13515@arm.com>
+ <CAEC9eQOMd7ME5KiG2QHCf3TMJAwSxLUgGpmFrpw_HQT4me9YWg@mail.gmail.com>
+Message-ID: <CAFp+6iF7EbcVqrDKpP4KbYVTEFMD7Jvp9B9kXbAQjpQN3vM=aQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 05 September 2014 13:51:47 Mark Rutland wrote:
-> On Fri, Sep 05, 2014 at 12:05:52PM +0100, Russell King - ARM Linux wrote:
-> > On Fri, Sep 05, 2014 at 12:45:47PM +0200, Robert Richter wrote:
-> > > On 05.09.14 10:32:40, Russell King - ARM Linux wrote:
-> > > No, we need it just to enable all our drivers on the SoC. We want to
-> > > enable the SoC by using defconfig + ARCH_THUNDER. As said in my other
-> > > mail, I put it here to be able to base all other thunder driver patch
-> > > sets on this initial base patch set. Otherwise this particular patch
-> > > and also the dtb patch need to be shipped with all other driver patch
-> > > sets. This might lead to duplicate submissions of the same patch.
-> > > 
-> > > With doing defconfig + ARCH_THUNDER we also want to enable the max
-> > > number of cpus that is currently supported. I only enable 32 cpus
-> > > since booting more cpus is untested. There might be problems at the 32
-> > > cpu boundary. Just setting it to 64 does not mean a kernel will
-> > > actually boot more than 32 cpus. But if it will be ack'ed, I would be
-> > > fine to set NR_CPUS to 32 or 64 in general and independent from
-> > > ARCH_THUNDER.
-> > > 
-> > > For simplicity I better drop setting NR_CPUS in this patch.
-> > 
-> > So, ARM64 will get a big long list of "config ARCH_foo" options just
-> > to stuff lots of broken select statements into the configuration.  Yes,
-> > this may have been the norm with ARM, but it's turned out to be more
-> > of a problem than a solution, especially as it keeps causing Kconfig
-> > warnings when things change in the rest of the kernel tree.
-> 
-> Agreed; this seems more pain than it is worth.
-
-Lots of select statements indeed would be a problem, but I don't think
-that is what Robert was suggesting.
-
-> > The same is true with defconfigs - Linus threatened to delete all ARM
-> > defconfigs except one at one point.
-> 
-> IMO we should continue doing what we've done so far and make the ARM64
-> defconfig work on everything it can by default, no ARCH_* necessary.
-> That's what most people will build and test and we shouldn't get
-> platform-specific code (well, drivers) breaking the single image.
-
-Right.
-
-> For the extreme configurations (really tiny or really big) custom
-> configuration being necessary is fine. That doesn't have to involve
-> ARCH_* config options.
-> 
-> If you want to build a custom config then you should have an idea of
-> what you need. ARCH_* options are only necessary if someone wants a
-> kernel tuned for a specific SoC but doesn't know anything about that
-> SoC.
-
-A common pattern these days is to do dependencies like
-
-arch/*/Kconfig:
-	config ARCH_FOO
-	bool "Enable support for Foo platform"
-	help
-	  ...
+Hi Will,
 
 
-drivers/*/Kconfig
-	config SUBSYS_FOO
-	bool "SUBSYS driver for Foo"
-	depends on ARCH_FOO || COMPILE_TEST
-	depends on OF && REGULATOR && GENERIC_PHY # or whatever
+On Fri, Sep 5, 2014 at 7:16 PM, Ajay kumar <ajaynumb@gmail.com> wrote:
+> Hi Will,
+>
+> On Fri, Sep 5, 2014 at 5:52 PM, Will Deacon <will.deacon@arm.com> wrote:
+>> [Looks like it's not just Rutland that can't spell the address of the
+>>  mailing list today. Fixed here, so please use this post in any replies].
+>>
+>> On Fri, Sep 05, 2014 at 12:57:04PM +0100, Will Deacon wrote:
+>>> Hi all,
+>>>
+>>> I'm one of the few, foolish people to try running mainline on my 5250-based
+>>> Samsung Chromebook (snow). I can live without wireless, usb3 and video
+>>> acceleration, so actually it makes a reasonable development platform for
+>>> doing A15-based (micro)-architectural work.
+>>>
+>>> However, since 3.15 I've not been able to boot *any* mainline kernels on
+>>> this board. I did mean to report this earlier, but I have other machines
+>>> that can run mainline so this has fallen by the wayside.
+>>>
+>>> The problems started with 3.16, where simple-fb would fail to initialise
+>>> and I lost my display. Note that I don't have a serial console on this
+>>> machine (I looked at the PCB and there's no way I can solder one of those
+>>> myself :) I bisected the issue at the time, and I could get my display back
+>>> by removing some of the new regulator and hdmi properties from the DT. At
+>>> that point, I could boot, but DMA didn't initialise for the MMC controller
+>>> so I couldn't mount my root filesystem.
+>>>http://www.spinics.net/lists/dri-devel/msg66740.html
+>>> With 3.17-rc3, it seems a lot worse -- I don't get any output after nv-uboot
+>>> (i.e. the nv-uboot screen just remains on the display, with the last line
+>>> reading "Stashed 20 records").
 
-That way we can enable everything in the defconfig, but someone
-who likes to build a more specialized kernel can disable the
-other platforms and won't get the drivers that are specific to
-those.
+It's unfortunate that you have not been able to use display on snow.
+As Ajay has mentioned in the previous mail, there are still some in-flight
+patches needed to get display up and running.
+And since you don't have a serial console available with your machine,
+the last print with you see is from the u-boot only.
 
-I personally think this is a bit more verbose than what we need, but
-I don't strongly object doing it that way.
+>>>
+>>> I'd usually try to debug this a bit further, but without a console it's
+>>> really painful to get anywhere. I've been working with 3.15, but now I'm
+>>> having to backport patches when I want to test them, which is more effort
+>>> than I can be bothered with.
+>>>
+>>> Is anybody else running mainline on this device and are these known/fixed
+>>> problems?
+> AFAIK, ARM chromebooks use DRM based display drivers and the required
+> patches are still not merged:
+> http://www.spinics.net/lists/dri-devel/msg66740.html
+>
+> Corresponding DT patches are also still not merged:
+> http://www.spinics.net/lists/arm-kernel/msg358324.html
+> http://www.spinics.net/lists/arm-kernel/msg358325.html
+>
+> There is a patch for configs as well:
+> https://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg35828.html
+>
+> Try these patches(I hope they will apply directly on 3.17-rc3) and you should
+> be able to use display on snow.
 
-The code size really should not matter much on ARM64 though: it's
-unlikely we will see a lot of systems with less than a few gigabytes
-of memory, and I expect that a generic kernel would be e.g. 6 MB
-instead of 4 MB for a platform specific kernel.
+We have pushed 3.17-rc3 kernel with above mentioned patches to github [1]
+Please use that, and in case you have some other requirements let us know.
 
-	Arnd
+[1] https://github.com/exynos-reference/kernel/tree/exynos5-v3.17-rc3-display
+
+
+
+-- 
+Best Regards
+Vivek Gautam
+Samsung R&D Institute, Bangalore
+India
