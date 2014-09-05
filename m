@@ -1,184 +1,112 @@
-From: wangyijing@huawei.com (Yijing Wang)
-Date: Fri, 5 Sep 2014 18:09:46 +0800
-Subject: [PATCH v1 01/21] PCI/MSI: Clean up struct msi_chip argument
-In-Reply-To: <1409911806-10519-1-git-send-email-wangyijing@huawei.com>
-References: <1409911806-10519-1-git-send-email-wangyijing@huawei.com>
-Message-ID: <1409911806-10519-2-git-send-email-wangyijing@huawei.com>
+From: mikko.perttunen@kapsi.fi (Mikko Perttunen)
+Date: Fri, 05 Sep 2014 12:50:22 +0300
+Subject: [PATCH v2 1/5] of: Add descriptions of thermtrip properties to
+ Tegra PMC bindings
+In-Reply-To: <53F6326F.2050600@wwwdotorg.org>
+References: <1407933685-12404-1-git-send-email-mperttunen@nvidia.com>
+ <1407933685-12404-2-git-send-email-mperttunen@nvidia.com>
+ <53F50231.5010605@wwwdotorg.org> <20140821065853.GE4486@ulmo>
+ <53F61275.9020508@wwwdotorg.org> <20140821165357.GC1172@ulmo>
+ <53F6326F.2050600@wwwdotorg.org>
+Message-ID: <5409875E.2080607@kapsi.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Msi_chip functions setup_irq/teardown_irq rarely use msi_chip
-argument. We can look up msi_chip pointer by the device pointer
-or irq number, so clean up msi_chip argument.
+Hi again!
 
-Signed-off-by: Yijing Wang <wangyijing@huawei.com>
-CC: Thierry Reding <thierry.reding@gmail.com>
-CC: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
----
- drivers/irqchip/irq-armada-370-xp.c |   12 +++++-------
- drivers/pci/host/pci-tegra.c        |    8 +++++---
- drivers/pci/host/pcie-designware.c  |    4 ++--
- drivers/pci/host/pcie-rcar.c        |    8 +++++---
- drivers/pci/msi.c                   |    4 ++--
- include/linux/msi.h                 |    5 ++---
- 6 files changed, 21 insertions(+), 20 deletions(-)
+I have fixed all other issues mentioned apart from this one. I can see 
+three ways ahead:
 
-diff --git a/drivers/irqchip/irq-armada-370-xp.c b/drivers/irqchip/irq-armada-370-xp.c
-index 574aba0..658990c 100644
---- a/drivers/irqchip/irq-armada-370-xp.c
-+++ b/drivers/irqchip/irq-armada-370-xp.c
-@@ -129,9 +129,8 @@ static void armada_370_xp_free_msi(int hwirq)
- 	mutex_unlock(&msi_used_lock);
- }
- 
--static int armada_370_xp_setup_msi_irq(struct msi_chip *chip,
--				       struct pci_dev *pdev,
--				       struct msi_desc *desc)
-+static int armada_370_xp_setup_msi_irq(struct pci_dev *pdev,
-+		struct msi_desc *desc)
- {
- 	struct msi_msg msg;
- 	int virq, hwirq;
-@@ -156,8 +155,7 @@ static int armada_370_xp_setup_msi_irq(struct msi_chip *chip,
- 	return 0;
- }
- 
--static void armada_370_xp_teardown_msi_irq(struct msi_chip *chip,
--					   unsigned int irq)
-+static void armada_370_xp_teardown_msi_irq(unsigned int irq)
- {
- 	struct irq_data *d = irq_get_irq_data(irq);
- 	unsigned long hwirq = d->hwirq;
-@@ -166,8 +164,8 @@ static void armada_370_xp_teardown_msi_irq(struct msi_chip *chip,
- 	armada_370_xp_free_msi(hwirq);
- }
- 
--static int armada_370_xp_check_msi_device(struct msi_chip *chip, struct pci_dev *dev,
--					  int nvec, int type)
-+static int armada_370_xp_check_msi_device(struct pci_dev *dev,
-+		int nvec, int type)
- {
- 	/* We support MSI, but not MSI-X */
- 	if (type == PCI_CAP_ID_MSI)
-diff --git a/drivers/pci/host/pci-tegra.c b/drivers/pci/host/pci-tegra.c
-index 0fb0fdb..edd4040 100644
---- a/drivers/pci/host/pci-tegra.c
-+++ b/drivers/pci/host/pci-tegra.c
-@@ -1157,9 +1157,10 @@ static irqreturn_t tegra_pcie_msi_irq(int irq, void *data)
- 	return processed > 0 ? IRQ_HANDLED : IRQ_NONE;
- }
- 
--static int tegra_msi_setup_irq(struct msi_chip *chip, struct pci_dev *pdev,
-+static int tegra_msi_setup_irq(struct pci_dev *pdev,
- 			       struct msi_desc *desc)
- {
-+	struct msi_chip *chip = pdev->bus->msi;
- 	struct tegra_msi *msi = to_tegra_msi(chip);
- 	struct msi_msg msg;
- 	unsigned int irq;
-@@ -1185,10 +1186,11 @@ static int tegra_msi_setup_irq(struct msi_chip *chip, struct pci_dev *pdev,
- 	return 0;
- }
- 
--static void tegra_msi_teardown_irq(struct msi_chip *chip, unsigned int irq)
-+static void tegra_msi_teardown_irq(unsigned int irq)
- {
--	struct tegra_msi *msi = to_tegra_msi(chip);
- 	struct irq_data *d = irq_get_irq_data(irq);
-+	struct msi_chip *chip = irq_get_chip_data(irq);
-+	struct tegra_msi *msi = to_tegra_msi(chip);
- 
- 	tegra_msi_free(msi, d->hwirq);
- }
-diff --git a/drivers/pci/host/pcie-designware.c b/drivers/pci/host/pcie-designware.c
-index 52bd3a1..2204456 100644
---- a/drivers/pci/host/pcie-designware.c
-+++ b/drivers/pci/host/pcie-designware.c
-@@ -342,7 +342,7 @@ static void clear_irq(unsigned int irq)
- 	msi->msi_attrib.multiple = 0;
- }
- 
--static int dw_msi_setup_irq(struct msi_chip *chip, struct pci_dev *pdev,
-+static int dw_msi_setup_irq(struct pci_dev *pdev,
- 			struct msi_desc *desc)
- {
- 	int irq, pos, msgvec;
-@@ -384,7 +384,7 @@ static int dw_msi_setup_irq(struct msi_chip *chip, struct pci_dev *pdev,
- 	return 0;
- }
- 
--static void dw_msi_teardown_irq(struct msi_chip *chip, unsigned int irq)
-+static void dw_msi_teardown_irq(unsigned int irq)
- {
- 	clear_irq(irq);
- }
-diff --git a/drivers/pci/host/pcie-rcar.c b/drivers/pci/host/pcie-rcar.c
-index 4884ee5..647bc9f 100644
---- a/drivers/pci/host/pcie-rcar.c
-+++ b/drivers/pci/host/pcie-rcar.c
-@@ -615,9 +615,10 @@ static irqreturn_t rcar_pcie_msi_irq(int irq, void *data)
- 	return IRQ_HANDLED;
- }
- 
--static int rcar_msi_setup_irq(struct msi_chip *chip, struct pci_dev *pdev,
-+static int rcar_msi_setup_irq(struct pci_dev *pdev,
- 			      struct msi_desc *desc)
- {
-+	struct msi_chip *chip = pdev->bus->msi;
- 	struct rcar_msi *msi = to_rcar_msi(chip);
- 	struct rcar_pcie *pcie = container_of(chip, struct rcar_pcie, msi.chip);
- 	struct msi_msg msg;
-@@ -645,10 +646,11 @@ static int rcar_msi_setup_irq(struct msi_chip *chip, struct pci_dev *pdev,
- 	return 0;
- }
- 
--static void rcar_msi_teardown_irq(struct msi_chip *chip, unsigned int irq)
-+static void rcar_msi_teardown_irq(unsigned int irq)
- {
--	struct rcar_msi *msi = to_rcar_msi(chip);
- 	struct irq_data *d = irq_get_irq_data(irq);
-+	struct msi_chip *chip = irq_get_chip_data(irq);
-+	struct rcar_msi *msi = to_rcar_msi(chip);
- 
- 	rcar_msi_free(msi, d->hwirq);
- }
-diff --git a/drivers/pci/msi.c b/drivers/pci/msi.c
-index 8fc9587..f6cb317 100644
---- a/drivers/pci/msi.c
-+++ b/drivers/pci/msi.c
-@@ -37,7 +37,7 @@ int __weak arch_setup_msi_irq(struct pci_dev *dev, struct msi_desc *desc)
- 	if (!chip || !chip->setup_irq)
- 		return -EINVAL;
- 
--	err = chip->setup_irq(chip, dev, desc);
-+	err = chip->setup_irq(dev, desc);
- 	if (err < 0)
- 		return err;
- 
-@@ -53,7 +53,7 @@ void __weak arch_teardown_msi_irq(unsigned int irq)
- 	if (!chip || !chip->teardown_irq)
- 		return;
- 
--	chip->teardown_irq(chip, irq);
-+	chip->teardown_irq(irq);
- }
- 
- int __weak arch_setup_msi_irqs(struct pci_dev *dev, int nvec, int type)
-diff --git a/include/linux/msi.h b/include/linux/msi.h
-index c3c70a6..762fe61 100644
---- a/include/linux/msi.h
-+++ b/include/linux/msi.h
-@@ -71,9 +71,8 @@ struct msi_chip {
- 	struct device_node *of_node;
- 	struct list_head list;
- 
--	int (*setup_irq)(struct msi_chip *chip, struct pci_dev *dev,
--			 struct msi_desc *desc);
--	void (*teardown_irq)(struct msi_chip *chip, unsigned int irq);
-+	int (*setup_irq)(struct pci_dev *dev, struct msi_desc *desc);
-+	void (*teardown_irq)(unsigned int irq);
- };
- 
- #endif /* LINUX_MSI_H */
--- 
-1.7.1
+1) Keep things as is. There is a slight possibility that in the future 
+we will have a hardware configuration with multiple bus addresses and 
+this will cause annoyance.
+2) Keep things otherwise as is, but read the bus address from the 
+thermtrip node. While at it, just have a reference to the the I2C bus 
+rather than the PMIC in the bindings.
+3) Create a new poweroff driver class with two operations: poweroff and 
+get_i2c_command. The AS3722 poweroff "driver" is already separated from 
+the MFD and would be relatively straightforward to port to a new driver 
+subsystem. However, other PMICs we have, such as Palmas, don't do this 
+and would require larger refactoring. TBH, this smells of 
+overengineering to me.
+4) Other ideas?
+
+What is your opinion?
+
+Cheers,
+Mikko
+
+On 08/21/2014 08:54 PM, Stephen Warren wrote:
+> On 08/21/2014 10:53 AM, Thierry Reding wrote:
+>> On Thu, Aug 21, 2014 at 09:38:29AM -0600, Stephen Warren wrote:
+>>> On 08/21/2014 12:58 AM, Thierry Reding wrote:
+>>>> On Wed, Aug 20, 2014 at 02:16:49PM -0600, Stephen Warren wrote:
+>>>>> On 08/13/2014 06:41 AM, Mikko Perttunen wrote:
+>>>>>> Hardware-triggered thermal reset requires configuring the I2C
+>>>>>> reset procedure. This configuration is read from the device tree,
+>>>>>> so document the relevant properties in the binding documentation.
+>>>>>
+>>>>>> diff --git
+>>>>>> a/Documentation/devicetree/bindings/arm/tegra/nvidia,tegra20-pmc.txt
+>>>>>> b/Documentation/devicetree/bindings/arm/tegra/nvidia,tegra20-pmc.txt
+>
+>>>>>> +- nvidia,pmu : Phandle to power management unit / PMIC handling
+>>>>>> poweroff
+>>>>>> +- nvidia,reg-addr : I2C register address to write poweroff
+>>>>>> command to
+>>>>>> +- nvidia,reg-data : Poweroff command to write to PMU
+>>>>>
+>>>>> Why are both the PMU/PMIC phandle and the register address/data
+>>>>> required? I
+>>>>> thought the purpose of having the phandle was to allow the register
+>>>>> address
+>>>>> and data to be queried from the PMU/PMIC driver.
+>>>>>
+>>>>> To me, it seems much simpler to get rid of the phandle and just
+>>>>> hard-code
+>>>>> the I2C bus number, address, and data into this node, rather than
+>>>>> having to
+>>>>> go query it from the PMU/PMIC driver, then find the I2C controller,
+>>>>> then
+>>>>> query it for its ID (and hope that all HW modules that talk to I2C
+>>>>> controllers directly use the same numbering scheme...)
+>>>>
+>>>> I originally requested this to be changed. It seems wrong to duplicate
+>>>> information about the PMIC in both the PMIC device tree node and the
+>>>> i2c-thermtrip node if we can get the same information from the driver
+>>>> directly (via the phandle). It certainly requires a little more code,
+>>>> but at the advantage of not having to figure out the I2C controller
+>>>> hardware number and I2C slave addresses when writing the i2c-thermtrip
+>>>> node.
+>>>
+>>> I cant see that argument, but surely the PMIC driver can also supply the
+>
+> Oops, that was meant to be can not cant.
+>
+>>> "reg-addr" and "reg-data" values too, if it's already being queried
+>>> for the
+>>> I2C device address and bus number? The binding above appears to
+>>> duplicate
+>>> part of the information, while requiring querying of the other part.
+>>
+>> I suppose that could be done. It would take a new function to do that,
+>> though, since I'm not aware of a generic mechanism to query this kind of
+>> information from a PMIC (there's no generic PMIC API, either, so perhaps
+>> it would be a good time to create one?). The I2C controller and I2C
+>> slave are generic I2C properties, whereas the register and data to power
+>> off the device are very device specific.
+>
+> I don't think it's possible to generically query an I2C device for its
+> address from the struct i2c_device object; the code still needs to call
+> a function in the PMIC driver to obtain this.
+>
+> That's because some I2C devices respond to multiple I2C addresses, and
+> there's no guarantee that the one I2C address in the DT (and hence the
+> struct i2c_device) is the address upon which the regulator function exists.
+>
+> grep for i2c_new_dummy in drivers/mfd and you'll find quite a few
+> examples. The Atmel MXT touchpad/screen is another example.
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-tegra" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
