@@ -1,130 +1,137 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Fri,  5 Sep 2014 15:47:22 -0700
-Subject: [PATCH v2 03/15] clk: Add __clk_mux_determine_rate_closest
-In-Reply-To: <1409957256-23729-1-git-send-email-sboyd@codeaurora.org>
-References: <1409957256-23729-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <1409957256-23729-4-git-send-email-sboyd@codeaurora.org>
+Date: Fri,  5 Sep 2014 15:47:19 -0700
+Subject: [PATCH v2 00/15] Krait clocks + Krait CPUfreq
+Message-ID: <1409957256-23729-1-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some clock drivers want to find the closest rate on the input of
-a mux instead of a rate that's less than or equal to the desired
-rate. Add a generic mux function to support this.
+These patches provide cpufreq scaling on devices with Krait CPUs.
+In Krait CPU designs there's one PLL and two muxes per CPU, allowing
+us to switch CPU frequencies independently.
 
-Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
----
- drivers/clk/clk.c            | 47 +++++++++++++++++++++++++++++++++++---------
- include/linux/clk-provider.h |  9 +++++++--
- 2 files changed, 45 insertions(+), 11 deletions(-)
+				 secondary
+	 +-----+                    +
+	 | QSB |-------+------------|\
+	 +-----+       |            | |-+
+		       |    +-------|/  |
+		       |    |       +   |
+	 +-----+       |    |           |
+	 | PLL |----+-------+           |   primary
+	 +-----+    |  |                |     +
+		    |  |                +-----|\       +------+
+	 +-------+  |  |                      | \      |      |
+	 | HFPLL |----------+-----------------|  |-----| CPU0 |
+	 +-------+  |  |    |                 |  |     |      |
+		    |  |    | +-----+         | /      +------+
+		    |  |    +-| / 2 |---------|/
+		    |  |      +-----+         +
+		    |  |         secondary
+		    |  |            +
+		    |  +------------|\
+		    |               | |-+
+		    +---------------|/  |   primary
+				    +   |     +
+					+-----|\       +------+
+	 +-------+                            | \      |      |
+	 | HFPLL |----------------------------|  |-----| CPU1 |
+	 +-------+          |                 |  |     |      |
+			    | +-----+         | /      +------+
+			    +-| / 2 |---------|/
+			      +-----+         +
 
-diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-index b76fa69b44cb..255ec8c92919 100644
---- a/drivers/clk/clk.c
-+++ b/drivers/clk/clk.c
-@@ -712,14 +712,20 @@ struct clk *__clk_lookup(const char *name)
- 	return NULL;
- }
- 
--/*
-- * Helper for finding best parent to provide a given frequency. This can be used
-- * directly as a determine_rate callback (e.g. for a mux), or from a more
-- * complex clock that may combine a mux with other operations.
-- */
--long __clk_mux_determine_rate(struct clk_hw *hw, unsigned long rate,
--			      unsigned long *best_parent_rate,
--			      struct clk **best_parent_p)
-+static bool mux_is_better_rate(unsigned long rate, unsigned long now,
-+			   unsigned long best, unsigned long flags)
-+{
-+	if (flags & CLK_MUX_ROUND_CLOSEST)
-+		return abs(now - rate) < abs(best - rate);
-+
-+	return now <= rate && now > best;
-+}
-+
-+static long
-+clk_mux_determine_rate_flags(struct clk_hw *hw, unsigned long rate,
-+			     unsigned long *best_parent_rate,
-+			     struct clk **best_parent_p,
-+			     unsigned long flags)
- {
- 	struct clk *clk = hw->clk, *parent, *best_parent = NULL;
- 	int i, num_parents;
-@@ -747,7 +753,7 @@ long __clk_mux_determine_rate(struct clk_hw *hw, unsigned long rate,
- 			parent_rate = __clk_round_rate(parent, rate);
- 		else
- 			parent_rate = __clk_get_rate(parent);
--		if (parent_rate <= rate && parent_rate > best) {
-+		if (mux_is_better_rate(rate, parent_rate, best, flags)) {
- 			best_parent = parent;
- 			best = parent_rate;
- 		}
-@@ -760,8 +766,31 @@ out:
- 
- 	return best;
- }
-+
-+/*
-+ * Helper for finding best parent to provide a given frequency. This can be used
-+ * directly as a determine_rate callback (e.g. for a mux), or from a more
-+ * complex clock that may combine a mux with other operations.
-+ */
-+long __clk_mux_determine_rate(struct clk_hw *hw, unsigned long rate,
-+			      unsigned long *best_parent_rate,
-+			      struct clk **best_parent_p)
-+{
-+	return clk_mux_determine_rate_flags(hw, rate, best_parent_rate,
-+					    best_parent_p, 0);
-+}
- EXPORT_SYMBOL_GPL(__clk_mux_determine_rate);
- 
-+long __clk_mux_determine_rate_closest(struct clk_hw *hw, unsigned long rate,
-+			      unsigned long *best_parent_rate,
-+			      struct clk **best_parent_p)
-+{
-+	return clk_mux_determine_rate_flags(hw, rate, best_parent_rate,
-+					    best_parent_p,
-+					    CLK_MUX_ROUND_CLOSEST);
-+}
-+EXPORT_SYMBOL_GPL(__clk_mux_determine_rate_closest);
-+
- /***        clk api        ***/
- 
- void __clk_unprepare(struct clk *clk)
-diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
-index 48a92e318542..ba97e25c1115 100644
---- a/include/linux/clk-provider.h
-+++ b/include/linux/clk-provider.h
-@@ -372,6 +372,8 @@ struct clk *clk_register_divider_table(struct device *dev, const char *name,
-  *	register, and mask of mux bits are in higher 16-bit of this register.
-  *	While setting the mux bits, higher 16-bit should also be updated to
-  *	indicate changing mux bits.
-+ * CLK_MUX_ROUND_CLOSEST - Use the parent rate that is closest to the desired
-+ *	frequency.
-  */
- struct clk_mux {
- 	struct clk_hw	hw;
-@@ -386,7 +388,8 @@ struct clk_mux {
- #define CLK_MUX_INDEX_ONE		BIT(0)
- #define CLK_MUX_INDEX_BIT		BIT(1)
- #define CLK_MUX_HIWORD_MASK		BIT(2)
--#define CLK_MUX_READ_ONLY	BIT(3) /* mux setting cannot be changed */
-+#define CLK_MUX_READ_ONLY		BIT(3) /* mux can't be changed */
-+#define CLK_MUX_ROUND_CLOSEST		BIT(4)
- 
- extern const struct clk_ops clk_mux_ops;
- extern const struct clk_ops clk_mux_ro_ops;
-@@ -529,7 +532,9 @@ struct clk *__clk_lookup(const char *name);
- long __clk_mux_determine_rate(struct clk_hw *hw, unsigned long rate,
- 			      unsigned long *best_parent_rate,
- 			      struct clk **best_parent_p);
--
-+long __clk_mux_determine_rate_closest(struct clk_hw *hw, unsigned long rate,
-+			      unsigned long *best_parent_rate,
-+			      struct clk **best_parent_p);
- /*
-  * FIXME clock api without lock protection
-  */
+To support this in the common clock framework we model the muxes,
+dividers, and PLLs as different clocks. CPUfreq only interacts
+with the primary mux (farthest right in the diagram). When CPUfreq
+sets a rate, the mux code finds the best parent that can provide the rate.
+Due to the design, QSB and the top PLL are always a fixed rate and thus
+only support one frequency each. These sources provide the lowest
+frequencies for the CPUs. The HFPLLs are where we can make the CPU go
+faster (GHz range). Sometimes we need to run the HFPLL twice as
+fast and divide it by two to get a particular frequency.
+
+When switching rates we can't leave the CPU clocked by the HFPLL because
+we need to turn off the output of the PLL when changing its frequency.
+This means we have to switch over to the secondary mux and use one of the
+fixed sources. This is why we need something like the safe parent patch.
+
+I plan to submit the DTS changes through arm-soc, but I've included everything
+here to make it easier to pick things up for testing, etc. Please note
+that these patches rely on the Krait L2 accessor patch I posted a while back
+in another series[1]. This also relies on the cpufreq-generic patchset from
+Viresh[2]. If anything can be picked up right now it would be better
+to reduce the churn over time as other pieces settle. The series gets
+progressively more controversial as it goes on, so I hope that things
+near the beggining will be picked up earlier.
+
+Changes since v1:
+ * Added IPQ and APQ8064 support
+ * Switched to cpufreq-generic
+ * Added OPP parsing from DT (need to write binding though)
+ * New patches to make clk-generic.c go away
+  * Made mux and divider reusable for non-MMIO devices
+  * Added a mux_determine_rate_closest (not sure if this is really needed)
+  * Added unregistration of muxes
+ * New patch to avoid sending high frequencies down to devices using clocks
+
+TODO:
+ * Add Krait regulator voltage scaling (not strictly necessary)
+ * Document DT bindings
+ * Use a new efuse/eeprom API instead of hardcoding the location in the driver
+ * Add some thermal awareness
+
+
+Stephen Boyd (15):
+  clk: mux: Add unregistration API
+  clk: mux: Split out register accessors for reuse
+  clk: Add __clk_mux_determine_rate_closest
+  clk: divider: Make generic for usage elsewhere
+  clk: Add safe switch hook
+  clk: Avoid sending high rates to downstream clocks during set_rate
+  clk: qcom: Add support for High-Frequency PLLs (HFPLLs)
+  clk: qcom: Add HFPLL driver
+  clk: qcom: Add MSM8960/APQ8064's HFPLLs
+  clk: qcom: Add IPQ806X's HFPLLs
+  clk: qcom: Add support for Krait clocks
+  clk: qcom: Add KPSS ACC/GCC driver
+  clk: qcom: Add Krait clock controller driver
+  cpufreq: Add module to register cpufreq on Krait CPUs
+  ARM: dts: qcom: Add necessary DT data for Krait cpufreq
+
+ arch/arm/boot/dts/qcom-apq8064.dtsi          | 230 +++++++++++++++++
+ arch/arm/boot/dts/qcom-msm8960.dtsi          |  49 ++++
+ arch/arm/boot/dts/qcom-msm8974.dtsi          | 311 ++++++++++++++++++++++-
+ drivers/clk/clk-divider.c                    | 197 +++++++++------
+ drivers/clk/clk-mux.c                        |  91 ++++---
+ drivers/clk/clk.c                            | 133 +++++++---
+ drivers/clk/qcom/Kconfig                     |  28 +++
+ drivers/clk/qcom/Makefile                    |   5 +
+ drivers/clk/qcom/clk-hfpll.c                 | 253 +++++++++++++++++++
+ drivers/clk/qcom/clk-hfpll.h                 |  54 ++++
+ drivers/clk/qcom/clk-krait.c                 | 166 +++++++++++++
+ drivers/clk/qcom/clk-krait.h                 |  49 ++++
+ drivers/clk/qcom/gcc-ipq806x.c               |  83 +++++++
+ drivers/clk/qcom/gcc-msm8960.c               | 172 +++++++++++++
+ drivers/clk/qcom/hfpll.c                     | 110 +++++++++
+ drivers/clk/qcom/kpss-xcc.c                  |  94 +++++++
+ drivers/clk/qcom/krait-cc.c                  | 357 +++++++++++++++++++++++++++
+ drivers/cpufreq/Kconfig.arm                  |   9 +
+ drivers/cpufreq/Makefile                     |   1 +
+ drivers/cpufreq/qcom-cpufreq.c               | 199 +++++++++++++++
+ include/dt-bindings/clock/qcom,gcc-msm8960.h |   2 +
+ include/linux/clk-private.h                  |   2 +
+ include/linux/clk-provider.h                 |  32 ++-
+ 23 files changed, 2486 insertions(+), 141 deletions(-)
+ create mode 100644 drivers/clk/qcom/clk-hfpll.c
+ create mode 100644 drivers/clk/qcom/clk-hfpll.h
+ create mode 100644 drivers/clk/qcom/clk-krait.c
+ create mode 100644 drivers/clk/qcom/clk-krait.h
+ create mode 100644 drivers/clk/qcom/hfpll.c
+ create mode 100644 drivers/clk/qcom/kpss-xcc.c
+ create mode 100644 drivers/clk/qcom/krait-cc.c
+ create mode 100644 drivers/cpufreq/qcom-cpufreq.c
+
+[1] http://lkml.iu.edu/hypermail/linux/kernel/1404.0/02636.html
+[2] git://git.linaro.org/people/viresh.kumar/linux cpufreq/cpu0-krait-v3
 -- 
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
 hosted by The Linux Foundation
