@@ -1,98 +1,80 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 5 Sep 2014 13:51:47 +0100
-Subject: [PATCH v2 1/4] arm64, thunder: Add Kconfig option for Cavium
- Thunder SoC Family
-In-Reply-To: <20140905110552.GH30401@n2100.arm.linux.org.uk>
-References: <1409903205-2762-1-git-send-email-rric@kernel.org>
- <1409903205-2762-2-git-send-email-rric@kernel.org>
- <20140905093239.GC30401@n2100.arm.linux.org.uk>
- <20140905104547.GT4703@rric.localhost>
- <20140905110552.GH30401@n2100.arm.linux.org.uk>
-Message-ID: <20140905125147.GC20164@leverpostej>
+From: Anson.Huang@freescale.com (Anson.Huang at freescale.com)
+Date: Fri, 5 Sep 2014 12:58:28 +0000
+Subject: [PATCH V2 3/3] ARM: imx: source gpt per clk from OSC for system
+ timer
+In-Reply-To: <CAOMZO5CJLSXy3p-eAe9xOJw8p4gxoRuT91bXV8gswy5oMuU6XQ@mail.gmail.com>
+References: <1409887606-22388-1-git-send-email-b20788@freescale.com>
+ <1409887606-22388-4-git-send-email-b20788@freescale.com>,
+ <CAOMZO5CJLSXy3p-eAe9xOJw8p4gxoRuT91bXV8gswy5oMuU6XQ@mail.gmail.com>
+Message-ID: <5E619FDB-56BB-486E-B627-9D2A9D4F9F54@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 05, 2014 at 12:05:52PM +0100, Russell King - ARM Linux wrote:
-> On Fri, Sep 05, 2014 at 12:45:47PM +0200, Robert Richter wrote:
-> > On 05.09.14 10:32:40, Russell King - ARM Linux wrote:
-> > > On Fri, Sep 05, 2014 at 09:46:42AM +0200, Robert Richter wrote:
-> > > > From: Radha Mohan Chintakuntla <rchintakuntla@cavium.com>
-> > > > 
-> > > > Increase maximum numbers of cpus to 32. This relates to current
-> > > > maximal possible cpu number. Increasing this to 64 cpus will be a
-> > > > separate patch not part of this enablement patches.
-> > > > 
-> > > > Signed-off-by: Radha Mohan Chintakuntla <rchintakuntla@cavium.com>
-> > > > Signed-off-by: Robert Richter <rrichter@cavium.com>
-> > > > ---
-> > > >  arch/arm64/Kconfig | 6 ++++++
-> > > >  1 file changed, 6 insertions(+)
-> > > > 
-> > > > diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-> > > > index fd4e81a4e1ce..77fb82b0f684 100644
-> > > > --- a/arch/arm64/Kconfig
-> > > > +++ b/arch/arm64/Kconfig
-> > > > @@ -134,6 +134,11 @@ source "kernel/Kconfig.freezer"
-> > > >  
-> > > >  menu "Platform selection"
-> > > >  
-> > > > +config ARCH_THUNDER
-> > > > +	bool "Cavium Inc. Thunder SoC Family"
-> > > > +	help
-> > > > +	  This enables support for Cavium's Thunder Family of SoCs.
-> > > > +
-> > > >  config ARCH_VEXPRESS
-> > > >  	bool "ARMv8 software model (Versatile Express)"
-> > > >  	select ARCH_REQUIRE_GPIOLIB
-> > > > @@ -256,6 +261,7 @@ config NR_CPUS
-> > > >  	range 2 32
-> > > >  	depends on SMP
-> > > >  	# These have to remain sorted largest to smallest
-> > > > +	default "32" if ARCH_THUNDER
-> > > >  	default "8"
-> > > 
-> > > Why do you need ARCH_THUNDER?  If it's just to change this default,
-> > 
-> > No, we need it just to enable all our drivers on the SoC. We want to
-> > enable the SoC by using defconfig + ARCH_THUNDER. As said in my other
-> > mail, I put it here to be able to base all other thunder driver patch
-> > sets on this initial base patch set. Otherwise this particular patch
-> > and also the dtb patch need to be shipped with all other driver patch
-> > sets. This might lead to duplicate submissions of the same patch.
-> > 
-> > With doing defconfig + ARCH_THUNDER we also want to enable the max
-> > number of cpus that is currently supported. I only enable 32 cpus
-> > since booting more cpus is untested. There might be problems at the 32
-> > cpu boundary. Just setting it to 64 does not mean a kernel will
-> > actually boot more than 32 cpus. But if it will be ack'ed, I would be
-> > fine to set NR_CPUS to 32 or 64 in general and independent from
-> > ARCH_THUNDER.
-> > 
-> > For simplicity I better drop setting NR_CPUS in this patch.
+
+
+Sent from my iPad
+
+? 2014-9-5?20:09?"Fabio Estevam" <festevam@gmail.com> ???
+
+> On Fri, Sep 5, 2014 at 12:26 AM, Anson Huang <b20788@freescale.com> wrote:
+>> On i.MX6Q TO > 1.0, i.MX6DL and i.MX6SX, gpt per clock
+>> can be from OSC instead of ipg_per, as ipg_per's rate
+>> may be scaled when system enter low bus mode, to keep
+>> system timer NOT drift, better to make gpt per clock
+>> at fixed rate, here add support for gpt per clock to
+>> be from OSC which is at fixed rate always.
+>> 
+>> There are some difference on this implementation of
+>> gpt per clock source, see below for details:
+>> 
+>> i.MX6Q TO > 1.0: GPT_CR_CLKSRC, 3b'101 selects fix clock
+>>    of OSC / 8 for gpt per clk;
 > 
-> So, ARM64 will get a big long list of "config ARCH_foo" options just
-> to stuff lots of broken select statements into the configuration.  Yes,
-> this may have been the norm with ARM, but it's turned out to be more
-> of a problem than a solution, especially as it keeps causing Kconfig
-> warnings when things change in the rest of the kernel tree.
+> You mean "5b'101 selects fix clock..."
+> 
+>> i.MX6DL and i.MX6SX: GPT_CR_CLKSRC, 3b'101 selects OSC
+> 
+> Same here: "5b'101"
 
-Agreed; this seems more pain than it is worth.
+[Anson] I thought 3b'101 means 3 bits, value 101... Maybe my understanding is incorrect, will correct it n v3.
+> 
+>> @@ -293,7 +299,7 @@ static int __init mxc_clockevent_init(struct clk *timer_clk)
+>> static void __init _mxc_timer_init(int irq,
+>>                                   struct clk *clk_per, struct clk *clk_ipg)
+>> {
+>> -       uint32_t tctl_val;
+>> +       uint32_t tctl_val, tprer_val;
+>> 
+>>        if (IS_ERR(clk_per)) {
+>>                pr_err("i.MX timer: unable to get clk\n");
+>> @@ -312,10 +318,26 @@ static void __init _mxc_timer_init(int irq,
+>>        __raw_writel(0, timer_base + MXC_TCTL);
+>>        __raw_writel(0, timer_base + MXC_TPRER); /* see datasheet note */
+>> 
+>> -       if (timer_is_v2())
+>> -               tctl_val = V2_TCTL_CLK_PER | V2_TCTL_FRR | V2_TCTL_WAITEN | MXC_TCTL_TEN;
+>> -       else
+>> +       if (timer_is_v2()) {
+>> +               if (((cpu_is_imx6q() && imx_get_soc_revision() >
+>> +                       IMX_CHIP_REVISION_1_0) || cpu_is_imx6dl() ||
+>> +                       cpu_is_imx6sx()) && (clk_get_rate(clk_per) ==
+>> +                       V2_TIMER_RATE_OSC_DIV8)) {
+>> +                       tctl_val = V2_TCTL_CLK_OSC_DIV8 | V2_TCTL_FRR |
+>> +                               V2_TCTL_WAITEN | MXC_TCTL_TEN;
+>> +                       if (cpu_is_imx6dl() || cpu_is_imx6sx()) {
+>> +                               /* 24 / 8 = 3 MHz */
+>> +                               tprer_val = 7 << V2_TPRER_PRE24M;
+>> +                               __raw_writel(tprer_val, timer_base + MXC_TPRER);
+>> +                               tctl_val |= V2_TCTL_24MEN;
+>> +                       }
+>> +               } else {
+>> +                       tctl_val = V2_TCTL_CLK_PER | V2_TCTL_FRR |
+>> +                               V2_TCTL_WAITEN | MXC_TCTL_TEN;
+>> +               }
+>> +       } else {
+>>                tctl_val = MX1_2_TCTL_FRR | MX1_2_TCTL_CLK_PCLK1 | MXC_TCTL_TEN;
+>> +       }
+> 
+> Can this block be rearranged a bit so that it becomes easier to read?
 
-> The same is true with defconfigs - Linus threatened to delete all ARM
-> defconfigs except one at one point.
-
-IMO we should continue doing what we've done so far and make the ARM64
-defconfig work on everything it can by default, no ARCH_* necessary.
-That's what most people will build and test and we shouldn't get
-platform-specific code (well, drivers) breaking the single image.
-
-For the extreme configurations (really tiny or really big) custom
-configuration being necessary is fine. That doesn't have to involve
-ARCH_* config options.
-
-If you want to build a custom config then you should have an idea of
-what you need. ARCH_* options are only necessary if someone wants a
-kernel tuned for a specific SoC but doesn't know anything about that
-SoC.
-
-Mark.
+I have to consider v1, v2, and on v2, MX6Q's implementation is different from MX6DL and MX6SX, MX6SL has its special implementation, and MX6Q has difference between TO1.0 and other TOs, also, we have to consider the old dtb case. So, there are more than 6 different cases we need to consider, I thought it was the best way I can figure out, could you advice if you have better idea?
