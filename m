@@ -1,35 +1,100 @@
-From: anders.berg@avagotech.com (Anders Berg)
-Date: Fri, 5 Sep 2014 11:05:37 +0200
-Subject: [PATCH 1/2] gpio: Add driver for AXM55xx SSP chip selects
-In-Reply-To: <CACRpkdZEoBan=Lqr1T-iY41U9NfMA_MCLX3LA=juw7X4pmRvSQ@mail.gmail.com>
-References: <1409576021-24828-1-git-send-email-anders.berg@avagotech.com>
- <1409576021-24828-2-git-send-email-anders.berg@avagotech.com>
- <CACRpkdby4H-fivNn_kG2uL0EjsCGAc+t6OyFi0+VcNGf2Z9NQA@mail.gmail.com>
- <20140904170630.GL29327@sirena.org.uk>
- <CACRpkdZEoBan=Lqr1T-iY41U9NfMA_MCLX3LA=juw7X4pmRvSQ@mail.gmail.com>
-Message-ID: <CAE0=X_3QO5p26M=FS7joKS3zD6LAM_moFutHNcyE1-CjauL3Rw@mail.gmail.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Fri, 5 Sep 2014 11:15:26 +0200
+Subject: [PATCH] tty/serial: at91: BUG: disable interrupts when
+ !UART_ENABLE_MS()
+In-Reply-To: <1409760567-13186-1-git-send-email-richard.genoud@gmail.com>
+References: <1409760567-13186-1-git-send-email-richard.genoud@gmail.com>
+Message-ID: <54097F2E.6090809@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> On Thu, Sep 4, 2014 at 7:06 PM, Mark Brown <broonie@kernel.org> wrote:
->> On Thu, Sep 04, 2014 at 07:04:44PM +0200, Linus Walleij wrote:
->>> I need an ACK from Mark Brown on this before I apply.
->>> The driver seems to do what it should, but I need Mark to
->>> be OK with exporting the CS signals from an SSP/SPI block
->>> to be exposed to Linux as GPIOs.
->>>
->>> (Top-posting and quoting patch verbatim so Mark gets it.)
->>
->> I don't see any sort of reasoning for this?
->
-> Maybe there was some earlier, but this is an excellent opportunity
-> to repeat it... So Anders: why do you want to do this?
->
+On 03/09/2014 18:09, Richard Genoud :
+> In set_termios(), interrupts where not disabled if UART_ENABLE_MS() was
+> false.
+> 
+> Tested on at91sam9g35.
+> 
+> CC: stable at vger.kernel.org # >= 3.16
+> 
+> Signed-off-by: Richard Genoud <richard.genoud@gmail.com>
+> ---
+>  drivers/tty/serial/atmel_serial.c | 43 ++++++++++++++++++++++++++++++++++++++-
+>  1 file changed, 42 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/tty/serial/atmel_serial.c b/drivers/tty/serial/atmel_serial.c
+> index 7b63677475c1..d7d4584549a5 100644
+> --- a/drivers/tty/serial/atmel_serial.c
+> +++ b/drivers/tty/serial/atmel_serial.c
+> @@ -527,6 +527,45 @@ static void atmel_enable_ms(struct uart_port *port)
+>  }
+>  
+>  /*
+> + * Disable modem status interrupts
+> + */
+> +static void atmel_disable_ms(struct uart_port *port)
+> +{
+> +	struct atmel_uart_port *atmel_port = to_atmel_uart_port(port);
+> +	uint32_t idr = 0;
+> +
+> +	/*
+> +	 * Interrupt should not be disabled twice
+> +	 */
+> +	if (!atmel_port->ms_irq_enabled)
+> +		return;
+> +
+> +	atmel_port->ms_irq_enabled = false;
+> +
+> +	if (atmel_port->gpio_irq[UART_GPIO_CTS] >= 0)
+> +		disable_irq(atmel_port->gpio_irq[UART_GPIO_CTS]);
+> +	else
+> +		idr |= ATMEL_US_CTSIC;
+> +
+> +	if (atmel_port->gpio_irq[UART_GPIO_DSR] >= 0)
+> +		disable_irq(atmel_port->gpio_irq[UART_GPIO_DSR]);
+> +	else
+> +		idr |= ATMEL_US_DSRIC;
+> +
+> +	if (atmel_port->gpio_irq[UART_GPIO_RI] >= 0)
+> +		disable_irq(atmel_port->gpio_irq[UART_GPIO_RI]);
+> +	else
+> +		idr |= ATMEL_US_RIIC;
+> +
+> +	if (atmel_port->gpio_irq[UART_GPIO_DCD] >= 0)
+> +		disable_irq(atmel_port->gpio_irq[UART_GPIO_DCD]);
+> +	else
+> +		idr |= ATMEL_US_DCDIC;
+> +
+> +	UART_PUT_IDR(port, idr);
+> +}
+> +
+> +/*
+>   * Control the transmission of a break signal
+>   */
+>  static void atmel_break_ctl(struct uart_port *port, int break_state)
+> @@ -1993,7 +2032,9 @@ static void atmel_set_termios(struct uart_port *port, struct ktermios *termios,
+>  
+>  	/* CTS flow-control and modem-status interrupts */
+>  	if (UART_ENABLE_MS(port, termios->c_cflag))
+> -		port->ops->enable_ms(port);
+> +		atmel_enable_ms(port);
+> +	else
+> +		atmel_disable_ms(port);
+>  
+>  	spin_unlock_irqrestore(&port->lock, flags);
+>  }
 
-Well, the problem with adding this to the spi-pl022 driver (as a
-vendor specific extension) is that this IP block unfortunately isn't
-distinguishable from the standard ARM PL022 implementation (same
-values in the PrimeCell identification registers). That's why I went
-down the GPIO path...
+Richard,
 
-/Anders
+Indeed it seems needed:
+
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+
+
+But BTW, I see just below a call to the atmel_enable_ms() function in
+atmel_set_ldisc(). My question is, shouldn't we also add this
+atmel_disable_ms() in the alternative that disables the PPS in this
+ldisc function?
+
+Thanks, bye,
+-- 
+Nicolas Ferre
