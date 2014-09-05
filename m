@@ -1,70 +1,69 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Fri, 05 Sep 2014 11:07:42 -0600
-Subject: [PATCH] ARM: tegra: rely on bootloader pinmux programming on
- Tegra124
-In-Reply-To: <1409758926-22966-1-git-send-email-swarren@wwwdotorg.org>
-References: <1409758926-22966-1-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <5409EDDE.6060305@wwwdotorg.org>
+From: peter.griffin@linaro.org (Peter Griffin)
+Date: Fri,  5 Sep 2014 18:23:44 +0100
+Subject: [PATCH RESEND v5 0/5]  Add EHCI and OHCI drivers for STi SoC's
+Message-ID: <1409937829-23708-1-git-send-email-peter.griffin@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/03/2014 09:42 AM, Stephen Warren wrote:
-> From: Stephen Warren <swarren@nvidia.com>
->
-> The defined mechanism for programming the Tegra pinmux is to perform all
-> of the following at once in order, before using any I/O controller that
-> is affected by the pinmux:
->
-> - Set the CLAMP_INPUTS_WHEN_TRISTATED PMC register bit.
-> - Set up any GPIO pins to their "initial" state.
-> - Program all pinmux settings in one go.
->
-> Other methods such as:
->
-> - Not setting CLAMP_INPUTS_WHEN_TRISTATED.
-> - Not setting GPIOs to their "initial" state before programming the
->    pinmux settings of the related pin, in particular the mux function.
-> - Not programming the entire pinmux at once, in order to avoid
->    possible conflicting settings.
->
-> ... are not qualified or supported by NVIDIA ASIC/syseng. They could
-> cause glitches or undesired output levels on some pins, or controller
-> malfunction.
->
-> While we've been getting away with doing something different on many
-> Tegra boards without issue, I believe we've just been getting lucky.
-> I'd like to switch all Tegra124 systems to the correct scheme now so
-> they provide the right example to follow, and require that any new
-> boards we support upstream work in the same fashion.
->
-> While it would be nice to update boards containing older SoCs for
-> consistency, I don't anticipate doing so. It's too much churn to change
-> at this time. At least with all Tegra124 boards converted, the most
-> recent boards provide the correct example.
->
-> Since the bootloader needs to reprogram the pinmux to access certain
-> peripherals, it must program the entire pinmux due to the supported
-> rules above. As such, there is no need to program any part of the pinmux
-> from the kernel, unless dynamic pinmuxing is used. Given this, we couuld
-> simply remove the pinmux "default" state from the DT entirely. However,
-> some bootloaders parse the DT to perform their initial pinmux setup, so
-> it's useful to keep the pinmux data in DT. To allow this while avoiding
-> redundant work in the kernel, rename the "default" state to "boot". The
-> kernel won't apply this, but bootloaders can still look for this state
-> name and apply it. Note however that the DT provides zero information
-> about the required initial GPIO setup, so bootloaders using this approach
-> are not likely to operate correctly without an additional GPIO
-> initialization table somewhere. Previous discussions on the DT mailing
-> list have rejected adding such a table to DT...
->
-> The following U-Boot commits fully initialize the pinmux:
->
-> Jetson TK1: 4ff213b8e478 ARM: tegra: clamp inputs on Jetson TK1
-> Venice2: 3365479ce78a ARM: tegra: Venice2 pinmux spreadsheet updates
-> Both are part of U-Boot v2014.07 and later.
->
-> Without those commits, the only fallout I see from this change is that
-> HDMI on Venice2 no longer works. Given the very small user-base of this
-> platform, I feel that requiring a bootloader update is reasonable.
+Hi,
 
-I've applied this to Tegra's for-3.18/dt branch.
+As part of the RESEND I've rebased this series on top of 3.17-rc3. I believe all
+feedback has been addressed.
+
+The series was re-worked from v2 onwards to split out the ehci and ohci parts
+into their own drivers / devices like most other ARM platforms based on
+feedback from Arnd Bergmann (see here http://www.spinics.net/lists/linux-usb/msg111124.html. 
+
+The ehci-platform & ohci-platform have been used as a basis for this in case we
+wish to merge the drivers again in the future.
+
+Changes since v4:
+ - Ensure suspend / resume callbacks are wrapped in #ifdef CONFIG_PM_SLEEP as otherwise we
+   will get linker 'unused function' warnings when this option is disabled.
+ - Only declare and reference pm_ops struct if CONFIG_PM_SLEEP is enabled, this saves a few bytes
+
+Changes since v3:
+ - Make reset / power, clocks etc non optional dt options to simplify code
+ - Get rid of non DT boot code left over from *hci-platform drivers
+ - Remove DMA mask code
+ - Remove pre_setup func ptr and configure ahb2st bus convertor in ehci_platform_reset
+ - Unabstract and remove usb-st-common.c
+ - Have one kconfig which enables both ehci-st & ohci-st drivers
+
+Changes since v2:
+ - Based on Arnd Berghman feedback, split out into 2 devices / drivers
+ - Base drivers oh ehci-platform.c & ohci-platform.c with required extensions
+   to allow possible re-merge in the furture.
+
+Changes since v1:
+ - Correct s/OCHI/OHCI/ spelling
+ - Improve kconfig help message
+ - Various formating / spelling nits identified by Lee Jones
+ - Make driver depend on OF & remove node checks in code
+ - Use devm_ioremap_resource
+ - Remove unnecessary header files
+
+Peter Griffin (5):
+  usb: host: ehci-st: Add EHCI support for ST STB devices
+  usb: host: ohci-st: Add OHCI driver support for ST STB devices
+  usb: host: ehci-st: Add ehci-st devicetree bindings documentation
+  usb: host: ohci-st: Add ohci-st devicetree bindings documentation
+  MAINTAINERS: Add ehci-st.c and ohci-st.c to ARCH/STI architecture
+
+ Documentation/devicetree/bindings/usb/ehci-st.txt |  39 +++
+ Documentation/devicetree/bindings/usb/ohci-st.txt |  37 +++
+ MAINTAINERS                                       |   2 +
+ drivers/usb/host/Kconfig                          |   8 +
+ drivers/usb/host/Makefile                         |   1 +
+ drivers/usb/host/ehci-st.c                        | 365 ++++++++++++++++++++++
+ drivers/usb/host/ohci-st.c                        | 339 ++++++++++++++++++++
+ drivers/usb/host/usb-st-common.h                  |  31 ++
+ 8 files changed, 822 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/usb/ehci-st.txt
+ create mode 100644 Documentation/devicetree/bindings/usb/ohci-st.txt
+ create mode 100644 drivers/usb/host/ehci-st.c
+ create mode 100644 drivers/usb/host/ohci-st.c
+ create mode 100644 drivers/usb/host/usb-st-common.h
+
+-- 
+1.9.1
