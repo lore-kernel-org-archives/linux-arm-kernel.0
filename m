@@ -1,90 +1,65 @@
-From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Fri, 5 Sep 2014 11:41:22 -0600
-Subject: [PATCH] PCI: mvebu: Fix uninitialized variable in
- mvebu_get_tgt_attr()
-In-Reply-To: <1407512045-26969-1-git-send-email-geert+renesas@glider.be>
-References: <1407512045-26969-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <20140905174122.GD8080@google.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 5 Sep 2014 10:46:33 -0700
+Subject: [PATCH] ARM: dts: omap3-overo: Fix UART wake-up events
+Message-ID: <20140905174633.GA3238@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 08, 2014 at 05:34:05PM +0200, Geert Uytterhoeven wrote:
-> drivers/pci/host/pci-mvebu.c: In function 'mvebu_get_tgt_attr':
-> drivers/pci/host/pci-mvebu.c:887:39: warning: 'rtype' may be used uninitialized in this function [-Wmaybe-uninitialized]
->    if (slot == PCI_SLOT(devfn) && type == rtype) {
->                                        ^
-> 
-> If there's ever gonna be a configuration space or 64-bit memory space
-> entry in DT, rtype will be uninitialized, and the wrong entry may be
-> returned.
-> 
-> Initialize rtype to 0 (which is an unused IORESOURCE_* type) to fix this.
-> 
-> Introduced in commit 11be65472a427dcf7a11ab6e3e3628f1c6768b5b ("PCI:
-> mvebu: Adapt to the new device tree layout").
-> 
-> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-> ---
-> Alternatively, should the "else if (DT_FLAGS_TO_TYPE(flags) ==
-> DT_TYPE_MEM32)" just be changed to "else", assuming there can never be
-> other entries than for I/O or 32-bit memory space?
-> ---
->  drivers/pci/host/pci-mvebu.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/drivers/pci/host/pci-mvebu.c b/drivers/pci/host/pci-mvebu.c
-> index ce23e0f076b6..9515f0d13fd4 100644
-> --- a/drivers/pci/host/pci-mvebu.c
-> +++ b/drivers/pci/host/pci-mvebu.c
-> @@ -877,7 +877,7 @@ static int mvebu_get_tgt_attr(struct device_node *np, int devfn,
->  		u32 flags = of_read_number(range, 1);
->  		u32 slot = of_read_number(range + 1, 1);
->  		u64 cpuaddr = of_read_number(range + na, pna);
-> -		unsigned long rtype;
-> +		unsigned long rtype = 0;
->  
->  		if (DT_FLAGS_TO_TYPE(flags) == DT_TYPE_IO)
->  			rtype = IORESOURCE_IO;
-> -- 
-> 1.9.1
-> 
+Compared to legacy booting, we don't have wake-up events enabled
+for device tree based booting. This means that if deeper idle
+states are enabled, the device won't wake up to UART events and
+seems like it has hung.
 
-This fix looks right to me.  I added a stable tag as follows.  Thomas
-and/or Jason, and you ack this?
+Let's fix that by adding the wake-up interrupt. Note that we
+don't need to set the PIN_OFF_WAKEUPENABLE any longer, that's
+handled by the wake-up interrupt when the serial driver does
+request_irq on it.
 
+Tested with the following on omap3-overo-summit that has the
+ES2.1 omap:
 
-commit f96f4040d0d01b6eeacda212cf7db105d06a55ba
-Author: Geert Uytterhoeven <geert+renesas@glider.be>
-Date:   Fri Aug 8 17:34:05 2014 +0200
+#!/bin/bash
 
-    PCI: mvebu: Fix uninitialized "rtype" in mvebu_get_tgt_attr()
-    
-    drivers/pci/host/pci-mvebu.c: In function 'mvebu_get_tgt_attr':
-    drivers/pci/host/pci-mvebu.c:887:39: warning: 'rtype' may be used uninitialized in this function [-Wmaybe-uninitialized]
-       if (slot == PCI_SLOT(devfn) && type == rtype) {
-                                           ^
-    
-    If there's ever a DT entry other than DT_TYPE_IO or DT_TYPE_MEM32,
-    e.g., a configuration space or 64-bit memory space entry, rtype will
-    be uninitialized, and the wrong entry may be returned.
-    
-    Initialize rtype to 0 (which is an unused IORESOURCE_* type) to fix this.
-    
-    Fixes: 11be65472a42 ("PCI: mvebu: Adapt to the new device tree layout")
-    Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-    Signed-off-by: Bjorn Helgaas <bhelgaas@google.com>
-    CC: stable at vger.kernel.org	# v3.12+
+uarts=$(find /sys/class/tty/ttyO*/device/power/ -type d)
+for uart in $uarts; do
+        echo 3000 > $uart/autosuspend_delay_ms
+done
 
-diff --git a/drivers/pci/host/pci-mvebu.c b/drivers/pci/host/pci-mvebu.c
-index a8c6f1a92e0f..081579c0971e 100644
---- a/drivers/pci/host/pci-mvebu.c
-+++ b/drivers/pci/host/pci-mvebu.c
-@@ -877,7 +877,7 @@ static int mvebu_get_tgt_attr(struct device_node *np, int devfn,
- 		u32 flags = of_read_number(range, 1);
- 		u32 slot = of_read_number(range + 1, 1);
- 		u64 cpuaddr = of_read_number(range + na, pna);
--		unsigned long rtype;
-+		unsigned long rtype = 0;
+uarts=$(find /sys/class/tty/ttyO*/power/ -type d)
+for uart in $uarts; do
+        echo enabled > $uart/wakeup
+        echo auto > $uart/control
+done
+
+echo 1 > /sys/kernel/debug/pm_debug/enable_off_mode
+
+# grep -i uart /proc/interrupts
+ 90:       1085      INTC  74  OMAP UART2
+338:          5   pinctrl 366  OMAP UART2
+
+# grep ^core_pwrdm /sys/kernel/debug/pm_debug/count
+core_pwrdm (ON),OFF:1654,RET:131,INA:39,ON:1825...
+
+Signed-off-by: Tony Lindgren <tony@atomide.com>
+
+--- a/arch/arm/boot/dts/omap3-overo-common-peripherals.dtsi
++++ b/arch/arm/boot/dts/omap3-overo-common-peripherals.dtsi
+@@ -36,8 +36,8 @@
  
- 		if (DT_FLAGS_TO_TYPE(flags) == DT_TYPE_IO)
- 			rtype = IORESOURCE_IO;
+ 	uart3_pins: pinmux_uart3_pins {
+ 		pinctrl-single,pins = <
+-			OMAP3_CORE1_IOPAD(0x219e, PIN_INPUT | PIN_OFF_WAKEUPENABLE | MUX_MODE0)	/* uart3_rx_irrx.uart3_rx_irrx */
+-			OMAP3_CORE1_IOPAD(0x21a0, PIN_OUTPUT | MUX_MODE0)		/* uart3_tx_irtx.uart3_tx_irtx */
++			OMAP3_CORE1_IOPAD(0x219e, PIN_INPUT | MUX_MODE0)	/* uart3_rx_irrx.uart3_rx_irrx */
++			OMAP3_CORE1_IOPAD(0x21a0, PIN_OUTPUT | MUX_MODE0)	/* uart3_tx_irtx.uart3_tx_irtx */
+ 		>;
+ 	};
+ };
+@@ -88,6 +88,7 @@
+ };
+ 
+ &uart3 {
++	interrupts-extended = <&intc 74 &omap3_pmx_core OMAP3_UART3_RX>;
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&uart3_pins>;
+ };
