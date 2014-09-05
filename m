@@ -1,141 +1,144 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Fri,  5 Sep 2014 18:34:57 +0100
-Subject: [PATCH v9 8/8] drivers: cpuidle: initialize Exynos driver through DT
-In-Reply-To: <1409938498-17984-1-git-send-email-lorenzo.pieralisi@arm.com>
-References: <1409938498-17984-1-git-send-email-lorenzo.pieralisi@arm.com>
-Message-ID: <1409938498-17984-9-git-send-email-lorenzo.pieralisi@arm.com>
+From: m-karicheri2@ti.com (Murali Karicheri)
+Date: Fri, 5 Sep 2014 13:39:42 -0400
+Subject: [PATCH] PCI: keystone: update to support multiple pci ports
+Message-ID: <1409938782-31460-1-git-send-email-m-karicheri2@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With the introduction of DT based idle states, CPUidle drivers for
-ARM can now initialize idle states data through properties in the device
-tree.
+K2E SoC has two PCI ports. The SATA controller is connected to second
+PCI port (port 1). This patch enhances the driver to support multiple
+ports.
 
-This patch adds code to the Exynos CPUidle driver to dynamically
-initialize idle states data through the updated device tree source
-files.
+Update the DT Documentation for the new attribute, ti,pcie-port and
+remove the note for bootargs as this is no longer needed.
 
-Cc: Chander Kashyap <k.chander@samsung.com>
-Cc: Kukjin Kim <kgene.kim@samsung.com>
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
-Acked-by: Daniel Lezcano <daniel.lezcano@linaro.org>
-Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
+
+CC: Rob Herring <robh+dt@kernel.org>
+CC: Pawel Moll <pawel.moll@arm.com>
+CC: Mark Rutland <mark.rutland@arm.com>
+CC: Ian Campbell <ijc+devicetree@hellion.org.uk>
+CC: Kumar Gala <galak@codeaurora.org>
+CC: Bjorn Helgaas <bhelgaas@google.com>
+CC: Santosh Shilimkar <santosh.shilimkar@ti.com>
 ---
- arch/arm/boot/dts/exynos4210.dtsi | 11 +++++++++++
- arch/arm/boot/dts/exynos5250.dtsi | 11 +++++++++++
- drivers/cpuidle/Kconfig.arm       |  1 +
- drivers/cpuidle/cpuidle-exynos.c  | 18 +++++++++++++++++-
- 4 files changed, 40 insertions(+), 1 deletion(-)
+ .../devicetree/bindings/pci/pci-keystone.txt       |    8 ++++---
+ drivers/pci/host/pci-keystone.c                    |   23 ++++++++++++++------
+ drivers/pci/host/pci-keystone.h                    |    4 ++--
+ 3 files changed, 23 insertions(+), 12 deletions(-)
 
-diff --git a/arch/arm/boot/dts/exynos4210.dtsi b/arch/arm/boot/dts/exynos4210.dtsi
-index eab7c7b..69fd1a0 100644
---- a/arch/arm/boot/dts/exynos4210.dtsi
-+++ b/arch/arm/boot/dts/exynos4210.dtsi
-@@ -48,12 +48,23 @@
- 			device_type = "cpu";
- 			compatible = "arm,cortex-a9";
- 			reg = <0x900>;
-+			cpu-idle-states = <&CLUSTER_SLEEP_0>;
- 		};
+diff --git a/Documentation/devicetree/bindings/pci/pci-keystone.txt b/Documentation/devicetree/bindings/pci/pci-keystone.txt
+index ceb3e24..e279143 100644
+--- a/Documentation/devicetree/bindings/pci/pci-keystone.txt
++++ b/Documentation/devicetree/bindings/pci/pci-keystone.txt
+@@ -58,11 +58,13 @@ Optional properties:-
+ 	phy-names: name of the Generic Keystine SerDes phy for PCI
+ 	  - If boot loader already does PCI link establishment, then phys and
+ 	    phy-names shouldn't be present.
++	ti,pcie-port: PCI port number. This is used to configure the PCI port
++	    number. For example K2E SoC supports 2 PCI ports and PCI bindings
++	    for the second port adds ti,pcie-port = <1> to identify second port
++	    and driver uses this to configure the PCI mode register for second
++	    port. If not present, port number 0 is assumed.
  
- 		cpu at 901 {
- 			device_type = "cpu";
- 			compatible = "arm,cortex-a9";
- 			reg = <0x901>;
-+			cpu-idle-states = <&CLUSTER_SLEEP_0>;
-+		};
-+
-+		idle-states {
-+			CLUSTER_SLEEP_0: cluster-sleep-0 {
-+				compatible = "arm,idle-state";
-+				entry-latency-us = <1000>;
-+				exit-latency-us = <300>;
-+				min-residency-us = <100000>;
-+			};
- 		};
- 	};
+ Designware DT Properties not applicable for Keystone PCI
  
-diff --git a/arch/arm/boot/dts/exynos5250.dtsi b/arch/arm/boot/dts/exynos5250.dtsi
-index 492e1ef..3a758ff 100644
---- a/arch/arm/boot/dts/exynos5250.dtsi
-+++ b/arch/arm/boot/dts/exynos5250.dtsi
-@@ -63,12 +63,23 @@
- 			compatible = "arm,cortex-a15";
- 			reg = <0>;
- 			clock-frequency = <1700000000>;
-+			cpu-idle-states = <&CLUSTER_SLEEP_0>;
- 		};
- 		cpu at 1 {
- 			device_type = "cpu";
- 			compatible = "arm,cortex-a15";
- 			reg = <1>;
- 			clock-frequency = <1700000000>;
-+			cpu-idle-states = <&CLUSTER_SLEEP_0>;
-+		};
-+
-+		idle-states {
-+			CLUSTER_SLEEP_0: cluster-sleep-0 {
-+				compatible = "arm,idle-state";
-+				entry-latency-us = <1000>;
-+				exit-latency-us = <300>;
-+				min-residency-us = <100000>;
-+			};
- 		};
- 	};
+ 1. pcie_bus clock-names not used.  Instead, a phandle to phys is used.
  
-diff --git a/drivers/cpuidle/Kconfig.arm b/drivers/cpuidle/Kconfig.arm
-index e339c7f..04cc229 100644
---- a/drivers/cpuidle/Kconfig.arm
-+++ b/drivers/cpuidle/Kconfig.arm
-@@ -55,6 +55,7 @@ config ARM_AT91_CPUIDLE
- config ARM_EXYNOS_CPUIDLE
- 	bool "Cpu Idle Driver for the Exynos processors"
- 	depends on ARCH_EXYNOS
-+	select DT_IDLE_STATES
- 	help
- 	  Select this to enable cpuidle for Exynos processors
+-Note for PCI driver usage
+-=========================
+-Driver requires pci=pcie_bus_perf in the bootargs for proper functioning.
+diff --git a/drivers/pci/host/pci-keystone.c b/drivers/pci/host/pci-keystone.c
+index a132622..b4831e8 100644
+--- a/drivers/pci/host/pci-keystone.c
++++ b/drivers/pci/host/pci-keystone.c
+@@ -252,8 +252,8 @@ static int keystone_pcie_fault(unsigned long addr, unsigned int fsr,
  
-diff --git a/drivers/cpuidle/cpuidle-exynos.c b/drivers/cpuidle/cpuidle-exynos.c
-index ba9b34b..e66a426 100644
---- a/drivers/cpuidle/cpuidle-exynos.c
-+++ b/drivers/cpuidle/cpuidle-exynos.c
-@@ -18,6 +18,8 @@
- #include <asm/suspend.h>
- #include <asm/cpuidle.h>
- 
-+#include "dt_idle_states.h"
-+
- static void (*exynos_enter_aftr)(void);
- 
- static int exynos_enter_lowpower(struct cpuidle_device *dev,
-@@ -56,13 +58,27 @@ static struct cpuidle_driver exynos_idle_driver = {
- 	.safe_state_index = 0,
- };
- 
-+static const struct of_device_id exynos_idle_state_match[] __initconst = {
-+	{ .compatible = "arm,idle-state",
-+	  .data = exynos_enter_lowpower },
-+	{ },
-+};
-+
- static int exynos_cpuidle_probe(struct platform_device *pdev)
+ static void __init ks_pcie_host_init(struct pcie_port *pp)
  {
- 	int ret;
-+	struct cpuidle_driver *drv = &exynos_idle_driver;
+-	u32 vendor_device_id, val;
+ 	struct keystone_pcie *ks_pcie = to_keystone_pcie(pp);
++	u32 val;
  
- 	exynos_enter_aftr = (void *)(pdev->dev.platform_data);
+ 	ks_pcie_establish_link(ks_pcie);
+ 	ks_dw_pcie_setup_rc_app_regs(ks_pcie);
+@@ -262,8 +262,7 @@ static void __init ks_pcie_host_init(struct pcie_port *pp)
+ 			pp->dbi_base + PCI_IO_BASE);
  
--	ret = cpuidle_register(&exynos_idle_driver, NULL);
-+	/* Start at index 1, index 0 standard WFI */
-+	ret = dt_init_idle_driver(drv, exynos_idle_state_match, 1);
-+	if (ret < 0) {
-+		dev_err(&pdev->dev, "failed to initialize idle states\n");
-+		return ret;
-+	}
+ 	/* update the Vendor ID */
+-	vendor_device_id = readl(ks_pcie->va_reg_pciid);
+-	writew((vendor_device_id >> 16), pp->dbi_base + PCI_DEVICE_ID);
++	writew(ks_pcie->device_id, pp->dbi_base + PCI_DEVICE_ID);
+ 
+ 	/* update the DEV_STAT_CTRL to publish right mrrs */
+ 	val = readl(pp->dbi_base + PCIE_CAP_BASE + PCI_EXP_DEVCTL);
+@@ -344,12 +343,13 @@ static int __exit ks_pcie_remove(struct platform_device *pdev)
+ static int __init ks_pcie_probe(struct platform_device *pdev)
+ {
+ 	struct device *dev = &pdev->dev;
++	struct device_node *np = dev->of_node;
+ 	struct keystone_pcie *ks_pcie;
++	int ret = 0, port_id = 0;
+ 	struct pcie_port *pp;
+ 	struct resource *res;
+ 	void __iomem *reg_p;
+ 	struct phy *phy;
+-	int ret = 0;
+ 	u32 val;
+ 
+ 	ks_pcie = devm_kzalloc(&pdev->dev, sizeof(*ks_pcie),
+@@ -360,17 +360,24 @@ static int __init ks_pcie_probe(struct platform_device *pdev)
+ 	}
+ 	pp = &ks_pcie->pp;
+ 
++	/* read the PCI port id */
++	of_property_read_u32(np, "ti,pcie-port", &port_id);
 +
-+	ret = cpuidle_register(drv, NULL);
- 	if (ret) {
- 		dev_err(&pdev->dev, "failed to register cpuidle driver\n");
- 		return ret;
+ 	/* index 2 is the devcfg register for RC mode settings */
+ 	res = platform_get_resource(pdev, IORESOURCE_MEM, 2);
+ 	reg_p = devm_ioremap_resource(dev, res);
+ 	if (IS_ERR(reg_p))
+ 		return PTR_ERR(reg_p);
+ 
++
+ 	/* enable RC mode in devcfg */
+ 	val = readl(reg_p);
+-	val &= ~PCIE_MODE_MASK;
+-	val |= PCIE_RC_MODE;
++	port_id <<= 1;
++	val &= ~(PCIE_MODE_MASK << port_id);
++	val |= (PCIE_RC_MODE << port_id);
+ 	writel(val, reg_p);
++	devm_iounmap(dev, reg_p);
++	devm_release_mem_region(dev, res->start, resource_size(res));
+ 
+ 	/* initialize SerDes Phy if present */
+ 	phy = devm_phy_get(dev, "pcie-phy");
+@@ -385,7 +392,9 @@ static int __init ks_pcie_probe(struct platform_device *pdev)
+ 	reg_p = devm_ioremap_resource(dev, res);
+ 	if (IS_ERR(reg_p))
+ 		return PTR_ERR(reg_p);
+-	ks_pcie->va_reg_pciid = reg_p;
++	ks_pcie->device_id = readl(reg_p) >> 16;
++	devm_iounmap(dev, reg_p);
++	devm_release_mem_region(dev, res->start, resource_size(res));
+ 
+ 	pp->dev = dev;
+ 	platform_set_drvdata(pdev, ks_pcie);
+diff --git a/drivers/pci/host/pci-keystone.h b/drivers/pci/host/pci-keystone.h
+index 729ea7d..80cfa8e 100644
+--- a/drivers/pci/host/pci-keystone.h
++++ b/drivers/pci/host/pci-keystone.h
+@@ -19,8 +19,8 @@
+ struct keystone_pcie {
+ 	struct	clk		*clk;
+ 	struct	pcie_port	pp;
+-	void __iomem		*va_reg_pciid;
+-
++	/* PCI Device ID */
++	u32			device_id;
+ 	int			num_legacy_host_irqs;
+ 	int			legacy_host_irqs[MAX_LEGACY_HOST_IRQS];
+ 	struct			device_node *legacy_intc_np;
 -- 
-1.9.1
+1.7.9.5
