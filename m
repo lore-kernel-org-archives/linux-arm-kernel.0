@@ -1,21 +1,26 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri,  5 Sep 2014 12:22:18 +0100
-Subject: [PATCH 1/2] arm64: psci: respect MIGRATE_INFO_TYPE
+Date: Fri,  5 Sep 2014 12:22:19 +0100
+Subject: [PATCH 2/2] arm: psci: don't call CPU_OFF blindly
 In-Reply-To: <1409916139-20127-1-git-send-email-mark.rutland@arm.com>
 References: <1409916139-20127-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <1409916139-20127-2-git-send-email-mark.rutland@arm.com>
+Message-ID: <1409916139-20127-3-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit e71246a23acb (PSCI: Add initial support for PSCIv0.2 functions)
-added hooks for MIGRATE_INFO_TYPE, but didn't call it anywhere. This
-means that currently a UP Trusted OS can reject CPU_OFF calls, which
-will cause things to blow up.
+The generic PSCI operations for arm check the presence of a CPU_OFF ID
+far too late, and in the absence of an ID will panic(), rather than
+producing a warning.
 
-This patch ensures we test MIGRATE_INFO_TYPE before calling CPU_OFF. If
-there's a UP trusted OS hotplug is rejected. Full support for PSCI in
-the presence of a UP trusted OS will require the use of MIGRATE and will
-have to come as a later patch.
+This patch adds a psci_cpu_disable callback which tests the presence of
+a CPU_OFF id. As this is called earlier than psci_cpu_die, the failure
+can be handled gracefully without brining down the system. Additionally
+a check is added for a UP trusted OS in the presence of PSCI 0.2+. Full
+support will require the use of MIGRATE, but for now rejecting hotplug
+will prevent psci_cpu_die from brining down the system.
+
+The now redundant check for scpi_ops.cpu_off is removed from
+psci_cpu_die. At the same time, the whitespace is corrected from seven
+spaces to tabs.
 
 Signed-off-by: Mark Rutland <mark.rutland@arm.com>
 Cc: Ashwin Chaugule <ashwin.chaugule@linaro.org>
@@ -26,17 +31,29 @@ Cc: Christoffer Dall <christoffer.dall@linaro.org>
 Cc: Will Deacon <will.deacon@arm.com>
 Cc: Catalin Marinas <catalin.marinas@arm.com>
 ---
- arch/arm64/kernel/psci.c | 14 ++++++++++++++
- 1 file changed, 14 insertions(+)
+ arch/arm/kernel/psci_smp.c | 36 +++++++++++++++++++++++++++++-------
+ 1 file changed, 29 insertions(+), 7 deletions(-)
 
-diff --git a/arch/arm64/kernel/psci.c b/arch/arm64/kernel/psci.c
-index 5539547..a5407af 100644
---- a/arch/arm64/kernel/psci.c
-+++ b/arch/arm64/kernel/psci.c
-@@ -386,6 +386,20 @@ static int cpu_psci_cpu_disable(unsigned int cpu)
- 	/* Fail early if we don't have CPU_OFF support */
- 	if (!psci_ops.cpu_off)
- 		return -EOPNOTSUPP;
+Stefano, I've followed your lead with the __ref annotation here, but I couldn't
+figure out why they exist on cpu_die and cpu_kill; it feels rather dodgy. Do
+you know why they were added, or if they are superfluous?
+
+There are some other cleanups that should happen here (static,
+CPU_METHOD_OF_DECLARE), but those will come as a later cleanups series.
+
+diff --git a/arch/arm/kernel/psci_smp.c b/arch/arm/kernel/psci_smp.c
+index 28a1db4..2b00d3c 100644
+--- a/arch/arm/kernel/psci_smp.c
++++ b/arch/arm/kernel/psci_smp.c
+@@ -56,17 +56,38 @@ static int psci_boot_secondary(unsigned int cpu, struct task_struct *idle)
+ }
+ 
+ #ifdef CONFIG_HOTPLUG_CPU
++int __ref psci_cpu_disable(unsigned int cpu)
++{
++	/* Fail early if we don't have CPU_OFF support */
++	if (!psci_ops.cpu_off)
++		return -EOPNOTSUPP;
 +
 +	/*
 +	 * In the presence of a UP trusted OS, it might not be possible to
@@ -51,8 +68,36 @@ index 5539547..a5407af 100644
 +			return -EPERM;
 +	}
 +
- 	return 0;
++	return 0;
++}
++
+ void __ref psci_cpu_die(unsigned int cpu)
+ {
+-       const struct psci_power_state ps = {
+-               .type = PSCI_POWER_STATE_TYPE_POWER_DOWN,
+-       };
++	const struct psci_power_state ps = {
++		.type = PSCI_POWER_STATE_TYPE_POWER_DOWN,
++	};
+ 
+-       if (psci_ops.cpu_off)
+-               psci_ops.cpu_off(ps);
++	psci_ops.cpu_off(ps);
+ 
+-       /* We should never return */
+-       panic("psci: cpu %d failed to shutdown\n", cpu);
++	/* We should never return */
++	panic("psci: cpu %d failed to shutdown\n", cpu);
  }
  
+ int __ref psci_cpu_kill(unsigned int cpu)
+@@ -109,6 +130,7 @@ bool __init psci_smp_available(void)
+ struct smp_operations __initdata psci_smp_ops = {
+ 	.smp_boot_secondary	= psci_boot_secondary,
+ #ifdef CONFIG_HOTPLUG_CPU
++	.cpu_disable		= psci_cpu_disable,
+ 	.cpu_die		= psci_cpu_die,
+ 	.cpu_kill		= psci_cpu_kill,
+ #endif
 -- 
 1.9.1
