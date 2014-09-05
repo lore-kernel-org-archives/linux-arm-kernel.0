@@ -1,45 +1,31 @@
-From: rric@kernel.org (Robert Richter)
-Date: Fri, 5 Sep 2014 08:55:19 +0200
-Subject: [PATCH] arm64, dts: Add dtbs_install make target
-In-Reply-To: <20140829134942.GP4703@rric.localhost>
-References: <1406732794-20920-1-git-send-email-rric@kernel.org>
- <1406732794-20920-3-git-send-email-rric@kernel.org>
- <CAOesGMh9KkdKB_ytJ7CCbkPW7dHTX91NdfDMsMNfbmOBVOJ8PQ@mail.gmail.com>
- <20140828161556.GN4703@rric.localhost>
- <20140828162549.GP14650@leverpostej>
- <CAOesGMjtjcgUNV8WLp6_Zbok-0zq5afg_KS8QJYp=kDVabrQvg@mail.gmail.com>
- <20140828181429.GO4703@rric.localhost>
- <CAOesGMh3TEKZkyPjopfSm07C2ydw5=2VrzY0xQ=9jkhoA-Z_kQ@mail.gmail.com>
- <20140829121023.GW13038@rric.localhost>
- <20140829134942.GP4703@rric.localhost>
-Message-ID: <20140905065519.GQ4703@rric.localhost>
+From: gdjakov@mm-sol.com (Georgi Djakov)
+Date: Fri, 05 Sep 2014 10:20:57 +0300
+Subject: [PATCH v4 4/4] pinctrl: qcom: Make the target processor value
+ configurable
+In-Reply-To: <CACRpkdZQouNk0z1AQHbjULJXdRK07-kZDXLcnx0Xayew0fnocA@mail.gmail.com>
+References: <1409761696-15435-1-git-send-email-gdjakov@mm-sol.com>	<1409761696-15435-5-git-send-email-gdjakov@mm-sol.com>
+ <CACRpkdZQouNk0z1AQHbjULJXdRK07-kZDXLcnx0Xayew0fnocA@mail.gmail.com>
+Message-ID: <54096459.7020201@mm-sol.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Olof,
-
-On 29.08.14 15:49:42, Robert Richter wrote:
-> On 29.08.14 14:10:23, Robert Richter wrote:
-> > On 28.08.14 16:01:08, Olof Johansson wrote:
-> > > Thinking about it a bit more, the even more obvious solution that I
-> > > for some reason didn't think of at the time, is to have the
-> > > dtbs_install target create the appropriate subdirectories on the
-> > > install side, so that the structure is preserved.
-> > > 
-> > > That comes a bit closer to how modules are handled as well.
-> > 
-> > Yes, dtbs_install target would be useful.
-> > 
-> > Will come with a solution for this too.
+On 09/04/2014 07:20 PM, Linus Walleij wrote:
+> On Wed, Sep 3, 2014 at 6:28 PM, Georgi Djakov <gdjakov@mm-sol.com> wrote:
 > 
-> below is a patch that adds the dtbs_install target to arm64. Taken
-> from arm where this was already implemented.
+>> Currently the value used to specify that interrupts from the gpio should
+>> be routed to the application processor is hardcoded for all Qualcomm SoCs.
+>> But the new APQ8084 SoC uses a different value. To resolve this, we make
+>> this value configurable for each SoC. For all existing SoCs we continue
+>> to use the current value, and only for APQ8084 we use the new value.
+>>
+>> Suggested-by: Bjorn Andersson <bjorn.andersson@sonymobile.com>
+>> Acked-by: Bjorn Andersson <bjorn.andersson@sonymobile.com>
+>> Signed-off-by: Georgi Djakov <gdjakov@mm-sol.com>
+> 
+> Patch applied.
+> 
+> Yours,
+> Linus Walleij
+> 
 
-please note that I sent a separate patch set with a complete
-implementation of this with the title:
-
- [PATCH 0/6] dts, kbuild: Implement support for dtb vendor subdirs
-
-this patch is included there too.
-
--Robert
+Thank you, Bjorn and Linus!
