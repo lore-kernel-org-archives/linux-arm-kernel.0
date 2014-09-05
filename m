@@ -1,10 +1,10 @@
 From: wangyijing@huawei.com (Yijing Wang)
-Date: Fri, 5 Sep 2014 18:09:58 +0800
-Subject: [PATCH v1 13/21] MIPS/Xlp/MSI: Use MSI chip framework to configure
- MSI/MSI-X irq
+Date: Fri, 5 Sep 2014 18:09:54 +0800
+Subject: [PATCH v1 09/21] Irq_remapping/MSI: Use MSI chip framework to
+ configure MSI/MSI-X irq
 In-Reply-To: <1409911806-10519-1-git-send-email-wangyijing@huawei.com>
 References: <1409911806-10519-1-git-send-email-wangyijing@huawei.com>
-Message-ID: <1409911806-10519-14-git-send-email-wangyijing@huawei.com>
+Message-ID: <1409911806-10519-10-git-send-email-wangyijing@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,47 +13,36 @@ MSI/MSI-X irq. So we can manage MSI/MSI-X irq in a unified framework.
 
 Signed-off-by: Yijing Wang <wangyijing@huawei.com>
 ---
- arch/mips/pci/msi-xlp.c |   14 ++++++++++++--
- 1 files changed, 12 insertions(+), 2 deletions(-)
+ drivers/iommu/irq_remapping.c |    8 +++++++-
+ 1 files changed, 7 insertions(+), 1 deletions(-)
 
-diff --git a/arch/mips/pci/msi-xlp.c b/arch/mips/pci/msi-xlp.c
-index e469dc7..6b791ef 100644
---- a/arch/mips/pci/msi-xlp.c
-+++ b/arch/mips/pci/msi-xlp.c
-@@ -245,7 +245,7 @@ static struct irq_chip xlp_msix_chip = {
- 	.irq_unmask	= unmask_msi_irq,
- };
- 
--void arch_teardown_msi_irq(unsigned int irq)
-+void xlp_teardown_msi_irq(unsigned int irq)
- {
+diff --git a/drivers/iommu/irq_remapping.c b/drivers/iommu/irq_remapping.c
+index 33c4395..e75026e 100644
+--- a/drivers/iommu/irq_remapping.c
++++ b/drivers/iommu/irq_remapping.c
+@@ -148,6 +148,11 @@ static int irq_remapping_setup_msi_irqs(struct pci_dev *dev,
+ 		return do_setup_msix_irqs(dev, nvec);
  }
  
-@@ -450,7 +450,7 @@ static int xlp_setup_msix(uint64_t lnkbase, int node, int link,
- 	return 0;
- }
- 
--int arch_setup_msi_irq(struct pci_dev *dev, struct msi_desc *desc)
-+static int xlp_setup_msi_irq(struct pci_dev *dev, struct msi_desc *desc)
- {
- 	struct pci_dev *lnkdev;
- 	uint64_t lnkbase;
-@@ -472,6 +472,16 @@ int arch_setup_msi_irq(struct pci_dev *dev, struct msi_desc *desc)
- 		return xlp_setup_msi(lnkbase, node, link, desc);
- }
- 
-+static struct msi_chip xlp_chip = {
-+	.setup_irq = xlp_setup_msi_irq,
-+	.teardown_irq = xlp_teardown_msi_irq,
++static struct msi_chip remap_msi_chip = {
++	.setup_irqs = irq_remapping_setup_msi_irqs,
++	.teardown_irq = native_teardown_msi_irq,
 +};
 +
-+struct msi_chip *arch_find_msi_chip(struct pci_dev *dev)
-+{
-+	return &xlp_chip;
-+}
-+
- void __init xlp_init_node_msi_irqs(int node, int link)
+ static void eoi_ioapic_pin_remapped(int apic, int pin, int vector)
  {
- 	struct nlm_soc_info *nodep;
+ 	/*
+@@ -165,9 +170,10 @@ static void __init irq_remapping_modify_x86_ops(void)
+ 	x86_io_apic_ops.set_affinity	= set_remapped_irq_affinity;
+ 	x86_io_apic_ops.setup_entry	= setup_ioapic_remapped_entry;
+ 	x86_io_apic_ops.eoi_ioapic_pin	= eoi_ioapic_pin_remapped;
+-	x86_msi.setup_msi_irqs		= irq_remapping_setup_msi_irqs;
++	x86_msi.setup_msi_irqs          = irq_remapping_setup_msi_irqs;
+ 	x86_msi.setup_hpet_msi		= setup_hpet_msi_remapped;
+ 	x86_msi.compose_msi_msg		= compose_remapped_msi_msg;
++	x86_msi_chip = &remap_msi_chip;
+ }
+ 
+ static __init int setup_nointremap(char *str)
 -- 
 1.7.1
