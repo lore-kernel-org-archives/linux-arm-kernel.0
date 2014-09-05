@@ -1,53 +1,33 @@
-From: rric@kernel.org (Robert Richter)
-Date: Fri,  5 Sep 2014 09:46:44 +0200
-Subject: [PATCH v2 3/4] arm64,
- thunder: Document devicetree bindings for Cavium Thunder SoC
-In-Reply-To: <1409903205-2762-1-git-send-email-rric@kernel.org>
-References: <1409903205-2762-1-git-send-email-rric@kernel.org>
-Message-ID: <1409903205-2762-4-git-send-email-rric@kernel.org>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri,  5 Sep 2014 09:55:39 +0200
+Subject: [PATCH] pinctrl: single: fix freudian slip
+Message-ID: <1409903739-25998-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Radha Mohan Chintakuntla <rchintakuntla@cavium.com>
+commit 03e9f0cac5da6af85758276cb4624caf5911f2b9
+"pinctrl: clean up after enable refactoring"
+renamed the vtable callback .enable to .set_mux. The
+renaming was done manually, and one of the alterations
+contained a freudian slip. I confess, I am human.
 
-This patch adds documentation for the devicetree bindings used by the
-DT files of Cavium Thunder SoC platforms.
-
-Signed-off-by: Radha Mohan Chintakuntla <rchintakuntla@cavium.com>
-Signed-off-by: Robert Richter <rrichter@cavium.com>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- Documentation/devicetree/bindings/arm/cavium-thunder.txt | 10 ++++++++++
- Documentation/devicetree/bindings/arm/cpus.txt           |  1 +
- 2 files changed, 11 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/arm/cavium-thunder.txt
+ drivers/pinctrl/pinctrl-single.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/Documentation/devicetree/bindings/arm/cavium-thunder.txt b/Documentation/devicetree/bindings/arm/cavium-thunder.txt
-new file mode 100644
-index 000000000000..6f63a5866902
---- /dev/null
-+++ b/Documentation/devicetree/bindings/arm/cavium-thunder.txt
-@@ -0,0 +1,10 @@
-+Cavium Thunder platform device tree bindings
-+--------------------------------------------
-+
-+Boards with Cavium's Thunder SoC shall have following properties.
-+
-+Root Node
-+---------
-+Required root node properties:
-+
-+  - compatible = "cavium,thunder-88xx";
-diff --git a/Documentation/devicetree/bindings/arm/cpus.txt b/Documentation/devicetree/bindings/arm/cpus.txt
-index 298e2f6b33c6..578796a2cfa9 100644
---- a/Documentation/devicetree/bindings/arm/cpus.txt
-+++ b/Documentation/devicetree/bindings/arm/cpus.txt
-@@ -166,6 +166,7 @@ nodes to be present and contain the properties described below.
- 			    "arm,cortex-r5"
- 			    "arm,cortex-r7"
- 			    "brcm,brahma-b15"
-+			    "cavium,thunder"
- 			    "faraday,fa526"
- 			    "intel,sa110"
- 			    "intel,sa1100"
+diff --git a/drivers/pinctrl/pinctrl-single.c b/drivers/pinctrl/pinctrl-single.c
+index 9032422ad18f..fb94b772ad62 100644
+--- a/drivers/pinctrl/pinctrl-single.c
++++ b/drivers/pinctrl/pinctrl-single.c
+@@ -519,7 +519,7 @@ static const struct pinmux_ops pcs_pinmux_ops = {
+ 	.get_functions_count = pcs_get_functions_count,
+ 	.get_function_name = pcs_get_function_name,
+ 	.get_function_groups = pcs_get_function_groups,
+-	.set_mux = pcs_sex_mux,
++	.set_mux = pcs_set_mux,
+ 	.gpio_request_enable = pcs_request_gpio,
+ };
+ 
 -- 
-2.0.1
+1.9.3
