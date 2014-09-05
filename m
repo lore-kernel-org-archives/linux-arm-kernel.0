@@ -1,40 +1,40 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Fri, 5 Sep 2014 17:21:28 +0200
-Subject: [PATCH] ARM: at91/dt: sam9g20: set at91sam9g20 pllb driver
-In-Reply-To: <1409606986-32455-1-git-send-email-gael.portay@gmail.com>
-References: <1409606986-32455-1-git-send-email-gael.portay@gmail.com>
-Message-ID: <5409D4F8.4090806@atmel.com>
+From: peter@hurleysoftware.com (Peter Hurley)
+Date: Fri, 05 Sep 2014 11:24:52 -0400
+Subject: [RFC PATCH 1/1] drivers: introduce ARM SBSA generic UART driver
+In-Reply-To: <5409CC61.1040709@arm.com>
+References: <1409328803-1953-1-git-send-email-andre.przywara@arm.com>
+ <1409328803-1953-2-git-send-email-andre.przywara@arm.com>
+ <54060A4B.2050504@hurleysoftware.com> <5409CC61.1040709@arm.com>
+Message-ID: <5409D5C4.5000905@hurleysoftware.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/09/2014 23:29, Ga?l PORTAY :
-> The at91sam9g20 SOC uses its own pllb implementation which is different
-> from the one inherited from at91sam9260 SOC.
+On 09/05/2014 10:44 AM, Andre Przywara wrote:
+> On 02/09/14 19:19, Peter Hurley wrote:
+>> On 08/29/2014 12:13 PM, Andre Przywara wrote:
+>>> +static void
+>>> +sbsa_uart_set_termios(struct uart_port *port, struct ktermios *termios,
+>>> +               struct ktermios *old)
+>>> +{
+>>> +     unsigned long flags;
+>>> +     unsigned int baud = 115200;
+>>> +
+>>> +     spin_lock_irqsave(&port->lock, flags);
+>>         ^^^^^^^^^^^^^^^^^
+>>
+>> Can be spin_lock_irq(&port->lock) here.
 > 
-> Signed-off-by: Ga?l PORTAY <gael.portay@gmail.com>
+> Why is this? Because this code cannot be called with interrupts already
+> off?
 
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+Yes.
 
-Stacked on at91-3.17-fixes. Thanks!
+> This would apply to the original PL011 driver also then?
 
-> ---
->  arch/arm/boot/dts/at91sam9g20.dtsi | 1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/arch/arm/boot/dts/at91sam9g20.dtsi b/arch/arm/boot/dts/at91sam9g20.dtsi
-> index 31f7652..4e0abbd 100644
-> --- a/arch/arm/boot/dts/at91sam9g20.dtsi
-> +++ b/arch/arm/boot/dts/at91sam9g20.dtsi
-> @@ -40,6 +40,7 @@
->  				};
->  
->  				pllb: pllbck {
-> +					compatible = "atmel,at91sam9g20-clk-pllb";
->  					atmel,clk-input-range = <2000000 32000000>;
->  					atmel,pll-clk-output-ranges = <30000000 100000000 0 0>;
->  				};
-> 
+Also, yes.
 
+I mentioned it because new code should use the spin_lock_irq() flavor
+[primarily as a visual aid for driver authors].
 
--- 
-Nicolas Ferre
+Regards,
+Peter Hurley
