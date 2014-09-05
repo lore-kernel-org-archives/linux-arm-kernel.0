@@ -1,61 +1,35 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Fri, 05 Sep 2014 15:27:22 +0100
-Subject: [RFC PATCH 1/1] drivers: introduce ARM SBSA generic UART driver
-In-Reply-To: <2856634.LN9gbfSP9v@wuerfel>
-References: <1409328803-1953-1-git-send-email-andre.przywara@arm.com>
- <3749748.k4a1nSHDdj@wuerfel>
- <CAL_JsqKGbSd5BymnFhT8KBjbBCPO8wsrHhG9Qn20c7mrrxTDDA@mail.gmail.com>
- <2856634.LN9gbfSP9v@wuerfel>
-Message-ID: <5409C84A.90000@arm.com>
+From: david.vrabel@citrix.com (David Vrabel)
+Date: Fri, 5 Sep 2014 15:29:20 +0100
+Subject: [Xen-devel] [PATCH v1 08/21] x86/xen/MSI: Use MSI chip framework
+ to configure MSI/MSI-X irq
+In-Reply-To: <1409911806-10519-9-git-send-email-wangyijing@huawei.com>
+References: <1409911806-10519-1-git-send-email-wangyijing@huawei.com>
+ <1409911806-10519-9-git-send-email-wangyijing@huawei.com>
+Message-ID: <5409C8C0.8020200@citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 05/09/14 11:09, Yijing Wang wrote:
+> Use MSI chip framework instead of arch MSI functions to configure
+> MSI/MSI-X irq. So we can manage MSI/MSI-X irq in a unified framework.
+[...]
+> --- a/arch/x86/pci/xen.c
+> +++ b/arch/x86/pci/xen.c
+[...]
+> @@ -418,9 +430,9 @@ int __init pci_xen_init(void)
+>  #endif
+>  
+>  #ifdef CONFIG_PCI_MSI
+> -	x86_msi.setup_msi_irqs = xen_setup_msi_irqs;
+> -	x86_msi.teardown_msi_irq = xen_teardown_msi_irq;
+> -	x86_msi.teardown_msi_irqs = xen_teardown_msi_irqs;
+> +	xen_msi_chip.setup_irqs = xen_setup_msi_irqs;
+> +	xen_msi_chip.teardown_irqs = xen_teardown_msi_irqs;
+> +	x86_msi_chip = &xen_msi_chip;
+>  	msi_chip.irq_mask = xen_nop_msi_mask;
+>  	msi_chip.irq_unmask = xen_nop_msi_mask;
 
+Why have these not been changed to set the x86_msi_chip.mask/unmask
+fields instead?
 
-On 02/09/14 20:34, Arnd Bergmann wrote:
-> On Tuesday 02 September 2014 12:38:23 Rob Herring wrote:
->> On Tue, Sep 2, 2014 at 8:48 AM, Arnd Bergmann <arnd@arndb.de> wrote:
->>> On Tuesday 02 September 2014 08:20:53 Rob Herring wrote:
->>>>>>
->>>>>> This alone is not okay. There is no such implementation of hardware.
->>>>>
->>>>> But the SBSA explicitly allows this. I don't know of any vendor who just
->>>>> implements the subset, but I've been told that this has been asked for.
->>>>
->>>> To use baudrate as an example, that must be configurable somehow
->>>> either with pl011 registers or in a vendor specific way. I suppose you
->>>> could do an actual implementation with all those things hardcoded in
->>>> the design, but that seems unlikely.
->>>
->>> Why does the baudrate need to be configurable? I think it's completely
->>> reasonable to specify a console port that has a fixed (as in the
->>> OS must not care) rate, and that can be implemented either as a UART
->>> with a programmable rate or as a set of registers that directly talks
->>> to a remote system management device over whatever hardware protocol
->>> they choose.
->>
->> Sure. It is also completely reasonable that baudrate is configurable
->> and vendors can implement it however they choose since the SBSA does
->> not specify it. IIRC, the enabling and disabling bits are not
->> specified either.
->>
->> Not having configurability is simply one variation on possible
->> implementations.
-> 
-> It's not obvious to me though that we are served better by a
-> pl011 driver that allows any possible subset of the features,
-> rather than having the existing driver for pl011, and a new driver
-> for the sbsa subset, which then won't allow any of the optional
-> features.
-> 
-> Yes, there is some duplication, but a driver for this kind of
-> dumb console port should be doable in very little code, at
-> least less than the proposed implementation.
-
-I see your point, but as long as this means to introduce another serial
-prefix I would rather avoid it.
-As said in the other mail, I think the integration into PL011 does not
-look too bad, so we can discuss again this when I post the code later.
-
-Cheers,
-Andre.
+David
