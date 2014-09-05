@@ -1,29 +1,82 @@
-From: jingchang.lu@freescale.com (Jingchang Lu)
-Date: Fri, 5 Sep 2014 10:35:14 +0800
-Subject: [PATCH] doc: dt-binding: of-serial: add Freescale 64-byte FIFO mode
- uart binding
-Message-ID: <1409884514-24705-1-git-send-email-jingchang.lu@freescale.com>
+From: wanghaibin.wang@huawei.com (wanghaibin)
+Date: Fri, 5 Sep 2014 11:28:11 +0800
+Subject: [PATCH v2 12/15] arm/arm64: KVM: add virtual GICv3 distributor
+ emulation
+In-Reply-To: <1408626416-11326-13-git-send-email-andre.przywara@arm.com>
+References: <1408626416-11326-1-git-send-email-andre.przywara@arm.com>
+ <1408626416-11326-13-git-send-email-andre.przywara@arm.com>
+Message-ID: <54092DCB.3010107@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This add the 64-byte FIFO mode device tree binding for Freescale DUART.
+On 2014/8/21 21:06, Andre Przywara wrote:
 
-Signed-off-by: Jingchang Lu <jingchang.lu@freescale.com>
----
- Documentation/devicetree/bindings/serial/of-serial.txt | 1 +
- 1 file changed, 1 insertion(+)
 
-diff --git a/Documentation/devicetree/bindings/serial/of-serial.txt b/Documentation/devicetree/bindings/serial/of-serial.txt
-index 7705477..7b132eb 100644
---- a/Documentation/devicetree/bindings/serial/of-serial.txt
-+++ b/Documentation/devicetree/bindings/serial/of-serial.txt
-@@ -14,6 +14,7 @@ Required properties:
- 	- "altr,16550-FIFO32"
- 	- "altr,16550-FIFO64"
- 	- "altr,16550-FIFO128"
-+	- "fsl,16550-FIFO64"
- 	- "serial" if the port type is unknown.
- - reg : offset and length of the register set for the device.
- - interrupts : should contain uart interrupt.
--- 
-1.8.0
+> +void vgic_v3_dispatch_sgi(struct kvm_vcpu *vcpu, u64 reg)
+> +{
+> +	struct kvm *kvm = vcpu->kvm;
+> +	struct kvm_vcpu *c_vcpu;
+> +	struct vgic_dist *dist = &kvm->arch.vgic;
+> +	u16 target_cpus;
+> +	u64 mpidr, mpidr_h, mpidr_l;
+> +	int sgi, mode, c, vcpu_id;
+> +	int updated = 0;
+> +
+> +	vcpu_id = vcpu->vcpu_id;
+> +
+> +	sgi = (reg >> 24) & 0xf;
+> +	mode = (reg >> 40) & 0x1;
+> +	target_cpus = reg & 0xffff;
+> +	mpidr = ((reg >> 48) & 0xff) << MPIDR_LEVEL_SHIFT(3);
+> +	mpidr |= ((reg >> 32) & 0xff) << MPIDR_LEVEL_SHIFT(2);
+> +	mpidr |= ((reg >> 16) & 0xff) << MPIDR_LEVEL_SHIFT(1);
+> +	mpidr &= ~MPIDR_LEVEL_MASK;
+> +
+
+> +	/*
+> +	 * We take the dist lock here, because we come from the sysregs
+> +	 * code path and not from MMIO (where this is already done)
+> +	 */
+> +	spin_lock(&dist->lock);
+> +	kvm_for_each_vcpu(c, c_vcpu, kvm) {
+
+
+Hi, Andre, there is a suggestion. Move the
+
+> +		if (target_cpus == 0)
+> +			break;
+
+code, out the  kvm_for_each_vcpu loop, Like :
+
+
+	if (!mode && target_cpus == 0)   /* the judgement do not need judge in kvm_for_each_vcpu loop */
+		return;
+
+	spin_lock(&dist->lock);
+	kvm_for_each_vcpu(c, c_vcpu, kvm) {
+
+> +		if (mode && c == vcpu_id)       /* not to myself */
+> +			continue;
+> +		if (!mode) {
+> +			mpidr_h = kvm_vcpu_get_mpidr(c_vcpu);
+> +			mpidr_l = MPIDR_AFFINITY_LEVEL(mpidr_h, 0);
+> +			mpidr_h &= ~MPIDR_LEVEL_MASK;
+> +			if (mpidr != mpidr_h)
+> +				continue;
+> +			if (!(target_cpus & BIT(mpidr_l)))
+> +				continue;
+> +			target_cpus &= ~BIT(mpidr_l);
+> +		}
+> +		/* Flag the SGI as pending */
+> +		vgic_dist_irq_set(c_vcpu, sgi);
+> +		updated = 1;
+> +		kvm_debug("SGI%d from CPU%d to CPU%d\n", sgi, vcpu_id, c);
+> +	}
+> +	if (updated)
+> +		vgic_update_state(vcpu->kvm);
+> +	spin_unlock(&dist->lock);
+> +	if (updated)
+> +		vgic_kick_vcpus(vcpu->kvm);
+> +}
+> +
+> +
