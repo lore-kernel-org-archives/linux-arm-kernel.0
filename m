@@ -1,49 +1,35 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 05 Sep 2014 21:00:19 +0200
-Subject: [PATCH] PCI: keystone: update to support multiple pci ports
-In-Reply-To: <540A0212.6060303@ti.com>
-References: <1409938782-31460-1-git-send-email-m-karicheri2@ti.com>
- <7260053.FoBVhTXVfj@wuerfel> <540A0212.6060303@ti.com>
-Message-ID: <3654923.JrIGV2dJ70@wuerfel>
+From: bhelgaas@google.com (Bjorn Helgaas)
+Date: Fri, 5 Sep 2014 13:00:29 -0600
+Subject: [PATCH] PCI: mvebu: Fix uninitialized variable in
+ mvebu_get_tgt_attr()
+In-Reply-To: <5898856.RmRf87KNto@wuerfel>
+References: <1407512045-26969-1-git-send-email-geert+renesas@glider.be>
+ <20140905174122.GD8080@google.com>
+ <20140905202044.4c166a43@free-electrons.com>
+ <5898856.RmRf87KNto@wuerfel>
+Message-ID: <CAErSpo4sEQN6T9knuh4U2x9BCUODJheaAf3S8+W4U4oC-C7mMA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 05 September 2014 14:33:54 Murali Karicheri wrote:
-> > This looks like it's a shared register of some sort that doesn't
-> > really belong into the registers of a particular port. Could it
-> > be that it's actually for the PHY?
-> >
-> This a shared device configuration register between the two ports the 
-> desciption states it is bootstrap configuration of the PCIe module as 
-> Endpoint or Root complex and Not Phy. Hope below text will help.
+On Fri, Sep 5, 2014 at 12:34 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Friday 05 September 2014 20:20:44 Thomas Petazzoni wrote:
+>> Hum, I think I would actually prefer something like:
+>>
+>>                 if (DT_FLAGS_TO_TYPE(flags) == DT_TYPE_IO)
+>>                         rtype = IORESOURCE_IO;
+>>                 else if (DT_FLAGS_TO_TYPE(flags) == DT_TYPE_MEM32)
+>>                         rtype = IORESOURCE_MEM;
+>> +               else
+>> +                       continue;
+>>
+>> So that we're explicit with the fact that we only care about I/O and
+>> MEM32 resource types.
+>
+> Agreed, that looks better than my patch as well.
 
-Ok. Why do you want to have this user-selectable though? Can't it
-just be set by the boot loader before starting Linux?
+I like it better, too, but we still need the "range += rangesz" part,
+so I don't think it will work.  I suppose that could be moved to the
+update expression of the "for" loop.  Or, since we don't use "i" in
+the loop at all, maybe we could do something like this:
 
-	Arnd
-
-> Table 3-23 Device Configuration Register (DEVCFG)
-> 
-> 
-> PCIESSMODE[1:0] 00b PCIESSMODE is used to control the
-> functionality of PCIESS module out of
-> reset. This MMR output is connected to
-> DEVTYPE input of PCIESS
-> (Changes from
-> Nysh) : Note that in Nysh this value came
-> from a bootstrap pin.
-> 00 : Endpoint
-> 01 : Legacy Endpoint
-> 10 : Rootcomplex
-> 11 : Reserved
-> PCIESS_1_MODE[1:0
-> ]
-> 00b PCIESSMODE is used to control the
-> functionality of PCIE_1 module out of
-> reset. This MMR output is connected to
-> DEVTYPE input of PCIE_1
-> 00 : Endpoint
-> 01 : Legacy Endpoint
-> 10 : Rootcomplex
-> 11 : Reserv
-> 
+    for (; range < rend; range += rangesz)
