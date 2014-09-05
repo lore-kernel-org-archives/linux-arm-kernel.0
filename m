@@ -1,65 +1,59 @@
-From: boris.brezillon@free-electrons.com (Boris BREZILLON)
-Date: Fri, 5 Sep 2014 16:18:37 +0200
-Subject: [PATCH] ARM: at91: rm9200: fix clock registration
-In-Reply-To: <1409926533-7853-1-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1409926533-7853-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <20140905161837.7b83929c@bbrezillon>
+From: gael.portay@gmail.com (=?UTF-8?q?Ga=C3=ABl=20PORTAY?=)
+Date: Fri,  5 Sep 2014 16:14:40 +0200
+Subject: [PATCHv3 4/4] clocksource: tcb_clksrc: sanitize IRQ request
+In-Reply-To: <1409926480-16367-1-git-send-email-gael.portay@gmail.com>
+References: <1409926480-16367-1-git-send-email-gael.portay@gmail.com>
+Message-ID: <1409926480-16367-5-git-send-email-gael.portay@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri,  5 Sep 2014 16:15:33 +0200
-Alexandre Belloni <alexandre.belloni@free-electrons.com> wrote:
+The clock is not unprepared in case of the request IRQ fails.
 
-> Actually register clocks from device tree when using the common clock
-> framework.
-> 
-> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+Also update to request_irq.
 
+Signed-off-by: Ga?l PORTAY <gael.portay@gmail.com>
+Acked-by: Daniel Lezcano <daniel.lezcano@linaro.org>
 Acked-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+---
+ drivers/clocksource/tcb_clksrc.c | 13 ++++---------
+ 1 file changed, 4 insertions(+), 9 deletions(-)
 
-> ---
->  arch/arm/mach-at91/board-dt-rm9200.c | 11 ++++++++++-
->  1 file changed, 10 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/mach-at91/board-dt-rm9200.c b/arch/arm/mach-at91/board-dt-rm9200.c
-> index 61ea21445664..a598481a3570 100644
-> --- a/arch/arm/mach-at91/board-dt-rm9200.c
-> +++ b/arch/arm/mach-at91/board-dt-rm9200.c
-> @@ -14,6 +14,7 @@
->  #include <linux/gpio.h>
->  #include <linux/of.h>
->  #include <linux/of_irq.h>
-> +#include <linux/clk-provider.h>
->  
->  #include <asm/setup.h>
->  #include <asm/irq.h>
-> @@ -24,13 +25,21 @@
->  #include "at91_aic.h"
->  #include "generic.h"
->  
-> +static void __init rm9200_dt_timer_init(void)
-> +{
-> +#if defined(CONFIG_COMMON_CLK)
-> +	of_clk_init(NULL);
-> +#endif
-> +	at91rm9200_timer_init();
-> +}
-> +
->  static const char *at91rm9200_dt_board_compat[] __initdata = {
->  	"atmel,at91rm9200",
->  	NULL
->  };
->  
->  DT_MACHINE_START(at91rm9200_dt, "Atmel AT91RM9200 (Device Tree)")
-> -	.init_time      = at91rm9200_timer_init,
-> +	.init_time      = rm9200_dt_timer_init,
->  	.map_io		= at91_map_io,
->  	.init_early	= at91rm9200_dt_initialize,
->  	.dt_compat	= at91rm9200_dt_board_compat,
-
-
-
+diff --git a/drivers/clocksource/tcb_clksrc.c b/drivers/clocksource/tcb_clksrc.c
+index f922e81..8bdbc45 100644
+--- a/drivers/clocksource/tcb_clksrc.c
++++ b/drivers/clocksource/tcb_clksrc.c
+@@ -178,12 +178,6 @@ static irqreturn_t ch2_irq(int irq, void *handle)
+ 	return IRQ_NONE;
+ }
+ 
+-static struct irqaction tc_irqaction = {
+-	.name		= "tc_clkevt",
+-	.flags		= IRQF_TIMER,
+-	.handler	= ch2_irq,
+-};
+-
+ static int __init setup_clkevents(struct atmel_tc *tc, int clk32k_divisor_idx)
+ {
+ 	int ret;
+@@ -198,15 +192,16 @@ static int __init setup_clkevents(struct atmel_tc *tc, int clk32k_divisor_idx)
+ 
+ 	clkevt.regs = tc->regs;
+ 	clkevt.clk = t2_clk;
+-	tc_irqaction.dev_id = &clkevt;
+ 
+ 	timer_clock = clk32k_divisor_idx;
+ 
+ 	clkevt.clkevt.cpumask = cpumask_of(0);
+ 
+-	ret = setup_irq(irq, &tc_irqaction);
+-	if (ret)
++	ret = request_irq(irq, ch2_irq, IRQF_TIMER, "tc_clkevt", &clkevt);
++	if (ret) {
++		clk_disable_unprepare(t2_clk);
+ 		return ret;
++	}
+ 
+ 	clockevents_config_and_register(&clkevt.clkevt, 32768, 1, 0xffff);
+ 
 -- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+1.9.3
