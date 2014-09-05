@@ -1,47 +1,40 @@
-From: jingchang.lu@freescale.com (Jingchang Lu)
-Date: Fri, 5 Sep 2014 01:57:12 +0000
-Subject: LPAE boot failed after commit 7fb00c2fca4b6: "ARM: 8114/1: LPAE:
- load upper bits of early TTBR0/TTBR1"
-In-Reply-To: <20140904155212.GA22354@arm.com>
-References: <2a4c00eb49dc4f40b3577609f1f33219@BL2PR03MB467.namprd03.prod.outlook.com>
- <20140904155212.GA22354@arm.com>
-Message-ID: <594e5fa1addf492a8c5fa2460b3e3064@BL2PR03MB467.namprd03.prod.outlook.com>
+From: addy.ke@rock-chips.com (Addy Ke)
+Date: Fri,  5 Sep 2014 10:32:13 +0800
+Subject: [PATCH] i2c: rk3x: fix divisor calculation for SCL frequency
+Message-ID: <1409884333-3544-1-git-send-email-addy.ke@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->-----Original Message-----
->From: Catalin Marinas [mailto:catalin.marinas at arm.com]
->Sent: Thursday, September 04, 2014 11:52 PM
->To: Lu Jingchang-B35083
->Cc: rmk+kernel at arm.linux.org.uk; k.khlebnikov at samsung.com; linux-arm-
->kernel at lists.infradead.org
->Subject: Re: LPAE boot failed after commit 7fb00c2fca4b6: "ARM: 8114/1:
->LPAE: load upper bits of early TTBR0/TTBR1"
->
->On Wed, Sep 03, 2014 at 11:08:31AM +0100, Jingchang Lu wrote:
->>   Our one ARMv7 Cortex-A7 based dual core SoC with LPAE support could
->> not boot since next-20140811 on the linux-next tree, I notice that there
->is a commit 7fb00c2fca4b6c58be521?, ?ARM: 8114/1: LPAE: load upper bits of
->early TTBR0/TTBR1?.
->> Revert that commit the SoC boots successfully, do you have any
->suggestion on this, thanks.
->>
->>   related SoC hardware and kernel configurations are:
->>        DRAM PHYS address: 0x80000000
->>        CONFIG_VMSPLIT_2G
->>        CONFIG_PAGE_OFFSET=0x80000000
->>        CONFIG_ARM_LPAE
->
->Does this patch fixes the problem:
->
->http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=8132/1
->
->--
->Catalin
+I2C_CLKDIV register descripted in the previous version of
+RK3x chip manual is incorrect. Plus 1 is required.
 
-Yes, with this patch, all thing works well, the system boots successfully.
-Thanks.
+The correct formula:
+- T(SCL_HIGH) = T(PCLK) * (CLKDIVH + 1) * 8
+- T(SCL_LOW) = T(PCLK) * (CLKDIVL + 1) * 8
+- (SCL Divsor) = 8 * ((CLKDIVL + 1) + (CLKDIVH + 1))
+- SCL = PCLK / (CLK Divsor)
 
+It will be updated to the latest version of chip manual.
 
-Best Regards,
-Jingchang
+Signed-off-by: Addy Ke <addy.ke@rock-chips.com>
+---
+ drivers/i2c/busses/i2c-rk3x.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/i2c/busses/i2c-rk3x.c b/drivers/i2c/busses/i2c-rk3x.c
+index e637c32..76b6604 100644
+--- a/drivers/i2c/busses/i2c-rk3x.c
++++ b/drivers/i2c/busses/i2c-rk3x.c
+@@ -433,8 +433,8 @@ static void rk3x_i2c_set_scl_rate(struct rk3x_i2c *i2c, unsigned long scl_rate)
+ 	unsigned long i2c_rate = clk_get_rate(i2c->clk);
+ 	unsigned int div;
+ 
+-	/* SCL rate = (clk rate) / (8 * DIV) */
+-	div = DIV_ROUND_UP(i2c_rate, scl_rate * 8);
++	/* SCL rate = (clk rate) / (8 * (DIV + 2)) */
++	div = DIV_ROUND_UP(i2c_rate, scl_rate * 8) - 2;
+ 
+ 	/* The lower and upper half of the CLKDIV reg describe the length of
+ 	 * SCL low & high periods. */
+-- 
+1.8.3.2
