@@ -1,122 +1,187 @@
 From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Fri,  5 Sep 2014 18:34:52 +0100
-Subject: [PATCH v9 3/8] arm64: kernel: introduce cpu_init_idle CPU operation
+Date: Fri,  5 Sep 2014 18:34:53 +0100
+Subject: [PATCH v9 4/8] arm64: add PSCI CPU_SUSPEND based cpu_suspend support
 In-Reply-To: <1409938498-17984-1-git-send-email-lorenzo.pieralisi@arm.com>
 References: <1409938498-17984-1-git-send-email-lorenzo.pieralisi@arm.com>
-Message-ID: <1409938498-17984-4-git-send-email-lorenzo.pieralisi@arm.com>
+Message-ID: <1409938498-17984-5-git-send-email-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The CPUidle subsystem on ARM64 machines requires the idle states
-implementation back-end to initialize idle states parameter upon
-boot. This patch adds a hook in the CPU operations structure that
-should be initialized by the CPU operations back-end in order to
-provide a function that initializes cpu idle states.
+This patch implements the cpu_suspend cpu operations method through
+the PSCI CPU SUSPEND API. The PSCI implementation translates the idle state
+index passed by the cpu_suspend core call into a valid PSCI state according to
+the PSCI states initialized at boot through the cpu_init_idle() CPU
+operations hook.
 
-This patch also adds the infrastructure to arm64 kernel required
-to export the CPU operations based initialization interface, so
-that drivers (ie CPUidle) can use it when they are initialized
-at probe time.
+The PSCI CPU suspend operation hook checks if the PSCI state is a
+standby state. If it is, it calls the PSCI suspend implementation
+straight away, without saving any context. If the state is a power
+down state the kernel calls the __cpu_suspend API (that saves the CPU
+context) and passed the PSCI suspend finisher as a parameter so that PSCI
+can be called by the __cpu_suspend implementation after saving and flushing
+the context as last function before power down.
 
+For power down states, entry point is set to cpu_resume physical address,
+that represents the default kernel execution address following a CPU reset.
+
+Reviewed-by: Ashwin Chaugule <ashwin.chaugule@linaro.org>
 Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
 Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 ---
- arch/arm64/include/asm/cpu_ops.h |  3 +++
- arch/arm64/include/asm/cpuidle.h | 13 +++++++++++++
- arch/arm64/kernel/Makefile       |  1 +
- arch/arm64/kernel/cpuidle.c      | 31 +++++++++++++++++++++++++++++++
- 4 files changed, 48 insertions(+)
- create mode 100644 arch/arm64/include/asm/cpuidle.h
- create mode 100644 arch/arm64/kernel/cpuidle.c
+ arch/arm64/kernel/psci.c | 104 +++++++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 104 insertions(+)
 
-diff --git a/arch/arm64/include/asm/cpu_ops.h b/arch/arm64/include/asm/cpu_ops.h
-index d7b4b38..47dfa31 100644
---- a/arch/arm64/include/asm/cpu_ops.h
-+++ b/arch/arm64/include/asm/cpu_ops.h
-@@ -28,6 +28,8 @@ struct device_node;
-  *		enable-method property.
-  * @cpu_init:	Reads any data necessary for a specific enable-method from the
-  *		devicetree, for a given cpu node and proposed logical id.
-+ * @cpu_init_idle: Reads any data necessary to initialize CPU idle states from
-+ *		devicetree, for a given cpu node and proposed logical id.
-  * @cpu_prepare: Early one-time preparation step for a cpu. If there is a
-  *		mechanism for doing so, tests whether it is possible to boot
-  *		the given CPU.
-@@ -47,6 +49,7 @@ struct device_node;
- struct cpu_operations {
- 	const char	*name;
- 	int		(*cpu_init)(struct device_node *, unsigned int);
-+	int		(*cpu_init_idle)(struct device_node *, unsigned int);
- 	int		(*cpu_prepare)(unsigned int);
- 	int		(*cpu_boot)(unsigned int);
- 	void		(*cpu_postboot)(void);
-diff --git a/arch/arm64/include/asm/cpuidle.h b/arch/arm64/include/asm/cpuidle.h
-new file mode 100644
-index 0000000..b52a993
---- /dev/null
-+++ b/arch/arm64/include/asm/cpuidle.h
-@@ -0,0 +1,13 @@
-+#ifndef __ASM_CPUIDLE_H
-+#define __ASM_CPUIDLE_H
+diff --git a/arch/arm64/kernel/psci.c b/arch/arm64/kernel/psci.c
+index 5539547..866c1c8 100644
+--- a/arch/arm64/kernel/psci.c
++++ b/arch/arm64/kernel/psci.c
+@@ -21,6 +21,7 @@
+ #include <linux/reboot.h>
+ #include <linux/pm.h>
+ #include <linux/delay.h>
++#include <linux/slab.h>
+ #include <uapi/linux/psci.h>
+ 
+ #include <asm/compiler.h>
+@@ -28,6 +29,7 @@
+ #include <asm/errno.h>
+ #include <asm/psci.h>
+ #include <asm/smp_plat.h>
++#include <asm/suspend.h>
+ #include <asm/system_misc.h>
+ 
+ #define PSCI_POWER_STATE_TYPE_STANDBY		0
+@@ -65,6 +67,8 @@ enum psci_function {
+ 	PSCI_FN_MAX,
+ };
+ 
++static DEFINE_PER_CPU_READ_MOSTLY(struct psci_power_state *, psci_power_state);
 +
-+#ifdef CONFIG_CPU_IDLE
-+extern int cpu_init_idle(unsigned int cpu);
-+#else
-+static inline int cpu_init_idle(unsigned int cpu)
+ static u32 psci_function_id[PSCI_FN_MAX];
+ 
+ static int psci_to_linux_errno(int errno)
+@@ -93,6 +97,18 @@ static u32 psci_power_state_pack(struct psci_power_state state)
+ 		 & PSCI_0_2_POWER_STATE_AFFL_MASK);
+ }
+ 
++static void psci_power_state_unpack(u32 power_state,
++				    struct psci_power_state *state)
 +{
-+	return -EOPNOTSUPP;
++	state->id = (power_state & PSCI_0_2_POWER_STATE_ID_MASK) >>
++			PSCI_0_2_POWER_STATE_ID_SHIFT;
++	state->type = (power_state & PSCI_0_2_POWER_STATE_TYPE_MASK) >>
++			PSCI_0_2_POWER_STATE_TYPE_SHIFT;
++	state->affinity_level =
++			(power_state & PSCI_0_2_POWER_STATE_AFFL_MASK) >>
++			PSCI_0_2_POWER_STATE_AFFL_SHIFT;
 +}
-+#endif
 +
-+#endif
-diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
-index 383d81d..be78980 100644
---- a/arch/arm64/kernel/Makefile
-+++ b/arch/arm64/kernel/Makefile
-@@ -27,6 +27,7 @@ arm64-obj-$(CONFIG_PERF_EVENTS)		+= perf_regs.o
- arm64-obj-$(CONFIG_HW_PERF_EVENTS)	+= perf_event.o
- arm64-obj-$(CONFIG_HAVE_HW_BREAKPOINT)	+= hw_breakpoint.o
- arm64-obj-$(CONFIG_ARM64_CPU_SUSPEND)	+= sleep.o suspend.o
-+arm64-obj-$(CONFIG_CPU_IDLE)		+= cpuidle.o
- arm64-obj-$(CONFIG_JUMP_LABEL)		+= jump_label.o
- arm64-obj-$(CONFIG_KGDB)		+= kgdb.o
- arm64-obj-$(CONFIG_EFI)			+= efi.o efi-stub.o efi-entry.o
-diff --git a/arch/arm64/kernel/cpuidle.c b/arch/arm64/kernel/cpuidle.c
-new file mode 100644
-index 0000000..19d17f5
---- /dev/null
-+++ b/arch/arm64/kernel/cpuidle.c
-@@ -0,0 +1,31 @@
-+/*
-+ * ARM64 CPU idle arch support
-+ *
-+ * Copyright (C) 2014 ARM Ltd.
-+ * Author: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#include <linux/of.h>
-+#include <linux/of_device.h>
-+
-+#include <asm/cpuidle.h>
-+#include <asm/cpu_ops.h>
-+
-+int cpu_init_idle(unsigned int cpu)
+ /*
+  * The following two functions are invoked via the invoke_psci_fn pointer
+  * and will not be inlined, allowing us to piggyback on the AAPCS.
+@@ -199,6 +215,63 @@ static int psci_migrate_info_type(void)
+ 	return err;
+ }
+ 
++static int __maybe_unused cpu_psci_cpu_init_idle(struct device_node *cpu_node,
++						 unsigned int cpu)
 +{
-+	int ret = -EOPNOTSUPP;
-+	struct device_node *cpu_node = of_cpu_device_node_get(cpu);
++	int i, ret, count = 0;
++	struct psci_power_state *psci_states;
++	struct device_node *state_node;
 +
-+	if (!cpu_node)
++	/*
++	 * If the PSCI cpu_suspend function hook has not been initialized
++	 * idle states must not be enabled, so bail out
++	 */
++	if (!psci_ops.cpu_suspend)
++		return -EOPNOTSUPP;
++
++	/* Count idle states */
++	while ((state_node = of_parse_phandle(cpu_node, "cpu-idle-states",
++					      count))) {
++		count++;
++		of_node_put(state_node);
++	}
++
++	if (!count)
 +		return -ENODEV;
 +
-+	if (cpu_ops[cpu] && cpu_ops[cpu]->cpu_init_idle)
-+		ret = cpu_ops[cpu]->cpu_init_idle(cpu_node, cpu);
++	psci_states = kcalloc(count, sizeof(*psci_states), GFP_KERNEL);
++	if (!psci_states)
++		return -ENOMEM;
 +
-+	of_node_put(cpu_node);
++	for (i = 0; i < count; i++) {
++		u32 psci_power_state;
++
++		state_node = of_parse_phandle(cpu_node, "cpu-idle-states", i);
++
++		ret = of_property_read_u32(state_node,
++					   "arm,psci-suspend-param",
++					   &psci_power_state);
++		if (ret) {
++			pr_warn(" * %s missing arm,psci-suspend-param property\n",
++				state_node->full_name);
++			of_node_put(state_node);
++			goto free_mem;
++		}
++
++		of_node_put(state_node);
++		pr_debug("psci-power-state %#x index %d\n", psci_power_state,
++							    i);
++		psci_power_state_unpack(psci_power_state, &psci_states[i]);
++	}
++	/* Idle states parsed correctly, initialize per-cpu pointer */
++	per_cpu(psci_power_state, cpu) = psci_states;
++	return 0;
++
++free_mem:
++	kfree(psci_states);
 +	return ret;
 +}
++
+ static int get_set_conduit_method(struct device_node *np)
+ {
+ 	const char *method;
+@@ -436,8 +509,39 @@ static int cpu_psci_cpu_kill(unsigned int cpu)
+ #endif
+ #endif
+ 
++static int psci_suspend_finisher(unsigned long index)
++{
++	struct psci_power_state *state = __get_cpu_var(psci_power_state);
++
++	return psci_ops.cpu_suspend(state[index - 1],
++				    virt_to_phys(cpu_resume));
++}
++
++static int __maybe_unused cpu_psci_cpu_suspend(unsigned long index)
++{
++	int ret;
++	struct psci_power_state *state = __get_cpu_var(psci_power_state);
++	/*
++	 * idle state index 0 corresponds to wfi, should never be called
++	 * from the cpu_suspend operations
++	 */
++	if (WARN_ON_ONCE(!index))
++		return -EINVAL;
++
++	if (state->type == PSCI_POWER_STATE_TYPE_STANDBY)
++		ret = psci_ops.cpu_suspend(state[index - 1], 0);
++	else
++		ret = __cpu_suspend(index, psci_suspend_finisher);
++
++	return ret;
++}
++
+ const struct cpu_operations cpu_psci_ops = {
+ 	.name		= "psci",
++#ifdef CONFIG_CPU_IDLE
++	.cpu_init_idle	= cpu_psci_cpu_init_idle,
++	.cpu_suspend	= cpu_psci_cpu_suspend,
++#endif
+ #ifdef CONFIG_SMP
+ 	.cpu_init	= cpu_psci_cpu_init,
+ 	.cpu_prepare	= cpu_psci_cpu_prepare,
 -- 
 1.9.1
