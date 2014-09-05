@@ -1,37 +1,52 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 5 Sep 2014 10:52:52 +0100
-Subject: [PATCH] arm: prevent BUG_ON in audit_syscall_entry()
-In-Reply-To: <1409910393-30896-1-git-send-email-takahiro.akashi@linaro.org>
-References: <1409910393-30896-1-git-send-email-takahiro.akashi@linaro.org>
-Message-ID: <20140905095252.GF30401@n2100.arm.linux.org.uk>
+From: wangyijing@huawei.com (Yijing Wang)
+Date: Fri, 5 Sep 2014 18:10:00 +0800
+Subject: [PATCH v1 15/21] Powerpc/MSI: Use MSI chip framework to configure
+ MSI/MSI-X irq
+In-Reply-To: <1409911806-10519-1-git-send-email-wangyijing@huawei.com>
+References: <1409911806-10519-1-git-send-email-wangyijing@huawei.com>
+Message-ID: <1409911806-10519-16-git-send-email-wangyijing@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 05, 2014 at 06:46:33PM +0900, AKASHI Takahiro wrote:
-> BUG_ON() in audit_syscall_entry() will be hit if user issues syscall(-1)
-> while syscall auditing is enabled (that is, by starting auditd).
-> In fact, syscall(-1) just fails (not signaled despite the expectation,
-> this is another minor bug), but the succeeding syscall hits BUG_ON.
-> 
-> When auditing syscall(-1), audit_syscall_entry() is called anyway, but
-> audit_syscall_exit() is not called and then 'in_syscall' flag in thread's
-> audit context is kept on. In this way, audit_syscall_entry() against
-> the succeeding syscall will see BUG_ON(in_syscall).
-> 
-> This patch fixes this bug by
-> 1) enforcing syscall exit tracing, including audit_syscall_exit(), to be
->    executed in all cases,
+Use MSI chip framework instead of arch MSI functions to configure
+MSI/MSI-X irq. So we can manage MSI/MSI-X irq in a unified framework.
 
-Really, no.  That adds additional overhead to every syscall, and that
-matters for system performance.  We want to have as little as possible
-overhead here.
+Signed-off-by: Yijing Wang <wangyijing@huawei.com>
+---
+ arch/powerpc/kernel/msi.c |   14 ++++++++++++--
+ 1 files changed, 12 insertions(+), 2 deletions(-)
 
-The second issue here is that you haven't explained where the oops
-occurs.  It's seen as a good practice to include the oops dump for the
-bug you're fixing in the commit changelog, so that others can see the
-starting point for the investigation, and see exactly where things are
-going wrong.
-
+diff --git a/arch/powerpc/kernel/msi.c b/arch/powerpc/kernel/msi.c
+index 71bd161..01781a4 100644
+--- a/arch/powerpc/kernel/msi.c
++++ b/arch/powerpc/kernel/msi.c
+@@ -13,7 +13,7 @@
+ 
+ #include <asm/machdep.h>
+ 
+-int arch_setup_msi_irqs(struct pci_dev *dev, int nvec, int type)
++static int ppc_setup_msi_irqs(struct pci_dev *dev, int nvec, int type)
+ {
+ 	if (!ppc_md.setup_msi_irqs || !ppc_md.teardown_msi_irqs) {
+ 		pr_debug("msi: Platform doesn't provide MSI callbacks.\n");
+@@ -27,7 +27,17 @@ int arch_setup_msi_irqs(struct pci_dev *dev, int nvec, int type)
+ 	return ppc_md.setup_msi_irqs(dev, nvec, type);
+ }
+ 
+-void arch_teardown_msi_irqs(struct pci_dev *dev)
++static void ppc_teardown_msi_irqs(struct pci_dev *dev)
+ {
+ 	ppc_md.teardown_msi_irqs(dev);
+ }
++
++static struct msi_chip ppc_msi_chip = {
++	.setup_irqs = ppc_setup_msi_irqs,
++	.teardown_irqs = ppc_teardown_msi_irqs,
++};
++
++struct msi_chip *arch_find_msi_chip(struct pci_dev *dev)
++{
++	return &ppc_msi_chip;
++}
 -- 
-FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
-according to speedtest.net.
+1.7.1
