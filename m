@@ -1,46 +1,19 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Fri, 5 Sep 2014 13:47:08 +0200
-Subject: [PATCH v7 1/5] Documentation: Add device tree bindings for
- Freescale i.MX GPC
-In-Reply-To: <1409060791-23167-2-git-send-email-p.zabel@pengutronix.de>
-References: <1409060791-23167-1-git-send-email-p.zabel@pengutronix.de>
- <1409060791-23167-2-git-send-email-p.zabel@pengutronix.de>
-Message-ID: <CAMuHMdUqbk+OZiBMUsebQ_==7jCan+dHsfJLhi+CPUE=xc6yRA@mail.gmail.com>
+From: pebolle@tiscali.nl (Paul Bolle)
+Date: Fri, 05 Sep 2014 13:53:04 +0200
+Subject: [PATCH v2] ARM: spear: Remove references to PLAT_SPEAR_SINGLE
+In-Reply-To: <2863474.Iz36QDfM80@wuerfel>
+References: <1392153676.14317.8.camel@x220> <1409910654.5546.161.camel@x220>
+ <CAKohpomS5TrG0eU51N-Pu2jE-ZVioNHz-U_7Y-mfFSUU+As-MQ@mail.gmail.com>
+ <2863474.Iz36QDfM80@wuerfel>
+Message-ID: <1409917984.7832.22.camel@x220>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Philipp,
+On Fri, 2014-09-05 at 13:38 +0200, Arnd Bergmann wrote:
+> I've applied this patch to the next/fixes-non-critical branch now, with minor
+> fixup for a conflict that has come in. See below for the final version.
 
-On Tue, Aug 26, 2014 at 3:46 PM, Philipp Zabel <p.zabel@pengutronix.de> wrote:
-> +++ b/Documentation/devicetree/bindings/power/fsl,imx-gpc.txt
-> @@ -0,0 +1,54 @@
+Thanks for picking this up!
 
-> +IP cores belonging to a power domain should contain a 'power-domain' property
 
-power-domains
-
-> +that is a phandle pointing to the gpc device node and a DOMAIN_INDEX specifying
-> +the power domain the device belongs to.
-> +
-> +Example of a device that is part of the PU power domain:
-> +
-> +       vpu: vpu at 02040000 {
-> +               reg = <0x02040000 0x3c000>;
-> +               /* ... */
-> +               power-domain = <&gpc 1>;
-
-power-domains
-
-> +               /* ... */
-> +       };
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Paul Bolle
