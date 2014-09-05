@@ -1,59 +1,37 @@
-From: wangyijing@huawei.com (Yijing Wang)
-Date: Fri, 5 Sep 2014 18:10:04 +0800
-Subject: [PATCH v1 19/21] Sparc/MSI: Use MSI chip framework to configure
- MSI/MSI-X irq
-In-Reply-To: <1409911806-10519-1-git-send-email-wangyijing@huawei.com>
-References: <1409911806-10519-1-git-send-email-wangyijing@huawei.com>
-Message-ID: <1409911806-10519-20-git-send-email-wangyijing@huawei.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 5 Sep 2014 10:52:52 +0100
+Subject: [PATCH] arm: prevent BUG_ON in audit_syscall_entry()
+In-Reply-To: <1409910393-30896-1-git-send-email-takahiro.akashi@linaro.org>
+References: <1409910393-30896-1-git-send-email-takahiro.akashi@linaro.org>
+Message-ID: <20140905095252.GF30401@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use MSI chip framework instead of arch MSI functions to configure
-MSI/MSI-X irq. So we can manage MSI/MSI-X irq in a unified framework.
+On Fri, Sep 05, 2014 at 06:46:33PM +0900, AKASHI Takahiro wrote:
+> BUG_ON() in audit_syscall_entry() will be hit if user issues syscall(-1)
+> while syscall auditing is enabled (that is, by starting auditd).
+> In fact, syscall(-1) just fails (not signaled despite the expectation,
+> this is another minor bug), but the succeeding syscall hits BUG_ON.
+> 
+> When auditing syscall(-1), audit_syscall_entry() is called anyway, but
+> audit_syscall_exit() is not called and then 'in_syscall' flag in thread's
+> audit context is kept on. In this way, audit_syscall_entry() against
+> the succeeding syscall will see BUG_ON(in_syscall).
+> 
+> This patch fixes this bug by
+> 1) enforcing syscall exit tracing, including audit_syscall_exit(), to be
+>    executed in all cases,
 
-Signed-off-by: Yijing Wang <wangyijing@huawei.com>
----
- arch/sparc/kernel/pci.c |   14 ++++++++++++--
- 1 files changed, 12 insertions(+), 2 deletions(-)
+Really, no.  That adds additional overhead to every syscall, and that
+matters for system performance.  We want to have as little as possible
+overhead here.
 
-diff --git a/arch/sparc/kernel/pci.c b/arch/sparc/kernel/pci.c
-index b36365f..2a89ee2 100644
---- a/arch/sparc/kernel/pci.c
-+++ b/arch/sparc/kernel/pci.c
-@@ -905,7 +905,7 @@ int pci_domain_nr(struct pci_bus *pbus)
- EXPORT_SYMBOL(pci_domain_nr);
- 
- #ifdef CONFIG_PCI_MSI
--int arch_setup_msi_irq(struct pci_dev *pdev, struct msi_desc *desc)
-+int sparc_setup_msi_irq(struct pci_dev *pdev, struct msi_desc *desc)
- {
- 	struct pci_pbm_info *pbm = pdev->dev.archdata.host_controller;
- 	unsigned int irq;
-@@ -916,7 +916,7 @@ int arch_setup_msi_irq(struct pci_dev *pdev, struct msi_desc *desc)
- 	return pbm->setup_msi_irq(&irq, pdev, desc);
- }
- 
--void arch_teardown_msi_irq(unsigned int irq)
-+void sparc_teardown_msi_irq(unsigned int irq)
- {
- 	struct msi_desc *entry = irq_get_msi_desc(irq);
- 	struct pci_dev *pdev = entry->dev;
-@@ -925,6 +925,16 @@ void arch_teardown_msi_irq(unsigned int irq)
- 	if (pbm->teardown_msi_irq)
- 		pbm->teardown_msi_irq(irq, pdev);
- }
-+
-+static struct msi_chip sparc_msi_chip = {
-+	.setup_irq = sparc_setup_msi_irq,
-+	.teardown_irq = sparc_teardown_msi_irq,
-+};
-+
-+struct msi_chip *arch_find_msi_chip(struct pci_dev *dev)
-+{
-+	return &sparc_msi_chip;
-+}
- #endif /* !(CONFIG_PCI_MSI) */
- 
- static void ali_sound_dma_hack(struct pci_dev *pdev, int set_bit)
+The second issue here is that you haven't explained where the oops
+occurs.  It's seen as a good practice to include the oops dump for the
+bug you're fixing in the commit changelog, so that others can see the
+starting point for the investigation, and see exactly where things are
+going wrong.
+
 -- 
-1.7.1
+FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
+according to speedtest.net.
