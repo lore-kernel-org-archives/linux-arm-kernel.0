@@ -1,19 +1,31 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 5 Sep 2014 23:13:18 +0200
-Subject: [GIT PULL] at91: defconfig for 3.18 #1
-In-Reply-To: <1409731274-23483-1-git-send-email-nicolas.ferre@atmel.com>
-References: <1409731274-23483-1-git-send-email-nicolas.ferre@atmel.com>
-Message-ID: <201409052313.19248.arnd@arndb.de>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Fri, 5 Sep 2014 23:13:38 +0200 (CEST)
+Subject: [PATCH V2 3/3] mfd: palmas: Add support for optional wakeup
+In-Reply-To: <1409950311-25236-4-git-send-email-nm@ti.com>
+References: <1409950311-25236-1-git-send-email-nm@ti.com>
+ <1409950311-25236-4-git-send-email-nm@ti.com>
+Message-ID: <alpine.DEB.2.10.1409052311210.5472@nanos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 03 September 2014, Nicolas Ferre wrote:
-> Arnd, Olof, Kevin,
-> 
-> Some defconfig updates for AT91. May be included after my 4 previous
-> pull-requests but it is certainly not a hard dependency as it won't break
-> compilation anyway.
+On Fri, 5 Sep 2014, Nishanth Menon wrote:
+> +	if (!palmas->wakeirq)
+> +		goto no_wake_irq;
+> +
+> +	ret = devm_request_irq(palmas->dev, palmas->wakeirq,
+> +			       palmas_wake_irq,
+> +			       IRQF_ONESHOT | pdata->irq_flags,
 
-Pulled into next/defconfig, thanks!
+Why is this marked IRQF_ONESHOT?
 
-	Arnd
+> +			       dev_name(palmas->dev),
+> +			       &palmas);
+> +	if (ret < 0)
+> +		goto err_i2c;
+
+Why err and not doing the obvious clearing of palmas->wakeirq and
+keep at least the i2c functional?
+
+Thanks,
+
+	tglx
