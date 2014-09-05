@@ -1,40 +1,48 @@
-From: Anson.Huang@freescale.com (Anson.Huang at freescale.com)
-Date: Fri, 5 Sep 2014 03:32:14 +0000
-Subject: [PATCH 0/3] move gpt per clk parent for ipg_per to OSC
-In-Reply-To: <20140905003523.GD10809@dragon>
-References: <1409729805-9741-1-git-send-email-b20788@freescale.com>
- <CAOMZO5BOfsvrH3ijxKwyGemEW-B60n-+4wpDZ5xfC98efM469w@mail.gmail.com>
- <20140905003523.GD10809@dragon>
-Message-ID: <7e5aa554087e4809895cf7648ac224c0@BN1PR0301MB0628.namprd03.prod.outlook.com>
+From: swingboard@gmail.com (swingboard)
+Date: Fri, 5 Sep 2014 11:34:57 +0800
+Subject: [PATCH 2/8] spi: sirf: request and free cs gpio in setup and
+ cleanup callbacks
+In-Reply-To: <20140904191954.GO29327@sirena.org.uk>
+References: <1409648468-5436-1-git-send-email-Barry.Song@csr.com>
+ <1409648468-5436-3-git-send-email-Barry.Song@csr.com>
+ <20140904191954.GO29327@sirena.org.uk>
+Message-ID: <CA+qxAP06x5uHzObuWzmcAjFz4YKHRxxH5FE5cGZYzKQNUsJdyg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Shawn and Fabio
-	Thanks for advice, I have sent out V2 patch, please help review.
+2014-09-05 3:19 GMT+08:00 Mark Brown <broonie@kernel.org>:
+> On Tue, Sep 02, 2014 at 05:01:02PM +0800, Barry Song wrote:
+>> From: Qipan Li <Qipan.Li@csr.com>
+>>
+>> move spi controller's gpio request work out from probe() to spi device
+>> register stage, so after spi device register spi controller can deactive
+>> device's gpio chipselect. old code can't do it because gpio request has
+>> not be done until device register is finised in spi_bitbang_start.
+>> and add cleanup function to free CS gpio.
+>
+> I'm not quite sure I understand the rationale here - as far as I can
+> tell this is making the GPIO request happen later not earlier so it's
+> not clear to me what the problem this is fixing in the existing code.
+> If the goal is to move the request around in the probe function why not
+> just move the existing code earlier in probe()?
+>
+> This also won't interact well with deferred probe, though a better
+> solution here would be some kind of deferred device registration and
+> typically the link ordering will mean it won't be an issue when
+> everything is built in.
 
-Best regards!
-Anson Huang
-
-
------Original Message-----
-From: Shawn Guo [mailto:shawn.guo at freescale.com] 
-Sent: 2014-09-05 8:35 AM
-To: Fabio Estevam
-Cc: Huang Yongcai-B20788; Sascha Hauer; devicetree at vger.kernel.org; linux-arm-kernel at lists.infradead.org
-Subject: Re: [PATCH 0/3] move gpt per clk parent for ipg_per to OSC
-
-On Thu, Sep 04, 2014 at 07:50:35PM -0300, Fabio Estevam wrote:
-> This patch series works fine if we use the new dtb and new kernel.
-> 
-> However, booting a kernel with these series applied and using an old 
-> dtb we get a system with broken timer.
-> 
-> 'sleep 1' takes something like 20 seconds in this case.
-
-Oh, yes.  It breaks the compatibility with existing DTB.  Dropped the patches for now.
-
-Anson,
-
-We may need to query the clock rate and then decide how to set up those register bits?
-
-Shawn
+As GPIO cs can be high or low validate and the used GPIO pin with
+default value may high or low,
+it is need do spi device's chipselect invalidation work in spi_setup,
+the patch purpose for it.
+master->cs_gpios only assigned after spi_bitbang_start and the
+function call spi_setup,
+if keep the existing code there will result gpio usage before gpio request.
+just move gpio request code in spi_sirfsoc_setup before gpio use.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140905/4af903d9/attachment.sig>
