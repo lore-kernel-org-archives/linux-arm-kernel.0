@@ -1,57 +1,182 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Fri, 5 Sep 2014 14:48:00 +0200
-Subject: [PATCH] tty/serial: at91: BUG: disable interrupts when
- !UART_ENABLE_MS()
-In-Reply-To: <54099926.6000302@hurleysoftware.com>
-References: <1409760567-13186-1-git-send-email-richard.genoud@gmail.com>
- <54097F2E.6090809@atmel.com> <54099926.6000302@hurleysoftware.com>
-Message-ID: <5409B100.5080709@atmel.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Fri, 5 Sep 2014 07:48:30 -0500
+Subject: [PATCH 2/6] dts,
+ kbuild: Factor out dtbs install rules to Makefile.dtbinst
+In-Reply-To: <1409899692-1455-3-git-send-email-rric@kernel.org>
+References: <1409899692-1455-1-git-send-email-rric@kernel.org>
+ <1409899692-1455-3-git-send-email-rric@kernel.org>
+Message-ID: <CAL_Jsq+NYU9c0Jw8DX_iH6G5_9tom9DGcP548q4tKQsdkb-s0A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/09/2014 13:06, Peter Hurley :
-> Hi Nicolas,
-> 
-> On 09/05/2014 05:15 AM, Nicolas Ferre wrote:
->> On 03/09/2014 18:09, Richard Genoud :
->> Richard,
->>
->> Indeed it seems needed:
->>
->> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
->>
->>
->> But BTW, I see just below a call to the atmel_enable_ms() function in
->> atmel_set_ldisc(). My question is, shouldn't we also add this
->> atmel_disable_ms() in the alternative that disables the PPS in this
->> ldisc function?
-> 
-> I have that change in another series but it has to wait for:
+On Fri, Sep 5, 2014 at 1:48 AM, Robert Richter <rric@kernel.org> wrote:
+> From: Robert Richter <rrichter@cavium.com>
+>
+> Move dtbs install rules to Makefile.dtbinst. This change is needed to
+> implement support for dts vendor subdirs. The change makes Makefiles
+> easier and smaller as no longer the dtbs_install rule needs to be
+> defined. Another advantage is that install goals are not encoded in
+> targets anymore (%.dtb_dtbinst_).
+>
+> Signed-off-by: Robert Richter <rrichter@cavium.com>
+> ---
+>  arch/arm/Makefile            |  6 +++++-
+>  arch/arm/boot/dts/Makefile   |  2 --
+>  arch/arm64/Makefile          |  6 +++++-
+>  arch/arm64/boot/dts/Makefile |  2 --
+>  scripts/Kbuild.include       |  6 ++++++
+>  scripts/Makefile.dtbinst     | 38 ++++++++++++++++++++++++++++++++++++++
+>  scripts/Makefile.lib         | 12 ------------
+>  7 files changed, 54 insertions(+), 18 deletions(-)
+>  create mode 100644 scripts/Makefile.dtbinst
+>
+> diff --git a/arch/arm/Makefile b/arch/arm/Makefile
+> index 0ce9d0f71f2a..1963d9a9a2c4 100644
+> --- a/arch/arm/Makefile
+> +++ b/arch/arm/Makefile
+> @@ -313,9 +313,13 @@ $(BOOT_TARGETS): vmlinux
+>         $(Q)$(MAKE) $(build)=$(boot)/dts MACHINE=$(MACHINE) $(boot)/dts/$@
+>
+>  PHONY += dtbs dtbs_install
+> -dtbs dtbs_install: prepare scripts
+> +
+> +dtbs: prepare scripts
+>         $(Q)$(MAKE) $(build)=$(boot)/dts MACHINE=$(MACHINE) $@
+>
+> +dtbs_install:
+> +       $(Q)$(MAKE) $(dtbinst)=$(boot)/dts MACHINE=$(MACHINE)
 
-Given the attractive enhancements that you describe below... I'll wait
-with pleasure ;-)
+Can't you get rid of MACHINE here, too?
 
-> 1. another series that fixes races setting and clearing the controlling tty
->    (and reduces the footprint of tty_mutex)
-> 2. a series built on that which moves tty_lock() out from under tty_mutex
->    when reopening ttys
->    This allows the tty_lock to be held while closing the tty.
-> 3. a series which removes the ldisc flush from the serial core, among some
->    other locking fixes in the serial core.
->    This fixes a lock inversion between the termios_rwsem and the port mutex.
-> 
-> All of which enables the set_ldisc() notification to be safely passed
-> termios so it can use UART_ENABLE_MS() and also claim the port mutex
-> to change the UPF_HARDPPS_CD flag, which is currently non-atomic and
-> may corrupt the uart port flags field.
-> 
-> The series also claims the port lock around the *_enable_ms() in the
-> various set_ldisc() handlers to protect the hardware re-programming :)
-> 
-> Right now, all of this is temporarily stuck on the most recent patch
-> series, which hinges on whether the kernel should continue to support
-> non-atomic byte stores.
+Rob
 
-Thanks for sharing your plans. Bye,
--- 
-Nicolas Ferre
+> +
+>  # We use MRPROPER_FILES and CLEAN_FILES now
+>  archclean:
+>         $(Q)$(MAKE) $(clean)=$(boot)
+> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+> index b8c5cd3ddeb9..ab40afb87fb2 100644
+> --- a/arch/arm/boot/dts/Makefile
+> +++ b/arch/arm/boot/dts/Makefile
+> @@ -502,5 +502,3 @@ dtbs: $(addprefix $(obj)/, $(dtb-y))
+>         $(Q)rm -f $(obj)/../*.dtb
+>
+>  clean-files := *.dtb
+> -
+> -dtbs_install: $(addsuffix _dtbinst_, $(dtb-y))
+> diff --git a/arch/arm64/Makefile b/arch/arm64/Makefile
+> index e0a8292bc832..1627861e9bbd 100644
+> --- a/arch/arm64/Makefile
+> +++ b/arch/arm64/Makefile
+> @@ -72,9 +72,13 @@ zinstall install: vmlinux
+>         $(Q)$(MAKE) $(build)=$(boot)/dts $(boot)/dts/$@
+>
+>  PHONY += dtbs dtbs_install
+> -dtbs dtbs_install: prepare scripts
+> +
+> +dtbs: prepare scripts
+>         $(Q)$(MAKE) $(build)=$(boot)/dts $@
+>
+> +dtbs_install:
+> +       $(Q)$(MAKE) $(dtbinst)=$(boot)/dts
+> +
+>  PHONY += vdso_install
+>  vdso_install:
+>         $(Q)$(MAKE) $(build)=arch/arm64/kernel/vdso $@
+> diff --git a/arch/arm64/boot/dts/Makefile b/arch/arm64/boot/dts/Makefile
+> index 82e1c4cf8780..0a14c3828301 100644
+> --- a/arch/arm64/boot/dts/Makefile
+> +++ b/arch/arm64/boot/dts/Makefile
+> @@ -7,5 +7,3 @@ targets += $(dtb-y)
+>  dtbs: $(addprefix $(obj)/, $(dtb-y))
+>
+>  clean-files := *.dtb
+> -
+> -dtbs_install: $(addsuffix _dtbinst_, $(dtb-y))
+> diff --git a/scripts/Kbuild.include b/scripts/Kbuild.include
+> index 8a9a4e1c7eab..861f5b4d48a2 100644
+> --- a/scripts/Kbuild.include
+> +++ b/scripts/Kbuild.include
+> @@ -179,6 +179,12 @@ build := -f $(if $(KBUILD_SRC),$(srctree)/)scripts/Makefile.build obj
+>  # $(Q)$(MAKE) $(modbuiltin)=dir
+>  modbuiltin := -f $(if $(KBUILD_SRC),$(srctree)/)scripts/Makefile.modbuiltin obj
+>
+> +###
+> +# Shorthand for $(Q)$(MAKE) -f scripts/Makefile.dtbinst obj=
+> +# Usage:
+> +# $(Q)$(MAKE) $(dtbinst)=dir
+> +dtbinst := -f $(if $(KBUILD_SRC),$(srctree)/)scripts/Makefile.dtbinst obj
+> +
+>  # Prefix -I with $(srctree) if it is not an absolute path.
+>  # skip if -I has no parameter
+>  addtree = $(if $(patsubst -I%,%,$(1)), \
+> diff --git a/scripts/Makefile.dtbinst b/scripts/Makefile.dtbinst
+> new file mode 100644
+> index 000000000000..54286cccc289
+> --- /dev/null
+> +++ b/scripts/Makefile.dtbinst
+> @@ -0,0 +1,38 @@
+> +# ==========================================================================
+> +# Installing dtb files
+> +#
+> +# Installs all dtb files listed in $(dtb-y) either in the
+> +# INSTALL_DTBS_PATH directory or the default location:
+> +#
+> +#   $INSTALL_PATH/dtbs/$KERNELRELEASE
+> +#
+> +# ==========================================================================
+> +
+> +src := $(obj)
+> +
+> +PHONY := __dtbs_install
+> +__dtbs_install:
+> +
+> +include include/config/auto.conf
+> +include scripts/Kbuild.include
+> +include $(srctree)/$(obj)/Makefile
+> +
+> +PHONY += __dtbs_install_prep
+> +__dtbs_install_prep:
+> +       $(Q)if [ -d $(INSTALL_DTBS_PATH).old ]; then rm -rf $(INSTALL_DTBS_PATH).old; fi
+> +       $(Q)if [ -d $(INSTALL_DTBS_PATH) ]; then mv $(INSTALL_DTBS_PATH) $(INSTALL_DTBS_PATH).old; fi
+> +       $(Q)mkdir -p $(INSTALL_DTBS_PATH)
+> +
+> +dtbinst-files  := $(dtb-y)
+> +
+> +# Helper targets for Installing DTBs into the boot directory
+> +quiet_cmd_dtb_install =        INSTALL $<
+> +      cmd_dtb_install =        cp $< $(2)
+> +
+> +$(dtbinst-files): %.dtb: $(obj)/%.dtb | __dtbs_install_prep
+> +       $(call cmd,dtb_install,$(INSTALL_DTBS_PATH))
+> +
+> +PHONY += $(dtbinst-files)
+> +__dtbs_install: $(dtbinst-files)
+> +
+> +.PHONY: $(PHONY)
+> diff --git a/scripts/Makefile.lib b/scripts/Makefile.lib
+> index 260bf8acfce9..83a453794266 100644
+> --- a/scripts/Makefile.lib
+> +++ b/scripts/Makefile.lib
+> @@ -274,18 +274,6 @@ $(obj)/%.dtb: $(src)/%.dts FORCE
+>
+>  dtc-tmp = $(subst $(comma),_,$(dot-target).dts.tmp)
+>
+> -# Helper targets for Installing DTBs into the boot directory
+> -quiet_cmd_dtb_install =        INSTALL $<
+> -      cmd_dtb_install =        cp $< $(2)
+> -
+> -_dtbinst_pre_:
+> -       $(Q)if [ -d $(INSTALL_DTBS_PATH).old ]; then rm -rf $(INSTALL_DTBS_PATH).old; fi
+> -       $(Q)if [ -d $(INSTALL_DTBS_PATH) ]; then mv $(INSTALL_DTBS_PATH) $(INSTALL_DTBS_PATH).old; fi
+> -       $(Q)mkdir -p $(INSTALL_DTBS_PATH)
+> -
+> -%.dtb_dtbinst_: $(obj)/%.dtb _dtbinst_pre_
+> -       $(call cmd,dtb_install,$(INSTALL_DTBS_PATH))
+> -
+>  # Bzip2
+>  # ---------------------------------------------------------------------------
+>
+> --
+> 2.0.1
+>
