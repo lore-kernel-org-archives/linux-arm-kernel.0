@@ -1,86 +1,43 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Fri,  5 Sep 2014 09:46:10 -0300
-Subject: [PATCH] ARM: dts: imx6qdl-sabresd: Configure the pins locally
-Message-ID: <1409921170-23935-1-git-send-email-festevam@gmail.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Fri, 5 Sep 2014 07:46:19 -0500
+Subject: [PATCH 5/6] dts, arm64: Move dts files to vendor subdirs
+In-Reply-To: <1409899692-1455-6-git-send-email-rric@kernel.org>
+References: <1409899692-1455-1-git-send-email-rric@kernel.org>
+ <1409899692-1455-6-git-send-email-rric@kernel.org>
+Message-ID: <CAL_JsqLJ+zuqx9RELw3p2Pa13QuXsDR3Fv1Qcaeqk+R6HXy9uQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fabio Estevam <fabio.estevam@freescale.com>
+On Fri, Sep 5, 2014 at 1:48 AM, Robert Richter <rric@kernel.org> wrote:
+> From: Robert Richter <rrichter@cavium.com>
+>
+> Moving dts files to vendor subdirs.
+>
+> Signed-off-by: Robert Richter <rrichter@cavium.com>
+> ---
+>  arch/arm64/boot/dts/Makefile                     |   4 +-
+>  arch/arm64/boot/dts/apm-mustang.dts              |  34 --
+>  arch/arm64/boot/dts/apm-storm.dtsi               | 425 -----------------------
+>  arch/arm64/boot/dts/apm/Makefile                 |   5 +
+>  arch/arm64/boot/dts/apm/apm-mustang.dts          |  34 ++
+>  arch/arm64/boot/dts/apm/apm-storm.dtsi           | 425 +++++++++++++++++++++++
+>  arch/arm64/boot/dts/arm/Makefile                 |   6 +
+>  arch/arm64/boot/dts/arm/foundation-v8.dts        | 232 +++++++++++++
+>  arch/arm64/boot/dts/arm/rtsm_ve-aemv8a.dts       | 159 +++++++++
+>  arch/arm64/boot/dts/arm/rtsm_ve-motherboard.dtsi | 240 +++++++++++++
+>  arch/arm64/boot/dts/foundation-v8.dts            | 232 -------------
+>  arch/arm64/boot/dts/rtsm_ve-aemv8a.dts           | 159 ---------
+>  arch/arm64/boot/dts/rtsm_ve-motherboard.dtsi     | 240 -------------
+>  13 files changed, 1103 insertions(+), 1092 deletions(-)
 
-Passing '0x80000000' to the pin configuration means that kernel will skip the
-IOMUXC_SW_PAD_CTL configuration and will use whathever values come from the 
-bootloader.
+This should be sent with renames enabled (-M option). You can enable
+it by default with this in your git config:
 
-Instead of relying on the bootloader setup, let's configure it in the kernel to
-have predictable settings.
+[diff]
+        renames = true
 
-'0x1b0b0' is the default POR value for all these pins and has also been verified
-that the pins are using this value by manually inspecting the IOMUXC_SW_PAD_CTL
-registers, so no functional change has been made.
+Otherwise,
 
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
- arch/arm/boot/dts/imx6qdl-sabresd.dtsi | 26 +++++++++++++-------------
- 1 file changed, 13 insertions(+), 13 deletions(-)
+Acked-by: Rob Herring <robh@kernel.org>
 
-diff --git a/arch/arm/boot/dts/imx6qdl-sabresd.dtsi b/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
-index 07fb302..baf2f00 100644
---- a/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
-@@ -327,15 +327,15 @@
- 	imx6qdl-sabresd {
- 		pinctrl_hog: hoggrp {
- 			fsl,pins = <
--				MX6QDL_PAD_NANDF_D0__GPIO2_IO00 0x80000000
--				MX6QDL_PAD_NANDF_D1__GPIO2_IO01 0x80000000
--				MX6QDL_PAD_NANDF_D2__GPIO2_IO02 0x80000000
--				MX6QDL_PAD_NANDF_D3__GPIO2_IO03 0x80000000
-+				MX6QDL_PAD_NANDF_D0__GPIO2_IO00 0x1b0b0
-+				MX6QDL_PAD_NANDF_D1__GPIO2_IO01 0x1b0b0
-+				MX6QDL_PAD_NANDF_D2__GPIO2_IO02 0x1b0b0
-+				MX6QDL_PAD_NANDF_D3__GPIO2_IO03 0x1b0b0
- 				MX6QDL_PAD_GPIO_0__CCM_CLKO1    0x130b0
--				MX6QDL_PAD_NANDF_CLE__GPIO6_IO07 0x80000000
--				MX6QDL_PAD_ENET_TXD1__GPIO1_IO29 0x80000000
--				MX6QDL_PAD_EIM_D22__GPIO3_IO22  0x80000000
--				MX6QDL_PAD_ENET_CRS_DV__GPIO1_IO25 0x80000000
-+				MX6QDL_PAD_NANDF_CLE__GPIO6_IO07 0x1b0b0
-+				MX6QDL_PAD_ENET_TXD1__GPIO1_IO29 0x1b0b0
-+				MX6QDL_PAD_EIM_D22__GPIO3_IO22  0x1b0b0
-+				MX6QDL_PAD_ENET_CRS_DV__GPIO1_IO25 0x1b0b0
- 			>;
- 		};
- 
-@@ -380,9 +380,9 @@
- 
- 		pinctrl_gpio_keys: gpio_keysgrp {
- 			fsl,pins = <
--				MX6QDL_PAD_EIM_D29__GPIO3_IO29 0x80000000
--				MX6QDL_PAD_GPIO_4__GPIO1_IO04  0x80000000
--				MX6QDL_PAD_GPIO_5__GPIO1_IO05  0x80000000
-+				MX6QDL_PAD_EIM_D29__GPIO3_IO29 0x1b0b0
-+				MX6QDL_PAD_GPIO_4__GPIO1_IO04  0x1b0b0
-+				MX6QDL_PAD_GPIO_5__GPIO1_IO05  0x1b0b0
- 			>;
- 		};
- 
-@@ -409,7 +409,7 @@
- 
- 		pinctrl_pcie: pciegrp {
- 			fsl,pins = <
--				MX6QDL_PAD_GPIO_17__GPIO7_IO12	0x80000000
-+				MX6QDL_PAD_GPIO_17__GPIO7_IO12	0x1b0b0
- 			>;
- 		};
- 
-@@ -487,7 +487,7 @@
- 	gpio_leds {
- 		pinctrl_gpio_leds: gpioledsgrp {
- 			fsl,pins = <
--				MX6QDL_PAD_GPIO_2__GPIO1_IO02 0x80000000
-+				MX6QDL_PAD_GPIO_2__GPIO1_IO02 0x1b0b0
- 			>;
- 		};
- 	};
--- 
-1.9.1
+Rob
