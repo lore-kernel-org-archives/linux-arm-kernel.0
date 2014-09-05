@@ -1,64 +1,140 @@
-From: m-karicheri2@ti.com (Murali Karicheri)
-Date: Fri, 5 Sep 2014 16:37:25 -0400
-Subject: [PATCH] PCI: keystone: update to support multiple pci ports
-In-Reply-To: <3654923.JrIGV2dJ70@wuerfel>
-References: <1409938782-31460-1-git-send-email-m-karicheri2@ti.com>
- <7260053.FoBVhTXVfj@wuerfel> <540A0212.6060303@ti.com>
- <3654923.JrIGV2dJ70@wuerfel>
-Message-ID: <540A1F05.80706@ti.com>
+From: bhelgaas@google.com (Bjorn Helgaas)
+Date: Fri, 5 Sep 2014 14:40:43 -0600
+Subject: [PATCH v2] PCI: keystone: add a pci quirk to limit mrrs
+In-Reply-To: <540A1D54.9030103@ti.com>
+References: <1407527132-3294-1-git-send-email-m-karicheri2@ti.com>
+ <20140905192329.GE8080@google.com> <540A1D54.9030103@ti.com>
+Message-ID: <CAErSpo7LHFbg-CiWr+UYdy4vuvPjcCyERyTzU_F59An-gW-O4w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/05/2014 03:00 PM, Arnd Bergmann wrote:
-> On Friday 05 September 2014 14:33:54 Murali Karicheri wrote:
->>> This looks like it's a shared register of some sort that doesn't
->>> really belong into the registers of a particular port. Could it
->>> be that it's actually for the PHY?
+On Fri, Sep 5, 2014 at 2:30 PM, Murali Karicheri <m-karicheri2@ti.com> wrote:
+> On 09/05/2014 03:23 PM, Bjorn Helgaas wrote:
+>>
+>> On Fri, Aug 08, 2014 at 03:45:32PM -0400, Murali Karicheri wrote:
 >>>
->> This a shared device configuration register between the two ports the
->> desciption states it is bootstrap configuration of the PCIe module as
->> Endpoint or Root complex and Not Phy. Hope below text will help.
->
-> Ok. Why do you want to have this user-selectable though? Can't it
-> just be set by the boot loader before starting Linux?
-
-Arnd,
-
-As the driver is responsible for configuring the device to support the 
-device functionality, it make sense to do this in the device driver. The 
-driver enables clock to the IP and this is an addition thing to be 
-configured so that when the device is powered up, it should function as 
-RC. The IP can be configured to work as Root Complex or Endpoint. So not 
-sure why you want to me to move this functionality to boot loader.
-
-Murali
-
->
-> 	Arnd
->
->> Table 3-23 Device Configuration Register (DEVCFG)
+>>> Keystone PCI controller has a limitation that memory read request
+>>> size must not exceed 256 bytes. This is a hardware limitation and
+>>> add a quirk to force this limit on all downstream devices by
+>>> updating mrrs.
+>>>
+>>> Signed-off-by: Murali Karicheri<m-karicheri2@ti.com>
+>>> ---
+>>>   -v2: made the quirk happens after tuning
+>>>   -v1: changed printk to indicate PCI bdf
+>>>   This applies on top of the Keystone PCI controller patch series
+>>>   at http://thread.gmane.org/gmane.linux.kernel.pci/33523
+>>>   drivers/pci/host/pci-keystone.c |   40
+>>> +++++++++++++++++++++++++++++++++++++++
+>>>   1 file changed, 40 insertions(+)
+>>>
+>>> diff --git a/drivers/pci/host/pci-keystone.c
+>>> b/drivers/pci/host/pci-keystone.c
+>>> index c1cfaef..a132622 100644
+>>> --- a/drivers/pci/host/pci-keystone.c
+>>> +++ b/drivers/pci/host/pci-keystone.c
+>>> @@ -42,8 +42,48 @@
+>>>   /* DEV_STAT_CTRL */
+>>>   #define PCIE_CAP_BASE         0x70
+>>>
+>>> +/* PCIE controller device IDs */
+>>> +#define PCIE_RC_K2HK           0xb008
+>>> +#define PCIE_RC_K2E            0xb009
+>>> +#define PCIE_RC_K2L            0xb00a
 >>
 >>
->> PCIESSMODE[1:0] 00b PCIESSMODE is used to control the
->> functionality of PCIESS module out of
->> reset. This MMR output is connected to
->> DEVTYPE input of PCIESS
->> (Changes from
->> Nysh) : Note that in Nysh this value came
->> from a bootstrap pin.
->> 00 : Endpoint
->> 01 : Legacy Endpoint
->> 10 : Rootcomplex
->> 11 : Reserved
->> PCIESS_1_MODE[1:0
->> ]
->> 00b PCIESSMODE is used to control the
->> functionality of PCIE_1 module out of
->> reset. This MMR output is connected to
->> DEVTYPE input of PCIE_1
->> 00 : Endpoint
->> 01 : Legacy Endpoint
->> 10 : Rootcomplex
->> 11 : Reserv
+>> A Root Complex doesn't appear in config space as a PCI device, so I think
+>> these are actually Root Port devices, aren't they?
+>
+>
+> Yes.
+>
 >>
+>> I suppose the spec would allow Root Complex Integrated Endpoints, on which
+>> MRRS could also be set, but I think your quirk ignores them because they
+>> would appear on the root bus.  Is ignoring them OK, or would you want to
+>> set MRRS for those as well?
+>
+>
+> How does the Root Complex integrated endpoints are designed? Our PCI can act
+> as a RC or EP and not both at the same time. So I guess this is not
+> applicable.
+
+My guess is that you probably don't have any integrated endpoints and
+hence don't need to worry about MRRS for them.  The PCIe spec (r3.0,
+sec 1.3.2.3) says "A Root Complex Integrated Endpoint is implemented
+on internal logic of Root Complexes that contains [sic] the Root
+Ports."
+
+For example, my laptop has:
+
+  00:03.0 Audio device: Intel Corporation Haswell-ULT HD Audio Controller
+  00:1c.0 PCI bridge: Intel Corporation Lynx Point-LP PCI Express Root Port 1
+  00:1c.3 PCI bridge: Intel Corporation Lynx Point-LP PCI Express Root Port 4
+
+the 00:03.0 Audio device is a PCIe device but it is a sibling of the
+Root Ports rather than being downstream from them, i.e., it's an
+Integrated Endpoint that is part of the Root Complex itself.
+
+>>> +
+>>>   #define to_keystone_pcie(x)   container_of(x, struct keystone_pcie, pp)
+>>>
+>>> +static void quirk_limit_mrrs(struct pci_dev *dev)
+>>> +{
+>>> +       struct pci_bus *bus = dev->bus;
+>>> +       struct pci_dev *bridge = bus->self;
+>>> +
+>>> +       if (pci_is_root_bus(bus))
+>>> +               return;
+>>> +
+>>> +       /* look for the host bridge */
+>>> +       while (!pci_is_root_bus(bus)) {
+>>> +               bridge = bus->self;
+>>> +               bus = bus->parent;
+>>> +       }
+>>> +
+>>> +       if (bridge) {
+>>> +               u16 id;
+>>> +
+>>> +               /*
+>>> +                * Keystone PCI controller has a h/w limitation of
+>>> +                * 256 bytes maximum read request size. It can't handle
+>>> +                * anything higher than this. So force this limit on
+>>> +                * all downstream devices
+>>> +                */
+>>> +               pci_read_config_word(bridge, PCI_DEVICE_ID,&id);
+>>
+>>
+>> I think you should check the Vendor ID here as well.  Otherwise, there's a
+>> possibility of applying this quirk to devices under a bridge with the same
+>> Device ID but different Vendor ID.
+>>
+>> And I think you should be able to use the bridge->vendor and
+>> bridge->device
+>> fields instead of reading them from config space.  Actually, this might be
+>> a good place to use pci_match_id().
+>
+>
+> Ok.
+>
+>
+>>
+>>> +               if ((id == PCIE_RC_K2HK) || (id == PCIE_RC_K2E) ||
+>>> +                   (id == PCIE_RC_K2L)) {
+>>> +                       if (pcie_get_readrq(dev)>  256) {
+>>> +                               dev_info(&dev->dev, "limiting mrrs to
+>>> 256\n");
+>>> +                               pcie_set_readrq(dev, 256);
+>>> +                       }
+>>> +               }
+>>> +       }
+>>> +}
+>>> +DECLARE_PCI_FIXUP_ENABLE(PCI_ANY_ID, PCI_ANY_ID, quirk_limit_mrrs);
+>>> +
+>>>   static int ks_pcie_establish_link(struct keystone_pcie *ks_pcie)
+>>>   {
+>>>         struct pcie_port *pp =&ks_pcie->pp;
+>>> --
+>>> 1.7.9.5
+>>>
 >
