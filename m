@@ -1,44 +1,74 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Fri, 05 Sep 2014 14:42:59 +0400
-Subject: [PATCH v1 09/21] Irq_remapping/MSI: Use MSI chip framework to
- configure MSI/MSI-X irq
-In-Reply-To: <1409911806-10519-10-git-send-email-wangyijing@huawei.com>
-References: <1409911806-10519-1-git-send-email-wangyijing@huawei.com>
- <1409911806-10519-10-git-send-email-wangyijing@huawei.com>
-Message-ID: <540993B3.1000701@cogentembedded.com>
+From: robert.richter@caviumnetworks.com (Robert Richter)
+Date: Fri, 5 Sep 2014 12:45:47 +0200
+Subject: [PATCH v2 1/4] arm64, thunder: Add Kconfig option for Cavium
+ Thunder SoC Family
+In-Reply-To: <20140905093239.GC30401@n2100.arm.linux.org.uk>
+References: <1409903205-2762-1-git-send-email-rric@kernel.org>
+ <1409903205-2762-2-git-send-email-rric@kernel.org>
+ <20140905093239.GC30401@n2100.arm.linux.org.uk>
+Message-ID: <20140905104547.GT4703@rric.localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+On 05.09.14 10:32:40, Russell King - ARM Linux wrote:
+> On Fri, Sep 05, 2014 at 09:46:42AM +0200, Robert Richter wrote:
+> > From: Radha Mohan Chintakuntla <rchintakuntla@cavium.com>
+> > 
+> > Increase maximum numbers of cpus to 32. This relates to current
+> > maximal possible cpu number. Increasing this to 64 cpus will be a
+> > separate patch not part of this enablement patches.
+> > 
+> > Signed-off-by: Radha Mohan Chintakuntla <rchintakuntla@cavium.com>
+> > Signed-off-by: Robert Richter <rrichter@cavium.com>
+> > ---
+> >  arch/arm64/Kconfig | 6 ++++++
+> >  1 file changed, 6 insertions(+)
+> > 
+> > diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+> > index fd4e81a4e1ce..77fb82b0f684 100644
+> > --- a/arch/arm64/Kconfig
+> > +++ b/arch/arm64/Kconfig
+> > @@ -134,6 +134,11 @@ source "kernel/Kconfig.freezer"
+> >  
+> >  menu "Platform selection"
+> >  
+> > +config ARCH_THUNDER
+> > +	bool "Cavium Inc. Thunder SoC Family"
+> > +	help
+> > +	  This enables support for Cavium's Thunder Family of SoCs.
+> > +
+> >  config ARCH_VEXPRESS
+> >  	bool "ARMv8 software model (Versatile Express)"
+> >  	select ARCH_REQUIRE_GPIOLIB
+> > @@ -256,6 +261,7 @@ config NR_CPUS
+> >  	range 2 32
+> >  	depends on SMP
+> >  	# These have to remain sorted largest to smallest
+> > +	default "32" if ARCH_THUNDER
+> >  	default "8"
+> 
+> Why do you need ARCH_THUNDER?  If it's just to change this default,
 
-On 9/5/2014 2:09 PM, Yijing Wang wrote:
+No, we need it just to enable all our drivers on the SoC. We want to
+enable the SoC by using defconfig + ARCH_THUNDER. As said in my other
+mail, I put it here to be able to base all other thunder driver patch
+sets on this initial base patch set. Otherwise this particular patch
+and also the dtb patch need to be shipped with all other driver patch
+sets. This might lead to duplicate submissions of the same patch.
 
-> Use MSI chip framework instead of arch MSI functions to configure
-> MSI/MSI-X irq. So we can manage MSI/MSI-X irq in a unified framework.
+With doing defconfig + ARCH_THUNDER we also want to enable the max
+number of cpus that is currently supported. I only enable 32 cpus
+since booting more cpus is untested. There might be problems at the 32
+cpu boundary. Just setting it to 64 does not mean a kernel will
+actually boot more than 32 cpus. But if it will be ack'ed, I would be
+fine to set NR_CPUS to 32 or 64 in general and independent from
+ARCH_THUNDER.
 
-> Signed-off-by: Yijing Wang <wangyijing@huawei.com>
-> ---
->   drivers/iommu/irq_remapping.c |    8 +++++++-
->   1 files changed, 7 insertions(+), 1 deletions(-)
+For simplicity I better drop setting NR_CPUS in this patch.
 
-> diff --git a/drivers/iommu/irq_remapping.c b/drivers/iommu/irq_remapping.c
-> index 33c4395..e75026e 100644
-> --- a/drivers/iommu/irq_remapping.c
-> +++ b/drivers/iommu/irq_remapping.c
-[...]
-> @@ -165,9 +170,10 @@ static void __init irq_remapping_modify_x86_ops(void)
->   	x86_io_apic_ops.set_affinity	= set_remapped_irq_affinity;
->   	x86_io_apic_ops.setup_entry	= setup_ioapic_remapped_entry;
->   	x86_io_apic_ops.eoi_ioapic_pin	= eoi_ioapic_pin_remapped;
-> -	x86_msi.setup_msi_irqs		= irq_remapping_setup_msi_irqs;
-> +	x86_msi.setup_msi_irqs          = irq_remapping_setup_msi_irqs;
+-Robert
 
-    AFAICS, this change only converts tabs to spaces, so not needed at all.
-
->   	x86_msi.setup_hpet_msi		= setup_hpet_msi_remapped;
->   	x86_msi.compose_msi_msg		= compose_remapped_msi_msg;
-> +	x86_msi_chip = &remap_msi_chip;
-
-    Please align = with the rest of assignments.
-
-WBR, Sergei
+> please don't bother - we don't do this kind of thing on x86, so why
+> should it be done here?  Just ensure that NR_CPUS is appropriately
+> adjusted.  Alternatively, look at how x86 deals with this (with
+> X86_BIGSMP / MAXSMP).
