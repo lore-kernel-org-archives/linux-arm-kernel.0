@@ -1,31 +1,23 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Fri, 5 Sep 2014 23:13:38 +0200 (CEST)
-Subject: [PATCH V2 3/3] mfd: palmas: Add support for optional wakeup
-In-Reply-To: <1409950311-25236-4-git-send-email-nm@ti.com>
-References: <1409950311-25236-1-git-send-email-nm@ti.com>
- <1409950311-25236-4-git-send-email-nm@ti.com>
-Message-ID: <alpine.DEB.2.10.1409052311210.5472@nanos>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 5 Sep 2014 23:13:43 +0200
+Subject: [GIT PULL] DaVinci DT additions for v3.18 (merge window)
+In-Reply-To: <5409DC0A.30509@ti.com>
+References: <54043F08.9060702@ti.com> <201409042156.30819.arnd@arndb.de>
+ <5409DC0A.30509@ti.com>
+Message-ID: <201409052313.43455.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 5 Sep 2014, Nishanth Menon wrote:
-> +	if (!palmas->wakeirq)
-> +		goto no_wake_irq;
-> +
-> +	ret = devm_request_irq(palmas->dev, palmas->wakeirq,
-> +			       palmas_wake_irq,
-> +			       IRQF_ONESHOT | pdata->irq_flags,
+On Friday 05 September 2014, Sekhar Nori wrote:
+>   git://git.kernel.org/pub/scm/linux/kernel/git/nsekhar/linux-davinci.git tags/davinci-for-v3.18/dt
+> 
+> for you to fetch changes up to 3f526696e7840239844fc7ff9b5cf014d7192c42:
+> 
+>   ARM: DTS: da850-evm: Enable audio via simple-card (2014-08-26 15:34:44 +0530)
+> 
+> ----------------------------------------------------------------
+> DT additions for DA850. Adds EDMA and audio support.
 
-Why is this marked IRQF_ONESHOT?
+Ok, pulled into next/dt now, thanks!
 
-> +			       dev_name(palmas->dev),
-> +			       &palmas);
-> +	if (ret < 0)
-> +		goto err_i2c;
-
-Why err and not doing the obvious clearing of palmas->wakeirq and
-keep at least the i2c functional?
-
-Thanks,
-
-	tglx
+	Arnd
