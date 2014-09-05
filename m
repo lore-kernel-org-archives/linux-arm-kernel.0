@@ -1,49 +1,36 @@
-From: peter.griffin@linaro.org (Peter Griffin)
-Date: Fri, 5 Sep 2014 19:25:31 +0100
-Subject: [STLinux Kernel] [PATCH 4/4] watchdog: st_wdt: Add new driver
- for ST's LPC Watchdog
-In-Reply-To: <20140905155811.GA12374@roeck-us.net>
-References: <1409841592-18890-1-git-send-email-lee.jones@linaro.org>
- <1409841592-18890-6-git-send-email-lee.jones@linaro.org>
- <20140905155811.GA12374@roeck-us.net>
-Message-ID: <20140905182531.GA2383@griffinp-ThinkPad-X1-Carbon-2nd>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 05 Sep 2014 20:30:49 +0200
+Subject: [PATCH RESEND v5 1/5] usb: host: ehci-st: Add EHCI support for ST
+ STB devices
+In-Reply-To: <20140905181636.GA1715@griffinp-ThinkPad-X1-Carbon-2nd>
+References: <1409937829-23708-1-git-send-email-peter.griffin@linaro.org>
+ <202755915.brE74x99uQ@wuerfel>
+ <20140905181636.GA1715@griffinp-ThinkPad-X1-Carbon-2nd>
+Message-ID: <3890179.kgPZYmEVZm@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-> > +static int st_wdog_remove(struct platform_device *pdev)
-> > +{
-> > +	struct st_wdog *st_wdog = watchdog_get_drvdata(&st_wdog_dev);
-> > +
-> > +	if (watchdog_active(&st_wdog_dev))
-> > +		st_wdog_stop(&st_wdog_dev);
-> > +
-> > +	st_wdog_setup(st_wdog, WDT_DISABLE);
-> > +
-> > +	watchdog_unregister_device(&st_wdog_dev);
-> > +
-> No clk_disable_unprepare ?
+On Friday 05 September 2014 19:16:36 Peter Griffin wrote:
+> On Fri, 05 Sep 2014, Arnd Bergmann wrote:
 > 
-> Maye it is not necessary, but then I wonder why you have it above.
-
-I think your right it should have a clk_disable_unprepare. Otherwise you will end up leaking a clock
-reference each time you insmod / rmmod the driver.
+> > On Friday 05 September 2014 18:23:45 Peter Griffin wrote:
+> > > +struct st_platform_priv {
+> > > +       struct clk *clks[USB_MAX_CLKS];
+> > > +       struct clk *clk48;
+> > > +       struct reset_control *rst;
+> > > +       struct reset_control *pwr;
+> > > +       struct phy *phy;
+> > > +};
+> > 
+> > Any reason why this is in a shared header file? It looks like
+> > duplicating the structure under two different names would
+> > actually be shorter and keep the drivers more readable as they'd
+> > be self-contained, even when they have the exact same structure.
 > 
-> > +	return 0;
-> > +}
-> > +
-> > +#ifdef CONFIG_PM
-> > +static int st_wdog_suspend(struct device *dev)
-> > +{
-> > +	if (watchdog_active(&st_wdog_dev))
-> > +		st_wdog_stop(&st_wdog_dev);
-> > +
-> 
-> Is any clock activity necessary here ? Just asking, I don't really have an idea.
+> The only reason was it was a identical structure so I put it in a shared
+> header file. I can unabstract it if you want?
 
-I would also expect the clock to be managed in suspend / resume callbacks.
+Yes, I think that would be an improvement. Everything looks great to me
+otherwise, at least after a brief look.
 
-regards,
-
-Peter.
+	Arnd
