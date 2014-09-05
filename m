@@ -1,39 +1,48 @@
 From: daniel.thompson@linaro.org (Daniel Thompson)
-Date: Fri,  5 Sep 2014 16:33:14 +0100
-Subject: [PATCH v2 1/5] ARM: remove unused do_unexp_fiq() function
+Date: Fri,  5 Sep 2014 16:33:17 +0100
+Subject: [PATCH v2 4/5] arm64: Introduce dummy version of asm/fiq.h
 In-Reply-To: <1409931198-22600-1-git-send-email-daniel.thompson@linaro.org>
 References: <1409846620-14542-1-git-send-email-daniel.thompson@linaro.org>
  <1409931198-22600-1-git-send-email-daniel.thompson@linaro.org>
-Message-ID: <1409931198-22600-2-git-send-email-daniel.thompson@linaro.org>
+Message-ID: <1409931198-22600-5-git-send-email-daniel.thompson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Russell King <rmk+kernel@arm.linux.org.uk>
+Drivers that are shared between arm and arm64 and which employ
+FIQ on arm cannot include asm/fiq.h without #ifdef'ing. This patch
+introduces a dummy version of asm/fiq.h to arm64 to avoid this.
 
-do_unexp_fiq() has never been called by any code in the last 10 years,
-it's about time it was removed!
-
-Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm/kernel/traps.c | 6 ------
- 1 file changed, 6 deletions(-)
+ arch/arm64/include/asm/fiq.h | 18 ++++++++++++++++++
+ 1 file changed, 18 insertions(+)
+ create mode 100644 arch/arm64/include/asm/fiq.h
 
-diff --git a/arch/arm/kernel/traps.c b/arch/arm/kernel/traps.c
-index c8e4bb7..a447dcc 100644
---- a/arch/arm/kernel/traps.c
-+++ b/arch/arm/kernel/traps.c
-@@ -460,12 +460,6 @@ die_sig:
- 	arm_notify_die("Oops - undefined instruction", regs, &info, 0, 6);
- }
- 
--asmlinkage void do_unexp_fiq (struct pt_regs *regs)
--{
--	printk("Hmm.  Unexpected FIQ received, but trying to continue\n");
--	printk("You may have a hardware problem...\n");
--}
--
- /*
-  * bad_mode handles the impossible case in the vectors.  If you see one of
-  * these, then it's extremely serious, and could mean you have buggy hardware.
+diff --git a/arch/arm64/include/asm/fiq.h b/arch/arm64/include/asm/fiq.h
+new file mode 100644
+index 0000000..909ec54
+--- /dev/null
++++ b/arch/arm64/include/asm/fiq.h
+@@ -0,0 +1,18 @@
++/*
++ * arch/arm64/include/asm/fiq.h
++ *
++ * Placeholder to reduce #ifdef'ing in shared arm/arm64 drivers.
++ */
++
++#ifndef __ASM_FIQ_H
++#define __ASM_FIQ_H
++
++/*
++ * This placeholder allows code of the following form to be simplified:
++ *
++ * #ifdef CONFIG_FIQ
++ * #include <asm/fiq.h>
++ * #endif
++ */
++
++#endif
 -- 
 1.9.3
