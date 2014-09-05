@@ -1,70 +1,56 @@
-From: LW@KARO-electronics.de (Lothar =?UTF-8?B?V2HDn21hbm4=?=)
-Date: Fri, 5 Sep 2014 13:38:38 +0200
-Subject: [PATCH v2 5/6] ARM: dts: imx28-tx28: Fix display duplicate name
- warning
-In-Reply-To: <1409880683-27402-5-git-send-email-festevam@gmail.com>
-References: <1409880683-27402-1-git-send-email-festevam@gmail.com>
- <1409880683-27402-5-git-send-email-festevam@gmail.com>
-Message-ID: <20140905133838.22b2d56c@ipc1.ka-ro>
+From: pali.rohar@gmail.com (Pali =?utf-8?q?Roh=C3=A1r?=)
+Date: Fri, 5 Sep 2014 13:38:40 +0200
+Subject: [PATCH] ARM: /proc/cpuinfo: Use DT machine name when possible
+In-Reply-To: <1403110464-29646-1-git-send-email-pali.rohar@gmail.com>
+References: <1403110464-29646-1-git-send-email-pali.rohar@gmail.com>
+Message-ID: <201409051338.40988@pali>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-Fabio Estevam wrote:
-> From: Fabio Estevam <fabio.estevam@freescale.com>
+On Wednesday 18 June 2014 18:54:24 Pali Roh?r wrote:
+> Machine name from board description is some generic name on DT
+> kernel. DT provides machine name property which is specific
+> for board, so use it instead generic one when possible.
 > 
-> The lcdif node has a property named "display" and also a child node
-> called "display", which causes the following warning:
-> 
-> device-tree: Duplicate name in lcdif at 80030000, renamed to "display#1"
-> 
-> Rename the child node name in order to avoid the warning.
-> 
-> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+> Signed-off-by: Pali Roh?r <pali.rohar@gmail.com>
 > ---
-> Changes since v1:
-> - Also update 'aliases'
+>  arch/arm/kernel/setup.c |    7 +++++--
+>  1 file changed, 5 insertions(+), 2 deletions(-)
 > 
->  arch/arm/boot/dts/imx28-tx28.dts | 6 +++---
->  1 file changed, 3 insertions(+), 3 deletions(-)
+> diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+> index 8a16ee5..fbc7b4f 100644
+> --- a/arch/arm/kernel/setup.c
+> +++ b/arch/arm/kernel/setup.c
+> @@ -875,10 +875,13 @@ void __init setup_arch(char **cmdline_p)
 > 
-> diff --git a/arch/arm/boot/dts/imx28-tx28.dts b/arch/arm/boot/dts/imx28-tx28.dts
-> index e14bd86..f947fbb 100644
-> --- a/arch/arm/boot/dts/imx28-tx28.dts
-> +++ b/arch/arm/boot/dts/imx28-tx28.dts
-> @@ -21,7 +21,7 @@
->  	aliases {
->  		can0 = &can0;
->  		can1 = &can1;
-> -		display = &display;
-> +		display = &display0;
->  		ds1339 = &ds1339;
->  		gpio5 = &gpio5;
->  		lcdif = &lcdif;
-> @@ -309,10 +309,10 @@
->  	pinctrl-names = "default";
->  	pinctrl-0 = <&lcdif_24bit_pins_a &lcdif_sync_pins_a &tx28_lcdif_ctrl_pins>;
->  	lcd-supply = <&reg_lcd>;
-> -	display = <&display>;
-> +	display = <&display0>;
->  	status = "okay";
->  
-> -	display: display at 0 {
-> +	display0: display0 {
->  		bits-per-pixel = <32>;
->  		bus-width = <24>;
->  		display-timings {
+>  	setup_processor();
+>  	mdesc = setup_machine_fdt(__atags_pointer);
+> -	if (!mdesc)
+> +	if (mdesc)
+> +		machine_name = of_flat_dt_get_machine_name();
+> +	else
+>  		mdesc = setup_machine_tags(__atags_pointer,
+> __machine_arch_type); machine_desc = mdesc;
+> -	machine_name = mdesc->name;
+> +	if (!machine_name)
+> +		machine_name = mdesc->name;
+> 
+>  	if (mdesc->reboot_mode != REBOOT_HARD)
+>  		reboot_mode = mdesc->reboot_mode;
 
-Acked-by: Lothar Wa?mann <LW@KARO-electronics.de>
+So, do you really want to break userspace which reading file 
+/proc/cpuinfo (after migration from boardcode --> DT)?
+
+I still do not see reason for that. And only this one file is 
+problematic...
 
 -- 
-___________________________________________________________
-
-Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
-Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
-Gesch?ftsf?hrer: Matthias Kaussen
-Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
-
-www.karo-electronics.de | info at karo-electronics.de
-___________________________________________________________
+Pali Roh?r
+pali.rohar at gmail.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: This is a digitally signed message part.
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140905/db8b702e/attachment.sig>
