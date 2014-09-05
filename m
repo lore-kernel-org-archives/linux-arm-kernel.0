@@ -1,29 +1,46 @@
 From: festevam@gmail.com (Fabio Estevam)
-Date: Thu, 4 Sep 2014 22:26:08 -0300
-Subject: [PATCH 5/6] ARM: dts: imx28-tx28: Fix display duplicate name
+Date: Thu,  4 Sep 2014 22:31:19 -0300
+Subject: [PATCH v2 2/6] ARM: dts: imx28-apf28dev: Fix display duplicate name
  warning
-In-Reply-To: <20140905005710.GG10809@dragon>
-References: <1409851379-5330-1-git-send-email-fabio.estevam@freescale.com>
- <1409851379-5330-5-git-send-email-fabio.estevam@freescale.com>
- <20140905005710.GG10809@dragon>
-Message-ID: <CAOMZO5CcPKujdvT_Oz65swN87Y+AaKqFUpVi64bQK19kYdCyMg@mail.gmail.com>
+In-Reply-To: <1409880683-27402-1-git-send-email-festevam@gmail.com>
+References: <1409880683-27402-1-git-send-email-festevam@gmail.com>
+Message-ID: <1409880683-27402-2-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 4, 2014 at 9:57 PM, Shawn Guo <shawn.guo@freescale.com> wrote:
+From: Fabio Estevam <fabio.estevam@freescale.com>
 
->   DTC     arch/arm/boot/dts/imx28-tx28.dtb
-> ERROR (path_references): Reference to non-existent node or label "display"
+The lcdif node has a property named "display" and also a child node
+called "display", which causes the following warning:
 
-Ops, I missed this hunk in the aliases section:
+device-tree: Duplicate name in lcdif at 80030000, renamed to "display#1"
 
---- a/arch/arm/boot/dts/imx28-tx28.dts
-+++ b/arch/arm/boot/dts/imx28-tx28.dts
-@@ -21,7 +21,7 @@
-        aliases {
-                can0 = &can0;
-                can1 = &can1;
--               display = &display;
-+               display = &display0;
+Rename the child node name in order to avoid the wa
 
-Will send a v2.
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+---
+Changes since v1:
+- None
+
+ arch/arm/boot/dts/imx28-apf28dev.dts | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/boot/dts/imx28-apf28dev.dts b/arch/arm/boot/dts/imx28-apf28dev.dts
+index 221cac4..1f38a05 100644
+--- a/arch/arm/boot/dts/imx28-apf28dev.dts
++++ b/arch/arm/boot/dts/imx28-apf28dev.dts
+@@ -83,10 +83,10 @@
+ 				pinctrl-names = "default";
+ 				pinctrl-0 = <&lcdif_16bit_pins_a
+ 						&lcdif_pins_apf28dev>;
+-				display = <&display>;
++				display = <&display0>;
+ 				status = "okay";
+ 
+-				display: display {
++				display0: display0 {
+ 					bits-per-pixel = <16>;
+ 					bus-width = <16>;
+ 
+-- 
+1.9.1
