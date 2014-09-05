@@ -1,23 +1,39 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 05 Sep 2014 14:28:45 +0200
-Subject: [PATCH 11/19] ARM: S5PV210: Remove support for board files
-In-Reply-To: <1409918658.7832.25.camel@x220>
-References: <1404496099-26708-1-git-send-email-t.figa@samsung.com>
- <201409041802.36466.arnd@arndb.de> <1409918658.7832.25.camel@x220>
-Message-ID: <16177201.Mk3a7oJAud@wuerfel>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Fri, 05 Sep 2014 14:34:54 +0200
+Subject: [PATCH v5 RESEND 2/3] ARM: EXYNOS: Remove unneeded __ref annotation
+ for cpu_die function
+In-Reply-To: <1409920495-16533-1-git-send-email-k.kozlowski@samsung.com>
+References: <1409920495-16533-1-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <1409920495-16533-2-git-send-email-k.kozlowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 05 September 2014 14:04:18 Paul Bolle wrote:
-> 
-> On Thu, 2014-09-04 at 18:02 +0200, Arnd Bergmann wrote:
-> > I think it would be nice if you could submit a patch to remove the
-> > drivers from ASoC, then we can see if anybody complains.
-> 
-> Just to know what I'm getting my self into: whom would you expect to
-> send me agitated messages once those patches have landed?
+The __ref annotation for exynos_cpu_die() is not needed because the
+function does not reference any __init/__exit symbol or call.
 
-That would be somebody who is using their own patches on top of
-mainline and didn't notice that upstream broke under them ;-)
+Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+Reviewed-by: Tomasz Figa <t.figa@samsung.com>
 
-	Arnd
+---
+Changes since v4:
+1. Rebase on linux-next-20140804.
+2. Add Reviewed-by Tomasz Figa.
+---
+ arch/arm/mach-exynos/platsmp.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm/mach-exynos/platsmp.c b/arch/arm/mach-exynos/platsmp.c
+index a809f76c8160..83b20a38a598 100644
+--- a/arch/arm/mach-exynos/platsmp.c
++++ b/arch/arm/mach-exynos/platsmp.c
+@@ -373,7 +373,7 @@ static void __init exynos_smp_prepare_cpus(unsigned int max_cpus)
+  *
+  * Called with IRQs disabled
+  */
+-static void __ref exynos_cpu_die(unsigned int cpu)
++static void exynos_cpu_die(unsigned int cpu)
+ {
+ 	int spurious = 0;
+ 
+-- 
+1.9.1
