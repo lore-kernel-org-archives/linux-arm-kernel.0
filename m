@@ -1,45 +1,44 @@
 From: behanw@converseincode.com (behanw at converseincode.com)
-Date: Fri,  5 Sep 2014 17:06:16 -0700
-Subject: [PATCH v2 6/7] arm: LLVMLinux: Use current_stack_pointer in
- unwind_backtrace
+Date: Fri,  5 Sep 2014 17:06:17 -0700
+Subject: [PATCH v2 7/7] arm: LLVMLinux: Use global stack register variable for
+ percpu
 In-Reply-To: <1409961977-11762-1-git-send-email-behanw@converseincode.com>
 References: <1409961977-11762-1-git-send-email-behanw@converseincode.com>
-Message-ID: <1409961977-11762-7-git-send-email-behanw@converseincode.com>
+Message-ID: <1409961977-11762-8-git-send-email-behanw@converseincode.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Behan Webster <behanw@converseincode.com>
+From: Mark Charlebois <charlebm@gmail.com>
 
-Use the global current_stack_pointer to get the value of the stack pointer.
-This change supports being able to compile the kernel with both gcc and clang.
+Using global current_stack_pointer works on both clang and gcc.
+current_stack_pointer is an unsigned long and needs to be cast
+as a pointer to dereference.
 
-Signed-off-by: Behan Webster <behanw@converseincode.com>
 Signed-off-by: Mark Charlebois <charlebm@gmail.com>
-Reviewed-by: Jan-Simon M?ller <dl9pf@gmx.de>
 ---
- arch/arm/kernel/unwind.c | 3 +--
- 1 file changed, 1 insertion(+), 2 deletions(-)
+ arch/arm/include/asm/percpu.h | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/kernel/unwind.c b/arch/arm/kernel/unwind.c
-index a61a1df..caea23b 100644
---- a/arch/arm/kernel/unwind.c
-+++ b/arch/arm/kernel/unwind.c
-@@ -471,7 +471,6 @@ int unwind_frame(struct stackframe *frame)
- void unwind_backtrace(struct pt_regs *regs, struct task_struct *tsk)
+diff --git a/arch/arm/include/asm/percpu.h b/arch/arm/include/asm/percpu.h
+index 209e650..a89b407 100644
+--- a/arch/arm/include/asm/percpu.h
++++ b/arch/arm/include/asm/percpu.h
+@@ -30,14 +30,14 @@ static inline void set_my_cpu_offset(unsigned long off)
+ static inline unsigned long __my_cpu_offset(void)
  {
- 	struct stackframe frame;
--	register unsigned long current_sp asm ("sp");
+ 	unsigned long off;
+-	register unsigned long *sp asm ("sp");
  
- 	pr_debug("%s(regs = %p tsk = %p)\n", __func__, regs, tsk);
+ 	/*
+ 	 * Read TPIDRPRW.
+ 	 * We want to allow caching the value, so avoid using volatile and
+ 	 * instead use a fake stack read to hazard against barrier().
+ 	 */
+-	asm("mrc p15, 0, %0, c13, c0, 4" : "=r" (off) : "Q" (*sp));
++	asm("mrc p15, 0, %0, c13, c0, 4" : "=r" (off)
++		: "Q" (*(const unsigned long *)current_stack_pointer));
  
-@@ -485,7 +484,7 @@ void unwind_backtrace(struct pt_regs *regs, struct task_struct *tsk)
- 			frame.pc = regs->ARM_lr;
- 	} else if (tsk == current) {
- 		frame.fp = (unsigned long)__builtin_frame_address(0);
--		frame.sp = current_sp;
-+		frame.sp = current_stack_pointer;
- 		frame.lr = (unsigned long)__builtin_return_address(0);
- 		frame.pc = (unsigned long)unwind_backtrace;
- 	} else {
+ 	return off;
+ }
 -- 
 1.9.1
