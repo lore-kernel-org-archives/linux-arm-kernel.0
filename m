@@ -1,61 +1,45 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Sat,  6 Sep 2014 11:14:16 +0100
-Subject: [PATCH] ARM: omap: Remove stray ARCH_HAS_OPP references
-Message-ID: <1409998456-28066-1-git-send-email-broonie@kernel.org>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Sat,  6 Sep 2014 18:47:25 +0800
+Subject: [PATCH 4/7] ARM: dts: sun8i: Unify ahb1 clock nodes
+In-Reply-To: <1410000448-9999-1-git-send-email-wens@csie.org>
+References: <1410000448-9999-1-git-send-email-wens@csie.org>
+Message-ID: <1410000448-9999-5-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-OPP is now a normal kernel library selected by its users rather than a
-feature that architectures need to enable so ARCH_HAS_OPP serves no
-function any more - remove the selects.
+The clock driver has unified support for the ahb1 clock.
+Unify the clock nodes so it works.
 
-Signed-off-by: Mark Brown <broonie@kernel.org>
+Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 ---
- arch/arm/mach-omap2/Kconfig | 5 -----
- 1 file changed, 5 deletions(-)
+ arch/arm/boot/dts/sun8i-a23.dtsi | 12 ++----------
+ 1 file changed, 2 insertions(+), 10 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
-index e7189dcc9309..11ccf0b4e5c2 100644
---- a/arch/arm/mach-omap2/Kconfig
-+++ b/arch/arm/mach-omap2/Kconfig
-@@ -25,7 +25,6 @@ config ARCH_OMAP4
- 	bool "TI OMAP4"
- 	depends on ARCH_MULTI_V7
- 	select ARCH_OMAP2PLUS
--	select ARCH_HAS_OPP
- 	select ARCH_NEEDS_CPU_IDLE_COUPLED if SMP
- 	select ARM_CPU_SUSPEND if PM
- 	select ARM_ERRATA_720789
-@@ -44,7 +43,6 @@ config SOC_OMAP5
- 	bool "TI OMAP5"
- 	depends on ARCH_MULTI_V7
- 	select ARCH_OMAP2PLUS
--	select ARCH_HAS_OPP
- 	select ARM_CPU_SUSPEND if PM
- 	select ARM_GIC
- 	select HAVE_ARM_SCU if SMP
-@@ -56,14 +54,12 @@ config SOC_AM33XX
- 	bool "TI AM33XX"
- 	depends on ARCH_MULTI_V7
- 	select ARCH_OMAP2PLUS
--	select ARCH_HAS_OPP
- 	select ARM_CPU_SUSPEND if PM
+diff --git a/arch/arm/boot/dts/sun8i-a23.dtsi b/arch/arm/boot/dts/sun8i-a23.dtsi
+index 2ec86d36..cc8c650 100644
+--- a/arch/arm/boot/dts/sun8i-a23.dtsi
++++ b/arch/arm/boot/dts/sun8i-a23.dtsi
+@@ -104,19 +104,11 @@
+ 			clock-output-names = "axi";
+ 		};
  
- config SOC_AM43XX
- 	bool "TI AM43x"
- 	depends on ARCH_MULTI_V7
- 	select ARCH_OMAP2PLUS
--	select ARCH_HAS_OPP
- 	select ARM_GIC
- 	select MACH_OMAP_GENERIC
- 	select MIGHT_HAVE_CACHE_L2X0
-@@ -72,7 +68,6 @@ config SOC_DRA7XX
- 	bool "TI DRA7XX"
- 	depends on ARCH_MULTI_V7
- 	select ARCH_OMAP2PLUS
--	select ARCH_HAS_OPP
- 	select ARM_CPU_SUSPEND if PM
- 	select ARM_GIC
- 	select HAVE_ARM_ARCH_TIMER
+-		ahb1_mux: ahb1_mux_clk at 01c20054 {
+-			#clock-cells = <0>;
+-			compatible = "allwinner,sun6i-a31-ahb1-mux-clk";
+-			reg = <0x01c20054 0x4>;
+-			clocks = <&osc32k>, <&osc24M>, <&axi>, <&pll6>;
+-			clock-output-names = "ahb1_mux";
+-		};
+-
+ 		ahb1: ahb1_clk at 01c20054 {
+ 			#clock-cells = <0>;
+-			compatible = "allwinner,sun4i-a10-ahb-clk";
++			compatible = "allwinner,sun6i-a31-ahb1-clk";
+ 			reg = <0x01c20054 0x4>;
+-			clocks = <&ahb1_mux>;
++			clocks = <&osc32k>, <&osc24M>, <&axi>, <&pll6>;
+ 			clock-output-names = "ahb1";
+ 		};
+ 
 -- 
 2.1.0
