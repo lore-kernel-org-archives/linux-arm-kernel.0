@@ -1,44 +1,34 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Sat, 6 Sep 2014 09:27:28 +0200
-Subject: arm: Add basic support for MediaTek MT8127 & MT8135 SoCs
-In-Reply-To: <15158935.ieDDcCvpAL@wuerfel>
-References: <1409874660-8710-1-git-send-email-srv_yingjoe.chen@mediatek.com>
- <15158935.ieDDcCvpAL@wuerfel>
-Message-ID: <CABuKBeLNyHbNjzcZ0jmjPmxEbSBPuzur-Dmuzed0kOJ5W9C4bg@mail.gmail.com>
+From: cyndis@kapsi.fi (Mikko Perttunen)
+Date: Sat,  6 Sep 2014 11:54:40 +0300
+Subject: [PATCH v3 0/5] Thermal reset support in PMC
+Message-ID: <1409993685-21911-1-git-send-email-cyndis@kapsi.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2014-09-05 21:36 GMT+02:00 Arnd Bergmann <arnd@arndb.de>:
-> Hello Joe,
->
-> On Friday 05 September 2014 07:50:55 Joe. C wrote:
->> This series add basic device tree support MT8127 & MT8135.
->> This series is based on v3.17-rc3.
->>
->> We are planning to upstream drivers for MT8127 & MT8135 SoCs.
->> MT8135 is a tablet soc featuring 2 CA7 + 2 CA15. MT8127 is a
->> tablet soc with 4 CA7. They share many similar IP components
->> with MT65xx series.
->
-> The patches look very nice to me, I'm glad to hear you have
-> plans to upstream more.
->
->> Please note this one is not base on intpol [1] patches I sent
->> last month. Base on the discussion on intpol, I think it might
->> take some more time. I'd like to have this merge first so we
->> can work on other stuff simultaneously.
->
-> Yes, I agree. I'll wait for Matthias to pick up your patches
-> and send a pull request for them.
+Hi,
 
-The patches look fine to me, apart from the inconsistency in the
-subject. I will fix this when I pick them.
-I'm just wondering if I should wait until we get an ACK from the DTS maintainer.
+this series adds support for hardware-triggered thermal reset to the PMC
+driver. Namely, it adds device tree properties for specifying the I2C
+command to be sent when thermtrip is triggered. It is to be noted
+that thermtrip won't be ever triggered without a soctherm driver to
+calibrate the sensors.
 
->
->         Arnd
+Git repo at
+  git://github.com/cyndis/linux.git pmc-thermtrip-v3
 
+Mikko Perttunen (5):
+  of: Add descriptions of thermtrip properties to Tegra PMC bindings
+  of: Add nvidia,controller-id property to Tegra I2C bindings
+  ARM: tegra124: Add I2C controller ids to device tree
+  ARM: tegra: Add PMC thermtrip programming to Jetson TK1 device tree
+  ARM: tegra: Add thermal reset (thermtrip) support to PMC
 
+ .../bindings/arm/tegra/nvidia,tegra20-pmc.txt      |  23 ++
+ .../devicetree/bindings/i2c/nvidia,tegra20-i2c.txt |   5 +
+ arch/arm/boot/dts/tegra124-jetson-tk1.dts          |   9 +-
+ arch/arm/boot/dts/tegra124.dtsi                    |   6 +
+ drivers/soc/tegra/pmc.c                            | 379 ++++++++++++++-------
+ 5 files changed, 289 insertions(+), 133 deletions(-)
 
 -- 
-motzblog.wordpress.com
+2.1.0
