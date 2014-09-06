@@ -1,30 +1,50 @@
-From: tj@kernel.org (Tejun Heo)
-Date: Sat, 6 Sep 2014 11:28:09 +0900
-Subject: [PATCH v9 3/3] ahci_xgene: Fix the link down in first attempt
- for the APM X-Gene SoC AHCI SATA host controller driver.
-In-Reply-To: <1409217682-5759-4-git-send-email-stripathi@apm.com>
-References: <1409217682-5759-1-git-send-email-stripathi@apm.com>
- <1409217682-5759-4-git-send-email-stripathi@apm.com>
-Message-ID: <20140906022809.GB21579@mtj.dyndns.org>
+From: Nathan_Lynch@mentor.com (Nathan Lynch)
+Date: Fri, 5 Sep 2014 21:32:49 -0500
+Subject: [PATCH v9 0/6] ARM: VDSO
+In-Reply-To: <1408744351-7814-1-git-send-email-nathan_lynch@mentor.com>
+References: <1408744351-7814-1-git-send-email-nathan_lynch@mentor.com>
+Message-ID: <540A7251.8050708@mentor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 28, 2014 at 02:51:22PM +0530, Suman Tripathi wrote:
-> Due to HW errata the APM X-Gene AHCI SATA host controller reports link
-> down even if the device presence is detected. This issue is due to speed
-> negotiation failure. This patch implements the algorithm to retry the
-> COMRESET if PxSTAT register reports device presence detected but
-> PHY communication not established. The maximum retry attempts are 3.
+On 08/22/2014 04:52 PM, Nathan Lynch wrote:
+> Provide fast userspace implementations of gettimeofday and
+> clock_gettime on systems that implement the generic timers extension
+> defined in ARMv7.  This follows the example of arm64 in conception but
+> significantly differs in some aspects of the implementation (C vs
+> assembly, mainly).
 > 
-> This patch also fixes the code to match the algorithm for the printing
-> a warning message if the disparity error still exists after link up.
+> Clocks supported:
+> - CLOCK_REALTIME
+> - CLOCK_MONOTONIC
+> - CLOCK_REALTIME_COARSE
+> - CLOCK_MONOTONIC_COARSE
 > 
-> Signed-off-by: Loc Ho <lho@apm.com>
-> Signed-off-by: Suman Tripathi <stripathi@apm.com>
+> This also provides clock_getres (as arm64 does).
+> 
+> getcpu support is planned but not included at this time.
+> 
+> For applications to transparently benefit from this change,
+> ARM-specific support code needs to be added to glibc.  I have such a
+> patch, and have verified that glibc's self tests do not detect any
+> regressions.  I hope to have that code added to glibc for the 2.21
+> release.
+> 
+> The VDSO symbols are available for lookup via dlsym even with an
+> unpatched glibc.
+> 
+> Note that while the high-precision realtime and monotonic clock
+> support depends on the generic timers extension, support for
+> clock_getres and coarse clocks is independent of the timer
+> implementation and is provided unconditionally.  High-resolution clock
+> support requires changes to the arch timer code, posted here:
+> 
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2014-August/281280.html
+> 
+> The VDSO will function correctly without those changes, but
+> gettimeofday and clock_gettime with CLOCK_REALTIME/CLOCK_MONOTONIC
+> will not be accelerated.
 
-Applied to libata/for-3.17-fixes.
-
-Thanks.
-
--- 
-tejun
+Russell, what is your current thinking on taking the VDSO patches?  I
+believe all feedback has been addressed and I was hoping to get it into
+3.18...
