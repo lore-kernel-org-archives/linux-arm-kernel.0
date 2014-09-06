@@ -1,28 +1,49 @@
-From: emilio@elopez.com.ar (=?UTF-8?B?RW1pbGlvIEzDs3Bleg==?=)
-Date: Sat, 06 Sep 2014 13:50:21 -0300
-Subject: [PATCH 1/5] ARM: sun4i: Relicense the A10 DTSI under GPLv2/X11
-In-Reply-To: <1409682069-7164-1-git-send-email-maxime.ripard@free-electrons.com>
-References: <1409682069-7164-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <540B3B4D.9090108@elopez.com.ar>
+From: alchark@gmail.com (Alexey Charkov)
+Date: Sat,  6 Sep 2014 21:21:11 +0400
+Subject: [PATCH 0/4] tty: vt8500_serial: Changes for -next
+Message-ID: <1410024075-1354-1-git-send-email-alchark@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Maxime,
+Hi all,
 
-El 02/09/14 a las 15:21, Maxime Ripard escibi?:
-> The current GPL only licensing on the DTSI makes it very impractical for other
-> software components licensed under another license.
->
-> In order to make it easier for them to reuse our device trees, relicense our
-> DTSI first under a GPL/X11 dual-license. Hopefully, the DTS will follow soon.
->
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+This series introduces a bit of clean-up (reduce magic numbers) and
+new features for the VT8500 serial driver.
 
-For this whole series (and any future one doing this same kind of dual 
-licensing on sunxi dts/dtsi where I may be involved),
+Firstly, in a new generation of WonderMedia SoC's the UART module
+changed slightly, and now requires one more bit to be set in its
+line control register to function properly. This is handled in the
+first patch by adding a new DT 'compatible' string for the new chips.
 
-Acked-by: Emilio L?pez <emilio@elopez.com.ar>
+Secondly, a couple of ommissions from the initial driver version are
+now filled, namely RTS setting (second patch) and correct calculation
+of baud rate predivisors, divisors etc. for any given input clock
+(third patch). Initial version implicitly assumed input clock to be
+always 24MHz and predivisor to be /2 (which holds for current chips,
+but doesn't need to hold in general).
 
-Cheers,
+Thirdly, polled console functions are now implemented (fourth patch)
+to support KGDB over VT8500 UART.
 
-Emilio
+These changes have been tested on a WonderMedia WM8880 netbook (all),
+and on a VIA Springboard (WM8950) (all except KGDB).
+
+Greg, could you please merge these for -next, if they look fine?
+
+Thanks a lot,
+Alexey
+
+Alexey Charkov (4):
+  tty: vt8500_serial: add support for UART in WM8880 chips
+  tty: vt8500_serial: add missing support for RTS setting
+  tty: vt8500_serial: explicitly calculate base baud rate
+  tty: vt8500_serial: add polled console functions
+
+ .../devicetree/bindings/serial/via,vt8500-uart.txt |  17 ---
+ .../devicetree/bindings/serial/vt8500-uart.txt     |   3 +-
+ drivers/tty/serial/vt8500_serial.c                 | 136 ++++++++++++++++++---
+ 3 files changed, 118 insertions(+), 38 deletions(-)
+ delete mode 100644 Documentation/devicetree/bindings/serial/via,vt8500-uart.txt
+
+-- 
+2.0.0
