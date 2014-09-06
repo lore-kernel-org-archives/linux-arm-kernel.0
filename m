@@ -1,81 +1,72 @@
-From: tinamdar@apm.com (Tanmay Inamdar)
-Date: Fri,  5 Sep 2014 17:25:42 -0700
-Subject: [PATCH v6 3/4] dt-bindings: pci: xgene pcie device tree bindings
-In-Reply-To: <1409963143-11951-1-git-send-email-tinamdar@apm.com>
-References: <1409963143-11951-1-git-send-email-tinamdar@apm.com>
-Message-ID: <1409963143-11951-4-git-send-email-tinamdar@apm.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Sat, 6 Sep 2014 10:14:00 +0900
+Subject: [PATCH v2 1/3] clocksource: sh_cmt: Document SoC specific bindings
+In-Reply-To: <6240436.VfJ5CJaKOx@avalon>
+References: <1409792121-28912-1-git-send-email-horms+renesas@verge.net.au>
+ <1409792121-28912-2-git-send-email-horms+renesas@verge.net.au>
+ <6240436.VfJ5CJaKOx@avalon>
+Message-ID: <20140906011359.GB16116@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the bindings for X-Gene PCIe driver. The driver resides
-under 'drivers/pci/host/pci-xgene.c' file.
+On Thu, Sep 04, 2014 at 09:58:40AM +0300, Laurent Pinchart wrote:
+> Hi Simon,
+> 
+> A couple of other small issues I've missed.
+> 
+> On Thursday 04 September 2014 09:55:19 Simon Horman wrote:
+> > In general Renesas hardware is not documented to the extent
+> > where the relationship between IP blocks on different SoCs can be assumed
+> > although they may appear to operate the same way. Furthermore the
+> > documentation typically does not specify a version for individual
+> > IP blocks. For these reasons a convention of using the SoC name in place
+> > of a version and providing SoC-specific compat strings has been adopted.
+> > 
+> > Although not universally liked this convention is used in the bindings for
+> > a number of drivers for Renesas hardware. The purpose of this patch is to
+> > update the Renesas R-Car Compare Match Timer (CMT) driver to follow this
+> > convention.
+> > 
+> > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> > Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> > Acked-by: Mark Rutland <mark.rutland@arm.com>
+> > 
+> > ---
+> > * I plan to follow up with patches to use these new bindings in the
+> >   dtsi files for the affected SoCs.
+> > 
+> > v2
+> > * Reorder compat entries so more-specific entries and their fallbacks
+> >   are grouped with the fallback entry coming last.
+> > * Explicitly document fallback
+> > ---
+> >  .../devicetree/bindings/timer/renesas,cmt.txt      | 44 ++++++++++++++++---
+> >  1 file changed, 38 insertions(+), 6 deletions(-)
+> > 
+> > diff --git a/Documentation/devicetree/bindings/timer/renesas,cmt.txt
+> > b/Documentation/devicetree/bindings/timer/renesas,cmt.txt index
+> > a17418b..7b44f4b 100644
+> > --- a/Documentation/devicetree/bindings/timer/renesas,cmt.txt
+> > +++ b/Documentation/devicetree/bindings/timer/renesas,cmt.txt
+> > @@ -11,15 +11,47 @@ datasheets.
+> > 
+> >  Required Properties:
+> > 
+> > -  - compatible: must contain one of the following.
+> > -    - "renesas,cmt-32" for the 32-bit CMT
+> > +  - compatible: must contain one or more of the following:
+> > +    - "renesas,cmt-32-r8a7740" for the R8a7740 32-bit CMT
+> 
+> s/R8a7740/R8A7740/
+> 
+> > +		(CMT0)
+> > +    - "renesas,cmt-32-sh7372" for the SH7372 32-bit CMT
+> > +		(CMT0)
+> > +    - "renesas,cmt-32-sh73a0" for the SH73a0 32-bit CMT
+> 
+> s/SH73a0/SH73A0/
 
-Signed-off-by: Tanmay Inamdar <tinamdar@apm.com>
----
- .../devicetree/bindings/pci/xgene-pci.txt          | 55 ++++++++++++++++++++++
- 1 file changed, 55 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/pci/xgene-pci.txt
+Thanks, I have decided to go for lower case instead.
+That is consistent with other nearby usage in the same file.
 
-diff --git a/Documentation/devicetree/bindings/pci/xgene-pci.txt b/Documentation/devicetree/bindings/pci/xgene-pci.txt
-new file mode 100644
-index 0000000..683a253
---- /dev/null
-+++ b/Documentation/devicetree/bindings/pci/xgene-pci.txt
-@@ -0,0 +1,55 @@
-+* AppliedMicro X-Gene PCIe interface
-+
-+Required properties:
-+- device_type: set to "pci"
-+- compatible: should contain "apm,xgene-pcie" to identify the core.
-+- reg: A list of physical base address and length for each set of controller
-+       registers. Must contain an entry for each entry in the reg-names
-+       property.
-+- reg-names: Must include the following entries:
-+  "csr": controller configuration registers.
-+  "cfg": pcie configuration space registers.
-+- #address-cells: set to <3>
-+- #size-cells: set to <2>
-+- ranges: ranges for the outbound memory, I/O regions.
-+- dma-ranges: ranges for the inbound memory regions.
-+- #interrupt-cells: set to <1>
-+- interrupt-map-mask and interrupt-map: standard PCI properties
-+	to define the mapping of the PCIe interface to interrupt
-+	numbers.
-+- clocks: from common clock binding: handle to pci clock.
-+
-+Optional properties:
-+- status: Either "ok" or "disabled".
-+
-+Example:
-+
-+SoC specific DT Entry:
-+
-+	pcie0: pcie at 1f2b0000 {
-+		status = "disabled";
-+		device_type = "pci";
-+		compatible = "apm,xgene-storm-pcie", "apm,xgene-pcie";
-+		#interrupt-cells = <1>;
-+		#size-cells = <2>;
-+		#address-cells = <3>;
-+		reg = < 0x00 0x1f2b0000 0x0 0x00010000   /* Controller registers */
-+			0xe0 0xd0000000 0x0 0x00040000>; /* PCI config space */
-+		reg-names = "csr", "cfg";
-+		ranges = <0x01000000 0x00 0x00000000 0xe0 0x10000000 0x00 0x00010000   /* io */
-+			  0x02000000 0x00 0x80000000 0xe1 0x80000000 0x00 0x80000000>; /* mem */
-+		dma-ranges = <0x42000000 0x80 0x00000000 0x80 0x00000000 0x00 0x80000000
-+			      0x42000000 0x00 0x00000000 0x00 0x00000000 0x80 0x00000000>;
-+		interrupt-map-mask = <0x0 0x0 0x0 0x7>;
-+		interrupt-map = <0x0 0x0 0x0 0x1 &gic 0x0 0xc2 0x1
-+				 0x0 0x0 0x0 0x2 &gic 0x0 0xc3 0x1
-+				 0x0 0x0 0x0 0x3 &gic 0x0 0xc4 0x1
-+				 0x0 0x0 0x0 0x4 &gic 0x0 0xc5 0x1>;
-+		clocks = <&pcie0clk 0>;
-+	};
-+
-+
-+Board specific DT Entry:
-+	&pcie0 {
-+		status = "ok";
-+	};
--- 
-1.9.1
+[snip]
