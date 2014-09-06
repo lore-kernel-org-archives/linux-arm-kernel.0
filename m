@@ -1,30 +1,33 @@
-From: pankaj.dubey@samsung.com (Pankaj Dubey)
-Date: Sat, 06 Sep 2014 18:33:33 +0530
-Subject: [PATCH] clk: samsung: exynos3250: fix mout_cam_blk parent list
-Message-ID: <1410008613-20861-1-git-send-email-pankaj.dubey@samsung.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Sat, 6 Sep 2014 14:53:08 +0100
+Subject: [PATCH 1/2] gpio: Add driver for AXM55xx SSP chip selects
+In-Reply-To: <CAE0=X_3QO5p26M=FS7joKS3zD6LAM_moFutHNcyE1-CjauL3Rw@mail.gmail.com>
+References: <1409576021-24828-1-git-send-email-anders.berg@avagotech.com>
+ <1409576021-24828-2-git-send-email-anders.berg@avagotech.com>
+ <CACRpkdby4H-fivNn_kG2uL0EjsCGAc+t6OyFi0+VcNGf2Z9NQA@mail.gmail.com>
+ <20140904170630.GL29327@sirena.org.uk>
+ <CACRpkdZEoBan=Lqr1T-iY41U9NfMA_MCLX3LA=juw7X4pmRvSQ@mail.gmail.com>
+ <CAE0=X_3QO5p26M=FS7joKS3zD6LAM_moFutHNcyE1-CjauL3Rw@mail.gmail.com>
+Message-ID: <20140906135308.GC2601@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As per user manual of Exynos3250 SRC_CAM can select
-div_cam_blk_320 if it's value is 0xC, so placing
-div_cam_blk_320 at proper index in parent list of mout_cam_blk.
+On Fri, Sep 05, 2014 at 11:05:37AM +0200, Anders Berg wrote:
 
-Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
----
- drivers/clk/samsung/clk-exynos3250.c |    1 +
- 1 file changed, 1 insertion(+)
+> Well, the problem with adding this to the spi-pl022 driver (as a
+> vendor specific extension) is that this IP block unfortunately isn't
+> distinguishable from the standard ARM PL022 implementation (same
+> values in the PrimeCell identification registers). That's why I went
+> down the GPIO path...
 
-diff --git a/drivers/clk/samsung/clk-exynos3250.c b/drivers/clk/samsung/clk-exynos3250.c
-index e1cb464..ba8f073f 100644
---- a/drivers/clk/samsung/clk-exynos3250.c
-+++ b/drivers/clk/samsung/clk-exynos3250.c
-@@ -248,6 +248,7 @@ PNAME(group_sclk_cam_blk_p)	= { "xxti", "xusbxti",
- 				    "none", "none", "none",
- 				    "none", "div_mpll_pre",
- 				    "mout_epll_user", "mout_vpll",
-+				    "none", "none", "none",
- 				    "div_cam_blk_320", };
- PNAME(group_sclk_fimd0_p)	= { "xxti", "xusbxti",
- 				    "m_bitclkhsdiv4_2l", "none",
--- 
-1.7.9.5
+Would it not be more straightforward to just register it as a platform
+device in this case, or use a separate OF ID in the DT?  We appear to
+specify a compatible string when registering AMBA devices even if we are
+capable of identifying using the ID registers.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140906/80437134/attachment.sig>
