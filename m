@@ -1,45 +1,66 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Sat, 06 Sep 2014 16:09:29 +0200
-Subject: arm: Add basic support for MediaTek MT8127 & MT8135 SoCs
-In-Reply-To: <CABuKBeLNyHbNjzcZ0jmjPmxEbSBPuzur-Dmuzed0kOJ5W9C4bg@mail.gmail.com>
-References: <1409874660-8710-1-git-send-email-srv_yingjoe.chen@mediatek.com>
- <15158935.ieDDcCvpAL@wuerfel>
- <CABuKBeLNyHbNjzcZ0jmjPmxEbSBPuzur-Dmuzed0kOJ5W9C4bg@mail.gmail.com>
-Message-ID: <2858628.XILj3pUtxM@wuerfel>
+From: nm@ti.com (Nishanth Menon)
+Date: Sat, 06 Sep 2014 09:10:41 -0500
+Subject: [PATCH] ARM: omap: Remove stray ARCH_HAS_OPP references
+In-Reply-To: <1409998456-28066-1-git-send-email-broonie@kernel.org>
+References: <1409998456-28066-1-git-send-email-broonie@kernel.org>
+Message-ID: <540B15E1.6090604@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 06 September 2014 09:27:28 Matthias Brugger wrote:
-> 2014-09-05 21:36 GMT+02:00 Arnd Bergmann <arnd@arndb.de>:
-> > Hello Joe,
-> >
-> > On Friday 05 September 2014 07:50:55 Joe. C wrote:
-> >> This series add basic device tree support MT8127 & MT8135.
-> >> This series is based on v3.17-rc3.
-> >>
-> >> We are planning to upstream drivers for MT8127 & MT8135 SoCs.
-> >> MT8135 is a tablet soc featuring 2 CA7 + 2 CA15. MT8127 is a
-> >> tablet soc with 4 CA7. They share many similar IP components
-> >> with MT65xx series.
-> >
-> > The patches look very nice to me, I'm glad to hear you have
-> > plans to upstream more.
-> >
-> >> Please note this one is not base on intpol [1] patches I sent
-> >> last month. Base on the discussion on intpol, I think it might
-> >> take some more time. I'd like to have this merge first so we
-> >> can work on other stuff simultaneously.
-> >
-> > Yes, I agree. I'll wait for Matthias to pick up your patches
-> > and send a pull request for them.
-> 
-> The patches look fine to me, apart from the inconsistency in the
-> subject. I will fix this when I pick them.
-> I'm just wondering if I should wait until we get an ACK from the DTS maintainer.
+On 09/06/2014 05:14 AM, Mark Brown wrote:
+> OPP is now a normal kernel library selected by its users rather than a
+> feature that architectures need to enable so ARCH_HAS_OPP serves no
+> function any more - remove the selects.
+>
+> Signed-off-by: Mark Brown <broonie@kernel.org>
+> ---
+>   arch/arm/mach-omap2/Kconfig | 5 -----
+>   1 file changed, 5 deletions(-)
+>
+> diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
+> index e7189dcc9309..11ccf0b4e5c2 100644
+> --- a/arch/arm/mach-omap2/Kconfig
+> +++ b/arch/arm/mach-omap2/Kconfig
+> @@ -25,7 +25,6 @@ config ARCH_OMAP4
+>   	bool "TI OMAP4"
+>   	depends on ARCH_MULTI_V7
+>   	select ARCH_OMAP2PLUS
+> -	select ARCH_HAS_OPP
+>   	select ARCH_NEEDS_CPU_IDLE_COUPLED if SMP
+>   	select ARM_CPU_SUSPEND if PM
+>   	select ARM_ERRATA_720789
+> @@ -44,7 +43,6 @@ config SOC_OMAP5
+>   	bool "TI OMAP5"
+>   	depends on ARCH_MULTI_V7
+>   	select ARCH_OMAP2PLUS
+> -	select ARCH_HAS_OPP
+>   	select ARM_CPU_SUSPEND if PM
+>   	select ARM_GIC
+>   	select HAVE_ARM_SCU if SMP
+> @@ -56,14 +54,12 @@ config SOC_AM33XX
+>   	bool "TI AM33XX"
+>   	depends on ARCH_MULTI_V7
+>   	select ARCH_OMAP2PLUS
+> -	select ARCH_HAS_OPP
+>   	select ARM_CPU_SUSPEND if PM
+>
+>   config SOC_AM43XX
+>   	bool "TI AM43x"
+>   	depends on ARCH_MULTI_V7
+>   	select ARCH_OMAP2PLUS
+> -	select ARCH_HAS_OPP
+>   	select ARM_GIC
+>   	select MACH_OMAP_GENERIC
+>   	select MIGHT_HAVE_CACHE_L2X0
+> @@ -72,7 +68,6 @@ config SOC_DRA7XX
+>   	bool "TI DRA7XX"
+>   	depends on ARCH_MULTI_V7
+>   	select ARCH_OMAP2PLUS
+> -	select ARCH_HAS_OPP
+>   	select ARM_CPU_SUSPEND if PM
+>   	select ARM_GIC
+>   	select HAVE_ARM_ARCH_TIMER
+>
 
-It surely doesn't hurt to wait a bit more, but if it takes too
-long, you can just apply the patches. For all I can tell, only
-documented bindings are used, and it's more important to
-review new or extended bindings.
 
-	Arnd
+Acked-by: Nishanth Menon <nm@ti.com>
