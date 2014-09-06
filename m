@@ -1,50 +1,44 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Sat,  6 Sep 2014 14:45:10 +0800
-Subject: [PATCH] clk: sunxi: add correct divider table for sun4i-apb0 clock
-Message-ID: <1409985910-30737-1-git-send-email-wens@csie.org>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Sat, 6 Sep 2014 09:27:28 +0200
+Subject: arm: Add basic support for MediaTek MT8127 & MT8135 SoCs
+In-Reply-To: <15158935.ieDDcCvpAL@wuerfel>
+References: <1409874660-8710-1-git-send-email-srv_yingjoe.chen@mediatek.com>
+ <15158935.ieDDcCvpAL@wuerfel>
+Message-ID: <CABuKBeLNyHbNjzcZ0jmjPmxEbSBPuzur-Dmuzed0kOJ5W9C4bg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The sun4i-apb0 clock, as found on all platforms using it, is a
-power-of-two-based divider clock, with a special divider of 2
-for value 0.
+2014-09-05 21:36 GMT+02:00 Arnd Bergmann <arnd@arndb.de>:
+> Hello Joe,
+>
+> On Friday 05 September 2014 07:50:55 Joe. C wrote:
+>> This series add basic device tree support MT8127 & MT8135.
+>> This series is based on v3.17-rc3.
+>>
+>> We are planning to upstream drivers for MT8127 & MT8135 SoCs.
+>> MT8135 is a tablet soc featuring 2 CA7 + 2 CA15. MT8127 is a
+>> tablet soc with 4 CA7. They share many similar IP components
+>> with MT65xx series.
+>
+> The patches look very nice to me, I'm glad to hear you have
+> plans to upstream more.
+>
+>> Please note this one is not base on intpol [1] patches I sent
+>> last month. Base on the discussion on intpol, I think it might
+>> take some more time. I'd like to have this merge first so we
+>> can work on other stuff simultaneously.
+>
+> Yes, I agree. I'll wait for Matthias to pick up your patches
+> and send a pull request for them.
 
-This was causing the clock framework to incorrectly calculate
-the clock rate for apb1 and related modules on sun6i and sun8i.
-On sun[4/5/7]i, u-boot SPL configures the divider with value 1
-for /2 divider, so no suprises there.
+The patches look fine to me, apart from the inconsistency in the
+subject. I will fix this when I pick them.
+I'm just wondering if I should wait until we get an ACK from the DTS maintainer.
 
-This patch adds a proper divider table for it, so the correct
-clock rate can be calculated.
+>
+>         Arnd
 
-Signed-off-by: Chen-Yu Tsai <wens@csie.org>
----
- drivers/clk/sunxi/clk-sunxi.c | 9 +++++++++
- 1 file changed, 9 insertions(+)
 
-diff --git a/drivers/clk/sunxi/clk-sunxi.c b/drivers/clk/sunxi/clk-sunxi.c
-index b654b7b..2cf6581 100644
---- a/drivers/clk/sunxi/clk-sunxi.c
-+++ b/drivers/clk/sunxi/clk-sunxi.c
-@@ -762,10 +762,19 @@ static const struct div_data sun4i_ahb_data __initconst = {
- 	.width	= 2,
- };
- 
-+static const struct clk_div_table sun4i_apb0_table[] __initconst = {
-+	{ .val = 0, .div = 2 },
-+	{ .val = 1, .div = 2 },
-+	{ .val = 2, .div = 4 },
-+	{ .val = 3, .div = 8 },
-+	{ } /* sentinel */
-+};
-+
- static const struct div_data sun4i_apb0_data __initconst = {
- 	.shift	= 8,
- 	.pow	= 1,
- 	.width	= 2,
-+	.table	= sun4i_apb0_table,
- };
- 
- static const struct div_data sun6i_a31_apb2_div_data __initconst = {
+
 -- 
-2.1.0
+motzblog.wordpress.com
