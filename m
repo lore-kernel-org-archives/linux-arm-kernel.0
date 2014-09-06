@@ -1,35 +1,28 @@
-From: emilio@elopez.com.ar (=?windows-1252?Q?Emilio_L=F3pez?=)
-Date: Sat, 06 Sep 2014 12:55:18 -0300
-Subject: [PATCH] clk: sunxi: add correct divider table for sun4i-apb0 clock
-In-Reply-To: <1409985910-30737-1-git-send-email-wens@csie.org>
-References: <1409985910-30737-1-git-send-email-wens@csie.org>
-Message-ID: <540B2E66.1020509@elopez.com.ar>
+From: emilio@elopez.com.ar (=?UTF-8?B?RW1pbGlvIEzDs3Bleg==?=)
+Date: Sat, 06 Sep 2014 13:50:21 -0300
+Subject: [PATCH 1/5] ARM: sun4i: Relicense the A10 DTSI under GPLv2/X11
+In-Reply-To: <1409682069-7164-1-git-send-email-maxime.ripard@free-electrons.com>
+References: <1409682069-7164-1-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <540B3B4D.9090108@elopez.com.ar>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Maxime,
 
-El 06/09/14 a las 03:45, Chen-Yu Tsai escibi?:
-> The sun4i-apb0 clock, as found on all platforms using it, is a
-> power-of-two-based divider clock, with a special divider of 2
-> for value 0.
+El 02/09/14 a las 15:21, Maxime Ripard escibi?:
+> The current GPL only licensing on the DTSI makes it very impractical for other
+> software components licensed under another license.
 >
-> This was causing the clock framework to incorrectly calculate
-> the clock rate for apb1 and related modules on sun6i and sun8i.
-> On sun[4/5/7]i, u-boot SPL configures the divider with value 1
-> for /2 divider, so no suprises there.
+> In order to make it easier for them to reuse our device trees, relicense our
+> DTSI first under a GPL/X11 dual-license. Hopefully, the DTS will follow soon.
 >
-> This patch adds a proper divider table for it, so the correct
-> clock rate can be calculated.
->
-> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 
- From a quick look at the A10 manual,
+For this whole series (and any future one doing this same kind of dual 
+licensing on sunxi dts/dtsi where I may be involved),
 
 Acked-by: Emilio L?pez <emilio@elopez.com.ar>
 
-I'll see about testing it on hardware today/tomorrow
-
-Thanks!
+Cheers,
 
 Emilio
