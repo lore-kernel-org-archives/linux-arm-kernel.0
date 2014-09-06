@@ -1,44 +1,37 @@
-From: behanw@converseincode.com (behanw at converseincode.com)
-Date: Fri,  5 Sep 2014 17:06:17 -0700
-Subject: [PATCH v2 7/7] arm: LLVMLinux: Use global stack register variable for
- percpu
-In-Reply-To: <1409961977-11762-1-git-send-email-behanw@converseincode.com>
-References: <1409961977-11762-1-git-send-email-behanw@converseincode.com>
-Message-ID: <1409961977-11762-8-git-send-email-behanw@converseincode.com>
+From: tinamdar@apm.com (Tanmay Inamdar)
+Date: Fri,  5 Sep 2014 17:25:43 -0700
+Subject: [PATCH v6 4/4] MAINTAINERS: entry for APM X-Gene PCIe host driver
+In-Reply-To: <1409963143-11951-1-git-send-email-tinamdar@apm.com>
+References: <1409963143-11951-1-git-send-email-tinamdar@apm.com>
+Message-ID: <1409963143-11951-5-git-send-email-tinamdar@apm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Mark Charlebois <charlebm@gmail.com>
+Add entry for AppliedMicro X-Gene PCIe host driver.
 
-Using global current_stack_pointer works on both clang and gcc.
-current_stack_pointer is an unsigned long and needs to be cast
-as a pointer to dereference.
-
-Signed-off-by: Mark Charlebois <charlebm@gmail.com>
+Signed-off-by: Tanmay Inamdar <tinamdar@apm.com>
 ---
- arch/arm/include/asm/percpu.h | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ MAINTAINERS | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-diff --git a/arch/arm/include/asm/percpu.h b/arch/arm/include/asm/percpu.h
-index 209e650..a89b407 100644
---- a/arch/arm/include/asm/percpu.h
-+++ b/arch/arm/include/asm/percpu.h
-@@ -30,14 +30,14 @@ static inline void set_my_cpu_offset(unsigned long off)
- static inline unsigned long __my_cpu_offset(void)
- {
- 	unsigned long off;
--	register unsigned long *sp asm ("sp");
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 5e7866a..cd9bb3da 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -6941,6 +6941,14 @@ L:	linux-pci at vger.kernel.org
+ S:	Maintained
+ F:	drivers/pci/host/*spear*
  
- 	/*
- 	 * Read TPIDRPRW.
- 	 * We want to allow caching the value, so avoid using volatile and
- 	 * instead use a fake stack read to hazard against barrier().
- 	 */
--	asm("mrc p15, 0, %0, c13, c0, 4" : "=r" (off) : "Q" (*sp));
-+	asm("mrc p15, 0, %0, c13, c0, 4" : "=r" (off)
-+		: "Q" (*(const unsigned long *)current_stack_pointer));
- 
- 	return off;
- }
++PCI DRIVER FOR APPLIEDMICRO XGENE
++M:	Tanmay Inamdar <tinamdar@apm.com>
++L:	linux-pci at vger.kernel.org
++L:	linux-arm-kernel at lists.infradead.org
++S:	Maintained
++F:	Documentation/devicetree/bindings/pci/xgene-pci.txt
++F:	drivers/pci/host/pci-xgene.c
++
+ PCMCIA SUBSYSTEM
+ P:	Linux PCMCIA Team
+ L:	linux-pcmcia at lists.infradead.org
 -- 
 1.9.1
