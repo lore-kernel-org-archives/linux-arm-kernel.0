@@ -1,66 +1,47 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Sat, 06 Sep 2014 09:10:41 -0500
-Subject: [PATCH] ARM: omap: Remove stray ARCH_HAS_OPP references
-In-Reply-To: <1409998456-28066-1-git-send-email-broonie@kernel.org>
-References: <1409998456-28066-1-git-send-email-broonie@kernel.org>
-Message-ID: <540B15E1.6090604@ti.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Sat, 06 Sep 2014 16:12:57 +0200
+Subject: [PATCH] arm64: LLVMLinux: Add missing abort() for AARCH64
+In-Reply-To: <1409959302-13976-1-git-send-email-behanw@converseincode.com>
+References: <1409959302-13976-1-git-send-email-behanw@converseincode.com>
+Message-ID: <53558632.2D4ZDSZcaf@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/06/2014 05:14 AM, Mark Brown wrote:
-> OPP is now a normal kernel library selected by its users rather than a
-> feature that architectures need to enable so ARCH_HAS_OPP serves no
-> function any more - remove the selects.
->
-> Signed-off-by: Mark Brown <broonie@kernel.org>
-> ---
->   arch/arm/mach-omap2/Kconfig | 5 -----
->   1 file changed, 5 deletions(-)
->
-> diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
-> index e7189dcc9309..11ccf0b4e5c2 100644
-> --- a/arch/arm/mach-omap2/Kconfig
-> +++ b/arch/arm/mach-omap2/Kconfig
-> @@ -25,7 +25,6 @@ config ARCH_OMAP4
->   	bool "TI OMAP4"
->   	depends on ARCH_MULTI_V7
->   	select ARCH_OMAP2PLUS
-> -	select ARCH_HAS_OPP
->   	select ARCH_NEEDS_CPU_IDLE_COUPLED if SMP
->   	select ARM_CPU_SUSPEND if PM
->   	select ARM_ERRATA_720789
-> @@ -44,7 +43,6 @@ config SOC_OMAP5
->   	bool "TI OMAP5"
->   	depends on ARCH_MULTI_V7
->   	select ARCH_OMAP2PLUS
-> -	select ARCH_HAS_OPP
->   	select ARM_CPU_SUSPEND if PM
->   	select ARM_GIC
->   	select HAVE_ARM_SCU if SMP
-> @@ -56,14 +54,12 @@ config SOC_AM33XX
->   	bool "TI AM33XX"
->   	depends on ARCH_MULTI_V7
->   	select ARCH_OMAP2PLUS
-> -	select ARCH_HAS_OPP
->   	select ARM_CPU_SUSPEND if PM
->
->   config SOC_AM43XX
->   	bool "TI AM43x"
->   	depends on ARCH_MULTI_V7
->   	select ARCH_OMAP2PLUS
-> -	select ARCH_HAS_OPP
->   	select ARM_GIC
->   	select MACH_OMAP_GENERIC
->   	select MIGHT_HAVE_CACHE_L2X0
-> @@ -72,7 +68,6 @@ config SOC_DRA7XX
->   	bool "TI DRA7XX"
->   	depends on ARCH_MULTI_V7
->   	select ARCH_OMAP2PLUS
-> -	select ARCH_HAS_OPP
->   	select ARM_CPU_SUSPEND if PM
->   	select ARM_GIC
->   	select HAVE_ARM_ARCH_TIMER
->
+On Friday 05 September 2014 16:21:42 behanw at converseincode.com wrote:
+> From: Mark Charlebois <charlebm@gmail.com>
+> 
+> Add missing abort for arch aarch64.
+> 
+> This patch makes the aarch64 kernel able to compile with gcc or clang.
+> 
+> Signed-off-by: Mark Charlebois <charlebm@gmail.com>
+> Signed-off-by: Behan Webster <behanw@converseincode.com>
 
+You don't describe why this is needed. When does clang emit an abort()
+call? Is that the expected behavior when not linking against a full
+C library?
 
-Acked-by: Nishanth Menon <nm@ti.com>
+>  arch/arm64/kernel/traps.c | 9 +++++++++
+>  1 file changed, 9 insertions(+)
+> 
+> diff --git a/arch/arm64/kernel/traps.c b/arch/arm64/kernel/traps.c
+> index 02cd3f0..123cd6e 100644
+> --- a/arch/arm64/kernel/traps.c
+> +++ b/arch/arm64/kernel/traps.c
+> @@ -349,6 +349,15 @@ void __pgd_error(const char *file, int line, unsigned long val)
+>         pr_crit("%s:%d: bad pgd %016lx.\n", file, line, val);
+>  }
+>  
+> +void abort(void)
+> +{
+> +       BUG();
+> +
+> +       /* if that doesn't kill us, halt */
+> +       panic("Oops failed to kill thread");
+> +}
+> +EXPORT_SYMBOL(abort);
+
+I don't see the point in doing both BUG() and panic(). Doesn't panic()
+already print all the information you want in this case?
+
+	Arnd
