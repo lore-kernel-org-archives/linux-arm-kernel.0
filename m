@@ -1,35 +1,65 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Sat,  6 Sep 2014 18:47:27 +0800
-Subject: [PATCH 6/7] ARM: dts: sun6i: Add required ahb1 clock parent and rates
- for dma controller
+Date: Sat,  6 Sep 2014 18:47:28 +0800
+Subject: [PATCH 7/7] dmaengine: sun6i: Remove obsolete clk muxing code
 In-Reply-To: <1410000448-9999-1-git-send-email-wens@csie.org>
 References: <1410000448-9999-1-git-send-email-wens@csie.org>
-Message-ID: <1410000448-9999-7-git-send-email-wens@csie.org>
+Message-ID: <1410000448-9999-8-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The DMA controller requires AHB1 bus clock to be clocked from PLL6.
+The sun6i DMA controller requires the AHB1 bus clock to be
+clocked from PLL6. This was originally done by the dmaengine
+driver during probe time. The AHB1 clock driver has since been
+unified, so the original code does not work.
+
+Remove the clk muxing code, and replace it with DT clk default
+properties.
 
 Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 ---
- arch/arm/boot/dts/sun6i-a31.dtsi | 5 +++++
- 1 file changed, 5 insertions(+)
+ drivers/dma/sun6i-dma.c | 23 -----------------------
+ 1 file changed, 23 deletions(-)
 
-diff --git a/arch/arm/boot/dts/sun6i-a31.dtsi b/arch/arm/boot/dts/sun6i-a31.dtsi
-index 8eb2c6d..1117989 100644
---- a/arch/arm/boot/dts/sun6i-a31.dtsi
-+++ b/arch/arm/boot/dts/sun6i-a31.dtsi
-@@ -317,6 +317,11 @@
- 			clocks = <&ahb1_gates 6>;
- 			resets = <&ahb1_rst 6>;
- 			#dma-cells = <1>;
-+
-+			/* DMA controller requires AHB1 clocked from PLL6 */
-+			assigned-clocks = <&ahb1>;
-+			assigned-clock-parents = <&pll6>;
-+			assigned-clock-rates = <200000000>;
- 		};
+diff --git a/drivers/dma/sun6i-dma.c b/drivers/dma/sun6i-dma.c
+index 1f92a56..3aa10b3 100644
+--- a/drivers/dma/sun6i-dma.c
++++ b/drivers/dma/sun6i-dma.c
+@@ -862,7 +862,6 @@ static int sun6i_dma_probe(struct platform_device *pdev)
+ {
+ 	struct sun6i_dma_dev *sdc;
+ 	struct resource *res;
+-	struct clk *mux, *pll6;
+ 	int ret, i;
  
- 		mmc0: mmc at 01c0f000 {
+ 	sdc = devm_kzalloc(&pdev->dev, sizeof(*sdc), GFP_KERNEL);
+@@ -886,28 +885,6 @@ static int sun6i_dma_probe(struct platform_device *pdev)
+ 		return PTR_ERR(sdc->clk);
+ 	}
+ 
+-	mux = clk_get(NULL, "ahb1_mux");
+-	if (IS_ERR(mux)) {
+-		dev_err(&pdev->dev, "Couldn't get AHB1 Mux\n");
+-		return PTR_ERR(mux);
+-	}
+-
+-	pll6 = clk_get(NULL, "pll6");
+-	if (IS_ERR(pll6)) {
+-		dev_err(&pdev->dev, "Couldn't get PLL6\n");
+-		clk_put(mux);
+-		return PTR_ERR(pll6);
+-	}
+-
+-	ret = clk_set_parent(mux, pll6);
+-	clk_put(pll6);
+-	clk_put(mux);
+-
+-	if (ret) {
+-		dev_err(&pdev->dev, "Couldn't reparent AHB1 on PLL6\n");
+-		return ret;
+-	}
+-
+ 	sdc->rstc = devm_reset_control_get(&pdev->dev, NULL);
+ 	if (IS_ERR(sdc->rstc)) {
+ 		dev_err(&pdev->dev, "No reset controller specified\n");
 -- 
 2.1.0
