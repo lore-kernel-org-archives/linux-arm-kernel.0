@@ -1,51 +1,33 @@
 From: broonie@kernel.org (Mark Brown)
-Date: Sat,  6 Sep 2014 12:40:16 +0100
-Subject: [PATCH] ARM: zynq: Add ISL9305 regulator on Parallella board
-Message-ID: <1410003616-32077-1-git-send-email-broonie@kernel.org>
+Date: Sat, 6 Sep 2014 13:54:12 +0100
+Subject: [PATCH] irq: gic-v3: Tag all low level accessors __maybey_unused
+In-Reply-To: <20140817170453.GE12769@titan.lakedaemon.net>
+References: <1406748194-21094-1-git-send-email-broonie@kernel.org>
+ <20140817170453.GE12769@titan.lakedaemon.net>
+Message-ID: <20140906125412.GA32429@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There is an ISL9305 regulator on the Parallella board, add it to the DT
-along with descriptions of all the supplies.
+On Sun, Aug 17, 2014 at 01:04:53PM -0400, Jason Cooper wrote:
+> On Wed, Jul 30, 2014 at 08:23:14PM +0100, Mark Brown wrote:
+> > From: Mark Brown <broonie@linaro.org>
 
-Signed-off-by: Mark Brown <broonie@kernel.org>
----
- arch/arm/boot/dts/zynq-parallella.dts | 23 +++++++++++++++++++++++
- 1 file changed, 23 insertions(+)
+> > This is only really needed for gic_write_sgi1r in the !SMP case since it
+> > is only referenced in the SMP initialisation code but it seems better to
+> > have these functions all next to each other and declared consistently.
 
-diff --git a/arch/arm/boot/dts/zynq-parallella.dts b/arch/arm/boot/dts/zynq-parallella.dts
-index 41afd9da6876..43ca89fb92e4 100644
---- a/arch/arm/boot/dts/zynq-parallella.dts
-+++ b/arch/arm/boot/dts/zynq-parallella.dts
-@@ -53,6 +53,29 @@
- 
- &i2c0 {
- 	status = "okay";
-+
-+	isl9305: isl9305 at 68 {
-+		compatible = "isl,isl9305";
-+		reg = <0x68>;
-+
-+		regulators {
-+			dcd1 {
-+				regulator-name = "VDD_DSP";
-+				regulator-always-on;
-+			};
-+			dcd2 {
-+				regulator-name = "1P35V";
-+				regulator-always-on;
-+			};
-+			ldo1 {
-+				regulator-name = "VDD_ADJ";
-+			};
-+			ldo2 {
-+				regulator-name = "VDD_GPIO";
-+				regulator-always-on;
-+			};
-+		};
-+	};
- };
- 
- &sdhci1 {
--- 
-2.1.0
+> > Signed-off-by: Mark Brown <broonie@linaro.org>
+> > ---
+> >  drivers/irqchip/irq-gic-v3.c | 10 +++++-----
+> >  1 file changed, 5 insertions(+), 5 deletions(-)
+
+> Applied to irqchip/urgent
+
+This appears to have disappeared from -next and the warning is back.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140906/2ede6ad0/attachment.sig>
