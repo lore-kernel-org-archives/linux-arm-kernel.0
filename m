@@ -1,88 +1,57 @@
-From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Sat, 6 Sep 2014 08:17:43 -0600
-Subject: [PATCH v6 0/4] APM X-Gene PCIe host controller
-In-Reply-To: <1409963143-11951-1-git-send-email-tinamdar@apm.com>
-References: <1409963143-11951-1-git-send-email-tinamdar@apm.com>
-Message-ID: <CAErSpo643rAAqR0AAy5CwSkMv28Cw8Y55EYrYo0AHvQZxgvgXg@mail.gmail.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Sat, 6 Sep 2014 15:31:14 +0100
+Subject: [PATCH 2/2] spi: davinci: support adding delay between
+ transmission
+In-Reply-To: <5409C704.5070303@ti.com>
+References: <1408634706-5762-1-git-send-email-grygorii.strashko@ti.com>
+ <1408634706-5762-3-git-send-email-grygorii.strashko@ti.com>
+ <20140821182035.GM24407@sirena.org.uk> <53F74695.3010902@ti.com>
+ <20140822150644.GX24407@sirena.org.uk> <5409C704.5070303@ti.com>
+Message-ID: <20140906143113.GI2601@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 5, 2014 at 6:25 PM, Tanmay Inamdar <tinamdar@apm.com> wrote:
-> This patch adds support for AppliedMicro X-Gene PCIe host controller. The
-> driver is tested on X-Gene platform with different gen1/2/3 PCIe endpoint
-> cards.
->
-> X-Gene PCIe controller driver has depedency on the pcie arm64 arch support.
-> Liviu Dudau from ARM has sent a patch set for pcie arm64 arch support and
-> support for creating generic pcie bridge from device tree. Liviu's patches
-> are available here
-> 1. https://lkml.org/lkml/2014/8/12/361
+On Fri, Sep 05, 2014 at 05:21:56PM +0300, Grygorii Strashko wrote:
 
-I'm hoping to merge Liviu's patches and this X-Gene support for v3.18.
-I'm currently waiting for Liviu's v10 series (hopefully based on
-v3.17-rc2), and since your series depends on that, I'm going to wait
-for a v7 of your series that is rebased on top of Liviu's v10.  Does
-that make sense?
+> I think we have some misunderstanding here :(
+> 1) All new properties a optional and should be specified for SPI Slave devices
+> 2) Seems we are talking using different terms:
+> - you referring to the term "transfers" - sequence of packets.
+>   Each packet is one transfer (array of words).
+> - while these new properties affect on "transmissions" - sequence of words.
+>   Each word is one transmission.
 
-> If someone wishes to test PCIe on X-Gene with this patch set, above mentioned
-> patches from Liviu must be applied before the patches in this patch set. Also
-> please use latest xgene u-boot firmware.
->
-> changes since V5:
-> 1. Port driver to changed interface of 'of_create_pci_host_bridge'
-> 2. Fix the prefetch bit setting
-> 3. Removed bunch of register programming which is already done by firmware
->
-> changes since V4:
-> 1. fix section mismatch warnings
-> 2. fix the patch description
-> 3. fix indentation
-> 4. update read/write cfg functions by passing both addr and offset.
-> 5. use 'time_before' for timeout.
-> 6. remove unnecessary 'IS_ERR_OR_NULL'. Keep 'IS_ERR' for 'clk_get'
-> 7. remove BUG_ON for pci_ioremap_io.
->
-> changes since V3:
-> 1. remove 'struct hw_pci' and supporting ops in hw_pci
-> 2. add code to create the host bridge from dts
-> 3. add code to scan the the host bridge
-> 4. modify outbound windows setup function to get resource information from
->    'bridge->windows'
-> 5. add compatible string in pcie dts node with current X-Gene SOC name.
->
-> changes since V2:
-> 1. redefined each PCI port in different PCI domain correctly.
-> 2. removed setup_lane and setup_link functions from driver.
-> 3. removed scan_bus wrapper and set_primary_bus hack.
-> 4. added pci_ioremap_io for io resources.
->
-> changes since V1:
-> 1. added PCI domain support
-> 2. reading cpu and pci addresses from device tree to configure regions.
-> 3. got rid of unnecessary wrappers for readl and writel.
-> 4. got rid of endpoint configuration code.
-> 5. added 'dma-ranges' property support to read inbound region configuration.
-> 6. renamed host driver file to 'pci-xgene.c' from 'pcie-xgene.c'
-> 7. dropped 'clock-names' property from bindings
-> 8. added comments whereever requested.
->
-> Tanmay Inamdar (4):
->   pci:host: APM X-Gene PCIe controller driver
->   arm64: dts: APM X-Gene PCIe device tree nodes
->   dt-bindings: pci: xgene pcie device tree bindings
->   MAINTAINERS: entry for APM X-Gene PCIe host driver
->
->  .../devicetree/bindings/pci/xgene-pci.txt          |  55 ++
->  MAINTAINERS                                        |   8 +
->  arch/arm64/boot/dts/apm-mustang.dts                |   8 +
->  arch/arm64/boot/dts/apm-storm.dtsi                 | 160 ++++++
->  drivers/pci/host/Kconfig                           |  10 +
->  drivers/pci/host/Makefile                          |   1 +
->  drivers/pci/host/pci-xgene.c                       | 638 +++++++++++++++++++++
->  7 files changed, 880 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/pci/xgene-pci.txt
->  create mode 100644 drivers/pci/host/pci-xgene.c
->
-> --
-> 1.9.1
->
+That's *very* unusual terminology which doesn't match my expectations at
+all.  Please describe words as words, that'll be much more obvious.
+
+> Also, below is additional information about properties which
+> are used in 5-pin mode (SPI_READY) to improve error detection
+> [OMAP-L138/da830 - http://www.ti.com/lit/ug/spruh77a/spruh77a.pdf]:
+
+This is a *whole* other thing, please split these out and work on this
+separately.  The client device is going to need to be doing the same
+thing here so implementing this as a local option in the controller
+driver isn't the best way forwards.
+
+> >> SPIFMTn[23].PARPOL - Parity polarity: even or odd. PARPOL can be modified in privilege mode only.
+> >>   0 An even parity flag is added at the end of the transmit data stream.
+> >>   1 An odd parity flag is added at the end of the transmit data stream.
+
+> > Why would these be specified in DT and not with runtime flags enabled by
+> > the device?  It looks like they affect the data stream generated by the
+> > controller so the client device needs to know about them; I'd expect
+> > that it's device driver would be controlling when they are enabled if
+> > the controller supports them.
+
+> Could you clarify, pls - Do you mean that struct spi_device.mode and 
+> common SPI DT bindings should be extended to support this?
+
+Yes, if they aren't something that's purely internal to the device they
+need to be generic so that both devices can be configured appropriately.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140906/36c7ece5/attachment-0001.sig>
