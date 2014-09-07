@@ -1,32 +1,38 @@
-From: mpa@pengutronix.de (Markus Pargmann)
-Date: Sun,  7 Sep 2014 19:19:31 +0200
-Subject: [PATCH v6 3/7] net: cpsw: header, Add missing include
-In-Reply-To: <1410110375-3570-1-git-send-email-mpa@pengutronix.de>
-References: <1410110375-3570-1-git-send-email-mpa@pengutronix.de>
-Message-ID: <1410110375-3570-4-git-send-email-mpa@pengutronix.de>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Sun, 07 Sep 2014 22:42:43 +0200
+Subject: [PATCH] rtc: pcf8563: fix uninitialized use warning
+Message-ID: <3640058.m4Rfp1dmTJ@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-"MII_BUS_ID_SIZE" is defined in linux/phy.h which is not included in the
-cpsw.h file.
+gcc-4.9 found a potential condition under which the 'pending'
+variable may be used uninitialized:
 
-Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
-Reviewed-by: Wolfram Sang <wsa@the-dreams.de>
----
- drivers/net/ethernet/ti/cpsw.h | 1 +
- 1 file changed, 1 insertion(+)
+drivers/rtc/rtc-pcf8563.c: In function 'pcf8563_irq':
+drivers/rtc/rtc-pcf8563.c:173:5: warning: 'pending' may be used uninitialized in this function [-Wmaybe-uninitialized]
 
-diff --git a/drivers/net/ethernet/ti/cpsw.h b/drivers/net/ethernet/ti/cpsw.h
-index 574f49da693f..1b710674630c 100644
---- a/drivers/net/ethernet/ti/cpsw.h
-+++ b/drivers/net/ethernet/ti/cpsw.h
-@@ -15,6 +15,7 @@
- #define __CPSW_H__
+This is because in the pcf8563_get_alarm_mode() function, we
+check any nonzero return of pcf8563_read_block_data, but
+in the irq function we only check for negative values, so
+a possible positive value does not get detected if the compiler
+chooses not to inline the entire call chain.
+
+Checking for any non-zero value in the interrupt handler as well
+is just as correct and lets the compiler know what we are doing,
+without needing a bogus initialization.
+
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+
+diff --git a/drivers/rtc/rtc-pcf8563.c b/drivers/rtc/rtc-pcf8563.c
+index 5a197d9dc7e7..3a6f994c4da8 100644
+--- a/drivers/rtc/rtc-pcf8563.c
++++ b/drivers/rtc/rtc-pcf8563.c
+@@ -167,7 +167,7 @@ static irqreturn_t pcf8563_irq(int irq, void *dev_id)
+ 	char pending;
  
- #include <linux/if_ether.h>
-+#include <linux/phy.h>
+ 	err = pcf8563_get_alarm_mode(pcf8563->client, NULL, &pending);
+-	if (err < 0)
++	if (err)
+ 		return err;
  
- struct cpsw_slave_data {
- 	char		phy_id[MII_BUS_ID_SIZE];
--- 
-2.1.0
+ 	if (pending) {
