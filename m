@@ -1,35 +1,147 @@
-From: arno@natisbad.org (Arnaud Ebalard)
-Date: Sun, 07 Sep 2014 11:19:19 +0200
-Subject: [PATCH 1/2] ARM: mvebu: Netgear RN104: Use Hardware BCH ECC
-In-Reply-To: <20140907093851.377ddd29@free-electrons.com> (Thomas Petazzoni's
- message of "Sun, 7 Sep 2014 09:38:51 +0200")
-References: <cover.1410035142.git.arno@natisbad.org>
- <920c7e7169dc6aaaa3eb4bced2336d38e77b8864.1410035142.git.arno@natisbad.org>
- <20140907093851.377ddd29@free-electrons.com>
-Message-ID: <87oaurg548.fsf@natisbad.org>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Sun, 7 Sep 2014 11:36:05 +0200
+Subject: [PATCH v3 2/2] arm/arm64: KVM: Support KVM_CAP_READONLY_MEM
+In-Reply-To: <1409053393-13768-2-git-send-email-christoffer.dall@linaro.org>
+References: <1409053393-13768-1-git-send-email-christoffer.dall@linaro.org>
+ <1409053393-13768-2-git-send-email-christoffer.dall@linaro.org>
+Message-ID: <CAKv+Gu-ph_eRvX=bCcryQHx02fTXcaXeHWxyUeyhbhsD2VJ5gg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas,
-
-Thomas Petazzoni <thomas.petazzoni@free-electrons.com> writes:
-
-> On Sat, 06 Sep 2014 22:49:25 +0200, Arnaud Ebalard wrote:
+On 26 August 2014 13:43, Christoffer Dall <christoffer.dall@linaro.org> wrote:
+> When userspace loads code and data in a read-only memory regions, KVM
+> needs to be able to handle this on arm and arm64.  Specifically this is
+> used when running code directly from a read-only flash device; the
+> common scenario is a UEFI blob loaded with the -bios option in QEMU.
 >
->> Fixes: 0373a558bd79 ("ARM: mvebu: Enable NAND controller in ReadyNAS 104 .dts file")
->> Depends-on: 5b3e507820c6 ("mtd: nand: pxa3xx: Use ECC strength and step size devicetree binding")
+> Note that the MMIO exit on writes to a read-only memory is ABI and can
+> be used to emulate block-erase style flash devices.
 >
-> Maybe it's worth noting that it's not a build dependency: your commit
-> changing the Device Tree files can perfectly be applied without the
-> NAND ECC strength and step size bindings. Of course, it will have no
-> effect on an older kernel that doesn't support those bindings, but it
-> will not cause a build failure.
+> Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 
-Yes. To be more explicit, if the patches are candidates for stable, I
-think they are only useful for 3.16.y (3.16 is the first kernel with
-5b3e507820c6). As you point, backporting down to 3.14 would not hurt
-but would only be decorative.
+Tested-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 
-Cheers,
+Are these on track for 3.18?
 
-a+
+
+> ---
+> Changelog[v3]:
+>  - Remove the check for fault_status != FSC_FAULT in the I/O memory
+>    abort section, since we now do support permission faults on I/O
+>    regions.  Reported-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> Changelog[v2]:
+>  - None
+>
+>  arch/arm/include/uapi/asm/kvm.h   |  1 +
+>  arch/arm/kvm/arm.c                |  1 +
+>  arch/arm/kvm/mmu.c                | 22 ++++++++--------------
+>  arch/arm64/include/uapi/asm/kvm.h |  1 +
+>  4 files changed, 11 insertions(+), 14 deletions(-)
+>
+> diff --git a/arch/arm/include/uapi/asm/kvm.h b/arch/arm/include/uapi/asm/kvm.h
+> index e6ebdd3..51257fd 100644
+> --- a/arch/arm/include/uapi/asm/kvm.h
+> +++ b/arch/arm/include/uapi/asm/kvm.h
+> @@ -25,6 +25,7 @@
+>
+>  #define __KVM_HAVE_GUEST_DEBUG
+>  #define __KVM_HAVE_IRQ_LINE
+> +#define __KVM_HAVE_READONLY_MEM
+>
+>  #define KVM_REG_SIZE(id)                                               \
+>         (1U << (((id) & KVM_REG_SIZE_MASK) >> KVM_REG_SIZE_SHIFT))
+> diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
+> index 9f788eb..ac306b4 100644
+> --- a/arch/arm/kvm/arm.c
+> +++ b/arch/arm/kvm/arm.c
+> @@ -188,6 +188,7 @@ int kvm_vm_ioctl_check_extension(struct kvm *kvm, long ext)
+>         case KVM_CAP_ONE_REG:
+>         case KVM_CAP_ARM_PSCI:
+>         case KVM_CAP_ARM_PSCI_0_2:
+> +       case KVM_CAP_READONLY_MEM:
+>                 r = 1;
+>                 break;
+>         case KVM_CAP_COALESCED_MMIO:
+> diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
+> index 16e7994..62f5642 100644
+> --- a/arch/arm/kvm/mmu.c
+> +++ b/arch/arm/kvm/mmu.c
+> @@ -747,14 +747,13 @@ static bool transparent_hugepage_adjust(pfn_t *pfnp, phys_addr_t *ipap)
+>  }
+>
+>  static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+> -                         struct kvm_memory_slot *memslot,
+> +                         struct kvm_memory_slot *memslot, unsigned long hva,
+>                           unsigned long fault_status)
+>  {
+>         int ret;
+>         bool write_fault, writable, hugetlb = false, force_pte = false;
+>         unsigned long mmu_seq;
+>         gfn_t gfn = fault_ipa >> PAGE_SHIFT;
+> -       unsigned long hva = gfn_to_hva(vcpu->kvm, gfn);
+>         struct kvm *kvm = vcpu->kvm;
+>         struct kvm_mmu_memory_cache *memcache = &vcpu->arch.mmu_page_cache;
+>         struct vm_area_struct *vma;
+> @@ -863,7 +862,8 @@ int kvm_handle_guest_abort(struct kvm_vcpu *vcpu, struct kvm_run *run)
+>         unsigned long fault_status;
+>         phys_addr_t fault_ipa;
+>         struct kvm_memory_slot *memslot;
+> -       bool is_iabt;
+> +       unsigned long hva;
+> +       bool is_iabt, write_fault, writable;
+>         gfn_t gfn;
+>         int ret, idx;
+>
+> @@ -884,7 +884,10 @@ int kvm_handle_guest_abort(struct kvm_vcpu *vcpu, struct kvm_run *run)
+>         idx = srcu_read_lock(&vcpu->kvm->srcu);
+>
+>         gfn = fault_ipa >> PAGE_SHIFT;
+> -       if (!kvm_is_visible_gfn(vcpu->kvm, gfn)) {
+> +       memslot = gfn_to_memslot(vcpu->kvm, gfn);
+> +       hva = gfn_to_hva_memslot_prot(memslot, gfn, &writable);
+> +       write_fault = kvm_is_write_fault(kvm_vcpu_get_hsr(vcpu));
+> +       if (kvm_is_error_hva(hva) || (write_fault && !writable)) {
+>                 if (is_iabt) {
+>                         /* Prefetch Abort on I/O address */
+>                         kvm_inject_pabt(vcpu, kvm_vcpu_get_hfar(vcpu));
+> @@ -892,13 +895,6 @@ int kvm_handle_guest_abort(struct kvm_vcpu *vcpu, struct kvm_run *run)
+>                         goto out_unlock;
+>                 }
+>
+> -               if (fault_status != FSC_FAULT) {
+> -                       kvm_err("Unsupported fault status on io memory: %#lx\n",
+> -                               fault_status);
+> -                       ret = -EFAULT;
+> -                       goto out_unlock;
+> -               }
+> -
+>                 /*
+>                  * The IPA is reported as [MAX:12], so we need to
+>                  * complement it with the bottom 12 bits from the
+> @@ -910,9 +906,7 @@ int kvm_handle_guest_abort(struct kvm_vcpu *vcpu, struct kvm_run *run)
+>                 goto out_unlock;
+>         }
+>
+> -       memslot = gfn_to_memslot(vcpu->kvm, gfn);
+> -
+> -       ret = user_mem_abort(vcpu, fault_ipa, memslot, fault_status);
+> +       ret = user_mem_abort(vcpu, fault_ipa, memslot, hva, fault_status);
+>         if (ret == 0)
+>                 ret = 1;
+>  out_unlock:
+> diff --git a/arch/arm64/include/uapi/asm/kvm.h b/arch/arm64/include/uapi/asm/kvm.h
+> index e633ff8..f4ec5a6 100644
+> --- a/arch/arm64/include/uapi/asm/kvm.h
+> +++ b/arch/arm64/include/uapi/asm/kvm.h
+> @@ -37,6 +37,7 @@
+>
+>  #define __KVM_HAVE_GUEST_DEBUG
+>  #define __KVM_HAVE_IRQ_LINE
+> +#define __KVM_HAVE_READONLY_MEM
+>
+>  #define KVM_REG_SIZE(id)                                               \
+>         (1U << (((id) & KVM_REG_SIZE_MASK) >> KVM_REG_SIZE_SHIFT))
+> --
+> 2.0.0
+>
