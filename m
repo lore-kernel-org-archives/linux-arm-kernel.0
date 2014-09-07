@@ -1,35 +1,66 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Sun, 7 Sep 2014 12:06:34 +0200
-Subject: [PATCH v3 2/2] arm/arm64: KVM: Support KVM_CAP_READONLY_MEM
-In-Reply-To: <CAKv+Gu-ph_eRvX=bCcryQHx02fTXcaXeHWxyUeyhbhsD2VJ5gg@mail.gmail.com>
-References: <1409053393-13768-1-git-send-email-christoffer.dall@linaro.org>
- <1409053393-13768-2-git-send-email-christoffer.dall@linaro.org>
- <CAKv+Gu-ph_eRvX=bCcryQHx02fTXcaXeHWxyUeyhbhsD2VJ5gg@mail.gmail.com>
-Message-ID: <CAMJs5B__CFvVHU46_m6H3kNp4rXqQdEZmAP2=j4sCjcJLDG1OA@mail.gmail.com>
+From: sagar.tv@gmail.com (Vidya Sagar)
+Date: Sun,  7 Sep 2014 15:58:07 +0530
+Subject: [PATCH v4] ARM: fix debug prints relevant to PCI devices
+Message-ID: <1410085687-11273-1-git-send-email-vidyas@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Sep 7, 2014 at 11:36 AM, Ard Biesheuvel
-<ard.biesheuvel@linaro.org> wrote:
-> On 26 August 2014 13:43, Christoffer Dall <christoffer.dall@linaro.org> wrote:
->> When userspace loads code and data in a read-only memory regions, KVM
->> needs to be able to handle this on arm and arm64.  Specifically this is
->> used when running code directly from a read-only flash device; the
->> common scenario is a UEFI blob loaded with the -bios option in QEMU.
->>
->> Note that the MMIO exit on writes to a read-only memory is ABI and can
->> be used to emulate block-erase style flash devices.
->>
->> Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
->
-> Tested-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->
+From: Vidya Sagar <sagar.tv@gmail.com>
 
-Thanks!
+As per PCIe spec, fast back-to-back transactions feature
+is not applicable to PCIe devices. Hence, do not print
+that fast back-to-back trasactions are disabled when
+there is a PCIe device found on the bus
 
-> Are these on track for 3.18?
->
-yes, already in kvmarm/next.
+Signed-off-by: Vidya Sagar <sagar.tv@gmail.com>
+---
+v4:
+* initialized 'has_pcie_dev' to 'false'
 
--Christoffer
+v3:
+* removed KERN_INFO from pr_info() which was not removed by mistake in previous patch
+
+v2:
+* Modified has_pcie_dev type to bool and used pci_is_pcie() instead of pci_pcie_cap()
+* replaced printk with pr_info
+
+ arch/arm/kernel/bios32.c | 9 +++++++--
+ 1 file changed, 7 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/kernel/bios32.c b/arch/arm/kernel/bios32.c
+index 17a26c1..03c56ba 100644
+--- a/arch/arm/kernel/bios32.c
++++ b/arch/arm/kernel/bios32.c
+@@ -290,6 +290,7 @@ void pcibios_fixup_bus(struct pci_bus *bus)
+ {
+ 	struct pci_dev *dev;
+ 	u16 features = PCI_COMMAND_SERR | PCI_COMMAND_PARITY | PCI_COMMAND_FAST_BACK;
++	bool has_pcie_dev = false;
+ 
+ 	/*
+ 	 * Walk the devices on this bus, working out what we can
+@@ -298,6 +299,8 @@ void pcibios_fixup_bus(struct pci_bus *bus)
+ 	list_for_each_entry(dev, &bus->devices, bus_list) {
+ 		u16 status;
+ 
++		if (!has_pcie_dev)
++			has_pcie_dev = pci_is_pcie(dev);
+ 		pci_read_config_word(dev, PCI_STATUS, &status);
+ 
+ 		/*
+@@ -354,9 +357,11 @@ void pcibios_fixup_bus(struct pci_bus *bus)
+ 
+ 	/*
+ 	 * Report what we did for this bus
++	 * (only if the bus doesn't have any PCIe devices)
+ 	 */
+-	printk(KERN_INFO "PCI: bus%d: Fast back to back transfers %sabled\n",
+-		bus->number, (features & PCI_COMMAND_FAST_BACK) ? "en" : "dis");
++	if (!has_pcie_dev)
++		pr_info("PCI: bus%d: Fast back to back transfers %sabled\n",
++			bus->number, (features & PCI_COMMAND_FAST_BACK) ? "en" : "dis");
+ }
+ EXPORT_SYMBOL(pcibios_fixup_bus);
+ 
+-- 
+1.8.1.5
