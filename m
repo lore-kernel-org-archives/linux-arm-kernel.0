@@ -1,38 +1,37 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Sun, 07 Sep 2014 22:42:43 +0200
-Subject: [PATCH] rtc: pcf8563: fix uninitialized use warning
-Message-ID: <3640058.m4Rfp1dmTJ@wuerfel>
+Date: Sun, 07 Sep 2014 23:06:05 +0200
+Subject: [PATCH ] ARM: pxa: fix section mismatch warning for
+ pxa_timer_nodt_init
+In-Reply-To: <12220413.BdRleC0Xf5@wuerfel>
+References: <1405356724-32207-1-git-send-email-robert.jarzmik@free.fr>
+ <87oawivarv.fsf@free.fr> <12220413.BdRleC0Xf5@wuerfel>
+Message-ID: <3188925.pjYA4K7kjn@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-gcc-4.9 found a potential condition under which the 'pending'
-variable may be used uninitialized:
+On Saturday 26 July 2014 20:50:36 Arnd Bergmann wrote:
+> commit a38b1f60b5245a3 ("ARM: pxa: Add non device-tree timer link to
+> clocksource") introduced a harmless section mismatch warning for
+> all pxa platforms, by introducing a new pxa_timer_init() function
+> that is not marked __init but that calls pxa_timer_nodt_init(),
+> which is. The function is only called at init time, so it is safe
+> to also annotate it this way.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> 
 
-drivers/rtc/rtc-pcf8563.c: In function 'pcf8563_irq':
-drivers/rtc/rtc-pcf8563.c:173:5: warning: 'pending' may be used uninitialized in this function [-Wmaybe-uninitialized]
+Apparently this is not merged yet, should we take it through arm-soc?
 
-This is because in the pcf8563_get_alarm_mode() function, we
-check any nonzero return of pcf8563_read_block_data, but
-in the irq function we only check for negative values, so
-a possible positive value does not get detected if the compiler
-chooses not to inline the entire call chain.
-
-Checking for any non-zero value in the interrupt handler as well
-is just as correct and lets the compiler know what we are doing,
-without needing a bogus initialization.
-
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-
-diff --git a/drivers/rtc/rtc-pcf8563.c b/drivers/rtc/rtc-pcf8563.c
-index 5a197d9dc7e7..3a6f994c4da8 100644
---- a/drivers/rtc/rtc-pcf8563.c
-+++ b/drivers/rtc/rtc-pcf8563.c
-@@ -167,7 +167,7 @@ static irqreturn_t pcf8563_irq(int irq, void *dev_id)
- 	char pending;
- 
- 	err = pcf8563_get_alarm_mode(pcf8563->client, NULL, &pending);
--	if (err < 0)
-+	if (err)
- 		return err;
- 
- 	if (pending) {
+diff --git a/arch/arm/mach-pxa/generic.c b/arch/arm/mach-pxa/generic.c
+index 630fa916bbc6..04b013fbc98f 100644
+--- a/arch/arm/mach-pxa/generic.c
++++ b/arch/arm/mach-pxa/generic.c
+@@ -61,7 +61,7 @@ EXPORT_SYMBOL(get_clock_tick_rate);
+ /*
+  * For non device-tree builds, keep legacy timer init
+  */
+-void pxa_timer_init(void)
++void __init pxa_timer_init(void)
+ {
+        pxa_timer_nodt_init(IRQ_OST0, io_p2v(0x40a00000),
+                            get_clock_tick_rate());
