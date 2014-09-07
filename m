@@ -1,472 +1,66 @@
-From: info@lategoodbye.de (Stefan Wahren)
-Date: Sun,  7 Sep 2014 13:37:48 +0200
-Subject: [PATCH RFC 2/3] ARM: regulator: add Freescale MXS regulator driver
-In-Reply-To: <1410089869-6611-1-git-send-email-info@lategoodbye.de>
-References: <1410089869-6611-1-git-send-email-info@lategoodbye.de>
-Message-ID: <1410089869-6611-3-git-send-email-info@lategoodbye.de>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Sun, 7 Sep 2014 09:32:18 -0400
+Subject: [RFC PATCH 0/6] Change vendor prefix for Intersil Corporation
+In-Reply-To: <20140820121643.GU12769@titan.lakedaemon.net>
+References: <1408524184-31928-1-git-send-email-p.zabel@pengutronix.de>
+ <20140820121643.GU12769@titan.lakedaemon.net>
+Message-ID: <20140907133218.GA30828@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds driver support for Freescale i.MX23, i.MX28 on-chip regulators.
-There are 4 voltage regulators: vddd, vdda, vddio, vddmem and 1 overall
-current regulator.
+On Wed, Aug 20, 2014 at 08:16:43AM -0400, Jason Cooper wrote:
+> Philipp,
+> 
+> On Wed, Aug 20, 2014 at 10:42:58AM +0200, Philipp Zabel wrote:
+> > Hi,
+> > 
+> > currently there is a wild mixture of isl, isil, and intersil
+> > compatibles in the kernel. I figure at this point it is still
+> > possible to change this to use "isil" everywhere without too
+> > much pain, but it might be preferred to keep the already
+> > documented "isl" prefix, even though it doesn't follow the
+> > convention to use the NASDAQ symbol where available.
+> > 
+> > The current users of the "isil" prefix are the following drivers
+> > and device trees, so we could just as well change those instead:
+> > 	arch/arm/boot/dts/tegra20-seaboard.dts
+> > 	arch/arm/boot/dts/tegra20-ventana.dts
+> > 	arch/arm/boot/dts/tegra30-cardhu.dtsi
+> > 	arch/powerpc/boot/dts/p1022rdk.dts
+> > 	drivers/staging/iio/light/isl29018.c
+> > 	drivers/staging/iio/light/isl29028.c
+> > 
+> > regards
+> > Philipp
+> > 
+> > Philipp Zabel (6):
+> >   of: Change vendor prefix for Intersil Corporation to isil
+> >   Documentation: Add isl1208 and isl12022 to trivial-devices list
+> >   ARM: mvebu: Change vendor prefix for Intersil Corporation to isil
+> >   powerpc/85xx: Change vendor prefix for Intersil Corporation to isil
+> >   rtc: rtc-isl12022: Change vendor prefix for Intersil Corporation to
+> >     isil
+> >   rtc: rtc-isl12057: Change vendor prefix for Intersil Corporation to
+> >     isil
+> > 
+> >  Documentation/devicetree/bindings/i2c/trivial-devices.txt | 4 +++-
+> >  Documentation/devicetree/bindings/vendor-prefixes.txt     | 2 +-
+> >  arch/arm/boot/dts/armada-370-netgear-rn102.dts            | 2 +-
+> >  arch/arm/boot/dts/armada-370-netgear-rn104.dts            | 2 +-
+> >  arch/arm/boot/dts/armada-xp-netgear-rn2120.dts            | 2 +-
+> >  arch/powerpc/boot/dts/ppa8548.dts                         | 2 +-
+> >  drivers/rtc/rtc-isl12022.c                                | 3 ++-
+> >  drivers/rtc/rtc-isl12057.c                                | 3 ++-
+> >  8 files changed, 12 insertions(+), 8 deletions(-)
+> 
+> This looks good overall.  My only nit is that I'd like to see the legacy
+> name(s) captured in the binding docs.
+> 
+> I'll take the Armada dts changes through mvebu/arm-soc after a few days.
 
-Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
----
- drivers/regulator/Kconfig         |   9 +
- drivers/regulator/Makefile        |   1 +
- drivers/regulator/mxs-regulator.c | 411 ++++++++++++++++++++++++++++++++++++++
- 3 files changed, 421 insertions(+)
- create mode 100644 drivers/regulator/mxs-regulator.c
+Just to dot our i's and cross our t's, would you mind sending out a
+non-rfc version of this series?
 
-diff --git a/drivers/regulator/Kconfig b/drivers/regulator/Kconfig
-index 7a3a061..e90e587 100644
---- a/drivers/regulator/Kconfig
-+++ b/drivers/regulator/Kconfig
-@@ -432,6 +432,15 @@ config REGULATOR_MC13892
- 	  Say y here to support the regulators found on the Freescale MC13892
- 	  PMIC.
- 
-+config REGULATOR_MXS
-+	tristate "Freescale MXS on-chip regulators"
-+	depends on ARCH_MXS
-+	default y if ARCH_MXS
-+	help
-+	  Say y here to support Freescale MXS on-chip regulators.
-+	  It is recommended that this option be enabled on i.MX23,
-+	  i.MX28 platform.
-+
- config REGULATOR_PALMAS
- 	tristate "TI Palmas PMIC Regulators"
- 	depends on MFD_PALMAS
-diff --git a/drivers/regulator/Makefile b/drivers/regulator/Makefile
-index 25271f8..0f5b66c 100644
---- a/drivers/regulator/Makefile
-+++ b/drivers/regulator/Makefile
-@@ -58,6 +58,7 @@ obj-$(CONFIG_REGULATOR_MAX77802) += max77802.o
- obj-$(CONFIG_REGULATOR_MC13783) += mc13783-regulator.o
- obj-$(CONFIG_REGULATOR_MC13892) += mc13892-regulator.o
- obj-$(CONFIG_REGULATOR_MC13XXX_CORE) +=  mc13xxx-regulator-core.o
-+obj-$(CONFIG_REGULATOR_MXS) += mxs-regulator.o
- obj-$(CONFIG_REGULATOR_PALMAS) += palmas-regulator.o
- obj-$(CONFIG_REGULATOR_PFUZE100) += pfuze100-regulator.o
- obj-$(CONFIG_REGULATOR_TPS51632) += tps51632-regulator.o
-diff --git a/drivers/regulator/mxs-regulator.c b/drivers/regulator/mxs-regulator.c
-new file mode 100644
-index 0000000..7d74518
---- /dev/null
-+++ b/drivers/regulator/mxs-regulator.c
-@@ -0,0 +1,411 @@
-+/*
-+ * Freescale STMP378X voltage regulators
-+ *
-+ * Embedded Alley Solutions, Inc <source@embeddedalley.com>
-+ *
-+ * Copyright (C) 2014 Stefan Wahren
-+ * Copyright (C) 2010 Freescale Semiconductor, Inc.
-+ * Copyright 2008 Embedded Alley Solutions, Inc All Rights Reserved.
-+ */
-+
-+/*
-+ * The code contained herein is licensed under the GNU General Public
-+ * License. You may obtain a copy of the GNU General Public License
-+ * Version 2 or later at the following locations:
-+ *
-+ * http://www.opensource.org/licenses/gpl-license.html
-+ * http://www.gnu.org/copyleft/gpl.html
-+ */
-+
-+#include <linux/delay.h>
-+#include <linux/err.h>
-+#include <linux/init.h>
-+#include <linux/io.h>
-+#include <linux/kernel.h>
-+#include <linux/module.h>
-+#include <linux/of.h>
-+#include <linux/of_address.h>
-+#include <linux/platform_device.h>
-+#include <linux/regulator/driver.h>
-+#include <linux/regulator/machine.h>
-+#include <linux/regulator/of_regulator.h>
-+#include <linux/slab.h>
-+
-+#define HW_POWER_VDDDCTRL	(0x00000040)
-+#define HW_POWER_VDDACTRL	(0x00000050)
-+#define HW_POWER_VDDIOCTRL	(0x00000060)
-+#define HW_POWER_STS	        (0x000000c0)
-+
-+#define BM_POWER_STS_DC_OK	(1 << 9)
-+#define BM_POWER_REG_MODE       (1 << 17)
-+#define BM_POWER_LEVEL_TRG      0x1f
-+
-+#define MXS_REG5V_NOT_USB 0
-+#define MXS_REG5V_IS_USB 1
-+
-+
-+struct mxs_regulator {
-+	struct regulator_desc rdesc;
-+	struct regulator_init_data *initdata;
-+	struct mxs_regulator *parent;
-+
-+	spinlock_t         lock;
-+	wait_queue_head_t  wait_q;
-+	struct notifier_block nb;
-+
-+	const char *name;
-+	void __iomem *base_addr;
-+	void __iomem *power_addr;
-+	int mode;
-+	int cur_uV;
-+	int cur_uA;
-+	int max_uA;
-+	u32 max_reg_val;
-+};
-+
-+static int mxs_set_voltage(struct regulator_dev *reg, int min_uV, int max_uV,
-+			   unsigned *selector)
-+{
-+	struct mxs_regulator *sreg = rdev_get_drvdata(reg);
-+	struct regulation_constraints *con = &sreg->initdata->constraints;
-+	void __iomem *power_sts = sreg->power_addr + HW_POWER_STS;
-+	u32 val, regs, i;
-+
-+	pr_debug("%s: uv %d, min %d, max %d\n", __func__,
-+		max_uV, con->min_uV, con->max_uV);
-+
-+	if (max_uV < con->min_uV || max_uV > con->max_uV)
-+		return -EINVAL;
-+
-+	val = (max_uV - con->min_uV) * sreg->max_reg_val /
-+			(con->max_uV - con->min_uV);
-+
-+	regs = (__raw_readl(sreg->base_addr) & ~BM_POWER_LEVEL_TRG);
-+	pr_debug("%s: calculated val %d\n", __func__, val);
-+	__raw_writel(val | regs, sreg->base_addr);
-+	for (i = 20; i; i--) {
-+		if (__raw_readl(power_sts) & BM_POWER_STS_DC_OK)
-+			break;
-+		udelay(1);
-+	}
-+
-+	if (i)
-+		goto out;
-+
-+	__raw_writel(val | regs, sreg->base_addr);
-+	for (i = 40000; i; i--) {
-+		if (__raw_readl(power_sts) & BM_POWER_STS_DC_OK)
-+			break;
-+		udelay(1);
-+	}
-+
-+	if (i)
-+		goto out;
-+
-+	for (i = 40000; i; i--) {
-+		if (__raw_readl(power_sts) & BM_POWER_STS_DC_OK)
-+			break;
-+		udelay(1);
-+	}
-+
-+out:
-+	return !i;
-+}
-+
-+
-+static int mxs_get_voltage(struct regulator_dev *reg)
-+{
-+	struct mxs_regulator *sreg = rdev_get_drvdata(reg);
-+	struct regulation_constraints *con = &sreg->initdata->constraints;
-+	int uv;
-+	u32 val = __raw_readl(sreg->base_addr) & BM_POWER_LEVEL_TRG;
-+
-+	if (val > sreg->max_reg_val)
-+		val = sreg->max_reg_val;
-+
-+	uv = con->min_uV + val *
-+		(con->max_uV - con->min_uV) / sreg->max_reg_val;
-+
-+	return uv;
-+}
-+
-+static int main_add_current(struct mxs_regulator *sreg,
-+			    int uA)
-+{
-+	pr_debug("%s: enter reg %s, uA=%d\n", __func__, sreg->name, uA);
-+
-+	if (uA > 0 && (sreg->cur_uA + uA > sreg->max_uA))
-+		return -EINVAL;
-+
-+	sreg->cur_uA += uA;
-+
-+	return 0;
-+}
-+
-+static int mxs_set_current_limit(struct regulator_dev *reg, int min_uA,
-+				 int max_uA)
-+{
-+	struct mxs_regulator *sreg = rdev_get_drvdata(reg);
-+	struct mxs_regulator *parent = sreg->parent;
-+	int ret = 0;
-+	unsigned long flags;
-+
-+	pr_debug("%s: enter reg %s, uA=%d\n",
-+		 __func__, sreg->name, max_uA);
-+
-+	if (parent) {
-+		spin_lock_irqsave(&parent->lock, flags);
-+		ret = main_add_current(parent, max_uA - sreg->cur_uA);
-+		spin_unlock_irqrestore(&parent->lock, flags);
-+	}
-+
-+	if ((!ret) || (!parent))
-+		goto out;
-+
-+	if (sreg->mode == REGULATOR_MODE_FAST)
-+		return ret;
-+
-+	while (ret) {
-+		wait_event(parent->wait_q ,
-+			   (max_uA - sreg->cur_uA <
-+			    parent->max_uA -
-+			    parent->cur_uA));
-+		spin_lock_irqsave(&parent->lock, flags);
-+		ret = main_add_current(parent, max_uA - sreg->cur_uA);
-+		spin_unlock_irqrestore(&parent->lock, flags);
-+	}
-+out:
-+	if (parent && (max_uA - sreg->cur_uA < 0))
-+		wake_up_all(&parent->wait_q);
-+	sreg->cur_uA = max_uA;
-+	return 0;
-+}
-+
-+static int mxs_get_current_limit(struct regulator_dev *reg)
-+{
-+	struct mxs_regulator *sreg = rdev_get_drvdata(reg);
-+
-+	return sreg->cur_uA;
-+}
-+
-+static int mxs_set_mode(struct regulator_dev *reg, unsigned int mode)
-+{
-+	struct mxs_regulator *sreg = rdev_get_drvdata(reg);
-+	int ret = 0;
-+	u32 val;
-+
-+	switch (mode) {
-+	case REGULATOR_MODE_FAST:
-+		val = __raw_readl(sreg->base_addr);
-+		__raw_writel(val | BM_POWER_REG_MODE, sreg->base_addr);
-+		break;
-+
-+	case REGULATOR_MODE_NORMAL:
-+		val = __raw_readl(sreg->base_addr);
-+		__raw_writel(val & ~BM_POWER_REG_MODE, sreg->base_addr);
-+		break;
-+
-+	default:
-+		ret = -EINVAL;
-+		break;
-+	}
-+	return ret;
-+}
-+
-+static unsigned int mxs_get_mode(struct regulator_dev *reg)
-+{
-+	struct mxs_regulator *sreg = rdev_get_drvdata(reg);
-+	u32 val = __raw_readl(sreg->base_addr) & BM_POWER_REG_MODE;
-+
-+	return val ? REGULATOR_MODE_FAST : REGULATOR_MODE_NORMAL;
-+}
-+
-+static struct regulator_ops mxs_rops = {
-+	.set_voltage	= mxs_set_voltage,
-+	.get_voltage	= mxs_get_voltage,
-+	.set_current_limit	= mxs_set_current_limit,
-+	.get_current_limit	= mxs_get_current_limit,
-+	.set_mode	= mxs_set_mode,
-+	.get_mode	= mxs_get_mode,
-+};
-+
-+static int reg_callback(struct notifier_block *self,
-+			unsigned long event, void *data)
-+{
-+	unsigned long flags;
-+	struct mxs_regulator *sreg =
-+		container_of(self, struct mxs_regulator , nb);
-+
-+	switch (event) {
-+	case MXS_REG5V_IS_USB:
-+		spin_lock_irqsave(&sreg->lock, flags);
-+		sreg->max_uA = 500000;
-+		spin_unlock_irqrestore(&sreg->lock, flags);
-+		break;
-+	case MXS_REG5V_NOT_USB:
-+		spin_lock_irqsave(&sreg->lock, flags);
-+		sreg->max_uA = 0x7fffffff;
-+		spin_unlock_irqrestore(&sreg->lock, flags);
-+		break;
-+	}
-+
-+	return 0;
-+}
-+
-+static int mxs_regulator_probe(struct platform_device *pdev)
-+{
-+	struct device *dev = &pdev->dev;
-+	struct device_node *np = dev->of_node;
-+	struct device_node *parent;
-+	struct regulator_desc *rdesc;
-+	struct regulator_dev *rdev;
-+	struct mxs_regulator *sreg;
-+	struct regulator_init_data *initdata;
-+	struct regulation_constraints *con;
-+	struct regulator_config config = { };
-+	void __iomem *base_addr = NULL;
-+	void __iomem *power_addr = NULL;
-+	u64 regaddr64 = 0;
-+	const u32 *regaddr_p;
-+	u32 val = 0;
-+	int ret;
-+
-+	if (!np) {
-+		dev_err(dev, "missing device tree\n");
-+		return -EINVAL;
-+	}
-+
-+	/* get device base address */
-+	base_addr = of_iomap(np, 0);
-+	if (!base_addr)
-+		return -ENXIO;
-+
-+	parent = of_get_parent(np);
-+	if (!parent)
-+		return -ENXIO;
-+
-+	power_addr = of_iomap(parent, 0);
-+	if (!power_addr)
-+		return -ENXIO;
-+
-+	regaddr_p = of_get_address(np, 0, NULL, NULL);
-+	if (regaddr_p)
-+		regaddr64 = of_translate_address(np, regaddr_p);
-+
-+	if (!regaddr64) {
-+		dev_err(dev, "no or invalid reg property set\n");
-+		return -EINVAL;
-+	}
-+
-+	initdata = of_get_regulator_init_data(dev, np);
-+	if (!initdata)
-+		return -EINVAL;
-+
-+	ret = of_property_read_u32(np, "mxs-max-reg-val",
-+				   &val);
-+	if (!val) {
-+		dev_err(dev, "no or invalid mxs-max-reg-val property set\n");
-+		return ret;
-+	}
-+
-+	dev_info(dev, "regulator found\n");
-+
-+	sreg = devm_kzalloc(dev, sizeof(*sreg), GFP_KERNEL);
-+	if (!sreg)
-+		return -ENOMEM;
-+	sreg->initdata = initdata;
-+	sreg->name = of_get_property(np, "regulator-name", NULL);
-+	sreg->cur_uA = 0;
-+	sreg->cur_uV = 0;
-+	sreg->base_addr = base_addr;
-+	sreg->power_addr = power_addr;
-+	init_waitqueue_head(&sreg->wait_q);
-+	spin_lock_init(&sreg->lock);
-+	sreg->max_reg_val = val;
-+
-+	rdesc = &sreg->rdesc;
-+	rdesc->name = sreg->name;
-+	rdesc->owner = THIS_MODULE;
-+	rdesc->ops = &mxs_rops;
-+
-+	if (strcmp(rdesc->name, "overall_current") == 0)
-+		rdesc->type = REGULATOR_CURRENT;
-+	else
-+		rdesc->type = REGULATOR_VOLTAGE;
-+
-+	con = &initdata->constraints;
-+	rdesc->n_voltages = sreg->max_reg_val;
-+	rdesc->min_uV = con->min_uV;
-+	rdesc->uV_step = (con->max_uV - con->min_uV) / sreg->max_reg_val;
-+	rdesc->linear_min_sel = 0;
-+	rdesc->vsel_reg = regaddr64;
-+	rdesc->vsel_mask = BM_POWER_LEVEL_TRG;
-+
-+	config.dev = &pdev->dev;
-+	config.init_data = initdata;
-+	config.driver_data = sreg;
-+	config.of_node = np;
-+
-+	pr_debug("probing regulator %s %s %d\n",
-+			sreg->name,
-+			rdesc->name,
-+			pdev->id);
-+
-+	/* register regulator */
-+	rdev = devm_regulator_register(dev, rdesc, &config);
-+
-+	if (IS_ERR(rdev)) {
-+		dev_err(&pdev->dev, "failed to register %s\n",
-+			rdesc->name);
-+		return PTR_ERR(rdev);
-+	}
-+
-+	if (sreg->max_uA) {
-+		struct regulator *regu;
-+
-+		regu = regulator_get(NULL, sreg->name);
-+		sreg->nb.notifier_call = reg_callback;
-+		regulator_register_notifier(regu, &sreg->nb);
-+	}
-+
-+	platform_set_drvdata(pdev, rdev);
-+
-+	of_property_read_u32(np, "mxs-default-microvolt",
-+				   &val);
-+
-+	if (val)
-+		mxs_set_voltage(rdev, val, val, NULL);
-+
-+	return 0;
-+}
-+
-+static struct of_device_id of_mxs_regulator_match_tbl[] = {
-+	{ .compatible = "fsl,mxs-regulator", },
-+	{ /* end */ }
-+};
-+
-+static struct platform_driver mxs_regulator_driver = {
-+	.driver = {
-+		.name	= "mxs-regulator",
-+		.owner  = THIS_MODULE,
-+		.of_match_table = of_mxs_regulator_match_tbl,
-+	},
-+	.probe	= mxs_regulator_probe,
-+};
-+
-+static int __init mxs_regulator_init(void)
-+{
-+	return platform_driver_register(&mxs_regulator_driver);
-+}
-+postcore_initcall(mxs_regulator_init);
-+
-+static void __exit mxs_regulator_exit(void)
-+{
-+	platform_driver_unregister(&mxs_regulator_driver);
-+}
-+module_exit(mxs_regulator_exit);
-+
-+MODULE_AUTHOR("Embedded Alley Solutions <source@embeddedalley.com>");
-+MODULE_AUTHOR("Stefan Wahren <stefan.wahren@i2se.com>");
-+MODULE_DESCRIPTION("Freescale STMP378X voltage regulators");
-+MODULE_LICENSE("GPL v2");
--- 
-1.8.1.4
+thx,
+
+Jason.
