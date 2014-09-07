@@ -1,48 +1,80 @@
 From: info@lategoodbye.de (Stefan Wahren)
-Date: Sun,  7 Sep 2014 13:37:46 +0200
-Subject: [PATCH RFC 0/3] ARM: regulator: add Freescale MXS regulator driver
-Message-ID: <1410089869-6611-1-git-send-email-info@lategoodbye.de>
+Date: Sun,  7 Sep 2014 13:37:49 +0200
+Subject: [PATCH RFC 3/3] DT: ARM: mxs: enable regulator support for i.MX28
+In-Reply-To: <1410089869-6611-1-git-send-email-info@lategoodbye.de>
+References: <1410089869-6611-1-git-send-email-info@lategoodbye.de>
+Message-ID: <1410089869-6611-4-git-send-email-info@lategoodbye.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch series draft should adds support for Freescale i.MX23, i.MX28 
-on-chip regulators. I'm new to regulator drivers and need early feedback for 
-the driver's stage before i go in the wrong direction.
+This patch enables the regulator support for i.MX28.
 
-The information about the i.MX28 regulators are from chapter 11 of the 
-reference manual [1].
+Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
+---
+ arch/arm/boot/dts/imx28.dtsi | 50 +++++++++++++++++++++++++++++++++++++++++++-
+ 1 file changed, 49 insertions(+), 1 deletion(-)
 
-This driver based on the Freescale high level [2] and low level driver [3], 
-but contains the following changes:
-
-* devictree support
-* code cleanup
-
-Please bear in mind that the code is not tested against real hardware and 
-it's not expected to work.
-
-I'm not sure if it's correct, but these series based on the for-next branch
-of Mark Brown's regulator repository.
-
-Any comments about the code are welcome.
-
-[1] - http://cache.freescale.com/files/dsp/doc/ref_manual/MCIMX28RM.pdf
-[2] - http://git.freescale.com/git/cgit.cgi/imx/linux-2.6-imx.git/tree/drivers/regulator/mxs-regulator.c?h=imx_2.6.35_maintain
-[3] - http://git.freescale.com/git/cgit.cgi/imx/linux-2.6-imx.git/tree/arch/arm/mach-mx28/power.c?h=imx_2.6.35_maintain
-
-Stefan Wahren (3):
-  DT: add binding for MXS regulator
-  ARM: regulator: add Freescale MXS regulator driver
-  DT: ARM: mxs: enable regulator support for i.MX28
-
- .../bindings/regulator/mxs-regulator.txt           |  38 ++
- arch/arm/boot/dts/imx28.dtsi                       |  50 ++-
- drivers/regulator/Kconfig                          |   9 +
- drivers/regulator/Makefile                         |   1 +
- drivers/regulator/mxs-regulator.c                  | 411 +++++++++++++++++++++
- 5 files changed, 508 insertions(+), 1 deletion(-)
- create mode 100644 Documentation/devicetree/bindings/regulator/mxs-regulator.txt
- create mode 100644 drivers/regulator/mxs-regulator.c
-
+diff --git a/arch/arm/boot/dts/imx28.dtsi b/arch/arm/boot/dts/imx28.dtsi
+index a95cc53..10c7cdf 100644
+--- a/arch/arm/boot/dts/imx28.dtsi
++++ b/arch/arm/boot/dts/imx28.dtsi
+@@ -979,8 +979,56 @@
+ 			};
+ 
+ 			power: power at 80044000 {
++				compatible = "fsl,imx28-power";
++				#address-cells = <1>;
++				#size-cells = <0>;
+ 				reg = <0x80044000 0x2000>;
+-				status = "disabled";
++
++				/*
++				reg_curr: regulator-overall_current at 80044010 {
++					reg = <0x80044010>;
++					compatible = "fsl,mxs-regulator";
++					regulator-name = "overall_current";
++					regulator-min-microvolt = <>;
++					regulator-max-microvolt = <>;
++					regulator-min-microamp = <>;
++					regulator-max-microamp = <>;
++					regulator-always-on;
++					regulator-boot-on;
++				};
++				*/
++
++				reg_vddd: regulator-vddd at 80044040 {
++					reg = <0x80044040>;
++					compatible = "fsl,mxs-regulator";
++					regulator-name = "vddd";
++					regulator-min-microvolt = <800000>;
++					regulator-max-microvolt = <1575000>;
++					regulator-always-on;
++					mxs-max-reg-val = <0x1f>;
++				};
++
++				reg_vdda: regulator-vdda at 80044050 {
++					reg = <0x80044050>;
++					compatible = "fsl,mxs-regulator";
++					regulator-name = "vdda";
++					regulator-min-microvolt = <1500000>;
++					regulator-max-microvolt = <2275000>;
++					regulator-always-on;
++					mxs-max-reg-val = <0x1f>;
++				};
++
++				reg_vddio: regulator-vddio at 80044060 {
++					reg = <0x80044060>;
++					compatible = "fsl,mxs-regulator";
++					regulator-name = "vddio";
++					regulator-min-microvolt = <2800000>;
++					regulator-max-microvolt = <3600000>;
++					regulator-microvolt-offset = <80000>;
++					regulator-always-on;
++					mxs-max-reg-val = <0x10>;
++					mxs-default-microvolt = <3300000>;
++				};
+ 			};
+ 
+ 			saif1: saif at 80046000 {
 -- 
 1.8.1.4
