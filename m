@@ -1,47 +1,69 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Sun, 07 Sep 2014 17:35:18 +0400
-Subject: [PATCH RFC 1/3] DT: add binding for MXS regulator
-In-Reply-To: <1410089869-6611-2-git-send-email-info@lategoodbye.de>
-References: <1410089869-6611-1-git-send-email-info@lategoodbye.de>
- <1410089869-6611-2-git-send-email-info@lategoodbye.de>
-Message-ID: <540C5F16.4000108@cogentembedded.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Sun, 7 Sep 2014 10:02:55 -0400
+Subject: [PATCH] irq: gic-v3: Tag all low level accessors __maybey_unused
+In-Reply-To: <20140906125412.GA32429@sirena.org.uk>
+References: <1406748194-21094-1-git-send-email-broonie@kernel.org>
+ <20140817170453.GE12769@titan.lakedaemon.net>
+ <20140906125412.GA32429@sirena.org.uk>
+Message-ID: <20140907140255.GB30828@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+Mark, Stephen,
 
-On 9/7/2014 3:37 PM, Stefan Wahren wrote:
+On Sat, Sep 06, 2014 at 01:54:12PM +0100, Mark Brown wrote:
+> On Sun, Aug 17, 2014 at 01:04:53PM -0400, Jason Cooper wrote:
+> > On Wed, Jul 30, 2014 at 08:23:14PM +0100, Mark Brown wrote:
+> > > From: Mark Brown <broonie@linaro.org>
+> 
+> > > This is only really needed for gic_write_sgi1r in the !SMP case since it
+> > > is only referenced in the SMP initialisation code but it seems better to
+> > > have these functions all next to each other and declared consistently.
+> 
+> > > Signed-off-by: Mark Brown <broonie@linaro.org>
+> > > ---
+> > >  drivers/irqchip/irq-gic-v3.c | 10 +++++-----
+> > >  1 file changed, 5 insertions(+), 5 deletions(-)
+> 
+> > Applied to irqchip/urgent
+> 
+> This appears to have disappeared from -next and the warning is back.
 
-> This patch adds the Device tree bindings for the Freescale MXS on-chip
-> regulators.
+Hmm, interesting. Here's what I have in irqchip/for-next,irqchip/urgent:
 
-> Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
-> ---
->   .../bindings/regulator/mxs-regulator.txt           | 38 ++++++++++++++++++++++
->   1 file changed, 38 insertions(+)
->   create mode 100644 Documentation/devicetree/bindings/regulator/mxs-regulator.txt
+  c44e9d77fd1c irqchip: gic-v3: Tag all low level accessors __maybe_unused
+  ddc86821ee2c irqchip: gic-v3: Only define gic_peek_irq() when building SMP
 
-> diff --git a/Documentation/devicetree/bindings/regulator/mxs-regulator.txt b/Documentation/devicetree/bindings/regulator/mxs-regulator.txt
-> new file mode 100644
-> index 0000000..c3226cc
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/regulator/mxs-regulator.txt
-> @@ -0,0 +1,38 @@
-> +MXS regulators
-> +
-> +Required node properties:
-> +- compatible: Should be "fsl,<soc>-power", where soc is "imx23" or "imx28"
-> +- reg: Offset and length of the register set for the device
-> +
-> +Required regulator properties:
-> +- compatible: Must be "fsl,mxs-regulator"
-> +- reg: Offset of the register set for the regulator
-> +- mxs-max-reg-val: Maximum value of this register
-> +
-> +Optional regulator properties:
-> +- mxs-default-microvolt: initial voltage of the regulator
+and:
 
-    Vendor specific property names should be prefixed with the vendor name and 
-comma.
+$ git tag --contains c44e9d77fd1c | grep ^next | sort -V
+next-20140820
+next-20140822
+next-20140823
+next-20140825
+next-20140826
+next-20140827
+next-20140828
+next-20140829
 
-WBR, Sergei
+To see whether I forgot to add /urgent to /for-next or if
+irqchip/for-next was dropped, I did the same search against the first
+commit I added to irqchip/core:
+
+$ git tag --contains 1c36d42c4ffe | grep ^next | sort -V
+next-20140822
+next-20140823
+next-20140825
+next-20140826
+next-20140827
+next-20140828
+next-20140829
+
+Also dropped on the 30th.  So, unless I really screwed up, -next is no
+longer pulling irqchip/for-next.
+
+Stephen, could you please look and see if this is the case?
+
+thx,
+
+Jason.
