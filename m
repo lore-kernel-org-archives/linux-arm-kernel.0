@@ -1,50 +1,64 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Sun, 7 Sep 2014 12:34:57 +0200
-Subject: [PATCH 06/11] KVM: vgic: declare probe function pointer as const
-In-Reply-To: <540C32A8.1000409@linaro.org>
-References: <540C32A8.1000409@linaro.org>
-Message-ID: <CAKv+Gu8vAuHfnq5BfV=wac8SP3VYMizxg_7K4Baitj0TbWfYaw@mail.gmail.com>
+From: info@lategoodbye.de (Stefan Wahren)
+Date: Sun,  7 Sep 2014 13:37:47 +0200
+Subject: [PATCH RFC 1/3] DT: add binding for MXS regulator
+In-Reply-To: <1410089869-6611-1-git-send-email-info@lategoodbye.de>
+References: <1410089869-6611-1-git-send-email-info@lategoodbye.de>
+Message-ID: <1410089869-6611-2-git-send-email-info@lategoodbye.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> We extract the vgic probe function from the of_device_id data pointer,
-> which is const. Kill the sparse warning by ensuring that the local
-> function pointer is also marked as const.
->
-> Cc: Marc Zyngier <marc.zyngier@arm.com>
-> Signed-off-by: Will Deacon <will.deacon@arm.com>
-> ---
->  virt/kvm/arm/vgic.c | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
->
-> diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
-> index d1cfe672b9d7..efe6eee2e7eb 100644
-> --- a/virt/kvm/arm/vgic.c
-> +++ b/virt/kvm/arm/vgic.c
-> @@ -1557,8 +1557,8 @@ static const struct of_device_id vgic_ids[] = {
->  int kvm_vgic_hyp_init(void)
->  {
->         const struct of_device_id *matched_id;
-> -       int (*vgic_probe)(struct device_node *,const struct vgic_ops **,
-> -                         const struct vgic_params **);
-> +       const int (*vgic_probe)(struct device_node *,const struct vgic_ops **,
-> +                               const struct vgic_params **);
->         struct device_node *vgic_node;
->         int ret;
->
+This patch adds the Device tree bindings for the Freescale MXS on-chip
+regulators.
 
-Hi all,
+Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
+---
+ .../bindings/regulator/mxs-regulator.txt           | 38 ++++++++++++++++++++++
+ 1 file changed, 38 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/regulator/mxs-regulator.txt
 
-I noticed this patch in kvmarm/next, and I think it is wrong.
-
-Sparse complains about the fact that you are assigning the value of a
-pointer to const data to a pointer to non-const data, and this is not
-what is happening. Dereferencing a function pointer does not give you
-an lvalue, so a function pointer points to const data by definition,
-and the assignment is fine and sparse is wrong. The fact that you can
-squelch the warning by typing the function pointer as returning a
-by-value const result only emphasizes how confused sparse gets about
-this.
-
+diff --git a/Documentation/devicetree/bindings/regulator/mxs-regulator.txt b/Documentation/devicetree/bindings/regulator/mxs-regulator.txt
+new file mode 100644
+index 0000000..c3226cc
+--- /dev/null
++++ b/Documentation/devicetree/bindings/regulator/mxs-regulator.txt
+@@ -0,0 +1,38 @@
++MXS regulators
++
++Required node properties:
++- compatible: Should be "fsl,<soc>-power", where soc is "imx23" or "imx28"
++- reg: Offset and length of the register set for the device
++
++Required regulator properties:
++- compatible: Must be "fsl,mxs-regulator"
++- reg: Offset of the register set for the regulator
++- mxs-max-reg-val: Maximum value of this register
++
++Optional regulator properties:
++- mxs-default-microvolt: initial voltage of the regulator
++
++Any regulator property defined as part of the core regulator
++binding, defined in regulator.txt, can also be used.
++
++Example:
++
++	power: power at 80044000 {
++		compatible = "fsl,imx28-power";
++		#address-cells = <1>;
++		#size-cells = <0>;
++		reg = <0x80044000 0x2000>;
++
++		reg_vddio: regulator-vddio at 80044060 {
++			reg = <0x80044060>;
++			compatible = "fsl,mxs-regulator";
++			regulator-name = "vddio";
++			regulator-min-microvolt = <2800000>;
++			regulator-max-microvolt = <3600000>;
++			regulator-microvolt-offset = <80000>;
++			regulator-always-on;
++			mxs-max-reg-val = <0x10>;
++			mxs-default-microvolt = <3300000>;
++		};
++	};
++
 -- 
-Ard.
+1.8.1.4
