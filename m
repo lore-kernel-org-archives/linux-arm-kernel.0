@@ -1,35 +1,30 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Sun, 7 Sep 2014 08:30:24 +0100
-Subject: [PATCH] arm64: LLVMLinux: Provide __aeabi_* symbols which are
- needed for clang
-In-Reply-To: <CAFzeTN0AO40k2ObpMX3xPOmKaiGdiLREev1A2J0sE=B7z64qug@mail.gmail.com>
-References: <1409959394-14936-1-git-send-email-behanw@converseincode.com>
- <2954780.2t9bpyu7ov@wuerfel>
- <CAFzeTN0AO40k2ObpMX3xPOmKaiGdiLREev1A2J0sE=B7z64qug@mail.gmail.com>
-Message-ID: <56E276C7-8204-48DD-B5C5-BF5B1452248A@arm.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Sun, 7 Sep 2014 09:38:51 +0200
+Subject: [PATCH 1/2] ARM: mvebu: Netgear RN104: Use Hardware BCH ECC
+In-Reply-To: <920c7e7169dc6aaaa3eb4bced2336d38e77b8864.1410035142.git.arno@natisbad.org>
+References: <cover.1410035142.git.arno@natisbad.org>
+ <920c7e7169dc6aaaa3eb4bced2336d38e77b8864.1410035142.git.arno@natisbad.org>
+Message-ID: <20140907093851.377ddd29@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 7 Sep 2014, at 03:30, Mark Charlebois <charlebm@gmail.com> wrote:
-> On Sat, Sep 6, 2014 at 7:16 AM, Arnd Bergmann <arnd@arndb.de> wrote:
->> 
->> On Friday 05 September 2014 16:23:14 behanw at converseincode.com wrote:
->>> + *  Copyright (C) 2012  Mark Charlebois
->>> + */
->>> +
->>> +/*
->>> + * EABI routines
->> 
->> Does EABI specify these function names? I would think that they are
->> just random libgcc (whatever that is called in clang) functions.
-> 
-> http://infocenter.arm.com/help/topic/com.arm.doc.ihi0043d/IHI0043D_rtabi.pdf
-> 
-> See section 4.3.4 Memory copying, clearing, and setting
+Dear Arnaud Ebalard,
 
-What does this document have to do with arm64 (AArch64, A64)? We don?t
-need such symbols on arm64. Also, the arm64 kernel links with libgcc (no
-immediate need AFAICT but the compiler does not guarantee the intrinsics
-would always be generated inline).
+On Sat, 06 Sep 2014 22:49:25 +0200, Arnaud Ebalard wrote:
 
-Catalin
+> Fixes: 0373a558bd79 ("ARM: mvebu: Enable NAND controller in ReadyNAS 104 .dts file")
+> Depends-on: 5b3e507820c6 ("mtd: nand: pxa3xx: Use ECC strength and step size devicetree binding")
+
+Maybe it's worth noting that it's not a build dependency: your commit
+changing the Device Tree files can perfectly be applied without the
+NAND ECC strength and step size bindings. Of course, it will have no
+effect on an older kernel that doesn't support those bindings, but it
+will not cause a build failure.
+
+Thanks!
+
+Thomas
+-- 
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
