@@ -1,32 +1,33 @@
 From: mpa@pengutronix.de (Markus Pargmann)
-Date: Sun,  7 Sep 2014 19:19:32 +0200
-Subject: [PATCH v6 4/7] net: cpsw: Replace pr_err by dev_err
+Date: Sun,  7 Sep 2014 19:19:30 +0200
+Subject: [PATCH v6 2/7] net: cpsw: Add missing return value
 In-Reply-To: <1410110375-3570-1-git-send-email-mpa@pengutronix.de>
 References: <1410110375-3570-1-git-send-email-mpa@pengutronix.de>
-Message-ID: <1410110375-3570-5-git-send-email-mpa@pengutronix.de>
+Message-ID: <1410110375-3570-3-git-send-email-mpa@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use dev_err instead of pr_err.
+ret is set 0 at this point, so jumping to that error label would result
+in a return value of 0. Set ret to -ENOMEM to return a proper error
+value.
 
 Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
 Reviewed-by: Wolfram Sang <wsa@the-dreams.de>
 ---
- drivers/net/ethernet/ti/cpsw.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/net/ethernet/ti/cpsw.c | 1 +
+ 1 file changed, 1 insertion(+)
 
 diff --git a/drivers/net/ethernet/ti/cpsw.c b/drivers/net/ethernet/ti/cpsw.c
-index f09b4639ad31..0bc2c2a2c236 100644
+index 999fb72688d2..f09b4639ad31 100644
 --- a/drivers/net/ethernet/ti/cpsw.c
 +++ b/drivers/net/ethernet/ti/cpsw.c
-@@ -1921,7 +1921,7 @@ static int cpsw_probe_dt(struct cpsw_platform_data *data,
- 		mdio = of_find_device_by_node(mdio_node);
- 		of_node_put(mdio_node);
- 		if (!mdio) {
--			pr_err("Missing mdio platform device\n");
-+			dev_err(&pdev->dev, "Missing mdio platform device\n");
- 			return -EINVAL;
- 		}
- 		snprintf(slave_data->phy_id, sizeof(slave_data->phy_id),
+@@ -2063,6 +2063,7 @@ static int cpsw_probe(struct platform_device *pdev)
+ 	priv->irq_enabled = true;
+ 	if (!priv->cpts) {
+ 		dev_err(&pdev->dev, "error allocating cpts\n");
++		ret = -ENOMEM;
+ 		goto clean_ndev_ret;
+ 	}
+ 
 -- 
 2.1.0
