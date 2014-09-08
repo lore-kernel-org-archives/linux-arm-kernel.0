@@ -1,41 +1,34 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Mon, 8 Sep 2014 10:52:50 -0700
-Subject: [PATCH 10/11] ARM: rockchip: enable cpufreq-related options
-In-Reply-To: <1409958374-30937-11-git-send-email-heiko@sntech.de>
-References: <1409958374-30937-1-git-send-email-heiko@sntech.de>
- <1409958374-30937-11-git-send-email-heiko@sntech.de>
-Message-ID: <CAD=FV=X_+pmz5+eizYmHcWzKbq7h-1P=W2Lt2s2NOkP=KFzN9A@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 8 Sep 2014 10:55:10 -0700
+Subject: [PATCH v8 00/18] 8250-core based serial driver for OMAP + DMA
+In-Reply-To: <20140908174020.GI3238@atomide.com>
+References: <1409943773-7874-1-git-send-email-bigeasy@linutronix.de>
+ <20140908174020.GI3238@atomide.com>
+Message-ID: <20140908175510.GK3238@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Heiko,
+* Tony Lindgren <tony@atomide.com> [140908 10:41]:
+> * Sebastian Andrzej Siewior <bigeasy@linutronix.de> [140905 12:03]:
+> > This is my complete queue fo the omap serial driver based on the 8250 core
+> > code. I played with it on beagle bone, am335x-evm and dra7xx including DMA.
+> > The runtime-pm pieces look now bug-compatible with the omap-serial driver.
+> > Besides the runtime-om improvement I also fixed a few corner cases for the
+> > TX-DMA problem. The DMA fixes (in edma and omap-dma) were dropped and the
+> > problem has been in 8250-dma via patch #13.
+> > 
+> > The whole queue is available at
+> >   git://git.breakpoint.cc/bigeasy/linux.git uart_v8
+> 
+> Gave the above branch a quick try, but it again does not idle for
+> my omap3 test cases. It seems that now the cm_idlest1_core sdma
+> bit is blocking deeper idle states. Is that the correct branch
+> to use?
 
-On Fri, Sep 5, 2014 at 4:06 PM, Heiko Stuebner <heiko@sntech.de> wrote:
-> Enable ARCH_HAS_CPUFREQ and ARCH_HAS_OPP.
->
-> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
-> ---
->  arch/arm/mach-rockchip/Kconfig | 2 ++
->  1 file changed, 2 insertions(+)
->
-> diff --git a/arch/arm/mach-rockchip/Kconfig b/arch/arm/mach-rockchip/Kconfig
-> index d168669..007e9dd 100644
-> --- a/arch/arm/mach-rockchip/Kconfig
-> +++ b/arch/arm/mach-rockchip/Kconfig
-> @@ -2,6 +2,8 @@ config ARCH_ROCKCHIP
->         bool "Rockchip RK2928 and RK3xxx SOCs" if ARCH_MULTI_V7
->         select PINCTRL
->         select PINCTRL_ROCKCHIP
-> +       select ARCH_HAS_CPUFREQ
-> +       select ARCH_HAS_OPP
->         select ARCH_HAS_RESET_CONTROLLER
->         select ARCH_REQUIRE_GPIOLIB
->         select ARM_GIC
+Never mind. User error. I forgot to apply my own patch for force
+idling the UARTs for the omap hwmod. And the sdma bit clears if
+I do sleep 5 before attempting to read the sysfs entry..
 
-This patch might be useful to folks trying to pick patches on older
-kernels, but I don't think we want it to land upstream.  See:
+Regards,
 
-19682f7 ARM: Remove ARCH_HAS_CPUFREQ config option
-78c5e0b PM / OPP: Remove ARCH_HAS_OPP
-
--Doug
+Tony
