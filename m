@@ -1,71 +1,69 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Mon, 8 Sep 2014 09:27:56 -0500
-Subject: [PATCH v10 07/10] OF: Introduce helper function for getting PCI
- domain_nr
-In-Reply-To: <1410184472-17630-8-git-send-email-Liviu.Dudau@arm.com>
-References: <1410184472-17630-1-git-send-email-Liviu.Dudau@arm.com>
- <1410184472-17630-8-git-send-email-Liviu.Dudau@arm.com>
-Message-ID: <CAL_JsqJi8k1Goc3UmXhuxf9v7=4gJrYG_Di7v574PxS8TsJaXw@mail.gmail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 8 Sep 2014 15:28:31 +0100
+Subject: [PATCH] efi/arm64: fix fdt-related memory reservation
+In-Reply-To: <1410186065.27715.2.camel@deneb.redhat.com>
+References: <1410183102-6969-1-git-send-email-msalter@redhat.com>
+ <20140908140609.GI12081@leverpostej>
+ <1410186065.27715.2.camel@deneb.redhat.com>
+Message-ID: <20140908142831.GK12081@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 8, 2014 at 8:54 AM, Liviu Dudau <Liviu.Dudau@arm.com> wrote:
-> Add of_pci_get_domain_nr() to retrieve the PCI domain number
-> of a given device from DT. If the information is not present,
-> the function can be requested to allocate a new domain number.
->
-> Cc: Bjorn Helgaas <bhelgaas@google.com>
-> Cc: Arnd Bergmann <arnd@arndb.de>
-> Cc: Grant Likely <grant.likely@linaro.org>
-> Cc: Rob Herring <robh+dt@kernel.org>
-> Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
-> Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
-> ---
->  drivers/of/of_pci.c    | 34 ++++++++++++++++++++++++++++++++++
->  include/linux/of_pci.h |  7 +++++++
->  2 files changed, 41 insertions(+)
->
-> diff --git a/drivers/of/of_pci.c b/drivers/of/of_pci.c
-> index 8481996..a107edb 100644
-> --- a/drivers/of/of_pci.c
-> +++ b/drivers/of/of_pci.c
-> @@ -89,6 +89,40 @@ int of_pci_parse_bus_range(struct device_node *node, struct resource *res)
->  }
->  EXPORT_SYMBOL_GPL(of_pci_parse_bus_range);
->
-> +static atomic_t of_domain_nr = ATOMIC_INIT(-1);
-> +
-> +/**
-> + * This function will try to obtain the host bridge domain number by
-> + * using of_alias_get_id() call with "pci-domain" as a stem. If that
-> + * fails, a local allocator will be used. The local allocator can
-> + * be requested to return a new domain_nr if the information is missing
-> + * from the device tree.
-> + *
-> + * @node: device tree node with the domain information
-> + * @allocate_if_missing: if DT lacks information about the domain nr,
-> + * allocate a new number.
-> + *
-> + * Returns the associated domain number from DT, or a new domain number
-> + * if DT information is missing and @allocate_if_missing is true. If
-> + * @allocate_if_missing is false then the last allocated domain number
-> + * will be returned.
-> + */
-> +int of_pci_get_domain_nr(struct device_node *node, bool allocate_if_missing)
-> +{
-> +       int domain;
-> +
-> +       domain = of_alias_get_id(node, "pci-domain");
-> +       if (domain == -ENODEV) {
-> +               if (allocate_if_missing)
-> +                       domain = atomic_inc_return(&of_domain_nr);
-> +               else
-> +                       domain = atomic_read(&of_domain_nr);
+On Mon, Sep 08, 2014 at 03:21:05PM +0100, Mark Salter wrote:
+> On Mon, 2014-09-08 at 15:06 +0100, Mark Rutland wrote:
+> > Hi Mark,
+> > 
+> > On Mon, Sep 08, 2014 at 02:31:42PM +0100, Mark Salter wrote:
+> > > Commit 86c8b27a01cf:
+> > >  "arm64: ignore DT memreserve entries when booting in UEFI mode
+> > > 
+> > > prevents early_init_fdt_scan_reserved_mem() from being called for
+> > > arm64 kernels booting via UEFI. This was done because the kernel
+> > > will use the UEFI memory map to determine reserved memory regions.
+> > > That approach has problems in that early_init_fdt_scan_reserved_mem()
+> > > also reserves the FDT itself and any node-specific reserved memory.
+> > > By chance of some kernel configs, the FDT may be overwritten before
+> > > it can be unflattened and the kernel will fail to boot. More subtle
+> > > problems will result if the FDT has node specific reserved memory
+> > > which is not really reserved.
+> > 
+> > That doesn't sound like fun; apologies for allowing such brokenness
+> > through in the first place.
+> 
+> Heh. It was obvious that DT unflattening was broken, but bisecting
+> didn't help much because I kept finding patches which when reverted
+> made the problem go away even though they obviously weren't the
+> cause.
 
-This function seems a bit broken to me. It is overloaded with too many
-different outcomes. Think about how this would work if you have
-multiple PCI buses and a mixture of having pci-domain aliases or not.
-Aren't domain numbers global? Allocation should then start outside of
-the range of alias ids.
+Yeah, those types of bugs are never fun. I recall a similar situation
+with the __INIT annotation in the versatile pen code. 
 
-Rob
+> > [...]
+> > 
+> > > +	/*
+> > > +	 * Delete all memory reserve map entries. When booting via UEFI,
+> > > +	 * kernel will use the UEFI memory map to find reserved regions.
+> > > +	 */
+> > > +	num_rsv = fdt_num_mem_rsv(fdt);
+> > > +	for (i = 0; i < num_rsv; i++)
+> > > +		fdt_del_mem_rsv(fdt, i);
+> > 
+> > I don't think that's right. Won't the memreserve entries shift down by
+> > one each time we call fdt_del_mem_rsv?
+> > 
+> > Shouldn't this be something like:
+> > 
+> > while (fdt_num_mem_rsv(fdt))
+> > 	fdt_del_mem_rsv(fdt, 0);
+> > 
+> > Or we could count downwards.
+> > 
+> 
+> Sigh. Yes, you are right. I only tested with one reserved region.
+> I think counting down would be the way to go. I'll send a fixed
+> patch shortly.
+
+Ok, that sounds fine by me; make sure you add my ack :)
+
+Thanks,
+Mark.
