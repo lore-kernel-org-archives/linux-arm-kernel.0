@@ -1,49 +1,20 @@
-From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Mon, 8 Sep 2014 10:39:05 -0600
-Subject: [PATCH v10 07/10] OF: Introduce helper function for getting PCI
- domain_nr
-In-Reply-To: <20140908155931.GP27864@e106497-lin.cambridge.arm.com>
-References: <1410184472-17630-1-git-send-email-Liviu.Dudau@arm.com>
- <1410184472-17630-8-git-send-email-Liviu.Dudau@arm.com>
- <CAL_JsqJi8k1Goc3UmXhuxf9v7=4gJrYG_Di7v574PxS8TsJaXw@mail.gmail.com>
- <20140908145459.GO27864@e106497-lin.cambridge.arm.com>
- <CAL_JsqJdGKDVwJOpPp19OkVPGzR7Zqv3nh+ONHHaYnPLYTYoYg@mail.gmail.com>
- <20140908155931.GP27864@e106497-lin.cambridge.arm.com>
-Message-ID: <20140908163905.GC29679@obsidianresearch.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 8 Sep 2014 09:39:31 -0700
+Subject: [PATCH 08/18] tty: serial: Add 8250-core based omap driver
+In-Reply-To: <1409943773-7874-9-git-send-email-bigeasy@linutronix.de>
+References: <1409943773-7874-1-git-send-email-bigeasy@linutronix.de>
+ <1409943773-7874-9-git-send-email-bigeasy@linutronix.de>
+Message-ID: <20140908163930.GF3238@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 08, 2014 at 04:59:31PM +0100, Liviu Dudau wrote:
-
-> > I don't really understand how domains are used so it's hard to provide
-> > a recommendation here. Do domains even belong in the DT?
+* Sebastian Andrzej Siewior <bigeasy@linutronix.de> [140905 12:03]:
 > 
-> ACPI calls them segments and the way Bjorn explained it to me at some moment was
-> that it was an attempt to split up a bus in different groups (or alternatively,
-> merge a few busses together). To be honest I haven't seen systems where the domain
-> is anything other than zero, but JasonG (or maybe Benjamin) were floating an
-> idea of using the domain number to identify physical slots.
+> It has been only tested as console UART on am335x-evm, dra7-evm and
+> beagle bone. I also did some longer raw-transfers to meassure the load.
 
-A PCI domain qualifies the bus:device.function addressing so that we
-can have duplicate BDFs in the system.
+You may want to also update this with beagleboard xm now too?
 
-So, yes, they belong in DT - each 'top level' PCI node naturally
-represents a unique set of BDF addressing below it, and could alias
-other top level nodes. The first step to resolve a BDF to a DT node is
-to find the correct 'top level' by mapping the domain number.
+Regards,
 
-In an ideal world no small scale system should ever have domains. They
-were primarily introduced for large scale NUMA system that actually
-have more than 256 PCI busses.
-
-However, from a DT prespective, we've been saying that if the SOC
-presents a PCI-E root port that shares nothing with other root ports
-(ie aperture, driver instance, config space) then those ports must be
-represented by unique 'top level' DT nodes, and each DT node must be
-assigned to a Linux PCI domain.
-
-IMHO, designing such a SOC ignores the API guidelines provides by the
-PCI-E spec itself, and I hope such a thing won't be considered SBSA
-compatible..
-
-Jason
+Tony 
