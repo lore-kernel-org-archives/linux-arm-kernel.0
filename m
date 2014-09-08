@@ -1,47 +1,42 @@
-From: behanw@converseincode.com (Behan Webster)
-Date: Mon, 08 Sep 2014 16:53:39 -0500
-Subject: [PATCH] arm64: LLVMLinux: Provide __aeabi_* symbols which are
- needed for clang
-In-Reply-To: <CAFzeTN10iz0eMTVqdRhzvqKagyB7srEZN8YAUOJzxzfJihv62Q@mail.gmail.com>
-References: <1409959394-14936-1-git-send-email-behanw@converseincode.com>	<2954780.2t9bpyu7ov@wuerfel>	<CAFzeTN0AO40k2ObpMX3xPOmKaiGdiLREev1A2J0sE=B7z64qug@mail.gmail.com>	<56E276C7-8204-48DD-B5C5-BF5B1452248A@arm.com>
- <CAFzeTN10iz0eMTVqdRhzvqKagyB7srEZN8YAUOJzxzfJihv62Q@mail.gmail.com>
-Message-ID: <540E2563.8020909@converseincode.com>
+From: rabin@rab.in (Rabin Vincent)
+Date: Mon, 8 Sep 2014 23:55:06 +0200
+Subject: [PATCH v5 3/8] arm: fixmap: implement __set_fixmap()
+In-Reply-To: <20140908191634.GV5598@outflux.net>
+References: <1409781429-27593-1-git-send-email-keescook@chromium.org>
+ <1409781429-27593-4-git-send-email-keescook@chromium.org>
+ <20140904170349.GL7156@arm.com>
+ <CAGXu5jKimGaupwyUwt0Zwa3OtjeoED8-uBeMX0MwXjBYP6ssAg@mail.gmail.com>
+ <20140904172748.GO7156@arm.com> <20140908191634.GV5598@outflux.net>
+Message-ID: <20140908215506.GA4759@dator>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/08/14 16:01, Mark Charlebois wrote:
-> On Sun, Sep 7, 2014 at 12:30 AM, Catalin Marinas
-> <catalin.marinas@arm.com> wrote:
->> On 7 Sep 2014, at 03:30, Mark Charlebois <charlebm@gmail.com> wrote:
->>> On Sat, Sep 6, 2014 at 7:16 AM, Arnd Bergmann <arnd@arndb.de> wrote:
->>>> On Friday 05 September 2014 16:23:14 behanw at converseincode.com wrote:
->>>>> + *  Copyright (C) 2012  Mark Charlebois
->>>>> + */
->>>>> +
->>>>> +/*
->>>>> + * EABI routines
->>>> Does EABI specify these function names? I would think that they are
->>>> just random libgcc (whatever that is called in clang) functions.
->>> http://infocenter.arm.com/help/topic/com.arm.doc.ihi0043d/IHI0043D_rtabi.pdf
->>>
->>> See section 4.3.4 Memory copying, clearing, and setting
->> What does this document have to do with arm64 (AArch64, A64)? We don?t
->> need such symbols on arm64. Also, the arm64 kernel links with libgcc (no
->> immediate need AFAICT but the compiler does not guarantee the intrinsics
->> would always be generated inline).
-> [reposting in plain text]
->
-> This patch was made early in the arm64 kernel support. I just retested
-> and you are correct, it is no longer needed.  My apologies to all.
+On Mon, Sep 08, 2014 at 12:16:34PM -0700, Kees Cook wrote:
+> On Thu, Sep 04, 2014 at 06:27:48PM +0100, Will Deacon wrote:
+> > On Thu, Sep 04, 2014 at 06:23:42PM +0100, Kees Cook wrote:
+> > > Ah! If this is the case, perhaps we can get away with
+> > > local_flush_tlb_kernel_range() then?
+> > 
+> > That's a bit tricky, since you need to ensure that preemption is disabled
+> > until the mapping is put back like it was.
+> 
+> Okay, under both real hardware with the errata, and under QEMU, things seem
+> to work with this change to the series. What do you think?
 
-Whoops. I normally check whether a patch is still needed before posting 
-them. I seem to have missed that step this time. My apologies as well.
+Preemption is already disabled until the mapping is put back in this
+patch.c code because interrupts are disabled from before the time
+set_fixmap() is called until after clear_fixmap() is called.
 
-That all being said, I prefer to see patches no longer required, than 
-needing them to be upstreamed, so in that this is a win.
+I'd guess that Will meant other (future) callers of set_fixmap() would
+have to ensure similar behaviour with set_fixmap() / clear_fixmap().
 
-Behan
+Unless I'm missing something set/clear_fixmap() seem to be quite arch
+specific and only really used on x86, so we could ensure that future
+users on ARM perform the correct tlb flush:  the first user on ARM with
+a non-atomic context (or you) could implement a set_fixmap() which does
+the global flush and have this patch.c (and any other atomic context
+callers) call __set_fixmap() directly.
 
--- 
-Behan Webster
-behanw at converseincode.com
+The change to local_flush_tlb_kernel_range() in __set_fixmap() would of
+course be needed in that case, and IIRC that was what my original patch
+had (via set_top_pte()).
