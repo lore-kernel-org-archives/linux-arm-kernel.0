@@ -1,31 +1,47 @@
-From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
-Date: Mon, 08 Sep 2014 08:09:35 +0200
-Subject: Unable to boot mainline on snow chromebook since 3.15
-In-Reply-To: <CAD=FV=UYDDhL02CrhPUAHPncepwAF2-BgTmXOamy-Mdz80S-vw@mail.gmail.com>
-References: <20140905115704.GO13515@arm.com>	<20140905122232.GP13515@arm.com>	<CAD=FV=VfioJf9VYoSYL0QBk-bN93-Ecx3=0n9hb5Q4rcx43-_g@mail.gmail.com>	<540C202E.2060009@collabora.co.uk>	<540C7F5B.6070307@gmail.com>
- <CAD=FV=UYDDhL02CrhPUAHPncepwAF2-BgTmXOamy-Mdz80S-vw@mail.gmail.com>
-Message-ID: <540D481F.8030500@collabora.co.uk>
+From: mpa@pengutronix.de (Markus Pargmann)
+Date: Mon,  8 Sep 2014 08:43:37 +0200
+Subject: [PATCH v2] regmap: Fix debugfs-file 'registers' mode
+Message-ID: <1410158617-16827-1-git-send-email-mpa@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Doug,
+The macro "REGMAP_ALLOW_WRITE_DEBUGFS" can be used to enable write
+support on the registers file in the debugfs. The mode of the file is
+fixed to 0400 so it is not possible to write the file ever.
 
-On 09/08/2014 06:36 AM, Doug Anderson wrote:
-> 
-> One (ugly?) solution would be to add a feature to your bootloader to
-> modify the device tree to mark regulators as "always-on".  Since the
-> booloader gets to touch the device tree and the bootloader is involved
-> in communicating into about SimpleFB, it kinda makes sense.
-> 
+This patch fixes the mode by setting it to the correct value depending
+on the macro.
 
-I can't say I like to mark the regulators as always-on on the DT and that's
-why I copied the patch in the response instead of posting it as a proper patch
-but I think relying in the bootloaders to modify the DT is not better.
+Cc: Dimitris Papastamos <dp@opensource.wolfsonmicro.com>
+Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
+---
 
-IMHO U-boot should only modify the strictly necessary like the /chosen branch
-even though lately I've seen some attempts in the OMAP community to (ab)use
-U-Boot's fdt command to mangle the DT before passing to the kernel in order to
-support different Beagle Bone Black capes.
+Notes:
+    Changes in v2:
+    - Change registers_mode type to umode_t.
 
-Best regards,
-Javier
+ drivers/base/regmap/regmap-debugfs.c | 9 ++++++++-
+ 1 file changed, 8 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/base/regmap/regmap-debugfs.c b/drivers/base/regmap/regmap-debugfs.c
+index 625417e53bdd..d4e8a6f30c16 100644
+--- a/drivers/base/regmap/regmap-debugfs.c
++++ b/drivers/base/regmap/regmap-debugfs.c
+@@ -512,7 +512,14 @@ void regmap_debugfs_init(struct regmap *map, const char *name)
+ 			    map, &regmap_reg_ranges_fops);
+ 
+ 	if (map->max_register || regmap_readable(map, 0)) {
+-		debugfs_create_file("registers", 0400, map->debugfs,
++		umode_t registers_mode;
++
++		if (IS_ENABLED(REGMAP_ALLOW_WRITE_DEBUGFS))
++			registers_mode = 0600;
++		else
++			registers_mode = 0400;
++
++		debugfs_create_file("registers", registers_mode, map->debugfs,
+ 				    map, &regmap_map_fops);
+ 		debugfs_create_file("access", 0400, map->debugfs,
+ 				    map, &regmap_access_fops);
+-- 
+2.1.0
