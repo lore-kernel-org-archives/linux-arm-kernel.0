@@ -1,28 +1,33 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 8 Sep 2014 10:40:21 -0700
-Subject: [PATCH v8 00/18] 8250-core based serial driver for OMAP + DMA
-In-Reply-To: <1409943773-7874-1-git-send-email-bigeasy@linutronix.de>
-References: <1409943773-7874-1-git-send-email-bigeasy@linutronix.de>
-Message-ID: <20140908174020.GI3238@atomide.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Mon, 8 Sep 2014 19:48:05 +0200
+Subject: [PATCH] clk: efm32: fix build warning
+In-Reply-To: <3456522.oqa7pbstSD@wuerfel>
+References: <3456522.oqa7pbstSD@wuerfel>
+Message-ID: <20140908174805.GL23009@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Sebastian Andrzej Siewior <bigeasy@linutronix.de> [140905 12:03]:
-> This is my complete queue fo the omap serial driver based on the 8250 core
-> code. I played with it on beagle bone, am335x-evm and dra7xx including DMA.
-> The runtime-pm pieces look now bug-compatible with the omap-serial driver.
-> Besides the runtime-om improvement I also fixed a few corner cases for the
-> TX-DMA problem. The DMA fixes (in edma and omap-dma) were dropped and the
-> problem has been in 8250-dma via patch #13.
+On Mon, Sep 08, 2014 at 05:19:40PM +0200, Arnd Bergmann wrote:
+> The normal prototype for of clk init functions is to return void,
+> while efm32gg_cmu_init return an int, resulting in this harmless
+> build warning:
 > 
-> The whole queue is available at
->   git://git.breakpoint.cc/bigeasy/linux.git uart_v8
+> drivers/clk/clk-efm32gg.c:81:189: warning: comparison of distinct pointer types lacks a cast [enabled by default]
+>  CLK_OF_DECLARE(efm32ggcmu, "efm32gg,cmu", efm32gg_cmu_init);
+> 
+> This changes the return type to avoid the warning.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+I already sent the exact same patch some time ago, even the sha1 sums in
+the diff match.
 
-Gave the above branch a quick try, but it again does not idle for
-my omap3 test cases. It seems that now the cm_idlest1_core sdma
-bit is blocking deeper idle states. Is that the correct branch
-to use?
+	Subject: [PATCH] clk/efm32gg: fix dt init prototype
+	Message-Id: <1406558301-17866-1-git-send-email-u.kleine-koenig@pengutronix.de>
+	Date: Mon, 28 Jul 2014 16:38:21 +0200
 
-Regards,
+Thanks
+Uwe
 
-Tony
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
