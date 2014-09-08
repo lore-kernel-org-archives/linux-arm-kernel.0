@@ -1,62 +1,120 @@
-From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
-Date: Mon, 08 Sep 2014 16:05:40 +0200
-Subject: Unable to boot mainline on snow chromebook since 3.15
-In-Reply-To: <20140908134937.GK4015@sirena.org.uk>
-References: <20140905115704.GO13515@arm.com> <20140905122232.GP13515@arm.com>
- <CAD=FV=VfioJf9VYoSYL0QBk-bN93-Ecx3=0n9hb5Q4rcx43-_g@mail.gmail.com>
- <540C202E.2060009@collabora.co.uk> <540C7F5B.6070307@gmail.com>
- <540C83DE.10505@collabora.co.uk> <540C8577.2070907@gmail.com>
- <20140908112112.GK26030@arm.com>
- <CACxGe6v40wMSW8LJRtyZ3C6PinRMcQM-Zog+XpTJ-QG3HHJknw@mail.gmail.com>
- <20140908134937.GK4015@sirena.org.uk>
-Message-ID: <540DB7B4.4060300@collabora.co.uk>
+From: liviu@dudau.co.uk (Liviu Dudau)
+Date: Mon, 8 Sep 2014 14:59:18 +0100
+Subject: [PATCH v6 0/4] APM X-Gene PCIe host controller
+In-Reply-To: <CAErSpo643rAAqR0AAy5CwSkMv28Cw8Y55EYrYo0AHvQZxgvgXg@mail.gmail.com>
+References: <1409963143-11951-1-git-send-email-tinamdar@apm.com>
+ <CAErSpo643rAAqR0AAy5CwSkMv28Cw8Y55EYrYo0AHvQZxgvgXg@mail.gmail.com>
+Message-ID: <20140908135918.GA1296@bart.dudau.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Will,
+On Sat, Sep 06, 2014 at 08:17:43AM -0600, Bjorn Helgaas wrote:
+> On Fri, Sep 5, 2014 at 6:25 PM, Tanmay Inamdar <tinamdar@apm.com> wrote:
+> > This patch adds support for AppliedMicro X-Gene PCIe host controller. The
+> > driver is tested on X-Gene platform with different gen1/2/3 PCIe endpoint
+> > cards.
+> >
+> > X-Gene PCIe controller driver has depedency on the pcie arm64 arch support.
+> > Liviu Dudau from ARM has sent a patch set for pcie arm64 arch support and
+> > support for creating generic pcie bridge from device tree. Liviu's patches
+> > are available here
+> > 1. https://lkml.org/lkml/2014/8/12/361
+> 
+> I'm hoping to merge Liviu's patches and this X-Gene support for v3.18.
+> I'm currently waiting for Liviu's v10 series (hopefully based on
+> v3.17-rc2), and since your series depends on that, I'm going to wait
+> for a v7 of your series that is rebased on top of Liviu's v10.  Does
+> that make sense?
 
-On 09/08/2014 03:49 PM, Mark Brown wrote:
-> On Mon, Sep 08, 2014 at 01:20:11PM +0100, Grant Likely wrote:
->> On Mon, Sep 8, 2014 at 12:21 PM, Will Deacon <will.deacon@arm.com> wrote:
-> 
->> > Whilst I'm sympathetic to people working to enable DRM, I think this is
->> > the right solution to the problem. The transition from simplefb to DRM
->> > shouldn't break display for a bunch of kernel revisions whilst the code is
->> > in flux.
-> 
->> I would go further. The kernel behaviour has changed, and we have to
->> deal with platforms that assume the old behaviour. That means either
->> defaulting to leaving enabled regulators/clocks alone unless there is
->> a flag in the DT saying they can be power managed, or black listing
->> platforms that are known to depend on the regulator being on.
-> 
-> For regulators there is essentially a flag in DT already - the
-> regulators should not be described in DT if the OS isn't supposed to be
-> managing them.
-> 
->> Updating the device tree must not be required to get the kernel to
->> boot, but it is valid to require a DT upgrade to get better
->> performance (battery life) out of the platform.
-> 
-> This has got to be a blacklist then, and it seems like we've got to fix
-> simplefb to actually support managing the resources it's using.  The
-> current plan does not seem at all sensible - we're talking about adding
-> hacks in every subsystem that provides resources and bodging DTs in
-> order to work around simplefb.
-> 
+Hi Bjorn,
 
-Since many folks don't agree that hacking different subsystems is the way
-forward I'll hold the patches and don't post them. The sunxi thread [0]
-already shows how different people have strong opposite positions on the
-correct approach to handle this.
+I've sent v10 based on v3.17-rc4, hope this is OK.
 
-For now you can just disable the tps65090 PMIC support by not enabling the
-CONFIG_REGULATOR_TPS65090 kconfig symbol on your kernel config. That will give
-you exactly the same behavior that before tps65090 support was added to the
-Snow DT on commit b16be76 ("ARM: dts: add tps65090 power regulator for
-exynos5250-snow") which AFAIU was good enough for your workflow.
+Tanmay, unfortunately the API has changed again. I've put in the cover letter
+of the series how the probe function needs changing. Basically, you need to
+stop relying on the host bridge being created and use just the resource list
+coming out of the of_pci_get_host_bridge_resources().
 
 Best regards,
-Javier
+Liviu
 
-[0]: https://www.mail-archive.com/linux-sunxi at googlegroups.com/msg06623.html
+> 
+> > If someone wishes to test PCIe on X-Gene with this patch set, above mentioned
+> > patches from Liviu must be applied before the patches in this patch set. Also
+> > please use latest xgene u-boot firmware.
+> >
+> > changes since V5:
+> > 1. Port driver to changed interface of 'of_create_pci_host_bridge'
+> > 2. Fix the prefetch bit setting
+> > 3. Removed bunch of register programming which is already done by firmware
+> >
+> > changes since V4:
+> > 1. fix section mismatch warnings
+> > 2. fix the patch description
+> > 3. fix indentation
+> > 4. update read/write cfg functions by passing both addr and offset.
+> > 5. use 'time_before' for timeout.
+> > 6. remove unnecessary 'IS_ERR_OR_NULL'. Keep 'IS_ERR' for 'clk_get'
+> > 7. remove BUG_ON for pci_ioremap_io.
+> >
+> > changes since V3:
+> > 1. remove 'struct hw_pci' and supporting ops in hw_pci
+> > 2. add code to create the host bridge from dts
+> > 3. add code to scan the the host bridge
+> > 4. modify outbound windows setup function to get resource information from
+> >    'bridge->windows'
+> > 5. add compatible string in pcie dts node with current X-Gene SOC name.
+> >
+> > changes since V2:
+> > 1. redefined each PCI port in different PCI domain correctly.
+> > 2. removed setup_lane and setup_link functions from driver.
+> > 3. removed scan_bus wrapper and set_primary_bus hack.
+> > 4. added pci_ioremap_io for io resources.
+> >
+> > changes since V1:
+> > 1. added PCI domain support
+> > 2. reading cpu and pci addresses from device tree to configure regions.
+> > 3. got rid of unnecessary wrappers for readl and writel.
+> > 4. got rid of endpoint configuration code.
+> > 5. added 'dma-ranges' property support to read inbound region configuration.
+> > 6. renamed host driver file to 'pci-xgene.c' from 'pcie-xgene.c'
+> > 7. dropped 'clock-names' property from bindings
+> > 8. added comments whereever requested.
+> >
+> > Tanmay Inamdar (4):
+> >   pci:host: APM X-Gene PCIe controller driver
+> >   arm64: dts: APM X-Gene PCIe device tree nodes
+> >   dt-bindings: pci: xgene pcie device tree bindings
+> >   MAINTAINERS: entry for APM X-Gene PCIe host driver
+> >
+> >  .../devicetree/bindings/pci/xgene-pci.txt          |  55 ++
+> >  MAINTAINERS                                        |   8 +
+> >  arch/arm64/boot/dts/apm-mustang.dts                |   8 +
+> >  arch/arm64/boot/dts/apm-storm.dtsi                 | 160 ++++++
+> >  drivers/pci/host/Kconfig                           |  10 +
+> >  drivers/pci/host/Makefile                          |   1 +
+> >  drivers/pci/host/pci-xgene.c                       | 638 +++++++++++++++++++++
+> >  7 files changed, 880 insertions(+)
+> >  create mode 100644 Documentation/devicetree/bindings/pci/xgene-pci.txt
+> >  create mode 100644 drivers/pci/host/pci-xgene.c
+> >
+> > --
+> > 1.9.1
+> >
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
+
+-- 
+-------------------
+   .oooO
+   (   )
+    \ (  Oooo.
+     \_) (   )
+          ) /
+         (_/
+
+ One small step
+   for me ...
