@@ -1,51 +1,74 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Mon, 8 Sep 2014 11:49:39 -0400 (EDT)
-Subject: [PATCH v3 3/5] arm: fiq: Replace default FIQ handler
-In-Reply-To: <1410190115-32604-4-git-send-email-daniel.thompson@linaro.org>
-References: <1409931198-22600-1-git-send-email-daniel.thompson@linaro.org>
- <1410190115-32604-1-git-send-email-daniel.thompson@linaro.org>
- <1410190115-32604-4-git-send-email-daniel.thompson@linaro.org>
-Message-ID: <alpine.LFD.2.11.1409081140360.16533@knanqh.ubzr>
+From: m-karicheri2@ti.com (Murali Karicheri)
+Date: Mon, 8 Sep 2014 11:52:47 -0400
+Subject: [PATCH] PCI: keystone: update to support multiple pci ports
+In-Reply-To: <5769746.NkKjYOOUiv@wuerfel>
+References: <1409938782-31460-1-git-send-email-m-karicheri2@ti.com>
+ <3654923.JrIGV2dJ70@wuerfel> <540A1F05.80706@ti.com>
+ <5769746.NkKjYOOUiv@wuerfel>
+Message-ID: <540DD0CF.4000501@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 8 Sep 2014, Daniel Thompson wrote:
+On 09/05/2014 05:11 PM, Arnd Bergmann wrote:
+> On Friday 05 September 2014 16:37:25 Murali Karicheri wrote:
+>> On 09/05/2014 03:00 PM, Arnd Bergmann wrote:
+>>> On Friday 05 September 2014 14:33:54 Murali Karicheri wrote:
+>>>>> This looks like it's a shared register of some sort that doesn't
+>>>>> really belong into the registers of a particular port. Could it
+>>>>> be that it's actually for the PHY?
+>>>>>
+>>>> This a shared device configuration register between the two ports the
+>>>> desciption states it is bootstrap configuration of the PCIe module as
+>>>> Endpoint or Root complex and Not Phy. Hope below text will help.
+>>>
+>>> Ok. Why do you want to have this user-selectable though? Can't it
+>>> just be set by the boot loader before starting Linux?
+>>
+>> Arnd,
+>>
+>> As the driver is responsible for configuring the device to support the
+>> device functionality, it make sense to do this in the device driver. The
+>> driver enables clock to the IP and this is an addition thing to be
+>> configured so that when the device is powered up, it should function as
+>> RC. The IP can be configured to work as Root Complex or Endpoint. So not
+>> sure why you want to me to move this functionality to boot loader.
+>
+> But the driver can only do root complex mode, and we would probably
+> want a completely different driver if we were to start supporting
+> endpoint mode.
+>
+Arnd,
 
-> +@
-> +@ Taking a FIQ in abort mode is similar to taking a FIQ in SVC mode
-> +@ and reuses the same macros. However in abort mode we must also
-> +@ save/restore lr_abt and spsr_abt to make nested aborts safe.
-> +@
-> +	.align 5
-> +__fiq_abt:
-> +	svc_entry 0, 0
-> +
-> + ARM(	msr	cpsr_c, #ABT_MODE | PSR_I_BIT | PSR_F_BIT )
-> + THUMB( mov	r0, #ABT_MODE | PSR_I_BIT | PSR_F_BIT )
-> + THUMB( msr	cpsr_c, r0 )
-> +	mov	r1, lr		@ Save lr_abt
-> +	mrs	r2, spsr	@ Save spsr_abt, abort is now safe
-> + ARM(	msr	cpsr_c, #SVC_MODE | PSR_I_BIT | PSR_F_BIT )
-> + THUMB( mov	r0, #SVC_MODE | PSR_I_BIT | PSR_F_BIT )
-> + THUMB( msr	cpsr_c, r0 )
-> +	push	{r1 - r2}
+Good point! I will drop index#2 handling in the driver code and will 
+handle the same in boot loader. But I have a question though. The 
+original driver which is queued up for merge to v3.18 has index #2 for 
+this reg offset and is documented in the DT documentation as
 
-	stmfd sp!, {r1 - r2}
-
-> +
-> +	sub	r0, sp, #8			@ struct pt_regs *regs
-> +	bl	handle_fiq_as_nmi
-> +
-> +	pop	{r1 - r2}
-
-	ldmfd sp!, {r1 - r2}
-
-... so that old binutils we still accept to compile the kernel (in ARM 
-mode) are happy.
-
-Otherwise...
-
-Acked-by: Nicolas Pitre <nico@linaro.org>
+	index 2 is the base address and length of PCI mode configuration
+	register.
+	index 3 is the base address and length of PCI device ID register.
 
 
-Nicolas
+Will this create any issue in terms of backward compatibility if I 
+remove it and move index3 to index2 and update the code for the same? I 
+assume since this patch also will likely be on the next branch soon, and 
+gets merged together with original driver to v3.18, this should be fine. 
+But for some reason, if this patch doesn't make to v3.18, then won't 
+this break the backward compatibility?
+
+I think the other option is document index2 as obsolete and update the 
+document and remove the code for handling it. Any suggestion?
+
+Thanks
+
+Murali
+
+> This also implies that the firmware has to pass a different DT for
+> endpoint mode, so it should be responsible for setting up the hardware
+> to match the DT.
+>
+> 	Arnd
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
