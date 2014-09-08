@@ -1,61 +1,35 @@
-From: steve.capper@linaro.org (Steve Capper)
-Date: Mon, 8 Sep 2014 10:06:27 +0100
-Subject: [PATCH V3 0/6] RCU get_user_pages_fast and __get_user_pages_fast
-In-Reply-To: <CAPvkgC0YVhPEBqbWSDnGyZBUn3+8Kv7-yx1-_n0Jx+giKzOqmw@mail.gmail.com>
-References: <1409237107-24228-1-git-send-email-steve.capper@linaro.org>
- <20140828152320.GN22580@arm.com>
- <CAPvkgC0YVhPEBqbWSDnGyZBUn3+8Kv7-yx1-_n0Jx+giKzOqmw@mail.gmail.com>
-Message-ID: <20140908090626.GA14634@linaro.org>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Mon, 8 Sep 2014 11:12:23 +0200
+Subject: [PATCH 3/5] arm: MTK: Add basic support for mt8135
+In-Reply-To: <1409874660-8710-4-git-send-email-srv_yingjoe.chen@mediatek.com>
+References: <1409874660-8710-1-git-send-email-srv_yingjoe.chen@mediatek.com>
+ <1409874660-8710-4-git-send-email-srv_yingjoe.chen@mediatek.com>
+Message-ID: <20140908091223.GC15722@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 01, 2014 at 12:43:06PM +0100, Steve Capper wrote:
-> On 28 August 2014 16:23, Will Deacon <will.deacon@arm.com> wrote:
-> > On Thu, Aug 28, 2014 at 03:45:01PM +0100, Steve Capper wrote:
-> >> I would like to get this series into 3.18 as it fixes quite a big problem
-> >> with THP on arm and arm64. This series is split into a core mm part, an
-> >> arm part and an arm64 part.
-> >>
-> >> Could somebody please take patch #1 (if it looks okay)?
-> >> Russell, would you be happy with patches #2, #3, #4? (if we get #1 merged)
-> >> Catalin, would you be happy taking patches #5, #6? (if we get #1 merged)
-> >
-> > Pretty sure we're happy to take the arm64 bits once you've got the core
-> > changes sorted out. Failing that, Catalin's acked them so they could go via
-> > an mm tree if it's easier.
-> >
+On Fri, Sep 05, 2014 at 07:50:58AM +0800, Joe.C wrote:
+> From: "Joe.C" <yingjoe.chen@mediatek.com>
 > 
-> Hello,
-> 
-> Are any mm maintainers willing to take the first patch from this
-> series into their tree for merging into 3.18?
->   mm: Introduce a general RCU get_user_pages_fast.
-> 
-> (or please let me know if there are any issues with the patch that
-> need addressing).
-> 
-> As Will has stated, Catalin's already acked the arm64 patches, and
-> these can also go in via an mm tree if that makes things easier:
->   arm64: mm: Enable HAVE_RCU_TABLE_FREE logic
->   arm64: mm: Enable RCU fast_gup
-> 
-> Thanks,
-> --
-> Steve
+> +
+> +	soc {
+> +		#address-cells = <2>;
+> +		#size-cells = <2>;
+> +		compatible = "simple-bus";
+> +		ranges;
+> +
+> +		timer: timer at 10008000 {
+> +			compatible = "mediatek,mt6577-timer";
 
-Hi,
-Just a ping on this.
+This should also have a mediatek,mt8135-timer compatible. Just in case
+there are incompatibilities in the timer you are not aware of now you'll
+still have the possibility later to distinguish between the mt6577 timer
+and the mt8135 timer in the driver.
 
-I was wondering if the first patch in this series:
+Sascha
 
-[PATCH V3 1/6] mm: Introduce a general RCU get_user_pages_fast.
-http://marc.info/?l=linux-mm&m=140923713202355&w=2
-
-could be merged into 3.18 via an mm tree, or if there are any issues
-with the patch that I should fix?
-
-Acks or flames from the mm maintainers would be greatly appreciated!
-
-Cheers,
 -- 
-Steve
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
