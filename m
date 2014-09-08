@@ -1,41 +1,36 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Mon, 08 Sep 2014 13:54:36 +0200
-Subject: [PATCH v7 1/5] Documentation: Add device tree bindings for
- Freescale i.MX GPC
-In-Reply-To: <CAMuHMdUqbk+OZiBMUsebQ_==7jCan+dHsfJLhi+CPUE=xc6yRA@mail.gmail.com>
-References: <1409060791-23167-1-git-send-email-p.zabel@pengutronix.de>
- <1409060791-23167-2-git-send-email-p.zabel@pengutronix.de>
- <CAMuHMdUqbk+OZiBMUsebQ_==7jCan+dHsfJLhi+CPUE=xc6yRA@mail.gmail.com>
-Message-ID: <1410177276.3981.35.camel@paszta.hi.pengutronix.de>
+From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
+Date: Mon, 08 Sep 2014 13:55:29 +0200
+Subject: Unable to boot mainline on snow chromebook since 3.15
+In-Reply-To: <20140908112112.GK26030@arm.com>
+References: <20140905115704.GO13515@arm.com> <20140905122232.GP13515@arm.com>
+ <CAD=FV=VfioJf9VYoSYL0QBk-bN93-Ecx3=0n9hb5Q4rcx43-_g@mail.gmail.com>
+ <540C202E.2060009@collabora.co.uk> <540C7F5B.6070307@gmail.com>
+ <540C83DE.10505@collabora.co.uk> <540C8577.2070907@gmail.com>
+ <20140908112112.GK26030@arm.com>
+Message-ID: <540D9931.6050603@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Geert,
+Hello Will,
 
-Am Freitag, den 05.09.2014, 13:47 +0200 schrieb Geert Uytterhoeven:
-> Hi Philipp,
+On 09/08/2014 01:21 PM, Will Deacon wrote:
+> On Sun, Sep 07, 2014 at 05:19:03PM +0100, Tomasz Figa wrote:
+>> At least for next 3.17-rc I'd suggest fixing this up in respective clock
+>> driver and dropping the hack only after Exynos DRM patches are merged
+>> and confirmed working.
 > 
-> On Tue, Aug 26, 2014 at 3:46 PM, Philipp Zabel <p.zabel@pengutronix.de> wrote:
-> > +++ b/Documentation/devicetree/bindings/power/fsl,imx-gpc.txt
-> > @@ -0,0 +1,54 @@
+> Whilst I'm sympathetic to people working to enable DRM, I think this is
+> the right solution to the problem. The transition from simplefb to DRM
+> shouldn't break display for a bunch of kernel revisions whilst the code is
+> in flux.
 > 
-> > +IP cores belonging to a power domain should contain a 'power-domain' property
-> 
-> power-domains
-> 
-> > +that is a phandle pointing to the gpc device node and a DOMAIN_INDEX specifying
-> > +the power domain the device belongs to.
-> > +
-> > +Example of a device that is part of the PU power domain:
-> > +
-> > +       vpu: vpu at 02040000 {
-> > +               reg = <0x02040000 0x3c000>;
-> > +               /* ... */
-> > +               power-domain = <&gpc 1>;
-> 
-> power-domains
 
-Thanks, I'll change those.
+Agreed, I'm preparing a patch-set to prevent the kernel to disable both the
+clocks and regulators needed for the display, I'll try to post it today or
+tomorrow at worst.
 
-regards
-Philipp
+> Will
+> 
+
+Best regards,
+Javier
