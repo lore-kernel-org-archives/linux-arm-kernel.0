@@ -1,115 +1,61 @@
-From: achandran@mvista.com (Arun Chandran)
-Date: Mon, 8 Sep 2014 14:22:28 +0530
-Subject: [PATCH V3] irqchip:gic: change access of gicc_ctrl register to
- read modify write.
-In-Reply-To: <1393537013-6264-1-git-send-email-fkan@apm.com>
-References: <1393537013-6264-1-git-send-email-fkan@apm.com>
-Message-ID: <CAFdej02vSm8TbUWGsMr936WN1GNmJ0SBuEKQkKyzKoEjtVmc+g@mail.gmail.com>
+From: steve.capper@linaro.org (Steve Capper)
+Date: Mon, 8 Sep 2014 10:06:27 +0100
+Subject: [PATCH V3 0/6] RCU get_user_pages_fast and __get_user_pages_fast
+In-Reply-To: <CAPvkgC0YVhPEBqbWSDnGyZBUn3+8Kv7-yx1-_n0Jx+giKzOqmw@mail.gmail.com>
+References: <1409237107-24228-1-git-send-email-steve.capper@linaro.org>
+ <20140828152320.GN22580@arm.com>
+ <CAPvkgC0YVhPEBqbWSDnGyZBUn3+8Kv7-yx1-_n0Jx+giKzOqmw@mail.gmail.com>
+Message-ID: <20140908090626.GA14634@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Feng,
+On Mon, Sep 01, 2014 at 12:43:06PM +0100, Steve Capper wrote:
+> On 28 August 2014 16:23, Will Deacon <will.deacon@arm.com> wrote:
+> > On Thu, Aug 28, 2014 at 03:45:01PM +0100, Steve Capper wrote:
+> >> I would like to get this series into 3.18 as it fixes quite a big problem
+> >> with THP on arm and arm64. This series is split into a core mm part, an
+> >> arm part and an arm64 part.
+> >>
+> >> Could somebody please take patch #1 (if it looks okay)?
+> >> Russell, would you be happy with patches #2, #3, #4? (if we get #1 merged)
+> >> Catalin, would you be happy taking patches #5, #6? (if we get #1 merged)
+> >
+> > Pretty sure we're happy to take the arm64 bits once you've got the core
+> > changes sorted out. Failing that, Catalin's acked them so they could go via
+> > an mm tree if it's easier.
+> >
+> 
+> Hello,
+> 
+> Are any mm maintainers willing to take the first patch from this
+> series into their tree for merging into 3.18?
+>   mm: Introduce a general RCU get_user_pages_fast.
+> 
+> (or please let me know if there are any issues with the patch that
+> need addressing).
+> 
+> As Will has stated, Catalin's already acked the arm64 patches, and
+> these can also go in via an mm tree if that makes things easier:
+>   arm64: mm: Enable HAVE_RCU_TABLE_FREE logic
+>   arm64: mm: Enable RCU fast_gup
+> 
+> Thanks,
+> --
+> Steve
 
-Is this patch still needed to fix perf calltrace?
-http://lists.infradead.org/pipermail/linux-arm-kernel/2014-June/265814.html
+Hi,
+Just a ping on this.
 
-On Fri, Feb 28, 2014 at 3:06 AM, Feng Kan <fkan@apm.com> wrote:
-> This change is made to preserve the GIC v2 releated bits in the
-> GIC_CPU_CTRL register (also known as the GICC_CTLR register in spec).
-> The original code only set the enable/disable group bit in this register.
-> This code will preserve the bypass bits configured by the bootload except
-> the enable/disable bit. The main reason for this change is to allow the
-> bypass bits specified in the v2 spec to remain untouched by the current
-> GIC code. In the X-Gene platform, the bypass functionality is not used
-> and bypass must be disabled at all time.
->
-> Signed-off-by: Vinayak Kale <vkale@apm.com>
-> Acked-by: Anup Patel <apatel@apm.com>
-> Signed-off-by: Feng Kan <fkan@apm.com>
-> ---
-> V3 Changes:
->         - Sorry, forgot to change the mask for cpu_init path
->           assumed bootloader setup bits correctly.
-> V2 Changes:
->         - only mask off v2 bypass bits
->  drivers/irqchip/irq-gic.c |   32 +++++++++++++++++++++++++++++---
->  1 files changed, 29 insertions(+), 3 deletions(-)
->
-> diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
-> index 341c601..3ca7995 100644
-> --- a/drivers/irqchip/irq-gic.c
-> +++ b/drivers/irqchip/irq-gic.c
-> @@ -418,6 +418,7 @@ static void gic_cpu_init(struct gic_chip_data *gic)
->         void __iomem *dist_base = gic_data_dist_base(gic);
->         void __iomem *base = gic_data_cpu_base(gic);
->         unsigned int cpu_mask, cpu = smp_processor_id();
-> +       unsigned int ctrl_mask;
->         int i;
->
->         /*
-> @@ -449,13 +450,29 @@ static void gic_cpu_init(struct gic_chip_data *gic)
->                 writel_relaxed(0xa0a0a0a0, dist_base + GIC_DIST_PRI + i * 4 / 4);
->
->         writel_relaxed(0xf0, base + GIC_CPU_PRIMASK);
-> -       writel_relaxed(1, base + GIC_CPU_CTRL);
-> +
-> +       ctrl_mask = readl(base + GIC_CPU_CTRL);
+I was wondering if the first patch in this series:
 
-readl_relaxed() here?
+[PATCH V3 1/6] mm: Introduce a general RCU get_user_pages_fast.
+http://marc.info/?l=linux-mm&m=140923713202355&w=2
 
-> +
-> +       /* Mask out the gic v2 bypass bits */
-> +       ctrl_mask &= 0x1e0;
-> +
-> +       /* Enable group 0 */
-> +       ctrl_mask |= 0x1;
-> +       writel_relaxed(ctrl_mask, base + GIC_CPU_CTRL);
->  }
->
->  void gic_cpu_if_down(void)
->  {
-> +       unsigned int ctrl_mask;
->         void __iomem *cpu_base = gic_data_cpu_base(&gic_data[0]);
-> -       writel_relaxed(0, cpu_base + GIC_CPU_CTRL);
-> +
-> +       ctrl_mask = readl(cpu_base + GIC_CPU_CTRL);
-readl_relaxed() here?
+could be merged into 3.18 via an mm tree, or if there are any issues
+with the patch that I should fix?
 
-> +       /*
-> +        * Disable grp enable bit, leave the bypass bits alone as changing
-> +        * them could leave the system unstable
-> +        */
-> +       ctrl_mask &= 0x1e0;
-> +       writel_relaxed(ctrl_mask, cpu_base + GIC_CPU_CTRL);
->  }
->
->  #ifdef CONFIG_CPU_PM
-> @@ -566,6 +583,7 @@ static void gic_cpu_restore(unsigned int gic_nr)
->  {
->         int i;
->         u32 *ptr;
-> +       unsigned int ctrl_mask;
->         void __iomem *dist_base;
->         void __iomem *cpu_base;
->
-> @@ -590,7 +608,15 @@ static void gic_cpu_restore(unsigned int gic_nr)
->                 writel_relaxed(0xa0a0a0a0, dist_base + GIC_DIST_PRI + i * 4);
->
->         writel_relaxed(0xf0, cpu_base + GIC_CPU_PRIMASK);
-> -       writel_relaxed(1, cpu_base + GIC_CPU_CTRL);
-> +
-> +       ctrl_mask = readl(cpu_base + GIC_CPU_CTRL);
+Acks or flames from the mm maintainers would be greatly appreciated!
 
-readl_relaxed() here?
-
-> +
-> +       /* Mask out the gic v2 bypass bits */
-> +       ctrl_mask &= 0x1e0;
-> +
-> +       /* Enable group 0 */
-> +       ctrl_mask |= 0x1;
-> +       writel_relaxed(ctrl_mask, cpu_base + GIC_CPU_CTRL);
->  }
->
-
---Arun
+Cheers,
+-- 
+Steve
