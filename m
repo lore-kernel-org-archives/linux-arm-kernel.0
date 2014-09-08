@@ -1,53 +1,32 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Mon, 8 Sep 2014 17:45:24 -0500
-Subject: [GIT PULL 2/2] ARM: OMAP4+: PRM fixes, DRA7 suspend-to-ram support
-In-Reply-To: <20140908223204.GN3238@atomide.com>
-References: <1410195620-6347-1-git-send-email-nm@ti.com>
- <1410195620-6347-2-git-send-email-nm@ti.com>
- <20140908223204.GN3238@atomide.com>
-Message-ID: <20140908224524.GA31480@kahuna>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Tue, 09 Sep 2014 01:07:14 +0200
+Subject: [PATCH 00/15] PM / Domains: Cleanups and remove superfluous APIs
+In-Reply-To: <7ha96eyt9f.fsf@paris.lan>
+References: <1409741551-16437-1-git-send-email-ulf.hansson@linaro.org>
+ <7ha96eyt9f.fsf@paris.lan>
+Message-ID: <2208348.uMLR68bVng@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15:32-20140908, Tony Lindgren wrote:
-> * Nishanth Menon <nm@ti.com> [140908 10:02]:
-> > Hi Tony,
-> > Please pull the following changes.
-> > 
-> > part 2: "ARM: OMAP3+: PRM: fix up prm_handling"
-> > http://marc.info/?l=linux-kernel&m=140871580806186&w=2
-> > Status: Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> > 
-> > part 3: "ARM: OMAP5+: pdata quirks for pinctrl"
-> > http://marc.info/?l=linux-kernel&m=140871598306262&w=2
-> > Status: Sending pull based on http://marc.info/?l=linux-kernel&m=140871666506706&w=2 (Acked by Tony, Pulled by Linus W)
-> > 
-> > part 5: "ARM: OMAP5 / DRA7: Add framework for suspend and cpuidle"
-> > http://marc.info/?l=linux-kernel&m=140871637106555&w=2
-> > Status: picked up kevin's tested and reviewed-by, dropped cpuidle for this pull
-> > 
-> > These could go into your tree for the branch  omap-for-v3.18/soc
-> > 
-> > The following changes since commit 7d1311b93e58ed55f3a31cc8f94c4b8fe988a2b9:
-> > 
-> >   Linux 3.17-rc1 (2014-08-16 10:40:26 -0600)
-> > 
-> > are available in the git repository at:
-> > 
-> >   https://github.com/nmenon/linux-2.6-playground.git pull/v3.18/for-omap-soc
+On Friday, September 05, 2014 08:35:56 AM Kevin Hilman wrote:
+> Ulf Hansson <ulf.hansson@linaro.org> writes:
 > 
-> Thanks pulling into omap-for-v3.18/soc.
+> > This patchset has a bit of a history and some parts of it has been posted
+> > earlier.
+> > http://lists.infradead.org/pipermail/linux-arm-kernel/2014-June/262725.html
+> >
+> > The intent is to simplify code for the generic power domain and also some of
+> > the machine specific code that uses the generic power domain.
+> >
+> > Do note, there are dependencies through this patchset, especially related to
+> > the ARM SoC changes, thus they all need to be kept together.
+> 
+> Reviewed-by: Kevin Hilman <khilman@linaro.org>
 
-Tony, Apologies, I missed the last patch in the series:
+My understanding is that this is for the whole series.
 
-https://patchwork.kernel.org/patch/4765011/
-
-If you could cherry-pick the same with 
-Reviewed-by: Kevin Hilman <khilman@linaro.org>
-Tested-by: Kevin Hilman <khilman@linaro.org>
-based on Kevin's feedback:
-http://marc.info/?l=linux-arm-kernel&m=140916701909122&w=2
+Which I'm queuing up for 3.18, thanks!
 
 -- 
-Regards,
-Nishanth Menon
+I speak only for myself.
+Rafael J. Wysocki, Intel Open Source Technology Center.
