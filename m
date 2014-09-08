@@ -1,309 +1,228 @@
-From: mpa@pengutronix.de (Markus Pargmann)
-Date: Mon,  8 Sep 2014 15:58:33 +0200
-Subject: [PATCH v6] watchdog: Add DA9063 PMIC watchdog driver.
-Message-ID: <1410184713-6436-1-git-send-email-mpa@pengutronix.de>
+From: Liviu.Dudau@arm.com (Liviu Dudau)
+Date: Mon,  8 Sep 2014 14:55:49 +0100
+Subject: [PATCH v10] arm64: Add architectural support for PCIe
+In-Reply-To: <1410184549-17690-1-git-send-email-Liviu.Dudau@arm.com>
+References: <1410184549-17690-1-git-send-email-Liviu.Dudau@arm.com>
+Message-ID: <1410184549-17690-2-git-send-email-Liviu.Dudau@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Krystian Garbaciak <krystian.garbaciak@diasemi.com>
+Use the generic PCI domain and OF functions
+to provide support for PCI Express on arm64.
 
-This driver supports the watchdog device inside the DA9063 PMIC.
-
-Signed-off-by: Krystian Garbaciak <krystian.garbaciak@diasemi.com>
-Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
-Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
+Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
+[Generic PCI domain support]
+Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
 ---
+ arch/arm64/Kconfig               | 22 ++++++++++++++-
+ arch/arm64/include/asm/Kbuild    |  1 +
+ arch/arm64/include/asm/io.h      |  3 +-
+ arch/arm64/include/asm/pci.h     | 37 +++++++++++++++++++++++++
+ arch/arm64/include/asm/pgtable.h |  2 ++
+ arch/arm64/kernel/Makefile       |  1 +
+ arch/arm64/kernel/pci.c          | 59 ++++++++++++++++++++++++++++++++++++++++
+ 7 files changed, 123 insertions(+), 2 deletions(-)
+ create mode 100644 arch/arm64/include/asm/pci.h
+ create mode 100644 arch/arm64/kernel/pci.c
 
-Notes:
-    Changes in v6:
-     - Fix compile error
-    
-    Changes in v5:
-     - Kconfig: Add note about the module name.
-     - Change selector variables to int
-     - Style fixes
-     - use unsigned int to remove gcc verbose warning
-     - Integrate _kick() and _disable() into the calling functions
-    
-    Changes in v4:
-     - Fixed indentation
-     - Fixed lock without unlock
-     - Check for parent device and device driver data in probe(). If not present,
-       this is an invalid prober initialization, return -EINVAL.
-    
-    Changes in v3:
-     - Cleanup error handling for timeout selection and setting
-     - Fix race condition due to late wdt drvdata setup
-     - Remove static struct watchdog_device. It is not initialized in the probe
-       function
-     - Use WATCHDOG_NOWAYOUT_INIT_STATUS for the status
-     - Remove 0 shift using DA9063_TWDSCALE_SHIFT
-
- drivers/watchdog/Kconfig      |   9 ++
- drivers/watchdog/Makefile     |   1 +
- drivers/watchdog/da9063_wdt.c | 222 ++++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 232 insertions(+)
- create mode 100644 drivers/watchdog/da9063_wdt.c
-
-diff --git a/drivers/watchdog/Kconfig b/drivers/watchdog/Kconfig
-index f57312fced80..669de63a7a48 100644
---- a/drivers/watchdog/Kconfig
-+++ b/drivers/watchdog/Kconfig
-@@ -87,6 +87,15 @@ config DA9055_WATCHDOG
- 	  This driver can also be built as a module.  If so, the module
- 	  will be called da9055_wdt.
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index fd4e81a..6b01df9 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -81,7 +81,7 @@ config MMU
+ 	def_bool y
  
-+config DA9063_WATCHDOG
-+	tristate "Dialog DA9063 Watchdog"
-+	depends on MFD_DA9063
-+	select WATCHDOG_CORE
+ config NO_IOPORT_MAP
+-	def_bool y
++	def_bool y if !PCI
+ 
+ config STACKTRACE_SUPPORT
+ 	def_bool y
+@@ -156,6 +156,26 @@ menu "Bus support"
+ config ARM_AMBA
+ 	bool
+ 
++config PCI
++	bool "PCI support"
 +	help
-+	  Support for the watchdog in the DA9063 PMIC.
++	  This feature enables support for PCIe bus system. If you say Y
++	  here, the kernel will include drivers and infrastructure code
++	  to support PCIe bus devices.
 +
-+	  This driver can be built as a module. The module name is da9063_wdt.
++config PCI_DOMAINS
++	def_bool PCI
 +
- config GPIO_WATCHDOG
- 	tristate "Watchdog device controlled through GPIO-line"
- 	depends on OF_GPIO
-diff --git a/drivers/watchdog/Makefile b/drivers/watchdog/Makefile
-index 468c3204c3b1..6c467a9821fe 100644
---- a/drivers/watchdog/Makefile
-+++ b/drivers/watchdog/Makefile
-@@ -173,6 +173,7 @@ obj-$(CONFIG_XEN_WDT) += xen_wdt.o
- # Architecture Independent
- obj-$(CONFIG_DA9052_WATCHDOG) += da9052_wdt.o
- obj-$(CONFIG_DA9055_WATCHDOG) += da9055_wdt.o
-+obj-$(CONFIG_DA9063_WATCHDOG) += da9063_wdt.o
- obj-$(CONFIG_GPIO_WATCHDOG)	+= gpio_wdt.o
- obj-$(CONFIG_WM831X_WATCHDOG) += wm831x_wdt.o
- obj-$(CONFIG_WM8350_WATCHDOG) += wm8350_wdt.o
-diff --git a/drivers/watchdog/da9063_wdt.c b/drivers/watchdog/da9063_wdt.c
++config PCI_DOMAINS_GENERIC
++	def_bool PCI
++
++config PCI_SYSCALL
++	def_bool PCI
++
++source "drivers/pci/Kconfig"
++source "drivers/pci/pcie/Kconfig"
++source "drivers/pci/hotplug/Kconfig"
++
+ endmenu
+ 
+ menu "Kernel Features"
+diff --git a/arch/arm64/include/asm/Kbuild b/arch/arm64/include/asm/Kbuild
+index 0b3fcf8..07cb417 100644
+--- a/arch/arm64/include/asm/Kbuild
++++ b/arch/arm64/include/asm/Kbuild
+@@ -29,6 +29,7 @@ generic-y += mman.h
+ generic-y += msgbuf.h
+ generic-y += mutex.h
+ generic-y += pci.h
++generic-y += pci-bridge.h
+ generic-y += poll.h
+ generic-y += preempt.h
+ generic-y += resource.h
+diff --git a/arch/arm64/include/asm/io.h b/arch/arm64/include/asm/io.h
+index e0ecdcf..f998d90 100644
+--- a/arch/arm64/include/asm/io.h
++++ b/arch/arm64/include/asm/io.h
+@@ -121,7 +121,8 @@ static inline u64 __raw_readq(const volatile void __iomem *addr)
+ /*
+  *  I/O port access primitives.
+  */
+-#define IO_SPACE_LIMIT		0xffff
++#define arch_has_dev_port()	(1)
++#define IO_SPACE_LIMIT		(SZ_32M - 1)
+ #define PCI_IOBASE		((void __iomem *)(MODULES_VADDR - SZ_32M))
+ 
+ static inline u8 inb(unsigned long addr)
+diff --git a/arch/arm64/include/asm/pci.h b/arch/arm64/include/asm/pci.h
 new file mode 100644
-index 000000000000..88441bdd2d1b
+index 0000000..872ba93
 --- /dev/null
-+++ b/drivers/watchdog/da9063_wdt.c
-@@ -0,0 +1,222 @@
-+/*
-+ * Watchdog driver for DA9063 PMICs.
-+ *
-+ * Copyright(c) 2012 Dialog Semiconductor Ltd.
-+ *
-+ * Author: Mariusz Wojtasik <mariusz.wojtasik@diasemi.com>
-+ *
-+ * This program is free software; you can redistribute  it and/or modify it
-+ * under  the terms of  the GNU General  Public License as published by the
-+ * Free Software Foundation;  either version 2 of the  License, or (at your
-+ * option) any later version.
-+ */
++++ b/arch/arm64/include/asm/pci.h
+@@ -0,0 +1,37 @@
++#ifndef __ASM_PCI_H
++#define __ASM_PCI_H
++#ifdef __KERNEL__
 +
-+#include <linux/kernel.h>
-+#include <linux/module.h>
-+#include <linux/watchdog.h>
-+#include <linux/platform_device.h>
-+#include <linux/uaccess.h>
++#include <linux/types.h>
 +#include <linux/slab.h>
-+#include <linux/delay.h>
-+#include <linux/mfd/da9063/registers.h>
-+#include <linux/mfd/da9063/core.h>
-+#include <linux/regmap.h>
++#include <linux/dma-mapping.h>
++
++#include <asm/io.h>
++#include <asm-generic/pci-bridge.h>
++#include <asm-generic/pci-dma-compat.h>
++
++#define PCIBIOS_MIN_IO		0x1000
++#define PCIBIOS_MIN_MEM		0
 +
 +/*
-+ * Watchdog selector to timeout in seconds.
-+ *   0: WDT disabled;
-+ *   others: timeout = 2048 ms * 2^(TWDSCALE-1).
++ * Set to 1 if the kernel should re-assign all PCI bus numbers
 + */
-+static const int wdt_timeout[] = { 0, 2, 4, 8, 16, 32, 65, 131 };
-+#define DA9063_TWDSCALE_DISABLE		0
-+#define DA9063_TWDSCALE_MIN		1
-+#define DA9063_TWDSCALE_MAX		(ARRAY_SIZE(wdt_timeout) - 1)
-+#define DA9063_WDT_MIN_TIMEOUT		wdt_timeout[DA9063_TWDSCALE_MIN]
-+#define DA9063_WDT_MAX_TIMEOUT		wdt_timeout[DA9063_TWDSCALE_MAX]
-+#define DA9063_WDG_TIMEOUT		wdt_timeout[3]
++#define pcibios_assign_all_busses() \
++	(pci_has_flag(PCI_REASSIGN_ALL_BUS))
 +
-+struct da9063_watchdog {
-+	struct da9063 *da9063;
-+	struct watchdog_device wdtdev;
-+	struct mutex lock;
-+};
++/*
++ * PCI address space differs from physical memory address space
++ */
++#define PCI_DMA_BUS_IS_PHYS	(0)
 +
-+static int da9063_wdt_timeout_to_sel(int secs)
++extern int isa_dma_bridge_buggy;
++
++#ifdef CONFIG_PCI
++static inline int pci_proc_domain(struct pci_bus *bus)
 +{
-+	unsigned int i;
++	return 1;
++}
++#endif  /* CONFIG_PCI */
 +
-+	for (i = DA9063_TWDSCALE_MIN; i <= DA9063_TWDSCALE_MAX; i++) {
-+		if (wdt_timeout[i] >= secs)
-+			return i;
-+	}
++#endif  /* __KERNEL__ */
++#endif  /* __ASM_PCI_H */
+diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
+index ffe1ba0..a968523 100644
+--- a/arch/arm64/include/asm/pgtable.h
++++ b/arch/arm64/include/asm/pgtable.h
+@@ -296,6 +296,8 @@ static inline int has_transparent_hugepage(void)
+ 	__pgprot_modify(prot, PTE_ATTRINDX_MASK, PTE_ATTRINDX(MT_DEVICE_nGnRnE) | PTE_PXN | PTE_UXN)
+ #define pgprot_writecombine(prot) \
+ 	__pgprot_modify(prot, PTE_ATTRINDX_MASK, PTE_ATTRINDX(MT_NORMAL_NC) | PTE_PXN | PTE_UXN)
++#define pgprot_device(prot) \
++	__pgprot_modify(prot, PTE_ATTRINDX_MASK, PTE_ATTRINDX(MT_DEVICE_nGnRE) | PTE_PXN | PTE_UXN)
+ #define __HAVE_PHYS_MEM_ACCESS_PROT
+ struct file;
+ extern pgprot_t phys_mem_access_prot(struct file *file, unsigned long pfn,
+diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
+index df7ef87..1ed5a06 100644
+--- a/arch/arm64/kernel/Makefile
++++ b/arch/arm64/kernel/Makefile
+@@ -29,6 +29,7 @@ arm64-obj-$(CONFIG_ARM64_CPU_SUSPEND)	+= sleep.o suspend.o
+ arm64-obj-$(CONFIG_JUMP_LABEL)		+= jump_label.o
+ arm64-obj-$(CONFIG_KGDB)		+= kgdb.o
+ arm64-obj-$(CONFIG_EFI)			+= efi.o efi-stub.o efi-entry.o
++arm64-obj-$(CONFIG_PCI)			+= pci.o
+ 
+ obj-y					+= $(arm64-obj-y) vdso/
+ obj-m					+= $(arm64-obj-m)
+diff --git a/arch/arm64/kernel/pci.c b/arch/arm64/kernel/pci.c
+new file mode 100644
+index 0000000..0d755d6
+--- /dev/null
++++ b/arch/arm64/kernel/pci.c
+@@ -0,0 +1,59 @@
++/*
++ * Code borrowed from powerpc/kernel/pci-common.c
++ *
++ * Copyright (C) 2003 Anton Blanchard <anton@au.ibm.com>, IBM
++ * Copyright (C) 2014 ARM Ltd.
++ *
++ * This program is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU General Public License
++ * version 2 as published by the Free Software Foundation.
++ *
++ */
 +
-+	return -EINVAL;
++#include <linux/init.h>
++#include <linux/io.h>
++#include <linux/kernel.h>
++#include <linux/mm.h>
++#include <linux/of_pci.h>
++#include <linux/of_platform.h>
++#include <linux/slab.h>
++
++#include <asm/pci-bridge.h>
++
++/*
++ * Called after each bus is probed, but before its children are examined
++ */
++void pcibios_fixup_bus(struct pci_bus *bus)
++{
++	/* nothing to do, expected to be removed in the future */
 +}
 +
-+static int _da9063_wdt_set_timeout(struct da9063 *da9063, unsigned int regval)
++/*
++ * We don't have to worry about legacy ISA devices, so nothing to do here
++ */
++resource_size_t pcibios_align_resource(void *data, const struct resource *res,
++				resource_size_t size, resource_size_t align)
 +{
-+	return regmap_update_bits(da9063->regmap, DA9063_REG_CONTROL_D,
-+			DA9063_TWDSCALE_MASK, regval);
++	return res->start;
 +}
 +
-+static int da9063_wdt_start(struct watchdog_device *wdd)
++/*
++ * Try to assign the IRQ number from DT when adding a new device
++ */
++int pcibios_add_device(struct pci_dev *dev)
 +{
-+	struct da9063_watchdog *wdt = watchdog_get_drvdata(wdd);
-+	int selector;
-+	int ret;
-+
-+	selector = da9063_wdt_timeout_to_sel(wdt->wdtdev.timeout);
-+	if (selector < 0) {
-+		dev_err(wdt->da9063->dev, "Timeout out of range (timeout=%d)\n",
-+				wdt->wdtdev.timeout);
-+		return selector;
-+	}
-+
-+	mutex_lock(&wdt->lock);
-+	ret = _da9063_wdt_set_timeout(wdt->da9063, selector);
-+	if (ret) {
-+		dev_err(wdt->da9063->dev, "Watchdog failed to start (err = %d)\n",
-+				ret);
-+	}
-+	mutex_unlock(&wdt->lock);
-+
-+	return ret;
-+}
-+
-+static int da9063_wdt_stop(struct watchdog_device *wdd)
-+{
-+	struct da9063_watchdog *wdt = watchdog_get_drvdata(wdd);
-+	int ret;
-+
-+	mutex_lock(&wdt->lock);
-+	ret = regmap_update_bits(wdt->da9063->regmap, DA9063_REG_CONTROL_D,
-+			DA9063_TWDSCALE_MASK,
-+			DA9063_TWDSCALE_DISABLE);
-+	if (ret)
-+		dev_alert(wdt->da9063->dev, "Watchdog failed to stop (err = %d)\n",
-+				ret);
-+	mutex_unlock(&wdt->lock);
-+
-+	return ret;
-+}
-+
-+static int da9063_wdt_ping(struct watchdog_device *wdd)
-+{
-+	struct da9063_watchdog *wdt = watchdog_get_drvdata(wdd);
-+	int ret;
-+
-+	mutex_lock(&wdt->lock);
-+	ret = regmap_write(wdt->da9063->regmap, DA9063_REG_CONTROL_F,
-+			DA9063_WATCHDOG);
-+	if (ret)
-+		dev_alert(wdt->da9063->dev, "Failed to ping the watchdog (err = %d)\n",
-+				ret);
-+	mutex_unlock(&wdt->lock);
-+
-+	return ret;
-+}
-+
-+static int da9063_wdt_set_timeout(struct watchdog_device *wdd,
-+		unsigned int timeout)
-+{
-+	struct da9063_watchdog *wdt = watchdog_get_drvdata(wdd);
-+	int selector;
-+	int ret;
-+
-+	selector = da9063_wdt_timeout_to_sel(timeout);
-+	if (selector < 0) {
-+		dev_err(wdt->da9063->dev,
-+				"Unsupported watchdog timeout, should be between 2 and 131\n");
-+		return -EINVAL;
-+	}
-+
-+	mutex_lock(&wdt->lock);
-+
-+	ret = _da9063_wdt_set_timeout(wdt->da9063, selector);
-+	if (ret)
-+		dev_err(wdt->da9063->dev, "Failed to set watchdog timeout (err = %d)\n",
-+				ret);
-+	else
-+		wdd->timeout = wdt_timeout[selector];
-+
-+	mutex_unlock(&wdt->lock);
-+
-+	return ret;
-+}
-+
-+static const struct watchdog_info da9063_watchdog_info = {
-+	.options = WDIOF_SETTIMEOUT | WDIOF_KEEPALIVEPING,
-+	.identity = "DA9063 Watchdog",
-+};
-+
-+static const struct watchdog_ops da9063_watchdog_ops = {
-+	.owner = THIS_MODULE,
-+	.start = da9063_wdt_start,
-+	.stop = da9063_wdt_stop,
-+	.ping = da9063_wdt_ping,
-+	.set_timeout = da9063_wdt_set_timeout,
-+};
-+
-+static int da9063_wdt_probe(struct platform_device *pdev)
-+{
-+	int ret;
-+	struct da9063 *da9063;
-+	struct da9063_watchdog *wdt;
-+
-+	if (!pdev->dev.parent)
-+		return -EINVAL;
-+
-+	da9063 = dev_get_drvdata(pdev->dev.parent);
-+	if (!da9063)
-+		return -EINVAL;
-+
-+	wdt = devm_kzalloc(&pdev->dev, sizeof(*wdt), GFP_KERNEL);
-+	if (!wdt)
-+		return -ENOMEM;
-+
-+	wdt->da9063 = da9063;
-+	mutex_init(&wdt->lock);
-+
-+	wdt->wdtdev.info = &da9063_watchdog_info;
-+	wdt->wdtdev.ops = &da9063_watchdog_ops;
-+	wdt->wdtdev.min_timeout = DA9063_WDT_MIN_TIMEOUT;
-+	wdt->wdtdev.max_timeout = DA9063_WDT_MAX_TIMEOUT;
-+	wdt->wdtdev.timeout = DA9063_WDG_TIMEOUT;
-+
-+	wdt->wdtdev.status = WATCHDOG_NOWAYOUT_INIT_STATUS;
-+
-+	watchdog_set_drvdata(&wdt->wdtdev, wdt);
-+	dev_set_drvdata(&pdev->dev, wdt);
-+
-+	ret = watchdog_register_device(&wdt->wdtdev);
-+	if (ret) {
-+		dev_err(da9063->dev, "da9063-watchdog registration failed (err = %d)",
-+				ret);
-+		return ret;
-+	}
++	dev->irq = of_irq_parse_and_map_pci(dev, 0, 0);
 +
 +	return 0;
 +}
 +
-+static int da9063_wdt_remove(struct platform_device *pdev)
++
++#ifdef CONFIG_PCI_DOMAINS_GENERIC
++void pci_bus_assign_domain_nr(struct pci_bus *bus, struct device *parent)
 +{
-+	struct da9063_watchdog *wdt = dev_get_drvdata(&pdev->dev);
++	int domain = of_pci_get_domain_nr(parent->of_node, true);
 +
-+	watchdog_unregister_device(&wdt->wdtdev);
-+
-+	return 0;
++	if (domain >= 0)
++		bus->domain_nr = domain;
 +}
-+
-+static struct platform_driver da9063_wdt_driver = {
-+	.probe = da9063_wdt_probe,
-+	.remove = da9063_wdt_remove,
-+	.driver = {
-+		.name = DA9063_DRVNAME_WATCHDOG,
-+	},
-+};
-+module_platform_driver(da9063_wdt_driver);
-+
-+MODULE_AUTHOR("Mariusz Wojtasik <mariusz.wojtasik@diasemi.com>");
-+MODULE_DESCRIPTION("Watchdog driver for Dialog DA9063");
-+MODULE_LICENSE("GPL");
-+MODULE_ALIAS("platform:" DA9063_DRVNAME_WATCHDOG);
++#endif
 -- 
-2.1.0
+2.0.4
