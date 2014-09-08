@@ -1,27 +1,25 @@
-From: joel.schopp@amd.com (Joel Schopp)
-Date: Mon, 8 Sep 2014 22:21:44 +0000
-Subject: [PATCH] KVM: arm64: add gic-400 compatible
-Message-ID: <20140908222144.4967.80301.stgit@joelaarch64.amd.com>
+From: tj@kernel.org (Tejun Heo)
+Date: Tue, 9 Sep 2014 07:24:47 +0900
+Subject: [PATCH v4 2/3] ata: Add Qualcomm ARM SoC AHCI SATA host
+ controller driver
+In-Reply-To: <1410194390-29007-2-git-send-email-galak@codeaurora.org>
+References: <1410194390-29007-1-git-send-email-galak@codeaurora.org>
+ <1410194390-29007-2-git-send-email-galak@codeaurora.org>
+Message-ID: <20140908222447.GC3806@mtj.dyndns.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a one liner to identify the gic-400.  It's gicv2 with optional MSI extensions.
+On Mon, Sep 08, 2014 at 11:39:49AM -0500, Kumar Gala wrote:
+> Add support for the Qualcomm AHCI SATA controller that exists on several
+> SoC and specifically the IPQ806x family of chips.  The IPQ806x SATA support
+> requires the associated IPQ806x SATA PHY Driver to be enabled as well.
+> 
+> Signed-off-by: Kumar Gala <galak@codeaurora.org>
 
-Cc: Christoffer Dall <christoffer.dall@linaro.org>
-Signed-off-by: Joel Schopp <joel.schopp@amd.com>
----
- virt/kvm/arm/vgic.c |    1 +
- 1 file changed, 1 insertion(+)
+Please cc Hans de Goede <hdegoede@redhat.com> on all ahci_platform
+related changes.
 
-diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
-index 73eba79..e81444e 100644
---- a/virt/kvm/arm/vgic.c
-+++ b/virt/kvm/arm/vgic.c
-@@ -1550,6 +1550,7 @@ static struct notifier_block vgic_cpu_nb = {
- 
- static const struct of_device_id vgic_ids[] = {
- 	{ .compatible = "arm,cortex-a15-gic", .data = vgic_v2_probe, },
-+	{ .compatible = "arm,gic-400", .data = vgic_v2_probe, },
- 	{ .compatible = "arm,gic-v3", .data = vgic_v3_probe, },
- 	{},
- };
+Thanks.
+
+-- 
+tejun
