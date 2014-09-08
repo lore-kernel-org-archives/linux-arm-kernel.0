@@ -1,95 +1,72 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 8 Sep 2014 12:57:35 +0100
-Subject: [PATCH 3/4] watchdog: st_wdt: Provide binding documentation for
- ST's LPC Watchdog driver
-In-Reply-To: <20140905152758.GA10670@roeck-us.net>
-References: <1409841592-18890-1-git-send-email-lee.jones@linaro.org>
- <1409841592-18890-5-git-send-email-lee.jones@linaro.org>
- <20140905152758.GA10670@roeck-us.net>
-Message-ID: <20140908115735.GA26284@lee--X1>
+From: peter.griffin@linaro.org (Peter Griffin)
+Date: Mon,  8 Sep 2014 13:04:43 +0100
+Subject: [PATCH v6 0/5]  Add EHCI and OHCI drivers for STi SoC's
+Message-ID: <1410177888-26710-1-git-send-email-peter.griffin@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 05 Sep 2014, Guenter Roeck wrote:
-> On Thu, Sep 04, 2014 at 03:39:51PM +0100, Lee Jones wrote:
-> > Signed-off-by: David Paris <david.paris@st.com>
-> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> 
-> You might want to copy the devicetree mailing list for bindings approval.
+Hi,
 
-This is strange.  There are two emails, exactly the same send 1 second
-apart.  Once has the DT ML CC'ed, the other does not.  I think `git
-send-email` picked up the *~ file left over by Emacs.  I'll endeavour
-to remove those in future.
+I believe all feedback has been incorporated, and this series has also been rebased on
+3.17-rc3.
 
-> > ---
-> >  .../devicetree/bindings/watchdog/st-lpc-wdt.txt    | 27 ++++++++++++++++++++++
-> >  1 file changed, 27 insertions(+)
-> >  create mode 100644 Documentation/devicetree/bindings/watchdog/st-lpc-wdt.txt
-> > 
-> > diff --git a/Documentation/devicetree/bindings/watchdog/st-lpc-wdt.txt b/Documentation/devicetree/bindings/watchdog/st-lpc-wdt.txt
-> > new file mode 100644
-> > index 0000000..f0e57ba
-> > --- /dev/null
-> > +++ b/Documentation/devicetree/bindings/watchdog/st-lpc-wdt.txt
-> > @@ -0,0 +1,27 @@
-> > +STMicroelectronics LPC Watchdog
-> > +===============================
-> > +
-> > +Required properties
-> > +
-> > +- compatible 	: "st,<soc>-watchdog"
-> 
-> Is this acceptable ? I thought the supported bindings have to be listed
-> explicitly.
+It was re-worked from v2 onwards to split out the ehci and ohci parts
+into their own drivers / devices like most other ARM platforms based on
+feedback from Arnd Bergmann (see here http://www.spinics.net/lists/linux-usb/msg111124.html. 
 
-I can do that.
+The ehci-platform & ohci-platform have been used as a basis for this in case we
+wish to merge the drivers again in the future.
 
-> > +- reg		: LPC registers base address + range
-> > +- reg-names	: Register map "base" and "syscfg-en" are compulsory "type" is
-> 
-> '.' after compulsory ?
+Changes since v5:
+ - Remove shared header file and duplicate private structure to help readability
+   and keep driver self contained, based on Arnd feedback.
+ - Rebased on 3.17-rc3
 
-Sure. :)
+Changes since v4:
+ - Ensure suspend / resume callbacks are wrapped in #ifdef CONFIG_PM_SLEEP as otherwise we
+   will get linker 'unused function' warnings when this option is disabled.
+ - Only declare and reference pm_ops struct if CONFIG_PM_SLEEP is enabled, this saves a few bytes
 
-> > +		  platform dependent and not required for the STiH407.
-> > +- clock-names 	: Should be "lpc_wdt"
-> > +- clocks	: Clock used by LPC device
-> > +- timeout-sec	: Qatchdog timeout in seconds
-> 
-> Watchdog
+Changes since v3:
+ - Make reset / power, clocks etc non optional dt options to simplify code
+ - Get rid of non DT boot code left over from *hci-platform drivers
+ - Remove DMA mask code
+ - Remove pre_setup func ptr and configure ahb2st bus convertor in ehci_platform_reset
+ - Unabstract and remove usb-st-common.c
+ - Have one kconfig which enables both ehci-st & ohci-st drivers
 
+Changes since v2:
+ - Based on Arnd Berghman feedback, split out into 2 devices / drivers
+ - Base drivers oh ehci-platform.c & ohci-platform.c with required extensions
+   to allow possible re-merge in the furture.
 
+Changes since v1:
+ - Correct s/OCHI/OHCI/ spelling
+ - Improve kconfig help message
+ - Various formating / spelling nits identified by Lee Jones
+ - Make driver depend on OF & remove node checks in code
+ - Use devm_ioremap_resource
+ - Remove unnecessary header files
 
-> > +- st,syscfg	: Syscfg node used to configure cpu reset type and mask
-> > +- st,warm_reset	: If present, reset type will be 'warm'. If not, it will be cold
-> 
-> s/cold/cold./ ?
+Peter Griffin (5):
+  usb: host: ehci-st: Add EHCI support for ST STB devices
+  usb: host: ohci-st: Add OHCI driver support for ST STB devices
+  usb: host: ehci-st: Add ehci-st devicetree bindings documentation
+  usb: host: ohci-st: Add ohci-st devicetree bindings documentation
+  MAINTAINERS: Add ehci-st.c and ohci-st.c to ARCH/STI architecture
 
-There shouldn't be any full stops.
-
-Will change s/STiH407./STiH407/ above.
-
-> > +
-> > +Example:
-> > +	watchdog at fde05000 {
-> > +		compatible	= "st,stih416-lpc-watchdog";
-> > +		reg		= <0xfde05000 0x1000> <0x204 0x4>;
-> > +		reg-names	= "base", "syscfg-en"
-> > +		clock-names	= "lpc_wdt";
-> > +		clocks 		= <&clk_s_d3_flexgen CLK_LPC_0>;
-> > +		timeout-sec	= <600>;
-> > +		st,syscfg	= <&syscfg_core>;
-> > +		st,warm_reset;
-> > +	};
-> > +
-> 
-> Empty line at the end results in a whitespace error when applying.
-
-Will fix.
+ Documentation/devicetree/bindings/usb/ehci-st.txt |  39 +++
+ Documentation/devicetree/bindings/usb/ohci-st.txt |  37 +++
+ MAINTAINERS                                       |   2 +
+ drivers/usb/host/Kconfig                          |   8 +
+ drivers/usb/host/Makefile                         |   1 +
+ drivers/usb/host/ehci-st.c                        | 375 ++++++++++++++++++++++
+ drivers/usb/host/ohci-st.c                        | 349 ++++++++++++++++++++
+ 7 files changed, 811 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/usb/ehci-st.txt
+ create mode 100644 Documentation/devicetree/bindings/usb/ohci-st.txt
+ create mode 100644 drivers/usb/host/ehci-st.c
+ create mode 100644 drivers/usb/host/ohci-st.c
 
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+1.9.1
