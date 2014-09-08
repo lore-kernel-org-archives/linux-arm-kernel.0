@@ -1,77 +1,33 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 8 Sep 2014 13:25:51 +0200
-Subject: [PATCH 2/8 v2] leds: add device tree bindings for register bit
- LEDs
-In-Reply-To: <5686741.QjIvGO0Jfo@wuerfel>
-References: <1409659354-23553-1-git-send-email-linus.walleij@linaro.org>
- <1409659354-23553-3-git-send-email-linus.walleij@linaro.org>
- <5686741.QjIvGO0Jfo@wuerfel>
-Message-ID: <CACRpkdarXzrprA=1=oT-1K8X3y-QPH+gkteHCpZDcCA3pBZMOQ@mail.gmail.com>
+Date: Mon,  8 Sep 2014 13:27:41 +0200
+Subject: [PATCH] ARM: on a generic DT system: do not touch l2x0
+Message-ID: <1410175661-31011-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 2, 2014 at 2:24 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Tuesday 02 September 2014 14:02:28 Linus Walleij wrote:
->> +LED sub-node properties:
->> +
->> +Required properties:
->> +- compatible : must be "register-bit-led"
->> +- offset : register offset to the register controlling this LED
->> +- mask : bit mask for the bit controlling this LED in the register
->> +  typically 0x01, 0x02, 0x04 ...
->>
->
-> How does the driver know whether to do byte or word sized accesses?
+Set no bits, mask all bits in the AUX l2x0 register for the
+default DT ARM system: if anything needs to be modified, it
+should be done using DT bindings.
 
-Like with all other bindings based on
-Documentation/devicetree/bindings/mfd/syscon.txt
-it is implicit that the access size is 32 bit words. Just grep
-for syscon in the bindings and you will see none define the access
-width.
+Suggested-by: Arnd Bergmann <arnd@arndb.de>
+Cc: Russell King <linux@arm.linux.org.uk>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ arch/arm/kernel/devtree.c | 2 ++
+ 1 file changed, 2 insertions(+)
 
-If this should be fixed, the parent syscon binding should be
-altered to cover access width for all children as this is a property
-of the entire register range.
-
-So for example:
-
-gpr: iomuxc-gpr at 020e0000 {
-        compatible = "fsl,imx6q-iomuxc-gpr", "syscon";
-        reg = <0x020e0000 0x38>;
-        register-width = <32>;
-        register-valid = <32>;
-        register-stride = <4>;
-};
-
-So as to indicate that this register range is made up of 32 bit
-words, all 32 bits are valid in each word, and the stride between
-words i 4 bytes (i.e. tightly packed).
-
-As mentioned by Rob, the "syscon" driver should be renamed
-"register-range" and "syscon" deprecated as binding, as it is
-Linux terminology.
-
-I guess this adds up to the conclusion that the "syscon" binding
-was badly reviewed and merged, and now we're suffering from it.
-
-----
-
-Not that anyone should care when reviewing device tree bindings,
-but as it happens, the Linux driver
-drivers/mfd/syscon.c
-explicitly assumes all sycons are 32bit:
-
-static struct regmap_config syscon_regmap_config = {
-        .reg_bits = 32,
-        .val_bits = 32,
-        .reg_stride = 4,
-};
-
-If one happens to work on Linux (we would never assume such a
-thing, but if one by infinitesimal chance would still happen to do that)
-we can leave a note in this posting that the syscon driver would need to
-be altered to marshall it's regmap differently on stumbling onto this
-new property.
-
-Yours,
-Linus Walleij
+diff --git a/arch/arm/kernel/devtree.c b/arch/arm/kernel/devtree.c
+index 11c54de9f8cf..d989c0c2b221 100644
+--- a/arch/arm/kernel/devtree.c
++++ b/arch/arm/kernel/devtree.c
+@@ -207,6 +207,8 @@ const struct machine_desc * __init setup_machine_fdt(unsigned int dt_phys)
+ 
+ #ifdef CONFIG_ARCH_MULTIPLATFORM
+ 	DT_MACHINE_START(GENERIC_DT, "Generic DT based system")
++		.l2c_aux_val = 0x0,
++		.l2c_aux_mask = ~0x0,
+ 	MACHINE_END
+ 
+ 	mdesc_best = &__mach_desc_GENERIC_DT;
+-- 
+1.9.3
