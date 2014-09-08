@@ -1,22 +1,37 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 8 Sep 2014 17:24:49 +0100
-Subject: [PATCH v3 0/5] arm: Implement arch_trigger_all_cpu_backtrace
-In-Reply-To: <1410190115-32604-1-git-send-email-daniel.thompson@linaro.org>
-References: <1409931198-22600-1-git-send-email-daniel.thompson@linaro.org>
- <1410190115-32604-1-git-send-email-daniel.thompson@linaro.org>
-Message-ID: <20140908162449.GD12361@n2100.arm.linux.org.uk>
+From: nm@ti.com (Nishanth Menon)
+Date: Mon, 8 Sep 2014 11:29:04 -0500
+Subject: [PATCH 00/10] ARM: OMAP5 / DRA7: Add framework for suspend and
+ cpuidle
+In-Reply-To: <7htx4xbv7p.fsf@paris.lan>
+References: <1408716154-26101-1-git-send-email-nm@ti.com>
+ <7htx4xbv7p.fsf@paris.lan>
+Message-ID: <540DD950.30207@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 08, 2014 at 04:28:30PM +0100, Daniel Thompson wrote:
-> * Restructured to sit nicely on a similar FYI patchset from Russell
->   King. It now effectively replaces the work in progress final patch
->   with something much more complete.
+On 08/27/2014 02:15 PM, Kevin Hilman wrote:
+> Nishanth Menon <nm@ti.com> writes:
+> 
+>> The following series are various fixes and improvements for
+>> supporting suspend-to-ram. This depends on the following for basic functionality:
+>> series 1/6 where powerdomain fixes were involved.
+> 
+> I had a look through this series, and it looks good overall.  I think Daniel
+> needs to weigh in on the CPUidle driver, otherwise.
+> 
+> Reviewed-by: Kevin Hilman <khilman@linaro.org>
+> 
+> I also tested on omap5uevm with the pm_debug/wakeup_timer_seconds patch.
+> 
+> Tested-by: Kevin Hilman <khilman@linaro.org>
+> 
+> Kevin
+> 
 
-I'd suggest that patch 2 should be in a different place - get the FIQ
-infrastructure in place first before adding any users of it would be
-a much more sensible patch ordering.
+I am dropping cpuidle patch for the moment, and sending remaining
+stuff to Tony for merge with Kevin's Reviewed and Tested. we will send
+cpuidle once we have Daniel's response.
 
 -- 
-FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
-according to speedtest.net.
+Regards,
+Nishanth Menon
