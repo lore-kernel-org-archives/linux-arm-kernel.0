@@ -1,29 +1,150 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Mon, 8 Sep 2014 16:33:29 -0700
-Subject: [PATCH 03/18] tty: serial: 8250_core: allow to set ->throttle /
- ->unthrottle callbacks
-In-Reply-To: <1409943773-7874-4-git-send-email-bigeasy@linutronix.de>
-References: <1409943773-7874-1-git-send-email-bigeasy@linutronix.de>
- <1409943773-7874-4-git-send-email-bigeasy@linutronix.de>
-Message-ID: <20140908233329.GA32144@kroah.com>
+From: naobsd@gmail.com (Naoki FUKAUMI)
+Date: Tue, 9 Sep 2014 08:45:37 +0900
+Subject: [PATCH 08/11] ARM: dts: rockchip: add operating points and armclk
+ references
+In-Reply-To: <CAD=FV=U0h2nDQf6JzErhUn+R7384xSTeTjga03MZtOccf7S0bg@mail.gmail.com>
+References: <1409958374-30937-1-git-send-email-heiko@sntech.de>
+ <1409958374-30937-9-git-send-email-heiko@sntech.de>
+ <CAD=FV=U0h2nDQf6JzErhUn+R7384xSTeTjga03MZtOccf7S0bg@mail.gmail.com>
+Message-ID: <CAFnsNoSFk1CaANVcwYpMPWwRzWTrYXe99yFvzpTFsyqVR4eNVw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 05, 2014 at 09:02:38PM +0200, Sebastian Andrzej Siewior wrote:
-> The OMAP UART provides support for HW assisted flow control. What is
-> missing is the support to throttle / unthrottle callbacks which are used
-> by the omap-serial driver at the moment.
-> This patch adds the callbacks. It should be safe to add them since they
-> are only invoked from the serial_core (uart_throttle()) if the feature
-> flags are set.
-> 
-> Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
+hi
 
-Due to other recent changes, this patch fails to apply :(
+On Tue, Sep 9, 2014 at 5:16 AM, Doug Anderson <dianders@chromium.org> wrote:
+> Heiko,
+>
+> On Fri, Sep 5, 2014 at 4:06 PM, Heiko Stuebner <heiko@sntech.de> wrote:
+>> Add basic OPP entries for current supported Rockchip SoCs.
+>> The operating points are currently very conservative, so individual
+>> boards may opt to redefine them.
+>>
+>> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+>> ---
+>>  arch/arm/boot/dts/rk3066a.dtsi | 12 +++++++++++-
+>>  arch/arm/boot/dts/rk3188.dtsi  | 15 ++++++++++++++-
+>>  arch/arm/boot/dts/rk3288.dtsi  | 17 ++++++++++++++++-
+>>  3 files changed, 41 insertions(+), 3 deletions(-)
+>>
+>> diff --git a/arch/arm/boot/dts/rk3066a.dtsi b/arch/arm/boot/dts/rk3066a.dtsi
+>> index 879a818..572c30b 100644
+>> --- a/arch/arm/boot/dts/rk3066a.dtsi
+>> +++ b/arch/arm/boot/dts/rk3066a.dtsi
+>> @@ -26,11 +26,21 @@
+>>                 #size-cells = <0>;
+>>                 enable-method = "rockchip,rk3066-smp";
+>>
+>> -               cpu at 0 {
+>> +               cpu0: cpu at 0 {
+>>                         device_type = "cpu";
+>>                         compatible = "arm,cortex-a9";
+>>                         next-level-cache = <&L2>;
+>>                         reg = <0x0>;
+>> +                       operating-points = <
+>> +                               /* kHz    uV */
+>> +                               1008000 1075000
+>> +                                816000 1025000
+>> +                                600000 1025000
+>> +                                504000 1000000
+>> +                                312000  975000
+>> +                       >;
+>> +                       clock-latency = <40000>;
+>> +                       clocks = <&cru ARMCLK>;
+>>                 };
+>>                 cpu at 1 {
+>>                         device_type = "cpu";
+>> diff --git a/arch/arm/boot/dts/rk3188.dtsi b/arch/arm/boot/dts/rk3188.dtsi
+>> index ee801a9..e237216 100644
+>> --- a/arch/arm/boot/dts/rk3188.dtsi
+>> +++ b/arch/arm/boot/dts/rk3188.dtsi
+>> @@ -26,11 +26,24 @@
+>>                 #size-cells = <0>;
+>>                 enable-method = "rockchip,rk3066-smp";
+>>
+>> -               cpu at 0 {
+>> +               cpu0: cpu at 0 {
+>>                         device_type = "cpu";
+>>                         compatible = "arm,cortex-a9";
+>>                         next-level-cache = <&L2>;
+>>                         reg = <0x0>;
+>> +                       operating-points = <
+>> +                               /* kHz    uV */
+>> +                               1608000 1350000
+>> +                               1416000 1250000
+>> +                               1200000 1150000
+>> +                               1008000 1075000
+>> +                                816000  975000
+>> +                                600000  950000
+>> +                                504000  925000
+>> +                                312000  875000
+>> +                       >;
+>> +                       clock-latency = <40000>;
+>> +                       clocks = <&cru ARMCLK>;
+>>                 };
+>>                 cpu at 1 {
+>>                         device_type = "cpu";
+>> diff --git a/arch/arm/boot/dts/rk3288.dtsi b/arch/arm/boot/dts/rk3288.dtsi
+>> index 5950b0a..9275a47 100644
+>> --- a/arch/arm/boot/dts/rk3288.dtsi
+>> +++ b/arch/arm/boot/dts/rk3288.dtsi
+>> @@ -40,10 +40,25 @@
+>>                 #address-cells = <1>;
+>>                 #size-cells = <0>;
+>>
+>> -               cpu at 500 {
+>> +               cpu0: cpu at 500 {
+>>                         device_type = "cpu";
+>>                         compatible = "arm,cortex-a12";
+>>                         reg = <0x500>;
+>> +                       operating-points = <
+>> +                               /* KHz    uV */
+>> +                               1416000 1150000
+>> +                               1200000 1050000
+>> +                               1008000 1000000
+>> +                               816000  950000
+>> +                               696000  900000
+>> +                               600000  850000
+>> +                               408000  850000
+>> +                               312000  850000
+>> +                               216000  850000
+>> +                               126000  850000
+>> +                       >;
+>
+> This doesn't quite match the ordering that Kever put up most recently
+> at <https://chromium-review.googlesource.com/#/c/211862/2/arch/arm/boot/dts/rk3288.dtsi>.
+> Specifically, he has:
+>
+> 1800000 1300000
+> 1608000 1200000
+> 1416000 1150000
+> 1200000 1100000
+> 1008000 1050000
+> [ 816000 1000000
+> 600000 900000
+> 408000 850000
+> 216000 850000
+> 126000 850000
 
-I've applied your first two, can you respin the rest and resend as a new
-series?
+in Rockchip R-BOX SDK(for Box/HDMI dongle), voltage is bit higher...
 
-thanks,
+https://bitbucket.org/T-Firefly/firefly-rk3288/src/ab220fdc428283b2358644eec36059bb58b429a0/kernel/arch/arm/boot/dts/rk3288-box.dts?at=master#cl-557
 
-greg k-h
+                126000 900000
+                216000 900000
+                312000 900000
+                408000 900000
+                600000 950000
+                696000 950000
+                816000 1000000
+                1008000 1050000
+                1200000 1100000
+                1416000 1200000
+                1512000 1300000
+                1608000 1350000
+                1704000 1350000
+                1800000 1350000
+
+and there are different set of values in other rk3288-*.dts.
+
+(I don't know which is correct, sorry)
