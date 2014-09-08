@@ -1,46 +1,90 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon,  8 Sep 2014 09:57:07 +0900
-Subject: [PATCH v3 2/3] ARM: shmobile: sh73a0: Use SoC-specific 48-bit CMT
- compat string
+Date: Mon,  8 Sep 2014 09:57:08 +0900
+Subject: [PATCH v3 3/3] ARM: shmobile: kzm9g-reference: Enable CMT1 in device
+ tree
 In-Reply-To: <1410137828-4769-1-git-send-email-horms+renesas@verge.net.au>
 References: <1410137828-4769-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1410137828-4769-3-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1410137828-4769-4-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In general Renesas hardware is not documented to the extent
-where the relationship between IP blocks on different SoCs can be assumed
-although they may appear to operate the same way. Furthermore the
-documentation typically does not specify a version for individual
-IP blocks. For these reasons a convention of using the SoC name in place
-of a version and providing SoC-specific compat strings has been adopted.
+From: Ulrich Hecht <ulrich.hecht+renesas@gmail.com>
 
-Although not universally liked this convention is used in the bindings for
-a number of drivers for Renesas hardware. The purpose of this patch is to
-make use of the SoC-specific CMT compat string for the sh73a0 48-bit CMT
-clock source.
-
+Signed-off-by: Ulrich Hecht <ulrich.hecht+renesas@gmail.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 
 ---
 v3
-* First post
+* No change
 ---
- arch/arm/boot/dts/sh73a0.dtsi | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/boot/dts/sh73a0-kzm9g-reference.dts |  4 ++++
+ arch/arm/mach-shmobile/setup-sh73a0.c        | 11 +----------
+ 2 files changed, 5 insertions(+), 10 deletions(-)
 
-diff --git a/arch/arm/boot/dts/sh73a0.dtsi b/arch/arm/boot/dts/sh73a0.dtsi
-index 6cb29cd..030a592 100644
---- a/arch/arm/boot/dts/sh73a0.dtsi
-+++ b/arch/arm/boot/dts/sh73a0.dtsi
-@@ -49,7 +49,7 @@
+diff --git a/arch/arm/boot/dts/sh73a0-kzm9g-reference.dts b/arch/arm/boot/dts/sh73a0-kzm9g-reference.dts
+index 477f815..30ef97e 100644
+--- a/arch/arm/boot/dts/sh73a0-kzm9g-reference.dts
++++ b/arch/arm/boot/dts/sh73a0-kzm9g-reference.dts
+@@ -173,6 +173,10 @@
  	};
+ };
  
- 	cmt1: timer at e6138000 {
--		compatible = "renesas,cmt-48";
-+		compatible = "renesas,cmt-48-sh73a0", "renesas,cmt-48";
- 		reg = <0xe6138000 0x200>;
- 		interrupts = <0 65 IRQ_TYPE_LEVEL_HIGH>;
++&cmt1 {
++	status = "ok";
++};
++
+ &i2c0 {
+ 	status = "okay";
+ 	as3711 at 40 {
+diff --git a/arch/arm/mach-shmobile/setup-sh73a0.c b/arch/arm/mach-shmobile/setup-sh73a0.c
+index 0085305..b7bd8e5 100644
+--- a/arch/arm/mach-shmobile/setup-sh73a0.c
++++ b/arch/arm/mach-shmobile/setup-sh73a0.c
+@@ -697,10 +697,6 @@ static struct platform_device irqpin3_device = {
+ 	},
+ };
+ 
+-static struct platform_device *sh73a0_devices_dt[] __initdata = {
+-	&cmt1_device,
+-};
+-
+ static struct platform_device *sh73a0_early_devices[] __initdata = {
+ 	&scif0_device,
+ 	&scif1_device,
+@@ -713,6 +709,7 @@ static struct platform_device *sh73a0_early_devices[] __initdata = {
+ 	&scif8_device,
+ 	&tmu0_device,
+ 	&ipmmu_device,
++	&cmt1_device,
+ };
+ 
+ static struct platform_device *sh73a0_late_devices[] __initdata = {
+@@ -737,8 +734,6 @@ void __init sh73a0_add_standard_devices(void)
+ 	/* Clear software reset bit on SY-DMAC module */
+ 	__raw_writel(__raw_readl(SRCR2) & ~(1 << 18), SRCR2);
+ 
+-	platform_add_devices(sh73a0_devices_dt,
+-			    ARRAY_SIZE(sh73a0_devices_dt));
+ 	platform_add_devices(sh73a0_early_devices,
+ 			    ARRAY_SIZE(sh73a0_early_devices));
+ 	platform_add_devices(sh73a0_late_devices,
+@@ -763,8 +758,6 @@ void __init sh73a0_earlytimer_init(void)
+ 
+ void __init sh73a0_add_early_devices(void)
+ {
+-	early_platform_add_devices(sh73a0_devices_dt,
+-				   ARRAY_SIZE(sh73a0_devices_dt));
+ 	early_platform_add_devices(sh73a0_early_devices,
+ 				   ARRAY_SIZE(sh73a0_early_devices));
+ 
+@@ -779,8 +772,6 @@ void __init sh73a0_add_standard_devices_dt(void)
+ 	/* clocks are setup late during boot in the case of DT */
+ 	sh73a0_clock_init();
+ 
+-	platform_add_devices(sh73a0_devices_dt,
+-			     ARRAY_SIZE(sh73a0_devices_dt));
+ 	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+ }
  
 -- 
 2.0.1
