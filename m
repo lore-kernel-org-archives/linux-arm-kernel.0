@@ -1,44 +1,56 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 08 Sep 2014 13:02:33 +0200
-Subject: "mm: introduce dump_vma fix 2" still broken
-Message-ID: <2815658.dHHBXc7oHP@wuerfel>
+From: daniel.thompson@linaro.org (Daniel Thompson)
+Date: Mon, 08 Sep 2014 12:03:59 +0100
+Subject: [PATCH v2 4/5] arm64: Introduce dummy version of asm/fiq.h
+In-Reply-To: <20140905165033.GD10976@arm.com>
+References: <1409846620-14542-1-git-send-email-daniel.thompson@linaro.org>
+ <1409931198-22600-1-git-send-email-daniel.thompson@linaro.org>
+ <1409931198-22600-5-git-send-email-daniel.thompson@linaro.org>
+ <20140905165033.GD10976@arm.com>
+Message-ID: <540D8D1F.5000804@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 05/09/14 17:50, Catalin Marinas wrote:
+> On Fri, Sep 05, 2014 at 04:33:17PM +0100, Daniel Thompson wrote:
+>> Drivers that are shared between arm and arm64 and which employ
+>> FIQ on arm cannot include asm/fiq.h without #ifdef'ing. This patch
+>> introduces a dummy version of asm/fiq.h to arm64 to avoid this.
+>>
+>> Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
+>> Cc: Catalin Marinas <catalin.marinas@arm.com>
+>> Cc: Will Deacon <will.deacon@arm.com>
+>> ---
+>>  arch/arm64/include/asm/fiq.h | 18 ++++++++++++++++++
+>>  1 file changed, 18 insertions(+)
+>>  create mode 100644 arch/arm64/include/asm/fiq.h
+>>
+>> diff --git a/arch/arm64/include/asm/fiq.h b/arch/arm64/include/asm/fiq.h
+>> new file mode 100644
+>> index 0000000..909ec54
+>> --- /dev/null
+>> +++ b/arch/arm64/include/asm/fiq.h
+>> @@ -0,0 +1,18 @@
+>> +/*
+>> + * arch/arm64/include/asm/fiq.h
+>> + *
+>> + * Placeholder to reduce #ifdef'ing in shared arm/arm64 drivers.
+>> + */
+>> +
+>> +#ifndef __ASM_FIQ_H
+>> +#define __ASM_FIQ_H
+>> +
+>> +/*
+>> + * This placeholder allows code of the following form to be simplified:
+>> + *
+>> + * #ifdef CONFIG_FIQ
+>> + * #include <asm/fiq.h>
+>> + * #endif
+>> + */
+>> +
+>> +#endif
+> 
+> OK, we add a dummy file, but please keep it simple. Comments are fine
+> but no need for header guards (nor the file name, on arm64 we try to get
+> rid of them, though some still slip through).
 
-I saw this commit today in linux-next, which fixes a build error, but introduces
-a new warning:
-
-commit a60224c708f880dd937b352b7461cbf14e93012d
-Author: Stephen Rothwell <sfr@canb.auug.org.au>
-Date:   Mon Sep 8 19:41:54 2014 +1000
-
-    mm: introduce dump_vma fix 2
-    
-    Signed-off-by: Stephen Rothwell <sfr@canb.auug.org.au>
-
-diff --git a/mm/page_alloc.c b/mm/page_alloc.c
-index cb510c08073b..0de60769bcf6 100644
---- a/mm/page_alloc.c
-+++ b/mm/page_alloc.c
-@@ -6739,7 +6739,7 @@ void dump_vma(const struct vm_area_struct *vma)
-                "prot %lx anon_vma %p vm_ops %p\n"
-                "pgoff %lx file %p private_data %p\n",
-                vma, (void *)vma->vm_start, (void *)vma->vm_end, vma->vm_next,
--               vma->vm_prev, vma->vm_mm, vma->vm_page_prot.pgprot,
-+               vma->vm_prev, vma->vm_mm, pgprot_val(vma->vm_page_prot),
-                vma->anon_vma, vma->vm_ops, vma->vm_pgoff,
-                vma->vm_file, vma->vm_private_data);
-        dump_flags(vma->vm_flags, vmaflags_names, ARRAY_SIZE(vmaflags_names));
-
-
-/git/arm-soc/mm/page_alloc.c: In function 'dump_vma':
-/git/arm-soc/mm/page_alloc.c:6744:3: warning: format '%lx' expects argument of type 'long unsigned int', but argument 8 has type 'pgprot_t' [-Wformat=]
-   vma->vm_file, vma->vm_private_data);
-   ^
-
-This happens on machines that use ARM LPAE, where pgprot_t is in fact
-a 64-bit integer. The simplest fix I see would be add a cast to u64
-and always print this as a 64bit value.
-
-	Arnd
+Ok. I'll fix this.
