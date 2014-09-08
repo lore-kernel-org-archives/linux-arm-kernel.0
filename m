@@ -1,89 +1,149 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Mon, 8 Sep 2014 15:09:10 +0530
-Subject: [PATCH v3 1/4] phy: phy-stih41x-usb: Add usb phy support for
- STiH41x SoCs.
-In-Reply-To: <1410168638-11072-2-git-send-email-peter.griffin@linaro.org>
-References: <1410168638-11072-1-git-send-email-peter.griffin@linaro.org>
- <1410168638-11072-2-git-send-email-peter.griffin@linaro.org>
-Message-ID: <540D793E.9050301@ti.com>
+From: pramod.gurav@smartplayin.com (Pramod Gurav)
+Date: Mon, 08 Sep 2014 15:12:48 +0530
+Subject: [PATCH v2 00/15] Krait clocks + Krait CPUfreq
+In-Reply-To: <1409957256-23729-1-git-send-email-sboyd@codeaurora.org>
+References: <1409957256-23729-1-git-send-email-sboyd@codeaurora.org>
+Message-ID: <540D7A18.4030201@smartplayin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Stephen,
+Looks like one patch is missing from v1. Is this removed from v2
+patchset from some reason?
+	ARM: Add Krait L2 register accessor functions
 
-On Monday 08 September 2014 03:00 PM, Peter Griffin wrote:
-> This driver adds support for USB (1.1 and 2.0) phy for STiH415 and
-> STiH416 System-On-Chips from STMicroelectronics.
+But there are references to this in v2 set and build fails while
+compiling drivers/clk/qcom/clk-krait.c.
+
+Thanks and Regards
+Pramod
+
+On Saturday 06 September 2014 04:17 AM, Stephen Boyd wrote:
+> These patches provide cpufreq scaling on devices with Krait CPUs.
+> In Krait CPU designs there's one PLL and two muxes per CPU, allowing
+> us to switch CPU frequencies independently.
 > 
-> Signed-off-by: Maxime Coquelin <maxime.coquelin@st.com>
-> Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
-> ---
->  drivers/phy/Kconfig           |   8 ++
->  drivers/phy/Makefile          |   1 +
->  drivers/phy/phy-stih41x-usb.c | 192 ++++++++++++++++++++++++++++++++++++++++++
->  3 files changed, 201 insertions(+)
->  create mode 100644 drivers/phy/phy-stih41x-usb.c
+> 				 secondary
+> 	 +-----+                    +
+> 	 | QSB |-------+------------|\
+> 	 +-----+       |            | |-+
+> 		       |    +-------|/  |
+> 		       |    |       +   |
+> 	 +-----+       |    |           |
+> 	 | PLL |----+-------+           |   primary
+> 	 +-----+    |  |                |     +
+> 		    |  |                +-----|\       +------+
+> 	 +-------+  |  |                      | \      |      |
+> 	 | HFPLL |----------+-----------------|  |-----| CPU0 |
+> 	 +-------+  |  |    |                 |  |     |      |
+> 		    |  |    | +-----+         | /      +------+
+> 		    |  |    +-| / 2 |---------|/
+> 		    |  |      +-----+         +
+> 		    |  |         secondary
+> 		    |  |            +
+> 		    |  +------------|\
+> 		    |               | |-+
+> 		    +---------------|/  |   primary
+> 				    +   |     +
+> 					+-----|\       +------+
+> 	 +-------+                            | \      |      |
+> 	 | HFPLL |----------------------------|  |-----| CPU1 |
+> 	 +-------+          |                 |  |     |      |
+> 			    | +-----+         | /      +------+
+> 			    +-| / 2 |---------|/
+> 			      +-----+         +
 > 
-> diff --git a/drivers/phy/Kconfig b/drivers/phy/Kconfig
-> index 0dd7427..26f8a86 100644
-> --- a/drivers/phy/Kconfig
-> +++ b/drivers/phy/Kconfig
-> @@ -230,4 +230,12 @@ config PHY_XGENE
->  	help
->  	  This option enables support for APM X-Gene SoC multi-purpose PHY.
->  
-> +config PHY_STIH41X_USB
-> +	tristate "STMicroelectronics USB2 PHY driver for STiH41x series"
-> +	depends on ARCH_STI
-> +	select GENERIC_PHY
-> +	help
-> +	  Enable this to support the USB transceiver that is part of
-> +	  STMicroelectronics STiH41x SoC series.
-> +
->  endmenu
-> diff --git a/drivers/phy/Makefile b/drivers/phy/Makefile
-> index 95c69ed..d02f365 100644
-> --- a/drivers/phy/Makefile
-> +++ b/drivers/phy/Makefile
-> @@ -28,3 +28,4 @@ obj-$(CONFIG_PHY_QCOM_IPQ806X_SATA)	+= phy-qcom-ipq806x-sata.o
->  obj-$(CONFIG_PHY_ST_SPEAR1310_MIPHY)	+= phy-spear1310-miphy.o
->  obj-$(CONFIG_PHY_ST_SPEAR1340_MIPHY)	+= phy-spear1340-miphy.o
->  obj-$(CONFIG_PHY_XGENE)			+= phy-xgene.o
-> +obj-$(CONFIG_PHY_STIH41X_USB)		+= phy-stih41x-usb.o
-> diff --git a/drivers/phy/phy-stih41x-usb.c b/drivers/phy/phy-stih41x-usb.c
-> new file mode 100644
-> index 0000000..7d0a5d4
-> --- /dev/null
-> +++ b/drivers/phy/phy-stih41x-usb.c
-> @@ -0,0 +1,192 @@
-
-.
-.
-<skip>
-.
-.
-
-> +
-> +	phy_provider = devm_of_phy_provider_register(dev, of_phy_simple_xlate);
-> +	if (IS_ERR(phy_provider))
-> +		return PTR_ERR(phy_provider);
-> +
-> +	phy = devm_phy_create(dev, NULL, &stih41x_usb_phy_ops, NULL);
-> +
-> +	if (IS_ERR(phy)) {
-> +		dev_err(dev, "failed to create Display Port PHY\n");
-> +		return PTR_ERR(phy);
-> +	}
-> +
-> +	phy_dev->dev = dev;
-> +
-> +	phy_set_drvdata(phy, phy_dev);
-> +
-> +	phy_provider = devm_of_phy_provider_register(dev, of_phy_simple_xlate);
-> +	if (IS_ERR(phy_provider))
-> +		return PTR_ERR(phy_provider);
-
-registering phy provider multiple times..
-
-Thanks
-Kishon
+> To support this in the common clock framework we model the muxes,
+> dividers, and PLLs as different clocks. CPUfreq only interacts
+> with the primary mux (farthest right in the diagram). When CPUfreq
+> sets a rate, the mux code finds the best parent that can provide the rate.
+> Due to the design, QSB and the top PLL are always a fixed rate and thus
+> only support one frequency each. These sources provide the lowest
+> frequencies for the CPUs. The HFPLLs are where we can make the CPU go
+> faster (GHz range). Sometimes we need to run the HFPLL twice as
+> fast and divide it by two to get a particular frequency.
+> 
+> When switching rates we can't leave the CPU clocked by the HFPLL because
+> we need to turn off the output of the PLL when changing its frequency.
+> This means we have to switch over to the secondary mux and use one of the
+> fixed sources. This is why we need something like the safe parent patch.
+> 
+> I plan to submit the DTS changes through arm-soc, but I've included everything
+> here to make it easier to pick things up for testing, etc. Please note
+> that these patches rely on the Krait L2 accessor patch I posted a while back
+> in another series[1]. This also relies on the cpufreq-generic patchset from
+> Viresh[2]. If anything can be picked up right now it would be better
+> to reduce the churn over time as other pieces settle. The series gets
+> progressively more controversial as it goes on, so I hope that things
+> near the beggining will be picked up earlier.
+> 
+> Changes since v1:
+>  * Added IPQ and APQ8064 support
+>  * Switched to cpufreq-generic
+>  * Added OPP parsing from DT (need to write binding though)
+>  * New patches to make clk-generic.c go away
+>   * Made mux and divider reusable for non-MMIO devices
+>   * Added a mux_determine_rate_closest (not sure if this is really needed)
+>   * Added unregistration of muxes
+>  * New patch to avoid sending high frequencies down to devices using clocks
+> 
+> TODO:
+>  * Add Krait regulator voltage scaling (not strictly necessary)
+>  * Document DT bindings
+>  * Use a new efuse/eeprom API instead of hardcoding the location in the driver
+>  * Add some thermal awareness
+> 
+> 
+> Stephen Boyd (15):
+>   clk: mux: Add unregistration API
+>   clk: mux: Split out register accessors for reuse
+>   clk: Add __clk_mux_determine_rate_closest
+>   clk: divider: Make generic for usage elsewhere
+>   clk: Add safe switch hook
+>   clk: Avoid sending high rates to downstream clocks during set_rate
+>   clk: qcom: Add support for High-Frequency PLLs (HFPLLs)
+>   clk: qcom: Add HFPLL driver
+>   clk: qcom: Add MSM8960/APQ8064's HFPLLs
+>   clk: qcom: Add IPQ806X's HFPLLs
+>   clk: qcom: Add support for Krait clocks
+>   clk: qcom: Add KPSS ACC/GCC driver
+>   clk: qcom: Add Krait clock controller driver
+>   cpufreq: Add module to register cpufreq on Krait CPUs
+>   ARM: dts: qcom: Add necessary DT data for Krait cpufreq
+> 
+>  arch/arm/boot/dts/qcom-apq8064.dtsi          | 230 +++++++++++++++++
+>  arch/arm/boot/dts/qcom-msm8960.dtsi          |  49 ++++
+>  arch/arm/boot/dts/qcom-msm8974.dtsi          | 311 ++++++++++++++++++++++-
+>  drivers/clk/clk-divider.c                    | 197 +++++++++------
+>  drivers/clk/clk-mux.c                        |  91 ++++---
+>  drivers/clk/clk.c                            | 133 +++++++---
+>  drivers/clk/qcom/Kconfig                     |  28 +++
+>  drivers/clk/qcom/Makefile                    |   5 +
+>  drivers/clk/qcom/clk-hfpll.c                 | 253 +++++++++++++++++++
+>  drivers/clk/qcom/clk-hfpll.h                 |  54 ++++
+>  drivers/clk/qcom/clk-krait.c                 | 166 +++++++++++++
+>  drivers/clk/qcom/clk-krait.h                 |  49 ++++
+>  drivers/clk/qcom/gcc-ipq806x.c               |  83 +++++++
+>  drivers/clk/qcom/gcc-msm8960.c               | 172 +++++++++++++
+>  drivers/clk/qcom/hfpll.c                     | 110 +++++++++
+>  drivers/clk/qcom/kpss-xcc.c                  |  94 +++++++
+>  drivers/clk/qcom/krait-cc.c                  | 357 +++++++++++++++++++++++++++
+>  drivers/cpufreq/Kconfig.arm                  |   9 +
+>  drivers/cpufreq/Makefile                     |   1 +
+>  drivers/cpufreq/qcom-cpufreq.c               | 199 +++++++++++++++
+>  include/dt-bindings/clock/qcom,gcc-msm8960.h |   2 +
+>  include/linux/clk-private.h                  |   2 +
+>  include/linux/clk-provider.h                 |  32 ++-
+>  23 files changed, 2486 insertions(+), 141 deletions(-)
+>  create mode 100644 drivers/clk/qcom/clk-hfpll.c
+>  create mode 100644 drivers/clk/qcom/clk-hfpll.h
+>  create mode 100644 drivers/clk/qcom/clk-krait.c
+>  create mode 100644 drivers/clk/qcom/clk-krait.h
+>  create mode 100644 drivers/clk/qcom/hfpll.c
+>  create mode 100644 drivers/clk/qcom/kpss-xcc.c
+>  create mode 100644 drivers/clk/qcom/krait-cc.c
+>  create mode 100644 drivers/cpufreq/qcom-cpufreq.c
+> 
+> [1] http://lkml.iu.edu/hypermail/linux/kernel/1404.0/02636.html
+> [2] git://git.linaro.org/people/viresh.kumar/linux cpufreq/cpu0-krait-v3
+> 
