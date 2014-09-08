@@ -1,122 +1,62 @@
-From: rric@kernel.org (Robert Richter)
-Date: Mon, 8 Sep 2014 16:31:38 +0200
-Subject: [PATCH] ITS: Fixing 32 bit compatibility
-In-Reply-To: <1410185480-5153-1-git-send-email-rric@kernel.org>
-References: <1410185480-5153-1-git-send-email-rric@kernel.org>
-Message-ID: <20140908143138.GZ4703@rric.localhost>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Mon, 8 Sep 2014 20:03:39 +0530
+Subject: [PATCH v2 1/8] phy: miphy28lp: Add Device Tree bindings for the
+ MiPHY28lp
+In-Reply-To: <1409758637-28654-2-git-send-email-gabriel.fernandez@linaro.org>
+References: <1409758637-28654-1-git-send-email-gabriel.fernandez@linaro.org>
+ <1409758637-28654-2-git-send-email-gabriel.fernandez@linaro.org>
+Message-ID: <540DBE43.50403@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Marc,
+Hi,
 
-On 08.09.14 16:11:19, Robert Richter wrote:
-> From: Robert Richter <rrichter@cavium.com>
+On Wednesday 03 September 2014 09:07 PM, Gabriel FERNANDEZ wrote:
+> The MiPHY28lp is a Generic PHY which can serve various SATA or PCIe
+> or USB3 devices.
 > 
-> Fixing 32 bit compatibility by using ULL for u64 constants.
+> Signed-off-by: alexandre torgue <alexandre.torgue@st.com>
+> Signed-off-by: Giuseppe Cavallaro <peppe.cavallaro@st.com>
+> Signed-off-by: Gabriel Fernandez <gabriel.fernandez@linaro.org>
+> ---
+>  .../devicetree/bindings/phy/phy-miphy28lp.txt      | 126 +++++++++++++++++++++
+>  1 file changed, 126 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/phy/phy-miphy28lp.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/phy/phy-miphy28lp.txt b/Documentation/devicetree/bindings/phy/phy-miphy28lp.txt
+> new file mode 100644
+> index 0000000..5e307af
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/phy/phy-miphy28lp.txt
+> @@ -0,0 +1,126 @@
+> +STMicroelectronics STi MIPHY28LP PHY binding
+> +============================================
+> +
+> +This binding describes a miphy device that is used to control PHY hardware
+> +for SATA, PCIe or USB3.
+> +
+> +Required properties (controller (parent) node):
+> +- compatible	: Should be "st,miphy28lp-phy"
+> +- st,syscfg	: Should be a phandle of the system configuration register group
+> +		  which contain the SATA, PCIe or USB3 mode setting bits
+> +
+> +Required nodes	:  A sub-node is required for each channel the controller
+> +		   provides. Address range information including the usual
+> +		   'reg' and 'reg-names' properties are used inside these
+> +		   nodes to describe the controller's topology. These nodes
+> +		   are translated by the driver's .xlate() function.
+> +
+> +Required properties (port (child) node):
+> +- #phy-cells	: Should be 1 (See second example)
+> +		  Cell after port phandle is device type from:
+> +			- MIPHY_TYPE_SATA
+> +			- MIPHY_TYPE_PCI
+> +			- MIPHY_TYPE_USB3
+> +- reg		: Address and length of the register set for the device
+> +- reg-names	: The names of the register addresses corresponding to the registers
+> +		  filled in "reg". Is can also contain the offset of the system configuration
 
-the same is true for gicv3-its (branch 'gicv3/its' of
-git://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms). See
-the patch below. You may merge the fixes with your patches or apply it
-on top of yours.
+%s/Is/It
 
--Robert
-
-
-
->From 38a71030b9b93a14afada6979c709f6addac5112 Mon Sep 17 00:00:00 2001
-From: Robert Richter <rrichter@cavium.com>
-Date: Tue, 26 Aug 2014 18:08:56 +0200
-Subject: [PATCH] ITS: Fixing 32 bit compatibility
-
-Fixing 32 bit compatibility by using ULL for u64 constants.
-
-Signed-off-by: Robert Richter <rrichter@cavium.com>
----
- drivers/irqchip/irq-gic-v3-its.c | 28 ++++++++++++++--------------
- 1 file changed, 14 insertions(+), 14 deletions(-)
-
-diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
-index 26927521fc28..2fda6935ad32 100644
---- a/drivers/irqchip/irq-gic-v3-its.c
-+++ b/drivers/irqchip/irq-gic-v3-its.c
-@@ -173,55 +173,55 @@ static struct rdist *gic_rdist;
- 
- static void its_encode_cmd(struct its_cmd_block *cmd, u8 cmd_nr)
- {
--	cmd->raw_cmd[0] &= ~0xffUL;
-+	cmd->raw_cmd[0] &= ~0xffULL;
- 	cmd->raw_cmd[0] |= cmd_nr;
- }
- 
- static void its_encode_devid(struct its_cmd_block *cmd, u32 devid)
- {
--	cmd->raw_cmd[0] &= 0xffffffffUL;
-+	cmd->raw_cmd[0] &= 0xffffffffULL;
- 	cmd->raw_cmd[0] |= ((u64)devid) << 32;
- }
- 
- static void its_encode_event_id(struct its_cmd_block *cmd, u32 id)
- {
--	cmd->raw_cmd[1] &= ~0xffffffffUL;
-+	cmd->raw_cmd[1] &= ~0xffffffffULL;
- 	cmd->raw_cmd[1] |= id;
- }
- 
- static void its_encode_phys_id(struct its_cmd_block *cmd, u32 phys_id)
- {
--	cmd->raw_cmd[1] &= 0xffffffffUL;
-+	cmd->raw_cmd[1] &= 0xffffffffULL;
- 	cmd->raw_cmd[1] |= ((u64)phys_id) << 32;
- }
- 
- static void its_encode_size(struct its_cmd_block *cmd, u8 size)
- {
--	cmd->raw_cmd[1] &= ~0xffUL;
--	cmd->raw_cmd[1] |= size & 0xff;
-+	cmd->raw_cmd[1] &= ~0xffULL;
-+	cmd->raw_cmd[1] |= size;
- }
- 
- static void its_encode_itt(struct its_cmd_block *cmd, u64 itt_addr)
- {
--	cmd->raw_cmd[2] &= ~0xffffffffffffUL;
--	cmd->raw_cmd[2] |= itt_addr & 0xffffffffff00UL;
-+	cmd->raw_cmd[2] &= ~0xffffffffffffULL;
-+	cmd->raw_cmd[2] |= itt_addr & 0xffffffffff00ULL;
- }
- 
- static void its_encode_valid(struct its_cmd_block *cmd, int valid)
- {
--	cmd->raw_cmd[2] &= ~(1UL << 63);
-+	cmd->raw_cmd[2] &= ~(1ULL << 63);
- 	cmd->raw_cmd[2] |= ((u64)!!valid) << 63;
- }
- 
- static void its_encode_target(struct its_cmd_block *cmd, u64 target_addr)
- {
--	cmd->raw_cmd[2] &= ~(0xffffffffUL << 16);
--	cmd->raw_cmd[2] |= (target_addr & (0xffffffffUL << 16));
-+	cmd->raw_cmd[2] &= ~(0xffffffffULL << 16);
-+	cmd->raw_cmd[2] |= (target_addr & (0xffffffffULL << 16));
- }
- 
- static void its_encode_collection(struct its_cmd_block *cmd, u16 col)
- {
--	cmd->raw_cmd[2] &= ~0xffffUL;
-+	cmd->raw_cmd[2] &= ~0xffffULL;
- 	cmd->raw_cmd[2] |= col;
- }
- 
-@@ -1221,8 +1221,8 @@ static int its_msi_setup_irq(struct msi_chip *chip,
- 
- 	addr = its->phys_base + GITS_TRANSLATER;
- 
--	msg.address_lo		= addr & ((1UL << 32) - 1);
--	msg.address_hi		= addr >> 32;
-+	msg.address_lo		= (u32)addr;
-+	msg.address_hi		= (u32)(addr >> 32);
- 	msg.data		= vec_nr;
- 
- 	write_msi_msg(irq, &msg);
--- 
-2.0.1
+Thanks
+Kishon
