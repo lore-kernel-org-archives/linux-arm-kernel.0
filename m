@@ -1,149 +1,47 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Tue, 09 Sep 2014 00:11:53 +0200
-Subject: [PATCH v3 3/9] PM / Domains: Add APIs to attach/detach a PM
- domain for a device
-In-Reply-To: <1409838756-31963-4-git-send-email-ulf.hansson@linaro.org>
-References: <1409838756-31963-1-git-send-email-ulf.hansson@linaro.org>
- <1409838756-31963-4-git-send-email-ulf.hansson@linaro.org>
-Message-ID: <2898464.MGK3rBhRTU@vostro.rjw.lan>
+From: behanw@converseincode.com (Behan Webster)
+Date: Mon, 08 Sep 2014 16:53:39 -0500
+Subject: [PATCH] arm64: LLVMLinux: Provide __aeabi_* symbols which are
+ needed for clang
+In-Reply-To: <CAFzeTN10iz0eMTVqdRhzvqKagyB7srEZN8YAUOJzxzfJihv62Q@mail.gmail.com>
+References: <1409959394-14936-1-git-send-email-behanw@converseincode.com>	<2954780.2t9bpyu7ov@wuerfel>	<CAFzeTN0AO40k2ObpMX3xPOmKaiGdiLREev1A2J0sE=B7z64qug@mail.gmail.com>	<56E276C7-8204-48DD-B5C5-BF5B1452248A@arm.com>
+ <CAFzeTN10iz0eMTVqdRhzvqKagyB7srEZN8YAUOJzxzfJihv62Q@mail.gmail.com>
+Message-ID: <540E2563.8020909@converseincode.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, September 04, 2014 03:52:30 PM Ulf Hansson wrote:
-> To maintain scalability let's add common methods to attach and detach
-> a PM domain for a device, dev_pm_domain_attach|detach().
-> 
-> Typically dev_pm_domain_attach() shall be invoked from subsystem level
-> code at the probe phase to try to attach a device to its PM domain.
-> The reversed actions may be done a the remove phase and then by invoking
-> dev_pm_domain_detach().
-> 
-> The supported PM domains at this point are the ACPI and the generic
-> PM domains.
-> 
-> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
-> Tested-by: Philipp Zabel <p.zabel@pengutronix.de>
-> ---
->  drivers/base/power/common.c | 56 +++++++++++++++++++++++++++++++++++++++++++++
->  include/linux/pm.h          | 14 ++++++++++++
->  2 files changed, 70 insertions(+)
-> 
-> diff --git a/drivers/base/power/common.c b/drivers/base/power/common.c
-> index df2e5ee..9a86b16 100644
-> --- a/drivers/base/power/common.c
-> +++ b/drivers/base/power/common.c
-> @@ -11,6 +11,8 @@
->  #include <linux/export.h>
->  #include <linux/slab.h>
->  #include <linux/pm_clock.h>
-> +#include <linux/acpi.h>
-> +#include <linux/pm_domain.h>
->  
->  /**
->   * dev_pm_get_subsys_data - Create or refcount power.subsys_data for device.
-> @@ -82,3 +84,57 @@ int dev_pm_put_subsys_data(struct device *dev)
->  	return ret;
->  }
->  EXPORT_SYMBOL_GPL(dev_pm_put_subsys_data);
-> +
-> +/**
-> + * dev_pm_domain_attach - Attach a device to its PM domain.
-> + * @dev: Device to attach.
-> + * @power_on: Used to indicate whether we should power on the device.
-> + *
-> + * The @dev may only be attached to a single PM domain. By iterating through
-> + * the available alternatives we try to find a valid PM domain for the device.
-> + *
-> + * This function should typically be invoked from subsystem level code during
-> + * the probe phase. Especially for those that holds devices which requires
-> + * power management through PM domains.
-> + *
-> + * Callers must ensure proper synchronization of this function with power
-> + * management callbacks.
-> + *
-> + * Returns 0 on successfully attached PM domain or negative error code.
-> + */
-> +int dev_pm_domain_attach(struct device *dev, bool power_on)
-> +{
-> +	int ret;
-> +
-> +	ret = acpi_dev_pm_attach(dev, power_on);
-> +	if (!ret || ret == -EPROBE_DEFER)
+On 09/08/14 16:01, Mark Charlebois wrote:
+> On Sun, Sep 7, 2014 at 12:30 AM, Catalin Marinas
+> <catalin.marinas@arm.com> wrote:
+>> On 7 Sep 2014, at 03:30, Mark Charlebois <charlebm@gmail.com> wrote:
+>>> On Sat, Sep 6, 2014 at 7:16 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+>>>> On Friday 05 September 2014 16:23:14 behanw at converseincode.com wrote:
+>>>>> + *  Copyright (C) 2012  Mark Charlebois
+>>>>> + */
+>>>>> +
+>>>>> +/*
+>>>>> + * EABI routines
+>>>> Does EABI specify these function names? I would think that they are
+>>>> just random libgcc (whatever that is called in clang) functions.
+>>> http://infocenter.arm.com/help/topic/com.arm.doc.ihi0043d/IHI0043D_rtabi.pdf
+>>>
+>>> See section 4.3.4 Memory copying, clearing, and setting
+>> What does this document have to do with arm64 (AArch64, A64)? We don?t
+>> need such symbols on arm64. Also, the arm64 kernel links with libgcc (no
+>> immediate need AFAICT but the compiler does not guarantee the intrinsics
+>> would always be generated inline).
+> [reposting in plain text]
+>
+> This patch was made early in the arm64 kernel support. I just retested
+> and you are correct, it is no longer needed.  My apologies to all.
 
-acpi_dev_pm_attach() doesn't return EPROBE_DEFER and there are no plans for it
-to do that.  IIRC, I pointed that out to you in the previous round (or even
-earlier).  Please remove this check, it is pointless.
+Whoops. I normally check whether a patch is still needed before posting 
+them. I seem to have missed that step this time. My apologies as well.
 
-> +		return ret;
-> +
-> +	return genpd_dev_pm_attach(dev);
+That all being said, I prefer to see patches no longer required, than 
+needing them to be upstreamed, so in that this is a win.
 
-And why don't you write this as
-
-	ret = acpi_dev_pm_attach(dev, power_on);
-	if (ret)
-		ret = genpd_dev_pm_attach(dev);
-
-	return ret;
-
-> +}
-> +EXPORT_SYMBOL_GPL(dev_pm_domain_attach);
-> +
-> +/**
-> + * dev_pm_domain_detach - Detach a device from its PM domain.
-> + * @dev: Device to attach.
-> + * @power_off: Used to indicate whether we should power off the device.
-> + *
-> + * The @dev may be attached to a PM domain. By iterating through the available
-> + * alternatives we detach it from its PM domain.
-> + *
-> + * This functions will reverse the actions from dev_pm_domain_attach() and thus
-> + * detach the @dev from its PM domain. Typically it should be invoked from
-> + * subsystem level code during the remove phase.
-> + *
-> + * Callers must ensure proper synchronization of this function with power
-> + * management callbacks.
-> + *
-> + * Returns 0 on successfully detached PM domain or negative error code.
-> + */
-> +int dev_pm_domain_detach(struct device *dev, bool power_off)
-> +{
-> +	if (acpi_dev_pm_detach(dev, power_off))
-> +		return genpd_dev_pm_detach(dev);
-
-And analogously here?  Or the other way around?  Just please make them both
-look analogously.
-
-> +	return 0;
-> +}
-> +EXPORT_SYMBOL_GPL(dev_pm_domain_detach);
-> diff --git a/include/linux/pm.h b/include/linux/pm.h
-> index 72c0fe0..8176b07 100644
-> --- a/include/linux/pm.h
-> +++ b/include/linux/pm.h
-> @@ -621,6 +621,20 @@ struct dev_pm_domain {
->  	struct dev_pm_ops	ops;
->  };
->  
-> +#ifdef CONFIG_PM
-> +extern int dev_pm_domain_attach(struct device *dev, bool power_on);
-> +extern int dev_pm_domain_detach(struct device *dev, bool power_off);
-> +#else
-> +static inline int dev_pm_domain_attach(struct device *dev, bool power_on)
-> +{
-> +	return -ENODEV;
-> +}
-> +static inline int dev_pm_domain_detach(struct device *dev, bool power_off)
-> +{
-> +	return -ENODEV;
-> +}
-> +#endif
-> +
->  /*
->   * The PM_EVENT_ messages are also used by drivers implementing the legacy
->   * suspend framework, based on the ->suspend() and ->resume() callbacks common
-> 
+Behan
 
 -- 
-I speak only for myself.
-Rafael J. Wysocki, Intel Open Source Technology Center.
+Behan Webster
+behanw at converseincode.com
