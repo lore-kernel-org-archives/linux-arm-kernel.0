@@ -1,60 +1,49 @@
-From: msalter@redhat.com (Mark Salter)
-Date: Mon, 08 Sep 2014 10:21:05 -0400
-Subject: [PATCH] efi/arm64: fix fdt-related memory reservation
-In-Reply-To: <20140908140609.GI12081@leverpostej>
-References: <1410183102-6969-1-git-send-email-msalter@redhat.com>
- <20140908140609.GI12081@leverpostej>
-Message-ID: <1410186065.27715.2.camel@deneb.redhat.com>
+From: ashwin.chaugule@linaro.org (Ashwin Chaugule)
+Date: Mon, 8 Sep 2014 10:25:47 -0400
+Subject: [PATCH 1/2] arm64: psci: respect MIGRATE_INFO_TYPE
+In-Reply-To: <20140908141434.GJ12081@leverpostej>
+References: <1409915540-20044-1-git-send-email-mark.rutland@arm.com>
+ <1409915540-20044-2-git-send-email-mark.rutland@arm.com>
+ <CAJ5Y-eZqWsLT1ERWsdzCQASgzCfFTgn6fCBCpc7ceMoU2ONkNA@mail.gmail.com>
+ <20140905141345.GF20164@leverpostej>
+ <CAJ5Y-eb3jJSaR4VCPFe+A+PVbLAbyVGBAcb+_zsOQQ=Rhk9Q0g@mail.gmail.com>
+ <20140908141434.GJ12081@leverpostej>
+Message-ID: <CAJ5Y-eZVus1TjEXSoq9edJbYYTneH0jm=Tbx0LfVQG8ZSeJDEg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2014-09-08 at 15:06 +0100, Mark Rutland wrote:
-> Hi Mark,
-> 
-> On Mon, Sep 08, 2014 at 02:31:42PM +0100, Mark Salter wrote:
-> > Commit 86c8b27a01cf:
-> >  "arm64: ignore DT memreserve entries when booting in UEFI mode
-> > 
-> > prevents early_init_fdt_scan_reserved_mem() from being called for
-> > arm64 kernels booting via UEFI. This was done because the kernel
-> > will use the UEFI memory map to determine reserved memory regions.
-> > That approach has problems in that early_init_fdt_scan_reserved_mem()
-> > also reserves the FDT itself and any node-specific reserved memory.
-> > By chance of some kernel configs, the FDT may be overwritten before
-> > it can be unflattened and the kernel will fail to boot. More subtle
-> > problems will result if the FDT has node specific reserved memory
-> > which is not really reserved.
-> 
-> That doesn't sound like fun; apologies for allowing such brokenness
-> through in the first place.
-
-Heh. It was obvious that DT unflattening was broken, but bisecting
-didn't help much because I kept finding patches which when reverted
-made the problem go away even though they obviously weren't the
-cause.
-
-> 
+On 8 September 2014 10:14, Mark Rutland <mark.rutland@arm.com> wrote:
 > [...]
-> 
-> > +	/*
-> > +	 * Delete all memory reserve map entries. When booting via UEFI,
-> > +	 * kernel will use the UEFI memory map to find reserved regions.
-> > +	 */
-> > +	num_rsv = fdt_num_mem_rsv(fdt);
-> > +	for (i = 0; i < num_rsv; i++)
-> > +		fdt_del_mem_rsv(fdt, i);
-> 
-> I don't think that's right. Won't the memreserve entries shift down by
-> one each time we call fdt_del_mem_rsv?
-> 
-> Shouldn't this be something like:
-> 
-> while (fdt_num_mem_rsv(fdt))
-> 	fdt_del_mem_rsv(fdt, 0);
-> 
-> Or we could count downwards.
-> 
+>
+>> >> Guessing there is no way for us to know which CPU the UP TOS is
+>> >> running on and only deny hotplug on that CPU?
+>> >
+>> > In the comment above I mention we can use MIGRATE_INFO_UP_CPU for that.
+>> > I started down that route, but the plumbing for it ended up looking a
+>> > little crazy so I thought it was better for the moment to have a simple
+>> > solution that we can backport to stable.
+>>
+>> Ah. I faintly recollect experiencing similar craziness when I was
+>> adding v0.2 support.
+>
+> Yeah, it's lot of churny fun with many function prototypes changing
+> about. I wasn't too keen on rushing that, though I would like to get
+> around to it at some point.
+>
+>> > No systems with a UP trusted OS (migrateable or not) have hit my radar
+>> > yet, and we're currently broken for them anyhow. So for the moment it
+>> > didn't seem worthwhile implementing support for those. We can add the
+>> > requisite MIGRATE_INFO_UP_CPU and MIGRATE calls in a later series.
+>>
+>> Ok.
+>>
+>> Acked-by: Ashwin Chaugule <ashwin.chaugule@linaro.org>
+>
+> Thanks.
+>
+> Does that apply to both patches or just the arm64 one?
 
-Sigh. Yes, you are right. I only tested with one reserved region.
-I think counting down would be the way to go. I'll send a fixed
-patch shortly.
+Sorry, just looked at it. Please consider the ACK for both.
+
+Thanks,
+Ashwin
