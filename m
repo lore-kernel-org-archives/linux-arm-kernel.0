@@ -1,36 +1,46 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Mon, 8 Sep 2014 22:53:09 +0200
-Subject: [PATCH v3 2/9] PM / Domains: Add generic OF-based PM domain
- look-up
-In-Reply-To: <3105400.7vSnq2rA6s@vostro.rjw.lan>
-References: <1409838756-31963-1-git-send-email-ulf.hansson@linaro.org>
- <CAPDyKFovLmajQORVT1Mf01J5L7O73JNDFz=gr3fXKvF5xZGCdQ@mail.gmail.com>
- <5191943.peyCs6gZVs@vostro.rjw.lan>
- <3105400.7vSnq2rA6s@vostro.rjw.lan>
-Message-ID: <CAMuHMdURbp8a0Ps2sZUZn7UHcWXZvRgS-4ubk1r=wGgXZ1PHmA@mail.gmail.com>
+From: charlebm@gmail.com (Mark Charlebois)
+Date: Mon, 8 Sep 2014 14:01:48 -0700
+Subject: [PATCH] arm64: LLVMLinux: Provide __aeabi_* symbols which are
+ needed for clang
+In-Reply-To: <56E276C7-8204-48DD-B5C5-BF5B1452248A@arm.com>
+References: <1409959394-14936-1-git-send-email-behanw@converseincode.com>
+ <2954780.2t9bpyu7ov@wuerfel>
+ <CAFzeTN0AO40k2ObpMX3xPOmKaiGdiLREev1A2J0sE=B7z64qug@mail.gmail.com>
+ <56E276C7-8204-48DD-B5C5-BF5B1452248A@arm.com>
+Message-ID: <CAFzeTN10iz0eMTVqdRhzvqKagyB7srEZN8YAUOJzxzfJihv62Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rafael,
+On Sun, Sep 7, 2014 at 12:30 AM, Catalin Marinas
+<catalin.marinas@arm.com> wrote:
+> On 7 Sep 2014, at 03:30, Mark Charlebois <charlebm@gmail.com> wrote:
+>> On Sat, Sep 6, 2014 at 7:16 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+>>>
+>>> On Friday 05 September 2014 16:23:14 behanw at converseincode.com wrote:
+>>>> + *  Copyright (C) 2012  Mark Charlebois
+>>>> + */
+>>>> +
+>>>> +/*
+>>>> + * EABI routines
+>>>
+>>> Does EABI specify these function names? I would think that they are
+>>> just random libgcc (whatever that is called in clang) functions.
+>>
+>> http://infocenter.arm.com/help/topic/com.arm.doc.ihi0043d/IHI0043D_rtabi.pdf
+>>
+>> See section 4.3.4 Memory copying, clearing, and setting
+>
+> What does this document have to do with arm64 (AArch64, A64)? We don?t
+> need such symbols on arm64. Also, the arm64 kernel links with libgcc (no
+> immediate need AFAICT but the compiler does not guarantee the intrinsics
+> would always be generated inline).
 
-On Mon, Sep 8, 2014 at 11:08 PM, Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
-> BTW, I get bounces from t.figa at samsung.com, so I won't apply the patch with
-> that as the "From" field.  And the s-o-b from a bouncing address is worthless
-> too.
+[reposting in plain text]
 
-In the mean time, Tomasz has moved:
-http://www.spinics.net/lists/arm-kernel/msg357102.html
+This patch was made early in the arm64 kernel support. I just retested
+and you are correct, it is no longer needed.  My apologies to all.
 
-Still, the From/SoB indicate attribution to Samsung, so I think it should be
-kept.
+-Mark
 
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+>
+> Catalin
