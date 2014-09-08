@@ -1,59 +1,43 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 8 Sep 2014 13:14:15 +0200
-Subject: [PATCH 2/8 v2] leds: add device tree bindings for register bit
- LEDs
-In-Reply-To: <CAMuHMdXB_6vJpTeDgr4iiA=T_3bK7nQ3anF-HSdnEz=2QqYzaw@mail.gmail.com>
-References: <1409659354-23553-1-git-send-email-linus.walleij@linaro.org>
- <1409659354-23553-3-git-send-email-linus.walleij@linaro.org>
- <CAMuHMdXB_6vJpTeDgr4iiA=T_3bK7nQ3anF-HSdnEz=2QqYzaw@mail.gmail.com>
-Message-ID: <CACRpkdbk=QL_N-sTADBi09jZmGs_0A9EMctNmxVOxOFr61_=LA@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 08 Sep 2014 13:14:05 +0200
+Subject: [PATCH] ASoC: simple-card: fix regression in clock rate lookup
+Message-ID: <42811667.3TM1iBfezH@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 2, 2014 at 4:22 PM, Geert Uytterhoeven <geert@linux-m68k.org> wrote:
-> On Tue, Sep 2, 2014 at 2:02 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
->> +LED sub-node properties:
->> +
->> +Required properties:
->> +- compatible : must be "register-bit-led"
->> +- offset : register offset to the register controlling this LED
->> +- mask : bit mask for the bit controlling this LED in the register
->
-> Why don't you use a "reg" property with "#address-cells = <2>" and
-> "#size-cells = <1>", so you can store offset and mask there?
+Commit 7c7b9cf53d284f ("ASoC: simple-card: fixup cpu_dai_name
+clear case") changed the way that "sound-dai" properties are handled,
+which leads to the clock frequency not being picked up from the
+node that the phandle points to, as correctly identified by gcc
+with this warning:
 
-Because "reg" means a register range not based off another range,
-i.e. not relative, and the OF cores does not allow overlapping
-reg ranges as would be the case here IIRC.
+sound/soc/generic/simple-card.c: In function 'asoc_simple_card_sub_parse_of':
+sound/soc/generic/simple-card.c:165:7: warning: 'node' may be used uninitialized in this function [-Wmaybe-uninitialized]
 
->> +syscon: syscon at 10000000 {
->> +       compatible = "arm,realview-pb1176-syscon", "syscon";
->> +       reg = <0x10000000 0x1000>;
->> +
->> +       led at 08.0 {
->> +               compatible = "register-bit-led";
->> +               offset = <0x08>;
->> +               mask = <0x01>;
->> +               label = "versatile:0";
->> +               linux,default-trigger = "heartbeat";
->> +               default-state = "on";
->> +       };
->
-> ePAPR v1.1 says:
->
-> "The unit-address must match the first address specified in the reg property
->  of the node. If the node has no reg property, the @ and unit-address must
->  be omitted ..."
->
-> So you cannot have the "@8.0" without a "reg" property.
+This restores the previous behavior by using the node from
+of_parse_phandle_with_args() that was previously being
+returned from of_parse_phandle().
 
-This terminology was suggested by Rob Herring due to the fact that
-there were no previous examples.
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 
-Rob: care to comment?
-
-Right now I have that distinct feeling of despair as the v8 patch set
-is still stuck in DT syntax discussions...
-
-Yours,
-Linus Walleij
+diff --git a/sound/soc/generic/simple-card.c b/sound/soc/generic/simple-card.c
+index b563850c43f4..a0440bd533d5 100644
+--- a/sound/soc/generic/simple-card.c
++++ b/sound/soc/generic/simple-card.c
+@@ -116,7 +116,6 @@ asoc_simple_card_sub_parse_of(struct device_node *np,
+ 			      int *args_count)
+ {
+ 	struct of_phandle_args args;
+-	struct device_node *node;
+ 	struct clk *clk;
+ 	u32 val;
+ 	int ret;
+@@ -162,7 +161,7 @@ asoc_simple_card_sub_parse_of(struct device_node *np,
+ 	} else if (!of_property_read_u32(np, "system-clock-frequency", &val)) {
+ 		dai->sysclk = val;
+ 	} else {
+-		clk = of_clk_get(node, 0);
++		clk = of_clk_get(args.np, 0);
+ 		if (!IS_ERR(clk))
+ 			dai->sysclk = clk_get_rate(clk);
+ 	}
