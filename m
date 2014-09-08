@@ -1,55 +1,59 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Mon, 8 Sep 2014 22:44:24 +0100
-Subject: [PATCH 0/2] PSCI: don't call CPU_OFF when it might fail
-In-Reply-To: <20140908102405.GB12081@leverpostej>
-References: <1409916139-20127-1-git-send-email-mark.rutland@arm.com>
- <alpine.DEB.2.02.1409052151450.2334@kaball.uk.xensource.com>
- <20140908102405.GB12081@leverpostej>
-Message-ID: <alpine.DEB.2.02.1409082244110.2334@kaball.uk.xensource.com>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Mon, 8 Sep 2014 15:51:26 -0600
+Subject: [PATCH 08/11 v5] coresight: adding documentation for coresight
+In-Reply-To: <CACRpkdbD3Ds=iPxwD57ERd=xPAyVvdVbMEfjqdtAvO-0YqT_EA@mail.gmail.com>
+References: <1409159852-7249-1-git-send-email-mathieu.poirier@linaro.org>
+ <1409159852-7249-9-git-send-email-mathieu.poirier@linaro.org>
+ <CACRpkdbD3Ds=iPxwD57ERd=xPAyVvdVbMEfjqdtAvO-0YqT_EA@mail.gmail.com>
+Message-ID: <CANLsYkzrXcx9UCc6bxfKR59sjDwg=p1YhKWAS5YV0iYZNH67Gw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 8 Sep 2014, Mark Rutland wrote:
-> On Fri, Sep 05, 2014 at 09:53:05PM +0100, Stefano Stabellini wrote:
-> > On Fri, 5 Sep 2014, Mark Rutland wrote:
-> > > [Apologies to all who received this already, I typo'd the LAKML address]
-> > > 
-> > > In certain conditions PSCI's CPU_OFF call may return DENIED (in the presence of
-> > > a UP OS on the secure world), or might not exist (in early implementations
-> > > prior to PSCI 0.2). Both the arm and arm64 callers fail to handle the former,
-> > > and the arm caller doesn't handle the latter.
-> > > 
-> > > We can determine wether a CPU_OFF call will succeed by calling
-> > > MIGRATE_INFO_TYPE. If we receive 2 (A.K.A. PSCI_0_2_TOS_MP) in response we know
-> > > that CPU_OFF should succeed, and in other cases it is necessary to discover
-> > > which CPU said OS lives on and attempt migration. As there don't seem to be any
-> > > UP implementations out there so far, for now we can limit ourselves to only
-> > > supporting CPU hotplug in the PSCI_0_2_TOS_MP case. Hotplug support on such
-> > > systems will require additional work, but at least they won't blow up by
-> > > default.
-> > > 
-> > > These patches add the necessary checks to the arm and arm64 PSCI callers to
-> > > prevent the issues described above. MIGRATE_INFO_TYPE is a mandatory part of
-> > > PSCI 0.2, so no conforming implementation should be adversely affected. Both
-> > > the ARM Trusted Firmware and KVM respond to MIGRATE_INFO_TYPE with
-> > > PSCI_0_2_TOS_MP, so should see no loss of functionality (verified on Juno). 
-> > > 
-> > > Thanks,
-> > > Mark.
-> > > 
-> > > Mark Rutland (2):
-> > >   arm64: psci: respect MIGRATE_INFO_TYPE
-> > >   arm: psci: don't call CPU_OFF blindly
-> > > 
-> > >  arch/arm/kernel/psci_smp.c | 36 +++++++++++++++++++++++++++++-------
-> > >  arch/arm64/kernel/psci.c   | 14 ++++++++++++++
-> > >  2 files changed, 43 insertions(+), 7 deletions(-)
-> >  
-> > The patches look good to me and AFACT they would work fine on Xen 4.4
-> > and the soon to be release 4.5.
-> 
-> Cheers.
-> 
-> Can I take that as an ack?
+Apologies on the late reply - I was doing a quick review of your
+earlier comments before getting ready for another submission when I
+remembered I hadn't address this one.  Pls see below.
 
-Yes
+On 3 September 2014 02:43, Linus Walleij <linus.walleij@linaro.org> wrote:
+> On Wed, Aug 27, 2014 at 7:17 PM,  <mathieu.poirier@linaro.org> wrote:
+>
+>> From: Mathieu Poirier <mathieu.poirier@linaro.org>
+>>
+>> Documentation for the coresight framework and drivers.
+>>
+>> Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+> (...)
+>>  Documentation/trace/coresight.txt | 237 ++++++++++++++++++++++++++++++++++++++
+>
+> I guess you agreed on this location? If it's ARM-specific,
+> Documentation/arm/coresight.txt
+> is an alternative.
+
+I didn't have prior agreement with anyone before - it was simply
+dropped there to get the conversation started.  Very well, I'll move
+it to @arm.
+
+>
+>> +The file cstrace.bin can be decompressed using "ptm2human", DS-5 or Trace32.
+>
+> Is ptm2human a candidate for the kernel tools/ directory?
+
+A fair amount of work would have to be invested in "ptm2human" to make
+it production ready.
+
+>
+> Maybe not now but later?
+>
+> +root at linaro-developer:/sys/kernel/debug/coresight# ls
+>
+> Maybe reduce noise here:
+>
+> root:/sys/kernel/debug/coresight# ls
+>
+> The reader probably does not need to know the name of your
+> development system.
+
+Ok.
+
+>
+> Yours,
+> Linus Walleij
