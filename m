@@ -1,27 +1,42 @@
-From: abrestic@chromium.org (Andrew Bresticker)
-Date: Mon, 8 Sep 2014 09:22:11 -0700
-Subject: [PATCH v3 0/9] Tegra xHCI support
-In-Reply-To: <CAAObsKAYqpJMJnxSMxhkkRtnoEwLwgUa1y7ij5ZHvHf1jRok+Q@mail.gmail.com>
-References: <1409693701-16520-1-git-send-email-abrestic@chromium.org>
- <CAAObsKAYqpJMJnxSMxhkkRtnoEwLwgUa1y7ij5ZHvHf1jRok+Q@mail.gmail.com>
-Message-ID: <CAL1qeaF7U9aoBp5gQPS=r+pe6krKmXdP1qak2gjhNqQMoHFB8A@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 8 Sep 2014 17:23:16 +0100
+Subject: [PATCH v3 5/5] irqchip: gic: Add support for IPI FIQ
+In-Reply-To: <1410190115-32604-6-git-send-email-daniel.thompson@linaro.org>
+References: <1409931198-22600-1-git-send-email-daniel.thompson@linaro.org>
+ <1410190115-32604-1-git-send-email-daniel.thompson@linaro.org>
+ <1410190115-32604-6-git-send-email-daniel.thompson@linaro.org>
+Message-ID: <20140908162316.GC12361@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 8, 2014 at 8:34 AM, Tomeu Vizoso <tomeu@tomeuvizoso.net> wrote:
-> On 2 September 2014 23:34, Andrew Bresticker <abrestic@chromium.org> wrote:
->>
->> Tested on Venice2, Jetson TK1, and Big with a variety of USB2.0 and
->> USB3.0 memory sticks and ethernet dongles using controller firmware
->> recently posted by Andrew Chew [2].
->
-> I have had mixed results when testing this on a Jetson TK1 board. Of 8
-> USB devices I tested with, about half where probed correctly, but the
-> other half repeatedly fail in hub_port_init because in the GET_STATUS
-> right after the reset, the C_PORT_CONNECTION bit is set.
->
-> I don't see any correlation between the failure and the kind of usb
-> device, but I don't have much experience with USB implementations
-> either.
+On Mon, Sep 08, 2014 at 04:28:35PM +0100, Daniel Thompson wrote:
+> @@ -604,8 +731,19 @@ static void gic_raise_softirq(const struct cpumask *mask, unsigned int irq)
+>  {
+>  	int cpu;
+>  	unsigned long flags, map = 0;
+> +	unsigned long softint;
+>  
+> -	raw_spin_lock_irqsave(&irq_controller_lock, flags);
+> +	/*
+> +	 * The locking in this function ensures we don't use stale cpu mappings
+> +	 * and thus we never route an IPI to the wrong physical core during a
+> +	 * big.LITTLE switch. The switch code takes both of these locks meaning
+> +	 * we can choose whichever lock is safe to use from our current calling
+> +	 * context.
+> +	 */
+> +	if (in_nmi())
+> +		raw_spin_lock(&fiq_safe_migration_lock);
+> +	else
+> +		raw_spin_lock_irqsave(&irq_controller_lock, flags);
 
-Hmm... I haven't seen that before.  Which particular devices were you using?
+Firstly, why would gic_raise_softirq() be called in FIQ context?  Secondly,
+this doesn't save you.  If you were in the middle of gic_migrate_target()
+when the FIQ happened that (for some reason prompted you to call this),
+you would immediately deadlock trying to that this IRQ.
+
+I suggest not even trying to solve this "race" which I don't think is
+one which needs to even be considered (due to the first point.)
+
+-- 
+FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
+according to speedtest.net.
