@@ -1,33 +1,41 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Mon, 8 Sep 2014 19:48:05 +0200
-Subject: [PATCH] clk: efm32: fix build warning
-In-Reply-To: <3456522.oqa7pbstSD@wuerfel>
-References: <3456522.oqa7pbstSD@wuerfel>
-Message-ID: <20140908174805.GL23009@pengutronix.de>
+From: dianders@chromium.org (Doug Anderson)
+Date: Mon, 8 Sep 2014 10:52:50 -0700
+Subject: [PATCH 10/11] ARM: rockchip: enable cpufreq-related options
+In-Reply-To: <1409958374-30937-11-git-send-email-heiko@sntech.de>
+References: <1409958374-30937-1-git-send-email-heiko@sntech.de>
+ <1409958374-30937-11-git-send-email-heiko@sntech.de>
+Message-ID: <CAD=FV=X_+pmz5+eizYmHcWzKbq7h-1P=W2Lt2s2NOkP=KFzN9A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 08, 2014 at 05:19:40PM +0200, Arnd Bergmann wrote:
-> The normal prototype for of clk init functions is to return void,
-> while efm32gg_cmu_init return an int, resulting in this harmless
-> build warning:
-> 
-> drivers/clk/clk-efm32gg.c:81:189: warning: comparison of distinct pointer types lacks a cast [enabled by default]
->  CLK_OF_DECLARE(efm32ggcmu, "efm32gg,cmu", efm32gg_cmu_init);
-> 
-> This changes the return type to avoid the warning.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-I already sent the exact same patch some time ago, even the sha1 sums in
-the diff match.
+Heiko,
 
-	Subject: [PATCH] clk/efm32gg: fix dt init prototype
-	Message-Id: <1406558301-17866-1-git-send-email-u.kleine-koenig@pengutronix.de>
-	Date: Mon, 28 Jul 2014 16:38:21 +0200
+On Fri, Sep 5, 2014 at 4:06 PM, Heiko Stuebner <heiko@sntech.de> wrote:
+> Enable ARCH_HAS_CPUFREQ and ARCH_HAS_OPP.
+>
+> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+> ---
+>  arch/arm/mach-rockchip/Kconfig | 2 ++
+>  1 file changed, 2 insertions(+)
+>
+> diff --git a/arch/arm/mach-rockchip/Kconfig b/arch/arm/mach-rockchip/Kconfig
+> index d168669..007e9dd 100644
+> --- a/arch/arm/mach-rockchip/Kconfig
+> +++ b/arch/arm/mach-rockchip/Kconfig
+> @@ -2,6 +2,8 @@ config ARCH_ROCKCHIP
+>         bool "Rockchip RK2928 and RK3xxx SOCs" if ARCH_MULTI_V7
+>         select PINCTRL
+>         select PINCTRL_ROCKCHIP
+> +       select ARCH_HAS_CPUFREQ
+> +       select ARCH_HAS_OPP
+>         select ARCH_HAS_RESET_CONTROLLER
+>         select ARCH_REQUIRE_GPIOLIB
+>         select ARM_GIC
 
-Thanks
-Uwe
+This patch might be useful to folks trying to pick patches on older
+kernels, but I don't think we want it to land upstream.  See:
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+19682f7 ARM: Remove ARCH_HAS_CPUFREQ config option
+78c5e0b PM / OPP: Remove ARCH_HAS_OPP
+
+-Doug
