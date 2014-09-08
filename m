@@ -1,149 +1,169 @@
-From: pramod.gurav@smartplayin.com (Pramod Gurav)
-Date: Mon, 08 Sep 2014 15:12:48 +0530
-Subject: [PATCH v2 00/15] Krait clocks + Krait CPUfreq
-In-Reply-To: <1409957256-23729-1-git-send-email-sboyd@codeaurora.org>
-References: <1409957256-23729-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <540D7A18.4030201@smartplayin.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 8 Sep 2014 11:37:13 +0200
+Subject: [PATCH v2] ARM: sun5i: Add DT for HSG H702 tablet board
+In-Reply-To: <1409580879-15601-1-git-send-email-wens@csie.org>
+References: <1409580879-15601-1-git-send-email-wens@csie.org>
+Message-ID: <20140908093713.GE3804@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stephen,
-Looks like one patch is missing from v1. Is this removed from v2
-patchset from some reason?
-	ARM: Add Krait L2 register accessor functions
+Hi,
 
-But there are references to this in v2 set and build fails while
-compiling drivers/clk/qcom/clk-krait.c.
+On Mon, Sep 01, 2014 at 10:14:39PM +0800, Chen-Yu Tsai wrote:
+> This is a Q8 format 7 inch tablet with an Allwinner A13 SoC.
+> It has 512MB DRAM, 4GB NAND flash, an accelerometer, camera,
+> RTL8188-based WiFi, and micro SD slot for external storage.
+> 
+> It is likely made by a subsidiary of Hanns.G (Hannstar).
+> 
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+> ---
+> 
+> Added missing '>' to the email address in the header.
+> 
+> Sorry for the noise.
+> 
+> ---
+>  arch/arm/boot/dts/Makefile               |   1 +
+>  arch/arm/boot/dts/sun5i-a13-hsg-h702.dts | 101 +++++++++++++++++++++++++++++++
+>  2 files changed, 102 insertions(+)
+>  create mode 100644 arch/arm/boot/dts/sun5i-a13-hsg-h702.dts
+> 
+> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+> index b8c5cd3..94e61a6 100644
+> --- a/arch/arm/boot/dts/Makefile
+> +++ b/arch/arm/boot/dts/Makefile
+> @@ -406,6 +406,7 @@ dtb-$(CONFIG_MACH_SUN4I) += \
+>  dtb-$(CONFIG_MACH_SUN5I) += \
+>  	sun5i-a10s-olinuxino-micro.dtb \
+>  	sun5i-a10s-r7-tv-dongle.dtb \
+> +	sun5i-a13-hsg-h702.dtb \
+>  	sun5i-a13-olinuxino.dtb \
+>  	sun5i-a13-olinuxino-micro.dtb
+>  dtb-$(CONFIG_MACH_SUN6I) += \
+> diff --git a/arch/arm/boot/dts/sun5i-a13-hsg-h702.dts b/arch/arm/boot/dts/sun5i-a13-hsg-h702.dts
+> new file mode 100644
+> index 0000000..6335c1e
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/sun5i-a13-hsg-h702.dts
+> @@ -0,0 +1,101 @@
+> +/*
+> + * Copyright 2014 Chen-Yu Tsai <wens@csie.org>
+> + *
+> + * The code contained herein is licensed under the GNU General Public
+> + * License. You may obtain a copy of the GNU General Public License
+> + * Version 2 or later at the following locations:
 
-Thanks and Regards
-Pramod
+Could you relicense the file to match the GPL/X11 dual license we've
+been working on?
 
-On Saturday 06 September 2014 04:17 AM, Stephen Boyd wrote:
-> These patches provide cpufreq scaling on devices with Krait CPUs.
-> In Krait CPU designs there's one PLL and two muxes per CPU, allowing
-> us to switch CPU frequencies independently.
-> 
-> 				 secondary
-> 	 +-----+                    +
-> 	 | QSB |-------+------------|\
-> 	 +-----+       |            | |-+
-> 		       |    +-------|/  |
-> 		       |    |       +   |
-> 	 +-----+       |    |           |
-> 	 | PLL |----+-------+           |   primary
-> 	 +-----+    |  |                |     +
-> 		    |  |                +-----|\       +------+
-> 	 +-------+  |  |                      | \      |      |
-> 	 | HFPLL |----------+-----------------|  |-----| CPU0 |
-> 	 +-------+  |  |    |                 |  |     |      |
-> 		    |  |    | +-----+         | /      +------+
-> 		    |  |    +-| / 2 |---------|/
-> 		    |  |      +-----+         +
-> 		    |  |         secondary
-> 		    |  |            +
-> 		    |  +------------|\
-> 		    |               | |-+
-> 		    +---------------|/  |   primary
-> 				    +   |     +
-> 					+-----|\       +------+
-> 	 +-------+                            | \      |      |
-> 	 | HFPLL |----------------------------|  |-----| CPU1 |
-> 	 +-------+          |                 |  |     |      |
-> 			    | +-----+         | /      +------+
-> 			    +-| / 2 |---------|/
-> 			      +-----+         +
-> 
-> To support this in the common clock framework we model the muxes,
-> dividers, and PLLs as different clocks. CPUfreq only interacts
-> with the primary mux (farthest right in the diagram). When CPUfreq
-> sets a rate, the mux code finds the best parent that can provide the rate.
-> Due to the design, QSB and the top PLL are always a fixed rate and thus
-> only support one frequency each. These sources provide the lowest
-> frequencies for the CPUs. The HFPLLs are where we can make the CPU go
-> faster (GHz range). Sometimes we need to run the HFPLL twice as
-> fast and divide it by two to get a particular frequency.
-> 
-> When switching rates we can't leave the CPU clocked by the HFPLL because
-> we need to turn off the output of the PLL when changing its frequency.
-> This means we have to switch over to the secondary mux and use one of the
-> fixed sources. This is why we need something like the safe parent patch.
-> 
-> I plan to submit the DTS changes through arm-soc, but I've included everything
-> here to make it easier to pick things up for testing, etc. Please note
-> that these patches rely on the Krait L2 accessor patch I posted a while back
-> in another series[1]. This also relies on the cpufreq-generic patchset from
-> Viresh[2]. If anything can be picked up right now it would be better
-> to reduce the churn over time as other pieces settle. The series gets
-> progressively more controversial as it goes on, so I hope that things
-> near the beggining will be picked up earlier.
-> 
-> Changes since v1:
->  * Added IPQ and APQ8064 support
->  * Switched to cpufreq-generic
->  * Added OPP parsing from DT (need to write binding though)
->  * New patches to make clk-generic.c go away
->   * Made mux and divider reusable for non-MMIO devices
->   * Added a mux_determine_rate_closest (not sure if this is really needed)
->   * Added unregistration of muxes
->  * New patch to avoid sending high frequencies down to devices using clocks
-> 
-> TODO:
->  * Add Krait regulator voltage scaling (not strictly necessary)
->  * Document DT bindings
->  * Use a new efuse/eeprom API instead of hardcoding the location in the driver
->  * Add some thermal awareness
-> 
-> 
-> Stephen Boyd (15):
->   clk: mux: Add unregistration API
->   clk: mux: Split out register accessors for reuse
->   clk: Add __clk_mux_determine_rate_closest
->   clk: divider: Make generic for usage elsewhere
->   clk: Add safe switch hook
->   clk: Avoid sending high rates to downstream clocks during set_rate
->   clk: qcom: Add support for High-Frequency PLLs (HFPLLs)
->   clk: qcom: Add HFPLL driver
->   clk: qcom: Add MSM8960/APQ8064's HFPLLs
->   clk: qcom: Add IPQ806X's HFPLLs
->   clk: qcom: Add support for Krait clocks
->   clk: qcom: Add KPSS ACC/GCC driver
->   clk: qcom: Add Krait clock controller driver
->   cpufreq: Add module to register cpufreq on Krait CPUs
->   ARM: dts: qcom: Add necessary DT data for Krait cpufreq
-> 
->  arch/arm/boot/dts/qcom-apq8064.dtsi          | 230 +++++++++++++++++
->  arch/arm/boot/dts/qcom-msm8960.dtsi          |  49 ++++
->  arch/arm/boot/dts/qcom-msm8974.dtsi          | 311 ++++++++++++++++++++++-
->  drivers/clk/clk-divider.c                    | 197 +++++++++------
->  drivers/clk/clk-mux.c                        |  91 ++++---
->  drivers/clk/clk.c                            | 133 +++++++---
->  drivers/clk/qcom/Kconfig                     |  28 +++
->  drivers/clk/qcom/Makefile                    |   5 +
->  drivers/clk/qcom/clk-hfpll.c                 | 253 +++++++++++++++++++
->  drivers/clk/qcom/clk-hfpll.h                 |  54 ++++
->  drivers/clk/qcom/clk-krait.c                 | 166 +++++++++++++
->  drivers/clk/qcom/clk-krait.h                 |  49 ++++
->  drivers/clk/qcom/gcc-ipq806x.c               |  83 +++++++
->  drivers/clk/qcom/gcc-msm8960.c               | 172 +++++++++++++
->  drivers/clk/qcom/hfpll.c                     | 110 +++++++++
->  drivers/clk/qcom/kpss-xcc.c                  |  94 +++++++
->  drivers/clk/qcom/krait-cc.c                  | 357 +++++++++++++++++++++++++++
->  drivers/cpufreq/Kconfig.arm                  |   9 +
->  drivers/cpufreq/Makefile                     |   1 +
->  drivers/cpufreq/qcom-cpufreq.c               | 199 +++++++++++++++
->  include/dt-bindings/clock/qcom,gcc-msm8960.h |   2 +
->  include/linux/clk-private.h                  |   2 +
->  include/linux/clk-provider.h                 |  32 ++-
->  23 files changed, 2486 insertions(+), 141 deletions(-)
->  create mode 100644 drivers/clk/qcom/clk-hfpll.c
->  create mode 100644 drivers/clk/qcom/clk-hfpll.h
->  create mode 100644 drivers/clk/qcom/clk-krait.c
->  create mode 100644 drivers/clk/qcom/clk-krait.h
->  create mode 100644 drivers/clk/qcom/hfpll.c
->  create mode 100644 drivers/clk/qcom/kpss-xcc.c
->  create mode 100644 drivers/clk/qcom/krait-cc.c
->  create mode 100644 drivers/cpufreq/qcom-cpufreq.c
-> 
-> [1] http://lkml.iu.edu/hypermail/linux/kernel/1404.0/02636.html
-> [2] git://git.linaro.org/people/viresh.kumar/linux cpufreq/cpu0-krait-v3
-> 
+> + *
+> + * http://www.opensource.org/licenses/gpl-license.html
+> + * http://www.gnu.org/copyleft/gpl.html
+> + */
+> +
+> +/dts-v1/;
+> +/include/ "sun5i-a13.dtsi"
+> +/include/ "sunxi-common-regulators.dtsi"
+> +
+> +/ {
+> +	model = "HSG H702";
+> +	compatible = "hsg,h702", "allwinner,sun5i-a13";
+> +
+> +	soc at 01c00000 {
+> +		mmc0: mmc at 01c0f000 {
+> +			pinctrl-names = "default";
+> +			pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin_h702>;
+> +			vmmc-supply = <&reg_vcc3v3>;
+> +			bus-width = <4>;
+> +			cd-gpios = <&pio 6 0 0>; /* PG0 */
+> +			cd-inverted;
+> +			status = "okay";
+> +		};
+> +
+> +		usbphy: phy at 01c13400 {
+> +			usb1_vbus-supply = <&reg_usb1_vbus>;
+> +			status = "okay";
+> +		};
+> +
+> +		ehci0: usb at 01c14000 {
+> +			status = "okay";
+> +		};
+> +
+> +		ohci0: usb at 01c14400 {
+> +			status = "okay";
+> +		};
+> +
+> +		pinctrl at 01c20800 {
+> +			mmc0_cd_pin_h702: mmc0_cd_pin at 0 {
+> +				allwinner,pins = "PG0";
+> +				allwinner,function = "gpio_in";
+> +				allwinner,drive = <0>;
+> +				allwinner,pull = <1>;
+> +			};
+> +		};
+> +
+> +		uart1: serial at 01c28400 {
+> +			pinctrl-names = "default";
+> +			pinctrl-0 = <&uart1_pins_b>;
+> +			status = "okay";
+> +		};
+> +
+> +		i2c0: i2c at 01c2ac00 {
+> +			pinctrl-names = "default";
+> +			pinctrl-0 = <&i2c0_pins_a>;
+> +			status = "okay";
+> +
+> +			axp209: pmic at 34 {
+> +				compatible = "x-powers,axp209";
+> +				reg = <0x34>;
+> +				interrupts = <0>;
+> +				interrupt-controller;
+> +				#interrupt-cells = <1>;
+> +			};
+> +		};
+> +
+> +		i2c1: i2c at 01c2b000 {
+> +			pinctrl-names = "default";
+> +			pinctrl-0 = <&i2c1_pins_a>;
+> +			status = "okay";
+> +
+> +			pcf8563: rtc at 51 {
+> +				compatible = "nxp,pcf8563";
+> +				reg = <0x51>;
+> +			};
+> +		};
+> +
+> +		i2c2: i2c at 01c2b400 {
+> +			pinctrl-names = "default";
+> +			pinctrl-0 = <&i2c2_pins_a>;
+> +			status = "okay";
+> +		};
+> +	};
+> +
+> +	reg_usb1_vbus: usb1-vbus {
+> +		/*
+> +		 * There doesn't seem to be a GPIO for controlling
+> +		 * vbus, despite the fex file saying otherwise.
+> +		 * Override the original settings with empty ones.
+> +		 */
+> +		pinctrl-0 = <>;
+> +		gpio = <>;
+> +		status = "okay";
+
+Hmmmm, no. Just use a regular fixed regulator here, like reg_vcc3v3.
+
+Thanks!
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140908/d6981696/attachment.sig>
