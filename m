@@ -1,55 +1,51 @@
-From: daniel.thompson@linaro.org (Daniel Thompson)
-Date: Mon, 08 Sep 2014 16:57:06 +0100
-Subject: [PATCH v3 3/5] arm: fiq: Replace default FIQ handler
-In-Reply-To: <alpine.LFD.2.11.1409081140360.16533@knanqh.ubzr>
-References: <1409931198-22600-1-git-send-email-daniel.thompson@linaro.org>
- <1410190115-32604-1-git-send-email-daniel.thompson@linaro.org>
- <1410190115-32604-4-git-send-email-daniel.thompson@linaro.org>
- <alpine.LFD.2.11.1409081140360.16533@knanqh.ubzr>
-Message-ID: <540DD1D2.8060206@linaro.org>
+From: dianders@chromium.org (Doug Anderson)
+Date: Mon, 8 Sep 2014 08:58:33 -0700
+Subject: Unable to boot mainline on snow chromebook since 3.15
+In-Reply-To: <CACxGe6v40wMSW8LJRtyZ3C6PinRMcQM-Zog+XpTJ-QG3HHJknw@mail.gmail.com>
+References: <20140905115704.GO13515@arm.com> <20140905122232.GP13515@arm.com>
+ <CAD=FV=VfioJf9VYoSYL0QBk-bN93-Ecx3=0n9hb5Q4rcx43-_g@mail.gmail.com>
+ <540C202E.2060009@collabora.co.uk> <540C7F5B.6070307@gmail.com>
+ <540C83DE.10505@collabora.co.uk> <540C8577.2070907@gmail.com>
+ <20140908112112.GK26030@arm.com>
+ <CACxGe6v40wMSW8LJRtyZ3C6PinRMcQM-Zog+XpTJ-QG3HHJknw@mail.gmail.com>
+Message-ID: <CAD=FV=VAqzvJQDQMjjeQ1p5okyDzE=ff_sguObZxh59qbzcaTQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/09/14 16:49, Nicolas Pitre wrote:
-> On Mon, 8 Sep 2014, Daniel Thompson wrote:
-> 
->> +@
->> +@ Taking a FIQ in abort mode is similar to taking a FIQ in SVC mode
->> +@ and reuses the same macros. However in abort mode we must also
->> +@ save/restore lr_abt and spsr_abt to make nested aborts safe.
->> +@
->> +	.align 5
->> +__fiq_abt:
->> +	svc_entry 0, 0
->> +
->> + ARM(	msr	cpsr_c, #ABT_MODE | PSR_I_BIT | PSR_F_BIT )
->> + THUMB( mov	r0, #ABT_MODE | PSR_I_BIT | PSR_F_BIT )
->> + THUMB( msr	cpsr_c, r0 )
->> +	mov	r1, lr		@ Save lr_abt
->> +	mrs	r2, spsr	@ Save spsr_abt, abort is now safe
->> + ARM(	msr	cpsr_c, #SVC_MODE | PSR_I_BIT | PSR_F_BIT )
->> + THUMB( mov	r0, #SVC_MODE | PSR_I_BIT | PSR_F_BIT )
->> + THUMB( msr	cpsr_c, r0 )
->> +	push	{r1 - r2}
-> 
-> 	stmfd sp!, {r1 - r2}
-> 
->> +
->> +	sub	r0, sp, #8			@ struct pt_regs *regs
->> +	bl	handle_fiq_as_nmi
->> +
->> +	pop	{r1 - r2}
-> 
-> 	ldmfd sp!, {r1 - r2}
-> 
-> ... so that old binutils we still accept to compile the kernel (in ARM 
-> mode) are happy.
+Grant,
 
-Will do.
+On Mon, Sep 8, 2014 at 5:20 AM, Grant Likely <grant.likely@secretlab.ca> wrote:
+> On Mon, Sep 8, 2014 at 12:21 PM, Will Deacon <will.deacon@arm.com> wrote:
+>> On Sun, Sep 07, 2014 at 05:19:03PM +0100, Tomasz Figa wrote:
+>>> At least for next 3.17-rc I'd suggest fixing this up in respective clock
+>>> driver and dropping the hack only after Exynos DRM patches are merged
+>>> and confirmed working.
+>>
+>> Whilst I'm sympathetic to people working to enable DRM, I think this is
+>> the right solution to the problem. The transition from simplefb to DRM
+>> shouldn't break display for a bunch of kernel revisions whilst the code is
+>> in flux.
+>
+> I would go further. The kernel behaviour has changed, and we have to
+> deal with platforms that assume the old behaviour. That means either
+> defaulting to leaving enabled regulators/clocks alone unless there is
+> a flag in the DT saying they can be power managed, or black listing
+> platforms that are known to depend on the regulator being on.
+>
+> Updating the device tree must not be required to get the kernel to
+> boot, but it is valid to require a DT upgrade to get better
+> performance (battery life) out of the platform.
+
+In this case people using SImple FB are not really using an officially
+sanctioned device tree.  The simple-fb fragment is created on the fly
+via a "DO NOT SUBMIT" patch sitting on a code review server.  It's not
+something that's shipped with real firmware nor is it something
+present in the kernel.  See
+<https://chromium-review.googlesource.com/#/c/49358/2/board/samsung/smdk5250/smdk5250.c>
+as I mentioned above.
+
+Is this really a device tree that we need to guarantee backward
+compatibility with?
 
 
-> Otherwise...
-> 
-> Acked-by: Nicolas Pitre <nico@linaro.org>
-
-Thanks :-)
+-Doug
