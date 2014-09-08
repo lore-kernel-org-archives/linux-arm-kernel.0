@@ -1,169 +1,37 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 8 Sep 2014 11:37:13 +0200
-Subject: [PATCH v2] ARM: sun5i: Add DT for HSG H702 tablet board
-In-Reply-To: <1409580879-15601-1-git-send-email-wens@csie.org>
-References: <1409580879-15601-1-git-send-email-wens@csie.org>
-Message-ID: <20140908093713.GE3804@lukather>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Mon, 8 Sep 2014 15:11:13 +0530
+Subject: [PATCH v3 4/4] ARM: multi_v7_defconfig: Enable stih41x usb phy
+ driver.
+In-Reply-To: <1410168638-11072-5-git-send-email-peter.griffin@linaro.org>
+References: <1410168638-11072-1-git-send-email-peter.griffin@linaro.org>
+ <1410168638-11072-5-git-send-email-peter.griffin@linaro.org>
+Message-ID: <540D79B9.6090408@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
 
-On Mon, Sep 01, 2014 at 10:14:39PM +0800, Chen-Yu Tsai wrote:
-> This is a Q8 format 7 inch tablet with an Allwinner A13 SoC.
-> It has 512MB DRAM, 4GB NAND flash, an accelerometer, camera,
-> RTL8188-based WiFi, and micro SD slot for external storage.
+
+On Monday 08 September 2014 03:00 PM, Peter Griffin wrote:
+> This driver is used by the ehci / ohci usb controllers on stih41x SoCs.
 > 
-> It is likely made by a subsidiary of Hanns.G (Hannstar).
-> 
-> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+> Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
+
+FWIW
+Acked-by: Kishon Vijay Abraham I <kishon@ti.com>
 > ---
+>  arch/arm/configs/multi_v7_defconfig | 1 +
+>  1 file changed, 1 insertion(+)
 > 
-> Added missing '>' to the email address in the header.
+> diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+> index 5fb95fb..74fd4a1 100644
+> --- a/arch/arm/configs/multi_v7_defconfig
+> +++ b/arch/arm/configs/multi_v7_defconfig
+> @@ -387,6 +387,7 @@ CONFIG_PWM_VT8500=y
+>  CONFIG_OMAP_USB2=y
+>  CONFIG_TI_PIPE3=y
+>  CONFIG_PHY_MIPHY365X=y
+> +CONFIG_PHY_STIH41X_USB=y
+>  CONFIG_PHY_SUN4I_USB=y
+>  CONFIG_EXT4_FS=y
+>  CONFIG_VFAT_FS=y
 > 
-> Sorry for the noise.
-> 
-> ---
->  arch/arm/boot/dts/Makefile               |   1 +
->  arch/arm/boot/dts/sun5i-a13-hsg-h702.dts | 101 +++++++++++++++++++++++++++++++
->  2 files changed, 102 insertions(+)
->  create mode 100644 arch/arm/boot/dts/sun5i-a13-hsg-h702.dts
-> 
-> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-> index b8c5cd3..94e61a6 100644
-> --- a/arch/arm/boot/dts/Makefile
-> +++ b/arch/arm/boot/dts/Makefile
-> @@ -406,6 +406,7 @@ dtb-$(CONFIG_MACH_SUN4I) += \
->  dtb-$(CONFIG_MACH_SUN5I) += \
->  	sun5i-a10s-olinuxino-micro.dtb \
->  	sun5i-a10s-r7-tv-dongle.dtb \
-> +	sun5i-a13-hsg-h702.dtb \
->  	sun5i-a13-olinuxino.dtb \
->  	sun5i-a13-olinuxino-micro.dtb
->  dtb-$(CONFIG_MACH_SUN6I) += \
-> diff --git a/arch/arm/boot/dts/sun5i-a13-hsg-h702.dts b/arch/arm/boot/dts/sun5i-a13-hsg-h702.dts
-> new file mode 100644
-> index 0000000..6335c1e
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/sun5i-a13-hsg-h702.dts
-> @@ -0,0 +1,101 @@
-> +/*
-> + * Copyright 2014 Chen-Yu Tsai <wens@csie.org>
-> + *
-> + * The code contained herein is licensed under the GNU General Public
-> + * License. You may obtain a copy of the GNU General Public License
-> + * Version 2 or later at the following locations:
-
-Could you relicense the file to match the GPL/X11 dual license we've
-been working on?
-
-> + *
-> + * http://www.opensource.org/licenses/gpl-license.html
-> + * http://www.gnu.org/copyleft/gpl.html
-> + */
-> +
-> +/dts-v1/;
-> +/include/ "sun5i-a13.dtsi"
-> +/include/ "sunxi-common-regulators.dtsi"
-> +
-> +/ {
-> +	model = "HSG H702";
-> +	compatible = "hsg,h702", "allwinner,sun5i-a13";
-> +
-> +	soc at 01c00000 {
-> +		mmc0: mmc at 01c0f000 {
-> +			pinctrl-names = "default";
-> +			pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin_h702>;
-> +			vmmc-supply = <&reg_vcc3v3>;
-> +			bus-width = <4>;
-> +			cd-gpios = <&pio 6 0 0>; /* PG0 */
-> +			cd-inverted;
-> +			status = "okay";
-> +		};
-> +
-> +		usbphy: phy at 01c13400 {
-> +			usb1_vbus-supply = <&reg_usb1_vbus>;
-> +			status = "okay";
-> +		};
-> +
-> +		ehci0: usb at 01c14000 {
-> +			status = "okay";
-> +		};
-> +
-> +		ohci0: usb at 01c14400 {
-> +			status = "okay";
-> +		};
-> +
-> +		pinctrl at 01c20800 {
-> +			mmc0_cd_pin_h702: mmc0_cd_pin at 0 {
-> +				allwinner,pins = "PG0";
-> +				allwinner,function = "gpio_in";
-> +				allwinner,drive = <0>;
-> +				allwinner,pull = <1>;
-> +			};
-> +		};
-> +
-> +		uart1: serial at 01c28400 {
-> +			pinctrl-names = "default";
-> +			pinctrl-0 = <&uart1_pins_b>;
-> +			status = "okay";
-> +		};
-> +
-> +		i2c0: i2c at 01c2ac00 {
-> +			pinctrl-names = "default";
-> +			pinctrl-0 = <&i2c0_pins_a>;
-> +			status = "okay";
-> +
-> +			axp209: pmic at 34 {
-> +				compatible = "x-powers,axp209";
-> +				reg = <0x34>;
-> +				interrupts = <0>;
-> +				interrupt-controller;
-> +				#interrupt-cells = <1>;
-> +			};
-> +		};
-> +
-> +		i2c1: i2c at 01c2b000 {
-> +			pinctrl-names = "default";
-> +			pinctrl-0 = <&i2c1_pins_a>;
-> +			status = "okay";
-> +
-> +			pcf8563: rtc at 51 {
-> +				compatible = "nxp,pcf8563";
-> +				reg = <0x51>;
-> +			};
-> +		};
-> +
-> +		i2c2: i2c at 01c2b400 {
-> +			pinctrl-names = "default";
-> +			pinctrl-0 = <&i2c2_pins_a>;
-> +			status = "okay";
-> +		};
-> +	};
-> +
-> +	reg_usb1_vbus: usb1-vbus {
-> +		/*
-> +		 * There doesn't seem to be a GPIO for controlling
-> +		 * vbus, despite the fex file saying otherwise.
-> +		 * Override the original settings with empty ones.
-> +		 */
-> +		pinctrl-0 = <>;
-> +		gpio = <>;
-> +		status = "okay";
-
-Hmmmm, no. Just use a regular fixed regulator here, like reg_vcc3v3.
-
-Thanks!
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140908/d6981696/attachment.sig>
