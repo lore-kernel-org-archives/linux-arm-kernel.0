@@ -1,29 +1,153 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Sun, 7 Sep 2014 21:43:25 -0700
-Subject: Unable to boot mainline on snow chromebook since 3.15
-In-Reply-To: <540C7F5B.6070307@gmail.com>
-References: <20140905115704.GO13515@arm.com> <20140905122232.GP13515@arm.com>
- <CAD=FV=VfioJf9VYoSYL0QBk-bN93-Ecx3=0n9hb5Q4rcx43-_g@mail.gmail.com>
- <540C202E.2060009@collabora.co.uk> <540C7F5B.6070307@gmail.com>
-Message-ID: <CAD=FV=XXHvF8zjADH7bmM11nEiZ4WXFKZCuB=Q7CYFfQgkdbDA@mail.gmail.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Mon, 8 Sep 2014 10:16:19 +0530
+Subject: [PATCH v2 14/15] cpufreq: Add module to register cpufreq on Krait
+ CPUs
+In-Reply-To: <1409957256-23729-16-git-send-email-sboyd@codeaurora.org>
+References: <1409957256-23729-1-git-send-email-sboyd@codeaurora.org>
+ <1409957256-23729-16-git-send-email-sboyd@codeaurora.org>
+Message-ID: <CAKohpokLFMMK-h2657=_BCBr3oXCTiQDA+C-rDgorxfrPR-9YQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 6 September 2014 04:17, Stephen Boyd <sboyd@codeaurora.org> wrote:
 
-On Sun, Sep 7, 2014 at 8:52 AM, Tomasz Figa <tomasz.figa@gmail.com> wrote:
-> Now with regulators this is pretty straightforward, but with clocks I
-> believe it's an open issue. AFAIR we've discussed this on MLs some time
-> ago (at least I remember Doug commenting on that topic) and kind of
-> concluded that SoC clock drivers could include lists of clocks to be
-> enabled at boot-up (as a HACK to enable things like simplefb until
-> proper support for respective features are added).
+> diff --git a/drivers/cpufreq/qcom-cpufreq.c b/drivers/cpufreq/qcom-cpufreq.c
+> new file mode 100644
+> index 000000000000..aa8eb97144b6
+> --- /dev/null
+> +++ b/drivers/cpufreq/qcom-cpufreq.c
+> @@ -0,0 +1,199 @@
+> +/* Copyright (c) 2014, The Linux Foundation. All rights reserved.
 
-I think my old problem was with earlyprintk and a core clock getting
-disabled.  See (44ff025 clk: exynos5420: Remove aclk66_peric from the
-clock tree description).  I think I've seen others solve the same
-problem with the concept of "critical clocks".
+Shouldn't this have Qcom instead?
 
-I agree that regulator and clock frameworks allow very different "hacks".  ;)
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 and
+> + * only version 2 as published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + */
+> +
+> +#include <linux/kernel.h>
+> +#include <linux/module.h>
+> +#include <linux/cpu.h>
+> +#include <linux/of.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/err.h>
+> +#include <linux/io.h>
+> +#include <linux/slab.h>
+> +#include <linux/pm_opp.h>
+> +#include <linux/init.h>
 
--Doug
+Would be good if these can be in alphanumeric order. That helps maintaining
+them later on..
+
+> +static void __init get_krait_bin_format_a(int *speed, int *pvs, int *pvs_ver)
+> +{
+
+> +}
+> +
+> +static void __init get_krait_bin_format_b(int *speed, int *pvs, int *pvs_ver)
+> +{
+
+> +}
+
+To be honest, I didn't try to apply much brain on the above routines :)
+
+> +static int __init qcom_cpufreq_populate_opps(void)
+> +{
+> +       int len, num_rows, i, k;
+> +       char table_name[] = "qcom,speedXX-pvsXX-bin-vXX";
+> +       struct device_node *np;
+> +       struct device *dev;
+> +       int cpu = 0;
+> +       int speed, pvs, pvs_ver;
+> +       int cols;
+
+All the 'int' declarations can be combined in a single line if you would like.
+
+> +       np = of_find_node_by_name(NULL, "qcom,pvs");
+> +       if (!np)
+> +               pr_warn("Can't find PVS node\n");
+> +
+> +       if (of_property_read_bool(np, "qcom,pvs-format-a")) {
+> +               get_krait_bin_format_a(&speed, &pvs, &pvs_ver);
+> +               cols = 2;
+> +       } else {
+> +               get_krait_bin_format_b(&speed, &pvs, &pvs_ver);
+> +               cols = 3;
+> +       }
+> +
+> +       snprintf(table_name, sizeof(table_name),
+> +                       "qcom,speed%d-pvs%d-bin-v%d", speed, pvs, pvs_ver);
+> +again:
+> +       dev = get_cpu_device(cpu);
+> +       if (!dev)
+> +               return -ENODEV;
+> +
+> +       if (!of_find_property(np, table_name, &len))
+> +               return -EINVAL;
+> +
+> +       len /= sizeof(u32);
+> +       if (len % cols || len == 0)
+> +               return -EINVAL;
+> +
+> +       num_rows = len / cols;
+> +
+> +       for (i = 0, k = 0; i < num_rows; i++) {
+> +               u32 freq, volt;
+> +
+> +               of_property_read_u32_index(np, table_name, k++, &freq);
+> +               of_property_read_u32_index(np, table_name, k++, &volt);
+> +               while (k % cols)
+> +                       k++; /* Skip uA entries if present */
+> +               if (dev_pm_opp_add(dev, freq, volt))
+> +                       pr_warn("failed to add OPP %u\n", freq);
+> +       }
+> +
+> +       if (cpu++ < num_possible_cpus())
+> +               goto again;
+> +
+> +       return 0;
+> +}
+> +
+> +static int __init qcom_cpufreq_driver_init(void)
+> +{
+> +       struct platform_device_info devinfo = { .name = "cpufreq-generic", };
+> +       struct device *cpu_dev;
+> +       struct device_node *np;
+> +       struct platform_device *pdev;
+> +
+> +       cpu_dev = get_cpu_device(0);
+> +       if (!cpu_dev)
+> +               return -ENODEV;
+> +
+> +       np = of_node_get(cpu_dev->of_node);
+> +       if (!np)
+> +               return -ENOENT;
+> +
+> +       if (!of_device_is_compatible(np, "qcom,krait")) {
+> +               of_node_put(np);
+> +               return -ENODEV;
+> +       }
+> +       of_node_put(np);
+> +
+> +       qcom_cpufreq_populate_opps();
+> +       pdev = platform_device_register_full(&devinfo);
+> +
+> +       return PTR_ERR_OR_ZERO(pdev);
+> +}
+> +module_init(qcom_cpufreq_driver_init);
+> +
+> +MODULE_DESCRIPTION("Qualcomm CPUfreq driver");
+
+A module author as well?
+
+> +MODULE_LICENSE("GPL v2");
+
+Otherwise mostly good:
+
+Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
