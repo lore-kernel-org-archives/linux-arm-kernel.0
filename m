@@ -1,42 +1,56 @@
-From: rabin@rab.in (Rabin Vincent)
-Date: Mon, 8 Sep 2014 23:55:06 +0200
-Subject: [PATCH v5 3/8] arm: fixmap: implement __set_fixmap()
-In-Reply-To: <20140908191634.GV5598@outflux.net>
-References: <1409781429-27593-1-git-send-email-keescook@chromium.org>
- <1409781429-27593-4-git-send-email-keescook@chromium.org>
- <20140904170349.GL7156@arm.com>
- <CAGXu5jKimGaupwyUwt0Zwa3OtjeoED8-uBeMX0MwXjBYP6ssAg@mail.gmail.com>
- <20140904172748.GO7156@arm.com> <20140908191634.GV5598@outflux.net>
-Message-ID: <20140908215506.GA4759@dator>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 8 Sep 2014 15:19:48 -0700
+Subject: [GIT PULL 1/2] ARM: OMAP 4+: powerdomain fixes
+In-Reply-To: <1410195620-6347-1-git-send-email-nm@ti.com>
+References: <1410195620-6347-1-git-send-email-nm@ti.com>
+Message-ID: <20140908221947.GM3238@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 08, 2014 at 12:16:34PM -0700, Kees Cook wrote:
-> On Thu, Sep 04, 2014 at 06:27:48PM +0100, Will Deacon wrote:
-> > On Thu, Sep 04, 2014 at 06:23:42PM +0100, Kees Cook wrote:
-> > > Ah! If this is the case, perhaps we can get away with
-> > > local_flush_tlb_kernel_range() then?
-> > 
-> > That's a bit tricky, since you need to ensure that preemption is disabled
-> > until the mapping is put back like it was.
+* Nishanth Menon <nm@ti.com> [140908 10:00]:
+> Hi Tony,
+> Please pull the following changes.
+> Series discussed in:
+> http://marc.info/?l=linux-kernel&m=140871554106082&w=2
+> Includes (v2 patch) https://patchwork.kernel.org/patch/4790541/
+> Status: Acked by Santosh and Reviewed-by Kevin	
 > 
-> Okay, under both real hardware with the errata, and under QEMU, things seem
-> to work with this change to the series. What do you think?
+> These could go into your tree for the branch omap-for-v3.18/fixes-not-urgent
 
-Preemption is already disabled until the mapping is put back in this
-patch.c code because interrupts are disabled from before the time
-set_fixmap() is called until after clear_fixmap() is called.
+Thanks pulling them there.
 
-I'd guess that Will meant other (future) callers of set_fixmap() would
-have to ensure similar behaviour with set_fixmap() / clear_fixmap().
-
-Unless I'm missing something set/clear_fixmap() seem to be quite arch
-specific and only really used on x86, so we could ensure that future
-users on ARM perform the correct tlb flush:  the first user on ARM with
-a non-atomic context (or you) could implement a set_fixmap() which does
-the global flush and have this patch.c (and any other atomic context
-callers) call __set_fixmap() directly.
-
-The change to local_flush_tlb_kernel_range() in __set_fixmap() would of
-course be needed in that case, and IIRC that was what my original patch
-had (via set_top_pte()).
+Tony
+ 
+> The following changes since commit 7d1311b93e58ed55f3a31cc8f94c4b8fe988a2b9:
+> 
+>   Linux 3.17-rc1 (2014-08-16 10:40:26 -0600)
+> 
+> are available in the git repository at:
+> 
+>   https://github.com/nmenon/linux-2.6-playground.git pull/v3.18/powerdomain-fixes
+> 
+> for you to fetch changes up to 3e6a1c945950140926dd6e2cc667893de0a7fe3b:
+> 
+>   ARM: OMAP4+: PM: Use only valid low power state for CPU hotplug (2014-09-08 11:22:43 -0500)
+> 
+> ----------------------------------------------------------------
+> Nishanth Menon (7):
+>       ARM: OMAP: DRA7: powerdomain data: fix powerdomain powerstate
+>       ARM: OMAP5: powerdomain data: fix powerdomain powerstate
+>       ARM: OMAP2+: powerdomain: pwrdm_for_each_clkdm iterate only valid clkdms
+>       ARM: OMAP2+: powerdomain: introduce logic for finding valid power domain
+>       ARM: OMAP4+: PM: Make logic state programmable
+>       ARM: OMAP4+: PM: use only valid low power state for suspend
+>       ARM: OMAP4+: PM: Use only valid low power state for CPU hotplug
+> 
+>  arch/arm/mach-omap2/omap-mpuss-lowpower.c   |    4 ++
+>  arch/arm/mach-omap2/pm44xx.c                |    9 ++-
+>  arch/arm/mach-omap2/powerdomain.c           |   79 ++++++++++++++++++++++++++-
+>  arch/arm/mach-omap2/powerdomain.h           |    4 ++
+>  arch/arm/mach-omap2/powerdomains54xx_data.c |   12 ++--
+>  arch/arm/mach-omap2/powerdomains7xx_data.c  |   14 ++---
+>  6 files changed, 106 insertions(+), 16 deletions(-)
+> 
+> Regards,
+> Nishanth Menon
+> 
