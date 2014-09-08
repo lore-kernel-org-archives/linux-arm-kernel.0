@@ -1,153 +1,58 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Mon, 8 Sep 2014 10:16:19 +0530
-Subject: [PATCH v2 14/15] cpufreq: Add module to register cpufreq on Krait
- CPUs
-In-Reply-To: <1409957256-23729-16-git-send-email-sboyd@codeaurora.org>
-References: <1409957256-23729-1-git-send-email-sboyd@codeaurora.org>
- <1409957256-23729-16-git-send-email-sboyd@codeaurora.org>
-Message-ID: <CAKohpokLFMMK-h2657=_BCBr3oXCTiQDA+C-rDgorxfrPR-9YQ@mail.gmail.com>
+From: monstr@monstr.eu (Michal Simek)
+Date: Mon, 08 Sep 2014 07:20:09 +0200
+Subject: [PATCH] drivers/usb/host/ehci-xilinx-of.c: Include
+ "linux/of_irq.h" to avoid compiling error
+In-Reply-To: <540738C7.5000106@gmail.com>
+References: <540738C7.5000106@gmail.com>
+Message-ID: <540D3C89.6080702@monstr.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 6 September 2014 04:17, Stephen Boyd <sboyd@codeaurora.org> wrote:
+On 09/03/2014 05:50 PM, Chen Gang wrote:
+> Need include it for irq_of_parse_and_map(), the related error with
+> allmodconfig under microblaze:
+> 
+>   drivers/usb/host/ehci-xilinx-of.c: In function ?ehci_hcd_xilinx_of_probe?:
+>   drivers/usb/host/ehci-xilinx-of.c:156:2: error: implicit declaration of function ?irq_of_parse_and_map? [-Werror=implicit-function-declaration]
+>     irq = irq_of_parse_and_map(dn, 0);
+>     ^
+> 
+> Signed-off-by: Chen Gang <gang.chen.5i5j@gmail.com>
+> ---
+>  drivers/usb/host/ehci-xilinx-of.c | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/drivers/usb/host/ehci-xilinx-of.c b/drivers/usb/host/ehci-xilinx-of.c
+> index fe57710..a232836 100644
+> --- a/drivers/usb/host/ehci-xilinx-of.c
+> +++ b/drivers/usb/host/ehci-xilinx-of.c
+> @@ -31,6 +31,7 @@
+>  #include <linux/of.h>
+>  #include <linux/of_platform.h>
+>  #include <linux/of_address.h>
+> +#include <linux/of_irq.h>
+>  
+>  /**
+>   * ehci_xilinx_port_handed_over - hand the port out if failed to enable it
+> 
 
-> diff --git a/drivers/cpufreq/qcom-cpufreq.c b/drivers/cpufreq/qcom-cpufreq.c
-> new file mode 100644
-> index 000000000000..aa8eb97144b6
-> --- /dev/null
-> +++ b/drivers/cpufreq/qcom-cpufreq.c
-> @@ -0,0 +1,199 @@
-> +/* Copyright (c) 2014, The Linux Foundation. All rights reserved.
+Acked-by: Michal Simek <monstr@monstr.eu>
 
-Shouldn't this have Qcom instead?
+Thanks,
+Michal
 
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 and
-> + * only version 2 as published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + */
-> +
-> +#include <linux/kernel.h>
-> +#include <linux/module.h>
-> +#include <linux/cpu.h>
-> +#include <linux/of.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/err.h>
-> +#include <linux/io.h>
-> +#include <linux/slab.h>
-> +#include <linux/pm_opp.h>
-> +#include <linux/init.h>
+-- 
+Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
+w: www.monstr.eu p: +42-0-721842854
+Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
+Maintainer of Linux kernel - Xilinx Zynq ARM architecture
+Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
 
-Would be good if these can be in alphanumeric order. That helps maintaining
-them later on..
 
-> +static void __init get_krait_bin_format_a(int *speed, int *pvs, int *pvs_ver)
-> +{
-
-> +}
-> +
-> +static void __init get_krait_bin_format_b(int *speed, int *pvs, int *pvs_ver)
-> +{
-
-> +}
-
-To be honest, I didn't try to apply much brain on the above routines :)
-
-> +static int __init qcom_cpufreq_populate_opps(void)
-> +{
-> +       int len, num_rows, i, k;
-> +       char table_name[] = "qcom,speedXX-pvsXX-bin-vXX";
-> +       struct device_node *np;
-> +       struct device *dev;
-> +       int cpu = 0;
-> +       int speed, pvs, pvs_ver;
-> +       int cols;
-
-All the 'int' declarations can be combined in a single line if you would like.
-
-> +       np = of_find_node_by_name(NULL, "qcom,pvs");
-> +       if (!np)
-> +               pr_warn("Can't find PVS node\n");
-> +
-> +       if (of_property_read_bool(np, "qcom,pvs-format-a")) {
-> +               get_krait_bin_format_a(&speed, &pvs, &pvs_ver);
-> +               cols = 2;
-> +       } else {
-> +               get_krait_bin_format_b(&speed, &pvs, &pvs_ver);
-> +               cols = 3;
-> +       }
-> +
-> +       snprintf(table_name, sizeof(table_name),
-> +                       "qcom,speed%d-pvs%d-bin-v%d", speed, pvs, pvs_ver);
-> +again:
-> +       dev = get_cpu_device(cpu);
-> +       if (!dev)
-> +               return -ENODEV;
-> +
-> +       if (!of_find_property(np, table_name, &len))
-> +               return -EINVAL;
-> +
-> +       len /= sizeof(u32);
-> +       if (len % cols || len == 0)
-> +               return -EINVAL;
-> +
-> +       num_rows = len / cols;
-> +
-> +       for (i = 0, k = 0; i < num_rows; i++) {
-> +               u32 freq, volt;
-> +
-> +               of_property_read_u32_index(np, table_name, k++, &freq);
-> +               of_property_read_u32_index(np, table_name, k++, &volt);
-> +               while (k % cols)
-> +                       k++; /* Skip uA entries if present */
-> +               if (dev_pm_opp_add(dev, freq, volt))
-> +                       pr_warn("failed to add OPP %u\n", freq);
-> +       }
-> +
-> +       if (cpu++ < num_possible_cpus())
-> +               goto again;
-> +
-> +       return 0;
-> +}
-> +
-> +static int __init qcom_cpufreq_driver_init(void)
-> +{
-> +       struct platform_device_info devinfo = { .name = "cpufreq-generic", };
-> +       struct device *cpu_dev;
-> +       struct device_node *np;
-> +       struct platform_device *pdev;
-> +
-> +       cpu_dev = get_cpu_device(0);
-> +       if (!cpu_dev)
-> +               return -ENODEV;
-> +
-> +       np = of_node_get(cpu_dev->of_node);
-> +       if (!np)
-> +               return -ENOENT;
-> +
-> +       if (!of_device_is_compatible(np, "qcom,krait")) {
-> +               of_node_put(np);
-> +               return -ENODEV;
-> +       }
-> +       of_node_put(np);
-> +
-> +       qcom_cpufreq_populate_opps();
-> +       pdev = platform_device_register_full(&devinfo);
-> +
-> +       return PTR_ERR_OR_ZERO(pdev);
-> +}
-> +module_init(qcom_cpufreq_driver_init);
-> +
-> +MODULE_DESCRIPTION("Qualcomm CPUfreq driver");
-
-A module author as well?
-
-> +MODULE_LICENSE("GPL v2");
-
-Otherwise mostly good:
-
-Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140908/51d60e4e/attachment.sig>
