@@ -1,49 +1,34 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Mon, 08 Sep 2014 23:26:49 +0200
-Subject: [PATCH v3 2/9] PM / Domains: Add generic OF-based PM domain
- look-up
-In-Reply-To: <CAMuHMdURbp8a0Ps2sZUZn7UHcWXZvRgS-4ubk1r=wGgXZ1PHmA@mail.gmail.com>
-References: <1409838756-31963-1-git-send-email-ulf.hansson@linaro.org>
- <3105400.7vSnq2rA6s@vostro.rjw.lan>
- <CAMuHMdURbp8a0Ps2sZUZn7UHcWXZvRgS-4ubk1r=wGgXZ1PHmA@mail.gmail.com>
-Message-ID: <8273189.CFBBe805uk@vostro.rjw.lan>
+From: broonie@kernel.org (Mark Brown)
+Date: Mon, 8 Sep 2014 22:21:43 +0100
+Subject: [PATCH] RFC: add function for localbus address
+In-Reply-To: <540E1014.8090102@codeaurora.org>
+References: <540E1014.8090102@codeaurora.org>
+Message-ID: <20140908212143.GN2601@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday, September 08, 2014 10:53:09 PM Geert Uytterhoeven wrote:
-> Hi Rafael,
-> 
-> On Mon, Sep 8, 2014 at 11:08 PM, Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
-> > BTW, I get bounces from t.figa at samsung.com, so I won't apply the patch with
-> > that as the "From" field.  And the s-o-b from a bouncing address is worthless
-> > too.
-> 
-> In the mean time, Tomasz has moved:
-> http://www.spinics.net/lists/arm-kernel/msg357102.html
-> 
-> Still, the From/SoB indicate attribution to Samsung, so I think it should be
-> kept.
+On Mon, Sep 08, 2014 at 01:22:44PM -0700, Stephen Boyd wrote:
 
-The "From:" field should point to a submitter's address that is actually active,
-so that (s)he can handle problem reports *sent* *to* *that* address.  I'm not
-going to apply anything with a bouncing "From:".
+> Where is this described? From the commit text that introduces
+> IORESOURCE_REG I see:
 
-The s-o-b is more of a gray area, but again it is supposed to be possible
-to verify which it won't be if it bounces.
+> "Currently a bunch of I2C/SPI MFD drivers are using IORESOURCE_IO for
+> register address ranges. Since this causes some confusion due to the
+> primary use of this resource type for PCI/ISA I/O ports create a new
+> resource type IORESOURCE_REG."
 
-Also note that this is not Tomasz who is submitting this patch today, but Ulf
-who doesn't even work for Samsung as far as I know.
+> And the comment next to the #define says "Register offsets". I don't see
+> anywhere where it mentions these are CPU addresses. Certainly the
+> current IORESOURCE_REG users aren't CPU addresses because they're
+> SPI/I2C device drivers.
 
-So I'd suggest using "Tomasz Figa <tomasz.figa@gmail.com>" as a "From:", remove
-his s-o-b entirely (and using the Ulf's one only) and add something like that
-to the changelog:
-
-"This patch was originally submitted by Tomasz Figa when he was employed
- by Samsung.
-
- Link: <URL-of-the-original-submission>"
-
-This way Samsung will get the recognition and there won't be bouncing addresses
-in tags etc.
-
-Rafael
+Right, the intention was specifically to handle things where
+IORESOURCE_MEM wasn't appropriate as it wasn't ever going to be memory
+mapped I/O and should be in a separate address space.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140908/72d85d51/attachment.sig>
