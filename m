@@ -1,136 +1,52 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 08 Sep 2014 22:43:32 +0200
-Subject: [PATCH] ARM: cache-l2x0: optimize aurora range operations
-In-Reply-To: <2958731.nsOomQFma0@wuerfel>
-References: <2852268.nkG1OoBDfE@wuerfel>
- <20140908153946.GB12361@n2100.arm.linux.org.uk> <2958731.nsOomQFma0@wuerfel>
-Message-ID: <2885617.4rXk1QzsZ5@wuerfel>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Mon, 08 Sep 2014 23:04:23 +0200
+Subject: [PATCH v3 2/9] PM / Domains: Add generic OF-based PM domain
+ look-up
+In-Reply-To: <CAPDyKFovLmajQORVT1Mf01J5L7O73JNDFz=gr3fXKvF5xZGCdQ@mail.gmail.com>
+References: <1409838756-31963-1-git-send-email-ulf.hansson@linaro.org>
+ <3075771.rIWPm62y5x@vostro.rjw.lan>
+ <CAPDyKFovLmajQORVT1Mf01J5L7O73JNDFz=gr3fXKvF5xZGCdQ@mail.gmail.com>
+Message-ID: <5191943.peyCs6gZVs@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The aurora_inv_range(), aurora_clean_range() and aurora_flush_range()
-functions are highly redundant, both in source and in object code, and
-they are harder to understand than necessary.
+On Monday, September 08, 2014 09:26:20 AM Ulf Hansson wrote:
+> On 8 September 2014 00:13, Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
+> > On Thursday, September 04, 2014 03:52:29 PM Ulf Hansson wrote:
+> >> From: Tomasz Figa <t.figa@samsung.com>
+> >>
+> >> This patch introduces generic code to perform PM domain look-up using
+> >> device tree and automatically bind devices to their PM domains.
+> >>
+> >> Generic device tree bindings are introduced to specify PM domains of
+> >> devices in their device tree nodes.
+> >>
+> >> Backwards compatibility with legacy Samsung-specific PM domain bindings
+> >> is provided, but for now the new code is not compiled when
+> >> CONFIG_ARCH_EXYNOS is selected to avoid collision with legacy code.
+> >> This will change as soon as the Exynos PM domain code gets converted to
+> >> use the generic framework in further patch.
+> >>
+> >> Signed-off-by: Tomasz Figa <t.figa@samsung.com>
+> >> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+> >> [Ulf:Added attach|detach functions, fixed review comments]
+> >> Tested-by: Philipp Zabel <p.zabel@pengutronix.de>
+> >
+> > However, for this one (and consequently the rest) I need an ACK from the
+> > people who maintain the bindings.
+> 
+> These DT bindings have been discussed between Tomasz and devicetree
+> maintainers previously. So I think there are fine.
+> 
+> Also, when browsing the mail-archives, I found an ack from Rob Herrring:
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2014-March/237989.html
+> 
+> I realize that I didn't put the DT maintainers on the to-line when
+> posting this patch, but just the devicetree list. I have now included
+> them on this reply, but maybe I should repost instead. What do you
+> think? Are you happy with the above ack from Rob?
 
-By moving the range loop into the aurora_pa_range() function, they
-become trivial wrappers, and the object code start looking like what
-one would expect for an optimal implementation.
+That should be sufficient, but I wonder why you didn't add it to the patch
+to start with?
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
----
- arch/arm/mm/cache-l2x0.c | 67 +++++++++++++++++-----------------------------------------
- 1 file changed, 22 insertions(+), 45 deletions(-)
-
-diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
-index 0964e83e0238..82d724af294e 100644
---- a/arch/arm/mm/cache-l2x0.c
-+++ b/arch/arm/mm/cache-l2x0.c
-@@ -1033,7 +1033,7 @@ static const struct l2c_init_data of_l2c310_coherent_data __initconst = {
-  * noninclusive, while the hardware cache range operations use
-  * inclusive start and end addresses.
-  */
--static unsigned long calc_range_end(unsigned long start, unsigned long end)
-+static unsigned long aurora_range_end(unsigned long start, unsigned long end)
- {
- 	/*
- 	 * Limit the number of cache lines processed at once,
-@@ -1052,25 +1052,13 @@ static unsigned long calc_range_end(unsigned long start, unsigned long end)
- 	return end;
- }
- 
--/*
-- * Make sure 'start' and 'end' reference the same page, as L2 is PIPT
-- * and range operations only do a TLB lookup on the start address.
-- */
- static void aurora_pa_range(unsigned long start, unsigned long end,
--			unsigned long offset)
-+			    unsigned long offset)
- {
- 	void __iomem *base = l2x0_base;
-+	unsigned long range_end;
- 	unsigned long flags;
- 
--	raw_spin_lock_irqsave(&l2x0_lock, flags);
--	writel_relaxed(start, base + AURORA_RANGE_BASE_ADDR_REG);
--	writel_relaxed(end, base + offset);
--	writel_relaxed(0, base + AURORA_SYNC_REG);
--	raw_spin_unlock_irqrestore(&l2x0_lock, flags);
--}
--
--static void aurora_inv_range(unsigned long start, unsigned long end)
--{
- 	/*
- 	 * round start and end adresses up to cache line size
- 	 */
-@@ -1078,15 +1066,24 @@ static void aurora_inv_range(unsigned long start, unsigned long end)
- 	end = ALIGN(end, CACHE_LINE_SIZE);
- 
- 	/*
--	 * Invalidate all full cache lines between 'start' and 'end'.
-+	 * perform operation on all full cache lines between 'start' and 'end'
- 	 */
- 	while (start < end) {
--		unsigned long range_end = calc_range_end(start, end);
--		aurora_pa_range(start, range_end - CACHE_LINE_SIZE,
--				AURORA_INVAL_RANGE_REG);
-+		range_end = aurora_range_end(start, end);
-+
-+		raw_spin_lock_irqsave(&l2x0_lock, flags);
-+		writel_relaxed(start, base + AURORA_RANGE_BASE_ADDR_REG);
-+		writel_relaxed(range_end - CACHE_LINE_SIZE, base + offset);
-+		writel_relaxed(0, base + AURORA_SYNC_REG);
-+		raw_spin_unlock_irqrestore(&l2x0_lock, flags);
-+
- 		start = range_end;
- 	}
- }
-+static void aurora_inv_range(unsigned long start, unsigned long end)
-+{
-+	aurora_pa_range(start, end, AURORA_INVAL_RANGE_REG);
-+}
- 
- static void aurora_clean_range(unsigned long start, unsigned long end)
- {
-@@ -1094,36 +1091,16 @@ static void aurora_clean_range(unsigned long start, unsigned long end)
- 	 * If L2 is forced to WT, the L2 will always be clean and we
- 	 * don't need to do anything here.
- 	 */
--	if (!l2_wt_override) {
--		start &= ~(CACHE_LINE_SIZE - 1);
--		end = ALIGN(end, CACHE_LINE_SIZE);
--		while (start != end) {
--			unsigned long range_end = calc_range_end(start, end);
--			aurora_pa_range(start, range_end - CACHE_LINE_SIZE,
--					AURORA_CLEAN_RANGE_REG);
--			start = range_end;
--		}
--	}
-+	if (!l2_wt_override)
-+		aurora_pa_range(start, end, AURORA_CLEAN_RANGE_REG);
- }
- 
- static void aurora_flush_range(unsigned long start, unsigned long end)
- {
--	start &= ~(CACHE_LINE_SIZE - 1);
--	end = ALIGN(end, CACHE_LINE_SIZE);
--	while (start != end) {
--		unsigned long range_end = calc_range_end(start, end);
--		/*
--		 * If L2 is forced to WT, the L2 will always be clean and we
--		 * just need to invalidate.
--		 */
--		if (l2_wt_override)
--			aurora_pa_range(start, range_end - CACHE_LINE_SIZE,
--							AURORA_INVAL_RANGE_REG);
--		else
--			aurora_pa_range(start, range_end - CACHE_LINE_SIZE,
--							AURORA_FLUSH_RANGE_REG);
--		start = range_end;
--	}
-+	if (l2_wt_override)
-+		aurora_pa_range(start, end, AURORA_INVAL_RANGE_REG);
-+	else
-+		aurora_pa_range(start, end, AURORA_FLUSH_RANGE_REG);
- }
- 
- static void aurora_flush_all(void)
+Rafael
