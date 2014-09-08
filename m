@@ -1,36 +1,29 @@
 From: dianders@chromium.org (Doug Anderson)
-Date: Sun, 7 Sep 2014 21:36:56 -0700
+Date: Sun, 7 Sep 2014 21:43:25 -0700
 Subject: Unable to boot mainline on snow chromebook since 3.15
 In-Reply-To: <540C7F5B.6070307@gmail.com>
 References: <20140905115704.GO13515@arm.com> <20140905122232.GP13515@arm.com>
  <CAD=FV=VfioJf9VYoSYL0QBk-bN93-Ecx3=0n9hb5Q4rcx43-_g@mail.gmail.com>
  <540C202E.2060009@collabora.co.uk> <540C7F5B.6070307@gmail.com>
-Message-ID: <CAD=FV=UYDDhL02CrhPUAHPncepwAF2-BgTmXOamy-Mdz80S-vw@mail.gmail.com>
+Message-ID: <CAD=FV=XXHvF8zjADH7bmM11nEiZ4WXFKZCuB=Q7CYFfQgkdbDA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
 On Sun, Sep 7, 2014 at 8:52 AM, Tomasz Figa <tomasz.figa@gmail.com> wrote:
-> So I believe we've got a process issue here. If you don't have normal
-> support for display hardware, but you want to keep the display
-> operational thanks to bootloader already initializing it, you should not
-> add anything to the kernel which breaks it, until full support comes in.
->
-> This means that respective regulators should be either always-on or not
-> listed at all (I'd favor the former) and respective clocks either
-> somehow enabled at boot-up or completely ignored, including all their
-> parents capable of being gated.
+> Now with regulators this is pretty straightforward, but with clocks I
+> believe it's an open issue. AFAIR we've discussed this on MLs some time
+> ago (at least I remember Doug commenting on that topic) and kind of
+> concluded that SoC clock drivers could include lists of clocks to be
+> enabled at boot-up (as a HACK to enable things like simplefb until
+> proper support for respective features are added).
 
-It seems slightly broken to hack the device tree in this way.  I'll be
-the first to admit that I often list regulators as "always-on" during
-bringup when not everything is done, and I guess it's not that
-different.  ...but given everything going on upstream (and people
-working on Suspend/Resume, DRM, etc) it seems like it might be a bit
-of a pain.  ...but if that's what everyone agrees on, I won't disagree
-too strongly.
+I think my old problem was with earlyprintk and a core clock getting
+disabled.  See (44ff025 clk: exynos5420: Remove aclk66_peric from the
+clock tree description).  I think I've seen others solve the same
+problem with the concept of "critical clocks".
 
-One (ugly?) solution would be to add a feature to your bootloader to
-modify the device tree to mark regulators as "always-on".  Since the
-booloader gets to touch the device tree and the bootloader is involved
-in communicating into about SimpleFB, it kinda makes sense.
+I agree that regulator and clock frameworks allow very different "hacks".  ;)
+
+-Doug
