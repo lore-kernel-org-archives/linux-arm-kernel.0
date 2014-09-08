@@ -1,97 +1,58 @@
 From: Liviu.Dudau@arm.com (Liviu Dudau)
-Date: Mon,  8 Sep 2014 14:54:29 +0100
-Subject: [PATCH v10 07/10] OF: Introduce helper function for getting PCI
- domain_nr
-In-Reply-To: <1410184472-17630-1-git-send-email-Liviu.Dudau@arm.com>
+Date: Mon, 8 Sep 2014 15:05:34 +0100
+Subject: [PATCH v10 06/10] PCI: Introduce generic domain handling for PCI
+ busses.
+In-Reply-To: <20140908140321.GF22717@arm.com>
 References: <1410184472-17630-1-git-send-email-Liviu.Dudau@arm.com>
-Message-ID: <1410184472-17630-8-git-send-email-Liviu.Dudau@arm.com>
+ <1410184472-17630-7-git-send-email-Liviu.Dudau@arm.com>
+ <20140908140321.GF22717@arm.com>
+Message-ID: <20140908140533.GM27864@e106497-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add of_pci_get_domain_nr() to retrieve the PCI domain number
-of a given device from DT. If the information is not present,
-the function can be requested to allocate a new domain number.
+On Mon, Sep 08, 2014 at 03:03:21PM +0100, Catalin Marinas wrote:
+> On Mon, Sep 08, 2014 at 02:54:28PM +0100, Liviu Dudau wrote:
+> > The handling of PCI domains (or PCI segments in ACPI speak) is
+> > usually a straightforward affair but its implementation is
+> > currently left to the architectural code, with pci_domain_nr(b)
+> > querying the value of the domain associated with bus b.
+> > 
+> > This patch introduces CONFIG_PCI_DOMAINS_GENERIC as an
+> > option that can be selected if an architecture want a
+> > simple implementation where the value of the domain
+> > associated with a bus is stored in struct pci_bus.
+> > 
+> > The architectures that select CONFIG_PCI_DOMAINS_GENERIC will
+> > then have to implement pci_bus_assign_domain_nr() as a way
+> > of setting the domain number associated with a root bus.
+> > All child busses except the root bus will inherit the domain_nr
+> > value from their parent.
+> > 
+> > Cc: Bjorn Helgaas <bhelgaas@google.com>
+> > Cc: Arnd Bergmann <arnd@arndb.de>
+> > Signed-off-by: Catalin Marinas <Catalin.Marinas@arm.com>
+> > [Renamed pci_set_domain_nr() to pci_bus_assign_domain_nr()]
+> > Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
+> 
+> I'm probably the author here, but the patch log doesn't say so (I don't
+> mind, just a remark).
 
-Cc: Bjorn Helgaas <bhelgaas@google.com>
-Cc: Arnd Bergmann <arnd@arndb.de>
-Cc: Grant Likely <grant.likely@linaro.org>
-Cc: Rob Herring <robh+dt@kernel.org>
-Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
-Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
----
- drivers/of/of_pci.c    | 34 ++++++++++++++++++++++++++++++++++
- include/linux/of_pci.h |  7 +++++++
- 2 files changed, 41 insertions(+)
+I've took you patch initially from an email fragment, sorry, should've
+altered the commiter accordingly.
 
-diff --git a/drivers/of/of_pci.c b/drivers/of/of_pci.c
-index 8481996..a107edb 100644
---- a/drivers/of/of_pci.c
-+++ b/drivers/of/of_pci.c
-@@ -89,6 +89,40 @@ int of_pci_parse_bus_range(struct device_node *node, struct resource *res)
- }
- EXPORT_SYMBOL_GPL(of_pci_parse_bus_range);
- 
-+static atomic_t of_domain_nr = ATOMIC_INIT(-1);
-+
-+/**
-+ * This function will try to obtain the host bridge domain number by
-+ * using of_alias_get_id() call with "pci-domain" as a stem. If that
-+ * fails, a local allocator will be used. The local allocator can
-+ * be requested to return a new domain_nr if the information is missing
-+ * from the device tree.
-+ *
-+ * @node: device tree node with the domain information
-+ * @allocate_if_missing: if DT lacks information about the domain nr,
-+ * allocate a new number.
-+ *
-+ * Returns the associated domain number from DT, or a new domain number
-+ * if DT information is missing and @allocate_if_missing is true. If
-+ * @allocate_if_missing is false then the last allocated domain number
-+ * will be returned.
-+ */
-+int of_pci_get_domain_nr(struct device_node *node, bool allocate_if_missing)
-+{
-+	int domain;
-+
-+	domain = of_alias_get_id(node, "pci-domain");
-+	if (domain == -ENODEV) {
-+		if (allocate_if_missing)
-+			domain = atomic_inc_return(&of_domain_nr);
-+		else
-+			domain = atomic_read(&of_domain_nr);
-+	}
-+
-+	return domain;
-+}
-+EXPORT_SYMBOL_GPL(of_pci_get_domain_nr);
-+
- #ifdef CONFIG_PCI_MSI
- 
- static LIST_HEAD(of_pci_msi_chip_list);
-diff --git a/include/linux/of_pci.h b/include/linux/of_pci.h
-index dde3a4a..3a3824c 100644
---- a/include/linux/of_pci.h
-+++ b/include/linux/of_pci.h
-@@ -15,6 +15,7 @@ struct device_node *of_pci_find_child_device(struct device_node *parent,
- int of_pci_get_devfn(struct device_node *np);
- int of_irq_parse_and_map_pci(const struct pci_dev *dev, u8 slot, u8 pin);
- int of_pci_parse_bus_range(struct device_node *node, struct resource *res);
-+int of_pci_get_domain_nr(struct device_node *node, bool allocate_if_missing);
- #else
- static inline int of_irq_parse_pci(const struct pci_dev *pdev, struct of_phandle_args *out_irq)
- {
-@@ -43,6 +44,12 @@ of_pci_parse_bus_range(struct device_node *node, struct resource *res)
- {
- 	return -EINVAL;
- }
-+
-+static inline int
-+of_pci_get_domain_nr(struct device_node *node, bool allocate_if_missing)
-+{
-+	return -1;
-+}
- #endif
- 
- #if defined(CONFIG_OF) && defined(CONFIG_PCI_MSI)
+Best regards,
+Liviu
+
+> 
+> -- 
+> Catalin
+
 -- 
-2.0.4
+====================
+| I would like to |
+| fix the world,  |
+| but they're not |
+| giving me the   |
+ \ source code!  /
+  ---------------
+    ?\_(?)_/?
