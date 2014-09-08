@@ -1,46 +1,49 @@
-From: charlebm@gmail.com (Mark Charlebois)
-Date: Mon, 8 Sep 2014 14:01:48 -0700
-Subject: [PATCH] arm64: LLVMLinux: Provide __aeabi_* symbols which are
- needed for clang
-In-Reply-To: <56E276C7-8204-48DD-B5C5-BF5B1452248A@arm.com>
-References: <1409959394-14936-1-git-send-email-behanw@converseincode.com>
- <2954780.2t9bpyu7ov@wuerfel>
- <CAFzeTN0AO40k2ObpMX3xPOmKaiGdiLREev1A2J0sE=B7z64qug@mail.gmail.com>
- <56E276C7-8204-48DD-B5C5-BF5B1452248A@arm.com>
-Message-ID: <CAFzeTN10iz0eMTVqdRhzvqKagyB7srEZN8YAUOJzxzfJihv62Q@mail.gmail.com>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Mon, 08 Sep 2014 23:26:49 +0200
+Subject: [PATCH v3 2/9] PM / Domains: Add generic OF-based PM domain
+ look-up
+In-Reply-To: <CAMuHMdURbp8a0Ps2sZUZn7UHcWXZvRgS-4ubk1r=wGgXZ1PHmA@mail.gmail.com>
+References: <1409838756-31963-1-git-send-email-ulf.hansson@linaro.org>
+ <3105400.7vSnq2rA6s@vostro.rjw.lan>
+ <CAMuHMdURbp8a0Ps2sZUZn7UHcWXZvRgS-4ubk1r=wGgXZ1PHmA@mail.gmail.com>
+Message-ID: <8273189.CFBBe805uk@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Sep 7, 2014 at 12:30 AM, Catalin Marinas
-<catalin.marinas@arm.com> wrote:
-> On 7 Sep 2014, at 03:30, Mark Charlebois <charlebm@gmail.com> wrote:
->> On Sat, Sep 6, 2014 at 7:16 AM, Arnd Bergmann <arnd@arndb.de> wrote:
->>>
->>> On Friday 05 September 2014 16:23:14 behanw at converseincode.com wrote:
->>>> + *  Copyright (C) 2012  Mark Charlebois
->>>> + */
->>>> +
->>>> +/*
->>>> + * EABI routines
->>>
->>> Does EABI specify these function names? I would think that they are
->>> just random libgcc (whatever that is called in clang) functions.
->>
->> http://infocenter.arm.com/help/topic/com.arm.doc.ihi0043d/IHI0043D_rtabi.pdf
->>
->> See section 4.3.4 Memory copying, clearing, and setting
->
-> What does this document have to do with arm64 (AArch64, A64)? We don?t
-> need such symbols on arm64. Also, the arm64 kernel links with libgcc (no
-> immediate need AFAICT but the compiler does not guarantee the intrinsics
-> would always be generated inline).
+On Monday, September 08, 2014 10:53:09 PM Geert Uytterhoeven wrote:
+> Hi Rafael,
+> 
+> On Mon, Sep 8, 2014 at 11:08 PM, Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
+> > BTW, I get bounces from t.figa at samsung.com, so I won't apply the patch with
+> > that as the "From" field.  And the s-o-b from a bouncing address is worthless
+> > too.
+> 
+> In the mean time, Tomasz has moved:
+> http://www.spinics.net/lists/arm-kernel/msg357102.html
+> 
+> Still, the From/SoB indicate attribution to Samsung, so I think it should be
+> kept.
 
-[reposting in plain text]
+The "From:" field should point to a submitter's address that is actually active,
+so that (s)he can handle problem reports *sent* *to* *that* address.  I'm not
+going to apply anything with a bouncing "From:".
 
-This patch was made early in the arm64 kernel support. I just retested
-and you are correct, it is no longer needed.  My apologies to all.
+The s-o-b is more of a gray area, but again it is supposed to be possible
+to verify which it won't be if it bounces.
 
--Mark
+Also note that this is not Tomasz who is submitting this patch today, but Ulf
+who doesn't even work for Samsung as far as I know.
 
->
-> Catalin
+So I'd suggest using "Tomasz Figa <tomasz.figa@gmail.com>" as a "From:", remove
+his s-o-b entirely (and using the Ulf's one only) and add something like that
+to the changelog:
+
+"This patch was originally submitted by Tomasz Figa when he was employed
+ by Samsung.
+
+ Link: <URL-of-the-original-submission>"
+
+This way Samsung will get the recognition and there won't be bouncing addresses
+in tags etc.
+
+Rafael
