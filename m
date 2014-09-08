@@ -1,167 +1,40 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Mon, 8 Sep 2014 17:42:13 +0800
-Subject: [PATCH v2] ARM: sun5i: Add DT for HSG H702 tablet board
-In-Reply-To: <20140908093713.GE3804@lukather>
-References: <1409580879-15601-1-git-send-email-wens@csie.org>
- <20140908093713.GE3804@lukather>
-Message-ID: <CAGb2v64bM9mEW_sd7KPNAfDijXRAgBkOtD9motJU8R3TpQ5wWw@mail.gmail.com>
+From: pramod.gurav@smartplayin.com (Pramod Gurav)
+Date: Mon, 08 Sep 2014 15:18:54 +0530
+Subject: [PATCH v5 2/7] qcom: spm: Add Subsystem Power Manager driver
+ (SAW2)
+In-Reply-To: <1409870132-16929-3-git-send-email-lina.iyer@linaro.org>
+References: <1409870132-16929-1-git-send-email-lina.iyer@linaro.org>
+ <1409870132-16929-3-git-send-email-lina.iyer@linaro.org>
+Message-ID: <540D7B86.1000008@smartplayin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 8, 2014 at 5:37 PM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> Hi,
->
-> On Mon, Sep 01, 2014 at 10:14:39PM +0800, Chen-Yu Tsai wrote:
->> This is a Q8 format 7 inch tablet with an Allwinner A13 SoC.
->> It has 512MB DRAM, 4GB NAND flash, an accelerometer, camera,
->> RTL8188-based WiFi, and micro SD slot for external storage.
->>
->> It is likely made by a subsidiary of Hanns.G (Hannstar).
->>
->> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
->> ---
->>
->> Added missing '>' to the email address in the header.
->>
->> Sorry for the noise.
->>
->> ---
->>  arch/arm/boot/dts/Makefile               |   1 +
->>  arch/arm/boot/dts/sun5i-a13-hsg-h702.dts | 101 +++++++++++++++++++++++++++++++
->>  2 files changed, 102 insertions(+)
->>  create mode 100644 arch/arm/boot/dts/sun5i-a13-hsg-h702.dts
->>
->> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
->> index b8c5cd3..94e61a6 100644
->> --- a/arch/arm/boot/dts/Makefile
->> +++ b/arch/arm/boot/dts/Makefile
->> @@ -406,6 +406,7 @@ dtb-$(CONFIG_MACH_SUN4I) += \
->>  dtb-$(CONFIG_MACH_SUN5I) += \
->>       sun5i-a10s-olinuxino-micro.dtb \
->>       sun5i-a10s-r7-tv-dongle.dtb \
->> +     sun5i-a13-hsg-h702.dtb \
->>       sun5i-a13-olinuxino.dtb \
->>       sun5i-a13-olinuxino-micro.dtb
->>  dtb-$(CONFIG_MACH_SUN6I) += \
->> diff --git a/arch/arm/boot/dts/sun5i-a13-hsg-h702.dts b/arch/arm/boot/dts/sun5i-a13-hsg-h702.dts
->> new file mode 100644
->> index 0000000..6335c1e
->> --- /dev/null
->> +++ b/arch/arm/boot/dts/sun5i-a13-hsg-h702.dts
->> @@ -0,0 +1,101 @@
->> +/*
->> + * Copyright 2014 Chen-Yu Tsai <wens@csie.org>
->> + *
->> + * The code contained herein is licensed under the GNU General Public
->> + * License. You may obtain a copy of the GNU General Public License
->> + * Version 2 or later at the following locations:
->
-> Could you relicense the file to match the GPL/X11 dual license we've
-> been working on?
+Hi Lina,
 
-Sure. That's the plan. :)
-Waiting for that series to be merged before I send a new version.
+On Friday 05 September 2014 04:05 AM, Lina Iyer wrote:
 
->> + *
->> + * http://www.opensource.org/licenses/gpl-license.html
->> + * http://www.gnu.org/copyleft/gpl.html
->> + */
->> +
->> +/dts-v1/;
->> +/include/ "sun5i-a13.dtsi"
->> +/include/ "sunxi-common-regulators.dtsi"
->> +
->> +/ {
->> +     model = "HSG H702";
->> +     compatible = "hsg,h702", "allwinner,sun5i-a13";
->> +
->> +     soc at 01c00000 {
->> +             mmc0: mmc at 01c0f000 {
->> +                     pinctrl-names = "default";
->> +                     pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin_h702>;
->> +                     vmmc-supply = <&reg_vcc3v3>;
->> +                     bus-width = <4>;
->> +                     cd-gpios = <&pio 6 0 0>; /* PG0 */
->> +                     cd-inverted;
->> +                     status = "okay";
->> +             };
->> +
->> +             usbphy: phy at 01c13400 {
->> +                     usb1_vbus-supply = <&reg_usb1_vbus>;
->> +                     status = "okay";
->> +             };
->> +
->> +             ehci0: usb at 01c14000 {
->> +                     status = "okay";
->> +             };
->> +
->> +             ohci0: usb at 01c14400 {
->> +                     status = "okay";
->> +             };
->> +
->> +             pinctrl at 01c20800 {
->> +                     mmc0_cd_pin_h702: mmc0_cd_pin at 0 {
->> +                             allwinner,pins = "PG0";
->> +                             allwinner,function = "gpio_in";
->> +                             allwinner,drive = <0>;
->> +                             allwinner,pull = <1>;
->> +                     };
->> +             };
->> +
->> +             uart1: serial at 01c28400 {
->> +                     pinctrl-names = "default";
->> +                     pinctrl-0 = <&uart1_pins_b>;
->> +                     status = "okay";
->> +             };
->> +
->> +             i2c0: i2c at 01c2ac00 {
->> +                     pinctrl-names = "default";
->> +                     pinctrl-0 = <&i2c0_pins_a>;
->> +                     status = "okay";
->> +
->> +                     axp209: pmic at 34 {
->> +                             compatible = "x-powers,axp209";
->> +                             reg = <0x34>;
->> +                             interrupts = <0>;
->> +                             interrupt-controller;
->> +                             #interrupt-cells = <1>;
->> +                     };
->> +             };
->> +
->> +             i2c1: i2c at 01c2b000 {
->> +                     pinctrl-names = "default";
->> +                     pinctrl-0 = <&i2c1_pins_a>;
->> +                     status = "okay";
->> +
->> +                     pcf8563: rtc at 51 {
->> +                             compatible = "nxp,pcf8563";
->> +                             reg = <0x51>;
->> +                     };
->> +             };
->> +
->> +             i2c2: i2c at 01c2b400 {
->> +                     pinctrl-names = "default";
->> +                     pinctrl-0 = <&i2c2_pins_a>;
->> +                     status = "okay";
->> +             };
->> +     };
->> +
->> +     reg_usb1_vbus: usb1-vbus {
->> +             /*
->> +              * There doesn't seem to be a GPIO for controlling
->> +              * vbus, despite the fex file saying otherwise.
->> +              * Override the original settings with empty ones.
->> +              */
->> +             pinctrl-0 = <>;
->> +             gpio = <>;
->> +             status = "okay";
->
-> Hmmmm, no. Just use a regular fixed regulator here, like reg_vcc3v3.
+>  drivers/soc/qcom/spm.c     | 192 +++++++++++++++++++++++++++++++++++++++++++++
+>  3 files changed, 262 insertions(+)
+>  create mode 100644 drivers/soc/qcom/spm-drv.h
+>  create mode 100644 drivers/soc/qcom/spm.c
+> 
+> diff --git a/drivers/soc/qcom/Makefile b/drivers/soc/qcom/Makefile
+> index 70d52ed..20b329f 100644
+> --- a/drivers/soc/qcom/Makefile
+> +++ b/drivers/soc/qcom/Makefile
+> @@ -1,3 +1,4 @@
+>  obj-$(CONFIG_QCOM_GSBI)	+=	qcom_gsbi.o
+> +obj-$(CONFIG_QCOM_PM)	+=	spm.o
 
-Ok, will fix.
+CONFIG_QCOM_PM is missing in Kconfig hence this driver wont build. I see
+it is added in patch #3. Please move it to this patch so that this
+driver builds.
+
+>  CFLAGS_scm.o :=$(call as-instr,.arch_extension sec,-DREQUIRES_SEC=1)
+>  obj-$(CONFIG_QCOM_SCM) += scm.o scm-boot.o
+> diff --git a/drivers/soc/qcom/spm-drv.h b/drivers/soc/qcom/spm-drv.h
+> new file mode 100644
+> index 0000000..e91df44
 
 Thanks
-
-
-ChenYu
+Pramod
