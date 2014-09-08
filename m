@@ -1,40 +1,52 @@
-From: frans.klaver@xsens.com (Frans Klaver)
-Date: Mon, 8 Sep 2014 16:46:18 +0200
-Subject: [PATCH v8 00/18] 8250-core based serial driver for OMAP + DMA
-In-Reply-To: <1409943773-7874-1-git-send-email-bigeasy@linutronix.de>
-References: <1409943773-7874-1-git-send-email-bigeasy@linutronix.de>
-Message-ID: <20140908144616.GA22315@ci00147.xsens-tech.local>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 8 Sep 2014 15:50:48 +0100
+Subject: [PATCH 1/2] arm64: psci: respect MIGRATE_INFO_TYPE
+In-Reply-To: <CAJ5Y-eZVus1TjEXSoq9edJbYYTneH0jm=Tbx0LfVQG8ZSeJDEg@mail.gmail.com>
+References: <1409915540-20044-1-git-send-email-mark.rutland@arm.com>
+ <1409915540-20044-2-git-send-email-mark.rutland@arm.com>
+ <CAJ5Y-eZqWsLT1ERWsdzCQASgzCfFTgn6fCBCpc7ceMoU2ONkNA@mail.gmail.com>
+ <20140905141345.GF20164@leverpostej>
+ <CAJ5Y-eb3jJSaR4VCPFe+A+PVbLAbyVGBAcb+_zsOQQ=Rhk9Q0g@mail.gmail.com>
+ <20140908141434.GJ12081@leverpostej>
+ <CAJ5Y-eZVus1TjEXSoq9edJbYYTneH0jm=Tbx0LfVQG8ZSeJDEg@mail.gmail.com>
+Message-ID: <20140908145047.GM12081@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Mon, Sep 08, 2014 at 03:25:47PM +0100, Ashwin Chaugule wrote:
+> On 8 September 2014 10:14, Mark Rutland <mark.rutland@arm.com> wrote:
+> > [...]
+> >
+> >> >> Guessing there is no way for us to know which CPU the UP TOS is
+> >> >> running on and only deny hotplug on that CPU?
+> >> >
+> >> > In the comment above I mention we can use MIGRATE_INFO_UP_CPU for that.
+> >> > I started down that route, but the plumbing for it ended up looking a
+> >> > little crazy so I thought it was better for the moment to have a simple
+> >> > solution that we can backport to stable.
+> >>
+> >> Ah. I faintly recollect experiencing similar craziness when I was
+> >> adding v0.2 support.
+> >
+> > Yeah, it's lot of churny fun with many function prototypes changing
+> > about. I wasn't too keen on rushing that, though I would like to get
+> > around to it at some point.
+> >
+> >> > No systems with a UP trusted OS (migrateable or not) have hit my radar
+> >> > yet, and we're currently broken for them anyhow. So for the moment it
+> >> > didn't seem worthwhile implementing support for those. We can add the
+> >> > requisite MIGRATE_INFO_UP_CPU and MIGRATE calls in a later series.
+> >>
+> >> Ok.
+> >>
+> >> Acked-by: Ashwin Chaugule <ashwin.chaugule@linaro.org>
+> >
+> > Thanks.
+> >
+> > Does that apply to both patches or just the arm64 one?
+> 
+> Sorry, just looked at it. Please consider the ACK for both.
 
-On Fri, Sep 05, 2014 at 09:02:35PM +0200, Sebastian Andrzej Siewior wrote:
-> This is my complete queue fo the omap serial driver based on the 8250 core
-> code. I played with it on beagle bone, am335x-evm and dra7xx including DMA.
-> The runtime-pm pieces look now bug-compatible with the omap-serial driver.
-> Besides the runtime-om improvement I also fixed a few corner cases for the
-> TX-DMA problem. The DMA fixes (in edma and omap-dma) were dropped and the
-> problem has been in 8250-dma via patch #13.
+Thanks for taking a look, it's much appreciated.
 
-Thanks for the respin. I've just tested the series a bit. Here's some
-things I ran into.
-
-- Basic console use is better than the previous series. It behaves
-  pretty much like the omap-serial implementation.
-
-- ncurses based applications (vi, less) don't play nice for me on the
-  console with this series. less doesn't show me anything. vi doesn't
-  return to console properly.
-
-- I seem seem to get stuck in a "serial8250: too much work for irq%d"
-  loop somewhat reliably. We have a rather demanding application with
-  typically somewhere between 600 and 1000 byte packets being sent at
-  240Hz (roughly somewhere between 1.5 and 2 Mb/s). We run at baudrate
-  3500k. I get into this "too much work" thing already when running at
-  300 bytes per packet.
-
-I hope this is of some use to you. I'll do more testing later.
-
-Thanks,
-Frans
+Mark.
