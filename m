@@ -1,122 +1,165 @@
-From: khilman@kernel.org (Kevin Hilman)
-Date: Mon, 08 Sep 2014 08:58:53 -0700
-Subject: [PATCH v9 5/8] drivers: cpuidle: implement DT based idle states
- infrastructure
-In-Reply-To: <20140905212908.GA28626@e102568-lin.cambridge.arm.com> (Lorenzo
- Pieralisi's message of "Fri, 5 Sep 2014 22:29:08 +0100")
-References: <1409938498-17984-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1409938498-17984-6-git-send-email-lorenzo.pieralisi@arm.com>
- <7hlhpxygzv.fsf@paris.lan>
- <20140905212908.GA28626@e102568-lin.cambridge.arm.com>
-Message-ID: <7hoauqw1c2.fsf@paris.lan>
+From: Liviu.Dudau@arm.com (Liviu Dudau)
+Date: Mon, 8 Sep 2014 16:59:31 +0100
+Subject: [PATCH v10 07/10] OF: Introduce helper function for getting PCI
+ domain_nr
+In-Reply-To: <CAL_JsqJdGKDVwJOpPp19OkVPGzR7Zqv3nh+ONHHaYnPLYTYoYg@mail.gmail.com>
+References: <1410184472-17630-1-git-send-email-Liviu.Dudau@arm.com>
+ <1410184472-17630-8-git-send-email-Liviu.Dudau@arm.com>
+ <CAL_JsqJi8k1Goc3UmXhuxf9v7=4gJrYG_Di7v574PxS8TsJaXw@mail.gmail.com>
+ <20140908145459.GO27864@e106497-lin.cambridge.arm.com>
+ <CAL_JsqJdGKDVwJOpPp19OkVPGzR7Zqv3nh+ONHHaYnPLYTYoYg@mail.gmail.com>
+Message-ID: <20140908155931.GP27864@e106497-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Lorenzo Pieralisi <lorenzo.pieralisi@arm.com> writes:
+On Mon, Sep 08, 2014 at 04:27:36PM +0100, Rob Herring wrote:
+> On Mon, Sep 8, 2014 at 9:54 AM, Liviu Dudau <Liviu.Dudau@arm.com> wrote:
+> > On Mon, Sep 08, 2014 at 03:27:56PM +0100, Rob Herring wrote:
+> >> On Mon, Sep 8, 2014 at 8:54 AM, Liviu Dudau <Liviu.Dudau@arm.com> wrote:
+> >> > Add of_pci_get_domain_nr() to retrieve the PCI domain number
+> >> > of a given device from DT. If the information is not present,
+> >> > the function can be requested to allocate a new domain number.
+> >> >
+> >> > Cc: Bjorn Helgaas <bhelgaas@google.com>
+> >> > Cc: Arnd Bergmann <arnd@arndb.de>
+> >> > Cc: Grant Likely <grant.likely@linaro.org>
+> >> > Cc: Rob Herring <robh+dt@kernel.org>
+> >> > Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
+> >> > Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
+> >> > ---
+> >> >  drivers/of/of_pci.c    | 34 ++++++++++++++++++++++++++++++++++
+> >> >  include/linux/of_pci.h |  7 +++++++
+> >> >  2 files changed, 41 insertions(+)
+> >> >
+> >> > diff --git a/drivers/of/of_pci.c b/drivers/of/of_pci.c
+> >> > index 8481996..a107edb 100644
+> >> > --- a/drivers/of/of_pci.c
+> >> > +++ b/drivers/of/of_pci.c
+> >> > @@ -89,6 +89,40 @@ int of_pci_parse_bus_range(struct device_node *node, struct resource *res)
+> >> >  }
+> >> >  EXPORT_SYMBOL_GPL(of_pci_parse_bus_range);
+> >> >
+> >> > +static atomic_t of_domain_nr = ATOMIC_INIT(-1);
+> >> > +
+> >> > +/**
+> >> > + * This function will try to obtain the host bridge domain number by
+> >> > + * using of_alias_get_id() call with "pci-domain" as a stem. If that
+> >> > + * fails, a local allocator will be used. The local allocator can
+> >> > + * be requested to return a new domain_nr if the information is missing
+> >> > + * from the device tree.
+> >> > + *
+> >> > + * @node: device tree node with the domain information
+> >> > + * @allocate_if_missing: if DT lacks information about the domain nr,
+> >> > + * allocate a new number.
+> >> > + *
+> >> > + * Returns the associated domain number from DT, or a new domain number
+> >> > + * if DT information is missing and @allocate_if_missing is true. If
+> >> > + * @allocate_if_missing is false then the last allocated domain number
+> >> > + * will be returned.
+> >> > + */
+> >> > +int of_pci_get_domain_nr(struct device_node *node, bool allocate_if_missing)
+> >> > +{
+> >> > +       int domain;
+> >> > +
+> >> > +       domain = of_alias_get_id(node, "pci-domain");
+> >> > +       if (domain == -ENODEV) {
+> >> > +               if (allocate_if_missing)
+> >> > +                       domain = atomic_inc_return(&of_domain_nr);
+> >> > +               else
+> >> > +                       domain = atomic_read(&of_domain_nr);
+> >>
+> >> This function seems a bit broken to me. It is overloaded with too many
+> >> different outcomes. Think about how this would work if you have
+> >> multiple PCI buses and a mixture of having pci-domain aliases or not.
+> >> Aren't domain numbers global? Allocation should then start outside of
+> >> the range of alias ids.
+> >>
+> >> Rob
+> >>
+> >
+> > Rob,
+> >
+> > Would this version make more sense?
+> 
+> No.
+> 
+> > int of_pci_get_domain_nr(struct device_node *node, bool allocate_if_missing)
+> > {
+> >        int domain;
+> >
+> >        domain = of_alias_get_id(node, "pci-domain");
+> >        if (domain == -ENODEV) {
+> >                if (allocate_if_missing)
+> >                        domain = atomic_inc_return(&of_domain_nr);
+> >                else
+> >                        domain = atomic_read(&of_domain_nr);
+> >        } else {
+> >                /* remember the largest value seen */
+> >                int d = atomic_read(&of_domain_nr);
+> >                atomic_set(&of_domain_nr, max(domain, d));
+> >        }
+> >
+> >        return domain;
+> > }
+> > EXPORT_SYMBOL_GPL(of_pci_get_domain_nr);
+> >
+> > It would still create gaps and possible duplicates, but this is just a number
+> > and trying to create a new root bus in an existing domain should fail. I have
+> 
+> Is failure okay in that case?
 
-> On Fri, Sep 05, 2014 at 09:00:52PM +0100, Kevin Hilman wrote:
->> Lorenzo Pieralisi <lorenzo.pieralisi@arm.com> writes:
->> 
->> > On most common ARM systems, the low-power states a CPU can be put into are
->> > not discoverable in HW and require device tree bindings to describe
->> > power down suspend operations and idle states parameters.
->> >
->> > In order to enable DT based idle states and configure idle drivers, this
->> > patch implements the bulk infrastructure required to parse the device tree
->> > idle states bindings and initialize the corresponding CPUidle driver states
->> > data.
->> >
->> > The parsing API accepts a start index that defines the first idle state
->> > that should be initialized by the parsing code in order to give new and
->> > legacy driver flexibility over which states should be parsed using the
->> > new DT mechanism.
->> >
->> > The idle states node(s) is obtained from the phandle list of the first cpu
->> > in the driver cpumask;  the kernel checks that the idle state node phandle
->> > is the same for all CPUs in the driver cpumask before declaring the idle state
->> > as valid and start parsing its content.
->> >
->> > The idle state enter function pointer is initialized through DT match
->> > structures passed in by the CPUidle driver, so that ARM legacy code can
->> > cope with platform specific idle entry method based on compatible
->> > string matching and the code used to initialize the enter function pointer
->> > can be moved to the DT generic layer.
->> >
->> > Acked-by: Catalin Marinas <catalin.marinas@arm.com>
->> > Acked-by: Daniel Lezcano <daniel.lezcano@linaro.org>
->> > Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
->> 
->> [...]
->> 
->> > +	idle_state->flags = CPUIDLE_FLAG_TIME_VALID;
->> > +	if (of_property_read_bool(state_node, "local-timer-stop"))
->> > +		idle_state->flags |= CPUIDLE_FLAG_TIMER_STOP;
->> > +	/*
->> > +	 * TODO:
->> > +	 *	replace with kstrdup and pointer assignment when name
->> > +	 *	and desc become string pointers
->> > +	 */
->> > +	strncpy(idle_state->name, state_node->name, CPUIDLE_NAME_LEN - 1);
->> > +	strncpy(idle_state->desc, state_node->name, CPUIDLE_DESC_LEN - 1);
->> 
->> This is a very minor concern, and shouldn't hold back this series,
->> but...
->> 
->> I was playing with this series in order to test out the qcom cpuidle
->> driver from Lina, and noticed that the state name and descriptions were
->> not terribly helpful:
->> 
->> /sys/devices/system/cpu/cpu0/cpuidle # cat state?/name
->> cpu-idle-state-
->> cpu-idle-state-
->> /sys/devices/system/cpu/cpu0/cpuidle # cat state?/desc
->> cpu-idle-state-0
->> cpu-idle-state-1
->> 
->> Turns out these strings come from the node name itself, and truncated in
->> the case of state->name, but this can be fixed in the DTS itself (c.f.
->> reply to Lina's driver.)
->> 
->> However, seeing that the node name is used to populate both the
->> state->name and ->, made me wonder if there should better way to set the
->> state->desc field to a more useful string.  Tools like powertop actually
->> use that field and it can be quite useful.
->
-> Well, the truncation problem will be solved when those strings will be
-> kdup'ed, so for the name I think there is not a problem, copying the
-> state node is fine waiting for those strings to become pointers.
->
-> For desc, there are four options:
->
-> (1) enumerating idle states (but that's worse than copying the name into
->     desc since on ARM idle-state{1,2,3...} means nothing)
-> (2) copying the idle state node compatible string into desc
-> (3) Add an optional property to the DT bindings to describe the state
-> (4) Leave code as it is
->
-> (3) I am not extremely keen at this stage to re-patch the DT bindings,
-> it has been an awful lot of work to make everyone agree so I would avoid
-> any changes, I hope you understand (and I am not even sure DT maintainers
-> would accept that, so even less keen on changing the DT bindings at this
-> stage).
->
-> (2) I am not sure it will clarify the description much.
->
-> (1) I would rule it out. So either we accept that the name can be
-> extended in length (that's going to be the case since we will
-> dynamically allocate the string so there will be no truncation, to
-> a reasonable extent) so (4) is fine, or we merge this code and I
-> will take care of pushing for (3) in a separate patch and copy the resulting
-> description into desc (if that change does not get NACK'ed).
->
-> I would really want to see this code in the mailine asap since it is
-> groundwork for all future CPUidle generalisation, I hope that what I am
-> saying above is acceptable, please let me know what you think.
+Well, you would get the failure at development time and hopefully fix the DT to
+eliminate sparseness of domain numbers.
 
-Agreed, as I stated when I rasied this issue, it's a very minor concern
-and I don't think it should hold back this series.
+> 
+> > no clue on how to generate unique values without parsing the DT and filling
+> > a sparse array with values found there and then checking for allocated values
+> 
+> You really only need to know the maximum value and then start the
+> non-DT allocations from there.
+> 
+> > on new requests. This function gets called quite a lot and I'm trying not to
+> > make it too heavy weight.
+> 
+> Generally, nothing should be accessing the same DT value frequently.
+> It should get cached somewhere.
+> 
 
-After this series is merged, I think approach (3) is probably the best
-and should be done as a follow-up patch/series.
+The problem appears for DTs that don't have the pci-domain info. Then the cached
+value is left at the default non-valid value and attempts to rescan the DT will
+be made every time the function is called.
 
-Kevin
+> I don't really understand how domains are used so it's hard to provide
+> a recommendation here. Do domains even belong in the DT?
+
+ACPI calls them segments and the way Bjorn explained it to me at some moment was
+that it was an attempt to split up a bus in different groups (or alternatively,
+merge a few busses together). To be honest I haven't seen systems where the domain
+is anything other than zero, but JasonG (or maybe Benjamin) were floating an
+idea of using the domain number to identify physical slots.
+
+> This function
+> is just a weird mixture of data retrieval and allocation. I think you
+> need to separate it into 2 functions.
+
+It is meant to do allocation with the retrieval being a short-cut (or fine
+control if you want).
+
+I need to think a bit more for a better solution.
+
+Best regards,
+Liviu
+
+> 
+> Rob
+> 
+
+-- 
+====================
+| I would like to |
+| fix the world,  |
+| but they're not |
+| giving me the   |
+ \ source code!  /
+  ---------------
+    ?\_(?)_/?
