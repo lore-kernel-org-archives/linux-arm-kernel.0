@@ -1,51 +1,122 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 8 Sep 2014 09:51:17 -0700
-Subject: [PATCH v6 5/7] net: cpsw: Add am33xx MACID readout
-In-Reply-To: <1410110375-3570-6-git-send-email-mpa@pengutronix.de>
-References: <1410110375-3570-1-git-send-email-mpa@pengutronix.de>
- <1410110375-3570-6-git-send-email-mpa@pengutronix.de>
-Message-ID: <20140908165116.GH3238@atomide.com>
+From: fkan@apm.com (Feng Kan)
+Date: Mon, 8 Sep 2014 09:57:01 -0700
+Subject: [PATCH V3] irqchip:gic: change access of gicc_ctrl register to
+ read modify write.
+In-Reply-To: <CAFdej02vSm8TbUWGsMr936WN1GNmJ0SBuEKQkKyzKoEjtVmc+g@mail.gmail.com>
+References: <1393537013-6264-1-git-send-email-fkan@apm.com>
+ <CAFdej02vSm8TbUWGsMr936WN1GNmJ0SBuEKQkKyzKoEjtVmc+g@mail.gmail.com>
+Message-ID: <CAL85gmBRUuc3mtOGSkNuspEgkRQe42LV0e=fQfNmwcCicjT=vA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Markus Pargmann <mpa@pengutronix.de> [140907 10:20]:
-> This patch adds a function to get the MACIDs from the am33xx SoC
-> control module registers which hold unique vendor MACIDs. This is only
-> used if of_get_mac_address() fails to get a valid mac address.
-...
+On Mon, Sep 8, 2014 at 1:52 AM, Arun Chandran <achandran@mvista.com> wrote:
+> Hi Feng,
+>
+> Is this patch still needed to fix perf calltrace?
+Yes, if the someone decide to run the secure mode of the GIC, which is
+what is present in
+the kernel tree now.
 
-> @@ -1928,8 +1960,16 @@ static int cpsw_probe_dt(struct cpsw_platform_data *data,
->  			 PHY_ID_FMT, mdio->name, phyid);
->  
->  		mac_addr = of_get_mac_address(slave_node);
-> -		if (mac_addr)
-> +		if (mac_addr) {
->  			memcpy(slave_data->mac_addr, mac_addr, ETH_ALEN);
-> +		} else {
-> +			if (of_machine_is_compatible("ti,am33xx")) {
-> +				ret = cpsw_am33xx_cm_get_macid(&pdev->dev, i,
-> +							slave_data->mac_addr);
-> +				if (ret)
-> +					return ret;
-> +			}
-> +		}
->  
->  		slave_data->phy_if = of_get_phy_mode(slave_node);
->  		if (slave_data->phy_if < 0) {
-
-Thanks for updating this, this looks more future proof for adding
-the dra7 related patch.
-
-For the long run, it probably makes sense to add SoC specific
-compatible values such as "ti,cpsw-am3350" and so on. Then the
-mac address functions can be initialized based on the of_device_id
-entry for .data. The wiring is cleary SoC specific here.
-
-So for the purpose of this series, I'm fine with this series,
-please feel free to add for this patch:
-
-Acked-by: Tony Lindgren <tony@atomide.com>
-
-Regards,
-
-Tony
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2014-June/265814.html
+>
+> On Fri, Feb 28, 2014 at 3:06 AM, Feng Kan <fkan@apm.com> wrote:
+>> This change is made to preserve the GIC v2 releated bits in the
+>> GIC_CPU_CTRL register (also known as the GICC_CTLR register in spec).
+>> The original code only set the enable/disable group bit in this register.
+>> This code will preserve the bypass bits configured by the bootload except
+>> the enable/disable bit. The main reason for this change is to allow the
+>> bypass bits specified in the v2 spec to remain untouched by the current
+>> GIC code. In the X-Gene platform, the bypass functionality is not used
+>> and bypass must be disabled at all time.
+>>
+>> Signed-off-by: Vinayak Kale <vkale@apm.com>
+>> Acked-by: Anup Patel <apatel@apm.com>
+>> Signed-off-by: Feng Kan <fkan@apm.com>
+>> ---
+>> V3 Changes:
+>>         - Sorry, forgot to change the mask for cpu_init path
+>>           assumed bootloader setup bits correctly.
+>> V2 Changes:
+>>         - only mask off v2 bypass bits
+>>  drivers/irqchip/irq-gic.c |   32 +++++++++++++++++++++++++++++---
+>>  1 files changed, 29 insertions(+), 3 deletions(-)
+>>
+>> diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
+>> index 341c601..3ca7995 100644
+>> --- a/drivers/irqchip/irq-gic.c
+>> +++ b/drivers/irqchip/irq-gic.c
+>> @@ -418,6 +418,7 @@ static void gic_cpu_init(struct gic_chip_data *gic)
+>>         void __iomem *dist_base = gic_data_dist_base(gic);
+>>         void __iomem *base = gic_data_cpu_base(gic);
+>>         unsigned int cpu_mask, cpu = smp_processor_id();
+>> +       unsigned int ctrl_mask;
+>>         int i;
+>>
+>>         /*
+>> @@ -449,13 +450,29 @@ static void gic_cpu_init(struct gic_chip_data *gic)
+>>                 writel_relaxed(0xa0a0a0a0, dist_base + GIC_DIST_PRI + i * 4 / 4);
+>>
+>>         writel_relaxed(0xf0, base + GIC_CPU_PRIMASK);
+>> -       writel_relaxed(1, base + GIC_CPU_CTRL);
+>> +
+>> +       ctrl_mask = readl(base + GIC_CPU_CTRL);
+>
+> readl_relaxed() here?
+>
+>> +
+>> +       /* Mask out the gic v2 bypass bits */
+>> +       ctrl_mask &= 0x1e0;
+>> +
+>> +       /* Enable group 0 */
+>> +       ctrl_mask |= 0x1;
+>> +       writel_relaxed(ctrl_mask, base + GIC_CPU_CTRL);
+>>  }
+>>
+>>  void gic_cpu_if_down(void)
+>>  {
+>> +       unsigned int ctrl_mask;
+>>         void __iomem *cpu_base = gic_data_cpu_base(&gic_data[0]);
+>> -       writel_relaxed(0, cpu_base + GIC_CPU_CTRL);
+>> +
+>> +       ctrl_mask = readl(cpu_base + GIC_CPU_CTRL);
+> readl_relaxed() here?
+>
+>> +       /*
+>> +        * Disable grp enable bit, leave the bypass bits alone as changing
+>> +        * them could leave the system unstable
+>> +        */
+>> +       ctrl_mask &= 0x1e0;
+>> +       writel_relaxed(ctrl_mask, cpu_base + GIC_CPU_CTRL);
+>>  }
+>>
+>>  #ifdef CONFIG_CPU_PM
+>> @@ -566,6 +583,7 @@ static void gic_cpu_restore(unsigned int gic_nr)
+>>  {
+>>         int i;
+>>         u32 *ptr;
+>> +       unsigned int ctrl_mask;
+>>         void __iomem *dist_base;
+>>         void __iomem *cpu_base;
+>>
+>> @@ -590,7 +608,15 @@ static void gic_cpu_restore(unsigned int gic_nr)
+>>                 writel_relaxed(0xa0a0a0a0, dist_base + GIC_DIST_PRI + i * 4);
+>>
+>>         writel_relaxed(0xf0, cpu_base + GIC_CPU_PRIMASK);
+>> -       writel_relaxed(1, cpu_base + GIC_CPU_CTRL);
+>> +
+>> +       ctrl_mask = readl(cpu_base + GIC_CPU_CTRL);
+>
+> readl_relaxed() here?
+Trying to make sure read is completed before write back out to gic.
+>
+>> +
+>> +       /* Mask out the gic v2 bypass bits */
+>> +       ctrl_mask &= 0x1e0;
+>> +
+>> +       /* Enable group 0 */
+>> +       ctrl_mask |= 0x1;
+>> +       writel_relaxed(ctrl_mask, cpu_base + GIC_CPU_CTRL);
+>>  }
+>>
+>
+> --Arun
