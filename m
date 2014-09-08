@@ -1,34 +1,78 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon, 8 Sep 2014 22:21:43 +0100
-Subject: [PATCH] RFC: add function for localbus address
-In-Reply-To: <540E1014.8090102@codeaurora.org>
-References: <540E1014.8090102@codeaurora.org>
-Message-ID: <20140908212143.GN2601@sirena.org.uk>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 8 Sep 2014 14:29:25 -0700
+Subject: [PATCH] ARM: omap: fix Kconfig warning
+In-Reply-To: <2797284.2mFcuQ0Ias@wuerfel>
+References: <3763111.OttSKCMuxb@wuerfel> <20140908153400.GC3238@atomide.com>
+ <2797284.2mFcuQ0Ias@wuerfel>
+Message-ID: <20140908212924.GL3238@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 08, 2014 at 01:22:44PM -0700, Stephen Boyd wrote:
+* Arnd Bergmann <arnd@arndb.de> [140908 11:17]:
+> On Monday 08 September 2014 08:34:00 Tony Lindgren wrote:
+> > * Arnd Bergmann <arnd@arndb.de> [140908 08:01]:
+> > > A small mistake during the recent Kconfig cleanup has led
+> > > to a harmless warning for OMAP1:
+> > > 
+> > > warning: (ARCH_OMAP1) selects ARCH_OMAP which has unmet direct dependencies (ARCH_MULTI_V6 || ARCH_MULTI_V7)
+> > > 
+> > > We can easily avoid that by moving the ARCH_OMAP symbol outside of the
+> > > OMAP2 submenu.
+> > 
+> > OK I made a similar patch, but I moved it into plat-omap/Kconfig
+> > as it's also used by omap1. The regression was probably caused by
+> > commit 21278aeafbfa (ARM: use menuconfig for sub-arch menus).
+> > 
+> > If that works for you, I'll verify the regression causing commit
+> > and post it with a description.
+> 
+> Yes, sounds good. Your version is better than mind.
 
-> Where is this described? From the commit text that introduces
-> IORESOURCE_REG I see:
+OK here's the patch again with breaking commit and reported by.
 
-> "Currently a bunch of I2C/SPI MFD drivers are using IORESOURCE_IO for
-> register address ranges. Since this causes some confusion due to the
-> primary use of this resource type for PCI/ISA I/O ports create a new
-> resource type IORESOURCE_REG."
+Regards,
 
-> And the comment next to the #define says "Register offsets". I don't see
-> anywhere where it mentions these are CPU addresses. Certainly the
-> current IORESOURCE_REG users aren't CPU addresses because they're
-> SPI/I2C device drivers.
+Tony
 
-Right, the intention was specifically to handle things where
-IORESOURCE_MEM wasn't appropriate as it wasn't ever going to be memory
-mapped I/O and should be in a separate address space.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140908/72d85d51/attachment.sig>
+
+8< -------------
+From: Tony Lindgren <tony@atomide.com>
+Date: Mon, 8 Sep 2014 07:52:11 -0700
+Subject: [PATCH] ARM: OMAP: Fix Kconfig warning for omap1
+
+Commit 21278aeafbfa ("ARM: use menuconfig for sub-arch menus") improved
+the sub-arch menus, but accidentally caused new warnings for omap1.
+This was because the commit added a menu entry around config ARCH_OMAP
+bool entry where the menu had depends on ARCH_MULTI_V6 || ARCH_MULTI_V7.
+
+As ARCH_OMAP is shared between omap1 and omap2plus, let's fix the
+issue by defining ARCH_OMAP in the shared plat-omap/Kconfig.
+
+Fixes: 21278aeafbfa ("ARM: use menuconfig for sub-arch menus")
+Reported-by: Andreas Ruprecht <rupran@einserver.de>
+Cc: Arnd Bergmann <arnd@arndb.de>
+Signed-off-by: Tony Lindgren <tony@atomide.com>
+
+--- a/arch/arm/mach-omap2/Kconfig
++++ b/arch/arm/mach-omap2/Kconfig
+@@ -1,9 +1,6 @@
+ menu "TI OMAP/AM/DM/DRA Family"
+ 	depends on ARCH_MULTI_V6 || ARCH_MULTI_V7
+ 
+-config ARCH_OMAP
+-	bool
+-
+ config ARCH_OMAP2
+ 	bool "TI OMAP2"
+ 	depends on ARCH_MULTI_V6
+diff --git a/arch/arm/plat-omap/Kconfig b/arch/arm/plat-omap/Kconfig
+index 02fc10d..d055db3 100644
+--- a/arch/arm/plat-omap/Kconfig
++++ b/arch/arm/plat-omap/Kconfig
+@@ -1,3 +1,6 @@
++config ARCH_OMAP
++	bool
++
+ if ARCH_OMAP
+ 
+ menu "TI OMAP Common Features"
