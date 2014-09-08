@@ -1,38 +1,119 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 08 Sep 2014 16:53:39 +0200
-Subject: [PATCH] ARM: avoid l2x0 build warning for CONFIG_OF=n
-Message-ID: <2852268.nkG1OoBDfE@wuerfel>
+From: Liviu.Dudau@arm.com (Liviu Dudau)
+Date: Mon, 8 Sep 2014 15:54:59 +0100
+Subject: [PATCH v10 07/10] OF: Introduce helper function for getting PCI
+ domain_nr
+In-Reply-To: <CAL_JsqJi8k1Goc3UmXhuxf9v7=4gJrYG_Di7v574PxS8TsJaXw@mail.gmail.com>
+References: <1410184472-17630-1-git-send-email-Liviu.Dudau@arm.com>
+ <1410184472-17630-8-git-send-email-Liviu.Dudau@arm.com>
+ <CAL_JsqJi8k1Goc3UmXhuxf9v7=4gJrYG_Di7v574PxS8TsJaXw@mail.gmail.com>
+Message-ID: <20140908145459.GO27864@e106497-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A few functions in the l2x0 code are now only used from code that
-is DT-only, so we get harmless gcc warnings about unused static
-symbols unless these are removed as well.
+On Mon, Sep 08, 2014 at 03:27:56PM +0100, Rob Herring wrote:
+> On Mon, Sep 8, 2014 at 8:54 AM, Liviu Dudau <Liviu.Dudau@arm.com> wrote:
+> > Add of_pci_get_domain_nr() to retrieve the PCI domain number
+> > of a given device from DT. If the information is not present,
+> > the function can be requested to allocate a new domain number.
+> >
+> > Cc: Bjorn Helgaas <bhelgaas@google.com>
+> > Cc: Arnd Bergmann <arnd@arndb.de>
+> > Cc: Grant Likely <grant.likely@linaro.org>
+> > Cc: Rob Herring <robh+dt@kernel.org>
+> > Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
+> > Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
+> > ---
+> >  drivers/of/of_pci.c    | 34 ++++++++++++++++++++++++++++++++++
+> >  include/linux/of_pci.h |  7 +++++++
+> >  2 files changed, 41 insertions(+)
+> >
+> > diff --git a/drivers/of/of_pci.c b/drivers/of/of_pci.c
+> > index 8481996..a107edb 100644
+> > --- a/drivers/of/of_pci.c
+> > +++ b/drivers/of/of_pci.c
+> > @@ -89,6 +89,40 @@ int of_pci_parse_bus_range(struct device_node *node, struct resource *res)
+> >  }
+> >  EXPORT_SYMBOL_GPL(of_pci_parse_bus_range);
+> >
+> > +static atomic_t of_domain_nr = ATOMIC_INIT(-1);
+> > +
+> > +/**
+> > + * This function will try to obtain the host bridge domain number by
+> > + * using of_alias_get_id() call with "pci-domain" as a stem. If that
+> > + * fails, a local allocator will be used. The local allocator can
+> > + * be requested to return a new domain_nr if the information is missing
+> > + * from the device tree.
+> > + *
+> > + * @node: device tree node with the domain information
+> > + * @allocate_if_missing: if DT lacks information about the domain nr,
+> > + * allocate a new number.
+> > + *
+> > + * Returns the associated domain number from DT, or a new domain number
+> > + * if DT information is missing and @allocate_if_missing is true. If
+> > + * @allocate_if_missing is false then the last allocated domain number
+> > + * will be returned.
+> > + */
+> > +int of_pci_get_domain_nr(struct device_node *node, bool allocate_if_missing)
+> > +{
+> > +       int domain;
+> > +
+> > +       domain = of_alias_get_id(node, "pci-domain");
+> > +       if (domain == -ENODEV) {
+> > +               if (allocate_if_missing)
+> > +                       domain = atomic_inc_return(&of_domain_nr);
+> > +               else
+> > +                       domain = atomic_read(&of_domain_nr);
+> 
+> This function seems a bit broken to me. It is overloaded with too many
+> different outcomes. Think about how this would work if you have
+> multiple PCI buses and a mixture of having pci-domain aliases or not.
+> Aren't domain numbers global? Allocation should then start outside of
+> the range of alias ids.
+> 
+> Rob
+> 
 
-arch/arm/mm/cache-l2x0.c:167:13: warning: 'l2x0_cache_sync' defined but not used [-Wunused-function]
-arch/arm/mm/cache-l2x0.c:184:13: warning: 'l2x0_flush_all' defined but not used [-Wunused-function]
-arch/arm/mm/cache-l2x0.c:194:13: warning: 'l2x0_disable' defined but not used [-Wunused-function]
+Rob,
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Fixes: cf9ea8f130e2 ("ARM: l2c: remove obsolete l2x0 ops for non-OF init")
+Would this version make more sense?
 
-diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
-index 5f2c988a06ac..08670f96281d 100644
---- a/arch/arm/mm/cache-l2x0.c
-+++ b/arch/arm/mm/cache-l2x0.c
-@@ -164,6 +164,7 @@ static inline void debug_writel(unsigned long val)
- }
- #endif
- 
-+#ifdef CONFIG_OF
- static void l2x0_cache_sync(void)
- {
- 	unsigned long flags;
-@@ -201,6 +202,7 @@ static void l2x0_disable(void)
- 	dsb(st);
- 	raw_spin_unlock_irqrestore(&l2x0_lock, flags);
- }
-+#endif
- 
- static void l2c_save(void __iomem *base)
- {
+int of_pci_get_domain_nr(struct device_node *node, bool allocate_if_missing)
+{
+       int domain;
+
+       domain = of_alias_get_id(node, "pci-domain");
+       if (domain == -ENODEV) {
+               if (allocate_if_missing)
+                       domain = atomic_inc_return(&of_domain_nr);
+               else
+                       domain = atomic_read(&of_domain_nr);
+       } else {
+               /* remember the largest value seen */
+               int d = atomic_read(&of_domain_nr);
+               atomic_set(&of_domain_nr, max(domain, d));
+       }
+
+       return domain;
+}
+EXPORT_SYMBOL_GPL(of_pci_get_domain_nr);
+
+It would still create gaps and possible duplicates, but this is just a number
+and trying to create a new root bus in an existing domain should fail. I have
+no clue on how to generate unique values without parsing the DT and filling
+a sparse array with values found there and then checking for allocated values
+on new requests. This function gets called quite a lot and I'm trying not to
+make it too heavy weight.
+
+
+Best regards,
+Liviu
+
+-- 
+====================
+| I would like to |
+| fix the world,  |
+| but they're not |
+| giving me the   |
+ \ source code!  /
+  ---------------
+    ?\_(?)_/?
