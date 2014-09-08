@@ -1,78 +1,32 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 8 Sep 2014 14:29:25 -0700
-Subject: [PATCH] ARM: omap: fix Kconfig warning
-In-Reply-To: <2797284.2mFcuQ0Ias@wuerfel>
-References: <3763111.OttSKCMuxb@wuerfel> <20140908153400.GC3238@atomide.com>
- <2797284.2mFcuQ0Ias@wuerfel>
-Message-ID: <20140908212924.GL3238@atomide.com>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Mon, 8 Sep 2014 14:31:17 -0700
+Subject: [PATCH v3 1/2] Documentation: dt-bindings: add dt binding info
+ for dwc2 dr_mode
+In-Reply-To: <CAD=FV=WDv9Pxe+jSqsfARPvjxMWPfcVpPMk1wHCgOO8ePiCh3g@mail.gmail.com>
+References: <1407159942-7063-1-git-send-email-kever.yang@rock-chips.com>
+ <1407159942-7063-2-git-send-email-kever.yang@rock-chips.com>
+ <CAD=FV=WDv9Pxe+jSqsfARPvjxMWPfcVpPMk1wHCgOO8ePiCh3g@mail.gmail.com>
+Message-ID: <20140908213117.GA3227@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Arnd Bergmann <arnd@arndb.de> [140908 11:17]:
-> On Monday 08 September 2014 08:34:00 Tony Lindgren wrote:
-> > * Arnd Bergmann <arnd@arndb.de> [140908 08:01]:
-> > > A small mistake during the recent Kconfig cleanup has led
-> > > to a harmless warning for OMAP1:
-> > > 
-> > > warning: (ARCH_OMAP1) selects ARCH_OMAP which has unmet direct dependencies (ARCH_MULTI_V6 || ARCH_MULTI_V7)
-> > > 
-> > > We can easily avoid that by moving the ARCH_OMAP symbol outside of the
-> > > OMAP2 submenu.
-> > 
-> > OK I made a similar patch, but I moved it into plat-omap/Kconfig
-> > as it's also used by omap1. The regression was probably caused by
-> > commit 21278aeafbfa (ARM: use menuconfig for sub-arch menus).
-> > 
-> > If that works for you, I'll verify the regression causing commit
-> > and post it with a description.
+On Mon, Sep 08, 2014 at 11:50:25AM -0700, Doug Anderson wrote:
+> Greg,
 > 
-> Yes, sounds good. Your version is better than mind.
+> On Mon, Aug 4, 2014 at 6:45 AM, Kever Yang <kever.yang@rock-chips.com> wrote:
+> > Indicate that the generic dr_mode binding should be used for dwc2.
+> >
+> > Signed-off-by: Kever Yang <kever.yang@rock-chips.com>
+> > ---
+> >
+> > Changes in v3: None
+> > Changes in v2:
+> > - Split out dr_mode and rk3288 bindings.
+> >
+> >  Documentation/devicetree/bindings/usb/dwc2.txt | 2 ++
+> >  1 file changed, 2 insertions(+)
+> 
+> Are there any other changes you'd like for this patch (and the next
+> one that goes with it) before landing?
 
-OK here's the patch again with breaking commit and reported by.
-
-Regards,
-
-Tony
-
-
-8< -------------
-From: Tony Lindgren <tony@atomide.com>
-Date: Mon, 8 Sep 2014 07:52:11 -0700
-Subject: [PATCH] ARM: OMAP: Fix Kconfig warning for omap1
-
-Commit 21278aeafbfa ("ARM: use menuconfig for sub-arch menus") improved
-the sub-arch menus, but accidentally caused new warnings for omap1.
-This was because the commit added a menu entry around config ARCH_OMAP
-bool entry where the menu had depends on ARCH_MULTI_V6 || ARCH_MULTI_V7.
-
-As ARCH_OMAP is shared between omap1 and omap2plus, let's fix the
-issue by defining ARCH_OMAP in the shared plat-omap/Kconfig.
-
-Fixes: 21278aeafbfa ("ARM: use menuconfig for sub-arch menus")
-Reported-by: Andreas Ruprecht <rupran@einserver.de>
-Cc: Arnd Bergmann <arnd@arndb.de>
-Signed-off-by: Tony Lindgren <tony@atomide.com>
-
---- a/arch/arm/mach-omap2/Kconfig
-+++ b/arch/arm/mach-omap2/Kconfig
-@@ -1,9 +1,6 @@
- menu "TI OMAP/AM/DM/DRA Family"
- 	depends on ARCH_MULTI_V6 || ARCH_MULTI_V7
- 
--config ARCH_OMAP
--	bool
--
- config ARCH_OMAP2
- 	bool "TI OMAP2"
- 	depends on ARCH_MULTI_V6
-diff --git a/arch/arm/plat-omap/Kconfig b/arch/arm/plat-omap/Kconfig
-index 02fc10d..d055db3 100644
---- a/arch/arm/plat-omap/Kconfig
-+++ b/arch/arm/plat-omap/Kconfig
-@@ -1,3 +1,6 @@
-+config ARCH_OMAP
-+	bool
-+
- if ARCH_OMAP
- 
- menu "TI OMAP Common Features"
+No idea, please resend.
