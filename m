@@ -1,35 +1,39 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 09 Sep 2014 11:39:05 +0100
-Subject: [PATCH v2] ARM/arm64: KVM: fix use of WnR bit in
- kvm_is_write_fault()
-In-Reply-To: <1410258429-17090-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1410258429-17090-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <540ED8C9.2080609@arm.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 8 Sep 2014 15:03:21 +0100
+Subject: [PATCH v10 06/10] PCI: Introduce generic domain handling for PCI
+ busses.
+In-Reply-To: <1410184472-17630-7-git-send-email-Liviu.Dudau@arm.com>
+References: <1410184472-17630-1-git-send-email-Liviu.Dudau@arm.com>
+ <1410184472-17630-7-git-send-email-Liviu.Dudau@arm.com>
+Message-ID: <20140908140321.GF22717@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/09/14 11:27, Ard Biesheuvel wrote:
-> The ISS encoding for an exception from a Data Abort has a WnR
-> bit[6] that indicates whether the Data Abort was caused by a
-> read or a write instruction. While there are several fields
-> in the encoding that are only valid if the ISV bit[24] is set,
-> WnR is not one of them, so we can read it unconditionally.
+On Mon, Sep 08, 2014 at 02:54:28PM +0100, Liviu Dudau wrote:
+> The handling of PCI domains (or PCI segments in ACPI speak) is
+> usually a straightforward affair but its implementation is
+> currently left to the architectural code, with pci_domain_nr(b)
+> querying the value of the domain associated with bus b.
 > 
-> Instead of fixing both implementations of kvm_is_write_fault()
-> in place, reimplement it just once using kvm_vcpu_dabt_iswrite(),
-> which already does the right thing with respect to the WnR bit.
-> Also fix up the callers to pass 'vcpu'
+> This patch introduces CONFIG_PCI_DOMAINS_GENERIC as an
+> option that can be selected if an architecture want a
+> simple implementation where the value of the domain
+> associated with a bus is stored in struct pci_bus.
 > 
-> Acked-by: Laszlo Ersek <lersek@redhat.com>
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> The architectures that select CONFIG_PCI_DOMAINS_GENERIC will
+> then have to implement pci_bus_assign_domain_nr() as a way
+> of setting the domain number associated with a root bus.
+> All child busses except the root bus will inherit the domain_nr
+> value from their parent.
+> 
+> Cc: Bjorn Helgaas <bhelgaas@google.com>
+> Cc: Arnd Bergmann <arnd@arndb.de>
+> Signed-off-by: Catalin Marinas <Catalin.Marinas@arm.com>
+> [Renamed pci_set_domain_nr() to pci_bus_assign_domain_nr()]
+> Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
 
-Because I like that kind of diffstat:
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+I'm probably the author here, but the patch log doesn't say so (I don't
+mind, just a remark).
 
-Christoffer, if you too are happy with that, I'll queue it right away.
-
-Thanks,
-
-	M.
 -- 
-Jazz is not dead. It just smells funny...
+Catalin
