@@ -1,74 +1,60 @@
-From: daniel.thompson@linaro.org (Daniel Thompson)
-Date: Mon, 08 Sep 2014 14:22:57 +0100
-Subject: [PATCH v1 1/6] arm: fiq: Replace default FIQ handler
-In-Reply-To: <alpine.LFD.2.11.1409051348200.16533@knanqh.ubzr>
-References: <1409662853-29313-1-git-send-email-daniel.thompson@linaro.org>
- <1409846620-14542-1-git-send-email-daniel.thompson@linaro.org>
- <1409846620-14542-2-git-send-email-daniel.thompson@linaro.org>
- <alpine.LFD.2.11.1409041452500.16533@knanqh.ubzr>
- <54097C6B.7040805@linaro.org>
- <alpine.LFD.2.11.1409051348200.16533@knanqh.ubzr>
-Message-ID: <540DADB1.4060105@linaro.org>
+From: balbi@ti.com (Felipe Balbi)
+Date: Mon, 8 Sep 2014 08:24:03 -0500
+Subject: [PATCH 2/2] ARM: dts: omap5: Add dr_mode for dwc3
+In-Reply-To: <540D9449.3090008@compulab.co.il>
+References: <1381402195-29257-1-git-send-email-kishon@ti.com>
+ <1381402195-29257-2-git-send-email-kishon@ti.com>
+ <52580F34.8030809@ti.com> <20140416161619.GH28035@saruman.home>
+ <540D9449.3090008@compulab.co.il>
+Message-ID: <20140908132403.GA22409@saruman.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/09/14 19:04, Nicolas Pitre wrote:
-> On Fri, 5 Sep 2014, Daniel Thompson wrote:
+Hi,
+
+On Mon, Sep 08, 2014 at 02:34:33PM +0300, Dmitry Lifshitz wrote:
+> Hi Felipe, Roger
 > 
->> On 04/09/14 19:57, Nicolas Pitre wrote:
->>> On Thu, 4 Sep 2014, Daniel Thompson wrote:
->>>
->>>> +@ svc_exit_via_fiq - similar to svc_exit but switches to FIQ mode before exit
->>>> +@
->>>> +@ This macro acts in a similar manner to svc_exit but switches to FIQ
->>>> +@ mode to restore the final part of the register state.
->>>> +@
->>>> +@ We cannot use the normal svc_exit procedure because that would
->>>> +@ clobber spsr_svc (FIQ could be delivered during the first few instructions
->>>> +@ of vector_swi meaning its contents have not been saved anywhere).
->>>> +@
->>>
->>> Wouldn't it be better for this macro to live in entry-header.S alongside 
->>> the others?
->>
->> I'm not sure either way.
->>
->> svc_exit_from_fiq isn't needed by entry-common.S and cannot be used by
->> entry-v7m.S because v7m has no FIQ. For that reason I decided to place
->> it alongside svc_entry in entry-armv.S rather than alongside svc_exit in
->> entry-header.S .
+> On 04/16/2014 07:16 PM, Felipe Balbi wrote:
+> >On Fri, Oct 11, 2013 at 05:46:12PM +0300, Roger Quadros wrote:
+> >>Hi,
+> >>
+> >>On 10/10/2013 01:49 PM, Kishon Vijay Abraham I wrote:
+> >>>From: George Cherian <george.cherian@ti.com>
+> >>>
+> >>>Added dr_mode property in dwc3 and set its default mode to device.
+> >>
+> >>If there is a specific reason why this is not set to "otg", we need
+> >>to explain it here.
+> >>
+> >>AFAIK the port is meant to be used as OTG port.
+> >
+> >we still don't have the workaround for dual role ports, I've been
+> >working on it but still need to retest and make sure it's working fine
+> >before merging upstream.
+> >
 > 
-> Here's a list of macros from entry-headers.S that I don't see being used 
-> in entry-v7m.S: zero_fp, alignment_trap, store_user_sp_lr, 
-> load_user_sp_lr, svc_exit, ct_user_exit, ct_user_enter.
-
-All except one of of these are consumed either by entry-common.S or by
-entry-header.S itself.
-
-svc_exit is the only exception, it is exclusively consumed by entry-armv.S.
-
-
-> Yet, entry-header.S contains macros such as v7m_exception_entry and 
-> v7m_exception_slow_exit which are unlikely to ever be used in 
-> entry-armv.S.
-
-Although these macros are v7m specific they are used in
-conditionally compiled code within entry-common.S in order to implement
-system call handlers.
-
-
->> I am happy to move it if you have a strong preference here. Please let
->> me know.
 > 
-> I don't have a strong preference, but a preference nevertheless.
+> Does the OTG port suppose to work with OMAP5? I mean role switching
+> mechanism?
 > 
-> It just looks odd that a file is already dedicated to gather all those 
-> macros for similar purposes and this one is not there.  That makes 
-> future code review/maintenance a bit annoying if similar things are not 
-> kept in one place.
+> I'm testing kernel v3.16 with OMAP5 based board (CM-T54).
+> 
+> If I set CONFIG_USB_DWC3_DUAL_ROLE, than nothing is going on when I plug
+> some device/host cable into micro USB3.0 port (VBUS/ID detection with extcon
+> events works fine).
 
-I will move the macro to entry-common.S in order to keep it alongside
-its workalike function svc_exit.
+Dual role does not work. We allow the driver to the built with both Host
+and Peripheral support because some platforms have more than one port
+and building the driver with dual role allows us to make one port host
+and one peripheral.
 
-That said, I do retain a (pretty weakly held) view that both these
-macros might be better off moved to entry-armv.S .
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140908/5ab8a951/attachment.sig>
