@@ -1,43 +1,59 @@
-From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Mon, 8 Sep 2014 13:39:40 -0600
-Subject: [PATCH RESEND] ARM: PCI: Use PCI_CLASS_* defines for PCI class
-In-Reply-To: <20140908180357.GA6159@obsidianresearch.com>
-References: <1410163532-31057-1-git-send-email-lisovy@gmail.com>
- <CAErSpo7sOc72V3g5tOov8Yj4nKiuJupaUTKEEecHMcqEUrzh_g@mail.gmail.com>
- <20140908180357.GA6159@obsidianresearch.com>
-Message-ID: <CAErSpo7QQMRFKSk4vQCkDeEQQXX87Gq5YAKR+P4bxxcqMSJeDw@mail.gmail.com>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Mon, 8 Sep 2014 20:40:23 +0100
+Subject: Unable to boot mainline on snow chromebook since 3.15
+In-Reply-To: <CAD=FV=VAqzvJQDQMjjeQ1p5okyDzE=ff_sguObZxh59qbzcaTQ@mail.gmail.com>
+References: <20140905115704.GO13515@arm.com> <20140905122232.GP13515@arm.com>
+ <CAD=FV=VfioJf9VYoSYL0QBk-bN93-Ecx3=0n9hb5Q4rcx43-_g@mail.gmail.com>
+ <540C202E.2060009@collabora.co.uk> <540C7F5B.6070307@gmail.com>
+ <540C83DE.10505@collabora.co.uk> <540C8577.2070907@gmail.com>
+ <20140908112112.GK26030@arm.com>
+ <CACxGe6v40wMSW8LJRtyZ3C6PinRMcQM-Zog+XpTJ-QG3HHJknw@mail.gmail.com>
+ <CAD=FV=VAqzvJQDQMjjeQ1p5okyDzE=ff_sguObZxh59qbzcaTQ@mail.gmail.com>
+Message-ID: <CACxGe6t_ex1bU=CvTpXR4VJgNf1hAq33hr6ykbHy_sMXEk4h-g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[-cc Mike's old email address]
-
-On Mon, Sep 8, 2014 at 12:03 PM, Jason Gunthorpe
-<jgunthorpe@obsidianresearch.com> wrote:
-> On Mon, Sep 08, 2014 at 10:36:36AM -0600, Bjorn Helgaas wrote:
+On Mon, Sep 8, 2014 at 4:58 PM, Doug Anderson <dianders@chromium.org> wrote:
+> Grant,
 >
->> Presumably these devices have PCI BARs (since that's how dev->resource
->> got filled in), and we want to somehow ignore them, not assign
->> resources to them, and not allow drivers to use whatever is mapped by
->> the BARs.  But clearing out the struct resources isn't really safe by
->> itself.  The hardware BAR still contains some value, and may still be
->> enabled, which means that it may conflict with other devices.
+> On Mon, Sep 8, 2014 at 5:20 AM, Grant Likely <grant.likely@secretlab.ca> wrote:
+>> On Mon, Sep 8, 2014 at 12:21 PM, Will Deacon <will.deacon@arm.com> wrote:
+>>> On Sun, Sep 07, 2014 at 05:19:03PM +0100, Tomasz Figa wrote:
+>>>> At least for next 3.17-rc I'd suggest fixing this up in respective clock
+>>>> driver and dropping the hack only after Exynos DRM patches are merged
+>>>> and confirmed working.
+>>>
+>>> Whilst I'm sympathetic to people working to enable DRM, I think this is
+>>> the right solution to the problem. The transition from simplefb to DRM
+>>> shouldn't break display for a bunch of kernel revisions whilst the code is
+>>> in flux.
+>>
+>> I would go further. The kernel behaviour has changed, and we have to
+>> deal with platforms that assume the old behaviour. That means either
+>> defaulting to leaving enabled regulators/clocks alone unless there is
+>> a flag in the DT saying they can be power managed, or black listing
+>> platforms that are known to depend on the regulator being on.
+>>
+>> Updating the device tree must not be required to get the kernel to
+>> boot, but it is valid to require a DT upgrade to get better
+>> performance (battery life) out of the platform.
 >
-> I've seen this pattern before in the old mvebu stuff.
+> In this case people using SImple FB are not really using an officially
+> sanctioned device tree.  The simple-fb fragment is created on the fly
+> via a "DO NOT SUBMIT" patch sitting on a code review server.  It's not
+> something that's shipped with real firmware nor is it something
+> present in the kernel.  See
+> <https://chromium-review.googlesource.com/#/c/49358/2/board/samsung/smdk5250/smdk5250.c>
+> as I mentioned above.
 >
-> Essentially for that case the mvebu HW is a repurposed end port core,
-> so when working as a root port it presents an end port config space
-> (not a root port bridge config space). The BAR in that config space is
-> not relevant, so the old mvebu used code like this to hide it from the
-> PCI core. Otherwise the core will try to program it from the aperture,
-> and the default BAR size is really big, so it runs out of space.
+> Is this really a device tree that we need to guarantee backward
+> compatibility with?
 
-How does mvebu deal with this now?  I don't see anything similar in pci-mvebu.c.
+Well, lets see... We've got a real user complaining about a platform
+that used to work on mainline, and no longer does. The only loophole
+for ignoring breakage is if there nobody cares that it is broken. That
+currently isn't the case. So even though it's based on a patch that
+has "DO NOT SUBMIT" in large friendly letters on the front cover, it
+doesn't change the situation that mainline has a regression.
 
-If the BAR is still a functioning PCI BAR, i.e., it decodes address
-space and potentially responds to accesses there, we really should pay
-attention to it.  That doesn't mean we have to assign space to it, but
-for example, we might want to make sure we have PCI_COMMAND_MEM turned
-off.  If we just clear out the resource start/end/flags, the PCI core
-doesn't have enough information to do that.
-
-Bjorn
+g.
