@@ -1,161 +1,75 @@
-From: lifshitz@compulab.co.il (Dmitry Lifshitz)
-Date: Mon, 08 Sep 2014 15:32:37 +0300
-Subject: [PATCH 2/2] ARM: dts: omap5: Add dr_mode for dwc3
-In-Reply-To: <540D955C.6060602@ti.com>
-References: <1381402195-29257-1-git-send-email-kishon@ti.com>
- <1381402195-29257-2-git-send-email-kishon@ti.com> <52580F34.8030809@ti.com>
- <20140416161619.GH28035@saruman.home> <540D9449.3090008@compulab.co.il>
- <540D955C.6060602@ti.com>
-Message-ID: <540DA1E5.1060701@compulab.co.il>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 8 Sep 2014 14:36:48 +0200
+Subject: [PATCH 5/7 v6] ARM: l2c: parse 'cache-size' and 'cache-sets'
+ properties
+In-Reply-To: <4685530.jbNLD4yaA8@wuerfel>
+References: <1410176286-32533-1-git-send-email-linus.walleij@linaro.org>
+ <1410176286-32533-6-git-send-email-linus.walleij@linaro.org>
+ <4685530.jbNLD4yaA8@wuerfel>
+Message-ID: <CACRpkdb_bS0P-fGxogiyCzG9CRPhJK1Gro=H3X1Ks_-UoXh52w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Roger,
-
-Thank you for a quick reply. See, my reply below.
-
-On 09/08/2014 02:39 PM, Roger Quadros wrote:
-> On 09/08/2014 02:34 PM, Dmitry Lifshitz wrote:
->> Hi Felipe, Roger
->>
->> On 04/16/2014 07:16 PM, Felipe Balbi wrote:
->>> On Fri, Oct 11, 2013 at 05:46:12PM +0300, Roger Quadros wrote:
->>>> Hi,
->>>>
->>>> On 10/10/2013 01:49 PM, Kishon Vijay Abraham I wrote:
->>>>> From: George Cherian <george.cherian@ti.com>
->>>>>
->>>>> Added dr_mode property in dwc3 and set its default mode to device.
->>>>
->>>> If there is a specific reason why this is not set to "otg", we need
->>>> to explain it here.
->>>>
->>>> AFAIK the port is meant to be used as OTG port.
->>>
->>> we still don't have the workaround for dual role ports, I've been
->>> working on it but still need to retest and make sure it's working fine
->>> before merging upstream.
->>>
->>
->>
->> Does the OTG port suppose to work with OMAP5? I mean role switching mechanism?
->>
->> I'm testing kernel v3.16 with OMAP5 based board (CM-T54).
->>
->> If I set CONFIG_USB_DWC3_DUAL_ROLE, than nothing is going on when I plug some device/host cable into micro USB3.0 port (VBUS/ID detection with extcon events works fine).
->>
->> CONFIG_USB_DWC3_HOST/CONFIG_USB_DWC3_GADGET bring port to appropriate mode and it works.
->>
->> What is the purpose of setting dr_mode = "peripheral" in omap5.dtsi, since it is overridden by config options in dwc3_probe()?
+On Mon, Sep 8, 2014 at 2:20 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Monday 08 September 2014 13:38:04 Linus Walleij wrote:
+>> +       of_property_read_u32(np, "cache-size", &size);
+>> +       of_property_read_u32(np, "cache-sets", &sets);
+>> +
+>> +       if (!size || !sets)
+>> +               return;
+>> +
+>> +       way_size = size / sets;
 >
-> If dual role works it should be "otg" then. I'm not sure why it was set to peripheral. Maybe the role switching mechanism
-> was not in place earlier.
-
-
-This is what I have when setting dr_mode = "otg" (and compiling with 
-CONFIG_USB_DWC3_DUAL_ROLE):
-
-when load gadget driver and plugging host PC cable:
-
-root at cm-debian:~# modprobe g_ether
-using random self ethernet address
-using random host ethernet address
-usb0: HOST MAC fa:db:52:7f:95:c5
-usb0: MAC be:75:8d:71:6d:02
-using random self ethernet address
-using random host ethernet address
-g_ether gadget: Ethernet Gadget, version: Memorial Day 2008
-g_ether gadget: g_ether ready
-root at cm-debian:~# ------------[ cut here ]------------
-WARNING: CPU: 0 PID: 65 at 
-/home/lifshitz/workroot/git-repo/OMAP5/omap5-kernel/drivers/bus/omap_l3_noc.c:147 
-l3_handle_target.isra.2+0x230/0x27c()
-44000000.ocp:L3 Standard Error: MASTER UN IDENTIFIED TARGET OCMRAM 
-(Read): At Address: 0x00000000 : Data Access in User mode during 
-Functional access
-Modules linked in: usb_f_eem g_ether usb_f_rndis libcomposite u_ether 
-configfs rfcomm ecb btmrvl_sdio btmrvl bluetooth mwifiex_sdio mwifiex 
-dwc3 ahci_platform libahci_platform libahci libata snd_soc_cm_t54 
-ads7846 dwc3_omap extcon_palmas rtc_palmas extcon_class at24 
-snd_soc_wm8731 snd_soc_omap_mcbsp
-CPU: 0 PID: 65 Comm: irq/39-palmas Tainted: G        W 
-3.16.0-cm-t54+ #99
-[<c00156d0>] (unwind_backtrace) from [<c00124ac>] (show_stack+0x10/0x14)
-[<c00124ac>] (show_stack) from [<c05e29dc>] (dump_stack+0x74/0x8c)
-[<c05e29dc>] (dump_stack) from [<c0037dbc>] (warn_slowpath_common+0x70/0x88)
-[<c0037dbc>] (warn_slowpath_common) from [<c0037e68>] 
-(warn_slowpath_fmt+0x30/0x40)
-[<c0037e68>] (warn_slowpath_fmt) from [<c02d88b8>] 
-(l3_handle_target.isra.2+0x230/0x27c)
-[<c02d88b8>] (l3_handle_target.isra.2) from [<c02d89b0>] 
-(l3_interrupt_handler+0xac/0x13c)
-[<c02d89b0>] (l3_interrupt_handler) from [<c007ea00>] 
-(handle_irq_event_percpu+0x7c/0x230)
-[<c007ea00>] (handle_irq_event_percpu) from [<c007ebf8>] 
-(handle_irq_event+0x44/0x64)
-[<c007ebf8>] (handle_irq_event) from [<c0081b78>] 
-(handle_fasteoi_irq+0xa8/0x134)
-[<c0081b78>] (handle_fasteoi_irq) from [<c007e398>] 
-(generic_handle_irq+0x20/0x30)
-[<c007e398>] (generic_handle_irq) from [<c000f4ac>] (handle_IRQ+0x40/0x90)
-[<c000f4ac>] (handle_IRQ) from [<c0008620>] (gic_handle_irq+0x2c/0x60)
-[<c0008620>] (gic_handle_irq) from [<c05eacc0>] (__irq_svc+0x40/0x50)
-Exception stack(0xec939d80 to 0xec939dc8)
-9d80: ecb729b0 20000013 00000000 00000001 ecb72800 eca1e000 00000000 
-ec939e44
-9da0: ec939ed0 20000013 ecb72818 ed005e14 ec939ec8 ec939dc8 bf015f54 
-c05ea548
-9dc0: 80000013 ffffffff
-[<c05eacc0>] (__irq_svc) from [<c05ea548>] 
-(_raw_spin_unlock_irqrestore+0x1c/0x20)
-[<c05ea548>] (_raw_spin_unlock_irqrestore) from [<bf015f54>] 
-(extcon_update_state+0x144/0x1c4 [extcon_class])
-[<bf015f54>] (extcon_update_state [extcon_class]) from [<bf023288>] 
-(palmas_vbus_irq_handler+0x64/0xa0 [extcon_palmas])
-[<bf023288>] (palmas_vbus_irq_handler [extcon_palmas]) from [<c00815a8>] 
-(handle_nested_irq+0xa0/0x10c)
-[<c00815a8>] (handle_nested_irq) from [<c03ab85c>] 
-(regmap_irq_thread+0x184/0x300)
-[<c03ab85c>] (regmap_irq_thread) from [<c007f8b8>] (irq_thread_fn+0x1c/0x40)
-[<c007f8b8>] (irq_thread_fn) from [<c007f6a4>] (irq_thread+0x120/0x15c)
-[<c007f6a4>] (irq_thread) from [<c0056434>] (kthread+0xdc/0xf0)
-[<c0056434>] (kthread) from [<c000eb98>] (ret_from_fork+0x14/0x3c)
----[ end trace 3b365a734f7f3202 ]---
-palmas-usb 48070000.i2c:palmas at 48:palmas_usb: USB cable is attached
-
-
-
-when plugging storage device:
-
-root at cm-debian:~# dmesg | tail -n20
-...
-omap-dwc3 4a020000.omap_dwc3: ID GND
-palmas-usb 48070000.i2c:palmas at 48:palmas_usb: USB-HOST cable is attached
-palmas-usb 48070000.i2c:palmas at 48:palmas_usb: USB cable is attached
-
-and nothing is going on.
-
-Once again, when compiling with predefined role 
-(CONFIG_USB_DWC3_HOST/CONFIG_USB_DWC3_GADGET) the port is functional in 
-both modes.
-
-I'm wondering, if dwc3_probe() calls
-dwc3_core_init_mode() -> dwc3_set_mode() than why it is not required in 
-dwc3_omap_set_mailbox()?
-
-
+> Going back to this one: Isn't (size / sets) the set-size rather
+> than the way-size?
 >
-> George any objections for "otg"?
+> After we discussed this on IRC, I had expected a calculation like
 >
-> cheers,
-> -roger
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
->
->
+>         set_size = size / sets;
+>         ways = set_size / line_size;
+>         way_size = size / ways;
 
-Thanks,
+First: in this PB1176 case:
 
-Dmitry
+set_size = 128K/8 = 16K
+ways = 16K/32 = 512 bytes
+way_size = 128K/512 = 128 bytes
+
+Well maybe it's the ARM reference manual internal lingo that
+is actually causing the confusion here. It will say something
+like:
+
+[19:17] Way-size 3?b000 = Reserved, internally mapped to 16KB
+3?b001 = 16KB, this is the default value
+3?b010 = 32KB
+3?b011 = 64KB
+3?b100 = 128KB
+3?b101 = 256KB
+3?b110 to 3?b111 = Reserved, internally mapped to 256 KB
+
+OK way-size ... is in the 16 thru 256KB range, which fits nicely
+with set size incidentally. And also corresponds to current
+comments in the code such as this from
+arch/arm/mach-realview/realview_pb1176.c:
+
+#ifdef CONFIG_CACHE_L2X0
+        /*
+         * The PL220 needs to be manually configured as the hardware
+         * doesn't report the correct sizes.
+         * 128kB (16kB/way), 8-way associativity, event monitor and
+         * parity enabled, ignore share bit, no force write allocate
+         * Bits:  .... ...0 0111 0011 0000 .... .... ....
+         */
+        l2x0_init(__io_address(REALVIEW_PB1176_L220_BASE), 0x00730000,
+0xfe000fff);
+#endif
+
+I can add a comment explaining that ARMs terminology does
+not match the academic terminology or something, and say that
+the thing we poke into "way-size" is actually "set size", if we agree
+that is what we're seeing here.
+
+Florian: what was your interpretation?
+
+Yours,
+Linus Walleij
