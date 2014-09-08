@@ -1,88 +1,115 @@
-From: ludovic.desroches@atmel.com (Ludovic Desroches)
-Date: Mon, 8 Sep 2014 10:40:31 +0200
-Subject: [PATCH v2] iio: adc: at91: don't use the last converted data register
-Message-ID: <1410165631-8688-1-git-send-email-ludovic.desroches@atmel.com>
+From: achandran@mvista.com (Arun Chandran)
+Date: Mon, 8 Sep 2014 14:22:28 +0530
+Subject: [PATCH V3] irqchip:gic: change access of gicc_ctrl register to
+ read modify write.
+In-Reply-To: <1393537013-6264-1-git-send-email-fkan@apm.com>
+References: <1393537013-6264-1-git-send-email-fkan@apm.com>
+Message-ID: <CAFdej02vSm8TbUWGsMr936WN1GNmJ0SBuEKQkKyzKoEjtVmc+g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If touchscreen mode is enabled and a conversion is requested on another
-channel, the result in the last converted data register can be a
-touchscreen relative value. Starting a conversion involves to do a
-conversion for all active channel. It starts with ADC channels and ends
-with touchscreen channels. Then if ADC_LCD register is not read quickly,
-its content may be a touchscreen conversion.
-To remove this temporal constraint, the conversion value is taken from
-the channel data register.
+Hi Feng,
 
-Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
----
+Is this patch still needed to fix perf calltrace?
+http://lists.infradead.org/pipermail/linux-arm-kernel/2014-June/265814.html
 
-Changes from v1:
-- use GENMASK and BIT macros
+On Fri, Feb 28, 2014 at 3:06 AM, Feng Kan <fkan@apm.com> wrote:
+> This change is made to preserve the GIC v2 releated bits in the
+> GIC_CPU_CTRL register (also known as the GICC_CTLR register in spec).
+> The original code only set the enable/disable group bit in this register.
+> This code will preserve the bypass bits configured by the bootload except
+> the enable/disable bit. The main reason for this change is to allow the
+> bypass bits specified in the v2 spec to remain untouched by the current
+> GIC code. In the X-Gene platform, the bypass functionality is not used
+> and bypass must be disabled at all time.
+>
+> Signed-off-by: Vinayak Kale <vkale@apm.com>
+> Acked-by: Anup Patel <apatel@apm.com>
+> Signed-off-by: Feng Kan <fkan@apm.com>
+> ---
+> V3 Changes:
+>         - Sorry, forgot to change the mask for cpu_init path
+>           assumed bootloader setup bits correctly.
+> V2 Changes:
+>         - only mask off v2 bypass bits
+>  drivers/irqchip/irq-gic.c |   32 +++++++++++++++++++++++++++++---
+>  1 files changed, 29 insertions(+), 3 deletions(-)
+>
+> diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
+> index 341c601..3ca7995 100644
+> --- a/drivers/irqchip/irq-gic.c
+> +++ b/drivers/irqchip/irq-gic.c
+> @@ -418,6 +418,7 @@ static void gic_cpu_init(struct gic_chip_data *gic)
+>         void __iomem *dist_base = gic_data_dist_base(gic);
+>         void __iomem *base = gic_data_cpu_base(gic);
+>         unsigned int cpu_mask, cpu = smp_processor_id();
+> +       unsigned int ctrl_mask;
+>         int i;
+>
+>         /*
+> @@ -449,13 +450,29 @@ static void gic_cpu_init(struct gic_chip_data *gic)
+>                 writel_relaxed(0xa0a0a0a0, dist_base + GIC_DIST_PRI + i * 4 / 4);
+>
+>         writel_relaxed(0xf0, base + GIC_CPU_PRIMASK);
+> -       writel_relaxed(1, base + GIC_CPU_CTRL);
+> +
+> +       ctrl_mask = readl(base + GIC_CPU_CTRL);
 
- drivers/iio/adc/at91_adc.c |   12 +++++++-----
- 1 file changed, 7 insertions(+), 5 deletions(-)
+readl_relaxed() here?
 
-diff --git a/drivers/iio/adc/at91_adc.c b/drivers/iio/adc/at91_adc.c
-index 3b5bacd..1812d12 100644
---- a/drivers/iio/adc/at91_adc.c
-+++ b/drivers/iio/adc/at91_adc.c
-@@ -196,6 +196,7 @@ struct at91_adc_state {
- 	bool			done;
- 	int			irq;
- 	u16			last_value;
-+	int			chnb;
- 	struct mutex		lock;
- 	u8			num_channels;
- 	void __iomem		*reg_base;
-@@ -274,7 +275,7 @@ void handle_adc_eoc_trigger(int irq, struct iio_dev *idev)
- 		disable_irq_nosync(irq);
- 		iio_trigger_poll(idev->trig, iio_get_time_ns());
- 	} else {
--		st->last_value = at91_adc_readl(st, AT91_ADC_LCDR);
-+		st->last_value = at91_adc_readl(st, AT91_ADC_CHAN(st, st->chnb));
- 		st->done = true;
- 		wake_up_interruptible(&st->wq_data_avail);
- 	}
-@@ -351,7 +352,7 @@ static irqreturn_t at91_adc_rl_interrupt(int irq, void *private)
- 	unsigned int reg;
- 
- 	status &= at91_adc_readl(st, AT91_ADC_IMR);
--	if (status & st->registers->drdy_mask)
-+	if (status & GENMASK(st->num_channels, 0))
- 		handle_adc_eoc_trigger(irq, idev);
- 
- 	if (status & AT91RL_ADC_IER_PEN) {
-@@ -418,7 +419,7 @@ static irqreturn_t at91_adc_9x5_interrupt(int irq, void *private)
- 		AT91_ADC_IER_YRDY |
- 		AT91_ADC_IER_PRDY;
- 
--	if (status & st->registers->drdy_mask)
-+	if (status & GENMASK(st->num_channels, 0))
- 		handle_adc_eoc_trigger(irq, idev);
- 
- 	if (status & AT91_ADC_IER_PEN) {
-@@ -689,9 +690,10 @@ static int at91_adc_read_raw(struct iio_dev *idev,
- 	case IIO_CHAN_INFO_RAW:
- 		mutex_lock(&st->lock);
- 
-+		st->chnb = chan->channel;
- 		at91_adc_writel(st, AT91_ADC_CHER,
- 				AT91_ADC_CH(chan->channel));
--		at91_adc_writel(st, AT91_ADC_IER, st->registers->drdy_mask);
-+		at91_adc_writel(st, AT91_ADC_IER, BIT(chan->channel));
- 		at91_adc_writel(st, AT91_ADC_CR, AT91_ADC_START);
- 
- 		ret = wait_event_interruptible_timeout(st->wq_data_avail,
-@@ -708,7 +710,7 @@ static int at91_adc_read_raw(struct iio_dev *idev,
- 
- 		at91_adc_writel(st, AT91_ADC_CHDR,
- 				AT91_ADC_CH(chan->channel));
--		at91_adc_writel(st, AT91_ADC_IDR, st->registers->drdy_mask);
-+		at91_adc_writel(st, AT91_ADC_IDR, BIT(chan->channel));
- 
- 		st->last_value = 0;
- 		st->done = false;
--- 
-1.7.9.5
+> +
+> +       /* Mask out the gic v2 bypass bits */
+> +       ctrl_mask &= 0x1e0;
+> +
+> +       /* Enable group 0 */
+> +       ctrl_mask |= 0x1;
+> +       writel_relaxed(ctrl_mask, base + GIC_CPU_CTRL);
+>  }
+>
+>  void gic_cpu_if_down(void)
+>  {
+> +       unsigned int ctrl_mask;
+>         void __iomem *cpu_base = gic_data_cpu_base(&gic_data[0]);
+> -       writel_relaxed(0, cpu_base + GIC_CPU_CTRL);
+> +
+> +       ctrl_mask = readl(cpu_base + GIC_CPU_CTRL);
+readl_relaxed() here?
+
+> +       /*
+> +        * Disable grp enable bit, leave the bypass bits alone as changing
+> +        * them could leave the system unstable
+> +        */
+> +       ctrl_mask &= 0x1e0;
+> +       writel_relaxed(ctrl_mask, cpu_base + GIC_CPU_CTRL);
+>  }
+>
+>  #ifdef CONFIG_CPU_PM
+> @@ -566,6 +583,7 @@ static void gic_cpu_restore(unsigned int gic_nr)
+>  {
+>         int i;
+>         u32 *ptr;
+> +       unsigned int ctrl_mask;
+>         void __iomem *dist_base;
+>         void __iomem *cpu_base;
+>
+> @@ -590,7 +608,15 @@ static void gic_cpu_restore(unsigned int gic_nr)
+>                 writel_relaxed(0xa0a0a0a0, dist_base + GIC_DIST_PRI + i * 4);
+>
+>         writel_relaxed(0xf0, cpu_base + GIC_CPU_PRIMASK);
+> -       writel_relaxed(1, cpu_base + GIC_CPU_CTRL);
+> +
+> +       ctrl_mask = readl(cpu_base + GIC_CPU_CTRL);
+
+readl_relaxed() here?
+
+> +
+> +       /* Mask out the gic v2 bypass bits */
+> +       ctrl_mask &= 0x1e0;
+> +
+> +       /* Enable group 0 */
+> +       ctrl_mask |= 0x1;
+> +       writel_relaxed(ctrl_mask, cpu_base + GIC_CPU_CTRL);
+>  }
+>
+
+--Arun
