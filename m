@@ -1,75 +1,49 @@
-From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Mon, 8 Sep 2014 10:36:36 -0600
-Subject: [PATCH RESEND] ARM: PCI: Use PCI_CLASS_* defines for PCI class
-In-Reply-To: <1410163532-31057-1-git-send-email-lisovy@gmail.com>
-References: <1410163532-31057-1-git-send-email-lisovy@gmail.com>
-Message-ID: <CAErSpo7sOc72V3g5tOov8Yj4nKiuJupaUTKEEecHMcqEUrzh_g@mail.gmail.com>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Mon, 8 Sep 2014 10:39:05 -0600
+Subject: [PATCH v10 07/10] OF: Introduce helper function for getting PCI
+ domain_nr
+In-Reply-To: <20140908155931.GP27864@e106497-lin.cambridge.arm.com>
+References: <1410184472-17630-1-git-send-email-Liviu.Dudau@arm.com>
+ <1410184472-17630-8-git-send-email-Liviu.Dudau@arm.com>
+ <CAL_JsqJi8k1Goc3UmXhuxf9v7=4gJrYG_Di7v574PxS8TsJaXw@mail.gmail.com>
+ <20140908145459.GO27864@e106497-lin.cambridge.arm.com>
+ <CAL_JsqJdGKDVwJOpPp19OkVPGzR7Zqv3nh+ONHHaYnPLYTYoYg@mail.gmail.com>
+ <20140908155931.GP27864@e106497-lin.cambridge.arm.com>
+Message-ID: <20140908163905.GC29679@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[+cc Mike]
+On Mon, Sep 08, 2014 at 04:59:31PM +0100, Liviu Dudau wrote:
 
-This doesn't touch drivers/pci or conflict with any PCI-related
-changes, so I'll leave this up to Russell.  My comments on this are
-just kibbitzing.
+> > I don't really understand how domains are used so it's hard to provide
+> > a recommendation here. Do domains even belong in the DT?
+> 
+> ACPI calls them segments and the way Bjorn explained it to me at some moment was
+> that it was an attempt to split up a bus in different groups (or alternatively,
+> merge a few busses together). To be honest I haven't seen systems where the domain
+> is anything other than zero, but JasonG (or maybe Benjamin) were floating an
+> idea of using the domain number to identify physical slots.
 
-On Mon, Sep 8, 2014 at 2:05 AM, Rostislav Lisovy <lisovy@gmail.com> wrote:
-> Signed-off-by: Rostislav Lisovy <lisovy@gmail.com>
-> Reviewed-by: Yijing Wang <wangyijing@huawei.com>
-> ---
-> The header file include/linux/pci_ids.h defines
-> #define PCI_CLASS_BRIDGE_OTHER          0x0680
-> #define PCI_CLASS_SYSTEM_DMA            0x0801
->
-> ((struct pci_dev*)dev)->class
-> corresponds to the 3 bytes Class code in the PCI Configuration space
-> header -- 1B Base class, 1B Sub-class, 1B Reg-level interface.
->
-> In that case
-> (PCI_CLASS_BRIDGE_OTHER << 8)
-> is equivalent to 0x68000 (imagine the leading zero)
-> and
-> ((PCI_CLASS_SYSTEM_DMA << 8) | 0x03))
-> is equivalent to 0x80103.
+A PCI domain qualifies the bus:device.function addressing so that we
+can have duplicate BDFs in the system.
 
-This part looks like it's supposed to be the changelog, which should
-be above the Signed-off-by.
+So, yes, they belong in DT - each 'top level' PCI node naturally
+represents a unique set of BDF addressing below it, and could alias
+other top level nodes. The first step to resolve a BDF to a DT node is
+to find the correct 'top level' by mapping the domain number.
 
->  arch/arm/kernel/bios32.c |    5 ++---
->  1 file changed, 2 insertions(+), 3 deletions(-)
->
-> diff --git a/arch/arm/kernel/bios32.c b/arch/arm/kernel/bios32.c
-> index 17a26c1..e511ad1 100644
-> --- a/arch/arm/kernel/bios32.c
-> +++ b/arch/arm/kernel/bios32.c
-> @@ -255,10 +255,9 @@ static void pci_fixup_it8152(struct pci_dev *dev)
->  {
->         int i;
->         /* fixup for ITE 8152 devices */
-> -       /* FIXME: add defines for class 0x68000 and 0x80103 */
->         if ((dev->class >> 8) == PCI_CLASS_BRIDGE_HOST ||
-> -           dev->class == 0x68000 ||
-> -           dev->class == 0x80103) {
-> +           dev->class == (PCI_CLASS_BRIDGE_OTHER << 8) ||
-> +           dev->class == ((PCI_CLASS_SYSTEM_DMA << 8) | 0x03)) {
->                 for (i = 0; i < PCI_NUM_RESOURCES; i++) {
->                         dev->resource[i].start = 0;
->                         dev->resource[i].end   = 0;
+In an ideal world no small scale system should ever have domains. They
+were primarily introduced for large scale NUMA system that actually
+have more than 256 PCI busses.
 
-The interesting part to me is the part you didn't change, i.e.,
-setting the resource start/end/flags to 0.  That's all from
-a8fc0789558d ("[ARM] 4577/1: ITE 8152 PCI bridge support"), which
-unfortunately doesn't have any more details about *why* this is
-needed.
+However, from a DT prespective, we've been saying that if the SOC
+presents a PCI-E root port that shares nothing with other root ports
+(ie aperture, driver instance, config space) then those ports must be
+represented by unique 'top level' DT nodes, and each DT node must be
+assigned to a Linux PCI domain.
 
-Presumably these devices have PCI BARs (since that's how dev->resource
-got filled in), and we want to somehow ignore them, not assign
-resources to them, and not allow drivers to use whatever is mapped by
-the BARs.  But clearing out the struct resources isn't really safe by
-itself.  The hardware BAR still contains some value, and may still be
-enabled, which means that it may conflict with other devices.
+IMHO, designing such a SOC ignores the API guidelines provides by the
+PCI-E spec itself, and I hope such a thing won't be considered SBSA
+compatible..
 
-I guess you're not making a functional change, so maybe we don't need
-to worry about this.  But it does leave me scratching my head a bit.
-
-Bjorn
+Jason
