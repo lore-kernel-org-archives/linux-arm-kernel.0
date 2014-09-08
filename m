@@ -1,52 +1,142 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 8 Sep 2014 15:50:48 +0100
-Subject: [PATCH 1/2] arm64: psci: respect MIGRATE_INFO_TYPE
-In-Reply-To: <CAJ5Y-eZVus1TjEXSoq9edJbYYTneH0jm=Tbx0LfVQG8ZSeJDEg@mail.gmail.com>
-References: <1409915540-20044-1-git-send-email-mark.rutland@arm.com>
- <1409915540-20044-2-git-send-email-mark.rutland@arm.com>
- <CAJ5Y-eZqWsLT1ERWsdzCQASgzCfFTgn6fCBCpc7ceMoU2ONkNA@mail.gmail.com>
- <20140905141345.GF20164@leverpostej>
- <CAJ5Y-eb3jJSaR4VCPFe+A+PVbLAbyVGBAcb+_zsOQQ=Rhk9Q0g@mail.gmail.com>
- <20140908141434.GJ12081@leverpostej>
- <CAJ5Y-eZVus1TjEXSoq9edJbYYTneH0jm=Tbx0LfVQG8ZSeJDEg@mail.gmail.com>
-Message-ID: <20140908145047.GM12081@leverpostej>
+From: grant.likely@linaro.org (Grant Likely)
+Date: Mon, 08 Sep 2014 15:52:04 +0100
+Subject: [PATCH] RFC: add function for localbus address
+In-Reply-To: <1409672700-21697-1-git-send-email-svarbanov@mm-sol.com>
+References: <20140729234522.E9FF1C40738@trevor.secretlab.ca>
+ <1409672700-21697-1-git-send-email-svarbanov@mm-sol.com>
+Message-ID: <20140908145204.8ADC2C40AE5@trevor.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 08, 2014 at 03:25:47PM +0100, Ashwin Chaugule wrote:
-> On 8 September 2014 10:14, Mark Rutland <mark.rutland@arm.com> wrote:
-> > [...]
-> >
-> >> >> Guessing there is no way for us to know which CPU the UP TOS is
-> >> >> running on and only deny hotplug on that CPU?
-> >> >
-> >> > In the comment above I mention we can use MIGRATE_INFO_UP_CPU for that.
-> >> > I started down that route, but the plumbing for it ended up looking a
-> >> > little crazy so I thought it was better for the moment to have a simple
-> >> > solution that we can backport to stable.
-> >>
-> >> Ah. I faintly recollect experiencing similar craziness when I was
-> >> adding v0.2 support.
-> >
-> > Yeah, it's lot of churny fun with many function prototypes changing
-> > about. I wasn't too keen on rushing that, though I would like to get
-> > around to it at some point.
-> >
-> >> > No systems with a UP trusted OS (migrateable or not) have hit my radar
-> >> > yet, and we're currently broken for them anyhow. So for the moment it
-> >> > didn't seem worthwhile implementing support for those. We can add the
-> >> > requisite MIGRATE_INFO_UP_CPU and MIGRATE calls in a later series.
-> >>
-> >> Ok.
-> >>
-> >> Acked-by: Ashwin Chaugule <ashwin.chaugule@linaro.org>
-> >
-> > Thanks.
-> >
-> > Does that apply to both patches or just the arm64 one?
+On Tue,  2 Sep 2014 18:45:00 +0300, Stanimir Varbanov <svarbanov@mm-sol.com> wrote:
+> Hi Grant,
 > 
-> Sorry, just looked at it. Please consider the ACK for both.
+> I came down to this. Could you review? Is that
+> implementation closer to the suggestion made by you.
+> 
+> ---
+>  drivers/of/address.c       |   49 ++++++++++++++++++++++++++++++++++++++++++++
+>  drivers/of/platform.c      |   20 ++++++++++++++---
+>  include/linux/of_address.h |   19 +++++++++++++++++
+>  3 files changed, 84 insertions(+), 4 deletions(-)
+> 
+> diff --git a/drivers/of/address.c b/drivers/of/address.c
+> index e371825..86c2166 100644
+> --- a/drivers/of/address.c
+> +++ b/drivers/of/address.c
+> @@ -601,6 +601,32 @@ const __be32 *of_get_address(struct device_node *dev, int index, u64 *size,
+>  }
+>  EXPORT_SYMBOL(of_get_address);
+>  
+> +const __be32 *of_get_localbus_address(struct device_node *np, int index,
+> +				      u64 *size)
+> +{
+> +	struct device_node *root, *parent;
+> +	const __be32 *ranges, *prop = NULL;
+> +
+> +	parent = of_get_parent(np);
+> +	if (!parent)
+> +		return NULL;
+> +
+> +	root = of_find_node_by_path("/");
+> +
+> +	if (parent == root) {
+> +		of_node_put(parent);
+> +		return NULL;
+> +	}
+> +
+> +	ranges = of_get_property(parent, "ranges", NULL);
+> +	of_node_put(parent);
+> +
+> +	if (!ranges)
+> +		prop = of_get_address(np, index, size, NULL);
+> +
+> +	return prop;
+> +}
 
-Thanks for taking a look, it's much appreciated.
+So, the above doesn't make much sense to me. It looks like the function
+merely decodes the local address, and the below function will stuff it
+into a resource structure, but the tests for if the parent is root or
+the parent has a ranges property are nonsensical. That shouldn't matter
+for the functionality (except for automatically decoding them.. more
+below)
 
-Mark.
+> +
+>  unsigned long __weak pci_address_to_pio(phys_addr_t address)
+>  {
+>  	if (address > IO_SPACE_LIMIT)
+> @@ -665,6 +691,29 @@ int of_address_to_resource(struct device_node *dev, int index,
+>  }
+>  EXPORT_SYMBOL_GPL(of_address_to_resource);
+>  
+> +int of_localbus_address_to_resource(struct device_node *dev, int index,
+> +				    struct resource *r)
+> +{
+> +	const char *name = NULL;
+> +	const __be32 *addrp;
+> +	u64 size;
+> +
+> +	addrp = of_get_localbus_address(dev, index, &size);
+> +	if (!addrp)
+> +		return -EINVAL;
+> +
+> +	of_property_read_string_index(dev, "reg-names", index, &name);
+> +
+> +	memset(r, 0, sizeof(*r));
+> +	r->start = be32_to_cpup(addrp);
+> +	r->end = r->start + size - 1;
+> +	r->flags = IORESOURCE_REG;
+
+This is problematic. A resource is created, but there is absolutely no
+indication that the resource represents a localbus address instead of a
+CPU address. platform_device reg resources represent CPU addresses.
+Trying to overload it will cause confusion in drivers.
+
+> +	r->name = name ? name : dev->full_name;
+> +
+> +	return 0;
+> +}
+> +EXPORT_SYMBOL_GPL(of_localbus_address_to_resource);
+> +
+>  struct device_node *of_find_matching_node_by_address(struct device_node *from,
+>  					const struct of_device_id *matches,
+>  					u64 base_address)
+> diff --git a/drivers/of/platform.c b/drivers/of/platform.c
+> index 0197725..36dcbd7 100644
+> --- a/drivers/of/platform.c
+> +++ b/drivers/of/platform.c
+> @@ -106,8 +106,9 @@ struct platform_device *of_device_alloc(struct device_node *np,
+>  				  struct device *parent)
+>  {
+>  	struct platform_device *dev;
+> -	int rc, i, num_reg = 0, num_irq;
+> +	int rc, i, num_reg = 0, num_localbus_reg = 0, num_irq;
+>  	struct resource *res, temp_res;
+> +	int num_resources;
+>  
+>  	dev = platform_device_alloc("", -1);
+>  	if (!dev)
+> @@ -116,22 +117,33 @@ struct platform_device *of_device_alloc(struct device_node *np,
+>  	/* count the io and irq resources */
+>  	while (of_address_to_resource(np, num_reg, &temp_res) == 0)
+>  		num_reg++;
+> +
+> +	while (of_localbus_address_to_resource(np,
+> +					num_localbus_reg, &temp_res) == 0)
+> +		num_localbus_reg++;
+> +
+
+No, I don't support doing this. The moment a platform_driver depends on
+a local bus address it is doing something special. It needs to decode
+its own address in that case, which it can easily do.
+
+Any platform_driver that interprets a IORESOURCE_REG as a localbus
+address instead of a CPU address is *BROKEN*. It should be changed to
+either decode the address itself, of a new bus type should be created
+that can make its own decisions about what address resources mean.
+
+I realize that you want to reuse the platform populate functionality in
+this case. We can refactor some of that code to make it usable for
+customized platform_bus_type instances.
+
+g.
