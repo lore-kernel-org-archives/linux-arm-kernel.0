@@ -1,65 +1,63 @@
 From: peter.griffin@linaro.org (Peter Griffin)
-Date: Mon,  8 Sep 2014 13:04:46 +0100
-Subject: [PATCH v6 3/5] usb: host: ehci-st: Add ehci-st devicetree bindings
+Date: Mon,  8 Sep 2014 13:04:47 +0100
+Subject: [PATCH v6 4/5] usb: host: ohci-st: Add ohci-st devicetree bindings
  documentation
 In-Reply-To: <1410177888-26710-1-git-send-email-peter.griffin@linaro.org>
 References: <1410177888-26710-1-git-send-email-peter.griffin@linaro.org>
-Message-ID: <1410177888-26710-4-git-send-email-peter.griffin@linaro.org>
+Message-ID: <1410177888-26710-5-git-send-email-peter.griffin@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch documents the device tree bindings required for the
-ehci on-chip controller found in ST consumer electronics SoC's.
+This patch documents the device tree bindings required for
+the ohci on-chip controller found in ST consumer electronics SoC's.
 
 Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
 ---
- Documentation/devicetree/bindings/usb/ehci-st.txt | 39 +++++++++++++++++++++++
- 1 file changed, 39 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/usb/ehci-st.txt
+ Documentation/devicetree/bindings/usb/ohci-st.txt | 37 +++++++++++++++++++++++
+ 1 file changed, 37 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/usb/ohci-st.txt
 
-diff --git a/Documentation/devicetree/bindings/usb/ehci-st.txt b/Documentation/devicetree/bindings/usb/ehci-st.txt
+diff --git a/Documentation/devicetree/bindings/usb/ohci-st.txt b/Documentation/devicetree/bindings/usb/ohci-st.txt
 new file mode 100644
-index 0000000..fb45fa5
+index 0000000..6d83937
 --- /dev/null
-+++ b/Documentation/devicetree/bindings/usb/ehci-st.txt
-@@ -0,0 +1,39 @@
-+ST USB EHCI controller
++++ b/Documentation/devicetree/bindings/usb/ohci-st.txt
+@@ -0,0 +1,37 @@
++ST USB OHCI controller
 +
 +Required properties:
-+ - compatible		: must be "st,st-ehci-300x"
++
++ - compatible		: must be "st,st-ohci-300x"
 + - reg			: physical base addresses of the controller and length of memory mapped
 +			  region
-+ - interrupts		: one EHCI interrupt should be described here
-+ - pinctrl-names	: a pinctrl state named "default" must be defined
-+ - pinctrl-0		: phandle referencing pin configuration of the USB controller
-+See: Documentation/devicetree/bindings/pinctrl/pinctrl-binding.txt
++ - interrupts		: one OHCI controller interrupt should be described here
 + - clocks		: phandle list of usb clocks
 + - clock-names		: should be "ic" for interconnect clock and "clk48"
 +See: Documentation/devicetree/bindings/clock/clock-bindings.txt
 +
 + - phys			: phandle for the PHY device
 + - phy-names		: should be "usb"
-+ - resets		: phandle + reset specifier pairs to the powerdown and softreset lines
-+			  of the USB IP
-+ - reset-names		: should be "power" and "softreset"
++
++ - resets		: phandle to the powerdown and reset controller for the USB IP
++ - reset-names		: should be "power" and "softreset".
 +See: Documentation/devicetree/bindings/reset/st,sti-powerdown.txt
 +See: Documentation/devicetree/bindings/reset/reset.txt
 +
 +Example:
 +
-+	ehci1: usb at 0xfe203e00 {
-+		compatible = "st,st-ehci-300x";
-+		reg = <0xfe203e00 0x100>;
-+		interrupts = <GIC_SPI 148 IRQ_TYPE_NONE>;
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pinctrl_usb1>;
-+		clocks = <&clk_s_a1_ls 0>;
++	ohci0: usb at 0xfe1ffc00 {
++		compatible = "st,st-ohci-300x";
++		reg = <0xfe1ffc00 0x100>;
++		interrupts = <GIC_SPI 149 IRQ_TYPE_NONE>;
++		clocks = <&clk_s_a1_ls 0>,
++			 <&clockgen_b0 0>;
++		clock-names = "ic", "clk48";
 +		phys = <&usb2_phy>;
 +		phy-names = "usb";
 +		status = "okay";
 +
-+		resets = <&powerdown STIH416_USB1_POWERDOWN>,
-+			 <&softreset STIH416_USB1_SOFTRESET>;
++		resets = <&powerdown STIH416_USB0_POWERDOWN>,
++			 <&softreset STIH416_USB0_SOFTRESET>;
 +		reset-names = "power", "softreset";
 +	};
 -- 
