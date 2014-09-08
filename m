@@ -1,82 +1,43 @@
-From: boris.brezillon@free-electrons.com (Boris BREZILLON)
-Date: Mon, 8 Sep 2014 21:37:43 +0200
-Subject: [PATCH 4/5] rtc: at91sam9: retain slow clock and check its rate
-In-Reply-To: <20140908212218.6a81af86@bbrezillon>
-References: <1409733934-14465-1-git-send-email-boris.brezillon@free-electrons.com>
- <1409733934-14465-5-git-send-email-boris.brezillon@free-electrons.com>
- <20140908173338.GD14623@piout.net>
- <20140908212218.6a81af86@bbrezillon>
-Message-ID: <20140908213743.27d7a1bc@bbrezillon>
+From: bhelgaas@google.com (Bjorn Helgaas)
+Date: Mon, 8 Sep 2014 13:39:40 -0600
+Subject: [PATCH RESEND] ARM: PCI: Use PCI_CLASS_* defines for PCI class
+In-Reply-To: <20140908180357.GA6159@obsidianresearch.com>
+References: <1410163532-31057-1-git-send-email-lisovy@gmail.com>
+ <CAErSpo7sOc72V3g5tOov8Yj4nKiuJupaUTKEEecHMcqEUrzh_g@mail.gmail.com>
+ <20140908180357.GA6159@obsidianresearch.com>
+Message-ID: <CAErSpo7QQMRFKSk4vQCkDeEQQXX87Gq5YAKR+P4bxxcqMSJeDw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 8 Sep 2014 21:22:18 +0200
-Boris BREZILLON <boris.brezillon@free-electrons.com> wrote:
+[-cc Mike's old email address]
 
-> On Mon, 8 Sep 2014 19:33:38 +0200
-> Alexandre Belloni <alexandre.belloni@free-electrons.com> wrote:
-> 
-> > On 03/09/2014 at 10:45:33 +0200, Boris Brezillon wrote :
-> > > The RTT block is using the slow clock and expect it to run at 32KHz.
-> > > Now that we moved to the CCF it's better to retain the clk reference so
-> > > that the CCF can't disable the slow clock considering it is unused.
-> > > 
-> > > Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
-> > > ---
-> > >  drivers/rtc/rtc-at91sam9.c | 24 ++++++++++++++++++++++++
-> > >  1 file changed, 24 insertions(+)
-> > > 
-> > > diff --git a/drivers/rtc/rtc-at91sam9.c b/drivers/rtc/rtc-at91sam9.c
-> > > index 57014b7..5c5093b 100644
-> > > --- a/drivers/rtc/rtc-at91sam9.c
-> > > +++ b/drivers/rtc/rtc-at91sam9.c
-> > > @@ -21,6 +21,7 @@
-> > >  #include <linux/slab.h>
-> > >  #include <linux/platform_data/atmel.h>
-> > >  #include <linux/io.h>
-> > > +#include <linux/clk.h>
-> > >  
-> > >  /*
-> > >   * This driver uses two configurable hardware resources that live in the
-> > > @@ -74,6 +75,7 @@ struct sam9_rtc {
-> > >  	u32			imr;
-> > >  	void __iomem		*gpbr;
-> > >  	int 			irq;
-> > > +	struct clk		*sclk;
-> > >  };
-> > >  
-> > >  #define rtt_readl(rtc, field) \
-> > > @@ -373,6 +375,25 @@ static int at91_rtc_probe(struct platform_device *pdev)
-> > >  		return ret;
-> > >  	}
-> > >  
-> > > +	/* Retain slow clk if it is specified in the DT.
-> > > +	 * Do not complain if slow clk is missing, but check its rate
-> > > +	 * if it is available.
-> > > +	 */
-> > > +	rtc->sclk = devm_clk_get(&pdev->dev, NULL);
-> > > +	if (!IS_ERR(rtc->sclk)) {
-> > > +		if (clk_get_rate(rtc->sclk) != AT91_SLOW_CLOCK) {
-> > 
-> > I would not bother doing that check but use the value for MR instead of
-> > AT91_SLOW_CLOCK (see my previous mail).
-> 
-> Unfortunately, we can't get rid of this macro without modifying the
-> clk_lookup table in several arch/arm/mach-at91/<soc-name>.c files in
-> order to handle non DT/CCF cases (which will remain until all non DT
-> boards are moved to DT).
+On Mon, Sep 8, 2014 at 12:03 PM, Jason Gunthorpe
+<jgunthorpe@obsidianresearch.com> wrote:
+> On Mon, Sep 08, 2014 at 10:36:36AM -0600, Bjorn Helgaas wrote:
+>
+>> Presumably these devices have PCI BARs (since that's how dev->resource
+>> got filled in), and we want to somehow ignore them, not assign
+>> resources to them, and not allow drivers to use whatever is mapped by
+>> the BARs.  But clearing out the struct resources isn't really safe by
+>> itself.  The hardware BAR still contains some value, and may still be
+>> enabled, which means that it may conflict with other devices.
+>
+> I've seen this pattern before in the old mvebu stuff.
+>
+> Essentially for that case the mvebu HW is a repurposed end port core,
+> so when working as a root port it presents an end port config space
+> (not a root port bridge config space). The BAR in that config space is
+> not relevant, so the old mvebu used code like this to hide it from the
+> PCI core. Otherwise the core will try to program it from the aperture,
+> and the default BAR size is really big, so it runs out of space.
 
-After taking a closer look at what should be modified, I think it's
-worth it: there's only 5 impacted files (at91sam9260.c, at91sam9261.c,
-at91sam9263.c, at91sam9rl.c and at91sam9g45.c) and adding a clk_lookup
-entry is pretty easy.
+How does mvebu deal with this now?  I don't see anything similar in pci-mvebu.c.
 
-Moreover we'll end up with a clean driver and won't have to bother
-about cleaning it up when dropping non DT boards support.
+If the BAR is still a functioning PCI BAR, i.e., it decodes address
+space and potentially responds to accesses there, we really should pay
+attention to it.  That doesn't mean we have to assign space to it, but
+for example, we might want to make sure we have PCI_COMMAND_MEM turned
+off.  If we just clear out the resource start/end/flags, the PCI core
+doesn't have enough information to do that.
 
-
-
--- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+Bjorn
