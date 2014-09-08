@@ -1,44 +1,36 @@
-From: gautam.vivek@samsung.com (Vivek Gautam)
-Date: Mon, 8 Sep 2014 09:53:09 +0530
-Subject: [PATCH v6 4/4] phy: exynos5-usbdrd: Calibrate LOS levels for
- exynos5420/5800
-In-Reply-To: <20140905175651.GK24449@saruman.home>
-References: <1409656338-20337-1-git-send-email-gautam.vivek@samsung.com>
- <1409656338-20337-5-git-send-email-gautam.vivek@samsung.com>
- <20140902143438.GB16872@saruman.home>
- <CAFp+6iEyqmbwMLFrBKD7NVLDAC=b+h1hPKFS=BG4k9D69hn_dg@mail.gmail.com>
- <20140903144225.GD31855@saruman.home>
- <CAFp+6iETPJCWMMkjHrpDcdCv=K0PbefYLa4eBOwN=aUY2=EHLA@mail.gmail.com>
- <20140905175651.GK24449@saruman.home>
-Message-ID: <CAFp+6iGU86yL8Ry3ArJJjBy2Cs0Em2B49yssH3BK5fJwyaZbtA@mail.gmail.com>
+From: dianders@chromium.org (Doug Anderson)
+Date: Sun, 7 Sep 2014 21:36:56 -0700
+Subject: Unable to boot mainline on snow chromebook since 3.15
+In-Reply-To: <540C7F5B.6070307@gmail.com>
+References: <20140905115704.GO13515@arm.com> <20140905122232.GP13515@arm.com>
+ <CAD=FV=VfioJf9VYoSYL0QBk-bN93-Ecx3=0n9hb5Q4rcx43-_g@mail.gmail.com>
+ <540C202E.2060009@collabora.co.uk> <540C7F5B.6070307@gmail.com>
+Message-ID: <CAD=FV=UYDDhL02CrhPUAHPncepwAF2-BgTmXOamy-Mdz80S-vw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 5, 2014 at 11:26 PM, Felipe Balbi <balbi@ti.com> wrote:
-> On Thu, Sep 04, 2014 at 12:01:19PM +0530, Vivek Gautam wrote:
->> > Don't we have phy_power_on()
->> > for that ? It looks like you could just as well do this from
->> > phy_power_on() ?
->>
->> No, unfortunately keeping these calibration settings in phy_power_on()
->> doesn't help, since we need to do this after XHCI reset has happened.
+Hi,
+
+On Sun, Sep 7, 2014 at 8:52 AM, Tomasz Figa <tomasz.figa@gmail.com> wrote:
+> So I believe we've got a process issue here. If you don't have normal
+> support for display hardware, but you want to keep the display
+> operational thanks to bootloader already initializing it, you should not
+> add anything to the kernel which breaks it, until full support comes in.
 >
-> teach xHCI about PHYs ?
+> This means that respective regulators should be either always-on or not
+> listed at all (I'd favor the former) and respective clocks either
+> somehow enabled at boot-up or completely ignored, including all their
+> parents capable of being gated.
 
-sorry i couldn't understand you here.
-Aren't we trying to do the same with Heikki's patch about dwc3 :
-[PATCH 6/6] usb: dwc3: host: convey the PHYs to xhci
+It seems slightly broken to hack the device tree in this way.  I'll be
+the first to admit that I often list regulators as "always-on" during
+bringup when not everything is done, and I guess it's not that
+different.  ...but given everything going on upstream (and people
+working on Suspend/Resume, DRM, etc) it seems like it might be a bit
+of a pain.  ...but if that's what everyone agrees on, I won't disagree
+too strongly.
 
-and the 2nd patch in this series :
-[PATCH v6 2/4] usb: host: xhci-plat: Get PHYs for xhci's hcds
-
-Is there something else that is expected ?
-
-
-
-
--- 
-Best Regards
-Vivek Gautam
-Samsung R&D Institute, Bangalore
-India
+One (ugly?) solution would be to add a feature to your bootloader to
+modify the device tree to mark regulators as "always-on".  Since the
+booloader gets to touch the device tree and the bootloader is involved
+in communicating into about SimpleFB, it kinda makes sense.
