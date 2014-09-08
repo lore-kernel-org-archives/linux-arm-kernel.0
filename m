@@ -1,129 +1,56 @@
-From: ludovic.desroches@atmel.com (Ludovic Desroches)
-Date: Mon, 8 Sep 2014 09:11:57 +0200
-Subject: [RESEND PATCH] iio: adc: at91: don't use the last converted data
- register
-In-Reply-To: <20140903083506.GF10093@piout.net>
-References: <1409726069-13054-1-git-send-email-ludovic.desroches@atmel.com>
- <20140903083506.GF10093@piout.net>
-Message-ID: <20140908071157.GF4434@ldesroches-Latitude-E6320>
+From: rric@kernel.org (Robert Richter)
+Date: Mon, 8 Sep 2014 09:14:09 +0200
+Subject: [PATCH 2/6] dts, kbuild: Factor out dtbs install rules to
+ Makefile.dtbinst
+In-Reply-To: <CAL_Jsq+NYU9c0Jw8DX_iH6G5_9tom9DGcP548q4tKQsdkb-s0A@mail.gmail.com>
+References: <1409899692-1455-1-git-send-email-rric@kernel.org>
+ <1409899692-1455-3-git-send-email-rric@kernel.org>
+ <CAL_Jsq+NYU9c0Jw8DX_iH6G5_9tom9DGcP548q4tKQsdkb-s0A@mail.gmail.com>
+Message-ID: <20140908071409.GV4703@rric.localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 03, 2014 at 10:35:06AM +0200, Alexandre Belloni wrote:
-> On 03/09/2014 at 08:34:29 +0200, Ludovic Desroches wrote :
-> > If touchscreen mode is enabled and a conversion is requested on another
-> > channel, the result in the last converted data register can be a
-> > touchscreen relative value. Starting a conversion involves to do a
-> > conversion for all active channel. It starts with ADC channels and ends
-> > with touchscreen channels. Then if ADC_LCD register is not read quickly,
-> > its content may be a touchscreen conversion.
-> > To remove this temporal constraint, the conversion value is taken from
-> > the channel data register.
-> > 
-> > Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
-> 
-> I wondering whether we should get rid of drdy in the trigger path too.
-
-Yes we can, then we have to use other interrupts. It could be
-interesting because when conversion is done, it is done on all active
-channels and touchscreen (if touchscreen mode is enabled of course).
-Enabling drdy will cause to receive an interrupt after each conversion
-(usually we are not fast enough to process irqs one by one, when we get
-the first drdy irq and when we read the status register, others
-conversions have already been completed). So getting rid of drdy is a
-good idea but choosing the appropriate interrupt is a bit more
-complicated:
-- if using touchscreen with pressure measurement, we can rely on prdy
-- if using touchscreen without pressure measurement, we can rely on yrdy
-- if not using touchscreen, we can rely on EOCx where x is the higher
-  channel number.
-
-> Maybe this can be done in a follow-up patch. Else,
-> 
-> Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-> 
+On 05.09.14 07:48:30, Rob Herring wrote:
+> On Fri, Sep 5, 2014 at 1:48 AM, Robert Richter <rric@kernel.org> wrote:
+> > From: Robert Richter <rrichter@cavium.com>
+> >
+> > Move dtbs install rules to Makefile.dtbinst. This change is needed to
+> > implement support for dts vendor subdirs. The change makes Makefiles
+> > easier and smaller as no longer the dtbs_install rule needs to be
+> > defined. Another advantage is that install goals are not encoded in
+> > targets anymore (%.dtb_dtbinst_).
+> >
+> > Signed-off-by: Robert Richter <rrichter@cavium.com>
 > > ---
-> > 
-> > Sorry for the noise, there was a typo in the CC list.
-> > 
-> >  drivers/iio/adc/at91_adc.c |   14 +++++++++-----
-> >  1 file changed, 9 insertions(+), 5 deletions(-)
-> > 
-> > diff --git a/drivers/iio/adc/at91_adc.c b/drivers/iio/adc/at91_adc.c
-> > index 3b5bacd..dde22cb 100644
-> > --- a/drivers/iio/adc/at91_adc.c
-> > +++ b/drivers/iio/adc/at91_adc.c
-> > @@ -196,6 +196,7 @@ struct at91_adc_state {
-> >  	bool			done;
-> >  	int			irq;
-> >  	u16			last_value;
-> > +	int			chnb;
-> >  	struct mutex		lock;
-> >  	u8			num_channels;
-> >  	void __iomem		*reg_base;
-> > @@ -274,7 +275,7 @@ void handle_adc_eoc_trigger(int irq, struct iio_dev *idev)
-> >  		disable_irq_nosync(irq);
-> >  		iio_trigger_poll(idev->trig, iio_get_time_ns());
-> >  	} else {
-> > -		st->last_value = at91_adc_readl(st, AT91_ADC_LCDR);
-> > +		st->last_value = at91_adc_readl(st, AT91_ADC_CHAN(st, st->chnb));
-> >  		st->done = true;
-> >  		wake_up_interruptible(&st->wq_data_avail);
-> >  	}
-> > @@ -348,10 +349,11 @@ static irqreturn_t at91_adc_rl_interrupt(int irq, void *private)
-> >  	struct iio_dev *idev = private;
-> >  	struct at91_adc_state *st = iio_priv(idev);
-> >  	u32 status = at91_adc_readl(st, st->registers->status_register);
-> > +	const u32 eoc_mask = (1 << st->num_channels) - 1;
-> >  	unsigned int reg;
-> >  
-> >  	status &= at91_adc_readl(st, AT91_ADC_IMR);
-> > -	if (status & st->registers->drdy_mask)
-> > +	if (status & eoc_mask)
-> >  		handle_adc_eoc_trigger(irq, idev);
-> >  
-> >  	if (status & AT91RL_ADC_IER_PEN) {
-> > @@ -413,12 +415,13 @@ static irqreturn_t at91_adc_9x5_interrupt(int irq, void *private)
-> >  	struct iio_dev *idev = private;
-> >  	struct at91_adc_state *st = iio_priv(idev);
-> >  	u32 status = at91_adc_readl(st, st->registers->status_register);
-> > +	const u32 eoc_mask = (1 << st->num_channels) - 1;
-> >  	const uint32_t ts_data_irq_mask =
-> >  		AT91_ADC_IER_XRDY |
-> >  		AT91_ADC_IER_YRDY |
-> >  		AT91_ADC_IER_PRDY;
-> >  
-> > -	if (status & st->registers->drdy_mask)
-> > +	if (status & eoc_mask)
-> >  		handle_adc_eoc_trigger(irq, idev);
-> >  
-> >  	if (status & AT91_ADC_IER_PEN) {
-> > @@ -689,9 +692,10 @@ static int at91_adc_read_raw(struct iio_dev *idev,
-> >  	case IIO_CHAN_INFO_RAW:
-> >  		mutex_lock(&st->lock);
-> >  
-> > +		st->chnb = chan->channel;
-> >  		at91_adc_writel(st, AT91_ADC_CHER,
-> >  				AT91_ADC_CH(chan->channel));
-> > -		at91_adc_writel(st, AT91_ADC_IER, st->registers->drdy_mask);
-> > +		at91_adc_writel(st, AT91_ADC_IER, 1 << chan->channel);
-> >  		at91_adc_writel(st, AT91_ADC_CR, AT91_ADC_START);
-> >  
-> >  		ret = wait_event_interruptible_timeout(st->wq_data_avail,
-> > @@ -708,7 +712,7 @@ static int at91_adc_read_raw(struct iio_dev *idev,
-> >  
-> >  		at91_adc_writel(st, AT91_ADC_CHDR,
-> >  				AT91_ADC_CH(chan->channel));
-> > -		at91_adc_writel(st, AT91_ADC_IDR, st->registers->drdy_mask);
-> > +		at91_adc_writel(st, AT91_ADC_IDR, 1 << chan->channel);
-> >  
-> >  		st->last_value = 0;
-> >  		st->done = false;
-> > -- 
-> > 1.7.9.5
-> > 
+> >  arch/arm/Makefile            |  6 +++++-
+> >  arch/arm/boot/dts/Makefile   |  2 --
+> >  arch/arm64/Makefile          |  6 +++++-
+> >  arch/arm64/boot/dts/Makefile |  2 --
+> >  scripts/Kbuild.include       |  6 ++++++
+> >  scripts/Makefile.dtbinst     | 38 ++++++++++++++++++++++++++++++++++++++
+> >  scripts/Makefile.lib         | 12 ------------
+> >  7 files changed, 54 insertions(+), 18 deletions(-)
+> >  create mode 100644 scripts/Makefile.dtbinst
+> >
+> > diff --git a/arch/arm/Makefile b/arch/arm/Makefile
+> > index 0ce9d0f71f2a..1963d9a9a2c4 100644
+> > --- a/arch/arm/Makefile
+> > +++ b/arch/arm/Makefile
+> > @@ -313,9 +313,13 @@ $(BOOT_TARGETS): vmlinux
+> >         $(Q)$(MAKE) $(build)=$(boot)/dts MACHINE=$(MACHINE) $(boot)/dts/$@
+> >
+> >  PHONY += dtbs dtbs_install
+> > -dtbs dtbs_install: prepare scripts
+> > +
+> > +dtbs: prepare scripts
+> >         $(Q)$(MAKE) $(build)=$(boot)/dts MACHINE=$(MACHINE) $@
+> >
+> > +dtbs_install:
+> > +       $(Q)$(MAKE) $(dtbinst)=$(boot)/dts MACHINE=$(MACHINE)
 > 
-> -- 
-> Alexandre Belloni, Free Electrons
-> Embedded Linux, Kernel and Android engineering
-> http://free-electrons.com
+> Can't you get rid of MACHINE here, too?
+
+I moved this change to the end of this patch series to let maintainers
+the choise to drop the change if they are not fine with it.
+
+-Robert
