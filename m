@@ -1,41 +1,27 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Mon, 8 Sep 2014 09:12:03 -0700
-Subject: Unable to boot mainline on snow chromebook since 3.15
-In-Reply-To: <20140908160758.GS26030@arm.com>
-References: <20140905115704.GO13515@arm.com> <20140905122232.GP13515@arm.com>
- <CAD=FV=VfioJf9VYoSYL0QBk-bN93-Ecx3=0n9hb5Q4rcx43-_g@mail.gmail.com>
- <540C202E.2060009@collabora.co.uk> <540C7F5B.6070307@gmail.com>
- <CAD=FV=UYDDhL02CrhPUAHPncepwAF2-BgTmXOamy-Mdz80S-vw@mail.gmail.com>
- <540D481F.8030500@collabora.co.uk>
- <CAD=FV=U_ZwgqBWN_bLfi97rjMLmDoQBk17gtQS1_ekxJKWJO6w@mail.gmail.com>
- <20140908160758.GS26030@arm.com>
-Message-ID: <CAD=FV=UkuxpSxAhheRXqzyKLYSh6GyQPP86oD-58UsK6=gLzeQ@mail.gmail.com>
+From: abrestic@chromium.org (Andrew Bresticker)
+Date: Mon, 8 Sep 2014 09:22:11 -0700
+Subject: [PATCH v3 0/9] Tegra xHCI support
+In-Reply-To: <CAAObsKAYqpJMJnxSMxhkkRtnoEwLwgUa1y7ij5ZHvHf1jRok+Q@mail.gmail.com>
+References: <1409693701-16520-1-git-send-email-abrestic@chromium.org>
+ <CAAObsKAYqpJMJnxSMxhkkRtnoEwLwgUa1y7ij5ZHvHf1jRok+Q@mail.gmail.com>
+Message-ID: <CAL1qeaF7U9aoBp5gQPS=r+pe6krKmXdP1qak2gjhNqQMoHFB8A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Will,
-
-On Mon, Sep 8, 2014 at 9:07 AM, Will Deacon <will.deacon@arm.com> wrote:
-> On Mon, Sep 08, 2014 at 04:55:31PM +0100, Doug Anderson wrote:
->> So "simple-framebuffer" is added to the device tree here:
+On Mon, Sep 8, 2014 at 8:34 AM, Tomeu Vizoso <tomeu@tomeuvizoso.net> wrote:
+> On 2 September 2014 23:34, Andrew Bresticker <abrestic@chromium.org> wrote:
 >>
->> https://chromium-review.googlesource.com/#/c/49358/2/board/samsung/smdk5250/smdk5250.c
->>
->> That's one of the two patches to build your own U-Boot for enabling
->> simplefb.  You'll notice that's not a super official thing.  It's a
->> "DO NOT SUBMIT" patch sitting in a gerrit code review server, so I
->> wouldn't exactly call it a stable ABI that we can't break.  It's not
->> something shipping in real products and it's not even landed in a git
->> tree (I suppose maybe someone somewhere landed it, but...).
+>> Tested on Venice2, Jetson TK1, and Big with a variety of USB2.0 and
+>> USB3.0 memory sticks and ethernet dongles using controller firmware
+>> recently posted by Andrew Chew [2].
 >
-> I just took the uboot image linked to from the chromium.org page here:
+> I have had mixed results when testing this on a Jetson TK1 board. Of 8
+> USB devices I tested with, about half where probed correctly, but the
+> other half repeatedly fail in hub_port_init because in the GET_STATUS
+> right after the reset, the C_PORT_CONNECTION bit is set.
 >
->   http://www.chromium.org/chromium-os/u-boot-porting-guide/using-nv-u-boot-on-the-samsung-arm-chromebook#TOC-Getting-nv-U-Boot
+> I don't see any correlation between the failure and the kind of usb
+> device, but I don't have much experience with USB implementations
+> either.
 
-Ah, OK.  It's still using the "DO NOT SUBMIT" patchs, but I guess
-given that there is a binary built up there by a fairly official
-source...  Hrmm.  I think Olof is the one that built that.  Perhaps
-he'd be willing to muck with that and see if he can grab the
-regulators?
-
--Doug
+Hmm... I haven't seen that before.  Which particular devices were you using?
