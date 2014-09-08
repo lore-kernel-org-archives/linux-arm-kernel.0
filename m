@@ -1,45 +1,126 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 08 Sep 2014 17:26:26 +0200
-Subject: [PATCHv2] rtc: pcf8563: fix uninitialized use warning
-Message-ID: <2750370.rlMuFcoBUA@wuerfel>
+From: robherring2@gmail.com (Rob Herring)
+Date: Mon, 8 Sep 2014 10:27:36 -0500
+Subject: [PATCH v10 07/10] OF: Introduce helper function for getting PCI
+ domain_nr
+In-Reply-To: <20140908145459.GO27864@e106497-lin.cambridge.arm.com>
+References: <1410184472-17630-1-git-send-email-Liviu.Dudau@arm.com>
+ <1410184472-17630-8-git-send-email-Liviu.Dudau@arm.com>
+ <CAL_JsqJi8k1Goc3UmXhuxf9v7=4gJrYG_Di7v574PxS8TsJaXw@mail.gmail.com>
+ <20140908145459.GO27864@e106497-lin.cambridge.arm.com>
+Message-ID: <CAL_JsqJdGKDVwJOpPp19OkVPGzR7Zqv3nh+ONHHaYnPLYTYoYg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-gcc-4.9 found a potential condition under which the 'pending'
-variable may be used uninitialized:
+On Mon, Sep 8, 2014 at 9:54 AM, Liviu Dudau <Liviu.Dudau@arm.com> wrote:
+> On Mon, Sep 08, 2014 at 03:27:56PM +0100, Rob Herring wrote:
+>> On Mon, Sep 8, 2014 at 8:54 AM, Liviu Dudau <Liviu.Dudau@arm.com> wrote:
+>> > Add of_pci_get_domain_nr() to retrieve the PCI domain number
+>> > of a given device from DT. If the information is not present,
+>> > the function can be requested to allocate a new domain number.
+>> >
+>> > Cc: Bjorn Helgaas <bhelgaas@google.com>
+>> > Cc: Arnd Bergmann <arnd@arndb.de>
+>> > Cc: Grant Likely <grant.likely@linaro.org>
+>> > Cc: Rob Herring <robh+dt@kernel.org>
+>> > Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
+>> > Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
+>> > ---
+>> >  drivers/of/of_pci.c    | 34 ++++++++++++++++++++++++++++++++++
+>> >  include/linux/of_pci.h |  7 +++++++
+>> >  2 files changed, 41 insertions(+)
+>> >
+>> > diff --git a/drivers/of/of_pci.c b/drivers/of/of_pci.c
+>> > index 8481996..a107edb 100644
+>> > --- a/drivers/of/of_pci.c
+>> > +++ b/drivers/of/of_pci.c
+>> > @@ -89,6 +89,40 @@ int of_pci_parse_bus_range(struct device_node *node, struct resource *res)
+>> >  }
+>> >  EXPORT_SYMBOL_GPL(of_pci_parse_bus_range);
+>> >
+>> > +static atomic_t of_domain_nr = ATOMIC_INIT(-1);
+>> > +
+>> > +/**
+>> > + * This function will try to obtain the host bridge domain number by
+>> > + * using of_alias_get_id() call with "pci-domain" as a stem. If that
+>> > + * fails, a local allocator will be used. The local allocator can
+>> > + * be requested to return a new domain_nr if the information is missing
+>> > + * from the device tree.
+>> > + *
+>> > + * @node: device tree node with the domain information
+>> > + * @allocate_if_missing: if DT lacks information about the domain nr,
+>> > + * allocate a new number.
+>> > + *
+>> > + * Returns the associated domain number from DT, or a new domain number
+>> > + * if DT information is missing and @allocate_if_missing is true. If
+>> > + * @allocate_if_missing is false then the last allocated domain number
+>> > + * will be returned.
+>> > + */
+>> > +int of_pci_get_domain_nr(struct device_node *node, bool allocate_if_missing)
+>> > +{
+>> > +       int domain;
+>> > +
+>> > +       domain = of_alias_get_id(node, "pci-domain");
+>> > +       if (domain == -ENODEV) {
+>> > +               if (allocate_if_missing)
+>> > +                       domain = atomic_inc_return(&of_domain_nr);
+>> > +               else
+>> > +                       domain = atomic_read(&of_domain_nr);
+>>
+>> This function seems a bit broken to me. It is overloaded with too many
+>> different outcomes. Think about how this would work if you have
+>> multiple PCI buses and a mixture of having pci-domain aliases or not.
+>> Aren't domain numbers global? Allocation should then start outside of
+>> the range of alias ids.
+>>
+>> Rob
+>>
+>
+> Rob,
+>
+> Would this version make more sense?
 
-drivers/rtc/rtc-pcf8563.c: In function 'pcf8563_irq':
-drivers/rtc/rtc-pcf8563.c:173:5: warning: 'pending' may be used uninitialized in this function [-Wmaybe-uninitialized]
+No.
 
-This is because in the pcf8563_get_alarm_mode() function, we
-check any nonzero return of pcf8563_read_block_data, but
-in the irq function we only check for negative values, so
-a possible positive value does not get detected if the compiler
-chooses not to inline the entire call chain.
+> int of_pci_get_domain_nr(struct device_node *node, bool allocate_if_missing)
+> {
+>        int domain;
+>
+>        domain = of_alias_get_id(node, "pci-domain");
+>        if (domain == -ENODEV) {
+>                if (allocate_if_missing)
+>                        domain = atomic_inc_return(&of_domain_nr);
+>                else
+>                        domain = atomic_read(&of_domain_nr);
+>        } else {
+>                /* remember the largest value seen */
+>                int d = atomic_read(&of_domain_nr);
+>                atomic_set(&of_domain_nr, max(domain, d));
+>        }
+>
+>        return domain;
+> }
+> EXPORT_SYMBOL_GPL(of_pci_get_domain_nr);
+>
+> It would still create gaps and possible duplicates, but this is just a number
+> and trying to create a new root bus in an existing domain should fail. I have
 
-Checking for any non-zero value in the interrupt handler as well
-is just as correct and lets the compiler know what we are doing,
-without needing a bogus initialization.
+Is failure okay in that case?
 
-As pointed out by Sergei Shtylyov, the same code section contains
-another bug: an interrupt handler is not supposed to return
-an errno value. Let's fix this as well by returning IRQ_NONE
-in case of a communication error.
+> no clue on how to generate unique values without parsing the DT and filling
+> a sparse array with values found there and then checking for allocated values
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+You really only need to know the maximum value and then start the
+non-DT allocations from there.
 
-diff --git a/drivers/rtc/rtc-pcf8563.c b/drivers/rtc/rtc-pcf8563.c
-index 5a197d9dc7e7..c2ef0a22ee94 100644
---- a/drivers/rtc/rtc-pcf8563.c
-+++ b/drivers/rtc/rtc-pcf8563.c
-@@ -167,8 +167,8 @@ static irqreturn_t pcf8563_irq(int irq, void *dev_id)
- 	char pending;
- 
- 	err = pcf8563_get_alarm_mode(pcf8563->client, NULL, &pending);
--	if (err < 0)
--		return err;
-+	if (err)
-+		return IRQ_NONE;
- 
- 	if (pending) {
- 		rtc_update_irq(pcf8563->rtc, 1, RTC_IRQF | RTC_AF);
+> on new requests. This function gets called quite a lot and I'm trying not to
+> make it too heavy weight.
+
+Generally, nothing should be accessing the same DT value frequently.
+It should get cached somewhere.
+
+I don't really understand how domains are used so it's hard to provide
+a recommendation here. Do domains even belong in the DT? This function
+is just a weird mixture of data retrieval and allocation. I think you
+need to separate it into 2 functions.
+
+Rob
