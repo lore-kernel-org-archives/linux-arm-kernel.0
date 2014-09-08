@@ -1,56 +1,59 @@
-From: daniel.thompson@linaro.org (Daniel Thompson)
-Date: Mon, 08 Sep 2014 12:03:59 +0100
-Subject: [PATCH v2 4/5] arm64: Introduce dummy version of asm/fiq.h
-In-Reply-To: <20140905165033.GD10976@arm.com>
-References: <1409846620-14542-1-git-send-email-daniel.thompson@linaro.org>
- <1409931198-22600-1-git-send-email-daniel.thompson@linaro.org>
- <1409931198-22600-5-git-send-email-daniel.thompson@linaro.org>
- <20140905165033.GD10976@arm.com>
-Message-ID: <540D8D1F.5000804@linaro.org>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 8 Sep 2014 13:14:15 +0200
+Subject: [PATCH 2/8 v2] leds: add device tree bindings for register bit
+ LEDs
+In-Reply-To: <CAMuHMdXB_6vJpTeDgr4iiA=T_3bK7nQ3anF-HSdnEz=2QqYzaw@mail.gmail.com>
+References: <1409659354-23553-1-git-send-email-linus.walleij@linaro.org>
+ <1409659354-23553-3-git-send-email-linus.walleij@linaro.org>
+ <CAMuHMdXB_6vJpTeDgr4iiA=T_3bK7nQ3anF-HSdnEz=2QqYzaw@mail.gmail.com>
+Message-ID: <CACRpkdbk=QL_N-sTADBi09jZmGs_0A9EMctNmxVOxOFr61_=LA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/09/14 17:50, Catalin Marinas wrote:
-> On Fri, Sep 05, 2014 at 04:33:17PM +0100, Daniel Thompson wrote:
->> Drivers that are shared between arm and arm64 and which employ
->> FIQ on arm cannot include asm/fiq.h without #ifdef'ing. This patch
->> introduces a dummy version of asm/fiq.h to arm64 to avoid this.
->>
->> Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
->> Cc: Catalin Marinas <catalin.marinas@arm.com>
->> Cc: Will Deacon <will.deacon@arm.com>
->> ---
->>  arch/arm64/include/asm/fiq.h | 18 ++++++++++++++++++
->>  1 file changed, 18 insertions(+)
->>  create mode 100644 arch/arm64/include/asm/fiq.h
->>
->> diff --git a/arch/arm64/include/asm/fiq.h b/arch/arm64/include/asm/fiq.h
->> new file mode 100644
->> index 0000000..909ec54
->> --- /dev/null
->> +++ b/arch/arm64/include/asm/fiq.h
->> @@ -0,0 +1,18 @@
->> +/*
->> + * arch/arm64/include/asm/fiq.h
->> + *
->> + * Placeholder to reduce #ifdef'ing in shared arm/arm64 drivers.
->> + */
+On Tue, Sep 2, 2014 at 4:22 PM, Geert Uytterhoeven <geert@linux-m68k.org> wrote:
+> On Tue, Sep 2, 2014 at 2:02 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
+>> +LED sub-node properties:
 >> +
->> +#ifndef __ASM_FIQ_H
->> +#define __ASM_FIQ_H
->> +
->> +/*
->> + * This placeholder allows code of the following form to be simplified:
->> + *
->> + * #ifdef CONFIG_FIQ
->> + * #include <asm/fiq.h>
->> + * #endif
->> + */
->> +
->> +#endif
-> 
-> OK, we add a dummy file, but please keep it simple. Comments are fine
-> but no need for header guards (nor the file name, on arm64 we try to get
-> rid of them, though some still slip through).
+>> +Required properties:
+>> +- compatible : must be "register-bit-led"
+>> +- offset : register offset to the register controlling this LED
+>> +- mask : bit mask for the bit controlling this LED in the register
+>
+> Why don't you use a "reg" property with "#address-cells = <2>" and
+> "#size-cells = <1>", so you can store offset and mask there?
 
-Ok. I'll fix this.
+Because "reg" means a register range not based off another range,
+i.e. not relative, and the OF cores does not allow overlapping
+reg ranges as would be the case here IIRC.
+
+>> +syscon: syscon at 10000000 {
+>> +       compatible = "arm,realview-pb1176-syscon", "syscon";
+>> +       reg = <0x10000000 0x1000>;
+>> +
+>> +       led at 08.0 {
+>> +               compatible = "register-bit-led";
+>> +               offset = <0x08>;
+>> +               mask = <0x01>;
+>> +               label = "versatile:0";
+>> +               linux,default-trigger = "heartbeat";
+>> +               default-state = "on";
+>> +       };
+>
+> ePAPR v1.1 says:
+>
+> "The unit-address must match the first address specified in the reg property
+>  of the node. If the node has no reg property, the @ and unit-address must
+>  be omitted ..."
+>
+> So you cannot have the "@8.0" without a "reg" property.
+
+This terminology was suggested by Rob Herring due to the fact that
+there were no previous examples.
+
+Rob: care to comment?
+
+Right now I have that distinct feeling of despair as the v8 patch set
+is still stuck in DT syntax discussions...
+
+Yours,
+Linus Walleij
