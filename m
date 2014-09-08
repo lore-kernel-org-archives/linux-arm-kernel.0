@@ -1,35 +1,58 @@
-From: anders.berg@avagotech.com (Anders Berg)
-Date: Mon, 8 Sep 2014 13:02:32 +0200
-Subject: [PATCH 1/2] gpio: Add driver for AXM55xx SSP chip selects
-In-Reply-To: <20140906135308.GC2601@sirena.org.uk>
-References: <1409576021-24828-1-git-send-email-anders.berg@avagotech.com>
- <1409576021-24828-2-git-send-email-anders.berg@avagotech.com>
- <CACRpkdby4H-fivNn_kG2uL0EjsCGAc+t6OyFi0+VcNGf2Z9NQA@mail.gmail.com>
- <20140904170630.GL29327@sirena.org.uk>
- <CACRpkdZEoBan=Lqr1T-iY41U9NfMA_MCLX3LA=juw7X4pmRvSQ@mail.gmail.com>
- <CAE0=X_3QO5p26M=FS7joKS3zD6LAM_moFutHNcyE1-CjauL3Rw@mail.gmail.com>
- <20140906135308.GC2601@sirena.org.uk>
-Message-ID: <CAE0=X_2q1Z+pGuh6OY9Si5jbrF9HkczNFUqUgK_8xBekNvMeyQ@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 8 Sep 2014 12:03:14 +0100
+Subject: [PATCH 06/11] KVM: vgic: declare probe function pointer as const
+In-Reply-To: <CAKv+Gu8vAuHfnq5BfV=wac8SP3VYMizxg_7K4Baitj0TbWfYaw@mail.gmail.com>
+References: <540C32A8.1000409@linaro.org>
+ <CAKv+Gu8vAuHfnq5BfV=wac8SP3VYMizxg_7K4Baitj0TbWfYaw@mail.gmail.com>
+Message-ID: <20140908110314.GG26030@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Sep 6, 2014 at 3:53 PM, Mark Brown <broonie@kernel.org> wrote:
-> On Fri, Sep 05, 2014 at 11:05:37AM +0200, Anders Berg wrote:
->
->> Well, the problem with adding this to the spi-pl022 driver (as a
->> vendor specific extension) is that this IP block unfortunately isn't
->> distinguishable from the standard ARM PL022 implementation (same
->> values in the PrimeCell identification registers). That's why I went
->> down the GPIO path...
->
-> Would it not be more straightforward to just register it as a platform
-> device in this case, or use a separate OF ID in the DT?  We appear to
-> specify a compatible string when registering AMBA devices even if we are
-> capable of identifying using the ID registers.
+On Sun, Sep 07, 2014 at 11:34:57AM +0100, Ard Biesheuvel wrote:
+> > We extract the vgic probe function from the of_device_id data pointer,
+> > which is const. Kill the sparse warning by ensuring that the local
+> > function pointer is also marked as const.
+> >
+> > Cc: Marc Zyngier <marc.zyngier@arm.com>
+> > Signed-off-by: Will Deacon <will.deacon@arm.com>
+> > ---
+> >  virt/kvm/arm/vgic.c | 4 ++--
+> >  1 file changed, 2 insertions(+), 2 deletions(-)
+> >
+> > diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
+> > index d1cfe672b9d7..efe6eee2e7eb 100644
+> > --- a/virt/kvm/arm/vgic.c
+> > +++ b/virt/kvm/arm/vgic.c
+> > @@ -1557,8 +1557,8 @@ static const struct of_device_id vgic_ids[] = {
+> >  int kvm_vgic_hyp_init(void)
+> >  {
+> >         const struct of_device_id *matched_id;
+> > -       int (*vgic_probe)(struct device_node *,const struct vgic_ops **,
+> > -                         const struct vgic_params **);
+> > +       const int (*vgic_probe)(struct device_node *,const struct vgic_ops **,
+> > +                               const struct vgic_params **);
+> >         struct device_node *vgic_node;
+> >         int ret;
+> >
+> 
+> Hi all,
 
-I'll drop this gpio patch for now and submit a patch on the pl022
-driver instead. I read the arm,primecell binding and learned that
-there is a property (arm,primecell-periphid) that can be used to
-override the HW PrimeCell ID. Seems like something to use here, right?
+Hi Ard,
 
-/Anders
+> I noticed this patch in kvmarm/next, and I think it is wrong.
+> 
+> Sparse complains about the fact that you are assigning the value of a
+> pointer to const data to a pointer to non-const data, and this is not
+> what is happening. Dereferencing a function pointer does not give you
+> an lvalue, so a function pointer points to const data by definition,
+> and the assignment is fine and sparse is wrong. The fact that you can
+> squelch the warning by typing the function pointer as returning a
+> by-value const result only emphasizes how confused sparse gets about
+> this.
+
+Great, if you're fixing sparse (looks like you are) then we can drop this
+patch from -next.
+
+Cheers,
+
+Will
