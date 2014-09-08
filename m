@@ -1,58 +1,58 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Mon, 08 Sep 2014 20:43:40 +0200
-Subject: [PATCH v5 0/4] Patches to add support for Rockchip dwc2 controller
-In-Reply-To: <1407470159-14722-1-git-send-email-kever.yang@rock-chips.com>
-References: <1407470159-14722-1-git-send-email-kever.yang@rock-chips.com>
-Message-ID: <4508852.pY5QcWPyfZ@diego>
+From: nm@ti.com (Nishanth Menon)
+Date: Mon, 8 Sep 2014 13:47:27 -0500
+Subject: [PATCH 6/6] ARM: dts: dra7-evm: Mark uart1 rxd as wakeup capable
+In-Reply-To: <1408716235-26164-7-git-send-email-nm@ti.com>
+References: <1408716235-26164-1-git-send-email-nm@ti.com>
+ <1408716235-26164-7-git-send-email-nm@ti.com>
+Message-ID: <20140908184727.GA2103@kahuna>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Greg,
+On 09:03-20140822, Nishanth Menon wrote:
+>  	status = "okay";
+>  	pinctrl-names = "default";
+>  	pinctrl-0 = <&uart1_pins>;
+> +	interrupts-extended = <&gic GIC_SPI 67 IRQ_TYPE_LEVEL_HIGH
+> +			       &dra7_pmx_core 0x3e0>;
+^^
+Thanks to Lee Jones pointing this out to me in a different context[1]
+I made the wrong usage. Fixing the syntax to stay in sync with
+Documentation/devicetree/bindings/interrupt-controller/interrupts.txt
 
-Am Freitag, 8. August 2014, 11:55:55 schrieb Kever Yang:
-> These patches to add support for dwc2 controller found in
-> Rockchip processors rk3066, rk3188 and rk3288,
-> and enable dts for rk3288 evb.
+[1] http://marc.info/?l=linux-omap&m=140930980325273&w=2
 
-will you take patches 1 and 2?
+-----8<----
+>From c3c284ebd2b8d5535abf297ef7537b2caa7fe67b Mon Sep 17 00:00:00 2001
+From: Nishanth Menon <nm@ti.com>
+Date: Fri, 6 Jun 2014 20:53:22 -0500
+Subject: [PATCH V2 6/6] ARM: dts: dra7-evm: Mark uart1 rxd as wakeup capable
+
+Mark rxd as wakeupcapable for 115200n8 no hardware-flow control
+configuration. If h/w flow control is being used, then rts/cts
+appropriately should be used.
+
+Signed-off-by: Nishanth Menon <nm@ti.com>
+---
+ arch/arm/boot/dts/dra7-evm.dts |    2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/arch/arm/boot/dts/dra7-evm.dts b/arch/arm/boot/dts/dra7-evm.dts
+index 50f8022..08434c7 100644
+--- a/arch/arm/boot/dts/dra7-evm.dts
++++ b/arch/arm/boot/dts/dra7-evm.dts
+@@ -303,6 +303,8 @@
+ 	status = "okay";
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&uart1_pins>;
++	interrupts-extended = <&gic GIC_SPI 67 IRQ_TYPE_LEVEL_HIGH>,
++			      <&dra7_pmx_core 0x3e0>;
+ };
+ 
+ &uart2 {
+-- 
+1.7.9.5
 
 
-Thanks
-Heiko
-
-
-> 
-> Changes in v5:
-> - max_transfer_size change to 65535 to met the requirement of
->   header file
-> - change the sort order of dwc2 in rk3288.dtsi
-> - don't enable otg port for evb
-> 
-> Changes in v4:
-> - max_transfer_size change to 65536, this should be enough
->   for most transfer, the hardware auto-detect will set this
->   to 0x7ffff which may make dma_alloc_coherent fail when
->   non-dword aligned buf from driver like usbnet happen.
-> - remove EHCI and HSIC dts patch for Doug had post it seprately.
-> 
-> Changes in v3:
-> - EHCI and HSIC move new for version 3.
-> - Rebase
-> 
-> Changes in v2:
-> - Split out dr_mode and rk3288 bindings.
-> - add compatible "snps,dwc2" bingding info
-> - set most parameters as driver auto-detect
-> - evb patch added in version 2
-> 
-> Kever Yang (4):
->   Documentation: dt-bindings: add dt binding info for Rockchip dwc2
->   usb: dwc2: add compatible data for rockchip soc
->   ARM: dts: add rk3288 dwc2 controller support
->   ARM: dts: Enable USB host1(dwc) on rk3288-evb
-> 
->  Documentation/devicetree/bindings/usb/dwc2.txt |  3 +++
->  arch/arm/boot/dts/rk3288-evb.dtsi              |  4 ++++
->  arch/arm/boot/dts/rk3288.dtsi                  | 20 ++++++++++++++++++
->  drivers/usb/dwc2/platform.c                    | 29
-> ++++++++++++++++++++++++++ 4 files changed, 56 insertions(+)
+-- 
+Regards,
+Nishanth Menon
