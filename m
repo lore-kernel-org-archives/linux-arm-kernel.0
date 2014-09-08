@@ -1,59 +1,53 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 8 Sep 2014 11:22:45 +0100
-Subject: [PATCH 2/2] arm: psci: don't call CPU_OFF blindly
-In-Reply-To: <alpine.DEB.2.02.1409052132450.2334@kaball.uk.xensource.com>
+Date: Mon, 8 Sep 2014 11:24:05 +0100
+Subject: [PATCH 0/2] PSCI: don't call CPU_OFF when it might fail
+In-Reply-To: <alpine.DEB.2.02.1409052151450.2334@kaball.uk.xensource.com>
 References: <1409916139-20127-1-git-send-email-mark.rutland@arm.com>
- <1409916139-20127-3-git-send-email-mark.rutland@arm.com>
- <alpine.DEB.2.02.1409052132450.2334@kaball.uk.xensource.com>
-Message-ID: <20140908102245.GA12081@leverpostej>
+ <alpine.DEB.2.02.1409052151450.2334@kaball.uk.xensource.com>
+Message-ID: <20140908102405.GB12081@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 05, 2014 at 09:48:46PM +0100, Stefano Stabellini wrote:
+On Fri, Sep 05, 2014 at 09:53:05PM +0100, Stefano Stabellini wrote:
 > On Fri, 5 Sep 2014, Mark Rutland wrote:
-> > The generic PSCI operations for arm check the presence of a CPU_OFF ID
-> > far too late, and in the absence of an ID will panic(), rather than
-> > producing a warning.
+> > [Apologies to all who received this already, I typo'd the LAKML address]
 > > 
-> > This patch adds a psci_cpu_disable callback which tests the presence of
-> > a CPU_OFF id. As this is called earlier than psci_cpu_die, the failure
-> > can be handled gracefully without brining down the system. Additionally
-> > a check is added for a UP trusted OS in the presence of PSCI 0.2+. Full
-> > support will require the use of MIGRATE, but for now rejecting hotplug
-> > will prevent psci_cpu_die from brining down the system.
+> > In certain conditions PSCI's CPU_OFF call may return DENIED (in the presence of
+> > a UP OS on the secure world), or might not exist (in early implementations
+> > prior to PSCI 0.2). Both the arm and arm64 callers fail to handle the former,
+> > and the arm caller doesn't handle the latter.
 > > 
-> > The now redundant check for scpi_ops.cpu_off is removed from
-> > psci_cpu_die. At the same time, the whitespace is corrected from seven
-> > spaces to tabs.
+> > We can determine wether a CPU_OFF call will succeed by calling
+> > MIGRATE_INFO_TYPE. If we receive 2 (A.K.A. PSCI_0_2_TOS_MP) in response we know
+> > that CPU_OFF should succeed, and in other cases it is necessary to discover
+> > which CPU said OS lives on and attempt migration. As there don't seem to be any
+> > UP implementations out there so far, for now we can limit ourselves to only
+> > supporting CPU hotplug in the PSCI_0_2_TOS_MP case. Hotplug support on such
+> > systems will require additional work, but at least they won't blow up by
+> > default.
 > > 
-> > Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> > Cc: Ashwin Chaugule <ashwin.chaugule@linaro.org>
-> > Cc: Rob Herring <robh@kernel.org>
-> > Cc: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-> > Cc: Ian Campbell <ian.campbell@citrix.com>
-> > Cc: Christoffer Dall <christoffer.dall@linaro.org>
-> > Cc: Will Deacon <will.deacon@arm.com>
-> > Cc: Catalin Marinas <catalin.marinas@arm.com>
-> > ---
+> > These patches add the necessary checks to the arm and arm64 PSCI callers to
+> > prevent the issues described above. MIGRATE_INFO_TYPE is a mandatory part of
+> > PSCI 0.2, so no conforming implementation should be adversely affected. Both
+> > the ARM Trusted Firmware and KVM respond to MIGRATE_INFO_TYPE with
+> > PSCI_0_2_TOS_MP, so should see no loss of functionality (verified on Juno). 
+> > 
+> > Thanks,
+> > Mark.
+> > 
+> > Mark Rutland (2):
+> >   arm64: psci: respect MIGRATE_INFO_TYPE
+> >   arm: psci: don't call CPU_OFF blindly
+> > 
 > >  arch/arm/kernel/psci_smp.c | 36 +++++++++++++++++++++++++++++-------
-> >  1 file changed, 29 insertions(+), 7 deletions(-)
-> > 
-> > Stefano, I've followed your lead with the __ref annotation here, but I couldn't
-> > figure out why they exist on cpu_die and cpu_kill; it feels rather dodgy. Do
-> > you know why they were added, or if they are superfluous?
-> 
-> I don't think that __ref is needed.
-> That particular snipped of code came from Rob Herring, maybe he knows
-> why it was added in the first place.
+> >  arch/arm64/kernel/psci.c   | 14 ++++++++++++++
+> >  2 files changed, 43 insertions(+), 7 deletions(-)
+>  
+> The patches look good to me and AFACT they would work fine on Xen 4.4
+> and the soon to be release 4.5.
 
-I've traced that back, but can't see any rationale. Perhaps that had
-something to do with __cpuinit/__cpuexit, but there doesn't seem to be
-any reason for them now. I guess the __ref annotation on cpu_die in
-arch/arm/kernel/smp.c can go too given __cpuinit and __cpuexit are gone.
+Cheers.
 
-Rob, do you have any idea either way?
+Can I take that as an ack?
 
-Thanks,
 Mark.
-
-[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2013-March/158570.html
