@@ -1,42 +1,51 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 8 Sep 2014 13:31:58 +0200
-Subject: [PATCH v2] ARM: dt: fix up PL011 device tree bindings
-In-Reply-To: <1399887437-32154-1-git-send-email-linus.walleij@linaro.org>
-References: <1399887437-32154-1-git-send-email-linus.walleij@linaro.org>
-Message-ID: <CACRpkdai=GX694hH1VxfMiGXcf7YH3wTE9HVS3hHA_zFFT28fw@mail.gmail.com>
+From: lifshitz@compulab.co.il (Dmitry Lifshitz)
+Date: Mon, 08 Sep 2014 14:34:33 +0300
+Subject: [PATCH 2/2] ARM: dts: omap5: Add dr_mode for dwc3
+In-Reply-To: <20140416161619.GH28035@saruman.home>
+References: <1381402195-29257-1-git-send-email-kishon@ti.com>
+ <1381402195-29257-2-git-send-email-kishon@ti.com> <52580F34.8030809@ti.com>
+ <20140416161619.GH28035@saruman.home>
+Message-ID: <540D9449.3090008@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 12, 2014 at 11:37 AM, Linus Walleij
-<linus.walleij@linaro.org> wrote:
+Hi Felipe, Roger
 
-> Make the map match the reality, the current binding text is
-> nonsense:
+On 04/16/2014 07:16 PM, Felipe Balbi wrote:
+> On Fri, Oct 11, 2013 at 05:46:12PM +0300, Roger Quadros wrote:
+>> Hi,
+>>
+>> On 10/10/2013 01:49 PM, Kishon Vijay Abraham I wrote:
+>>> From: George Cherian <george.cherian@ti.com>
+>>>
+>>> Added dr_mode property in dwc3 and set its default mode to device.
+>>
+>> If there is a specific reason why this is not set to "otg", we need
+>> to explain it here.
+>>
+>> AFAIK the port is meant to be used as OTG port.
 >
-> - The clock required for the clocking of the serial port
->   must come first and is not optional (as the driver will
->   otherwise proceed to grab and use the apb_pclk as uartclk),
->   and the apb_pclk that clocks the logic must come second
->   as the code will retrieve the first clock by index,
->   whereas the PrimeCell but will explicitly look for
->   "apb_pclk" so this can be specified later, as it is
->   looked up by name.
+> we still don't have the workaround for dual role ports, I've been
+> working on it but still need to retest and make sure it's working fine
+> before merging upstream.
 >
-> - The pin control state "default" is the only mandated
->   state, the sleep state is entirely optional.
->
-> We also add an example to avoid further confusion.
->
-> Reported-by: Arnd Bergmann <arnd@arndb.de>
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-> ---
-> ChangeLog v1->v2:
-> - Rename amba_pclk to apb_pclk
-> - Split clock/clocks properties and indicate that listin one
->   clock only is deprecated
 
-I don't see either this or Mark's related patch being applied and the DT
-binding for PL011 left in a sad state. Can we please apply this?
 
-Yours,
-Linus Walleij
+Does the OTG port suppose to work with OMAP5? I mean role switching 
+mechanism?
+
+I'm testing kernel v3.16 with OMAP5 based board (CM-T54).
+
+If I set CONFIG_USB_DWC3_DUAL_ROLE, than nothing is going on when I plug 
+some device/host cable into micro USB3.0 port (VBUS/ID detection with 
+extcon events works fine).
+
+CONFIG_USB_DWC3_HOST/CONFIG_USB_DWC3_GADGET bring port to appropriate 
+mode and it works.
+
+What is the purpose of setting dr_mode = "peripheral" in omap5.dtsi, 
+since it is overridden by config options in dwc3_probe()?
+
+Thank you in advance for the assistance,
+
+Dmitry
