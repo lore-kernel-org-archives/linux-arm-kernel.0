@@ -1,33 +1,53 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 8 Sep 2014 13:46:01 +0100
-Subject: Unable to boot mainline on snow chromebook since 3.15
-In-Reply-To: <540D9931.6050603@collabora.co.uk>
-References: <20140905115704.GO13515@arm.com> <20140905122232.GP13515@arm.com>
- <CAD=FV=VfioJf9VYoSYL0QBk-bN93-Ecx3=0n9hb5Q4rcx43-_g@mail.gmail.com>
- <540C202E.2060009@collabora.co.uk> <540C7F5B.6070307@gmail.com>
- <540C83DE.10505@collabora.co.uk> <540C8577.2070907@gmail.com>
- <20140908112112.GK26030@arm.com> <540D9931.6050603@collabora.co.uk>
-Message-ID: <20140908124601.GN26030@arm.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Mon, 8 Sep 2014 14:56:56 +0200
+Subject: [GIT PULL] at91: cleanup for 3.18 #2
+Message-ID: <1410181016-9944-1-git-send-email-nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 08, 2014 at 12:55:29PM +0100, Javier Martinez Canillas wrote:
-> On 09/08/2014 01:21 PM, Will Deacon wrote:
-> > On Sun, Sep 07, 2014 at 05:19:03PM +0100, Tomasz Figa wrote:
-> >> At least for next 3.17-rc I'd suggest fixing this up in respective clock
-> >> driver and dropping the hack only after Exynos DRM patches are merged
-> >> and confirmed working.
-> > 
-> > Whilst I'm sympathetic to people working to enable DRM, I think this is
-> > the right solution to the problem. The transition from simplefb to DRM
-> > shouldn't break display for a bunch of kernel revisions whilst the code is
-> > in flux.
-> > 
-> 
-> Agreed, I'm preparing a patch-set to prevent the kernel to disable both the
-> clocks and regulators needed for the display, I'll try to post it today or
-> tomorrow at worst.
+Arnd, Olof, Kevin,
 
-Thanks, Javier. Please CC me on the patch and I'll take it for a spin.
+Another pull-request that can be considered as "fixes-non-critical" or
+"cleanup". I choose the latest as the patches are a little bit more than just
+fixes.  The bug found by Ga?l is present on AT91 kernels for a long time so I
+decided to avoid trying to submit it during the "-rc phase" or adding a
+"stable" tag.
+This material goes on top of the previous "cleanup" pull-request that you took
+but comes with no dependency.
 
-Will
+Thanks, best regards,
+
+The following changes since commit 2626063f86cdce500153e8550334b9331421dc6f:
+
+  ARM: at91: remove old irq material (2014-08-19 20:32:49 +0200)
+
+are available in the git repository at:
+
+  git://github.com/at91linux/linux-at91.git tags/at91-cleanup2
+
+for you to fetch changes up to d07a1ecdfb96b26dd665b54fee22fc7417b1cb08:
+
+  clocksource: tcb_clksrc: sanitize IRQ request (2014-09-08 10:54:03 +0200)
+
+----------------------------------------------------------------
+Second batch of AT91 cleanup for 3.18:
+- Timer Counter (TC) fixup and cleanup:
+  - fix segmentation fault when kexec-ing a kernel by masking
+    TC interrupts at shutdown and probe time
+  - use modern driver model: devm_*, probe function, sanitize IRQ request
+
+----------------------------------------------------------------
+Ga?l PORTAY (4):
+      ARM: at91/tclib: prefer using of devm_* functions
+      ARM: at91/tclib: move initialization from alloc to probe
+      ARM: at91/tclib: mask interruptions at shutdown and probe
+      clocksource: tcb_clksrc: sanitize IRQ request
+
+ drivers/clocksource/tcb_clksrc.c |  15 ++----
+ drivers/misc/atmel_tclib.c       | 101 +++++++++++++++--------------------
+ drivers/pwm/pwm-atmel-tcb.c      |   2 +-
+ include/linux/atmel_tc.h         |  13 +++--
+ 4 files changed, 60 insertions(+), 71 deletions(-)
+
+-- 
+Nicolas Ferre
