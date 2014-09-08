@@ -1,37 +1,39 @@
 From: Liviu.Dudau@arm.com (Liviu Dudau)
-Date: Mon,  8 Sep 2014 14:54:23 +0100
-Subject: [PATCH v10 01/10] Fix ioport_map() for !CONFIG_GENERIC_IOMAP cases.
+Date: Mon,  8 Sep 2014 14:54:31 +0100
+Subject: [PATCH v10 09/10] PCI: Assign unassigned bus resources in
+ pci_scan_root_bus()
 In-Reply-To: <1410184472-17630-1-git-send-email-Liviu.Dudau@arm.com>
 References: <1410184472-17630-1-git-send-email-Liviu.Dudau@arm.com>
-Message-ID: <1410184472-17630-2-git-send-email-Liviu.Dudau@arm.com>
+Message-ID: <1410184472-17630-10-git-send-email-Liviu.Dudau@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The inline version of ioport_map() that gets used when !CONFIG_GENERIC_IOMAP
-is wrong. It returns a mapped (i.e. virtual) address that can start from
-zero and completely ignores the PCI_IOBASE and IO_SPACE_LIMIT that most
-architectures that use !CONFIG_GENERIC_MAP define.
+If the firmware has not assigned all the bus resources and
+we are not just probing the PCIe busses, it makes sense to
+assign the unassigned resources in pci_scan_root_bus().
 
+Cc: Bjorn Helgaas <bhelgaas@google.com>
+Cc: Arnd Bergmann <arnd@arndb.de>
+Cc: Jason Gunthorpe <jgunthorpe@obsidianresearch.com>
+Cc: Rob Herring <robh+dt@kernel.org>
 Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
-Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
-Acked-by: Arnd Bergmann <arnd@arndb.de>
-Tested-by: Tanmay Inamdar <tinamdar@apm.com>
 ---
- include/asm-generic/io.h | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/pci/probe.c | 3 +++
+ 1 file changed, 3 insertions(+)
 
-diff --git a/include/asm-generic/io.h b/include/asm-generic/io.h
-index 975e1cc..2e2161b 100644
---- a/include/asm-generic/io.h
-+++ b/include/asm-generic/io.h
-@@ -331,7 +331,7 @@ static inline void iounmap(void __iomem *addr)
- #ifndef CONFIG_GENERIC_IOMAP
- static inline void __iomem *ioport_map(unsigned long port, unsigned int nr)
- {
--	return (void __iomem *) port;
-+	return (void __iomem *)(PCI_IOBASE + (port & IO_SPACE_LIMIT));
- }
+diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
+index ef891d2..508cf61 100644
+--- a/drivers/pci/probe.c
++++ b/drivers/pci/probe.c
+@@ -1953,6 +1953,9 @@ struct pci_bus *pci_scan_root_bus(struct device *parent, int bus,
+ 	if (!found)
+ 		pci_bus_update_busn_res_end(b, max);
  
- static inline void ioport_unmap(void __iomem *p)
++	if (!pci_has_flag(PCI_PROBE_ONLY))
++		pci_assign_unassigned_bus_resources(b);
++
+ 	pci_bus_add_devices(b);
+ 	return b;
+ }
 -- 
 2.0.4
