@@ -1,150 +1,53 @@
-From: khiem.nguyen.xt@renesas.com (Khiem Nguyen)
-Date: Tue, 09 Sep 2014 07:44:11 +0900
-Subject: [PATCH/RFC 2/5] PM / Domains: Add DT bindings for the R-Mobile
- System Controller
-In-Reply-To: <1410183344-14756-3-git-send-email-geert+renesas@glider.be>
-References: <1410183344-14756-1-git-send-email-geert+renesas@glider.be>
- <1410183344-14756-3-git-send-email-geert+renesas@glider.be>
-Message-ID: <540E313B.8000305@renesas.com>
+From: nm@ti.com (Nishanth Menon)
+Date: Mon, 8 Sep 2014 17:45:24 -0500
+Subject: [GIT PULL 2/2] ARM: OMAP4+: PRM fixes, DRA7 suspend-to-ram support
+In-Reply-To: <20140908223204.GN3238@atomide.com>
+References: <1410195620-6347-1-git-send-email-nm@ti.com>
+ <1410195620-6347-2-git-send-email-nm@ti.com>
+ <20140908223204.GN3238@atomide.com>
+Message-ID: <20140908224524.GA31480@kahuna>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Geert, 
-
-Thanks for your patch.
-
-On 9/8/2014 10:35 PM, Geert Uytterhoeven wrote:
-> A.o., the Renesas R-Mobile System Controller provides power management
-> support, following the generic PM domain bindings in
-> Documentation/devicetree/bindings/power/power_domain.txt.
+On 15:32-20140908, Tony Lindgren wrote:
+> * Nishanth Menon <nm@ti.com> [140908 10:02]:
+> > Hi Tony,
+> > Please pull the following changes.
+> > 
+> > part 2: "ARM: OMAP3+: PRM: fix up prm_handling"
+> > http://marc.info/?l=linux-kernel&m=140871580806186&w=2
+> > Status: Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> > 
+> > part 3: "ARM: OMAP5+: pdata quirks for pinctrl"
+> > http://marc.info/?l=linux-kernel&m=140871598306262&w=2
+> > Status: Sending pull based on http://marc.info/?l=linux-kernel&m=140871666506706&w=2 (Acked by Tony, Pulled by Linus W)
+> > 
+> > part 5: "ARM: OMAP5 / DRA7: Add framework for suspend and cpuidle"
+> > http://marc.info/?l=linux-kernel&m=140871637106555&w=2
+> > Status: picked up kevin's tested and reviewed-by, dropped cpuidle for this pull
+> > 
+> > These could go into your tree for the branch  omap-for-v3.18/soc
+> > 
+> > The following changes since commit 7d1311b93e58ed55f3a31cc8f94c4b8fe988a2b9:
+> > 
+> >   Linux 3.17-rc1 (2014-08-16 10:40:26 -0600)
+> > 
+> > are available in the git repository at:
+> > 
+> >   https://github.com/nmenon/linux-2.6-playground.git pull/v3.18/for-omap-soc
 > 
-> For now this supports the R-Mobile A1 (r8a7740) only, but it should be
-> sufficiently generic to handle other members of the SH-Mobile/R-Mobile
-> family in the future.
-> 
-> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-> ---
->  .../bindings/power/renesas,sysc-rmobile.txt        | 106 +++++++++++++++++++++
->  1 file changed, 106 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/power/renesas,sysc-rmobile.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/power/renesas,sysc-rmobile.txt b/Documentation/devicetree/bindings/power/renesas,sysc-rmobile.txt
-> new file mode 100644
-> index 000000000000..8d9d64df0088
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/power/renesas,sysc-rmobile.txt
-> @@ -0,0 +1,106 @@
-> +DT bindings for the Renesas R-Mobile System Controller
-> +
-> +== System Controller Node ==
-> +
-> +The R-Mobile System Controller provides the following functions:
-> +  - Boot mode management,
-> +  - Reset generation,
-> +  - Power management.
-> +
-> +Required properties:
-> +- compatible: Should be "renesas,sysc-<soctype>", "renesas,sysc-rmobile" as
-> +	      fallback.
-> +	      Examples with soctypes are:
-> +		- "renesas,sysc-r8a7740" (R-Mobile A1)
-> +- reg: Two address start and address range blocks for the device:
-> +         - The first block refers to the normally accessible registers,
-> +         - the second block refers to the registers protected by the HPB
-> +	   semaphore.
-> +
-> +Optional nodes:
-> +- pm-domains: This node contains a hierarchy of PM domain nodes, which should
-> +  match the Power Area Hierarchy in the Power Domain Specifications section of
-> +  the device's datasheet.
-> +
-> +
-> +== PM Domain Nodes ==
-> +
-> +Each of the PM domain nodes represents a PM domain, as documented by the
-> +generic PM domain bindings in
-> +Documentation/devicetree/bindings/power/power_domain.txt.
-> +
-> +The nodes should be named by the real power area names, and thus their names
-> +should be unique.
-> +
-> +Required properties:
-> +  - #power-domain-cells: Must be 0.
-> +
-> +Optional properties:
-> +- reg: If the PM domain is not always-on, this property must contain the bit
-> +       index number for the corresponding power area in the various Power
-> +       Control and Status Registers. The parent's node must contain the
-> +       following two properties:
-> +	 - #address-cells: Must be 1,
-> +	 - #address-cells: Must be 0.
+> Thanks pulling into omap-for-v3.18/soc.
 
-Should it be "#size-cells: Must be 0." ?
+Tony, Apologies, I missed the last patch in the series:
 
-> +       If the PM domain is always-on, this property must be omitted.
-> +- power-on-latency: Power-on latency of the PM domain, in ns,
-> +- power-off-latency: Power-off latency of the PM domain, in ns.
-> +
-> +
-> +Example:
-> +
-> +This shows a subset of the r8a7740 PM domain hierarchy, containing the
-> +C5 "always-on" domain, 2 of its subdomains (A4S and A4SU), and the A3SP domain,
-> +which is a subdomain of A4S.
-> +
-> +	sysc: system-controller at e6180000 {
-> +		compatible = "renesas,sysc-r8a7740", "renesas,sysc-rmobile";
-> +		reg = <0xe6180000 8000>, <0xe6188000 8000>;
-> +
-> +		pm-domains {
-> +			pd_c5: c5 {
-> +				#address-cells = <1>;
-> +				#size-cells = <0>;
-> +				#power-domain-cells = <0>;
-> +
-> +				pd_a4s: a4s at 10 {
-> +					reg = <10>;
-> +					#address-cells = <1>;
-> +					#size-cells = <0>;
-> +					#power-domain-cells = <0>;
-> +					power-on-latency = <250000>;
-> +					power-off-latency = <250000>;
-> +
-> +					pd_a3sp: a3sp at 11 {
-> +						reg = <11>;
-> +						#power-domain-cells = <0>;
-> +						power-on-latency = <250000>;
-> +						power-off-latency = <250000>;
-> +					};
-> +				};
-> +
-> +				pd_a4su: a4su at 20 {
-> +					reg = <20>;
-> +					#power-domain-cells = <0>;
-> +					power-on-latency = <250000>;
-> +					power-off-latency = <250000>;
-> +				};
-> +			};
-> +		};
-> +	};
-> +
-> +
-> +== PM Domain Consumers ==
-> +
-> +Hardware blocks belonging to a PM domain should contain a "power-domains"
-> +property that is a phandle pointing to the corresponding PM domain node.
-> +
-> +Example:
-> +
-> +	tpu: pwm at e6600000 {
-> +		compatible = "renesas,tpu-r8a7740", "renesas,tpu";
-> +		reg = <0xe6600000 0x100>;
-> +		clocks = <&mstp3_clks R8A7740_CLK_TPU0>;
-> +		power-domains = <&pd_a3sp>;
-> +		#pwm-cells = <3>;
-> +	};
-> 
+https://patchwork.kernel.org/patch/4765011/
+
+If you could cherry-pick the same with 
+Reviewed-by: Kevin Hilman <khilman@linaro.org>
+Tested-by: Kevin Hilman <khilman@linaro.org>
+based on Kevin's feedback:
+http://marc.info/?l=linux-arm-kernel&m=140916701909122&w=2
 
 -- 
-Best regards,
-KHIEM Nguyen
+Regards,
+Nishanth Menon
