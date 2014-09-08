@@ -1,39 +1,64 @@
 From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 8 Sep 2014 15:03:21 +0100
-Subject: [PATCH v10 06/10] PCI: Introduce generic domain handling for PCI
- busses.
-In-Reply-To: <1410184472-17630-7-git-send-email-Liviu.Dudau@arm.com>
-References: <1410184472-17630-1-git-send-email-Liviu.Dudau@arm.com>
- <1410184472-17630-7-git-send-email-Liviu.Dudau@arm.com>
-Message-ID: <20140908140321.GF22717@arm.com>
+Date: Mon, 8 Sep 2014 14:54:36 +0100
+Subject: [PATCH] clocksource: arch_timer: Fix code to use physical timers
+ when requested
+In-Reply-To: <CAD=FV=UwfP0x-bswbtV_eUvpKeOSNnsVVLTE3VHguyhm_jiSug@mail.gmail.com>
+References: <1409173419-13076-1-git-send-email-sonnyrao@chromium.org>
+ <CAOesGMjK65Rc-K0fyFUUJLw6huLT82E-nqJwZO4PqhgopF96Ow@mail.gmail.com>
+ <CAPz6YkWAPtuy4sAuAK9GtpDgfGsccxeS+pqqe_t_R818Jt01qA@mail.gmail.com>
+ <53FE5B09.2020403@codeaurora.org>
+ <CAOesGMhTivDzJFuxONggcJ6N5UvZopKa=+tv9PoPX593cpnm0A@mail.gmail.com>
+ <53FE7E3B.1010500@codeaurora.org>
+ <CAOesGMgXnsqttHwAxEW4a7-Rx-nmSwpJd_Dt1iCcFOvzDwbzdA@mail.gmail.com>
+ <CAD=FV=VjN6Xam-nRRcxvOoN-gokU6DbGVjoPXN_fkTJssH1RWA@mail.gmail.com>
+ <20140828093505.GC14650@leverpostej>
+ <CAD=FV=UwfP0x-bswbtV_eUvpKeOSNnsVVLTE3VHguyhm_jiSug@mail.gmail.com>
+Message-ID: <20140908135436.GC22717@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 08, 2014 at 02:54:28PM +0100, Liviu Dudau wrote:
-> The handling of PCI domains (or PCI segments in ACPI speak) is
-> usually a straightforward affair but its implementation is
-> currently left to the architectural code, with pci_domain_nr(b)
-> querying the value of the domain associated with bus b.
+On Fri, Sep 05, 2014 at 11:11:47PM +0100, Doug Anderson wrote:
+> On Thu, Aug 28, 2014 at 2:35 AM, Mark Rutland <mark.rutland@arm.com> wrote:
+> > Not if you boot Linux at hyp, as we've recommended for this precise
+> > reason. That doesn't fix other things like CNTFRQ if the secure
+> > initialisation doesn't poke that, however.
 > 
-> This patch introduces CONFIG_PCI_DOMAINS_GENERIC as an
-> option that can be selected if an architecture want a
-> simple implementation where the value of the domain
-> associated with a bus is stored in struct pci_bus.
+> I'll freely admit that I'm out of my league and out of my comfort zone
+> here, but...
 > 
-> The architectures that select CONFIG_PCI_DOMAINS_GENERIC will
-> then have to implement pci_bus_assign_domain_nr() as a way
-> of setting the domain number associated with a root bus.
-> All child busses except the root bus will inherit the domain_nr
-> value from their parent.
-> 
-> Cc: Bjorn Helgaas <bhelgaas@google.com>
-> Cc: Arnd Bergmann <arnd@arndb.de>
-> Signed-off-by: Catalin Marinas <Catalin.Marinas@arm.com>
-> [Renamed pci_set_domain_nr() to pci_bus_assign_domain_nr()]
-> Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
+> In the theory that firmware ought to be as minimal as possible
+> (because it's hard to update and hard to keep in sync with kernel
+> versions), it seems like firmware ought to start the kernel out in as
+> permissive mode as it's willing to provide, right?
 
-I'm probably the author here, but the patch log doesn't say so (I don't
-mind, just a remark).
+Not necessarily (and definitely not for arm64). And we've seen in
+practice that the actual deployed kernel may run in a different security
+mode than what's in mainline and used for initial development (you may
+just not see all the patches upstream). For development, that's indeed
+simpler, but once you go into production, a customer requesting some
+secure OS for payments etc. and Linux is moved to the non-secure side
+(and you end up putting hacks in the kernel because they were not
+spotted during initial development with Linux running in secure mode).
+
+> If the kernel is started out as permissive as possible then it can do
+> anything it needs to.  Future versions of the kernel can be
+> implemented to do any way-cool things that they want to do without an
+> update to firmware, right?  ...and current versions of the kernel can
+> just shed permissions if they don't want them.
+> 
+> ...so if I understand correctly, "Secure SVC" mode is more permissive
+> than "Non Secure HYP" mode, right?  It looks to me as if we currently
+> start the kernel in "Secure SVC" mode.  What do you think about the
+> kernel detecting Secure SVC and then dropping down permission levels
+> (to Non Secure HYP).  Once it did this, it could update things like
+> the virtual offset and then transition down further into non-secure
+> SVC mode.
+
+If we talk about ARMv8/AArch64, Secure SVC (aka secure EL1) is not more
+permissive than Non-secure Hyp (aka non-secure EL2). The only way to go
+from secure EL1 to non-secure EL2 is via EL3 (and SMC call) which means
+firmware code. Certain registers like CNTFRQ are only writable in EL3,
+CNTVOFF in EL2 or EL3.
 
 -- 
 Catalin
