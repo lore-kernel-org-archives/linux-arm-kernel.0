@@ -1,43 +1,22 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 08 Sep 2014 13:14:05 +0200
-Subject: [PATCH] ASoC: simple-card: fix regression in clock rate lookup
-Message-ID: <42811667.3TM1iBfezH@wuerfel>
+From: broonie@kernel.org (Mark Brown)
+Date: Mon, 8 Sep 2014 12:16:27 +0100
+Subject: [PATCH v2] regmap: Fix debugfs-file 'registers' mode
+In-Reply-To: <1410158617-16827-1-git-send-email-mpa@pengutronix.de>
+References: <1410158617-16827-1-git-send-email-mpa@pengutronix.de>
+Message-ID: <20140908111627.GI4015@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 7c7b9cf53d284f ("ASoC: simple-card: fixup cpu_dai_name
-clear case") changed the way that "sound-dai" properties are handled,
-which leads to the clock frequency not being picked up from the
-node that the phandle points to, as correctly identified by gcc
-with this warning:
+On Mon, Sep 08, 2014 at 08:43:37AM +0200, Markus Pargmann wrote:
+> The macro "REGMAP_ALLOW_WRITE_DEBUGFS" can be used to enable write
+> support on the registers file in the debugfs. The mode of the file is
+> fixed to 0400 so it is not possible to write the file ever.
 
-sound/soc/generic/simple-card.c: In function 'asoc_simple_card_sub_parse_of':
-sound/soc/generic/simple-card.c:165:7: warning: 'node' may be used uninitialized in this function [-Wmaybe-uninitialized]
-
-This restores the previous behavior by using the node from
-of_parse_phandle_with_args() that was previously being
-returned from of_parse_phandle().
-
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-
-diff --git a/sound/soc/generic/simple-card.c b/sound/soc/generic/simple-card.c
-index b563850c43f4..a0440bd533d5 100644
---- a/sound/soc/generic/simple-card.c
-+++ b/sound/soc/generic/simple-card.c
-@@ -116,7 +116,6 @@ asoc_simple_card_sub_parse_of(struct device_node *np,
- 			      int *args_count)
- {
- 	struct of_phandle_args args;
--	struct device_node *node;
- 	struct clk *clk;
- 	u32 val;
- 	int ret;
-@@ -162,7 +161,7 @@ asoc_simple_card_sub_parse_of(struct device_node *np,
- 	} else if (!of_property_read_u32(np, "system-clock-frequency", &val)) {
- 		dai->sysclk = val;
- 	} else {
--		clk = of_clk_get(node, 0);
-+		clk = of_clk_get(args.np, 0);
- 		if (!IS_ERR(clk))
- 			dai->sysclk = clk_get_rate(clk);
- 	}
+Applied, thanks.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140908/5925a2f7/attachment.sig>
