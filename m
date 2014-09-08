@@ -1,41 +1,81 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Mon, 8 Sep 2014 13:48:47 -0700
-Subject: [PATCH 02/11] clk: rockchip: fix rk3288 pll status register
- location
-In-Reply-To: <1409958374-30937-3-git-send-email-heiko@sntech.de>
-References: <1409958374-30937-1-git-send-email-heiko@sntech.de>
- <1409958374-30937-3-git-send-email-heiko@sntech.de>
-Message-ID: <CAD=FV=XjzKA_dqMjysaP7pCy5OwAEO-fFgUnVQ5tFF8+w6XuyQ@mail.gmail.com>
+From: lersek@redhat.com (Laszlo Ersek)
+Date: Mon, 08 Sep 2014 22:52:06 +0200
+Subject: [PATCH] ARM/arm64: KVM: fix use of WnR bit in kvm_is_write_fault()
+In-Reply-To: <1410208167-32532-1-git-send-email-ard.biesheuvel@linaro.org>
+References: <1410208167-32532-1-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <540E16F6.5000008@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Fri, Sep 5, 2014 at 4:06 PM, Heiko Stuebner <heiko@sntech.de> wrote:
-> From: Jianqun <jay.xu@rock-chips.com>
->
-> In RK3288, APLL lock status bit is in GRF_SOC_STATUS1,
-> but in RK3188, is GRFSOC_STATUS0.
->
-> Signed-off-by: Jianqun <jay.xu@rock-chips.com>
-> Reviewed-by: Heiko Stuebner <heiko@sntech.de>
-> Tested-by: Heiko Stuebner <heiko@sntech.de>
+On 09/08/14 22:29, Ard Biesheuvel wrote:
+> The ISS encoding for an exception from a Data Abort has a WnR
+> bit[6] that indicates whether the Data Abort was caused by a
+> read or a write instruction. While there are several fields
+> in the encoding that are only valid if the ISV bit[24] is set,
+> WnR is not one of them, so we can read it unconditionally.
+> 
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 > ---
->  drivers/clk/rockchip/clk-rk3288.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
->
-> diff --git a/drivers/clk/rockchip/clk-rk3288.c b/drivers/clk/rockchip/clk-rk3288.c
-> index 038b1aa..4586578 100644
-> --- a/drivers/clk/rockchip/clk-rk3288.c
-> +++ b/drivers/clk/rockchip/clk-rk3288.c
-> @@ -20,7 +20,7 @@
->  #include "clk.h"
->
->  #define RK3288_GRF_SOC_CON(x)  (0x244 + x * 4)
-> -#define RK3288_GRF_SOC_STATUS  0x280
-> +#define RK3288_GRF_SOC_STATUS  0x284
+> 
+> This fixes an issue I observed with UEFI running under QEMU/KVM using
+> NOR flash emulation and the upcoming KVM_CAP_READONLY_MEM support, where
+> NOR flash reads were mistaken for NOR flash writes, resulting in all read
+> accesses to go through the MMIO emulation layer.
+> 
+>  arch/arm/include/asm/kvm_mmu.h   | 5 +----
+>  arch/arm64/include/asm/kvm_mmu.h | 5 +----
+>  2 files changed, 2 insertions(+), 8 deletions(-)
+> 
+> diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
+> index 5cc0b0f5f72f..fad5648980ad 100644
+> --- a/arch/arm/include/asm/kvm_mmu.h
+> +++ b/arch/arm/include/asm/kvm_mmu.h
+> @@ -83,10 +83,7 @@ static inline bool kvm_is_write_fault(unsigned long hsr)
+>  	unsigned long hsr_ec = hsr >> HSR_EC_SHIFT;
+>  	if (hsr_ec == HSR_EC_IABT)
+>  		return false;
+> -	else if ((hsr & HSR_ISV) && !(hsr & HSR_WNR))
+> -		return false;
+> -	else
+> -		return true;
+> +	return hsr & HSR_WNR;
+>  }
+>  
+>  static inline void kvm_clean_pgd(pgd_t *pgd)
+> diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
+> index 8e138c7c53ac..09fd9e4c13d8 100644
+> --- a/arch/arm64/include/asm/kvm_mmu.h
+> +++ b/arch/arm64/include/asm/kvm_mmu.h
+> @@ -100,10 +100,7 @@ static inline bool kvm_is_write_fault(unsigned long esr)
+>  	if (esr_ec == ESR_EL2_EC_IABT)
+>  		return false;
+>  
+> -	if ((esr & ESR_EL2_ISV) && !(esr & ESR_EL2_WNR))
+> -		return false;
+> -
+> -	return true;
+> +	return esr & ESR_EL2_WNR;
+>  }
+>  
+>  static inline void kvm_clean_pgd(pgd_t *pgd) {}
+> 
 
-I probably would have also given this a rename to GRF_SOC_STATUS1 to
-make it a little clearer.  Mind doing that?
+No clue about the 32-bit case, but the 64-bit change checks out against
+the ARM ARM. The ISV (ISS[24]) is documented to determine the validity
+of bits ISS[23:14], but WnR is ISS[6], hence it appears independent indeed.
 
--Doug
+The pre-patch code only considered a clear WnR meaningful /
+consequential only if the ISV was set -- more precisely, it only even
+looked at the WnR then, due to the short-circuit nature of && --, and it
+defaulted to "write fault". Synchronous data aborts due to funky
+register writeback instructions don't set the ISV, hence the code used
+to turn its back on the clear WnR. (Apologies for explaining it to
+myself publicly.) We now ignore the ISV and key off the WnR only.
+
+You're awesome, Ard. (And now you can drop a few patches from your
+linaro-topic-virt-post-v7-roundup branch! :))
+
+Acked-by: Laszlo Ersek <lersek@redhat.com>
+
+Cheers
+Laszlo
