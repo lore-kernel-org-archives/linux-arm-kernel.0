@@ -1,46 +1,48 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 08 Sep 2014 17:17:13 +0200
-Subject: [PATCH] video: mx3fb: always enable BACKLIGHT_LCD_SUPPORT
-Message-ID: <4032283.arT8F9Ogcl@wuerfel>
+Date: Mon, 08 Sep 2014 17:19:40 +0200
+Subject: [PATCH] clk: efm32: fix build warning
+Message-ID: <3456522.oqa7pbstSD@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 7edaa761ee81b ("video: mx3fb: Add backlight control support")
-changed the mx3fb driver so it always selects the BACKLIGHT_CLASS_DEVICE
-symbol, but that is hidden behind BACKLIGHT_LCD_SUPPORT in Kconfig, so
-we get a Kconfig warning for multi_v5_defconfig, which doesn't have that:
+The normal prototype for of clk init functions is to return void,
+while efm32gg_cmu_init return an int, resulting in this harmless
+build warning:
 
-Warning: (DRM_RADEON && DRM_NOUVEAU && DRM_I915 && DRM_GMA500 &&
-DRM_SHMOBILE && DRM_TILCDC && FB_BACKLIGHT && FB_MX3 && USB_APPLEDISPLAY
-&& FB_OLPC_DCON && ASUS_LAPTOP && SONY_LAPTOP && THINKPAD_ACPI &&
-EEEPC_LAPTOP && ACPI_CMPC && SAMSUNG_Q10) selects BACKLIGHT_CLASS_DEVICE
-which has unmet direct dependencies (HAS_IOMEM && BACKLIGHT_LCD_SUPPORT)
+drivers/clk/clk-efm32gg.c:81:189: warning: comparison of distinct pointer types lacks a cast [enabled by default]
+ CLK_OF_DECLARE(efm32ggcmu, "efm32gg,cmu", efm32gg_cmu_init);
 
-This makes sure we always enable both symbols together for mx3fb, like
-we do for the other drivers that can't be built without backlight
-support. Note that a better solution would be to ensure the driver can
-work with or without backlight support.
+This changes the return type to avoid the warning.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Cc: Alexander Stein <alexander.stein@systec-electronic.com>
-Cc: Tomi Valkeinen <tomi.valkeinen@ti.com>
-Cc: linux-fbdev at vger.kernel.org
-Cc: Jean-Christophe Plagniol-Villard <plagnioj@jcrosoft.com>
 
-diff --git a/drivers/video/fbdev/Kconfig b/drivers/video/fbdev/Kconfig
-index ccbe2ae22ac5..c7bf606a8706 100644
---- a/drivers/video/fbdev/Kconfig
-+++ b/drivers/video/fbdev/Kconfig
-@@ -2356,10 +2356,11 @@ config FB_MSM
- config FB_MX3
- 	tristate "MX3 Framebuffer support"
- 	depends on FB && MX3_IPU
-+	select BACKLIGHT_CLASS_DEVICE
-+	select BACKLIGHT_LCD_SUPPORT
- 	select FB_CFB_FILLRECT
- 	select FB_CFB_COPYAREA
- 	select FB_CFB_IMAGEBLIT
--	select BACKLIGHT_CLASS_DEVICE
- 	default y
- 	help
- 	  This is a framebuffer device for the i.MX31 LCD Controller. So
+diff --git a/drivers/clk/clk-efm32gg.c b/drivers/clk/clk-efm32gg.c
+index bac2ddf49d02..73a8d0ff530c 100644
+--- a/drivers/clk/clk-efm32gg.c
++++ b/drivers/clk/clk-efm32gg.c
+@@ -22,7 +22,7 @@ static struct clk_onecell_data clk_data = {
+ 	.clk_num = ARRAY_SIZE(clk),
+ };
+ 
+-static int __init efm32gg_cmu_init(struct device_node *np)
++static void __init efm32gg_cmu_init(struct device_node *np)
+ {
+ 	int i;
+ 	void __iomem *base;
+@@ -33,7 +33,7 @@ static int __init efm32gg_cmu_init(struct device_node *np)
+ 	base = of_iomap(np, 0);
+ 	if (!base) {
+ 		pr_warn("Failed to map address range for efm32gg,cmu node\n");
+-		return -EADDRNOTAVAIL;
++		return;
+ 	}
+ 
+ 	clk[clk_HFXO] = clk_register_fixed_rate(NULL, "HFXO", NULL,
+@@ -76,6 +76,6 @@ static int __init efm32gg_cmu_init(struct device_node *np)
+ 	clk[clk_HFPERCLKDAC0] = clk_register_gate(NULL, "HFPERCLK.DAC0",
+ 			"HFXO", 0, base + CMU_HFPERCLKEN0, 17, 0, NULL);
+ 
+-	return of_clk_add_provider(np, of_clk_src_onecell_get, &clk_data);
++	of_clk_add_provider(np, of_clk_src_onecell_get, &clk_data);
+ }
+ CLK_OF_DECLARE(efm32ggcmu, "efm32gg,cmu", efm32gg_cmu_init);
