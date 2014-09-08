@@ -1,55 +1,30 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 08 Sep 2014 17:20:56 +0200
-Subject: [PATCH] cifs: remove dead code
-Message-ID: <3319326.1eJrmz0Vgc@wuerfel>
+Date: Mon, 08 Sep 2014 17:22:40 +0200
+Subject: [PATCH] rtc: pcf8563: fix uninitialized use warning
+In-Reply-To: <540D8CA8.5020104@cogentembedded.com>
+References: <3640058.m4Rfp1dmTJ@wuerfel> <540D8CA8.5020104@cogentembedded.com>
+Message-ID: <10094879.uvjB4Q3B81@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-cifs provides two dummy functions 'sess_auth_lanman' and
-'sess_auth_kerberos' for the case in which the respective
-features are not defined. However, the caller is also under
-an #ifdef, so we just get warnings about unused code:
+On Monday 08 September 2014 15:02:00 Sergei Shtylyov wrote:
+> > diff --git a/drivers/rtc/rtc-pcf8563.c b/drivers/rtc/rtc-pcf8563.c
+> > index 5a197d9dc7e7..3a6f994c4da8 100644
+> > --- a/drivers/rtc/rtc-pcf8563.c
+> > +++ b/drivers/rtc/rtc-pcf8563.c
+> > @@ -167,7 +167,7 @@ static irqreturn_t pcf8563_irq(int irq, void *dev_id)
+> >       char pending;
+> >
+> >       err = pcf8563_get_alarm_mode(pcf8563->client, NULL, &pending);
+> > -     if (err < 0)
+> > +     if (err)
+> >               return err;
+> 
+>     Returning negative values from the IRQ handler doesn't seem valid.
+> Arbitrary positive value aren't good either. Perhaps should return IRQ_NONE 
+> instead?
 
-fs/cifs/sess.c:1109:1: warning: 'sess_auth_kerberos' defined but not used [-Wunused-function]
- sess_auth_kerberos(struct sess_data *sess_data)
+Good point. This is unrelated to the problem I was trying to fix, but it
+seems like a good idea to fix both.
 
-Removing the dead functions gets rid of the warnings without
-any downsides that I can see.
-
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-
-diff --git a/fs/cifs/sess.c b/fs/cifs/sess.c
-index 07fe97ac6b0c..ab0fda6e8e58 100644
---- a/fs/cifs/sess.c
-+++ b/fs/cifs/sess.c
-@@ -745,14 +745,6 @@ out:
- 	sess_free_buffer(sess_data);
- }
- 
--#else
--
--static void
--sess_auth_lanman(struct sess_data *sess_data)
--{
--	sess_data->result = -EOPNOTSUPP;
--	sess_data->func = NULL;
--}
- #endif
- 
- static void
-@@ -1103,15 +1095,6 @@ out:
- 	ses->auth_key.response = NULL;
- }
- 
--#else
--
--static void
--sess_auth_kerberos(struct sess_data *sess_data)
--{
--	cifs_dbg(VFS, "Kerberos negotiated but upcall support disabled!\n");
--	sess_data->result = -ENOSYS;
--	sess_data->func = NULL;
--}
- #endif /* ! CONFIG_CIFS_UPCALL */
- 
- /*
+	Arnd
