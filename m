@@ -1,62 +1,76 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Mon, 8 Sep 2014 20:03:39 +0530
-Subject: [PATCH v2 1/8] phy: miphy28lp: Add Device Tree bindings for the
- MiPHY28lp
-In-Reply-To: <1409758637-28654-2-git-send-email-gabriel.fernandez@linaro.org>
-References: <1409758637-28654-1-git-send-email-gabriel.fernandez@linaro.org>
- <1409758637-28654-2-git-send-email-gabriel.fernandez@linaro.org>
-Message-ID: <540DBE43.50403@ti.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Mon, 8 Sep 2014 15:35:54 +0100
+Subject: [PATCH 4/4] watchdog: st_wdt: Add new driver for ST's LPC Watchdog
+In-Reply-To: <540DAFBC.1010502@roeck-us.net>
+References: <1409841592-18890-1-git-send-email-lee.jones@linaro.org>
+ <1409841592-18890-6-git-send-email-lee.jones@linaro.org>
+ <20140905155811.GA12374@roeck-us.net>
+ <20140908123246.GB26284@lee--X1> <540DAFBC.1010502@roeck-us.net>
+Message-ID: <20140908143554.GD30307@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Mon, 08 Sep 2014, Guenter Roeck wrote:
 
-On Wednesday 03 September 2014 09:07 PM, Gabriel FERNANDEZ wrote:
-> The MiPHY28lp is a Generic PHY which can serve various SATA or PCIe
-> or USB3 devices.
+> On 09/08/2014 05:32 AM, Lee Jones wrote:
+> >On Fri, 05 Sep 2014, Guenter Roeck wrote:
+> ...
+> >>>+
+> >>>+static struct st_wdog_syscfg stid127_syscfg = {
+> >>>+	.type_mask	= BIT(2),
+> >>>+	.enable_mask	= BIT(2),
+> >>>+};
+> >>>+
+> >>>+static struct st_wdog_syscfg stih415_syscfg = {
+> >>>+	.type_mask	= BIT(6),
+> >>>+	.enable_mask	= BIT(7),
+> >>>+};
+> >>>+
+> >>>+static struct st_wdog_syscfg stih416_syscfg = {
+> >>>+	.type_mask	= BIT(6),
+> >>>+	.enable_mask	= BIT(7),
+> >>>+};
+> >>>+
+> >>>+static struct st_wdog_syscfg stih407_syscfg = {
+> >>>+	.enable_mask	= BIT(19),
+> >>>+};
+> >>>+
+> ...
 > 
-> Signed-off-by: alexandre torgue <alexandre.torgue@st.com>
-> Signed-off-by: Giuseppe Cavallaro <peppe.cavallaro@st.com>
-> Signed-off-by: Gabriel Fernandez <gabriel.fernandez@linaro.org>
-> ---
->  .../devicetree/bindings/phy/phy-miphy28lp.txt      | 126 +++++++++++++++++++++
->  1 file changed, 126 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/phy/phy-miphy28lp.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/phy/phy-miphy28lp.txt b/Documentation/devicetree/bindings/phy/phy-miphy28lp.txt
-> new file mode 100644
-> index 0000000..5e307af
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/phy/phy-miphy28lp.txt
-> @@ -0,0 +1,126 @@
-> +STMicroelectronics STi MIPHY28LP PHY binding
-> +============================================
-> +
-> +This binding describes a miphy device that is used to control PHY hardware
-> +for SATA, PCIe or USB3.
-> +
-> +Required properties (controller (parent) node):
-> +- compatible	: Should be "st,miphy28lp-phy"
-> +- st,syscfg	: Should be a phandle of the system configuration register group
-> +		  which contain the SATA, PCIe or USB3 mode setting bits
-> +
-> +Required nodes	:  A sub-node is required for each channel the controller
-> +		   provides. Address range information including the usual
-> +		   'reg' and 'reg-names' properties are used inside these
-> +		   nodes to describe the controller's topology. These nodes
-> +		   are translated by the driver's .xlate() function.
-> +
-> +Required properties (port (child) node):
-> +- #phy-cells	: Should be 1 (See second example)
-> +		  Cell after port phandle is device type from:
-> +			- MIPHY_TYPE_SATA
-> +			- MIPHY_TYPE_PCI
-> +			- MIPHY_TYPE_USB3
-> +- reg		: Address and length of the register set for the device
-> +- reg-names	: The names of the register addresses corresponding to the registers
-> +		  filled in "reg". Is can also contain the offset of the system configuration
+> >>>+	/* Mask/unmask watchdog reset */
+> >>>+	regmap_update_bits(st_wdog->syscfg->regmap,
+> >>>+			   st_wdog->syscfg->enable_reg,
+> >>>+			   st_wdog->syscfg->enable_mask,
+> >>>+			   !enable);
+> >>
+> >>enable is a bool, but is supposed to provide the value to be put into the
+> >>register, masked with enable_mask. Unless I am missing something, the value
+> >>is not shifted in regmap_update_bits. So I don't think this can work, but
+> >>effectively always writes zero into the mask unless the mask happens to be
+> >>at bit position 0 - which never happens.
+> >>
+> >>Same is true for warm_reset above, which also has values 0 or 1.
+> >>
+> >>I know it does not really matter in C (at least when it comes to handling
+> >>0 and 1), but I would suggest to avoid mixing booleans with bit masks.
+> >
+> >You're right of course, great spot.
+> >
+> >How about?
+> >
+> >   !enable << ffs(st_wdog->syscfg->enable_mask).
+> >
+> Seems to add a lot of complexity (as in 'makes it difficult to understand')
+> to avoid a conditional, and assumes that enable_mask will never have more
+> than one bit set. I would go with
+> 	enable ? st_wdog->syscfg->enable_mask : 0
+> to avoid confusion, but your call.
 
-%s/Is/It
+Actually, it would be the other way round, but the implementation is
+nice.  I'll use that instead.
 
-Thanks
-Kishon
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
