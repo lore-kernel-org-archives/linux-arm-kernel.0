@@ -1,93 +1,58 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Mon, 8 Sep 2014 11:38:21 -0700
-Subject: [PATCH v5 3/8] arm: fixmap: implement __set_fixmap()
-In-Reply-To: <20140908103959.GD26030@arm.com>
-References: <1409781429-27593-1-git-send-email-keescook@chromium.org>
- <1409781429-27593-4-git-send-email-keescook@chromium.org>
- <20140904170349.GL7156@arm.com>
- <CAGXu5jKimGaupwyUwt0Zwa3OtjeoED8-uBeMX0MwXjBYP6ssAg@mail.gmail.com>
- <20140904172748.GO7156@arm.com>
- <CAGXu5jJVJ1F=6Q909ppuKoWPdSoz7bTLLxBiY_5eQ=nQQiCHmw@mail.gmail.com>
- <20140908103959.GD26030@arm.com>
-Message-ID: <CAGXu5jJGaY1pY8UHAe7-VL=R8pRoDkLL_WLBcWMTUkfmtdid1Q@mail.gmail.com>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Mon, 08 Sep 2014 20:43:40 +0200
+Subject: [PATCH v5 0/4] Patches to add support for Rockchip dwc2 controller
+In-Reply-To: <1407470159-14722-1-git-send-email-kever.yang@rock-chips.com>
+References: <1407470159-14722-1-git-send-email-kever.yang@rock-chips.com>
+Message-ID: <4508852.pY5QcWPyfZ@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 8, 2014 at 3:39 AM, Will Deacon <will.deacon@arm.com> wrote:
-> On Fri, Sep 05, 2014 at 08:41:08PM +0100, Kees Cook wrote:
->> On Thu, Sep 4, 2014 at 10:27 AM, Will Deacon <will.deacon@arm.com> wrote:
->> > On Thu, Sep 04, 2014 at 06:23:42PM +0100, Kees Cook wrote:
->> >> On Thu, Sep 4, 2014 at 10:03 AM, Will Deacon <will.deacon@arm.com> wrote:
->> >> > Hi Kees,
->> >> >
->> >> > On Wed, Sep 03, 2014 at 10:57:04PM +0100, Kees Cook wrote:
->> >> >> This is used from set_fixmap() and clear_fixmap() via asm-generic/fixmap.h.
->> >> >> Also makes sure that the fixmap allocation fits into the expected range.
->> >> >>
->> >> >> Based on patch by Rabin Vincent.
->> >> >
->> >> > [...]
->> >> >
->> >> >> +void __set_fixmap(enum fixed_addresses idx, phys_addr_t phys, pgprot_t prot)
->> >> >> +{
->> >> >> +     unsigned long vaddr = __fix_to_virt(idx);
->> >> >> +     pte_t *pte = pte_offset_kernel(pmd_off_k(vaddr), vaddr);
->> >> >> +
->> >> >> +     /* Make sure fixmap region does not exceed available allocation. */
->> >> >> +     BUILD_BUG_ON(FIXADDR_START + (__end_of_fixed_addresses * PAGE_SIZE) >
->> >> >> +                  FIXADDR_END);
->> >> >> +     BUG_ON(idx >= __end_of_fixed_addresses);
->> >> >> +
->> >> >> +     if (pgprot_val(prot))
->> >> >> +             set_pte_at(NULL, vaddr, pte,
->> >> >> +                     pfn_pte(phys >> PAGE_SHIFT, prot));
->> >> >> +     else
->> >> >> +             pte_clear(NULL, vaddr, pte);
->> >> >> +
->> >> >> +     /*
->> >> >> +      * Given the potential a15 tlbi errata, we can only do tlb flushes
->> >> >> +      * with interrupts disabled. Callers must have taken care of this.
->> >> >> +      */
->> >> >> +     WARN_ON_ONCE(!irqs_disabled());
->> >> >> +     flush_tlb_kernel_range(vaddr, vaddr + PAGE_SIZE);
->> >> >
->> >> > Aha, this explains why we were confusing each other! The issue is that
->> >> > interrupts must be *enabled*, so this code does the exact opposite of
->> >> > what we need.
->> >> >
->> >> > I think this got lost in a sea of double negatives during the last round
->> >> > of review.
->> >>
->> >> Ah! If this is the case, perhaps we can get away with
->> >> local_flush_tlb_kernel_range() then?
->> >
->> > That's a bit tricky, since you need to ensure that preemption is disabled
->> > until the mapping is put back like it was.
->>
->> Even with CONFIG_ARM_ERRATA_798181 enabled, I don't see a problem here
->> using flush_tlb_kernel_range(). When doing the ftrace work, this was
->> trivial to trip over, so I think we're in a good state here.
->>
->> I've tested this on real hardware now too, and nothing falls over.
->> I'll get rid of the comment and the WARN_ON_ONCE, but AFAICT, this is
->> safe.
->
-> But was that hardware actually affected by the erratum? There is a runtime
-> check which will avoid the cross-call if not.
->
->> Do you have a suggestion about what needs fixing?
->
-> The easiest thing to do would be ensuring that __set_fixmap is always called
-> with interrupts enabled. If you can guarantee that, then you need to rework
-> the locking so that interrupts aren't disabled. I admit that I've lost a
-> fair amount of the context here, but that's the fundamental issue.
+Hi Greg,
 
-In retesting, it hit the problem. Ugh. I will investigate what can be done.
+Am Freitag, 8. August 2014, 11:55:55 schrieb Kever Yang:
+> These patches to add support for dwc2 controller found in
+> Rockchip processors rk3066, rk3188 and rk3288,
+> and enable dts for rk3288 evb.
 
-Thanks,
+will you take patches 1 and 2?
 
--Kees
 
--- 
-Kees Cook
-Chrome OS Security
+Thanks
+Heiko
+
+
+> 
+> Changes in v5:
+> - max_transfer_size change to 65535 to met the requirement of
+>   header file
+> - change the sort order of dwc2 in rk3288.dtsi
+> - don't enable otg port for evb
+> 
+> Changes in v4:
+> - max_transfer_size change to 65536, this should be enough
+>   for most transfer, the hardware auto-detect will set this
+>   to 0x7ffff which may make dma_alloc_coherent fail when
+>   non-dword aligned buf from driver like usbnet happen.
+> - remove EHCI and HSIC dts patch for Doug had post it seprately.
+> 
+> Changes in v3:
+> - EHCI and HSIC move new for version 3.
+> - Rebase
+> 
+> Changes in v2:
+> - Split out dr_mode and rk3288 bindings.
+> - add compatible "snps,dwc2" bingding info
+> - set most parameters as driver auto-detect
+> - evb patch added in version 2
+> 
+> Kever Yang (4):
+>   Documentation: dt-bindings: add dt binding info for Rockchip dwc2
+>   usb: dwc2: add compatible data for rockchip soc
+>   ARM: dts: add rk3288 dwc2 controller support
+>   ARM: dts: Enable USB host1(dwc) on rk3288-evb
+> 
+>  Documentation/devicetree/bindings/usb/dwc2.txt |  3 +++
+>  arch/arm/boot/dts/rk3288-evb.dtsi              |  4 ++++
+>  arch/arm/boot/dts/rk3288.dtsi                  | 20 ++++++++++++++++++
+>  drivers/usb/dwc2/platform.c                    | 29
+> ++++++++++++++++++++++++++ 4 files changed, 56 insertions(+)
