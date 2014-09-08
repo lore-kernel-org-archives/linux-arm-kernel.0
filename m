@@ -1,40 +1,78 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 8 Sep 2014 11:53:07 +0100
-Subject: [PATCH] arm64: LLVMLinux: Fix inline arm64 assembly for use with
- clang
-In-Reply-To: <1409959460-15989-1-git-send-email-behanw@converseincode.com>
-References: <1409959460-15989-1-git-send-email-behanw@converseincode.com>
-Message-ID: <20140908105307.GF26030@arm.com>
+From: rric@kernel.org (Robert Richter)
+Date: Mon, 8 Sep 2014 13:01:31 +0200
+Subject: [PATCH v2 1/4] arm64, thunder: Add Kconfig option for Cavium
+ Thunder SoC Family
+In-Reply-To: <2952834.1P42roDKD9@wuerfel>
+References: <1409903205-2762-1-git-send-email-rric@kernel.org>
+ <7863371.EMkUuntQWU@wuerfel> <20140905142245.GG20164@leverpostej>
+ <2952834.1P42roDKD9@wuerfel>
+Message-ID: <20140908110131.GX4703@rric.localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Sep 06, 2014 at 12:24:20AM +0100, behanw at converseincode.com wrote:
-> From: Mark Charlebois <charlebm@gmail.com>
+On 05.09.14 18:25:35, Arnd Bergmann wrote:
+> On Friday 05 September 2014 15:22:46 Mark Rutland wrote:
+> > 
+> > > A common pattern these days is to do dependencies like
+> > > 
+> > > arch/*/Kconfig:
+> > >       config ARCH_FOO
+> > >       bool "Enable support for Foo platform"
+> > >       help
+> > >         ...
+> > > 
+> > > 
+> > > drivers/*/Kconfig
+> > >       config SUBSYS_FOO
+> > >       bool "SUBSYS driver for Foo"
+> > >       depends on ARCH_FOO || COMPILE_TEST
+> > >       depends on OF && REGULATOR && GENERIC_PHY # or whatever
+> >
+> > Russell's comments w.r.t. Kconfig warnings when config names change
+> > still holds regardless of select vs depends on.
 > 
-> Fix variable types for 64-bit inline assembly.
+> Yes, that's what I wrote in my reply as well.
 > 
-> This patch now works with both gcc and clang.
+> > > That way we can enable everything in the defconfig, but someone
+> > > who likes to build a more specialized kernel can disable the
+> > > other platforms and won't get the drivers that are specific to
+> > > those.
+> > > 
+> > > I personally think this is a bit more verbose than what we need, but
+> > > I don't strongly object doing it that way.
+> > 
+> > You'd still be able to do this without ARCH_FOO, though you would need
+> > to know which drivers are necessary for a particular SoC. That seems to
+> > be the way things are handled on x86; I don't recall having to select
+> > support for specific machines there, just the individual drivers.
 
-Really? This looks like something the clang needs to do better on, as I
-really don't see people adding these casts to future code. They're ugly and
-redundant (or GCC).
+This is well hidden on x86, but each vendor has a config option. For
+AMD systems we have had our own option to disable vendor specific
+code, see CPU_SUP_AMD for example. Disabling this will remove all AMD
+specific code in the kernel. Of course this is enabled per default.
 
-This hunk:
+With ARCH_THUNDER I intended to do the same (you could name this also
+SOC_SUP_CAVIUM or so but I kept the current naming scheme). In patch
+4/4 I have added the option to defconfig. This enables this per
+default and nobody has to deal with any option manually, just running
+make defconfig is fine.
 
-> diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
-> index c555672..6894ef3 100644
-> --- a/arch/arm64/mm/mmu.c
-> +++ b/arch/arm64/mm/mmu.c
-> @@ -94,7 +94,7 @@ static int __init early_cachepolicy(char *p)
->  	 */
->  	asm volatile(
->  	"	mrs	%0, mair_el1\n"
-> -	"	bfi	%0, %1, #%2, #8\n"
-> +	"	bfi	%0, %1, %2, #8\n"
->  	"	msr	mair_el1, %0\n"
->  	"	isb\n"
->  	: "=&r" (tmp)
+Also, at least to disable building the dtb file for foo, you will need
+ARCH_FOO too. How else would you deal with dtb files then?
 
-also looks fishy. Does gas accept that without the '#' prefix?
+Having ARCH_FOO might not be necessary for drivers. One could enable
+drivers manually, but this option is still a good reference for the
+drivers needed by foo. At some point you will carry tons of enabled
+drivers in your defconfig and you don't know which platform actually
+is using it. For generic drivers this might be fine.  But in my point
+of few, each soc specific driver should have an soc specific option
+too. Then you easily can remove an soc from the defconfig.
 
-Will
+-Robert
+
+> The main difference is that there are very few drivers on x86 that are
+> specific to one of the two chip makers. Almost everything is a PCI
+> device that can actually be plugged in anywhere.
+> 
+> On ARM64 there is going to be a lot of stuff that really makes sense
+> only for one of the 50 licensees.
