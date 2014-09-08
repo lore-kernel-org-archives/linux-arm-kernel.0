@@ -1,59 +1,134 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon,  8 Sep 2014 13:37:59 +0200
-Subject: [PATCH 0/7]  ARM RealView DeviceTree support v6
-Message-ID: <1410176286-32533-1-git-send-email-linus.walleij@linaro.org>
+Date: Mon,  8 Sep 2014 13:38:01 +0200
+Subject: [PATCH 2/7 v6] leds: add device tree bindings for register bit LEDs
+In-Reply-To: <1410176286-32533-1-git-send-email-linus.walleij@linaro.org>
+References: <1410176286-32533-1-git-send-email-linus.walleij@linaro.org>
+Message-ID: <1410176286-32533-3-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I've updated the RealView DeviceTree patch again.
+This adds the device tree bindings used by register bit LEDs.
 
-Main changes:
-- Calculate cache associativity from ePAPR definitions
-- Rely on the l2c_aux_[mask|val] from the DT_MACHINE
-- Add cache line size to device tree
-
-Florian Fainelli (1):
-  ARM: l2c: parse 'cache-size' and 'cache-sets' properties
-
-Linus Walleij (6):
-  leds: add a driver for syscon-based LEDs
-  leds: add device tree bindings for register bit LEDs
-  power: reset: driver for the Versatile syscon reboot
-  soc: add driver for the ARM RealView
-  ARM: l2x0: calculate associativity from ePAPR cache props
-  ARM: realview: basic device tree implementation
-
- Documentation/devicetree/bindings/arm/arm-boards   |  65 ++++++
- Documentation/devicetree/bindings/arm/gic.txt      |   1 +
- Documentation/devicetree/bindings/arm/l2cc.txt     |   2 +
- .../devicetree/bindings/leds/register-bit-led.txt  |  99 +++++++++
- arch/arm/boot/dts/Makefile                         |   1 +
- arch/arm/boot/dts/arm-realview-pb1176.dts          | 246 +++++++++++++++++++++
- arch/arm/mach-realview/Kconfig                     |  13 ++
- arch/arm/mach-realview/Makefile                    |   1 +
- arch/arm/mach-realview/realview-dt.c               |  32 +++
- arch/arm/mm/cache-l2x0.c                           | 111 ++++++++++
- drivers/irqchip/irq-gic.c                          |   2 +
- drivers/leds/Kconfig                               |  10 +
- drivers/leds/Makefile                              |   1 +
- drivers/leds/leds-syscon.c                         | 165 ++++++++++++++
- drivers/power/reset/Kconfig                        |   9 +
- drivers/power/reset/Makefile                       |   1 +
- drivers/power/reset/arm-versatile-reboot.c         | 111 ++++++++++
- drivers/soc/Kconfig                                |   1 +
- drivers/soc/Makefile                               |   1 +
- drivers/soc/versatile/Kconfig                      |  10 +
- drivers/soc/versatile/Makefile                     |   1 +
- drivers/soc/versatile/soc-realview.c               | 144 ++++++++++++
- 22 files changed, 1027 insertions(+)
+Cc: devicetree at vger.kernel.org
+Cc: Bryan Wu <cooloney@gmail.com>
+Cc: Richard Purdie <rpurdie@rpsys.net>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ChangeLog v1->v2:
+- Rename binding "register-bit-led"
+- Define that such nodes appear only as children of syscon
+- Group required and optional parameters
+- Number nodes as foo@<offset>.<bit>
+- Update example
+---
+ .../devicetree/bindings/leds/register-bit-led.txt  | 99 ++++++++++++++++++++++
+ 1 file changed, 99 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/leds/register-bit-led.txt
- create mode 100644 arch/arm/boot/dts/arm-realview-pb1176.dts
- create mode 100644 arch/arm/mach-realview/realview-dt.c
- create mode 100644 drivers/leds/leds-syscon.c
- create mode 100644 drivers/power/reset/arm-versatile-reboot.c
- create mode 100644 drivers/soc/versatile/Kconfig
- create mode 100644 drivers/soc/versatile/Makefile
- create mode 100644 drivers/soc/versatile/soc-realview.c
 
+diff --git a/Documentation/devicetree/bindings/leds/register-bit-led.txt b/Documentation/devicetree/bindings/leds/register-bit-led.txt
+new file mode 100644
+index 000000000000..379cefdc0bda
+--- /dev/null
++++ b/Documentation/devicetree/bindings/leds/register-bit-led.txt
+@@ -0,0 +1,99 @@
++Device Tree Bindings for Register Bit LEDs
++
++Register bit leds are used with syscon multifunctional devices
++where single bits in a certain register can turn on/off a
++single LED. The register bit LEDs appear as children to the
++syscon device, with the proper compatible string. For the
++syscon bindings see:
++Documentation/devicetree/bindings/mfd/syscon.txt
++
++Each LED is represented as a sub-node of the syscon device. Each
++node's name represents the name of the corresponding LED.
++
++LED sub-node properties:
++
++Required properties:
++- compatible : must be "register-bit-led"
++- offset : register offset to the register controlling this LED
++- mask : bit mask for the bit controlling this LED in the register
++  typically 0x01, 0x02, 0x04 ...
++
++Optional properties:
++- label : (optional)
++  see Documentation/devicetree/bindings/leds/common.txt
++- linux,default-trigger : (optional)
++  see Documentation/devicetree/bindings/leds/common.txt
++- default-state: (optional) The initial state of the LED. Valid
++  values are "on", "off", and "keep". If the LED is already on or off
++  and the default-state property is set the to same value, then no
++  glitch should be produced where the LED momentarily turns off (or
++  on). The "keep" setting will keep the LED at whatever its current
++  state is, without producing a glitch.  The default is off if this
++  property is not present.
++
++Example:
++
++syscon: syscon at 10000000 {
++	compatible = "arm,realview-pb1176-syscon", "syscon";
++	reg = <0x10000000 0x1000>;
++
++	led at 08.0 {
++		compatible = "register-bit-led";
++		offset = <0x08>;
++		mask = <0x01>;
++		label = "versatile:0";
++		linux,default-trigger = "heartbeat";
++		default-state = "on";
++	};
++	led at 08.1 {
++		compatible = "register-bit-led";
++		offset = <0x08>;
++		mask = <0x02>;
++		label = "versatile:1";
++		linux,default-trigger = "mmc0";
++		default-state = "off";
++	};
++	led at 08.2 {
++		compatible = "register-bit-led";
++		offset = <0x08>;
++		mask = <0x04>;
++		label = "versatile:2";
++		linux,default-trigger = "cpu0";
++		default-state = "off";
++	};
++	led at 08.3 {
++		compatible = "register-bit-led";
++		offset = <0x08>;
++		mask = <0x08>;
++		label = "versatile:3";
++		default-state = "off";
++	};
++	led at 08.4 {
++		compatible = "register-bit-led";
++		offset = <0x08>;
++		mask = <0x10>;
++		label = "versatile:4";
++		default-state = "off";
++	};
++	led at 08.5 {
++		compatible = "register-bit-led";
++		offset = <0x08>;
++		mask = <0x20>;
++		label = "versatile:5";
++		default-state = "off";
++	};
++	led at 08.6 {
++		compatible = "register-bit-led";
++		offset = <0x08>;
++		mask = <0x40>;
++		label = "versatile:6";
++		default-state = "off";
++	};
++	led at 08.7 {
++		compatible = "register-bit-led";
++		offset = <0x08>;
++		mask = <0x80>;
++		label = "versatile:7";
++		default-state = "off";
++	};
++};
 -- 
 1.9.3
