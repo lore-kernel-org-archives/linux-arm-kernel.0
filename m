@@ -1,51 +1,39 @@
-From: lifshitz@compulab.co.il (Dmitry Lifshitz)
-Date: Mon, 08 Sep 2014 14:34:33 +0300
-Subject: [PATCH 2/2] ARM: dts: omap5: Add dr_mode for dwc3
-In-Reply-To: <20140416161619.GH28035@saruman.home>
-References: <1381402195-29257-1-git-send-email-kishon@ti.com>
- <1381402195-29257-2-git-send-email-kishon@ti.com> <52580F34.8030809@ti.com>
- <20140416161619.GH28035@saruman.home>
-Message-ID: <540D9449.3090008@compulab.co.il>
+From: broonie@kernel.org (Mark Brown)
+Date: Mon, 8 Sep 2014 12:35:47 +0100
+Subject: [PATCH 1/2] gpio: Add driver for AXM55xx SSP chip selects
+In-Reply-To: <CAE0=X_2q1Z+pGuh6OY9Si5jbrF9HkczNFUqUgK_8xBekNvMeyQ@mail.gmail.com>
+References: <1409576021-24828-1-git-send-email-anders.berg@avagotech.com>
+ <1409576021-24828-2-git-send-email-anders.berg@avagotech.com>
+ <CACRpkdby4H-fivNn_kG2uL0EjsCGAc+t6OyFi0+VcNGf2Z9NQA@mail.gmail.com>
+ <20140904170630.GL29327@sirena.org.uk>
+ <CACRpkdZEoBan=Lqr1T-iY41U9NfMA_MCLX3LA=juw7X4pmRvSQ@mail.gmail.com>
+ <CAE0=X_3QO5p26M=FS7joKS3zD6LAM_moFutHNcyE1-CjauL3Rw@mail.gmail.com>
+ <20140906135308.GC2601@sirena.org.uk>
+ <CAE0=X_2q1Z+pGuh6OY9Si5jbrF9HkczNFUqUgK_8xBekNvMeyQ@mail.gmail.com>
+Message-ID: <20140908113547.GJ4015@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Felipe, Roger
+On Mon, Sep 08, 2014 at 01:02:32PM +0200, Anders Berg wrote:
+> On Sat, Sep 6, 2014 at 3:53 PM, Mark Brown <broonie@kernel.org> wrote:
 
-On 04/16/2014 07:16 PM, Felipe Balbi wrote:
-> On Fri, Oct 11, 2013 at 05:46:12PM +0300, Roger Quadros wrote:
->> Hi,
->>
->> On 10/10/2013 01:49 PM, Kishon Vijay Abraham I wrote:
->>> From: George Cherian <george.cherian@ti.com>
->>>
->>> Added dr_mode property in dwc3 and set its default mode to device.
->>
->> If there is a specific reason why this is not set to "otg", we need
->> to explain it here.
->>
->> AFAIK the port is meant to be used as OTG port.
->
-> we still don't have the workaround for dual role ports, I've been
-> working on it but still need to retest and make sure it's working fine
-> before merging upstream.
->
+> > Would it not be more straightforward to just register it as a platform
+> > device in this case, or use a separate OF ID in the DT?  We appear to
+> > specify a compatible string when registering AMBA devices even if we are
+> > capable of identifying using the ID registers.
 
+> I'll drop this gpio patch for now and submit a patch on the pl022
+> driver instead. I read the arm,primecell binding and learned that
+> there is a property (arm,primecell-periphid) that can be used to
+> override the HW PrimeCell ID. Seems like something to use here, right?
 
-Does the OTG port suppose to work with OMAP5? I mean role switching 
-mechanism?
-
-I'm testing kernel v3.16 with OMAP5 based board (CM-T54).
-
-If I set CONFIG_USB_DWC3_DUAL_ROLE, than nothing is going on when I plug 
-some device/host cable into micro USB3.0 port (VBUS/ID detection with 
-extcon events works fine).
-
-CONFIG_USB_DWC3_HOST/CONFIG_USB_DWC3_GADGET bring port to appropriate 
-mode and it works.
-
-What is the purpose of setting dr_mode = "peripheral" in omap5.dtsi, 
-since it is overridden by config options in dwc3_probe()?
-
-Thank you in advance for the assistance,
-
-Dmitry
+Possibly, though if there's no hardware ID to override to that might not
+be the best option.  You could always define a property that's specific
+to the pl022 driver flagging that it's got these extra chip selects though.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140908/27fa5806/attachment.sig>
