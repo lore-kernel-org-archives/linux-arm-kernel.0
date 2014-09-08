@@ -1,43 +1,99 @@
-From: philippe.retornaz@gmail.com (=?UTF-8?B?UGhpbGlwcGUgUsOpdG9ybmF6?=)
-Date: Mon, 08 Sep 2014 14:06:36 +0200
-Subject: [PATCH] mfd: mc13xxx: Configure WDI reset
-In-Reply-To: <20140908092559.GB24081@pengutronix.de>
-References: <1410159671-25873-1-git-send-email-mpa@pengutronix.de>
- <540D5DEB.6020605@gmail.com> <20140908092559.GB24081@pengutronix.de>
-Message-ID: <540D9BCC.2000801@gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 08 Sep 2014 14:15:35 +0200
+Subject: [PATCH 6/7 v6] ARM: l2x0: calculate associativity from ePAPR
+ cache props
+In-Reply-To: <1410176286-32533-7-git-send-email-linus.walleij@linaro.org>
+References: <1410176286-32533-1-git-send-email-linus.walleij@linaro.org>
+ <1410176286-32533-7-git-send-email-linus.walleij@linaro.org>
+Message-ID: <65434961.9Ji0STQpff@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 08/09/2014 11:25, Markus Pargmann a ?crit :
-> Hi,
->
-> On Mon, Sep 08, 2014 at 09:42:35AM +0200, Philippe R?tornaz wrote:
->> Hello
->>
->> Le 08/09/2014 09:01, Markus Pargmann a ?crit :
->>> Setup the PMIC to make a restart when a watchdog interrupt occures.
->>> If this is not configured, the PMIC will shut down the power supply
->>> without a restart.
->>
->>
->> Well, this was used to poweroff the mx31moboard board.
->> So we need to be able to configure the functionality.
->
-> So on mx31moboard the watchdog interrupt always leads to a poweroff instead of
-> a reset?
+On Monday 08 September 2014 13:38:05 Linus Walleij wrote:
+>  static void __init l2x0_cache_size_of_parse(const struct device_node *np,
+>                                             u32 *aux_val, u32 *aux_mask,
+> -                                           u32 max_way_size)
+> +                                           u32 max_way_size,
+> +                                           u32 max_associativity)
+>  {
+>         u32 mask = 0, val = 0;
+>         u32 size = 0, sets = 0;
+>         u32 way_size = 0, way_size_bits = 1;
+> +       u32 linesize = 0;
+> +       u32 assoc = 0;
+>  
+>         of_property_read_u32(np, "cache-size", &size);
+>         of_property_read_u32(np, "cache-sets", &sets);
+> +       of_property_read_u32(np, "cache-line-size", &linesize);
+>  
 
-Well, no, it simply doesn't work since the output pin is not enabled :)
-We enable the watchdog output only in pm_power_off().
+If I read ePAPR correctly, you have to read "cache-block-size" as well, and
+use that as a fallback if "cache-line-size" is not provided. The line size
+is only required to be in the DT if it's different from the block size.
 
-> Perhaps it would be better to switch back to poweroff on
-> watchdog interrupt right before the shutdown watchdog interrupt is
-> triggered.
+>         if (!size || !sets)
+>                 return;
+> @@ -962,10 +966,56 @@ static void __init l2x0_cache_size_of_parse(const struct device_node *np,
+>         way_size = size / sets;
+>  
+>         if (way_size > max_way_size) {
+> -               pr_warn("L2C: way size %dKB is too large\n", way_size >> 10);
+> +               pr_warn("L2C OF: way size %dKB is too large\n", way_size >> 10);
+>                 return;
+>         }
+>  
+> +       /* All these l2 caches have the same line size actually */
+> +       if (!linesize)
+> +               linesize = CACHE_LINE_SIZE;
+> +       if (linesize != CACHE_LINE_SIZE)
+> +               pr_warn("L2C OF: DT supplied line size %d bytes does "
+> +                       "not match hardware line size of %d bytes\n",
+> +                       linesize,
+> +                       CACHE_LINE_SIZE);
 
-Yes, we definitely should be doing this.
-The only point is that we don't have currently access to the PMIC from 
-pm_power_off().
-Is there a clean/recommended way to do it ?
+and CACHE_LINE_SIZE seems to be what ePAPR calls cache-block-size, i.e.
+the fundamental unit of cache management as seen from the CPU, independent
+of how it is physically organized.
 
-Thanks !
+> +       /*
+> +        * This cache is set associative. By increasing associativity
+> +        * we increase the number of blocks per set. Usually this
+> +        * quickly hits the roof at 8 or 16 ways of associativity.
+> +        */
+> +       assoc = way_size / linesize;
+> +       if (assoc > max_associativity)
+> +               assoc = max_associativity;
+> +
 
-Philippe
+I don't see what this helps us. Doesn't this silently try to fix up
+incorrect device trees?
+If so, I'd rather see the cache get disabled and a warning printed
+here.
+
+> +       /*
+> +        * Special checks for the PL310 that only has two settings and
+> +        * cannot be set to fully associative.
+> +        */
+> +       if (max_associativity == 16) {
+> +               if (assoc <= 8) {
+> +                       assoc = 8;
+> +                       /* Leave bit 16 in associativity set to 0 */
+> +               }
+> +               if (assoc > 8 && assoc <= 16) {
+> +                       assoc = 16;
+> +                       val |= L310_AUX_CTRL_ASSOCIATIVITY_16;
+> +               }
+
+Same thing here.
+
+> +       } else {
+> +               if (sets == 1)
+> +                       /* Direct-mapped cache */
+> +                       assoc = 1;
+> +               val |= (assoc << L2X0_AUX_CTRL_ASSOC_SHIFT);
+> +       }
+
+This looks wrong: isn't "sets==1" fully associative rather than
+direct-mapped?
+
+	Arnd
