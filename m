@@ -1,81 +1,66 @@
-From: lersek@redhat.com (Laszlo Ersek)
-Date: Mon, 08 Sep 2014 22:52:06 +0200
-Subject: [PATCH] ARM/arm64: KVM: fix use of WnR bit in kvm_is_write_fault()
-In-Reply-To: <1410208167-32532-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1410208167-32532-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <540E16F6.5000008@redhat.com>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Mon, 08 Sep 2014 22:53:09 +0200
+Subject: [PATCH v3 2/9] PM / Domains: Add generic OF-based PM domain
+ look-up
+In-Reply-To: <3105400.7vSnq2rA6s@vostro.rjw.lan>
+References: <1409838756-31963-1-git-send-email-ulf.hansson@linaro.org>
+ <CAPDyKFovLmajQORVT1Mf01J5L7O73JNDFz=gr3fXKvF5xZGCdQ@mail.gmail.com>
+ <5191943.peyCs6gZVs@vostro.rjw.lan> <3105400.7vSnq2rA6s@vostro.rjw.lan>
+Message-ID: <540E1735.9010603@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/08/14 22:29, Ard Biesheuvel wrote:
-> The ISS encoding for an exception from a Data Abort has a WnR
-> bit[6] that indicates whether the Data Abort was caused by a
-> read or a write instruction. While there are several fields
-> in the encoding that are only valid if the ISV bit[24] is set,
-> WnR is not one of them, so we can read it unconditionally.
+On 08.09.2014 23:08, Rafael J. Wysocki wrote:
+> On Monday, September 08, 2014 11:04:23 PM Rafael J. Wysocki wrote:
+>> On Monday, September 08, 2014 09:26:20 AM Ulf Hansson wrote:
+>>> On 8 September 2014 00:13, Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
+>>>> On Thursday, September 04, 2014 03:52:29 PM Ulf Hansson wrote:
+>>>>> From: Tomasz Figa <t.figa@samsung.com>
+>>>>>
+>>>>> This patch introduces generic code to perform PM domain look-up using
+>>>>> device tree and automatically bind devices to their PM domains.
+>>>>>
+>>>>> Generic device tree bindings are introduced to specify PM domains of
+>>>>> devices in their device tree nodes.
+>>>>>
+>>>>> Backwards compatibility with legacy Samsung-specific PM domain bindings
+>>>>> is provided, but for now the new code is not compiled when
+>>>>> CONFIG_ARCH_EXYNOS is selected to avoid collision with legacy code.
+>>>>> This will change as soon as the Exynos PM domain code gets converted to
+>>>>> use the generic framework in further patch.
+>>>>>
+>>>>> Signed-off-by: Tomasz Figa <t.figa@samsung.com>
+>>>>> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+>>>>> [Ulf:Added attach|detach functions, fixed review comments]
+>>>>> Tested-by: Philipp Zabel <p.zabel@pengutronix.de>
+>>>>
+>>>> However, for this one (and consequently the rest) I need an ACK from the
+>>>> people who maintain the bindings.
+>>>
+>>> These DT bindings have been discussed between Tomasz and devicetree
+>>> maintainers previously. So I think there are fine.
+>>>
+>>> Also, when browsing the mail-archives, I found an ack from Rob Herrring:
+>>> http://lists.infradead.org/pipermail/linux-arm-kernel/2014-March/237989.html
+>>>
+>>> I realize that I didn't put the DT maintainers on the to-line when
+>>> posting this patch, but just the devicetree list. I have now included
+>>> them on this reply, but maybe I should repost instead. What do you
+>>> think? Are you happy with the above ack from Rob?
+>>
+>> That should be sufficient, but I wonder why you didn't add it to the patch
+>> to start with?
 > 
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> ---
-> 
-> This fixes an issue I observed with UEFI running under QEMU/KVM using
-> NOR flash emulation and the upcoming KVM_CAP_READONLY_MEM support, where
-> NOR flash reads were mistaken for NOR flash writes, resulting in all read
-> accesses to go through the MMIO emulation layer.
-> 
->  arch/arm/include/asm/kvm_mmu.h   | 5 +----
->  arch/arm64/include/asm/kvm_mmu.h | 5 +----
->  2 files changed, 2 insertions(+), 8 deletions(-)
-> 
-> diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
-> index 5cc0b0f5f72f..fad5648980ad 100644
-> --- a/arch/arm/include/asm/kvm_mmu.h
-> +++ b/arch/arm/include/asm/kvm_mmu.h
-> @@ -83,10 +83,7 @@ static inline bool kvm_is_write_fault(unsigned long hsr)
->  	unsigned long hsr_ec = hsr >> HSR_EC_SHIFT;
->  	if (hsr_ec == HSR_EC_IABT)
->  		return false;
-> -	else if ((hsr & HSR_ISV) && !(hsr & HSR_WNR))
-> -		return false;
-> -	else
-> -		return true;
-> +	return hsr & HSR_WNR;
->  }
->  
->  static inline void kvm_clean_pgd(pgd_t *pgd)
-> diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
-> index 8e138c7c53ac..09fd9e4c13d8 100644
-> --- a/arch/arm64/include/asm/kvm_mmu.h
-> +++ b/arch/arm64/include/asm/kvm_mmu.h
-> @@ -100,10 +100,7 @@ static inline bool kvm_is_write_fault(unsigned long esr)
->  	if (esr_ec == ESR_EL2_EC_IABT)
->  		return false;
->  
-> -	if ((esr & ESR_EL2_ISV) && !(esr & ESR_EL2_WNR))
-> -		return false;
-> -
-> -	return true;
-> +	return esr & ESR_EL2_WNR;
->  }
->  
->  static inline void kvm_clean_pgd(pgd_t *pgd) {}
-> 
+> BTW, I get bounces from t.figa at samsung.com, so I won't apply the patch with
+> that as the "From" field.  And the s-o-b from a bouncing address is worthless
+> too.
 
-No clue about the 32-bit case, but the 64-bit change checks out against
-the ARM ARM. The ISV (ISS[24]) is documented to determine the validity
-of bits ISS[23:14], but WnR is ISS[6], hence it appears independent indeed.
+Yes, that e-mail address is no longer valid, as I'm not at Samsung
+anymore. I'm not sure what's the right thing to do with From and SOB in
+this series, though.
 
-The pre-patch code only considered a clear WnR meaningful /
-consequential only if the ISV was set -- more precisely, it only even
-looked at the WnR then, due to the short-circuit nature of && --, and it
-defaulted to "write fault". Synchronous data aborts due to funky
-register writeback instructions don't set the ISV, hence the code used
-to turn its back on the clear WnR. (Apologies for explaining it to
-myself publicly.) We now ignore the ISV and key off the WnR only.
+If it's of any help, my private address (and the one I use for things I
+maintain and any open source activity on my own) is this one.
 
-You're awesome, Ard. (And now you can drop a few patches from your
-linaro-topic-virt-post-v7-roundup branch! :))
-
-Acked-by: Laszlo Ersek <lersek@redhat.com>
-
-Cheers
-Laszlo
+Best regards,
+Tomasz
