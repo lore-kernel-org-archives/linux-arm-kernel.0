@@ -1,39 +1,59 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon, 8 Sep 2014 12:35:47 +0100
-Subject: [PATCH 1/2] gpio: Add driver for AXM55xx SSP chip selects
-In-Reply-To: <CAE0=X_2q1Z+pGuh6OY9Si5jbrF9HkczNFUqUgK_8xBekNvMeyQ@mail.gmail.com>
-References: <1409576021-24828-1-git-send-email-anders.berg@avagotech.com>
- <1409576021-24828-2-git-send-email-anders.berg@avagotech.com>
- <CACRpkdby4H-fivNn_kG2uL0EjsCGAc+t6OyFi0+VcNGf2Z9NQA@mail.gmail.com>
- <20140904170630.GL29327@sirena.org.uk>
- <CACRpkdZEoBan=Lqr1T-iY41U9NfMA_MCLX3LA=juw7X4pmRvSQ@mail.gmail.com>
- <CAE0=X_3QO5p26M=FS7joKS3zD6LAM_moFutHNcyE1-CjauL3Rw@mail.gmail.com>
- <20140906135308.GC2601@sirena.org.uk>
- <CAE0=X_2q1Z+pGuh6OY9Si5jbrF9HkczNFUqUgK_8xBekNvMeyQ@mail.gmail.com>
-Message-ID: <20140908113547.GJ4015@sirena.org.uk>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon,  8 Sep 2014 13:37:59 +0200
+Subject: [PATCH 0/7]  ARM RealView DeviceTree support v6
+Message-ID: <1410176286-32533-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 08, 2014 at 01:02:32PM +0200, Anders Berg wrote:
-> On Sat, Sep 6, 2014 at 3:53 PM, Mark Brown <broonie@kernel.org> wrote:
+I've updated the RealView DeviceTree patch again.
 
-> > Would it not be more straightforward to just register it as a platform
-> > device in this case, or use a separate OF ID in the DT?  We appear to
-> > specify a compatible string when registering AMBA devices even if we are
-> > capable of identifying using the ID registers.
+Main changes:
+- Calculate cache associativity from ePAPR definitions
+- Rely on the l2c_aux_[mask|val] from the DT_MACHINE
+- Add cache line size to device tree
 
-> I'll drop this gpio patch for now and submit a patch on the pl022
-> driver instead. I read the arm,primecell binding and learned that
-> there is a property (arm,primecell-periphid) that can be used to
-> override the HW PrimeCell ID. Seems like something to use here, right?
+Florian Fainelli (1):
+  ARM: l2c: parse 'cache-size' and 'cache-sets' properties
 
-Possibly, though if there's no hardware ID to override to that might not
-be the best option.  You could always define a property that's specific
-to the pl022 driver flagging that it's got these extra chip selects though.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140908/27fa5806/attachment.sig>
+Linus Walleij (6):
+  leds: add a driver for syscon-based LEDs
+  leds: add device tree bindings for register bit LEDs
+  power: reset: driver for the Versatile syscon reboot
+  soc: add driver for the ARM RealView
+  ARM: l2x0: calculate associativity from ePAPR cache props
+  ARM: realview: basic device tree implementation
+
+ Documentation/devicetree/bindings/arm/arm-boards   |  65 ++++++
+ Documentation/devicetree/bindings/arm/gic.txt      |   1 +
+ Documentation/devicetree/bindings/arm/l2cc.txt     |   2 +
+ .../devicetree/bindings/leds/register-bit-led.txt  |  99 +++++++++
+ arch/arm/boot/dts/Makefile                         |   1 +
+ arch/arm/boot/dts/arm-realview-pb1176.dts          | 246 +++++++++++++++++++++
+ arch/arm/mach-realview/Kconfig                     |  13 ++
+ arch/arm/mach-realview/Makefile                    |   1 +
+ arch/arm/mach-realview/realview-dt.c               |  32 +++
+ arch/arm/mm/cache-l2x0.c                           | 111 ++++++++++
+ drivers/irqchip/irq-gic.c                          |   2 +
+ drivers/leds/Kconfig                               |  10 +
+ drivers/leds/Makefile                              |   1 +
+ drivers/leds/leds-syscon.c                         | 165 ++++++++++++++
+ drivers/power/reset/Kconfig                        |   9 +
+ drivers/power/reset/Makefile                       |   1 +
+ drivers/power/reset/arm-versatile-reboot.c         | 111 ++++++++++
+ drivers/soc/Kconfig                                |   1 +
+ drivers/soc/Makefile                               |   1 +
+ drivers/soc/versatile/Kconfig                      |  10 +
+ drivers/soc/versatile/Makefile                     |   1 +
+ drivers/soc/versatile/soc-realview.c               | 144 ++++++++++++
+ 22 files changed, 1027 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/leds/register-bit-led.txt
+ create mode 100644 arch/arm/boot/dts/arm-realview-pb1176.dts
+ create mode 100644 arch/arm/mach-realview/realview-dt.c
+ create mode 100644 drivers/leds/leds-syscon.c
+ create mode 100644 drivers/power/reset/arm-versatile-reboot.c
+ create mode 100644 drivers/soc/versatile/Kconfig
+ create mode 100644 drivers/soc/versatile/Makefile
+ create mode 100644 drivers/soc/versatile/soc-realview.c
+
+-- 
+1.9.3
