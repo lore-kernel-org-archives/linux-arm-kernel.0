@@ -1,10 +1,10 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon,  8 Sep 2014 09:27:44 +0900
-Subject: [PATCH 1/5] ARM: shmobile: r8a7740: Use SoC-specific 48-bit CMT
+Date: Mon,  8 Sep 2014 09:27:45 +0900
+Subject: [PATCH 2/5] ARM: shmobile: r8a7790: Use SoC-specific 48-bit CMT
  compat string
 In-Reply-To: <1410136068-32220-1-git-send-email-horms+renesas@verge.net.au>
 References: <1410136068-32220-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1410136068-32220-2-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1410136068-32220-3-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -17,26 +17,35 @@ of a version and providing SoC-specific compat strings has been adopted.
 
 Although not universally liked this convention is used in the bindings for
 a number of drivers for Renesas hardware. The purpose of this patch is to
-make use of the SoC-specific CMT compat string for the r8a7740 48-bit CMT
+make use of the SoC-specific CMT compat string for the r8a7790 48-bit CMT
 clock source.
 
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7740.dtsi | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/boot/dts/r8a7790.dtsi | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/boot/dts/r8a7740.dtsi b/arch/arm/boot/dts/r8a7740.dtsi
-index 1067a96..d46c213 100644
---- a/arch/arm/boot/dts/r8a7740.dtsi
-+++ b/arch/arm/boot/dts/r8a7740.dtsi
-@@ -42,7 +42,7 @@
+diff --git a/arch/arm/boot/dts/r8a7790.dtsi b/arch/arm/boot/dts/r8a7790.dtsi
+index a3cd307..d0e1773 100644
+--- a/arch/arm/boot/dts/r8a7790.dtsi
++++ b/arch/arm/boot/dts/r8a7790.dtsi
+@@ -211,7 +211,7 @@
  	};
  
- 	cmt1: timer at e6138000 {
--		compatible = "renesas,cmt-48";
-+		compatible = "renesas,cmt-48-r8a7740", "renesas,cmt-48";
- 		reg = <0xe6138000 0x170>;
- 		interrupts = <0 58 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp3_clks R8A7740_CLK_CMT1>;
+ 	cmt0: timer at ffca0000 {
+-		compatible = "renesas,cmt-48-gen2";
++		compatible = "renesas,cmt-48-r8a7790", "renesas,cmt-48-gen2";
+ 		reg = <0 0xffca0000 0 0x1004>;
+ 		interrupts = <0 142 IRQ_TYPE_LEVEL_HIGH>,
+ 			     <0 143 IRQ_TYPE_LEVEL_HIGH>;
+@@ -224,7 +224,7 @@
+ 	};
+ 
+ 	cmt1: timer at e6130000 {
+-		compatible = "renesas,cmt-48-gen2";
++		compatible = "renesas,cmt-48-r8a7790", "renesas,cmt-48-gen2";
+ 		reg = <0 0xe6130000 0 0x1004>;
+ 		interrupts = <0 120 IRQ_TYPE_LEVEL_HIGH>,
+ 			     <0 121 IRQ_TYPE_LEVEL_HIGH>,
 -- 
 2.0.1
