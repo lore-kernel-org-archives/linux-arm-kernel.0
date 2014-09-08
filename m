@@ -1,33 +1,42 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon,  8 Sep 2014 13:27:41 +0200
-Subject: [PATCH] ARM: on a generic DT system: do not touch l2x0
-Message-ID: <1410175661-31011-1-git-send-email-linus.walleij@linaro.org>
+Date: Mon, 8 Sep 2014 13:31:58 +0200
+Subject: [PATCH v2] ARM: dt: fix up PL011 device tree bindings
+In-Reply-To: <1399887437-32154-1-git-send-email-linus.walleij@linaro.org>
+References: <1399887437-32154-1-git-send-email-linus.walleij@linaro.org>
+Message-ID: <CACRpkdai=GX694hH1VxfMiGXcf7YH3wTE9HVS3hHA_zFFT28fw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Set no bits, mask all bits in the AUX l2x0 register for the
-default DT ARM system: if anything needs to be modified, it
-should be done using DT bindings.
+On Mon, May 12, 2014 at 11:37 AM, Linus Walleij
+<linus.walleij@linaro.org> wrote:
 
-Suggested-by: Arnd Bergmann <arnd@arndb.de>
-Cc: Russell King <linux@arm.linux.org.uk>
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
- arch/arm/kernel/devtree.c | 2 ++
- 1 file changed, 2 insertions(+)
+> Make the map match the reality, the current binding text is
+> nonsense:
+>
+> - The clock required for the clocking of the serial port
+>   must come first and is not optional (as the driver will
+>   otherwise proceed to grab and use the apb_pclk as uartclk),
+>   and the apb_pclk that clocks the logic must come second
+>   as the code will retrieve the first clock by index,
+>   whereas the PrimeCell but will explicitly look for
+>   "apb_pclk" so this can be specified later, as it is
+>   looked up by name.
+>
+> - The pin control state "default" is the only mandated
+>   state, the sleep state is entirely optional.
+>
+> We also add an example to avoid further confusion.
+>
+> Reported-by: Arnd Bergmann <arnd@arndb.de>
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> ---
+> ChangeLog v1->v2:
+> - Rename amba_pclk to apb_pclk
+> - Split clock/clocks properties and indicate that listin one
+>   clock only is deprecated
 
-diff --git a/arch/arm/kernel/devtree.c b/arch/arm/kernel/devtree.c
-index 11c54de9f8cf..d989c0c2b221 100644
---- a/arch/arm/kernel/devtree.c
-+++ b/arch/arm/kernel/devtree.c
-@@ -207,6 +207,8 @@ const struct machine_desc * __init setup_machine_fdt(unsigned int dt_phys)
- 
- #ifdef CONFIG_ARCH_MULTIPLATFORM
- 	DT_MACHINE_START(GENERIC_DT, "Generic DT based system")
-+		.l2c_aux_val = 0x0,
-+		.l2c_aux_mask = ~0x0,
- 	MACHINE_END
- 
- 	mdesc_best = &__mach_desc_GENERIC_DT;
--- 
-1.9.3
+I don't see either this or Mark's related patch being applied and the DT
+binding for PL011 left in a sad state. Can we please apply this?
+
+Yours,
+Linus Walleij
