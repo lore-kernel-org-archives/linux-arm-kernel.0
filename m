@@ -1,23 +1,77 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 8 Sep 2014 12:21:12 +0100
-Subject: Unable to boot mainline on snow chromebook since 3.15
-In-Reply-To: <540C8577.2070907@gmail.com>
-References: <20140905115704.GO13515@arm.com> <20140905122232.GP13515@arm.com>
- <CAD=FV=VfioJf9VYoSYL0QBk-bN93-Ecx3=0n9hb5Q4rcx43-_g@mail.gmail.com>
- <540C202E.2060009@collabora.co.uk> <540C7F5B.6070307@gmail.com>
- <540C83DE.10505@collabora.co.uk> <540C8577.2070907@gmail.com>
-Message-ID: <20140908112112.GK26030@arm.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 8 Sep 2014 13:25:51 +0200
+Subject: [PATCH 2/8 v2] leds: add device tree bindings for register bit
+ LEDs
+In-Reply-To: <5686741.QjIvGO0Jfo@wuerfel>
+References: <1409659354-23553-1-git-send-email-linus.walleij@linaro.org>
+ <1409659354-23553-3-git-send-email-linus.walleij@linaro.org>
+ <5686741.QjIvGO0Jfo@wuerfel>
+Message-ID: <CACRpkdarXzrprA=1=oT-1K8X3y-QPH+gkteHCpZDcCA3pBZMOQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Sep 07, 2014 at 05:19:03PM +0100, Tomasz Figa wrote:
-> At least for next 3.17-rc I'd suggest fixing this up in respective clock
-> driver and dropping the hack only after Exynos DRM patches are merged
-> and confirmed working.
+On Tue, Sep 2, 2014 at 2:24 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Tuesday 02 September 2014 14:02:28 Linus Walleij wrote:
+>> +LED sub-node properties:
+>> +
+>> +Required properties:
+>> +- compatible : must be "register-bit-led"
+>> +- offset : register offset to the register controlling this LED
+>> +- mask : bit mask for the bit controlling this LED in the register
+>> +  typically 0x01, 0x02, 0x04 ...
+>>
+>
+> How does the driver know whether to do byte or word sized accesses?
 
-Whilst I'm sympathetic to people working to enable DRM, I think this is
-the right solution to the problem. The transition from simplefb to DRM
-shouldn't break display for a bunch of kernel revisions whilst the code is
-in flux.
+Like with all other bindings based on
+Documentation/devicetree/bindings/mfd/syscon.txt
+it is implicit that the access size is 32 bit words. Just grep
+for syscon in the bindings and you will see none define the access
+width.
 
-Will
+If this should be fixed, the parent syscon binding should be
+altered to cover access width for all children as this is a property
+of the entire register range.
+
+So for example:
+
+gpr: iomuxc-gpr at 020e0000 {
+        compatible = "fsl,imx6q-iomuxc-gpr", "syscon";
+        reg = <0x020e0000 0x38>;
+        register-width = <32>;
+        register-valid = <32>;
+        register-stride = <4>;
+};
+
+So as to indicate that this register range is made up of 32 bit
+words, all 32 bits are valid in each word, and the stride between
+words i 4 bytes (i.e. tightly packed).
+
+As mentioned by Rob, the "syscon" driver should be renamed
+"register-range" and "syscon" deprecated as binding, as it is
+Linux terminology.
+
+I guess this adds up to the conclusion that the "syscon" binding
+was badly reviewed and merged, and now we're suffering from it.
+
+----
+
+Not that anyone should care when reviewing device tree bindings,
+but as it happens, the Linux driver
+drivers/mfd/syscon.c
+explicitly assumes all sycons are 32bit:
+
+static struct regmap_config syscon_regmap_config = {
+        .reg_bits = 32,
+        .val_bits = 32,
+        .reg_stride = 4,
+};
+
+If one happens to work on Linux (we would never assume such a
+thing, but if one by infinitesimal chance would still happen to do that)
+we can leave a note in this posting that the syscon driver would need to
+be altered to marshall it's regmap differently on stumbling onto this
+new property.
+
+Yours,
+Linus Walleij
