@@ -1,57 +1,59 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon, 8 Sep 2014 11:20:10 +0100
-Subject: Unable to boot mainline on snow chromebook since 3.15
-In-Reply-To: <CAD=FV=UYDDhL02CrhPUAHPncepwAF2-BgTmXOamy-Mdz80S-vw@mail.gmail.com>
-References: <20140905115704.GO13515@arm.com> <20140905122232.GP13515@arm.com>
- <CAD=FV=VfioJf9VYoSYL0QBk-bN93-Ecx3=0n9hb5Q4rcx43-_g@mail.gmail.com>
- <540C202E.2060009@collabora.co.uk> <540C7F5B.6070307@gmail.com>
- <CAD=FV=UYDDhL02CrhPUAHPncepwAF2-BgTmXOamy-Mdz80S-vw@mail.gmail.com>
-Message-ID: <20140908102010.GF4015@sirena.org.uk>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 8 Sep 2014 11:22:45 +0100
+Subject: [PATCH 2/2] arm: psci: don't call CPU_OFF blindly
+In-Reply-To: <alpine.DEB.2.02.1409052132450.2334@kaball.uk.xensource.com>
+References: <1409916139-20127-1-git-send-email-mark.rutland@arm.com>
+ <1409916139-20127-3-git-send-email-mark.rutland@arm.com>
+ <alpine.DEB.2.02.1409052132450.2334@kaball.uk.xensource.com>
+Message-ID: <20140908102245.GA12081@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Sep 07, 2014 at 09:36:56PM -0700, Doug Anderson wrote:
-> On Sun, Sep 7, 2014 at 8:52 AM, Tomasz Figa <tomasz.figa@gmail.com> wrote:
+On Fri, Sep 05, 2014 at 09:48:46PM +0100, Stefano Stabellini wrote:
+> On Fri, 5 Sep 2014, Mark Rutland wrote:
+> > The generic PSCI operations for arm check the presence of a CPU_OFF ID
+> > far too late, and in the absence of an ID will panic(), rather than
+> > producing a warning.
+> > 
+> > This patch adds a psci_cpu_disable callback which tests the presence of
+> > a CPU_OFF id. As this is called earlier than psci_cpu_die, the failure
+> > can be handled gracefully without brining down the system. Additionally
+> > a check is added for a UP trusted OS in the presence of PSCI 0.2+. Full
+> > support will require the use of MIGRATE, but for now rejecting hotplug
+> > will prevent psci_cpu_die from brining down the system.
+> > 
+> > The now redundant check for scpi_ops.cpu_off is removed from
+> > psci_cpu_die. At the same time, the whitespace is corrected from seven
+> > spaces to tabs.
+> > 
+> > Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+> > Cc: Ashwin Chaugule <ashwin.chaugule@linaro.org>
+> > Cc: Rob Herring <robh@kernel.org>
+> > Cc: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+> > Cc: Ian Campbell <ian.campbell@citrix.com>
+> > Cc: Christoffer Dall <christoffer.dall@linaro.org>
+> > Cc: Will Deacon <will.deacon@arm.com>
+> > Cc: Catalin Marinas <catalin.marinas@arm.com>
+> > ---
+> >  arch/arm/kernel/psci_smp.c | 36 +++++++++++++++++++++++++++++-------
+> >  1 file changed, 29 insertions(+), 7 deletions(-)
+> > 
+> > Stefano, I've followed your lead with the __ref annotation here, but I couldn't
+> > figure out why they exist on cpu_die and cpu_kill; it feels rather dodgy. Do
+> > you know why they were added, or if they are superfluous?
+> 
+> I don't think that __ref is needed.
+> That particular snipped of code came from Rob Herring, maybe he knows
+> why it was added in the first place.
 
-> > So I believe we've got a process issue here. If you don't have normal
-> > support for display hardware, but you want to keep the display
-> > operational thanks to bootloader already initializing it, you should not
-> > add anything to the kernel which breaks it, until full support comes in.
+I've traced that back, but can't see any rationale. Perhaps that had
+something to do with __cpuinit/__cpuexit, but there doesn't seem to be
+any reason for them now. I guess the __ref annotation on cpu_die in
+arch/arm/kernel/smp.c can go too given __cpuinit and __cpuexit are gone.
 
-> > This means that respective regulators should be either always-on or not
-> > listed at all (I'd favor the former) and respective clocks either
-> > somehow enabled at boot-up or completely ignored, including all their
-> > parents capable of being gated.
+Rob, do you have any idea either way?
 
-> It seems slightly broken to hack the device tree in this way.  I'll be
-> the first to admit that I often list regulators as "always-on" during
-> bringup when not everything is done, and I guess it's not that
-> different.  ...but given everything going on upstream (and people
-> working on Suspend/Resume, DRM, etc) it seems like it might be a bit
-> of a pain.  ...but if that's what everyone agrees on, I won't disagree
-> too strongly.
+Thanks,
+Mark.
 
-> One (ugly?) solution would be to add a feature to your bootloader to
-> modify the device tree to mark regulators as "always-on".  Since the
-> booloader gets to touch the device tree and the bootloader is involved
-> in communicating into about SimpleFB, it kinda makes sense.
-
-That would seem to make sense, yes - we're apparently communicating this
-as a virtual device so we should make sure that virtual device has the
-resources it needs either directly or by reference to other devices so
-the driver can keep them on.  Ideally we'd be doing this with fallback
-compatibles or something but this will probably work OK.
-
-I'd expect we're also going to run into the same problems with what
-people are currently doing with the SoC power domains, we also have code
-to power them off when they're idle, and this whole performance with
-adding hacks isn't going to be robust or scale - it's essentially just
-praying that nothing turns off the resources we need as far as I can
-tell.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140908/147040cb/attachment.sig>
+[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2013-March/158570.html
