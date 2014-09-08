@@ -1,122 +1,82 @@
-From: fkan@apm.com (Feng Kan)
-Date: Mon, 8 Sep 2014 09:57:01 -0700
-Subject: [PATCH V3] irqchip:gic: change access of gicc_ctrl register to
- read modify write.
-In-Reply-To: <CAFdej02vSm8TbUWGsMr936WN1GNmJ0SBuEKQkKyzKoEjtVmc+g@mail.gmail.com>
-References: <1393537013-6264-1-git-send-email-fkan@apm.com>
- <CAFdej02vSm8TbUWGsMr936WN1GNmJ0SBuEKQkKyzKoEjtVmc+g@mail.gmail.com>
-Message-ID: <CAL85gmBRUuc3mtOGSkNuspEgkRQe42LV0e=fQfNmwcCicjT=vA@mail.gmail.com>
+From: m-karicheri2@ti.com (Murali Karicheri)
+Date: Mon, 8 Sep 2014 12:58:34 -0400
+Subject: [PATCH - v3] PCI: keystone: add a pci quirk to limit mrrs
+Message-ID: <1410195514-29945-1-git-send-email-m-karicheri2@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 8, 2014 at 1:52 AM, Arun Chandran <achandran@mvista.com> wrote:
-> Hi Feng,
->
-> Is this patch still needed to fix perf calltrace?
-Yes, if the someone decide to run the secure mode of the GIC, which is
-what is present in
-the kernel tree now.
+Keystone PCI controller has a limitation that memory read request
+size must not exceed 256 bytes. This is a hardware limitation and
+add a quirk to force this limit on all downstream devices by
+updating mrrs.
 
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2014-June/265814.html
->
-> On Fri, Feb 28, 2014 at 3:06 AM, Feng Kan <fkan@apm.com> wrote:
->> This change is made to preserve the GIC v2 releated bits in the
->> GIC_CPU_CTRL register (also known as the GICC_CTLR register in spec).
->> The original code only set the enable/disable group bit in this register.
->> This code will preserve the bypass bits configured by the bootload except
->> the enable/disable bit. The main reason for this change is to allow the
->> bypass bits specified in the v2 spec to remain untouched by the current
->> GIC code. In the X-Gene platform, the bypass functionality is not used
->> and bypass must be disabled at all time.
->>
->> Signed-off-by: Vinayak Kale <vkale@apm.com>
->> Acked-by: Anup Patel <apatel@apm.com>
->> Signed-off-by: Feng Kan <fkan@apm.com>
->> ---
->> V3 Changes:
->>         - Sorry, forgot to change the mask for cpu_init path
->>           assumed bootloader setup bits correctly.
->> V2 Changes:
->>         - only mask off v2 bypass bits
->>  drivers/irqchip/irq-gic.c |   32 +++++++++++++++++++++++++++++---
->>  1 files changed, 29 insertions(+), 3 deletions(-)
->>
->> diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
->> index 341c601..3ca7995 100644
->> --- a/drivers/irqchip/irq-gic.c
->> +++ b/drivers/irqchip/irq-gic.c
->> @@ -418,6 +418,7 @@ static void gic_cpu_init(struct gic_chip_data *gic)
->>         void __iomem *dist_base = gic_data_dist_base(gic);
->>         void __iomem *base = gic_data_cpu_base(gic);
->>         unsigned int cpu_mask, cpu = smp_processor_id();
->> +       unsigned int ctrl_mask;
->>         int i;
->>
->>         /*
->> @@ -449,13 +450,29 @@ static void gic_cpu_init(struct gic_chip_data *gic)
->>                 writel_relaxed(0xa0a0a0a0, dist_base + GIC_DIST_PRI + i * 4 / 4);
->>
->>         writel_relaxed(0xf0, base + GIC_CPU_PRIMASK);
->> -       writel_relaxed(1, base + GIC_CPU_CTRL);
->> +
->> +       ctrl_mask = readl(base + GIC_CPU_CTRL);
->
-> readl_relaxed() here?
->
->> +
->> +       /* Mask out the gic v2 bypass bits */
->> +       ctrl_mask &= 0x1e0;
->> +
->> +       /* Enable group 0 */
->> +       ctrl_mask |= 0x1;
->> +       writel_relaxed(ctrl_mask, base + GIC_CPU_CTRL);
->>  }
->>
->>  void gic_cpu_if_down(void)
->>  {
->> +       unsigned int ctrl_mask;
->>         void __iomem *cpu_base = gic_data_cpu_base(&gic_data[0]);
->> -       writel_relaxed(0, cpu_base + GIC_CPU_CTRL);
->> +
->> +       ctrl_mask = readl(cpu_base + GIC_CPU_CTRL);
-> readl_relaxed() here?
->
->> +       /*
->> +        * Disable grp enable bit, leave the bypass bits alone as changing
->> +        * them could leave the system unstable
->> +        */
->> +       ctrl_mask &= 0x1e0;
->> +       writel_relaxed(ctrl_mask, cpu_base + GIC_CPU_CTRL);
->>  }
->>
->>  #ifdef CONFIG_CPU_PM
->> @@ -566,6 +583,7 @@ static void gic_cpu_restore(unsigned int gic_nr)
->>  {
->>         int i;
->>         u32 *ptr;
->> +       unsigned int ctrl_mask;
->>         void __iomem *dist_base;
->>         void __iomem *cpu_base;
->>
->> @@ -590,7 +608,15 @@ static void gic_cpu_restore(unsigned int gic_nr)
->>                 writel_relaxed(0xa0a0a0a0, dist_base + GIC_DIST_PRI + i * 4);
->>
->>         writel_relaxed(0xf0, cpu_base + GIC_CPU_PRIMASK);
->> -       writel_relaxed(1, cpu_base + GIC_CPU_CTRL);
->> +
->> +       ctrl_mask = readl(cpu_base + GIC_CPU_CTRL);
->
-> readl_relaxed() here?
-Trying to make sure read is completed before write back out to gic.
->
->> +
->> +       /* Mask out the gic v2 bypass bits */
->> +       ctrl_mask &= 0x1e0;
->> +
->> +       /* Enable group 0 */
->> +       ctrl_mask |= 0x1;
->> +       writel_relaxed(ctrl_mask, cpu_base + GIC_CPU_CTRL);
->>  }
->>
->
-> --Arun
+Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
+---
+  -v3: added check for vendor id and use pci_matc_id() to do matching
+  -v2: made the quirk happens after tuning
+  -v1: changed printk to indicate PCI bdf
+ drivers/pci/host/pci-keystone.c |   47 +++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 47 insertions(+)
+
+diff --git a/drivers/pci/host/pci-keystone.c b/drivers/pci/host/pci-keystone.c
+index c1cfaef..0a477e5 100644
+--- a/drivers/pci/host/pci-keystone.c
++++ b/drivers/pci/host/pci-keystone.c
+@@ -42,8 +42,55 @@
+ /* DEV_STAT_CTRL */
+ #define PCIE_CAP_BASE		0x70
+ 
++/* PCIE controller device IDs */
++#define PCIE_RC_K2HK		0xb008
++#define PCIE_RC_K2E		0xb009
++#define PCIE_RC_K2L		0xb00a
++
+ #define to_keystone_pcie(x)	container_of(x, struct keystone_pcie, pp)
+ 
++
++
++static void quirk_limit_mrrs(struct pci_dev *dev)
++{
++	struct pci_bus *bus = dev->bus;
++	struct pci_dev *bridge = bus->self;
++	static const struct pci_device_id rc_pci_devids[] = {
++		{ PCI_DEVICE(PCI_VENDOR_ID_TI, PCIE_RC_K2HK),
++		 .class = PCI_CLASS_BRIDGE_PCI << 8, .class_mask = ~0, },
++		{ PCI_DEVICE(PCI_VENDOR_ID_TI, PCIE_RC_K2E),
++		 .class = PCI_CLASS_BRIDGE_PCI << 8, .class_mask = ~0, },
++		{ PCI_DEVICE(PCI_VENDOR_ID_TI, PCIE_RC_K2L),
++		 .class = PCI_CLASS_BRIDGE_PCI << 8, .class_mask = ~0, },
++		{ 0, },
++	};
++
++	if (pci_is_root_bus(bus))
++		return;
++
++	/* look for the host bridge */
++	while (!pci_is_root_bus(bus)) {
++		bridge = bus->self;
++		bus = bus->parent;
++	}
++
++	if (bridge) {
++		/*
++		 * Keystone PCI controller has a h/w limitation of
++		 * 256 bytes maximum read request size. It can't handle
++		 * anything higher than this. So force this limit on
++		 * all downstream devices
++		 */
++		if (pci_match_id(rc_pci_devids, bridge)) {
++			if (pcie_get_readrq(dev) > 256) {
++				dev_info(&dev->dev, "limiting mrrs to 256\n");
++				pcie_set_readrq(dev, 256);
++			}
++		}
++	}
++}
++DECLARE_PCI_FIXUP_ENABLE(PCI_ANY_ID, PCI_ANY_ID, quirk_limit_mrrs);
++
+ static int ks_pcie_establish_link(struct keystone_pcie *ks_pcie)
+ {
+ 	struct pcie_port *pp = &ks_pcie->pp;
+-- 
+1.7.9.5
