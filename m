@@ -1,76 +1,29 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 8 Sep 2014 15:35:54 +0100
-Subject: [PATCH 4/4] watchdog: st_wdt: Add new driver for ST's LPC Watchdog
-In-Reply-To: <540DAFBC.1010502@roeck-us.net>
-References: <1409841592-18890-1-git-send-email-lee.jones@linaro.org>
- <1409841592-18890-6-git-send-email-lee.jones@linaro.org>
- <20140905155811.GA12374@roeck-us.net>
- <20140908123246.GB26284@lee--X1> <540DAFBC.1010502@roeck-us.net>
-Message-ID: <20140908143554.GD30307@lee--X1>
+From: broonie@kernel.org (Mark Brown)
+Date: Mon, 8 Sep 2014 15:39:56 +0100
+Subject: [PATCH 2/2] spi: davinci: support adding delay between
+ transmission
+In-Reply-To: <540DAF91.6090002@ti.com>
+References: <1408634706-5762-1-git-send-email-grygorii.strashko@ti.com>
+ <1408634706-5762-3-git-send-email-grygorii.strashko@ti.com>
+ <20140821182035.GM24407@sirena.org.uk> <53F74695.3010902@ti.com>
+ <20140822150644.GX24407@sirena.org.uk> <5409C704.5070303@ti.com>
+ <20140906143113.GI2601@sirena.org.uk> <540DAF91.6090002@ti.com>
+Message-ID: <20140908143956.GL4015@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 08 Sep 2014, Guenter Roeck wrote:
+On Mon, Sep 08, 2014 at 04:30:57PM +0300, Grygorii Strashko wrote:
 
-> On 09/08/2014 05:32 AM, Lee Jones wrote:
-> >On Fri, 05 Sep 2014, Guenter Roeck wrote:
-> ...
-> >>>+
-> >>>+static struct st_wdog_syscfg stid127_syscfg = {
-> >>>+	.type_mask	= BIT(2),
-> >>>+	.enable_mask	= BIT(2),
-> >>>+};
-> >>>+
-> >>>+static struct st_wdog_syscfg stih415_syscfg = {
-> >>>+	.type_mask	= BIT(6),
-> >>>+	.enable_mask	= BIT(7),
-> >>>+};
-> >>>+
-> >>>+static struct st_wdog_syscfg stih416_syscfg = {
-> >>>+	.type_mask	= BIT(6),
-> >>>+	.enable_mask	= BIT(7),
-> >>>+};
-> >>>+
-> >>>+static struct st_wdog_syscfg stih407_syscfg = {
-> >>>+	.enable_mask	= BIT(19),
-> >>>+};
-> >>>+
-> ...
-> 
-> >>>+	/* Mask/unmask watchdog reset */
-> >>>+	regmap_update_bits(st_wdog->syscfg->regmap,
-> >>>+			   st_wdog->syscfg->enable_reg,
-> >>>+			   st_wdog->syscfg->enable_mask,
-> >>>+			   !enable);
-> >>
-> >>enable is a bool, but is supposed to provide the value to be put into the
-> >>register, masked with enable_mask. Unless I am missing something, the value
-> >>is not shifted in regmap_update_bits. So I don't think this can work, but
-> >>effectively always writes zero into the mask unless the mask happens to be
-> >>at bit position 0 - which never happens.
-> >>
-> >>Same is true for warm_reset above, which also has values 0 or 1.
-> >>
-> >>I know it does not really matter in C (at least when it comes to handling
-> >>0 and 1), but I would suggest to avoid mixing booleans with bit masks.
-> >
-> >You're right of course, great spot.
-> >
-> >How about?
-> >
-> >   !enable << ffs(st_wdog->syscfg->enable_mask).
-> >
-> Seems to add a lot of complexity (as in 'makes it difficult to understand')
-> to avoid a conditional, and assumes that enable_mask will never have more
-> than one bit set. I would go with
-> 	enable ? st_wdog->syscfg->enable_mask : 0
-> to avoid confusion, but your call.
+> I'll split this patch and first introduce WDELAY, C2TDELAY, T2CDELAY
+> (with updated documentation).
+> The only question is - Should they be somehow common or specific for spi-davinci?
 
-Actually, it would be the other way round, but the implementation is
-nice.  I'll use that instead.
-
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+If they don't have any impact on the device at the remote end of the
+link then making them device specific is fine.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140908/bc5f0571/attachment.sig>
