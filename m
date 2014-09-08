@@ -1,40 +1,53 @@
-From: pramod.gurav@smartplayin.com (Pramod Gurav)
-Date: Mon, 08 Sep 2014 15:18:54 +0530
-Subject: [PATCH v5 2/7] qcom: spm: Add Subsystem Power Manager driver
- (SAW2)
-In-Reply-To: <1409870132-16929-3-git-send-email-lina.iyer@linaro.org>
-References: <1409870132-16929-1-git-send-email-lina.iyer@linaro.org>
- <1409870132-16929-3-git-send-email-lina.iyer@linaro.org>
-Message-ID: <540D7B86.1000008@smartplayin.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 08 Sep 2014 11:52:35 +0200
+Subject: [GIT PULL] at91: drivers for 3.18 #2
+In-Reply-To: <20140908092642.GB20883@lukather>
+References: <1409934969-11584-1-git-send-email-nicolas.ferre@atmel.com>
+ <201409052325.11709.arnd@arndb.de> <20140908092642.GB20883@lukather>
+Message-ID: <26517543.McM8Q5P0vn@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lina,
-
-On Friday 05 September 2014 04:05 AM, Lina Iyer wrote:
-
->  drivers/soc/qcom/spm.c     | 192 +++++++++++++++++++++++++++++++++++++++++++++
->  3 files changed, 262 insertions(+)
->  create mode 100644 drivers/soc/qcom/spm-drv.h
->  create mode 100644 drivers/soc/qcom/spm.c
+On Monday 08 September 2014 11:26:42 Maxime Ripard wrote:
+> On Fri, Sep 05, 2014 at 11:25:11PM +0200, Arnd Bergmann wrote:
+> > On Friday 05 September 2014, Nicolas Ferre wrote:
+> > > Arnd, Olof, Kevin,
+> > > 
+> > > This pull-request is focused on the work that Maxime did for migrating our timer
+> > > (PIT) to the clocksource sub-system. A big cleanup happened which allows us to
+> > > be even closer to the point when we have only the bare minimum in our formerly
+> > > crowded mach-at91 directory.
+> > > 
+> > > This pull-request goes on top of the "drivers" one already sent to you on Sept.
+> > > 01st.
+> > 
+> > Hmm, I'm not too happy to see more uses of early_platform_*, I was hoping
+> > we could kill that off in the long run. This is only used for the legacy
+> > board files, not for DT, right?
 > 
-> diff --git a/drivers/soc/qcom/Makefile b/drivers/soc/qcom/Makefile
-> index 70d52ed..20b329f 100644
-> --- a/drivers/soc/qcom/Makefile
-> +++ b/drivers/soc/qcom/Makefile
-> @@ -1,3 +1,4 @@
->  obj-$(CONFIG_QCOM_GSBI)	+=	qcom_gsbi.o
-> +obj-$(CONFIG_QCOM_PM)	+=	spm.o
+> Yes, the DT uses the usual CLOCKSOURCE_OF_DECLARE mechanism.
+> 
+> I wasn't aware that early_platform drivers were in the killzone, but
+> I'm definitely aware that global custom exported functions are, hence
+> why I went this way.
 
-CONFIG_QCOM_PM is missing in Kconfig hence this driver wont build. I see
-it is added in patch #3. Please move it to this patch so that this
-driver builds.
+I don't think it has been discussed much on the mailing list or IRC.
+The early platform devices have not been used much outside of arch/sh
+and arch/arm/mach-shmobile, and those only use it for clocksource and
+serial.
 
->  CFLAGS_scm.o :=$(call as-instr,.arch_extension sec,-DREQUIRES_SEC=1)
->  obj-$(CONFIG_QCOM_SCM) += scm.o scm-boot.o
-> diff --git a/drivers/soc/qcom/spm-drv.h b/drivers/soc/qcom/spm-drv.h
-> new file mode 100644
-> index 0000000..e91df44
+Now we have a new method for both of these, at least with DT, so
+my impression is that we won't need the early_platform support in
+the future. One of the problems with the current interface is that
+it requires statically declaring platform_device structures, which is
+something that has been on Greg's list of device model antipatterns
+for a long time.
 
-Thanks
-Pramod
+> > Do you have a timeline for getting rid of the board files completely?
+> 
+> I don't, but it would be great if we could kill these in the next
+> couple releases.
+
+Ok, good.
+
+	Arnd
