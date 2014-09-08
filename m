@@ -1,94 +1,57 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 8 Sep 2014 15:32:05 -0700
-Subject: [GIT PULL 2/2] ARM: OMAP4+: PRM fixes, DRA7 suspend-to-ram support
-In-Reply-To: <1410195620-6347-2-git-send-email-nm@ti.com>
-References: <1410195620-6347-1-git-send-email-nm@ti.com>
- <1410195620-6347-2-git-send-email-nm@ti.com>
-Message-ID: <20140908223204.GN3238@atomide.com>
+From: keescook@chromium.org (Kees Cook)
+Date: Mon, 8 Sep 2014 15:40:43 -0700
+Subject: [PATCH v5 3/8] arm: fixmap: implement __set_fixmap()
+In-Reply-To: <20140908215506.GA4759@dator>
+References: <1409781429-27593-1-git-send-email-keescook@chromium.org>
+ <1409781429-27593-4-git-send-email-keescook@chromium.org>
+ <20140904170349.GL7156@arm.com>
+ <CAGXu5jKimGaupwyUwt0Zwa3OtjeoED8-uBeMX0MwXjBYP6ssAg@mail.gmail.com>
+ <20140904172748.GO7156@arm.com> <20140908191634.GV5598@outflux.net>
+ <20140908215506.GA4759@dator>
+Message-ID: <CAGXu5jJFB+pcDVkcMoRZ9DnJu7MQuN=kceDhpkGrO=6ZLFy6Kw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Nishanth Menon <nm@ti.com> [140908 10:02]:
-> Hi Tony,
-> Please pull the following changes.
-> 
-> part 2: "ARM: OMAP3+: PRM: fix up prm_handling"
-> http://marc.info/?l=linux-kernel&m=140871580806186&w=2
-> Status: Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> 
-> part 3: "ARM: OMAP5+: pdata quirks for pinctrl"
-> http://marc.info/?l=linux-kernel&m=140871598306262&w=2
-> Status: Sending pull based on http://marc.info/?l=linux-kernel&m=140871666506706&w=2 (Acked by Tony, Pulled by Linus W)
-> 
-> part 5: "ARM: OMAP5 / DRA7: Add framework for suspend and cpuidle"
-> http://marc.info/?l=linux-kernel&m=140871637106555&w=2
-> Status: picked up kevin's tested and reviewed-by, dropped cpuidle for this pull
-> 
-> These could go into your tree for the branch  omap-for-v3.18/soc
-> 
-> The following changes since commit 7d1311b93e58ed55f3a31cc8f94c4b8fe988a2b9:
-> 
->   Linux 3.17-rc1 (2014-08-16 10:40:26 -0600)
-> 
-> are available in the git repository at:
-> 
->   https://github.com/nmenon/linux-2.6-playground.git pull/v3.18/for-omap-soc
+On Mon, Sep 8, 2014 at 2:55 PM, Rabin Vincent <rabin@rab.in> wrote:
+> On Mon, Sep 08, 2014 at 12:16:34PM -0700, Kees Cook wrote:
+>> On Thu, Sep 04, 2014 at 06:27:48PM +0100, Will Deacon wrote:
+>> > On Thu, Sep 04, 2014 at 06:23:42PM +0100, Kees Cook wrote:
+>> > > Ah! If this is the case, perhaps we can get away with
+>> > > local_flush_tlb_kernel_range() then?
+>> >
+>> > That's a bit tricky, since you need to ensure that preemption is disabled
+>> > until the mapping is put back like it was.
+>>
+>> Okay, under both real hardware with the errata, and under QEMU, things seem
+>> to work with this change to the series. What do you think?
+>
+> Preemption is already disabled until the mapping is put back in this
+> patch.c code because interrupts are disabled from before the time
+> set_fixmap() is called until after clear_fixmap() is called.
 
-Thanks pulling into omap-for-v3.18/soc.
+Should I drop the preempt_disable/enable(), and just add a comment to
+set_fixmap()?
 
-Regards,
+> I'd guess that Will meant other (future) callers of set_fixmap() would
+> have to ensure similar behaviour with set_fixmap() / clear_fixmap().
+>
+> Unless I'm missing something set/clear_fixmap() seem to be quite arch
+> specific and only really used on x86, so we could ensure that future
+> users on ARM perform the correct tlb flush:  the first user on ARM with
+> a non-atomic context (or you) could implement a set_fixmap() which does
+> the global flush and have this patch.c (and any other atomic context
+> callers) call __set_fixmap() directly.
+>
+> The change to local_flush_tlb_kernel_range() in __set_fixmap() would of
+> course be needed in that case, and IIRC that was what my original patch
+> had (via set_top_pte()).
 
-Tony
- 
-> for you to fetch changes up to 628ed4717000789bff827c5799d1aac4c1008541:
-> 
->   ARM: OMAP5: Add hook in SoC initcalls to enable pm initialization (2014-09-08 11:38:43 -0500)
-> 
-> ----------------------------------------------------------------
-> Keerthy (1):
->       ARM: AM437x: use pdata quirks for pinctrl information
-> 
-> Nishanth Menon (8):
->       ARM: OMAP4+: prminst: provide function to find prm_dev instance offset
->       ARM: OMAP4: PRM: use the generic prm_inst to allow logic to be abstracted
->       ARM: OMAP4+: PRM: register interrupt information from DT
->       ARM: OMAP4+: PRM: remove "wkup" event
->       ARM: OMAP4+: PRM: Enable wakeup capability for OMAP5, DRA7
->       ARM: OMAP3+: PRM: register interrupt information from DT
->       ARM: OMAP5: use pdata quirks for pinctrl information
->       ARM: DRA7: use pdata quirks for pinctrl information
-> 
-> Rajendra Nayak (2):
->       ARM: OMAP5 / DRA7: PM: Avoid all SAR saves
->       ARM: OMAP5 / DRA7: Enable CPU RET on suspend
-> 
-> Santosh Shilimkar (6):
->       ARM: OMAP5 / DRA7: PM: Update CPU context register offset
->       ARM: OMAP5 / DRA7: PM: Set MPUSS-EMIF clock-domain static dependency
->       ARM: OMAP5 / DRA7: PM / wakeupgen: Enables ES2 PM mode by default
->       ARM: OMAP5 / DRA7: PM: Enable Mercury retention mode on CPUx powerdomains
->       ARM: OMAP5 / DRA7: PM: Provide a dummy startup function for CPU hotplug
->       ARM: OMAP5: Add hook in SoC initcalls to enable pm initialization
-> 
->  arch/arm/mach-omap2/common.h              |    2 +-
->  arch/arm/mach-omap2/io.c                  |    3 +
->  arch/arm/mach-omap2/omap-mpuss-lowpower.c |  102 ++++++++++++++++++++---------
->  arch/arm/mach-omap2/omap-secure.h         |    1 +
->  arch/arm/mach-omap2/omap-wakeupgen.c      |   20 +++++-
->  arch/arm/mach-omap2/omap-wakeupgen.h      |    1 +
->  arch/arm/mach-omap2/pdata-quirks.c        |   10 +++
->  arch/arm/mach-omap2/pm.h                  |    1 +
->  arch/arm/mach-omap2/pm44xx.c              |   48 ++++++++++++--
->  arch/arm/mach-omap2/prm3xxx.c             |   18 +++++
->  arch/arm/mach-omap2/prm44xx.c             |   90 +++++++++++++++++++++----
->  arch/arm/mach-omap2/prminst44xx.c         |   40 ++++++-----
->  arch/arm/mach-omap2/prminst44xx.h         |    3 +
->  13 files changed, 275 insertions(+), 64 deletions(-)
-> 
-> Regards,
-> Nishanth Menon
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
+Ah, so it was, yes! Will, which version of this logic would you prefer?
+
+Thanks!
+
+-Kees
+
+-- 
+Kees Cook
+Chrome OS Security
