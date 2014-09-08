@@ -1,32 +1,52 @@
-From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Mon, 8 Sep 2014 12:03:57 -0600
-Subject: [PATCH RESEND] ARM: PCI: Use PCI_CLASS_* defines for PCI class
-In-Reply-To: <CAErSpo7sOc72V3g5tOov8Yj4nKiuJupaUTKEEecHMcqEUrzh_g@mail.gmail.com>
-References: <1410163532-31057-1-git-send-email-lisovy@gmail.com>
- <CAErSpo7sOc72V3g5tOov8Yj4nKiuJupaUTKEEecHMcqEUrzh_g@mail.gmail.com>
-Message-ID: <20140908180357.GA6159@obsidianresearch.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 08 Sep 2014 20:16:42 +0200
+Subject: [PATCH] ARM: omap: fix Kconfig warning
+In-Reply-To: <20140908153400.GC3238@atomide.com>
+References: <3763111.OttSKCMuxb@wuerfel> <20140908153400.GC3238@atomide.com>
+Message-ID: <2797284.2mFcuQ0Ias@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 08, 2014 at 10:36:36AM -0600, Bjorn Helgaas wrote:
+On Monday 08 September 2014 08:34:00 Tony Lindgren wrote:
+> * Arnd Bergmann <arnd@arndb.de> [140908 08:01]:
+> > A small mistake during the recent Kconfig cleanup has led
+> > to a harmless warning for OMAP1:
+> > 
+> > warning: (ARCH_OMAP1) selects ARCH_OMAP which has unmet direct dependencies (ARCH_MULTI_V6 || ARCH_MULTI_V7)
+> > 
+> > We can easily avoid that by moving the ARCH_OMAP symbol outside of the
+> > OMAP2 submenu.
+> 
+> OK I made a similar patch, but I moved it into plat-omap/Kconfig
+> as it's also used by omap1. The regression was probably caused by
+> commit 21278aeafbfa (ARM: use menuconfig for sub-arch menus).
+> 
+> If that works for you, I'll verify the regression causing commit
+> and post it with a description.
 
-> Presumably these devices have PCI BARs (since that's how dev->resource
-> got filled in), and we want to somehow ignore them, not assign
-> resources to them, and not allow drivers to use whatever is mapped by
-> the BARs.  But clearing out the struct resources isn't really safe by
-> itself.  The hardware BAR still contains some value, and may still be
-> enabled, which means that it may conflict with other devices.
+Yes, sounds good. Your version is better than mind.
 
-I've seen this pattern before in the old mvebu stuff.
+	Arnd
 
-Essentially for that case the mvebu HW is a repurposed end port core,
-so when working as a root port it presents an end port config space
-(not a root port bridge config space). The BAR in that config space is
-not relevant, so the old mvebu used code like this to hide it from the
-PCI core. Otherwise the core will try to program it from the aperture,
-and the default BAR size is really big, so it runs out of space.
-
-Not sure if this is the same for this driver, but it looks very
-similar..
-
-Jason
+> 
+> --- a/arch/arm/mach-omap2/Kconfig
+> +++ b/arch/arm/mach-omap2/Kconfig
+> @@ -1,9 +1,6 @@
+>  menu "TI OMAP/AM/DM/DRA Family"
+>  	depends on ARCH_MULTI_V6 || ARCH_MULTI_V7
+>  
+> -config ARCH_OMAP
+> -	bool
+> -
+>  config ARCH_OMAP2
+>  	bool "TI OMAP2"
+>  	depends on ARCH_MULTI_V6
+> --- a/arch/arm/plat-omap/Kconfig
+> +++ b/arch/arm/plat-omap/Kconfig
+> @@ -1,3 +1,6 @@
+> +config ARCH_OMAP
+> +	bool
+> +
+>  if ARCH_OMAP
+>  
+>  menu "TI OMAP Common Features"
