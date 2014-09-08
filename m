@@ -1,60 +1,46 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Mon, 8 Sep 2014 20:45:43 +0530
-Subject: [PATCH v2 7/8] phy: miphy28lp: Add SSC support for PCIE
-In-Reply-To: <1409758637-28654-8-git-send-email-gabriel.fernandez@linaro.org>
-References: <1409758637-28654-1-git-send-email-gabriel.fernandez@linaro.org>
- <1409758637-28654-8-git-send-email-gabriel.fernandez@linaro.org>
-Message-ID: <540DC81F.6000901@ti.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 08 Sep 2014 17:17:13 +0200
+Subject: [PATCH] video: mx3fb: always enable BACKLIGHT_LCD_SUPPORT
+Message-ID: <4032283.arT8F9Ogcl@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Commit 7edaa761ee81b ("video: mx3fb: Add backlight control support")
+changed the mx3fb driver so it always selects the BACKLIGHT_CLASS_DEVICE
+symbol, but that is hidden behind BACKLIGHT_LCD_SUPPORT in Kconfig, so
+we get a Kconfig warning for multi_v5_defconfig, which doesn't have that:
 
+Warning: (DRM_RADEON && DRM_NOUVEAU && DRM_I915 && DRM_GMA500 &&
+DRM_SHMOBILE && DRM_TILCDC && FB_BACKLIGHT && FB_MX3 && USB_APPLEDISPLAY
+&& FB_OLPC_DCON && ASUS_LAPTOP && SONY_LAPTOP && THINKPAD_ACPI &&
+EEEPC_LAPTOP && ACPI_CMPC && SAMSUNG_Q10) selects BACKLIGHT_CLASS_DEVICE
+which has unmet direct dependencies (HAS_IOMEM && BACKLIGHT_LCD_SUPPORT)
 
-On Wednesday 03 September 2014 09:07 PM, Gabriel FERNANDEZ wrote:
-> SSC is the technique of modulating the operating frequency of a signal
-> slightly to spread its radiated emissions over a range of frequencies.
-> This reduction in the maximum emission for a given frequency helps meet
-> radiated emission requirements.
-> These settings are applicable for PCIE with Internal clock.
-> 
-> Signed-off-by: Harsh Gupta <harsh.gupta@st.com>
-> Signed-off-by: Gabriel Fernandez <gabriel.fernandez@linaro.orgm>
-> ---
->  drivers/phy/phy-miphy28lp.c | 32 ++++++++++++++++++++++++++++++++
->  1 file changed, 32 insertions(+)
-> 
-> diff --git a/drivers/phy/phy-miphy28lp.c b/drivers/phy/phy-miphy28lp.c
-> index b36e737..976fdda 100644
-> --- a/drivers/phy/phy-miphy28lp.c
-> +++ b/drivers/phy/phy-miphy28lp.c
-> @@ -679,6 +679,36 @@ static int miphy28lp_init_sata(struct miphy28lp_phy *miphy_phy)
->  	return miphy_is_ready(miphy_phy);
->  }
->  
-> +static void miphy_pcie_tune_ssc(struct miphy28lp_phy *miphy_phy)
-> +{
-> +	u8 val;
-> +
-> +	/* Compensate Tx impedance to avoid out of range values */
-> +	if (miphy_phy->ssc) {
-> +		/*
-> +		 * Enable the SSC on PLL for all banks
-> +		 * SSC Modulation @ 31 KHz and 4000 ppm modulation amp
-> +		 */
-> +		val = readb_relaxed(miphy_phy->base + 0x0c);
-> +		val |= 0x04;
-> +		writeb_relaxed(val, miphy_phy->base + 0x0c);
-> +		val = readb_relaxed(miphy_phy->base + 0x0a);
-> +		val |= 0x10;
-> +		writeb_relaxed(val, miphy_phy->base + 0x0a);
+This makes sure we always enable both symbols together for mx3fb, like
+we do for the other drivers that can't be built without backlight
+support. Note that a better solution would be to ensure the driver can
+work with or without backlight support.
 
-macros for these registers and values is needed. Or else it's difficult to review.
-> +
-> +		for (val = 0; val < 2; val++) {
-> +			writeb_relaxed(val, miphy_phy->base + 0x0f);
-> +			writeb_relaxed(0x69, miphy_phy->base + 0xe5);
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Cc: Alexander Stein <alexander.stein@systec-electronic.com>
+Cc: Tomi Valkeinen <tomi.valkeinen@ti.com>
+Cc: linux-fbdev at vger.kernel.org
+Cc: Jean-Christophe Plagniol-Villard <plagnioj@jcrosoft.com>
 
-Do these registers have to be written for every iteration?
-
-Thanks
-Kishon
+diff --git a/drivers/video/fbdev/Kconfig b/drivers/video/fbdev/Kconfig
+index ccbe2ae22ac5..c7bf606a8706 100644
+--- a/drivers/video/fbdev/Kconfig
++++ b/drivers/video/fbdev/Kconfig
+@@ -2356,10 +2356,11 @@ config FB_MSM
+ config FB_MX3
+ 	tristate "MX3 Framebuffer support"
+ 	depends on FB && MX3_IPU
++	select BACKLIGHT_CLASS_DEVICE
++	select BACKLIGHT_LCD_SUPPORT
+ 	select FB_CFB_FILLRECT
+ 	select FB_CFB_COPYAREA
+ 	select FB_CFB_IMAGEBLIT
+-	select BACKLIGHT_CLASS_DEVICE
+ 	default y
+ 	help
+ 	  This is a framebuffer device for the i.MX31 LCD Controller. So
