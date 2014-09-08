@@ -1,78 +1,48 @@
-From: rric@kernel.org (Robert Richter)
-Date: Mon, 8 Sep 2014 13:01:31 +0200
-Subject: [PATCH v2 1/4] arm64, thunder: Add Kconfig option for Cavium
- Thunder SoC Family
-In-Reply-To: <2952834.1P42roDKD9@wuerfel>
-References: <1409903205-2762-1-git-send-email-rric@kernel.org>
- <7863371.EMkUuntQWU@wuerfel> <20140905142245.GG20164@leverpostej>
- <2952834.1P42roDKD9@wuerfel>
-Message-ID: <20140908110131.GX4703@rric.localhost>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Mon, 08 Sep 2014 15:02:00 +0400
+Subject: [PATCH] rtc: pcf8563: fix uninitialized use warning
+In-Reply-To: <3640058.m4Rfp1dmTJ@wuerfel>
+References: <3640058.m4Rfp1dmTJ@wuerfel>
+Message-ID: <540D8CA8.5020104@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05.09.14 18:25:35, Arnd Bergmann wrote:
-> On Friday 05 September 2014 15:22:46 Mark Rutland wrote:
-> > 
-> > > A common pattern these days is to do dependencies like
-> > > 
-> > > arch/*/Kconfig:
-> > >       config ARCH_FOO
-> > >       bool "Enable support for Foo platform"
-> > >       help
-> > >         ...
-> > > 
-> > > 
-> > > drivers/*/Kconfig
-> > >       config SUBSYS_FOO
-> > >       bool "SUBSYS driver for Foo"
-> > >       depends on ARCH_FOO || COMPILE_TEST
-> > >       depends on OF && REGULATOR && GENERIC_PHY # or whatever
-> >
-> > Russell's comments w.r.t. Kconfig warnings when config names change
-> > still holds regardless of select vs depends on.
-> 
-> Yes, that's what I wrote in my reply as well.
-> 
-> > > That way we can enable everything in the defconfig, but someone
-> > > who likes to build a more specialized kernel can disable the
-> > > other platforms and won't get the drivers that are specific to
-> > > those.
-> > > 
-> > > I personally think this is a bit more verbose than what we need, but
-> > > I don't strongly object doing it that way.
-> > 
-> > You'd still be able to do this without ARCH_FOO, though you would need
-> > to know which drivers are necessary for a particular SoC. That seems to
-> > be the way things are handled on x86; I don't recall having to select
-> > support for specific machines there, just the individual drivers.
+Hello.
 
-This is well hidden on x86, but each vendor has a config option. For
-AMD systems we have had our own option to disable vendor specific
-code, see CPU_SUP_AMD for example. Disabling this will remove all AMD
-specific code in the kernel. Of course this is enabled per default.
+On 9/8/2014 12:42 AM, Arnd Bergmann wrote:
 
-With ARCH_THUNDER I intended to do the same (you could name this also
-SOC_SUP_CAVIUM or so but I kept the current naming scheme). In patch
-4/4 I have added the option to defconfig. This enables this per
-default and nobody has to deal with any option manually, just running
-make defconfig is fine.
+> gcc-4.9 found a potential condition under which the 'pending'
+> variable may be used uninitialized:
 
-Also, at least to disable building the dtb file for foo, you will need
-ARCH_FOO too. How else would you deal with dtb files then?
+> drivers/rtc/rtc-pcf8563.c: In function 'pcf8563_irq':
+> drivers/rtc/rtc-pcf8563.c:173:5: warning: 'pending' may be used uninitialized in this function [-Wmaybe-uninitialized]
 
-Having ARCH_FOO might not be necessary for drivers. One could enable
-drivers manually, but this option is still a good reference for the
-drivers needed by foo. At some point you will carry tons of enabled
-drivers in your defconfig and you don't know which platform actually
-is using it. For generic drivers this might be fine.  But in my point
-of few, each soc specific driver should have an soc specific option
-too. Then you easily can remove an soc from the defconfig.
+> This is because in the pcf8563_get_alarm_mode() function, we
+> check any nonzero return of pcf8563_read_block_data, but
+> in the irq function we only check for negative values, so
+> a possible positive value does not get detected if the compiler
+> chooses not to inline the entire call chain.
 
--Robert
+> Checking for any non-zero value in the interrupt handler as well
+> is just as correct and lets the compiler know what we are doing,
+> without needing a bogus initialization.
+>
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+>
+> diff --git a/drivers/rtc/rtc-pcf8563.c b/drivers/rtc/rtc-pcf8563.c
+> index 5a197d9dc7e7..3a6f994c4da8 100644
+> --- a/drivers/rtc/rtc-pcf8563.c
+> +++ b/drivers/rtc/rtc-pcf8563.c
+> @@ -167,7 +167,7 @@ static irqreturn_t pcf8563_irq(int irq, void *dev_id)
+>   	char pending;
+>
+>   	err = pcf8563_get_alarm_mode(pcf8563->client, NULL, &pending);
+> -	if (err < 0)
+> +	if (err)
+>   		return err;
 
-> The main difference is that there are very few drivers on x86 that are
-> specific to one of the two chip makers. Almost everything is a PCI
-> device that can actually be plugged in anywhere.
-> 
-> On ARM64 there is going to be a lot of stuff that really makes sense
-> only for one of the 50 licensees.
+    Returning negative values from the IRQ handler doesn't seem valid.
+Arbitrary positive value aren't good either. Perhaps should return IRQ_NONE 
+instead?
+
+WBR, Sergei
