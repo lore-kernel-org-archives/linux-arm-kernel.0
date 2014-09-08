@@ -1,34 +1,43 @@
-From: peter.griffin@linaro.org (Peter Griffin)
-Date: Mon,  8 Sep 2014 13:04:48 +0100
-Subject: [PATCH v6 5/5] MAINTAINERS: Add ehci-st.c and ohci-st.c to ARCH/STI
- architecture
-In-Reply-To: <1410177888-26710-1-git-send-email-peter.griffin@linaro.org>
-References: <1410177888-26710-1-git-send-email-peter.griffin@linaro.org>
-Message-ID: <1410177888-26710-6-git-send-email-peter.griffin@linaro.org>
+From: philippe.retornaz@gmail.com (=?UTF-8?B?UGhpbGlwcGUgUsOpdG9ybmF6?=)
+Date: Mon, 08 Sep 2014 14:06:36 +0200
+Subject: [PATCH] mfd: mc13xxx: Configure WDI reset
+In-Reply-To: <20140908092559.GB24081@pengutronix.de>
+References: <1410159671-25873-1-git-send-email-mpa@pengutronix.de>
+ <540D5DEB.6020605@gmail.com> <20140908092559.GB24081@pengutronix.de>
+Message-ID: <540D9BCC.2000801@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the ehci-st.c and ohci-st.c files for the usb 2.0
-& usb1.1 host controller drivers found on stih41x and stih4xx STMicroelectronics
-SoC's into the STI arch section of the maintainers file.
+Le 08/09/2014 11:25, Markus Pargmann a ?crit :
+> Hi,
+>
+> On Mon, Sep 08, 2014 at 09:42:35AM +0200, Philippe R?tornaz wrote:
+>> Hello
+>>
+>> Le 08/09/2014 09:01, Markus Pargmann a ?crit :
+>>> Setup the PMIC to make a restart when a watchdog interrupt occures.
+>>> If this is not configured, the PMIC will shut down the power supply
+>>> without a restart.
+>>
+>>
+>> Well, this was used to poweroff the mx31moboard board.
+>> So we need to be able to configure the functionality.
+>
+> So on mx31moboard the watchdog interrupt always leads to a poweroff instead of
+> a reset?
 
-Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
----
- MAINTAINERS | 2 ++
- 1 file changed, 2 insertions(+)
+Well, no, it simply doesn't work since the output pin is not enabled :)
+We enable the watchdog output only in pm_power_off().
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index cf24bb5..5abd281 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -1398,6 +1398,8 @@ F:	drivers/media/rc/st_rc.c
- F:	drivers/i2c/busses/i2c-st.c
- F:	drivers/tty/serial/st-asc.c
- F:	drivers/mmc/host/sdhci-st.c
-+F:	drivers/usb/host/ehci-st.c
-+F:	drivers/usb/host/ohci-st.c
- 
- ARM/TECHNOLOGIC SYSTEMS TS7250 MACHINE SUPPORT
- M:	Lennert Buytenhek <kernel@wantstofly.org>
--- 
-1.9.1
+> Perhaps it would be better to switch back to poweroff on
+> watchdog interrupt right before the shutdown watchdog interrupt is
+> triggered.
+
+Yes, we definitely should be doing this.
+The only point is that we don't have currently access to the PMIC from 
+pm_power_off().
+Is there a clean/recommended way to do it ?
+
+Thanks !
+
+Philippe
