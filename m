@@ -1,32 +1,79 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Mon, 8 Sep 2014 14:31:17 -0700
-Subject: [PATCH v3 1/2] Documentation: dt-bindings: add dt binding info
- for dwc2 dr_mode
-In-Reply-To: <CAD=FV=WDv9Pxe+jSqsfARPvjxMWPfcVpPMk1wHCgOO8ePiCh3g@mail.gmail.com>
-References: <1407159942-7063-1-git-send-email-kever.yang@rock-chips.com>
- <1407159942-7063-2-git-send-email-kever.yang@rock-chips.com>
- <CAD=FV=WDv9Pxe+jSqsfARPvjxMWPfcVpPMk1wHCgOO8ePiCh3g@mail.gmail.com>
-Message-ID: <20140908213117.GA3227@kroah.com>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Mon, 08 Sep 2014 14:37:29 -0700
+Subject: [RFC PATCH 0/3] PM / clock_ops: allow to specify custom
+ pm_clk_notifier callback
+In-Reply-To: <1406313096-29761-1-git-send-email-grygorii.strashko@ti.com>
+ (Grygorii Strashko's message of "Fri, 25 Jul 2014 21:31:33 +0300")
+References: <1406313096-29761-1-git-send-email-grygorii.strashko@ti.com>
+Message-ID: <7hr3zln692.fsf@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 08, 2014 at 11:50:25AM -0700, Doug Anderson wrote:
-> Greg,
-> 
-> On Mon, Aug 4, 2014 at 6:45 AM, Kever Yang <kever.yang@rock-chips.com> wrote:
-> > Indicate that the generic dr_mode binding should be used for dwc2.
-> >
-> > Signed-off-by: Kever Yang <kever.yang@rock-chips.com>
-> > ---
-> >
-> > Changes in v3: None
-> > Changes in v2:
-> > - Split out dr_mode and rk3288 bindings.
-> >
-> >  Documentation/devicetree/bindings/usb/dwc2.txt | 2 ++
-> >  1 file changed, 2 insertions(+)
-> 
-> Are there any other changes you'd like for this patch (and the next
-> one that goes with it) before landing?
+Grygorii Strashko <grygorii.strashko@ti.com> writes:
 
-No idea, please resend.
+> The CLK PM domain (clock_ops.c) assumes that platform code should always provide
+> list of Connection IDs of the clock (con_id) in pm_clk_notifier_block structure.
+> Then CLK PM domain uses these con_ids to setup list of clocks per device.
+>
+> Such approach is inconvenient when devices can have different number
+> of clocks. For example, if maximum number of clocks used by
+> devices is 4 the pm_clk_notifier_block structure will look like:
+>
+> static struct pm_clk_notifier_block platform_domain_notifier = {
+> 	.pm_domain = &keystone_pm_domain,
+> 	.con_ids = { "fck", "opt1", "opt2", "opt3", NULL },
+> };
+>
+> More over, clocks in DT have to be named using only above con_ids:
+> 	clocks = <&paclk13>, <&clkcpgmac>, <&chipclk12>;
+> 	clock-names = "fck", "opt1", "opt2";
+>
+> It makes hard to enable/support Runtime PM in case when some HW modules are used
+> by different SoCs or there are few version of the same SoC, because clock trees
+> can be changed significantly in all such cases.
+>
+> This patch set allows to specify custom pm_clk_notifier callback from
+> platform code and in such way makes CLK PM domain initialization
+> more flexible. 
+
+Replacing the pm_clk notifier is essentially replacing the guts of the
+clock_ops code.
+
+I think your platform may have left the realm of "simple" platforms that
+the clock_ops was intended for.
+
+Since you're essentially gutting clock_ops, have you considered
+migrating to genpd and having your own pm_domain ops that manage your clocks?
+
+> Also, It updates Keystone 2 platform code to provide custom
+> callback which fills list of clocks for Device with all clocks assigned to this
+> Device in DT.
+> More over, It's safe for Keystone 2 to perform CLK PM domain initialization
+> at device's binding time instead of device's creation time.
+>
+> I've posted these patches because I need fully enable Runtime PM on Keystone 2
+> where all HW modules are controlled using clocks only. That's why CLK PM domain 
+> fits our needs perfectly. 
+
+Heh, doesn't seem like a perfect fit to me ;)
+
+> Also, on Keystone 2 clocks are initialized early and
+> they are available at device creation time. The main problems from my side are:
+>  - every time when support for new HW modules is added the ".con_ids" array 
+>    need to be checked and updated;
+>  - restriction for clock's names in DT - to be named using only above con_ids
+>    It's ugly.
+>
+> I hope, this approach to be accepted at least as temporal solution until 
+> the generic solution is not found.
+
+Sorry if I missed it, but is there ongoing discussion of a more generic
+solution other than this one:
+
+> [1] Previously, same problem was discussed in, but no final solution was accepted:
+>  "[PATCH/RFC 0/4] of: Register clocks for Runtime PM with PM core"
+>  https://lkml.org/lkml/2014/4/24/1118
+
+Personally, I still like Geert's approach better.
+
+Kevin
