@@ -1,52 +1,35 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 08 Sep 2014 20:16:42 +0200
-Subject: [PATCH] ARM: omap: fix Kconfig warning
-In-Reply-To: <20140908153400.GC3238@atomide.com>
-References: <3763111.OttSKCMuxb@wuerfel> <20140908153400.GC3238@atomide.com>
-Message-ID: <2797284.2mFcuQ0Ias@wuerfel>
+Date: Mon, 08 Sep 2014 20:18:57 +0200
+Subject: [PATCH] clk: efm32: fix build warning
+In-Reply-To: <20140908174805.GL23009@pengutronix.de>
+References: <3456522.oqa7pbstSD@wuerfel>
+ <20140908174805.GL23009@pengutronix.de>
+Message-ID: <34912135.k5JMtvLE1Q@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 08 September 2014 08:34:00 Tony Lindgren wrote:
-> * Arnd Bergmann <arnd@arndb.de> [140908 08:01]:
-> > A small mistake during the recent Kconfig cleanup has led
-> > to a harmless warning for OMAP1:
+On Monday 08 September 2014 19:48:05 Uwe Kleine-K?nig wrote:
+> On Mon, Sep 08, 2014 at 05:19:40PM +0200, Arnd Bergmann wrote:
+> > The normal prototype for of clk init functions is to return void,
+> > while efm32gg_cmu_init return an int, resulting in this harmless
+> > build warning:
 > > 
-> > warning: (ARCH_OMAP1) selects ARCH_OMAP which has unmet direct dependencies (ARCH_MULTI_V6 || ARCH_MULTI_V7)
+> > drivers/clk/clk-efm32gg.c:81:189: warning: comparison of distinct pointer types lacks a cast [enabled by default]
+> >  CLK_OF_DECLARE(efm32ggcmu, "efm32gg,cmu", efm32gg_cmu_init);
 > > 
-> > We can easily avoid that by moving the ARCH_OMAP symbol outside of the
-> > OMAP2 submenu.
+> > This changes the return type to avoid the warning.
+> > 
+> > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> I already sent the exact same patch some time ago, even the sha1 sums in
+> the diff match.
 > 
-> OK I made a similar patch, but I moved it into plat-omap/Kconfig
-> as it's also used by omap1. The regression was probably caused by
-> commit 21278aeafbfa (ARM: use menuconfig for sub-arch menus).
+>         Subject: [PATCH] clk/efm32gg: fix dt init prototype
+>         Message-Id: <1406558301-17866-1-git-send-email-u.kleine-koenig@pengutronix.de>
+>         Date: Mon, 28 Jul 2014 16:38:21 +0200
 > 
-> If that works for you, I'll verify the regression causing commit
-> and post it with a description.
 
-Yes, sounds good. Your version is better than mind.
+Ok, good to see that we came to the same conclusion.
+
+Mike, could you please try to get Uwe's patch into 3.17?
 
 	Arnd
-
-> 
-> --- a/arch/arm/mach-omap2/Kconfig
-> +++ b/arch/arm/mach-omap2/Kconfig
-> @@ -1,9 +1,6 @@
->  menu "TI OMAP/AM/DM/DRA Family"
->  	depends on ARCH_MULTI_V6 || ARCH_MULTI_V7
->  
-> -config ARCH_OMAP
-> -	bool
-> -
->  config ARCH_OMAP2
->  	bool "TI OMAP2"
->  	depends on ARCH_MULTI_V6
-> --- a/arch/arm/plat-omap/Kconfig
-> +++ b/arch/arm/plat-omap/Kconfig
-> @@ -1,3 +1,6 @@
-> +config ARCH_OMAP
-> +	bool
-> +
->  if ARCH_OMAP
->  
->  menu "TI OMAP Common Features"
