@@ -1,51 +1,94 @@
-From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
-Date: Mon, 08 Sep 2014 14:43:10 +0200
-Subject: [PATCH 1/2] ARM: exynos_defconfig: Enable Control Groups support
-In-Reply-To: <53FE02E6.3030302@suse.de>
-References: <1409137341-20516-1-git-send-email-javier.martinez@collabora.co.uk>
- <53FE02E6.3030302@suse.de>
-Message-ID: <540DA45E.1040702@collabora.co.uk>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 8 Sep 2014 14:43:55 +0200
+Subject: [PATCH 6/7 v6] ARM: l2x0: calculate associativity from ePAPR
+ cache props
+In-Reply-To: <65434961.9Ji0STQpff@wuerfel>
+References: <1410176286-32533-1-git-send-email-linus.walleij@linaro.org>
+ <1410176286-32533-7-git-send-email-linus.walleij@linaro.org>
+ <65434961.9Ji0STQpff@wuerfel>
+Message-ID: <CACRpkdaTWt=0cbfgrnbah3jHRsvGUnVzsCb1uqFKPUNfvZ+AhA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Andreas,
+On Mon, Sep 8, 2014 at 2:15 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Monday 08 September 2014 13:38:05 Linus Walleij wrote:
+>>  static void __init l2x0_cache_size_of_parse(const struct device_node *np,
+>>                                             u32 *aux_val, u32 *aux_mask,
+>> -                                           u32 max_way_size)
+>> +                                           u32 max_way_size,
+>> +                                           u32 max_associativity)
+>>  {
+>>         u32 mask = 0, val = 0;
+>>         u32 size = 0, sets = 0;
+>>         u32 way_size = 0, way_size_bits = 1;
+>> +       u32 linesize = 0;
+>> +       u32 assoc = 0;
+>>
+>>         of_property_read_u32(np, "cache-size", &size);
+>>         of_property_read_u32(np, "cache-sets", &sets);
+>> +       of_property_read_u32(np, "cache-line-size", &linesize);
+>>
+>
+> If I read ePAPR correctly, you have to read "cache-block-size" as well, and
+> use that as a fallback if "cache-line-size" is not provided. The line size
+> is only required to be in the DT if it's different from the block size.
 
-On 08/27/2014 06:10 PM, Andreas F?rber wrote:
-> Am 27.08.2014 13:02, schrieb Javier Martinez Canillas:
->> systemd needs control groups support to be enabled in the
->> kernel so let's enable it by default since is quite likely
->> that a user-space with systemd will be used.
->> 
->> Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
->> ---
->>  arch/arm/configs/exynos_defconfig | 1 +
->>  1 file changed, 1 insertion(+)
->> 
->> diff --git a/arch/arm/configs/exynos_defconfig b/arch/arm/configs/exynos_defconfig
->> index 676c744..590abde 100644
->> --- a/arch/arm/configs/exynos_defconfig
->> +++ b/arch/arm/configs/exynos_defconfig
->> @@ -1,6 +1,7 @@
->>  CONFIG_SYSVIPC=y
->>  CONFIG_NO_HZ=y
->>  CONFIG_HIGH_RES_TIMERS=y
->> +CONFIG_CGROUPS=y
->>  CONFIG_BLK_DEV_INITRD=y
->>  CONFIG_KALLSYMS_ALL=y
->>  CONFIG_MODULES=y
-> 
-> CONFIG_FHANDLE=y is also needed for systemd to get a serial console.
-> multi_v7 has that already.
-> 
+OK fixed this...
 
-That's a requirement for systemd >= 209 AFAIK. I've systemd 208 on my debian
-jessie and it works without it.
+>>         if (way_size > max_way_size) {
+>> -               pr_warn("L2C: way size %dKB is too large\n", way_size >> 10);
+>> +               pr_warn("L2C OF: way size %dKB is too large\n", way_size >> 10);
+>>                 return;
+>>         }
+>>
+>> +       /* All these l2 caches have the same line size actually */
+>> +       if (!linesize)
+>> +               linesize = CACHE_LINE_SIZE;
+>> +       if (linesize != CACHE_LINE_SIZE)
+>> +               pr_warn("L2C OF: DT supplied line size %d bytes does "
+>> +                       "not match hardware line size of %d bytes\n",
+>> +                       linesize,
+>> +                       CACHE_LINE_SIZE);
+>
+> and CACHE_LINE_SIZE seems to be what ePAPR calls cache-block-size, i.e.
+> the fundamental unit of cache management as seen from the CPU, independent
+> of how it is physically organized.
 
-I agree that it should be included but I think it can be in a follow-up patch.
+Yeah. Well, actually that means the variable in cache-l2x0.c should
+be renamed from CACHE_LINE_SIZE to CACHE_BLOCK_SIZE
+if we go with that terminology, right? That is the real change that
+is needed to make terminology consistent then.
 
-> Regards,
-> Andreas
-> 
+>> +       /*
+>> +        * This cache is set associative. By increasing associativity
+>> +        * we increase the number of blocks per set. Usually this
+>> +        * quickly hits the roof at 8 or 16 ways of associativity.
+>> +        */
+>> +       assoc = way_size / linesize;
+>> +       if (assoc > max_associativity)
+>> +               assoc = max_associativity;
+>> +
+>
+> I don't see what this helps us. Doesn't this silently try to fix up
+> incorrect device trees?
 
-Best regards,
-Javier
+I will look closer... But whatever comes out of the calculation
+is always way about 8 or even 16. Probably my arithmetics
+get it wrong because of terminology confusion. With the
+definitions from your previous mail, maybe it all ends up
+correctly. I'll hack around a bit and see.
+
+>> +       } else {
+>> +               if (sets == 1)
+>> +                       /* Direct-mapped cache */
+>> +                       assoc = 1;
+>> +               val |= (assoc << L2X0_AUX_CTRL_ASSOC_SHIFT);
+>> +       }
+>
+> This looks wrong: isn't "sets==1" fully associative rather than
+> direct-mapped?
+
+Yep. I'll fix.
+
+Yours,
+Linus Walleij
