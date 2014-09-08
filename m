@@ -1,33 +1,30 @@
 From: peter.griffin@linaro.org (Peter Griffin)
-Date: Mon,  8 Sep 2014 10:30:37 +0100
-Subject: [PATCH v3 3/4] MAINTAINERS: Add phy-stih41x-usb.c to ARCH/STI
- architecture
+Date: Mon,  8 Sep 2014 10:30:38 +0100
+Subject: [PATCH v3 4/4] ARM: multi_v7_defconfig: Enable stih41x usb phy driver.
 In-Reply-To: <1410168638-11072-1-git-send-email-peter.griffin@linaro.org>
 References: <1410168638-11072-1-git-send-email-peter.griffin@linaro.org>
-Message-ID: <1410168638-11072-4-git-send-email-peter.griffin@linaro.org>
+Message-ID: <1410168638-11072-5-git-send-email-peter.griffin@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the new phy-sti41x-usb.c PHY driver found on
-STMicroelectronics stih41x consumer electronics SoC's into the STI
-arch section of the maintainers file.
+This driver is used by the ehci / ohci usb controllers on stih41x SoCs.
 
 Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
 ---
- MAINTAINERS | 1 +
+ arch/arm/configs/multi_v7_defconfig | 1 +
  1 file changed, 1 insertion(+)
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index cf24bb5..4cb59cf 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -1398,6 +1398,7 @@ F:	drivers/media/rc/st_rc.c
- F:	drivers/i2c/busses/i2c-st.c
- F:	drivers/tty/serial/st-asc.c
- F:	drivers/mmc/host/sdhci-st.c
-+F:	drivers/phy/phy-stih41x-usb.c
- 
- ARM/TECHNOLOGIC SYSTEMS TS7250 MACHINE SUPPORT
- M:	Lennert Buytenhek <kernel@wantstofly.org>
+diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+index 5fb95fb..74fd4a1 100644
+--- a/arch/arm/configs/multi_v7_defconfig
++++ b/arch/arm/configs/multi_v7_defconfig
+@@ -387,6 +387,7 @@ CONFIG_PWM_VT8500=y
+ CONFIG_OMAP_USB2=y
+ CONFIG_TI_PIPE3=y
+ CONFIG_PHY_MIPHY365X=y
++CONFIG_PHY_STIH41X_USB=y
+ CONFIG_PHY_SUN4I_USB=y
+ CONFIG_EXT4_FS=y
+ CONFIG_VFAT_FS=y
 -- 
 1.9.1
