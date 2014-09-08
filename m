@@ -1,75 +1,88 @@
-From: msalter@redhat.com (Mark Salter)
-Date: Mon,  8 Sep 2014 09:31:42 -0400
-Subject: [PATCH] efi/arm64: fix fdt-related memory reservation
-Message-ID: <1410183102-6969-1-git-send-email-msalter@redhat.com>
+From: geert+renesas@glider.be (Geert Uytterhoeven)
+Date: Mon,  8 Sep 2014 15:35:39 +0200
+Subject: [PATCH/RFC 0/5] ARM: shmobile: R-Mobile: Prototype DT PM domain
+ support
+Message-ID: <1410183344-14756-1-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 86c8b27a01cf:
- "arm64: ignore DT memreserve entries when booting in UEFI mode
+	Hi all,
 
-prevents early_init_fdt_scan_reserved_mem() from being called for
-arm64 kernels booting via UEFI. This was done because the kernel
-will use the UEFI memory map to determine reserved memory regions.
-That approach has problems in that early_init_fdt_scan_reserved_mem()
-also reserves the FDT itself and any node-specific reserved memory.
-By chance of some kernel configs, the FDT may be overwritten before
-it can be unflattened and the kernel will fail to boot. More subtle
-problems will result if the FDT has node specific reserved memory
-which is not really reserved.
+This patch series contains prototype code to enable DT support for PM domains
+on Renesas R-Mobile SoCs.
 
-This patch has the UEFI stub remove the memory reserve map entries
-from the FDT as it does with the memory nodes. This allows
-early_init_fdt_scan_reserved_mem() to be called unconditionally
-so that the other needed reservations are made.
+Currently it's limited to R-Mobile A1 (r8a7740), but given the similarity of
+the SYSC System-Controller on the various SH-Mobile/R-Mobile SoCs, and the
+abstraction of PM domains in DT, it should be sufficiently generic to handle
+other SoCs in the future (e.g. SH-Mobile AP4 (sh7372), SH-Mobile AG5 (sh73a0),
+R-Mobile APE6 (r8a73a4)).
 
-Signed-off-by: Mark Salter <msalter@redhat.com>
----
- arch/arm64/mm/init.c               |  3 +--
- drivers/firmware/efi/libstub/fdt.c | 10 +++++++++-
- 2 files changed, 10 insertions(+), 3 deletions(-)
+Despite my request to add support for non-contiguous arrays for onecell PM
+domain providers, I went for representing the SoC's power area hierarchy as a
+hierarchy in DT, with multiple PM domain nodes, and using "#power-domain-cells
+= <0>" (see also the P.S. below).  The code to support a proper hiearchy turned
+out to be surprisingly clean and simple(r).
 
-diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
-index 5472c24..a83061f 100644
---- a/arch/arm64/mm/init.c
-+++ b/arch/arm64/mm/init.c
-@@ -149,8 +149,7 @@ void __init arm64_memblock_init(void)
- 		memblock_reserve(__virt_to_phys(initrd_start), initrd_end - initrd_start);
- #endif
- 
--	if (!efi_enabled(EFI_MEMMAP))
--		early_init_fdt_scan_reserved_mem();
-+	early_init_fdt_scan_reserved_mem();
- 
- 	/* 4GB maximum for 32-bit only capable devices */
- 	if (IS_ENABLED(CONFIG_ZONE_DMA))
-diff --git a/drivers/firmware/efi/libstub/fdt.c b/drivers/firmware/efi/libstub/fdt.c
-index a56bb35..723c7da 100644
---- a/drivers/firmware/efi/libstub/fdt.c
-+++ b/drivers/firmware/efi/libstub/fdt.c
-@@ -22,7 +22,7 @@ efi_status_t update_fdt(efi_system_table_t *sys_table, void *orig_fdt,
- 			unsigned long map_size, unsigned long desc_size,
- 			u32 desc_ver)
- {
--	int node, prev;
-+	int node, prev, i, num_rsv;
- 	int status;
- 	u32 fdt_val32;
- 	u64 fdt_val64;
-@@ -73,6 +73,14 @@ efi_status_t update_fdt(efi_system_table_t *sys_table, void *orig_fdt,
- 		prev = node;
- 	}
- 
-+	/*
-+	 * Delete all memory reserve map entries. When booting via UEFI,
-+	 * kernel will use the UEFI memory map to find reserved regions.
-+	 */
-+	num_rsv = fdt_num_mem_rsv(fdt);
-+	for (i = 0; i < num_rsv; i++)
-+		fdt_del_mem_rsv(fdt, i);
-+
- 	node = fdt_subnode_offset(fdt, 0, "chosen");
- 	if (node < 0) {
- 		node = fdt_add_subnode(fdt, 0, "chosen");
--- 
-1.8.3.1
+Dependencies:
+  - "[PATCH 00/11] ARM: shmobile: r8a7740/armadillo legacy prototype pm domain
+    support", sent by me (www.spinics.net/lists/arm-kernel/msg358037.html),
+  - "[PATCH v3 0/9] PM / Domains: Generic OF-based support", sent by Ulf
+    Hansson (www.spinics.net/lists/arm-kernel/msg357003.html),
+  - "[PATCH 00/15] PM / Domains: Cleanups and remove superfluous APIs", sent by
+    Ulf Hansson (www.spinics.net/lists/linux-samsung-soc/msg36407.html).
+
+Note that this still won't work as-is, this is just an RFC.
+More fixes are needed in sh-mobile platform glue, and to resolve the bad
+interaction with drivers/sh/pm_runtime.c and clk_disable_unused().
+But none of these matter for e.g. discussing DT bindings.
+With those fixed/worked around, functionality is almost equivalent to the
+non-DT case.  Missing are Run-Time management of the module clocks
+(pm_clk_*()), and device latencies.
+
+Thanks for your comments!
+
+Geert Uytterhoeven (5):
+  PM / Domains: Add DT bindings for power-on/off latencies
+  PM / Domains: Add DT bindings for the R-Mobile System Controller
+  ARM: shmobile: R-Mobile: Store SYSC base address in rmobile_pm_domain
+  ARM: shmobile: R-Mobile: Add DT support for PM domains
+  ARM: shmobile: r8a7740 dtsi: Add PM domain support
+
+ .../devicetree/bindings/power/power_domain.txt     |   6 +
+ .../bindings/power/renesas,sysc-rmobile.txt        | 106 +++++++++++++
+ arch/arm/boot/dts/r8a7740.dtsi                     | 121 +++++++++++++++
+ arch/arm/mach-shmobile/Kconfig                     |   3 +-
+ arch/arm/mach-shmobile/pm-r8a7740.c                |  14 ++
+ arch/arm/mach-shmobile/pm-rmobile.c                | 169 +++++++++++++++++++--
+ arch/arm/mach-shmobile/pm-rmobile.h                |   1 +
+ arch/arm/mach-shmobile/pm-sh7372.c                 |  11 ++
+ 8 files changed, 417 insertions(+), 14 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/power/renesas,sysc-rmobile.txt
+
+P.S. I did try "#power-domain-cells = <1>", but the hassle with sparse
+     definitions and error-prone multiple arrays (not unlikely, but even worse
+     than with the SMTP clock specifiers) was just too much. Not to mention
+     representing the C5 "always-on" power area...
+
+	renesas,pm-domain-indices = <
+		R8A7740_PD_A4LC R8A7740_PD_A4MP R8A7740_PD_D4
+		R8A7740_PD_A4R R8A7740_PD_A3RV R8A7740_PD_A4S
+		R8A7740_PD_A3SP R8A7740_PD_A3SM R8A7740_PD_A3SG
+		R8A7740_PD_A4SU
+	>;
+	renesas,pm-domain-names =
+		"A4LC", "A4MP", "D4", "A4R", "A3RV", "A4S", "A3SP",
+		"A3SM", "A3SG", "A4SU";
+	renesas,pm-domain-parents =
+		"", "", "", "", "A4R", "", "A4S", "A4S", "A4S", "";
+
+Gr{oetje,eeting}s,
+
+						Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+							    -- Linus Torvalds
