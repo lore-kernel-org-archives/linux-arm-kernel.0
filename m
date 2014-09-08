@@ -1,36 +1,47 @@
 From: nm@ti.com (Nishanth Menon)
-Date: Mon, 8 Sep 2014 11:29:04 -0500
-Subject: [PATCH 00/10] ARM: OMAP5 / DRA7: Add framework for suspend and
- cpuidle
-In-Reply-To: <7htx4xbv7p.fsf@paris.lan>
-References: <1408716154-26101-1-git-send-email-nm@ti.com>
- <7htx4xbv7p.fsf@paris.lan>
-Message-ID: <540DD950.30207@ti.com>
+Date: Mon, 8 Sep 2014 11:32:29 -0500
+Subject: [PATCH 0/3] ARM: OMAP5+: pdata quirks for pinctrl
+In-Reply-To: <1408715725-25919-1-git-send-email-nm@ti.com>
+References: <1408715725-25919-1-git-send-email-nm@ti.com>
+Message-ID: <540DDA1D.9070903@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/27/2014 02:15 PM, Kevin Hilman wrote:
-> Nishanth Menon <nm@ti.com> writes:
+On 08/22/2014 08:55 AM, Nishanth Menon wrote:
+> The following series are various fixes and improvements for daisychain
+> support in OMAP5+ using pinctrl framework similar to that done for
+> OMAP3+
 > 
->> The following series are various fixes and improvements for
->> supporting suspend-to-ram. This depends on the following for basic functionality:
->> series 1/6 where powerdomain fixes were involved.
+> This is part 3/6 series which eventually enables framework for
+> suspend-to-ram and cpuidle for OMAP5 and DRA7
 > 
-> I had a look through this series, and it looks good overall.  I think Daniel
-> needs to weigh in on the CPUidle driver, otherwise.
+> Each of series is based on v3.17-rc1 and this specific series is available:
+> weblink: https://github.com/nmenon/linux-2.6-playground/commits/push/v3.17/prm-pdata-quirks
 > 
-> Reviewed-by: Kevin Hilman <khilman@linaro.org>
+> git repo: https://github.com/nmenon/linux-2.6-playground.git push/v3.17/prm-pdata-quirks
 > 
-> I also tested on omap5uevm with the pm_debug/wakeup_timer_seconds patch.
+> An complete integrated branch is available here: https://github.com/nmenon/linux-2.6-playground/commits/testing/v3.17/cpu-idle-suspend-dra7-omap5-framework
 > 
-> Tested-by: Kevin Hilman <khilman@linaro.org>
+> Minor note: thanks to existing style in pdata-quirks, new entries
+> continue to possess 'over 80 character' checkpatch warnings
 > 
-> Kevin
+> Keerthy (1):
+>   ARM: AM437x: use pdata quirks for pinctrl information
+> 
+> Nishanth Menon (2):
+>   ARM: OMAP5: use pdata quirks for pinctrl information
+>   ARM: DRA7: use pdata quirks for pinctrl information
+> 
+>  arch/arm/mach-omap2/pdata-quirks.c |   10 ++++++++++
+>  1 file changed, 10 insertions(+)
 > 
 
-I am dropping cpuidle patch for the moment, and sending remaining
-stuff to Tony for merge with Kevin's Reviewed and Tested. we will send
-cpuidle once we have Daniel's response.
+Since there are no further comments (and the pinctrl side of the fixes
+were accepted by Linus W[1], will send this for merge to Tony.
+
+
+[1] http://marc.info/?l=linux-kernel&m=140871666506706&w=2 (acked by
+Tony, picked by Linus)
 
 -- 
 Regards,
