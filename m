@@ -1,35 +1,63 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon, 8 Sep 2014 11:12:23 +0200
-Subject: [PATCH 3/5] arm: MTK: Add basic support for mt8135
-In-Reply-To: <1409874660-8710-4-git-send-email-srv_yingjoe.chen@mediatek.com>
-References: <1409874660-8710-1-git-send-email-srv_yingjoe.chen@mediatek.com>
- <1409874660-8710-4-git-send-email-srv_yingjoe.chen@mediatek.com>
-Message-ID: <20140908091223.GC15722@pengutronix.de>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Mon,  8 Sep 2014 11:19:18 +0200
+Subject: [PATCH v2 3/5] ARM: mvebu: Change vendor prefix for Intersil
+ Corporation to isil
+In-Reply-To: <1410167960-554-1-git-send-email-p.zabel@pengutronix.de>
+References: <1410167960-554-1-git-send-email-p.zabel@pengutronix.de>
+Message-ID: <1410167960-554-4-git-send-email-p.zabel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 05, 2014 at 07:50:58AM +0800, Joe.C wrote:
-> From: "Joe.C" <yingjoe.chen@mediatek.com>
-> 
-> +
-> +	soc {
-> +		#address-cells = <2>;
-> +		#size-cells = <2>;
-> +		compatible = "simple-bus";
-> +		ranges;
-> +
-> +		timer: timer at 10008000 {
-> +			compatible = "mediatek,mt6577-timer";
+Currently there is a wild mixture of isl, isil, and intersil
+compatibles in the kernel. At this point, changing the vendor
+symbol to the most often used variant, which is equal to the
+NASDAQ symbol, isil, should not hurt.
 
-This should also have a mediatek,mt8135-timer compatible. Just in case
-there are incompatibilities in the timer you are not aware of now you'll
-still have the possibility later to distinguish between the mt6577 timer
-and the mt8135 timer in the driver.
+Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
+---
+ arch/arm/boot/dts/armada-370-netgear-rn102.dts | 2 +-
+ arch/arm/boot/dts/armada-370-netgear-rn104.dts | 2 +-
+ arch/arm/boot/dts/armada-xp-netgear-rn2120.dts | 2 +-
+ 3 files changed, 3 insertions(+), 3 deletions(-)
 
-Sascha
-
+diff --git a/arch/arm/boot/dts/armada-370-netgear-rn102.dts b/arch/arm/boot/dts/armada-370-netgear-rn102.dts
+index d6d572e..edc381c 100644
+--- a/arch/arm/boot/dts/armada-370-netgear-rn102.dts
++++ b/arch/arm/boot/dts/armada-370-netgear-rn102.dts
+@@ -122,7 +122,7 @@
+ 				status = "okay";
+ 
+ 				isl12057: isl12057 at 68 {
+-					compatible = "isl,isl12057";
++					compatible = "isil,isl12057";
+ 					reg = <0x68>;
+ 				};
+ 
+diff --git a/arch/arm/boot/dts/armada-370-netgear-rn104.dts b/arch/arm/boot/dts/armada-370-netgear-rn104.dts
+index c5fe8b5..7367b4c 100644
+--- a/arch/arm/boot/dts/armada-370-netgear-rn104.dts
++++ b/arch/arm/boot/dts/armada-370-netgear-rn104.dts
+@@ -117,7 +117,7 @@
+ 				status = "okay";
+ 
+ 				isl12057: isl12057 at 68 {
+-					compatible = "isl,isl12057";
++					compatible = "isil,isl12057";
+ 					reg = <0x68>;
+ 				};
+ 
+diff --git a/arch/arm/boot/dts/armada-xp-netgear-rn2120.dts b/arch/arm/boot/dts/armada-xp-netgear-rn2120.dts
+index 0cf999a..252def8 100644
+--- a/arch/arm/boot/dts/armada-xp-netgear-rn2120.dts
++++ b/arch/arm/boot/dts/armada-xp-netgear-rn2120.dts
+@@ -174,7 +174,7 @@
+ 				status = "okay";
+ 
+ 				isl12057: isl12057 at 68 {
+-					compatible = "isl,isl12057";
++					compatible = "isil,isl12057";
+ 					reg = <0x68>;
+ 				};
+ 
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+2.1.0.rc1
