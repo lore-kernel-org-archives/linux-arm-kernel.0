@@ -1,159 +1,56 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Tue, 09 Sep 2014 10:24:13 +0200
-Subject: [PATCH] ARM: dts: Add SPI nodes to rk3288
-In-Reply-To: <1409935991-15067-1-git-send-email-dianders@chromium.org>
-References: <1409935991-15067-1-git-send-email-dianders@chromium.org>
-Message-ID: <1893562.fBlNbjpirW@diego>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 09 Sep 2014 10:23:01 +0200
+Subject: [PATCH v2] ARM: l2c: parse cache properties from ePAPR definitions
+In-Reply-To: <3750746.eYplbZAGky@wuerfel>
+References: <1410246633-23407-1-git-send-email-linus.walleij@linaro.org>
+ <3750746.eYplbZAGky@wuerfel>
+Message-ID: <3872359.cDihUR1d12@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Freitag, 5. September 2014, 09:53:11 schrieb Doug Anderson:
-> From: huang lin <hl@rock-chips.com>
+On Tuesday 09 September 2014 09:42:18 Arnd Bergmann wrote:
+> > +     switch (set_size >> 10) {
+> > +     case 512:
+> > +             set_size_bits = 6;
+> > +             break;
+> > +     case 256:
+> > +             set_size_bits = 5;
+> > +             break;
+> > +     case 128:
+> > +             set_size_bits = 4;
+> > +             break;
+> > +     case 64:
+> > +             set_size_bits = 3;
+> > +             break;
+> > +     case 32:
+> > +             set_size_bits = 2;
+> > +             break;
+> > +     case 16:
+> > +             set_size_bits = 1;
+> > +             break;
+> > +     default:
+> > +             pr_err("L2C OF: cache way size: %d KB is not mapped\n",
+> > +                    way_size);
+> > +             break;
+> > +     }
+> > +
+> > +     /*
+> > +      * The l2x0 TRMs call this size "way size" but that is incorrect:
+> > +      * the thing being configured in these register bits is actually
+> > +      * the cache set size, so the variable here has the right name
+> > +      * but the register bit definitions following the TRM are not
+> > +      * in archaic naming.
+> > +      */
 > 
-> This adds basic SPI nodes to the base rk3288 device tree file.
+> No, I think actually the comment and the variable name are wrong here,
+> and the TRM is right. I'm surprised you get the right results out of
+> this. The set_size should be a relatively small number, e.g. 256 bytes
+> in case of an 8-way associative cache with 32 byte lines. What is the
+> pr_debug output and the properties you pass in for your example system?
 > 
-> A few notes:
-> * It's assumed that most users of the SPI ports are using chip select
->   0.  Thus the default pinctrl for the ports enables chip select 0
->   (but not chip select 1 on ports that have it).  If a board wants to
->   use chip select 1 or wants a GPIO chip select the board should
->   override the pinctrl (just like boards can override UART pinctrl if
->   they have hardware flow control).
-> * Since SPI DMA support appears broken and the SPI works fine without
->   DMA we don't include the DMA references.  That can come in a later
->   change.
 
-Added to my dts branch with the one small change described below
+I just saw you had 'cache-sets = <8>' in your original DT file. That
+is the wrong number, it needs to be 'cache-sets = <512>'. When you
+fix that, you should get the right way_size as well.
 
-
-> 
-> Signed-off-by: huang lin <hl@rock-chips.com>
-> Signed-off-by: Doug Anderson <dianders@chromium.org>
-> ---
-> 
->  arch/arm/boot/dts/rk3288.dtsi | 92
-> +++++++++++++++++++++++++++++++++++++++++++ 1 file changed, 92
-> insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/rk3288.dtsi b/arch/arm/boot/dts/rk3288.dtsi
-> index 5f866e0..75d1f4c 100644
-> --- a/arch/arm/boot/dts/rk3288.dtsi
-> +++ b/arch/arm/boot/dts/rk3288.dtsi
-> @@ -34,6 +34,9 @@
->  		serial2 = &uart2;
->  		serial3 = &uart3;
->  		serial4 = &uart4;
-> +		spi0 = &spi0;
-> +		spi1 = &spi1;
-> +		spi2 = &spi2;
->  	};
-> 
->  	cpus {
-> @@ -128,6 +131,45 @@
->  		status = "disabled";
->  	};
-> 
-> +	spi0: spi at ff110000 {
-> +		compatible = "rockchip,rk3066-spi";
-
-I've changed the compatibles to the one defined in the binding, aka
-	"rockchip,rk3288-spi", "rockchip,rk3066-spi"
-
-
-> +		clocks = <&cru SCLK_SPI0>, <&cru PCLK_SPI0>;
-> +		clock-names = "spiclk", "apb_pclk";
-> +		interrupts = <GIC_SPI 44 IRQ_TYPE_LEVEL_HIGH>;
-> +		pinctrl-names = "default";
-> +		pinctrl-0 = <&spi0_clk &spi0_tx &spi0_rx &spi0_cs0>;
-> +		reg = <0xff110000 0x1000>;
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +		status = "disabled";
-> +	};
-> +
-> +	spi1: spi at ff120000 {
-> +		compatible = "rockchip,rk3066-spi";
-> +		clocks = <&cru SCLK_SPI1>, <&cru PCLK_SPI1>;
-> +		clock-names = "spiclk", "apb_pclk";
-> +		interrupts = <GIC_SPI 45 IRQ_TYPE_LEVEL_HIGH>;
-> +		pinctrl-names = "default";
-> +		pinctrl-0 = <&spi1_clk &spi1_tx &spi1_rx &spi1_cs0>;
-> +		reg = <0xff120000 0x1000>;
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +		status = "disabled";
-> +	};
-> +
-> +	spi2: spi at ff130000 {
-> +		compatible = "rockchip,rk3066-spi";
-> +		clocks = <&cru SCLK_SPI2>, <&cru PCLK_SPI2>;
-> +		clock-names = "spiclk", "apb_pclk";
-> +		interrupts = <GIC_SPI 46 IRQ_TYPE_LEVEL_HIGH>;
-> +		pinctrl-names = "default";
-> +		pinctrl-0 = <&spi2_clk &spi2_tx &spi2_rx &spi2_cs0>;
-> +		reg = <0xff130000 0x1000>;
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +		status = "disabled";
-> +	};
-> +
->  	i2c1: i2c at ff140000 {
->  		compatible = "rockchip,rk3288-i2c";
->  		reg = <0xff140000 0x1000>;
-> @@ -700,6 +742,56 @@
->  			};
->  		};
-> 
-> +		spi0 {
-> +			spi0_clk: spi0-clk {
-> +				rockchip,pins = <5 12 RK_FUNC_1 &pcfg_pull_up>;
-> +			};
-> +			spi0_cs0: spi0-cs0 {
-> +				rockchip,pins = <5 13 RK_FUNC_1 &pcfg_pull_up>;
-> +			};
-> +			spi0_tx: spi0-tx {
-> +				rockchip,pins = <5 14 RK_FUNC_1 &pcfg_pull_up>;
-> +			};
-> +			spi0_rx: spi0-rx {
-> +				rockchip,pins = <5 15 RK_FUNC_1 &pcfg_pull_up>;
-> +			};
-> +			spi0_cs1: spi0-cs1 {
-> +				rockchip,pins = <5 16 RK_FUNC_1 &pcfg_pull_up>;
-> +			};
-> +		};
-> +		spi1 {
-> +			spi1_clk: spi1-clk {
-> +				rockchip,pins = <7 12 RK_FUNC_2 &pcfg_pull_up>;
-> +			};
-> +			spi1_cs0: spi1-cs0 {
-> +				rockchip,pins = <7 13 RK_FUNC_2 &pcfg_pull_up>;
-> +			};
-> +			spi1_rx: spi1-rx {
-> +				rockchip,pins = <7 14 RK_FUNC_2 &pcfg_pull_up>;
-> +			};
-> +			spi1_tx: spi1-tx {
-> +				rockchip,pins = <7 15 RK_FUNC_2 &pcfg_pull_up>;
-> +			};
-> +		};
-> +
-> +		spi2 {
-> +			spi2_cs1: spi2-cs1 {
-> +				rockchip,pins = <8 3 RK_FUNC_1 &pcfg_pull_up>;
-> +			};
-> +			spi2_clk: spi2-clk {
-> +				rockchip,pins = <8 6 RK_FUNC_1 &pcfg_pull_up>;
-> +			};
-> +			spi2_cs0: spi2-cs0 {
-> +				rockchip,pins = <8 7 RK_FUNC_1 &pcfg_pull_up>;
-> +			};
-> +			spi2_rx: spi2-rx {
-> +				rockchip,pins = <8 8 RK_FUNC_1 &pcfg_pull_up>;
-> +			};
-> +			spi2_tx: spi2-tx {
-> +				rockchip,pins = <8 9 RK_FUNC_1 &pcfg_pull_up>;
-> +			};
-> +		};
-> +
->  		uart0 {
->  			uart0_xfer: uart0-xfer {
->  				rockchip,pins = <4 16 RK_FUNC_1 &pcfg_pull_up>,
+	Arnd
