@@ -1,64 +1,36 @@
-From: gautam.vivek@samsung.com (Vivek Gautam)
-Date: Tue, 9 Sep 2014 07:19:50 +0530
-Subject: [PATCH v6 4/4] phy: exynos5-usbdrd: Calibrate LOS levels for
- exynos5420/5800
-In-Reply-To: <20140908134454.GK22409@saruman.home>
-References: <1409656338-20337-1-git-send-email-gautam.vivek@samsung.com>
- <1409656338-20337-5-git-send-email-gautam.vivek@samsung.com>
- <20140902143438.GB16872@saruman.home>
- <CAFp+6iEyqmbwMLFrBKD7NVLDAC=b+h1hPKFS=BG4k9D69hn_dg@mail.gmail.com>
- <20140903144225.GD31855@saruman.home>
- <CAFp+6iETPJCWMMkjHrpDcdCv=K0PbefYLa4eBOwN=aUY2=EHLA@mail.gmail.com>
- <20140905175651.GK24449@saruman.home>
- <CAFp+6iGU86yL8Ry3ArJJjBy2Cs0Em2B49yssH3BK5fJwyaZbtA@mail.gmail.com>
- <20140908134454.GK22409@saruman.home>
-Message-ID: <CAFp+6iG+gmD_JseytYuVQcRK9ErOqQrUEWJoU1KUU7PqMd=aRw@mail.gmail.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Tue, 9 Sep 2014 11:02:18 +0900
+Subject: [GIT PULL] Renesas ARM Based SoC Init Delay Updates For v3.18
+In-Reply-To: <201409051727.18845.arnd@arndb.de>
+References: <cover.1408927601.git.horms+renesas@verge.net.au>
+ <201409051727.18845.arnd@arndb.de>
+Message-ID: <20140909020218.GA23233@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Fri, Sep 05, 2014 at 05:27:18PM +0200, Arnd Bergmann wrote:
+> On Monday 25 August 2014, Simon Horman wrote:
+> > Hi Olof, Hi Kevin, Hi Arnd,
+> > 
+> > Please consider these Renesas ARM based SoC init delay updates for v3.18.
+> > 
+> 
+> While looking at your branches, I noticed that you go to great lengths
+> to compute the correct lpj value and avoid the calibration.
+> 
+> However, I believe the "modern" way to do this is to call
+> register_current_timer_delay() in order to base the delay loop
+> on the hardware timer instead of looping in the CPU. This is
+> more accurate and more robust against CPU frequency scaling.
 
+I may be wrong but my understanding is that Renesas SoCs may be
+booted without a timer.
 
-On Mon, Sep 8, 2014 at 7:14 PM, Felipe Balbi <balbi@ti.com> wrote:
-> Hi,
->
-> On Mon, Sep 08, 2014 at 09:53:09AM +0530, Vivek Gautam wrote:
->> On Fri, Sep 5, 2014 at 11:26 PM, Felipe Balbi <balbi@ti.com> wrote:
->> > On Thu, Sep 04, 2014 at 12:01:19PM +0530, Vivek Gautam wrote:
->> >> > Don't we have phy_power_on()
->> >> > for that ? It looks like you could just as well do this from
->> >> > phy_power_on() ?
->> >>
->> >> No, unfortunately keeping these calibration settings in phy_power_on()
->> >> doesn't help, since we need to do this after XHCI reset has happened.
->> >
->> > teach xHCI about PHYs ?
->>
->> sorry i couldn't understand you here.
->> Aren't we trying to do the same with Heikki's patch about dwc3 :
->> [PATCH 6/6] usb: dwc3: host: convey the PHYs to xhci
->>
->> and the 2nd patch in this series :
->> [PATCH v6 2/4] usb: host: xhci-plat: Get PHYs for xhci's hcds
->>
->> Is there something else that is expected ?
->
-> right, use that to call phy_init() at the right time, then you need to
-> add a new ->calibrate() method which, likely, will only be used by you
-> ;-)
+> I'm applying the patches now, but it's something you may want
+> to look at in the future. On a related topic, your clocksource
+> drivers could be simplified for the DT-only case by using
+> CLOCKSOURCE_OF_DECLARE() instead of early_platform_init(), but
+> I don't know what the impact would be for the arch/sh and legacy
+> mach-shmobile cases.
 
-so you mean, the xhci should itself call phy_init() at a time suitable,
-so that ->calibrate() is not required at all ?
-
-i think you meant there - "then you __do not__ need to
-> add a new ->calibrate() method which, likely,
-will only be used by you", is it ?
-
-
-
-
--- 
-Best Regards
-Vivek Gautam
-Samsung R&D Institute, Bangalore
-India
+Thanks, I will have that looked into.
