@@ -1,25 +1,28 @@
-From: stigge@antcom.de (Roland Stigge)
-Date: Tue, 09 Sep 2014 16:52:07 +0200
-Subject: [GIT PULL] ARM: LPC32xx: Defconfig update
-Message-ID: <540F1417.3010708@antcom.de>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 09 Sep 2014 16:59:07 +0200
+Subject: [GIT PULL 2/2] SOCFPGA driver updates for 3.18
+In-Reply-To: <1409847105-27241-2-git-send-email-dinguyen@opensource.altera.com>
+References: <1409847105-27241-1-git-send-email-dinguyen@opensource.altera.com>
+ <1409847105-27241-2-git-send-email-dinguyen@opensource.altera.com>
+Message-ID: <3081326.KgOEtsBgKv@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 2ce7598c9a453e0acd0e07be7be3f5eb39608ebd:
+On Thursday 04 September 2014 11:11:45 dinguyen at opensource.altera.com wrote:
+> Hi Arnd, Kevin and Olof,
+> 
+> Please consider pulling this patch for v3.18. Boris had given me permission to
+> take this patch together with it's DTS component. The DTS portion was in the
+> previous pull request.
 
-  Linux 3.17-rc4 (2014-09-07 16:09:43 -0700)
+I have no objections to the code, but I don't understand what you gain
+from merging it through arm-soc. There is no dependency between the
+driver and the dts entries in any way, you just need to have both in order
+for things to work.
 
-are available in the git repository at:
+We can always pull in drivers with permission from the maintainer when there
+is a good reason to do that, but I don't see that reason for this patch,
+so I'd prefer to have Boris merge it through his tree, unless I'm missing
+something.
 
-  git://git.antcom.de/linux-2.6 lpc32xx/defconfig
-
-for you to fetch changes up to da5926c0d47596720499ddc0ddee04b1a65a2cff:
-
-  ARM: LPC32xx: defconfig update (2014-09-09 15:35:42 +0200)
-
-----------------------------------------------------------------
-Roland Stigge (1):
-      ARM: LPC32xx: defconfig update
-
- arch/arm/configs/lpc32xx_defconfig | 2 ++
- 1 file changed, 2 insertions(+)
+	Arnd
