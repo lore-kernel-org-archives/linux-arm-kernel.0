@@ -1,31 +1,30 @@
 From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Tue,  9 Sep 2014 18:50:58 +0200
-Subject: [PATCH v3 1/7] arm: dts: Build dtb for Mediatek board
+Date: Tue,  9 Sep 2014 18:50:59 +0200
+Subject: [PATCH v3 2/7] arm: multi_v7_defconfig: Enable Mediatek platform
 In-Reply-To: <1410281464-9587-1-git-send-email-matthias.bgg@gmail.com>
 References: <1410281464-9587-1-git-send-email-matthias.bgg@gmail.com>
-Message-ID: <1410281464-9587-2-git-send-email-matthias.bgg@gmail.com>
+Message-ID: <1410281464-9587-3-git-send-email-matthias.bgg@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This allows the "make dtbs" to build the aquaris5 dtb for the Mediatek
-SoC.
+Enable Mediatek platform support for multi_v7_defconfig.
 
 Signed-off-by: Matthias Brugger <matthias.bgg@gmail.com>
 ---
- arch/arm/boot/dts/Makefile | 1 +
+ arch/arm/configs/multi_v7_defconfig | 1 +
  1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index b8c5cd3..055b20c 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -491,6 +491,7 @@ dtb-$(CONFIG_MACH_DOVE) += dove-cm-a510.dtb \
- 	dove-d2plug.dtb \
- 	dove-d3plug.dtb \
- 	dove-dove-db.dtb
-+dtb-$(CONFIG_ARCH_MEDIATEK) += mt6589-aquaris5.dtb
- 
- targets += dtbs dtbs_install
- targets += $(dtb-y)
+diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+index 5fb95fb..4c08101 100644
+--- a/arch/arm/configs/multi_v7_defconfig
++++ b/arch/arm/configs/multi_v7_defconfig
+@@ -42,6 +42,7 @@ CONFIG_SOC_AM33XX=y
+ CONFIG_SOC_AM43XX=y
+ CONFIG_SOC_DRA7XX=y
+ CONFIG_ARCH_QCOM=y
++CONFIG_ARCH_MEDIATEK=y
+ CONFIG_ARCH_MSM8X60=y
+ CONFIG_ARCH_MSM8960=y
+ CONFIG_ARCH_MSM8974=y
 -- 
 1.9.1
