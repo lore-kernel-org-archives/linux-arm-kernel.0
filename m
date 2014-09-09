@@ -1,39 +1,56 @@
-From: m.chehab@samsung.com (Mauro Carvalho Chehab)
-Date: Tue, 09 Sep 2014 13:10:36 -0300
-Subject: [PATCHv2 2/3] [media] s5p-jpeg: Fix compilation with COMPILE_TEST
-In-Reply-To: <540F1D11.9030400@samsung.com>
-References: <20140909124306.2d5a0d76@canb.auug.org.au>
- <6cbd00c5f2d342b573aaf9c0e533778374dd2e1e.1410273306.git.m.chehab@samsung.com>
- <b7343e6296b5d1d68b7229b8307442fd4141bcb3.1410273306.git.m.chehab@samsung.com>
- <540F15B2.3000902@samsung.com> <20140909120936.527bd852.m.chehab@samsung.com>
- <540F1D11.9030400@samsung.com>
-Message-ID: <20140909131036.7265121f.m.chehab@samsung.com>
+From: khilman@kernel.org (Kevin Hilman)
+Date: Tue, 09 Sep 2014 09:11:18 -0700
+Subject: [PATCH/RFC 4/5] ARM: shmobile: R-Mobile: Add DT support for PM
+ domains
+In-Reply-To: <1410183344-14756-5-git-send-email-geert+renesas@glider.be>
+ (Geert Uytterhoeven's message of "Mon, 8 Sep 2014 15:35:43 +0200")
+References: <1410183344-14756-1-git-send-email-geert+renesas@glider.be>
+ <1410183344-14756-5-git-send-email-geert+renesas@glider.be>
+Message-ID: <7h1trkkc49.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ERROR: "__bad_ndelay" [drivers/media/platform/s5p-jpeg/s5p-jpeg.ko] undefined!
+Geert Uytterhoeven <geert+renesas@glider.be> writes:
 
-That happens because asm-generic doesn't like any ndelay time
-bigger than 20us.
+> Populate the PM domains from DT, and provide support to hook up devices
+> to their respective PM domain.
+>
+> The always-on power area (e.g. C5 on r8a7740) is created as a PM domain
+> without software control, to allow Run-Time management of module clocks
+> for hardware blocks inside this area in the future.
+> Power-on/off latencies are supported.
+>
+> Limitations and special cases in the non-DT case are handled through
+> rmobile_pm_quirks(). Checks for hardcoded PM domain indices should be
+> replaced by the analysis of relations between devices and PM domains in
+> DT.
+>
+> Initialization is done from core_initcall(), as the
+> "renesas,intc-irqpin" driver uses postcore_initcall().
+>
+> This is functionally almost equivalent to the non-DT case. Missing are
+> Run-Time management of the module clocks (pm_clk_*()), and device
+> latencies.
+>
+> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Currently, usleep_range() couldn't simply be used, since
-exynos4_jpeg_sw_reset() is called with a spinlock held.
+[...]
 
-So, let's use ndelay() instead.
+This series looks really good to me.  Just a minor question about a
+possible next step...
 
-Reported-by: Stephen Rothwell <sfr@canb.auug.org.au>
-Signed-off-by: Mauro Carvalho Chehab <m.chehab@samsung.com>
+> +static int r8a7740_pd_a4s_suspend(void)
+> +{
+> +	/*
+> +	 * The A4S domain contains the CPU core and therefore it should
+> +	 * only be turned off if the CPU is in use.
+> +	 */
+> +	return -EBUSY;
+> +}
 
-diff --git a/drivers/media/platform/s5p-jpeg/jpeg-hw-exynos4.c b/drivers/media/platform/s5p-jpeg/jpeg-hw-exynos4.c
-index e51c078360f5..ab6d6f43c96f 100644
---- a/drivers/media/platform/s5p-jpeg/jpeg-hw-exynos4.c
-+++ b/drivers/media/platform/s5p-jpeg/jpeg-hw-exynos4.c
-@@ -23,7 +23,7 @@ void exynos4_jpeg_sw_reset(void __iomem *base)
- 	reg = readl(base + EXYNOS4_JPEG_CNTL_REG);
- 	writel(reg & ~EXYNOS4_SOFT_RESET_HI, base + EXYNOS4_JPEG_CNTL_REG);
- 
--	ndelay(100000);
-+	udelay(100);
- 
- 	writel(reg | EXYNOS4_SOFT_RESET_HI, base + EXYNOS4_JPEG_CNTL_REG);
- }
+
+Do you have plans to use pm_genpd_attach_cpuidle() for this eventually,
+maybe by checking if the enclosing node is a CPU?  If not, are there
+other plans to handle idle for the power domains that contain CPUs?
+
+Kevin
