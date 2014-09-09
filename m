@@ -1,97 +1,45 @@
-From: Liviu.Dudau@arm.com (Liviu Dudau)
-Date: Tue, 9 Sep 2014 09:46:21 +0100
-Subject: [PATCH v10 07/10] OF: Introduce helper function for getting PCI
- domain_nr
-In-Reply-To: <540E960D.7080408@huawei.com>
-References: <1410184472-17630-1-git-send-email-Liviu.Dudau@arm.com>
- <1410184472-17630-8-git-send-email-Liviu.Dudau@arm.com>
- <CAL_JsqJi8k1Goc3UmXhuxf9v7=4gJrYG_Di7v574PxS8TsJaXw@mail.gmail.com>
- <20140908145459.GO27864@e106497-lin.cambridge.arm.com>
- <CAL_JsqJdGKDVwJOpPp19OkVPGzR7Zqv3nh+ONHHaYnPLYTYoYg@mail.gmail.com>
- <20140908155931.GP27864@e106497-lin.cambridge.arm.com>
- <540E960D.7080408@huawei.com>
-Message-ID: <20140909084621.GS27864@e106497-lin.cambridge.arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 09 Sep 2014 10:50:46 +0200
+Subject: [GIT PULL] Renesas ARM Based SoC Init Delay Updates For v3.18
+In-Reply-To: <20140909020218.GA23233@verge.net.au>
+References: <cover.1408927601.git.horms+renesas@verge.net.au>
+ <201409051727.18845.arnd@arndb.de> <20140909020218.GA23233@verge.net.au>
+Message-ID: <11409170.rfMyQrIgd0@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 09, 2014 at 06:54:21AM +0100, Yijing Wang wrote:
-> >>> on new requests. This function gets called quite a lot and I'm trying not to
-> >>> make it too heavy weight.
-> >>
-> >> Generally, nothing should be accessing the same DT value frequently.
-> >> It should get cached somewhere.
-> >>
+On Tuesday 09 September 2014 11:02:18 Simon Horman wrote:
+> On Fri, Sep 05, 2014 at 05:27:18PM +0200, Arnd Bergmann wrote:
+> > On Monday 25 August 2014, Simon Horman wrote:
+> > > Hi Olof, Hi Kevin, Hi Arnd,
+> > > 
+> > > Please consider these Renesas ARM based SoC init delay updates for v3.18.
+> > > 
 > > 
-> > The problem appears for DTs that don't have the pci-domain info. Then the cached
-> > value is left at the default non-valid value and attempts to rescan the DT will
-> > be made every time the function is called.
+> > While looking at your branches, I noticed that you go to great lengths
+> > to compute the correct lpj value and avoid the calibration.
 > > 
-> >> I don't really understand how domains are used so it's hard to provide
-> >> a recommendation here. Do domains even belong in the DT?
-> > 
-> > ACPI calls them segments and the way Bjorn explained it to me at some moment was
-> > that it was an attempt to split up a bus in different groups (or alternatively,
-> > merge a few busses together). To be honest I haven't seen systems where the domain
-> > is anything other than zero, but JasonG (or maybe Benjamin) were floating an
-> > idea of using the domain number to identify physical slots.
+> > However, I believe the "modern" way to do this is to call
+> > register_current_timer_delay() in order to base the delay loop
+> > on the hardware timer instead of looping in the CPU. This is
+> > more accurate and more robust against CPU frequency scaling.
 > 
-> PCI domain(or named segment) is provided by firmware, in ACPI system, we evaluated it
-> by method "_SEG". in IA64 with ACPI, PCI hostbridge driver retrieves the domain from ACPI,
-> if it's absent, the default domain is zero. So I wonder why in DTS, if it's absent, we get
-> a auto increment domain value.
+> I may be wrong but my understanding is that Renesas SoCs may be
+> booted without a timer.
 
-Because you can have more than one hostbridge (rare, but not impossible) and unless you
-want to join the two segments, you might want to give it a different domain.
+Do you mean some of them only have a clockevent driver but no clocksource,
+and use the jiffies clocksource instead?
 
-Best regards,
-Liviu
+I've looked at the three drivers/clocksource/{sh,em}_*.c files, and it seems
+sh_mtu2.c indeed has no clocksource support, although the binding description
+mentions that it has multiple counters that could be used for this
+purpose. This timer is only used on R7S72100, so if you add
+'register_current_timer_delay' calls to the other drivers, you can
+decide to either keep computing the lpj value for R7S72100 but not the
+others, or try to add a clocksource implementation to mtu2 as well.
 
-> 
-> PCI get domain by ACPI "_SEG" in IA64(drivers/acpi/pci_root.c)
-> ......
-> 	status = acpi_evaluate_integer(handle, METHOD_NAME__SEG, NULL,
-> 				       &segment);
-> 	if (ACPI_FAILURE(status) && status != AE_NOT_FOUND) {
-> 		dev_err(&device->dev,  "can't evaluate _SEG\n");
-> 		result = -ENODEV;
-> 		goto end;
-> 	}
-> .......
-> 
-> Thanks!
-> Yijing.
-> 
-> > 
-> >> This function
-> >> is just a weird mixture of data retrieval and allocation. I think you
-> >> need to separate it into 2 functions.
-> > 
-> > It is meant to do allocation with the retrieval being a short-cut (or fine
-> > control if you want).
-> > 
-> > I need to think a bit more for a better solution.
-> > 
-> > Best regards,
-> > Liviu
-> > 
-> >>
-> >> Rob
-> >>
-> > 
-> 
-> 
-> -- 
-> Thanks!
-> Yijing
-> 
-> 
+Note that the read_current_timer() function for the delay implementation
+doesn't have to be based on the same timer as the clocksource, but in
+practice it often is.
 
--- 
-====================
-| I would like to |
-| fix the world,  |
-| but they're not |
-| giving me the   |
- \ source code!  /
-  ---------------
-    ?\_(?)_/?
+	Arnd
