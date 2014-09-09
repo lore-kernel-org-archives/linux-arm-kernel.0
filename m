@@ -1,138 +1,107 @@
-From: Liviu.Dudau@arm.com (Liviu Dudau)
-Date: Tue, 9 Sep 2014 15:11:22 +0100
-Subject: [PATCH v10 07/10] OF: Introduce helper function for getting PCI
- domain_nr
-In-Reply-To: <540EC8CB.7010106@huawei.com>
-References: <1410184472-17630-1-git-send-email-Liviu.Dudau@arm.com>
- <1410184472-17630-8-git-send-email-Liviu.Dudau@arm.com>
- <CAL_JsqJi8k1Goc3UmXhuxf9v7=4gJrYG_Di7v574PxS8TsJaXw@mail.gmail.com>
- <20140908145459.GO27864@e106497-lin.cambridge.arm.com>
- <CAL_JsqJdGKDVwJOpPp19OkVPGzR7Zqv3nh+ONHHaYnPLYTYoYg@mail.gmail.com>
- <20140908155931.GP27864@e106497-lin.cambridge.arm.com>
- <540E960D.7080408@huawei.com>
- <20140909084621.GS27864@e106497-lin.cambridge.arm.com>
- <540EC8CB.7010106@huawei.com>
-Message-ID: <20140909141122.GY27864@e106497-lin.cambridge.arm.com>
+From: daniel.thompson@linaro.org (Daniel Thompson)
+Date: Tue,  9 Sep 2014 15:15:05 +0100
+Subject: [PATCH v4 0/6] arm: Implement arch_trigger_all_cpu_backtrace
+In-Reply-To: <1410190115-32604-1-git-send-email-daniel.thompson@linaro.org>
+References: <1410190115-32604-1-git-send-email-daniel.thompson@linaro.org>
+Message-ID: <1410272111-30516-1-git-send-email-daniel.thompson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 09, 2014 at 10:30:51AM +0100, Yijing Wang wrote:
-> On 2014/9/9 16:46, Liviu Dudau wrote:
-> > On Tue, Sep 09, 2014 at 06:54:21AM +0100, Yijing Wang wrote:
-> >>>>> on new requests. This function gets called quite a lot and I'm trying not to
-> >>>>> make it too heavy weight.
-> >>>>
-> >>>> Generally, nothing should be accessing the same DT value frequently.
-> >>>> It should get cached somewhere.
-> >>>>
-> >>>
-> >>> The problem appears for DTs that don't have the pci-domain info. Then the cached
-> >>> value is left at the default non-valid value and attempts to rescan the DT will
-> >>> be made every time the function is called.
-> >>>
-> >>>> I don't really understand how domains are used so it's hard to provide
-> >>>> a recommendation here. Do domains even belong in the DT?
-> >>>
-> >>> ACPI calls them segments and the way Bjorn explained it to me at some moment was
-> >>> that it was an attempt to split up a bus in different groups (or alternatively,
-> >>> merge a few busses together). To be honest I haven't seen systems where the domain
-> >>> is anything other than zero, but JasonG (or maybe Benjamin) were floating an
-> >>> idea of using the domain number to identify physical slots.
-> >>
-> >> PCI domain(or named segment) is provided by firmware, in ACPI system, we evaluated it
-> >> by method "_SEG". in IA64 with ACPI, PCI hostbridge driver retrieves the domain from ACPI,
-> >> if it's absent, the default domain is zero. So I wonder why in DTS, if it's absent, we get
-> >> a auto increment domain value.
-> > 
-> > Because you can have more than one hostbridge (rare, but not impossible) and unless you
-> > want to join the two segments, you might want to give it a different domain.
-> 
-> OK. Sorry, I have one last question, because domain will be used to calculate the address used to
-> access PCI hardware config registers. So if DTS file doesn't report the domain, how do we know
-> we would access the right registers when we use the auto increment domain vaule ?
+This patchset implements arch_trigger_all_cpu_backtrace for arm.
 
-That's a good question and sides with Arnd's suggestion to try to mandate the presence of the PCI
-domain in the DTS. However, by grepping through the source code, it looks like the architectures
-that use the domain number for reading config registers (x86-based) are non-DT architectures,
-while DT-aware arches seem to ignore the domain number except when printing out messages. Is that
-another confirmation that most DT-aware architectures have only run with domain_nr = 0?
+Non-maskable signalling relies on the kernel being able to access FIQ
+and therefore, for devices that implement TrustZone, it will work only on
+systems that boot the kernel in secure mode.
+
+Tested on Freescale iMX.6 (both via SysRq-l and by deliberately locking
+up the kernel with CONFIG_DEBUG_SPINLOCK=y).
+
+Changes since v3:
+
+* Replaced push/pop with stmfd/ldmfd respectively (review of Nicolas
+  Pitre).
+
+* Really fix bad pt_regs pointer generation in __fiq_abt.
+
+* Remove fiq_safe_migration_lock and associated logic in
+  gic_raise_softirq() (review of Russell King)
+
+* Restructured to introduce the default FIQ handler first, before the
+  new features (review of Russell King).
+
+Changes since v2:
+
+* Removed redundant header guards from arch/arm64/include/asm/fiq.h
+  (review of Catalin Marinas).
+
+* Moved svc_exit_via_fiq macro to entry-header.S (review of Nicolas
+  Pitre).
+
+Changes since v1:
+
+* Restructured to sit nicely on a similar FYI patchset from Russell
+  King. It now effectively replaces the work in progress final patch
+  with something much more complete.
+
+* Implemented (and tested) a Thumb-2 implementation of svc_exit_via_fiq
+  (review of Nicolas Pitre)
+
+* Dropped the GIC group 0 workaround patch. The issue of FIQ interrupts
+  being acknowledged by the IRQ handler does still exist but should be
+  harmless because the IRQ handler will still wind up calling
+  ipi_cpu_backtrace().
+
+* Removed any dependency on CONFIG_FIQ; all cpu backtrace effectively
+  becomes a platform feature (although the use of non-maskable
+  interrupts to implement it is best effort rather than guaranteed).
+
+* Better comments highlighting usage of RAZ/WI registers (and parts of
+  registers) in the GIC code.
+
+Changes *before* v1:
+
+* This patchset is a hugely cut-down successor to "[PATCH v11 00/19]
+  arm: KGDB NMI/FIQ support". Thanks to Thomas Gleixner for suggesting
+  the new structure. For historic details see:
+        https://lkml.org/lkml/2014/9/2/227
+
+* Fix bug in __fiq_abt (no longer passes a bad struct pt_regs value).
+  In fixing this we also remove the useless indirection previously
+  found in the fiq_handler macro.
+
+* Make default fiq handler "always on" by migrating from fiq.c to
+  traps.c and replace do_unexp_fiq with the new handler (review
+  of Russell King).
+
+* Add arm64 version of fiq.h (review of Russell King)
+
+* Removed conditional branching and code from irq-gic.c, this is
+  replaced by much simpler code that relies on the GIC specification's
+  heavy use of read-as-zero/write-ignored (review of Russell King)
 
 
-> Has there a mechanism to make sure system can access the correct registers by the domain ?
+Daniel Thompson (4):
+  arm: fiq: Replace default FIQ handler
+  arm64: Introduce dummy version of asm/fiq.h
+  irqchip: gic: Add support for IPI FIQ
+  arm: smp: Handle ipi_cpu_backtrace() using FIQ (if available)
 
-Not as such if you look with x86 glasses. With the exception of powerpc all other architecures
-seem to happily assume domain_nr = 0 and ignore it in the computation of configuration registers
-offsets.
+Russell King (2):
+  ARM: remove unused do_unexp_fiq() function
+  ARM: add basic support for on-demand backtrace of other CPUs
 
-Best regards,
-Liviu
+ arch/arm/include/asm/irq.h      |   5 ++
+ arch/arm/include/asm/smp.h      |   3 +
+ arch/arm/kernel/entry-armv.S    |  95 ++++++++++++++++++++++++---
+ arch/arm/kernel/entry-header.S  |  47 ++++++++++++++
+ arch/arm/kernel/setup.c         |   8 ++-
+ arch/arm/kernel/smp.c           |  65 +++++++++++++++++++
+ arch/arm/kernel/traps.c         |  32 ++++++++-
+ arch/arm64/include/asm/fiq.h    |   8 +++
+ drivers/irqchip/irq-gic.c       | 140 ++++++++++++++++++++++++++++++++++++++--
+ include/linux/irqchip/arm-gic.h |   3 +
+ 10 files changed, 387 insertions(+), 19 deletions(-)
+ create mode 100644 arch/arm64/include/asm/fiq.h
 
-> 
-> Thanks!
-> Yijing.
-> 
-> > 
-> > Best regards,
-> > Liviu
-> > 
-> >>
-> >> PCI get domain by ACPI "_SEG" in IA64(drivers/acpi/pci_root.c)
-> >> ......
-> >> 	status = acpi_evaluate_integer(handle, METHOD_NAME__SEG, NULL,
-> >> 				       &segment);
-> >> 	if (ACPI_FAILURE(status) && status != AE_NOT_FOUND) {
-> >> 		dev_err(&device->dev,  "can't evaluate _SEG\n");
-> >> 		result = -ENODEV;
-> >> 		goto end;
-> >> 	}
-> >> .......
-> >>
-> >> Thanks!
-> >> Yijing.
-> >>
-> >>>
-> >>>> This function
-> >>>> is just a weird mixture of data retrieval and allocation. I think you
-> >>>> need to separate it into 2 functions.
-> >>>
-> >>> It is meant to do allocation with the retrieval being a short-cut (or fine
-> >>> control if you want).
-> >>>
-> >>> I need to think a bit more for a better solution.
-> >>>
-> >>> Best regards,
-> >>> Liviu
-> >>>
-> >>>>
-> >>>> Rob
-> >>>>
-> >>>
-> >>
-> >>
-> >> -- 
-> >> Thanks!
-> >> Yijing
-> >>
-> >>
-> > 
-> 
-> 
-> -- 
-> Thanks!
-> Yijing
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
-
--- 
-====================
-| I would like to |
-| fix the world,  |
-| but they're not |
-| giving me the   |
- \ source code!  /
-  ---------------
-    ?\_(?)_/?
+--
+1.9.3
