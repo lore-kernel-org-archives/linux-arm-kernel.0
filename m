@@ -1,60 +1,31 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Mon,  8 Sep 2014 23:11:26 -0700
-Subject: [PATCH 2/2] asm-generic: COMMON_CLK defines __clk_{get,put}
-In-Reply-To: <1410242868-14750-1-git-send-email-mturquette@linaro.org>
-References: <1410242868-14750-1-git-send-email-mturquette@linaro.org>
-Message-ID: <1410243086-14925-1-git-send-email-mturquette@linaro.org>
+From: jcm@redhat.com (Jon Masters)
+Date: Tue, 09 Sep 2014 02:14:58 -0400
+Subject: [PATCH v3 13/17] ARM64 / ACPI: Add GICv2 specific ACPI boot
+ support
+In-Reply-To: <5404AE56.80801@arm.com>
+References: <1409583475-6978-1-git-send-email-hanjun.guo@linaro.org>
+ <1409583475-6978-14-git-send-email-hanjun.guo@linaro.org>
+ <5404AE56.80801@arm.com>
+Message-ID: <540E9AE2.5070902@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If CONFIG_COMMON_CLK is selected then __clk_get and __clk_put are
-defined in drivers/clk/clk.c and declared in include/linux/clkdev.h.
+On 09/01/2014 01:35 PM, Marc Zyngier wrote:
+> On 01/09/14 15:57, Hanjun Guo wrote:
+>> From: Tomasz Nowicki <tomasz.nowicki@linaro.org>
+>>
+>> ACPI kernel uses MADT table for proper GIC initialization. It needs to
+>> parse GIC related subtables, collect CPU interface and distributor
+>> addresses and call driver initialization function (which is hardware
+>> abstraction agnostic). In a similar way, FDT initialize GICv1/2.
+>>
+>> NOTE: This commit allow to initialize GICv1/2 only.
+> 
+> I cannot help but notice that there is no support for KVM here. It'd be
+> good to add a note to that effect, so that people do not expect
+> virtualization support to be working when booting with ACPI.
 
-Sylwester's series[0] to properly support clk_{get,put} in the common
-clock framework made changes to the asm-specific clkdev.h headers, but
-not the asm-generic version. Tomeu's recent changes[1] to introduce a
-provider/consumer split in the clock framework uncovered this problem,
-causing the following build error on any architecture using the
-asm-generic clkdev.h (e.g. x86 architecture and the ACPI LPSS driver):
+Wei Huang within Red Hat is currently beginning the process of bringing
+up KVM support under ACPI on real hardware. This will be fixed asap.
 
-In file included from drivers/acpi/acpi_lpss.c:15:0:
-include/linux/clkdev.h:59:5: error: conflicting types for ?__clk_get?
- int __clk_get(struct clk_core *clk);
-     ^
-In file included from arch/x86/include/generated/asm/clkdev.h:1:0,
-                 from include/linux/clkdev.h:15,
-                 from drivers/acpi/acpi_lpss.c:15:
-include/asm-generic/clkdev.h:20:19: note: previous definition of ?__clk_get? was here
- static inline int __clk_get(struct clk *clk) { return 1; }
-                   ^
-
-Fixed by only declarating  __clk_get and __clk_put when
-CONFIG_COMMON_CLK is set.
-
-[0] http://lkml.kernel.org/r/<1386177127-2894-5-git-send-email-s.nawrocki@samsung.com>
-[1] http://lkml.kernel.org/r/<1409758148-20104-1-git-send-email-tomeu.vizoso@collabora.com>
-
-Signed-off-by: Mike Turquette <mturquette@linaro.org>
----
- include/asm-generic/clkdev.h | 2 ++
- 1 file changed, 2 insertions(+)
-
-diff --git a/include/asm-generic/clkdev.h b/include/asm-generic/clkdev.h
-index 90a32a6..4ff33474 100644
---- a/include/asm-generic/clkdev.h
-+++ b/include/asm-generic/clkdev.h
-@@ -15,10 +15,12 @@
- 
- #include <linux/slab.h>
- 
-+#ifndef CONFIG_COMMON_CLK
- struct clk;
- 
- static inline int __clk_get(struct clk *clk) { return 1; }
- static inline void __clk_put(struct clk *clk) { }
-+#endif
- 
- static inline struct clk_lookup_alloc *__clkdev_alloc(size_t size)
- {
--- 
-1.8.3.2
+Jon.
