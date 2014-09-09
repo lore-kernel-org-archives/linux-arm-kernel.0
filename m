@@ -1,54 +1,93 @@
-From: jingchang.lu@freescale.com (Jingchang Lu)
-Date: Tue, 9 Sep 2014 17:06:28 +0800
-Subject: [PATCHv3 0/6]  ARM: imx: Add Freescale LS1021A SoC and board support
-Message-ID: <1410253594-15567-1-git-send-email-jingchang.lu@freescale.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Tue, 9 Sep 2014 12:01:43 +0200
+Subject: [PATCH] ARM/arm64: KVM: fix use of WnR bit in kvm_is_write_fault()
+In-Reply-To: <ed95e7484d2ade8345683a29670a9c5d@www.loen.fr>
+References: <1410208167-32532-1-git-send-email-ard.biesheuvel@linaro.org>
+ <ed95e7484d2ade8345683a29670a9c5d@www.loen.fr>
+Message-ID: <CAKv+Gu_3B_U7eHXxRzqWUBZ5YdSGo6-PEM+3R9Mudi9jPDAtHQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series contain the support for Freescale LS1021A CPU and LS1021A-QDS
-and LS1021A-TWR board.
+On 9 September 2014 11:35, Marc Zyngier <marc.zyngier@arm.com> wrote:
+> Hi Ard,
+>
+>
+> On 2014-09-08 21:29, Ard Biesheuvel wrote:
+>>
+>> The ISS encoding for an exception from a Data Abort has a WnR
+>> bit[6] that indicates whether the Data Abort was caused by a
+>> read or a write instruction. While there are several fields
+>> in the encoding that are only valid if the ISV bit[24] is set,
+>> WnR is not one of them, so we can read it unconditionally.
+>>
+>> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+>> ---
+>>
+>> This fixes an issue I observed with UEFI running under QEMU/KVM using
+>> NOR flash emulation and the upcoming KVM_CAP_READONLY_MEM support, where
+>> NOR flash reads were mistaken for NOR flash writes, resulting in all read
+>> accesses to go through the MMIO emulation layer.
+>>
+>>  arch/arm/include/asm/kvm_mmu.h   | 5 +----
+>>  arch/arm64/include/asm/kvm_mmu.h | 5 +----
+>>  2 files changed, 2 insertions(+), 8 deletions(-)
+>>
+>> diff --git a/arch/arm/include/asm/kvm_mmu.h
+>> b/arch/arm/include/asm/kvm_mmu.h
+>> index 5cc0b0f5f72f..fad5648980ad 100644
+>> --- a/arch/arm/include/asm/kvm_mmu.h
+>> +++ b/arch/arm/include/asm/kvm_mmu.h
+>> @@ -83,10 +83,7 @@ static inline bool kvm_is_write_fault(unsigned long
+>> hsr)
+>>         unsigned long hsr_ec = hsr >> HSR_EC_SHIFT;
+>>         if (hsr_ec == HSR_EC_IABT)
+>>                 return false;
+>> -       else if ((hsr & HSR_ISV) && !(hsr & HSR_WNR))
+>> -               return false;
+>> -       else
+>> -               return true;
+>> +       return hsr & HSR_WNR;
+>>  }
+>>
+>>  static inline void kvm_clean_pgd(pgd_t *pgd)
+>> diff --git a/arch/arm64/include/asm/kvm_mmu.h
+>> b/arch/arm64/include/asm/kvm_mmu.h
+>> index 8e138c7c53ac..09fd9e4c13d8 100644
+>> --- a/arch/arm64/include/asm/kvm_mmu.h
+>> +++ b/arch/arm64/include/asm/kvm_mmu.h
+>> @@ -100,10 +100,7 @@ static inline bool kvm_is_write_fault(unsigned long
+>> esr)
+>>         if (esr_ec == ESR_EL2_EC_IABT)
+>>                 return false;
+>>
+>> -       if ((esr & ESR_EL2_ISV) && !(esr & ESR_EL2_WNR))
+>> -               return false;
+>> -
+>> -       return true;
+>> +       return esr & ESR_EL2_WNR;
+>>  }
+>>
+>>  static inline void kvm_clean_pgd(pgd_t *pgd) {}
+>
+>
+> Nice catch. One thing though.
+>
+> This is a case where code duplication has led to this glaring bug:
+> On both arm and arm64, kvm_emulate.h has code that implements this
+> correctly, just that we failed to use it. Blame me.
+>
+> I think this should be rewritten entierely in mmu.c, with something like
+> this (fully untested, of course):
+>
+> static bool kvm_is_write_fault(struct kvm_vcpu *vcpu)
+> {
+>         if (kvm_vcpu_trap_is_iabt(vcpu))
+>                 return false;
+>
+>         return kvm_vcpu_dabt_iswrite(vcpu);
+> }
+>
+> Care to respin it?
+>
 
-The LS1021A SoC combines two ARM Cortex-A7 cores that have been optimized
-for high reliability and pack the highest level of integration available
-for sub-3 W embedded communications processors and with a comprehensive
-enablement model focused on ease of programmability.
-
-The LS1021A SoC shares IPs with i.MX family, Vybrid family and Freescale
-PowerPC platform. 
-
-For the detail information about LS1021A SoC, please refer to the RM doc.
-
----
-changes in v3:
-rewrite scfg and dcfg doc binding description.
-remove untested node.
-
-changes in v2:
-remove unused nodes.
-wakeup the secondary core by IPI call to u-boot standby procedure. 
-add dt-bindings for LS1021A SoC and platform gerenal configuration nodes.
-
-----------------------------------------------------------------
-Jingchang Lu (6):
-	ARM: dts: Add SoC level device tree support for LS1021A
-	ARM: dts: Add initial LS1021A QDS board dts support
-	ARM: dts: Add initial LS1021A TWR board dts support
-	dt-bindings: arm: add Freescale LS1021A SoC device tree binding
-	ARM: imx: Add initial support for Freescale LS1021A
-	ARM: imx: Add Freescale LS1021A SMP support
-
- Documentation/devicetree/bindings/arm/fsl.txt |  38 +++
- arch/arm/boot/dts/Makefile                    |   2 +
- arch/arm/boot/dts/ls1021a-qds.dts             | 285 +++++++++++++++++++++
- arch/arm/boot/dts/ls1021a-twr.dts             | 117 +++++++++
- arch/arm/boot/dts/ls1021a.dtsi                | 670 ++++++++++++++++++++++++++++++++++++++++++++++++++
- arch/arm/mach-imx/Kconfig                     |  14 ++
- arch/arm/mach-imx/Makefile                    |   4 +-
- arch/arm/mach-imx/common.h                    |   1 +
- arch/arm/mach-imx/mach-ls1021a.c              |  34 +++
- arch/arm/mach-imx/platsmp.c                   |  32 +++
- 10 files changed, 1216 insertions(+), 1 deletion(-)
- create mode 100644 arch/arm/boot/dts/ls1021a-qds.dts
- create mode 100755 arch/arm/boot/dts/ls1021a-twr.dts
- create mode 100644 arch/arm/boot/dts/ls1021a.dtsi
- create mode 100644 arch/arm/mach-imx/mach-ls1021a.c
+Will do.
