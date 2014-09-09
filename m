@@ -1,59 +1,28 @@
-From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
-Date: Tue, 9 Sep 2014 17:21:46 +0200
-Subject: [PATCH 0/2] fixes for struct clk_core migration
-In-Reply-To: <1410242868-14750-1-git-send-email-mturquette@linaro.org>
-References: <1410242868-14750-1-git-send-email-mturquette@linaro.org>
-Message-ID: <CAAObsKCmxZLj0V+rECvLGQhqnQuO0zV3NmtFPyMUMEAhV9Pq+A@mail.gmail.com>
+From: marcel@ziswiler.com (Marcel Ziswiler)
+Date: Tue,  9 Sep 2014 17:28:44 +0200
+Subject: [PATCH 0/3] ASoC/ARM: tegra: apalis/colibri t30: sgtl5000 audio
+Message-ID: <cover.1410276224.git.marcel@ziswiler.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 9 September 2014 08:07, Mike Turquette <mturquette@linaro.org> wrote:
-> A few build issues have popped up with more extensive testing of the
-> patches to split the clock framework into a proper provider/consumer
-> relationship. [0]
->
-> The first patch adapts Intel's LPSS driver to use the clock provider
-> APIs. If no one objects to this patch then I will fold it into Tomeu's
-> patch #2. [1]
->
-> Tomeu, can you run your Coccinelle script again against all of arch/ and
-> drivers/ to make sure nothing else was left out?
+This series adds/integrates Freescale SGTL5000 analogue audio codec
+support.
 
-Sure, I had to add a few new files that are now in linux-next,
-including the lpss driver.
+Marcel Ziswiler (3):
+  ASoC: tegra: add tegra sgtl5000 machine driver
+  ARM: tegra: apalis/colibri t30: integrate audio support
+  ARM: tegra: enable sgtl5000 audio
 
-I just sent a v10 of my series, but the only changed commit is the
-generated one:
+ .../bindings/sound/nvidia,tegra-audio-sgtl5000.txt |  45 +++++
+ arch/arm/boot/dts/tegra30-apalis.dtsi              |  49 +++++
+ arch/arm/boot/dts/tegra30-colibri.dtsi             |  49 +++++
+ arch/arm/configs/tegra_defconfig                   |   1 +
+ sound/soc/tegra/Kconfig                            |  10 +
+ sound/soc/tegra/Makefile                           |   2 +
+ sound/soc/tegra/tegra_sgtl5000.c                   | 216 +++++++++++++++++++++
+ 7 files changed, 372 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/sound/nvidia,tegra-audio-sgtl5000.txt
+ create mode 100644 sound/soc/tegra/tegra_sgtl5000.c
 
-https://lkml.kernel.org/r/<1410271497-27148-1-git-send-email-tomeu.vizoso@collabora.com>
-
-Cheers,
-
-Tomeu
-
-> The second patch brings the asm-generic version of clkdev.h up to speed
-> with all of the asm-specific versions, by not declaring __clk_get and
-> __clk_put if CONFIG_COMMON_CLK is set. If no one objects to this patch
-> then I will move it to the front of the patch stack when rebasing
-> Tomeu's series.
->
-> [0] http://lkml.kernel.org/r/<1409758148-20104-1-git-send-email-tomeu.vizoso@collabora.com>
-> [1] http://lkml.kernel.org/r/<1409758317-20564-1-git-send-email-tomeu.vizoso@collabora.com>
->
-> Mike Turquette (2):
->   acpi: lpss: convert from struct clk to struct clk_core
->   asm-generic: COMMON_CLK defines __clk_{get,put}
->
->  drivers/acpi/acpi_lpss.c               | 6 +++---
->  include/asm-generic/clkdev.h           | 2 ++
->  include/linux/platform_data/clk-lpss.h | 2 +-
->  3 files changed, 6 insertions(+), 4 deletions(-)
->
-> --
-> 1.8.3.2
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
+-- 
+1.9.3
