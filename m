@@ -1,68 +1,76 @@
-From: vikas.sajjan@samsung.com (Vikas Sajjan)
-Date: Tue, 9 Sep 2014 11:24:48 +0530
-Subject: [RESEND PATCH v4 2/2] ARM: EXYNOS: Refactor the pm code to use DT
- based lookup
-In-Reply-To: <02aa01cfc77c$94865f20$bd931d60$@samsung.com>
-References: <1408431167-14134-1-git-send-email-vikas.sajjan@samsung.com>
- <1408431167-14134-3-git-send-email-vikas.sajjan@samsung.com>
- <CAGm_ybjx4t7kGg0mJHjrox39jP-DNgc-0rkLNn2rcOLS6JjAHQ@mail.gmail.com>
- <2186657.jhIisq7Fok@amdc1032>
- <CAGm_ybhDsGpoHg8XVBOPEv7oHc0YdSZBW_JXB0hZk-y6Bac00g@mail.gmail.com>
- <02aa01cfc77c$94865f20$bd931d60$@samsung.com>
-Message-ID: <CAGm_ybj2jekeq0pqqYeXyr6e6cMRfVkto8=nGm=2utCnJSvy_g@mail.gmail.com>
+From: wangyijing@huawei.com (Yijing Wang)
+Date: Tue, 9 Sep 2014 13:54:21 +0800
+Subject: [PATCH v10 07/10] OF: Introduce helper function for getting PCI
+ domain_nr
+In-Reply-To: <20140908155931.GP27864@e106497-lin.cambridge.arm.com>
+References: <1410184472-17630-1-git-send-email-Liviu.Dudau@arm.com>
+ <1410184472-17630-8-git-send-email-Liviu.Dudau@arm.com>
+ <CAL_JsqJi8k1Goc3UmXhuxf9v7=4gJrYG_Di7v574PxS8TsJaXw@mail.gmail.com>
+ <20140908145459.GO27864@e106497-lin.cambridge.arm.com>
+ <CAL_JsqJdGKDVwJOpPp19OkVPGzR7Zqv3nh+ONHHaYnPLYTYoYg@mail.gmail.com>
+ <20140908155931.GP27864@e106497-lin.cambridge.arm.com>
+Message-ID: <540E960D.7080408@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kukjin,
+>>> on new requests. This function gets called quite a lot and I'm trying not to
+>>> make it too heavy weight.
+>>
+>> Generally, nothing should be accessing the same DT value frequently.
+>> It should get cached somewhere.
+>>
+> 
+> The problem appears for DTs that don't have the pci-domain info. Then the cached
+> value is left at the default non-valid value and attempts to rescan the DT will
+> be made every time the function is called.
+> 
+>> I don't really understand how domains are used so it's hard to provide
+>> a recommendation here. Do domains even belong in the DT?
+> 
+> ACPI calls them segments and the way Bjorn explained it to me at some moment was
+> that it was an attempt to split up a bus in different groups (or alternatively,
+> merge a few busses together). To be honest I haven't seen systems where the domain
+> is anything other than zero, but JasonG (or maybe Benjamin) were floating an
+> idea of using the domain number to identify physical slots.
 
-On Wed, Sep 3, 2014 at 7:10 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
-> Vikas Sajjan wrote:
->>
->> Hi,
->>
-> Hi,
->
-> Sorry for late response...
->
->> On Tue, Aug 19, 2014 at 3:05 PM, Bartlomiej Zolnierkiewicz
->> <b.zolnierkie@samsung.com> wrote:
->> >
->> > Hi,
->> >
->> > On Tuesday, August 19, 2014 01:26:49 PM Vikas Sajjan wrote:
->> >> Hi Kukjin,
->> >>
->> >> On Tue, Aug 19, 2014 at 12:22 PM, Vikas Sajjan <vikas.sajjan@samsung.com> wrote:
->> >> > Refactoring the pm.c to avoid using "soc_is_exynos" checks,
->> >> > instead use the DT based lookup.
->> >> >
->> >> > While at it, consolidate the common code across SoCs
->> >> > and create static helper functions.
->> >> >
->> >> > Signed-off-by: Vikas Sajjan <vikas.sajjan@samsung.com>
->> >> > Reviewed-by: Tomasz Figa <t.figa@samsung.com>
->> >>
->> >> Can you pick this series...
->> >
->> > I think that my PM_SLEEP=n build fixes should go in before this cleanup
->> > series:
->>
->> Its better for Kukjin to decide which series he wants to pick first.
->>
-> Hmm...I need to have a look at the Bart's fix then I'll let you know. Maybe
-> tomorrow morning ;)
->
+PCI domain(or named segment) is provided by firmware, in ACPI system, we evaluated it
+by method "_SEG". in IA64 with ACPI, PCI hostbridge driver retrieves the domain from ACPI,
+if it's absent, the default domain is zero. So I wonder why in DTS, if it's absent, we get
+a auto increment domain value.
 
-PING...
+PCI get domain by ACPI "_SEG" in IA64(drivers/acpi/pci_root.c)
+......
+	status = acpi_evaluate_integer(handle, METHOD_NAME__SEG, NULL,
+				       &segment);
+	if (ACPI_FAILURE(status) && status != AE_NOT_FOUND) {
+		dev_err(&device->dev,  "can't evaluate _SEG\n");
+		result = -ENODEV;
+		goto end;
+	}
+.......
 
+Thanks!
+Yijing.
+
+> 
+>> This function
+>> is just a weird mixture of data retrieval and allocation. I think you
+>> need to separate it into 2 functions.
+> 
+> It is meant to do allocation with the retrieval being a short-cut (or fine
+> control if you want).
+> 
+> I need to think a bit more for a better solution.
+> 
+> Best regards,
+> Liviu
+> 
 >>
->> >
->> >   http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg35430.html
->> >
->
-> - Kukjin
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>> Rob
+>>
+> 
+
+
+-- 
+Thanks!
+Yijing
