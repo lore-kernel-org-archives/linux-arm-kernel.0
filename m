@@ -1,76 +1,123 @@
-From: wangyijing@huawei.com (Yijing Wang)
-Date: Tue, 9 Sep 2014 13:54:21 +0800
-Subject: [PATCH v10 07/10] OF: Introduce helper function for getting PCI
- domain_nr
-In-Reply-To: <20140908155931.GP27864@e106497-lin.cambridge.arm.com>
-References: <1410184472-17630-1-git-send-email-Liviu.Dudau@arm.com>
- <1410184472-17630-8-git-send-email-Liviu.Dudau@arm.com>
- <CAL_JsqJi8k1Goc3UmXhuxf9v7=4gJrYG_Di7v574PxS8TsJaXw@mail.gmail.com>
- <20140908145459.GO27864@e106497-lin.cambridge.arm.com>
- <CAL_JsqJdGKDVwJOpPp19OkVPGzR7Zqv3nh+ONHHaYnPLYTYoYg@mail.gmail.com>
- <20140908155931.GP27864@e106497-lin.cambridge.arm.com>
-Message-ID: <540E960D.7080408@huawei.com>
+From: achandran@mvista.com (Arun Chandran)
+Date: Tue, 9 Sep 2014 11:31:49 +0530
+Subject: [PATCH V3] irqchip:gic: change access of gicc_ctrl register to
+ read modify write.
+In-Reply-To: <CAL85gmBRUuc3mtOGSkNuspEgkRQe42LV0e=fQfNmwcCicjT=vA@mail.gmail.com>
+References: <1393537013-6264-1-git-send-email-fkan@apm.com>
+ <CAFdej02vSm8TbUWGsMr936WN1GNmJ0SBuEKQkKyzKoEjtVmc+g@mail.gmail.com>
+ <CAL85gmBRUuc3mtOGSkNuspEgkRQe42LV0e=fQfNmwcCicjT=vA@mail.gmail.com>
+Message-ID: <CAFdej03AmUn92sSH=7Hfk0+yWEFWaywJt63DjeTc+nHSZeb61A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->>> on new requests. This function gets called quite a lot and I'm trying not to
->>> make it too heavy weight.
+On Mon, Sep 8, 2014 at 10:27 PM, Feng Kan <fkan@apm.com> wrote:
+> On Mon, Sep 8, 2014 at 1:52 AM, Arun Chandran <achandran@mvista.com> wrote:
+>> Hi Feng,
 >>
->> Generally, nothing should be accessing the same DT value frequently.
->> It should get cached somewhere.
+>> Is this patch still needed to fix perf calltrace?
+> Yes, if the someone decide to run the secure mode of the GIC, which is
+> what is present in
+> the kernel tree now.
+>
+>> http://lists.infradead.org/pipermail/linux-arm-kernel/2014-June/265814.html
 >>
-> 
-> The problem appears for DTs that don't have the pci-domain info. Then the cached
-> value is left at the default non-valid value and attempts to rescan the DT will
-> be made every time the function is called.
-> 
->> I don't really understand how domains are used so it's hard to provide
->> a recommendation here. Do domains even belong in the DT?
-> 
-> ACPI calls them segments and the way Bjorn explained it to me at some moment was
-> that it was an attempt to split up a bus in different groups (or alternatively,
-> merge a few busses together). To be honest I haven't seen systems where the domain
-> is anything other than zero, but JasonG (or maybe Benjamin) were floating an
-> idea of using the domain number to identify physical slots.
-
-PCI domain(or named segment) is provided by firmware, in ACPI system, we evaluated it
-by method "_SEG". in IA64 with ACPI, PCI hostbridge driver retrieves the domain from ACPI,
-if it's absent, the default domain is zero. So I wonder why in DTS, if it's absent, we get
-a auto increment domain value.
-
-PCI get domain by ACPI "_SEG" in IA64(drivers/acpi/pci_root.c)
-......
-	status = acpi_evaluate_integer(handle, METHOD_NAME__SEG, NULL,
-				       &segment);
-	if (ACPI_FAILURE(status) && status != AE_NOT_FOUND) {
-		dev_err(&device->dev,  "can't evaluate _SEG\n");
-		result = -ENODEV;
-		goto end;
-	}
-.......
-
-Thanks!
-Yijing.
-
-> 
->> This function
->> is just a weird mixture of data retrieval and allocation. I think you
->> need to separate it into 2 functions.
-> 
-> It is meant to do allocation with the retrieval being a short-cut (or fine
-> control if you want).
-> 
-> I need to think a bit more for a better solution.
-> 
-> Best regards,
-> Liviu
-> 
+>> On Fri, Feb 28, 2014 at 3:06 AM, Feng Kan <fkan@apm.com> wrote:
+>>> This change is made to preserve the GIC v2 releated bits in the
+>>> GIC_CPU_CTRL register (also known as the GICC_CTLR register in spec).
+>>> The original code only set the enable/disable group bit in this register.
+>>> This code will preserve the bypass bits configured by the bootload except
+>>> the enable/disable bit. The main reason for this change is to allow the
+>>> bypass bits specified in the v2 spec to remain untouched by the current
+>>> GIC code. In the X-Gene platform, the bypass functionality is not used
+>>> and bypass must be disabled at all time.
+>>>
+>>> Signed-off-by: Vinayak Kale <vkale@apm.com>
+>>> Acked-by: Anup Patel <apatel@apm.com>
+>>> Signed-off-by: Feng Kan <fkan@apm.com>
+>>> ---
+>>> V3 Changes:
+>>>         - Sorry, forgot to change the mask for cpu_init path
+>>>           assumed bootloader setup bits correctly.
+>>> V2 Changes:
+>>>         - only mask off v2 bypass bits
+>>>  drivers/irqchip/irq-gic.c |   32 +++++++++++++++++++++++++++++---
+>>>  1 files changed, 29 insertions(+), 3 deletions(-)
+>>>
+>>> diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
+>>> index 341c601..3ca7995 100644
+>>> --- a/drivers/irqchip/irq-gic.c
+>>> +++ b/drivers/irqchip/irq-gic.c
+>>> @@ -418,6 +418,7 @@ static void gic_cpu_init(struct gic_chip_data *gic)
+>>>         void __iomem *dist_base = gic_data_dist_base(gic);
+>>>         void __iomem *base = gic_data_cpu_base(gic);
+>>>         unsigned int cpu_mask, cpu = smp_processor_id();
+>>> +       unsigned int ctrl_mask;
+>>>         int i;
+>>>
+>>>         /*
+>>> @@ -449,13 +450,29 @@ static void gic_cpu_init(struct gic_chip_data *gic)
+>>>                 writel_relaxed(0xa0a0a0a0, dist_base + GIC_DIST_PRI + i * 4 / 4);
+>>>
+>>>         writel_relaxed(0xf0, base + GIC_CPU_PRIMASK);
+>>> -       writel_relaxed(1, base + GIC_CPU_CTRL);
+>>> +
+>>> +       ctrl_mask = readl(base + GIC_CPU_CTRL);
 >>
->> Rob
+>> readl_relaxed() here?
 >>
-> 
+>>> +
+>>> +       /* Mask out the gic v2 bypass bits */
+>>> +       ctrl_mask &= 0x1e0;
+>>> +
+>>> +       /* Enable group 0 */
+>>> +       ctrl_mask |= 0x1;
+>>> +       writel_relaxed(ctrl_mask, base + GIC_CPU_CTRL);
+>>>  }
+>>>
+>>>  void gic_cpu_if_down(void)
+>>>  {
+>>> +       unsigned int ctrl_mask;
+>>>         void __iomem *cpu_base = gic_data_cpu_base(&gic_data[0]);
+>>> -       writel_relaxed(0, cpu_base + GIC_CPU_CTRL);
+>>> +
+>>> +       ctrl_mask = readl(cpu_base + GIC_CPU_CTRL);
+>> readl_relaxed() here?
+>>
+>>> +       /*
+>>> +        * Disable grp enable bit, leave the bypass bits alone as changing
+>>> +        * them could leave the system unstable
+>>> +        */
+>>> +       ctrl_mask &= 0x1e0;
+>>> +       writel_relaxed(ctrl_mask, cpu_base + GIC_CPU_CTRL);
+>>>  }
+>>>
+>>>  #ifdef CONFIG_CPU_PM
+>>> @@ -566,6 +583,7 @@ static void gic_cpu_restore(unsigned int gic_nr)
+>>>  {
+>>>         int i;
+>>>         u32 *ptr;
+>>> +       unsigned int ctrl_mask;
+>>>         void __iomem *dist_base;
+>>>         void __iomem *cpu_base;
+>>>
+>>> @@ -590,7 +608,15 @@ static void gic_cpu_restore(unsigned int gic_nr)
+>>>                 writel_relaxed(0xa0a0a0a0, dist_base + GIC_DIST_PRI + i * 4);
+>>>
+>>>         writel_relaxed(0xf0, cpu_base + GIC_CPU_PRIMASK);
+>>> -       writel_relaxed(1, cpu_base + GIC_CPU_CTRL);
+>>> +
+>>> +       ctrl_mask = readl(cpu_base + GIC_CPU_CTRL);
+>>
+>> readl_relaxed() here?
+> Trying to make sure read is completed before write back out to gic.
+>>
 
+Will the cpu reorder  readl_relaxed() and a writel_relaxed() calls?
 
--- 
-Thanks!
-Yijing
+val = readl_relaxed(reg1);
+val += 1;
+wrietl_relaxed(val, reg1);
+
+In the above code reg1 getting 'val+1' is not guaranteed?
+
+--Arun
