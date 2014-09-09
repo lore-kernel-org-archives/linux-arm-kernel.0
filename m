@@ -1,125 +1,39 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 9 Sep 2014 11:27:55 +0200
-Subject: [PATCH v2] ARM: l2c: parse cache properties from ePAPR definitions
-In-Reply-To: <3750746.eYplbZAGky@wuerfel>
-References: <1410246633-23407-1-git-send-email-linus.walleij@linaro.org>
- <3750746.eYplbZAGky@wuerfel>
-Message-ID: <CACRpkdY8314pTi2nw9gXmFJvmr6sdsyi+1iSUFrs2eVVEZ=3RA@mail.gmail.com>
+From: pebolle@tiscali.nl (Paul Bolle)
+Date: Tue, 09 Sep 2014 11:28:07 +0200
+Subject: [PATCH] arm64, defconfig: Increase NR_CPUS default to 64
+In-Reply-To: <20140909080740.GP23009@pengutronix.de>
+References: <1410176689-20020-1-git-send-email-rric@kernel.org>
+ <20140909080740.GP23009@pengutronix.de>
+Message-ID: <1410254887.22255.14.camel@x220>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 9, 2014 at 9:42 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Tuesday 09 September 2014 09:10:33 Linus Walleij wrote:
+On Tue, 2014-09-09 at 10:07 +0200, Uwe Kleine-K?nig wrote:
+> On Mon, Sep 08, 2014 at 01:44:48PM +0200, Robert Richter wrote:
+> > @@ -252,11 +252,11 @@ config SCHED_SMT
+> >  	  places. If unsure say N here.
+> >  
+> >  config NR_CPUS
+> > -	int "Maximum number of CPUs (2-32)"
+> > -	range 2 32
+> > +	int "Maximum number of CPUs (2-64)"
+> > +	range 2 64
+> >  	depends on SMP
+> >  	# These have to remain sorted largest to smallest
+> Unrelated to the patch: What does this comment mean? There is only one
+> line following, so it's sorted implicitly.
 
-> I wonder if we should add another property here that tells
-> the OS to override the aux register setting for way-size
-> and associativity. In theory the properties above are meant
-> to be there for any cache, but I don't think we want to actually
-> re-compute the auxctrl register values based on this all the
-> time.
+This comment doesn't mean much, anymore.
 
-OK added that.
+It was added in commit 159428538323 ("arm64: Add Kconfig option for APM
+X-Gene SOC family"). Why someone cared so much about the sorting of the
+two defaults is unclear to me. Maybe only to make sure future commits
+wouldn't mess up the sorting order. Anyhow, it seems it was just
+forgotten to remove that line in commit 62aceb8ff4b3 ("arm64: make
+default NR_CPUS 8") which again made it a single item list.
 
->> +     /* All these l2 caches have the same line = block size actually */
->> +     if (!linesize) {
->> +             if (blocksize) {
->> +                     /* If linesize if not given, it is equal to blocksize */
->> +                     linesize = blocksize;
->> +             } else {
->> +                     /* Fall back to known size */
->> +                     linesize = CACHE_LINE_SIZE;
->> +             }
->> +     }
->
-> Maybe add a warning for the last fallback?
+> > -	default "8"
+> > +	default "64"
 
-OK.
 
->> +     /* This is the PL3x0 case */
->> +     if (max_associativity == 16 && (assoc != 8 && assoc != 16)) {
->> +             pr_err("L2C OF: cache setting yield illegal associativity\n");
->> +             pr_err("L2C OF: %d calculated, only 8 and 16 legal\n", assoc);
->> +             return;
->> +     }
->
-> I'd rather see another function argument for the minimum associativity
-> here. We have a few other cache controllers that are partially compatible
-> with l2x0 (tauros3, aurora, bcm11351) and one of these or one we might
-> add in the future could support a maximum of 16 but also some other sizes
-> below 8.
-
-Well it's more like a list in that case. PL310 supports 8 or 16 way
-associativity, not 7, 9, 10...
-
->> +     /*
->> +      * Special checks for the PL310 that only has two settings and
->> +      * cannot be set to fully associative.
->> +      */
->> +     if (max_associativity == 16) {
->> +             if (assoc == 16)
->> +                     val |= L310_AUX_CTRL_ASSOCIATIVITY_16;
->> +             /* Else bit is left zero == 8 way associativity */
->> +     } else {
->> +             val |= (assoc << L2X0_AUX_CTRL_ASSOC_SHIFT);
->> +     }
->
-> What happens if we set the bit for assoc=8 on pl310? Is that
-> defined to be ignored or does it have to be zero?
-
-Only one single bit selects associativity on PL310.
-
-Bit 16 = 0 -> 8-way associativity
-Bit 16 = 1 -> 16-way associativity
-
-On L220 there are 1,2,3,4,5,6,7,8 ways of associativity.
-
->> +     /*
->> +      * The l2x0 TRMs call this size "way size" but that is incorrect:
->> +      * the thing being configured in these register bits is actually
->> +      * the cache set size, so the variable here has the right name
->> +      * but the register bit definitions following the TRM are not
->> +      * in archaic naming.
->> +      */
->
-> No, I think actually the comment and the variable name are wrong here,
-> and the TRM is right. I'm surprised you get the right results out of
-> this. The set_size should be a relatively small number, e.g. 256 bytes
-> in case of an 8-way associative cache with 32 byte lines. What is the
-> pr_debug output and the properties you pass in for your example system?
-
-It looks like that:
-
-L2C OF: override cache size: 131072 bytes (128KB)
-L2C OF: override set size: 16384 bytes (16 KB)
-L2C OF: override line size: 32 bytes
-L2C OF: override ways: 512 ways
-L2C OF: override way size: 256 bytes
-L2C OF: override associativity: 8
-L2C: DT/platform modifies aux control register: 0x02020fff -> 0x02030fff
-L2C-220 cache controller enabled, 8 ways, 128 kB
-L2C-220: CACHE_ID 0x41000486, AUX_CTRL 0x06030fff
-
-Based on that device tree:
-
-        L2: l2-cache {
-            compatible = "arm,l220-cache";
-            reg = <0x10110000 0x1000>;
-            interrupt-parent = <&intc_dc1176>;
-            interrupts = <0 13 IRQ_TYPE_LEVEL_HIGH>;
-            cache-unified;
-            cache-level = <2>;
-            /*
-             * Override default cache size, sets and
-             * associativity as these may be erroneously set
-             * up by boot loader(s).
-             */
-            arm,override-auxreg;
-            cache-size = <131072>; // 128kB
-            cache-sets = <8>;
-            cache-line-size = <32>;
-        };
-
-But I'll take a closer look to make sure we get this right.
-
-Yours,
-Linus Walleij
+Paul Bolle
