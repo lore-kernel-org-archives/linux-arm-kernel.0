@@ -1,39 +1,77 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Tue, 9 Sep 2014 11:14:27 +0900
-Subject: [GIT PULL] Renesas ARM Based SoC Cleanup Updates for v3.18
-In-Reply-To: <201409051820.45791.arnd@arndb.de>
-References: <cover.1408670789.git.horms+renesas@verge.net.au>
- <201409051820.45791.arnd@arndb.de>
-Message-ID: <20140909021427.GB23233@verge.net.au>
+Date: Tue, 9 Sep 2014 11:26:50 +0900
+Subject: [PATCH 00/11] ARM: shmobile: r8a7740/armadillo legacy prototype
+ pm domain support
+In-Reply-To: <1409320217-13278-1-git-send-email-geert+renesas@glider.be>
+References: <1409320217-13278-1-git-send-email-geert+renesas@glider.be>
+Message-ID: <20140909022649.GC31320@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 05, 2014 at 06:20:45PM +0200, Arnd Bergmann wrote:
-> On Saturday 23 August 2014, Simon Horman wrote:
-> > Please consider these Renesas ARM based SoC cleanup updates for v3.18.
-> > 
-> > This pull request is based on
-> > "Renesas ARM Based SoC DT Timers Updates for v3.18",
-> > tagged as dt-timers-for-v3.18,
-> > which I have already sent a pull-request for.
-> > 
-> > This is a rebase of changes that didn't quite make it into v3.17.
-> > These cleanups depend on changes in dt-timers-for-v3.18 and rebasing
-> > to remove that dependency is not entirely trivial.
-> > 
-> 
-> 
-> I hesitated a bit for this one and the dt-timers-for-v3.18 branch, as they
-> don't really fit into our scheme, and I'd much prefer having the cleanups
-> done first, while everything else isn't that important.
+Hi Geert,
 
-Thanks, we are working on improving our processes to try to
-get more cleanups in earlier in the release cycle.
+I would like Magnus's opinion but mine is that the non-WIP patches
+could be queued up. At least patch 1 and 2. Possibly others if
+they don't depend (other than diff noise) on WIP patches.
 
-> In the end, I stuck it all into next/soc.
+With the WIP patches, I am not entirely opposed to merging them
+too, so long as they move things in a good direction. And in particular
+don't break anything.
+
+On Fri, Aug 29, 2014 at 03:50:06PM +0200, Geert Uytterhoeven wrote:
+> 	Hi Simon, Magnus,
 > 
-> That's the last one of the outstanding shmobile pull requests that I'm
-> aware of. Again, sorry for taking my time with them. Please check that
-> I didn't miss anything you wanted me to pull.
-
-Thanks, I have checked and I don't see anything missing.
+> This series contains prototype patches to improve pm domain support for
+> r8a7740/armadillo800eva, mimicking (parts of) the existing pm domain support
+> for sh7372/mackerel.
+> 
+> More specifically, they
+>   - Add missing devices to existing pm domains,
+>   - Add missing pm domains, hooking up devices and subdomains,
+> 
+> There are a few things commented out, and a few rough edges or missing things
+> (cfr. the patches marked with "[WIP]", and the "FIXME" sections therein),
+> but the result does boot, and s2ram works.
+> 
+> Please note that DT/multi-platform support will be added later.
+> 
+> This series depends on my series "[PATCH 0/5] ARM: shmobile: pm domain
+> improvements and cleanups".
+> 
+> Thanks for your comments and suggestions!
+> 
+> Geert Uytterhoeven (11):
+>   ARM: shmobile: r8a7740: Add missing A3SP pm domain devices
+>   ARM: shmobile: r8a7740: Add missing A4S pm domain devices
+>   [WIP] ARM: shmobile: armadillo800eva legacy: Add missing A3SP pm
+>     domain devices
+>   ARM: shmobile: armadillo800eva legacy: Add missing A4S pm domain
+>     devices
+>   ARM: shmobile: r8a7740: Add A3RV pm domain support
+>   ARM: shmobile: r8a7740: Add A3SG pm domain support
+>   [WIP] ARM: shmobile: r8a7740/armadillo legacy: Add A4MP pm domain
+>     support
+>   [WIP] ARM: shmobile: r8a7740: Add D4 pm domain support
+>   ARM: shmobile: r8a7740/armadillo legacy: Add A4R pm domain support
+>   [WIP] ARM: shmobile: r8a7740: Add A4SU pm domain support
+>   [WIP] ARM: shmobile: r8a7740: Add A3SM pm domain support
+> 
+>  arch/arm/mach-shmobile/board-armadillo800eva.c |   11 ++++++++++-
+>  arch/arm/mach-shmobile/pm-r8a7740.c            |   25 ++++++++++++++++++++++++
+>  arch/arm/mach-shmobile/setup-r8a7740.c         |   11 +++++++++++
+>  3 files changed, 46 insertions(+), 1 deletion(-)
+> 
+> -- 
+> 1.7.9.5
+> 
+> Gr{oetje,eeting}s,
+> 
+> 						Geert
+> 
+> --
+> Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+> 
+> In personal conversations with technical people, I call myself a hacker. But
+> when I'm talking to journalists I just say "programmer" or something like that.
+> 							    -- Linus Torvalds
+> 
