@@ -1,104 +1,94 @@
-From: wangyijing@huawei.com (Yijing Wang)
-Date: Tue, 9 Sep 2014 17:30:51 +0800
-Subject: [PATCH v10 07/10] OF: Introduce helper function for getting PCI
- domain_nr
-In-Reply-To: <20140909084621.GS27864@e106497-lin.cambridge.arm.com>
-References: <1410184472-17630-1-git-send-email-Liviu.Dudau@arm.com>
- <1410184472-17630-8-git-send-email-Liviu.Dudau@arm.com>
- <CAL_JsqJi8k1Goc3UmXhuxf9v7=4gJrYG_Di7v574PxS8TsJaXw@mail.gmail.com>
- <20140908145459.GO27864@e106497-lin.cambridge.arm.com>
- <CAL_JsqJdGKDVwJOpPp19OkVPGzR7Zqv3nh+ONHHaYnPLYTYoYg@mail.gmail.com>
- <20140908155931.GP27864@e106497-lin.cambridge.arm.com>
- <540E960D.7080408@huawei.com>
- <20140909084621.GS27864@e106497-lin.cambridge.arm.com>
-Message-ID: <540EC8CB.7010106@huawei.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 09 Sep 2014 10:35:45 +0100
+Subject: [PATCH] ARM/arm64: KVM: fix use of WnR bit in
+ =?UTF-8?Q?kvm=5Fis=5Fwrite=5Ffault=28=29?=
+In-Reply-To: <1410208167-32532-1-git-send-email-ard.biesheuvel@linaro.org>
+References: <1410208167-32532-1-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <ed95e7484d2ade8345683a29670a9c5d@www.loen.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2014/9/9 16:46, Liviu Dudau wrote:
-> On Tue, Sep 09, 2014 at 06:54:21AM +0100, Yijing Wang wrote:
->>>>> on new requests. This function gets called quite a lot and I'm trying not to
->>>>> make it too heavy weight.
->>>>
->>>> Generally, nothing should be accessing the same DT value frequently.
->>>> It should get cached somewhere.
->>>>
->>>
->>> The problem appears for DTs that don't have the pci-domain info. Then the cached
->>> value is left at the default non-valid value and attempts to rescan the DT will
->>> be made every time the function is called.
->>>
->>>> I don't really understand how domains are used so it's hard to provide
->>>> a recommendation here. Do domains even belong in the DT?
->>>
->>> ACPI calls them segments and the way Bjorn explained it to me at some moment was
->>> that it was an attempt to split up a bus in different groups (or alternatively,
->>> merge a few busses together). To be honest I haven't seen systems where the domain
->>> is anything other than zero, but JasonG (or maybe Benjamin) were floating an
->>> idea of using the domain number to identify physical slots.
->>
->> PCI domain(or named segment) is provided by firmware, in ACPI system, we evaluated it
->> by method "_SEG". in IA64 with ACPI, PCI hostbridge driver retrieves the domain from ACPI,
->> if it's absent, the default domain is zero. So I wonder why in DTS, if it's absent, we get
->> a auto increment domain value.
-> 
-> Because you can have more than one hostbridge (rare, but not impossible) and unless you
-> want to join the two segments, you might want to give it a different domain.
+Hi Ard,
 
-OK. Sorry, I have one last question, because domain will be used to calculate the address used to
-access PCI hardware config registers. So if DTS file doesn't report the domain, how do we know
-we would access the right registers when we use the auto increment domain vaule ?
-Has there a mechanism to make sure system can access the correct registers by the domain ?
+On 2014-09-08 21:29, Ard Biesheuvel wrote:
+> The ISS encoding for an exception from a Data Abort has a WnR
+> bit[6] that indicates whether the Data Abort was caused by a
+> read or a write instruction. While there are several fields
+> in the encoding that are only valid if the ISV bit[24] is set,
+> WnR is not one of them, so we can read it unconditionally.
+>
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> ---
+>
+> This fixes an issue I observed with UEFI running under QEMU/KVM using
+> NOR flash emulation and the upcoming KVM_CAP_READONLY_MEM support, 
+> where
+> NOR flash reads were mistaken for NOR flash writes, resulting in all 
+> read
+> accesses to go through the MMIO emulation layer.
+>
+>  arch/arm/include/asm/kvm_mmu.h   | 5 +----
+>  arch/arm64/include/asm/kvm_mmu.h | 5 +----
+>  2 files changed, 2 insertions(+), 8 deletions(-)
+>
+> diff --git a/arch/arm/include/asm/kvm_mmu.h 
+> b/arch/arm/include/asm/kvm_mmu.h
+> index 5cc0b0f5f72f..fad5648980ad 100644
+> --- a/arch/arm/include/asm/kvm_mmu.h
+> +++ b/arch/arm/include/asm/kvm_mmu.h
+> @@ -83,10 +83,7 @@ static inline bool kvm_is_write_fault(unsigned 
+> long hsr)
+>  	unsigned long hsr_ec = hsr >> HSR_EC_SHIFT;
+>  	if (hsr_ec == HSR_EC_IABT)
+>  		return false;
+> -	else if ((hsr & HSR_ISV) && !(hsr & HSR_WNR))
+> -		return false;
+> -	else
+> -		return true;
+> +	return hsr & HSR_WNR;
+>  }
+>
+>  static inline void kvm_clean_pgd(pgd_t *pgd)
+> diff --git a/arch/arm64/include/asm/kvm_mmu.h
+> b/arch/arm64/include/asm/kvm_mmu.h
+> index 8e138c7c53ac..09fd9e4c13d8 100644
+> --- a/arch/arm64/include/asm/kvm_mmu.h
+> +++ b/arch/arm64/include/asm/kvm_mmu.h
+> @@ -100,10 +100,7 @@ static inline bool kvm_is_write_fault(unsigned 
+> long esr)
+>  	if (esr_ec == ESR_EL2_EC_IABT)
+>  		return false;
+>
+> -	if ((esr & ESR_EL2_ISV) && !(esr & ESR_EL2_WNR))
+> -		return false;
+> -
+> -	return true;
+> +	return esr & ESR_EL2_WNR;
+>  }
+>
+>  static inline void kvm_clean_pgd(pgd_t *pgd) {}
 
-Thanks!
-Yijing.
+Nice catch. One thing though.
 
-> 
-> Best regards,
-> Liviu
-> 
->>
->> PCI get domain by ACPI "_SEG" in IA64(drivers/acpi/pci_root.c)
->> ......
->> 	status = acpi_evaluate_integer(handle, METHOD_NAME__SEG, NULL,
->> 				       &segment);
->> 	if (ACPI_FAILURE(status) && status != AE_NOT_FOUND) {
->> 		dev_err(&device->dev,  "can't evaluate _SEG\n");
->> 		result = -ENODEV;
->> 		goto end;
->> 	}
->> .......
->>
->> Thanks!
->> Yijing.
->>
->>>
->>>> This function
->>>> is just a weird mixture of data retrieval and allocation. I think you
->>>> need to separate it into 2 functions.
->>>
->>> It is meant to do allocation with the retrieval being a short-cut (or fine
->>> control if you want).
->>>
->>> I need to think a bit more for a better solution.
->>>
->>> Best regards,
->>> Liviu
->>>
->>>>
->>>> Rob
->>>>
->>>
->>
->>
->> -- 
->> Thanks!
->> Yijing
->>
->>
-> 
+This is a case where code duplication has led to this glaring bug:
+On both arm and arm64, kvm_emulate.h has code that implements this 
+correctly, just that we failed to use it. Blame me.
 
+I think this should be rewritten entierely in mmu.c, with something 
+like this (fully untested, of course):
 
+static bool kvm_is_write_fault(struct kvm_vcpu *vcpu)
+{
+         if (kvm_vcpu_trap_is_iabt(vcpu))
+                 return false;
+
+         return kvm_vcpu_dabt_iswrite(vcpu);
+}
+
+Care to respin it?
+
+Thanks,
+
+         M.
 -- 
-Thanks!
-Yijing
+Fast, cheap, reliable. Pick two.
