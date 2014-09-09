@@ -1,53 +1,144 @@
-From: peter.griffin@linaro.org (Peter Griffin)
-Date: Tue, 9 Sep 2014 08:34:46 +0100
-Subject: [PATCH 2/3] phy: phy-stih407-usb: Add dt documentation for USB
- picophy found on stih407 SoC family
-In-Reply-To: <540DCB91.7060702@ti.com>
-References: <1409740079-16554-1-git-send-email-peter.griffin@linaro.org>
- <1409740079-16554-3-git-send-email-peter.griffin@linaro.org>
- <540DCB91.7060702@ti.com>
-Message-ID: <20140909073446.GB7620@griffinp-ThinkPad-X1-Carbon-2nd>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 09 Sep 2014 09:42:18 +0200
+Subject: [PATCH v2] ARM: l2c: parse cache properties from ePAPR definitions
+In-Reply-To: <1410246633-23407-1-git-send-email-linus.walleij@linaro.org>
+References: <1410246633-23407-1-git-send-email-linus.walleij@linaro.org>
+Message-ID: <3750746.eYplbZAGky@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kishon,
-
-Thanks for reviewing :-)
-
-> > +On STiH410, we have to use the DWC3 port#2 with a picoPHY to manage USB2
-> > +devices. The USB2 Controller will use the ports #0 and #1.
-> > +
-> > +This is to document the DT parameters to be passed from the blob in that case.
-> > +
-> > +Required properties:
-> > +- compatible		: should be "st,stih407-usb2-phy"
+On Tuesday 09 September 2014 09:10:33 Linus Walleij wrote:
+> When both 'cache-size' and 'cache-sets' are specified for a L2 cache
+> controller node, parse those properties and set up the
+> set size based on which type of L2 cache controller we are using.
 > 
-> If STiH410 also uses the same driver then you should add a new compatibility
-> value for it.
-
-I will remove the reference to stih410 in V2, as currently it is not supported
-upstream, and I'm not sure what ST's plans are regarding upstreaming it. If/
-when it is upstreamed, we can add this and a compabible property back in.
-
-<snip>
-> > +
-> > +usb2_picophy0: usbpicophy at 0 {
-> usbpicophy at f8 since you have a reg property ;-)
-
-will fix in V2
-
+> Update the L2 cache controller Device Tree binding with the optional
+> 'cache-size', 'cache-sets', 'cache-block-size' and 'cache-line-size'
+> properties. These come from the ePAPR specification.
 > 
-> > +	compatible	= "st,stih407-usb2-phy";
-> > +	reg		= <0xf8 0x04>,	/* syscfg 5062 */
-> > +			  <0xf4 0x04>;	/* syscfg 5061 */
-> > +	reg-names	= "param",
-> > +			  "ctrl";
-> > +			  #phy-cells = <0>;
+> Using the cache size, number of sets and cache line size we can
+> calculate desired associativity of the L2 cache. This is done
+> by the calculation:
 > 
-> alignment seems to have gone wrong here.
+>     set size = cache size / sets
+>     ways = set size / line size
+>     way size = cache size / ways
+>     associativity = way size / line size
+> 
+> This patch is an extended version based on the initial patch
+> by Florian Fainelli.
+> 
+> Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 
-Will fix in v2
+Looks much better!
 
-regards,
+> +static void __init l2x0_cache_size_of_parse(const struct device_node *np,
+> +					    u32 *aux_val, u32 *aux_mask,
+> +					    u32 max_set_size,
+> +					    u32 max_associativity)
+> +{
+> +	u32 mask = 0, val = 0;
+> +	u32 cache_size = 0, sets = 0;
+> +	u32 set_size = 0, set_size_bits = 1;
+> +	u32 ways = 0, way_size = 0;
+> +	u32 blocksize = 0;
+> +	u32 linesize = 0;
+> +	u32 assoc = 0;
+> +
+> +	of_property_read_u32(np, "cache-size", &cache_size);
+> +	of_property_read_u32(np, "cache-sets", &sets);
+> +	of_property_read_u32(np, "cache-block-size", &blocksize);
+> +	of_property_read_u32(np, "cache-line-size", &linesize);
+> +
+> +	if (!cache_size || !sets)
+> +		return;
 
-Peter.
+I wonder if we should add another property here that tells
+the OS to override the aux register setting for way-size
+and associativity. In theory the properties above are meant
+to be there for any cache, but I don't think we want to actually
+re-compute the auxctrl register values based on this all the
+time.
+
+> +	/* All these l2 caches have the same line = block size actually */
+> +	if (!linesize) {
+> +		if (blocksize) {
+> +			/* If linesize if not given, it is equal to blocksize */
+> +			linesize = blocksize;
+> +		} else {
+> +			/* Fall back to known size */
+> +			linesize = CACHE_LINE_SIZE;
+> +		}
+> +	}
+
+Maybe add a warning for the last fallback?
+
+> +	/* This is the PL3x0 case */
+> +	if (max_associativity == 16 && (assoc != 8 && assoc != 16)) {
+> +		pr_err("L2C OF: cache setting yield illegal associativity\n");
+> +		pr_err("L2C OF: %d calculated, only 8 and 16 legal\n", assoc);
+> +		return;
+> +	}
+
+I'd rather see another function argument for the minimum associativity
+here. We have a few other cache controllers that are partially compatible
+with l2x0 (tauros3, aurora, bcm11351) and one of these or one we might
+add in the future could support a maximum of 16 but also some other sizes
+below 8.
+
+> +	/*
+> +	 * Special checks for the PL310 that only has two settings and
+> +	 * cannot be set to fully associative.
+> +	 */
+> +	if (max_associativity == 16) {
+> +		if (assoc == 16)
+> +			val |= L310_AUX_CTRL_ASSOCIATIVITY_16;
+> +		/* Else bit is left zero == 8 way associativity */
+> +	} else {
+> +		val |= (assoc << L2X0_AUX_CTRL_ASSOC_SHIFT);
+> +	}
+
+What happens if we set the bit for assoc=8 on pl310? Is that
+defined to be ignored or does it have to be zero?
+
+> +	switch (set_size >> 10) {
+> +	case 512:
+> +		set_size_bits = 6;
+> +		break;
+> +	case 256:
+> +		set_size_bits = 5;
+> +		break;
+> +	case 128:
+> +		set_size_bits = 4;
+> +		break;
+> +	case 64:
+> +		set_size_bits = 3;
+> +		break;
+> +	case 32:
+> +		set_size_bits = 2;
+> +		break;
+> +	case 16:
+> +		set_size_bits = 1;
+> +		break;
+> +	default:
+> +		pr_err("L2C OF: cache way size: %d KB is not mapped\n",
+> +		       way_size);
+> +		break;
+> +	}
+> +
+> +	/*
+> +	 * The l2x0 TRMs call this size "way size" but that is incorrect:
+> +	 * the thing being configured in these register bits is actually
+> +	 * the cache set size, so the variable here has the right name
+> +	 * but the register bit definitions following the TRM are not
+> +	 * in archaic naming.
+> +	 */
+
+No, I think actually the comment and the variable name are wrong here,
+and the TRM is right. I'm surprised you get the right results out of
+this. The set_size should be a relatively small number, e.g. 256 bytes
+in case of an 8-way associative cache with 32 byte lines. What is the
+pr_debug output and the properties you pass in for your example system?
+
+	Arnd
