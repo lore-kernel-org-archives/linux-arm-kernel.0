@@ -1,74 +1,151 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Tue, 09 Sep 2014 15:46:28 +0200
-Subject: [PATCH v4 4/9] drivercore / platform: Convert to
- dev_pm_domain_attach|detach()
-In-Reply-To: <1410262570-22785-5-git-send-email-ulf.hansson@linaro.org>
-References: <1409838756-31963-1-git-send-email-ulf.hansson@linaro.org>
- <1410262570-22785-1-git-send-email-ulf.hansson@linaro.org>
- <1410262570-22785-5-git-send-email-ulf.hansson@linaro.org>
-Message-ID: <1504653.iqBBHr8Hq7@vostro.rjw.lan>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Tue, 9 Sep 2014 14:35:46 +0100
+Subject: [PATCH v10 08/10] OF: PCI: Add support for parsing PCI host
+ bridge resources from DT
+In-Reply-To: <1410184472-17630-9-git-send-email-Liviu.Dudau@arm.com>
+References: <1410184472-17630-1-git-send-email-Liviu.Dudau@arm.com>
+ <1410184472-17630-9-git-send-email-Liviu.Dudau@arm.com>
+Message-ID: <20140909133546.GB2636@e102568-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, September 09, 2014 01:36:05 PM Ulf Hansson wrote:
-> Previously only the ACPI PM domain was supported by the platform bus.
+On Mon, Sep 08, 2014 at 02:54:30PM +0100, Liviu Dudau wrote:
+> Provide a function to parse the PCI DT ranges that can be used to
+> create a pci_host_bridge structure together with its associated
+> bus.
 > 
-> Let's convert to the common attach/detach functions for PM domains,
-> which currently means we are extending the support to include the
-> generic PM domain as well.
-> 
-> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
-> Tested-by: Philipp Zabel <p.zabel@pengutronix.de>
-> Reviewed-by: Kevin Hilman <khilman@linaro.org>
-
-Greg, any objections here?
-
+> Cc: Bjorn Helgaas <bhelgaas@google.com>
+> Cc: Arnd Bergmann <arnd@arndb.de>
+> Cc: Grant Likely <grant.likely@linaro.org>
+> Cc: Rob Herring <robh+dt@kernel.org>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
 > ---
->  drivers/base/platform.c | 15 ++++++++-------
->  1 file changed, 8 insertions(+), 7 deletions(-)
+>  drivers/of/of_pci.c    | 102 +++++++++++++++++++++++++++++++++++++++++++++++++
+>  include/linux/of_pci.h |  11 ++++++
+>  2 files changed, 113 insertions(+)
 > 
-> diff --git a/drivers/base/platform.c b/drivers/base/platform.c
-> index ab4f4ce..904be3d 100644
-> --- a/drivers/base/platform.c
-> +++ b/drivers/base/platform.c
-> @@ -506,11 +506,12 @@ static int platform_drv_probe(struct device *_dev)
->  	if (ret < 0)
->  		return ret;
+> diff --git a/drivers/of/of_pci.c b/drivers/of/of_pci.c
+> index a107edb..36701da 100644
+> --- a/drivers/of/of_pci.c
+> +++ b/drivers/of/of_pci.c
+> @@ -1,7 +1,9 @@
+>  #include <linux/kernel.h>
+>  #include <linux/export.h>
+>  #include <linux/of.h>
+> +#include <linux/of_address.h>
+>  #include <linux/of_pci.h>
+> +#include <linux/slab.h>
 >  
-> -	acpi_dev_pm_attach(_dev, true);
-> -
-> -	ret = drv->probe(dev);
-> -	if (ret)
-> -		acpi_dev_pm_detach(_dev, true);
-> +	ret = dev_pm_domain_attach(_dev, true);
-> +	if (ret != -EPROBE_DEFER) {
-> +		ret = drv->probe(dev);
-> +		if (ret)
-> +			dev_pm_domain_detach(_dev, true);
-> +	}
->  
->  	if (drv->prevent_deferred_probe && ret == -EPROBE_DEFER) {
->  		dev_warn(_dev, "probe deferral not supported\n");
-> @@ -532,7 +533,7 @@ static int platform_drv_remove(struct device *_dev)
->  	int ret;
->  
->  	ret = drv->remove(dev);
-> -	acpi_dev_pm_detach(_dev, true);
-> +	dev_pm_domain_detach(_dev, true);
->  
->  	return ret;
+>  static inline int __of_pci_pci_compare(struct device_node *node,
+>  				       unsigned int data)
+> @@ -123,6 +125,106 @@ int of_pci_get_domain_nr(struct device_node *node, bool allocate_if_missing)
 >  }
-> @@ -543,7 +544,7 @@ static void platform_drv_shutdown(struct device *_dev)
->  	struct platform_device *dev = to_platform_device(_dev);
+>  EXPORT_SYMBOL_GPL(of_pci_get_domain_nr);
 >  
->  	drv->shutdown(dev);
-> -	acpi_dev_pm_detach(_dev, true);
-> +	dev_pm_domain_detach(_dev, true);
->  }
->  
->  /**
-> 
+> +/**
+> + * of_pci_get_host_bridge_resources - Parse PCI host bridge resources from DT
+> + * @dev: device node of the host bridge having the range property
+> + * @busno: bus number associated with the bridge root bus
+> + * @bus_max: maximum number of busses for this bridge
+> + * @resources: list where the range of resources will be added after DT parsing
+> + * @io_base: pointer to a variable that will contain on return the physical
+> + * address for the start of the I/O range.
+> + *
+> + * It is the callers job to free the @resources list.
+> + *
+> + * This function will parse the "ranges" property of a PCI host bridge device
+> + * node and setup the resource mapping based on its content. It is expected
+> + * that the property conforms with the Power ePAPR document.
 
--- 
-I speak only for myself.
-Rafael J. Wysocki, Intel Open Source Technology Center.
+You should also define what it returns and when.
+
+> + *
+> + */
+> +int of_pci_get_host_bridge_resources(struct device_node *dev,
+> +			unsigned char busno, unsigned char bus_max,
+> +			struct list_head *resources, resource_size_t *io_base)
+> +{
+> +	struct resource *res;
+> +	struct resource *bus_range;
+> +	struct of_pci_range range;
+> +	struct of_pci_range_parser parser;
+> +	char range_type[4];
+> +	int err;
+> +
+> +	bus_range = kzalloc(sizeof(*bus_range), GFP_KERNEL);
+> +	if (!bus_range)
+> +		return -ENOMEM;
+> +
+> +	pr_info("PCI host bridge %s ranges:\n", dev->full_name);
+> +
+> +	err = of_pci_parse_bus_range(dev, bus_range);
+> +	if (err) {
+> +		bus_range->start = busno;
+> +		bus_range->end = bus_max;
+> +		bus_range->flags = IORESOURCE_BUS;
+> +		pr_info("  No bus range found for %s, using %pR\n",
+> +			dev->full_name, &bus_range);
+> +	} else {
+> +		if (bus_range->end > bus_range->start + bus_max)
+> +			bus_range->end = bus_range->start + bus_max;
+> +	}
+> +	pci_add_resource(resources, bus_range);
+
+This means that eg in the PCI generic host controller I cannot "filter"
+the bus resource, unless I remove it, "filter" it, and add it again.
+
+I certainly can't filter a resource that has been already added without
+removing it first.
+
+Thoughts ?
+
+> +
+> +	/* Check for ranges property */
+> +	err = of_pci_range_parser_init(&parser, dev);
+> +	if (err)
+> +		goto parse_failed;
+> +
+> +	pr_debug("Parsing ranges property...\n");
+> +	for_each_of_pci_range(&parser, &range) {
+> +		/* Read next ranges element */
+> +		if ((range.flags & IORESOURCE_TYPE_BITS) == IORESOURCE_IO)
+> +			snprintf(range_type, 4, " IO");
+> +		else if ((range.flags & IORESOURCE_TYPE_BITS) == IORESOURCE_MEM)
+> +			snprintf(range_type, 4, "MEM");
+> +		else
+> +			snprintf(range_type, 4, "err");
+> +		pr_info("  %s %#010llx..%#010llx -> %#010llx\n", range_type,
+> +			range.cpu_addr, range.cpu_addr + range.size - 1,
+> +			range.pci_addr);
+> +
+> +		/*
+> +		 * If we failed translation or got a zero-sized region
+> +		 * then skip this range
+> +		 */
+> +		if (range.cpu_addr == OF_BAD_ADDR || range.size == 0)
+> +			continue;
+> +
+> +		res = kzalloc(sizeof(struct resource), GFP_KERNEL);
+> +		if (!res) {
+> +			err = -ENOMEM;
+> +			goto parse_failed;
+> +		}
+> +
+> +		err = of_pci_range_to_resource(&range, dev, res);
+> +		if (err) {
+> +			kfree(res);
+
+You might want to add a label to free res to make things more uniform.
+
+> +			goto parse_failed;
+> +		}
+> +
+> +		if (resource_type(res) == IORESOURCE_IO) {
+> +			if (*io_base)
+
+You do not zero io_base in the first place so you should ask the API
+user to do that. Is 0 a valid value BTW ? If it is you've got to resort
+to something else to detect multiple IO resources.
+
+Lorenzo
