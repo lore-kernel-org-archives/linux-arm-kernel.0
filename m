@@ -1,151 +1,121 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Tue, 9 Sep 2014 14:35:46 +0100
-Subject: [PATCH v10 08/10] OF: PCI: Add support for parsing PCI host
- bridge resources from DT
-In-Reply-To: <1410184472-17630-9-git-send-email-Liviu.Dudau@arm.com>
-References: <1410184472-17630-1-git-send-email-Liviu.Dudau@arm.com>
- <1410184472-17630-9-git-send-email-Liviu.Dudau@arm.com>
-Message-ID: <20140909133546.GB2636@e102568-lin.cambridge.arm.com>
+From: grygorii.strashko@ti.com (Grygorii Strashko)
+Date: Tue, 9 Sep 2014 16:41:21 +0300
+Subject: [RFC PATCH 0/3] PM / clock_ops: allow to specify custom
+ pm_clk_notifier callback
+In-Reply-To: <7hr3zln692.fsf@linaro.org>
+References: <1406313096-29761-1-git-send-email-grygorii.strashko@ti.com>
+ <7hr3zln692.fsf@linaro.org>
+Message-ID: <540F0381.7010500@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 08, 2014 at 02:54:30PM +0100, Liviu Dudau wrote:
-> Provide a function to parse the PCI DT ranges that can be used to
-> create a pci_host_bridge structure together with its associated
-> bus.
+Hi Kevin,
+
+On 09/09/2014 12:37 AM, Kevin Hilman wrote:
+> Grygorii Strashko <grygorii.strashko@ti.com> writes:
 > 
-> Cc: Bjorn Helgaas <bhelgaas@google.com>
-> Cc: Arnd Bergmann <arnd@arndb.de>
-> Cc: Grant Likely <grant.likely@linaro.org>
-> Cc: Rob Herring <robh+dt@kernel.org>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
-> ---
->  drivers/of/of_pci.c    | 102 +++++++++++++++++++++++++++++++++++++++++++++++++
->  include/linux/of_pci.h |  11 ++++++
->  2 files changed, 113 insertions(+)
+>> The CLK PM domain (clock_ops.c) assumes that platform code should always provide
+>> list of Connection IDs of the clock (con_id) in pm_clk_notifier_block structure.
+>> Then CLK PM domain uses these con_ids to setup list of clocks per device.
+>>
+>> Such approach is inconvenient when devices can have different number
+>> of clocks. For example, if maximum number of clocks used by
+>> devices is 4 the pm_clk_notifier_block structure will look like:
+>>
+>> static struct pm_clk_notifier_block platform_domain_notifier = {
+>> 	.pm_domain = &keystone_pm_domain,
+>> 	.con_ids = { "fck", "opt1", "opt2", "opt3", NULL },
+>> };
+>>
+>> More over, clocks in DT have to be named using only above con_ids:
+>> 	clocks = <&paclk13>, <&clkcpgmac>, <&chipclk12>;
+>> 	clock-names = "fck", "opt1", "opt2";
+>>
+>> It makes hard to enable/support Runtime PM in case when some HW modules are used
+>> by different SoCs or there are few version of the same SoC, because clock trees
+>> can be changed significantly in all such cases.
+>>
+>> This patch set allows to specify custom pm_clk_notifier callback from
+>> platform code and in such way makes CLK PM domain initialization
+>> more flexible.
 > 
-> diff --git a/drivers/of/of_pci.c b/drivers/of/of_pci.c
-> index a107edb..36701da 100644
-> --- a/drivers/of/of_pci.c
-> +++ b/drivers/of/of_pci.c
-> @@ -1,7 +1,9 @@
->  #include <linux/kernel.h>
->  #include <linux/export.h>
->  #include <linux/of.h>
-> +#include <linux/of_address.h>
->  #include <linux/of_pci.h>
-> +#include <linux/slab.h>
->  
->  static inline int __of_pci_pci_compare(struct device_node *node,
->  				       unsigned int data)
-> @@ -123,6 +125,106 @@ int of_pci_get_domain_nr(struct device_node *node, bool allocate_if_missing)
->  }
->  EXPORT_SYMBOL_GPL(of_pci_get_domain_nr);
->  
-> +/**
-> + * of_pci_get_host_bridge_resources - Parse PCI host bridge resources from DT
-> + * @dev: device node of the host bridge having the range property
-> + * @busno: bus number associated with the bridge root bus
-> + * @bus_max: maximum number of busses for this bridge
-> + * @resources: list where the range of resources will be added after DT parsing
-> + * @io_base: pointer to a variable that will contain on return the physical
-> + * address for the start of the I/O range.
-> + *
-> + * It is the callers job to free the @resources list.
-> + *
-> + * This function will parse the "ranges" property of a PCI host bridge device
-> + * node and setup the resource mapping based on its content. It is expected
-> + * that the property conforms with the Power ePAPR document.
+> Replacing the pm_clk notifier is essentially replacing the guts of the
+> clock_ops code.
+> 
+> I think your platform may have left the realm of "simple" platforms that
+> the clock_ops was intended for.
+> 
+> Since you're essentially gutting clock_ops, have you considered
+> migrating to genpd and having your own pm_domain ops that manage your clocks?
 
-You should also define what it returns and when.
+Yes. I've thought about using genpd. But:
+- PM domain is not merged in 3.17 and I don't know if it will be merged in 3.18 :(
+http://www.spinics.net/lists/arm-kernel/msg357003.html
 
-> + *
-> + */
-> +int of_pci_get_host_bridge_resources(struct device_node *dev,
-> +			unsigned char busno, unsigned char bus_max,
-> +			struct list_head *resources, resource_size_t *io_base)
-> +{
-> +	struct resource *res;
-> +	struct resource *bus_range;
-> +	struct of_pci_range range;
-> +	struct of_pci_range_parser parser;
-> +	char range_type[4];
-> +	int err;
-> +
-> +	bus_range = kzalloc(sizeof(*bus_range), GFP_KERNEL);
-> +	if (!bus_range)
-> +		return -ENOMEM;
-> +
-> +	pr_info("PCI host bridge %s ranges:\n", dev->full_name);
-> +
-> +	err = of_pci_parse_bus_range(dev, bus_range);
-> +	if (err) {
-> +		bus_range->start = busno;
-> +		bus_range->end = bus_max;
-> +		bus_range->flags = IORESOURCE_BUS;
-> +		pr_info("  No bus range found for %s, using %pR\n",
-> +			dev->full_name, &bus_range);
-> +	} else {
-> +		if (bus_range->end > bus_range->start + bus_max)
-> +			bus_range->end = bus_range->start + bus_max;
-> +	}
-> +	pci_add_resource(resources, bus_range);
+- To switch using PM domains I will need to create PM domain node PER EACH device,
+(if I understand PM domain bindings right). For example:
 
-This means that eg in the PCI generic host controller I cannot "filter"
-the bus resource, unless I remove it, "filter" it, and add it again.
++power_netcp: power-controller at 0 {
++		compatible = "keystone,power-controller";
++		#power-domain-cells = <0>;
++		clocks = <&clkcpgmac>, <&clkpa>, <&chipclk12>;
++	};
 
-I certainly can't filter a resource that has been already added without
-removing it first.
+netcp: netcp at 2090000 {
+		reg = <0x2620110 0x8>;
++		power-domains = <&power_netcp>;
+...
+}
 
-Thoughts ?
+- I'm not sure that such DT- definition will be accepted - 
+It's not obviously a HW definitions.
 
-> +
-> +	/* Check for ranges property */
-> +	err = of_pci_range_parser_init(&parser, dev);
-> +	if (err)
-> +		goto parse_failed;
-> +
-> +	pr_debug("Parsing ranges property...\n");
-> +	for_each_of_pci_range(&parser, &range) {
-> +		/* Read next ranges element */
-> +		if ((range.flags & IORESOURCE_TYPE_BITS) == IORESOURCE_IO)
-> +			snprintf(range_type, 4, " IO");
-> +		else if ((range.flags & IORESOURCE_TYPE_BITS) == IORESOURCE_MEM)
-> +			snprintf(range_type, 4, "MEM");
-> +		else
-> +			snprintf(range_type, 4, "err");
-> +		pr_info("  %s %#010llx..%#010llx -> %#010llx\n", range_type,
-> +			range.cpu_addr, range.cpu_addr + range.size - 1,
-> +			range.pci_addr);
-> +
-> +		/*
-> +		 * If we failed translation or got a zero-sized region
-> +		 * then skip this range
-> +		 */
-> +		if (range.cpu_addr == OF_BAD_ADDR || range.size == 0)
-> +			continue;
-> +
-> +		res = kzalloc(sizeof(struct resource), GFP_KERNEL);
-> +		if (!res) {
-> +			err = -ENOMEM;
-> +			goto parse_failed;
-> +		}
-> +
-> +		err = of_pci_range_to_resource(&range, dev, res);
-> +		if (err) {
-> +			kfree(res);
+Looks like, I'll have no choice as only switch to genpd even if it will 
+introduce code & data over head.
 
-You might want to add a label to free res to make things more uniform.
+> 
+>> Also, It updates Keystone 2 platform code to provide custom
+>> callback which fills list of clocks for Device with all clocks assigned to this
+>> Device in DT.
+>> More over, It's safe for Keystone 2 to perform CLK PM domain initialization
+>> at device's binding time instead of device's creation time.
+>>
+>> I've posted these patches because I need fully enable Runtime PM on Keystone 2
+>> where all HW modules are controlled using clocks only. That's why CLK PM domain
+>> fits our needs perfectly.
+> 
+> Heh, doesn't seem like a perfect fit to me ;)
+> 
+>> Also, on Keystone 2 clocks are initialized early and
+>> they are available at device creation time. The main problems from my side are:
+>>   - every time when support for new HW modules is added the ".con_ids" array
+>>     need to be checked and updated;
+>>   - restriction for clock's names in DT - to be named using only above con_ids
+>>     It's ugly.
+>>
+>> I hope, this approach to be accepted at least as temporal solution until
+>> the generic solution is not found.
+> 
+> Sorry if I missed it, but is there ongoing discussion of a more generic
+> solution other than this one:
 
-> +			goto parse_failed;
-> +		}
-> +
-> +		if (resource_type(res) == IORESOURCE_IO) {
-> +			if (*io_base)
+Yep. :( But It's ongoing more than 2 months already and seems there is no
+light at the end of tunnel.
 
-You do not zero io_base in the first place so you should ask the API
-user to do that. Is 0 a valid value BTW ? If it is you've got to resort
-to something else to detect multiple IO resources.
+> 
+>> [1] Previously, same problem was discussed in, but no final solution was accepted:
+>>   "[PATCH/RFC 0/4] of: Register clocks for Runtime PM with PM core"
+>>   https://lkml.org/lkml/2014/4/24/1118
+> 
+> Personally, I still like Geert's approach better.
+> 
 
-Lorenzo
+Unfortunately, Geert is not going to continue working on it (as I know).
+
+Thanks for your comments.
+I agree. This solution isn't good - it's just fast attempt to solve problem
+with minimal changes in common code.
+
+
+Regards,
+-grygorii
