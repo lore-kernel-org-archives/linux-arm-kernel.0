@@ -1,41 +1,29 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 09 Sep 2014 11:08:11 +0200
-Subject: [PATCH v2 1/4] phy: phy-stih407-usb: Add usb picoPHY driver found
- on stih407 SoC family
-In-Reply-To: <1410253218-18318-2-git-send-email-peter.griffin@linaro.org>
-References: <1410253218-18318-1-git-send-email-peter.griffin@linaro.org>
- <1410253218-18318-2-git-send-email-peter.griffin@linaro.org>
-Message-ID: <2894228.eRmxgHsWbh@wuerfel>
+From: rric@kernel.org (Robert Richter)
+Date: Tue, 9 Sep 2014 11:12:01 +0200
+Subject: [PATCH] GICv3: Fixing 32 bit compatibility
+In-Reply-To: <20140909080042.GO23009@pengutronix.de>
+References: <1410185480-5153-1-git-send-email-rric@kernel.org>
+ <20140909080042.GO23009@pengutronix.de>
+Message-ID: <20140909091201.GA4527@rric.localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 09 September 2014 10:00:15 Peter Griffin wrote:
-> This is the generic phy driver for the picoPHY ports used by the
-> USB2 and USB3 Host controllers when controlling usb2/1.1 devices. It
-> is found on STiH407 SoC family from STMicroelectronics.
-> 
-> Signed-off-by: Giuseppe Cavallaro <peppe.cavallaro@st.com>
-> Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
+On 09.09.14 10:00:42, Uwe Kleine-K?nig wrote:
+> On Mon, Sep 08, 2014 at 04:11:19PM +0200, Robert Richter wrote:
 
-Looks good overall, just one question:
+> > @@ -479,7 +479,7 @@ static void gic_raise_softirq(const struct cpumask *mask, unsigned int irq)
+> >     smp_wmb();
+> >  
+> >     for_each_cpu_mask(cpu, *mask) {
+> > -           u64 cluster_id = cpu_logical_map(cpu) & ~0xffUL;
+> > +           u64 cluster_id = cpu_logical_map(cpu) & ~0xffULL;
+> This doesn't change anything, does it?
 
-> +
-> +	match = of_match_device(stih407_usb2_picophy_of_match, dev);
-> +	if (!match)
-> +		return -ENODEV;
-....
-> +
-> +	phy = devm_phy_create(dev, NULL, match->data, NULL);
-> +	if (IS_ERR(phy)) {
-> +		dev_err(dev, "failed to create Display Port PHY\n");
-> +		return PTR_ERR(phy);
-> +	}
-> +
+It does, not in 64 bit but in 32 bit there unsigned long is 32
+bit. So, bit masks are broken if you compile a 32 bit kernel.
 
-There is only one entry in the match table, so it always points to
-stih407_usb2_picophy_data. Do you have plans to add another set of
-operations soon?
-If not, just remove the .data pointer and hardcode the operations
-in the devm_phy_create call.
+> I wonder if it would be cleaner to use (u64)0xff here.
 
-	Arnd
+No, that's ULL for. This is commonly used in x86 too.
+
+-Robert
