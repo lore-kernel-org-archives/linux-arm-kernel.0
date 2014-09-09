@@ -1,114 +1,54 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue,  9 Sep 2014 12:27:09 +0200
-Subject: [PATCH v2] ARM/arm64: KVM: fix use of WnR bit in kvm_is_write_fault()
-Message-ID: <1410258429-17090-1-git-send-email-ard.biesheuvel@linaro.org>
+From: yamada.m@jp.panasonic.com (Masahiro Yamada)
+Date: Tue,  9 Sep 2014 19:26:19 +0900
+Subject: [PATCH 1/3] kbuild: remove unnecessary "obj- := dummy.o" trick
+In-Reply-To: <1410258381-7088-1-git-send-email-yamada.m@jp.panasonic.com>
+References: <1410258381-7088-1-git-send-email-yamada.m@jp.panasonic.com>
+Message-ID: <1410258381-7088-2-git-send-email-yamada.m@jp.panasonic.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The ISS encoding for an exception from a Data Abort has a WnR
-bit[6] that indicates whether the Data Abort was caused by a
-read or a write instruction. While there are several fields
-in the encoding that are only valid if the ISV bit[24] is set,
-WnR is not one of them, so we can read it unconditionally.
+In these Makefiles, at least one of "obj-y" and "obj-" is non-empty,
+hence built-in.o is always created without such a trick.
 
-Instead of fixing both implementations of kvm_is_write_fault()
-in place, reimplement it just once using kvm_vcpu_dabt_iswrite(),
-which already does the right thing with respect to the WnR bit.
-Also fix up the callers to pass 'vcpu'
-
-Acked-by: Laszlo Ersek <lersek@redhat.com>
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Signed-off-by: Masahiro Yamada <yamada.m@jp.panasonic.com>
 ---
-v2: reimplement locally in mmu.c and drop the 2 arch specific version
-    add ack
 
- arch/arm/include/asm/kvm_mmu.h   | 11 -----------
- arch/arm/kvm/mmu.c               | 12 ++++++++++--
- arch/arm64/include/asm/kvm_mmu.h | 13 -------------
- 3 files changed, 10 insertions(+), 26 deletions(-)
+ arch/arm/plat-samsung/Makefile | 1 -
+ drivers/clk/shmobile/Makefile  | 2 --
+ drivers/net/wimax/Makefile     | 4 ----
+ 3 files changed, 7 deletions(-)
 
-diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
-index 5cc0b0f5f72f..3f688b458143 100644
---- a/arch/arm/include/asm/kvm_mmu.h
-+++ b/arch/arm/include/asm/kvm_mmu.h
-@@ -78,17 +78,6 @@ static inline void kvm_set_pte(pte_t *pte, pte_t new_pte)
- 	flush_pmd_entry(pte);
- }
+diff --git a/arch/arm/plat-samsung/Makefile b/arch/arm/plat-samsung/Makefile
+index 5fe1750..a402262 100644
+--- a/arch/arm/plat-samsung/Makefile
++++ b/arch/arm/plat-samsung/Makefile
+@@ -8,7 +8,6 @@ ccflags-$(CONFIG_ARCH_MULTI_V7) += -I$(srctree)/$(src)/include
  
--static inline bool kvm_is_write_fault(unsigned long hsr)
--{
--	unsigned long hsr_ec = hsr >> HSR_EC_SHIFT;
--	if (hsr_ec == HSR_EC_IABT)
--		return false;
--	else if ((hsr & HSR_ISV) && !(hsr & HSR_WNR))
--		return false;
--	else
--		return true;
--}
--
- static inline void kvm_clean_pgd(pgd_t *pgd)
- {
- 	clean_dcache_area(pgd, PTRS_PER_S2_PGD * sizeof(pgd_t));
-diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
-index 747ef4c97d98..c68ec28f17c3 100644
---- a/arch/arm/kvm/mmu.c
-+++ b/arch/arm/kvm/mmu.c
-@@ -746,6 +746,14 @@ static bool transparent_hugepage_adjust(pfn_t *pfnp, phys_addr_t *ipap)
- 	return false;
- }
+ obj-y				:=
+ obj-m				:=
+-obj-n				:= dummy.o
+ obj-				:=
  
-+static bool kvm_is_write_fault(struct kvm_vcpu *vcpu)
-+{
-+	if (kvm_vcpu_trap_is_iabt(vcpu))
-+		return false;
-+
-+	return kvm_vcpu_dabt_iswrite(vcpu);
-+}
-+
- static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
- 			  struct kvm_memory_slot *memslot, unsigned long hva,
- 			  unsigned long fault_status)
-@@ -760,7 +768,7 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
- 	pfn_t pfn;
- 	pgprot_t mem_type = PAGE_S2;
- 
--	write_fault = kvm_is_write_fault(kvm_vcpu_get_hsr(vcpu));
-+	write_fault = kvm_is_write_fault(vcpu);
- 	if (fault_status == FSC_PERM && !write_fault) {
- 		kvm_err("Unexpected L2 read permission error\n");
- 		return -EFAULT;
-@@ -886,7 +894,7 @@ int kvm_handle_guest_abort(struct kvm_vcpu *vcpu, struct kvm_run *run)
- 	gfn = fault_ipa >> PAGE_SHIFT;
- 	memslot = gfn_to_memslot(vcpu->kvm, gfn);
- 	hva = gfn_to_hva_memslot_prot(memslot, gfn, &writable);
--	write_fault = kvm_is_write_fault(kvm_vcpu_get_hsr(vcpu));
-+	write_fault = kvm_is_write_fault(vcpu);
- 	if (kvm_is_error_hva(hva) || (write_fault && !writable)) {
- 		if (is_iabt) {
- 			/* Prefetch Abort on I/O address */
-diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
-index 8e138c7c53ac..737da742b293 100644
---- a/arch/arm64/include/asm/kvm_mmu.h
-+++ b/arch/arm64/include/asm/kvm_mmu.h
-@@ -93,19 +93,6 @@ void kvm_clear_hyp_idmap(void);
- #define	kvm_set_pte(ptep, pte)		set_pte(ptep, pte)
- #define	kvm_set_pmd(pmdp, pmd)		set_pmd(pmdp, pmd)
- 
--static inline bool kvm_is_write_fault(unsigned long esr)
--{
--	unsigned long esr_ec = esr >> ESR_EL2_EC_SHIFT;
+ # Objects we always build independent of SoC choice
+diff --git a/drivers/clk/shmobile/Makefile b/drivers/clk/shmobile/Makefile
+index e002923..9aab51c8 100644
+--- a/drivers/clk/shmobile/Makefile
++++ b/drivers/clk/shmobile/Makefile
+@@ -6,5 +6,3 @@ obj-$(CONFIG_ARCH_R8A7790)		+= clk-rcar-gen2.o
+ obj-$(CONFIG_ARCH_R8A7791)		+= clk-rcar-gen2.o
+ obj-$(CONFIG_ARCH_SHMOBILE_MULTI)	+= clk-div6.o
+ obj-$(CONFIG_ARCH_SHMOBILE_MULTI)	+= clk-mstp.o
+-# for emply built-in.o
+-obj-n	:= dummy
+diff --git a/drivers/net/wimax/Makefile b/drivers/net/wimax/Makefile
+index 992bc02..692184d 100644
+--- a/drivers/net/wimax/Makefile
++++ b/drivers/net/wimax/Makefile
+@@ -1,5 +1 @@
 -
--	if (esr_ec == ESR_EL2_EC_IABT)
--		return false;
+ obj-$(CONFIG_WIMAX_I2400M)	+= i2400m/
 -
--	if ((esr & ESR_EL2_ISV) && !(esr & ESR_EL2_WNR))
--		return false;
--
--	return true;
--}
--
- static inline void kvm_clean_pgd(pgd_t *pgd) {}
- static inline void kvm_clean_pmd_entry(pmd_t *pmd) {}
- static inline void kvm_clean_pte(pte_t *pte) {}
+-# (from Sam Ravnborg) force kbuild to create built-in.o
+-obj- := dummy.o
 -- 
-1.8.3.2
+1.9.1
