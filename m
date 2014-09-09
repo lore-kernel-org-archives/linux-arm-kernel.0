@@ -1,41 +1,31 @@
-From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Tue, 09 Sep 2014 16:58:58 +0200
-Subject: [PATCH 2/3] [media] s5p-jpeg: Fix compilation with COMPILE_TEST
-In-Reply-To: <b7343e6296b5d1d68b7229b8307442fd4141bcb3.1410273306.git.m.chehab@samsung.com>
-References: <20140909124306.2d5a0d76@canb.auug.org.au>
- <6cbd00c5f2d342b573aaf9c0e533778374dd2e1e.1410273306.git.m.chehab@samsung.com>
- <b7343e6296b5d1d68b7229b8307442fd4141bcb3.1410273306.git.m.chehab@samsung.com>
-Message-ID: <540F15B2.3000902@samsung.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 09 Sep 2014 17:02:34 +0200
+Subject: [GIT PULL 1/2] SOCFPGA updates for 3.18
+In-Reply-To: <20140909141756.GA30100@amd>
+References: <1409847105-27241-1-git-send-email-dinguyen@opensource.altera.com>
+ <20140909141756.GA30100@amd>
+Message-ID: <4134101.OOENTRabu1@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/09/14 16:38, Mauro Carvalho Chehab wrote:
-> ERROR: "__bad_ndelay" [drivers/media/platform/s5p-jpeg/s5p-jpeg.ko] undefined!
+On Tuesday 09 September 2014 16:17:56 Pavel Machek wrote:
+> > Jaehoon Chung (1):
+> >       ARM: dts: socfpga: unuse the slot-node and deprecate the supports-highspeed for dw-mmc
+> > 
 > 
-> Yet, it sounds a bad idea to use ndelay to wait for 100 us
-> for the device to reset.
+> This patch is a bad idea. It removes support for two mmc cards on a
+> single controller -- configuration hardware supports and configuration
+> that allows using u-SD card on mcvevk board.
 > 
-> Reported-by: Stephen Rothwell <sfr@canb.auug.org.au>
-> Signed-off-by: Mauro Carvalho Chehab <m.chehab@samsung.com>
-> 
-> diff --git a/drivers/media/platform/s5p-jpeg/jpeg-hw-exynos4.c b/drivers/media/platform/s5p-jpeg/jpeg-hw-exynos4.c
-> index e51c078360f5..01eeacf28843 100644
-> --- a/drivers/media/platform/s5p-jpeg/jpeg-hw-exynos4.c
-> +++ b/drivers/media/platform/s5p-jpeg/jpeg-hw-exynos4.c
-> @@ -23,7 +23,9 @@ void exynos4_jpeg_sw_reset(void __iomem *base)
->  	reg = readl(base + EXYNOS4_JPEG_CNTL_REG);
->  	writel(reg & ~EXYNOS4_SOFT_RESET_HI, base + EXYNOS4_JPEG_CNTL_REG);
->  
-> +#ifndef CONFIG_COMPILE_TEST
->  	ndelay(100000);
-> +#endif
 
-Wouldn't be a better fix to replace ndelay(100000); with udelay(100),
-rather than sticking in a not so pretty #ifndef ?
+Your objection comes too late, and to the wrong patch, since the
+driver and all other users have already been changed. We had a long
+discussion about this when the issue first came up, and we could
+not find any example of dw-mmc actually being used in a scenario
+with one controller that has multiple devices attached.
 
-I guess usleep_range() couldn't simply be used, since
-exynos4_jpeg_sw_reset() is called with a spinlock held.
+Apparently every user out there instead uses multiple controller
+instances instead. Are you sure that the socfpga implementation
+is an exception from this?
 
---
-Regards,
-Sylwester
+	Arnd
