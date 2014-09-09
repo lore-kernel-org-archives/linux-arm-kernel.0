@@ -1,80 +1,35 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Tue, 9 Sep 2014 10:38:29 +1000
-Subject: "mm: introduce dump_vma fix 2" still broken
-In-Reply-To: <540DBD62.5040605@oracle.com>
-References: <2815658.dHHBXc7oHP@wuerfel>
-	<540DBD62.5040605@oracle.com>
-Message-ID: <20140909103829.05c0889f@canb.auug.org.au>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 8 Sep 2014 17:41:46 -0700
+Subject: [PATCH 03/18] tty: serial: 8250_core: allow to set ->throttle /
+ ->unthrottle callbacks
+In-Reply-To: <20140908233329.GA32144@kroah.com>
+References: <1409943773-7874-1-git-send-email-bigeasy@linutronix.de>
+ <1409943773-7874-4-git-send-email-bigeasy@linutronix.de>
+ <20140908233329.GA32144@kroah.com>
+Message-ID: <20140909004146.GF10785@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sasha,
-
-On Mon, 08 Sep 2014 10:29:54 -0400 Sasha Levin <sasha.levin@oracle.com> wrote:
->
-> On 09/08/2014 07:02 AM, Arnd Bergmann wrote:
+* Greg Kroah-Hartman <gregkh@linuxfoundation.org> [140908 16:33]:
+> On Fri, Sep 05, 2014 at 09:02:38PM +0200, Sebastian Andrzej Siewior wrote:
+> > The OMAP UART provides support for HW assisted flow control. What is
+> > missing is the support to throttle / unthrottle callbacks which are used
+> > by the omap-serial driver at the moment.
+> > This patch adds the callbacks. It should be safe to add them since they
+> > are only invoked from the serial_core (uart_throttle()) if the feature
+> > flags are set.
 > > 
-> > I saw this commit today in linux-next, which fixes a build error, but introduces
-> > a new warning:
-> > 
-> > commit a60224c708f880dd937b352b7461cbf14e93012d
-> > Author: Stephen Rothwell <sfr@canb.auug.org.au>
-> > Date:   Mon Sep 8 19:41:54 2014 +1000
-> > 
-> >     mm: introduce dump_vma fix 2
-> >     
-> >     Signed-off-by: Stephen Rothwell <sfr@canb.auug.org.au>
-> > 
-> > diff --git a/mm/page_alloc.c b/mm/page_alloc.c
-> > index cb510c08073b..0de60769bcf6 100644
-> > --- a/mm/page_alloc.c
-> > +++ b/mm/page_alloc.c
-> > @@ -6739,7 +6739,7 @@ void dump_vma(const struct vm_area_struct *vma)
-> >                 "prot %lx anon_vma %p vm_ops %p\n"
-> >                 "pgoff %lx file %p private_data %p\n",
-> >                 vma, (void *)vma->vm_start, (void *)vma->vm_end, vma->vm_next,
-> > -               vma->vm_prev, vma->vm_mm, vma->vm_page_prot.pgprot,
-> > +               vma->vm_prev, vma->vm_mm, pgprot_val(vma->vm_page_prot),
-> >                 vma->anon_vma, vma->vm_ops, vma->vm_pgoff,
-> >                 vma->vm_file, vma->vm_private_data);
-> >         dump_flags(vma->vm_flags, vmaflags_names, ARRAY_SIZE(vmaflags_names));
-> > 
-> > 
-> > /git/arm-soc/mm/page_alloc.c: In function 'dump_vma':
-> > /git/arm-soc/mm/page_alloc.c:6744:3: warning: format '%lx' expects argument of type 'long unsigned int', but argument 8 has type 'pgprot_t' [-Wformat=]
-> >    vma->vm_file, vma->vm_private_data);
-> >    ^
-> > 
-> > This happens on machines that use ARM LPAE, where pgprot_t is in fact
-> > a 64-bit integer. The simplest fix I see would be add a cast to u64
-> > and always print this as a 64bit value.
+> > Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
 > 
-> Hi Arnd,
+> Due to other recent changes, this patch fails to apply :(
 > 
-> The fix for the original issue would be:
-> 
-> 	http://ozlabs.org/~akpm/mmots/broken-out/introduce-dump_vma-fix-2.patch
-> 
-> Which includes the casting that Stephen's patch didn't have.
+> I've applied your first two, can you respin the rest and resend as a new
+> series?
 
-Thanks for pointing it out, I will replace my patch with that (unless
-Andrew does a new mmotm today).
+It seems that we've reached pretty much omap-serial compability and
+the remaining bugs are either already there with omap-serial or are
+SoC specific and/or DMA related. So Sebastian, please feel also free
+to add this when reposting:
 
-> Stephen, in the future, is there a way to get build fixes faster to you? From
-> what I understand -mm syncs up only once in a couple of days. It might make
-> everyone?s life much easier if build errors wouldn't drag over a week.
-
-Andrew (and others) sometime cc's me on such fixes in which case I add
-them to linux-next until Andrew does a new mmotm.
-
-It didn't help that I have been away for a week.
--- 
-Cheers,
-Stephen Rothwell                    sfr at canb.auug.org.au
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140909/ce9a2d80/attachment-0001.sig>
+Reviewed-by: Tony Lindgren <tony@atomide.com>
+Tested-by: Tony Lindgren <tony@atomide.com>
