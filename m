@@ -1,204 +1,188 @@
 From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
-Date: Tue,  9 Sep 2014 16:02:09 +0200
-Subject: [PATCH v10 1/9] clk: Add temporary mapping to the existing API
-In-Reply-To: <1410271329-26637-1-git-send-email-tomeu.vizoso@collabora.com>
+Date: Tue,  9 Sep 2014 16:06:47 +0200
+Subject: [PATCH v10 4/9] clk: per-user clock accounting for debug
+In-Reply-To: <1410271612-27389-1-git-send-email-tomeu.vizoso@collabora.com>
 References: <1410271329-26637-1-git-send-email-tomeu.vizoso@collabora.com>
-Message-ID: <1410271329-26637-2-git-send-email-tomeu.vizoso@collabora.com>
+ <1410271612-27389-1-git-send-email-tomeu.vizoso@collabora.com>
+Message-ID: <1410271612-27389-2-git-send-email-tomeu.vizoso@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To preserve git-bisectability, add aliases from the future provider API to the
-existing public API.
+When a clock has multiple users, the WARNING on imbalance of
+enable/disable may not show the guilty party since although they may
+have commited the error earlier, the warning is emitted later when some
+other user, presumably innocent, disables the clock.
 
-Also includes clk-provider.h and clk-dev.h in a few places so the right
-functions are defined.
+Provide per-user clock enable/disable accounting and disabler tracking
+in order to help debug these problems.
+
+Based on previous work by Rabin Vincent <rabin@rab.in>.
 
 Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
-Acked-by: Tony Lindgren <tony@atomide.com>
-Acked-by: Jason Cooper <jason@lakedaemon.net>
-Acked-by: Simon Horman <horms+renesas@verge.net.au>
-Acked-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 Tested-by: Heiko Stuebner <heiko@sntech.de>
-
 ---
-v9: * Add mapping for clk_get_name
+ drivers/clk/clk.c           | 38 ++++++++++++++++++++++++++++++++++----
+ drivers/clk/clk.h           |  3 ++-
+ drivers/clk/clkdev.c        | 14 ++++++++++----
+ include/linux/clk-private.h |  5 +++++
+ 4 files changed, 51 insertions(+), 9 deletions(-)
 
-v7: * Add mappings for clk_notifier_[un]register
-    * Add more clk-provider.h includes to clk implementations
-
-v4: * Add more clk-provider.h includes to clk implementations
-    * Add mapping for clk_provider_round_rate
----
- arch/arm/mach-omap2/display.c                 |  1 +
- arch/arm/mach-omap2/omap_device.c             |  1 +
- arch/arm/mach-shmobile/clock.c                |  1 +
- arch/arm/plat-orion/common.c                  |  1 +
- drivers/clk/berlin/bg2.c                      |  1 +
- drivers/clk/berlin/bg2q.c                     |  1 +
- drivers/clk/clk-conf.c                        |  1 +
- drivers/clk/clkdev.c                          |  1 +
- drivers/media/platform/exynos4-is/media-dev.c |  1 +
- include/linux/clk-provider.h                  | 27 +++++++++++++++++++++++++++
- include/linux/clk/zynq.h                      |  1 +
- 11 files changed, 37 insertions(+)
-
-diff --git a/arch/arm/mach-omap2/display.c b/arch/arm/mach-omap2/display.c
-index bf852d7..0f9e479 100644
---- a/arch/arm/mach-omap2/display.c
-+++ b/arch/arm/mach-omap2/display.c
-@@ -21,6 +21,7 @@
- #include <linux/platform_device.h>
- #include <linux/io.h>
- #include <linux/clk.h>
-+#include <linux/clk-provider.h>
- #include <linux/err.h>
- #include <linux/delay.h>
- #include <linux/of.h>
-diff --git a/arch/arm/mach-omap2/omap_device.c b/arch/arm/mach-omap2/omap_device.c
-index d22c30d..f138a62 100644
---- a/arch/arm/mach-omap2/omap_device.c
-+++ b/arch/arm/mach-omap2/omap_device.c
-@@ -32,6 +32,7 @@
- #include <linux/io.h>
- #include <linux/clk.h>
- #include <linux/clkdev.h>
-+#include <linux/clk-provider.h>
- #include <linux/pm_runtime.h>
- #include <linux/of.h>
- #include <linux/notifier.h>
-diff --git a/arch/arm/mach-shmobile/clock.c b/arch/arm/mach-shmobile/clock.c
-index 806f940..ed415dc 100644
---- a/arch/arm/mach-shmobile/clock.c
-+++ b/arch/arm/mach-shmobile/clock.c
-@@ -24,6 +24,7 @@
+diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+index ce84b1f..61a3492 100644
+--- a/drivers/clk/clk.c
++++ b/drivers/clk/clk.c
+@@ -543,7 +543,8 @@ static int clk_disable_unused(void)
+ }
+ late_initcall_sync(clk_disable_unused);
  
- #ifdef CONFIG_COMMON_CLK
- #include <linux/clk.h>
-+#include <linux/clk-provider.h>
- #include <linux/clkdev.h>
- #include "clock.h"
+-struct clk *__clk_create_clk(struct clk_core *clk_core)
++struct clk *__clk_create_clk(struct clk_core *clk_core, const char *dev,
++			     const char *con)
+ {
+ 	struct clk *clk;
  
-diff --git a/arch/arm/plat-orion/common.c b/arch/arm/plat-orion/common.c
-index 3ec6e8e..961b593 100644
---- a/arch/arm/plat-orion/common.c
-+++ b/arch/arm/plat-orion/common.c
-@@ -15,6 +15,7 @@
- #include <linux/serial_8250.h>
- #include <linux/ata_platform.h>
- #include <linux/clk.h>
-+#include <linux/clk-provider.h>
- #include <linux/clkdev.h>
- #include <linux/mv643xx_eth.h>
- #include <linux/mv643xx_i2c.h>
-diff --git a/drivers/clk/berlin/bg2.c b/drivers/clk/berlin/bg2.c
-index 515fb13..4c81e09 100644
---- a/drivers/clk/berlin/bg2.c
-+++ b/drivers/clk/berlin/bg2.c
-@@ -19,6 +19,7 @@
+@@ -556,6 +557,8 @@ struct clk *__clk_create_clk(struct clk_core *clk_core)
+ 		return ERR_PTR(-ENOMEM);
  
- #include <linux/clk.h>
- #include <linux/clk-provider.h>
-+#include <linux/clkdev.h>
- #include <linux/kernel.h>
- #include <linux/of.h>
- #include <linux/of_address.h>
-diff --git a/drivers/clk/berlin/bg2q.c b/drivers/clk/berlin/bg2q.c
-index 21784e4..748da9b 100644
---- a/drivers/clk/berlin/bg2q.c
-+++ b/drivers/clk/berlin/bg2q.c
-@@ -19,6 +19,7 @@
+ 	clk->core = clk_core;
++	clk->dev_id = dev;
++	clk->con_id = con;
  
- #include <linux/clk.h>
- #include <linux/clk-provider.h>
-+#include <linux/clkdev.h>
- #include <linux/kernel.h>
- #include <linux/of.h>
- #include <linux/of_address.h>
-diff --git a/drivers/clk/clk-conf.c b/drivers/clk/clk-conf.c
-index aad4796..d36a7b3 100644
---- a/drivers/clk/clk-conf.c
-+++ b/drivers/clk/clk-conf.c
-@@ -8,6 +8,7 @@
+ 	return clk;
+ }
+@@ -936,10 +939,25 @@ EXPORT_SYMBOL_GPL(clk_provider_disable);
   */
+ void clk_disable(struct clk *clk_user)
+ {
++	struct clk_core *clk;
++	unsigned long flags;
++
+ 	if (IS_ERR_OR_NULL(clk_user))
+ 		return;
  
- #include <linux/clk.h>
-+#include <linux/clkdev.h>
- #include <linux/clk-provider.h>
- #include <linux/clk/clk-conf.h>
- #include <linux/device.h>
+-	clk_provider_disable(clk_to_clk_core(clk_user));
++	clk = clk_to_clk_core(clk_user);
++
++	flags = clk_enable_lock();
++	if (!WARN(clk_user->enable_count == 0,
++		  "incorrect disable clk dev %s con %s last disabler %pF\n",
++		  clk_user->dev_id, clk_user->con_id, clk_user->last_disable)) {
++
++		clk_user->last_disable = __builtin_return_address(0);
++		clk_user->enable_count--;
++
++		__clk_disable(clk);
++	}
++	clk_enable_unlock(flags);
+ }
+ EXPORT_SYMBOL_GPL(clk_disable);
+ 
+@@ -1000,10 +1018,22 @@ EXPORT_SYMBOL_GPL(clk_provider_enable);
+  */
+ int clk_enable(struct clk *clk_user)
+ {
++	struct clk_core *clk;
++	unsigned long flags;
++	int ret;
++
+ 	if (!clk_user)
+ 		return 0;
+ 
+-	return clk_provider_enable(clk_to_clk_core(clk_user));
++	clk = clk_to_clk_core(clk_user);
++
++	flags = clk_enable_lock();
++	ret = __clk_enable(clk);
++	if (!ret)
++		clk_user->enable_count++;
++	clk_enable_unlock(flags);
++
++	return ret;
+ }
+ EXPORT_SYMBOL_GPL(clk_enable);
+ 
+@@ -1698,7 +1728,7 @@ struct clk *clk_get_parent(struct clk *clk_user)
+ 	clk = clk_to_clk_core(clk_user);
+ 	parent = clk_provider_get_parent(clk);
+ 
+-	return __clk_create_clk(parent);
++	return __clk_create_clk(parent, clk_user->dev_id, clk_user->con_id);
+ }
+ EXPORT_SYMBOL_GPL(clk_get_parent);
+ 
+diff --git a/drivers/clk/clk.h b/drivers/clk/clk.h
+index 3b3068b..49eff38 100644
+--- a/drivers/clk/clk.h
++++ b/drivers/clk/clk.h
+@@ -19,5 +19,6 @@ void of_clk_unlock(void);
+ #endif
+ 
+ #if defined(CONFIG_COMMON_CLK)
+-struct clk *__clk_create_clk(struct clk_core *clk_core);
++struct clk *__clk_create_clk(struct clk_core *clk_core, const char *dev,
++			     const char *con);
+ #endif
 diff --git a/drivers/clk/clkdev.c b/drivers/clk/clkdev.c
-index da4bda8..c751d0c 100644
+index 080b3df..f7b352a 100644
 --- a/drivers/clk/clkdev.c
 +++ b/drivers/clk/clkdev.c
-@@ -18,6 +18,7 @@
- #include <linux/string.h>
- #include <linux/mutex.h>
- #include <linux/clk.h>
-+#include <linux/clk-provider.h>
- #include <linux/clkdev.h>
- #include <linux/of.h>
+@@ -76,7 +76,9 @@ struct clk_core *of_clk_provider_get(struct device_node *np, int index)
  
-diff --git a/drivers/media/platform/exynos4-is/media-dev.c b/drivers/media/platform/exynos4-is/media-dev.c
-index 344718d..2620c48 100644
---- a/drivers/media/platform/exynos4-is/media-dev.c
-+++ b/drivers/media/platform/exynos4-is/media-dev.c
-@@ -13,6 +13,7 @@
- #include <linux/bug.h>
- #include <linux/clk.h>
- #include <linux/clk-provider.h>
-+#include <linux/clkdev.h>
- #include <linux/device.h>
- #include <linux/errno.h>
- #include <linux/i2c.h>
-diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
-index 411dd7e..99b906f 100644
---- a/include/linux/clk-provider.h
-+++ b/include/linux/clk-provider.h
-@@ -16,6 +16,33 @@
+ struct clk *of_clk_get(struct device_node *np, int index)
+ {
+-	return __clk_create_clk(of_clk_provider_get(np, index));
++	struct clk_core *clk = of_clk_provider_get(np, index);
++
++	return __clk_create_clk(clk, np->full_name, NULL);
+ }
+ EXPORT_SYMBOL(of_clk_get);
  
- #ifdef CONFIG_COMMON_CLK
+@@ -129,7 +131,9 @@ struct clk_core *of_clk_provider_get_by_name(struct device_node *np, const char
+  */
+ struct clk *of_clk_get_by_name(struct device_node *np, const char *name)
+ {
+-	return __clk_create_clk(of_clk_provider_get_by_name(np, name));
++	struct clk_core *clk = of_clk_provider_get_by_name(np, name);
++
++	return __clk_create_clk(clk, np->full_name, NULL);
+ }
+ EXPORT_SYMBOL(of_clk_get_by_name);
+ #endif
+@@ -201,7 +205,7 @@ struct clk *clk_get_sys(const char *dev_id, const char *con_id)
+ #if defined(CONFIG_COMMON_CLK)
+ 	struct clk_core *clk = clk_provider_get_sys(dev_id, con_id);
  
-+/* Temporarily map the to-be-added API to the old API, just so stuff compiles */
-+#define clk_core			clk
+-	return __clk_create_clk(clk);
++	return __clk_create_clk(clk, dev_id, con_id);
+ #else
+ 	struct clk_lookup *cl;
+ 
+@@ -241,7 +245,9 @@ EXPORT_SYMBOL(clk_provider_get);
+ struct clk *clk_get(struct device *dev, const char *con_id)
+ {
+ #if defined(CONFIG_COMMON_CLK)
+-	return __clk_create_clk(clk_provider_get(dev, con_id));
++        const char *dev_id = dev ? dev_name(dev) : NULL;
 +
-+#define __clk_create_clk
++	return __clk_create_clk(clk_provider_get(dev, con_id), dev_id, con_id);
+ #else
+ 	const char *dev_id = dev ? dev_name(dev) : NULL;
+ 	struct clk *clk;
+diff --git a/include/linux/clk-private.h b/include/linux/clk-private.h
+index 2c1ece9..ce6a528 100644
+--- a/include/linux/clk-private.h
++++ b/include/linux/clk-private.h
+@@ -57,6 +57,11 @@ struct clk_core {
+ 
+ struct clk {
+ 	struct clk_core	*core;
++	const char	*dev_id;
++	const char	*con_id;
 +
-+#define clk_provider_get			clk_get
-+#define clk_provider_get_sys			clk_get_sys
-+#define devm_clk_provider_get			devm_clk_get
-+#define of_clk_provider_get			of_clk_get
-+#define of_clk_provider_get_by_name		of_clk_get_by_name
-+
-+#define clk_provider_set_rate			clk_set_rate
-+#define clk_provider_get_rate			clk_get_rate
-+#define clk_provider_round_rate			clk_round_rate
-+#define clk_provider_set_parent			clk_set_parent
-+#define clk_provider_get_parent			clk_get_parent
-+#define clk_provider_prepare			clk_prepare
-+#define clk_provider_unprepare			clk_unprepare
-+#define clk_provider_enable			clk_enable
-+#define clk_provider_disable			clk_disable
-+#define clk_provider_prepare_enable		clk_prepare_enable
-+#define clk_provider_disable_unprepare		clk_unprepare
-+#define clk_provider_notifier_register		clk_notifier_register
-+#define clk_provider_notifier_unregister	clk_notifier_unregister
-+
-+#define clk_get_name				__clk_get_name
-+
++	unsigned int	enable_count;
++	void		*last_disable;
+ };
+ 
  /*
-  * flags used across common struct clk.  these flags should only affect the
-  * top-level framework.  custom flags for dealing with hardware specifics
-diff --git a/include/linux/clk/zynq.h b/include/linux/clk/zynq.h
-index 7a5633b..a990a59 100644
---- a/include/linux/clk/zynq.h
-+++ b/include/linux/clk/zynq.h
-@@ -21,6 +21,7 @@
- #define __LINUX_CLK_ZYNQ_H_
- 
- #include <linux/spinlock.h>
-+#include <linux/clk-provider.h>
- 
- void zynq_clock_init(void);
- 
 -- 
 1.9.3
