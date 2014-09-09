@@ -1,92 +1,68 @@
-From: daniel.thompson@linaro.org (Daniel Thompson)
-Date: Tue,  9 Sep 2014 15:15:11 +0100
-Subject: [PATCH v4 6/6] arm: smp: Handle ipi_cpu_backtrace() using FIQ (if
- available)
-In-Reply-To: <1410272111-30516-1-git-send-email-daniel.thompson@linaro.org>
-References: <1410190115-32604-1-git-send-email-daniel.thompson@linaro.org>
- <1410272111-30516-1-git-send-email-daniel.thompson@linaro.org>
-Message-ID: <1410272111-30516-7-git-send-email-daniel.thompson@linaro.org>
+From: grygorii.strashko@ti.com (Grygorii Strashko)
+Date: Tue, 9 Sep 2014 17:15:58 +0300
+Subject: [RFC PATCH v2 2/7] dma-mapping: replace set_arch_dma_coherent_ops
+ with arch_setup_dma_ops
+In-Reply-To: <20140908103129.GC26030@arm.com>
+References: <1409680587-29818-1-git-send-email-will.deacon@arm.com>
+ <1409680587-29818-3-git-send-email-will.deacon@arm.com>
+ <5409D8C5.9010804@ti.com> <20140908103129.GC26030@arm.com>
+Message-ID: <540F0B9E.5060505@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Previous changes have introduced a replacement default FIQ handler and
-an implementation of arch_trigger_all_cpu_backtrace for ARM but these
-are currently independant.
+Hi Will,
 
-This patch plumbs together these features making it possible, on platforms
-that support it, to trigger backtrace using FIQ.
+On 09/08/2014 01:31 PM, Will Deacon wrote:
+> On Fri, Sep 05, 2014 at 04:37:41PM +0100, Grygorii Strashko wrote:
+> 
+>> On 09/02/2014 08:56 PM, Will Deacon wrote:
+>>> set_arch_dma_coherent_ops is called from of_dma_configure in order to
+>>> swizzle the architectural dma-mapping functions over to a cache-coherent
+>>> implementation. This is currently implemented only for ARM.
+>>>
+>>> In anticipation of re-using this mechanism for IOMMU-backed dma-mapping
+>>> ops too, this patch replaces the function with a broader
+>>> arch_setup_dma_ops callback which is also responsible for setting the
+>>> DMA mask and offset as well as selecting the correct mapping functions.
+>>>
+>>> A further advantage of this split is that it nicely isolates the
+>>> of-specific code from the dma-mapping code, allowing potential reuse by
+>>> other buses (e.g. PCI) in the future.
+>>
+>> I think this patch can introduce a regression if it will be used as is :(
+>>
+>> When this code was initially created there ware a lot of discussion about
+>> and finally it was decided to configure all common (for all arches) DMA
+>> specific parameters for devices in common code, while strictly arch
+>> specific things using arch specific APIs/callbacks.
+>>
+>> The following parameters are common now:
+>> dev->coherent_dma_mask	= mask;
+>> dev->dma_mask		= &dev->coherent_dma_mask;
+>> dev->dma_pfn_offset	= offset;
+>>
+>> and they need to be set always, otherwise it will affect on other
+>> DT-based arches.
+> 
+> Ok, in which case we can either configure the struct device in
+> of_dma_configure before calling arch_setup_dma_ops, or we can do the work
+> in a generic version of arch_setup_dma_ops (that I haven't added yet).
 
-Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
----
- arch/arm/include/asm/smp.h | 3 +++
- arch/arm/kernel/smp.c      | 5 ++++-
- arch/arm/kernel/traps.c    | 3 +++
- 3 files changed, 10 insertions(+), 1 deletion(-)
+Just think that it would more simpler to add arch-API:
+  arch_setup_iommu(struct device *dev, struct iommu_dma_mapping *iommu)
 
-diff --git a/arch/arm/include/asm/smp.h b/arch/arm/include/asm/smp.h
-index 2ec765c..0580270 100644
---- a/arch/arm/include/asm/smp.h
-+++ b/arch/arm/include/asm/smp.h
-@@ -18,6 +18,8 @@
- # error "<asm/smp.h> included in non-SMP build"
- #endif
- 
-+#define SMP_IPI_FIQ_MASK 0x0100
-+
- #define raw_smp_processor_id() (current_thread_info()->cpu)
- 
- struct seq_file;
-@@ -85,6 +87,7 @@ extern void arch_send_call_function_single_ipi(int cpu);
- extern void arch_send_call_function_ipi_mask(const struct cpumask *mask);
- extern void arch_send_wakeup_ipi_mask(const struct cpumask *mask);
- 
-+extern void ipi_cpu_backtrace(struct pt_regs *regs);
- extern int register_ipi_completion(struct completion *completion, int cpu);
- 
- struct smp_operations {
-diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
-index 94959f9..2a33bab 100644
---- a/arch/arm/kernel/smp.c
-+++ b/arch/arm/kernel/smp.c
-@@ -455,6 +455,7 @@ static const char *ipi_types[NR_IPI] __tracepoint_string = {
- 	S(IPI_CPU_STOP, "CPU stop interrupts"),
- 	S(IPI_IRQ_WORK, "IRQ work interrupts"),
- 	S(IPI_COMPLETION, "completion interrupts"),
-+	S(IPI_BACKTRACE, "backtrace trigger interrupts"),
- };
- 
- static void smp_cross_call(const struct cpumask *target, unsigned int ipinr)
-@@ -543,7 +544,7 @@ static void ipi_cpu_stop(unsigned int cpu)
- 		cpu_relax();
- }
- 
--static void ipi_cpu_backtrace(struct pt_regs *regs)
-+void ipi_cpu_backtrace(struct pt_regs *regs)
- {
- 	int cpu = smp_processor_id();
- 
-@@ -584,6 +585,8 @@ void handle_IPI(int ipinr, struct pt_regs *regs)
- 	unsigned int cpu = smp_processor_id();
- 	struct pt_regs *old_regs = set_irq_regs(regs);
- 
-+	BUILD_BUG_ON(SMP_IPI_FIQ_MASK != BIT(IPI_CPU_BACKTRACE));
-+
- 	if ((unsigned)ipinr < NR_IPI) {
- 		trace_ipi_entry(ipi_types[ipinr]);
- 		__inc_irq_stat(cpu, ipi_irqs[ipinr]);
-diff --git a/arch/arm/kernel/traps.c b/arch/arm/kernel/traps.c
-index 92c4ea1..40b1de7 100644
---- a/arch/arm/kernel/traps.c
-+++ b/arch/arm/kernel/traps.c
-@@ -483,6 +483,9 @@ asmlinkage void __exception_irq_entry handle_fiq_as_nmi(struct pt_regs *regs)
- #ifdef CONFIG_ARM_GIC
- 	gic_handle_fiq_ipi();
- #endif
-+#ifdef CONFIG_SMP
-+	ipi_cpu_backtrace(regs);
-+#endif
- 
- 	nmi_exit();
- 
--- 
-1.9.3
+and call it at the end of of_dma_configure() as following:
+
+  arch_setup_iommu(dev, of_iommu_configure(dev));
+
+so it will setup IOMMU parameters for device and overwrite DMA
+parameters respectively.
+
+if IOMMU is not present/disabled arch_setup_iommu() will be a NOP and 
+system will roll back to default (old) behavior.
+
+Also it will simplify ARM dma-mapping changes -
+ only IOMMU code will need to be added.
+
+Best regards,
+-grygorii
