@@ -1,39 +1,111 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Tue,  9 Sep 2014 11:40:09 +0900
-Subject: [GIT PULL] Renesas ARM Based SoC Clocksource Updates for v3.18
-Message-ID: <cover.1410230283.git.horms+renesas@verge.net.au>
+Date: Tue,  9 Sep 2014 11:40:10 +0900
+Subject: [PATCH 1/3] clocksource: sh_cmt: Document SoC specific bindings
+In-Reply-To: <cover.1410230283.git.horms+renesas@verge.net.au>
+References: <cover.1410230283.git.horms+renesas@verge.net.au>
+Message-ID: <01fe3aaa3abd3379788173e0017a6299b5b438db.1410230283.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Daniel,
+In general Renesas hardware is not documented to the extent
+where the relationship between IP blocks on different SoCs can be assumed
+although they may appear to operate the same way. Furthermore the
+documentation typically does not specify a version for individual
+IP blocks. For these reasons a convention of using the SoC name in place
+of a version and providing SoC-specific compat strings has been adopted.
 
-Please consider these Renesas ARM based SoC clocksource updates for v3.18.
+Although not universally liked this convention is used in the bindings for
+a number of drivers for Renesas hardware. The purpose of this patch is to
+update the Renesas R-Car Compare Match Timer (CMT) driver to follow this
+convention.
 
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Acked-by: Mark Rutland <mark.rutland@arm.com>
+Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
 
-The following changes since commit 7d1311b93e58ed55f3a31cc8f94c4b8fe988a2b9:
+---
+* I plan to follow up with patches to use these new bindings in the
+  dtsi files for the affected SoCs.
 
-  Linux 3.17-rc1 (2014-08-16 10:40:26 -0600)
+v2
+* Reorder compat entries so more-specific entries and their fallbacks
+  are grouped with the fallback entry coming last.
+* Explicitly document fallback
 
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-clocksource-for-v3.18
-
-for you to fetch changes up to fb0eee2f141976b5d7f31e477a71556d312f7dc3:
-
-  clocksource: sh_tmu: Document r8a7779 binding (2014-09-06 10:20:53 +0900)
-
-----------------------------------------------------------------
-Renesas Clocksource Updates for v3.18
-
-* Document per-SoC bindings
-
-----------------------------------------------------------------
-Simon Horman (3):
-      clocksource: sh_cmt: Document SoC specific bindings
-      clocksource: sh_mtu2: Document r7s72100 binding
-      clocksource: sh_tmu: Document r8a7779 binding
-
+v3
+* Avoid circular dependency in documentation of fallback
+  behaviour of renesas,cmt-48-gen2
+* Use consistent case for SoC names in compat string descriptions
+---
  .../devicetree/bindings/timer/renesas,cmt.txt      | 44 +++++++++++++++++++---
- .../devicetree/bindings/timer/renesas,mtu2.txt     |  7 +++-
- .../devicetree/bindings/timer/renesas,tmu.txt      |  7 +++-
- 3 files changed, 48 insertions(+), 10 deletions(-)
+ 1 file changed, 38 insertions(+), 6 deletions(-)
+
+diff --git a/Documentation/devicetree/bindings/timer/renesas,cmt.txt b/Documentation/devicetree/bindings/timer/renesas,cmt.txt
+index a17418b..1a05c1b 100644
+--- a/Documentation/devicetree/bindings/timer/renesas,cmt.txt
++++ b/Documentation/devicetree/bindings/timer/renesas,cmt.txt
+@@ -11,15 +11,47 @@ datasheets.
+ 
+ Required Properties:
+ 
+-  - compatible: must contain one of the following.
+-    - "renesas,cmt-32" for the 32-bit CMT
++  - compatible: must contain one or more of the following:
++    - "renesas,cmt-32-r8a7740" for the r8a7740 32-bit CMT
++		(CMT0)
++    - "renesas,cmt-32-sh7372" for the sh7372 32-bit CMT
++		(CMT0)
++    - "renesas,cmt-32-sh73a0" for the sh73a0 32-bit CMT
++		(CMT0)
++    - "renesas,cmt-32" for all 32-bit CMT without fast clock support
+ 		(CMT0 on sh7372, sh73a0 and r8a7740)
+-    - "renesas,cmt-32-fast" for the 32-bit CMT with fast clock support
++		This is a fallback for the above renesas,cmt-32-* entries.
++
++    - "renesas,cmt-32-fast-r8a7740" for the r8a7740 32-bit CMT with fast
++		clock support (CMT[234])
++    - "renesas,cmt-32-fast-sh7372" for the sh7372 32-bit CMT with fast
++		clock support (CMT[234])
++    - "renesas,cmt-32-fast-sh73a0" for the sh73A0 32-bit CMT with fast
++		clock support (CMT[234])
++    - "renesas,cmt-32-fast" for all 32-bit CMT with fast clock support
+ 		(CMT[234] on sh7372, sh73a0 and r8a7740)
+-    - "renesas,cmt-48" for the 48-bit CMT
++		This is a fallback for the above renesas,cmt-32-fast-* entries.
++
++    - "renesas,cmt-48-sh7372" for the sh7372 48-bit CMT
++		(CMT1)
++    - "renesas,cmt-48-sh73a0" for the sh73A0 48-bit CMT
++		(CMT1)
++    - "renesas,cmt-48-r8a7740" for the r8a7740 48-bit CMT
++		(CMT1)
++    - "renesas,cmt-48" for all non-second generation 48-bit CMT
+ 		(CMT1 on sh7372, sh73a0 and r8a7740)
+-    - "renesas,cmt-48-gen2" for the second generation 48-bit CMT
++		This is a fallback for the above renesas,cmt-48-* entries.
++
++    - "renesas,cmt-48-r8a73a4" for the r8a73a4 48-bit CMT
++		(CMT[01])
++    - "renesas,cmt-48-r8a7790" for the r8a7790 48-bit CMT
++		(CMT[01])
++    - "renesas,cmt-48-r8a7791" for the r8a7791 48-bit CMT
++		(CMT[01])
++    - "renesas,cmt-48-gen2" for all second generation 48-bit CMT
+ 		(CMT[01] on r8a73a4, r8a7790 and r8a7791)
++		This is a fallback for the renesas,cmt-48-r8a73a4,
++		renesas,cmt-48-r8a7790 and renesas,cmt-48-r8a7791 entries.
+ 
+   - reg: base address and length of the registers block for the timer module.
+   - interrupts: interrupt-specifier for the timer, one per channel.
+@@ -36,7 +68,7 @@ Example: R8A7790 (R-Car H2) CMT0 node
+ 	them channels 0 and 1 in the documentation.
+ 
+ 	cmt0: timer at ffca0000 {
+-		compatible = "renesas,cmt-48-gen2";
++		compatible = "renesas,cmt-48-r8a7790", "renesas,cmt-48-gen2";
+ 		reg = <0 0xffca0000 0 0x1004>;
+ 		interrupts = <0 142 IRQ_TYPE_LEVEL_HIGH>,
+ 			     <0 142 IRQ_TYPE_LEVEL_HIGH>;
+-- 
+2.0.1
