@@ -1,67 +1,49 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Tue, 9 Sep 2014 11:42:20 -0400
-Subject: [PATCH V2 0/4] clk: mvebu: Improve clock drift
-In-Reply-To: <1409645719-20003-1-git-send-email-gregory.clement@free-electrons.com>
-References: <1409645719-20003-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <20140909154220.GN30828@titan.lakedaemon.net>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 09 Sep 2014 17:43:26 +0200
+Subject: [GIT PULL] ARM: LPC32xx: Device tree updates
+In-Reply-To: <540F1409.3070206@antcom.de>
+References: <540F1409.3070206@antcom.de>
+Message-ID: <4173517.3fBhGIV2aO@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 02, 2014 at 10:15:15AM +0200, Gregory CLEMENT wrote:
-> Hi Mike, Jason, Andrew and Sebastian,
+On Tuesday 09 September 2014 16:51:53 Roland Stigge wrote:
+> The following changes since commit 2ce7598c9a453e0acd0e07be7be3f5eb39608ebd:
 > 
-> Few users reported a timer drift on the Armada 370 based board such as
-> the mirabox or the Netgear ReadyNAS 102. This is the second series
-> with few improvements after the review of the 1st version.
+>   Linux 3.17-rc4 (2014-09-07 16:09:43 -0700)
 > 
-> The reason is that when the SSCG (Spread Spectrum Clock Generator) is
-> enabled, it shifts the frequency of the clock. The percentage is no
-> more than 1% but when the clock is used for a timer it leads to a
-> clock drift.
+> are available in the git repository at:
 > 
-> This series allows to correct the affected clock when the SSCG is
-> enabled. This drift can happen on all the mvebu SoC on the cpu clock
-> block (ie cpu, ddr and l2 cache). Currently the only notable effect is
-> for the Armada 370 because this SoC use the l2cache clock as source
-> for the timer. That's why even if the series allow any of the mvebu
-> SoC to benefit to this correction, Armada 370 is the only user of it.
+>   git://git.antcom.de/linux-2.6 lpc32xx/dt
 > 
-> The first 2 patches should go through the clk subsystem, whereas the
-> third one should go to the arm-soc through the mvebu tree.
+> for you to fetch changes up to de1fcd7f8a6d313c92c2af476b012305d4fe6553:
 > 
-> The last one is just to fix a typo I found while I was reading the clk
-> code.
+>   ARM: LPC32xx: Use DMA for both SSP channels (2014-09-09 15:05:31 +0200)
 > 
-> Thanks,
-> 
-> Gregory
-> 
-> Changelog:
-> 
-> v1 -> v2:
-> - made the function a370_is_sscg_enabled() a static one
-> - reword the comment to make clear that the formula in datasheet is
->   erroneous
-> - added a fix_sscg_deviation() callback in order to be able to deal
->   with the Dove case which is different from the other mvebu SoCs
-> 
-> 
-> Gregory CLEMENT (4):
->   clk: mvebu: Fix clk frequency value if SSCG is enabled
->   clk: mvebu: armada-370: Fix timer drift caused by the SSCG deviation
->   ARM: mvebu: add SSCG to Armada 370 Device Tree
->   clk: mvebu: armada-375: Fix the description of the SAR in the comment
-> 
->  arch/arm/boot/dts/armada-370.dtsi |  4 ++
->  drivers/clk/mvebu/armada-370.c    |  8 ++++
->  drivers/clk/mvebu/armada-375.c    |  4 +-
->  drivers/clk/mvebu/common.c        | 82 +++++++++++++++++++++++++++++++++++++++
->  drivers/clk/mvebu/common.h        |  7 ++++
->  5 files changed, 103 insertions(+), 2 deletions(-)
 
-Patches 1, 2, and 4 applied to mvebu/drivers-clk with Leigh's Tested-by.
-#3 applied to mvebu/dt with same Tested-by.
+Hi Roland,
 
-thx,
+I'm glad to see some pull requests from you again, you've been
+absent for a while.
 
-Jason.
+I have no objection to the patches, but I notice that you have just
+rebased them all today on the latest -rc.
+In general, we prefer the branches to be based on an older -rc,
+preferably -rc1, unless you have a dependency on a bug fix that
+went into a later one.
+Can you rebase them to -rc1 and send a new version?
+
+On a separate topic, are you still actively working with lpc32xx
+based machines? You cleaned up the platform a lot when you took
+over in 2012, but now we have move other platforms much further
+and I wonder if you could do some of the same changes.
+Most importantly, I really want most platforms to be part of
+ARCH_MULTIPLATFORM and build them into the same image. For
+lpc32xx, this is currently not possible because you are not using
+the common clk implementation. Would it be possible for you
+to look into converting that driver over and moving it to
+drivers/clk?
+There are a few other things that could be done if you are motivated,
+but that is the only one that I need and can't do myself.
+
+	Arnd
