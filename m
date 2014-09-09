@@ -1,37 +1,54 @@
-From: ankit.jindal@linaro.org (Ankit Jindal)
-Date: Tue,  9 Sep 2014 15:26:59 +0530
-Subject: [PATCH 5/5] MAINTAINERS: Add entry for APM Xgene QMTM UIO driver
-In-Reply-To: <1410256619-3213-1-git-send-email-ankit.jindal@linaro.org>
-References: <1410256619-3213-1-git-send-email-ankit.jindal@linaro.org>
-Message-ID: <1410256619-3213-6-git-send-email-ankit.jindal@linaro.org>
+From: jingchang.lu@freescale.com (Jingchang Lu)
+Date: Tue, 9 Sep 2014 17:06:28 +0800
+Subject: [PATCHv3 0/6]  ARM: imx: Add Freescale LS1021A SoC and board support
+Message-ID: <1410253594-15567-1-git-send-email-jingchang.lu@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add entry to maintainer list for APM Xgene QMTM UIO driver.
+This series contain the support for Freescale LS1021A CPU and LS1021A-QDS
+and LS1021A-TWR board.
 
-Signed-off-by: Ankit Jindal <ankit.jindal@linaro.org>
-Signed-off-by: Tushar Jagad <tushar.jagad@linaro.org>
+The LS1021A SoC combines two ARM Cortex-A7 cores that have been optimized
+for high reliability and pack the highest level of integration available
+for sub-3 W embedded communications processors and with a comprehensive
+enablement model focused on ease of programmability.
+
+The LS1021A SoC shares IPs with i.MX family, Vybrid family and Freescale
+PowerPC platform. 
+
+For the detail information about LS1021A SoC, please refer to the RM doc.
+
 ---
- MAINTAINERS |    7 +++++++
- 1 file changed, 7 insertions(+)
+changes in v3:
+rewrite scfg and dcfg doc binding description.
+remove untested node.
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 5e7866a..138663f 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -727,6 +727,13 @@ S:	Supported
- F:	drivers/net/ethernet/apm/xgene/
- F:	Documentation/devicetree/bindings/net/apm-xgene-enet.txt
- 
-+APPLIED MICRO (APM) X-GENE QMTM UIO DRIVER
-+M:	Ankit Jindal <ankit.jindal@linaro.org>
-+M:	Tushar Jagad <tushar.jagad@linaro.org>
-+S:	Supported
-+F:	drivers/uio/uio_xgene_qmtm.c
-+F:	Documentation/devicetree/bindings/uio/uio_xgene_qmtm.txt
-+
- APTINA CAMERA SENSOR PLL
- M:	Laurent Pinchart <Laurent.pinchart@ideasonboard.com>
- L:	linux-media at vger.kernel.org
--- 
-1.7.9.5
+changes in v2:
+remove unused nodes.
+wakeup the secondary core by IPI call to u-boot standby procedure. 
+add dt-bindings for LS1021A SoC and platform gerenal configuration nodes.
+
+----------------------------------------------------------------
+Jingchang Lu (6):
+	ARM: dts: Add SoC level device tree support for LS1021A
+	ARM: dts: Add initial LS1021A QDS board dts support
+	ARM: dts: Add initial LS1021A TWR board dts support
+	dt-bindings: arm: add Freescale LS1021A SoC device tree binding
+	ARM: imx: Add initial support for Freescale LS1021A
+	ARM: imx: Add Freescale LS1021A SMP support
+
+ Documentation/devicetree/bindings/arm/fsl.txt |  38 +++
+ arch/arm/boot/dts/Makefile                    |   2 +
+ arch/arm/boot/dts/ls1021a-qds.dts             | 285 +++++++++++++++++++++
+ arch/arm/boot/dts/ls1021a-twr.dts             | 117 +++++++++
+ arch/arm/boot/dts/ls1021a.dtsi                | 670 ++++++++++++++++++++++++++++++++++++++++++++++++++
+ arch/arm/mach-imx/Kconfig                     |  14 ++
+ arch/arm/mach-imx/Makefile                    |   4 +-
+ arch/arm/mach-imx/common.h                    |   1 +
+ arch/arm/mach-imx/mach-ls1021a.c              |  34 +++
+ arch/arm/mach-imx/platsmp.c                   |  32 +++
+ 10 files changed, 1216 insertions(+), 1 deletion(-)
+ create mode 100644 arch/arm/boot/dts/ls1021a-qds.dts
+ create mode 100755 arch/arm/boot/dts/ls1021a-twr.dts
+ create mode 100644 arch/arm/boot/dts/ls1021a.dtsi
+ create mode 100644 arch/arm/mach-imx/mach-ls1021a.c
