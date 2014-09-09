@@ -1,67 +1,85 @@
-From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Tue, 9 Sep 2014 08:26:19 -0600
-Subject: [PATCH v10 07/10] OF: Introduce helper function for getting PCI
- domain_nr
-In-Reply-To: <540EC8CB.7010106@huawei.com>
-References: <1410184472-17630-1-git-send-email-Liviu.Dudau@arm.com>
- <1410184472-17630-8-git-send-email-Liviu.Dudau@arm.com>
- <CAL_JsqJi8k1Goc3UmXhuxf9v7=4gJrYG_Di7v574PxS8TsJaXw@mail.gmail.com>
- <20140908145459.GO27864@e106497-lin.cambridge.arm.com>
- <CAL_JsqJdGKDVwJOpPp19OkVPGzR7Zqv3nh+ONHHaYnPLYTYoYg@mail.gmail.com>
- <20140908155931.GP27864@e106497-lin.cambridge.arm.com>
- <540E960D.7080408@huawei.com>
- <20140909084621.GS27864@e106497-lin.cambridge.arm.com>
- <540EC8CB.7010106@huawei.com>
-Message-ID: <CAErSpo4cAfom2=07NYDRfTCdHO22M0v+ueiaZuG6v2Xd18wEnQ@mail.gmail.com>
+From: keescook@chromium.org (Kees Cook)
+Date: Tue, 9 Sep 2014 07:33:11 -0700
+Subject: [PATCH v5 3/8] arm: fixmap: implement __set_fixmap()
+In-Reply-To: <20140909123829.GK1754@arm.com>
+References: <1409781429-27593-1-git-send-email-keescook@chromium.org>
+ <1409781429-27593-4-git-send-email-keescook@chromium.org>
+ <20140904170349.GL7156@arm.com>
+ <CAGXu5jKimGaupwyUwt0Zwa3OtjeoED8-uBeMX0MwXjBYP6ssAg@mail.gmail.com>
+ <20140904172748.GO7156@arm.com> <20140908191634.GV5598@outflux.net>
+ <20140908215506.GA4759@dator>
+ <CAGXu5jJFB+pcDVkcMoRZ9DnJu7MQuN=kceDhpkGrO=6ZLFy6Kw@mail.gmail.com>
+ <20140909123829.GK1754@arm.com>
+Message-ID: <CAGXu5jJoW-B7WwuFUhbN4e1aL-HVxa9x4da9hB9DcCGEXVLgzw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 9, 2014 at 3:30 AM, Yijing Wang <wangyijing@huawei.com> wrote:
-> On 2014/9/9 16:46, Liviu Dudau wrote:
->> On Tue, Sep 09, 2014 at 06:54:21AM +0100, Yijing Wang wrote:
->>>>>> on new requests. This function gets called quite a lot and I'm trying not to
->>>>>> make it too heavy weight.
->>>>>
->>>>> Generally, nothing should be accessing the same DT value frequently.
->>>>> It should get cached somewhere.
->>>>>
->>>>
->>>> The problem appears for DTs that don't have the pci-domain info. Then the cached
->>>> value is left at the default non-valid value and attempts to rescan the DT will
->>>> be made every time the function is called.
->>>>
->>>>> I don't really understand how domains are used so it's hard to provide
->>>>> a recommendation here. Do domains even belong in the DT?
->>>>
->>>> ACPI calls them segments and the way Bjorn explained it to me at some moment was
->>>> that it was an attempt to split up a bus in different groups (or alternatively,
->>>> merge a few busses together). To be honest I haven't seen systems where the domain
->>>> is anything other than zero, but JasonG (or maybe Benjamin) were floating an
->>>> idea of using the domain number to identify physical slots.
->>>
->>> PCI domain(or named segment) is provided by firmware, in ACPI system, we evaluated it
->>> by method "_SEG". in IA64 with ACPI, PCI hostbridge driver retrieves the domain from ACPI,
->>> if it's absent, the default domain is zero. So I wonder why in DTS, if it's absent, we get
->>> a auto increment domain value.
+On Tue, Sep 9, 2014 at 5:38 AM, Will Deacon <will.deacon@arm.com> wrote:
+> On Mon, Sep 08, 2014 at 11:40:43PM +0100, Kees Cook wrote:
+>> On Mon, Sep 8, 2014 at 2:55 PM, Rabin Vincent <rabin@rab.in> wrote:
+>> > On Mon, Sep 08, 2014 at 12:16:34PM -0700, Kees Cook wrote:
+>> >> On Thu, Sep 04, 2014 at 06:27:48PM +0100, Will Deacon wrote:
+>> >> > On Thu, Sep 04, 2014 at 06:23:42PM +0100, Kees Cook wrote:
+>> >> > > Ah! If this is the case, perhaps we can get away with
+>> >> > > local_flush_tlb_kernel_range() then?
+>> >> >
+>> >> > That's a bit tricky, since you need to ensure that preemption is disabled
+>> >> > until the mapping is put back like it was.
+>> >>
+>> >> Okay, under both real hardware with the errata, and under QEMU, things seem
+>> >> to work with this change to the series. What do you think?
+>> >
+>> > Preemption is already disabled until the mapping is put back in this
+>> > patch.c code because interrupts are disabled from before the time
+>> > set_fixmap() is called until after clear_fixmap() is called.
 >>
->> Because you can have more than one hostbridge (rare, but not impossible) and unless you
->> want to join the two segments, you might want to give it a different domain.
+>> Should I drop the preempt_disable/enable(), and just add a comment to
+>> set_fixmap()?
+>>
+>> > I'd guess that Will meant other (future) callers of set_fixmap() would
+>> > have to ensure similar behaviour with set_fixmap() / clear_fixmap().
+>> >
+>> > Unless I'm missing something set/clear_fixmap() seem to be quite arch
+>> > specific and only really used on x86, so we could ensure that future
+>> > users on ARM perform the correct tlb flush:  the first user on ARM with
+>> > a non-atomic context (or you) could implement a set_fixmap() which does
+>> > the global flush and have this patch.c (and any other atomic context
+>> > callers) call __set_fixmap() directly.
+>> >
+>> > The change to local_flush_tlb_kernel_range() in __set_fixmap() would of
+>> > course be needed in that case, and IIRC that was what my original patch
+>> > had (via set_top_pte()).
+>>
+>> Ah, so it was, yes! Will, which version of this logic would you prefer?
 >
-> OK. Sorry, I have one last question, because domain will be used to calculate the address used to
-> access PCI hardware config registers. So if DTS file doesn't report the domain, how do we know
-> we would access the right registers when we use the auto increment domain vaule ?
-> Has there a mechanism to make sure system can access the correct registers by the domain ?
+> I still don't think we're solving the general problem here -- we're actually
+> just making the ftrace case work. It is perfectly possible for another CPU
+> to undergo a TLB miss and refill whilst the page table is being modified by
+> the CPU with preemption disabled. In this case, a local tlb flush won't
+> invalidate that entry on the other core, and we have no way of knowing when
+> the original permissions are actually observed across the system.
 
-I think you're referring to config access via ECAM (PCIe r3.0, sec
-7.2.2).  In that case, I don't think the domain should be used to
-compute the memory-mapped configuration address.  Each host bridge is
-in exactly one domain, and each host bridge has an associated ECAM
-area base.  The address calculation uses the bus number, device
-number, function number, and register number to compute an offset into
-the ECAM area.
+The fixmap is used by anything doing patching _except_ ftrace,
+actually. It's used by jump labels, kprobes, and kgdb. This code is
+the general case. Access to set_fixmap is done via the kernel patching
+interface: patch_text().
 
-So as long as the DT tells you the ECAM information for each host
-bridge, that should be sufficient.  The domain number is then just a
-Linux convenience and is not tied to the platform as it is on ia64.
+Right now, the patch_text interface checks cache_ops_need_broadcast(),
+and conditionally runs under stop_machine(). We could make this
+unconditional, and we'll avoid any problem with TLB misses on another
+CPU.
 
-Bjorn
+> So I think we need to figure out a way to invalidate the TLB properly. What
+> do architectures that use IPIs for TLB broadcasting do (x86, some powerpc,
+> mips, ...)? They must have exactly the same problem.
+
+I don't think this should be done at the set_fixmap level, as it is
+more a primitive. I think making sure patch_text() always works would
+be best. What do you think of using an unconditional stop_machine()
+instead?
+
+-Kees
+
+-- 
+Kees Cook
+Chrome OS Security
