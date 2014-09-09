@@ -1,45 +1,34 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Tue, 9 Sep 2014 11:50:21 +0900
-Subject: [PATCH 0/5] ARM: shmobile: Use SoC-specific clock source compat
- strings
-In-Reply-To: <20140908002956.GA32532@verge.net.au>
-References: <1410136068-32220-1-git-send-email-horms+renesas@verge.net.au>
- <20140908002956.GA32532@verge.net.au>
-Message-ID: <20140909025021.GF31320@verge.net.au>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 8 Sep 2014 19:52:26 -0700
+Subject: [PATCHv3 0/5] OMAP Mailbox framework adoption & DT support
+In-Reply-To: <20140908232053.GS3238@atomide.com>
+References: <1406680479-18446-1-git-send-email-s-anna@ti.com>
+ <20140908232053.GS3238@atomide.com>
+Message-ID: <20140909025225.GI10785@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 08, 2014 at 09:29:56AM +0900, Simon Horman wrote:
-> On Mon, Sep 08, 2014 at 09:27:43AM +0900, Simon Horman wrote:
-> > In general Renesas hardware is not documented to the extent
-> > where the relationship between IP blocks on different SoCs can be assumed
-> > although they may appear to operate the same way. Furthermore the
-> > documentation typically does not specify a version for individual
-> > IP blocks. For these reasons a convention of using the SoC name in place
-> > of a version and providing SoC-specific compat strings has been adopted.
+* Tony Lindgren <tony@atomide.com> [140908 16:21]:
+> * Suman Anna <s-anna@ti.com> [140729 17:37]:
+> > Hi,
 > > 
-> > Although not universally liked this convention is used in the bindings
-> > for a number of drivers for Renesas hardware. The purpose of this series
-> > is to make use of SoC specific clock source strings.
+> > This is an updated version of the OMAP Mailbox framework adoption &
+> > DT support series, refreshed to work with the v9 version of the mailbox
+> > framework [1] from Jassi Brar while also addressing some minor review
+> > comments. Detailed changes are summarized below. Patches are based on
+> > 3.16-rc2.
 > 
-> This series is based on
-> renesas-next-20140904v2-v3.17-rc2
-> 
-> The bindings used are proposed in
-> "[PATCH v3 0/3] clocksource: Document Renesas SoC specific bindings"
-> 
-> > Simon Horman (5):
-> >   ARM: shmobile: r8a7740: Use SoC-specific 48-bit CMT compat string
-> >   ARM: shmobile: r8a7790: Use SoC-specific 48-bit CMT compat string
-> >   ARM: shmobile: r8a7791: Use SoC-specific 48-bit CMT compat string
-> >   ARM: shmobile: r7s72100: Use SoC-specific MTU2 compat string
-> >   ARM: shmobile: r8a7779: Use SoC-specific TMU compat string
-> > 
-> >  arch/arm/boot/dts/r7s72100.dtsi | 2 +-
-> >  arch/arm/boot/dts/r8a7740.dtsi  | 2 +-
-> >  arch/arm/boot/dts/r8a7779.dtsi  | 6 +++---
-> >  arch/arm/boot/dts/r8a7790.dtsi  | 4 ++--
-> >  arch/arm/boot/dts/r8a7791.dtsi  | 4 ++--
-> >  5 files changed, 9 insertions(+), 9 deletions(-)
+> Sorry for the delay, just noticed that I'm supposed to queue
+> these too. I'll queue these into omap-for-v3.18/mailbox against
+> v3.17-rc1 and will probably also merge it into omap-for-v3.18/dt
+> as well.
 
-I have queued up these changes.
+Actually this is not compiling and seems to probably miss
+the dependencies from Jassi, so dropping the branch.
+
+Anyways, since it seems you need to repost this again, please
+repost the DT changes separately from the driver changes.
+
+Regards,
+
+Tony
