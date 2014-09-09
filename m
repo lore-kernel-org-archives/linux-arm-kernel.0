@@ -1,87 +1,115 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 8 Sep 2014 17:58:09 -0700
-Subject: [PATCH 1/6] ARM: dts: OMAP3+: Add PRM interrupt
-In-Reply-To: <1408716235-26164-2-git-send-email-nm@ti.com>
-References: <1408716235-26164-1-git-send-email-nm@ti.com>
- <1408716235-26164-2-git-send-email-nm@ti.com>
-Message-ID: <20140909005808.GG10785@atomide.com>
+Date: Mon, 8 Sep 2014 17:59:03 -0700
+Subject: [PATCH 00/35] arm: omap: move intc to drivers/irqchip/
+In-Reply-To: <1406582183-696-1-git-send-email-balbi@ti.com>
+References: <1406582183-696-1-git-send-email-balbi@ti.com>
+Message-ID: <20140909005903.GH10785@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Nishanth Menon <nm@ti.com> [140822 07:08]:
-> Provide OMAP3, 4 and OMAP5 with interrupt number for PRM
+* Felipe Balbi <balbi@ti.com> [140728 14:19]:
+> Hi folks,
 > 
-> And for DRA7, provide crossbar number for prm interrupt.
+> here's another rebase of the original series moving INTC
+> to drivers.
 > 
-> Signed-off-by: Nishanth Menon <nm@ti.com>
+> There aren't many changes, only some fixes here and there
+> because of recent changes to irq_domain and irqchip.
+> 
+> I have also added a patch to enable INTC address space
+> protection so that only privileged modes can access
+> INTC's address space.
+> 
+> Patches tested on top of v3.17-rc7 with a beagle bone black,
+> the only plataform I have which still uses INTC.
+> 
+> Tony, if you can run your PM test cases on your side, I'd
+> be really glad.
 
-I've picked this patch only into omap-for-v3.18/soc as
-this is needed for Felipe's intc related changes to work
-properly with the wake-up interrupts for DT based booting
-for off-idle.
+With Nishants changes for the omap3 PRCM interrupt and the
+related .dts changes the PM works for me now with this series.
 
-So please don't include this patch into your pull request
-for the other dts changes you have.
+So I'm applying these into omap-for-v3.18/intc on top of
+Nishant's changes in omap-for-v3.18/soc thanks.
 
 Regards,
 
 Tony
-
-> ---
->  arch/arm/boot/dts/dra7.dtsi  |    1 +
->  arch/arm/boot/dts/omap3.dtsi |    1 +
->  arch/arm/boot/dts/omap4.dtsi |    1 +
->  arch/arm/boot/dts/omap5.dtsi |    1 +
->  4 files changed, 4 insertions(+)
+ 
+> cheers
 > 
-> diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
-> index 97f603c..7a3e011 100644
-> --- a/arch/arm/boot/dts/dra7.dtsi
-> +++ b/arch/arm/boot/dts/dra7.dtsi
-> @@ -89,6 +89,7 @@
->  		prm: prm at 4ae06000 {
->  			compatible = "ti,dra7-prm";
->  			reg = <0x4ae06000 0x3000>;
-> +			interrupts = <GIC_SPI 6 IRQ_TYPE_LEVEL_HIGH>;
->  
->  			prm_clocks: clocks {
->  				#address-cells = <1>;
-> diff --git a/arch/arm/boot/dts/omap3.dtsi b/arch/arm/boot/dts/omap3.dtsi
-> index 575a49b..3136ed1 100644
-> --- a/arch/arm/boot/dts/omap3.dtsi
-> +++ b/arch/arm/boot/dts/omap3.dtsi
-> @@ -97,6 +97,7 @@
->  		prm: prm at 48306000 {
->  			compatible = "ti,omap3-prm";
->  			reg = <0x48306000 0x4000>;
-> +			interrupts = <11>;
->  
->  			prm_clocks: clocks {
->  				#address-cells = <1>;
-> diff --git a/arch/arm/boot/dts/omap4.dtsi b/arch/arm/boot/dts/omap4.dtsi
-> index 69408b5..7375d44 100644
-> --- a/arch/arm/boot/dts/omap4.dtsi
-> +++ b/arch/arm/boot/dts/omap4.dtsi
-> @@ -129,6 +129,7 @@
->  		prm: prm at 4a306000 {
->  			compatible = "ti,omap4-prm";
->  			reg = <0x4a306000 0x3000>;
-> +			interrupts = <GIC_SPI 11 IRQ_TYPE_LEVEL_HIGH>;
->  
->  			prm_clocks: clocks {
->  				#address-cells = <1>;
-> diff --git a/arch/arm/boot/dts/omap5.dtsi b/arch/arm/boot/dts/omap5.dtsi
-> index fc8df17..df0a09b 100644
-> --- a/arch/arm/boot/dts/omap5.dtsi
-> +++ b/arch/arm/boot/dts/omap5.dtsi
-> @@ -131,6 +131,7 @@
->  		prm: prm at 4ae06000 {
->  			compatible = "ti,omap5-prm";
->  			reg = <0x4ae06000 0x3000>;
-> +			interrupts = <GIC_SPI 11 IRQ_TYPE_LEVEL_HIGH>;
->  
->  			prm_clocks: clocks {
->  				#address-cells = <1>;
+> Felipe Balbi (35):
+>   arm: omap: irq: make omap_irq_base global
+>   arm: omap: irq: define INTC_ILR0 register
+>   arm: omap: irq: start to remove irq_banks array
+>   arm: omap: irq: add a global omap_nr_irqs variable
+>   arm: omap: irq: remove rest of irq_banks usage
+>   arm: omap: irq: remove unused macro
+>   arm: omap: irq: switch over to intc_readl on omap_intc_handle_irq
+>   arm: omap: irq: remove unnecessary base_addr argument
+>   arm: omap: irq: rename omap3_intc_regs
+>   arm: omap: irq: always define omap3 support
+>   arm: omap: irq: reorganize code a little bit
+>   arm: omap: irq: make intc_of_init static
+>   arm: omap: irq: call set_handle_irq() from intc_of_init
+>   arm: omap: irq: use IRQCHIP_DECLARE macro
+>   arm: omap: irq: drop .handle_irq and .init_irq fields
+>   arm: omap: irq: add specific compatibles for omap3 and am33xx devices
+>   arm: omap: irq: use compatible flag to figure out number of IRQ lines
+>   arm: boot: dts: am33xx/omap3: fix intc compatible flag
+>   arm: omap: irq: drop ti,intc-size support
+>   arm: boot: dts: omap2/3/am33xx: drop ti,intc-size
+>   arm: omap: irq: move some more code around
+>   arm: omap: irq: call set_handle_irq() from .init_irq
+>   arm: omap: irq: drop omap3_intc_handle_irq()
+>   arm: omap: irq: drop omap2_intc_handle_irq()
+>   arm: omap: irq: remove unnecessary header
+>   arm: omap: irq: remove nr_irqs argument
+>   arm: omap: irq: introduce omap_nr_pending
+>   arm: omap: irq: get rid of ifdef hack
+>   arm: omap: intc: switch over to linear irq domain
+>   irqchip: add irq-omap-intc.h header
+>   arm: omap: irq: move irq.c to drivers/irqchip/
+>   irq: intc: minor improvement to omap_irq_pending()
+>   irq: intc: comment style cleanup
+>   irq: intc: remove unnecesary of_address_to_resource() call
+>   irq: intc: enable IP protection
+> 
+>  arch/arm/boot/dts/am33xx.dtsi              |   3 +-
+>  arch/arm/boot/dts/omap2.dtsi               |   1 -
+>  arch/arm/boot/dts/omap3.dtsi               |   3 +-
+>  arch/arm/mach-omap2/Kconfig                |   1 +
+>  arch/arm/mach-omap2/Makefile               |   3 +-
+>  arch/arm/mach-omap2/board-3430sdp.c        |   2 +-
+>  arch/arm/mach-omap2/board-am3517crane.c    |   2 +-
+>  arch/arm/mach-omap2/board-am3517evm.c      |   2 +-
+>  arch/arm/mach-omap2/board-cm-t35.c         |   3 +-
+>  arch/arm/mach-omap2/board-cm-t3517.c       |   2 +-
+>  arch/arm/mach-omap2/board-devkit8000.c     |   2 +-
+>  arch/arm/mach-omap2/board-generic.c        |  14 -
+>  arch/arm/mach-omap2/board-ldp.c            |   2 +-
+>  arch/arm/mach-omap2/board-omap3beagle.c    |   2 +-
+>  arch/arm/mach-omap2/board-omap3logic.c     |   3 +-
+>  arch/arm/mach-omap2/board-omap3pandora.c   |   2 +-
+>  arch/arm/mach-omap2/board-omap3stalker.c   |   2 +-
+>  arch/arm/mach-omap2/board-omap3touchbook.c |   2 +-
+>  arch/arm/mach-omap2/board-overo.c          |   2 +-
+>  arch/arm/mach-omap2/board-rx51.c           |   2 +-
+>  arch/arm/mach-omap2/board-ti8168evm.c      |   1 +
+>  arch/arm/mach-omap2/common.h               |  22 --
+>  arch/arm/mach-omap2/cpuidle34xx.c          |   1 +
+>  arch/arm/mach-omap2/irq.c                  | 380 ---------------------------
+>  arch/arm/mach-omap2/pm24xx.c               |   1 +
+>  arch/arm/mach-omap2/pm34xx.c               |   1 +
+>  drivers/irqchip/Kconfig                    |   5 +
+>  drivers/irqchip/Makefile                   |   1 +
+>  drivers/irqchip/irq-omap-intc.c            | 408 +++++++++++++++++++++++++++++
+>  include/linux/irqchip/irq-omap-intc.h      |  32 +++
+>  30 files changed, 468 insertions(+), 439 deletions(-)
+>  delete mode 100644 arch/arm/mach-omap2/irq.c
+>  create mode 100644 drivers/irqchip/irq-omap-intc.c
+>  create mode 100644 include/linux/irqchip/irq-omap-intc.h
+> 
 > -- 
-> 1.7.9.5
+> 2.0.1.563.g66f467c
 > 
