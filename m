@@ -1,83 +1,53 @@
-From: info@lategoodbye.de (Stefan Wahren)
-Date: Tue, 09 Sep 2014 20:48:40 +0200
-Subject: [PATCH RFC 1/3] DT: add binding for MXS regulator
-In-Reply-To: <20140909175940.GF3896@leverpostej>
-References: <1410089869-6611-1-git-send-email-info@lategoodbye.de>
- <1410089869-6611-2-git-send-email-info@lategoodbye.de>
- <20140909175940.GF3896@leverpostej>
-Message-ID: <540F4B88.5080108@lategoodbye.de>
+From: m.chehab@samsung.com (Mauro Carvalho Chehab)
+Date: Tue, 09 Sep 2014 15:40:32 -0300
+Subject: [PATCH 2/3] [media] s5p-jpeg: Fix compilation with COMPILE_TEST
+In-Reply-To: <60097822.tu6OncvLxQ@wuerfel>
+References: <20140909124306.2d5a0d76@canb.auug.org.au>
+ <540F15B2.3000902@samsung.com> <20140909120936.527bd852.m.chehab@samsung.com>
+ <60097822.tu6OncvLxQ@wuerfel>
+Message-ID: <20140909154032.01625bb0.m.chehab@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+Em Tue, 09 Sep 2014 19:54:19 +0200
+Arnd Bergmann <arnd@arndb.de> escreveu:
 
-Am 09.09.2014 19:59, schrieb Mark Rutland:
-> On Sun, Sep 07, 2014 at 12:37:47PM +0100, Stefan Wahren wrote:
->> This patch adds the Device tree bindings for the Freescale MXS on-chip
->> regulators.
->>
->> Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
->> ---
->>   .../bindings/regulator/mxs-regulator.txt           | 38 ++++++++++++++++++++++
->>   1 file changed, 38 insertions(+)
->>   create mode 100644 Documentation/devicetree/bindings/regulator/mxs-regulator.txt
->>
->> diff --git a/Documentation/devicetree/bindings/regulator/mxs-regulator.txt b/Documentation/devicetree/bindings/regulator/mxs-regulator.txt
->> new file mode 100644
->> index 0000000..c3226cc
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/regulator/mxs-regulator.txt
->> @@ -0,0 +1,38 @@
->> +MXS regulators
->> +
->> +Required node properties:
->> +- compatible: Should be "fsl,<soc>-power", where soc is "imx23" or "imx28"
->> +- reg: Offset and length of the register set for the device
->
-> We require #address-cells and #size-cells if the child nodes have reg
-> entries.
+> On Tuesday 09 September 2014 12:09:36 Mauro Carvalho Chehab wrote:
+> > -exynos4.c
+> > > > index e51c078360f5..01eeacf28843 100644
+> > > > --- a/drivers/media/platform/s5p-jpeg/jpeg-hw-exynos4.c
+> > > > +++ b/drivers/media/platform/s5p-jpeg/jpeg-hw-exynos4.c
+> > > > @@ -23,7 +23,9 @@ void exynos4_jpeg_sw_reset(void __iomem *base)
+> > > >     reg = readl(base + EXYNOS4_JPEG_CNTL_REG);
+> > > >     writel(reg & ~EXYNOS4_SOFT_RESET_HI, base + EXYNOS4_JPEG_CNTL_REG);
+> > > >  
+> > > > +#ifndef CONFIG_COMPILE_TEST
+> > > >     ndelay(100000);
+> > > > +#endif
+> > > 
+> > > Wouldn't be a better fix to replace ndelay(100000); with udelay(100),
+> > > rather than sticking in a not so pretty #ifndef ?
+> > 
+> > Works for me. I'll submit a new version.
+> 
+> New version looks good to me. On a more general level, I would argue
+> that we should not disable code based on COMPILE_TEST. The typical
+> use of this symbol is to make it possible to compile more code, not
+> to change the behavior of code on machines that were able to build
+> it already.
 
-okay.
+Yeah, agreed as a general concept. In this case, however, it were
+causing a compilation breakage on X86 (as it generates a non-existing
+_bad_ndelay() symbol, if the time is bigger than 20000). See
+include/asm-generic/delay.h.
 
->
->> +
->> +Required regulator properties:
->> +- compatible: Must be "fsl,mxs-regulator"
->> +- reg: Offset of the register set for the regulator
->
-> Is this the offset or the absolute physical address?
->
-> The example seems to be absolute.
+Btw, I suspect that the only reason why ndelay(100000) causes a
+compilation breakage is to avoid a big number, as the maximum limit
+check ndelay() code (20000) at asm-generic is identical to the one
+for udelay(). So, for ndelay, it means 20us, while, for udelay,
+it means 20ms. Even so, both calls the very same implementation code.
 
-You are right, the description is wrong.
+Perhaps we should fix it, for both to accept a maximum time of 20ms.
 
->
->> +- mxs-max-reg-val: Maximum value of this register
->
-> What does this even mean? What's the format?
->
-> Is this not implied by standard properties like regulator-max-microvolt?
-
-Unfortunately not as long the step size in microvolt isn't defined. The 
-parameter defines the register value in hex corresponding to 
-regulator-max-microvolt.
-
-step size = (regulator-max-microvolt - regulator-min-microvolt) / 
-mxs-max-reg-val
-
-May be i missed or understand something wrong?
-
->
->> +Optional regulator properties:
->> +- mxs-default-microvolt: initial voltage of the regulator
->
-> Why is this necessary?
-
-The original driver from Freescale set the MX28 regulator vddio to 3.38 
-V during registering. I think that is ugly to implement in the driver 
-part, so i add a more general property in the devicetree binding.
-
->
-> Mark.
-
-Stefan
+Regards,
+Mauro
