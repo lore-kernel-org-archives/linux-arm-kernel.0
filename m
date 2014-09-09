@@ -1,43 +1,33 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 09 Sep 2014 13:53:03 +0200
-Subject: [PATCHv3 1/6] ARM: dts: Add SoC level device tree support for
- LS1021A
-In-Reply-To: <1410253952-15631-2-git-send-email-jingchang.lu@freescale.com>
-References: <1410253952-15631-1-git-send-email-jingchang.lu@freescale.com>
- <1410253952-15631-2-git-send-email-jingchang.lu@freescale.com>
-Message-ID: <62651744.c71MLsL3Q5@wuerfel>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 9 Sep 2014 12:54:46 +0100
+Subject: [PATCH v4 0/9] PM / Domains: Generic OF-based support
+In-Reply-To: <1410262570-22785-1-git-send-email-ulf.hansson@linaro.org>
+References: <1409838756-31963-1-git-send-email-ulf.hansson@linaro.org>
+ <1410262570-22785-1-git-send-email-ulf.hansson@linaro.org>
+Message-ID: <20140909115446.GW2601@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 09 September 2014 17:12:27 Jingchang Lu wrote:
-> +       aliases {
-> +               serial0 = &lpuart0;
-> +               serial1 = &lpuart1;
-> +               serial2 = &lpuart2;
-> +               serial3 = &lpuart3;
-> +               serial4 = &lpuart4;
-> +               serial5 = &lpuart5;
-> +               ethernet0 = &enet0;
-> +               ethernet1 = &enet1;
-> +               ethernet2 = &enet2;
-> +               sysclk = &sysclk;
-> +       };
-> +
-> +       memory at 80000000 {
-> +               device_type = "memory";
-> +               reg = <0x0 0x80000000 0x0 0x20000000>;
-> +       };
-> +
-> 
+On Tue, Sep 09, 2014 at 01:36:01PM +0200, Ulf Hansson wrote:
+> Changes in v4:
+> 	- Rebased patch "PM / Domains: Add generic OF-based PM domain look-up" -
+> 	  and updated the author and the commit message.
+> 	- Adopted review comments for "PM / Domains: Add APIs to attach/detach
+> 	  a PM domain for a device".
+> 	- Updated author and commit message for "ARM: exynos: Move to generic
+> 	  PM domain DT bindings".
+> 	- Added some acks and reviewed by tags.
+> 	- Started to use the "--in-reply-to" option to git-send-email. It should
+> 	  provide the option to show a better diffstat per patch.
 
-
-One more thing: these should all go into the board specific files.
-
-The installed memory is almost always a property of the board, not the
-SoC, and a lot of boards only connect a subset of the serial ports,
-or they may have them in a different order.
-
-In particular, you only provide aliases for the six out of the
-ten available uarts, which seems arbitrary.
-
-	Arnd
+Please don't send serieses in reply to earlier versions, it buries
+things in the middle of old discussions which can mean they don't get
+noticed, especially when you're sending multiple large patch serieses at
+the same time.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140909/9406e4fc/attachment.sig>
