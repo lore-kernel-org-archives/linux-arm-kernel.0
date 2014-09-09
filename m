@@ -1,108 +1,327 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Tue,  9 Sep 2014 13:22:01 +0900
-Subject: [PATCH 1/6] ARM: shmobile: r8a7740: Multiplatform support
+Date: Tue,  9 Sep 2014 13:22:02 +0900
+Subject: [PATCH 2/6] ARM: shmobile: armadillo800eva: Sync DTS
 In-Reply-To: <cover.1410235700.git.horms+renesas@verge.net.au>
 References: <cover.1410235700.git.horms+renesas@verge.net.au>
-Message-ID: <c41215b781efbfa22ffc9dc474c2981c130c153d.1410235700.git.horms+renesas@verge.net.au>
+Message-ID: <25aa7ba3fdfbfcb48e13c1b7d008bd9e2ca9fa82.1410235700.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Magnus Damm <damm+renesas@opensource.se>
 
-Enable r8a7740 Multiplatform support for the generic r8a7740
-machine vector. No board support is enabled, and the board
-code for Armadillo 800 EVA DT Reference is left by itself.
+Take the contents from the Armadillo800EVA DT reference DTS
+and add them to the "regular" Armadillo800EVA DTS. This is
+preparation for removal of the DT reference DTS. So the goal
+is to have a single DTS for this Armadillo board.
+
+The SoC "r8a7740" is added to compatible string but the board
+is left as-is (excluding the reference suffix).
+
+The kernel command line is left as-is, earlyprintk is used in
+case of legacy and for multiplatform we can simply ignore it
+for now.
 
 Signed-off-by: Magnus Damm <damm+renesas@opensource.se>
+Tested-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/Kconfig         | 5 +++++
- arch/arm/mach-shmobile/pm-r8a7740.c    | 5 ++---
- arch/arm/mach-shmobile/r8a7740.h       | 4 ++--
- arch/arm/mach-shmobile/setup-r8a7740.c | 8 +++++++-
- 4 files changed, 16 insertions(+), 6 deletions(-)
+ arch/arm/boot/dts/r8a7740-armadillo800eva.dts | 276 +++++++++++++++++++++++++-
+ 1 file changed, 275 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-shmobile/Kconfig b/arch/arm/mach-shmobile/Kconfig
-index e15dff7..498162f 100644
---- a/arch/arm/mach-shmobile/Kconfig
-+++ b/arch/arm/mach-shmobile/Kconfig
-@@ -26,6 +26,11 @@ config ARCH_R7S72100
- 	bool "RZ/A1H (R7S72100)"
- 	select SYS_SUPPORTS_SH_MTU2
+diff --git a/arch/arm/boot/dts/r8a7740-armadillo800eva.dts b/arch/arm/boot/dts/r8a7740-armadillo800eva.dts
+index a06a11e..effb7b4 100644
+--- a/arch/arm/boot/dts/r8a7740-armadillo800eva.dts
++++ b/arch/arm/boot/dts/r8a7740-armadillo800eva.dts
+@@ -10,10 +10,18 @@
  
-+config ARCH_R8A7740
-+	bool "R-Mobile A1 (R8A77400)"
-+	select ARCH_RMOBILE
-+	select RENESAS_INTC_IRQPIN
+ /dts-v1/;
+ #include "r8a7740.dtsi"
++#include <dt-bindings/gpio/gpio.h>
++#include <dt-bindings/input/input.h>
++#include <dt-bindings/interrupt-controller/irq.h>
++#include <dt-bindings/pwm/pwm.h>
+ 
+ / {
+ 	model = "armadillo 800 eva";
+-	compatible = "renesas,armadillo800eva";
++	compatible = "renesas,armadillo800eva", "renesas,r8a7740";
 +
- config ARCH_R8A7779
- 	bool "R-Car H1 (R8A77790)"
- 	select RENESAS_INTC_IRQPIN
-diff --git a/arch/arm/mach-shmobile/pm-r8a7740.c b/arch/arm/mach-shmobile/pm-r8a7740.c
-index a0d44d5..4d327de 100644
---- a/arch/arm/mach-shmobile/pm-r8a7740.c
-+++ b/arch/arm/mach-shmobile/pm-r8a7740.c
-@@ -13,7 +13,7 @@
- #include "common.h"
- #include "pm-rmobile.h"
++	aliases {
++		serial1 = &scifa1;
++	};
  
--#ifdef CONFIG_PM
-+#if defined(CONFIG_PM) && !defined(CONFIG_ARCH_MULTIPLATFORM)
- static int r8a7740_pd_a4s_suspend(void)
- {
- 	/*
-@@ -58,8 +58,7 @@ void __init r8a7740_init_pm_domains(void)
- 	rmobile_init_domains(r8a7740_pm_domains, ARRAY_SIZE(r8a7740_pm_domains));
- 	pm_genpd_add_subdomain_names("A4S", "A3SP");
- }
--
--#endif /* CONFIG_PM */
-+#endif /* CONFIG_PM && !CONFIG_ARCH_MULTIPLATFORM */
- 
- #ifdef CONFIG_SUSPEND
- static int r8a7740_enter_suspend(suspend_state_t suspend_state)
-diff --git a/arch/arm/mach-shmobile/r8a7740.h b/arch/arm/mach-shmobile/r8a7740.h
-index 3352fb8..f369b4b 100644
---- a/arch/arm/mach-shmobile/r8a7740.h
-+++ b/arch/arm/mach-shmobile/r8a7740.h
-@@ -53,10 +53,10 @@ extern void r8a7740_clock_init(u8 md_ck);
- extern void r8a7740_pinmux_init(void);
- extern void r8a7740_pm_init(void);
- 
--#ifdef CONFIG_PM
-+#if defined(CONFIG_PM) && !defined(CONFIG_ARCH_MULTIPLATFORM)
- extern void __init r8a7740_init_pm_domains(void);
- #else
- static inline void r8a7740_init_pm_domains(void) {}
--#endif /* CONFIG_PM */
-+#endif /* CONFIG_PM && !CONFIG_ARCH_MULTIPLATFORM */
- 
- #endif /* __ASM_R8A7740_H__ */
-diff --git a/arch/arm/mach-shmobile/setup-r8a7740.c b/arch/arm/mach-shmobile/setup-r8a7740.c
-index 8fe270d..1e55c50 100644
---- a/arch/arm/mach-shmobile/setup-r8a7740.c
-+++ b/arch/arm/mach-shmobile/setup-r8a7740.c
-@@ -36,6 +36,7 @@
- #include <asm/mach/map.h>
- #include <asm/mach/arch.h>
- #include <asm/mach/time.h>
-+#include <asm/hardware/cache-l2x0.h>
- 
- #include "common.h"
- #include "dma-register.h"
-@@ -813,7 +814,12 @@ void __init r8a7740_init_irq_of(void)
- 
- static void __init r8a7740_generic_init(void)
- {
--	r8a7740_clock_init(0);
-+	r8a7740_meram_workaround();
+ 	chosen {
+ 		bootargs = "console=tty0 console=ttySC1,115200 earlyprintk=sh-sci.1,115200 ignore_loglevel root=/dev/nfs ip=dhcp rw";
+@@ -23,4 +31,270 @@
+ 		device_type = "memory";
+ 		reg = <0x40000000 0x20000000>;
+ 	};
 +
-+#ifdef CONFIG_CACHE_L2X0
-+	/* Shared attribute override enable, 32K*8way */
-+	l2x0_init(IOMEM(0xf0002000), 0x00400000, 0xc20f0fff);
-+#endif
- 	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
- }
- 
++	reg_3p3v: regulator at 0 {
++		compatible = "regulator-fixed";
++		regulator-name = "fixed-3.3V";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++		regulator-always-on;
++		regulator-boot-on;
++	};
++
++	vcc_sdhi0: regulator at 1 {
++		compatible = "regulator-fixed";
++
++		regulator-name = "SDHI0 Vcc";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++
++		gpio = <&pfc 75 GPIO_ACTIVE_HIGH>;
++		enable-active-high;
++	};
++
++	vccq_sdhi0: regulator at 2 {
++		compatible = "regulator-gpio";
++
++		regulator-name = "SDHI0 VccQ";
++		regulator-min-microvolt = <1800000>;
++		regulator-max-microvolt = <3300000>;
++		vin-supply = <&vcc_sdhi0>;
++
++		enable-gpio = <&pfc 74 GPIO_ACTIVE_HIGH>;
++		gpios = <&pfc 17 GPIO_ACTIVE_HIGH>;
++		states = <3300000 0
++			  1800000 1>;
++
++		enable-active-high;
++	};
++
++	reg_5p0v: regulator at 3 {
++		compatible = "regulator-fixed";
++		regulator-name = "fixed-5.0V";
++		regulator-min-microvolt = <5000000>;
++		regulator-max-microvolt = <5000000>;
++		regulator-always-on;
++		regulator-boot-on;
++	};
++
++	gpio-keys {
++		compatible = "gpio-keys";
++
++		power-key {
++			gpios = <&pfc 99 GPIO_ACTIVE_LOW>;
++			linux,code = <KEY_POWER>;
++			label = "SW3";
++			gpio-key,wakeup;
++		};
++
++		back-key {
++			gpios = <&pfc 100 GPIO_ACTIVE_LOW>;
++			linux,code = <KEY_BACK>;
++			label = "SW4";
++		};
++
++		menu-key {
++			gpios = <&pfc 97 GPIO_ACTIVE_LOW>;
++			linux,code = <KEY_MENU>;
++			label = "SW5";
++		};
++
++		home-key {
++			gpios = <&pfc 98 GPIO_ACTIVE_LOW>;
++			linux,code = <KEY_HOME>;
++			label = "SW6";
++		};
++	};
++
++	leds {
++		compatible = "gpio-leds";
++		led3 {
++			gpios = <&pfc 102 GPIO_ACTIVE_HIGH>;
++			label = "LED3";
++		};
++		led4 {
++			gpios = <&pfc 111 GPIO_ACTIVE_HIGH>;
++			label = "LED4";
++		};
++		led5 {
++			gpios = <&pfc 110 GPIO_ACTIVE_HIGH>;
++			label = "LED5";
++		};
++		led6 {
++			gpios = <&pfc 177 GPIO_ACTIVE_HIGH>;
++			label = "LED6";
++		};
++	};
++
++	i2c2: i2c at 2 {
++		#address-cells = <1>;
++		#size-cells = <0>;
++		compatible = "i2c-gpio";
++		gpios = <&pfc 208 GPIO_ACTIVE_HIGH /* sda */
++			 &pfc 91 GPIO_ACTIVE_HIGH /* scl */
++			>;
++		i2c-gpio,delay-us = <5>;
++	};
++
++	backlight {
++		compatible = "pwm-backlight";
++		pwms = <&tpu 2 33333 PWM_POLARITY_INVERTED>;
++		brightness-levels = <0 1 2 4 8 16 32 64 128 255>;
++		default-brightness-level = <9>;
++		pinctrl-0 = <&backlight_pins>;
++		pinctrl-names = "default";
++		power-supply = <&reg_5p0v>;
++		enable-gpios = <&pfc 61 GPIO_ACTIVE_HIGH>;
++	};
++
++	sound {
++		compatible = "simple-audio-card";
++
++		simple-audio-card,format = "i2s";
++
++		simple-audio-card,cpu {
++			sound-dai = <&sh_fsi2 0>;
++			bitclock-inversion;
++		};
++
++		simple-audio-card,codec {
++			sound-dai = <&wm8978>;
++			bitclock-master;
++			frame-master;
++			system-clock-frequency = <12288000>;
++		};
++	};
++};
++
++&ether {
++	pinctrl-0 = <&ether_pins>;
++	pinctrl-names = "default";
++
++	phy-handle = <&phy0>;
++	status = "ok";
++
++	phy0: ethernet-phy at 0 {
++		reg = <0>;
++	};
++};
++
++&extal1_clk {
++	clock-frequency = <25000000>;
++};
++&extal2_clk {
++	clock-frequency = <48000000>;
++};
++&fsibck_clk {
++	clock-frequency = <12288000>;
++};
++&cpg_clocks {
++	renesas,mode = <0x05>; /* MD_CK0 | MD_CK2 */
++};
++
++&cmt1 {
++	status = "ok";
++};
++
++&i2c0 {
++	status = "okay";
++	touchscreen at 55 {
++		compatible = "sitronix,st1232";
++		reg = <0x55>;
++		interrupt-parent = <&irqpin1>;
++		interrupts = <2 IRQ_TYPE_LEVEL_LOW>;
++		pinctrl-0 = <&st1232_pins>;
++		pinctrl-names = "default";
++		gpios = <&pfc 166 GPIO_ACTIVE_LOW>;
++	};
++
++	wm8978: wm8978 at 1a {
++		#sound-dai-cells = <0>;
++		compatible = "wlf,wm8978";
++		reg = <0x1a>;
++	};
++};
++
++&i2c2 {
++	status = "okay";
++	rtc at 30 {
++		compatible = "sii,s35390a";
++		reg = <0x30>;
++	};
++};
++
++&pfc {
++	ether_pins: ether {
++		renesas,groups = "gether_mii", "gether_int";
++		renesas,function = "gether";
++	};
++
++	scifa1_pins: serial1 {
++		renesas,groups = "scifa1_data";
++		renesas,function = "scifa1";
++	};
++
++	st1232_pins: touchscreen {
++		renesas,groups = "intc_irq10";
++		renesas,function = "intc";
++	};
++
++	backlight_pins: backlight {
++		renesas,groups = "tpu0_to2_1";
++		renesas,function = "tpu0";
++	};
++
++	mmc0_pins: mmc0 {
++		renesas,groups = "mmc0_data8_1", "mmc0_ctrl_1";
++		renesas,function = "mmc0";
++	};
++
++	sdhi0_pins: sd0 {
++		renesas,groups = "sdhi0_data4", "sdhi0_ctrl", "sdhi0_wp";
++		renesas,function = "sdhi0";
++	};
++
++	fsia_pins: sounda {
++		renesas,groups = "fsia_sclk_in", "fsia_mclk_out",
++				 "fsia_data_in_1", "fsia_data_out_0";
++		renesas,function = "fsia";
++	};
++};
++
++&tpu {
++	status = "okay";
++};
++
++&mmcif0 {
++	pinctrl-0 = <&mmc0_pins>;
++	pinctrl-names = "default";
++
++	vmmc-supply = <&reg_3p3v>;
++	bus-width = <8>;
++	non-removable;
++	status = "okay";
++};
++
++&scifa1 {
++	pinctrl-0 = <&scifa1_pins>;
++	pinctrl-names = "default";
++
++	status = "okay";
++};
++
++&sdhi0 {
++	pinctrl-0 = <&sdhi0_pins>;
++	pinctrl-names = "default";
++
++	vmmc-supply = <&vcc_sdhi0>;
++	vqmmc-supply = <&vccq_sdhi0>;
++	bus-width = <4>;
++	cd-gpios = <&pfc 167 GPIO_ACTIVE_LOW>;
++	status = "okay";
++};
++
++&sh_fsi2 {
++	pinctrl-0 = <&fsia_pins>;
++	pinctrl-names = "default";
++
++	status = "okay";
+ };
 -- 
 2.0.1
