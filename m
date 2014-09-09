@@ -1,48 +1,56 @@
 From: geoff@infradead.org (Geoff Levand)
 Date: Tue, 09 Sep 2014 22:49:05 +0000
-Subject: [PATCH 10/13] arm64/kexec: Revert change to machine_shutdown()
+Subject: [PATCH 09/13] arm64/kexec: Kexec expects cpu_die
 In-Reply-To: <cover.1410302383.git.geoff@infradead.org>
 References: <cover.1410302383.git.geoff@infradead.org>
-Message-ID: <de2fda64cc5eebcf96d9d845b185c6382c900ac3.1410302383.git.geoff@infradead.org>
+Message-ID: <8760d3e11621065a78236e91724875f0e1cfadf4.1410302383.git.geoff@infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 90f51a09ef83 ("arm64: Fix machine_shutdown() definition") changed the
-implementation of machine_shutdown() from calling smp_send_stop() to
-calling disable_nonboot_cpus().  Revert that part of the commit so that
-machine_shutdown() once again calls smp_send_stop().
-
-With the application of another patch in this series, (arm64: Use cpu_ops for
-smp_stop), smp_send_stop() will do the correct thing for a kexec reboot. This
-change also corrects the source code comment for the machine_shutdown() routine.
+The arm64 implementation of kexec expects an operational cpu_die method of
+struct cpu_operations, so add defined(CONFIG_KEXEC) to the preprocessor
+conditional that enables cpu_die.
 
 Signed-off-by: Geoff Levand <geoff@infradead.org>
 ---
- arch/arm64/kernel/process.c | 9 +++------
- 1 file changed, 3 insertions(+), 6 deletions(-)
+ arch/arm64/include/asm/cpu_ops.h | 2 +-
+ arch/arm64/kernel/psci.c         | 4 ++--
+ 2 files changed, 3 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm64/kernel/process.c b/arch/arm64/kernel/process.c
-index 0a3414b..cd0ae9d 100644
---- a/arch/arm64/kernel/process.c
-+++ b/arch/arm64/kernel/process.c
-@@ -101,15 +101,12 @@ void arch_cpu_idle_dead(void)
- /*
-  * Called by kexec, immediately prior to machine_kexec().
-  *
-- * This must completely disable all secondary CPUs; simply causing those CPUs
-- * to execute e.g. a RAM-based pin loop is not sufficient. This allows the
-- * kexec'd kernel to use any and all RAM as it sees fit, without having to
-- * avoid any code or data used by any SW CPU pin loop. The CPU hotplug
-- * functionality embodied in disable_nonboot_cpus() to achieve this.
-+ * This must shutdown all secondary CPUs.  The functionality
-+ * embodied in smp_send_stop() will achieve this.
-  */
- void machine_shutdown(void)
- {
--	disable_nonboot_cpus();
-+	smp_send_stop();
+diff --git a/arch/arm64/include/asm/cpu_ops.h b/arch/arm64/include/asm/cpu_ops.h
+index d7b4b38..9fd7281 100644
+--- a/arch/arm64/include/asm/cpu_ops.h
++++ b/arch/arm64/include/asm/cpu_ops.h
+@@ -50,7 +50,7 @@ struct cpu_operations {
+ 	int		(*cpu_prepare)(unsigned int);
+ 	int		(*cpu_boot)(unsigned int);
+ 	void		(*cpu_postboot)(void);
+-#ifdef CONFIG_HOTPLUG_CPU
++#if defined(CONFIG_HOTPLUG_CPU) || defined(CONFIG_KEXEC)
+ 	int		(*cpu_disable)(unsigned int cpu);
+ 	void		(*cpu_die)(unsigned int cpu);
+ 	int		(*cpu_kill)(unsigned int cpu);
+diff --git a/arch/arm64/kernel/psci.c b/arch/arm64/kernel/psci.c
+index 5539547..81dbbc9 100644
+--- a/arch/arm64/kernel/psci.c
++++ b/arch/arm64/kernel/psci.c
+@@ -380,7 +380,7 @@ static int cpu_psci_cpu_boot(unsigned int cpu)
+ 	return err;
  }
  
- /*
+-#ifdef CONFIG_HOTPLUG_CPU
++#if defined(CONFIG_HOTPLUG_CPU) || defined(CONFIG_KEXEC)
+ static int cpu_psci_cpu_disable(unsigned int cpu)
+ {
+ 	/* Fail early if we don't have CPU_OFF support */
+@@ -442,7 +442,7 @@ const struct cpu_operations cpu_psci_ops = {
+ 	.cpu_init	= cpu_psci_cpu_init,
+ 	.cpu_prepare	= cpu_psci_cpu_prepare,
+ 	.cpu_boot	= cpu_psci_cpu_boot,
+-#ifdef CONFIG_HOTPLUG_CPU
++#if defined(CONFIG_HOTPLUG_CPU) || defined(CONFIG_KEXEC)
+ 	.cpu_disable	= cpu_psci_cpu_disable,
+ 	.cpu_die	= cpu_psci_cpu_die,
+ 	.cpu_kill	= cpu_psci_cpu_kill,
 -- 
 1.9.1
