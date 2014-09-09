@@ -1,101 +1,54 @@
-From: boris.brezillon@free-electrons.com (Boris BREZILLON)
-Date: Tue,  9 Sep 2014 11:30:34 +0200
-Subject: [PATCH v2 5/6] rtc: at91sam9: use clk API instead of relying on
- AT91_SLOW_CLOCK
-In-Reply-To: <1410255035-26775-1-git-send-email-boris.brezillon@free-electrons.com>
-References: <1410255035-26775-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1410255035-26775-6-git-send-email-boris.brezillon@free-electrons.com>
+From: jingchang.lu@freescale.com (Jingchang Lu)
+Date: Tue, 9 Sep 2014 16:39:12 +0800
+Subject: [PATCHv3 1/6] ARM: dts: Add SoC level device tree support for LS1021A
+Message-ID: <1410251958-3961-1-git-send-email-jingchang.lu@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The RTT block is using the slow clock which is accessible through the clk
-API.
-Use the clk API to retrieve, enable and get the slow clk rate instead of
-the AT91_SLOW_CLOCK macro (which hardcodes the slow clk rate).
-Doing this allows us to reference the clk thus preventing the CCF from
-disabling it during the "disable unused" phase.
+This series contain the support for Freescale LS1021A CPU and LS1021A-QDS
+and LS1021A-TWR board.
 
-Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
+The LS1021A SoC combines two ARM Cortex-A7 cores that have been optimized
+for high reliability and pack the highest level of integration available
+for sub-3W embedded communications processors and with a comprehensive
+enablement model focused on ease of programmability.
+
+The LS1021A SoC shares IPs with i.MX family, Vybrid family and Freescale
+PowerPC platform. 
+
+For the detail information about LS1021A SoC, please refer to the RM doc.
+
 ---
- drivers/rtc/rtc-at91sam9.c | 28 ++++++++++++++++++++++++----
- 1 file changed, 24 insertions(+), 4 deletions(-)
+changes in v3:
+rewrite scfg and dcfg binding doc description.
+remove untested node and mtd partation info.
 
-diff --git a/drivers/rtc/rtc-at91sam9.c b/drivers/rtc/rtc-at91sam9.c
-index 57014b7..a6c498e 100644
---- a/drivers/rtc/rtc-at91sam9.c
-+++ b/drivers/rtc/rtc-at91sam9.c
-@@ -21,6 +21,7 @@
- #include <linux/slab.h>
- #include <linux/platform_data/atmel.h>
- #include <linux/io.h>
-+#include <linux/clk.h>
- 
- /*
-  * This driver uses two configurable hardware resources that live in the
-@@ -59,8 +60,6 @@
- #define AT91_RTT_ALMS		(1 << 0)		/* Real-time Alarm Status */
- #define AT91_RTT_RTTINC		(1 << 1)		/* Real-time Timer Increment */
- 
--#define AT91_SLOW_CLOCK		32768
--
- /*
-  * We store ALARM_DISABLED in ALMV to record that no alarm is set.
-  * It's also the reset value for that field.
-@@ -74,6 +73,7 @@ struct sam9_rtc {
- 	u32			imr;
- 	void __iomem		*gpbr;
- 	int 			irq;
-+	struct clk		*sclk;
- };
- 
- #define rtt_readl(rtc, field) \
-@@ -310,6 +310,7 @@ static int at91_rtc_probe(struct platform_device *pdev)
- 	struct sam9_rtc	*rtc;
- 	int		ret, irq;
- 	u32		mr;
-+	unsigned int	sclk_rate;
- 
- 	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
- 	r_gpbr = platform_get_resource(pdev, IORESOURCE_MEM, 1);
-@@ -348,11 +349,27 @@ static int at91_rtc_probe(struct platform_device *pdev)
- 		return -ENOMEM;
- 	}
- 
-+	rtc->sclk = devm_clk_get(&pdev->dev, NULL);
-+	if (IS_ERR(rtc->sclk))
-+		return PTR_ERR(rtc->sclk);
-+
-+	sclk_rate = clk_get_rate(rtc->sclk);
-+	if (!sclk_rate || sclk_rate > AT91_RTT_RTTRST) {
-+		dev_err(&pdev->dev, "Invalid slow clock rate");
-+		return -EINVAL;
-+	}
-+
-+	ret = clk_prepare_enable(rtc->sclk);
-+	if (ret) {
-+		dev_err(&pdev->dev, "Could not enable slow clock");
-+		return ret;
-+	}
-+
- 	mr = rtt_readl(rtc, MR);
- 
- 	/* unless RTT is counting at 1 Hz, re-initialize it */
--	if ((mr & AT91_RTT_RTPRES) != AT91_SLOW_CLOCK) {
--		mr = AT91_RTT_RTTRST | (AT91_SLOW_CLOCK & AT91_RTT_RTPRES);
-+	if ((mr & AT91_RTT_RTPRES) != sclk_rate) {
-+		mr = AT91_RTT_RTTRST | (sclk_rate & AT91_RTT_RTPRES);
- 		gpbr_writel(rtc, 0);
- 	}
- 
-@@ -397,6 +414,9 @@ static int at91_rtc_remove(struct platform_device *pdev)
- 	/* disable all interrupts */
- 	rtt_writel(rtc, MR, mr & ~(AT91_RTT_ALMIEN | AT91_RTT_RTTINCIEN));
- 
-+	if (!IS_ERR(rtc->sclk))
-+		clk_disable_unprepare(rtc->sclk);
-+
- 	return 0;
- }
- 
--- 
-1.9.1
+changes in v2:
+remove unused nodes.
+wakeup the secondary core by IPI call to u-boot standby procedure. 
+add dt-bindings for LS1021A SoC and platform gerenal configuration nodes.
+
+----------------------------------------------------------------
+Jingchang Lu (6):
+	ARM: dts: Add SoC level device tree support for LS1021A
+	ARM: dts: Add initial LS1021A QDS board dts support
+	ARM: dts: Add initial LS1021A TWR board dts support
+	dt-bindings: arm: add Freescale LS1021A SoC device tree binding
+	ARM: imx: Add initial support for Freescale LS1021A
+	ARM: imx: Add Freescale LS1021A SMP support
+
+ Documentation/devicetree/bindings/arm/fsl.txt |  38 +++
+ arch/arm/boot/dts/Makefile                    |   2 +
+ arch/arm/boot/dts/ls1021a-qds.dts             | 285 +++++++++++++++++++++
+ arch/arm/boot/dts/ls1021a-twr.dts             | 117 +++++++++
+ arch/arm/boot/dts/ls1021a.dtsi                | 670 ++++++++++++++++++++++++++++++++++++++++++++++++++
+ arch/arm/mach-imx/Kconfig                     |  14 ++
+ arch/arm/mach-imx/Makefile                    |   4 +-
+ arch/arm/mach-imx/common.h                    |   1 +
+ arch/arm/mach-imx/mach-ls1021a.c              |  34 +++
+ arch/arm/mach-imx/platsmp.c                   |  32 +++
+ 10 files changed, 1216 insertions(+), 1 deletion(-)
+ create mode 100644 arch/arm/boot/dts/ls1021a-qds.dts
+ create mode 100755 arch/arm/boot/dts/ls1021a-twr.dts
+ create mode 100644 arch/arm/boot/dts/ls1021a.dtsi
+ create mode 100644 arch/arm/mach-imx/mach-ls1021a.c
