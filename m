@@ -1,63 +1,24 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 8 Sep 2014 17:19:35 -0700
-Subject: [PATCH] ARM: dts: am335x-boneblack: Add names for remaining
- regulators
-In-Reply-To: <1409951525-30035-1-git-send-email-broonie@kernel.org>
-References: <1409951525-30035-1-git-send-email-broonie@kernel.org>
-Message-ID: <20140909001935.GD10785@atomide.com>
+Date: Mon, 8 Sep 2014 17:20:55 -0700
+Subject: [PATCH] ARM: omap: Remove stray ARCH_HAS_OPP references
+In-Reply-To: <540B15E1.6090604@ti.com>
+References: <1409998456-28066-1-git-send-email-broonie@kernel.org>
+ <540B15E1.6090604@ti.com>
+Message-ID: <20140909002054.GE10785@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Mark Brown <broonie@kernel.org> [140905 14:12]:
-> Add regulator-name properties for the regulators that don't have them,
-> allowing the kernel to display the name from the schematic rather than
-> the name of the regulator on the PMIC in order to improve diagnostics.
-> 
-> Signed-off-by: Mark Brown <broonie@kernel.org>
+* Nishanth Menon <nm@ti.com> [140906 07:11]:
+> On 09/06/2014 05:14 AM, Mark Brown wrote:
+> >OPP is now a normal kernel library selected by its users rather than a
+> >feature that architectures need to enable so ARCH_HAS_OPP serves no
+> >function any more - remove the selects.
+> >
+> >Signed-off-by: Mark Brown <broonie@kernel.org>
+... 
+ 
+> Acked-by: Nishanth Menon <nm@ti.com>
 
-Applying into omap-for-v3.18/dt thanks.
+Applying into omap-for-v3.18/soc thanks.
 
-Tony
-
-> ---
->  arch/arm/boot/dts/am335x-bone-common.dtsi | 5 +++++
->  1 file changed, 5 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/am335x-bone-common.dtsi b/arch/arm/boot/dts/am335x-bone-common.dtsi
-> index bde1777b62be..fe983d204b2b 100644
-> --- a/arch/arm/boot/dts/am335x-bone-common.dtsi
-> +++ b/arch/arm/boot/dts/am335x-bone-common.dtsi
-> @@ -227,6 +227,7 @@
->  &tps {
->  	regulators {
->  		dcdc1_reg: regulator at 0 {
-> +			regulator-name = "vdds_dpr";
->  			regulator-always-on;
->  		};
->  
-> @@ -249,18 +250,22 @@
->  		};
->  
->  		ldo1_reg: regulator at 3 {
-> +			regulator-name = "vio,vrtc,vdds";
->  			regulator-always-on;
->  		};
->  
->  		ldo2_reg: regulator at 4 {
-> +			regulator-name = "vdd_3v3aux";
->  			regulator-always-on;
->  		};
->  
->  		ldo3_reg: regulator at 5 {
-> +			regulator-name = "vdd_1v8";
->  			regulator-always-on;
->  		};
->  
->  		ldo4_reg: regulator at 6 {
-> +			regulator-name = "vdd_3v3a";
->  			regulator-always-on;
->  		};
->  	};
-> -- 
-> 2.1.0
-> 
+Tony 
