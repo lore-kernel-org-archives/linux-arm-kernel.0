@@ -1,39 +1,196 @@
-From: m.chehab@samsung.com (Mauro Carvalho Chehab)
-Date: Tue,  9 Sep 2014 15:54:05 -0300
-Subject: [PATCHv3 2/3] [media] s5p-jpeg: Fix compilation with COMPILE_TEST
-In-Reply-To: <5f850d5d45a27c50dabf3da08689cbedf986841b.1410288748.git.m.chehab@samsung.com>
-References: <6cbd00c5f2d342b573aaf9c0e533778374dd2e1e.1410273306.git.m.chehab@samsung.com>
- <5f850d5d45a27c50dabf3da08689cbedf986841b.1410288748.git.m.chehab@samsung.com>
-Message-ID: <e9793025e2d9a18dacfc302e2f032f2f49f9f746.1410288748.git.m.chehab@samsung.com>
+From: info@lategoodbye.de (Stefan Wahren)
+Date: Tue, 09 Sep 2014 21:17:17 +0200
+Subject: [PATCH RFC 2/3] ARM: regulator: add Freescale MXS regulator driver
+In-Reply-To: <20140909182211.GG3896@leverpostej>
+References: <1410089869-6611-1-git-send-email-info@lategoodbye.de>
+ <1410089869-6611-3-git-send-email-info@lategoodbye.de>
+ <20140909182211.GG3896@leverpostej>
+Message-ID: <540F523D.4010904@lategoodbye.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ERROR: "__bad_ndelay" [drivers/media/platform/s5p-jpeg/s5p-jpeg.ko] undefined!
+Hi,
 
-That happens because asm-generic doesn't like any ndelay time
-bigger than 20us.
+Am 09.09.2014 20:22, schrieb Mark Rutland:
+> [...]
+>
+>> +       regs = (__raw_readl(sreg->base_addr) & ~BM_POWER_LEVEL_TRG);
+>
+> I suspect you should be using the *_relaxed accessors rather than the
+> __raw_* accessors.
+>
+> [...]
+>
+>> +static int mxs_regulator_probe(struct platform_device *pdev)
+>> +{
+>> +       struct device *dev = &pdev->dev;
+>> +       struct device_node *np = dev->of_node;
+>> +       struct device_node *parent;
+>> +       struct regulator_desc *rdesc;
+>> +       struct regulator_dev *rdev;
+>> +       struct mxs_regulator *sreg;
+>> +       struct regulator_init_data *initdata;
+>> +       struct regulation_constraints *con;
+>> +       struct regulator_config config = { };
+>> +       void __iomem *base_addr = NULL;
+>> +       void __iomem *power_addr = NULL;
+>> +       u64 regaddr64 = 0;
+>> +       const u32 *regaddr_p;
+>> +       u32 val = 0;
+>> +       int ret;
+>> +
+>> +       if (!np) {
+>> +               dev_err(dev, "missing device tree\n");
+>> +               return -EINVAL;
+>> +       }
+>> +
+>> +       /* get device base address */
+>> +       base_addr = of_iomap(np, 0);
+>> +       if (!base_addr)
+>> +               return -ENXIO;
+>> +
+>> +       parent = of_get_parent(np);
+>> +       if (!parent)
+>> +               return -ENXIO;
+>
+> Leak of the (successfully mapped) base_addr.
+>
+>> +
+>> +       power_addr = of_iomap(parent, 0);
+>> +       if (!power_addr)
+>> +               return -ENXIO;
+>
+> Leak of base_addr and dangling refcount on parent. These apply to all
+> subsequent returns.
+>
+>> +
+>> +       regaddr_p = of_get_address(np, 0, NULL, NULL);
+>
+> of_get_address returns a __be32*, not a u32*, so sparse will be very
+> unhappy here...
+>
+>> +       if (regaddr_p)
+>> +               regaddr64 = of_translate_address(np, regaddr_p);
+>
+> ...and as of_translate_address returns a u64 you'll need a separate
+> variable for the input and output.
+>
+>> +
+>> +       if (!regaddr64) {
+>> +               dev_err(dev, "no or invalid reg property set\n");
+>> +               return -EINVAL;
+>> +       }
+>> +
+>> +       initdata = of_get_regulator_init_data(dev, np);
+>> +       if (!initdata)
+>> +               return -EINVAL;
+>> +
+>> +       ret = of_property_read_u32(np, "mxs-max-reg-val",
+>> +                                  &val);
+>> +       if (!val) {
+>> +               dev_err(dev, "no or invalid mxs-max-reg-val property set\n");
+>> +               return ret;
+>> +       }
+>> +
+>> +       dev_info(dev, "regulator found\n");
+>> +
+>> +       sreg = devm_kzalloc(dev, sizeof(*sreg), GFP_KERNEL);
+>> +       if (!sreg)
+>> +               return -ENOMEM;
+>> +       sreg->initdata = initdata;
+>> +       sreg->name = of_get_property(np, "regulator-name", NULL);
+>
+> I'm not keen on using of_get_property here. We have no idea if
+> regulator-name is even a string (it should be, but we have no
+> guarantee).
 
-Currently, usleep_range() couldn't simply be used, since
-exynos4_jpeg_sw_reset() is called with a spinlock held.
+Better using of_property_read_string?
 
-So, let's use udelay() instead.
+>
+>> +       sreg->cur_uA = 0;
+>> +       sreg->cur_uV = 0;
+>> +       sreg->base_addr = base_addr;
+>> +       sreg->power_addr = power_addr;
+>> +       init_waitqueue_head(&sreg->wait_q);
+>> +       spin_lock_init(&sreg->lock);
+>> +       sreg->max_reg_val = val;
+>> +
+>> +       rdesc = &sreg->rdesc;
+>> +       rdesc->name = sreg->name;
+>> +       rdesc->owner = THIS_MODULE;
+>> +       rdesc->ops = &mxs_rops;
+>> +
+>> +       if (strcmp(rdesc->name, "overall_current") == 0)
+>> +               rdesc->type = REGULATOR_CURRENT;
+>> +       else
+>> +               rdesc->type = REGULATOR_VOLTAGE;
+>
+> Wouldn't it make more sense to explicitly match the names you expect?
+>
 
-Reported-by: Stephen Rothwell <sfr@canb.auug.org.au>
-Acked-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
-Signed-off-by: Mauro Carvalho Chehab <m.chehab@samsung.com>
+Okay, i make "regulator-name" a required property and use a white list 
+of all possible regulators.
 
-diff --git a/drivers/media/platform/s5p-jpeg/jpeg-hw-exynos4.c b/drivers/media/platform/s5p-jpeg/jpeg-hw-exynos4.c
-index e51c078360f5..ab6d6f43c96f 100644
---- a/drivers/media/platform/s5p-jpeg/jpeg-hw-exynos4.c
-+++ b/drivers/media/platform/s5p-jpeg/jpeg-hw-exynos4.c
-@@ -23,7 +23,7 @@ void exynos4_jpeg_sw_reset(void __iomem *base)
- 	reg = readl(base + EXYNOS4_JPEG_CNTL_REG);
- 	writel(reg & ~EXYNOS4_SOFT_RESET_HI, base + EXYNOS4_JPEG_CNTL_REG);
- 
--	ndelay(100000);
-+	udelay(100);
- 
- 	writel(reg | EXYNOS4_SOFT_RESET_HI, base + EXYNOS4_JPEG_CNTL_REG);
- }
--- 
-1.9.3
+>> +       con = &initdata->constraints;
+>> +       rdesc->n_voltages = sreg->max_reg_val;
+>> +       rdesc->min_uV = con->min_uV;
+>> +       rdesc->uV_step = (con->max_uV - con->min_uV) / sreg->max_reg_val;
+>> +       rdesc->linear_min_sel = 0;
+>> +       rdesc->vsel_reg = regaddr64;
+>> +       rdesc->vsel_mask = BM_POWER_LEVEL_TRG;
+>> +
+>> +       config.dev = &pdev->dev;
+>> +       config.init_data = initdata;
+>> +       config.driver_data = sreg;
+>> +       config.of_node = np;
+>> +
+>> +       pr_debug("probing regulator %s %s %d\n",
+>> +                       sreg->name,
+>> +                       rdesc->name,
+>> +                       pdev->id);
+>
+> Aren't those two names always the same per the code above?
+>
+
+Sure, i will fix that.
+
+>> +
+>> +       /* register regulator */
+>> +       rdev = devm_regulator_register(dev, rdesc, &config);
+>> +
+>> +       if (IS_ERR(rdev)) {
+>> +               dev_err(&pdev->dev, "failed to register %s\n",
+>> +                       rdesc->name);
+>> +               return PTR_ERR(rdev);
+>> +       }
+>> +
+>> +       if (sreg->max_uA) {
+>> +               struct regulator *regu;
+>> +
+>> +               regu = regulator_get(NULL, sreg->name);
+>> +               sreg->nb.notifier_call = reg_callback;
+>> +               regulator_register_notifier(regu, &sreg->nb);
+>> +       }
+>> +
+>> +       platform_set_drvdata(pdev, rdev);
+>> +
+>> +       of_property_read_u32(np, "mxs-default-microvolt",
+>> +                                  &val);
+>> +
+>> +       if (val)
+>> +               mxs_set_voltage(rdev, val, val, NULL);
+>
+> As I mentioned in my comments on the binding, I'd like to know why this
+> is necessary and if it is why it shouldn't be a standardised property.
+
+ From my understanding the standardised properties only defines a range, 
+but no default state of the regulators. If the initialization from the 
+bootloader or a hardcoded initialization in the driver is okay then the 
+property is not necessary.
+
+> Mark.
+>
+
+Thanks for your feedback.
+
+Stefan
