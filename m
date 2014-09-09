@@ -1,67 +1,39 @@
 From: jingchang.lu@freescale.com (Jingchang Lu)
-Date: Tue, 9 Sep 2014 17:12:31 +0800
-Subject: [PATCHv3 5/6] ARM: imx: Add initial support for Freescale LS1021A
+Date: Tue, 9 Sep 2014 17:12:29 +0800
+Subject: [PATCHv3 3/6] ARM: dts: Add initial LS1021A TWR board dts support
 In-Reply-To: <1410253952-15631-1-git-send-email-jingchang.lu@freescale.com>
 References: <1410253952-15631-1-git-send-email-jingchang.lu@freescale.com>
-Message-ID: <1410253952-15631-6-git-send-email-jingchang.lu@freescale.com>
+Message-ID: <1410253952-15631-4-git-send-email-jingchang.lu@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jingchang Lu <b35083@freescale.com>
-
-The LS1021A SoC is a dual-core Cortex-A7 based processor,
-this add the initial support for it.
-
-Signed-off-by: Jingchang Lu <b35083@freescale.com>
+Signed-off-by: Chen Lu <B46807@freescale.com>
+Signed-off-by: Chao Fu <B44548@freescale.com>
+Signed-off-by: Jingchang Lu <jingchang.lu@freescale.com>
 ---
- arch/arm/mach-imx/Kconfig        | 14 ++++++++++++++
- arch/arm/mach-imx/Makefile       |  2 ++
- arch/arm/mach-imx/mach-ls1021a.c | 33 +++++++++++++++++++++++++++++++++
- 3 files changed, 49 insertions(+)
- create mode 100644 arch/arm/mach-imx/mach-ls1021a.c
+ arch/arm/boot/dts/Makefile        |   1 +
+ arch/arm/boot/dts/ls1021a-twr.dts | 117 ++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 118 insertions(+)
+ create mode 100755 arch/arm/boot/dts/ls1021a-twr.dts
 
-diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
-index 3da9f71..ba7a089 100644
---- a/arch/arm/mach-imx/Kconfig
-+++ b/arch/arm/mach-imx/Kconfig
-@@ -651,6 +651,20 @@ config SOC_VF610
- 	help
- 	  This enable support for Freescale Vybrid VF610 processor.
- 
-+config SOC_LS1021A
-+	bool "Freescale LS1021A support"
-+	select CPU_V7
-+	select ARM_GIC
-+	select CLKSRC_OF
-+	select HAVE_ARM_ARCH_TIMER
-+	select HAVE_SMP
-+	select MIGHT_HAVE_PCI
-+	select PCI_DOMAINS if PCI
-+	select ZONE_DMA if ARM_LPAE
-+
-+	help
-+	  This enable support for Freescale LS1021A processor.
-+
- endif
- 
- source "arch/arm/mach-imx/devices/Kconfig"
-diff --git a/arch/arm/mach-imx/Makefile b/arch/arm/mach-imx/Makefile
-index dd674c7..3e12532 100644
---- a/arch/arm/mach-imx/Makefile
-+++ b/arch/arm/mach-imx/Makefile
-@@ -111,4 +111,6 @@ obj-$(CONFIG_SOC_IMX53) += mach-imx53.o
- 
- obj-$(CONFIG_SOC_VF610) += clk-vf610.o mach-vf610.o
- 
-+obj-$(CONFIG_SOC_LS1021A) += mach-ls1021a.o
-+
- obj-y += devices/
-diff --git a/arch/arm/mach-imx/mach-ls1021a.c b/arch/arm/mach-imx/mach-ls1021a.c
-new file mode 100644
-index 0000000..2ffc20f
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index d2609c4..a972457 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -246,6 +246,7 @@ dtb-$(CONFIG_ARCH_MXC) += \
+ 	imx6sl-evk.dtb \
+ 	imx6sx-sdb.dtb \
+ 	ls1021a-qds.dtb \
++	ls1021a-twr.dtb \
+ 	vf610-colibri-eval-v3.dtb \
+ 	vf610-cosmic.dtb \
+ 	vf610-twr.dtb
+diff --git a/arch/arm/boot/dts/ls1021a-twr.dts b/arch/arm/boot/dts/ls1021a-twr.dts
+new file mode 100755
+index 0000000..1a7e9fb
 --- /dev/null
-+++ b/arch/arm/mach-imx/mach-ls1021a.c
-@@ -0,0 +1,33 @@
++++ b/arch/arm/boot/dts/ls1021a-twr.dts
+@@ -0,0 +1,117 @@
 +/*
 + * Copyright 2013-2014 Freescale Semiconductor, Inc.
 + *
@@ -71,29 +43,113 @@ index 0000000..2ffc20f
 + * (at your option) any later version.
 + */
 +
-+#include <linux/of_platform.h>
-+#include <asm/mach/arch.h>
++/dts-v1/;
++#include "ls1021a.dtsi"
 +
-+#include "common.h"
++/ {
++	model = "LS1021A TWR Board";
 +
-+static void __init ls1021a_init_machine(void)
-+{
-+	mxc_arch_reset_init_dt();
-+	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
-+}
-+
-+static const char *ls1021a_dt_compat[] __initdata = {
-+	"fsl,ls1021a",
-+	NULL,
++	aliases {
++		enet2_rgmii_phy = &rgmii_phy1;
++		enet0_sgmii_phy = &sgmii_phy2;
++		enet1_sgmii_phy = &sgmii_phy0;
++	};
 +};
 +
-+DT_MACHINE_START(LS1021A, "Freescale LS1021A")
-+#ifdef CONFIG_ZONE_DMA
-+	.dma_zone_size	= SZ_128M,
-+#endif
-+	.init_machine   = ls1021a_init_machine,
-+	.dt_compat	= ls1021a_dt_compat,
-+	.restart	= mxc_restart,
-+MACHINE_END
++&dspi1 {
++	bus-num = <0>;
++	status = "okay";
++
++	dspiflash: s25fl064k at 0 {
++		#address-cells = <1>;
++		#size-cells = <1>;
++		compatible = "spansion,s25fl064k";
++		spi-max-frequency = <16000000>;
++		spi-cpol;
++		spi-cpha;
++		reg = <0>;
++	};
++};
++
++&enet0 {
++	tbi-handle = <&tbi1>;
++	phy-handle = <&sgmii_phy2>;
++	phy-connection-type = "sgmii";
++	status = "okay";
++};
++
++&enet1 {
++	tbi-handle = <&tbi1>;
++	phy-handle = <&sgmii_phy0>;
++	phy-connection-type = "sgmii";
++	status = "okay";
++};
++
++&enet2 {
++	phy-handle = <&rgmii_phy1>;
++	phy-connection-type = "rgmii-id";
++	status = "okay";
++};
++
++&i2c0 {
++	status = "okay";
++};
++
++&i2c1 {
++	status = "okay";
++};
++
++&ifc {
++	status = "okay";
++	#address-cells = <2>;
++	#size-cells = <1>;
++	/* NOR, and CPLD on board */
++	ranges = <0x0 0x0 0x0 0x60000000 0x08000000>;
++
++		nor at 0,0 {
++			#address-cells = <1>;
++			#size-cells = <1>;
++			compatible = "cfi-flash";
++			reg = <0x0 0x0 0x8000000>;
++			bank-width = <2>;
++			device-width = <1>;
++		};
++};
++
++&lpuart0 {
++	status = "okay";
++};
++
++&mdio0 {
++	sgmii_phy0: ethernet-phy at 0 {
++		reg = <0x0>;
++	};
++	rgmii_phy1: ethernet-phy at 1 {
++		reg = <0x1>;
++	};
++	sgmii_phy2: ethernet-phy at 2 {
++		reg = <0x2>;
++	};
++	tbi1: tbi-phy at 1f {
++		reg = <0x1f>;
++		device_type = "tbi-phy";
++	};
++};
++
++&pwm6 {
++	status = "okay";
++};
++
++&pwm7 {
++	status = "okay";
++};
++
++&uart0 {
++	status = "okay";
++};
++
++&uart1 {
++	status = "okay";
++};
 -- 
 1.8.0
