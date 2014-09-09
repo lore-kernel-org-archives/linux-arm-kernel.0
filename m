@@ -1,71 +1,69 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 9 Sep 2014 11:15:20 +0200
-Subject: [GIT PULL] at91: drivers for 3.18 #2
-In-Reply-To: <26517543.McM8Q5P0vn@wuerfel>
-References: <1409934969-11584-1-git-send-email-nicolas.ferre@atmel.com>
- <201409052325.11709.arnd@arndb.de>
- <20140908092642.GB20883@lukather> <26517543.McM8Q5P0vn@wuerfel>
-Message-ID: <20140909091520.GJ3804@lukather>
+From: gabriel.fernandez@linaro.org (Gabriel Fernandez)
+Date: Tue, 9 Sep 2014 11:23:45 +0200
+Subject: [PATCH v2 7/8] phy: miphy28lp: Add SSC support for PCIE
+In-Reply-To: <540DC81F.6000901@ti.com>
+References: <1409758637-28654-1-git-send-email-gabriel.fernandez@linaro.org>
+ <1409758637-28654-8-git-send-email-gabriel.fernandez@linaro.org>
+ <540DC81F.6000901@ti.com>
+Message-ID: <CAG374jAGFXFJJkNjHBcApgzMw+VdfFQJOFmvOnvzozknk20XDw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 08, 2014 at 11:52:35AM +0200, Arnd Bergmann wrote:
-> On Monday 08 September 2014 11:26:42 Maxime Ripard wrote:
-> > On Fri, Sep 05, 2014 at 11:25:11PM +0200, Arnd Bergmann wrote:
-> > > On Friday 05 September 2014, Nicolas Ferre wrote:
-> > > > Arnd, Olof, Kevin,
-> > > > 
-> > > > This pull-request is focused on the work that Maxime did for migrating our timer
-> > > > (PIT) to the clocksource sub-system. A big cleanup happened which allows us to
-> > > > be even closer to the point when we have only the bare minimum in our formerly
-> > > > crowded mach-at91 directory.
-> > > > 
-> > > > This pull-request goes on top of the "drivers" one already sent to you on Sept.
-> > > > 01st.
-> > > 
-> > > Hmm, I'm not too happy to see more uses of early_platform_*, I was hoping
-> > > we could kill that off in the long run. This is only used for the legacy
-> > > board files, not for DT, right?
-> > 
-> > Yes, the DT uses the usual CLOCKSOURCE_OF_DECLARE mechanism.
-> > 
-> > I wasn't aware that early_platform drivers were in the killzone, but
-> > I'm definitely aware that global custom exported functions are, hence
-> > why I went this way.
-> 
-> I don't think it has been discussed much on the mailing list or IRC.
-> The early platform devices have not been used much outside of arch/sh
-> and arch/arm/mach-shmobile, and those only use it for clocksource and
-> serial.
+Hi Kishon,
 
-That's what I found, yes.
+On 8 September 2014 17:15, Kishon Vijay Abraham I <kishon@ti.com> wrote:
+>
+>
+> On Wednesday 03 September 2014 09:07 PM, Gabriel FERNANDEZ wrote:
+>> SSC is the technique of modulating the operating frequency of a signal
+>> slightly to spread its radiated emissions over a range of frequencies.
+>> This reduction in the maximum emission for a given frequency helps meet
+>> radiated emission requirements.
+>> These settings are applicable for PCIE with Internal clock.
+>>
+>> Signed-off-by: Harsh Gupta <harsh.gupta@st.com>
+>> Signed-off-by: Gabriel Fernandez <gabriel.fernandez@linaro.orgm>
+>> ---
+>>  drivers/phy/phy-miphy28lp.c | 32 ++++++++++++++++++++++++++++++++
+>>  1 file changed, 32 insertions(+)
+>>
+>> diff --git a/drivers/phy/phy-miphy28lp.c b/drivers/phy/phy-miphy28lp.c
+>> index b36e737..976fdda 100644
+>> --- a/drivers/phy/phy-miphy28lp.c
+>> +++ b/drivers/phy/phy-miphy28lp.c
+>> @@ -679,6 +679,36 @@ static int miphy28lp_init_sata(struct miphy28lp_phy *miphy_phy)
+>>       return miphy_is_ready(miphy_phy);
+>>  }
+>>
+>> +static void miphy_pcie_tune_ssc(struct miphy28lp_phy *miphy_phy)
+>> +{
+>> +     u8 val;
+>> +
+>> +     /* Compensate Tx impedance to avoid out of range values */
+>> +     if (miphy_phy->ssc) {
+>> +             /*
+>> +              * Enable the SSC on PLL for all banks
+>> +              * SSC Modulation @ 31 KHz and 4000 ppm modulation amp
+>> +              */
+>> +             val = readb_relaxed(miphy_phy->base + 0x0c);
+>> +             val |= 0x04;
+>> +             writeb_relaxed(val, miphy_phy->base + 0x0c);
+>> +             val = readb_relaxed(miphy_phy->base + 0x0a);
+>> +             val |= 0x10;
+>> +             writeb_relaxed(val, miphy_phy->base + 0x0a);
+>
+> macros for these registers and values is needed. Or else it's difficult to review.
+ok will be fix to v3
 
-> Now we have a new method for both of these, at least with DT, so
-> my impression is that we won't need the early_platform support in
-> the future.
+>> +
+>> +             for (val = 0; val < 2; val++) {
+>> +                     writeb_relaxed(val, miphy_phy->base + 0x0f);
+>> +                     writeb_relaxed(0x69, miphy_phy->base + 0xe5);
+>
+> Do these registers have to be written for every iteration?
 
-I agree with that. I only see the early platform stuff as a temporary
-measure for board files, before they're removed.
+Yes because we select the bank value before (with val)
 
-> One of the problems with the current interface is that it requires
-> statically declaring platform_device structures, which is something
-> that has been on Greg's list of device model antipatterns for a long
-> time.
-
-I didn't find any difference with how you declare platform_devices
-compared to the old-usual way in board files, or was it something on
-the list too ? :)
-
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140909/d719a72e/attachment.sig>
+>
+> Thanks
+> Kishon
