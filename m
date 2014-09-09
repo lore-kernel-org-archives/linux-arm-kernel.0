@@ -1,51 +1,38 @@
-From: tharvey@gateworks.com (Tim Harvey)
-Date: Mon,  8 Sep 2014 23:07:31 -0700
-Subject: [PATCH 6/6] ARM: dts: imx: ventana: add canbus support for GW52xx
-In-Reply-To: <1410242851-30765-1-git-send-email-tharvey@gateworks.com>
-References: <1410242851-30765-1-git-send-email-tharvey@gateworks.com>
-Message-ID: <1410242851-30765-7-git-send-email-tharvey@gateworks.com>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Mon,  8 Sep 2014 23:07:46 -0700
+Subject: [PATCH 0/2] fixes for struct clk_core migration
+Message-ID: <1410242868-14750-1-git-send-email-mturquette@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The GW52xx baseboard supports CANbus so we enable it, configure its pinmux
-and CAN_STBY gpio.
+A few build issues have popped up with more extensive testing of the
+patches to split the clock framework into a proper provider/consumer
+relationship. [0]
 
-Signed-off-by: Tim Harvey <tharvey@gateworks.com>
----
- arch/arm/boot/dts/imx6qdl-gw52xx.dtsi | 14 ++++++++++++++
- 1 file changed, 14 insertions(+)
+The first patch adapts Intel's LPSS driver to use the clock provider
+APIs. If no one objects to this patch then I will fold it into Tomeu's
+patch #2. [1]
 
-diff --git a/arch/arm/boot/dts/imx6qdl-gw52xx.dtsi b/arch/arm/boot/dts/imx6qdl-gw52xx.dtsi
-index 6d137b4..d3c0bf5 100644
---- a/arch/arm/boot/dts/imx6qdl-gw52xx.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-gw52xx.dtsi
-@@ -145,6 +145,12 @@
- 	status = "okay";
- };
- 
-+&can1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_flexcan1>;
-+	status = "okay";
-+};
-+
- &fec {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_enet>;
-@@ -352,6 +358,14 @@
- 			>;
- 		};
- 
-+		pinctrl_flexcan1: flexcan1grp {
-+			fsl,pins = <
-+				MX6QDL_PAD_KEY_ROW2__FLEXCAN1_RX	0x1b0b1
-+				MX6QDL_PAD_KEY_COL2__FLEXCAN1_TX	0x1b0b1
-+				MX6QDL_PAD_GPIO_9__GPIO1_IO09		0x4001b0b0 /* CAN_STBY */
-+			>;
-+		};
-+
- 		pinctrl_gpio_leds: gpioledsgrp {
- 			fsl,pins = <
- 				MX6QDL_PAD_KEY_COL0__GPIO4_IO06  0x1b0b0
+Tomeu, can you run your Coccinelle script again against all of arch/ and
+drivers/ to make sure nothing else was left out?
+
+The second patch brings the asm-generic version of clkdev.h up to speed
+with all of the asm-specific versions, by not declaring __clk_get and
+__clk_put if CONFIG_COMMON_CLK is set. If no one objects to this patch
+then I will move it to the front of the patch stack when rebasing
+Tomeu's series.
+
+[0] http://lkml.kernel.org/r/<1409758148-20104-1-git-send-email-tomeu.vizoso@collabora.com>
+[1] http://lkml.kernel.org/r/<1409758317-20564-1-git-send-email-tomeu.vizoso@collabora.com>
+
+Mike Turquette (2):
+  acpi: lpss: convert from struct clk to struct clk_core
+  asm-generic: COMMON_CLK defines __clk_{get,put}
+
+ drivers/acpi/acpi_lpss.c               | 6 +++---
+ include/asm-generic/clkdev.h           | 2 ++
+ include/linux/platform_data/clk-lpss.h | 2 +-
+ 3 files changed, 6 insertions(+), 4 deletions(-)
+
 -- 
 1.8.3.2
