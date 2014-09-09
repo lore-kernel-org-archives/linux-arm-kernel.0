@@ -1,35 +1,78 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Tue, 9 Sep 2014 14:45:52 +0200
-Subject: [PATCH v4 0/9] PM / Domains: Generic OF-based support
-In-Reply-To: <20140909115446.GW2601@sirena.org.uk>
-References: <1409838756-31963-1-git-send-email-ulf.hansson@linaro.org>
- <1410262570-22785-1-git-send-email-ulf.hansson@linaro.org>
- <20140909115446.GW2601@sirena.org.uk>
-Message-ID: <CAPDyKFr8OM3k0iJROvFOPN=UG=XfwJ7HBu1Yms8Yo=0C0fvW0A@mail.gmail.com>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Tue, 09 Sep 2014 15:16:29 +0200
+Subject: [PATCH 1/2] acpi: lpss: convert from struct clk to struct clk_core
+In-Reply-To: <1410242868-14750-2-git-send-email-mturquette@linaro.org>
+References: <1410242868-14750-1-git-send-email-mturquette@linaro.org>
+ <1410242868-14750-2-git-send-email-mturquette@linaro.org>
+Message-ID: <7263163.khRHYpcBRO@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 9 September 2014 13:54, Mark Brown <broonie@kernel.org> wrote:
-> On Tue, Sep 09, 2014 at 01:36:01PM +0200, Ulf Hansson wrote:
->> Changes in v4:
->>       - Rebased patch "PM / Domains: Add generic OF-based PM domain look-up" -
->>         and updated the author and the commit message.
->>       - Adopted review comments for "PM / Domains: Add APIs to attach/detach
->>         a PM domain for a device".
->>       - Updated author and commit message for "ARM: exynos: Move to generic
->>         PM domain DT bindings".
->>       - Added some acks and reviewed by tags.
->>       - Started to use the "--in-reply-to" option to git-send-email. It should
->>         provide the option to show a better diffstat per patch.
->
-> Please don't send serieses in reply to earlier versions, it buries
-> things in the middle of old discussions which can mean they don't get
-> noticed, especially when you're sending multiple large patch serieses at
-> the same time.
+On Monday, September 08, 2014 11:07:47 PM Mike Turquette wrote:
+> Looks like this driver was missed during the original mass driver
+> rework[0]. This patch converts the LPSS driver to the new clock provider
+> data type (struct clk_core).
+> 
+> If there are no objections I propose to roll this patch into a rebase of
+> that patch[0] in my tree.
+> 
+> [0] http://lkml.kernel.org/r/<1409758317-20564-1-git-send-email-tomeu.vizoso@collabora.com>
+> 
+> Signed-off-by: Mike Turquette <mturquette@linaro.org>
 
-Sorry, I just thought that it simplified life in this particular case. :-)
+Mika, any comments here?
 
-If additional versions needs to be posted I will follow your advise. Thanks!
+> ---
+>  drivers/acpi/acpi_lpss.c               | 6 +++---
+>  include/linux/platform_data/clk-lpss.h | 2 +-
+>  2 files changed, 4 insertions(+), 4 deletions(-)
+> 
+> diff --git a/drivers/acpi/acpi_lpss.c b/drivers/acpi/acpi_lpss.c
+> index 9dfec48..454179f 100644
+> --- a/drivers/acpi/acpi_lpss.c
+> +++ b/drivers/acpi/acpi_lpss.c
+> @@ -57,7 +57,7 @@ ACPI_MODULE_NAME("acpi_lpss");
+>  struct lpss_shared_clock {
+>  	const char *name;
+>  	unsigned long rate;
+> -	struct clk *clk;
+> +	struct clk_core *clk;
+>  };
+>  
+>  struct lpss_private_data;
+> @@ -83,7 +83,7 @@ static struct lpss_device_desc lpss_dma_desc = {
+>  struct lpss_private_data {
+>  	void __iomem *mmio_base;
+>  	resource_size_t mmio_size;
+> -	struct clk *clk;
+> +	struct clk_core *clk;
+>  	const struct lpss_device_desc *dev_desc;
+>  	u32 prv_reg_ctx[LPSS_PRV_REG_COUNT];
+>  };
+> @@ -278,7 +278,7 @@ static int register_device_clock(struct acpi_device *adev,
+>  	const struct lpss_device_desc *dev_desc = pdata->dev_desc;
+>  	struct lpss_shared_clock *shared_clock = dev_desc->shared_clock;
+>  	const char *devname = dev_name(&adev->dev);
+> -	struct clk *clk = ERR_PTR(-ENODEV);
+> +	struct clk_core *clk = ERR_PTR(-ENODEV);
+>  	struct lpss_clk_data *clk_data;
+>  	const char *parent, *clk_name;
+>  	void __iomem *prv_base;
+> diff --git a/include/linux/platform_data/clk-lpss.h b/include/linux/platform_data/clk-lpss.h
+> index 2390199..3c3237c 100644
+> --- a/include/linux/platform_data/clk-lpss.h
+> +++ b/include/linux/platform_data/clk-lpss.h
+> @@ -15,7 +15,7 @@
+>  
+>  struct lpss_clk_data {
+>  	const char *name;
+> -	struct clk *clk;
+> +	struct clk_core *clk;
+>  };
+>  
+>  extern int lpt_clk_init(void);
+> 
 
-Kind regards
-Uffe
+-- 
+I speak only for myself.
+Rafael J. Wysocki, Intel Open Source Technology Center.
