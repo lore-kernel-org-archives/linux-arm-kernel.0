@@ -1,54 +1,69 @@
-From: j.anaszewski@samsung.com (Jacek Anaszewski)
-Date: Tue, 09 Sep 2014 17:30:25 +0200
-Subject: [PATCH 2/3] [media] s5p-jpeg: Fix compilation with COMPILE_TEST
-In-Reply-To: <20140909120936.527bd852.m.chehab@samsung.com>
-References: <20140909124306.2d5a0d76@canb.auug.org.au>
- <6cbd00c5f2d342b573aaf9c0e533778374dd2e1e.1410273306.git.m.chehab@samsung.com>
- <b7343e6296b5d1d68b7229b8307442fd4141bcb3.1410273306.git.m.chehab@samsung.com>
- <540F15B2.3000902@samsung.com> <20140909120936.527bd852.m.chehab@samsung.com>
-Message-ID: <540F1D11.9030400@samsung.com>
+From: galak@codeaurora.org (Kumar Gala)
+Date: Tue,  9 Sep 2014 10:36:48 -0500
+Subject: [PATCH v4 3/3] ata: qcom: Add device tree bindings information
+In-Reply-To: <1410277008-20242-1-git-send-email-galak@codeaurora.org>
+References: <1410277008-20242-1-git-send-email-galak@codeaurora.org>
+Message-ID: <1410277008-20242-3-git-send-email-galak@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mauro, Sylwester,
+Add device tree binding for Qualcomm AHCI SATA controller and specifically
+the sata controller on the IPQ806x family of SoCs.
 
-On 09/09/2014 05:09 PM, Mauro Carvalho Chehab wrote:
-> Em Tue, 09 Sep 2014 16:58:58 +0200
-> Sylwester Nawrocki <s.nawrocki@samsung.com> escreveu:
->
->> On 09/09/14 16:38, Mauro Carvalho Chehab wrote:
->>> ERROR: "__bad_ndelay" [drivers/media/platform/s5p-jpeg/s5p-jpeg.ko] undefined!
->>>
->>> Yet, it sounds a bad idea to use ndelay to wait for 100 us
->>> for the device to reset.
->>>
->>> Reported-by: Stephen Rothwell <sfr@canb.auug.org.au>
->>> Signed-off-by: Mauro Carvalho Chehab <m.chehab@samsung.com>
->>>
->>> diff --git a/drivers/media/platform/s5p-jpeg/jpeg-hw-exynos4.c b/drivers/media/platform/s5p-jpeg/jpeg-hw-exynos4.c
->>> index e51c078360f5..01eeacf28843 100644
->>> --- a/drivers/media/platform/s5p-jpeg/jpeg-hw-exynos4.c
->>> +++ b/drivers/media/platform/s5p-jpeg/jpeg-hw-exynos4.c
->>> @@ -23,7 +23,9 @@ void exynos4_jpeg_sw_reset(void __iomem *base)
->>>   	reg = readl(base + EXYNOS4_JPEG_CNTL_REG);
->>>   	writel(reg & ~EXYNOS4_SOFT_RESET_HI, base + EXYNOS4_JPEG_CNTL_REG);
->>>
->>> +#ifndef CONFIG_COMPILE_TEST
->>>   	ndelay(100000);
->>> +#endif
->>
->> Wouldn't be a better fix to replace ndelay(100000); with udelay(100),
->> rather than sticking in a not so pretty #ifndef ?
->
-> Works for me. I'll submit a new version.
->
->> I guess usleep_range() couldn't simply be used, since
->> exynos4_jpeg_sw_reset() is called with a spinlock held.
->
-> Ok.
+Signed-off-by: Kumar Gala <galak@codeaurora.org>
+---
+(reposted with Hans on list)
 
-Within few days I will perform some hardware tests, to verify
-if there is more room for improvement here.
+ .../devicetree/bindings/ata/qcom-sata.txt          | 40 ++++++++++++++++++++++
+ 1 file changed, 40 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/ata/qcom-sata.txt
 
-Best Regards,
-Jacek Anaszewski
+diff --git a/Documentation/devicetree/bindings/ata/qcom-sata.txt b/Documentation/devicetree/bindings/ata/qcom-sata.txt
+new file mode 100644
+index 0000000..5e74e41
+--- /dev/null
++++ b/Documentation/devicetree/bindings/ata/qcom-sata.txt
+@@ -0,0 +1,40 @@
++* Qualcomm AHCI SATA Controller
++
++SATA nodes are defined to describe on-chip Serial ATA controllers.
++Each SATA controller should have its own node.
++
++Required properties:
++- compatible		: compatible list, contains "qcom,msm-ahci"
++- interrupts		: <interrupt mapping for SATA IRQ>
++- reg			: <registers mapping>
++- phys			: Must contain exactly one entry as specified
++			  in phy-bindings.txt
++- phy-names		: Must be "sata-phy"
++
++Required properties for "qcom,ipq806x-ahci" compatible:
++- clocks		: Must contain an entry for each entry in clock-names.
++- clock-names		: Shall be:
++				"slave_iface" - Fabric port AHB clock for SATA
++				"iface" - AHB clock
++				"core" - core clock
++				"rxoob" - RX out-of-band clock
++				"pmalive" - Power Module Alive clock
++
++Example:
++	sata at 29000000 {
++		compatible = "qcom,ipq806x-ahci", "qcom,msm-ahci";
++		reg = <0x29000000 0x180>;
++
++		interrupts = <0 209 0x0>;
++
++		clocks = <&gcc SFAB_SATA_S_H_CLK>,
++			 <&gcc SATA_H_CLK>,
++			 <&gcc SATA_A_CLK>,
++			 <&gcc SATA_RXOOB_CLK>,
++			 <&gcc SATA_PMALIVE_CLK>;
++		clock-names = "slave_iface", "iface", "core",
++				"rxoob", "pmalive";
++
++		phys = <&sata_phy>;
++		phy-names = "sata-phy";
++	};
+-- 
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
