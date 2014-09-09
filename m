@@ -1,36 +1,45 @@
 From: jingchang.lu@freescale.com (Jingchang Lu)
-Date: Tue, 9 Sep 2014 17:12:27 +0800
-Subject: [PATCHv3 1/6] ARM: dts: Add SoC level device tree support for LS1021A
+Date: Tue, 9 Sep 2014 17:12:28 +0800
+Subject: [PATCHv3 2/6] ARM: dts: Add initial LS1021A QDS board dts support
 In-Reply-To: <1410253952-15631-1-git-send-email-jingchang.lu@freescale.com>
 References: <1410253952-15631-1-git-send-email-jingchang.lu@freescale.com>
-Message-ID: <1410253952-15631-2-git-send-email-jingchang.lu@freescale.com>
+Message-ID: <1410253952-15631-3-git-send-email-jingchang.lu@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Jingchang Lu <b35083@freescale.com>
 
-Add Freescale LS1021A SoC device tree support
-
-Signed-off-by: Nikhil Badola <nikhil.badola@freescale.com>
-Signed-off-by: Chenhui Zhao <chenhui.zhao@freescale.com>
-Signed-off-by: Suresh Gupta <suresh.gupta@freescale.com>
-Signed-off-by: Shaveta Leekha <shaveta@freescale.com>
-Signed-off-by: Ruchika Gupta <ruchika.gupta@freescale.com>
-Signed-off-by: Bhupesh Sharma <bhupesh.sharma@freescale.com>
-Signed-off-by: Chao Fu <b44548@freescale.com>
+Signed-off-by: Alison Wang <alison.wang@freescale.com>
+Signed-off-by: Chao Fu <B44548@freescale.com>
+Signed-off-by: Jason Jin <Jason.Jin@freescale.com>
 Signed-off-by: Xiubo Li <Li.Xiubo@freescale.com>
+Signed-off-by: Bhupesh Sharma <bhupesh.sharma@freescale.com>
+Signed-off-by: Jaiprakash Singh <b44839@freescale.com>
 Signed-off-by: Jingchang Lu <jingchang.lu@freescale.com>
 ---
- arch/arm/boot/dts/ls1021a.dtsi | 670 +++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 670 insertions(+)
- create mode 100644 arch/arm/boot/dts/ls1021a.dtsi
+ arch/arm/boot/dts/Makefile        |   1 +
+ arch/arm/boot/dts/ls1021a-qds.dts | 285 ++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 286 insertions(+)
+ create mode 100644 arch/arm/boot/dts/ls1021a-qds.dts
 
-diff --git a/arch/arm/boot/dts/ls1021a.dtsi b/arch/arm/boot/dts/ls1021a.dtsi
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 75c7b74..d2609c4 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -245,6 +245,7 @@ dtb-$(CONFIG_ARCH_MXC) += \
+ 	imx6q-tx6q-1110.dtb \
+ 	imx6sl-evk.dtb \
+ 	imx6sx-sdb.dtb \
++	ls1021a-qds.dtb \
+ 	vf610-colibri-eval-v3.dtb \
+ 	vf610-cosmic.dtb \
+ 	vf610-twr.dtb
+diff --git a/arch/arm/boot/dts/ls1021a-qds.dts b/arch/arm/boot/dts/ls1021a-qds.dts
 new file mode 100644
-index 0000000..bc6ac30
+index 0000000..a0a95f5
 --- /dev/null
-+++ b/arch/arm/boot/dts/ls1021a.dtsi
-@@ -0,0 +1,670 @@
++++ b/arch/arm/boot/dts/ls1021a-qds.dts
+@@ -0,0 +1,285 @@
 +/*
 + * Copyright 2013-2014 Freescale Semiconductor, Inc.
 + *
@@ -40,666 +49,281 @@ index 0000000..bc6ac30
 + * (at your option) any later version.
 + */
 +
-+#include "skeleton64.dtsi"
-+#include <dt-bindings/interrupt-controller/arm-gic.h>
++/dts-v1/;
++#include "ls1021a.dtsi"
 +
 +/ {
-+	compatible = "fsl,ls1021a";
-+	interrupt-parent = <&gic>;
-+	#address-cells = <2>;
-+	#size-cells = <2>;
++	model = "LS1021A QDS Board";
 +
 +	aliases {
-+		serial0 = &lpuart0;
-+		serial1 = &lpuart1;
-+		serial2 = &lpuart2;
-+		serial3 = &lpuart3;
-+		serial4 = &lpuart4;
-+		serial5 = &lpuart5;
-+		ethernet0 = &enet0;
-+		ethernet1 = &enet1;
-+		ethernet2 = &enet2;
-+		sysclk = &sysclk;
-+	};
-+
-+	memory at 80000000 {
-+		device_type = "memory";
-+		reg = <0x0 0x80000000 0x0 0x20000000>;
-+	};
-+
-+	cpus {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		cpu at f00 {
-+			compatible = "arm,cortex-a7";
-+			device_type = "cpu";
-+			reg = <0xf00>;
-+		};
-+
-+		cpu at f01 {
-+			compatible = "arm,cortex-a7";
-+			device_type = "cpu";
-+			reg = <0xf01>;
-+		};
-+	};
-+
-+	timer {
-+		compatible = "arm,armv7-timer";
-+		interrupts = 	<GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_LOW)>,
-+				<GIC_PPI 14 (GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_LOW)>,
-+				<GIC_PPI 11 (GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_LOW)>,
-+				<GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_LOW)>;
-+	};
-+
-+	pmu {
-+		compatible = "arm,cortex-a7-pmu";
-+		interrupts = <GIC_SPI 138 IRQ_TYPE_LEVEL_HIGH>,
-+				<GIC_SPI 139 IRQ_TYPE_LEVEL_HIGH>;
++		enet0_rgmii_phy = &rgmii_phy1;
++		enet1_rgmii_phy = &rgmii_phy2;
++		enet2_rgmii_phy = &rgmii_phy3;
++		enet0_sgmii_phy = &sgmii_phy1c;
++		enet1_sgmii_phy = &sgmii_phy1d;
 +	};
 +
 +	soc {
-+		compatible = "simple-bus";
-+		#address-cells = <2>;
-+		#size-cells = <2>;
-+		interrupt-parent = <&gic>;
-+		ranges;
-+
-+		gic: interrupt-controller at 1400000 {
-+			compatible = "arm,cortex-a7-gic";
-+			#interrupt-cells = <3>;
-+			interrupt-controller;
-+			reg = <0x0 0x1401000 0x0 0x1000>,
-+				<0x0 0x1402000 0x0 0x1000>,
-+				<0x0 0x1404000 0x0 0x2000>,
-+				<0x0 0x1406000 0x0 0x2000>;
-+			interrupts = <GIC_PPI 9 (GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_HIGH)>;
-+
-+		};
-+
-+		ifc: ifc at 1530000 {
-+			compatible = "fsl,ifc", "simple-bus";
-+			reg = <0x0 0x1530000 0x0 0x10000>;
-+			interrupts = <GIC_SPI 75 IRQ_TYPE_LEVEL_HIGH>;
-+		};
-+
-+		dcfg: dcfg at 1ee0000 {
-+			compatible = "fsl,ls1021a-dcfg";
-+			reg = <0x0 0x1ee0000 0x0 0x10000>;
-+		};
-+
-+		esdhc: esdhc at 1560000 {
-+			compatible = "fsl,esdhc";
-+			reg = <0x0 0x1560000 0x0 0x10000>;
-+			interrupts = <GIC_SPI 94 IRQ_TYPE_LEVEL_HIGH>;
-+			clock-frequency = <0>;
-+			voltage-ranges = <1800 1800 3300 3300>;
-+			sdhci,auto-cmd12;
-+			big-endian;
-+			bus-width = <4>;
-+			status = "disabled";
-+		};
-+
-+		scfg: scfg at 1570000 {
-+			compatible = "fsl,ls1021a-scfg";
-+			reg = <0x0 0x1570000 0x0 0x10000>;
-+		};
-+
-+		crypto: crypto at 1700000 {
-+			compatible = "fsl,sec-v5.3", "fsl,sec-v5.0", "fsl,sec-v4.0";
-+			fsl,sec-era = <4>;
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+			reg		 = <0x0 0x1700000 0x0 0x100000>;
-+			ranges		 = <0x0 0x0 0x1700000 0x100000>;
-+			interrupts	 = <GIC_SPI 107 IRQ_TYPE_LEVEL_HIGH>;
-+
-+			sec_jr0: jr at 10000 {
-+				compatible = "fsl,sec-v5.3-job-ring",
-+				     "fsl,sec-v5.0-job-ring",
-+				     "fsl,sec-v4.0-job-ring";
-+				reg = <0x10000 0x10000>;
-+				interrupts = <GIC_SPI 103 IRQ_TYPE_LEVEL_HIGH>;
++		leds {
++			compatible = "pwm-leds";
++			led0 {
++				label = "led0";
++				pwms = <&pwm3 0 150000 0>;
++				max-brightness = <100>;
 +			};
-+
-+			sec_jr1: jr at 20000 {
-+				compatible = "fsl,sec-v5.3-job-ring",
-+				     "fsl,sec-v5.0-job-ring",
-+				     "fsl,sec-v4.0-job-ring";
-+				reg = <0x20000 0x10000>;
-+				interrupts = <GIC_SPI 104 IRQ_TYPE_LEVEL_HIGH>;
++			led1 {
++				label = "led1";
++				pwms = <&pwm3 1 150000 0>;
++				max-brightness = <100>;
 +			};
-+
-+			sec_jr2: jr at 30000 {
-+				compatible = "fsl,sec-v5.3-job-ring",
-+				     "fsl,sec-v5.0-job-ring",
-+				     "fsl,sec-v4.0-job-ring";
-+				reg = <0x30000 0x10000>;
-+				interrupts = <GIC_SPI 105 IRQ_TYPE_LEVEL_HIGH>;
++			led2 {
++				label = "led2";
++				pwms = <&pwm3 2 150000 0>;
++				max-brightness = <100>;
 +			};
-+
-+			sec_jr3: jr at 40000 {
-+				compatible = "fsl,sec-v5.3-job-ring",
-+				     "fsl,sec-v5.0-job-ring",
-+				     "fsl,sec-v4.0-job-ring";
-+				reg = <0x40000 0x10000>;
-+				interrupts = <GIC_SPI 106 IRQ_TYPE_LEVEL_HIGH>;
++			led3 {
++				label = "led3";
++				pwms = <&pwm3 3 150000 0>;
++				max-brightness = <100>;
 +			};
-+
-+		};
-+
-+		clockgen: clocking at 1ee1000 {
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+			ranges = <0x0 0x0 0x1ee1000 0x10000>;
-+
-+			sysclk: sysclk {
-+				compatible = "fixed-clock";
-+				#clock-cells = <0>;
-+				clock-frequency = <100000000>;
-+				clock-output-names = "sysclk";
++			led4 {
++				label = "led4";
++				pwms = <&pwm3 4 150000 0>;
++				max-brightness = <100>;
 +			};
-+
-+			cga_pll1: pll1 at 800 {
-+				compatible = "fsl,qoriq-core-pll-2.0";
-+				#clock-cells = <1>;
-+				reg = <0x800 0x10>;
-+				clocks = <&sysclk>;
-+				clock-output-names = "cga-pll1", "cga-pll1-div2",
-+						"cga-pll1-div3", "cga-pll1-div4";
++			led5 {
++				label = "led5";
++				pwms = <&pwm3 5 150000 0>;
++				max-brightness = <100>;
 +			};
-+
-+			platform_clk: pll at c00 {
-+				compatible = "fsl,qoriq-core-pll-2.0";
-+				#clock-cells = <1>;
-+				reg = <0xc00 0x10>;
-+				clocks = <&sysclk>;
-+				clock-output-names = "platform-clk", "platform-clk-div2";
++			led6 {
++				label = "led6";
++				pwms = <&pwm3 6 150000 0>;
++				max-brightness = <100>;
 +			};
-+
-+			cluster1_clk: clk0c0 at 0 {
-+				compatible = "fsl,qoriq-core-mux-2.0";
-+				#clock-cells = <1>;
-+				reg = <0x0 0x10>;
-+				clock-names = "pll1cga", "pll1cga-div2";
-+				clocks = <&cga_pll1 0>, <&cga_pll1 2>;
-+				clock-output-names = "cluster1-clk";
-+
-+			};
-+		};
-+
-+		dspi0: dspi at 2100000 {
-+			compatible = "fsl,vf610-dspi";
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			reg = <0x0 0x2100000 0x0 0x10000>;
-+			interrupts = <GIC_SPI 96 IRQ_TYPE_LEVEL_HIGH>;
-+			clock-names = "dspi";
-+			clocks = <&platform_clk 1>;
-+			spi-num-chipselects = <5>;
-+			big-endian;
-+			status = "disabled";
-+		};
-+
-+		dspi1: dspi at 2110000 {
-+			compatible = "fsl,vf610-dspi";
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			reg = <0x0 0x2110000 0x0 0x10000>;
-+			interrupts = <GIC_SPI 97 IRQ_TYPE_LEVEL_HIGH>;
-+			clock-names = "dspi";
-+			clocks = <&platform_clk 1>;
-+			spi-num-chipselects = <5>;
-+			big-endian;
-+			status = "disabled";
-+		};
-+
-+		i2c0: i2c at 2180000 {
-+			compatible = "fsl,vf610-i2c";
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			reg = <0x0 0x2180000 0x0 0x10000>;
-+			interrupts = <GIC_SPI 88 IRQ_TYPE_LEVEL_HIGH>;
-+			clock-names = "i2c";
-+			clocks = <&platform_clk 1>;
-+			status = "disabled";
-+		};
-+
-+		i2c1: i2c at 2190000 {
-+			compatible = "fsl,vf610-i2c";
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			reg = <0x0 0x2190000 0x0 0x10000>;
-+			interrupts = <GIC_SPI 89 IRQ_TYPE_LEVEL_HIGH>;
-+			clock-names = "i2c";
-+			clocks = <&platform_clk 1>;
-+			status = "disabled";
-+		};
-+
-+		i2c2: i2c at 21a0000 {
-+			compatible = "fsl,vf610-i2c";
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			reg = <0x0 0x21a0000 0x0 0x10000>;
-+			interrupts = <GIC_SPI 90 IRQ_TYPE_LEVEL_HIGH>;
-+			clock-names = "i2c";
-+			clocks = <&platform_clk 1>;
-+			status = "disabled";
-+		};
-+
-+		uart0: serial at 21c0500 {
-+			compatible = "fsl,16550-FIFO64", "ns16550a";
-+			reg = <0x0 0x21c0500 0x0 0x100>;
-+			interrupts = <GIC_SPI 86 IRQ_TYPE_LEVEL_HIGH>;
-+			clock-frequency = <0>;
-+			fifo-size = <15>;
-+			status = "disabled";
-+		};
-+
-+		uart1: serial at 21c0600 {
-+			compatible = "fsl,16550-FIFO64", "ns16550a";
-+			reg = <0x0 0x21c0600 0x0 0x100>;
-+			interrupts = <GIC_SPI 86 IRQ_TYPE_LEVEL_HIGH>;
-+			clock-frequency = <0>;
-+			fifo-size = <15>;
-+			status = "disabled";
-+		};
-+
-+		uart2: serial at 21d0500 {
-+			compatible = "fsl,16550-FIFO64", "ns16550a";
-+			reg = <0x0 0x21d0500 0x0 0x100>;
-+			interrupts = <GIC_SPI 87 IRQ_TYPE_LEVEL_HIGH>;
-+			clock-frequency = <0>;
-+			fifo-size = <15>;
-+			status = "disabled";
-+		};
-+
-+		uart3: serial at 21d0600 {
-+			compatible = "fsl,16550-FIFO64", "ns16550a";
-+			reg = <0x0 0x21d0600 0x0 0x100>;
-+			interrupts = <GIC_SPI 87 IRQ_TYPE_LEVEL_HIGH>;
-+			clock-frequency = <0>;
-+			fifo-size = <15>;
-+			status = "disabled";
-+		};
-+
-+		lpuart0: serial at 2950000 {
-+			compatible = "fsl,ls1021a-lpuart";
-+			reg = <0x0 0x2950000 0x0 0x1000>;
-+			interrupts = <GIC_SPI 80 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&sysclk>;
-+			clock-names = "ipg";
-+			status = "disabled";
-+		};
-+
-+		lpuart1: serial at 2960000 {
-+			compatible = "fsl,ls1021a-lpuart";
-+			reg = <0x0 0x2960000 0x0 0x1000>;
-+			interrupts = <GIC_SPI 81 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&platform_clk 1>;
-+			clock-names = "ipg";
-+			status = "disabled";
-+		};
-+
-+		lpuart2: serial at 2970000 {
-+			compatible = "fsl,ls1021a-lpuart";
-+			reg = <0x0 0x2970000 0x0 0x1000>;
-+			interrupts = <GIC_SPI 82 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&platform_clk 1>;
-+			clock-names = "ipg";
-+			status = "disabled";
-+		};
-+
-+		lpuart3: serial at 2980000 {
-+			compatible = "fsl,ls1021a-lpuart";
-+			reg = <0x0 0x2980000 0x0 0x1000>;
-+			interrupts = <GIC_SPI 83 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&platform_clk 1>;
-+			clock-names = "ipg";
-+			status = "disabled";
-+		};
-+
-+		lpuart4: serial at 2990000 {
-+			compatible = "fsl,ls1021a-lpuart";
-+			reg = <0x0 0x2990000 0x0 0x1000>;
-+			interrupts = <GIC_SPI 84 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&platform_clk 1>;
-+			clock-names = "ipg";
-+			status = "disabled";
-+		};
-+
-+		lpuart5: serial at 29a0000 {
-+			compatible = "fsl,ls1021a-lpuart";
-+			reg = <0x0 0x29a0000 0x0 0x1000>;
-+			interrupts = <GIC_SPI 85 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&platform_clk 1>;
-+			clock-names = "ipg";
-+			status = "disabled";
-+		};
-+
-+		ftm0_1: ftm0_1 at 29d0000 {
-+			compatible = "fsl,ftm-timer";
-+			reg = <0x0 0x29d0000 0x0 0x10000>,
-+				<0x0 0x29e0000 0x0 0x10000>;
-+			interrupts = <GIC_SPI 118 IRQ_TYPE_LEVEL_HIGH>;
-+			clock-names = "ftm-evt", "ftm-src",
-+			        "ftm-evt-counter-en", "ftm-src-counter-en";
-+			clocks = <&platform_clk 1>, <&platform_clk 1>,
-+			       <&platform_clk 1>, <&platform_clk 1>;
-+			big-endian;
-+			status = "disabled";
-+		};
-+
-+		pwm3: ftm at 2a00000 {
-+			compatible = "fsl,vf610-ftm-pwm";
-+			#pwm-cells = <3>;
-+			reg = <0x0 0x2a00000 0x0 0x10000>;
-+			interrupts = <GIC_SPI 121 IRQ_TYPE_LEVEL_HIGH>;
-+			clock-names = "ftm_sys", "ftm_ext",
-+				"ftm_fix", "ftm_cnt_clk_en";
-+			clocks = <&platform_clk 1>, <&platform_clk 1>,
-+				<&platform_clk 1>, <&platform_clk 1>;
-+			big-endian;
-+			status = "disabled";
-+		};
-+
-+		pwm6: ftm at 2a30000 {
-+			compatible = "fsl,vf610-ftm-pwm";
-+			#pwm-cells = <3>;
-+			reg = <0x0 0x2a30000 0x0 0x10000>;
-+			interrupts = <GIC_SPI 123 IRQ_TYPE_LEVEL_HIGH>;
-+			clock-names = "ftm_sys", "ftm_ext",
-+				"ftm_fix", "ftm_cnt_clk_en";
-+			clocks = <&platform_clk 1>, <&platform_clk 1>,
-+				<&platform_clk 1>, <&platform_clk 1>;
-+			big-endian;
-+			status = "disabled";
-+		};
-+
-+		pwm7: ftm at 2a40000 {
-+			compatible = "fsl,vf610-ftm-pwm";
-+			#pwm-cells = <3>;
-+			reg = <0x0 0x2a40000 0x0 0x10000>;
-+			interrupts = <GIC_SPI 124 IRQ_TYPE_LEVEL_HIGH>;
-+			clock-names = "ftm_sys", "ftm_ext",
-+				"ftm_fix", "ftm_cnt_clk_en";
-+			clocks = <&platform_clk 1>, <&platform_clk 1>,
-+				<&platform_clk 1>, <&platform_clk 1>;
-+			big-endian;
-+			status = "disabled";
-+		};
-+
-+		wdog0: wdog at 2ad0000 {
-+			compatible = "fsl,imx21-wdt";
-+			reg = <0x0 0x2ad0000 0x0 0x10000>;
-+			interrupts = <GIC_SPI 115 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&platform_clk 1>;
-+			clock-names = "wdog";
-+			big-endian;
-+		};
-+
-+		sai1: sai at 2b50000 {
-+			compatible = "fsl,vf610-sai";
-+			reg = <0x0 0x2b50000 0x0 0x10000>;
-+			interrupts = <GIC_SPI 132 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&platform_clk 1>;
-+			clock-names = "sai";
-+			dma-names = "tx", "rx";
-+			dmas = <&edma0 1 47>,
-+				<&edma0 1 46>;
-+			big-endian-regs;
-+			status = "disabled";
-+		};
-+
-+		sai2: sai at 2b60000 {
-+			compatible = "fsl,vf610-sai";
-+			reg = <0x0 0x2b60000 0x0 0x10000>;
-+			interrupts = <GIC_SPI 133 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&platform_clk 1>;
-+			clock-names = "sai";
-+			dma-names = "tx", "rx";
-+			dmas = <&edma0 1 45>,
-+				<&edma0 1 44>;
-+			big-endian-regs;
-+			status = "disabled";
-+		};
-+
-+		edma0: edma at 2c00000 {
-+			#dma-cells = <2>;
-+			compatible = "fsl,vf610-edma";
-+			reg = <0x0 0x2c00000 0x0 0x10000>,
-+				<0x0 0x2c10000 0x0 0x10000>,
-+				<0x0 0x2c20000 0x0 0x10000>;
-+			interrupts = <GIC_SPI 135 IRQ_TYPE_LEVEL_HIGH>,
-+					<GIC_SPI 135 IRQ_TYPE_LEVEL_HIGH>;
-+			interrupt-names = "edma-tx", "edma-err";
-+			dma-channels = <32>;
-+			big-endian;
-+			clock-names = "dmamux0", "dmamux1";
-+			clocks = <&platform_clk 1>,
-+				<&platform_clk 1>;
-+		};
-+
-+		mdio0: mdio at 2d24000 {
-+			compatible = "gianfar";
-+			device_type = "mdio";
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			reg = <0x0 0x2d24000 0x0 0x4000>;
-+		};
-+
-+		enet0: ethernet at 2d10000 {
-+			compatible = "fsl,etsec2";
-+			device_type = "network";
-+			#address-cells = <2>;
-+			#size-cells = <2>;
-+			interrupt-parent = <&gic>;
-+			model = "eTSEC";
-+			fsl,dma-endian-le;
-+			fsl,num_rx_queues = <0x1>;
-+			fsl,num_tx_queues = <0x1>;
-+			ranges;
-+
-+			queue-group at 0 {
-+				#address-cells = <1>;
-+				#size-cells = <1>;
-+				reg = <0x0 0x2d10000 0x0 0x8000>;
-+				fsl,rx-bit-map = <0xff>;
-+				fsl,tx-bit-map = <0xff>;
-+				interrupts = <GIC_SPI 144 IRQ_TYPE_LEVEL_HIGH>,
-+					<GIC_SPI 145 IRQ_TYPE_LEVEL_HIGH>,
-+					<GIC_SPI 146 IRQ_TYPE_LEVEL_HIGH>;
-+			};
-+
-+		};
-+
-+		enet1: ethernet at 2d50000 {
-+			compatible = "fsl,etsec2";
-+			device_type = "network";
-+			#address-cells = <2>;
-+			#size-cells = <2>;
-+			interrupt-parent = <&gic>;
-+			model = "eTSEC";
-+			fsl,dma-endian-le;
-+			fsl,num_rx_queues = <0x1>;
-+			fsl,num_tx_queues = <0x1>;
-+			ranges;
-+
-+			queue-group at 0 {
-+				#address-cells = <1>;
-+				#size-cells = <1>;
-+				reg = <0x0 0x2d50000 0x0 0x8000>;
-+				fsl,rx-bit-map = <0xff>;
-+				fsl,tx-bit-map = <0xff>;
-+				interrupts = <GIC_SPI 150 IRQ_TYPE_LEVEL_HIGH>,
-+					<GIC_SPI 152 IRQ_TYPE_LEVEL_HIGH>,
-+					<GIC_SPI 153 IRQ_TYPE_LEVEL_HIGH>;
-+			};
-+
-+		};
-+
-+		enet2: ethernet at 2d90000 {
-+			compatible = "fsl,etsec2";
-+			device_type = "network";
-+			#address-cells = <2>;
-+			#size-cells = <2>;
-+			interrupt-parent = <&gic>;
-+			model = "eTSEC";
-+			fsl,dma-endian-le;
-+			fsl,num_rx_queues = <0x1>;
-+			fsl,num_tx_queues = <0x1>;
-+			ranges;
-+
-+			queue-group at 0 {
-+				#address-cells = <1>;
-+				#size-cells = <1>;
-+				reg = <0x0 0x2d90000 0x0 0x8000>;
-+				fsl,rx-bit-map = <0xff>;
-+				fsl,tx-bit-map = <0xff>;
-+				interrupts = <GIC_SPI 157 IRQ_TYPE_LEVEL_HIGH>,
-+					<GIC_SPI 158 IRQ_TYPE_LEVEL_HIGH>,
-+					<GIC_SPI 159 IRQ_TYPE_LEVEL_HIGH>;
-+			};
-+		};
-+
-+		usb at 8600000 {
-+			compatible = "fsl-usb2-dr-v2.5", "fsl-usb2-dr";
-+			reg = <0x0 0x8600000 0x0 0x1000>;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			interrupts = <GIC_SPI 171 IRQ_TYPE_LEVEL_HIGH>;
-+			dr_mode = "host";
-+			phy_type = "ulpi";
-+		};
-+
-+		usb at 3100000 {
-+			compatible = "fsl,fsl-dwc3";
-+			#address-cells = <2>;
-+			#size-cells = <2>;
-+			ranges;
-+
-+			dwc3 {
-+				compatible = "snps,dwc3";
-+				reg = <0x0 0x3100000 0x0 0x10000>;
-+				interrupts = <GIC_SPI 93 IRQ_TYPE_LEVEL_HIGH>;
-+				dr_mode = "host";
-+				maximum-speed = "high-speed";
++			led7 {
++				label = "led7";
++				pwms = <&pwm3 7 150000 0>;
++				max-brightness = <100>;
 +			};
 +		};
 +	};
++};
 +
-+	dcsr {
++&dspi0 {
++	bus-num = <0>;
++	status = "okay";
++
++	dspiflash: at45db021d at 0 {
 +		#address-cells = <1>;
 +		#size-cells = <1>;
-+		compatible = "fsl,dcsr", "simple-bus";
++		compatible = "atmel,at45db021d", "atmel,at45", "atmel,dataflash";
++		spi-max-frequency = <16000000>;
++		spi-cpol;
++		spi-cpha;
++		reg = <0>;
++	};
++};
 +
-+		ranges = <0x0 0x0 0x20000000 0x1000000>;
++&enet0 {
++	tbi-handle = <&tbi0>;
++	phy-handle = <&sgmii_phy1c>;
++	phy-connection-type = "sgmii";
++	status = "okay";
++};
 +
-+		dcsr-epu at 0 {
-+			compatible = "fsl,ls1021a-dcsr-epu";
-+			reg = <0x0 0x10000>;
++&enet1 {
++	tbi-handle = <&tbi0>;
++	phy-handle = <&sgmii_phy1d>;
++	phy-connection-type = "sgmii";
++	status = "okay";
++};
++
++&enet2 {
++	phy-handle = <&rgmii_phy3>;
++	phy-connection-type = "rgmii-id";
++	status = "okay";
++};
++
++&i2c0 {
++	status = "okay";
++	pca9547 at 77 {
++		compatible = "philips,pca9547";
++		reg = <0x77>;
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		i2c at 0 {
++			#address-cells = <1>;
++			#size-cells = <0>;
++			reg = <0x0>;
++
++			rtc at 68 {
++				compatible = "dallas,ds3232";
++				reg = <0x68>;
++				interrupts = <GIC_SPI 169 IRQ_TYPE_LEVEL_HIGH>;
++			};
 +		};
 +
-+		dcsr-gdi at 100000 {
-+			compatible = "fsl,ls1021a-dcsr-gdi";
-+			reg = <0x100000 0x10000>;
++		i2c at 2 {
++			#address-cells = <1>;
++			#size-cells = <0>;
++			reg = <0x2>;
++
++			ina220 at 40 {
++				compatible = "ti,ina220";
++				reg = <0x40>;
++				shunt-resistor = <1000>;
++			};
++
++			ina220 at 41 {
++				compatible = "ti,ina220";
++				reg = <0x41>;
++				shunt-resistor = <1000>;
++			};
 +		};
 +
-+		dcsr-dddi at 120000 {
-+			compatible = "fsl,ls1021a-dcsr-dddi";
-+			reg = <0x120000 0x10000>;
++		i2c at 3 {
++			#address-cells = <1>;
++			#size-cells = <0>;
++			reg = <0x3>;
++
++			eeprom at 56 {
++				compatible = "at24,24c512";
++				reg = <0x56>;
++			};
++
++			eeprom at 57 {
++				compatible = "at24,24c512";
++				reg = <0x57>;
++			};
++
++			adt7461a at 4c {
++				compatible = "adt7461a";
++				reg = <0x4c>;
++			};
 +		};
 +
-+		dcsr-dcfg at 220000 {
-+			compatible = "fsl,ls1021a-dcsr-dcfg";
-+			reg = <0x220000 0x1000>;
-+		};
-+
-+		dcsr-clock at 221000 {
-+			compatible = "fsl,ls1021a-dcsr-clock";
-+			reg = <0x221000 0x1000>;
-+		};
-+
-+		dcsr-rcpm at 222000 {
-+			compatible = "fsl,ls1021a-dcsr-rcpm";
-+			reg = <0x222000 0x1000 0x223000 0x1000>;
-+		};
-+
-+		dcsr-ccp at 225000 {
-+			compatible = "fsl,ls1021a-dcsr-ccp";
-+			reg = <0x225000 0x1000>;
-+		};
-+
-+		dcsr-fusectrl at 226000 {
-+			compatible = "fsl,ls1021a-dcsr-fusectrl";
-+			reg = <0x226000 0x1000>;
-+		};
-+
-+		dcsr-dap at 300000 {
-+			compatible = "fsl,ls1021a-dcsr-dap";
-+			reg = <0x300000 0x10000>;
-+		};
-+
-+		dcsr-cstf at 350000 {
-+			compatible = "fsl,ls1021a-dcsr-cstf";
-+			reg = <0x350000 0x1000 0x3a7000 0x1000>;
-+		};
-+
-+		dcsr-a7rom at 360000 {
-+			compatible = "fsl,ls1021a-dcsr-a7rom";
-+			reg = <0x360000 0x10000>;
-+		};
-+
-+		dcsr-a7cpu at 370000 {
-+			compatible = "fsl,ls1021a-dcsr-a7cpu";
-+			reg = <0x370000 0x8000>;
-+		};
-+
-+		dcsr-a7cti at 378000 {
-+			compatible = "fsl,ls1021a-dcsr-a7cti";
-+			reg = <0x378000 0x4000>;
-+		};
-+
-+		dcsr-etm at 37c000 {
-+			compatible = "fsl,ls1021a-dcsr-etm";
-+			reg = <0x37c000 0x1000 0x37d000 0x3000>;
-+		};
-+
-+		dcsr-hugorom at 3a0000 {
-+			compatible = "fsl,ls1021a-dcsr-hugorom";
-+			reg = <0x3a0000 0x1000>;
-+		};
-+
-+		dcsr-etf at 3a1000 {
-+			compatible = "fsl,ls1021a-dcsr-etf";
-+			reg = <0x3a1000 0x1000 0x3a2000 0x1000>;
-+		};
-+
-+		dcsr-etr at 3a3000 {
-+			compatible = "fsl,ls1021a-dcsr-etr";
-+			reg = <0x3a3000 0x1000>;
-+		};
-+
-+		dcsr-cti at 3a4000 {
-+			compatible = "fsl,ls1021a-dcsr-cti";
-+			reg = <0x3a4000 0x1000 0x3a5000 0x1000 0x3a6000 0x1000>;
-+		};
-+
-+		dcsr-atbrepl at 3a8000 {
-+			compatible = "fsl,ls1021a-dcsr-atbrepl";
-+			reg = <0x3a8000 0x1000>;
-+		};
-+
-+		dcsr-tsgen-ctrl at 3a9000 {
-+			compatible = "fsl,ls1021a-dcsr-tsgen-ctrl";
-+			reg = <0x3a9000 0x1000>;
-+		};
-+
-+		dcsr-tsgen-read at 3aa000 {
-+			compatible = "fsl,ls1021a-dcsr-tsgen-read";
-+			reg = <0x3aa000 0x1000>;
++		i2c at 4 {
++			#address-cells = <1>;
++			#size-cells = <0>;
++			reg = <0x4>;
 +		};
 +	};
++};
++
++&ifc {
++	status = "okay";
++	#address-cells = <2>;
++	#size-cells = <1>;
++	/* NOR, NAND Flashes and FPGA on board */
++	ranges = <0x0 0x0 0x0 0x60000000 0x08000000
++		0x2 0x0 0x0 0x7e800000 0x00010000
++		0x3 0x0 0x0 0x7fb00000 0x00000100>;
++
++		nor at 0,0 {
++			#address-cells = <1>;
++			#size-cells = <1>;
++			compatible = "cfi-flash";
++			reg = <0x0 0x0 0x8000000>;
++			bank-width = <2>;
++			device-width = <1>;
++		};
++
++		nand at 2,0 {
++			#address-cells = <1>;
++			#size-cells = <1>;
++			compatible = "fsl,ifc-nand";
++			reg = <0x2 0x0 0x10000>;
++		};
++
++		fpga: board-control at 3,0 {
++			#address-cells = <1>;
++			#size-cells = <1>;
++			compatible = "simple-bus";
++			reg = <0x3 0x0 0x0000100>;
++			bank-width = <1>;
++			device-width = <1>;
++			ranges = <0 3 0 0x100>;
++
++			mdio-mux-emi1 {
++				compatible = "mdio-mux-mmioreg";
++				mdio-parent-bus = <&mdio0>;
++				#address-cells = <1>;
++				#size-cells = <0>;
++				reg = <0x54 1>; /* BRDCFG4 */
++				mux-mask = <0xe0>; /* EMI1[2:0] */
++
++				/* Onboard PHYs */
++				ls1021amdio0: mdio at 0 {
++					reg = <0>;
++					#address-cells = <1>;
++					#size-cells = <0>;
++					rgmii_phy1: ethernet-phy at 1 {
++						reg = <0x1>;
++					};
++				};
++				ls1021amdio1: mdio at 20 {
++					reg = <0x20>;
++					#address-cells = <1>;
++					#size-cells = <0>;
++					rgmii_phy2: ethernet-phy at 2 {
++						reg = <0x2>;
++					};
++				};
++				ls1021amdio2: mdio at 40 {
++					reg = <0x40>;
++					#address-cells = <1>;
++					#size-cells = <0>;
++					rgmii_phy3: ethernet-phy at 3 {
++						reg = <0x3>;
++					};
++				};
++				ls1021amdio3: mdio at 60 {
++					reg = <0x60>;
++					#address-cells = <1>;
++					#size-cells = <0>;
++					sgmii_phy1c: ethernet-phy at 1c {
++						reg = <0x1c>;
++					};
++				};
++				ls1021amdio4: mdio at 80 {
++					reg = <0x80>;
++					#address-cells = <1>;
++					#size-cells = <0>;
++					sgmii_phy1d: ethernet-phy at 1d {
++						reg = <0x1d>;
++					};
++				};
++			};
++		};
++};
++
++&lpuart0 {
++	status = "okay";
++};
++
++&mdio0 {
++	tbi0: tbi-phy at 8 {
++		reg = <0x8>;
++		device_type = "tbi-phy";
++	};
++};
++
++&pwm3 {
++	status = "okay";
++};
++
++&pwm7 {
++	status = "okay";
++};
++
++&uart0 {
++	status = "okay";
++};
++
++&uart1 {
++	status = "okay";
 +};
 -- 
 1.8.0
