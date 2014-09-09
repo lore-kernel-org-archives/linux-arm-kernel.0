@@ -1,44 +1,35 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 9 Sep 2014 18:52:26 +0100
-Subject: [PATCH v2 3/8] Documentation: bindings: net: add the Marvell
- PXA168 Ethernet controller
-In-Reply-To: <2897714.QyEFFDa5hL@wuerfel>
-References: <1410273848-24663-1-git-send-email-antoine.tenart@free-electrons.com>
- <3827594.chb831jyvc@wuerfel> <20140909160136.GA26051@kwain>
- <2897714.QyEFFDa5hL@wuerfel>
-Message-ID: <20140909175226.GE3896@leverpostej>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 09 Sep 2014 19:54:19 +0200
+Subject: [PATCH 2/3] [media] s5p-jpeg: Fix compilation with COMPILE_TEST
+In-Reply-To: <20140909120936.527bd852.m.chehab@samsung.com>
+References: <20140909124306.2d5a0d76@canb.auug.org.au>
+ <540F15B2.3000902@samsung.com> <20140909120936.527bd852.m.chehab@samsung.com>
+Message-ID: <60097822.tu6OncvLxQ@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 09, 2014 at 06:47:35PM +0100, Arnd Bergmann wrote:
-> On Tuesday 09 September 2014 18:01:36 Antoine Tenart wrote:
+On Tuesday 09 September 2014 12:09:36 Mauro Carvalho Chehab wrote:
+> -exynos4.c
+> > > index e51c078360f5..01eeacf28843 100644
+> > > --- a/drivers/media/platform/s5p-jpeg/jpeg-hw-exynos4.c
+> > > +++ b/drivers/media/platform/s5p-jpeg/jpeg-hw-exynos4.c
+> > > @@ -23,7 +23,9 @@ void exynos4_jpeg_sw_reset(void __iomem *base)
+> > >     reg = readl(base + EXYNOS4_JPEG_CNTL_REG);
+> > >     writel(reg & ~EXYNOS4_SOFT_RESET_HI, base + EXYNOS4_JPEG_CNTL_REG);
+> > >  
+> > > +#ifndef CONFIG_COMPILE_TEST
+> > >     ndelay(100000);
+> > > +#endif
 > > 
-> > On Tue, Sep 09, 2014 at 05:58:12PM +0200, Arnd Bergmann wrote:
-> > > On Tuesday 09 September 2014 16:44:03 Antoine Tenart wrote:
-> > > > +- clocks: pointer to the clock for the device.
-> > > > +- clock-names: should be "MFUCLK".
-> > > 
-> > > Clock names are normally not capitalized. Are you able to change
-> > > that name when providing a binding or make it an anoymous clock?
-> > > What does MFU stand for anyway?
-> > 
-> > Sure. I could have make it an anonymous clock but the name "MFUCLK" was
-> > already used by the pxa168 Ethernet driver so I didn't wanted to change
-> > that.
+> > Wouldn't be a better fix to replace ndelay(100000); with udelay(100),
+> > rather than sticking in a not so pretty #ifndef ?
 > 
-> I believe you can just ask for an anonymous clock anyway and get the
-> first one even if it has a name, but I didn't check.
-> 
-> In any case, we should not just take a clock name in a DT binding
-> because it happened to be used by platform code. It's easy fix the
-> platform code when someone makes a mistake there, but very hard to
-> fix DT strings once there are users relying on a particular convention.
+> Works for me. I'll submit a new version.
 
-At least with names it's easy to add/remove abitrary sets of clocks. We
-can be stuck with bad names but I don't think that's as big a concern.
+New version looks good to me. On a more general level, I would argue
+that we should not disable code based on COMPILE_TEST. The typical
+use of this symbol is to make it possible to compile more code, not
+to change the behavior of code on machines that were able to build
+it already.
 
-So if there is an actual name for the clock input line (from the pov of
-the consumer), I'd recommend using it. Note that this does not have to
-be the current "MFUCLK" as used by platform data.
-
-Mark.
+	Arnd
