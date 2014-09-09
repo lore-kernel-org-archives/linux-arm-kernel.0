@@ -1,196 +1,47 @@
-From: info@lategoodbye.de (Stefan Wahren)
-Date: Tue, 09 Sep 2014 21:17:17 +0200
-Subject: [PATCH RFC 2/3] ARM: regulator: add Freescale MXS regulator driver
-In-Reply-To: <20140909182211.GG3896@leverpostej>
-References: <1410089869-6611-1-git-send-email-info@lategoodbye.de>
- <1410089869-6611-3-git-send-email-info@lategoodbye.de>
- <20140909182211.GG3896@leverpostej>
-Message-ID: <540F523D.4010904@lategoodbye.de>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Tue, 9 Sep 2014 21:01:08 +0200
+Subject: [PATCH v7 2/5] ARM: imx6: gpc: Add PU power domain for GPU/VPU
+In-Reply-To: <1410177246.3981.34.camel@paszta.hi.pengutronix.de>
+References: <1409060791-23167-1-git-send-email-p.zabel@pengutronix.de>
+ <1409060791-23167-3-git-send-email-p.zabel@pengutronix.de>
+ <CAPDyKFovJOVyKRNSA+sEjd4mXA9QYYYDQEAvTzkptj8FDzgWTQ@mail.gmail.com>
+ <1410177246.3981.34.camel@paszta.hi.pengutronix.de>
+Message-ID: <CAPDyKFozmLLEwK297K0mtvf-m_fUC79ZstbF6V-TAnNTh41VZw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+[...]
 
-Am 09.09.2014 20:22, schrieb Mark Rutland:
-> [...]
+>> > +       is_off = IS_ENABLED(CONFIG_PM_RUNTIME);
+>> > +       if (is_off)
+>> > +               imx6q_pm_pu_power_off(&imx6q_pu_domain.base);
+>>
+>> Could you elaborate why is_off depends on CONFIG_PM_RUNTIME? That
+>> seems strange to me. :-)
+>>
+>> Additionally, I think it would be better to leave the domain "on"
+>> state. Wouldn't that even be required for some drivers to be able to
+>> succeed probing of these devices?
 >
->> +       regs = (__raw_readl(sreg->base_addr) & ~BM_POWER_LEVEL_TRG);
+> The devices in the PU power domain are Vivante GPUs and the CODA Video
+> Processing Unit. These are platform devices that don't need to be active
+> to enumerate before being probed. The drivers support runtime PM, so if
+> CONFIG_PM_RUNTIME is enabled, it is safe to disable the PU power domain
+> on boot. The drivers will probe and request for the power domain to be
+> enabled via runtime PM before accessing the hardware.
 >
-> I suspect you should be using the *_relaxed accessors rather than the
-> __raw_* accessors.
->
-> [...]
->
->> +static int mxs_regulator_probe(struct platform_device *pdev)
->> +{
->> +       struct device *dev = &pdev->dev;
->> +       struct device_node *np = dev->of_node;
->> +       struct device_node *parent;
->> +       struct regulator_desc *rdesc;
->> +       struct regulator_dev *rdev;
->> +       struct mxs_regulator *sreg;
->> +       struct regulator_init_data *initdata;
->> +       struct regulation_constraints *con;
->> +       struct regulator_config config = { };
->> +       void __iomem *base_addr = NULL;
->> +       void __iomem *power_addr = NULL;
->> +       u64 regaddr64 = 0;
->> +       const u32 *regaddr_p;
->> +       u32 val = 0;
->> +       int ret;
->> +
->> +       if (!np) {
->> +               dev_err(dev, "missing device tree\n");
->> +               return -EINVAL;
->> +       }
->> +
->> +       /* get device base address */
->> +       base_addr = of_iomap(np, 0);
->> +       if (!base_addr)
->> +               return -ENXIO;
->> +
->> +       parent = of_get_parent(np);
->> +       if (!parent)
->> +               return -ENXIO;
->
-> Leak of the (successfully mapped) base_addr.
->
->> +
->> +       power_addr = of_iomap(parent, 0);
->> +       if (!power_addr)
->> +               return -ENXIO;
->
-> Leak of base_addr and dangling refcount on parent. These apply to all
-> subsequent returns.
->
->> +
->> +       regaddr_p = of_get_address(np, 0, NULL, NULL);
->
-> of_get_address returns a __be32*, not a u32*, so sparse will be very
-> unhappy here...
->
->> +       if (regaddr_p)
->> +               regaddr64 = of_translate_address(np, regaddr_p);
->
-> ...and as of_translate_address returns a u64 you'll need a separate
-> variable for the input and output.
->
->> +
->> +       if (!regaddr64) {
->> +               dev_err(dev, "no or invalid reg property set\n");
->> +               return -EINVAL;
->> +       }
->> +
->> +       initdata = of_get_regulator_init_data(dev, np);
->> +       if (!initdata)
->> +               return -EINVAL;
->> +
->> +       ret = of_property_read_u32(np, "mxs-max-reg-val",
->> +                                  &val);
->> +       if (!val) {
->> +               dev_err(dev, "no or invalid mxs-max-reg-val property set\n");
->> +               return ret;
->> +       }
->> +
->> +       dev_info(dev, "regulator found\n");
->> +
->> +       sreg = devm_kzalloc(dev, sizeof(*sreg), GFP_KERNEL);
->> +       if (!sreg)
->> +               return -ENOMEM;
->> +       sreg->initdata = initdata;
->> +       sreg->name = of_get_property(np, "regulator-name", NULL);
->
-> I'm not keen on using of_get_property here. We have no idea if
-> regulator-name is even a string (it should be, but we have no
-> guarantee).
+> If CONFIG_PM_RUNTIME is disabled, the power domain needs to stay enabled
+> at all times.
 
-Better using of_property_read_string?
+Hi Philipp,
 
->
->> +       sreg->cur_uA = 0;
->> +       sreg->cur_uV = 0;
->> +       sreg->base_addr = base_addr;
->> +       sreg->power_addr = power_addr;
->> +       init_waitqueue_head(&sreg->wait_q);
->> +       spin_lock_init(&sreg->lock);
->> +       sreg->max_reg_val = val;
->> +
->> +       rdesc = &sreg->rdesc;
->> +       rdesc->name = sreg->name;
->> +       rdesc->owner = THIS_MODULE;
->> +       rdesc->ops = &mxs_rops;
->> +
->> +       if (strcmp(rdesc->name, "overall_current") == 0)
->> +               rdesc->type = REGULATOR_CURRENT;
->> +       else
->> +               rdesc->type = REGULATOR_VOLTAGE;
->
-> Wouldn't it make more sense to explicitly match the names you expect?
->
+Thanks for your reply, that certainly made it clear on what you would
+like to accomplish.
 
-Okay, i make "regulator-name" a required property and use a white list 
-of all possible regulators.
+Before discussing further consequences in genpd of this approach
+(using IS_ENABLED(CONFIG_PM_RUNTIME)), I would be interested to see
+how the runtime PM support is implemented for any of the drivers you
+refer to. Do you mind pointing me to any of them?
 
->> +       con = &initdata->constraints;
->> +       rdesc->n_voltages = sreg->max_reg_val;
->> +       rdesc->min_uV = con->min_uV;
->> +       rdesc->uV_step = (con->max_uV - con->min_uV) / sreg->max_reg_val;
->> +       rdesc->linear_min_sel = 0;
->> +       rdesc->vsel_reg = regaddr64;
->> +       rdesc->vsel_mask = BM_POWER_LEVEL_TRG;
->> +
->> +       config.dev = &pdev->dev;
->> +       config.init_data = initdata;
->> +       config.driver_data = sreg;
->> +       config.of_node = np;
->> +
->> +       pr_debug("probing regulator %s %s %d\n",
->> +                       sreg->name,
->> +                       rdesc->name,
->> +                       pdev->id);
->
-> Aren't those two names always the same per the code above?
->
-
-Sure, i will fix that.
-
->> +
->> +       /* register regulator */
->> +       rdev = devm_regulator_register(dev, rdesc, &config);
->> +
->> +       if (IS_ERR(rdev)) {
->> +               dev_err(&pdev->dev, "failed to register %s\n",
->> +                       rdesc->name);
->> +               return PTR_ERR(rdev);
->> +       }
->> +
->> +       if (sreg->max_uA) {
->> +               struct regulator *regu;
->> +
->> +               regu = regulator_get(NULL, sreg->name);
->> +               sreg->nb.notifier_call = reg_callback;
->> +               regulator_register_notifier(regu, &sreg->nb);
->> +       }
->> +
->> +       platform_set_drvdata(pdev, rdev);
->> +
->> +       of_property_read_u32(np, "mxs-default-microvolt",
->> +                                  &val);
->> +
->> +       if (val)
->> +               mxs_set_voltage(rdev, val, val, NULL);
->
-> As I mentioned in my comments on the binding, I'd like to know why this
-> is necessary and if it is why it shouldn't be a standardised property.
-
- From my understanding the standardised properties only defines a range, 
-but no default state of the regulators. If the initialization from the 
-bootloader or a hardcoded initialization in the driver is okay then the 
-property is not necessary.
-
-> Mark.
->
-
-Thanks for your feedback.
-
-Stefan
+Kind regards
+Uffe
