@@ -1,48 +1,57 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Tue, 09 Sep 2014 10:09:20 +0200
-Subject: [PATCH v5 3/4] ARM: dts: add rk3288 dwc2 controller support
-In-Reply-To: <1596739.u7ZntKLW7r@diego>
-References: <1407470159-14722-1-git-send-email-kever.yang@rock-chips.com>
- <CAD=FV=XNSp85H2zVrLPdxDfhokEWFspvwUHjVMWRu8k_wFFm0Q@mail.gmail.com>
- <1596739.u7ZntKLW7r@diego>
-Message-ID: <1765958.gOlsR47vAx@diego>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Tue, 9 Sep 2014 10:07:40 +0200
+Subject: [PATCH] arm64, defconfig: Increase NR_CPUS default to 64
+In-Reply-To: <1410176689-20020-1-git-send-email-rric@kernel.org>
+References: <1410176689-20020-1-git-send-email-rric@kernel.org>
+Message-ID: <20140909080740.GP23009@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Freitag, 8. August 2014, 17:53:45 schrieb Heiko St?bner:
-> Am Freitag, 8. August 2014, 08:45:16 schrieb Doug Anderson:
-> > Kever,
-> > 
-> > On Thu, Aug 7, 2014 at 8:55 PM, Kever Yang <kever.yang@rock-chips.com>
+On Mon, Sep 08, 2014 at 01:44:48PM +0200, Robert Richter wrote:
+> From: Robert Richter <rrichter@cavium.com>
 > 
-> wrote:
-> > > rk3288 has two kind of usb controller, this add the dwc2 controller
-> > > for otg and host1.
-> > > 
-> > > Controller can works with usb PHY default setting and Vbus on.
-> > > 
-> > > Signed-off-by: Kever Yang <kever.yang@rock-chips.com>
-> > > Reviewed-by: Doug Anderson <dianders@chromium.org>
-> > > Tested-by: Doug Anderson <dianders@chromium.org>
-> > > ---
-> > > 
-> > > Changes in v5:
-> > > - change the sort order of dwc2 in rk3288.dtsi
-> > > 
-> > > Changes in v4: None
-> > > Changes in v3:
-> > > - EHCI and HSIC move new for version 3.
-> > > 
-> > > Changes in v2: None
-> > > 
-> > >  arch/arm/boot/dts/rk3288.dtsi | 20 ++++++++++++++++++++
-> > >  1 file changed, 20 insertions(+)
-> > 
-> > IMHO this series is ready to go in for 3.18.  I'm assuming Heiko will
-> > pick it up once the bindings have landed.  It already has my tags.  ;)
+> Raising the current maximum limit to 64. This is needed for Cavium's
+> Thunder systems that will have at least 48 cores per die.
 > 
-> correct ... the dts changes look ok, so I'll take patches 3 and 4 once
-> patches 1 and 2 are included somewhere.
+> The change keeps the current memory footprint in cpu mask structures.
+> It does not break existing code. Setting the maximum to 64 cpus still
+> boots systems with less cpus.
 > 
+> Mark's Juno happily booted with a NR_CPUS=64 kernel.
+> 
+> Tested on our Thunder system with 48 cores. We could see interrupts to
+> all cores.
+> 
+> Cc: Radha Mohan Chintakuntla <rchintakuntla@cavium.com>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Signed-off-by: Robert Richter <rrichter@cavium.com>
+> ---
+>  arch/arm64/Kconfig | 6 +++---
+>  1 file changed, 3 insertions(+), 3 deletions(-)
+> 
+> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+> index fd4e81a4e1ce..67fca2ea81a7 100644
+> --- a/arch/arm64/Kconfig
+> +++ b/arch/arm64/Kconfig
+> @@ -252,11 +252,11 @@ config SCHED_SMT
+>  	  places. If unsure say N here.
+>  
+>  config NR_CPUS
+> -	int "Maximum number of CPUs (2-32)"
+> -	range 2 32
+> +	int "Maximum number of CPUs (2-64)"
+> +	range 2 64
+>  	depends on SMP
+>  	# These have to remain sorted largest to smallest
+Unrelated to the patch: What does this comment mean? There is only one
+line following, so it's sorted implicitly.
 
-I've added patches 3 and 4 to my v3.18-next/dts branch
+Best regards
+Uwe
+
+> -	default "8"
+> +	default "64"
+
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
