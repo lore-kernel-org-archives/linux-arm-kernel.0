@@ -1,66 +1,32 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Mon, 08 Sep 2014 23:15:36 -0700
-Subject: [PATCH v9 2/6] clk: Move all drivers to use internal API
-In-Reply-To: <20140908061355.19023.47997@quantum>
-References: <1409758148-20104-2-git-send-email-tomeu.vizoso@collabora.com>
- <1409758317-20564-1-git-send-email-tomeu.vizoso@collabora.com>
- <20140908061355.19023.47997@quantum>
-Message-ID: <20140909061536.19023.90796@quantum>
+From: jcm@redhat.com (Jon Masters)
+Date: Tue, 09 Sep 2014 02:21:20 -0400
+Subject: [PATCH v3 13/17] ARM64 / ACPI: Add GICv2 specific ACPI boot
+ support
+In-Reply-To: <5406EDDC.3020208@arm.com>
+References: <1409583475-6978-1-git-send-email-hanjun.guo@linaro.org>
+ <1409583475-6978-14-git-send-email-hanjun.guo@linaro.org>
+ <5404AE56.80801@arm.com> <5405AE95.1020201@linaro.org>
+ <5405BFE7.5060005@arm.com> <5405E626.4090306@linaro.org>
+ <5406EDDC.3020208@arm.com>
+Message-ID: <540E9C60.4090103@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Mike Turquette (2014-09-07 23:13:55)
-> Quoting Tomeu Vizoso (2014-09-03 08:31:57)
-> > In preparation to change the public API to return a per-user clk structure,
-> > remove any usage of this public API from the clock implementations.
-> > 
-> > The reason for having this in a separate commit from the one that introduces
-> > the implementation of the new functions is to separate the changes generated
-> > with Coccinelle from the rest, and keep the patches' size reasonable.
-> > 
-> > Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
-> > Tested-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-> > Tested-by: Heiko Stuebner <heiko@sntech.de>
-> > Acked-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-> 
-> Hi Tomeu,
-> 
-> Looks like the Coccinelle script had a false-positive.
-> asm-generic/clkdev.h was converted from clk->clk_core and this blowed up
-> clock drivers for architectures that don't provide an asm-specific
-> clkdev.h implementation. This fixes x86's LPSS and a Microblaze driver.
-> 
-> I've rolled the following fix into your 2/9 patch. No action is
-> necessary.
-> 
-> Regards,
-> Mike
-> 
-> 
-> 
-> diff --git a/include/asm-generic/clkdev.h b/include/asm-generic/clkdev.h
-> index 4320225..90a32a6 100644
-> --- a/include/asm-generic/clkdev.h
-> +++ b/include/asm-generic/clkdev.h
-> @@ -15,10 +15,10 @@
-> 
->  #include <linux/slab.h>
-> 
-> -struct clk_core;
-> +struct clk;
-> 
-> -static inline int __clk_get(struct clk_core *clk) { return 1; }
-> -static inline void __clk_put(struct clk_core *clk) { }
-> +static inline int __clk_get(struct clk *clk) { return 1; }
-> +static inline void __clk_put(struct clk *clk) { }
-> 
->  static inline struct clk_lookup_alloc *__clkdev_alloc(size_t size)
->  {
+On 09/03/2014 06:30 AM, Marc Zyngier wrote:
+> On 02/09/14 16:45, Hanjun Guo wrote:
 
-Please disregard the above patch. I might have jumped the gun on this
-one. I've posted an alternative (and hopefully correct) fix here:
+>> This value is for max processors entries in MADT, and we will use it to scan MADT
+>> for SMP/GIC Init, I just make it big enough for GICv3/4. since ACPI core will stop
+>> scan MADT if the real numbers of processors entries are reached no matter
+>> how big ACPI_MAX_GICV3_CPU_INTERFACE_ENTRIES is, I think we can just
+>> define a number big enough then it will work (x86 and ia64 did the same thing).
+> 
+> Also, with GICv3++, there is no such thing as a memory-mapped CPU
+> interface anymore. What you get is a bunch of redistributors (one per
+> CPU). I assume what you have here actually describe the redistributors,
+> and its name should reflect that.
 
-http://lkml.kernel.org/r/<1410242868-14750-1-git-send-email-mturquette@linaro.org>
+(though you could have a GICv3/v4 system providing a legacy GICv2(m)
+compatibility mode having the CPU memory interfaces still defined)
 
-Regards,
-Mike
+Jon.
