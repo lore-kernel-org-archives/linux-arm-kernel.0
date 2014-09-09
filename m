@@ -1,31 +1,34 @@
-From: pankaj.dubey@samsung.com (Pankaj Dubey)
-Date: Tue, 09 Sep 2014 17:24:57 +0530
-Subject: [PATCH] clk: samsung: exynos3250: fix width and shift of div_spi0_isp
- clock
-Message-ID: <1410263697-768-1-git-send-email-pankaj.dubey@samsung.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 09 Sep 2014 14:05:51 +0200
+Subject: [PATCH v2 1/4] phy: phy-stih407-usb: Add usb picoPHY driver found
+ on stih407 SoC family
+In-Reply-To: <1706244.K6iQdujHby@amdc1032>
+References: <1410253218-18318-1-git-send-email-peter.griffin@linaro.org>
+ <1410253218-18318-2-git-send-email-peter.griffin@linaro.org>
+ <1706244.K6iQdujHby@amdc1032>
+Message-ID: <2931258.khlMVogpQg@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Update shift and width field of div_spi0_isp clock as per Exynos3250
-user manual.
+On Tuesday 09 September 2014 13:52:54 Bartlomiej Zolnierkiewicz wrote:
+> I believe that this should use
+> 
+>         select GENERIC_PHY
+> 
+> instead (just like all other PHY drivers except PHY_MIPHY365X which
+> also should be fixed to use select).
 
-Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
----
- drivers/clk/samsung/clk-exynos3250.c |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Right. It would also be good to change 'depends on ARCH_STI'
+into 'depends on ARCH_STI || COMPILE_TEST', but only if it
+actually compiles on x86.
 
-diff --git a/drivers/clk/samsung/clk-exynos3250.c b/drivers/clk/samsung/clk-exynos3250.c
-index ba8f073f..a3dee34 100644
---- a/drivers/clk/samsung/clk-exynos3250.c
-+++ b/drivers/clk/samsung/clk-exynos3250.c
-@@ -406,7 +406,7 @@ static struct samsung_div_clock div_clks[] __initdata = {
- 	DIV(CLK_DIV_SPI1_ISP, "div_spi1_isp", "mout_spi1_isp", DIV_ISP, 16, 4),
- 	DIV_F(CLK_DIV_SPI0_ISP_PRE, "div_spi0_isp_pre", "div_spi0_isp",
- 		DIV_ISP, 8, 8, CLK_SET_RATE_PARENT, 0),
--	DIV(CLK_DIV_SPI0_ISP, "div_spi0_isp", "mout_spi0_isp", DIV_ISP, 0, 4),
-+	DIV(CLK_DIV_SPI0_ISP, "div_spi0_isp", "mout_spi0_isp", DIV_ISP, 4, 4),
- 
- 	/* DIV_FSYS0 */
- 	DIV_F(CLK_DIV_TSADC_PRE, "div_tsadc_pre", "div_tsadc", DIV_FSYS0, 8, 8,
--- 
-1.7.9.5
+Note that currently both providers and users of the PHY API
+use 'select GENERIC_PHY', which probably not what we want:
+only providers (like this one) should 'select' it, while
+drivers using this interface could either 'depends on
+GENERIC_PHY' or leave out the Kconfig dependency entirely.
+
+Adding 'depends on' for drivers using the interface might
+be cleaner, but can result in dependency loops.
+
+	Arnd
