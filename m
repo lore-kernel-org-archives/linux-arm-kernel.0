@@ -1,39 +1,41 @@
-From: pebolle@tiscali.nl (Paul Bolle)
-Date: Tue, 09 Sep 2014 11:28:07 +0200
-Subject: [PATCH] arm64, defconfig: Increase NR_CPUS default to 64
-In-Reply-To: <20140909080740.GP23009@pengutronix.de>
-References: <1410176689-20020-1-git-send-email-rric@kernel.org>
- <20140909080740.GP23009@pengutronix.de>
-Message-ID: <1410254887.22255.14.camel@x220>
+From: robert.richter@caviumnetworks.com (Robert Richter)
+Date: Tue, 9 Sep 2014 11:26:53 +0200
+Subject: [PATCH] GICv3: Fixing 32 bit compatibility
+In-Reply-To: <20140909091912.GQ23009@pengutronix.de>
+References: <1410185480-5153-1-git-send-email-rric@kernel.org>
+ <20140909080042.GO23009@pengutronix.de>
+ <20140909091201.GA4527@rric.localhost>
+ <20140909091912.GQ23009@pengutronix.de>
+Message-ID: <20140909092653.GC4588@rric.localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2014-09-09 at 10:07 +0200, Uwe Kleine-K?nig wrote:
-> On Mon, Sep 08, 2014 at 01:44:48PM +0200, Robert Richter wrote:
-> > @@ -252,11 +252,11 @@ config SCHED_SMT
-> >  	  places. If unsure say N here.
-> >  
-> >  config NR_CPUS
-> > -	int "Maximum number of CPUs (2-32)"
-> > -	range 2 32
-> > +	int "Maximum number of CPUs (2-64)"
-> > +	range 2 64
-> >  	depends on SMP
-> >  	# These have to remain sorted largest to smallest
-> Unrelated to the patch: What does this comment mean? There is only one
-> line following, so it's sorted implicitly.
+On 09.09.14 11:19:12, Uwe Kleine-K?nig wrote:
+> On Tue, Sep 09, 2014 at 11:12:01AM +0200, Robert Richter wrote:
+> > On 09.09.14 10:00:42, Uwe Kleine-K?nig wrote:
+> > > On Mon, Sep 08, 2014 at 04:11:19PM +0200, Robert Richter wrote:
+> > 
+> > > > @@ -479,7 +479,7 @@ static void gic_raise_softirq(const struct cpumask *mask, unsigned int irq)
+> > > >     smp_wmb();
+> > > >  
+> > > >     for_each_cpu_mask(cpu, *mask) {
+> > > > -           u64 cluster_id = cpu_logical_map(cpu) & ~0xffUL;
+> > > > +           u64 cluster_id = cpu_logical_map(cpu) & ~0xffULL;
+> > > This doesn't change anything, does it?
+> > 
+> > It does, not in 64 bit but in 32 bit there unsigned long is 32
+> > bit. So, bit masks are broken if you compile a 32 bit kernel.
+> Can you make an example where the result actually changes?
 
-This comment doesn't mean much, anymore.
+Upper 32 bits will be cleared above.
 
-It was added in commit 159428538323 ("arm64: Add Kconfig option for APM
-X-Gene SOC family"). Why someone cared so much about the sorting of the
-two defaults is unclear to me. Maybe only to make sure future commits
-wouldn't mess up the sorting order. Anyhow, it seems it was just
-forgotten to remove that line in commit 62aceb8ff4b3 ("arm64: make
-default NR_CPUS 8") which again made it a single item list.
+> > > I wonder if it would be cleaner to use (u64)0xff here.
+> > 
+> > No, that's ULL for. This is commonly used in x86 too.
+> I don't care much here, but I'd say ULL is to force an unsigned long
+> long. If you want to make it obvious that you want a 64bit value, a cast
+> to u64 makes this more clear.
 
-> > -	default "8"
-> > +	default "64"
+ULL is no cast at all.
 
-
-Paul Bolle
+-Robert
