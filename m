@@ -1,48 +1,41 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Tue, 09 Sep 2014 13:57:39 -0700
-Subject: [PATCH v9 0/6] Add Maxim 77802 clocks support
-In-Reply-To: <CABxcv=mww1wcf+vo5uLxBrNZBVJhj9zvbwGu_oAKXm4XDUNvCQ@mail.gmail.com>
-References: <1408350784-15577-1-git-send-email-javier.martinez@collabora.co.uk>
- <CABxcv=mww1wcf+vo5uLxBrNZBVJhj9zvbwGu_oAKXm4XDUNvCQ@mail.gmail.com>
-Message-ID: <20140909205739.19023.50828@quantum>
+From: pavel@denx.de (Pavel Machek)
+Date: Tue, 9 Sep 2014 23:02:32 +0200
+Subject: [GIT PULL 1/2] SOCFPGA updates for 3.18
+In-Reply-To: <4134101.OOENTRabu1@wuerfel>
+References: <1409847105-27241-1-git-send-email-dinguyen@opensource.altera.com>
+ <20140909141756.GA30100@amd> <4134101.OOENTRabu1@wuerfel>
+Message-ID: <20140909210232.GA539@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Javier Martinez Canillas (2014-09-07 23:49:28)
-> Hello Mike,
+On Tue 2014-09-09 17:02:34, Arnd Bergmann wrote:
+> On Tuesday 09 September 2014 16:17:56 Pavel Machek wrote:
+> > > Jaehoon Chung (1):
+> > >       ARM: dts: socfpga: unuse the slot-node and deprecate the supports-highspeed for dw-mmc
+> > > 
+> > 
+> > This patch is a bad idea. It removes support for two mmc cards on a
+> > single controller -- configuration hardware supports and configuration
+> > that allows using u-SD card on mcvevk board.
+> > 
 > 
-> On Mon, Aug 18, 2014 at 10:32 AM, Javier Martinez Canillas
-> <javier.martinez@collabora.co.uk> wrote:
-> > This series add support for the clocks present in the Maxim
-> > 77802 Power Managment IC. Previously, the series was part
-> > of a bigger one [0] that aimed to add support for all the
-> > devices in the max77802 PMIC. But now the Maxim 77802 PMIC
-> > dependencies were already merged for 3.17 so the series can
-> > be split and each driver can go through the relevant tree.
-> >
-> 
-> This series was first posted for 3.17 and you acked the whole set but
-> it missed 3.17 because had as a dependency some changes in the
-> max77802 mfd driver. Those dependencies made for 3.17 and that's why I
-> re-posted it for 3.18 about a month ago.
-> 
-> Since we are in 3.17-rc4 already, I'm afraid that this series may miss
-> 3.18 again, is there anything else you need from me to pick this
-> series? It will obviously conflict with Tomeu's "Per-user clock
-> constraints" series [0] so if you want I can rebase it on top of your
-> clk-next-tomeu-kirkwood-v2 branch [1].
+> Your objection comes too late, and to the wrong patch, since the
+> driver and all other users have already been changed. We had a long
+> discussion about this when the issue first came up, and we could
+> not find any example of dw-mmc actually being used in a scenario
+> with one controller that has multiple devices attached.
 
-Thanks for pinging me about it. I've pulled this series into clk-next
-for 3.18. Everything is going to conflict with Tomeu's series so we'll
-just handle that when it comes to merge his series (which I've since
-removed from clk-next due to pending issues).
+Well, this is not first time I raised this. 3.17 is not yet out, so we
+still have chance to fix regressions without major fuss.
 
-Regards,
-Mike
+> Apparently every user out there instead uses multiple controller
+> instances instead. Are you sure that the socfpga implementation
+> is an exception from this?
 
-> 
-> Thanks a lot and best regards,
-> Javier
-> 
-> [0]: https://lkml.org/lkml/2014/9/1/466
-> [1]: https://git.linaro.org/people/mike.turquette/linux.git/shortlog/refs/heads/clk-next-tomeu-kirkwood-v2
+Marek Vasut has the hardware. His board apprently has uSD and eMMC,
+and I believe it has just one controller. I'll try to get details.
+
+									Pavel
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
