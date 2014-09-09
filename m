@@ -1,171 +1,31 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Tue, 09 Sep 2014 13:22:57 +0200
-Subject: [PATCH] ARM: dts: Add rk808 PMIC to rk3288-evb-rk808
-In-Reply-To: <1409074123-17449-1-git-send-email-dianders@chromium.org>
-References: <1409074123-17449-1-git-send-email-dianders@chromium.org>
-Message-ID: <23122191.L4GLoISGbk@diego>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 9 Sep 2014 12:22:21 +0100
+Subject: [PATCH] regulator: mc13xxx: add missing of_node_get()
+In-Reply-To: <CAFRkauBhzHot9=z-Jv-rvdLaSWSfyYSULMKqcVX+tiHcXrxt_g@mail.gmail.com>
+References: <1410260825-21667-1-git-send-email-guodong.xu@linaro.org>
+ <CAFRkauBhzHot9=z-Jv-rvdLaSWSfyYSULMKqcVX+tiHcXrxt_g@mail.gmail.com>
+Message-ID: <20140909112221.GP2601@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Dienstag, 26. August 2014, 10:28:43 schrieb Doug Anderson:
-> This adds initial support.  For now, regulators are always on and we
-> don't specify the input supply for all of the regulators.
+On Tue, Sep 09, 2014 at 07:11:46PM +0800, Axel Lin wrote:
+> 2014-09-09 19:07 GMT+08:00 Guodong Xu <guodong.xu@linaro.org>:
+> > mc13xxx_parse_regulators_dt() goes through dt tree to search for regulator
+> > sub-nodes. For each matched node, later on it will be used and registered
+> > into a regulator_dev.
+> >
+> > of_node_get() should be called to increase its refcount.
 
-The basic rk808 mfd including the bindings got accepted, so
+> I think it's done by regulator core:
 
-Added to v3.18-next/dts branch with the small modification described below
+> commit 63c7c9e16c8e92cc069854f2babdf82d2d38e4c7
+> regulator: core: Get and put regulator of_node
 
-> 
-> Signed-off-by: huang lin <hl@rock-chips.com>
-> Signed-off-by: Doug Anderson <dianders@chromium.org>
-> ---
-> This patch is based on Chris's WIP rk808 series.
-> 
->  arch/arm/boot/dts/rk3288-evb-rk808.dts | 131
-> +++++++++++++++++++++++++++++++++ 1 file changed, 131 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/rk3288-evb-rk808.dts
-> b/arch/arm/boot/dts/rk3288-evb-rk808.dts index 9a88b6c..513c88e 100644
-> --- a/arch/arm/boot/dts/rk3288-evb-rk808.dts
-> +++ b/arch/arm/boot/dts/rk3288-evb-rk808.dts
-> @@ -16,3 +16,134 @@
->  / {
->  	compatible = "rockchip,rk3288-evb-rk808", "rockchip,rk3288";
->  };
-> +
-> +&i2c0 {
-> +	status = "okay";
-> +
-> +	rk808: pmic at 1b {
-> +		compatible = "rockchip,rk808";
-> +		clock-output-names = "xin32k", "rk808-clkout2";
-
-I moved the clock-output-names below the #clock-cells and the reg from below 
-to here.
-
-
-
-> +		interrupt-parent = <&gpio0>;
-> +		interrupts = <4 IRQ_TYPE_LEVEL_LOW>;
-> +		pinctrl-names = "default";
-> +		pinctrl-0 = <&pmic_int>;
-> +		reg = <0x1b>;
-> +		rockchip,system-power-controller;
-> +		wakeup-source;
-> +		#clock-cells = <1>;
-> +
-> +		vcc8-supply = <&vcc_18>;
-> +		vcc9-supply = <&vcc_io>;
-> +		vcc10-supply = <&vcc_io>;
-> +		vcc12-supply = <&vcc_io>;
-> +		vddio-supply = <&vccio_pmu>;
-> +
-> +		regulators {
-> +			vdd_cpu: DCDC_REG1 {
-> +				regulator-always-on;
-> +				regulator-boot-on;
-> +				regulator-min-microvolt = <750000>;
-> +				regulator-max-microvolt = <1300000>;
-> +				regulator-name = "vdd_arm";
-> +			};
-> +
-> +			vdd_gpu: DCDC_REG2 {
-> +				regulator-always-on;
-> +				regulator-boot-on;
-> +				regulator-min-microvolt = <850000>;
-> +				regulator-max-microvolt = <1250000>;
-> +				regulator-name = "vdd_gpu";
-> +			};
-> +
-> +			vcc_ddr: DCDC_REG3 {
-> +				regulator-always-on;
-> +				regulator-boot-on;
-> +				regulator-name = "vcc_ddr";
-> +			};
-> +
-> +			vcc_io: DCDC_REG4 {
-> +				regulator-always-on;
-> +				regulator-boot-on;
-> +				regulator-min-microvolt = <3300000>;
-> +				regulator-max-microvolt = <3300000>;
-> +				regulator-name = "vcc_io";
-> +			};
-> +
-> +			vccio_pmu: LDO_REG1 {
-> +				regulator-always-on;
-> +				regulator-boot-on;
-> +				regulator-min-microvolt = <3300000>;
-> +				regulator-max-microvolt = <3300000>;
-> +				regulator-name = "vccio_pmu";
-> +			};
-> +
-> +			vcc_tp: LDO_REG2 {
-> +				regulator-always-on;
-> +				regulator-boot-on;
-> +				regulator-min-microvolt = <3300000>;
-> +				regulator-max-microvolt = <3300000>;
-> +				regulator-name = "vcc_tp";
-> +			};
-> +
-> +			vdd_10: LDO_REG3 {
-> +				regulator-always-on;
-> +				regulator-boot-on;
-> +				regulator-min-microvolt = <1000000>;
-> +				regulator-max-microvolt = <1000000>;
-> +				regulator-name = "vdd_10";
-> +			};
-> +
-> +			vcc18_lcd: LDO_REG4 {
-> +				regulator-always-on;
-> +				regulator-boot-on;
-> +				regulator-min-microvolt = <1800000>;
-> +				regulator-max-microvolt = <1800000>;
-> +				regulator-name = "vcc18_lcd";
-> +			};
-> +
-> +			vccio_sd: LDO_REG5 {
-> +				regulator-always-on;
-> +				regulator-boot-on;
-> +				regulator-min-microvolt = <1800000>;
-> +				regulator-max-microvolt = <3300000>;
-> +				regulator-name = "vccio_sd";
-> +			};
-> +
-> +			vdd10_lcd: LDO_REG6 {
-> +				regulator-always-on;
-> +				regulator-boot-on;
-> +				regulator-min-microvolt = <1000000>;
-> +				regulator-max-microvolt = <1000000>;
-> +				regulator-name = "vdd10_lcd";
-> +			};
-> +
-> +			vcc_18: LDO_REG7 {
-> +				regulator-always-on;
-> +				regulator-boot-on;
-> +				regulator-min-microvolt = <1800000>;
-> +				regulator-max-microvolt = <1800000>;
-> +				regulator-name = "vcc_18";
-> +			};
-> +
-> +			vcca_codec: LDO_REG8 {
-> +				regulator-always-on;
-> +				regulator-boot-on;
-> +				regulator-min-microvolt = <3300000>;
-> +				regulator-max-microvolt = <3300000>;
-> +				regulator-name = "vcca_codec";
-> +			};
-> +
-> +			vcc_wl: SWITCH_REG1 {
-> +				regulator-always-on;
-> +				regulator-boot-on;
-> +				regulator-name = "vcc_wl";
-> +			};
-> +
-> +			vcc_lcd: SWITCH_REG2 {
-> +				regulator-always-on;
-> +				regulator-boot-on;
-> +				regulator-name = "vcc_lcd";
-> +			};
-> +		};
-> +	};
-> +};
+Yes, that's the idea anyway.  It's possible this is buggy though.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140909/bc7be692/attachment.sig>
