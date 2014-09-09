@@ -1,87 +1,84 @@
-From: suravee.suthikulpanit@amd.com (suravee.suthikulpanit at amd.com)
-Date: Tue, 9 Sep 2014 15:37:15 -0500
-Subject: [PATCH] ata: ahci_platform: Add ACPI support for AMD Seattle SATA
- controller
-Message-ID: <1410295035-14471-1-git-send-email-suravee.suthikulpanit@amd.com>
+From: m-karicheri2@ti.com (Murali Karicheri)
+Date: Tue, 9 Sep 2014 16:42:46 -0400
+Subject: [PATCH v2 2/2] PCI: keystone: update to support multiple pci ports
+In-Reply-To: <3294679.puV171E8qx@wuerfel>
+References: <1410293835-13050-1-git-send-email-m-karicheri2@ti.com>
+ <1410293835-13050-2-git-send-email-m-karicheri2@ti.com>
+ <3294679.puV171E8qx@wuerfel>
+Message-ID: <540F6646.3010607@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
+On 09/09/2014 04:28 PM, Arnd Bergmann wrote:
+> On Tuesday 09 September 2014 16:17:15 Murali Karicheri wrote:
+>> K2E SoC has two PCI ports. The SATA controller is connected to second
+>> PCI port (port 1). This patch enhances the driver to support multiple
+>> ports.
+>>
+>> Update the DT Documentation for the new attribute, ti,pcie-port and
+>> remove the note for bootargs as this is no longer needed.
+>>
+>> Signed-off-by: Murali Karicheri<m-karicheri2@ti.com>
+>> ---
+>>   - updated based on comment against v1
+>>   .../devicetree/bindings/pci/pci-keystone.txt       |    8 +++++---
+>>   drivers/pci/host/pci-keystone.c                    |   15 ++++++++++-----
+>>   drivers/pci/host/pci-keystone.h                    |    4 ++--
+>>   3 files changed, 17 insertions(+), 10 deletions(-)
+>>
+>> diff --git a/Documentation/devicetree/bindings/pci/pci-keystone.txt b/Documentation/devicetree/bindings/pci/pci-keystone.txt
+>> index bedacf0..c8f5773 100644
+>> --- a/Documentation/devicetree/bindings/pci/pci-keystone.txt
+>> +++ b/Documentation/devicetree/bindings/pci/pci-keystone.txt
+>> @@ -56,11 +56,13 @@ Optional properties:-
+>>   	phy-names: name of the Generic Keystine SerDes phy for PCI
+>>   	  - If boot loader already does PCI link establishment, then phys and
+>>   	    phy-names shouldn't be present.
+>> +	ti,pcie-port: PCI port number. This is used to configure the PCI port
+>> +	    number. For example K2E SoC supports 2 PCI ports and PCI bindings
+>> +	    for the second port adds ti,pcie-port =<1>  to identify second port
+>> +	    and driver uses this to configure the PCI mode register for second
+>> +	    port. If not present, port number 0 is assumed.
+>
+> Is this still needed? I thought with patch 1 removed, we no longer had
+> a reason to know the port number.
+>
+You are right. I will remove it and re-send.
 
-This patch adds ACPI support for non-PCI SATA contoller in ahci_platform driver.
-It adds ACPI matching table in ahci_platform to support AMD Seattle SATA controller
-with following ASL structure in DSDT:
+>> -=========================
+>> -Driver requires pci=pcie_bus_perf in the bootargs for proper functioning.
+>> diff --git a/drivers/pci/host/pci-keystone.c b/drivers/pci/host/pci-keystone.c
+>> index f1119eb..893820d 100644
+>> --- a/drivers/pci/host/pci-keystone.c
+>> +++ b/drivers/pci/host/pci-keystone.c
+>> @@ -253,8 +253,8 @@ static int keystone_pcie_fault(unsigned long addr, unsigned int fsr,
+>>
+>>   static void __init ks_pcie_host_init(struct pcie_port *pp)
+>>   {
+>> -	u32 vendor_device_id, val;
+>>   	struct keystone_pcie *ks_pcie = to_keystone_pcie(pp);
+>> +	u32 val;
+>>
+>>   	ks_pcie_establish_link(ks_pcie);
+>>   	ks_dw_pcie_setup_rc_app_regs(ks_pcie);
+>> @@ -263,8 +263,7 @@ static void __init ks_pcie_host_init(struct pcie_port *pp)
+>>   			pp->dbi_base + PCI_IO_BASE);
+>>
+>>   	/* update the Vendor ID */
+>> -	vendor_device_id = readl(ks_pcie->va_reg_pciid);
+>> -	writew((vendor_device_id>>  16), pp->dbi_base + PCI_DEVICE_ID);
+>> +	writew(ks_pcie->device_id, pp->dbi_base + PCI_DEVICE_ID);
+>>
+>>   	/* update the DEV_STAT_CTRL to publish right mrrs */
+>>   	val = readl(pp->dbi_base + PCIE_CAP_BASE + PCI_EXP_DEVCTL);
+>
+> This change must have slipped in accidentally, at least it's not
+> described in the changelog. Should this be another patch?
+> The change seems useful.
+Are you referring to mrrs or update to device id?  device id is in a SoC 
+register at index2 and is read and updated by the driver here. MRRS 
+update was originally in the code.
 
-    Device (SATA0)
-    {
-      Name(_HID, "AMDI0600")	// Seattle AHSATA
-      Name (_CCA, 1)		// Cache-coherent controller
-      Name (_CRS, ResourceTemplate ()
-      {
-        Memory32Fixed (ReadWrite, 0xE0300000, 0x00010000)
-        Interrupt (ResourceConsumer, Level, ActiveHigh, Exclusive,,,) { 387 }
-      })
-    }
-
-Since ATA driver should not require PCI support for ATA_ACPI,
-this patch also removes dependency in the driver/ata/Kconfig.
-
-Signed-off-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
----
- drivers/ata/Kconfig         |  2 +-
- drivers/ata/ahci_platform.c | 13 +++++++++++++
- 2 files changed, 14 insertions(+), 1 deletion(-)
-
-diff --git a/drivers/ata/Kconfig b/drivers/ata/Kconfig
-index e1b9278..f2e6c9e 100644
---- a/drivers/ata/Kconfig
-+++ b/drivers/ata/Kconfig
-@@ -48,7 +48,7 @@ config ATA_VERBOSE_ERROR
- 
- config ATA_ACPI
- 	bool "ATA ACPI Support"
--	depends on ACPI && PCI
-+	depends on ACPI
- 	default y
- 	help
- 	  This option adds support for ATA-related ACPI objects.
-diff --git a/drivers/ata/ahci_platform.c b/drivers/ata/ahci_platform.c
-index f61ddb9..3499bab 100644
---- a/drivers/ata/ahci_platform.c
-+++ b/drivers/ata/ahci_platform.c
-@@ -20,6 +20,9 @@
- #include <linux/platform_device.h>
- #include <linux/libata.h>
- #include <linux/ahci_platform.h>
-+#ifdef CONFIG_ATA_ACPI
-+#include <linux/acpi.h>
-+#endif
- #include "ahci.h"
- 
- static const struct ata_port_info ahci_port_info = {
-@@ -87,6 +90,13 @@ static const struct of_device_id ahci_of_match[] = {
- };
- MODULE_DEVICE_TABLE(of, ahci_of_match);
- 
-+#ifdef CONFIG_ATA_ACPI
-+static const struct acpi_device_id ahci_acpi_match[] = {
-+	{ "AMDI0600", 0 }, /* AMD Seattle AHCI */
-+	{ },
-+};
-+#endif
-+
- static struct platform_driver ahci_driver = {
- 	.probe = ahci_probe,
- 	.remove = ata_platform_remove_one,
-@@ -94,6 +104,9 @@ static struct platform_driver ahci_driver = {
- 		.name = "ahci",
- 		.owner = THIS_MODULE,
- 		.of_match_table = ahci_of_match,
-+#ifdef CONFIG_ATA_ACPI
-+		.acpi_match_table = ACPI_PTR(ahci_acpi_match),
-+#endif
- 		.pm = &ahci_pm_ops,
- 	},
- };
--- 
-1.9.3
+Murali
+>
+> 	Arnd
