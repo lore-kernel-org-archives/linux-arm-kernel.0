@@ -1,65 +1,35 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Tue, 09 Sep 2014 10:43:37 -0700
-Subject: [PATCH 1/3] kbuild: remove unnecessary "obj- := dummy.o" trick
-In-Reply-To: <1410258381-7088-2-git-send-email-yamada.m@jp.panasonic.com>
-References: <1410258381-7088-1-git-send-email-yamada.m@jp.panasonic.com>
- <1410258381-7088-2-git-send-email-yamada.m@jp.panasonic.com>
-Message-ID: <20140909174337.19023.97772@quantum>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 09 Sep 2014 19:47:35 +0200
+Subject: [PATCH v2 3/8] Documentation: bindings: net: add the Marvell
+ PXA168 Ethernet controller
+In-Reply-To: <20140909160136.GA26051@kwain>
+References: <1410273848-24663-1-git-send-email-antoine.tenart@free-electrons.com>
+ <3827594.chb831jyvc@wuerfel> <20140909160136.GA26051@kwain>
+Message-ID: <2897714.QyEFFDa5hL@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Masahiro Yamada (2014-09-09 03:26:19)
-> In these Makefiles, at least one of "obj-y" and "obj-" is non-empty,
-> hence built-in.o is always created without such a trick.
+On Tuesday 09 September 2014 18:01:36 Antoine Tenart wrote:
 > 
-> Signed-off-by: Masahiro Yamada <yamada.m@jp.panasonic.com>
+> On Tue, Sep 09, 2014 at 05:58:12PM +0200, Arnd Bergmann wrote:
+> > On Tuesday 09 September 2014 16:44:03 Antoine Tenart wrote:
+> > > +- clocks: pointer to the clock for the device.
+> > > +- clock-names: should be "MFUCLK".
+> > 
+> > Clock names are normally not capitalized. Are you able to change
+> > that name when providing a binding or make it an anoymous clock?
+> > What does MFU stand for anyway?
+> 
+> Sure. I could have make it an anonymous clock but the name "MFUCLK" was
+> already used by the pxa168 Ethernet driver so I didn't wanted to change
+> that.
 
-Acked-by: Mike Turquette <mturquette@linaro.org>
+I believe you can just ask for an anonymous clock anyway and get the
+first one even if it has a name, but I didn't check.
 
-> ---
-> 
->  arch/arm/plat-samsung/Makefile | 1 -
->  drivers/clk/shmobile/Makefile  | 2 --
->  drivers/net/wimax/Makefile     | 4 ----
->  3 files changed, 7 deletions(-)
-> 
-> diff --git a/arch/arm/plat-samsung/Makefile b/arch/arm/plat-samsung/Makefile
-> index 5fe1750..a402262 100644
-> --- a/arch/arm/plat-samsung/Makefile
-> +++ b/arch/arm/plat-samsung/Makefile
-> @@ -8,7 +8,6 @@ ccflags-$(CONFIG_ARCH_MULTI_V7) += -I$(srctree)/$(src)/include
->  
->  obj-y                          :=
->  obj-m                          :=
-> -obj-n                          := dummy.o
->  obj-                           :=
->  
->  # Objects we always build independent of SoC choice
-> diff --git a/drivers/clk/shmobile/Makefile b/drivers/clk/shmobile/Makefile
-> index e002923..9aab51c8 100644
-> --- a/drivers/clk/shmobile/Makefile
-> +++ b/drivers/clk/shmobile/Makefile
-> @@ -6,5 +6,3 @@ obj-$(CONFIG_ARCH_R8A7790)              += clk-rcar-gen2.o
->  obj-$(CONFIG_ARCH_R8A7791)             += clk-rcar-gen2.o
->  obj-$(CONFIG_ARCH_SHMOBILE_MULTI)      += clk-div6.o
->  obj-$(CONFIG_ARCH_SHMOBILE_MULTI)      += clk-mstp.o
-> -# for emply built-in.o
-> -obj-n  := dummy
-> diff --git a/drivers/net/wimax/Makefile b/drivers/net/wimax/Makefile
-> index 992bc02..692184d 100644
-> --- a/drivers/net/wimax/Makefile
-> +++ b/drivers/net/wimax/Makefile
-> @@ -1,5 +1 @@
-> -
->  obj-$(CONFIG_WIMAX_I2400M)     += i2400m/
-> -
-> -# (from Sam Ravnborg) force kbuild to create built-in.o
-> -obj- := dummy.o
-> -- 
-> 1.9.1
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
+In any case, we should not just take a clock name in a DT binding
+because it happened to be used by platform code. It's easy fix the
+platform code when someone makes a mistake there, but very hard to
+fix DT strings once there are users relying on a particular convention.
+
+	Arnd
