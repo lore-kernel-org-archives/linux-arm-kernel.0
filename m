@@ -1,78 +1,38 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Tue, 09 Sep 2014 15:16:29 +0200
-Subject: [PATCH 1/2] acpi: lpss: convert from struct clk to struct clk_core
-In-Reply-To: <1410242868-14750-2-git-send-email-mturquette@linaro.org>
-References: <1410242868-14750-1-git-send-email-mturquette@linaro.org>
- <1410242868-14750-2-git-send-email-mturquette@linaro.org>
-Message-ID: <7263163.khRHYpcBRO@vostro.rjw.lan>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Tue,  9 Sep 2014 15:05:14 +0200
+Subject: [PATCH v8 4/5] ARM: dts: imx6sl: Add power-domain information to gpc
+ node
+In-Reply-To: <1410267915-18126-1-git-send-email-p.zabel@pengutronix.de>
+References: <1410267915-18126-1-git-send-email-p.zabel@pengutronix.de>
+Message-ID: <1410267915-18126-5-git-send-email-p.zabel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday, September 08, 2014 11:07:47 PM Mike Turquette wrote:
-> Looks like this driver was missed during the original mass driver
-> rework[0]. This patch converts the LPSS driver to the new clock provider
-> data type (struct clk_core).
-> 
-> If there are no objections I propose to roll this patch into a rebase of
-> that patch[0] in my tree.
-> 
-> [0] http://lkml.kernel.org/r/<1409758317-20564-1-git-send-email-tomeu.vizoso@collabora.com>
-> 
-> Signed-off-by: Mike Turquette <mturquette@linaro.org>
+The PGC that is part of GPC controls isolation and power sequencing of the
+power domains. The PU power domain will be handled by the generic pm domain
+framework. It needs a phandle to the PU regulator to turn off power when
+the domain is disabled and a list of clocks to be enabled during powerup
+for reset propagation.
 
-Mika, any comments here?
+Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
+---
+ arch/arm/boot/dts/imx6sl.dtsi | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-> ---
->  drivers/acpi/acpi_lpss.c               | 6 +++---
->  include/linux/platform_data/clk-lpss.h | 2 +-
->  2 files changed, 4 insertions(+), 4 deletions(-)
-> 
-> diff --git a/drivers/acpi/acpi_lpss.c b/drivers/acpi/acpi_lpss.c
-> index 9dfec48..454179f 100644
-> --- a/drivers/acpi/acpi_lpss.c
-> +++ b/drivers/acpi/acpi_lpss.c
-> @@ -57,7 +57,7 @@ ACPI_MODULE_NAME("acpi_lpss");
->  struct lpss_shared_clock {
->  	const char *name;
->  	unsigned long rate;
-> -	struct clk *clk;
-> +	struct clk_core *clk;
->  };
->  
->  struct lpss_private_data;
-> @@ -83,7 +83,7 @@ static struct lpss_device_desc lpss_dma_desc = {
->  struct lpss_private_data {
->  	void __iomem *mmio_base;
->  	resource_size_t mmio_size;
-> -	struct clk *clk;
-> +	struct clk_core *clk;
->  	const struct lpss_device_desc *dev_desc;
->  	u32 prv_reg_ctx[LPSS_PRV_REG_COUNT];
->  };
-> @@ -278,7 +278,7 @@ static int register_device_clock(struct acpi_device *adev,
->  	const struct lpss_device_desc *dev_desc = pdata->dev_desc;
->  	struct lpss_shared_clock *shared_clock = dev_desc->shared_clock;
->  	const char *devname = dev_name(&adev->dev);
-> -	struct clk *clk = ERR_PTR(-ENODEV);
-> +	struct clk_core *clk = ERR_PTR(-ENODEV);
->  	struct lpss_clk_data *clk_data;
->  	const char *parent, *clk_name;
->  	void __iomem *prv_base;
-> diff --git a/include/linux/platform_data/clk-lpss.h b/include/linux/platform_data/clk-lpss.h
-> index 2390199..3c3237c 100644
-> --- a/include/linux/platform_data/clk-lpss.h
-> +++ b/include/linux/platform_data/clk-lpss.h
-> @@ -15,7 +15,7 @@
->  
->  struct lpss_clk_data {
->  	const char *name;
-> -	struct clk *clk;
-> +	struct clk_core *clk;
->  };
->  
->  extern int lpt_clk_init(void);
-> 
-
+diff --git a/arch/arm/boot/dts/imx6sl.dtsi b/arch/arm/boot/dts/imx6sl.dtsi
+index c75800c..7ae4847 100644
+--- a/arch/arm/boot/dts/imx6sl.dtsi
++++ b/arch/arm/boot/dts/imx6sl.dtsi
+@@ -581,6 +581,10 @@
+ 				compatible = "fsl,imx6sl-gpc", "fsl,imx6q-gpc";
+ 				reg = <0x020dc000 0x4000>;
+ 				interrupts = <0 89 IRQ_TYPE_LEVEL_HIGH>;
++				pu-supply = <&reg_pu>;
++				clocks = <&clks IMX6SL_CLK_GPU2D_OVG>,
++					 <&clks IMX6SL_CLK_GPU2D_PODF>;
++				#power-domain-cells = <1>;
+ 			};
+ 
+ 			gpr: iomuxc-gpr at 020e0000 {
 -- 
-I speak only for myself.
-Rafael J. Wysocki, Intel Open Source Technology Center.
+2.1.0
