@@ -1,93 +1,35 @@
-From: knaack.h@gmx.de (Hartmut Knaack)
-Date: Tue, 09 Sep 2014 23:54:37 +0200
-Subject: [PATCH v2] iio: adc: at91: don't use the last converted data
- register
-In-Reply-To: <1410165631-8688-1-git-send-email-ludovic.desroches@atmel.com>
-References: <1410165631-8688-1-git-send-email-ludovic.desroches@atmel.com>
-Message-ID: <540F771D.5040106@gmx.de>
+From: gg@slimlogic.co.uk (Graeme Gregory)
+Date: Tue, 9 Sep 2014 23:04:23 +0100
+Subject: [PATCH v3 03/17] ARM64 / ACPI: Introduce lowlevel suspend function
+In-Reply-To: <20140909163529.GA6370@arm.com>
+References: <1409583475-6978-1-git-send-email-hanjun.guo@linaro.org>
+ <1409583475-6978-4-git-send-email-hanjun.guo@linaro.org>
+ <20140909163529.GA6370@arm.com>
+Message-ID: <20140909220423.GL6558@xora-haswell.xora.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ludovic Desroches schrieb, Am 08.09.2014 10:40:
-> If touchscreen mode is enabled and a conversion is requested on another
-> channel, the result in the last converted data register can be a
-> touchscreen relative value. Starting a conversion involves to do a
-> conversion for all active channel. It starts with ADC channels and ends
-> with touchscreen channels. Then if ADC_LCD register is not read quickly,
-> its content may be a touchscreen conversion.
-> To remove this temporal constraint, the conversion value is taken from
-> the channel data register.
+On Tue, Sep 09, 2014 at 05:35:29PM +0100, Catalin Marinas wrote:
+> On Mon, Sep 01, 2014 at 03:57:41PM +0100, Hanjun Guo wrote:
+> > From: Graeme Gregory <graeme.gregory@linaro.org>
+> > 
+> > acpi_wakeup_address is used on x86 as the address bios jumps into
+> > when machine wakes up from suspend. As arm64 does not have such a
+> > bios this mechanism will be provided by other means. But the define
+> > is still required inside the acpi core.
+> > 
+> > Introduce a null stub for acpi_suspend_lowlevel as this is also
+> > required by core. This will be filled in when standards are
+> > defined for arm64 ACPI global power states.
 > 
-> Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-> Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
-> ---
+> Do we actually plan to use these on arm64? I'm worried most of these
+> don't make sense on arm64 (the aim is to use PSCI). Is it possible to
+> refactor the core code so that we don't have to define dummy macros or
+> variables just to be able to build the kernel?
 > 
-> Changes from v1:
-> - use GENMASK and BIT macros
-> 
->  drivers/iio/adc/at91_adc.c |   12 +++++++-----
->  1 file changed, 7 insertions(+), 5 deletions(-)
-> 
-> diff --git a/drivers/iio/adc/at91_adc.c b/drivers/iio/adc/at91_adc.c
-> index 3b5bacd..1812d12 100644
-> --- a/drivers/iio/adc/at91_adc.c
-> +++ b/drivers/iio/adc/at91_adc.c
-> @@ -196,6 +196,7 @@ struct at91_adc_state {
->  	bool			done;
->  	int			irq;
->  	u16			last_value;
-> +	int			chnb;
->  	struct mutex		lock;
->  	u8			num_channels;
->  	void __iomem		*reg_base;
-> @@ -274,7 +275,7 @@ void handle_adc_eoc_trigger(int irq, struct iio_dev *idev)
->  		disable_irq_nosync(irq);
->  		iio_trigger_poll(idev->trig, iio_get_time_ns());
->  	} else {
-> -		st->last_value = at91_adc_readl(st, AT91_ADC_LCDR);
-> +		st->last_value = at91_adc_readl(st, AT91_ADC_CHAN(st, st->chnb));
->  		st->done = true;
->  		wake_up_interruptible(&st->wq_data_avail);
->  	}
-> @@ -351,7 +352,7 @@ static irqreturn_t at91_adc_rl_interrupt(int irq, void *private)
->  	unsigned int reg;
->  
->  	status &= at91_adc_readl(st, AT91_ADC_IMR);
-> -	if (status & st->registers->drdy_mask)
-> +	if (status & GENMASK(st->num_channels, 0))
-You need to use st->num_channels - 1, since GENMASK starts counting from bit position 0.
->  		handle_adc_eoc_trigger(irq, idev);
->  
->  	if (status & AT91RL_ADC_IER_PEN) {
-> @@ -418,7 +419,7 @@ static irqreturn_t at91_adc_9x5_interrupt(int irq, void *private)
->  		AT91_ADC_IER_YRDY |
->  		AT91_ADC_IER_PRDY;
->  
-> -	if (status & st->registers->drdy_mask)
-> +	if (status & GENMASK(st->num_channels, 0))
-Same here.
->  		handle_adc_eoc_trigger(irq, idev);
->  
->  	if (status & AT91_ADC_IER_PEN) {
-> @@ -689,9 +690,10 @@ static int at91_adc_read_raw(struct iio_dev *idev,
->  	case IIO_CHAN_INFO_RAW:
->  		mutex_lock(&st->lock);
->  
-> +		st->chnb = chan->channel;
->  		at91_adc_writel(st, AT91_ADC_CHER,
->  				AT91_ADC_CH(chan->channel));
-> -		at91_adc_writel(st, AT91_ADC_IER, st->registers->drdy_mask);
-> +		at91_adc_writel(st, AT91_ADC_IER, BIT(chan->channel));
->  		at91_adc_writel(st, AT91_ADC_CR, AT91_ADC_START);
->  
->  		ret = wait_event_interruptible_timeout(st->wq_data_avail,
-> @@ -708,7 +710,7 @@ static int at91_adc_read_raw(struct iio_dev *idev,
->  
->  		at91_adc_writel(st, AT91_ADC_CHDR,
->  				AT91_ADC_CH(chan->channel));
-> -		at91_adc_writel(st, AT91_ADC_IDR, st->registers->drdy_mask);
-> +		at91_adc_writel(st, AT91_ADC_IDR, BIT(chan->channel));
->  
->  		st->last_value = 0;
->  		st->done = false;
-> 
+Currently ia64 does the same as this for stubbing out the functions.
+
+We did investigate removing the code but that ultimately ended with more
+functions and variables stubbed then this.
+
+Graeme
