@@ -1,57 +1,42 @@
-From: shengjiu.wang@freescale.com (Shengjiu Wang)
-Date: Tue, 9 Sep 2014 17:13:27 +0800
-Subject: [PATCH V1 3/3] ARM: dts: imx6sl: add baud clock and clock-names for
- ssi
-In-Reply-To: <cover.1410253534.git.shengjiu.wang@freescale.com>
-References: <cover.1410253534.git.shengjiu.wang@freescale.com>
-Message-ID: <67953db04c71ff8a7530e3457e8937458e1e246c.1410253534.git.shengjiu.wang@freescale.com>
+From: boris.brezillon@free-electrons.com (Boris BREZILLON)
+Date: Tue,  9 Sep 2014 11:14:59 +0200
+Subject: [PATCH] ARM: at91: enable new AIC driver even if the old one is
+ selected
+Message-ID: <1410254099-24680-1-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Baud clock is used for bit clock generation in master mode. Ipg clock
-is peripheral clock and peripheral access clock.
+The new AIC driver is currently only selected when only DT board support
+is enabled (and not when both DT and non-DT boards are supported), thus,
+when booting a "DT + non-DT" kernel with a dtb, the irqchip is never
+initialized/registered which then triggers a panic.
 
-Signed-off-by: Shengjiu Wang <shengjiu.wang@freescale.com>
+Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
 ---
- arch/arm/boot/dts/imx6sl.dtsi |   12 +++++++++---
- 1 file changed, 9 insertions(+), 3 deletions(-)
+ arch/arm/mach-at91/Kconfig | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/boot/dts/imx6sl.dtsi b/arch/arm/boot/dts/imx6sl.dtsi
-index ba67714..dfd83e6 100644
---- a/arch/arm/boot/dts/imx6sl.dtsi
-+++ b/arch/arm/boot/dts/imx6sl.dtsi
-@@ -231,7 +231,9 @@
- 							"fsl,imx51-ssi";
- 					reg = <0x02028000 0x4000>;
- 					interrupts = <0 46 IRQ_TYPE_LEVEL_HIGH>;
--					clocks = <&clks IMX6SL_CLK_SSI1>;
-+					clocks = <&clks IMX6SL_CLK_SSI1_IPG>,
-+						 <&clks IMX6SL_CLK_SSI1>;
-+					clock-names = "ipg", "baud";
- 					dmas = <&sdma 37 1 0>,
- 					       <&sdma 38 1 0>;
- 					dma-names = "rx", "tx";
-@@ -245,7 +247,9 @@
- 							"fsl,imx51-ssi";
- 					reg = <0x0202c000 0x4000>;
- 					interrupts = <0 47 IRQ_TYPE_LEVEL_HIGH>;
--					clocks = <&clks IMX6SL_CLK_SSI2>;
-+					clocks = <&clks IMX6SL_CLK_SSI2_IPG>,
-+						 <&clks IMX6SL_CLK_SSI2>;
-+					clock-names = "ipg", "baud";
- 					dmas = <&sdma 41 1 0>,
- 					       <&sdma 42 1 0>;
- 					dma-names = "rx", "tx";
-@@ -259,7 +263,9 @@
- 							"fsl,imx51-ssi";
- 					reg = <0x02030000 0x4000>;
- 					interrupts = <0 48 IRQ_TYPE_LEVEL_HIGH>;
--					clocks = <&clks IMX6SL_CLK_SSI3>;
-+					clocks = <&clks IMX6SL_CLK_SSI3_IPG>,
-+						 <&clks IMX6SL_CLK_SSI3>;
-+					clock-names = "ipg", "baud";
- 					dmas = <&sdma 45 1 0>,
- 					       <&sdma 46 1 0>;
- 					dma-names = "rx", "tx";
+diff --git a/arch/arm/mach-at91/Kconfig b/arch/arm/mach-at91/Kconfig
+index 7df2c9b..cd7c0cb 100644
+--- a/arch/arm/mach-at91/Kconfig
++++ b/arch/arm/mach-at91/Kconfig
+@@ -51,7 +51,7 @@ config HAVE_AT91_SMD
+ config SOC_AT91SAM9
+ 	bool
+ 	select AT91_SAM9_TIME
+-	select ATMEL_AIC_IRQ if !OLD_IRQ_AT91
++	select ATMEL_AIC_IRQ
+ 	select CPU_ARM926T
+ 	select GENERIC_CLOCKEVENTS
+ 
+@@ -111,7 +111,7 @@ endif
+ if SOC_SAM_V4_V5
+ config SOC_AT91RM9200
+ 	bool "AT91RM9200"
+-	select ATMEL_AIC_IRQ if !OLD_IRQ_AT91
++	select ATMEL_AIC_IRQ
+ 	select CPU_ARM920T
+ 	select GENERIC_CLOCKEVENTS
+ 	select HAVE_AT91_DBGU0
 -- 
-1.7.9.5
+1.9.1
