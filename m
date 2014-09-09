@@ -1,28 +1,45 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Tue, 9 Sep 2014 14:19:07 -0300
-Subject: [PATCHv2 2/3] [media] s5p-jpeg: Fix compilation with COMPILE_TEST
-In-Reply-To: <20140909131036.7265121f.m.chehab@samsung.com>
-References: <20140909124306.2d5a0d76@canb.auug.org.au>
- <6cbd00c5f2d342b573aaf9c0e533778374dd2e1e.1410273306.git.m.chehab@samsung.com>
- <b7343e6296b5d1d68b7229b8307442fd4141bcb3.1410273306.git.m.chehab@samsung.com>
- <540F15B2.3000902@samsung.com>
- <20140909120936.527bd852.m.chehab@samsung.com>
- <540F1D11.9030400@samsung.com>
- <20140909131036.7265121f.m.chehab@samsung.com>
-Message-ID: <CAOMZO5ASN_Kcp4q-stmsoXBFcmtJLyyeEEpwy=U40qqghT7vXA@mail.gmail.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 9 Sep 2014 18:20:57 +0100
+Subject: [PATCH v2] spi: davinci: add support for adding delay between
+ word's transmission
+In-Reply-To: <540F3447.3020609@ti.com>
+References: <1410278851-10783-1-git-send-email-grygorii.strashko@ti.com>
+ <20140909165555.GD2601@sirena.org.uk> <540F3447.3020609@ti.com>
+Message-ID: <20140909172057.GH2601@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 9, 2014 at 1:10 PM, Mauro Carvalho Chehab
-<m.chehab@samsung.com> wrote:
-> ERROR: "__bad_ndelay" [drivers/media/platform/s5p-jpeg/s5p-jpeg.ko] undefined!
->
-> That happens because asm-generic doesn't like any ndelay time
-> bigger than 20us.
->
-> Currently, usleep_range() couldn't simply be used, since
-> exynos4_jpeg_sw_reset() is called with a spinlock held.
->
-> So, let's use ndelay() instead.
+On Tue, Sep 09, 2014 at 01:09:27PM -0400, Murali Karicheri wrote:
+> On 09/09/2014 12:55 PM, Mark Brown wrote:
+> >On Tue, Sep 09, 2014 at 07:07:31PM +0300, Grygorii Strashko wrote:
 
-You meant 'udelay() instead'.
+> >>- ti,spi-c2t-delay: Chip-select-active-to-transmit-start delay
+> >>	(SPIDELAY.C2TDELAY)
+
+> >>- ti,spi-t2c-delay: Transmit-end-to-chip-select-inactive delay
+> >>	(SPIDELAY.T2CDELAY)
+
+> >Now I look at these they look very much like the standard delay feature
+> >that the SPI subsystem has already - are they?
+
+> As Grygorii explained in previous postings (reproduced below), these delays
+> are handled by the SPI hardware on Keystone and affect the delay between
+> successive word tranmssion and has nothing to do with the delay you are
+> talking about. Isn't the standard delay you mention here is between
+> successive packets send down to the lower level driver (in this case
+> spi-davinci.c) ?
+
+He talked about such delays between words (and there were some other
+delays listed which seemed to meet that description) but the above don't
+appear to refer to them, the above refer to delays around chip select
+which most definitely are covered with the standard delays.
+
+If these delays are not related to chip select then the documentation
+needs to be fixed to not refer to chip select.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140909/ce792e6d/attachment.sig>
