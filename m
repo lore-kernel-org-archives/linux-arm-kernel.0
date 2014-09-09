@@ -1,76 +1,61 @@
-From: bhupesh.sharma@freescale.com (bhupesh.sharma at freescale.com)
-Date: Tue, 9 Sep 2014 11:46:18 +0000
-Subject: [PATCH V3 0/6] ARM64: Add support for FSL's LS2085A SoC
-In-Reply-To: <3563146.jh46O3eIbG@wuerfel>
-References: <1409757194-28155-1-git-send-email-bhupesh.sharma@freescale.com>
- <6499926.sQm3J8L764@wuerfel> <20140904091319.GA32228@leverpostej>
- <3563146.jh46O3eIbG@wuerfel>
-Message-ID: <04e8fff8fb044e8ea5ffe92bfe029d6c@BN1PR03MB220.namprd03.prod.outlook.com>
+From: pavel@denx.de (Pavel Machek)
+Date: Tue, 9 Sep 2014 13:49:41 +0200
+Subject: 3.17-rc2: root=/dev/mmcblk0p2 command line parsing fails
+In-Reply-To: <CADhT+wdx2SsHnk=zML7a6mUVJxvLQ9ARO16QoYYsopAqhw7cow@mail.gmail.com>
+References: <1405397216-909-1-git-send-email-dinguyen@altera.com>
+ <53C4D874.2040206@samsung.com>
+ <20140814184710.GA11558@amd.pavel.ucw.cz>
+ <53ED2262.50604@gmail.com>
+ <20140814210252.GB26857@amd.pavel.ucw.cz>
+ <20140826114707.GA16372@amd>
+ <CADhT+wdx2SsHnk=zML7a6mUVJxvLQ9ARO16QoYYsopAqhw7cow@mail.gmail.com>
+Message-ID: <20140909114941.GE15404@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark, Arnd
+Hi!
 
-> -----Original Message-----
-> From: Arnd Bergmann [mailto:arnd at arndb.de]
-> Sent: Thursday, September 04, 2014 3:09 PM
-> To: Mark Rutland
-> Cc: linux-arm-kernel at lists.infradead.org; rob.herring at linaro.org; Sharma
-> Bhupesh-B45370; Catalin Marinas; Will Deacon; Yoder Stuart-B08248;
-> grant.likely at secretlab.ca; Marc Zyngier; Basu Arnab-B45036; Geoff Levand
-> Subject: Re: [PATCH V3 0/6] ARM64: Add support for FSL's LS2085A SoC
-> 
-> On Thursday 04 September 2014 10:13:19 Mark Rutland wrote:
-> > On Wed, Sep 03, 2014 at 07:31:44PM +0100, Arnd Bergmann wrote:
-> > > On Wednesday 03 September 2014 17:31:30 Mark Rutland wrote:
-> > > >
-> > > > However, I'm not sure I follow the reasoning for making this
-> > > > significantly harder, and even ignoring that I don't think this
-> > > > does make things significantly harder. Especially so if we have a
-> > > > PSCI node but not an enable method -- in that case its trivial to
-> > > > patch in an unrelated enable-method anyhow.
-> > >
-> > > Right, it's not actually much harder. A better way to look at it is
-> > > probably that we document what which parts we expect to stay
-> > > constant and which parts are to be filled out by the boot loader.
-> > > Independent of what PSCI implementation the boot loader provides, we
-> > > would like to see enable-method="psci".
+> > The problem is still there in 3.17-rc2. 3.16 does not have the
+> > problem. Messages are still similar:
 > >
-> > So in the /cpus node, have a comment like:
+> > mmc0: new high speed SDHC card at address b368
+> > mmcblk0: mmc0:b368 USD   7.45 GiB
+> >  mmcblk0: p1 p2 p3 p4
+> > VFS: Cannot open root device "mmcblk0p2" or unknown-block(0,0): error
+> > -6
+> > Please append a correct "root=" boot option; here are the available
+> > partitions:
+> > b300         7822336 mmcblk0  driver: mmcblk
+> >   b301          102400 mmcblk0p1 00082434-01
+> >   b302         1048576 mmcblk0p2 00082434-02
+> >   b303            1024 mmcblk0p3 00082434-03
+> >   b304         6086656 mmcblk0p4 00082434-04
+> > Kernel panic - not syncing: VFS: Unable to mount root fs on unknown-block(0,0)
+> > CPU: 0 PID: 1 Comm: swapper/0 Not tainted
+> > 3.17.0-rc2-00368-gec0400b-dirty #83
 > >
-> > /*
-> >  * We expect the enable-method to be "psci", but this is dependent on
-> >  * the FW, which will fill this in.
-> >  */
+> >
+> > What is going on there? Clearly partition table was parsed and
+> > partitions are available; does the mention of unknown-block(0,0) mean
+> > that kernel failed to parse the command line?
+> >
+> > I replaced "root=/dev/mmcblk0p2" with "root=b302" and have a booting
+> > system.
 > 
-> I was thinking of leaving the enable-method in the cpus node, but having
-> an empty psci node with a similar comment.
 > 
-> > Or, should we put together a soc-guidance.txt with that, ensuring
-> > things are initialised correctly (CNTVOFF, CNTFREQ), etc?
+> Can you do a bisect? 3.17-rc2 booted fine for me today:
 > 
-> I would very much welcome documentation like that!
+> EXT3-fs (mmcblk0p2): mounted filesystem with ordered data mode
+> VFS: Mounted root (ext3 filesystem) on device 179:2.
+> Freeing unused kernel memory: 252K (c052d000 - c056c000)
+> random: nonblocking pool is initialized
 
-Is this documentation planned (already being worked upon), or should I try to spin-out a RFC patch
-which tries to add this guidance documentation.
+Bisect would be hard... and I believe the problem is somewhere in
+block layer now -- not socfpga-specific.
 
-Regards,
-Bhupesh
+Best regards,
+								Pavel
 
-> 
-> > > I just saw that Geoff had a related comment, and documenting this
-> > > would make it clearer to other reviewers, as well as people that
-> > > happen to look at this file as a base for new platforms.
-> >
-> > I agree that having something to point people in the right direction
-> > is a good idea. The only point I disagree with is putitng something in
-> > the DT that can be trivially made false (and possibly with good
-> reason).
-> >
-> > I'm happy with having comments.
-> 
-> Right, but I see no good reason for having something else in the enable-
-> method, the only way I can see why that would be done is for the boot
-> loader or firmware implementer to be misinformed.
-> 
-> 	Arnd
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
