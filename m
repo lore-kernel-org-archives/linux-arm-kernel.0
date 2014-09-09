@@ -1,29 +1,59 @@
-From: antoine.tenart@free-electrons.com (Antoine Tenart)
-Date: Tue,  9 Sep 2014 16:47:49 +0200
-Subject: [PATCH] ARM: dts: berlin: enable timer 1 for sched_clock
-Message-ID: <1410274069-24922-1-git-send-email-antoine.tenart@free-electrons.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 9 Sep 2014 07:48:02 -0700
+Subject: [PATCH v6 5/7] net: cpsw: Add am33xx MACID readout
+In-Reply-To: <20140909060522.GD24081@pengutronix.de>
+References: <1410110375-3570-1-git-send-email-mpa@pengutronix.de>
+ <1410110375-3570-6-git-send-email-mpa@pengutronix.de>
+ <20140908165116.GH3238@atomide.com>
+ <20140909060522.GD24081@pengutronix.de>
+Message-ID: <20140909144802.GJ10785@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable timer 1 to be the source for the sched_clock, allowing to have a
-more precise value than 1/HZ.
+* Markus Pargmann <mpa@pengutronix.de> [140908 23:05]:
+> On Mon, Sep 08, 2014 at 09:51:17AM -0700, Tony Lindgren wrote:
+> > * Markus Pargmann <mpa@pengutronix.de> [140907 10:20]:
+> > > This patch adds a function to get the MACIDs from the am33xx SoC
+> > > control module registers which hold unique vendor MACIDs. This is only
+> > > used if of_get_mac_address() fails to get a valid mac address.
+> > ...
+> > 
+> > > @@ -1928,8 +1960,16 @@ static int cpsw_probe_dt(struct cpsw_platform_data *data,
+> > >  			 PHY_ID_FMT, mdio->name, phyid);
+> > >  
+> > >  		mac_addr = of_get_mac_address(slave_node);
+> > > -		if (mac_addr)
+> > > +		if (mac_addr) {
+> > >  			memcpy(slave_data->mac_addr, mac_addr, ETH_ALEN);
+> > > +		} else {
+> > > +			if (of_machine_is_compatible("ti,am33xx")) {
+> > > +				ret = cpsw_am33xx_cm_get_macid(&pdev->dev, i,
+> > > +							slave_data->mac_addr);
+> > > +				if (ret)
+> > > +					return ret;
+> > > +			}
+> > > +		}
+> > >  
+> > >  		slave_data->phy_if = of_get_phy_mode(slave_node);
+> > >  		if (slave_data->phy_if < 0) {
+> > 
+> > Thanks for updating this, this looks more future proof for adding
+> > the dra7 related patch.
+> > 
+> > For the long run, it probably makes sense to add SoC specific
+> > compatible values such as "ti,cpsw-am3350" and so on. Then the
+> > mac address functions can be initialized based on the of_device_id
+> > entry for .data. The wiring is cleary SoC specific here.
+> 
+> The hardware doesn't differ across the SoCs, so I thought it may be
+> better to keep one compatible and parse the machine compatible for the
+> MACID location. But different compatible values are also ok.
 
-Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
----
- arch/arm/boot/dts/berlin2q.dtsi | 1 -
- 1 file changed, 1 deletion(-)
+Yes both will work, and you're right the Ethernet hardware is
+the same. I already forgot that we're getting mac address from the
+system control module.. And that's really SoC specific so your solution
+is better at least for now.
 
-diff --git a/arch/arm/boot/dts/berlin2q.dtsi b/arch/arm/boot/dts/berlin2q.dtsi
-index a216cb621ebc..e22b99a3a796 100644
---- a/arch/arm/boot/dts/berlin2q.dtsi
-+++ b/arch/arm/boot/dts/berlin2q.dtsi
-@@ -247,7 +247,6 @@
- 				reg = <0x2c14 0x14>;
- 				clocks = <&chip CLKID_CFG>;
- 				clock-names = "timer";
--				status = "disabled";
- 			};
- 
- 			timer2: timer at 2c28 {
--- 
-1.9.1
+Regards,
+
+Tony
