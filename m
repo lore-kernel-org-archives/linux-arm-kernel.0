@@ -1,67 +1,55 @@
 From: horms+renesas@verge.net.au (Simon Horman)
 Date: Tue,  9 Sep 2014 13:22:17 +0900
-Subject: [GIT PULL] Third Round of Renesas ARM Based SoC Soc Updates for v3.18
-Message-ID: <cover.1410235571.git.horms+renesas@verge.net.au>
+Subject: [PATCH 1/2] ARM: shmobile: support Cortex-A7 in shmobile_init_delay()
+In-Reply-To: <cover.1410235571.git.horms+renesas@verge.net.au>
+References: <cover.1410235571.git.horms+renesas@verge.net.au>
+Message-ID: <0dc50fd3dc4a70d0d317103188c129d378125643.1410235571.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof, Hi Kevin, Hi Arnd,
+From: Ulrich Hecht <ulrich.hecht+renesas@gmail.com>
 
-Please consider these third round of Renesas ARM based SoC soc updates for v3.18.
+Signed-off-by: Ulrich Hecht <ulrich.hecht+renesas@gmail.com>
+Acked-by: Magnus Damm <damm+renesas@opensource.se>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ arch/arm/mach-shmobile/timer.c | 9 +++++----
+ 1 file changed, 5 insertions(+), 4 deletions(-)
 
-This pull request is based on the previous round of
-such requests, tagged as renesas-soc2-for-v3.18,
-which you have already pulled.
-
-This pull-request has a minor conflict with
-"[GIT PULL] Renesas ARM Based SoC Kconfig Cleanups for v3.18",
-tagged as renesas-kconfig-cleanups-for-v3.18, which you
-have previously pulled.
-
-
-The solution is to take both and the conflicting area of
-arch/arm/mach-shmobile/Kconfig should look like this:
-
-config ARCH_R8A7791
-        bool "R-Car M2-W (R8A77910)"
-        select ARCH_RCAR_GEN2
-
-config ARCH_R8A7794
-        bool "R-Car E2 (R8A77940)"
-        select ARCH_RCAR_GEN2
-
-comment "Renesas ARM SoCs Board Type"
-
-This resolution can be found in the renesas-next-20140905-v3.17-rc2 tag
-of my renesas tree on kernel.org.
-
-
-The following changes since commit 86155b35d173317518458c6f9c0a3ea8c5324bed:
-
-  ARM: shmobile: Move legacy INTC definitions from irqs.h to intc.h (2014-08-22 12:23:32 +0900)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-soc3-for-v3.18
-
-for you to fetch changes up to 5923abb205e05773e0bb16c7ca4c0b41dbeec40e:
-
-  ARM: shmobile: Initial r8a7794 SoC support (2014-09-05 17:23:49 +0900)
-
-----------------------------------------------------------------
-Third Round of Renesas ARM Based SoC Soc Updates for v3.18
-
-* Initial r8a7794 SoC support
-* Support Cortex-A7 in shmobile_init_delay()
-
-----------------------------------------------------------------
-Ulrich Hecht (2):
-      ARM: shmobile: support Cortex-A7 in shmobile_init_delay()
-      ARM: shmobile: Initial r8a7794 SoC support
-
- arch/arm/mach-shmobile/Kconfig         |  4 ++++
- arch/arm/mach-shmobile/Makefile        |  1 +
- arch/arm/mach-shmobile/setup-r8a7794.c | 35 ++++++++++++++++++++++++++++++++++
- arch/arm/mach-shmobile/timer.c         |  9 +++++----
- 4 files changed, 45 insertions(+), 4 deletions(-)
- create mode 100644 arch/arm/mach-shmobile/setup-r8a7794.c
+diff --git a/arch/arm/mach-shmobile/timer.c b/arch/arm/mach-shmobile/timer.c
+index 942efdc..0b01770 100644
+--- a/arch/arm/mach-shmobile/timer.c
++++ b/arch/arm/mach-shmobile/timer.c
+@@ -60,7 +60,7 @@ void __init shmobile_setup_delay(unsigned int max_cpu_core_mhz,
+ void __init shmobile_init_delay(void)
+ {
+ 	struct device_node *np, *cpus;
+-	bool is_a8_a9 = false;
++	bool is_a7_a8_a9 = false;
+ 	bool is_a15 = false;
+ 	u32 max_freq = 0;
+ 
+@@ -74,9 +74,10 @@ void __init shmobile_init_delay(void)
+ 		if (!of_property_read_u32(np, "clock-frequency", &freq))
+ 			max_freq = max(max_freq, freq);
+ 
+-		if (of_device_is_compatible(np, "arm,cortex-a8") ||
++		if (of_device_is_compatible(np, "arm,cortex-a7") ||
++		    of_device_is_compatible(np, "arm,cortex-a8") ||
+ 		    of_device_is_compatible(np, "arm,cortex-a9"))
+-			is_a8_a9 = true;
++			is_a7_a8_a9 = true;
+ 		else if (of_device_is_compatible(np, "arm,cortex-a15"))
+ 			is_a15 = true;
+ 	}
+@@ -86,7 +87,7 @@ void __init shmobile_init_delay(void)
+ 	if (!max_freq)
+ 		return;
+ 
+-	if (is_a8_a9)
++	if (is_a7_a8_a9)
+ 		shmobile_setup_delay_hz(max_freq, 1, 3);
+ 	else if (is_a15 && !IS_ENABLED(CONFIG_ARM_ARCH_TIMER))
+ 		shmobile_setup_delay_hz(max_freq, 2, 4);
+-- 
+2.0.1
