@@ -1,41 +1,40 @@
-From: robert.richter@caviumnetworks.com (Robert Richter)
-Date: Tue, 9 Sep 2014 11:26:53 +0200
-Subject: [PATCH] GICv3: Fixing 32 bit compatibility
-In-Reply-To: <20140909091912.GQ23009@pengutronix.de>
-References: <1410185480-5153-1-git-send-email-rric@kernel.org>
- <20140909080042.GO23009@pengutronix.de>
- <20140909091201.GA4527@rric.localhost>
- <20140909091912.GQ23009@pengutronix.de>
-Message-ID: <20140909092653.GC4588@rric.localhost>
+From: boris.brezillon@free-electrons.com (Boris BREZILLON)
+Date: Tue,  9 Sep 2014 11:30:31 +0200
+Subject: [PATCH v2 2/6] rtc: at91sam9: use standard readl/writel functions
+ instead of raw versions
+In-Reply-To: <1410255035-26775-1-git-send-email-boris.brezillon@free-electrons.com>
+References: <1410255035-26775-1-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1410255035-26775-3-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09.09.14 11:19:12, Uwe Kleine-K?nig wrote:
-> On Tue, Sep 09, 2014 at 11:12:01AM +0200, Robert Richter wrote:
-> > On 09.09.14 10:00:42, Uwe Kleine-K?nig wrote:
-> > > On Mon, Sep 08, 2014 at 04:11:19PM +0200, Robert Richter wrote:
-> > 
-> > > > @@ -479,7 +479,7 @@ static void gic_raise_softirq(const struct cpumask *mask, unsigned int irq)
-> > > >     smp_wmb();
-> > > >  
-> > > >     for_each_cpu_mask(cpu, *mask) {
-> > > > -           u64 cluster_id = cpu_logical_map(cpu) & ~0xffUL;
-> > > > +           u64 cluster_id = cpu_logical_map(cpu) & ~0xffULL;
-> > > This doesn't change anything, does it?
-> > 
-> > It does, not in 64 bit but in 32 bit there unsigned long is 32
-> > bit. So, bit masks are broken if you compile a 32 bit kernel.
-> Can you make an example where the result actually changes?
+Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
+---
+ drivers/rtc/rtc-at91sam9.c | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
 
-Upper 32 bits will be cleared above.
-
-> > > I wonder if it would be cleaner to use (u64)0xff here.
-> > 
-> > No, that's ULL for. This is commonly used in x86 too.
-> I don't care much here, but I'd say ULL is to force an unsigned long
-> long. If you want to make it obvious that you want a 64bit value, a cast
-> to u64 makes this more clear.
-
-ULL is no cast at all.
-
--Robert
+diff --git a/drivers/rtc/rtc-at91sam9.c b/drivers/rtc/rtc-at91sam9.c
+index 51f0038..74a9ca0 100644
+--- a/drivers/rtc/rtc-at91sam9.c
++++ b/drivers/rtc/rtc-at91sam9.c
+@@ -77,14 +77,14 @@ struct sam9_rtc {
+ };
+ 
+ #define rtt_readl(rtc, field) \
+-	__raw_readl((rtc)->rtt + AT91_RTT_ ## field)
++	readl((rtc)->rtt + AT91_RTT_ ## field)
+ #define rtt_writel(rtc, field, val) \
+-	__raw_writel((val), (rtc)->rtt + AT91_RTT_ ## field)
++	writel((val), (rtc)->rtt + AT91_RTT_ ## field)
+ 
+ #define gpbr_readl(rtc) \
+-	__raw_readl((rtc)->gpbr)
++	readl((rtc)->gpbr)
+ #define gpbr_writel(rtc, val) \
+-	__raw_writel((val), (rtc)->gpbr)
++	writel((val), (rtc)->gpbr)
+ 
+ /*
+  * Read current time and date in RTC
+-- 
+1.9.1
