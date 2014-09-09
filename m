@@ -1,33 +1,53 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 9 Sep 2014 12:54:46 +0100
-Subject: [PATCH v4 0/9] PM / Domains: Generic OF-based support
-In-Reply-To: <1410262570-22785-1-git-send-email-ulf.hansson@linaro.org>
-References: <1409838756-31963-1-git-send-email-ulf.hansson@linaro.org>
- <1410262570-22785-1-git-send-email-ulf.hansson@linaro.org>
-Message-ID: <20140909115446.GW2601@sirena.org.uk>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 09 Sep 2014 13:58:17 +0200
+Subject: =?UTF-8?B?562U5aSNOg==?= [PATCH 2/2] PCI: Layerscape: Add
+ Layerscape PCIe driver
+In-Reply-To: <540F51F1.1060909@freescale.com>
+References: <1409856338-1730-1-git-send-email-Minghuan.Lian@freescale.com>
+ <60096763.M59cqLJ4gm@wuerfel> <540F51F1.1060909@freescale.com>
+Message-ID: <10318509.zOTEUpfc9B@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 09, 2014 at 01:36:01PM +0200, Ulf Hansson wrote:
-> Changes in v4:
-> 	- Rebased patch "PM / Domains: Add generic OF-based PM domain look-up" -
-> 	  and updated the author and the commit message.
-> 	- Adopted review comments for "PM / Domains: Add APIs to attach/detach
-> 	  a PM domain for a device".
-> 	- Updated author and commit message for "ARM: exynos: Move to generic
-> 	  PM domain DT bindings".
-> 	- Added some acks and reviewed by tags.
-> 	- Started to use the "--in-reply-to" option to git-send-email. It should
-> 	  provide the option to show a better diffstat per patch.
+On Tuesday 09 September 2014 19:16:01 Lian Minghuan-B31939 wrote:
+> On 2014?09?09? 10:50, Arnd Bergmann wrote:
+> > On Tuesday 09 September 2014 18:46:59 Lian Minghuan-B31939 wrote:
+> >> On 2014?09?09? 09:56, Arnd Bergmann wrote:
+> >>> On Tuesday 09 September 2014 17:25:57 Lian Minghuan-B31939 wrote:
+> >>>> [Minghuan] I discussed with my colleague. They worry about performance
+> >>>> degradation if using regmap API,
+> >>>> because there are some fast device use scfg. We tend to use a simple way
+> >>>> to map andread/write scfg directly.
+> >>> I see. In this case, I would probably create a separate msi controller
+> >>> driver that owns the "fsl,ls1021a-scfg" device, and is referenced
+> >>> through the "msi-parent" property in the pcie controller.
+> >>>
+> >>> You can use of_pci_find_msi_chip_by_node() to get the msi_chip
+> >>> instance and then connect that to your pci host. This will also
+> >>> take care of the case where you may want to use the main GICv3
+> >>> on a future SoC.
+> >>
+> >> [Minghuan] There is something wrong with LS1021A MSI hardware that it
+> >> only supports one interrupt not 32 interrupts.  Now, I do not want to
+> >> create a separate msi controller driver just for incorrect hardware.
+> >> I may provide complete MSI driver for the new hardware when it is ready.
+> >
+> > Would you just leave out MSI support for the LS1021A PCIe variant?
+> > I guess that's fine because all device drivers should also support
+> > legacy interrupts and there is no performance gain in MSI in this
+> > case.
+>
+> [Minghuan] I have added MSI support for LS1021A PCIe just reserved 31 
+> interrupts as used.
 
-Please don't send serieses in reply to earlier versions, it buries
-things in the middle of old discussions which can mean they don't get
-noticed, especially when you're sending multiple large patch serieses at
-the same time.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140909/9406e4fc/attachment.sig>
+I don't understand your logic then. If LS1021A has an incorrect MSI
+implementation, and you may want to reuse the PCIe driver with a
+future chip that either includes a correct MSI implementation, or
+with one that uses the GICv3 instead, isn't that even more reason
+to split out the MSI support into a separate driver?
+
+That way you can at least separate the normal code path from the
+broken one and don't need any special run-time or compile-conditionals
+beyond calling of_pci_find_msi_chip_by_node().
+
+	Arnd
