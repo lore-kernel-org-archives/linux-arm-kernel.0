@@ -1,45 +1,71 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Tue, 9 Sep 2014 11:53:45 +0900
-Subject: [PATCH v3 0/3] ARM: shmobile: sh73a0: Enable CMT1 device using DT
-In-Reply-To: <20140908015209.GA28715@verge.net.au>
-References: <1410137828-4769-1-git-send-email-horms+renesas@verge.net.au>
- <CANqRtoRYvcEgbpK3=s3i6X2nikaeu6S1cdNZU3ycbWhXE_3oow@mail.gmail.com>
- <20140908015209.GA28715@verge.net.au>
-Message-ID: <20140909025340.GG31320@verge.net.au>
+From: kgene@kernel.org (kgene at kernel.org)
+Date: Tue, 09 Sep 2014 12:06:22 +0900
+Subject: [PATCH v2 5/7] arm64: dts: Add initial device tree support for
+ EXYNOS7
+In-Reply-To: <118816680.lTOkj0TsFJ@wuerfel>
+References: <1409672143-8574-1-git-send-email-ch.naveen@samsung.com>
+ <3382034.5ADO0F7naY@wuerfel> <043401cfc794$7f228650$7d6792f0$@samsung.com>
+ <118816680.lTOkj0TsFJ@wuerfel>
+Message-ID: <02e501cfcbdb$0a95cea0$1fc16be0$@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 08, 2014 at 10:52:13AM +0900, Simon Horman wrote:
-> On Mon, Sep 08, 2014 at 10:10:45AM +0900, Magnus Damm wrote:
-> > Hi Simon,
-> > 
-> > On Mon, Sep 8, 2014 at 9:57 AM, Simon Horman <horms+renesas@verge.net.au> wrote:
-> > > Hi,
-> > >
-> > > this is a slightly modified version of this change which
-> > > was previously available in
-> > > "[PATCH v2 00/10] sh73a0 common clock framework implementation"
-> > >
-> > > The purpose of breaking or this change is to allow it to
-> > > be applied independently of the changes in the above mentioned series.
-> > >
-> > > The changes are as follows:
-> > > - Don't use DT clocks as they are added by the above mentioned series
-> > >   and thus not present yet.
-> > > - Add patch to use SoC-specific 48-bit CMT compat string.
-> > >
-> > > Simon Horman (1):
-> > >   ARM: shmobile: sh73a0: Use SoC-specific 48-bit CMT compat string
-> > >
-> > > Ulrich Hecht (2):
-> > >   ARM: shmobile: sh73a0: Add CMT1 device to DT
-> > >   ARM: shmobile: kzm9g-reference: Enable CMT1 in device tree
-> > 
-> > Looking good, thanks for doing this!
-> > 
-> > Acked-by: Magnus Damm <damm+renesas@opensource.se>
+Arnd Bergmann wrote:
 > 
-> Thanks, I plan to leave them open for review a little
-> bit longer and if all goes well queue them up tomorrow.
+> On Thursday 04 September 2014 01:31:21 Kukjin Kim wrote:
+> > > This is the board specific file, so it seems ok.
+> > >
+> > I mean there are many espresso boards are having different exynos7
+> > SoC. I mean exynos7-espresso cannot represent all of espresso boards.
+> >
+> 
+> Ah, I see, that makes sense.
+> 
+> We definitely need a top-level .dts file for each board that is different
+> in a nondiscoverable way then.
+> 
+Agreed.
 
-Thanks, I have queued these up after squashing the first two patches together.
+And one more, at this moment just using exynos7 would be nice to us then if
+required, we could add any specific properties later.
+
+> If the mmc settings and possibly some other nodes (to be added later)
+> are common across them, those can be in a board specific .dtsi file.
+> 
+Yes, right.
+
+> For the memory node, I would actually expect that to be filled by
+> the boot loader, so we could leave it out entirely. The same applies
+> to the command line: the parts that are in there at the moment (
+> "console=ttySAC2,115200n8 root=/dev/ram0 ramdisk=16384 initrd=0x42000000,16M")
+> clearly don't belong into a generic dts file and none of them should be
+> set that way.
+> 
+Hmm...yeah we need to use proper boot-loader but I think kernel needs having
+default memory property if boot loader doesn't have anything?
+
+> For the initial version, that would mean that the file comes down to having
+> as its only contents
+> 
+> /dts-v1/;
+> #include <dt-bindings/gpio/gpio.h>
+> #include "exynos7123.dtsi"
+> #include "exynos7-espresso.dtsi" // for the mmc nodes
+> 
+> / {
+>        model = "Samsung ESPRESSO board based on EXYNOS7123";
+>        compatible = "samsung,espresso", "samsung,exynos7123", "samsung,exynos7";
+> };
+> 
+> One more thing I just noticed is the GPL statement in the dts files.
+> Can we please change that to a permissive license in order to allow
+> including it in non-GPL boot loaders and operating systems?
+> 
+> Dual GPL+MIT or GPL+BSD would make most sense here.
+> 
+I need to check about that with license guy in my team ;)
+
+Naveen, I'll have a look at the patch again.
+
+Thanks,
+Kukjin
