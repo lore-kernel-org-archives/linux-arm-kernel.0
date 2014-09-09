@@ -1,30 +1,40 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Tue, 09 Sep 2014 13:43:10 +0200
-Subject: [PATCH v4 0/9] PM / Domains: Generic OF-based support
-In-Reply-To: <1410262570-22785-1-git-send-email-ulf.hansson@linaro.org>
-References: <1409838756-31963-1-git-send-email-ulf.hansson@linaro.org>
- <1410262570-22785-1-git-send-email-ulf.hansson@linaro.org>
-Message-ID: <540EE7CE.9000400@gmail.com>
+From: jhs@mojatatu.com (Jamal Hadi Salim)
+Date: Tue, 09 Sep 2014 07:44:09 -0400
+Subject: [PATCH v2 0/3] net: Add Keystone NetCP ethernet driver support
+In-Reply-To: <540DC00F.1080103@ti.com>
+References: <1408115562-22487-1-git-send-email-santosh.shilimkar@ti.com>
+ <20140821.163612.282672926741753926.davem@davemloft.net>
+ <53F79DC5.8030003@ti.com> <540DC00F.1080103@ti.com>
+Message-ID: <540EE809.9020901@mojatatu.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ulf,
+On 09/08/14 10:41, Santosh Shilimkar wrote:
 
-On 09.09.2014 13:36, Ulf Hansson wrote:
-> Changes in v4:
-> 	- Rebased patch "PM / Domains: Add generic OF-based PM domain look-up" -
-> 	  and updated the author and the commit message.
-> 	- Adopted review comments for "PM / Domains: Add APIs to attach/detach
-> 	  a PM domain for a device".
-> 	- Updated author and commit message for "ARM: exynos: Move to generic
-> 	  PM domain DT bindings".
-> 	- Added some acks and reviewed by tags.
-> 	- Started to use the "--in-reply-to" option to git-send-email. It should
-> 	  provide the option to show a better diffstat per patch.
-> 
+>> The NetCP plugin module infrastructure use all the standard kernel
+>> infrastructure and its very tiny.
 
-I guess this series doesn't need more tags, but, anyway, it looks good
-to me. Thanks a lot for taking care of it.
+So i found this manual here:
+http://www.silica.com/fileadmin/02_Products/Productdetails/Texas_Instruments/SILICA_TI_66AK2E05-ds.pdf
 
-Best regards,
-Tomasz
+Glad there is an open document!
+There are a couple of ethernet switch chips I can spot there.
+
+Can i control those with "bridge" or say "brctl" utilities?
+
+I can see the bridge ports are exposed and i should be able to
+control them via ifconfig or ip link. Thats what "standard
+kernel infrastructure" means. Magic hidden in a driver is
+not.
+
+Take a look at recent netconf discussion (as well as earlier
+referenced discussions):
+http://vger.kernel.org/netconf-nf-offload.pdf
+
+Maybe we can help providing you some direction?
+The problem is it doesnt seem that the offload specs for
+those other pieces are open? e.g how do i add an entry
+to the L2 switch?
+
+cheers,
+jamal
