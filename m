@@ -1,33 +1,39 @@
 From: antoine.tenart@free-electrons.com (Antoine Tenart)
-Date: Tue,  9 Sep 2014 16:44:06 +0200
-Subject: [PATCH v2 6/8] net: pxa168_eth: allow Berlin SoCs to use the
- pxa168_eth driver
+Date: Tue,  9 Sep 2014 16:44:07 +0200
+Subject: [PATCH v2 7/8] ARM: dts: berlin: add the Ethernet node
 In-Reply-To: <1410273848-24663-1-git-send-email-antoine.tenart@free-electrons.com>
 References: <1410273848-24663-1-git-send-email-antoine.tenart@free-electrons.com>
-Message-ID: <1410273848-24663-7-git-send-email-antoine.tenart@free-electrons.com>
+Message-ID: <1410273848-24663-8-git-send-email-antoine.tenart@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Berlin SoCs have an Ethernet controller compatible with the pxa168.
-Allow these SoCs to use the pxa168_eth driver.
+This patch adds the Ethernet node, enabling the network unit on Berlin
+BG2Q SoCs.
 
 Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
 ---
- drivers/net/ethernet/marvell/Kconfig | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/boot/dts/berlin2q.dtsi | 9 +++++++++
+ 1 file changed, 9 insertions(+)
 
-diff --git a/drivers/net/ethernet/marvell/Kconfig b/drivers/net/ethernet/marvell/Kconfig
-index 1b4fc7c639e6..48b9466d1781 100644
---- a/drivers/net/ethernet/marvell/Kconfig
-+++ b/drivers/net/ethernet/marvell/Kconfig
-@@ -64,7 +64,7 @@ config MVPP2
+diff --git a/arch/arm/boot/dts/berlin2q.dtsi b/arch/arm/boot/dts/berlin2q.dtsi
+index 400c40fceccc..a216cb621ebc 100644
+--- a/arch/arm/boot/dts/berlin2q.dtsi
++++ b/arch/arm/boot/dts/berlin2q.dtsi
+@@ -114,6 +114,15 @@
+ 			#interrupt-cells = <3>;
+ 		};
  
- config PXA168_ETH
- 	tristate "Marvell pxa168 ethernet support"
--	depends on CPU_PXA168
-+	depends on CPU_PXA168 || ARCH_BERLIN
- 	select PHYLIB
- 	---help---
- 	  This driver supports the pxa168 Ethernet ports.
++		eth0: ethernet at b90000 {
++			compatible = "marvell,pxa168-eth";
++			reg = <0xb90000 0x10000>;
++			clocks = <&chip CLKID_GETH0>;
++			clock-names = "MFUCLK";
++			interrupts = <GIC_SPI 24 IRQ_TYPE_LEVEL_HIGH>;
++			status = "disabled";
++		};
++
+ 		cpu-ctrl at dd0000 {
+ 			compatible = "marvell,berlin-cpu-ctrl";
+ 			reg = <0xdd0000 0x10000>;
 -- 
 1.9.1
