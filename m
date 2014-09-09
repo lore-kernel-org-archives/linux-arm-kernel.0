@@ -1,25 +1,58 @@
-From: jcm@redhat.com (Jon Masters)
-Date: Tue, 09 Sep 2014 02:55:02 -0400
-Subject: [RFC PATCH for Juno 0/2] Drivers for Juno to boot from ACPI
-In-Reply-To: <353732273.2TKdyNJ83M@wuerfel>
-References: <1409583961-7466-1-git-send-email-hanjun.guo@linaro.org>
- <353732273.2TKdyNJ83M@wuerfel>
-Message-ID: <540EA446.7010200@redhat.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Tue, 9 Sep 2014 09:04:57 +0200
+Subject: [PATCH v3 2/9] PM / Domains: Add generic OF-based PM domain
+ look-up
+In-Reply-To: <5191943.peyCs6gZVs@vostro.rjw.lan>
+References: <1409838756-31963-1-git-send-email-ulf.hansson@linaro.org>
+ <3075771.rIWPm62y5x@vostro.rjw.lan>
+ <CAPDyKFovLmajQORVT1Mf01J5L7O73JNDFz=gr3fXKvF5xZGCdQ@mail.gmail.com>
+ <5191943.peyCs6gZVs@vostro.rjw.lan>
+Message-ID: <CAPDyKFok8oE2S0BQg1mwikFjyQ+VH9GevCYXTgG68z+5MW+W6Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/01/2014 11:29 AM, Arnd Bergmann wrote:
-> On Monday 01 September 2014 23:05:59 Hanjun Guo wrote:
->> This patch set is example of the sort of driver changes needed to boot
->> Juno using ACPI tables, which using the ACPI tables devloped for MS
->> Windows and published by ARM [1].
-> 
-> What about platform support?
+On 8 September 2014 23:04, Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
+> On Monday, September 08, 2014 09:26:20 AM Ulf Hansson wrote:
+>> On 8 September 2014 00:13, Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
+>> > On Thursday, September 04, 2014 03:52:29 PM Ulf Hansson wrote:
+>> >> From: Tomasz Figa <t.figa@samsung.com>
+>> >>
+>> >> This patch introduces generic code to perform PM domain look-up using
+>> >> device tree and automatically bind devices to their PM domains.
+>> >>
+>> >> Generic device tree bindings are introduced to specify PM domains of
+>> >> devices in their device tree nodes.
+>> >>
+>> >> Backwards compatibility with legacy Samsung-specific PM domain bindings
+>> >> is provided, but for now the new code is not compiled when
+>> >> CONFIG_ARCH_EXYNOS is selected to avoid collision with legacy code.
+>> >> This will change as soon as the Exynos PM domain code gets converted to
+>> >> use the generic framework in further patch.
+>> >>
+>> >> Signed-off-by: Tomasz Figa <t.figa@samsung.com>
+>> >> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+>> >> [Ulf:Added attach|detach functions, fixed review comments]
+>> >> Tested-by: Philipp Zabel <p.zabel@pengutronix.de>
+>> >
+>> > However, for this one (and consequently the rest) I need an ACK from the
+>> > people who maintain the bindings.
+>>
+>> These DT bindings have been discussed between Tomasz and devicetree
+>> maintainers previously. So I think there are fine.
+>>
+>> Also, when browsing the mail-archives, I found an ack from Rob Herrring:
+>> http://lists.infradead.org/pipermail/linux-arm-kernel/2014-March/237989.html
+>>
+>> I realize that I didn't put the DT maintainers on the to-line when
+>> posting this patch, but just the devicetree list. I have now included
+>> them on this reply, but maybe I should repost instead. What do you
+>> think? Are you happy with the above ack from Rob?
+>
+> That should be sufficient, but I wonder why you didn't add it to the patch
+> to start with?
 
-I think Juno is just serving as an example here since it's from ARM and
-thus various people have access to it already, etc. It's not the best
-example of a server platform out there, since that wasn't its original
-design purpose (but it's a wonderful platform nonetheless). There is
-work currently in flight to offer other reference ACPI examples.
+I didn't remember it being formally acked, until I decided to browsed
+the mail archives in detail. Sorry about that.
 
-Jon.
+Kind regards
+Uffe
