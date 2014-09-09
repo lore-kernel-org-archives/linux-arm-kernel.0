@@ -1,28 +1,41 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 09 Sep 2014 16:59:07 +0200
-Subject: [GIT PULL 2/2] SOCFPGA driver updates for 3.18
-In-Reply-To: <1409847105-27241-2-git-send-email-dinguyen@opensource.altera.com>
-References: <1409847105-27241-1-git-send-email-dinguyen@opensource.altera.com>
- <1409847105-27241-2-git-send-email-dinguyen@opensource.altera.com>
-Message-ID: <3081326.KgOEtsBgKv@wuerfel>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Tue, 09 Sep 2014 16:58:58 +0200
+Subject: [PATCH 2/3] [media] s5p-jpeg: Fix compilation with COMPILE_TEST
+In-Reply-To: <b7343e6296b5d1d68b7229b8307442fd4141bcb3.1410273306.git.m.chehab@samsung.com>
+References: <20140909124306.2d5a0d76@canb.auug.org.au>
+ <6cbd00c5f2d342b573aaf9c0e533778374dd2e1e.1410273306.git.m.chehab@samsung.com>
+ <b7343e6296b5d1d68b7229b8307442fd4141bcb3.1410273306.git.m.chehab@samsung.com>
+Message-ID: <540F15B2.3000902@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 04 September 2014 11:11:45 dinguyen at opensource.altera.com wrote:
-> Hi Arnd, Kevin and Olof,
+On 09/09/14 16:38, Mauro Carvalho Chehab wrote:
+> ERROR: "__bad_ndelay" [drivers/media/platform/s5p-jpeg/s5p-jpeg.ko] undefined!
 > 
-> Please consider pulling this patch for v3.18. Boris had given me permission to
-> take this patch together with it's DTS component. The DTS portion was in the
-> previous pull request.
+> Yet, it sounds a bad idea to use ndelay to wait for 100 us
+> for the device to reset.
+> 
+> Reported-by: Stephen Rothwell <sfr@canb.auug.org.au>
+> Signed-off-by: Mauro Carvalho Chehab <m.chehab@samsung.com>
+> 
+> diff --git a/drivers/media/platform/s5p-jpeg/jpeg-hw-exynos4.c b/drivers/media/platform/s5p-jpeg/jpeg-hw-exynos4.c
+> index e51c078360f5..01eeacf28843 100644
+> --- a/drivers/media/platform/s5p-jpeg/jpeg-hw-exynos4.c
+> +++ b/drivers/media/platform/s5p-jpeg/jpeg-hw-exynos4.c
+> @@ -23,7 +23,9 @@ void exynos4_jpeg_sw_reset(void __iomem *base)
+>  	reg = readl(base + EXYNOS4_JPEG_CNTL_REG);
+>  	writel(reg & ~EXYNOS4_SOFT_RESET_HI, base + EXYNOS4_JPEG_CNTL_REG);
+>  
+> +#ifndef CONFIG_COMPILE_TEST
+>  	ndelay(100000);
+> +#endif
 
-I have no objections to the code, but I don't understand what you gain
-from merging it through arm-soc. There is no dependency between the
-driver and the dts entries in any way, you just need to have both in order
-for things to work.
+Wouldn't be a better fix to replace ndelay(100000); with udelay(100),
+rather than sticking in a not so pretty #ifndef ?
 
-We can always pull in drivers with permission from the maintainer when there
-is a good reason to do that, but I don't see that reason for this patch,
-so I'd prefer to have Boris merge it through his tree, unless I'm missing
-something.
+I guess usleep_range() couldn't simply be used, since
+exynos4_jpeg_sw_reset() is called with a spinlock held.
 
-	Arnd
+--
+Regards,
+Sylwester
