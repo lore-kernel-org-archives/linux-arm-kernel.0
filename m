@@ -1,84 +1,42 @@
 From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Tue,  9 Sep 2014 15:05:11 +0200
-Subject: [PATCH v8 1/5] Documentation: Add device tree bindings for Freescale
- i.MX GPC
+Date: Tue,  9 Sep 2014 15:05:13 +0200
+Subject: [PATCH v8 3/5] ARM: dts: imx6qdl: Add power-domain information to gpc
+ node
 In-Reply-To: <1410267915-18126-1-git-send-email-p.zabel@pengutronix.de>
 References: <1410267915-18126-1-git-send-email-p.zabel@pengutronix.de>
-Message-ID: <1410267915-18126-2-git-send-email-p.zabel@pengutronix.de>
+Message-ID: <1410267915-18126-4-git-send-email-p.zabel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The i.MX6 contains a power controller that controls power gating and
-sequencing for the SoC's power domains.
+The PGC that is part of GPC controls isolation and power sequencing of the
+power domains. The PU power domain will be handled by the generic pm domain
+framework. It needs a phandle to the PU regulator to turn off power when
+the domain is disabled, and a list of phandles to all clocks that must be
+enabled during powerup for reset propagation.
 
 Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
 ---
-Changes since v7:
- - Fixed documentation to used proper property name 'power-domains'.
----
- .../devicetree/bindings/power/fsl,imx-gpc.txt      | 54 ++++++++++++++++++++++
- 1 file changed, 54 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/power/fsl,imx-gpc.txt
+ arch/arm/boot/dts/imx6qdl.dtsi | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/power/fsl,imx-gpc.txt b/Documentation/devicetree/bindings/power/fsl,imx-gpc.txt
-new file mode 100644
-index 0000000..8ff7bce
---- /dev/null
-+++ b/Documentation/devicetree/bindings/power/fsl,imx-gpc.txt
-@@ -0,0 +1,54 @@
-+Freescale i.MX General Power Controller
-+=======================================
-+
-+The i.MX6Q General Power Control (GPC) block contains DVFS load tracking
-+counters and Power Gating Control (PGC) for the CPU and PU (GPU/VPU) power
-+domains.
-+
-+Required properties:
-+- compatible: Should be "fsl,imx6q-gpc" or "fsl,imx6sl-gpc"
-+- reg: should be register base and length as documented in the
-+  datasheet
-+- interrupts: Should contain GPC interrupt request 1
-+- pu-supply: Link to the LDO regulator powering the PU power domain
-+- clocks: Clock phandles to devices in the PU power domain that need
-+	  to be enabled during domain power-up for reset propagation.
-+- #power-domain-cells: Should be 1, see below:
-+
-+The gpc node is a power-controller as documented by the generic power domain
-+bindings in Documentation/devicetree/bindings/power/power_domain.txt.
-+
-+Example:
-+
-+	gpc: gpc at 020dc000 {
-+		compatible = "fsl,imx6q-gpc";
-+		reg = <0x020dc000 0x4000>;
-+		interrupts = <0 89 0x04 0 90 0x04>;
-+		pu-supply = <&reg_pu>;
-+		clocks = <&clks 122>, <&clks 74>, <&clks 121>,
-+			 <&clks 26>, <&clks 143>, <&clks 168>;
-+		#power-domain-cells = <1>;
-+	};
-+
-+
-+Specifying power domain for IP modules
-+======================================
-+
-+IP cores belonging to a power domain should contain a 'power-domains' property
-+that is a phandle pointing to the gpc device node and a DOMAIN_INDEX specifying
-+the power domain the device belongs to.
-+
-+Example of a device that is part of the PU power domain:
-+
-+	vpu: vpu at 02040000 {
-+		reg = <0x02040000 0x3c000>;
-+		/* ... */
-+		power-domains = <&gpc 1>;
-+		/* ... */
-+	};
-+
-+The following DOMAIN_INDEX values are valid for i.MX6Q:
-+ARM_DOMAIN     0
-+PU_DOMAIN      1
-+The following additional DOMAIN_INDEX value is valid for i.MX6SL:
-+DISPLAY_DOMAIN 2
+diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
+index c701af9..0b1384c 100644
+--- a/arch/arm/boot/dts/imx6qdl.dtsi
++++ b/arch/arm/boot/dts/imx6qdl.dtsi
+@@ -670,6 +670,14 @@
+ 				reg = <0x020dc000 0x4000>;
+ 				interrupts = <0 89 IRQ_TYPE_LEVEL_HIGH>,
+ 					     <0 90 IRQ_TYPE_LEVEL_HIGH>;
++				pu-supply = <&reg_pu>;
++				clocks = <&clks IMX6QDL_CLK_GPU3D_CORE>,
++					 <&clks IMX6QDL_CLK_GPU3D_SHADER>,
++					 <&clks IMX6QDL_CLK_GPU2D_CORE>,
++					 <&clks IMX6QDL_CLK_GPU2D_AXI>,
++					 <&clks IMX6QDL_CLK_OPENVG_AXI>,
++					 <&clks IMX6QDL_CLK_VPU_AXI>;
++				#power-domain-cells = <1>;
+ 			};
+ 
+ 			gpr: iomuxc-gpr at 020e0000 {
 -- 
 2.1.0
