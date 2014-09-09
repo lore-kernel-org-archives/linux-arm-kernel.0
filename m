@@ -1,7 +1,7 @@
 From: stigge@antcom.de (Roland Stigge)
-Date: Tue, 09 Sep 2014 16:51:53 +0200
-Subject: [GIT PULL] ARM: LPC32xx: Device tree updates
-Message-ID: <540F1409.3070206@antcom.de>
+Date: Tue, 09 Sep 2014 16:52:03 +0200
+Subject: [GIT PULL] ARM: LPC32xx: Platform support
+Message-ID: <540F1413.1020902@antcom.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -11,15 +11,17 @@ The following changes since commit 2ce7598c9a453e0acd0e07be7be3f5eb39608ebd:
 
 are available in the git repository at:
 
-  git://git.antcom.de/linux-2.6 lpc32xx/dt
+  git://git.antcom.de/linux-2.6 lpc32xx/core
 
-for you to fetch changes up to de1fcd7f8a6d313c92c2af476b012305d4fe6553:
+for you to fetch changes up to 767f61f47fb0e91f575ddd428b5fc018b3b88eda:
 
-  ARM: LPC32xx: Use DMA for both SSP channels (2014-09-09 15:05:31 +0200)
+  ARM: LPC32xx: Fix reset function (2014-09-09 15:13:14 +0200)
 
 ----------------------------------------------------------------
-Roland Stigge (1):
-      ARM: LPC32xx: Use DMA for both SSP channels
+Roland Stigge (2):
+      ARM: LPC32xx: Configure DMA signals
+      ARM: LPC32xx: Fix reset function
 
- arch/arm/boot/dts/lpc32xx.dtsi | 11 ++++++++++-
- 1 file changed, 10 insertions(+), 1 deletion(-)
+ arch/arm/mach-lpc32xx/common.c  | 29 ++++++-----------------------
+ arch/arm/mach-lpc32xx/phy3250.c | 24 ++++++++++++++++++++++++
+ 2 files changed, 30 insertions(+), 23 deletions(-)
