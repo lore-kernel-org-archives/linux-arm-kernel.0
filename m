@@ -1,85 +1,50 @@
-From: mika.westerberg@linux.intel.com (Mika Westerberg)
-Date: Tue, 9 Sep 2014 16:52:09 +0300
-Subject: [PATCH 1/2] acpi: lpss: convert from struct clk to struct clk_core
-In-Reply-To: <7263163.khRHYpcBRO@vostro.rjw.lan>
-References: <1410242868-14750-1-git-send-email-mturquette@linaro.org>
- <1410242868-14750-2-git-send-email-mturquette@linaro.org>
- <7263163.khRHYpcBRO@vostro.rjw.lan>
-Message-ID: <20140909135209.GW13406@lahna.fi.intel.com>
+From: nm@ti.com (Nishanth Menon)
+Date: Tue, 9 Sep 2014 08:59:38 -0500
+Subject: [GIT PULL] ARM: dts: OMAP5 / DRA7: pinctrl updates 
+Message-ID: <1410271178-28336-1-git-send-email-nm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 09, 2014 at 03:16:29PM +0200, Rafael J. Wysocki wrote:
-> On Monday, September 08, 2014 11:07:47 PM Mike Turquette wrote:
-> > Looks like this driver was missed during the original mass driver
-> > rework[0]. This patch converts the LPSS driver to the new clock provider
-> > data type (struct clk_core).
-> > 
-> > If there are no objections I propose to roll this patch into a rebase of
-> > that patch[0] in my tree.
-> > 
-> > [0] http://lkml.kernel.org/r/<1409758317-20564-1-git-send-email-tomeu.vizoso@collabora.com>
-> > 
-> > Signed-off-by: Mike Turquette <mturquette@linaro.org>
-> 
-> Mika, any comments here?
 
-Adding Heikki who recently did some clock changes to acpi_lpss.c.
+Hi Tony,
 
-To me this looks fine.
+Please pull this series was posted[1] and based on the previous pulls
+[2] [3], updating the dts to enable the relevant feature.
 
-> 
-> > ---
-> >  drivers/acpi/acpi_lpss.c               | 6 +++---
-> >  include/linux/platform_data/clk-lpss.h | 2 +-
-> >  2 files changed, 4 insertions(+), 4 deletions(-)
-> > 
-> > diff --git a/drivers/acpi/acpi_lpss.c b/drivers/acpi/acpi_lpss.c
-> > index 9dfec48..454179f 100644
-> > --- a/drivers/acpi/acpi_lpss.c
-> > +++ b/drivers/acpi/acpi_lpss.c
-> > @@ -57,7 +57,7 @@ ACPI_MODULE_NAME("acpi_lpss");
-> >  struct lpss_shared_clock {
-> >  	const char *name;
-> >  	unsigned long rate;
-> > -	struct clk *clk;
-> > +	struct clk_core *clk;
-> >  };
-> >  
-> >  struct lpss_private_data;
-> > @@ -83,7 +83,7 @@ static struct lpss_device_desc lpss_dma_desc = {
-> >  struct lpss_private_data {
-> >  	void __iomem *mmio_base;
-> >  	resource_size_t mmio_size;
-> > -	struct clk *clk;
-> > +	struct clk_core *clk;
-> >  	const struct lpss_device_desc *dev_desc;
-> >  	u32 prv_reg_ctx[LPSS_PRV_REG_COUNT];
-> >  };
-> > @@ -278,7 +278,7 @@ static int register_device_clock(struct acpi_device *adev,
-> >  	const struct lpss_device_desc *dev_desc = pdata->dev_desc;
-> >  	struct lpss_shared_clock *shared_clock = dev_desc->shared_clock;
-> >  	const char *devname = dev_name(&adev->dev);
-> > -	struct clk *clk = ERR_PTR(-ENODEV);
-> > +	struct clk_core *clk = ERR_PTR(-ENODEV);
-> >  	struct lpss_clk_data *clk_data;
-> >  	const char *parent, *clk_name;
-> >  	void __iomem *prv_base;
-> > diff --git a/include/linux/platform_data/clk-lpss.h b/include/linux/platform_data/clk-lpss.h
-> > index 2390199..3c3237c 100644
-> > --- a/include/linux/platform_data/clk-lpss.h
-> > +++ b/include/linux/platform_data/clk-lpss.h
-> > @@ -15,7 +15,7 @@
-> >  
-> >  struct lpss_clk_data {
-> >  	const char *name;
-> > -	struct clk *clk;
-> > +	struct clk_core *clk;
-> >  };
-> >  
-> >  extern int lpt_clk_init(void);
-> > 
-> 
-> -- 
-> I speak only for myself.
-> Rafael J. Wysocki, Intel Open Source Technology Center.
+NOTE: I have dropped patch #1 of the series based on [4].
+
+These could go to your branch omap-for-v3.18/dt
+
+The following changes since commit 7d1311b93e58ed55f3a31cc8f94c4b8fe988a2b9:
+
+  Linux 3.17-rc1 (2014-08-16 10:40:26 -0600)
+
+are available in the git repository at:
+
+  https://github.com/nmenon/linux-2.6-playground.git pull/v3.18/for-dt-pinctrl-updates
+
+for you to fetch changes up to 66b0436977e2c62388d48836ff784f1fedb49c4f:
+
+  ARM: dts: dra7-evm: Mark uart1 rxd as wakeup capable (2014-09-09 08:33:29 -0500)
+
+----------------------------------------------------------------
+Nishanth Menon (5):
+      ARM: dts: OMAP5: switch to compatible pinctrl
+      ARM: dts: DRA7: switch to compatible pinctrl
+      ARM: dts: AM437x: switch to compatible pinctrl
+      ARM: dts: OMAP5 / DRA7: switch over to interrupts-extended property for UART
+      ARM: dts: dra7-evm: Mark uart1 rxd as wakeup capable
+
+ arch/arm/boot/dts/am4372.dtsi  |    4 +++-
+ arch/arm/boot/dts/dra7-evm.dts |    2 ++
+ arch/arm/boot/dts/dra7.dtsi    |   24 +++++++++++++-----------
+ arch/arm/boot/dts/omap5.dtsi   |   20 ++++++++++++--------
+ 4 files changed, 30 insertions(+), 20 deletions(-)
+
+[1] http://marc.info/?l=linux-kernel&m=140871681606779&w=2
+[2] http://marc.info/?l=linux-kernel&m=141019565513129&w=2
+[3] http://marc.info/?l=linux-kernel&m=141019566913133&w=2
+[4] http://marc.info/?l=linux-omap&m=141022429924564&w=2
+
+Regards,
+Nishanth Menon
