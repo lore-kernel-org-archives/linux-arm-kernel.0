@@ -1,39 +1,88 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 09 Sep 2014 12:50:47 +0200
-Subject: =?UTF-8?B?562U5aSNOg==?= [PATCH 2/2] PCI: Layerscape: Add
- Layerscape PCIe driver
-In-Reply-To: <540F4B23.5040209@freescale.com>
-References: <1409856338-1730-1-git-send-email-Minghuan.Lian@freescale.com>
- <6844751.zBSvS2zU47@wuerfel> <540F4B23.5040209@freescale.com>
-Message-ID: <60096763.M59cqLJ4gm@wuerfel>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 9 Sep 2014 11:53:10 +0100
+Subject: [PATCH 4/5] dt-bindings: Add binding info for Xgene QMTM UIO
+ driver
+In-Reply-To: <1410256619-3213-5-git-send-email-ankit.jindal@linaro.org>
+References: <1410256619-3213-1-git-send-email-ankit.jindal@linaro.org>
+ <1410256619-3213-5-git-send-email-ankit.jindal@linaro.org>
+Message-ID: <20140909105310.GC27786@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 09 September 2014 18:46:59 Lian Minghuan-B31939 wrote:
-> On 2014?09?09? 09:56, Arnd Bergmann wrote:
-> > On Tuesday 09 September 2014 17:25:57 Lian Minghuan-B31939 wrote:
-> >> [Minghuan] I discussed with my colleague. They worry about performance
-> >> degradation if using regmap API,
-> >> because there are some fast device use scfg. We tend to use a simple way
-> >> to map andread/write scfg directly.
-> >
-> > I see. In this case, I would probably create a separate msi controller
-> > driver that owns the "fsl,ls1021a-scfg" device, and is referenced
-> > through the "msi-parent" property in the pcie controller.
-> >
-> > You can use of_pci_find_msi_chip_by_node() to get the msi_chip
-> > instance and then connect that to your pci host. This will also
-> > take care of the case where you may want to use the main GICv3
->
-> > on a future SoC.
-> [Minghuan] There is something wrong with LS1021A MSI hardware that it 
-> only supports one interrupt not 32 interrupts.  Now, I do not want to 
-> create a separate msi controller driver just for incorrect hardware.
-> I may provide complete MSI driver for the new hardware when it is ready.
+On Tue, Sep 09, 2014 at 10:56:58AM +0100, Ankit Jindal wrote:
+> This patch adds device tree binding documentation for
+> Xgene QMTM UIO driver.
+> 
+> Signed-off-by: Ankit Jindal <ankit.jindal@linaro.org>
+> Signed-off-by: Tushar Jagad <tushar.jagad@linaro.org>
+> ---
+>  .../devicetree/bindings/uio/uio_xgene_qmtm.txt     |   45 ++++++++++++++++++++
+>  1 file changed, 45 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/uio/uio_xgene_qmtm.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/uio/uio_xgene_qmtm.txt b/Documentation/devicetree/bindings/uio/uio_xgene_qmtm.txt
+> new file mode 100644
+> index 0000000..b71831b
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/uio/uio_xgene_qmtm.txt
+> @@ -0,0 +1,45 @@
+> +APM X-Gene QMTM UIO nodes
+> +
+> +QMTM UIO nodes are defined for user space access to on-chip QMTM device
+> +on APM X-Gene SOC using UIO framework.
+> +
 
-Would you just leave out MSI support for the LS1021A PCIe variant?
-I guess that's fine because all device drivers should also support
-legacy interrupts and there is no performance gain in MSI in this
-case.
+Userspace vs kernel space has precisely _nothing_ to do with a HW
+description.
 
-	Arnd
+This doesn't describe at all what the device is (e.g. what does QMTM
+stand for, what is it used for?).
+
+NAK.
+
+Please ensure you Cc the devicetree list (devicetree at vger.kernel.org) in
+future.
+
+> +Required properties:
+> +- compatible: Should be "apm,xgene-qmtm-uio"
+
+This should definitely not have "uio" in the name.
+
+> +- reg: Address and length of the register set for the device. It contains the
+> +  information of registers in the same order as described by reg-names.
+> +- reg-names: Should contain the register set names
+> +  - "csr": QMTM control and status register address space.
+> +  - "fabric": QMTM memory mapped access to queue states.
+
+These look ok, I guess.
+
+> +  - "qpool": Memory location for creating QMTM queues. This could be some
+> +    SRAM or reserved portion of RAM. It is expected that size and location
+> +    of qpool memory will be configurable via bootloader.
+
+I don't follow why this should be described in a reg entry. This is not
+a property of the device; this is a separate resource being assigned to
+the device.
+
+Why can the kernel not allocate this dynamically?
+
+If you need a specific fixed pool, use the reserved-memory bindings.
+
+> +- clocks: Reference to the clock entry.
+
+There is only one clock input to the IP block?
+
+> +- num_queues: Number of queues under this QMTM device.
+
+s/_/-/, property names should use '-' rather than '_'.
+
+> +- devid: QMTM identification number for the system having multiple QMTM devices
+
+What exactly is this used for? Why is the reg entry not sufficient?
+
+> +Optional properties:
+> +- status: Should be "ok" or "disabled" for enabled/disabled. Default is "ok".
+
+This is so standard I don't see the point in documenting it.
+
+Mark.
