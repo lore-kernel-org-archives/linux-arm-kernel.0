@@ -1,54 +1,104 @@
-From: jingchang.lu@freescale.com (Jingchang Lu)
-Date: Tue, 9 Sep 2014 16:39:12 +0800
-Subject: [PATCHv3 1/6] ARM: dts: Add SoC level device tree support for LS1021A
-Message-ID: <1410251958-3961-1-git-send-email-jingchang.lu@freescale.com>
+From: wangyijing@huawei.com (Yijing Wang)
+Date: Tue, 9 Sep 2014 17:30:51 +0800
+Subject: [PATCH v10 07/10] OF: Introduce helper function for getting PCI
+ domain_nr
+In-Reply-To: <20140909084621.GS27864@e106497-lin.cambridge.arm.com>
+References: <1410184472-17630-1-git-send-email-Liviu.Dudau@arm.com>
+ <1410184472-17630-8-git-send-email-Liviu.Dudau@arm.com>
+ <CAL_JsqJi8k1Goc3UmXhuxf9v7=4gJrYG_Di7v574PxS8TsJaXw@mail.gmail.com>
+ <20140908145459.GO27864@e106497-lin.cambridge.arm.com>
+ <CAL_JsqJdGKDVwJOpPp19OkVPGzR7Zqv3nh+ONHHaYnPLYTYoYg@mail.gmail.com>
+ <20140908155931.GP27864@e106497-lin.cambridge.arm.com>
+ <540E960D.7080408@huawei.com>
+ <20140909084621.GS27864@e106497-lin.cambridge.arm.com>
+Message-ID: <540EC8CB.7010106@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series contain the support for Freescale LS1021A CPU and LS1021A-QDS
-and LS1021A-TWR board.
+On 2014/9/9 16:46, Liviu Dudau wrote:
+> On Tue, Sep 09, 2014 at 06:54:21AM +0100, Yijing Wang wrote:
+>>>>> on new requests. This function gets called quite a lot and I'm trying not to
+>>>>> make it too heavy weight.
+>>>>
+>>>> Generally, nothing should be accessing the same DT value frequently.
+>>>> It should get cached somewhere.
+>>>>
+>>>
+>>> The problem appears for DTs that don't have the pci-domain info. Then the cached
+>>> value is left at the default non-valid value and attempts to rescan the DT will
+>>> be made every time the function is called.
+>>>
+>>>> I don't really understand how domains are used so it's hard to provide
+>>>> a recommendation here. Do domains even belong in the DT?
+>>>
+>>> ACPI calls them segments and the way Bjorn explained it to me at some moment was
+>>> that it was an attempt to split up a bus in different groups (or alternatively,
+>>> merge a few busses together). To be honest I haven't seen systems where the domain
+>>> is anything other than zero, but JasonG (or maybe Benjamin) were floating an
+>>> idea of using the domain number to identify physical slots.
+>>
+>> PCI domain(or named segment) is provided by firmware, in ACPI system, we evaluated it
+>> by method "_SEG". in IA64 with ACPI, PCI hostbridge driver retrieves the domain from ACPI,
+>> if it's absent, the default domain is zero. So I wonder why in DTS, if it's absent, we get
+>> a auto increment domain value.
+> 
+> Because you can have more than one hostbridge (rare, but not impossible) and unless you
+> want to join the two segments, you might want to give it a different domain.
 
-The LS1021A SoC combines two ARM Cortex-A7 cores that have been optimized
-for high reliability and pack the highest level of integration available
-for sub-3W embedded communications processors and with a comprehensive
-enablement model focused on ease of programmability.
+OK. Sorry, I have one last question, because domain will be used to calculate the address used to
+access PCI hardware config registers. So if DTS file doesn't report the domain, how do we know
+we would access the right registers when we use the auto increment domain vaule ?
+Has there a mechanism to make sure system can access the correct registers by the domain ?
 
-The LS1021A SoC shares IPs with i.MX family, Vybrid family and Freescale
-PowerPC platform. 
+Thanks!
+Yijing.
 
-For the detail information about LS1021A SoC, please refer to the RM doc.
+> 
+> Best regards,
+> Liviu
+> 
+>>
+>> PCI get domain by ACPI "_SEG" in IA64(drivers/acpi/pci_root.c)
+>> ......
+>> 	status = acpi_evaluate_integer(handle, METHOD_NAME__SEG, NULL,
+>> 				       &segment);
+>> 	if (ACPI_FAILURE(status) && status != AE_NOT_FOUND) {
+>> 		dev_err(&device->dev,  "can't evaluate _SEG\n");
+>> 		result = -ENODEV;
+>> 		goto end;
+>> 	}
+>> .......
+>>
+>> Thanks!
+>> Yijing.
+>>
+>>>
+>>>> This function
+>>>> is just a weird mixture of data retrieval and allocation. I think you
+>>>> need to separate it into 2 functions.
+>>>
+>>> It is meant to do allocation with the retrieval being a short-cut (or fine
+>>> control if you want).
+>>>
+>>> I need to think a bit more for a better solution.
+>>>
+>>> Best regards,
+>>> Liviu
+>>>
+>>>>
+>>>> Rob
+>>>>
+>>>
+>>
+>>
+>> -- 
+>> Thanks!
+>> Yijing
+>>
+>>
+> 
 
----
-changes in v3:
-rewrite scfg and dcfg binding doc description.
-remove untested node and mtd partation info.
 
-changes in v2:
-remove unused nodes.
-wakeup the secondary core by IPI call to u-boot standby procedure. 
-add dt-bindings for LS1021A SoC and platform gerenal configuration nodes.
-
-----------------------------------------------------------------
-Jingchang Lu (6):
-	ARM: dts: Add SoC level device tree support for LS1021A
-	ARM: dts: Add initial LS1021A QDS board dts support
-	ARM: dts: Add initial LS1021A TWR board dts support
-	dt-bindings: arm: add Freescale LS1021A SoC device tree binding
-	ARM: imx: Add initial support for Freescale LS1021A
-	ARM: imx: Add Freescale LS1021A SMP support
-
- Documentation/devicetree/bindings/arm/fsl.txt |  38 +++
- arch/arm/boot/dts/Makefile                    |   2 +
- arch/arm/boot/dts/ls1021a-qds.dts             | 285 +++++++++++++++++++++
- arch/arm/boot/dts/ls1021a-twr.dts             | 117 +++++++++
- arch/arm/boot/dts/ls1021a.dtsi                | 670 ++++++++++++++++++++++++++++++++++++++++++++++++++
- arch/arm/mach-imx/Kconfig                     |  14 ++
- arch/arm/mach-imx/Makefile                    |   4 +-
- arch/arm/mach-imx/common.h                    |   1 +
- arch/arm/mach-imx/mach-ls1021a.c              |  34 +++
- arch/arm/mach-imx/platsmp.c                   |  32 +++
- 10 files changed, 1216 insertions(+), 1 deletion(-)
- create mode 100644 arch/arm/boot/dts/ls1021a-qds.dts
- create mode 100755 arch/arm/boot/dts/ls1021a-twr.dts
- create mode 100644 arch/arm/boot/dts/ls1021a.dtsi
- create mode 100644 arch/arm/mach-imx/mach-ls1021a.c
+-- 
+Thanks!
+Yijing
