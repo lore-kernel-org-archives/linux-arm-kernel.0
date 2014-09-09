@@ -1,66 +1,68 @@
-From: mpa@pengutronix.de (Markus Pargmann)
-Date: Tue, 9 Sep 2014 07:51:57 +0200
-Subject: [PATCH] mfd: mc13xxx: Configure WDI reset
-In-Reply-To: <540D9BCC.2000801@gmail.com>
-References: <1410159671-25873-1-git-send-email-mpa@pengutronix.de>
- <540D5DEB.6020605@gmail.com>
- <20140908092559.GB24081@pengutronix.de>
- <540D9BCC.2000801@gmail.com>
-Message-ID: <20140909055157.GC24081@pengutronix.de>
+From: vikas.sajjan@samsung.com (Vikas Sajjan)
+Date: Tue, 9 Sep 2014 11:24:48 +0530
+Subject: [RESEND PATCH v4 2/2] ARM: EXYNOS: Refactor the pm code to use DT
+ based lookup
+In-Reply-To: <02aa01cfc77c$94865f20$bd931d60$@samsung.com>
+References: <1408431167-14134-1-git-send-email-vikas.sajjan@samsung.com>
+ <1408431167-14134-3-git-send-email-vikas.sajjan@samsung.com>
+ <CAGm_ybjx4t7kGg0mJHjrox39jP-DNgc-0rkLNn2rcOLS6JjAHQ@mail.gmail.com>
+ <2186657.jhIisq7Fok@amdc1032>
+ <CAGm_ybhDsGpoHg8XVBOPEv7oHc0YdSZBW_JXB0hZk-y6Bac00g@mail.gmail.com>
+ <02aa01cfc77c$94865f20$bd931d60$@samsung.com>
+Message-ID: <CAGm_ybj2jekeq0pqqYeXyr6e6cMRfVkto8=nGm=2utCnJSvy_g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Kukjin,
 
-On Mon, Sep 08, 2014 at 02:06:36PM +0200, Philippe R?tornaz wrote:
-> Le 08/09/2014 11:25, Markus Pargmann a ?crit :
-> >Hi,
-> >
-> >On Mon, Sep 08, 2014 at 09:42:35AM +0200, Philippe R?tornaz wrote:
-> >>Hello
-> >>
-> >>Le 08/09/2014 09:01, Markus Pargmann a ?crit :
-> >>>Setup the PMIC to make a restart when a watchdog interrupt occures.
-> >>>If this is not configured, the PMIC will shut down the power supply
-> >>>without a restart.
-> >>
-> >>
-> >>Well, this was used to poweroff the mx31moboard board.
-> >>So we need to be able to configure the functionality.
-> >
-> >So on mx31moboard the watchdog interrupt always leads to a poweroff instead of
-> >a reset?
-> 
-> Well, no, it simply doesn't work since the output pin is not enabled :)
-> We enable the watchdog output only in pm_power_off().
-> 
-> >Perhaps it would be better to switch back to poweroff on
-> >watchdog interrupt right before the shutdown watchdog interrupt is
-> >triggered.
-> 
-> Yes, we definitely should be doing this.
-> The only point is that we don't have currently access to the PMIC
-> from pm_power_off().
-> Is there a clean/recommended way to do it ?
+On Wed, Sep 3, 2014 at 7:10 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
+> Vikas Sajjan wrote:
+>>
+>> Hi,
+>>
+> Hi,
+>
+> Sorry for late response...
+>
+>> On Tue, Aug 19, 2014 at 3:05 PM, Bartlomiej Zolnierkiewicz
+>> <b.zolnierkie@samsung.com> wrote:
+>> >
+>> > Hi,
+>> >
+>> > On Tuesday, August 19, 2014 01:26:49 PM Vikas Sajjan wrote:
+>> >> Hi Kukjin,
+>> >>
+>> >> On Tue, Aug 19, 2014 at 12:22 PM, Vikas Sajjan <vikas.sajjan@samsung.com> wrote:
+>> >> > Refactoring the pm.c to avoid using "soc_is_exynos" checks,
+>> >> > instead use the DT based lookup.
+>> >> >
+>> >> > While at it, consolidate the common code across SoCs
+>> >> > and create static helper functions.
+>> >> >
+>> >> > Signed-off-by: Vikas Sajjan <vikas.sajjan@samsung.com>
+>> >> > Reviewed-by: Tomasz Figa <t.figa@samsung.com>
+>> >>
+>> >> Can you pick this series...
+>> >
+>> > I think that my PM_SLEEP=n build fixes should go in before this cleanup
+>> > series:
+>>
+>> Its better for Kukjin to decide which series he wants to pick first.
+>>
+> Hmm...I need to have a look at the Bart's fix then I'll let you know. Maybe
+> tomorrow morning ;)
+>
 
-An exported function in the pmic mfd driver that switches between
-poweroff/reset on watchdog interrupt may be ok for this. In the board
-pm_power_off routine you could then use of_find_device_by_node() or
-something similar to get the device struct and pass it to the function.
+PING...
 
-Best Regards,
-
-Markus
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140909/999413b8/attachment.sig>
+>>
+>> >
+>> >   http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg35430.html
+>> >
+>
+> - Kukjin
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
