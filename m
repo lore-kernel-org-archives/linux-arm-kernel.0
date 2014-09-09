@@ -1,88 +1,34 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 9 Sep 2014 11:53:10 +0100
-Subject: [PATCH 4/5] dt-bindings: Add binding info for Xgene QMTM UIO
- driver
-In-Reply-To: <1410256619-3213-5-git-send-email-ankit.jindal@linaro.org>
-References: <1410256619-3213-1-git-send-email-ankit.jindal@linaro.org>
- <1410256619-3213-5-git-send-email-ankit.jindal@linaro.org>
-Message-ID: <20140909105310.GC27786@leverpostej>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 09 Sep 2014 12:55:09 +0200
+Subject: [RFC PATCH for Juno 0/2] Drivers for Juno to boot from ACPI
+In-Reply-To: <540EA446.7010200@redhat.com>
+References: <1409583961-7466-1-git-send-email-hanjun.guo@linaro.org>
+ <353732273.2TKdyNJ83M@wuerfel> <540EA446.7010200@redhat.com>
+Message-ID: <3840839.IPB3Ru8Evk@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 09, 2014 at 10:56:58AM +0100, Ankit Jindal wrote:
-> This patch adds device tree binding documentation for
-> Xgene QMTM UIO driver.
+On Tuesday 09 September 2014 02:55:02 Jon Masters wrote:
+> On 09/01/2014 11:29 AM, Arnd Bergmann wrote:
+> > On Monday 01 September 2014 23:05:59 Hanjun Guo wrote:
+> >> This patch set is example of the sort of driver changes needed to boot
+> >> Juno using ACPI tables, which using the ACPI tables devloped for MS
+> >> Windows and published by ARM [1].
+> > 
+> > What about platform support?
 > 
-> Signed-off-by: Ankit Jindal <ankit.jindal@linaro.org>
-> Signed-off-by: Tushar Jagad <tushar.jagad@linaro.org>
-> ---
->  .../devicetree/bindings/uio/uio_xgene_qmtm.txt     |   45 ++++++++++++++++++++
->  1 file changed, 45 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/uio/uio_xgene_qmtm.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/uio/uio_xgene_qmtm.txt b/Documentation/devicetree/bindings/uio/uio_xgene_qmtm.txt
-> new file mode 100644
-> index 0000000..b71831b
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/uio/uio_xgene_qmtm.txt
-> @@ -0,0 +1,45 @@
-> +APM X-Gene QMTM UIO nodes
-> +
-> +QMTM UIO nodes are defined for user space access to on-chip QMTM device
-> +on APM X-Gene SOC using UIO framework.
-> +
+> I think Juno is just serving as an example here since it's from ARM and
+> thus various people have access to it already, etc. It's not the best
+> example of a server platform out there, since that wasn't its original
+> design purpose (but it's a wonderful platform nonetheless). There is
+> work currently in flight to offer other reference ACPI examples.
 
-Userspace vs kernel space has precisely _nothing_ to do with a HW
-description.
+Ok, I see. This is a bit disappointing because it's actually the third
+attempt to come up with a reference platform (after Exynos and X-Gene),
+and it always seems to come down to deciding that this particular
+platform doesn't really work with ACPI beyond basic booting.
 
-This doesn't describe at all what the device is (e.g. what does QMTM
-stand for, what is it used for?).
+Which platform(s) are you talking about? Are you sure it will be better
+suited than the first three?
 
-NAK.
-
-Please ensure you Cc the devicetree list (devicetree at vger.kernel.org) in
-future.
-
-> +Required properties:
-> +- compatible: Should be "apm,xgene-qmtm-uio"
-
-This should definitely not have "uio" in the name.
-
-> +- reg: Address and length of the register set for the device. It contains the
-> +  information of registers in the same order as described by reg-names.
-> +- reg-names: Should contain the register set names
-> +  - "csr": QMTM control and status register address space.
-> +  - "fabric": QMTM memory mapped access to queue states.
-
-These look ok, I guess.
-
-> +  - "qpool": Memory location for creating QMTM queues. This could be some
-> +    SRAM or reserved portion of RAM. It is expected that size and location
-> +    of qpool memory will be configurable via bootloader.
-
-I don't follow why this should be described in a reg entry. This is not
-a property of the device; this is a separate resource being assigned to
-the device.
-
-Why can the kernel not allocate this dynamically?
-
-If you need a specific fixed pool, use the reserved-memory bindings.
-
-> +- clocks: Reference to the clock entry.
-
-There is only one clock input to the IP block?
-
-> +- num_queues: Number of queues under this QMTM device.
-
-s/_/-/, property names should use '-' rather than '_'.
-
-> +- devid: QMTM identification number for the system having multiple QMTM devices
-
-What exactly is this used for? Why is the reg entry not sufficient?
-
-> +Optional properties:
-> +- status: Should be "ok" or "disabled" for enabled/disabled. Default is "ok".
-
-This is so standard I don't see the point in documenting it.
-
-Mark.
+	Arnd
