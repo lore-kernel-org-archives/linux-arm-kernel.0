@@ -1,28 +1,58 @@
-From: geoff@infradead.org (Geoff Levand)
-Date: Tue, 09 Sep 2014 22:49:05 +0000
-Subject: [PATCH 12/13] arm64/kexec: Enable kexec in the arm64 defconfig
-In-Reply-To: <cover.1410302383.git.geoff@infradead.org>
-References: <cover.1410302383.git.geoff@infradead.org>
-Message-ID: <209bf9f9eed9f8dea4a381a4a279eeca1915537b.1410302383.git.geoff@infradead.org>
+From: m-karicheri2@ti.com (Murali Karicheri)
+Date: Tue, 9 Sep 2014 18:50:13 -0400
+Subject: [PATCH v2 2/2] PCI: keystone: update to support multiple pci ports
+In-Reply-To: <3967092.l9bxcqMaSa@wuerfel>
+References: <1410293835-13050-1-git-send-email-m-karicheri2@ti.com>
+ <9042477.aRbAhpkfQ5@wuerfel> <540F75DF.5050904@ti.com>
+ <3967092.l9bxcqMaSa@wuerfel>
+Message-ID: <540F8425.70304@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Geoff Levand <geoff@infradead.org>
----
- arch/arm64/configs/defconfig | 1 +
- 1 file changed, 1 insertion(+)
+On 09/09/2014 05:52 PM, Arnd Bergmann wrote:
+> On Tuesday 09 September 2014 17:49:19 Murali Karicheri wrote:
+>> Actually this is an inteded. The vendor ID is in a register indicated by
+>> reg offset and as per the device spec, it needs to be read and updated
+>> by the software. Now since multiple instances of PCI device needs to be
+>> read the same register, the reading happens in the probe() and same is
+>> unmapped after that.
+>>
+>> +       ks_pcie->device_id = readl(reg_p)>>  16;
+>> +       devm_iounmap(dev, reg_p);
+>> +       devm_release_mem_region(dev, res->start, resource_size(res));
+>>
+>> Afetr that in ks_pcie_host_init(), it update the device_id in the RC's
+>> config space.
+>
+> I'm not sure I understand the purpose of this. Do you mean you read
+> the vendor/device ID of whichever device happens to get probed first
+> and then program the same ID into all other devices as well?
 
-diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
-index d92ef3c..ebf8b3f 100644
---- a/arch/arm64/configs/defconfig
-+++ b/arch/arm64/configs/defconfig
-@@ -39,6 +39,7 @@ CONFIG_PREEMPT=y
- CONFIG_KSM=y
- CONFIG_TRANSPARENT_HUGEPAGE=y
- CONFIG_CMA=y
-+CONFIG_KEXEC=y
- CONFIG_CMDLINE="console=ttyAMA0"
- # CONFIG_CORE_DUMP_DEFAULT_ELF_HEADERS is not set
- CONFIG_COMPAT=y
--- 
-1.9.1
+My mistake. It is the device ID, not vendor ID. The PCI driver supports 
+PCI h/w on K2HK, K2E and K2L SoCs for which PCI device IDs are assigned as
+
++#define PCIE_RC_K2HK		0xb008
++#define PCIE_RC_K2E		0xb009
++#define PCIE_RC_K2L		0xb00a
++
+
+and the same driver code runs on all these h/w. The device ID is not 
+filled in by default by the h/w, in the config space of the RC at offset 
+1000h "VENDOR_DEVICE_ID Vendor and Device Identification Register". 
+Same is available in a seperate SoC register whose offset is specified 
+by index 2. This is read by driver and updated in the config space. The 
+Vendor ID is however set by default.
+
+There is a mrrs PCI quirk required for Keystone PCI which depends on 
+this vendor ID to be filled correctly as it match vendor id/ device id 
+of the bridge device to apply the quirk.
+
+Hope this clarify your question.
+
+Murali
+
+>
+> What if the order changes between two boots? Why does the vendor/device
+> ID of the host bridge even matter at all?
+>
+> 	Arnd
