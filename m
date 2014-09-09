@@ -1,158 +1,46 @@
-From: B31939@freescale.com (Lian Minghuan-B31939)
-Date: Tue, 9 Sep 2014 17:25:57 +0000
-Subject: =?UTF-8?B?562U5aSNOiBbUEFUQ0ggMi8yXSBQQ0k6IExheWVyc2NhcGU6IEE=?=
- =?UTF-8?B?ZGQgTGF5ZXJzY2FwZSBQQ0llIGRyaXZlcg==?=
-In-Reply-To: <7284910.vZQKmpeMI1@wuerfel>
-References: <1409856338-1730-1-git-send-email-Minghuan.Lian@freescale.com>
- <2799937.bNtU9KXR6t@wuerfel> <1409930568256.17564@freescale.com>
- <7284910.vZQKmpeMI1@wuerfel>
-Message-ID: <540F3825.6080601@freescale.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 09 Sep 2014 11:27:12 +0200
+Subject: [GIT PULL] at91: drivers for 3.18 #2
+In-Reply-To: <20140909091520.GJ3804@lukather>
+References: <1409934969-11584-1-git-send-email-nicolas.ferre@atmel.com>
+ <26517543.McM8Q5P0vn@wuerfel> <20140909091520.GJ3804@lukather>
+Message-ID: <3053665.vhA4jELi7x@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+On Tuesday 09 September 2014 11:15:20 Maxime Ripard wrote:
+> 
+> > One of the problems with the current interface is that it requires
+> > statically declaring platform_device structures, which is something
+> > that has been on Greg's list of device model antipatterns for a long
+> > time.
+> 
+> I didn't find any difference with how you declare platform_devices
+> compared to the old-usual way in board files, or was it something on
+> the list too ? 
 
-I am sorry for missed reply style and thank you very much for fixing it.
-please see my comments inline.
+Yes. We never really bothered with cleaning up the existing static
+platform_device instances, because the plan is to move away from
+board files to DT anyway, but in short, if you ever need to add
+a platform device to a legacy board file, do it like
 
-Thanks,
-Minghuan
+	pdev = platform_device_alloc(...);
+	platform_device_register(dev);
 
-On 2014?09?05? 08:44, Arnd Bergmann wrote:
-> On Friday 05 September 2014 07:22:08 Minghuan.Lian at freescale.com wrote:
->> Hi Arnd,
->>
->> Please see my comments inline.
-> Please use the usual reply style in the future, using '>' characters to
-> properly give attribution. I'm fixing this up manually in my reply
-> here, so others can follow the discussion.
->
->>> On Thursday 04 September 2014 18:45:38 Minghuan Lian wrote:
->>>> +
->>>> +#define PCIE_LS1021A_BASE    0x3400000
->>>> +#define PCIE_LS1021A_REG_SIZE        0x0100000
->>> This does not belong here. All addresses must come from DT,
->>> and you should not do the calculation below based on the address.
->> [Minghuan] LS1021A contains two PCI controllers. I use them to
->> calculation the PCI controller index.
->> There are several separate registers for PEX1 and PEX2 in SCFG
->> register space. It is hard to get them address from DTS. Could
->> you tell me a way to get PCI controller index?
-> The easiest way would be to put the index as a property in the
-> device tree itself.
-[Minghuan] I want to use  scfg = <&scfg 0> you mentioned below.
->>> +struct ls_pcie {
->>> +     struct list_head node;
->>> +     struct device *dev;
->>> +     struct pci_bus *bus;
->>> +     void __iomem *dbi;
->>> +     void __iomem *scfg;
->>> +     struct pcie_port pp;
->>> +     int id;
->>> +     int index;
->>> +     int irq;
->>> +     int msi_irq;
->>> +     int pme_irq;
->>> +};
->> irq and pme_irq seem to be completely unused, so better
->> not add them until they are actually used.
->> [Minghuan] Ok, I will remove them.
->>
->> The scfg registers seem to belong to another device that
->> is responsible for multiple instances. Unfortunately,
->> this "fsl,ls1021a-scfg" device is not documented anywhere
->> that I can see.
->>
->> Is this some sort of syscon node, or is it specific to the
->> pcie controller(s)?
->>
->> [Minghaun] SCFG provides SoC specific configuration and status
->> registers for the device including PCI USB eTSEC SATA ...
->> The platform patches that contains SCFG code are being upstream.
-> This sounds like it should be a syscon node, and you should use
-> syscon_regmap_lookup_by_phandle() to find the scfg node from each
-> of those drivers, rather than scanning the DT yourself in each
-> of the drivers using it.
->
-> This can also be a place to put the index, such as
->
-> 	scfg = <&scfg 0>;
->
-> for the first PCIe node. The probe function then extracts both
-> the phandle for the syscon and the index from that property.
-[Minghuan] I discussed with my colleague. They worry about performance 
-degradation if using regmap API,
-because there are some fast device use scfg. We tend to use a simple way 
-to map andread/write scfg directly.
->>> +static int ls_pcie_link_up(struct pcie_port *pp)
->>> +{
->>> +     u32 rc, tmp;
->>> +     struct ls_pcie *pcie = to_ls_pcie(pp);
->>> +
->>> +     tmp = ioread32(pcie->scfg + SCFG_SCFGREVCR_OFF);
->>> +     iowrite32(SCFG_NO_BIT_REVERSE, pcie->scfg + SCFG_SCFGREVCR_OFF);
->>> +
->>> +     rc = (ioread32(pcie->scfg + PEXMSCPORTSR(pcie->index)) >>
->>> +          LTSSM_STATE_SHIFT) & LTSSM_STATE_MASK;
->>> +
->>> +     iowrite32(tmp, pcie->scfg + SCFG_SCFGREVCR_OFF);
->>> +
->>> +     if (rc < LTSSM_PCIE_L0)
->>> +             return 0;
->>> +
->>> +     return 1;
->>> +}
->> This looks like it is really a phy driver, although a pretty minimal
->> one.
->>
->> [Minghuan] I read SCFG register. SCFG provides SoC specific configuration
->> and status registers for the device including PCI USB eTSEC SATA ...
-> I'm guessing that a lot of that is phy related information though.
-> A nicer way to deal with this, compared to using syscon directly is
-> to have a phy driver for your chip, and have that deal with all
-> the phy related setup. In this case you would have a reference in
-> the client driver like
->
-> 	phys = <&scfgphy LS1021A_PHY_PCIE0>;
-> 	phy-names = "pcie";
->
-> And in the pcie driver you just call devm_phy_get(dev, "pcie") to get a reference
-> to that phy node, and then you can use the phy API to perform actions on
-> it (init, power_on, power_off, exit).
->
-> This keeps all knowledge about the phy registers inside of the scfg area
-> in one place, and you only have to add a new phy driver for a future SoC
-> that has the same PCIe core but different scfg.
-[Minghuan] SCFG does not contains power_on power_off or other PCI 
-control registers.
-We only  get link up and MSI related status via SCFG. So I think it is 
-not enough to call scfg
-PCIe phy.
->>> +static u32 ls_pcie_get_msi_addr(struct pcie_port *pp)
->>> +{
->>> +     return SCFG_SPIMSICR_ADDR;
->>> +}
->>> +
->>> +static u32 ls_pcie_get_msi_data(struct pcie_port *pp, int pos)
->>> +{
->>> +     struct ls_pcie *pcie = to_ls_pcie(pp);
->>> +
->>> +     if (pcie->id == PCI_DEVICE_ID_LS1021A)
->>> +             return MSI_LS1021A_DATA(pcie->index);
->>> +
->>> +     return pos;
->>> +}
->> My impression is that you have two distinct MSI controller
->> implementations, one for LS1021A and the other one for everything
->> else. How about using separate pcie_host_ops for them, possibly
->> also moving them into separate files?
->>
->> A good way to deal with this is to put the pointers to the two
->> pcie_host_ops into the data fields of the ls_pcie_of_match table.
->>
->> [Minghuan] LS1021 contains the same two PCI controllers PEX1 and PEX2.
->> both PEX1 and PEX use the same MSI address, but different MSI message data.
-> I mean LS1021 is different from other chips here, since you compare
-> the pcie->id value.
-[Minghuan] I see. I will change it.
-> 	Arnd
+or
+
+	platform_device_register_simple(...);
+
+or
+
+	static const struct platform_device_info info __initconst = { ... };
+	platform_device_register_full(&info);
+
+but not
+
+	static struct platform_device pdev = { ... };
+	platform_device_register(&pdev);
+
+Unfortunately, the early platform_device only allows the last type.
+
+	Arnd
