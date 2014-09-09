@@ -1,53 +1,122 @@
-From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Tue, 9 Sep 2014 14:15:43 -0600
-Subject: [PATCH RESEND] ARM: PCI: Use PCI_CLASS_* defines for PCI class
-In-Reply-To: <CAErSpo56jB1Bf2JtYCGKXZBZqRF1jXFxGmeewPX_e6vSXueGyA@mail.gmail.com>
-References: <1410163532-31057-1-git-send-email-lisovy@gmail.com>
- <CAErSpo7sOc72V3g5tOov8Yj4nKiuJupaUTKEEecHMcqEUrzh_g@mail.gmail.com>
- <20140908180357.GA6159@obsidianresearch.com>
- <CAErSpo7QQMRFKSk4vQCkDeEQQXX87Gq5YAKR+P4bxxcqMSJeDw@mail.gmail.com>
- <20140908200422.GA6204@obsidianresearch.com>
- <CAErSpo56jB1Bf2JtYCGKXZBZqRF1jXFxGmeewPX_e6vSXueGyA@mail.gmail.com>
-Message-ID: <20140909201543.GC14765@obsidianresearch.com>
+From: m-karicheri2@ti.com (Murali Karicheri)
+Date: Tue, 9 Sep 2014 16:17:15 -0400
+Subject: [PATCH v2 2/2] PCI: keystone: update to support multiple pci ports
+In-Reply-To: <1410293835-13050-1-git-send-email-m-karicheri2@ti.com>
+References: <1410293835-13050-1-git-send-email-m-karicheri2@ti.com>
+Message-ID: <1410293835-13050-2-git-send-email-m-karicheri2@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 09, 2014 at 01:31:46PM -0600, Bjorn Helgaas wrote:
-> On Mon, Sep 8, 2014 at 2:04 PM, Jason Gunthorpe
-> <jgunthorpe@obsidianresearch.com> wrote:
-> > On Mon, Sep 08, 2014 at 01:39:40PM -0600, Bjorn Helgaas wrote:
-> >
-> >> > Essentially for that case the mvebu HW is a repurposed end port core,
-> >> > so when working as a root port it presents an end port config space
-> >> > (not a root port bridge config space). The BAR in that config space is
-> >> > not relevant, so the old mvebu used code like this to hide it from the
-> >> > PCI core. Otherwise the core will try to program it from the aperture,
-> >> > and the default BAR size is really big, so it runs out of space.
-> 
-> This is a bit of a tangent, but an endpoint has a type 0 config
-> header, while a root port is a bridge and has a type 1 config header.
-> I don't understand how the PCI core can operate a root port correctly
-> if that port has a type 0 config header.
+K2E SoC has two PCI ports. The SATA controller is connected to second
+PCI port (port 1). This patch enhances the driver to support multiple
+ports.
 
-Well, it cannot operate 'correctly' but something gets bodged
-together enough to pass basic scenarios..
+Update the DT Documentation for the new attribute, ti,pcie-port and
+remove the note for bootargs as this is no longer needed.
 
-Everything gets flattened down to bus 0, so the end port config space
-gets to be device 0x10, and then config access to other device numbers
-are forwarded out as TLPs to whatever is connected, so typically the
-connected device shows up as device 0x0.
+Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
+---
+ - updated based on comment against v1
+ .../devicetree/bindings/pci/pci-keystone.txt       |    8 +++++---
+ drivers/pci/host/pci-keystone.c                    |   15 ++++++++++-----
+ drivers/pci/host/pci-keystone.h                    |    4 ++--
+ 3 files changed, 17 insertions(+), 10 deletions(-)
 
-> It sounds like when these devices are configured as root ports, they
-> have BARs visible to the host, which is how dev->resource[] would get
-> filled in to begin with.  We manage normal BARs so the CPU can perform
-> MMIO accesses to the device.  In this case, it sounds like the BARs
-> are more for the benefit of devices below the bridge that want to
-> perform DMA.  The PCI core certainly wouldn't know what to do about
-> something like that, so I agree the best thing to do is to clear out
-> the resource completely and pretend it doesn't exist.  I guess a new
-> (not repurposed) design would probably put stuff like this in
-> device-specific config space, not in architected BARs.
-
-Yes to all of this.
-
-Jason
+diff --git a/Documentation/devicetree/bindings/pci/pci-keystone.txt b/Documentation/devicetree/bindings/pci/pci-keystone.txt
+index bedacf0..c8f5773 100644
+--- a/Documentation/devicetree/bindings/pci/pci-keystone.txt
++++ b/Documentation/devicetree/bindings/pci/pci-keystone.txt
+@@ -56,11 +56,13 @@ Optional properties:-
+ 	phy-names: name of the Generic Keystine SerDes phy for PCI
+ 	  - If boot loader already does PCI link establishment, then phys and
+ 	    phy-names shouldn't be present.
++	ti,pcie-port: PCI port number. This is used to configure the PCI port
++	    number. For example K2E SoC supports 2 PCI ports and PCI bindings
++	    for the second port adds ti,pcie-port = <1> to identify second port
++	    and driver uses this to configure the PCI mode register for second
++	    port. If not present, port number 0 is assumed.
+ 
+ Designware DT Properties not applicable for Keystone PCI
+ 
+ 1. pcie_bus clock-names not used.  Instead, a phandle to phys is used.
+ 
+-Note for PCI driver usage
+-=========================
+-Driver requires pci=pcie_bus_perf in the bootargs for proper functioning.
+diff --git a/drivers/pci/host/pci-keystone.c b/drivers/pci/host/pci-keystone.c
+index f1119eb..893820d 100644
+--- a/drivers/pci/host/pci-keystone.c
++++ b/drivers/pci/host/pci-keystone.c
+@@ -253,8 +253,8 @@ static int keystone_pcie_fault(unsigned long addr, unsigned int fsr,
+ 
+ static void __init ks_pcie_host_init(struct pcie_port *pp)
+ {
+-	u32 vendor_device_id, val;
+ 	struct keystone_pcie *ks_pcie = to_keystone_pcie(pp);
++	u32 val;
+ 
+ 	ks_pcie_establish_link(ks_pcie);
+ 	ks_dw_pcie_setup_rc_app_regs(ks_pcie);
+@@ -263,8 +263,7 @@ static void __init ks_pcie_host_init(struct pcie_port *pp)
+ 			pp->dbi_base + PCI_IO_BASE);
+ 
+ 	/* update the Vendor ID */
+-	vendor_device_id = readl(ks_pcie->va_reg_pciid);
+-	writew((vendor_device_id >> 16), pp->dbi_base + PCI_DEVICE_ID);
++	writew(ks_pcie->device_id, pp->dbi_base + PCI_DEVICE_ID);
+ 
+ 	/* update the DEV_STAT_CTRL to publish right mrrs */
+ 	val = readl(pp->dbi_base + PCIE_CAP_BASE + PCI_EXP_DEVCTL);
+@@ -345,12 +344,13 @@ static int __exit ks_pcie_remove(struct platform_device *pdev)
+ static int __init ks_pcie_probe(struct platform_device *pdev)
+ {
+ 	struct device *dev = &pdev->dev;
++	struct device_node *np = dev->of_node;
+ 	struct keystone_pcie *ks_pcie;
++	int ret = 0, port_id = 0;
+ 	struct pcie_port *pp;
+ 	struct resource *res;
+ 	void __iomem *reg_p;
+ 	struct phy *phy;
+-	int ret = 0;
+ 
+ 	ks_pcie = devm_kzalloc(&pdev->dev, sizeof(*ks_pcie),
+ 				GFP_KERNEL);
+@@ -360,6 +360,9 @@ static int __init ks_pcie_probe(struct platform_device *pdev)
+ 	}
+ 	pp = &ks_pcie->pp;
+ 
++	/* read the PCI port id */
++	of_property_read_u32(np, "ti,pcie-port", &port_id);
++
+ 	/* initialize SerDes Phy if present */
+ 	phy = devm_phy_get(dev, "pcie-phy");
+ 	if (!IS_ERR_OR_NULL(phy)) {
+@@ -373,7 +376,9 @@ static int __init ks_pcie_probe(struct platform_device *pdev)
+ 	reg_p = devm_ioremap_resource(dev, res);
+ 	if (IS_ERR(reg_p))
+ 		return PTR_ERR(reg_p);
+-	ks_pcie->va_reg_pciid = reg_p;
++	ks_pcie->device_id = readl(reg_p) >> 16;
++	devm_iounmap(dev, reg_p);
++	devm_release_mem_region(dev, res->start, resource_size(res));
+ 
+ 	pp->dev = dev;
+ 	platform_set_drvdata(pdev, ks_pcie);
+diff --git a/drivers/pci/host/pci-keystone.h b/drivers/pci/host/pci-keystone.h
+index 729ea7d..80cfa8e 100644
+--- a/drivers/pci/host/pci-keystone.h
++++ b/drivers/pci/host/pci-keystone.h
+@@ -19,8 +19,8 @@
+ struct keystone_pcie {
+ 	struct	clk		*clk;
+ 	struct	pcie_port	pp;
+-	void __iomem		*va_reg_pciid;
+-
++	/* PCI Device ID */
++	u32			device_id;
+ 	int			num_legacy_host_irqs;
+ 	int			legacy_host_irqs[MAX_LEGACY_HOST_IRQS];
+ 	struct			device_node *legacy_intc_np;
+-- 
+1.7.9.5
