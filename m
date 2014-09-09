@@ -1,36 +1,63 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Tue,  9 Sep 2014 15:05:15 +0200
-Subject: [PATCH v8 5/5] ARM: dts: imx6qdl: Allow disabling the PU regulator,
- add a enable ramp delay
-In-Reply-To: <1410267915-18126-1-git-send-email-p.zabel@pengutronix.de>
-References: <1410267915-18126-1-git-send-email-p.zabel@pengutronix.de>
-Message-ID: <1410267915-18126-6-git-send-email-p.zabel@pengutronix.de>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 09 Sep 2014 15:06:47 +0200
+Subject: [PATCH] binfmt_misc: work around gcc-4.9 warning
+Message-ID: <36592637.GQ9Dnm0IKp@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The PU regulator is enabled during boot, but not necessarily always-on.
-It can be disabled by the generic pm domain framework when the PU power
-domain is shut down. The ramp delay of 150 us might be a bit conservative,
-the value is taken from the Freescale kernel.
+gcc-4.9 on ARM gives us a mysterious warning about the binfmt_misc
+parse_command function:
 
-Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
----
- arch/arm/boot/dts/imx6qdl.dtsi | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+fs/binfmt_misc.c: In function 'parse_command.part.3':
+fs/binfmt_misc.c:405:7: warning: array subscript is above array bounds [-Warray-bounds]
 
-diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
-index 0b1384c..d8d3d93 100644
---- a/arch/arm/boot/dts/imx6qdl.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl.dtsi
-@@ -579,7 +579,8 @@
- 					regulator-name = "vddpu";
- 					regulator-min-microvolt = <725000>;
- 					regulator-max-microvolt = <1450000>;
--					regulator-always-on;
-+					regulator-enable-ramp-delay = <150>;
-+					regulator-boot-on;
- 					anatop-reg-offset = <0x140>;
- 					anatop-vol-bit-shift = <9>;
- 					anatop-vol-bit-width = <5>;
--- 
-2.1.0
+I've managed to trace this back to the ARM implementation of memset,
+which is called from copy_from_user in case of a fault and which does
+
+ #define memset(p,v,n)                                                  \
+        ({                                                              \
+                void *__p = (p); size_t __n = n;                        \
+                if ((__n) != 0) {                                       \
+                        if (__builtin_constant_p((v)) && (v) == 0)      \
+                                __memzero((__p),(__n));                 \
+                        else                                            \
+                                memset((__p),(v),(__n));                \
+                }                                                       \
+                (__p);                                                  \
+        })
+
+Apparently gcc gets confused by the check for "size != 0" and believes
+that the size might be zero when it gets to the line that does
+"if (s[count-1] == '\n')", so it would access data outside of the
+array.
+
+gcc is clearly wrong here, since this condition was already checked
+earlier in the function and the 'size' value can not change in the
+meantime.
+
+Fortunately, we can work around it and get rid of the warning by
+rearranging the function to check for zero size after doing the
+copy_from_user. It is still safe to pass a zero size into
+copy_from_user, so it does not cause any side effects.
+
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+
+diff --git a/fs/binfmt_misc.c b/fs/binfmt_misc.c
+index b60500300dd7..1fc2b028d504 100644
+--- a/fs/binfmt_misc.c
++++ b/fs/binfmt_misc.c
+@@ -396,12 +396,12 @@ static int parse_command(const char __user *buffer, size_t count)
+ {
+ 	char s[4];
+ 
+-	if (!count)
+-		return 0;
+ 	if (count > 3)
+ 		return -EINVAL;
+ 	if (copy_from_user(s, buffer, count))
+ 		return -EFAULT;
++	if (!count)
++		return 0;
+ 	if (s[count-1] == '\n')
+ 		count--;
+ 	if (count == 1 && s[0] == '0')
