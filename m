@@ -1,52 +1,46 @@
-From: jcm@redhat.com (Jon Masters)
-Date: Tue, 09 Sep 2014 00:29:06 -0400
-Subject: [PATCH v3 09/17] ARM64 / ACPI: Parse MADT for SMP initialization
-In-Reply-To: <5408854B.9010703@linaro.org>
-References: <1409583475-6978-1-git-send-email-hanjun.guo@linaro.org>
- <1409583475-6978-10-git-send-email-hanjun.guo@linaro.org>
- <20140903172138.GG1824@e102568-lin.cambridge.arm.com>
- <5408854B.9010703@linaro.org>
-Message-ID: <540E8212.8090304@redhat.com>
+From: takahiro.akashi@linaro.org (AKASHI Takahiro)
+Date: Tue, 09 Sep 2014 13:48:51 +0900
+Subject: [PATCH] arm: prevent BUG_ON in audit_syscall_entry()
+In-Reply-To: <20140905095252.GF30401@n2100.arm.linux.org.uk>
+References: <1409910393-30896-1-git-send-email-takahiro.akashi@linaro.org>
+ <20140905095252.GF30401@n2100.arm.linux.org.uk>
+Message-ID: <540E86B3.7080700@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Hanjun, Lorenzo,
+Russell,
 
-Resending due to my mail client removing list CCs...sorry about that.
-
-On 09/04/2014 11:29 AM, Hanjun Guo wrote:
-
->>> +	} else {
->>> +		/* Fist GICC entry must be BSP as ACPI spec said */
->> s/Fist/First/
+On 09/05/2014 06:52 PM, Russell King - ARM Linux wrote:
+> On Fri, Sep 05, 2014 at 06:46:33PM +0900, AKASHI Takahiro wrote:
+>> BUG_ON() in audit_syscall_entry() will be hit if user issues syscall(-1)
+>> while syscall auditing is enabled (that is, by starting auditd).
+>> In fact, syscall(-1) just fails (not signaled despite the expectation,
+>> this is another minor bug), but the succeeding syscall hits BUG_ON.
 >>
->>> +		if  (cpu_logical_map(0) != mpidr) {
->>> +			pr_err("First GICC entry is not BSP for MPIDR 0x%llx\n",
->>> +			       mpidr);
->>> +			return -EINVAL;
->>> +		}
->> Interesting, this means that if I want to change the boot CPU I have to
->> recompile the ACPI tables. Is that really true ?
+>> When auditing syscall(-1), audit_syscall_entry() is called anyway, but
+>> audit_syscall_exit() is not called and then 'in_syscall' flag in thread's
+>> audit context is kept on. In this way, audit_syscall_entry() against
+>> the succeeding syscall will see BUG_ON(in_syscall).
+>>
+>> This patch fixes this bug by
+>> 1) enforcing syscall exit tracing, including audit_syscall_exit(), to be
+>>     executed in all cases,
+>
+> Really, no.  That adds additional overhead to every syscall, and that
+> matters for system performance.  We want to have as little as possible
+> overhead here.
 
-Well, the ACPI5.1 specification does require that the PEs (cores) be
-listed in a very specific order, with the boot CPU first, and then a
-precisely defined sequence of interleaving of any possible SMT threads
-with other cores. So I think you would in practice update your tables.
+My words might have confused you, but this issue exists, in the current
+mainline kernel, not only against syscall(-1), but any invalid or pseudo syscalls.
+(And other archs seem to behave in the same way AFAIK.)
+But if you want, I can fix it.
+See my next version.
 
->>> +	/*
->>> +	 * ACPI 5.1 only has two explicit methods to boot up SMP,
->>> +	 * PSCI and Parking protocol, but the Parking protocol is
->>> +	 * only specified for ARMv7 now, so make PSCI as the only
->>> +	 * way for the SMP boot protocol before some updates for
->>> +	 * the ACPI spec or the Parking protocol spec.
->>> +	 */
+-Takahiro AKASHI
 
-The Parking Protocol may be updated for a (limited) number of platforms
-that may use it in the early days. The preferred option (as described in
-the SBBR) is to use PSCI when at all possible. Some implementations of
-the architecture may not be able to use PSCI for MP-Boot. Thus while
-there may be some limited early use of the parking protocol (including
-while PSCI firmware is being finalized during bringup activities), it
-will ultimately be completely replaced by PSCI based boot over time.
-
-Jon.
+> The second issue here is that you haven't explained where the oops
+> occurs.  It's seen as a good practice to include the oops dump for the
+> bug you're fixing in the commit changelog, so that others can see the
+> starting point for the investigation, and see exactly where things are
+> going wrong.
+>
