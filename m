@@ -1,104 +1,91 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Tue, 09 Sep 2014 10:54:45 -0700
-Subject: [PATCH] ARM: perf: Don't sleep while atomic when enabling per-cpu
- interrupts
-In-Reply-To: <20140909113943.GG1754@arm.com>
-References: <1410200814-25878-1-git-send-email-sboyd@codeaurora.org>
- <20140909113943.GG1754@arm.com>
-Message-ID: <540F3EE5.90500@codeaurora.org>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 9 Sep 2014 18:59:40 +0100
+Subject: [PATCH RFC 1/3] DT: add binding for MXS regulator
+In-Reply-To: <1410089869-6611-2-git-send-email-info@lategoodbye.de>
+References: <1410089869-6611-1-git-send-email-info@lategoodbye.de>
+ <1410089869-6611-2-git-send-email-info@lategoodbye.de>
+Message-ID: <20140909175940.GF3896@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/09/14 04:39, Will Deacon wrote:
-> It's interesting that arm64 isn't affected by this problem, since we don't
-> update the active_irqs mask for PPIs there and consequently just pass the
-> irq instead of the cpu_pmu. I can't see why we actually need to update the
-> active_irqs mask for arch/arm/, so could we remove that and follow arm64's
-> lead instead? That would remove the need for a new struct definition too.
->
+On Sun, Sep 07, 2014 at 12:37:47PM +0100, Stefan Wahren wrote:
+> This patch adds the Device tree bindings for the Freescale MXS on-chip
+> regulators.
+> 
+> Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
+> ---
+>  .../bindings/regulator/mxs-regulator.txt           | 38 ++++++++++++++++++++++
+>  1 file changed, 38 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/regulator/mxs-regulator.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/regulator/mxs-regulator.txt b/Documentation/devicetree/bindings/regulator/mxs-regulator.txt
+> new file mode 100644
+> index 0000000..c3226cc
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/regulator/mxs-regulator.txt
+> @@ -0,0 +1,38 @@
+> +MXS regulators
+> +
+> +Required node properties:
+> +- compatible: Should be "fsl,<soc>-power", where soc is "imx23" or "imx28"
+> +- reg: Offset and length of the register set for the device
 
-I guess you're saying that we don't need the active_irqs mask in the
-percpu irq case? It looks like we still use it to determine when the
-last CPU PMU has been disabled in the non-percpu case.
+We require #address-cells and #size-cells if the child nodes have reg
+entries.
 
-Here's the interdiff. Is there a reason arm64 casts data to an unsigned
-int pointer when what's passed is an int pointer?
+> +
+> +Required regulator properties:
+> +- compatible: Must be "fsl,mxs-regulator"
+> +- reg: Offset of the register set for the regulator
 
-----8<-----
+Is this the offset or the absolute physical address?
 
-diff --git a/arch/arm/kernel/perf_event_cpu.c b/arch/arm/kernel/perf_event_cpu.c
-index 1f24b47cd81e..4bf4cce759fe 100644
---- a/arch/arm/kernel/perf_event_cpu.c
-+++ b/arch/arm/kernel/perf_event_cpu.c
-@@ -74,28 +74,17 @@ static struct pmu_hw_events *cpu_pmu_get_cpu_events(void)
- 	return this_cpu_ptr(&cpu_hw_events);
- }
- 
--struct pmu_enable {
--	struct arm_pmu *pmu;
--	int irq;
--};
--
- static void cpu_pmu_enable_percpu_irq(void *data)
- {
--	struct pmu_enable *pmu_enable = data;
--	struct arm_pmu *cpu_pmu = pmu_enable->pmu;
--	int irq = pmu_enable->irq;
-+	int irq = *(int *)data;
- 
- 	enable_percpu_irq(irq, IRQ_TYPE_NONE);
--	cpumask_set_cpu(smp_processor_id(), &cpu_pmu->active_irqs);
- }
- 
- static void cpu_pmu_disable_percpu_irq(void *data)
- {
--	struct pmu_enable *pmu_enable = data;
--	struct arm_pmu *cpu_pmu = pmu_enable->pmu;
--	int irq = pmu_enable->irq;
-+	int irq = *(int *)data;
- 
--	cpumask_clear_cpu(smp_processor_id(), &cpu_pmu->active_irqs);
- 	disable_percpu_irq(irq);
- }
- 
-@@ -103,15 +92,12 @@ static void cpu_pmu_free_irq(struct arm_pmu *cpu_pmu)
- {
- 	int i, irq, irqs;
- 	struct platform_device *pmu_device = cpu_pmu->plat_device;
--	struct pmu_enable pmu_enable;
- 
- 	irqs = min(pmu_device->num_resources, num_possible_cpus());
- 
- 	irq = platform_get_irq(pmu_device, 0);
- 	if (irq >= 0 && irq_is_percpu(irq)) {
--		pmu_enable.pmu = cpu_pmu;
--		pmu_enable.irq = irq;
--		on_each_cpu(cpu_pmu_disable_percpu_irq, &pmu_enable, 1);
-+		on_each_cpu(cpu_pmu_disable_percpu_irq, &irq, 1);
- 		free_percpu_irq(irq, &percpu_pmu);
- 	} else {
- 		for (i = 0; i < irqs; ++i) {
-@@ -128,7 +114,6 @@ static int cpu_pmu_request_irq(struct arm_pmu *cpu_pmu, irq_handler_t handler)
- {
- 	int i, err, irq, irqs;
- 	struct platform_device *pmu_device = cpu_pmu->plat_device;
--	struct pmu_enable pmu_enable;
- 
- 	if (!pmu_device)
- 		return -ENODEV;
-@@ -147,9 +132,7 @@ static int cpu_pmu_request_irq(struct arm_pmu *cpu_pmu, irq_handler_t handler)
- 				irq);
- 			return err;
- 		}
--		pmu_enable.pmu = cpu_pmu;
--		pmu_enable.irq = irq;
--		on_each_cpu(cpu_pmu_enable_percpu_irq, &pmu_enable, 1);
-+		on_each_cpu(cpu_pmu_enable_percpu_irq, &irq, 1);
- 	} else {
- 		for (i = 0; i < irqs; ++i) {
- 			err = 0;
+The example seems to be absolute.
 
+> +- mxs-max-reg-val: Maximum value of this register
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+What does this even mean? What's the format?
+
+Is this not implied by standard properties like regulator-max-microvolt?
+
+> +Optional regulator properties:
+> +- mxs-default-microvolt: initial voltage of the regulator
+
+Why is this necessary?
+
+Mark.
+
+> +
+> +Any regulator property defined as part of the core regulator
+> +binding, defined in regulator.txt, can also be used.
+> +
+> +Example:
+> +
+> +	power: power at 80044000 {
+> +		compatible = "fsl,imx28-power";
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +		reg = <0x80044000 0x2000>;
+> +
+> +		reg_vddio: regulator-vddio at 80044060 {
+> +			reg = <0x80044060>;
+> +			compatible = "fsl,mxs-regulator";
+> +			regulator-name = "vddio";
+> +			regulator-min-microvolt = <2800000>;
+> +			regulator-max-microvolt = <3600000>;
+> +			regulator-microvolt-offset = <80000>;
+> +			regulator-always-on;
+> +			mxs-max-reg-val = <0x10>;
+> +			mxs-default-microvolt = <3300000>;
+> +		};
+> +	};
+> +
+> -- 
+> 1.8.1.4
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
