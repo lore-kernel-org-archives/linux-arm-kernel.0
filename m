@@ -1,189 +1,63 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Tue,  9 Sep 2014 13:36:10 +0200
-Subject: [PATCH v4 9/9] ARM: exynos: Move to generic PM domain DT bindings
-In-Reply-To: <1410262570-22785-1-git-send-email-ulf.hansson@linaro.org>
-References: <1409838756-31963-1-git-send-email-ulf.hansson@linaro.org>
- <1410262570-22785-1-git-send-email-ulf.hansson@linaro.org>
-Message-ID: <1410262570-22785-10-git-send-email-ulf.hansson@linaro.org>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 9 Sep 2014 12:39:43 +0100
+Subject: [PATCH] ARM: perf: Don't sleep while atomic when enabling
+ per-cpu interrupts
+In-Reply-To: <1410200814-25878-1-git-send-email-sboyd@codeaurora.org>
+References: <1410200814-25878-1-git-send-email-sboyd@codeaurora.org>
+Message-ID: <20140909113943.GG1754@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Tomasz Figa <tomasz.figa@gmail.com>
+Hi Stephen,
 
-This patch moves Exynos PM domain code to use the new generic PM domain
-look-up framework introduced in previous patches, thus also allowing
-the new code to be compiled with CONFIG_ARCH_EXYNOS.
+On Mon, Sep 08, 2014 at 07:26:54PM +0100, Stephen Boyd wrote:
+> Rob Clark reports a sleeping while atomic bug when using perf.
+> 
+> BUG: sleeping function called from invalid context at ../kernel/locking/mutex.c:583
+> in_atomic(): 1, irqs_disabled(): 128, pid: 0, name: swapper/0
+> ------------[ cut here ]------------
+> WARNING: CPU: 2 PID: 4828 at ../kernel/locking/mutex.c:479 mutex_lock_nested+0x3a0/0x3e8()
+> DEBUG_LOCKS_WARN_ON(in_interrupt())
+> Modules linked in:
+> CPU: 2 PID: 4828 Comm: Xorg.bin Tainted: G        W      3.17.0-rc3-00234-gd535c45-dirty #819
+> [<c0216690>] (unwind_backtrace) from [<c0212174>] (show_stack+0x10/0x14)
+> [<c0212174>] (show_stack) from [<c0867cc0>] (dump_stack+0x98/0xb8)
+> [<c0867cc0>] (dump_stack) from [<c02492a4>] (warn_slowpath_common+0x70/0x8c)
+> [<c02492a4>] (warn_slowpath_common) from [<c02492f0>] (warn_slowpath_fmt+0x30/0x40)
+> [<c02492f0>] (warn_slowpath_fmt) from [<c086a3f8>] (mutex_lock_nested+0x3a0/0x3e8)
+> [<c086a3f8>] (mutex_lock_nested) from [<c0294d08>] (irq_find_host+0x20/0x9c)
+> [<c0294d08>] (irq_find_host) from [<c0769d50>] (of_irq_get+0x28/0x48)
+> [<c0769d50>] (of_irq_get) from [<c057d104>] (platform_get_irq+0x1c/0x8c)
+> [<c057d104>] (platform_get_irq) from [<c021a06c>] (cpu_pmu_enable_percpu_irq+0x14/0x38)
+> [<c021a06c>] (cpu_pmu_enable_percpu_irq) from [<c02b1634>] (flush_smp_call_function_queue+0x88/0x178)
+> [<c02b1634>] (flush_smp_call_function_queue) from [<c0214dc0>] (handle_IPI+0x88/0x160)
+> [<c0214dc0>] (handle_IPI) from [<c0208930>] (gic_handle_irq+0x64/0x68)
+> [<c0208930>] (gic_handle_irq) from [<c0212d04>] (__irq_svc+0x44/0x5c)
+> Exception stack(0xe63ddea0 to 0xe63ddee8)
+> dea0: 00000001 00000001 00000000 c2f3b200 c16db380 c032d4a0 e63ddf40 60010013
+> dec0: 00000000 001fbfd4 00000100 00000000 00000001 e63ddee8 c0284770 c02a2e30
+> dee0: 20010013 ffffffff
+> [<c0212d04>] (__irq_svc) from [<c02a2e30>] (ktime_get_ts64+0x1c8/0x200)
+> [<c02a2e30>] (ktime_get_ts64) from [<c032d4a0>] (poll_select_set_timeout+0x60/0xa8)
+> [<c032d4a0>] (poll_select_set_timeout) from [<c032df64>] (SyS_select+0xa8/0x118)
+> [<c032df64>] (SyS_select) from [<c020e8e0>] (ret_fast_syscall+0x0/0x48)
+> ---[ end trace 0bb583b46342da6f ]---
+> INFO: lockdep is turned off.
+> 
+> We don't really need to get the platform irq again when we're
+> enabling or disabling the per-cpu irq. Instead we can pass along
+> the two pieces of data we need to the enable/disable functions.
+> This should be slightly more efficient and also fix the
+> scheduling while atomic bug.
+> 
+> Reported-by: Rob Clark <robdclark@gmail.com>
+> Fixes: bbd64559376f "ARM: perf: support percpu irqs for the CPU PMU"
+> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 
-This patch was originally submitted by Tomasz Figa when he was employed
-by Samsung.
-http://marc.info/?l=linux-pm&m=139955336002083&w=2
+It's interesting that arm64 isn't affected by this problem, since we don't
+update the active_irqs mask for PPIs there and consequently just pass the
+irq instead of the cpu_pmu. I can't see why we actually need to update the
+active_irqs mask for arch/arm/, so could we remove that and follow arm64's
+lead instead? That would remove the need for a new struct definition too.
 
-Cc: linux-samsung-soc at vger.kernel.org
-Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
-Reviewed-by: Kevin Hilman <khilman@linaro.org>
----
- .../bindings/arm/exynos/power_domain.txt           | 13 ++--
- arch/arm/mach-exynos/pm_domains.c                  | 78 +---------------------
- kernel/power/Kconfig                               |  2 +-
- 3 files changed, 8 insertions(+), 85 deletions(-)
-
-diff --git a/Documentation/devicetree/bindings/arm/exynos/power_domain.txt b/Documentation/devicetree/bindings/arm/exynos/power_domain.txt
-index 8b4f7b7f..abde1ea 100644
---- a/Documentation/devicetree/bindings/arm/exynos/power_domain.txt
-+++ b/Documentation/devicetree/bindings/arm/exynos/power_domain.txt
-@@ -8,6 +8,8 @@ Required Properties:
-     * samsung,exynos4210-pd - for exynos4210 type power domain.
- - reg: physical base address of the controller and length of memory mapped
-     region.
-+- #power-domain-cells: number of cells in power domain specifier;
-+    must be 0.
- 
- Optional Properties:
- - clocks: List of clock handles. The parent clocks of the input clocks to the
-@@ -29,6 +31,7 @@ Example:
- 	lcd0: power-domain-lcd0 {
- 		compatible = "samsung,exynos4210-pd";
- 		reg = <0x10023C00 0x10>;
-+		#power-domain-cells = <0>;
- 	};
- 
- 	mfc_pd: power-domain at 10044060 {
-@@ -37,12 +40,8 @@ Example:
- 		clocks = <&clock CLK_FIN_PLL>, <&clock CLK_MOUT_SW_ACLK333>,
- 			<&clock CLK_MOUT_USER_ACLK333>;
- 		clock-names = "oscclk", "pclk0", "clk0";
-+		#power-domain-cells = <0>;
- 	};
- 
--Example of the node using power domain:
--
--	node {
--		/* ... */
--		samsung,power-domain = <&lcd0>;
--		/* ... */
--	};
-+See Documentation/devicetree/bindings/power/power_domain.txt for description
-+of consumer-side bindings.
-diff --git a/arch/arm/mach-exynos/pm_domains.c b/arch/arm/mach-exynos/pm_domains.c
-index fd76e1b..20f2671 100644
---- a/arch/arm/mach-exynos/pm_domains.c
-+++ b/arch/arm/mach-exynos/pm_domains.c
-@@ -105,78 +105,6 @@ static int exynos_pd_power_off(struct generic_pm_domain *domain)
- 	return exynos_pd_power(domain, false);
- }
- 
--static void exynos_add_device_to_domain(struct exynos_pm_domain *pd,
--					 struct device *dev)
--{
--	int ret;
--
--	dev_dbg(dev, "adding to power domain %s\n", pd->pd.name);
--
--	while (1) {
--		ret = pm_genpd_add_device(&pd->pd, dev);
--		if (ret != -EAGAIN)
--			break;
--		cond_resched();
--	}
--
--	pm_genpd_dev_need_restore(dev, true);
--}
--
--static void exynos_remove_device_from_domain(struct device *dev)
--{
--	struct generic_pm_domain *genpd = dev_to_genpd(dev);
--	int ret;
--
--	dev_dbg(dev, "removing from power domain %s\n", genpd->name);
--
--	while (1) {
--		ret = pm_genpd_remove_device(genpd, dev);
--		if (ret != -EAGAIN)
--			break;
--		cond_resched();
--	}
--}
--
--static void exynos_read_domain_from_dt(struct device *dev)
--{
--	struct platform_device *pd_pdev;
--	struct exynos_pm_domain *pd;
--	struct device_node *node;
--
--	node = of_parse_phandle(dev->of_node, "samsung,power-domain", 0);
--	if (!node)
--		return;
--	pd_pdev = of_find_device_by_node(node);
--	if (!pd_pdev)
--		return;
--	pd = platform_get_drvdata(pd_pdev);
--	exynos_add_device_to_domain(pd, dev);
--}
--
--static int exynos_pm_notifier_call(struct notifier_block *nb,
--				    unsigned long event, void *data)
--{
--	struct device *dev = data;
--
--	switch (event) {
--	case BUS_NOTIFY_BIND_DRIVER:
--		if (dev->of_node)
--			exynos_read_domain_from_dt(dev);
--
--		break;
--
--	case BUS_NOTIFY_UNBOUND_DRIVER:
--		exynos_remove_device_from_domain(dev);
--
--		break;
--	}
--	return NOTIFY_DONE;
--}
--
--static struct notifier_block platform_nb = {
--	.notifier_call = exynos_pm_notifier_call,
--};
--
- static __init int exynos4_pm_init_power_domain(void)
- {
- 	struct platform_device *pdev;
-@@ -202,7 +130,6 @@ static __init int exynos4_pm_init_power_domain(void)
- 		pd->base = of_iomap(np, 0);
- 		pd->pd.power_off = exynos_pd_power_off;
- 		pd->pd.power_on = exynos_pd_power_on;
--		pd->pd.of_node = np;
- 
- 		pd->oscclk = clk_get(dev, "oscclk");
- 		if (IS_ERR(pd->oscclk))
-@@ -228,15 +155,12 @@ static __init int exynos4_pm_init_power_domain(void)
- 			clk_put(pd->oscclk);
- 
- no_clk:
--		platform_set_drvdata(pdev, pd);
--
- 		on = __raw_readl(pd->base + 0x4) & INT_LOCAL_PWR_EN;
- 
- 		pm_genpd_init(&pd->pd, NULL, !on);
-+		of_genpd_add_provider_simple(np, &pd->pd);
- 	}
- 
--	bus_register_notifier(&platform_bus_type, &platform_nb);
--
- 	return 0;
- }
- arch_initcall(exynos4_pm_init_power_domain);
-diff --git a/kernel/power/Kconfig b/kernel/power/Kconfig
-index 897619b..bbef57f 100644
---- a/kernel/power/Kconfig
-+++ b/kernel/power/Kconfig
-@@ -304,7 +304,7 @@ config PM_GENERIC_DOMAINS_RUNTIME
- 
- config PM_GENERIC_DOMAINS_OF
- 	def_bool y
--	depends on PM_GENERIC_DOMAINS && OF && !ARCH_EXYNOS
-+	depends on PM_GENERIC_DOMAINS && OF
- 
- config CPU_PM
- 	bool
--- 
-1.9.1
+Will
