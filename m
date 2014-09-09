@@ -1,64 +1,79 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Tue, 9 Sep 2014 12:15:33 -0500
-Subject: [PATCH] ARM: OMAP5+: Reuse OMAP4 PM code for OMAP5 and DRA7
-Message-ID: <1410282933-30131-1-git-send-email-nm@ti.com>
+From: bhelgaas@google.com (Bjorn Helgaas)
+Date: Tue, 9 Sep 2014 11:17:00 -0600
+Subject: [PATCH v3 04/17] ARM64 / ACPI: Introduce early_param for "acpi"
+In-Reply-To: <1409583475-6978-5-git-send-email-hanjun.guo@linaro.org>
+References: <1409583475-6978-1-git-send-email-hanjun.guo@linaro.org>
+ <1409583475-6978-5-git-send-email-hanjun.guo@linaro.org>
+Message-ID: <CAErSpo6G89mkPgas8Wk3ofq__dUo5MKvBjob5D_w5_GaBJWH0w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-OMAP4, OMAP5 and DRA7 share a lot of common logic and data structures.
-These have been enabled in the previous patches, however, this also
-means that OMAP5 or DRA7 only builds also need to build OMAP4 logic.
-Update to reuse OMAP4 logic.
+On Mon, Sep 1, 2014 at 8:57 AM, Hanjun Guo <hanjun.guo@linaro.org> wrote:
+> From: Al Stone <al.stone@linaro.org>
+>
+> Introduce one early parameters "off" for "acpi" to disable ACPI on
+> ARM64.
 
-This fixes the 'undefined reference to 'omap4_pm_init_early'' in
-OMAP5 or DRA7 only builds.
+It might be worth mentioning the purpose of this in the changelog (and
+maybe the documentation).  I don't think this parameter is supported
+on ia64, and on x86 it seems like it's mostly used as a "fix" by
+Ubuntu users who consider the problem resolved when they find this
+parameter.  That just means we don't get a chance to fix the real
+underlying problem, so I'm not sure it's a real benefit to have the
+parameter.
 
-Fixes: 6af16a1dac5465c ("ARM: DRA7: Add hook in SoC initcalls to enable pm initialization")
-Fixes: 628ed4717000789 ("ARM: OMAP5: Add hook in SoC initcalls to enable pm initialization")
-Reported-by: Tony Lindgren <tony@atomide.com>
-Signed-off-by: Nishanth Menon <nm@ti.com>
----
-
-This fixes the regression with randconfig that Tony reported with
-omap-for-v3.18/soc branch.
-
-Tested with CONFIG_ARCH_OMAP2, CONFIG_ARCH_OMAP3, CONFIG_ARCH_OMAP4,
-CONFIG_SOC_OMAP5, CONFIG_SOC_AM33XX, CONFIG_SOC_AM43XX, CONFIG_SOC_DRA7XX
-only builds.
-
-
- arch/arm/mach-omap2/Makefile |   12 ++++++++----
- 1 file changed, 8 insertions(+), 4 deletions(-)
-
-diff --git a/arch/arm/mach-omap2/Makefile b/arch/arm/mach-omap2/Makefile
-index 69bbcba..d9dd99c 100644
---- a/arch/arm/mach-omap2/Makefile
-+++ b/arch/arm/mach-omap2/Makefile
-@@ -87,9 +87,10 @@ ifeq ($(CONFIG_PM),y)
- obj-$(CONFIG_ARCH_OMAP2)		+= pm24xx.o
- obj-$(CONFIG_ARCH_OMAP2)		+= sleep24xx.o
- obj-$(CONFIG_ARCH_OMAP3)		+= pm34xx.o sleep34xx.o
--obj-$(CONFIG_ARCH_OMAP4)		+= pm44xx.o omap-mpuss-lowpower.o
--obj-$(CONFIG_SOC_OMAP5)			+= omap-mpuss-lowpower.o
--obj-$(CONFIG_SOC_DRA7XX)		+= omap-mpuss-lowpower.o
-+omap-4-5-pm-common			=  pm44xx.o omap-mpuss-lowpower.o
-+obj-$(CONFIG_ARCH_OMAP4)		+= $(omap-4-5-pm-common)
-+obj-$(CONFIG_SOC_OMAP5)			+= $(omap-4-5-pm-common)
-+obj-$(CONFIG_SOC_DRA7XX)		+= $(omap-4-5-pm-common)
- obj-$(CONFIG_PM_DEBUG)			+= pm-debug.o
- 
- obj-$(CONFIG_POWER_AVS_OMAP)		+= sr_device.o
-@@ -102,7 +103,10 @@ endif
- 
- ifeq ($(CONFIG_CPU_IDLE),y)
- obj-$(CONFIG_ARCH_OMAP3)                += cpuidle34xx.o
--obj-$(CONFIG_ARCH_OMAP4)                += cpuidle44xx.o
-+omap-4-5-idle-common			=  cpuidle44xx.o
-+obj-$(CONFIG_ARCH_OMAP4)		+= $(omap-4-5-idle-common)
-+obj-$(CONFIG_SOC_OMAP5)			+= $(omap-4-5-idle-common)
-+obj-$(CONFIG_SOC_DRA7XX)		+= $(omap-4-5-idle-common)
- endif
- 
- # PRCM
--- 
-1.7.9.5
+> Signed-off-by: Al Stone <al.stone@linaro.org>
+> Signed-off-by: Graeme Gregory <graeme.gregory@linaro.org>
+> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+> ---
+>  Documentation/kernel-parameters.txt |    3 ++-
+>  arch/arm64/kernel/acpi.c            |   15 +++++++++++++++
+>  2 files changed, 17 insertions(+), 1 deletion(-)
+>
+> diff --git a/Documentation/kernel-parameters.txt b/Documentation/kernel-parameters.txt
+> index 5ae8608..9dfb1d8 100644
+> --- a/Documentation/kernel-parameters.txt
+> +++ b/Documentation/kernel-parameters.txt
+> @@ -165,7 +165,7 @@ multipliers 'Kilo', 'Mega', and 'Giga', equalling 2^10, 2^20, and 2^30
+>  bytes respectively. Such letter suffixes can also be entirely omitted.
+>
+>
+> -       acpi=           [HW,ACPI,X86]
+> +       acpi=           [HW,ACPI,X86,ARM]
+>                         Advanced Configuration and Power Interface
+>                         Format: { force | off | strict | noirq | rsdt }
+>                         force -- enable ACPI if default was off
+> @@ -175,6 +175,7 @@ bytes respectively. Such letter suffixes can also be entirely omitted.
+>                                 strictly ACPI specification compliant.
+>                         rsdt -- prefer RSDT over (default) XSDT
+>                         copy_dsdt -- copy DSDT to memory
+> +                       For ARM64, ONLY "acpi=off" is available.
+>
+>                         See also Documentation/power/runtime_pm.txt, pci=noacpi
+>
+> diff --git a/arch/arm64/kernel/acpi.c b/arch/arm64/kernel/acpi.c
+> index b6940a0..9547275 100644
+> --- a/arch/arm64/kernel/acpi.c
+> +++ b/arch/arm64/kernel/acpi.c
+> @@ -74,3 +74,18 @@ void __init acpi_boot_table_init(void)
+>   * TBD when ARM/ARM64 starts to support suspend...
+>   */
+>  int (*acpi_suspend_lowlevel)(void) = NULL;
+> +
+> +static int __init parse_acpi(char *arg)
+> +{
+> +       if (!arg)
+> +               return -EINVAL;
+> +
+> +       /* "acpi=off" disables both ACPI table parsing and interpreter */
+> +       if (strcmp(arg, "off") == 0)
+> +               disable_acpi();
+> +       else
+> +               return -EINVAL; /* Core will print when we return error */
+> +
+> +       return 0;
+> +}
+> +early_param("acpi", parse_acpi);
+> --
+> 1.7.9.5
+>
