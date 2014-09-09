@@ -1,49 +1,138 @@
-From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
-Date: Tue,  9 Sep 2014 16:06:52 +0200
-Subject: [PATCH v10 9/9] clk: Add docs about calling clk_put after
- clk_get_parent
-In-Reply-To: <1410271612-27389-1-git-send-email-tomeu.vizoso@collabora.com>
-References: <1410271329-26637-1-git-send-email-tomeu.vizoso@collabora.com>
- <1410271612-27389-1-git-send-email-tomeu.vizoso@collabora.com>
-Message-ID: <1410271612-27389-7-git-send-email-tomeu.vizoso@collabora.com>
+From: Liviu.Dudau@arm.com (Liviu Dudau)
+Date: Tue, 9 Sep 2014 15:11:22 +0100
+Subject: [PATCH v10 07/10] OF: Introduce helper function for getting PCI
+ domain_nr
+In-Reply-To: <540EC8CB.7010106@huawei.com>
+References: <1410184472-17630-1-git-send-email-Liviu.Dudau@arm.com>
+ <1410184472-17630-8-git-send-email-Liviu.Dudau@arm.com>
+ <CAL_JsqJi8k1Goc3UmXhuxf9v7=4gJrYG_Di7v574PxS8TsJaXw@mail.gmail.com>
+ <20140908145459.GO27864@e106497-lin.cambridge.arm.com>
+ <CAL_JsqJdGKDVwJOpPp19OkVPGzR7Zqv3nh+ONHHaYnPLYTYoYg@mail.gmail.com>
+ <20140908155931.GP27864@e106497-lin.cambridge.arm.com>
+ <540E960D.7080408@huawei.com>
+ <20140909084621.GS27864@e106497-lin.cambridge.arm.com>
+ <540EC8CB.7010106@huawei.com>
+Message-ID: <20140909141122.GY27864@e106497-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As otherwise the per-user clk will be leaked.
+On Tue, Sep 09, 2014 at 10:30:51AM +0100, Yijing Wang wrote:
+> On 2014/9/9 16:46, Liviu Dudau wrote:
+> > On Tue, Sep 09, 2014 at 06:54:21AM +0100, Yijing Wang wrote:
+> >>>>> on new requests. This function gets called quite a lot and I'm trying not to
+> >>>>> make it too heavy weight.
+> >>>>
+> >>>> Generally, nothing should be accessing the same DT value frequently.
+> >>>> It should get cached somewhere.
+> >>>>
+> >>>
+> >>> The problem appears for DTs that don't have the pci-domain info. Then the cached
+> >>> value is left at the default non-valid value and attempts to rescan the DT will
+> >>> be made every time the function is called.
+> >>>
+> >>>> I don't really understand how domains are used so it's hard to provide
+> >>>> a recommendation here. Do domains even belong in the DT?
+> >>>
+> >>> ACPI calls them segments and the way Bjorn explained it to me at some moment was
+> >>> that it was an attempt to split up a bus in different groups (or alternatively,
+> >>> merge a few busses together). To be honest I haven't seen systems where the domain
+> >>> is anything other than zero, but JasonG (or maybe Benjamin) were floating an
+> >>> idea of using the domain number to identify physical slots.
+> >>
+> >> PCI domain(or named segment) is provided by firmware, in ACPI system, we evaluated it
+> >> by method "_SEG". in IA64 with ACPI, PCI hostbridge driver retrieves the domain from ACPI,
+> >> if it's absent, the default domain is zero. So I wonder why in DTS, if it's absent, we get
+> >> a auto increment domain value.
+> > 
+> > Because you can have more than one hostbridge (rare, but not impossible) and unless you
+> > want to join the two segments, you might want to give it a different domain.
+> 
+> OK. Sorry, I have one last question, because domain will be used to calculate the address used to
+> access PCI hardware config registers. So if DTS file doesn't report the domain, how do we know
+> we would access the right registers when we use the auto increment domain vaule ?
 
-Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
----
- drivers/clk/clk.c   | 3 ++-
- include/linux/clk.h | 3 ++-
- 2 files changed, 4 insertions(+), 2 deletions(-)
+That's a good question and sides with Arnd's suggestion to try to mandate the presence of the PCI
+domain in the DTS. However, by grepping through the source code, it looks like the architectures
+that use the domain number for reading config registers (x86-based) are non-DT architectures,
+while DT-aware arches seem to ignore the domain number except when printing out messages. Is that
+another confirmation that most DT-aware architectures have only run with domain_nr = 0?
 
-diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-index 1ad8cb7..8ac8543 100644
---- a/drivers/clk/clk.c
-+++ b/drivers/clk/clk.c
-@@ -1784,7 +1784,8 @@ EXPORT_SYMBOL_GPL(clk_provider_get_parent);
-  * clk_get_parent - return the parent of a clk
-  * @clk_user: the clk whose parent gets returned
-  *
-- * Simply returns clk->parent.  Returns NULL if clk is NULL.
-+ * Simply returns clk->parent.  Returns NULL if clk is NULL. Caller must call
-+ * clk_put() to release the returned struct clk.
-  */
- struct clk *clk_get_parent(struct clk *clk_user)
- {
-diff --git a/include/linux/clk.h b/include/linux/clk.h
-index 066b100..4f54952 100644
---- a/include/linux/clk.h
-+++ b/include/linux/clk.h
-@@ -306,7 +306,8 @@ int clk_set_parent(struct clk *clk, struct clk *parent);
-  * @clk: clock source
-  *
-  * Returns struct clk corresponding to parent clock source, or
-- * valid IS_ERR() condition containing errno.
-+ * valid IS_ERR() condition containing errno. Caller must call
-+ * clk_put() to release the returned struct clk.
-  */
- struct clk *clk_get_parent(struct clk *clk);
- 
+
+> Has there a mechanism to make sure system can access the correct registers by the domain ?
+
+Not as such if you look with x86 glasses. With the exception of powerpc all other architecures
+seem to happily assume domain_nr = 0 and ignore it in the computation of configuration registers
+offsets.
+
+Best regards,
+Liviu
+
+> 
+> Thanks!
+> Yijing.
+> 
+> > 
+> > Best regards,
+> > Liviu
+> > 
+> >>
+> >> PCI get domain by ACPI "_SEG" in IA64(drivers/acpi/pci_root.c)
+> >> ......
+> >> 	status = acpi_evaluate_integer(handle, METHOD_NAME__SEG, NULL,
+> >> 				       &segment);
+> >> 	if (ACPI_FAILURE(status) && status != AE_NOT_FOUND) {
+> >> 		dev_err(&device->dev,  "can't evaluate _SEG\n");
+> >> 		result = -ENODEV;
+> >> 		goto end;
+> >> 	}
+> >> .......
+> >>
+> >> Thanks!
+> >> Yijing.
+> >>
+> >>>
+> >>>> This function
+> >>>> is just a weird mixture of data retrieval and allocation. I think you
+> >>>> need to separate it into 2 functions.
+> >>>
+> >>> It is meant to do allocation with the retrieval being a short-cut (or fine
+> >>> control if you want).
+> >>>
+> >>> I need to think a bit more for a better solution.
+> >>>
+> >>> Best regards,
+> >>> Liviu
+> >>>
+> >>>>
+> >>>> Rob
+> >>>>
+> >>>
+> >>
+> >>
+> >> -- 
+> >> Thanks!
+> >> Yijing
+> >>
+> >>
+> > 
+> 
+> 
+> -- 
+> Thanks!
+> Yijing
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
+
 -- 
-1.9.3
+====================
+| I would like to |
+| fix the world,  |
+| but they're not |
+| giving me the   |
+ \ source code!  /
+  ---------------
+    ?\_(?)_/?
