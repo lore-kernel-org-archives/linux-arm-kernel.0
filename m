@@ -1,59 +1,54 @@
-From: m-karicheri2@ti.com (Murali Karicheri)
-Date: Tue, 9 Sep 2014 13:09:27 -0400
-Subject: [PATCH v2] spi: davinci: add support for adding delay between
- word's transmission
-In-Reply-To: <20140909165555.GD2601@sirena.org.uk>
-References: <1410278851-10783-1-git-send-email-grygorii.strashko@ti.com>
- <20140909165555.GD2601@sirena.org.uk>
-Message-ID: <540F3447.3020609@ti.com>
+From: abrestic@chromium.org (Andrew Bresticker)
+Date: Tue, 9 Sep 2014 10:09:50 -0700
+Subject: [PATCH v3 0/9] Tegra xHCI support
+In-Reply-To: <CAAObsKAXO-pBtqd1jNj8faXqpE+5Wb0RFzPp+jn9FH0B=dHq8g@mail.gmail.com>
+References: <1409693701-16520-1-git-send-email-abrestic@chromium.org>
+ <CAAObsKAYqpJMJnxSMxhkkRtnoEwLwgUa1y7ij5ZHvHf1jRok+Q@mail.gmail.com>
+ <CAL1qeaF7U9aoBp5gQPS=r+pe6krKmXdP1qak2gjhNqQMoHFB8A@mail.gmail.com>
+ <CAAObsKAXO-pBtqd1jNj8faXqpE+5Wb0RFzPp+jn9FH0B=dHq8g@mail.gmail.com>
+Message-ID: <CAL1qeaFUaqs9SDv1p+dYDYLn9hwDxdTQ=K-wo+Qa5+KGY=U47w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/09/2014 12:55 PM, Mark Brown wrote:
-> On Tue, Sep 09, 2014 at 07:07:31PM +0300, Grygorii Strashko wrote:
+On Tue, Sep 9, 2014 at 1:21 AM, Tomeu Vizoso <tomeu@tomeuvizoso.net> wrote:
+> On 8 September 2014 18:22, Andrew Bresticker <abrestic@chromium.org> wrote:
+>> On Mon, Sep 8, 2014 at 8:34 AM, Tomeu Vizoso <tomeu@tomeuvizoso.net> wrote:
+>>> On 2 September 2014 23:34, Andrew Bresticker <abrestic@chromium.org> wrote:
+>>>>
+>>>> Tested on Venice2, Jetson TK1, and Big with a variety of USB2.0 and
+>>>> USB3.0 memory sticks and ethernet dongles using controller firmware
+>>>> recently posted by Andrew Chew [2].
+>>>
+>>> I have had mixed results when testing this on a Jetson TK1 board. Of 8
+>>> USB devices I tested with, about half where probed correctly, but the
+>>> other half repeatedly fail in hub_port_init because in the GET_STATUS
+>>> right after the reset, the C_PORT_CONNECTION bit is set.
+>>>
+>>> I don't see any correlation between the failure and the kind of usb
+>>> device, but I don't have much experience with USB implementations
+>>> either.
+>>
+>> Hmm... I haven't seen that before.  Which particular devices were you using?
 >
->> - ti,spi-c2t-delay: Chip-select-active-to-transmit-start delay
->> 	(SPIDELAY.C2TDELAY)
+> Here they are:
 >
->> - ti,spi-t2c-delay: Transmit-end-to-chip-select-inactive delay
->> 	(SPIDELAY.T2CDELAY)
+> work:
 >
-> Now I look at these they look very much like the standard delay feature
-> that the SPI subsystem has already - are they?
-Mark,
+> Genius keyboard: 05d5:6782
+> Logitech mouse: 046d:c06a
+> Denver MP3 player: 10d6:1100
+> Atheros Bluetooth dongle: 0cf3:3005
+>
+> don't work:
+>
+> MCS7830 ethernet dongle: 9710:7830
+> Genesys Logic hub: 05e3:0608
+> Alcor flash drive: 058f:6387
+> JMicron SATA bridge: 152d:2329
 
-As Grygorii explained in previous postings (reproduced below), these 
-delays are handled by the SPI hardware on Keystone and affect the delay 
-between successive word tranmssion and has nothing to do with the delay 
-you are talking about. Isn't the standard delay you mention here is 
-between successive packets send down to the lower level driver (in this 
-case spi-davinci.c) ?
+I have the same SATA bridge and it is enumerating fine for me, but
+I've ordered the hub as well and will check that out.
 
-Murali
-
-Below is timing diagram which shows, in general, how these new 
-parameters affect on words transmission over Keystone/Davinci SPI bus:
-
-              +-+ +-+ +-+ +-+ +-+                           +-+ +-+ +-+
-SPI_CLK      | | | | | | | | | |                           | | | | | |
-   +----------+ +-+ +-+ +-+ +-+ +---------------------------+ +-+ +-+ +-
-
-SPI_SOMI/SIMO+-----------------+                           +-----------
-   +----------+ word1           +---------------------------+word2
-              +-----------------+                           +-----------
-                                           WDELAY
-                                          <--------->
-                                         +           +
-SPI_CS                                  |           |
-   +----+                                +-----------+
-        |                                |           |
-        +-----+-----------------+--------+           +-----+------------
-        |     |                 |        |           |     |
-        +     +                 +        |           +     +
-         <--->                   <------>             <--->
-        C2TDELAY                 T2CDELAY            C2TDELAY
-
-Where:
-         WDELAY - Delay in between transmissions
-	C2TDELAY - Chip-select-active-to-transmit-start-delay
-	T2CDELAY - Transmit-end-to-chip-select-inactive-delay
+Did you have any other patches applied when testing these?  Were you
+using either SATA or PCIe at the same time?  Just trying to figure out
+if there's anything else different between our setups.
