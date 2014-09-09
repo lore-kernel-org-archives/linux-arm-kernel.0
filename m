@@ -1,59 +1,45 @@
-From: jcm@redhat.com (Jon Masters)
-Date: Tue, 9 Sep 2014 12:44:45 -0400 (EDT)
-Subject: [PATCH v3 02/17] ARM64 / ACPI: Get RSDP and ACPI boot-time tables
-In-Reply-To: <540F2DCF.1010104@redhat.com>
-References: <1409583475-6978-1-git-send-email-hanjun.guo@linaro.org>
- <1409583475-6978-3-git-send-email-hanjun.guo@linaro.org>
- <20140909162648.GE2910@arm.com> <540F2DCF.1010104@redhat.com>
-Message-ID: <1672724278.9306589.1410281085602.JavaMail.zimbra@zmail15.collab.prod.int.phx2.redhat.com>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Tue,  9 Sep 2014 18:50:57 +0200
+Subject: [PATCH v3 0/7] arm: mediatek: Add more basic features
+Message-ID: <1410281464-9587-1-git-send-email-matthias.bgg@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-One of the ARM guys pointed out the cache issue before I had meant to send this note then. Sorry.
+This patch set adds some minor changes to the Mediatek mt6589 support.
+
+Features are low-level debugging on the mt6589, the addition to the
+"make dtbs" and multi_v7_defconfig, earlyprintk suppport, as well as a small
+changes in the DTS files.
+
+The patch set is based on v3.17-rc1
+
+Changes for v3:
+- drop quirk to enable ARM arch timer
+
+Changes for v2:
+- rebased on v3.17-rc1
+- add patch for the compatible property of aquaris5
+- add patch setting GIC compatible string to new "arm,cortex-a7-gic"
+- set ARM arch timer frequency in DTS
+
+---
+
+Matthias Brugger (7):
+  arm: dts: Build dtb for Mediatek board
+  arm: multi_v7_defconfig: Enable Mediatek platform
+  arm: dts: mt6589: Fix typo in GIC unit address
+  arm: mediatek: Add earlyprintk support for mt6589
+  arm: dts: mt6589-aquaris5: Add boot argument earlyprintk
+  arm: dts: mediatek: Add compatible property for aquaris5
+  arm: dts: mt6589: Change compatible string for GIC
+
+ Documentation/devicetree/bindings/arm/mediatek.txt |  6 ++++++
+ arch/arm/Kconfig.debug                             | 10 ++++++++++
+ arch/arm/boot/dts/Makefile                         |  1 +
+ arch/arm/boot/dts/mt6589-aquaris5.dts              |  5 +++++
+ arch/arm/boot/dts/mt6589.dtsi                      |  4 ++--
+ arch/arm/configs/multi_v7_defconfig                |  1 +
+ 6 files changed, 25 insertions(+), 2 deletions(-)
 
 -- 
-Computer Architect | Sent from my #ARM Powered Mobile device
-
-On Sep 9, 2014 12:41 PM, Jon Masters <jcm@redhat.com> wrote:
->
-> On 09/09/2014 12:26 PM, Catalin Marinas wrote: 
-> > On Mon, Sep 01, 2014 at 03:On 09/09/2014 12:26 PM, Catalin Marinas wrote:
-> On Mon, Sep 01, 2014 at 03:57:40PM +0100, Hanjun Guo wrote:
->> diff --git a/arch/arm64/include/asm/acenv.h b/arch/arm64/include/asm/acenv.h
->> new file mode 100644
->> index 0000000..3899ee6
->> --- /dev/null
->> +++ b/arch/arm64/include/asm/acenv.h
->> @@ -0,0 +1,18 @@
->> +/*
->> + * ARM64 specific ACPICA environments and implementation
->> + *
->> + * Copyright (C) 2014, Linaro Ltd.
->> + *   Author: Hanjun Guo <hanjun.guo@linaro.org>
->> + *   Author: Graeme Gregory <graeme.gregory@linaro.org>
->> + *
->> + * This program is free software; you can redistribute it and/or modify
->> + * it under the terms of the GNU General Public License version 2 as
->> + * published by the Free Software Foundation.
->> + */
->> +
->> +#ifndef _ASM_ACENV_H
->> +#define _ASM_ACENV_H
->> +
->> +#define ACPI_FLUSH_CPU_CACHE() WARN_ONCE(1, "Not currently supported on ARM64")
-> 
-> Does this mean that it will be supported at some point? Looking at the
-> places where this function is called, I don't really see how this would
-> ever work on ARM. Which means that we add such macro just to be able to
-> compile code that would never be used on arm64. I would rather see the
-> relevant ACPI files only compiled on x86/IA-64 rather than arm64.
-
-That specific cache behavior is a part of e.g. ACPI C3 state support
-(e.g. ACPI5.1 8.1.4 Processor Power State C3). As you note, it's not
-going to work on 64-bit ARM as it does on x86, but it's optional to
-implement C3 and early 64-bit ARM systems should not report Wbindv flags
-in the FADT anyway. They can also set FADT.P_LVL3_LAT > 1000, which has
-the effect of disabling C3 support, while also allowing for use of _CST
-objects to define more flexible C-States later on.
-
-Jon.
+1.9.1
