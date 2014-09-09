@@ -1,85 +1,66 @@
 From: jcm@redhat.com (Jon Masters)
-Date: Tue, 09 Sep 2014 01:34:45 -0400
+Date: Tue, 09 Sep 2014 01:44:00 -0400
 Subject: [PATCH v3 09/17] ARM64 / ACPI: Parse MADT for SMP initialization
-In-Reply-To: <540E8C1F.5060802@linaro.org>
+In-Reply-To: <540E88A2.1000606@linaro.org>
 References: <1409583475-6978-1-git-send-email-hanjun.guo@linaro.org>
  <1409583475-6978-10-git-send-email-hanjun.guo@linaro.org>
- <20140903172138.GG1824@e102568-lin.cambridge.arm.com>
- <5408854B.9010703@linaro.org> <540E8212.8090304@redhat.com>
- <540E8C1F.5060802@linaro.org>
-Message-ID: <540E9175.1070807@redhat.com>
+ <540E80BD.20801@redhat.com> <540E88A2.1000606@linaro.org>
+Message-ID: <540E93A0.4040306@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/09/2014 01:11 AM, Hanjun Guo wrote:
-> On 2014?09?09? 12:29, Jon Masters wrote:
->> Hi Hanjun, Lorenzo,
-> 
+On 09/09/2014 12:57 AM, Hanjun Guo wrote:
 > Hi Jon,
 > 
+> On 2014?09?09? 12:23, Jon Masters wrote:
+>> On 09/01/2014 10:57 AM, Hanjun Guo wrote:
+>>> MADT contains the information for MPIDR which is essential for
+>>> SMP initialization, parse the GIC cpu interface structures to
+>>> get the MPIDR value and map it to cpu_logical_map(), and add
+>>> enabled cpu with valid MPIDR into cpu_possible_map.
+>>>
+>>> ACPI 5.1 only has two explicit methods to boot up SMP, PSCI and
+>>> Parking protocol, but the Parking protocol is only specified for
+>>> ARMv7 now, so make PSCI as the only way for the SMP boot protocol
+>>> before some updates for the ACPI spec or the Parking protocol spec.
+>>> +	/* CPU 0 was already initialized */
+>>> +	if (cpu) {
+>>> +		if (cpu_ops[cpu]->cpu_init(NULL, cpu))
+>>> +			return -EOPNOTSUPP;
+>>> +
+>>> +		/* map the logical cpu id to cpu MPIDR */
+>>> +		cpu_logical_map(cpu) = mpidr;
+>> I'm not sure it's worth noting in a comment or just in the dialogue that
+>> none of these MPIDR values is literally the value in the MPIDR. Linux
+>> doesn't store that anyway (even in the cpu_logical_map), since it is
+>> pre-filtered against MPIDR_HWID_BITMASK to remove the non-affinity level
+>> bits. And since the ACPI5.1 specification requires that non-affinity
+>> bits be zero everything works. But it relies upon this assumption so it
+>> might be worth explicitly masking out the bits when making the call into:
 >>
->> Resending due to my mail client removing list CCs...sorry about that.
+>>        acpi_map_gic_cpu_interface(processor->arm_mpidr,
+>>                processor->flags & ACPI_MADT_ENABLED);
 >>
->> On 09/04/2014 11:29 AM, Hanjun Guo wrote:
->>
->>>>> +	} else {
->>>>> +		/* Fist GICC entry must be BSP as ACPI spec said */
->>>> s/Fist/First/
->>>>
->>>>> +		if  (cpu_logical_map(0) != mpidr) {
->>>>> +			pr_err("First GICC entry is not BSP for MPIDR 0x%llx\n",
->>>>> +			       mpidr);
->>>>> +			return -EINVAL;
->>>>> +		}
->>>> Interesting, this means that if I want to change the boot CPU I have to
->>>> recompile the ACPI tables. Is that really true ?
->> Well, the ACPI5.1 specification does require that the PEs (cores) be
->> listed in a very specific order, with the boot CPU first, and then a
->> precisely defined sequence of interleaving of any possible SMT threads
->> with other cores. So I think you would in practice update your tables.
+>> During the parsing of the processor object's MPIDR value.
 > 
-> Thanks for the clarify.
-
-No problem :) I'm trying to go through the various threads and ensure
-various things are documented in the record. I'm skipping (for now)
-notes on e.g. CPU cache flush behavior because we're not pushing for C3
-support (or really any runtime power management) in the first round.
-
->>
->>>>> +	/*
->>>>> +	 * ACPI 5.1 only has two explicit methods to boot up SMP,
->>>>> +	 * PSCI and Parking protocol, but the Parking protocol is
->>>>> +	 * only specified for ARMv7 now, so make PSCI as the only
->>>>> +	 * way for the SMP boot protocol before some updates for
->>>>> +	 * the ACPI spec or the Parking protocol spec.
->>>>> +	 */
->> The Parking Protocol may be updated for a (limited) number of platforms
->> that may use it in the early days. The preferred option (as described in
->> the SBBR) is to use PSCI when at all possible. Some implementations of
->> the architecture may not be able to use PSCI for MP-Boot. Thus while
->> there may be some limited early use of the parking protocol (including
->> while PSCI firmware is being finalized during bringup activities), it
->> will ultimately be completely replaced by PSCI based boot over time.
+> Yes, I agree with you. When I tested this patch set on our
+> ARM64 platform, I found this problem too. some firmware
+> will just present the real MPIDR value to OS which some reserved
+> bit set to 1, and it will lead to some logic problem in this patch.
+> (actually firmware didn't obey with ACPI spec)
 > 
-> Thank you for the clarify again :)
+> I had updated the patch with:
 > 
-> Will Parking Protocol be upstreamed?
+> +	acpi_map_gic_cpu_interface(processor->arm_mpidr & MPIDR_HWID_BITMASK,
+> +		processor->flags & ACPI_MADT_ENABLED);
+> 
+> and then the problem was gone :)
 
-Yes, a version against v8 will be posted (perhaps in the next few days),
-but we should not wait for it in this general discussion. The default in
-v8 will be PSCI other than for early bringup, or for an architecture
-implementation that cannot use PSCI, which is rare.
-
-(When we wrote the SBBR we had many discussions about this. A goal is to
-be fair to everyone - those rare instances where PSCI is not possible
-must be covered by a specification, but there must be a strong
-preference established for a preferred course over the longer term)
-
-> If yes, I think we can update the
-> comments when Parking Protocol driver upstreamed.
-
-Indeed so. For the moment, the logic you have in your patch to fail
-setup in the case that there is no defined PSCI cpu ops for the
-associated processor is fine IMHO.
+Did I miss an updated patch posting then? It is possible...I was keeping
+out of this thread for "obvious" reasons (I'm somewhat biased in favor
+of ACPI on 64-bit ARM server platforms and thus not objective in all
+cases...so I am confining my feedback to technical specifics). But it's
+necessary that there be a little more discussion here. I've got a couple
+of requests into various vendors to get more vocal too.
 
 Jon.
