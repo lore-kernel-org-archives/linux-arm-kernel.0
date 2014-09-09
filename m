@@ -1,27 +1,59 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Tue, 9 Sep 2014 11:39:20 +0200
-Subject: [PATCH v2 0/6] rtc: at91sam9: add DT support
-In-Reply-To: <1410255035-26775-1-git-send-email-boris.brezillon@free-electrons.com>
-References: <1410255035-26775-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <20140909093920.GI14623@piout.net>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Tue, 9 Sep 2014 11:43:39 +0200
+Subject: [PATCH] GICv3: Fixing 32 bit compatibility
+In-Reply-To: <20140909092653.GC4588@rric.localhost>
+References: <1410185480-5153-1-git-send-email-rric@kernel.org>
+ <20140909080042.GO23009@pengutronix.de>
+ <20140909091201.GA4527@rric.localhost>
+ <20140909091912.GQ23009@pengutronix.de>
+ <20140909092653.GC4588@rric.localhost>
+Message-ID: <20140909094339.GR23009@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/09/2014 at 11:30:29 +0200, Boris Brezillon wrote :
-> Hello,
+On Tue, Sep 09, 2014 at 11:26:53AM +0200, Robert Richter wrote:
+> On 09.09.14 11:19:12, Uwe Kleine-K?nig wrote:
+> > On Tue, Sep 09, 2014 at 11:12:01AM +0200, Robert Richter wrote:
+> > > On 09.09.14 10:00:42, Uwe Kleine-K?nig wrote:
+> > > > On Mon, Sep 08, 2014 at 04:11:19PM +0200, Robert Richter wrote:
+> > > 
+> > > > > @@ -479,7 +479,7 @@ static void gic_raise_softirq(const struct cpumask *mask, unsigned int irq)
+> > > > >     smp_wmb();
+> > > > >  
+> > > > >     for_each_cpu_mask(cpu, *mask) {
+> > > > > -           u64 cluster_id = cpu_logical_map(cpu) & ~0xffUL;
+> > > > > +           u64 cluster_id = cpu_logical_map(cpu) & ~0xffULL;
+> > > > This doesn't change anything, does it?
+> > > 
+> > > It does, not in 64 bit but in 32 bit there unsigned long is 32
+> > > bit. So, bit masks are broken if you compile a 32 bit kernel.
+> > Can you make an example where the result actually changes?
 > 
-> This patch series adds DT support to the atmel at91sam9 RTC driver.
-> 
-> It also removes any machine specific inclusions to prepare the migration
-> to multi platform kernel support, and retain the slow clock to prevent
-> the CCF from disabling it at the end of boot.
-> 
+> Upper 32 bits will be cleared above.
+ah, I missed the ~ while thinking about the difference.
 
-Whole series is:
+> > > > I wonder if it would be cleaner to use (u64)0xff here.
+> > > 
+> > > No, that's ULL for. This is commonly used in x86 too.
+> > I don't care much here, but I'd say ULL is to force an unsigned long
+> > long. If you want to make it obvious that you want a 64bit value, a cast
+> > to u64 makes this more clear.
+> 
+> ULL is no cast at all.
+That's irrelevant here if it's a cast or not. It makes the constant be
+an unsigned long long one.
 
-Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+If you want an unsigned long long value, use ULL (or a cast to unsigned
+long long if the value permits), if you want an u64 use a cast to u64.
+
+Probably it doesn't make sense to continue to argue here. The type of
+cpu_logical_map(cpu) varies per architecture but is always <= 64 bits
+wide and IIRC unsigned long long is guaranteed to be >= 64 bits wide so
+everything is fine with your patch today.
+
+Best regards
+Uwe
 
 -- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
