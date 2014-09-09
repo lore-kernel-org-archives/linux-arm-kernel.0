@@ -1,175 +1,118 @@
-From: alex.bennee@linaro.org (=?UTF-8?q?Alex=20Benn=C3=A9e?=)
-Date: Tue,  9 Sep 2014 17:27:19 +0100
-Subject: [PATCH 2/2] KVM: fix api documentation of KVM_GET_EMULATED_CPUID
-In-Reply-To: <1410280039-2823-1-git-send-email-alex.bennee@linaro.org>
-References: <1410280039-2823-1-git-send-email-alex.bennee@linaro.org>
-Message-ID: <1410280039-2823-3-git-send-email-alex.bennee@linaro.org>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Tue, 9 Sep 2014 12:29:58 -0400
+Subject: [PATCH v2 5/8] net: pxa168_eth: get and set the mac address on
+ the Ethernet controller
+In-Reply-To: <1410273848-24663-6-git-send-email-antoine.tenart@free-electrons.com>
+References: <1410273848-24663-1-git-send-email-antoine.tenart@free-electrons.com>
+ <1410273848-24663-6-git-send-email-antoine.tenart@free-electrons.com>
+Message-ID: <20140909162958.GS30828@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It looks like when this was initially merged it got accidentally included
-in the following section. I've just moved it back in the correct section
-and re-numbered it as other ioctls have been added since.
+On Tue, Sep 09, 2014 at 04:44:05PM +0200, Antoine Tenart wrote:
+> When changing the MAC address, in addition to updating the dev_addr in
+> the net_device structure, this patch also update the MAC address
+> registers (high and low) of the Ethernet controller with the new MAC.
+> The address stored in these registers is used for IEEE 802.3x Ethernet
+> flow control, which is already enabled.
+> 
+> This patch also tries reading the MAC address stored in these registers
+> when probing the driver, to use the MAC address set by the bootloader
+> and avoid using a random one.
 
-Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>
+Hmm, the wording here seems odd.  I think the preference should be:
 
-diff --git a/Documentation/virtual/kvm/api.txt b/Documentation/virtual/kvm/api.txt
-index 723d3f3..60c1582 100644
---- a/Documentation/virtual/kvm/api.txt
-+++ b/Documentation/virtual/kvm/api.txt
-@@ -2620,6 +2620,76 @@ When debug events exit the main run loop with the reason
- KVM_EXIT_DEBUG with the kvm_debug_exit_arch part of the kvm_run
- structure containing architecture specific debug information.
- 
-+4.88 KVM_GET_EMULATED_CPUID
-+
-+Capability: KVM_CAP_EXT_EMUL_CPUID
-+Architectures: x86
-+Type: system ioctl
-+Parameters: struct kvm_cpuid2 (in/out)
-+Returns: 0 on success, -1 on error
-+
-+struct kvm_cpuid2 {
-+	__u32 nent;
-+	__u32 flags;
-+	struct kvm_cpuid_entry2 entries[0];
-+};
-+
-+The member 'flags' is used for passing flags from userspace.
-+
-+#define KVM_CPUID_FLAG_SIGNIFCANT_INDEX		BIT(0)
-+#define KVM_CPUID_FLAG_STATEFUL_FUNC		BIT(1)
-+#define KVM_CPUID_FLAG_STATE_READ_NEXT		BIT(2)
-+
-+struct kvm_cpuid_entry2 {
-+	__u32 function;
-+	__u32 index;
-+	__u32 flags;
-+	__u32 eax;
-+	__u32 ebx;
-+	__u32 ecx;
-+	__u32 edx;
-+	__u32 padding[3];
-+};
-+
-+This ioctl returns x86 cpuid features which are emulated by
-+kvm.Userspace can use the information returned by this ioctl to query
-+which features are emulated by kvm instead of being present natively.
-+
-+Userspace invokes KVM_GET_EMULATED_CPUID by passing a kvm_cpuid2
-+structure with the 'nent' field indicating the number of entries in
-+the variable-size array 'entries'. If the number of entries is too low
-+to describe the cpu capabilities, an error (E2BIG) is returned. If the
-+number is too high, the 'nent' field is adjusted and an error (ENOMEM)
-+is returned. If the number is just right, the 'nent' field is adjusted
-+to the number of valid entries in the 'entries' array, which is then
-+filled.
-+
-+The entries returned are the set CPUID bits of the respective features
-+which kvm emulates, as returned by the CPUID instruction, with unknown
-+or unsupported feature bits cleared.
-+
-+Features like x2apic, for example, may not be present in the host cpu
-+but are exposed by kvm in KVM_GET_SUPPORTED_CPUID because they can be
-+emulated efficiently and thus not included here.
-+
-+The fields in each entry are defined as follows:
-+
-+  function: the eax value used to obtain the entry
-+  index: the ecx value used to obtain the entry (for entries that are
-+         affected by ecx)
-+  flags: an OR of zero or more of the following:
-+        KVM_CPUID_FLAG_SIGNIFCANT_INDEX:
-+           if the index field is valid
-+        KVM_CPUID_FLAG_STATEFUL_FUNC:
-+           if cpuid for this function returns different values for successive
-+           invocations; there will be several entries with the same function,
-+           all with this flag set
-+        KVM_CPUID_FLAG_STATE_READ_NEXT:
-+           for KVM_CPUID_FLAG_STATEFUL_FUNC entries, set if this entry is
-+           the first entry to be read by a cpu
-+   eax, ebx, ecx, edx: the values returned by the cpuid instruction for
-+         this function/index combination
-+
- 5. The kvm_run structure
- ------------------------
- 
-@@ -2918,76 +2988,6 @@ and usually define the validity of a groups of registers. (e.g. one bit
- };
- 
- 
--4.81 KVM_GET_EMULATED_CPUID
--
--Capability: KVM_CAP_EXT_EMUL_CPUID
--Architectures: x86
--Type: system ioctl
--Parameters: struct kvm_cpuid2 (in/out)
--Returns: 0 on success, -1 on error
--
--struct kvm_cpuid2 {
--	__u32 nent;
--	__u32 flags;
--	struct kvm_cpuid_entry2 entries[0];
--};
--
--The member 'flags' is used for passing flags from userspace.
--
--#define KVM_CPUID_FLAG_SIGNIFCANT_INDEX		BIT(0)
--#define KVM_CPUID_FLAG_STATEFUL_FUNC		BIT(1)
--#define KVM_CPUID_FLAG_STATE_READ_NEXT		BIT(2)
--
--struct kvm_cpuid_entry2 {
--	__u32 function;
--	__u32 index;
--	__u32 flags;
--	__u32 eax;
--	__u32 ebx;
--	__u32 ecx;
--	__u32 edx;
--	__u32 padding[3];
--};
--
--This ioctl returns x86 cpuid features which are emulated by
--kvm.Userspace can use the information returned by this ioctl to query
--which features are emulated by kvm instead of being present natively.
--
--Userspace invokes KVM_GET_EMULATED_CPUID by passing a kvm_cpuid2
--structure with the 'nent' field indicating the number of entries in
--the variable-size array 'entries'. If the number of entries is too low
--to describe the cpu capabilities, an error (E2BIG) is returned. If the
--number is too high, the 'nent' field is adjusted and an error (ENOMEM)
--is returned. If the number is just right, the 'nent' field is adjusted
--to the number of valid entries in the 'entries' array, which is then
--filled.
--
--The entries returned are the set CPUID bits of the respective features
--which kvm emulates, as returned by the CPUID instruction, with unknown
--or unsupported feature bits cleared.
--
--Features like x2apic, for example, may not be present in the host cpu
--but are exposed by kvm in KVM_GET_SUPPORTED_CPUID because they can be
--emulated efficiently and thus not included here.
--
--The fields in each entry are defined as follows:
--
--  function: the eax value used to obtain the entry
--  index: the ecx value used to obtain the entry (for entries that are
--         affected by ecx)
--  flags: an OR of zero or more of the following:
--        KVM_CPUID_FLAG_SIGNIFCANT_INDEX:
--           if the index field is valid
--        KVM_CPUID_FLAG_STATEFUL_FUNC:
--           if cpuid for this function returns different values for successive
--           invocations; there will be several entries with the same function,
--           all with this flag set
--        KVM_CPUID_FLAG_STATE_READ_NEXT:
--           for KVM_CPUID_FLAG_STATEFUL_FUNC entries, set if this entry is
--           the first entry to be read by a cpu
--   eax, ebx, ecx, edx: the values returned by the cpuid instruction for
--         this function/index combination
--
- 
- 6. Capabilities that can be enabled on vCPUs
- --------------------------------------------
--- 
-2.1.0
+ 1) bootloader-supplied addr via DT
+ 2) addr read from device
+ 3) randomly generated one.
+
+> 
+> Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
+> ---
+>  drivers/net/ethernet/marvell/pxa168_eth.c | 36 +++++++++++++++++++++++++++++--
+>  1 file changed, 34 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/net/ethernet/marvell/pxa168_eth.c b/drivers/net/ethernet/marvell/pxa168_eth.c
+> index 10422f2df6cc..0ecbb3903b71 100644
+> --- a/drivers/net/ethernet/marvell/pxa168_eth.c
+> +++ b/drivers/net/ethernet/marvell/pxa168_eth.c
+> @@ -60,6 +60,8 @@
+>  #define PORT_COMMAND		0x0410
+>  #define PORT_STATUS		0x0418
+>  #define HTPR			0x0428
+> +#define MAC_ADDR_LOW		0x0430
+> +#define MAC_ADDR_HIGH		0x0438
+>  #define SDMA_CONFIG		0x0440
+>  #define SDMA_CMD		0x0448
+>  #define INT_CAUSE		0x0450
+> @@ -604,16 +606,42 @@ static void pxa168_eth_set_rx_mode(struct net_device *dev)
+>  		update_hash_table_mac_address(pep, NULL, ha->addr);
+>  }
+>  
+> +static void pxa168_eth_get_mac_address(struct net_device *dev,
+> +				       unsigned char *addr)
+> +{
+> +	struct pxa168_eth_private *pep = netdev_priv(dev);
+> +	unsigned int mac_h = rdl(pep, MAC_ADDR_HIGH);
+> +	unsigned int mac_l = rdl(pep, MAC_ADDR_LOW);
+> +
+> +	addr[0] = (mac_h >> 24) & 0xff;
+> +	addr[1] = (mac_h >> 16) & 0xff;
+> +	addr[2] = (mac_h >> 8) & 0xff;
+> +	addr[3] = mac_h & 0xff;
+> +	addr[4] = (mac_l >> 8) & 0xff;
+> +	addr[5] = mac_l & 0xff;
+> +}
+> +
+>  static int pxa168_eth_set_mac_address(struct net_device *dev, void *addr)
+>  {
+>  	struct sockaddr *sa = addr;
+>  	struct pxa168_eth_private *pep = netdev_priv(dev);
+>  	unsigned char oldMac[ETH_ALEN];
+> +	u32 mac_h, mac_l;
+>  
+>  	if (!is_valid_ether_addr(sa->sa_data))
+>  		return -EADDRNOTAVAIL;
+>  	memcpy(oldMac, dev->dev_addr, ETH_ALEN);
+>  	memcpy(dev->dev_addr, sa->sa_data, ETH_ALEN);
+> +
+> +	mac_h = sa->sa_data[0] << 24;
+> +	mac_h |= sa->sa_data[1] << 16;
+> +	mac_h |= sa->sa_data[2] << 8;
+> +	mac_h |= sa->sa_data[3];
+> +	mac_l = sa->sa_data[4] << 8;
+> +	mac_l |= sa->sa_data[5];
+> +	wrl(pep, MAC_ADDR_HIGH, mac_h);
+> +	wrl(pep, MAC_ADDR_LOW, mac_l);
+> +
+>  	netif_addr_lock_bh(dev);
+>  	update_hash_table_mac_address(pep, oldMac, dev->dev_addr);
+>  	netif_addr_unlock_bh(dev);
+> @@ -1494,8 +1522,12 @@ static int pxa168_eth_probe(struct platform_device *pdev)
+>  
+>  	INIT_WORK(&pep->tx_timeout_task, pxa168_eth_tx_timeout_task);
+>  
+> -	dev_info(&pdev->dev, "Using random mac address\n");
+> -	eth_hw_addr_random(dev);
+> +	/* try reading the mac address, if set by the bootloader */
+> +	pxa168_eth_get_mac_address(dev, dev->dev_addr);
+> +	if (!is_valid_ether_addr(dev->dev_addr)) {
+> +		dev_info(&pdev->dev, "Using random mac address\n");
+> +		eth_hw_addr_random(dev);
+> +	}
+
+I would do the above iff there was no valid addr supplied by the DT.
+
+thx,
+
+Jason.
+>  
+>  	pep->rx_ring_size = NUM_RX_DESCS;
+>  	pep->tx_ring_size = NUM_TX_DESCS;
+> -- 
+> 1.9.1
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe devicetree" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
