@@ -1,35 +1,33 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 9 Sep 2014 09:14:13 +0200
-Subject: [PATCH 5/7 v6] ARM: l2c: parse 'cache-size' and 'cache-sets'
- properties
-In-Reply-To: <3479071.8nx1ubr8a9@wuerfel>
-References: <1410176286-32533-1-git-send-email-linus.walleij@linaro.org>
- <4685530.jbNLD4yaA8@wuerfel>
- <CACRpkdb_bS0P-fGxogiyCzG9CRPhJK1Gro=H3X1Ks_-UoXh52w@mail.gmail.com>
- <3479071.8nx1ubr8a9@wuerfel>
-Message-ID: <CACRpkdapk1t+8DnY_ojWm+76=D=7k-wnrm11J6dbpPDkCM_WhQ@mail.gmail.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Tue, 9 Sep 2014 09:16:34 +0200
+Subject: [PATCH/RFC 2/5] PM / Domains: Add DT bindings for the R-Mobile
+ System Controller
+In-Reply-To: <540E313B.8000305@renesas.com>
+References: <1410183344-14756-1-git-send-email-geert+renesas@glider.be>
+ <1410183344-14756-3-git-send-email-geert+renesas@glider.be>
+ <540E313B.8000305@renesas.com>
+Message-ID: <CAMuHMdWRT=ZjXLVtPKJ1ppYLACQhBHJxZRxf6cnGkfC2dLxOOQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 8, 2014 at 3:16 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> [Me]
->> I can add a comment explaining that ARMs terminology does
->> not match the academic terminology or something, and say that
->> the thing we poke into "way-size" is actually "set size", if we agree
->> that is what we're seeing here.
+Hi Khiem-san,
+
+On Tue, Sep 9, 2014 at 12:44 AM, Khiem Nguyen
+<khiem.nguyen.xt@renesas.com> wrote:
+>> +      - #address-cells: Must be 1,
+>> +      - #address-cells: Must be 0.
 >
-> Let's see again: 16KB way-size * 8 ways = 128KB, that seems correct.
-> 16KB way-size / 32B line-size = 512 sets, that also seems realistic.
-> 128KB cache-size / 512 sets = 256B set-size. 256B / 32B = 8 ways,
-> so everything fits together.
+> Should it be "#size-cells: Must be 0." ?
 
-I've sent a v2 version of the patch using the terminology and calculations
-from this thread, and it yields the right numbers, for PB1176, I will check
-with the values from other RealView platforms to see if they also give the
-same result back.
+Yes, obviously. Thanks, will fix.
 
-I had to squash Florians & my patch, it didn't make sense to have them
-artificially separate.
+Gr{oetje,eeting}s,
 
-Yours,
-Linus Walleij
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
