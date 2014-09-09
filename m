@@ -1,55 +1,53 @@
 From: wsa@the-dreams.de (Wolfram Sang)
-Date: Tue,  9 Sep 2014 16:54:30 +0200
-Subject: [RFC 4/4] ARM: shmobile: r8a7790: adapt DTS for I2C slave support
-In-Reply-To: <1410274470-12712-1-git-send-email-wsa@the-dreams.de>
-References: <1410274470-12712-1-git-send-email-wsa@the-dreams.de>
-Message-ID: <1410274470-12712-5-git-send-email-wsa@the-dreams.de>
+Date: Tue,  9 Sep 2014 16:54:26 +0200
+Subject: [RFC 0/4] i2c: slave support framework for Linux devices
+Message-ID: <1410274470-12712-1-git-send-email-wsa@the-dreams.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Wolfram Sang <wsa+renesas@sang-engineering.com>
+Finally, here is my take on the often desired feature that Linux can not only
+be an I2C master, but also an I2C slave. Compared to my draft sent out last
+week, this RFC has been tested on hardware (Renesas Lager board) and works \o/
 
-Not for upstream!
+One big part still missing is documentation, so brave ones need to "use the
+source". However, this approach turned out to be even less intrusive than
+expected, so that is hopefully a good sign.
 
-Signed-off-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
----
- arch/arm/boot/dts/r8a7790-lager.dts | 15 ++++++++++-----
- 1 file changed, 10 insertions(+), 5 deletions(-)
+Basically, an I2C slave is a standard I2C client providing a callback function.
+When registering as a slave, the connection to the I2C adapter is made which
+uses the callback when a slave event happens. That splits the HW support
+(enabling slave mode on the adapter) and SW support (here a generic eeprom
+simulator) nicely IMO.
 
-diff --git a/arch/arm/boot/dts/r8a7790-lager.dts b/arch/arm/boot/dts/r8a7790-lager.dts
-index 856b4236b674..12aa2f21e6fa 100644
---- a/arch/arm/boot/dts/r8a7790-lager.dts
-+++ b/arch/arm/boot/dts/r8a7790-lager.dts
-@@ -205,9 +205,9 @@
- 		renesas,function = "msiof1";
- 	};
- 
--	iic1_pins: iic1 {
--		renesas,groups = "iic1";
--		renesas,function = "iic1";
-+	i2c1_pins: i2c1 {
-+		renesas,groups = "i2c1";
-+		renesas,function = "i2c1";
- 	};
- 
- 	iic2_pins: iic2 {
-@@ -356,10 +356,15 @@
- 	status = "ok";
- };
- 
--&iic1	{
-+&i2c1	{
- 	status = "ok";
--	pinctrl-0 = <&iic1_pins>;
-+	pinctrl-0 = <&i2c1_pins>;
- 	pinctrl-names = "default";
-+
-+	eeprom at 64 {
-+		compatible = "slave-24c02";
-+		reg = <0x64>;
-+	};
- };
- 
- &iic2	{
+Besides documentation, there are still some error checks missing and more
+features could also be added (of course). Yet, I think this version is good
+enough to discuss the steps taken here.
+
+The patches are based on top of 3.17-rc4, but will easily apply to renesas/devel.
+A git tree can be found here:
+
+git://git.kernel.org/pub/scm/linux/kernel/git/wsa/linux.git i2c/slave-support
+
+Comments welcome! Thanks,
+
+   Wolfram
+
+
+Wolfram Sang (4):
+  i2c: core changes for slave support
+  i2c: slave: add eeprom simulator driver
+  i2c: rcar: add slave support
+  ARM: shmobile: r8a7790: adapt DTS for I2C slave support
+
+ arch/arm/boot/dts/r8a7790-lager.dts |  15 ++--
+ drivers/i2c/Kconfig                 |  10 +++
+ drivers/i2c/Makefile                |   1 +
+ drivers/i2c/busses/i2c-rcar.c       | 122 ++++++++++++++++++++++++++---
+ drivers/i2c/i2c-core.c              |  44 +++++++++++
+ drivers/i2c/i2c-slave-eeprom.c      | 152 ++++++++++++++++++++++++++++++++++++
+ include/linux/i2c.h                 |  22 ++++++
+ 7 files changed, 352 insertions(+), 14 deletions(-)
+ create mode 100644 drivers/i2c/i2c-slave-eeprom.c
+
 -- 
 2.0.0
