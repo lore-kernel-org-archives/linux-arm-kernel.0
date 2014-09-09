@@ -1,38 +1,47 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Tue, 9 Sep 2014 08:38:44 -0700
-Subject: [PATCH 0/2] Two imx-drm oops fixes
-In-Reply-To: <20140909151339.GA2341@dragon>
-References: <20140901170712.GJ30401@n2100.arm.linux.org.uk>
- <20140908190859.GA16374@kroah.com>
- <20140908190949.GB16374@kroah.com> <20140909151339.GA2341@dragon>
-Message-ID: <20140909153844.GA6117@kroah.com>
+From: khilman@kernel.org (Kevin Hilman)
+Date: Tue, 09 Sep 2014 08:40:13 -0700
+Subject: [PATCH/RFC 4/5] ARM: shmobile: R-Mobile: Add DT support for PM
+ domains
+In-Reply-To: <1410183344-14756-5-git-send-email-geert+renesas@glider.be>
+ (Geert Uytterhoeven's message of "Mon, 8 Sep 2014 15:35:43 +0200")
+References: <1410183344-14756-1-git-send-email-geert+renesas@glider.be>
+ <1410183344-14756-5-git-send-email-geert+renesas@glider.be>
+Message-ID: <7hfvg0kdk2.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 09, 2014 at 11:13:41PM +0800, Shawn Guo wrote:
-> On Mon, Sep 08, 2014 at 12:09:49PM -0700, Greg Kroah-Hartman wrote:
-> > On Mon, Sep 08, 2014 at 12:08:59PM -0700, Greg Kroah-Hartman wrote:
-> > > On Mon, Sep 01, 2014 at 06:07:12PM +0100, Russell King - ARM Linux wrote:
-> > > > Greg,
-> > > > 
-> > > > Here's two oops fixes for imx-drm, which I've had queued up for a number
-> > > > of months now.  Shawn posted different fixes for the same oops recently
-> > > > as well.
-> > > 
-> > > So do I take your patches, or Shawn's?
-> > 
-> > Actually, yours are "smaller", so I'll defer to you and take yours...
-> 
-> Greg,
-> 
-> My patch is bigger than Russell's because I cleaned up the code a little
-> bit along the way of fixing the bug.
-> 
-> I will send you the cleanup as an incremental patch based on Russell's
-> fixes.
+Geert Uytterhoeven <geert+renesas@glider.be> writes:
 
-That's what you should have done in the first place, don't try to do
-multiple things in the same patch, especially for bugfixes that
-need/want to be backported, you know better than that...
+> Populate the PM domains from DT, and provide support to hook up devices
+> to their respective PM domain.
+>
+> The always-on power area (e.g. C5 on r8a7740) is created as a PM domain
+> without software control, to allow Run-Time management of module clocks
+> for hardware blocks inside this area in the future.
+> Power-on/off latencies are supported.
+>
+> Limitations and special cases in the non-DT case are handled through
+> rmobile_pm_quirks(). Checks for hardcoded PM domain indices should be
+> replaced by the analysis of relations between devices and PM domains in
+> DT.
+>
+> Initialization is done from core_initcall(), as the
+> "renesas,intc-irqpin" driver uses postcore_initcall().
+>
+> This is functionally almost equivalent to the non-DT case. Missing are
+> Run-Time management of the module clocks (pm_clk_*()), and device
+> latencies.
+>
+> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 
-greg k-h
+[...]
+
+> +static int r8a7740_pd_a4s_suspend(void)
+> +{
+> +	/*
+> +	 * The A4S domain contains the CPU core and therefore it should
+> +	 * only be turned off if the CPU is in use.
+
+I think you meant "if the CPU is *not* in use."  ?  :)
+
+Kevin
