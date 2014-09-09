@@ -1,150 +1,63 @@
-From: arunks.linux@gmail.com (Arun KS)
-Date: Tue, 9 Sep 2014 16:27:11 +0530
-Subject: [PATCH V3] irqchip:gic: change access of gicc_ctrl register to
- read modify write.
-In-Reply-To: <CAFdej03AmUn92sSH=7Hfk0+yWEFWaywJt63DjeTc+nHSZeb61A@mail.gmail.com>
-References: <1393537013-6264-1-git-send-email-fkan@apm.com>
- <CAFdej02vSm8TbUWGsMr936WN1GNmJ0SBuEKQkKyzKoEjtVmc+g@mail.gmail.com>
- <CAL85gmBRUuc3mtOGSkNuspEgkRQe42LV0e=fQfNmwcCicjT=vA@mail.gmail.com>
- <CAFdej03AmUn92sSH=7Hfk0+yWEFWaywJt63DjeTc+nHSZeb61A@mail.gmail.com>
-Message-ID: <CAKZGPAObTe2L6YkBfWMAfeVqTbjE2UbHTO=QCLx6pWD-D2RM4A@mail.gmail.com>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Tue, 9 Sep 2014 13:58:53 +0300
+Subject: [PATCH] video: mx3fb: always enable BACKLIGHT_LCD_SUPPORT
+In-Reply-To: <4032283.arT8F9Ogcl@wuerfel>
+References: <4032283.arT8F9Ogcl@wuerfel>
+Message-ID: <540EDD6D.6070704@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arun,
+On 08/09/14 18:17, Arnd Bergmann wrote:
+> Commit 7edaa761ee81b ("video: mx3fb: Add backlight control support")
+> changed the mx3fb driver so it always selects the BACKLIGHT_CLASS_DEVICE
+> symbol, but that is hidden behind BACKLIGHT_LCD_SUPPORT in Kconfig, so
+> we get a Kconfig warning for multi_v5_defconfig, which doesn't have that:
+> 
+> Warning: (DRM_RADEON && DRM_NOUVEAU && DRM_I915 && DRM_GMA500 &&
+> DRM_SHMOBILE && DRM_TILCDC && FB_BACKLIGHT && FB_MX3 && USB_APPLEDISPLAY
+> && FB_OLPC_DCON && ASUS_LAPTOP && SONY_LAPTOP && THINKPAD_ACPI &&
+> EEEPC_LAPTOP && ACPI_CMPC && SAMSUNG_Q10) selects BACKLIGHT_CLASS_DEVICE
+> which has unmet direct dependencies (HAS_IOMEM && BACKLIGHT_LCD_SUPPORT)
+> 
+> This makes sure we always enable both symbols together for mx3fb, like
+> we do for the other drivers that can't be built without backlight
+> support. Note that a better solution would be to ensure the driver can
+> work with or without backlight support.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Cc: Alexander Stein <alexander.stein@systec-electronic.com>
+> Cc: Tomi Valkeinen <tomi.valkeinen@ti.com>
+> Cc: linux-fbdev at vger.kernel.org
+> Cc: Jean-Christophe Plagniol-Villard <plagnioj@jcrosoft.com>
+> 
+> diff --git a/drivers/video/fbdev/Kconfig b/drivers/video/fbdev/Kconfig
+> index ccbe2ae22ac5..c7bf606a8706 100644
+> --- a/drivers/video/fbdev/Kconfig
+> +++ b/drivers/video/fbdev/Kconfig
+> @@ -2356,10 +2356,11 @@ config FB_MSM
+>  config FB_MX3
+>  	tristate "MX3 Framebuffer support"
+>  	depends on FB && MX3_IPU
+> +	select BACKLIGHT_CLASS_DEVICE
+> +	select BACKLIGHT_LCD_SUPPORT
+>  	select FB_CFB_FILLRECT
+>  	select FB_CFB_COPYAREA
+>  	select FB_CFB_IMAGEBLIT
+> -	select BACKLIGHT_CLASS_DEVICE
+>  	default y
+>  	help
+>  	  This is a framebuffer device for the i.MX31 LCD Controller. So
+> 
 
-On Tue, Sep 9, 2014 at 11:31 AM, Arun Chandran <achandran@mvista.com> wrote:
-> On Mon, Sep 8, 2014 at 10:27 PM, Feng Kan <fkan@apm.com> wrote:
->> On Mon, Sep 8, 2014 at 1:52 AM, Arun Chandran <achandran@mvista.com> wrote:
->>> Hi Feng,
->>>
->>> Is this patch still needed to fix perf calltrace?
->> Yes, if the someone decide to run the secure mode of the GIC, which is
->> what is present in
->> the kernel tree now.
->>
->>> http://lists.infradead.org/pipermail/linux-arm-kernel/2014-June/265814.html
->>>
->>> On Fri, Feb 28, 2014 at 3:06 AM, Feng Kan <fkan@apm.com> wrote:
->>>> This change is made to preserve the GIC v2 releated bits in the
->>>> GIC_CPU_CTRL register (also known as the GICC_CTLR register in spec).
->>>> The original code only set the enable/disable group bit in this register.
->>>> This code will preserve the bypass bits configured by the bootload except
->>>> the enable/disable bit. The main reason for this change is to allow the
->>>> bypass bits specified in the v2 spec to remain untouched by the current
->>>> GIC code. In the X-Gene platform, the bypass functionality is not used
->>>> and bypass must be disabled at all time.
->>>>
->>>> Signed-off-by: Vinayak Kale <vkale@apm.com>
->>>> Acked-by: Anup Patel <apatel@apm.com>
->>>> Signed-off-by: Feng Kan <fkan@apm.com>
->>>> ---
->>>> V3 Changes:
->>>>         - Sorry, forgot to change the mask for cpu_init path
->>>>           assumed bootloader setup bits correctly.
->>>> V2 Changes:
->>>>         - only mask off v2 bypass bits
->>>>  drivers/irqchip/irq-gic.c |   32 +++++++++++++++++++++++++++++---
->>>>  1 files changed, 29 insertions(+), 3 deletions(-)
->>>>
->>>> diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
->>>> index 341c601..3ca7995 100644
->>>> --- a/drivers/irqchip/irq-gic.c
->>>> +++ b/drivers/irqchip/irq-gic.c
->>>> @@ -418,6 +418,7 @@ static void gic_cpu_init(struct gic_chip_data *gic)
->>>>         void __iomem *dist_base = gic_data_dist_base(gic);
->>>>         void __iomem *base = gic_data_cpu_base(gic);
->>>>         unsigned int cpu_mask, cpu = smp_processor_id();
->>>> +       unsigned int ctrl_mask;
->>>>         int i;
->>>>
->>>>         /*
->>>> @@ -449,13 +450,29 @@ static void gic_cpu_init(struct gic_chip_data *gic)
->>>>                 writel_relaxed(0xa0a0a0a0, dist_base + GIC_DIST_PRI + i * 4 / 4);
->>>>
->>>>         writel_relaxed(0xf0, base + GIC_CPU_PRIMASK);
->>>> -       writel_relaxed(1, base + GIC_CPU_CTRL);
->>>> +
->>>> +       ctrl_mask = readl(base + GIC_CPU_CTRL);
->>>
->>> readl_relaxed() here?
->>>
->>>> +
->>>> +       /* Mask out the gic v2 bypass bits */
->>>> +       ctrl_mask &= 0x1e0;
->>>> +
->>>> +       /* Enable group 0 */
->>>> +       ctrl_mask |= 0x1;
->>>> +       writel_relaxed(ctrl_mask, base + GIC_CPU_CTRL);
->>>>  }
->>>>
->>>>  void gic_cpu_if_down(void)
->>>>  {
->>>> +       unsigned int ctrl_mask;
->>>>         void __iomem *cpu_base = gic_data_cpu_base(&gic_data[0]);
->>>> -       writel_relaxed(0, cpu_base + GIC_CPU_CTRL);
->>>> +
->>>> +       ctrl_mask = readl(cpu_base + GIC_CPU_CTRL);
->>> readl_relaxed() here?
->>>
->>>> +       /*
->>>> +        * Disable grp enable bit, leave the bypass bits alone as changing
->>>> +        * them could leave the system unstable
->>>> +        */
->>>> +       ctrl_mask &= 0x1e0;
->>>> +       writel_relaxed(ctrl_mask, cpu_base + GIC_CPU_CTRL);
->>>>  }
->>>>
->>>>  #ifdef CONFIG_CPU_PM
->>>> @@ -566,6 +583,7 @@ static void gic_cpu_restore(unsigned int gic_nr)
->>>>  {
->>>>         int i;
->>>>         u32 *ptr;
->>>> +       unsigned int ctrl_mask;
->>>>         void __iomem *dist_base;
->>>>         void __iomem *cpu_base;
->>>>
->>>> @@ -590,7 +608,15 @@ static void gic_cpu_restore(unsigned int gic_nr)
->>>>                 writel_relaxed(0xa0a0a0a0, dist_base + GIC_DIST_PRI + i * 4);
->>>>
->>>>         writel_relaxed(0xf0, cpu_base + GIC_CPU_PRIMASK);
->>>> -       writel_relaxed(1, cpu_base + GIC_CPU_CTRL);
->>>> +
->>>> +       ctrl_mask = readl(cpu_base + GIC_CPU_CTRL);
->>>
->>> readl_relaxed() here?
->> Trying to make sure read is completed before write back out to gic.
->>>
->
-> Will the cpu reorder  readl_relaxed() and a writel_relaxed() calls?
->
-> val = readl_relaxed(reg1);
-> val += 1;
-> wrietl_relaxed(val, reg1);
->
-> In the above code reg1 getting 'val+1' is not guaranteed?
+Thanks, queued for 3.18.
 
-reg1 getting 'val+1' is guaranteed because of the address dependency.
-If we use writel instead of writel_relaxed(), there will be a dsb()
-instruction inserted before actual write.
-That is, all write operations before dsb() on all cores will be
-committed. The processors stall during this period.
-dsb also waits for any TLB or cache maintenance operations to finish
-across cores/clusters.
+ Tomi
 
-In this scenario it is okey to use _relaxed(). I might be wrong, in
-that case some experts will correct me here.
 
-The rule is like writel() handle write buffer flushing by default. And
-for performance related areas use _relaxed variants.
-
-Thanks,
-Arun KS
-
->
-> --Arun
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140909/14fb0c17/attachment.sig>
