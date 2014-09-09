@@ -1,35 +1,51 @@
-From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Tue, 9 Sep 2014 13:31:36 +0300
-Subject: [PATCH v4 10/11] ARM: OMAP2+: AM33XX: Basic suspend resume support
-In-Reply-To: <7h7g1dlp8b.fsf@linaro.org>
-References: <1405047349-15101-1-git-send-email-d-gerlach@ti.com>
- <1405047349-15101-11-git-send-email-d-gerlach@ti.com>
- <7h7g1dlp8b.fsf@linaro.org>
-Message-ID: <CAK=WgbYwGcSCxHfa880up1qKTroS=mi8UAf_Qh6Wz9n5x4D9rw@mail.gmail.com>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Tue, 9 Sep 2014 12:35:32 +0200 (CEST)
+Subject: [RFC PATCH v2] clockevents: re-calculate event when cpu enter idle
+In-Reply-To: <1409793933-29938-1-git-send-email-leoy@marvell.com>
+References: <1409793933-29938-1-git-send-email-leoy@marvell.com>
+Message-ID: <alpine.DEB.2.10.1409091223160.11037@nanos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 9, 2014 at 1:30 AM, Kevin Hilman <khilman@linaro.org> wrote:
-> To me, it's not terribly clear how you made the split between this PM
-> core code an the remoteproc code.  In the changelog for the remoteproc
-> patch, it states it's to "load the firmware for and boot the wkup_m3".
-> But, while parts of the IPC are here in pm33xx.c, parts of the IPC are
-> also inside the remoteproc driver, so I'm quite curious if that's OK
-> with the remoteproc maintainers.  Either way, please make it clearer how
-> and why you made the split, and please isolate the wkup_m3 IPC/protocol
-> from this code.  Think of people wanting to rework/extend the wkup_m3
-> firmware.  They shouldn't be messing around in here, but rather inside a
-> driver specificaly for the wkup_m3.
+On Thu, 4 Sep 2014, Leo Yan wrote:
 
-I haven't looked at the code very thoroughly yet, but generally a
-remoteproc driver should only implement the three start/stop/kick
-rproc_ops, and then register them via the remoteproc framework.
-Exposing additional API directly from that driver isn't something we
-immediately want to accept.
+This changelog is pretty uncomprehensible, but I can see what you are
+trying to solve.
 
-If relevant, we would generally prefer to extend remoteproc instead,
-so other platform-specific drivers could utilize that functionality as
-well. Or rpmsg - if we're missing some IPC functionality.
+> Below flow will have the redundant interrupts for broadcast timer:
+> 
+> 1. Process A starts a hrtimer with 100ms timeout, then Process A will
+>    wait on the waitqueue to sleep;
+> 2. The CPU which Process A runs on will enter idle and call notify
+>    CLOCK_EVT_NOTIFY_BROADCAST_ENTER, so the CPU will shutdown its local
+>    and set broadcast timer's next event with delta for 100ms timeout;
+> 3. After 70ms later, the CPU is waken up by other peripheral's interrupt
+>    and Process A will be waken up as well; Process A will cancel the hrtimer
+>    at this point, kernel will remove the timer event from the event queue
+>    but it will not really disable broadcast timer;
+> 4. So after 30ms later, the broadcast timer interrupt will be triggered
+>    even though the timer has been cancelled by s/w in step 3.
+> 
+> To fix this issue, in theory cpu can check this situation when the cpu
+> enter and exit idle; So it can iterate the related idle cpus to calculate
+> the correct broadcast event value.
+> 
+> But with upper method, it has the side effect. Due the cpu enter and exit
+> idle state very frequently in short time, so can optimize to only calculate
+> the correct state only when the cpu join into broadcast timer and set the
+> next event after calculate a different event compare to previous time.
+
+And you inflict this unconditionally on every invocation of broadcast
+enter, if the cpu is not the one which has the first expiring timer.
+
+What's the point of doing a full scan unconditionally just to catch an
+obscure corner case like you describe above? That's just stupid and
+while it might be a non issue on your quadcore ARM it's going to be a
+pain on larger mostly idle machines.
+
+So unconditially forcing the scan on everyone to deal with some corner
+case is not going to happen.
 
 Thanks,
-Ohad.
+
+	tglx
