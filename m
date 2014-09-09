@@ -1,35 +1,51 @@
-From: kgene@kernel.org (kgene at kernel.org)
-Date: Tue, 09 Sep 2014 12:47:35 +0900
-Subject: [PATCH v2 0/5] Add max77802 support for Peach boards
-In-Reply-To: <CABxcv==ycrPw1MTv7X0baX2WfqgDS+4EEfGAWc+ZhpiR6=Uy+Q@mail.gmail.com>
-References: <1408533593-32346-1-git-send-email-javier.martinez@collabora.co.uk>
- <CABxcv==ycrPw1MTv7X0baX2WfqgDS+4EEfGAWc+ZhpiR6=Uy+Q@mail.gmail.com>
-Message-ID: <04ab01cfcbe0$caeac4d0$60c04e70$@kernel.org>
+From: yangyingliang@huawei.com (Yang Yingliang)
+Date: Tue, 9 Sep 2014 11:59:45 +0800
+Subject: [PATCH] arm64: add guard macro of unistd.h to prevent double inclusion
+Message-ID: <1410235185-16652-1-git-send-email-yangyingliang@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Javier Martinez Canillas wrote:
-> 
-> Hello Kukjin,
-> 
-Hi,
+Add guard macros in both uapi/asm/unistd.h and asm/unistd.h.
 
-> On Wed, Aug 20, 2014 at 1:19 PM, Javier Martinez Canillas
-> <javier.martinez@collabora.co.uk> wrote:
-> >
-> > This is a second version of the series that adds max77802 support for
-> > the Peach Pit and Pi boards. The series also have all the pending
-> > patches that were posted but depended on this support. I've picked
-> > all the patches I found and rebased them to be sure that they apply
-> > cleanly on top of linux-next. Also I've taken some DT snippets from
-> > the downstream Chrome OS 3.8 kernel DTS for devices that use one of
-> > these regulators as their input supply.
-> >
-> 
-> Any comments on this series?
-> 
-Looks good to me but I just wanted to get ack from chrome guy, Doug? But since
-Naveen tested, it should be fine I think. I'll take the series.
+Signed-off-by: Yang Yingliang <yangyingliang@huawei.com>
+---
+ arch/arm64/include/asm/unistd.h      | 5 +++++
+ arch/arm64/include/uapi/asm/unistd.h | 5 +++++
+ 2 files changed, 10 insertions(+)
 
-Thanks,
-Kukjin
+diff --git a/arch/arm64/include/asm/unistd.h b/arch/arm64/include/asm/unistd.h
+index 6d2bf41..21a7dec 100644
+--- a/arch/arm64/include/asm/unistd.h
++++ b/arch/arm64/include/asm/unistd.h
+@@ -13,6 +13,9 @@
+  * You should have received a copy of the GNU General Public License
+  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+  */
++#ifndef __ASM_ARM64_UNISTD_H
++#define __ASM_ARM64_UNISTD_H
++
+ #ifdef CONFIG_COMPAT
+ #define __ARCH_WANT_COMPAT_SYS_GETDENTS64
+ #define __ARCH_WANT_COMPAT_STAT64
+@@ -48,3 +51,5 @@
+ #include <uapi/asm/unistd.h>
+ 
+ #define NR_syscalls (__NR_syscalls)
++
++#endif /* __ASM_ARM64_UNISTD_H */
+diff --git a/arch/arm64/include/uapi/asm/unistd.h b/arch/arm64/include/uapi/asm/unistd.h
+index 1caadc2..ab72cac 100644
+--- a/arch/arm64/include/uapi/asm/unistd.h
++++ b/arch/arm64/include/uapi/asm/unistd.h
+@@ -13,4 +13,9 @@
+  * You should have received a copy of the GNU General Public License
+  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+  */
++#ifndef _UAPI__ASM_ARM64_UNISTD_H
++#define _UAPI__ASM_ARM64_UNISTD_H
++
+ #include <asm-generic/unistd.h>
++
++#endif /* _UAPI__ASM_ARM64_UNISTD_H */
+-- 
+1.8.0
