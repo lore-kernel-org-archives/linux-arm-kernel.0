@@ -1,63 +1,60 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 9 Sep 2014 16:17:23 +0100
-Subject: [PATCH 0/3] move arm dual timer into drivers/clocksource
-In-Reply-To: <1406865536-23984-1-git-send-email-wangkefeng.wang@huawei.com>
-References: <1406865536-23984-1-git-send-email-wangkefeng.wang@huawei.com>
-Message-ID: <20140909151723.GA3494@leverpostej>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Tue, 9 Sep 2014 11:19:54 -0400
+Subject: [PATCH v2 0/3] net: Add Keystone NetCP ethernet driver support
+In-Reply-To: <540EE809.9020901@mojatatu.com>
+References: <1408115562-22487-1-git-send-email-santosh.shilimkar@ti.com>
+ <20140821.163612.282672926741753926.davem@davemloft.net>
+ <53F79DC5.8030003@ti.com> <540DC00F.1080103@ti.com>
+ <540EE809.9020901@mojatatu.com>
+Message-ID: <540F1A9A.1020309@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kefeng,
+On Tuesday 09 September 2014 07:44 AM, Jamal Hadi Salim wrote:
+> On 09/08/14 10:41, Santosh Shilimkar wrote:
+> 
+>>> The NetCP plugin module infrastructure use all the standard kernel
+>>> infrastructure and its very tiny.
+> 
+> So i found this manual here:
+> http://www.silica.com/fileadmin/02_Products/Productdetails/Texas_Instruments/SILICA_TI_66AK2E05-ds.pdf
+> 
+> Glad there is an open document!
+> There are a couple of ethernet switch chips I can spot there.
+> 
+All the documentation is open including packet accelerator offload
+in ti.com.
 
-Superficially this series looks as if it could be useful (enabling sp804
-support for arm64), but there are several problems:
+> Can i control those with "bridge" or say "brctl" utilities?
+> 
+> I can see the bridge ports are exposed and i should be able to
+> control them via ifconfig or ip link. Thats what "standard
+> kernel infrastructure" means. Magic hidden in a driver is
+> not.
+> 
+There is nothing magic hidden in the driver. The bridge ports
+are exposed as standard network interfaces. Currently the
+drivers don't support bridge offload functionality and
+the bridging is disabled in the switch by default. 
 
-* The commit messages are terse at best.
-* The cover letter provides no rationale.
-* Patch 2 doesn't appear to apply to current mainline (v3.17-rc4)
+> Take a look at recent netconf discussion (as well as earlier
+> referenced discussions):
+> http://vger.kernel.org/netconf-nf-offload.pdf
+> 
+> Maybe we can help providing you some direction?
+> The problem is it doesnt seem that the offload specs for
+> those other pieces are open? e.g how do i add an entry
+> to the L2 switch?
+> 
+We got such requests from customers but couldn't
+support it for Linux. We are also looking for such
+support and any direction are welcome. Your slide
+deck seems to capture the key topics like L2/IPSEC
+offload which we are also interested to hear.
 
-I was unable to find a later posting. Do you intend to continue with
-this series?
+Just to be clear, your point was about L2 switch offload
+which the driver don't support at the moment. It might confuse
+others. The driver doesn't implements anything non-standard.
 
-Mark.
-
-On Fri, Aug 01, 2014 at 04:58:53AM +0100, Kefeng Wang wrote:
-> Kefeng Wang (3):
->   ARM: remove unnecessary include arm_timer.h and timer-sp.h
->   clocksource: move arm dual timer into drivers/clocksource
->   clocksouce: sp804: use pr_fmt for logging
-> 
->  arch/arm/Kconfig                          |   5 -
->  arch/arm/common/Makefile                  |   1 -
->  arch/arm/common/timer-sp.c                | 304 -----------------------------
->  arch/arm/include/asm/hardware/arm_timer.h |  35 ----
->  arch/arm/include/asm/hardware/timer-sp.h  |  23 ---
->  arch/arm/mach-integrator/integrator_ap.c  |   2 +-
->  arch/arm/mach-nspire/nspire.c             |   2 -
->  arch/arm/mach-realview/core.c             |   5 +-
->  arch/arm/mach-versatile/core.c            |   5 +-
->  arch/arm/mach-vexpress/ct-ca9x4.c         |   3 -
->  arch/arm/mach-vexpress/v2m.c              |   5 +-
->  drivers/clocksource/Kconfig               |   7 +
->  drivers/clocksource/Makefile              |   1 +
->  drivers/clocksource/timer-sp.c            | 307 ++++++++++++++++++++++++++++++
->  include/clocksource/arm_timer.h           |  35 ++++
->  include/clocksource/timer-sp.h            |  23 +++
->  16 files changed, 383 insertions(+), 380 deletions(-)
->  delete mode 100644 arch/arm/common/timer-sp.c
->  delete mode 100644 arch/arm/include/asm/hardware/arm_timer.h
->  delete mode 100644 arch/arm/include/asm/hardware/timer-sp.h
->  create mode 100644 drivers/clocksource/timer-sp.c
->  create mode 100644 include/clocksource/arm_timer.h
->  create mode 100644 include/clocksource/timer-sp.h
-> 
-> -- 
-> 1.7.12.4
-> 
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+Regards,
+Santosh
