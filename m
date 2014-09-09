@@ -1,121 +1,85 @@
-From: grygorii.strashko@ti.com (Grygorii Strashko)
-Date: Tue, 9 Sep 2014 16:41:21 +0300
-Subject: [RFC PATCH 0/3] PM / clock_ops: allow to specify custom
- pm_clk_notifier callback
-In-Reply-To: <7hr3zln692.fsf@linaro.org>
-References: <1406313096-29761-1-git-send-email-grygorii.strashko@ti.com>
- <7hr3zln692.fsf@linaro.org>
-Message-ID: <540F0381.7010500@ti.com>
+From: mika.westerberg@linux.intel.com (Mika Westerberg)
+Date: Tue, 9 Sep 2014 16:52:09 +0300
+Subject: [PATCH 1/2] acpi: lpss: convert from struct clk to struct clk_core
+In-Reply-To: <7263163.khRHYpcBRO@vostro.rjw.lan>
+References: <1410242868-14750-1-git-send-email-mturquette@linaro.org>
+ <1410242868-14750-2-git-send-email-mturquette@linaro.org>
+ <7263163.khRHYpcBRO@vostro.rjw.lan>
+Message-ID: <20140909135209.GW13406@lahna.fi.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kevin,
-
-On 09/09/2014 12:37 AM, Kevin Hilman wrote:
-> Grygorii Strashko <grygorii.strashko@ti.com> writes:
+On Tue, Sep 09, 2014 at 03:16:29PM +0200, Rafael J. Wysocki wrote:
+> On Monday, September 08, 2014 11:07:47 PM Mike Turquette wrote:
+> > Looks like this driver was missed during the original mass driver
+> > rework[0]. This patch converts the LPSS driver to the new clock provider
+> > data type (struct clk_core).
+> > 
+> > If there are no objections I propose to roll this patch into a rebase of
+> > that patch[0] in my tree.
+> > 
+> > [0] http://lkml.kernel.org/r/<1409758317-20564-1-git-send-email-tomeu.vizoso@collabora.com>
+> > 
+> > Signed-off-by: Mike Turquette <mturquette@linaro.org>
 > 
->> The CLK PM domain (clock_ops.c) assumes that platform code should always provide
->> list of Connection IDs of the clock (con_id) in pm_clk_notifier_block structure.
->> Then CLK PM domain uses these con_ids to setup list of clocks per device.
->>
->> Such approach is inconvenient when devices can have different number
->> of clocks. For example, if maximum number of clocks used by
->> devices is 4 the pm_clk_notifier_block structure will look like:
->>
->> static struct pm_clk_notifier_block platform_domain_notifier = {
->> 	.pm_domain = &keystone_pm_domain,
->> 	.con_ids = { "fck", "opt1", "opt2", "opt3", NULL },
->> };
->>
->> More over, clocks in DT have to be named using only above con_ids:
->> 	clocks = <&paclk13>, <&clkcpgmac>, <&chipclk12>;
->> 	clock-names = "fck", "opt1", "opt2";
->>
->> It makes hard to enable/support Runtime PM in case when some HW modules are used
->> by different SoCs or there are few version of the same SoC, because clock trees
->> can be changed significantly in all such cases.
->>
->> This patch set allows to specify custom pm_clk_notifier callback from
->> platform code and in such way makes CLK PM domain initialization
->> more flexible.
-> 
-> Replacing the pm_clk notifier is essentially replacing the guts of the
-> clock_ops code.
-> 
-> I think your platform may have left the realm of "simple" platforms that
-> the clock_ops was intended for.
-> 
-> Since you're essentially gutting clock_ops, have you considered
-> migrating to genpd and having your own pm_domain ops that manage your clocks?
+> Mika, any comments here?
 
-Yes. I've thought about using genpd. But:
-- PM domain is not merged in 3.17 and I don't know if it will be merged in 3.18 :(
-http://www.spinics.net/lists/arm-kernel/msg357003.html
+Adding Heikki who recently did some clock changes to acpi_lpss.c.
 
-- To switch using PM domains I will need to create PM domain node PER EACH device,
-(if I understand PM domain bindings right). For example:
-
-+power_netcp: power-controller at 0 {
-+		compatible = "keystone,power-controller";
-+		#power-domain-cells = <0>;
-+		clocks = <&clkcpgmac>, <&clkpa>, <&chipclk12>;
-+	};
-
-netcp: netcp at 2090000 {
-		reg = <0x2620110 0x8>;
-+		power-domains = <&power_netcp>;
-...
-}
-
-- I'm not sure that such DT- definition will be accepted - 
-It's not obviously a HW definitions.
-
-Looks like, I'll have no choice as only switch to genpd even if it will 
-introduce code & data over head.
+To me this looks fine.
 
 > 
->> Also, It updates Keystone 2 platform code to provide custom
->> callback which fills list of clocks for Device with all clocks assigned to this
->> Device in DT.
->> More over, It's safe for Keystone 2 to perform CLK PM domain initialization
->> at device's binding time instead of device's creation time.
->>
->> I've posted these patches because I need fully enable Runtime PM on Keystone 2
->> where all HW modules are controlled using clocks only. That's why CLK PM domain
->> fits our needs perfectly.
+> > ---
+> >  drivers/acpi/acpi_lpss.c               | 6 +++---
+> >  include/linux/platform_data/clk-lpss.h | 2 +-
+> >  2 files changed, 4 insertions(+), 4 deletions(-)
+> > 
+> > diff --git a/drivers/acpi/acpi_lpss.c b/drivers/acpi/acpi_lpss.c
+> > index 9dfec48..454179f 100644
+> > --- a/drivers/acpi/acpi_lpss.c
+> > +++ b/drivers/acpi/acpi_lpss.c
+> > @@ -57,7 +57,7 @@ ACPI_MODULE_NAME("acpi_lpss");
+> >  struct lpss_shared_clock {
+> >  	const char *name;
+> >  	unsigned long rate;
+> > -	struct clk *clk;
+> > +	struct clk_core *clk;
+> >  };
+> >  
+> >  struct lpss_private_data;
+> > @@ -83,7 +83,7 @@ static struct lpss_device_desc lpss_dma_desc = {
+> >  struct lpss_private_data {
+> >  	void __iomem *mmio_base;
+> >  	resource_size_t mmio_size;
+> > -	struct clk *clk;
+> > +	struct clk_core *clk;
+> >  	const struct lpss_device_desc *dev_desc;
+> >  	u32 prv_reg_ctx[LPSS_PRV_REG_COUNT];
+> >  };
+> > @@ -278,7 +278,7 @@ static int register_device_clock(struct acpi_device *adev,
+> >  	const struct lpss_device_desc *dev_desc = pdata->dev_desc;
+> >  	struct lpss_shared_clock *shared_clock = dev_desc->shared_clock;
+> >  	const char *devname = dev_name(&adev->dev);
+> > -	struct clk *clk = ERR_PTR(-ENODEV);
+> > +	struct clk_core *clk = ERR_PTR(-ENODEV);
+> >  	struct lpss_clk_data *clk_data;
+> >  	const char *parent, *clk_name;
+> >  	void __iomem *prv_base;
+> > diff --git a/include/linux/platform_data/clk-lpss.h b/include/linux/platform_data/clk-lpss.h
+> > index 2390199..3c3237c 100644
+> > --- a/include/linux/platform_data/clk-lpss.h
+> > +++ b/include/linux/platform_data/clk-lpss.h
+> > @@ -15,7 +15,7 @@
+> >  
+> >  struct lpss_clk_data {
+> >  	const char *name;
+> > -	struct clk *clk;
+> > +	struct clk_core *clk;
+> >  };
+> >  
+> >  extern int lpt_clk_init(void);
+> > 
 > 
-> Heh, doesn't seem like a perfect fit to me ;)
-> 
->> Also, on Keystone 2 clocks are initialized early and
->> they are available at device creation time. The main problems from my side are:
->>   - every time when support for new HW modules is added the ".con_ids" array
->>     need to be checked and updated;
->>   - restriction for clock's names in DT - to be named using only above con_ids
->>     It's ugly.
->>
->> I hope, this approach to be accepted at least as temporal solution until
->> the generic solution is not found.
-> 
-> Sorry if I missed it, but is there ongoing discussion of a more generic
-> solution other than this one:
-
-Yep. :( But It's ongoing more than 2 months already and seems there is no
-light at the end of tunnel.
-
-> 
->> [1] Previously, same problem was discussed in, but no final solution was accepted:
->>   "[PATCH/RFC 0/4] of: Register clocks for Runtime PM with PM core"
->>   https://lkml.org/lkml/2014/4/24/1118
-> 
-> Personally, I still like Geert's approach better.
-> 
-
-Unfortunately, Geert is not going to continue working on it (as I know).
-
-Thanks for your comments.
-I agree. This solution isn't good - it's just fast attempt to solve problem
-with minimal changes in common code.
-
-
-Regards,
--grygorii
+> -- 
+> I speak only for myself.
+> Rafael J. Wysocki, Intel Open Source Technology Center.
