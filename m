@@ -1,40 +1,31 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 09 Sep 2014 14:36:30 +0200
-Subject: [PATCH v3 1/2] rtc: pcf8563: fix uninitialized use warning
+Date: Tue, 09 Sep 2014 14:37:02 +0200
+Subject: [PATCH v3 2/2] rtc: pcf8563: fix pcf8563_irq error return value
 In-Reply-To: <540DCEB0.6030108@cogentembedded.com>
 References: <2750370.rlMuFcoBUA@wuerfel> <540DCEB0.6030108@cogentembedded.com>
-Message-ID: <19416272.eCNUZ3hTWV@wuerfel>
+Message-ID: <3249459.KnxQRYTdsz@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-gcc-4.9 found a potential condition under which the 'pending'
-variable may be used uninitialized:
+As pointed out by Sergei Shtylyov, the pcf8563_irq function
+contains a bug in the error handling: an interrupt handler
+is not supposed to return an errno value but an 'enum
+irqreturn'.
 
-drivers/rtc/rtc-pcf8563.c: In function 'pcf8563_irq':
-drivers/rtc/rtc-pcf8563.c:173:5: warning: 'pending' may be used uninitialized in this function [-Wmaybe-uninitialized]
-
-This is because in the pcf8563_get_alarm_mode() function, we
-check any nonzero return of pcf8563_read_block_data, but
-in the irq function we only check for negative values, so
-a possible positive value does not get detected if the compiler
-chooses not to inline the entire call chain.
-
-Checking for any non-zero value in the interrupt handler as well
-is just as correct and lets the compiler know what we are doing,
-without needing a bogus initialization.
+Let's fix this by returning IRQ_NONE in case of a communication error.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 
 diff --git a/drivers/rtc/rtc-pcf8563.c b/drivers/rtc/rtc-pcf8563.c
-index 5a197d9dc7e7..3a6f994c4da8 100644
+index 3a6f994c4da8..c2ef0a22ee94 100644
 --- a/drivers/rtc/rtc-pcf8563.c
 +++ b/drivers/rtc/rtc-pcf8563.c
-@@ -167,7 +167,7 @@ static irqreturn_t pcf8563_irq(int irq, void *dev_id)
- 	char pending;
+@@ -168,7 +168,7 @@ static irqreturn_t pcf8563_irq(int irq, void *dev_id)
  
  	err = pcf8563_get_alarm_mode(pcf8563->client, NULL, &pending);
--	if (err < 0)
-+	if (err)
- 		return err;
+ 	if (err)
+-		return err;
++		return IRQ_NONE;
  
  	if (pending) {
+ 		rtc_update_irq(pcf8563->rtc, 1, RTC_IRQF | RTC_AF);
