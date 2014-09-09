@@ -1,56 +1,57 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 09 Sep 2014 10:23:01 +0200
-Subject: [PATCH v2] ARM: l2c: parse cache properties from ePAPR definitions
-In-Reply-To: <3750746.eYplbZAGky@wuerfel>
-References: <1410246633-23407-1-git-send-email-linus.walleij@linaro.org>
- <3750746.eYplbZAGky@wuerfel>
-Message-ID: <3872359.cDihUR1d12@wuerfel>
+From: daniel.thompson@linaro.org (Daniel Thompson)
+Date: Tue, 09 Sep 2014 09:24:16 +0100
+Subject: [PATCH v3 5/5] irqchip: gic: Add support for IPI FIQ
+In-Reply-To: <20140908162316.GC12361@n2100.arm.linux.org.uk>
+References: <1409931198-22600-1-git-send-email-daniel.thompson@linaro.org>
+ <1410190115-32604-1-git-send-email-daniel.thompson@linaro.org>
+ <1410190115-32604-6-git-send-email-daniel.thompson@linaro.org>
+ <20140908162316.GC12361@n2100.arm.linux.org.uk>
+Message-ID: <540EB930.6010404@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 09 September 2014 09:42:18 Arnd Bergmann wrote:
-> > +     switch (set_size >> 10) {
-> > +     case 512:
-> > +             set_size_bits = 6;
-> > +             break;
-> > +     case 256:
-> > +             set_size_bits = 5;
-> > +             break;
-> > +     case 128:
-> > +             set_size_bits = 4;
-> > +             break;
-> > +     case 64:
-> > +             set_size_bits = 3;
-> > +             break;
-> > +     case 32:
-> > +             set_size_bits = 2;
-> > +             break;
-> > +     case 16:
-> > +             set_size_bits = 1;
-> > +             break;
-> > +     default:
-> > +             pr_err("L2C OF: cache way size: %d KB is not mapped\n",
-> > +                    way_size);
-> > +             break;
-> > +     }
-> > +
-> > +     /*
-> > +      * The l2x0 TRMs call this size "way size" but that is incorrect:
-> > +      * the thing being configured in these register bits is actually
-> > +      * the cache set size, so the variable here has the right name
-> > +      * but the register bit definitions following the TRM are not
-> > +      * in archaic naming.
-> > +      */
+On 08/09/14 17:23, Russell King - ARM Linux wrote:
+> On Mon, Sep 08, 2014 at 04:28:35PM +0100, Daniel Thompson wrote:
+>> @@ -604,8 +731,19 @@ static void gic_raise_softirq(const struct cpumask *mask, unsigned int irq)
+>>  {
+>>  	int cpu;
+>>  	unsigned long flags, map = 0;
+>> +	unsigned long softint;
+>>  
+>> -	raw_spin_lock_irqsave(&irq_controller_lock, flags);
+>> +	/*
+>> +	 * The locking in this function ensures we don't use stale cpu mappings
+>> +	 * and thus we never route an IPI to the wrong physical core during a
+>> +	 * big.LITTLE switch. The switch code takes both of these locks meaning
+>> +	 * we can choose whichever lock is safe to use from our current calling
+>> +	 * context.
+>> +	 */
+>> +	if (in_nmi())
+>> +		raw_spin_lock(&fiq_safe_migration_lock);
+>> +	else
+>> +		raw_spin_lock_irqsave(&irq_controller_lock, flags);
 > 
-> No, I think actually the comment and the variable name are wrong here,
-> and the TRM is right. I'm surprised you get the right results out of
-> this. The set_size should be a relatively small number, e.g. 256 bytes
-> in case of an 8-way associative cache with 32 byte lines. What is the
-> pr_debug output and the properties you pass in for your example system?
-> 
+> Firstly, why would gic_raise_softirq() be called in FIQ context?
 
-I just saw you had 'cache-sets = <8>' in your original DT file. That
-is the wrong number, it needs to be 'cache-sets = <512>'. When you
-fix that, you should get the right way_size as well.
+Oops.
 
-	Arnd
+This code should have been removed. It *is* required for kgdb (which
+needs to send FIQ to other processors via IPI and may itself be running
+from FIQ) but it not needed for the currently targeted use case.
+
+
+> Secondly,
+> this doesn't save you.  If you were in the middle of gic_migrate_target()
+> when the FIQ happened that (for some reason prompted you to call this),
+> you would immediately deadlock trying to that this IRQ.
+
+This cannot happen because gic_migrate_target() runs with FIQ disabled.
+
+
+> I suggest not even trying to solve this "race" which I don't think is
+> one which needs to even be considered (due to the first point.)
+
+As mentioned above I believe it eventually needs to be addressed by some
+means but it certainly doesn't belong in the current patchset.
+
+I will remove it.
