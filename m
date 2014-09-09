@@ -1,61 +1,83 @@
-From: pavel@denx.de (Pavel Machek)
-Date: Tue, 9 Sep 2014 13:49:41 +0200
-Subject: 3.17-rc2: root=/dev/mmcblk0p2 command line parsing fails
-In-Reply-To: <CADhT+wdx2SsHnk=zML7a6mUVJxvLQ9ARO16QoYYsopAqhw7cow@mail.gmail.com>
-References: <1405397216-909-1-git-send-email-dinguyen@altera.com>
- <53C4D874.2040206@samsung.com>
- <20140814184710.GA11558@amd.pavel.ucw.cz>
- <53ED2262.50604@gmail.com>
- <20140814210252.GB26857@amd.pavel.ucw.cz>
- <20140826114707.GA16372@amd>
- <CADhT+wdx2SsHnk=zML7a6mUVJxvLQ9ARO16QoYYsopAqhw7cow@mail.gmail.com>
-Message-ID: <20140909114941.GE15404@amd>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 09 Sep 2014 13:50:09 +0200
+Subject: [PATCHv3 1/6] ARM: dts: Add SoC level device tree support for
+ LS1021A
+In-Reply-To: <1410253952-15631-2-git-send-email-jingchang.lu@freescale.com>
+References: <1410253952-15631-1-git-send-email-jingchang.lu@freescale.com>
+ <1410253952-15631-2-git-send-email-jingchang.lu@freescale.com>
+Message-ID: <4286278.g3iXMFknkK@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+On Tuesday 09 September 2014 17:12:27 Jingchang Lu wrote:
 
-> > The problem is still there in 3.17-rc2. 3.16 does not have the
-> > problem. Messages are still similar:
-> >
-> > mmc0: new high speed SDHC card at address b368
-> > mmcblk0: mmc0:b368 USD   7.45 GiB
-> >  mmcblk0: p1 p2 p3 p4
-> > VFS: Cannot open root device "mmcblk0p2" or unknown-block(0,0): error
-> > -6
-> > Please append a correct "root=" boot option; here are the available
-> > partitions:
-> > b300         7822336 mmcblk0  driver: mmcblk
-> >   b301          102400 mmcblk0p1 00082434-01
-> >   b302         1048576 mmcblk0p2 00082434-02
-> >   b303            1024 mmcblk0p3 00082434-03
-> >   b304         6086656 mmcblk0p4 00082434-04
-> > Kernel panic - not syncing: VFS: Unable to mount root fs on unknown-block(0,0)
-> > CPU: 0 PID: 1 Comm: swapper/0 Not tainted
-> > 3.17.0-rc2-00368-gec0400b-dirty #83
-> >
-> >
-> > What is going on there? Clearly partition table was parsed and
-> > partitions are available; does the mention of unknown-block(0,0) mean
-> > that kernel failed to parse the command line?
-> >
-> > I replaced "root=/dev/mmcblk0p2" with "root=b302" and have a booting
-> > system.
-> 
-> 
-> Can you do a bisect? 3.17-rc2 booted fine for me today:
-> 
-> EXT3-fs (mmcblk0p2): mounted filesystem with ordered data mode
-> VFS: Mounted root (ext3 filesystem) on device 179:2.
-> Freeing unused kernel memory: 252K (c052d000 - c056c000)
-> random: nonblocking pool is initialized
+> +		dcfg: dcfg at 1ee0000 {
+> +			compatible = "fsl,ls1021a-dcfg";
+> +			reg = <0x0 0x1ee0000 0x0 0x10000>;
+> +		};
+> +		scfg: scfg at 1570000 {
+> +			compatible = "fsl,ls1021a-scfg";
+> +			reg = <0x0 0x1570000 0x0 0x10000>;
+> +		};
 
-Bisect would be hard... and I believe the problem is somewhere in
-block layer now -- not socfpga-specific.
+Should these be marked as 'compatible = "syscon"' as well?
 
-Best regards,
-								Pavel
+> +	dcsr {
+> +		#address-cells = <1>;
+> +		#size-cells = <1>;
+> +		compatible = "fsl,dcsr", "simple-bus";
+> +
+> +		ranges = <0x0 0x0 0x20000000 0x1000000>;
+> +
+> +		dcsr-epu at 0 {
+> +			compatible = "fsl,ls1021a-dcsr-epu";
+> +			reg = <0x0 0x10000>;
+> +		};
 
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+The binding document only specifies a generic "fsl,dcsr-epu", not
+"fsl,ls1021a-dcsr-epu". It also mandates that "interrupts"
+must be present and contain three interrupt lines.
+
+Please fix either the DT or the binding, so they match.	
+
+> +		dcsr-gdi at 100000 {
+> +			compatible = "fsl,ls1021a-dcsr-gdi";
+> +			reg = <0x100000 0x10000>;
+> +		};
+> +
+> +		dcsr-dddi at 120000 {
+> +			compatible = "fsl,ls1021a-dcsr-dddi";
+> +			reg = <0x120000 0x10000>;
+> +		};
+> +
+> +		dcsr-dcfg at 220000 {
+> +			compatible = "fsl,ls1021a-dcsr-dcfg";
+> +			reg = <0x220000 0x1000>;
+> +		};
+> +
+> +		dcsr-clock at 221000 {
+> +			compatible = "fsl,ls1021a-dcsr-clock";
+> +			reg = <0x221000 0x1000>;
+> +		};
+
+None of these are part of the dcsr.txt binding.
+
+> +		dcsr-rcpm at 222000 {
+> +			compatible = "fsl,ls1021a-dcsr-rcpm";
+> +			reg = <0x222000 0x1000 0x223000 0x1000>;
+> +		};
+
+Missing generic fsl,dcsr-rcpm compatible value again.
+
+> +		dcsr-ccp at 225000 {
+> +			compatible = "fsl,ls1021a-dcsr-ccp";
+> +			reg = <0x225000 0x1000>;
+> +		};
+
+I'm not checking any devices below this one, I assume they are mostly
+incomplete, so please go through the whole list and make sure they
+all match the documentation.
+I can't really find any code using the dcsr in Linux. Is there
+an out of tree driver that you plan to submit?
+
+	Arnd
