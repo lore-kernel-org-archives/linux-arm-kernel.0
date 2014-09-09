@@ -1,49 +1,65 @@
-From: s-anna@ti.com (Suman Anna)
-Date: Tue, 9 Sep 2014 11:15:22 -0500
-Subject: [PATCHv3 0/5] OMAP Mailbox framework adoption & DT support
-In-Reply-To: <20140909025225.GI10785@atomide.com>
-References: <1406680479-18446-1-git-send-email-s-anna@ti.com>
- <20140908232053.GS3238@atomide.com> <20140909025225.GI10785@atomide.com>
-Message-ID: <540F279A.1080700@ti.com>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Tue, 9 Sep 2014 21:27:16 +0530
+Subject: [PATCH v3 2/2] dma: Add Xilinx AXI Direct Memory Access Engine
+ driver support
+In-Reply-To: <CA+mB=1KarJGUYTZu=2k46gqt3oMAuYawfq+H=Lxa7YVqcThjCw@mail.gmail.com>
+References: <1406549869-24422-1-git-send-email-sthokal@xilinx.com>
+ <1406549869-24422-2-git-send-email-sthokal@xilinx.com>
+ <20140819170346.GS13288@intel.com>
+ <CA+mB=1L14Os=ZdJzj8_+XXa+oq4ZOS_kadQHpKQ2yws2tqGVSQ@mail.gmail.com>
+ <20140904063613.GD1610@intel.com>
+ <CA+mB=1KarJGUYTZu=2k46gqt3oMAuYawfq+H=Lxa7YVqcThjCw@mail.gmail.com>
+Message-ID: <20140909155716.GN1610@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tony,
-
-On 09/08/2014 09:52 PM, Tony Lindgren wrote:
-> * Tony Lindgren <tony@atomide.com> [140908 16:21]:
->> * Suman Anna <s-anna@ti.com> [140729 17:37]:
->>> Hi,
->>>
->>> This is an updated version of the OMAP Mailbox framework adoption &
->>> DT support series, refreshed to work with the v9 version of the mailbox
->>> framework [1] from Jassi Brar while also addressing some minor review
->>> comments. Detailed changes are summarized below. Patches are based on
->>> 3.16-rc2.
->>
->> Sorry for the delay, just noticed that I'm supposed to queue
->> these too. I'll queue these into omap-for-v3.18/mailbox against
->> v3.17-rc1 and will probably also merge it into omap-for-v3.18/dt
->> as well.
+On Tue, Sep 09, 2014 at 12:52:16AM +0530, Srikanth Thokala wrote:
+> Hi Vinod,
 > 
-> Actually this is not compiling and seems to probably miss
-> the dependencies from Jassi, so dropping the branch.
+> On Thu, Sep 4, 2014 at 12:06 PM, Vinod Koul <vinod.koul@intel.com> wrote:
+> > On Wed, Sep 03, 2014 at 12:17:43PM +0530, Srikanth Thokala wrote:
+> >> Hi Vinod,
+> >>
+> >> Apologies for the delay.
+> >>
+> >> On Tue, Aug 19, 2014 at 10:33 PM, Vinod Koul <vinod.koul@intel.com> wrote:
+> >> > On Mon, Jul 28, 2014 at 05:47:49PM +0530, Srikanth Thokala wrote:
+> >> >> +struct xilinx_dma_chan {
+> >> >> +     struct xilinx_dma_device *xdev;
+> >> >> +     u32 ctrl_offset;
+> >> >> +     spinlock_t lock;
+> >> >> +     struct list_head pending_list;
+> >> >> +     struct xilinx_dma_tx_descriptor *active_desc;
+> >> >> +     struct xilinx_dma_tx_descriptor *allocated_desc;
+> >> >> +     struct list_head done_list;
+> >> >> +     struct list_head free_seg_list;
+> >> >> +     struct dma_chan common;
+> >> >> +     struct xilinx_dma_tx_segment *seg_v;
+> >> >> +     dma_addr_t seg_p;
+> >> >> +     struct device *dev;
+> >> >> +     int irq;
+> >> >> +     int id;
+> >> >> +     enum dma_transfer_direction direction;
+> >> > This looks suspect. Why should channel have direction, for a descriptor it
+> >> > makes sense though.
+> >>
+> >> The channel only supports transfers in one direction. Either from memory to
+> >> peripheral or from peripheral to memory, that's fixed and can't be changed
+> >> at runtime.  So, the driver needs to know which direction the channel supports
+> >> and hence it can reject transfers with the wrong direction.
+> > But you already have this information in descriptor so why duplicate?
+> 
+> Our descriptor doesn't have the information of channel direction, we have this
+> information only in the chan structure (struct xilinx_dma_chan) which
+> is populated
+> while parsing the DT.  So, we use this information to ensure if we are servicing
+> proper channel (in prep_slave_sg call).
+One of the argument of prep_slave_sg call is direction. You need to use that
+and store in in your descriptor for using it afterwards
 
-The last 2 patches which is the framework adoption portion needs the
-framework patches from Jassi (as stated in the cover letter). I will
-ping on the framework thread to see if it is making it into 3.18. In any
-case, we should be able to take the first three patches (2 in drivers
-and 1 for DT) - they are independent of the framework and also are
-dependencies for the framework adoption patches.
+> FYI: We also need the direction of the channel so that we can select SRC/DST
+> register address in the issue_pending() call.
+And you have the descriptor there as well so can use it
 
-> Anyways, since it seems you need to repost this again, please
-> repost the DT changes separately from the driver changes.
-
-Yeah, the other two dependent series are merged for 3.17, so these are
-the only patches remaining. I just need to repost them on a 3.17-rc, but
-there are no changes required (even with v10 of the framework). So given
-above, do you want me to split the first 3 (there is one DT patch) and
-post them so that they can be merged for 3.18?
-
-regards
-Suman
+-- 
+~Vinod
