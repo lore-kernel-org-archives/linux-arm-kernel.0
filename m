@@ -1,49 +1,159 @@
-From: tomeu@tomeuvizoso.net (Tomeu Vizoso)
-Date: Tue, 9 Sep 2014 10:21:14 +0200
-Subject: [PATCH v3 0/9] Tegra xHCI support
-In-Reply-To: <CAL1qeaF7U9aoBp5gQPS=r+pe6krKmXdP1qak2gjhNqQMoHFB8A@mail.gmail.com>
-References: <1409693701-16520-1-git-send-email-abrestic@chromium.org>
- <CAAObsKAYqpJMJnxSMxhkkRtnoEwLwgUa1y7ij5ZHvHf1jRok+Q@mail.gmail.com>
- <CAL1qeaF7U9aoBp5gQPS=r+pe6krKmXdP1qak2gjhNqQMoHFB8A@mail.gmail.com>
-Message-ID: <CAAObsKAXO-pBtqd1jNj8faXqpE+5Wb0RFzPp+jn9FH0B=dHq8g@mail.gmail.com>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Tue, 09 Sep 2014 10:24:13 +0200
+Subject: [PATCH] ARM: dts: Add SPI nodes to rk3288
+In-Reply-To: <1409935991-15067-1-git-send-email-dianders@chromium.org>
+References: <1409935991-15067-1-git-send-email-dianders@chromium.org>
+Message-ID: <1893562.fBlNbjpirW@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 8 September 2014 18:22, Andrew Bresticker <abrestic@chromium.org> wrote:
-> On Mon, Sep 8, 2014 at 8:34 AM, Tomeu Vizoso <tomeu@tomeuvizoso.net> wrote:
->> On 2 September 2014 23:34, Andrew Bresticker <abrestic@chromium.org> wrote:
->>>
->>> Tested on Venice2, Jetson TK1, and Big with a variety of USB2.0 and
->>> USB3.0 memory sticks and ethernet dongles using controller firmware
->>> recently posted by Andrew Chew [2].
->>
->> I have had mixed results when testing this on a Jetson TK1 board. Of 8
->> USB devices I tested with, about half where probed correctly, but the
->> other half repeatedly fail in hub_port_init because in the GET_STATUS
->> right after the reset, the C_PORT_CONNECTION bit is set.
->>
->> I don't see any correlation between the failure and the kind of usb
->> device, but I don't have much experience with USB implementations
->> either.
->
-> Hmm... I haven't seen that before.  Which particular devices were you using?
+Am Freitag, 5. September 2014, 09:53:11 schrieb Doug Anderson:
+> From: huang lin <hl@rock-chips.com>
+> 
+> This adds basic SPI nodes to the base rk3288 device tree file.
+> 
+> A few notes:
+> * It's assumed that most users of the SPI ports are using chip select
+>   0.  Thus the default pinctrl for the ports enables chip select 0
+>   (but not chip select 1 on ports that have it).  If a board wants to
+>   use chip select 1 or wants a GPIO chip select the board should
+>   override the pinctrl (just like boards can override UART pinctrl if
+>   they have hardware flow control).
+> * Since SPI DMA support appears broken and the SPI works fine without
+>   DMA we don't include the DMA references.  That can come in a later
+>   change.
 
-Here they are:
+Added to my dts branch with the one small change described below
 
-work:
 
-Genius keyboard: 05d5:6782
-Logitech mouse: 046d:c06a
-Denver MP3 player: 10d6:1100
-Atheros Bluetooth dongle: 0cf3:3005
+> 
+> Signed-off-by: huang lin <hl@rock-chips.com>
+> Signed-off-by: Doug Anderson <dianders@chromium.org>
+> ---
+> 
+>  arch/arm/boot/dts/rk3288.dtsi | 92
+> +++++++++++++++++++++++++++++++++++++++++++ 1 file changed, 92
+> insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/rk3288.dtsi b/arch/arm/boot/dts/rk3288.dtsi
+> index 5f866e0..75d1f4c 100644
+> --- a/arch/arm/boot/dts/rk3288.dtsi
+> +++ b/arch/arm/boot/dts/rk3288.dtsi
+> @@ -34,6 +34,9 @@
+>  		serial2 = &uart2;
+>  		serial3 = &uart3;
+>  		serial4 = &uart4;
+> +		spi0 = &spi0;
+> +		spi1 = &spi1;
+> +		spi2 = &spi2;
+>  	};
+> 
+>  	cpus {
+> @@ -128,6 +131,45 @@
+>  		status = "disabled";
+>  	};
+> 
+> +	spi0: spi at ff110000 {
+> +		compatible = "rockchip,rk3066-spi";
 
-don't work:
+I've changed the compatibles to the one defined in the binding, aka
+	"rockchip,rk3288-spi", "rockchip,rk3066-spi"
 
-MCS7830 ethernet dongle: 9710:7830
-Genesys Logic hub: 05e3:0608
-Alcor flash drive: 058f:6387
-JMicron SATA bridge: 152d:2329
 
-HTH,
-
-Tomeu
+> +		clocks = <&cru SCLK_SPI0>, <&cru PCLK_SPI0>;
+> +		clock-names = "spiclk", "apb_pclk";
+> +		interrupts = <GIC_SPI 44 IRQ_TYPE_LEVEL_HIGH>;
+> +		pinctrl-names = "default";
+> +		pinctrl-0 = <&spi0_clk &spi0_tx &spi0_rx &spi0_cs0>;
+> +		reg = <0xff110000 0x1000>;
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +		status = "disabled";
+> +	};
+> +
+> +	spi1: spi at ff120000 {
+> +		compatible = "rockchip,rk3066-spi";
+> +		clocks = <&cru SCLK_SPI1>, <&cru PCLK_SPI1>;
+> +		clock-names = "spiclk", "apb_pclk";
+> +		interrupts = <GIC_SPI 45 IRQ_TYPE_LEVEL_HIGH>;
+> +		pinctrl-names = "default";
+> +		pinctrl-0 = <&spi1_clk &spi1_tx &spi1_rx &spi1_cs0>;
+> +		reg = <0xff120000 0x1000>;
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +		status = "disabled";
+> +	};
+> +
+> +	spi2: spi at ff130000 {
+> +		compatible = "rockchip,rk3066-spi";
+> +		clocks = <&cru SCLK_SPI2>, <&cru PCLK_SPI2>;
+> +		clock-names = "spiclk", "apb_pclk";
+> +		interrupts = <GIC_SPI 46 IRQ_TYPE_LEVEL_HIGH>;
+> +		pinctrl-names = "default";
+> +		pinctrl-0 = <&spi2_clk &spi2_tx &spi2_rx &spi2_cs0>;
+> +		reg = <0xff130000 0x1000>;
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +		status = "disabled";
+> +	};
+> +
+>  	i2c1: i2c at ff140000 {
+>  		compatible = "rockchip,rk3288-i2c";
+>  		reg = <0xff140000 0x1000>;
+> @@ -700,6 +742,56 @@
+>  			};
+>  		};
+> 
+> +		spi0 {
+> +			spi0_clk: spi0-clk {
+> +				rockchip,pins = <5 12 RK_FUNC_1 &pcfg_pull_up>;
+> +			};
+> +			spi0_cs0: spi0-cs0 {
+> +				rockchip,pins = <5 13 RK_FUNC_1 &pcfg_pull_up>;
+> +			};
+> +			spi0_tx: spi0-tx {
+> +				rockchip,pins = <5 14 RK_FUNC_1 &pcfg_pull_up>;
+> +			};
+> +			spi0_rx: spi0-rx {
+> +				rockchip,pins = <5 15 RK_FUNC_1 &pcfg_pull_up>;
+> +			};
+> +			spi0_cs1: spi0-cs1 {
+> +				rockchip,pins = <5 16 RK_FUNC_1 &pcfg_pull_up>;
+> +			};
+> +		};
+> +		spi1 {
+> +			spi1_clk: spi1-clk {
+> +				rockchip,pins = <7 12 RK_FUNC_2 &pcfg_pull_up>;
+> +			};
+> +			spi1_cs0: spi1-cs0 {
+> +				rockchip,pins = <7 13 RK_FUNC_2 &pcfg_pull_up>;
+> +			};
+> +			spi1_rx: spi1-rx {
+> +				rockchip,pins = <7 14 RK_FUNC_2 &pcfg_pull_up>;
+> +			};
+> +			spi1_tx: spi1-tx {
+> +				rockchip,pins = <7 15 RK_FUNC_2 &pcfg_pull_up>;
+> +			};
+> +		};
+> +
+> +		spi2 {
+> +			spi2_cs1: spi2-cs1 {
+> +				rockchip,pins = <8 3 RK_FUNC_1 &pcfg_pull_up>;
+> +			};
+> +			spi2_clk: spi2-clk {
+> +				rockchip,pins = <8 6 RK_FUNC_1 &pcfg_pull_up>;
+> +			};
+> +			spi2_cs0: spi2-cs0 {
+> +				rockchip,pins = <8 7 RK_FUNC_1 &pcfg_pull_up>;
+> +			};
+> +			spi2_rx: spi2-rx {
+> +				rockchip,pins = <8 8 RK_FUNC_1 &pcfg_pull_up>;
+> +			};
+> +			spi2_tx: spi2-tx {
+> +				rockchip,pins = <8 9 RK_FUNC_1 &pcfg_pull_up>;
+> +			};
+> +		};
+> +
+>  		uart0 {
+>  			uart0_xfer: uart0-xfer {
+>  				rockchip,pins = <4 16 RK_FUNC_1 &pcfg_pull_up>,
