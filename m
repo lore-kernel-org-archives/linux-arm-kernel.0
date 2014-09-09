@@ -1,47 +1,39 @@
-From: khilman@kernel.org (Kevin Hilman)
-Date: Tue, 09 Sep 2014 08:40:13 -0700
-Subject: [PATCH/RFC 4/5] ARM: shmobile: R-Mobile: Add DT support for PM
- domains
-In-Reply-To: <1410183344-14756-5-git-send-email-geert+renesas@glider.be>
- (Geert Uytterhoeven's message of "Mon, 8 Sep 2014 15:35:43 +0200")
-References: <1410183344-14756-1-git-send-email-geert+renesas@glider.be>
- <1410183344-14756-5-git-send-email-geert+renesas@glider.be>
-Message-ID: <7hfvg0kdk2.fsf@deeprootsystems.com>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Tue, 9 Sep 2014 09:41:23 -0600
+Subject: [PATCH v10 07/10] OF: Introduce helper function for getting PCI
+ domain_nr
+In-Reply-To: <CAErSpo4cAfom2=07NYDRfTCdHO22M0v+ueiaZuG6v2Xd18wEnQ@mail.gmail.com>
+References: <1410184472-17630-1-git-send-email-Liviu.Dudau@arm.com>
+ <1410184472-17630-8-git-send-email-Liviu.Dudau@arm.com>
+ <CAL_JsqJi8k1Goc3UmXhuxf9v7=4gJrYG_Di7v574PxS8TsJaXw@mail.gmail.com>
+ <20140908145459.GO27864@e106497-lin.cambridge.arm.com>
+ <CAL_JsqJdGKDVwJOpPp19OkVPGzR7Zqv3nh+ONHHaYnPLYTYoYg@mail.gmail.com>
+ <20140908155931.GP27864@e106497-lin.cambridge.arm.com>
+ <540E960D.7080408@huawei.com>
+ <20140909084621.GS27864@e106497-lin.cambridge.arm.com>
+ <540EC8CB.7010106@huawei.com>
+ <CAErSpo4cAfom2=07NYDRfTCdHO22M0v+ueiaZuG6v2Xd18wEnQ@mail.gmail.com>
+Message-ID: <20140909154123.GA12906@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Geert Uytterhoeven <geert+renesas@glider.be> writes:
+On Tue, Sep 09, 2014 at 08:26:19AM -0600, Bjorn Helgaas wrote:
 
-> Populate the PM domains from DT, and provide support to hook up devices
-> to their respective PM domain.
->
-> The always-on power area (e.g. C5 on r8a7740) is created as a PM domain
-> without software control, to allow Run-Time management of module clocks
-> for hardware blocks inside this area in the future.
-> Power-on/off latencies are supported.
->
-> Limitations and special cases in the non-DT case are handled through
-> rmobile_pm_quirks(). Checks for hardcoded PM domain indices should be
-> replaced by the analysis of relations between devices and PM domains in
-> DT.
->
-> Initialization is done from core_initcall(), as the
-> "renesas,intc-irqpin" driver uses postcore_initcall().
->
-> This is functionally almost equivalent to the non-DT case. Missing are
-> Run-Time management of the module clocks (pm_clk_*()), and device
-> latencies.
->
-> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> So as long as the DT tells you the ECAM information for each host
+> bridge, that should be sufficient.  The domain number is then just a
+> Linux convenience and is not tied to the platform as it is on ia64.
 
-[...]
+I think this is right for DT systems - the domain is purely internal
+to the kernel and userspace, it is used to locate the proper host
+bridge driver instance, which contains the proper config accessor (and
+register bases, etc).
 
-> +static int r8a7740_pd_a4s_suspend(void)
-> +{
-> +	/*
-> +	 * The A4S domain contains the CPU core and therefore it should
-> +	 * only be turned off if the CPU is in use.
+AFAIK the main reason to have a DT alias to learn the domain number is
+to make it stable so things like udev/etc can reliably match on the
+PCI location.
 
-I think you meant "if the CPU is *not* in use."  ?  :)
+This is similar to i2c, etc that use the alias scheme, so IMHO
+whatever they do to assign ID's to drivers should be copied for domain
+numbers.
 
-Kevin
+Jason
