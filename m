@@ -1,56 +1,40 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 09 Sep 2014 11:16:04 +0200
-Subject: [PATCH v10 07/10] OF: Introduce helper function for getting PCI
- domain_nr
-In-Reply-To: <20140909084621.GS27864@e106497-lin.cambridge.arm.com>
-References: <1410184472-17630-1-git-send-email-Liviu.Dudau@arm.com>
- <540E960D.7080408@huawei.com>
- <20140909084621.GS27864@e106497-lin.cambridge.arm.com>
-Message-ID: <3780051.0eHpCN6UC9@wuerfel>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Tue, 9 Sep 2014 11:19:12 +0200
+Subject: [PATCH] GICv3: Fixing 32 bit compatibility
+In-Reply-To: <20140909091201.GA4527@rric.localhost>
+References: <1410185480-5153-1-git-send-email-rric@kernel.org>
+ <20140909080042.GO23009@pengutronix.de>
+ <20140909091201.GA4527@rric.localhost>
+Message-ID: <20140909091912.GQ23009@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 09 September 2014 09:46:21 Liviu Dudau wrote:
-> On Tue, Sep 09, 2014 at 06:54:21AM +0100, Yijing Wang wrote:
-> > >>> on new requests. This function gets called quite a lot and I'm trying not to
-> > >>> make it too heavy weight.
-> > >>
-> > >> Generally, nothing should be accessing the same DT value frequently.
-> > >> It should get cached somewhere.
-> > >>
-> > > 
-> > > The problem appears for DTs that don't have the pci-domain info. Then the cached
-> > > value is left at the default non-valid value and attempts to rescan the DT will
-> > > be made every time the function is called.
-> > > 
-> > >> I don't really understand how domains are used so it's hard to provide
-> > >> a recommendation here. Do domains even belong in the DT?
-> > > 
-> > > ACPI calls them segments and the way Bjorn explained it to me at some moment was
-> > > that it was an attempt to split up a bus in different groups (or alternatively,
-> > > merge a few busses together). To be honest I haven't seen systems where the domain
-> > > is anything other than zero, but JasonG (or maybe Benjamin) were floating an
-> > > idea of using the domain number to identify physical slots.
-> > 
-> > PCI domain(or named segment) is provided by firmware, in ACPI system, we evaluated it
-> > by method "_SEG". in IA64 with ACPI, PCI hostbridge driver retrieves the domain from ACPI,
-> > if it's absent, the default domain is zero. So I wonder why in DTS, if it's absent, we get
-> > a auto increment domain value.
+On Tue, Sep 09, 2014 at 11:12:01AM +0200, Robert Richter wrote:
+> On 09.09.14 10:00:42, Uwe Kleine-K?nig wrote:
+> > On Mon, Sep 08, 2014 at 04:11:19PM +0200, Robert Richter wrote:
 > 
-> Because you can have more than one hostbridge (rare, but not impossible) and unless you
-> want to join the two segments, you might want to give it a different domain.
+> > > @@ -479,7 +479,7 @@ static void gic_raise_softirq(const struct cpumask *mask, unsigned int irq)
+> > >     smp_wmb();
+> > >  
+> > >     for_each_cpu_mask(cpu, *mask) {
+> > > -           u64 cluster_id = cpu_logical_map(cpu) & ~0xffUL;
+> > > +           u64 cluster_id = cpu_logical_map(cpu) & ~0xffULL;
+> > This doesn't change anything, does it?
+> 
+> It does, not in 64 bit but in 32 bit there unsigned long is 32
+> bit. So, bit masks are broken if you compile a 32 bit kernel.
+Can you make an example where the result actually changes?
 
-I think you misunderstood the question. The difference is that in ACPI you
-are required to specify the domain, while in DT it is optional with your
-implementation.
+> > I wonder if it would be cleaner to use (u64)0xff here.
+> 
+> No, that's ULL for. This is commonly used in x86 too.
+I don't care much here, but I'd say ULL is to force an unsigned long
+long. If you want to make it obvious that you want a 64bit value, a cast
+to u64 makes this more clear.
 
-I think in general it would be nice if we could mandate that in DT you also
-have to always provide a domain number, however the problem is that we can't
-change the existing DTB files that people are using that do not specify a
-domain.
+Best regards
+Uwe
 
-We could possibly make this an architecture specific setting though and
-mandate that all ARM64 platforms have to set it, while ARM32 does not need
-it.
-
-	Arnd
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
