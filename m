@@ -1,39 +1,30 @@
-From: jcm@redhat.com (Jon Masters)
-Date: Tue, 09 Sep 2014 15:39:38 -0400
-Subject: [PATCH v2 3/3] arm64/efi: efistub: don't abort if base of DRAM
- is occupied
-In-Reply-To: <20140820173528.GH21734@leverpostej>
-References: <1406717944-24725-1-git-send-email-ard.biesheuvel@linaro.org>
- <1406717944-24725-4-git-send-email-ard.biesheuvel@linaro.org>
- <20140814113204.GE24018@leverpostej>
- <20140820171057.GG29733@console-pimps.org>
- <20140820173528.GH21734@leverpostej>
-Message-ID: <540F577A.4040709@redhat.com>
+From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
+Date: Tue, 09 Sep 2014 21:41:20 +0200
+Subject: [PATCH v8 00/18] 8250-core based serial driver for OMAP + DMA
+In-Reply-To: <20140908183353.GB4686@ci00147.xsens-tech.local>
+References: <1409943773-7874-1-git-send-email-bigeasy@linutronix.de>
+ <20140908144616.GA22315@ci00147.xsens-tech.local>
+ <20140908151501.GA22584@linutronix.de>
+ <20140908183353.GB4686@ci00147.xsens-tech.local>
+Message-ID: <540F57E0.8030404@linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/20/2014 01:35 PM, Mark Rutland wrote:
-> On Wed, Aug 20, 2014 at 06:10:57PM +0100, Matt Fleming wrote:
->> On Thu, 14 Aug, at 12:32:05PM, Mark Rutland wrote:
->>> On Wed, Jul 30, 2014 at 11:59:04AM +0100, Ard Biesheuvel wrote:
->>>> If we cannot relocate the kernel Image to its preferred offset of base of DRAM
->>>> plus TEXT_OFFSET, instead relocate it to the lowest available 2 MB boundary plus
->>>> TEXT_OFFSET. We may lose a bit of memory at the low end, but we can still
->>>> proceed normally otherwise.
->>>>
->>>> Signed-off-by: Ard Biesheuvel <ard.biesheuvel-QSEj5FYQhm4dnm+yROfE0A@public.gmane.org>
->>>> Acked-by: Mark Salter <msalter-H+wXaHxf7aLQT0dZR+AlfA@public.gmane.org>
->>>
->>> Acked-by: Mark Rutland <mark.rutland-5wv7dgnIgG8@public.gmane.org>
->>
->> Ard, who's picking this up?
+On 09/08/2014 08:33 PM, Frans Klaver wrote:
+> Thanks. I'll give it a spin on Wednesday.
+
+Could you please pull the upcoming v9 first?
+
+ git://git.breakpoint.cc/bigeasy/linux.git uart_v9_pre1
+
+This solves a few of my am335x related issues.
+
+The problem that the uart freezes on beagle board xm is still there.
+>From what I can say is that the DMA transfer is started but not
+completed and I can't reproduce it on dra7xx
+
+> Thanks,
+> Frans
 > 
-> Will's already taken this into arm64/devel [1,2] with the intention of
-> waiting for v3.18 [3]. Per Leif's comment [4] that might have to be
-> bumped.
 
-So what's the plan with this series? Waiting for 3.18? The problem is
-that this patch series needs to be pulled for any platform with an EFI
-firmware located at DRAM base (e.g. AMD Seattle) as was noted before.
-
-Jon.
+Sebastian
