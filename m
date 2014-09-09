@@ -1,125 +1,41 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Tue, 9 Sep 2014 16:51:50 +0100
-Subject: [PATCH v9 5/8] drivers: cpuidle: implement DT based idle states
- infrastructure
-In-Reply-To: <7hoauqw1c2.fsf@paris.lan>
-References: <1409938498-17984-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1409938498-17984-6-git-send-email-lorenzo.pieralisi@arm.com>
- <7hlhpxygzv.fsf@paris.lan>
- <20140905212908.GA28626@e102568-lin.cambridge.arm.com>
- <7hoauqw1c2.fsf@paris.lan>
-Message-ID: <20140909155150.GB4948@e102568-lin.cambridge.arm.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Tue, 9 Sep 2014 11:53:34 -0400
+Subject: [PATCH 0/2] ARM: mvebu: Use Hardware BCH ECC for RN104 and RN2120
+In-Reply-To: <cover.1410035142.git.arno@natisbad.org>
+References: <cover.1410035142.git.arno@natisbad.org>
+Message-ID: <20140909155334.GO30828@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 08, 2014 at 04:58:53PM +0100, Kevin Hilman wrote:
-> Lorenzo Pieralisi <lorenzo.pieralisi@arm.com> writes:
+On Sat, Sep 06, 2014 at 10:48:44PM +0200, Arnaud Ebalard wrote:
+> Hi,
 > 
-> > On Fri, Sep 05, 2014 at 09:00:52PM +0100, Kevin Hilman wrote:
-> >> Lorenzo Pieralisi <lorenzo.pieralisi@arm.com> writes:
-> >> 
-> >> > On most common ARM systems, the low-power states a CPU can be put into are
-> >> > not discoverable in HW and require device tree bindings to describe
-> >> > power down suspend operations and idle states parameters.
-> >> >
-> >> > In order to enable DT based idle states and configure idle drivers, this
-> >> > patch implements the bulk infrastructure required to parse the device tree
-> >> > idle states bindings and initialize the corresponding CPUidle driver states
-> >> > data.
-> >> >
-> >> > The parsing API accepts a start index that defines the first idle state
-> >> > that should be initialized by the parsing code in order to give new and
-> >> > legacy driver flexibility over which states should be parsed using the
-> >> > new DT mechanism.
-> >> >
-> >> > The idle states node(s) is obtained from the phandle list of the first cpu
-> >> > in the driver cpumask;  the kernel checks that the idle state node phandle
-> >> > is the same for all CPUs in the driver cpumask before declaring the idle state
-> >> > as valid and start parsing its content.
-> >> >
-> >> > The idle state enter function pointer is initialized through DT match
-> >> > structures passed in by the CPUidle driver, so that ARM legacy code can
-> >> > cope with platform specific idle entry method based on compatible
-> >> > string matching and the code used to initialize the enter function pointer
-> >> > can be moved to the DT generic layer.
-> >> >
-> >> > Acked-by: Catalin Marinas <catalin.marinas@arm.com>
-> >> > Acked-by: Daniel Lezcano <daniel.lezcano@linaro.org>
-> >> > Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> >> 
-> >> [...]
-> >> 
-> >> > +	idle_state->flags = CPUIDLE_FLAG_TIME_VALID;
-> >> > +	if (of_property_read_bool(state_node, "local-timer-stop"))
-> >> > +		idle_state->flags |= CPUIDLE_FLAG_TIMER_STOP;
-> >> > +	/*
-> >> > +	 * TODO:
-> >> > +	 *	replace with kstrdup and pointer assignment when name
-> >> > +	 *	and desc become string pointers
-> >> > +	 */
-> >> > +	strncpy(idle_state->name, state_node->name, CPUIDLE_NAME_LEN - 1);
-> >> > +	strncpy(idle_state->desc, state_node->name, CPUIDLE_DESC_LEN - 1);
-> >> 
-> >> This is a very minor concern, and shouldn't hold back this series,
-> >> but...
-> >> 
-> >> I was playing with this series in order to test out the qcom cpuidle
-> >> driver from Lina, and noticed that the state name and descriptions were
-> >> not terribly helpful:
-> >> 
-> >> /sys/devices/system/cpu/cpu0/cpuidle # cat state?/name
-> >> cpu-idle-state-
-> >> cpu-idle-state-
-> >> /sys/devices/system/cpu/cpu0/cpuidle # cat state?/desc
-> >> cpu-idle-state-0
-> >> cpu-idle-state-1
-> >> 
-> >> Turns out these strings come from the node name itself, and truncated in
-> >> the case of state->name, but this can be fixed in the DTS itself (c.f.
-> >> reply to Lina's driver.)
-> >> 
-> >> However, seeing that the node name is used to populate both the
-> >> state->name and ->, made me wonder if there should better way to set the
-> >> state->desc field to a more useful string.  Tools like powertop actually
-> >> use that field and it can be quite useful.
-> >
-> > Well, the truncation problem will be solved when those strings will be
-> > kdup'ed, so for the name I think there is not a problem, copying the
-> > state node is fine waiting for those strings to become pointers.
-> >
-> > For desc, there are four options:
-> >
-> > (1) enumerating idle states (but that's worse than copying the name into
-> >     desc since on ARM idle-state{1,2,3...} means nothing)
-> > (2) copying the idle state node compatible string into desc
-> > (3) Add an optional property to the DT bindings to describe the state
-> > (4) Leave code as it is
-> >
-> > (3) I am not extremely keen at this stage to re-patch the DT bindings,
-> > it has been an awful lot of work to make everyone agree so I would avoid
-> > any changes, I hope you understand (and I am not even sure DT maintainers
-> > would accept that, so even less keen on changing the DT bindings at this
-> > stage).
-> >
-> > (2) I am not sure it will clarify the description much.
-> >
-> > (1) I would rule it out. So either we accept that the name can be
-> > extended in length (that's going to be the case since we will
-> > dynamically allocate the string so there will be no truncation, to
-> > a reasonable extent) so (4) is fine, or we merge this code and I
-> > will take care of pushing for (3) in a separate patch and copy the resulting
-> > description into desc (if that change does not get NACK'ed).
-> >
-> > I would really want to see this code in the mailine asap since it is
-> > groundwork for all future CPUidle generalisation, I hope that what I am
-> > saying above is acceptable, please let me know what you think.
+> Following Ben's report and fix for RN102, I did some tests
+> on RN104 and RN2120 (they have the same Hynix H27U1G8F2BTR
+> flash and setup) and came up w/ the exact same fixes for
+> their respective .dts files. With those patches, it is now
+> possible to update kernel from userland and u-boot will
+> happily load and boot it on those devices.
 > 
-> Agreed, as I stated when I rasied this issue, it's a very minor concern
-> and I don't think it should hold back this series.
+> Both patches should be candidates for stable, I guess.
 > 
-> After this series is merged, I think approach (3) is probably the best
-> and should be done as a follow-up patch/series.
+> Cheers,
+> 
+> a+
+> 
+> Arnaud Ebalard (2):
+>   ARM: mvebu: Netgear RN104: Use Hardware BCH ECC
+>   ARM: mvebu: Netgear RN2120: Use Hardware BCH ECC
+> 
+>  arch/arm/boot/dts/armada-370-netgear-rn104.dts | 4 ++++
+>  arch/arm/boot/dts/armada-xp-netgear-rn2120.dts | 4 ++++
+>  2 files changed, 8 insertions(+)
 
-I agree and that's what I will do, thank you Kevin (and Mark).
+I've applied both patches to mvebu/fixes and flagged them for stable,
+v3.14+.  I removed the 'Depends' line from each, as Thomas mentioned,
+there is no build dependency between these dts changes and the code
+supporting it (as it should be).
 
-Lorenzo
+thx,
+
+Jason.
