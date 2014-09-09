@@ -1,46 +1,46 @@
 From: boris.brezillon@free-electrons.com (Boris BREZILLON)
-Date: Tue,  9 Sep 2014 11:30:29 +0200
-Subject: [PATCH v2 0/6] rtc: at91sam9: add DT support
-Message-ID: <1410255035-26775-1-git-send-email-boris.brezillon@free-electrons.com>
+Date: Tue,  9 Sep 2014 11:30:32 +0200
+Subject: [PATCH v2 3/6] rtc: at91sam9: add DT support
+In-Reply-To: <1410255035-26775-1-git-send-email-boris.brezillon@free-electrons.com>
+References: <1410255035-26775-1-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1410255035-26775-4-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Add of_match_table to the existing driver so that rtc nodes defined in at91
+DTs can be attached to this driver.
 
-This patch series adds DT support to the atmel at91sam9 RTC driver.
+Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
+---
+ drivers/rtc/rtc-at91sam9.c | 9 +++++++++
+ 1 file changed, 9 insertions(+)
 
-It also removes any machine specific inclusions to prepare the migration
-to multi platform kernel support, and retain the slow clock to prevent
-the CCF from disabling it at the end of boot.
-
-Best Regards,
-
-Boris
-
-Changes since v1:
- - remove non CCF specific case by adding the appropriate clk_lookup
-   entries in arch/arm/mach-at91/<soc-name>.c files
-
-Boris BREZILLON (6):
-  rtc: at91sam9: remove references to mach specific headers
-  rtc: at91sam9: use standard readl/writel functions instead of raw
-    versions
-  rtc: at91sam9: add DT support
-  ARM: at91: add clk_lookup entry for RTT devices
-  rtc: at91sam9: use clk API instead of relying on AT91_SLOW_CLOCK
-  rtc: at91sam9: add DT bindings documentation
-
- .../devicetree/bindings/rtc/atmel,at91sam9-rtc.txt | 20 +++++++
- arch/arm/mach-at91/at91sam9260.c                   |  2 +
- arch/arm/mach-at91/at91sam9261.c                   |  2 +
- arch/arm/mach-at91/at91sam9263.c                   |  4 ++
- arch/arm/mach-at91/at91sam9g45.c                   |  2 +
- arch/arm/mach-at91/at91sam9rl.c                    |  2 +
- arch/arm/mach-at91/clock.c                         |  2 +-
- arch/arm/mach-at91/clock.h                         |  1 +
- drivers/rtc/rtc-at91sam9.c                         | 63 ++++++++++++++++++----
- 9 files changed, 87 insertions(+), 11 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/rtc/atmel,at91sam9-rtc.txt
-
+diff --git a/drivers/rtc/rtc-at91sam9.c b/drivers/rtc/rtc-at91sam9.c
+index 74a9ca0..57014b7 100644
+--- a/drivers/rtc/rtc-at91sam9.c
++++ b/drivers/rtc/rtc-at91sam9.c
+@@ -454,6 +454,14 @@ static int at91_rtc_resume(struct device *dev)
+ 
+ static SIMPLE_DEV_PM_OPS(at91_rtc_pm_ops, at91_rtc_suspend, at91_rtc_resume);
+ 
++#ifdef CONFIG_OF
++static const struct of_device_id at91_rtc_dt_ids[] = {
++	{ .compatible = "atmel,at91sam9260-rtt" },
++	{ /* sentinel */ }
++};
++MODULE_DEVICE_TABLE(of, at91_rtc_dt_ids);
++#endif
++
+ static struct platform_driver at91_rtc_driver = {
+ 	.probe		= at91_rtc_probe,
+ 	.remove		= at91_rtc_remove,
+@@ -462,6 +470,7 @@ static struct platform_driver at91_rtc_driver = {
+ 		.name	= "rtc-at91sam9",
+ 		.owner	= THIS_MODULE,
+ 		.pm	= &at91_rtc_pm_ops,
++		.of_match_table = of_match_ptr(at91_rtc_dt_ids),
+ 	},
+ };
+ 
 -- 
 1.9.1
