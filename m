@@ -1,30 +1,128 @@
-From: antoine.tenart@free-electrons.com (Antoine Tenart)
-Date: Tue, 9 Sep 2014 16:51:03 +0200
-Subject: [PATCH 1/5] net: mvberlin_eth: add an Ethernet driver for
- Marvell Berlin
-In-Reply-To: <20140829145145.GA7735@arch.cereza>
-References: <1409320263-10295-1-git-send-email-antoine.tenart@free-electrons.com>
- <1409320263-10295-2-git-send-email-antoine.tenart@free-electrons.com>
- <20140829145145.GA7735@arch.cereza>
-Message-ID: <20140909145103.GA15973@kwain>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Tue,  9 Sep 2014 16:54:27 +0200
+Subject: [RFC 1/4] i2c: core changes for slave support
+In-Reply-To: <1410274470-12712-1-git-send-email-wsa@the-dreams.de>
+References: <1410274470-12712-1-git-send-email-wsa@the-dreams.de>
+Message-ID: <1410274470-12712-2-git-send-email-wsa@the-dreams.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ezequiel,
+From: Wolfram Sang <wsa+renesas@sang-engineering.com>
 
-On Fri, Aug 29, 2014 at 11:51:45AM -0300, Ezequiel Garcia wrote:
-> Hi Antoine,
-> 
-> A quick look...
+Signed-off-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
+---
+ drivers/i2c/i2c-core.c | 44 ++++++++++++++++++++++++++++++++++++++++++++
+ include/linux/i2c.h    | 22 ++++++++++++++++++++++
+ 2 files changed, 66 insertions(+)
 
-Well, it seems Sebastian is right and we can use the existing PXA168
-Ethernet driver, so I just sent a new series doing that...
-
-Thanks for the review anyway!
-
-Antoine
-
+diff --git a/drivers/i2c/i2c-core.c b/drivers/i2c/i2c-core.c
+index 632057a44615..6713d438539b 100644
+--- a/drivers/i2c/i2c-core.c
++++ b/drivers/i2c/i2c-core.c
+@@ -27,6 +27,7 @@
+    OF support is copyright (c) 2008 Jochen Friedrich <jochen@scram.de>
+    (based on a previous patch from Jon Smirl <jonsmirl@gmail.com>) and
+    (c) 2013  Wolfram Sang <wsa@the-dreams.de>
++   I2C slave support (c) 2014 by Wolfram Sang <wsa@sang-engineering.com> 
+  */
+ 
+ #include <linux/module.h>
+@@ -2536,6 +2537,49 @@ trace:
+ }
+ EXPORT_SYMBOL(i2c_smbus_xfer);
+ 
++int i2c_slave_register(struct i2c_client *client, i2c_slave_cb_t slave_cb)
++{
++	int ret;
++
++	if (!client || !slave_cb)
++		return -EINVAL;
++
++	if (!(client->flags & I2C_CLIENT_TEN)) {
++		/* Enforce stricter address checking */
++		ret = i2c_check_addr_validity(client->addr);
++		if (ret)
++			return ret;
++	}
++
++	if (!client->adapter->algo->reg_slave)
++		return -EOPNOTSUPP;
++
++	client->slave_cb = slave_cb;
++
++	ret = client->adapter->algo->reg_slave(client);
++	if (ret)
++		client->slave_cb = NULL;
++
++	return ret;
++}
++EXPORT_SYMBOL_GPL(i2c_slave_register);
++
++int i2c_slave_unregister(struct i2c_client *client)
++{
++	int ret;
++
++	if (!client->adapter->algo->unreg_slave)
++		return -EOPNOTSUPP;
++
++	ret = client->adapter->algo->unreg_slave(client);
++
++	if (ret == 0)
++		client->slave_cb = NULL;
++
++	return ret;
++}
++EXPORT_SYMBOL_GPL(i2c_slave_unregister);
++
+ MODULE_AUTHOR("Simon G. Vogl <simon@tk.uni-linz.ac.at>");
+ MODULE_DESCRIPTION("I2C-Bus main module");
+ MODULE_LICENSE("GPL");
+diff --git a/include/linux/i2c.h b/include/linux/i2c.h
+index a95efeb53a8b..11d4edb1ab3e 100644
+--- a/include/linux/i2c.h
++++ b/include/linux/i2c.h
+@@ -121,6 +121,24 @@ extern s32 i2c_smbus_write_i2c_block_data(const struct i2c_client *client,
+ 					  const u8 *values);
+ #endif /* I2C */
+ 
++/* I2C slave support */
++
++enum i2c_slave_event {
++	I2C_SLAVE_REQ_READ_START,
++	I2C_SLAVE_REQ_READ_END,
++	I2C_SLAVE_REQ_WRITE_START,
++	I2C_SLAVE_REQ_WRITE_END,
++	I2C_SLAVE_STOP,
++};
++
++typedef int (*i2c_slave_cb_t)(struct i2c_client *, enum i2c_slave_event, u8 *);
++
++extern int i2c_slave_register(struct i2c_client *client, i2c_slave_cb_t slave_cb);
++extern int i2c_slave_unregister(struct i2c_client *client);
++
++#define i2c_slave_event(__client, __event, __value) \
++	__client->slave_cb(__client, __event, __value)
++
+ /**
+  * struct i2c_driver - represent an I2C device driver
+  * @class: What kind of i2c device we instantiate (for detect)
+@@ -224,6 +242,7 @@ struct i2c_client {
+ 	struct device dev;		/* the device structure		*/
+ 	int irq;			/* irq issued by device		*/
+ 	struct list_head detected;
++	i2c_slave_cb_t slave_cb;	/* callback for slave mode	*/
+ };
+ #define to_i2c_client(d) container_of(d, struct i2c_client, dev)
+ 
+@@ -377,6 +396,9 @@ struct i2c_algorithm {
+ 
+ 	/* To determine what the adapter supports */
+ 	u32 (*functionality) (struct i2c_adapter *);
++
++	int (*reg_slave)(struct i2c_client *client);
++	int (*unreg_slave)(struct i2c_client *client);
+ };
+ 
+ /**
 -- 
-Antoine T?nart, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+2.0.0
