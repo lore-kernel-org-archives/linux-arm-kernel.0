@@ -1,49 +1,46 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 09 Sep 2014 17:43:26 +0200
-Subject: [GIT PULL] ARM: LPC32xx: Device tree updates
-In-Reply-To: <540F1409.3070206@antcom.de>
-References: <540F1409.3070206@antcom.de>
-Message-ID: <4173517.3fBhGIV2aO@wuerfel>
+From: bp@suse.de (Borislav Petkov)
+Date: Tue, 9 Sep 2014 17:45:25 +0200
+Subject: [GIT PULL 2/2] SOCFPGA driver updates for 3.18
+In-Reply-To: <3081326.KgOEtsBgKv@wuerfel>
+References: <1409847105-27241-1-git-send-email-dinguyen@opensource.altera.com>
+ <1409847105-27241-2-git-send-email-dinguyen@opensource.altera.com>
+ <3081326.KgOEtsBgKv@wuerfel>
+Message-ID: <20140909154525.GC4054@nazgul.tnic>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 09 September 2014 16:51:53 Roland Stigge wrote:
-> The following changes since commit 2ce7598c9a453e0acd0e07be7be3f5eb39608ebd:
+On Tue, Sep 09, 2014 at 04:59:07PM +0200, Arnd Bergmann wrote:
+> On Thursday 04 September 2014 11:11:45 dinguyen at opensource.altera.com wrote:
+> > Hi Arnd, Kevin and Olof,
+> > 
+> > Please consider pulling this patch for v3.18. Boris had given me permission to
+> > take this patch together with it's DTS component. The DTS portion was in the
+> > previous pull request.
 > 
->   Linux 3.17-rc4 (2014-09-07 16:09:43 -0700)
-> 
-> are available in the git repository at:
-> 
->   git://git.antcom.de/linux-2.6 lpc32xx/dt
-> 
-> for you to fetch changes up to de1fcd7f8a6d313c92c2af476b012305d4fe6553:
-> 
->   ARM: LPC32xx: Use DMA for both SSP channels (2014-09-09 15:05:31 +0200)
-> 
+> I have no objections to the code, but I don't understand what you gain
+> from merging it through arm-soc. There is no dependency between the
+> driver and the dts entries in any way, you just need to have both in order
+> for things to work.
 
-Hi Roland,
+This is why I wanted them to go together, for completeness...
 
-I'm glad to see some pull requests from you again, you've been
-absent for a while.
+> We can always pull in drivers with permission from the maintainer when there
+> is a good reason to do that, but I don't see that reason for this patch,
+> so I'd prefer to have Boris merge it through his tree, unless I'm missing
+> something.
 
-I have no objection to the patches, but I notice that you have just
-rebased them all today on the latest -rc.
-In general, we prefer the branches to be based on an older -rc,
-preferably -rc1, unless you have a dependency on a bug fix that
-went into a later one.
-Can you rebase them to -rc1 and send a new version?
+... but then Dinh suggested he takes it so... In any case, I don't care
+who takes it. Normally I'd take them without much ado but I'd suggest
+we make an exception this one time since I'm on vacation with flaky
+interwebs connection and doing pull requests and merging patches doesn't
+work as smoothly.
 
-On a separate topic, are you still actively working with lpc32xx
-based machines? You cleaned up the platform a lot when you took
-over in 2012, but now we have move other platforms much further
-and I wonder if you could do some of the same changes.
-Most importantly, I really want most platforms to be part of
-ARCH_MULTIPLATFORM and build them into the same image. For
-lpc32xx, this is currently not possible because you are not using
-the common clk implementation. Would it be possible for you
-to look into converting that driver over and moving it to
-drivers/clk?
-There are a few other things that could be done if you are motivated,
-but that is the only one that I need and can't do myself.
+So Arnd, if you take it this one time only, I'd appreciate it. Otherwise
+it'll have to wait until I get back.
 
-	Arnd
+Thanks.
+
+-- 
+Regards/Gruss,
+    Boris.
+--
