@@ -1,9 +1,9 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Tue,  9 Sep 2014 11:40:10 +0900
-Subject: [PATCH 1/3] clocksource: sh_cmt: Document SoC specific bindings
+Date: Tue,  9 Sep 2014 11:40:12 +0900
+Subject: [PATCH 3/3] clocksource: sh_tmu: Document r8a7779 binding
 In-Reply-To: <cover.1410230283.git.horms+renesas@verge.net.au>
 References: <cover.1410230283.git.horms+renesas@verge.net.au>
-Message-ID: <01fe3aaa3abd3379788173e0017a6299b5b438db.1410230283.git.horms+renesas@verge.net.au>
+Message-ID: <fb0eee2f141976b5d7f31e477a71556d312f7dc3.1410230283.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -14,98 +14,57 @@ documentation typically does not specify a version for individual
 IP blocks. For these reasons a convention of using the SoC name in place
 of a version and providing SoC-specific compat strings has been adopted.
 
-Although not universally liked this convention is used in the bindings for
-a number of drivers for Renesas hardware. The purpose of this patch is to
-update the Renesas R-Car Compare Match Timer (CMT) driver to follow this
+Although not universally liked this convention is used in the bindings
+for a number of drivers for Renesas hardware. The purpose of this patch is
+to update the Renesas R-Car Timer Unit (TMU) driver to follow this
 convention.
 
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
-Acked-by: Mark Rutland <mark.rutland@arm.com>
 Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
 
 ---
-* I plan to follow up with patches to use these new bindings in the
-  dtsi files for the affected SoCs.
+* I plan to follow up with a patch patch to use the new binding in the
+  dtsi files for the r8a7779 SoC.
+commit 471269b790aec03385dc4fb127ed7094ff83c16d
 
 v2
-* Reorder compat entries so more-specific entries and their fallbacks
-  are grouped with the fallback entry coming last.
-* Explicitly document fallback
+* Suggestions by Mark Rutland and Sergei Shtylyov
+  - Compatible strings should be "one or more" not "one" of those listed
+  - Describe the generic binding as covering any MTU2 device
+  - Re-order compat strings from most to least specific
 
 v3
-* Avoid circular dependency in documentation of fallback
-  behaviour of renesas,cmt-48-gen2
-* Use consistent case for SoC names in compat string descriptions
+* Suggested by Laurent Pinchart
+  - Reword in keeping with a similar though more extensive patch for CMT
 ---
- .../devicetree/bindings/timer/renesas,cmt.txt      | 44 +++++++++++++++++++---
- 1 file changed, 38 insertions(+), 6 deletions(-)
+ Documentation/devicetree/bindings/timer/renesas,tmu.txt | 7 +++++--
+ 1 file changed, 5 insertions(+), 2 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/timer/renesas,cmt.txt b/Documentation/devicetree/bindings/timer/renesas,cmt.txt
-index a17418b..1a05c1b 100644
---- a/Documentation/devicetree/bindings/timer/renesas,cmt.txt
-+++ b/Documentation/devicetree/bindings/timer/renesas,cmt.txt
-@@ -11,15 +11,47 @@ datasheets.
+diff --git a/Documentation/devicetree/bindings/timer/renesas,tmu.txt b/Documentation/devicetree/bindings/timer/renesas,tmu.txt
+index 425d0c5..7db89fb 100644
+--- a/Documentation/devicetree/bindings/timer/renesas,tmu.txt
++++ b/Documentation/devicetree/bindings/timer/renesas,tmu.txt
+@@ -8,7 +8,10 @@ are independent. The TMU hardware supports up to three channels.
  
  Required Properties:
  
--  - compatible: must contain one of the following.
--    - "renesas,cmt-32" for the 32-bit CMT
+-  - compatible: must contain "renesas,tmu"
 +  - compatible: must contain one or more of the following:
-+    - "renesas,cmt-32-r8a7740" for the r8a7740 32-bit CMT
-+		(CMT0)
-+    - "renesas,cmt-32-sh7372" for the sh7372 32-bit CMT
-+		(CMT0)
-+    - "renesas,cmt-32-sh73a0" for the sh73a0 32-bit CMT
-+		(CMT0)
-+    - "renesas,cmt-32" for all 32-bit CMT without fast clock support
- 		(CMT0 on sh7372, sh73a0 and r8a7740)
--    - "renesas,cmt-32-fast" for the 32-bit CMT with fast clock support
-+		This is a fallback for the above renesas,cmt-32-* entries.
-+
-+    - "renesas,cmt-32-fast-r8a7740" for the r8a7740 32-bit CMT with fast
-+		clock support (CMT[234])
-+    - "renesas,cmt-32-fast-sh7372" for the sh7372 32-bit CMT with fast
-+		clock support (CMT[234])
-+    - "renesas,cmt-32-fast-sh73a0" for the sh73A0 32-bit CMT with fast
-+		clock support (CMT[234])
-+    - "renesas,cmt-32-fast" for all 32-bit CMT with fast clock support
- 		(CMT[234] on sh7372, sh73a0 and r8a7740)
--    - "renesas,cmt-48" for the 48-bit CMT
-+		This is a fallback for the above renesas,cmt-32-fast-* entries.
-+
-+    - "renesas,cmt-48-sh7372" for the sh7372 48-bit CMT
-+		(CMT1)
-+    - "renesas,cmt-48-sh73a0" for the sh73A0 48-bit CMT
-+		(CMT1)
-+    - "renesas,cmt-48-r8a7740" for the r8a7740 48-bit CMT
-+		(CMT1)
-+    - "renesas,cmt-48" for all non-second generation 48-bit CMT
- 		(CMT1 on sh7372, sh73a0 and r8a7740)
--    - "renesas,cmt-48-gen2" for the second generation 48-bit CMT
-+		This is a fallback for the above renesas,cmt-48-* entries.
-+
-+    - "renesas,cmt-48-r8a73a4" for the r8a73a4 48-bit CMT
-+		(CMT[01])
-+    - "renesas,cmt-48-r8a7790" for the r8a7790 48-bit CMT
-+		(CMT[01])
-+    - "renesas,cmt-48-r8a7791" for the r8a7791 48-bit CMT
-+		(CMT[01])
-+    - "renesas,cmt-48-gen2" for all second generation 48-bit CMT
- 		(CMT[01] on r8a73a4, r8a7790 and r8a7791)
-+		This is a fallback for the renesas,cmt-48-r8a73a4,
-+		renesas,cmt-48-r8a7790 and renesas,cmt-48-r8a7791 entries.
++    - "renesas,tmu-r8a7779" for the r8a7779 TMU
++    - "renesas,tmu" for any TMU.
++      This is a fallback for the above renesas,tmu-* entries
  
    - reg: base address and length of the registers block for the timer module.
-   - interrupts: interrupt-specifier for the timer, one per channel.
-@@ -36,7 +68,7 @@ Example: R8A7790 (R-Car H2) CMT0 node
- 	them channels 0 and 1 in the documentation.
  
- 	cmt0: timer at ffca0000 {
--		compatible = "renesas,cmt-48-gen2";
-+		compatible = "renesas,cmt-48-r8a7790", "renesas,cmt-48-gen2";
- 		reg = <0 0xffca0000 0 0x1004>;
- 		interrupts = <0 142 IRQ_TYPE_LEVEL_HIGH>,
- 			     <0 142 IRQ_TYPE_LEVEL_HIGH>;
+@@ -27,7 +30,7 @@ Optional Properties:
+ Example: R8A7779 (R-Car H1) TMU0 node
+ 
+ 	tmu0: timer at ffd80000 {
+-		compatible = "renesas,tmu";
++		compatible = "renesas,tmu-r8a7779", "renesas,tmu";
+ 		reg = <0xffd80000 0x30>;
+ 		interrupts = <0 32 IRQ_TYPE_LEVEL_HIGH>,
+ 			     <0 33 IRQ_TYPE_LEVEL_HIGH>,
 -- 
 2.0.1
