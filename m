@@ -1,31 +1,66 @@
-From: jcm@redhat.com (Jon Masters)
-Date: Tue, 09 Sep 2014 02:14:58 -0400
-Subject: [PATCH v3 13/17] ARM64 / ACPI: Add GICv2 specific ACPI boot
- support
-In-Reply-To: <5404AE56.80801@arm.com>
-References: <1409583475-6978-1-git-send-email-hanjun.guo@linaro.org>
- <1409583475-6978-14-git-send-email-hanjun.guo@linaro.org>
- <5404AE56.80801@arm.com>
-Message-ID: <540E9AE2.5070902@redhat.com>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Mon, 08 Sep 2014 23:15:36 -0700
+Subject: [PATCH v9 2/6] clk: Move all drivers to use internal API
+In-Reply-To: <20140908061355.19023.47997@quantum>
+References: <1409758148-20104-2-git-send-email-tomeu.vizoso@collabora.com>
+ <1409758317-20564-1-git-send-email-tomeu.vizoso@collabora.com>
+ <20140908061355.19023.47997@quantum>
+Message-ID: <20140909061536.19023.90796@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/01/2014 01:35 PM, Marc Zyngier wrote:
-> On 01/09/14 15:57, Hanjun Guo wrote:
->> From: Tomasz Nowicki <tomasz.nowicki@linaro.org>
->>
->> ACPI kernel uses MADT table for proper GIC initialization. It needs to
->> parse GIC related subtables, collect CPU interface and distributor
->> addresses and call driver initialization function (which is hardware
->> abstraction agnostic). In a similar way, FDT initialize GICv1/2.
->>
->> NOTE: This commit allow to initialize GICv1/2 only.
+Quoting Mike Turquette (2014-09-07 23:13:55)
+> Quoting Tomeu Vizoso (2014-09-03 08:31:57)
+> > In preparation to change the public API to return a per-user clk structure,
+> > remove any usage of this public API from the clock implementations.
+> > 
+> > The reason for having this in a separate commit from the one that introduces
+> > the implementation of the new functions is to separate the changes generated
+> > with Coccinelle from the rest, and keep the patches' size reasonable.
+> > 
+> > Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
+> > Tested-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+> > Tested-by: Heiko Stuebner <heiko@sntech.de>
+> > Acked-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 > 
-> I cannot help but notice that there is no support for KVM here. It'd be
-> good to add a note to that effect, so that people do not expect
-> virtualization support to be working when booting with ACPI.
+> Hi Tomeu,
+> 
+> Looks like the Coccinelle script had a false-positive.
+> asm-generic/clkdev.h was converted from clk->clk_core and this blowed up
+> clock drivers for architectures that don't provide an asm-specific
+> clkdev.h implementation. This fixes x86's LPSS and a Microblaze driver.
+> 
+> I've rolled the following fix into your 2/9 patch. No action is
+> necessary.
+> 
+> Regards,
+> Mike
+> 
+> 
+> 
+> diff --git a/include/asm-generic/clkdev.h b/include/asm-generic/clkdev.h
+> index 4320225..90a32a6 100644
+> --- a/include/asm-generic/clkdev.h
+> +++ b/include/asm-generic/clkdev.h
+> @@ -15,10 +15,10 @@
+> 
+>  #include <linux/slab.h>
+> 
+> -struct clk_core;
+> +struct clk;
+> 
+> -static inline int __clk_get(struct clk_core *clk) { return 1; }
+> -static inline void __clk_put(struct clk_core *clk) { }
+> +static inline int __clk_get(struct clk *clk) { return 1; }
+> +static inline void __clk_put(struct clk *clk) { }
+> 
+>  static inline struct clk_lookup_alloc *__clkdev_alloc(size_t size)
+>  {
 
-Wei Huang within Red Hat is currently beginning the process of bringing
-up KVM support under ACPI on real hardware. This will be fixed asap.
+Please disregard the above patch. I might have jumped the gun on this
+one. I've posted an alternative (and hopefully correct) fix here:
 
-Jon.
+http://lkml.kernel.org/r/<1410242868-14750-1-git-send-email-mturquette@linaro.org>
+
+Regards,
+Mike
