@@ -1,55 +1,172 @@
-From: m-karicheri2@ti.com (Murali Karicheri)
-Date: Tue, 9 Sep 2014 14:20:27 -0400
-Subject: [PATCH v2] spi: davinci: add support for adding delay between
- word's transmission
-In-Reply-To: <20140909172057.GH2601@sirena.org.uk>
-References: <1410278851-10783-1-git-send-email-grygorii.strashko@ti.com>
- <20140909165555.GD2601@sirena.org.uk> <540F3447.3020609@ti.com>
- <20140909172057.GH2601@sirena.org.uk>
-Message-ID: <540F44EB.8090700@ti.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 9 Sep 2014 19:22:11 +0100
+Subject: [PATCH RFC 2/3] ARM: regulator: add Freescale MXS regulator driver
+In-Reply-To: <1410089869-6611-3-git-send-email-info@lategoodbye.de>
+References: <1410089869-6611-1-git-send-email-info@lategoodbye.de>
+ <1410089869-6611-3-git-send-email-info@lategoodbye.de>
+Message-ID: <20140909182211.GG3896@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/09/2014 01:20 PM, Mark Brown wrote:
-> On Tue, Sep 09, 2014 at 01:09:27PM -0400, Murali Karicheri wrote:
->> On 09/09/2014 12:55 PM, Mark Brown wrote:
->>> On Tue, Sep 09, 2014 at 07:07:31PM +0300, Grygorii Strashko wrote:
->
->>>> - ti,spi-c2t-delay: Chip-select-active-to-transmit-start delay
->>>> 	(SPIDELAY.C2TDELAY)
->
->>>> - ti,spi-t2c-delay: Transmit-end-to-chip-select-inactive delay
->>>> 	(SPIDELAY.T2CDELAY)
->
->>> Now I look at these they look very much like the standard delay feature
->>> that the SPI subsystem has already - are they?
->
->> As Grygorii explained in previous postings (reproduced below), these delays
->> are handled by the SPI hardware on Keystone and affect the delay between
->> successive word tranmssion and has nothing to do with the delay you are
->> talking about. Isn't the standard delay you mention here is between
->> successive packets send down to the lower level driver (in this case
->> spi-davinci.c) ?
->
-> He talked about such delays between words (and there were some other
-> delays listed which seemed to meet that description) but the above don't
-> appear to refer to them, the above refer to delays around chip select
-> which most definitely are covered with the standard delays.
->
-> If these delays are not related to chip select then the documentation
-> needs to be fixed to not refer to chip select.
+[...]
 
-Ok. So what I understand is the issue is not having the right 
-description to indicate that these parameters are delays associated with 
-tranmission of successive words on the wire. Personally I like these 
-description match with what is described in the device spec/ user guide 
-and what is described above match with that. However we could add 
-additional description as below to to make it more explicit.
+> +       regs = (__raw_readl(sreg->base_addr) & ~BM_POWER_LEVEL_TRG);
 
-spi-c2t-delay - delay after CS is asserted before output bits on wire
-spi-t2c-delay - delay after tramission of bits and before deasserting CS
-wdelay - delay between successive word transmission.
+I suspect you should be using the *_relaxed accessors rather than the
+__raw_* accessors.
 
-Do you think this will help?
+[...]
 
-Murali
+> +static int mxs_regulator_probe(struct platform_device *pdev)
+> +{
+> +       struct device *dev = &pdev->dev;
+> +       struct device_node *np = dev->of_node;
+> +       struct device_node *parent;
+> +       struct regulator_desc *rdesc;
+> +       struct regulator_dev *rdev;
+> +       struct mxs_regulator *sreg;
+> +       struct regulator_init_data *initdata;
+> +       struct regulation_constraints *con;
+> +       struct regulator_config config = { };
+> +       void __iomem *base_addr = NULL;
+> +       void __iomem *power_addr = NULL;
+> +       u64 regaddr64 = 0;
+> +       const u32 *regaddr_p;
+> +       u32 val = 0;
+> +       int ret;
+> +
+> +       if (!np) {
+> +               dev_err(dev, "missing device tree\n");
+> +               return -EINVAL;
+> +       }
+> +
+> +       /* get device base address */
+> +       base_addr = of_iomap(np, 0);
+> +       if (!base_addr)
+> +               return -ENXIO;
+> +
+> +       parent = of_get_parent(np);
+> +       if (!parent)
+> +               return -ENXIO;
+
+Leak of the (successfully mapped) base_addr.
+
+> +
+> +       power_addr = of_iomap(parent, 0);
+> +       if (!power_addr)
+> +               return -ENXIO;
+
+Leak of base_addr and dangling refcount on parent. These apply to all
+subsequent returns.
+
+> +
+> +       regaddr_p = of_get_address(np, 0, NULL, NULL);
+
+of_get_address returns a __be32*, not a u32*, so sparse will be very
+unhappy here...
+
+> +       if (regaddr_p)
+> +               regaddr64 = of_translate_address(np, regaddr_p);
+
+...and as of_translate_address returns a u64 you'll need a separate
+variable for the input and output.
+
+> +
+> +       if (!regaddr64) {
+> +               dev_err(dev, "no or invalid reg property set\n");
+> +               return -EINVAL;
+> +       }
+> +
+> +       initdata = of_get_regulator_init_data(dev, np);
+> +       if (!initdata)
+> +               return -EINVAL;
+> +
+> +       ret = of_property_read_u32(np, "mxs-max-reg-val",
+> +                                  &val);
+> +       if (!val) {
+> +               dev_err(dev, "no or invalid mxs-max-reg-val property set\n");
+> +               return ret;
+> +       }
+> +
+> +       dev_info(dev, "regulator found\n");
+> +
+> +       sreg = devm_kzalloc(dev, sizeof(*sreg), GFP_KERNEL);
+> +       if (!sreg)
+> +               return -ENOMEM;
+> +       sreg->initdata = initdata;
+> +       sreg->name = of_get_property(np, "regulator-name", NULL);
+
+I'm not keen on using of_get_property here. We have no idea if
+regulator-name is even a string (it should be, but we have no
+guarantee).
+
+> +       sreg->cur_uA = 0;
+> +       sreg->cur_uV = 0;
+> +       sreg->base_addr = base_addr;
+> +       sreg->power_addr = power_addr;
+> +       init_waitqueue_head(&sreg->wait_q);
+> +       spin_lock_init(&sreg->lock);
+> +       sreg->max_reg_val = val;
+> +
+> +       rdesc = &sreg->rdesc;
+> +       rdesc->name = sreg->name;
+> +       rdesc->owner = THIS_MODULE;
+> +       rdesc->ops = &mxs_rops;
+> +
+> +       if (strcmp(rdesc->name, "overall_current") == 0)
+> +               rdesc->type = REGULATOR_CURRENT;
+> +       else
+> +               rdesc->type = REGULATOR_VOLTAGE;
+
+Wouldn't it make more sense to explicitly match the names you expect?
+
+> +       con = &initdata->constraints;
+> +       rdesc->n_voltages = sreg->max_reg_val;
+> +       rdesc->min_uV = con->min_uV;
+> +       rdesc->uV_step = (con->max_uV - con->min_uV) / sreg->max_reg_val;
+> +       rdesc->linear_min_sel = 0;
+> +       rdesc->vsel_reg = regaddr64;
+> +       rdesc->vsel_mask = BM_POWER_LEVEL_TRG;
+> +
+> +       config.dev = &pdev->dev;
+> +       config.init_data = initdata;
+> +       config.driver_data = sreg;
+> +       config.of_node = np;
+> +
+> +       pr_debug("probing regulator %s %s %d\n",
+> +                       sreg->name,
+> +                       rdesc->name,
+> +                       pdev->id);
+
+Aren't those two names always the same per the code above?
+
+> +
+> +       /* register regulator */
+> +       rdev = devm_regulator_register(dev, rdesc, &config);
+> +
+> +       if (IS_ERR(rdev)) {
+> +               dev_err(&pdev->dev, "failed to register %s\n",
+> +                       rdesc->name);
+> +               return PTR_ERR(rdev);
+> +       }
+> +
+> +       if (sreg->max_uA) {
+> +               struct regulator *regu;
+> +
+> +               regu = regulator_get(NULL, sreg->name);
+> +               sreg->nb.notifier_call = reg_callback;
+> +               regulator_register_notifier(regu, &sreg->nb);
+> +       }
+> +
+> +       platform_set_drvdata(pdev, rdev);
+> +
+> +       of_property_read_u32(np, "mxs-default-microvolt",
+> +                                  &val);
+> +
+> +       if (val)
+> +               mxs_set_voltage(rdev, val, val, NULL);
+
+As I mentioned in my comments on the binding, I'd like to know why this
+is necessary and if it is why it shouldn't be a standardised property.
+
+Mark.
