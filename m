@@ -1,57 +1,44 @@
-From: daniel.thompson@linaro.org (Daniel Thompson)
-Date: Tue, 09 Sep 2014 09:24:16 +0100
-Subject: [PATCH v3 5/5] irqchip: gic: Add support for IPI FIQ
-In-Reply-To: <20140908162316.GC12361@n2100.arm.linux.org.uk>
-References: <1409931198-22600-1-git-send-email-daniel.thompson@linaro.org>
- <1410190115-32604-1-git-send-email-daniel.thompson@linaro.org>
- <1410190115-32604-6-git-send-email-daniel.thompson@linaro.org>
- <20140908162316.GC12361@n2100.arm.linux.org.uk>
-Message-ID: <540EB930.6010404@linaro.org>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Tue, 09 Sep 2014 10:28:36 +0200
+Subject: [PATCH v2] ARM: dts: Add mshc aliases for rk3288
+In-Reply-To: <1409785523-12209-1-git-send-email-dianders@chromium.org>
+References: <1409785523-12209-1-git-send-email-dianders@chromium.org>
+Message-ID: <18318098.Hm4yenW6Sf@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/09/14 17:23, Russell King - ARM Linux wrote:
-> On Mon, Sep 08, 2014 at 04:28:35PM +0100, Daniel Thompson wrote:
->> @@ -604,8 +731,19 @@ static void gic_raise_softirq(const struct cpumask *mask, unsigned int irq)
->>  {
->>  	int cpu;
->>  	unsigned long flags, map = 0;
->> +	unsigned long softint;
->>  
->> -	raw_spin_lock_irqsave(&irq_controller_lock, flags);
->> +	/*
->> +	 * The locking in this function ensures we don't use stale cpu mappings
->> +	 * and thus we never route an IPI to the wrong physical core during a
->> +	 * big.LITTLE switch. The switch code takes both of these locks meaning
->> +	 * we can choose whichever lock is safe to use from our current calling
->> +	 * context.
->> +	 */
->> +	if (in_nmi())
->> +		raw_spin_lock(&fiq_safe_migration_lock);
->> +	else
->> +		raw_spin_lock_irqsave(&irq_controller_lock, flags);
+Am Mittwoch, 3. September 2014, 16:05:23 schrieb Doug Anderson:
+> It's convenient (and less confusing to people reading logs) if the
+> eMMC port on rk3288 is consistenly marked with mmc0 and the sdmmc port
+> on rk3288 is consistently marked with mmc1.  Add the appropriate
+> aliases.
+
+Added to my v3.18-next/dts branch
+
 > 
-> Firstly, why would gic_raise_softirq() be called in FIQ context?
-
-Oops.
-
-This code should have been removed. It *is* required for kgdb (which
-needs to send FIQ to other processors via IPI and may itself be running
-from FIQ) but it not needed for the currently targeted use case.
-
-
-> Secondly,
-> this doesn't save you.  If you were in the middle of gic_migrate_target()
-> when the FIQ happened that (for some reason prompted you to call this),
-> you would immediately deadlock trying to that this IRQ.
-
-This cannot happen because gic_migrate_target() runs with FIQ disabled.
-
-
-> I suggest not even trying to solve this "race" which I don't think is
-> one which needs to even be considered (due to the first point.)
-
-As mentioned above I believe it eventually needs to be addressed by some
-means but it certainly doesn't belong in the current patchset.
-
-I will remove it.
+> Signed-off-by: Doug Anderson <dianders@chromium.org>
+> Reviewed-by: Sonny Rao <sonnyrao@chromium.org>
+> ---
+> 
+> Changes in v2:
+> - Use mshc aliases now
+> - Adds sdio0/1 aliases since those are in the dts.
+> 
+>  arch/arm/boot/dts/rk3288.dtsi | 4 ++++
+>  1 file changed, 4 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/rk3288.dtsi b/arch/arm/boot/dts/rk3288.dtsi
+> index 5f866e0..2c5d01f 100644
+> --- a/arch/arm/boot/dts/rk3288.dtsi
+> +++ b/arch/arm/boot/dts/rk3288.dtsi
+> @@ -29,6 +29,10 @@
+>  		i2c3 = &i2c3;
+>  		i2c4 = &i2c4;
+>  		i2c5 = &i2c5;
+> +		mshc0 = &emmc;
+> +		mshc1 = &sdmmc;
+> +		mshc2 = &sdio0;
+> +		mshc3 = &sdio1;
+>  		serial0 = &uart0;
+>  		serial1 = &uart1;
+>  		serial2 = &uart2;
