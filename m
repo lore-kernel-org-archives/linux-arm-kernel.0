@@ -1,148 +1,136 @@
 From: geoff@infradead.org (Geoff Levand)
 Date: Tue, 09 Sep 2014 22:49:04 +0000
-Subject: [PATCH 05/13] arm64: Add EL2 switch to soft_restart
+Subject: [PATCH 06/13] arm64: Add new routine read_cpu_properties
 In-Reply-To: <cover.1410302383.git.geoff@infradead.org>
 References: <cover.1410302383.git.geoff@infradead.org>
-Message-ID: <96f2a2c19f24e3370302bdbd9ea18f61babafaea.1410302383.git.geoff@infradead.org>
+Message-ID: <b68073fb2e816f97311b9a3547e3656164ae85d0.1410302383.git.geoff@infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When a CPU is reset it needs to be put into the exception level it had when it
-entered the kernel.  Update cpu_reset() to accept an argument el2_switch which
-signals cpu_reset() to enter the soft reset address at EL2.  If el2_switch is
-not set the soft reset address will be entered at EL1.
-
-Update cpu_soft_restart() and soft_restart() to pass the return of
-is_hyp_mode_available() as the el2_switch value to cpu_reset().  Also update the
-comments of cpu_reset(), cpu_soft_restart() and soft_restart() to reflect this
-change.
+The kexec re-boot support that will be added in a subsequent patch in this
+series will need to read the device tree CPU properties, and it is expected
+that a rework of the SMP spin table code to handle cpu_die will also need this
+functionality, so add two new common arm64 files cpu-properties.h and
+cpu-properties.c that define a new structure cpu_properties that hold the
+various CPU properties from a device tree, and the new routine
+read_cpu_properties() that fills the structure from a device tree CPU node.
 
 Signed-off-by: Geoff Levand <geoff@infradead.org>
 ---
- arch/arm64/include/asm/proc-fns.h |  4 ++--
- arch/arm64/kernel/process.c       |  6 ++++-
- arch/arm64/mm/proc.S              | 47 +++++++++++++++++++++++++++++----------
- 3 files changed, 42 insertions(+), 15 deletions(-)
+ arch/arm64/kernel/cpu-properties.c | 58 ++++++++++++++++++++++++++++++++++++++
+ arch/arm64/kernel/cpu-properties.h | 39 +++++++++++++++++++++++++
+ 2 files changed, 97 insertions(+)
+ create mode 100644 arch/arm64/kernel/cpu-properties.c
+ create mode 100644 arch/arm64/kernel/cpu-properties.h
 
-diff --git a/arch/arm64/include/asm/proc-fns.h b/arch/arm64/include/asm/proc-fns.h
-index 9a8fd84..339394d 100644
---- a/arch/arm64/include/asm/proc-fns.h
-+++ b/arch/arm64/include/asm/proc-fns.h
-@@ -32,8 +32,8 @@ extern void cpu_cache_off(void);
- extern void cpu_do_idle(void);
- extern void cpu_do_switch_mm(unsigned long pgd_phys, struct mm_struct *mm);
- extern void cpu_reset(unsigned long addr) __attribute__((noreturn));
--void cpu_soft_restart(phys_addr_t cpu_reset,
--		unsigned long addr) __attribute__((noreturn));
-+void cpu_soft_restart(phys_addr_t cpu_reset, unsigned long el2_switch,
-+		      unsigned long addr) __attribute__((noreturn));
- extern void cpu_do_suspend(struct cpu_suspend_ctx *ptr);
- extern u64 cpu_do_resume(phys_addr_t ptr, u64 idmap_ttbr);
- 
-diff --git a/arch/arm64/kernel/process.c b/arch/arm64/kernel/process.c
-index bf66922..0a3414b 100644
---- a/arch/arm64/kernel/process.c
-+++ b/arch/arm64/kernel/process.c
-@@ -50,6 +50,7 @@
- #include <asm/mmu_context.h>
- #include <asm/processor.h>
- #include <asm/stacktrace.h>
-+#include <asm/virt.h>
- 
- #ifdef CONFIG_CC_STACKPROTECTOR
- #include <linux/stackprotector.h>
-@@ -60,7 +61,10 @@ EXPORT_SYMBOL(__stack_chk_guard);
- void soft_restart(unsigned long addr)
- {
- 	setup_mm_for_reboot();
--	cpu_soft_restart(virt_to_phys(cpu_reset), addr);
-+
-+	cpu_soft_restart(virt_to_phys(cpu_reset), is_hyp_mode_available(),
-+			 addr);
-+
- 	/* Should never get here */
- 	BUG();
- }
-diff --git a/arch/arm64/mm/proc.S b/arch/arm64/mm/proc.S
-index 4e778b1..7467199 100644
---- a/arch/arm64/mm/proc.S
-+++ b/arch/arm64/mm/proc.S
-@@ -25,6 +25,7 @@
- #include <asm/hwcap.h>
- #include <asm/pgtable-hwdef.h>
- #include <asm/pgtable.h>
-+#include <asm/virt.h>
- 
- #include "proc-macros.S"
- 
-@@ -59,27 +60,48 @@ ENTRY(cpu_cache_off)
- ENDPROC(cpu_cache_off)
- 
- /*
-- *	cpu_reset(loc)
-+ * cpu_reset(el2_switch, loc) - Helper for cpu_soft_restart.
-  *
-- *	Perform a soft reset of the system.  Put the CPU into the same state
-- *	as it would be if it had been reset, and branch to what would be the
-- *	reset vector. It must be executed with the flat identity mapping.
-+ * @cpu_reset: Physical address of the cpu_reset routine.
-+ * @el2_switch: Flag to indicate a swich to EL2 is needed.
-+ * @addr: Location to jump to for soft reset.
-  *
-- *	- loc   - location to jump to for soft reset
-+ * Put the CPU into the same state as it would be if it had been reset, and
-+ * branch to what would be the reset vector. It must be executed with the
-+ * flat identity mapping.
-  */
-+
- 	.align	5
-+
- ENTRY(cpu_reset)
--	mrs	x1, sctlr_el1
--	bic	x1, x1, #1
--	msr	sctlr_el1, x1			// disable the MMU
-+	mrs	x2, sctlr_el1
-+	bic	x2, x2, #1
-+	msr	sctlr_el1, x2			// disable the MMU
- 	isb
--	ret	x0
-+
-+	cbz	x0, 1f				// el2_switch?
-+	mov	x0, x1
-+	mov	x1, xzr
-+	mov	x2, xzr
-+	mov	x3, xzr
-+	hvc	#HVC_CALL_FUNC			// no return
-+
-+1:	ret	x1
- ENDPROC(cpu_reset)
- 
+diff --git a/arch/arm64/kernel/cpu-properties.c b/arch/arm64/kernel/cpu-properties.c
+new file mode 100644
+index 0000000..e64b34b
+--- /dev/null
++++ b/arch/arm64/kernel/cpu-properties.c
+@@ -0,0 +1,58 @@
 +/*
-+ * cpu_soft_restart(cpu_reset, el2_switch, addr) - Perform a cpu soft reset.
++ * Copyright (C) Linaro.
 + *
-+ * @cpu_reset: Physical address of the cpu_reset routine.
-+ * @el2_switch: Flag to indicate a swich to EL2 is needed, passed to cpu_reset.
-+ * @addr: Location to jump to for soft reset, passed to cpu_reset.
-+ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
 + */
 +
- ENTRY(cpu_soft_restart)
--	/* Save address of cpu_reset() and reset address */
--	mov	x19, x0
--	mov	x20, x1
-+	mov	x19, x0				// cpu_reset
-+	mov	x20, x1				// el2_switch
-+	mov	x21, x2				// addr
- 
- 	/* Turn D-cache off */
- 	bl	cpu_cache_off
-@@ -88,6 +110,7 @@ ENTRY(cpu_soft_restart)
- 	bl	flush_cache_all
- 
- 	mov	x0, x20
-+	mov	x1, x21
- 	ret	x19
- ENDPROC(cpu_soft_restart)
- 
++#include "cpu-properties.h"
++
++int read_cpu_properties(struct cpu_properties *p, const struct device_node *dn)
++{
++	const u32 *cell;
++
++	memset(p, 0, sizeof(*p));
++	p->hwid = INVALID_HWID;
++	p->cpu_release_addr = INVALID_ADDR;
++
++	cell = of_get_property(dn, "reg", NULL);
++
++	if (!cell) {
++		pr_err("%s: Error: %s: invalid reg property\n",
++		       __func__, dn->full_name);
++		return -1;
++	}
++
++	p->hwid = of_read_number(cell,
++		of_n_addr_cells((struct device_node *)dn)) & MPIDR_HWID_BITMASK;
++
++	p->enable_method = of_get_property(dn, "enable-method", NULL);
++
++	if (!p->enable_method) {
++		pr_err("%s: Error: %s: invalid enable-method\n",
++		       __func__, dn->full_name);
++		return -1;
++	}
++
++	if (!strcmp(p->enable_method, "psci")) {
++		p->type = cpu_enable_method_psci;
++		return 0;
++	}
++
++	if (strcmp(p->enable_method, "spin-table")) {
++		p->type = cpu_enable_method_unknown;
++		return -1;
++	}
++
++	p->type = cpu_enable_method_spin_table;
++
++	if (of_property_read_u64(dn, "cpu-release-addr",
++				 &p->cpu_release_addr)) {
++		pr_err("%s: Error: %s: invalid cpu-return-addr property\n",
++		       __func__, dn->full_name);
++		return -1;
++	}
++
++	return 0;
++}
+diff --git a/arch/arm64/kernel/cpu-properties.h b/arch/arm64/kernel/cpu-properties.h
+new file mode 100644
+index 0000000..b4218ef
+--- /dev/null
++++ b/arch/arm64/kernel/cpu-properties.h
+@@ -0,0 +1,39 @@
++/*
++ * Copyright (C) Linaro.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++
++#if !defined(__ARM64_CPU_PROPERTIES_H)
++#define __ARM64_CPU_PROPERTIES_H
++
++#include <asm/memory.h>
++#include <asm/cputype.h>
++
++#define INVALID_ADDR UL(~0)
++
++#if !defined(__ASSEMBLY__)
++
++#include <linux/kernel.h>
++#include <linux/of.h>
++
++enum cpu_enable_method {
++	cpu_enable_method_unknown,
++	cpu_enable_method_psci,
++	cpu_enable_method_spin_table,
++};
++
++struct cpu_properties {
++	u64 hwid;
++	u64 cpu_release_addr;
++	const char *enable_method;
++	enum cpu_enable_method type;
++};
++
++int read_cpu_properties(struct cpu_properties *p, const struct device_node *dn);
++
++#endif /* !defined(__ASSEMBLY__) */
++
++#endif
 -- 
 1.9.1
