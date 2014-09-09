@@ -1,100 +1,39 @@
-From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Tue, 9 Sep 2014 13:31:46 -0600
-Subject: [PATCH RESEND] ARM: PCI: Use PCI_CLASS_* defines for PCI class
-In-Reply-To: <20140908200422.GA6204@obsidianresearch.com>
-References: <1410163532-31057-1-git-send-email-lisovy@gmail.com>
- <CAErSpo7sOc72V3g5tOov8Yj4nKiuJupaUTKEEecHMcqEUrzh_g@mail.gmail.com>
- <20140908180357.GA6159@obsidianresearch.com>
- <CAErSpo7QQMRFKSk4vQCkDeEQQXX87Gq5YAKR+P4bxxcqMSJeDw@mail.gmail.com>
- <20140908200422.GA6204@obsidianresearch.com>
-Message-ID: <CAErSpo56jB1Bf2JtYCGKXZBZqRF1jXFxGmeewPX_e6vSXueGyA@mail.gmail.com>
+From: jcm@redhat.com (Jon Masters)
+Date: Tue, 09 Sep 2014 15:39:38 -0400
+Subject: [PATCH v2 3/3] arm64/efi: efistub: don't abort if base of DRAM
+ is occupied
+In-Reply-To: <20140820173528.GH21734@leverpostej>
+References: <1406717944-24725-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1406717944-24725-4-git-send-email-ard.biesheuvel@linaro.org>
+ <20140814113204.GE24018@leverpostej>
+ <20140820171057.GG29733@console-pimps.org>
+ <20140820173528.GH21734@leverpostej>
+Message-ID: <540F577A.4040709@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 8, 2014 at 2:04 PM, Jason Gunthorpe
-<jgunthorpe@obsidianresearch.com> wrote:
-> On Mon, Sep 08, 2014 at 01:39:40PM -0600, Bjorn Helgaas wrote:
->
->> > Essentially for that case the mvebu HW is a repurposed end port core,
->> > so when working as a root port it presents an end port config space
->> > (not a root port bridge config space). The BAR in that config space is
->> > not relevant, so the old mvebu used code like this to hide it from the
->> > PCI core. Otherwise the core will try to program it from the aperture,
->> > and the default BAR size is really big, so it runs out of space.
+On 08/20/2014 01:35 PM, Mark Rutland wrote:
+> On Wed, Aug 20, 2014 at 06:10:57PM +0100, Matt Fleming wrote:
+>> On Thu, 14 Aug, at 12:32:05PM, Mark Rutland wrote:
+>>> On Wed, Jul 30, 2014 at 11:59:04AM +0100, Ard Biesheuvel wrote:
+>>>> If we cannot relocate the kernel Image to its preferred offset of base of DRAM
+>>>> plus TEXT_OFFSET, instead relocate it to the lowest available 2 MB boundary plus
+>>>> TEXT_OFFSET. We may lose a bit of memory at the low end, but we can still
+>>>> proceed normally otherwise.
+>>>>
+>>>> Signed-off-by: Ard Biesheuvel <ard.biesheuvel-QSEj5FYQhm4dnm+yROfE0A@public.gmane.org>
+>>>> Acked-by: Mark Salter <msalter-H+wXaHxf7aLQT0dZR+AlfA@public.gmane.org>
+>>>
+>>> Acked-by: Mark Rutland <mark.rutland-5wv7dgnIgG8@public.gmane.org>
+>>
+>> Ard, who's picking this up?
+> 
+> Will's already taken this into arm64/devel [1,2] with the intention of
+> waiting for v3.18 [3]. Per Leif's comment [4] that might have to be
+> bumped.
 
-This is a bit of a tangent, but an endpoint has a type 0 config
-header, while a root port is a bridge and has a type 1 config header.
-I don't understand how the PCI core can operate a root port correctly
-if that port has a type 0 config header.
+So what's the plan with this series? Waiting for 3.18? The problem is
+that this patch series needs to be pulled for any platform with an EFI
+firmware located at DRAM base (e.g. AMD Seattle) as was noted before.
 
->> How does mvebu deal with this now?  I don't see anything similar in
->> pci-mvebu.c.
->
-> The new driver doesn't allow the core directly access to the end point
-> config space registers, the entire config space is managed by the
-> driver directly, exactly how the HW requires it to be set for root
-> port operation. The core sees the config space of a root port bridge
-> that is created by the driver.
->
->> If the BAR is still a functioning PCI BAR, i.e., it decodes address
->> space and potentially responds to accesses there, we really should pay
->> attention to it.  That doesn't mean we have to assign space to it, but
->> for example, we might want to make sure we have PCI_COMMAND_MEM turned
->> off.  If we just clear out the resource start/end/flags, the PCI core
->> doesn't have enough information to do that.
->
-> In mvebu land, the BAR does need to have a proper value. IIRC, with
-> the old driver the bootloader was expected to configure PCI to an
-> operational state, and the kernel was expected not to touch that BAR
-> register at all.
->
-> For mvebu the new driver explicitly sets that BAR properly like this:
->
->         /* Setup BAR[1] to all DRAM banks. */
->         mvebu_writel(port, dram->cs[0].base, PCIE_BAR_LO_OFF(1));
->         mvebu_writel(port, 0, PCIE_BAR_HI_OFF(1));
->         mvebu_writel(port, ((size - 1) & 0xffff0000) | 1,
->                      PCIE_BAR_CTRL_OFF(1));
->
-> [Note: mvebu has a memory mapped alias for the end port config space,
->  which is what PCIE_BAR_LO_OFF is referencing.]
->
-> Eg, it is matching the DRAM. This is because in an end port the BAR
-> claims incoming MemRd/MemWr TLPs, and for root port operation you want
-> the HW to claim all TLPs related to system memory.
->
-> The old driver (linux/arch/arm/mach-orion5x/pci.c) did this:
->
-> static void rc_pci_fixup(struct pci_dev *dev)
-> {
->         /*
->          * Prevent enumeration of root complex.
->          */
->         if (dev->bus->parent == NULL && dev->devfn == 0) {
->                 int i;
->
->                 for (i = 0; i < DEVICE_COUNT_RESOURCE; i++) {
->                         dev->resource[i].start = 0;
->                         dev->resource[i].end   = 0;
->                         dev->resource[i].flags = 0;
->                 }
->         }
-> }
-> DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_MARVELL, PCI_ANY_ID, rc_pci_fixup);
->
-> Which seems very similar to what you quoted?
-
-I haven't worked with devices like this before, so pardon my ignorance.
-
-It sounds like when these devices are configured as root ports, they
-have BARs visible to the host, which is how dev->resource[] would get
-filled in to begin with.  We manage normal BARs so the CPU can perform
-MMIO accesses to the device.  In this case, it sounds like the BARs
-are more for the benefit of devices below the bridge that want to
-perform DMA.  The PCI core certainly wouldn't know what to do about
-something like that, so I agree the best thing to do is to clear out
-the resource completely and pretend it doesn't exist.  I guess a new
-(not repurposed) design would probably put stuff like this in
-device-specific config space, not in architected BARs.
-
-Bjorn
+Jon.
