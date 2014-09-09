@@ -1,38 +1,40 @@
-From: k.kozlowski@samsung.com (=?UTF-8?B?S3J6eXN6dG9mIEtvesWCb3dza2k=?=)
-Date: Tue, 09 Sep 2014 14:24:23 +0200
-Subject: [PATCH] clk: samsung: exynos3250: fix mout_cam_blk parent list
-In-Reply-To: <1410008613-20861-1-git-send-email-pankaj.dubey@samsung.com>
-References: <1410008613-20861-1-git-send-email-pankaj.dubey@samsung.com>
-Message-ID: <540EF177.8090005@samsung.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 09 Sep 2014 14:36:30 +0200
+Subject: [PATCH v3 1/2] rtc: pcf8563: fix uninitialized use warning
+In-Reply-To: <540DCEB0.6030108@cogentembedded.com>
+References: <2750370.rlMuFcoBUA@wuerfel> <540DCEB0.6030108@cogentembedded.com>
+Message-ID: <19416272.eCNUZ3hTWV@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06.09.2014 15:03, Pankaj Dubey wrote:
-> As per user manual of Exynos3250 SRC_CAM can select
-> div_cam_blk_320 if it's value is 0xC, so placing
-> div_cam_blk_320 at proper index in parent list of mout_cam_blk.
->
-> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
-> ---
->   drivers/clk/samsung/clk-exynos3250.c |    1 +
->   1 file changed, 1 insertion(+)
+gcc-4.9 found a potential condition under which the 'pending'
+variable may be used uninitialized:
 
-Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+drivers/rtc/rtc-pcf8563.c: In function 'pcf8563_irq':
+drivers/rtc/rtc-pcf8563.c:173:5: warning: 'pending' may be used uninitialized in this function [-Wmaybe-uninitialized]
 
-Best regards,
-Krzysztof
+This is because in the pcf8563_get_alarm_mode() function, we
+check any nonzero return of pcf8563_read_block_data, but
+in the irq function we only check for negative values, so
+a possible positive value does not get detected if the compiler
+chooses not to inline the entire call chain.
 
->
-> diff --git a/drivers/clk/samsung/clk-exynos3250.c b/drivers/clk/samsung/clk-exynos3250.c
-> index e1cb464..ba8f073f 100644
-> --- a/drivers/clk/samsung/clk-exynos3250.c
-> +++ b/drivers/clk/samsung/clk-exynos3250.c
-> @@ -248,6 +248,7 @@ PNAME(group_sclk_cam_blk_p)	= { "xxti", "xusbxti",
->   				    "none", "none", "none",
->   				    "none", "div_mpll_pre",
->   				    "mout_epll_user", "mout_vpll",
-> +				    "none", "none", "none",
->   				    "div_cam_blk_320", };
->   PNAME(group_sclk_fimd0_p)	= { "xxti", "xusbxti",
->   				    "m_bitclkhsdiv4_2l", "none",
->
+Checking for any non-zero value in the interrupt handler as well
+is just as correct and lets the compiler know what we are doing,
+without needing a bogus initialization.
+
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+
+diff --git a/drivers/rtc/rtc-pcf8563.c b/drivers/rtc/rtc-pcf8563.c
+index 5a197d9dc7e7..3a6f994c4da8 100644
+--- a/drivers/rtc/rtc-pcf8563.c
++++ b/drivers/rtc/rtc-pcf8563.c
+@@ -167,7 +167,7 @@ static irqreturn_t pcf8563_irq(int irq, void *dev_id)
+ 	char pending;
+ 
+ 	err = pcf8563_get_alarm_mode(pcf8563->client, NULL, &pending);
+-	if (err < 0)
++	if (err)
+ 		return err;
+ 
+ 	if (pending) {
