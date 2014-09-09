@@ -1,40 +1,53 @@
-From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
-Date: Tue, 09 Sep 2014 09:33:42 +0200
-Subject: [PATCH v8 00/18] 8250-core based serial driver for OMAP + DMA
-In-Reply-To: <20140908175510.GK3238@atomide.com>
-References: <1409943773-7874-1-git-send-email-bigeasy@linutronix.de>
- <20140908174020.GI3238@atomide.com> <20140908175510.GK3238@atomide.com>
-Message-ID: <540EAD56.8090304@linutronix.de>
+From: peter.griffin@linaro.org (Peter Griffin)
+Date: Tue, 9 Sep 2014 08:34:46 +0100
+Subject: [PATCH 2/3] phy: phy-stih407-usb: Add dt documentation for USB
+ picophy found on stih407 SoC family
+In-Reply-To: <540DCB91.7060702@ti.com>
+References: <1409740079-16554-1-git-send-email-peter.griffin@linaro.org>
+ <1409740079-16554-3-git-send-email-peter.griffin@linaro.org>
+ <540DCB91.7060702@ti.com>
+Message-ID: <20140909073446.GB7620@griffinp-ThinkPad-X1-Carbon-2nd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/08/2014 07:55 PM, Tony Lindgren wrote:
-> * Tony Lindgren <tony@atomide.com> [140908 10:41]:
->> * Sebastian Andrzej Siewior <bigeasy@linutronix.de> [140905 12:03]:
->>> This is my complete queue fo the omap serial driver based on the 8250 core
->>> code. I played with it on beagle bone, am335x-evm and dra7xx including DMA.
->>> The runtime-pm pieces look now bug-compatible with the omap-serial driver.
->>> Besides the runtime-om improvement I also fixed a few corner cases for the
->>> TX-DMA problem. The DMA fixes (in edma and omap-dma) were dropped and the
->>> problem has been in 8250-dma via patch #13.
->>>
->>> The whole queue is available at
->>>   git://git.breakpoint.cc/bigeasy/linux.git uart_v8
->>
->> Gave the above branch a quick try, but it again does not idle for
->> my omap3 test cases. It seems that now the cm_idlest1_core sdma
->> bit is blocking deeper idle states. Is that the correct branch
->> to use?
+Hi Kishon,
+
+Thanks for reviewing :-)
+
+> > +On STiH410, we have to use the DWC3 port#2 with a picoPHY to manage USB2
+> > +devices. The USB2 Controller will use the ports #0 and #1.
+> > +
+> > +This is to document the DT parameters to be passed from the blob in that case.
+> > +
+> > +Required properties:
+> > +- compatible		: should be "st,stih407-usb2-phy"
 > 
-> Never mind. User error. I forgot to apply my own patch for force
-> idling the UARTs for the omap hwmod. And the sdma bit clears if
-> I do sleep 5 before attempting to read the sysfs entry..
+> If STiH410 also uses the same driver then you should add a new compatibility
+> value for it.
 
-Okay. There is also this "uart_v8_hacks" branch where I splitted out
-the hacks I had like the pstore one or the force idle for instance.
+I will remove the reference to stih410 in V2, as currently it is not supported
+upstream, and I'm not sure what ST's plans are regarding upstreaming it. If/
+when it is upstreamed, we can add this and a compabible property back in.
 
-> Regards,
+<snip>
+> > +
+> > +usb2_picophy0: usbpicophy at 0 {
+> usbpicophy at f8 since you have a reg property ;-)
+
+will fix in V2
+
 > 
-> Tony
+> > +	compatible	= "st,stih407-usb2-phy";
+> > +	reg		= <0xf8 0x04>,	/* syscfg 5062 */
+> > +			  <0xf4 0x04>;	/* syscfg 5061 */
+> > +	reg-names	= "param",
+> > +			  "ctrl";
+> > +			  #phy-cells = <0>;
+> 
+> alignment seems to have gone wrong here.
 
-Sebastian
+Will fix in v2
+
+regards,
+
+Peter.
