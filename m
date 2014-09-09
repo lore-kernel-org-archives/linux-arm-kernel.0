@@ -1,66 +1,66 @@
-From: jcm@redhat.com (Jon Masters)
-Date: Tue, 09 Sep 2014 01:44:00 -0400
-Subject: [PATCH v3 09/17] ARM64 / ACPI: Parse MADT for SMP initialization
-In-Reply-To: <540E88A2.1000606@linaro.org>
-References: <1409583475-6978-1-git-send-email-hanjun.guo@linaro.org>
- <1409583475-6978-10-git-send-email-hanjun.guo@linaro.org>
- <540E80BD.20801@redhat.com> <540E88A2.1000606@linaro.org>
-Message-ID: <540E93A0.4040306@redhat.com>
+From: mpa@pengutronix.de (Markus Pargmann)
+Date: Tue, 9 Sep 2014 07:51:57 +0200
+Subject: [PATCH] mfd: mc13xxx: Configure WDI reset
+In-Reply-To: <540D9BCC.2000801@gmail.com>
+References: <1410159671-25873-1-git-send-email-mpa@pengutronix.de>
+ <540D5DEB.6020605@gmail.com>
+ <20140908092559.GB24081@pengutronix.de>
+ <540D9BCC.2000801@gmail.com>
+Message-ID: <20140909055157.GC24081@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/09/2014 12:57 AM, Hanjun Guo wrote:
-> Hi Jon,
-> 
-> On 2014?09?09? 12:23, Jon Masters wrote:
->> On 09/01/2014 10:57 AM, Hanjun Guo wrote:
->>> MADT contains the information for MPIDR which is essential for
->>> SMP initialization, parse the GIC cpu interface structures to
->>> get the MPIDR value and map it to cpu_logical_map(), and add
->>> enabled cpu with valid MPIDR into cpu_possible_map.
->>>
->>> ACPI 5.1 only has two explicit methods to boot up SMP, PSCI and
->>> Parking protocol, but the Parking protocol is only specified for
->>> ARMv7 now, so make PSCI as the only way for the SMP boot protocol
->>> before some updates for the ACPI spec or the Parking protocol spec.
->>> +	/* CPU 0 was already initialized */
->>> +	if (cpu) {
->>> +		if (cpu_ops[cpu]->cpu_init(NULL, cpu))
->>> +			return -EOPNOTSUPP;
->>> +
->>> +		/* map the logical cpu id to cpu MPIDR */
->>> +		cpu_logical_map(cpu) = mpidr;
->> I'm not sure it's worth noting in a comment or just in the dialogue that
->> none of these MPIDR values is literally the value in the MPIDR. Linux
->> doesn't store that anyway (even in the cpu_logical_map), since it is
->> pre-filtered against MPIDR_HWID_BITMASK to remove the non-affinity level
->> bits. And since the ACPI5.1 specification requires that non-affinity
->> bits be zero everything works. But it relies upon this assumption so it
->> might be worth explicitly masking out the bits when making the call into:
->>
->>        acpi_map_gic_cpu_interface(processor->arm_mpidr,
->>                processor->flags & ACPI_MADT_ENABLED);
->>
->> During the parsing of the processor object's MPIDR value.
-> 
-> Yes, I agree with you. When I tested this patch set on our
-> ARM64 platform, I found this problem too. some firmware
-> will just present the real MPIDR value to OS which some reserved
-> bit set to 1, and it will lead to some logic problem in this patch.
-> (actually firmware didn't obey with ACPI spec)
-> 
-> I had updated the patch with:
-> 
-> +	acpi_map_gic_cpu_interface(processor->arm_mpidr & MPIDR_HWID_BITMASK,
-> +		processor->flags & ACPI_MADT_ENABLED);
-> 
-> and then the problem was gone :)
+Hi,
 
-Did I miss an updated patch posting then? It is possible...I was keeping
-out of this thread for "obvious" reasons (I'm somewhat biased in favor
-of ACPI on 64-bit ARM server platforms and thus not objective in all
-cases...so I am confining my feedback to technical specifics). But it's
-necessary that there be a little more discussion here. I've got a couple
-of requests into various vendors to get more vocal too.
+On Mon, Sep 08, 2014 at 02:06:36PM +0200, Philippe R?tornaz wrote:
+> Le 08/09/2014 11:25, Markus Pargmann a ?crit :
+> >Hi,
+> >
+> >On Mon, Sep 08, 2014 at 09:42:35AM +0200, Philippe R?tornaz wrote:
+> >>Hello
+> >>
+> >>Le 08/09/2014 09:01, Markus Pargmann a ?crit :
+> >>>Setup the PMIC to make a restart when a watchdog interrupt occures.
+> >>>If this is not configured, the PMIC will shut down the power supply
+> >>>without a restart.
+> >>
+> >>
+> >>Well, this was used to poweroff the mx31moboard board.
+> >>So we need to be able to configure the functionality.
+> >
+> >So on mx31moboard the watchdog interrupt always leads to a poweroff instead of
+> >a reset?
+> 
+> Well, no, it simply doesn't work since the output pin is not enabled :)
+> We enable the watchdog output only in pm_power_off().
+> 
+> >Perhaps it would be better to switch back to poweroff on
+> >watchdog interrupt right before the shutdown watchdog interrupt is
+> >triggered.
+> 
+> Yes, we definitely should be doing this.
+> The only point is that we don't have currently access to the PMIC
+> from pm_power_off().
+> Is there a clean/recommended way to do it ?
 
-Jon.
+An exported function in the pmic mfd driver that switches between
+poweroff/reset on watchdog interrupt may be ok for this. In the board
+pm_power_off routine you could then use of_find_device_by_node() or
+something similar to get the device struct and pass it to the function.
+
+Best Regards,
+
+Markus
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140909/999413b8/attachment.sig>
