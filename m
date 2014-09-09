@@ -1,60 +1,35 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Tue, 9 Sep 2014 11:19:54 -0400
-Subject: [PATCH v2 0/3] net: Add Keystone NetCP ethernet driver support
-In-Reply-To: <540EE809.9020901@mojatatu.com>
-References: <1408115562-22487-1-git-send-email-santosh.shilimkar@ti.com>
- <20140821.163612.282672926741753926.davem@davemloft.net>
- <53F79DC5.8030003@ti.com> <540DC00F.1080103@ti.com>
- <540EE809.9020901@mojatatu.com>
-Message-ID: <540F1A9A.1020309@ti.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 09 Sep 2014 17:20:11 +0200
+Subject: [GIT PULL] Third Round of Renesas ARM Based SoC Soc Updates for
+ v3.18
+In-Reply-To: <cover.1410235571.git.horms+renesas@verge.net.au>
+References: <cover.1410235571.git.horms+renesas@verge.net.au>
+Message-ID: <4196537.hvL3OIMxQq@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 09 September 2014 07:44 AM, Jamal Hadi Salim wrote:
-> On 09/08/14 10:41, Santosh Shilimkar wrote:
+On Tuesday 09 September 2014 13:22:17 Simon Horman wrote:
+> Hi Olof, Hi Kevin, Hi Arnd,
 > 
->>> The NetCP plugin module infrastructure use all the standard kernel
->>> infrastructure and its very tiny.
+> Please consider these third round of Renesas ARM based SoC soc updates for v3.18.
 > 
-> So i found this manual here:
-> http://www.silica.com/fileadmin/02_Products/Productdetails/Texas_Instruments/SILICA_TI_66AK2E05-ds.pdf
+> This pull request is based on the previous round of
+> such requests, tagged as renesas-soc2-for-v3.18,
+> which you have already pulled.
 > 
-> Glad there is an open document!
-> There are a couple of ethernet switch chips I can spot there.
-> 
-All the documentation is open including packet accelerator offload
-in ti.com.
+> This pull-request has a minor conflict with
+> "[GIT PULL] Renesas ARM Based SoC Kconfig Cleanups for v3.18",
+> tagged as renesas-kconfig-cleanups-for-v3.18, which you
+> have previously pulled.
 
-> Can i control those with "bridge" or say "brctl" utilities?
-> 
-> I can see the bridge ports are exposed and i should be able to
-> control them via ifconfig or ip link. Thats what "standard
-> kernel infrastructure" means. Magic hidden in a driver is
-> not.
-> 
-There is nothing magic hidden in the driver. The bridge ports
-are exposed as standard network interfaces. Currently the
-drivers don't support bridge offload functionality and
-the bridging is disabled in the switch by default. 
+Pulled into next/soc as well. One detail I noticed for the first time is
+that the setup-*.c file hides the machine descriptor inside of #ifdef
+CONFIG_USE_OF, which makes no sense since the file is only compiled
+when ARCH_MULTIPLATFORM is set, and that does 'select USE_OF'.
+It would be better not to add that #ifdef for new files, and you
+could perhaps remove the existing ones after the conversion to
+multiplatform is complete.
 
-> Take a look at recent netconf discussion (as well as earlier
-> referenced discussions):
-> http://vger.kernel.org/netconf-nf-offload.pdf
-> 
-> Maybe we can help providing you some direction?
-> The problem is it doesnt seem that the offload specs for
-> those other pieces are open? e.g how do i add an entry
-> to the L2 switch?
-> 
-We got such requests from customers but couldn't
-support it for Linux. We are also looking for such
-support and any direction are welcome. Your slide
-deck seems to capture the key topics like L2/IPSEC
-offload which we are also interested to hear.
+Thanks,
 
-Just to be clear, your point was about L2 switch offload
-which the driver don't support at the moment. It might confuse
-others. The driver doesn't implements anything non-standard.
-
-Regards,
-Santosh
+	Arnd
