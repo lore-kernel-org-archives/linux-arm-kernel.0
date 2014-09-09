@@ -1,106 +1,67 @@
-From: geoff@infradead.org (Geoff Levand)
-Date: Tue, 09 Sep 2014 22:51:48 +0000
-Subject: [PATCH 00/13] arm64 kexec kernel patches V2
-Message-ID: <cover.1410302383.git.geoff@infradead.org>
+From: dianders@chromium.org (Doug Anderson)
+Date: Tue,  9 Sep 2014 16:06:04 -0700
+Subject: [PATCH] mfd: RK808: Add register caching
+Message-ID: <1410303964-6943-1-git-send-email-dianders@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi All,
+Let's define the voltatile registers (those that can't be cached) and
+enable caching.  The rk808 is accessed almost constantly with cpufreq
+so this is really nice.
 
-This series adds the core support for kexec re-boots on arm64.  I have tested
-with the ARM VE fast model using various kernel config options for both the
-first and second stage kernels.
+As measured by ftrace:
+  before this change: cpu0_set_target() => ~2200us
+  after this change:  cpu0_set_target() =>  ~500us
 
-To load a second stage kernel and execute a kexec re-boot on arm64 my patches to
-kexec-tools [2], which have not yet been merged upstream, are needed.
+Signed-off-by: Doug Anderson <dianders@chromium.org>
+---
+ drivers/mfd/rk808.c | 30 ++++++++++++++++++++++++++++++
+ 1 file changed, 30 insertions(+)
 
-This series does not include some re-work of the spin-table CPU enable method
-that is needed to support it, nor does it include some re-work of KVM to support
-CPU soft reset.  A kernel built with these patches will boot and run correctly,
-but will fail to load a kexec kernel if running on a machine with any spin-table
-enabled CPUs and will fail the kexec re-boot if the first stage kernel was built
-with CONFIG_KVM=y.  Work-in-progress patches to support these are in the master
-branch of my linux-kexec repository [1].
-
-Patches 1-5 rework the arm64 hcall mechanism to give the arm64 soft_restart()
-routine the ability to switch exception levels from EL1 to EL2 for kernels that
-were entered in EL2.
-
-Patches 6 and 7 add two new arm64 generic routines read_cpu_properties() and
-local_disable() that the kexec code uses.
-
-Patches 8-10 fixup machine_shutdown() to work correctly for a kexec re-boot.
-The implementation relies on the effects of smp_send_stop() to shutdown the
-secondary processors of an SMP system via the cpu_disable and cpu_die methods of
-the arm64 cpu_ops structure.
-
-Patches 11 and 12 add the actual kexec support.
-
-Patch 13 adds a kernel command line parameter kexec_ignore_compat_check for
-expert users to give more control over loading second stage kernels.
-
-Please consider all patches for inclusion.  Any comments or suggestions on how 
-to improve are welcome.
-
-[1]  https://git.linaro.org/people/geoff.levand/linux-kexec.git
-[2]  https://git.linaro.org/people/geoff.levand/kexec-tools.git
-
--Geoff
-
-The following changes since commit e3672649faae400e8a598938766a63f395a27ae6:
-
-  arm64: defconfig: increase NR_CPUS default to 64 (2014-09-08 14:55:27 +0100)
-
-are available in the git repository at:
-
-  git://git.linaro.org/people/geoff.levand/linux-kexec.git kexec-v2
-
-for you to fetch changes up to 99f09410a26c001efd06c270aa2e348d6cac6b01:
-
-  arm64/kexec: Add kexec_ignore_compat_check param (2014-09-09 15:33:48 -0700)
-
-Geoff Levand (13):
-  arm64: Add ESR_EL2_EC macros to hyp-stub
-  arm64/kvm: Fix assembler compatibility of macros
-  arm64: Convert hcalls to use ISS field
-  arm64: Add new hcall HVC_CALL_FUNC
-  arm64: Add EL2 switch to soft_restart
-  arm64: Add new routine read_cpu_properties
-  arm64: Add new routine local_disable
-  arm64: Use cpu_ops for smp_stop
-  arm64/kexec: Kexec expects cpu_die
-  arm64/kexec: Revert change to machine_shutdown()
-  arm64/kexec: Add core kexec support
-  arm64/kexec: Enable kexec in the arm64 defconfig
-  arm64/kexec: Add kexec_ignore_compat_check param
-
- Documentation/kernel-parameters.txt |  13 +
- arch/arm64/Kconfig                  |   8 +
- arch/arm64/configs/defconfig        |   1 +
- arch/arm64/include/asm/cpu_ops.h    |   2 +-
- arch/arm64/include/asm/irqflags.h   |  13 +
- arch/arm64/include/asm/kexec.h      |  52 +++
- arch/arm64/include/asm/kvm_arm.h    |   2 +-
- arch/arm64/include/asm/proc-fns.h   |   4 +-
- arch/arm64/include/asm/virt.h       |  31 ++
- arch/arm64/kernel/Makefile          |   2 +
- arch/arm64/kernel/cpu-properties.c  |  58 ++++
- arch/arm64/kernel/cpu-properties.h  |  39 +++
- arch/arm64/kernel/hyp-stub.S        |  51 ++-
- arch/arm64/kernel/machine_kexec.c   | 627 ++++++++++++++++++++++++++++++++++++
- arch/arm64/kernel/process.c         |  15 +-
- arch/arm64/kernel/psci.c            |   4 +-
- arch/arm64/kernel/relocate_kernel.S | 185 +++++++++++
- arch/arm64/kernel/smp.c             |   9 +
- arch/arm64/kvm/hyp.S                |  19 +-
- arch/arm64/mm/proc.S                |  47 ++-
- include/uapi/linux/kexec.h          |   1 +
- 21 files changed, 1139 insertions(+), 44 deletions(-)
- create mode 100644 arch/arm64/include/asm/kexec.h
- create mode 100644 arch/arm64/kernel/cpu-properties.c
- create mode 100644 arch/arm64/kernel/cpu-properties.h
- create mode 100644 arch/arm64/kernel/machine_kexec.c
- create mode 100644 arch/arm64/kernel/relocate_kernel.S
-
+diff --git a/drivers/mfd/rk808.c b/drivers/mfd/rk808.c
+index 0324422..bd02150 100644
+--- a/drivers/mfd/rk808.c
++++ b/drivers/mfd/rk808.c
+@@ -29,10 +29,40 @@ struct rk808_reg_data {
+ 	int value;
+ };
+ 
++static bool rk808_is_volatile_reg(struct device *dev, unsigned int reg)
++{
++	/*
++	 * Notes:
++	 * - Technically the ROUND_30s bit makes RTC_CTRL_REG volatile, but
++	 *   we don't use that feature.  It's better to cache.
++	 * - It's unlikely we care that RK808_DEVCTRL_REG is volatile since
++	 *   bits are cleared in case when we shutoff anyway, but better safe.
++	 */
++
++	switch (reg) {
++	case RK808_SECONDS_REG ... RK808_WEEKS_REG:
++	case RK808_RTC_STATUS_REG:
++	case RK808_VB_MON_REG:
++	case RK808_THERMAL_REG:
++	case RK808_DCDC_UV_STS_REG:
++	case RK808_LDO_UV_STS_REG:
++	case RK808_DCDC_PG_REG:
++	case RK808_LDO_PG_REG:
++	case RK808_DEVCTRL_REG:
++	case RK808_INT_STS_REG1:
++	case RK808_INT_STS_REG2:
++		return true;
++	}
++
++	return false;
++}
++
+ static const struct regmap_config rk808_regmap_config = {
+ 	.reg_bits = 8,
+ 	.val_bits = 8,
+ 	.max_register = RK808_IO_POL_REG,
++	.cache_type = REGCACHE_RBTREE,
++	.volatile_reg = rk808_is_volatile_reg,
+ };
+ 
+ static struct resource rtc_resources[] = {
 -- 
-1.9.1
+2.1.0.rc2.206.gedb03e5
