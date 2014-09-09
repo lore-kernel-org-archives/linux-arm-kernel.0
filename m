@@ -1,32 +1,41 @@
-From: peter.griffin@linaro.org (Peter Griffin)
-Date: Tue,  9 Sep 2014 10:00:18 +0100
-Subject: [PATCH v2 4/4] ARM: multi_v7_defconfig: Enable stih407 usb picophy
-In-Reply-To: <1410253218-18318-1-git-send-email-peter.griffin@linaro.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 09 Sep 2014 11:08:11 +0200
+Subject: [PATCH v2 1/4] phy: phy-stih407-usb: Add usb picoPHY driver found
+ on stih407 SoC family
+In-Reply-To: <1410253218-18318-2-git-send-email-peter.griffin@linaro.org>
 References: <1410253218-18318-1-git-send-email-peter.griffin@linaro.org>
-Message-ID: <1410253218-18318-5-git-send-email-peter.griffin@linaro.org>
+ <1410253218-18318-2-git-send-email-peter.griffin@linaro.org>
+Message-ID: <2894228.eRmxgHsWbh@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch enables the picoPHY usb phy which is used by
-the usb2 and usb3 host controllers when controlling usb2/1.1
-devices. It is found in stih407 family SoC's from STMicroelectronics.
+On Tuesday 09 September 2014 10:00:15 Peter Griffin wrote:
+> This is the generic phy driver for the picoPHY ports used by the
+> USB2 and USB3 Host controllers when controlling usb2/1.1 devices. It
+> is found on STiH407 SoC family from STMicroelectronics.
+> 
+> Signed-off-by: Giuseppe Cavallaro <peppe.cavallaro@st.com>
+> Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
 
-Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
----
- arch/arm/configs/multi_v7_defconfig | 1 +
- 1 file changed, 1 insertion(+)
+Looks good overall, just one question:
 
-diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-index 5fb95fb..65f4611 100644
---- a/arch/arm/configs/multi_v7_defconfig
-+++ b/arch/arm/configs/multi_v7_defconfig
-@@ -387,6 +387,7 @@ CONFIG_PWM_VT8500=y
- CONFIG_OMAP_USB2=y
- CONFIG_TI_PIPE3=y
- CONFIG_PHY_MIPHY365X=y
-+CONFIG_PHY_STIH407_USB=y
- CONFIG_PHY_SUN4I_USB=y
- CONFIG_EXT4_FS=y
- CONFIG_VFAT_FS=y
--- 
-1.9.1
+> +
+> +	match = of_match_device(stih407_usb2_picophy_of_match, dev);
+> +	if (!match)
+> +		return -ENODEV;
+....
+> +
+> +	phy = devm_phy_create(dev, NULL, match->data, NULL);
+> +	if (IS_ERR(phy)) {
+> +		dev_err(dev, "failed to create Display Port PHY\n");
+> +		return PTR_ERR(phy);
+> +	}
+> +
+
+There is only one entry in the match table, so it always points to
+stih407_usb2_picophy_data. Do you have plans to add another set of
+operations soon?
+If not, just remove the .data pointer and hardcode the operations
+in the devm_phy_create call.
+
+	Arnd
