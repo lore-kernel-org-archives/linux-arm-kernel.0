@@ -1,45 +1,128 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 09 Sep 2014 10:50:46 +0200
-Subject: [GIT PULL] Renesas ARM Based SoC Init Delay Updates For v3.18
-In-Reply-To: <20140909020218.GA23233@verge.net.au>
-References: <cover.1408927601.git.horms+renesas@verge.net.au>
- <201409051727.18845.arnd@arndb.de> <20140909020218.GA23233@verge.net.au>
-Message-ID: <11409170.rfMyQrIgd0@wuerfel>
+From: leoy@marvell.com (Leo Yan)
+Date: Tue, 9 Sep 2014 16:55:49 +0800
+Subject: [RFC PATCH v2] clockevents: re-calculate event when cpu enter idle
+In-Reply-To: <1409793933-29938-1-git-send-email-leoy@marvell.com>
+References: <1409793933-29938-1-git-send-email-leoy@marvell.com>
+Message-ID: <540EC095.8060901@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 09 September 2014 11:02:18 Simon Horman wrote:
-> On Fri, Sep 05, 2014 at 05:27:18PM +0200, Arnd Bergmann wrote:
-> > On Monday 25 August 2014, Simon Horman wrote:
-> > > Hi Olof, Hi Kevin, Hi Arnd,
-> > > 
-> > > Please consider these Renesas ARM based SoC init delay updates for v3.18.
-> > > 
-> > 
-> > While looking at your branches, I noticed that you go to great lengths
-> > to compute the correct lpj value and avoid the calibration.
-> > 
-> > However, I believe the "modern" way to do this is to call
-> > register_current_timer_delay() in order to base the delay loop
-> > on the hardware timer instead of looping in the CPU. This is
-> > more accurate and more robust against CPU frequency scaling.
-> 
-> I may be wrong but my understanding is that Renesas SoCs may be
-> booted without a timer.
 
-Do you mean some of them only have a clockevent driver but no clocksource,
-and use the jiffies clocksource instead?
+On 09/04/2014 09:25 AM, Leo Yan wrote:
+> Below flow will have the redundant interrupts for broadcast timer:
+>
+> 1. Process A starts a hrtimer with 100ms timeout, then Process A will
+>     wait on the waitqueue to sleep;
+> 2. The CPU which Process A runs on will enter idle and call notify
+>     CLOCK_EVT_NOTIFY_BROADCAST_ENTER, so the CPU will shutdown its local
+>     and set broadcast timer's next event with delta for 100ms timeout;
+> 3. After 70ms later, the CPU is waken up by other peripheral's interrupt
+>     and Process A will be waken up as well; Process A will cancel the hrtimer
+>     at this point, kernel will remove the timer event from the event queue
+>     but it will not really disable broadcast timer;
+> 4. So after 30ms later, the broadcast timer interrupt will be triggered
+>     even though the timer has been cancelled by s/w in step 3.
+>
+> To fix this issue, in theory cpu can check this situation when the cpu
+> enter and exit idle; So it can iterate the related idle cpus to calculate
+> the correct broadcast event value.
+>
+> But with upper method, it has the side effect. Due the cpu enter and exit
+> idle state very frequently in short time, so can optimize to only calculate
+> the correct state only when the cpu join into broadcast timer and set the
+> next event after calculate a different event compare to previous time.
+>
+> Signed-off-by: Leo Yan <leoy@marvell.com>
 
-I've looked at the three drivers/clocksource/{sh,em}_*.c files, and it seems
-sh_mtu2.c indeed has no clocksource support, although the binding description
-mentions that it has multiple counters that could be used for this
-purpose. This timer is only used on R7S72100, so if you add
-'register_current_timer_delay' calls to the other drivers, you can
-decide to either keep computing the lpj value for R7S72100 but not the
-others, or try to add a clocksource implementation to mtu2 as well.
+hi Thomas and all,
 
-Note that the read_current_timer() function for the delay implementation
-doesn't have to be based on the same timer as the clocksource, but in
-practice it often is.
+Could u take time to review this patch, do u think this patch is 
+adorable? we have do some testing and looks like it's health. But i 
+still want to know if u have any comment or suggestion, or we can merge 
+this patch into mainline.
 
-	Arnd
+Thanks,
+Leo Yan
+
+> ---
+>   kernel/time/tick-broadcast.c | 56 +++++++++++++++++++++++++++++++++++++-------
+>   1 file changed, 48 insertions(+), 8 deletions(-)
+>
+> diff --git a/kernel/time/tick-broadcast.c b/kernel/time/tick-broadcast.c
+> index 64c5990..52f8879 100644
+> --- a/kernel/time/tick-broadcast.c
+> +++ b/kernel/time/tick-broadcast.c
+> @@ -324,6 +324,31 @@ unlock:
+>   	raw_spin_unlock(&tick_broadcast_lock);
+>   }
+>
+> +static void tick_broadcast_oneshot_get_earlier_event(void)
+> +{
+> +	struct clock_event_device *bc;
+> +	struct tick_device *td;
+> +	ktime_t next_event;
+> +	int cpu, next_cpu = 0;
+> +
+> +	next_event.tv64 = KTIME_MAX;
+> +
+> +	/* iterate all expired events */
+> +	for_each_cpu(cpu, tick_broadcast_oneshot_mask) {
+> +
+> +		td = &per_cpu(tick_cpu_device, cpu);
+> +		if (td->evtdev->next_event.tv64 < next_event.tv64) {
+> +			next_event.tv64 = td->evtdev->next_event.tv64;
+> +			next_cpu = cpu;
+> +		}
+> +	}
+> +
+> +	bc = tick_broadcast_device.evtdev;
+> +	if (next_event.tv64 != KTIME_MAX &&
+> +	    next_event.tv64 != bc->next_event.tv64)
+> +		tick_broadcast_set_event(bc, next_cpu, next_event, 0);
+> +}
+> +
+>   /*
+>    * Powerstate information: The system enters/leaves a state, where
+>    * affected devices might stop
+> @@ -717,17 +742,32 @@ int tick_broadcast_oneshot_control(unsigned long reason)
+>   		if (!cpumask_test_and_set_cpu(cpu, tick_broadcast_oneshot_mask)) {
+>   			WARN_ON_ONCE(cpumask_test_cpu(cpu, tick_broadcast_pending_mask));
+>   			broadcast_shutdown_local(bc, dev);
+> +
+> +			/*
+> +			 * We only reprogram the broadcast timer if we did not
+> +			 * mark ourself in the force mask; If the current CPU
+> +			 * is in the force mask, then we are going to be woken
+> +			 * by the IPI right away.
+> +			 */
+> +			if (cpumask_test_cpu(cpu, tick_broadcast_force_mask))
+> +				goto out;
+> +
+>   			/*
+> -			 * We only reprogram the broadcast timer if we
+> -			 * did not mark ourself in the force mask and
+> -			 * if the cpu local event is earlier than the
+> -			 * broadcast event. If the current CPU is in
+> -			 * the force mask, then we are going to be
+> -			 * woken by the IPI right away.
+> +			 * Reprogram the broadcast timer if the cpu local event
+> +			 * is earlier than the broadcast event;
+>   			 */
+> -			if (!cpumask_test_cpu(cpu, tick_broadcast_force_mask) &&
+> -			    dev->next_event.tv64 < bc->next_event.tv64)
+> +			if (dev->next_event.tv64 < bc->next_event.tv64) {
+>   				tick_broadcast_set_event(bc, cpu, dev->next_event, 1);
+> +				goto out;
+> +			}
+> +
+> +			/*
+> +			 * It's possible the cpu has cancelled the timer which
+> +			 * has set the broadcast event at last time, so
+> +			 * re-calculate the broadcast timer according to all
+> +			 * related cpus' expire events.
+> +			 */
+> +			tick_broadcast_oneshot_get_earlier_event();
+>   		}
+>   		/*
+>   		 * If the current CPU owns the hrtimer broadcast
+>
