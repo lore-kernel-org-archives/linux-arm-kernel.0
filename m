@@ -1,33 +1,22 @@
-From: khilman@kernel.org (Kevin Hilman)
-Date: Tue, 09 Sep 2014 08:05:12 -0700
-Subject: [PATCH 00/15] PM / Domains: Cleanups and remove superfluous APIs
-In-Reply-To: <2208348.uMLR68bVng@vostro.rjw.lan> (Rafael J. Wysocki's message
- of "Tue, 09 Sep 2014 01:07:14 +0200")
-References: <1409741551-16437-1-git-send-email-ulf.hansson@linaro.org>
- <7ha96eyt9f.fsf@paris.lan> <2208348.uMLR68bVng@vostro.rjw.lan>
-Message-ID: <7hr3zkkf6f.fsf@deeprootsystems.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 09 Sep 2014 17:05:17 +0200
+Subject: [GIT PULL] at91: cleanup for 3.18 #2
+In-Reply-To: <1410181016-9944-1-git-send-email-nicolas.ferre@atmel.com>
+References: <1410181016-9944-1-git-send-email-nicolas.ferre@atmel.com>
+Message-ID: <2942172.hhXGdFhYuO@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-"Rafael J. Wysocki" <rjw@rjwysocki.net> writes:
+On Monday 08 September 2014 14:56:56 Nicolas Ferre wrote:
+> Another pull-request that can be considered as "fixes-non-critical" or
+> "cleanup". I choose the latest as the patches are a little bit more than just
+> fixes.  The bug found by Ga?l is present on AT91 kernels for a long time so I
+> decided to avoid trying to submit it during the "-rc phase" or adding a
+> "stable" tag.
+> This material goes on top of the previous "cleanup" pull-request that you took
+> but comes with no dependency.
+> 
 
-> On Friday, September 05, 2014 08:35:56 AM Kevin Hilman wrote:
->> Ulf Hansson <ulf.hansson@linaro.org> writes:
->> 
->> > This patchset has a bit of a history and some parts of it has been posted
->> > earlier.
->> > http://lists.infradead.org/pipermail/linux-arm-kernel/2014-June/262725.html
->> >
->> > The intent is to simplify code for the generic power domain and also some of
->> > the machine specific code that uses the generic power domain.
->> >
->> > Do note, there are dependencies through this patchset, especially related to
->> > the ARM SoC changes, thus they all need to be kept together.
->> 
->> Reviewed-by: Kevin Hilman <khilman@linaro.org>
->
-> My understanding is that this is for the whole series.
+Ok, pulled into next/cleanup, thanks!
 
-Correct.
-
-Kevin
+	Arnd
