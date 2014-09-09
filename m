@@ -1,34 +1,72 @@
-From: m.chehab@samsung.com (Mauro Carvalho Chehab)
-Date: Tue,  9 Sep 2014 11:38:18 -0300
-Subject: [PATCH 2/3] [media] s5p-jpeg: Fix compilation with COMPILE_TEST
-In-Reply-To: <6cbd00c5f2d342b573aaf9c0e533778374dd2e1e.1410273306.git.m.chehab@samsung.com>
-References: <20140909124306.2d5a0d76@canb.auug.org.au>
- <6cbd00c5f2d342b573aaf9c0e533778374dd2e1e.1410273306.git.m.chehab@samsung.com>
-Message-ID: <b7343e6296b5d1d68b7229b8307442fd4141bcb3.1410273306.git.m.chehab@samsung.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Tue, 9 Sep 2014 09:42:25 -0500
+Subject: [PATCH v6 4/4] phy: exynos5-usbdrd: Calibrate LOS levels for
+ exynos5420/5800
+In-Reply-To: <CAFp+6iG+gmD_JseytYuVQcRK9ErOqQrUEWJoU1KUU7PqMd=aRw@mail.gmail.com>
+References: <1409656338-20337-1-git-send-email-gautam.vivek@samsung.com>
+ <1409656338-20337-5-git-send-email-gautam.vivek@samsung.com>
+ <20140902143438.GB16872@saruman.home>
+ <CAFp+6iEyqmbwMLFrBKD7NVLDAC=b+h1hPKFS=BG4k9D69hn_dg@mail.gmail.com>
+ <20140903144225.GD31855@saruman.home>
+ <CAFp+6iETPJCWMMkjHrpDcdCv=K0PbefYLa4eBOwN=aUY2=EHLA@mail.gmail.com>
+ <20140905175651.GK24449@saruman.home>
+ <CAFp+6iGU86yL8Ry3ArJJjBy2Cs0Em2B49yssH3BK5fJwyaZbtA@mail.gmail.com>
+ <20140908134454.GK22409@saruman.home>
+ <CAFp+6iG+gmD_JseytYuVQcRK9ErOqQrUEWJoU1KUU7PqMd=aRw@mail.gmail.com>
+Message-ID: <20140909144225.GF6151@saruman.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ERROR: "__bad_ndelay" [drivers/media/platform/s5p-jpeg/s5p-jpeg.ko] undefined!
+On Tue, Sep 09, 2014 at 07:19:50AM +0530, Vivek Gautam wrote:
+> Hi,
+> 
+> 
+> On Mon, Sep 8, 2014 at 7:14 PM, Felipe Balbi <balbi@ti.com> wrote:
+> > Hi,
+> >
+> > On Mon, Sep 08, 2014 at 09:53:09AM +0530, Vivek Gautam wrote:
+> >> On Fri, Sep 5, 2014 at 11:26 PM, Felipe Balbi <balbi@ti.com> wrote:
+> >> > On Thu, Sep 04, 2014 at 12:01:19PM +0530, Vivek Gautam wrote:
+> >> >> > Don't we have phy_power_on()
+> >> >> > for that ? It looks like you could just as well do this from
+> >> >> > phy_power_on() ?
+> >> >>
+> >> >> No, unfortunately keeping these calibration settings in phy_power_on()
+> >> >> doesn't help, since we need to do this after XHCI reset has happened.
+> >> >
+> >> > teach xHCI about PHYs ?
+> >>
+> >> sorry i couldn't understand you here.
+> >> Aren't we trying to do the same with Heikki's patch about dwc3 :
+> >> [PATCH 6/6] usb: dwc3: host: convey the PHYs to xhci
+> >>
+> >> and the 2nd patch in this series :
+> >> [PATCH v6 2/4] usb: host: xhci-plat: Get PHYs for xhci's hcds
+> >>
+> >> Is there something else that is expected ?
+> >
+> > right, use that to call phy_init() at the right time, then you need to
+> > add a new ->calibrate() method which, likely, will only be used by you
+> > ;-)
+> 
+> so you mean, the xhci should itself call phy_init() at a time suitable,
+> so that ->calibrate() is not required at all ?
+> 
+> i think you meant there - "then you __do not__ need to
 
-Yet, it sounds a bad idea to use ndelay to wait for 100 us
-for the device to reset.
+right :-)
 
-Reported-by: Stephen Rothwell <sfr@canb.auug.org.au>
-Signed-off-by: Mauro Carvalho Chehab <m.chehab@samsung.com>
+> > add a new ->calibrate() method which, likely,
+> will only be used by you", is it ?
 
-diff --git a/drivers/media/platform/s5p-jpeg/jpeg-hw-exynos4.c b/drivers/media/platform/s5p-jpeg/jpeg-hw-exynos4.c
-index e51c078360f5..01eeacf28843 100644
---- a/drivers/media/platform/s5p-jpeg/jpeg-hw-exynos4.c
-+++ b/drivers/media/platform/s5p-jpeg/jpeg-hw-exynos4.c
-@@ -23,7 +23,9 @@ void exynos4_jpeg_sw_reset(void __iomem *base)
- 	reg = readl(base + EXYNOS4_JPEG_CNTL_REG);
- 	writel(reg & ~EXYNOS4_SOFT_RESET_HI, base + EXYNOS4_JPEG_CNTL_REG);
- 
-+#ifndef CONFIG_COMPILE_TEST
- 	ndelay(100000);
-+#endif
- 
- 	writel(reg | EXYNOS4_SOFT_RESET_HI, base + EXYNOS4_JPEG_CNTL_REG);
- }
+yup
+
 -- 
-1.9.3
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140909/cfa35ca9/attachment.sig>
