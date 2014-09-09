@@ -1,90 +1,75 @@
-From: d-gerlach@ti.com (Dave Gerlach)
-Date: Tue, 9 Sep 2014 15:28:19 -0500
-Subject: [PATCH v4 10/11] ARM: OMAP2+: AM33XX: Basic suspend resume support
-In-Reply-To: <540F5C39.7040201@ti.com>
-References: <1405047349-15101-1-git-send-email-d-gerlach@ti.com>
- <1405047349-15101-11-git-send-email-d-gerlach@ti.com>
- <7h7g1dlp8b.fsf@linaro.org>
- <CAK=WgbYwGcSCxHfa880up1qKTroS=mi8UAf_Qh6Wz9n5x4D9rw@mail.gmail.com>
- <540F5C39.7040201@ti.com>
-Message-ID: <540F62E3.6080804@ti.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 09 Sep 2014 22:28:16 +0200
+Subject: [PATCH v2 2/2] PCI: keystone: update to support multiple pci ports
+In-Reply-To: <1410293835-13050-2-git-send-email-m-karicheri2@ti.com>
+References: <1410293835-13050-1-git-send-email-m-karicheri2@ti.com>
+ <1410293835-13050-2-git-send-email-m-karicheri2@ti.com>
+Message-ID: <3294679.puV171E8qx@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Kevin/Ohad,
-On 09/09/2014 02:59 PM, Suman Anna wrote:
-> Hi Ohad,
+On Tuesday 09 September 2014 16:17:15 Murali Karicheri wrote:
+> K2E SoC has two PCI ports. The SATA controller is connected to second
+> PCI port (port 1). This patch enhances the driver to support multiple
+> ports.
 > 
-> On 09/09/2014 05:31 AM, Ohad Ben-Cohen wrote:
->> On Tue, Sep 9, 2014 at 1:30 AM, Kevin Hilman <khilman@linaro.org> wrote:
->>> To me, it's not terribly clear how you made the split between this PM
->>> core code an the remoteproc code.  In the changelog for the remoteproc
->>> patch, it states it's to "load the firmware for and boot the wkup_m3".
->>> But, while parts of the IPC are here in pm33xx.c, parts of the IPC are
->>> also inside the remoteproc driver, so I'm quite curious if that's OK
->>> with the remoteproc maintainers.  Either way, please make it clearer how
->>> and why you made the split, and please isolate the wkup_m3 IPC/protocol
->>> from this code.  Think of people wanting to rework/extend the wkup_m3
->>> firmware.  They shouldn't be messing around in here, but rather inside a
->>> driver specificaly for the wkup_m3.
->>
->> I haven't looked at the code very thoroughly yet, but generally a
->> remoteproc driver should only implement the three start/stop/kick
->> rproc_ops, and then register them via the remoteproc framework.
->> Exposing additional API directly from that driver isn't something we
->> immediately want to accept.
->>
->> If relevant, we would generally prefer to extend remoteproc instead,
->> so other platform-specific drivers could utilize that functionality as
->> well. Or rpmsg - if we're missing some IPC functionality.
+> Update the DT Documentation for the new attribute, ti,pcie-port and
+> remove the note for bootargs as this is no longer needed.
 > 
-> The WkupM3 cannot access DDR, and so we don't intend to use rpmsg. The
-> IPC with wkup_m3 is usually one of the last steps for putting the SoC
-> into a desired low-power state either during suspend or cpuidle, and the
-> communication uses a bank of fixed registers. The .kick is specific
-> to virtio-based communication, and so this is not gonna be used.
+> Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
+> ---
+>  - updated based on comment against v1
+>  .../devicetree/bindings/pci/pci-keystone.txt       |    8 +++++---
+>  drivers/pci/host/pci-keystone.c                    |   15 ++++++++++-----
+>  drivers/pci/host/pci-keystone.h                    |    4 ++--
+>  3 files changed, 17 insertions(+), 10 deletions(-)
 > 
-> If you can take a closer look at the wkup_m3 remoteproc driver and give
-> your comments, then we can plan on the next steps. Especially as there
-> are also pieces pertaining to the PM layer knowing the WkupM3 has been
-> loaded and booted. There are already some pending comments on code
-> fragments from Santosh and myself, but let us know your inputs on the
-> integration aspects on PM, remoteproc and IPC with WkupM3.
->
+> diff --git a/Documentation/devicetree/bindings/pci/pci-keystone.txt b/Documentation/devicetree/bindings/pci/pci-keystone.txt
+> index bedacf0..c8f5773 100644
+> --- a/Documentation/devicetree/bindings/pci/pci-keystone.txt
+> +++ b/Documentation/devicetree/bindings/pci/pci-keystone.txt
+> @@ -56,11 +56,13 @@ Optional properties:-
+>  	phy-names: name of the Generic Keystine SerDes phy for PCI
+>  	  - If boot loader already does PCI link establishment, then phys and
+>  	    phy-names shouldn't be present.
+> +	ti,pcie-port: PCI port number. This is used to configure the PCI port
+> +	    number. For example K2E SoC supports 2 PCI ports and PCI bindings
+> +	    for the second port adds ti,pcie-port = <1> to identify second port
+> +	    and driver uses this to configure the PCI mode register for second
+> +	    port. If not present, port number 0 is assumed.
 
-The split was defined by putting all the application specific (to the
-firmware in use) code in the platform pm code while trying to keep all the
-IPC code within the wkup_m3_rproc driver. The exposed API is definitely
-heavily biased towards the intended use-case, but the CM3 was designed with
-this exact purpose in mind and not much else, and due to the limited IPC
-registers we have to work with there isn't a whole lot of flexibility. Only IPC
-reg 0 is always used as the resume address, the usage of the other registers is
-defined by the firmware and pm code.
+Is this still needed? I thought with patch 1 removed, we no longer had
+a reason to know the port number.
 
-Just as a refresher for those not familiar with it, the IPC mechanism works
-like this: we load the ipc registers (8 for am33xx, 16 for am43xx) with any
-information we want to communicate to the CM3, then we make a dummy write to
-the Mailbox which triggers an interrupt on the CM3, the CM3 does what it
-needs to with the info passed in the IPC regs and writes anything it wants to
-communicate back to these registers, and then triggers a different interrupt
-(not related to mailbox) to let the MPU know it is done. It's kind of a mess so
-I figured one driver was the best way to encapsulate it all, and I still had to
-introduce callbacks within the wkup_m3_rproc driver so it could let the pm code
-know when the FW loaded (to actually enable pm) and when an interrupt was
-received from the wkup_m3 (so the pm code can process the response).
+> -=========================
+> -Driver requires pci=pcie_bus_perf in the bootargs for proper functioning.
+> diff --git a/drivers/pci/host/pci-keystone.c b/drivers/pci/host/pci-keystone.c
+> index f1119eb..893820d 100644
+> --- a/drivers/pci/host/pci-keystone.c
+> +++ b/drivers/pci/host/pci-keystone.c
+> @@ -253,8 +253,8 @@ static int keystone_pcie_fault(unsigned long addr, unsigned int fsr,
+>  
+>  static void __init ks_pcie_host_init(struct pcie_port *pp)
+>  {
+> -	u32 vendor_device_id, val;
+>  	struct keystone_pcie *ks_pcie = to_keystone_pcie(pp);
+> +	u32 val;
+>  
+>  	ks_pcie_establish_link(ks_pcie);
+>  	ks_dw_pcie_setup_rc_app_regs(ks_pcie);
+> @@ -263,8 +263,7 @@ static void __init ks_pcie_host_init(struct pcie_port *pp)
+>  			pp->dbi_base + PCI_IO_BASE);
+>  
+>  	/* update the Vendor ID */
+> -	vendor_device_id = readl(ks_pcie->va_reg_pciid);
+> -	writew((vendor_device_id >> 16), pp->dbi_base + PCI_DEVICE_ID);
+> +	writew(ks_pcie->device_id, pp->dbi_base + PCI_DEVICE_ID);
+>  
+>  	/* update the DEV_STAT_CTRL to publish right mrrs */
+>  	val = readl(pp->dbi_base + PCIE_CAP_BASE + PCI_EXP_DEVCTL);
 
-As Suman stated, this sequence is part of the suspend path and also will be part
-of the lower c-states for cpuidle, so we need something fast and lightweight.
-RPMsg is way more than we need and it doesn't really fit the use case, so I'm
-not sure what makes the most sense, extending remoteproc in some way to support
-IPC communication like described above or leaving the basic FW loading
-functionality in place in remoteproc but moving the IPC and wkup_m3
-functionality back into the platform pm33xx code as it's so specific to that
-use-case anyway.
+This change must have slipped in accidentally, at least it's not
+described in the changelog. Should this be another patch?
+The change seems useful.
 
-Regards,
-Dave
-
-> regards
-> Suman
-> 
+	Arnd
