@@ -1,56 +1,92 @@
 From: geoff@infradead.org (Geoff Levand)
 Date: Tue, 09 Sep 2014 22:49:05 +0000
-Subject: [PATCH 09/13] arm64/kexec: Kexec expects cpu_die
+Subject: [PATCH 13/13] arm64/kexec: Add kexec_ignore_compat_check param
 In-Reply-To: <cover.1410302383.git.geoff@infradead.org>
 References: <cover.1410302383.git.geoff@infradead.org>
-Message-ID: <8760d3e11621065a78236e91724875f0e1cfadf4.1410302383.git.geoff@infradead.org>
+Message-ID: <99f09410a26c001efd06c270aa2e348d6cac6b01.1410302383.git.geoff@infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The arm64 implementation of kexec expects an operational cpu_die method of
-struct cpu_operations, so add defined(CONFIG_KEXEC) to the preprocessor
-conditional that enables cpu_die.
+Add the new kernel command line parameter kexec_ignore_compat_check which
+specifies whether or not to ignore arm64 kexec compatibility checks.
+
+For some systems the compatibility checks may be too restrictive, and setting
+this parameter could allow those systems to kexec to kernel images that would
+not pass the compatibility checks.
 
 Signed-off-by: Geoff Levand <geoff@infradead.org>
 ---
- arch/arm64/include/asm/cpu_ops.h | 2 +-
- arch/arm64/kernel/psci.c         | 4 ++--
- 2 files changed, 3 insertions(+), 3 deletions(-)
+ Documentation/kernel-parameters.txt | 13 +++++++++++++
+ arch/arm64/kernel/machine_kexec.c   | 19 +++++++++++++++++--
+ 2 files changed, 30 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm64/include/asm/cpu_ops.h b/arch/arm64/include/asm/cpu_ops.h
-index d7b4b38..9fd7281 100644
---- a/arch/arm64/include/asm/cpu_ops.h
-+++ b/arch/arm64/include/asm/cpu_ops.h
-@@ -50,7 +50,7 @@ struct cpu_operations {
- 	int		(*cpu_prepare)(unsigned int);
- 	int		(*cpu_boot)(unsigned int);
- 	void		(*cpu_postboot)(void);
--#ifdef CONFIG_HOTPLUG_CPU
-+#if defined(CONFIG_HOTPLUG_CPU) || defined(CONFIG_KEXEC)
- 	int		(*cpu_disable)(unsigned int cpu);
- 	void		(*cpu_die)(unsigned int cpu);
- 	int		(*cpu_kill)(unsigned int cpu);
-diff --git a/arch/arm64/kernel/psci.c b/arch/arm64/kernel/psci.c
-index 5539547..81dbbc9 100644
---- a/arch/arm64/kernel/psci.c
-+++ b/arch/arm64/kernel/psci.c
-@@ -380,7 +380,7 @@ static int cpu_psci_cpu_boot(unsigned int cpu)
- 	return err;
- }
+diff --git a/Documentation/kernel-parameters.txt b/Documentation/kernel-parameters.txt
+index 5ae8608..c70f4b8 100644
+--- a/Documentation/kernel-parameters.txt
++++ b/Documentation/kernel-parameters.txt
+@@ -1529,6 +1529,19 @@ bytes respectively. Such letter suffixes can also be entirely omitted.
+ 			use the HighMem zone if it exists, and the Normal
+ 			zone if it does not.
  
--#ifdef CONFIG_HOTPLUG_CPU
-+#if defined(CONFIG_HOTPLUG_CPU) || defined(CONFIG_KEXEC)
- static int cpu_psci_cpu_disable(unsigned int cpu)
- {
- 	/* Fail early if we don't have CPU_OFF support */
-@@ -442,7 +442,7 @@ const struct cpu_operations cpu_psci_ops = {
- 	.cpu_init	= cpu_psci_cpu_init,
- 	.cpu_prepare	= cpu_psci_cpu_prepare,
- 	.cpu_boot	= cpu_psci_cpu_boot,
--#ifdef CONFIG_HOTPLUG_CPU
-+#if defined(CONFIG_HOTPLUG_CPU) || defined(CONFIG_KEXEC)
- 	.cpu_disable	= cpu_psci_cpu_disable,
- 	.cpu_die	= cpu_psci_cpu_die,
- 	.cpu_kill	= cpu_psci_cpu_kill,
++	kexec_ignore_compat_check [KEXEC,ARM64]
++			This parameter specifies whether or not to ignore arm64
++			kexec compatibility checks.  The default is to honor the
++			checks.  Set this parameter to ignore all kexec
++			compatibility checks on arm64 systems.  Setting this
++			could cause the system to become unstable after a kexec
++			re-boot.  If unsure, do not set.
++
++			For some systems the compatibility checks may be too
++			restrictive, and setting this parameter could allow
++			those systems to kexec to kernel images that would not
++			pass the compatibility checks.
++
+ 	kgdbdbgp=	[KGDB,HW] kgdb over EHCI usb debug port.
+ 			Format: <Controller#>[,poll interval]
+ 			The controller # is the number of the ehci usb debug
+diff --git a/arch/arm64/kernel/machine_kexec.c b/arch/arm64/kernel/machine_kexec.c
+index 043a3bc..45c2db2 100644
+--- a/arch/arm64/kernel/machine_kexec.c
++++ b/arch/arm64/kernel/machine_kexec.c
+@@ -36,6 +36,20 @@ extern unsigned long kexec_dtb_addr;
+ extern unsigned long kexec_kimage_head;
+ extern unsigned long kexec_kimage_start;
+ 
++/*
++ * kexec_ignore_compat_check - Set to ignore kexec compatibility checks.
++ */
++
++static int __read_mostly kexec_ignore_compat_check;
++
++static int __init setup_kexec_ignore_compat_check(char *__unused)
++{
++	kexec_ignore_compat_check = 1;
++	return 1;
++}
++
++__setup("kexec_ignore_compat_check", setup_kexec_ignore_compat_check);
++
+ /**
+  * struct kexec_boot_info - Boot info needed by the local kexec routines.
+  */
+@@ -410,7 +424,8 @@ static int kexec_compat_check(const struct kexec_ctx *ctx)
+ 			if (cp_1->hwid != cp_2->hwid)
+ 				continue;
+ 
+-			if (!kexec_cpu_check(cp_1, cp_2))
++			if (!kexec_cpu_check(cp_1, cp_2) &&
++				!kexec_ignore_compat_check)
+ 				return -EINVAL;
+ 
+ 			to_process--;
+@@ -506,7 +521,7 @@ int machine_kexec_prepare(struct kimage *image)
+ 
+ 	result = kexec_compat_check(ctx);
+ 
+-	if (result)
++	if (result && !kexec_ignore_compat_check)
+ 		goto on_error;
+ 
+ 	kexec_dtb_addr = dtb_seg->mem;
 -- 
 1.9.1
