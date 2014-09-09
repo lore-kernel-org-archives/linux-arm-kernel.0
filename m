@@ -1,62 +1,49 @@
 From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
-Date: Tue,  9 Sep 2014 16:06:51 +0200
-Subject: [PATCH v10 8/9] clk: Take the prepare lock when updating the per-user
- constraints
+Date: Tue,  9 Sep 2014 16:06:52 +0200
+Subject: [PATCH v10 9/9] clk: Add docs about calling clk_put after
+ clk_get_parent
 In-Reply-To: <1410271612-27389-1-git-send-email-tomeu.vizoso@collabora.com>
 References: <1410271329-26637-1-git-send-email-tomeu.vizoso@collabora.com>
  <1410271612-27389-1-git-send-email-tomeu.vizoso@collabora.com>
-Message-ID: <1410271612-27389-6-git-send-email-tomeu.vizoso@collabora.com>
+Message-ID: <1410271612-27389-7-git-send-email-tomeu.vizoso@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+As otherwise the per-user clk will be leaked.
+
 Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
 ---
- drivers/clk/clk.c | 18 ++++++++++++++++--
- 1 file changed, 16 insertions(+), 2 deletions(-)
+ drivers/clk/clk.c   | 3 ++-
+ include/linux/clk.h | 3 ++-
+ 2 files changed, 4 insertions(+), 2 deletions(-)
 
 diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-index f283dcc..1ad8cb7 100644
+index 1ad8cb7..8ac8543 100644
 --- a/drivers/clk/clk.c
 +++ b/drivers/clk/clk.c
-@@ -1734,15 +1734,25 @@ EXPORT_SYMBOL_GPL(clk_set_rate);
- int clk_set_floor_rate(struct clk *clk_user, unsigned long rate)
+@@ -1784,7 +1784,8 @@ EXPORT_SYMBOL_GPL(clk_provider_get_parent);
+  * clk_get_parent - return the parent of a clk
+  * @clk_user: the clk whose parent gets returned
+  *
+- * Simply returns clk->parent.  Returns NULL if clk is NULL.
++ * Simply returns clk->parent.  Returns NULL if clk is NULL. Caller must call
++ * clk_put() to release the returned struct clk.
+  */
+ struct clk *clk_get_parent(struct clk *clk_user)
  {
- 	struct clk_core *clk = clk_to_clk_core(clk_user);
-+	int ret;
-+
-+	clk_prepare_lock();
- 
- 	clk_user->floor_constraint = rate;
--	return clk_provider_set_rate(clk, clk_provider_get_rate(clk));
-+	ret = clk_provider_set_rate(clk, clk_provider_get_rate(clk));
-+
-+	clk_prepare_unlock();
-+
-+	return ret;
- }
- EXPORT_SYMBOL_GPL(clk_set_floor_rate);
- 
- int clk_set_ceiling_rate(struct clk *clk_user, unsigned long rate)
- {
- 	struct clk_core *clk = clk_to_clk_core(clk_user);
-+	int ret;
-+
-+	clk_prepare_lock();
- 
- 	WARN(rate > 0 && rate < clk_user->floor_constraint,
- 	     "clk %s dev %s con %s: new ceiling %lu lower than existing floor %lu\n",
-@@ -1750,7 +1760,11 @@ int clk_set_ceiling_rate(struct clk *clk_user, unsigned long rate)
- 	     clk_user->floor_constraint);
- 
- 	clk_user->ceiling_constraint = rate;
--	return clk_provider_set_rate(clk, clk_provider_get_rate(clk));
-+	ret = clk_provider_set_rate(clk, clk_provider_get_rate(clk));
-+
-+	clk_prepare_unlock();
-+
-+	return ret;
- }
- EXPORT_SYMBOL_GPL(clk_set_ceiling_rate);
+diff --git a/include/linux/clk.h b/include/linux/clk.h
+index 066b100..4f54952 100644
+--- a/include/linux/clk.h
++++ b/include/linux/clk.h
+@@ -306,7 +306,8 @@ int clk_set_parent(struct clk *clk, struct clk *parent);
+  * @clk: clock source
+  *
+  * Returns struct clk corresponding to parent clock source, or
+- * valid IS_ERR() condition containing errno.
++ * valid IS_ERR() condition containing errno. Caller must call
++ * clk_put() to release the returned struct clk.
+  */
+ struct clk *clk_get_parent(struct clk *clk);
  
 -- 
 1.9.3
