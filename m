@@ -1,150 +1,78 @@
-From: naobsd@gmail.com (Naoki FUKAUMI)
-Date: Tue, 9 Sep 2014 08:45:37 +0900
-Subject: [PATCH 08/11] ARM: dts: rockchip: add operating points and armclk
- references
-In-Reply-To: <CAD=FV=U0h2nDQf6JzErhUn+R7384xSTeTjga03MZtOccf7S0bg@mail.gmail.com>
-References: <1409958374-30937-1-git-send-email-heiko@sntech.de>
- <1409958374-30937-9-git-send-email-heiko@sntech.de>
- <CAD=FV=U0h2nDQf6JzErhUn+R7384xSTeTjga03MZtOccf7S0bg@mail.gmail.com>
-Message-ID: <CAFnsNoSFk1CaANVcwYpMPWwRzWTrYXe99yFvzpTFsyqVR4eNVw@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 8 Sep 2014 17:03:34 -0700
+Subject: [PATCH] ARM: OMAP2+: board-generic: add support for AM57xx family
+In-Reply-To: <1408388875-7360-1-git-send-email-nm@ti.com>
+References: <1408388875-7360-1-git-send-email-nm@ti.com>
+Message-ID: <20140909000334.GV3238@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-hi
+* Nishanth Menon <nm@ti.com> [140818 12:10]:
+> AM57xx processor family are variants of DRA7 family of processors and
+> targetted at industrial and non-automotive applications.
+> 
+> Signed-off-by: Nishanth Menon <nm@ti.com>
 
-On Tue, Sep 9, 2014 at 5:16 AM, Doug Anderson <dianders@chromium.org> wrote:
-> Heiko,
->
-> On Fri, Sep 5, 2014 at 4:06 PM, Heiko Stuebner <heiko@sntech.de> wrote:
->> Add basic OPP entries for current supported Rockchip SoCs.
->> The operating points are currently very conservative, so individual
->> boards may opt to redefine them.
->>
->> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
->> ---
->>  arch/arm/boot/dts/rk3066a.dtsi | 12 +++++++++++-
->>  arch/arm/boot/dts/rk3188.dtsi  | 15 ++++++++++++++-
->>  arch/arm/boot/dts/rk3288.dtsi  | 17 ++++++++++++++++-
->>  3 files changed, 41 insertions(+), 3 deletions(-)
->>
->> diff --git a/arch/arm/boot/dts/rk3066a.dtsi b/arch/arm/boot/dts/rk3066a.dtsi
->> index 879a818..572c30b 100644
->> --- a/arch/arm/boot/dts/rk3066a.dtsi
->> +++ b/arch/arm/boot/dts/rk3066a.dtsi
->> @@ -26,11 +26,21 @@
->>                 #size-cells = <0>;
->>                 enable-method = "rockchip,rk3066-smp";
->>
->> -               cpu at 0 {
->> +               cpu0: cpu at 0 {
->>                         device_type = "cpu";
->>                         compatible = "arm,cortex-a9";
->>                         next-level-cache = <&L2>;
->>                         reg = <0x0>;
->> +                       operating-points = <
->> +                               /* kHz    uV */
->> +                               1008000 1075000
->> +                                816000 1025000
->> +                                600000 1025000
->> +                                504000 1000000
->> +                                312000  975000
->> +                       >;
->> +                       clock-latency = <40000>;
->> +                       clocks = <&cru ARMCLK>;
->>                 };
->>                 cpu at 1 {
->>                         device_type = "cpu";
->> diff --git a/arch/arm/boot/dts/rk3188.dtsi b/arch/arm/boot/dts/rk3188.dtsi
->> index ee801a9..e237216 100644
->> --- a/arch/arm/boot/dts/rk3188.dtsi
->> +++ b/arch/arm/boot/dts/rk3188.dtsi
->> @@ -26,11 +26,24 @@
->>                 #size-cells = <0>;
->>                 enable-method = "rockchip,rk3066-smp";
->>
->> -               cpu at 0 {
->> +               cpu0: cpu at 0 {
->>                         device_type = "cpu";
->>                         compatible = "arm,cortex-a9";
->>                         next-level-cache = <&L2>;
->>                         reg = <0x0>;
->> +                       operating-points = <
->> +                               /* kHz    uV */
->> +                               1608000 1350000
->> +                               1416000 1250000
->> +                               1200000 1150000
->> +                               1008000 1075000
->> +                                816000  975000
->> +                                600000  950000
->> +                                504000  925000
->> +                                312000  875000
->> +                       >;
->> +                       clock-latency = <40000>;
->> +                       clocks = <&cru ARMCLK>;
->>                 };
->>                 cpu at 1 {
->>                         device_type = "cpu";
->> diff --git a/arch/arm/boot/dts/rk3288.dtsi b/arch/arm/boot/dts/rk3288.dtsi
->> index 5950b0a..9275a47 100644
->> --- a/arch/arm/boot/dts/rk3288.dtsi
->> +++ b/arch/arm/boot/dts/rk3288.dtsi
->> @@ -40,10 +40,25 @@
->>                 #address-cells = <1>;
->>                 #size-cells = <0>;
->>
->> -               cpu at 500 {
->> +               cpu0: cpu at 500 {
->>                         device_type = "cpu";
->>                         compatible = "arm,cortex-a12";
->>                         reg = <0x500>;
->> +                       operating-points = <
->> +                               /* KHz    uV */
->> +                               1416000 1150000
->> +                               1200000 1050000
->> +                               1008000 1000000
->> +                               816000  950000
->> +                               696000  900000
->> +                               600000  850000
->> +                               408000  850000
->> +                               312000  850000
->> +                               216000  850000
->> +                               126000  850000
->> +                       >;
->
-> This doesn't quite match the ordering that Kever put up most recently
-> at <https://chromium-review.googlesource.com/#/c/211862/2/arch/arm/boot/dts/rk3288.dtsi>.
-> Specifically, he has:
->
-> 1800000 1300000
-> 1608000 1200000
-> 1416000 1150000
-> 1200000 1100000
-> 1008000 1050000
-> [ 816000 1000000
-> 600000 900000
-> 408000 850000
-> 216000 850000
-> 126000 850000
+Applying into omap-for-v3.18/dt thanks.
 
-in Rockchip R-BOX SDK(for Box/HDMI dongle), voltage is bit higher...
+Tony
 
-https://bitbucket.org/T-Firefly/firefly-rk3288/src/ab220fdc428283b2358644eec36059bb58b429a0/kernel/arch/arm/boot/dts/rk3288-box.dts?at=master#cl-557
-
-                126000 900000
-                216000 900000
-                312000 900000
-                408000 900000
-                600000 950000
-                696000 950000
-                816000 1000000
-                1008000 1050000
-                1200000 1100000
-                1416000 1200000
-                1512000 1300000
-                1608000 1350000
-                1704000 1350000
-                1800000 1350000
-
-and there are different set of values in other rk3288-*.dts.
-
-(I don't know which is correct, sorry)
+> ---
+> 
+> NOTE: there is no discrenable features yet defined in register set at
+> this point in time.
+> 
+> Tested on AM5728 compatible platform and based on v3.17-rc1
+> 
+>  .../devicetree/bindings/arm/omap/omap.txt          |   12 ++++++++++++
+>  arch/arm/mach-omap2/board-generic.c                |    4 ++++
+>  2 files changed, 16 insertions(+)
+> 
+> diff --git a/Documentation/devicetree/bindings/arm/omap/omap.txt b/Documentation/devicetree/bindings/arm/omap/omap.txt
+> index 0edc903..ddd9bcd 100644
+> --- a/Documentation/devicetree/bindings/arm/omap/omap.txt
+> +++ b/Documentation/devicetree/bindings/arm/omap/omap.txt
+> @@ -85,6 +85,18 @@ SoCs:
+>  - DRA722
+>    compatible = "ti,dra722", "ti,dra72", "ti,dra7"
+>  
+> +- AM5728
+> +  compatible = "ti,am5728", "ti,dra742", "ti,dra74", "ti,dra7"
+> +
+> +- AM5726
+> +  compatible = "ti,am5726", "ti,dra742", "ti,dra74", "ti,dra7"
+> +
+> +- AM5718
+> +  compatible = "ti,am5718", "ti,dra722", "ti,dra72", "ti,dra7"
+> +
+> +- AM5716
+> +  compatible = "ti,am5716", "ti,dra722", "ti,dra72", "ti,dra7"
+> +
+>  - AM4372
+>    compatible = "ti,am4372", "ti,am43"
+>  
+> diff --git a/arch/arm/mach-omap2/board-generic.c b/arch/arm/mach-omap2/board-generic.c
+> index 9480997..bdb5194 100644
+> --- a/arch/arm/mach-omap2/board-generic.c
+> +++ b/arch/arm/mach-omap2/board-generic.c
+> @@ -241,6 +241,8 @@ MACHINE_END
+>  
+>  #ifdef CONFIG_SOC_DRA7XX
+>  static const char *dra74x_boards_compat[] __initconst = {
+> +	"ti,am5728",
+> +	"ti,am5726",
+>  	"ti,dra742",
+>  	"ti,dra7",
+>  	NULL,
+> @@ -260,6 +262,8 @@ DT_MACHINE_START(DRA74X_DT, "Generic DRA74X (Flattened Device Tree)")
+>  MACHINE_END
+>  
+>  static const char *dra72x_boards_compat[] __initconst = {
+> +	"ti,am5718",
+> +	"ti,am5716",
+>  	"ti,dra722",
+>  	NULL,
+>  };
+> -- 
+> 1.7.9.5
+> 
