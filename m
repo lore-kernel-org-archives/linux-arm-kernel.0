@@ -1,49 +1,38 @@
-From: tyler.baker@linaro.org (Tyler Baker)
-Date: Wed, 10 Sep 2014 11:20:19 -0700
-Subject: exynos5420/arndale-octa: imprecise external aborts on exynos_defconfig
-Message-ID: <CANMBJr41TQx4jVjnOO9WThn=SiZCq12mx1xtGN8_ubzZrO1=YA@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 10 Sep 2014 19:21:37 +0100
+Subject: [PATCH] ARM: perf: Don't sleep while atomic when enabling
+ per-cpu interrupts
+In-Reply-To: <540F3EE5.90500@codeaurora.org>
+References: <1410200814-25878-1-git-send-email-sboyd@codeaurora.org>
+ <20140909113943.GG1754@arm.com> <540F3EE5.90500@codeaurora.org>
+Message-ID: <20140910182137.GL1710@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Exynos5420-based Arndale octa boards have recently started failing boot
-tests due to imprecise external aborts.  This only appears to happen
-when using exynos_defconfig and boots fine with multi_v7_defconfig.  The
-issue seems to be intermittent, so is not reliably reproducable and
-difficult to bisect.  Here are a few boot logs from recent
-mainline/linux-next kernels that are failing:
+On Tue, Sep 09, 2014 at 06:54:45PM +0100, Stephen Boyd wrote:
+> On 09/09/14 04:39, Will Deacon wrote:
+> > It's interesting that arm64 isn't affected by this problem, since we don't
+> > update the active_irqs mask for PPIs there and consequently just pass the
+> > irq instead of the cpu_pmu. I can't see why we actually need to update the
+> > active_irqs mask for arch/arm/, so could we remove that and follow arm64's
+> > lead instead? That would remove the need for a new struct definition too.
+> >
+> 
+> I guess you're saying that we don't need the active_irqs mask in the
+> percpu irq case? It looks like we still use it to determine when the
+> last CPU PMU has been disabled in the non-percpu case.
 
-mainline/v3.17-rc3-165-g56c2285:
-    http://armv7.com/scheduler/job/5525/log_file#L_59_276
+Correct.
 
-mainline/v3.17-rc3-176-g2b12164:
-    http://armv7.com/scheduler/job/5595/log_file#L_59_278
+> Here's the interdiff. Is there a reason arm64 casts data to an unsigned
+> int pointer when what's passed is an int pointer?
 
-mainline/v3.17-rc4-131-gd030671:
-    http://armv7.com/scheduler/job/5770/log_file#L_193_277
+There has to be a cast to something because data is a void *.
+enable_percpu_irq takes an unsigned int, so I guess that's why it was
+chosen. I'm not fussed either way.
 
-mainline/v3.17-rc4-146-g619df5d:
-    http://armv7.com/scheduler/job/6014/log_file#L_124_0
+Feel free to submit the full patch with my ack:
 
-next/20140908:
-    http://armv7.com/scheduler/job/5815/log_file#L_59_276
+  Acked-by: Will Deacon <will.deacon@arm.com>
 
-next/20140910:
-    http://armv7.com/scheduler/job/6161/log_file#L_59_278
-
-The ramdisk is used is a very minimal open embedded based filesystem,
-which can be found here:
-
-http://images.armcloud.us/lava/common/linaro-image-minimal-initramfs-genericarmv7a.cpio.gz.u-boot
-
-Please let me know if any more information is needed to help
-reproduce. If/when a root cause is determined, I am more than willing
-to assist in testing any fixes provided.
-
-Thanks,
-
--- 
-Tyler Baker
-Tech Lead, LAVA
-Linaro.org | Open source software for ARM SoCs
-Follow Linaro: http://www.facebook.com/pages/Linaro
-http://twitter.com/#!/linaroorg - http://www.linaro.org/linaro-blog
+Will
