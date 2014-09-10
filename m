@@ -1,80 +1,57 @@
-From: sthokal@xilinx.com (Srikanth Thokala)
-Date: Wed, 10 Sep 2014 12:29:05 +0530
-Subject: [PATCH v3 2/2] dma: Add Xilinx AXI Direct Memory Access Engine
- driver support
-In-Reply-To: <20140909155716.GN1610@intel.com>
-References: <1406549869-24422-1-git-send-email-sthokal@xilinx.com>
- <1406549869-24422-2-git-send-email-sthokal@xilinx.com>
- <20140819170346.GS13288@intel.com>
- <CA+mB=1L14Os=ZdJzj8_+XXa+oq4ZOS_kadQHpKQ2yws2tqGVSQ@mail.gmail.com>
- <20140904063613.GD1610@intel.com>
- <CA+mB=1KarJGUYTZu=2k46gqt3oMAuYawfq+H=Lxa7YVqcThjCw@mail.gmail.com>
- <20140909155716.GN1610@intel.com>
-Message-ID: <CA+mB=1+1EgDDrnmn1dKjU6Q__1uxgRcCrHx1-ho9+AWkSvCThA@mail.gmail.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Wed, 10 Sep 2014 09:13:27 +0200
+Subject: [GIT PULL 1/2] SOCFPGA updates for 3.18
+In-Reply-To: <20140909210232.GA539@amd>
+References: <1409847105-27241-1-git-send-email-dinguyen@opensource.altera.com>
+ <20140909141756.GA30100@amd> <4134101.OOENTRabu1@wuerfel>
+ <20140909210232.GA539@amd>
+Message-ID: <CAPDyKFr35646zQUDUnv9LYy9jtY7r343hev9FrhxOfjVMb6MJw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Vinod,
-
-On Tue, Sep 9, 2014 at 9:27 PM, Vinod Koul <vinod.koul@intel.com> wrote:
-> On Tue, Sep 09, 2014 at 12:52:16AM +0530, Srikanth Thokala wrote:
->> Hi Vinod,
+On 9 September 2014 23:02, Pavel Machek <pavel@denx.de> wrote:
+> On Tue 2014-09-09 17:02:34, Arnd Bergmann wrote:
+>> On Tuesday 09 September 2014 16:17:56 Pavel Machek wrote:
+>> > > Jaehoon Chung (1):
+>> > >       ARM: dts: socfpga: unuse the slot-node and deprecate the supports-highspeed for dw-mmc
+>> > >
+>> >
+>> > This patch is a bad idea. It removes support for two mmc cards on a
+>> > single controller -- configuration hardware supports and configuration
+>> > that allows using u-SD card on mcvevk board.
+>> >
 >>
->> On Thu, Sep 4, 2014 at 12:06 PM, Vinod Koul <vinod.koul@intel.com> wrote:
->> > On Wed, Sep 03, 2014 at 12:17:43PM +0530, Srikanth Thokala wrote:
->> >> Hi Vinod,
->> >>
->> >> Apologies for the delay.
->> >>
->> >> On Tue, Aug 19, 2014 at 10:33 PM, Vinod Koul <vinod.koul@intel.com> wrote:
->> >> > On Mon, Jul 28, 2014 at 05:47:49PM +0530, Srikanth Thokala wrote:
->> >> >> +struct xilinx_dma_chan {
->> >> >> +     struct xilinx_dma_device *xdev;
->> >> >> +     u32 ctrl_offset;
->> >> >> +     spinlock_t lock;
->> >> >> +     struct list_head pending_list;
->> >> >> +     struct xilinx_dma_tx_descriptor *active_desc;
->> >> >> +     struct xilinx_dma_tx_descriptor *allocated_desc;
->> >> >> +     struct list_head done_list;
->> >> >> +     struct list_head free_seg_list;
->> >> >> +     struct dma_chan common;
->> >> >> +     struct xilinx_dma_tx_segment *seg_v;
->> >> >> +     dma_addr_t seg_p;
->> >> >> +     struct device *dev;
->> >> >> +     int irq;
->> >> >> +     int id;
->> >> >> +     enum dma_transfer_direction direction;
->> >> > This looks suspect. Why should channel have direction, for a descriptor it
->> >> > makes sense though.
->> >>
->> >> The channel only supports transfers in one direction. Either from memory to
->> >> peripheral or from peripheral to memory, that's fixed and can't be changed
->> >> at runtime.  So, the driver needs to know which direction the channel supports
->> >> and hence it can reject transfers with the wrong direction.
->> > But you already have this information in descriptor so why duplicate?
->>
->> Our descriptor doesn't have the information of channel direction, we have this
->> information only in the chan structure (struct xilinx_dma_chan) which
->> is populated
->> while parsing the DT.  So, we use this information to ensure if we are servicing
->> proper channel (in prep_slave_sg call).
-> One of the argument of prep_slave_sg call is direction. You need to use that
-> and store in in your descriptor for using it afterwards
+>> Your objection comes too late, and to the wrong patch, since the
+>> driver and all other users have already been changed. We had a long
+>> discussion about this when the issue first came up, and we could
+>> not find any example of dw-mmc actually being used in a scenario
+>> with one controller that has multiple devices attached.
 >
->> FYI: We also need the direction of the channel so that we can select SRC/DST
->> register address in the issue_pending() call.
-> And you have the descriptor there as well so can use it
-
-Ok, got it. Thanks.  I will send v4 with the changes mentioned.
-
-- Srikanth
-
+> Well, this is not first time I raised this. 3.17 is not yet out, so we
+> still have chance to fix regressions without major fuss.
 >
-> --
-> ~Vinod
+>> Apparently every user out there instead uses multiple controller
+>> instances instead. Are you sure that the socfpga implementation
+>> is an exception from this?
 >
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
+> Marek Vasut has the hardware. His board apprently has uSD and eMMC,
+> and I believe it has just one controller. I'll try to get details.
+>
+
+Just wanted to highlight some of the reasons to why the earlier
+discussion we have had, came to the conclusion to remove the slot
+node.
+
+1) The mmc core don't support multiple cards attached to the same
+host, it never has. Also, I am not aware of any requests that
+suggested us to add it. Due to obvious reasons from performance
+perspective it's simply a really bad idea, that's likely also why
+there haven't been any requests for it.
+
+2) On the host level, the support for handle multiple slots in DT for
+dw-mmc has been broken. While dw-mmc parsed the DT nodes for slots, it
+screwed up configurations. Thus the support for slots have never
+worked as expected from DT point of view.
+
+Kind regards
+Uffe
