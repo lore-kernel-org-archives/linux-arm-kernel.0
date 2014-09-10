@@ -1,93 +1,69 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Wed, 10 Sep 2014 11:09:59 -0700
-Subject: [PATCH] clocksource: arch_timer: Fix code to use physical timers
- when requested
-In-Reply-To: <20140910173401.GG1710@arm.com>
-References: <CAPz6YkWAPtuy4sAuAK9GtpDgfGsccxeS+pqqe_t_R818Jt01qA@mail.gmail.com>
- <53FE5B09.2020403@codeaurora.org>
- <CAOesGMhTivDzJFuxONggcJ6N5UvZopKa=+tv9PoPX593cpnm0A@mail.gmail.com>
- <53FE7E3B.1010500@codeaurora.org>
- <CAOesGMgXnsqttHwAxEW4a7-Rx-nmSwpJd_Dt1iCcFOvzDwbzdA@mail.gmail.com>
- <CAD=FV=VjN6Xam-nRRcxvOoN-gokU6DbGVjoPXN_fkTJssH1RWA@mail.gmail.com>
- <20140828093505.GC14650@leverpostej>
- <CAD=FV=UwfP0x-bswbtV_eUvpKeOSNnsVVLTE3VHguyhm_jiSug@mail.gmail.com>
- <20140908135436.GC22717@arm.com>
- <CAD=FV=Up=+zNneY-behnkFbhupi50_f5R=ECgJQeqGV5kz5d2g@mail.gmail.com>
- <20140910173401.GG1710@arm.com>
-Message-ID: <CAD=FV=WJpP1aAo-r9bnUQg5xarGQYo8pROvyh0a5dt+m1OOn4g@mail.gmail.com>
+From: geoff@infradead.org (Geoff Levand)
+Date: Wed, 10 Sep 2014 11:11:49 -0700
+Subject: [PATCH V2 04/13] arm64: Add new hcall HVC_CALL_FUNC
+In-Reply-To: <ea28cfef061d06e86704845a877802e057749b39.1410302383.git.geoff@infradead.org>
+References: <cover.1410302383.git.geoff@infradead.org>
+ <ea28cfef061d06e86704845a877802e057749b39.1410302383.git.geoff@infradead.org>
+Message-ID: <1410372709.30895.0.camel@smoke>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Will,
+Add the new hcall HVC_CALL_FUNC that allows execution of a function at EL2.
+During CPU reset the CPU must be brought to the exception level it had on
+entry to the kernel.  The HVC_CALL_FUNC hcall will provide the mechanism
+needed for this exception level switch.
 
-On Wed, Sep 10, 2014 at 10:34 AM, Will Deacon <will.deacon@arm.com> wrote:
-> Setting aside the security model, booting in secure mode can also have a
-> significant impact on the programming model of system IP, not just the CPU.
-> For example, the SMMU register file suddenly looks different and the way in
-> which it is programmed also changes. The GIC (v3+) is similar. Linux doesn't
-> have drivers that know about this so, whilst not impossible, there's a
-> non-trivial amount of work (and then maintenance overhead) if you want to
-> support booting Linux on the secure side.
+Signed-off-by: Geoff Levand <geoff@infradead.org>
+---
+ arch/arm64/include/asm/virt.h | 13 +++++++++++++
+ arch/arm64/kernel/hyp-stub.S  | 10 ++++++++++
+ 2 files changed, 23 insertions(+)
 
-Hrm.  I could have sworn someone told me that exynos5250-snow is
-booted in Secure SVC mode and has been that way forever.  I could
-certainly be wrong.  Stupid question, but should any of your
-statements apply to an A15 or an A12?  Maybe things change with newer
-CPUs?
-
-
-On the rk3288 I have in front of me I tried running the following at
-(semi early) boot to help confirm we were in Secure SVC.  Standard "I
-don't know what I'm doing" caveats apply:
-
-       asm volatile("mrc p15, 0, %0, c1, c1, 0" : "=r" (val));
-       pr_info("DOUG: val is %#010x", val);
-       val |= (1 << 2);
-       asm volatile("mcr p15, 0, %0, c1, c1, 0" : : "r" (val));
-       val = 0xffffffff;
-       asm volatile("mrc p15, 0, %0, c1, c1, 0" : "=r" (val));
-       pr_info("DOUG: val is %#010x", val);
-
-When I did that I found that I was able to read back 0x00000004.  OK,
-and I just replicated that same behavior on exynos5250-snow.
-
-Since I think the SCR register is only accessible from "Secure PL1
-modes" and I showed that I could change it, to me that meant that I
-must be in "Secure PL1".  Please yell if I'm just being an idiot and I
-can look for some other way to test for secure mode.
-
-
-Also: I wasn't actually suggesting running Linux in secure mode, I was
-only suggesting _booting_ Linux in secure mode.  The idea was that
-Linux would realize this and immediately switch to nonsecure HYP mode.
-Linux doesn't normally run@HYP mode, so it would eventually drop
-down into nonsecure SVC mode, too.
-
-One (admittedly weak) justification was that if someone later wanted
-to do some whizbang feature in the Linux kernel that required "secure
-svc" mode then it would be possible on this hardware.  Obviously this
-person would need to implement a whole crapload of code to handle
-this, but they wouldn't need to add custom firmware.
-
-The other (important) justification was to keep bootloaders simple.
-All of the "I've never even thought about secure mode" bootloaders
-that I've seen just happen to boot the kernel in Secure SVC.  That
-makes me think that must be the easiest thing for them to do.  We
-should support them.
-
-
-> The secure world may be more permissive in some regards, but it's actually
-> a burden in others. It's not a simple superset of non-secure, and this is
-> more evident than ever in ARMv8.
->
-> As I understand it, this conversation started because we're booting at
-> non-secure EL1 with a badly configured EL2. That sounds like something
-> we may have to fix/work around in Linux (Olof points out that it used to
-> work), but we shouldn't conflate that with booting on the secure side to
-> get away from broken firmware.
-
-See above and also my summary to Mark Rutland.  I don't think your
-statement above is quite where we're at, but hopefully we're on the
-same page now.  :)
-
--Doug
+diff --git a/arch/arm64/include/asm/virt.h b/arch/arm64/include/asm/virt.h
+index 894fe53..cc4250c 100644
+--- a/arch/arm64/include/asm/virt.h
++++ b/arch/arm64/include/asm/virt.h
+@@ -41,6 +41,19 @@
+ 
+ #define HVC_KVM_CALL_HYP 3
+ 
++/*
++ * HVC_CALL_FUNC - Execute a function at EL2.
++ *
++ * @x0: Physical address of the funtion to be executed.
++ * @x1: Passed as the first argument to the function.
++ * @x2: Passed as the second argument to the function.
++ * @x3: Passed as the third argument to the function.
++ *
++ * The called function must preserve the contents of register x18.
++ */
++
++#define HVC_CALL_FUNC 4
++
+ #ifndef __ASSEMBLY__
+ 
+ /*
+diff --git a/arch/arm64/kernel/hyp-stub.S b/arch/arm64/kernel/hyp-stub.S
+index 9ab5f70..27d786d 100644
+--- a/arch/arm64/kernel/hyp-stub.S
++++ b/arch/arm64/kernel/hyp-stub.S
+@@ -75,7 +75,17 @@ el1_sync:
+ 1:	cmp	x10, #HVC_SET_VECTORS
+ 	b.ne	1f
+ 	msr	vbar_el2, x0
++	b	2f
+ 
++1:	cmp	x10, #HVC_CALL_FUNC
++	b.ne    1f
++	mov	x18, lr
++	mov	lr, x0
++	mov	x0, x1
++	mov	x1, x2
++	mov	x2, x3
++	blr	lr
++	mov	lr, x18
+ 1:
+ 2:	eret
+ ENDPROC(el1_sync)
+-- 
+1.9.1
