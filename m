@@ -1,45 +1,28 @@
-From: varkabhadram@gmail.com (Varka Bhadram)
-Date: Wed, 10 Sep 2014 09:46:04 +0530
-Subject: [PATCH v5] spi: spi-imx: add DMA support
-In-Reply-To: <1410312604-31949-1-git-send-email-b38343@freescale.com>
-References: <1410312604-31949-1-git-send-email-b38343@freescale.com>
-Message-ID: <540FD084.6000805@gmail.com>
+From: sfr@canb.auug.org.au (Stephen Rothwell)
+Date: Wed, 10 Sep 2014 14:18:50 +1000
+Subject: linux-next: manual merge of the pm tree with the arm-soc tree
+Message-ID: <20140910141850.34c07f72@canb.auug.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/10/2014 07:00 AM, Robin Gong wrote:
-> Enable DMA support on i.mx6. The read speed can increase from 600KB/s
-> to 1.2MB/s on i.mx6q. You can disable or enable dma function in dts.
+Hi Rafael,
 
-(...)
+Today's linux-next merge of the pm tree got a conflict in
+arch/arm/mach-shmobile/setup-sh73a0.c between commit aa0bdc303b0f
+("ARM: shmobile: sh73a0: Remove duplicate CPUFreq bits") from the
+arm-soc tree and commit 978027e170fb ("cpufreq: cpu0: rename driver and
+internals to 'cpufreq_dt'") from the pm tree.
 
-> +
-> +static int spi_imx_sdma_init(struct device *dev, struct spi_imx_data *spi_imx,
-> +			     struct spi_master *master,
-> +			     const struct resource *res)
-> +{
-> +	struct dma_slave_config slave_config = {};
-> +	int ret;
-> +
-> +	/* Prepare for TX DMA: */
-> +	master->dma_tx = dma_request_slave_channel(dev, "tx");
-> +	if (!master->dma_tx) {
-> +		dev_err(dev, "cannot get the TX DMA channel!\n");
-> +		ret = -EINVAL;
-> +		goto err;
-> +	}
-> +
-> +	slave_config.direction = DMA_MEM_TO_DEV;
-> +	slave_config.dst_addr = res->start + MXC_CSPITXDATA;
-> +	slave_config.dst_addr_width = DMA_SLAVE_BUSWIDTH_1_BYTE;
-> +	slave_config.dst_maxburst = spi_imx_get_fifosize(spi_imx) / 2;
-> +	ret = dmaengine_slave_config(master->dma_tx, &slave_config);
-> +	if (ret) {
-> +		dev_err(dev, "error in TX dma configuration.");
-> +		
-
-Missed terminating new line..
+I fixed it up (the former removed the lines that were updated by the
+latter) and can carry the fix as necessary (no action is required).
 
 -- 
-Regards,
-Varka Bhadram.
+Cheers,
+Stephen Rothwell                    sfr at canb.auug.org.au
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140910/992b659e/attachment.sig>
