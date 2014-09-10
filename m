@@ -1,193 +1,86 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Thu, 11 Sep 2014 00:22:35 +0200
-Subject: [PATCH v2] iio: adc: rockchip_saradc: add support for rk3066-tsadc
- variant
-Message-ID: <1629907.fyghANjlk9@diego>
+From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
+Date: Wed, 10 Sep 2014 15:25:56 -0700
+Subject: [PATCH v4 1/3] ARM: dts: Add Peach Pit dts entry for Atmel
+ touchpad
+In-Reply-To: <1410348691-18317-2-git-send-email-javier.martinez@collabora.co.uk>
+References: <1410348691-18317-1-git-send-email-javier.martinez@collabora.co.uk>
+ <1410348691-18317-2-git-send-email-javier.martinez@collabora.co.uk>
+Message-ID: <20140910222553.GF38736@core.coreip.homeip.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Older Rockchip SoCs, at least the rk3066, used a slightly modified saradc
-for temperature measurements. This so called tsadc does not contain any
-active parts like temperature interrupts and only supports polling the
-current temperature. The returned voltage can then be converted by a
-suitable thermal driver to and actual temperature and used for thermal
-handling.
+On Wed, Sep 10, 2014 at 01:31:29PM +0200, Javier Martinez Canillas wrote:
+> From: Sjoerd Simons <sjoerd.simons@collabora.co.uk>
+> 
+> The Peach Pit board has an Atmel maXTouch trackpad device.
+> Add the needed Device Tree nodes to support it.
+> 
+> This Device Tree change is based on the Chrome OS 3.8 tree
+> but adapted to use the mainline Atmel maXTouch DT binding.
+> 
+> Signed-off-by: Sjoerd Simons <sjoerd.simons@collabora.co.uk>
+> Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
 
-Signed-off-by: Heiko Stuebner <heiko@sntech.de>
----
-changes since v1:
-- use GENMASK instead of creating the mask manually
-  as suggested by Hartmut Knaack
+Reviewed-by: Dmitry Torokhov <dmitry.torokhov@gmail.com>
 
-I've also opted for simply keeping the indent mismatch in
-struct rockchip_saradc, as I don't think it's worth the churn
-it produces
+> ---
+> 
+> Changes since v3:
+>  - Use KEY_RESERVED even for not reserved pins with a GPIO not hooked.
+>    Suggested by Nick Dyer.
+>  - Add a comment to specify the maXTouch chip version so is more clear.
+>    Suggested by Nick Dyer.
+>  - Omit trailing omit KEY_RESERVED after the GPIO pins. Suggested by Nick Dyer.
+> 
+> Changes since v2:
+>  - Add spaces around '=' on properties. Suggested by Andreas Faerber.
+> 
+> Changes since v1:
+>  - Change trackpad IRQ pad function from 0x0 (GPIO input) to 0xf (GPIO IRQ).
+>    suggested by Tomasz Figa.
+>  - Remove BTN_TOOL_* from "linux,gpio-keymap" property since those are set
+>    by input mt core if INPUT_MT_POINTER is set. Suggested by Nick Dyer.
+>  - Use correct values for "linux,gpio-keymap" property. Suggested by Nick Dyer.
+>  - Remove support for Peach Pi board since it uses a different Atmel touchpad
+>    that requires an Atmel object protocol  (T100) not supported by the driver.
+>  - Use IRQ type constants from <dt-bindings/interrupt-controller/irq.h> instead
+>    of magic numbers. Suggested by Andreas Faerber.
+> 
+>  arch/arm/boot/dts/exynos5420-peach-pit.dts | 29 +++++++++++++++++++++++++++++
+>  1 file changed, 29 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/exynos5420-peach-pit.dts b/arch/arm/boot/dts/exynos5420-peach-pit.dts
+> index f247709..ad56d4c 100644
+> --- a/arch/arm/boot/dts/exynos5420-peach-pit.dts
+> +++ b/arch/arm/boot/dts/exynos5420-peach-pit.dts
+> @@ -507,6 +507,28 @@
+>  	};
+>  };
+>  
+> +&hsi2c_8 {
+> +	status = "okay";
+> +	clock-frequency = <333000>;
+> +
+> +	/* Atmel mXT336S */
+> +	trackpad at 4b {
+> +		compatible = "atmel,maxtouch";
+> +		reg = <0x4b>;
+> +		interrupt-parent = <&gpx1>;
+> +		interrupts = <1 IRQ_TYPE_EDGE_FALLING>;
+> +		wakeup-source;
+> +		pinctrl-names = "default";
+> +		pinctrl-0 = <&trackpad_irq>;
+> +		linux,gpio-keymap = <KEY_RESERVED
+> +				     KEY_RESERVED
+> +				     KEY_RESERVED	/* GPIO0 */
+> +				     KEY_RESERVED	/* GPIO1 */
+> +				     KEY_RESERVED	/* GPIO2 */
+> +				     BTN_LEFT>; 	/* GPIO3 */
 
- .../bindings/iio/adc/rockchip-saradc.txt           |  2 +-
- drivers/iio/adc/rockchip_saradc.c                  | 62 +++++++++++++++++-----
- 2 files changed, 50 insertions(+), 14 deletions(-)
+Seems like a single space sneaked between the semicolon and the tab.
+Maybe whoever applies could squash it.
 
-diff --git a/Documentation/devicetree/bindings/iio/adc/rockchip-saradc.txt b/Documentation/devicetree/bindings/iio/adc/rockchip-saradc.txt
-index 5d3ec1d..a9a5fe1 100644
---- a/Documentation/devicetree/bindings/iio/adc/rockchip-saradc.txt
-+++ b/Documentation/devicetree/bindings/iio/adc/rockchip-saradc.txt
-@@ -1,7 +1,7 @@
- Rockchip Successive Approximation Register (SAR) A/D Converter bindings
- 
- Required properties:
--- compatible: Should be "rockchip,saradc"
-+- compatible: Should be "rockchip,saradc" or "rockchip,rk3066-tsadc"
- - reg: physical base address of the controller and length of memory mapped
-        region.
- - interrupts: The interrupt number to the cpu. The interrupt specifier format
-diff --git a/drivers/iio/adc/rockchip_saradc.c b/drivers/iio/adc/rockchip_saradc.c
-index e074a0b..99200b7 100644
---- a/drivers/iio/adc/rockchip_saradc.c
-+++ b/drivers/iio/adc/rockchip_saradc.c
-@@ -18,13 +18,13 @@
- #include <linux/interrupt.h>
- #include <linux/io.h>
- #include <linux/of.h>
-+#include <linux/of_device.h>
- #include <linux/clk.h>
- #include <linux/completion.h>
- #include <linux/regulator/consumer.h>
- #include <linux/iio/iio.h>
- 
- #define SARADC_DATA			0x00
--#define SARADC_DATA_MASK		0x3ff
- 
- #define SARADC_STAS			0x04
- #define SARADC_STAS_BUSY		BIT(0)
-@@ -38,15 +38,22 @@
- #define SARADC_DLY_PU_SOC		0x0c
- #define SARADC_DLY_PU_SOC_MASK		0x3f
- 
--#define SARADC_BITS			10
- #define SARADC_TIMEOUT			msecs_to_jiffies(100)
- 
-+struct rockchip_saradc_data {
-+	int				num_bits;
-+	const struct iio_chan_spec	*channels;
-+	int				num_channels;
-+	unsigned long			clk_rate;
-+};
-+
- struct rockchip_saradc {
- 	void __iomem		*regs;
- 	struct clk		*pclk;
- 	struct clk		*clk;
- 	struct completion	completion;
- 	struct regulator	*vref;
-+	const struct rockchip_saradc_data *data;
- 	u16			last_val;
- };
- 
-@@ -90,7 +97,7 @@ static int rockchip_saradc_read_raw(struct iio_dev *indio_dev,
- 		}
- 
- 		*val = ret / 1000;
--		*val2 = SARADC_BITS;
-+		*val2 = info->data->num_bits;
- 		return IIO_VAL_FRACTIONAL_LOG2;
- 	default:
- 		return -EINVAL;
-@@ -103,7 +110,7 @@ static irqreturn_t rockchip_saradc_isr(int irq, void *dev_id)
- 
- 	/* Read value */
- 	info->last_val = readl_relaxed(info->regs + SARADC_DATA);
--	info->last_val &= SARADC_DATA_MASK;
-+	info->last_val &= GENMASK(info->data->num_bits - 1, 0);
- 
- 	/* Clear irq & power down adc */
- 	writel_relaxed(0, info->regs + SARADC_CTRL);
-@@ -133,12 +140,44 @@ static const struct iio_chan_spec rockchip_saradc_iio_channels[] = {
- 	ADC_CHANNEL(2, "adc2"),
- };
- 
-+static const struct rockchip_saradc_data saradc_data = {
-+	.num_bits = 10,
-+	.channels = rockchip_saradc_iio_channels,
-+	.num_channels = ARRAY_SIZE(rockchip_saradc_iio_channels),
-+	.clk_rate = 1000000,
-+};
-+
-+static const struct iio_chan_spec rockchip_rk3066_tsadc_iio_channels[] = {
-+	ADC_CHANNEL(0, "adc0"),
-+	ADC_CHANNEL(1, "adc1"),
-+};
-+
-+static const struct rockchip_saradc_data rk3066_tsadc_data = {
-+	.num_bits = 12,
-+	.channels = rockchip_rk3066_tsadc_iio_channels,
-+	.num_channels = ARRAY_SIZE(rockchip_rk3066_tsadc_iio_channels),
-+	.clk_rate = 50000,
-+};
-+
-+static const struct of_device_id rockchip_saradc_match[] = {
-+	{
-+		.compatible = "rockchip,saradc",
-+		.data = &saradc_data,
-+	}, {
-+		.compatible = "rockchip,rk3066-tsadc",
-+		.data = &rk3066_tsadc_data,
-+	},
-+	{},
-+};
-+MODULE_DEVICE_TABLE(of, rockchip_saradc_match);
-+
- static int rockchip_saradc_probe(struct platform_device *pdev)
- {
- 	struct rockchip_saradc *info = NULL;
- 	struct device_node *np = pdev->dev.of_node;
- 	struct iio_dev *indio_dev = NULL;
- 	struct resource	*mem;
-+	const struct of_device_id *match;
- 	int ret;
- 	int irq;
- 
-@@ -152,6 +191,9 @@ static int rockchip_saradc_probe(struct platform_device *pdev)
- 	}
- 	info = iio_priv(indio_dev);
- 
-+	match = of_match_device(rockchip_saradc_match, &pdev->dev);
-+	info->data = match->data;
-+
- 	mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
- 	info->regs = devm_ioremap_resource(&pdev->dev, mem);
- 	if (IS_ERR(info->regs))
-@@ -195,7 +237,7 @@ static int rockchip_saradc_probe(struct platform_device *pdev)
- 	 * Use a default of 1MHz for the converter clock.
- 	 * This may become user-configurable in the future.
- 	 */
--	ret = clk_set_rate(info->clk, 1000000);
-+	ret = clk_set_rate(info->clk, info->data->clk_rate);
- 	if (ret < 0) {
- 		dev_err(&pdev->dev, "failed to set adc clk rate, %d\n", ret);
- 		return ret;
-@@ -227,8 +269,8 @@ static int rockchip_saradc_probe(struct platform_device *pdev)
- 	indio_dev->info = &rockchip_saradc_iio_info;
- 	indio_dev->modes = INDIO_DIRECT_MODE;
- 
--	indio_dev->channels = rockchip_saradc_iio_channels;
--	indio_dev->num_channels = ARRAY_SIZE(rockchip_saradc_iio_channels);
-+	indio_dev->channels = info->data->channels;
-+	indio_dev->num_channels = info->data->num_channels;
- 
- 	ret = iio_device_register(indio_dev);
- 	if (ret)
-@@ -296,12 +338,6 @@ static int rockchip_saradc_resume(struct device *dev)
- static SIMPLE_DEV_PM_OPS(rockchip_saradc_pm_ops,
- 			 rockchip_saradc_suspend, rockchip_saradc_resume);
- 
--static const struct of_device_id rockchip_saradc_match[] = {
--	{ .compatible = "rockchip,saradc" },
--	{},
--};
--MODULE_DEVICE_TABLE(of, rockchip_saradc_match);
--
- static struct platform_driver rockchip_saradc_driver = {
- 	.probe		= rockchip_saradc_probe,
- 	.remove		= rockchip_saradc_remove,
+Thanks.
+
 -- 
-2.0.1
+Dmitry
