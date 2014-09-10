@@ -1,60 +1,52 @@
-From: konrad.wilk@oracle.com (Konrad Rzeszutek Wilk)
-Date: Wed, 10 Sep 2014 10:59:57 -0400
-Subject: [Xen-devel] [PATCH v1 08/21] x86/xen/MSI: Use MSI chip framework
- to configure MSI/MSI-X irq
-In-Reply-To: <54104641.7020007@citrix.com>
-References: <1409911806-10519-1-git-send-email-wangyijing@huawei.com>
- <1409911806-10519-9-git-send-email-wangyijing@huawei.com>
- <5409C8C0.8020200@citrix.com> <540E6095.8030409@huawei.com>
- <54104641.7020007@citrix.com>
-Message-ID: <20140910145957.GD12893@laptop.dumpdata.com>
+From: johan@kernel.org (Johan Hovold)
+Date: Wed, 10 Sep 2014 17:07:02 +0200
+Subject: [PATCH 5/5] rtc: at91sam9: add DT bindings documentation
+In-Reply-To: <20140910152019.111c4c01@bbrezillon>
+References: <1409733934-14465-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1409733934-14465-6-git-send-email-boris.brezillon@free-electrons.com>
+ <20140910121424.GG2974@localhost>
+ <20140910152019.111c4c01@bbrezillon>
+Message-ID: <20140910150702.GK2974@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 10, 2014 at 01:38:25PM +0100, David Vrabel wrote:
-> On 09/09/14 03:06, Yijing Wang wrote:
-> > On 2014/9/5 22:29, David Vrabel wrote:
-> >> On 05/09/14 11:09, Yijing Wang wrote:
-> >>> Use MSI chip framework instead of arch MSI functions to configure
-> >>> MSI/MSI-X irq. So we can manage MSI/MSI-X irq in a unified framework.
-> >> [...]
-> >>> --- a/arch/x86/pci/xen.c
-> >>> +++ b/arch/x86/pci/xen.c
-> >> [...]
-> >>> @@ -418,9 +430,9 @@ int __init pci_xen_init(void)
-> >>>  #endif
-> >>>  
-> >>>  #ifdef CONFIG_PCI_MSI
-> >>> -	x86_msi.setup_msi_irqs = xen_setup_msi_irqs;
-> >>> -	x86_msi.teardown_msi_irq = xen_teardown_msi_irq;
-> >>> -	x86_msi.teardown_msi_irqs = xen_teardown_msi_irqs;
-> >>> +	xen_msi_chip.setup_irqs = xen_setup_msi_irqs;
-> >>> +	xen_msi_chip.teardown_irqs = xen_teardown_msi_irqs;
-> >>> +	x86_msi_chip = &xen_msi_chip;
-> >>>  	msi_chip.irq_mask = xen_nop_msi_mask;
-> >>>  	msi_chip.irq_unmask = xen_nop_msi_mask;
-> >>
-> >> Why have these not been changed to set the x86_msi_chip.mask/unmask
-> >> fields instead?
+On Wed, Sep 10, 2014 at 03:20:19PM +0200, Boris BREZILLON wrote:
+> On Wed, 10 Sep 2014 14:14:24 +0200
+> Johan Hovold <johan@kernel.org> wrote:
+
+> > This does not describe the hardware, but rather a specific software
+> > configuration.
 > > 
-> > Hi David, x86_msi_chip here is struct msi_chip data type, used to configure MSI/MSI-X
-> > irq. msi_chip above is struct irq_chip data type, represent the MSI irq controller. They are
-> > not the same object. Their name easily confusing people.
+> > The RTT is first of all not an RTC (although it can be used as one in a
+> > specific software configuration). And the second register resource above
+> > is not an RTT register, but a general-purpose backup register could be
+> > used for other purposes (which register to use is currently configurable
+> > for legacy booting using CONFIG_RTC_DRV_AT91SAM9_GPBR).
 > 
-> Ok, it all makes sense now.
+> We could use a syscon device (which exposes a regmap) for the GPBR
+> block.
 > 
-> Acked-by: David Vrabel <david.vrabel@citrix.com>
+> rtc at ffffff20 {
 
-You can also add 'Tested-by: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>'
+rtt
 
-on the whole series - I ran it through on Xen and on baremetal with a mix of 32/64 builds.
-
-Oh, and also Reviewed-by: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com> the Xen parts.
-
+> 	compatible = "atmel,at91sam9260-rtt";
+> 	reg = <0xfffffd20 0x10>;
+> 	interrupts = <1 4 7>;
+> 	clocks = <&clk32k>;
+> 	atmel,time-reg = <&gpbr 0x0>;
+> };
 > 
-> David
-> 
-> _______________________________________________
-> Xen-devel mailing list
-> Xen-devel at lists.xen.org
-> http://lists.xen.org/xen-devel
+> gpbr: syscon at fffffd50 {
+> 	compatible = "atmel,at91sam9260-gpbr", "syscon";
+> 	reg = <0xfffffd50 0x10>;
+> 	
+> };
+
+Yes, this essentially what I suggested in the thread (and my last reply)
+and relying on syscon rather than a custom driver seems like a good
+idea. It would allow early access to the registers too with the recently
+proposed changes. It would not guarantee any kind of exclusivity,
+though, but I guess that's tolerable?
+
+Johan
