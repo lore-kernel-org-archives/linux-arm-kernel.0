@@ -1,87 +1,211 @@
-From: boris.brezillon@free-electrons.com (Boris BREZILLON)
-Date: Wed, 10 Sep 2014 17:31:14 +0200
-Subject: [PATCH 5/5] rtc: at91sam9: add DT bindings documentation
-In-Reply-To: <20140910150702.GK2974@localhost>
-References: <1409733934-14465-1-git-send-email-boris.brezillon@free-electrons.com>
- <1409733934-14465-6-git-send-email-boris.brezillon@free-electrons.com>
- <20140910121424.GG2974@localhost>
- <20140910152019.111c4c01@bbrezillon>
- <20140910150702.GK2974@localhost>
-Message-ID: <20140910173114.593dd132@bbrezillon>
+From: Liviu.Dudau@arm.com (Liviu Dudau)
+Date: Wed, 10 Sep 2014 16:32:33 +0100
+Subject: [PATCH v10 08/10] OF: PCI: Add support for parsing PCI host
+ bridge resources from DT
+In-Reply-To: <20140910151026.GB11640@e102568-lin.cambridge.arm.com>
+References: <1410184472-17630-1-git-send-email-Liviu.Dudau@arm.com>
+ <1410184472-17630-9-git-send-email-Liviu.Dudau@arm.com>
+ <20140909133546.GB2636@e102568-lin.cambridge.arm.com>
+ <20140910142241.GD27864@e106497-lin.cambridge.arm.com>
+ <20140910151026.GB11640@e102568-lin.cambridge.arm.com>
+Message-ID: <20140910153233.GG27864@e106497-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 10 Sep 2014 17:07:02 +0200
-Johan Hovold <johan@kernel.org> wrote:
-
-> On Wed, Sep 10, 2014 at 03:20:19PM +0200, Boris BREZILLON wrote:
-> > On Wed, 10 Sep 2014 14:14:24 +0200
-> > Johan Hovold <johan@kernel.org> wrote:
-> 
-> > > This does not describe the hardware, but rather a specific software
-> > > configuration.
+On Wed, Sep 10, 2014 at 04:10:26PM +0100, Lorenzo Pieralisi wrote:
+> On Wed, Sep 10, 2014 at 03:22:41PM +0100, Liviu Dudau wrote:
+> > On Tue, Sep 09, 2014 at 02:35:46PM +0100, Lorenzo Pieralisi wrote:
+> > > On Mon, Sep 08, 2014 at 02:54:30PM +0100, Liviu Dudau wrote:
+> > > > Provide a function to parse the PCI DT ranges that can be used to
+> > > > create a pci_host_bridge structure together with its associated
+> > > > bus.
+> > > > 
+> > > > Cc: Bjorn Helgaas <bhelgaas@google.com>
+> > > > Cc: Arnd Bergmann <arnd@arndb.de>
+> > > > Cc: Grant Likely <grant.likely@linaro.org>
+> > > > Cc: Rob Herring <robh+dt@kernel.org>
+> > > > Cc: Catalin Marinas <catalin.marinas@arm.com>
+> > > > Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
+> > > > ---
+> > > >  drivers/of/of_pci.c    | 102 +++++++++++++++++++++++++++++++++++++++++++++++++
+> > > >  include/linux/of_pci.h |  11 ++++++
+> > > >  2 files changed, 113 insertions(+)
+> > > > 
+> > > > diff --git a/drivers/of/of_pci.c b/drivers/of/of_pci.c
+> > > > index a107edb..36701da 100644
+> > > > --- a/drivers/of/of_pci.c
+> > > > +++ b/drivers/of/of_pci.c
+> > > > @@ -1,7 +1,9 @@
+> > > >  #include <linux/kernel.h>
+> > > >  #include <linux/export.h>
+> > > >  #include <linux/of.h>
+> > > > +#include <linux/of_address.h>
+> > > >  #include <linux/of_pci.h>
+> > > > +#include <linux/slab.h>
+> > > >  
+> > > >  static inline int __of_pci_pci_compare(struct device_node *node,
+> > > >  				       unsigned int data)
+> > > > @@ -123,6 +125,106 @@ int of_pci_get_domain_nr(struct device_node *node, bool allocate_if_missing)
+> > > >  }
+> > > >  EXPORT_SYMBOL_GPL(of_pci_get_domain_nr);
+> > > >  
+> > > > +/**
+> > > > + * of_pci_get_host_bridge_resources - Parse PCI host bridge resources from DT
+> > > > + * @dev: device node of the host bridge having the range property
+> > > > + * @busno: bus number associated with the bridge root bus
+> > > > + * @bus_max: maximum number of busses for this bridge
+> > > > + * @resources: list where the range of resources will be added after DT parsing
+> > > > + * @io_base: pointer to a variable that will contain on return the physical
+> > > > + * address for the start of the I/O range.
+> > > > + *
+> > > > + * It is the callers job to free the @resources list.
+> > > > + *
+> > > > + * This function will parse the "ranges" property of a PCI host bridge device
+> > > > + * node and setup the resource mapping based on its content. It is expected
+> > > > + * that the property conforms with the Power ePAPR document.
 > > > 
-> > > The RTT is first of all not an RTC (although it can be used as one in a
-> > > specific software configuration). And the second register resource above
-> > > is not an RTT register, but a general-purpose backup register could be
-> > > used for other purposes (which register to use is currently configurable
-> > > for legacy booting using CONFIG_RTC_DRV_AT91SAM9_GPBR).
+> > > You should also define what it returns and when.
 > > 
-> > We could use a syscon device (which exposes a regmap) for the GPBR
-> > block.
+> > Thanks, will do.
 > > 
-> > rtc at ffffff20 {
-> 
-> rtt
-> 
-> > 	compatible = "atmel,at91sam9260-rtt";
-> > 	reg = <0xfffffd20 0x10>;
-> > 	interrupts = <1 4 7>;
-> > 	clocks = <&clk32k>;
-> > 	atmel,time-reg = <&gpbr 0x0>;
-> > };
+> > > 
+> > > > + *
+> > > > + */
+> > > > +int of_pci_get_host_bridge_resources(struct device_node *dev,
+> > > > +			unsigned char busno, unsigned char bus_max,
+> > > > +			struct list_head *resources, resource_size_t *io_base)
+> > > > +{
+> > > > +	struct resource *res;
+> > > > +	struct resource *bus_range;
+> > > > +	struct of_pci_range range;
+> > > > +	struct of_pci_range_parser parser;
+> > > > +	char range_type[4];
+> > > > +	int err;
+> > > > +
+> > > > +	bus_range = kzalloc(sizeof(*bus_range), GFP_KERNEL);
+> > > > +	if (!bus_range)
+> > > > +		return -ENOMEM;
+> > > > +
+> > > > +	pr_info("PCI host bridge %s ranges:\n", dev->full_name);
+> > > > +
+> > > > +	err = of_pci_parse_bus_range(dev, bus_range);
+> > > > +	if (err) {
+> > > > +		bus_range->start = busno;
+> > > > +		bus_range->end = bus_max;
+> > > > +		bus_range->flags = IORESOURCE_BUS;
+> > > > +		pr_info("  No bus range found for %s, using %pR\n",
+> > > > +			dev->full_name, &bus_range);
+> > > > +	} else {
+> > > > +		if (bus_range->end > bus_range->start + bus_max)
+> > > > +			bus_range->end = bus_range->start + bus_max;
+> > > > +	}
+> > > > +	pci_add_resource(resources, bus_range);
+> > > 
+> > > This means that eg in the PCI generic host controller I cannot "filter"
+> > > the bus resource, unless I remove it, "filter" it, and add it again.
 > > 
-> > gpbr: syscon at fffffd50 {
-> > 	compatible = "atmel,at91sam9260-gpbr", "syscon";
-> > 	reg = <0xfffffd50 0x10>;
-> > 	
-> > };
+> > I'm not sure what you mean. Why do you have to remove the bus resource and
+> > add it again? What you get back from of_pci_get_host_bridge_resources() is
+> > a list of resources as they have been parsed from DT. You now have the option
+> > of doing any filtering that you might have done pre-v10 in the
+> > pcibios_fixup_bridge_ranges() but that is only on the list that was returned
+> > from of_pci_get_host_bridge_resources(). At this moment no root bus or
+> > host bridge structure has been created so no resource was added to those.
+> > With the filtered list you can use it to call pci_scan_root_bus() and *then*
+> > it gets added to the pci_host_bridge structure.
 > 
-> Yes, this essentially what I suggested in the thread (and my last reply)
-> and relying on syscon rather than a custom driver seems like a good
-> idea. It would allow early access to the registers too with the recently
-> proposed changes. It would not guarantee any kind of exclusivity,
-> though, but I guess that's tolerable?
+> You are right sorry. As discussed, I just have to remove the resources
+> assignment in the respective host controller drivers (because you do
+> that in the API) and grab the resource pointers to "filter" them.
+> 
+> > > I certainly can't filter a resource that has been already added without
+> > > removing it first.
+> > > 
+> > > Thoughts ?
+> > 
+> > Hope I have explained what happens. Please let me know if you have any other
+> > comments.
+> 
+> There were other comments below ;)
 
-Yep, that's one of the concern I had with the syscon/regmap
-approach :-(, but I guess I'll give this solution a try and post a new
-version of this series ;-).
+My PgDn key is broken ;)
 
-Can we just leave the rtt as an rtc problem on the side for now and bind
-it to the rtc-at91sam9 driver.
+> 
+> Thanks,
+> Lorenzo
+> 
+> > 
+> > Best regards,
+> > Liviu
+> > 
+> > > 
+> > > > +
+> > > > +	/* Check for ranges property */
+> > > > +	err = of_pci_range_parser_init(&parser, dev);
+> > > > +	if (err)
+> > > > +		goto parse_failed;
+> > > > +
+> > > > +	pr_debug("Parsing ranges property...\n");
+> > > > +	for_each_of_pci_range(&parser, &range) {
+> > > > +		/* Read next ranges element */
+> > > > +		if ((range.flags & IORESOURCE_TYPE_BITS) == IORESOURCE_IO)
+> > > > +			snprintf(range_type, 4, " IO");
+> > > > +		else if ((range.flags & IORESOURCE_TYPE_BITS) == IORESOURCE_MEM)
+> > > > +			snprintf(range_type, 4, "MEM");
+> > > > +		else
+> > > > +			snprintf(range_type, 4, "err");
+> > > > +		pr_info("  %s %#010llx..%#010llx -> %#010llx\n", range_type,
+> > > > +			range.cpu_addr, range.cpu_addr + range.size - 1,
+> > > > +			range.pci_addr);
+> > > > +
+> > > > +		/*
+> > > > +		 * If we failed translation or got a zero-sized region
+> > > > +		 * then skip this range
+> > > > +		 */
+> > > > +		if (range.cpu_addr == OF_BAD_ADDR || range.size == 0)
+> > > > +			continue;
+> > > > +
+> > > > +		res = kzalloc(sizeof(struct resource), GFP_KERNEL);
+> > > > +		if (!res) {
+> > > > +			err = -ENOMEM;
+> > > > +			goto parse_failed;
+> > > > +		}
+> > > > +
+> > > > +		err = of_pci_range_to_resource(&range, dev, res);
+> > > > +		if (err) {
+> > > > +			kfree(res);
+> > > 
+> > > You might want to add a label to free res to make things more uniform.
 
-If we ever decide to add a new driver using the RTT for another purpose
-we will still be able to reference the RTT block like this (and keep
-the existing rtt node definition):
+Sorry, not following you. How would a label help here?
 
+> > > 
+> > > > +			goto parse_failed;
+> > > > +		}
+> > > > +
+> > > > +		if (resource_type(res) == IORESOURCE_IO) {
+> > > > +			if (*io_base)
+> > > 
+> > > You do not zero io_base in the first place so you should ask the API
+> > > user to do that. Is 0 a valid value BTW ? If it is you've got to resort
+> > > to something else to detect multiple IO resources.
 
-rtt-based-rtc {
-	compatible = "atmel,rtt-rtc";
-	atmel,rtt = <&rtt>;
-	atmel,time-reg = <&gpbr 0x0>;
-}
+No, zero is not a valid value. It is the cpu_addr value from the IO range, I'm
+hopying that no one is crazy enough to map PCI address space at CPU address zero.
+Thanks for spotting the lack of initialisation though, I need to fix it.
 
-rtt-based-xdev {
-	compatible = "atmel,rtt-xdev";
-	atmel,rtt = <&rtt>;
-	/*...*/
-}
+Best regards,
+Liviu
 
-Regards,
-
-Boris
+> > > 
+> > > Lorenzo
 
 -- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+====================
+| I would like to |
+| fix the world,  |
+| but they're not |
+| giving me the   |
+ \ source code!  /
+  ---------------
+    ?\_(?)_/?
