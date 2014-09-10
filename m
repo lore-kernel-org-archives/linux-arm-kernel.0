@@ -1,28 +1,46 @@
-From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
-Date: Wed, 10 Sep 2014 11:02:38 +0200
-Subject: [PATCH v2 5/5] ARM: dts: Add Peach Pit and Pi dts entry for
- ISL29018 sensor
-In-Reply-To: <CAD=FV=WdMx=7oLChYz-y2cY=MBpJmT7KXBq_hMV7FS16VT+85w@mail.gmail.com>
-References: <1408533593-32346-1-git-send-email-javier.martinez@collabora.co.uk>	<1408533593-32346-6-git-send-email-javier.martinez@collabora.co.uk>
- <CAD=FV=WdMx=7oLChYz-y2cY=MBpJmT7KXBq_hMV7FS16VT+85w@mail.gmail.com>
-Message-ID: <541013AE.6090805@collabora.co.uk>
+From: xuwei5@hisilicon.com (xuwei)
+Date: Wed, 10 Sep 2014 17:01:30 +0800
+Subject: [GIT PULL][for 3.18] pull request for the clock update of Hisilicon
+ HiX5HD2 soc
+Message-ID: <5410136A.4080701@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Doug,
+Hi Mike,
 
-On 09/10/2014 06:52 AM, Doug Anderson wrote:
-> 
-> I would note that the downstream dts file has this i2c bus at 400kHz.
-> ...but that's not a problem with your patch.  Perhaps you could submit
-> that as a separate patch?
->
+Please help to merge pull request for the clock update of Hisilicon HiX5HD2 soc. 
 
-Indeed, I've to re-spin anyways so I'll include that on the next version as a
-separate patch.
+Best Regards,
+Wei
 
-> Reviewed-by: Doug Anderson <dianders@chromium.org>
-> 
+The following changes since commit 5162797e4d77414cd9ac863ca58588c10b8f8f3a:
 
-Best regards,
-Javier
+  clk: hix5hd2: add complex clk (2014-09-01 16:09:05 +0100)
+
+are available in the git repository at:
+
+  git://github.com/hisilicon/linux-hisi.git tags/hix5hd2-clock-for-3.18
+
+for you to fetch changes up to b89ffd8e390a9f0812e62c4985b6d3f246669273:
+
+  clk: hix5hd2: add I2C clocks (2014-09-01 16:09:33 +0100)
+
+----------------------------------------------------------------
+Hisilicon HiX5HD2 clock updates for 3.18
+
+-Add I2C, watchdog and sd clocks
+-Add clock drivers for HiX5HD2 to support sata, usb and ethernet
+
+----------------------------------------------------------------
+Guoxiong Yan (1):
+      clk: hix5hd2: add watchdog0 clocks
+
+Jiancheng Xue (1):
+      clk: hix5hd2: add sd clk
+
+Wei Yan (1):
+      clk: hix5hd2: add I2C clocks
+
+ drivers/clk/hisilicon/clk-hix5hd2.c       | 51 +++++++++++++++++++++++++++++++++++++++++++++------
+ include/dt-bindings/clock/hix5hd2-clock.h | 18 ++++++++++++++++++
+ 2 files changed, 63 insertions(+), 6 deletions(-)
