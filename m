@@ -1,34 +1,55 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Wed, 10 Sep 2014 14:45:21 +0100
-Subject: ARM bigendian cpuhotplug
-In-Reply-To: <CAMQ1t3q22P7UDXUhoJiThjnrS_GMdAFaSaDxRzUi8KM=pa9QQw@mail.gmail.com>
-References: <CAMQ1t3q22P7UDXUhoJiThjnrS_GMdAFaSaDxRzUi8KM=pa9QQw@mail.gmail.com>
-Message-ID: <541055F1.2060604@arm.com>
+From: maxime.coquelin@st.com (Maxime Coquelin)
+Date: Wed, 10 Sep 2014 15:46:05 +0200
+Subject: [GIT PULL v2] STiH407 reset controller support
+In-Reply-To: <20140909213651.GA591@pengutronix.de>
+References: <20140909213651.GA591@pengutronix.de>
+Message-ID: <5410561D.9040707@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Philipp,
 
+On 09/09/2014 11:36 PM, Philipp Zabel wrote:
+> Hi Maxime,
+>
+> I have rebased the STiH407 reset controller patches onto v3.17-rc1.
+> The following changes since commit 7d1311b93e58ed55f3a31cc8f94c4b8fe988a2b9:
+>
+>    Linux 3.17-rc1 (2014-08-16 10:40:26 -0600)
+>
+> are available in the git repository at:
+>
+>    git://git.pengutronix.de/git/pza/linux.git tags/reset-for-sti-3.18
+>
+> for you to fetch changes up to a83a81838a294adbb5356e6b4a3adcda1439d98e:
+>
+>    reset: sti: Document sti-picophyreset controllers bindings. (2014-09-04 13:05:01 +0200)
+>
+> ----------------------------------------------------------------
+> STiH407 reset controller support
+>
+> ----------------------------------------------------------------
+> Peter Griffin (2):
+>        reset: stih407: Add softreset, powerdown and picophy controllers
+>        reset: sti: Document sti-picophyreset controllers bindings.
+>
+>   .../bindings/reset/st,sti-picophyreset.txt         |  42 ++++++
+>   drivers/reset/sti/Kconfig                          |   4 +
+>   drivers/reset/sti/Makefile                         |   1 +
+>   drivers/reset/sti/reset-stih407.c                  | 158 +++++++++++++++++++++
+>   .../dt-bindings/reset-controller/stih407-resets.h  |  61 ++++++++
+>   5 files changed, 266 insertions(+)
+>   create mode 100644 Documentation/devicetree/bindings/reset/st,sti-picophyreset.txt
+>   create mode 100644 drivers/reset/sti/reset-stih407.c
+>   create mode 100644 include/dt-bindings/reset-controller/stih407-resets.h
+>
 
-On 10/09/14 13:59, Hemanth Kumar wrote:
->> Are you referring to ARM Vexpress platform with TC2/CA15_A7 card ?
->> If yes, idle doesn't work with CONFIG_MTD_CFI irrespective of
->> endianness, it's platform limitation.
->
->> Regards,
->> Sudeep
->
->
-> Thanks for the reply what is the hardware limitation for this card (VE
-> CA-15_A7) when we enable CONFIG_MTD_CFI
->
+Thanks!
 
-The cpu resume path should ideal be on some sram or on-chip memory, but
-on TC2 we use the NOR flash @0x0. When you enable NOR flash in Linux,
-you can't expect it to be in read-mode always as other cpus might put
-the NOR device is any mode based on its interaction. As a result when a
-suspended cpu resumes it might not find the resume code if NOR was not
-in read mode resulting in unpredicted behaviour. As I said before it's
-purely a platform firmware limitation.
+Merged into sti-dt-for-v3.18.
+It will be available at:
+git://git.stlinux.com/devel/kernel/linux-sti.git
+in a couple of hours.
 
-Regards,
-Sudeep
+Best regards,
+Maxime
