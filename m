@@ -1,67 +1,55 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Wed, 10 Sep 2014 09:55:48 -0700
-Subject: [GIT PULL][for 3.18] pull request for the clock update of
- Hisilicon HiX5HD2 soc
-In-Reply-To: <5410136A.4080701@hisilicon.com>
-References: <5410136A.4080701@hisilicon.com>
-Message-ID: <20140910165548.19023.46442@quantum>
+From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
+Date: Wed, 10 Sep 2014 18:56:37 +0200
+Subject: [PATCH v8 00/18] 8250-core based serial driver for OMAP + DMA
+In-Reply-To: <20140910141554.GC22315@ci00147.xsens-tech.local>
+References: <1409943773-7874-1-git-send-email-bigeasy@linutronix.de>
+ <20140908144616.GA22315@ci00147.xsens-tech.local>
+ <20140908151501.GA22584@linutronix.de>
+ <20140908183353.GB4686@ci00147.xsens-tech.local>
+ <540F57E0.8030404@linutronix.de>
+ <20140910141554.GC22315@ci00147.xsens-tech.local>
+Message-ID: <541082C5.7040608@linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting xuwei (2014-09-10 02:01:30)
-> Hi Mike,
+On 09/10/2014 04:15 PM, Frans Klaver wrote:
+> On Tue, Sep 09, 2014 at 09:41:20PM +0200, Sebastian Andrzej Siewior wrote:
+>> On 09/08/2014 08:33 PM, Frans Klaver wrote:
+>>> Thanks. I'll give it a spin on Wednesday.
+>>
+>> Could you please pull the upcoming v9 first?
+>>
+>>  git://git.breakpoint.cc/bigeasy/linux.git uart_v9_pre1
+>>
+>> This solves a few of my am335x related issues.
 > 
-> Please help to merge pull request for the clock update of Hisilicon HiX5HD2 soc. 
-> 
-> Best Regards,
-> Wei
-> 
-> The following changes since commit 5162797e4d77414cd9ac863ca58588c10b8f8f3a:
-> 
->   clk: hix5hd2: add complex clk (2014-09-01 16:09:05 +0100)
+> Using v9_pre1, I get a kernel panic in edma_dma_pause() on echan->edesc
+> being NULL. I do get data before this happens. This is at high speed,
+> high rate. No mention of the irq having too much to do, though. The more
+> data I transmit, the more likely this is to occur.
 
-Small nitpick: it looks like you generated this pull request against
-commit 5162797e, but I think you really meant to use v3.17-rc1.
+Hmm. This shouldn't happen because if dma->rx_running is set, then
+there should be a descriptor to pause.
+Could check how this could happen? (and which event tries to do so)
 
-Also this pull request contains the complex clock but it is not listed
-in your tag description below.
+In the meantime, the lower part of [0] should fix the NULL bug.
 
-Finally, I had some concern about the complex clock implementation (I
-think it should use the reset framework to control the Ethernet phy) so
-let's resolve that in the other thread before I pull this.
+[0] https://lkml.org/lkml/2014/7/29/506
 
-Thanks!
-Mike
+> I don't currently have the setup to lower the baudrate. I would probably
+> need to reproduce this on a beaglebone, instead of our custom board.
+> I'll see if I can do that.
+> 
+> If you need more info, just let me know.
 
-> 
-> are available in the git repository at:
-> 
->   git://github.com/hisilicon/linux-hisi.git tags/hix5hd2-clock-for-3.18
-> 
-> for you to fetch changes up to b89ffd8e390a9f0812e62c4985b6d3f246669273:
-> 
->   clk: hix5hd2: add I2C clocks (2014-09-01 16:09:33 +0100)
-> 
-> ----------------------------------------------------------------
-> Hisilicon HiX5HD2 clock updates for 3.18
-> 
-> -Add I2C, watchdog and sd clocks
-> -Add clock drivers for HiX5HD2 to support sata, usb and ethernet
-> 
-> ----------------------------------------------------------------
-> Guoxiong Yan (1):
->       clk: hix5hd2: add watchdog0 clocks
-> 
-> Jiancheng Xue (1):
->       clk: hix5hd2: add sd clk
-> 
-> Wei Yan (1):
->       clk: hix5hd2: add I2C clocks
-> 
->  drivers/clk/hisilicon/clk-hix5hd2.c       | 51 +++++++++++++++++++++++++++++++++++++++++++++------
->  include/dt-bindings/clock/hix5hd2-clock.h | 18 ++++++++++++++++++
->  2 files changed, 63 insertions(+), 6 deletions(-)
-> 
-> 
-> 
-> 
+I just pushed uart_v9_pre2 and I will post it once I rebased it on top
+Greg's latest.
+There was a bug where THRE could be active longer than needed caused a
+few not needed interrupts until the FIFO was empty again.
+
+My "less on file" test case did not fail anymore with this.
+
+> Thanks,
+> Frans
+
+Sebastian
