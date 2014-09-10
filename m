@@ -1,8 +1,8 @@
 From: gautam.vivek@samsung.com (Vivek Gautam)
-Date: Wed, 10 Sep 2014 09:07:28 +0530
+Date: Wed, 10 Sep 2014 09:09:57 +0530
 Subject: [PATCH v6 4/4] phy: exynos5-usbdrd: Calibrate LOS levels for
  exynos5420/5800
-In-Reply-To: <20140909144225.GF6151@saruman.home>
+In-Reply-To: <CAFp+6iHJKmeothDM67WW60Sqqj8BQroBCzZ8zecKwM_GcYL8HA@mail.gmail.com>
 References: <1409656338-20337-1-git-send-email-gautam.vivek@samsung.com>
  <1409656338-20337-5-git-send-email-gautam.vivek@samsung.com>
  <20140902143438.GB16872@saruman.home>
@@ -14,62 +14,69 @@ References: <1409656338-20337-1-git-send-email-gautam.vivek@samsung.com>
  <20140908134454.GK22409@saruman.home>
  <CAFp+6iG+gmD_JseytYuVQcRK9ErOqQrUEWJoU1KUU7PqMd=aRw@mail.gmail.com>
  <20140909144225.GF6151@saruman.home>
-Message-ID: <CAFp+6iHJKmeothDM67WW60Sqqj8BQroBCzZ8zecKwM_GcYL8HA@mail.gmail.com>
+ <CAFp+6iHJKmeothDM67WW60Sqqj8BQroBCzZ8zecKwM_GcYL8HA@mail.gmail.com>
+Message-ID: <CAFp+6iHRJ5oAA+K1Y0Y2uadPhsR6wmrd13DM39dqiL4jj+swHg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-adding Julius here,
+On Wed, Sep 10, 2014 at 9:07 AM, Vivek Gautam <gautam.vivek@samsung.com> wrote:
+> adding Julius here,
 
+i think i had missed adding Julius for this entire series :-(
+I should be more careful with the CC list in future.
+Added his chromium id, since that seems to be more active.
 
-On Tue, Sep 9, 2014 at 8:12 PM, Felipe Balbi <balbi@ti.com> wrote:
-> On Tue, Sep 09, 2014 at 07:19:50AM +0530, Vivek Gautam wrote:
->> Hi,
->>
->>
->> On Mon, Sep 8, 2014 at 7:14 PM, Felipe Balbi <balbi@ti.com> wrote:
->> > Hi,
->> >
->> > On Mon, Sep 08, 2014 at 09:53:09AM +0530, Vivek Gautam wrote:
->> >> On Fri, Sep 5, 2014 at 11:26 PM, Felipe Balbi <balbi@ti.com> wrote:
->> >> > On Thu, Sep 04, 2014 at 12:01:19PM +0530, Vivek Gautam wrote:
->> >> >> > Don't we have phy_power_on()
->> >> >> > for that ? It looks like you could just as well do this from
->> >> >> > phy_power_on() ?
->> >> >>
->> >> >> No, unfortunately keeping these calibration settings in phy_power_on()
->> >> >> doesn't help, since we need to do this after XHCI reset has happened.
->> >> >
->> >> > teach xHCI about PHYs ?
->> >>
->> >> sorry i couldn't understand you here.
->> >> Aren't we trying to do the same with Heikki's patch about dwc3 :
->> >> [PATCH 6/6] usb: dwc3: host: convey the PHYs to xhci
->> >>
->> >> and the 2nd patch in this series :
->> >> [PATCH v6 2/4] usb: host: xhci-plat: Get PHYs for xhci's hcds
->> >>
->> >> Is there something else that is expected ?
->> >
->> > right, use that to call phy_init() at the right time, then you need to
->> > add a new ->calibrate() method which, likely, will only be used by you
->> > ;-)
->>
->> so you mean, the xhci should itself call phy_init() at a time suitable,
->> so that ->calibrate() is not required at all ?
->>
->> i think you meant there - "then you __do not__ need to
 >
-> right :-)
+>
+> On Tue, Sep 9, 2014 at 8:12 PM, Felipe Balbi <balbi@ti.com> wrote:
+>> On Tue, Sep 09, 2014 at 07:19:50AM +0530, Vivek Gautam wrote:
+>>> Hi,
+>>>
+>>>
+>>> On Mon, Sep 8, 2014 at 7:14 PM, Felipe Balbi <balbi@ti.com> wrote:
+>>> > Hi,
+>>> >
+>>> > On Mon, Sep 08, 2014 at 09:53:09AM +0530, Vivek Gautam wrote:
+>>> >> On Fri, Sep 5, 2014 at 11:26 PM, Felipe Balbi <balbi@ti.com> wrote:
+>>> >> > On Thu, Sep 04, 2014 at 12:01:19PM +0530, Vivek Gautam wrote:
+>>> >> >> > Don't we have phy_power_on()
+>>> >> >> > for that ? It looks like you could just as well do this from
+>>> >> >> > phy_power_on() ?
+>>> >> >>
+>>> >> >> No, unfortunately keeping these calibration settings in phy_power_on()
+>>> >> >> doesn't help, since we need to do this after XHCI reset has happened.
+>>> >> >
+>>> >> > teach xHCI about PHYs ?
+>>> >>
+>>> >> sorry i couldn't understand you here.
+>>> >> Aren't we trying to do the same with Heikki's patch about dwc3 :
+>>> >> [PATCH 6/6] usb: dwc3: host: convey the PHYs to xhci
+>>> >>
+>>> >> and the 2nd patch in this series :
+>>> >> [PATCH v6 2/4] usb: host: xhci-plat: Get PHYs for xhci's hcds
+>>> >>
+>>> >> Is there something else that is expected ?
+>>> >
+>>> > right, use that to call phy_init() at the right time, then you need to
+>>> > add a new ->calibrate() method which, likely, will only be used by you
+>>> > ;-)
+>>>
+>>> so you mean, the xhci should itself call phy_init() at a time suitable,
+>>> so that ->calibrate() is not required at all ?
+>>>
+>>> i think you meant there - "then you __do not__ need to
+>>
+>> right :-)
+>
+> alright, i will prepare a patch for the suggested change.
+>
+> But AFAI remember we had discussion for this patch in earlier version,
+> and Julius suggested to use a generic approach for such
+> change wherein other users in future may be able to use the
+> facility.
+> Julius any thoughts about the change suggested by Felipe.
 
-alright, i will prepare a patch for the suggested change.
 
-But AFAI remember we had discussion for this patch in earlier version,
-and Julius suggested to use a generic approach for such
-change wherein other users in future may be able to use the
-facility.
-Julius any thoughts about the change suggested by Felipe.
-
-[snip]
 
 
 -- 
