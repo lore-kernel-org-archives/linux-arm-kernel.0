@@ -1,68 +1,184 @@
-From: vincent.guittot@linaro.org (Vincent Guittot)
-Date: Wed, 10 Sep 2014 16:22:12 +0200
-Subject: [PATCH v5 04/12] sched: Allow all archs to set the capacity_orig
-In-Reply-To: <20140910135039.GP3190@worktop.ger.corp.intel.com>
-References: <1409051215-16788-1-git-send-email-vincent.guittot@linaro.org>
- <1409051215-16788-5-git-send-email-vincent.guittot@linaro.org>
- <540204DC.5090204@linux.vnet.ibm.com>
- <20140910135039.GP3190@worktop.ger.corp.intel.com>
-Message-ID: <CAKfTPtCx4V+2cTVV4hkb3=f-qg2q-KSGYkyri8Hf3JT-b5FHxQ@mail.gmail.com>
+From: Liviu.Dudau@arm.com (Liviu Dudau)
+Date: Wed, 10 Sep 2014 15:22:41 +0100
+Subject: [PATCH v10 08/10] OF: PCI: Add support for parsing PCI host
+ bridge resources from DT
+In-Reply-To: <20140909133546.GB2636@e102568-lin.cambridge.arm.com>
+References: <1410184472-17630-1-git-send-email-Liviu.Dudau@arm.com>
+ <1410184472-17630-9-git-send-email-Liviu.Dudau@arm.com>
+ <20140909133546.GB2636@e102568-lin.cambridge.arm.com>
+Message-ID: <20140910142241.GD27864@e106497-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10 September 2014 15:50, Peter Zijlstra <peterz@infradead.org> wrote:
-> On Sat, Aug 30, 2014 at 10:37:40PM +0530, Preeti U Murthy wrote:
->> > -   if ((sd->flags & SD_SHARE_CPUCAPACITY) && weight > 1) {
->> > -           if (sched_feat(ARCH_CAPACITY))
->>
->> Aren't you missing this check above? I understand that it is not
->> crucial, but that would also mean removing ARCH_CAPACITY sched_feat
->> altogether, wouldn't it?
->
-> Yes he's missing that, I added the below bit on top.
+On Tue, Sep 09, 2014 at 02:35:46PM +0100, Lorenzo Pieralisi wrote:
+> On Mon, Sep 08, 2014 at 02:54:30PM +0100, Liviu Dudau wrote:
+> > Provide a function to parse the PCI DT ranges that can be used to
+> > create a pci_host_bridge structure together with its associated
+> > bus.
+> > 
+> > Cc: Bjorn Helgaas <bhelgaas@google.com>
+> > Cc: Arnd Bergmann <arnd@arndb.de>
+> > Cc: Grant Likely <grant.likely@linaro.org>
+> > Cc: Rob Herring <robh+dt@kernel.org>
+> > Cc: Catalin Marinas <catalin.marinas@arm.com>
+> > Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
+> > ---
+> >  drivers/of/of_pci.c    | 102 +++++++++++++++++++++++++++++++++++++++++++++++++
+> >  include/linux/of_pci.h |  11 ++++++
+> >  2 files changed, 113 insertions(+)
+> > 
+> > diff --git a/drivers/of/of_pci.c b/drivers/of/of_pci.c
+> > index a107edb..36701da 100644
+> > --- a/drivers/of/of_pci.c
+> > +++ b/drivers/of/of_pci.c
+> > @@ -1,7 +1,9 @@
+> >  #include <linux/kernel.h>
+> >  #include <linux/export.h>
+> >  #include <linux/of.h>
+> > +#include <linux/of_address.h>
+> >  #include <linux/of_pci.h>
+> > +#include <linux/slab.h>
+> >  
+> >  static inline int __of_pci_pci_compare(struct device_node *node,
+> >  				       unsigned int data)
+> > @@ -123,6 +125,106 @@ int of_pci_get_domain_nr(struct device_node *node, bool allocate_if_missing)
+> >  }
+> >  EXPORT_SYMBOL_GPL(of_pci_get_domain_nr);
+> >  
+> > +/**
+> > + * of_pci_get_host_bridge_resources - Parse PCI host bridge resources from DT
+> > + * @dev: device node of the host bridge having the range property
+> > + * @busno: bus number associated with the bridge root bus
+> > + * @bus_max: maximum number of busses for this bridge
+> > + * @resources: list where the range of resources will be added after DT parsing
+> > + * @io_base: pointer to a variable that will contain on return the physical
+> > + * address for the start of the I/O range.
+> > + *
+> > + * It is the callers job to free the @resources list.
+> > + *
+> > + * This function will parse the "ranges" property of a PCI host bridge device
+> > + * node and setup the resource mapping based on its content. It is expected
+> > + * that the property conforms with the Power ePAPR document.
+> 
+> You should also define what it returns and when.
 
-FWIW, your changes are fine for me
+Thanks, will do.
 
->
-> So the argument last time:
-> lkml.kernel.org/r/20140709105721.GT19379 at twins.programming.kicks-ass.net
-> was that you cannot put sched_feat(ARCH_CAPACITY) inside a weak arch_*
-> function. The test has to be outside, seeing how it needs to decide to
-> call the arch function at all (or revert to the default implementation).
->
-> ---
-> --- a/kernel/sched/fair.c
-> +++ b/kernel/sched/fair.c
-> @@ -5700,7 +5700,7 @@ unsigned long __weak arch_scale_freq_cap
->         return default_scale_capacity(sd, cpu);
->  }
->
-> -unsigned long __weak arch_scale_cpu_capacity(struct sched_domain *sd, int cpu)
-> +static unsigned long default_scale_cpu_capacity(struct sched_domain *sd, int cpu)
->  {
->         if ((sd->flags & SD_SHARE_CPUCAPACITY) && (sd->span_weight > 1))
->                 return sd->smt_gain / sd->span_weight;
-> @@ -5708,6 +5708,11 @@ unsigned long __weak arch_scale_cpu_capa
->         return SCHED_CAPACITY_SCALE;
->  }
->
-> +unsigned long __weak arch_scale_cpu_capacity(struct sched_domain *sd, int cpu)
-> +{
-> +       return default_scale_cpu_capacity(sd, cpu);
-> +}
-> +
->  static unsigned long scale_rt_capacity(int cpu)
->  {
->         struct rq *rq = cpu_rq(cpu);
-> @@ -5747,7 +5752,10 @@ static void update_cpu_capacity(struct s
->         unsigned long capacity = SCHED_CAPACITY_SCALE;
->         struct sched_group *sdg = sd->groups;
->
-> -       capacity *= arch_scale_cpu_capacity(sd, cpu);
-> +       if (sched_feat(ARCH_CAPACITY))
-> +               capacity *= arch_scale_cpu_capacity(sd, cpu);
-> +       else
-> +               capacity *= default_scale_cpu_capacity(sd, cpu);
->
->         capacity >>= SCHED_CAPACITY_SHIFT;
->
+> 
+> > + *
+> > + */
+> > +int of_pci_get_host_bridge_resources(struct device_node *dev,
+> > +			unsigned char busno, unsigned char bus_max,
+> > +			struct list_head *resources, resource_size_t *io_base)
+> > +{
+> > +	struct resource *res;
+> > +	struct resource *bus_range;
+> > +	struct of_pci_range range;
+> > +	struct of_pci_range_parser parser;
+> > +	char range_type[4];
+> > +	int err;
+> > +
+> > +	bus_range = kzalloc(sizeof(*bus_range), GFP_KERNEL);
+> > +	if (!bus_range)
+> > +		return -ENOMEM;
+> > +
+> > +	pr_info("PCI host bridge %s ranges:\n", dev->full_name);
+> > +
+> > +	err = of_pci_parse_bus_range(dev, bus_range);
+> > +	if (err) {
+> > +		bus_range->start = busno;
+> > +		bus_range->end = bus_max;
+> > +		bus_range->flags = IORESOURCE_BUS;
+> > +		pr_info("  No bus range found for %s, using %pR\n",
+> > +			dev->full_name, &bus_range);
+> > +	} else {
+> > +		if (bus_range->end > bus_range->start + bus_max)
+> > +			bus_range->end = bus_range->start + bus_max;
+> > +	}
+> > +	pci_add_resource(resources, bus_range);
+> 
+> This means that eg in the PCI generic host controller I cannot "filter"
+> the bus resource, unless I remove it, "filter" it, and add it again.
+
+I'm not sure what you mean. Why do you have to remove the bus resource and
+add it again? What you get back from of_pci_get_host_bridge_resources() is
+a list of resources as they have been parsed from DT. You now have the option
+of doing any filtering that you might have done pre-v10 in the
+pcibios_fixup_bridge_ranges() but that is only on the list that was returned
+from of_pci_get_host_bridge_resources(). At this moment no root bus or
+host bridge structure has been created so no resource was added to those.
+With the filtered list you can use it to call pci_scan_root_bus() and *then*
+it gets added to the pci_host_bridge structure.
+
+> 
+> I certainly can't filter a resource that has been already added without
+> removing it first.
+> 
+> Thoughts ?
+
+Hope I have explained what happens. Please let me know if you have any other
+comments.
+
+Best regards,
+Liviu
+
+> 
+> > +
+> > +	/* Check for ranges property */
+> > +	err = of_pci_range_parser_init(&parser, dev);
+> > +	if (err)
+> > +		goto parse_failed;
+> > +
+> > +	pr_debug("Parsing ranges property...\n");
+> > +	for_each_of_pci_range(&parser, &range) {
+> > +		/* Read next ranges element */
+> > +		if ((range.flags & IORESOURCE_TYPE_BITS) == IORESOURCE_IO)
+> > +			snprintf(range_type, 4, " IO");
+> > +		else if ((range.flags & IORESOURCE_TYPE_BITS) == IORESOURCE_MEM)
+> > +			snprintf(range_type, 4, "MEM");
+> > +		else
+> > +			snprintf(range_type, 4, "err");
+> > +		pr_info("  %s %#010llx..%#010llx -> %#010llx\n", range_type,
+> > +			range.cpu_addr, range.cpu_addr + range.size - 1,
+> > +			range.pci_addr);
+> > +
+> > +		/*
+> > +		 * If we failed translation or got a zero-sized region
+> > +		 * then skip this range
+> > +		 */
+> > +		if (range.cpu_addr == OF_BAD_ADDR || range.size == 0)
+> > +			continue;
+> > +
+> > +		res = kzalloc(sizeof(struct resource), GFP_KERNEL);
+> > +		if (!res) {
+> > +			err = -ENOMEM;
+> > +			goto parse_failed;
+> > +		}
+> > +
+> > +		err = of_pci_range_to_resource(&range, dev, res);
+> > +		if (err) {
+> > +			kfree(res);
+> 
+> You might want to add a label to free res to make things more uniform.
+> 
+> > +			goto parse_failed;
+> > +		}
+> > +
+> > +		if (resource_type(res) == IORESOURCE_IO) {
+> > +			if (*io_base)
+> 
+> You do not zero io_base in the first place so you should ask the API
+> user to do that. Is 0 a valid value BTW ? If it is you've got to resort
+> to something else to detect multiple IO resources.
+> 
+> Lorenzo
+
+-- 
+====================
+| I would like to |
+| fix the world,  |
+| but they're not |
+| giving me the   |
+ \ source code!  /
+  ---------------
+    ?\_(?)_/?
