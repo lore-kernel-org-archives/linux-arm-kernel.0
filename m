@@ -1,153 +1,98 @@
-From: s-anna@ti.com (Suman Anna)
-Date: Wed, 10 Sep 2014 14:27:23 -0500
-Subject: [REPOST PATCHv3] ARM: dts: OMAP2+: Add sub mailboxes device node
- information
-In-Reply-To: <1410377243-8147-1-git-send-email-s-anna@ti.com>
-References: <1410377243-8147-1-git-send-email-s-anna@ti.com>
-Message-ID: <1410377243-8147-2-git-send-email-s-anna@ti.com>
+From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
+Date: Wed, 10 Sep 2014 21:30:03 +0200
+Subject: [PATCH 08/16] tty: serial: 8250_dma: enqueue RX dma again on
+ completion.
+In-Reply-To: <1410377411-26656-1-git-send-email-bigeasy@linutronix.de>
+References: <1410377411-26656-1-git-send-email-bigeasy@linutronix.de>
+Message-ID: <1410377411-26656-9-git-send-email-bigeasy@linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The sub-mailbox devices are added to the Mailbox DT nodes on
-OMAP2420, OMAP2430, OMAP3, AM33xx, AM43xx, OMAP4 and OMAP5
-family of SoCs. This data represents the same mailboxes that
-used to be represented in hwmod attribute data previously.
-The node name is chosen based on the .name field of
-omap_mbox_dev_info structure used in the hwmod data.
+The omap needs a DMA request pending right away. If it is enqueued once
+the bytes are in the FIFO then nothing will happen and the FIFO will be
+later purged via RX-timeout interrupt.
+This patch enqueues RX-DMA request on completion but not if it was
+aborted on error. The first enqueue will happen in the driver in
+startup.
 
-Cc: "Beno?t Cousson" <bcousson@baylibre.com>
-Cc: Rob Herring <robh+dt@kernel.org>
-Cc: Pawel Moll <pawel.moll@arm.com>
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
-Cc: Kumar Gala <galak@codeaurora.org>
-Signed-off-by: Suman Anna <s-anna@ti.com>
+Reviewed-by: Tony Lindgren <tony@atomide.com>
+Tested-by: Tony Lindgren <tony@atomide.com>
+Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
 ---
- arch/arm/boot/dts/am33xx.dtsi   | 4 ++++
- arch/arm/boot/dts/am4372.dtsi   | 4 ++++
- arch/arm/boot/dts/omap2420.dtsi | 8 ++++++++
- arch/arm/boot/dts/omap2430.dtsi | 4 ++++
- arch/arm/boot/dts/omap3.dtsi    | 4 ++++
- arch/arm/boot/dts/omap4.dtsi    | 8 ++++++++
- arch/arm/boot/dts/omap5.dtsi    | 8 ++++++++
- 7 files changed, 40 insertions(+)
+ drivers/tty/serial/8250/8250.h      |  3 ++-
+ drivers/tty/serial/8250/8250_core.c |  3 +++
+ drivers/tty/serial/8250/8250_dma.c  | 12 +++++++++---
+ 3 files changed, 14 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
-index 3a0a161..e4f165a 100644
---- a/arch/arm/boot/dts/am33xx.dtsi
-+++ b/arch/arm/boot/dts/am33xx.dtsi
-@@ -354,6 +354,10 @@
- 			ti,hwmods = "mailbox";
- 			ti,mbox-num-users = <4>;
- 			ti,mbox-num-fifos = <8>;
-+			mbox_wkupm3: wkup_m3 {
-+				ti,mbox-tx = <0 0 0>;
-+				ti,mbox-rx = <0 0 3>;
-+			};
- 		};
+diff --git a/drivers/tty/serial/8250/8250.h b/drivers/tty/serial/8250/8250.h
+index a63d198f8d03..fbed1636e9c4 100644
+--- a/drivers/tty/serial/8250/8250.h
++++ b/drivers/tty/serial/8250/8250.h
+@@ -80,7 +80,8 @@ struct serial8250_config {
+ #define UART_BUG_NOMSR	(1 << 2)	/* UART has buggy MSR status bits (Au1x00) */
+ #define UART_BUG_THRE	(1 << 3)	/* UART has buggy THRE reassertion */
+ #define UART_BUG_PARITY	(1 << 4)	/* UART mishandles parity if FIFO enabled */
+-
++#define UART_BUG_DMA_RX	(1 << 5)	/* UART needs DMA RX req before there is
++					   data in FIFO */
+ #define PROBE_RSA	(1 << 0)
+ #define PROBE_ANY	(~0)
  
- 		timer1: timer at 44e31000 {
-diff --git a/arch/arm/boot/dts/am4372.dtsi b/arch/arm/boot/dts/am4372.dtsi
-index 9b3d2ba..a0503be 100644
---- a/arch/arm/boot/dts/am4372.dtsi
-+++ b/arch/arm/boot/dts/am4372.dtsi
-@@ -168,6 +168,10 @@
- 			ti,hwmods = "mailbox";
- 			ti,mbox-num-users = <4>;
- 			ti,mbox-num-fifos = <8>;
-+			mbox_wkupm3: wkup_m3 {
-+				ti,mbox-tx = <0 0 0>;
-+				ti,mbox-rx = <0 0 3>;
-+			};
- 		};
+diff --git a/drivers/tty/serial/8250/8250_core.c b/drivers/tty/serial/8250/8250_core.c
+index 9f961ea82564..39b1c7318f17 100644
+--- a/drivers/tty/serial/8250/8250_core.c
++++ b/drivers/tty/serial/8250/8250_core.c
+@@ -1592,6 +1592,9 @@ int serial8250_handle_irq(struct uart_port *port, unsigned int iir)
  
- 		timer1: timer at 44e31000 {
-diff --git a/arch/arm/boot/dts/omap2420.dtsi b/arch/arm/boot/dts/omap2420.dtsi
-index 9be3c12..ae89aad 100644
---- a/arch/arm/boot/dts/omap2420.dtsi
-+++ b/arch/arm/boot/dts/omap2420.dtsi
-@@ -159,6 +159,14 @@
- 			ti,hwmods = "mailbox";
- 			ti,mbox-num-users = <4>;
- 			ti,mbox-num-fifos = <6>;
-+			mbox_dsp: dsp {
-+				ti,mbox-tx = <0 0 0>;
-+				ti,mbox-rx = <1 0 0>;
-+			};
-+			mbox_iva: iva {
-+				ti,mbox-tx = <2 1 3>;
-+				ti,mbox-rx = <3 1 3>;
-+			};
- 		};
+ 		if (!up->dma || dma_err)
+ 			status = serial8250_rx_chars(up, status);
++
++		if (dma_err && up->bugs & UART_BUG_DMA_RX)
++			serial8250_rx_dma(up, 0);
+ 	}
+ 	serial8250_modem_status(up);
+ 	if ((!up->dma || (up->dma && up->dma->tx_err)) &&
+diff --git a/drivers/tty/serial/8250/8250_dma.c b/drivers/tty/serial/8250/8250_dma.c
+index 69e54abb6e71..3674900a1f14 100644
+--- a/drivers/tty/serial/8250/8250_dma.c
++++ b/drivers/tty/serial/8250/8250_dma.c
+@@ -50,9 +50,8 @@ static void __dma_tx_complete(void *param)
+ 	spin_unlock_irqrestore(&p->port.lock, flags);
+ }
  
- 		timer1: timer at 48028000 {
-diff --git a/arch/arm/boot/dts/omap2430.dtsi b/arch/arm/boot/dts/omap2430.dtsi
-index 1a00f15..b56d7161 100644
---- a/arch/arm/boot/dts/omap2430.dtsi
-+++ b/arch/arm/boot/dts/omap2430.dtsi
-@@ -249,6 +249,10 @@
- 			ti,hwmods = "mailbox";
- 			ti,mbox-num-users = <4>;
- 			ti,mbox-num-fifos = <6>;
-+			mbox_dsp: dsp {
-+				ti,mbox-tx = <0 0 0>;
-+				ti,mbox-rx = <1 0 0>;
-+			};
- 		};
+-static void __dma_rx_complete(void *param)
++static void __dma_rx_do_complete(struct uart_8250_port *p, bool error)
+ {
+-	struct uart_8250_port	*p = param;
+ 	struct uart_8250_dma	*dma = p->dma;
+ 	struct tty_port		*tty_port = &p->port.state->port;
+ 	struct dma_tx_state	state;
+@@ -68,10 +67,17 @@ static void __dma_rx_complete(void *param)
  
- 		timer1: timer at 49018000 {
-diff --git a/arch/arm/boot/dts/omap3.dtsi b/arch/arm/boot/dts/omap3.dtsi
-index 575a49b..b2ae8b8 100644
---- a/arch/arm/boot/dts/omap3.dtsi
-+++ b/arch/arm/boot/dts/omap3.dtsi
-@@ -334,6 +334,10 @@
- 			interrupts = <26>;
- 			ti,mbox-num-users = <2>;
- 			ti,mbox-num-fifos = <2>;
-+			mbox_dsp: dsp {
-+				ti,mbox-tx = <0 0 0>;
-+				ti,mbox-rx = <1 0 0>;
-+			};
- 		};
+ 	tty_insert_flip_string(tty_port, dma->rx_buf, count);
+ 	p->port.icount.rx += count;
++	if (!error && p->bugs & UART_BUG_DMA_RX)
++		serial8250_rx_dma(p, 0);
  
- 		mcspi1: spi at 48098000 {
-diff --git a/arch/arm/boot/dts/omap4.dtsi b/arch/arm/boot/dts/omap4.dtsi
-index 69408b5..bc54d66 100644
---- a/arch/arm/boot/dts/omap4.dtsi
-+++ b/arch/arm/boot/dts/omap4.dtsi
-@@ -656,6 +656,14 @@
- 			ti,hwmods = "mailbox";
- 			ti,mbox-num-users = <3>;
- 			ti,mbox-num-fifos = <8>;
-+			mbox_ipu: mbox_ipu {
-+				ti,mbox-tx = <0 0 0>;
-+				ti,mbox-rx = <1 0 0>;
-+			};
-+			mbox_dsp: mbox_dsp {
-+				ti,mbox-tx = <3 0 0>;
-+				ti,mbox-rx = <2 0 0>;
-+			};
- 		};
+ 	tty_flip_buffer_push(tty_port);
+ }
  
- 		timer1: timer at 4a318000 {
-diff --git a/arch/arm/boot/dts/omap5.dtsi b/arch/arm/boot/dts/omap5.dtsi
-index fc8df17..43336c2 100644
---- a/arch/arm/boot/dts/omap5.dtsi
-+++ b/arch/arm/boot/dts/omap5.dtsi
-@@ -642,6 +642,14 @@
- 			ti,hwmods = "mailbox";
- 			ti,mbox-num-users = <3>;
- 			ti,mbox-num-fifos = <8>;
-+			mbox_ipu: mbox_ipu {
-+				ti,mbox-tx = <0 0 0>;
-+				ti,mbox-rx = <1 0 0>;
-+			};
-+			mbox_dsp: mbox_dsp {
-+				ti,mbox-tx = <3 0 0>;
-+				ti,mbox-rx = <2 0 0>;
-+			};
- 		};
- 
- 		timer1: timer at 4ae18000 {
++static void __dma_rx_complete(void *param)
++{
++	__dma_rx_do_complete(param, false);
++}
++
+ int serial8250_tx_dma(struct uart_8250_port *p)
+ {
+ 	struct uart_8250_dma		*dma = p->dma;
+@@ -139,7 +145,7 @@ int serial8250_rx_dma(struct uart_8250_port *p, unsigned int iir)
+ 		 */
+ 		if (dma_status == DMA_IN_PROGRESS) {
+ 			dmaengine_pause(dma->rxchan);
+-			__dma_rx_complete(p);
++			__dma_rx_do_complete(p, true);
+ 		}
+ 		return -ETIMEDOUT;
+ 	default:
 -- 
-2.0.4
+2.1.0
