@@ -1,82 +1,67 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Wed, 10 Sep 2014 18:55:19 +0200
-Subject: [PATCH 5/5] rtc: at91sam9: add DT bindings documentation
-In-Reply-To: <20140910155236.GL2974@localhost>
-References: <1409733934-14465-1-git-send-email-boris.brezillon@free-electrons.com>
- <1409733934-14465-6-git-send-email-boris.brezillon@free-electrons.com>
- <20140910121424.GG2974@localhost> <20140910152019.111c4c01@bbrezillon>
- <20140910150702.GK2974@localhost> <20140910173114.593dd132@bbrezillon>
- <20140910155236.GL2974@localhost>
-Message-ID: <54108277.9000100@atmel.com>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Wed, 10 Sep 2014 09:55:48 -0700
+Subject: [GIT PULL][for 3.18] pull request for the clock update of
+ Hisilicon HiX5HD2 soc
+In-Reply-To: <5410136A.4080701@hisilicon.com>
+References: <5410136A.4080701@hisilicon.com>
+Message-ID: <20140910165548.19023.46442@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/09/2014 17:52, Johan Hovold :
-> On Wed, Sep 10, 2014 at 05:31:14PM +0200, Boris BREZILLON wrote:
->> On Wed, 10 Sep 2014 17:07:02 +0200
->> Johan Hovold <johan@kernel.org> wrote:
+Quoting xuwei (2014-09-10 02:01:30)
+> Hi Mike,
 > 
->>> Yes, this essentially what I suggested in the thread (and my last reply)
->>> and relying on syscon rather than a custom driver seems like a good
->>> idea. It would allow early access to the registers too with the recently
->>> proposed changes. It would not guarantee any kind of exclusivity,
->>> though, but I guess that's tolerable?
->>
->> Yep, that's one of the concern I had with the syscon/regmap
->> approach :-(, but I guess I'll give this solution a try and post a new
->> version of this series ;-).
+> Please help to merge pull request for the clock update of Hisilicon HiX5HD2 soc. 
 > 
-> Perhaps we should see what Nicolas and Jean-Christophe says before
-> rushing into anything (again). ;)
+> Best Regards,
+> Wei
+> 
+> The following changes since commit 5162797e4d77414cd9ac863ca58588c10b8f8f3a:
+> 
+>   clk: hix5hd2: add complex clk (2014-09-01 16:09:05 +0100)
 
-I said and say it again: keep it simple: if gpbr 0 is used by bootloader
-to pass information about the boot media, use gpbr 1, without protection
-without anything fancy, please.
+Small nitpick: it looks like you generated this pull request against
+commit 5162797e, but I think you really meant to use v3.17-rc1.
 
-atmel,at91-rtt-as-rtc-gpbr = <1>;
-is good for me.
+Also this pull request contains the complex clock but it is not listed
+in your tag description below.
 
-We can decide to keep the DT binding as "unstable" and see what happen
-in one year from now (I suspect nothing will happen). The result is that
-we will have a simple update of this driver without new API or new
-sub-system to learn and maintain.
+Finally, I had some concern about the complex clock implementation (I
+think it should use the reset framework to control the Ethernet phy) so
+let's resolve that in the other thread before I pull this.
 
-So, all in all, I would just take what Johan or Boris did, and go with
-this, now!
+Thanks!
+Mike
 
-
-> I remember J-C considered loosing track of what was using a particular
-> backup register to be a regression. But I guess you can't have it both
-> ways (e.g. if you also want the early access soon provided by syscon).
 > 
-> I'll refresh my rtt and gmbr-node patches meanwhile, as they should be
-> needed in some form at least.
+> are available in the git repository at:
 > 
->> Can we just leave the rtt as an rtc problem on the side for now and bind
->> it to the rtc-at91sam9 driver.
->>
->> If we ever decide to add a new driver using the RTT for another purpose
->> we will still be able to reference the RTT block like this (and keep
->> the existing rtt node definition):
->>
->> rtt-based-rtc {
->> 	compatible = "atmel,rtt-rtc";
->> 	atmel,rtt = <&rtt>;
->> 	atmel,time-reg = <&gpbr 0x0>;
->> }
+>   git://github.com/hisilicon/linux-hisi.git tags/hix5hd2-clock-for-3.18
 > 
-> But why not do this from the start?
+> for you to fetch changes up to b89ffd8e390a9f0812e62c4985b6d3f246669273:
 > 
->> rtt-based-xdev {
->> 	compatible = "atmel,rtt-xdev";
->> 	atmel,rtt = <&rtt>;
->> 	/*...*/
->> }
+>   clk: hix5hd2: add I2C clocks (2014-09-01 16:09:33 +0100)
 > 
-> Johan
+> ----------------------------------------------------------------
+> Hisilicon HiX5HD2 clock updates for 3.18
+> 
+> -Add I2C, watchdog and sd clocks
+> -Add clock drivers for HiX5HD2 to support sata, usb and ethernet
+> 
+> ----------------------------------------------------------------
+> Guoxiong Yan (1):
+>       clk: hix5hd2: add watchdog0 clocks
+> 
+> Jiancheng Xue (1):
+>       clk: hix5hd2: add sd clk
+> 
+> Wei Yan (1):
+>       clk: hix5hd2: add I2C clocks
+> 
+>  drivers/clk/hisilicon/clk-hix5hd2.c       | 51 +++++++++++++++++++++++++++++++++++++++++++++------
+>  include/dt-bindings/clock/hix5hd2-clock.h | 18 ++++++++++++++++++
+>  2 files changed, 63 insertions(+), 6 deletions(-)
 > 
 > 
-
-
--- 
-Nicolas Ferre
+> 
+> 
