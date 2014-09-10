@@ -1,102 +1,91 @@
-From: gautam.vivek@samsung.com (Vivek Gautam)
-Date: Wed, 10 Sep 2014 10:53:23 +0530
-Subject: [PATCH v6 4/4] phy: exynos5-usbdrd: Calibrate LOS levels for
- exynos5420/5800
-In-Reply-To: <20140910045328.GA32475@saruman.home>
-References: <CAFp+6iEyqmbwMLFrBKD7NVLDAC=b+h1hPKFS=BG4k9D69hn_dg@mail.gmail.com>
- <20140903144225.GD31855@saruman.home>
- <CAFp+6iETPJCWMMkjHrpDcdCv=K0PbefYLa4eBOwN=aUY2=EHLA@mail.gmail.com>
- <20140905175651.GK24449@saruman.home>
- <CAFp+6iGU86yL8Ry3ArJJjBy2Cs0Em2B49yssH3BK5fJwyaZbtA@mail.gmail.com>
- <20140908134454.GK22409@saruman.home>
- <CAFp+6iG+gmD_JseytYuVQcRK9ErOqQrUEWJoU1KUU7PqMd=aRw@mail.gmail.com>
- <20140909144225.GF6151@saruman.home>
- <CAFp+6iHJKmeothDM67WW60Sqqj8BQroBCzZ8zecKwM_GcYL8HA@mail.gmail.com>
- <CAFp+6iHRJ5oAA+K1Y0Y2uadPhsR6wmrd13DM39dqiL4jj+swHg@mail.gmail.com>
- <20140910045328.GA32475@saruman.home>
-Message-ID: <CAFp+6iHMhbi4V4LAkNsgzDc192ihT2a1mZHgLbia=K2U8+x=2w@mail.gmail.com>
+From: heikki.krogerus@linux.intel.com (Heikki Krogerus)
+Date: Wed, 10 Sep 2014 08:30:56 +0300
+Subject: [PATCH 1/2] acpi: lpss: convert from struct clk to struct clk_core
+In-Reply-To: <20140909135209.GW13406@lahna.fi.intel.com>
+References: <1410242868-14750-1-git-send-email-mturquette@linaro.org>
+ <1410242868-14750-2-git-send-email-mturquette@linaro.org>
+ <7263163.khRHYpcBRO@vostro.rjw.lan>
+ <20140909135209.GW13406@lahna.fi.intel.com>
+Message-ID: <20140910053056.GA30423@xps8300>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 10, 2014 at 10:23 AM, Felipe Balbi <balbi@ti.com> wrote:
-> On Wed, Sep 10, 2014 at 09:09:57AM +0530, Vivek Gautam wrote:
->> On Wed, Sep 10, 2014 at 9:07 AM, Vivek Gautam <gautam.vivek@samsung.com> wrote:
->> > adding Julius here,
->>
->> i think i had missed adding Julius for this entire series :-(
->> I should be more careful with the CC list in future.
->> Added his chromium id, since that seems to be more active.
->>
->> >
->> >
->> > On Tue, Sep 9, 2014 at 8:12 PM, Felipe Balbi <balbi@ti.com> wrote:
->> >> On Tue, Sep 09, 2014 at 07:19:50AM +0530, Vivek Gautam wrote:
->> >>> Hi,
->> >>>
->> >>>
->> >>> On Mon, Sep 8, 2014 at 7:14 PM, Felipe Balbi <balbi@ti.com> wrote:
->> >>> > Hi,
->> >>> >
->> >>> > On Mon, Sep 08, 2014 at 09:53:09AM +0530, Vivek Gautam wrote:
->> >>> >> On Fri, Sep 5, 2014 at 11:26 PM, Felipe Balbi <balbi@ti.com> wrote:
->> >>> >> > On Thu, Sep 04, 2014 at 12:01:19PM +0530, Vivek Gautam wrote:
->> >>> >> >> > Don't we have phy_power_on()
->> >>> >> >> > for that ? It looks like you could just as well do this from
->> >>> >> >> > phy_power_on() ?
->> >>> >> >>
->> >>> >> >> No, unfortunately keeping these calibration settings in phy_power_on()
->> >>> >> >> doesn't help, since we need to do this after XHCI reset has happened.
->> >>> >> >
->> >>> >> > teach xHCI about PHYs ?
->> >>> >>
->> >>> >> sorry i couldn't understand you here.
->> >>> >> Aren't we trying to do the same with Heikki's patch about dwc3 :
->> >>> >> [PATCH 6/6] usb: dwc3: host: convey the PHYs to xhci
->> >>> >>
->> >>> >> and the 2nd patch in this series :
->> >>> >> [PATCH v6 2/4] usb: host: xhci-plat: Get PHYs for xhci's hcds
->> >>> >>
->> >>> >> Is there something else that is expected ?
->> >>> >
->> >>> > right, use that to call phy_init() at the right time, then you need to
->> >>> > add a new ->calibrate() method which, likely, will only be used by you
->> >>> > ;-)
->> >>>
->> >>> so you mean, the xhci should itself call phy_init() at a time suitable,
->> >>> so that ->calibrate() is not required at all ?
->> >>>
->> >>> i think you meant there - "then you __do not__ need to
->> >>
->> >> right :-)
->> >
->> > alright, i will prepare a patch for the suggested change.
->> >
->> > But AFAI remember we had discussion for this patch in earlier
->> > version, and Julius suggested to use a generic approach for such
->> > change wherein other users in future may be able to use the
->> > facility.
->
-> right, and what's more generic than adding the support for PHYs straight
-> into xHCI ?
->
-> What I fear is that we end up opening the doors for every odd
-> platform-specific operation to be added to the framework without really
-> considering what needs to be done. That would defeat the idea of having
-> a generic framework altogether.
+On Tue, Sep 09, 2014 at 04:52:09PM +0300, Mika Westerberg wrote:
+> On Tue, Sep 09, 2014 at 03:16:29PM +0200, Rafael J. Wysocki wrote:
+> > On Monday, September 08, 2014 11:07:47 PM Mike Turquette wrote:
+> > > Looks like this driver was missed during the original mass driver
+> > > rework[0]. This patch converts the LPSS driver to the new clock provider
+> > > data type (struct clk_core).
+> > > 
+> > > If there are no objections I propose to roll this patch into a rebase of
+> > > that patch[0] in my tree.
+> > > 
+> > > [0] http://lkml.kernel.org/r/<1409758317-20564-1-git-send-email-tomeu.vizoso@collabora.com>
+> > > 
+> > > Signed-off-by: Mike Turquette <mturquette@linaro.org>
+> > 
+> > Mika, any comments here?
+> 
+> Adding Heikki who recently did some clock changes to acpi_lpss.c.
+> 
+> To me this looks fine.
 
-Ok, i will prepare the patch series as suggested and post it
-to gather opinion from you. :-)
+Looks fine to me to.
 
->
-> cheers
->
-> --
-> balbi
-
-
+> > > ---
+> > >  drivers/acpi/acpi_lpss.c               | 6 +++---
+> > >  include/linux/platform_data/clk-lpss.h | 2 +-
+> > >  2 files changed, 4 insertions(+), 4 deletions(-)
+> > > 
+> > > diff --git a/drivers/acpi/acpi_lpss.c b/drivers/acpi/acpi_lpss.c
+> > > index 9dfec48..454179f 100644
+> > > --- a/drivers/acpi/acpi_lpss.c
+> > > +++ b/drivers/acpi/acpi_lpss.c
+> > > @@ -57,7 +57,7 @@ ACPI_MODULE_NAME("acpi_lpss");
+> > >  struct lpss_shared_clock {
+> > >  	const char *name;
+> > >  	unsigned long rate;
+> > > -	struct clk *clk;
+> > > +	struct clk_core *clk;
+> > >  };
+> > >  
+> > >  struct lpss_private_data;
+> > > @@ -83,7 +83,7 @@ static struct lpss_device_desc lpss_dma_desc = {
+> > >  struct lpss_private_data {
+> > >  	void __iomem *mmio_base;
+> > >  	resource_size_t mmio_size;
+> > > -	struct clk *clk;
+> > > +	struct clk_core *clk;
+> > >  	const struct lpss_device_desc *dev_desc;
+> > >  	u32 prv_reg_ctx[LPSS_PRV_REG_COUNT];
+> > >  };
+> > > @@ -278,7 +278,7 @@ static int register_device_clock(struct acpi_device *adev,
+> > >  	const struct lpss_device_desc *dev_desc = pdata->dev_desc;
+> > >  	struct lpss_shared_clock *shared_clock = dev_desc->shared_clock;
+> > >  	const char *devname = dev_name(&adev->dev);
+> > > -	struct clk *clk = ERR_PTR(-ENODEV);
+> > > +	struct clk_core *clk = ERR_PTR(-ENODEV);
+> > >  	struct lpss_clk_data *clk_data;
+> > >  	const char *parent, *clk_name;
+> > >  	void __iomem *prv_base;
+> > > diff --git a/include/linux/platform_data/clk-lpss.h b/include/linux/platform_data/clk-lpss.h
+> > > index 2390199..3c3237c 100644
+> > > --- a/include/linux/platform_data/clk-lpss.h
+> > > +++ b/include/linux/platform_data/clk-lpss.h
+> > > @@ -15,7 +15,7 @@
+> > >  
+> > >  struct lpss_clk_data {
+> > >  	const char *name;
+> > > -	struct clk *clk;
+> > > +	struct clk_core *clk;
+> > >  };
+> > >  
+> > >  extern int lpt_clk_init(void);
+> > > 
+> > 
+> > -- 
+> > I speak only for myself.
+> > Rafael J. Wysocki, Intel Open Source Technology Center.
 
 -- 
-Best Regards
-Vivek Gautam
-Samsung R&D Institute, Bangalore
-India
+heikki
