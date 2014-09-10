@@ -1,98 +1,36 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Wed, 10 Sep 2014 05:20:27 -0500
-Subject: [PATCH] bus: omap_l3_noc: Fix connID for OMAP4
-Message-ID: <1410344427-26006-1-git-send-email-nm@ti.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 10 Sep 2014 11:21:05 +0100
+Subject: [PATCH v5] spi: spi-imx: add DMA support
+In-Reply-To: <1410312604-31949-1-git-send-email-b38343@freescale.com>
+References: <1410312604-31949-1-git-send-email-b38343@freescale.com>
+Message-ID: <20140910102105.GR2601@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit d4d8819e205854c ("bus: omap_l3_noc: fix masterid detection")
-did the right thing in dropping the LSB 2 bits which is not part
-of the ConnID for NTTP master address. However, as part of that
-change, we should also have ensured that existing list of OMAP4 connID
-codes are also shifted by 2 bits to ensure that connIDs map to "Table
-13-18. ConnID Values" as provided in Technical Reference Manuals for
-OMAP4430(Rev AP, April 2014, SWPU220AP) and OMAP4460(Rev AB, April
-2014, SWPU234AB)
+On Wed, Sep 10, 2014 at 09:30:04AM +0800, Robin Gong wrote:
 
-Fixes: d4d8819e205854c ("bus: omap_l3_noc: fix masterid detection")
-Reported-by: Kristian Otnes <kotnes@cisco.com>
-Signed-off-by: Nishanth Menon <nm@ti.com>
----
+> +static bool spi_imx_can_dma(struct spi_master *master, struct spi_device *spi,
+> +			 struct spi_transfer *transfer)
+> +{
+> +	struct spi_imx_data *spi_imx = spi_master_get_devdata(master);
+> +
+> +	if (spi_imx->dma_is_inited && (transfer->len > spi_imx->rx_wml)
+> +	    && (transfer->len > spi_imx->tx_wml))
+> +		spi_imx->usedma = true;
+> +	else
+> +		spi_imx->usedma = false;
+> +
+> +	return spi_imx->usedma;
+> +}
 
-Based on v3.17-rc1 - but might be 3.17 rc material
-
-Quick links (seems to work on firefox):
-4430:
-http://www.ti.com/lit/ug/swpu231ap/swpu231ap.pdf#page=3030&zoom=auto,0,699.5
-4460:
-http://www.ti.com/lit/ug/swpu235ab/swpu235ab.pdf#page=3073&zoom=auto,0,699.5
-
-NOTE: there are a few more cleanup patches that can follow these..
-will leave those out for now.
-
- drivers/bus/omap_l3_noc.h |   50 ++++++++++++++++++++++-----------------------
- 1 file changed, 25 insertions(+), 25 deletions(-)
-
-diff --git a/drivers/bus/omap_l3_noc.h b/drivers/bus/omap_l3_noc.h
-index 551e010..9525458 100644
---- a/drivers/bus/omap_l3_noc.h
-+++ b/drivers/bus/omap_l3_noc.h
-@@ -188,31 +188,31 @@ static struct l3_flagmux_data omap_l3_flagmux_clk3 = {
- };
- 
- static struct l3_masters_data omap_l3_masters[] = {
--	{ 0x0 , "MPU"},
--	{ 0x10, "CS_ADP"},
--	{ 0x14, "xxx"},
--	{ 0x20, "DSP"},
--	{ 0x30, "IVAHD"},
--	{ 0x40, "ISS"},
--	{ 0x44, "DucatiM3"},
--	{ 0x48, "FaceDetect"},
--	{ 0x50, "SDMA_Rd"},
--	{ 0x54, "SDMA_Wr"},
--	{ 0x58, "xxx"},
--	{ 0x5C, "xxx"},
--	{ 0x60, "SGX"},
--	{ 0x70, "DSS"},
--	{ 0x80, "C2C"},
--	{ 0x88, "xxx"},
--	{ 0x8C, "xxx"},
--	{ 0x90, "HSI"},
--	{ 0xA0, "MMC1"},
--	{ 0xA4, "MMC2"},
--	{ 0xA8, "MMC6"},
--	{ 0xB0, "UNIPRO1"},
--	{ 0xC0, "USBHOSTHS"},
--	{ 0xC4, "USBOTGHS"},
--	{ 0xC8, "USBHOSTFS"}
-+	{ 0x00, "MPU"},
-+	{ 0x04, "CS_ADP"},
-+	{ 0x05, "xxx"},
-+	{ 0x08, "DSP"},
-+	{ 0x0C, "IVAHD"},
-+	{ 0x10, "ISS"},
-+	{ 0x11, "DucatiM3"},
-+	{ 0x12, "FaceDetect"},
-+	{ 0x14, "SDMA_Rd"},
-+	{ 0x15, "SDMA_Wr"},
-+	{ 0x16, "xxx"},
-+	{ 0x17, "xxx"},
-+	{ 0x18, "SGX"},
-+	{ 0x1C, "DSS"},
-+	{ 0x20, "C2C"},
-+	{ 0x22, "xxx"},
-+	{ 0x23, "xxx"},
-+	{ 0x24, "HSI"},
-+	{ 0x28, "MMC1"},
-+	{ 0x29, "MMC2"},
-+	{ 0x2A, "MMC6"},
-+	{ 0x2C, "UNIPRO1"},
-+	{ 0x30, "USBHOSTHS"},
-+	{ 0x31, "USBOTGHS"},
-+	{ 0x32, "USBHOSTFS"}
- };
- 
- static struct l3_flagmux_data *omap_l3_flagmux[] = {
--- 
-1.7.9.5
+This isn't going to work, anything that looks at the usedma flag will
+see the result of the last thing that was checked which may or may not
+be the transfer that it's handling.  The driver should check to see if
+the core mapped the transfer for DMA.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140910/b5cff6e2/attachment-0001.sig>
