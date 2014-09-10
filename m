@@ -1,58 +1,34 @@
-From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
-Date: Wed, 10 Sep 2014 21:39:20 +0200
-Subject: [RFC] ARM: edma: unconditionally ack the error interrupt
-Message-ID: <1410377960-26921-1-git-send-email-bigeasy@linutronix.de>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 10 Sep 2014 20:45:22 +0100
+Subject: Unable to boot mainline on snow chromebook since 3.15
+In-Reply-To: <CAD=FV=W0qQZF58AvF8kZW+z4CsfnruQZLw_TA-eGy3fUruLbcg@mail.gmail.com>
+References: <20140908112112.GK26030@arm.com>
+ <CACxGe6v40wMSW8LJRtyZ3C6PinRMcQM-Zog+XpTJ-QG3HHJknw@mail.gmail.com>
+ <CAD=FV=VAqzvJQDQMjjeQ1p5okyDzE=ff_sguObZxh59qbzcaTQ@mail.gmail.com>
+ <CACxGe6t_ex1bU=CvTpXR4VJgNf1hAq33hr6ykbHy_sMXEk4h-g@mail.gmail.com>
+ <CAOesGMipX3MV6sMWLuY=D+bQ6qe8P17YFbTFwZOHPeSc3Pw9Cg@mail.gmail.com>
+ <20140910143144.GF7960@sirena.org.uk>
+ <CACxGe6u=QkGTKGfaE_jJ5VFMhdVKQNggp3qVBUgNP7rDbZss_A@mail.gmail.com>
+ <20140910153919.GH7960@sirena.org.uk>
+ <CACxGe6uBcTPMh4p=oi7m_TVpjUrkgbQvxbStAn27HXEJxYe5fw@mail.gmail.com>
+ <CAD=FV=W0qQZF58AvF8kZW+z4CsfnruQZLw_TA-eGy3fUruLbcg@mail.gmail.com>
+Message-ID: <20140910194522.GM7960@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With 8250-dma, 8250-omap and am335x I observe the following:
+On Wed, Sep 10, 2014 at 09:45:21AM -0700, Doug Anderson wrote:
 
-- start a RX transfer which will finish once the FIFO has enough data
-- The TX side starts a large TX transfer, say 1244 bytes. It takes approx
-  102ms for the transfer to complete
-- cancel the RX transfer & start the RX transfer a few times
-- the TX transfer completes. dma_irq_handler() notices this and
-  schedules the completion callback
-- dma_ccerr_handler() is invoked. It returns IRQ_NONE because all four
-  checked registers return 0.
-- the last irq handler is repeated a few times until the irq core shuts it
-  down.
+> Right now I know that clock disabling is supposed to be inhibited
+> during the early boot process.  I think regulators too?
 
-I see the above describes pattern also without dma_ccerr_handler()
-beeing invoked. But if it is invoked, it always _after_ the dma interrupt
-handler for the TX handler was handled. If I disable TX-DMA for the UART
-then I don't see this dma_ccerr_handler() at all.
-
-Testing longer I see two addition scenarios of dma_ccerr_handler():
-- EDMA_EMR0 reports 0x04000000 (the channel used by TX-UART).
-  edma_callback() reports "looks like slot is null". Looks harmless.
-- EDMA_EMR0 reports the same values but later in the loop where a match
-  search again EDMA_EMR0 reports 0 and so thing is done.
-
-Since it looks like the EDMA_EMR0 is loosing its content before the
-dma_ccerr_handler() is invoked, I suggest to unconditionally ack the
-interrupt so the irq core does not shut it down.
-
-Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
----
- arch/arm/common/edma.c | 4 +++-
- 1 file changed, 3 insertions(+), 1 deletion(-)
-
-diff --git a/arch/arm/common/edma.c b/arch/arm/common/edma.c
-index 88099175fc56..b31f3b7b3851 100644
---- a/arch/arm/common/edma.c
-+++ b/arch/arm/common/edma.c
-@@ -432,8 +432,10 @@ static irqreturn_t dma_ccerr_handler(int irq, void *data)
- 	if ((edma_read_array(ctlr, EDMA_EMR, 0) == 0) &&
- 	    (edma_read_array(ctlr, EDMA_EMR, 1) == 0) &&
- 	    (edma_read(ctlr, EDMA_QEMR) == 0) &&
--	    (edma_read(ctlr, EDMA_CCERR) == 0))
-+	    (edma_read(ctlr, EDMA_CCERR) == 0)) {
-+		edma_write(ctlr, EDMA_EEVAL, 1);
- 		return IRQ_NONE;
-+	}
- 
- 	while (1) {
- 		int j = -1;
--- 
-2.1.0
+No, for regulators we'll quite happily disable anything a consumer asks
+us to at any point but we'll only do a sweep for regulators that were
+enabled on startup then not subsequently referenced and turn them off in
+late_initcall.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140910/5121a2bf/attachment.sig>
