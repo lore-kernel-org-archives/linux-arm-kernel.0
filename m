@@ -1,65 +1,46 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Wed, 10 Sep 2014 09:03:52 -0700
-Subject: Unable to boot mainline on snow chromebook since 3.15
-In-Reply-To: <20140910111728.GG28488@arm.com>
-References: <20140905122232.GP13515@arm.com>
- <CAD=FV=VfioJf9VYoSYL0QBk-bN93-Ecx3=0n9hb5Q4rcx43-_g@mail.gmail.com>
- <540C202E.2060009@collabora.co.uk> <540C7F5B.6070307@gmail.com>
- <540C83DE.10505@collabora.co.uk> <540C8577.2070907@gmail.com>
- <20140908112112.GK26030@arm.com>
- <CACxGe6v40wMSW8LJRtyZ3C6PinRMcQM-Zog+XpTJ-QG3HHJknw@mail.gmail.com>
- <20140908134937.GK4015@sirena.org.uk>
- <540DB7B4.4060300@collabora.co.uk> <20140910111728.GG28488@arm.com>
-Message-ID: <CAD=FV=Uf+4=mcwMM8qhx4r9WzcKZkgwHjUR26wnvPJJzDvmvSg@mail.gmail.com>
+From: d-gerlach@ti.com (Dave Gerlach)
+Date: Wed, 10 Sep 2014 11:04:02 -0500
+Subject: [PATCH v3 1/3] ARM: AM335x: Get rid of unused sram init function
+In-Reply-To: <cover.1410362895.git.d-gerlach@ti.com>
+References: <cover.1410362895.git.d-gerlach@ti.com>
+Message-ID: <a28cef967f4b3f0b486ac473f6e3b0a189c047cc.1410362895.git.d-gerlach@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Will,
+From: Rajendra Nayak <rnayak@ti.com>
 
-On Wed, Sep 10, 2014 at 4:17 AM, Will Deacon <will.deacon@arm.com> wrote:
-> On Mon, Sep 08, 2014 at 03:05:40PM +0100, Javier Martinez Canillas wrote:
->> Hello Will,
->
-> Hi Javier,
->
->> Since many folks don't agree that hacking different subsystems is the way
->> forward I'll hold the patches and don't post them. The sunxi thread [0]
->> already shows how different people have strong opposite positions on the
->> correct approach to handle this.
->>
->> For now you can just disable the tps65090 PMIC support by not enabling the
->> CONFIG_REGULATOR_TPS65090 kconfig symbol on your kernel config. That will give
->> you exactly the same behavior that before tps65090 support was added to the
->> Snow DT on commit b16be76 ("ARM: dts: add tps65090 power regulator for
->> exynos5250-snow") which AFAIU was good enough for your workflow.
->
-> Disabling the regulator support gives me my framebuffer back, thanks.
+Remove the empty am33xx_sram_init() function.
 
-Yay!  Is this good enough to tide you over until DRM support lands?
+Signed-off-by: Rajendra Nayak <rnayak@ti.com>
+Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
+---
+ arch/arm/mach-omap2/sram.c | 7 -------
+ 1 file changed, 7 deletions(-)
 
-
-> I
-> then get stuck mounting my root filesystem over sd card because it's
-> reported as read-only. The following hack solved the issue, but I'm not
-> exactly sure where this regression has come from (whether this is a board
-> quirk or pinctrl is really misconfigured).
-
-This is a regression that was introduced by:
-
-9795a84 mmc: dw_mmc: remove dw_mci_of_cd_gpio/wp_gpio()
-
-In "exynos5250-cros-common.dtsi" you can see that the "wp-gpios =
-<&gpc2 1 0>;" is still listed under the slot node.  Nobody is looking
-there anymore.
-
-This is fixed in linux-next by:
-
-aaa25a5 ARM: dts: unuse the slot-node and deprecate the
-supports-highspeed for dw-mmc in exynos
-
-
-I'll let Kukjin decide what he wants to do about the regression in
-v3.17 (how to deal with conflicts, backporting, etc).
-
-
--Doug
+diff --git a/arch/arm/mach-omap2/sram.c b/arch/arm/mach-omap2/sram.c
+index ddf1818..5e45df0 100644
+--- a/arch/arm/mach-omap2/sram.c
++++ b/arch/arm/mach-omap2/sram.c
+@@ -285,11 +285,6 @@ static inline int omap34xx_sram_init(void)
+ }
+ #endif /* CONFIG_ARCH_OMAP3 */
+ 
+-static inline int am33xx_sram_init(void)
+-{
+-	return 0;
+-}
+-
+ int __init omap_sram_init(void)
+ {
+ 	omap_detect_sram();
+@@ -299,8 +294,6 @@ int __init omap_sram_init(void)
+ 		omap242x_sram_init();
+ 	else if (cpu_is_omap2430())
+ 		omap243x_sram_init();
+-	else if (soc_is_am33xx())
+-		am33xx_sram_init();
+ 	else if (cpu_is_omap34xx())
+ 		omap34xx_sram_init();
+ 
+-- 
+1.9.0
