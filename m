@@ -1,53 +1,43 @@
-From: geoff@infradead.org (Geoff Levand)
-Date: Wed, 10 Sep 2014 10:23:57 -0700
-Subject: [PATCH 04/13] arm64: Add new hcall HVC_CALL_FUNC
-In-Reply-To: <20140910170740.GE1710@arm.com>
-References: <cover.1410302383.git.geoff@infradead.org>
- <ea28cfef061d06e86704845a877802e057749b39.1410302383.git.geoff@infradead.org>
- <20140910170740.GE1710@arm.com>
-Message-ID: <1410369837.11440.18.camel@smoke>
+From: Nathan_Lynch@mentor.com (Nathan Lynch)
+Date: Wed, 10 Sep 2014 12:25:28 -0500
+Subject: [PATCH v9 4/6] ARM: add vdso user-space code
+In-Reply-To: <20140910171014.GF1710@arm.com>
+References: <1408744351-7814-1-git-send-email-nathan_lynch@mentor.com>
+ <1408744351-7814-5-git-send-email-nathan_lynch@mentor.com>
+ <20140910164755.GC1710@arm.com>
+ <CALCETrUKcH11nL4peq5=t0TFMKeY8h-d5kbq1+VV9ujAzYpd-Q@mail.gmail.com>
+ <20140910171014.GF1710@arm.com>
+Message-ID: <54108988.9050307@mentor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will,
-
-On Wed, 2014-09-10 at 18:07 +0100, Will Deacon wrote:
-> On Tue, Sep 09, 2014 at 11:49:04PM +0100, Geoff Levand wrote:
-> > Add the new hcall HVC_CALL_FUNC that allows execution of a function at EL2.
-> > During CPU reset the CPU must be brought to the exception level it had on
-> > entry to the kernel.  The HVC_CALL_FUNC hcall will provide the mechanism
-> > needed for this exception level switch.
-> > 
-> > Signed-off-by: Geoff Levand <geoff@infradead.org>
-> > ---
-> >  arch/arm64/include/asm/virt.h | 11 +++++++++++
-> >  arch/arm64/kernel/hyp-stub.S  | 10 ++++++++++
-> >  2 files changed, 21 insertions(+)
+On 09/10/2014 12:10 PM, Will Deacon wrote:
+> On Wed, Sep 10, 2014 at 05:52:39PM +0100, Andy Lutomirski wrote:
+>> On Wed, Sep 10, 2014 at 9:47 AM, Will Deacon <will.deacon@arm.com> wrote:
+>>> On Fri, Aug 22, 2014 at 10:52:29PM +0100, Nathan Lynch wrote:
+>>>> Place vdso-related user-space code in arch/arm/kernel/vdso/.
+>>>>
+>>>> It is almost completely written in C with some assembly helpers to
+>>>> load the data page address, sample the counter, and fall back to
+>>>> system calls when necessary.
+>>>
+>>> I'm still a bit puzzled as to how we can implement a compat version of this
+>>> for a 32-bit userspace running under a 64-bit kernel. Maybe the answer is
+>>> that we don't care enough (programs will still work fine without it), but if
+>>> we did want to then we're going to need to build the kernel with two
+>>> toolchains and it gets really horrible.
+>>>
+>>> Do you have any ideas?
+>>
+>> Convince the gcc and binutils people to add a-m32 option to aarch64?
+>> That's how x86_64 pulls this off :)  Or you could require a
+>> cross-compiler to be available to enable this particular feature.
 > 
-> [...]
-> 
-> > diff --git a/arch/arm64/kernel/hyp-stub.S b/arch/arm64/kernel/hyp-stub.S
-> > index 9ab5f70..a21cf51 100644
-> > --- a/arch/arm64/kernel/hyp-stub.S
-> > +++ b/arch/arm64/kernel/hyp-stub.S
-> > @@ -75,7 +75,17 @@ el1_sync:
-> >  1:	cmp	x10, #HVC_SET_VECTORS
-> >  	b.ne	1f
-> >  	msr	vbar_el2, x0
-> > +	b	2f
-> >  
-> > +1:	cmp	x10, #HVC_CALL_FUNC
-> > +	b.ne    1f
-> > +	mov	x29, lr
-> > +	mov	lr, x0
-> > +	mov	x0, x1
-> > +	mov	x1, x2
-> > +	mov	x2, x3
-> > +	blr	lr
-> > +	mov	lr, x29
-> 
-> Why are you clobbering x29?
+> The compilers have two separate backends, so I think I'll know what they
+> say. I guess it's either overhauling kbuild to support two cross compilers,
+> or have some shell script to accept an option we make up.
 
-I can change this to x28, unless you can recommend another?
-
--Geoff
+arch/powerpc has addressed this with a CROSS32_COMPILE= variable for
+producing 32-bit outputs (compat vdso, bootwrapper) during a 64-bit
+kernel build.  I think that was used before powerpc toolchains commonly
+honored -m32.
