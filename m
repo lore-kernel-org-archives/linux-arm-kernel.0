@@ -1,49 +1,34 @@
-From: b38343@freescale.com (Robin Gong)
-Date: Wed, 10 Sep 2014 13:46:22 +0800
-Subject: [PATCH v5] spi: spi-imx: add DMA support
-In-Reply-To: <540FD084.6000805@gmail.com>
-References: <1410312604-31949-1-git-send-email-b38343@freescale.com>
- <540FD084.6000805@gmail.com>
-Message-ID: <20140910054621.GA29307@Robin-OptiPlex-780>
+From: pankaj.dubey@samsung.com (Pankaj Dubey)
+Date: Wed, 10 Sep 2014 11:26:05 +0530
+Subject: [PATCH] clk: samsung: exynos5260: fix typo in clock name
+Message-ID: <1410328565-25122-1-git-send-email-pankaj.dubey@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 10, 2014 at 09:46:04AM +0530, Varka Bhadram wrote:
-> On 09/10/2014 07:00 AM, Robin Gong wrote:
-> >Enable DMA support on i.mx6. The read speed can increase from 600KB/s
-> >to 1.2MB/s on i.mx6q. You can disable or enable dma function in dts.
-> 
-> (...)
-> 
-> >+
-> >+static int spi_imx_sdma_init(struct device *dev, struct spi_imx_data *spi_imx,
-> >+			     struct spi_master *master,
-> >+			     const struct resource *res)
-> >+{
-> >+	struct dma_slave_config slave_config = {};
-> >+	int ret;
-> >+
-> >+	/* Prepare for TX DMA: */
-> >+	master->dma_tx = dma_request_slave_channel(dev, "tx");
-> >+	if (!master->dma_tx) {
-> >+		dev_err(dev, "cannot get the TX DMA channel!\n");
-> >+		ret = -EINVAL;
-> >+		goto err;
-> >+	}
-> >+
-> >+	slave_config.direction = DMA_MEM_TO_DEV;
-> >+	slave_config.dst_addr = res->start + MXC_CSPITXDATA;
-> >+	slave_config.dst_addr_width = DMA_SLAVE_BUSWIDTH_1_BYTE;
-> >+	slave_config.dst_maxburst = spi_imx_get_fifosize(spi_imx) / 2;
-> >+	ret = dmaengine_slave_config(master->dma_tx, &slave_config);
-> >+	if (ret) {
-> >+		dev_err(dev, "error in TX dma configuration.");
-> >+		
-> 
-> Missed terminating new line..
->
-You mean lack "\n" in the print info? If yes, I can improve it in v6.
-> -- 
-> Regards,
-> Varka Bhadram.
-> 
+From: Chander Kashyap <k.chander@samsung.com>
+
+The parent name added in parent list as
+mout_phyclk_mipi_dphy_4l_m_txbyte_clkhs_p, is different
+than the defined parent due to typo.
+
+Signed-off-by: Abhilash Kesavan <a.kesavan@samsung.com>
+Signed-off-by: Chander Kashyap <k.chander@samsung.com>
+---
+ drivers/clk/samsung/clk-exynos5260.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/clk/samsung/clk-exynos5260.c b/drivers/clk/samsung/clk-exynos5260.c
+index 64596ba..4db4e8d 100644
+--- a/drivers/clk/samsung/clk-exynos5260.c
++++ b/drivers/clk/samsung/clk-exynos5260.c
+@@ -1579,7 +1579,7 @@ struct samsung_fixed_rate_clock fixed_rate_clks[] __initdata = {
+ 	FRATE(PHYCLK_HDMI_LINK_O_TMDS_CLKHI, "phyclk_hdmi_link_o_tmds_clkhi",
+ 			NULL, CLK_IS_ROOT, 125000000),
+ 	FRATE(PHYCLK_MIPI_DPHY_4L_M_TXBYTECLKHS,
+-			"phyclk_mipi_dphy_4l_m_txbyteclkhs" , NULL,
++			"phyclk_mipi_dphy_4l_m_txbyte_clkhs" , NULL,
+ 			CLK_IS_ROOT, 187500000),
+ 	FRATE(PHYCLK_DPTX_PHY_O_REF_CLK_24M, "phyclk_dptx_phy_o_ref_clk_24m",
+ 			NULL, CLK_IS_ROOT, 24000000),
+-- 
+1.7.9.5
