@@ -1,62 +1,60 @@
-From: lifshitz@compulab.co.il (Dmitry Lifshitz)
-Date: Wed, 10 Sep 2014 15:03:33 +0300
-Subject: [PATCH 2/2] ARM: dts: omap5: Add dr_mode for dwc3
-In-Reply-To: <20140908132403.GA22409@saruman.home>
-References: <1381402195-29257-1-git-send-email-kishon@ti.com>
- <1381402195-29257-2-git-send-email-kishon@ti.com> <52580F34.8030809@ti.com>
- <20140416161619.GH28035@saruman.home> <540D9449.3090008@compulab.co.il>
- <20140908132403.GA22409@saruman.home>
-Message-ID: <54103E15.3090406@compulab.co.il>
+From: johan@kernel.org (Johan Hovold)
+Date: Wed, 10 Sep 2014 14:14:24 +0200
+Subject: [PATCH 5/5] rtc: at91sam9: add DT bindings documentation
+In-Reply-To: <1409733934-14465-6-git-send-email-boris.brezillon@free-electrons.com>
+References: <1409733934-14465-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1409733934-14465-6-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <20140910121424.GG2974@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Wed, Sep 03, 2014 at 10:45:34AM +0200, Boris BREZILLON wrote:
+> Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
+> ---
+>  .../devicetree/bindings/rtc/atmel,at91sam9-rtc.txt   | 20 ++++++++++++++++++++
+>  1 file changed, 20 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/rtc/atmel,at91sam9-rtc.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/rtc/atmel,at91sam9-rtc.txt b/Documentation/devicetree/bindings/rtc/atmel,at91sam9-rtc.txt
+> new file mode 100644
+> index 0000000..9ca455f
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/rtc/atmel,at91sam9-rtc.txt
+> @@ -0,0 +1,20 @@
+> +Atmel AT91SAM9260 Real Time Timer
+> +
+> +Required properties:
+> +- compatible: should be: "atmel,at91sam9260-rtt"
+> +- reg: should contain 2 memory regions
+> +  * the first one encodes the memory region of the RTT controller
+> +  * the second one encodes the GPBR (General Purpose Backup Resgisters)
+> +    memory region used to store the current time
+> +- interrupts: rtc alarm/event interrupt
+> +- clocks: should contain one clock pointing the the slow clk
+> +
+> +Example:
+> +
+> +rtc at fffffe00 {
+> +	compatible = "atmel,at91sam9260-rtt";
+> +	reg = <0xfffffd20 0x10
+> +	       0xfffffd50 0x4>;
+> +	interrupts = <1 4 7>;
+> +	clocks = <&clk32k>;
+> +};
 
-On 09/08/2014 04:24 PM, Felipe Balbi wrote:
-> Hi,
->
-> On Mon, Sep 08, 2014 at 02:34:33PM +0300, Dmitry Lifshitz wrote:
->> Hi Felipe, Roger
->>
->> On 04/16/2014 07:16 PM, Felipe Balbi wrote:
->>> On Fri, Oct 11, 2013 at 05:46:12PM +0300, Roger Quadros wrote:
->>>> Hi,
->>>>
->>>> On 10/10/2013 01:49 PM, Kishon Vijay Abraham I wrote:
->>>>> From: George Cherian <george.cherian@ti.com>
->>>>>
->>>>> Added dr_mode property in dwc3 and set its default mode to device.
->>>>
->>>> If there is a specific reason why this is not set to "otg", we need
->>>> to explain it here.
->>>>
->>>> AFAIK the port is meant to be used as OTG port.
->>>
->>> we still don't have the workaround for dual role ports, I've been
->>> working on it but still need to retest and make sure it's working fine
->>> before merging upstream.
->>>
->>
->>
->> Does the OTG port suppose to work with OMAP5? I mean role switching
->> mechanism?
->>
->> I'm testing kernel v3.16 with OMAP5 based board (CM-T54).
->>
->> If I set CONFIG_USB_DWC3_DUAL_ROLE, than nothing is going on when I plug
->> some device/host cable into micro USB3.0 port (VBUS/ID detection with extcon
->> events works fine).
->
-> Dual role does not work. We allow the driver to the built with both Host
-> and Peripheral support because some platforms have more than one port
-> and building the driver with dual role allows us to make one port host
-> and one peripheral.
->
+This does not describe the hardware, but rather a specific software
+configuration.
 
-Please, can you provide some detail about platforms with several ports.
-How do that ports are connected to DWC3?
+The RTT is first of all not an RTC (although it can be used as one in a
+specific software configuration). And the second register resource above
+is not an RTT register, but a general-purpose backup register could be
+used for other purposes (which register to use is currently configurable
+for legacy booting using CONFIG_RTC_DRV_AT91SAM9_GPBR).
 
+This was discussed in the thread where I posted an RFC for this last
+year (which you linked to in your original submission thread), but no
+conclusion was reached:
 
-Thanks,
+	http://www.spinics.net/lists/arm-kernel/msg236292.html
 
-Dmitry
+Johan
