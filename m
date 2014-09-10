@@ -1,57 +1,31 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Wed, 10 Sep 2014 11:21:30 +0800
-Subject: [PATCH v1] ARM: dts: imx6dl: disable dma support for spi on
- i.mx6dl
-In-Reply-To: <1410312816-32171-1-git-send-email-b38343@freescale.com>
-References: <1410312816-32171-1-git-send-email-b38343@freescale.com>
-Message-ID: <20140910032128.GD18566@dragon>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Wed, 10 Sep 2014 00:27:05 -0300
+Subject: [PATCH] ARM: imx_v6_v7_defconfig: Select CONFIG_SND_SOC_FSL_SAI
+Message-ID: <1410319625-21069-1-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 10, 2014 at 09:33:36AM +0800, Robin Gong wrote:
-> There is one weird data in rxfifo after one full rx/tx transfer
-> done sometimes. It looks a design issue and hard to workaround
-> totally, so disable dma functhion here. And will re-enable it
-> once the root cause found.
-> 
-> Signed-off-by: Robin Gong <b38343@freescale.com>
-> ---
->  arch/arm/boot/dts/imx6dl.dtsi | 16 ++++++++++++++++
->  1 file changed, 16 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/imx6dl.dtsi b/arch/arm/boot/dts/imx6dl.dtsi
-> index b453e0e..e84a1ff 100644
-> --- a/arch/arm/boot/dts/imx6dl.dtsi
-> +++ b/arch/arm/boot/dts/imx6dl.dtsi
-> @@ -102,6 +102,22 @@
->  	};
->  };
->  
-> +&ecspi1 {
-> +	dma-names = "", "";
-> +};
-> +
-> +&ecspi2 {
-> +	dma-names = "", "";
-> +};
-> +
-> +&ecspi3 {
-> +	dma-names = "", "";
-> +};
-> +
-> +&ecspi4 {
-> +	dma-names = "", "";
-> +};
-> +
+From: Fabio Estevam <fabio.estevam@freescale.com>
 
-This looks odd.  Can we drop the dma properties from imx6qdl.dtsi,
-and only add them in imx6q.dtsi instead?
+The fsl sai driver is used by the vf610-twr board, so let's enable it by
+default.
 
-Shawn
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+---
+ arch/arm/configs/imx_v6_v7_defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
->  &hdmi {
->  	compatible = "fsl,imx6dl-hdmi";
->  };
-> -- 
-> 1.9.1
-> 
+diff --git a/arch/arm/configs/imx_v6_v7_defconfig b/arch/arm/configs/imx_v6_v7_defconfig
+index f386e05..5961399 100644
+--- a/arch/arm/configs/imx_v6_v7_defconfig
++++ b/arch/arm/configs/imx_v6_v7_defconfig
+@@ -202,6 +202,7 @@ CONFIG_LOGO=y
+ CONFIG_SOUND=y
+ CONFIG_SND=y
+ CONFIG_SND_SOC=y
++CONFIG_SND_SOC_FSL_SAI=y
+ CONFIG_SND_IMX_SOC=y
+ CONFIG_SND_SOC_PHYCORE_AC97=y
+ CONFIG_SND_SOC_EUKREA_TLV320=y
+-- 
+1.9.1
