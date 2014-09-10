@@ -1,60 +1,192 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 10 Sep 2014 15:31:44 +0100
-Subject: Unable to boot mainline on snow chromebook since 3.15
-In-Reply-To: <CAOesGMipX3MV6sMWLuY=D+bQ6qe8P17YFbTFwZOHPeSc3Pw9Cg@mail.gmail.com>
-References: <CAD=FV=VfioJf9VYoSYL0QBk-bN93-Ecx3=0n9hb5Q4rcx43-_g@mail.gmail.com>
- <540C202E.2060009@collabora.co.uk> <540C7F5B.6070307@gmail.com>
- <540C83DE.10505@collabora.co.uk> <540C8577.2070907@gmail.com>
- <20140908112112.GK26030@arm.com>
- <CACxGe6v40wMSW8LJRtyZ3C6PinRMcQM-Zog+XpTJ-QG3HHJknw@mail.gmail.com>
- <CAD=FV=VAqzvJQDQMjjeQ1p5okyDzE=ff_sguObZxh59qbzcaTQ@mail.gmail.com>
- <CACxGe6t_ex1bU=CvTpXR4VJgNf1hAq33hr6ykbHy_sMXEk4h-g@mail.gmail.com>
- <CAOesGMipX3MV6sMWLuY=D+bQ6qe8P17YFbTFwZOHPeSc3Pw9Cg@mail.gmail.com>
-Message-ID: <20140910143144.GF7960@sirena.org.uk>
+From: pawel.moll@arm.com (Pawel Moll)
+Date: Wed, 10 Sep 2014 15:33:37 +0100
+Subject: [PATCH 1/2] ARM: vexpress: Add CLCD Device Tree properties
+Message-ID: <1410359618-3441-1-git-send-email-pawel.moll@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 10, 2014 at 06:06:46AM -0700, Olof Johansson wrote:
-> On Mon, Sep 8, 2014 at 12:40 PM, Grant Likely <grant.likely@secretlab.ca> wrote:
+... for V2M-P1 motherboard CLCD (limited to 640x480 16bpp and using
+dedicated video RAM bank) and for V2P-CA9 (up to 1024x768 16bpp).
 
-> > Well, lets see... We've got a real user complaining about a platform
-> > that used to work on mainline, and no longer does. The only loophole
-> > for ignoring breakage is if there nobody cares that it is broken. That
-> > currently isn't the case. So even though it's based on a patch that
-> > has "DO NOT SUBMIT" in large friendly letters on the front cover, it
-> > doesn't change the situation that mainline has a regression.
+Signed-off-by: Pawel Moll <pawel.moll@arm.com>
+---
+ arch/arm/boot/dts/vexpress-v2m-rs1.dtsi | 36 +++++++++++++++++++++++++++++++--
+ arch/arm/boot/dts/vexpress-v2m.dtsi     | 36 +++++++++++++++++++++++++++++++--
+ arch/arm/boot/dts/vexpress-v2p-ca9.dts  | 31 ++++++++++++++++++++++++++++
+ 3 files changed, 99 insertions(+), 4 deletions(-)
 
-> Yeah, I'm with you on this Grant, it doesn't matter what the patch is
-> labelled as.
-
-> One way to deal with this could be to add a quirk at boot time --
-> looking for the simplefb and if found, modifies the regulators to keep
-> them on. That'd go in the kernel, not in firmware.
-
-Well, we should also be fixing simplefb to manage the resources it uses
-though that doesn't clean up after the broken DTs that are currently
-deployed.
-
-As well as the regulators we'll also need to fix the clocks.  If we're
-going to start adding these fixups perhaps we want to consider having a
-wrapper stage that deals with rewriting DTs prior to trying to use them?
-I'm not sure if it makes much difference but there's overlap with other
-tools like the ATAGs conversion wrapper and building separately would
-let the fixup code run early without directly going into the early init
-code (which seems a bit scary).
-
-> Much better would have been if the DRM changes worked when they
-> landed, so that the migration form simplefb to drm was invisible to
-> the user. Or at least, to get them working ASAP since they're still
-> broken. :(
-
-As far as I can tell the problem here is coming from the decision to
-have simplefb use resources without knowing about them - can we agree
-that this is a bad idea?
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140910/f2ef9bdd/attachment-0001.sig>
+diff --git a/arch/arm/boot/dts/vexpress-v2m-rs1.dtsi b/arch/arm/boot/dts/vexpress-v2m-rs1.dtsi
+index 756c986..2efb205 100644
+--- a/arch/arm/boot/dts/vexpress-v2m-rs1.dtsi
++++ b/arch/arm/boot/dts/vexpress-v2m-rs1.dtsi
+@@ -41,7 +41,7 @@
+ 			bank-width = <4>;
+ 		};
+ 
+-		vram at 2,00000000 {
++		v2m_video_ram: vram at 2,00000000 {
+ 			compatible = "arm,vexpress-vram";
+ 			reg = <2 0x00000000 0x00800000>;
+ 		};
+@@ -246,9 +246,41 @@
+ 			clcd at 1f0000 {
+ 				compatible = "arm,pl111", "arm,primecell";
+ 				reg = <0x1f0000 0x1000>;
++				interrupt-names = "combined";
+ 				interrupts = <14>;
+ 				clocks = <&v2m_oscclk1>, <&smbclk>;
+ 				clock-names = "clcdclk", "apb_pclk";
++				memory-region = <&v2m_video_ram>;
++				max-memory-bandwidth = <50350000>; /* 16bpp @ 25.175MHz */
++
++				port {
++					v2m_clcd_pads: endpoint {
++						remote-endpoint = <&v2m_clcd_panel>;
++						arm,pl11x,tft-r0g0b0-pads = <0 8 16>;
++					};
++				};
++
++				panel {
++					compatible = "panel-dpi";
++
++					port {
++						v2m_clcd_panel: endpoint {
++							remote-endpoint = <&v2m_clcd_pads>;
++						};
++					};
++
++					panel-timing {
++						clock-frequency = <25175000>;
++						hactive = <640>;
++						hback-porch = <40>;
++						hfront-porch = <24>;
++						hsync-len = <96>;
++						vactive = <480>;
++						vback-porch = <32>;
++						vfront-porch = <11>;
++						vsync-len = <2>;
++					};
++				};
+ 			};
+ 		};
+ 
+@@ -350,7 +382,7 @@
+ 				/* CLCD clock */
+ 				compatible = "arm,vexpress-osc";
+ 				arm,vexpress-sysreg,func = <1 1>;
+-				freq-range = <23750000 63500000>;
++				freq-range = <23750000 65000000>;
+ 				#clock-cells = <0>;
+ 				clock-output-names = "v2m:oscclk1";
+ 			};
+diff --git a/arch/arm/boot/dts/vexpress-v2m.dtsi b/arch/arm/boot/dts/vexpress-v2m.dtsi
+index ba856d6..cb3090f 100644
+--- a/arch/arm/boot/dts/vexpress-v2m.dtsi
++++ b/arch/arm/boot/dts/vexpress-v2m.dtsi
+@@ -40,7 +40,7 @@
+ 			bank-width = <4>;
+ 		};
+ 
+-		vram at 3,00000000 {
++		v2m_video_ram: vram at 3,00000000 {
+ 			compatible = "arm,vexpress-vram";
+ 			reg = <3 0x00000000 0x00800000>;
+ 		};
+@@ -245,9 +245,41 @@
+ 			clcd at 1f000 {
+ 				compatible = "arm,pl111", "arm,primecell";
+ 				reg = <0x1f000 0x1000>;
++				interrupt-names = "combined";
+ 				interrupts = <14>;
+ 				clocks = <&v2m_oscclk1>, <&smbclk>;
+ 				clock-names = "clcdclk", "apb_pclk";
++				memory-region = <&v2m_video_ram>;
++				max-memory-bandwidth = <50350000>; /* 16bpp @ 25.175MHz */
++
++				port {
++					v2m_clcd_pads: endpoint {
++						remote-endpoint = <&v2m_clcd_panel>;
++						arm,pl11x,tft-r0g0b0-pads = <0 8 16>;
++					};
++				};
++
++				panel {
++					compatible = "panel-dpi";
++
++					port {
++						v2m_clcd_panel: endpoint {
++							remote-endpoint = <&v2m_clcd_pads>;
++						};
++					};
++
++					panel-timing {
++						clock-frequency = <25175000>;
++						hactive = <640>;
++						hback-porch = <40>;
++						hfront-porch = <24>;
++						hsync-len = <96>;
++						vactive = <480>;
++						vback-porch = <32>;
++						vfront-porch = <11>;
++						vsync-len = <2>;
++					};
++				};
+ 			};
+ 		};
+ 
+@@ -349,7 +381,7 @@
+ 				/* CLCD clock */
+ 				compatible = "arm,vexpress-osc";
+ 				arm,vexpress-sysreg,func = <1 1>;
+-				freq-range = <23750000 63500000>;
++				freq-range = <23750000 65000000>;
+ 				#clock-cells = <0>;
+ 				clock-output-names = "v2m:oscclk1";
+ 			};
+diff --git a/arch/arm/boot/dts/vexpress-v2p-ca9.dts b/arch/arm/boot/dts/vexpress-v2p-ca9.dts
+index 62d9b22..23662b5 100644
+--- a/arch/arm/boot/dts/vexpress-v2p-ca9.dts
++++ b/arch/arm/boot/dts/vexpress-v2p-ca9.dts
+@@ -70,9 +70,40 @@
+ 	clcd at 10020000 {
+ 		compatible = "arm,pl111", "arm,primecell";
+ 		reg = <0x10020000 0x1000>;
++		interrupt-names = "combined";
+ 		interrupts = <0 44 4>;
+ 		clocks = <&oscclk1>, <&oscclk2>;
+ 		clock-names = "clcdclk", "apb_pclk";
++		max-memory-bandwidth = <130000000>; /* 16bpp @ 63.5MHz */
++
++		port {
++			clcd_pads: endpoint {
++				remote-endpoint = <&clcd_panel>;
++				arm,pl11x,tft-r0g0b0-pads = <0 8 16>;
++			};
++		};
++
++		panel {
++			compatible = "panel-dpi";
++
++			port {
++				clcd_panel: endpoint {
++					remote-endpoint = <&clcd_pads>;
++				};
++			};
++
++			panel-timing {
++				clock-frequency = <63500127>;
++				hactive = <1024>;
++				hback-porch = <152>;
++				hfront-porch = <48>;
++				hsync-len = <104>;
++				vactive = <768>;
++				vback-porch = <23>;
++				vfront-porch = <3>;
++				vsync-len = <4>;
++			};
++		};
+ 	};
+ 
+ 	memory-controller at 100e0000 {
+-- 
+1.9.1
