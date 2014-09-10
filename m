@@ -1,96 +1,30 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 10 Sep 2014 19:27:39 +0100
-Subject: [PATCH 1/6] iommu/arm-smmu: add support for specifying clocks
-In-Reply-To: <vnkwa968b6ux.fsf@mitchelh-linux.qualcomm.com>
-References: <1407891099-24641-1-git-send-email-mitchelh@codeaurora.org>
- <1407891099-24641-2-git-send-email-mitchelh@codeaurora.org>
- <20140819125833.GO23128@arm.com> <53F39F6D.1040205@codeaurora.org>
- <20140826142757.GU23445@arm.com>
- <vnkwa968b6ux.fsf@mitchelh-linux.qualcomm.com>
-Message-ID: <20140910182739.GM1710@arm.com>
+Date: Wed, 10 Sep 2014 19:30:03 +0100
+Subject: [PATCH v3 04/17] ARM64 / ACPI: Introduce early_param for "acpi"
+In-Reply-To: <CAErSpo58eWadcyTrsBPAa-QFNmWn5jO7yQGc=N6F6PgNXnXcJA@mail.gmail.com>
+References: <1409583475-6978-1-git-send-email-hanjun.guo@linaro.org>
+ <1409583475-6978-5-git-send-email-hanjun.guo@linaro.org>
+ <CAErSpo6G89mkPgas8Wk3ofq__dUo5MKvBjob5D_w5_GaBJWH0w@mail.gmail.com>
+ <540F7BE2.8060403@redhat.com> <20140910130419.GJ28488@arm.com>
+ <CAErSpo58eWadcyTrsBPAa-QFNmWn5jO7yQGc=N6F6PgNXnXcJA@mail.gmail.com>
+Message-ID: <20140910183003.GN1710@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 10, 2014 at 02:29:42AM +0100, Mitchel Humpherys wrote:
-> On Tue, Aug 26 2014 at 07:27:58 AM, Will Deacon <will.deacon@arm.com> wrote:
-> > On Tue, Aug 19, 2014 at 08:03:09PM +0100, Olav Haugan wrote:
-> >> Clients of the SMMU driver are required to vote for clocks and power
-> >> when they know they need to use the SMMU. However, the clock and power
-> >> needed to be on for the SMMU to service bus masters aren't necessarily
-> >> the same as the ones needed to read/write registers...See below.
-> >
-> > The case I'm thinking of is where a device masters through the IOMMU, but
-> > doesn't make use of any translations. In this case, its transactions will
-> > bypass the SMMU and I want to ensure that continues to happen, regardless of
-> > the power state of the SMMU.
+On Wed, Sep 10, 2014 at 02:21:59PM +0100, Bjorn Helgaas wrote:
+> On Wed, Sep 10, 2014 at 7:04 AM, Will Deacon <will.deacon@arm.com> wrote:
 > 
-> Then I assume the driver for such a device wouldn't be attaching to (or
-> detaching from) the IOMMU, so we won't be touching it at all either
-> way. Or am I missing something?
-
-As long as its only the register file that gets powered down, then there's
-no issue. However, that's making assumptions about what these clocks are
-controlling. Is there a way for the driver to know which aspects of the
-device are controlled by which clock?
-
-> >> > What stops theses from racing with each other when there are multiple
-> >> > clocks? I also assume that the clk API ignores calls to clk_enable_prepare
-> >> > for a clk that's already enabled? I couldn't find that code...
-> >> 
-> >> All the clock APIs are reference counted yes. Not sure what you mean by
-> >> racing with each other? When you call to enable a clock the call does
-> >> not return until the clock is already ON (or OFF).
-> >
-> > I was thinking of an interrupt handler racing with normal code, but actually
-> > you balance the clk enable/disable in the interrupt handlers. However, it's
-> > not safe to call these clk functions from irq context anyway, since
-> > clk_prepare may sleep.
+> > It's blindingly obvious that acpi=off is there to disable ACPI at boot.
+> > We either support that option or we don't -- none of this `oh, well you
+> > can use it in this specific case I suppose' rubbish. I'm not questioning
+> > your use-case, but there's really no need to talk about an `orderly
+> > adoption' when all you need to say is that your ACPI is busted and passing
+> > acpi=off lets you boot with a devicetree.
 > 
-> Ah yes. You okay with moving to a threaded IRQ?
+> Maybe we should set a taint bit or give some other indication that
+> we're using a flag to work around breakage.
 
-A threaded IRQ already makes sense for context interrupts (if anybody has a
-platform that can do stalls properly), but it seems a bit weird for the
-global fault handler. Is there no way to fix the race instead?
-
-> >> >> @@ -2061,12 +2164,16 @@ static int arm_smmu_device_dt_probe(struct platform_device *pdev)
-> >> >>  	spin_unlock(&arm_smmu_devices_lock);
-> >> >>  
-> >> >>  	arm_smmu_device_reset(smmu);
-> >> >> +	arm_smmu_disable_clocks(smmu);
-> >> > 
-> >> > I wonder if this is really the right thing to do. Rather than the
-> >> > fine-grained clock enable/disable you have, why don't we just enable in
-> >> > domain_init and disable in domain_destroy, with refcounting for the clocks?
-> >> > 
-> >> 
-> >> So the whole point of all of this is that we try to save power. As Mitch
-> >> wrote in the commit text we want to only leave the clock and power on
-> >> for as short period of time as possible.
-> >
-> > Understood, but if the clocks are going up and down like yo-yos, then it's
-> > not obvious that you end up saving any power at all. Have you tried
-> > measuring the power consumption with different granularities for the
-> > clocks?
-> 
-> This has been profiled extensively and for some use cases it's a huge
-> win. Unfortunately we don't have any numbers for public sharing :( but
-> you can imagine a use case where some multimedia framework maps a bunch
-> of buffers into an SMMU at the beginning of some interactive user
-> session and doesn't unmap them until the (human) user decides they are
-> done. This could be a long time, all the while these clocks could be
-> off, saving power.
-
-Ok, I can see that. I wonder whether we could wrap all of the iommu_ops
-functions with the clock enable/disable code, instead of putting it directly
-into the drivers?
-
-> > The code you're proposing seems to take the approach of `we're going to
-> > access registers so enable the clocks, access the registers then disable the
-> > clocks', which is simple but may not be particularly effective.
-> 
-> Yes, that's a good summary of the approach here. It has been effective
-> in saving power for us in the past...
-
-Mike, do you have any experience with this sort of stuff?
+That sounds like a good idea. Working around breakage is a fact of life,
+but the taint indicates that it's not the ideal behaviour.
 
 Will
