@@ -1,60 +1,66 @@
-From: johan@kernel.org (Johan Hovold)
-Date: Wed, 10 Sep 2014 14:14:24 +0200
-Subject: [PATCH 5/5] rtc: at91sam9: add DT bindings documentation
-In-Reply-To: <1409733934-14465-6-git-send-email-boris.brezillon@free-electrons.com>
-References: <1409733934-14465-1-git-send-email-boris.brezillon@free-electrons.com>
- <1409733934-14465-6-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <20140910121424.GG2974@localhost>
+From: mikpelinux@gmail.com (Mikael Pettersson)
+Date: Wed, 10 Sep 2014 14:32:20 +0200
+Subject: gcc 4.8.3 miscompiles drivers/net/ethernet/freescale/fec_main.c ?!
+In-Reply-To: <20140910110943.3673dbb4@archvile>
+References: <20140910110943.3673dbb4@archvile>
+Message-ID: <21520.17620.519242.597681@gargle.gargle.HOWL>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 03, 2014 at 10:45:34AM +0200, Boris BREZILLON wrote:
-> Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
-> ---
->  .../devicetree/bindings/rtc/atmel,at91sam9-rtc.txt   | 20 ++++++++++++++++++++
->  1 file changed, 20 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/rtc/atmel,at91sam9-rtc.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/rtc/atmel,at91sam9-rtc.txt b/Documentation/devicetree/bindings/rtc/atmel,at91sam9-rtc.txt
-> new file mode 100644
-> index 0000000..9ca455f
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/rtc/atmel,at91sam9-rtc.txt
-> @@ -0,0 +1,20 @@
-> +Atmel AT91SAM9260 Real Time Timer
-> +
-> +Required properties:
-> +- compatible: should be: "atmel,at91sam9260-rtt"
-> +- reg: should contain 2 memory regions
-> +  * the first one encodes the memory region of the RTT controller
-> +  * the second one encodes the GPBR (General Purpose Backup Resgisters)
-> +    memory region used to store the current time
-> +- interrupts: rtc alarm/event interrupt
-> +- clocks: should contain one clock pointing the the slow clk
-> +
-> +Example:
-> +
-> +rtc at fffffe00 {
-> +	compatible = "atmel,at91sam9260-rtt";
-> +	reg = <0xfffffd20 0x10
-> +	       0xfffffd50 0x4>;
-> +	interrupts = <1 4 7>;
-> +	clocks = <&clk32k>;
-> +};
+David Jander writes:
+ > 
+ > Hi,
+ > 
+ > I am seeing a strange problem when building a recent kernel with gcc-4.8.3 for
+ > armv7-a that contains the following patch:
+ > 
+ > https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit?id=bfd4ecdd87d350e19457fe0d02fa1e046774c44e
+ > 
+ > Unfortunately I am not good enough at reading ARM assembly output from GCC to
+ > understand whats going wrong, so I am asking for help.
+ > 
+ > I started noticing ethernet packet loss on a i.MX6 board after upgrading the
+ > kernel from 3.16-rc-something to latest mainline. The problem is very easy to
+ > reproduce so I started git-bisecting. Git bisect gave me the above patch as
+ > the culprit, and indeed: Without the patch a flood-ping goes fine (just one
+ > dot on screen, no lost packets). I apply the patch and the dots start filling
+ > the screen instantly.
+ > 
+ > I am compiling the kernel using Pengutronix's OSELAS toolchain version
+ > 2013.12.1, which is based on linaro gcc-4.8.3 without any relevant patches
+ > AFAIK.
 
-This does not describe the hardware, but rather a specific software
-configuration.
+Linaro's toolchain is itself heavily modified compared to FSF gcc-4.8.3,
+so first please try a pure vanilla FSF gcc-4.8.3, and then a likewise
+vanilla gcc-4.9.1.  If those also cause the malfunction, then you have
+proof for a bug in upstream gcc (or possibly undefined code in the kernel),
+otherwise the bug is likely Linaro's.
 
-The RTT is first of all not an RTC (although it can be used as one in a
-specific software configuration). And the second register resource above
-is not an RTT register, but a general-purpose backup register could be
-used for other purposes (which register to use is currently configurable
-for legacy booting using CONFIG_RTC_DRV_AT91SAM9_GPBR).
+ > Compiling with -O2 breaks the code, while -Os seems to produce a correctly
+ > working kernel.
+ > 
+ > I decided to make changes to the code and see if I could find other ways to
+ > "fix" the problem, and I got the following result:
+ > 
+ > The above mentioned patch introduces the static function fec_enet_hwtstamp()
+ > near line 1068 of fec_main.c. If I make an exact copy of this function, where
+ > I only change the name (e.g. fec_enet_hwtstamp2), and change one of the two
+ > places this function is called to instead use the other name, GCC inlines both
+ > copies and the problem disappears!
+ > 
+ > Since I am not very good at GCC internals nor do I know this piece of code in
+ > fec_main.c very well, I am asking here for help in hunting down the real bug,
+ > which I suspect is in GCC... but I want to know for sure.
+ > 
+ > Best regards,
+ > 
+ > -- 
+ > David Jander
+ > Protonic Holland.
+ > 
+ > _______________________________________________
+ > linux-arm-kernel mailing list
+ > linux-arm-kernel at lists.infradead.org
+ > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
-This was discussed in the thread where I posted an RFC for this last
-year (which you linked to in your original submission thread), but no
-conclusion was reached:
-
-	http://www.spinics.net/lists/arm-kernel/msg236292.html
-
-Johan
+-- 
