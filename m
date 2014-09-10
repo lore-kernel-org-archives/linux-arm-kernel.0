@@ -1,54 +1,53 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 10 Sep 2014 12:17:28 +0100
-Subject: Unable to boot mainline on snow chromebook since 3.15
-In-Reply-To: <540DB7B4.4060300@collabora.co.uk>
-References: <20140905122232.GP13515@arm.com>
- <CAD=FV=VfioJf9VYoSYL0QBk-bN93-Ecx3=0n9hb5Q4rcx43-_g@mail.gmail.com>
- <540C202E.2060009@collabora.co.uk> <540C7F5B.6070307@gmail.com>
- <540C83DE.10505@collabora.co.uk> <540C8577.2070907@gmail.com>
- <20140908112112.GK26030@arm.com>
- <CACxGe6v40wMSW8LJRtyZ3C6PinRMcQM-Zog+XpTJ-QG3HHJknw@mail.gmail.com>
- <20140908134937.GK4015@sirena.org.uk>
- <540DB7B4.4060300@collabora.co.uk>
-Message-ID: <20140910111728.GG28488@arm.com>
+Date: Wed, 10 Sep 2014 12:22:13 +0100
+Subject: [RFC PATCH v2 3/7] iommu: add new iommu_ops callback for adding
+ an OF device
+In-Reply-To: <541032F6.1090809@samsung.com>
+References: <1409680587-29818-1-git-send-email-will.deacon@arm.com>
+ <1409680587-29818-4-git-send-email-will.deacon@arm.com>
+ <541032F6.1090809@samsung.com>
+Message-ID: <20140910112213.GH28488@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 08, 2014 at 03:05:40PM +0100, Javier Martinez Canillas wrote:
-> Hello Will,
-
-Hi Javier,
-
-> Since many folks don't agree that hacking different subsystems is the way
-> forward I'll hold the patches and don't post them. The sunxi thread [0]
-> already shows how different people have strong opposite positions on the
-> correct approach to handle this.
+On Wed, Sep 10, 2014 at 12:16:06PM +0100, Marek Szyprowski wrote:
+> On 2014-09-02 19:56, Will Deacon wrote:
+> > This patch adds a new function to the iommu_ops structure to allow an
+> > OF device to be added to a specific IOMMU instance using the recently
+> > merged generic devicetree binding for IOMMUs. The callback (of_xlate)
+> > takes a struct device representing the master and an of_phandle_args
+> > representing the IOMMU and the correspondong IDs for the new master.
+> >
+> > Signed-off-by: Will Deacon <will.deacon@arm.com>
+> > ---
+> >   include/linux/iommu.h | 5 +++++
+> >   1 file changed, 5 insertions(+)
+> >
+> > diff --git a/include/linux/iommu.h b/include/linux/iommu.h
+> > index fdddb14cd8f5..3e766b85daa3 100644
+> > --- a/include/linux/iommu.h
+> > +++ b/include/linux/iommu.h
+> > @@ -21,6 +21,7 @@
+> >   
+> >   #include <linux/errno.h>
+> >   #include <linux/err.h>
+> > +#include <linux/of.h>
+> >   #include <linux/types.h>
+> >   #include <trace/events/iommu.h>
+> >   
+> > @@ -136,6 +137,10 @@ struct iommu_ops {
+> >   	/* Get the numer of window per domain */
+> >   	u32 (*domain_get_windows)(struct iommu_domain *domain);
+> >   
+> > +#ifdef CONFIG_OF_IOMMU
+> > +	int (*of_xlate)(struct device *dev, struct of_phandle_args *args);
 > 
-> For now you can just disable the tps65090 PMIC support by not enabling the
-> CONFIG_REGULATOR_TPS65090 kconfig symbol on your kernel config. That will give
-> you exactly the same behavior that before tps65090 support was added to the
-> Snow DT on commit b16be76 ("ARM: dts: add tps65090 power regulator for
-> exynos5250-snow") which AFAIU was good enough for your workflow.
+> If I understand correctly how it is designed to work, then it should be:
+> 
+> struct iommu_data *(*of_xlate)(struct device *dev, struct 
+> of_phandle_args *args);
 
-Disabling the regulator support gives me my framebuffer back, thanks. I
-then get stuck mounting my root filesystem over sd card because it's
-reported as read-only. The following hack solved the issue, but I'm not
-exactly sure where this regression has come from (whether this is a board
-quirk or pinctrl is really misconfigured).
+Yeah, that might be cleaner than the of_iommu_get_data call in
+of_dma_configure. I'm currently cooking a v3, so I'll include this change.
 
 Will
-
---->8
-
-diff --git a/arch/arm/boot/dts/exynos5250-snow.dts b/arch/arm/boot/dts/exynos5250-snow.dts
-index f2b8c41..932d82e 100644
---- a/arch/arm/boot/dts/exynos5250-snow.dts
-+++ b/arch/arm/boot/dts/exynos5250-snow.dts
-@@ -231,6 +231,7 @@
-        };
- 
-        mmc at 12220000 {
-+               disable-wp;
-                status = "okay";
-        };
- 
