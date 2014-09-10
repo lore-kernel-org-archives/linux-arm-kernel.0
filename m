@@ -1,86 +1,190 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Wed, 10 Sep 2014 09:39:47 -0700
-Subject: [PATCH] clocksource: arch_timer: Fix code to use physical timers
- when requested
-In-Reply-To: <20140910155509.GA7519@leverpostej>
-References: <CAOesGMjK65Rc-K0fyFUUJLw6huLT82E-nqJwZO4PqhgopF96Ow@mail.gmail.com>
- <CAPz6YkWAPtuy4sAuAK9GtpDgfGsccxeS+pqqe_t_R818Jt01qA@mail.gmail.com>
- <53FE5B09.2020403@codeaurora.org>
- <CAOesGMhTivDzJFuxONggcJ6N5UvZopKa=+tv9PoPX593cpnm0A@mail.gmail.com>
- <53FE7E3B.1010500@codeaurora.org>
- <CAOesGMgXnsqttHwAxEW4a7-Rx-nmSwpJd_Dt1iCcFOvzDwbzdA@mail.gmail.com>
- <CAD=FV=VjN6Xam-nRRcxvOoN-gokU6DbGVjoPXN_fkTJssH1RWA@mail.gmail.com>
- <20140828093505.GC14650@leverpostej>
- <CAD=FV=UwfP0x-bswbtV_eUvpKeOSNnsVVLTE3VHguyhm_jiSug@mail.gmail.com>
- <54106707.4010006@codeaurora.org>
- <20140910155509.GA7519@leverpostej>
-Message-ID: <CAOesGMjjgRvhhn+24u+dmKyXX0QwecMVKXx=yib_Wpkzm+YY_Q@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 10 Sep 2014 17:41:47 +0100
+Subject: [PATCH v4 09/11] ARM64: kernel: add support for cpu cache
+ information
+In-Reply-To: <1409763617-17074-10-git-send-email-sudeep.holla@arm.com>
+References: <1409763617-17074-1-git-send-email-sudeep.holla@arm.com>
+ <1409763617-17074-10-git-send-email-sudeep.holla@arm.com>
+Message-ID: <20140910164147.GB1710@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 10, 2014 at 8:55 AM, Mark Rutland <mark.rutland@arm.com> wrote:
-> On Wed, Sep 10, 2014 at 03:58:15PM +0100, Christopher Covington wrote:
->> On 09/05/2014 06:11 PM, Doug Anderson wrote:
->> > Mark,
->> >
->> > On Thu, Aug 28, 2014 at 2:35 AM, Mark Rutland <mark.rutland@arm.com> wrote:
->> >> Not if you boot Linux at hyp, as we've recommended for this precise
->> >> reason. That doesn't fix other things like CNTFRQ if the secure
->> >> initialisation doesn't poke that, however.
->> >
->> > I'll freely admit that I'm out of my league and out of my comfort zone
->> > here, but...
->> >
->> > In the theory that firmware ought to be as minimal as possible
->> > (because it's hard to update and hard to keep in sync with kernel
->> > versions), it seems like firmware ought to start the kernel out in as
->> > permissive mode as it's willing to provide, right?
->> >
->> > If the kernel is started out as permissive as possible then it can do
->> > anything it needs to.  Future versions of the kernel can be
->> > implemented to do any way-cool things that they want to do without an
->> > update to firmware, right?  ...and current versions of the kernel can
->> > just shed permissions if they don't want them.
->> >
->> > ...so if I understand correctly, "Secure SVC" mode is more permissive
->> > than "Non Secure HYP" mode, right?  It looks to me as if we currently
->> > start the kernel in "Secure SVC" mode.  What do you think about the
->> > kernel detecting Secure SVC and then dropping down permission levels
->> > (to Non Secure HYP).  Once it did this, it could update things like
->> > the virtual offset and then transition down further into non-secure
->> > SVC mode.
->> >
->> > ...or maybe this has been discussed millions of times already and I'm
->> > just clueless.  ...or maybe this is just too hard for the kernel to do
->> > in a generic way?
->>
->> I think this is a great idea. When running on simulators, it would make (the
->> non-DTB parts of) the bootwrapper and QEMU's built-in bootloader unnecessary.
->
-> That's not true in general as other secure initialization will still be
-> necessary, and the extent and character of that initialization is going
-> to be implementation specific.
->
-> If you have the infrastructure necessary to load and boot an arbitrary
-> kernel at the most highly privileged exception level, then you
-> necessarily have all the plumbing in place for loading an updateable
-> firmware into that level. That latter option is preferable.
+Hi Sudeep,
 
-It might be preferable by you since it makes the kernel simpler, but
-for the rest of us who are busy shipping product, it means extra work.
-Why would we have to write a brand new firmware layer for this? No
-fricking way.
+On Wed, Sep 03, 2014 at 06:00:15PM +0100, Sudeep Holla wrote:
+> From: Sudeep Holla <sudeep.holla@arm.com>
+> 
+> This patch adds support for cacheinfo on ARM64.
+> 
+> On ARMv8, the cache hierarchy can be identified through Cache Level ID
+> (CLIDR) register while the cache geometry is provided by Cache Size ID
+> (CCSIDR) register.
+> 
+> Since the architecture doesn't provide any way of detecting the cpus
+> sharing particular cache, device tree is used for the same purpose.
 
-> The issue at hand is not whether Linux should be in charge of secure
-> world state. The issue at hand is that firmware booted Linux at PL1
-> without taking ownership of all PL2 state (CNTVOFF included). Were
-> either the firmware or Linux to manage PL2 (configuring CNTVOFF with a
-> consistent value on all CPUs) that problem would not exist.
+Out of interest, what's this actually for? Is there something useful in
+userspace that will lap this out of sysfs? If so, it would be great if those
+people could take these patches for a spin.
 
-No, the issue at hand is that Linux is now expecting PL2 resources to
-always have been set up. That is a regression in the true sense. It
-didn't use to be the case, and now it is.
+> diff --git a/arch/arm64/kernel/cacheinfo.c b/arch/arm64/kernel/cacheinfo.c
+> new file mode 100644
+> index 000000000000..a9cbf3b40a1f
+> --- /dev/null
+> +++ b/arch/arm64/kernel/cacheinfo.c
+> @@ -0,0 +1,142 @@
+> +/*
+> + *  ARM64 cacheinfo support
+> + *
+> + *  Copyright (C) 2014 ARM Ltd.
+> + *  All Rights Reserved
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + *
+> + * This program is distributed "as is" WITHOUT ANY WARRANTY of any
+> + * kind, whether express or implied; without even the implied warranty
+> + * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+> + * GNU General Public License for more details.
+> + *
+> + * You should have received a copy of the GNU General Public License
+> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+> + */
+> +
+> +#include <linux/bitops.h>
+> +#include <linux/cacheinfo.h>
+> +#include <linux/cpu.h>
+> +#include <linux/compiler.h>
+> +#include <linux/of.h>
+> +
+> +#include <asm/processor.h>
+> +
+> +#define MAX_CACHE_LEVEL			7	/* Max 7 level supported */
+> +/* Ctypen, bits[3(n - 1) + 2 : 3(n - 1)], for n = 1 to 7 */
+> +#define CLIDR_CTYPE_SHIFT(level)	(3 * (level - 1))
+> +#define CLIDR_CTYPE_MASK(level)		(7 << CLIDR_CTYPE_SHIFT(level))
+> +#define CLIDR_CTYPE(clidr, level)	\
+> +	(((clidr) & CLIDR_CTYPE_MASK(level)) >> CLIDR_CTYPE_SHIFT(level))
+> +
+> +static inline enum cache_type get_cache_type(int level)
+> +{
+> +	u64 clidr;
+> +
+> +	if (level > MAX_CACHE_LEVEL)
+> +		return CACHE_TYPE_NOCACHE;
+> +	asm volatile ("mrs     %x0, clidr_el1" : "=r" (clidr));
+> +	return CLIDR_CTYPE(clidr, level);
+> +}
+> +
+> +/*
+> + * NumSets, bits[27:13] - (Number of sets in cache) - 1
+> + * Associativity, bits[12:3] - (Associativity of cache) - 1
+> + * LineSize, bits[2:0] - (Log2(Number of words in cache line)) - 2
+> + */
+> +#define CCSIDR_WRITE_THROUGH		BIT(31)
+> +#define CCSIDR_WRITE_BACK		BIT(30)
+> +#define CCSIDR_READ_ALLOCATE		BIT(29)
+> +#define CCSIDR_WRITE_ALLOCATE		BIT(28)
+> +#define CCSIDR_LINESIZE_MASK		0x7
+> +#define CCSIDR_ASSOCIATIVITY_SHIFT	3
+> +#define CCSIDR_ASSOCIATIVITY_MASK	0x3FF
+> +#define CCSIDR_NUMSETS_SHIFT		13
+> +#define CCSIDR_NUMSETS_MASK		0x7FF
+> +
+> +/*
+> + * Which cache CCSIDR represents depends on CSSELR value
+> + * Make sure no one else changes CSSELR during this
+> + * smp_call_function_single prevents preemption for us
+> + */
+> +static inline u32 get_ccsidr(u64 csselr)
+> +{
+> +	u64 ccsidr;
+> +
+> +	/* Put value into CSSELR */
+> +	asm volatile("msr csselr_el1, %x0" : : "r" (csselr));
+> +	isb();
+> +	/* Read result out of CCSIDR */
+> +	asm volatile("mrs %x0, ccsidr_el1" : "=r" (ccsidr));
+> +
+> +	return (u32)ccsidr;
 
+Since you're using %x0, can you just make ccsidr a u32?
 
+Also, we have icache_get_ccsidr in kernel/cpuinfo.c already, as well as
+some parsing constants in asm/cachetype.h. Can you try to clean up some of
+the duplication/needless split please? (moving this helper and the #defines
+out would be a good start).
 
--Olof
+Will
+
+> +}
+> +
+> +static void ci_leaf_init(struct cacheinfo *this_leaf,
+> +			 enum cache_type type, unsigned int level)
+> +{
+> +	bool is_instr_cache = type & CACHE_TYPE_INST;
+> +	u32 tmp = get_ccsidr((level - 1) << 1 | is_instr_cache);
+> +
+> +	this_leaf->level = level;
+> +	this_leaf->type = type;
+> +	this_leaf->coherency_line_size =
+> +	    (1 << ((tmp & CCSIDR_LINESIZE_MASK) + 2)) * 4;
+> +	this_leaf->number_of_sets =
+> +	    ((tmp >> CCSIDR_NUMSETS_SHIFT) & CCSIDR_NUMSETS_MASK) + 1;
+> +	this_leaf->ways_of_associativity = ((tmp >> CCSIDR_ASSOCIATIVITY_SHIFT)
+> +					    & CCSIDR_ASSOCIATIVITY_MASK) + 1;
+> +	this_leaf->size = this_leaf->number_of_sets *
+> +	    this_leaf->coherency_line_size * this_leaf->ways_of_associativity;
+> +	this_leaf->attributes =
+> +		((tmp & CCSIDR_WRITE_THROUGH) ? CACHE_WRITE_THROUGH : 0) |
+> +		((tmp & CCSIDR_WRITE_BACK) ? CACHE_WRITE_BACK : 0) |
+> +		((tmp & CCSIDR_READ_ALLOCATE) ? CACHE_READ_ALLOCATE : 0) |
+> +		((tmp & CCSIDR_WRITE_ALLOCATE) ? CACHE_WRITE_ALLOCATE : 0);
+> +}
+> +
+> +static int __init_cache_level(unsigned int cpu)
+> +{
+> +	unsigned int ctype, level, leaves;
+> +	struct cpu_cacheinfo *this_cpu_ci = get_cpu_cacheinfo(cpu);
+> +
+> +	for (level = 1, leaves = 0; level <= MAX_CACHE_LEVEL; level++) {
+> +		ctype = get_cache_type(level);
+> +		if (ctype == CACHE_TYPE_NOCACHE) {
+> +			level--;
+> +			break;
+> +		}
+> +		/* Separate instruction and data caches */
+> +		leaves += (ctype == CACHE_TYPE_SEPARATE) ? 2 : 1;
+> +	}
+> +
+> +	this_cpu_ci->num_levels = level;
+> +	this_cpu_ci->num_leaves = leaves;
+> +	return 0;
+> +}
+> +
+> +static int __populate_cache_leaves(unsigned int cpu)
+> +{
+> +	unsigned int level, idx;
+> +	enum cache_type type;
+> +	struct cpu_cacheinfo *this_cpu_ci = get_cpu_cacheinfo(cpu);
+> +	struct cacheinfo *this_leaf = this_cpu_ci->info_list;
+> +
+> +	for (idx = 0, level = 1; level <= this_cpu_ci->num_levels &&
+> +	     idx < this_cpu_ci->num_leaves; idx++, level++) {
+> +		type = get_cache_type(level);
+> +		if (type == CACHE_TYPE_SEPARATE) {
+> +			ci_leaf_init(this_leaf++, CACHE_TYPE_DATA, level);
+> +			ci_leaf_init(this_leaf++, CACHE_TYPE_INST, level);
+> +		} else {
+> +			ci_leaf_init(this_leaf++, type, level);
+> +		}
+> +	}
+> +	return 0;
+> +}
+> +
+> +DEFINE_SMP_CALL_CACHE_FUNCTION(init_cache_level)
+> +DEFINE_SMP_CALL_CACHE_FUNCTION(populate_cache_leaves)
+> -- 
+> 1.8.3.2
+> 
