@@ -1,46 +1,50 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 10 Sep 2014 18:10:14 +0100
-Subject: [PATCH v9 4/6] ARM: add vdso user-space code
-In-Reply-To: <CALCETrUKcH11nL4peq5=t0TFMKeY8h-d5kbq1+VV9ujAzYpd-Q@mail.gmail.com>
-References: <1408744351-7814-1-git-send-email-nathan_lynch@mentor.com>
- <1408744351-7814-5-git-send-email-nathan_lynch@mentor.com>
- <20140910164755.GC1710@arm.com>
- <CALCETrUKcH11nL4peq5=t0TFMKeY8h-d5kbq1+VV9ujAzYpd-Q@mail.gmail.com>
-Message-ID: <20140910171014.GF1710@arm.com>
+From: info@lategoodbye.de (Stefan Wahren)
+Date: Wed, 10 Sep 2014 19:32:36 +0200
+Subject: [PATCH RFC 2/3] ARM: regulator: add Freescale MXS regulator driver
+In-Reply-To: <20140910151316.GG7960@sirena.org.uk>
+References: <1410089869-6611-1-git-send-email-info@lategoodbye.de>
+ <1410089869-6611-3-git-send-email-info@lategoodbye.de>
+ <20140909182211.GG3896@leverpostej> <540F523D.4010904@lategoodbye.de>
+ <20140910141853.GA4994@leverpostej> <20140910151316.GG7960@sirena.org.uk>
+Message-ID: <54108B34.6010701@lategoodbye.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 10, 2014 at 05:52:39PM +0100, Andy Lutomirski wrote:
-> On Wed, Sep 10, 2014 at 9:47 AM, Will Deacon <will.deacon@arm.com> wrote:
-> > On Fri, Aug 22, 2014 at 10:52:29PM +0100, Nathan Lynch wrote:
-> >> Place vdso-related user-space code in arch/arm/kernel/vdso/.
-> >>
-> >> It is almost completely written in C with some assembly helpers to
-> >> load the data page address, sample the counter, and fall back to
-> >> system calls when necessary.
-> >
-> > I'm still a bit puzzled as to how we can implement a compat version of this
-> > for a 32-bit userspace running under a 64-bit kernel. Maybe the answer is
-> > that we don't care enough (programs will still work fine without it), but if
-> > we did want to then we're going to need to build the kernel with two
-> > toolchains and it gets really horrible.
-> >
-> > Do you have any ideas?
-> 
-> Convince the gcc and binutils people to add a-m32 option to aarch64?
-> That's how x86_64 pulls this off :)  Or you could require a
-> cross-compiler to be available to enable this particular feature.
+Hi Mark,
 
-The compilers have two separate backends, so I think I'll know what they
-say. I guess it's either overhauling kbuild to support two cross compilers,
-or have some shell script to accept an option we make up.
+Am 10.09.2014 17:13, schrieb Mark Brown:
+> On Wed, Sep 10, 2014 at 03:18:53PM +0100, Mark Rutland wrote:
+>> On Tue, Sep 09, 2014 at 08:17:17PM +0100, Stefan Wahren wrote:
+>
+> Ugh, this looks like it might be a regulator driver but since the
+> subject line was "ARM: " I deleted it unread - if your changelog looks
+> different to all the other changelogs in the subsystem it probably needs
+> changing.
 
-> I have no further bright ideas, unless aarch64 and arm assembly are
-> miraculously nearly compatible, in which case you could do something
-> like what x32 does (build 64-bit and then use objcopy to turn the
-> result into an x32 object).
+sorry about the confusion, i will remove ARM in the next version.
 
-The assembler is pretty different, so I'd be pretty uneasy about trying to
-do that.
+Changelog? I didn't send a changelog because it was my first version.
 
-Will
+Should i resend this version only to you?
+
+>
+>>>>> +       sreg = devm_kzalloc(dev, sizeof(*sreg), GFP_KERNEL);
+>>>>> +       if (!sreg)
+>>>>> +               return -ENOMEM;
+>>>>> +       sreg->initdata = initdata;
+>>>>> +       sreg->name = of_get_property(np, "regulator-name", NULL);
+>
+>>>> I'm not keen on using of_get_property here. We have no idea if
+>>>> regulator-name is even a string (it should be, but we have no
+>>>> guarantee).
+>
+>>> Better using of_property_read_string?
+>
+>> Yes. That will check the value is NUL-terminated, at least.
+>
+> Or just remove the property entirely...  without having seen the
+> bindings if we're specifying the name of the device via the device tree
+> something seems wrong.
+>
+
+BR Stefan
