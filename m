@@ -1,96 +1,91 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Wed, 10 Sep 2014 12:42:23 +0200
-Subject: [GIT PULL 1/2] SOCFPGA updates for 3.18
-In-Reply-To: <20140910083337.GA5178@amd>
-References: <1409847105-27241-1-git-send-email-dinguyen@opensource.altera.com>
- <20140909141756.GA30100@amd> <4134101.OOENTRabu1@wuerfel>
- <20140909210232.GA539@amd>
- <CAPDyKFr35646zQUDUnv9LYy9jtY7r343hev9FrhxOfjVMb6MJw@mail.gmail.com>
- <20140910083337.GA5178@amd>
-Message-ID: <CAPDyKFoXiNOHQ3W=U08jU2PG-fz4F_7wuW-KNEoDfcQzrLKmVA@mail.gmail.com>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Wed, 10 Sep 2014 12:43:02 +0200
+Subject: [PATCH] serial: cadence: Add generic earlycon support
+Message-ID: <58f2c9cf267e64f5d7566920844fb2db251e77d2.1410345777.git.michal.simek@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10 September 2014 10:33, Pavel Machek <pavel@denx.de> wrote:
-> On Wed 2014-09-10 09:13:27, Ulf Hansson wrote:
->> On 9 September 2014 23:02, Pavel Machek <pavel@denx.de> wrote:
->> > On Tue 2014-09-09 17:02:34, Arnd Bergmann wrote:
->> >> On Tuesday 09 September 2014 16:17:56 Pavel Machek wrote:
->> >> > > Jaehoon Chung (1):
->> >> > >       ARM: dts: socfpga: unuse the slot-node and deprecate the supports-highspeed for dw-mmc
->> >> > >
->> >> >
->> >> > This patch is a bad idea. It removes support for two mmc cards on a
->> >> > single controller -- configuration hardware supports and configuration
->> >> > that allows using u-SD card on mcvevk board.
->> >> >
->> >>
->> >> Your objection comes too late, and to the wrong patch, since the
->> >> driver and all other users have already been changed. We had a long
->> >> discussion about this when the issue first came up, and we could
->> >> not find any example of dw-mmc actually being used in a scenario
->> >> with one controller that has multiple devices attached.
->> >
->> > Well, this is not first time I raised this. 3.17 is not yet out, so we
->> > still have chance to fix regressions without major fuss.
->> >
->> >> Apparently every user out there instead uses multiple controller
->> >> instances instead. Are you sure that the socfpga implementation
->> >> is an exception from this?
->> >
->> > Marek Vasut has the hardware. His board apprently has uSD and eMMC,
->> > and I believe it has just one controller. I'll try to get details.
->> >
->>
->> Just wanted to highlight some of the reasons to why the earlier
->> discussion we have had, came to the conclusion to remove the slot
->> node.
->>
->> 1) The mmc core don't support multiple cards attached to the same
->> host, it never has. Also, I am not aware of any requests that
->> suggested us to add it. Due to obvious reasons from performance
->> perspective it's simply a really bad idea, that's likely also why
->> there haven't been any requests for it.
->
-> Well, that's Linux problem, right? (And why is it bad idea, btw? The
-> bandwidth will be shared between the controllers, ok, that does not
-> sound too bad.)
+Add earlycon support for the cadence serial port.
+This is based on recent patches:
+"tty/serial: pl011: add generic earlycon support"
+(sha1: 0d3c673e7881e691991b2a4745bd4f149603baa2)
+"tty/serial: add arm/arm64 semihosting earlycon"
+(sha1: d50d7269ebcb438afa346cdffce0f4e2a1b9e831)
 
-Bandwidth is just one issue. Latency is yet another, which is probably
-far worse to handle than bandwidth.
+Signed-off-by: Michal Simek <michal.simek@xilinx.com>
+---
 
->
->> 2) On the host level, the support for handle multiple slots in DT for
->> dw-mmc has been broken. While dw-mmc parsed the DT nodes for slots, it
->> screwed up configurations. Thus the support for slots have never
->> worked as expected from DT point of view.
->
-> Well, DT is supposed to describe the hardware. From your description,
-> it seems that linux does not support two slots on one controller and
-> DT parsing code basically ignores the slots. (Logical, if it can't
-> support two slots).
->
-> So now we are breaking DT description due to Linux limitations. Which
->
-> a) makes it hard for any other os not having same limitation
->
-> b) makes it hard for people to fix the limitation
->
-> c) does not really solve anything
+ Documentation/kernel-parameters.txt |  6 ++++++
+ drivers/tty/serial/Kconfig          |  1 +
+ drivers/tty/serial/xilinx_uartps.c  | 19 +++++++++++++++++++
+ 3 files changed, 26 insertions(+)
 
-Yes it does, the problem in 2) gets fixed.
+diff --git a/Documentation/kernel-parameters.txt b/Documentation/kernel-parameters.txt
+index a8eb6afce6a4..97055dc43167 100644
+--- a/Documentation/kernel-parameters.txt
++++ b/Documentation/kernel-parameters.txt
+@@ -921,6 +921,12 @@ bytes respectively. Such letter suffixes can also be entirely omitted.
 
->
-> d) breaks backward compatibility with old dts
+ 	earlycon=	[KNL] Output early console device and options.
 
-According to 2), it has never worked - so we don't break anything.
++		cdns,<addr>
++			Start an early, polled-mode console on a cadence serial
++			port at the specified address. The cadence serial port
++			must already be setup and configured. Options are not
++			yet supported.
++
+ 		uart[8250],io,<addr>[,options]
+ 		uart[8250],mmio,<addr>[,options]
+ 		uart[8250],mmio32,<addr>[,options]
+diff --git a/drivers/tty/serial/Kconfig b/drivers/tty/serial/Kconfig
+index b4d61e6bf28c..72fd2b6e2241 100644
+--- a/drivers/tty/serial/Kconfig
++++ b/drivers/tty/serial/Kconfig
+@@ -1411,6 +1411,7 @@ config SERIAL_XILINX_PS_UART_CONSOLE
+ 	bool "Cadence UART console support"
+ 	depends on SERIAL_XILINX_PS_UART=y
+ 	select SERIAL_CORE_CONSOLE
++	select SERIAL_EARLYCON
+ 	help
+ 	  Enable a Cadence UART port to be the system console.
 
->
-> If nothing, d) should be argument not to do this.
->                                                                         Pavel
-> --
-> (english) http://www.livejournal.com/~pavelmachek
-> (cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+diff --git a/drivers/tty/serial/xilinx_uartps.c b/drivers/tty/serial/xilinx_uartps.c
+index 01951d27cc03..675f3fe068f6 100644
+--- a/drivers/tty/serial/xilinx_uartps.c
++++ b/drivers/tty/serial/xilinx_uartps.c
+@@ -1051,6 +1051,25 @@ static void cdns_uart_console_putchar(struct uart_port *port, int ch)
+ 	cdns_uart_writel(ch, CDNS_UART_FIFO_OFFSET);
+ }
 
-Kind regards
-Uffe
++static void cdns_early_write(struct console *con, const char *s, unsigned n)
++{
++	struct earlycon_device *dev = con->data;
++
++	uart_console_write(&dev->port, s, n, cdns_uart_console_putchar);
++}
++
++static int __init cdns_early_console_setup(struct earlycon_device *device,
++					   const char *opt)
++{
++	if (!device->port.membase)
++		return -ENODEV;
++
++	device->con->write = cdns_early_write;
++
++	return 0;
++}
++EARLYCON_DECLARE(cdns, cdns_early_console_setup);
++
+ /**
+  * cdns_uart_console_write - perform write operation
+  * @co: Console handle
+--
+1.8.2.3
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140910/ad1c5a30/attachment.sig>
