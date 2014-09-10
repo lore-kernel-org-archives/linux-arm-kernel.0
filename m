@@ -1,29 +1,134 @@
 From: d.lavnikevich@sam-solutions.com (Dmitry Lavnikevich)
-Date: Wed, 10 Sep 2014 16:46:47 +0300
-Subject: [PATCH 3/5] ARM: imx_v6_v7_defconfig: enable imx-tlv320aic3x by
- default
+Date: Wed, 10 Sep 2014 16:46:48 +0300
+Subject: [PATCH 4/5] ARM: dts: pbab01: enable I2S audio on phyFLEX-i.MX6 boards
 In-Reply-To: <1410356809-26179-1-git-send-email-d.lavnikevich@sam-solutions.com>
 References: <1410356809-26179-1-git-send-email-d.lavnikevich@sam-solutions.com>
-Message-ID: <1410356809-26179-4-git-send-email-d.lavnikevich@sam-solutions.com>
+Message-ID: <1410356809-26179-5-git-send-email-d.lavnikevich@sam-solutions.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Audio on phyFLEX boards is presented by tlv320aic3007 codec connected over SSI
+interface.
+
 Signed-off-by: Dmitry Lavnikevich <d.lavnikevich@sam-solutions.com>
 ---
- arch/arm/configs/imx_v6_v7_defconfig | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm/boot/dts/imx6qdl-phytec-pbab01.dtsi | 59 +++++++++++++++++++++++++++-
+ arch/arm/boot/dts/imx6qdl-phytec-pfla02.dtsi | 15 +++++++
+ 2 files changed, 72 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/configs/imx_v6_v7_defconfig b/arch/arm/configs/imx_v6_v7_defconfig
-index 16cfec4385c8..66a6a5c6e75a 100644
---- a/arch/arm/configs/imx_v6_v7_defconfig
-+++ b/arch/arm/configs/imx_v6_v7_defconfig
-@@ -213,6 +213,7 @@ CONFIG_SND_SOC_IMX_WM8962=y
- CONFIG_SND_SOC_IMX_SGTL5000=y
- CONFIG_SND_SOC_IMX_SPDIF=y
- CONFIG_SND_SOC_IMX_MC13783=y
-+CONFIG_SND_SOC_IMX_TLV320AIC3X=y
- CONFIG_USB=y
- CONFIG_USB_EHCI_HCD=y
- CONFIG_USB_EHCI_MXC=y
+diff --git a/arch/arm/boot/dts/imx6qdl-phytec-pbab01.dtsi b/arch/arm/boot/dts/imx6qdl-phytec-pbab01.dtsi
+index f1bdcae5b97d..8f778fe8c0b7 100644
+--- a/arch/arm/boot/dts/imx6qdl-phytec-pbab01.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-phytec-pbab01.dtsi
+@@ -13,6 +13,46 @@
+ 	chosen {
+ 		linux,stdout-path = &uart4;
+ 	};
++
++	regulators {
++		sound_1v8: regulator at 2 {
++			compatible = "regulator-fixed";
++			reg = <2>;
++			regulator-name = "i2s-audio-1v8";
++			regulator-min-microvolt = <1800000>;
++			regulator-max-microvolt = <1800000>;
++			regulator-always-on;
++		};
++		sound_3v3: regulator at 3 {
++			compatible = "regulator-fixed";
++			reg = <3>;
++			regulator-name = "i2s-audio-3v3";
++			regulator-min-microvolt = <3300000>;
++			regulator-max-microvolt = <3300000>;
++			regulator-always-on;
++		};
++	};
++
++	sound {
++		compatible = "fsl,imx-audio-tlv320aic3x";
++		model = "imx6q-phyflex-tlv320aic3007";
++		ssi-controller = <&ssi2>;
++		audio-codec = <&codec>;
++		audio-routing =
++			"Line Out", "LLOUT",
++			"Line Out", "RLOUT",
++			"Speaker", "SPOP",
++			"Speaker", "SPOM",
++			"Headphone Jack", "HPLOUT",
++			"Headphone Jack", "HPROUT",
++			"MIC3L", "Mic Jack",
++			"MIC3R", "Mic Jack",
++			"Mic Jack", "Mic Bias",
++			"LINE1L", "Line In",
++			"LINE1R", "Line In";
++		mux-int-port = <2>;
++		mux-ext-port = <5>;
++	};
+ };
+ 
+ &fec {
+@@ -27,12 +67,27 @@
+ 	status = "okay";
+ };
+ 
++&ssi2 {
++	fsl,mode = "i2s-slave";
++	status = "okay";
++};
++
++&audmux {
++	status = "okay";
++};
++
+ &i2c2 {
+ 	status = "okay";
+ 
+-	tlv320 at 18 {
+-		compatible = "ti,tlv320aic3x";
++	codec: tlv320 at 18 {
++		compatible = "ti,tlv320aic3007";
+ 		reg = <0x18>;
++		ai3x-micbias-vg = <2>;
++
++		AVDD-supply = <&sound_3v3>;
++		IOVDD-supply = <&sound_3v3>;
++		DRVDD-supply = <&sound_3v3>;
++		DVDD-supply = <&sound_1v8>;
+ 	};
+ 
+ 	stmpe at 41 {
+diff --git a/arch/arm/boot/dts/imx6qdl-phytec-pfla02.dtsi b/arch/arm/boot/dts/imx6qdl-phytec-pfla02.dtsi
+index a927e88ccc98..1c4464dcb497 100644
+--- a/arch/arm/boot/dts/imx6qdl-phytec-pfla02.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-phytec-pfla02.dtsi
+@@ -58,6 +58,12 @@
+ 	};
+ };
+ 
++&audmux {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_audmux>;
++	status = "disabled";
++};
++
+ &ecspi3 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_ecspi3>;
+@@ -319,6 +325,15 @@
+ 				MX6QDL_PAD_ENET_TXD1__GPIO1_IO29 0x80000000
+ 			>;
+ 		};
++
++		pinctrl_audmux: audmuxgrp {
++			fsl,pins = <
++				MX6QDL_PAD_DISP0_DAT16__AUD5_TXC	0x130b0
++				MX6QDL_PAD_DISP0_DAT18__AUD5_TXFS	0x130b0
++				MX6QDL_PAD_DISP0_DAT17__AUD5_TXD	0x110b0
++				MX6QDL_PAD_DISP0_DAT19__AUD5_RXD	0x130b0
++			>;
++		};
+ 	};
+ };
+ 
 -- 
 2.1.0
