@@ -1,59 +1,33 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Wed, 10 Sep 2014 13:16:06 +0200
-Subject: [RFC PATCH v2 3/7] iommu: add new iommu_ops callback for adding an
- OF device
-In-Reply-To: <1409680587-29818-4-git-send-email-will.deacon@arm.com>
-References: <1409680587-29818-1-git-send-email-will.deacon@arm.com>
- <1409680587-29818-4-git-send-email-will.deacon@arm.com>
-Message-ID: <541032F6.1090809@samsung.com>
+From: b38343@freescale.com (Robin Gong)
+Date: Wed, 10 Sep 2014 19:22:59 +0800
+Subject: [PATCH v5] spi: spi-imx: add DMA support
+In-Reply-To: <20140910102105.GR2601@sirena.org.uk>
+References: <1410312604-31949-1-git-send-email-b38343@freescale.com>
+ <20140910102105.GR2601@sirena.org.uk>
+Message-ID: <20140910112258.GA30794@Robin-OptiPlex-780>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
-
-On 2014-09-02 19:56, Will Deacon wrote:
-> This patch adds a new function to the iommu_ops structure to allow an
-> OF device to be added to a specific IOMMU instance using the recently
-> merged generic devicetree binding for IOMMUs. The callback (of_xlate)
-> takes a struct device representing the master and an of_phandle_args
-> representing the IOMMU and the correspondong IDs for the new master.
->
-> Signed-off-by: Will Deacon <will.deacon@arm.com>
-> ---
->   include/linux/iommu.h | 5 +++++
->   1 file changed, 5 insertions(+)
->
-> diff --git a/include/linux/iommu.h b/include/linux/iommu.h
-> index fdddb14cd8f5..3e766b85daa3 100644
-> --- a/include/linux/iommu.h
-> +++ b/include/linux/iommu.h
-> @@ -21,6 +21,7 @@
->   
->   #include <linux/errno.h>
->   #include <linux/err.h>
-> +#include <linux/of.h>
->   #include <linux/types.h>
->   #include <trace/events/iommu.h>
->   
-> @@ -136,6 +137,10 @@ struct iommu_ops {
->   	/* Get the numer of window per domain */
->   	u32 (*domain_get_windows)(struct iommu_domain *domain);
->   
-> +#ifdef CONFIG_OF_IOMMU
-> +	int (*of_xlate)(struct device *dev, struct of_phandle_args *args);
-
-If I understand correctly how it is designed to work, then it should be:
-
-struct iommu_data *(*of_xlate)(struct device *dev, struct 
-of_phandle_args *args);
-
-> +#endif
-> +
->   	unsigned long pgsize_bitmap;
->   };
->   
-
-Best regards
--- 
-Marek Szyprowski, PhD
-Samsung R&D Institute Poland
+On Wed, Sep 10, 2014 at 11:21:05AM +0100, Mark Brown wrote:
+> On Wed, Sep 10, 2014 at 09:30:04AM +0800, Robin Gong wrote:
+> 
+> > +static bool spi_imx_can_dma(struct spi_master *master, struct spi_device *spi,
+> > +			 struct spi_transfer *transfer)
+> > +{
+> > +	struct spi_imx_data *spi_imx = spi_master_get_devdata(master);
+> > +
+> > +	if (spi_imx->dma_is_inited && (transfer->len > spi_imx->rx_wml)
+> > +	    && (transfer->len > spi_imx->tx_wml))
+> > +		spi_imx->usedma = true;
+> > +	else
+> > +		spi_imx->usedma = false;
+> > +
+> > +	return spi_imx->usedma;
+> > +}
+> 
+> This isn't going to work, anything that looks at the usedma flag will
+> see the result of the last thing that was checked which may or may not
+> be the transfer that it's handling.  The driver should check to see if
+> the core mapped the transfer for DMA.
+Yes, you're right. I should use "transfer->tx_sg->sgl == NULL" or
+"transfer->rx_sg->sgl == NULL" instead of usedma flag in driver, right?
