@@ -1,41 +1,31 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed, 10 Sep 2014 09:43:31 +0900
-Subject: [PATCH] ARM: shmobile: r8a7794: Remove unnecessary #ifdef
- CONFIG_USE_OF
-Message-ID: <1410309811-14918-1-git-send-email-horms+renesas@verge.net.au>
+Date: Wed, 10 Sep 2014 09:44:47 +0900
+Subject: [PATCH] ARM: shmobile: Enable r8a7794 SoC in shmobile_defconfig
+Message-ID: <1410309887-15492-1-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The r8a7794 support is always compiled using ARCH_MULTIPLATFORM which
-selects USE_OF. So #ifdef CONFIG_USE_OF is unnecessary.
+Support for the r8a7794 was recently added.
+Enable it in the shmobile_defconfig to increase build coverage.
 
-Cc: Ulrich Hecht <ulrich.hecht+renesas@gmail.com>
-Reported-by: Arnd Bergmann <arnd@arndb.de>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
 
-This patch is based on renesas-devel-20140910v2-v3.17-rc4
+Based on renesas-devel-20140910v2-v3.17-rc4
+ arch/arm/configs/shmobile_defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
- arch/arm/mach-shmobile/setup-r8a7794.c | 3 ---
- 1 file changed, 3 deletions(-)
-
-diff --git a/arch/arm/mach-shmobile/setup-r8a7794.c b/arch/arm/mach-shmobile/setup-r8a7794.c
-index 05e970c..c10acd1 100644
---- a/arch/arm/mach-shmobile/setup-r8a7794.c
-+++ b/arch/arm/mach-shmobile/setup-r8a7794.c
-@@ -19,8 +19,6 @@
- #include "rcar-gen2.h"
- #include <asm/mach/arch.h>
- 
--#ifdef CONFIG_USE_OF
--
- static const char * const r8a7794_boards_compat_dt[] __initconst = {
- 	"renesas,r8a7794",
- 	NULL,
-@@ -32,4 +30,3 @@ DT_MACHINE_START(R8A7794_DT, "Generic R8A7794 (Flattened Device Tree)")
- 	.init_time	= rcar_gen2_timer_init,
- 	.dt_compat	= r8a7794_boards_compat_dt,
- MACHINE_END
--#endif /* CONFIG_USE_OF */
+diff --git a/arch/arm/configs/shmobile_defconfig b/arch/arm/configs/shmobile_defconfig
+index 522275a..d7346ad 100644
+--- a/arch/arm/configs/shmobile_defconfig
++++ b/arch/arm/configs/shmobile_defconfig
+@@ -16,6 +16,7 @@ CONFIG_ARCH_R8A7740=y
+ CONFIG_ARCH_R8A7779=y
+ CONFIG_ARCH_R8A7790=y
+ CONFIG_ARCH_R8A7791=y
++CONFIG_ARCH_R8A7794=y
+ CONFIG_MACH_KOELSCH=y
+ CONFIG_MACH_LAGER=y
+ CONFIG_MACH_MARZEN=y
 -- 
 2.0.1
