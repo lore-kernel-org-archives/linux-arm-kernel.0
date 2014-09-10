@@ -1,54 +1,75 @@
-From: geoff@infradead.org (Geoff Levand)
-Date: Wed, 10 Sep 2014 09:35:14 -0700
-Subject: [PATCH 02/13] arm64/kvm: Fix assembler compatibility of macros
-In-Reply-To: <CAKv+Gu_hs-Sv=Bg6uyKc41OV9sKS0sfM1YAcCMaTF7aTH9YPwA@mail.gmail.com>
-References: <cover.1410302383.git.geoff@infradead.org>
- <bc4abc340eaa4da448f62326a134fabfb5a2a875.1410302383.git.geoff@infradead.org>
- <CAKv+Gu_hs-Sv=Bg6uyKc41OV9sKS0sfM1YAcCMaTF7aTH9YPwA@mail.gmail.com>
-Message-ID: <1410366914.11440.16.camel@smoke>
+From: olof@lixom.net (Olof Johansson)
+Date: Wed, 10 Sep 2014 09:36:32 -0700
+Subject: Unable to boot mainline on snow chromebook since 3.15
+In-Reply-To: <20140910143144.GF7960@sirena.org.uk>
+References: <CAD=FV=VfioJf9VYoSYL0QBk-bN93-Ecx3=0n9hb5Q4rcx43-_g@mail.gmail.com>
+ <540C202E.2060009@collabora.co.uk> <540C7F5B.6070307@gmail.com>
+ <540C83DE.10505@collabora.co.uk> <540C8577.2070907@gmail.com>
+ <20140908112112.GK26030@arm.com>
+ <CACxGe6v40wMSW8LJRtyZ3C6PinRMcQM-Zog+XpTJ-QG3HHJknw@mail.gmail.com>
+ <CAD=FV=VAqzvJQDQMjjeQ1p5okyDzE=ff_sguObZxh59qbzcaTQ@mail.gmail.com>
+ <CACxGe6t_ex1bU=CvTpXR4VJgNf1hAq33hr6ykbHy_sMXEk4h-g@mail.gmail.com>
+ <CAOesGMipX3MV6sMWLuY=D+bQ6qe8P17YFbTFwZOHPeSc3Pw9Cg@mail.gmail.com>
+ <20140910143144.GF7960@sirena.org.uk>
+Message-ID: <CAOesGMgn7F7UoGJmO6K74KE_x+Rw8H2MpzCjBjNOq0g9o1TuNg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2014-09-10 at 10:40 +0200, Ard Biesheuvel wrote:
-> On 10 September 2014 00:49, Geoff Levand <geoff@infradead.org> wrote:
-> > Some of the macros defined in kvm_arm.h are useful in the exception vector
-> > routines, but they are not compatible with the assembler.  Change the
-> > definition of ESR_EL2_ISS to be compatible.
-> >
-> > Fixes build errors like these when using kvm_arm.h in assembly
-> > source files:
-> >
-> >   Error: unexpected characters following instruction at operand 3 -- `add x0,x1,#((1U<<25)-1)'
-> >
-> > Signed-off-by: Geoff Levand <geoff@infradead.org>
-> > ---
-> >  arch/arm64/include/asm/kvm_arm.h | 2 +-
-> >  1 file changed, 1 insertion(+), 1 deletion(-)
-> >
-> > diff --git a/arch/arm64/include/asm/kvm_arm.h b/arch/arm64/include/asm/kvm_arm.h
-> > index cc83520..e0e7e64 100644
-> > --- a/arch/arm64/include/asm/kvm_arm.h
-> > +++ b/arch/arm64/include/asm/kvm_arm.h
-> > @@ -176,7 +176,7 @@
-> >  #define ESR_EL2_EC_SHIFT       (26)
-> >  #define ESR_EL2_EC             (0x3fU << ESR_EL2_EC_SHIFT)
-> >  #define ESR_EL2_IL             (1U << 25)
-> > -#define ESR_EL2_ISS            (ESR_EL2_IL - 1)
-> > +#define ESR_EL2_ISS            (0xffff)
-> 
-> Don't you mean 0x1ffffff?
+On Wed, Sep 10, 2014 at 7:31 AM, Mark Brown <broonie@kernel.org> wrote:
+> On Wed, Sep 10, 2014 at 06:06:46AM -0700, Olof Johansson wrote:
+>> On Mon, Sep 8, 2014 at 12:40 PM, Grant Likely <grant.likely@secretlab.ca> wrote:
+>
+>> > Well, lets see... We've got a real user complaining about a platform
+>> > that used to work on mainline, and no longer does. The only loophole
+>> > for ignoring breakage is if there nobody cares that it is broken. That
+>> > currently isn't the case. So even though it's based on a patch that
+>> > has "DO NOT SUBMIT" in large friendly letters on the front cover, it
+>> > doesn't change the situation that mainline has a regression.
+>
+>> Yeah, I'm with you on this Grant, it doesn't matter what the patch is
+>> labelled as.
+>
+>> One way to deal with this could be to add a quirk at boot time --
+>> looking for the simplefb and if found, modifies the regulators to keep
+>> them on. That'd go in the kernel, not in firmware.
+>
+> Well, we should also be fixing simplefb to manage the resources it uses
+> though that doesn't clean up after the broken DTs that are currently
+> deployed.
+>
+> As well as the regulators we'll also need to fix the clocks.  If we're
+> going to start adding these fixups perhaps we want to consider having a
+> wrapper stage that deals with rewriting DTs prior to trying to use them?
+> I'm not sure if it makes much difference but there's overlap with other
+> tools like the ATAGs conversion wrapper and building separately would
+> let the fixup code run early without directly going into the early init
+> code (which seems a bit scary).
 
-Hcalls have a 16 bit 'payload', the upper bits of the ISS field
-are specified as zero by the architecture so 0xffff is the same
-as 0x1ffffff.
+Yes, having a stage that fixes up broken device trees makes a lot of
+sense. It can likely be plugged into the machine descriptor today per
+platform, since I think most things we have going on right now are
+platform-specific quirks.
 
-> And, there is a macro UL() for this purpose, so I suppose you could
-> redefine ESR_EL2_IL as (UL(1) << 25) as well. I know it is not
-> strictly the same thing, but it should be good enough as this is arm64
-> only
+I'm strongly against doing this outside of the kernel, since they're
+closely tied together today. We've always had the quirk tables for
+devices in the kernel, and we used to do this a long time ago on
+powerpc as well (we did it before we built the flat DT out of the OF
+equivalent there, most of the time).
 
-Sure that will be OK.  The one other use of ESR_EL2_IL will promote
-the operation to unsigned long without ill effect.  I'll prepare an
-updated patch.
+>> Much better would have been if the DRM changes worked when they
+>> landed, so that the migration form simplefb to drm was invisible to
+>> the user. Or at least, to get them working ASAP since they're still
+>> broken. :(
+>
+> As far as I can tell the problem here is coming from the decision to
+> have simplefb use resources without knowing about them - can we agree
+> that this is a bad idea?
 
--Geoff
+As already argued, there are good reasons to sometimes allow this, as
+long as it can be expected that it's something that's just used during
+early boot. For example, having DEBUG_LL output on a pre-mapped
+framebuffer could be really useful. Once DRM comes up, it'll tear down
+the existing one.
+
+
+-Olof
