@@ -1,88 +1,49 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Wed, 10 Sep 2014 11:07:03 +0200
-Subject: [PATCH v8 2/5] ARM: imx6: gpc: Add PU power domain for GPU/VPU
-In-Reply-To: <20140910034918.GA28759@Robin-OptiPlex-780>
-References: <1410267915-18126-1-git-send-email-p.zabel@pengutronix.de>
- <1410267915-18126-3-git-send-email-p.zabel@pengutronix.de>
- <20140910034918.GA28759@Robin-OptiPlex-780>
-Message-ID: <1410340023.4508.4.camel@paszta.hi.pengutronix.de>
+From: david@protonic.nl (David Jander)
+Date: Wed, 10 Sep 2014 11:09:43 +0200
+Subject: gcc 4.8.3 miscompiles drivers/net/ethernet/freescale/fec_main.c ?!
+Message-ID: <20140910110943.3673dbb4@archvile>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Robin,
 
-Am Mittwoch, den 10.09.2014, 11:49 +0800 schrieb Robin Gong:
-> Hi Philipp,
->   Thanks for your great job, power domain make things clear. But looks your
-> patch depend on 'PU regulator', if there is no PU regulator passed down from
-> dts, we'll never implement your way for PGC. On i.mx6sx, there is no internal
-> PU regulator, so I suggest you consider this case. 
+Hi,
 
-thank you for the hint. Would making the PU regulator optional be enough
-to make this work on i.MX6SX?
+I am seeing a strange problem when building a recent kernel with gcc-4.8.3 for
+armv7-a that contains the following patch:
 
-regards
-Philipp
+https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit?id=bfd4ecdd87d350e19457fe0d02fa1e046774c44e
 
----8<---
-From: Philipp Zabel <p.zabel@pengutronix.de>
-Subject: [PATCH] ARM: imx6: gpc: Make PU regulator optional
+Unfortunately I am not good enough at reading ARM assembly output from GCC to
+understand whats going wrong, so I am asking for help.
 
-On i.MX6SX there is no internal PU regulator, make it optional.
+I started noticing ethernet packet loss on a i.MX6 board after upgrading the
+kernel from 3.16-rc-something to latest mainline. The problem is very easy to
+reproduce so I started git-bisecting. Git bisect gave me the above patch as
+the culprit, and indeed: Without the patch a flood-ping goes fine (just one
+dot on screen, no lost packets). I apply the patch and the dots start filling
+the screen instantly.
 
-Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
----
- arch/arm/mach-imx/gpc.c | 17 +++++++++++------
- 1 file changed, 11 insertions(+), 6 deletions(-)
+I am compiling the kernel using Pengutronix's OSELAS toolchain version
+2013.12.1, which is based on linaro gcc-4.8.3 without any relevant patches
+AFAIK.
+Compiling with -O2 breaks the code, while -Os seems to produce a correctly
+working kernel.
 
-diff --git a/arch/arm/mach-imx/gpc.c b/arch/arm/mach-imx/gpc.c
-index cdf8a06..b36703d 100644
---- a/arch/arm/mach-imx/gpc.c
-+++ b/arch/arm/mach-imx/gpc.c
-@@ -186,7 +186,8 @@ static int imx6q_pm_pu_power_off(struct generic_pm_domain *genpd)
- 	/* Wait ISO + ISO2SW IPG clock cycles */
- 	ndelay((iso + iso2sw) * 1000 / 66);
- 
--	regulator_disable(pu->reg);
-+	if (pu->reg)
-+		regulator_disable(pu->reg);
- 
- 	return 0;
- }
-@@ -197,8 +198,9 @@ static int imx6q_pm_pu_power_on(struct generic_pm_domain *genpd)
- 	int i, ret, sw, sw2iso;
- 	u32 val;
- 
--	ret = regulator_enable(pu->reg);
--	if (ret) {
-+	if (pu->reg)
-+		ret = regulator_enable(pu->reg);
-+	if (pu->reg && ret) {
- 		pr_err("%s: failed to enable regulator: %d\n", __func__, ret);
- 		return ret;
- 	}
-@@ -309,7 +311,9 @@ static int imx_gpc_probe(struct platform_device *pdev)
- 	struct regulator *pu_reg;
- 	int ret;
- 
--	pu_reg = devm_regulator_get(&pdev->dev, "pu");
-+	pu_reg = devm_regulator_get_optional(&pdev->dev, "pu");
-+	if (PTR_ERR(pu_reg) == -ENODEV)
-+		pu_reg = NULL;
- 	if (IS_ERR(pu_reg)) {
- 		ret = PTR_ERR(pu_reg);
- 		dev_err(&pdev->dev, "failed to get pu regulator: %d\n", ret);
-@@ -317,8 +321,9 @@ static int imx_gpc_probe(struct platform_device *pdev)
- 	}
- 
- 	/* The regulator is initially enabled */
--	ret = regulator_enable(pu_reg);
--	if (ret < 0) {
-+	if (pu_reg)
-+		ret = regulator_enable(pu_reg);
-+	if (pu_reg && ret < 0) {
- 		dev_err(&pdev->dev, "failed to enable pu regulator: %d\n", ret);
- 		return ret;
- 	}
+I decided to make changes to the code and see if I could find other ways to
+"fix" the problem, and I got the following result:
+
+The above mentioned patch introduces the static function fec_enet_hwtstamp()
+near line 1068 of fec_main.c. If I make an exact copy of this function, where
+I only change the name (e.g. fec_enet_hwtstamp2), and change one of the two
+places this function is called to instead use the other name, GCC inlines both
+copies and the problem disappears!
+
+Since I am not very good at GCC internals nor do I know this piece of code in
+fec_main.c very well, I am asking here for help in hunting down the real bug,
+which I suspect is in GCC... but I want to know for sure.
+
+Best regards,
+
 -- 
-2.1.0
+David Jander
+Protonic Holland.
