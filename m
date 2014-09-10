@@ -1,282 +1,129 @@
-From: jic23@kernel.org (Jonathan Cameron)
-Date: Wed, 10 Sep 2014 20:05:53 +0100
-Subject: [PATCH] iio: adc: rockchip_saradc: add support for rk3066-tsadc
- variant
-In-Reply-To: <38104193.mr2XbIjNkb@diego>
-References: <1999284.oRCTeZRSv1@diego> <540642CA.9080007@gmx.de>
- <38104193.mr2XbIjNkb@diego>
-Message-ID: <5410A111.6040007@kernel.org>
+From: mitchelh@codeaurora.org (Mitchel Humpherys)
+Date: Wed, 10 Sep 2014 12:09:06 -0700
+Subject: [PATCH 1/6] iommu/arm-smmu: add support for specifying clocks
+In-Reply-To: <20140910182739.GM1710@arm.com> (Will Deacon's message of "Wed,
+ 10 Sep 2014 19:27:39 +0100")
+References: <1407891099-24641-1-git-send-email-mitchelh@codeaurora.org>
+ <1407891099-24641-2-git-send-email-mitchelh@codeaurora.org>
+ <20140819125833.GO23128@arm.com> <53F39F6D.1040205@codeaurora.org>
+ <20140826142757.GU23445@arm.com>
+ <vnkwa968b6ux.fsf@mitchelh-linux.qualcomm.com>
+ <20140910182739.GM1710@arm.com>
+Message-ID: <vnkwbnqn9tt9.fsf@mitchelh-linux.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/09/14 11:13, Heiko St?bner wrote:
-> Am Mittwoch, 3. September 2014, 00:20:58 schrieb Hartmut Knaack:
->> Heiko St?bner schrieb:
->>> Older Rockchip SoCs, at least the rk3066, used a slightly modified saradc
->>> for temperature measurements. This so called tsadc does not contain any
->>> active parts like temperature interrupts and only supports polling the
->>> current temperature. The returned voltage can then be converted by a
->>> suitable thermal driver to and actual temperature and used for thermal
->>> handling.
->>>
->>> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
->>> ---
->>
->> Looks mostly good to me, just some minor style issues inline.
->>
->>> This is a different IP than the rk3288-tsadc Ceasar provided a driver for.
->>> As the commit messages states, the one used on the rk3066 is just a
->>> saradc,
->>> while the new tsadc in the rk3288 contains active components for thermal
->>> handling.
->>>
->>> A working example using the pending iio-thermal driver can found on
->>> https://github.com/mmind/linux-rockchip/commit/c07e02f069d9677d489f2541766
->>> 19fae36f2aad0> 
->>>  .../bindings/iio/adc/rockchip-saradc.txt           |  2 +-
->>>  drivers/iio/adc/rockchip_saradc.c                  | 62
->>>  +++++++++++++++++----- 2 files changed, 50 insertions(+), 14
->>>  deletions(-)
->>>
->>> diff --git a/Documentation/devicetree/bindings/iio/adc/rockchip-saradc.txt
->>> b/Documentation/devicetree/bindings/iio/adc/rockchip-saradc.txt index
->>> 5d3ec1d..a9a5fe1 100644
->>> --- a/Documentation/devicetree/bindings/iio/adc/rockchip-saradc.txt
->>> +++ b/Documentation/devicetree/bindings/iio/adc/rockchip-saradc.txt
->>> @@ -1,7 +1,7 @@
->>>
->>>  Rockchip Successive Approximation Register (SAR) A/D Converter bindings
->>>
->>>  Required properties:
->>> -- compatible: Should be "rockchip,saradc"
->>> +- compatible: Should be "rockchip,saradc" or "rockchip,rk3066-tsadc"
->>>
->>>  - reg: physical base address of the controller and length of memory
->>>  mapped
->>>  
->>>         region.
->>>  
->>>  - interrupts: The interrupt number to the cpu. The interrupt specifier
->>>  format> 
->>> diff --git a/drivers/iio/adc/rockchip_saradc.c
->>> b/drivers/iio/adc/rockchip_saradc.c index e074a0b..7effada 100644
->>> --- a/drivers/iio/adc/rockchip_saradc.c
->>> +++ b/drivers/iio/adc/rockchip_saradc.c
->>> @@ -18,13 +18,13 @@
->>>
->>>  #include <linux/interrupt.h>
->>>  #include <linux/io.h>
->>>  #include <linux/of.h>
->>>
->>> +#include <linux/of_device.h>
->>>
->>>  #include <linux/clk.h>
->>>  #include <linux/completion.h>
->>>  #include <linux/regulator/consumer.h>
->>>  #include <linux/iio/iio.h>
->>>  
->>>  #define SARADC_DATA			0x00
->>>
->>> -#define SARADC_DATA_MASK		0x3ff
->>>
->>>  #define SARADC_STAS			0x04
->>>  #define SARADC_STAS_BUSY		BIT(0)
->>>
->>> @@ -38,15 +38,22 @@
->>>
->>>  #define SARADC_DLY_PU_SOC		0x0c
->>>  #define SARADC_DLY_PU_SOC_MASK		0x3f
->>>
->>> -#define SARADC_BITS			10
->>>
->>>  #define SARADC_TIMEOUT			msecs_to_jiffies(100)
->>>
->>> +struct rockchip_saradc_data {
->>> +	int				num_bits;
->>> +	const struct iio_chan_spec	*channels;
->>> +	int				num_channels;
->>> +	unsigned long			clk_rate;
->>> +};
->>> +
->>>
->>>  struct rockchip_saradc {
->>>  
->>>  	void __iomem		*regs;
->>>  	struct clk		*pclk;
->>>  	struct clk		*clk;
->>>  	struct completion	completion;
->>>  	struct regulator	*vref;
->>>
->>> +	const struct rockchip_saradc_data *data;
->>>
->>>  	u16			last_val;
->>>  
->>>  };
->>
->> The alignment of the whole block should be adjusted to fit with the new
->> element.
-> 
-> Hmm, I'm not sure if this should be in this patch, as changing the indentation 
-> is more or less an unrelated change which makes recognizing the actual change 
-> of adding the data field harder to see. 
-> 
-> It could be a second patch on top to adapt the formating, but this also sounds 
-> a bit like overkill.
-> 
-> In any case I guess I'll wait for Jonathan to decide how he likes this to be 
-> approached.
-> 
-Personally I hate this sort of careful block alignment for structures precisely because
-it generates churn.  I just don't hate it enough to moan about it in reviews :)
+On Wed, Sep 10 2014 at 11:27:39 AM, Will Deacon <will.deacon@arm.com> wrote:
+> On Wed, Sep 10, 2014 at 02:29:42AM +0100, Mitchel Humpherys wrote:
+>> On Tue, Aug 26 2014 at 07:27:58 AM, Will Deacon <will.deacon@arm.com> wrote:
+>> > On Tue, Aug 19, 2014 at 08:03:09PM +0100, Olav Haugan wrote:
+>> >> Clients of the SMMU driver are required to vote for clocks and power
+>> >> when they know they need to use the SMMU. However, the clock and power
+>> >> needed to be on for the SMMU to service bus masters aren't necessarily
+>> >> the same as the ones needed to read/write registers...See below.
+>> >
+>> > The case I'm thinking of is where a device masters through the IOMMU, but
+>> > doesn't make use of any translations. In this case, its transactions will
+>> > bypass the SMMU and I want to ensure that continues to happen, regardless of
+>> > the power state of the SMMU.
+>> 
+>> Then I assume the driver for such a device wouldn't be attaching to (or
+>> detaching from) the IOMMU, so we won't be touching it at all either
+>> way. Or am I missing something?
+>
+> As long as its only the register file that gets powered down, then there's
+> no issue. However, that's making assumptions about what these clocks are
+> controlling. Is there a way for the driver to know which aspects of the
+> device are controlled by which clock?
 
-Definitely doesn't want to be in this patch, but feel free to submit another
-either tidying up or dropping it in favour of not bothering to align it.
+Yes, folks should only be putting "config" clocks here. In our system,
+at least, the clocks for configuring the SMMU are different than those
+for using it. Maybe I should make a note about what "kinds" of clocks
+can be specified here in the bindings (i.e. only those that can be
+safely disabled while still allowing translations to occur)?
+
+>
+>> >> > What stops theses from racing with each other when there are multiple
+>> >> > clocks? I also assume that the clk API ignores calls to clk_enable_prepare
+>> >> > for a clk that's already enabled? I couldn't find that code...
+>> >> 
+>> >> All the clock APIs are reference counted yes. Not sure what you mean by
+>> >> racing with each other? When you call to enable a clock the call does
+>> >> not return until the clock is already ON (or OFF).
+>> >
+>> > I was thinking of an interrupt handler racing with normal code, but actually
+>> > you balance the clk enable/disable in the interrupt handlers. However, it's
+>> > not safe to call these clk functions from irq context anyway, since
+>> > clk_prepare may sleep.
+>> 
+>> Ah yes. You okay with moving to a threaded IRQ?
+>
+> A threaded IRQ already makes sense for context interrupts (if anybody has a
+> platform that can do stalls properly), but it seems a bit weird for the
+> global fault handler. Is there no way to fix the race instead?
+
+Are you referring to the scenario where someone might be disabling
+clocks at the same time? This isn't a problem since the clocks are
+refcounted. I believe the main problem here is calling clk_enable from
+atomic context since it might sleep.
+
+For my own edification, why would it be weird to move to a threaded IRQ
+here? We're not really doing any important work here (just printing an
+informational message) so moving to a threaded IRQ actually seems like
+the courteous thing to do...
+
+>
+>> >> >> @@ -2061,12 +2164,16 @@ static int arm_smmu_device_dt_probe(struct platform_device *pdev)
+>> >> >>  	spin_unlock(&arm_smmu_devices_lock);
+>> >> >>  
+>> >> >>  	arm_smmu_device_reset(smmu);
+>> >> >> +	arm_smmu_disable_clocks(smmu);
+>> >> > 
+>> >> > I wonder if this is really the right thing to do. Rather than the
+>> >> > fine-grained clock enable/disable you have, why don't we just enable in
+>> >> > domain_init and disable in domain_destroy, with refcounting for the clocks?
+>> >> > 
+>> >> 
+>> >> So the whole point of all of this is that we try to save power. As Mitch
+>> >> wrote in the commit text we want to only leave the clock and power on
+>> >> for as short period of time as possible.
+>> >
+>> > Understood, but if the clocks are going up and down like yo-yos, then it's
+>> > not obvious that you end up saving any power at all. Have you tried
+>> > measuring the power consumption with different granularities for the
+>> > clocks?
+>> 
+>> This has been profiled extensively and for some use cases it's a huge
+>> win. Unfortunately we don't have any numbers for public sharing :( but
+>> you can imagine a use case where some multimedia framework maps a bunch
+>> of buffers into an SMMU at the beginning of some interactive user
+>> session and doesn't unmap them until the (human) user decides they are
+>> done. This could be a long time, all the while these clocks could be
+>> off, saving power.
+>
+> Ok, I can see that. I wonder whether we could wrap all of the iommu_ops
+> functions with the clock enable/disable code, instead of putting it directly
+> into the drivers?
+
+Interesting idea... I'm up for it if the IOMMU core and driver
+maintainers are okay with it.
+
+>
+>> > The code you're proposing seems to take the approach of `we're going to
+>> > access registers so enable the clocks, access the registers then disable the
+>> > clocks', which is simple but may not be particularly effective.
+>> 
+>> Yes, that's a good summary of the approach here. It has been effective
+>> in saving power for us in the past...
+>
+> Mike, do you have any experience with this sort of stuff?
+>
+> Will
 
 
-> 
->>> @@ -90,7 +97,7 @@ static int rockchip_saradc_read_raw(struct iio_dev
->>> *indio_dev,> 
->>>  		}
->>>  		
->>>  		*val = ret / 1000;
->>>
->>> -		*val2 = SARADC_BITS;
->>> +		*val2 = info->data->num_bits;
->>>
->>>  		return IIO_VAL_FRACTIONAL_LOG2;
->>>  	
->>>  	default:
->>>  		return -EINVAL;
->>>
->>> @@ -103,7 +110,7 @@ static irqreturn_t rockchip_saradc_isr(int irq, void
->>> *dev_id)> 
->>>  	/* Read value */
->>>  	info->last_val = readl_relaxed(info->regs + SARADC_DATA);
->>>
->>> -	info->last_val &= SARADC_DATA_MASK;
->>> +	info->last_val &= BIT(info->data->num_bits) - 1;
->>
->> I think using GENMASK would reflect the intention better, that you want to
->> mask out your data.
-> 
-> I didn't know GENMASK before, so thanks for the pointer .. this looks quite 
-> cool :-)
-> 
-> 
->>>  	/* Clear irq & power down adc */
->>>  	writel_relaxed(0, info->regs + SARADC_CTRL);
->>>
->>> @@ -133,12 +140,44 @@ static const struct iio_chan_spec
->>> rockchip_saradc_iio_channels[] = {> 
->>>  	ADC_CHANNEL(2, "adc2"),
->>>  
->>>  };
->>>
->>> +static const struct rockchip_saradc_data saradc_data = {
->>> +	.num_bits = 10,
->>> +	.channels = rockchip_saradc_iio_channels,
->>> +	.num_channels = ARRAY_SIZE(rockchip_saradc_iio_channels),
->>> +	.clk_rate = 1000000,
->>> +};
->>> +
->>> +static const struct iio_chan_spec rockchip_rk3066_tsadc_iio_channels[] =
->>> {
->>> +	ADC_CHANNEL(0, "adc0"),
->>> +	ADC_CHANNEL(1, "adc1"),
->>> +};
->>> +
->>> +static const struct rockchip_saradc_data rk3066_tsadc_data = {
->>> +	.num_bits = 12,
->>> +	.channels = rockchip_rk3066_tsadc_iio_channels,
->>> +	.num_channels = ARRAY_SIZE(rockchip_rk3066_tsadc_iio_channels),
->>> +	.clk_rate = 50000,
->>> +};
->>> +
->>> +static const struct of_device_id rockchip_saradc_match[] = {
->>> +	{
->>> +		.compatible = "rockchip,saradc",
->>> +		.data = &saradc_data,
->>> +	}, {
->>> +		.compatible = "rockchip,rk3066-tsadc",
->>> +		.data = &rk3066_tsadc_data,
->>> +	},
->>> +	{},
->>> +};
->>> +MODULE_DEVICE_TABLE(of, rockchip_saradc_match);
->>> +
->>>
->>>  static int rockchip_saradc_probe(struct platform_device *pdev)
->>>  {
->>>  
->>>  	struct rockchip_saradc *info = NULL;
->>>  	struct device_node *np = pdev->dev.of_node;
->>>  	struct iio_dev *indio_dev = NULL;
->>>  	struct resource	*mem;
->>>
->>> +	const struct of_device_id *match;
->>>
->>>  	int ret;
->>>  	int irq;
->>>
->>> @@ -152,6 +191,9 @@ static int rockchip_saradc_probe(struct
->>> platform_device *pdev)> 
->>>  	}
->>>  	info = iio_priv(indio_dev);
->>>
->>> +	match = of_match_device(rockchip_saradc_match, &pdev->dev);
->>> +	info->data = match->data;
->>> +
->>>
->>>  	mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
->>>  	info->regs = devm_ioremap_resource(&pdev->dev, mem);
->>>  	if (IS_ERR(info->regs))
->>>
->>> @@ -195,7 +237,7 @@ static int rockchip_saradc_probe(struct
->>> platform_device *pdev)> 
->>>  	 * Use a default of 1MHz for the converter clock.
->>>  	 * This may become user-configurable in the future.
->>>  	 */
->>>
->>> -	ret = clk_set_rate(info->clk, 1000000);
->>> +	ret = clk_set_rate(info->clk, info->data->clk_rate);
->>>
->>>  	if (ret < 0) {
->>>  	
->>>  		dev_err(&pdev->dev, "failed to set adc clk rate, %d\n", ret);
->>>  		return ret;
->>>
->>> @@ -227,8 +269,8 @@ static int rockchip_saradc_probe(struct
->>> platform_device *pdev)> 
->>>  	indio_dev->info = &rockchip_saradc_iio_info;
->>>  	indio_dev->modes = INDIO_DIRECT_MODE;
->>>
->>> -	indio_dev->channels = rockchip_saradc_iio_channels;
->>> -	indio_dev->num_channels = ARRAY_SIZE(rockchip_saradc_iio_channels);
->>> +	indio_dev->channels = info->data->channels;
->>> +	indio_dev->num_channels = info->data->num_channels;
->>>
->>>  	ret = iio_device_register(indio_dev);
->>>  	if (ret)
->>>
->>> @@ -296,12 +338,6 @@ static int rockchip_saradc_resume(struct device *dev)
->>>
->>>  static SIMPLE_DEV_PM_OPS(rockchip_saradc_pm_ops,
->>>  
->>>  			 rockchip_saradc_suspend, rockchip_saradc_resume);
->>>
->>> -static const struct of_device_id rockchip_saradc_match[] = {
->>> -	{ .compatible = "rockchip,saradc" },
->>> -	{},
->>> -};
->>> -MODULE_DEVICE_TABLE(of, rockchip_saradc_match);
->>> -
->>>
->>>  static struct platform_driver rockchip_saradc_driver = {
->>>  
->>>  	.probe		= rockchip_saradc_probe,
->>>  	.remove		= rockchip_saradc_remove,
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-iio" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+
+-Mitch
+
+-- 
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
