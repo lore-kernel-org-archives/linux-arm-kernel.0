@@ -1,195 +1,29 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Wed, 10 Sep 2014 16:10:26 +0100
-Subject: [PATCH v10 08/10] OF: PCI: Add support for parsing PCI host
- bridge resources from DT
-In-Reply-To: <20140910142241.GD27864@e106497-lin.cambridge.arm.com>
-References: <1410184472-17630-1-git-send-email-Liviu.Dudau@arm.com>
- <1410184472-17630-9-git-send-email-Liviu.Dudau@arm.com>
- <20140909133546.GB2636@e102568-lin.cambridge.arm.com>
- <20140910142241.GD27864@e106497-lin.cambridge.arm.com>
-Message-ID: <20140910151026.GB11640@e102568-lin.cambridge.arm.com>
+From: b38343@freescale.com (Robin Gong)
+Date: Wed, 10 Sep 2014 23:18:01 +0800
+Subject: [PATCH v5] spi: spi-imx: add DMA support
+In-Reply-To: <20140910114530.GD7960@sirena.org.uk>
+References: <1410312604-31949-1-git-send-email-b38343@freescale.com>
+ <20140910102105.GR2601@sirena.org.uk>
+ <20140910112258.GA30794@Robin-OptiPlex-780>
+ <20140910114530.GD7960@sirena.org.uk>
+Message-ID: <20140910151759.GA31462@Robin-OptiPlex-780>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 10, 2014 at 03:22:41PM +0100, Liviu Dudau wrote:
-> On Tue, Sep 09, 2014 at 02:35:46PM +0100, Lorenzo Pieralisi wrote:
-> > On Mon, Sep 08, 2014 at 02:54:30PM +0100, Liviu Dudau wrote:
-> > > Provide a function to parse the PCI DT ranges that can be used to
-> > > create a pci_host_bridge structure together with its associated
-> > > bus.
-> > > 
-> > > Cc: Bjorn Helgaas <bhelgaas@google.com>
-> > > Cc: Arnd Bergmann <arnd@arndb.de>
-> > > Cc: Grant Likely <grant.likely@linaro.org>
-> > > Cc: Rob Herring <robh+dt@kernel.org>
-> > > Cc: Catalin Marinas <catalin.marinas@arm.com>
-> > > Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
-> > > ---
-> > >  drivers/of/of_pci.c    | 102 +++++++++++++++++++++++++++++++++++++++++++++++++
-> > >  include/linux/of_pci.h |  11 ++++++
-> > >  2 files changed, 113 insertions(+)
-> > > 
-> > > diff --git a/drivers/of/of_pci.c b/drivers/of/of_pci.c
-> > > index a107edb..36701da 100644
-> > > --- a/drivers/of/of_pci.c
-> > > +++ b/drivers/of/of_pci.c
-> > > @@ -1,7 +1,9 @@
-> > >  #include <linux/kernel.h>
-> > >  #include <linux/export.h>
-> > >  #include <linux/of.h>
-> > > +#include <linux/of_address.h>
-> > >  #include <linux/of_pci.h>
-> > > +#include <linux/slab.h>
-> > >  
-> > >  static inline int __of_pci_pci_compare(struct device_node *node,
-> > >  				       unsigned int data)
-> > > @@ -123,6 +125,106 @@ int of_pci_get_domain_nr(struct device_node *node, bool allocate_if_missing)
-> > >  }
-> > >  EXPORT_SYMBOL_GPL(of_pci_get_domain_nr);
-> > >  
-> > > +/**
-> > > + * of_pci_get_host_bridge_resources - Parse PCI host bridge resources from DT
-> > > + * @dev: device node of the host bridge having the range property
-> > > + * @busno: bus number associated with the bridge root bus
-> > > + * @bus_max: maximum number of busses for this bridge
-> > > + * @resources: list where the range of resources will be added after DT parsing
-> > > + * @io_base: pointer to a variable that will contain on return the physical
-> > > + * address for the start of the I/O range.
-> > > + *
-> > > + * It is the callers job to free the @resources list.
-> > > + *
-> > > + * This function will parse the "ranges" property of a PCI host bridge device
-> > > + * node and setup the resource mapping based on its content. It is expected
-> > > + * that the property conforms with the Power ePAPR document.
-> > 
-> > You should also define what it returns and when.
+On Wed, Sep 10, 2014 at 12:45:30PM +0100, Mark Brown wrote:
+> On Wed, Sep 10, 2014 at 07:22:59PM +0800, Robin Gong wrote:
+> > On Wed, Sep 10, 2014 at 11:21:05AM +0100, Mark Brown wrote:
 > 
-> Thanks, will do.
+> > > This isn't going to work, anything that looks at the usedma flag will
+> > > see the result of the last thing that was checked which may or may not
+> > > be the transfer that it's handling.  The driver should check to see if
+> > > the core mapped the transfer for DMA.
 > 
-> > 
-> > > + *
-> > > + */
-> > > +int of_pci_get_host_bridge_resources(struct device_node *dev,
-> > > +			unsigned char busno, unsigned char bus_max,
-> > > +			struct list_head *resources, resource_size_t *io_base)
-> > > +{
-> > > +	struct resource *res;
-> > > +	struct resource *bus_range;
-> > > +	struct of_pci_range range;
-> > > +	struct of_pci_range_parser parser;
-> > > +	char range_type[4];
-> > > +	int err;
-> > > +
-> > > +	bus_range = kzalloc(sizeof(*bus_range), GFP_KERNEL);
-> > > +	if (!bus_range)
-> > > +		return -ENOMEM;
-> > > +
-> > > +	pr_info("PCI host bridge %s ranges:\n", dev->full_name);
-> > > +
-> > > +	err = of_pci_parse_bus_range(dev, bus_range);
-> > > +	if (err) {
-> > > +		bus_range->start = busno;
-> > > +		bus_range->end = bus_max;
-> > > +		bus_range->flags = IORESOURCE_BUS;
-> > > +		pr_info("  No bus range found for %s, using %pR\n",
-> > > +			dev->full_name, &bus_range);
-> > > +	} else {
-> > > +		if (bus_range->end > bus_range->start + bus_max)
-> > > +			bus_range->end = bus_range->start + bus_max;
-> > > +	}
-> > > +	pci_add_resource(resources, bus_range);
-> > 
-> > This means that eg in the PCI generic host controller I cannot "filter"
-> > the bus resource, unless I remove it, "filter" it, and add it again.
+> > Yes, you're right. I should use "transfer->tx_sg->sgl == NULL" or
+> > "transfer->rx_sg->sgl == NULL" instead of usedma flag in driver, right?
 > 
-> I'm not sure what you mean. Why do you have to remove the bus resource and
-> add it again? What you get back from of_pci_get_host_bridge_resources() is
-> a list of resources as they have been parsed from DT. You now have the option
-> of doing any filtering that you might have done pre-v10 in the
-> pcibios_fixup_bridge_ranges() but that is only on the list that was returned
-> from of_pci_get_host_bridge_resources(). At this moment no root bus or
-> host bridge structure has been created so no resource was added to those.
-> With the filtered list you can use it to call pci_scan_root_bus() and *then*
-> it gets added to the pci_host_bridge structure.
-
-You are right sorry. As discussed, I just have to remove the resources
-assignment in the respective host controller drivers (because you do
-that in the API) and grab the resource pointers to "filter" them.
-
-> > I certainly can't filter a resource that has been already added without
-> > removing it first.
-> > 
-> > Thoughts ?
-> 
-> Hope I have explained what happens. Please let me know if you have any other
-> comments.
-
-There were other comments below ;)
-
-Thanks,
-Lorenzo
-
-> 
-> Best regards,
-> Liviu
-> 
-> > 
-> > > +
-> > > +	/* Check for ranges property */
-> > > +	err = of_pci_range_parser_init(&parser, dev);
-> > > +	if (err)
-> > > +		goto parse_failed;
-> > > +
-> > > +	pr_debug("Parsing ranges property...\n");
-> > > +	for_each_of_pci_range(&parser, &range) {
-> > > +		/* Read next ranges element */
-> > > +		if ((range.flags & IORESOURCE_TYPE_BITS) == IORESOURCE_IO)
-> > > +			snprintf(range_type, 4, " IO");
-> > > +		else if ((range.flags & IORESOURCE_TYPE_BITS) == IORESOURCE_MEM)
-> > > +			snprintf(range_type, 4, "MEM");
-> > > +		else
-> > > +			snprintf(range_type, 4, "err");
-> > > +		pr_info("  %s %#010llx..%#010llx -> %#010llx\n", range_type,
-> > > +			range.cpu_addr, range.cpu_addr + range.size - 1,
-> > > +			range.pci_addr);
-> > > +
-> > > +		/*
-> > > +		 * If we failed translation or got a zero-sized region
-> > > +		 * then skip this range
-> > > +		 */
-> > > +		if (range.cpu_addr == OF_BAD_ADDR || range.size == 0)
-> > > +			continue;
-> > > +
-> > > +		res = kzalloc(sizeof(struct resource), GFP_KERNEL);
-> > > +		if (!res) {
-> > > +			err = -ENOMEM;
-> > > +			goto parse_failed;
-> > > +		}
-> > > +
-> > > +		err = of_pci_range_to_resource(&range, dev, res);
-> > > +		if (err) {
-> > > +			kfree(res);
-> > 
-> > You might want to add a label to free res to make things more uniform.
-> > 
-> > > +			goto parse_failed;
-> > > +		}
-> > > +
-> > > +		if (resource_type(res) == IORESOURCE_IO) {
-> > > +			if (*io_base)
-> > 
-> > You do not zero io_base in the first place so you should ask the API
-> > user to do that. Is 0 a valid value BTW ? If it is you've got to resort
-> > to something else to detect multiple IO resources.
-> > 
-> > Lorenzo
-> 
-> -- 
-> ====================
-> | I would like to |
-> | fix the world,  |
-> | but they're not |
-> | giving me the   |
->  \ source code!  /
->   ---------------
->     ?\_(?)_/?
+> Right.
+But looks spi core framework can make sure every rx or tx transfer in sequence.
+If so, can_dma will never be called until this transfer finished
+(spi_pump_messages), and my usedma flag also never be modified until next
+transfer start. Please correct me if I am wrong, thanks.
