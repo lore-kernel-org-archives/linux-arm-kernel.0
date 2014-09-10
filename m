@@ -1,36 +1,39 @@
-From: cubicool@gmail.com (Jeremy Moles)
-Date: Wed, 10 Sep 2014 13:57:33 -0400
-Subject: EP93XX / EDB9315A Audio Issues
-Message-ID: <5410910D.6060201@gmail.com>
+From: geoff@infradead.org (Geoff Levand)
+Date: Wed, 10 Sep 2014 11:04:46 -0700
+Subject: [PATCH V2 02/13] arm64/kvm: Fix assembler compatibility of macros
+In-Reply-To: <bc4abc340eaa4da448f62326a134fabfb5a2a875.1410302383.git.geoff@infradead.org>
+References: <cover.1410302383.git.geoff@infradead.org>
+ <bc4abc340eaa4da448f62326a134fabfb5a2a875.1410302383.git.geoff@infradead.org>
+Message-ID: <1410372286.11440.22.camel@smoke>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-(I'm cross-posting this to the linux-arm-kernel and alsa-devel lists, as 
-recommended):
+Some of the macros defined in kvm_arm.h are useful in the exception vector
+routines, but they are not compatible with the assembler.  Change the
+definition of ESR_EL2_ISS to be compatible.
 
-I'm looking for anyone who has successfully used the EP93XX/EDB9315A 
-demo board's sound infrastructure. I have been working with Hartley 
-Sweeten on patching some DMA coherency mask issues (successfully), and 
-while this makes the kernel stop complaining (and allows the userspace 
-to "appear" to work) I never actually get any sound out of the machine 
-on newer kernels.
+Fixes build errors like these when using kvm_arm.h in assembly
+source files:
 
-I do, however, have an existing (binary-only) 2.6.21 kernel from the 
-client where sound _IS_ functional; thus, I know the system can 
-POTENTIALLY work, and that the problem is software-based.
+  Error: unexpected characters following instruction at operand 3 -- `and x0,x1,#((1U<<25)-1)'
 
-At this point, I have a mountain of information I can provide about the 
-state of my EDB9315A board, but what I'm really looking for is someone 
-to connect with and/or have consult with us to get sound working on 
-newer kernels with this board exactly (although other EP93XX boards 
-might be similar, I'm so mistrustful of everything at this point I'm 
-looking for someone else with this hardware EXACTLY).
+Signed-off-by: Geoff Levand <geoff@infradead.org>
+---
+ arch/arm64/include/asm/kvm_arm.h | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-I've tried 3.15-3.17, all with the same results. aplay/alsamixer see the 
-device, appear to interact with it in a normal fashion (it even 
-mutes/unmutes the device every time you touch it), but no sound is ever 
-produced. It is possible, of course, the problem is in userspace (I'm 
-using a custom Yocto-based image), but I'm doubtful of that.
-
-At any rate, any help would be greatly appreciate, although i realize 
-this is fringe hardware. :)
+diff --git a/arch/arm64/include/asm/kvm_arm.h b/arch/arm64/include/asm/kvm_arm.h
+index cc83520..fb42ab5 100644
+--- a/arch/arm64/include/asm/kvm_arm.h
++++ b/arch/arm64/include/asm/kvm_arm.h
+@@ -175,7 +175,7 @@
+ /* Exception Syndrome Register (ESR) bits */
+ #define ESR_EL2_EC_SHIFT	(26)
+ #define ESR_EL2_EC		(0x3fU << ESR_EL2_EC_SHIFT)
+-#define ESR_EL2_IL		(1U << 25)
++#define ESR_EL2_IL		(UL(1) << 25)
+ #define ESR_EL2_ISS		(ESR_EL2_IL - 1)
+ #define ESR_EL2_ISV_SHIFT	(24)
+ #define ESR_EL2_ISV		(1U << ESR_EL2_ISV_SHIFT)
+-- 
+1.9.1
