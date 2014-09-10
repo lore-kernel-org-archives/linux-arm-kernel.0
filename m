@@ -1,49 +1,57 @@
-From: david@protonic.nl (David Jander)
-Date: Wed, 10 Sep 2014 11:09:43 +0200
-Subject: gcc 4.8.3 miscompiles drivers/net/ethernet/freescale/fec_main.c ?!
-Message-ID: <20140910110943.3673dbb4@archvile>
+From: suravee.suthikulpanit@amd.com (suravee.suthikulpanit at amd.com)
+Date: Wed, 10 Sep 2014 04:14:59 -0500
+Subject: [PATCH 0/2 V5] irqchip: gic: Introduce ARM GICv2m MSI(-X) support
+Message-ID: <1410340501-30752-1-git-send-email-suravee.suthikulpanit@amd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+From: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
 
-Hi,
+This patch set introduces support for MSI(-X) in GICv2m specification,
+which is implemented in some variation of GIC400.
 
-I am seeing a strange problem when building a recent kernel with gcc-4.8.3 for
-armv7-a that contains the following patch:
+This depends on and has been tested with the following patch set which
+implements PCI supports for ARM64:
+ 
+    * https://lkml.org/lkml/2014/8/12/394
+    * https://lkml.org/lkml/2014/8/12/361
 
-https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit?id=bfd4ecdd87d350e19457fe0d02fa1e046774c44e
+Changes in V5:
+    * Rebase to git://git.infradead.org/users/jcooper/linux.git irqchip/core
 
-Unfortunately I am not good enough at reading ARM assembly output from GCC to
-understand whats going wrong, so I am asking for help.
+  Marc Zyngier suggestions:
+    * Only use GICv2m irq_chip for MSI interrupts.
+    * Simplify logic to support multi-MSI in arch/arm64/kernel/msi.c.
+    * Modify gicv2m_setup_msi_irq() to also handle multi-MSI.
 
-I started noticing ethernet packet loss on a i.MX6 board after upgrading the
-kernel from 3.16-rc-something to latest mainline. The problem is very easy to
-reproduce so I started git-bisecting. Git bisect gave me the above patch as
-the culprit, and indeed: Without the patch a flood-ping goes fine (just one
-dot on screen, no lost packets). I apply the patch and the dots start filling
-the screen instantly.
+  Mark Rutlan suggestions: 
+    * V4 patch set did not support multiple MSI register frame within a GIC.
+      Although, the proposed GICv2m device tree binding should be able to
+      handle the case.  Mark was questioning on how we can properly handle
+      this in the code. Therefore, I try to implement this by iterating through
+      the subnodes and look for msi-controller property. Once found, the code
+      parses v2m register frame information and store it in the v2m_list of
+      each gic_chip_data.
 
-I am compiling the kernel using Pengutronix's OSELAS toolchain version
-2013.12.1, which is based on linaro gcc-4.8.3 without any relevant patches
-AFAIK.
-Compiling with -O2 breaks the code, while -Os seems to produce a correctly
-working kernel.
+  Jingoo han suggestions:
+    * Misc clean up.
 
-I decided to make changes to the code and see if I could find other ways to
-"fix" the problem, and I got the following result:
+Suravee Suthikulpanit (2):
+  irqchip: gic: Add supports for ARM GICv2m MSI(-X)
+  irqchip: gicv2m: Add support for multiple MSI for ARM64 GICv2m
 
-The above mentioned patch introduces the static function fec_enet_hwtstamp()
-near line 1068 of fec_main.c. If I make an exact copy of this function, where
-I only change the name (e.g. fec_enet_hwtstamp2), and change one of the two
-places this function is called to instead use the other name, GCC inlines both
-copies and the problem disappears!
-
-Since I am not very good at GCC internals nor do I know this piece of code in
-fec_main.c very well, I am asking here for help in hunting down the real bug,
-which I suspect is in GCC... but I want to know for sure.
-
-Best regards,
+ Documentation/devicetree/bindings/arm/gic.txt |  39 +++
+ arch/arm64/kernel/Makefile                    |   1 +
+ arch/arm64/kernel/msi.c                       |  41 ++++
+ drivers/irqchip/Kconfig                       |   7 +
+ drivers/irqchip/Makefile                      |   1 +
+ drivers/irqchip/irq-gic-v2m.c                 | 326 ++++++++++++++++++++++++++
+ drivers/irqchip/irq-gic.c                     |  88 ++++---
+ drivers/irqchip/irq-gic.h                     |  51 ++++
+ 8 files changed, 526 insertions(+), 28 deletions(-)
+ create mode 100644 arch/arm64/kernel/msi.c
+ create mode 100644 drivers/irqchip/irq-gic-v2m.c
+ create mode 100644 drivers/irqchip/irq-gic.h
 
 -- 
-David Jander
-Protonic Holland.
+1.9.3
