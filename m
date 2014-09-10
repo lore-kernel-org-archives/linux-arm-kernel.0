@@ -1,134 +1,64 @@
 From: d.lavnikevich@sam-solutions.com (Dmitry Lavnikevich)
-Date: Wed, 10 Sep 2014 16:46:48 +0300
-Subject: [PATCH 4/5] ARM: dts: pbab01: enable I2S audio on phyFLEX-i.MX6 boards
+Date: Wed, 10 Sep 2014 16:46:49 +0300
+Subject: [PATCH 5/5] ASoC: tlv320aic3x: fix PLL D configuration
 In-Reply-To: <1410356809-26179-1-git-send-email-d.lavnikevich@sam-solutions.com>
 References: <1410356809-26179-1-git-send-email-d.lavnikevich@sam-solutions.com>
-Message-ID: <1410356809-26179-5-git-send-email-d.lavnikevich@sam-solutions.com>
+Message-ID: <1410356809-26179-6-git-send-email-d.lavnikevich@sam-solutions.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Audio on phyFLEX boards is presented by tlv320aic3007 codec connected over SSI
-interface.
+Current caching implementation during regcache_sync() call bypasses
+all register writes of values that are already known as default
+(regmap reg_defaults). Same time in TLV320AIC3x codecs register 5
+(AIC3X_PLL_PROGC_REG) write should be immediately followed by register
+6 write (AIC3X_PLL_PROGD_REG) even if it was not changed. Otherwise
+both registers will not be written.
+
+This brings to issue that appears particulary in case of 44.1kHz
+playback with 19.2MHz master clock. In this case AIC3X_PLL_PROGC_REG
+is 0x6e while AIC3X_PLL_PROGD_REG is 0x0 (same as register
+default). Thus AIC3X_PLL_PROGC_REG also remains not written and we get
+wrong playback speed.
+
+In this patch snd_soc_read() is used to get cached pll values and
+snd_soc_write() (unlike regcache_sync() this function doesn't bypasses
+hardware default values) to write them to registers.
 
 Signed-off-by: Dmitry Lavnikevich <d.lavnikevich@sam-solutions.com>
 ---
- arch/arm/boot/dts/imx6qdl-phytec-pbab01.dtsi | 59 +++++++++++++++++++++++++++-
- arch/arm/boot/dts/imx6qdl-phytec-pfla02.dtsi | 15 +++++++
- 2 files changed, 72 insertions(+), 2 deletions(-)
+ sound/soc/codecs/tlv320aic3x.c | 13 +++++++++++++
+ 1 file changed, 13 insertions(+)
 
-diff --git a/arch/arm/boot/dts/imx6qdl-phytec-pbab01.dtsi b/arch/arm/boot/dts/imx6qdl-phytec-pbab01.dtsi
-index f1bdcae5b97d..8f778fe8c0b7 100644
---- a/arch/arm/boot/dts/imx6qdl-phytec-pbab01.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-phytec-pbab01.dtsi
-@@ -13,6 +13,46 @@
- 	chosen {
- 		linux,stdout-path = &uart4;
- 	};
-+
-+	regulators {
-+		sound_1v8: regulator at 2 {
-+			compatible = "regulator-fixed";
-+			reg = <2>;
-+			regulator-name = "i2s-audio-1v8";
-+			regulator-min-microvolt = <1800000>;
-+			regulator-max-microvolt = <1800000>;
-+			regulator-always-on;
-+		};
-+		sound_3v3: regulator at 3 {
-+			compatible = "regulator-fixed";
-+			reg = <3>;
-+			regulator-name = "i2s-audio-3v3";
-+			regulator-min-microvolt = <3300000>;
-+			regulator-max-microvolt = <3300000>;
-+			regulator-always-on;
-+		};
-+	};
-+
-+	sound {
-+		compatible = "fsl,imx-audio-tlv320aic3x";
-+		model = "imx6q-phyflex-tlv320aic3007";
-+		ssi-controller = <&ssi2>;
-+		audio-codec = <&codec>;
-+		audio-routing =
-+			"Line Out", "LLOUT",
-+			"Line Out", "RLOUT",
-+			"Speaker", "SPOP",
-+			"Speaker", "SPOM",
-+			"Headphone Jack", "HPLOUT",
-+			"Headphone Jack", "HPROUT",
-+			"MIC3L", "Mic Jack",
-+			"MIC3R", "Mic Jack",
-+			"Mic Jack", "Mic Bias",
-+			"LINE1L", "Line In",
-+			"LINE1R", "Line In";
-+		mux-int-port = <2>;
-+		mux-ext-port = <5>;
-+	};
- };
+diff --git a/sound/soc/codecs/tlv320aic3x.c b/sound/soc/codecs/tlv320aic3x.c
+index 64f179ee9834..5e8626ae612b 100644
+--- a/sound/soc/codecs/tlv320aic3x.c
++++ b/sound/soc/codecs/tlv320aic3x.c
+@@ -1121,6 +1121,7 @@ static int aic3x_regulator_event(struct notifier_block *nb,
+ static int aic3x_set_power(struct snd_soc_codec *codec, int power)
+ {
+ 	struct aic3x_priv *aic3x = snd_soc_codec_get_drvdata(codec);
++	unsigned int pll_c, pll_d;
+ 	int ret;
  
- &fec {
-@@ -27,12 +67,27 @@
- 	status = "okay";
- };
- 
-+&ssi2 {
-+	fsl,mode = "i2s-slave";
-+	status = "okay";
-+};
+ 	if (power) {
+@@ -1138,6 +1139,18 @@ static int aic3x_set_power(struct snd_soc_codec *codec, int power)
+ 		/* Sync reg_cache with the hardware */
+ 		regcache_cache_only(aic3x->regmap, false);
+ 		regcache_sync(aic3x->regmap);
 +
-+&audmux {
-+	status = "okay";
-+};
-+
- &i2c2 {
- 	status = "okay";
- 
--	tlv320 at 18 {
--		compatible = "ti,tlv320aic3x";
-+	codec: tlv320 at 18 {
-+		compatible = "ti,tlv320aic3007";
- 		reg = <0x18>;
-+		ai3x-micbias-vg = <2>;
-+
-+		AVDD-supply = <&sound_3v3>;
-+		IOVDD-supply = <&sound_3v3>;
-+		DRVDD-supply = <&sound_3v3>;
-+		DVDD-supply = <&sound_1v8>;
- 	};
- 
- 	stmpe at 41 {
-diff --git a/arch/arm/boot/dts/imx6qdl-phytec-pfla02.dtsi b/arch/arm/boot/dts/imx6qdl-phytec-pfla02.dtsi
-index a927e88ccc98..1c4464dcb497 100644
---- a/arch/arm/boot/dts/imx6qdl-phytec-pfla02.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-phytec-pfla02.dtsi
-@@ -58,6 +58,12 @@
- 	};
- };
- 
-+&audmux {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_audmux>;
-+	status = "disabled";
-+};
-+
- &ecspi3 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_ecspi3>;
-@@ -319,6 +325,15 @@
- 				MX6QDL_PAD_ENET_TXD1__GPIO1_IO29 0x80000000
- 			>;
- 		};
-+
-+		pinctrl_audmux: audmuxgrp {
-+			fsl,pins = <
-+				MX6QDL_PAD_DISP0_DAT16__AUD5_TXC	0x130b0
-+				MX6QDL_PAD_DISP0_DAT18__AUD5_TXFS	0x130b0
-+				MX6QDL_PAD_DISP0_DAT17__AUD5_TXD	0x110b0
-+				MX6QDL_PAD_DISP0_DAT19__AUD5_RXD	0x130b0
-+			>;
-+		};
- 	};
- };
- 
++		/* Rewrite paired PLL D registers in case cached sync skipped
++		 * writing one of them and thus caused other one also not
++		 * being written
++		 */
++		pll_c = snd_soc_read(codec, AIC3X_PLL_PROGC_REG);
++		pll_d = snd_soc_read(codec, AIC3X_PLL_PROGD_REG);
++		if (pll_c == aic3x_reg[AIC3X_PLL_PROGC_REG].def ||
++			pll_d == aic3x_reg[AIC3X_PLL_PROGD_REG].def) {
++			snd_soc_write(codec, AIC3X_PLL_PROGC_REG, pll_c);
++			snd_soc_write(codec, AIC3X_PLL_PROGD_REG, pll_d);
++		}
+ 	} else {
+ 		/*
+ 		 * Do soft reset to this codec instance in order to clear
 -- 
 2.1.0
