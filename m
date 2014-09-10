@@ -1,129 +1,113 @@
-From: mitchelh@codeaurora.org (Mitchel Humpherys)
-Date: Wed, 10 Sep 2014 12:09:06 -0700
-Subject: [PATCH 1/6] iommu/arm-smmu: add support for specifying clocks
-In-Reply-To: <20140910182739.GM1710@arm.com> (Will Deacon's message of "Wed,
- 10 Sep 2014 19:27:39 +0100")
-References: <1407891099-24641-1-git-send-email-mitchelh@codeaurora.org>
- <1407891099-24641-2-git-send-email-mitchelh@codeaurora.org>
- <20140819125833.GO23128@arm.com> <53F39F6D.1040205@codeaurora.org>
- <20140826142757.GU23445@arm.com>
- <vnkwa968b6ux.fsf@mitchelh-linux.qualcomm.com>
- <20140910182739.GM1710@arm.com>
-Message-ID: <vnkwbnqn9tt9.fsf@mitchelh-linux.qualcomm.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Wed, 10 Sep 2014 12:13:46 -0700
+Subject: [PATCH v2] arm: perf: Don't sleep while atomic when enabling per-cpu
+ interrupts
+Message-ID: <1410376426-5707-1-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 10 2014 at 11:27:39 AM, Will Deacon <will.deacon@arm.com> wrote:
-> On Wed, Sep 10, 2014 at 02:29:42AM +0100, Mitchel Humpherys wrote:
->> On Tue, Aug 26 2014 at 07:27:58 AM, Will Deacon <will.deacon@arm.com> wrote:
->> > On Tue, Aug 19, 2014 at 08:03:09PM +0100, Olav Haugan wrote:
->> >> Clients of the SMMU driver are required to vote for clocks and power
->> >> when they know they need to use the SMMU. However, the clock and power
->> >> needed to be on for the SMMU to service bus masters aren't necessarily
->> >> the same as the ones needed to read/write registers...See below.
->> >
->> > The case I'm thinking of is where a device masters through the IOMMU, but
->> > doesn't make use of any translations. In this case, its transactions will
->> > bypass the SMMU and I want to ensure that continues to happen, regardless of
->> > the power state of the SMMU.
->> 
->> Then I assume the driver for such a device wouldn't be attaching to (or
->> detaching from) the IOMMU, so we won't be touching it at all either
->> way. Or am I missing something?
->
-> As long as its only the register file that gets powered down, then there's
-> no issue. However, that's making assumptions about what these clocks are
-> controlling. Is there a way for the driver to know which aspects of the
-> device are controlled by which clock?
+Rob Clark reports a sleeping while atomic bug when using perf.
 
-Yes, folks should only be putting "config" clocks here. In our system,
-at least, the clocks for configuring the SMMU are different than those
-for using it. Maybe I should make a note about what "kinds" of clocks
-can be specified here in the bindings (i.e. only those that can be
-safely disabled while still allowing translations to occur)?
+BUG: sleeping function called from invalid context at ../kernel/locking/mutex.c:583
+in_atomic(): 1, irqs_disabled(): 128, pid: 0, name: swapper/0
+------------[ cut here ]------------
+WARNING: CPU: 2 PID: 4828 at ../kernel/locking/mutex.c:479 mutex_lock_nested+0x3a0/0x3e8()
+DEBUG_LOCKS_WARN_ON(in_interrupt())
+Modules linked in:
+CPU: 2 PID: 4828 Comm: Xorg.bin Tainted: G        W      3.17.0-rc3-00234-gd535c45-dirty #819
+[<c0216690>] (unwind_backtrace) from [<c0212174>] (show_stack+0x10/0x14)
+[<c0212174>] (show_stack) from [<c0867cc0>] (dump_stack+0x98/0xb8)
+[<c0867cc0>] (dump_stack) from [<c02492a4>] (warn_slowpath_common+0x70/0x8c)
+[<c02492a4>] (warn_slowpath_common) from [<c02492f0>] (warn_slowpath_fmt+0x30/0x40)
+[<c02492f0>] (warn_slowpath_fmt) from [<c086a3f8>] (mutex_lock_nested+0x3a0/0x3e8)
+[<c086a3f8>] (mutex_lock_nested) from [<c0294d08>] (irq_find_host+0x20/0x9c)
+[<c0294d08>] (irq_find_host) from [<c0769d50>] (of_irq_get+0x28/0x48)
+[<c0769d50>] (of_irq_get) from [<c057d104>] (platform_get_irq+0x1c/0x8c)
+[<c057d104>] (platform_get_irq) from [<c021a06c>] (cpu_pmu_enable_percpu_irq+0x14/0x38)
+[<c021a06c>] (cpu_pmu_enable_percpu_irq) from [<c02b1634>] (flush_smp_call_function_queue+0x88/0x178)
+[<c02b1634>] (flush_smp_call_function_queue) from [<c0214dc0>] (handle_IPI+0x88/0x160)
+[<c0214dc0>] (handle_IPI) from [<c0208930>] (gic_handle_irq+0x64/0x68)
+[<c0208930>] (gic_handle_irq) from [<c0212d04>] (__irq_svc+0x44/0x5c)
+Exception stack(0xe63ddea0 to 0xe63ddee8)
+dea0: 00000001 00000001 00000000 c2f3b200 c16db380 c032d4a0 e63ddf40 60010013
+dec0: 00000000 001fbfd4 00000100 00000000 00000001 e63ddee8 c0284770 c02a2e30
+dee0: 20010013 ffffffff
+[<c0212d04>] (__irq_svc) from [<c02a2e30>] (ktime_get_ts64+0x1c8/0x200)
+[<c02a2e30>] (ktime_get_ts64) from [<c032d4a0>] (poll_select_set_timeout+0x60/0xa8)
+[<c032d4a0>] (poll_select_set_timeout) from [<c032df64>] (SyS_select+0xa8/0x118)
+[<c032df64>] (SyS_select) from [<c020e8e0>] (ret_fast_syscall+0x0/0x48)
+---[ end trace 0bb583b46342da6f ]---
+INFO: lockdep is turned off.
 
->
->> >> > What stops theses from racing with each other when there are multiple
->> >> > clocks? I also assume that the clk API ignores calls to clk_enable_prepare
->> >> > for a clk that's already enabled? I couldn't find that code...
->> >> 
->> >> All the clock APIs are reference counted yes. Not sure what you mean by
->> >> racing with each other? When you call to enable a clock the call does
->> >> not return until the clock is already ON (or OFF).
->> >
->> > I was thinking of an interrupt handler racing with normal code, but actually
->> > you balance the clk enable/disable in the interrupt handlers. However, it's
->> > not safe to call these clk functions from irq context anyway, since
->> > clk_prepare may sleep.
->> 
->> Ah yes. You okay with moving to a threaded IRQ?
->
-> A threaded IRQ already makes sense for context interrupts (if anybody has a
-> platform that can do stalls properly), but it seems a bit weird for the
-> global fault handler. Is there no way to fix the race instead?
+We don't really need to get the platform irq again when we're
+enabling or disabling the per-cpu irq. Furthermore, we don't
+really need to set and clear bits in the active_irqs bitmask
+because that's only used in the non-percpu irq case to figure out
+when the last CPU PMU has been disabled. Just pass the irq
+directly to the enable/disable functions to clean all this up.
+This should be slightly more efficient and also fix the
+scheduling while atomic bug.
 
-Are you referring to the scenario where someone might be disabling
-clocks at the same time? This isn't a problem since the clocks are
-refcounted. I believe the main problem here is calling clk_enable from
-atomic context since it might sleep.
+Reported-by: Rob Clark <robdclark@gmail.com>
+Fixes: bbd64559376f "ARM: perf: support percpu irqs for the CPU PMU"
+Acked-by: Will Deacon <will.deacon@arm.com>
+Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+---
 
-For my own edification, why would it be weird to move to a threaded IRQ
-here? We're not really doing any important work here (just printing an
-informational message) so moving to a threaded IRQ actually seems like
-the courteous thing to do...
+I'll drop this in the patch tracker tomorrow unless I hear differently.
 
->
->> >> >> @@ -2061,12 +2164,16 @@ static int arm_smmu_device_dt_probe(struct platform_device *pdev)
->> >> >>  	spin_unlock(&arm_smmu_devices_lock);
->> >> >>  
->> >> >>  	arm_smmu_device_reset(smmu);
->> >> >> +	arm_smmu_disable_clocks(smmu);
->> >> > 
->> >> > I wonder if this is really the right thing to do. Rather than the
->> >> > fine-grained clock enable/disable you have, why don't we just enable in
->> >> > domain_init and disable in domain_destroy, with refcounting for the clocks?
->> >> > 
->> >> 
->> >> So the whole point of all of this is that we try to save power. As Mitch
->> >> wrote in the commit text we want to only leave the clock and power on
->> >> for as short period of time as possible.
->> >
->> > Understood, but if the clocks are going up and down like yo-yos, then it's
->> > not obvious that you end up saving any power at all. Have you tried
->> > measuring the power consumption with different granularities for the
->> > clocks?
->> 
->> This has been profiled extensively and for some use cases it's a huge
->> win. Unfortunately we don't have any numbers for public sharing :( but
->> you can imagine a use case where some multimedia framework maps a bunch
->> of buffers into an SMMU at the beginning of some interactive user
->> session and doesn't unmap them until the (human) user decides they are
->> done. This could be a long time, all the while these clocks could be
->> off, saving power.
->
-> Ok, I can see that. I wonder whether we could wrap all of the iommu_ops
-> functions with the clock enable/disable code, instead of putting it directly
-> into the drivers?
+Changes since v1:
+ * Simplify code by skipping active_irqs bit setting.
 
-Interesting idea... I'm up for it if the IOMMU core and driver
-maintainers are okay with it.
+ arch/arm/kernel/perf_event_cpu.c | 14 ++++----------
+ 1 file changed, 4 insertions(+), 10 deletions(-)
 
->
->> > The code you're proposing seems to take the approach of `we're going to
->> > access registers so enable the clocks, access the registers then disable the
->> > clocks', which is simple but may not be particularly effective.
->> 
->> Yes, that's a good summary of the approach here. It has been effective
->> in saving power for us in the past...
->
-> Mike, do you have any experience with this sort of stuff?
->
-> Will
-
-
-
--Mitch
-
+diff --git a/arch/arm/kernel/perf_event_cpu.c b/arch/arm/kernel/perf_event_cpu.c
+index e6a6edbec613..4bf4cce759fe 100644
+--- a/arch/arm/kernel/perf_event_cpu.c
++++ b/arch/arm/kernel/perf_event_cpu.c
+@@ -76,21 +76,15 @@ static struct pmu_hw_events *cpu_pmu_get_cpu_events(void)
+ 
+ static void cpu_pmu_enable_percpu_irq(void *data)
+ {
+-	struct arm_pmu *cpu_pmu = data;
+-	struct platform_device *pmu_device = cpu_pmu->plat_device;
+-	int irq = platform_get_irq(pmu_device, 0);
++	int irq = *(int *)data;
+ 
+ 	enable_percpu_irq(irq, IRQ_TYPE_NONE);
+-	cpumask_set_cpu(smp_processor_id(), &cpu_pmu->active_irqs);
+ }
+ 
+ static void cpu_pmu_disable_percpu_irq(void *data)
+ {
+-	struct arm_pmu *cpu_pmu = data;
+-	struct platform_device *pmu_device = cpu_pmu->plat_device;
+-	int irq = platform_get_irq(pmu_device, 0);
++	int irq = *(int *)data;
+ 
+-	cpumask_clear_cpu(smp_processor_id(), &cpu_pmu->active_irqs);
+ 	disable_percpu_irq(irq);
+ }
+ 
+@@ -103,7 +97,7 @@ static void cpu_pmu_free_irq(struct arm_pmu *cpu_pmu)
+ 
+ 	irq = platform_get_irq(pmu_device, 0);
+ 	if (irq >= 0 && irq_is_percpu(irq)) {
+-		on_each_cpu(cpu_pmu_disable_percpu_irq, cpu_pmu, 1);
++		on_each_cpu(cpu_pmu_disable_percpu_irq, &irq, 1);
+ 		free_percpu_irq(irq, &percpu_pmu);
+ 	} else {
+ 		for (i = 0; i < irqs; ++i) {
+@@ -138,7 +132,7 @@ static int cpu_pmu_request_irq(struct arm_pmu *cpu_pmu, irq_handler_t handler)
+ 				irq);
+ 			return err;
+ 		}
+-		on_each_cpu(cpu_pmu_enable_percpu_irq, cpu_pmu, 1);
++		on_each_cpu(cpu_pmu_enable_percpu_irq, &irq, 1);
+ 	} else {
+ 		for (i = 0; i < irqs; ++i) {
+ 			err = 0;
 -- 
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
 hosted by The Linux Foundation
