@@ -1,46 +1,88 @@
-From: xuwei5@hisilicon.com (xuwei)
-Date: Wed, 10 Sep 2014 17:01:30 +0800
-Subject: [GIT PULL][for 3.18] pull request for the clock update of Hisilicon
- HiX5HD2 soc
-Message-ID: <5410136A.4080701@hisilicon.com>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Wed, 10 Sep 2014 11:07:03 +0200
+Subject: [PATCH v8 2/5] ARM: imx6: gpc: Add PU power domain for GPU/VPU
+In-Reply-To: <20140910034918.GA28759@Robin-OptiPlex-780>
+References: <1410267915-18126-1-git-send-email-p.zabel@pengutronix.de>
+ <1410267915-18126-3-git-send-email-p.zabel@pengutronix.de>
+ <20140910034918.GA28759@Robin-OptiPlex-780>
+Message-ID: <1410340023.4508.4.camel@paszta.hi.pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mike,
+Hi Robin,
 
-Please help to merge pull request for the clock update of Hisilicon HiX5HD2 soc. 
+Am Mittwoch, den 10.09.2014, 11:49 +0800 schrieb Robin Gong:
+> Hi Philipp,
+>   Thanks for your great job, power domain make things clear. But looks your
+> patch depend on 'PU regulator', if there is no PU regulator passed down from
+> dts, we'll never implement your way for PGC. On i.mx6sx, there is no internal
+> PU regulator, so I suggest you consider this case. 
 
-Best Regards,
-Wei
+thank you for the hint. Would making the PU regulator optional be enough
+to make this work on i.MX6SX?
 
-The following changes since commit 5162797e4d77414cd9ac863ca58588c10b8f8f3a:
+regards
+Philipp
 
-  clk: hix5hd2: add complex clk (2014-09-01 16:09:05 +0100)
+---8<---
+From: Philipp Zabel <p.zabel@pengutronix.de>
+Subject: [PATCH] ARM: imx6: gpc: Make PU regulator optional
 
-are available in the git repository at:
+On i.MX6SX there is no internal PU regulator, make it optional.
 
-  git://github.com/hisilicon/linux-hisi.git tags/hix5hd2-clock-for-3.18
+Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
+---
+ arch/arm/mach-imx/gpc.c | 17 +++++++++++------
+ 1 file changed, 11 insertions(+), 6 deletions(-)
 
-for you to fetch changes up to b89ffd8e390a9f0812e62c4985b6d3f246669273:
-
-  clk: hix5hd2: add I2C clocks (2014-09-01 16:09:33 +0100)
-
-----------------------------------------------------------------
-Hisilicon HiX5HD2 clock updates for 3.18
-
--Add I2C, watchdog and sd clocks
--Add clock drivers for HiX5HD2 to support sata, usb and ethernet
-
-----------------------------------------------------------------
-Guoxiong Yan (1):
-      clk: hix5hd2: add watchdog0 clocks
-
-Jiancheng Xue (1):
-      clk: hix5hd2: add sd clk
-
-Wei Yan (1):
-      clk: hix5hd2: add I2C clocks
-
- drivers/clk/hisilicon/clk-hix5hd2.c       | 51 +++++++++++++++++++++++++++++++++++++++++++++------
- include/dt-bindings/clock/hix5hd2-clock.h | 18 ++++++++++++++++++
- 2 files changed, 63 insertions(+), 6 deletions(-)
+diff --git a/arch/arm/mach-imx/gpc.c b/arch/arm/mach-imx/gpc.c
+index cdf8a06..b36703d 100644
+--- a/arch/arm/mach-imx/gpc.c
++++ b/arch/arm/mach-imx/gpc.c
+@@ -186,7 +186,8 @@ static int imx6q_pm_pu_power_off(struct generic_pm_domain *genpd)
+ 	/* Wait ISO + ISO2SW IPG clock cycles */
+ 	ndelay((iso + iso2sw) * 1000 / 66);
+ 
+-	regulator_disable(pu->reg);
++	if (pu->reg)
++		regulator_disable(pu->reg);
+ 
+ 	return 0;
+ }
+@@ -197,8 +198,9 @@ static int imx6q_pm_pu_power_on(struct generic_pm_domain *genpd)
+ 	int i, ret, sw, sw2iso;
+ 	u32 val;
+ 
+-	ret = regulator_enable(pu->reg);
+-	if (ret) {
++	if (pu->reg)
++		ret = regulator_enable(pu->reg);
++	if (pu->reg && ret) {
+ 		pr_err("%s: failed to enable regulator: %d\n", __func__, ret);
+ 		return ret;
+ 	}
+@@ -309,7 +311,9 @@ static int imx_gpc_probe(struct platform_device *pdev)
+ 	struct regulator *pu_reg;
+ 	int ret;
+ 
+-	pu_reg = devm_regulator_get(&pdev->dev, "pu");
++	pu_reg = devm_regulator_get_optional(&pdev->dev, "pu");
++	if (PTR_ERR(pu_reg) == -ENODEV)
++		pu_reg = NULL;
+ 	if (IS_ERR(pu_reg)) {
+ 		ret = PTR_ERR(pu_reg);
+ 		dev_err(&pdev->dev, "failed to get pu regulator: %d\n", ret);
+@@ -317,8 +321,9 @@ static int imx_gpc_probe(struct platform_device *pdev)
+ 	}
+ 
+ 	/* The regulator is initially enabled */
+-	ret = regulator_enable(pu_reg);
+-	if (ret < 0) {
++	if (pu_reg)
++		ret = regulator_enable(pu_reg);
++	if (pu_reg && ret < 0) {
+ 		dev_err(&pdev->dev, "failed to enable pu regulator: %d\n", ret);
+ 		return ret;
+ 	}
+-- 
+2.1.0
