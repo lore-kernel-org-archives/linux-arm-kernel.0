@@ -1,184 +1,29 @@
-From: Liviu.Dudau@arm.com (Liviu Dudau)
-Date: Wed, 10 Sep 2014 15:22:41 +0100
-Subject: [PATCH v10 08/10] OF: PCI: Add support for parsing PCI host
- bridge resources from DT
-In-Reply-To: <20140909133546.GB2636@e102568-lin.cambridge.arm.com>
-References: <1410184472-17630-1-git-send-email-Liviu.Dudau@arm.com>
- <1410184472-17630-9-git-send-email-Liviu.Dudau@arm.com>
- <20140909133546.GB2636@e102568-lin.cambridge.arm.com>
-Message-ID: <20140910142241.GD27864@e106497-lin.cambridge.arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 10 Sep 2014 16:26:36 +0200
+Subject: [GIT PULL] ARM: LPC32xx: Device tree updates
+In-Reply-To: <54105765.5090708@antcom.de>
+References: <540F1409.3070206@antcom.de> <4173517.3fBhGIV2aO@wuerfel>
+ <54105765.5090708@antcom.de>
+Message-ID: <3900226.tYc6lW0Md4@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 09, 2014 at 02:35:46PM +0100, Lorenzo Pieralisi wrote:
-> On Mon, Sep 08, 2014 at 02:54:30PM +0100, Liviu Dudau wrote:
-> > Provide a function to parse the PCI DT ranges that can be used to
-> > create a pci_host_bridge structure together with its associated
-> > bus.
-> > 
-> > Cc: Bjorn Helgaas <bhelgaas@google.com>
-> > Cc: Arnd Bergmann <arnd@arndb.de>
-> > Cc: Grant Likely <grant.likely@linaro.org>
-> > Cc: Rob Herring <robh+dt@kernel.org>
-> > Cc: Catalin Marinas <catalin.marinas@arm.com>
-> > Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
-> > ---
-> >  drivers/of/of_pci.c    | 102 +++++++++++++++++++++++++++++++++++++++++++++++++
-> >  include/linux/of_pci.h |  11 ++++++
-> >  2 files changed, 113 insertions(+)
-> > 
-> > diff --git a/drivers/of/of_pci.c b/drivers/of/of_pci.c
-> > index a107edb..36701da 100644
-> > --- a/drivers/of/of_pci.c
-> > +++ b/drivers/of/of_pci.c
-> > @@ -1,7 +1,9 @@
-> >  #include <linux/kernel.h>
-> >  #include <linux/export.h>
-> >  #include <linux/of.h>
-> > +#include <linux/of_address.h>
-> >  #include <linux/of_pci.h>
-> > +#include <linux/slab.h>
-> >  
-> >  static inline int __of_pci_pci_compare(struct device_node *node,
-> >  				       unsigned int data)
-> > @@ -123,6 +125,106 @@ int of_pci_get_domain_nr(struct device_node *node, bool allocate_if_missing)
-> >  }
-> >  EXPORT_SYMBOL_GPL(of_pci_get_domain_nr);
-> >  
-> > +/**
-> > + * of_pci_get_host_bridge_resources - Parse PCI host bridge resources from DT
-> > + * @dev: device node of the host bridge having the range property
-> > + * @busno: bus number associated with the bridge root bus
-> > + * @bus_max: maximum number of busses for this bridge
-> > + * @resources: list where the range of resources will be added after DT parsing
-> > + * @io_base: pointer to a variable that will contain on return the physical
-> > + * address for the start of the I/O range.
-> > + *
-> > + * It is the callers job to free the @resources list.
-> > + *
-> > + * This function will parse the "ranges" property of a PCI host bridge device
-> > + * node and setup the resource mapping based on its content. It is expected
-> > + * that the property conforms with the Power ePAPR document.
+On Wednesday 10 September 2014 15:51:33 Roland Stigge wrote:
 > 
-> You should also define what it returns and when.
+> > You cleaned up the platform a lot when you took
+> > over in 2012, but now we have move other platforms much further
+> > and I wonder if you could do some of the same changes.
+> > Most importantly, I really want most platforms to be part of
+> > ARCH_MULTIPLATFORM and build them into the same image. For
+> > lpc32xx, this is currently not possible because you are not using
+> > the common clk implementation. Would it be possible for you
+> > to look into converting that driver over and moving it to
+> > drivers/clk?
+> 
+> It's certainly possible, but time might be scarce. What would be a good
+> reference platform to have a look into as example? Or a hint/link?
 
-Thanks, will do.
+I'll let Linus answer that one, he converted a couple of platform and
+probably has a better idea than I do.
 
-> 
-> > + *
-> > + */
-> > +int of_pci_get_host_bridge_resources(struct device_node *dev,
-> > +			unsigned char busno, unsigned char bus_max,
-> > +			struct list_head *resources, resource_size_t *io_base)
-> > +{
-> > +	struct resource *res;
-> > +	struct resource *bus_range;
-> > +	struct of_pci_range range;
-> > +	struct of_pci_range_parser parser;
-> > +	char range_type[4];
-> > +	int err;
-> > +
-> > +	bus_range = kzalloc(sizeof(*bus_range), GFP_KERNEL);
-> > +	if (!bus_range)
-> > +		return -ENOMEM;
-> > +
-> > +	pr_info("PCI host bridge %s ranges:\n", dev->full_name);
-> > +
-> > +	err = of_pci_parse_bus_range(dev, bus_range);
-> > +	if (err) {
-> > +		bus_range->start = busno;
-> > +		bus_range->end = bus_max;
-> > +		bus_range->flags = IORESOURCE_BUS;
-> > +		pr_info("  No bus range found for %s, using %pR\n",
-> > +			dev->full_name, &bus_range);
-> > +	} else {
-> > +		if (bus_range->end > bus_range->start + bus_max)
-> > +			bus_range->end = bus_range->start + bus_max;
-> > +	}
-> > +	pci_add_resource(resources, bus_range);
-> 
-> This means that eg in the PCI generic host controller I cannot "filter"
-> the bus resource, unless I remove it, "filter" it, and add it again.
-
-I'm not sure what you mean. Why do you have to remove the bus resource and
-add it again? What you get back from of_pci_get_host_bridge_resources() is
-a list of resources as they have been parsed from DT. You now have the option
-of doing any filtering that you might have done pre-v10 in the
-pcibios_fixup_bridge_ranges() but that is only on the list that was returned
-from of_pci_get_host_bridge_resources(). At this moment no root bus or
-host bridge structure has been created so no resource was added to those.
-With the filtered list you can use it to call pci_scan_root_bus() and *then*
-it gets added to the pci_host_bridge structure.
-
-> 
-> I certainly can't filter a resource that has been already added without
-> removing it first.
-> 
-> Thoughts ?
-
-Hope I have explained what happens. Please let me know if you have any other
-comments.
-
-Best regards,
-Liviu
-
-> 
-> > +
-> > +	/* Check for ranges property */
-> > +	err = of_pci_range_parser_init(&parser, dev);
-> > +	if (err)
-> > +		goto parse_failed;
-> > +
-> > +	pr_debug("Parsing ranges property...\n");
-> > +	for_each_of_pci_range(&parser, &range) {
-> > +		/* Read next ranges element */
-> > +		if ((range.flags & IORESOURCE_TYPE_BITS) == IORESOURCE_IO)
-> > +			snprintf(range_type, 4, " IO");
-> > +		else if ((range.flags & IORESOURCE_TYPE_BITS) == IORESOURCE_MEM)
-> > +			snprintf(range_type, 4, "MEM");
-> > +		else
-> > +			snprintf(range_type, 4, "err");
-> > +		pr_info("  %s %#010llx..%#010llx -> %#010llx\n", range_type,
-> > +			range.cpu_addr, range.cpu_addr + range.size - 1,
-> > +			range.pci_addr);
-> > +
-> > +		/*
-> > +		 * If we failed translation or got a zero-sized region
-> > +		 * then skip this range
-> > +		 */
-> > +		if (range.cpu_addr == OF_BAD_ADDR || range.size == 0)
-> > +			continue;
-> > +
-> > +		res = kzalloc(sizeof(struct resource), GFP_KERNEL);
-> > +		if (!res) {
-> > +			err = -ENOMEM;
-> > +			goto parse_failed;
-> > +		}
-> > +
-> > +		err = of_pci_range_to_resource(&range, dev, res);
-> > +		if (err) {
-> > +			kfree(res);
-> 
-> You might want to add a label to free res to make things more uniform.
-> 
-> > +			goto parse_failed;
-> > +		}
-> > +
-> > +		if (resource_type(res) == IORESOURCE_IO) {
-> > +			if (*io_base)
-> 
-> You do not zero io_base in the first place so you should ask the API
-> user to do that. Is 0 a valid value BTW ? If it is you've got to resort
-> to something else to detect multiple IO resources.
-> 
-> Lorenzo
-
--- 
-====================
-| I would like to |
-| fix the world,  |
-| but they're not |
-| giving me the   |
- \ source code!  /
-  ---------------
-    ?\_(?)_/?
+	Arnd
