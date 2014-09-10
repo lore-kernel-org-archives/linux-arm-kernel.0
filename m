@@ -1,45 +1,32 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 10 Sep 2014 16:13:16 +0100
-Subject: [PATCH RFC 2/3] ARM: regulator: add Freescale MXS regulator driver
-In-Reply-To: <20140910141853.GA4994@leverpostej>
-References: <1410089869-6611-1-git-send-email-info@lategoodbye.de>
- <1410089869-6611-3-git-send-email-info@lategoodbye.de>
- <20140909182211.GG3896@leverpostej>
- <540F523D.4010904@lategoodbye.de>
- <20140910141853.GA4994@leverpostej>
-Message-ID: <20140910151316.GG7960@sirena.org.uk>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 10 Sep 2014 17:17:41 +0200
+Subject: [GIT PULL] ARM: LPC32xx: Defconfig updates
+In-Reply-To: <541058CE.8020609@antcom.de>
+References: <541058CE.8020609@antcom.de>
+Message-ID: <3400889.BE1GxQoC0p@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 10, 2014 at 03:18:53PM +0100, Mark Rutland wrote:
-> On Tue, Sep 09, 2014 at 08:17:17PM +0100, Stefan Wahren wrote:
+On Wednesday 10 September 2014 15:57:34 Roland Stigge wrote:
+> The following changes since commit 7d1311b93e58ed55f3a31cc8f94c4b8fe988a2b9:
+> 
+>   Linux 3.17-rc1 (2014-08-16 10:40:26 -0600)
+> 
+> are available in the git repository at:
+> 
+>   git://git.antcom.de/linux-2.6 lpc32xx/defconfig
+> 
+> for you to fetch changes up to 4884f769e65b2b02bfdafb9f64217844dfa3d84f:
+> 
+>   ARM: LPC32xx: defconfig update (2014-09-10 15:41:11 +0200)
+> 
+> ----------------------------------------------------------------
+> Roland Stigge (1):
+>       ARM: LPC32xx: defconfig update
+> 
+>  arch/arm/configs/lpc32xx_defconfig | 2 ++
+>  1 file changed, 2 insertions(+)
 
-Ugh, this looks like it might be a regulator driver but since the
-subject line was "ARM: " I deleted it unread - if your changelog looks
-different to all the other changelogs in the subsystem it probably needs
-changing.
+Pulled into next/defconfig, thanks!
 
-> > >> +       sreg = devm_kzalloc(dev, sizeof(*sreg), GFP_KERNEL);
-> > >> +       if (!sreg)
-> > >> +               return -ENOMEM;
-> > >> +       sreg->initdata = initdata;
-> > >> +       sreg->name = of_get_property(np, "regulator-name", NULL);
-
-> > > I'm not keen on using of_get_property here. We have no idea if
-> > > regulator-name is even a string (it should be, but we have no
-> > > guarantee).
-
-> > Better using of_property_read_string?
-
-> Yes. That will check the value is NUL-terminated, at least.
-
-Or just remove the property entirely...  without having seen the
-bindings if we're specifying the name of the device via the device tree
-something seems wrong.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140910/de331256/attachment-0001.sig>
+	Arnd
