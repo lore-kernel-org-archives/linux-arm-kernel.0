@@ -1,145 +1,77 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 10 Sep 2014 18:27:10 +0100
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 10 Sep 2014 18:34:01 +0100
 Subject: [PATCH] clocksource: arch_timer: Fix code to use physical timers
  when requested
-In-Reply-To: <1409173419-13076-1-git-send-email-sonnyrao@chromium.org>
-References: <1409173419-13076-1-git-send-email-sonnyrao@chromium.org>
-Message-ID: <20140910172710.GA3300@leverpostej>
+In-Reply-To: <CAD=FV=Up=+zNneY-behnkFbhupi50_f5R=ECgJQeqGV5kz5d2g@mail.gmail.com>
+References: <CAPz6YkWAPtuy4sAuAK9GtpDgfGsccxeS+pqqe_t_R818Jt01qA@mail.gmail.com>
+ <53FE5B09.2020403@codeaurora.org>
+ <CAOesGMhTivDzJFuxONggcJ6N5UvZopKa=+tv9PoPX593cpnm0A@mail.gmail.com>
+ <53FE7E3B.1010500@codeaurora.org>
+ <CAOesGMgXnsqttHwAxEW4a7-Rx-nmSwpJd_Dt1iCcFOvzDwbzdA@mail.gmail.com>
+ <CAD=FV=VjN6Xam-nRRcxvOoN-gokU6DbGVjoPXN_fkTJssH1RWA@mail.gmail.com>
+ <20140828093505.GC14650@leverpostej>
+ <CAD=FV=UwfP0x-bswbtV_eUvpKeOSNnsVVLTE3VHguyhm_jiSug@mail.gmail.com>
+ <20140908135436.GC22717@arm.com>
+ <CAD=FV=Up=+zNneY-behnkFbhupi50_f5R=ECgJQeqGV5kz5d2g@mail.gmail.com>
+Message-ID: <20140910173401.GG1710@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sonny,
+On Wed, Sep 10, 2014 at 06:17:23PM +0100, Doug Anderson wrote:
+> On Mon, Sep 8, 2014 at 6:54 AM, Catalin Marinas <catalin.marinas@arm.com> wrote:
+> > On Fri, Sep 05, 2014 at 11:11:47PM +0100, Doug Anderson wrote:
+> >> On Thu, Aug 28, 2014 at 2:35 AM, Mark Rutland <mark.rutland@arm.com> wrote:
+> >> > Not if you boot Linux at hyp, as we've recommended for this precise
+> >> > reason. That doesn't fix other things like CNTFRQ if the secure
+> >> > initialisation doesn't poke that, however.
+> >>
+> >> I'll freely admit that I'm out of my league and out of my comfort zone
+> >> here, but...
+> >>
+> >> In the theory that firmware ought to be as minimal as possible
+> >> (because it's hard to update and hard to keep in sync with kernel
+> >> versions), it seems like firmware ought to start the kernel out in as
+> >> permissive mode as it's willing to provide, right?
+> >
+> > Not necessarily (and definitely not for arm64). And we've seen in
+> > practice that the actual deployed kernel may run in a different security
+> > mode than what's in mainline and used for initial development (you may
+> > just not see all the patches upstream). For development, that's indeed
+> > simpler, but once you go into production, a customer requesting some
+> > secure OS for payments etc. and Linux is moved to the non-secure side
+> > (and you end up putting hacks in the kernel because they were not
+> > spotted during initial development with Linux running in secure mode).
+> 
+> I guess the important part of my statement is "as it's willing to
+> provide".  In your case your firmware isn't willing to provide "secure
+> SVC".  In our case it is.
+> 
+> We've actually shipped products where the firmware boots the kernel in
+> "secure" mode.  These products have a very different security model
+> than you're envisioning, I guess.  In these products, less firmware is
+> better and adding firmware code to do the whole transition to "non
+> secure hyp mode" just isn't worth it.  It's not just a one-time blob
+> of code in the firmware before booting the kernel.  (I'm told) it
+> means somehow keeping firmware code around to help out with turning
+> processors off/on and to help with resume from S3.  That's
+> infrastructure that we don't want to add.
 
-On Wed, Aug 27, 2014 at 10:03:39PM +0100, Sonny Rao wrote:
-> This is a bug fix for using physical arch timers when
-> the arch_timer_use_virtual boolean is false.  It restores the
-> arch_counter_get_cntpct() function after removal in
-> 
-> 0d651e4e "clocksource: arch_timer: use virtual counters"
-> 
-> and completes the implementation of memory mapped access for physical
-> timers, so if a system is trying to use physical timers, it will
-> function properly.
+Setting aside the security model, booting in secure mode can also have a
+significant impact on the programming model of system IP, not just the CPU.
+For example, the SMMU register file suddenly looks different and the way in
+which it is programmed also changes. The GIC (v3+) is similar. Linux doesn't
+have drivers that know about this so, whilst not impossible, there's a
+non-trivial amount of work (and then maintenance overhead) if you want to
+support booting Linux on the secure side.
 
-To get back to the topic at hand:
+The secure world may be more permissive in some regards, but it's actually
+a burden in others. It's not a simple superset of non-secure, and this is
+more evident than ever in ARMv8.
 
-Which platform is this required by?
+As I understand it, this conversation started because we're booting at
+non-secure EL1 with a badly configured EL2. That sounds like something
+we may have to fix/work around in Linux (Olof points out that it used to
+work), but we shouldn't conflate that with booting on the secure side to
+get away from broken firmware.
 
-Why exactly is arch_timer_use_virtual false in this case?
-
-Thanks,
-Mark.
-
-> 
-> Signed-off-by: Sonny Rao <sonnyrao@chromium.org>
-> ---
->  arch/arm/include/asm/arch_timer.h    |  9 +++++++++
->  arch/arm64/include/asm/arch_timer.h  | 10 ++++++++++
->  drivers/clocksource/arm_arch_timer.c | 30 ++++++++++++++++++++++++++----
->  3 files changed, 45 insertions(+), 4 deletions(-)
-> 
-> diff --git a/arch/arm/include/asm/arch_timer.h b/arch/arm/include/asm/arch_timer.h
-> index 0704e0c..e72aa4d 100644
-> --- a/arch/arm/include/asm/arch_timer.h
-> +++ b/arch/arm/include/asm/arch_timer.h
-> @@ -78,6 +78,15 @@ static inline u32 arch_timer_get_cntfrq(void)
->  	return val;
->  }
->  
-> +static inline u64 arch_counter_get_cntpct(void)
-> +{
-> +	u64 cval;
-> +
-> +	isb();
-> +	asm volatile("mrrc p15, 0, %Q0, %R0, c14" : "=r" (cval));
-> +	return cval;
-> +}
-> +
->  static inline u64 arch_counter_get_cntvct(void)
->  {
->  	u64 cval;
-> diff --git a/arch/arm64/include/asm/arch_timer.h b/arch/arm64/include/asm/arch_timer.h
-> index 9400596..58657c4 100644
-> --- a/arch/arm64/include/asm/arch_timer.h
-> +++ b/arch/arm64/include/asm/arch_timer.h
-> @@ -135,6 +135,16 @@ static inline void arch_timer_evtstrm_enable(int divider)
->  #endif
->  }
->  
-> +static inline u64 arch_counter_get_cntpct(void)
-> +{
-> +	u64 cval;
-> +
-> +	isb();
-> +	asm volatile("mrs %0, cntpct_el0" : "=r" (cval));
-> +
-> +	return cval;
-> +}
-> +
->  static inline u64 arch_counter_get_cntvct(void)
->  {
->  	u64 cval;
-> diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
-> index 5163ec1..ad723cb 100644
-> --- a/drivers/clocksource/arm_arch_timer.c
-> +++ b/drivers/clocksource/arm_arch_timer.c
-> @@ -30,6 +30,8 @@
->  #define CNTTIDR		0x08
->  #define CNTTIDR_VIRT(n)	(BIT(1) << ((n) * 4))
->  
-> +#define CNTPCT_LO	0x00
-> +#define CNTPCT_HI	0x04
->  #define CNTVCT_LO	0x08
->  #define CNTVCT_HI	0x0c
->  #define CNTFRQ		0x10
-> @@ -386,6 +388,19 @@ static u64 arch_counter_get_cntvct_mem(void)
->  	return ((u64) vct_hi << 32) | vct_lo;
->  }
->  
-> +static u64 arch_counter_get_cntpct_mem(void)
-> +{
-> +	u32 pct_lo, pct_hi, tmp_hi;
-> +
-> +	do {
-> +		pct_hi = readl_relaxed(arch_counter_base + CNTPCT_HI);
-> +		pct_lo = readl_relaxed(arch_counter_base + CNTPCT_LO);
-> +		tmp_hi = readl_relaxed(arch_counter_base + CNTPCT_HI);
-> +	} while (pct_hi != tmp_hi);
-> +
-> +	return ((u64) pct_hi << 32) | pct_lo;
-> +}
-> +
->  /*
->   * Default to cp15 based access because arm64 uses this function for
->   * sched_clock() before DT is probed and the cp15 method is guaranteed
-> @@ -429,10 +444,17 @@ static void __init arch_counter_register(unsigned type)
->  	u64 start_count;
->  
->  	/* Register the CP15 based counter if we have one */
-> -	if (type & ARCH_CP15_TIMER)
-> -		arch_timer_read_counter = arch_counter_get_cntvct;
-> -	else
-> -		arch_timer_read_counter = arch_counter_get_cntvct_mem;
-> +	if (type & ARCH_CP15_TIMER) {
-> +		if (arch_timer_use_virtual)
-> +			arch_timer_read_counter = arch_counter_get_cntvct;
-> +		else
-> +			arch_timer_read_counter = arch_counter_get_cntpct;
-> +	} else {
-> +		if (arch_timer_use_virtual)
-> +			arch_timer_read_counter = arch_counter_get_cntvct_mem;
-> +		else
-> +			arch_timer_read_counter = arch_counter_get_cntpct_mem;
-> +	}
->  
->  	start_count = arch_timer_read_counter();
->  	clocksource_register_hz(&clocksource_counter, arch_timer_rate);
-> -- 
-> 1.8.3.2
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+Will
