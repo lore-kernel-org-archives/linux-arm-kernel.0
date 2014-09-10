@@ -1,102 +1,54 @@
-From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Wed, 10 Sep 2014 10:32:50 -0600
-Subject: [PATCH v10 07/10] OF: Introduce helper function for getting PCI
- domain_nr
-In-Reply-To: <CAL_JsqJMRqbwNkB2K6Mg2DU9mSHwAObtD7LLG2_n=4jGDAFhyQ@mail.gmail.com>
-References: <CAL_JsqJi8k1Goc3UmXhuxf9v7=4gJrYG_Di7v574PxS8TsJaXw@mail.gmail.com>
- <20140908145459.GO27864@e106497-lin.cambridge.arm.com>
- <CAL_JsqJdGKDVwJOpPp19OkVPGzR7Zqv3nh+ONHHaYnPLYTYoYg@mail.gmail.com>
- <20140908155931.GP27864@e106497-lin.cambridge.arm.com>
- <540E960D.7080408@huawei.com>
- <20140909084621.GS27864@e106497-lin.cambridge.arm.com>
- <540EC8CB.7010106@huawei.com>
- <CAErSpo4cAfom2=07NYDRfTCdHO22M0v+ueiaZuG6v2Xd18wEnQ@mail.gmail.com>
- <20140909154123.GA12906@obsidianresearch.com>
- <CAL_JsqJMRqbwNkB2K6Mg2DU9mSHwAObtD7LLG2_n=4jGDAFhyQ@mail.gmail.com>
-Message-ID: <20140910163250.GA22910@obsidianresearch.com>
+From: geoff@infradead.org (Geoff Levand)
+Date: Wed, 10 Sep 2014 09:35:14 -0700
+Subject: [PATCH 02/13] arm64/kvm: Fix assembler compatibility of macros
+In-Reply-To: <CAKv+Gu_hs-Sv=Bg6uyKc41OV9sKS0sfM1YAcCMaTF7aTH9YPwA@mail.gmail.com>
+References: <cover.1410302383.git.geoff@infradead.org>
+ <bc4abc340eaa4da448f62326a134fabfb5a2a875.1410302383.git.geoff@infradead.org>
+ <CAKv+Gu_hs-Sv=Bg6uyKc41OV9sKS0sfM1YAcCMaTF7aTH9YPwA@mail.gmail.com>
+Message-ID: <1410366914.11440.16.camel@smoke>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 09, 2014 at 09:44:56PM -0500, Rob Herring wrote:
-> On Tue, Sep 9, 2014 at 10:41 AM, Jason Gunthorpe
-> <jgunthorpe@obsidianresearch.com> wrote:
-> > On Tue, Sep 09, 2014 at 08:26:19AM -0600, Bjorn Helgaas wrote:
+On Wed, 2014-09-10 at 10:40 +0200, Ard Biesheuvel wrote:
+> On 10 September 2014 00:49, Geoff Levand <geoff@infradead.org> wrote:
+> > Some of the macros defined in kvm_arm.h are useful in the exception vector
+> > routines, but they are not compatible with the assembler.  Change the
+> > definition of ESR_EL2_ISS to be compatible.
 > >
-> >> So as long as the DT tells you the ECAM information for each host
-> >> bridge, that should be sufficient.  The domain number is then just a
-> >> Linux convenience and is not tied to the platform as it is on ia64.
+> > Fixes build errors like these when using kvm_arm.h in assembly
+> > source files:
 > >
-> > I think this is right for DT systems - the domain is purely internal
-> > to the kernel and userspace, it is used to locate the proper host
-> > bridge driver instance, which contains the proper config accessor (and
-> > register bases, etc).
+> >   Error: unexpected characters following instruction at operand 3 -- `add x0,x1,#((1U<<25)-1)'
 > >
-> > AFAIK the main reason to have a DT alias to learn the domain number is
-> > to make it stable so things like udev/etc can reliably match on the
-> > PCI location.
+> > Signed-off-by: Geoff Levand <geoff@infradead.org>
+> > ---
+> >  arch/arm64/include/asm/kvm_arm.h | 2 +-
+> >  1 file changed, 1 insertion(+), 1 deletion(-)
+> >
+> > diff --git a/arch/arm64/include/asm/kvm_arm.h b/arch/arm64/include/asm/kvm_arm.h
+> > index cc83520..e0e7e64 100644
+> > --- a/arch/arm64/include/asm/kvm_arm.h
+> > +++ b/arch/arm64/include/asm/kvm_arm.h
+> > @@ -176,7 +176,7 @@
+> >  #define ESR_EL2_EC_SHIFT       (26)
+> >  #define ESR_EL2_EC             (0x3fU << ESR_EL2_EC_SHIFT)
+> >  #define ESR_EL2_IL             (1U << 25)
+> > -#define ESR_EL2_ISS            (ESR_EL2_IL - 1)
+> > +#define ESR_EL2_ISS            (0xffff)
 > 
-> For what purpose?
+> Don't you mean 0x1ffffff?
 
-udev places PCI D:B:D.F's all over the place, eg:
+Hcalls have a 16 bit 'payload', the upper bits of the ISS field
+are specified as zero by the architecture so 0xffff is the same
+as 0x1ffffff.
 
-$ ls /dev/serial/by-path/
-pci-0000:00:1a.0-usb-0:1.4.2.5:1.0@
-pci-0000:00:1a.0-usb-0:1.4.2.6:1.0@
-$ ls /dev/disk/by-path/
-pci-0000:03:00.0-sas-0x5fcfffff00000001-lun-0@
-pci-0000:03:00.0-sas-0x5fcfffff00000001-lun-0-part1@
-pci-0000:03:00.0-sas-0x5fcfffff00000001-lun-0-part2@
-pci-0000:03:00.0-sas-0x5fcfffff00000001-lun-0-part3@
-    ^^^^
-domain number
+> And, there is a macro UL() for this purpose, so I suppose you could
+> redefine ESR_EL2_IL as (UL(1) << 25) as well. I know it is not
+> strictly the same thing, but it should be good enough as this is arm64
+> only
 
-It is part of the stable naming scheme udev uses - and that scheme is
-predicated on the PCI location being stable.
+Sure that will be OK.  The one other use of ESR_EL2_IL will promote
+the operation to unsigned long without ill effect.  I'll prepare an
+updated patch.
 
-> IMO they should not. We really want to move away from aliases, not
-> expand their use. They are used for serial because there was no good
-> way to not break things like "console=ttyS0". I2C I think was more
-> internal, but may have been for i2c-dev. What are we going to break if
-> we don't have consistent domain numbering? 
-
-Well, DT needs some kind of solution to produce stable names for
-things. It is no good if the names unpredictably randomize.
-
-Lets use I2C as an example. My embedded systems have multiple I2C
-busses, with multiple drivers (so load order is not easily ensured).
-I am relying on DT aliases to force the bus numbers to stable values,
-but if I don't do that - then how do I find things in user space?
-
-$ ls -l /sys/bus/i2c/devices
-lrwxrwxrwx    1 root     root            0 Sep 10 16:12 i2c-2 -> ../../../devices/pci0000:00/0000:00:01.0/i2c_qsfp.4/i2c-2
-
-Oh, I have to search based on the HW path, which includes the domain
-number.
-
-So that *must* be really stable, or user space has no hope of mapping
-real hardware back to an I2C bus number.
-
-The same is true for pretty much every small IDR scheme in the kernel
-- they rely on the HW path for stable names.
-
-As an aside, I think for embedded being able to directly specify
-things like the bus number for I2C, ethX for ethernet, etc is very
-valuable, I would be sad to see that go away.
-
-> DT, I'd rather see it as part of the PCI root node. But I'm not
-> convinced it is needed.
- 
-> It doesn't really sound like we have any actual need to solve this for
-> DT ATM. It's not clear to me if all buses should be domain 0 or a
-> simple incrementing index for each bus in absence of any firmware set
-> value.
-
-There are already ARM DTs in the kernel that require multiple domains,
-so that ship has sailed.
-
-I don't think it really matters where the number comes from, so long
-as it doesn't change after a kernel upgrade, or with a different
-module load order, or if the DT is recompiled, or whatever. It needs
-to be stable.
-
-Jason
+-Geoff
