@@ -1,20 +1,17 @@
 From: shawn.guo@freescale.com (Shawn Guo)
-Date: Wed, 10 Sep 2014 11:10:48 +0800
-Subject: [PATCH V1 0/3] refine the ssi clock for imx6sl, and update dts
- file.
-In-Reply-To: <cover.1410253534.git.shengjiu.wang@freescale.com>
-References: <cover.1410253534.git.shengjiu.wang@freescale.com>
-Message-ID: <20140910031046.GA18566@dragon>
+Date: Wed, 10 Sep 2014 11:16:01 +0800
+Subject: [PATCH 0/4] ARM: dts: several updates for the imx28-tx28.dts file
+In-Reply-To: <1410261963-27956-1-git-send-email-LW@KARO-electronics.de>
+References: <1410261963-27956-1-git-send-email-LW@KARO-electronics.de>
+Message-ID: <20140910031559.GB18566@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 09, 2014 at 05:13:24PM +0800, Shengjiu Wang wrote:
-> This serial patch is for refining the ssi clock tree for imx6sl,
-> and update imx6qdl and imx6sl dts file.
-> 
-> Shengjiu Wang (3):
->   ARM: clk-imx6sl: refine clock tree for SSI
->   ARM: dts: imx6qdl: add baud clock and clock-names for ssi
->   ARM: dts: imx6sl: add baud clock and clock-names for ssi
+On Tue, Sep 09, 2014 at 01:25:59PM +0200, Lothar Wa?mann wrote:
+> - remove unused labels on spidev nodes
+> - add third spidev node to utilize all available CS
+> - use GPIO polarity flags
+> - add configuration for spi-gpio driver as alternative to spi-mxs
+> - add an alias for the can transceiver regulator which is used by U-Boot
 
-Applied all, thanks.
+Applied all 4, thanks.
