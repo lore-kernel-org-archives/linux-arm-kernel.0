@@ -1,37 +1,46 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 10 Sep 2014 11:51:21 -0700
-Subject: [PATCH] ARM: perf: Don't sleep while atomic when enabling per-cpu
- interrupts
-In-Reply-To: <20140910182137.GL1710@arm.com>
-References: <1410200814-25878-1-git-send-email-sboyd@codeaurora.org>
- <20140909113943.GG1754@arm.com> <540F3EE5.90500@codeaurora.org>
- <20140910182137.GL1710@arm.com>
-Message-ID: <54109DA9.4070208@codeaurora.org>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Wed, 10 Sep 2014 15:54:45 -0300
+Subject: [PATCH RFC 2/3] ARM: regulator: add Freescale MXS regulator driver
+In-Reply-To: <54108B34.6010701@lategoodbye.de>
+References: <1410089869-6611-1-git-send-email-info@lategoodbye.de>
+ <1410089869-6611-3-git-send-email-info@lategoodbye.de>
+ <20140909182211.GG3896@leverpostej>
+ <540F523D.4010904@lategoodbye.de>
+ <20140910141853.GA4994@leverpostej>
+ <20140910151316.GG7960@sirena.org.uk>
+ <54108B34.6010701@lategoodbye.de>
+Message-ID: <CAOMZO5BEN_DQOyhrx5ZB7y6DoDvqbLvDyJfAabOvtUvKOiGHOA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/10/14 11:21, Will Deacon wrote:
-> On Tue, Sep 09, 2014 at 06:54:45PM +0100, Stephen Boyd wrote:
->
->> Here's the interdiff. Is there a reason arm64 casts data to an unsigned
->> int pointer when what's passed is an int pointer?
-> There has to be a cast to something because data is a void *.
-> enable_percpu_irq takes an unsigned int, so I guess that's why it was
-> chosen. I'm not fussed either way.
+Hi Stefan,
 
-Right, I'm just annoyed that what's passed in the void * is not an
-unsigned int, it's an int. I agree that eventually we'll hand it to
-enable_percpu_irq and there it will be implicitly casted to an unsigned
-int so it really doesn't matter.
-
+On Wed, Sep 10, 2014 at 2:32 PM, Stefan Wahren <info@lategoodbye.de> wrote:
+> Hi Mark,
 >
-> Feel free to submit the full patch with my ack:
+> Am 10.09.2014 17:13, schrieb Mark Brown:
+>>
+>> On Wed, Sep 10, 2014 at 03:18:53PM +0100, Mark Rutland wrote:
+>>>
+>>> On Tue, Sep 09, 2014 at 08:17:17PM +0100, Stefan Wahren wrote:
+>>
+>>
+>> Ugh, this looks like it might be a regulator driver but since the
+>> subject line was "ARM: " I deleted it unread - if your changelog looks
+>> different to all the other changelogs in the subsystem it probably needs
+>> changing.
 >
->   Acked-by: Will Deacon <will.deacon@arm.com>
 >
+> sorry about the confusion, i will remove ARM in the next version.
+>
+> Changelog? I didn't send a changelog because it was my first version.
+>
+> Should i resend this version only to you?
 
-Ok thanks.
+In the cover letter of this RFC series you mentioned that this has not
+been tested on real hardware.
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+What about sending a new version of this series (with the RFC prefix
+removed and with Mark Rutland's suggestion implemented) tested on a
+mx28 board and also with the Subject of the regulator patch changed to
+'regulator: add support for mxs regulator" with Mark Brown on Cc?
