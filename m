@@ -1,44 +1,39 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Wed, 10 Sep 2014 17:52:02 +0200
-Subject: [PATCH] clk: rockchip: also protect hclk_peri as critical
-Message-ID: <1950006.Th78Z9O4lJ@diego>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 10 Sep 2014 16:52:16 +0100
+Subject: [PATCH v5] spi: spi-imx: add DMA support
+In-Reply-To: <20140910151759.GA31462@Robin-OptiPlex-780>
+References: <1410312604-31949-1-git-send-email-b38343@freescale.com>
+ <20140910102105.GR2601@sirena.org.uk>
+ <20140910112258.GA30794@Robin-OptiPlex-780>
+ <20140910114530.GD7960@sirena.org.uk>
+ <20140910151759.GA31462@Robin-OptiPlex-780>
+Message-ID: <20140910155216.GI7960@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The dwc2 usb controller also uses agressive clock gating, which in this
-case leads to hclk_peri getting disabled and hanging the system.
-Therefore move it to the critical clocks until we also control that
-part of the system.
+On Wed, Sep 10, 2014 at 11:18:01PM +0800, Robin Gong wrote:
+> On Wed, Sep 10, 2014 at 12:45:30PM +0100, Mark Brown wrote:
 
-Signed-off-by: Heiko Stuebner <heiko@sntech.de>
----
- drivers/clk/rockchip/clk-rk3188.c | 1 +
- drivers/clk/rockchip/clk-rk3288.c | 1 +
- 2 files changed, 2 insertions(+)
+> > > Yes, you're right. I should use "transfer->tx_sg->sgl == NULL" or
+> > > "transfer->rx_sg->sgl == NULL" instead of usedma flag in driver, right?
 
-diff --git a/drivers/clk/rockchip/clk-rk3188.c b/drivers/clk/rockchip/clk-rk3188.c
-index 1892c66..9f9937e 100644
---- a/drivers/clk/rockchip/clk-rk3188.c
-+++ b/drivers/clk/rockchip/clk-rk3188.c
-@@ -602,6 +602,7 @@ static struct rockchip_clk_branch rk3188_clk_branches[] __initdata = {
- static const char *rk3188_critical_clocks[] __initconst = {
- 	"aclk_cpu",
- 	"aclk_peri",
-+	"hclk_peri",
- };
- 
- static void __init rk3188_common_clk_init(struct device_node *np)
-diff --git a/drivers/clk/rockchip/clk-rk3288.c b/drivers/clk/rockchip/clk-rk3288.c
-index 43e0ad0..c76b16d 100644
---- a/drivers/clk/rockchip/clk-rk3288.c
-+++ b/drivers/clk/rockchip/clk-rk3288.c
-@@ -683,6 +683,7 @@ static struct rockchip_clk_branch rk3288_clk_branches[] __initdata = {
- static const char *rk3288_critical_clocks[] __initconst = {
- 	"aclk_cpu",
- 	"aclk_peri",
-+	"hclk_peri",
- };
- 
- static void __init rk3288_clk_init(struct device_node *np)
--- 
-2.0.1
+> > Right.
+
+> But looks spi core framework can make sure every rx or tx transfer in sequence.
+> If so, can_dma will never be called until this transfer finished
+> (spi_pump_messages), and my usedma flag also never be modified until next
+> transfer start. Please correct me if I am wrong, thanks.
+
+Even if that were true currently this would still not be good code since
+it would break in the face of SPI core changes.  In any case the
+assumption isn't true for the current SPI core, the DMA mapping is done
+for all transfers in a message before we start running them and it's
+entirely likely that we will have patterns like a short PIO transfer
+followed by a big data block.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140910/b45be854/attachment.sig>
