@@ -1,118 +1,191 @@
 From: heiko@sntech.de (Heiko Stuebner)
-Date: Wed, 10 Sep 2014 20:46:54 +0200
-Subject: [PATCH 5/6] ARM: dts: rockchip: add emmc nodes for rk3066 and rk3188
+Date: Wed, 10 Sep 2014 20:46:53 +0200
+Subject: [PATCH 4/6] ARM: dts: rockchip: add Cortex-A9 SPI controller nodes
 In-Reply-To: <1410374815-20208-1-git-send-email-heiko@sntech.de>
 References: <1410374815-20208-1-git-send-email-heiko@sntech.de>
-Message-ID: <1410374815-20208-6-git-send-email-heiko@sntech.de>
+Message-ID: <1410374815-20208-5-git-send-email-heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the controller node, pinctrl settings for the customizable pins
-and sort the controllers like on rk3288 as emmc, sdmmc, sdio for
-handling convenience.
+This adds basic spi nodes and pinctrl settings to the rk3066 and rk3188
+devicetree files.
 
 Signed-off-by: Heiko Stuebner <heiko@sntech.de>
 ---
- arch/arm/boot/dts/rk3066a.dtsi | 21 +++++++++++++++++++++
- arch/arm/boot/dts/rk3188.dtsi  | 21 +++++++++++++++++++++
- arch/arm/boot/dts/rk3xxx.dtsi  | 14 ++++++++++++++
- 3 files changed, 56 insertions(+)
+ arch/arm/boot/dts/rk3066a.dtsi | 46 ++++++++++++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/rk3188.dtsi  | 48 ++++++++++++++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/rk3xxx.dtsi  | 24 +++++++++++++++++++++
+ 3 files changed, 118 insertions(+)
 
 diff --git a/arch/arm/boot/dts/rk3066a.dtsi b/arch/arm/boot/dts/rk3066a.dtsi
-index 8021eed..ad9c2db 100644
+index 879a818..8021eed 100644
 --- a/arch/arm/boot/dts/rk3066a.dtsi
 +++ b/arch/arm/boot/dts/rk3066a.dtsi
-@@ -179,6 +179,27 @@
- 			bias-disable;
+@@ -238,6 +238,42 @@
+ 			};
  		};
  
-+		emmc {
-+			emmc_clk: emmc-clk {
-+				rockchip,pins = <RK_GPIO3 31 RK_FUNC_2 &pcfg_pull_default>;
++		spi0 {
++			spi0_clk: spi0-clk {
++				rockchip,pins = <RK_GPIO1 5 RK_FUNC_2 &pcfg_pull_default>;
 +			};
-+
-+			emmc_cmd: emmc-cmd {
-+				rockchip,pins = <RK_GPIO4 9 RK_FUNC_2 &pcfg_pull_default>;
++			spi0_cs0: spi0-cs0 {
++				rockchip,pins = <RK_GPIO1 4 RK_FUNC_2 &pcfg_pull_default>;
 +			};
-+
-+			emmc_rst: emmc-rst {
-+				rockchip,pins = <RK_GPIO4 10 RK_FUNC_2 &pcfg_pull_default>;
++			spi0_tx: spi0-tx {
++				rockchip,pins = <RK_GPIO1 7 RK_FUNC_2 &pcfg_pull_default>;
 +			};
-+
-+			/*
-+			 * The data pins are shared between nandc and emmc and
-+			 * not accessible through pinctrl. Also they should've
-+			 * been already set correctly by firmware, as
-+			 * flash/emmc is the boot-device.
-+			 */
++			spi0_rx: spi0-rx {
++				rockchip,pins = <RK_GPIO1 6 RK_FUNC_2 &pcfg_pull_default>;
++			};
++			spi0_cs1: spi0-cs1 {
++				rockchip,pins = <RK_GPIO4 15 RK_FUNC_1 &pcfg_pull_default>;
++			};
 +		};
 +
- 		i2c0 {
- 			i2c0_xfer: i2c0-xfer {
- 				rockchip,pins = <RK_GPIO2 28 RK_FUNC_1 &pcfg_pull_none>,
++		spi1 {
++			spi1_clk: spi1-clk {
++				rockchip,pins = <RK_GPIO2 19 RK_FUNC_2 &pcfg_pull_default>;
++			};
++			spi1_cs0: spi1-cs0 {
++				rockchip,pins = <RK_GPIO2 20 RK_FUNC_2 &pcfg_pull_default>;
++			};
++			spi1_rx: spi1-rx {
++				rockchip,pins = <RK_GPIO2 22 RK_FUNC_2 &pcfg_pull_default>;
++			};
++			spi1_tx: spi1-tx {
++				rockchip,pins = <RK_GPIO2 21 RK_FUNC_2 &pcfg_pull_default>;
++			};
++			spi1_cs1: spi1-cs1 {
++				rockchip,pins = <RK_GPIO2 23 RK_FUNC_2 &pcfg_pull_default>;
++			};
++		};
++
+ 		uart0 {
+ 			uart0_xfer: uart0-xfer {
+ 				rockchip,pins = <RK_GPIO1 0 RK_FUNC_1 &pcfg_pull_default>,
+@@ -406,6 +442,16 @@
+ 	pinctrl-0 = <&pwm3_out>;
+ };
+ 
++&spi0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&spi0_clk &spi0_tx &spi0_rx &spi0_cs0>;
++};
++
++&spi1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&spi1_clk &spi1_tx &spi1_rx &spi1_cs0>;
++};
++
+ &uart0 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&uart0_xfer>;
 diff --git a/arch/arm/boot/dts/rk3188.dtsi b/arch/arm/boot/dts/rk3188.dtsi
-index 573ef61..9a1ff0b 100644
+index ee801a9..573ef61 100644
 --- a/arch/arm/boot/dts/rk3188.dtsi
 +++ b/arch/arm/boot/dts/rk3188.dtsi
-@@ -147,6 +147,27 @@
- 			bias-disable;
+@@ -206,6 +206,42 @@
+ 			};
  		};
  
-+		emmc {
-+			emmc_clk: emmc-clk {
-+				rockchip,pins = <RK_GPIO0 24 RK_FUNC_2 &pcfg_pull_default>;
++		spi0 {
++			spi0_clk: spi0-clk {
++				rockchip,pins = <RK_GPIO1 6 RK_FUNC_2 &pcfg_pull_up>;
 +			};
-+
-+			emmc_cmd: emmc-cmd {
-+				rockchip,pins = <RK_GPIO0 26 RK_FUNC_2 &pcfg_pull_default>;
++			spi0_cs0: spi0-cs0 {
++				rockchip,pins = <RK_GPIO1 7 RK_FUNC_2 &pcfg_pull_up>;
 +			};
-+
-+			emmc_rst: emmc-rst {
-+				rockchip,pins = <RK_GPIO0 27 RK_FUNC_2 &pcfg_pull_default>;
++			spi0_tx: spi0-tx {
++				rockchip,pins = <RK_GPIO1 5 RK_FUNC_2 &pcfg_pull_up>;
 +			};
-+
-+			/*
-+			 * The data pins are shared between nandc and emmc and
-+			 * not accessible through pinctrl. Also they should've
-+			 * been already set correctly by firmware, as
-+			 * flash/emmc is the boot-device.
-+			 */
++			spi0_rx: spi0-rx {
++				rockchip,pins = <RK_GPIO1 4 RK_FUNC_2 &pcfg_pull_up>;
++			};
++			spi0_cs1: spi0-cs1 {
++				rockchip,pins = <RK_GPIO1 15 RK_FUNC_1 &pcfg_pull_up>;
++			};
 +		};
 +
- 		i2c0 {
- 			i2c0_xfer: i2c0-xfer {
- 				rockchip,pins = <RK_GPIO1 24 RK_FUNC_1 &pcfg_pull_none>,
++		spi1 {
++			spi1_clk: spi1-clk {
++				rockchip,pins = <RK_GPIO0 30 RK_FUNC_1 &pcfg_pull_up>;
++			};
++			spi1_cs0: spi1-cs0 {
++				rockchip,pins = <RK_GPIO0 31 RK_FUNC_1 &pcfg_pull_up>;
++			};
++			spi1_rx: spi1-rx {
++				rockchip,pins = <RK_GPIO0 28 RK_FUNC_1 &pcfg_pull_up>;
++			};
++			spi1_tx: spi1-tx {
++				rockchip,pins = <RK_GPIO0 29 RK_FUNC_1 &pcfg_pull_up>;
++			};
++			spi1_cs1: spi1-cs1 {
++				rockchip,pins = <RK_GPIO1 14 RK_FUNC_2 &pcfg_pull_up>;
++			};
++		};
++
+ 		uart0 {
+ 			uart0_xfer: uart0-xfer {
+ 				rockchip,pins = <RK_GPIO1 0 RK_FUNC_1 &pcfg_pull_up>,
+@@ -381,6 +417,18 @@
+ 	pinctrl-0 = <&pwm3_out>;
+ };
+ 
++&spi0 {
++	compatible = "rockchip,rk3188-spi", "rockchip,rk3066-spi";
++	pinctrl-names = "default";
++	pinctrl-0 = <&spi0_clk &spi0_tx &spi0_rx &spi0_cs0>;
++};
++
++&spi1 {
++	compatible = "rockchip,rk3188-spi", "rockchip,rk3066-spi";
++	pinctrl-names = "default";
++	pinctrl-0 = <&spi1_clk &spi1_tx &spi1_rx &spi1_cs0>;
++};
++
+ &uart0 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&uart0_xfer>;
 diff --git a/arch/arm/boot/dts/rk3xxx.dtsi b/arch/arm/boot/dts/rk3xxx.dtsi
-index 7bcd698..c383f5c 100644
+index c873624..7bcd698 100644
 --- a/arch/arm/boot/dts/rk3xxx.dtsi
 +++ b/arch/arm/boot/dts/rk3xxx.dtsi
-@@ -26,6 +26,9 @@
+@@ -26,6 +26,8 @@
  		i2c2 = &i2c2;
  		i2c3 = &i2c3;
  		i2c4 = &i2c4;
-+		mshc0 = &emmc;
-+		mshc1 = &mmc0;
-+		mshc2 = &mmc1;
- 		spi0 = &spi0;
- 		spi1 = &spi1;
- 	};
-@@ -137,6 +140,17 @@
- 		status = "disabled";
++		spi0 = &spi0;
++		spi1 = &spi1;
  	};
  
-+	emmc: dwmmc at 1021c000 {
-+		compatible = "rockchip,rk2928-dw-mshc";
-+		reg = <0x1021c000 0x1000>;
-+		interrupts = <GIC_SPI 25 IRQ_TYPE_LEVEL_HIGH>;
+ 	xin24m: oscillator {
+@@ -291,4 +293,26 @@
+ 		clock-names = "saradc", "apb_pclk";
+ 		status = "disabled";
+ 	};
 +
-+		clocks = <&cru HCLK_EMMC>, <&cru SCLK_EMMC>;
-+		clock-names = "biu", "ciu";
-+
++	spi0: spi at 20070000 {
++		compatible = "rockchip,rk3066-spi";
++		clocks = <&cru SCLK_SPI0>, <&cru PCLK_SPI0>;
++		clock-names = "spiclk", "apb_pclk";
++		interrupts = <GIC_SPI 38 IRQ_TYPE_LEVEL_HIGH>;
++		reg = <0x20070000 0x1000>;
++		#address-cells = <1>;
++		#size-cells = <0>;
 +		status = "disabled";
 +	};
 +
- 	pmu: pmu at 20004000 {
- 		compatible = "rockchip,rk3066-pmu", "syscon";
- 		reg = <0x20004000 0x100>;
++	spi1: spi at 20074000 {
++		compatible = "rockchip,rk3066-spi";
++		clocks = <&cru SCLK_SPI1>, <&cru PCLK_SPI1>;
++		clock-names = "spiclk", "apb_pclk";
++		interrupts = <GIC_SPI 39 IRQ_TYPE_LEVEL_HIGH>;
++		reg = <0x20074000 0x1000>;
++		#address-cells = <1>;
++		#size-cells = <0>;
++		status = "disabled";
++	};
+ };
 -- 
 2.0.1
