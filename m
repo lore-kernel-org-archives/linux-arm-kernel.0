@@ -1,42 +1,55 @@
-From: klightspeed@killerwolves.net (klightspeed at killerwolves.net)
-Date: Wed, 10 Sep 2014 18:55:41 +1000
-Subject: [PATCH reword] ARM: MVEBU: Netgear RN102: Use Hardware BCH ECC
-Message-ID: <1410339341-3372-1-git-send-email-klightspeed@killerwolves.net>
+From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
+Date: Wed, 10 Sep 2014 10:59:20 +0200
+Subject: [PATCH v2 1/5] ARM: dts: Add Peach Pit and Pi dts entry for
+ max77802 PMIC
+In-Reply-To: <CAD=FV=VVLmnvZToewvsiJDUbapPj5BBA=RG4a7_N9wadRN7CTg@mail.gmail.com>
+References: <1408533593-32346-1-git-send-email-javier.martinez@collabora.co.uk>	<1408533593-32346-2-git-send-email-javier.martinez@collabora.co.uk>
+ <CAD=FV=VVLmnvZToewvsiJDUbapPj5BBA=RG4a7_N9wadRN7CTg@mail.gmail.com>
+Message-ID: <541012E8.9010208@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The bootloader on the Netgear ReadyNAS RN102 uses Hardware BCH ECC
-(strength = 4), while the pxa3xx NAND driver by default uses 
-Hamming ECC (strength = 1).
+Hello Doug,
 
-This patch changes the ECC mode on these machines to match that
-of the bootloader and of the stock firmware. That way, it is
-now possible to update the kernel from userland (e.g. using
-standard tools from mtd-utils package); u-boot will happily
-load and boot it.
+On 09/10/2014 06:42 AM, Doug Anderson wrote:
+>> +
+>> +                       ldo35_reg: LDO35 {
+>> +                               regulator-name = "ldo_35";
+>> +                               regulator-min-microvolt = <1200000>;
+>> +                               regulator-max-microvolt = <1200000>;
+>> +                               inl2-supply = <&buck7_reg>;
+> 
+> Is this a typo?  Shouldn't supplies be specified at the top?
+>
 
-Fixes: 92beaccd8b49 ("ARM: mvebu: Enable NAND controller in ReadyNAS 102 .dts file")
-Signed-off-by: Ben Peddell <klightspeed@killerwolves.net>
-Acked-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
-Tested-by: Arnaud Ebalard <arno@natisbad.org>
----
- arch/arm/boot/dts/armada-370-netgear-rn102.dts | 4 ++++
- 1 file changed, 4 insertions(+)
+Yes it is a left over from a previous attempt. The first time I looked at the
+DT binding doc to see how parent supplies should be defined, the example said:
 
-diff --git a/arch/arm/boot/dts/armada-370-netgear-rn102.dts b/arch/arm/boot/dts/armada-370-netgear-rn102.dts
-index d6d572e..285524f 100644
---- a/arch/arm/boot/dts/armada-370-netgear-rn102.dts
-+++ b/arch/arm/boot/dts/armada-370-netgear-rn102.dts
-@@ -143,6 +143,10 @@
- 				marvell,nand-enable-arbiter;
- 				nand-on-flash-bbt;
- 
-+				/* Use Hardware BCH ECC */
-+				nand-ecc-strength = <4>;
-+				nand-ecc-step-size = <512>;
-+
- 				partition at 0 {
- 					label = "u-boot";
- 					reg = <0x0000000 0x180000>;  /* 1.5MB */
--- 
-1.8.5.5
+        xyzreg: regulator at 0 {
+                regulator-min-microvolt = <1000000>;
+                regulator-max-microvolt = <2500000>;
+                regulator-always-on;
+                vin-supply = <&vin>;
+        };
+
+but that didn't work for me since the parent supplies are not parsed in
+of_get_regulation_constraints() [0] but in regulator_register() [1] by calling
+regulator_dev_lookup() passing the parent device.
+
+So then I looked at other DTS and found that the supplies where indeed defined
+on the top as properties of the "regulators" parent node so that's what I
+used. I missed to remove the supply for this regulator, thanks a lot for noticing.
+
+BTW, Documentation/devicetree/bindings/regulator/regulator.txt should be
+changed to reflect that the supplies should not be defined in the regulator
+node but in the parent node but that is unrelated to this patch of course.
+
+> 
+> Other than that, you can add my Reviewed-by.
+> 
+
+Best regards,
+Javier
+
+[0]: http://lxr.free-electrons.com/source/drivers/regulator/of_regulator.c#L19
+[1]: http://lxr.free-electrons.com/source/drivers/regulator/core.c#L3506
