@@ -1,108 +1,59 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Wed, 10 Sep 2014 12:11:55 +0200
-Subject: [PATCH] ata: ahci_platform: Add ACPI support for AMD Seattle
- SATA controller
-In-Reply-To: <1410295035-14471-1-git-send-email-suravee.suthikulpanit@amd.com>
-References: <1410295035-14471-1-git-send-email-suravee.suthikulpanit@amd.com>
-Message-ID: <541023EB.70705@redhat.com>
+From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
+Date: Wed, 10 Sep 2014 12:19:44 +0200
+Subject: [PATCH v3 0/7] Add max77802 support for Peach boards
+Message-ID: <1410344391-5675-1-git-send-email-javier.martinez@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hello Kukjin,
 
-On 09/09/2014 10:37 PM, suravee.suthikulpanit at amd.com wrote:
-> From: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
-> 
-> This patch adds ACPI support for non-PCI SATA contoller in ahci_platform driver.
-> It adds ACPI matching table in ahci_platform to support AMD Seattle SATA controller
-> with following ASL structure in DSDT:
-> 
->     Device (SATA0)
->     {
->       Name(_HID, "AMDI0600")	// Seattle AHSATA
->       Name (_CCA, 1)		// Cache-coherent controller
->       Name (_CRS, ResourceTemplate ()
->       {
->         Memory32Fixed (ReadWrite, 0xE0300000, 0x00010000)
->         Interrupt (ResourceConsumer, Level, ActiveHigh, Exclusive,,,) { 387 }
->       })
->     }
-> 
-> Since ATA driver should not require PCI support for ATA_ACPI,
-> this patch also removes dependency in the driver/ata/Kconfig.
-> 
-> Signed-off-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
+This is a third version of th series that adds max77802 support for
+the Peach Pit and Pi boards. The series also have all the pending
+patches that were posted but depended on this support. I've picked
+all the patches I found and rebased them to be sure that they apply
+cleanly on top of linux-next. Also I've taken some DT snippets from
+the downstream Chrome OS 3.8 kernel DTS for devices that use one of
+these regulators as their input supply.
 
-Looks good to me, one small nitpick inline.
+Changes since v2 [0]:
+ - Remove left over supply on ldo35 regulator, suggested by Doug Anderson.
+ - Add a patch to change the i2c7 clock at 400kHz, suggested by Doug Anderson.
+ - Add a patch from Vivek Gautam to enable max77802 regulator driver support.
 
-Acked-by: Hans de Goede <hdegoede@redhat.com>
+Changes sinve v1 [1]:
+ - Dropped patch that added vmmc and vqmmc supplies as suggested
+   by Doug Anderson.
+ - Use IRQ flags define instead of a magic number as suggested by
+   Andreas Faerber.
 
+The series is composed of the following patches:
 
+Javier Martinez Canillas (3):
+  ARM: dts: Add Peach Pit and Pi dts entry for max77802 PMIC
+  ARM: dts: Add Peach Pit and Pi dts entry for ISL29018 sensor
+  ARM: dts: Set i2c7 clock at 400kHz for Peach boards
 
-> ---
->  drivers/ata/Kconfig         |  2 +-
->  drivers/ata/ahci_platform.c | 13 +++++++++++++
->  2 files changed, 14 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/ata/Kconfig b/drivers/ata/Kconfig
-> index e1b9278..f2e6c9e 100644
-> --- a/drivers/ata/Kconfig
-> +++ b/drivers/ata/Kconfig
-> @@ -48,7 +48,7 @@ config ATA_VERBOSE_ERROR
->  
->  config ATA_ACPI
->  	bool "ATA ACPI Support"
-> -	depends on ACPI && PCI
-> +	depends on ACPI
->  	default y
->  	help
->  	  This option adds support for ATA-related ACPI objects.
-> diff --git a/drivers/ata/ahci_platform.c b/drivers/ata/ahci_platform.c
-> index f61ddb9..3499bab 100644
-> --- a/drivers/ata/ahci_platform.c
-> +++ b/drivers/ata/ahci_platform.c
-> @@ -20,6 +20,9 @@
->  #include <linux/platform_device.h>
->  #include <linux/libata.h>
->  #include <linux/ahci_platform.h>
-> +#ifdef CONFIG_ATA_ACPI
-> +#include <linux/acpi.h>
-> +#endif
->  #include "ahci.h"
->  
->  static const struct ata_port_info ahci_port_info = {
-> @@ -87,6 +90,13 @@ static const struct of_device_id ahci_of_match[] = {
->  };
->  MODULE_DEVICE_TABLE(of, ahci_of_match);
->  
-> +#ifdef CONFIG_ATA_ACPI
-> +static const struct acpi_device_id ahci_acpi_match[] = {
-> +	{ "AMDI0600", 0 }, /* AMD Seattle AHCI */
-> +	{ },
-> +};
-> +#endif
-> +
->  static struct platform_driver ahci_driver = {
->  	.probe = ahci_probe,
->  	.remove = ata_platform_remove_one,
-> @@ -94,6 +104,9 @@ static struct platform_driver ahci_driver = {
->  		.name = "ahci",
->  		.owner = THIS_MODULE,
->  		.of_match_table = ahci_of_match,
-> +#ifdef CONFIG_ATA_ACPI
-> +		.acpi_match_table = ACPI_PTR(ahci_acpi_match),
-> +#endif
+Naveen Krishna Chatradhi (1):
+  ARM: dts: Add thermistor dts fragment used by exynos based Peach
+    boards
 
-Hmm, is the cast here really necessary ? AFAIK nowadays we usually
-don't need this cast macros, and they can hide accidental prototype
-differences, so they are better avoided.
+Rahul Sharma (2):
+  ARM: dts: add hdmi regulators for exynos5800 based peach-pi board
+  ARM: dts: add hdmi regulators for exynos5420 based peach-pit board
+
+Vivek Gautam (1):
+  ARM: exynos_defconfig: Enable MAX77802
+
+ arch/arm/boot/dts/cros-adc-thermistors.dtsi |  44 ++++
+ arch/arm/boot/dts/exynos5420-peach-pit.dts  | 389 ++++++++++++++++++++++++++++
+ arch/arm/boot/dts/exynos5800-peach-pi.dts   | 389 ++++++++++++++++++++++++++++
+ arch/arm/configs/exynos_defconfig           |   3 +
+ 4 files changed, 825 insertions(+)
+ create mode 100644 arch/arm/boot/dts/cros-adc-thermistors.dtsi
 
 
->  		.pm = &ahci_pm_ops,
->  	},
->  };
-> 
+Best regards,
+Javier
 
-Regards,
-
-Hans
+[0]: https://lkml.org/lkml/2014/8/20/225
+[1]: https://lkml.org/lkml/2014/8/19/372
