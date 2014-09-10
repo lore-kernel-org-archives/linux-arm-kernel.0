@@ -1,43 +1,145 @@
-From: Nathan_Lynch@mentor.com (Nathan Lynch)
-Date: Wed, 10 Sep 2014 12:25:28 -0500
-Subject: [PATCH v9 4/6] ARM: add vdso user-space code
-In-Reply-To: <20140910171014.GF1710@arm.com>
-References: <1408744351-7814-1-git-send-email-nathan_lynch@mentor.com>
- <1408744351-7814-5-git-send-email-nathan_lynch@mentor.com>
- <20140910164755.GC1710@arm.com>
- <CALCETrUKcH11nL4peq5=t0TFMKeY8h-d5kbq1+VV9ujAzYpd-Q@mail.gmail.com>
- <20140910171014.GF1710@arm.com>
-Message-ID: <54108988.9050307@mentor.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 10 Sep 2014 18:27:10 +0100
+Subject: [PATCH] clocksource: arch_timer: Fix code to use physical timers
+ when requested
+In-Reply-To: <1409173419-13076-1-git-send-email-sonnyrao@chromium.org>
+References: <1409173419-13076-1-git-send-email-sonnyrao@chromium.org>
+Message-ID: <20140910172710.GA3300@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/10/2014 12:10 PM, Will Deacon wrote:
-> On Wed, Sep 10, 2014 at 05:52:39PM +0100, Andy Lutomirski wrote:
->> On Wed, Sep 10, 2014 at 9:47 AM, Will Deacon <will.deacon@arm.com> wrote:
->>> On Fri, Aug 22, 2014 at 10:52:29PM +0100, Nathan Lynch wrote:
->>>> Place vdso-related user-space code in arch/arm/kernel/vdso/.
->>>>
->>>> It is almost completely written in C with some assembly helpers to
->>>> load the data page address, sample the counter, and fall back to
->>>> system calls when necessary.
->>>
->>> I'm still a bit puzzled as to how we can implement a compat version of this
->>> for a 32-bit userspace running under a 64-bit kernel. Maybe the answer is
->>> that we don't care enough (programs will still work fine without it), but if
->>> we did want to then we're going to need to build the kernel with two
->>> toolchains and it gets really horrible.
->>>
->>> Do you have any ideas?
->>
->> Convince the gcc and binutils people to add a-m32 option to aarch64?
->> That's how x86_64 pulls this off :)  Or you could require a
->> cross-compiler to be available to enable this particular feature.
-> 
-> The compilers have two separate backends, so I think I'll know what they
-> say. I guess it's either overhauling kbuild to support two cross compilers,
-> or have some shell script to accept an option we make up.
+Hi Sonny,
 
-arch/powerpc has addressed this with a CROSS32_COMPILE= variable for
-producing 32-bit outputs (compat vdso, bootwrapper) during a 64-bit
-kernel build.  I think that was used before powerpc toolchains commonly
-honored -m32.
+On Wed, Aug 27, 2014 at 10:03:39PM +0100, Sonny Rao wrote:
+> This is a bug fix for using physical arch timers when
+> the arch_timer_use_virtual boolean is false.  It restores the
+> arch_counter_get_cntpct() function after removal in
+> 
+> 0d651e4e "clocksource: arch_timer: use virtual counters"
+> 
+> and completes the implementation of memory mapped access for physical
+> timers, so if a system is trying to use physical timers, it will
+> function properly.
+
+To get back to the topic at hand:
+
+Which platform is this required by?
+
+Why exactly is arch_timer_use_virtual false in this case?
+
+Thanks,
+Mark.
+
+> 
+> Signed-off-by: Sonny Rao <sonnyrao@chromium.org>
+> ---
+>  arch/arm/include/asm/arch_timer.h    |  9 +++++++++
+>  arch/arm64/include/asm/arch_timer.h  | 10 ++++++++++
+>  drivers/clocksource/arm_arch_timer.c | 30 ++++++++++++++++++++++++++----
+>  3 files changed, 45 insertions(+), 4 deletions(-)
+> 
+> diff --git a/arch/arm/include/asm/arch_timer.h b/arch/arm/include/asm/arch_timer.h
+> index 0704e0c..e72aa4d 100644
+> --- a/arch/arm/include/asm/arch_timer.h
+> +++ b/arch/arm/include/asm/arch_timer.h
+> @@ -78,6 +78,15 @@ static inline u32 arch_timer_get_cntfrq(void)
+>  	return val;
+>  }
+>  
+> +static inline u64 arch_counter_get_cntpct(void)
+> +{
+> +	u64 cval;
+> +
+> +	isb();
+> +	asm volatile("mrrc p15, 0, %Q0, %R0, c14" : "=r" (cval));
+> +	return cval;
+> +}
+> +
+>  static inline u64 arch_counter_get_cntvct(void)
+>  {
+>  	u64 cval;
+> diff --git a/arch/arm64/include/asm/arch_timer.h b/arch/arm64/include/asm/arch_timer.h
+> index 9400596..58657c4 100644
+> --- a/arch/arm64/include/asm/arch_timer.h
+> +++ b/arch/arm64/include/asm/arch_timer.h
+> @@ -135,6 +135,16 @@ static inline void arch_timer_evtstrm_enable(int divider)
+>  #endif
+>  }
+>  
+> +static inline u64 arch_counter_get_cntpct(void)
+> +{
+> +	u64 cval;
+> +
+> +	isb();
+> +	asm volatile("mrs %0, cntpct_el0" : "=r" (cval));
+> +
+> +	return cval;
+> +}
+> +
+>  static inline u64 arch_counter_get_cntvct(void)
+>  {
+>  	u64 cval;
+> diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
+> index 5163ec1..ad723cb 100644
+> --- a/drivers/clocksource/arm_arch_timer.c
+> +++ b/drivers/clocksource/arm_arch_timer.c
+> @@ -30,6 +30,8 @@
+>  #define CNTTIDR		0x08
+>  #define CNTTIDR_VIRT(n)	(BIT(1) << ((n) * 4))
+>  
+> +#define CNTPCT_LO	0x00
+> +#define CNTPCT_HI	0x04
+>  #define CNTVCT_LO	0x08
+>  #define CNTVCT_HI	0x0c
+>  #define CNTFRQ		0x10
+> @@ -386,6 +388,19 @@ static u64 arch_counter_get_cntvct_mem(void)
+>  	return ((u64) vct_hi << 32) | vct_lo;
+>  }
+>  
+> +static u64 arch_counter_get_cntpct_mem(void)
+> +{
+> +	u32 pct_lo, pct_hi, tmp_hi;
+> +
+> +	do {
+> +		pct_hi = readl_relaxed(arch_counter_base + CNTPCT_HI);
+> +		pct_lo = readl_relaxed(arch_counter_base + CNTPCT_LO);
+> +		tmp_hi = readl_relaxed(arch_counter_base + CNTPCT_HI);
+> +	} while (pct_hi != tmp_hi);
+> +
+> +	return ((u64) pct_hi << 32) | pct_lo;
+> +}
+> +
+>  /*
+>   * Default to cp15 based access because arm64 uses this function for
+>   * sched_clock() before DT is probed and the cp15 method is guaranteed
+> @@ -429,10 +444,17 @@ static void __init arch_counter_register(unsigned type)
+>  	u64 start_count;
+>  
+>  	/* Register the CP15 based counter if we have one */
+> -	if (type & ARCH_CP15_TIMER)
+> -		arch_timer_read_counter = arch_counter_get_cntvct;
+> -	else
+> -		arch_timer_read_counter = arch_counter_get_cntvct_mem;
+> +	if (type & ARCH_CP15_TIMER) {
+> +		if (arch_timer_use_virtual)
+> +			arch_timer_read_counter = arch_counter_get_cntvct;
+> +		else
+> +			arch_timer_read_counter = arch_counter_get_cntpct;
+> +	} else {
+> +		if (arch_timer_use_virtual)
+> +			arch_timer_read_counter = arch_counter_get_cntvct_mem;
+> +		else
+> +			arch_timer_read_counter = arch_counter_get_cntpct_mem;
+> +	}
+>  
+>  	start_count = arch_timer_read_counter();
+>  	clocksource_register_hz(&clocksource_counter, arch_timer_rate);
+> -- 
+> 1.8.3.2
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
