@@ -1,52 +1,55 @@
-From: johan@kernel.org (Johan Hovold)
-Date: Wed, 10 Sep 2014 17:07:02 +0200
-Subject: [PATCH 5/5] rtc: at91sam9: add DT bindings documentation
-In-Reply-To: <20140910152019.111c4c01@bbrezillon>
-References: <1409733934-14465-1-git-send-email-boris.brezillon@free-electrons.com>
- <1409733934-14465-6-git-send-email-boris.brezillon@free-electrons.com>
- <20140910121424.GG2974@localhost>
- <20140910152019.111c4c01@bbrezillon>
-Message-ID: <20140910150702.GK2974@localhost>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Wed, 10 Sep 2014 17:09:39 +0200
+Subject: [PATCH v2] ARM: dts: Specify Odroid X2/U3 audio clock parents and
+ rates
+Message-ID: <1410361779-28017-1-git-send-email-s.nawrocki@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 10, 2014 at 03:20:19PM +0200, Boris BREZILLON wrote:
-> On Wed, 10 Sep 2014 14:14:24 +0200
-> Johan Hovold <johan@kernel.org> wrote:
+This ensures the core and the audio subsystem clocks are configured
+properly, as expected by the sound machine driver. These bits are
+missing to obtain proper audio sample rates in kernel v3.17, where
+audio support for Odroid X2/U3 was first added.
 
-> > This does not describe the hardware, but rather a specific software
-> > configuration.
-> > 
-> > The RTT is first of all not an RTC (although it can be used as one in a
-> > specific software configuration). And the second register resource above
-> > is not an RTT register, but a general-purpose backup register could be
-> > used for other purposes (which register to use is currently configurable
-> > for legacy booting using CONFIG_RTC_DRV_AT91SAM9_GPBR).
-> 
-> We could use a syscon device (which exposes a regmap) for the GPBR
-> block.
-> 
-> rtc at ffffff20 {
+Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+---
+It would be good to have it applied as a fix for v3.17.
 
-rtt
+First version of this patch was missing settings for EPLL, now it all
+should be complete.
 
-> 	compatible = "atmel,at91sam9260-rtt";
-> 	reg = <0xfffffd20 0x10>;
-> 	interrupts = <1 4 7>;
-> 	clocks = <&clk32k>;
-> 	atmel,time-reg = <&gpbr 0x0>;
-> };
-> 
-> gpbr: syscon at fffffd50 {
-> 	compatible = "atmel,at91sam9260-gpbr", "syscon";
-> 	reg = <0xfffffd50 0x10>;
-> 	
-> };
+ arch/arm/boot/dts/exynos4412-odroid-common.dtsi |   15 +++++++++++++++
+ 1 file changed, 15 insertions(+)
 
-Yes, this essentially what I suggested in the thread (and my last reply)
-and relying on syscon rather than a custom driver seems like a good
-idea. It would allow early access to the registers too with the recently
-proposed changes. It would not guarantee any kind of exclusivity,
-though, but I guess that's tolerable?
+diff --git a/arch/arm/boot/dts/exynos4412-odroid-common.dtsi b/arch/arm/boot/dts/exynos4412-odroid-common.dtsi
+index adadaf9..4fd7e0e 100644
+--- a/arch/arm/boot/dts/exynos4412-odroid-common.dtsi
++++ b/arch/arm/boot/dts/exynos4412-odroid-common.dtsi
+@@ -41,10 +41,25 @@
+ 		clock-names = "iis", "i2s_opclk0";
+ 	};
 
-Johan
++	clock-controller at 10030000 {
++		assigned-clocks = <&clock CLK_FOUT_EPLL>;
++		assigned-clock-rates = <192000000>;
++	};
++
+ 	sound: sound {
+ 		compatible = "samsung,odroidx2-audio";
+ 		samsung,i2s-controller = <&i2s0>;
+ 		samsung,audio-codec = <&max98090>;
++		assigned-clocks = <&clock_audss EXYNOS_MOUT_AUDSS>,
++				<&clock_audss EXYNOS_MOUT_I2S>,
++				<&clock_audss EXYNOS_DOUT_SRP>,
++				<&clock_audss EXYNOS_DOUT_AUD_BUS>;
++		assigned-clock-parents = <&clock CLK_FOUT_EPLL>,
++				<&clock_audss EXYNOS_MOUT_AUDSS>;
++		assigned-clock-rates = <0>,
++				<0>,
++				<192000000>,
++				<19200000>;
+ 	};
+
+ 	mmc at 12550000 {
+--
+1.7.9.5
