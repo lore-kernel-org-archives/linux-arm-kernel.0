@@ -1,73 +1,85 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Wed, 10 Sep 2014 14:34:02 +0200
-Subject: [RFC PATCH 0/3] PM / clock_ops: allow to specify custom
- pm_clk_notifier callback
-In-Reply-To: <540F0381.7010500@ti.com>
-References: <1406313096-29761-1-git-send-email-grygorii.strashko@ti.com>
- <7hr3zln692.fsf@linaro.org> <540F0381.7010500@ti.com>
-Message-ID: <CAMuHMdXRx6QUs2zhsXXz6aia0=v521+_B4NR61JVv61aWnwyPw@mail.gmail.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Wed, 10 Sep 2014 14:35:32 +0200
+Subject: [PATCH v7 2/5] ARM: imx6: gpc: Add PU power domain for GPU/VPU
+In-Reply-To: <20140909204938.GA26440@pengutronix.de>
+References: <1409060791-23167-1-git-send-email-p.zabel@pengutronix.de>
+ <1409060791-23167-3-git-send-email-p.zabel@pengutronix.de>
+ <CAPDyKFovJOVyKRNSA+sEjd4mXA9QYYYDQEAvTzkptj8FDzgWTQ@mail.gmail.com>
+ <1410177246.3981.34.camel@paszta.hi.pengutronix.de>
+ <CAPDyKFozmLLEwK297K0mtvf-m_fUC79ZstbF6V-TAnNTh41VZw@mail.gmail.com>
+ <20140909204938.GA26440@pengutronix.de>
+Message-ID: <CAPDyKFowGCo+b4X0AYK6fj254GiCCaXTj45hgjZGDNYDum=1kA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Grygorii,
-
-On Tue, Sep 9, 2014 at 3:41 PM, Grygorii Strashko
-<grygorii.strashko@ti.com> wrote:
->>> Also, It updates Keystone 2 platform code to provide custom
->>> callback which fills list of clocks for Device with all clocks assigned to this
->>> Device in DT.
->>> More over, It's safe for Keystone 2 to perform CLK PM domain initialization
->>> at device's binding time instead of device's creation time.
->>>
->>> I've posted these patches because I need fully enable Runtime PM on Keystone 2
->>> where all HW modules are controlled using clocks only. That's why CLK PM domain
->>> fits our needs perfectly.
+On 9 September 2014 22:49, Philipp Zabel <pza@pengutronix.de> wrote:
+> On Tue, Sep 09, 2014 at 09:01:08PM +0200, Ulf Hansson wrote:
+>> [...]
 >>
->> Heh, doesn't seem like a perfect fit to me ;)
+>> >> > +       is_off = IS_ENABLED(CONFIG_PM_RUNTIME);
+>> >> > +       if (is_off)
+>> >> > +               imx6q_pm_pu_power_off(&imx6q_pu_domain.base);
+>> >>
+>> >> Could you elaborate why is_off depends on CONFIG_PM_RUNTIME? That
+>> >> seems strange to me. :-)
+>> >>
+>> >> Additionally, I think it would be better to leave the domain "on"
+>> >> state. Wouldn't that even be required for some drivers to be able to
+>> >> succeed probing of these devices?
+>> >
+>> > The devices in the PU power domain are Vivante GPUs and the CODA Video
+>> > Processing Unit. These are platform devices that don't need to be active
+>> > to enumerate before being probed. The drivers support runtime PM, so if
+>> > CONFIG_PM_RUNTIME is enabled, it is safe to disable the PU power domain
+>> > on boot. The drivers will probe and request for the power domain to be
+>> > enabled via runtime PM before accessing the hardware.
+>> >
+>> > If CONFIG_PM_RUNTIME is disabled, the power domain needs to stay enabled
+>> > at all times.
 >>
->>> Also, on Keystone 2 clocks are initialized early and
->>> they are available at device creation time. The main problems from my side are:
->>>   - every time when support for new HW modules is added the ".con_ids" array
->>>     need to be checked and updated;
->>>   - restriction for clock's names in DT - to be named using only above con_ids
->>>     It's ugly.
->>>
->>> I hope, this approach to be accepted at least as temporal solution until
->>> the generic solution is not found.
+>> Hi Philipp,
 >>
->> Sorry if I missed it, but is there ongoing discussion of a more generic
->> solution other than this one:
+>> Thanks for your reply, that certainly made it clear on what you would
+>> like to accomplish.
+>>
+>> Before discussing further consequences in genpd of this approach
+>> (using IS_ENABLED(CONFIG_PM_RUNTIME)), I would be interested to see
+>> how the runtime PM support is implemented for any of the drivers you
+>> refer to. Do you mind pointing me to any of them?
 >
-> Yep. :( But It's ongoing more than 2 months already and seems there is no
-> light at the end of tunnel.
->
->>
->>> [1] Previously, same problem was discussed in, but no final solution was accepted:
->>>   "[PATCH/RFC 0/4] of: Register clocks for Runtime PM with PM core"
->>>   https://lkml.org/lkml/2014/4/24/1118
->>
->> Personally, I still like Geert's approach better.
->>
->
-> Unfortunately, Geert is not going to continue working on it (as I know).
+> Of course, the CODA driver is at drivers/media/platform/coda.c in mainline
+> kernels (moved to drivers/media/platform/coda-common.c in linux-next).
 
-For the record, I had postponed working on it, as we had an interim solution for
-multiplatform shmobile being broken in mainline (drivers/sh/pm_runtime.c).
+Thanks! I went for a look and found some parts that concerns me. :-)
 
-Currently I'm tackling "real" power domains. As this is incompatible with
-the above hack (you can attach only one power domain to a device, as Ulf
-had pointed out before --- Hm, why is the DT property called "power-domains"
-(plural) then?), I'll have to revisit anyway, and get back to it.
-Furthermore, not all shmobile SoCs have such fine-grained power domains
-as sh7372/sh73a0/r8a7740/r8a73a4, so we still need something better there.
+In principle, the coda platform driver will have a close dependency to
+its corresponding PM domain state (powered or not powered) while
+probing, which seems fragile.
 
-Gr{oetje,eeting}s,
+In the case of CONFIG_PM_RUNTIME, the driver will not bring the coda
+device into active state (runtime PM resumed) during probing. As you
+also stated above, but this have consequences. Let me elaborate.
 
-                        Geert
+When the device gets attached to its PM domain, which is prior the
+coda driver is probed - the device specific flag in genpd,
+"need_restore", get assigned to a value depending on what status the
+PM domain currently has. The "need_restore" flag is used internally in
+genpd to understand when the device's runtime PM callbacks shall or
+shall not be invoked.
 
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+As long as the state of the PM domain is powered off, when it gets
+attached to the coda device - this works. Can you guarantee that's
+true for all SoCs and PM domains that uses the coda driver?
 
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+It won't work if the PM domain is powered on while attaching occurs.
+That's because the device's runtime PM state will not be in sync with
+the "need_restore" flag in genpd. In other words, genpd will prevent
+the coda driver's runtime PM callbacks from being invoked properly.
+
+So this is a generic problem while using genpd and there are similar
+issues for the opposite situation. I am already working on a fix for
+it and will keep you posted. Let's see if that fix may effect this
+patch as well.
+
+Kind regards
+Uffe
