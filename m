@@ -1,38 +1,29 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 10 Sep 2014 19:21:37 +0100
-Subject: [PATCH] ARM: perf: Don't sleep while atomic when enabling
- per-cpu interrupts
-In-Reply-To: <540F3EE5.90500@codeaurora.org>
-References: <1410200814-25878-1-git-send-email-sboyd@codeaurora.org>
- <20140909113943.GG1754@arm.com> <540F3EE5.90500@codeaurora.org>
-Message-ID: <20140910182137.GL1710@arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 10 Sep 2014 20:22:43 +0200
+Subject: [GIT PULL] ARM: LPC32xx: Platform specific core updates
+In-Reply-To: <54105885.9020303@antcom.de>
+References: <54105885.9020303@antcom.de>
+Message-ID: <706522618.D4UDp8GaZm@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 09, 2014 at 06:54:45PM +0100, Stephen Boyd wrote:
-> On 09/09/14 04:39, Will Deacon wrote:
-> > It's interesting that arm64 isn't affected by this problem, since we don't
-> > update the active_irqs mask for PPIs there and consequently just pass the
-> > irq instead of the cpu_pmu. I can't see why we actually need to update the
-> > active_irqs mask for arch/arm/, so could we remove that and follow arm64's
-> > lead instead? That would remove the need for a new struct definition too.
-> >
+On Wednesday 10 September 2014 15:56:21 Roland Stigge wrote:
+> The following changes since commit 7d1311b93e58ed55f3a31cc8f94c4b8fe988a2b9:
 > 
-> I guess you're saying that we don't need the active_irqs mask in the
-> percpu irq case? It looks like we still use it to determine when the
-> last CPU PMU has been disabled in the non-percpu case.
+>   Linux 3.17-rc1 (2014-08-16 10:40:26 -0600)
+> 
+> are available in the git repository at:
+> 
+>   git://git.antcom.de/linux-2.6 lpc32xx/core
+> 
+> for you to fetch changes up to 0816e792911ad8fb999862114e9a2ba805aa9753:
+> 
 
-Correct.
+Hi Roland,
 
-> Here's the interdiff. Is there a reason arm64 casts data to an unsigned
-> int pointer when what's passed is an int pointer?
+I probably should have looked into the contents the first time around.
+I have cherry-picked the reset fix into the next/fixes-non-critical,
+but have decided not to apply the dma change for the same reason
+as the respective DT changes.
 
-There has to be a cast to something because data is a void *.
-enable_percpu_irq takes an unsigned int, so I guess that's why it was
-chosen. I'm not fussed either way.
-
-Feel free to submit the full patch with my ack:
-
-  Acked-by: Will Deacon <will.deacon@arm.com>
-
-Will
+	Arnd
