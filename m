@@ -1,83 +1,67 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Wed, 10 Sep 2014 15:56:16 +0100
-Subject: Unable to boot mainline on snow chromebook since 3.15
-In-Reply-To: <20140910143144.GF7960@sirena.org.uk>
-References: <CAD=FV=VfioJf9VYoSYL0QBk-bN93-Ecx3=0n9hb5Q4rcx43-_g@mail.gmail.com>
- <540C202E.2060009@collabora.co.uk> <540C7F5B.6070307@gmail.com>
- <540C83DE.10505@collabora.co.uk> <540C8577.2070907@gmail.com>
- <20140908112112.GK26030@arm.com>
- <CACxGe6v40wMSW8LJRtyZ3C6PinRMcQM-Zog+XpTJ-QG3HHJknw@mail.gmail.com>
- <CAD=FV=VAqzvJQDQMjjeQ1p5okyDzE=ff_sguObZxh59qbzcaTQ@mail.gmail.com>
- <CACxGe6t_ex1bU=CvTpXR4VJgNf1hAq33hr6ykbHy_sMXEk4h-g@mail.gmail.com>
- <CAOesGMipX3MV6sMWLuY=D+bQ6qe8P17YFbTFwZOHPeSc3Pw9Cg@mail.gmail.com>
- <20140910143144.GF7960@sirena.org.uk>
-Message-ID: <CACxGe6u=QkGTKGfaE_jJ5VFMhdVKQNggp3qVBUgNP7rDbZss_A@mail.gmail.com>
+From: cov@codeaurora.org (Christopher Covington)
+Date: Wed, 10 Sep 2014 10:58:15 -0400
+Subject: [PATCH] clocksource: arch_timer: Fix code to use physical timers
+ when requested
+In-Reply-To: <CAD=FV=UwfP0x-bswbtV_eUvpKeOSNnsVVLTE3VHguyhm_jiSug@mail.gmail.com>
+References: <1409173419-13076-1-git-send-email-sonnyrao@chromium.org>
+ <CAOesGMjK65Rc-K0fyFUUJLw6huLT82E-nqJwZO4PqhgopF96Ow@mail.gmail.com>
+ <CAPz6YkWAPtuy4sAuAK9GtpDgfGsccxeS+pqqe_t_R818Jt01qA@mail.gmail.com>
+ <53FE5B09.2020403@codeaurora.org>
+ <CAOesGMhTivDzJFuxONggcJ6N5UvZopKa=+tv9PoPX593cpnm0A@mail.gmail.com>
+ <53FE7E3B.1010500@codeaurora.org>
+ <CAOesGMgXnsqttHwAxEW4a7-Rx-nmSwpJd_Dt1iCcFOvzDwbzdA@mail.gmail.com>
+ <CAD=FV=VjN6Xam-nRRcxvOoN-gokU6DbGVjoPXN_fkTJssH1RWA@mail.gmail.com>
+ <20140828093505.GC14650@leverpostej>
+ <CAD=FV=UwfP0x-bswbtV_eUvpKeOSNnsVVLTE3VHguyhm_jiSug@mail.gmail.com>
+Message-ID: <54106707.4010006@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 10, 2014 at 3:31 PM, Mark Brown <broonie@kernel.org> wrote:
-> On Wed, Sep 10, 2014 at 06:06:46AM -0700, Olof Johansson wrote:
->> On Mon, Sep 8, 2014 at 12:40 PM, Grant Likely <grant.likely@secretlab.ca> wrote:
->
->> > Well, lets see... We've got a real user complaining about a platform
->> > that used to work on mainline, and no longer does. The only loophole
->> > for ignoring breakage is if there nobody cares that it is broken. That
->> > currently isn't the case. So even though it's based on a patch that
->> > has "DO NOT SUBMIT" in large friendly letters on the front cover, it
->> > doesn't change the situation that mainline has a regression.
->
->> Yeah, I'm with you on this Grant, it doesn't matter what the patch is
->> labelled as.
->
->> One way to deal with this could be to add a quirk at boot time --
->> looking for the simplefb and if found, modifies the regulators to keep
->> them on. That'd go in the kernel, not in firmware.
->
-> Well, we should also be fixing simplefb to manage the resources it uses
-> though that doesn't clean up after the broken DTs that are currently
-> deployed.
->
-> As well as the regulators we'll also need to fix the clocks.  If we're
-> going to start adding these fixups perhaps we want to consider having a
-> wrapper stage that deals with rewriting DTs prior to trying to use them?
-> I'm not sure if it makes much difference but there's overlap with other
-> tools like the ATAGs conversion wrapper and building separately would
-> let the fixup code run early without directly going into the early init
-> code (which seems a bit scary).
->
->> Much better would have been if the DRM changes worked when they
->> landed, so that the migration form simplefb to drm was invisible to
->> the user. Or at least, to get them working ASAP since they're still
->> broken. :(
->
-> As far as I can tell the problem here is coming from the decision to
-> have simplefb use resources without knowing about them - can we agree
-> that this is a bad idea?
+On 09/05/2014 06:11 PM, Doug Anderson wrote:
+> Mark,
+> 
+> On Thu, Aug 28, 2014 at 2:35 AM, Mark Rutland <mark.rutland@arm.com> wrote:
+>> Not if you boot Linux at hyp, as we've recommended for this precise
+>> reason. That doesn't fix other things like CNTFRQ if the secure
+>> initialisation doesn't poke that, however.
+> 
+> I'll freely admit that I'm out of my league and out of my comfort zone
+> here, but...
+> 
+> In the theory that firmware ought to be as minimal as possible
+> (because it's hard to update and hard to keep in sync with kernel
+> versions), it seems like firmware ought to start the kernel out in as
+> permissive mode as it's willing to provide, right?
+> 
+> If the kernel is started out as permissive as possible then it can do
+> anything it needs to.  Future versions of the kernel can be
+> implemented to do any way-cool things that they want to do without an
+> update to firmware, right?  ...and current versions of the kernel can
+> just shed permissions if they don't want them.
+> 
+> ...so if I understand correctly, "Secure SVC" mode is more permissive
+> than "Non Secure HYP" mode, right?  It looks to me as if we currently
+> start the kernel in "Secure SVC" mode.  What do you think about the
+> kernel detecting Secure SVC and then dropping down permission levels
+> (to Non Secure HYP).  Once it did this, it could update things like
+> the virtual offset and then transition down further into non-secure
+> SVC mode.
+> 
+> ...or maybe this has been discussed millions of times already and I'm
+> just clueless.  ...or maybe this is just too hard for the kernel to do
+> in a generic way?
 
-No, I don't think we can... there is a certain amount of "firmware got
-things working for us, and we're going to use it for a while" that is
-absolutely reasonable. simplefb is a good example, but there are
-certainly others.
+I think this is a great idea. When running on simulators, it would make (the
+non-DTB parts of) the bootwrapper and QEMU's built-in bootloader unnecessary.
 
-I /do/ think it would be better for the simplefb data to get embedded
-or linked into the node of the graphics controller so that it can be
-torn down appropriately, and we need a rule for how long boot-state
-can be considered valid so that a proper driver can either reserve the
-resources for a given SoC, or do a full handoff from the simplefb.
-Even without that though, we need to be able to handle the case of an
-anonymous simplefb node with no regulator information. If that means
-the default simplefb behaviour is to inhibit runtime pm on all
-resources until a real driver show up, then that might just be what we
-need to do.
+Implementing it on AArch64 should be trivial as you can just read CurrentEL
+and work from whatever EL/PL you're at. Is there an easy way to check whether
+you're in secure or nonsecure mode in AArch32? I seem to recall discussion
+about putting this information into the DTB, which makes me think there isn't.
 
-Two things should probably be changed from the current setup. 1)
-simplefb shouldn't be a platform driver. It is a boot thing that
-handles initial state from the graphics chip. By implementing it as a
-platform driver, it prevents the real driver from binding to the real
-device if the simplefb data embedded into it. 2) make sure that an SoC
-driver can protect the needed resources before they are automatically
-disabled. Either by putting them in an earlier initcall, or handling
-it in the subsystem code. I don't know enough about the regulator and
-clock runtime PM to know what the best way to do this is.
+Christopher
 
-g.
+-- 
+Employee of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by the Linux Foundation.
