@@ -1,36 +1,56 @@
-From: nicoleotsuka@gmail.com (Nicolin Chen)
-Date: Wed, 10 Sep 2014 11:14:15 -0700
-Subject: [alsa-devel] [PATCH 2/5] ASoC: fsl: add imx-tlv320aic3x machine
- driver
-In-Reply-To: <20140910142740.GC16489@pengutronix.de>
-References: <1410356809-26179-1-git-send-email-d.lavnikevich@sam-solutions.com>
- <1410356809-26179-3-git-send-email-d.lavnikevich@sam-solutions.com>
- <20140910142740.GC16489@pengutronix.de>
-Message-ID: <CAGoOwPSpkNy6uNVAjG2HgiHHscKZjL5wgVrkyGwWCmyU7x+gWg@mail.gmail.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 10 Sep 2014 19:17:01 +0100
+Subject: Unable to boot mainline on snow chromebook since 3.15
+In-Reply-To: <CAOesGMgn7F7UoGJmO6K74KE_x+Rw8H2MpzCjBjNOq0g9o1TuNg@mail.gmail.com>
+References: <540C7F5B.6070307@gmail.com> <540C83DE.10505@collabora.co.uk>
+ <540C8577.2070907@gmail.com> <20140908112112.GK26030@arm.com>
+ <CACxGe6v40wMSW8LJRtyZ3C6PinRMcQM-Zog+XpTJ-QG3HHJknw@mail.gmail.com>
+ <CAD=FV=VAqzvJQDQMjjeQ1p5okyDzE=ff_sguObZxh59qbzcaTQ@mail.gmail.com>
+ <CACxGe6t_ex1bU=CvTpXR4VJgNf1hAq33hr6ykbHy_sMXEk4h-g@mail.gmail.com>
+ <CAOesGMipX3MV6sMWLuY=D+bQ6qe8P17YFbTFwZOHPeSc3Pw9Cg@mail.gmail.com>
+ <20140910143144.GF7960@sirena.org.uk>
+ <CAOesGMgn7F7UoGJmO6K74KE_x+Rw8H2MpzCjBjNOq0g9o1TuNg@mail.gmail.com>
+Message-ID: <20140910181701.GL7960@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 10, 2014 at 7:27 AM, Markus Pargmann <mpa@pengutronix.de> wrote:
-> Hi,
->
-> On Wed, Sep 10, 2014 at 04:46:46PM +0300, Dmitry Lavnikevich wrote:
->> This is driver for i.MX6 boards with tlv320aic3x audio codecs.
->>
->> Signed-off-by: Dmitry Lavnikevich <d.lavnikevich@sam-solutions.com>
->> ---
->>  .../bindings/sound/fsl,imx-audio-tlv320aic3x.txt   |  27 ++++
->>  sound/soc/fsl/Kconfig                              |  13 ++
->>  sound/soc/fsl/Makefile                             |   2 +
->>  sound/soc/fsl/imx-tlv320aic3x.c                    | 177 +++++++++++++++++++++
->>  4 files changed, 219 insertions(+)
->>  create mode 100644 Documentation/devicetree/bindings/sound/fsl,imx-audio-tlv320aic3x.txt
->>  create mode 100644 sound/soc/fsl/imx-tlv320aic3x.c
->
-> Is it possible to use the simple-card
-> (Documentation/devicetree/bindings/sound/simple-card.txt) instead of
-> adding a new audio card driver? There are also DT bindings for the imx
-> audiomultiplexer (imx-audmux.txt).
+On Wed, Sep 10, 2014 at 09:36:32AM -0700, Olof Johansson wrote:
+> On Wed, Sep 10, 2014 at 7:31 AM, Mark Brown <broonie@kernel.org> wrote:
 
-I don't know why my mutt doesn't display this mail.
+> > As well as the regulators we'll also need to fix the clocks.  If we're
+> > going to start adding these fixups perhaps we want to consider having a
+> > wrapper stage that deals with rewriting DTs prior to trying to use them?
+> > I'm not sure if it makes much difference but there's overlap with other
+> > tools like the ATAGs conversion wrapper and building separately would
+> > let the fixup code run early without directly going into the early init
+> > code (which seems a bit scary).
 
-Anyway, if Simple Card supports audmux, yes, it's also a good idea.
+> I'm strongly against doing this outside of the kernel, since they're
+> closely tied together today. We've always had the quirk tables for
+> devices in the kernel, and we used to do this a long time ago on
+> powerpc as well (we did it before we built the flat DT out of the OF
+> equivalent there, most of the time).
+
+Indeed - sorry, the above wasn't adequately clear.  I think that we
+should build this separately but keep it part of the kernel source.  The
+split I was thinking of was purely technical.
+
+> > As far as I can tell the problem here is coming from the decision to
+> > have simplefb use resources without knowing about them - can we agree
+> > that this is a bad idea?
+
+> As already argued, there are good reasons to sometimes allow this, as
+> long as it can be expected that it's something that's just used during
+> early boot. For example, having DEBUG_LL output on a pre-mapped
+> framebuffer could be really useful. Once DRM comes up, it'll tear down
+> the existing one.
+
+The problem here seems to be that that just during early boot assumption
+isn't playing out so well...
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140910/fafa9828/attachment.sig>
