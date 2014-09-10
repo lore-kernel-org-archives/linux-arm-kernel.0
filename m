@@ -1,25 +1,20 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Wed, 10 Sep 2014 13:02:02 -0700
-Subject: [PATCH v3 6/7] ARM: dts: Set i2c7 clock at 400kHz for Peach boards
-In-Reply-To: <1410344391-5675-7-git-send-email-javier.martinez@collabora.co.uk>
-References: <1410344391-5675-1-git-send-email-javier.martinez@collabora.co.uk>
- <1410344391-5675-7-git-send-email-javier.martinez@collabora.co.uk>
-Message-ID: <CAD=FV=Wb+0gQ7xLzxoXz_7gxEK01oX3fm8wcBwqM2tzUvQ8h-g@mail.gmail.com>
+From: davem@davemloft.net (David Miller)
+Date: Wed, 10 Sep 2014 13:03:26 -0700 (PDT)
+Subject: [PATCH v1] net: ethernet: arc: Don't free Rockchip resources
+ before disconnect from phy
+In-Reply-To: <1410335473-23573-1-git-send-email-romain.perier@gmail.com>
+References: <1410335473-23573-1-git-send-email-romain.perier@gmail.com>
+Message-ID: <20140910.130326.265195308573058113.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Javier,
+From: Romain Perier <romain.perier@gmail.com>
+Date: Wed, 10 Sep 2014 07:51:13 +0000
 
-On Wed, Sep 10, 2014 at 3:19 AM, Javier Martinez Canillas
-<javier.martinez@collabora.co.uk> wrote:
-> The downstream ChromeOS 3.8 kernel sets the clock frequency
-> for the I2C bus 7 at 400kHz. Do the same change in mainline.
->
-> Suggested-by: Doug Anderson <dianders@chromium.org>
-> Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
-> ---
->  arch/arm/boot/dts/exynos5420-peach-pit.dts | 1 +
->  arch/arm/boot/dts/exynos5800-peach-pi.dts  | 1 +
->  2 files changed, 2 insertions(+)
+> Free resources before being disconnected from phy and calling core driver is
+> wrong and should not happen. It avoids a delay of 4-5s caused by the timeout of
+> phy_disconnect().
+> 
+> Signed-off-by: Romain Perier <romain.perier@gmail.com>
 
-Reviewed-by: Doug Anderson <dianders@chromium.org>
+Applied, thanks.
