@@ -1,36 +1,41 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Wed, 10 Sep 2014 12:51:04 -0700
-Subject: Unable to boot mainline on snow chromebook since 3.15
-In-Reply-To: <20140910194522.GM7960@sirena.org.uk>
-References: <20140908112112.GK26030@arm.com>
- <CACxGe6v40wMSW8LJRtyZ3C6PinRMcQM-Zog+XpTJ-QG3HHJknw@mail.gmail.com>
- <CAD=FV=VAqzvJQDQMjjeQ1p5okyDzE=ff_sguObZxh59qbzcaTQ@mail.gmail.com>
- <CACxGe6t_ex1bU=CvTpXR4VJgNf1hAq33hr6ykbHy_sMXEk4h-g@mail.gmail.com>
- <CAOesGMipX3MV6sMWLuY=D+bQ6qe8P17YFbTFwZOHPeSc3Pw9Cg@mail.gmail.com>
- <20140910143144.GF7960@sirena.org.uk>
- <CACxGe6u=QkGTKGfaE_jJ5VFMhdVKQNggp3qVBUgNP7rDbZss_A@mail.gmail.com>
- <20140910153919.GH7960@sirena.org.uk>
- <CACxGe6uBcTPMh4p=oi7m_TVpjUrkgbQvxbStAn27HXEJxYe5fw@mail.gmail.com>
- <CAD=FV=W0qQZF58AvF8kZW+z4CsfnruQZLw_TA-eGy3fUruLbcg@mail.gmail.com>
- <20140910194522.GM7960@sirena.org.uk>
-Message-ID: <CAD=FV=WStUY=8jwwbPx_3J-=owv+YPd6QaS90DGL9r+bpAmJGw@mail.gmail.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 10 Sep 2014 20:50:52 +0100
+Subject: [PATCH RFC 2/3] ARM: regulator: add Freescale MXS regulator driver
+In-Reply-To: <54108B34.6010701@lategoodbye.de>
+References: <1410089869-6611-1-git-send-email-info@lategoodbye.de>
+ <1410089869-6611-3-git-send-email-info@lategoodbye.de>
+ <20140909182211.GG3896@leverpostej>
+ <540F523D.4010904@lategoodbye.de>
+ <20140910141853.GA4994@leverpostej>
+ <20140910151316.GG7960@sirena.org.uk>
+ <54108B34.6010701@lategoodbye.de>
+Message-ID: <20140910195052.GN7960@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mark,
+On Wed, Sep 10, 2014 at 07:32:36PM +0200, Stefan Wahren wrote:
+> Am 10.09.2014 17:13, schrieb Mark Brown:
 
-On Wed, Sep 10, 2014 at 12:45 PM, Mark Brown <broonie@kernel.org> wrote:
-> On Wed, Sep 10, 2014 at 09:45:21AM -0700, Doug Anderson wrote:
->
->> Right now I know that clock disabling is supposed to be inhibited
->> during the early boot process.  I think regulators too?
->
-> No, for regulators we'll quite happily disable anything a consumer asks
-> us to at any point but we'll only do a sweep for regulators that were
-> enabled on startup then not subsequently referenced and turn them off in
-> late_initcall.
+> >Ugh, this looks like it might be a regulator driver but since the
+> >subject line was "ARM: " I deleted it unread - if your changelog looks
+> >different to all the other changelogs in the subsystem it probably needs
+> >changing.
 
-Ah, that sounds exactly like the clock framework then.  I think I just
-didn't explain the clock framework properly.
+> sorry about the confusion, i will remove ARM in the next version.
 
--Doug
+> Changelog? I didn't send a changelog because it was my first version.
+
+The changelog is the text describing the change you are making, not
+something describing differences between revisions of the patch set.
+
+> Should i resend this version only to you?
+
+It sounds like this needs a new version anyway so may as well just wait
+for that.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140910/9dc97e03/attachment.sig>
