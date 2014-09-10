@@ -1,39 +1,95 @@
-From: luto@amacapital.net (Andy Lutomirski)
-Date: Wed, 10 Sep 2014 09:52:39 -0700
-Subject: [PATCH v9 4/6] ARM: add vdso user-space code
-In-Reply-To: <20140910164755.GC1710@arm.com>
-References: <1408744351-7814-1-git-send-email-nathan_lynch@mentor.com>
- <1408744351-7814-5-git-send-email-nathan_lynch@mentor.com>
- <20140910164755.GC1710@arm.com>
-Message-ID: <CALCETrUKcH11nL4peq5=t0TFMKeY8h-d5kbq1+VV9ujAzYpd-Q@mail.gmail.com>
+From: Liviu.Dudau@arm.com (Liviu Dudau)
+Date: Wed, 10 Sep 2014 17:53:47 +0100
+Subject: [PATCH v10 08/10] OF: PCI: Add support for parsing PCI host
+ bridge resources from DT
+In-Reply-To: <20140910163746.GB19662@e102568-lin.cambridge.arm.com>
+References: <1410184472-17630-1-git-send-email-Liviu.Dudau@arm.com>
+ <1410184472-17630-9-git-send-email-Liviu.Dudau@arm.com>
+ <20140909133546.GB2636@e102568-lin.cambridge.arm.com>
+ <20140910142241.GD27864@e106497-lin.cambridge.arm.com>
+ <20140910151026.GB11640@e102568-lin.cambridge.arm.com>
+ <20140910153233.GG27864@e106497-lin.cambridge.arm.com>
+ <20140910163746.GB19662@e102568-lin.cambridge.arm.com>
+Message-ID: <20140910165347.GJ27864@e106497-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 10, 2014 at 9:47 AM, Will Deacon <will.deacon@arm.com> wrote:
-> Hi Nathan,
->
-> On Fri, Aug 22, 2014 at 10:52:29PM +0100, Nathan Lynch wrote:
->> Place vdso-related user-space code in arch/arm/kernel/vdso/.
->>
->> It is almost completely written in C with some assembly helpers to
->> load the data page address, sample the counter, and fall back to
->> system calls when necessary.
->
-> I'm still a bit puzzled as to how we can implement a compat version of this
-> for a 32-bit userspace running under a 64-bit kernel. Maybe the answer is
-> that we don't care enough (programs will still work fine without it), but if
-> we did want to then we're going to need to build the kernel with two
-> toolchains and it gets really horrible.
->
-> Do you have any ideas?
+On Wed, Sep 10, 2014 at 05:37:47PM +0100, Lorenzo Pieralisi wrote:
+> On Wed, Sep 10, 2014 at 04:32:33PM +0100, Liviu Dudau wrote:
+> 
+> [...]
+> 
+> > > > > > +		/*
+> > > > > > +		 * If we failed translation or got a zero-sized region
+> > > > > > +		 * then skip this range
+> > > > > > +		 */
+> > > > > > +		if (range.cpu_addr == OF_BAD_ADDR || range.size == 0)
+> > > > > > +			continue;
+> > > > > > +
+> > > > > > +		res = kzalloc(sizeof(struct resource), GFP_KERNEL);
+> > > > > > +		if (!res) {
+> > > > > > +			err = -ENOMEM;
+> > > > > > +			goto parse_failed;
+> > > > > > +		}
+> > > > > > +
+> > > > > > +		err = of_pci_range_to_resource(&range, dev, res);
+> > > > > > +		if (err) {
+> > > > > > +			kfree(res);
+> > > > > 
+> > > > > You might want to add a label to free res to make things more uniform.
+> > 
+> > Sorry, not following you. How would a label help here?
+> 
+> It was just a suggestion so ignore it if you do not think it is cleaner.
+> It is to make code more uniform and undo operations in one place instead of
+> doing it piecemeal (you kfree the res here and jump to complete the clean-up,
+> whereas you might want to add a different label and a different goto
+> destination and carry out the kfree there).
 
-Convince the gcc and binutils people to add a-m32 option to aarch64?
-That's how x86_64 pulls this off :)  Or you could require a
-cross-compiler to be available to enable this particular feature.
+But that kfree is the only done once, while the pci_free_resource_list() is
+done twice.
 
-I have no further bright ideas, unless aarch64 and arm assembly are
-miraculously nearly compatible, in which case you could do something
-like what x32 does (build 64-bit and then use objcopy to turn the
-result into an x32 object).
+> 
+> I do not mind either, it is just what I noticed.
+> 
+> > > > > > +			goto parse_failed;
+> > > > > > +		}
+> > > > > > +
+> > > > > > +		if (resource_type(res) == IORESOURCE_IO) {
+> > > > > > +			if (*io_base)
+> > > > > 
+> > > > > You do not zero io_base in the first place so you should ask the API
+> > > > > user to do that. Is 0 a valid value BTW ? If it is you've got to resort
+> > > > > to something else to detect multiple IO resources.
+> > 
+> > No, zero is not a valid value. It is the cpu_addr value from the IO range, I'm
+> > hopying that no one is crazy enough to map PCI address space at CPU address zero.
+> > Thanks for spotting the lack of initialisation though, I need to fix it.
+> 
+> Mmm...wasn't a trick question sorry :D
+> 
+> PCI host bridge /pci ranges:
+>    IO 0x00000000..0x0000ffff -> 0x00000000
+>    More than one I/O resource converted. CPU offset for old range lost!
+>      MEM 0x41000000..0x7fffffff -> 0x41000000
+>      pci-host-generic 40000000.pci: PCI host bridge to bus 0000:00
+>      pci_bus 0000:00: root bus resource [bu-01]
+>      pci_bus 0000:00: root bus resource [io  0x0000-0xffff]
+>      pci_bus 0000:00: root bus resource [mem 0x41000000-0x7fffffff]
+> 
 
---Andy
+Your DT puts the IO space at CPU address zero? Could you copy the relevant
+host bridge node from DT here?
+
+Best regards,
+Liviu
+
+-- 
+====================
+| I would like to |
+| fix the world,  |
+| but they're not |
+| giving me the   |
+ \ source code!  /
+  ---------------
+    ?\_(?)_/?
