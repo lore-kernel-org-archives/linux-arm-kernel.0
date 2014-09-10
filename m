@@ -1,47 +1,58 @@
-From: mpa@pengutronix.de (Markus Pargmann)
-Date: Wed, 10 Sep 2014 16:27:40 +0200
-Subject: [alsa-devel] [PATCH 2/5] ASoC: fsl: add imx-tlv320aic3x machine
- driver
-In-Reply-To: <1410356809-26179-3-git-send-email-d.lavnikevich@sam-solutions.com>
-References: <1410356809-26179-1-git-send-email-d.lavnikevich@sam-solutions.com>
- <1410356809-26179-3-git-send-email-d.lavnikevich@sam-solutions.com>
-Message-ID: <20140910142740.GC16489@pengutronix.de>
+From: m-karicheri2@ti.com (Murali Karicheri)
+Date: Wed, 10 Sep 2014 10:28:32 -0400
+Subject: [PATCH v2 2/2] PCI: keystone: update to support multiple pci ports
+In-Reply-To: <3814561.AbrslYBNjb@wuerfel>
+References: <1410293835-13050-1-git-send-email-m-karicheri2@ti.com>
+ <3967092.l9bxcqMaSa@wuerfel> <540F8425.70304@ti.com>
+ <3814561.AbrslYBNjb@wuerfel>
+Message-ID: <54106010.8040206@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 09/10/2014 04:22 AM, Arnd Bergmann wrote:
+> On Tuesday 09 September 2014 18:50:13 Murali Karicheri wrote:
+>> My mistake. It is the device ID, not vendor ID. The PCI driver supports
+>> PCI h/w on K2HK, K2E and K2L SoCs for which PCI device IDs are assigned as
+>>
+>> +#define PCIE_RC_K2HK           0xb008
+>> +#define PCIE_RC_K2E            0xb009
+>> +#define PCIE_RC_K2L            0xb00a
+>> +
+>>
+>> and the same driver code runs on all these h/w. The device ID is not
+>> filled in by default by the h/w, in the config space of the RC at offset
+>> 1000h "VENDOR_DEVICE_ID Vendor and Device Identification Register".
+>> Same is available in a seperate SoC register whose offset is specified
+>> by index 2. This is read by driver and updated in the config space. The
+>> Vendor ID is however set by default.
+>>
+>> There is a mrrs PCI quirk required for Keystone PCI which depends on
+>> this vendor ID to be filled correctly as it match vendor id/ device id
+>> of the bridge device to apply the quirk.
+>>
+>> Hope this clarify your question.
+>
+> Ok, I understand now. Yes, this makes sense, though I wonder if it would
+> have been easier to handle the quirk in a different way based on the
+> driver rather than the PCI ID. It's probably not worth revisiting though,
+> unless Bjorn wants to see it done differently now.
 
-On Wed, Sep 10, 2014 at 04:46:46PM +0300, Dmitry Lavnikevich wrote:
-> This is driver for i.MX6 boards with tlv320aic3x audio codecs.
-> 
-> Signed-off-by: Dmitry Lavnikevich <d.lavnikevich@sam-solutions.com>
-> ---
->  .../bindings/sound/fsl,imx-audio-tlv320aic3x.txt   |  27 ++++
->  sound/soc/fsl/Kconfig                              |  13 ++
->  sound/soc/fsl/Makefile                             |   2 +
->  sound/soc/fsl/imx-tlv320aic3x.c                    | 177 +++++++++++++++++++++
->  4 files changed, 219 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/sound/fsl,imx-audio-tlv320aic3x.txt
->  create mode 100644 sound/soc/fsl/imx-tlv320aic3x.c
+Bjorn has reviewed the quirk patch and wanted to check the device ID and 
+vendor ID to avoid applying the quirck when bridge is non TI and same 
+device ID.
 
-Is it possible to use the simple-card
-(Documentation/devicetree/bindings/sound/simple-card.txt) instead of
-adding a new audio card driver? There are also DT bindings for the imx
-audiomultiplexer (imx-audmux.txt).
+So support for two PCI port requires only the PCI device id related 
+change. So I will modify the subject and commit log to reflect the same 
+and re-send the patch.
 
-Best regards,
+Thanks again Arnd for your comments.
 
-Markus
+Regards,
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140910/109f31a3/attachment.sig>
+Murali
+>
+> 	Arnd
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
