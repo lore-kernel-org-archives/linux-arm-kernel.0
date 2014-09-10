@@ -1,26 +1,25 @@
 From: shawn.guo@freescale.com (Shawn Guo)
-Date: Wed, 10 Sep 2014 09:51:06 +0800
-Subject: [PATCH] ARM: imx_v4_v5_defconfig: Select CONFIG_IMX_WEIM
-In-Reply-To: <1409927663-8871-1-git-send-email-festevam@gmail.com>
-References: <1409927663-8871-1-git-send-email-festevam@gmail.com>
-Message-ID: <20140910015104.GD2341@dragon>
+Date: Wed, 10 Sep 2014 09:52:01 +0800
+Subject: [PATCH] ARM: dts: imx6qdl-sabresd: Configure the pins locally
+In-Reply-To: <1409921170-23935-1-git-send-email-festevam@gmail.com>
+References: <1409921170-23935-1-git-send-email-festevam@gmail.com>
+Message-ID: <20140910015159.GE2341@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 05, 2014 at 11:34:23AM -0300, Fabio Estevam wrote:
+On Fri, Sep 05, 2014 at 09:46:10AM -0300, Fabio Estevam wrote:
 > From: Fabio Estevam <fabio.estevam@freescale.com>
 > 
-> The imx weim driver is used by some mx27/mx1 boards, so let's enable it by
-> default.
+> Passing '0x80000000' to the pin configuration means that kernel will skip the
+> IOMUXC_SW_PAD_CTL configuration and will use whathever values come from the 
+> bootloader.
 > 
-> Generated this patch by doing:
+> Instead of relying on the bootloader setup, let's configure it in the kernel to
+> have predictable settings.
 > 
-> - make imx_v4_v5_defconfig
-> - make menuconfig and manually select CONFIG_IMX_WEIM
-> - make savedefconfig
-> - cp defconfig arch/arm/configs/imx_v4_v5_defconfig
-> 
-> ,which results in some additional cleanups.
+> '0x1b0b0' is the default POR value for all these pins and has also been verified
+> that the pins are using this value by manually inspecting the IOMUXC_SW_PAD_CTL
+> registers, so no functional change has been made.
 > 
 > Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
 
