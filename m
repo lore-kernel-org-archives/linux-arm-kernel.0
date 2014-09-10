@@ -1,122 +1,60 @@
-From: guodong.xu@linaro.org (Guodong Xu)
-Date: Wed, 10 Sep 2014 11:50:39 +0800
-Subject: [PATCH] regulator: remove unnecessary of_node_get() to parent
-Message-ID: <1410321039-26888-1-git-send-email-guodong.xu@linaro.org>
+From: zlim.lnx@gmail.com (Zi Shen Lim)
+Date: Tue, 9 Sep 2014 20:58:01 -0700
+Subject: [PATCHv4 2/2] arm64: Add CONFIG_DEBUG_SET_MODULE_RONX support
+In-Reply-To: <20140901154529.GF24594@arm.com>
+References: <1408477303-2640-1-git-send-email-lauraa@codeaurora.org>
+ <1408477303-2640-3-git-send-email-lauraa@codeaurora.org>
+ <20140826144023.GA22256@localhost> <540493DC.20909@codeaurora.org>
+ <20140901154529.GF24594@arm.com>
+Message-ID: <CAMDttNf9nWutGNVT8f+f99SX8WtDNSBDN4uvpS+oJKNMdXs7xQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-These of_node_get() were added to balance refcount decrements inside of
-of_find_node_by_name().
-See: commit c92f5dd2c42f ("regulator: Add missing of_node_put()")
+Hi Will,
 
-However of_find_node_by_name() was then replaced by of_get_child_by_name(),
-which doesn't call of_node_put() against its input parameter.
+On Mon, Sep 1, 2014 at 8:45 AM, Will Deacon <will.deacon@arm.com> wrote:
+> On Mon, Sep 01, 2014 at 04:42:20PM +0100, Laura Abbott wrote:
+>> On 8/26/2014 7:40 AM, Catalin Marinas wrote:
+>> > On Tue, Aug 19, 2014 at 08:41:43PM +0100, Laura Abbott wrote:
+>> >> --- /dev/null
+>> >> +++ b/arch/arm64/mm/pageattr.c
+>> > [...]
+>> >> +static int change_memory_common(unsigned long addr, int numpages,
+>> >> +                          pgprot_t set_mask, pgprot_t clear_mask)
+>> >> +{
+>> >> +  unsigned long start = addr;
+>> >> +  unsigned long size = PAGE_SIZE*numpages;
+>> >> +  unsigned long end = start + size;
+>> >> +  int ret;
+>> >> +  struct page_change_data data;
+>> >> +
+>> >> +  if (!IS_ALIGNED(addr, PAGE_SIZE)) {
+>> >> +          addr &= PAGE_MASK;
 
-So, need to remove these unnecessary of_node_get() calls.
+I don't see any uses of addr after this.
+Perhaps we also meant to compute start and end?
 
-Signed-off-by: Guodong Xu <guodong.xu@linaro.org>
----
- drivers/regulator/88pm8607.c           | 2 +-
- drivers/regulator/da9052-regulator.c   | 4 ++--
- drivers/regulator/max8907-regulator.c  | 2 +-
- drivers/regulator/max8925-regulator.c  | 2 +-
- drivers/regulator/max8997.c            | 2 +-
- drivers/regulator/palmas-regulator.c   | 1 -
- drivers/regulator/tps65910-regulator.c | 2 +-
- 7 files changed, 7 insertions(+), 8 deletions(-)
-
-diff --git a/drivers/regulator/88pm8607.c b/drivers/regulator/88pm8607.c
-index 337634a..6d77dcd 100644
---- a/drivers/regulator/88pm8607.c
-+++ b/drivers/regulator/88pm8607.c
-@@ -319,7 +319,7 @@ static int pm8607_regulator_dt_init(struct platform_device *pdev,
- 				    struct regulator_config *config)
- {
- 	struct device_node *nproot, *np;
--	nproot = of_node_get(pdev->dev.parent->of_node);
-+	nproot = pdev->dev.parent->of_node;
- 	if (!nproot)
- 		return -ENODEV;
- 	nproot = of_get_child_by_name(nproot, "regulators");
-diff --git a/drivers/regulator/da9052-regulator.c b/drivers/regulator/da9052-regulator.c
-index fdb6ea8..0003362 100644
---- a/drivers/regulator/da9052-regulator.c
-+++ b/drivers/regulator/da9052-regulator.c
-@@ -422,9 +422,9 @@ static int da9052_regulator_probe(struct platform_device *pdev)
- 		config.init_data = pdata->regulators[pdev->id];
- 	} else {
- #ifdef CONFIG_OF
--		struct device_node *nproot, *np;
-+		struct device_node *nproot = da9052->dev->of_node;
-+		struct device_node *np;
- 
--		nproot = of_node_get(da9052->dev->of_node);
- 		if (!nproot)
- 			return -ENODEV;
- 
-diff --git a/drivers/regulator/max8907-regulator.c b/drivers/regulator/max8907-regulator.c
-index 9623e9e..3426be8 100644
---- a/drivers/regulator/max8907-regulator.c
-+++ b/drivers/regulator/max8907-regulator.c
-@@ -226,7 +226,7 @@ static int max8907_regulator_parse_dt(struct platform_device *pdev)
- 	struct device_node *np, *regulators;
- 	int ret;
- 
--	np = of_node_get(pdev->dev.parent->of_node);
-+	np = pdev->dev.parent->of_node;
- 	if (!np)
- 		return 0;
- 
-diff --git a/drivers/regulator/max8925-regulator.c b/drivers/regulator/max8925-regulator.c
-index dad2bcd..7770777 100644
---- a/drivers/regulator/max8925-regulator.c
-+++ b/drivers/regulator/max8925-regulator.c
-@@ -250,7 +250,7 @@ static int max8925_regulator_dt_init(struct platform_device *pdev,
- 	struct device_node *nproot, *np;
- 	int rcount;
- 
--	nproot = of_node_get(pdev->dev.parent->of_node);
-+	nproot = pdev->dev.parent->of_node;
- 	if (!nproot)
- 		return -ENODEV;
- 	np = of_get_child_by_name(nproot, "regulators");
-diff --git a/drivers/regulator/max8997.c b/drivers/regulator/max8997.c
-index 90b4c53..9c31e21 100644
---- a/drivers/regulator/max8997.c
-+++ b/drivers/regulator/max8997.c
-@@ -917,7 +917,7 @@ static int max8997_pmic_dt_parse_pdata(struct platform_device *pdev,
- 	struct max8997_regulator_data *rdata;
- 	unsigned int i, dvs_voltage_nr = 1, ret;
- 
--	pmic_np = of_node_get(iodev->dev->of_node);
-+	pmic_np = iodev->dev->of_node;
- 	if (!pmic_np) {
- 		dev_err(&pdev->dev, "could not find pmic sub-node\n");
- 		return -ENODEV;
-diff --git a/drivers/regulator/palmas-regulator.c b/drivers/regulator/palmas-regulator.c
-index a7ce34d..1878e5b 100644
---- a/drivers/regulator/palmas-regulator.c
-+++ b/drivers/regulator/palmas-regulator.c
-@@ -1427,7 +1427,6 @@ static void palmas_dt_to_pdata(struct device *dev,
- 	u32 prop;
- 	int idx, ret;
- 
--	node = of_node_get(node);
- 	regulators = of_get_child_by_name(node, "regulators");
- 	if (!regulators) {
- 		dev_info(dev, "regulator node not found\n");
-diff --git a/drivers/regulator/tps65910-regulator.c b/drivers/regulator/tps65910-regulator.c
-index 2064507..18fc991 100644
---- a/drivers/regulator/tps65910-regulator.c
-+++ b/drivers/regulator/tps65910-regulator.c
-@@ -1014,7 +1014,7 @@ static struct tps65910_board *tps65910_parse_dt_reg_data(
- 	if (!pmic_plat_data)
- 		return NULL;
- 
--	np = of_node_get(pdev->dev.parent->of_node);
-+	np = pdev->dev.parent->of_node;
- 	regulators = of_get_child_by_name(np, "regulators");
- 	if (!regulators) {
- 		dev_err(&pdev->dev, "regulator node not found\n");
--- 
-1.9.1
+>> >> +          WARN_ON_ONCE(1);
+>> >> +  }
+>> >> +
+>> >> +  if (!is_module_address(start) || !is_module_address(end))
+>> >> +          return -EINVAL;
+>> >
+>> > Minor thing, "end" is exclusive here. Do you still get the right check
+>> > with is_module_address(end)?
+>> >
+>>
+>> No, You are correct. I'll talk to Will to get that fixed up.
+>
+> I already had a crack at fixing it:
+>
+>   https://git.kernel.org/cgit/linux/kernel/git/arm64/linux.git/commit/?h=devel&id=a8b974874c4770860c2a356adb9397d38f6c2b70
+>
+> How did I do?
+>
+> Will
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
