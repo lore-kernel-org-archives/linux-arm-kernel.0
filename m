@@ -1,26 +1,71 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Wed, 10 Sep 2014 10:13:40 +0800
-Subject: [PATCH 1/4] ARM: i.MX: Remove i.MX1 Armadeus APF9328 board support
-In-Reply-To: <20140910020835.GF2341@dragon>
-References: <1409978083-20047-1-git-send-email-shc_work@mail.ru>
- <20140910020835.GF2341@dragon>
-Message-ID: <20140910021338.GE3389@dragon>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 10 Sep 2014 02:14:58 +0000
+Subject: [PATCH] ARM: OMAP5+: Reuse OMAP4 PM code for OMAP5 and DRA7
+In-Reply-To: <1410282933-30131-1-git-send-email-nm@ti.com>
+References: <1410282933-30131-1-git-send-email-nm@ti.com>
+Message-ID: <20140910021458.GA1058@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 10, 2014 at 10:08:37AM +0800, Shawn Guo wrote:
-> On Sat, Sep 06, 2014 at 08:34:40AM +0400, Alexander Shiyan wrote:
-> > mach-apf9328.c can be replaced with devicetree equivalent: imx1-apf9328.dts,
-> > so remove the board file.
-> > 
-> > Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
+* Nishanth Menon <nm@ti.com> [140909 17:16]:
+> OMAP4, OMAP5 and DRA7 share a lot of common logic and data structures.
+> These have been enabled in the previous patches, however, this also
+> means that OMAP5 or DRA7 only builds also need to build OMAP4 logic.
+> Update to reuse OMAP4 logic.
 > 
-> Hi Alexander,
+> This fixes the 'undefined reference to 'omap4_pm_init_early'' in
+> OMAP5 or DRA7 only builds.
 > 
-> I would like to apply the series as a cleanup on imx/cleanup branch.
-> Can you please rebase the series on that branch?
+> Fixes: 6af16a1dac5465c ("ARM: DRA7: Add hook in SoC initcalls to enable pm initialization")
+> Fixes: 628ed4717000789 ("ARM: OMAP5: Add hook in SoC initcalls to enable pm initialization")
+> Reported-by: Tony Lindgren <tony@atomide.com>
+> Signed-off-by: Nishanth Menon <nm@ti.com>
+> ---
+> 
+> This fixes the regression with randconfig that Tony reported with
+> omap-for-v3.18/soc branch.
+> 
+> Tested with CONFIG_ARCH_OMAP2, CONFIG_ARCH_OMAP3, CONFIG_ARCH_OMAP4,
+> CONFIG_SOC_OMAP5, CONFIG_SOC_AM33XX, CONFIG_SOC_AM43XX, CONFIG_SOC_DRA7XX
+> only builds.
 
-Or a better way might be deferring the series to the next cycle after
-the i.MX DT support lands on mainline?
+Thanks applying into omap-for-v3.18/soc.
 
-Shawn
+Tony 
+ 
+>  arch/arm/mach-omap2/Makefile |   12 ++++++++----
+>  1 file changed, 8 insertions(+), 4 deletions(-)
+> 
+> diff --git a/arch/arm/mach-omap2/Makefile b/arch/arm/mach-omap2/Makefile
+> index 69bbcba..d9dd99c 100644
+> --- a/arch/arm/mach-omap2/Makefile
+> +++ b/arch/arm/mach-omap2/Makefile
+> @@ -87,9 +87,10 @@ ifeq ($(CONFIG_PM),y)
+>  obj-$(CONFIG_ARCH_OMAP2)		+= pm24xx.o
+>  obj-$(CONFIG_ARCH_OMAP2)		+= sleep24xx.o
+>  obj-$(CONFIG_ARCH_OMAP3)		+= pm34xx.o sleep34xx.o
+> -obj-$(CONFIG_ARCH_OMAP4)		+= pm44xx.o omap-mpuss-lowpower.o
+> -obj-$(CONFIG_SOC_OMAP5)			+= omap-mpuss-lowpower.o
+> -obj-$(CONFIG_SOC_DRA7XX)		+= omap-mpuss-lowpower.o
+> +omap-4-5-pm-common			=  pm44xx.o omap-mpuss-lowpower.o
+> +obj-$(CONFIG_ARCH_OMAP4)		+= $(omap-4-5-pm-common)
+> +obj-$(CONFIG_SOC_OMAP5)			+= $(omap-4-5-pm-common)
+> +obj-$(CONFIG_SOC_DRA7XX)		+= $(omap-4-5-pm-common)
+>  obj-$(CONFIG_PM_DEBUG)			+= pm-debug.o
+>  
+>  obj-$(CONFIG_POWER_AVS_OMAP)		+= sr_device.o
+> @@ -102,7 +103,10 @@ endif
+>  
+>  ifeq ($(CONFIG_CPU_IDLE),y)
+>  obj-$(CONFIG_ARCH_OMAP3)                += cpuidle34xx.o
+> -obj-$(CONFIG_ARCH_OMAP4)                += cpuidle44xx.o
+> +omap-4-5-idle-common			=  cpuidle44xx.o
+> +obj-$(CONFIG_ARCH_OMAP4)		+= $(omap-4-5-idle-common)
+> +obj-$(CONFIG_SOC_OMAP5)			+= $(omap-4-5-idle-common)
+> +obj-$(CONFIG_SOC_DRA7XX)		+= $(omap-4-5-idle-common)
+>  endif
+>  
+>  # PRCM
+> -- 
+> 1.7.9.5
+> 
