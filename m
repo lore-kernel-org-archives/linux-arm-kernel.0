@@ -1,68 +1,94 @@
-From: boris.brezillon@free-electrons.com (Boris BREZILLON)
-Date: Wed, 10 Sep 2014 17:35:32 +0200
-Subject: [PATCH 5/5] rtc: at91sam9: add DT bindings documentation
-In-Reply-To: <20140910150702.GK2974@localhost>
-References: <1409733934-14465-1-git-send-email-boris.brezillon@free-electrons.com>
- <1409733934-14465-6-git-send-email-boris.brezillon@free-electrons.com>
- <20140910121424.GG2974@localhost>
- <20140910152019.111c4c01@bbrezillon>
- <20140910150702.GK2974@localhost>
-Message-ID: <20140910173532.0e8b1ef7@bbrezillon>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 10 Sep 2014 16:39:19 +0100
+Subject: Unable to boot mainline on snow chromebook since 3.15
+In-Reply-To: <CACxGe6u=QkGTKGfaE_jJ5VFMhdVKQNggp3qVBUgNP7rDbZss_A@mail.gmail.com>
+References: <540C7F5B.6070307@gmail.com> <540C83DE.10505@collabora.co.uk>
+ <540C8577.2070907@gmail.com> <20140908112112.GK26030@arm.com>
+ <CACxGe6v40wMSW8LJRtyZ3C6PinRMcQM-Zog+XpTJ-QG3HHJknw@mail.gmail.com>
+ <CAD=FV=VAqzvJQDQMjjeQ1p5okyDzE=ff_sguObZxh59qbzcaTQ@mail.gmail.com>
+ <CACxGe6t_ex1bU=CvTpXR4VJgNf1hAq33hr6ykbHy_sMXEk4h-g@mail.gmail.com>
+ <CAOesGMipX3MV6sMWLuY=D+bQ6qe8P17YFbTFwZOHPeSc3Pw9Cg@mail.gmail.com>
+ <20140910143144.GF7960@sirena.org.uk>
+ <CACxGe6u=QkGTKGfaE_jJ5VFMhdVKQNggp3qVBUgNP7rDbZss_A@mail.gmail.com>
+Message-ID: <20140910153919.GH7960@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 10 Sep 2014 17:07:02 +0200
-Johan Hovold <johan@kernel.org> wrote:
+On Wed, Sep 10, 2014 at 03:56:16PM +0100, Grant Likely wrote:
+> On Wed, Sep 10, 2014 at 3:31 PM, Mark Brown <broonie@kernel.org> wrote:
 
-> On Wed, Sep 10, 2014 at 03:20:19PM +0200, Boris BREZILLON wrote:
-> > On Wed, 10 Sep 2014 14:14:24 +0200
-> > Johan Hovold <johan@kernel.org> wrote:
-> 
-> > > This does not describe the hardware, but rather a specific software
-> > > configuration.
-> > > 
-> > > The RTT is first of all not an RTC (although it can be used as one in a
-> > > specific software configuration). And the second register resource above
-> > > is not an RTT register, but a general-purpose backup register could be
-> > > used for other purposes (which register to use is currently configurable
-> > > for legacy booting using CONFIG_RTC_DRV_AT91SAM9_GPBR).
-> > 
-> > We could use a syscon device (which exposes a regmap) for the GPBR
-> > block.
-> > 
-> > rtc at ffffff20 {
-> 
-> rtt
-> 
-> > 	compatible = "atmel,at91sam9260-rtt";
-> > 	reg = <0xfffffd20 0x10>;
-> > 	interrupts = <1 4 7>;
-> > 	clocks = <&clk32k>;
-> > 	atmel,time-reg = <&gpbr 0x0>;
-> > };
-> > 
-> > gpbr: syscon at fffffd50 {
-> > 	compatible = "atmel,at91sam9260-gpbr", "syscon";
-> > 	reg = <0xfffffd50 0x10>;
-> > 	
-> > };
-> 
-> Yes, this essentially what I suggested in the thread (and my last reply)
-> and relying on syscon rather than a custom driver seems like a good
-> idea. It would allow early access to the registers too with the recently
-> proposed changes. It would not guarantee any kind of exclusivity,
-> though, but I guess that's tolerable?
+> > As far as I can tell the problem here is coming from the decision to
+> > have simplefb use resources without knowing about them - can we agree
+> > that this is a bad idea?
 
-I know about the "mfd: syscon: Decouple syscon interface from platform
-devices" series, but I wonder why we would need to access GPBR
-registers during early boot stages. Do you have something in mind :-)?
+> No, I don't think we can... there is a certain amount of "firmware got
+> things working for us, and we're going to use it for a while" that is
+> absolutely reasonable. simplefb is a good example, but there are
+> certainly others.
 
-> 
-> Johan
+That bit is fine - I definitely think it's reasonable to have things
+like this where the device is initialized prior to the kernel starting
+and we use some simplified subset.  What I think is a big problem here
+is that we're not being told what parts of the system state are relevant
+to this initialization (worse, we're being told things that are actively
+wrong for some of the resources).  This seems inherently fragile.
 
+> I /do/ think it would be better for the simplefb data to get embedded
+> or linked into the node of the graphics controller so that it can be
+> torn down appropriately, and we need a rule for how long boot-state
+> can be considered valid so that a proper driver can either reserve the
+> resources for a given SoC, or do a full handoff from the simplefb.
+> Even without that though, we need to be able to handle the case of an
+> anonymous simplefb node with no regulator information. If that means
+> the default simplefb behaviour is to inhibit runtime pm on all
+> resources until a real driver show up, then that might just be what we
+> need to do.
 
+I think saying that it's a good idea to have an simplefb node without
+resource management is exactly the problem here - if we start from the
+assumption that this is a good idea we do get dragged down this path but
+it seems like we took a wrong turn going that way in the first place.
 
--- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+It's not just regulators - we've got exactly the same problem with
+clocks on this system for example, they're also getting disabled because
+they seem unused and users have to pass in a kernel command line bodge
+to avoid that.  We'd also have an issue if something decided to change
+the rates of some of the clocks, and power domains have the same problem
+(Ulf's patches to genericise their code has the same behaviour with
+regard to powering off unused domains, some of the existing
+implementations do that already).
+
+> Two things should probably be changed from the current setup. 1)
+> simplefb shouldn't be a platform driver. It is a boot thing that
+> handles initial state from the graphics chip. By implementing it as a
+> platform driver, it prevents the real driver from binding to the real
+> device if the simplefb data embedded into it. 2) make sure that an SoC
+> driver can protect the needed resources before they are automatically
+> disabled. Either by putting them in an earlier initcall, or handling
+> it in the subsystem code. I don't know enough about the regulator and
+> clock runtime PM to know what the best way to do this is.
+
+Right, I agree with what you're saying here but what I'm saying is that
+the way to ensure that the resources are protected is for the simplefb
+node to tell the kernel what resources are being used, otherwise it
+seems like we're just guessing and will fall over ourselves sooner or
+later.  
+
+We can't use initcall hacks as these only work in cases where we will at
+some point hand over to a real driver and there seems to be a clear use
+case for using simplefb prior to that driver being written; even where
+we will hand over to a real driver we can't put a definite timescale on
+that happening since in the distro case it might be being loaded from
+disk at some point after userspace is running.
+
+There's not a lot the subsystem can do without breaking other users or
+making the system substantially worse if we don't tell it what resources
+are affected, we'll end up being forced to tend too far towards being
+conservative about what we allow to happen.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140910/e19ad105/attachment.sig>
