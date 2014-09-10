@@ -1,95 +1,36 @@
-From: sonnyrao@chromium.org (Sonny Rao)
-Date: Wed, 10 Sep 2014 11:05:43 -0700
-Subject: [PATCH] clocksource: arch_timer: Fix code to use physical timers
- when requested
-In-Reply-To: <CAD=FV=U4ar=jW273=0PMX1A_hTqxPAJ9avJuTD2N4RNa4a12xg@mail.gmail.com>
-References: <1409173419-13076-1-git-send-email-sonnyrao@chromium.org>
- <20140910172710.GA3300@leverpostej>
- <CAD=FV=U4ar=jW273=0PMX1A_hTqxPAJ9avJuTD2N4RNa4a12xg@mail.gmail.com>
-Message-ID: <CAPz6YkW1ES23+xg5SpjkGz3RA6FCR5t540mRyDvHgqaFWQR-5A@mail.gmail.com>
+From: nicoleotsuka@gmail.com (Nicolin Chen)
+Date: Wed, 10 Sep 2014 11:07:36 -0700
+Subject: [PATCH 2/5] ASoC: fsl: add imx-tlv320aic3x machine driver
+In-Reply-To: <1410356809-26179-3-git-send-email-d.lavnikevich@sam-solutions.com>
+References: <1410356809-26179-1-git-send-email-d.lavnikevich@sam-solutions.com>
+ <1410356809-26179-3-git-send-email-d.lavnikevich@sam-solutions.com>
+Message-ID: <20140910180735.GB4628@Asurada>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 10, 2014 at 10:52 AM, Doug Anderson <dianders@chromium.org> wrote:
-> Mark,
->
-> On Wed, Sep 10, 2014 at 10:27 AM, Mark Rutland <mark.rutland@arm.com> wrote:
->> Hi Sonny,
->>
->> On Wed, Aug 27, 2014 at 10:03:39PM +0100, Sonny Rao wrote:
->>> This is a bug fix for using physical arch timers when
->>> the arch_timer_use_virtual boolean is false.  It restores the
->>> arch_counter_get_cntpct() function after removal in
->>>
->>> 0d651e4e "clocksource: arch_timer: use virtual counters"
->>>
->>> and completes the implementation of memory mapped access for physical
->>> timers, so if a system is trying to use physical timers, it will
->>> function properly.
->>
->> To get back to the topic at hand:
->>
->> Which platform is this required by?
->
-> I've seen similar problems on the A7s on exynos5420 / exynos5800 and
-> on rk3288.  I can't say what other platforms might be affected.  Note
-> that the arch timers on exyno5420/exynos5800 are not supported anyway,
-> so I guess that means we're just worrying about the rk3288.
+Hi Dmitry,
+   
+On Wed, Sep 10, 2014 at 04:46:46PM +0300, Dmitry Lavnikevich wrote:
+> This is driver for i.MX6 boards with tlv320aic3x audio codecs.
+> 
+> Signed-off-by: Dmitry Lavnikevich <d.lavnikevich@sam-solutions.com>
+> ---
+>  .../bindings/sound/fsl,imx-audio-tlv320aic3x.txt   |  27 ++++
+>  sound/soc/fsl/Kconfig                              |  13 ++
+>  sound/soc/fsl/Makefile                             |   2 +
+>  sound/soc/fsl/imx-tlv320aic3x.c                    | 177 +++++++++++++++++++++
+>  4 files changed, 219 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/sound/fsl,imx-audio-tlv320aic3x.txt
+>  create mode 100644 sound/soc/fsl/imx-tlv320aic3x.c
 
-Yeah, given that this problem has manifest on at least two different
-SoCs using ARM's cores, it would have been nice if the offset were
-specified to start out as zero when in reset by the architecture (and
-was implemented that way in ARM's core IP), but it looks like it
-wasn't.
+This whole single patch looks pretty clean. So I suggest it may be merged
+into fsl-asoc-card.c driver whose DT binding is almost identical to yours
+so that we don't need to add a machine driver with duplicated code. And
+you can feel free to enable fsl-asoc-card in the defconfig as well -- I
+was about to do it and to replace imx-wm8962 and imx-sgtl5000 with it.
 
->
->
->> Why exactly is arch_timer_use_virtual false in this case?
->
-> To re-summarize my understanding of everything (many of the below is
-> secondhand knowledge, so correct if wrong):
->
-> 1. The initial problem is that the virtual offset is not initialized
-> by anyone and is per core (each core gets a different, random offset).
-> That makes the virtual counter useless.  ...but the kernel only uses
-> virtual counters.
->
-> 2. As far as I know, we don't have any particular need for HYP mode
-> nor for limiting access to secure mode.
->
-> 3. You can only change the virtual offset from HYP mode.  That means
-> someone needs to transition to HYP mode if we want to use virtual
-> counters.
->
-> 4. If the kernel happens to be in HYP mode it will init the virtual offset.
->
-> 5. We could transition to HYP mode once in the firmware and boot the
-> kernel like that, but since firmware is gone after we've booted the
-> kernel, we run into the same problem when we power off a processor and
-> when we resume from S3.  The firmware is not involved in these cases.
-> In these cases the processors have an uninitialized virtual offset
-> again.  These processors don't appear to magically come up in HYP
-> mode.  Thus it would be up to the kernel to transition to HYP mode,
-> init the offset, and get out of HYP mode.  ...or just use the physical
-> counter.
->
->
-> If you can suggest something that doesn't require us to involve the
-> firmware in processor bringup and in resume, I'm all ears.  We have a
-> desire not to involve the firmware there because of all the issues of
-> keeping kernel/firmware in sync and because of the extra difficultly
-> of shipping firmware updates (understandably the QA needed to validate
-> a new firmware is much higher than the QA needed to validate a new
-> kernel).
+The only extra trivia you need to tackle is to add a clock binding into
+your dts for CODEC side.
 
-One thing that was used in the past was to have the kernel load a blob
-from /lib/firmware/ which did some re-initialization when coming out
-of suspend or deep sleep.  We could do something similar here and have
-it either fix virtual offset or put it into hyp mode.  That would help
-solve our issue of making it easier to update and avoid QA hassles.
-Is such a solution acceptable to upstream?
-
-
->
->
-> -Doug
+Thanks
+Nicolin
