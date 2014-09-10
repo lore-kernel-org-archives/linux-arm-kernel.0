@@ -1,95 +1,82 @@
-From: Liviu.Dudau@arm.com (Liviu Dudau)
-Date: Wed, 10 Sep 2014 17:53:47 +0100
-Subject: [PATCH v10 08/10] OF: PCI: Add support for parsing PCI host
- bridge resources from DT
-In-Reply-To: <20140910163746.GB19662@e102568-lin.cambridge.arm.com>
-References: <1410184472-17630-1-git-send-email-Liviu.Dudau@arm.com>
- <1410184472-17630-9-git-send-email-Liviu.Dudau@arm.com>
- <20140909133546.GB2636@e102568-lin.cambridge.arm.com>
- <20140910142241.GD27864@e106497-lin.cambridge.arm.com>
- <20140910151026.GB11640@e102568-lin.cambridge.arm.com>
- <20140910153233.GG27864@e106497-lin.cambridge.arm.com>
- <20140910163746.GB19662@e102568-lin.cambridge.arm.com>
-Message-ID: <20140910165347.GJ27864@e106497-lin.cambridge.arm.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Wed, 10 Sep 2014 18:55:19 +0200
+Subject: [PATCH 5/5] rtc: at91sam9: add DT bindings documentation
+In-Reply-To: <20140910155236.GL2974@localhost>
+References: <1409733934-14465-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1409733934-14465-6-git-send-email-boris.brezillon@free-electrons.com>
+ <20140910121424.GG2974@localhost> <20140910152019.111c4c01@bbrezillon>
+ <20140910150702.GK2974@localhost> <20140910173114.593dd132@bbrezillon>
+ <20140910155236.GL2974@localhost>
+Message-ID: <54108277.9000100@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 10, 2014 at 05:37:47PM +0100, Lorenzo Pieralisi wrote:
-> On Wed, Sep 10, 2014 at 04:32:33PM +0100, Liviu Dudau wrote:
+On 10/09/2014 17:52, Johan Hovold :
+> On Wed, Sep 10, 2014 at 05:31:14PM +0200, Boris BREZILLON wrote:
+>> On Wed, 10 Sep 2014 17:07:02 +0200
+>> Johan Hovold <johan@kernel.org> wrote:
 > 
-> [...]
+>>> Yes, this essentially what I suggested in the thread (and my last reply)
+>>> and relying on syscon rather than a custom driver seems like a good
+>>> idea. It would allow early access to the registers too with the recently
+>>> proposed changes. It would not guarantee any kind of exclusivity,
+>>> though, but I guess that's tolerable?
+>>
+>> Yep, that's one of the concern I had with the syscon/regmap
+>> approach :-(, but I guess I'll give this solution a try and post a new
+>> version of this series ;-).
 > 
-> > > > > > +		/*
-> > > > > > +		 * If we failed translation or got a zero-sized region
-> > > > > > +		 * then skip this range
-> > > > > > +		 */
-> > > > > > +		if (range.cpu_addr == OF_BAD_ADDR || range.size == 0)
-> > > > > > +			continue;
-> > > > > > +
-> > > > > > +		res = kzalloc(sizeof(struct resource), GFP_KERNEL);
-> > > > > > +		if (!res) {
-> > > > > > +			err = -ENOMEM;
-> > > > > > +			goto parse_failed;
-> > > > > > +		}
-> > > > > > +
-> > > > > > +		err = of_pci_range_to_resource(&range, dev, res);
-> > > > > > +		if (err) {
-> > > > > > +			kfree(res);
-> > > > > 
-> > > > > You might want to add a label to free res to make things more uniform.
-> > 
-> > Sorry, not following you. How would a label help here?
-> 
-> It was just a suggestion so ignore it if you do not think it is cleaner.
-> It is to make code more uniform and undo operations in one place instead of
-> doing it piecemeal (you kfree the res here and jump to complete the clean-up,
-> whereas you might want to add a different label and a different goto
-> destination and carry out the kfree there).
+> Perhaps we should see what Nicolas and Jean-Christophe says before
+> rushing into anything (again). ;)
 
-But that kfree is the only done once, while the pci_free_resource_list() is
-done twice.
+I said and say it again: keep it simple: if gpbr 0 is used by bootloader
+to pass information about the boot media, use gpbr 1, without protection
+without anything fancy, please.
 
+atmel,at91-rtt-as-rtc-gpbr = <1>;
+is good for me.
+
+We can decide to keep the DT binding as "unstable" and see what happen
+in one year from now (I suspect nothing will happen). The result is that
+we will have a simple update of this driver without new API or new
+sub-system to learn and maintain.
+
+So, all in all, I would just take what Johan or Boris did, and go with
+this, now!
+
+
+> I remember J-C considered loosing track of what was using a particular
+> backup register to be a regression. But I guess you can't have it both
+> ways (e.g. if you also want the early access soon provided by syscon).
 > 
-> I do not mind either, it is just what I noticed.
+> I'll refresh my rtt and gmbr-node patches meanwhile, as they should be
+> needed in some form at least.
 > 
-> > > > > > +			goto parse_failed;
-> > > > > > +		}
-> > > > > > +
-> > > > > > +		if (resource_type(res) == IORESOURCE_IO) {
-> > > > > > +			if (*io_base)
-> > > > > 
-> > > > > You do not zero io_base in the first place so you should ask the API
-> > > > > user to do that. Is 0 a valid value BTW ? If it is you've got to resort
-> > > > > to something else to detect multiple IO resources.
-> > 
-> > No, zero is not a valid value. It is the cpu_addr value from the IO range, I'm
-> > hopying that no one is crazy enough to map PCI address space at CPU address zero.
-> > Thanks for spotting the lack of initialisation though, I need to fix it.
+>> Can we just leave the rtt as an rtc problem on the side for now and bind
+>> it to the rtc-at91sam9 driver.
+>>
+>> If we ever decide to add a new driver using the RTT for another purpose
+>> we will still be able to reference the RTT block like this (and keep
+>> the existing rtt node definition):
+>>
+>> rtt-based-rtc {
+>> 	compatible = "atmel,rtt-rtc";
+>> 	atmel,rtt = <&rtt>;
+>> 	atmel,time-reg = <&gpbr 0x0>;
+>> }
 > 
-> Mmm...wasn't a trick question sorry :D
+> But why not do this from the start?
 > 
-> PCI host bridge /pci ranges:
->    IO 0x00000000..0x0000ffff -> 0x00000000
->    More than one I/O resource converted. CPU offset for old range lost!
->      MEM 0x41000000..0x7fffffff -> 0x41000000
->      pci-host-generic 40000000.pci: PCI host bridge to bus 0000:00
->      pci_bus 0000:00: root bus resource [bu-01]
->      pci_bus 0000:00: root bus resource [io  0x0000-0xffff]
->      pci_bus 0000:00: root bus resource [mem 0x41000000-0x7fffffff]
+>> rtt-based-xdev {
+>> 	compatible = "atmel,rtt-xdev";
+>> 	atmel,rtt = <&rtt>;
+>> 	/*...*/
+>> }
+> 
+> Johan
+> 
 > 
 
-Your DT puts the IO space at CPU address zero? Could you copy the relevant
-host bridge node from DT here?
-
-Best regards,
-Liviu
 
 -- 
-====================
-| I would like to |
-| fix the world,  |
-| but they're not |
-| giving me the   |
- \ source code!  /
-  ---------------
-    ?\_(?)_/?
+Nicolas Ferre
