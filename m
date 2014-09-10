@@ -1,57 +1,35 @@
-From: jhs@mojatatu.com (Jamal Hadi Salim)
-Date: Wed, 10 Sep 2014 07:33:04 -0400
-Subject: [PATCH v2 0/3] net: Add Keystone NetCP ethernet driver support
-In-Reply-To: <540F1A9A.1020309@ti.com>
-References: <1408115562-22487-1-git-send-email-santosh.shilimkar@ti.com>
- <20140821.163612.282672926741753926.davem@davemloft.net>
- <53F79DC5.8030003@ti.com> <540DC00F.1080103@ti.com>
- <540EE809.9020901@mojatatu.com> <540F1A9A.1020309@ti.com>
-Message-ID: <541036F0.2030001@mojatatu.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 10 Sep 2014 12:33:07 +0100
+Subject: [RFC PATCH v2 3/7] iommu: add new iommu_ops callback for adding
+ an OF device
+In-Reply-To: <20140910112213.GH28488@arm.com>
+References: <1409680587-29818-1-git-send-email-will.deacon@arm.com>
+ <1409680587-29818-4-git-send-email-will.deacon@arm.com>
+ <541032F6.1090809@samsung.com> <20140910112213.GH28488@arm.com>
+Message-ID: <20140910113306.GI28488@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/09/14 11:19, Santosh Shilimkar wrote:
+On Wed, Sep 10, 2014 at 12:22:13PM +0100, Will Deacon wrote:
+> On Wed, Sep 10, 2014 at 12:16:06PM +0100, Marek Szyprowski wrote:
+> > On 2014-09-02 19:56, Will Deacon wrote:
+> > > +#ifdef CONFIG_OF_IOMMU
+> > > +	int (*of_xlate)(struct device *dev, struct of_phandle_args *args);
+> > 
+> > If I understand correctly how it is designed to work, then it should be:
+> > 
+> > struct iommu_data *(*of_xlate)(struct device *dev, struct 
+> > of_phandle_args *args);
+> 
+> Yeah, that might be cleaner than the of_iommu_get_data call in
+> of_dma_configure. I'm currently cooking a v3, so I'll include this change.
 
-> All the documentation is open including packet accelerator offload
-> in ti.com.
+Actually, I spoke too soon. If we make of_xlate return the iommu_data, then
+we have to continue getting the iommu_ops from the bus_type, otherwise we
+have no way to call the right of_xlate.
 
-Very nice.
-Would you do me a kindness and point to the switch interface
-documentation (and other ones on that soc)?
+So I'd rather leave of_dma_configure using of_iommu_get_data (I'm currently
+ripping out the bus code in there) so that we can embed the iommu_ops in
+iommu_data instead.
 
-> We got such requests from customers but couldn't
-> support it for Linux.
-
-It has been difficult because every chip vendor is trying
-to do their own thing. Some have huge (fugly) SDKs in user space
-which make it worse. Thats the struggle we are trying to
-deal with. Of course none of those vendors want to open
-up their specs. You present a nice opportunity to not follow
-that path.
-
-> We are also looking for such
-> support and any direction are welcome. Your slide
-> deck seems to capture the key topics like L2/IPSEC
-> offload which we are also interested to hear.
->
-
-The slides list the most popular offloads. But not necessarily
-all known offloads.
-
-> Just to be clear, your point was about L2 switch offload
-> which the driver don't support at the moment. It might confuse
-> others. The driver doesn't implements anything non-standard.
->
-
-If i understood you correctly:
-Your initial patches dont intend to expose any offloads - you are just
-abstracting this as a NIC. I think that is a legit reason.
-However, the problem is you are also exposing the packet processors
-and switch offloading in a proprietary way.
-For a sample of how L2 basic functions like FDB tables are controlled
-within a NIC - take a look at the Intel NICs.
-Either that or you hide all the offload interfaces and over time add
-them (starting with L2 - NICs with L2 are common).
-
-cheers,
-jamal
+Will
