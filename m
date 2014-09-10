@@ -1,188 +1,65 @@
-From: d-gerlach@ti.com (Dave Gerlach)
-Date: Wed, 10 Sep 2014 11:04:04 -0500
-Subject: [PATCH v3 3/3] ARM: OMAP4+: Remove static iotable mappings for SRAM
-In-Reply-To: <cover.1410362895.git.d-gerlach@ti.com>
-References: <cover.1410362895.git.d-gerlach@ti.com>
-Message-ID: <3e5c2bcdc4b395d4fa0aa0a1e1273b3188006768.1410362895.git.d-gerlach@ti.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 10 Sep 2014 17:23:13 +0100
+Subject: Unable to boot mainline on snow chromebook since 3.15
+In-Reply-To: <CAD=FV=Uf+4=mcwMM8qhx4r9WzcKZkgwHjUR26wnvPJJzDvmvSg@mail.gmail.com>
+References: <540C202E.2060009@collabora.co.uk> <540C7F5B.6070307@gmail.com>
+ <540C83DE.10505@collabora.co.uk> <540C8577.2070907@gmail.com>
+ <20140908112112.GK26030@arm.com>
+ <CACxGe6v40wMSW8LJRtyZ3C6PinRMcQM-Zog+XpTJ-QG3HHJknw@mail.gmail.com>
+ <20140908134937.GK4015@sirena.org.uk>
+ <540DB7B4.4060300@collabora.co.uk> <20140910111728.GG28488@arm.com>
+ <CAD=FV=Uf+4=mcwMM8qhx4r9WzcKZkgwHjUR26wnvPJJzDvmvSg@mail.gmail.com>
+Message-ID: <20140910162313.GA1710@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Rajendra Nayak <rnayak@ti.com>
+On Wed, Sep 10, 2014 at 05:03:52PM +0100, Doug Anderson wrote:
+> On Wed, Sep 10, 2014 at 4:17 AM, Will Deacon <will.deacon@arm.com> wrote:
+> > On Mon, Sep 08, 2014 at 03:05:40PM +0100, Javier Martinez Canillas wrote:
+> >> Since many folks don't agree that hacking different subsystems is the way
+> >> forward I'll hold the patches and don't post them. The sunxi thread [0]
+> >> already shows how different people have strong opposite positions on the
+> >> correct approach to handle this.
+> >>
+> >> For now you can just disable the tps65090 PMIC support by not enabling the
+> >> CONFIG_REGULATOR_TPS65090 kconfig symbol on your kernel config. That will give
+> >> you exactly the same behavior that before tps65090 support was added to the
+> >> Snow DT on commit b16be76 ("ARM: dts: add tps65090 power regulator for
+> >> exynos5250-snow") which AFAIU was good enough for your workflow.
+> >
+> > Disabling the regulator support gives me my framebuffer back, thanks.
+> 
+> Yay!  Is this good enough to tide you over until DRM support lands?
 
-In order to handle errata I688, a page of sram was reserved by doing a
-static iotable map. Now that we use gen_pool to manage sram, we can
-completely remove all of these static mappings and use gen_pool_alloc()
-to get the one page of sram space needed to implement errata I688.
-omap_bus_sync will be NOP until SRAM initialization happens.
+I'm a happy camper as long as it doesn't break again. It looks like I've
+started another discussion as to whether simplefb breakages count as
+regressions.
 
-Suggested-by: Sekhar Nori <nsekhar@ti.com>
-Signed-off-by: Rajendra Nayak <rnayak@ti.com>
-Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
----
-v2->v3: add check for null sram_pool
+> > I
+> > then get stuck mounting my root filesystem over sd card because it's
+> > reported as read-only. The following hack solved the issue, but I'm not
+> > exactly sure where this regression has come from (whether this is a board
+> > quirk or pinctrl is really misconfigured).
+> 
+> This is a regression that was introduced by:
+> 
+> 9795a84 mmc: dw_mmc: remove dw_mci_of_cd_gpio/wp_gpio()
+> 
+> In "exynos5250-cros-common.dtsi" you can see that the "wp-gpios =
+> <&gpc2 1 0>;" is still listed under the slot node.  Nobody is looking
+> there anymore.
+> 
+> This is fixed in linux-next by:
+> 
+> aaa25a5 ARM: dts: unuse the slot-node and deprecate the
+> supports-highspeed for dw-mmc in exynos
 
- Documentation/devicetree/bindings/arm/omap/mpu.txt |  3 +++
- arch/arm/boot/dts/omap4.dtsi                       |  1 +
- arch/arm/boot/dts/omap5.dtsi                       |  3 ++-
- arch/arm/mach-omap2/io.c                           | 17 -----------------
- arch/arm/mach-omap2/omap4-common.c                 | 22 +++++++++++++++++++++-
- arch/arm/mach-omap2/sram.c                         |  6 ------
- arch/arm/mach-omap2/sram.h                         |  6 ------
- 7 files changed, 27 insertions(+), 31 deletions(-)
+Thanks for the patch info.
 
-diff --git a/Documentation/devicetree/bindings/arm/omap/mpu.txt b/Documentation/devicetree/bindings/arm/omap/mpu.txt
-index 83f405b..763695d 100644
---- a/Documentation/devicetree/bindings/arm/omap/mpu.txt
-+++ b/Documentation/devicetree/bindings/arm/omap/mpu.txt
-@@ -10,6 +10,9 @@ Required properties:
- 	       Should be "ti,omap5-mpu" for OMAP5
- - ti,hwmods: "mpu"
- 
-+Optional properties:
-+- sram:	Phandle to the ocmcram node
-+
- Examples:
- 
- - For an OMAP5 SMP system:
-diff --git a/arch/arm/boot/dts/omap4.dtsi b/arch/arm/boot/dts/omap4.dtsi
-index f584611..42a2d12 100644
---- a/arch/arm/boot/dts/omap4.dtsi
-+++ b/arch/arm/boot/dts/omap4.dtsi
-@@ -81,6 +81,7 @@
- 		mpu {
- 			compatible = "ti,omap4-mpu";
- 			ti,hwmods = "mpu";
-+			sram = <&ocmcram>;
- 		};
- 
- 		dsp {
-diff --git a/arch/arm/boot/dts/omap5.dtsi b/arch/arm/boot/dts/omap5.dtsi
-index d4e6976..dff19bd 100644
---- a/arch/arm/boot/dts/omap5.dtsi
-+++ b/arch/arm/boot/dts/omap5.dtsi
-@@ -104,8 +104,9 @@
- 	soc {
- 		compatible = "ti,omap-infra";
- 		mpu {
--			compatible = "ti,omap5-mpu";
-+			compatible = "ti,omap4-mpu";
- 			ti,hwmods = "mpu";
-+			sram = <&ocmcram>;
- 		};
- 	};
- 
-diff --git a/arch/arm/mach-omap2/io.c b/arch/arm/mach-omap2/io.c
-index 5d0667c..a80ee95 100644
---- a/arch/arm/mach-omap2/io.c
-+++ b/arch/arm/mach-omap2/io.c
-@@ -231,15 +231,6 @@ static struct map_desc omap44xx_io_desc[] __initdata = {
- 		.length		= L4_PER_44XX_SIZE,
- 		.type		= MT_DEVICE,
- 	},
--#ifdef CONFIG_OMAP4_ERRATA_I688
--	{
--		.virtual	= OMAP4_SRAM_VA,
--		.pfn		= __phys_to_pfn(OMAP4_SRAM_PA),
--		.length		= PAGE_SIZE,
--		.type		= MT_MEMORY_RW_SO,
--	},
--#endif
--
- };
- #endif
- 
-@@ -269,14 +260,6 @@ static struct map_desc omap54xx_io_desc[] __initdata = {
- 		.length		= L4_PER_54XX_SIZE,
- 		.type		= MT_DEVICE,
- 	},
--#ifdef CONFIG_OMAP4_ERRATA_I688
--	{
--		.virtual	= OMAP4_SRAM_VA,
--		.pfn		= __phys_to_pfn(OMAP4_SRAM_PA),
--		.length		= PAGE_SIZE,
--		.type		= MT_MEMORY_RW_SO,
--	},
--#endif
- };
- #endif
- 
-diff --git a/arch/arm/mach-omap2/omap4-common.c b/arch/arm/mach-omap2/omap4-common.c
-index a0fe747..16b20ce 100644
---- a/arch/arm/mach-omap2/omap4-common.c
-+++ b/arch/arm/mach-omap2/omap4-common.c
-@@ -25,6 +25,7 @@
- #include <linux/irqchip/irq-crossbar.h>
- #include <linux/of_address.h>
- #include <linux/reboot.h>
-+#include <linux/genalloc.h>
- 
- #include <asm/hardware/cache-l2x0.h>
- #include <asm/mach/map.h>
-@@ -71,6 +72,26 @@ void omap_bus_sync(void)
- }
- EXPORT_SYMBOL(omap_bus_sync);
- 
-+static int __init omap4_sram_init(void)
-+{
-+	struct device_node *np;
-+	struct gen_pool *sram_pool;
-+
-+	np = of_find_compatible_node(NULL, NULL, "ti,omap4-mpu");
-+	if (!np)
-+		pr_warn("%s:Unable to allocate sram needed to handle errata I688\n",
-+			__func__);
-+	sram_pool = of_get_named_gen_pool(np, "sram", 0);
-+	if (!sram_pool)
-+		pr_warn("%s:Unable to get sram pool needed to handle errata I688\n",
-+			__func__);
-+	else
-+		sram_sync = (void *)gen_pool_alloc(sram_pool, PAGE_SIZE);
-+
-+	return 0;
-+}
-+omap_arch_initcall(omap4_sram_init);
-+
- /* Steal one page physical memory for barrier implementation */
- int __init omap_barrier_reserve_memblock(void)
- {
-@@ -91,7 +112,6 @@ void __init omap_barriers_init(void)
- 	dram_io_desc[0].type = MT_MEMORY_RW_SO;
- 	iotable_init(dram_io_desc, ARRAY_SIZE(dram_io_desc));
- 	dram_sync = (void __iomem *) dram_io_desc[0].virtual;
--	sram_sync = (void __iomem *) OMAP4_SRAM_VA;
- 
- 	pr_info("OMAP4: Map 0x%08llx to 0x%08lx for dram barrier\n",
- 		(long long) paddr, dram_io_desc[0].virtual);
-diff --git a/arch/arm/mach-omap2/sram.c b/arch/arm/mach-omap2/sram.c
-index e5ac29d..cd488b8 100644
---- a/arch/arm/mach-omap2/sram.c
-+++ b/arch/arm/mach-omap2/sram.c
-@@ -124,12 +124,6 @@ static void __init omap2_map_sram(void)
- {
- 	int cached = 1;
- 
--#ifdef CONFIG_OMAP4_ERRATA_I688
--	if (cpu_is_omap44xx()) {
--		omap_sram_start += PAGE_SIZE;
--		omap_sram_size -= SZ_16K;
--	}
--#endif
- 	if (cpu_is_omap34xx()) {
- 		/*
- 		 * SRAM must be marked as non-cached on OMAP3 since the
-diff --git a/arch/arm/mach-omap2/sram.h b/arch/arm/mach-omap2/sram.h
-index 3f83b80..948d3ed 100644
---- a/arch/arm/mach-omap2/sram.h
-+++ b/arch/arm/mach-omap2/sram.h
-@@ -74,9 +74,3 @@ static inline void omap_push_sram_idle(void) {}
-  */
- #define OMAP2_SRAM_PA		0x40200000
- #define OMAP3_SRAM_PA           0x40200000
--#ifdef CONFIG_OMAP4_ERRATA_I688
--#define OMAP4_SRAM_PA		0x40304000
--#define OMAP4_SRAM_VA		0xfe404000
--#else
--#define OMAP4_SRAM_PA		0x40300000
--#endif
--- 
-1.9.0
+> I'll let Kukjin decide what he wants to do about the regression in
+> v3.17 (how to deal with conflicts, backporting, etc).
+
+Kukjin, please can you see about getting this merged? Not being able to
+mount my root filesystem is less than ideal.
+
+Will
