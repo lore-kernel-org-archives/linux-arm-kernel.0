@@ -1,67 +1,26 @@
-From: cov@codeaurora.org (Christopher Covington)
-Date: Wed, 10 Sep 2014 10:58:15 -0400
-Subject: [PATCH] clocksource: arch_timer: Fix code to use physical timers
- when requested
-In-Reply-To: <CAD=FV=UwfP0x-bswbtV_eUvpKeOSNnsVVLTE3VHguyhm_jiSug@mail.gmail.com>
-References: <1409173419-13076-1-git-send-email-sonnyrao@chromium.org>
- <CAOesGMjK65Rc-K0fyFUUJLw6huLT82E-nqJwZO4PqhgopF96Ow@mail.gmail.com>
- <CAPz6YkWAPtuy4sAuAK9GtpDgfGsccxeS+pqqe_t_R818Jt01qA@mail.gmail.com>
- <53FE5B09.2020403@codeaurora.org>
- <CAOesGMhTivDzJFuxONggcJ6N5UvZopKa=+tv9PoPX593cpnm0A@mail.gmail.com>
- <53FE7E3B.1010500@codeaurora.org>
- <CAOesGMgXnsqttHwAxEW4a7-Rx-nmSwpJd_Dt1iCcFOvzDwbzdA@mail.gmail.com>
- <CAD=FV=VjN6Xam-nRRcxvOoN-gokU6DbGVjoPXN_fkTJssH1RWA@mail.gmail.com>
- <20140828093505.GC14650@leverpostej>
- <CAD=FV=UwfP0x-bswbtV_eUvpKeOSNnsVVLTE3VHguyhm_jiSug@mail.gmail.com>
-Message-ID: <54106707.4010006@codeaurora.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 10 Sep 2014 15:58:18 +0100
+Subject: [PATCH 2/2] ARM: vexpress: Remove non-DT code
+In-Reply-To: <1410359618-3441-2-git-send-email-pawel.moll@arm.com>
+References: <1410359618-3441-1-git-send-email-pawel.moll@arm.com>
+ <1410359618-3441-2-git-send-email-pawel.moll@arm.com>
+Message-ID: <20140910145818.GG12361@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/05/2014 06:11 PM, Doug Anderson wrote:
-> Mark,
+On Wed, Sep 10, 2014 at 03:33:38PM +0100, Pawel Moll wrote:
+> Now, with the CLCD DT support available, there is no
+> more reason to keep the non-DT support for V2P-CA9.
 > 
-> On Thu, Aug 28, 2014 at 2:35 AM, Mark Rutland <mark.rutland@arm.com> wrote:
->> Not if you boot Linux at hyp, as we've recommended for this precise
->> reason. That doesn't fix other things like CNTFRQ if the secure
->> initialisation doesn't poke that, however.
-> 
-> I'll freely admit that I'm out of my league and out of my comfort zone
-> here, but...
-> 
-> In the theory that firmware ought to be as minimal as possible
-> (because it's hard to update and hard to keep in sync with kernel
-> versions), it seems like firmware ought to start the kernel out in as
-> permissive mode as it's willing to provide, right?
-> 
-> If the kernel is started out as permissive as possible then it can do
-> anything it needs to.  Future versions of the kernel can be
-> implemented to do any way-cool things that they want to do without an
-> update to firmware, right?  ...and current versions of the kernel can
-> just shed permissions if they don't want them.
-> 
-> ...so if I understand correctly, "Secure SVC" mode is more permissive
-> than "Non Secure HYP" mode, right?  It looks to me as if we currently
-> start the kernel in "Secure SVC" mode.  What do you think about the
-> kernel detecting Secure SVC and then dropping down permission levels
-> (to Non Secure HYP).  Once it did this, it could update things like
-> the virtual offset and then transition down further into non-secure
-> SVC mode.
-> 
-> ...or maybe this has been discussed millions of times already and I'm
-> just clueless.  ...or maybe this is just too hard for the kernel to do
-> in a generic way?
+> Removed, together with "some" supporting code. It was
+> necessary to make PLAT_VERSATILE_SCHED_CLOCK optional
+> and selected by the machines still interested in it.
 
-I think this is a great idea. When running on simulators, it would make (the
-non-DTB parts of) the bootwrapper and QEMU's built-in bootloader unnecessary.
-
-Implementing it on AArch64 should be trivial as you can just read CurrentEL
-and work from whatever EL/PL you're at. Is there an easy way to check whether
-you're in secure or nonsecure mode in AArch32? I seem to recall discussion
-about putting this information into the DTB, which makes me think there isn't.
-
-Christopher
+So, I'll then be asking ARM to provide updated instructions on how to
+boot the CT9x4 with DT... or I'll simply take it out of the nightly
+build and boot system when this patch hits mainline and stop all
+testing of it.
 
 -- 
-Employee of Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by the Linux Foundation.
+FTTC broadband for 0.8mile line: currently at 9.5Mbps down 400kbps up
+according to speedtest.net.
