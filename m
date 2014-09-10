@@ -1,46 +1,13 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Wed, 10 Sep 2014 15:54:45 -0300
-Subject: [PATCH RFC 2/3] ARM: regulator: add Freescale MXS regulator driver
-In-Reply-To: <54108B34.6010701@lategoodbye.de>
-References: <1410089869-6611-1-git-send-email-info@lategoodbye.de>
- <1410089869-6611-3-git-send-email-info@lategoodbye.de>
- <20140909182211.GG3896@leverpostej>
- <540F523D.4010904@lategoodbye.de>
- <20140910141853.GA4994@leverpostej>
- <20140910151316.GG7960@sirena.org.uk>
- <54108B34.6010701@lategoodbye.de>
-Message-ID: <CAOMZO5BEN_DQOyhrx5ZB7y6DoDvqbLvDyJfAabOvtUvKOiGHOA@mail.gmail.com>
+From: lznuaa@gmail.com (Zhi Li)
+Date: Wed, 10 Sep 2014 13:55:51 -0500
+Subject: [Patch v3 net-next 00/12] net: fec: imx6sx multiqueue support
+In-Reply-To: <54109e51.65d4440a.594b.6b4bSMTPIN_ADDED_BROKEN@mx.google.com>
+References: <54109e51.65d4440a.594b.6b4bSMTPIN_ADDED_BROKEN@mx.google.com>
+Message-ID: <CAHrpEqTOcLFcJMs54BEixf2sU3NJJO-m5fDnt+4N0ae-uLcZoA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stefan,
-
-On Wed, Sep 10, 2014 at 2:32 PM, Stefan Wahren <info@lategoodbye.de> wrote:
-> Hi Mark,
->
-> Am 10.09.2014 17:13, schrieb Mark Brown:
->>
->> On Wed, Sep 10, 2014 at 03:18:53PM +0100, Mark Rutland wrote:
->>>
->>> On Tue, Sep 09, 2014 at 08:17:17PM +0100, Stefan Wahren wrote:
->>
->>
->> Ugh, this looks like it might be a regulator driver but since the
->> subject line was "ARM: " I deleted it unread - if your changelog looks
->> different to all the other changelogs in the subsystem it probably needs
->> changing.
+On Wed, Sep 10, 2014 at 1:30 PM,  <yes@shlinux1.ap.freescale.net> wrote:
 >
 >
-> sorry about the confusion, i will remove ARM in the next version.
->
-> Changelog? I didn't send a changelog because it was my first version.
->
-> Should i resend this version only to you?
-
-In the cover letter of this RFC series you mentioned that this has not
-been tested on real hardware.
-
-What about sending a new version of this series (with the RFC prefix
-removed and with Mark Rutland's suggestion implemented) tested on a
-mx28 board and also with the Subject of the regulator patch changed to
-'regulator: add support for mxs regulator" with Mark Brown on Cc?
+Sorry again, use wrong sender email address.
