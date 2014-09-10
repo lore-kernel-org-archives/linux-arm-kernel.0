@@ -1,91 +1,49 @@
-From: heikki.krogerus@linux.intel.com (Heikki Krogerus)
-Date: Wed, 10 Sep 2014 08:30:56 +0300
-Subject: [PATCH 1/2] acpi: lpss: convert from struct clk to struct clk_core
-In-Reply-To: <20140909135209.GW13406@lahna.fi.intel.com>
-References: <1410242868-14750-1-git-send-email-mturquette@linaro.org>
- <1410242868-14750-2-git-send-email-mturquette@linaro.org>
- <7263163.khRHYpcBRO@vostro.rjw.lan>
- <20140909135209.GW13406@lahna.fi.intel.com>
-Message-ID: <20140910053056.GA30423@xps8300>
+From: b38343@freescale.com (Robin Gong)
+Date: Wed, 10 Sep 2014 13:46:22 +0800
+Subject: [PATCH v5] spi: spi-imx: add DMA support
+In-Reply-To: <540FD084.6000805@gmail.com>
+References: <1410312604-31949-1-git-send-email-b38343@freescale.com>
+ <540FD084.6000805@gmail.com>
+Message-ID: <20140910054621.GA29307@Robin-OptiPlex-780>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 09, 2014 at 04:52:09PM +0300, Mika Westerberg wrote:
-> On Tue, Sep 09, 2014 at 03:16:29PM +0200, Rafael J. Wysocki wrote:
-> > On Monday, September 08, 2014 11:07:47 PM Mike Turquette wrote:
-> > > Looks like this driver was missed during the original mass driver
-> > > rework[0]. This patch converts the LPSS driver to the new clock provider
-> > > data type (struct clk_core).
-> > > 
-> > > If there are no objections I propose to roll this patch into a rebase of
-> > > that patch[0] in my tree.
-> > > 
-> > > [0] http://lkml.kernel.org/r/<1409758317-20564-1-git-send-email-tomeu.vizoso@collabora.com>
-> > > 
-> > > Signed-off-by: Mike Turquette <mturquette@linaro.org>
-> > 
-> > Mika, any comments here?
+On Wed, Sep 10, 2014 at 09:46:04AM +0530, Varka Bhadram wrote:
+> On 09/10/2014 07:00 AM, Robin Gong wrote:
+> >Enable DMA support on i.mx6. The read speed can increase from 600KB/s
+> >to 1.2MB/s on i.mx6q. You can disable or enable dma function in dts.
 > 
-> Adding Heikki who recently did some clock changes to acpi_lpss.c.
+> (...)
 > 
-> To me this looks fine.
-
-Looks fine to me to.
-
-> > > ---
-> > >  drivers/acpi/acpi_lpss.c               | 6 +++---
-> > >  include/linux/platform_data/clk-lpss.h | 2 +-
-> > >  2 files changed, 4 insertions(+), 4 deletions(-)
-> > > 
-> > > diff --git a/drivers/acpi/acpi_lpss.c b/drivers/acpi/acpi_lpss.c
-> > > index 9dfec48..454179f 100644
-> > > --- a/drivers/acpi/acpi_lpss.c
-> > > +++ b/drivers/acpi/acpi_lpss.c
-> > > @@ -57,7 +57,7 @@ ACPI_MODULE_NAME("acpi_lpss");
-> > >  struct lpss_shared_clock {
-> > >  	const char *name;
-> > >  	unsigned long rate;
-> > > -	struct clk *clk;
-> > > +	struct clk_core *clk;
-> > >  };
-> > >  
-> > >  struct lpss_private_data;
-> > > @@ -83,7 +83,7 @@ static struct lpss_device_desc lpss_dma_desc = {
-> > >  struct lpss_private_data {
-> > >  	void __iomem *mmio_base;
-> > >  	resource_size_t mmio_size;
-> > > -	struct clk *clk;
-> > > +	struct clk_core *clk;
-> > >  	const struct lpss_device_desc *dev_desc;
-> > >  	u32 prv_reg_ctx[LPSS_PRV_REG_COUNT];
-> > >  };
-> > > @@ -278,7 +278,7 @@ static int register_device_clock(struct acpi_device *adev,
-> > >  	const struct lpss_device_desc *dev_desc = pdata->dev_desc;
-> > >  	struct lpss_shared_clock *shared_clock = dev_desc->shared_clock;
-> > >  	const char *devname = dev_name(&adev->dev);
-> > > -	struct clk *clk = ERR_PTR(-ENODEV);
-> > > +	struct clk_core *clk = ERR_PTR(-ENODEV);
-> > >  	struct lpss_clk_data *clk_data;
-> > >  	const char *parent, *clk_name;
-> > >  	void __iomem *prv_base;
-> > > diff --git a/include/linux/platform_data/clk-lpss.h b/include/linux/platform_data/clk-lpss.h
-> > > index 2390199..3c3237c 100644
-> > > --- a/include/linux/platform_data/clk-lpss.h
-> > > +++ b/include/linux/platform_data/clk-lpss.h
-> > > @@ -15,7 +15,7 @@
-> > >  
-> > >  struct lpss_clk_data {
-> > >  	const char *name;
-> > > -	struct clk *clk;
-> > > +	struct clk_core *clk;
-> > >  };
-> > >  
-> > >  extern int lpt_clk_init(void);
-> > > 
-> > 
-> > -- 
-> > I speak only for myself.
-> > Rafael J. Wysocki, Intel Open Source Technology Center.
-
--- 
-heikki
+> >+
+> >+static int spi_imx_sdma_init(struct device *dev, struct spi_imx_data *spi_imx,
+> >+			     struct spi_master *master,
+> >+			     const struct resource *res)
+> >+{
+> >+	struct dma_slave_config slave_config = {};
+> >+	int ret;
+> >+
+> >+	/* Prepare for TX DMA: */
+> >+	master->dma_tx = dma_request_slave_channel(dev, "tx");
+> >+	if (!master->dma_tx) {
+> >+		dev_err(dev, "cannot get the TX DMA channel!\n");
+> >+		ret = -EINVAL;
+> >+		goto err;
+> >+	}
+> >+
+> >+	slave_config.direction = DMA_MEM_TO_DEV;
+> >+	slave_config.dst_addr = res->start + MXC_CSPITXDATA;
+> >+	slave_config.dst_addr_width = DMA_SLAVE_BUSWIDTH_1_BYTE;
+> >+	slave_config.dst_maxburst = spi_imx_get_fifosize(spi_imx) / 2;
+> >+	ret = dmaengine_slave_config(master->dma_tx, &slave_config);
+> >+	if (ret) {
+> >+		dev_err(dev, "error in TX dma configuration.");
+> >+		
+> 
+> Missed terminating new line..
+>
+You mean lack "\n" in the print info? If yes, I can improve it in v6.
+> -- 
+> Regards,
+> Varka Bhadram.
+> 
