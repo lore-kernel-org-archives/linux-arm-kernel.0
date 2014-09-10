@@ -1,77 +1,96 @@
-From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
-Date: Wed, 10 Sep 2014 12:24:53 +0200
-Subject: [PATCH v3 0/9] Tegra xHCI support
-In-Reply-To: <CAL1qeaFUaqs9SDv1p+dYDYLn9hwDxdTQ=K-wo+Qa5+KGY=U47w@mail.gmail.com>
-References: <1409693701-16520-1-git-send-email-abrestic@chromium.org>	<CAAObsKAYqpJMJnxSMxhkkRtnoEwLwgUa1y7ij5ZHvHf1jRok+Q@mail.gmail.com>	<CAL1qeaF7U9aoBp5gQPS=r+pe6krKmXdP1qak2gjhNqQMoHFB8A@mail.gmail.com>	<CAAObsKAXO-pBtqd1jNj8faXqpE+5Wb0RFzPp+jn9FH0B=dHq8g@mail.gmail.com>
- <CAL1qeaFUaqs9SDv1p+dYDYLn9hwDxdTQ=K-wo+Qa5+KGY=U47w@mail.gmail.com>
-Message-ID: <541026F5.9000609@collabora.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Wed, 10 Sep 2014 12:42:23 +0200
+Subject: [GIT PULL 1/2] SOCFPGA updates for 3.18
+In-Reply-To: <20140910083337.GA5178@amd>
+References: <1409847105-27241-1-git-send-email-dinguyen@opensource.altera.com>
+ <20140909141756.GA30100@amd> <4134101.OOENTRabu1@wuerfel>
+ <20140909210232.GA539@amd>
+ <CAPDyKFr35646zQUDUnv9LYy9jtY7r343hev9FrhxOfjVMb6MJw@mail.gmail.com>
+ <20140910083337.GA5178@amd>
+Message-ID: <CAPDyKFoXiNOHQ3W=U08jU2PG-fz4F_7wuW-KNEoDfcQzrLKmVA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/09/2014 07:09 PM, Andrew Bresticker wrote:
-> On Tue, Sep 9, 2014 at 1:21 AM, Tomeu Vizoso <tomeu@tomeuvizoso.net> wrote:
->> On 8 September 2014 18:22, Andrew Bresticker <abrestic@chromium.org> wrote:
->>> On Mon, Sep 8, 2014 at 8:34 AM, Tomeu Vizoso <tomeu@tomeuvizoso.net> wrote:
->>>> On 2 September 2014 23:34, Andrew Bresticker <abrestic@chromium.org> wrote:
->>>>>
->>>>> Tested on Venice2, Jetson TK1, and Big with a variety of USB2.0 and
->>>>> USB3.0 memory sticks and ethernet dongles using controller firmware
->>>>> recently posted by Andrew Chew [2].
->>>>
->>>> I have had mixed results when testing this on a Jetson TK1 board. Of 8
->>>> USB devices I tested with, about half where probed correctly, but the
->>>> other half repeatedly fail in hub_port_init because in the GET_STATUS
->>>> right after the reset, the C_PORT_CONNECTION bit is set.
->>>>
->>>> I don't see any correlation between the failure and the kind of usb
->>>> device, but I don't have much experience with USB implementations
->>>> either.
->>>
->>> Hmm... I haven't seen that before.  Which particular devices were you using?
+On 10 September 2014 10:33, Pavel Machek <pavel@denx.de> wrote:
+> On Wed 2014-09-10 09:13:27, Ulf Hansson wrote:
+>> On 9 September 2014 23:02, Pavel Machek <pavel@denx.de> wrote:
+>> > On Tue 2014-09-09 17:02:34, Arnd Bergmann wrote:
+>> >> On Tuesday 09 September 2014 16:17:56 Pavel Machek wrote:
+>> >> > > Jaehoon Chung (1):
+>> >> > >       ARM: dts: socfpga: unuse the slot-node and deprecate the supports-highspeed for dw-mmc
+>> >> > >
+>> >> >
+>> >> > This patch is a bad idea. It removes support for two mmc cards on a
+>> >> > single controller -- configuration hardware supports and configuration
+>> >> > that allows using u-SD card on mcvevk board.
+>> >> >
+>> >>
+>> >> Your objection comes too late, and to the wrong patch, since the
+>> >> driver and all other users have already been changed. We had a long
+>> >> discussion about this when the issue first came up, and we could
+>> >> not find any example of dw-mmc actually being used in a scenario
+>> >> with one controller that has multiple devices attached.
+>> >
+>> > Well, this is not first time I raised this. 3.17 is not yet out, so we
+>> > still have chance to fix regressions without major fuss.
+>> >
+>> >> Apparently every user out there instead uses multiple controller
+>> >> instances instead. Are you sure that the socfpga implementation
+>> >> is an exception from this?
+>> >
+>> > Marek Vasut has the hardware. His board apprently has uSD and eMMC,
+>> > and I believe it has just one controller. I'll try to get details.
+>> >
 >>
->> Here they are:
+>> Just wanted to highlight some of the reasons to why the earlier
+>> discussion we have had, came to the conclusion to remove the slot
+>> node.
 >>
->> work:
->>
->> Genius keyboard: 05d5:6782
->> Logitech mouse: 046d:c06a
->> Denver MP3 player: 10d6:1100
->> Atheros Bluetooth dongle: 0cf3:3005
->>
->> don't work:
->>
->> MCS7830 ethernet dongle: 9710:7830
->> Genesys Logic hub: 05e3:0608
->> Alcor flash drive: 058f:6387
->> JMicron SATA bridge: 152d:2329
-> 
-> I have the same SATA bridge and it is enumerating fine for me, but
-> I've ordered the hub as well and will check that out.
-> 
-> Did you have any other patches applied when testing these?
+>> 1) The mmc core don't support multiple cards attached to the same
+>> host, it never has. Also, I am not aware of any requests that
+>> suggested us to add it. Due to obvious reasons from performance
+>> perspective it's simply a really bad idea, that's likely also why
+>> there haven't been any requests for it.
+>
+> Well, that's Linux problem, right? (And why is it bad idea, btw? The
+> bandwidth will be shared between the controllers, ok, that does not
+> sound too bad.)
 
-Here is the branch, including the .config I used:
+Bandwidth is just one issue. Latency is yet another, which is probably
+far worse to handle than bandwidth.
 
-http://cgit.collabora.com/git/user/tomeu/linux.git/log/?h=3.17rc4-xhci
+>
+>> 2) On the host level, the support for handle multiple slots in DT for
+>> dw-mmc has been broken. While dw-mmc parsed the DT nodes for slots, it
+>> screwed up configurations. Thus the support for slots have never
+>> worked as expected from DT point of view.
+>
+> Well, DT is supposed to describe the hardware. From your description,
+> it seems that linux does not support two slots on one controller and
+> DT parsing code basically ignores the slots. (Logical, if it can't
+> support two slots).
+>
+> So now we are breaking DT description due to Linux limitations. Which
+>
+> a) makes it hard for any other os not having same limitation
+>
+> b) makes it hard for people to fix the limitation
+>
+> c) does not really solve anything
 
-> Were you
-> using either SATA or PCIe at the same time?
+Yes it does, the problem in 2) gets fixed.
 
-Nope, haven't even tried those yet.
+>
+> d) breaks backward compatibility with old dts
 
-> Just trying to figure out
-> if there's anything else different between our setups.
+According to 2), it has never worked - so we don't break anything.
 
-Yeah, I'm afraid I don't have any good suggestion to make. But maybe you
-will find some error on my part in how I have applied the patches or in
-the config.
-
-Regards,
-
-Tomeu
-
+>
+> If nothing, d) should be argument not to do this.
+>                                                                         Pavel
 > --
-> To unsubscribe from this list: send the line "unsubscribe linux-tegra" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+> (english) http://www.livejournal.com/~pavelmachek
+> (cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+
+Kind regards
+Uffe
