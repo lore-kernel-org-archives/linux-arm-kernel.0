@@ -1,41 +1,53 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 10 Sep 2014 18:35:32 +0100
-Subject: [PATCH 04/13] arm64: Add new hcall HVC_CALL_FUNC
-In-Reply-To: <1410369837.11440.18.camel@smoke>
-References: <cover.1410302383.git.geoff@infradead.org>
- <ea28cfef061d06e86704845a877802e057749b39.1410302383.git.geoff@infradead.org>
- <20140910170740.GE1710@arm.com> <1410369837.11440.18.camel@smoke>
-Message-ID: <20140910173532.GH1710@arm.com>
+Date: Wed, 10 Sep 2014 18:38:29 +0100
+Subject: [PATCH] arm64: LLVMLinux: Fix inline arm64 assembly for use with
+ clang
+In-Reply-To: <20140908093051.GA12657@localhost>
+References: <1409959460-15989-1-git-send-email-behanw@converseincode.com>
+ <20140908093051.GA12657@localhost>
+Message-ID: <20140910173829.GI1710@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 10, 2014 at 06:23:57PM +0100, Geoff Levand wrote:
-> On Wed, 2014-09-10 at 18:07 +0100, Will Deacon wrote:
-> > On Tue, Sep 09, 2014 at 11:49:04PM +0100, Geoff Levand wrote:
-> > > diff --git a/arch/arm64/kernel/hyp-stub.S b/arch/arm64/kernel/hyp-stub.S
-> > > index 9ab5f70..a21cf51 100644
-> > > --- a/arch/arm64/kernel/hyp-stub.S
-> > > +++ b/arch/arm64/kernel/hyp-stub.S
-> > > @@ -75,7 +75,17 @@ el1_sync:
-> > >  1:	cmp	x10, #HVC_SET_VECTORS
-> > >  	b.ne	1f
-> > >  	msr	vbar_el2, x0
-> > > +	b	2f
-> > >  
-> > > +1:	cmp	x10, #HVC_CALL_FUNC
-> > > +	b.ne    1f
-> > > +	mov	x29, lr
-> > > +	mov	lr, x0
-> > > +	mov	x0, x1
-> > > +	mov	x1, x2
-> > > +	mov	x2, x3
-> > > +	blr	lr
-> > > +	mov	lr, x29
+On Mon, Sep 08, 2014 at 10:30:51AM +0100, Olof Johansson wrote:
+> On Fri, Sep 05, 2014 at 04:24:20PM -0700, behanw at converseincode.com wrote:
+> > From: Mark Charlebois <charlebm@gmail.com>
 > > 
-> > Why are you clobbering x29?
+> > Fix variable types for 64-bit inline assembly.
+> > 
+> > This patch now works with both gcc and clang.
+> > 
+> > Signed-off-by: Mark Charlebois <charlebm@gmail.com>
+> > Signed-off-by: Behan Webster <behanw@converseincode.com>
+> > ---
+> >  arch/arm64/include/asm/arch_timer.h | 26 +++++++++++++++-----------
+> >  arch/arm64/include/asm/uaccess.h    |  2 +-
+> >  arch/arm64/kernel/debug-monitors.c  |  8 ++++----
+> >  arch/arm64/kernel/perf_event.c      | 34 +++++++++++++++++-----------------
+> >  arch/arm64/mm/mmu.c                 |  2 +-
+> >  5 files changed, 38 insertions(+), 34 deletions(-)
+> > 
+> > diff --git a/arch/arm64/include/asm/arch_timer.h b/arch/arm64/include/asm/arch_timer.h
+> > index 9400596..c1f87e0 100644
+> > --- a/arch/arm64/include/asm/arch_timer.h
+> > +++ b/arch/arm64/include/asm/arch_timer.h
+> > @@ -37,19 +37,23 @@ void arch_timer_reg_write_cp15(int access, enum arch_timer_reg reg, u32 val)
+> >  	if (access == ARCH_TIMER_PHYS_ACCESS) {
+> >  		switch (reg) {
+> >  		case ARCH_TIMER_REG_CTRL:
+> > -			asm volatile("msr cntp_ctl_el0,  %0" : : "r" (val));
+> > +			asm volatile("msr cntp_ctl_el0,  %0"
+> > +				: : "r" ((u64)val));
 > 
-> I can change this to x28, unless you can recommend another?
+> Ick. Care to elaborate in the patch description why this is needed with
+> LLVM? It's really messy and very annoying having to cast register values
+> every time they're passed in, instead of the compiler handling it for you.
+> 
+> Is there a way to catch this with GCC? If not, I expect you to get broken
+> all the time on this by people who don't notice.
 
-How about something that's not callee saved?
+Question to the clang people (Clangers?): what happens if the %0 above is
+rewritten as %x0 and the cast on val is dropped? I could stomach a change
+adding that, but it's still likely to regress without regular build testing.
 
 Will
