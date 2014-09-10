@@ -1,69 +1,36 @@
-From: geoff@infradead.org (Geoff Levand)
-Date: Wed, 10 Sep 2014 11:11:49 -0700
-Subject: [PATCH V2 04/13] arm64: Add new hcall HVC_CALL_FUNC
-In-Reply-To: <ea28cfef061d06e86704845a877802e057749b39.1410302383.git.geoff@infradead.org>
-References: <cover.1410302383.git.geoff@infradead.org>
- <ea28cfef061d06e86704845a877802e057749b39.1410302383.git.geoff@infradead.org>
-Message-ID: <1410372709.30895.0.camel@smoke>
+From: nicoleotsuka@gmail.com (Nicolin Chen)
+Date: Wed, 10 Sep 2014 11:14:15 -0700
+Subject: [alsa-devel] [PATCH 2/5] ASoC: fsl: add imx-tlv320aic3x machine
+ driver
+In-Reply-To: <20140910142740.GC16489@pengutronix.de>
+References: <1410356809-26179-1-git-send-email-d.lavnikevich@sam-solutions.com>
+ <1410356809-26179-3-git-send-email-d.lavnikevich@sam-solutions.com>
+ <20140910142740.GC16489@pengutronix.de>
+Message-ID: <CAGoOwPSpkNy6uNVAjG2HgiHHscKZjL5wgVrkyGwWCmyU7x+gWg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the new hcall HVC_CALL_FUNC that allows execution of a function at EL2.
-During CPU reset the CPU must be brought to the exception level it had on
-entry to the kernel.  The HVC_CALL_FUNC hcall will provide the mechanism
-needed for this exception level switch.
+On Wed, Sep 10, 2014 at 7:27 AM, Markus Pargmann <mpa@pengutronix.de> wrote:
+> Hi,
+>
+> On Wed, Sep 10, 2014 at 04:46:46PM +0300, Dmitry Lavnikevich wrote:
+>> This is driver for i.MX6 boards with tlv320aic3x audio codecs.
+>>
+>> Signed-off-by: Dmitry Lavnikevich <d.lavnikevich@sam-solutions.com>
+>> ---
+>>  .../bindings/sound/fsl,imx-audio-tlv320aic3x.txt   |  27 ++++
+>>  sound/soc/fsl/Kconfig                              |  13 ++
+>>  sound/soc/fsl/Makefile                             |   2 +
+>>  sound/soc/fsl/imx-tlv320aic3x.c                    | 177 +++++++++++++++++++++
+>>  4 files changed, 219 insertions(+)
+>>  create mode 100644 Documentation/devicetree/bindings/sound/fsl,imx-audio-tlv320aic3x.txt
+>>  create mode 100644 sound/soc/fsl/imx-tlv320aic3x.c
+>
+> Is it possible to use the simple-card
+> (Documentation/devicetree/bindings/sound/simple-card.txt) instead of
+> adding a new audio card driver? There are also DT bindings for the imx
+> audiomultiplexer (imx-audmux.txt).
 
-Signed-off-by: Geoff Levand <geoff@infradead.org>
----
- arch/arm64/include/asm/virt.h | 13 +++++++++++++
- arch/arm64/kernel/hyp-stub.S  | 10 ++++++++++
- 2 files changed, 23 insertions(+)
+I don't know why my mutt doesn't display this mail.
 
-diff --git a/arch/arm64/include/asm/virt.h b/arch/arm64/include/asm/virt.h
-index 894fe53..cc4250c 100644
---- a/arch/arm64/include/asm/virt.h
-+++ b/arch/arm64/include/asm/virt.h
-@@ -41,6 +41,19 @@
- 
- #define HVC_KVM_CALL_HYP 3
- 
-+/*
-+ * HVC_CALL_FUNC - Execute a function at EL2.
-+ *
-+ * @x0: Physical address of the funtion to be executed.
-+ * @x1: Passed as the first argument to the function.
-+ * @x2: Passed as the second argument to the function.
-+ * @x3: Passed as the third argument to the function.
-+ *
-+ * The called function must preserve the contents of register x18.
-+ */
-+
-+#define HVC_CALL_FUNC 4
-+
- #ifndef __ASSEMBLY__
- 
- /*
-diff --git a/arch/arm64/kernel/hyp-stub.S b/arch/arm64/kernel/hyp-stub.S
-index 9ab5f70..27d786d 100644
---- a/arch/arm64/kernel/hyp-stub.S
-+++ b/arch/arm64/kernel/hyp-stub.S
-@@ -75,7 +75,17 @@ el1_sync:
- 1:	cmp	x10, #HVC_SET_VECTORS
- 	b.ne	1f
- 	msr	vbar_el2, x0
-+	b	2f
- 
-+1:	cmp	x10, #HVC_CALL_FUNC
-+	b.ne    1f
-+	mov	x18, lr
-+	mov	lr, x0
-+	mov	x0, x1
-+	mov	x1, x2
-+	mov	x2, x3
-+	blr	lr
-+	mov	lr, x18
- 1:
- 2:	eret
- ENDPROC(el1_sync)
--- 
-1.9.1
+Anyway, if Simple Card supports audmux, yes, it's also a good idea.
