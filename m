@@ -1,77 +1,41 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 10 Sep 2014 18:34:01 +0100
-Subject: [PATCH] clocksource: arch_timer: Fix code to use physical timers
- when requested
-In-Reply-To: <CAD=FV=Up=+zNneY-behnkFbhupi50_f5R=ECgJQeqGV5kz5d2g@mail.gmail.com>
-References: <CAPz6YkWAPtuy4sAuAK9GtpDgfGsccxeS+pqqe_t_R818Jt01qA@mail.gmail.com>
- <53FE5B09.2020403@codeaurora.org>
- <CAOesGMhTivDzJFuxONggcJ6N5UvZopKa=+tv9PoPX593cpnm0A@mail.gmail.com>
- <53FE7E3B.1010500@codeaurora.org>
- <CAOesGMgXnsqttHwAxEW4a7-Rx-nmSwpJd_Dt1iCcFOvzDwbzdA@mail.gmail.com>
- <CAD=FV=VjN6Xam-nRRcxvOoN-gokU6DbGVjoPXN_fkTJssH1RWA@mail.gmail.com>
- <20140828093505.GC14650@leverpostej>
- <CAD=FV=UwfP0x-bswbtV_eUvpKeOSNnsVVLTE3VHguyhm_jiSug@mail.gmail.com>
- <20140908135436.GC22717@arm.com>
- <CAD=FV=Up=+zNneY-behnkFbhupi50_f5R=ECgJQeqGV5kz5d2g@mail.gmail.com>
-Message-ID: <20140910173401.GG1710@arm.com>
+Date: Wed, 10 Sep 2014 18:35:32 +0100
+Subject: [PATCH 04/13] arm64: Add new hcall HVC_CALL_FUNC
+In-Reply-To: <1410369837.11440.18.camel@smoke>
+References: <cover.1410302383.git.geoff@infradead.org>
+ <ea28cfef061d06e86704845a877802e057749b39.1410302383.git.geoff@infradead.org>
+ <20140910170740.GE1710@arm.com> <1410369837.11440.18.camel@smoke>
+Message-ID: <20140910173532.GH1710@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 10, 2014 at 06:17:23PM +0100, Doug Anderson wrote:
-> On Mon, Sep 8, 2014 at 6:54 AM, Catalin Marinas <catalin.marinas@arm.com> wrote:
-> > On Fri, Sep 05, 2014 at 11:11:47PM +0100, Doug Anderson wrote:
-> >> On Thu, Aug 28, 2014 at 2:35 AM, Mark Rutland <mark.rutland@arm.com> wrote:
-> >> > Not if you boot Linux at hyp, as we've recommended for this precise
-> >> > reason. That doesn't fix other things like CNTFRQ if the secure
-> >> > initialisation doesn't poke that, however.
-> >>
-> >> I'll freely admit that I'm out of my league and out of my comfort zone
-> >> here, but...
-> >>
-> >> In the theory that firmware ought to be as minimal as possible
-> >> (because it's hard to update and hard to keep in sync with kernel
-> >> versions), it seems like firmware ought to start the kernel out in as
-> >> permissive mode as it's willing to provide, right?
-> >
-> > Not necessarily (and definitely not for arm64). And we've seen in
-> > practice that the actual deployed kernel may run in a different security
-> > mode than what's in mainline and used for initial development (you may
-> > just not see all the patches upstream). For development, that's indeed
-> > simpler, but once you go into production, a customer requesting some
-> > secure OS for payments etc. and Linux is moved to the non-secure side
-> > (and you end up putting hacks in the kernel because they were not
-> > spotted during initial development with Linux running in secure mode).
+On Wed, Sep 10, 2014 at 06:23:57PM +0100, Geoff Levand wrote:
+> On Wed, 2014-09-10 at 18:07 +0100, Will Deacon wrote:
+> > On Tue, Sep 09, 2014 at 11:49:04PM +0100, Geoff Levand wrote:
+> > > diff --git a/arch/arm64/kernel/hyp-stub.S b/arch/arm64/kernel/hyp-stub.S
+> > > index 9ab5f70..a21cf51 100644
+> > > --- a/arch/arm64/kernel/hyp-stub.S
+> > > +++ b/arch/arm64/kernel/hyp-stub.S
+> > > @@ -75,7 +75,17 @@ el1_sync:
+> > >  1:	cmp	x10, #HVC_SET_VECTORS
+> > >  	b.ne	1f
+> > >  	msr	vbar_el2, x0
+> > > +	b	2f
+> > >  
+> > > +1:	cmp	x10, #HVC_CALL_FUNC
+> > > +	b.ne    1f
+> > > +	mov	x29, lr
+> > > +	mov	lr, x0
+> > > +	mov	x0, x1
+> > > +	mov	x1, x2
+> > > +	mov	x2, x3
+> > > +	blr	lr
+> > > +	mov	lr, x29
+> > 
+> > Why are you clobbering x29?
 > 
-> I guess the important part of my statement is "as it's willing to
-> provide".  In your case your firmware isn't willing to provide "secure
-> SVC".  In our case it is.
-> 
-> We've actually shipped products where the firmware boots the kernel in
-> "secure" mode.  These products have a very different security model
-> than you're envisioning, I guess.  In these products, less firmware is
-> better and adding firmware code to do the whole transition to "non
-> secure hyp mode" just isn't worth it.  It's not just a one-time blob
-> of code in the firmware before booting the kernel.  (I'm told) it
-> means somehow keeping firmware code around to help out with turning
-> processors off/on and to help with resume from S3.  That's
-> infrastructure that we don't want to add.
+> I can change this to x28, unless you can recommend another?
 
-Setting aside the security model, booting in secure mode can also have a
-significant impact on the programming model of system IP, not just the CPU.
-For example, the SMMU register file suddenly looks different and the way in
-which it is programmed also changes. The GIC (v3+) is similar. Linux doesn't
-have drivers that know about this so, whilst not impossible, there's a
-non-trivial amount of work (and then maintenance overhead) if you want to
-support booting Linux on the secure side.
-
-The secure world may be more permissive in some regards, but it's actually
-a burden in others. It's not a simple superset of non-secure, and this is
-more evident than ever in ARMv8.
-
-As I understand it, this conversation started because we're booting at
-non-secure EL1 with a badly configured EL2. That sounds like something
-we may have to fix/work around in Linux (Olof points out that it used to
-work), but we shouldn't conflate that with booting on the secure side to
-get away from broken firmware.
+How about something that's not callee saved?
 
 Will
