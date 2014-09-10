@@ -1,27 +1,49 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 10 Sep 2014 20:19:52 +0200
-Subject: [PATCH v10 07/10] OF: Introduce helper function for getting PCI
- domain_nr
-In-Reply-To: <20140909112054.GD29639@arm.com>
-References: <1410184472-17630-1-git-send-email-Liviu.Dudau@arm.com>
- <3780051.0eHpCN6UC9@wuerfel> <20140909112054.GD29639@arm.com>
-Message-ID: <2908259.jgJNuDxCCa@wuerfel>
+From: tyler.baker@linaro.org (Tyler Baker)
+Date: Wed, 10 Sep 2014 11:20:19 -0700
+Subject: exynos5420/arndale-octa: imprecise external aborts on exynos_defconfig
+Message-ID: <CANMBJr41TQx4jVjnOO9WThn=SiZCq12mx1xtGN8_ubzZrO1=YA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 09 September 2014 12:20:54 Catalin Marinas wrote:
-> 
-> We can assume that if a domain is not specified and there is a single
-> top level PCIe node, the domain defaults to 0. Are there any arm32
-> platforms that require multiple domains (and do not specify a number in
-> the DT)?
+Exynos5420-based Arndale octa boards have recently started failing boot
+tests due to imprecise external aborts.  This only appears to happen
+when using exynos_defconfig and boots fine with multi_v7_defconfig.  The
+issue seems to be intermittent, so is not reliably reproducable and
+difficult to bisect.  Here are a few boot logs from recent
+mainline/linux-next kernels that are failing:
 
-In theory, I think all of them could work with a single domain, but then
-you need to partition the bus number space between the host controllers,
-so you have the exact same situation that you either need to make up
-random bus numbers or put them in DT.
+mainline/v3.17-rc3-165-g56c2285:
+    http://armv7.com/scheduler/job/5525/log_file#L_59_276
 
-Using multiple domains is way cleaner for this, even if we have to
-make up the numbers.
+mainline/v3.17-rc3-176-g2b12164:
+    http://armv7.com/scheduler/job/5595/log_file#L_59_278
 
-	Arnd
+mainline/v3.17-rc4-131-gd030671:
+    http://armv7.com/scheduler/job/5770/log_file#L_193_277
+
+mainline/v3.17-rc4-146-g619df5d:
+    http://armv7.com/scheduler/job/6014/log_file#L_124_0
+
+next/20140908:
+    http://armv7.com/scheduler/job/5815/log_file#L_59_276
+
+next/20140910:
+    http://armv7.com/scheduler/job/6161/log_file#L_59_278
+
+The ramdisk is used is a very minimal open embedded based filesystem,
+which can be found here:
+
+http://images.armcloud.us/lava/common/linaro-image-minimal-initramfs-genericarmv7a.cpio.gz.u-boot
+
+Please let me know if any more information is needed to help
+reproduce. If/when a root cause is determined, I am more than willing
+to assist in testing any fixes provided.
+
+Thanks,
+
+-- 
+Tyler Baker
+Tech Lead, LAVA
+Linaro.org | Open source software for ARM SoCs
+Follow Linaro: http://www.facebook.com/pages/Linaro
+http://twitter.com/#!/linaroorg - http://www.linaro.org/linaro-blog
