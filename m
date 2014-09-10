@@ -1,39 +1,95 @@
-From: geoff@infradead.org (Geoff Levand)
-Date: Wed, 10 Sep 2014 11:04:46 -0700
-Subject: [PATCH V2 02/13] arm64/kvm: Fix assembler compatibility of macros
-In-Reply-To: <bc4abc340eaa4da448f62326a134fabfb5a2a875.1410302383.git.geoff@infradead.org>
-References: <cover.1410302383.git.geoff@infradead.org>
- <bc4abc340eaa4da448f62326a134fabfb5a2a875.1410302383.git.geoff@infradead.org>
-Message-ID: <1410372286.11440.22.camel@smoke>
+From: sonnyrao@chromium.org (Sonny Rao)
+Date: Wed, 10 Sep 2014 11:05:43 -0700
+Subject: [PATCH] clocksource: arch_timer: Fix code to use physical timers
+ when requested
+In-Reply-To: <CAD=FV=U4ar=jW273=0PMX1A_hTqxPAJ9avJuTD2N4RNa4a12xg@mail.gmail.com>
+References: <1409173419-13076-1-git-send-email-sonnyrao@chromium.org>
+ <20140910172710.GA3300@leverpostej>
+ <CAD=FV=U4ar=jW273=0PMX1A_hTqxPAJ9avJuTD2N4RNa4a12xg@mail.gmail.com>
+Message-ID: <CAPz6YkW1ES23+xg5SpjkGz3RA6FCR5t540mRyDvHgqaFWQR-5A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some of the macros defined in kvm_arm.h are useful in the exception vector
-routines, but they are not compatible with the assembler.  Change the
-definition of ESR_EL2_ISS to be compatible.
+On Wed, Sep 10, 2014 at 10:52 AM, Doug Anderson <dianders@chromium.org> wrote:
+> Mark,
+>
+> On Wed, Sep 10, 2014 at 10:27 AM, Mark Rutland <mark.rutland@arm.com> wrote:
+>> Hi Sonny,
+>>
+>> On Wed, Aug 27, 2014 at 10:03:39PM +0100, Sonny Rao wrote:
+>>> This is a bug fix for using physical arch timers when
+>>> the arch_timer_use_virtual boolean is false.  It restores the
+>>> arch_counter_get_cntpct() function after removal in
+>>>
+>>> 0d651e4e "clocksource: arch_timer: use virtual counters"
+>>>
+>>> and completes the implementation of memory mapped access for physical
+>>> timers, so if a system is trying to use physical timers, it will
+>>> function properly.
+>>
+>> To get back to the topic at hand:
+>>
+>> Which platform is this required by?
+>
+> I've seen similar problems on the A7s on exynos5420 / exynos5800 and
+> on rk3288.  I can't say what other platforms might be affected.  Note
+> that the arch timers on exyno5420/exynos5800 are not supported anyway,
+> so I guess that means we're just worrying about the rk3288.
 
-Fixes build errors like these when using kvm_arm.h in assembly
-source files:
+Yeah, given that this problem has manifest on at least two different
+SoCs using ARM's cores, it would have been nice if the offset were
+specified to start out as zero when in reset by the architecture (and
+was implemented that way in ARM's core IP), but it looks like it
+wasn't.
 
-  Error: unexpected characters following instruction at operand 3 -- `and x0,x1,#((1U<<25)-1)'
+>
+>
+>> Why exactly is arch_timer_use_virtual false in this case?
+>
+> To re-summarize my understanding of everything (many of the below is
+> secondhand knowledge, so correct if wrong):
+>
+> 1. The initial problem is that the virtual offset is not initialized
+> by anyone and is per core (each core gets a different, random offset).
+> That makes the virtual counter useless.  ...but the kernel only uses
+> virtual counters.
+>
+> 2. As far as I know, we don't have any particular need for HYP mode
+> nor for limiting access to secure mode.
+>
+> 3. You can only change the virtual offset from HYP mode.  That means
+> someone needs to transition to HYP mode if we want to use virtual
+> counters.
+>
+> 4. If the kernel happens to be in HYP mode it will init the virtual offset.
+>
+> 5. We could transition to HYP mode once in the firmware and boot the
+> kernel like that, but since firmware is gone after we've booted the
+> kernel, we run into the same problem when we power off a processor and
+> when we resume from S3.  The firmware is not involved in these cases.
+> In these cases the processors have an uninitialized virtual offset
+> again.  These processors don't appear to magically come up in HYP
+> mode.  Thus it would be up to the kernel to transition to HYP mode,
+> init the offset, and get out of HYP mode.  ...or just use the physical
+> counter.
+>
+>
+> If you can suggest something that doesn't require us to involve the
+> firmware in processor bringup and in resume, I'm all ears.  We have a
+> desire not to involve the firmware there because of all the issues of
+> keeping kernel/firmware in sync and because of the extra difficultly
+> of shipping firmware updates (understandably the QA needed to validate
+> a new firmware is much higher than the QA needed to validate a new
+> kernel).
 
-Signed-off-by: Geoff Levand <geoff@infradead.org>
----
- arch/arm64/include/asm/kvm_arm.h | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+One thing that was used in the past was to have the kernel load a blob
+from /lib/firmware/ which did some re-initialization when coming out
+of suspend or deep sleep.  We could do something similar here and have
+it either fix virtual offset or put it into hyp mode.  That would help
+solve our issue of making it easier to update and avoid QA hassles.
+Is such a solution acceptable to upstream?
 
-diff --git a/arch/arm64/include/asm/kvm_arm.h b/arch/arm64/include/asm/kvm_arm.h
-index cc83520..fb42ab5 100644
---- a/arch/arm64/include/asm/kvm_arm.h
-+++ b/arch/arm64/include/asm/kvm_arm.h
-@@ -175,7 +175,7 @@
- /* Exception Syndrome Register (ESR) bits */
- #define ESR_EL2_EC_SHIFT	(26)
- #define ESR_EL2_EC		(0x3fU << ESR_EL2_EC_SHIFT)
--#define ESR_EL2_IL		(1U << 25)
-+#define ESR_EL2_IL		(UL(1) << 25)
- #define ESR_EL2_ISS		(ESR_EL2_IL - 1)
- #define ESR_EL2_ISV_SHIFT	(24)
- #define ESR_EL2_ISV		(1U << ESR_EL2_ISV_SHIFT)
--- 
-1.9.1
+
+>
+>
+> -Doug
