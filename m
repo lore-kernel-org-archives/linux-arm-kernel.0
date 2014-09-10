@@ -1,29 +1,96 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 10 Sep 2014 20:22:43 +0200
-Subject: [GIT PULL] ARM: LPC32xx: Platform specific core updates
-In-Reply-To: <54105885.9020303@antcom.de>
-References: <54105885.9020303@antcom.de>
-Message-ID: <706522618.D4UDp8GaZm@wuerfel>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 10 Sep 2014 19:27:39 +0100
+Subject: [PATCH 1/6] iommu/arm-smmu: add support for specifying clocks
+In-Reply-To: <vnkwa968b6ux.fsf@mitchelh-linux.qualcomm.com>
+References: <1407891099-24641-1-git-send-email-mitchelh@codeaurora.org>
+ <1407891099-24641-2-git-send-email-mitchelh@codeaurora.org>
+ <20140819125833.GO23128@arm.com> <53F39F6D.1040205@codeaurora.org>
+ <20140826142757.GU23445@arm.com>
+ <vnkwa968b6ux.fsf@mitchelh-linux.qualcomm.com>
+Message-ID: <20140910182739.GM1710@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 10 September 2014 15:56:21 Roland Stigge wrote:
-> The following changes since commit 7d1311b93e58ed55f3a31cc8f94c4b8fe988a2b9:
+On Wed, Sep 10, 2014 at 02:29:42AM +0100, Mitchel Humpherys wrote:
+> On Tue, Aug 26 2014 at 07:27:58 AM, Will Deacon <will.deacon@arm.com> wrote:
+> > On Tue, Aug 19, 2014 at 08:03:09PM +0100, Olav Haugan wrote:
+> >> Clients of the SMMU driver are required to vote for clocks and power
+> >> when they know they need to use the SMMU. However, the clock and power
+> >> needed to be on for the SMMU to service bus masters aren't necessarily
+> >> the same as the ones needed to read/write registers...See below.
+> >
+> > The case I'm thinking of is where a device masters through the IOMMU, but
+> > doesn't make use of any translations. In this case, its transactions will
+> > bypass the SMMU and I want to ensure that continues to happen, regardless of
+> > the power state of the SMMU.
 > 
->   Linux 3.17-rc1 (2014-08-16 10:40:26 -0600)
-> 
-> are available in the git repository at:
-> 
->   git://git.antcom.de/linux-2.6 lpc32xx/core
-> 
-> for you to fetch changes up to 0816e792911ad8fb999862114e9a2ba805aa9753:
-> 
+> Then I assume the driver for such a device wouldn't be attaching to (or
+> detaching from) the IOMMU, so we won't be touching it at all either
+> way. Or am I missing something?
 
-Hi Roland,
+As long as its only the register file that gets powered down, then there's
+no issue. However, that's making assumptions about what these clocks are
+controlling. Is there a way for the driver to know which aspects of the
+device are controlled by which clock?
 
-I probably should have looked into the contents the first time around.
-I have cherry-picked the reset fix into the next/fixes-non-critical,
-but have decided not to apply the dma change for the same reason
-as the respective DT changes.
+> >> > What stops theses from racing with each other when there are multiple
+> >> > clocks? I also assume that the clk API ignores calls to clk_enable_prepare
+> >> > for a clk that's already enabled? I couldn't find that code...
+> >> 
+> >> All the clock APIs are reference counted yes. Not sure what you mean by
+> >> racing with each other? When you call to enable a clock the call does
+> >> not return until the clock is already ON (or OFF).
+> >
+> > I was thinking of an interrupt handler racing with normal code, but actually
+> > you balance the clk enable/disable in the interrupt handlers. However, it's
+> > not safe to call these clk functions from irq context anyway, since
+> > clk_prepare may sleep.
+> 
+> Ah yes. You okay with moving to a threaded IRQ?
 
-	Arnd
+A threaded IRQ already makes sense for context interrupts (if anybody has a
+platform that can do stalls properly), but it seems a bit weird for the
+global fault handler. Is there no way to fix the race instead?
+
+> >> >> @@ -2061,12 +2164,16 @@ static int arm_smmu_device_dt_probe(struct platform_device *pdev)
+> >> >>  	spin_unlock(&arm_smmu_devices_lock);
+> >> >>  
+> >> >>  	arm_smmu_device_reset(smmu);
+> >> >> +	arm_smmu_disable_clocks(smmu);
+> >> > 
+> >> > I wonder if this is really the right thing to do. Rather than the
+> >> > fine-grained clock enable/disable you have, why don't we just enable in
+> >> > domain_init and disable in domain_destroy, with refcounting for the clocks?
+> >> > 
+> >> 
+> >> So the whole point of all of this is that we try to save power. As Mitch
+> >> wrote in the commit text we want to only leave the clock and power on
+> >> for as short period of time as possible.
+> >
+> > Understood, but if the clocks are going up and down like yo-yos, then it's
+> > not obvious that you end up saving any power at all. Have you tried
+> > measuring the power consumption with different granularities for the
+> > clocks?
+> 
+> This has been profiled extensively and for some use cases it's a huge
+> win. Unfortunately we don't have any numbers for public sharing :( but
+> you can imagine a use case where some multimedia framework maps a bunch
+> of buffers into an SMMU at the beginning of some interactive user
+> session and doesn't unmap them until the (human) user decides they are
+> done. This could be a long time, all the while these clocks could be
+> off, saving power.
+
+Ok, I can see that. I wonder whether we could wrap all of the iommu_ops
+functions with the clock enable/disable code, instead of putting it directly
+into the drivers?
+
+> > The code you're proposing seems to take the approach of `we're going to
+> > access registers so enable the clocks, access the registers then disable the
+> > clocks', which is simple but may not be particularly effective.
+> 
+> Yes, that's a good summary of the approach here. It has been effective
+> in saving power for us in the past...
+
+Mike, do you have any experience with this sort of stuff?
+
+Will
