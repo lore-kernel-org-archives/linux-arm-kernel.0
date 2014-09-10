@@ -1,38 +1,34 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 10 Sep 2014 10:22:36 +0200
-Subject: [PATCH v2 2/2] PCI: keystone: update to support multiple pci ports
-In-Reply-To: <540F8425.70304@ti.com>
-References: <1410293835-13050-1-git-send-email-m-karicheri2@ti.com>
- <3967092.l9bxcqMaSa@wuerfel> <540F8425.70304@ti.com>
-Message-ID: <3814561.AbrslYBNjb@wuerfel>
+From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
+Date: Wed, 10 Sep 2014 10:26:19 +0200
+Subject: [PATCH 3/3] ARM64: make of_device_ids const
+In-Reply-To: <1410337579-23466-1-git-send-email-u.kleine-koenig@pengutronix.de>
+References: <1410337579-23466-1-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <1410337579-23466-4-git-send-email-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 09 September 2014 18:50:13 Murali Karicheri wrote:
-> My mistake. It is the device ID, not vendor ID. The PCI driver supports 
-> PCI h/w on K2HK, K2E and K2L SoCs for which PCI device IDs are assigned as
-> 
-> +#define PCIE_RC_K2HK           0xb008
-> +#define PCIE_RC_K2E            0xb009
-> +#define PCIE_RC_K2L            0xb00a
-> +
-> 
-> and the same driver code runs on all these h/w. The device ID is not 
-> filled in by default by the h/w, in the config space of the RC at offset 
-> 1000h "VENDOR_DEVICE_ID Vendor and Device Identification Register". 
-> Same is available in a seperate SoC register whose offset is specified 
-> by index 2. This is read by driver and updated in the config space. The 
-> Vendor ID is however set by default.
-> 
-> There is a mrrs PCI quirk required for Keystone PCI which depends on 
-> this vendor ID to be filled correctly as it match vendor id/ device id 
-> of the bridge device to apply the quirk.
-> 
-> Hope this clarify your question.
+of_device_ids (i.e. compatible strings and the respective data) are not
+supposed to change at runtime. All functions working with of_device_ids
+provided by <linux/of.h> work with const of_device_ids. So mark the
+only non-const struct in arch/arm64 as const, too.
 
-Ok, I understand now. Yes, this makes sense, though I wonder if it would
-have been easier to handle the quirk in a different way based on the
-driver rather than the PCI ID. It's probably not worth revisiting though,
-unless Bjorn wants to see it done differently now.
+Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+---
+ arch/arm64/kernel/perf_event.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-	Arnd
+diff --git a/arch/arm64/kernel/perf_event.c b/arch/arm64/kernel/perf_event.c
+index baf5afb7e6a0..aa29ecb4f800 100644
+--- a/arch/arm64/kernel/perf_event.c
++++ b/arch/arm64/kernel/perf_event.c
+@@ -1276,7 +1276,7 @@ arch_initcall(cpu_pmu_reset);
+ /*
+  * PMU platform driver and devicetree bindings.
+  */
+-static struct of_device_id armpmu_of_device_ids[] = {
++static const struct of_device_id armpmu_of_device_ids[] = {
+ 	{.compatible = "arm,armv8-pmuv3"},
+ 	{},
+ };
+-- 
+2.1.0
