@@ -1,20 +1,30 @@
-From: davem@davemloft.net (David Miller)
-Date: Wed, 10 Sep 2014 13:03:26 -0700 (PDT)
-Subject: [PATCH v1] net: ethernet: arc: Don't free Rockchip resources
- before disconnect from phy
-In-Reply-To: <1410335473-23573-1-git-send-email-romain.perier@gmail.com>
-References: <1410335473-23573-1-git-send-email-romain.perier@gmail.com>
-Message-ID: <20140910.130326.265195308573058113.davem@davemloft.net>
+From: dianders@chromium.org (Doug Anderson)
+Date: Wed, 10 Sep 2014 13:03:28 -0700
+Subject: [PATCH v3 7/7] ARM: exynos_defconfig: Enable MAX77802
+In-Reply-To: <1410344391-5675-8-git-send-email-javier.martinez@collabora.co.uk>
+References: <1410344391-5675-1-git-send-email-javier.martinez@collabora.co.uk>
+ <1410344391-5675-8-git-send-email-javier.martinez@collabora.co.uk>
+Message-ID: <CAD=FV=UL8gUO7bGk4vxZxuUuwZumzNZsR5+DVXafB6Z7Psc2kQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Romain Perier <romain.perier@gmail.com>
-Date: Wed, 10 Sep 2014 07:51:13 +0000
+Javier,
 
-> Free resources before being disconnected from phy and calling core driver is
-> wrong and should not happen. It avoids a delay of 4-5s caused by the timeout of
-> phy_disconnect().
-> 
-> Signed-off-by: Romain Perier <romain.perier@gmail.com>
+On Wed, Sep 10, 2014 at 3:19 AM, Javier Martinez Canillas
+<javier.martinez@collabora.co.uk> wrote:
+> From: Vivek Gautam <gautam.vivek@samsung.com>
+>
+> Enabled MAX77802 pmic for exynos systems.
+> One config USB_ANNOUNCE_NEW_DEVICES to display device
+> information on connect.
+> Another config for I2C_CHARDEV to see i2c device nodes.
+>
+> Signed-off-by: Vivek Gautam <gautam.vivek@samsung.com>
+> Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+> ---
+>  arch/arm/configs/exynos_defconfig | 3 +++
+>  1 file changed, 3 insertions(+)
 
-Applied, thanks.
+I've no complaints about any of that.
+
+Reviewed-by: Doug Anderson <dianders@chromium.org>
