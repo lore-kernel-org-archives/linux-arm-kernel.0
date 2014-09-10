@@ -1,107 +1,127 @@
-From: guohanjun@huawei.com (Hanjun Guo)
-Date: Wed, 10 Sep 2014 15:30:19 +0800
-Subject: [PATCH v3 02/17] ARM64 / ACPI: Get RSDP and ACPI boot-time tables
-In-Reply-To: <20140909162648.GE2910@arm.com>
-References: <1409583475-6978-1-git-send-email-hanjun.guo@linaro.org>
- <1409583475-6978-3-git-send-email-hanjun.guo@linaro.org>
- <20140909162648.GE2910@arm.com>
-Message-ID: <540FFE0B.7070400@huawei.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Wed, 10 Sep 2014 15:33:35 +0800
+Subject: [PATCH V2 3/3] ARM: imx: source gpt per clk from OSC for system
+ timer
+In-Reply-To: <5E619FDB-56BB-486E-B627-9D2A9D4F9F54@freescale.com>
+References: <1409887606-22388-1-git-send-email-b20788@freescale.com>
+ <1409887606-22388-4-git-send-email-b20788@freescale.com>
+ <CAOMZO5CJLSXy3p-eAe9xOJw8p4gxoRuT91bXV8gswy5oMuU6XQ@mail.gmail.com>
+ <5E619FDB-56BB-486E-B627-9D2A9D4F9F54@freescale.com>
+Message-ID: <20140910073333.GC22579@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2014/9/10 0:26, Catalin Marinas wrote:
-> On Mon, Sep 01, 2014 at 03:57:40PM +0100, Hanjun Guo wrote:
->> diff --git a/arch/arm64/include/asm/acenv.h b/arch/arm64/include/asm/acenv.h
->> new file mode 100644
->> index 0000000..3899ee6
->> --- /dev/null
->> +++ b/arch/arm64/include/asm/acenv.h
->> @@ -0,0 +1,18 @@
->> +/*
->> + * ARM64 specific ACPICA environments and implementation
->> + *
->> + * Copyright (C) 2014, Linaro Ltd.
->> + *   Author: Hanjun Guo <hanjun.guo@linaro.org>
->> + *   Author: Graeme Gregory <graeme.gregory@linaro.org>
->> + *
->> + * This program is free software; you can redistribute it and/or modify
->> + * it under the terms of the GNU General Public License version 2 as
->> + * published by the Free Software Foundation.
->> + */
->> +
->> +#ifndef _ASM_ACENV_H
->> +#define _ASM_ACENV_H
->> +
->> +#define ACPI_FLUSH_CPU_CACHE() WARN_ONCE(1, "Not currently supported on ARM64")
+On Fri, Sep 05, 2014 at 12:58:28PM +0000, Anson.Huang at freescale.com wrote:
+> >> @@ -312,10 +318,26 @@ static void __init _mxc_timer_init(int irq,
+> >>        __raw_writel(0, timer_base + MXC_TCTL);
+> >>        __raw_writel(0, timer_base + MXC_TPRER); /* see datasheet note */
+> >> 
+> >> -       if (timer_is_v2())
+> >> -               tctl_val = V2_TCTL_CLK_PER | V2_TCTL_FRR | V2_TCTL_WAITEN | MXC_TCTL_TEN;
+> >> -       else
+> >> +       if (timer_is_v2()) {
+> >> +               if (((cpu_is_imx6q() && imx_get_soc_revision() >
+> >> +                       IMX_CHIP_REVISION_1_0) || cpu_is_imx6dl() ||
+> >> +                       cpu_is_imx6sx()) && (clk_get_rate(clk_per) ==
+> >> +                       V2_TIMER_RATE_OSC_DIV8)) {
+> >> +                       tctl_val = V2_TCTL_CLK_OSC_DIV8 | V2_TCTL_FRR |
+> >> +                               V2_TCTL_WAITEN | MXC_TCTL_TEN;
+> >> +                       if (cpu_is_imx6dl() || cpu_is_imx6sx()) {
+> >> +                               /* 24 / 8 = 3 MHz */
+> >> +                               tprer_val = 7 << V2_TPRER_PRE24M;
+> >> +                               __raw_writel(tprer_val, timer_base + MXC_TPRER);
+> >> +                               tctl_val |= V2_TCTL_24MEN;
+> >> +                       }
+> >> +               } else {
+> >> +                       tctl_val = V2_TCTL_CLK_PER | V2_TCTL_FRR |
+> >> +                               V2_TCTL_WAITEN | MXC_TCTL_TEN;
+> >> +               }
+> >> +       } else {
+> >>                tctl_val = MX1_2_TCTL_FRR | MX1_2_TCTL_CLK_PCLK1 | MXC_TCTL_TEN;
+> >> +       }
+> > 
+> > Can this block be rearranged a bit so that it becomes easier to read?
 > 
-> Does this mean that it will be supported at some point? Looking at the
-> places where this function is called, I don't really see how this would
-> ever work on ARM. Which means that we add such macro just to be able to
-> compile code that would never be used on arm64. I would rather see the
-> relevant ACPI files only compiled on x86/IA-64 rather than arm64.
-> 
->> diff --git a/arch/arm64/kernel/acpi.c b/arch/arm64/kernel/acpi.c
->> new file mode 100644
->> index 0000000..9252f72
->> --- /dev/null
->> +++ b/arch/arm64/kernel/acpi.c
-> 
-> [...]
-> 
->> +/*
->> + * acpi_boot_table_init() called from setup_arch(), always.
->> + *	1. find RSDP and get its address, and then find XSDT
->> + *	2. extract all tables and checksums them all
->> + *
->> + * We can parse ACPI boot-time tables such as MADT after
->> + * this function is called.
->> + */
->> +void __init acpi_boot_table_init(void)
->> +{
->> +	/* If acpi_disabled, bail out */
->> +	if (acpi_disabled)
->> +		return;
-> 
-> So at this point, there wouldn't be anything yet to set acpi_disabled to
-> 1, unless !CONFIG_ACPI.
-> 
->> +
->> +	/* Initialize the ACPI boot-time table parser. */
->> +	if (acpi_table_init())
->> +		disable_acpi();
-> 
-> Do you need anything more to add to this function later? Otherwise, just
-> call it in setup_arch() directly (maybe dependent on
-> IS_ENABLED(CONFIG_ACPI) or just create an equivalent dummy
-> acpi_table_init() when not configured).
+> I have to consider v1, v2, and on v2, MX6Q's implementation is different from MX6DL and MX6SX, MX6SL has its special implementation, and MX6Q has difference between TO1.0 and other TOs, also, we have to consider the old dtb case. So, there are more than 6 different cases we need to consider, I thought it was the best way I can figure out, could you advice if you have better idea?
 
-We add FADT parse function to this function later.
+[The lines should be wrapped around 70 columns]
 
-> 
->> diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
->> index c96172a..fb7cc0e 100644
->> --- a/arch/arm64/kernel/setup.c
->> +++ b/arch/arm64/kernel/setup.c
->> @@ -43,6 +43,7 @@
->>  #include <linux/of_fdt.h>
->>  #include <linux/of_platform.h>
->>  #include <linux/efi.h>
->> +#include <linux/acpi.h>
->>  
->>  #include <asm/fixmap.h>
->>  #include <asm/cpu.h>
->> @@ -385,6 +386,9 @@ void __init setup_arch(char **cmdline_p)
->>  	efi_init();
->>  	arm64_memblock_init();
->>  
->> +	/* Parse the ACPI tables for possible boot-time configuration */
->> +	acpi_boot_table_init();
-> 
-> Is there any dummy acpi_boot_table_init() when !CONFIG_ACPI? I couldn't
-> see one in this patch, so I don't see how this would compile when ACPI
-> is disabled.
+I'm also a bit concerned by the readability of the code.  Can we
+reasonably assume it must be V2_TCTL_CLK_OSC_DIV8 case if
+clk_get_rate(clk_per) returns 3000000?  In that case, the code can be
+simplified a bit, something like below.  Is it going to work?
 
-There is a stub function in linux/acpi.h when ACPI is disabled.
+Shawn
 
-Thanks
-Hanjun
+diff --git a/arch/arm/mach-imx/clk-imx6q.c b/arch/arm/mach-imx/clk-imx6q.c
+index 4ee6e77a0fdf..3f0401e27b38 100644
+--- a/arch/arm/mach-imx/clk-imx6q.c
++++ b/arch/arm/mach-imx/clk-imx6q.c
+@@ -245,6 +245,7 @@ static void __init imx6q_clocks_init(struct device_node *ccm_node)
+        clk[IMX6QDL_CLK_PLL3_80M]  = imx_clk_fixed_factor("pll3_80m",  "pll3_usb_otg",   1, 6);
+        clk[IMX6QDL_CLK_PLL3_60M]  = imx_clk_fixed_factor("pll3_60m",  "pll3_usb_otg",   1, 8);
+        clk[IMX6QDL_CLK_TWD]       = imx_clk_fixed_factor("twd",       "arm",            1, 2);
++       clk[IMX6QDL_CLK_GPT_3M]    = imx_clk_fixed_factor("gpt_3m",    "osc",            1, 8);
+        if (cpu_is_imx6dl()) {
+                clk[IMX6QDL_CLK_GPU2D_AXI] = imx_clk_fixed_factor("gpu2d_axi", "mmdc_ch0_axi_podf", 1, 1);
+                clk[IMX6QDL_CLK_GPU3D_AXI] = imx_clk_fixed_factor("gpu3d_axi", "mmdc_ch0_axi_podf", 1, 1);
+@@ -469,6 +470,13 @@ static void __init imx6q_clocks_init(struct device_node *ccm_node)
+
+        clk_register_clkdev(clk[IMX6QDL_CLK_ENET_REF], "enet_ref", NULL);
+
++       /*
++        * The gpt_3m clock is not available on i.MX6Q TO1.0.  Let's point it
++        * to clock gpt_ipg_per to ease the gpt driver code.
++        */
++       if (cpu_is_imx6q() && imx_get_soc_revision() == IMX_CHIP_REVISION_1_0)
++               clk[IMX6QDL_CLK_GPT_3M] = clk[IMX6QDL_CLK_GPT_IPG_PER];
++
+        if ((imx_get_soc_revision() != IMX_CHIP_REVISION_1_0) ||
+            cpu_is_imx6dl()) {
+                clk_set_parent(clk[IMX6QDL_CLK_LDB_DI0_SEL], clk[IMX6QDL_CLK_PLL5_VIDEO_DIV]);
+
+diff --git a/arch/arm/mach-imx/time.c b/arch/arm/mach-imx/time.c
+index bf92e5a351c0..c0ad839516b0 100644
+--- a/arch/arm/mach-imx/time.c
++++ b/arch/arm/mach-imx/time.c
+@@ -312,10 +317,21 @@ static void __init _mxc_timer_init(int irq,
+        __raw_writel(0, timer_base + MXC_TCTL);
+        __raw_writel(0, timer_base + MXC_TPRER); /* see datasheet note */
+
+-       if (timer_is_v2())
+-               tctl_val = V2_TCTL_CLK_PER | V2_TCTL_FRR | V2_TCTL_WAITEN | MXC_TCTL_TEN;
+-       else
++       if (timer_is_v2()) {
++               tctl_val = V2_TCTL_FRR | V2_TCTL_WAITEN | MXC_TCTL_TEN;
++               if (clk_get_rate(clk_per) == V2_TIMER_RATE_OSC_DIV8) {
+			/* Is the assumption corrrect ??? */
++                       tctl_val |= V2_TCTL_CLK_OSC_DIV8;
++                       if (cpu_is_imx6dl() || cpu_is_imx6sx()) {
++                               /* 24 / 8 = 3 MHz */
++                               __raw_writel(7 << V2_TPRER_PRE24M, timer_base + MXC_TPRER);
++                               tctl_val |= V2_TCTL_24MEN;
++                       }
++               } else {
++                       tctl_val |= V2_TCTL_CLK_PER;
++               }
++       } else {
+                tctl_val = MX1_2_TCTL_FRR | MX1_2_TCTL_CLK_PCLK1 | MXC_TCTL_TEN;
++       }
+
+        __raw_writel(tctl_val, timer_base + MXC_TCTL);
+
+@@ -349,9 +365,13 @@ static void __init mxc_timer_init_dt(struct device_node *np)
+        WARN_ON(!timer_base);
+        irq = irq_of_parse_and_map(np, 0);
+
+-       clk_per = of_clk_get_by_name(np, "per");
+        clk_ipg = of_clk_get_by_name(np, "ipg");
+
++       /* Try osc_per clock first, and fall back to per clock otherwise */
++       clk_per = of_clk_get_by_name(np, "osc_per");
++       if (!IS_ERR(clk_per))
++               clk_per = of_clk_get_by_name(np, "per");
++
+        _mxc_timer_init(irq, clk_per, clk_ipg);
+ }
+ CLOCKSOURCE_OF_DECLARE(mx1_timer, "fsl,imx1-gpt", mxc_timer_init_dt);
