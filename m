@@ -1,42 +1,32 @@
 From: heiko@sntech.de (Heiko Stuebner)
-Date: Wed, 10 Sep 2014 20:46:55 +0200
-Subject: [PATCH 6/6] ARM: dts: rockchip: clean up rk3xxx mmc nodes
+Date: Wed, 10 Sep 2014 20:46:50 +0200
+Subject: [PATCH 1/6] ARM: dts: rockchip: remove rockchip,
+ bus-index from rk3xxx i2c0
 In-Reply-To: <1410374815-20208-1-git-send-email-heiko@sntech.de>
 References: <1410374815-20208-1-git-send-email-heiko@sntech.de>
-Message-ID: <1410374815-20208-7-git-send-email-heiko@sntech.de>
+Message-ID: <1410374815-20208-2-git-send-email-heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 356649ab6d64 ("ARM: dts: rockchip: unuse the slot-node and deprecate
-the supports-highspeed for dw-mmc") removed the slots but not the #xx-cells
-properties describing the subnodes. Do this now.
+This is a remnant from the first i2c driver iteration that seems to have
+been forgotten and thus made its way into the dtsi. Remove it.
 
 Signed-off-by: Heiko Stuebner <heiko@sntech.de>
 ---
- arch/arm/boot/dts/rk3xxx.dtsi | 4 ----
- 1 file changed, 4 deletions(-)
+ arch/arm/boot/dts/rk3xxx.dtsi | 1 -
+ 1 file changed, 1 deletion(-)
 
 diff --git a/arch/arm/boot/dts/rk3xxx.dtsi b/arch/arm/boot/dts/rk3xxx.dtsi
-index c383f5c..9945bb9 100644
+index cce4a07..c021df3 100644
 --- a/arch/arm/boot/dts/rk3xxx.dtsi
 +++ b/arch/arm/boot/dts/rk3xxx.dtsi
-@@ -118,8 +118,6 @@
- 		compatible = "rockchip,rk2928-dw-mshc";
- 		reg = <0x10214000 0x1000>;
- 		interrupts = <GIC_SPI 23 IRQ_TYPE_LEVEL_HIGH>;
--		#address-cells = <1>;
--		#size-cells = <0>;
+@@ -135,7 +135,6 @@
+ 		#size-cells = <0>;
  
- 		clocks = <&cru HCLK_SDMMC>, <&cru SCLK_SDMMC>;
- 		clock-names = "biu", "ciu";
-@@ -131,8 +129,6 @@
- 		compatible = "rockchip,rk2928-dw-mshc";
- 		reg = <0x10218000 0x1000>;
- 		interrupts = <GIC_SPI 24 IRQ_TYPE_LEVEL_HIGH>;
--		#address-cells = <1>;
--		#size-cells = <0>;
+ 		rockchip,grf = <&grf>;
+-		rockchip,bus-index = <0>;
  
- 		clocks = <&cru HCLK_SDIO>, <&cru SCLK_SDIO>;
- 		clock-names = "biu", "ciu";
+ 		clock-names = "i2c";
+ 		clocks = <&cru PCLK_I2C0>;
 -- 
 2.0.1
