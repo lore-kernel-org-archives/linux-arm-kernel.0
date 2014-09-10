@@ -1,56 +1,20 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Wed, 10 Sep 2014 14:52:01 +0200
-Subject: [ANNOUNCE] ARM: at91: removal of board files
-Message-ID: <54104971.1080501@atmel.com>
+From: bcmarm@gmail.com (Hemanth Kumar)
+Date: Wed, 10 Sep 2014 18:29:56 +0530
+Subject: ARM bigendian cpuhotplug
+Message-ID: <CAMQ1t3q22P7UDXUhoJiThjnrS_GMdAFaSaDxRzUi8KM=pa9QQw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+>Are you referring to ARM Vexpress platform with TC2/CA15_A7 card ?
+>If yes, idle doesn't work with CONFIG_MTD_CFI irrespective of
+>endianness, it's platform limitation.
 
-The Atmel ARM-based SoC community (aka AT91) has been working on Device
-Tree since early August 2011. I only come back on this long process just
-for saying a big thank you to all people involved in this effort which
-in the end gives to the AT91 community a cleaner, stronger and more
-generic code base.
+>Regards,
+>Sudeep
 
-With the work about to being completed on the LCD controller we have now
-a comprehensive support for all AT91 SoC in DT. Some drivers were
-converted to DT several years ago, some have just been converted but we
-can rely on this technology and stop having to maintain useless code.
 
-So today, it's time for making one of the latest steps of this work: the
-*removal* of old-style "board-*.c" and "at91*_devices.c" files in
-mach-at91 directory.
+Thanks for the reply what is the hardware limitation for this card (VE
+CA-15_A7) when we enable CONFIG_MTD_CFI
 
-A work has been started several months ago (Cf. ARM: at91: DT: switch C
-board to DT, on Nov. 2013) but we didn't have much feedback from board
-maintainers.
-This time, we will simply remove the support for the boards that have
-not migrated to the Device Tree by the 3.18-3.19 time frame. To ensure
-this does not happen to your board, make sure to:
-- rework the patches sent by Jean-Christophe back then
-- or send your own .dts file for your board.
-All in all it will be easy to build these .dts files both from existing
-boards with the same SoC or convert the old board files that could
-easily be found in git history.
-
-BTW: Let me recall some simple rules while submitting an AT91 board DT file:
-- prefix .dts file name with "at91-"
-  (at91-foxg20.dts or at91-sama5d3_xplained.dts for instance)
-- DT nodes in address ascending order
-- command line without "mem" parameter and as short and generic
-  as possible
-- sorted inclusion of the .dts file in arch/arm/boot/dts/Makefile
-- a vendor used in a DT file must be added in
-  Documentation/devicetree/bindings/vendor-prefixes.txt as well
-- consider using the dual license approach for your board .dts file:
-  GPLv2+ and X11:
-http://lists.infradead.org/pipermail/linux-arm-kernel/2014-September/283767.html
-
-Please do not hesitate to contact the AT91 community for any question: I
-know that you may have difficulties to switch to this method if you are
-not used to kernel development, definitively, we can help.
-
-Best regards,
--- 
-Nicolas Ferre
+Reagards,
+Hemanth
