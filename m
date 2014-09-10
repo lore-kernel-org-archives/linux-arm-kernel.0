@@ -1,156 +1,107 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Wed, 10 Sep 2014 09:24:31 +0200
-Subject: [PATCH v4 2/4] dt-bindings: document Rockchip thermal
-In-Reply-To: <CAC-25o9qcddZLy8fcwEqWp7g5fXk31xhaQCcALuH+sXDgn5n8w@mail.gmail.com>
-References: <1409710239-19941-1-git-send-email-caesar.wang@rock-chips.com>
- <1410310946.25559.12.camel@rzhang1-toshiba>
- <CAC-25o9qcddZLy8fcwEqWp7g5fXk31xhaQCcALuH+sXDgn5n8w@mail.gmail.com>
-Message-ID: <1487694.oyLYSrbpA8@diego>
+From: guohanjun@huawei.com (Hanjun Guo)
+Date: Wed, 10 Sep 2014 15:30:19 +0800
+Subject: [PATCH v3 02/17] ARM64 / ACPI: Get RSDP and ACPI boot-time tables
+In-Reply-To: <20140909162648.GE2910@arm.com>
+References: <1409583475-6978-1-git-send-email-hanjun.guo@linaro.org>
+ <1409583475-6978-3-git-send-email-hanjun.guo@linaro.org>
+ <20140909162648.GE2910@arm.com>
+Message-ID: <540FFE0B.7070400@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Dienstag, 9. September 2014, 21:14:18 schrieb edubezval at gmail.com:
-> Hello,
+On 2014/9/10 0:26, Catalin Marinas wrote:
+> On Mon, Sep 01, 2014 at 03:57:40PM +0100, Hanjun Guo wrote:
+>> diff --git a/arch/arm64/include/asm/acenv.h b/arch/arm64/include/asm/acenv.h
+>> new file mode 100644
+>> index 0000000..3899ee6
+>> --- /dev/null
+>> +++ b/arch/arm64/include/asm/acenv.h
+>> @@ -0,0 +1,18 @@
+>> +/*
+>> + * ARM64 specific ACPICA environments and implementation
+>> + *
+>> + * Copyright (C) 2014, Linaro Ltd.
+>> + *   Author: Hanjun Guo <hanjun.guo@linaro.org>
+>> + *   Author: Graeme Gregory <graeme.gregory@linaro.org>
+>> + *
+>> + * This program is free software; you can redistribute it and/or modify
+>> + * it under the terms of the GNU General Public License version 2 as
+>> + * published by the Free Software Foundation.
+>> + */
+>> +
+>> +#ifndef _ASM_ACENV_H
+>> +#define _ASM_ACENV_H
+>> +
+>> +#define ACPI_FLUSH_CPU_CACHE() WARN_ONCE(1, "Not currently supported on ARM64")
 > 
-> On Tue, Sep 9, 2014 at 9:02 PM, Zhang Rui <rui.zhang@intel.com> wrote:
-> > On Tue, 2014-09-09 at 11:09 -0400, Eduardo Valentin wrote:
-> >> Hello
-> >> 
-> >> On Tue, Sep 09, 2014 at 01:35:31PM +0200, Heiko St?bner wrote:
-> >> > Am Dienstag, 9. September 2014, 10:27:17 schrieb Zhang Rui:
-> >> > > On Thu, 2014-09-04 at 09:02 +0800, Caesar Wang wrote:
-> >> > > > ? 2014?09?03? 16:07, Heiko St?bner ??:
-> >> > > > > Am Mittwoch, 3. September 2014, 10:10:37 schrieb Caesar Wang:
-> >> > > > >> This add the necessary binding documentation for the thermal
-> >> > > > >> found on Rockchip SoCs
-> >> > > > >> 
-> >> > > > >> Signed-off-by: zhaoyifeng <zyf@rock-chips.com>
-> >> > > > >> Signed-off-by: Caesar Wang <caesar.wang@rock-chips.com>
-> >> > > > >> ---
-> >> > > > >> 
-> >> > > > >>   .../devicetree/bindings/thermal/rockchip-thermal.txt | 20
-> >> > > > >> 
-> >> > > > >> ++++++++++++++++++++ 1 file changed, 20 insertions(+)
-> >> > > > >> 
-> >> > > > >>   create mode 100644
-> >> > > > >> 
-> >> > > > >> Documentation/devicetree/bindings/thermal/rockchip-thermal.txt
-> >> > > > >> 
-> >> > > > >> diff --git
-> >> > > > >> a/Documentation/devicetree/bindings/thermal/rockchip-thermal.txt
-> >> > > > >> b/Documentation/devicetree/bindings/thermal/rockchip-thermal.txt
-> >> > > > >> new
-> >> > > > >> file
-> >> > > > >> mode 100644
-> >> > > > >> index 0000000..1ed4d4c
-> >> > > > >> --- /dev/null
-> >> > > > >> +++
-> >> > > > >> b/Documentation/devicetree/bindings/thermal/rockchip-thermal.tx
-> >> > > > >> t
-> >> > > > >> @@ -0,0 +1,20 @@
-> >> > > > >> +* Temperature Sensor ADC (TSADC) on rockchip SoCs
-> >> > > > >> +
-> >> > > > >> +Required properties:
-> >> > > > >> +- compatible: "rockchip,rk3288-tsadc"
-> >> > > > >> +- reg: physical base address of the controller and length of
-> >> > > > >> memory
-> >> > > > >> mapped
-> >> > > > >> +       region.
-> >> > > > >> +- interrupts: The interrupt number to the cpu. The interrupt
-> >> > > > >> specifier
-> >> > > > >> format +           depends on the interrupt controller.
-> >> > > > >> +- clocks: Must contain an entry for each entry in clock-names.
-> >> > > > >> +- clock-names: Shall be "tsadc" for the converter-clock, and
-> >> > > > >> "apb_pclk" for +            the peripheral clock.
-> >> > > > > 
-> >> > > > > You're using the passive-temp, critical-temp and force-shut-temp
-> >> > > > > properties in your driver without declaring them here.
-> >> > > > 
-> >> > > > frankly,the about are need be declared. but  there are 4 types[0]
-> >> > > > for
-> >> > > > trip in thermal framework,
-> >> > > > there is no force-shut for me. So I want to change it three
-> >> > > > additional
-> >> > > > properties in [PATCH V4 4/4],
-> >> > > > 
-> >> > > > 
-> >> > > > [0]
-> >> > > > {
-> >> > > > 
-> >> > > >      THERMAL_TRIP_CRITICAL,
-> >> > > >      THERMAL_TRIP_HOT,
-> >> > > >      THERMAL_TRIP_PASSIVE,
-> >> > > >      THERMAL_TRIP_ACTIVE,
-> >> > > > 
-> >> > > > }
-> >> > > 
-> >> > > this sounds reasonable to me.
-> >> > > 
-> >> > > > > But more importantly, please use the generic trip-points for
-> >> > > > > this. I
-> >> > > > > guess it shouldn't be a problem to introduce a "forced-shutdown"
-> >> > > > > trippoint [0] for the additional trip-point you have - thermal
-> >> > > > > maintainers, please shout if I'm wrong :-)
-> >> > > 
-> >> > > what is the difference between a critical trip point and a
-> >> > > "forced-shutdown" trip point?
-> >> > > Thermal core will do a shutdown in case the critical trip point is
-> >> > > triggered.
-> >> > 
-> >> > The forced-shutdown is where the thermal controller is supposed to also
-> >> > do a>> 
-> >> Currently, there is no discrimination between hardware configured /
-> >> triggered thermal shutdown and software detected / triggered thermal
-> >> shutdown. One way to implement it though is to reuse the critical trip
-> >> type. Even if you use more than one trip type it is doable, it will
-> >> depend on the priorities you give to software triggered and hardware
-> >> triggered.
-> >> 
-> >> > shutdown in hardware. As you said the thermal core will also shutdown
-> >> > at the critical trip point, I guess we could map Caesar's value like
-> >> > 
-> >> > trip-point          tsadc
-> >> > critical            forced-shutdown (the 120 degrees in patch 4)
-> >> > 
-> >> > hot                 critical (the 100 degrees)
-> >> > ...
-> >> 
-> >> In the case we are planing to expand the trip type range, adding one
-> >> specific to hardware configurable shutdown makes sense to me too.
-> > 
-> > hmmm, why? you don't want an orderly shutdown? I still do not understand
-> > why we need a hardware shutdown trip point.
-> > Say, if we expect the system to be shutdown at 100C, I don't think we
-> > have a chance to trigger the hardware shutdown trip point.
-> > Further more, if my understanding is right, thermal core won't do
-> > anything for the hardware shutdown trip point because the system will be
-> > shutdown automatically, right? If this is true, why bother introducing
-> > this to thermal core?
+> Does this mean that it will be supported at some point? Looking at the
+> places where this function is called, I don't really see how this would
+> ever work on ARM. Which means that we add such macro just to be able to
+> compile code that would never be used on arm64. I would rather see the
+> relevant ACPI files only compiled on x86/IA-64 rather than arm64.
 > 
-> Some ICs allow configuring the temperature when the shutdown will
-> happen. That is, you setup in registers the thermal shutdown
-> threshold, and one of the output pin of the IC is wired to, say, the
-> processor reset pin. Some other ICs have the threshold hardwired, and
-> cannot be configured.
+>> diff --git a/arch/arm64/kernel/acpi.c b/arch/arm64/kernel/acpi.c
+>> new file mode 100644
+>> index 0000000..9252f72
+>> --- /dev/null
+>> +++ b/arch/arm64/kernel/acpi.c
 > 
-> Those options are a last chance to avoid processors to burn, in case
-> software really gets stuck at high temperatures.
+> [...]
 > 
-> The only thing that the thermal driver would need to worry is the
-> configuration step, that is, writing the value to the registers. In
-> the case the thermal core would have a specific trip type for such
-> case, the core itself would not do anything, except allowing designing
-> a thermal zone with hardware shutdown trips. And thus the thermal
-> driver would do the configuration.
+>> +/*
+>> + * acpi_boot_table_init() called from setup_arch(), always.
+>> + *	1. find RSDP and get its address, and then find XSDT
+>> + *	2. extract all tables and checksums them all
+>> + *
+>> + * We can parse ACPI boot-time tables such as MADT after
+>> + * this function is called.
+>> + */
+>> +void __init acpi_boot_table_init(void)
+>> +{
+>> +	/* If acpi_disabled, bail out */
+>> +	if (acpi_disabled)
+>> +		return;
 > 
+> So at this point, there wouldn't be anything yet to set acpi_disabled to
+> 1, unless !CONFIG_ACPI.
 > 
-> Currently, the way I see to implement this is to interpret critical
-> trips as the threshold to be configured at the IC registers. That is,
-> reusing critical trips as orderly power down and as the hardware
-> shutdown threshold.
+>> +
+>> +	/* Initialize the ACPI boot-time table parser. */
+>> +	if (acpi_table_init())
+>> +		disable_acpi();
+> 
+> Do you need anything more to add to this function later? Otherwise, just
+> call it in setup_arch() directly (maybe dependent on
+> IS_ENABLED(CONFIG_ACPI) or just create an equivalent dummy
+> acpi_table_init() when not configured).
 
-which was what I also meant to express above [but seemingly failed to do 
-properly :-) ].
+We add FADT parse function to this function later.
 
-Critical is specified as "Hardware not reliable", so I'd think it wouldn't 
-matter how the hw is shut down (orderly/unorderly) as long as its done.
+> 
+>> diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
+>> index c96172a..fb7cc0e 100644
+>> --- a/arch/arm64/kernel/setup.c
+>> +++ b/arch/arm64/kernel/setup.c
+>> @@ -43,6 +43,7 @@
+>>  #include <linux/of_fdt.h>
+>>  #include <linux/of_platform.h>
+>>  #include <linux/efi.h>
+>> +#include <linux/acpi.h>
+>>  
+>>  #include <asm/fixmap.h>
+>>  #include <asm/cpu.h>
+>> @@ -385,6 +386,9 @@ void __init setup_arch(char **cmdline_p)
+>>  	efi_init();
+>>  	arm64_memblock_init();
+>>  
+>> +	/* Parse the ACPI tables for possible boot-time configuration */
+>> +	acpi_boot_table_init();
+> 
+> Is there any dummy acpi_boot_table_init() when !CONFIG_ACPI? I couldn't
+> see one in this patch, so I don't see how this would compile when ACPI
+> is disabled.
+
+There is a stub function in linux/acpi.h when ACPI is disabled.
+
+Thanks
+Hanjun
