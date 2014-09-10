@@ -1,51 +1,57 @@
-From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
-Date: Wed, 10 Sep 2014 13:31:28 +0200
-Subject: [PATCH v4 0/3] Add Atmel maXTouch support for Peach boards
-Message-ID: <1410348691-18317-1-git-send-email-javier.martinez@collabora.co.uk>
+From: jhs@mojatatu.com (Jamal Hadi Salim)
+Date: Wed, 10 Sep 2014 07:33:04 -0400
+Subject: [PATCH v2 0/3] net: Add Keystone NetCP ethernet driver support
+In-Reply-To: <540F1A9A.1020309@ti.com>
+References: <1408115562-22487-1-git-send-email-santosh.shilimkar@ti.com>
+ <20140821.163612.282672926741753926.davem@davemloft.net>
+ <53F79DC5.8030003@ti.com> <540DC00F.1080103@ti.com>
+ <540EE809.9020901@mojatatu.com> <540F1A9A.1020309@ti.com>
+Message-ID: <541036F0.2030001@mojatatu.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Kukjin,
+On 09/09/14 11:19, Santosh Shilimkar wrote:
 
-This is a fourth version of the series that adds support
-for the Atmel trackpad found on the Exynos5420 Peach Pit
-and Pi boards.
+> All the documentation is open including packet accelerator offload
+> in ti.com.
 
-Support for Pi was included again even when the driver
-does not support yet the T100 touchscreen objects used
-by the Atmel mXT540S chip found on the Peach Pi, since
-Nick Dyer said that he will push the T100 support for
-3.18. So we can queue the Peach Pi DTS snippet for 3.18
-since by then the driver should already support it.
-It was tested on a Peach Pi with an out-of-tree patch
-that adds support the needed T100 object support.
+Very nice.
+Would you do me a kindness and point to the switch interface
+documentation (and other ones on that soc)?
 
-The first patch adds the needed changes for the Peach Pit
-DTS, the second patch does the same but for the Peach Pi
-DTS and the third patch enables the driver in the Exynos
-specific kernel configuration.
+> We got such requests from customers but couldn't
+> support it for Linux.
 
-The patch that enables the driver on the ARMv7 multi-platform
-config file was dropped since that is not meant to be merged
-through the linux-samsung tree. I'll post a separate series
-to sync exynos_defconfig and multi_v7_defconfig so those can
-be picked through the arm-soc tree.
+It has been difficult because every chip vendor is trying
+to do their own thing. Some have huge (fugly) SDKs in user space
+which make it worse. Thats the struggle we are trying to
+deal with. Of course none of those vendors want to open
+up their specs. You present a nice opportunity to not follow
+that path.
 
-This series must be merged after [0] to avoid merge conflicts.
+> We are also looking for such
+> support and any direction are welcome. Your slide
+> deck seems to capture the key topics like L2/IPSEC
+> offload which we are also interested to hear.
+>
 
-Javier Martinez Canillas (2):
-  ARM: dts: Add Peach Pi dts entry for Atmel touchpad
-  ARM: exynos_defconfig: Enable Atmel maXTouch support
+The slides list the most popular offloads. But not necessarily
+all known offloads.
 
-Sjoerd Simons (1):
-  ARM: dts: Add Peach Pit dts entry for Atmel touchpad
+> Just to be clear, your point was about L2 switch offload
+> which the driver don't support at the moment. It might confuse
+> others. The driver doesn't implements anything non-standard.
+>
 
- arch/arm/boot/dts/exynos5420-peach-pit.dts | 29 +++++++++++++++++++++++++++++
- arch/arm/boot/dts/exynos5800-peach-pi.dts  | 28 ++++++++++++++++++++++++++++
- arch/arm/configs/exynos_defconfig          |  1 +
- 3 files changed, 58 insertions(+)
+If i understood you correctly:
+Your initial patches dont intend to expose any offloads - you are just
+abstracting this as a NIC. I think that is a legit reason.
+However, the problem is you are also exposing the packet processors
+and switch offloading in a proprietary way.
+For a sample of how L2 basic functions like FDB tables are controlled
+within a NIC - take a look at the Intel NICs.
+Either that or you hide all the offload interfaces and over time add
+them (starting with L2 - NICs with L2 are common).
 
-Best regards,
-Javier
-
-[0]: https://lkml.org/lkml/2014/9/10/226
+cheers,
+jamal
