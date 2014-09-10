@@ -1,95 +1,48 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Tue, 9 Sep 2014 23:53:28 -0500
-Subject: [PATCH v6 4/4] phy: exynos5-usbdrd: Calibrate LOS levels for
- exynos5420/5800
-In-Reply-To: <CAFp+6iHRJ5oAA+K1Y0Y2uadPhsR6wmrd13DM39dqiL4jj+swHg@mail.gmail.com>
-References: <CAFp+6iEyqmbwMLFrBKD7NVLDAC=b+h1hPKFS=BG4k9D69hn_dg@mail.gmail.com>
- <20140903144225.GD31855@saruman.home>
- <CAFp+6iETPJCWMMkjHrpDcdCv=K0PbefYLa4eBOwN=aUY2=EHLA@mail.gmail.com>
- <20140905175651.GK24449@saruman.home>
- <CAFp+6iGU86yL8Ry3ArJJjBy2Cs0Em2B49yssH3BK5fJwyaZbtA@mail.gmail.com>
- <20140908134454.GK22409@saruman.home>
- <CAFp+6iG+gmD_JseytYuVQcRK9ErOqQrUEWJoU1KUU7PqMd=aRw@mail.gmail.com>
- <20140909144225.GF6151@saruman.home>
- <CAFp+6iHJKmeothDM67WW60Sqqj8BQroBCzZ8zecKwM_GcYL8HA@mail.gmail.com>
- <CAFp+6iHRJ5oAA+K1Y0Y2uadPhsR6wmrd13DM39dqiL4jj+swHg@mail.gmail.com>
-Message-ID: <20140910045328.GA32475@saruman.home>
+From: dianders@chromium.org (Doug Anderson)
+Date: Tue, 9 Sep 2014 21:58:00 -0700
+Subject: [PATCH v2 0/5] Add max77802 support for Peach boards
+In-Reply-To: <04ab01cfcbe0$caeac4d0$60c04e70$@kernel.org>
+References: <1408533593-32346-1-git-send-email-javier.martinez@collabora.co.uk>
+ <CABxcv==ycrPw1MTv7X0baX2WfqgDS+4EEfGAWc+ZhpiR6=Uy+Q@mail.gmail.com>
+ <04ab01cfcbe0$caeac4d0$60c04e70$@kernel.org>
+Message-ID: <CAD=FV=UuT_78kWS274jY1y69XQoYCadgfAHXjdBaJdJDsVk-pw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 10, 2014 at 09:09:57AM +0530, Vivek Gautam wrote:
-> On Wed, Sep 10, 2014 at 9:07 AM, Vivek Gautam <gautam.vivek@samsung.com> wrote:
-> > adding Julius here,
-> 
-> i think i had missed adding Julius for this entire series :-(
-> I should be more careful with the CC list in future.
-> Added his chromium id, since that seems to be more active.
-> 
-> >
-> >
-> > On Tue, Sep 9, 2014 at 8:12 PM, Felipe Balbi <balbi@ti.com> wrote:
-> >> On Tue, Sep 09, 2014 at 07:19:50AM +0530, Vivek Gautam wrote:
-> >>> Hi,
-> >>>
-> >>>
-> >>> On Mon, Sep 8, 2014 at 7:14 PM, Felipe Balbi <balbi@ti.com> wrote:
-> >>> > Hi,
-> >>> >
-> >>> > On Mon, Sep 08, 2014 at 09:53:09AM +0530, Vivek Gautam wrote:
-> >>> >> On Fri, Sep 5, 2014 at 11:26 PM, Felipe Balbi <balbi@ti.com> wrote:
-> >>> >> > On Thu, Sep 04, 2014 at 12:01:19PM +0530, Vivek Gautam wrote:
-> >>> >> >> > Don't we have phy_power_on()
-> >>> >> >> > for that ? It looks like you could just as well do this from
-> >>> >> >> > phy_power_on() ?
-> >>> >> >>
-> >>> >> >> No, unfortunately keeping these calibration settings in phy_power_on()
-> >>> >> >> doesn't help, since we need to do this after XHCI reset has happened.
-> >>> >> >
-> >>> >> > teach xHCI about PHYs ?
-> >>> >>
-> >>> >> sorry i couldn't understand you here.
-> >>> >> Aren't we trying to do the same with Heikki's patch about dwc3 :
-> >>> >> [PATCH 6/6] usb: dwc3: host: convey the PHYs to xhci
-> >>> >>
-> >>> >> and the 2nd patch in this series :
-> >>> >> [PATCH v6 2/4] usb: host: xhci-plat: Get PHYs for xhci's hcds
-> >>> >>
-> >>> >> Is there something else that is expected ?
-> >>> >
-> >>> > right, use that to call phy_init() at the right time, then you need to
-> >>> > add a new ->calibrate() method which, likely, will only be used by you
-> >>> > ;-)
-> >>>
-> >>> so you mean, the xhci should itself call phy_init() at a time suitable,
-> >>> so that ->calibrate() is not required at all ?
-> >>>
-> >>> i think you meant there - "then you __do not__ need to
-> >>
-> >> right :-)
-> >
-> > alright, i will prepare a patch for the suggested change.
-> >
-> > But AFAI remember we had discussion for this patch in earlier
-> > version, and Julius suggested to use a generic approach for such
-> > change wherein other users in future may be able to use the
-> > facility.
+Hi,
 
-right, and what's more generic than adding the support for PHYs straight
-into xHCI ?
+On Mon, Sep 8, 2014 at 8:47 PM,  <kgene@kernel.org> wrote:
+> Javier Martinez Canillas wrote:
+>>
+>> Hello Kukjin,
+>>
+> Hi,
+>
+>> On Wed, Aug 20, 2014 at 1:19 PM, Javier Martinez Canillas
+>> <javier.martinez@collabora.co.uk> wrote:
+>> >
+>> > This is a second version of the series that adds max77802 support for
+>> > the Peach Pit and Pi boards. The series also have all the pending
+>> > patches that were posted but depended on this support. I've picked
+>> > all the patches I found and rebased them to be sure that they apply
+>> > cleanly on top of linux-next. Also I've taken some DT snippets from
+>> > the downstream Chrome OS 3.8 kernel DTS for devices that use one of
+>> > these regulators as their input supply.
+>> >
+>>
+>> Any comments on this series?
+>>
+> Looks good to me but I just wanted to get ack from chrome guy, Doug? But since
+> Naveen tested, it should be fine I think. I'll take the series.
 
-What I fear is that we end up opening the doors for every odd
-platform-specific operation to be added to the framework without really
-considering what needs to be done. That would defeat the idea of having
-a generic framework altogether.
+I haven't had crazy amounts of time to review pit/pi patches recently,
+but luckily Javier has been picking up my slack.  I think he's more of
+a maintainer for these file than I am at this point.
 
-cheers
+...but I did do a quick skim / compare to our tree and found one small
+bug (see patch #1) and added my Reviewed-by tags.
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140909/9d71f7f9/attachment-0001.sig>
+-Doug
+
+
+-Doug
