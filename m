@@ -1,48 +1,60 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Tue, 9 Sep 2014 21:58:00 -0700
-Subject: [PATCH v2 0/5] Add max77802 support for Peach boards
-In-Reply-To: <04ab01cfcbe0$caeac4d0$60c04e70$@kernel.org>
-References: <1408533593-32346-1-git-send-email-javier.martinez@collabora.co.uk>
- <CABxcv==ycrPw1MTv7X0baX2WfqgDS+4EEfGAWc+ZhpiR6=Uy+Q@mail.gmail.com>
- <04ab01cfcbe0$caeac4d0$60c04e70$@kernel.org>
-Message-ID: <CAD=FV=UuT_78kWS274jY1y69XQoYCadgfAHXjdBaJdJDsVk-pw@mail.gmail.com>
+From: b38343@freescale.com (Robin Gong)
+Date: Wed, 10 Sep 2014 13:16:16 +0800
+Subject: [PATCH v1] ARM: dts: imx6dl: disable dma support for spi on
+ i.mx6dl
+In-Reply-To: <20140910032128.GD18566@dragon>
+References: <1410312816-32171-1-git-send-email-b38343@freescale.com>
+ <20140910032128.GD18566@dragon>
+Message-ID: <20140910051615.GA29006@Robin-OptiPlex-780>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Mon, Sep 8, 2014 at 8:47 PM,  <kgene@kernel.org> wrote:
-> Javier Martinez Canillas wrote:
->>
->> Hello Kukjin,
->>
-> Hi,
+On Wed, Sep 10, 2014 at 11:21:30AM +0800, Shawn Guo wrote:
+> On Wed, Sep 10, 2014 at 09:33:36AM +0800, Robin Gong wrote:
+> > There is one weird data in rxfifo after one full rx/tx transfer
+> > done sometimes. It looks a design issue and hard to workaround
+> > totally, so disable dma functhion here. And will re-enable it
+> > once the root cause found.
+> > 
+> > Signed-off-by: Robin Gong <b38343@freescale.com>
+> > ---
+> >  arch/arm/boot/dts/imx6dl.dtsi | 16 ++++++++++++++++
+> >  1 file changed, 16 insertions(+)
+> > 
+> > diff --git a/arch/arm/boot/dts/imx6dl.dtsi b/arch/arm/boot/dts/imx6dl.dtsi
+> > index b453e0e..e84a1ff 100644
+> > --- a/arch/arm/boot/dts/imx6dl.dtsi
+> > +++ b/arch/arm/boot/dts/imx6dl.dtsi
+> > @@ -102,6 +102,22 @@
+> >  	};
+> >  };
+> >  
+> > +&ecspi1 {
+> > +	dma-names = "", "";
+> > +};
+> > +
+> > +&ecspi2 {
+> > +	dma-names = "", "";
+> > +};
+> > +
+> > +&ecspi3 {
+> > +	dma-names = "", "";
+> > +};
+> > +
+> > +&ecspi4 {
+> > +	dma-names = "", "";
+> > +};
+> > +
+> 
+> This looks odd.  Can we drop the dma properties from imx6qdl.dtsi,
+> and only add them in imx6q.dtsi instead?
+> 
+> Shawn
 >
->> On Wed, Aug 20, 2014 at 1:19 PM, Javier Martinez Canillas
->> <javier.martinez@collabora.co.uk> wrote:
->> >
->> > This is a second version of the series that adds max77802 support for
->> > the Peach Pit and Pi boards. The series also have all the pending
->> > patches that were posted but depended on this support. I've picked
->> > all the patches I found and rebased them to be sure that they apply
->> > cleanly on top of linux-next. Also I've taken some DT snippets from
->> > the downstream Chrome OS 3.8 kernel DTS for devices that use one of
->> > these regulators as their input supply.
->> >
->>
->> Any comments on this series?
->>
-> Looks good to me but I just wanted to get ack from chrome guy, Doug? But since
-> Naveen tested, it should be fine I think. I'll take the series.
-
-I haven't had crazy amounts of time to review pit/pi patches recently,
-but luckily Javier has been picking up my slack.  I think he's more of
-a maintainer for these file than I am at this point.
-
-...but I did do a quick skim / compare to our tree and found one small
-bug (see patch #1) and added my Reviewed-by tags.
-
--Doug
-
-
--Doug
+Ok, I'll send v2.
+> >  &hdmi {
+> >  	compatible = "fsl,imx6dl-hdmi";
+> >  };
+> > -- 
+> > 1.9.1
+> > 
