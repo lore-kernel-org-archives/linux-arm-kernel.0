@@ -1,143 +1,53 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Wed, 10 Sep 2014 18:21:05 +0100
-Subject: [PATCH v4 09/11] ARM64: kernel: add support for cpu cache
- information
-In-Reply-To: <20140910164147.GB1710@arm.com>
-References: <1409763617-17074-1-git-send-email-sudeep.holla@arm.com>
- <1409763617-17074-10-git-send-email-sudeep.holla@arm.com>
- <20140910164147.GB1710@arm.com>
-Message-ID: <54108881.6070202@arm.com>
+From: geoff@infradead.org (Geoff Levand)
+Date: Wed, 10 Sep 2014 10:23:57 -0700
+Subject: [PATCH 04/13] arm64: Add new hcall HVC_CALL_FUNC
+In-Reply-To: <20140910170740.GE1710@arm.com>
+References: <cover.1410302383.git.geoff@infradead.org>
+ <ea28cfef061d06e86704845a877802e057749b39.1410302383.git.geoff@infradead.org>
+ <20140910170740.GE1710@arm.com>
+Message-ID: <1410369837.11440.18.camel@smoke>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Will,
 
-Thanks for having a look this.
+On Wed, 2014-09-10 at 18:07 +0100, Will Deacon wrote:
+> On Tue, Sep 09, 2014 at 11:49:04PM +0100, Geoff Levand wrote:
+> > Add the new hcall HVC_CALL_FUNC that allows execution of a function at EL2.
+> > During CPU reset the CPU must be brought to the exception level it had on
+> > entry to the kernel.  The HVC_CALL_FUNC hcall will provide the mechanism
+> > needed for this exception level switch.
+> > 
+> > Signed-off-by: Geoff Levand <geoff@infradead.org>
+> > ---
+> >  arch/arm64/include/asm/virt.h | 11 +++++++++++
+> >  arch/arm64/kernel/hyp-stub.S  | 10 ++++++++++
+> >  2 files changed, 21 insertions(+)
+> 
+> [...]
+> 
+> > diff --git a/arch/arm64/kernel/hyp-stub.S b/arch/arm64/kernel/hyp-stub.S
+> > index 9ab5f70..a21cf51 100644
+> > --- a/arch/arm64/kernel/hyp-stub.S
+> > +++ b/arch/arm64/kernel/hyp-stub.S
+> > @@ -75,7 +75,17 @@ el1_sync:
+> >  1:	cmp	x10, #HVC_SET_VECTORS
+> >  	b.ne	1f
+> >  	msr	vbar_el2, x0
+> > +	b	2f
+> >  
+> > +1:	cmp	x10, #HVC_CALL_FUNC
+> > +	b.ne    1f
+> > +	mov	x29, lr
+> > +	mov	lr, x0
+> > +	mov	x0, x1
+> > +	mov	x1, x2
+> > +	mov	x2, x3
+> > +	blr	lr
+> > +	mov	lr, x29
+> 
+> Why are you clobbering x29?
 
-On 10/09/14 17:41, Will Deacon wrote:
-> Hi Sudeep,
->
-> On Wed, Sep 03, 2014 at 06:00:15PM +0100, Sudeep Holla wrote:
->> From: Sudeep Holla <sudeep.holla@arm.com>
->>
->> This patch adds support for cacheinfo on ARM64.
->>
->> On ARMv8, the cache hierarchy can be identified through Cache Level ID
->> (CLIDR) register while the cache geometry is provided by Cache Size ID
->> (CCSIDR) register.
->>
->> Since the architecture doesn't provide any way of detecting the cpus
->> sharing particular cache, device tree is used for the same purpose.
->
-> Out of interest, what's this actually for? Is there something useful in
-> userspace that will lap this out of sysfs? If so, it would be great if those
-> people could take these patches for a spin.
->
+I can change this to x28, unless you can recommend another?
 
-I am not aware how the userspace makes use of this information in
-particular. Since it's already part of cacheinfo ABI on other
-architectures, I am just making sure we present some sane value deriving
-it from DT on ARM{32,64} platforms. For sure lscpu uses it, not aware of
-any other application.
-
->> diff --git a/arch/arm64/kernel/cacheinfo.c b/arch/arm64/kernel/cacheinfo.c
->> new file mode 100644
->> index 000000000000..a9cbf3b40a1f
->> --- /dev/null
->> +++ b/arch/arm64/kernel/cacheinfo.c
->> @@ -0,0 +1,142 @@
->> +/*
->> + *  ARM64 cacheinfo support
->> + *
->> + *  Copyright (C) 2014 ARM Ltd.
->> + *  All Rights Reserved
->> + *
->> + * This program is free software; you can redistribute it and/or modify
->> + * it under the terms of the GNU General Public License version 2 as
->> + * published by the Free Software Foundation.
->> + *
->> + * This program is distributed "as is" WITHOUT ANY WARRANTY of any
->> + * kind, whether express or implied; without even the implied warranty
->> + * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
->> + * GNU General Public License for more details.
->> + *
->> + * You should have received a copy of the GNU General Public License
->> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
->> + */
->> +
->> +#include <linux/bitops.h>
->> +#include <linux/cacheinfo.h>
->> +#include <linux/cpu.h>
->> +#include <linux/compiler.h>
->> +#include <linux/of.h>
->> +
->> +#include <asm/processor.h>
->> +
->> +#define MAX_CACHE_LEVEL			7	/* Max 7 level supported */
->> +/* Ctypen, bits[3(n - 1) + 2 : 3(n - 1)], for n = 1 to 7 */
->> +#define CLIDR_CTYPE_SHIFT(level)	(3 * (level - 1))
->> +#define CLIDR_CTYPE_MASK(level)		(7 << CLIDR_CTYPE_SHIFT(level))
->> +#define CLIDR_CTYPE(clidr, level)	\
->> +	(((clidr) & CLIDR_CTYPE_MASK(level)) >> CLIDR_CTYPE_SHIFT(level))
->> +
->> +static inline enum cache_type get_cache_type(int level)
->> +{
->> +	u64 clidr;
->> +
->> +	if (level > MAX_CACHE_LEVEL)
->> +		return CACHE_TYPE_NOCACHE;
->> +	asm volatile ("mrs     %x0, clidr_el1" : "=r" (clidr));
->> +	return CLIDR_CTYPE(clidr, level);
->> +}
->> +
->> +/*
->> + * NumSets, bits[27:13] - (Number of sets in cache) - 1
->> + * Associativity, bits[12:3] - (Associativity of cache) - 1
->> + * LineSize, bits[2:0] - (Log2(Number of words in cache line)) - 2
->> + */
->> +#define CCSIDR_WRITE_THROUGH		BIT(31)
->> +#define CCSIDR_WRITE_BACK		BIT(30)
->> +#define CCSIDR_READ_ALLOCATE		BIT(29)
->> +#define CCSIDR_WRITE_ALLOCATE		BIT(28)
->> +#define CCSIDR_LINESIZE_MASK		0x7
->> +#define CCSIDR_ASSOCIATIVITY_SHIFT	3
->> +#define CCSIDR_ASSOCIATIVITY_MASK	0x3FF
->> +#define CCSIDR_NUMSETS_SHIFT		13
->> +#define CCSIDR_NUMSETS_MASK		0x7FF
->> +
->> +/*
->> + * Which cache CCSIDR represents depends on CSSELR value
->> + * Make sure no one else changes CSSELR during this
->> + * smp_call_function_single prevents preemption for us
->> + */
->> +static inline u32 get_ccsidr(u64 csselr)
->> +{
->> +	u64 ccsidr;
->> +
->> +	/* Put value into CSSELR */
->> +	asm volatile("msr csselr_el1, %x0" : : "r" (csselr));
->> +	isb();
->> +	/* Read result out of CCSIDR */
->> +	asm volatile("mrs %x0, ccsidr_el1" : "=r" (ccsidr));
->> +
->> +	return (u32)ccsidr;
->
-> Since you're using %x0, can you just make ccsidr a u32?
->
-
-This was suggested by MarkR, I think u32 should be fine for reading back
-ccsidr. IIRC his concern was more when writing cssselr as GCC might
-leave stale data in upper 32-bit if we use u32 for csselr but had
-suggested to change both.
-
-> Also, we have icache_get_ccsidr in kernel/cpuinfo.c already, as well as
-> some parsing constants in asm/cachetype.h. Can you try to clean up some of
-> the duplication/needless split please? (moving this helper and the #defines
-> out would be a good start).
->
-
-Agreed, I know and am already tracking recent changes from Ard, will
-clean up the duplication once it hits the mainline.
-
-Regards,
-Sudeep
+-Geoff
