@@ -1,116 +1,72 @@
-From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Wed, 10 Sep 2014 18:37:34 +0200
-Subject: [PATCH] ARM: dts: Specify default clocks for Exynos4 FIMC devices
-Message-ID: <1410367054-30926-1-git-send-email-s.nawrocki@samsung.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Wed, 10 Sep 2014 17:37:47 +0100
+Subject: [PATCH v10 08/10] OF: PCI: Add support for parsing PCI host
+ bridge resources from DT
+In-Reply-To: <20140910153233.GG27864@e106497-lin.cambridge.arm.com>
+References: <1410184472-17630-1-git-send-email-Liviu.Dudau@arm.com>
+ <1410184472-17630-9-git-send-email-Liviu.Dudau@arm.com>
+ <20140909133546.GB2636@e102568-lin.cambridge.arm.com>
+ <20140910142241.GD27864@e106497-lin.cambridge.arm.com>
+ <20140910151026.GB11640@e102568-lin.cambridge.arm.com>
+ <20140910153233.GG27864@e106497-lin.cambridge.arm.com>
+Message-ID: <20140910163746.GB19662@e102568-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The default mux and divider clocks are specified in device tree
-so that the FIMC devices in Exynos4210 and Exynos4x12 SoCs are
-clocked from recommended clock source and with maximum supported
-frequency. If needed these settings could be overrode in board
-specific dts files, however they are in practice optimal in most
-cases.
+On Wed, Sep 10, 2014 at 04:32:33PM +0100, Liviu Dudau wrote:
 
-Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
----
- arch/arm/boot/dts/exynos4210.dtsi |   16 ++++++++++++++++
- arch/arm/boot/dts/exynos4x12.dtsi |   16 ++++++++++++++++
- 2 files changed, 32 insertions(+)
+[...]
 
-diff --git a/arch/arm/boot/dts/exynos4210.dtsi b/arch/arm/boot/dts/exynos4210.dtsi
-index 807bb5b..0969d2e 100644
---- a/arch/arm/boot/dts/exynos4210.dtsi
-+++ b/arch/arm/boot/dts/exynos4210.dtsi
-@@ -154,18 +154,30 @@
- 			samsung,pix-limits = <4224 8192 1920 4224>;
- 			samsung,mainscaler-ext;
- 			samsung,cam-if;
-+			assigned-clocks = <&clock CLK_MOUT_FIMC0>,
-+					<&clock CLK_SCLK_FIMC0>;
-+			assigned-clock-parents = <&clock CLK_SCLK_MPLL>;
-+			assigned-clock-rates = <0>, <160000000>;
- 		};
- 
- 		fimc_1: fimc at 11810000 {
- 			samsung,pix-limits = <4224 8192 1920 4224>;
- 			samsung,mainscaler-ext;
- 			samsung,cam-if;
-+			assigned-clocks = <&clock CLK_MOUT_FIMC1>,
-+					<&clock CLK_SCLK_FIMC1>;
-+			assigned-clock-parents = <&clock CLK_SCLK_MPLL>;
-+			assigned-clock-rates = <0>, <160000000>;
- 		};
- 
- 		fimc_2: fimc at 11820000 {
- 			samsung,pix-limits = <4224 8192 1920 4224>;
- 			samsung,mainscaler-ext;
- 			samsung,lcd-wb;
-+			assigned-clocks = <&clock CLK_MOUT_FIMC2>,
-+					<&clock CLK_SCLK_FIMC2>;
-+			assigned-clock-parents = <&clock CLK_SCLK_MPLL>;
-+			assigned-clock-rates = <0>, <160000000>;
- 		};
- 
- 		fimc_3: fimc at 11830000 {
-@@ -173,6 +185,10 @@
- 			samsung,rotators = <0>;
- 			samsung,mainscaler-ext;
- 			samsung,lcd-wb;
-+			assigned-clocks = <&clock CLK_MOUT_FIMC3>,
-+					<&clock CLK_SCLK_FIMC3>;
-+			assigned-clock-parents = <&clock CLK_SCLK_MPLL>;
-+			assigned-clock-rates = <0>, <160000000>;
- 		};
- 	};
- };
-diff --git a/arch/arm/boot/dts/exynos4x12.dtsi b/arch/arm/boot/dts/exynos4x12.dtsi
-index 861bb91..38ba14f 100644
---- a/arch/arm/boot/dts/exynos4x12.dtsi
-+++ b/arch/arm/boot/dts/exynos4x12.dtsi
-@@ -162,6 +162,10 @@
- 			samsung,mainscaler-ext;
- 			samsung,isp-wb;
- 			samsung,cam-if;
-+			assigned-clocks = <&clock CLK_MOUT_FIMC0>,
-+					<&clock CLK_SCLK_FIMC0>;
-+			assigned-clock-parents = <&clock CLK_MOUT_MPLL_USER_T>;
-+			assigned-clock-rates = <0>, <176000000>;
- 		};
- 
- 		fimc_1: fimc at 11810000 {
-@@ -170,6 +174,10 @@
- 			samsung,mainscaler-ext;
- 			samsung,isp-wb;
- 			samsung,cam-if;
-+			assigned-clocks = <&clock CLK_MOUT_FIMC1>,
-+					<&clock CLK_SCLK_FIMC1>;
-+			assigned-clock-parents = <&clock CLK_MOUT_MPLL_USER_T>;
-+			assigned-clock-rates = <0>, <176000000>;
- 		};
- 
- 		fimc_2: fimc at 11820000 {
-@@ -179,6 +187,10 @@
- 			samsung,isp-wb;
- 			samsung,lcd-wb;
- 			samsung,cam-if;
-+			assigned-clocks = <&clock CLK_MOUT_FIMC2>,
-+					<&clock CLK_SCLK_FIMC2>;
-+			assigned-clock-parents = <&clock CLK_MOUT_MPLL_USER_T>;
-+			assigned-clock-rates = <0>, <176000000>;
- 		};
- 
- 		fimc_3: fimc at 11830000 {
-@@ -188,6 +200,10 @@
- 			samsung,mainscaler-ext;
- 			samsung,isp-wb;
- 			samsung,lcd-wb;
-+			assigned-clocks = <&clock CLK_MOUT_FIMC3>,
-+					<&clock CLK_SCLK_FIMC3>;
-+			assigned-clock-parents = <&clock CLK_MOUT_MPLL_USER_T>;
-+			assigned-clock-rates = <0>, <176000000>;
- 		};
- 
- 		fimc_lite_0: fimc-lite at 12390000 {
--- 
-1.7.9.5
+> > > > > +		/*
+> > > > > +		 * If we failed translation or got a zero-sized region
+> > > > > +		 * then skip this range
+> > > > > +		 */
+> > > > > +		if (range.cpu_addr == OF_BAD_ADDR || range.size == 0)
+> > > > > +			continue;
+> > > > > +
+> > > > > +		res = kzalloc(sizeof(struct resource), GFP_KERNEL);
+> > > > > +		if (!res) {
+> > > > > +			err = -ENOMEM;
+> > > > > +			goto parse_failed;
+> > > > > +		}
+> > > > > +
+> > > > > +		err = of_pci_range_to_resource(&range, dev, res);
+> > > > > +		if (err) {
+> > > > > +			kfree(res);
+> > > > 
+> > > > You might want to add a label to free res to make things more uniform.
+> 
+> Sorry, not following you. How would a label help here?
+
+It was just a suggestion so ignore it if you do not think it is cleaner.
+It is to make code more uniform and undo operations in one place instead of
+doing it piecemeal (you kfree the res here and jump to complete the clean-up,
+whereas you might want to add a different label and a different goto
+destination and carry out the kfree there).
+
+I do not mind either, it is just what I noticed.
+
+> > > > > +			goto parse_failed;
+> > > > > +		}
+> > > > > +
+> > > > > +		if (resource_type(res) == IORESOURCE_IO) {
+> > > > > +			if (*io_base)
+> > > > 
+> > > > You do not zero io_base in the first place so you should ask the API
+> > > > user to do that. Is 0 a valid value BTW ? If it is you've got to resort
+> > > > to something else to detect multiple IO resources.
+> 
+> No, zero is not a valid value. It is the cpu_addr value from the IO range, I'm
+> hopying that no one is crazy enough to map PCI address space at CPU address zero.
+> Thanks for spotting the lack of initialisation though, I need to fix it.
+
+Mmm...wasn't a trick question sorry :D
+
+PCI host bridge /pci ranges:
+   IO 0x00000000..0x0000ffff -> 0x00000000
+   More than one I/O resource converted. CPU offset for old range lost!
+     MEM 0x41000000..0x7fffffff -> 0x41000000
+     pci-host-generic 40000000.pci: PCI host bridge to bus 0000:00
+     pci_bus 0000:00: root bus resource [bu-01]
+     pci_bus 0000:00: root bus resource [io  0x0000-0xffff]
+     pci_bus 0000:00: root bus resource [mem 0x41000000-0x7fffffff]
