@@ -1,44 +1,33 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 10 Sep 2014 09:47:05 +0100
-Subject: [PATCHv4 2/2] arm64: Add CONFIG_DEBUG_SET_MODULE_RONX support
-In-Reply-To: <CAMDttNf9nWutGNVT8f+f99SX8WtDNSBDN4uvpS+oJKNMdXs7xQ@mail.gmail.com>
-References: <1408477303-2640-1-git-send-email-lauraa@codeaurora.org>
- <1408477303-2640-3-git-send-email-lauraa@codeaurora.org>
- <20140826144023.GA22256@localhost> <540493DC.20909@codeaurora.org>
- <20140901154529.GF24594@arm.com>
- <CAMDttNf9nWutGNVT8f+f99SX8WtDNSBDN4uvpS+oJKNMdXs7xQ@mail.gmail.com>
-Message-ID: <20140910084705.GB28488@arm.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Wed, 10 Sep 2014 11:55:31 +0300
+Subject: [periperi] How to set default GPIO pin ?
+In-Reply-To: <8738cc0vx9.wl%kuninori.morimoto.gx@gmail.com>
+References: <8738cc0vx9.wl%kuninori.morimoto.gx@gmail.com>
+Message-ID: <2862746.g5u9pdpKDi@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 10, 2014 at 04:58:01AM +0100, Zi Shen Lim wrote:
-> On Mon, Sep 1, 2014 at 8:45 AM, Will Deacon <will.deacon@arm.com> wrote:
-> > On Mon, Sep 01, 2014 at 04:42:20PM +0100, Laura Abbott wrote:
-> >> On 8/26/2014 7:40 AM, Catalin Marinas wrote:
-> >> > On Tue, Aug 19, 2014 at 08:41:43PM +0100, Laura Abbott wrote:
-> >> >> --- /dev/null
-> >> >> +++ b/arch/arm64/mm/pageattr.c
-> >> > [...]
-> >> >> +static int change_memory_common(unsigned long addr, int numpages,
-> >> >> +                          pgprot_t set_mask, pgprot_t clear_mask)
-> >> >> +{
-> >> >> +  unsigned long start = addr;
-> >> >> +  unsigned long size = PAGE_SIZE*numpages;
-> >> >> +  unsigned long end = start + size;
-> >> >> +  int ret;
-> >> >> +  struct page_change_data data;
-> >> >> +
-> >> >> +  if (!IS_ALIGNED(addr, PAGE_SIZE)) {
-> >> >> +          addr &= PAGE_MASK;
+Hi Morimoto-san,
+
+(Moving this thread to linux-sh and linux-arm and CC'ing Linus Walleij)
+
+On Sunday 31 August 2014 22:08:52 Kuninori Morimoto wrote:
 > 
-> I don't see any uses of addr after this.
-> Perhaps we also meant to compute start and end?
+> I know we can use "defalt" PFC settings on DT.
+> But, how to use "defalt" GPIO pin settings on DT ?
+> 
+> We would like to use GPIO 7-17 as Low output,
+> and do nothing after boot.
 
+>From a DT point of view I believe this is supposed to be done by specifying 
+the output-low or output-high properties in the pinctrl configuration node. 
+However, these properties are not supported by the PFC driver, and there's no 
+easy way for the PFC driver to configure GPIOs handled by a different driver 
+such as the gpio-rcar driver for instance.
 
-Actually, I think the alignment fixup should just be performed directly on
-start, but this is Laura's code so it would be good if she could confirm.
+Linus, do you have any hindsight on how this should be implemented ?
 
-Laura -- what's the right thing to do here? (sending a fix patch would be
-ideal :)
+-- 
+Regards,
 
-Will
+Laurent Pinchart
