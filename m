@@ -1,49 +1,65 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Mon, 8 Sep 2014 02:30:51 -0700
-Subject: [PATCH] arm64: LLVMLinux: Fix inline arm64 assembly for use with
- clang
-In-Reply-To: <1409959460-15989-1-git-send-email-behanw@converseincode.com>
-References: <1409959460-15989-1-git-send-email-behanw@converseincode.com>
-Message-ID: <20140908093051.GA12657@localhost>
+From: dianders@chromium.org (Doug Anderson)
+Date: Wed, 10 Sep 2014 09:03:52 -0700
+Subject: Unable to boot mainline on snow chromebook since 3.15
+In-Reply-To: <20140910111728.GG28488@arm.com>
+References: <20140905122232.GP13515@arm.com>
+ <CAD=FV=VfioJf9VYoSYL0QBk-bN93-Ecx3=0n9hb5Q4rcx43-_g@mail.gmail.com>
+ <540C202E.2060009@collabora.co.uk> <540C7F5B.6070307@gmail.com>
+ <540C83DE.10505@collabora.co.uk> <540C8577.2070907@gmail.com>
+ <20140908112112.GK26030@arm.com>
+ <CACxGe6v40wMSW8LJRtyZ3C6PinRMcQM-Zog+XpTJ-QG3HHJknw@mail.gmail.com>
+ <20140908134937.GK4015@sirena.org.uk>
+ <540DB7B4.4060300@collabora.co.uk> <20140910111728.GG28488@arm.com>
+Message-ID: <CAD=FV=Uf+4=mcwMM8qhx4r9WzcKZkgwHjUR26wnvPJJzDvmvSg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 05, 2014 at 04:24:20PM -0700, behanw at converseincode.com wrote:
-> From: Mark Charlebois <charlebm@gmail.com>
-> 
-> Fix variable types for 64-bit inline assembly.
-> 
-> This patch now works with both gcc and clang.
-> 
-> Signed-off-by: Mark Charlebois <charlebm@gmail.com>
-> Signed-off-by: Behan Webster <behanw@converseincode.com>
-> ---
->  arch/arm64/include/asm/arch_timer.h | 26 +++++++++++++++-----------
->  arch/arm64/include/asm/uaccess.h    |  2 +-
->  arch/arm64/kernel/debug-monitors.c  |  8 ++++----
->  arch/arm64/kernel/perf_event.c      | 34 +++++++++++++++++-----------------
->  arch/arm64/mm/mmu.c                 |  2 +-
->  5 files changed, 38 insertions(+), 34 deletions(-)
-> 
-> diff --git a/arch/arm64/include/asm/arch_timer.h b/arch/arm64/include/asm/arch_timer.h
-> index 9400596..c1f87e0 100644
-> --- a/arch/arm64/include/asm/arch_timer.h
-> +++ b/arch/arm64/include/asm/arch_timer.h
-> @@ -37,19 +37,23 @@ void arch_timer_reg_write_cp15(int access, enum arch_timer_reg reg, u32 val)
->  	if (access == ARCH_TIMER_PHYS_ACCESS) {
->  		switch (reg) {
->  		case ARCH_TIMER_REG_CTRL:
-> -			asm volatile("msr cntp_ctl_el0,  %0" : : "r" (val));
-> +			asm volatile("msr cntp_ctl_el0,  %0"
-> +				: : "r" ((u64)val));
+Will,
 
-Ick. Care to elaborate in the patch description why this is needed with
-LLVM? It's really messy and very annoying having to cast register values
-every time they're passed in, instead of the compiler handling it for you.
+On Wed, Sep 10, 2014 at 4:17 AM, Will Deacon <will.deacon@arm.com> wrote:
+> On Mon, Sep 08, 2014 at 03:05:40PM +0100, Javier Martinez Canillas wrote:
+>> Hello Will,
+>
+> Hi Javier,
+>
+>> Since many folks don't agree that hacking different subsystems is the way
+>> forward I'll hold the patches and don't post them. The sunxi thread [0]
+>> already shows how different people have strong opposite positions on the
+>> correct approach to handle this.
+>>
+>> For now you can just disable the tps65090 PMIC support by not enabling the
+>> CONFIG_REGULATOR_TPS65090 kconfig symbol on your kernel config. That will give
+>> you exactly the same behavior that before tps65090 support was added to the
+>> Snow DT on commit b16be76 ("ARM: dts: add tps65090 power regulator for
+>> exynos5250-snow") which AFAIU was good enough for your workflow.
+>
+> Disabling the regulator support gives me my framebuffer back, thanks.
 
-Is there a way to catch this with GCC? If not, I expect you to get broken
-all the time on this by people who don't notice.
+Yay!  Is this good enough to tide you over until DRM support lands?
 
 
+> I
+> then get stuck mounting my root filesystem over sd card because it's
+> reported as read-only. The following hack solved the issue, but I'm not
+> exactly sure where this regression has come from (whether this is a board
+> quirk or pinctrl is really misconfigured).
 
--Olof
+This is a regression that was introduced by:
+
+9795a84 mmc: dw_mmc: remove dw_mci_of_cd_gpio/wp_gpio()
+
+In "exynos5250-cros-common.dtsi" you can see that the "wp-gpios =
+<&gpc2 1 0>;" is still listed under the slot node.  Nobody is looking
+there anymore.
+
+This is fixed in linux-next by:
+
+aaa25a5 ARM: dts: unuse the slot-node and deprecate the
+supports-highspeed for dw-mmc in exynos
+
+
+I'll let Kukjin decide what he wants to do about the regression in
+v3.17 (how to deal with conflicts, backporting, etc).
+
+
+-Doug
