@@ -1,58 +1,243 @@
-From: m-karicheri2@ti.com (Murali Karicheri)
-Date: Wed, 10 Sep 2014 10:28:32 -0400
-Subject: [PATCH v2 2/2] PCI: keystone: update to support multiple pci ports
-In-Reply-To: <3814561.AbrslYBNjb@wuerfel>
-References: <1410293835-13050-1-git-send-email-m-karicheri2@ti.com>
- <3967092.l9bxcqMaSa@wuerfel> <540F8425.70304@ti.com>
- <3814561.AbrslYBNjb@wuerfel>
-Message-ID: <54106010.8040206@ti.com>
+From: cov@codeaurora.org (Christopher Covington)
+Date: Wed, 10 Sep 2014 10:31:39 -0400
+Subject: [PATCH 18/24] ARM64: Add vdso for ILP32 and use it for the signal
+ return
+In-Reply-To: <1409779158-30963-19-git-send-email-apinski@cavium.com>
+References: <1409779158-30963-1-git-send-email-apinski@cavium.com>
+ <1409779158-30963-19-git-send-email-apinski@cavium.com>
+Message-ID: <541060CB.6000402@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/10/2014 04:22 AM, Arnd Bergmann wrote:
-> On Tuesday 09 September 2014 18:50:13 Murali Karicheri wrote:
->> My mistake. It is the device ID, not vendor ID. The PCI driver supports
->> PCI h/w on K2HK, K2E and K2L SoCs for which PCI device IDs are assigned as
->>
->> +#define PCIE_RC_K2HK           0xb008
->> +#define PCIE_RC_K2E            0xb009
->> +#define PCIE_RC_K2L            0xb00a
->> +
->>
->> and the same driver code runs on all these h/w. The device ID is not
->> filled in by default by the h/w, in the config space of the RC at offset
->> 1000h "VENDOR_DEVICE_ID Vendor and Device Identification Register".
->> Same is available in a seperate SoC register whose offset is specified
->> by index 2. This is read by driver and updated in the config space. The
->> Vendor ID is however set by default.
->>
->> There is a mrrs PCI quirk required for Keystone PCI which depends on
->> this vendor ID to be filled correctly as it match vendor id/ device id
->> of the bridge device to apply the quirk.
->>
->> Hope this clarify your question.
->
-> Ok, I understand now. Yes, this makes sense, though I wonder if it would
-> have been easier to handle the quirk in a different way based on the
-> driver rather than the PCI ID. It's probably not worth revisiting though,
-> unless Bjorn wants to see it done differently now.
+Hi Andrew,
 
-Bjorn has reviewed the quirk patch and wanted to check the device ID and 
-vendor ID to avoid applying the quirck when bridge is non TI and same 
-device ID.
+On 09/03/2014 05:19 PM, Andrew Pinski wrote:
+> This patch adds the VDSO for ILP32. We need to use a different
+> VDSO than LP64 since ILP32 uses ELF32 while LP64 uses ELF64.
+> 
+> After this patch, signal handling works mostly.  In that signals
+> go through their action and then returned correctly.
+> 
+> Signed-off-by: Andrew Pinski <apinski@cavium.com>
+> ---
+>  arch/arm64/include/asm/vdso.h                 |    4 +
+>  arch/arm64/kernel/Makefile                    |    5 +
+>  arch/arm64/kernel/signal.c                    |    4 +
+>  arch/arm64/kernel/vdso-ilp32/.gitignore       |    2 +
+>  arch/arm64/kernel/vdso-ilp32/Makefile         |   72 ++++++++++++++++++
+>  arch/arm64/kernel/vdso-ilp32/vdso-ilp32.S     |   33 ++++++++
+>  arch/arm64/kernel/vdso-ilp32/vdso-ilp32.lds.S |   98 +++++++++++++++++++++++++
+>  arch/arm64/kernel/vdso.c                      |   69 ++++++++++++++---
+>  8 files changed, 274 insertions(+), 13 deletions(-)
+>  create mode 100644 arch/arm64/kernel/vdso-ilp32/.gitignore
+>  create mode 100644 arch/arm64/kernel/vdso-ilp32/Makefile
+>  create mode 100644 arch/arm64/kernel/vdso-ilp32/vdso-ilp32.S
+>  create mode 100644 arch/arm64/kernel/vdso-ilp32/vdso-ilp32.lds.S
+> 
+> diff --git a/arch/arm64/include/asm/vdso.h b/arch/arm64/include/asm/vdso.h
+> index 839ce00..84050c6 100644
+> --- a/arch/arm64/include/asm/vdso.h
+> +++ b/arch/arm64/include/asm/vdso.h
+> @@ -29,6 +29,10 @@
+>  
+>  #include <generated/vdso-offsets.h>
+>  
+> +#ifdef CONFIG_ARM64_ILP32
+> +#include <generated/vdso-ilp32-offsets.h>
+> +#endif
+> +
+>  #define VDSO_SYMBOL(base, name)						   \
+>  ({									   \
+>  	(void *)(vdso_offset_##name - VDSO_LBASE + (unsigned long)(base)); \
+> diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
+> index 6de85f5..dcb9033 100644
+> --- a/arch/arm64/kernel/Makefile
+> +++ b/arch/arm64/kernel/Makefile
+> @@ -31,6 +31,7 @@ arm64-obj-$(CONFIG_KGDB)		+= kgdb.o
+>  arm64-obj-$(CONFIG_EFI)			+= efi.o efi-stub.o efi-entry.o
+>  
+>  obj-y					+= $(arm64-obj-y) vdso/
+> +obj-$(CONFIG_ARM64_ILP32)		+= vdso-ilp32/
+>  obj-m					+= $(arm64-obj-m)
+>  head-y					:= head.o
+>  extra-y					:= $(head-y) vmlinux.lds
+> @@ -38,3 +39,7 @@ extra-y					:= $(head-y) vmlinux.lds
+>  # vDSO - this must be built first to generate the symbol offsets
+>  $(call objectify,$(arm64-obj-y)): $(obj)/vdso/vdso-offsets.h
+>  $(obj)/vdso/vdso-offsets.h: $(obj)/vdso
+> +
+> +# vDSO - this must be built first to generate the symbol offsets
+> +$(call objectify,$(arm64-obj-y)): $(obj)/vdso-ilp32/vdso-ilp32-offsets.h
+> +$(obj)/vdso-ilp32/vdso-ilp32-offsets.h: $(obj)/vdso-ilp32
+> diff --git a/arch/arm64/kernel/signal.c b/arch/arm64/kernel/signal.c
+> index f47c064..5311147 100644
+> --- a/arch/arm64/kernel/signal.c
+> +++ b/arch/arm64/kernel/signal.c
+> @@ -242,6 +242,10 @@ static void setup_return(struct pt_regs *regs, struct k_sigaction *ka,
+>  
+>  	if (ka->sa.sa_flags & SA_RESTORER)
+>  		sigtramp = ka->sa.sa_restorer;
+> +#ifdef CONFIG_ARM64_ILP32
+> +	else if (is_ilp32_compat_task())
+> +		sigtramp = VDSO_SYMBOL(current->mm->context.vdso, sigtramp_ilp32);
+> +#endif
+>  	else
+>  		sigtramp = VDSO_SYMBOL(current->mm->context.vdso, sigtramp);
 
-So support for two PCI port requires only the PCI device id related 
-change. So I will modify the subject and commit log to reflect the same 
-and re-send the patch.
+In my opinion, moving the ifdef around the definition of
+is_ilp32_compat_task() would make the code easier to read and maintain.
 
-Thanks again Arnd for your comments.
+> diff --git a/arch/arm64/kernel/vdso.c b/arch/arm64/kernel/vdso.c
+> index a777ac3..21b3726 100644
+> --- a/arch/arm64/kernel/vdso.c
+> +++ b/arch/arm64/kernel/vdso.c
+> @@ -41,6 +41,12 @@ extern char vdso_start, vdso_end;
+>  static unsigned long vdso_pages;
+>  static struct page **vdso_pagelist;
+>  
+> +#ifdef CONFIG_ARM64_ILP32
+> +extern char vdso_ilp32_start, vdso_ilp32_end;
+> +static unsigned long vdso_ilp32_pages;
+> +static struct page **vdso_ilp32_pagelist;
+> +#endif
+> +
+>  /*
+>   * The vDSO data page.
+>   */
+> @@ -110,24 +116,31 @@ int aarch32_setup_vectors_page(struct linux_binprm *bprm, int uses_interp)
+>  }
+>  #endif /* CONFIG_AARCH32_EL0 */
+>  
+> -static struct vm_special_mapping vdso_spec[2];
+> +static struct vm_special_mapping vdso_spec[2][2];
+>  
+> -static int __init vdso_init(void)
+> +static inline int __init vdso_init_common(char *vdso_start, char *vdso_end,
+> +					  unsigned long *vdso_pagesp,
+> +					  struct page ***vdso_pagelistp,
+> +					  bool ilp32)
+>  {
+>  	int i;
+> +	unsigned long vdso_pages;
+> +	struct page **vdso_pagelist;
+>  
+> -	if (memcmp(&vdso_start, "\177ELF", 4)) {
+> +	if (memcmp(vdso_start, "\177ELF", 4)) {
+>  		pr_err("vDSO is not a valid ELF object!\n");
+>  		return -EINVAL;
+>  	}
+>  
+> -	vdso_pages = (&vdso_end - &vdso_start) >> PAGE_SHIFT;
+> +	vdso_pages = (vdso_end - vdso_start) >> PAGE_SHIFT;
+> +	*vdso_pagesp = vdso_pages;
+>  	pr_info("vdso: %ld pages (%ld code @ %p, %ld data @ %p)\n",
+> -		vdso_pages + 1, vdso_pages, &vdso_start, 1L, vdso_data);
+> +		vdso_pages + 1, vdso_pages, vdso_start, 1L, vdso_data);
+>  
+>  	/* Allocate the vDSO pagelist, plus a page for the data. */
+>  	vdso_pagelist = kcalloc(vdso_pages + 1, sizeof(struct page *),
+>  				GFP_KERNEL);
+> +	*vdso_pagelistp = vdso_pagelist;
+>  	if (vdso_pagelist == NULL)
+>  		return -ENOMEM;
+>  
+> @@ -136,33 +149,63 @@ static int __init vdso_init(void)
+>  
+>  	/* Grab the vDSO code pages. */
+>  	for (i = 0; i < vdso_pages; i++)
+> -		vdso_pagelist[i + 1] = virt_to_page(&vdso_start + i * PAGE_SIZE);
+> +		vdso_pagelist[i + 1] = virt_to_page(vdso_start + i * PAGE_SIZE);
+>  
+>  	/* Populate the special mapping structures */
+> -	vdso_spec[0] = (struct vm_special_mapping) {
+> +	vdso_spec[ilp32][0] = (struct vm_special_mapping) {
+>  		.name	= "[vvar]",
+>  		.pages	= vdso_pagelist,
+>  	};
+>  
+> -	vdso_spec[1] = (struct vm_special_mapping) {
+> +	vdso_spec[ilp32][1] = (struct vm_special_mapping) {
+>  		.name	= "[vdso]",
+>  		.pages	= &vdso_pagelist[1],
+>  	};
+>  
+>  	return 0;
+>  }
+> +
+> +static int __init vdso_init(void)
+> +{
+> +	return vdso_init_common(&vdso_start, &vdso_end,
+> +				&vdso_pages, &vdso_pagelist, 0);
+> +}
+>  arch_initcall(vdso_init);
+>  
+> +#ifdef CONFIG_ARM64_ILP32
+> +static int __init vdso_ilp32_init(void)
+> +{
+> +	return vdso_init_common(&vdso_ilp32_start, &vdso_ilp32_end,
+> +				&vdso_ilp32_pages, &vdso_ilp32_pagelist, 1);
+> +}
+> +arch_initcall(vdso_ilp32_init);
+> +#endif
+> +
+>  int arch_setup_additional_pages(struct linux_binprm *bprm,
+>  				int uses_interp)
+>  {
+>  	struct mm_struct *mm = current->mm;
+>  	unsigned long vdso_base, vdso_text_len, vdso_mapping_len;
+>  	void *ret;
+> -
+> -	vdso_text_len = vdso_pages << PAGE_SHIFT;
+> +	struct page **pagelist;
+> +	unsigned long pages;
+> +	bool ilp32;
+> +
+> +#ifdef CONFIG_ARM64_ILP32
+> +	ilp32 = is_ilp32_compat_task();
+> +	if (is_ilp32_compat_task()) {
+> +		pages = vdso_ilp32_pages;
+> +		pagelist = vdso_ilp32_pagelist;
+> +	} else
+> +#endif
+
+Same
+
+> +	{
+> +		ilp32 = false;
+> +		pages = vdso_pages;
+> +		pagelist = vdso_pagelist;
+> +	}
+> +	vdso_text_len = pages << PAGE_SHIFT;
+>  	/* Be sure to map the data page */
+> -	vdso_mapping_len = vdso_text_len + PAGE_SIZE;
+> +	vdso_mapping_len = (pages + 1) << PAGE_SHIFT;
+>  
+>  	down_write(&mm->mmap_sem);
+>  	vdso_base = get_unmapped_area(NULL, 0, vdso_mapping_len, 0, 0);
+> @@ -172,7 +215,7 @@ int arch_setup_additional_pages(struct linux_binprm *bprm,
+>  	}
+>  	ret = _install_special_mapping(mm, vdso_base, PAGE_SIZE,
+>  				       VM_READ|VM_MAYREAD,
+> -				       &vdso_spec[0]);
+> +				       &vdso_spec[ilp32][0]);
+>  	if (IS_ERR(ret))
+>  		goto up_fail;
+>  
+> @@ -181,7 +224,7 @@ int arch_setup_additional_pages(struct linux_binprm *bprm,
+>  	ret = _install_special_mapping(mm, vdso_base, vdso_text_len,
+>  				       VM_READ|VM_EXEC|
+>  				       VM_MAYREAD|VM_MAYWRITE|VM_MAYEXEC,
+> -				       &vdso_spec[1]);
+> +				       &vdso_spec[ilp32][1]);
+>  	if (IS_ERR(ret))
+>  		goto up_fail;
+>  
+> 
 
 Regards,
+Christopher
 
-Murali
->
-> 	Arnd
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+-- 
+Employee of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by the Linux Foundation.
