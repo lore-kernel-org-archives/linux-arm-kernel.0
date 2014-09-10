@@ -1,75 +1,79 @@
-From: yao.yuan@freescale.com (Yao Yuan)
-Date: Wed, 10 Sep 2014 14:48:01 +0000
-Subject: [PATCH v7 1/2] i2c: imx: add DMA support for freescale i2c driver
-In-Reply-To: <201409051240.44469.marex@denx.de>
-References: <1407923215-3749-1-git-send-email-yao.yuan@freescale.com>
- <201409041638.45537.marex@denx.de>
- <c10c1960255e4dbca2a281b995290c6d@BL2PR03MB338.namprd03.prod.outlook.com>
- <201409051240.44469.marex@denx.de>
-Message-ID: <1410360473732.53953@freescale.com>
+From: david@protonic.nl (David Jander)
+Date: Wed, 10 Sep 2014 16:49:20 +0200
+Subject: gcc 4.8.3 miscompiles drivers/net/ethernet/freescale/fec_main.c ?!
+In-Reply-To: <21520.17620.519242.597681@gargle.gargle.HOWL>
+References: <20140910110943.3673dbb4@archvile>
+ <21520.17620.519242.597681@gargle.gargle.HOWL>
+Message-ID: <20140910164920.3c448b40@archvile>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday, September 05, 2014 6:41 PM, Marek Vasut wrote:
-> On Friday, September 05, 2014 at 12:32:40 PM, Yao Yuan wrote:
-> [...]
-> > > > +static int i2c_imx_dma_write(struct imx_i2c_struct *i2c_imx,
-> > > > +					struct i2c_msg *msgs)
-> > > > +{
-> > > > +	int result;
-> > > > +	unsigned int temp = 0;
-> > > > +	unsigned long orig_jiffies = jiffies;
-> > > > +	struct imx_i2c_dma *dma = i2c_imx->dma;
-> > > > +	struct device *dev = &i2c_imx->adapter.dev;
-> > > > +
-> > > > +	dev_dbg(dev, "<%s> write slave address: addr=0x%x\n",
-> > > > +		__func__, msgs->addr << 1);
-> > > > +
-> > > > +	reinit_completion(&i2c_imx->dma->cmd_complete);
-> > > > +	dma->chan_using = dma->chan_tx;
-> > > > +	dma->dma_transfer_dir = DMA_MEM_TO_DEV;
-> > > > +	dma->dma_data_dir = DMA_TO_DEVICE;
-> > > > +	dma->dma_len = msgs->len - 1;
-> > > > +	result = i2c_imx_dma_xfer(i2c_imx, msgs);
-> > > > +	if (result)
-> > > > +		return result;
-> > > > +
-> > > > +	temp = imx_i2c_read_reg(i2c_imx, IMX_I2C_I2CR);
-> > > > +	temp |= I2CR_DMAEN;
-> > > > +	imx_i2c_write_reg(temp, i2c_imx, IMX_I2C_I2CR);
-> > > > +
-> > > > +	/*
-> > > > +	 * Write slave address.
-> > > > +	 * The first byte muse be transmitted by the CPU.
-> > > > +	 */
-> > > > +	imx_i2c_write_reg(msgs->addr << 1, i2c_imx, IMX_I2C_I2DR);
-> > > > +	result = wait_for_completion_interruptible_timeout(
-> > > > +				&i2c_imx->dma->cmd_complete,
-> > > > +				msecs_to_jiffies(IMX_I2C_DMA_TIMEOUT));
-> > > > +	if (result <= 0) {
-> > > > +		dmaengine_terminate_all(dma->chan_using);
-> > > > +		if (result)
-> > > > +			return result;
-> > > > +		else
-> > > > +			return -ETIMEDOUT;
-> > >
-> > > Shouldn't you force-disable the DMA here somehow (like unsetting
-> > > I2CR_DMAEN bit), if it failed or timed out?
-> >
-> > [Yuan Yao] Yes, I put the code for force-disable DMA in i2c_imx_start().
-> > In order to make sure any DMA error will not effect the I2C.
-> > It seems almost the same as put the code here, how about your think?
-> 
-> Would that mean that the "crashed" DMA would be running until the next
-> transmission is scheduled ?
-> 
-[Yuan Yao] No, In fact any DMA timeout will result the failure of I2C transmission
-and then it will turn to report the exception and wait for next transmission.
-The only thing I worried about is I2C may still receive some feedbacks after DMA timeout.
-In this case the feedbacks may lead to abnormal state in PIO mode.But it will be ignored
-in DMA model.
-That's why I tend to delay force-disable DMA until the next transmission begin.
-Could you please give me some suggestion?
 
-Thanks & Best regards,
-Yuan Yao
+(included Michael Olbrich in CC)...
+
+On Wed, 10 Sep 2014 14:32:20 +0200
+Mikael Pettersson <mikpelinux@gmail.com> wrote:
+
+> David Jander writes:
+>  > 
+>  > Hi,
+>  > 
+>  > I am seeing a strange problem when building a recent kernel with
+>  > gcc-4.8.3 for armv7-a that contains the following patch:
+>  > 
+>  > https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit?id=bfd4ecdd87d350e19457fe0d02fa1e046774c44e
+>  > 
+>  > Unfortunately I am not good enough at reading ARM assembly output from
+>  > GCC to understand whats going wrong, so I am asking for help.
+>  > 
+>  > I started noticing ethernet packet loss on a i.MX6 board after upgrading
+>  > the kernel from 3.16-rc-something to latest mainline. The problem is very
+>  > easy to reproduce so I started git-bisecting. Git bisect gave me the
+>  > above patch as the culprit, and indeed: Without the patch a flood-ping
+>  > goes fine (just one dot on screen, no lost packets). I apply the patch
+>  > and the dots start filling the screen instantly.
+>  > 
+>  > I am compiling the kernel using Pengutronix's OSELAS toolchain version
+>  > 2013.12.1, which is based on linaro gcc-4.8.3 without any relevant patches
+>  > AFAIK.
+> 
+> Linaro's toolchain is itself heavily modified compared to FSF gcc-4.8.3,
+> so first please try a pure vanilla FSF gcc-4.8.3, and then a likewise
+> vanilla gcc-4.9.1.  If those also cause the malfunction, then you have
+> proof for a bug in upstream gcc (or possibly undefined code in the kernel),
+> otherwise the bug is likely Linaro's.
+
+Thanks. I will try to build gcc-4.8.3 from vanilla FSF sources and try to
+reproduce the problem there. Do you think there is a chance this is still a
+kernel bug?
+I have assembly output of both working and broken cases (inlined and
+non-inlined function). I can post them here or send to anyone who wants to
+try to make sense of it....
+
+>  > Compiling with -O2 breaks the code, while -Os seems to produce a correctly
+>  > working kernel.
+>  > 
+>  > I decided to make changes to the code and see if I could find other ways
+>  > to "fix" the problem, and I got the following result:
+>  > 
+>  > The above mentioned patch introduces the static function
+>  > fec_enet_hwtstamp() near line 1068 of fec_main.c. If I make an exact copy
+>  > of this function, where I only change the name (e.g. fec_enet_hwtstamp2),
+>  > and change one of the two places this function is called to instead use
+>  > the other name, GCC inlines both copies and the problem disappears!
+>  > 
+>  > Since I am not very good at GCC internals nor do I know this piece of
+>  > code in fec_main.c very well, I am asking here for help in hunting down
+>  > the real bug, which I suspect is in GCC... but I want to know for sure.
+>  > 
+>  > Best regards,
+>  > 
+>  > -- 
+>  > David Jander
+>  > Protonic Holland.
+
+Best regards,
+
+-- 
+David Jander
+Protonic Holland.
