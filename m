@@ -1,39 +1,24 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Wed, 10 Sep 2014 12:50:18 +0200
-Subject: [PATCH RESEND] ARM: multi_v7_defconfig: Enable clock and RTC driver
- for S2M and S5M
-Message-ID: <1410346218-31079-1-git-send-email-k.kozlowski@samsung.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 10 Sep 2014 11:56:53 +0100
+Subject: [PATCH] ASoC: simple-card: fix regression in clock rate lookup
+In-Reply-To: <42811667.3TM1iBfezH@wuerfel>
+References: <42811667.3TM1iBfezH@wuerfel>
+Message-ID: <20140910105653.GB7960@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The config enables already Samsung's PMIC-s MFD and regulator drivers for
-S2MPS11/S2MPS14 and S5M8767. Enable also drivers for the rest of these
-PMIC-s features: clock and RTC.
+On Mon, Sep 08, 2014 at 01:14:05PM +0200, Arnd Bergmann wrote:
+> Commit 7c7b9cf53d284f ("ASoC: simple-card: fixup cpu_dai_name
+> clear case") changed the way that "sound-dai" properties are handled,
+> which leads to the clock frequency not being picked up from the
+> node that the phandle points to, as correctly identified by gcc
+> with this warning:
 
-Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
----
- arch/arm/configs/multi_v7_defconfig | 2 ++
- 1 file changed, 2 insertions(+)
-
-diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-index 5fb95fb758d9..7e25978f84f0 100644
---- a/arch/arm/configs/multi_v7_defconfig
-+++ b/arch/arm/configs/multi_v7_defconfig
-@@ -352,6 +352,7 @@ CONFIG_RTC_DRV_VT8500=y
- CONFIG_RTC_DRV_SUNXI=y
- CONFIG_RTC_DRV_MV=y
- CONFIG_RTC_DRV_TEGRA=y
-+CONFIG_RTC_DRV_S5M=y
- CONFIG_DMADEVICES=y
- CONFIG_DW_DMAC=y
- CONFIG_MV_XOR=y
-@@ -373,6 +374,7 @@ CONFIG_SERIO_NVEC_PS2=y
- CONFIG_NVEC_POWER=y
- CONFIG_QCOM_GSBI=y
- CONFIG_COMMON_CLK_QCOM=y
-+CONFIG_COMMON_CLK_S2MPS11=y
- CONFIG_MSM_GCC_8660=y
- CONFIG_MSM_MMCC_8960=y
- CONFIG_MSM_MMCC_8974=y
--- 
-1.9.1
+Applied, thanks.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140910/5368762a/attachment-0001.sig>
