@@ -1,42 +1,32 @@
-From: guodong.xu@linaro.org (Guodong Xu)
-Date: Wed, 10 Sep 2014 17:23:44 +0800
-Subject: [PATCH] regulator: remove unnecessary of_node_get() to parent
-In-Reply-To: <CAFRkauDnp0pEEFkzvUoD8i4Up5DaMJDM26uGihah86FxsO7Rsw@mail.gmail.com>
-References: <1410321039-26888-1-git-send-email-guodong.xu@linaro.org>	<CAFRkauBBmEKNnc3M-CPAWQ8yMZFo6W-wj-M1qMmn3hGAYL6sTg@mail.gmail.com>
- <CAFRkauDnp0pEEFkzvUoD8i4Up5DaMJDM26uGihah86FxsO7Rsw@mail.gmail.com>
-Message-ID: <541018A0.6070403@linaro.org>
+From: pbonzini@redhat.com (Paolo Bonzini)
+Date: Wed, 10 Sep 2014 11:34:53 +0200
+Subject: [PATCH 0/2] KVM API documentation patches
+In-Reply-To: <1410280039-2823-1-git-send-email-alex.bennee@linaro.org>
+References: <1410280039-2823-1-git-send-email-alex.bennee@linaro.org>
+Message-ID: <54101B3D.20000@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 09/10/2014 12:23 PM, Axel Lin wrote:
-> 2014-09-10 12:20 GMT+08:00 Axel Lin <axel.lin@ingics.com>:
->> 2014-09-10 11:50 GMT+08:00 Guodong Xu <guodong.xu@linaro.org>:
->>> These of_node_get() were added to balance refcount decrements inside of
->>> of_find_node_by_name().
->>> See: commit c92f5dd2c42f ("regulator: Add missing of_node_put()")
->>>
->>> However of_find_node_by_name() was then replaced by of_get_child_by_name(),
->>> which doesn't call of_node_put() against its input parameter.
->>>
->>> So, need to remove these unnecessary of_node_get() calls.
->>
->> The of_node_get() and of_node_put() is a pair.
->> You need to either keep both or remove both.
->>
->>
->> BTW,
->> I think either the comment of of_get_child_by_name() needs fix or the
->> implementation
->> needs fix. The implementation does not increment refcount.
+Il 09/09/2014 18:27, Alex Benn?e ha scritto:
+> Hi,
 > 
-> Ah, I see the of_node_get() and of_node_put() in __of_get_next_child.
-> So of_get_child_by_name() is correct.(both comment and implementation)
+> I'm preparing to add ARM KVM GDB support and I went to read the API
+> documentation and found it surprisingly mute on the subject ;-)
+> 
+> The first patch documents the "new" KVM_SET_GUEST_DEBUG ioctl based on
+> reviewing the code. I've included a long CC list of people who've
+> actually done the various implementations who I hope can sanity check
+> the write-up. The second is a trivial formatting fix for what looks
+> like a minor merge trip-up.
+> 
+> Alex Benn?e (2):
+>   KVM: document KVM_SET_GUEST_DEBUG api
+>   KVM: fix api documentation of KVM_GET_EMULATED_CPUID
+> 
+>  Documentation/virtual/kvm/api.txt | 184 +++++++++++++++++++++++---------------
+>  1 file changed, 114 insertions(+), 70 deletions(-)
 > 
 
-That's right. You only need to call of_node_put() once on the node
-of_get_child_by_name() returns. That's why I submit this patch to remove
-of_node_get() _before_ calling to of_get_child_by_name().
+Thanks, applying both!
 
--Guodong
+Paolo
