@@ -1,53 +1,55 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 10 Sep 2014 18:38:29 +0100
-Subject: [PATCH] arm64: LLVMLinux: Fix inline arm64 assembly for use with
- clang
-In-Reply-To: <20140908093051.GA12657@localhost>
-References: <1409959460-15989-1-git-send-email-behanw@converseincode.com>
- <20140908093051.GA12657@localhost>
-Message-ID: <20140910173829.GI1710@arm.com>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Wed, 10 Sep 2014 10:42:35 -0700
+Subject: [PATCH] clk: rockchip: also protect hclk_peri as critical
+In-Reply-To: <1950006.Th78Z9O4lJ@diego>
+References: <1950006.Th78Z9O4lJ@diego>
+Message-ID: <20140910174235.19023.4888@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 08, 2014 at 10:30:51AM +0100, Olof Johansson wrote:
-> On Fri, Sep 05, 2014 at 04:24:20PM -0700, behanw at converseincode.com wrote:
-> > From: Mark Charlebois <charlebm@gmail.com>
-> > 
-> > Fix variable types for 64-bit inline assembly.
-> > 
-> > This patch now works with both gcc and clang.
-> > 
-> > Signed-off-by: Mark Charlebois <charlebm@gmail.com>
-> > Signed-off-by: Behan Webster <behanw@converseincode.com>
-> > ---
-> >  arch/arm64/include/asm/arch_timer.h | 26 +++++++++++++++-----------
-> >  arch/arm64/include/asm/uaccess.h    |  2 +-
-> >  arch/arm64/kernel/debug-monitors.c  |  8 ++++----
-> >  arch/arm64/kernel/perf_event.c      | 34 +++++++++++++++++-----------------
-> >  arch/arm64/mm/mmu.c                 |  2 +-
-> >  5 files changed, 38 insertions(+), 34 deletions(-)
-> > 
-> > diff --git a/arch/arm64/include/asm/arch_timer.h b/arch/arm64/include/asm/arch_timer.h
-> > index 9400596..c1f87e0 100644
-> > --- a/arch/arm64/include/asm/arch_timer.h
-> > +++ b/arch/arm64/include/asm/arch_timer.h
-> > @@ -37,19 +37,23 @@ void arch_timer_reg_write_cp15(int access, enum arch_timer_reg reg, u32 val)
-> >  	if (access == ARCH_TIMER_PHYS_ACCESS) {
-> >  		switch (reg) {
-> >  		case ARCH_TIMER_REG_CTRL:
-> > -			asm volatile("msr cntp_ctl_el0,  %0" : : "r" (val));
-> > +			asm volatile("msr cntp_ctl_el0,  %0"
-> > +				: : "r" ((u64)val));
+Quoting Heiko St?bner (2014-09-10 08:52:02)
+> The dwc2 usb controller also uses agressive clock gating, which in this
+> case leads to hclk_peri getting disabled and hanging the system.
+> Therefore move it to the critical clocks until we also control that
+> part of the system.
 > 
-> Ick. Care to elaborate in the patch description why this is needed with
-> LLVM? It's really messy and very annoying having to cast register values
-> every time they're passed in, instead of the compiler handling it for you.
+> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+
+Applied to clk-next.
+
+Regards,
+Mike
+
+> ---
+>  drivers/clk/rockchip/clk-rk3188.c | 1 +
+>  drivers/clk/rockchip/clk-rk3288.c | 1 +
+>  2 files changed, 2 insertions(+)
 > 
-> Is there a way to catch this with GCC? If not, I expect you to get broken
-> all the time on this by people who don't notice.
-
-Question to the clang people (Clangers?): what happens if the %0 above is
-rewritten as %x0 and the cast on val is dropped? I could stomach a change
-adding that, but it's still likely to regress without regular build testing.
-
-Will
+> diff --git a/drivers/clk/rockchip/clk-rk3188.c b/drivers/clk/rockchip/clk-rk3188.c
+> index 1892c66..9f9937e 100644
+> --- a/drivers/clk/rockchip/clk-rk3188.c
+> +++ b/drivers/clk/rockchip/clk-rk3188.c
+> @@ -602,6 +602,7 @@ static struct rockchip_clk_branch rk3188_clk_branches[] __initdata = {
+>  static const char *rk3188_critical_clocks[] __initconst = {
+>         "aclk_cpu",
+>         "aclk_peri",
+> +       "hclk_peri",
+>  };
+>  
+>  static void __init rk3188_common_clk_init(struct device_node *np)
+> diff --git a/drivers/clk/rockchip/clk-rk3288.c b/drivers/clk/rockchip/clk-rk3288.c
+> index 43e0ad0..c76b16d 100644
+> --- a/drivers/clk/rockchip/clk-rk3288.c
+> +++ b/drivers/clk/rockchip/clk-rk3288.c
+> @@ -683,6 +683,7 @@ static struct rockchip_clk_branch rk3288_clk_branches[] __initdata = {
+>  static const char *rk3288_critical_clocks[] __initconst = {
+>         "aclk_cpu",
+>         "aclk_peri",
+> +       "hclk_peri",
+>  };
+>  
+>  static void __init rk3288_clk_init(struct device_node *np)
+> -- 
+> 2.0.1
+> 
+> 
