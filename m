@@ -1,45 +1,42 @@
-From: david.vrabel@citrix.com (David Vrabel)
-Date: Wed, 10 Sep 2014 13:38:25 +0100
-Subject: [Xen-devel] [PATCH v1 08/21] x86/xen/MSI: Use MSI chip framework
- to configure MSI/MSI-X irq
-In-Reply-To: <540E6095.8030409@huawei.com>
-References: <1409911806-10519-1-git-send-email-wangyijing@huawei.com>	<1409911806-10519-9-git-send-email-wangyijing@huawei.com>	<5409C8C0.8020200@citrix.com>
- <540E6095.8030409@huawei.com>
-Message-ID: <54104641.7020007@citrix.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Wed, 10 Sep 2014 14:40:57 +0200
+Subject: [PATCH/RFC 4/5] ARM: shmobile: R-Mobile: Add DT support for PM
+ domains
+In-Reply-To: <7h1trkkc49.fsf@deeprootsystems.com>
+References: <1410183344-14756-1-git-send-email-geert+renesas@glider.be>
+ <1410183344-14756-5-git-send-email-geert+renesas@glider.be>
+ <7h1trkkc49.fsf@deeprootsystems.com>
+Message-ID: <CAMuHMdUcaGNQWmfS4U=XhksscuWh6hk8gA8fOpaUwxSmChDbiQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/09/14 03:06, Yijing Wang wrote:
-> On 2014/9/5 22:29, David Vrabel wrote:
->> On 05/09/14 11:09, Yijing Wang wrote:
->>> Use MSI chip framework instead of arch MSI functions to configure
->>> MSI/MSI-X irq. So we can manage MSI/MSI-X irq in a unified framework.
->> [...]
->>> --- a/arch/x86/pci/xen.c
->>> +++ b/arch/x86/pci/xen.c
->> [...]
->>> @@ -418,9 +430,9 @@ int __init pci_xen_init(void)
->>>  #endif
->>>  
->>>  #ifdef CONFIG_PCI_MSI
->>> -	x86_msi.setup_msi_irqs = xen_setup_msi_irqs;
->>> -	x86_msi.teardown_msi_irq = xen_teardown_msi_irq;
->>> -	x86_msi.teardown_msi_irqs = xen_teardown_msi_irqs;
->>> +	xen_msi_chip.setup_irqs = xen_setup_msi_irqs;
->>> +	xen_msi_chip.teardown_irqs = xen_teardown_msi_irqs;
->>> +	x86_msi_chip = &xen_msi_chip;
->>>  	msi_chip.irq_mask = xen_nop_msi_mask;
->>>  	msi_chip.irq_unmask = xen_nop_msi_mask;
->>
->> Why have these not been changed to set the x86_msi_chip.mask/unmask
->> fields instead?
-> 
-> Hi David, x86_msi_chip here is struct msi_chip data type, used to configure MSI/MSI-X
-> irq. msi_chip above is struct irq_chip data type, represent the MSI irq controller. They are
-> not the same object. Their name easily confusing people.
+Hi Kevin,
 
-Ok, it all makes sense now.
+On Tue, Sep 9, 2014 at 6:11 PM, Kevin Hilman <khilman@kernel.org> wrote:
+>> +static int r8a7740_pd_a4s_suspend(void)
+>> +{
+>> +     /*
+>> +      * The A4S domain contains the CPU core and therefore it should
+>> +      * only be turned off if the CPU is in use.
+>> +      */
+>> +     return -EBUSY;
+>> +}
+>
+>
+> Do you have plans to use pm_genpd_attach_cpuidle() for this eventually,
+> maybe by checking if the enclosing node is a CPU?  If not, are there
+> other plans to handle idle for the power domains that contain CPUs?
 
-Acked-by: David Vrabel <david.vrabel@citrix.com>
+Yes, the plan is to add more power saving features, and use DT topology
+analysis to get rid of the hardcoded domain logic.
 
-David
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
