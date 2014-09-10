@@ -1,131 +1,46 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Wed, 10 Sep 2014 21:17:50 +0200
-Subject: [PATCH 1/2] ARM: rockchip: add basic smp support for rk3288
-In-Reply-To: <1410343554-8383-2-git-send-email-kever.yang@rock-chips.com>
-References: <1410343554-8383-1-git-send-email-kever.yang@rock-chips.com>
- <1410343554-8383-2-git-send-email-kever.yang@rock-chips.com>
-Message-ID: <10859079.lGoHcm2S7H@diego>
+From: s-anna@ti.com (Suman Anna)
+Date: Wed, 10 Sep 2014 14:20:57 -0500
+Subject: [REPOST PATCHv3 0/2] OMAP Mailbox DT support for 3.18
+Message-ID: <1410376859-7297-1-git-send-email-s-anna@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kever,
+Hi Tony,
 
-Am Mittwoch, 10. September 2014, 18:05:53 schrieb Kever Yang:
-> basic rk3288 smp support
-> 
-> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
-> Signed-off-by: Kever Yang <kever.yang@rock-chips.com>
-> ---
-> 
->  arch/arm/mach-rockchip/core.h    |  1 +
->  arch/arm/mach-rockchip/platsmp.c | 60
-> +++++++++++++++++++++++++++++++++++++--- 2 files changed, 57 insertions(+),
-> 4 deletions(-)
-> 
-> diff --git a/arch/arm/mach-rockchip/core.h b/arch/arm/mach-rockchip/core.h
-> index 39bca96..b2ade69 100644
-> --- a/arch/arm/mach-rockchip/core.h
-> +++ b/arch/arm/mach-rockchip/core.h
-> @@ -18,3 +18,4 @@ extern char rockchip_secondary_trampoline_end;
-> 
->  extern unsigned long rockchip_boot_fn;
->  extern void rockchip_secondary_startup(void);
-> +extern void secondary_startup(void);
-> diff --git a/arch/arm/mach-rockchip/platsmp.c
-> b/arch/arm/mach-rockchip/platsmp.c index 189684f..fcd33fd 100644
-> --- a/arch/arm/mach-rockchip/platsmp.c
-> +++ b/arch/arm/mach-rockchip/platsmp.c
-> @@ -77,6 +77,12 @@ static int __cpuinit rockchip_boot_secondary(unsigned int
-> cpu, /* start the core */
->  	pmu_set_power_domain(0 + cpu, true);
-> 
-> +	/* wait for cpu 1~3 bootup and run into wfe state */
-> +	udelay(10);
-> +	writel(virt_to_phys(secondary_startup), sram_base_addr + 8);
-> +	writel(0xDEADBEAF, sram_base_addr + 4);
-> +	dsb_sev();
-> +
+This is a repost of just the DT support patches (first 2 patches out
+of 5) from the OMAP Mailbox framework adoption and DT support series [1],
+so that they can be picked up for 3.18. The only change is an Acked-by
+picked up on the second patch. I will repost the third patch separately,
+and the last 2 patches once a framework branch is published (no changes
+on those as well).
 
-Are you sure this also works on the Cortex-A9, which do share the 
-rockchip_boot_secondary function here?
+The patches are rebased onto 3.17-rc3. The previous dependencies - the
+OMAP mailbox DT/hwmod cleanup series [2] and the OMAP mailbox cleanup
+series [3] have already been merged in 3.17-rc1, so there are no more
+pending dependencies for these patches.
 
-This is also the area where the rk3066/rk3188 put their bringup trampoline, so 
-writing new values there might break the code fragment for them.
+The following shows the boot logs on various OMAP platforms with just these
+patches:
+  OMAP2 (SDP2430)           : http://pastebin.ubuntu.com/8311033
+  OMAP3 (BeagleXM)          : http://pastebin.ubuntu.com/8310760
+  OMAP4 (PandaBoard)        : http://pastebin.ubuntu.com/8310633 
+  OMAP5 (OMAP5 uEVM)        : http://pastebin.ubuntu.com/8310650
+  DRA7  (DRA7 EVM)          : http://pastebin.ubuntu.com/8310700
+  AM33xx (BeagleBone Black) : http://pastebin.ubuntu.com/8310732
+  AM43xx (AM437x GP EVM)    : http://pastebin.ubuntu.com/8310824
 
+[1] http://marc.info/?l=linux-omap&m=140668054422693&w=2
+[2] http://marc.info/?l=linux-omap&m=140511512208519&w=2
+[3] http://www.spinics.net/lists/linux-omap/msg108574.html
 
+Suman Anna (2):
+  Documentation: dt: add omap mailbox bindings
+  mailbox/omap: add support for parsing dt devices
 
->  	return 0;
->  }
-> 
-> @@ -125,7 +131,7 @@ static int __init rockchip_smp_prepare_sram(struct
-> device_node *node) return 0;
->  }
-> 
-> -static void __init rockchip_smp_prepare_cpus(unsigned int max_cpus)
-> +static void __init rk3066_smp_prepare_cpus(unsigned int max_cpus)
->  {
->  	struct device_node *node;
->  	unsigned int i;
-> @@ -194,12 +200,58 @@ static void rockchip_cpu_die(unsigned int cpu)
->  }
->  #endif
-> 
-> -static struct smp_operations rockchip_smp_ops __initdata = {
-> -	.smp_prepare_cpus	= rockchip_smp_prepare_cpus,
-> +static void __init rk3288_smp_prepare_cpus(unsigned int max_cpus)
-> +{
-> +	struct device_node *node;
-> +	unsigned int i;
-> +
-> +	node = of_find_compatible_node(NULL, NULL, "rockchip,rk3066-smp-sram");
-> +	if (!node) {
-> +		pr_err("%s: could not find sram dt node\n", __func__);
-> +		return;
-> +	}
-> +
-> +	sram_base_addr = of_iomap(node, 0);
-> +	if (!sram_base_addr) {
-> +		pr_err("%s: could not map pmu registers\n", __func__);
-> +		return;
-> +	}
-> +
-> +	node = of_find_compatible_node(NULL, NULL, "rockchip,rk3288-pmu");
-> +	if (!node) {
-> +		pr_err("%s: could not find pmu dt node\n", __func__);
-> +		return;
-> +	}
-> +
-> +	pmu_base_addr = of_iomap(node, 0);
-> +	if (!pmu_base_addr) {
-> +		pr_err("%s: could not map pmu registers\n", __func__);
-> +		return;
-> +	}
-> +
-> +	ncores = 4;
-> +
-> +	/* Make sure that all cores except the first are really off */
-> +	for (i = 1; i < ncores; i++)
-> +		pmu_set_power_domain(0 + i, false);
-> +}
-> +
-> +static struct smp_operations rockchip3066_smp_ops __initdata = {
-> +	.smp_prepare_cpus	= rk3066_smp_prepare_cpus,
-> +	.smp_boot_secondary	= rockchip_boot_secondary,
-> +#ifdef CONFIG_HOTPLUG_CPU
-> +	.cpu_kill		= rockchip_cpu_kill,
-> +	.cpu_die		= rockchip_cpu_die,
-> +#endif
-> +};
-> +CPU_METHOD_OF_DECLARE(rk3066_smp, "rockchip,rk3066-smp",
-> &rockchip3066_smp_ops); +
-> +static struct smp_operations rockchip3288_smp_ops __initdata = {
-> +	.smp_prepare_cpus	= rk3288_smp_prepare_cpus,
->  	.smp_boot_secondary	= rockchip_boot_secondary,
->  #ifdef CONFIG_HOTPLUG_CPU
->  	.cpu_kill		= rockchip_cpu_kill,
->  	.cpu_die		= rockchip_cpu_die,
->  #endif
->  };
-> -CPU_METHOD_OF_DECLARE(rk3066_smp, "rockchip,rk3066-smp",
-> &rockchip_smp_ops); +CPU_METHOD_OF_DECLARE(rk3288_smp,
-> "rockchip,rk3288-smp", &rockchip3288_smp_ops);
+ .../devicetree/bindings/mailbox/omap-mailbox.txt   | 108 ++++++++++++++
+ drivers/mailbox/omap-mailbox.c                     | 156 +++++++++++++++++----
+ 2 files changed, 240 insertions(+), 24 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/mailbox/omap-mailbox.txt
+
+-- 
+2.0.4
