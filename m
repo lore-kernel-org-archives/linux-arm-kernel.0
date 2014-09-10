@@ -1,57 +1,36 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Wed, 10 Sep 2014 09:13:27 +0200
-Subject: [GIT PULL 1/2] SOCFPGA updates for 3.18
-In-Reply-To: <20140909210232.GA539@amd>
-References: <1409847105-27241-1-git-send-email-dinguyen@opensource.altera.com>
- <20140909141756.GA30100@amd> <4134101.OOENTRabu1@wuerfel>
- <20140909210232.GA539@amd>
-Message-ID: <CAPDyKFr35646zQUDUnv9LYy9jtY7r343hev9FrhxOfjVMb6MJw@mail.gmail.com>
+From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
+Date: Wed, 10 Sep 2014 09:18:03 +0200
+Subject: [PATCH v9 0/6] Add Maxim 77802 clocks support
+In-Reply-To: <20140909205739.19023.50828@quantum>
+References: <1408350784-15577-1-git-send-email-javier.martinez@collabora.co.uk>
+ <CABxcv=mww1wcf+vo5uLxBrNZBVJhj9zvbwGu_oAKXm4XDUNvCQ@mail.gmail.com>
+ <20140909205739.19023.50828@quantum>
+Message-ID: <540FFB2B.6010203@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 9 September 2014 23:02, Pavel Machek <pavel@denx.de> wrote:
-> On Tue 2014-09-09 17:02:34, Arnd Bergmann wrote:
->> On Tuesday 09 September 2014 16:17:56 Pavel Machek wrote:
->> > > Jaehoon Chung (1):
->> > >       ARM: dts: socfpga: unuse the slot-node and deprecate the supports-highspeed for dw-mmc
->> > >
->> >
->> > This patch is a bad idea. It removes support for two mmc cards on a
->> > single controller -- configuration hardware supports and configuration
->> > that allows using u-SD card on mcvevk board.
->> >
->>
->> Your objection comes too late, and to the wrong patch, since the
->> driver and all other users have already been changed. We had a long
->> discussion about this when the issue first came up, and we could
->> not find any example of dw-mmc actually being used in a scenario
->> with one controller that has multiple devices attached.
->
-> Well, this is not first time I raised this. 3.17 is not yet out, so we
-> still have chance to fix regressions without major fuss.
->
->> Apparently every user out there instead uses multiple controller
->> instances instead. Are you sure that the socfpga implementation
->> is an exception from this?
->
-> Marek Vasut has the hardware. His board apprently has uSD and eMMC,
-> and I believe it has just one controller. I'll try to get details.
->
+Hello Mike,
 
-Just wanted to highlight some of the reasons to why the earlier
-discussion we have had, came to the conclusion to remove the slot
-node.
+On 09/09/2014 10:57 PM, Mike Turquette wrote:
+> Quoting Javier Martinez Canillas (2014-09-07 23:49:28)
+>> 
+>> Since we are in 3.17-rc4 already, I'm afraid that this series may miss
+>> 3.18 again, is there anything else you need from me to pick this
+>> series? It will obviously conflict with Tomeu's "Per-user clock
+>> constraints" series [0] so if you want I can rebase it on top of your
+>> clk-next-tomeu-kirkwood-v2 branch [1].
+> 
+> Thanks for pinging me about it. I've pulled this series into clk-next
+> for 3.18. Everything is going to conflict with Tomeu's series so we'll
+> just handle that when it comes to merge his series (which I've since
+> removed from clk-next due to pending issues).
+> 
 
-1) The mmc core don't support multiple cards attached to the same
-host, it never has. Also, I am not aware of any requests that
-suggested us to add it. Due to obvious reasons from performance
-perspective it's simply a really bad idea, that's likely also why
-there haven't been any requests for it.
+Great, thanks a lot!
 
-2) On the host level, the support for handle multiple slots in DT for
-dw-mmc has been broken. While dw-mmc parsed the DT nodes for slots, it
-screwed up configurations. Thus the support for slots have never
-worked as expected from DT point of view.
+> Regards,
+> Mike
+> 
 
-Kind regards
-Uffe
+Best regards,
+Javier
