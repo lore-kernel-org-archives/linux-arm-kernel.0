@@ -1,55 +1,52 @@
-From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
-Date: Wed, 10 Sep 2014 18:56:37 +0200
-Subject: [PATCH v8 00/18] 8250-core based serial driver for OMAP + DMA
-In-Reply-To: <20140910141554.GC22315@ci00147.xsens-tech.local>
-References: <1409943773-7874-1-git-send-email-bigeasy@linutronix.de>
- <20140908144616.GA22315@ci00147.xsens-tech.local>
- <20140908151501.GA22584@linutronix.de>
- <20140908183353.GB4686@ci00147.xsens-tech.local>
- <540F57E0.8030404@linutronix.de>
- <20140910141554.GC22315@ci00147.xsens-tech.local>
-Message-ID: <541082C5.7040608@linutronix.de>
+From: nm@ti.com (Nishanth Menon)
+Date: Wed, 10 Sep 2014 11:56:43 -0500
+Subject: [PATCH v3 0/3] OMAP4+: Get rid of internal SRAM handling
+In-Reply-To: <cover.1410362895.git.d-gerlach@ti.com>
+References: <cover.1410362895.git.d-gerlach@ti.com>
+Message-ID: <20140910165643.GA3118@splat>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/10/2014 04:15 PM, Frans Klaver wrote:
-> On Tue, Sep 09, 2014 at 09:41:20PM +0200, Sebastian Andrzej Siewior wrote:
->> On 09/08/2014 08:33 PM, Frans Klaver wrote:
->>> Thanks. I'll give it a spin on Wednesday.
->>
->> Could you please pull the upcoming v9 first?
->>
->>  git://git.breakpoint.cc/bigeasy/linux.git uart_v9_pre1
->>
->> This solves a few of my am335x related issues.
+On 11:04-20140910, Dave Gerlach wrote:
+> v3:
+> Fix minor issue in last patch to check for null sram_pool if no sram
+> phandle is given in DT.
 > 
-> Using v9_pre1, I get a kernel panic in edma_dma_pause() on echan->edesc
-> being NULL. I do get data before this happens. This is at high speed,
-> high rate. No mention of the irq having too much to do, though. The more
-> data I transmit, the more likely this is to occur.
-
-Hmm. This shouldn't happen because if dma->rx_running is set, then
-there should be a descriptor to pause.
-Could check how this could happen? (and which event tries to do so)
-
-In the meantime, the lower part of [0] should fix the NULL bug.
-
-[0] https://lkml.org/lkml/2014/7/29/506
-
-> I don't currently have the setup to lower the baudrate. I would probably
-> need to reproduce this on a beaglebone, instead of our custom board.
-> I'll see if I can do that.
+> Make all OMAP DT only platforms (am33xx, am43xx, omap4 and omap5)
+> use drivers/misc/sram.c driver instead of the omap internal
+> implementation for SRAM handling.
 > 
-> If you need more info, just let me know.
+> Previous discussion can be found at [1].
+> 
+> Regards,
+> Dave
+> 
+> [1] http://lists.infradead.org/pipermail/linux-arm-kernel/2013-August/195588.html
+> 
+> Rajendra Nayak (3):
+>   ARM: AM335x: Get rid of unused sram init function
+>   ARM: OMAP4+: Move SRAM data to DT
+>   ARM: OMAP4+: Remove static iotable mappings for SRAM
+> 
+>  Documentation/devicetree/bindings/arm/omap/mpu.txt |  3 ++
+>  arch/arm/boot/dts/am33xx.dtsi                      |  5 ++-
+>  arch/arm/boot/dts/am4372.dtsi                      |  5 +++
+>  arch/arm/boot/dts/omap4.dtsi                       |  6 ++++
+>  arch/arm/boot/dts/omap5.dtsi                       |  8 ++++-
+>  arch/arm/configs/omap2plus_defconfig               |  1 +
+>  arch/arm/mach-omap2/io.c                           | 17 ----------
+>  arch/arm/mach-omap2/omap4-common.c                 | 22 +++++++++++-
+>  arch/arm/mach-omap2/sram.c                         | 39 +---------------------
+>  arch/arm/mach-omap2/sram.h                         |  7 ----
+>  10 files changed, 46 insertions(+), 67 deletions(-)
+> 
 
-I just pushed uart_v9_pre2 and I will post it once I rebased it on top
-Greg's latest.
-There was a bug where THRE could be active longer than needed caused a
-few not needed interrupts until the FIFO was empty again.
+Could you please provide logs for the following:
+a) Low power transition tests for OMAP3,4 on all available platforms as
+well?
+b) provide bootlogs on all omap2plus platforms to ensure we have no
+regressions.
 
-My "less on file" test case did not fail anymore with this.
-
-> Thanks,
-> Frans
-
-Sebastian
+-- 
+Regards,
+Nishanth Menon
