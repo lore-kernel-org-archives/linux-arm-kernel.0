@@ -1,36 +1,111 @@
-From: khilman@kernel.org (Kevin Hilman)
-Date: Wed, 10 Sep 2014 11:46:14 -0700
-Subject: exynos5420/arndale-octa: imprecise external aborts on
- exynos_defconfig
-In-Reply-To: <CANMBJr41TQx4jVjnOO9WThn=SiZCq12mx1xtGN8_ubzZrO1=YA@mail.gmail.com>
- (Tyler Baker's message of "Wed, 10 Sep 2014 11:20:19 -0700")
-References: <CANMBJr41TQx4jVjnOO9WThn=SiZCq12mx1xtGN8_ubzZrO1=YA@mail.gmail.com>
-Message-ID: <7h7g1bwbyh.fsf@deeprootsystems.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 10 Sep 2014 19:46:52 +0100
+Subject: [PATCH] clocksource: arch_timer: Fix code to use physical timers
+ when requested
+In-Reply-To: <CAD=FV=WJpP1aAo-r9bnUQg5xarGQYo8pROvyh0a5dt+m1OOn4g@mail.gmail.com>
+References: <CAOesGMhTivDzJFuxONggcJ6N5UvZopKa=+tv9PoPX593cpnm0A@mail.gmail.com>
+ <53FE7E3B.1010500@codeaurora.org>
+ <CAOesGMgXnsqttHwAxEW4a7-Rx-nmSwpJd_Dt1iCcFOvzDwbzdA@mail.gmail.com>
+ <CAD=FV=VjN6Xam-nRRcxvOoN-gokU6DbGVjoPXN_fkTJssH1RWA@mail.gmail.com>
+ <20140828093505.GC14650@leverpostej>
+ <CAD=FV=UwfP0x-bswbtV_eUvpKeOSNnsVVLTE3VHguyhm_jiSug@mail.gmail.com>
+ <20140908135436.GC22717@arm.com>
+ <CAD=FV=Up=+zNneY-behnkFbhupi50_f5R=ECgJQeqGV5kz5d2g@mail.gmail.com>
+ <20140910173401.GG1710@arm.com>
+ <CAD=FV=WJpP1aAo-r9bnUQg5xarGQYo8pROvyh0a5dt+m1OOn4g@mail.gmail.com>
+Message-ID: <20140910184652.GP1710@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tyler Baker <tyler.baker@linaro.org> writes:
+On Wed, Sep 10, 2014 at 07:09:59PM +0100, Doug Anderson wrote:
+> On Wed, Sep 10, 2014 at 10:34 AM, Will Deacon <will.deacon@arm.com> wrote:
+> > Setting aside the security model, booting in secure mode can also have a
+> > significant impact on the programming model of system IP, not just the CPU.
+> > For example, the SMMU register file suddenly looks different and the way in
+> > which it is programmed also changes. The GIC (v3+) is similar. Linux doesn't
+> > have drivers that know about this so, whilst not impossible, there's a
+> > non-trivial amount of work (and then maintenance overhead) if you want to
+> > support booting Linux on the secure side.
+> 
+> Hrm.  I could have sworn someone told me that exynos5250-snow is
+> booted in Secure SVC mode and has been that way forever.  I could
+> certainly be wrong.  Stupid question, but should any of your
+> statements apply to an A15 or an A12?  Maybe things change with newer
+> CPUs?
 
-> Exynos5420-based Arndale octa boards have recently started failing boot
-> tests due to imprecise external aborts.  This only appears to happen
-> when using exynos_defconfig and boots fine with multi_v7_defconfig.  The
-> issue seems to be intermittent, so is not reliably reproducable and
-> difficult to bisect.  Here are a few boot logs from recent
-> mainline/linux-next kernels that are failing:
+Snow does boot secure, which is why you don't get KVM without hacking the
+bootloader. However, snow also doesn't use:
 
-FYI, I'm seeing the same periodic aborts.  For example, here's my boot
-of next-20140910:
-http://images.armcloud.us/kernel-ci/next/next-20140910/arm-exynos_defconfig/boot-exynos5420-arndale-octa.html
+  - An ARMv8 CPU
+  - GICv3
+  - ARM SMMU
+  - Virtualisation (in the supported software image)
+  - Secure services (by the architectural definition)
 
-However, my userspace is much simpler and doesn't seem to cause a panic,
-so my boot tests report passing. (I should fixup my scripts so these
-imprecise aborts are reported as a FAIL.)
+> On the rk3288 I have in front of me I tried running the following at
+> (semi early) boot to help confirm we were in Secure SVC.  Standard "I
+> don't know what I'm doing" caveats apply:
+> 
+>        asm volatile("mrc p15, 0, %0, c1, c1, 0" : "=r" (val));
+>        pr_info("DOUG: val is %#010x", val);
+>        val |= (1 << 2);
+>        asm volatile("mcr p15, 0, %0, c1, c1, 0" : : "r" (val));
+>        val = 0xffffffff;
+>        asm volatile("mrc p15, 0, %0, c1, c1, 0" : "=r" (val));
+>        pr_info("DOUG: val is %#010x", val);
+> 
+> When I did that I found that I was able to read back 0x00000004.  OK,
+> and I just replicated that same behavior on exynos5250-snow.
+> 
+> Since I think the SCR register is only accessible from "Secure PL1
+> modes" and I showed that I could change it, to me that meant that I
+> must be in "Secure PL1".  Please yell if I'm just being an idiot and I
+> can look for some other way to test for secure mode.
 
-I'm glad you pointed out that it happens only with exynos_defconfig and
-not multi_v7_defconfig because I noticed that too.  I haven't had the
-time to track it any further than that, so maybe the exynos folks can
-help track it down from here.
+Again, this isn't the kind of platform I was referring to. Until recently,
+(32-bit) Linux has booted in secure svc just fine and there's no reason to
+break platforms relying on that.
 
-Thanks for reporting this,
+> Also: I wasn't actually suggesting running Linux in secure mode, I was
+> only suggesting _booting_ Linux in secure mode.  The idea was that
+> Linux would realize this and immediately switch to nonsecure HYP mode.
+> Linux doesn't normally run at HYP mode, so it would eventually drop
+> down into nonsecure SVC mode, too.
 
-Kevin
+For ARMv7, fill your boots. For ARMv8, this doesn't work unless you enter at
+EL3, in which case the kernel is going to need to grow an awful lot of
+knowledge to initialise arbitrary systems.
+
+> The other (important) justification was to keep bootloaders simple.
+> All of the "I've never even thought about secure mode" bootloaders
+> that I've seen just happen to boot the kernel in Secure SVC.  That
+> makes me think that must be the easiest thing for them to do.  We
+> should support them.
+
+Just to reiterate, you're talking ARMv7 and I'm talking ARMv8. For ARMv7,
+there is a separate argument about whether we should make bootloaders
+simple and the OS more complex, which has been had on the mailing list
+before (I don't think there was a good conclusion though -- Nico and Catalin
+were discussing about MCPM and PSCI, which is very much related to this
+topic).
+
+> > The secure world may be more permissive in some regards, but it's actually
+> > a burden in others. It's not a simple superset of non-secure, and this is
+> > more evident than ever in ARMv8.
+> >
+> > As I understand it, this conversation started because we're booting at
+> > non-secure EL1 with a badly configured EL2. That sounds like something
+> > we may have to fix/work around in Linux (Olof points out that it used to
+> > work), but we shouldn't conflate that with booting on the secure side to
+> > get away from broken firmware.
+> 
+> See above and also my summary to Mark Rutland.  I don't think your
+> statement above is quite where we're at, but hopefully we're on the
+> same page now.  :)
+
+If `where we're at' is trying to boot an ARMv7 product, then you can boot in
+secure svc and lose virtualisation support. Looking forward to ARMv8, this
+isn't going to work, so I'd encourage you to start thinking about getting
+a working bootloader as a requirement.
+
+Will
