@@ -1,120 +1,117 @@
-From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
-Date: Wed, 10 Sep 2014 09:36:01 +0200
-Subject: [PATCH v10 2/9] clk: Move all drivers to use internal API
-In-Reply-To: <20140909191205.19023.61366@quantum>
-References: <1410271329-26637-1-git-send-email-tomeu.vizoso@collabora.com>
- <1410271497-27148-1-git-send-email-tomeu.vizoso@collabora.com>
- <20140909191205.19023.61366@quantum>
-Message-ID: <540FFF61.1010107@collabora.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Wed, 10 Sep 2014 15:36:32 +0800
+Subject: [PATCH V2 3/3] ARM: imx: source gpt per clk from OSC for system
+ timer
+In-Reply-To: <1409887606-22388-4-git-send-email-b20788@freescale.com>
+References: <1409887606-22388-1-git-send-email-b20788@freescale.com>
+ <1409887606-22388-4-git-send-email-b20788@freescale.com>
+Message-ID: <20140910073631.GD22579@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/09/2014 09:12 PM, Mike Turquette wrote:
-> Quoting Tomeu Vizoso (2014-09-09 07:04:57)
->> In preparation to change the public API to return a per-user clk structure,
->> remove any usage of this public API from the clock implementations.
->>
->> The reason for having this in a separate commit from the one that introduces
->> the implementation of the new functions is to separate the changes generated
->> with Coccinelle from the rest, and keep the patches' size reasonable.
->>
->> Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
->> Tested-by: Boris Brezillon <boris.brezillon@free-electrons.com>
->> Tested-by: Heiko Stuebner <heiko@sntech.de>
->> Acked-by: Boris Brezillon <boris.brezillon@free-electrons.com>
->>
->> ---
->>
->> v10: * Add a few more files to be converted
->>      * Re-generate the patch on top of the latest changes
-> 
-> Hi Tomeu,
-> 
-> Generating this on top of linux-next is a no-go. I can't apply it to my
-> tree. The best thing is to generate it on top of -rc4, and that is what
-> I will merge.
+On Fri, Sep 05, 2014 at 11:26:46AM +0800, Anson Huang wrote:
+> diff --git a/arch/arm/mach-imx/time.c b/arch/arm/mach-imx/time.c
+> index bf92e5a..a3ecb4a 100644
+> --- a/arch/arm/mach-imx/time.c
+> +++ b/arch/arm/mach-imx/time.c
+> @@ -60,17 +60,23 @@
+>  #define MX2_TSTAT_CAPT		(1 << 1)
+>  #define MX2_TSTAT_COMP		(1 << 0)
+>  
+> -/* MX31, MX35, MX25, MX5 */
+> +/* MX31, MX35, MX25, MX5, MX6 */
+>  #define V2_TCTL_WAITEN		(1 << 3) /* Wait enable mode */
+>  #define V2_TCTL_CLK_IPG		(1 << 6)
+>  #define V2_TCTL_CLK_PER		(2 << 6)
+> +#define V2_TCTL_CLK_OSC_DIV8	(5 << 6)
+> +#define V2_TCTL_CLK_OSC		(7 << 6)
 
-Makes sense now, will do that.
+This one is unused?
 
-> Running the script against linux-next is still very useful and lets us
-> patch up the stuff that is not going through the clk tree. E.g. the LPSS
-> driver is already in mainline, so just running the semantic patch
-> against -rc4 is sufficient for it. However a patch like Shawn's "ARM:
-> imx: add an exclusive gate clock type" came in through the i.MX tree and
-> we'll need to patch it after the fact.
-> 
-> The best way to do that is for me to host a branch with just your
-> changes in it that everyone can pull in as a dependency with the same
-> commit ids.
+>  #define V2_TCTL_FRR		(1 << 9)
+> +#define V2_TCTL_24MEN		(1 << 10)
+> +#define V2_TPRER_PRE24M		12
+>  #define V2_IR			0x0c
+>  #define V2_TSTAT		0x08
+>  #define V2_TSTAT_OF1		(1 << 0)
+>  #define V2_TCN			0x24
+>  #define V2_TCMP			0x10
+>  
+> +#define	V2_TIMER_RATE_OSC_DIV8	3000000
 
-Sounds good to me.
+A space instead of tab should be used right after '#define'.
 
-> <snip>
-> 
->> diff --git a/drivers/acpi/acpi_lpss.c b/drivers/acpi/acpi_lpss.c
->> index bcbdbd2..f4c6ccf 100644
->> --- a/drivers/acpi/acpi_lpss.c
->> +++ b/drivers/acpi/acpi_lpss.c
->> @@ -11,7 +11,6 @@
->>   */
->>  
->>  #include <linux/acpi.h>
->> -#include <linux/clk.h>
->>  #include <linux/clkdev.h>
->>  #include <linux/clk-provider.h>
->>  #include <linux/err.h>
->> @@ -78,7 +77,7 @@ struct lpss_private_data {
->>         void __iomem *mmio_base;
->>         resource_size_t mmio_size;
->>         unsigned int fixed_clk_rate;
->> -       struct clk *clk;
->> +       struct clk_core *clk;
->>         const struct lpss_device_desc *dev_desc;
->>         u32 prv_reg_ctx[LPSS_PRV_REG_COUNT];
->>  };
->> @@ -229,7 +228,7 @@ static int register_device_clock(struct acpi_device *adev,
->>  {
->>         const struct lpss_device_desc *dev_desc = pdata->dev_desc;
->>         const char *devname = dev_name(&adev->dev);
->> -       struct clk *clk = ERR_PTR(-ENODEV);
->> +       struct clk_core *clk = ERR_PTR(-ENODEV);
->>         struct lpss_clk_data *clk_data;
->>         const char *parent, *clk_name;
->>         void __iomem *prv_base;
-> 
-> I think the following hunk is missing from your change:
-> 
-> --- a/drivers/acpi/acpi_lpss.c
-> +++ b/drivers/acpi/acpi_lpss.c
-> @@ -57,7 +57,7 @@ ACPI_MODULE_NAME("acpi_lpss");
->  struct lpss_shared_clock {
->         const char *name;
->         unsigned long rate;
-> -       struct clk *clk;
-> +       struct clk_core *clk;
->  };
-> 
-> 
-> Otherwise register_device_clock will blow up because we are assigning a
-> struct clk * to a struct clk_core *.
+> +
+>  #define timer_is_v1()	(cpu_is_mx1() || cpu_is_mx21() || cpu_is_mx27())
+>  #define timer_is_v2()	(!timer_is_v1())
+>  
+> @@ -293,7 +299,7 @@ static int __init mxc_clockevent_init(struct clk *timer_clk)
+>  static void __init _mxc_timer_init(int irq,
+>  				   struct clk *clk_per, struct clk *clk_ipg)
+>  {
+> -	uint32_t tctl_val;
+> +	uint32_t tctl_val, tprer_val;
 
-Yeah, that one isn't there because the code has been removed in
-linux-next by this patch:
+The variable tprer_val does not seem really needed.
 
-http://permalink.gmane.org/gmane.linux.acpi.devel/70205
+Shawn
 
-> Do you mind testing with ARCH=x86_64 and allmodconfig? That will help
-> catch issues like this.
-
-Will do. I have been having trouble building in a finite amount of time
-as many configs as I would have liked, and for some reason I'm not
-getting 0day notifications. So sorry about that and I hope no more such
-issues will slip through.
-
-Regards,
-
-Tomeu
-
-> Regards,
-> Mike
+>  
+>  	if (IS_ERR(clk_per)) {
+>  		pr_err("i.MX timer: unable to get clk\n");
+> @@ -312,10 +318,26 @@ static void __init _mxc_timer_init(int irq,
+>  	__raw_writel(0, timer_base + MXC_TCTL);
+>  	__raw_writel(0, timer_base + MXC_TPRER); /* see datasheet note */
+>  
+> -	if (timer_is_v2())
+> -		tctl_val = V2_TCTL_CLK_PER | V2_TCTL_FRR | V2_TCTL_WAITEN | MXC_TCTL_TEN;
+> -	else
+> +	if (timer_is_v2()) {
+> +		if (((cpu_is_imx6q() && imx_get_soc_revision() >
+> +			IMX_CHIP_REVISION_1_0) || cpu_is_imx6dl() ||
+> +			cpu_is_imx6sx()) && (clk_get_rate(clk_per) ==
+> +			V2_TIMER_RATE_OSC_DIV8)) {
+> +			tctl_val = V2_TCTL_CLK_OSC_DIV8 | V2_TCTL_FRR |
+> +				V2_TCTL_WAITEN | MXC_TCTL_TEN;
+> +			if (cpu_is_imx6dl() || cpu_is_imx6sx()) {
+> +				/* 24 / 8 = 3 MHz */
+> +				tprer_val = 7 << V2_TPRER_PRE24M;
+> +				__raw_writel(tprer_val, timer_base + MXC_TPRER);
+> +				tctl_val |= V2_TCTL_24MEN;
+> +			}
+> +		} else {
+> +			tctl_val = V2_TCTL_CLK_PER | V2_TCTL_FRR |
+> +				V2_TCTL_WAITEN | MXC_TCTL_TEN;
+> +		}
+> +	} else {
+>  		tctl_val = MX1_2_TCTL_FRR | MX1_2_TCTL_CLK_PCLK1 | MXC_TCTL_TEN;
+> +	}
+>  
+>  	__raw_writel(tctl_val, timer_base + MXC_TCTL);
+>  
+> @@ -339,7 +361,7 @@ void __init mxc_timer_init(void __iomem *base, int irq)
+>  
+>  static void __init mxc_timer_init_dt(struct device_node *np)
+>  {
+> -	struct clk *clk_per, *clk_ipg;
+> +	struct clk *clk_per, *clk_ipg, *clk_osc_per;
+>  	int irq;
+>  
+>  	if (timer_base)
+> @@ -352,6 +374,13 @@ static void __init mxc_timer_init_dt(struct device_node *np)
+>  	clk_per = of_clk_get_by_name(np, "per");
+>  	clk_ipg = of_clk_get_by_name(np, "ipg");
+>  
+> +	if ((cpu_is_imx6q() && imx_get_soc_revision() >
+> +		IMX_CHIP_REVISION_1_0) || cpu_is_imx6dl()) {
+> +		clk_osc_per = of_clk_get_by_name(np, "osc_per");
+> +		if (!IS_ERR(clk_osc_per))
+> +			clk_per = clk_osc_per;
+> +	}
+> +
+>  	_mxc_timer_init(irq, clk_per, clk_ipg);
+>  }
+>  CLOCKSOURCE_OF_DECLARE(mx1_timer, "fsl,imx1-gpt", mxc_timer_init_dt);
+> -- 
+> 1.7.9.5
 > 
