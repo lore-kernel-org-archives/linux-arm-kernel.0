@@ -1,28 +1,37 @@
-From: david.vrabel@citrix.com (David Vrabel)
-Date: Wed, 10 Sep 2014 13:36:14 +0100
-Subject: [Xen-devel] [PATCH v1 04/21] x86/xen/MSI: Eliminate
- arch_msix_mask_irq() and arch_msi_mask_irq()
-In-Reply-To: <1409911806-10519-5-git-send-email-wangyijing@huawei.com>
-References: <1409911806-10519-1-git-send-email-wangyijing@huawei.com>
- <1409911806-10519-5-git-send-email-wangyijing@huawei.com>
-Message-ID: <541045BE.9050804@citrix.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Wed, 10 Sep 2014 14:37:46 +0200
+Subject: [PATCH/RFC 4/5] ARM: shmobile: R-Mobile: Add DT support for PM
+ domains
+In-Reply-To: <7hfvg0kdk2.fsf@deeprootsystems.com>
+References: <1410183344-14756-1-git-send-email-geert+renesas@glider.be>
+ <1410183344-14756-5-git-send-email-geert+renesas@glider.be>
+ <7hfvg0kdk2.fsf@deeprootsystems.com>
+Message-ID: <CAMuHMdVz4QiRBHN43TE1-+R_zDouNMpTbak1rfmOmT4Vv0Lvxg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/09/14 11:09, Yijing Wang wrote:
-> Commit 0e4ccb150 added two __weak arch functions arch_msix_mask_irq()
-> and arch_msi_mask_irq() to fix a bug found when running xen in x86.
-> Introduced these two funcntions make MSI code complex. And mask/unmask
-> is the irq actions related to interrupt controller, should not use
-> weak arch functions to override mask/unmask interfaces. This patch
-> reverted commit 0e4ccb150 and export struct irq_chip msi_chip, modify
-> msi_chip->irq_mask/irq_unmask() in xen init functions to fix this
-> bug for simplicity. Also this is preparation for using struct
-> msi_chip instead of weak arch MSI functions in all platforms.
+Hi Kevin,
 
-Acked-by: David Vrabel <david.vrabel@citrix.com>
+On Tue, Sep 9, 2014 at 5:40 PM, Kevin Hilman <khilman@kernel.org> wrote:
+>> +static int r8a7740_pd_a4s_suspend(void)
+>> +{
+>> +     /*
+>> +      * The A4S domain contains the CPU core and therefore it should
+>> +      * only be turned off if the CPU is in use.
+>
+> I think you meant "if the CPU is *not* in use."  ?  :)
 
-But I wonder if it would be better the Xen subsystem to provide its own
-struct irq_chip instead of adjusting the fields in the generic x86 one.
+Ah, this was copied from pm-r8a7740.c, which was copied from pm-sh7372.c.
+The thinko has been fixed in the latter, when more advanced suspend support
+was added.
 
-David
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
