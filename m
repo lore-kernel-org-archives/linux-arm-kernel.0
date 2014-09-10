@@ -1,32 +1,21 @@
-From: pbonzini@redhat.com (Paolo Bonzini)
-Date: Wed, 10 Sep 2014 11:34:53 +0200
-Subject: [PATCH 0/2] KVM API documentation patches
-In-Reply-To: <1410280039-2823-1-git-send-email-alex.bennee@linaro.org>
-References: <1410280039-2823-1-git-send-email-alex.bennee@linaro.org>
-Message-ID: <54101B3D.20000@redhat.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 10 Sep 2014 10:41:35 +0100
+Subject: [PATCH 2/2] ASoC: mmp-pcm: add NO_PERIOD_WAKEUP for PCM INFO
+In-Reply-To: <1410338449-13961-2-git-send-email-zhouqiao@marvell.com>
+References: <1410338449-13961-1-git-send-email-zhouqiao@marvell.com>
+ <1410338449-13961-2-git-send-email-zhouqiao@marvell.com>
+Message-ID: <20140910094135.GN2601@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Il 09/09/2014 18:27, Alex Benn?e ha scritto:
-> Hi,
-> 
-> I'm preparing to add ARM KVM GDB support and I went to read the API
-> documentation and found it surprisingly mute on the subject ;-)
-> 
-> The first patch documents the "new" KVM_SET_GUEST_DEBUG ioctl based on
-> reviewing the code. I've included a long CC list of people who've
-> actually done the various implementations who I hope can sanity check
-> the write-up. The second is a trivial formatting fix for what looks
-> like a minor merge trip-up.
-> 
-> Alex Benn?e (2):
->   KVM: document KVM_SET_GUEST_DEBUG api
->   KVM: fix api documentation of KVM_GET_EMULATED_CPUID
-> 
->  Documentation/virtual/kvm/api.txt | 184 +++++++++++++++++++++++---------------
->  1 file changed, 114 insertions(+), 70 deletions(-)
-> 
+On Wed, Sep 10, 2014 at 04:40:49PM +0800, Qiao Zhou wrote:
+> add NO_PERIOD_WAKEUP to PCM INFO, which supports audio no IRQ mode
 
-Thanks, applying both!
-
-Paolo
+Acked-by: Mark Brown <broonie@linaro.org>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140910/8d65124f/attachment.sig>
